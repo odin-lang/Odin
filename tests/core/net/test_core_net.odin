@@ -66,24 +66,26 @@ main :: proc() {
 address_parsing_test :: proc(t: ^testing.T) {
 	for vector in IP_Address_Parsing_Test_Vectors {
 		kind := ""
-		if      vector.family == .IP6 { kind = "IPv6 address" }
-		else if vector.family == .IP4 {
-			if vector.non_decimal_ipv4 {
-				kind = "non-decimal IPv4 address"
-			} else {
-				kind = "decimal IPv4 address"
-			}
+		switch vector.family {
+		case .IP4:     kind = "[IPv4]"
+		case .IP4_Alt: kind = "[IPv4 Non-Decimal]"
+		case .IP6:     kind = "[IPv6]"
+		case: panic("Add support to the test for this type.")
 		}
 
-		fmt.printf("Parsing %v as %v\n", vector.textual, kind)
+		valid := len(vector.binstr) > 0
+
+		fmt.printf("%v %v\n", kind, vector.input)
 
 		msg := "-set a proper message-"
 		switch vector.family {
-		case .IP4:
+		case .IP4, .IP4_Alt:
 			/*
 				Does `net.parse_ip4_address` think we parsed the address properly?
 			*/
-			any_addr  := net.parse_address(vector.textual, vector.non_decimal_ipv4)
+			non_decimal := vector.family == .IP4_Alt
+
+			any_addr  := net.parse_address(vector.input, non_decimal)
 			parsed_ok := any_addr != nil
 			parsed:   net.IP4_Address
 
@@ -95,31 +97,31 @@ address_parsing_test :: proc(t: ^testing.T) {
 				parsed = addr
 			case net.IP6_Address:
 				parsed_ok = false
-				msg = fmt.tprintf("parse_address mistook %v as IPv6 address %v", vector.textual, addr)
+				msg = fmt.tprintf("parse_address mistook %v as IPv6 address %04x", vector.input, addr)
 				expect(t, false, msg)
 			}
 
-			if !parsed_ok && vector.should_parse {
-				msg = fmt.tprintf("parse_ip4_address failed to parse %v, expected %v", vector.textual, binstr_to_address(vector.binstr))
+			if !parsed_ok && valid {
+				msg = fmt.tprintf("parse_ip4_address failed to parse %v, expected %v", vector.input, binstr_to_address(vector.binstr))
 
-			} else if parsed_ok && !vector.should_parse {
-				msg = fmt.tprintf("parse_ip4_address parsed %v into %v, expected failure", vector.textual, parsed)
+			} else if parsed_ok && !valid {
+				msg = fmt.tprintf("parse_ip4_address parsed %v into %v, expected failure", vector.input, parsed)
 			}
-			expect(t, parsed_ok == vector.should_parse, msg)
+			expect(t, parsed_ok == valid, msg)
 
-			if vector.should_parse && parsed_ok {
+			if valid && parsed_ok {
 				actual_binary := address_to_binstr(parsed)
-				msg = fmt.tprintf("parse_ip4_address parsed %v into %v, expected %v", vector.textual, actual_binary, vector.binstr)
+				msg = fmt.tprintf("parse_ip4_address parsed %v into %v, expected %v", vector.input, actual_binary, vector.binstr)
 				expect(t, actual_binary == vector.binstr, msg)
 
 				/*
 					Do we turn an address back into the same string properly?
 					No point in testing the roundtrip if the first part failed.
 				*/
-				if vector.should_roundtrip && actual_binary == vector.binstr {
+				if len(vector.output) > 0 && actual_binary == vector.binstr {
 					stringified := net.address_to_string(parsed)
-					msg = fmt.tprintf("address_to_string turned %v into %v, expected %v", parsed, stringified, vector.textual)
-					expect(t, stringified == vector.textual, msg)
+					msg = fmt.tprintf("address_to_string turned %v into %v, expected %v", parsed, stringified, vector.output)
+					expect(t, stringified == vector.output, msg)
 				}
 			}
 
@@ -127,29 +129,29 @@ address_parsing_test :: proc(t: ^testing.T) {
 			/*
 				Do we parse the address properly?
 			*/
-			parsed, parsed_ok := net.parse_ip6_address(vector.textual)
+			parsed, parsed_ok := net.parse_ip6_address(vector.input)
 
-			if !parsed_ok && vector.should_parse {
-				msg = fmt.tprintf("parse_ip6_address failed to parse %v, expected %v", vector.textual, binstr_to_address(vector.binstr))
+			if !parsed_ok && valid {
+				msg = fmt.tprintf("parse_ip6_address failed to parse %v, expected %04x", vector.input, binstr_to_address(vector.binstr))
 
-			} else if parsed_ok && !vector.should_parse {
-				msg = fmt.tprintf("parse_ip6_address parsed %v into %v, expected failure", vector.textual, parsed)
+			} else if parsed_ok && !valid {
+				msg = fmt.tprintf("parse_ip6_address parsed %v into %04x, expected failure", vector.input, parsed)
 			}
-			expect(t, parsed_ok == vector.should_parse, msg)
+			expect(t, parsed_ok == valid, msg)
 
-			if vector.should_parse && parsed_ok {
+			if valid && parsed_ok {
 				actual_binary := address_to_binstr(parsed)
-				msg = fmt.tprintf("parse_ip6_address parsed %v into %v, expected %v", vector.textual, actual_binary, vector.binstr)
+				msg = fmt.tprintf("parse_ip6_address parsed %v into %v, expected %v", vector.input, actual_binary, vector.binstr)
 				expect(t, actual_binary == vector.binstr, msg)
 
 				/*
 					Do we turn an address back into the same string properly?
 					No point in testing the roundtrip if the first part failed.
 				*/
-				if vector.should_roundtrip && actual_binary == vector.binstr {
+				if len(vector.output) > 0 && actual_binary == vector.binstr {
 					stringified := net.address_to_string(parsed)
-					msg = fmt.tprintf("address_to_string turned %v into %v, expected %v", parsed, stringified, vector.textual)
-					expect(t, stringified == vector.textual, msg)
+					msg = fmt.tprintf("address_to_string turned %v into %v, expected %v", parsed, stringified, vector.output)
+					expect(t, stringified == vector.output, msg)
 				}
 			}
 		}
@@ -193,105 +195,125 @@ binstr_to_address :: proc(binstr: string) -> (address: net.Address) {
 	panic("Invalid test case")
 }
 
+Kind :: enum {
+	IP4,     // Decimal IPv4
+	IP4_Alt, // Non-decimal address
+	IP6,     // Hex IPv6 or mixed IPv4/IPv6.
+}
+
 IP_Address_Parsing_Test_Vector :: struct {
-	family:           net.Address_Family,
-	textual:          string,
+	// Give it to the IPv4 or IPv6 parser?
+	family:           Kind,
+
+	// Input address to try and parse.
+	input:            string,
+
+	/*
+		Hexadecimal representation of the expected numeric value of the address.
+		Zero length means input is invalid and the parser should report failure.
+	*/
 	binstr:           string,
-	should_parse:     bool,   // We expect this to be parsed.
-	should_roundtrip: bool,   // We expect this to roundtrip faithfully.
-	non_decimal_ipv4: bool,   // IPv4 inet_aton type address
+
+	// Expected `address_to_string` output, if a valid input and this string is non-empty.
+	output:           string,
 }
 
 IP_Address_Parsing_Test_Vectors :: []IP_Address_Parsing_Test_Vector{
 	// dotted-decimal notation
-	{ .IP4, "0.0.0.0",                 "00000000", true,  true,  false },
-	{ .IP4, "127.0.0.1",               "7f000001", true,  true,  false },
-	{ .IP4, "10.0.128.31",             "0a00801f", true,  true,  false },
-	{ .IP4, "255.255.255.255",         "ffffffff", true,  true,  false },
+	{ .IP4, "0.0.0.0",                 "00000000", "0.0.0.0"        },
+	{ .IP4, "127.0.0.1",               "7f000001", "127.0.0.1"      },
+	{ .IP4, "10.0.128.31",             "0a00801f", "10.0.128.31"    },
+	{ .IP4, "255.255.255.255",         "ffffffff", "255.255.255.255"},
 
 	// Odin custom: Address + port, valid
-	{ .IP4, "0.0.0.0:80",              "00000000", true,  false, false },
-	{ .IP4, "127.0.0.1:80",            "7f000001", true,  false, false },
-	{ .IP4, "10.0.128.31:80",          "0a00801f", true,  false, false },
-	{ .IP4, "255.255.255.255:80",      "ffffffff", true,  false, false },
+	{ .IP4, "0.0.0.0:80",              "00000000", "0.0.0.0"        },
+	{ .IP4, "127.0.0.1:80",            "7f000001", "127.0.0.1"      },
+	{ .IP4, "10.0.128.31:80",          "0a00801f", "10.0.128.31"    },
+	{ .IP4, "255.255.255.255:80",      "ffffffff", "255.255.255.255"},
 
-	{ .IP4, "[0.0.0.0]:80",            "00000000", true,  false, false },
-	{ .IP4, "[127.0.0.1]:80",          "7f000001", true,  false, false },
-	{ .IP4, "[10.0.128.31]:80",        "0a00801f", true,  false, false },
-	{ .IP4, "[255.255.255.255]:80",    "ffffffff", true,  false, false },
+	{ .IP4, "[0.0.0.0]:80",            "00000000", "0.0.0.0"        },
+	{ .IP4, "[127.0.0.1]:80",          "7f000001", "127.0.0.1"      },
+	{ .IP4, "[10.0.128.31]:80",        "0a00801f", "10.0.128.31"    },
+	{ .IP4, "[255.255.255.255]:80",    "ffffffff", "255.255.255.255"},
 
 	// Odin custom: Address + port, invalid
-	{ .IP4, "[]:80",                   "00000000", false, false, false },
-	{ .IP4, "[0.0.0.0]",               "00000000", false, false, false },
-	{ .IP4, "[127.0.0.1]:",            "7f000001", false, false, false },
-	{ .IP4, "[10.0.128.31] :80",       "0a00801f", false, false, false },
-	{ .IP4, "[255.255.255.255]:65536", "ffffffff", false, false, false },
+	{ .IP4, "[]:80",                   "", ""},
+	{ .IP4, "[0.0.0.0]",               "", ""},
+	{ .IP4, "[127.0.0.1]:",            "", ""},
+	{ .IP4, "[10.0.128.31] :80",       "", ""},
+	{ .IP4, "[255.255.255.255]:65536", "", ""},
 
 
 	// numbers-and-dots notation, but not dotted-decimal
-	// IMPORTANT: enable when we support `aton`-like addresses
-	{ .IP4, "1.2.03.4",                "01020304", true,  false, true  },
-	{ .IP4, "1.2.0x33.4",              "01023304", true,  false, true  },
-	{ .IP4, "1.2.0XAB.4",              "0102ab04", true,  false, true  },
-	{ .IP4, "1.2.0xabcd",              "0102abcd", true,  false, true  },
-	{ .IP4, "1.0xabcdef",              "01abcdef", true,  false, true  },
-	{ .IP4, "0x01abcdef",              "01abcdef", true,  false, true  },
-	{ .IP4, "00377.0x0ff.65534",       "fffffffe", true,  false, true  },
+	{ .IP4_Alt, "1.2.03.4",                "01020304", ""},
+	{ .IP4_Alt, "1.2.0x33.4",              "01023304", ""},
+	{ .IP4_Alt, "1.2.0XAB.4",              "0102ab04", ""},
+	{ .IP4_Alt, "1.2.0xabcd",              "0102abcd", ""},
+	{ .IP4_Alt, "1.0xabcdef",              "01abcdef", ""},
+	{ .IP4_Alt, "0x01abcdef",              "01abcdef", ""},
+	{ .IP4_Alt, "00377.0x0ff.65534",       "fffffffe", ""},
 
 	// invalid as decimal address
-	{ .IP4, ".1.2.3",                  "ffffffff", false, false, false },
-	{ .IP4, "1..2.3",                  "ffffffff", false, false, false },
-	{ .IP4, "1.2.3.",                  "ffffffff", false, false, false },
-	{ .IP4, "1.2.3.4.5",               "ffffffff", false, false, false },
-	{ .IP4, "1.2.3.a",                 "ffffffff", false, false, false },
-	{ .IP4, "1.256.2.3",               "ffffffff", false, false, false },
-	{ .IP4, "1.2.4294967296.3",        "ffffffff", false, false, false },
-	{ .IP4, "1.2.-4294967295.3",       "ffffffff", false, false, false },
-	{ .IP4, "1.2. 3.4",                "ffffffff", false, false, false },
+	{ .IP4, "",                        "", ""},
+	{ .IP4, ".1.2.3",                  "", ""},
+	{ .IP4, "1..2.3",                  "", ""},
+	{ .IP4, "1.2.3.",                  "", ""},
+	{ .IP4, "1.2.3.4.5",               "", ""},
+	{ .IP4, "1.2.3.a",                 "", ""},
+	{ .IP4, "1.256.2.3",               "", ""},
+	{ .IP4, "1.2.4294967296.3",        "", ""},
+	{ .IP4, "1.2.-4294967295.3",       "", ""},
+	{ .IP4, "1.2. 3.4",                "", ""},
 
 	// invalid as non-decimal address
-	{ .IP4, ".1.2.3",                  "ffffffff", false, false, true },
-	{ .IP4, "1..2.3",                  "ffffffff", false, false, true },
-	{ .IP4, "1.2.3.",                  "ffffffff", false, false, true },
-	{ .IP4, "1.2.3.4.5",               "ffffffff", false, false, true },
-	{ .IP4, "1.2.3.a",                 "ffffffff", false, false, true },
-	{ .IP4, "1.256.2.3",               "ffffffff", false, false, true },
-	{ .IP4, "1.2.4294967296.3",        "ffffffff", false, false, true },
-	{ .IP4, "1.2.-4294967295.3",       "ffffffff", false, false, true },
-	{ .IP4, "1.2. 3.4",                "ffffffff", false, false, true },
+	{ .IP4_Alt, "",                        "", ""},
+	{ .IP4_Alt, ".1.2.3",                  "", ""},
+	{ .IP4_Alt, "1..2.3",                  "", ""},
+	{ .IP4_Alt, "1.2.3.",                  "", ""},
+	{ .IP4_Alt, "1.2.3.4.5",               "", ""},
+	{ .IP4_Alt, "1.2.3.a",                 "", ""},
+	{ .IP4_Alt, "1.256.2.3",               "", ""},
+	{ .IP4_Alt, "1.2.4294967296.3",        "", ""},
+	{ .IP4_Alt, "1.2.-4294967295.3",       "", ""},
+	{ .IP4_Alt, "1.2. 3.4",                "", ""},
 
-/*
-	// ipv6
-	{ .IP6, ":",                       "",                                 false, false },
-	{ .IP6, "::",                      "00000000000000000000000000000000", true,  true  },
-	{ .IP6, "::1",                     "00000000000000000000000000000001", true,  true  },
-	{ .IP6, ":::",                     "",                                 false, false },
-	{ .IP6, "192.168.1.1",             "",                                 false, false },
-	{ .IP6, ":192.168.1.1",            "",                                 false, false },
-	{ .IP6, "::192.168.1.1",           "000000000000000000000000c0a80101", true,  true  },
-	{ .IP6, "0:0:0:0:0:0:192.168.1.1", "000000000000000000000000c0a80101", true,  true  },
-	{ .IP6, "0:0::0:0:0:192.168.1.1",  "000000000000000000000000c0a80101", true,  true  },
-	{ .IP6, "::012.34.56.78",          "",                                 false, false },
-	{ .IP6, ":ffff:192.168.1.1",       "",                                 false, false },
-	{ .IP6, "::ffff:192.168.1.1",      "00000000000000000000ffffc0a80101", true,  true  },
-	{ .IP6, ".192.168.1.1",            "",                                 false, false },
-	{ .IP6, ":.192.168.1.1",           "",                                 false, false },
-	{ .IP6, "a:0b:00c:000d:E:F::",     "000a000b000c000d000e000f00000000", true,  true  },
-	{ .IP6, "a:0b:00c:000d:0000e:f::", "",                                 false, false },
-	{ .IP6, "1:2:3:4:5:6::",           "00010002000300040005000600000000", true,  true  },
-	{ .IP6, "1:2:3:4:5:6:7::",         "00010002000300040005000600070000", true,  true  },
-	{ .IP6, "1:2:3:4:5:6:7:8::",       "",                                 false, false },
-	{ .IP6, "1:2:3:4:5:6:7::9",        "",                                 false, false },
-	{ .IP6, "::1:2:3:4:5:6",           "00000000000100020003000400050006", true,  true  },
-	{ .IP6, "::1:2:3:4:5:6:7",         "00000001000200030004000500060007", true,  true  },
-	{ .IP6, "::1:2:3:4:5:6:7:8",       "",                                 false, false },
-	{ .IP6, "a:b::c:d:e:f",            "000a000b00000000000c000d000e000f", true,  true  },
-	{ .IP6, "ffff:c0a8:5e4",           "",                                 false, false },
-	{ .IP6, ":ffff:c0a8:5e4",          "",                                 false, false },
-	{ .IP6, "0:0:0:0:0:ffff:c0a8:5e4", "00000000000000000000ffffc0a805e4", true,  true  },
-	{ .IP6, "0:0:0:0:ffff:c0a8:5e4",   "",                                 false, false },
-	{ .IP6, "0::ffff:c0a8:5e4",        "00000000000000000000ffffc0a805e4", true,  true  },
-	{ .IP6, "::0::ffff:c0a8:5e4",      "",                                 false, false },
-	{ .IP6, "c0a8",                    "",                                 false, false },
-*/
+	// Valid IPv6 addresses
+	{ .IP6, "::",                                            "00000000000000000000000000000000", "::"},
+	{ .IP6, "::1",                                           "00000000000000000000000000000001", "::1"},
+	{ .IP6, "::192.168.1.1",                                 "000000000000000000000000c0a80101", "::c0a8:101"},
+	{ .IP6, "0000:0000:0000:0000:0000:ffff:255.255.255.255", "00000000000000000000ffffffffffff", "::ffff:ffff:ffff"},
+
+
+	{ .IP6, "0:0:0:0:0:0:192.168.1.1", "000000000000000000000000c0a80101", "::c0a8:101"},
+	{ .IP6, "0:0::0:0:0:192.168.1.1",  "000000000000000000000000c0a80101", "::c0a8:101"},
+	{ .IP6, "::ffff:192.168.1.1",      "00000000000000000000ffffc0a80101", "::ffff:c0a8:101"},
+	{ .IP6, "a:0b:00c:000d:E:F::",     "000a000b000c000d000e000f00000000", "a:b:c:d:e:f::"},
+	{ .IP6, "1:2:3:4:5:6::",           "00010002000300040005000600000000", "1:2:3:4:5:6::"},
+	{ .IP6, "1:2:3:4:5:6:7::",         "00010002000300040005000600070000", "1:2:3:4:5:6:7:0"},
+	{ .IP6, "::1:2:3:4:5:6",           "00000000000100020003000400050006", "::1:2:3:4:5:6"},
+	{ .IP6, "::1:2:3:4:5:6:7",         "00000001000200030004000500060007", "0:1:2:3:4:5:6:7"},
+	{ .IP6, "a:b::c:d:e:f",            "000a000b00000000000c000d000e000f", "a:b::c:d:e:f"},
+	{ .IP6, "0:0:0:0:0:ffff:c0a8:5e4", "00000000000000000000ffffc0a805e4", "::ffff:c0a8:5e4"},
+	{ .IP6, "0::ffff:c0a8:5e4",        "00000000000000000000ffffc0a805e4", "::ffff:c0a8:5e4"},
+
+
+	// Invalid IPv6 addresses
+	{ .IP6, "",                        "", ""},
+	{ .IP6, ":",                       "", ""},
+	{ .IP6, ":::",                     "", ""},
+	{ .IP6, "192.168.1.1",             "", ""},
+	{ .IP6, ":192.168.1.1",            "", ""},
+	{ .IP6, "::012.34.56.78",          "", ""},
+	{ .IP6, ":ffff:192.168.1.1",       "", ""},
+	{ .IP6, ".192.168.1.1",            "", ""},
+	{ .IP6, ":.192.168.1.1",           "", ""},
+	{ .IP6, "a:0b:00c:000d:0000e:f::", "", ""},
+	{ .IP6, "1:2:3:4:5:6:7:8::",       "", ""},
+	{ .IP6, "1:2:3:4:5:6:7::9",        "", ""},
+	{ .IP6, "::1:2:3:4:5:6:7:8",       "", ""},
+	{ .IP6, "ffff:c0a8:5e4",           "", ""},
+	{ .IP6, ":ffff:c0a8:5e4",          "", ""},
+	{ .IP6, "0:0:0:0:ffff:c0a8:5e4",   "", ""},
+	{ .IP6, "::0::ffff:c0a8:5e4",      "", ""},
+	{ .IP6, "c0a8",                    "", ""},
 }
