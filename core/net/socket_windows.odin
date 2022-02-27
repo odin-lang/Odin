@@ -201,7 +201,6 @@ listen_tcp :: proc(interface_endpoint: Endpoint, backlog := 1000) -> (skt: TCP_S
 
 
 Accept_Error :: enum c.int {
-	Reset = win.WSAECONNRESET,
 	Not_Listening = win.WSAEINVAL,
 	No_Socket_Descriptors_Available_For_Client_Socket = win.WSAEMFILE,
 	No_Buffer_Space_Available = win.WSAENOBUFS,
@@ -211,19 +210,29 @@ Accept_Error :: enum c.int {
 }
 
 accept_tcp :: proc(sock: TCP_Socket, options := default_tcp_options) -> (client: TCP_Socket, source: Endpoint, err: Network_Error) {
-	sockaddr: win.SOCKADDR_STORAGE_LH
-	sockaddrlen := c.int(size_of(sockaddr))
-	client_sock := win.accept(Platform_Socket(sock), &sockaddr, &sockaddrlen)
-	if int(client_sock) == win.SOCKET_ERROR {
-		err = Accept_Error(win.WSAGetLastError())
+	for {
+		sockaddr: win.SOCKADDR_STORAGE_LH
+		sockaddrlen := c.int(size_of(sockaddr))
+		client_sock := win.accept(Platform_Socket(sock), &sockaddr, &sockaddrlen)
+		if int(client_sock) == win.SOCKET_ERROR {
+			e := win.WSAGetLastError()
+			if e == win.WSAECONNRESET {
+				// NOTE(tetra): Reset just means that a client that connection immediately lost the connection.
+				// There's no need to concern the user with this, so we handle it for them.
+				// On Linux, this error isn't possible in the first place according the man pages, so we also
+				// can do this to match the behaviour.
+				continue
+			}
+			err = Accept_Error(e)
+			return
+		}
+		client = TCP_Socket(client_sock)
+		source = sockaddr_to_endpoint(&sockaddr)
+		if options.no_delay {
+			_ = set_option(client, .TCP_Nodelay, true) // NOTE(tetra): Not vital to succeed; error ignored
+		}
 		return
 	}
-	client = TCP_Socket(client_sock)
-	source = sockaddr_to_endpoint(&sockaddr)
-	if options.no_delay {
-		_ = set_option(client, .TCP_Nodelay, true) // NOTE(tetra): Not vital to succeed; error ignored
-	}
-	return
 }
 
 
