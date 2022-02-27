@@ -17,7 +17,8 @@
 package http
 
 import "core:net"
-import "core:sync"
+import sync "core:sync/sync2"
+import "core:thread"
 
 Request_Status :: enum {
 	Unknown, // NOTE: ID does not exist
@@ -28,60 +29,131 @@ Request_Status :: enum {
 	Done,
 }
 
+Request_ID :: distinct int
+
 Client_Request :: struct {
-	request:   Request,
-	response:  Response,
-	socket:    net.TCP_Socket, // only valid if status == .Wait_Reply
-	status:    Request_Status,
+	request:         Request,        // Memory managed by user
+	response:        Response,       // Memory managed by user after request is completed
+	socket:          net.TCP_Socket, // only valid if status == .Wait_Reply
+	status:          Request_Status,
+	being_processed: bool,           // Updated in client_process_one_request()
 }
 
+/*
+	Provides a mechanism to easily run multiple HTTP requests at once.
 
+	This can be done using worker threads, or by manually calling client_process_one_request() or client_wait_for_response().
+
+	client_submit_request() can be used to add a pending request to the queue, which gives you a Request_ID that can be used to determine
+	when that request is done, or has failed.
+
+	There are two ways to retreive the result of a request:
+	- client_check_for_response() to poll the status of a request, and to retrieve the final result, without blocking.
+	- client_wait_for_response() to block until a request is done, temporarily donating the current thread to processing pending requests.
+
+	Forward progress is accomplished via calls to client_process_one_request(), which makes progress with a single
+	request in a blocking manner.
+	Worker threads, if created, will do this automatically, but if you ask for there to be no worker threads,
+	you will either have to call client_process_one_request() manually, as appropriate, or call client_wait_for_response(), which will
+	call through to it if the current request is not yet completed.
+
+	With the exception of client_init() and client_destroy(), all procedures are thread-safe.
+*/
 Client :: struct {
-	next_id:  Request_Id,
-	requests: map[Request_Id]Client_Request,
-	lock:     sync.Ticket_Mutex,
+	next_id:         Request_ID,                    // NOTE(tetra): Updated under request_lock
+	requests:        map[Request_ID]Client_Request, // NOTE(tetra): Updated under request_lock
+	request_lock:    sync.Mutex,
+	work_available:  sync.Sema,
+	workers:         []^thread.Thread,
+	workers_running: bool,                          // NOTE(tetra): Updated atomically
 }
 
-client_init :: proc(using c: ^Client, allocator := context.allocator) {
-	sync.ticket_mutex_init(&lock)
-	next_id = 0
-}
+client_init :: proc(c: ^Client, worker_count: int, allocator := context.allocator) {
+	context.allocator = allocator
 
-client_destroy :: proc(using c: ^Client) {
-	for _, cr in c.requests {
-		request_destroy(cr.request)
+	c^ = {}
+	c.requests.allocator = allocator
+
+	if worker_count > 0 {
+		c.workers = make([]^thread.Thread, worker_count)
+		c.workers_running = true
+
+		for _, i in c.workers {
+			c.workers[i] = thread.create_and_start_with_data(c, proc(data: rawptr) {
+				c := cast(^Client) data
+				for sync.atomic_load(&c.workers_running) {
+					client_process_one_request(c)
+				}
+			})
+		}
 	}
-	delete(requests)
+}
+
+client_destroy :: proc(c: ^Client) {
+	sync.atomic_store(&c.workers_running, false)
+	sync.sema_post(&c.work_available, len(c.workers))
+	for w in c.workers {
+		thread.destroy(w)
+	}
+	delete(c.workers, c.requests.allocator)
+
+	for _, cr in c.requests {
+		if cr.status == .Wait_Reply {
+			net.close(cr.socket)
+		}
+	}
+	delete(c.requests)
+
 	c^ = {}
 }
 
 
-Request_Id :: distinct int
+/*
+	Adds a pending HTTP request to the queue.
 
-client_submit_request :: proc(using c: ^Client, req: Request) -> Request_Id {
+	It is up to the caller to ensure that the Request remains valid for the duration of the request.
+
+	A request is considered completed when client_check_for_response() or client_wait_for_response() returns a status of Done
+	for a particular ID.
+*/
+client_submit_request :: proc(c: ^Client, req: Request) -> Request_ID {
 	cr := Client_Request{
 		request = req,
 		response = {},
 		status = .Need_Send,
 	}
 
+	defer sync.sema_post(&c.work_available)
+
 	{
-		sync.ticket_mutex_lock(&lock)
-		defer sync.ticket_mutex_unlock(&lock)
-		id := next_id
-		next_id += 1
-		requests[id] = cr
-		return Request_Id(id)
+		sync.mutex_lock(&c.request_lock)
+		defer sync.mutex_unlock(&c.request_lock)
+		id := c.next_id
+		c.next_id += 1
+		c.requests[id] = cr
+		return Request_ID(id)
 	}
 }
 
-client_check_for_response :: proc(using c: ^Client, id: Request_Id) -> (response: Response, status: Request_Status) {
+/*
+	Checks what the status of the request corresponding to the given ID is.
+
+	The request is removed from the queue if it is completed, otherwise it is
+	left in the queue.
+
+	When this procedure returns a status of Done, the returned Response is now managed by the caller
+	and needs to be destroyed as appropriate.
+*/
+client_check_for_response :: proc(c: ^Client, id: Request_ID) -> (response: Response, status: Request_Status) {
 	cr: Client_Request
 	ok: bool
 	{
-		sync.ticket_mutex_lock(&lock)
-		defer sync.ticket_mutex_unlock(&lock)
-		cr, ok = requests[id]
+		sync.mutex_lock(&c.request_lock)
+		defer sync.mutex_unlock(&c.request_lock)
+		cr, ok = c.requests[id]
+		if ok && cr.status == .Done {
+			delete_key(&c.requests, id)
+		}
 	}
 
 	if !ok {
@@ -91,7 +163,16 @@ client_check_for_response :: proc(using c: ^Client, id: Request_Id) -> (response
 	return cr.response, cr.status
 }
 
-client_wait_for_response :: proc(using c: ^Client, id: Request_Id) -> (response: Response, status: Request_Status) {
+/*
+	Waits for the request with the corresponding ID to be completed, or to fail.
+
+	When this procedure returns a status of Done, the returned Response is now managed by the caller
+	and needs to be destroyed as appropriate.
+
+	If the request is not finished, and hasn't failed, the current thread will be utilised to process pending requests with
+	calls to client_process_one_request().
+*/
+client_wait_for_response :: proc(c: ^Client, id: Request_ID) -> (response: Response, status: Request_Status) {
 	loop: for {
 		response, status = client_check_for_response(c, id)
 		switch status {
@@ -102,183 +183,101 @@ client_wait_for_response :: proc(using c: ^Client, id: Request_Id) -> (response:
 		case .Need_Send, .Wait_Reply:
 			// NOTE: gotta wait - might as well use the current thread to advance the requests
 			// TODO: block until there's stuff to process rather than spinning
-			client_process_requests(c)
+			client_process_one_request(c)
 		}
 	}
-
-	sync.ticket_mutex_lock(&lock)
-	defer sync.ticket_mutex_unlock(&lock)
-	delete_key(&requests, id)
 	return
 }
 
-client_execute_request :: proc(using c: ^Client, req: Request) -> (response: Response, status: Request_Status) {
+/*
+	Adds a request to the queue and blocks until it has completed.
+
+	This procedure just calls client_submit_request() and client_wait_for_response() internally.
+*/
+client_execute_request :: proc(c: ^Client, req: Request) -> (response: Response, status: Request_Status) {
 	id := client_submit_request(c, req)
-	// return client_wait_for_response(c, id);
 	response, status = client_wait_for_response(c, id)
 	return
 }
 
-client_process_requests :: proc(using c: ^Client) {
+/*
+	Waits for pending work to be available, and then makes progress to exactly one pending request.
+
+	This procedure is called by any worker threads you've asked for, calls to client_wait_for_response() when the desired
+	request isn't finished yet, or manually at your leisure.
+
+	If this procedure is not called anywhere, no requests will make progress.
+*/
+client_process_one_request :: proc(c: ^Client) {
+	//
+	// Fetch a request that isn't being processed yet
+	//
+
+	sync.sema_wait(&c.work_available)
+
+	id_to_process: Request_ID = ---
+	req_copy: Client_Request = ---
+	block: {
+		sync.mutex_lock(&c.request_lock)
+		defer sync.mutex_unlock(&c.request_lock)
+
+		for id, req in &c.requests {
+			if req.being_processed || req.status == .Done {
+				continue
+			} else {
+				req.being_processed = true
+				id_to_process = id
+				req_copy = req
+				break block
+			}
+		}
+
+		return // NOTE(tetra): Nothing to do, or all requests are being processed already.
+	}
+	req_copy.being_processed = false
+
+	//
+	// Process the one we grabbed
+	//
+
 	close_socket :: proc(s: ^net.TCP_Socket) {
 		net.close(s^)
 		s^ = {}
 	}
 
-	for _, req in &requests {
-		sync.ticket_mutex_lock(&lock)
-		defer sync.ticket_mutex_unlock(&lock)
-
-		switch req.status {
-		case .Need_Send:
-			skt, ok := send_request(req.request)
-			if ok {
-				req.socket = skt
-				req.status = .Wait_Reply
-			} else {
-				req.status = .Send_Failed
-				close_socket(&req.socket)
-			}
-		case .Wait_Reply:
-			resp, ok := recv_response(req.socket)
-			if ok {
-				req.response = resp
-				req.status = .Done
-			} else {
-				req.status = .Recv_Failed
-			}
-			close_socket(&req.socket)
-		case .Done, .Send_Failed, .Recv_Failed:
-			// do nothing.
-			// it'll be removed from the list when user code
-			// asks for it.
-		case .Unknown:
-			unreachable()
+	switch req_copy.status {
+	case .Need_Send:
+		skt, ok := send_request(req_copy.request)
+		if ok {
+			req_copy.socket = skt
+			req_copy.status = .Wait_Reply
+			sync.sema_post(&c.work_available)
+		} else {
+			req_copy.status = .Send_Failed
+			close_socket(&req_copy.socket)
 		}
-	}
-}
-
-/*
-Client_Request_State :: enum u8 {
-	Pending,
-	Connecting,
-	Failed,
-	// TODO
-}
-
-Client_Request_Token :: distinct u32;
-
-Client_Connecting_Request 	:: struct { req: Request, skt: net.Socket };
-Client_Failed_Request 		:: struct { req: Request, error: net.Dial_Error };
-Client_Reading_Response     :: struct { req: Request, skt: net.Socket, resp: Response };
-
-Client_Request :: union {
-	Client_Connecting_Request,
-	Client_Failed_Request,
-	Client_Reading_Response,
-}
-
-client_begin_request :: proc(using c: ^Client, req: Request) -> (token: Client_Request_Token, ok: bool) {
-	slot := new(Client_Request, allocator);
-	if slot == nil do return;
-	defer if !ok do delete(slot);
-
-	addr4, addr6, addr_ok := net.resolve(req.host);
-	if !addr_ok do return;
-	addr := addr4 != nil ? addr4 : addr6;
-
-	sync.ticket_mutex_lock(&lock);
-	defer sync.ticket_mutex_unlock(&lock);
-
-	append(&requests, slot);
-	tk := Client_Request_Token(len(requests));  // tokens are 1-based because 0 is the nil value.
-	assert(tk > 0);
-
-	skt, err := net.start_dial(addr, 80);
-	if err != nil do return;
-
-	slot^ = Client_Connecting_Request {
-		req = req,
-		skt = skt,
-	};
-
-	token = tk;
-	ok = true;
-	return;
-}
-
-client_poll_events :: proc(using c: ^Client) -> (updated: int) {
-	sync.ticket_mutex_lock(&lock);
-	defer sync.ticket_mutex_unlock(&lock);
-
-	for req, i in requests {
-		switch r in req {
-		case Client_Connecting_Request:
-			done, err := net.try_finish_dial(c);
-			if err != nil {
-				net.close(c);
-				requests[i] = Client_Failed_Request {
-					req = r.req,
-					error = err,
-				};
-				updated += 1;
-				fmt.println("failed");
-				continue;
-			}
-
-			if done {
-				write_request_to_socket(&r.req);
-				requests[i] = Client_Reading_Response {
-					req = r.req,
-					skt = r.skt,
-				};
-				requests[i].resp.headers.allocator = request_allocator;
-				fmt.println("connected");
-				updated += 1;
-			}
-
-		case Client_Reading_Response:
-			buf: [4096]byte = ---;
-			n, err := net.try_read(r.skt, buf[:]);
-			if n == 0 do continue;
-
-
-
-			updated += 1;
+	case .Wait_Reply:
+		resp, ok := recv_response(req_copy.socket)
+		if ok {
+			req_copy.response = resp
+			req_copy.status = .Done
+		} else {
+			req_copy.status = .Recv_Failed
 		}
-	}
-}
-
-client_get_response :: proc(using c: ^Client, token: Client_Request_Token) -> (done: bool, resp: Response) {
-	i := int(token);
-	if i < 0 || i >= len(requests) do return;
-
-	switch r in requests[i] {
-	case Client_Completed_Request:
-		done = true;
-		resp = r.resp;
-	}
-	return;
-}
-
-
-// TODO(tetra): maybe take request by ptr, and modify when response is ready?
-client_execute_request :: proc(c: ^Client, req: Request) -> (resp: Response, ok: bool) {
-	tok, ok := client_begin_request(c, req);
-	for {
-		if client_poll_events(c) == 0 {
-			sync.yield_processor();
-			continue;
-		}
-
-		done: bool;
-		done, resp, err = client_get_response(c, tok);
-		if done do break;
-
-		sync.yield_processor();
+		close_socket(&req_copy.socket)
+	case .Done, .Send_Failed, .Recv_Failed:
+		// do nothing.
+		// it'll be removed from the list when user code
+		// asks for it.
+	case .Unknown:
+		unreachable()
 	}
 
-	ok = true;
-	return;
+	//
+	// Store the updated request back into the map
+	//
+
+	sync.mutex_lock(&c.request_lock)
+	defer sync.mutex_unlock(&c.request_lock)
+	c.requests[id_to_process] = req_copy
 }
-*/
