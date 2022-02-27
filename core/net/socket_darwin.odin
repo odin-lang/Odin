@@ -195,7 +195,7 @@ listen_tcp :: proc(interface_endpoint: Endpoint, backlog := 1000) -> (skt: TCP_S
 
 
 Accept_Error :: enum c.int {
-	Reset = c.int(os.ECONNRESET),
+	Reset = c.int(os.ECONNRESET), // TODO(tetra): Is this error actually possible here? Or is like Linux, in which case we can remove it.
 	Not_Listening = c.int(os.EINVAL),
 	No_Socket_Descriptors_Available_For_Client_Socket = c.int(os.EMFILE),
 	No_Buffer_Space_Available = c.int(os.ENOBUFS),
@@ -230,10 +230,10 @@ close :: proc(skt: Any_Socket) {
 TCP_Recv_Error :: enum c.int {
 	Shutdown = c.int(os.ESHUTDOWN),
 	Not_Connected = c.int(os.ENOTCONN),
-	Connection_Broken = c.int(os.ENETRESET),
+	Connection_Broken = c.int(os.ENETRESET), // TODO(tetra): Is this error actually possible here?
 	Not_Socket = c.int(os.ENOTSOCK),
 	Aborted = c.int(os.ECONNABORTED),
-	Reset = c.int(os.ECONNRESET), // Gracefully shutdown
+	Connection_Closed = c.int(os.ECONNRESET), // TODO(tetra): Determine when this is different from the syscall returning n=0 and maybe normalize them?
 	Offline = c.int(os.ENETDOWN),
 	Host_Unreachable = c.int(os.EHOSTUNREACH),
 	Interrupted = c.int(os.EINTR),
@@ -295,8 +295,8 @@ recv :: proc{recv_tcp, recv_udp}
 
 // TODO
 TCP_Send_Error :: enum c.int {
-	Aborted = c.int(os.ECONNABORTED), // TODO: merge with Connection_Broken?
-	Connection_Broken = c.int(os.ECONNRESET),
+	Aborted = c.int(os.ECONNABORTED), // TODO: merge with other errors?
+	Connection_Closed = c.int(os.ECONNRESET),
 	Not_Connected = c.int(os.ENOTCONN),
 	Shutdown = c.int(os.ESHUTDOWN),
 	// The send queue was full.
