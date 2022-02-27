@@ -566,26 +566,83 @@ address_to_string :: proc(addr: Address, allocator := context.temp_allocator) ->
 	case IP4_Address:
 		fmt.sbprintf(&b, "%v.%v.%v.%v", v[0], v[1], v[2], v[3])
 	case IP6_Address:
-		i := 0
-		seen_double_colon := false
-		for i < len(v) {
-			if !seen_double_colon && v[i] == 0 && i < len(v) - 1 && v[i+1] == 0 {
-				seen_double_colon = true
-				for i < len(v) && v[i] == 0 {
-					i += 1
+		/*
+			First find the longest run of zeroes.
+		*/
+		zero_run_start      := -1
+		zero_run_end        := -1
+		best_zero_run_start := -1
+		best_zero_run_end   := -1
+
+		addr := transmute([8]u16be)v
+
+		last := u16be(1)
+		for val, i in addr {
+			/*
+				If we encounter adjacent zeroes, then start a new run if not already in one.
+				Also remember the rightmost index regardless, because it'll be the new
+				frontier of both new and existing runs.
+
+			*/
+			if last == 0 && val == 0 {
+				zero_run_end = i
+				if zero_run_start == -1 {
+					zero_run_start = i - 1
 				}
-				fmt.sbprintf(&b, "::")
-			} else if i > 0 {
-				fmt.sbprint(&b, ":")
 			}
 
-			if i < len(v) {
-				fmt.sbprintf(&b, "%x", v[i])
-				i += 1
+			/*
+				If we're in a run check if its length is better than the best recorded so far.
+				If so, update the best run's start and end.
+			*/
+			if zero_run_start != -1 {
+				best_run := (best_zero_run_end - best_zero_run_start)
+				run      := (zero_run_end - zero_run_start)
+
+				if run > best_run || best_zero_run_start == -1 {
+					best_zero_run_start = zero_run_start
+					best_zero_run_end   = zero_run_end
+				}
+			}
+
+			/*
+				If we were in a run, this is where we reset it.
+			*/
+			if val != 0 {
+				zero_run_start = -1
+			}
+
+			last = val
+		}
+
+		for val, i in addr {
+			if best_zero_run_start == i || best_zero_run_end == i {
+				/*
+					For the left and right side of the best zero run, print a `:`.
+				*/
+				fmt.sbprint(&b, ":")
+			} else if i < best_zero_run_start {
+				/*
+					If we haven't made it to the best run yet, print the digit.
+					Make sure we only print a `:` after the digit if it's not
+					immediately followed by the run's own leftmost `:`.
+				*/
+				fmt.sbprintf(&b, "%x", val)
+				if i < best_zero_run_start - 1 {
+					fmt.sbprintf(&b, ":")
+				}
+			} else if i > best_zero_run_end {
+				/*
+					If there are any digits after the zero run, print them.
+					But don't print the `:` at the end of the IP number.
+				*/
+				fmt.sbprintf(&b, "%x", val)
+				if i != 7 {
+					fmt.sbprintf(&b, ":")
+				}
 			}
 		}
 	}
-
 	return strings.to_string(b)
 }
 
