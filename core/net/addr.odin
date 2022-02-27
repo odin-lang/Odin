@@ -554,7 +554,6 @@ map_to_ip6 :: proc(addr: Address) -> Address {
 	return addr6
 }
 
-
 /*
 	Returns a temporarily-allocated string representation of the address.
 
@@ -569,10 +568,17 @@ address_to_string :: proc(addr: Address, allocator := context.temp_allocator) ->
 		/*
 			First find the longest run of zeroes.
 		*/
-		zero_run_start      := -1
-		zero_run_end        := -1
-		best_zero_run_start := -1
-		best_zero_run_end   := -1
+		Zero_Run :: struct {
+			start: int,
+			end:   int,
+		}
+
+		/*
+			We're dealing with 0-based indices, appropriately enough for runs of zeroes.
+			Still, it means we need to initialize runs with some value outside of the possible range.
+		*/
+		run  := Zero_Run{-1, -1}
+		best := Zero_Run{-1, -1}
 
 		addr := transmute([8]u16be)v
 
@@ -582,12 +588,11 @@ address_to_string :: proc(addr: Address, allocator := context.temp_allocator) ->
 				If we encounter adjacent zeroes, then start a new run if not already in one.
 				Also remember the rightmost index regardless, because it'll be the new
 				frontier of both new and existing runs.
-
 			*/
 			if last == 0 && val == 0 {
-				zero_run_end = i
-				if zero_run_start == -1 {
-					zero_run_start = i - 1
+				run.end = i
+				if run.start == -1 {
+					run.start = i - 1
 				}
 			}
 
@@ -595,13 +600,12 @@ address_to_string :: proc(addr: Address, allocator := context.temp_allocator) ->
 				If we're in a run check if its length is better than the best recorded so far.
 				If so, update the best run's start and end.
 			*/
-			if zero_run_start != -1 {
-				best_run := (best_zero_run_end - best_zero_run_start)
-				run      := (zero_run_end - zero_run_start)
+			if run.start != -1 {
+				length_to_beat := best.end - best.start
+				length         := run.end  - run.start
 
-				if run > best_run || best_zero_run_start == -1 {
-					best_zero_run_start = zero_run_start
-					best_zero_run_end   = zero_run_end
+				if length > length_to_beat {
+					best = run
 				}
 			}
 
@@ -609,29 +613,29 @@ address_to_string :: proc(addr: Address, allocator := context.temp_allocator) ->
 				If we were in a run, this is where we reset it.
 			*/
 			if val != 0 {
-				zero_run_start = -1
+				run = {-1, -1}
 			}
 
 			last = val
 		}
 
 		for val, i in addr {
-			if best_zero_run_start == i || best_zero_run_end == i {
+			if best.start == i || best.end == i {
 				/*
 					For the left and right side of the best zero run, print a `:`.
 				*/
 				fmt.sbprint(&b, ":")
-			} else if i < best_zero_run_start {
+			} else if i < best.start {
 				/*
 					If we haven't made it to the best run yet, print the digit.
 					Make sure we only print a `:` after the digit if it's not
 					immediately followed by the run's own leftmost `:`.
 				*/
 				fmt.sbprintf(&b, "%x", val)
-				if i < best_zero_run_start - 1 {
+				if i < best.start - 1 {
 					fmt.sbprintf(&b, ":")
 				}
-			} else if i > best_zero_run_end {
+			} else if i > best.end {
 				/*
 					If there are any digits after the zero run, print them.
 					But don't print the `:` at the end of the IP number.
