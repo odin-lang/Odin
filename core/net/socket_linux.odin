@@ -199,7 +199,6 @@ listen_tcp :: proc(interface_endpoint: Endpoint, backlog := 1000) -> (skt: TCP_S
 
 
 Accept_Error :: enum c.int {
-	Reset = c.int(os.ECONNRESET),
 	Not_Listening = c.int(os.EINVAL),
 	No_Socket_Descriptors_Available_For_Client_Socket = c.int(os.EMFILE),
 	No_Buffer_Space_Available = c.int(os.ENOBUFS),
