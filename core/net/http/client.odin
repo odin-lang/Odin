@@ -222,13 +222,18 @@ client_process_one_request :: proc(c: ^Client) {
 		defer sync.mutex_unlock(&c.request_lock)
 
 		for id, req in &c.requests {
-			if req.being_processed || req.status == .Done {
+			switch req.status {
+			case .Done, .Send_Failed, .Recv_Failed:
 				continue
-			} else {
+			case .Need_Send, .Wait_Reply:
 				req.being_processed = true
 				id_to_process = id
 				req_copy = req
 				break block
+			case .Unknown:
+				unreachable()
+			case:
+				unreachable()
 			}
 		}
 
