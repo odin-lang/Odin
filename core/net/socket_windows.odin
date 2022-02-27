@@ -254,7 +254,7 @@ TCP_Recv_Error :: enum c.int {
 	Would_Block = win.WSAEWOULDBLOCK,
 	Aborted = win.WSAECONNABORTED, // TODO: not functionally different from Reset; merge?
 	Timeout = win.WSAETIMEDOUT,
-	Reset = win.WSAECONNRESET, // Gracefully shutdown
+	Connection_Closed = win.WSAECONNRESET, // TODO(tetra): Determine when this is different from the syscall returning n=0 and maybe normalize them?
 	Host_Unreachable = win.WSAEHOSTUNREACH, // TODO: verify can actually happen
 }
 
@@ -326,7 +326,7 @@ TCP_Send_Error :: enum c.int {
 	Aborted = win.WSAECONNABORTED, // TODO: not functionally different from Reset; merge?
 	Not_Connected = win.WSAENOTCONN,
 	Shutdown = win.WSAESHUTDOWN,
-	Reset = win.WSAECONNRESET,
+	Connection_Closed = win.WSAECONNRESET,
 	No_Buffer_Space_Available = win.WSAENOBUFS,
 	Network_Subsystem_Failure = win.WSAENETDOWN,
 	Host_Unreachable = win.WSAEHOSTUNREACH,

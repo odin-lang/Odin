@@ -239,7 +239,7 @@ TCP_Recv_Error :: enum c.int {
 	Connection_Broken = c.int(os.ENETRESET),
 	Not_Socket = c.int(os.ENOTSOCK),
 	Aborted = c.int(os.ECONNABORTED),
-	Reset = c.int(os.ECONNRESET), // Gracefully shutdown
+	Connection_Closed = c.int(os.ECONNRESET), // TODO(tetra): Determine when this is different from the syscall returning n=0 and maybe normalize them?
 	Offline = c.int(os.ENETDOWN),
 	Host_Unreachable = c.int(os.EHOSTUNREACH),
 	Interrupted = c.int(os.EINTR),
@@ -314,8 +314,8 @@ recv :: proc{recv_tcp, recv_udp}
 
 // TODO
 TCP_Send_Error :: enum c.int {
-	Aborted = c.int(os.ECONNABORTED), // TODO: merge with Connection_Broken?
-	Connection_Broken = c.int(os.ECONNRESET),
+	Aborted = c.int(os.ECONNABORTED), // TODO(tetra): merge with other errors?
+	Connection_Closed = c.int(os.ECONNRESET),
 	Not_Connected = c.int(os.ENOTCONN),
 	Shutdown = c.int(os.ESHUTDOWN),
 	// The send queue was full.
