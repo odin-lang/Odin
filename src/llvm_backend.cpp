@@ -1298,6 +1298,10 @@ void lb_generate_code(lbGenerator *gen) {
 		}
 	}
 
+	if (build_context.target_features.len != 0) {
+		llvm_features = alloc_cstring(permanent_allocator(), build_context.target_features);
+	}
+
 	// GB_ASSERT_MSG(LLVMTargetHasAsmBackend(target));
 
 	LLVMCodeGenOptLevel code_gen_level = LLVMCodeGenLevelNone;

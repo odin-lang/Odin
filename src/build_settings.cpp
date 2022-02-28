@@ -232,6 +232,7 @@ struct BuildContext {
 	String extra_linker_flags;
 	String extra_assembler_flags;
 	String microarch;
+	String target_features;
 	BuildModeKind build_mode;
 	bool   generate_docs;
 	i32    optimization_level;
