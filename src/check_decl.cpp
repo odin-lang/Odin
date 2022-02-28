@@ -1130,6 +1130,10 @@ void check_global_variable_decl(CheckerContext *ctx, Entity *&e, Ast *type_expr,
 	}
 	ac.link_name = handle_link_name(ctx, e->token, ac.link_name, ac.link_prefix);
 
+	if (is_arch_wasm() && e->Variable.thread_local_model.len != 0) {
+		error(e->token, "@(thread_local) is not supported for this target platform");
+	}
+
 	String context_name = str_lit("variable declaration");
 
 	if (type_expr != nullptr) {

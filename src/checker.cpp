@@ -2271,7 +2271,7 @@ void generate_minimum_dependency_set(Checker *c, Entity *start) {
 		str_lit("args__"),
 	);
 
-	FORCE_ADD_RUNTIME_ENTITIES(build_context.no_crt,
+	FORCE_ADD_RUNTIME_ENTITIES((build_context.no_crt && !is_arch_wasm()),
 		// NOTE(bill): Only if these exist
 		str_lit("_tls_index"),
 		str_lit("_fltused"),
