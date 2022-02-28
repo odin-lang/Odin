@@ -2031,10 +2031,14 @@ bool check_procedure_type(CheckerContext *ctx, Type *type, Ast *proc_type_node, 
 	if (param_count > 0) {
 		Entity *end = params->Tuple.variables[param_count-1];
 		if (end->flags&EntityFlag_CVarArg) {
-			if (cc == ProcCC_StdCall || cc == ProcCC_CDecl) {
+			switch (cc) {
+			default:
 				type->Proc.c_vararg = true;
-			} else {
+				break;
+			case ProcCC_Odin:
+			case ProcCC_Contextless:
 				error(end->token, "Calling convention does not support #c_vararg");
+				break;
 			}
 		}
 	}
