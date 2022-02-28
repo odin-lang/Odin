@@ -46,6 +46,7 @@ enum ParseFileError {
 	ParseFile_InvalidToken,
 	ParseFile_GeneralError,
 	ParseFile_FileTooLarge,
+	ParseFile_DirectoryAlreadyExists,
 
 	ParseFile_Count,
 };
