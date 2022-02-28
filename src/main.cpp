@@ -626,6 +626,7 @@ enum BuildFlagKind {
 	BuildFlag_ExtraLinkerFlags,
 	BuildFlag_ExtraAssemblerFlags,
 	BuildFlag_Microarch,
+	BuildFlag_TargetFeatures,
 
 	BuildFlag_RelocMode,
 	BuildFlag_DisableRedZone,
@@ -783,7 +784,8 @@ bool parse_build_flags(Array<String> args) {
 	add_flag(&build_flags, BuildFlag_IgnoreUnknownAttributes, str_lit("ignore-unknown-attributes"), BuildFlagParam_None, Command__does_check);
 	add_flag(&build_flags, BuildFlag_ExtraLinkerFlags,    str_lit("extra-linker-flags"),            BuildFlagParam_String, Command__does_build);
 	add_flag(&build_flags, BuildFlag_ExtraAssemblerFlags, str_lit("extra-assembler-flags"),         BuildFlagParam_String, Command__does_build);
-	add_flag(&build_flags, BuildFlag_Microarch,         str_lit("microarch"),                       BuildFlagParam_String, Command__does_build);
+	add_flag(&build_flags, BuildFlag_Microarch,           str_lit("microarch"),                       BuildFlagParam_String, Command__does_build);
+	add_flag(&build_flags, BuildFlag_TargetFeatures,      str_lit("target-features"),                 BuildFlagParam_String, Command__does_build);
 
 	add_flag(&build_flags, BuildFlag_RelocMode,        str_lit("reloc-mode"),                       BuildFlagParam_String, Command__does_build);
 	add_flag(&build_flags, BuildFlag_DisableRedZone,   str_lit("disable-red-zone"),                 BuildFlagParam_None, Command__does_build);
@@ -1349,6 +1351,12 @@ bool parse_build_flags(Array<String> args) {
 							GB_ASSERT(value.kind == ExactValue_String);
 							build_context.microarch = value.value_string;
 							string_to_lower(&build_context.microarch);
+							break;
+						}
+						case BuildFlag_TargetFeatures: {
+							GB_ASSERT(value.kind == ExactValue_String);
+							build_context.target_features = value.value_string;
+							string_to_lower(&build_context.target_features);
 							break;
 						}
 						case BuildFlag_RelocMode: {
