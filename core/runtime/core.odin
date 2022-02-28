@@ -451,7 +451,7 @@ Odin_Endian_Type :: type_of(ODIN_ENDIAN)
 // This is probably only useful for freestanding targets
 foreign {
 	@(link_name="__$startup_runtime")
-	_startup_runtime :: proc() ---
+	_startup_runtime :: proc "odin" () ---
 }
 
 @(link_name="__$cleanup_runtime")
