@@ -146,6 +146,8 @@ when ODIN_OS == .Windows {
     foreign import botan_lib "system:botan-2"
 } else when ODIN_OS == .Darwin {
     foreign import botan_lib "system:botan-2"
+} else when ODIN_OS == .OpenBSD {
+    foreign import botan_lib "system:botan-2"
 }
 
 @(default_calling_convention="c")

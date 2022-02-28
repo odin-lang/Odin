@@ -1,5 +1,5 @@
 //+private
-//+build linux, darwin, freebsd
+//+build linux, darwin, freebsd, openbsd
 package runtime
 
 import "core:intrinsics"
