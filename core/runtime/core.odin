@@ -351,7 +351,6 @@ Context :: struct {
 	assertion_failure_proc: Assertion_Failure_Proc,
 	logger:                 Logger,
 
-	user_data:  any,
 	user_ptr:   rawptr,
 	user_index: int,
 
