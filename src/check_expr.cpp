@@ -9352,6 +9352,8 @@ ExprKind check_expr_base(CheckerContext *c, Operand *o, Ast *node, Type *type_hi
 	if (o->type != nullptr && is_type_untyped(o->type)) {
 		add_untyped(c, node, o->mode, o->type, o->value);
 	}
+	check_rtti_type_disallowed(node, o->type, "An expression is using a type, %s, which has been disallowed");
+
 	add_type_and_value(c->info, node, o->mode, o->type, o->value);
 	return kind;
 }

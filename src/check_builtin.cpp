@@ -1241,6 +1241,10 @@ bool check_builtin_procedure(CheckerContext *c, Operand *operand, Ast *call, i32
 		if (c->scope->flags&ScopeFlag_Global) {
 			compiler_error("'type_info_of' Cannot be declared within the runtime package due to how the internals of the compiler works");
 		}
+		if (build_context.disallow_rtti) {
+			error(call, "'%.*s' has been disallowed", LIT(builtin_name));
+			return false;
+		}
 
 		// NOTE(bill): The type information may not be setup yet
 		init_core_type_info(c->checker);
@@ -1253,9 +1257,9 @@ bool check_builtin_procedure(CheckerContext *c, Operand *operand, Ast *call, i32
 		Type *t = o.type;
 		if (t == nullptr || t == t_invalid || is_type_asm_proc(o.type) || is_type_polymorphic(t)) {
 			if (is_type_polymorphic(t)) {
-				error(ce->args[0], "Invalid argument for 'type_info_of', unspecialized polymorphic type");
+				error(ce->args[0], "Invalid argument for '%.*s', unspecialized polymorphic type", LIT(builtin_name));
 			} else {
-				error(ce->args[0], "Invalid argument for 'type_info_of'");
+				error(ce->args[0], "Invalid argument for '%.*s'", LIT(builtin_name));
 			}
 			return false;
 		}
@@ -1266,7 +1270,7 @@ bool check_builtin_procedure(CheckerContext *c, Operand *operand, Ast *call, i32
 		if (is_operand_value(o) && is_type_typeid(t)) {
 			add_package_dependency(c, "runtime", "__type_info_of");
 		} else if (o.mode != Addressing_Type) {
-			error(expr, "Expected a type or typeid for 'type_info_of'");
+			error(expr, "Expected a type or typeid for '%.*s'", LIT(builtin_name));
 			return false;
 		}
 
@@ -1280,6 +1284,10 @@ bool check_builtin_procedure(CheckerContext *c, Operand *operand, Ast *call, i32
 		if (c->scope->flags&ScopeFlag_Global) {
 			compiler_error("'typeid_of' Cannot be declared within the runtime package due to how the internals of the compiler works");
 		}
+		if (build_context.disallow_rtti) {
+			error(call, "'%.*s' has been disallowed", LIT(builtin_name));
+			return false;
+		}
 
 		// NOTE(bill): The type information may not be setup yet
 		init_core_type_info(c->checker);
@@ -1291,7 +1299,7 @@ bool check_builtin_procedure(CheckerContext *c, Operand *operand, Ast *call, i32
 		}
 		Type *t = o.type;
 		if (t == nullptr || t == t_invalid || is_type_asm_proc(o.type) || is_type_polymorphic(operand->type)) {
-			error(ce->args[0], "Invalid argument for 'typeid_of'");
+			error(ce->args[0], "Invalid argument for '%.*s'", LIT(builtin_name));
 			return false;
 		}
 		t = default_type(t);
@@ -1299,7 +1307,7 @@ bool check_builtin_procedure(CheckerContext *c, Operand *operand, Ast *call, i32
 		add_type_info_type(c, t);
 
 		if (o.mode != Addressing_Type) {
-			error(expr, "Expected a type for 'typeid_of'");
+			error(expr, "Expected a type for '%.*s'", LIT(builtin_name));
 			return false;
 		}
 
