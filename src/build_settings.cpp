@@ -1006,12 +1006,20 @@ void init_build_context(TargetMetrics *cross_target) {
 	#endif
 
 	if (bc->disable_red_zone) {
-		if (!(bc->metrics.os == TargetOs_freestanding && !is_arch_wasm())) {
+		if (!!is_arch_wasm() && bc->metrics.os == TargetOs_freestanding) {
 			gb_printf_err("-disable-red-zone is not support for this target");
 			gb_exit(1);
 		}
 	}
 
+	if (bc->metrics.os == TargetOs_freestanding) {
+		bc->no_entry_point = true;
+	} else {
+		if (bc->disallow_rtti) {
+			gb_printf_err("-disallow-rtti is only allowed on freestanding targets\n");
+			gb_exit(1);
+		}
+	}
 
 	// NOTE(zangent): The linker flags to set the build architecture are different
 	// across OSs. It doesn't make sense to allocate extra data on the heap
@@ -1063,14 +1071,14 @@ void init_build_context(TargetMetrics *cross_target) {
 		if (bc->metrics.arch == TargetArch_wasm64) {
 			link_flags = gb_string_appendc(link_flags, "-mwas64 ");
 		}
-		if (bc->metrics.os == TargetOs_freestanding) {
+		if (bc->no_entry_point) {
 			link_flags = gb_string_appendc(link_flags, "--no-entry ");
 		}
 		
 		bc->link_flags = make_string_c(link_flags);
 		
 		// Disallow on wasm
-		build_context.use_separate_modules = false;
+		bc->use_separate_modules = false;
 	} else {
 		gb_printf_err("Compiler Error: Unsupported architecture\n");
 		gb_exit(1);
@@ -1078,10 +1086,7 @@ void init_build_context(TargetMetrics *cross_target) {
 
 	bc->optimization_level = gb_clamp(bc->optimization_level, 0, 3);
 
-	if (bc->disallow_rtti && bc->metrics.os != TargetOs_freestanding)  {
-		gb_printf_err("-disallow-rtti is only allowed on freestanding targets\n");
-		gb_exit(1);
-	}
+
 
 	#undef LINK_FLAG_X64
 	#undef LINK_FLAG_386
