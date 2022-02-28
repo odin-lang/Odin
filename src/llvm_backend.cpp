@@ -624,6 +624,9 @@ struct lbGlobalVariable {
 };
 
 lbProcedure *lb_create_startup_type_info(lbModule *m) {
+	if (build_context.disallow_rtti) {
+		return nullptr;
+	}
 	LLVMPassManagerRef default_function_pass_manager = LLVMCreateFunctionPassManagerForModule(m->mod);
 	lb_populate_function_pass_manager(m, default_function_pass_manager, false, build_context.optimization_level);
 	LLVMFinalizeFunctionPassManager(default_function_pass_manager);
@@ -711,7 +714,9 @@ lbProcedure *lb_create_startup_runtime(lbModule *main_module, lbProcedure *start
 
 	lb_begin_procedure_body(p);
 
-	LLVMBuildCall2(p->builder, LLVMGetElementType(lb_type(main_module, startup_type_info->type)), startup_type_info->value, nullptr, 0, "");
+	if (startup_type_info) {
+		LLVMBuildCall2(p->builder, LLVMGetElementType(lb_type(main_module, startup_type_info->type)), startup_type_info->value, nullptr, 0, "");
+	}
 
 	if (objc_names) {
 		LLVMBuildCall2(p->builder, LLVMGetElementType(lb_type(main_module, objc_names->type)), objc_names->value, nullptr, 0, "");
@@ -1394,7 +1399,7 @@ void lb_generate_code(lbGenerator *gen) {
 
 	TIME_SECTION("LLVM Global Variables");
 
-	{
+	if (!build_context.disallow_rtti) {
 		lbModule *m = default_module;
 
 		{ // Add type info data

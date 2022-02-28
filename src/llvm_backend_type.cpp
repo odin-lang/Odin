@@ -90,6 +90,8 @@ lbValue lb_typeid(lbModule *m, Type *type) {
 }
 
 lbValue lb_type_info(lbModule *m, Type *type) {
+	GB_ASSERT(!build_context.disallow_rtti);
+
 	type = default_type(type);
 
 	isize index = lb_type_info_index(m->info, type);
@@ -108,6 +110,8 @@ lbValue lb_type_info(lbModule *m, Type *type) {
 }
 
 lbValue lb_get_type_info_ptr(lbModule *m, Type *type) {
+	GB_ASSERT(!build_context.disallow_rtti);
+
 	i32 index = cast(i32)lb_type_info_index(m->info, type);
 	GB_ASSERT(index >= 0);
 	// gb_printf_err("%d %s\n", index, type_to_string(type));
@@ -157,6 +161,10 @@ lbValue lb_type_info_member_tags_offset(lbProcedure *p, isize count) {
 
 
 void lb_setup_type_info_data(lbProcedure *p) { // NOTE(bill): Setup type_info data
+	if (build_context.disallow_rtti) {
+		return;
+	}
+
 	lbModule *m = p->module;
 	CheckerInfo *info = m->info;
 	
