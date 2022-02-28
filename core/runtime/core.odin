@@ -508,16 +508,18 @@ __type_info_of :: proc "contextless" (id: typeid) -> ^Type_Info #no_bounds_check
 	return &type_table[n]
 }
 
-typeid_base :: proc "contextless" (id: typeid) -> typeid {
-	ti := type_info_of(id)
-	ti = type_info_base(ti)
-	return ti.id
+when !ODIN_DISALLOW_RTTI {
+	typeid_base :: proc "contextless" (id: typeid) -> typeid {
+		ti := type_info_of(id)
+		ti = type_info_base(ti)
+		return ti.id
+	}
+	typeid_core :: proc "contextless" (id: typeid) -> typeid {
+		ti := type_info_core(type_info_of(id))
+		return ti.id
+	}
+	typeid_base_without_enum :: typeid_core
 }
-typeid_core :: proc "contextless" (id: typeid) -> typeid {
-	ti := type_info_core(type_info_of(id))
-	return ti.id
-}
-typeid_base_without_enum :: typeid_core
 
 
 
