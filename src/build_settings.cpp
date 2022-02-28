@@ -1077,6 +1077,11 @@ void init_build_context(TargetMetrics *cross_target) {
 
 	bc->optimization_level = gb_clamp(bc->optimization_level, 0, 3);
 
+	if (bc->disallow_rtti && bc->metrics.os != TargetOs_freestanding)  {
+		gb_printf_err("-disallow-rtti is only allowed on freestanding targets\n");
+		gb_exit(1);
+	}
+
 	#undef LINK_FLAG_X64
 	#undef LINK_FLAG_386
 }
