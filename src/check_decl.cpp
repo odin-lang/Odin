@@ -1205,6 +1205,8 @@ void check_global_variable_decl(CheckerContext *ctx, Entity *&e, Ast *type_expr,
 	Operand o = {};
 	check_expr_with_type_hint(ctx, &o, init_expr, e->type);
 	check_init_variable(ctx, e, &o, str_lit("variable declaration"));
+
+	check_rtti_type_disallowed(e->token, e->type, "A variable declaration is using a type, %s, which has been disallowed");
 }
 
 void check_proc_group_decl(CheckerContext *ctx, Entity *&pg_entity, DeclInfo *d) {

@@ -29,6 +29,23 @@ bool is_operand_undef(Operand o) {
 	return o.mode == Addressing_Value && o.type == t_untyped_undef;
 }
 
+bool check_rtti_type_disallowed(Token const &token, Type *type, char const *format) {
+	if (build_context.disallow_rtti && type) {
+		if (is_type_any(type)) {
+			gbString t = type_to_string(type);
+			error(token, format, t);
+			gb_string_free(t);
+			return true;
+		}
+	}
+	return false;
+}
+
+bool check_rtti_type_disallowed(Ast *expr, Type *type, char const *format) {
+	GB_ASSERT(expr != nullptr);
+	return check_rtti_type_disallowed(ast_token(expr), type, format);
+}
+
 void scope_reset(Scope *scope) {
 	if (scope == nullptr) return;
 
@@ -875,7 +892,8 @@ void init_universal(void) {
 
 // Types
 	for (isize i = 0; i < gb_count_of(basic_types); i++) {
-		add_global_type_entity(basic_types[i].Basic.name, &basic_types[i]);
+		String const &name = basic_types[i].Basic.name;
+		add_global_type_entity(name, &basic_types[i]);
 	}
 	add_global_type_entity(str_lit("byte"), &basic_types[Basic_u8]);
 
@@ -977,6 +995,7 @@ void init_universal(void) {
 	add_global_bool_constant("ODIN_TEST",                     bc->command_kind == Command_test);
 	add_global_bool_constant("ODIN_NO_ENTRY_POINT",           bc->no_entry_point);
 	add_global_bool_constant("ODIN_FOREIGN_ERROR_PROCEDURES", bc->ODIN_FOREIGN_ERROR_PROCEDURES);
+	add_global_bool_constant("ODIN_DISALLOW_RTTI",            bc->disallow_rtti);
 
 
 // Builtin Procedures
@@ -1668,6 +1687,10 @@ void add_implicit_entity(CheckerContext *c, Ast *clause, Entity *e) {
 
 void add_type_info_type(CheckerContext *c, Type *t) {
 	void add_type_info_type_internal(CheckerContext *c, Type *t);
+
+	if (build_context.disallow_rtti) {
+		return;
+	}
 
 	mutex_lock(&c->info->type_info_mutex);
 	add_type_info_type_internal(c, t);

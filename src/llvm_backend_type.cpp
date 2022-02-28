@@ -14,6 +14,8 @@ isize lb_type_info_index(CheckerInfo *info, Type *type, bool err_on_not_found=tr
 }
 
 lbValue lb_typeid(lbModule *m, Type *type) {
+	GB_ASSERT(!build_context.disallow_rtti);
+
 	type = default_type(type);
 
 	u64 id = cast(u64)lb_type_info_index(m->info, type);

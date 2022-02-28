@@ -3031,5 +3031,7 @@ Type *check_type_expr(CheckerContext *ctx, Ast *e, Type *named_type) {
 	}
 	set_base_type(named_type, type);
 
+	check_rtti_type_disallowed(e, type, "Use of a type, %s, which has been disallowed");
+
 	return type;
 }
