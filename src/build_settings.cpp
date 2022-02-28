@@ -277,6 +277,8 @@ struct BuildContext {
 	
 	bool copy_file_contents;
 
+	bool disallow_rtti;
+
 	RelocMode reloc_mode;
 	bool disable_red_zone;
 
@@ -946,7 +948,6 @@ void init_build_context(TargetMetrics *cross_target) {
 		}
 	}
 
-	
 	bc->copy_file_contents = true;
 
 	TargetMetrics *metrics = nullptr;

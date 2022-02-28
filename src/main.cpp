@@ -638,6 +638,7 @@ enum BuildFlagKind {
 	BuildFlag_StrictStyle,
 	BuildFlag_StrictStyleInitOnly,
 	BuildFlag_ForeignErrorProcedures,
+	BuildFlag_DisallowRTTI,
 
 	BuildFlag_Compact,
 	BuildFlag_GlobalDefinitions,
@@ -795,6 +796,9 @@ bool parse_build_flags(Array<String> args) {
 	add_flag(&build_flags, BuildFlag_StrictStyle,           str_lit("strict-style"),             BuildFlagParam_None, Command__does_check);
 	add_flag(&build_flags, BuildFlag_StrictStyleInitOnly,   str_lit("strict-style-init-only"),   BuildFlagParam_None, Command__does_check);
 	add_flag(&build_flags, BuildFlag_ForeignErrorProcedures, str_lit("foreign-error-procedures"), BuildFlagParam_None, Command__does_check);
+
+	add_flag(&build_flags, BuildFlag_DisallowRTTI,            str_lit("disallow-rtti"),              BuildFlagParam_None, Command__does_check);
+
 
 	add_flag(&build_flags, BuildFlag_Compact,           str_lit("compact"),            BuildFlagParam_None, Command_query);
 	add_flag(&build_flags, BuildFlag_GlobalDefinitions, str_lit("global-definitions"), BuildFlagParam_None, Command_query);
@@ -1389,6 +1393,9 @@ bool parse_build_flags(Array<String> args) {
 						}
 						case BuildFlag_DisallowDo:
 							build_context.disallow_do = true;
+							break;
+						case BuildFlag_DisallowRTTI:
+							build_context.disallow_rtti = true;
 							break;
 						case BuildFlag_DefaultToNilAllocator:
 							build_context.ODIN_DEFAULT_TO_NIL_ALLOCATOR = true;

@@ -1285,7 +1285,11 @@ void lb_generate_code(lbGenerator *gen) {
 		// x86-64-v3: (close to Haswell) AVX, AVX2, BMI1, BMI2, F16C, FMA, LZCNT, MOVBE, XSAVE
 		// x86-64-v4: AVX512F, AVX512BW, AVX512CD, AVX512DQ, AVX512VL
 		if (ODIN_LLVM_MINIMUM_VERSION_12) {
-			llvm_cpu = "x86-64-v2";
+			if (build_context.metrics.os == TargetOs_freestanding) {
+				llvm_cpu = "x86-64";
+			} else {
+				llvm_cpu = "x86-64-v2";
+			}
 		}
 	}
 
