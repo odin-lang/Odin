@@ -2174,7 +2174,7 @@ void init_map_entry_type(Type *type) {
 
 	/*
 	struct {
-		hash:  runtime.Map_Hash,
+		hash:  uintptr,
 		next:  int,
 		key:   Key,
 		value: Value,
