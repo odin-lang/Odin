@@ -463,7 +463,8 @@ i32 linker_stage(lbGenerator *gen) {
 			#endif
 			link_settings = gb_string_appendc(link_settings, "-Wl,-init,'_odin_entry_point' ");
 			link_settings = gb_string_appendc(link_settings, "-Wl,-fini,'_odin_exit_point' ");
-		} else {
+		} else if (build_context.metrics.os != TargetOs_openbsd) {
+			// OpenBSD defaults to PIE executable. do not pass -no-pie for it.
 			link_settings = gb_string_appendc(link_settings, "-no-pie ");
 		}
 		if (build_context.out_filepath.len > 0) {
