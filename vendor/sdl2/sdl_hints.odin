@@ -6,6 +6,7 @@ when ODIN_OS == .Windows { foreign import lib "SDL2.lib"    }
 when ODIN_OS == .Linux   { foreign import lib "system:SDL2" }
 when ODIN_OS == .Darwin  { foreign import lib "system:SDL2" }
 when ODIN_OS == .FreeBSD { foreign import lib "system:SDL2" }
+when ODIN_OS == .OpenBSD { foreign import lib "system:SDL2" }
 
 HINT_ACCELEROMETER_AS_JOYSTICK                :: "SDL_ACCELEROMETER_AS_JOYSTICK"
 HINT_ALLOW_ALT_TAB_WHILE_GRABBED              :: "SDL_ALLOW_ALT_TAB_WHILE_GRABBED"
