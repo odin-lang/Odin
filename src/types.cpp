@@ -703,7 +703,7 @@ struct TypePath;
 i64      type_size_of         (Type *t);
 i64      type_align_of        (Type *t);
 i64      type_offset_of       (Type *t, i32 index);
-gbString type_to_string       (Type *type);
+gbString type_to_string       (Type *type, bool shorthand=false);
 i64      type_size_of_internal(Type *t, TypePath *path);
 void     init_map_internal_types(Type *type);
 Type *   bit_set_to_int(Type *t);
@@ -3936,7 +3936,7 @@ Type *alloc_type_proc_from_types(Type **param_types, unsigned param_count, Type 
 
 
 
-gbString write_type_to_string(gbString str, Type *type) {
+gbString write_type_to_string(gbString str, Type *type, bool shorthand=false) {
 	if (type == nullptr) {
 		return gb_string_appendc(str, "<no type>");
 	}
@@ -4051,15 +4051,21 @@ gbString write_type_to_string(gbString str, Type *type) {
 		if (type->Struct.is_raw_union) str = gb_string_appendc(str, " #raw_union");
 		if (type->Struct.custom_align != 0) str = gb_string_append_fmt(str, " #align %d", cast(int)type->Struct.custom_align);
 		str = gb_string_appendc(str, " {");
-		for_array(i, type->Struct.fields) {
-			Entity *f = type->Struct.fields[i];
-			GB_ASSERT(f->kind == Entity_Variable);
-			if (i > 0) {
-				str = gb_string_appendc(str, ", ");
+
+
+		if (shorthand && type->Struct.fields.count > 16) {
+			str = gb_string_append_fmt(str, "%lld fields...", cast(long long)type->Struct.fields.count);
+		} else {
+			for_array(i, type->Struct.fields) {
+				Entity *f = type->Struct.fields[i];
+				GB_ASSERT(f->kind == Entity_Variable);
+				if (i > 0) {
+					str = gb_string_appendc(str, ", ");
+				}
+				str = gb_string_append_length(str, f->token.string.text, f->token.string.len);
+				str = gb_string_appendc(str, ": ");
+				str = write_type_to_string(str, f->type);
 			}
-			str = gb_string_append_length(str, f->token.string.text, f->token.string.len);
-			str = gb_string_appendc(str, ": ");
-			str = write_type_to_string(str, f->type);
 		}
 		str = gb_string_append_rune(str, '}');
 	} break;
@@ -4234,13 +4240,16 @@ gbString write_type_to_string(gbString str, Type *type) {
 }
 
 
-gbString type_to_string(Type *type, gbAllocator allocator) {
-	return write_type_to_string(gb_string_make(allocator, ""), type);
+gbString type_to_string(Type *type, gbAllocator allocator, bool shorthand=false) {
+	return write_type_to_string(gb_string_make(allocator, ""), type, shorthand);
 }
-gbString type_to_string(Type *type) {
-	return write_type_to_string(gb_string_make(heap_allocator(), ""), type);
+gbString type_to_string(Type *type, bool shorthand) {
+	return write_type_to_string(gb_string_make(heap_allocator(), ""), type, shorthand);
 }
 
+gbString type_to_string_shorthand(Type *type) {
+	return type_to_string(type, true);
+}
 
 
 
