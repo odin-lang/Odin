@@ -67,6 +67,7 @@ Method :: enum u8 {
 	POST,
 	PUT,
 	HEAD,
+	DELETE,
 }
 
 

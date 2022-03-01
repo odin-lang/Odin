@@ -143,8 +143,97 @@ parse_request :: proc(buffer: []u8) -> (req: Request, status_code: Status_Code) 
 	return
 }
 
+/*
+	TODO(cloin): Allow passing user contexts to routes
+	TODO(cloin): Make select_route support more complex routing options
+	TODO(cloin): Add support for ctrl-c signal handling?
+	TODO(cloin): Make new client sockets get passed to a task pool, rather than 1 for loop?
+	TODO(cloin): Fold file server into a server route
+	TODO(cloin): Add query param parsing / passthrough
+
+
+	Example usage:
+	```
+	hello_route :: proc(req: ^http.Request) -> (http.Status_Code, []string, []u8) {
+		ret := "hello\n"
+		return .Ok, nil, transmute([]u8)ret
+	}
+
+	main :: proc() {
+		srv := http.Server_Context{}
+		http.add_route(&srv, "/hello", hello_route)
+		http.start_server(&srv, 8000)
+	}
+	```
+*/
+
+Route_Callback :: proc(req: ^Request) -> (Status_Code, []string, []u8)
+
+Server_Context :: struct {
+	routes:  map[string]Route_Callback,
+}
+
+add_route :: proc(ctx: ^Server_Context, route: string, callback: Route_Callback) {
+	ctx.routes[route] = callback
+}
+
+select_route :: proc(ctx: ^Server_Context, route: string) -> (Route_Callback, bool) {
+	return ctx.routes[route]
+}
+
+start_server :: proc(ctx: ^Server_Context, port: int, allocator := context.allocator) {
+	context.allocator = allocator
+
+	skt, err := net.listen_tcp({net.IP6_Any, port})
+	if err != nil {
+		fmt.printf("Failed to bind to port!\n")
+		return
+	}
+
+	for ;; {
+		client, _, accept_err := net.accept_tcp(skt)
+		if accept_err != nil {
+			fmt.printf("Failed to listen for client?\n")
+			return
+		}
+		defer net.close(client)
+
+		read_buf := [4096]u8{}
+		_, recv_err := net.recv_tcp(client, read_buf[:])
+		if recv_err != nil {
+			fmt.printf("Failed to get data from client!\n")
+			return
+		}
+
+		req, status := parse_request(read_buf[:])
+		defer request_destroy(req)
+		if status != .Unknown {
+			resp := build_response(status)
+			send_response(client, transmute([]u8)resp)
+			delete(resp)
+			continue
+		}
+
+		route_func, ok := select_route(ctx, req.path)
+		if !ok {
+			resp := build_response(.Not_Found)
+			send_response(client, transmute([]u8)resp)
+			delete(resp)
+			continue
+		}
+
+		code, out_headers, data := route_func(&req)
+		resp := build_response(code, out_headers[:], string(data))
+		send_response(client, transmute([]u8)resp)
+		delete(resp)
+	}
+
+	unreachable()
+}
+
+
 // serve "project/static/*"
-serve_files :: proc(dir_path: string, port: int, allocator := context.allocator) -> () {
+serve_files :: proc(dir_path: string, port: int, allocator := context.allocator) {
 	context.allocator = allocator
 
 	skt, err := net.listen_tcp({net.IP6_Any, port})
