@@ -1106,7 +1106,7 @@ bool check_builtin_procedure(CheckerContext *c, Operand *operand, Ast *call, i32
 		
 		Selection sel = lookup_field(type, field_name, false);
 		if (sel.entity == nullptr) {
-			gbString type_str = type_to_string(type);
+			gbString type_str = type_to_string_shorthand(type);
 			error(ce->args[0],
 			      "'%s' has no field named '%.*s'", type_str, LIT(field_name));
 			gb_string_free(type_str);
@@ -1118,7 +1118,7 @@ bool check_builtin_procedure(CheckerContext *c, Operand *operand, Ast *call, i32
 			return false;
 		}
 		if (sel.indirect) {
-			gbString type_str = type_to_string(type);
+			gbString type_str = type_to_string_shorthand(type);
 			error(ce->args[0],
 			      "Field '%.*s' is embedded via a pointer in '%s'", LIT(field_name), type_str);
 			gb_string_free(type_str);
@@ -1179,7 +1179,7 @@ bool check_builtin_procedure(CheckerContext *c, Operand *operand, Ast *call, i32
 		
 		Selection sel = lookup_field(type, field_name, false);
 		if (sel.entity == nullptr) {
-			gbString type_str = type_to_string(type);
+			gbString type_str = type_to_string_shorthand(type);
 			error(ce->args[0],
 			      "'%s' has no field named '%.*s'", type_str, LIT(field_name));
 			gb_string_free(type_str);
@@ -1191,7 +1191,7 @@ bool check_builtin_procedure(CheckerContext *c, Operand *operand, Ast *call, i32
 			return false;
 		}
 		if (sel.indirect) {
-			gbString type_str = type_to_string(type);
+			gbString type_str = type_to_string_shorthand(type);
 			error(ce->args[0],
 			      "Field '%.*s' is embedded via a pointer in '%s'", LIT(field_name), type_str);
 			gb_string_free(type_str);
