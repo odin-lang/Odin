@@ -6,25 +6,25 @@ DEFAULT_PAGE_SIZE := uint(4096)
 
 Allocator_Error :: mem.Allocator_Error
 
-reserve :: proc(size: uint) -> (data: []byte, err: Allocator_Error) {
+reserve :: proc "contextless" (size: uint) -> (data: []byte, err: Allocator_Error) {
 	return _reserve(size)
 }
 
-commit :: proc(data: rawptr, size: uint) -> Allocator_Error {
+commit :: proc "contextless" (data: rawptr, size: uint) -> Allocator_Error {
 	return _commit(data, size)
 }
 
-reserve_and_commit :: proc(size: uint) -> (data: []byte, err: Allocator_Error) {
+reserve_and_commit :: proc "contextless" (size: uint) -> (data: []byte, err: Allocator_Error) {
 	data = reserve(size) or_return
 	commit(raw_data(data), size) or_return
 	return
 }
 
-decommit :: proc(data: rawptr, size: uint) {
+decommit :: proc "contextless" (data: rawptr, size: uint) {
 	_decommit(data, size)
 }
 
-release :: proc(data: rawptr, size: uint) {
+release :: proc "contextless" (data: rawptr, size: uint) {
 	_release(data, size)
 }
 
@@ -36,7 +36,7 @@ Protect_Flag :: enum u32 {
 Protect_Flags :: distinct bit_set[Protect_Flag; u32]
 Protect_No_Access :: Protect_Flags{}
 
-protect :: proc(data: rawptr, size: uint, flags: Protect_Flags) -> bool {
+protect :: proc "contextless" (data: rawptr, size: uint, flags: Protect_Flags) -> bool {
 	return _protect(data, size, flags)
 }
 
@@ -107,7 +107,7 @@ memory_block_alloc :: proc(committed, reserved: uint, flags: Memory_Block_Flags)
 }
 
 alloc_from_memory_block :: proc(block: ^Memory_Block, min_size, alignment: int) -> (data: []byte, err: Allocator_Error) {
-	calc_alignment_offset :: proc(block: ^Memory_Block, alignment: uintptr) -> uint {
+	calc_alignment_offset :: proc "contextless" (block: ^Memory_Block, alignment: uintptr) -> uint {
 		alignment_offset := uint(0)
 		ptr := uintptr(block.base[block.used:])
 		mask := alignment-1
