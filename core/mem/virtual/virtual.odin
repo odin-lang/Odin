@@ -82,11 +82,13 @@ memory_block_alloc :: proc(committed, reserved: uint, flags: Memory_Block_Flags)
 	pmblock := platform_memory_alloc(0, total_size) or_return
 	
 	pmblock.block.base = ([^]byte)(uintptr(pmblock) + base_offset)
-	commit(pmblock.block.base, committed) or_return
+	commit_err := platform_memory_commit(pmblock, uint(base_offset) + committed)
+	assert(commit_err == nil)
+
 	// Should be zeroed
 	assert(pmblock.block.used == 0)
 	assert(pmblock.block.prev == nil)	
-	if (do_protection) {
+	if do_protection {
 		protect(rawptr(uintptr(pmblock) + protect_offset), page_size, Protect_No_Access)
 	}
 	
@@ -115,23 +117,37 @@ alloc_from_memory_block :: proc(block: ^Memory_Block, min_size, alignment: int) 
 		return alignment_offset
 		
 	}
-	
+	do_commit_if_necessary :: proc(block: ^Memory_Block, size: uint) -> (err: Allocator_Error) {
+		if block.committed - block.used < size {
+			pmblock := (^Platform_Memory_Block)(block)
+			base_offset := uint(uintptr(block) - uintptr(pmblock))
+			platform_total_commit := base_offset + block.used + size
+
+			assert(pmblock.committed <= pmblock.reserved)
+			assert(pmblock.committed < platform_total_commit)
+
+			platform_memory_commit(pmblock, platform_total_commit) or_return
+
+			pmblock.committed = platform_total_commit
+			block.committed = pmblock.committed - base_offset
+		}
+		return nil
+	}
+
+
 	alignment_offset := calc_alignment_offset(block, uintptr(alignment))
-	
 	size := uint(min_size) + alignment_offset
-	
+
 	if block.used + size > block.reserved {
 		err = .Out_Of_Memory
 		return
 	}
-	
-	ptr := block.base[block.used:]
-	ptr = ptr[alignment_offset:]
-	
+	assert(block.committed <= block.reserved)
+	do_commit_if_necessary(block, size) or_return
+
+	data = block.base[block.used+alignment_offset:][:min_size]
 	block.used += size
-	assert(block.used <= block.reserved)
-	
-	return ptr[:min_size], nil	
+	return
 }
 
 

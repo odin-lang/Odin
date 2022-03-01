@@ -4,8 +4,9 @@ package mem_virtual
 import sync "core:sync/sync2"
 
 Platform_Memory_Block :: struct {
-	block:    Memory_Block,
-	reserved: uint,
+	block:      Memory_Block,
+	committed:  uint,
+	reserved:   uint,
 	prev, next: ^Platform_Memory_Block,
 } 
 
@@ -20,7 +21,8 @@ platform_memory_alloc :: proc(to_commit, to_reserve: uint) -> (block: ^Platform_
 	commit(raw_data(data), to_commit)
 	
 	block = (^Platform_Memory_Block)(raw_data(data))
-	block.reserved = to_reserve
+	block.committed = to_commit
+	block.reserved  = to_reserve
 	return
 }
 
@@ -51,4 +53,18 @@ platform_memory_init :: proc() {
 		global_platform_memory_block_sentinel.next = &global_platform_memory_block_sentinel
 		global_platform_memory_block_sentinel_set = true
 	}
+}
+
+platform_memory_commit :: proc(block: ^Platform_Memory_Block, to_commit: uint) -> (err: Allocator_Error) {
+	if to_commit < block.committed {
+		return nil
+	}
+	if to_commit > block.reserved {
+		return .Out_Of_Memory
+	}
+
+
+	commit(block, to_commit) or_return
+	block.committed = to_commit
+	return nil
 }
