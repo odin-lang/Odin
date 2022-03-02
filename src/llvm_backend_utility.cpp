@@ -1373,7 +1373,7 @@ lbValue lb_slice_elem(lbProcedure *p, lbValue slice) {
 	return lb_emit_struct_ev(p, slice, 0);
 }
 lbValue lb_slice_len(lbProcedure *p, lbValue slice) {
-	GB_ASSERT(is_type_slice(slice.type));
+	GB_ASSERT(is_type_slice(slice.type) || is_type_relative_slice(slice.type));
 	return lb_emit_struct_ev(p, slice, 1);
 }
 lbValue lb_dynamic_array_elem(lbProcedure *p, lbValue da) {
