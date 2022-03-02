@@ -7,7 +7,7 @@ when ODIN_OS == .Windows { foreign import lib "SDL2_mixer.lib"    }
 when ODIN_OS == .Linux   { foreign import lib "system:SDL2_mixer" }
 when ODIN_OS == .Darwin  { foreign import lib "system:SDL2_mixer" }
 when ODIN_OS == .FreeBSD { foreign import lib "system:SDL2_mixer" }
-
+when ODIN_OS == .OpenBSD { foreign import lib "system:SDL2_mixer" }
 
 MAJOR_VERSION :: 2
 MINOR_VERSION :: 0

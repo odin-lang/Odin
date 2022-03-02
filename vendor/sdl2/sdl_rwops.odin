@@ -6,6 +6,7 @@ when ODIN_OS == .Windows { foreign import lib "SDL2.lib"    }
 when ODIN_OS == .Linux   { foreign import lib "system:SDL2" }
 when ODIN_OS == .Darwin  { foreign import lib "system:SDL2" }
 when ODIN_OS == .FreeBSD { foreign import lib "system:SDL2" }
+when ODIN_OS == .OpenBSD { foreign import lib "system:SDL2" }
 
 /* RWops Types */
 RWOPS_UNKNOWN   :: 0 /**< Unknown stream type */

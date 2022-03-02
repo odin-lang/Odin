@@ -7,6 +7,7 @@ when ODIN_OS == .Windows { foreign import lib "SDL2_net.lib"    }
 when ODIN_OS == .Linux   { foreign import lib "system:SDL2_net" }
 when ODIN_OS == .Darwin  { foreign import lib "system:SDL2_net" }
 when ODIN_OS == .FreeBSD { foreign import lib "system:SDL2_net" }
+when ODIN_OS == .OpenBSD { foreign import lib "system:SDL2_net" }
 
 bool :: SDL.bool
 
