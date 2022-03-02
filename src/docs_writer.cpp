@@ -273,88 +273,27 @@ OdinDocPosition odin_doc_token_pos_cast(OdinDocWriter *w, TokenPos const &pos) {
 	return doc_pos;
 }
 
+bool get_doc_comment_group_lines(CommentGroup* g, Array<String>& doc_lines);
+
 bool odin_doc_append_comment_group_string(Array<u8> *buf, CommentGroup *g) {
 	if (g == nullptr) {
 		return false;
 	}
-	isize len = 0;
-	for_array(i, g->list) {
-		String comment = g->list[i].string;
-		len += comment.len;
-		len += 1; // for \n
-	}
-	if (len <= g->list.count) {
+
+	auto doc_lines = array_make<String>(heap_allocator(), 0, g->list.count);
+	defer(array_free(&doc_lines));
+	bool result = get_doc_comment_group_lines(g, doc_lines);
+	if (!result) {
 		return false;
 	}
 
-	isize count = 0;
-	for_array(i, g->list) {
-		String comment = g->list[i].string;
-		String original_comment = comment;
-
-		bool slash_slash = false;
-		if (comment[1] == '/') {
-			slash_slash = true;
-			comment.text += 2;
-			comment.len  -= 2;
-		} else if (comment[1] == '*') {
-			comment.text += 2;
-			comment.len  -= 4;
-		}
-
-		// Ignore the first space
-		if (comment.len > 0 && comment[0] == ' ') {
-			comment.text += 1;
-			comment.len  -= 1;
-		}
-
-		if (slash_slash) {
-			if (string_starts_with(comment, str_lit("+"))) {
-				continue;
-			}
-			if (string_starts_with(comment, str_lit("@("))) {
-				continue;
-			}
-		}
-
-		if (slash_slash) {
-			array_add_elems(buf, comment.text, comment.len);
-			array_add(buf, cast(u8)'\n');
-			count += 1;
-		} else {
-			isize pos = 0;
-			for (; pos < comment.len; pos++) {
-				isize end = pos;
-				for (; end < comment.len; end++) {
-					if (comment[end] == '\n') {
-						break;
-					}
-				}
-				String line = substring(comment, pos, end);
-				pos = end;
-				String trimmed_line = string_trim_whitespace(line);
-				if (trimmed_line.len == 0) {
-					if (count == 0) {
-						continue;
-					}
-				}
-				/*
-				 * Remove comments with
-				 * styles
-				 * like this
-				 */
-				if (string_starts_with(line, str_lit("* "))) {
-					line = substring(line, 2, line.len);
-				}
-
-				array_add_elems(buf, line.text, line.len);
-				array_add(buf, cast(u8)'\n');
-				count += 1;
-			}
-		}
+	for_array(i, doc_lines) {
+		String& line = doc_lines[i];
+		array_add_elems(buf, line.text, line.len);
+		array_add(buf, cast(u8)'\n');
 	}
 
-	if (count > 0) {
+	if (doc_lines.count > 0) {
 		array_add(buf, cast(u8)'\n');
 		return true;
 	}

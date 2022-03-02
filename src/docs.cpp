@@ -102,7 +102,24 @@ void print_doc_line_no_newline(i32 indent, String const &data) {
 }
 
 
-bool print_doc_comment_group_string(i32 indent, CommentGroup *g) {
+void adjust_common_indent_count(const String& line, isize& common_indent_level) {
+	isize number_of_indents = 0;
+	for (isize c = 0; c < line.len; c++) {
+		if (line[c] == '\t') {
+			number_of_indents += 1;
+		} else {
+			break;
+		}
+	}
+
+	if (common_indent_level == -1) {
+		common_indent_level = number_of_indents;
+	} else {
+		common_indent_level = gb_min(common_indent_level, number_of_indents);
+	}
+}
+
+bool get_doc_comment_group_lines(CommentGroup* g, Array<String>& doc_lines) {
 	if (g == nullptr) {
 		return false;
 	}
@@ -116,10 +133,11 @@ bool print_doc_comment_group_string(i32 indent, CommentGroup *g) {
 		return false;
 	}
 
+	isize common_indent_level = -1;
 	isize count = 0;
 	for_array(i, g->list) {
 		String comment = g->list[i].string;
-		String original_comment = comment;
+		// String original_comment = comment;
 
 		bool slash_slash = false;
 		if (comment[1] == '/') {
@@ -147,7 +165,16 @@ bool print_doc_comment_group_string(i32 indent, CommentGroup *g) {
 		}
 
 		if (slash_slash) {
-			print_doc_line(indent, comment);
+			String trimmed_comment = string_trim_whitespace(comment);
+			if (trimmed_comment.len == 0) {
+				if (count == 0) {
+					continue;
+				}
+			} else {
+				adjust_common_indent_count(comment, common_indent_level);
+			}
+
+			array_add(&doc_lines, comment);
 			count += 1;
 		} else {
 			isize pos = 0;
@@ -165,6 +192,8 @@ bool print_doc_comment_group_string(i32 indent, CommentGroup *g) {
 					if (count == 0) {
 						continue;
 					}
+				} else {
+					adjust_common_indent_count(line, common_indent_level);
 				}
 				/*
 				 * Remove comments with
@@ -175,20 +204,52 @@ bool print_doc_comment_group_string(i32 indent, CommentGroup *g) {
 					line = substring(line, 2, line.len);
 				}
 
-				print_doc_line(indent, line);
+				array_add(&doc_lines, line);
 				count += 1;
 			}
 		}
 	}
 
+	// Unindent common indents
+	for_array(i, doc_lines) {
+		String& line = doc_lines[i];
+		for (isize indent_level = 0; indent_level < common_indent_level; indent_level++) {
+			if (line.len > 0 && line[0] == '\t') {
+				line.text += 1;
+				line.len -= 1;
+			}
+		}
+	}
+
 	if (count > 0) {
-		print_doc_line(0, "");
 		return true;
 	}
 	return false;
 }
 
+bool print_doc_comment_group_string(i32 indent, CommentGroup *g) {
+	if (g == nullptr) {
+		return false;
+	}
+	
+	auto doc_lines = array_make<String>(heap_allocator(), 0, g->list.count);
+	defer(array_free(&doc_lines));
+	bool result = get_doc_comment_group_lines(g, doc_lines);
+	if (!result) {
+		return false;
+	}
 
+	for_array(i, doc_lines) {
+		String& line = doc_lines[i];
+		print_doc_line(indent, line);
+	}
+
+	if (doc_lines.count > 0) {
+		print_doc_line(0, "");
+		return true;
+	}
+	return false;
+}
 
 
 void print_doc_expr(Ast *expr) {
