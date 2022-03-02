@@ -9,6 +9,8 @@ when ODIN_OS == .Windows {
 		"system:Winmm.lib",
 		"system:Advapi32.lib",
 	}
+} else {
+	foreign import lib "system:portmidi"
 }
 
 #assert(size_of(b32) == size_of(c.int))
