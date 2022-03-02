@@ -2,8 +2,13 @@ package miniaudio
 
 import c "core:c/libc"
 
-when ODIN_OS == .Windows { foreign import lib "lib/miniaudio.lib" }
-when ODIN_OS == .Linux   { foreign import lib "lib/miniaudio.a" }
+when ODIN_OS == .Windows {
+	foreign import lib "lib/miniaudio.lib"
+} else when ODIN_OS == .Linux {
+	foreign import lib "lib/miniaudio.a"
+} else {
+	foreign import lib "system:miniaudio"
+}
 
 MAX_LOG_CALLBACKS :: 4
 
