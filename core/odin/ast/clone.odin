@@ -98,7 +98,7 @@ clone_node :: proc(node: ^Node) -> ^Node {
 	reflect.set_union_value(res.derived, derived_expr)
 	reflect.set_union_value(res.derived, derived_stmt)
 
-	switch r in res.derived {
+	if res.derived != nil do switch r in res.derived {
 	case ^Package, ^File:
 	case ^Bad_Expr:
 	case ^Ident:
@@ -313,7 +313,7 @@ clone_node :: proc(node: ^Node) -> ^Node {
 		r.tag = clone(r.tag)
 		r.type = clone(r.type)
 	case:
-		fmt.panicf("Unhandled node kind: %T", r)
+		fmt.panicf("Unhandled node kind: %v", r)
 	}
 
 	return res
