@@ -479,4 +479,4 @@ discard_to_next_byte_lsb_from_stream :: proc(z: ^Context_Stream_Input) {
 	consume_bits_lsb(z, discard)
 }
 
-discard_to_next_byte_lsb :: proc{discard_to_next_byte_lsb_from_memory, discard_to_next_byte_lsb_from_stream};
+discard_to_next_byte_lsb :: proc{discard_to_next_byte_lsb_from_memory, discard_to_next_byte_lsb_from_stream}
