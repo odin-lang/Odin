@@ -88,16 +88,20 @@ clone_node :: proc(node: ^Node) -> ^Node {
 		src = (^rawptr)(&node.derived)^
 	}
 	mem.copy(res, src, size)
-	res_any: any
-	res_any.data = res
-	res_any.id = ti.id
+	res_ptr_any: any
+	res_ptr_any.data = &res
+	res_ptr_any.id = ti.id
 
-	reflect.set_union_value(res.derived, res_any)
+	reflect.set_union_value(res.derived, res_ptr_any)
 
-	derived_expr := reflect.struct_field_value_by_name(res_any, "derived_expr", true)
-	derived_stmt := reflect.struct_field_value_by_name(res_any, "derived_stmt", true)
-	reflect.set_union_value(res.derived, derived_expr)
-	reflect.set_union_value(res.derived, derived_stmt)
+	res_ptr := reflect.deref(res_ptr_any)
+
+	if de := reflect.struct_field_value_by_name(res_ptr, "derived_expr", true); de != nil {
+		reflect.set_union_value(de, res_ptr_any)
+	}
+	if ds := reflect.struct_field_value_by_name(res_ptr, "derived_stmt", true); ds != nil {
+		reflect.set_union_value(ds, res_ptr_any)
+	}
 
 	if res.derived != nil do switch r in res.derived {
 	case ^Package, ^File:
