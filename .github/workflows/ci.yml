@@ -39,7 +39,7 @@ jobs:
           make
         timeout-minutes: 10
       - name: Odin check examples/all for Linux i386
-        run: ./odin check examples/all -vet -strict-style -target:linux_386
+        run: ./odin check examples/all -vet -strict-style -target:linux_i386
         timeout-minutes: 10
       - name: Odin check examples/all for OpenBSD amd64
         run: ./odin check examples/all -vet -strict-style -target:openbsd_amd64
@@ -151,5 +151,5 @@ jobs:
         shell: cmd
         run: |
           call "C:\Program Files (x86)\Microsoft Visual Studio\2019\Enterprise\VC\Auxiliary\Build\vcvars64.bat
-          odin check examples/all -strict-style -target:windows_386
+          odin check examples/all -strict-style -target:windows_i386
         timeout-minutes: 10
