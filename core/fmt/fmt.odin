@@ -605,7 +605,7 @@ fmt_bad_verb :: proc(using fi: ^Info, verb: rune) {
 fmt_bool :: proc(using fi: ^Info, b: bool, verb: rune) {
 	switch verb {
 	case 't', 'v':
-		io.write_string(writer, b ? "true" : "false", &fi.n)
+		fmt_string(fi, b ? "true" : "false", 's')
 	case:
 		fmt_bad_verb(fi, verb)
 	}
@@ -943,11 +943,27 @@ fmt_float :: proc(fi: ^Info, v: f64, bit_size: int, verb: rune) {
 fmt_string :: proc(fi: ^Info, s: string, verb: rune) {
 	switch verb {
 	case 's', 'v':
-		io.write_string(fi.writer, s, &fi.n)
-		if fi.width_set && len(s) < fi.width {
-			for _ in 0..<fi.width - len(s) {
-				io.write_byte(fi.writer, ' ', &fi.n)
+		if fi.width_set {
+			if fi.width > len(s) {
+				if fi.minus {
+					io.write_string(fi.writer, s, &fi.n)
+				}
+
+				for _ in 0..<fi.width - len(s) {
+					io.write_byte(fi.writer, ' ', &fi.n)
+				}
+
+				if !fi.minus {
+					io.write_string(fi.writer, s, &fi.n)
+				}
 			}
+			else {
+				io.write_string(fi.writer, s[:fi.width], &fi.n)
+			}
+		}
+		else
+		{
+			io.write_string(fi.writer, s, &fi.n)
 		}
 
 	case 'q': // quoted string
@@ -1058,7 +1074,7 @@ fmt_enum :: proc(fi: ^Info, v: any, verb: rune) {
 			fmt_arg(fi, any{v.data, runtime.type_info_base(e.base).id}, verb)
 		case 's', 'v':
 			if str, ok := enum_value_to_string(v); ok {
-				io.write_string(fi.writer, str, &fi.n)
+				fmt_string(fi, str, 's')
 			} else {
 				io.write_string(fi.writer, "%!(BAD ENUM VALUE=", &fi.n)
 				fmt_arg(fi, any{v.data, runtime.type_info_base(e.base).id}, 'i')
