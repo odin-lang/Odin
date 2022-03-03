@@ -1538,7 +1538,7 @@ void fix_advance_to_next_stmt(AstFile *f) {
 Token expect_closing(AstFile *f, TokenKind kind, String context) {
 	if (f->curr_token.kind != kind &&
 	    f->curr_token.kind == Token_Semicolon &&
-	    f->curr_token.string == "\n") {
+	    (f->curr_token.string == "\n" || f->curr_token.kind == Token_EOF)) {
 		Token tok = f->prev_token;
 		tok.pos.column += cast(i32)tok.string.len;
 		syntax_error(tok, "Missing ',' before newline in %.*s", LIT(context));
@@ -1560,6 +1560,7 @@ void assign_removal_flag_to_semicolon(AstFile *f) {
 			switch (curr_token->kind) {
 			case Token_CloseBrace:
 			case Token_CloseParen:
+			case Token_EOF:
 				ok = true;
 				break;
 			}
