@@ -327,4 +327,4 @@ KMOD_RESERVED :: Keymod{.RESERVED}
 KMOD_CTRL     :: Keymod{.LCTRL, .RCTRL}
 KMOD_SHIFT    :: Keymod{.LSHIFT, .RSHIFT}
 KMOD_ALT      :: Keymod{.LALT, .RALT}
-KMOD_GUI      :: Keymod{.LGUI, .RGUI};
+KMOD_GUI      :: Keymod{.LGUI, .RGUI}
