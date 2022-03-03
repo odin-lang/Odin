@@ -99,15 +99,17 @@ when ODIN_OS == .Windows {
 		"system:User32.lib",
 		"system:Shell32.lib",
 	}
-}
-when ODIN_OS == .Linux  {
+} else when ODIN_OS == .Linux  {
 	foreign import lib { 
 		"linux/libraylib.a",
 		"system:dl",
 		"system:pthread",
 	}
+} else when ODIN_OS == .Darwin {
+	foreign import lib "macos/libraylib.a"
+} else {
+	foreign import lib "system:raylib"
 }
-when ODIN_OS == .Darwin { foreign import lib "macos/libraylib.a" }
 
 VERSION :: "4.0"
 
