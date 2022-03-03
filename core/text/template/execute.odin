@@ -44,6 +44,7 @@ Execution_Error :: enum {
 	Invalid_Argument_Count,
 	Invalid_Argument_Type,
 	Out_Of_Bounds_Access,
+	Division_by_Zero,
 }
 Error :: union {
 	io.Error,
@@ -571,6 +572,201 @@ eval_field :: proc(s: ^State, dot: any, ident: string) -> (value: any, err: Erro
 	return nil, .Invalid_Value
 }
 
+Operator :: enum {
+	Add,
+	Sub,
+	Mul,
+	Div,
+}
+
+Value :: union {
+	bool,
+	i64,
+	f64,
+	string,
+}
+
+get_value :: proc(x: any) -> Value {
+	if v, ok := x.(Value); ok {
+		return v
+	}
+
+	id := reflect.typeid_core(x.id)
+	#partial switch reflect.type_kind(id) {
+	case .Integer, .Rune:
+		if v, ok := reflect.as_i64(x);    ok { return v }
+	case .Float:
+		if v, ok := reflect.as_f64(x);    ok { return v }
+	case .String:
+		if v, ok := reflect.as_string(x); ok { return v }
+	case .Boolean:
+		if v, ok := reflect.as_bool(x);   ok { return v }
+	}
+	return nil
+}
+
+promote_values :: proc(lhs, rhs: any) -> (x, y: Value, err: Error) {
+	a := get_value(lhs)
+	b := get_value(rhs)
+	if a == nil || b == nil {
+		err = .Invalid_Argument_Type
+		return
+	}
+	switch va in a {
+	case bool:
+		switch vb in b {
+		case bool:
+			return va, vb, nil
+		case i64:
+			return i64(va), vb, nil
+		case f64:
+			return f64(i64(va)), vb, nil
+		case string:
+			err = .Invalid_Argument_Type
+			return
+		}
+	case i64:
+		switch vb in b {
+		case bool:
+			return va, i64(vb), nil
+		case i64:
+			return va, vb, nil
+		case f64:
+			return f64(va), vb, nil
+		case string:
+			err = .Invalid_Argument_Type
+			return
+		}
+	case f64:
+		switch vb in b {
+		case bool:
+			return va, f64(i64(vb)), nil
+		case i64:
+			return va, f64(vb), nil
+		case f64:
+			return va, vb, nil
+		case string:
+			err = .Invalid_Argument_Type
+			return
+		}
+	case string:
+		switch vb in b {
+		case bool, i64, f64:
+			err = .Invalid_Argument_Type
+			return
+		case string:
+			return va, vb, nil
+		}
+	}
+
+	err = .Invalid_Argument_Type
+	return
+}
+
+eval_reduce :: proc(s: ^State, dot: any, op: Operator, args: []^parse.Node) -> (value: Value, err: Error) {
+	if len(args) < 1 {
+		return nil, .Invalid_Argument_Count
+	}
+
+	acc := get_value(eval_arg(s, dot, args[0]) or_return)
+	if acc == nil {
+		return nil, .Invalid_Argument_Type
+	}
+
+
+	if len(args) == 1 {
+		if op == .Add {
+			return acc, nil
+		}
+
+		switch v in acc {
+		case bool, string:
+			// none
+		case i64:
+			if op == .Sub {
+				return -v, nil
+			}
+		case f64:
+			if op == .Sub {
+				return -v, nil
+			}
+		}
+		return nil, .Invalid_Argument_Type
+	}
+
+	for arg in args[1:] {
+		elem := eval_arg(s, dot, arg) or_return
+		lhs, rhs := promote_values(acc, elem) or_return
+
+		switch x in lhs {
+		case bool:
+			y := rhs.(bool)
+			switch op {
+			case .Add:
+				acc = i64(x) + i64(y)
+			case .Sub:
+				acc = i64(x) - i64(y)
+			case .Mul:
+				acc = i64(x) * i64(y)
+			case .Div:
+				if !y {
+					err = .Division_by_Zero
+					return
+				}
+				acc = f64(i64(x)) / f64(i64(y))
+			}
+		case i64:
+			y := rhs.(i64)
+			switch op {
+			case .Add:
+				acc = x + y
+			case .Sub:
+				acc = x - y
+			case .Mul:
+				acc = x * y
+			case .Div:
+				if y == 0 {
+					err = .Division_by_Zero
+					return
+				}
+				acc = f64(x) / f64(y)
+			}
+		case f64:
+			y := rhs.(f64)
+			switch op {
+			case .Add:
+				acc = x + y
+			case .Sub:
+				acc = x - y
+			case .Mul:
+				acc = x * y
+			case .Div:
+				if y == 0 {
+					err = .Division_by_Zero
+					return
+				}
+				acc = x / y
+			}
+		case string:
+			y := rhs.(string)
+			if op != .Add {
+				err = .Invalid_Argument_Type
+				return
+			}
+			acc = strings.concatenate({x, y})
+		}
+
+	}
+
+	switch v in acc {
+	case bool:   return v, nil
+	case i64:    return v, nil
+	case f64:    return v, nil
+	case string: return v, nil
+	}
+	return nil, .Invalid_Argument_Type
+}
+
 eval_function :: proc(s: ^State, dot: any, name: string, cmd: ^parse.Node_Command, final: any) -> (value: any, err: Error) {
 	cmd_args := cmd.args[1:]
 
@@ -580,16 +776,28 @@ eval_function :: proc(s: ^State, dot: any, name: string, cmd: ^parse.Node_Comman
 			error(s, "%q expects at least 1 argument", name)
 			return nil, .Invalid_Argument_Count
 		}
-		// TODO
 
-		return nil, nil
-	case "*":
+		res := eval_reduce(s, dot, .Add if name == "+" else .Sub, cmd_args) or_return
+		switch v in res {
+		case bool:   return new_any(v), nil
+		case i64:    return new_any(v), nil
+		case f64:    return new_any(v), nil
+		case string: return new_any(v), nil
+		}
+		return nil, .Invalid_Argument_Type
+	case "*", "/":
 		if len(cmd_args) < 1 {
 			error(s, "%q expects at least 2 arguments, got %d", name, len(cmd_args))
 			return nil, .Invalid_Argument_Count
 		}
-		// TODO
-		return nil, nil
+		res := eval_reduce(s, dot, .Mul if name == "*" else .Div, cmd_args) or_return
+		switch v in res {
+		case bool:   return new_any(v), nil
+		case i64:    return new_any(v), nil
+		case f64:    return new_any(v), nil
+		case string: return new_any(v), nil
+		}
+		return nil, .Invalid_Argument_Type
 	}
 
 	function, ok := builtin_funcs[name]

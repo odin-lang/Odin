@@ -495,7 +495,7 @@ step :: proc(s: ^Scanner, state: Scan_State) -> Scan_State {
 		case '0' <= r && r <= '9':
 			backup(s)
 			return .Number
-		case r == '+', r == '-', r == '*':
+		case r == '+', r == '-', r == '*', r == '/':
 			emit(s, .Operator)
 		case is_alpha_numeric(r):
 			backup(s)
