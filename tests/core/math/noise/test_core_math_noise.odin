@@ -3,6 +3,7 @@ package test_core_math_noise
 import "core:testing"
 import "core:math/noise"
 import "core:fmt"
+import "core:os"
 
 TEST_count := 0
 TEST_fail  := 0
@@ -35,6 +36,9 @@ main :: proc() {
 	t := testing.T{}
 	noise_test(&t)
 	fmt.printf("%v/%v tests successful.\n", TEST_count - TEST_fail, TEST_count)
+	if TEST_fail > 0 {
+		os.exit(1)
+	}
 }
 
 Test_Vector :: struct {

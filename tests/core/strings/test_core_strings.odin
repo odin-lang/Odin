@@ -3,6 +3,7 @@ package test_core_image
 import "core:strings"
 import "core:testing"
 import "core:fmt"
+import "core:os"
 
 TEST_count := 0
 TEST_fail  := 0
@@ -35,6 +36,9 @@ main :: proc() {
     test_index_any_larger_string_found(&t)
 
     fmt.printf("%v/%v tests successful.\n", TEST_count - TEST_fail, TEST_count)
+    if TEST_fail > 0 {
+        os.exit(1)
+    }
 }
 
 @test
