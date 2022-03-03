@@ -99,15 +99,17 @@ when ODIN_OS == .Windows {
 		"system:User32.lib",
 		"system:Shell32.lib",
 	}
-}
-when ODIN_OS == .Linux  {
+} else when ODIN_OS == .Linux  {
 	foreign import lib { 
 		"linux/libraylib.a",
 		"system:dl",
 		"system:pthread",
 	}
+} else when ODIN_OS == .Darwin {
+	foreign import lib "macos/libraylib.a"
+} else {
+	foreign import lib "system:raylib"
 }
-when ODIN_OS == .Darwin { foreign import lib "macos/libraylib.a" }
 
 VERSION :: "4.0"
 
@@ -1150,9 +1152,9 @@ foreign lib {
 	DrawRectangleGradientH    :: proc(posX, posY, width, height: c.int, color1: Color, color2: Color) ---                                              // Draw a horizontal-gradient-filled rectangle
 	DrawRectangleGradientEx   :: proc(rec: Rectangle, col1, col2, col3, col4: Color) ---                                                               // Draw a gradient-filled rectangle with custom vertex colors
 	DrawRectangleLines        :: proc(posX, posY, width, height: c.int, color: Color) ---                                                              // Draw rectangle outline
-	DrawRectangleLinesEx      :: proc(rec: Rectangle, lineThick: c.int, color: Color) ---                                                              // Draw rectangle outline with extended parameters
+	DrawRectangleLinesEx      :: proc(rec: Rectangle, lineThick: f32, color: Color) ---                                                                // Draw rectangle outline with extended parameters
 	DrawRectangleRounded      :: proc(rec: Rectangle, roundness: f32, segments: c.int, color: Color) ---                                               // Draw rectangle with rounded edges
-	DrawRectangleRoundedLines :: proc(rec: Rectangle, roundness: f32, segments: c.int, lineThick: c.int, color: Color) ---                             // Draw rectangle with rounded edges outline
+	DrawRectangleRoundedLines :: proc(rec: Rectangle, roundness: f32, segments: c.int, lineThick: f32, color: Color) ---                               // Draw rectangle with rounded edges outline
 	DrawTriangle              :: proc(v1, v2, v3: Vector2, color: Color) ---                                                                           // Draw a color-filled triangle (vertex in counter-clockwise order!)
 	DrawTriangleLines         :: proc(v1, v2, v3: Vector2, color: Color) ---                                                                           // Draw triangle outline (vertex in counter-clockwise order!)
 	DrawTriangleFan           :: proc(points: [^]Vector2, pointsCount: c.int, color: Color) ---                                                        // Draw a triangle fan defined by points (first vertex is the center)
