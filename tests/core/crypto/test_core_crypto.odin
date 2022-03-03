@@ -37,6 +37,7 @@ import "core:crypto/jh"
 import "core:crypto/groestl"
 import "core:crypto/haval"
 import "core:crypto/siphash"
+import "core:os"
 
 TEST_count := 0
 TEST_fail  := 0
@@ -127,6 +128,9 @@ main :: proc() {
     bench_modern(&t)
 
     fmt.printf("%v/%v tests successful.\n", TEST_count - TEST_fail, TEST_count)
+    if TEST_fail > 0 {
+        os.exit(1)
+    }
 }
 
 TestHash :: struct {
