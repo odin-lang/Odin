@@ -8,7 +8,7 @@ import "core:strings"
 is_separator :: proc(c: byte) -> bool {
 	switch c {
 	case '/':  return true
-	case '\\': return ODIN_OS == "windows"
+	case '\\': return ODIN_OS == .Windows
 	}
 	return false
 }
@@ -32,7 +32,7 @@ volume_name :: proc(path: string) -> string {
 }
 
 volume_name_len :: proc(path: string) -> int {
-	if ODIN_OS == "windows" {
+	if ODIN_OS == .Windows {
 		if len(path) < 2 {
 			return 0
 		}
@@ -284,13 +284,14 @@ rel :: proc(base_path, target_path: string, allocator := context.allocator) -> (
 }
 
 dir :: proc(path: string, allocator := context.allocator) -> string {
+        context.allocator = allocator
 	vol := volume_name(path)
 	i := len(path) - 1
 	for i >= len(vol) && !is_separator(path[i]) {
 		i -= 1
 	}
-	dir := clean(path[len(vol) : i+1], allocator)
-	defer delete(dir, allocator)
+	dir := clean(path[len(vol) : i+1])
+	defer delete(dir)
 	if dir == "." && len(vol) > 2 {
 		return strings.clone(vol)
 	}

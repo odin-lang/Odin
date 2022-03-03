@@ -2,27 +2,32 @@ package libc
 
 // 7.30 Wide character classification and mapping utilities
 
-when ODIN_OS == "windows" {
+when ODIN_OS == .Windows {
 	foreign import libc "system:libucrt.lib"
-} else when ODIN_OS == "darwin" {
+} else when ODIN_OS == .Darwin {
 	foreign import libc "system:System.framework"
 } else {
 	foreign import libc "system:c"
 }
 
-when ODIN_OS == "windows" {
+when ODIN_OS == .Windows {
 	wctrans_t :: distinct wchar_t
 	wctype_t  :: distinct ushort
 }
 
-when ODIN_OS == "linux" {
+when ODIN_OS == .Linux {
 	wctrans_t :: distinct intptr_t
 	wctype_t  :: distinct ulong
 }
 
-when ODIN_OS == "darwin" {
+when ODIN_OS == .Darwin {
 	wctrans_t :: distinct int
 	wctype_t  :: distinct u32
+}
+
+when ODIN_OS == .OpenBSD {
+	wctrans_t :: distinct rawptr
+	wctype_t  :: distinct rawptr
 }
 
 @(default_calling_convention="c")

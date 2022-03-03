@@ -313,6 +313,7 @@ foreign libc {
 	@(link_name="getenv")   _unix_getenv   :: proc(cstring) -> cstring ---
 	@(link_name="getcwd")   _unix_getcwd   :: proc(buf: cstring, len: c.size_t) -> cstring ---
 	@(link_name="chdir")    _unix_chdir    :: proc(buf: cstring) -> c.int ---
+	@(link_name="mkdir")    _unix_mkdir    :: proc(buf: cstring, mode: u32) -> c.int ---
 	@(link_name="realpath") _unix_realpath :: proc(path: cstring, resolved_path: rawptr) -> rawptr ---
 
 	@(link_name="strerror") _darwin_string_error :: proc(num : c.int) -> cstring ---
@@ -320,7 +321,7 @@ foreign libc {
 	@(link_name="exit")    _unix_exit :: proc(status: c.int) -> ! ---
 }
 
-when ODIN_ARCH != "arm64" {
+when ODIN_ARCH != .arm64 {
 	_unix_fdopendir :: proc {_unix_fdopendir_amd64}
 	_unix_readdir_r :: proc {_unix_readdir_r_amd64}
 } else {
@@ -344,14 +345,13 @@ get_last_error_string :: proc() -> string {
 }
 
 open :: proc(path: string, flags: int = O_RDWR, mode: int = 0) -> (Handle, Errno) {
-	cstr := strings.clone_to_cstring(path)
+	cstr := strings.clone_to_cstring(path, context.temp_allocator)
 	handle := _unix_open(cstr, i32(flags), u16(mode))
-	delete(cstr)
 	if handle == -1 {
 		return INVALID_HANDLE, 1
 	}
 
-when  ODIN_OS == "darwin" && ODIN_ARCH == "arm64" {
+when  ODIN_OS == .Darwin && ODIN_ARCH == .arm64 {
 	if mode != 0 {
 		err := fchmod(handle, cast(u16)mode)
 		if err != 0 {
@@ -664,6 +664,15 @@ get_current_directory :: proc() -> string {
 set_current_directory :: proc(path: string) -> (err: Errno) {
 	cstr := strings.clone_to_cstring(path, context.temp_allocator)
 	res := _unix_chdir(cstr)
+	if res == -1 {
+		return Errno(get_last_error())
+	}
+	return ERROR_NONE
+}
+
+make_directory :: proc(path: string, mode: u32 = 0o775) -> Errno {
+	path_cstr := strings.clone_to_cstring(path, context.temp_allocator)
+	res := _unix_mkdir(path_cstr, mode)
 	if res == -1 {
 		return Errno(get_last_error())
 	}

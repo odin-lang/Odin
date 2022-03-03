@@ -57,6 +57,7 @@ void lb_mem_copy_non_overlapping(lbProcedure *p, lbValue dst, lbValue src, lbVal
 	LLVMBuildCall(p->builder, ip, args, gb_count_of(args), "");
 }
 
+
 lbProcedure *lb_create_procedure(lbModule *m, Entity *entity, bool ignore_body) {
 	GB_ASSERT(entity != nullptr);
 	GB_ASSERT(entity->kind == Entity_Procedure);
@@ -163,14 +164,6 @@ lbProcedure *lb_create_procedure(lbModule *m, Entity *entity, bool ignore_body) 
 		break;
 	}
 
-
-
-	// lbCallingConventionKind cc_kind = lbCallingConvention_C;
-	// // TODO(bill): Clean up this logic
-	// if (build_context.metrics.os != TargetOs_js)  {
-	// 	cc_kind = lb_calling_convention_map[pt->Proc.calling_convention];
-	// }
-	// LLVMSetFunctionCallConv(p->value, cc_kind);
 	lbValue proc_value = {p->value, p->type};
 	lb_add_entity(m, entity,  proc_value);
 	lb_add_member(m, p->name, proc_value);
@@ -480,9 +473,8 @@ void lb_begin_procedure_body(lbProcedure *p) {
 				} else if (arg_type->kind == lbArg_Direct) {
 					if (e->token.string.len != 0 && !is_blank_ident(e->token.string)) {
 						LLVMTypeRef param_type = lb_type(p->module, e->type);
-						LLVMValueRef value = LLVMGetParam(p->value, param_offset+param_index);
-
-						value = OdinLLVMBuildTransmute(p, value, param_type);
+						LLVMValueRef original_value = LLVMGetParam(p->value, param_offset+param_index);
+						LLVMValueRef value = OdinLLVMBuildTransmute(p, original_value, param_type);
 
 						lbValue param = {};
 						param.value = value;
@@ -491,7 +483,16 @@ void lb_begin_procedure_body(lbProcedure *p) {
 						lbValue ptr = lb_address_from_load_or_generate_local(p, param);
 						GB_ASSERT(LLVMIsAAllocaInst(ptr.value));
 						lb_add_entity(p->module, e, ptr);
-						lb_add_debug_param_variable(p, ptr.value, e->type, e->token, param_index+1);
+
+						lbBlock *block = p->decl_block;
+						if (original_value != value) {
+							block = p->curr_block;
+						}
+						LLVMValueRef debug_storage_value = value;
+						if (original_value != value && LLVMIsALoadInst(value)) {
+							debug_storage_value = LLVMGetOperand(value, 0);
+						}
+						lb_add_debug_param_variable(p, debug_storage_value, e->type, e->token, param_index+1, block);
 					}
 				} else if (arg_type->kind == lbArg_Indirect) {
 					if (e->token.string.len != 0 && !is_blank_ident(e->token.string)) {
@@ -499,7 +500,7 @@ void lb_begin_procedure_body(lbProcedure *p) {
 						ptr.value = LLVMGetParam(p->value, param_offset+param_index);
 						ptr.type = alloc_type_pointer(e->type);
 						lb_add_entity(p->module, e, ptr);
-						lb_add_debug_param_variable(p, ptr.value, e->type, e->token, param_index+1);
+						lb_add_debug_param_variable(p, ptr.value, e->type, e->token, param_index+1, p->decl_block);
 					}
 				}
 			}
@@ -2105,6 +2106,85 @@ lbValue lb_build_builtin_proc(lbProcedure *p, Ast *expr, TypeAndValue const &tv,
 			res.value = LLVMBuildCall2(p->builder, func_type, inline_asm, args, arg_count, "");
 			res.type = t_uintptr;
 			return res;
+		}
+
+	case BuiltinProc_objc_send:
+		return lb_handle_objc_send(p, expr);
+
+	case BuiltinProc_objc_find_selector:     return lb_handle_objc_find_selector(p, expr);
+	case BuiltinProc_objc_find_class:        return lb_handle_objc_find_class(p, expr);
+	case BuiltinProc_objc_register_selector: return lb_handle_objc_register_selector(p, expr);
+	case BuiltinProc_objc_register_class:    return lb_handle_objc_register_class(p, expr);
+
+
+	case BuiltinProc_constant_utf16_cstring:
+		{
+			auto const encode_surrogate_pair = [](Rune r, u16 *r1, u16 *r2) {
+				if (r < 0x10000 || r > 0x10ffff) {
+					*r1 = 0xfffd;
+					*r2 = 0xfffd;
+				} else {
+					r -= 0x10000;
+					*r1 = 0xd800 + ((r>>10)&0x3ff);
+					*r2 = 0xdc00 + (r&0x3ff);
+				}
+			};
+
+			lbModule *m = p->module;
+
+			auto tav = type_and_value_of_expr(ce->args[0]);
+			GB_ASSERT(tav.value.kind == ExactValue_String);
+			String value = tav.value.value_string;
+
+			LLVMTypeRef llvm_u16 = lb_type(m, t_u16);
+
+			isize max_len = value.len*2 + 1;
+			LLVMValueRef *buffer = gb_alloc_array(temporary_allocator(), LLVMValueRef, max_len);
+			isize n = 0;
+			while (value.len > 0) {
+				Rune r = 0;
+				isize w = gb_utf8_decode(value.text, value.len, &r);
+				value.text += w;
+				value.len  -= w;
+				if ((0 <= r && r < 0xd800) || (0xe000 <= r && r < 0x10000)) {
+					buffer[n++] = LLVMConstInt(llvm_u16, cast(u16)r, false);
+				} else if (0x10000 <= r && r <= 0x10ffff) {
+					u16 r1, r2;
+					encode_surrogate_pair(r, &r1, &r2);
+					buffer[n++] = LLVMConstInt(llvm_u16, r1, false);
+					buffer[n++] = LLVMConstInt(llvm_u16, r2, false);
+				} else {
+					buffer[n++] = LLVMConstInt(llvm_u16, 0xfffd, false);
+				}
+			}
+
+			buffer[n++] = LLVMConstInt(llvm_u16, 0, false);
+
+			LLVMValueRef array = LLVMConstArray(llvm_u16, buffer, cast(unsigned int)n);
+
+			char *name = nullptr;
+			{
+				isize max_len = 7+8+1;
+				name = gb_alloc_array(permanent_allocator(), char, max_len);
+				u32 id = m->gen->global_array_index.fetch_add(1);
+				isize len = gb_snprintf(name, max_len, "csbs$%x", id);
+				len -= 1;
+			}
+			LLVMValueRef global_data = LLVMAddGlobal(m->mod, LLVMTypeOf(array), name);
+			LLVMSetInitializer(global_data, array);
+			LLVMSetLinkage(global_data, LLVMInternalLinkage);
+
+
+
+			LLVMValueRef indices[] = {
+				LLVMConstInt(lb_type(m, t_u32), 0, false),
+				LLVMConstInt(lb_type(m, t_u32), 0, false),
+			};
+			lbValue res = {};
+			res.type = tv.type;
+			res.value = LLVMBuildInBoundsGEP(p->builder, global_data, indices, gb_count_of(indices), "");
+			return res;
+
 		}
 	}
 

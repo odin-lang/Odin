@@ -2,9 +2,9 @@ package libc
 
 // 7.27 Date and time
 
-when ODIN_OS == "windows" {
+when ODIN_OS == .Windows {
 	foreign import libc "system:libucrt.lib"
-} else when ODIN_OS == "darwin" {
+} else when ODIN_OS == .Darwin {
 	foreign import libc "system:System.framework"
 } else {
 	foreign import libc "system:c"
@@ -12,7 +12,7 @@ when ODIN_OS == "windows" {
 
 // We enforce 64-bit time_t and timespec as there is no reason to use 32-bit as
 // we approach the 2038 problem. Windows has defaulted to this since VC8 (2005).
-when ODIN_OS == "windows" {
+when ODIN_OS == .Windows {
 	foreign libc {
 		// 7.27.2 Time manipulation functions
 		                               clock        :: proc() -> clock_t ---
@@ -45,7 +45,7 @@ when ODIN_OS == "windows" {
 	}
 }
 
-when ODIN_OS == "linux" || ODIN_OS == "freebsd" || ODIN_OS == "darwin" {
+when ODIN_OS == .Linux || ODIN_OS == .FreeBSD || ODIN_OS == .Darwin || ODIN_OS == .OpenBSD {
 	@(default_calling_convention="c")
 	foreign libc {
 		// 7.27.2 Time manipulation functions
@@ -63,7 +63,12 @@ when ODIN_OS == "linux" || ODIN_OS == "freebsd" || ODIN_OS == "darwin" {
 		strftime     :: proc(s: [^]char, maxsize: size_t, format: cstring, timeptr: ^tm) -> size_t ---
 	}
 
-	CLOCKS_PER_SEC :: 1000000
+	when ODIN_OS == .OpenBSD {
+		CLOCKS_PER_SEC :: 100
+	} else {
+		CLOCKS_PER_SEC :: 1000000
+	}
+
 	TIME_UTC       :: 1
 
 	time_t         :: distinct i64

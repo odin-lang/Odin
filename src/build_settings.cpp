@@ -1,4 +1,4 @@
-#if defined(GB_SYSTEM_FREEBSD)
+#if defined(GB_SYSTEM_FREEBSD) || defined(GB_SYSTEM_OPENBSD)
 #include <sys/types.h>
 #include <sys/sysctl.h>
 #endif
@@ -16,6 +16,7 @@ enum TargetOsKind {
 	TargetOs_linux,
 	TargetOs_essence,
 	TargetOs_freebsd,
+	TargetOs_openbsd,
 	
 	TargetOs_wasi,
 	TargetOs_js,
@@ -53,6 +54,7 @@ String target_os_names[TargetOs_COUNT] = {
 	str_lit("linux"),
 	str_lit("essence"),
 	str_lit("freebsd"),
+	str_lit("openbsd"),
 	
 	str_lit("wasi"),
 	str_lit("js"),
@@ -354,6 +356,15 @@ gb_global TargetMetrics target_freebsd_amd64 = {
 	str_lit("e-m:w-i64:64-f80:128-n8:16:32:64-S128"),
 };
 
+gb_global TargetMetrics target_openbsd_amd64 = {
+	TargetOs_openbsd,
+	TargetArch_amd64,
+	8,
+	16,
+	str_lit("x86_64-unknown-openbsd-elf"),
+	str_lit("e-m:e-p270:32:32-p271:32:32-p272:64:64-i64:64-f80:128-n8:16:32:64-S128"),
+};
+
 gb_global TargetMetrics target_essence_amd64 = {
 	TargetOs_essence,
 	TargetArch_amd64,
@@ -417,6 +428,7 @@ gb_global NamedTargetMetrics named_targets[] = {
 	{ str_lit("windows_amd64"),       &target_windows_amd64  },
 	{ str_lit("freebsd_386"),         &target_freebsd_386    },
 	{ str_lit("freebsd_amd64"),       &target_freebsd_amd64  },
+	{ str_lit("openbsd_amd64"),       &target_openbsd_amd64  },
 	{ str_lit("freestanding_wasm32"), &target_freestanding_wasm32 },
 	{ str_lit("wasi_wasm32"),         &target_wasi_wasm32 },
 	{ str_lit("js_wasm32"),           &target_js_wasm32 },
@@ -722,10 +734,38 @@ String internal_odin_root_dir(void) {
 		len = readlink("/proc/curproc/exe", &path_buf[0], path_buf.count);
 #elif defined(GB_SYSTEM_DRAGONFLYBSD)
 		len = readlink("/proc/curproc/file", &path_buf[0], path_buf.count);
-#else
+#elif defined(GB_SYSTEM_LINUX)
 		len = readlink("/proc/self/exe", &path_buf[0], path_buf.count);
+#elif defined(GB_SYSTEM_OPENBSD)
+		int error;
+		int mib[] = {
+			CTL_KERN,
+			KERN_PROC_ARGS,
+			getpid(),
+			KERN_PROC_ARGV,
+		};
+		// get argv size
+		error = sysctl(mib, 4, NULL, (size_t *) &len, NULL, 0);
+		if (error == -1) {
+			// sysctl error
+			return make_string(nullptr, 0);
+		}
+		// get argv
+		char **argv = (char **)gb_malloc(len);
+		error = sysctl(mib, 4, argv, (size_t *) &len, NULL, 0);
+		if (error == -1) {
+			// sysctl error
+			gb_mfree(argv);
+			return make_string(nullptr, 0);
+		}
+		// copy argv[0] to path_buf
+		len = gb_strlen(argv[0]);
+		if(len < path_buf.count) {
+			gb_memmove(&path_buf[0], argv[0], len);
+		}
+		gb_mfree(argv);
 #endif
-		if(len == 0) {
+		if(len == 0 || len == -1) {
 			return make_string(nullptr, 0);
 		}
 		if (len < path_buf.count) {
@@ -922,6 +962,8 @@ void init_build_context(TargetMetrics *cross_target) {
 			#endif
 		#elif defined(GB_SYSTEM_FREEBSD)
 			metrics = &target_freebsd_amd64;
+		#elif defined(GB_SYSTEM_OPENBSD)
+			metrics = &target_openbsd_amd64;
 		#elif defined(GB_CPU_ARM)
 			metrics = &target_linux_arm64;
 		#else
@@ -978,6 +1020,9 @@ void init_build_context(TargetMetrics *cross_target) {
 			bc->link_flags = str_lit("-arch x86-64 ");
 			break;
 		case TargetOs_freebsd:
+			bc->link_flags = str_lit("-arch x86-64 ");
+			break;
+		case TargetOs_openbsd:
 			bc->link_flags = str_lit("-arch x86-64 ");
 			break;
 		}

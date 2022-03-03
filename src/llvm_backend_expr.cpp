@@ -3303,9 +3303,9 @@ lbAddr lb_build_addr(lbProcedure *p, Ast *expr) {
 	case_end;
 
 	case_ast_node(se, SelectorExpr, expr);
-		Ast *sel = unparen_expr(se->selector);
-		if (sel->kind == Ast_Ident) {
-			String selector = sel->Ident.token.string;
+		Ast *sel_node = unparen_expr(se->selector);
+		if (sel_node->kind == Ast_Ident) {
+			String selector = sel_node->Ident.token.string;
 			TypeAndValue tav = type_and_value_of_expr(se->expr);
 
 			if (tav.mode == Addressing_Invalid) {
@@ -3320,7 +3320,12 @@ lbAddr lb_build_addr(lbProcedure *p, Ast *expr) {
 
 			Type *type = base_type(tav.type);
 			if (tav.mode == Addressing_Type) { // Addressing_Type
-				GB_PANIC("Unreachable");
+				Selection sel = lookup_field(tav.type, selector, true);
+				if (sel.pseudo_field) {
+					GB_ASSERT(sel.entity->kind == Entity_Procedure);
+					return lb_addr(lb_find_value_from_entity(p->module, sel.entity));
+				}
+				GB_PANIC("Unreachable %.*s", LIT(selector));
 			}
 
 			if (se->swizzle_count > 0) {
@@ -3347,6 +3352,11 @@ lbAddr lb_build_addr(lbProcedure *p, Ast *expr) {
 
 			Selection sel = lookup_field(type, selector, false);
 			GB_ASSERT(sel.entity != nullptr);
+			if (sel.pseudo_field) {
+				GB_ASSERT(sel.entity->kind == Entity_Procedure);
+				Entity *e = entity_of_node(sel_node);
+				return lb_addr(lb_find_value_from_entity(p->module, e));
+			}
 
 			{
 				lbAddr addr = lb_build_addr(p, se->expr);

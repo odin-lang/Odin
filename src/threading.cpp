@@ -486,7 +486,7 @@ void thread_set_name(Thread *t, char const *name) {
 #elif defined(GB_SYSTEM_OSX)
 	// TODO(bill): Test if this works
 	pthread_setname_np(name);
-#elif defined(GB_SYSTEM_FREEBSD)
+#elif defined(GB_SYSTEM_FREEBSD) || defined(GB_SYSTEM_OPENBSD)
 	pthread_set_name_np(t->posix_handle, name);
 #else
 	// TODO(bill): Test if this works

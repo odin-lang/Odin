@@ -4,8 +4,8 @@ import c "core:c/libc"
 
 #assert(size_of(c.int) == size_of(b32))
 
-when ODIN_OS == "windows" { foreign import stbi "../lib/stb_image.lib" }
-when ODIN_OS == "linux"   { foreign import stbi "../lib/stb_image.a"   }
+when ODIN_OS == .Windows { foreign import stbi "../lib/stb_image.lib" }
+when ODIN_OS == .Linux   { foreign import stbi "../lib/stb_image.a"   }
 
 #assert(size_of(b32) == size_of(c.int))
 
@@ -74,8 +74,9 @@ foreign stbi {
 	info_from_memory    :: proc(buffer: [^]byte, len: c.int,       x, y, comp: ^c.int) -> c.int ---
 	info_from_callbacks :: proc(clbk: ^Io_Callbacks, user: rawptr, x, y, comp: ^c.int) -> c.int ---
 	
-	is_16_bit           :: proc(filename: cstring) -> b32 ---
-	is_16_bit_from_file :: proc(f: ^c.FILE) -> b32 ---
+	is_16_bit             :: proc(filename: cstring) -> b32 ---
+	is_16_bit_from_file   :: proc(f: ^c.FILE) -> b32 ---
+	is_16_bit_from_memory :: proc(buffer: [^]byte, len: c.int) -> c.int ---
 
 	// for image formats that explicitly notate that they have premultiplied alpha,
 	// we just return the colors as stored in the file. set this flag to force
