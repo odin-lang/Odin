@@ -101,6 +101,9 @@ foreign user32 {
 	}
 	@(link_name="GetCursorPos")     get_cursor_pos      :: proc(p: ^Point) -> Bool ---
 	@(link_name="SetCursorPos")     set_cursor_pos      :: proc(x, y: i32) -> Bool ---
+	@(link_name="GetCapure")        get_capture         :: proc(hwnd: Hwnd) -> Hwnd ---
+	@(link_name="SetCapture")       set_capture         :: proc(hwnd: Hwnd) -> Hwnd ---
+	@(link_name="ReleaseCapture")   release_capture     :: proc() -> Bool ---
 	@(link_name="ScreenToClient")   screen_to_client    :: proc(h: Hwnd, p: ^Point) -> Bool ---
 	@(link_name="ClientToScreen")   client_to_screen    :: proc(h: Hwnd, p: ^Point) -> Bool ---
 	@(link_name="PostQuitMessage")  post_quit_message   :: proc(exit_code: i32) ---

@@ -2,8 +2,13 @@ package miniaudio
 
 import "core:c"
 
-when ODIN_OS == "windows" { foreign import lib "lib/miniaudio.lib" }
-when ODIN_OS == "linux"   { foreign import lib "lib/miniaudio.a" }
+when ODIN_OS == .Windows {
+	foreign import lib "lib/miniaudio.lib"
+} else when ODIN_OS == .Linux {
+	foreign import lib "lib/miniaudio.a"
+} else {
+	foreign import lib "system:miniaudio"
+}
 
 handle :: distinct rawptr
 
@@ -270,7 +275,7 @@ thread_priority :: enum c.int {
 /* Spinlocks are 32-bit for compatibility reasons. */
 spinlock :: distinct u32
 
-when ODIN_OS == "windows" {
+when ODIN_OS == .Windows {
 	thread    :: distinct rawptr
 	mutex     :: distinct rawptr
 	event     :: distinct rawptr

@@ -1,4 +1,4 @@
-//+build linux, darwin, freebsd
+//+build linux, darwin, freebsd, openbsd
 package ENet
 
 // When we implement the appropriate bindings for Unix, the section separated
@@ -14,7 +14,7 @@ import "core:c"
 
 @(private="file") FD_ZERO :: #force_inline proc(s: ^fd_set) {
 	for i := size_of(fd_set) / size_of(c.long); i != 0; i -= 1 {
-		s.fds_bits[i] = 0;
+		s.fds_bits[i] = 0
 	}
 }
 

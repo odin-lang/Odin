@@ -33,6 +33,11 @@ Calling_Convention :: enum u8 {
 
 	None        = 6,
 	Naked       = 7,
+
+	_           = 8, // reserved
+
+	Win64       = 9,
+	SysV        = 10,
 }
 
 Type_Info_Enum_Value :: distinct i64
@@ -346,7 +351,6 @@ Context :: struct {
 	assertion_failure_proc: Assertion_Failure_Proc,
 	logger:                 Logger,
 
-	user_data:  any,
 	user_ptr:   rawptr,
 	user_index: int,
 
@@ -386,6 +390,35 @@ Raw_Cstring :: struct {
 	data: [^]byte,
 }
 
+
+/*
+	// Defined internally by the compiler
+	Odin_OS_Type :: enum int {
+		Unknown,
+		Windows,
+		Darwin,
+		Linux,
+		Essence,
+		FreeBSD,
+		WASI,
+		JS,
+		Freestanding,
+	}
+*/
+Odin_OS_Type :: type_of(ODIN_OS)
+
+/*
+	// Defined internally by the compiler
+	Odin_Arch_Type :: enum int {
+		Unknown,
+		amd64,
+		i386,
+		arm64,
+		wasm32,
+		wasm64,
+	}
+*/
+Odin_Arch_Type :: type_of(ODIN_ARCH)
 
 /*
 	// Defined internally by the compiler
@@ -540,7 +573,7 @@ __init_context :: proc "contextless" (c: ^Context) {
 }
 
 default_assertion_failure_proc :: proc(prefix, message: string, loc: Source_Code_Location) -> ! {
-	when ODIN_OS == "freestanding" {
+	when ODIN_OS == .Freestanding {
 		// Do nothing
 	} else {
 		print_caller_location(loc)

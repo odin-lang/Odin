@@ -46,6 +46,7 @@ enum ParseFileError {
 	ParseFile_InvalidToken,
 	ParseFile_GeneralError,
 	ParseFile_FileTooLarge,
+	ParseFile_DirectoryAlreadyExists,
 
 	ParseFile_Count,
 };
@@ -96,8 +97,6 @@ struct AstFile {
 	u32          flags;
 	AstPackage * pkg;
 	Scope *      scope;
-
-	Arena  arena;
 
 	Ast *        pkg_decl;
 	String       fullpath;
@@ -249,10 +248,28 @@ enum ProcCallingConvention : i32 {
 
 	ProcCC_InlineAsm   = 8,
 
+	ProcCC_Win64       = 9,
+	ProcCC_SysV        = 10,
+
+
 	ProcCC_MAX,
 
 
 	ProcCC_ForeignBlockDefault = -1,
+};
+
+char const *proc_calling_convention_strings[ProcCC_MAX] = {
+	"",
+	"odin",
+	"contextless",
+	"cdecl",
+	"stdcall",
+	"fastcall",
+	"none",
+	"naked",
+	"inlineasm",
+	"win64",
+	"sysv",
 };
 
 ProcCallingConvention default_calling_convention(void) {
@@ -282,6 +299,7 @@ enum FieldFlag : u32 {
 	FieldFlag_auto_cast = 1<<4,
 	FieldFlag_const     = 1<<5,
 	FieldFlag_any_int   = 1<<6,
+	FieldFlag_subtype   = 1<<7,
 
 	// Internal use by the parser only
 	FieldFlag_Tags      = 1<<10,
@@ -289,7 +307,7 @@ enum FieldFlag : u32 {
 
 	// Parameter List Restrictions
 	FieldFlag_Signature = FieldFlag_ellipsis|FieldFlag_using|FieldFlag_no_alias|FieldFlag_c_vararg|FieldFlag_auto_cast|FieldFlag_const|FieldFlag_any_int,
-	FieldFlag_Struct    = FieldFlag_using|FieldFlag_Tags,
+	FieldFlag_Struct    = FieldFlag_using|FieldFlag_subtype|FieldFlag_Tags,
 };
 
 enum StmtAllowFlag {
@@ -782,10 +800,10 @@ gb_inline bool is_ast_when_stmt(Ast *node) {
 	return node->kind == Ast_WhenStmt;
 }
 
-gb_global gb_thread_local Arena global_ast_arena = {};
+gb_global gb_thread_local Arena global_thread_local_ast_arena = {};
 
 gbAllocator ast_allocator(AstFile *f) {
-	Arena *arena = f ? &f->arena : &global_ast_arena;
+	Arena *arena = &global_thread_local_ast_arena;
 	return arena_allocator(arena);
 }
 

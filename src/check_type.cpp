@@ -144,6 +144,7 @@ void check_struct_fields(CheckerContext *ctx, Ast *node, Slice<Entity *> *fields
 		}
 
 		bool is_using = (p->flags&FieldFlag_using) != 0;
+		bool is_subtype = (p->flags&FieldFlag_subtype) != 0;
 
 		for_array(j, p->names) {
 			Ast *name = p->names[j];
@@ -158,6 +159,9 @@ void check_struct_fields(CheckerContext *ctx, Ast *node, Slice<Entity *> *fields
 			Entity *field = alloc_entity_field(ctx->scope, name_token, type, is_using, field_src_index);
 			add_entity(ctx, ctx->scope, name, field);
 			field->Variable.field_group_index = field_group_index;
+			if (is_subtype) {
+				field->flags |= EntityFlag_Subtype;
+			}
 
 			if (j == 0) {
 				field->Variable.docs = docs;
@@ -193,6 +197,20 @@ void check_struct_fields(CheckerContext *ctx, Ast *node, Slice<Entity *> *fields
 			}
 
 			populate_using_entity_scope(ctx, node, p, type);
+		}
+
+		if (is_subtype && p->names.count > 0) {
+			Type *first_type = fields_array[fields_array.count-1]->type;
+			Type *t = base_type(type_deref(first_type));
+
+			if (!does_field_type_allow_using(t) &&
+			    p->names.count >= 1 &&
+			    p->names[0]->kind == Ast_Ident) {
+				Token name_token = p->names[0]->Ident.token;
+				gbString type_str = type_to_string(first_type);
+				error(name_token, "'subtype' cannot be applied to the field '%.*s' of type '%s'", LIT(name_token.string), type_str);
+				gb_string_free(type_str);
+			}
 		}
 	}
 	
@@ -323,6 +341,10 @@ void add_polymorphic_record_entity(CheckerContext *ctx, Ast *node, Type *named_t
 	}
 
 	named_type->Named.type_name = e;
+	GB_ASSERT(original_type->kind == Type_Named);
+	e->TypeName.objc_class_name = original_type->Named.type_name->TypeName.objc_class_name;
+	// TODO(bill): Is this even correct? Or should the metadata be copied?
+	e->TypeName.objc_metadata = original_type->Named.type_name->TypeName.objc_metadata;
 
 	mutex_lock(&ctx->info->gen_types_mutex);
 	auto *found_gen_types = map_get(&ctx->info->gen_types, original_type);
@@ -1905,6 +1927,25 @@ bool check_procedure_type(CheckerContext *ctx, Type *type, Ast *proc_type_node, 
 	} else {
 		c->scope->flags &= ~ScopeFlag_ContextDefined;
 	}
+
+	TargetArchKind arch = build_context.metrics.arch;
+	switch (cc) {
+	case ProcCC_StdCall:
+	case ProcCC_FastCall:
+		if (arch != TargetArch_i386 && arch != TargetArch_amd64) {
+			error(proc_type_node, "Invalid procedure calling convention \"%s\" for target architecture, expected either i386 or amd64, got %.*s",
+			      proc_calling_convention_strings[cc], LIT(target_arch_names[arch]));
+		}
+		break;
+	case ProcCC_Win64:
+	case ProcCC_SysV:
+		if (arch != TargetArch_amd64) {
+			error(proc_type_node, "Invalid procedure calling convention \"%s\" for target architecture, expected amd64, got %.*s",
+			      proc_calling_convention_strings[cc], LIT(target_arch_names[arch]));
+		}
+		break;
+	}
+
 
 	bool variadic = false;
 	isize variadic_index = -1;

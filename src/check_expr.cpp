@@ -132,6 +132,62 @@ void check_did_you_mean_print(DidYouMeanAnswers *d, char const *prefix = "") {
 	}
 }
 
+void populate_check_did_you_mean_objc_entity(StringSet *set, Entity *e, bool is_type) {
+	if (e->kind != Entity_TypeName) {
+		return;
+	}
+	if (e->TypeName.objc_metadata == nullptr) {
+		return;
+	}
+	TypeNameObjCMetadata *objc_metadata = e->TypeName.objc_metadata;
+	Type *t = base_type(e->type);
+	GB_ASSERT(t->kind == Type_Struct);
+
+	if (is_type) {
+		for_array(i, objc_metadata->type_entries) {
+			String name = objc_metadata->type_entries[i].name;
+			string_set_add(set, name);
+		}
+	} else {
+		for_array(i, objc_metadata->value_entries) {
+			String name = objc_metadata->value_entries[i].name;
+			string_set_add(set, name);
+		}
+	}
+
+	for_array(i, t->Struct.fields) {
+		Entity *f = t->Struct.fields[i];
+		if (f->flags & EntityFlag_Using && f->type != nullptr) {
+			if (f->type->kind == Type_Named && f->type->Named.type_name) {
+				populate_check_did_you_mean_objc_entity(set, f->type->Named.type_name, is_type);
+			}
+		}
+	}
+}
+
+
+void check_did_you_mean_objc_entity(String const &name, Entity *e, bool is_type, char const *prefix = "") {
+	ERROR_BLOCK();
+	GB_ASSERT(e->kind == Entity_TypeName);
+	GB_ASSERT(e->TypeName.objc_metadata != nullptr);
+	auto *objc_metadata = e->TypeName.objc_metadata;
+	mutex_lock(objc_metadata->mutex);
+	defer (mutex_unlock(objc_metadata->mutex));
+
+	StringSet set = {};
+	string_set_init(&set, heap_allocator());
+	defer (string_set_destroy(&set));
+	populate_check_did_you_mean_objc_entity(&set, e, is_type);
+
+
+	DidYouMeanAnswers d = did_you_mean_make(heap_allocator(), set.entries.count, name);
+	defer (did_you_mean_destroy(&d));
+	for_array(i, set.entries) {
+		did_you_mean_append(&d, set.entries[i].value);
+	}
+	check_did_you_mean_print(&d, prefix);
+}
+
 void check_did_you_mean_type(String const &name, Array<Entity *> const &fields, char const *prefix = "") {
 	ERROR_BLOCK();
 
@@ -143,6 +199,7 @@ void check_did_you_mean_type(String const &name, Array<Entity *> const &fields, 
 	}
 	check_did_you_mean_print(&d, prefix);
 }
+
 
 void check_did_you_mean_type(String const &name, Slice<Entity *> const &fields, char const *prefix = "") {
 	ERROR_BLOCK();
@@ -226,42 +283,6 @@ void check_scope_decls(CheckerContext *c, Slice<Ast *> const &nodes, isize reser
 			check_entity_decl(c, e, d, nullptr);
 		}
 	}
-}
-
-
-isize check_is_assignable_to_using_subtype(Type *src, Type *dst, isize level = 0, bool src_is_ptr = false) {
-	Type *prev_src = src;
-	src = type_deref(src);
-	if (!src_is_ptr) {
-		src_is_ptr = src != prev_src;
-	}
-	src = base_type(src);
-
-	if (!is_type_struct(src)) {
-		return 0;
-	}
-
-	for_array(i, src->Struct.fields) {
-		Entity *f = src->Struct.fields[i];
-		if (f->kind != Entity_Variable || (f->flags&EntityFlag_Using) == 0) {
-			continue;
-		}
-
-		if (are_types_identical(f->type, dst)) {
-			return level+1;
-		}
-		if (src_is_ptr && is_type_pointer(dst)) {
-			if (are_types_identical(f->type, type_deref(dst))) {
-				return level+1;
-			}
-		}
-		isize nested_level = check_is_assignable_to_using_subtype(f->type, dst, level+1, src_is_ptr);
-		if (nested_level > 0) {
-			return nested_level;
-		}
-	}
-
-	return 0;
 }
 
 bool find_or_generate_polymorphic_procedure(CheckerContext *old_c, Entity *base_entity, Type *type,
@@ -4449,14 +4470,19 @@ Entity *check_selector(CheckerContext *c, Operand *operand, Ast *node, Type *typ
 
 	if (entity == nullptr) {
 		gbString op_str   = expr_to_string(op_expr);
-		gbString type_str = type_to_string(operand->type);
+		gbString type_str = type_to_string_shorthand(operand->type);
 		gbString sel_str  = expr_to_string(selector);
 		error(op_expr, "'%s' of type '%s' has no field '%s'", op_str, type_str, sel_str);
 
 		if (operand->type != nullptr && selector->kind == Ast_Ident) {
 			String const &name = selector->Ident.token.string;
 			Type *bt = base_type(operand->type);
-			if (bt->kind == Type_Struct) {
+			if (operand->type->kind == Type_Named &&
+			    operand->type->Named.type_name &&
+			    operand->type->Named.type_name->kind == Entity_TypeName &&
+			    operand->type->Named.type_name->TypeName.objc_metadata) {
+				check_did_you_mean_objc_entity(name, operand->type->Named.type_name, operand->mode == Addressing_Type);
+			} else if (bt->kind == Type_Struct) {
 				check_did_you_mean_type(name, bt->Struct.fields);
 			} else if (bt->kind == Type_Enum) {
 				check_did_you_mean_type(name, bt->Enum.fields);
@@ -4485,7 +4511,7 @@ Entity *check_selector(CheckerContext *c, Operand *operand, Ast *node, Type *typ
 		}
 
 		gbString op_str   = expr_to_string(op_expr);
-		gbString type_str = type_to_string(operand->type);
+		gbString type_str = type_to_string_shorthand(operand->type);
 		gbString sel_str  = expr_to_string(selector);
 		error(op_expr, "Cannot access non-constant field '%s' from '%s'", sel_str, op_str);
 		gb_string_free(sel_str);
@@ -4510,7 +4536,7 @@ Entity *check_selector(CheckerContext *c, Operand *operand, Ast *node, Type *typ
 		}
 
 		gbString op_str   = expr_to_string(op_expr);
-		gbString type_str = type_to_string(operand->type);
+		gbString type_str = type_to_string_shorthand(operand->type);
 		gbString sel_str  = expr_to_string(selector);
 		error(op_expr, "Cannot access non-constant field '%s' from '%s'", sel_str, op_str);
 		gb_string_free(sel_str);
@@ -4523,7 +4549,7 @@ Entity *check_selector(CheckerContext *c, Operand *operand, Ast *node, Type *typ
 
 	if (expr_entity != nullptr && is_type_polymorphic(expr_entity->type)) {
 		gbString op_str   = expr_to_string(op_expr);
-		gbString type_str = type_to_string(operand->type);
+		gbString type_str = type_to_string_shorthand(operand->type);
 		gbString sel_str  = expr_to_string(selector);
 		error(op_expr, "Cannot access field '%s' from non-specialized polymorphic type '%s'", sel_str, op_str);
 		gb_string_free(sel_str);
@@ -6432,10 +6458,10 @@ ExprKind check_call_expr(CheckerContext *c, Operand *operand, Ast *call, Ast *pr
 		return builtin_procs[id].kind;
 	}
 
-	Entity *e = entity_of_node(operand->expr);
+	Entity *initial_entity = entity_of_node(operand->expr);
 
-	if (e != nullptr && e->kind == Entity_Procedure) {
-		if (e->Procedure.deferred_procedure.entity != nullptr) {
+	if (initial_entity != nullptr && initial_entity->kind == Entity_Procedure) {
+		if (initial_entity->Procedure.deferred_procedure.entity != nullptr) {
 			call->viral_state_flags |= ViralStateFlag_ContainsDeferredProcedure;
 		}
 	}
@@ -9809,6 +9835,9 @@ gbString write_expr_to_string(gbString str, Ast *node, bool shorthand) {
 		}
 		if (f->flags&FieldFlag_const) {
 			str = gb_string_appendc(str, "#const ");
+		}
+		if (f->flags&FieldFlag_subtype) {
+			str = gb_string_appendc(str, "#subtype ");
 		}
 
 		for_array(i, f->names) {

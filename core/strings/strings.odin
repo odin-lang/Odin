@@ -280,10 +280,29 @@ _split :: proc(s_, sep: string, sep_save, n_: int, allocator := context.allocato
 	return res[:i+1]
 }
 
+/*
+	Splits a string into parts, based on a separator.
+	Returned strings are substrings of 's'.
+	```
+	s := "aaa.bbb.ccc.ddd.eee" // 5 parts
+	ss := split(s, ".")
+	fmt.println(ss)            // [aaa, bbb, ccc, ddd, eee]
+	```
+*/
 split :: proc(s, sep: string, allocator := context.allocator) -> []string {
 	return _split(s, sep, 0, -1, allocator)
 }
 
+/*
+	Splits a string into a total of 'n' parts, based on a separator.
+	Returns fewer parts if there wasn't enough occurrences of the separator.
+	Returned strings are substrings of 's'.
+	```
+	s := "aaa.bbb.ccc.ddd.eee" // 5 parts present
+	ss := split_n(s, ".", 3)   // total of 3 wanted
+	fmt.println(ss)            // [aaa, bbb, ccc.ddd.eee]
+	```
+*/
 split_n :: proc(s, sep: string, n: int, allocator := context.allocator) -> []string {
 	return _split(s, sep, 0, n, allocator)
 }
@@ -298,13 +317,7 @@ split_after_n :: proc(s, sep: string, n: int, allocator := context.allocator) ->
 
 
 @private
-_split_iterator :: proc(s: ^string, sep: string, sep_save, n: int) -> (res: string, ok: bool) {
-	s, n := s, n
-
-	if n == 0 {
-		return
-	}
-
+_split_iterator :: proc(s: ^string, sep: string, sep_save: int) -> (res: string, ok: bool) {
 	if sep == "" {
 		res = s[:]
 		ok = true
@@ -312,44 +325,27 @@ _split_iterator :: proc(s: ^string, sep: string, sep_save, n: int) -> (res: stri
 		return
 	}
 
-	if n < 0 {
-		n = count(s^, sep) + 1
-	}
-
-	n -= 1
-
-	i := 0
-	for ; i < n; i += 1 {
-		m := index(s^, sep)
-		if m < 0 {
-			break
-		}
+	m := index(s^, sep)
+	if m < 0 {
+		// not found
+		res = s[:]
+		ok = res != ""
+		s^ = s[len(s):]
+	} else {
 		res = s[:m+sep_save]
 		ok = true
 		s^ = s[m+len(sep):]
-		return
 	}
-	res = s[:]
-	ok = res != ""
-	s^ = s[len(s):]
 	return
 }
 
 
 split_iterator :: proc(s: ^string, sep: string) -> (string, bool) {
-	return _split_iterator(s, sep, 0, -1)
-}
-
-split_n_iterator :: proc(s: ^string, sep: string, n: int) -> (string, bool) {
-	return _split_iterator(s, sep, 0, n)
+	return _split_iterator(s, sep, 0)
 }
 
 split_after_iterator :: proc(s: ^string, sep: string) -> (string, bool) {
-	return _split_iterator(s, sep, len(sep), -1)
-}
-
-split_after_n_iterator :: proc(s: ^string, sep: string, n: int) -> (string, bool) {
-	return _split_iterator(s, sep, len(sep), n)
+	return _split_iterator(s, sep, len(sep))
 }
 
 
@@ -402,25 +398,13 @@ split_lines_after_n :: proc(s: string, n: int, allocator := context.allocator) -
 
 split_lines_iterator :: proc(s: ^string) -> (line: string, ok: bool) {
 	sep :: "\n"
-	line = _split_iterator(s, sep, 0, -1) or_return
-	return _trim_cr(line), true
-}
-
-split_lines_n_iterator :: proc(s: ^string, n: int) -> (line: string, ok: bool) {
-	sep :: "\n"
-	line = _split_iterator(s, sep, 0, n) or_return
+	line = _split_iterator(s, sep, 0) or_return
 	return _trim_cr(line), true
 }
 
 split_lines_after_iterator :: proc(s: ^string) -> (line: string, ok: bool) {
 	sep :: "\n"
-	line = _split_iterator(s, sep, len(sep), -1) or_return
-	return _trim_cr(line), true
-}
-
-split_lines_after_n_iterator :: proc(s: ^string, n: int) -> (line: string, ok: bool) {
-	sep :: "\n"
-	line = _split_iterator(s, sep, len(sep), n) or_return
+	line = _split_iterator(s, sep, len(sep)) or_return
 	return _trim_cr(line), true
 }
 
