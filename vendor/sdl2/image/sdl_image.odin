@@ -3,11 +3,11 @@ package sdl2_image
 import "core:c"
 import SDL ".."
 
-when ODIN_OS == .Windows { foreign import lib "SDL2_image.lib"    }
-when ODIN_OS == .Linux   { foreign import lib "system:SDL2_image" }
-when ODIN_OS == .Darwin  { foreign import lib "system:SDL2_image" }
-when ODIN_OS == .FreeBSD { foreign import lib "system:SDL2_image" }
-when ODIN_OS == .OpenBSD { foreign import lib "system:SDL2_image" }
+when ODIN_OS == .Windows {
+	foreign import lib "SDL2_image.lib"
+} else {
+	foreign import lib "system:SDL2_image"
+}
 
 bool :: SDL.bool
 
