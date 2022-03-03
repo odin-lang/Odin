@@ -68,12 +68,13 @@ clone_node :: proc(node: ^Node) -> ^Node {
 		return nil
 	}
 
-	size := size_of(Node)
+	size  := size_of(Node)
 	align := align_of(Node)
 	ti := reflect.union_variant_type_info(node.derived)
 	if ti != nil {
-		size = ti.size
-		align = ti.align
+		elem := ti.variant.(reflect.Type_Info_Pointer).elem
+		size  = elem.size
+		align = elem.align
 	}
 
 	#partial switch in node.derived {
