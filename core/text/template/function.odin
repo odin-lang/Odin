@@ -1,8 +1,8 @@
 package text_template
 
-import "core:mem"
 import "core:fmt"
 import "core:reflect"
+import "core:strconv"
 
 Function :: #type proc(args: []any) -> (value: any, err: Error)
 
@@ -57,6 +57,62 @@ init_builtin_funcs :: proc() {
 
 		n := reflect.length(args[0])
 		return new_any(n), nil
+	}
+
+	builtin_funcs["int"] = proc(args: []any) -> (value: any, err: Error) {
+		if len(args) != 1 {
+			err = .Invalid_Argument_Count
+			return
+		}
+		res: i64
+		switch v in get_value(args[0]) {
+		case bool:
+			res = i64(v)
+		case i64:
+			res = i64(v)
+		case f64:
+			res = i64(v)
+		case string:
+			if value, ok := strconv.parse_f64(v); ok {
+				res = i64(value)
+			} else if value, ok := strconv.parse_i64(v); ok {
+				res = i64(value)
+			} else {
+				return nil, .Invalid_Argument_Type
+			}
+		case:
+			return nil, .Invalid_Argument_Type
+		}
+
+		return new_any(res), nil
+	}
+
+	builtin_funcs["float"] = proc(args: []any) -> (value: any, err: Error) {
+		if len(args) != 1 {
+			err = .Invalid_Argument_Count
+			return
+		}
+		res: f64
+		switch v in get_value(args[0]) {
+		case bool:
+			res = f64(i64(v))
+		case i64:
+			res = f64(v)
+		case f64:
+			res = f64(v)
+		case string:
+			if value, ok := strconv.parse_f64(v); ok {
+				res = f64(value)
+			} else if value, ok := strconv.parse_i64(v); ok {
+				res = f64(value)
+			} else {
+				return nil, .Invalid_Argument_Type
+			}
+		case:
+			return nil, .Invalid_Argument_Type
+		}
+
+		return new_any(res), nil
 	}
 
 

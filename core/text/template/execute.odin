@@ -547,7 +547,7 @@ eval_field :: proc(s: ^State, dot: any, ident: string) -> (value: any, err: Erro
 			rm := (^mem.Raw_Map)(dot.data)
 
 			data := uintptr(rm.entries.data)
-			for i in 0..<rm.entries.len {
+			for _ in 0..<rm.entries.len {
 				key: string
 				switch key_type.id {
 				case typeid_of(string):

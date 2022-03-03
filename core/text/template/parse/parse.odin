@@ -1,6 +1,5 @@
 package text_template_parse
 
-import "core:io"
 import "core:fmt"
 import "core:mem"
 import "core:mem/virtual"

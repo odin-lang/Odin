@@ -1,7 +1,6 @@
 package text_template_parse
 
 import "../scan"
-import "core:strings"
 
 Pos :: scan.Pos
 Token :: scan.Token
