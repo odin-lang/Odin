@@ -280,7 +280,7 @@ bool global_ignore_warnings(void) {
 }
 
 
-gb_global TargetMetrics target_windows_386 = {
+gb_global TargetMetrics target_windows_i386 = {
 	TargetOs_windows,
 	TargetArch_i386,
 	4,
@@ -296,7 +296,7 @@ gb_global TargetMetrics target_windows_amd64 = {
 	str_lit("e-m:w-i64:64-f80:128-n8:16:32:64-S128"),
 };
 
-gb_global TargetMetrics target_linux_386 = {
+gb_global TargetMetrics target_linux_i386 = {
 	TargetOs_linux,
 	TargetArch_i386,
 	4,
@@ -339,7 +339,7 @@ gb_global TargetMetrics target_darwin_arm64 = {
 	str_lit("e-m:o-i64:64-i128:128-n32:64-S128"), // TODO(bill): Is this correct?
 };
 
-gb_global TargetMetrics target_freebsd_386 = {
+gb_global TargetMetrics target_freebsd_i386 = {
 	TargetOs_freebsd,
 	TargetArch_i386,
 	4,
@@ -421,12 +421,12 @@ gb_global NamedTargetMetrics named_targets[] = {
 	{ str_lit("darwin_amd64"),        &target_darwin_amd64   },
 	{ str_lit("darwin_arm64"),        &target_darwin_arm64   },
 	{ str_lit("essence_amd64"),       &target_essence_amd64  },
-	{ str_lit("linux_386"),           &target_linux_386      },
+	{ str_lit("linux_i386"),          &target_linux_i386     },
 	{ str_lit("linux_amd64"),         &target_linux_amd64    },
 	{ str_lit("linux_arm64"),         &target_linux_arm64    },
-	{ str_lit("windows_386"),         &target_windows_386    },
+	{ str_lit("windows_i386"),        &target_windows_i386   },
 	{ str_lit("windows_amd64"),       &target_windows_amd64  },
-	{ str_lit("freebsd_386"),         &target_freebsd_386    },
+	{ str_lit("freebsd_i386"),        &target_freebsd_i386   },
 	{ str_lit("freebsd_amd64"),       &target_freebsd_amd64  },
 	{ str_lit("openbsd_amd64"),       &target_openbsd_amd64  },
 	{ str_lit("freestanding_wasm32"), &target_freestanding_wasm32 },
@@ -971,13 +971,13 @@ void init_build_context(TargetMetrics *cross_target) {
 		#endif
 	#else
 		#if defined(GB_SYSTEM_WINDOWS)
-			metrics = &target_windows_386;
+			metrics = &target_windows_i386;
 		#elif defined(GB_SYSTEM_OSX)
 			#error "Build Error: Unsupported architecture"
 		#elif defined(GB_SYSTEM_FREEBSD)
-			metrics = &target_freebsd_386;
+			metrics = &target_freebsd_i386;
 		#else
-			metrics = &target_linux_386;
+			metrics = &target_linux_i386;
 		#endif
 	#endif
 
