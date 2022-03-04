@@ -363,9 +363,13 @@ thread_data := [3]Thread_Data{}
 	- etc.
 */
 tcp_tests :: proc(t: ^testing.T) {
+	fmt.println("Testing two servers trying to bind to the same endpoint...")
 	two_servers_binding_same_endpoint(t)
+	fmt.println("Testing client connecting to a closed port...")
 	client_connects_to_closed_port(t)
+	fmt.println("Testing client connecting to port that doesn't accept...")
 	client_connects_to_open_but_non_accepting_port(t)
+	fmt.println("Testing client sending server data...")
 	client_sends_server_data(t)
 }
 

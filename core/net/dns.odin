@@ -33,7 +33,7 @@ when ODIN_OS == .Windows {
 		resolv_conf        = "",
 		hosts_file         = "%WINDIR%\\system32\\drivers\\etc\\hosts",
 	}
-} else when ODIN_OS == .Linux || ODIN_OS == .Darwin {
+} else when ODIN_OS == .Linux || ODIN_OS == .Darwin || ODIN_OS == .OpenBSD {
 	getenv :: proc(key: string) -> (val: string) {
 		val, _ = os.getenv(key)
 		return
@@ -185,7 +185,7 @@ resolve_ip6 :: proc(hostname_and_maybe_port: string) -> (ep6: Endpoint, err: Net
 */
 when ODIN_OS == .Windows {
 	get_dns_records_from_os :: get_dns_records_windows
-} else when ODIN_OS == .Linux || ODIN_OS == .Darwin {
+} else when ODIN_OS == .Linux || ODIN_OS == .Darwin || ODIN_OS == .OpenBSD {
 	get_dns_records_from_os :: get_dns_records_unix
 } else {
 	#panic("get_dns_records_from_os not implemented on this OS")

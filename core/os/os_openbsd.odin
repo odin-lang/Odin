@@ -5,13 +5,84 @@ foreign import libc "system:c"
 import "core:runtime"
 import "core:strings"
 import "core:c"
+import "core:intrinsics"
 
+Socket    :: distinct int
 Handle    :: distinct i32
 Pid       :: distinct i32
 File_Time :: distinct u64
 Errno     :: distinct i32
 
+socklen_t :: c.int
+
 INVALID_HANDLE :: ~Handle(0)
+
+AF_UNSPEC:    int : 0
+AF_UNIX:      int : 1
+AF_LOCAL:     int : AF_UNIX
+AF_INET:      int : 2
+AF_INET6:     int : 24
+AF_BLUETOOTH: int : 32
+
+SOCK_STREAM:    int : 1
+SOCK_DGRAM:     int : 2
+SOCK_RAW:       int : 3
+SOCK_RDM:       int : 4
+SOCK_SEQPACKET: int : 5
+
+INADDR_ANY:       c.ulong : 0
+INADDR_BROADCAST: c.ulong : 0xffffffff
+INADDR_NONE:      c.ulong : 0xffffffff
+INADDR_DUMMY:     c.ulong : 0xc0000008
+
+IPPROTO_IP:       int : 0
+IPPROTO_ICMP:     int : 1
+IPPROTO_TCP:      int : 6
+IPPROTO_UDP:      int : 17
+IPPROTO_IPV6:     int : 41
+IPPROTO_ETHERNET: int : 143
+IPPROTO_RAW:      int : 255
+
+SHUT_RD:   int : 0
+SHUT_WR:   int : 1
+SHUT_RDWR: int : 2
+
+
+SOL_SOCKET:       int : 1
+SO_DEBUG	: int : 0x0001 /* turn on debugging info recording */
+SO_ACCEPTCONN	: int : 0x0002 /* socket has had listen() */
+SO_REUSEADDR	: int : 0x0004 /* allow local address reuse */
+SO_KEEPALIVE	: int : 0x0008 /* keep connections alive */
+SO_DONTROUTE	: int : 0x0010 /* just use interface addresses */
+SO_BROADCAST	: int : 0x0020 /* permit sending of broadcast msgs */
+SO_USELOOPBACK	: int : 0x0040 /* bypass hardware when possible */
+SO_LINGER	: int : 0x0080 /* linger on close if data present */
+SO_OOBINLINE	: int : 0x0100 /* leave received OOB data in line */
+SO_REUSEPORT	: int : 0x0200 /* allow local address & port reuse */
+SO_TIMESTAMP	: int : 0x0800 /* timestamp received dgram traffic */
+SO_BINDANY	: int : 0x1000 /* allow bind to any address */
+SO_ZEROIZE	: int : 0x2000 /* zero out all mbufs sent over socket */
+
+SO_SNDBUF	: int : 0x1001 /* send buffer size */
+SO_RCVBUF	: int : 0x1002 /* receive buffer size */
+SO_SNDLOWAT	: int : 0x1003 /* send low-water mark */
+SO_RCVLOWAT	: int : 0x1004 /* receive low-water mark */
+SO_SNDTIMEO	: int : 0x1005 /* send timeout */
+SO_RCVTIMEO	: int : 0x1006 /* receive timeout */
+SO_ERROR	: int : 0x1007 /* get error status and clear */
+SO_TYPE		: int : 0x1008 /* get socket type */
+SO_NETPROC	: int : 0x1020 /* multiplex; network processing */
+SO_RTABLE	: int : 0x1021 /* routing table to be used */
+SO_PEERCRED	: int : 0x1022 /* get connect-time credentials */
+SO_SPLICE	: int : 0x1023 /* splice data to other socket */
+SO_DOMAIN	: int : 0x1024 /* get socket domain */
+SO_PROTOCOL	: int : 0x1025 /* get socket protocol */
+
+TCP_NODELAY: int : 1
+TCP_CORK:    int : 3
+
+MSG_PEEK  : int : 0x02
+MSG_TRUNC : int : 0x20
 
 ERROR_NONE:	Errno: 0
 
@@ -136,6 +207,44 @@ RTLD_GLOBAL   :: 0x100
 RTLD_TRACE    :: 0x200
 RTLD_NODELETE :: 0x400
 
+ADDRESS_FAMILY :: u8
+SOCKADDR :: struct #packed {
+	sa_len:    u8,
+	sa_family: ADDRESS_FAMILY,
+	sa_data:   [14]c.char,
+}
+
+SOCKADDR_STORAGE_LH :: struct #packed {
+	sa_len:     u8,
+	ss_family:  ADDRESS_FAMILY,
+	__ss_pad1:  [6]c.char,
+	__ss_align: i64,
+	__ss_pad2:  [240]c.char,
+}
+
+sockaddr_in :: struct #packed {
+	sin_family: ADDRESS_FAMILY,
+	sin_port: u16be,
+	sin_addr: in_addr,
+	sin_zero: [8]c.char,
+}
+
+sockaddr_in6 :: struct #packed {
+	sin6_family: ADDRESS_FAMILY,
+	sin6_port: u16be,
+	sin6_flowinfo: c.ulong,
+	sin6_addr: in6_addr,
+	sin6_scope_id: c.ulong,
+}
+
+in_addr :: struct #packed {
+	s_addr: u32,
+}
+
+in6_addr :: struct #packed {
+	s6_addr: [16]u8,
+}
+
 MAX_PATH :: 1024
 
 // "Argv" arguments converted to Odin strings
@@ -156,6 +265,16 @@ blksize_t :: i32
 Unix_File_Time :: struct {
 	seconds:     time_t,
 	nanoseconds: c.long,
+}
+
+Timeval :: struct {
+	seconds: i64,
+	nanoseconds: int,
+}
+
+Linger :: struct {
+	onoff: int,
+	linger: int,
 }
 
 OS_Stat :: struct {
@@ -292,6 +411,16 @@ foreign libc {
 	@(link_name="dlsym")	_unix_dlsym	:: proc(handle: rawptr, symbol: cstring) -> rawptr ---
 	@(link_name="dlclose")	_unix_dlclose	:: proc(handle: rawptr) -> c.int ---
 	@(link_name="dlerror")	_unix_dlerror	:: proc() -> cstring ---
+
+	@(link_name="socket")   _unix_socket    :: proc(domain: int, type: int, protocol: int) -> int ---
+	@(link_name="connect")  _unix_connect   :: proc(sd: int, addr: rawptr, len: socklen_t) -> int ---
+	@(link_name="accept")   _unix_accept    :: proc(sd: int, addr: rawptr, len: rawptr) -> int ---
+	@(link_name="listen")   _unix_listen    :: proc(sd: int, backlog: int) -> int ---
+	@(link_name="bind")     _unix_bind      :: proc(sd: int, addr: rawptr, len: socklen_t) -> int ---
+	@(link_name="setsockopt") _unix_setsockopt :: proc(sd: int, level: int, optname: int, optval: rawptr, optlen: socklen_t) -> int ---
+	@(link_name="recvfrom")   _unix_recvfrom   :: proc(sd: int, buf: rawptr, len: uint, flags: int, addr: rawptr, alen: uintptr) -> i64 ---
+	@(link_name="sendto")     _unix_sendto     :: proc(sd: int, buf: rawptr, len: uint, flags: int, addr: rawptr, alen: socklen_t) -> i64 ---
+	@(link_name="shutdown")   _unix_shutdown   :: proc(sd: int, how: int) -> int ---
 }
 
 is_path_separator :: proc(r: rune) -> bool {
@@ -305,7 +434,7 @@ get_last_error :: proc() -> int {
 fork :: proc() -> (Pid, Errno) {
 	pid := _unix_fork()
 	if pid == -1 {
-		return Pid(-1), Errno(get_last_error())
+		return Pid(-1), Errno(Errno(get_last_error()))
 	}
 	return Pid(pid), ERROR_NONE
 }
@@ -314,7 +443,7 @@ open :: proc(path: string, flags: int = O_RDONLY, mode: int = 0) -> (Handle, Err
 	cstr := strings.clone_to_cstring(path, context.temp_allocator)
 	handle := _unix_open(cstr, c.int(flags), c.int(mode))
 	if handle == -1 {
-		return INVALID_HANDLE, Errno(get_last_error())
+		return INVALID_HANDLE, Errno(Errno(get_last_error()))
 	}
 	return handle, ERROR_NONE
 }
@@ -322,7 +451,7 @@ open :: proc(path: string, flags: int = O_RDONLY, mode: int = 0) -> (Handle, Err
 close :: proc(fd: Handle) -> Errno {
 	result := _unix_close(fd)
 	if result == -1 {
-		return Errno(get_last_error())
+		return Errno(Errno(get_last_error()))
 	}
 	return ERROR_NONE
 }
@@ -330,7 +459,7 @@ close :: proc(fd: Handle) -> Errno {
 read :: proc(fd: Handle, data: []byte) -> (int, Errno) {
 	bytes_read := _unix_read(fd, &data[0], c.size_t(len(data)))
 	if bytes_read == -1 {
-		return -1, Errno(get_last_error())
+		return -1, Errno(Errno(get_last_error()))
 	}
 	return int(bytes_read), ERROR_NONE
 }
@@ -341,7 +470,7 @@ write :: proc(fd: Handle, data: []byte) -> (int, Errno) {
 	}
 	bytes_written := _unix_write(fd, &data[0], c.size_t(len(data)))
 	if bytes_written == -1 {
-		return -1, Errno(get_last_error())
+		return -1, Errno(Errno(get_last_error()))
 	}
 	return int(bytes_written), ERROR_NONE
 }
@@ -349,7 +478,7 @@ write :: proc(fd: Handle, data: []byte) -> (int, Errno) {
 seek :: proc(fd: Handle, offset: i64, whence: int) -> (i64, Errno) {
 	res := _unix_seek(fd, offset, c.int(whence))
 	if res == -1 {
-		return -1, Errno(get_last_error())
+		return -1, Errno(Errno(get_last_error()))
 	}
 	return res, ERROR_NONE
 }
@@ -367,7 +496,7 @@ rename :: proc(old_path, new_path: string) -> Errno {
 	new_path_cstr := strings.clone_to_cstring(new_path, context.temp_allocator)
 	res := _unix_rename(old_path_cstr, new_path_cstr)
 	if res == -1 {
-		return Errno(get_last_error())
+		return Errno(Errno(get_last_error()))
 	}
 	return ERROR_NONE
 }
@@ -376,7 +505,7 @@ remove :: proc(path: string) -> Errno {
 	path_cstr := strings.clone_to_cstring(path, context.temp_allocator)
 	res := _unix_unlink(path_cstr)
 	if res == -1 {
-		return Errno(get_last_error())
+		return Errno(Errno(get_last_error()))
 	}
 	return ERROR_NONE
 }
@@ -385,7 +514,7 @@ make_directory :: proc(path: string, mode: mode_t = 0o775) -> Errno {
 	path_cstr := strings.clone_to_cstring(path, context.temp_allocator)
 	res := _unix_mkdir(path_cstr, mode)
 	if res == -1 {
-		return Errno(get_last_error())
+		return Errno(Errno(get_last_error()))
 	}
 	return ERROR_NONE
 }
@@ -394,7 +523,7 @@ remove_directory :: proc(path: string) -> Errno {
 	path_cstr := strings.clone_to_cstring(path, context.temp_allocator)
 	res := _unix_rmdir(path_cstr)
 	if res == -1 {
-		return Errno(get_last_error())
+		return Errno(Errno(get_last_error()))
 	}
 	return ERROR_NONE
 }
@@ -452,6 +581,99 @@ stdin:  Handle = 0
 stdout: Handle = 1
 stderr: Handle = 2
 
+
+socket :: proc(domain: int, type: int, protocol: int) -> (Socket, Errno) {
+	result := _unix_socket(domain, type, protocol)
+	if result < 0 {
+		return 0, Errno(get_last_error())
+	}
+	return Socket(result), ERROR_NONE
+}
+
+bind :: proc(sd: Socket, addr: ^SOCKADDR, len: socklen_t) -> (Errno) {
+	result := _unix_bind(int(sd), addr, len)
+	if result < 0 {
+		return Errno(get_last_error())
+	}
+	return ERROR_NONE
+}
+
+
+connect :: proc(sd: Socket, addr: ^SOCKADDR, len: socklen_t) -> (Errno) {
+	result := _unix_connect(int(sd), addr, len)
+	if result < 0 {
+		return Errno(get_last_error())
+	}
+	return ERROR_NONE
+}
+
+accept :: proc(sd: Socket, addr: ^SOCKADDR, len: rawptr) -> (Socket, Errno) {
+	result := _unix_accept(int(sd), rawptr(addr), len)
+	if result < 0 {
+		return 0, Errno(get_last_error())
+	}
+	return Socket(result), ERROR_NONE
+}
+
+listen :: proc(sd: Socket, backlog: int) -> (Errno) {
+	result := _unix_listen(int(sd), backlog)
+	if result < 0 {
+		return Errno(get_last_error())
+	}
+	return ERROR_NONE
+}
+
+setsockopt :: proc(sd: Socket, level: int, optname: int, optval: rawptr, optlen: socklen_t) -> (Errno) {
+	result := _unix_setsockopt(int(sd), level, optname, optval, optlen)
+	if result < 0 {
+		return Errno(get_last_error())
+	}
+	return ERROR_NONE
+}
+
+
+recvfrom :: proc(sd: Socket, data: []byte, flags: int, addr: ^SOCKADDR, addr_size: ^socklen_t) -> (u32, Errno) {
+	result := _unix_recvfrom(int(sd), raw_data(data), len(data), flags, addr, uintptr(addr_size))
+	if result < 0 {
+		return 0, Errno(get_last_error())
+	}
+	return u32(result), ERROR_NONE
+}
+
+recv :: proc(sd: Socket, data: []byte, flags: int) -> (u32, Errno) {
+	result := _unix_recvfrom(int(sd), raw_data(data), len(data), flags, nil, 0)
+	if result < 0 {
+		return 0, Errno(get_last_error())
+	}
+	return u32(result), ERROR_NONE
+}
+
+
+sendto :: proc(sd: Socket, data: []u8, flags: int, addr: ^SOCKADDR, addrlen: socklen_t) -> (u32, Errno) {
+	result := _unix_sendto(int(sd), raw_data(data), len(data), flags, addr, addrlen)
+	if result < 0 {
+		return 0, Errno(get_last_error())
+	}
+	return u32(result), ERROR_NONE
+}
+
+send :: proc(sd: Socket, data: []byte, flags: int) -> (u32, Errno) {
+	result := _unix_sendto(int(sd), raw_data(data), len(data), 0, nil, 0)
+	if result < 0 {
+		return 0, Errno(get_last_error())
+	}
+	return u32(result), ERROR_NONE
+}
+
+shutdown :: proc(sd: Socket, how: int) -> (Errno) {
+	result := _unix_shutdown(int(sd), how)
+	if result < 0 {
+		return Errno(get_last_error())
+	}
+	return ERROR_NONE
+}
+
+
 /* TODO(zangent): Implement these!                                                                                
 last_write_time :: proc(fd: Handle) -> File_Time {}                                                               
 last_write_time_by_name :: proc(name: string) -> File_Time {}                                                     
@@ -482,7 +704,7 @@ _stat :: proc(path: string) -> (OS_Stat, Errno) {
 	s: OS_Stat = ---
 	res := _unix_stat(cstr, &s)
 	if res == -1 {
-		return s, Errno(get_last_error())
+		return s, Errno(Errno(get_last_error()))
 	}
 	return s, ERROR_NONE
 }
@@ -495,7 +717,7 @@ _lstat :: proc(path: string) -> (OS_Stat, Errno) {
 	s: OS_Stat = ---
 	res := _unix_lstat(cstr, &s)
 	if res == -1 {
-		return s, Errno(get_last_error())
+		return s, Errno(Errno(get_last_error()))
 	}
 	return s, ERROR_NONE
 }
@@ -506,7 +728,7 @@ _fstat :: proc(fd: Handle) -> (OS_Stat, Errno) {
 	s: OS_Stat = ---
 	res := _unix_fstat(fd, &s)
 	if res == -1 {
-		return s, Errno(get_last_error())
+		return s, Errno(Errno(get_last_error()))
 	}
 	return s, ERROR_NONE
 }
@@ -515,7 +737,7 @@ _fstat :: proc(fd: Handle) -> (OS_Stat, Errno) {
 _fdopendir :: proc(fd: Handle) -> (Dir, Errno) {
 	dirp := _unix_fdopendir(fd)
 	if dirp == cast(Dir)nil {
-		return nil, Errno(get_last_error())
+		return nil, Errno(Errno(get_last_error()))
 	}
 	return dirp, ERROR_NONE
 }
@@ -524,7 +746,7 @@ _fdopendir :: proc(fd: Handle) -> (Dir, Errno) {
 _closedir :: proc(dirp: Dir) -> Errno {
 	rc := _unix_closedir(dirp)
 	if rc != 0 {
-		return Errno(get_last_error())
+		return Errno(Errno(get_last_error()))
 	}
 	return ERROR_NONE
 }
@@ -540,7 +762,7 @@ _readdir :: proc(dirp: Dir) -> (entry: Dirent, err: Errno, end_of_stream: bool) 
 	rc := _unix_readdir_r(dirp, &entry, &result)
 
 	if rc != 0 {
-		err = Errno(get_last_error())
+		err = Errno(Errno(get_last_error()))
 		return
 	}
 	err = ERROR_NONE
@@ -563,7 +785,7 @@ _readlink :: proc(path: string) -> (string, Errno) {
 		rc := _unix_readlink(path_cstr, &(buf[0]), bufsz)
 		if rc == -1 {
 			delete(buf)
-			return "", Errno(get_last_error())
+			return "", Errno(Errno(get_last_error()))
 		} else if rc == int(bufsz) {
 			bufsz += MAX_PATH
 			delete(buf)
@@ -590,7 +812,7 @@ absolute_path_from_relative :: proc(rel: string) -> (path: string, err: Errno) {
 
 	path_ptr := _unix_realpath(rel_cstr, nil)
 	if path_ptr == nil {
-		return "", Errno(get_last_error())
+		return "", Errno(Errno(get_last_error()))
 	}
 	defer _unix_free(path_ptr)
 
@@ -604,7 +826,7 @@ access :: proc(path: string, mask: int) -> (bool, Errno) {
 	cstr := strings.clone_to_cstring(path, context.temp_allocator)
 	res := _unix_access(cstr, c.int(mask))
 	if res == -1 {
-		return false, Errno(get_last_error())
+		return false, Errno(Errno(get_last_error()))
 	}
 	return true, ERROR_NONE
 }
@@ -640,7 +862,7 @@ get_current_directory :: proc() -> string {
 		if cwd != nil {
 			return string(cwd)
 		}
-		if Errno(get_last_error()) != ERANGE {
+		if Errno(Errno(get_last_error())) != ERANGE {
 			return ""
 		}
 		resize(&buf, len(buf) + MAX_PATH)
@@ -652,7 +874,7 @@ set_current_directory :: proc(path: string) -> (err: Errno) {
 	cstr := strings.clone_to_cstring(path, context.temp_allocator)
 	res := _unix_chdir(cstr)
 	if res == -1 {
-		return Errno(get_last_error())
+		return Errno(Errno(get_last_error()))
 	}
 	return ERROR_NONE
 }

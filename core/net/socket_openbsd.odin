@@ -1,4 +1,4 @@
-// +build linux
+// +build openbsd
 /*
 	Copyright 2022 Tetralux        <tetraluxonpc@gmail.com>
 	Copyright 2022 Colin Davidson  <colrdavidson@gmail.com>
@@ -14,6 +14,10 @@
 /*
 	Package net implements cross-platform Berkeley Sockets, DNS resolution and associated procedures.
 	For other protocols and their features, see subdirectories of this package.
+
+
+	IMPORTANT/TODO: This is a carbon copy of `socket_darwin.odin`. Adjust if necessary.
+
 */
 package net
 
@@ -25,12 +29,12 @@ Platform_Socket :: os.Socket
 
 Create_Socket_Error :: enum c.int {
 	Family_Not_Supported_For_This_Socket = c.int(os.EAFNOSUPPORT),
-	No_Socket_Descriptors_Available = c.int(os.EMFILE),
-	No_Buffer_Space_Available = c.int(os.ENOBUFS),
-	No_Memory_Available_Available = c.int(os.ENOMEM),
-	Protocol_Unsupported_By_System = c.int(os.EPROTONOSUPPORT),
-	Wrong_Protocol_For_Socket = c.int(os.EPROTONOSUPPORT),
-	Family_And_Socket_Type_Mismatch = c.int(os.EPROTONOSUPPORT),
+	No_Socket_Descriptors_Available      = c.int(os.EMFILE),
+	No_Buffer_Space_Available            = c.int(os.ENOBUFS),
+	No_Memory_Available_Available        = c.int(os.ENOMEM),
+	Protocol_Unsupported_By_System       = c.int(os.EPROTONOSUPPORT),
+	Wrong_Protocol_For_Socket            = c.int(os.EPROTONOSUPPORT),
+	Family_And_Socket_Type_Mismatch      = c.int(os.EPROTONOSUPPORT),
 }
 
 create_socket :: proc(family: Address_Family, protocol: Socket_Protocol) -> (socket: Any_Socket, err: Network_Error) {
@@ -68,19 +72,19 @@ create_socket :: proc(family: Address_Family, protocol: Socket_Protocol) -> (soc
 Dial_Error :: enum c.int {
 	Port_Required = -1,
 
-	Address_In_Use = c.int(os.EADDRINUSE),
-	In_Progress = c.int(os.EINPROGRESS),
-	Cannot_Use_Any_Address = c.int(os.EADDRNOTAVAIL),
-	Wrong_Family_For_Socket = c.int(os.EAFNOSUPPORT),
-	Refused = c.int(os.ECONNREFUSED),
-	Is_Listening_Socket = c.int(os.EACCES),
-	Already_Connected = c.int(os.EISCONN),
-	Network_Unreachable = c.int(os.ENETUNREACH), // Device is offline
-	Host_Unreachable = c.int(os.EHOSTUNREACH), // Remote host cannot be reached
+	Address_In_Use            = c.int(os.EADDRINUSE),
+	In_Progress               = c.int(os.EINPROGRESS),
+	Cannot_Use_Any_Address    = c.int(os.EADDRNOTAVAIL),
+	Wrong_Family_For_Socket   = c.int(os.EAFNOSUPPORT),
+	Refused                   = c.int(os.ECONNREFUSED),
+	Is_Listening_Socket       = c.int(os.EACCES),
+	Already_Connected         = c.int(os.EISCONN),
+	Network_Unreachable       = c.int(os.ENETUNREACH), // Device is offline
+	Host_Unreachable          = c.int(os.EHOSTUNREACH), // Remote host cannot be reached
 	No_Buffer_Space_Available = c.int(os.ENOBUFS),
-	Not_Socket = c.int(os.ENOTSOCK),
-	Timeout = c.int(os.ETIMEDOUT),
-	Would_Block = c.int(os.EWOULDBLOCK), // TODO: we may need special handling for this; maybe make a socket a struct with metadata?
+	Not_Socket                = c.int(os.ENOTSOCK),
+	Timeout                   = c.int(os.ETIMEDOUT),
+	Would_Block               = c.int(os.EWOULDBLOCK), // TODO: we may need special handling for this; maybe make a socket a struct with metadata?
 }
 
 dial_tcp_from_endpoint :: proc(endpoint: Endpoint, options := default_tcp_options) -> (skt: TCP_Socket, err: Network_Error) {
@@ -102,10 +106,6 @@ dial_tcp_from_endpoint :: proc(endpoint: Endpoint, options := default_tcp_option
 	if res != os.ERROR_NONE {
 		err = Dial_Error(res)
 		return
-	}
-
-	if options.no_delay {
-		_ = set_option(sock, .TCP_Nodelay, true) // NOTE(tetra): Not vital to succeed; error ignored
 	}
 
 	return
@@ -200,6 +200,7 @@ listen_tcp :: proc(interface_endpoint: Endpoint, backlog := 1000) -> (skt: TCP_S
 
 
 Accept_Error :: enum c.int {
+	Reset = c.int(os.ECONNRESET), // TODO(tetra): Is this error actually possible here? Or is like Linux, in which case we can remove it.
 	Not_Listening = c.int(os.EINVAL),
 	No_Socket_Descriptors_Available_For_Client_Socket = c.int(os.EMFILE),
 	No_Buffer_Space_Available = c.int(os.ENOBUFS),
@@ -208,7 +209,7 @@ Accept_Error :: enum c.int {
 	Would_Block = c.int(os.EWOULDBLOCK), // TODO: we may need special handling for this; maybe make a socket a struct with metadata?
 }
 
-accept_tcp :: proc(sock: TCP_Socket, options := default_tcp_options) -> (client: TCP_Socket, source: Endpoint, err: Network_Error) {
+accept_tcp :: proc(sock: TCP_Socket) -> (client: TCP_Socket, source: Endpoint, err: Network_Error) {
 	sockaddr: os.SOCKADDR_STORAGE_LH
 	sockaddrlen := c.int(size_of(sockaddr))
 
@@ -219,9 +220,6 @@ accept_tcp :: proc(sock: TCP_Socket, options := default_tcp_options) -> (client:
 	}
 	client = TCP_Socket(client_sock)
 	source = sockaddr_to_endpoint(&sockaddr)
-	if options.no_delay {
-		_ = set_option(client, .TCP_Nodelay, true) // NOTE(tetra): Not vital to succeed; error ignored
-	}
 	return
 }
 
@@ -237,7 +235,7 @@ close :: proc(skt: Any_Socket) {
 TCP_Recv_Error :: enum c.int {
 	Shutdown = c.int(os.ESHUTDOWN),
 	Not_Connected = c.int(os.ENOTCONN),
-	Connection_Broken = c.int(os.ENETRESET),
+	Connection_Broken = c.int(os.ENETRESET), // TODO(tetra): Is this error actually possible here?
 	Not_Socket = c.int(os.ENOTSOCK),
 	Aborted = c.int(os.ECONNABORTED),
 	Connection_Closed = c.int(os.ECONNRESET), // TODO(tetra): Determine when this is different from the syscall returning n=0 and maybe normalize them?
@@ -261,8 +259,7 @@ recv_tcp :: proc(skt: TCP_Socket, buf: []byte) -> (bytes_read: int, err: Network
 
 UDP_Recv_Error :: enum c.int {
 	// The buffer is too small to fit the entire message, and the message was truncated.
-	// When this happens, the rest of message is lost.
-	Buffer_Too_Small = c.int(os.EMSGSIZE),
+	Truncated = c.int(os.EMSGSIZE),
 	// The so-called socket is not an open socket.
 	Not_Socket = c.int(os.ENOTSOCK),
 	// The so-called socket is, in fact, not even a valid descriptor.
@@ -272,8 +269,8 @@ UDP_Recv_Error :: enum c.int {
 	// A signal occurred before any data was transmitted.
 	// See signal(7).
 	Interrupted = c.int(os.EINTR),
-	// The send timeout duration passed before all data was received.
-	// See Socket_Option.Receive_Timeout.
+	// The send timeout duration passed before all data was sent.
+	// See Socket_Option.Send_Timeout.
 	Timeout = c.int(os.EWOULDBLOCK), // NOTE: No, really. Presumably this means something different for nonblocking sockets...
 	// The socket must be bound for this operation, but isn't.
 	Socket_Not_Bound = c.int(os.EINVAL),
@@ -284,14 +281,9 @@ recv_udp :: proc(skt: UDP_Socket, buf: []byte) -> (bytes_read: int, remote_endpo
 		return
 	}
 
-	from: os.SOCKADDR_STORAGE_LH = ---
+	from: os.SOCKADDR_STORAGE_LH
 	fromsize := c.int(size_of(from))
-
-	// NOTE(tetra): On Linux, if the buffer is too small to fit the entire datagram payload, the rest is silently discarded,
-	// and no error is returned.
-	// However, if you pass MSG_TRUNC here, 'res' will be the size of the incoming message, rather than how much was read.
-	// We can use this fact to detect this condition and return .Buffer_Too_Small.
-	res, ok := os.recvfrom(Platform_Socket(skt), buf, os.MSG_TRUNC, cast(^os.SOCKADDR) &from, &fromsize)
+	res, ok := os.recvfrom(Platform_Socket(skt), buf, 0, cast(^os.SOCKADDR) &from, &fromsize)
 	if ok != os.ERROR_NONE {
 		err = UDP_Recv_Error(ok)
 		return
@@ -299,13 +291,6 @@ recv_udp :: proc(skt: UDP_Socket, buf: []byte) -> (bytes_read: int, remote_endpo
 
 	bytes_read = int(res)
 	remote_endpoint = sockaddr_to_endpoint(&from)
-
-	if bytes_read > len(buf) {
-		// NOTE(tetra): The buffer has been filled, with a partial message.
-		bytes_read = len(buf)
-		err = .Buffer_Too_Small
-	}
-
 	return
 }
 
@@ -315,7 +300,7 @@ recv :: proc{recv_tcp, recv_udp}
 
 // TODO
 TCP_Send_Error :: enum c.int {
-	Aborted = c.int(os.ECONNABORTED), // TODO(tetra): merge with other errors?
+	Aborted = c.int(os.ECONNABORTED), // TODO: merge with other errors?
 	Connection_Closed = c.int(os.ECONNRESET),
 	Not_Connected = c.int(os.ENOTCONN),
 	Shutdown = c.int(os.ESHUTDOWN),
@@ -355,7 +340,7 @@ send_tcp :: proc(skt: TCP_Socket, buf: []byte) -> (bytes_written: int, err: Netw
 // TODO
 UDP_Send_Error :: enum c.int {
 	// The message is too big. No data was sent.
-	Message_Too_Long = c.int(os.EMSGSIZE),
+	Truncated = c.int(os.EMSGSIZE),
 	// TODO: not sure what the exact circumstances for this is yet
 	Network_Unreachable = c.int(os.ENETUNREACH),
 	// There are no more emphemeral outbound ports available to bind the socket to, in order to send.
@@ -382,18 +367,18 @@ UDP_Send_Error :: enum c.int {
 	No_Memory_Available = c.int(os.ENOMEM),
 }
 
-// Sends a single UDP datagram packet.
-//
-// Datagrams are limited in size; attempting to send more than this limit at once will result in a Message_Too_Long error.
-// UDP packets are not guarenteed to be received in order.
 send_udp :: proc(skt: UDP_Socket, buf: []byte, to: Endpoint) -> (bytes_written: int, err: Network_Error) {
 	toaddr := endpoint_to_sockaddr(to)
-	res, os_err := os.sendto(Platform_Socket(skt), buf, 0, cast(^os.SOCKADDR) &toaddr, size_of(toaddr))
-	if os_err != os.ERROR_NONE {
-		err = UDP_Send_Error(os_err)
-		return
+	for bytes_written < len(buf) {
+		limit := min(1<<31, len(buf) - bytes_written)
+		remaining := buf[bytes_written:][:limit]
+		res, ok := os.sendto(Platform_Socket(skt), remaining, 0, cast(^os.SOCKADDR)&toaddr, size_of(toaddr))
+		if ok != os.ERROR_NONE {
+			err = UDP_Send_Error(ok)
+			return
+		}
+		bytes_written += int(res)
 	}
-	bytes_written = int(res)
 	return
 }
 
@@ -439,8 +424,8 @@ Socket_Option :: enum c.int {
 
 	Receive_Buffer_Size = c.int(os.SO_RCVBUF),
 	Send_Buffer_Size = c.int(os.SO_SNDBUF),
-	Receive_Timeout = c.int(os.SO_RCVTIMEO_NEW),
-	Send_Timeout = c.int(os.SO_SNDTIMEO_NEW),
+	Receive_Timeout = c.int(os.SO_RCVTIMEO),
+	Send_Timeout = c.int(os.SO_SNDTIMEO),
 }
 
 Socket_Option_Error :: enum c.int {
