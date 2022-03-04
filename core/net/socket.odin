@@ -25,7 +25,7 @@ any_socket_to_socket :: proc(any_socket: Any_Socket) -> Socket {
 	case TCP_Socket:  return Socket(s)
 	case UDP_Socket:  return Socket(s)
 	case:
-		unreachable()
+		return Socket({})
 	}
 }
 

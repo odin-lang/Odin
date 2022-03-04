@@ -169,7 +169,6 @@ Netmask :: distinct Address
 /*
 	INTERFACE / LINK STATE
 */
-
 Network_Interface :: struct {
 	adapter_name:     string, // On Windows this is a GUID that we could parse back into its u128 for more compact storage.
 	friendly_name:    string,

@@ -238,8 +238,9 @@ accept_tcp :: proc(sock: TCP_Socket, options := default_tcp_options) -> (client:
 
 
 close :: proc(skt: Any_Socket) {
-	s := any_socket_to_socket(skt)
-	win.closesocket(Platform_Socket(s))
+	if s := any_socket_to_socket(skt); s != {} {
+		win.closesocket(Platform_Socket(s))
+	}
 }
 
 
