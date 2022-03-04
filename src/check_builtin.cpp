@@ -952,7 +952,7 @@ bool check_builtin_procedure(CheckerContext *c, Operand *operand, Ast *call, i32
 			mode = Addressing_Constant;
 			value = exact_value_i64(at->EnumeratedArray.count);
 			type = t_untyped_integer;
-		} else if (is_type_slice(op_type) && id == BuiltinProc_len) {
+		} else if ((is_type_slice(op_type) || is_type_relative_slice(op_type)) && id == BuiltinProc_len) {
 			mode = Addressing_Value;
 		} else if (is_type_dynamic_array(op_type)) {
 			mode = Addressing_Value;
