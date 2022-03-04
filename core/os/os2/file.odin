@@ -61,6 +61,10 @@ create :: proc(name: string, perm: File_Mode = 0) -> (Handle, Error) {
 	return open(name, {.Read, .Write, .Create}, perm)
 }
 
+opendir :: proc(name: string) -> (Handle, Error) {
+	return _opendir(name)
+}
+
 open :: proc(name: string, flags := File_Flags{.Read}, perm: File_Mode = 0) -> (Handle, Error) {
 	flags := flags
 	if .Write not_in flags {
