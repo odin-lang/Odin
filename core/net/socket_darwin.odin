@@ -320,7 +320,7 @@ TCP_Send_Error :: enum c.int {
 // sent up to that point.
 send_tcp :: proc(skt: TCP_Socket, buf: []byte) -> (bytes_written: int, err: Network_Error) {
 	for bytes_written < len(buf) {
-		limit := min(1<<31, len(buf) - bytes_written)
+		limit := min(int(max(i32)), len(buf) - bytes_written)
 		remaining := buf[bytes_written:][:limit]
 		res, ok := os.send(Platform_Socket(skt), remaining, 0)
 		if ok != os.ERROR_NONE {
