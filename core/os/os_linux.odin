@@ -573,7 +573,7 @@ _unix_connect :: proc(sd: int, addr: rawptr, len: socklen_t) -> int {
 }
 
 _unix_accept :: proc(sd: int, addr: rawptr, len: rawptr) -> int {
-	return int(intrinsics.syscall(unix.SYS_accept, uintptr(sd), uintptr(addr), uintptr(len)))
+	return int(intrinsics.syscall(unix.SYS_accept4, uintptr(sd), uintptr(addr), uintptr(len), uintptr(0)))
 }
 
 _unix_listen :: proc(sd: int, backlog: int) -> int {
