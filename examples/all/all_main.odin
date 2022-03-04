@@ -178,7 +178,6 @@ _ :: odin_printer
 _ :: odin_tokenizer
 _ :: os
 _ :: net
-_ :: http
 _ :: slashpath
 _ :: filepath
 _ :: reflect
