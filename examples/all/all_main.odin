@@ -84,7 +84,6 @@ import odin_printer   "core:odin/printer"
 import odin_tokenizer "core:odin/tokenizer"
 
 import net            "core:net"
-import http           "core:net/http"
 
 import os             "core:os"
 
