@@ -59,7 +59,7 @@ main :: proc() {
 	mem.tracking_allocator_init(&_tracking_allocator, context.allocator)
 	context.allocator = mem.tracking_allocator(&_tracking_allocator)
 
-	// address_parsing_test(t)
+	address_parsing_test(t)
 
 	when ODIN_OS != .Windows {
 		fmt.printf("IMPORTANT: `core:thread` on {} does not yet have thread.terminate, so we can't run tests relying on them.\n", ODIN_OS)
