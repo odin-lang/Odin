@@ -365,6 +365,19 @@ index :: proc(val: any, i: int, loc := #caller_location) -> any {
 	return nil
 }
 
+deref :: proc(val: any) -> any {
+	if val != nil {
+		ti := type_info_base(type_info_of(val.id))
+		if info, ok := ti.variant.(Type_Info_Pointer); ok {
+			return any{
+				(^rawptr)(val.data)^,
+				info.elem.id,
+			}
+		}
+	}
+	return val
+}
+
 
 
 // Struct_Tag represents the type of the string of a struct field
@@ -680,7 +693,6 @@ union_variant_typeid :: proc(a: any) -> typeid {
 		return nil
 	}
 	panic("expected a union to reflect.union_variant_typeid")
-
 }
 
 get_union_variant_raw_tag :: proc(a: any) -> i64 {
