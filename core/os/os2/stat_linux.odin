@@ -2,7 +2,9 @@
 package os2
 
 import "core:time"
+import "core:strings"
 import "core:sys/unix"
+import "core:path/filepath"
 
 // File type
 S_IFMT   :: 0o170000 // Type of file mask
@@ -52,6 +54,12 @@ W_OK :: 2 // Test for write permission
 R_OK :: 4 // Test for read permission
 
 @private
+Unix_File_Time :: struct {
+	seconds:     i64,
+	nanoseconds: i64,
+}
+
+@private
 OS_Stat :: struct {
 	device_id:     u64, // ID of device containing file
 	serial:        u64, // File serial number
@@ -75,19 +83,21 @@ OS_Stat :: struct {
 }
 
 _fstat :: proc(fd: Handle, allocator := context.allocator) -> (File_Info, Error) {
+	return File_Info{}, nil
 }
 
 _stat :: proc(name: string, allocator := context.allocator) -> (File_Info, Error) {
+	return File_Info{}, nil
 }
 
 _lstat :: proc(name: string, allocator := context.allocator) -> (File_Info, Error) {
-	cstr := strings.clone_to_cstring(path)
+	cstr := strings.clone_to_cstring(name)
 	defer delete(cstr)
 
 	s: OS_Stat
 	result := unix.sys_lstat(cstr, &s)
 	if result < 0 {
-		return {}, unix.get_errno(result)
+		return {}, _get_platform_error(int(unix.get_errno(result)))
 	}
 
 	fi := File_Info {
@@ -96,10 +106,10 @@ _lstat :: proc(name: string, allocator := context.allocator) -> (File_Info, Erro
 		size = s.size,
 		mode = 0,
 		is_dir = S_ISDIR(s.mode),
-		creation_time = nil, // linux does not track this
+		creation_time = time.Time{0}, // linux does not track this
 		//TODO
-		modification_time = nil,
-		access_time = nil,
+		modification_time = time.Time{0},
+		access_time = time.Time{0},
 	}
 	
 	return fi, nil
@@ -110,7 +120,7 @@ _same_file :: proc(fi1, fi2: File_Info) -> bool {
 }
 
 _stat_internal :: proc(name: string) -> (s: OS_Stat, res: int) {
-	name_cstr = strings.clone_to_cstring(name, context.temp_allocator)
+	name_cstr := strings.clone_to_cstring(name, context.temp_allocator)
 	res = unix.sys_stat(name_cstr, &s)
 	return
 }

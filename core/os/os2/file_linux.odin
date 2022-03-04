@@ -3,6 +3,7 @@ package os2
 
 import "core:io"
 import "core:time"
+import "core:strings"
 import "core:sys/unix"
 
 
@@ -15,13 +16,64 @@ _ok_or_error :: proc(res: int) -> Error {
 	return res >= 0 ? nil : _get_platform_error(res)
 }
 
-_open :: proc(name: string, flags: File_Flags, perm: File_Mode) -> (Handle, Error) {
-	cstr := strings.clone_to_cstring(path, context.temp_allocator)
-	handle := Handle(unix.sys_open(cstr, int(flags), int(perm)))
-	if handle < 0 {
-		return Handle(-1), _get_platform_error(int(handle))
+_std_handle :: proc(kind: Std_Handle_Kind) -> Handle {
+	switch kind {
+	case .stdin:  return Handle(0)
+	case .stdout: return Handle(1)
+	case .stderr: return Handle(2)
 	}
-	return handle, nil
+	unreachable()
+}
+
+_O_RDONLY    :: 0o0
+_O_WRONLY    :: 0o1
+_O_RDWR      :: 0o2
+_O_CREAT     :: 0o100
+_O_EXCL      :: 0o200
+_O_TRUNC     :: 0o1000
+_O_APPEND    :: 0o2000
+_O_NONBLOCK  :: 0o4000
+_O_LARGEFILE :: 0o100000
+_O_DIRECTORY :: 0o200000
+_O_SYNC      :: 0o4010000
+_O_CLOEXEC   :: 0o2000000
+
+_opendir :: proc(name: string) -> (Handle, Error) {
+	cstr := strings.clone_to_cstring(name, context.temp_allocator)
+
+	flags := _O_RDONLY|_O_NONBLOCK|_O_DIRECTORY|_O_LARGEFILE|_O_CLOEXEC
+
+	handle_i := unix.sys_open(cstr, flags)
+	if handle_i < 0 {
+		return INVALID_HANDLE, _get_platform_error(handle_i)
+	}
+
+	return Handle(handle_i), nil
+}
+
+_open :: proc(name: string, flags: File_Flags, perm: File_Mode) -> (Handle, Error) {
+	cstr := strings.clone_to_cstring(name, context.temp_allocator)
+
+	flags_i: int
+	switch flags & O_RDONLY|O_WRONLY|O_RDWR {
+	case O_RDONLY: flags_i = _O_RDONLY
+	case O_WRONLY: flags_i = _O_WRONLY
+	case O_RDWR:   flags_i = _O_RDWR
+	}
+
+	flags_i |= (_O_APPEND * int(.Append in flags))
+	flags_i |= (_O_CREAT * int(.Create in flags))
+	flags_i |= (_O_EXCL * int(.Excl in flags))
+	flags_i |= (_O_SYNC * int(.Sync in flags))
+	flags_i |= (_O_TRUNC * int(.Trunc in flags))
+	flags_i |= (_O_CLOEXEC * int(.Close_On_Exec in flags))
+
+	handle_i := unix.sys_open(cstr, flags_i, int(perm))
+	if handle_i < 0 {
+		return INVALID_HANDLE, _get_platform_error(handle_i)
+	}
+
+	return Handle(handle_i), nil
 }
 
 _close :: proc(fd: Handle) -> Error {
@@ -46,30 +98,27 @@ _read :: proc(fd: Handle, p: []byte) -> (n: int, err: Error) {
 	if len(p) == 0 {
 		return 0, nil
 	}
-	n = unix.sys_read(fd, &data[0], c.size_t(len(data)))
+	n = unix.sys_read(int(fd), &p[0], len(p))
 	if n < 0 {
-		return -1, unix.get_errno(n)
+		return -1, _get_platform_error(int(unix.get_errno(n)))
 	}
-	return bytes_read, nil
+	return n, nil
 }
 
 _read_at :: proc(fd: Handle, p: []byte, offset: i64) -> (n: int, err: Error) {
 	if offset < 0 {
 		return 0, .Invalid_Offset
 	}
-	
-	curr_offset, err := _seek(fd, 0, .Current)
-	if err != nil {
-		return 0, err
-	}
-	defer _seek(fd, curr_offset, .Start)
-	_seek(fd, offset, .Start)
 
-	b := p
+	b, offset := p, offset
 	for len(b) > 0 {
-		m := _read(fd, b) or_return
+		m := unix.sys_pread(int(fd), &b[0], len(b), offset)
+		if m < 0 {
+			return -1, _get_platform_error(m)
+		}
 		n += m
 		b = b[m:]
+		offset += i64(m)
 	}
 	return
 }
@@ -83,7 +132,7 @@ _write :: proc(fd: Handle, p: []byte) -> (n: int, err: Error) {
 	if len(p) == 0 {
 		return 0, nil
 	}
-	n = unix.sys_write(fd, &p[0], uint(len(p)))
+	n = unix.sys_write(int(fd), &p[0], uint(len(p)))
 	if n < 0 {
 		return -1, _get_platform_error(n)
 	}
@@ -94,19 +143,16 @@ _write_at :: proc(fd: Handle, p: []byte, offset: i64) -> (n: int, err: Error) {
 	if offset < 0 {
 		return 0, .Invalid_Offset
 	}
-	
-	curr_offset, err := _seek(fd, 0, .Current)
-	if err != nil {
-		return 0, err
-	}
-	defer _seek(fd, curr_offset, .Start)
-	_seek(fd, offset, .Start)
 
-	b := p
+	b, offset := p, offset
 	for len(b) > 0 {
-		m := _write(fd, b) or_return
+		m := unix.sys_pwrite(int(fd), &b[0], len(b), offset)
+		if m < 0 {
+			return -1, _get_platform_error(m)
+		}
 		n += m
 		b = b[m:]
+		offset += i64(m)
 	}
 	return
 }
@@ -117,11 +163,12 @@ _write_to :: proc(fd: Handle, w: io.Writer) -> (n: i64, err: Error) {
 }
 
 _file_size :: proc(fd: Handle) -> (n: i64, err: Error) {
-	s, err := _fstat(fd) or_return
-	if err != nil {
-		return 0, err
+	s: OS_Stat = ---
+	res := unix.sys_fstat(int(fd), &s)
+	if res < 0 {
+		return -1, _get_platform_error(res)
 	}
-	return max(s.size, 0), nil
+	return s.size, nil
 }
 
 _sync :: proc(fd: Handle) -> Error {
@@ -137,17 +184,25 @@ _truncate :: proc(fd: Handle, size: i64) -> Error {
 }
 
 _remove :: proc(name: string) -> Error {
-	path_cstr := strings.clone_to_cstring(path, context.temp_allocator)
-	if _is_dir(name) {
-		return _ok_or_error(unix.sys_rmdir(path_cstr))
+	name_cstr := strings.clone_to_cstring(name, context.temp_allocator)
+
+	handle_i := unix.sys_open(name_cstr, int(File_Flags.Read))
+	if handle_i < 0 {
+		return _get_platform_error(handle_i)
 	}
-	return _ok_or_error(unix.sys_unlink(path_cstr))
+	defer unix.sys_close(handle_i)
+
+	/* TODO: THIS WILL NOT WORK */
+	if _is_dir(Handle(handle_i)) {
+		return _ok_or_error(unix.sys_rmdir(name_cstr))
+	}
+	return _ok_or_error(unix.sys_unlink(name_cstr))
 }
 
-_rename :: proc(old_path, new_path: string) -> Error {
-	old_path_cstr := strings.clone_to_cstring(old_path, context.temp_allocator)
-	new_path_cstr := strings.clone_to_cstring(new_path, context.temp_allocator)
-	return _ok_or_error(unix.sys_rename(old_path_cstr, new_path_cstr))
+_rename :: proc(old_name, new_name: string) -> Error {
+	old_name_cstr := strings.clone_to_cstring(old_name, context.temp_allocator)
+	new_name_cstr := strings.clone_to_cstring(new_name, context.temp_allocator)
+	return _ok_or_error(unix.sys_rename(old_name_cstr, new_name_cstr))
 }
 
 _link :: proc(old_name, new_name: string) -> Error {
@@ -163,16 +218,16 @@ _symlink :: proc(old_name, new_name: string) -> Error {
 }
 
 _read_link :: proc(name: string, allocator := context.allocator) -> (string, Error) {
-	path_cstr := strings.clone_to_cstring(path)
-	defer delete(path_cstr)
+	name_cstr := strings.clone_to_cstring(name)
+	defer delete(name_cstr)
 
 	bufsz : uint = 256
 	buf := make([]byte, bufsz, allocator)
 	for {
-		rc := unix.sys_readlink(path_cstr, &(buf[0]), bufsz)
+		rc := unix.sys_readlink(name_cstr, &(buf[0]), bufsz)
 		if rc < 0 {
 			delete(buf)
-			return "", unix.get_errno(rc)
+			return "", _get_platform_error(int(unix.get_errno(rc)))
 		} else if rc == int(bufsz) {
 			bufsz *= 2
 			delete(buf)
@@ -183,9 +238,9 @@ _read_link :: proc(name: string, allocator := context.allocator) -> (string, Err
 	}
 }
 
-_unlink :: proc(path: string) -> Error {
-	path_cstr := strings.clone_to_cstring(path, context.temp_allocator)
-	return _ok_or_error(unix.sys_unlink(path_cstr))
+_unlink :: proc(name: string) -> Error {
+	name_cstr := strings.clone_to_cstring(name, context.temp_allocator)
+	return _ok_or_error(unix.sys_unlink(name_cstr))
 }
 
 _chdir :: proc(fd: Handle) -> Error {
@@ -193,18 +248,16 @@ _chdir :: proc(fd: Handle) -> Error {
 }
 
 _chmod :: proc(fd: Handle, mode: File_Mode) -> Error {
-	//TODO
-	return nil
+	return _ok_or_error(unix.sys_fchmod(int(fd), int(mode)))
 }
 
 _chown :: proc(fd: Handle, uid, gid: int) -> Error {
-	//TODO
-	return nil
+	return _ok_or_error(unix.sys_fchown(int(fd), uid, gid))
 }
 
 _lchown :: proc(name: string, uid, gid: int) -> Error {
-	//TODO
-	return nil
+	name_cstr := strings.clone_to_cstring(name, context.temp_allocator)
+	return _ok_or_error(unix.sys_lchown(name_cstr, uid, gid))
 }
 
 _chtimes :: proc(name: string, atime, mtime: time.Time) -> Error {
@@ -212,14 +265,14 @@ _chtimes :: proc(name: string, atime, mtime: time.Time) -> Error {
 	return nil
 }
 
-_exists :: proc(path: string) -> bool {
-	path_cstr := strings.clone_to_cstring(path, context.temp_allocator)
-	return unix.sys_access(path_cstr, F_OK) == 0
+_exists :: proc(name: string) -> bool {
+	name_cstr := strings.clone_to_cstring(name, context.temp_allocator)
+	return unix.sys_access(name_cstr, F_OK) == 0
 }
 
 _is_file :: proc(fd: Handle) -> bool {
 	s: OS_Stat
-	res := unix.sys_fstat(int(fd), rawptr(&s))
+	res := unix.sys_fstat(int(fd), &s)
 	if res < 0 { // error
 		return false
 	}
@@ -228,7 +281,7 @@ _is_file :: proc(fd: Handle) -> bool {
 
 _is_dir :: proc(fd: Handle) -> bool {
 	s: OS_Stat
-	res := unix.sys_fstat(int(fd), rawptr(&s))
+	res := unix.sys_fstat(int(fd), &s)
 	if res < 0 { // error
 		return false
 	}
