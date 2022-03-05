@@ -406,8 +406,8 @@ i32 linker_stage(lbGenerator *gen) {
 				//                available at runtime wherever the executable is run, so we make require those to be
 				//                local to the executable (unless the system collection is used, in which case we search
 				//                the system library paths for the library file).
-				if (string_ends_with(lib, str_lit(".a"))) {
-					// static libs, absolute full path relative to the file in which the lib was imported from
+				if (string_ends_with(lib, str_lit(".a")) || string_ends_with(lib, str_lit(".o"))) {
+					// static libs and object files, absolute full path relative to the file in which the lib was imported from
 					lib_str = gb_string_append_fmt(lib_str, " -l:\"%.*s\" ", LIT(lib));
 				} else if (string_ends_with(lib, str_lit(".so"))) {
 					// dynamic lib, relative path to executable
