@@ -1,11 +1,9 @@
-package gzip
-
 /*
-	Copyright 2021 Jeroen van Rijn <nom@duclavier.com>.
+	Copyright 2021 Jeroen van Rijn (nom@duclavier.com).
 	Made available under Odin's BSD-3 license.
 
 	List of contributors:
-		Jeroen van Rijn: Initial implementation.
+		- Jeroen van Rijn: Initial implementation.
 
 	This package implements support for the GZIP file format v4.3,
 	as specified in RFC 1952.
@@ -13,6 +11,7 @@ package gzip
 	It is implemented in such a way that it lends itself naturally
 	to be the input to a complementary TAR implementation.
 */
+package gzip
 
 import "core:compress/zlib"
 import "core:compress"

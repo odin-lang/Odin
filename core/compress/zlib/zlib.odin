@@ -1,13 +1,12 @@
-package zlib
-
 /*
-	Copyright 2021 Jeroen van Rijn <nom@duclavier.com>.
+	Copyright 2021 Jeroen van Rijn (nom@duclavier.com).
 	Made available under Odin's BSD-3 license.
 
 	List of contributors:
-		Jeroen van Rijn: Initial implementation, optimization.
-		Ginger Bill:     Cosmetic changes.
+		- Jeroen van Rijn: Initial implementation, optimization.
+		- Ginger Bill:     Cosmetic changes.
 */
+package zlib
 
 import "core:compress"
 
@@ -119,6 +118,7 @@ Huffman_Table :: struct {
 }
 
 // Implementation starts here
+
 @(optimization_mode="speed")
 z_bit_reverse :: #force_inline proc(n: u16, bits: u8) -> (r: u16) {
 	assert(bits <= 16)
