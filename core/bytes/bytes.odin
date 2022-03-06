@@ -31,7 +31,8 @@ truncate_to_rune :: proc(str: []byte, r: rune) -> []byte {
 }
 
 // Compares two strings, returning a value representing which one comes first lexiographically.
-// -1 for `a`; 1 for `b`, or 0 if they are equal.
+//
+// Returns -1 for `a`, 1 for `b`, or 0 if they are equal.
 compare :: proc(lhs, rhs: []byte) -> int {
 	return mem.compare(lhs, rhs)
 }
@@ -259,7 +260,7 @@ index_byte :: proc(s: []byte, c: byte) -> int {
 	return -1
 }
 
-// Returns -1 if c is not present
+// Returns -1 if `c` is not present.
 last_index_byte :: proc(s: []byte, c: byte) -> int {
 	for i := len(s)-1; i >= 0; i -= 1 {
 		if s[i] == c {
@@ -460,7 +461,7 @@ replace_all :: proc(s, old, new: []byte, allocator := context.allocator) -> (out
 	return replace(s, old, new, -1, allocator)
 }
 
-// if n < 0, no limit on the number of replacements
+// If `n < 0`, there is no limit on the number of replacements.
 replace :: proc(s, old, new: []byte, n: int, allocator := context.allocator) -> (output: []byte, was_allocation: bool) {
 	if string(old) == string(new) || n == 0 {
 		was_allocation = false
@@ -851,8 +852,9 @@ split_multi_iterator :: proc(s: ^[]byte, substrs: [][]byte, skip_empty := false)
 
 
 
-// scrub scruvs invalid utf-8 characters and replaces them with the replacement string
-// Adjacent invalid bytes are only replaced once
+// Scrubs invalid UTF-8 characters and replaces them with the replacement string.
+//
+// Adjacent invalid bytes are only replaced once.
 scrub :: proc(s: []byte, replacement: []byte, allocator := context.allocator) -> []byte {
 	str := s
 	b: Buffer
@@ -959,7 +961,7 @@ partition :: proc(str, sep: []byte) -> (head, match, tail: []byte) {
 
 center_justify :: centre_justify // NOTE(bill): Because Americans exist
 
-// centre_justify returns a byte slice with a pad byte slice at boths sides if the str's rune length is smaller than length
+// Returns a byte slice with a `pad` byte slice at both sides if `str`'s rune length is smaller than `length`.
 centre_justify :: proc(str: []byte, length: int, pad: []byte, allocator := context.allocator) -> []byte {
 	n := rune_count(str)
 	if n >= length || pad == nil {
@@ -979,7 +981,7 @@ centre_justify :: proc(str: []byte, length: int, pad: []byte, allocator := conte
 	return buffer_to_bytes(&b)
 }
 
-// left_justify returns a byte slice with a pad byte slice at left side if the str's rune length is smaller than length
+// Returns a byte slice with a `pad` byte slice at the left side if `str`'s rune length is smaller than `length`.
 left_justify :: proc(str: []byte, length: int, pad: []byte, allocator := context.allocator) -> []byte {
 	n := rune_count(str)
 	if n >= length || pad == nil {
@@ -998,7 +1000,7 @@ left_justify :: proc(str: []byte, length: int, pad: []byte, allocator := context
 	return buffer_to_bytes(&b)
 }
 
-// right_justify returns a byte slice with a pad byte slice at right side if the str's rune length is smaller than length
+// Returns a byte slice with a `pad` byte slice at the right side if `str`'s rune length is smaller than `length`.
 right_justify :: proc(str: []byte, length: int, pad: []byte, allocator := context.allocator) -> []byte {
 	n := rune_count(str)
 	if n >= length || pad == nil {
@@ -1039,8 +1041,9 @@ write_pad_string :: proc(b: ^Buffer, pad: []byte, pad_len, remains: int) {
 }
 
 
-// fields splits the byte slice s around each instance of one or more consecutive white space character, defined by unicode.is_space
-// returning a slice of subslices of s or an empty slice if s only contains white space
+// Splits the byte slice `s` around each instance of one or more consecutive white space character, defined by `unicode.is_space`.
+//
+// Returns a slice of subslices of `s` or an empty slice if `s` only contains white space.
 fields :: proc(s: []byte, allocator := context.allocator) -> [][]byte #no_bounds_check {
 	n := 0
 	was_space := 1
@@ -1091,12 +1094,13 @@ fields :: proc(s: []byte, allocator := context.allocator) -> [][]byte #no_bounds
 }
 
 
-// fields_proc splits the byte slice s at each run of unicode code points `ch` satisfying f(ch)
-// returns a slice of subslices of s
-// If all code points in s satisfy f(ch) or string is empty, an empty slice is returned
+// Splits the byte slice `s` at each run of unicode code points `ch` satisfying `f(ch)`.
 //
-// fields_proc makes no guarantee about the order in which it calls f(ch)
-// it assumes that `f` always returns the same value for a given ch
+// Returns a slice of subslices of `s`.
+// If all code points in `s` satisfy `f(ch)` or string is empty, an empty slice is returned.
+//
+// `fields_proc` makes no guarantee about the order in which it calls `f(ch)`.
+// It assumes that `f` always returns the same value for a given `ch`.
 fields_proc :: proc(s: []byte, f: proc(rune) -> bool, allocator := context.allocator) -> [][]byte #no_bounds_check {
 	subslices := make([dynamic][]byte, 0, 32, allocator)
 
