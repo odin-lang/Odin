@@ -1,6 +1,7 @@
 package dynamic_bit_array
 
 import "core:intrinsics"
+import "core:mem"
 
 /*
 	Note that these constants are dependent on the backing being a u64.
@@ -206,7 +207,7 @@ create :: proc(max_index: int, min_index := 0, allocator := context.allocator) -
 */
 clear :: proc(ba: ^Bit_Array) {
 	if ba == nil { return }
-	ba.bits = {}
+	mem.zero_slice(ba.bits[:])
 }
 
 /*
