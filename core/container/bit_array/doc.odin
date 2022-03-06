@@ -21,6 +21,7 @@ package dynamic_bit_array
 			// returns `false`, `false`, because this Bit Array wasn't created to allow negative indices.
 			was_set, was_retrieved := get(&bits, -1)
 			fmt.println(was_set, was_retrieved) 
+			destroy(&bits)
 		}
 
 	-- A Bit Array can optionally allow for negative indices, if the mininum value was given during creation:
@@ -40,13 +41,13 @@ package dynamic_bit_array
 			using bit_array
 
 			bits := create(int(max(Foo)), int(min(Foo)))
-			defer destroy(&bits)
+			defer destroy(bits)
 
-			fmt.printf("Set(Bar):           %v\n",     set(&bits, Foo.Bar))
-			fmt.printf("Get(Bar):           %v, %v\n", get(&bits, Foo.Bar))
-			fmt.printf("Set(Negative_Test): %v\n",     set(&bits, Foo.Negative_Test))
-			fmt.printf("Get(Leaves):        %v, %v\n", get(&bits, Foo.Leaves))
-			fmt.printf("Get(Negative_Test): %v, %v\n", get(&bits, Foo.Negative_Test))
+			fmt.printf("Set(Bar):           %v\n",     set(bits, Foo.Bar))
+			fmt.printf("Get(Bar):           %v, %v\n", get(bits, Foo.Bar))
+			fmt.printf("Set(Negative_Test): %v\n",     set(bits, Foo.Negative_Test))
+			fmt.printf("Get(Leaves):        %v, %v\n", get(bits, Foo.Leaves))
+			fmt.printf("Get(Negative_Test): %v, %v\n", get(bits, Foo.Negative_Test))
 			fmt.printf("Freed.\n")
 		}
 */
