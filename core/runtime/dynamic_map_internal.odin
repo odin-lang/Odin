@@ -128,11 +128,9 @@ default_hasher_string :: proc "contextless" (data: rawptr, seed: uintptr) -> uin
 }
 default_hasher_cstring :: proc "contextless" (data: rawptr, seed: uintptr) -> uintptr {
 	h := u64(seed) + 0xcbf29ce484222325
-	ptr := (^uintptr)(data)^
-	for (^byte)(ptr)^ != 0 {
-		b := (^byte)(ptr)^
-		h = (h ~ u64(b)) * 0x100000001b3
-		ptr += 1
+	b := (^[^]byte)(data)^
+	if b != nil do for ; b[0] != 0; b = b[1:] {
+		h = (h ~ u64(b[0])) * 0x100000001b3
 	}
 	return uintptr(h)
 }
