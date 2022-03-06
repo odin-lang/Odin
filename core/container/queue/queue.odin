@@ -4,7 +4,7 @@ import "core:builtin"
 import "core:runtime"
 _ :: runtime
 
-// Dynamically resizable double-ended queue/ring-buffer
+// Dynamically resizable double-ended queue/ring-buffer.
 Queue :: struct($T: typeid) {
 	data:   [dynamic]T,
 	len:    uint,
@@ -13,7 +13,7 @@ Queue :: struct($T: typeid) {
 
 DEFAULT_CAPACITY :: 16
 
-// Procedure to initialize a queue
+// Initializes a queue.
 init :: proc(q: ^$Q/Queue($T), capacity := DEFAULT_CAPACITY, allocator := context.allocator) -> bool {
 	if q.data.allocator.procedure == nil {
 		q.data.allocator = allocator
@@ -22,7 +22,7 @@ init :: proc(q: ^$Q/Queue($T), capacity := DEFAULT_CAPACITY, allocator := contex
 	return reserve(q, capacity)
 }
 
-// Procedure to initialize a queue from a fixed backing slice
+// Initialize a queue from a fixed backing slice.
 init_from_slice :: proc(q: ^$Q/Queue($T), backing: []T) -> bool {
 	clear(q)
 	q.data = transmute([dynamic]T)runtime.Raw_Dynamic_Array{
@@ -34,27 +34,27 @@ init_from_slice :: proc(q: ^$Q/Queue($T), backing: []T) -> bool {
 	return true
 }
 
-// Procedure to destroy a queue
+// Destroys a queue.
 destroy :: proc(q: ^$Q/Queue($T)) {
 	delete(q.data)
 }
 
-// The length of the queue
+// Returns the length of the queue.
 len :: proc(q: $Q/Queue($T)) -> int {
 	return int(q.len)
 }
 
-// The current capacity of the queue
+// Returns the current capacity of the queue.
 cap :: proc(q: $Q/Queue($T)) -> int {
 	return builtin.len(q.data)
 }
 
-// Remaining space in the queue (cap-len)
+// Returns the remaining space in the queue (`cap-len`).
 space :: proc(q: $Q/Queue($T)) -> int {
 	return builtin.len(q.data) - int(q.len)
 }
 
-// Reserve enough space for at least the specified capacity
+// Reserves enough space for at least the specified capacity.
 reserve :: proc(q: ^$Q/Queue($T), capacity: int) -> bool {
 	if uint(capacity) > q.len {
 		return _grow(q, uint(capacity)) 
@@ -82,7 +82,7 @@ get_ptr :: proc(q: ^$Q/Queue($T), #any_int i: int, loc := #caller_location) -> ^
 	return &q.data[idx]
 }
 
-// Push an element to the back of the queue
+// Pushes an element to the back of the queue.
 push_back :: proc(q: ^$Q/Queue($T), elem: T) -> bool {
 	if space(q^) == 0 {
 		_grow(q) or_return
@@ -93,7 +93,7 @@ push_back :: proc(q: ^$Q/Queue($T), elem: T) -> bool {
 	return true
 }
 
-// Push an element to the front of the queue
+// Pushes an element to the front of the queue.
 push_front :: proc(q: ^$Q/Queue($T), elem: T) -> bool {
 	if space(q^) == 0 {
 		_grow(q) or_return
@@ -105,7 +105,7 @@ push_front :: proc(q: ^$Q/Queue($T), elem: T) -> bool {
 }
 
 
-// Pop an element from the back of the queue
+// Pops an element from the back of the queue.
 pop_back :: proc(q: ^$Q/Queue($T), loc := #caller_location) -> (elem: T) {
 	assert(condition=q.len > 0, loc=loc)
 	q.len -= 1
@@ -113,7 +113,7 @@ pop_back :: proc(q: ^$Q/Queue($T), loc := #caller_location) -> (elem: T) {
 	elem = q.data[idx]
 	return
 }
-// Safely pop an element from the back of the queue
+// Safely pops an element from the back of the queue.
 pop_back_safe :: proc(q: ^$Q/Queue($T)) -> (elem: T, ok: bool) {
 	if q.len > 0 {
 		q.len -= 1
@@ -124,7 +124,7 @@ pop_back_safe :: proc(q: ^$Q/Queue($T)) -> (elem: T, ok: bool) {
 	return
 }
 
-// Pop an element from the front of the queue
+// Pops an element from the front of the queue.
 pop_front :: proc(q: ^$Q/Queue($T), loc := #caller_location) -> (elem: T) {
 	assert(condition=q.len > 0, loc=loc)
 	elem = q.data[q.offset]
@@ -132,7 +132,7 @@ pop_front :: proc(q: ^$Q/Queue($T), loc := #caller_location) -> (elem: T) {
 	q.len -= 1
 	return
 }
-// Safely pop an element from the front of the queue
+// Safely pops an element from the front of the queues
 pop_front_safe :: proc(q: ^$Q/Queue($T)) -> (elem: T, ok: bool) {
 	if q.len > 0 {
 		elem = q.data[q.offset]
@@ -143,7 +143,7 @@ pop_front_safe :: proc(q: ^$Q/Queue($T)) -> (elem: T, ok: bool) {
 	return
 }
 
-// Push multiple elements to the front of the queue
+// Pushes multiple elements to the front of the queue.
 push_back_elems :: proc(q: ^$Q/Queue($T), elems: ..T) -> bool {
 	n := uint(builtin.len(elems))
 	if space(q^) < int(n) {
@@ -162,7 +162,7 @@ push_back_elems :: proc(q: ^$Q/Queue($T), elems: ..T) -> bool {
 	return true
 }
 
-// Consume `n` elements from the front of the queue
+// Consumes `n` elements from the front of the queue.
 consume_front :: proc(q: ^$Q/Queue($T), n: int, loc := #caller_location) {
 	assert(condition=int(q.len) >= n, loc=loc)
 	if n > 0 {
@@ -172,7 +172,7 @@ consume_front :: proc(q: ^$Q/Queue($T), n: int, loc := #caller_location) {
 	}
 }
 
-// Consume `n` elements from the back of the queue
+// Consumes `n` elements from the back of the queue.
 consume_back :: proc(q: ^$Q/Queue($T), n: int, loc := #caller_location) {
 	assert(condition=int(q.len) >= n, loc=loc)
 	if n > 0 {
@@ -188,14 +188,14 @@ push   :: proc{push_back, push_back_elems}
 append :: proc{push_back, push_back_elems}
 
 
-// Clear the contents of the queue
+// Clears the contents of the queue.
 clear :: proc(q: ^$Q/Queue($T)) {
 	q.len = 0
 	q.offset = 0
 }
 
 
-// Internal growinh procedure
+// Internal growing procedure.
 _grow :: proc(q: ^$Q/Queue($T), min_capacity: uint = 0) -> bool {
 	new_capacity := max(min_capacity, uint(8), uint(builtin.len(q.data))*2)
 	n := uint(builtin.len(q.data))
