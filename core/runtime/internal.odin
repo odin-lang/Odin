@@ -817,8 +817,8 @@ when IS_WASM {
 		case DBL_MANT_DIG + 2:
 			// okay
 		case:
-			a = u128(u128(a) >> u128(sd - (DBL_MANT_DIG+2))) |
-				u128(u128(a) & (~u128(0) >> u128(N + DBL_MANT_DIG+2 - sd)) != 0)
+			a = (a >> (sd - (DBL_MANT_DIG + 2))) |
+				u128(a & (~u128(0) >> (N + DBL_MANT_DIG + 2 - sd)) != 0)
 		}
 
 		a |= u128((a & 4) != 0)
@@ -830,7 +830,7 @@ when IS_WASM {
 			e += 1
 		}
 	} else {
-		a <<= u128(DBL_MANT_DIG - sd)
+		a <<= DBL_MANT_DIG - sd
 	}
 	fb: [2]u32
 	fb[1] = (0) |                            // sign
@@ -922,9 +922,9 @@ fixdfti :: proc(a: u64) -> i128 {
 	// Break a into sign, exponent, significand
 	aRep := a
 	aAbs := aRep & absMask
-	sign := i128(-1 if aRep & signBit != 0 else 1)
-	exponent := u64((aAbs >> significandBits) - exponentBias)
-	significand := u64((aAbs & significandMask) | implicitBit)
+	sign : i128 = -1 if aRep & signBit != 0 else 1
+	exponent : u64 = (aAbs >> significandBits) - exponentBias
+	significand : u64 = (aAbs & significandMask) | implicitBit
 
 	// If exponent is negative, the result is zero.
 	if exponent < 0 {
