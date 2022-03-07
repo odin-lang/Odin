@@ -25,23 +25,23 @@ _std_handle :: proc(kind: Std_Handle_Kind) -> Handle {
 	unreachable()
 }
 
-_O_RDONLY    :: 0o0
-_O_WRONLY    :: 0o1
-_O_RDWR      :: 0o2
-_O_CREAT     :: 0o100
-_O_EXCL      :: 0o200
-_O_TRUNC     :: 0o1000
-_O_APPEND    :: 0o2000
-_O_NONBLOCK  :: 0o4000
-_O_LARGEFILE :: 0o100000
-_O_DIRECTORY :: 0o200000
-_O_SYNC      :: 0o4010000
-_O_CLOEXEC   :: 0o2000000
+__O_RDONLY    :: 0o0
+__O_WRONLY    :: 0o1
+__O_RDWR      :: 0o2
+__O_CREAT     :: 0o100
+__O_EXCL      :: 0o200
+__O_TRUNC     :: 0o1000
+__O_APPEND    :: 0o2000
+__O_NONBLOCK  :: 0o4000
+__O_LARGEFILE :: 0o100000
+__O_DIRECTORY :: 0o200000
+__O_SYNC      :: 0o4010000
+__O_CLOEXEC   :: 0o2000000
 
 _opendir :: proc(name: string) -> (Handle, Error) {
 	cstr := strings.clone_to_cstring(name, context.temp_allocator)
 
-	flags := _O_RDONLY|_O_NONBLOCK|_O_DIRECTORY|_O_LARGEFILE|_O_CLOEXEC
+	flags := __O_RDONLY|__O_NONBLOCK|__O_DIRECTORY|__O_LARGEFILE|__O_CLOEXEC
 
 	handle_i := unix.sys_open(cstr, flags)
 	if handle_i < 0 {
@@ -56,17 +56,17 @@ _open :: proc(name: string, flags: File_Flags, perm: File_Mode) -> (Handle, Erro
 
 	flags_i: int
 	switch flags & O_RDONLY|O_WRONLY|O_RDWR {
-	case O_RDONLY: flags_i = _O_RDONLY
-	case O_WRONLY: flags_i = _O_WRONLY
-	case O_RDWR:   flags_i = _O_RDWR
+	case O_RDONLY: flags_i = __O_RDONLY
+	case O_WRONLY: flags_i = __O_WRONLY
+	case O_RDWR:   flags_i = __O_RDWR
 	}
 
-	flags_i |= (_O_APPEND * int(.Append in flags))
-	flags_i |= (_O_CREAT * int(.Create in flags))
-	flags_i |= (_O_EXCL * int(.Excl in flags))
-	flags_i |= (_O_SYNC * int(.Sync in flags))
-	flags_i |= (_O_TRUNC * int(.Trunc in flags))
-	flags_i |= (_O_CLOEXEC * int(.Close_On_Exec in flags))
+	flags_i |= (__O_APPEND * int(.Append in flags))
+	flags_i |= (__O_CREAT * int(.Create in flags))
+	flags_i |= (__O_EXCL * int(.Excl in flags))
+	flags_i |= (__O_SYNC * int(.Sync in flags))
+	flags_i |= (__O_TRUNC * int(.Trunc in flags))
+	flags_i |= (__O_CLOEXEC * int(.Close_On_Exec in flags))
 
 	handle_i := unix.sys_open(cstr, flags_i, int(perm))
 	if handle_i < 0 {

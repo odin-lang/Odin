@@ -1,13 +1,14 @@
 //+private
 package os2
 
-import "core:fmt"
 import "core:strings"
 import "core:sys/unix"
 import "core:path/filepath"
 
 _Path_Separator      :: '/'
 _Path_List_Separator :: ':'
+
+DIRECTORY_FLAGS :: __O_RDONLY|__O_NONBLOCK|__O_DIRECTORY|__O_LARGEFILE|__O_CLOEXEC
 
 _is_path_separator :: proc(c: byte) -> bool {
 	return c == '/'
@@ -53,9 +54,99 @@ _mkdir_all :: proc(path: string, perm: File_Mode) -> Error {
 	return _mkdir_all_stat(path, &s, perm)
 }
 
+dirent64 :: struct {
+	d_ino: u64,
+	d_off: u64,
+	d_reclen: u16,
+	d_type: u8,
+	d_name: [1]u8,
+}
+
+DT_UNKNOWN :: 0
+DT_FIFO :: 1
+DT_CHR :: 2
+DT_DIR :: 4
+DT_BLK :: 6
+DT_REG :: 8
+DT_LNK :: 10
+DT_SOCK :: 12
+DT_WHT :: 14
+
 _remove_all :: proc(path: string) -> Error {
-	// TODO
-	return nil
+	_remove_all_dir :: proc(dfd: Handle) -> Error {
+		n := 64
+		buf := make([]u8, n)
+		defer delete(buf)
+
+		loop: for {
+			res := unix.sys_getdents64(int(dfd), &buf[0], n)
+			switch res {
+			case -22:         //-EINVAL
+				n *= 2
+				buf = make([]u8, n)
+				continue loop
+			case -4096..<0:
+				return _get_platform_error(res)
+			case 0:
+				break loop
+			}
+
+			d: ^dirent64
+
+			for i := 0; i < res; i += int(d.d_reclen) {
+				description: string
+				d = (^dirent64)(rawptr(&buf[i]))
+				d_name_cstr := cstring(&d.d_name[0])
+
+				buf_len := uintptr(d.d_reclen) - offset_of(d.d_name)
+
+				/* check for current directory (.) */
+				#no_bounds_check if buf_len > 1 && d.d_name[0] == '.' && d.d_name[1] == 0 {
+					continue
+				}
+
+				/* check for parent directory (..) */
+				#no_bounds_check if buf_len > 2 && d.d_name[0] == '.' && d.d_name[1] == '.' && d.d_name[2] == 0 {
+					continue
+				}
+
+				res: int
+
+				switch d.d_type {
+				case DT_DIR:
+					handle_i := unix.sys_openat(int(dfd), d_name_cstr, DIRECTORY_FLAGS)
+					if handle_i < 0 {
+						return _get_platform_error(handle_i)
+					}
+					defer unix.sys_close(handle_i)
+					_remove_all_dir(Handle(handle_i)) or_return
+					res = unix.sys_unlinkat(int(dfd), d_name_cstr, int(unix.AT_REMOVEDIR))
+				case:
+					res = unix.sys_unlinkat(int(dfd), d_name_cstr) 
+				}
+
+				if res < 0 {
+					return _get_platform_error(res)
+				}
+			}
+		}
+		return nil
+	}
+
+	cstr := strings.clone_to_cstring(path, context.temp_allocator)
+
+	handle_i := unix.sys_open(cstr, DIRECTORY_FLAGS)
+	switch handle_i {
+	case -ENOTDIR:
+		return _ok_or_error(unix.sys_unlink(cstr))
+	case -4096..<0:
+		return _get_platform_error(handle_i)
+	}
+
+	fd := Handle(handle_i)
+	defer close(fd)
+	_remove_all_dir(fd) or_return
+	return _ok_or_error(unix.sys_rmdir(cstr))
 }
 
 _getwd :: proc(allocator := context.allocator) -> (dir: string, err: Error) {
@@ -71,8 +162,8 @@ _getwd :: proc(allocator := context.allocator) -> (dir: string, err: Error) {
 		if res >= 0 {
 			return strings.string_from_nul_terminated_ptr(&buf[0], len(buf)), nil
 		}
-		if errno := int(unix.get_errno(res)); errno != ERANGE {
-			return "", _get_platform_error(errno)
+		if res != -ERANGE {
+			return "", _get_platform_error(res)
 		}
 		resize(&buf, len(buf)+PATH_MAX)
 	}
