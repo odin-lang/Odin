@@ -1246,8 +1246,7 @@ left_pad :: proc(str: string, length: int, pad: string, allocator := context.all
     }
 
     pad_len := rune_count(pad)
-
-    full_pad_size := (length - n) * len(pad)
+    full_pad_size := (length - n) * pad_len
 
     b: Builder
     init_builder_len(&b, len(str) + full_pad_size, allocator)
@@ -1268,8 +1267,7 @@ right_pad :: proc(str: string, length: int, pad: string, allocator := context.al
     }
 
     pad_len := rune_count(pad)
-
-    full_pad_size := (length - n) * len(pad)
+    full_pad_size := (length - n) * pad_len
 
     b: Builder
     init_builder_len(&b, len(str) + full_pad_size, allocator)
