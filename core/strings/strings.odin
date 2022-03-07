@@ -537,7 +537,7 @@ index_any :: proc(s, chars: string) -> int {
 	if chars == "" {
 		return -1
 	}
-	
+
 	if len(chars) == 1 {
 		r := rune(chars[0])
 		if r >= utf8.RUNE_SELF {
@@ -545,7 +545,7 @@ index_any :: proc(s, chars: string) -> int {
 		}
 		return index_rune(s, r)
 	}
-	
+
 	if len(s) > 8 {
 		if as, ok := ascii_set_make(chars); ok {
 			for i in 0..<len(s) {
@@ -569,7 +569,7 @@ last_index_any :: proc(s, chars: string) -> int {
 	if chars == "" {
 		return -1
 	}
-	
+
 	if len(s) == 1 {
 		r := rune(s[0])
 		if r >= utf8.RUNE_SELF {
@@ -577,7 +577,7 @@ last_index_any :: proc(s, chars: string) -> int {
 		}
 		return index_rune(chars, r)
 	}
-	
+
 	if len(s) > 8 {
 		if as, ok := ascii_set_make(chars); ok {
 			for i := len(s)-1; i >= 0; i -= 1 {
@@ -588,7 +588,7 @@ last_index_any :: proc(s, chars: string) -> int {
 			return -1
 		}
 	}
-	
+
 	if len(chars) == 1 {
 		r := rune(chars[0])
 		if r >= utf8.RUNE_SELF {
@@ -1240,7 +1240,51 @@ right_justify :: proc(str: string, length: int, pad: string, allocator := contex
 	return to_string(b)
 }
 
+// left_pad returns a string with a pad string on the left side if the str's rune length is smaller than length
+left_pad :: proc(str: string, length: int, pad: string, allocator := context.allocator) -> string {
+    n := rune_count(str)
+    if n >= length || pad == "" {
+        return clone(str, allocator)
+    }
 
+    pad_len := rune_count(pad)
+
+    full_pad_size := (length - n) * len(pad)
+
+    b: Builder
+    init_builder(&b, allocator)
+    grow_builder(&b, len(str) + full_pad_size)
+
+    w := to_writer(&b)
+
+    write_pad_string(w, pad, pad_len, full_pad_size)
+    io.write_string(w, str)
+
+    return to_string(b)
+}
+
+// right_pad returns a string with a pad string on the right side if the str's rune length is smaller than length
+right_pad :: proc(str: string, length: int, pad: string, allocator := context.allocator) -> string {
+    n := rune_count(str)
+    if n >= length || pad == "" {
+        return clone(str, allocator)
+    }
+
+    pad_len := rune_count(pad)
+
+    full_pad_size := (length - n) * len(pad)
+
+    b: Builder
+    init_builder(&b, allocator)
+    grow_builder(&b, len(str) + full_pad_size)
+
+    w := to_writer(&b)
+
+    io.write_string(w, str)
+    write_pad_string(w, pad, pad_len, full_pad_size)
+
+    return to_string(b)
+}
 
 
 @private
