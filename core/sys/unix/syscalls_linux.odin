@@ -1537,6 +1537,10 @@ sys_open :: proc(path: cstring, flags: int, mode: int = 0o000) -> int {
 	}
 }
 
+sys_openat :: proc(dfd: int, path: cstring, flags: int, mode: int = 0o000) -> int {
+	return int(intrinsics.syscall(SYS_openat, uintptr(dfd), uintptr(rawptr(path)), uintptr(flags), uintptr(mode)))
+}
+
 sys_close :: proc(fd: int) -> int {
 	return int(intrinsics.syscall(SYS_close, uintptr(fd)))
 }
@@ -1699,6 +1703,10 @@ sys_unlink :: proc(path: cstring) -> int {
 	} else { // NOTE: arm64 does not have unlink
 		return int(intrinsics.syscall(SYS_unlinkat, uintptr(AT_FDCWD), uintptr(rawptr(path), 0)))
 	}
+}
+
+sys_unlinkat :: proc(dfd: int, path: cstring, flag: int = 0) -> int {
+	return int(intrinsics.syscall(SYS_unlinkat, uintptr(dfd), uintptr(rawptr(path)), flag))
 }
 
 sys_rmdir :: proc(path: cstring) -> int {
