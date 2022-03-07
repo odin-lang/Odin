@@ -1207,8 +1207,7 @@ left_justify :: proc(str: string, length: int, pad: string, allocator := context
 	pad_len := rune_count(pad)
 
 	b: Builder
-	init_builder(&b, allocator)
-	grow_builder(&b, len(str) + (remains/pad_len + 1)*len(pad))
+	init_builder_len(&b, len(str) + (remains/pad_len + 1)*len(pad), allocator)
 
 	w := to_writer(&b)
 
@@ -1229,8 +1228,7 @@ right_justify :: proc(str: string, length: int, pad: string, allocator := contex
 	pad_len := rune_count(pad)
 
 	b: Builder
-	init_builder(&b, allocator)
-	grow_builder(&b, len(str) + (remains/pad_len + 1)*len(pad))
+	init_builder_len(&b, len(str) + (remains/pad_len + 1)*len(pad), allocator)
 
 	w := to_writer(&b)
 
@@ -1252,8 +1250,7 @@ left_pad :: proc(str: string, length: int, pad: string, allocator := context.all
     full_pad_size := (length - n) * len(pad)
 
     b: Builder
-    init_builder(&b, allocator)
-    grow_builder(&b, len(str) + full_pad_size)
+    init_builder_len(&b, len(str) + full_pad_size, allocator)
 
     w := to_writer(&b)
 
@@ -1275,8 +1272,7 @@ right_pad :: proc(str: string, length: int, pad: string, allocator := context.al
     full_pad_size := (length - n) * len(pad)
 
     b: Builder
-    init_builder(&b, allocator)
-    grow_builder(&b, len(str) + full_pad_size)
+    init_builder_len(&b, len(str) + full_pad_size, allocator)
 
     w := to_writer(&b)
 
