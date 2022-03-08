@@ -1,6 +1,8 @@
 //+private
 package os2
 
+import "core:sys/unix"
+
 EPERM          :: 1
 ENOENT         :: 2
 ESRCH          :: 3
@@ -125,6 +127,15 @@ EOWNERDEAD     :: 130  /* Owner died */
 ENOTRECOVERABLE:: 131  /* State not recoverable */
 ERFKILL        :: 132  /* Operation not possible due to RF-kill */
 EHWPOISON      :: 133  /* Memory page has hardware error */
+
+_get_platform_error :: proc(res: int) -> Error {
+	errno := unix.get_errno(res)
+	return Platform_Error{i32(errno)}
+}
+
+_ok_or_error :: proc(res: int) -> Error {
+	return res >= 0 ? nil : _get_platform_error(res)
+}
 
 _error_string :: proc(errno: i32) -> string {
 	if errno == 0 {

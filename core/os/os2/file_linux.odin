@@ -7,22 +7,8 @@ import "core:strings"
 import "core:sys/unix"
 
 
-_get_platform_error :: proc(res: int) -> Error {
-	errno := unix.get_errno(res)
-	return Platform_Error{i32(errno)}
-}
-
-_ok_or_error :: proc(res: int) -> Error {
-	return res >= 0 ? nil : _get_platform_error(res)
-}
-
 _std_handle :: proc(kind: Std_Handle_Kind) -> Handle {
-	switch kind {
-	case .stdin:  return Handle(0)
-	case .stdout: return Handle(1)
-	case .stderr: return Handle(2)
-	}
-	unreachable()
+	return Handle(kind)
 }
 
 __O_RDONLY    :: 0o0
@@ -37,19 +23,6 @@ __O_LARGEFILE :: 0o100000
 __O_DIRECTORY :: 0o200000
 __O_SYNC      :: 0o4010000
 __O_CLOEXEC   :: 0o2000000
-
-_opendir :: proc(name: string) -> (Handle, Error) {
-	cstr := strings.clone_to_cstring(name, context.temp_allocator)
-
-	flags := __O_RDONLY|__O_NONBLOCK|__O_DIRECTORY|__O_LARGEFILE|__O_CLOEXEC
-
-	handle_i := unix.sys_open(cstr, flags)
-	if handle_i < 0 {
-		return INVALID_HANDLE, _get_platform_error(handle_i)
-	}
-
-	return Handle(handle_i), nil
-}
 
 _open :: proc(name: string, flags: File_Flags, perm: File_Mode) -> (Handle, Error) {
 	cstr := strings.clone_to_cstring(name, context.temp_allocator)
