@@ -35,7 +35,8 @@ echo ---
 echo ---
 echo Running core:encoding tests
 echo ---
-%PATH_TO_ODIN% run encoding %COMMON%
+%PATH_TO_ODIN% run encoding/json %COMMON%
+%PATH_TO_ODIN% run encoding/varint %COMMON%
 
 echo ---
 echo Running core:math/noise tests
