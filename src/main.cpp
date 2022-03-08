@@ -475,34 +475,39 @@ i32 linker_stage(lbGenerator *gen) {
 			}
 		}
 
-		result = system_exec_command_line_app("ld-link",
-			"clang -Wno-unused-command-line-argument %s -o \"%.*s%.*s\" %s "
-			" %s "
-			" %.*s "
-			" %.*s "
-			" %s "
-			#if defined(GB_SYSTEM_OSX)
-				// This sets a requirement of Mountain Lion and up, but the compiler doesn't work without this limit.
-				// NOTE: If you change this (although this minimum is as low as you can go with Odin working)
-				//       make sure to also change the 'mtriple' param passed to 'opt'
-				#if defined(GB_CPU_ARM)
-				" -mmacosx-version-min=12.0.0 "
-				#else
-				" -mmacosx-version-min=10.8.0 "
-				#endif
-				// This points the linker to where the entry point is
-				" -e _main "
-			#endif
-			, object_files, LIT(output_base), LIT(output_ext),
-			#if defined(GB_SYSTEM_OSX)
-			  "-lSystem -lm -Wl,-syslibroot /Library/Developer/CommandLineTools/SDKs/MacOSX.sdk -L/usr/local/lib",
+		gbString platform_lib_str = gb_string_make(heap_allocator(), "");
+		defer (gb_string_free(platform_lib_str));
+		#if defined(GB_SYSTEM_OSX)
+			platform_lib_str = gb_string_appendc(platform_lib_str, "-lSystem -lm -Wl,-syslibroot /Library/Developer/CommandLineTools/SDKs/MacOSX.sdk -L/usr/local/lib");
+		#else
+			platform_lib_str = gb_string_appendc(platform_lib_str, "-lc -lm");
+		#endif
+
+		#if defined(GB_SYSTEM_OSX)
+			// This sets a requirement of Mountain Lion and up, but the compiler doesn't work without this limit.
+			// NOTE: If you change this (although this minimum is as low as you can go with Odin working)
+			//       make sure to also change the 'mtriple' param passed to 'opt'
+			#if defined(GB_CPU_ARM)
+			link_settings = gb_string_appendc(link_settings, " -mmacosx-version-min=12.0.0 ");
 			#else
-			  "-lc -lm",
+			link_settings = gb_string_appendc(link_settings, " -mmacosx-version-min=10.8.0 ");
 			#endif
-			lib_str,
-			LIT(build_context.link_flags),
-			LIT(build_context.extra_linker_flags),
-			link_settings);
+			// This points the linker to where the entry point is
+			link_settings = gb_string_appendc(link_settings, " -e _main ");
+		#endif
+
+		gbString link_command_line = gb_string_make(heap_allocator(), "clang -Wno-unused-command-line-argument ");
+		defer (gb_string_free(link_command_line));
+
+		link_command_line = gb_string_appendc(link_command_line, object_files);
+		link_command_line = gb_string_append_fmt(link_command_line, " -o \"%.*s%.*s\" ", LIT(output_base), LIT(output_ext));
+		link_command_line = gb_string_append_fmt(link_command_line, " %s ", platform_lib_str);
+		link_command_line = gb_string_append_fmt(link_command_line, " %s ", lib_str);
+		link_command_line = gb_string_append_fmt(link_command_line, " %.*s ", LIT(build_context.link_flags));
+		link_command_line = gb_string_append_fmt(link_command_line, " %.*s ", LIT(build_context.extra_linker_flags));
+		link_command_line = gb_string_append_fmt(link_command_line, " %s ", link_settings);
+
+		result = system_exec_command_line_app("ld-link", link_command_line);
 
 		if (result) {
 			return result;
