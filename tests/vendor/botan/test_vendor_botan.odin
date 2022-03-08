@@ -14,6 +14,7 @@ package test_vendor_botan
 
 import "core:testing"
 import "core:fmt"
+import "core:os"
 
 import "vendor:botan/md4"
 import "vendor:botan/md5"
@@ -86,6 +87,9 @@ main :: proc() {
     test_siphash_2_4(&t)
 
     fmt.printf("%v/%v tests successful.\n", TEST_count - TEST_fail, TEST_count)
+    if TEST_fail > 0 {
+        os.exit(1)
+    }
 }
 
 TestHash :: struct {

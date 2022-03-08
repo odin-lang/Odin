@@ -57,6 +57,9 @@ main :: proc() {
 	png_test(&t)
 
 	fmt.printf("%v/%v tests successful.\n", TEST_count - TEST_fail, TEST_count)
+	if TEST_fail > 0 {
+		os.exit(1)
+	}
 }
 
 PNG_Test :: struct {

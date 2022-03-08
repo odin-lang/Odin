@@ -139,7 +139,13 @@ Context_Memory_Input :: struct #packed {
 	size_packed:       i64,
 	size_unpacked:     i64,
 }
-#assert(size_of(Context_Memory_Input) == 64)
+when size_of(rawptr) == 8 {
+	#assert(size_of(Context_Memory_Input) == 64)
+} else {
+	// e.g. `-target:windows_i386`
+	#assert(size_of(Context_Memory_Input) == 52)
+}
+
 
 Context_Stream_Input :: struct #packed {
 	input_data:        []u8,
@@ -473,4 +479,4 @@ discard_to_next_byte_lsb_from_stream :: proc(z: ^Context_Stream_Input) {
 	consume_bits_lsb(z, discard)
 }
 
-discard_to_next_byte_lsb :: proc{discard_to_next_byte_lsb_from_memory, discard_to_next_byte_lsb_from_stream};
+discard_to_next_byte_lsb :: proc{discard_to_next_byte_lsb_from_memory, discard_to_next_byte_lsb_from_stream}
