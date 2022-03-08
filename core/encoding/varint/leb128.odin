@@ -32,7 +32,7 @@ decode_uleb128 :: proc(buf: []u8) -> (val: u128, size: int, err: Error) {
 		size = i + 1
 
 		// 18 * 7 bits = 126, which means that a possible 19th byte may at most be 0b0000_0011.
-		if size == LEB128_MAX_BYTES && v > 0b0000_0011 {
+		if size > LEB128_MAX_BYTES || size == LEB128_MAX_BYTES && v > 0b0000_0011 {
 			return 0, 0, .Value_Too_Large
 		}
 
@@ -64,7 +64,7 @@ decode_ileb128 :: proc(buf: []u8) -> (val: i128, size: int, err: Error) {
 		size += 1
 
 		// 18 * 7 bits = 126, which including sign means we can have a 19th byte.
-		if size == LEB128_MAX_BYTES && v > 0x7f {
+		if size > LEB128_MAX_BYTES || size == LEB128_MAX_BYTES && v > 0x7f {
 			return 0, 0, .Value_Too_Large
 		}
 
