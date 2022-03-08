@@ -2,7 +2,7 @@ package test_core_odin_parser
 
 import "core:testing"
 import "core:fmt"
-
+import "core:os"
 import "core:odin/parser"
 
 
@@ -35,6 +35,9 @@ main :: proc() {
     test_parse_demo(&t)
 
     fmt.printf("%v/%v tests successful.\n", TEST_count - TEST_fail, TEST_count)
+    if TEST_fail > 0 {
+        os.exit(1)
+    }
 }
 
 

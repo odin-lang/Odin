@@ -677,4 +677,4 @@ inflate_from_byte_array_raw :: proc(input: []u8, buf: ^bytes.Buffer, raw := fals
 	return inflate_raw(z=&ctx, expected_output_size=expected_output_size)
 }
 
-inflate :: proc{inflate_from_context, inflate_from_byte_array};
+inflate :: proc{inflate_from_context, inflate_from_byte_array}

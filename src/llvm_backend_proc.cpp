@@ -1042,7 +1042,7 @@ lbValue lb_build_builtin_proc(lbProcedure *p, Ast *expr, TypeAndValue const &tv,
 			return lb_string_len(p, v);
 		} else if (is_type_array(t)) {
 			GB_PANIC("Array lengths are constant");
-		} else if (is_type_slice(t)) {
+		} else if (is_type_slice(t) || is_type_relative_slice(t)) {
 			return lb_slice_len(p, v);
 		} else if (is_type_dynamic_array(t)) {
 			return lb_dynamic_array_len(p, v);
@@ -1068,7 +1068,7 @@ lbValue lb_build_builtin_proc(lbProcedure *p, Ast *expr, TypeAndValue const &tv,
 			GB_PANIC("Unreachable");
 		} else if (is_type_array(t)) {
 			GB_PANIC("Array lengths are constant");
-		} else if (is_type_slice(t)) {
+		} else if (is_type_slice(t) || is_type_relative_slice(t)) {
 			return lb_slice_len(p, v);
 		} else if (is_type_dynamic_array(t)) {
 			return lb_dynamic_array_cap(p, v);

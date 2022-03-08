@@ -59,64 +59,64 @@ walk :: proc(v: ^Visitor, node: ^Node) {
 	}
 
 	switch n in &node.derived {
-	case File:
+	case ^File:
 		if n.docs != nil {
 			walk(v, n.docs)
 		}
 		walk_stmt_list(v, n.decls[:])
-	case Package:
+	case ^Package:
 		for _, f in n.files {
 			walk(v, f)
 		}
 
-	case Comment_Group:
+	case ^Comment_Group:
 		// empty
-	case Bad_Expr:
-	case Ident:
-	case Implicit:
-	case Undef:
-	case Basic_Lit:
-	case Basic_Directive:
-	case Ellipsis:
+	case ^Bad_Expr:
+	case ^Ident:
+	case ^Implicit:
+	case ^Undef:
+	case ^Basic_Lit:
+	case ^Basic_Directive:
+	case ^Ellipsis:
 		if n.expr != nil {
 			walk(v, n.expr)
 		}
-	case Proc_Lit:
+	case ^Proc_Lit:
 		walk(v, n.type)
 		walk(v, n.body)
 		walk_expr_list(v, n.where_clauses)
-	case Comp_Lit:
+	case ^Comp_Lit:
 		if n.type != nil {
 			walk(v, n.type)
 		}
 		walk_expr_list(v, n.elems)
-	case Tag_Expr:
+	case ^Tag_Expr:
 		walk(v, n.expr)
-	case Unary_Expr:
+	case ^Unary_Expr:
 		walk(v, n.expr)
-	case Binary_Expr:
+	case ^Binary_Expr:
 		walk(v, n.left)
 		walk(v, n.right)
-	case Paren_Expr:
+	case ^Paren_Expr:
 		walk(v, n.expr)
-	case Selector_Expr:
+	case ^Selector_Expr:
 		walk(v, n.expr)
 		walk(v, n.field)
-	case Implicit_Selector_Expr:
+	case ^Implicit_Selector_Expr:
 		walk(v, n.field)
-	case Selector_Call_Expr:
+	case ^Selector_Call_Expr:
 		walk(v, n.expr)
 		walk(v, n.call)
-	case Index_Expr:
+	case ^Index_Expr:
 		walk(v, n.expr)
 		walk(v, n.index)
-	case Matrix_Index_Expr:
+	case ^Matrix_Index_Expr:
 		walk(v, n.expr)
 		walk(v, n.row_index)
 		walk(v, n.column_index)
-	case Deref_Expr:
+	case ^Deref_Expr:
 		walk(v, n.expr)
-	case Slice_Expr:
+	case ^Slice_Expr:
 		walk(v, n.expr)
 		if n.low != nil {
 			walk(v, n.low)
@@ -124,57 +124,57 @@ walk :: proc(v: ^Visitor, node: ^Node) {
 		if n.high != nil {
 			walk(v, n.high)
 		}
-	case Call_Expr:
+	case ^Call_Expr:
 		walk(v, n.expr)
 		walk_expr_list(v, n.args)
-	case Field_Value:
+	case ^Field_Value:
 		walk(v, n.field)
 		walk(v, n.value)
-	case Ternary_If_Expr:
+	case ^Ternary_If_Expr:
 		walk(v, n.x)
 		walk(v, n.cond)
 		walk(v, n.y)
-	case Ternary_When_Expr:
+	case ^Ternary_When_Expr:
 		walk(v, n.x)
 		walk(v, n.cond)
 		walk(v, n.y)
-	case Or_Else_Expr:
+	case ^Or_Else_Expr:
 		walk(v, n.x)
 		walk(v, n.y)
-	case Or_Return_Expr:
+	case ^Or_Return_Expr:
 		walk(v, n.expr)
-	case Type_Assertion:
+	case ^Type_Assertion:
 		walk(v, n.expr)
 		if n.type != nil {
 			walk(v, n.type)
 		}
-	case Type_Cast:
+	case ^Type_Cast:
 		walk(v, n.type)
 		walk(v, n.expr)
-	case Auto_Cast:
+	case ^Auto_Cast:
 		walk(v, n.expr)
-	case Inline_Asm_Expr:
+	case ^Inline_Asm_Expr:
 		walk_expr_list(v, n.param_types)
 		walk(v, n.return_type)
 		walk(v, n.constraints_string)
 		walk(v, n.asm_string)
 
 
-	case Bad_Stmt:
-	case Empty_Stmt:
-	case Expr_Stmt:
+	case ^Bad_Stmt:
+	case ^Empty_Stmt:
+	case ^Expr_Stmt:
 		walk(v, n.expr)
-	case Tag_Stmt:
+	case ^Tag_Stmt:
 		walk(v, n.stmt)
-	case Assign_Stmt:
+	case ^Assign_Stmt:
 		walk_expr_list(v, n.lhs)
 		walk_expr_list(v, n.rhs)
-	case Block_Stmt:
+	case ^Block_Stmt:
 		if n.label != nil {
 			walk(v, n.label)
 		}
 		walk_stmt_list(v, n.stmts)
-	case If_Stmt:
+	case ^If_Stmt:
 		if n.label != nil {
 			walk(v, n.label)
 		}
@@ -186,17 +186,17 @@ walk :: proc(v: ^Visitor, node: ^Node) {
 		if n.else_stmt != nil {
 			walk(v, n.else_stmt)
 		}
-	case When_Stmt:
+	case ^When_Stmt:
 		walk(v, n.cond)
 		walk(v, n.body)
 		if n.else_stmt != nil {
 			walk(v, n.else_stmt)
 		}
-	case Return_Stmt:
+	case ^Return_Stmt:
 		walk_expr_list(v, n.results)
-	case Defer_Stmt:
+	case ^Defer_Stmt:
 		walk(v, n.stmt)
-	case For_Stmt:
+	case ^For_Stmt:
 		if n.label != nil {
 			walk(v, n.label)
 		}
@@ -210,7 +210,7 @@ walk :: proc(v: ^Visitor, node: ^Node) {
 			walk(v, n.post)
 		}
 		walk(v, n.body)
-	case Range_Stmt:
+	case ^Range_Stmt:
 		if n.label != nil {
 			walk(v, n.label)
 		}
@@ -221,7 +221,7 @@ walk :: proc(v: ^Visitor, node: ^Node) {
 		}
 		walk(v, n.expr)
 		walk(v, n.body)
-	case Inline_Range_Stmt:
+	case ^Inline_Range_Stmt:
 		if n.label != nil {
 			walk(v, n.label)
 		}
@@ -233,10 +233,10 @@ walk :: proc(v: ^Visitor, node: ^Node) {
 		}
 		walk(v, n.expr)
 		walk(v, n.body)
-	case Case_Clause:
+	case ^Case_Clause:
 		walk_expr_list(v, n.list)
 		walk_stmt_list(v, n.body)
-	case Switch_Stmt:
+	case ^Switch_Stmt:
 		if n.label != nil {
 			walk(v, n.label)
 		}
@@ -247,7 +247,7 @@ walk :: proc(v: ^Visitor, node: ^Node) {
 			walk(v, n.cond)
 		}
 		walk(v, n.body)
-	case Type_Switch_Stmt:
+	case ^Type_Switch_Stmt:
 		if n.label != nil {
 			walk(v, n.label)
 		}
@@ -258,16 +258,16 @@ walk :: proc(v: ^Visitor, node: ^Node) {
 			walk(v, n.expr)
 		}
 		walk(v, n.body)
-	case Branch_Stmt:
+	case ^Branch_Stmt:
 		if n.label != nil {
 			walk(v, n.label)
 		}
-	case Using_Stmt:
+	case ^Using_Stmt:
 		walk_expr_list(v, n.list)
 
 
-	case Bad_Decl:
-	case Value_Decl:
+	case ^Bad_Decl:
+	case ^Value_Decl:
 		if n.docs != nil {
 			walk(v, n.docs)
 		}
@@ -280,21 +280,21 @@ walk :: proc(v: ^Visitor, node: ^Node) {
 		if n.comment != nil {
 			walk(v, n.comment)
 		}
-	case Package_Decl:
+	case ^Package_Decl:
 		if n.docs != nil {
 			walk(v, n.docs)
 		}
 		if n.comment != nil {
 			walk(v, n.comment)
 		}
-	case Import_Decl:
+	case ^Import_Decl:
 		if n.docs != nil {
 			walk(v, n.docs)
 		}
 		if n.comment != nil {
 			walk(v, n.comment)
 		}
-	case Foreign_Block_Decl:
+	case ^Foreign_Block_Decl:
 		if n.docs != nil {
 			walk(v, n.docs)
 		}
@@ -303,7 +303,7 @@ walk :: proc(v: ^Visitor, node: ^Node) {
 			walk(v, n.foreign_library)
 		}
 		walk(v, n.body)
-	case Foreign_Import_Decl:
+	case ^Foreign_Import_Decl:
 		if n.docs != nil {
 			walk(v, n.docs)
 		}
@@ -313,11 +313,11 @@ walk :: proc(v: ^Visitor, node: ^Node) {
 			walk(v, n.comment)
 		}
 
-	case Proc_Group:
+	case ^Proc_Group:
 		walk_expr_list(v, n.args)
-	case Attribute:
+	case ^Attribute:
 		walk_expr_list(v, n.elems)
-	case Field:
+	case ^Field:
 		if n.docs != nil {
 			walk(v, n.docs)
 		}
@@ -331,31 +331,31 @@ walk :: proc(v: ^Visitor, node: ^Node) {
 		if n.comment != nil {
 			walk(v, n.comment)
 		}
-	case Field_List:
+	case ^Field_List:
 		for x in n.list {
 			walk(v, x)
 		}
-	case Typeid_Type:
+	case ^Typeid_Type:
 		if n.specialization != nil {
 			walk(v, n.specialization)
 		}
-	case Helper_Type:
+	case ^Helper_Type:
 		walk(v, n.type)
-	case Distinct_Type:
+	case ^Distinct_Type:
 		walk(v, n.type)
-	case Poly_Type:
+	case ^Poly_Type:
 		walk(v, n.type)
 		if n.specialization != nil {
 			walk(v, n.specialization)
 		}
-	case Proc_Type:
+	case ^Proc_Type:
 		walk(v, n.params)
 		walk(v, n.results)
-	case Pointer_Type:
+	case ^Pointer_Type:
 		walk(v, n.elem)
-	case Multi_Pointer_Type:
+	case ^Multi_Pointer_Type:
 		walk(v, n.elem)
-	case Array_Type:
+	case ^Array_Type:
 		if n.tag != nil {
 			walk(v, n.tag)
 		}
@@ -363,12 +363,12 @@ walk :: proc(v: ^Visitor, node: ^Node) {
 			walk(v, n.len)
 		}
 		walk(v, n.elem)
-	case Dynamic_Array_Type:
+	case ^Dynamic_Array_Type:
 		if n.tag != nil {
 			walk(v, n.tag)
 		}
 		walk(v, n.elem)
-	case Struct_Type:
+	case ^Struct_Type:
 		if n.poly_params != nil {
 			walk(v, n.poly_params)
 		}
@@ -377,7 +377,7 @@ walk :: proc(v: ^Visitor, node: ^Node) {
 		}
 		walk_expr_list(v, n.where_clauses)
 		walk(v, n.fields)
-	case Union_Type:
+	case ^Union_Type:
 		if n.poly_params != nil {
 			walk(v, n.poly_params)
 		}
@@ -386,23 +386,23 @@ walk :: proc(v: ^Visitor, node: ^Node) {
 		}
 		walk_expr_list(v, n.where_clauses)
 		walk_expr_list(v, n.variants)
-	case Enum_Type:
+	case ^Enum_Type:
 		if n.base_type != nil {
 			walk(v, n.base_type)
 		}
 		walk_expr_list(v, n.fields)
-	case Bit_Set_Type:
+	case ^Bit_Set_Type:
 		walk(v, n.elem)
 		if n.underlying != nil {
 			walk(v, n.underlying)
 		}
-	case Map_Type:
+	case ^Map_Type:
 		walk(v, n.key)
 		walk(v, n.value)
-	case Relative_Type:
+	case ^Relative_Type:
 		walk(v, n.tag)
 		walk(v, n.type)
-	case Matrix_Type:
+	case ^Matrix_Type:
 		walk(v, n.row_count)
 		walk(v, n.column_count)
 		walk(v, n.elem)

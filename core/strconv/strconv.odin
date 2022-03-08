@@ -895,6 +895,7 @@ unquote_string :: proc(lit: string, allocator := context.allocator) -> (res: str
 	if s == `""` {
 		return "", false, true
 	}
+	s = s[1:len(s)-1]
 
 	if contains_rune(s, '\n') >= 0 {
 		return s, false, false

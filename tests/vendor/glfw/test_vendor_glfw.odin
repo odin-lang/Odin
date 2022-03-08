@@ -3,6 +3,7 @@ package test_vendor_glfw
 import "core:testing"
 import "core:fmt"
 import "vendor:glfw"
+import "core:os"
 
 GLFW_MAJOR :: 3
 GLFW_MINOR :: 3
@@ -36,6 +37,9 @@ main :: proc() {
 	test_glfw(&t)
 
 	fmt.printf("%v/%v tests successful.\n", TEST_count - TEST_fail, TEST_count)
+	if TEST_fail > 0 {
+		os.exit(1)
+	}
 }
 
 @(test)

@@ -34,7 +34,7 @@ Node :: struct {
 	pos:         tokenizer.Pos,
 	end:         tokenizer.Pos,
 	state_flags: Node_State_Flags,
-	derived:     any,
+	derived:     Any_Node,
 }
 
 Comment_Group :: struct {
@@ -88,9 +88,11 @@ File :: struct {
 
 Expr :: struct {
 	using expr_base: Node,
+	derived_expr: Any_Expr,
 }
 Stmt :: struct {
 	using stmt_base: Node,
+	derived_stmt: Any_Stmt,
 }
 Decl :: struct {
 	using decl_base: Stmt,
@@ -541,7 +543,7 @@ unparen_expr :: proc(expr: ^Expr) -> (val: ^Expr) {
 		return
 	}
 	for {
-		e, ok := val.derived.(Paren_Expr)
+		e, ok := val.derived.(^Paren_Expr)
 		if !ok || e.expr == nil {
 			break
 		}
@@ -758,4 +760,173 @@ Matrix_Type :: struct {
 	row_count:    ^Expr,
 	column_count: ^Expr,
 	elem:         ^Expr,
+}
+
+
+Any_Node :: union {
+	^Package,
+	^File,
+	^Comment_Group,
+
+	^Bad_Expr,
+	^Ident,
+	^Implicit,
+	^Undef,
+	^Basic_Lit,
+	^Basic_Directive,
+	^Ellipsis,
+	^Proc_Lit,
+	^Comp_Lit,
+	^Tag_Expr,
+	^Unary_Expr,
+	^Binary_Expr,
+	^Paren_Expr,
+	^Selector_Expr,
+	^Implicit_Selector_Expr,
+	^Selector_Call_Expr,
+	^Index_Expr,
+	^Deref_Expr,
+	^Slice_Expr,
+	^Matrix_Index_Expr,
+	^Call_Expr,
+	^Field_Value,
+	^Ternary_If_Expr,
+	^Ternary_When_Expr,
+	^Or_Else_Expr,
+	^Or_Return_Expr,
+	^Type_Assertion,
+	^Type_Cast,
+	^Auto_Cast,
+	^Inline_Asm_Expr,
+
+	^Proc_Group,
+
+	^Typeid_Type,
+	^Helper_Type,
+	^Distinct_Type,
+	^Poly_Type,
+	^Proc_Type,
+	^Pointer_Type,
+	^Multi_Pointer_Type,
+	^Array_Type,
+	^Dynamic_Array_Type,
+	^Struct_Type,
+	^Union_Type,
+	^Enum_Type,
+	^Bit_Set_Type,
+	^Map_Type,
+	^Relative_Type,
+	^Matrix_Type,
+
+	^Bad_Stmt,
+	^Empty_Stmt,
+	^Expr_Stmt,
+	^Tag_Stmt,
+	^Assign_Stmt,
+	^Block_Stmt,
+	^If_Stmt,
+	^When_Stmt,
+	^Return_Stmt,
+	^Defer_Stmt,
+	^For_Stmt,
+	^Range_Stmt,
+	^Inline_Range_Stmt,
+	^Case_Clause,
+	^Switch_Stmt,
+	^Type_Switch_Stmt,
+	^Branch_Stmt,
+	^Using_Stmt,
+
+	^Bad_Decl,
+	^Value_Decl,
+	^Package_Decl,
+	^Import_Decl,
+	^Foreign_Block_Decl,
+	^Foreign_Import_Decl,
+
+	^Attribute,
+	^Field,
+	^Field_List,
+}
+
+
+Any_Expr :: union {
+	^Bad_Expr,
+	^Ident,
+	^Implicit,
+	^Undef,
+	^Basic_Lit,
+	^Basic_Directive,
+	^Ellipsis,
+	^Proc_Lit,
+	^Comp_Lit,
+	^Tag_Expr,
+	^Unary_Expr,
+	^Binary_Expr,
+	^Paren_Expr,
+	^Selector_Expr,
+	^Implicit_Selector_Expr,
+	^Selector_Call_Expr,
+	^Index_Expr,
+	^Deref_Expr,
+	^Slice_Expr,
+	^Matrix_Index_Expr,
+	^Call_Expr,
+	^Field_Value,
+	^Ternary_If_Expr,
+	^Ternary_When_Expr,
+	^Or_Else_Expr,
+	^Or_Return_Expr,
+	^Type_Assertion,
+	^Type_Cast,
+	^Auto_Cast,
+	^Inline_Asm_Expr,
+
+	^Proc_Group,
+
+	^Typeid_Type,
+	^Helper_Type,
+	^Distinct_Type,
+	^Poly_Type,
+	^Proc_Type,
+	^Pointer_Type,
+	^Multi_Pointer_Type,
+	^Array_Type,
+	^Dynamic_Array_Type,
+	^Struct_Type,
+	^Union_Type,
+	^Enum_Type,
+	^Bit_Set_Type,
+	^Map_Type,
+	^Relative_Type,
+	^Matrix_Type,
+}
+
+
+Any_Stmt :: union {
+	^Bad_Stmt,
+	^Empty_Stmt,
+	^Expr_Stmt,
+	^Tag_Stmt,
+	^Assign_Stmt,
+	^Block_Stmt,
+	^If_Stmt,
+	^When_Stmt,
+	^Return_Stmt,
+	^Defer_Stmt,
+	^For_Stmt,
+	^Range_Stmt,
+	^Inline_Range_Stmt,
+	^Case_Clause,
+	^Switch_Stmt,
+	^Type_Switch_Stmt,
+	^Branch_Stmt,
+	^Using_Stmt,
+
+	^Bad_Decl,
+	^Value_Decl,
+	^Package_Decl,
+	^Import_Decl,
+	^Foreign_Block_Decl,
+	^Foreign_Import_Decl,
 }

@@ -10,9 +10,13 @@ when ODIN_OS == .Windows {
 		"system:User32.lib",
 		"system:Shell32.lib",
 	}
+} else when ODIN_OS == .Linux  {
+	foreign import lib "linux/libraylib.a"
+} else when ODIN_OS == .Darwin {
+	foreign import lib "macos/libraylib.a"
+} else {
+	foreign import lib "system:raylib"
 }
-when ODIN_OS == .Linux  { foreign import lib "linux/libraylib.a" }
-when ODIN_OS == .Darwin { foreign import lib "macos/libraylib.a" }
 
 GRAPHICS_API_OPENGL_11  :: false
 GRAPHICS_API_OPENGL_21  :: true
