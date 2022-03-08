@@ -10,6 +10,8 @@
 // the LEB128 format as used by DWARF debug info, Android .dex and other file formats.
 package varint
 
+import "core:fmt"
+
 // In theory we should use the bigint package. In practice, varints bigger than this indicate a corrupted file.
 // Instead we'll set limits on the values we'll encode/decode
 // 18 * 7 bits = 126, which means that a possible 19th byte may at most be `0b0000_0011`.
@@ -29,6 +31,7 @@ decode_uleb128 :: proc(buf: []u8) -> (val: u128, size: int, err: Error) {
 	for v, i in buf {
 		size = i + 1
 
+		// 18 * 7 bits = 126, which means that a possible 19th byte may at most be 0b0000_0011.
 		if size == LEB128_MAX_BYTES && v > 0b0000_0011 {
 			return 0, 0, .Value_Too_Large
 		}
@@ -60,8 +63,8 @@ decode_ileb128 :: proc(buf: []u8) -> (val: i128, size: int, err: Error) {
 	for v in buf {
 		size += 1
 
-		// 18 * 7 bits = 126, which means that a possible 19th byte may at most be 0b0000_0011.
-		if size == LEB128_MAX_BYTES && v > 0b0000_0011 {
+		// 18 * 7 bits = 126, which including sign means we can have a 19th byte.
+		if size == LEB128_MAX_BYTES && v > 0x7f {
 			return 0, 0, .Value_Too_Large
 		}
 
@@ -86,6 +89,7 @@ encode_uleb128 :: proc(buf: []u8, val: u128) -> (size: int, err: Error) {
 		size += 1
 
 		if size > len(buf) {
+			fmt.println(val, buf[:size - 1])
 			return 0, .Buffer_Too_Small
 		}
 
