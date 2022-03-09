@@ -40,19 +40,15 @@ ifeq ($(OS), Darwin)
     LDFLAGS:=$(LDFLAGS) -lLLVM-C
 endif
 ifeq ($(OS), Linux)
-    LLVM_CONFIG=llvm-config
-
-	LLVM_VERSIONS = "13.%.%" "12.0.1" "11.1.0"
-
-    LLVM_VERSION_PATTERN_SEPERATOR = )|(
-    LLVM_VERSION_PATTERNS_ESCAPED_DOT = $(subst .,\.,$(LLVM_VERSIONS))
-    LLVM_VERSION_PATTERNS_REPLACE_PERCENT = $(subst %,.*,$(LLVM_VERSION_PATTERNS_ESCAPED_DOT))
-    LLVM_VERSION_PATTERN_REMOVE_ELEMENTS = $(subst " ",$(LLVM_VERSION_PATTERN_SEPERATOR),$(LLVM_VERSION_PATTERNS_REPLACE_PERCENT))
-    LLMV_VERSION_PATTERN_REMOVE_SINGLE_STR = $(subst ",,$(LLVM_VERSION_PATTERN_REMOVE_ELEMENTS))
-    LLVM_VERSION_PATTERN = "^(($(LLMV_VERSION_PATTERN_REMOVE_SINGLE_STR)))"
-
-    ifeq ($(shell $(LLVM_CONFIG) --version | grep -E $(LLVM_VERSION_PATTERN)),)
-		$(error "Requirement: llvm-config must be base version greater than 11")
+    LLVM_CONFIG=llvm-config-11
+    ifneq ($(shell which llvm-config-11 2>/dev/null),)
+        LLVM_CONFIG=llvm-config-11
+    else ifneq ($(shell which llvm-config-11-64 2>/dev/null),)
+        LLVM_CONFIG=llvm-config-11-64
+    else
+        ifeq ($(shell $(LLVM_CONFIG) --version | grep '^11\.'),)
+            $(error "Requirement: llvm-config must be version 11")
+        endif
     endif
 
     LDFLAGS:=$(LDFLAGS) -ldl
