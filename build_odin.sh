@@ -14,19 +14,21 @@ panic() {
 	exit 1
 }
 
+function version { echo "$@" | awk -F. '{ printf("%d%03d%03d%03d\n", $1,$2,$3,$4); }'; }
+
 config_darwin() {
 	ARCH=$(uname -m)
 	LLVM_CONFIG=llvm-config
 
 	# allow for arm only llvm's with version 13
 	if [ ARCH == arm64 ]; then
-		LLVM_VERSIONS="13.%.%"
+		MIN_LLVM_VERSION=("13.0.0")
 	else
 		# allow for x86 / amd64 all llvm versions begining from 11
-		LLVM_VERSIONS="13.%.%" "12.0.1" "11.1.0"
+		MIN_LLVM_VERSION=("11.1.0")
 	fi
 
-	if [ $($LLVM_CONFIG --version | grep -E $(LLVM_VERSION_PATTERN)) == 0 ]; then
+	if [ $(version $($LLVM_CONFIG --version)) -lt $(version $MIN_LLVM_VERSION) ]; then
 		if [ ARCH == arm64 ]; then
 			panic "Requirement: llvm-config must be base version 13 for arm64"
 		else
