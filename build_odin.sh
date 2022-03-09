@@ -52,6 +52,15 @@ config_openbsd() {
 config_linux() {
 	LLVM_CONFIG=llvm-config
 
+	MIN_LLVM_VERSION=("11.1.0")
+	if [ $(version $($LLVM_CONFIG --version)) -lt $(version $MIN_LLVM_VERSION) ]; then
+
+		LLVM_CONFIG=llvm-config-11
+		if [ $(version $($LLVM_CONFIG --version)) -lt $(version $MIN_LLVM_VERSION) ]; then
+			panic "Requirement: llvm-config must be base version greater than 11"
+		fi
+	fi
+
 	LDFLAGS="$LDFLAGS -ldl"
 	CFLAGS="$CFLAGS $($LLVM_CONFIG --cxxflags --ldflags)"
 	LDFLAGS="$LDFLAGS $($LLVM_CONFIG --libs core native --system-libs)"
