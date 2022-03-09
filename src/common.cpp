@@ -848,7 +848,7 @@ ReadDirectoryError read_directory(String path, Array<FileInfo> *fi) {
 
 	return ReadDirectory_None;
 }
-#elif defined(GB_SYSTEM_LINUX) || defined(GB_SYSTEM_OSX) || defined(GB_SYSTEM_FREEBSD)
+#elif defined(GB_SYSTEM_LINUX) || defined(GB_SYSTEM_OSX) || defined(GB_SYSTEM_FREEBSD) || defined(GB_SYSTEM_OPENBSD)
 
 #include <dirent.h>
 
@@ -1021,7 +1021,7 @@ LoadedFileError load_file_32(char const *fullpath, LoadedFile *memory_mapped_fil
 	#endif
 	}
 	
-	gbFileContents fc = gb_file_read_contents(heap_allocator(), true, fullpath);
+	gbFileContents fc = gb_file_read_contents(permanent_allocator(), true, fullpath);
 
 	if (fc.size > I32_MAX) {
 		err = LoadedFile_FileTooLarge;

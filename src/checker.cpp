@@ -225,8 +225,8 @@ bool decl_info_has_init(DeclInfo *d) {
 Scope *create_scope(CheckerInfo *info, Scope *parent, isize init_elements_capacity=DEFAULT_SCOPE_CAPACITY) {
 	Scope *s = gb_alloc_item(permanent_allocator(), Scope);
 	s->parent = parent;
-	string_map_init(&s->elements, permanent_allocator(), init_elements_capacity);
-	ptr_set_init(&s->imported, permanent_allocator(), 0);
+	string_map_init(&s->elements, heap_allocator(), init_elements_capacity);
+	ptr_set_init(&s->imported, heap_allocator(), 0);
 	mutex_init(&s->mutex);
 
 	if (parent != nullptr && parent != builtin_pkg->scope) {
@@ -733,11 +733,24 @@ void add_package_dependency(CheckerContext *c, char const *package_name, char co
 	String n = make_string_c(name);
 	AstPackage *p = get_core_package(&c->checker->info, make_string_c(package_name));
 	Entity *e = scope_lookup(p->scope, n);
-	e->flags |= EntityFlag_Used;
 	GB_ASSERT_MSG(e != nullptr, "%s", name);
 	GB_ASSERT(c->decl != nullptr);
+	e->flags |= EntityFlag_Used;
 	add_dependency(c->info, c->decl, e);
 }
+
+void try_to_add_package_dependency(CheckerContext *c, char const *package_name, char const *name) {
+	String n = make_string_c(name);
+	AstPackage *p = get_core_package(&c->checker->info, make_string_c(package_name));
+	Entity *e = scope_lookup(p->scope, n);
+	if (e == nullptr) {
+		return;
+	}
+	GB_ASSERT(c->decl != nullptr);
+	e->flags |= EntityFlag_Used;
+	add_dependency(c->info, c->decl, e);
+}
+
 
 void add_declaration_dependency(CheckerContext *c, Entity *e) {
 	if (e == nullptr) {
@@ -893,6 +906,7 @@ void init_universal(void) {
 			{"Linux",        TargetOs_linux},
 			{"Essence",      TargetOs_essence},
 			{"FreeBSD",      TargetOs_freebsd},
+			{"OpenBSD",      TargetOs_openbsd},
 			{"WASI",         TargetOs_wasi},
 			{"JS",           TargetOs_js},
 			{"Freestanding", TargetOs_freestanding},

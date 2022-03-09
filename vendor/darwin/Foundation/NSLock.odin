@@ -1,4 +1,3 @@
-//+build darwin
 package objc_Foundation
 
 Locking :: struct($T: typeid) {using _: Object}

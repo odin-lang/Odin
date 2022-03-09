@@ -79,6 +79,10 @@ extern "C" {
 		#ifndef GB_SYSTEM_FREEBSD
 		#define GB_SYSTEM_FREEBSD 1
 		#endif
+	#elif defined(__OpenBSD__)
+		#ifndef GB_SYSTEM_OPENBSD
+		#define GB_SYSTEM_OPENBSD 1
+		#endif
 	#else
 		#error This UNIX operating system is not supported
 	#endif
@@ -199,7 +203,7 @@ extern "C" {
 	#endif
 	#include <stdlib.h> // NOTE(bill): malloc on linux
 	#include <sys/mman.h>
-	#if !defined(GB_SYSTEM_OSX) && !defined(__FreeBSD__)
+	#if !defined(GB_SYSTEM_OSX) && !defined(__FreeBSD__) && !defined(__OpenBSD__)
 		#include <sys/sendfile.h>
 	#endif
 	#include <sys/stat.h>
@@ -235,6 +239,12 @@ extern "C" {
 	#define sendfile(out, in, offset, count) sendfile(out, in, offset, count, NULL, NULL, 0)
 #endif
 
+#if defined(GB_SYSTEM_OPENBSD)
+	#include <stdio.h>
+	#include <pthread_np.h>
+	#define lseek64 lseek
+#endif
+    
 #if defined(GB_SYSTEM_UNIX)
 	#include <semaphore.h>
 #endif
@@ -779,6 +789,13 @@ typedef struct gbAffinity {
 #elif defined(GB_SYSTEM_FREEBSD)
 typedef struct gbAffinity {
 	b32 is_accurate;
+	isize core_count;
+	isize thread_count;
+	isize threads_per_core;
+} gbAffinity;
+#elif defined(GB_SYSTEM_OPENBSD)
+typedef struct gbAffinity {
+	b32   is_accurate;
 	isize core_count;
 	isize thread_count;
 	isize threads_per_core;
@@ -3682,6 +3699,30 @@ isize gb_affinity_thread_count_for_core(gbAffinity *a, isize core) {
 	GB_ASSERT(0 <= core && core < a->core_count);
 	return a->threads_per_core;
 }
+
+#elif defined(GB_SYSTEM_OPENBSD)
+#include <unistd.h>
+
+void gb_affinity_init(gbAffinity *a) {
+	a->core_count       = sysconf(_SC_NPROCESSORS_ONLN);
+	a->threads_per_core = 1;
+	a->is_accurate      = a->core_count > 0;
+	a->core_count       = a->is_accurate ? a->core_count : 1;
+	a->thread_count     = a->core_count;
+}
+
+void gb_affinity_destroy(gbAffinity *a) {
+	gb_unused(a);
+}
+
+b32 gb_affinity_set(gbAffinity *a, isize core, isize thread_index) {
+	return true;
+}
+
+isize gb_affinity_thread_count_for_core(gbAffinity *a, isize core) {
+	GB_ASSERT(0 <= core && core < a->core_count);
+	return a->threads_per_core;
+}
 #else
 #error TODO(bill): Unknown system
 #endif
@@ -6025,7 +6066,7 @@ gbFileTime gb_file_last_write_time(char const *filepath) {
 gb_inline b32 gb_file_copy(char const *existing_filename, char const *new_filename, b32 fail_if_exists) {
 #if defined(GB_SYSTEM_OSX)
 	return copyfile(existing_filename, new_filename, NULL, COPYFILE_DATA) == 0;
-#else
+#elif defined(GB_SYSTEM_LINUX) || defined(GB_SYSTEM_FREEBSD)
 	isize size;
 	int existing_fd = open(existing_filename, O_RDONLY, 0);
 	int new_fd      = open(new_filename, O_WRONLY|O_CREAT, 0666);
@@ -6041,6 +6082,49 @@ gb_inline b32 gb_file_copy(char const *existing_filename, char const *new_filena
 	close(new_fd);
 	close(existing_fd);
 
+	return size == stat_existing.st_size;
+#else
+	int new_flags = O_WRONLY | O_CREAT;
+	if (fail_if_exists) {
+		new_flags |= O_EXCL;
+	}
+	int existing_fd = open(existing_filename, O_RDONLY, 0);
+	int new_fd      = open(new_filename, new_flags, 0666);
+
+	struct stat stat_existing;
+	if (fstat(existing_fd, &stat_existing) == -1) {
+		return 0;
+	}
+
+	size_t bsize = stat_existing.st_blksize > BUFSIZ ? stat_existing.st_blksize : BUFSIZ;
+	char *buf = (char *)malloc(bsize);
+	if (buf == NULL) {
+		close(new_fd);
+		close(existing_fd);
+		return 0;
+	}
+
+	isize size = 0;
+	ssize_t nread, nwrite, offset;
+	while ((nread = read(existing_fd, buf, bsize)) != -1 && nread != 0) {
+		for (offset = 0; nread; nread -= nwrite, offset += nwrite) {
+			if ((nwrite = write(new_fd, buf + offset, nread)) == -1 || nwrite == 0) {
+				free(buf);
+				close(new_fd);
+				close(existing_fd);
+				return 0;
+			}
+			size += nwrite;
+		}
+	}
+	
+	free(buf);
+	close(new_fd);
+	close(existing_fd);
+
+	if (nread == -1) {
+		return 0;
+	}
 	return size == stat_existing.st_size;
 #endif
 }
@@ -6093,6 +6177,7 @@ gbFileContents gb_file_read_contents(gbAllocator a, b32 zero_terminate, char con
 }
 
 void gb_file_free_contents(gbFileContents *fc) {
+    if (fc == NULL || fc->size == 0) return;
 	GB_ASSERT_NOT_NULL(fc->data);
 	gb_free(fc->allocator, fc->data);
 	fc->data = NULL;

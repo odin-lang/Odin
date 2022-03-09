@@ -1,4 +1,3 @@
-//+build darwin
 package objc_Metal
 
 import NS "vendor:darwin/Foundation"
@@ -27,7 +26,7 @@ AccelerationStructureInstanceDescriptorType :: enum NS.UInteger {
 	Default = 0,
 	UserID  = 1,
 	Motion  = 2,
-};
+}
 
 
 DataType :: enum NS.UInteger {

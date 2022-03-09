@@ -1,6 +1,6 @@
 GIT_SHA=$(shell git rev-parse --short HEAD)
 DISABLED_WARNINGS=-Wno-switch -Wno-macro-redefined -Wno-unused-value
-LDFLAGS=-pthread -ldl -lm -lstdc++
+LDFLAGS=-pthread -lm -lstdc++
 CFLAGS=-std=c++14 -DGIT_SHA=\"$(GIT_SHA)\"
 CFLAGS:=$(CFLAGS) -DODIN_VERSION_RAW=\"dev-$(shell date +"%Y-%m")\"
 CC=clang
@@ -8,9 +8,9 @@ CC=clang
 OS=$(shell uname)
 
 ifeq ($(OS), Darwin)
-    
+
     ARCH=$(shell uname -m)
-    LLVM_CONFIG=
+    LLVM_CONFIG=llvm-config
 
     # allow for arm only llvm's with version 13
     ifeq ($(ARCH), arm64)
@@ -27,9 +27,7 @@ ifeq ($(OS), Darwin)
     LLMV_VERSION_PATTERN_REMOVE_SINGLE_STR = $(subst ",,$(LLVM_VERSION_PATTERN_REMOVE_ELEMENTS))
     LLVM_VERSION_PATTERN = "^(($(LLMV_VERSION_PATTERN_REMOVE_SINGLE_STR)))"
 
-    ifneq ($(shell llvm-config --version | grep -E $(LLVM_VERSION_PATTERN)),)
-        LLVM_CONFIG=llvm-config
-    else
+    ifeq ($(shell $(LLVM_CONFIG) --version | grep -E $(LLVM_VERSION_PATTERN)),)
         ifeq ($(ARCH), arm64)
             $(error "Requirement: llvm-config must be base version 13 for arm64")
         else 
@@ -37,7 +35,7 @@ ifeq ($(OS), Darwin)
         endif 
     endif 
 
-    LDFLAGS:=$(LDFLAGS) -liconv
+    LDFLAGS:=$(LDFLAGS) -liconv -ldl
     CFLAGS:=$(CFLAGS) $(shell $(LLVM_CONFIG) --cxxflags --ldflags)
     LDFLAGS:=$(LDFLAGS) -lLLVM-C
 endif
@@ -48,13 +46,19 @@ ifeq ($(OS), Linux)
     else ifneq ($(shell which llvm-config-11-64 2>/dev/null),)
         LLVM_CONFIG=llvm-config-11-64
     else
-        ifneq ($(shell llvm-config --version | grep '^11\.'),)
-            LLVM_CONFIG=llvm-config
-        else
+        ifeq ($(shell $(LLVM_CONFIG) --version | grep '^11\.'),)
             $(error "Requirement: llvm-config must be version 11")
         endif
     endif
 
+    LDFLAGS:=$(LDFLAGS) -ldl
+    CFLAGS:=$(CFLAGS) $(shell $(LLVM_CONFIG) --cxxflags --ldflags)
+    LDFLAGS:=$(LDFLAGS) $(shell $(LLVM_CONFIG) --libs core native --system-libs)
+endif
+ifeq ($(OS), OpenBSD)
+    LLVM_CONFIG=/usr/local/bin/llvm-config
+
+    LDFLAGS:=$(LDFLAGS) -liconv
     CFLAGS:=$(CFLAGS) $(shell $(LLVM_CONFIG) --cxxflags --ldflags)
     LDFLAGS:=$(LDFLAGS) $(shell $(LLVM_CONFIG) --libs core native --system-libs)
 endif

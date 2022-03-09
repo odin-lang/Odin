@@ -703,7 +703,7 @@ struct TypePath;
 i64      type_size_of         (Type *t);
 i64      type_align_of        (Type *t);
 i64      type_offset_of       (Type *t, i32 index);
-gbString type_to_string       (Type *type);
+gbString type_to_string       (Type *type, bool shorthand=false);
 i64      type_size_of_internal(Type *t, TypePath *path);
 void     init_map_internal_types(Type *type);
 Type *   bit_set_to_int(Type *t);
@@ -2334,7 +2334,7 @@ String lookup_subtype_polymorphic_field(Type *dst, Type *src) {
 	GB_ASSERT(is_type_struct(src) || is_type_union(src));
 	for_array(i, src->Struct.fields) {
 		Entity *f = src->Struct.fields[i];
-		if (f->kind == Entity_Variable && f->flags & EntityFlag_Using) {
+		if (f->kind == Entity_Variable && f->flags & EntityFlags_IsSubtype) {
 			if (are_types_identical(dst, f->type)) {
 				return f->token.string;
 			}
@@ -2343,7 +2343,7 @@ String lookup_subtype_polymorphic_field(Type *dst, Type *src) {
 					return f->token.string;
 				}
 			}
-			if (is_type_struct(f->type)) {
+			if ((f->flags & EntityFlag_Using) != 0 && is_type_struct(f->type)) {
 				String name = lookup_subtype_polymorphic_field(dst, f->type);
 				if (name.len > 0) {
 					return name;
@@ -2489,9 +2489,9 @@ bool are_types_identical_internal(Type *x, Type *y, bool check_tuple_names) {
 					if (xf->token.string != yf->token.string) {
 						return false;
 					}
-					bool xf_is_using = (xf->flags&EntityFlag_Using) != 0;
-					bool yf_is_using = (yf->flags&EntityFlag_Using) != 0;
-					if (xf_is_using ^ yf_is_using) {
+					u64 xf_flags = (xf->flags&EntityFlags_IsSubtype);
+					u64 yf_flags = (yf->flags&EntityFlags_IsSubtype);
+					if (xf_flags != yf_flags) {
 						return false;
 					}
 				}
@@ -2623,6 +2623,17 @@ i64 union_tag_size(Type *u) {
 
 	// TODO(bill): Is this an okay approach?
 	i64 max_align = 1;
+
+	if (u->Union.variants.count < 1ull<<8) {
+		max_align = 1;
+	} else if (u->Union.variants.count < 1ull<<16) {
+		max_align = 2;
+	} else if (u->Union.variants.count < 1ull<<32) {
+		max_align = 4;
+	} else {
+		GB_PANIC("how many variants do you have?!");
+	}
+
 	for_array(i, u->Union.variants) {
 		Type *variant_type = u->Union.variants[i];
 		i64 align = type_align_of(variant_type);
@@ -3813,7 +3824,7 @@ isize check_is_assignable_to_using_subtype(Type *src, Type *dst, isize level = 0
 
 	for_array(i, src->Struct.fields) {
 		Entity *f = src->Struct.fields[i];
-		if (f->kind != Entity_Variable || (f->flags&EntityFlag_Using) == 0) {
+		if (f->kind != Entity_Variable || (f->flags&EntityFlags_IsSubtype) == 0) {
 			continue;
 		}
 
@@ -3925,7 +3936,7 @@ Type *alloc_type_proc_from_types(Type **param_types, unsigned param_count, Type 
 
 
 
-gbString write_type_to_string(gbString str, Type *type) {
+gbString write_type_to_string(gbString str, Type *type, bool shorthand=false) {
 	if (type == nullptr) {
 		return gb_string_appendc(str, "<no type>");
 	}
@@ -4040,15 +4051,21 @@ gbString write_type_to_string(gbString str, Type *type) {
 		if (type->Struct.is_raw_union) str = gb_string_appendc(str, " #raw_union");
 		if (type->Struct.custom_align != 0) str = gb_string_append_fmt(str, " #align %d", cast(int)type->Struct.custom_align);
 		str = gb_string_appendc(str, " {");
-		for_array(i, type->Struct.fields) {
-			Entity *f = type->Struct.fields[i];
-			GB_ASSERT(f->kind == Entity_Variable);
-			if (i > 0) {
-				str = gb_string_appendc(str, ", ");
+
+
+		if (shorthand && type->Struct.fields.count > 16) {
+			str = gb_string_append_fmt(str, "%lld fields...", cast(long long)type->Struct.fields.count);
+		} else {
+			for_array(i, type->Struct.fields) {
+				Entity *f = type->Struct.fields[i];
+				GB_ASSERT(f->kind == Entity_Variable);
+				if (i > 0) {
+					str = gb_string_appendc(str, ", ");
+				}
+				str = gb_string_append_length(str, f->token.string.text, f->token.string.len);
+				str = gb_string_appendc(str, ": ");
+				str = write_type_to_string(str, f->type);
 			}
-			str = gb_string_append_length(str, f->token.string.text, f->token.string.len);
-			str = gb_string_appendc(str, ": ");
-			str = write_type_to_string(str, f->type);
 		}
 		str = gb_string_append_rune(str, '}');
 	} break;
@@ -4223,13 +4240,16 @@ gbString write_type_to_string(gbString str, Type *type) {
 }
 
 
-gbString type_to_string(Type *type, gbAllocator allocator) {
-	return write_type_to_string(gb_string_make(allocator, ""), type);
+gbString type_to_string(Type *type, gbAllocator allocator, bool shorthand=false) {
+	return write_type_to_string(gb_string_make(allocator, ""), type, shorthand);
 }
-gbString type_to_string(Type *type) {
-	return write_type_to_string(gb_string_make(heap_allocator(), ""), type);
+gbString type_to_string(Type *type, bool shorthand) {
+	return write_type_to_string(gb_string_make(heap_allocator(), ""), type, shorthand);
 }
 
+gbString type_to_string_shorthand(Type *type) {
+	return type_to_string(type, true);
+}
 
 
 
