@@ -277,6 +277,14 @@ as_ptr :: proc(array: $T/[]$E) -> [^]E {
 	return raw_data(array)
 }
 
+as_type :: proc(array: $S/[]$E, $T: typeid) -> (value: T, ok: bool) {
+	if size_of(E) * len(array) < size_of(T) {
+		return {}, false
+	}
+
+	ptr := transmute(^T)raw_data(array)
+	return intrinsics.unaligned_load(ptr), true
+}
 
 mapper :: proc(s: $S/[]$U, f: proc(U) -> $V, allocator := context.allocator) -> []V {
 	r := make([]V, len(s), allocator)
