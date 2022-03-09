@@ -89,8 +89,11 @@ fi
 if [[ $# -eq 1 ]]; then
 	case $1 in
 	report)
-		EXTRAFLAGS="-g"
-		build_odin
+		if [[ ! -f "./odin" ]]; then
+			EXTRAFLAGS="-g"
+			build_odin
+		fi
+
 		./odin report
 		exit 0
 		;;
