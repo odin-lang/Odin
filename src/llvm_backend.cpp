@@ -1295,6 +1295,11 @@ void lb_generate_code(lbGenerator *gen) {
 		reloc_mode = LLVMRelocPIC;
 	}
 
+	if (build_context.metrics.os == TargetOs_openbsd) {
+		// Always use PIC for OpenBSD: it defaults to PIE
+		reloc_mode = LLVMRelocPIC;
+	}
+
 	for_array(i, gen->modules.entries) {
 		target_machines[i] = LLVMCreateTargetMachine(
 			target, target_triple, llvm_cpu,

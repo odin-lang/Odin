@@ -223,36 +223,35 @@ void add_objc_proc_type(CheckerContext *c, Ast *call, Type *return_type, Slice<T
 	map_set(&c->info->objc_msgSend_types, call, data);
 	mutex_unlock(&c->info->objc_types_mutex);
 
-	add_package_dependency(c, "runtime", "objc_lookUpClass");
-	add_package_dependency(c, "runtime", "sel_registerName");
-	add_package_dependency(c, "runtime", "objc_allocateClassPair");
+	try_to_add_package_dependency(c, "runtime", "objc_msgSend");
+	try_to_add_package_dependency(c, "runtime", "objc_msgSend_fpret");
+	try_to_add_package_dependency(c, "runtime", "objc_msgSend_fp2ret");
+	try_to_add_package_dependency(c, "runtime", "objc_msgSend_stret");
+}
 
-	add_package_dependency(c, "runtime", "objc_msgSend");
-	add_package_dependency(c, "runtime", "objc_msgSend_fpret");
-	add_package_dependency(c, "runtime", "objc_msgSend_fp2ret");
-	add_package_dependency(c, "runtime", "objc_msgSend_stret");
+bool is_constant_string(CheckerContext *c, String const &builtin_name, Ast *expr, String *name_) {
+	Operand op = {};
+	check_expr(c, &op, expr);
+	if (op.mode == Addressing_Constant && op.value.kind == ExactValue_String) {
+		if (name_) *name_ = op.value.value_string;
+		return true;
+	}
+	gbString e = expr_to_string(op.expr);
+	gbString t = type_to_string(op.type);
+	error(op.expr, "'%.*s' expected a constant string value, got %s of type %s", LIT(builtin_name), e, t);
+	gb_string_free(t);
+	gb_string_free(e);
+	return false;
 }
 
 bool check_builtin_objc_procedure(CheckerContext *c, Operand *operand, Ast *call, i32 id, Type *type_hint) {
-	auto const is_constant_string = [](CheckerContext *c, String const &builtin_name, Ast *expr, String *name_) -> bool {
-		Operand op = {};
-		check_expr(c, &op, expr);
-		if (op.mode == Addressing_Constant && op.value.kind == ExactValue_String) {
-			if (name_) *name_ = op.value.value_string;
-			return true;
-		}
-		gbString e = expr_to_string(op.expr);
-		gbString t = type_to_string(op.type);
-		error(op.expr, "'%.*s' expected a constant string value, got %s of type %s", LIT(builtin_name), e, t);
-		gb_string_free(t);
-		gb_string_free(e);
-		return false;
-	};
 	String builtin_name = builtin_procs[id].name;
 
 	if (build_context.metrics.os != TargetOs_darwin) {
-		error(call, "'%.*s' only works on darwin", LIT(builtin_name));
-		return false;
+		// allow on doc generation (e.g. Metal stuff)
+		if (build_context.command_kind != Command_doc && build_context.command_kind != Command_check) {
+			error(call, "'%.*s' only works on darwin", LIT(builtin_name));
+		}
 	}
 
 
@@ -371,6 +370,10 @@ bool check_builtin_objc_procedure(CheckerContext *c, Operand *operand, Ast *call
 
 		}
 		operand->mode = Addressing_Value;
+
+		try_to_add_package_dependency(c, "runtime", "objc_lookUpClass");
+		try_to_add_package_dependency(c, "runtime", "sel_registerName");
+		try_to_add_package_dependency(c, "runtime", "objc_allocateClassPair");
 		return true;
 	} break;
 	}
@@ -949,7 +952,7 @@ bool check_builtin_procedure(CheckerContext *c, Operand *operand, Ast *call, i32
 			mode = Addressing_Constant;
 			value = exact_value_i64(at->EnumeratedArray.count);
 			type = t_untyped_integer;
-		} else if (is_type_slice(op_type) && id == BuiltinProc_len) {
+		} else if ((is_type_slice(op_type) || is_type_relative_slice(op_type)) && id == BuiltinProc_len) {
 			mode = Addressing_Value;
 		} else if (is_type_dynamic_array(op_type)) {
 			mode = Addressing_Value;
@@ -1103,7 +1106,7 @@ bool check_builtin_procedure(CheckerContext *c, Operand *operand, Ast *call, i32
 		
 		Selection sel = lookup_field(type, field_name, false);
 		if (sel.entity == nullptr) {
-			gbString type_str = type_to_string(type);
+			gbString type_str = type_to_string_shorthand(type);
 			error(ce->args[0],
 			      "'%s' has no field named '%.*s'", type_str, LIT(field_name));
 			gb_string_free(type_str);
@@ -1115,7 +1118,7 @@ bool check_builtin_procedure(CheckerContext *c, Operand *operand, Ast *call, i32
 			return false;
 		}
 		if (sel.indirect) {
-			gbString type_str = type_to_string(type);
+			gbString type_str = type_to_string_shorthand(type);
 			error(ce->args[0],
 			      "Field '%.*s' is embedded via a pointer in '%s'", LIT(field_name), type_str);
 			gb_string_free(type_str);
@@ -1176,7 +1179,7 @@ bool check_builtin_procedure(CheckerContext *c, Operand *operand, Ast *call, i32
 		
 		Selection sel = lookup_field(type, field_name, false);
 		if (sel.entity == nullptr) {
-			gbString type_str = type_to_string(type);
+			gbString type_str = type_to_string_shorthand(type);
 			error(ce->args[0],
 			      "'%s' has no field named '%.*s'", type_str, LIT(field_name));
 			gb_string_free(type_str);
@@ -1188,7 +1191,7 @@ bool check_builtin_procedure(CheckerContext *c, Operand *operand, Ast *call, i32
 			return false;
 		}
 		if (sel.indirect) {
-			gbString type_str = type_to_string(type);
+			gbString type_str = type_to_string_shorthand(type);
 			error(ce->args[0],
 			      "Field '%.*s' is embedded via a pointer in '%s'", LIT(field_name), type_str);
 			gb_string_free(type_str);
@@ -3503,6 +3506,7 @@ bool check_builtin_procedure(CheckerContext *c, Operand *operand, Ast *call, i32
 			case TargetOs_linux:
 			case TargetOs_essence:
 			case TargetOs_freebsd:
+			case TargetOs_openbsd:
 				switch (build_context.metrics.arch) {
 				case TargetArch_i386:
 				case TargetArch_amd64:
@@ -4083,6 +4087,18 @@ bool check_builtin_procedure(CheckerContext *c, Operand *operand, Ast *call, i32
 
 			operand->mode = Addressing_Value;
 			operand->type = t_hasher_proc;
+			break;
+		}
+
+	case BuiltinProc_constant_utf16_cstring:
+		{
+			String value = {};
+			if (!is_constant_string(c, builtin_name, ce->args[0], &value)) {
+				return false;
+			}
+			operand->mode = Addressing_Value;
+			operand->type = alloc_type_multi_pointer(t_u16);
+			operand->value = {};
 			break;
 		}
 

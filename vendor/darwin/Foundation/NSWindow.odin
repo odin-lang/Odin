@@ -1,4 +1,3 @@
-//+build darwin
 package objc_Foundation
 
 import NS "vendor:darwin/Foundation"

@@ -284,13 +284,14 @@ rel :: proc(base_path, target_path: string, allocator := context.allocator) -> (
 }
 
 dir :: proc(path: string, allocator := context.allocator) -> string {
+        context.allocator = allocator
 	vol := volume_name(path)
 	i := len(path) - 1
 	for i >= len(vol) && !is_separator(path[i]) {
 		i -= 1
 	}
-	dir := clean(path[len(vol) : i+1], allocator)
-	defer delete(dir, allocator)
+	dir := clean(path[len(vol) : i+1])
+	defer delete(dir)
 	if dir == "." && len(vol) > 2 {
 		return strings.clone(vol)
 	}

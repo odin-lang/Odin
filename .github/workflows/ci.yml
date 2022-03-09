@@ -38,6 +38,12 @@ jobs:
           cd tests/vendor
           make
         timeout-minutes: 10
+      - name: Odin check examples/all for Linux i386
+        run: ./odin check examples/all -vet -strict-style -target:linux_i386
+        timeout-minutes: 10
+      - name: Odin check examples/all for OpenBSD amd64
+        run: ./odin check examples/all -vet -strict-style -target:openbsd_amd64
+        timeout-minutes: 10
   build_macOS:
     runs-on: macos-latest
     steps:
@@ -77,6 +83,9 @@ jobs:
         run: |
           cd tests/vendor
           make
+        timeout-minutes: 10
+      - name: Odin check examples/all for Darwin arm64
+        run: ./odin check examples/all -vet -strict-style -target:darwin_arm64
         timeout-minutes: 10
   build_windows:
     runs-on: windows-2019
@@ -137,4 +146,10 @@ jobs:
           call "C:\Program Files (x86)\Microsoft Visual Studio\2019\Enterprise\VC\Auxiliary\Build\vcvars64.bat
           cd tests\core\math\big
           call build.bat
+        timeout-minutes: 10
+      - name: Odin check examples/all for Windows 32bits
+        shell: cmd
+        run: |
+          call "C:\Program Files (x86)\Microsoft Visual Studio\2019\Enterprise\VC\Auxiliary\Build\vcvars64.bat
+          odin check examples/all -strict-style -target:windows_i386
         timeout-minutes: 10

@@ -384,7 +384,7 @@ i32 linker_stage(lbGenerator *gen) {
 			// NOTE(zangent): Sometimes, you have to use -framework on MacOS.
 			//   This allows you to specify '-f' in a #foreign_system_library,
 			//   without having to implement any new syntax specifically for MacOS.
-			#if defined(GB_SYSTEM_OSX)
+			if (build_context.metrics.os == TargetOs_darwin) {
 				if (string_ends_with(lib, str_lit(".framework"))) {
 					// framework thingie
 					String lib_name = lib;
@@ -400,14 +400,14 @@ i32 linker_stage(lbGenerator *gen) {
 					// dynamic or static system lib, just link regularly searching system library paths
 					lib_str = gb_string_append_fmt(lib_str, " -l%.*s ", LIT(lib));
 				}
-			#else
+			} else {
 				// NOTE(vassvik): static libraries (.a files) in linux can be linked to directly using the full path,
 				//                since those are statically linked to at link time. shared libraries (.so) has to be
 				//                available at runtime wherever the executable is run, so we make require those to be
 				//                local to the executable (unless the system collection is used, in which case we search
 				//                the system library paths for the library file).
-				if (string_ends_with(lib, str_lit(".a"))) {
-					// static libs, absolute full path relative to the file in which the lib was imported from
+				if (string_ends_with(lib, str_lit(".a")) || string_ends_with(lib, str_lit(".o"))) {
+					// static libs and object files, absolute full path relative to the file in which the lib was imported from
 					lib_str = gb_string_append_fmt(lib_str, " -l:\"%.*s\" ", LIT(lib));
 				} else if (string_ends_with(lib, str_lit(".so"))) {
 					// dynamic lib, relative path to executable
@@ -418,7 +418,7 @@ i32 linker_stage(lbGenerator *gen) {
 					// dynamic or static system lib, just link regularly searching system library paths
 					lib_str = gb_string_append_fmt(lib_str, " -l%.*s ", LIT(lib));
 				}
-			#endif
+			}
 		}
 
 		gbString object_files = gb_string_make(heap_allocator(), "");
@@ -456,14 +456,15 @@ i32 linker_stage(lbGenerator *gen) {
 			// line arguments prepared previously are incompatible with ld.
 			//
 			// Shared libraries are .dylib on MacOS and .so on Linux.
-			#if defined(GB_SYSTEM_OSX)
+			if (build_context.metrics.os == TargetOs_darwin) {
 				output_ext = STR_LIT(".dylib");
-			#else
+			} else {
 				output_ext = STR_LIT(".so");
-			#endif
+			}
 			link_settings = gb_string_appendc(link_settings, "-Wl,-init,'_odin_entry_point' ");
 			link_settings = gb_string_appendc(link_settings, "-Wl,-fini,'_odin_exit_point' ");
-		} else {
+		} else if (build_context.metrics.os != TargetOs_openbsd) {
+			// OpenBSD defaults to PIE executable. do not pass -no-pie for it.
 			link_settings = gb_string_appendc(link_settings, "-no-pie ");
 		}
 		if (build_context.out_filepath.len > 0) {
@@ -474,34 +475,39 @@ i32 linker_stage(lbGenerator *gen) {
 			}
 		}
 
-		result = system_exec_command_line_app("ld-link",
-			"clang -Wno-unused-command-line-argument %s -o \"%.*s%.*s\" %s "
-			" %s "
-			" %.*s "
-			" %.*s "
-			" %s "
-			#if defined(GB_SYSTEM_OSX)
-				// This sets a requirement of Mountain Lion and up, but the compiler doesn't work without this limit.
-				// NOTE: If you change this (although this minimum is as low as you can go with Odin working)
-				//       make sure to also change the 'mtriple' param passed to 'opt'
-				#if defined(GB_CPU_ARM)
-				" -mmacosx-version-min=12.0.0 "
-				#else
-				" -mmacosx-version-min=10.8.0 "
-				#endif
-				// This points the linker to where the entry point is
-				" -e _main "
-			#endif
-			, object_files, LIT(output_base), LIT(output_ext),
-			#if defined(GB_SYSTEM_OSX)
-			  "-lSystem -lm -Wl,-syslibroot /Library/Developer/CommandLineTools/SDKs/MacOSX.sdk -L/usr/local/lib",
-			#else
-			  "-lc -lm",
-			#endif
-			lib_str,
-			LIT(build_context.link_flags),
-			LIT(build_context.extra_linker_flags),
-			link_settings);
+		gbString platform_lib_str = gb_string_make(heap_allocator(), "");
+		defer (gb_string_free(platform_lib_str));
+		if (build_context.metrics.os == TargetOs_darwin) {
+			platform_lib_str = gb_string_appendc(platform_lib_str, "-lSystem -lm -Wl,-syslibroot /Library/Developer/CommandLineTools/SDKs/MacOSX.sdk -L/usr/local/lib");
+		} else {
+			platform_lib_str = gb_string_appendc(platform_lib_str, "-lc -lm");
+		}
+
+		if (build_context.metrics.os == TargetOs_darwin) {
+			// This sets a requirement of Mountain Lion and up, but the compiler doesn't work without this limit.
+			// NOTE: If you change this (although this minimum is as low as you can go with Odin working)
+			//       make sure to also change the 'mtriple' param passed to 'opt'
+			if (build_context.metrics.arch == TargetArch_arm64) {
+				link_settings = gb_string_appendc(link_settings, " -mmacosx-version-min=12.0.0 ");
+			} else {
+				link_settings = gb_string_appendc(link_settings, " -mmacosx-version-min=10.8.0 ");
+			}
+			// This points the linker to where the entry point is
+			link_settings = gb_string_appendc(link_settings, " -e _main ");
+		}
+
+		gbString link_command_line = gb_string_make(heap_allocator(), "clang -Wno-unused-command-line-argument ");
+		defer (gb_string_free(link_command_line));
+
+		link_command_line = gb_string_appendc(link_command_line, object_files);
+		link_command_line = gb_string_append_fmt(link_command_line, " -o \"%.*s%.*s\" ", LIT(output_base), LIT(output_ext));
+		link_command_line = gb_string_append_fmt(link_command_line, " %s ", platform_lib_str);
+		link_command_line = gb_string_append_fmt(link_command_line, " %s ", lib_str);
+		link_command_line = gb_string_append_fmt(link_command_line, " %.*s ", LIT(build_context.link_flags));
+		link_command_line = gb_string_append_fmt(link_command_line, " %.*s ", LIT(build_context.extra_linker_flags));
+		link_command_line = gb_string_append_fmt(link_command_line, " %s ", link_settings);
+
+		result = system_exec_command_line_app("ld-link", link_command_line);
 
 		if (result) {
 			return result;
@@ -572,14 +578,16 @@ void usage(String argv0) {
 	print_usage_line(0, "Usage:");
 	print_usage_line(1, "%.*s command [arguments]", LIT(argv0));
 	print_usage_line(0, "Commands:");
-	print_usage_line(1, "build     compile .odin file, or directory of .odin files, as an executable.");
-	print_usage_line(1, "          one must contain the program's entry point, all must be in the same package.");
-	print_usage_line(1, "run       same as 'build', but also then runs the newly compiled executable.");
-	print_usage_line(1, "check     parse and type check .odin file");
-	print_usage_line(1, "query     parse, type check, and output a .json file containing information about the program");
-	print_usage_line(1, "doc       generate documentation .odin file, or directory of .odin files");
-	print_usage_line(1, "version   print version");
-	print_usage_line(1, "report    print information useful to reporting a bug");
+	print_usage_line(1, "build             compile .odin file, or directory of .odin files, as an executable.");
+	print_usage_line(1, "                  one must contain the program's entry point, all must be in the same package.");
+	print_usage_line(1, "run               same as 'build', but also then runs the newly compiled executable.");
+	print_usage_line(1, "check             parse, and type check an .odin file, or directory of .odin files");
+	print_usage_line(1, "query             parse, type check, and output a .json file containing information about the program");
+	print_usage_line(1, "strip-semicolon   parse, type check, and remove unneeded semicolons from the entire program");
+	print_usage_line(1, "test              build ands runs procedures with the attribute @(test) in the initial package");
+	print_usage_line(1, "doc               generate documentation .odin file, or directory of .odin files");
+	print_usage_line(1, "version           print version");
+	print_usage_line(1, "report            print information useful to reporting a bug");
 	print_usage_line(0, "");
 	print_usage_line(0, "For further details on a command, use -help after the command name");
 	print_usage_line(1, "e.g. odin build -help");
@@ -2577,7 +2585,7 @@ int main(int arg_count, char const **arg_ptr) {
 	// NOTE(bill): add 'shared' directory if it is not already set
 	if (!find_library_collection_path(str_lit("shared"), nullptr)) {
 		add_library_collection(str_lit("shared"),
-							   get_fullpath_relative(heap_allocator(), odin_root_dir(), str_lit("shared")));
+			get_fullpath_relative(heap_allocator(), odin_root_dir(), str_lit("shared")));
 	}
 
 

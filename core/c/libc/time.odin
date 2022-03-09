@@ -45,7 +45,7 @@ when ODIN_OS == .Windows {
 	}
 }
 
-when ODIN_OS == .Linux || ODIN_OS == .FreeBSD || ODIN_OS == .Darwin {
+when ODIN_OS == .Linux || ODIN_OS == .FreeBSD || ODIN_OS == .Darwin || ODIN_OS == .OpenBSD {
 	@(default_calling_convention="c")
 	foreign libc {
 		// 7.27.2 Time manipulation functions
@@ -63,7 +63,12 @@ when ODIN_OS == .Linux || ODIN_OS == .FreeBSD || ODIN_OS == .Darwin {
 		strftime     :: proc(s: [^]char, maxsize: size_t, format: cstring, timeptr: ^tm) -> size_t ---
 	}
 
-	CLOCKS_PER_SEC :: 1000000
+	when ODIN_OS == .OpenBSD {
+		CLOCKS_PER_SEC :: 100
+	} else {
+		CLOCKS_PER_SEC :: 1000000
+	}
+
 	TIME_UTC       :: 1
 
 	time_t         :: distinct i64

@@ -41,6 +41,8 @@ mem_copy_non_overlapping :: proc(dst, src: rawptr, len: int) ---
 mem_zero                 :: proc(ptr: rawptr, len: int) ---
 mem_zero_volatile        :: proc(ptr: rawptr, len: int) ---
 
+unaligned_load           :: proc(src: ^$T) -> T ---
+unaligned_store          :: proc(dst: ^$T, val: T) -> T ---
 
 fixed_point_mul     :: proc(lhs, rhs: $T, #const scale: uint) -> T where type_is_integer(T) ---
 fixed_point_div     :: proc(lhs, rhs: $T, #const scale: uint) -> T where type_is_integer(T) ---

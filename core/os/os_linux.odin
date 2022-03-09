@@ -460,9 +460,8 @@ fork :: proc() -> (Pid, Errno) {
 }
 
 open :: proc(path: string, flags: int = O_RDONLY, mode: int = 0) -> (Handle, Errno) {
-	cstr := strings.clone_to_cstring(path)
+	cstr := strings.clone_to_cstring(path, context.temp_allocator)
 	handle := _unix_open(cstr, flags, mode)
-	defer delete(cstr)
 	if handle < 0 {
 		return INVALID_HANDLE, _get_errno(int(handle))
 	}
@@ -501,11 +500,13 @@ seek :: proc(fd: Handle, offset: i64, whence: int) -> (i64, Errno) {
 }
 
 file_size :: proc(fd: Handle) -> (i64, Errno) {
-	s, err := _fstat(fd)
-	if err != ERROR_NONE {
-		return 0, err
-	}
-	return max(s.size, 0), ERROR_NONE
+    // deliberately uninitialized; the syscall fills this buffer for us
+    s: OS_Stat = ---
+    result := _unix_fstat(fd, &s)
+    if result < 0 {
+        return 0, _get_errno(result)
+    }
+    return max(s.size, 0), ERROR_NONE
 }
 
 rename :: proc(old_path, new_path: string) -> Errno {
@@ -608,8 +609,7 @@ last_write_time_by_name :: proc(name: string) -> (File_Time, Errno) {
 
 @private
 _stat :: proc(path: string) -> (OS_Stat, Errno) {
-	cstr := strings.clone_to_cstring(path)
-	defer delete(cstr)
+	cstr := strings.clone_to_cstring(path, context.temp_allocator)
 
 	// deliberately uninitialized; the syscall fills this buffer for us
 	s: OS_Stat = ---
@@ -622,8 +622,7 @@ _stat :: proc(path: string) -> (OS_Stat, Errno) {
 
 @private
 _lstat :: proc(path: string) -> (OS_Stat, Errno) {
-	cstr := strings.clone_to_cstring(path)
-	defer delete(cstr)
+	cstr := strings.clone_to_cstring(path, context.temp_allocator)
 
 	// deliberately uninitialized; the syscall fills this buffer for us
 	s: OS_Stat = ---
@@ -690,8 +689,7 @@ _readdir :: proc(dirp: Dir) -> (entry: Dirent, err: Errno, end_of_stream: bool) 
 
 @private
 _readlink :: proc(path: string) -> (string, Errno) {
-	path_cstr := strings.clone_to_cstring(path)
-	defer delete(path_cstr)
+	path_cstr := strings.clone_to_cstring(path, context.temp_allocator)
 
 	bufsz : uint = 256
 	buf := make([]byte, bufsz)
@@ -727,8 +725,7 @@ absolute_path_from_relative :: proc(rel: string) -> (path: string, err: Errno) {
 		rel = "."
 	}
 
-	rel_cstr := strings.clone_to_cstring(rel)
-	defer delete(rel_cstr)
+	rel_cstr := strings.clone_to_cstring(rel, context.temp_allocator)
 
 	path_ptr := _unix_realpath(rel_cstr, nil)
 	if path_ptr == nil {
@@ -743,8 +740,7 @@ absolute_path_from_relative :: proc(rel: string) -> (path: string, err: Errno) {
 }
 
 access :: proc(path: string, mask: int) -> (bool, Errno) {
-	cstr := strings.clone_to_cstring(path)
-	defer delete(cstr)
+	cstr := strings.clone_to_cstring(path, context.temp_allocator)
 	result := _unix_access(cstr, mask)
 	if result < 0 {
 		return false, _get_errno(result)
@@ -768,8 +764,7 @@ heap_free :: proc(ptr: rawptr) {
 }
 
 getenv :: proc(name: string) -> (string, bool) {
-	path_str := strings.clone_to_cstring(name)
-	defer delete(path_str)
+	path_str := strings.clone_to_cstring(name, context.temp_allocator)
 	cstr := _unix_getenv(path_str)
 	if cstr == nil {
 		return "", false
@@ -807,6 +802,7 @@ set_current_directory :: proc(path: string) -> (err: Errno) {
 }
 
 exit :: proc "contextless" (code: int) -> ! {
+	runtime._cleanup_runtime_contextless()
 	_unix_exit(c.int(code))
 }
 
@@ -815,15 +811,13 @@ current_thread_id :: proc "contextless" () -> int {
 }
 
 dlopen :: proc(filename: string, flags: int) -> rawptr {
-	cstr := strings.clone_to_cstring(filename)
-	defer delete(cstr)
+	cstr := strings.clone_to_cstring(filename, context.temp_allocator)
 	handle := _unix_dlopen(cstr, c.int(flags))
 	return handle
 }
 dlsym :: proc(handle: rawptr, symbol: string) -> rawptr {
 	assert(handle != nil)
-	cstr := strings.clone_to_cstring(symbol)
-	defer delete(cstr)
+	cstr := strings.clone_to_cstring(symbol, context.temp_allocator)
 	proc_handle := _unix_dlsym(handle, cstr)
 	return proc_handle
 }
