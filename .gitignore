@@ -279,3 +279,5 @@ shared/
 *.ll
 
 *.sublime-workspace
+examples/bug/
+build.sh
