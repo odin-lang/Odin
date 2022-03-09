@@ -119,4 +119,6 @@ if [[ $# -eq 1 ]]; then
 
 	run_demo
 	exit 0
+else
+	panic "Too many arguments!"
 fi
