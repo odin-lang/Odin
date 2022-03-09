@@ -1,6 +1,7 @@
 package os
 
 import "core:sys/wasm/wasi"
+import "core:runtime"
 
 Handle :: distinct i32
 Errno :: distinct i32
@@ -93,5 +94,6 @@ heap_free :: proc(ptr: rawptr) {
 
 
 exit :: proc "contextless" (code: int) -> ! {
+	runtime._cleanup_runtime_contextless()
 	wasi.proc_exit(wasi.exitcode_t(code))
 }

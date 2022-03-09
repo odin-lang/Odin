@@ -459,6 +459,11 @@ _cleanup_runtime :: proc() {
 	default_temp_allocator_destroy(&global_default_temp_allocator_data)
 }
 
+_cleanup_runtime_contextless :: proc "contextless" () {
+	context = default_context()
+	_cleanup_runtime()
+}
+
 
 /////////////////////////////
 /////////////////////////////

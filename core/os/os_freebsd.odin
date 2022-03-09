@@ -419,6 +419,7 @@ set_current_directory :: proc(path: string) -> (err: Errno) {
 }
 
 exit :: proc "contextless" (code: int) -> ! {
+	runtime._cleanup_runtime_contextless()
 	_unix_exit(c.int(code))
 }
 
