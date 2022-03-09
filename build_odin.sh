@@ -16,43 +16,43 @@ panic() {
 
 config_darwin() {
 	ARCH=$(uname -m)
-    LLVM_CONFIG=llvm-config
+	LLVM_CONFIG=llvm-config
 
-    # allow for arm only llvm's with version 13
+	# allow for arm only llvm's with version 13
 	if [ ARCH == arm64 ]; then
-        LLVM_VERSIONS="13.%.%"
+		LLVM_VERSIONS="13.%.%"
 	else
-    	# allow for x86 / amd64 all llvm versions begining from 11
-        LLVM_VERSIONS="13.%.%" "12.0.1" "11.1.0"
+		# allow for x86 / amd64 all llvm versions begining from 11
+		LLVM_VERSIONS="13.%.%" "12.0.1" "11.1.0"
 	fi
 
     if [ $($LLVM_CONFIG --version | grep -E $(LLVM_VERSION_PATTERN)) == 0 ]; then
 		if [ ARCH == arm64 ]; then
-            panic "Requirement: llvm-config must be base version 13 for arm64"
+			panic "Requirement: llvm-config must be base version 13 for arm64"
 		else
 			panic "Requirement: llvm-config must be base version greater than 11 for amd64/x86"
 		fi
-    fi
+	fi
 
-    LDFLAGS="$LDFLAGS -liconv -ldl"
-    CFLAGS="$CFLAGS $($LLVM_CONFIG --cxxflags --ldflags)"
-    LDFLAGS="$LDFLAGS -lLLVM-C"
+	LDFLAGS="$LDFLAGS -liconv -ldl"
+	CFLAGS="$CFLAGS $($LLVM_CONFIG --cxxflags --ldflags)"
+	LDFLAGS="$LDFLAGS -lLLVM-C"
 }
 
 config_openbsd() {
-    LLVM_CONFIG=/usr/local/bin/llvm-config
+	LLVM_CONFIG=/usr/local/bin/llvm-config
 
-    LDFLAGS="$LDFLAGS -liconv"
-    CFLAGS="$CFLAGS $($LLVM_CONFIG --cxxflags --ldflags)"
-    LDFLAGS="$LDFLAGS $($LLVM_CONFIG --libs core native --system-libs)"
+	LDFLAGS="$LDFLAGS -liconv"
+	CFLAGS="$CFLAGS $($LLVM_CONFIG --cxxflags --ldflags)"
+	LDFLAGS="$LDFLAGS $($LLVM_CONFIG --libs core native --system-libs)"
 }
 
 config_linux() {
-    LLVM_CONFIG=llvm-config
+	LLVM_CONFIG=llvm-config
 
-    LDFLAGS="$LDFLAGS -ldl"
-    CFLAGS="$CFLAGS $($LLVM_CONFIG --cxxflags --ldflags)"
-    LDFLAGS="$LDFLAGS $($LLVM_CONFIG --libs core native --system-libs)"
+	LDFLAGS="$LDFLAGS -ldl"
+	CFLAGS="$CFLAGS $($LLVM_CONFIG --cxxflags --ldflags)"
+	LDFLAGS="$LDFLAGS $($LLVM_CONFIG --libs core native --system-libs)"
 }
 
 build_odin() {
