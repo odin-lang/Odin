@@ -483,7 +483,7 @@ i32 linker_stage(lbGenerator *gen) {
 			platform_lib_str = gb_string_appendc(platform_lib_str, "-lc -lm");
 		}
 
-		if (build_context.metrics.arch == TargetOs_darwin) {
+		if (build_context.metrics.os == TargetOs_darwin) {
 			// This sets a requirement of Mountain Lion and up, but the compiler doesn't work without this limit.
 			// NOTE: If you change this (although this minimum is as low as you can go with Odin working)
 			//       make sure to also change the 'mtriple' param passed to 'opt'
