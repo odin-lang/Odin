@@ -26,7 +26,7 @@ config_darwin() {
 		LLVM_VERSIONS="13.%.%" "12.0.1" "11.1.0"
 	fi
 
-    if [ $($LLVM_CONFIG --version | grep -E $(LLVM_VERSION_PATTERN)) == 0 ]; then
+	if [ $($LLVM_CONFIG --version | grep -E $(LLVM_VERSION_PATTERN)) == 0 ]; then
 		if [ ARCH == arm64 ]; then
 			panic "Requirement: llvm-config must be base version 13 for arm64"
 		else
