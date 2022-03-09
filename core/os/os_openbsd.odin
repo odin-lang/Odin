@@ -2,7 +2,6 @@ package os
 
 foreign import libc "system:c"
 
-import "core:runtime"
 import "core:strings"
 import "core:c"
 import "core:runtime"
