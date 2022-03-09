@@ -680,6 +680,7 @@ make_directory :: proc(path: string, mode: u32 = 0o775) -> Errno {
 }
 
 exit :: proc "contextless" (code: int) -> ! {
+	runtime._cleanup_runtime_contextless()
 	_unix_exit(i32(code))
 }
 

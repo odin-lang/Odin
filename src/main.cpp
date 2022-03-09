@@ -384,7 +384,7 @@ i32 linker_stage(lbGenerator *gen) {
 			// NOTE(zangent): Sometimes, you have to use -framework on MacOS.
 			//   This allows you to specify '-f' in a #foreign_system_library,
 			//   without having to implement any new syntax specifically for MacOS.
-			#if defined(GB_SYSTEM_OSX)
+			if (build_context.metrics.os == TargetOs_darwin) {
 				if (string_ends_with(lib, str_lit(".framework"))) {
 					// framework thingie
 					String lib_name = lib;
@@ -400,7 +400,7 @@ i32 linker_stage(lbGenerator *gen) {
 					// dynamic or static system lib, just link regularly searching system library paths
 					lib_str = gb_string_append_fmt(lib_str, " -l%.*s ", LIT(lib));
 				}
-			#else
+			} else {
 				// NOTE(vassvik): static libraries (.a files) in linux can be linked to directly using the full path,
 				//                since those are statically linked to at link time. shared libraries (.so) has to be
 				//                available at runtime wherever the executable is run, so we make require those to be
@@ -418,7 +418,7 @@ i32 linker_stage(lbGenerator *gen) {
 					// dynamic or static system lib, just link regularly searching system library paths
 					lib_str = gb_string_append_fmt(lib_str, " -l%.*s ", LIT(lib));
 				}
-			#endif
+			}
 		}
 
 		gbString object_files = gb_string_make(heap_allocator(), "");
@@ -456,11 +456,11 @@ i32 linker_stage(lbGenerator *gen) {
 			// line arguments prepared previously are incompatible with ld.
 			//
 			// Shared libraries are .dylib on MacOS and .so on Linux.
-			#if defined(GB_SYSTEM_OSX)
+			if (build_context.metrics.os == TargetOs_darwin) {
 				output_ext = STR_LIT(".dylib");
-			#else
+			} else {
 				output_ext = STR_LIT(".so");
-			#endif
+			}
 			link_settings = gb_string_appendc(link_settings, "-Wl,-init,'_odin_entry_point' ");
 			link_settings = gb_string_appendc(link_settings, "-Wl,-fini,'_odin_exit_point' ");
 		} else if (build_context.metrics.os != TargetOs_openbsd) {
@@ -477,24 +477,24 @@ i32 linker_stage(lbGenerator *gen) {
 
 		gbString platform_lib_str = gb_string_make(heap_allocator(), "");
 		defer (gb_string_free(platform_lib_str));
-		#if defined(GB_SYSTEM_OSX)
+		if (build_context.metrics.os == TargetOs_darwin) {
 			platform_lib_str = gb_string_appendc(platform_lib_str, "-lSystem -lm -Wl,-syslibroot /Library/Developer/CommandLineTools/SDKs/MacOSX.sdk -L/usr/local/lib");
-		#else
+		} else {
 			platform_lib_str = gb_string_appendc(platform_lib_str, "-lc -lm");
-		#endif
+		}
 
-		#if defined(GB_SYSTEM_OSX)
+		if (build_context.metrics.os == TargetOs_darwin) {
 			// This sets a requirement of Mountain Lion and up, but the compiler doesn't work without this limit.
 			// NOTE: If you change this (although this minimum is as low as you can go with Odin working)
 			//       make sure to also change the 'mtriple' param passed to 'opt'
-			#if defined(GB_CPU_ARM)
-			link_settings = gb_string_appendc(link_settings, " -mmacosx-version-min=12.0.0 ");
-			#else
-			link_settings = gb_string_appendc(link_settings, " -mmacosx-version-min=10.8.0 ");
-			#endif
+			if (build_context.metrics.arch == TargetArch_arm64) {
+				link_settings = gb_string_appendc(link_settings, " -mmacosx-version-min=12.0.0 ");
+			} else {
+				link_settings = gb_string_appendc(link_settings, " -mmacosx-version-min=10.8.0 ");
+			}
 			// This points the linker to where the entry point is
 			link_settings = gb_string_appendc(link_settings, " -e _main ");
-		#endif
+		}
 
 		gbString link_command_line = gb_string_make(heap_allocator(), "clang -Wno-unused-command-line-argument ");
 		defer (gb_string_free(link_command_line));
