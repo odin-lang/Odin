@@ -62,6 +62,7 @@ config_linux() {
 
 	MIN_LLVM_VERSION=("11.1.0")
 	if [ $(version $($LLVM_CONFIG --version)) -lt $(version $MIN_LLVM_VERSION) ]; then
+		echo "Tried to use " $(which $LLVM_CONFIG) "version" $($LLVM_CONFIG --version)
 		panic "Requirement: llvm-config must be base version greater than 11"
 	fi
 
