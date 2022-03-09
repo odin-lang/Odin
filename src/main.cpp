@@ -487,7 +487,7 @@ i32 linker_stage(lbGenerator *gen) {
 			// This sets a requirement of Mountain Lion and up, but the compiler doesn't work without this limit.
 			// NOTE: If you change this (although this minimum is as low as you can go with Odin working)
 			//       make sure to also change the 'mtriple' param passed to 'opt'
-			if (build_context.metrics.arch == TargetArch_amd64) {
+			if (build_context.metrics.arch == TargetArch_arm64) {
 				link_settings = gb_string_appendc(link_settings, " -mmacosx-version-min=12.0.0 ");
 			} else {
 				link_settings = gb_string_appendc(link_settings, " -mmacosx-version-min=10.8.0 ");
