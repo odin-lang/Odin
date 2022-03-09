@@ -164,6 +164,15 @@ slice_data_cast :: proc "contextless" ($T: typeid/[]$A, slice: $S/[]$B) -> T {
 	}
 }
 
+slice_load_type :: proc "contextless" ($T: typeid, slice: $S/[]$E) -> (value: T, ok: bool) {
+    if size_of(E) * len(slice) < size_of(T) {
+        return {}, false
+    }
+
+    ptr := transmute(^T)raw_data(slice)
+    return intrinsics.unaligned_load(ptr), true
+}
+
 slice_to_components :: proc "contextless" (slice: $E/[]$T) -> (data: ^T, len: int) {
 	s := transmute(Raw_Slice)slice
 	return s.data, s.len
