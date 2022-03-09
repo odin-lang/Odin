@@ -50,15 +50,19 @@ config_openbsd() {
 }
 
 config_linux() {
-	LLVM_CONFIG=llvm-config
+	if which llvm-config > /dev/null 2>&1; then
+		LLVM_CONFIG=llvm-config
+	elif which llvm-config-11 > /dev/null 2>&1; then
+		LLVM_CONFIG=llvm-config-11
+	elif which llvm-config-11-64 > /dev/null 2>&1; then
+		LLVM_CONFIG=llvm-config-11-64
+	else
+		panic "Unable to find LLVM-config"
+	fi
 
 	MIN_LLVM_VERSION=("11.1.0")
 	if [ $(version $($LLVM_CONFIG --version)) -lt $(version $MIN_LLVM_VERSION) ]; then
-
-		LLVM_CONFIG=llvm-config-11
-		if [ $(version $($LLVM_CONFIG --version)) -lt $(version $MIN_LLVM_VERSION) ]; then
-			panic "Requirement: llvm-config must be base version greater than 11"
-		fi
+		panic "Requirement: llvm-config must be base version greater than 11"
 	fi
 
 	LDFLAGS="$LDFLAGS -ldl"
