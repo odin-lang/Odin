@@ -56,6 +56,23 @@ config_linux() {
 }
 
 build_odin() {
+	case $1 in
+	debug)
+		EXTRAFLAGS="-g"
+		;;
+	release)
+		EXTRAFLAGS="-O3"
+		;;
+	release-native)
+		EXTRAFLAGS="-O3 -march=native"
+		;;
+	nightly)
+		EXTRAFLAGS="-DNIGHTLY -O3"
+		;;
+	*)
+		panic "Build mode unsupported!"
+	esac
+
 	set -x
 	$CC src/main.cpp src/libtommath.cpp $DISABLED_WARNINGS $CFLAGS $EXTRAFLAGS $LDFLAGS -o odin
 	set +x
@@ -75,14 +92,13 @@ Darwin)
 OpenBSD)
 	config_openbsd
 	;;
+*)
+	panic "Platform unsupported!"
 esac
 
 if [[ $# -eq 0 ]]; then
-	EXTRAFLAGS="-g"
-
-	build_odin
+	build_odin debug
 	run_demo
-
 	exit 0
 fi
 
@@ -90,32 +106,17 @@ if [[ $# -eq 1 ]]; then
 	case $1 in
 	report)
 		if [[ ! -f "./odin" ]]; then
-			EXTRAFLAGS="-g"
-			build_odin
+			build_odin debug
 		fi
 
 		./odin report
 		exit 0
 		;;
-	debug)
-		EXTRAFLAGS="-g"
-		;;
-	release)
-		EXTRAFLAGS="-O3"
-		;;
-	release_native)
-		EXTRAFLAGS="-O3 -march=native"
-		;;
-	nightly)
-		EXTRAFLAGS="-DNIGHTLY -O3"
-		;;
 	*)
-		panic "Unsupported build option!"
+		build_odin $1
 		;;
 	esac
 
-	build_odin
 	run_demo
-
 	exit 0
 fi
