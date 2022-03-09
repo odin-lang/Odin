@@ -14,7 +14,7 @@ panic() {
 	exit 1
 }
 
-function version { echo "$@" | awk -F. '{ printf("%d%03d%03d%03d\n", $1,$2,$3,$4); }'; }
+version() { echo "$@" | awk -F. '{ printf("%d%03d%03d%03d\n", $1,$2,$3,$4); }'; }
 
 config_darwin() {
 	ARCH=$(uname -m)
