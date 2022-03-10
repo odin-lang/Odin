@@ -2,9 +2,13 @@ package test_os2
 
 import "core:fmt"
 import "core:os/os2"
-import "core:sys/unix"
 import "core:testing"
 import "core:intrinsics"
+
+// really only want sys_access for more finite testing
+when ODIN_OS == .Linux {
+	import "core:sys/unix"
+}
 
 TEST_count := 0
 TEST_fail  := 0
@@ -140,12 +144,16 @@ path_test :: proc(t: ^testing.T) {
 	err = os2.close(fd)
 	_expect_no_error(t, err)
 
-	expect(t, unix.sys_access("a/b/c/file.txt", X_OK) < 0, "unexpected exec permission")
+	when ODIN_OS == .Linux {
+		expect(t, unix.sys_access("a/b/c/file.txt", X_OK) < 0, "unexpected exec permission")
+	}
 
 	err = os2.rename("a/b/c/file.txt", "a/b/file.txt")
 	_expect_no_error(t, err)
 
-	expect(t, unix.sys_access("a/b/c/file.txt", F_OK) < 0, "unexpected exec permission")
+	when ODIN_OS == .Linux {
+		expect(t, unix.sys_access("a/b/c/file.txt", F_OK) < 0, "unexpected exec permission")
+	}
 
 	err = os2.symlink("b/c/d", "a/symlink_to_d")
 	_expect_no_error(t, err)
@@ -161,7 +169,9 @@ path_test :: proc(t: ^testing.T) {
 	err = os2.close(fd)
 	_expect_no_error(t, err)
 
-	expect_value(t, unix.sys_access("a/b/c/d/shnt.txt", X_OK | R_OK | W_OK), 0)
+	when ODIN_OS == .Linux {
+		expect_value(t, unix.sys_access("a/b/c/d/shnt.txt", X_OK | R_OK | W_OK), 0)
+	}
 	
 	err = os2.remove_all("a")
 	_expect_no_error(t, err)
