@@ -106,19 +106,23 @@ read_console :: proc(handle: win32.HANDLE, b: []byte) -> (n: int, err: Errno) {
 	BUF_SIZE :: 386
 	buf16: [BUF_SIZE]u16
 	buf8: [4*BUF_SIZE]u8
-	
+
 	for n < len(b) && err == 0 {
-		max_read := u32(min(BUF_SIZE, len(b)/4))
-		
+		min_read := max(len(b)/4, 1 if len(b) > 0 else 0)
+		max_read := u32(min(BUF_SIZE, min_read))
+		if max_read == 0 {
+			break
+		}
+
 		single_read_length: u32
 		ok := win32.ReadConsoleW(handle, &buf16[0], max_read, &single_read_length, nil)
 		if !ok {
 			err = Errno(win32.GetLastError())
 		}
-		
+
 		buf8_len := utf16.decode_to_utf8(buf8[:], buf16[:single_read_length])
 		src := buf8[:buf8_len]
-		
+
 		ctrl_z := false
 		for i := 0; i < len(src) && n+i < len(b); i += 1 {
 			x := src[i]
@@ -129,9 +133,16 @@ read_console :: proc(handle: win32.HANDLE, b: []byte) -> (n: int, err: Errno) {
 			b[n] = x
 			n += 1
 		}
-		if ctrl_z || single_read_length < len(buf16) {
+		if ctrl_z || single_read_length < max_read {
 			break
 		}
+
+		// NOTE(bill): if the last two values were a newline, then it is expected that
+		// this is the end of the input
+		if n >= 2 && single_read_length == max_read && string(b[n-2:n]) == "\r\n" {
+			break
+		}
+
 	}
 	
 	return

@@ -444,7 +444,7 @@ procedure_map = {}
 def parse_procedures(f):
     data = re.findall(r"typedef (\w+\*?) \(\w+ \*(\w+)\)\((.+?)\);", src, re.S)
 
-    ff = []
+    group_ff = {"Loader":[], "Misc":[], "Instance":[], "Device":[]}
 
     for rt, name, fields in data:
         proc_name = no_vk(name)
@@ -464,18 +464,32 @@ def parse_procedures(f):
             ts += " -> {}".format(rt_str)
 
         procedure_map[proc_name] = ts
-        ff.append( (proc_name, ts) )
 
-    max_len = max(len(n) for n, t in ff)
+        fields_types_name = [do_type(t) for t in re.findall(r"(?:\s*|)(.+?)\s*\w+(?:,|$)", fields)]
+        table_name = fields_types_name[0]
+        nn = (proc_name, ts)
+        if table_name in ('Device', 'Queue', 'CommandBuffer') and proc_name != 'GetDeviceProcAddr':
+            group_ff["Device"].append(nn)
+        elif table_name in ('Instance', 'PhysicalDevice') or proc_name == 'GetDeviceProcAddr':
+            group_ff["Instance"].append(nn)
+        elif table_name in ('rawptr', '', 'DebugReportFlagsEXT') or proc_name == 'GetInstanceProcAddr':
+            group_ff["Misc"].append(nn)
+        else:
+            group_ff["Loader"].append(nn)
+
 
     f.write("import \"core:c\"\n\n")
-    f.write("// Procedure Types\n\n");
-    for n, t in ff:
-        f.write("{} :: #type {}\n".format(n.ljust(max_len), t.replace('"c"', '"system"')))
+    for group_name, ff in group_ff.items():
+        ff.sort()
+        f.write("// {} Procedure Types\n".format(group_name))
+        max_len = max(len(n) for n, t in ff)
+        for n, t in ff:
+            f.write("{} :: #type {}\n".format(n.ljust(max_len), t.replace('"c"', '"system"')))
+        f.write("\n")
 
 def group_functions(f):
     data = re.findall(r"typedef (\w+\*?) \(\w+ \*(\w+)\)\((.+?)\);", src, re.S)
-    group_map = {"Instance":[], "Device":[], "Loader":[]}
+    group_map = {"Loader":[], "Instance":[], "Device":[]}
 
     for rt, vkname, fields in data:
         fields_types_name = [do_type(t) for t in re.findall(r"(?:\s*|)(.+?)\s*\w+(?:,|$)", fields)]
@@ -493,6 +507,8 @@ def group_functions(f):
             pass
         else:
             group_map["Loader"].append(nn)
+    for _, group in group_map.items():
+        group.sort()
 
     for group_name, group_lines in group_map.items():
         f.write("// {} Procedures\n".format(group_name))
@@ -502,7 +518,7 @@ def group_functions(f):
             f.write('{}: {}\n'.format(remove_prefix(name, "Proc"), name.rjust(max_len)))
         f.write("\n")
 
-    f.write("load_proc_addresses :: proc(set_proc_address: SetProcAddressType) {\n")
+    f.write("load_proc_addresses_custom :: proc(set_proc_address: SetProcAddressType) {\n")
     for group_name, group_lines in group_map.items():
         f.write("\t// {} Procedures\n".format(group_name))
         max_len = max(len(name) for name, _ in group_lines)
@@ -514,7 +530,77 @@ def group_functions(f):
                 remove_prefix(vk_name, 'Proc'),
             ))
         f.write("\n")
-    f.write("}\n")
+    f.write("}\n\n")
+
+    f.write("// Device Procedure VTable\n")
+    f.write("Device_VTable :: struct {\n")
+    max_len = max(len(name) for name, _ in group_map["Device"])
+    for name, vk_name in group_map["Device"]:
+        f.write('\t{}: {},\n'.format(remove_prefix(name, "Proc"), name.rjust(max_len)))
+    f.write("}\n\n")
+
+    f.write("load_proc_addresses_device_vtable :: proc(device: Device, vtable: ^Device_VTable) {\n")
+    for name, vk_name in group_map["Device"]:
+        k = max_len - len(name)
+        f.write('\tvtable.{}{} = auto_cast GetDeviceProcAddr(device, "vk{}")\n'.format(
+            remove_prefix(name, 'Proc'),
+            "".ljust(k),
+            remove_prefix(vk_name, 'Proc'),
+        ))
+    f.write("}\n\n")
+
+    f.write("load_proc_addresses_device :: proc(device: Device) {\n")
+    max_len = max(len(name) for name, _ in group_map["Device"])
+    for name, vk_name in group_map["Device"]:
+        k = max_len - len(name)
+        f.write('\t{}{} = auto_cast GetDeviceProcAddr(device, "vk{}")\n'.format(
+            remove_prefix(name, 'Proc'),
+            "".ljust(k),
+            remove_prefix(vk_name, 'Proc'),
+        ))
+    f.write("}\n\n")
+
+    f.write("load_proc_addresses_instance :: proc(instance: Instance) {\n")
+    max_len = max(len(name) for name, _ in group_map["Instance"])
+    for name, vk_name in group_map["Instance"]:
+        k = max_len - len(name)
+        f.write('\t{}{} = auto_cast GetInstanceProcAddr(instance, "vk{}")\n'.format(
+            remove_prefix(name, 'Proc'),
+            "".ljust(k),
+            remove_prefix(vk_name, 'Proc'),
+        ))
+    f.write("\n\t// Device Procedures (may call into dispatch)\n")
+    max_len = max(len(name) for name, _ in group_map["Device"])
+    for name, vk_name in group_map["Device"]:
+        k = max_len - len(name)
+        f.write('\t{}{} = auto_cast GetInstanceProcAddr(instance, "vk{}")\n'.format(
+            remove_prefix(name, 'Proc'),
+            "".ljust(k),
+            remove_prefix(vk_name, 'Proc'),
+        ))
+    f.write("}\n\n")
+
+    f.write("load_proc_addresses_global :: proc(vk_get_instance_proc_addr: rawptr) {\n")
+    f.write("\tGetInstanceProcAddr = auto_cast vk_get_instance_proc_addr\n\n")
+    max_len = max(len(name) for name, _ in group_map["Loader"])
+    for name, vk_name in group_map["Loader"]:
+        k = max_len - len(name)
+        f.write('\t{}{} = auto_cast GetInstanceProcAddr(nil, "vk{}")\n'.format(
+            remove_prefix(name, 'Proc'),
+            "".ljust(k),
+            remove_prefix(vk_name, 'Proc'),
+        ))
+    f.write("}\n\n")
+
+    f.write("""
+load_proc_addresses :: proc{
+\tload_proc_addresses_global,
+\tload_proc_addresses_instance,
+\tload_proc_addresses_device,
+\tload_proc_addresses_device_vtable,
+\tload_proc_addresses_custom,
+}\n
+"""[1::])
 
 
 
@@ -581,14 +667,14 @@ MAX_GLOBAL_PRIORITY_SIZE_EXT  :: 16
     parse_handles_def(f)
     f.write("\n\n")
     parse_flags_def(f)
-    with open("../enums.odin", 'w', encoding='utf-8') as f:
-        f.write(BASE)
-        f.write("\n")
-        parse_enums(f)
-        f.write("\n\n")
-    with open("../structs.odin", 'w', encoding='utf-8') as f:
-        f.write(BASE)
-        f.write("""
+with open("../enums.odin", 'w', encoding='utf-8') as f:
+    f.write(BASE)
+    f.write("\n")
+    parse_enums(f)
+    f.write("\n\n")
+with open("../structs.odin", 'w', encoding='utf-8') as f:
+    f.write(BASE)
+    f.write("""
 import "core:c"
 
 when ODIN_OS == .Windows {
@@ -622,13 +708,12 @@ CAMetalLayer :: struct {}
 
 /********************************/
 """)
-        f.write("\n")
-        parse_structs(f)
-        f.write("\n\n")
-    with open("../procedures.odin", 'w', encoding='utf-8') as f:
-        f.write(BASE)
-        f.write("\n")
-        parse_procedures(f)
-        f.write("\n")
-        group_functions(f)
-        f.write("\n\n")
+    f.write("\n")
+    parse_structs(f)
+    f.write("\n\n")
+with open("../procedures.odin", 'w', encoding='utf-8') as f:
+    f.write(BASE)
+    f.write("\n")
+    parse_procedures(f)
+    f.write("\n")
+    group_functions(f)

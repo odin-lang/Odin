@@ -3,10 +3,11 @@ package sdl2_ttf
 import "core:c"
 import SDL ".."
 
-when ODIN_OS == .Windows { foreign import lib "SDL2_ttf.lib"    }
-when ODIN_OS == .Linux   { foreign import lib "system:SDL2_ttf" }
-when ODIN_OS == .Darwin  { foreign import lib "system:SDL2_ttf" }
-when ODIN_OS == .FreeBSD { foreign import lib "system:SDL2_ttf" }
+when ODIN_OS == .Windows {
+	foreign import lib "SDL2_ttf.lib"
+} else {
+	foreign import lib "system:SDL2_ttf"
+}
 
 bool :: SDL.bool
 
