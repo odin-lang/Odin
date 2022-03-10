@@ -3,8 +3,6 @@ package glfw_bindings
 import "core:c"
 import vk "vendor:vulkan"
 
-when ODIN_OS == .Linux   { foreign import glfw "system:glfw" } // TODO: Add the billion-or-so static libs to link to in linux
-when ODIN_OS == .Darwin  { foreign import glfw "system:glfw" }
 when ODIN_OS == .Windows {
 	foreign import glfw { 
 		"../lib/glfw3_mt.lib",
@@ -12,6 +10,11 @@ when ODIN_OS == .Windows {
 		"system:gdi32.lib", 
 		"system:shell32.lib",
 	} 
+} else when ODIN_OS == .Linux {
+	// TODO: Add the billion-or-so static libs to link to in linux
+	foreign import glfw "system:glfw"
+} else {
+	foreign import glfw "system:glfw"
 }
 
 #assert(size_of(c.int) == size_of(b32))

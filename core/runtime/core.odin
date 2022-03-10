@@ -351,7 +351,6 @@ Context :: struct {
 	assertion_failure_proc: Assertion_Failure_Proc,
 	logger:                 Logger,
 
-	user_data:  any,
 	user_ptr:   rawptr,
 	user_index: int,
 
@@ -458,6 +457,11 @@ foreign {
 @(link_name="__$cleanup_runtime")
 _cleanup_runtime :: proc() {
 	default_temp_allocator_destroy(&global_default_temp_allocator_data)
+}
+
+_cleanup_runtime_contextless :: proc "contextless" () {
+	context = default_context()
+	_cleanup_runtime()
 }
 
 

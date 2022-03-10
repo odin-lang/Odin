@@ -27,6 +27,19 @@ when ODIN_OS == .Linux || ODIN_OS == .FreeBSD {
 	ERANGE :: 34
 }
 
+when ODIN_OS == .OpenBSD {
+	@(private="file")
+	@(default_calling_convention="c")
+	foreign libc {
+		@(link_name="__errno")
+		_get_errno :: proc() -> ^int ---
+	}
+
+	EDOM   :: 33
+	EILSEQ :: 84
+	ERANGE :: 34
+}
+
 when ODIN_OS == .Windows {
 	@(private="file")
 	@(default_calling_convention="c")

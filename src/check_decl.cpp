@@ -174,6 +174,10 @@ void check_init_constant(CheckerContext *ctx, Entity *e, Operand *operand) {
 		return;
 	}
 
+	if (is_type_proc(e->type)) {
+		error(e->token, "Illegal declaration of a constant procedure value");
+	}
+
 	e->parent_proc_decl = ctx->curr_proc_decl;
 
 	e->Constant.value = operand->value;
