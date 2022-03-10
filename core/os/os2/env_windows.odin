@@ -1,8 +1,8 @@
 //+private
 package os2
 
-import "core:runtime"
-import "core:mem"
+//import "core:runtime"
+//import "core:mem"
 import win32 "core:sys/windows"
 
 _get_env :: proc(key: string, allocator := context.allocator) -> (value: string, found: bool) {

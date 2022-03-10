@@ -42,3 +42,8 @@ echo ---
 echo Running core:math/noise tests
 echo ---
 %PATH_TO_ODIN% run math/noise %COMMON%
+
+echo ---
+echo Running core:os/os2 tests
+echo ---
+%PATH_TO_ODIN% run os2 %COMMON%

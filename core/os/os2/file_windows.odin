@@ -36,11 +36,6 @@ _std_handle :: proc(kind: Std_Handle_Kind) -> Handle {
 	unreachable()
 }
 
-_opendir :: proc(path: string) -> (handle: Handle, err: Error) {
-	return INVALID_HANDLE, .Invalid_Argument
-}
-
-
 _open :: proc(path: string, flags: File_Flags, perm: File_Mode) -> (handle: Handle, err: Error) {
 	handle = INVALID_HANDLE
 	if len(path) == 0 {
