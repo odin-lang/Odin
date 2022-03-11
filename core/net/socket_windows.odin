@@ -339,6 +339,8 @@ TCP_Send_Error :: enum c.int {
 	Bad_Buffer = win.WSAEFAULT,
 	// Connection is broken due to keepalive activity detecting a failure during the operation.
 	Keepalive_Failure = win.WSAENETRESET, // TODO: not functionally different from Reset; merge?
+	// The so-called socket is not an open socket.
+	Not_Socket = win.WSAENOTSOCK,
 }
 
 // Repeatedly sends data until the entire buffer is sent.

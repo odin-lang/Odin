@@ -314,6 +314,8 @@ TCP_Send_Error :: enum c.int {
 	// The send timeout duration passed before all data was sent.
 	// See Socket_Option.Send_Timeout.
 	Timeout = c.int(os.EWOULDBLOCK), // NOTE: No, really. Presumably this means something different for nonblocking sockets...
+	// The so-called socket is not an open socket.
+	Not_Socket = c.int(os.ENOTSOCK),
 }
 
 // Repeatedly sends data until the entire buffer is sent.
