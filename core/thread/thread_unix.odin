@@ -44,7 +44,7 @@ _create :: proc(procedure: Thread_Proc, priority := Thread_Priority.Normal) -> ^
 
 		t.procedure(t)
 
-		t.flags += { .Done }
+		intrinsics.atomic_store(&t.flags, t.flags + { .Done });
 
 		sync.unlock(&t.mutex)
 
@@ -105,7 +105,7 @@ _start :: proc(t: ^Thread) {
 }
 
 _is_done :: proc(t: ^Thread) -> bool {
-	return intrinsics.atomic_and(&t.flags, { .Done }) != nil
+	return .Done in intrinsics.atomic_load(&t.flags);
 }
 
 _join :: proc(t: ^Thread) {
