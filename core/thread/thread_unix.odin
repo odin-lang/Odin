@@ -98,10 +98,9 @@ _create :: proc(procedure: Thread_Proc, priority := Thread_Priority.Normal) -> ^
 }
 
 _start :: proc(t: ^Thread) {
-	sync.lock(&t.mutex)
+	sync.guard(&t.mutex)
 	t.flags += { .Started }
 	sync.signal(&t.cond)
-	sync.unlock(&t.mutex)
 }
 
 _is_done :: proc(t: ^Thread) -> bool {
