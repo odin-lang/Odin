@@ -46,4 +46,5 @@ echo ---
 echo ---
 echo Running core:os/os2 tests
 echo ---
-%PATH_TO_ODIN% run os2 %COMMON%
+Rem Needed Shlwapi.lib for PathFileExistsW
+%PATH_TO_ODIN% run os2 %COMMON% -extra-linker-flags:Shlwapi.lib
