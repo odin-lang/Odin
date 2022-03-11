@@ -151,7 +151,7 @@ murmur32 :: proc(data: []byte, seed := u32(0)) -> u32 {
 		k1 ~= u32(tail[2]) << 16
 		fallthrough
 	case 2:
-		k1 ~= u32(tail[2]) << 8
+		k1 ~= u32(tail[1]) << 8
 		fallthrough
 	case 1:
 		k1 ~= u32(tail[0])
