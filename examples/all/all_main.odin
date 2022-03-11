@@ -54,6 +54,7 @@ import base64         "core:encoding/base64"
 import csv            "core:encoding/csv"
 import hxa            "core:encoding/hxa"
 import json           "core:encoding/json"
+import varint         "core:encoding/varint"
 
 import fmt            "core:fmt"
 import hash           "core:hash"
@@ -153,6 +154,7 @@ _ :: base64
 _ :: csv
 _ :: hxa
 _ :: json
+_ :: varint
 _ :: fmt
 _ :: hash
 _ :: image
