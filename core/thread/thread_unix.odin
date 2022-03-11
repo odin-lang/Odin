@@ -35,7 +35,7 @@ _create :: proc(procedure: Thread_Proc, priority := Thread_Priority.Normal) -> ^
 
 		t.id = sync.current_thread_id()
 
-		if .Started not_in t.flags {
+		for (.Started not_in t.flags) {
 			sync.wait(&t.cond, &t.mutex)
 		}
 
