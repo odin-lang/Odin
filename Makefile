@@ -62,6 +62,12 @@ ifeq ($(OS), OpenBSD)
     CFLAGS:=$(CFLAGS) $(shell $(LLVM_CONFIG) --cxxflags --ldflags)
     LDFLAGS:=$(LDFLAGS) $(shell $(LLVM_CONFIG) --libs core native --system-libs)
 endif
+ifeq ($(OS), FreeBSD)
+    LLVM_CONFIG=/usr/local/bin/llvm-config11
+
+    CFLAGS:=$(CFLAGS) $(shell $(LLVM_CONFIG) --cxxflags --ldflags)
+    LDFLAGS:=$(LDFLAGS) $(shell $(LLVM_CONFIG) --libs core native --system-libs)
+endif
 
 all: debug demo
 
