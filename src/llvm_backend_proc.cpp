@@ -1402,14 +1402,23 @@ lbValue lb_build_builtin_proc(lbProcedure *p, Ast *expr, TypeAndValue const &tv,
 
 	case BuiltinProc_read_cycle_counter:
 		{
-			char const *name = "llvm.readcyclecounter";
-			unsigned id = LLVMLookupIntrinsicID(name, gb_strlen(name));
-			GB_ASSERT_MSG(id != 0, "Unable to find %s", name);
-			LLVMValueRef ip = LLVMGetIntrinsicDeclaration(p->module->mod, id, nullptr, 0);
-
 			lbValue res = {};
-			res.value = LLVMBuildCall(p->builder, ip, nullptr, 0, "");
 			res.type = tv.type;
+
+			if (build_context.metrics.arch == TargetArch_arm64) {
+				LLVMTypeRef func_type = LLVMFunctionType(LLVMInt64TypeInContext(p->module->ctx), nullptr, 0, false);
+				bool has_side_effects = false;
+				LLVMValueRef the_asm = llvm_get_inline_asm(func_type, str_lit("mrs x9, cntvct_el0"), str_lit("=r"), has_side_effects);
+				GB_ASSERT(the_asm != nullptr);
+				res.value = LLVMBuildCall2(p->builder, func_type, the_asm, nullptr, 0, "");
+			} else {
+				char const *name = "llvm.readcyclecounter";
+				unsigned id = LLVMLookupIntrinsicID(name, gb_strlen(name));
+				GB_ASSERT_MSG(id != 0, "Unable to find %s", name);
+				LLVMValueRef ip = LLVMGetIntrinsicDeclaration(p->module->mod, id, nullptr, 0);
+
+				res.value = LLVMBuildCall(p->builder, ip, nullptr, 0, "");
+			}
 			return res;
 		}
 
