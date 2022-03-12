@@ -1779,7 +1779,7 @@ LLVMValueRef llvm_get_inline_asm(LLVMTypeRef func_type, String const &str, Strin
 	return LLVMGetInlineAsm(func_type,
 		cast(char *)str.text, cast(size_t)str.len,
 		cast(char *)clobbers.text, cast(size_t)clobbers.len,
-		/*HasSideEffects*/true, /*IsAlignStack*/false,
+		has_side_effects, is_align_stack,
 		dialect
 	#if LLVM_VERSION_MAJOR >= 13 
 		, /*CanThrow*/false
