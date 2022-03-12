@@ -1,4 +1,4 @@
-//+build linux, darwin, freebsd, openbsd
+//+build linux, darwin, openbsd
 package os
 
 import "core:time"
