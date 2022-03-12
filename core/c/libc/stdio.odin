@@ -79,7 +79,7 @@ when ODIN_OS == .Linux {
 }
 
 when ODIN_OS == .OpenBSD {
-	fpos_t :: i64
+	fpos_t :: distinct i64
 
 	_IOFBF :: 0
 	_IOLBF :: 1
