@@ -24,18 +24,73 @@ _is_path_separator :: proc(c: byte) -> bool {
 }
 
 _mkdir :: proc(path: string, perm: File_Mode) -> Error {
-	path_cstr := strings.clone_to_cstring(path, context.temp_allocator)
-	perm_i: int
 	if perm & (File_Mode_Named_Pipe | File_Mode_Device | File_Mode_Char_Device | File_Mode_Sym_Link) != 0 {
 		return .Invalid_Argument
 	}
 
+	path_cstr := strings.clone_to_cstring(path, context.temp_allocator)
 	return _ok_or_error(unix.sys_mkdir(path_cstr, int(perm & 0o777)))
 }
 
-// TODO
 _mkdir_all :: proc(path: string, perm: File_Mode) -> Error {
-	return nil
+	_mkdirat :: proc(dfd: Handle, path: []u8, perm: int, has_created: ^bool) -> Error {
+		if len(path) == 0 {
+			return nil
+		}
+		i: int
+		for /**/; i < len(path) - 1 && path[i] != '/'; i += 1 {}
+		path[i] = 0
+		new_dfd := unix.sys_openat(int(dfd), cstring(&path[0]), _OPENDIR_FLAGS)
+		switch new_dfd {
+		case -ENOENT:
+			res := unix.sys_mkdirat(int(dfd), cstring(&path[0]), perm)
+			if res < 0 {
+				return _get_platform_error(res)
+			}
+			has_created^ = true
+			new_dfd = unix.sys_openat(int(dfd), cstring(&path[0]), _OPENDIR_FLAGS)
+			if new_dfd < 0 {
+				return _get_platform_error(new_dfd)
+			}
+			fallthrough
+		case 0:
+			unix.sys_close(int(dfd))
+			// skip consecutive '/'
+			for i += 1; i < len(path) && path[i] == '/'; i += 1 {}
+			return _mkdirat(Handle(new_dfd), path[i:], perm, has_created)
+		case:
+			return _get_platform_error(new_dfd)
+		}
+		unreachable()
+	}
+
+	if perm & (File_Mode_Named_Pipe | File_Mode_Device | File_Mode_Char_Device | File_Mode_Sym_Link) != 0 {
+		return .Invalid_Argument
+	}
+
+	// need something we can edit, and use to generate cstrings
+	path_bytes := make([]u8, len(path) + 1, context.temp_allocator)
+	copy(path_bytes, path)
+	path_bytes[len(path)] = 0
+
+	dfd: int
+	if path_bytes[0] == '/' {
+		dfd = unix.sys_open("/", _OPENDIR_FLAGS)
+		path_bytes = path_bytes[1:]
+	} else {
+		dfd = unix.sys_open(".", _OPENDIR_FLAGS)
+	}
+	if dfd < 0 {
+		return _get_platform_error(dfd)
+	}
+	
+	has_created: bool
+	_mkdirat(Handle(dfd), path_bytes, int(perm & 0o777), &has_created) or_return
+	if has_created {
+		return nil
+	}
+	return .Exist
+	//return has_created ? nil : .Exist
 }
 
 dirent64 :: struct {
