@@ -1325,6 +1325,10 @@ void lb_generate_code(lbGenerator *gen) {
 
 	switch (build_context.reloc_mode) {
 	case RelocMode_Default:
+		if (build_context.metrics.os == TargetOs_openbsd) {
+			// Always use PIC for OpenBSD: it defaults to PIE
+			reloc_mode = LLVMRelocPIC;
+		}
 		break;
 	case RelocMode_Static:
 		reloc_mode = LLVMRelocStatic;

@@ -1387,7 +1387,7 @@ lbValue lb_slice_elem(lbProcedure *p, lbValue slice) {
 	return lb_emit_struct_ev(p, slice, 0);
 }
 lbValue lb_slice_len(lbProcedure *p, lbValue slice) {
-	GB_ASSERT(is_type_slice(slice.type));
+	GB_ASSERT(is_type_slice(slice.type) || is_type_relative_slice(slice.type));
 	return lb_emit_struct_ev(p, slice, 1);
 }
 lbValue lb_dynamic_array_elem(lbProcedure *p, lbValue da) {
@@ -1793,7 +1793,7 @@ LLVMValueRef llvm_get_inline_asm(LLVMTypeRef func_type, String const &str, Strin
 	return LLVMGetInlineAsm(func_type,
 		cast(char *)str.text, cast(size_t)str.len,
 		cast(char *)clobbers.text, cast(size_t)clobbers.len,
-		/*HasSideEffects*/true, /*IsAlignStack*/false,
+		has_side_effects, is_align_stack,
 		dialect
 	#if LLVM_VERSION_MAJOR >= 13 
 		, /*CanThrow*/false

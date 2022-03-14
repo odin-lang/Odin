@@ -232,10 +232,10 @@ foreign libc {
 	@(link_name="close")            _unix_close         :: proc(fd: Handle) -> c.int ---
 	@(link_name="read")             _unix_read          :: proc(fd: Handle, buf: rawptr, size: c.size_t) -> c.ssize_t ---
 	@(link_name="write")            _unix_write         :: proc(fd: Handle, buf: rawptr, size: c.size_t) -> c.ssize_t ---
-	@(link_name="lseek64")          _unix_seek          :: proc(fd: Handle, offset: i64, whence: c.int) -> i64 ---
+	@(link_name="lseek")          _unix_seek          :: proc(fd: Handle, offset: i64, whence: c.int) -> i64 ---
 	@(link_name="gettid")           _unix_gettid        :: proc() -> u64 ---
 	@(link_name="getpagesize")      _unix_getpagesize   :: proc() -> c.int ---
-	@(link_name="stat64")           _unix_stat          :: proc(path: cstring, stat: ^OS_Stat) -> c.int ---
+	@(link_name="stat")           _unix_stat          :: proc(path: cstring, stat: ^OS_Stat) -> c.int ---
 	@(link_name="fstat")            _unix_fstat         :: proc(fd: Handle, stat: ^OS_Stat) -> c.int ---
 	@(link_name="access")           _unix_access        :: proc(path: cstring, mask: c.int) -> c.int ---
 
@@ -419,6 +419,7 @@ set_current_directory :: proc(path: string) -> (err: Errno) {
 }
 
 exit :: proc "contextless" (code: int) -> ! {
+	runtime._cleanup_runtime_contextless()
 	_unix_exit(c.int(code))
 }
 

@@ -4470,7 +4470,7 @@ Entity *check_selector(CheckerContext *c, Operand *operand, Ast *node, Type *typ
 
 	if (entity == nullptr) {
 		gbString op_str   = expr_to_string(op_expr);
-		gbString type_str = type_to_string(operand->type);
+		gbString type_str = type_to_string_shorthand(operand->type);
 		gbString sel_str  = expr_to_string(selector);
 		error(op_expr, "'%s' of type '%s' has no field '%s'", op_str, type_str, sel_str);
 
@@ -4511,7 +4511,7 @@ Entity *check_selector(CheckerContext *c, Operand *operand, Ast *node, Type *typ
 		}
 
 		gbString op_str   = expr_to_string(op_expr);
-		gbString type_str = type_to_string(operand->type);
+		gbString type_str = type_to_string_shorthand(operand->type);
 		gbString sel_str  = expr_to_string(selector);
 		error(op_expr, "Cannot access non-constant field '%s' from '%s'", sel_str, op_str);
 		gb_string_free(sel_str);
@@ -4536,7 +4536,7 @@ Entity *check_selector(CheckerContext *c, Operand *operand, Ast *node, Type *typ
 		}
 
 		gbString op_str   = expr_to_string(op_expr);
-		gbString type_str = type_to_string(operand->type);
+		gbString type_str = type_to_string_shorthand(operand->type);
 		gbString sel_str  = expr_to_string(selector);
 		error(op_expr, "Cannot access non-constant field '%s' from '%s'", sel_str, op_str);
 		gb_string_free(sel_str);
@@ -4549,7 +4549,7 @@ Entity *check_selector(CheckerContext *c, Operand *operand, Ast *node, Type *typ
 
 	if (expr_entity != nullptr && is_type_polymorphic(expr_entity->type)) {
 		gbString op_str   = expr_to_string(op_expr);
-		gbString type_str = type_to_string(operand->type);
+		gbString type_str = type_to_string_shorthand(operand->type);
 		gbString sel_str  = expr_to_string(selector);
 		error(op_expr, "Cannot access field '%s' from non-specialized polymorphic type '%s'", sel_str, op_str);
 		gb_string_free(sel_str);

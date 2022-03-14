@@ -14,7 +14,6 @@ package siphash
 
 import "core:crypto"
 import "core:crypto/util"
-import "core:mem"
 
 /*
     High level API

@@ -952,7 +952,7 @@ bool check_builtin_procedure(CheckerContext *c, Operand *operand, Ast *call, i32
 			mode = Addressing_Constant;
 			value = exact_value_i64(at->EnumeratedArray.count);
 			type = t_untyped_integer;
-		} else if (is_type_slice(op_type) && id == BuiltinProc_len) {
+		} else if ((is_type_slice(op_type) || is_type_relative_slice(op_type)) && id == BuiltinProc_len) {
 			mode = Addressing_Value;
 		} else if (is_type_dynamic_array(op_type)) {
 			mode = Addressing_Value;
@@ -1106,7 +1106,7 @@ bool check_builtin_procedure(CheckerContext *c, Operand *operand, Ast *call, i32
 		
 		Selection sel = lookup_field(type, field_name, false);
 		if (sel.entity == nullptr) {
-			gbString type_str = type_to_string(type);
+			gbString type_str = type_to_string_shorthand(type);
 			error(ce->args[0],
 			      "'%s' has no field named '%.*s'", type_str, LIT(field_name));
 			gb_string_free(type_str);
@@ -1118,7 +1118,7 @@ bool check_builtin_procedure(CheckerContext *c, Operand *operand, Ast *call, i32
 			return false;
 		}
 		if (sel.indirect) {
-			gbString type_str = type_to_string(type);
+			gbString type_str = type_to_string_shorthand(type);
 			error(ce->args[0],
 			      "Field '%.*s' is embedded via a pointer in '%s'", LIT(field_name), type_str);
 			gb_string_free(type_str);
@@ -1179,7 +1179,7 @@ bool check_builtin_procedure(CheckerContext *c, Operand *operand, Ast *call, i32
 		
 		Selection sel = lookup_field(type, field_name, false);
 		if (sel.entity == nullptr) {
-			gbString type_str = type_to_string(type);
+			gbString type_str = type_to_string_shorthand(type);
 			error(ce->args[0],
 			      "'%s' has no field named '%.*s'", type_str, LIT(field_name));
 			gb_string_free(type_str);
@@ -1191,7 +1191,7 @@ bool check_builtin_procedure(CheckerContext *c, Operand *operand, Ast *call, i32
 			return false;
 		}
 		if (sel.indirect) {
-			gbString type_str = type_to_string(type);
+			gbString type_str = type_to_string_shorthand(type);
 			error(ce->args[0],
 			      "Field '%.*s' is embedded via a pointer in '%s'", LIT(field_name), type_str);
 			gb_string_free(type_str);
@@ -3514,6 +3514,7 @@ bool check_builtin_procedure(CheckerContext *c, Operand *operand, Ast *call, i32
 			case TargetOs_linux:
 			case TargetOs_essence:
 			case TargetOs_freebsd:
+			case TargetOs_openbsd:
 				switch (build_context.metrics.arch) {
 				case TargetArch_i386:
 				case TargetArch_amd64:
