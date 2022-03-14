@@ -94,6 +94,7 @@ the_basics :: proc() {
 		z: f64 // `z` is typed of type `f64` (64-bit floating point number)
 		z = 1  // `1` is an untyped integer literal which can be implicitly converted to `f64`
 				// No need for any suffixes or decimal places like in other languages
+				// (with the exception of negative zero, which must be given as `-0.0`)
 				// CONSTANTS JUST WORK!!!
 
 
@@ -1714,7 +1715,6 @@ deprecated_attribute :: proc() {
 }
 
 range_statements_with_multiple_return_values :: proc() {
-	// IMPORTANT NOTE(bill, 2019-11-02): This feature is subject to be changed/removed
 	fmt.println("\n#range statements with multiple return values")
 	My_Iterator :: struct {
 		index: int,
@@ -2004,7 +2004,6 @@ relative_data_types :: proc() {
 
 or_else_operator :: proc() {
 	fmt.println("\n#'or_else'")
-	// IMPORTANT NOTE: 'or_else' is an experimental feature and subject to change/removal
 	{
 		m: map[string]int
 		i: int
@@ -2035,8 +2034,6 @@ or_else_operator :: proc() {
 
 or_return_operator :: proc() {
 	fmt.println("\n#'or_return'")
-	// IMPORTANT NOTE: 'or_return' is an experimental feature and subject to change/removal
-	//
 	// The concept of 'or_return' will work by popping off the end value in a multiple
 	// valued expression and checking whether it was not 'nil' or 'false', and if so,
 	// set the end return value to value if possible. If the procedure only has one
