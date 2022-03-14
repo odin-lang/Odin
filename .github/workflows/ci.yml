@@ -90,6 +90,9 @@ jobs:
       - name: Odin check examples/all for Darwin arm64
         run: ./odin check examples/all -vet -strict-style -target:darwin_arm64
         timeout-minutes: 10
+      - name: Odin check examples/all for Linux arm64
+        run: ./odin check examples/all -vet -strict-style -target:linux_arm64
+        timeout-minutes: 10
   build_windows:
     runs-on: windows-2019
     steps:
