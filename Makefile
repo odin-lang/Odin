@@ -1,6 +1,6 @@
 GIT_SHA=$(shell git rev-parse --short HEAD)
 DISABLED_WARNINGS=-Wno-switch -Wno-macro-redefined -Wno-unused-value
-LDFLAGS=-pthread -ldl -lm -lstdc++
+LDFLAGS=-pthread -lm -lstdc++
 CFLAGS=-std=c++14 -DGIT_SHA=\"$(GIT_SHA)\"
 CFLAGS:=$(CFLAGS) -DODIN_VERSION_RAW=\"dev-$(shell date +"%Y-%m")\"
 CC=clang
@@ -8,7 +8,7 @@ CC=clang
 OS=$(shell uname)
 
 ifeq ($(OS), Darwin)
-    
+
     ARCH=$(shell uname -m)
     LLVM_CONFIG=llvm-config
 
@@ -35,7 +35,7 @@ ifeq ($(OS), Darwin)
         endif 
     endif 
 
-    LDFLAGS:=$(LDFLAGS) -liconv
+    LDFLAGS:=$(LDFLAGS) -liconv -ldl
     CFLAGS:=$(CFLAGS) $(shell $(LLVM_CONFIG) --cxxflags --ldflags)
     LDFLAGS:=$(LDFLAGS) -lLLVM-C
 endif
@@ -50,6 +50,20 @@ ifeq ($(OS), Linux)
             $(error "Requirement: llvm-config must be version 11")
         endif
     endif
+
+    LDFLAGS:=$(LDFLAGS) -ldl
+    CFLAGS:=$(CFLAGS) $(shell $(LLVM_CONFIG) --cxxflags --ldflags)
+    LDFLAGS:=$(LDFLAGS) $(shell $(LLVM_CONFIG) --libs core native --system-libs)
+endif
+ifeq ($(OS), OpenBSD)
+    LLVM_CONFIG=/usr/local/bin/llvm-config
+
+    LDFLAGS:=$(LDFLAGS) -liconv
+    CFLAGS:=$(CFLAGS) $(shell $(LLVM_CONFIG) --cxxflags --ldflags)
+    LDFLAGS:=$(LDFLAGS) $(shell $(LLVM_CONFIG) --libs core native --system-libs)
+endif
+ifeq ($(OS), FreeBSD)
+    LLVM_CONFIG=/usr/local/bin/llvm-config11
 
     CFLAGS:=$(CFLAGS) $(shell $(LLVM_CONFIG) --cxxflags --ldflags)
     LDFLAGS:=$(LDFLAGS) $(shell $(LLVM_CONFIG) --libs core native --system-libs)

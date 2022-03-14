@@ -11,7 +11,7 @@ current_thread_id :: proc "contextless" () -> int {
 //
 // A Mutex must not be copied after first use
 Mutex :: struct {
-	impl: _Mutex `This is a tag`,
+	impl: _Mutex,
 }
 
 // mutex_lock locks m

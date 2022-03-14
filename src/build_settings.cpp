@@ -1,4 +1,4 @@
-#if defined(GB_SYSTEM_FREEBSD)
+#if defined(GB_SYSTEM_FREEBSD) || defined(GB_SYSTEM_OPENBSD)
 #include <sys/types.h>
 #include <sys/sysctl.h>
 #endif
@@ -16,6 +16,7 @@ enum TargetOsKind : u16 {
 	TargetOs_linux,
 	TargetOs_essence,
 	TargetOs_freebsd,
+	TargetOs_openbsd,
 	
 	TargetOs_wasi,
 	TargetOs_js,
@@ -63,6 +64,7 @@ String target_os_names[TargetOs_COUNT] = {
 	str_lit("linux"),
 	str_lit("essence"),
 	str_lit("freebsd"),
+	str_lit("openbsd"),
 	
 	str_lit("wasi"),
 	str_lit("js"),
@@ -310,7 +312,7 @@ bool global_ignore_warnings(void) {
 }
 
 
-gb_global TargetMetrics target_windows_386 = {
+gb_global TargetMetrics target_windows_i386 = {
 	TargetOs_windows,
 	TargetArch_i386,
 	4,
@@ -326,7 +328,7 @@ gb_global TargetMetrics target_windows_amd64 = {
 	str_lit("e-m:w-i64:64-f80:128-n8:16:32:64-S128"),
 };
 
-gb_global TargetMetrics target_linux_386 = {
+gb_global TargetMetrics target_linux_i386 = {
 	TargetOs_linux,
 	TargetArch_i386,
 	4,
@@ -369,7 +371,7 @@ gb_global TargetMetrics target_darwin_arm64 = {
 	str_lit("e-m:o-i64:64-i128:128-n32:64-S128"), // TODO(bill): Is this correct?
 };
 
-gb_global TargetMetrics target_freebsd_386 = {
+gb_global TargetMetrics target_freebsd_i386 = {
 	TargetOs_freebsd,
 	TargetArch_i386,
 	4,
@@ -384,6 +386,15 @@ gb_global TargetMetrics target_freebsd_amd64 = {
 	16,
 	str_lit("x86_64-unknown-freebsd-elf"),
 	str_lit("e-m:w-i64:64-f80:128-n8:16:32:64-S128"),
+};
+
+gb_global TargetMetrics target_openbsd_amd64 = {
+	TargetOs_openbsd,
+	TargetArch_amd64,
+	8,
+	16,
+	str_lit("x86_64-unknown-openbsd-elf"),
+	str_lit("e-m:e-p270:32:32-p271:32:32-p272:64:64-i64:64-f80:128-n8:16:32:64-S128"),
 };
 
 gb_global TargetMetrics target_essence_amd64 = {
@@ -452,13 +463,14 @@ gb_global NamedTargetMetrics named_targets[] = {
 	{ str_lit("darwin_amd64"),        &target_darwin_amd64   },
 	{ str_lit("darwin_arm64"),        &target_darwin_arm64   },
 	{ str_lit("essence_amd64"),       &target_essence_amd64  },
-	{ str_lit("linux_386"),           &target_linux_386      },
+	{ str_lit("linux_i386"),          &target_linux_i386     },
 	{ str_lit("linux_amd64"),         &target_linux_amd64    },
 	{ str_lit("linux_arm64"),         &target_linux_arm64    },
-	{ str_lit("windows_386"),         &target_windows_386    },
+	{ str_lit("windows_i386"),        &target_windows_i386   },
 	{ str_lit("windows_amd64"),       &target_windows_amd64  },
-	{ str_lit("freebsd_386"),         &target_freebsd_386    },
+	{ str_lit("freebsd_i386"),        &target_freebsd_i386   },
 	{ str_lit("freebsd_amd64"),       &target_freebsd_amd64  },
+	{ str_lit("openbsd_amd64"),       &target_openbsd_amd64  },
 	{ str_lit("freestanding_wasm32"), &target_freestanding_wasm32 },
 	{ str_lit("wasi_wasm32"),         &target_wasi_wasm32 },
 	{ str_lit("js_wasm32"),           &target_js_wasm32 },
@@ -765,10 +777,38 @@ String internal_odin_root_dir(void) {
 		len = readlink("/proc/curproc/exe", &path_buf[0], path_buf.count);
 #elif defined(GB_SYSTEM_DRAGONFLYBSD)
 		len = readlink("/proc/curproc/file", &path_buf[0], path_buf.count);
-#else
+#elif defined(GB_SYSTEM_LINUX)
 		len = readlink("/proc/self/exe", &path_buf[0], path_buf.count);
+#elif defined(GB_SYSTEM_OPENBSD)
+		int error;
+		int mib[] = {
+			CTL_KERN,
+			KERN_PROC_ARGS,
+			getpid(),
+			KERN_PROC_ARGV,
+		};
+		// get argv size
+		error = sysctl(mib, 4, NULL, (size_t *) &len, NULL, 0);
+		if (error == -1) {
+			// sysctl error
+			return make_string(nullptr, 0);
+		}
+		// get argv
+		char **argv = (char **)gb_malloc(len);
+		error = sysctl(mib, 4, argv, (size_t *) &len, NULL, 0);
+		if (error == -1) {
+			// sysctl error
+			gb_mfree(argv);
+			return make_string(nullptr, 0);
+		}
+		// copy argv[0] to path_buf
+		len = gb_strlen(argv[0]);
+		if(len < path_buf.count) {
+			gb_memmove(&path_buf[0], argv[0], len);
+		}
+		gb_mfree(argv);
 #endif
-		if(len == 0) {
+		if(len == 0 || len == -1) {
 			return make_string(nullptr, 0);
 		}
 		if (len < path_buf.count) {
@@ -964,6 +1004,8 @@ void init_build_context(TargetMetrics *cross_target) {
 			#endif
 		#elif defined(GB_SYSTEM_FREEBSD)
 			metrics = &target_freebsd_amd64;
+		#elif defined(GB_SYSTEM_OPENBSD)
+			metrics = &target_openbsd_amd64;
 		#elif defined(GB_CPU_ARM)
 			metrics = &target_linux_arm64;
 		#else
@@ -971,13 +1013,13 @@ void init_build_context(TargetMetrics *cross_target) {
 		#endif
 	#else
 		#if defined(GB_SYSTEM_WINDOWS)
-			metrics = &target_windows_386;
+			metrics = &target_windows_i386;
 		#elif defined(GB_SYSTEM_OSX)
 			#error "Build Error: Unsupported architecture"
 		#elif defined(GB_SYSTEM_FREEBSD)
-			metrics = &target_freebsd_386;
+			metrics = &target_freebsd_i386;
 		#else
-			metrics = &target_linux_386;
+			metrics = &target_linux_i386;
 		#endif
 	#endif
 
@@ -1035,6 +1077,9 @@ void init_build_context(TargetMetrics *cross_target) {
 			bc->link_flags = str_lit("-arch x86-64 ");
 			break;
 		case TargetOs_freebsd:
+			bc->link_flags = str_lit("-arch x86-64 ");
+			break;
+		case TargetOs_openbsd:
 			bc->link_flags = str_lit("-arch x86-64 ");
 			break;
 		}

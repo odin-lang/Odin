@@ -6,7 +6,7 @@ SUPPORT_WASAPI     :: ODIN_OS == .Windows
 SUPPORT_DSOUND     :: ODIN_OS == .Windows
 SUPPORT_WINMM      :: ODIN_OS == .Windows
 SUPPORT_COREAUDIO  :: ODIN_OS == .Darwin
-SUPPORT_SNDIO      :: false // ODIN_OS == .OpenBSD
+SUPPORT_SNDIO      :: ODIN_OS == .OpenBSD
 SUPPORT_AUDIO4     :: false // ODIN_OS == .OpenBSD || ODIN_OS == .NetBSD
 SUPPORT_OSS        :: ODIN_OS == .FreeBSD
 SUPPORT_PULSEAUDIO :: ODIN_OS == .Linux
@@ -739,8 +739,8 @@ context_type :: struct {
 			pa_stream_writable_size:            proc "system" (),
 			pa_stream_readable_size:            proc "system" (),
 
-			/*pa_mainloop**/ pMainLoop:     ptr,
-			/*pa_context**/  pPulseContext: ptr,
+			/*pa_mainloop**/ pMainLoop:     rawptr,
+			/*pa_context**/  pPulseContext: rawptr,
 		} when SUPPORT_PULSEAUDIO else struct {}),
 		
 		jack: (struct {
@@ -791,7 +791,7 @@ context_type :: struct {
 			AudioUnitInitialize:           proc "system" (),
 			AudioUnitRender:               proc "system" (),
 
-			/*AudioComponent*/ component: ptr,
+			/*AudioComponent*/ component: rawptr,
 			noAudioSessionDeactivate:     b32, /* For tracking whether or not the iOS audio session should be explicitly deactivated. Set from the config in ma_context_init__coreaudio(). */
 		} when SUPPORT_COREAUDIO else struct {}),
 		

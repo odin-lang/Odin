@@ -17,6 +17,11 @@
 	#include <sys/sysctl.h>
 #endif
 
+#if defined(GB_SYSTEM_OPENBSD)
+	#include <sys/sysctl.h>
+	#include <sys/utsname.h>
+#endif
+
 /*
 	NOTE(Jeroen): This prints the Windows product edition only, to be called from `print_platform_details`.
 */
@@ -239,6 +244,14 @@ void report_ram_info() {
 		size_t   val_size = sizeof(ram_amount);
 
 		int sysctls[] = { CTL_HW, HW_MEMSIZE };
+		if (sysctl(sysctls, 2, &ram_amount, &val_size, NULL, 0) != -1) {
+			gb_printf("%lld MiB\n", ram_amount / gb_megabytes(1));
+		}
+	#elif defined(GB_SYSTEM_OPENBSD)
+		uint64_t ram_amount;
+		size_t   val_size = sizeof(ram_amount);
+
+		int sysctls[] = { CTL_HW, HW_PHYSMEM64 };
 		if (sysctl(sysctls, 2, &ram_amount, &val_size, NULL, 0) != -1) {
 			gb_printf("%lld MiB\n", ram_amount / gb_megabytes(1));
 		}
@@ -643,6 +656,14 @@ void print_bug_report_help() {
 		} else {
 			gb_printf("macOS: Unknown\n");
 		}			
+	#elif defined(GB_SYSTEM_OPENBSD)
+		struct utsname un;
+		
+		if (uname(&un) != -1) {
+			gb_printf("%s %s %s %s\n", un.sysname, un.release, un.version, un.machine);
+		} else {
+			gb_printf("OpenBSD: Unknown\n");    
+		}
 	#else
 		gb_printf("Unknown\n");
 

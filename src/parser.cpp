@@ -1538,7 +1538,7 @@ void fix_advance_to_next_stmt(AstFile *f) {
 Token expect_closing(AstFile *f, TokenKind kind, String context) {
 	if (f->curr_token.kind != kind &&
 	    f->curr_token.kind == Token_Semicolon &&
-	    f->curr_token.string == "\n") {
+	    (f->curr_token.string == "\n" || f->curr_token.kind == Token_EOF)) {
 		Token tok = f->prev_token;
 		tok.pos.column += cast(i32)tok.string.len;
 		syntax_error(tok, "Missing ',' before newline in %.*s", LIT(context));
@@ -1560,6 +1560,7 @@ void assign_removal_flag_to_semicolon(AstFile *f) {
 			switch (curr_token->kind) {
 			case Token_CloseBrace:
 			case Token_CloseParen:
+			case Token_EOF:
 				ok = true;
 				break;
 			}
@@ -5718,6 +5719,22 @@ ParseFileError parse_packages(Parser *p, String init_filename) {
 		if (!string_ends_with(init_fullpath, ext)) {
 			error_line("Expected either a directory or a .odin file, got '%.*s'\n", LIT(init_filename));
 			return ParseFile_WrongExtension;
+		}
+	} else if (init_fullpath.len != 0) {
+		String path = init_fullpath;
+		if (path[path.len-1] == '/') {
+			path.len -= 1;
+		}
+		if ((build_context.command_kind & Command__does_build) &&
+		    build_context.build_mode == BuildMode_Executable) {
+			String short_path = filename_from_path(path);
+			char *cpath = alloc_cstring(heap_allocator(), short_path);
+			defer (gb_free(heap_allocator(), cpath));
+
+			if (gb_file_exists(cpath)) {
+			    	error_line("Please specify the executable name with -out:<string> as a directory exists with the same name in the current working directory");
+			    	return ParseFile_DirectoryAlreadyExists;
+			}
 		}
 	}
 	

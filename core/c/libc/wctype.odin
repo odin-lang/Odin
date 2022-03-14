@@ -25,6 +25,11 @@ when ODIN_OS == .Darwin {
 	wctype_t  :: distinct u32
 }
 
+when ODIN_OS == .OpenBSD {
+	wctrans_t :: distinct rawptr
+	wctype_t  :: distinct rawptr
+}
+
 @(default_calling_convention="c")
 foreign libc {
 	// 7.30.2.1 Wide character classification functions

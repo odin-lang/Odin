@@ -924,6 +924,7 @@ void init_universal(void) {
 			{"Linux",        TargetOs_linux},
 			{"Essence",      TargetOs_essence},
 			{"FreeBSD",      TargetOs_freebsd},
+			{"OpenBSD",      TargetOs_openbsd},
 			{"WASI",         TargetOs_wasi},
 			{"JS",           TargetOs_js},
 			{"Freestanding", TargetOs_freestanding},

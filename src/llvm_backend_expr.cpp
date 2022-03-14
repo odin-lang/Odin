@@ -2202,6 +2202,21 @@ lbValue lb_emit_comp(lbProcedure *p, TokenKind op_kind, lbValue left, lbValue ri
 		}
 	}
 
+	if (is_type_matrix(a) && (op_kind == Token_CmpEq || op_kind == Token_NotEq)) {
+		Type *tl = base_type(a);
+		lbValue lhs = lb_address_from_load_or_generate_local(p, left);
+		lbValue rhs = lb_address_from_load_or_generate_local(p, right);
+
+
+		// TODO(bill): Test to see if this is actually faster!!!!
+		auto args = array_make<lbValue>(permanent_allocator(), 3);
+		args[0] = lb_emit_conv(p, lhs, t_rawptr);
+		args[1] = lb_emit_conv(p, rhs, t_rawptr);
+		args[2] = lb_const_int(p->module, t_int, type_size_of(tl));
+		lbValue val = lb_emit_runtime_call(p, "memory_compare", args);
+		lbValue res = lb_emit_comp(p, op_kind, val, lb_const_nil(p->module, val.type));
+		return lb_emit_conv(p, res, t_bool);
+	}
 	if (is_type_array(a) || is_type_enumerated_array(a)) {
 		Type *tl = base_type(a);
 		lbValue lhs = lb_address_from_load_or_generate_local(p, left);
