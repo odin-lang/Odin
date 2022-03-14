@@ -1577,7 +1577,7 @@ void assign_removal_flag_to_semicolon(AstFile *f) {
 	}
 }
 
-void expect_semicolon(AstFile *f, Ast *s) {
+void expect_semicolon(AstFile *f) {
 	Token prev_token = {};
 
 	if (allow_token(f, Token_Semicolon)) {
@@ -1602,17 +1602,17 @@ void expect_semicolon(AstFile *f, Ast *s) {
 	if (f->curr_token.kind == Token_EOF) {
 		return;
 	}
-
-	if (s != nullptr) {
-		return;
-	} 
 	switch (f->curr_token.kind) {
 	case Token_EOF:
 		return;
 	}
-	String p = token_to_string(f->curr_token);
-	syntax_error(prev_token, "Expected ';', got %.*s", LIT(p));
-	fix_advance_to_next_stmt(f);
+
+	if (f->curr_token.pos.line == f->prev_token.pos.line) {
+		String p = token_to_string(f->curr_token);
+		prev_token.pos = token_pos_end(prev_token);
+		syntax_error(prev_token, "Expected ';', got %.*s", LIT(p));
+		fix_advance_to_next_stmt(f);
+	}
 }
 
 
@@ -3181,7 +3181,7 @@ Ast *parse_foreign_block(AstFile *f, Token token) {
 	Ast *body = ast_block_stmt(f, decls, open, close);
 
 	Ast *decl = ast_foreign_block_decl(f, token, foreign_library, body, docs);
-	expect_semicolon(f, decl);
+	expect_semicolon(f);
 	return decl;
 }
 
@@ -3227,15 +3227,11 @@ Ast *parse_value_decl(AstFile *f, Array<Ast *> names, CommentGroup *docs) {
 	}
 
 	if (f->expr_level >= 0) {
-		Ast *end = nullptr;
-		if (!is_mutable && values.count > 0) {
-			end = values[values.count-1];
-		}
 		if (f->curr_token.kind == Token_CloseBrace &&
 		    f->curr_token.pos.line == f->prev_token.pos.line) {
 
 		} else {
-			expect_semicolon(f, end);
+			expect_semicolon(f);
 		}
 	}
 
@@ -4143,11 +4139,7 @@ Ast *parse_return_stmt(AstFile *f) {
 		advance_token(f);
 	}
 
-	Ast *end = nullptr;
-	if (results.count > 0) {
-		end = results[results.count-1];
-	}
-	expect_semicolon(f, end);
+	expect_semicolon(f);
 	return ast_return_stmt(f, token, results);
 }
 
@@ -4398,7 +4390,7 @@ Ast *parse_import_decl(AstFile *f, ImportDeclKind kind) {
 		syntax_error(import_name, "'using import' is not allowed, please use the import name explicitly");
 	}
 
-	expect_semicolon(f, s);
+	expect_semicolon(f);
 	return s;
 }
 
@@ -4456,7 +4448,7 @@ Ast *parse_foreign_decl(AstFile *f) {
 		} else {
 			s = ast_foreign_import_decl(f, token, filepaths, lib_name, docs, f->line_comment);
 		}
-		expect_semicolon(f, s);
+		expect_semicolon(f);
 		return s;
 	}
 	}
@@ -4595,7 +4587,7 @@ Ast *parse_stmt(AstFile *f) {
 	case Token_Not:
 	case Token_And:
 		s = parse_simple_stmt(f, StmtAllowFlag_Label);
-		expect_semicolon(f, s);
+		expect_semicolon(f);
 		return s;
 
 
@@ -4623,7 +4615,7 @@ Ast *parse_stmt(AstFile *f) {
 			label = parse_ident(f);
 		}
 		s = ast_branch_stmt(f, token, label);
-		expect_semicolon(f, s);
+		expect_semicolon(f);
 		return s;
 	}
 
@@ -4638,12 +4630,12 @@ Ast *parse_stmt(AstFile *f) {
 		Array<Ast *> list = parse_lhs_expr_list(f);
 		if (list.count == 0) {
 			syntax_error(token, "Illegal use of 'using' statement");
-			expect_semicolon(f, nullptr);
+			expect_semicolon(f);
 			return ast_bad_stmt(f, token, f->curr_token);
 		}
 
 		if (f->curr_token.kind != Token_Colon) {
-			expect_semicolon(f, list[list.count-1]);
+			expect_semicolon(f);
 			return ast_using_stmt(f, token, list);
 		}
 		expect_token_after(f, Token_Colon, "identifier list");
@@ -4700,13 +4692,13 @@ Ast *parse_stmt(AstFile *f) {
 		} else if (tag == "assert" || tag == "panic") {
 			Ast *t = ast_basic_directive(f, hash_token, name);
 			Ast *stmt = ast_expr_stmt(f, parse_call_expr(f, t));
-			expect_semicolon(f, stmt);
+			expect_semicolon(f);
 			return stmt;
 		} else if (name.string == "force_inline" ||
 		           name.string == "force_no_inline") {
 			Ast *expr = parse_force_inlining_operand(f, name);
 			Ast *stmt =  ast_expr_stmt(f, expr);
-			expect_semicolon(f, stmt);
+			expect_semicolon(f);
 			return stmt;
 		} else if (tag == "unroll") {
 			return parse_unrolled_for_loop(f, name);
@@ -4728,7 +4720,7 @@ Ast *parse_stmt(AstFile *f) {
 
 	case Token_Semicolon:
 		s = ast_empty_stmt(f, token);
-		expect_semicolon(f, nullptr);
+		expect_semicolon(f);
 		return s;
 	}
 
@@ -5586,7 +5578,7 @@ bool parse_file(Parser *p, AstFile *f) {
 	}
 
 	Ast *pd = ast_package_decl(f, f->package_token, package_name, docs, f->line_comment);
-	expect_semicolon(f, pd);
+	expect_semicolon(f);
 	f->pkg_decl = pd;
 
 	if (f->error_count == 0) {
