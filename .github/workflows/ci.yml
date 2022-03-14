@@ -7,9 +7,9 @@ jobs:
     steps:
       - uses: actions/checkout@v1
       - name: Download LLVM, botan
-        run: sudo apt-get install llvm-11 clang-11 llvm libbotan-2-dev botan
+        run: sudo apt-get install llvm-11 clang-11 libbotan-2-dev botan
       - name: build odin
-        run: make release
+        run: ./build_odin.sh release
       - name: Odin version
         run: ./odin version
         timeout-minutes: 1
@@ -58,7 +58,7 @@ jobs:
           TMP_PATH=$(xcrun --show-sdk-path)/user/include
           echo "CPATH=$TMP_PATH" >> $GITHUB_ENV
       - name: build odin
-        run: make release
+        run: ./build_odin.sh release
       - name: Odin version
         run: ./odin version
         timeout-minutes: 1
