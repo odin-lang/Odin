@@ -1514,9 +1514,8 @@ void lb_generate_code(lbGenerator *gen) {
 			if ((e->scope->flags&ScopeFlag_Init) && name == "main") {
 				GB_ASSERT(e == info->entry_point);
 			}
-			if (e->Procedure.is_export ||
-			    (e->Procedure.link_name.len > 0) ||
-			    ((e->scope->flags&ScopeFlag_File) && e->Procedure.link_name.len > 0)) {
+			if (build_context.command_kind == Command_test &&
+			    (e->Procedure.is_export || e->Procedure.link_name.len > 0)) {
 				String link_name = e->Procedure.link_name;
 				if (e->pkg->kind == Package_Runtime) {
 					if (link_name == "main"           ||
@@ -1738,6 +1737,11 @@ void lb_generate_code(lbGenerator *gen) {
 			lbProcedure *p = m->procedures_to_generate[i];
 			lb_generate_procedure(m, p);
 		}
+	}
+
+	if (build_context.command_kind == Command_test && !already_has_entry_point) {
+		TIME_SECTION("LLVM main");
+		lb_create_main_procedure(default_module, startup_runtime);
 	}
 
 	for_array(j, gen->modules.entries) {
