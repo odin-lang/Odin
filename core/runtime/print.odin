@@ -160,11 +160,19 @@ print_caller_location :: proc "contextless" (using loc: Source_Code_Location) {
 	}
 }
 print_typeid :: proc "contextless" (id: typeid) {
-	if id == nil {
-		print_string("nil")
+	when ODIN_DISALLOW_RTTI {
+		if id == nil {
+			print_string("nil")
+		} else {
+			print_string("<unknown type>")
+		}
 	} else {
-		ti := type_info_of(id)
-		print_type(ti)
+		if id == nil {
+			print_string("nil")
+		} else {
+			ti := type_info_of(id)
+			print_type(ti)
+		}
 	}
 }
 print_type :: proc "contextless" (ti: ^Type_Info) {
