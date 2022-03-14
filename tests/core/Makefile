@@ -1,7 +1,8 @@
 ODIN=../../odin
 PYTHON=$(shell which python3)
 
-all: download_test_assets image_test compress_test strings_test hash_test crypto_test noise_test encoding_test
+all: download_test_assets image_test compress_test strings_test hash_test crypto_test noise_test encoding_test \
+	 math_test linalg_glsl_math_test
 
 download_test_assets:
 	$(PYTHON) download_assets.py
@@ -27,3 +28,9 @@ noise_test:
 encoding_test:
 	$(ODIN) run encoding/json -out=test_json
 	$(ODIN) run encoding/varint -out=test_varint
+
+math_test:
+	$(ODIN) run math/test_core_math.odin -out=test_core_math -collection:tests=..
+
+linalg_glsl_math_test:
+	$(ODIN) run math/linalg/glsl/test_linalg_glsl_math.odin -out=test_linalg_glsl_math -collection:tests=..
