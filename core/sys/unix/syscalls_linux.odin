@@ -1717,11 +1717,19 @@ sys_rmdir :: proc(path: cstring) -> int {
 	}
 }
 
-sys_mkdir :: proc(path: cstring, mode: u32 = 0o775) -> int {
+sys_mkdir :: proc(path: cstring, mode: int) -> int {
 	when ODIN_ARCH != .arm64 {
 		return int(intrinsics.syscall(SYS_mkdir, uintptr(rawptr(path)), uintptr(mode)))
 	} else { // NOTE: arm64 does not have mkdir
 		return int(intrinsics.syscall(SYS_mkdirat, uintptr(AT_FDCWD), uintptr(rawptr(path)), uintptr(mode)))
+	}
+}
+
+sys_mknod :: proc(path: cstring, mode: int, dev: int) -> int {
+	when ODIN_ARCH != .arm64 {
+		return int(intrinsics.syscall(SYS_mknod, uintptr(rawptr(path)), uintptr(mode), uintptr(dev)))
+	} else { // NOTE: arm64 does not have mknod
+		return int(intrinsics.syscall(SYS_mknodat, uintptr(AT_FDCWD), uintptr(rawptr(path)), uintptr(mode), uintptr(dev)))
 	}
 }
 
