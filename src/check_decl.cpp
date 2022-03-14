@@ -440,6 +440,12 @@ void check_const_decl(CheckerContext *ctx, Entity *e, Ast *type_expr, Ast *init,
 
 	if (type_expr) {
 		e->type = check_type(ctx, type_expr);
+		if (are_types_identical(e->type, t_typeid)) {
+			e->type = nullptr;
+			e->kind = Entity_TypeName;
+			check_type_decl(ctx, e, init, named_type);
+			return;
+		}
 	}
 
 	Operand operand = {};
