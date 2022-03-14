@@ -8,7 +8,16 @@ import "core:path/filepath"
 _Path_Separator      :: '/'
 _Path_List_Separator :: ':'
 
-DIRECTORY_FLAGS :: __O_RDONLY|__O_NONBLOCK|__O_DIRECTORY|__O_LARGEFILE|__O_CLOEXEC
+_S_IFMT   :: 0o170000 // Type of file mask
+_S_IFIFO  :: 0o010000 // Named pipe (fifo)
+_S_IFCHR  :: 0o020000 // Character special
+_S_IFDIR  :: 0o040000 // Directory
+_S_IFBLK  :: 0o060000 // Block special
+_S_IFREG  :: 0o100000 // Regular
+_S_IFLNK  :: 0o120000 // Symbolic link
+_S_IFSOCK :: 0o140000 // Socket
+
+_OPENDIR_FLAGS :: _O_RDONLY|_O_NONBLOCK|_O_DIRECTORY|_O_LARGEFILE|_O_CLOEXEC
 
 _is_path_separator :: proc(c: byte) -> bool {
 	return c == '/'
@@ -16,42 +25,17 @@ _is_path_separator :: proc(c: byte) -> bool {
 
 _mkdir :: proc(path: string, perm: File_Mode) -> Error {
 	path_cstr := strings.clone_to_cstring(path, context.temp_allocator)
-	//TODO file_mode
-	return _ok_or_error(unix.sys_mkdir(path_cstr))
+	perm_i: int
+	if perm & (File_Mode_Named_Pipe | File_Mode_Device | File_Mode_Char_Device | File_Mode_Sym_Link) != 0 {
+		return .Invalid_Argument
+	}
+
+	return _ok_or_error(unix.sys_mkdir(path_cstr, int(perm & 0o777)))
 }
 
+// TODO
 _mkdir_all :: proc(path: string, perm: File_Mode) -> Error {
-	_mkdir_all_stat :: proc(path: string, s: ^OS_Stat, perm: File_Mode) -> Error {
-		if len(path) == 0 {
-			return nil
-		}
-	
-		path := path[len(path)-1] == '/' ? path[:len(path)-1] : path
-		dir, _ := filepath.split(path)
-
-		if len(dir) == 0 {
-			return _mkdir(path, perm)
-		}
-
-		dir_cstr := strings.clone_to_cstring(dir, context.temp_allocator)
-		errno := int(unix.get_errno(unix.sys_stat(dir_cstr, s)))
-		switch errno {
-		case 0:
-			if !S_ISDIR(s.mode) {
-				return .Exist
-			}
-			return _mkdir(path, perm)
-		case ENOENT:
-			_mkdir_all_stat(dir, s, perm) or_return
-			return _mkdir(path, perm)
-		case:
-			return _get_platform_error(errno)
-		}
-		unreachable()
-	}
-	// OS_Stat is fat. Make one and re-use it.
-	s: OS_Stat = ---
-	return _mkdir_all_stat(path, &s, perm)
+	return nil
 }
 
 dirent64 :: struct {
@@ -62,17 +46,9 @@ dirent64 :: struct {
 	d_name: [1]u8,
 }
 
-DT_UNKNOWN :: 0
-DT_FIFO :: 1
-DT_CHR :: 2
-DT_DIR :: 4
-DT_BLK :: 6
-DT_REG :: 8
-DT_LNK :: 10
-DT_SOCK :: 12
-DT_WHT :: 14
-
 _remove_all :: proc(path: string) -> Error {
+	DT_DIR :: 4
+
 	_remove_all_dir :: proc(dfd: Handle) -> Error {
 		n := 64
 		buf := make([]u8, n)
@@ -114,7 +90,7 @@ _remove_all :: proc(path: string) -> Error {
 
 				switch d.d_type {
 				case DT_DIR:
-					handle_i := unix.sys_openat(int(dfd), d_name_cstr, DIRECTORY_FLAGS)
+					handle_i := unix.sys_openat(int(dfd), d_name_cstr, _OPENDIR_FLAGS)
 					if handle_i < 0 {
 						return _get_platform_error(handle_i)
 					}
@@ -135,7 +111,7 @@ _remove_all :: proc(path: string) -> Error {
 
 	cstr := strings.clone_to_cstring(path, context.temp_allocator)
 
-	handle_i := unix.sys_open(cstr, DIRECTORY_FLAGS)
+	handle_i := unix.sys_open(cstr, _OPENDIR_FLAGS)
 	switch handle_i {
 	case -ENOTDIR:
 		return _ok_or_error(unix.sys_unlink(cstr))
@@ -149,7 +125,7 @@ _remove_all :: proc(path: string) -> Error {
 	return _ok_or_error(unix.sys_rmdir(cstr))
 }
 
-_getwd :: proc(allocator := context.allocator) -> (dir: string, err: Error) {
+_getwd :: proc(allocator := context.allocator) -> (string, Error) {
 	// NOTE(tetra): I would use PATH_MAX here, but I was not able to find
 	// an authoritative value for it across all systems.
 	// The largest value I could find was 4096, so might as well use the page size.
@@ -170,7 +146,7 @@ _getwd :: proc(allocator := context.allocator) -> (dir: string, err: Error) {
 	unreachable()
 }
 
-_setwd :: proc(dir: string) -> (err: Error) {
+_setwd :: proc(dir: string) -> Error {
 	dir_cstr := strings.clone_to_cstring(dir, context.temp_allocator)
 	return _ok_or_error(unix.sys_chdir(dir_cstr))
 }
