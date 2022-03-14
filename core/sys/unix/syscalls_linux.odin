@@ -1518,7 +1518,7 @@ when ODIN_ARCH == .amd64 {
 	#panic("Unsupported architecture")
 }
 
-AT_FDCWD            :: -100
+AT_FDCWD            :: ~uintptr(99)
 AT_REMOVEDIR        :: uintptr(0x200)
 AT_SYMLINK_FOLLOW   :: uintptr(0x400)
 AT_SYMLINK_NOFOLLOW :: uintptr(0x100)
@@ -1535,7 +1535,7 @@ sys_open :: proc(path: cstring, flags: int, mode: int = 0o000) -> int {
 	when ODIN_ARCH != .arm64 {
 		return int(intrinsics.syscall(SYS_open, uintptr(rawptr(path)), uintptr(flags), uintptr(mode)))
 	} else { // NOTE: arm64 does not have open
-		return int(intrinsics.syscall(SYS_openat, uintptr(AT_FDCWD), uintptr(rawptr(path), uintptr(flags), uintptr(mode))))
+		return int(intrinsics.syscall(SYS_openat, AT_FDCWD, uintptr(rawptr(path)), uintptr(flags), uintptr(mode)))
 	}
 }
 
@@ -1593,7 +1593,7 @@ sys_stat :: proc(path: cstring, stat: rawptr) -> int {
 	} else when ODIN_ARCH != .arm64 {
 		return int(intrinsics.syscall(SYS_stat64, uintptr(rawptr(path)), uintptr(stat)))
 	} else { // NOTE: arm64 does not have stat
-		return int(intrinsics.syscall(SYS_fstatat, uintptr(AT_FDCWD), uintptr(rawptr(path)), uintptr(stat), 0))
+		return int(intrinsics.syscall(SYS_fstatat, AT_FDCWD, uintptr(rawptr(path)), uintptr(stat), 0))
 	}
 }
 
@@ -1611,7 +1611,7 @@ sys_lstat :: proc(path: cstring, stat: rawptr) -> int {
 	} else when ODIN_ARCH != .arm64 {
 		return int(intrinsics.syscall(SYS_lstat64, uintptr(rawptr(path)), uintptr(stat)))
 	} else { // NOTE: arm64 does not have any lstat
-		return int(intrinsics.syscall(SYS_fstatat, uintptr(AT_FDCWD), uintptr(rawptr(path)), uintptr(stat), AT_SYMLINK_NOFOLLOW))
+		return int(intrinsics.syscall(SYS_fstatat, AT_FDCWD, uintptr(rawptr(path)), uintptr(stat), AT_SYMLINK_NOFOLLOW))
 	}
 }
 
@@ -1619,7 +1619,7 @@ sys_readlink :: proc(path: cstring, buf: rawptr, bufsiz: uint) -> int {
 	when ODIN_ARCH != .arm64 {
 		return int(intrinsics.syscall(SYS_readlink, uintptr(rawptr(path)), uintptr(buf), uintptr(bufsiz)))
 	} else { // NOTE: arm64 does not have readlink
-		return int(intrinsics.syscall(SYS_readlinkat, uintptr(AT_FDCWD), uintptr(rawptr(path)), uintptr(buf), uintptr(bufsiz)))
+		return int(intrinsics.syscall(SYS_readlinkat, AT_FDCWD, uintptr(rawptr(path)), uintptr(buf), uintptr(bufsiz)))
 	}
 }
 
@@ -1627,7 +1627,7 @@ sys_symlink :: proc(old_name: cstring, new_name: cstring) -> int {
 	when ODIN_ARCH != .arm64 {
 		return int(intrinsics.syscall(SYS_symlink, uintptr(rawptr(old_name)), uintptr(rawptr(new_name))))
 	} else { // NOTE: arm64 does not have symlink
-		return int(intrinsics.syscall(SYS_symlinkat, uintptr(rawptr(old_name)), uintptr(AT_FDCWD), uintptr(rawptr(new_name))))
+		return int(intrinsics.syscall(SYS_symlinkat, uintptr(rawptr(old_name)), AT_FDCWD, uintptr(rawptr(new_name))))
 	}
 }
 
@@ -1635,7 +1635,7 @@ sys_access :: proc(path: cstring, mask: int) -> int {
 	when ODIN_ARCH != .arm64 {
 		return int(intrinsics.syscall(SYS_access, uintptr(rawptr(path)), uintptr(mask)))
 	} else { // NOTE: arm64 does not have access
-		return int(intrinsics.syscall(SYS_faccessat, uintptr(AT_FDCWD), uintptr(rawptr(path)), uintptr(mask)))
+		return int(intrinsics.syscall(SYS_faccessat, AT_FDCWD, uintptr(rawptr(path)), uintptr(mask)))
 	}
 }
 
@@ -1655,7 +1655,7 @@ sys_chmod :: proc(path: cstring, mode: int) -> int {
 	when ODIN_ARCH != .arm64 {
 		return int(intrinsics.syscall(SYS_chmod, uintptr(rawptr(path)), uintptr(mode)))
 	} else { // NOTE: arm64 does not have chmod
-		return int(intrinsics.syscall(SYS_fchmodat, uintptr(AT_FDCWD), uintptr(rawptr(path)), uintptr(mode)))
+		return int(intrinsics.syscall(SYS_fchmodat, AT_FDCWD, uintptr(rawptr(path)), uintptr(mode)))
 	}
 }
 
@@ -1667,7 +1667,7 @@ sys_chown :: proc(path: cstring, user: int, group: int) -> int {
 	when ODIN_ARCH != .arm64 {
 		return int(intrinsics.syscall(SYS_chown, uintptr(rawptr(path)), uintptr(user), uintptr(group)))
 	} else { // NOTE: arm64 does not have chown
-		return int(intrinsics.syscall(SYS_fchownat, uintptr(AT_FDCWD), uintptr(rawptr(path)), uintptr(user), uintptr(group), 0))
+		return int(intrinsics.syscall(SYS_fchownat, AT_FDCWD, uintptr(rawptr(path)), uintptr(user), uintptr(group), 0))
 	}
 }
 
@@ -1679,7 +1679,7 @@ sys_lchown :: proc(path: cstring, user: int, group: int) -> int {
 	when ODIN_ARCH != .arm64 {
 		return int(intrinsics.syscall(SYS_lchown, uintptr(rawptr(path)), uintptr(user), uintptr(group)))
 	} else { // NOTE: arm64 does not have lchown
-		return int(intrinsics.syscall(SYS_fchownat, uintptr(AT_FDCWD), uintptr(rawptr(path)), uintptr(user), uintptr(group), AT_SYMLINK_NOFOLLOW))
+		return int(intrinsics.syscall(SYS_fchownat, AT_FDCWD, uintptr(rawptr(path)), uintptr(user), uintptr(group), AT_SYMLINK_NOFOLLOW))
 	}
 }
 
@@ -1687,7 +1687,7 @@ sys_rename :: proc(old, new: cstring) -> int {
 	when ODIN_ARCH != .arm64 {
 		return int(intrinsics.syscall(SYS_rename, uintptr(rawptr(old)), uintptr(rawptr(new))))
 	} else { // NOTE: arm64 does not have rename
-		return int(intrinsics.syscall(SYS_renameat, uintptr(AT_FDCWD), uintptr(rawptr(old)), uintptr(rawptr(new))))
+		return int(intrinsics.syscall(SYS_renameat, AT_FDCWD, uintptr(rawptr(old)), uintptr(rawptr(new))))
 	}
 }
 
@@ -1695,7 +1695,7 @@ sys_link :: proc(old_name: cstring, new_name: cstring) -> int {
 	when ODIN_ARCH != .arm64 {
 		return int(intrinsics.syscall(SYS_link, uintptr(rawptr(old_name)), uintptr(rawptr(new_name))))
 	} else { // NOTE: arm64 does not have link
-		return int(intrinsics.syscall(SYS_linkat, uintptr(AT_FDCWD), uintptr(rawptr(old_name)), uintptr(AT_FDCWD), uintptr(rawptr(new_name)), AT_SYMLINK_FOLLOW))
+		return int(intrinsics.syscall(SYS_linkat, AT_FDCWD, uintptr(rawptr(old_name)), AT_FDCWD, uintptr(rawptr(new_name)), AT_SYMLINK_FOLLOW))
 	}
 }
 
@@ -1703,7 +1703,7 @@ sys_unlink :: proc(path: cstring) -> int {
 	when ODIN_ARCH != .arm64 {
 		return int(intrinsics.syscall(SYS_unlink, uintptr(rawptr(path))))
 	} else { // NOTE: arm64 does not have unlink
-		return int(intrinsics.syscall(SYS_unlinkat, uintptr(AT_FDCWD), uintptr(rawptr(path), 0)))
+		return int(intrinsics.syscall(SYS_unlinkat, AT_FDCWD, uintptr(rawptr(path)), 0))
 	}
 }
 
@@ -1715,7 +1715,7 @@ sys_rmdir :: proc(path: cstring) -> int {
 	when ODIN_ARCH != .arm64 {
 		return int(intrinsics.syscall(SYS_rmdir, uintptr(rawptr(path))))
 	} else { // NOTE: arm64 does not have rmdir
-		return int(intrinsics.syscall(SYS_unlinkat, uintptr(AT_FDCWD), uintptr(rawptr(path)), AT_REMOVEDIR))
+		return int(intrinsics.syscall(SYS_unlinkat, AT_FDCWD, uintptr(rawptr(path)), AT_REMOVEDIR))
 	}
 }
 
@@ -1723,16 +1723,24 @@ sys_mkdir :: proc(path: cstring, mode: int) -> int {
 	when ODIN_ARCH != .arm64 {
 		return int(intrinsics.syscall(SYS_mkdir, uintptr(rawptr(path)), uintptr(mode)))
 	} else { // NOTE: arm64 does not have mkdir
-		return int(intrinsics.syscall(SYS_mkdirat, uintptr(AT_FDCWD), uintptr(rawptr(path)), uintptr(mode)))
+		return int(intrinsics.syscall(SYS_mkdirat, AT_FDCWD, uintptr(rawptr(path)), uintptr(mode)))
 	}
+}
+
+sys_mkdirat :: proc(dfd: int, path: cstring, mode: int) -> int {
+	return int(intrinsics.syscall(SYS_mkdirat, uintptr(dfd), uintptr(rawptr(path)), uintptr(mode)))
 }
 
 sys_mknod :: proc(path: cstring, mode: int, dev: int) -> int {
 	when ODIN_ARCH != .arm64 {
 		return int(intrinsics.syscall(SYS_mknod, uintptr(rawptr(path)), uintptr(mode), uintptr(dev)))
 	} else { // NOTE: arm64 does not have mknod
-		return int(intrinsics.syscall(SYS_mknodat, uintptr(AT_FDCWD), uintptr(rawptr(path)), uintptr(mode), uintptr(dev)))
+		return int(intrinsics.syscall(SYS_mknodat, AT_FDCWD, uintptr(rawptr(path)), uintptr(mode), uintptr(dev)))
 	}
+}
+
+sys_mknodat :: proc(dfd: int, path: cstring, mode: int, dev: int) -> int {
+	return int(intrinsics.syscall(SYS_mknodat, uintptr(dfd), uintptr(rawptr(path)), uintptr(mode), uintptr(dev)))
 }
 
 sys_truncate :: proc(path: cstring, length: i64) -> int {
@@ -1761,6 +1769,14 @@ sys_fsync :: proc(fd: int) -> int {
 
 sys_getdents64 :: proc(fd: int, dirent: rawptr, count: int) -> int {
 	return int(intrinsics.syscall(SYS_getdents64, uintptr(fd), uintptr(dirent), uintptr(count)))
+}
+
+sys_fork :: proc() -> int {
+	when ODIN_ARCH != .arm64 {
+		return int(intrinsics.syscall(SYS_fork))
+	} else {
+		return int(intrinsics.syscall(SYS_clone, SIGCHLD))
+	}
 }
 
 get_errno :: proc(res: int) -> i32 {

@@ -15,8 +15,9 @@ TEST_count := 0
 TEST_fail  := 0
 
 when ODIN_TEST {
-	expect  :: testing.expect
-	log     :: testing.log
+	expect_value :: testing.expect_value
+	expect       :: testing.expect
+	log          :: testing.log
 } else {
 	expect_value :: proc(t: ^testing.T, value, expected: $T, loc := #caller_location) where intrinsics.type_is_comparable(T) {
 		fmt.printf("[%v] ", loc)
@@ -170,7 +171,7 @@ file_test :: proc(t: ^testing.T) {
 	_expect_no_error(t, os2.close(fd))
 
 	_expect_no_error(t, os2.remove("file.txt"))
-	_expect_no_error(t, os2.mkdir("empty dir", 0))
+	_expect_no_error(t, os2.mkdir("empty dir", 0o755))
 	_expect_no_error(t, os2.remove("empty dir"))
 }
 
@@ -182,7 +183,7 @@ path_test :: proc(t: ^testing.T) {
 		_expect_no_error(t, err)
 	}
 
-	err = os2.mkdir_all("a/b/c/d", 0)
+	err = os2.mkdir_all("a/b/c/d", 0o755)
 	_expect_no_error(t, err)
 
 	expect(t, os2.exists("a"), "directory does not exist")
