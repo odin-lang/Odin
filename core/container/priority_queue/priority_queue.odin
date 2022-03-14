@@ -96,8 +96,8 @@ _shift_up :: proc(pq: ^$Q/Priority_Queue($T), j: int) {
 	}
 }
 
-// NOTE(bill): When an element at index 'i' has changed its value, this will fix the
-// the heap ordering. This is using a basic "heapsort" with shift up and a shift down parts.
+// When an element at index `i` has changed its value, this will fix the
+// heap ordering. This is using a basic "heapsort" with shift up and a shift down parts.
 fix :: proc(pq: ^$Q/Priority_Queue($T), i: int) {
 	if !_shift_down(pq, i, builtin.len(pq.queue)) {
 		_shift_up(pq, i)

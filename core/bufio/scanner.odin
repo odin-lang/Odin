@@ -6,7 +6,7 @@ import "core:mem"
 import "core:unicode/utf8"
 import "core:intrinsics"
 
-// Extra errors returns by scanning procedures
+// Extra errors returned by scanning procedures.
 Scanner_Extra_Error :: enum i32 {
 	Negative_Advance,
 	Advanced_Too_Far,
@@ -20,7 +20,7 @@ Scanner_Error :: union {
 	Scanner_Extra_Error,
 }
 
-// Split_Proc is the signature of the split procedure used to tokenize the input.
+// The signature of the split procedure used to tokenize the input.
 Split_Proc :: proc(data: []byte, at_eof: bool) -> (advance: int, token: []byte, err: Scanner_Error, final_token: bool)
 
 Scanner :: struct {
@@ -65,7 +65,7 @@ scanner_destroy :: proc(s: ^Scanner) {
 }
 
 
-// Returns the first non-EOF error that was encounted by the scanner
+// Returns the first non-EOF error that was encounted by the scanner.
 scanner_error :: proc(s: ^Scanner) -> Scanner_Error {
 	switch s._err {
 	case .EOF, .None:
@@ -74,23 +74,25 @@ scanner_error :: proc(s: ^Scanner) -> Scanner_Error {
 	return s._err
 }
 
-// Returns the most recent token created by scanner_scan.
+// Returns the most recent token created by `scanner_scan`.
+//
 // The underlying array may point to data that may be overwritten
-// by another call to scanner_scan.
+// by another call to `scanner_scan`.
 // Treat the returned value as if it is immutable.
 scanner_bytes :: proc(s: ^Scanner) -> []byte {
 	return s.token
 }
 
-// Returns the most recent token created by scanner_scan.
+// Returns the most recent token created by `scanner_scan`.
+//
 // The underlying array may point to data that may be overwritten
-// by another call to scanner_scan.
+// by another call to `scanner_scan`.
 // Treat the returned value as if it is immutable.
 scanner_text :: proc(s: ^Scanner) -> string {
 	return string(s.token)
 }
 
-// scanner_scan advances the scanner
+// Advances the scanner.
 scanner_scan :: proc(s: ^Scanner) -> bool {
 	set_err :: proc(s: ^Scanner, err: Scanner_Error) {
 		err := err

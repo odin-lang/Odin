@@ -8,8 +8,9 @@ MIN_READ :: 512
 @(private)
 SMALL_BUFFER_SIZE :: 64
 
-// A Buffer is a variable-sized buffer of bytes with a io.Stream interface
-// The zero value for Buffer is an empty buffer ready to use.
+// A variable-sized buffer of bytes with a `io.Stream` interface.
+//
+// The zero value for `Buffer` is an empty buffer ready to use.
 Buffer :: struct {
 	buf: [dynamic]byte,
 	off: int,
