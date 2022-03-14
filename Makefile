@@ -4,7 +4,7 @@ demo:
 	./odin run examples/demo/demo.odin
 
 report:
-	./odin.sh report
+	./odin report
 
 debug:
 	./build_odin.sh debug
