@@ -61,7 +61,7 @@ _make_time_from_unix_file_time :: proc(uft: Unix_File_Time) -> time.Time {
 _fill_file_info_from_stat :: proc(fi: ^File_Info, s: OS_Stat) {
 	fi.size = s.size
 	fi.mode = cast(File_Mode)s.mode
-	fi.is_dir = S_ISDIR(u32(s.mode))
+	fi.is_dir = S_ISDIR(s.mode)
 
 	// NOTE(laleksic, 2021-01-21): Not really creation time, but closest we can get (maybe better to leave it 0?)
 	fi.creation_time = _make_time_from_unix_file_time(s.status_change)

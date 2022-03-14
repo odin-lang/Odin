@@ -10,7 +10,6 @@ import "core:c"
 Handle :: distinct i32
 File_Time :: distinct u64
 Errno :: distinct i32
-Syscall :: distinct i32
 
 INVALID_HANDLE :: ~Handle(0)
 
@@ -142,39 +141,73 @@ RTLD_TRACE        :: 0x200
 RTLD_NODELETE     :: 0x01000
 RTLD_NOLOAD       :: 0x02000
 
+MAX_PATH :: 1024
+
 args := _alloc_command_line_arguments()
 
 Unix_File_Time :: struct {
-	seconds: i64,
+	seconds: time_t,
 	nanoseconds: c.long,
 }
 
+dev_t :: u64
+ino_t :: u64
+nlink_t :: u64
+off_t :: i64
+mode_t :: u16
 pid_t :: u32
+uid_t :: u32
+gid_t :: u32
+blkcnt_t :: i64
+blksize_t :: i32
+fflags_t :: u32
+
+when ODIN_ARCH == .amd64 /* LP64 */ {
+	time_t :: i64
+} else {
+	time_t :: i32
+}
+
 
 OS_Stat :: struct {
-	device_id: u64,
-	serial: u64,
-	nlink: u64,
-	mode: u32,
+	device_id: dev_t,
+	serial: ino_t,
+	nlink: nlink_t,
+	mode: mode_t,
 	_padding0: i16,
-	uid: u32,
-	gid: u32,
+	uid: uid_t,
+	gid: gid_t,
 	_padding1: i32,
-	rdev: u64,
+	rdev: dev_t,
 
 	last_access: Unix_File_Time,
 	modified: Unix_File_Time,
 	status_change: Unix_File_Time,
 	birthtime: Unix_File_Time,
 
-	size: i64,
-	blocks: i64,
-	block_size: i32,
+	size: off_t,
+	blocks: blkcnt_t,
+	block_size: blksize_t,
 
-	flags: u32,
+	flags: fflags_t,
 	gen: u64,
-	lspare: i64,
+	lspare: [10]u64,
 }
+
+
+// since FreeBSD v12
+Dirent :: struct {
+	ino: ino_t,
+	off: off_t,
+	reclen: u16,
+	type: u8,
+	_pad0: u8,
+	namlen: u16,
+	_pad1: u16,
+	name: [256]byte,
+}
+
+Dir :: distinct rawptr // DIR*
 
 // File type
 S_IFMT   :: 0o170000 // Type of file mask
@@ -211,13 +244,13 @@ S_ISGID :: 0o2000 // Set group id on execution
 S_ISVTX :: 0o1000 // Directory restrcted delete
 
 
-S_ISLNK  :: #force_inline proc(m: u32) -> bool do return (m & S_IFMT) == S_IFLNK
-S_ISREG  :: #force_inline proc(m: u32) -> bool do return (m & S_IFMT) == S_IFREG
-S_ISDIR  :: #force_inline proc(m: u32) -> bool do return (m & S_IFMT) == S_IFDIR
-S_ISCHR  :: #force_inline proc(m: u32) -> bool do return (m & S_IFMT) == S_IFCHR
-S_ISBLK  :: #force_inline proc(m: u32) -> bool do return (m & S_IFMT) == S_IFBLK
-S_ISFIFO :: #force_inline proc(m: u32) -> bool do return (m & S_IFMT) == S_IFIFO
-S_ISSOCK :: #force_inline proc(m: u32) -> bool do return (m & S_IFMT) == S_IFSOCK
+S_ISLNK  :: #force_inline proc(m: mode_t) -> bool do return (m & S_IFMT) == S_IFLNK
+S_ISREG  :: #force_inline proc(m: mode_t) -> bool do return (m & S_IFMT) == S_IFREG
+S_ISDIR  :: #force_inline proc(m: mode_t) -> bool do return (m & S_IFMT) == S_IFDIR
+S_ISCHR  :: #force_inline proc(m: mode_t) -> bool do return (m & S_IFMT) == S_IFCHR
+S_ISBLK  :: #force_inline proc(m: mode_t) -> bool do return (m & S_IFMT) == S_IFBLK
+S_ISFIFO :: #force_inline proc(m: mode_t) -> bool do return (m & S_IFMT) == S_IFIFO
+S_ISSOCK :: #force_inline proc(m: mode_t) -> bool do return (m & S_IFMT) == S_IFSOCK
 
 F_OK :: 0 // Test for file existance
 X_OK :: 1 // Test for execute permission
@@ -225,27 +258,38 @@ W_OK :: 2 // Test for write permission
 R_OK :: 4 // Test for read permission
 
 foreign libc {
-	@(link_name="__error") __errno_location :: proc() -> ^int ---
-	@(link_name="syscall")          syscall          :: proc(number: Syscall, #c_vararg args: ..any) -> int ---
+	@(link_name="__error")		__errno_location :: proc() -> ^int ---
 
 	@(link_name="open")             _unix_open       :: proc(path: cstring, flags: c.int, mode: c.int) -> Handle ---
 	@(link_name="close")            _unix_close         :: proc(fd: Handle) -> c.int ---
 	@(link_name="read")             _unix_read          :: proc(fd: Handle, buf: rawptr, size: c.size_t) -> c.ssize_t ---
 	@(link_name="write")            _unix_write         :: proc(fd: Handle, buf: rawptr, size: c.size_t) -> c.ssize_t ---
-	@(link_name="lseek64")          _unix_seek          :: proc(fd: Handle, offset: i64, whence: c.int) -> i64 ---
-	@(link_name="gettid")           _unix_gettid        :: proc() -> u64 ---
+	@(link_name="lseek")            _unix_seek          :: proc(fd: Handle, offset: i64, whence: c.int) -> i64 ---
 	@(link_name="getpagesize")      _unix_getpagesize   :: proc() -> c.int ---
-	@(link_name="stat64")           _unix_stat          :: proc(path: cstring, stat: ^OS_Stat) -> c.int ---
+	@(link_name="stat")             _unix_stat          :: proc(path: cstring, stat: ^OS_Stat) -> c.int ---
+	@(link_name="lstat")            _unix_lstat         :: proc(path: cstring, sb: ^OS_Stat) -> c.int ---
 	@(link_name="fstat")            _unix_fstat         :: proc(fd: Handle, stat: ^OS_Stat) -> c.int ---
+	@(link_name="readlink")         _unix_readlink      :: proc(path: cstring, buf: ^byte, bufsiz: c.size_t) -> c.ssize_t ---
 	@(link_name="access")           _unix_access        :: proc(path: cstring, mask: c.int) -> c.int ---
+	@(link_name="getcwd")           _unix_getcwd        :: proc(buf: cstring, len: c.size_t) -> cstring ---
+	@(link_name="chdir")            _unix_chdir         :: proc(buf: cstring) -> c.int ---
+	@(link_name="rename")           _unix_rename        :: proc(old, new: cstring) -> c.int ---
+	@(link_name="unlink")           _unix_unlink        :: proc(path: cstring) -> c.int ---
+	@(link_name="rmdir")            _unix_rmdir         :: proc(path: cstring) -> c.int ---
+	@(link_name="mkdir")            _unix_mkdir         :: proc(path: cstring, mode: mode_t) -> c.int ---
+	
+	@(link_name="fdopendir")        _unix_fdopendir     :: proc(fd: Handle) -> Dir ---
+	@(link_name="closedir")         _unix_closedir      :: proc(dirp: Dir) -> c.int ---
+	@(link_name="rewinddir")        _unix_rewinddir     :: proc(dirp: Dir) ---
+	@(link_name="readdir_r")        _unix_readdir_r     :: proc(dirp: Dir, entry: ^Dirent, result: ^^Dirent) -> c.int ---
 
 	@(link_name="malloc")           _unix_malloc        :: proc(size: c.size_t) -> rawptr ---
 	@(link_name="calloc")           _unix_calloc        :: proc(num, size: c.size_t) -> rawptr ---
 	@(link_name="free")             _unix_free          :: proc(ptr: rawptr) ---
 	@(link_name="realloc")          _unix_realloc       :: proc(ptr: rawptr, size: c.size_t) -> rawptr ---
+	
 	@(link_name="getenv")           _unix_getenv        :: proc(cstring) -> cstring ---
-	@(link_name="getcwd")           _unix_getcwd        :: proc(buf: cstring, len: c.size_t) -> cstring ---
-	@(link_name="chdir")            _unix_chdir         :: proc(buf: cstring) -> c.int ---
+	@(link_name="realpath")         _unix_realpath      :: proc(path: cstring, resolved_path: rawptr) -> rawptr ---
 
 	@(link_name="exit")             _unix_exit          :: proc(status: c.int) -> ! ---
 }
@@ -318,12 +362,102 @@ file_size :: proc(fd: Handle) -> (i64, Errno) {
 	return s.size, ERROR_NONE
 }
 
-stdin: Handle = 0
+rename :: proc(old_path, new_path: string) -> Errno {
+	old_path_cstr := strings.clone_to_cstring(old_path, context.temp_allocator)
+	new_path_cstr := strings.clone_to_cstring(new_path, context.temp_allocator)
+	res := _unix_rename(old_path_cstr, new_path_cstr)
+	if res == -1 {
+		return Errno(get_last_error())
+	}
+	return ERROR_NONE
+}
+
+remove :: proc(path: string) -> Errno {
+	path_cstr := strings.clone_to_cstring(path, context.temp_allocator)
+	res := _unix_unlink(path_cstr)
+	if res == -1 {
+		return Errno(get_last_error())
+	}
+	return ERROR_NONE
+}
+
+make_directory :: proc(path: string, mode: mode_t = 0o775) -> Errno {
+	path_cstr := strings.clone_to_cstring(path, context.temp_allocator)
+	res := _unix_mkdir(path_cstr, mode)
+	if res == -1 {
+		return Errno(get_last_error())
+	}
+	return ERROR_NONE
+}
+
+remove_directory :: proc(path: string) -> Errno {
+	path_cstr := strings.clone_to_cstring(path, context.temp_allocator)
+	res := _unix_rmdir(path_cstr)
+	if res == -1 {
+		return Errno(get_last_error())
+	}
+	return ERROR_NONE
+}
+
+is_file_handle :: proc(fd: Handle) -> bool {
+	s, err := _fstat(fd)
+	if err != ERROR_NONE {
+		return false
+	}
+	return S_ISREG(s.mode)
+}
+
+is_file_path :: proc(path: string, follow_links: bool = true) -> bool {
+	s: OS_Stat
+	err: Errno
+	if follow_links {
+		s, err = _stat(path)
+	} else {
+		s, err = _lstat(path)
+	}
+	if err != ERROR_NONE {
+		return false
+	}
+	return S_ISREG(s.mode)
+}
+
+is_dir_handle :: proc(fd: Handle) -> bool {
+	s, err := _fstat(fd)
+	if err != ERROR_NONE {
+		return false
+	}
+	return S_ISDIR(s.mode)
+}
+
+is_dir_path :: proc(path: string, follow_links: bool = true) -> bool {
+	s: OS_Stat
+	err: Errno
+	if follow_links {
+		s, err = _stat(path)
+	} else {
+		s, err = _lstat(path)
+	}
+	if err != ERROR_NONE {
+		return false
+	}
+	return S_ISDIR(s.mode)
+}
+
+is_file :: proc {is_file_path, is_file_handle}
+is_dir :: proc {is_dir_path, is_dir_handle}
+
+// NOTE(bill): Uses startup to initialize it
+
+stdin: Handle  = 0
 stdout: Handle = 1
 stderr: Handle = 2
 
+/* TODO(zangent): Implement these!                                                                                   
+last_write_time :: proc(fd: Handle) -> File_Time {}                                                                  
+last_write_time_by_name :: proc(name: string) -> File_Time {}                                                        
+*/
 last_write_time :: proc(fd: Handle) -> (File_Time, Errno) {
-	s, err := fstat(fd)
+	s, err := _fstat(fd)
 	if err != ERROR_NONE {
 		return 0, err
 	}
@@ -332,7 +466,7 @@ last_write_time :: proc(fd: Handle) -> (File_Time, Errno) {
 }
 
 last_write_time_by_name :: proc(name: string) -> (File_Time, Errno) {
-	s, err := stat(name)
+	s, err := _stat(name)
 	if err != ERROR_NONE {
 		return 0, err
 	}
@@ -340,23 +474,127 @@ last_write_time_by_name :: proc(name: string) -> (File_Time, Errno) {
 	return File_Time(modified), ERROR_NONE
 }
 
-stat :: proc(path: string) -> (OS_Stat, Errno) {
+@private
+_stat :: proc(path: string) -> (OS_Stat, Errno) {
 	cstr := strings.clone_to_cstring(path, context.temp_allocator)
-	s: OS_Stat
-	result := _unix_stat(cstr, &s)
+	s: OS_Stat = ---
+	result := _unix_lstat(cstr, &s)
 	if result == -1 {
 		return s, Errno(get_last_error())
 	}
 	return s, ERROR_NONE
 }
 
-fstat :: proc(fd: Handle) -> (OS_Stat, Errno) {
-	s: OS_Stat
+@private
+_lstat :: proc(path: string) -> (OS_Stat, Errno) {
+	cstr := strings.clone_to_cstring(path, context.temp_allocator)
+	
+	// deliberately uninitialized
+	s: OS_Stat = ---
+	res := _unix_lstat(cstr, &s)
+	if res == -1 {
+		return s, Errno(get_last_error())
+	}
+	return s, ERROR_NONE
+}
+
+@private
+_fstat :: proc(fd: Handle) -> (OS_Stat, Errno) {
+	s: OS_Stat = ---
 	result := _unix_fstat(fd, &s)
 	if result == -1 {
 		return s, Errno(get_last_error())
 	}
 	return s, ERROR_NONE
+}
+
+@private
+_fdopendir :: proc(fd: Handle) -> (Dir, Errno) {
+	dirp := _unix_fdopendir(fd)
+	if dirp == cast(Dir)nil {
+		return nil, Errno(get_last_error())
+	}
+	return dirp, ERROR_NONE
+}
+
+@private
+_closedir :: proc(dirp: Dir) -> Errno {
+	rc := _unix_closedir(dirp)
+	if rc != 0 {
+		return Errno(get_last_error())
+	}
+	return ERROR_NONE
+}
+
+@private
+_rewinddir :: proc(dirp: Dir) {
+	_unix_rewinddir(dirp)
+}
+
+@private
+_readdir :: proc(dirp: Dir) -> (entry: Dirent, err: Errno, end_of_stream: bool) {
+	result: ^Dirent
+	rc := _unix_readdir_r(dirp, &entry, &result)
+
+	if rc != 0 {
+		err = Errno(get_last_error())
+		return
+	}
+	err = ERROR_NONE
+
+	if result == nil {
+		end_of_stream = true
+		return
+	}
+
+	return
+}
+
+@private
+_readlink :: proc(path: string) -> (string, Errno) {
+	path_cstr := strings.clone_to_cstring(path, context.temp_allocator)
+
+	bufsz : uint = MAX_PATH
+	buf := make([]byte, MAX_PATH)
+	for {
+		rc := _unix_readlink(path_cstr, &(buf[0]), bufsz)
+		if rc == -1 {
+			delete(buf)
+			return "", Errno(get_last_error())
+		} else if rc == int(bufsz) {
+			bufsz += MAX_PATH
+			delete(buf)
+			buf = make([]byte, bufsz)
+		} else {
+			return strings.string_from_ptr(&buf[0], rc), ERROR_NONE
+		}	
+	}
+	unreachable()
+}
+
+// XXX FreeBSD
+absolute_path_from_handle :: proc(fd: Handle) -> (string, Errno) {
+	return "", Errno(ENOSYS)
+}
+
+absolute_path_from_relative :: proc(rel: string) -> (path: string, err: Errno) {
+	rel := rel
+	if rel == "" {
+		rel = "."
+	}
+
+	rel_cstr := strings.clone_to_cstring(rel, context.temp_allocator)
+
+	path_ptr := _unix_realpath(rel_cstr, nil)
+	if path_ptr == nil {
+		return "", Errno(get_last_error())
+	}
+	defer _unix_free(path_ptr)
+
+	path_cstr := transmute(cstring)path_ptr
+	path = strings.clone( string(path_cstr) )
+
+	return path, ERROR_NONE
 }
 
 access :: proc(path: string, mask: int) -> (bool, Errno) {
@@ -464,4 +702,3 @@ _alloc_command_line_arguments :: proc() -> []string {
 	}
 	return res
 }
-

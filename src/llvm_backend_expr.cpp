@@ -2824,16 +2824,25 @@ lbValue lb_build_unary_and(lbProcedure *p, Ast *expr) {
 						src_tag = lb_emit_load(p, lb_emit_union_tag_ptr(p, v));
 						dst_tag = lb_const_union_tag(p->module, src_type, dst_type);
 					}
+
+
+					isize arg_count = 6;
+					if (build_context.disallow_rtti) {
+						arg_count = 4;
+					}
+
 					lbValue ok = lb_emit_comp(p, Token_CmpEq, src_tag, dst_tag);
-					auto args = array_make<lbValue>(permanent_allocator(), 6);
+					auto args = array_make<lbValue>(permanent_allocator(), arg_count);
 					args[0] = ok;
 
 					args[1] = lb_find_or_add_entity_string(p->module, get_file_path_string(pos.file_id));
 					args[2] = lb_const_int(p->module, t_i32, pos.line);
 					args[3] = lb_const_int(p->module, t_i32, pos.column);
 
-					args[4] = lb_typeid(p->module, src_type);
-					args[5] = lb_typeid(p->module, dst_type);
+					if (!build_context.disallow_rtti) {
+						args[4] = lb_typeid(p->module, src_type);
+						args[5] = lb_typeid(p->module, dst_type);
+					}
 					lb_emit_runtime_call(p, "type_assertion_check", args);
 				}
 
@@ -2846,6 +2855,8 @@ lbValue lb_build_unary_and(lbProcedure *p, Ast *expr) {
 				}
 				lbValue data_ptr = lb_emit_struct_ev(p, v, 0);
 				if ((p->state_flags & StateFlag_no_type_assert) == 0) {
+					GB_ASSERT(!build_context.disallow_rtti);
+
 					lbValue any_id = lb_emit_struct_ev(p, v, 1);
 
 					lbValue id = lb_typeid(p->module, type);

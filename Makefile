@@ -30,10 +30,10 @@ ifeq ($(OS), Darwin)
     ifeq ($(shell $(LLVM_CONFIG) --version | grep -E $(LLVM_VERSION_PATTERN)),)
         ifeq ($(ARCH), arm64)
             $(error "Requirement: llvm-config must be base version 13 for arm64")
-        else 
+        else
             $(error "Requirement: llvm-config must be base version greater than 11 for amd64/x86")
-        endif 
-    endif 
+        endif
+    endif
 
     LDFLAGS:=$(LDFLAGS) -liconv -ldl
     CFLAGS:=$(CFLAGS) $(shell $(LLVM_CONFIG) --cxxflags --ldflags)
@@ -59,6 +59,12 @@ ifeq ($(OS), OpenBSD)
     LLVM_CONFIG=/usr/local/bin/llvm-config
 
     LDFLAGS:=$(LDFLAGS) -liconv
+    CFLAGS:=$(CFLAGS) $(shell $(LLVM_CONFIG) --cxxflags --ldflags)
+    LDFLAGS:=$(LDFLAGS) $(shell $(LLVM_CONFIG) --libs core native --system-libs)
+endif
+ifeq ($(OS), FreeBSD)
+    LLVM_CONFIG=/usr/local/bin/llvm-config11
+
     CFLAGS:=$(CFLAGS) $(shell $(LLVM_CONFIG) --cxxflags --ldflags)
     LDFLAGS:=$(LDFLAGS) $(shell $(LLVM_CONFIG) --libs core native --system-libs)
 endif

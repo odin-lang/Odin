@@ -676,17 +676,24 @@ lbValue lb_emit_union_cast(lbProcedure *p, lbValue value, Type *type, TokenPos p
 		// NOTE(bill): Panic on invalid conversion
 		Type *dst_type = tuple->Tuple.variables[0]->type;
 
+		isize arg_count = 7;
+		if (build_context.disallow_rtti) {
+			arg_count = 4;
+		}
+
 		lbValue ok = lb_emit_load(p, lb_emit_struct_ep(p, v.addr, 1));
-		auto args = array_make<lbValue>(permanent_allocator(), 7);
+		auto args = array_make<lbValue>(permanent_allocator(), arg_count);
 		args[0] = ok;
 
 		args[1] = lb_const_string(m, get_file_path_string(pos.file_id));
 		args[2] = lb_const_int(m, t_i32, pos.line);
 		args[3] = lb_const_int(m, t_i32, pos.column);
 
-		args[4] = lb_typeid(m, src_type);
-		args[5] = lb_typeid(m, dst_type);
-		args[6] = lb_emit_conv(p, value_, t_rawptr);
+		if (!build_context.disallow_rtti) {
+			args[4] = lb_typeid(m, src_type);
+			args[5] = lb_typeid(m, dst_type);
+			args[6] = lb_emit_conv(p, value_, t_rawptr);
+		}
 		lb_emit_runtime_call(p, "type_assertion_check2", args);
 
 		return lb_emit_load(p, lb_emit_struct_ep(p, v.addr, 0));
@@ -744,16 +751,23 @@ lbAddr lb_emit_any_cast_addr(lbProcedure *p, lbValue value, Type *type, TokenPos
 	if (!is_tuple) {
 		// NOTE(bill): Panic on invalid conversion
 		lbValue ok = lb_emit_load(p, lb_emit_struct_ep(p, v.addr, 1));
-		auto args = array_make<lbValue>(permanent_allocator(), 7);
+
+		isize arg_count = 7;
+		if (build_context.disallow_rtti) {
+			arg_count = 4;
+		}
+		auto args = array_make<lbValue>(permanent_allocator(), arg_count);
 		args[0] = ok;
 
 		args[1] = lb_const_string(m, get_file_path_string(pos.file_id));
 		args[2] = lb_const_int(m, t_i32, pos.line);
 		args[3] = lb_const_int(m, t_i32, pos.column);
 
-		args[4] = any_typeid;
-		args[5] = dst_typeid;
-		args[6] = lb_emit_struct_ev(p, value, 0);;
+		if (!build_context.disallow_rtti) {
+			args[4] = any_typeid;
+			args[5] = dst_typeid;
+			args[6] = lb_emit_struct_ev(p, value, 0);
+		}
 		lb_emit_runtime_call(p, "type_assertion_check2", args);
 
 		return lb_addr(lb_emit_struct_ep(p, v.addr, 0));
@@ -1779,7 +1793,7 @@ LLVMValueRef llvm_get_inline_asm(LLVMTypeRef func_type, String const &str, Strin
 	return LLVMGetInlineAsm(func_type,
 		cast(char *)str.text, cast(size_t)str.len,
 		cast(char *)clobbers.text, cast(size_t)clobbers.len,
-		/*HasSideEffects*/true, /*IsAlignStack*/false,
+		has_side_effects, is_align_stack,
 		dialect
 	#if LLVM_VERSION_MAJOR >= 13 
 		, /*CanThrow*/false
