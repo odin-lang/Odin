@@ -135,6 +135,10 @@ lbProcedure *lb_create_procedure(lbModule *m, Entity *entity, bool ignore_body) 
 		lb_add_attribute_to_proc(m, p->value, "naked");
 	}
 
+	if (!entity->Procedure.is_foreign && build_context.disable_red_zone) {
+		lb_add_attribute_to_proc(m, p->value, "noredzone");
+	}
+
 	switch (p->inlining) {
 	case ProcInlining_inline:
 		lb_add_attribute_to_proc(m, p->value, "alwaysinline");
