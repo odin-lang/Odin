@@ -52,7 +52,7 @@ _mkdir_all :: proc(path: string, perm: File_Mode) -> Error {
 			}
 			fallthrough
 		case 0:
-			if res := unix.sys_close(int(dfd)) < 0; res < 0 {
+			if res := unix.sys_close(int(dfd)); res < 0 {
 				return _get_platform_error(res)
 			}
 			// skip consecutive '/'
