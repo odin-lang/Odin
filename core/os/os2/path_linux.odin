@@ -35,7 +35,7 @@ _mkdir :: proc(path: string, perm: File_Mode) -> Error {
 _mkdir_all :: proc(path: string, perm: File_Mode) -> Error {
 	_mkdirat :: proc(dfd: Handle, path: []u8, perm: int, has_created: ^bool) -> Error {
 		if len(path) == 0 {
-			return nil
+			return _ok_or_error(unix.sys_close(int(dfd)))
 		}
 		i: int
 		for /**/; i < len(path) - 1 && path[i] != '/'; i += 1 {}
@@ -43,18 +43,18 @@ _mkdir_all :: proc(path: string, perm: File_Mode) -> Error {
 		new_dfd := unix.sys_openat(int(dfd), cstring(&path[0]), _OPENDIR_FLAGS)
 		switch new_dfd {
 		case -ENOENT:
-			res := unix.sys_mkdirat(int(dfd), cstring(&path[0]), perm)
-			if res < 0 {
+			if res := unix.sys_mkdirat(int(dfd), cstring(&path[0]), perm); res < 0 {
 				return _get_platform_error(res)
 			}
 			has_created^ = true
-			new_dfd = unix.sys_openat(int(dfd), cstring(&path[0]), _OPENDIR_FLAGS)
-			if new_dfd < 0 {
+			if new_dfd = unix.sys_openat(int(dfd), cstring(&path[0]), _OPENDIR_FLAGS); new_dfd < 0 {
 				return _get_platform_error(new_dfd)
 			}
 			fallthrough
 		case 0:
-			unix.sys_close(int(dfd))
+			if res := unix.sys_close(int(dfd)) < 0; res < 0 {
+				return _get_platform_error(res)
+			}
 			// skip consecutive '/'
 			for i += 1; i < len(path) && path[i] == '/'; i += 1 {}
 			return _mkdirat(Handle(new_dfd), path[i:], perm, has_created)
