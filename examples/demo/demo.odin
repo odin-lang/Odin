@@ -94,6 +94,7 @@ the_basics :: proc() {
 		z: f64 // `z` is typed of type `f64` (64-bit floating point number)
 		z = 1  // `1` is an untyped integer literal which can be implicitly converted to `f64`
 				// No need for any suffixes or decimal places like in other languages
+				// (with the exception of negative zero, which must be given as `-0.0`)
 				// CONSTANTS JUST WORK!!!
 
 
