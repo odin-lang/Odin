@@ -112,7 +112,8 @@ _remove_all :: proc(path: string) -> Error {
 		loop: for {
 			res := unix.sys_getdents64(int(dfd), &buf[0], n)
 			switch res {
-			case -22:         //-EINVAL
+			case -EINVAL:
+				delete(buf)
 				n *= 2
 				buf = make([]u8, n)
 				continue loop

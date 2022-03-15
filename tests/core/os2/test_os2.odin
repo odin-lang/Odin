@@ -2,6 +2,7 @@ package test_os2
 
 import "core:os"
 import "core:fmt"
+import "core:mem"
 import "core:os/os2"
 import "core:testing"
 import "core:intrinsics"
@@ -49,10 +50,22 @@ when ODIN_TEST {
 
 main :: proc()
 {
+	track: mem.Tracking_Allocator
+	mem.tracking_allocator_init(&track, context.allocator)
+	context.allocator = mem.tracking_allocator(&track)
+	
 	t: testing.T
 	file_test(&t)
 	path_test(&t)
 	fmt.printf("%v/%v tests successful.\n", TEST_count - TEST_fail, TEST_count)
+
+	for _, leak in track.allocation_map {
+		fmt.printf("%v leaked %v bytes\n", leak.location, leak.size)
+	}
+	for bad_free in track.bad_free_array {
+		fmt.printf("%v allocation %p was freed badly\n", bad_free.location, bad_free.memory)
+	}
+	
 	os.exit(TEST_fail > 0 ? 1 : 0)
 }
 
@@ -215,6 +228,7 @@ path_test :: proc(t: ^testing.T) {
 	symlink, err = os2.read_link("a/symlink_to_d")
 	_expect_no_error(t, err)
 	expect_value(t, symlink, "b/c/d")
+	delete(symlink)
 
 	fd, err = os2.create("a/symlink_to_d/shnt.txt", 0o744)
 	_expect_no_error(t, err)
