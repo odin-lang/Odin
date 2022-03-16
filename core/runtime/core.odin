@@ -451,12 +451,17 @@ Odin_Endian_Type :: type_of(ODIN_ENDIAN)
 // This is probably only useful for freestanding targets
 foreign {
 	@(link_name="__$startup_runtime")
-	_startup_runtime :: proc() ---
+	_startup_runtime :: proc "odin" () ---
 }
 
 @(link_name="__$cleanup_runtime")
 _cleanup_runtime :: proc() {
 	default_temp_allocator_destroy(&global_default_temp_allocator_data)
+}
+
+_cleanup_runtime_contextless :: proc "contextless" () {
+	context = default_context()
+	_cleanup_runtime()
 }
 
 
@@ -508,16 +513,18 @@ __type_info_of :: proc "contextless" (id: typeid) -> ^Type_Info #no_bounds_check
 	return &type_table[n]
 }
 
-typeid_base :: proc "contextless" (id: typeid) -> typeid {
-	ti := type_info_of(id)
-	ti = type_info_base(ti)
-	return ti.id
+when !ODIN_DISALLOW_RTTI {
+	typeid_base :: proc "contextless" (id: typeid) -> typeid {
+		ti := type_info_of(id)
+		ti = type_info_base(ti)
+		return ti.id
+	}
+	typeid_core :: proc "contextless" (id: typeid) -> typeid {
+		ti := type_info_core(type_info_of(id))
+		return ti.id
+	}
+	typeid_base_without_enum :: typeid_core
 }
-typeid_core :: proc "contextless" (id: typeid) -> typeid {
-	ti := type_info_core(type_info_of(id))
-	return ti.id
-}
-typeid_base_without_enum :: typeid_core
 
 
 

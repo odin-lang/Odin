@@ -15,14 +15,12 @@ when ODIN_TEST {
 	log     :: testing.log
 } else {
 	expect  :: proc(t: ^testing.T, condition: bool, message: string, loc := #caller_location) {
-		fmt.printf("[%v] ", loc)
 		TEST_count += 1
 		if !condition {
 			TEST_fail += 1
-			fmt.println(" FAIL:", message)
+			fmt.printf("[%v] %v\n", loc, message)
 			return
 		}
-		fmt.println(" PASS")
 	}
 	log     :: proc(t: ^testing.T, v: any, loc := #caller_location) {
 		fmt.printf("[%v] ", loc)

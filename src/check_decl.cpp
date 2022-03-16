@@ -440,6 +440,12 @@ void check_const_decl(CheckerContext *ctx, Entity *e, Ast *type_expr, Ast *init,
 
 	if (type_expr) {
 		e->type = check_type(ctx, type_expr);
+		if (are_types_identical(e->type, t_typeid)) {
+			e->type = nullptr;
+			e->kind = Entity_TypeName;
+			check_type_decl(ctx, e, init, named_type);
+			return;
+		}
 	}
 
 	Operand operand = {};
@@ -1130,6 +1136,10 @@ void check_global_variable_decl(CheckerContext *ctx, Entity *&e, Ast *type_expr,
 	}
 	ac.link_name = handle_link_name(ctx, e->token, ac.link_name, ac.link_prefix);
 
+	if (is_arch_wasm() && e->Variable.thread_local_model.len != 0) {
+		error(e->token, "@(thread_local) is not supported for this target platform");
+	}
+
 	String context_name = str_lit("variable declaration");
 
 	if (type_expr != nullptr) {
@@ -1205,6 +1215,8 @@ void check_global_variable_decl(CheckerContext *ctx, Entity *&e, Ast *type_expr,
 	Operand o = {};
 	check_expr_with_type_hint(ctx, &o, init_expr, e->type);
 	check_init_variable(ctx, e, &o, str_lit("variable declaration"));
+
+	check_rtti_type_disallowed(e->token, e->type, "A variable declaration is using a type, %s, which has been disallowed");
 }
 
 void check_proc_group_decl(CheckerContext *ctx, Entity *&pg_entity, DeclInfo *d) {
