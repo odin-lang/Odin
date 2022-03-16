@@ -52,8 +52,11 @@ walk :: proc(v: ^Visitor, node: ^Node) {
 		}
 	}
 
-
 	v := v
+	if v == nil || node == nil {
+		return
+	}
+
 	if v = v->visit(node); v == nil {
 		return
 	}

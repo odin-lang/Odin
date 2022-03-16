@@ -260,13 +260,13 @@ S_ISUID :: 0o4000 // Set user id on execution
 S_ISGID :: 0o2000 // Set group id on execution
 S_ISVTX :: 0o1000 // Directory restrcted delete
 
-S_ISLNK  :: #force_inline proc(m: u32) -> bool { return (m & S_IFMT) == S_IFLNK  }
-S_ISREG  :: #force_inline proc(m: u32) -> bool { return (m & S_IFMT) == S_IFREG  }
-S_ISDIR  :: #force_inline proc(m: u32) -> bool { return (m & S_IFMT) == S_IFDIR  }
-S_ISCHR  :: #force_inline proc(m: u32) -> bool { return (m & S_IFMT) == S_IFCHR  }
-S_ISBLK  :: #force_inline proc(m: u32) -> bool { return (m & S_IFMT) == S_IFBLK  }
-S_ISFIFO :: #force_inline proc(m: u32) -> bool { return (m & S_IFMT) == S_IFIFO  }
-S_ISSOCK :: #force_inline proc(m: u32) -> bool { return (m & S_IFMT) == S_IFSOCK }
+S_ISLNK  :: #force_inline proc(m: u16) -> bool { return (m & S_IFMT) == S_IFLNK  }
+S_ISREG  :: #force_inline proc(m: u16) -> bool { return (m & S_IFMT) == S_IFREG  }
+S_ISDIR  :: #force_inline proc(m: u16) -> bool { return (m & S_IFMT) == S_IFDIR  }
+S_ISCHR  :: #force_inline proc(m: u16) -> bool { return (m & S_IFMT) == S_IFCHR  }
+S_ISBLK  :: #force_inline proc(m: u16) -> bool { return (m & S_IFMT) == S_IFBLK  }
+S_ISFIFO :: #force_inline proc(m: u16) -> bool { return (m & S_IFMT) == S_IFIFO  }
+S_ISSOCK :: #force_inline proc(m: u16) -> bool { return (m & S_IFMT) == S_IFSOCK }
 
 R_OK :: 4 // Test for read permission
 W_OK :: 2 // Test for write permission
@@ -313,7 +313,7 @@ foreign libc {
 	@(link_name="getenv")   _unix_getenv   :: proc(cstring) -> cstring ---
 	@(link_name="getcwd")   _unix_getcwd   :: proc(buf: cstring, len: c.size_t) -> cstring ---
 	@(link_name="chdir")    _unix_chdir    :: proc(buf: cstring) -> c.int ---
-	@(link_name="mkdir")    _unix_mkdir    :: proc(buf: cstring, mode: u32) -> c.int ---
+	@(link_name="mkdir")    _unix_mkdir    :: proc(buf: cstring, mode: u16) -> c.int ---
 	@(link_name="realpath") _unix_realpath :: proc(path: cstring, resolved_path: rawptr) -> rawptr ---
 
 	@(link_name="strerror") _darwin_string_error :: proc(num : c.int) -> cstring ---
@@ -433,7 +433,7 @@ is_file_handle :: proc(fd: Handle) -> bool {
 	if err != ERROR_NONE {
 		return false
 	}
-	return S_ISREG(cast(u32)s.mode)
+	return S_ISREG(s.mode)
 }
 
 is_file_path :: proc(path: string, follow_links: bool = true) -> bool {
@@ -447,7 +447,7 @@ is_file_path :: proc(path: string, follow_links: bool = true) -> bool {
 	if err != ERROR_NONE {
 		return false
 	}
-	return S_ISREG(cast(u32)s.mode)
+	return S_ISREG(s.mode)
 }
 
 
@@ -456,7 +456,7 @@ is_dir_handle :: proc(fd: Handle) -> bool {
 	if err != ERROR_NONE {
 		return false
 	}
-	return S_ISDIR(cast(u32)s.mode)
+	return S_ISDIR(s.mode)
 }
 
 is_dir_path :: proc(path: string, follow_links: bool = true) -> bool {
@@ -470,7 +470,7 @@ is_dir_path :: proc(path: string, follow_links: bool = true) -> bool {
 	if err != ERROR_NONE {
 		return false
 	}
-	return S_ISDIR(cast(u32)s.mode)
+	return S_ISDIR(s.mode)
 }
 
 is_file :: proc {is_file_path, is_file_handle}
@@ -670,7 +670,7 @@ set_current_directory :: proc(path: string) -> (err: Errno) {
 	return ERROR_NONE
 }
 
-make_directory :: proc(path: string, mode: u32 = 0o775) -> Errno {
+make_directory :: proc(path: string, mode: u16 = 0o775) -> Errno {
 	path_cstr := strings.clone_to_cstring(path, context.temp_allocator)
 	res := _unix_mkdir(path_cstr, mode)
 	if res == -1 {
@@ -680,6 +680,7 @@ make_directory :: proc(path: string, mode: u32 = 0o775) -> Errno {
 }
 
 exit :: proc "contextless" (code: int) -> ! {
+	runtime._cleanup_runtime_contextless()
 	_unix_exit(i32(code))
 }
 

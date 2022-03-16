@@ -10,10 +10,6 @@ struct String {
 	u8 *  text;
 	isize len;
 
-	// u8 &operator[](isize i) {
-	// 	GB_ASSERT_MSG(0 <= i && i < len, "[%td]", i);
-	// 	return text[i];
-	// }
 	u8 const &operator[](isize i) const {
 		GB_ASSERT_MSG(0 <= i && i < len, "[%td]", i);
 		return text[i];
@@ -33,10 +29,6 @@ struct String {
 struct String16 {
 	wchar_t *text;
 	isize    len;
-	wchar_t &operator[](isize i) {
-		GB_ASSERT_MSG(0 <= i && i < len, "[%td]", i);
-		return text[i];
-	}
 	wchar_t const &operator[](isize i) const {
 		GB_ASSERT_MSG(0 <= i && i < len, "[%td]", i);
 		return text[i];

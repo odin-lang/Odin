@@ -2202,6 +2202,21 @@ lbValue lb_emit_comp(lbProcedure *p, TokenKind op_kind, lbValue left, lbValue ri
 		}
 	}
 
+	if (is_type_matrix(a) && (op_kind == Token_CmpEq || op_kind == Token_NotEq)) {
+		Type *tl = base_type(a);
+		lbValue lhs = lb_address_from_load_or_generate_local(p, left);
+		lbValue rhs = lb_address_from_load_or_generate_local(p, right);
+
+
+		// TODO(bill): Test to see if this is actually faster!!!!
+		auto args = array_make<lbValue>(permanent_allocator(), 3);
+		args[0] = lb_emit_conv(p, lhs, t_rawptr);
+		args[1] = lb_emit_conv(p, rhs, t_rawptr);
+		args[2] = lb_const_int(p->module, t_int, type_size_of(tl));
+		lbValue val = lb_emit_runtime_call(p, "memory_compare", args);
+		lbValue res = lb_emit_comp(p, op_kind, val, lb_const_nil(p->module, val.type));
+		return lb_emit_conv(p, res, t_bool);
+	}
 	if (is_type_array(a) || is_type_enumerated_array(a)) {
 		Type *tl = base_type(a);
 		lbValue lhs = lb_address_from_load_or_generate_local(p, left);
@@ -2809,16 +2824,25 @@ lbValue lb_build_unary_and(lbProcedure *p, Ast *expr) {
 						src_tag = lb_emit_load(p, lb_emit_union_tag_ptr(p, v));
 						dst_tag = lb_const_union_tag(p->module, src_type, dst_type);
 					}
+
+
+					isize arg_count = 6;
+					if (build_context.disallow_rtti) {
+						arg_count = 4;
+					}
+
 					lbValue ok = lb_emit_comp(p, Token_CmpEq, src_tag, dst_tag);
-					auto args = array_make<lbValue>(permanent_allocator(), 6);
+					auto args = array_make<lbValue>(permanent_allocator(), arg_count);
 					args[0] = ok;
 
 					args[1] = lb_find_or_add_entity_string(p->module, get_file_path_string(pos.file_id));
 					args[2] = lb_const_int(p->module, t_i32, pos.line);
 					args[3] = lb_const_int(p->module, t_i32, pos.column);
 
-					args[4] = lb_typeid(p->module, src_type);
-					args[5] = lb_typeid(p->module, dst_type);
+					if (!build_context.disallow_rtti) {
+						args[4] = lb_typeid(p->module, src_type);
+						args[5] = lb_typeid(p->module, dst_type);
+					}
 					lb_emit_runtime_call(p, "type_assertion_check", args);
 				}
 
@@ -2831,6 +2855,8 @@ lbValue lb_build_unary_and(lbProcedure *p, Ast *expr) {
 				}
 				lbValue data_ptr = lb_emit_struct_ev(p, v, 0);
 				if ((p->state_flags & StateFlag_no_type_assert) == 0) {
+					GB_ASSERT(!build_context.disallow_rtti);
+
 					lbValue any_id = lb_emit_struct_ev(p, v, 1);
 
 					lbValue id = lb_typeid(p->module, type);

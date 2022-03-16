@@ -2,9 +2,9 @@ package os
 
 foreign import libc "system:c"
 
-import "core:runtime"
 import "core:strings"
 import "core:c"
+import "core:runtime"
 
 Handle    :: distinct i32
 Pid       :: distinct i32
@@ -658,6 +658,7 @@ set_current_directory :: proc(path: string) -> (err: Errno) {
 }
 
 exit :: proc "contextless" (code: int) -> ! {
+	runtime._cleanup_runtime_contextless()
 	_unix_exit(c.int(code))
 }
 

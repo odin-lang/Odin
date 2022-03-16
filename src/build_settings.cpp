@@ -8,7 +8,7 @@
 // #define DEFAULT_TO_THREADED_CHECKER
 // #endif
 
-enum TargetOsKind {
+enum TargetOsKind : u16 {
 	TargetOs_Invalid,
 
 	TargetOs_windows,
@@ -26,7 +26,7 @@ enum TargetOsKind {
 	TargetOs_COUNT,
 };
 
-enum TargetArchKind {
+enum TargetArchKind : u16 {
 	TargetArch_Invalid,
 
 	TargetArch_amd64,
@@ -38,7 +38,7 @@ enum TargetArchKind {
 	TargetArch_COUNT,
 };
 
-enum TargetEndianKind {
+enum TargetEndianKind : u8 {
 	TargetEndian_Invalid,
 
 	TargetEndian_Little,
@@ -46,6 +46,16 @@ enum TargetEndianKind {
 
 	TargetEndian_COUNT,
 };
+
+enum TargetABIKind : u16 {
+	TargetABI_Default,
+
+	TargetABI_Win64,
+	TargetABI_SysV,
+
+	TargetABI_COUNT,
+};
+
 
 String target_os_names[TargetOs_COUNT] = {
 	str_lit(""),
@@ -77,6 +87,12 @@ String target_endian_names[TargetEndian_COUNT] = {
 	str_lit("big"),
 };
 
+String target_abi_names[TargetABI_COUNT] = {
+	str_lit(""),
+	str_lit("win64"),
+	str_lit("sysv"),
+};
+
 TargetEndianKind target_endians[TargetArch_COUNT] = {
 	TargetEndian_Invalid,
 	TargetEndian_Little,
@@ -100,6 +116,7 @@ struct TargetMetrics {
 	isize          max_align;
 	String         target_triplet;
 	String         target_data_layout;
+	TargetABIKind  abi;
 };
 
 
@@ -174,6 +191,13 @@ enum ErrorPosStyle {
 	ErrorPosStyle_COUNT
 };
 
+enum RelocMode : u8 {
+	RelocMode_Default,
+	RelocMode_Static,
+	RelocMode_PIC,
+	RelocMode_DynamicNoPIC,
+};
+
 // This stores the information for the specify architecture of this build
 struct BuildContext {
 	// Constants
@@ -185,6 +209,7 @@ struct BuildContext {
 	bool   ODIN_DEBUG;   // Odin in debug mode
 	bool   ODIN_DISABLE_ASSERT; // Whether the default 'assert' et al is disabled in code or not
 	bool   ODIN_DEFAULT_TO_NIL_ALLOCATOR; // Whether the default allocator is a "nil" allocator or not (i.e. it does nothing)
+	bool   ODIN_FOREIGN_ERROR_PROCEDURES;
 
 	ErrorPosStyle ODIN_ERROR_POS_STYLE;
 
@@ -209,6 +234,7 @@ struct BuildContext {
 	String extra_linker_flags;
 	String extra_assembler_flags;
 	String microarch;
+	String target_features;
 	BuildModeKind build_mode;
 	bool   generate_docs;
 	i32    optimization_level;
@@ -253,6 +279,12 @@ struct BuildContext {
 	bool show_debug_messages;
 	
 	bool copy_file_contents;
+
+	bool disallow_rtti;
+
+	RelocMode reloc_mode;
+	bool disable_red_zone;
+
 
 	u32 cmd_doc_flags;
 	Array<String> extra_packages;
@@ -410,6 +442,16 @@ gb_global TargetMetrics target_wasi_wasm32 = {
 // 	str_lit(""),
 // };
 
+gb_global TargetMetrics target_freestanding_amd64_sysv = {
+	TargetOs_freestanding,
+	TargetArch_amd64,
+	8,
+	16,
+	str_lit("x86_64-pc-none-gnu"),
+	str_lit("e-m:w-i64:64-f80:128-n8:16:32:64-S128"),
+	TargetABI_SysV,
+};
+
 
 
 struct NamedTargetMetrics {
@@ -432,7 +474,8 @@ gb_global NamedTargetMetrics named_targets[] = {
 	{ str_lit("freestanding_wasm32"), &target_freestanding_wasm32 },
 	{ str_lit("wasi_wasm32"),         &target_wasi_wasm32 },
 	{ str_lit("js_wasm32"),           &target_js_wasm32 },
-	// { str_lit("freestanding_wasm64"), &target_freestanding_wasm64 },
+
+	{ str_lit("freestanding_amd64_sysv"), &target_freestanding_amd64_sysv },
 };
 
 NamedTargetMetrics *selected_target_metrics;
@@ -946,7 +989,6 @@ void init_build_context(TargetMetrics *cross_target) {
 		}
 	}
 
-	
 	bc->copy_file_contents = true;
 
 	TargetMetrics *metrics = nullptr;
@@ -1005,6 +1047,21 @@ void init_build_context(TargetMetrics *cross_target) {
 	bc->threaded_checker = true;
 	#endif
 
+	if (bc->disable_red_zone) {
+		if (!!is_arch_wasm() && bc->metrics.os == TargetOs_freestanding) {
+			gb_printf_err("-disable-red-zone is not support for this target");
+			gb_exit(1);
+		}
+	}
+
+	if (bc->metrics.os == TargetOs_freestanding) {
+		bc->no_entry_point = true;
+	} else {
+		if (bc->disallow_rtti) {
+			gb_printf_err("-disallow-rtti is only allowed on freestanding targets\n");
+			gb_exit(1);
+		}
+	}
 
 	// NOTE(zangent): The linker flags to set the build architecture are different
 	// across OSs. It doesn't make sense to allocate extra data on the heap
@@ -1059,20 +1116,22 @@ void init_build_context(TargetMetrics *cross_target) {
 		if (bc->metrics.arch == TargetArch_wasm64) {
 			link_flags = gb_string_appendc(link_flags, "-mwas64 ");
 		}
-		if (bc->metrics.os == TargetOs_freestanding) {
+		if (bc->no_entry_point) {
 			link_flags = gb_string_appendc(link_flags, "--no-entry ");
 		}
 		
 		bc->link_flags = make_string_c(link_flags);
 		
 		// Disallow on wasm
-		build_context.use_separate_modules = false;
+		bc->use_separate_modules = false;
 	} else {
 		gb_printf_err("Compiler Error: Unsupported architecture\n");
 		gb_exit(1);
 	}
 
 	bc->optimization_level = gb_clamp(bc->optimization_level, 0, 3);
+
+
 
 	#undef LINK_FLAG_X64
 	#undef LINK_FLAG_386

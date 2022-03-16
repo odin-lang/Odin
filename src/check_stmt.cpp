@@ -2152,7 +2152,6 @@ void check_stmt_internal(CheckerContext *ctx, Ast *node, u32 flags) {
 					e->state = EntityState_Resolved;
 				}
 				ac.link_name = handle_link_name(ctx, e->token, ac.link_name, ac.link_prefix);
-				e->Variable.thread_local_model = ac.thread_local_model;
 
 				if (ac.link_name.len > 0) {
 					e->Variable.link_name = ac.link_name;
@@ -2181,6 +2180,10 @@ void check_stmt_internal(CheckerContext *ctx, Ast *node, u32 flags) {
 						}
 					}
 					e->Variable.thread_local_model = ac.thread_local_model;
+				}
+
+				if (is_arch_wasm() && e->Variable.thread_local_model.len != 0) {
+					error(e->token, "@(thread_local) is not supported for this target platform");
 				}
 				
 
