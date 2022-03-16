@@ -2,7 +2,7 @@ ODIN=../../odin
 PYTHON=$(shell which python3)
 
 all: download_test_assets image_test compress_test strings_test hash_test crypto_test noise_test encoding_test \
-	 math_test linalg_glsl_math_test
+	 math_test linalg_glsl_math_test reflect_test
 
 download_test_assets:
 	$(PYTHON) download_assets.py
@@ -26,6 +26,7 @@ noise_test:
 	$(ODIN) run math/noise -out=test_noise
 
 encoding_test:
+	$(ODIN) run encoding/hxa -out=test_hxa -collection:tests=..
 	$(ODIN) run encoding/json -out=test_json
 	$(ODIN) run encoding/varint -out=test_varint
 
@@ -34,3 +35,6 @@ math_test:
 
 linalg_glsl_math_test:
 	$(ODIN) run math/linalg/glsl/test_linalg_glsl_math.odin -out=test_linalg_glsl_math -collection:tests=..
+
+reflect_test:
+	$(ODIN) run reflect/test_core_reflect.odin -out=test_core_reflect -collection:tests=..
