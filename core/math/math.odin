@@ -1206,7 +1206,7 @@ prod :: proc "contextless" (x: $T/[]$E) -> (res: E)
 	return
 }
 
-cumsum_inplace :: proc "contextless" (x: $T/[]$E) -> T
+cumsum_inplace :: proc "contextless" (x: $T/[]$E)
 	where intrinsics.type_is_numeric(E) {
 	for i in 1..<len(x) {
 		x[i] = x[i-1] + x[i]
