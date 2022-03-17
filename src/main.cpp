@@ -46,6 +46,17 @@ gb_global Timings global_timings = {0};
 #include "checker.cpp"
 #include "docs.cpp"
 
+#define MULTITHREAD_OBJECT_GENERATION 1
+
+#ifndef USE_SEPARATE_MODULES
+#define USE_SEPARATE_MODULES build_context.use_separate_modules
+#endif
+
+#ifndef MULTITHREAD_OBJECT_GENERATION
+#define MULTITHREAD_OBJECT_GENERATION 0
+#endif
+
+#include "middle_end.cpp"
 
 #include "llvm_backend.cpp"
 
@@ -2730,6 +2741,11 @@ int main(int arg_count, char const **arg_ptr) {
 		}
 
 		return 0;
+	}
+
+	MAIN_TIME_SECTION("Middle End Pass");
+	if (!me_generate(checker)) {
+		return 1;
 	}
 
 	MAIN_TIME_SECTION("LLVM API Code Gen");

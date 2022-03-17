@@ -1,6 +1,6 @@
 // checker_builtin_procs.hpp
 
-enum BuiltinProcId {
+enum BuiltinProcId : u16 {
 	BuiltinProc_Invalid,
 
 	BuiltinProc_len,

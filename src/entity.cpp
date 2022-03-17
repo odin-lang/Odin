@@ -2,6 +2,9 @@ struct Scope;
 struct Checker;
 struct Type;
 struct DeclInfo;
+
+struct meProcedure;
+
 struct lbModule;
 struct lbProcedure;
 
@@ -172,6 +175,9 @@ struct Entity {
 
 	lbModule *   code_gen_module;
 	lbProcedure *code_gen_procedure;
+
+	meProcedure *me_procedure;
+
 
 	u64         order_in_src;
 	String      deprecated_message;

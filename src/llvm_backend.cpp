@@ -1,14 +1,3 @@
-#define MULTITHREAD_OBJECT_GENERATION 1
-
-#ifndef USE_SEPARATE_MODULES
-#define USE_SEPARATE_MODULES build_context.use_separate_modules
-#endif
-
-#ifndef MULTITHREAD_OBJECT_GENERATION
-#define MULTITHREAD_OBJECT_GENERATION 0
-#endif
-
-
 #include "llvm_backend.hpp"
 #include "llvm_abi.cpp"
 #include "llvm_backend_opt.cpp"
