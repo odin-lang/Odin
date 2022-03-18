@@ -186,7 +186,6 @@ struct TypeProc {
 	bool     c_vararg;
 	bool     is_polymorphic;
 	bool     is_poly_specialized;
-	bool     has_proc_default_values;
 	bool     has_named_results;
 	bool     diverging; // no return
 	bool     return_by_pointer;
