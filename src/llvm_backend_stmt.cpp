@@ -1652,13 +1652,16 @@ void lb_build_if_stmt(lbProcedure *p, Ast *node) {
 	}
 
 	lbValue cond = lb_build_cond(p, is->cond, then, else_);
+	// Note `cond.value` only set for non-and/or conditions and const negs so that the `LLVMIsConstant()`
+	// and `LLVMConstIntGetZExtValue()` calls below will be valid and `LLVMInstructionEraseFromParent()`
+	// will target the correct (& only) branch statement
 
 	if (is->label != nullptr) {
 		lbTargetList *tl = lb_push_target_list(p, is->label, done, nullptr, nullptr);
 		tl->is_block = true;
 	}
 
-	if (LLVMIsConstant(cond.value)) {
+	if (cond.value && LLVMIsConstant(cond.value)) {
 		// NOTE(bill): Do a compile time short circuit for when the condition is constantly known.
 		// This done manually rather than relying on the SSA passes because sometimes the SSA passes
 		// miss some even if they are constantly known, especially with few optimization passes.

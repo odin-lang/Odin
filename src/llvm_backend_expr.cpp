@@ -3028,7 +3028,7 @@ lbValue lb_build_expr(lbProcedure *p, Ast *expr) {
 		lbBlock *done  = lb_create_block(p, "if.done"); // NOTE(bill): Append later
 		lbBlock *else_ = lb_create_block(p, "if.else");
 
-		lbValue cond = lb_build_cond(p, te->cond, then, else_);
+		lb_build_cond(p, te->cond, then, else_);
 		lb_start_block(p, then);
 
 		Type *type = default_type(type_of_expr(expr));
@@ -4646,7 +4646,7 @@ lbAddr lb_build_addr(lbProcedure *p, Ast *expr) {
 		lbBlock *done  = lb_create_block(p, "if.done"); // NOTE(bill): Append later
 		lbBlock *else_ = lb_create_block(p, "if.else");
 
-		lbValue cond = lb_build_cond(p, te->cond, then, else_);
+		lb_build_cond(p, te->cond, then, else_);
 		lb_start_block(p, then);
 
 		Type *ptr_type = alloc_type_pointer(default_type(type_of_expr(expr)));

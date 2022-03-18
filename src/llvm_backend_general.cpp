@@ -2602,6 +2602,9 @@ lbValue lb_build_cond(lbProcedure *p, Ast *cond, lbBlock *true_block, lbBlock *f
 	GB_ASSERT(true_block  != nullptr);
 	GB_ASSERT(false_block != nullptr);
 
+	// Use to signal not to do compile time short circuit for consts
+	lbValue no_comptime_short_circuit = {};
+
 	switch (cond->kind) {
 	case_ast_node(pe, ParenExpr, cond);
 		return lb_build_cond(p, pe->expr, true_block, false_block);
@@ -2609,7 +2612,11 @@ lbValue lb_build_cond(lbProcedure *p, Ast *cond, lbBlock *true_block, lbBlock *f
 
 	case_ast_node(ue, UnaryExpr, cond);
 		if (ue->op.kind == Token_Not) {
-			return lb_build_cond(p, ue->expr, false_block, true_block);
+			lbValue cond_val = lb_build_cond(p, ue->expr, false_block, true_block);
+			if (cond_val.value && LLVMIsConstant(cond_val.value)) {
+				return lb_const_bool(p->module, cond_val.type, LLVMConstIntGetZExtValue(cond_val.value) == 0);
+			}
+			return no_comptime_short_circuit;
 		}
 	case_end;
 
@@ -2618,12 +2625,14 @@ lbValue lb_build_cond(lbProcedure *p, Ast *cond, lbBlock *true_block, lbBlock *f
 			lbBlock *block = lb_create_block(p, "cmp.and");
 			lb_build_cond(p, be->left, block, false_block);
 			lb_start_block(p, block);
-			return lb_build_cond(p, be->right, true_block, false_block);
+			lb_build_cond(p, be->right, true_block, false_block);
+			return no_comptime_short_circuit;
 		} else if (be->op.kind == Token_CmpOr) {
 			lbBlock *block = lb_create_block(p, "cmp.or");
 			lb_build_cond(p, be->left, true_block, block);
 			lb_start_block(p, block);
-			return lb_build_cond(p, be->right, true_block, false_block);
+			lb_build_cond(p, be->right, true_block, false_block);
+			return no_comptime_short_circuit;
 		}
 	case_end;
 	}
