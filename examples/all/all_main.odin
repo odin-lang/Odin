@@ -104,6 +104,7 @@ import time           "core:time"
 
 import unicode        "core:unicode"
 import utf8           "core:unicode/utf8"
+import utf8string     "core:unicode/utf8/utf8string"
 import utf16          "core:unicode/utf16"
 
 main :: proc(){}
@@ -193,4 +194,5 @@ _ :: thread
 _ :: time
 _ :: unicode
 _ :: utf8
+_ :: utf8string
 _ :: utf16
