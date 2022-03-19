@@ -578,7 +578,7 @@ PROCESS_INFORMATION :: struct {
 }
 
 // FYI: This is STARTUPINFOW, not STARTUPINFOA
-STARTUPINFO :: struct #packed {
+STARTUPINFO :: struct {
 	cb: DWORD,
 	lpReserved: LPWSTR,
 	lpDesktop: LPWSTR,

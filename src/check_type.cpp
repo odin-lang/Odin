@@ -1960,20 +1960,6 @@ bool check_procedure_type(CheckerContext *ctx, Type *type, Ast *proc_type_node, 
 	if (params)  param_count  = params ->Tuple.variables.count;
 	if (results) result_count = results->Tuple.variables.count;
 
-	if (param_count > 0) {
-		for_array(i, params->Tuple.variables) {
-			Entity *param = params->Tuple.variables[i];
-			if (param->kind == Entity_Variable) {
-				ParameterValue pv = param->Variable.param_value;
-				if (pv.kind == ParameterValue_Constant &&
-				    pv.value.kind == ExactValue_Procedure) {
-					type->Proc.has_proc_default_values = true;
-					break;
-				}
-			}
-		}
-	}
-
 	if (result_count > 0) {
 		Entity *first = results->Tuple.variables[0];
 		type->Proc.has_named_results = first->token.string != "";

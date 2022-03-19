@@ -2657,6 +2657,15 @@ Array<Entity *> proc_group_entities(CheckerContext *c, Operand o) {
 	return procs;
 }
 
+Array<Entity *> proc_group_entities_cloned(CheckerContext *c, Operand o) {
+	auto entities = proc_group_entities(c, o);
+	if (entities.count == 0) {
+		return {};
+	}
+	return array_clone(permanent_allocator(), entities);
+}
+
+
 
 
 void init_core_type_info(Checker *c) {

@@ -118,6 +118,16 @@ struct ParameterValue {
 	};
 };
 
+bool has_parameter_value(ParameterValue const &param_value) {
+	if (param_value.kind != ParameterValue_Invalid) {
+		return true;
+	}
+	if (param_value.original_ast_expr != nullptr) {
+		return true;
+	}
+	return false;
+}
+
 enum EntityConstantFlags : u32 {
 	EntityConstantFlag_ImplicitEnumValue = 1<<0,
 };
