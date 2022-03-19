@@ -9,7 +9,31 @@ struct meValue;
 struct meProcedure;
 struct meBlock;
 struct meInstruction;
+struct meConstant;
 struct meGlobalVariable;
+struct meParameter;
+
+
+enum meValueKind : u8 {
+	meValue_Invalid = 0,
+	meValue_Instruction,
+	meValue_ConstantValue,
+	meValue_Block,
+	meValue_Procedure,
+	meValue_GlobalVariable,
+	meValue_Parameter,
+};
+struct meValue {
+	meValueKind kind;
+	union {
+		meInstruction    *instr;
+		meConstant       *constant;
+		meBlock          *block;
+		meProcedure      *proc;
+		meGlobalVariable *global;
+		meParameter      *param;
+	};
+};
 
 enum meOpKind : u8 {
 	meOp_Invalid = 0,
@@ -22,7 +46,9 @@ enum meOpKind : u8 {
 	meOp_Phi,
 
 	// Unary Operators
-	meOp_FNeg,
+	meOp_Neg,
+	meOp_LogicalNot,
+	meOp_BitwiseNot,
 
 	// Binary Arithmetic Operators
 	meOp_Add,
@@ -43,7 +69,11 @@ enum meOpKind : u8 {
 	meOp_Alloca,
 	meOp_Load,
 	meOp_Store,
+	meOp_UnalignedLoad,
+	meOp_UnalignedStore,
 	meOp_GetElementPtr,
+	meOp_PtrOffset,
+	meOp_PtrSub,
 
 	// Cast Operators
 	meOp_Cast,
@@ -56,6 +86,7 @@ enum meOpKind : u8 {
 	meOp_LtEq,
 	meOp_Gt,
 	meOp_GtEq,
+
 	meOp_Min,
 	meOp_Max,
 
@@ -69,16 +100,20 @@ enum meOpKind : u8 {
 	meOp_ExtractValue,
 	meOp_Swizzle,
 
+	meOp_Alias, // alias of another value
+
 	// Atomics
 	meOp_Fence,
+	meOp_AtomicXchg,
 	meOp_AtomicCmpXchg,
 };
 
 enum meInstructionFlags : u16 {
-	meInstructionFlag_Volatile      = 1<<0,
-	meInstructionFlag_AtomicRMW     = 1<<1,
-	meInstructionFlag_ForceInline   = 1<<2,
-	meInstructionFlag_ForceNoInline = 1<<3,
+	meInstructionFlag_Volatile       = 1<<0,
+	meInstructionFlag_AtomicRMW      = 1<<1,
+	meInstructionFlag_ForceInline    = 1<<2,
+	meInstructionFlag_ForceNoInline  = 1<<3,
+	meInstructionFlag_HasSideEffects = 1<<4,
 };
 
 enum meAtomicOrderingKind : u8 {
@@ -110,14 +145,19 @@ struct meInstruction {
 	u16                  alignment;
 	u16                  uses;
 
-	Type *         type;
+	Type *       type;
 	meProcedure *parent;
-	TokenPos       pos;
+	TokenPos     pos;
 
-	meValue *operands[me_INSTRUCTION_MAX_ARG_COUNT];
-	isize operand_count;
+	meValue ops[me_INSTRUCTION_MAX_ARG_COUNT];
+	isize op_count;
 
-	Slice<meValue> *extra_operands; // non-null if used
+	Slice<meValue> *extra_ops; // non-null if used
+};
+
+struct meConstant {
+	ExactValue value;
+	Type *type;
 };
 
 struct meBlock {
@@ -165,32 +205,10 @@ struct meGlobalVariable {
 };
 
 struct meParameter {
-	String         name;
-	Entity *       entity;
+	String       name;
+	Entity *     entity;
 	meProcedure *parent;
-	i32            uses;
-};
-
-
-enum meValueKind : u8 {
-	meValue_Invalid = 0,
-	meValue_Instruction,
-	meValue_ConstantValue,
-	meValue_Block,
-	meValue_Procedure,
-	meValue_GlobalVariable,
-	meValue_Parameter,
-};
-struct meValue {
-	meValueKind kind;
-	union {
-		meInstruction    *instr;
-		ExactValue       *constant;
-		meBlock          *block;
-		meProcedure      *proc;
-		meGlobalVariable *global;
-		meParameter      *param;
-	};
+	i32          uses;
 };
 
 enum meAddrKind : u32 {
@@ -360,11 +378,12 @@ String me_get_entity_name(meModule *m, Entity *e, String default_name = {});
 meProcedure *me_procedure_create(meModule *m, Entity *entity, bool ignore_body=false);
 
 
-
-
 meValue me_value(meInstruction *instr);
-meValue me_value(ExactValue *constant);
+meValue me_value(meConstant *constant);
 meValue me_value(meBlock *block);
 meValue me_value(meProcedure *proc);
 meValue me_value(meGlobalVariable *global);
 meValue me_value(meParameter *param);
+
+
+meValue me_emit_conv(meProcedure *p, meValue value, Type *type);

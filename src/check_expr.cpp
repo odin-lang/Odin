@@ -119,6 +119,7 @@ void check_or_else_split_types(CheckerContext *c, Operand *x, String const &name
 void check_or_else_expr_no_value_error(CheckerContext *c, String const &name, Operand const &x, Type *type_hint);
 void check_or_return_split_types(CheckerContext *c, Operand *x, String const &name, Type **left_type_, Type **right_type_);
 
+bool check_is_castable_to(CheckerContext *c, Operand *operand, Type *y);
 
 void check_did_you_mean_print(DidYouMeanAnswers *d, char const *prefix = "") {
 	auto results = did_you_mean_results(d);
@@ -849,6 +850,14 @@ bool internal_check_is_assignable_to(Type *src, Type *dst) {
 	x.mode = Addressing_Value;
 	return check_is_assignable_to(nullptr, &x, dst);
 }
+
+bool internal_check_is_castable_to(Type *src, Type *dst) {
+	Operand x = {};
+	x.type = src;
+	x.mode = Addressing_Value;
+	return check_is_castable_to(nullptr, &x, dst);
+}
+
 
 AstPackage *get_package_of_type(Type *type) {
 	for (;;) {

@@ -2182,9 +2182,6 @@ lbValue lb_emit_comp(lbProcedure *p, TokenKind op_kind, lbValue left, lbValue ri
 	} else {
 		Type *lt = left.type;
 		Type *rt = right.type;
-
-		lt = left.type;
-		rt = right.type;
 		i64 ls = type_size_of(lt);
 		i64 rs = type_size_of(rt);
 
