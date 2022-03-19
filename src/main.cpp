@@ -2743,10 +2743,12 @@ int main(int arg_count, char const **arg_ptr) {
 		return 0;
 	}
 
+	#if defined(USE_MIDDLE_END)
 	MAIN_TIME_SECTION("Middle End Pass");
 	if (!me_generate(checker)) {
 		return 1;
 	}
+	#endif
 
 	MAIN_TIME_SECTION("LLVM API Code Gen");
 	lbGenerator *gen = gb_alloc_item(permanent_allocator(), lbGenerator);
