@@ -286,6 +286,13 @@ struct meDefer {
 	};
 };
 
+enum meDeferExitKind {
+	meDeferExit_Default,
+	meDeferExit_Return,
+	meDeferExit_Branch,
+};
+
+
 
 enum meProcedureFlags : u32 {
 	meProcedureFlag_Foreign    = 1<<1,
@@ -386,4 +393,7 @@ meValue me_value(meGlobalVariable *global);
 meValue me_value(meParameter *param);
 
 
+void me_build_stmt(meProcedure *p, Ast *stmt);
+meValue me_build_expr(meProcedure *p, Ast *expr);
 meValue me_emit_conv(meProcedure *p, meValue value, Type *type);
+

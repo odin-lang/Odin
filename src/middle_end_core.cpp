@@ -386,9 +386,6 @@ void me_block_start(meProcedure *p, meBlock *b) {
 	p->curr_block = b;
 }
 
-void me_build_stmt(meProcedure *p, Ast *stmt) {
-
-}
 
 meContextData *me_push_context_onto_stack_from_implicit_parameter(meProcedure *p) {
 	// TODO(bill): me_push_context_onto_stack_from_implicit_parameter
@@ -881,7 +878,7 @@ meValue me_emit_select(meProcedure *p, meValue cond, meValue left, meValue right
 	return me_value(v);
 }
 
-meValue me_emit_call(meProcedure *p, meValue proc, Slice<meValue> const &arguments, u16 instruction_flags) {
+meValue me_emit_call(meProcedure *p, meValue proc, Slice<meValue> const &arguments, u16 instruction_flags = 0) {
 	GB_PANIC("TODO");
 	return {};
 }

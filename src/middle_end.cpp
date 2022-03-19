@@ -1,5 +1,7 @@
 #include "middle_end.hpp"
 #include "middle_end_core.cpp"
+#include "middle_end_stmt.cpp"
+#include "middle_end_expr.cpp"
 
 
 void me_module_init(meModule *m, Checker *c) {
@@ -248,6 +250,46 @@ void me_procedure_body_begin(meProcedure *p) {
 void me_procedure_body_end(meProcedure *p) {
 	// TODO(bill): me_procedure_body_end
 }
+
+
+void me_build_nested_proc(meProcedure *p, AstProcLit *pd, Entity *e) {
+	GB_ASSERT(pd->body != nullptr);
+	meModule *m = p->module;
+	auto *min_dep_set = &m->info->minimum_dependency_set;
+
+	if (ptr_set_exists(min_dep_set, e) == false) {
+		// NOTE(bill): Nothing depends upon it so doesn't need to be built
+		return;
+	}
+
+	// NOTE(bill): Generate a new name
+	// parent.name-guid
+	String original_name = e->token.string;
+	String pd_name = original_name;
+	if (e->Procedure.link_name.len > 0) {
+		pd_name = e->Procedure.link_name;
+	}
+
+
+	isize name_len = p->name.len + 1 + pd_name.len + 1 + 10 + 1;
+	char *name_text = gb_alloc_array(permanent_allocator(), char, name_len);
+
+	i32 guid = cast(i32)p->children.count;
+	name_len = gb_snprintf(name_text, name_len, "%.*s.%.*s-%d", LIT(p->name), LIT(pd_name), guid);
+	String name = make_string(cast(u8 *)name_text, name_len-1);
+
+	e->Procedure.link_name = name;
+
+	meProcedure *nested_proc = me_procedure_create(p->module, e);
+	e->me_procedure = nested_proc;
+
+	meValue value = me_value(nested_proc);
+
+	me_add_entity(m, e, value);
+	array_add(&p->children, nested_proc);
+	array_add(&m->procedures_to_generate, nested_proc);
+}
+
 
 
 void me_generate_procedure(meModule *m, meProcedure *p) {
