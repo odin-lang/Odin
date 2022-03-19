@@ -334,6 +334,8 @@ bool me_generate(Checker *c) {
 	}
 
 	gb_printf_err("[middle end pass done]\n");
-	gb_exit(0);
+	if (true) {
+		gb_exit(0);
+	}
 	return true;
 }
