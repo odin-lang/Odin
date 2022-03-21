@@ -339,6 +339,25 @@ _split_iterator :: proc(s: ^string, sep: string, sep_save: int) -> (res: string,
 	return
 }
 
+@private
+_split_by_byte_iterator :: proc(s: ^string, sep: u8) -> (res: string, ok: bool) {
+	m := index_byte(s^, sep)
+	if m < 0 {
+		// not found
+		res = s[:]
+		ok = res != ""
+		s^ = {}
+	} else {
+		res = s[:m]
+		ok = true
+		s^ = s[m+1:]
+	}
+	return
+}
+
+split_by_byte_iterator :: proc(s: ^string, sep: u8) -> (string, bool) {
+	return _split_by_byte_iterator(s, sep)
+}
 
 split_iterator :: proc(s: ^string, sep: string) -> (string, bool) {
 	return _split_iterator(s, sep, 0)
