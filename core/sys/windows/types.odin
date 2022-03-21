@@ -21,7 +21,15 @@ HINSTANCE :: HANDLE
 HMODULE :: distinct HINSTANCE
 HRESULT :: distinct LONG
 HWND :: distinct HANDLE
+HDC :: distinct HANDLE
 HMONITOR :: distinct HANDLE
+HICON :: distinct HANDLE
+HCURSOR :: distinct HANDLE
+HMENU :: distinct HANDLE
+HBRUSH :: distinct HANDLE
+WPARAM :: distinct UINT_PTR
+LPARAM :: distinct LONG_PTR
+LRESULT :: distinct LONG_PTR
 BOOL :: distinct b32
 BYTE :: distinct u8
 BOOLEAN :: distinct b8
@@ -42,6 +50,7 @@ PULONG_PTR :: ^ULONG_PTR
 LPULONG_PTR :: ^ULONG_PTR
 DWORD_PTR :: ULONG_PTR
 LONG_PTR :: int
+UINT_PTR :: uintptr
 ULONG :: c_ulong
 UCHAR :: BYTE
 NTSTATUS :: c.long
@@ -176,6 +185,83 @@ FIONBIO: c_ulong : 0x8004667e
 GET_FILEEX_INFO_LEVELS :: distinct i32
 GetFileExInfoStandard: GET_FILEEX_INFO_LEVELS : 0
 GetFileExMaxInfoLevel: GET_FILEEX_INFO_LEVELS : 1
+
+
+WNDPROC :: #type proc "stdcall" (HWND, UINT, WPARAM, LPARAM) -> LRESULT
+
+WNDCLASSA :: struct {
+	style: UINT,
+	lpfnWndProc: WNDPROC,
+	cbClsExtra: c_int,
+	cbWndExtra: c_int,
+	hInstance: HINSTANCE,
+	hIcon: HICON,
+	hCursor: HCURSOR,
+	hbrBackground: HBRUSH,
+	lpszMenuName: LPCSTR,
+	lpszClassName: LPCSTR,
+}
+
+WNDCLASSW :: struct {
+	style: UINT,
+	lpfnWndProc: WNDPROC,
+	cbClsExtra: c_int,
+	cbWndExtra: c_int,
+	hInstance: HINSTANCE,
+	hIcon: HICON,
+	hCursor: HCURSOR,
+	hbrBackground: HBRUSH,
+	lpszMenuName: LPCWSTR,
+	lpszClassName: LPCWSTR,
+}
+
+WNDCLASSEXA :: struct {
+	cbSize: UINT,
+	style: UINT,
+	lpfnWndProc: WNDPROC,
+	cbClsExtra: c_int,
+	cbWndExtra: c_int,
+	hInstance: HINSTANCE,
+	hIcon: HICON,
+	hCursor: HCURSOR,
+	hbrBackground: HBRUSH,
+	lpszMenuName: LPCSTR,
+	lpszClassName: LPCSTR,
+	hIconSm: HICON,
+}
+
+WNDCLASSEXW :: struct {
+	cbSize: UINT,
+	style: UINT,
+	lpfnWndProc: WNDPROC,
+	cbClsExtra: c_int,
+	cbWndExtra: c_int,
+	hInstance: HINSTANCE,
+	hIcon: HICON,
+	hCursor: HCURSOR,
+	hbrBackground: HBRUSH,
+	lpszMenuName: LPCWSTR,
+	lpszClassName: LPCWSTR,
+	hIconSm: HICON,
+}
+
+MSG :: struct {
+	hwnd: HWND,
+	message: UINT,
+	wParam: WPARAM,
+	lParam: LPARAM,
+	time: DWORD,
+	pt: POINT,
+}
+
+PAINTSTRUCT :: struct {
+	hdc: HDC,
+	fErase: BOOL,
+	rcPaint: RECT,
+	fRestore: BOOL,
+	fIncUpdate: BOOL,
+	rgbReserved: [32]BYTE,
+}
 
 
 WIN32_FIND_DATAW :: struct {
@@ -784,17 +870,17 @@ SYSTEM_INFO :: struct {
 
 // https://docs.microsoft.com/en-us/windows-hardware/drivers/ddi/wdm/ns-wdm-_osversioninfoexw
 OSVERSIONINFOEXW :: struct {
-    dwOSVersionInfoSize: ULONG,
-    dwMajorVersion:      ULONG,
-    dwMinorVersion:      ULONG,
-    dwBuildNumber:       ULONG,
-    dwPlatformId:        ULONG,
-    szCSDVersion:        [128]WCHAR,
-    wServicePackMajor:   USHORT,
-    wServicePackMinor:   USHORT,
-    wSuiteMask:          USHORT,
-    wProductType:        UCHAR,
-    wReserved:           UCHAR,
+	dwOSVersionInfoSize: ULONG,
+	dwMajorVersion:      ULONG,
+	dwMinorVersion:      ULONG,
+	dwBuildNumber:       ULONG,
+	dwPlatformId:        ULONG,
+	szCSDVersion:        [128]WCHAR,
+	wServicePackMajor:   USHORT,
+	wServicePackMinor:   USHORT,
+	wSuiteMask:          USHORT,
+	wProductType:        UCHAR,
+	wReserved:           UCHAR,
 }
 
 // https://docs.microsoft.com/en-us/windows/win32/api/winnt/ns-winnt-quota_limits
@@ -837,24 +923,24 @@ PROFILEINFOW :: struct {
 	lpDefaultPath: LPWSTR,
 	lpServerName: LPWSTR,
 	lpPolicyPath: LPWSTR,
-  	hProfile: HANDLE,
+	hProfile: HANDLE,
 }
 
 // Used in LookupAccountNameW
 SID_NAME_USE :: distinct DWORD
 
 SID_TYPE :: enum SID_NAME_USE {
-  User = 1,
-  Group,
-  Domain,
-  Alias,
-  WellKnownGroup,
-  DeletedAccount,
-  Invalid,
-  Unknown,
-  Computer,
-  Label,
-  LogonSession,
+	User = 1,
+	Group,
+	Domain,
+	Alias,
+	WellKnownGroup,
+	DeletedAccount,
+	Invalid,
+	Unknown,
+	Computer,
+	Label,
+	LogonSession,
 }
 
 SECURITY_MAX_SID_SIZE :: 68
@@ -869,7 +955,7 @@ SID :: struct #packed {
 #assert(size_of(SID) == SECURITY_MAX_SID_SIZE)
 
 SID_IDENTIFIER_AUTHORITY :: struct #packed {
-    Value: [6]u8,
+	Value: [6]u8,
 }
 
 // For NetAPI32
@@ -901,11 +987,11 @@ USER_INFO_FLAG :: enum DWORD {
 	Passwd_Cant_Change              = 6,  // 1 <<  6: 0x0040,
 	Encrypted_Text_Password_Allowed = 7,  // 1 <<  7: 0x0080,
 
-    Temp_Duplicate_Account          = 8,  // 1 <<  8: 0x0100,
-    Normal_Account                  = 9,  // 1 <<  9: 0x0200,
-    InterDomain_Trust_Account       = 11, // 1 << 11: 0x0800,
-    Workstation_Trust_Account       = 12, // 1 << 12: 0x1000,
-    Server_Trust_Account            = 13, // 1 << 13: 0x2000,
+	Temp_Duplicate_Account          = 8,  // 1 <<  8: 0x0100,
+	Normal_Account                  = 9,  // 1 <<  9: 0x0200,
+	InterDomain_Trust_Account       = 11, // 1 << 11: 0x0800,
+	Workstation_Trust_Account       = 12, // 1 << 12: 0x1000,
+	Server_Trust_Account            = 13, // 1 << 13: 0x2000,
 }
 USER_INFO_FLAGS :: distinct bit_set[USER_INFO_FLAG]
 
