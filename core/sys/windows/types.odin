@@ -22,6 +22,10 @@ HMODULE :: distinct HINSTANCE
 HRESULT :: distinct LONG
 HWND :: distinct HANDLE
 HMONITOR :: distinct HANDLE
+HICON :: distinct HANDLE
+HCURSOR :: distinct HANDLE
+HMENU :: distinct HANDLE
+HBRUSH :: distinct HANDLE
 BOOL :: distinct b32
 BYTE :: distinct u8
 BOOLEAN :: distinct b8
@@ -37,6 +41,7 @@ SIZE_T :: uint
 PSIZE_T :: ^SIZE_T
 WORD :: u16
 CHAR :: c_char
+UINT_PTR :: uint
 ULONG_PTR :: uint
 PULONG_PTR :: ^ULONG_PTR
 LPULONG_PTR :: ^ULONG_PTR
@@ -45,6 +50,9 @@ LONG_PTR :: int
 ULONG :: c_ulong
 UCHAR :: BYTE
 NTSTATUS :: c.long
+LPARAM :: LONG_PTR
+WPARAM :: UINT_PTR
+LRESULT :: LONG_PTR
 
 UINT8  ::  u8
 UINT16 :: u16
