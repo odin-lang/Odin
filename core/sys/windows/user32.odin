@@ -137,7 +137,7 @@ WNDCLASSEXA :: struct {
 WNDCLASSEXW :: struct {
 	cbSize:        UINT,
 	style:         UINT,
-	lpfnWndProc:   ^WNDPROC,
+	lpfnWndProc:   WNDPROC,
 	cbClsExtra:    c_int,
 	cbWndExtra:    c_int,
 	hInstance:     HINSTANCE,
