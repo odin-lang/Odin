@@ -1054,6 +1054,7 @@ as_u64 :: proc(a: any) -> (value: u64, valid: bool) {
 	case Type_Info_Float:
 		valid = true
 		switch v in a {
+		case f16:   value = u64(v)
 		case f32:   value = u64(v)
 		case f64:   value = u64(v)
 		case f32le: value = u64(v)
@@ -1159,6 +1160,7 @@ as_f64 :: proc(a: any) -> (value: f64, valid: bool) {
 	case Type_Info_Float:
 		valid = true
 		switch v in a {
+		case f16:   value = f64(v)
 		case f32:   value = f64(v)
 		case f64:   value =    (v)
 		case f32le: value = f64(v)
