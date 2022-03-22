@@ -1,5 +1,5 @@
 @echo off
-set COMMON=-show-timings -no-bounds-check -vet -strict-style
+set COMMON=-show-timings -no-bounds-check -vet -strict-style -collection:tests=..
 set PATH_TO_ODIN==..\..\odin
 python3 download_assets.py
 echo ---
@@ -35,6 +35,7 @@ echo ---
 echo ---
 echo Running core:encoding tests
 echo ---
+%PATH_TO_ODIN% run encoding/hxa %COMMON%
 %PATH_TO_ODIN% run encoding/json %COMMON%
 %PATH_TO_ODIN% run encoding/varint %COMMON%
 
@@ -42,3 +43,18 @@ echo ---
 echo Running core:math/noise tests
 echo ---
 %PATH_TO_ODIN% run math/noise %COMMON%
+
+echo ---
+echo Running core:math tests
+echo ---
+%PATH_TO_ODIN% run math %COMMON%
+
+echo ---
+echo Running core:math/linalg/glsl tests
+echo ---
+%PATH_TO_ODIN% run math/linalg/glsl %COMMON%
+
+echo ---
+echo Running core:reflect tests
+echo ---
+%PATH_TO_ODIN% run reflect %COMMON%
