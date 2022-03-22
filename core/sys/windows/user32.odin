@@ -270,6 +270,9 @@ foreign user32 {
 	PostMessageA :: proc(hWnd: HWND, Msg: UINT, wParam: WPARAM, lParam: LPARAM) -> BOOL ---
 	PostMessageW :: proc(hWnd: HWND, Msg: UINT, wParam: WPARAM, lParam: LPARAM) -> BOOL ---
 
+	SendMessageA :: proc(hWnd: HWND, Msg: UINT, wParam: WPARAM, lParam: LPARAM) -> LRESULT ---
+	SendMessageW :: proc(hWnd: HWND, Msg: UINT, wParam: WPARAM, lParam: LPARAM) -> LRESULT ---
+
 	GetQueueStatus :: proc(flags: UINT) -> DWORD ---
 
 	DefWindowProcA :: proc(hWnd: HWND, Msg: UINT, wParam: WPARAM, lParma: LPARAM) -> LRESULT ---
