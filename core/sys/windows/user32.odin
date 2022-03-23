@@ -28,30 +28,6 @@ foreign user32 {
 	RegisterClassExA :: proc(^WNDCLASSEXA) -> ATOM ---
 	RegisterClassExW :: proc(^WNDCLASSEXW) -> ATOM ---
 
-	CreateWindowA :: proc(
-		lpClassName: LPCSTR,
-		lpWindowName: LPCSTR,
-		dwStyle: DWORD,
-		X: c_int,
-		Y: c_int,
-		nWidth: c_int,
-		nHeight: c_int,
-		hWndParent: HWND,
-		hMenu: HMENU,
-		hInstance: HINSTANCE,
-		lpParam: LPARAM) -> HWND ---
-	CreateWindowW :: proc(
-		lpClassName: LPCWSTR,
-		lpWindowName: LPCWSTR,
-		dwStyle: DWORD,
-		X: c_int,
-		Y: c_int,
-		nWidth: c_int,
-		nHeight: c_int,
-		hWndParent: HWND,
-		hMenu: HMENU,
-		hInstance: HINSTANCE,
-		lpParam: LPARAM) -> HWND ---
 	CreateWindowExA :: proc(
 		dwExStyle: DWORD,
 		lpClassName: LPCSTR,
@@ -110,6 +86,8 @@ foreign user32 {
 	DefWindowProcA :: proc(hWnd: HWND, Msg: UINT, wParam: WPARAM, lParam: LPARAM) -> LRESULT ---
 	DefWindowProcW :: proc(hWnd: HWND, Msg: UINT, wParam: WPARAM, lParam: LPARAM) -> LRESULT ---
 
+	FindWindowA :: proc(lpClassName: LPCSTR, lpWindowName: LPCSTR) -> HWND ---
+	FindWindowW :: proc(lpClassName: LPCWSTR, lpWindowName: LPCWSTR) -> HWND ---
 	FindWindowExA :: proc(hWndParent: HWND, hWndChildAfter: HWND, lpszClass: LPCSTR, lpszWindow: LPCSTR) -> HWND ---
 	FindWindowExW :: proc(hWndParent: HWND, hWndChildAfter: HWND, lpszClass: LPCWSTR, lpszWindow: LPCWSTR) -> HWND ---
 
@@ -124,6 +102,68 @@ foreign user32 {
 	GetDC :: proc(hWnd: HWND) -> HDC ---
 	ReleaseDC :: proc(hWnd: HWND, hDC: HDC) -> c_int ---
 
+	GetUpdateRect :: proc(hWnd: HWND, lpRect: LPRECT, bErase: BOOL) -> BOOL ---
+	ValidateRect :: proc(hWnd: HWND, lpRect: ^RECT) -> BOOL ---
+	InvalidateRect :: proc(hWnd: HWND, lpRect: ^RECT, bErase: BOOL) -> BOOL ---
+
 	BeginPaint :: proc(hWnd: HWND, lpPaint: ^PAINTSTRUCT) -> HDC ---
 	EndPaint :: proc(hWnd: HWND, lpPaint: ^PAINTSTRUCT) -> BOOL ---
+}
+
+CreateWindowA :: #force_inline proc "stdcall" (
+	lpClassName: LPCSTR,
+	lpWindowName: LPCSTR,
+	dwStyle: DWORD,
+	X: c_int,
+	Y: c_int,
+	nWidth: c_int,
+	nHeight: c_int,
+	hWndParent: HWND,
+	hMenu: HMENU,
+	hInstance: HINSTANCE,
+	lpParam: LPVOID,
+) -> HWND {
+	return CreateWindowExA(
+		0,
+		lpClassName,
+		lpWindowName,
+		dwStyle,
+		X,
+		Y,
+		nWidth,
+		nHeight,
+		hWndParent,
+		hMenu,
+		hInstance,
+		lpParam,
+	)
+}
+
+CreateWindowW :: #force_inline proc "stdcall" (
+	lpClassName: LPCTSTR,
+	lpWindowName: LPCTSTR,
+	dwStyle: DWORD,
+	X: c_int,
+	Y: c_int,
+	nWidth: c_int,
+	nHeight: c_int,
+	hWndParent: HWND,
+	hMenu: HMENU,
+	hInstance: HINSTANCE,
+	lpParam: LPVOID,
+) -> HWND {
+	return CreateWindowExW(
+		0,
+		lpClassName,
+		lpWindowName,
+		dwStyle,
+		X,
+		Y,
+		nWidth,
+		nHeight,
+		hWndParent,
+		hMenu,
+		hInstance,
+		lpParam,
+	)
 }
