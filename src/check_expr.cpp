@@ -9000,6 +9000,7 @@ ExprKind check_expr_base_internal(CheckerContext *c, Operand *o, Ast *node, Type
 
 	o->mode = Addressing_Invalid;
 	o->type = t_invalid;
+	o->value = {ExactValue_Invalid};
 
 	switch (node->kind) {
 	default:
