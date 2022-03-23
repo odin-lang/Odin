@@ -397,6 +397,20 @@ SW_FORCEMINIMIZE   : c_int : 11
 
 CW_USEDEFAULT      : c_int : -2147483648
 
+SIZE_RESTORED  :: 0
+SIZE_MINIMIZED :: 1
+SIZE_MAXIMIZED :: 2
+SIZE_MAXSHOW   :: 3
+SIZE_MAXHIDE   :: 4
+
+WMSZ_LEFT        :: 1
+WMSZ_RIGHT       :: 2
+WMSZ_TOP         :: 3
+WMSZ_TOPLEFT     :: 4
+WMSZ_TOPRIGHT    :: 5
+WMSZ_BOTTOM      :: 6
+WMSZ_BOTTOMLEFT  :: 7
+WMSZ_BOTTOMRIGHT :: 8
 
 _IDC_APPSTARTING := rawptr(uintptr(32650))
 _IDC_ARROW       := rawptr(uintptr(32512))
