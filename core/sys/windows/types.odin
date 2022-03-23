@@ -395,6 +395,7 @@ SW_FORCEMINIMIZE   : c_int : 11
 
 CW_USEDEFAULT      : c_int : -2147483648
 
+
 _IDC_APPSTARTING := rawptr(uintptr(32650))
 _IDC_ARROW       := rawptr(uintptr(32512))
 _IDC_CROSS       := rawptr(uintptr(32515))
@@ -411,6 +412,7 @@ _IDC_SIZENWSE    := rawptr(uintptr(32642))
 _IDC_SIZEWE      := rawptr(uintptr(32644))
 _IDC_UPARROW     := rawptr(uintptr(32516))
 _IDC_WAIT        := rawptr(uintptr(32514))
+
 IDC_APPSTARTING := cstring(_IDC_APPSTARTING)
 IDC_ARROW       := cstring(_IDC_ARROW)
 IDC_CROSS       := cstring(_IDC_CROSS)
@@ -427,6 +429,31 @@ IDC_SIZENWSE    := cstring(_IDC_SIZENWSE)
 IDC_SIZEWE      := cstring(_IDC_SIZEWE)
 IDC_UPARROW     := cstring(_IDC_UPARROW)
 IDC_WAIT        := cstring(_IDC_WAIT)
+
+
+_IDI_APPLICATION := rawptr(uintptr(32512))
+_IDI_HAND        := rawptr(uintptr(32513))
+_IDI_QUESTION    := rawptr(uintptr(32514))
+_IDI_EXCLAMATION := rawptr(uintptr(32515))
+_IDI_ASTERISK    := rawptr(uintptr(32516))
+_IDI_WINLOGO     := rawptr(uintptr(32517))
+_IDI_SHIELD      := rawptr(uintptr(32518))
+
+IDI_APPLICATION := cstring(_IDI_APPLICATION)
+IDI_HAND        := cstring(_IDI_HAND)
+IDI_QUESTION    := cstring(_IDI_QUESTION)
+IDI_EXCLAMATION := cstring(_IDI_EXCLAMATION)
+IDI_ASTERISK    := cstring(_IDI_ASTERISK)
+
+// if WINVER >= _WIN32_WINNT_NT4
+IDI_WINLOGO     := cstring(_IDI_WINLOGO)
+IDI_WARNING     := IDI_EXCLAMATION
+IDI_ERROR       := IDI_HAND
+IDI_INFORMATION := IDI_ASTERISK
+
+// if WINVER >= _WIN32_WINNT_VISTA
+IDI_SHIELD := cstring(_IDI_SHIELD)
+
 
 WSA_FLAG_OVERLAPPED: DWORD : 0x01
 WSA_FLAG_NO_HANDLE_INHERIT: DWORD : 0x80
