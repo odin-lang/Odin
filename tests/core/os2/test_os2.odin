@@ -1,9 +1,11 @@
 package test_os2
 
+import "core:os/os2"
+
 import "core:os"
 import "core:fmt"
 import "core:mem"
-import "core:os/os2"
+import "core:strings"
 import "core:testing"
 import "core:intrinsics"
 
@@ -116,7 +118,7 @@ file_test :: proc(t: ^testing.T) {
 	_expect_no_error(t, err)
 	expect_value(t, n, 10)
 
-	// seek to the "ll" in "hello"
+	// seek FROM BEGINNING to the "ll" in "hello"
 	n64: i64
 	n64, err = os2.seek(fd, 12, .Start)
 	_expect_no_error(t, err)
@@ -127,7 +129,7 @@ file_test :: proc(t: ^testing.T) {
 	_expect_no_error(t, err)
 	expect_value(t, n, 2)
 
-	// seek to the "e" in "he11o"
+	// seek BACK to the "e" in "he11o"
 	n64, err = os2.seek(fd, -3, .Current)
 	_expect_no_error(t, err)
 	expect_value(t, n64, 11)
@@ -137,7 +139,7 @@ file_test :: proc(t: ^testing.T) {
 	_expect_no_error(t, err)
 	expect_value(t, n, 1)
 
-	// seek to the "o" in "h311o"
+	// seek FROM THE END the "o" in "h311o"
 	n64, err = os2.seek(fd, -1, .End)
 	_expect_no_error(t, err)
 	expect_value(t, n64, 14)
@@ -157,10 +159,23 @@ file_test :: proc(t: ^testing.T) {
 		expect(t, unix.sys_access("file.txt", X_OK) == 0, "expected exec permission")
 	}
 
+	/* Build expected full path via cwd and known file name */
+	parts: [2]string
+	parts[0], err = os2.getwd()
+	defer delete(parts[0])
+	_expect_no_error(t, err)
+
+	parts[1] = "/file.txt"
+	expected_full_path := strings.concatenate(parts[:])
+	defer delete(expected_full_path)
+
+	full_path := os2.name(fd)
+	defer delete(full_path)
+	expect_value(t, full_path, expected_full_path)
+
 	// NOTE: chown not possible without root user
 	//_expect_no_error(t, os2.chown(fd, 0, 0))
 	_expect_no_error(t, os2.close(fd))
-
 
 	fd, err = os2.open("file.txt")
 	_expect_no_error(t, err)

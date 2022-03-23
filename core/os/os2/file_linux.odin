@@ -4,6 +4,7 @@ package os2
 import "core:io"
 import "core:time"
 import "core:strings"
+import "core:strconv"
 import "core:sys/unix"
 
 
@@ -55,8 +56,20 @@ _close :: proc(fd: Handle) -> Error {
 }
 
 _name :: proc(fd: Handle, allocator := context.allocator) -> string {
-	//TODO
-	return ""
+	// NOTE: Not sure how portable this really is
+	PROC_FD_PATH :: "/proc/self/fd/"
+
+	buf: [32]u8
+	copy(buf[:], PROC_FD_PATH)
+
+	strconv.itoa(buf[len(PROC_FD_PATH):], int(fd))
+
+	realpath: string
+	err: Error
+	if realpath, err = _read_link_cstr(cstring(&buf[0])); err != nil || realpath[0] != '/' {
+		return ""
+	}
+	return realpath
 }
 
 _seek :: proc(fd: Handle, offset: i64, whence: Seek_From) -> (ret: i64, err: Error) {
@@ -189,10 +202,7 @@ _symlink :: proc(old_name, new_name: string) -> Error {
 	return _ok_or_error(unix.sys_symlink(old_name_cstr, new_name_cstr))
 }
 
-_read_link :: proc(name: string, allocator := context.allocator) -> (string, Error) {
-	name_cstr := strings.clone_to_cstring(name)
-	defer delete(name_cstr)
-
+_read_link_cstr :: proc(name_cstr: cstring, allocator := context.allocator) -> (string, Error) {
 	bufsz : uint = 256
 	buf := make([]byte, bufsz, allocator)
 	for {
@@ -208,6 +218,11 @@ _read_link :: proc(name: string, allocator := context.allocator) -> (string, Err
 			return strings.string_from_ptr(&buf[0], rc), nil
 		}
 	}
+}
+
+_read_link :: proc(name: string, allocator := context.allocator) -> (string, Error) {
+	name_cstr := strings.clone_to_cstring(name, context.temp_allocator)
+	return _read_link_cstr(name_cstr, allocator)
 }
 
 _unlink :: proc(name: string) -> Error {
