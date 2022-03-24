@@ -27,6 +27,9 @@ HICON :: distinct HANDLE
 HCURSOR :: distinct HANDLE
 HMENU :: distinct HANDLE
 HBRUSH :: distinct HANDLE
+HGDIOBJ :: distinct HANDLE
+HBITMAP :: distinct HANDLE
+HGLOBAL :: distinct HANDLE
 BOOL :: distinct b32
 BYTE :: distinct u8
 BOOLEAN :: distinct b8
@@ -92,7 +95,8 @@ LPPROCESS_INFORMATION :: ^PROCESS_INFORMATION
 PSECURITY_ATTRIBUTES :: ^SECURITY_ATTRIBUTES
 LPSECURITY_ATTRIBUTES :: ^SECURITY_ATTRIBUTES
 LPSTARTUPINFO :: ^STARTUPINFO
-PVOID  :: rawptr
+VOID :: rawptr
+PVOID :: rawptr
 LPVOID :: rawptr
 PINT :: ^INT
 LPINT :: ^INT
@@ -465,6 +469,185 @@ IDI_WARNING      := IDI_EXCLAMATION
 IDI_ERROR        := IDI_HAND
 IDI_INFORMATION  := IDI_ASTERISK
 
+
+// DIB color table identifiers
+DIB_RGB_COLORS :: 0
+DIB_PAL_COLORS :: 1
+
+// constants for CreateDIBitmap
+CBM_INIT :: 0x04 // initialize bitmap
+
+// Region Flags
+ERROR         :: 0
+NULLREGION    :: 1
+SIMPLEREGION  :: 2
+COMPLEXREGION :: 3
+RGN_ERROR     :: ERROR
+
+// StretchBlt() Modes
+BLACKONWHITE      :: 1
+WHITEONBLACK      :: 2
+COLORONCOLOR      :: 3
+HALFTONE          :: 4
+MAXSTRETCHBLTMODE :: 4
+
+// Binary raster ops
+R2_BLACK       :: 1  // 0
+R2_NOTMERGEPEN :: 2  // DPon
+R2_MASKNOTPEN  :: 3  // DPna
+R2_NOTCOPYPEN  :: 4  // PN
+R2_MASKPENNOT  :: 5  // PDna
+R2_NOT         :: 6  // Dn
+R2_XORPEN      :: 7  // DPx
+R2_NOTMASKPEN  :: 8  // DPan
+R2_MASKPEN     :: 9  // DPa
+R2_NOTXORPEN   :: 10 // DPxn
+R2_NOP         :: 11 // D
+R2_MERGENOTPEN :: 12 // DPno
+R2_COPYPEN     :: 13 // P
+R2_MERGEPENNOT :: 14 // PDno
+R2_MERGEPEN    :: 15 // DPo
+R2_WHITE       :: 16 // 1
+R2_LAST        :: 16
+
+// Ternary raster operations
+SRCCOPY        : DWORD : 0x00CC0020 // dest = source
+SRCPAINT       : DWORD : 0x00EE0086 // dest = source OR dest
+SRCAND         : DWORD : 0x008800C6 // dest = source AND dest
+SRCINVERT      : DWORD : 0x00660046 // dest = source XOR dest
+SRCERASE       : DWORD : 0x00440328 // dest = source AND (NOT dest)
+NOTSRCCOPY     : DWORD : 0x00330008 // dest = (NOT source)
+NOTSRCERASE    : DWORD : 0x001100A6 // dest = (NOT src) AND (NOT dest)
+MERGECOPY      : DWORD : 0x00C000CA // dest = (source AND pattern
+MERGEPAINT     : DWORD : 0x00BB0226 // dest = (NOT source) OR dest
+PATCOPY        : DWORD : 0x00F00021 // dest = pattern
+PATPAINT       : DWORD : 0x00FB0A09 // dest = DPSnoo
+PATINVERT      : DWORD : 0x005A0049 // dest = pattern XOR dest
+DSTINVERT      : DWORD : 0x00550009 // dest = (NOT dest)
+BLACKNESS      : DWORD : 0x00000042 // dest = BLACK
+WHITENESS      : DWORD : 0x00FF0062 // dest = WHITE
+NOMIRRORBITMAP : DWORD : 0x80000000 // Do not Mirror the bitmap in this call
+CAPTUREBLT     : DWORD : 0x40000000 // Include layered windows
+
+// Stock Logical Objects
+WHITE_BRUSH         :: 0
+LTGRAY_BRUSH        :: 1
+GRAY_BRUSH          :: 2
+DKGRAY_BRUSH        :: 3
+BLACK_BRUSH         :: 4
+NULL_BRUSH          :: 5
+HOLLOW_BRUSH        :: NULL_BRUSH
+WHITE_PEN           :: 6
+BLACK_PEN           :: 7
+NULL_PEN            :: 8
+OEM_FIXED_FONT      :: 10
+ANSI_FIXED_FONT     :: 11
+ANSI_VAR_FONT       :: 12
+SYSTEM_FONT         :: 13
+DEVICE_DEFAULT_FONT :: 14
+DEFAULT_PALETTE     :: 15
+SYSTEM_FIXED_FONT   :: 16
+DEFAULT_GUI_FONT    :: 17
+DC_BRUSH            :: 18
+DC_PEN              :: 19
+STOCK_LAST          :: 19
+
+CLR_INVALID :: 0xFFFFFFFF
+
+RGBQUAD :: struct {
+	rgbBlue: BYTE,
+	rgbGreen: BYTE,
+	rgbRed: BYTE,
+	rgbReserved: BYTE,
+}
+
+PIXELFORMATDESCRIPTOR :: struct {
+	nSize: WORD,
+	nVersion: WORD,
+	dwFlags: DWORD,
+	iPixelType: BYTE,
+	cColorBits: BYTE,
+	cRedBits: BYTE,
+	cRedShift: BYTE,
+	cGreenBits: BYTE,
+	cGreenShift: BYTE,
+	cBlueBits: BYTE,
+	cBlueShift: BYTE,
+	cAlphaBits: BYTE,
+	cAlphaShift: BYTE,
+	cAccumBits: BYTE,
+	cAccumRedBits: BYTE,
+	cAccumGreenBits: BYTE,
+	cAccumBlueBits: BYTE,
+	cAccumAlphaBits: BYTE,
+	cDepthBits: BYTE,
+	cStencilBits: BYTE,
+	cAuxBuffers: BYTE,
+	iLayerType: BYTE,
+	bReserved: BYTE,
+	dwLayerMask: DWORD,
+	dwVisibleMask: DWORD,
+	dwDamageMask: DWORD,
+}
+
+BITMAPINFOHEADER :: struct {
+	biSize: DWORD,
+	biWidth: LONG,
+	biHeight: LONG,
+	biPlanes: WORD,
+	biBitCount: WORD,
+	biCompression: DWORD,
+	biSizeImage: DWORD,
+	biXPelsPerMeter: LONG,
+	biYPelsPerMeter: LONG,
+	biClrUsed: DWORD,
+	biClrImportant: DWORD,
+}
+
+BITMAPINFO :: struct {
+	bmiHeader: BITMAPINFOHEADER,
+	bmiColors: [1]RGBQUAD,
+}
+
+// pixel types
+PFD_TYPE_RGBA       :: 0
+PFD_TYPE_COLORINDEX :: 1
+
+// layer types
+PFD_MAIN_PLANE     :: 0
+PFD_OVERLAY_PLANE  :: 1
+PFD_UNDERLAY_PLANE :: -1
+
+// PIXELFORMATDESCRIPTOR flags
+PFD_DOUBLEBUFFER         :: 0x00000001
+PFD_STEREO               :: 0x00000002
+PFD_DRAW_TO_WINDOW       :: 0x00000004
+PFD_DRAW_TO_BITMAP       :: 0x00000008
+PFD_SUPPORT_GDI          :: 0x00000010
+PFD_SUPPORT_OPENGL       :: 0x00000020
+PFD_GENERIC_FORMAT       :: 0x00000040
+PFD_NEED_PALETTE         :: 0x00000080
+PFD_NEED_SYSTEM_PALETTE  :: 0x00000100
+PFD_SWAP_EXCHANGE        :: 0x00000200
+PFD_SWAP_COPY            :: 0x00000400
+PFD_SWAP_LAYER_BUFFERS   :: 0x00000800
+PFD_GENERIC_ACCELERATED  :: 0x00001000
+PFD_SUPPORT_DIRECTDRAW   :: 0x00002000
+PFD_DIRECT3D_ACCELERATED :: 0x00004000
+PFD_SUPPORT_COMPOSITION  :: 0x00008000
+
+// PIXELFORMATDESCRIPTOR flags for use in ChoosePixelFormat only
+PFD_DEPTH_DONTCARE        :: 0x20000000
+PFD_DOUBLEBUFFER_DONTCARE :: 0x40000000
+PFD_STEREO_DONTCARE       :: 0x80000000
+
+// constants for the biCompression field
+BI_RGB       :: 0
+BI_RLE8      :: 1
+BI_RLE4      :: 2
+BI_BITFIELDS :: 3
+BI_JPEG      :: 4
+BI_PNG       :: 5
 
 WSA_FLAG_OVERLAPPED: DWORD : 0x01
 WSA_FLAG_NO_HANDLE_INHERIT: DWORD : 0x80
