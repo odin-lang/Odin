@@ -675,22 +675,31 @@ void check_union_type(CheckerContext *ctx, Type *union_type, Ast *node, Array<Op
 			}
 			if (ok) {
 				array_add(&variants, t);
+
+				if (ut->kind == UnionType_shared_nil) {
+					if (!type_has_nil(t)) {
+						gbString s = type_to_string(t);
+						error(node, "Each variant of a union with #shared_nil must have a 'nil' value, got %s", s);
+						gb_string_free(s);
+					}
+				}
 			}
 		}
 	}
 
 	union_type->Union.variants = slice_from_array(variants);
-	union_type->Union.no_nil = ut->no_nil;
-	union_type->Union.maybe = ut->maybe;
-	if (union_type->Union.no_nil) {
+	union_type->Union.kind = ut->kind;
+	switch (ut->kind) {
+	case UnionType_no_nil:
 		if (variants.count < 2) {
 			error(ut->align, "A union with #no_nil must have at least 2 variants");
 		}
-	}
-	if (union_type->Union.maybe) {
+		break;
+	case UnionType_maybe:
 		if (variants.count != 1) {
 			error(ut->align, "A union with #maybe must have at 1 variant, got %lld", cast(long long)variants.count);
 		}
+		break;
 	}
 
 	if (ut->align != nullptr) {

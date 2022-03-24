@@ -10047,8 +10047,11 @@ gbString write_expr_to_string(gbString str, Ast *node, bool shorthand) {
 			str = write_expr_to_string(str, st->polymorphic_params, shorthand);
 			str = gb_string_appendc(str, ") ");
 		}
-		if (st->no_nil) str = gb_string_appendc(str, "#no_nil ");
-		if (st->maybe)  str = gb_string_appendc(str, "#maybe ");
+		switch (st->kind) {
+		case UnionType_maybe:      str = gb_string_appendc(str, "#maybe ");      break;
+		case UnionType_no_nil:     str = gb_string_appendc(str, "#no_nil ");     break;
+		case UnionType_shared_nil: str = gb_string_appendc(str, "#shared_nil "); break;
+		}
 		if (st->align) {
 			str = gb_string_appendc(str, "#align ");
 			str = write_expr_to_string(str, st->align, shorthand);

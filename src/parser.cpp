@@ -1071,15 +1071,14 @@ Ast *ast_struct_type(AstFile *f, Token token, Slice<Ast *> fields, isize field_c
 }
 
 
-Ast *ast_union_type(AstFile *f, Token token, Array<Ast *> const &variants, Ast *polymorphic_params, Ast *align, bool no_nil, bool maybe,
+Ast *ast_union_type(AstFile *f, Token token, Array<Ast *> const &variants, Ast *polymorphic_params, Ast *align, UnionTypeKind kind,
                     Token where_token, Array<Ast *> const &where_clauses) {
 	Ast *result = alloc_ast_node(f, Ast_UnionType);
 	result->UnionType.token              = token;
 	result->UnionType.variants           = slice_from_array(variants);
 	result->UnionType.polymorphic_params = polymorphic_params;
 	result->UnionType.align              = align;
-	result->UnionType.no_nil             = no_nil;
-	result->UnionType.maybe              = maybe;
+	result->UnionType.kind               = kind;
 	result->UnionType.where_token        = where_token;
 	result->UnionType.where_clauses      = slice_from_array(where_clauses);
 	return result;
@@ -2475,6 +2474,9 @@ Ast *parse_operand(AstFile *f, bool lhs) {
 		Ast *align = nullptr;
 		bool no_nil = false;
 		bool maybe = false;
+		bool shared_nil = false;
+
+		UnionTypeKind union_kind = UnionType_Normal;
 
 		Token start_token = f->curr_token;
 
@@ -2501,6 +2503,11 @@ Ast *parse_operand(AstFile *f, bool lhs) {
 					syntax_error(tag, "Duplicate union tag '#%.*s'", LIT(tag.string));
 				}
 				no_nil = true;
+			} else if (tag.string == "shared_nil") {
+				if (shared_nil) {
+					syntax_error(tag, "Duplicate union tag '#%.*s'", LIT(tag.string));
+				}
+				shared_nil = true;
 			} else if (tag.string == "maybe") {
 				if (maybe) {
 					syntax_error(tag, "Duplicate union tag '#%.*s'", LIT(tag.string));
@@ -2512,6 +2519,21 @@ Ast *parse_operand(AstFile *f, bool lhs) {
 		}
 		if (no_nil && maybe) {
 			syntax_error(f->curr_token, "#maybe and #no_nil cannot be applied together");
+		}
+		if (no_nil && shared_nil) {
+			syntax_error(f->curr_token, "#shared_nil and #no_nil cannot be applied together");
+		}
+		if (shared_nil && maybe) {
+			syntax_error(f->curr_token, "#maybe and #shared_nil cannot be applied together");
+		}
+
+
+		if (maybe) {
+			union_kind = UnionType_maybe;
+		} else if (no_nil) {
+			union_kind = UnionType_no_nil;
+		} else if (shared_nil) {
+			union_kind = UnionType_shared_nil;
 		}
 
 		skip_possible_newline_for_literal(f);
@@ -2544,7 +2566,7 @@ Ast *parse_operand(AstFile *f, bool lhs) {
 
 		Token close = expect_closing_brace_of_field_list(f);
 
-		return ast_union_type(f, token, variants, polymorphic_params, align, no_nil, maybe, where_token, where_clauses);
+		return ast_union_type(f, token, variants, polymorphic_params, align, union_kind, where_token, where_clauses);
 	} break;
 
 	case Token_enum: {
