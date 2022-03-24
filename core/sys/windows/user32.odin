@@ -108,6 +108,9 @@ foreign user32 {
 
 	BeginPaint :: proc(hWnd: HWND, lpPaint: ^PAINTSTRUCT) -> HDC ---
 	EndPaint :: proc(hWnd: HWND, lpPaint: ^PAINTSTRUCT) -> BOOL ---
+
+	GetKeyState :: proc(nVirtKey: c_int) -> SHORT ---
+	GetAsyncKeyState :: proc(vKey: c_int) -> SHORT ---
 }
 
 CreateWindowA :: #force_inline proc "stdcall" (
