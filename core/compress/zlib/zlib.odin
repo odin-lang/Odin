@@ -47,7 +47,7 @@ Options :: struct {
 	level: u8,
 }
 
-Error     :: compress.Error
+Error         :: compress.Error
 General_Error :: compress.General_Error
 ZLIB_Error    :: compress.ZLIB_Error
 Deflate_Error :: compress.Deflate_Error
