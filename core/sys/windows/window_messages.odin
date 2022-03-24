@@ -1,3 +1,4 @@
+// +build windows
 package sys_windows
 
 WM_NULL                       :: 0x0000
