@@ -14,7 +14,7 @@ foreign gdi32 {
 		hdc: HDC,
 		pbmih: ^BITMAPINFOHEADER,
 		flInit: DWORD,
-		pjBits: ^VOID,
+		pjBits: VOID,
 		pbmi: ^BITMAPINFO,
 		iUsage: UINT,
 	) -> HBITMAP ---
@@ -23,7 +23,7 @@ foreign gdi32 {
 		hdc: HDC,
 		pbmi: ^BITMAPINFO,
 		usage: UINT,
-		ppvBits: ^^VOID,
+		ppvBits: VOID,
 		hSection: HANDLE,
 		offset: DWORD,
 	) -> HBITMAP ---
@@ -38,7 +38,7 @@ foreign gdi32 {
 		ySrc: c_int,
 		SrcWidth: c_int,
 		SrcHeight: c_int,
-		lpBits: ^VOID,
+		lpBits: VOID,
 		lpbmi: ^BITMAPINFO,
 		iUsage: UINT,
 		rop: DWORD,
