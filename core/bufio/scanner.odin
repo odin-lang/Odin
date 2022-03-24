@@ -8,6 +8,7 @@ import "core:intrinsics"
 
 // Extra errors returns by scanning procedures
 Scanner_Extra_Error :: enum i32 {
+	None,
 	Negative_Advance,
 	Advanced_Too_Far,
 	Bad_Read_Count,
@@ -15,7 +16,7 @@ Scanner_Extra_Error :: enum i32 {
 	Too_Short,
 }
 
-Scanner_Error :: union {
+Scanner_Error :: union #shared_nil {
 	io.Error,
 	Scanner_Extra_Error,
 }
@@ -68,7 +69,7 @@ scanner_destroy :: proc(s: ^Scanner) {
 // Returns the first non-EOF error that was encounted by the scanner
 scanner_error :: proc(s: ^Scanner) -> Scanner_Error {
 	switch s._err {
-	case .EOF, .None:
+	case .EOF, nil:
 		return nil
 	}
 	return s._err
@@ -93,10 +94,6 @@ scanner_text :: proc(s: ^Scanner) -> string {
 // scanner_scan advances the scanner
 scanner_scan :: proc(s: ^Scanner) -> bool {
 	set_err :: proc(s: ^Scanner, err: Scanner_Error) {
-		err := err
-		if err == .None {
-			err = nil
-		}
 		switch s._err {
 		case nil, .EOF:
 			s._err = err
