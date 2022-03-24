@@ -2676,13 +2676,13 @@ parse_operand :: proc(p: ^Parser, lhs: bool) -> ^ast.Expr {
 		p.expr_level = prev_level
 
 		if is_no_nil && is_maybe {
-			error(p, p.curr_tok.pos, "#maybe and #no_nil cannot be applied together");
+			error(p, p.curr_tok.pos, "#maybe and #no_nil cannot be applied together")
 		}
 		if is_no_nil && is_shared_nil {
-			error(p, p.curr_tok.pos, "#shared_nil and #no_nil cannot be applied together");
+			error(p, p.curr_tok.pos, "#shared_nil and #no_nil cannot be applied together")
 		}
 		if is_shared_nil && is_maybe {
-			error(p, p.curr_tok.pos, "#maybe and #shared_nil cannot be applied together");
+			error(p, p.curr_tok.pos, "#maybe and #shared_nil cannot be applied together")
 		}
 
 		union_kind := ast.Union_Type_Kind.Normal
