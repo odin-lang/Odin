@@ -47,7 +47,7 @@ when size_of(uintptr) == 8 {
 }
 
 
-Error :: union {
+Error :: union #shared_nil {
 	General_Error,
 	Deflate_Error,
 	ZLIB_Error,
@@ -58,6 +58,7 @@ Error :: union {
 }
 
 General_Error :: enum {
+	None = 0,
 	File_Not_Found,
 	Cannot_Open_File,
 	File_Too_Short,
@@ -76,6 +77,7 @@ General_Error :: enum {
 }
 
 GZIP_Error :: enum {
+	None = 0,
 	Invalid_GZIP_Signature,
 	Reserved_Flag_Set,
 	Invalid_Extra_Data,
@@ -100,6 +102,7 @@ GZIP_Error :: enum {
 }
 
 ZIP_Error :: enum {
+	None = 0,
 	Invalid_ZIP_File_Signature,
 	Unexpected_Signature,
 	Insert_Next_Disk,
@@ -107,6 +110,7 @@ ZIP_Error :: enum {
 }
 
 ZLIB_Error :: enum {
+	None = 0,
 	Unsupported_Window_Size,
 	FDICT_Unsupported,
 	Unsupported_Compression_Level,
@@ -114,6 +118,7 @@ ZLIB_Error :: enum {
 }
 
 Deflate_Error :: enum {
+	None = 0,
 	Huffman_Bad_Sizes,
 	Huffman_Bad_Code_Lengths,
 	Inflate_Error,

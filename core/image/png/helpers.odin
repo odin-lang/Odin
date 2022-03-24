@@ -439,7 +439,7 @@ when false {
 		flags: int = O_WRONLY|O_CREATE|O_TRUNC
 
 		if len(image.pixels) == 0 || len(image.pixels) < image.width * image.height * int(image.channels) {
-			return E_PNG.Invalid_Image_Dimensions
+			return .Invalid_Image_Dimensions
 		}
 
 		mode: int = 0
@@ -450,7 +450,7 @@ when false {
 
 		fd, fderr := open(filename, flags, mode)
 		if fderr != 0 {
-			return E_General.Cannot_Open_File
+			return .Cannot_Open_File
 		}
 		defer close(fd)
 
@@ -473,7 +473,7 @@ when false {
 		case 3: ihdr.color_type = Color_Type{.Color}
 		case 4: ihdr.color_type = Color_Type{.Color, .Alpha}
 		case:// Unhandled
-			return E_PNG.Unknown_Color_Type
+			return .Unknown_Color_Type
 		}
 		h := make_chunk(ihdr, .IHDR)
 		write_chunk(fd, h)
