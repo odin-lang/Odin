@@ -2,7 +2,7 @@ ODIN=../../odin
 PYTHON=$(shell which python3)
 
 all: download_test_assets image_test compress_test strings_test hash_test crypto_test noise_test encoding_test \
-	 math_test linalg_glsl_math_test reflect_test
+	 math_test linalg_glsl_math_test filepath_test reflect_test
 
 download_test_assets:
 	$(PYTHON) download_assets.py
@@ -35,6 +35,9 @@ math_test:
 
 linalg_glsl_math_test:
 	$(ODIN) run math/linalg/glsl/test_linalg_glsl_math.odin -out=test_linalg_glsl_math -collection:tests=..
+
+filepath_test:
+	$(ODIN) run path/filepath/test_core_filepath.odin -out=test_core_filepath -collection:tests=..
 
 reflect_test:
 	$(ODIN) run reflect/test_core_reflect.odin -out=test_core_reflect -collection:tests=..

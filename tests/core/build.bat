@@ -55,6 +55,11 @@ echo ---
 %PATH_TO_ODIN% run math/linalg/glsl %COMMON%
 
 echo ---
+echo Running core:path/filepath tests
+echo ---
+%PATH_TO_ODIN% run path/filepath %COMMON%
+
+echo ---
 echo Running core:reflect tests
 echo ---
 %PATH_TO_ODIN% run reflect %COMMON%

@@ -1,5 +1,5 @@
 // The path/filepath package uses either forward slashes or backslashes depending on the operating system
-// To process paths usch as URLs that depend on forward slashes regardless of the OS, use the path package
+// To process paths such as URLs that depend on forward slashes regardless of the OS, use the path package
 package filepath
 
 import "core:strings"
@@ -300,6 +300,11 @@ dir :: proc(path: string, allocator := context.allocator) -> string {
 
 
 
+// Splits the PATH-like `path` string, returning an array of its separated components (delete after use).
+// For Windows the separator is `;`, for Unix it's  `:`.
+// An empty string returns nil. A non-empty string with no separators returns a 1-element array.
+// Any empty components will be included, e.g. `a::b` will return a 3-element array, as will `::`.
+// Separators within pairs of double-quotes will be ignored and stripped, e.g. `"a:b"c:d` will return []{`a:bc`, `d`}.
 split_list :: proc(path: string, allocator := context.allocator) -> []string {
 	if path == "" {
 		return nil
@@ -322,7 +327,7 @@ split_list :: proc(path: string, allocator := context.allocator) -> []string {
 	}
 
 	start, quote = 0, false
-	list := make([]string, count, allocator)
+	list := make([]string, count + 1, allocator)
 	index := 0
 	for i := 0; i < len(path); i += 1 {
 		c := path[i]
@@ -336,6 +341,7 @@ split_list :: proc(path: string, allocator := context.allocator) -> []string {
 		}
 	}
 	assert(index == count)
+	list[index] = path[start:]
 
 	for s0, i in list {
 		s, new := strings.replace_all(s0, `"`, ``, allocator)
