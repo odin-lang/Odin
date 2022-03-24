@@ -2630,8 +2630,9 @@ parse_operand :: proc(p: ^Parser, lhs: bool) -> ^ast.Expr {
 		tok := expect_token(p, .Union)
 		poly_params: ^ast.Field_List
 		align:       ^ast.Expr
-		is_maybe:    bool
-		is_no_nil:   bool
+		is_maybe:      bool
+		is_no_nil:     bool
+		is_shared_nil: bool
 
 		if allow_token(p, .Open_Paren) {
 			param_count: int
@@ -2663,11 +2664,33 @@ parse_operand :: proc(p: ^Parser, lhs: bool) -> ^ast.Expr {
 					error(p, tag.pos, "duplicate union tag '#%s'", tag.text)
 				}
 				is_no_nil = true
+			case "shared_nil":
+				if is_shared_nil {
+					error(p, tag.pos, "duplicate union tag '#%s'", tag.text)
+				}
+				is_shared_nil = true
 			case:
 				error(p, tag.pos, "invalid union tag '#%s", tag.text)
 			}
 		}
 		p.expr_level = prev_level
+
+		if is_no_nil && is_maybe {
+			error(p, p.curr_tok.pos, "#maybe and #no_nil cannot be applied together");
+		}
+		if is_no_nil && is_shared_nil {
+			error(p, p.curr_tok.pos, "#shared_nil and #no_nil cannot be applied together");
+		}
+		if is_shared_nil && is_maybe {
+			error(p, p.curr_tok.pos, "#maybe and #shared_nil cannot be applied together");
+		}
+
+		union_kind := ast.Union_Type_Kind.Normal
+		switch {
+		case is_maybe:      union_kind = .maybe
+		case is_no_nil:     union_kind = .no_nil
+		case is_shared_nil: union_kind = .shared_nil
+		}
 
 		where_token: tokenizer.Token
 		where_clauses: []^ast.Expr
@@ -2699,14 +2722,15 @@ parse_operand :: proc(p: ^Parser, lhs: bool) -> ^ast.Expr {
 
 		close := expect_closing_brace_of_field_list(p)
 
+
+
 		ut := ast.new(ast.Union_Type, tok.pos, end_pos(close))
 		ut.poly_params   = poly_params
 		ut.variants      = variants[:]
 		ut.align         = align
 		ut.where_token   = where_token
 		ut.where_clauses = where_clauses
-		ut.is_maybe      = is_maybe
-		ut.is_no_nil     = is_no_nil
+		ut.kind          = union_kind
 
 		return ut
 
