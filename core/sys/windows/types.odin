@@ -399,6 +399,30 @@ SW_RESTORE         : c_int : 9
 SW_SHOWDEFAULT     : c_int : 10
 SW_FORCEMINIMIZE   : c_int : 11
 
+// SetWindowPos Flags
+SWP_NOSIZE         :: 0x0001
+SWP_NOMOVE         :: 0x0002
+SWP_NOZORDER       :: 0x0004
+SWP_NOREDRAW       :: 0x0008
+SWP_NOACTIVATE     :: 0x0010
+SWP_FRAMECHANGED   :: 0x0020 // The frame changed: send WM_NCCALCSIZE
+SWP_SHOWWINDOW     :: 0x0040
+SWP_HIDEWINDOW     :: 0x0080
+SWP_NOCOPYBITS     :: 0x0100
+SWP_NOOWNERZORDER  :: 0x0200 // Don't do owner Z ordering
+SWP_NOSENDCHANGING :: 0x0400 // Don't send WM_WINDOWPOSCHANGING
+
+SWP_DRAWFRAME    :: SWP_FRAMECHANGED
+SWP_NOREPOSITION :: SWP_NOOWNERZORDER
+
+SWP_DEFERERASE     :: 0x2000 // same as SWP_DEFERDRAWING
+SWP_ASYNCWINDOWPOS :: 0x4000 // same as SWP_CREATESPB
+
+HWND_TOP       : HWND : 0
+HWND_BOTTOM    : HWND : 1
+HWND_TOPMOST   : HWND : -1
+HWND_NOTOPMOST : HWND : -2
+
 CW_USEDEFAULT      : c_int : -2147483648
 
 SIZE_RESTORED  :: 0
@@ -846,6 +870,15 @@ FILE_TYPE_PIPE :: 0x0003
 RECT  :: struct {left, top, right, bottom: LONG}
 POINT :: struct {x, y: LONG}
 
+WINDOWPOS :: struct {
+	hwnd: HWND,
+	hwndInsertAfter: HWND,
+	x: c_int,
+	y: c_int,
+	cx: c_int,
+	cy: c_int,
+	flags: UINT,
+}
 
 when size_of(uintptr) == 4 {
 	WSADATA :: struct {

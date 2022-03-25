@@ -97,6 +97,15 @@ foreign user32 {
 	LoadCursorW :: proc(hInstance: HINSTANCE, lpCursorName: LPCWSTR) -> HCURSOR ---
 
 	GetClientRect :: proc(hWnd: HWND, lpRect: ^RECT) -> BOOL ---
+	SetWindowPos :: proc(
+		hWnd: HWND,
+		hWndInsertAfter: HWND,
+		X: c_int,
+		Y: c_int,
+		cx: c_int,
+		cy: c_int,
+		uFlags: UINT,
+	) -> BOOL ---
 
 	GetWindowDC :: proc(hWnd: HWND) -> HDC ---
 	GetDC :: proc(hWnd: HWND) -> HDC ---
