@@ -1367,8 +1367,8 @@ fields_proc :: proc(s: string, f: proc(rune) -> bool, allocator := context.alloc
 }
 
 
-// fields_iterator returns the first run of characters in s that does not contain white space, defined by unicode.is_space
-// s will then start from any space after the substring, or be a nil string if the substring was the remaining characters
+// `fields_iterator` returns the first run of characters in `s` that does not contain white space, defined by `unicode.is_space`
+// `s` will then start from any space after the substring, or be an empty string if the substring was the remaining characters
 fields_iterator :: proc(s: ^string) -> (field: string, ok: bool) {
 	start, end := -1, -1
 	for r, offset in s {
