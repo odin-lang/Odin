@@ -477,10 +477,10 @@ SWP_NOREPOSITION :: SWP_NOOWNERZORDER
 SWP_DEFERERASE     :: 0x2000 // same as SWP_DEFERDRAWING
 SWP_ASYNCWINDOWPOS :: 0x4000 // same as SWP_CREATESPB
 
-HWND_TOP       :: 0
-HWND_BOTTOM    :: 1
-HWND_TOPMOST   :: -1
-HWND_NOTOPMOST :: -2
+HWND_TOP       :: HWND( uintptr(0))     //  0
+HWND_BOTTOM    :: HWND( uintptr(1))     //  1
+HWND_TOPMOST   :: HWND(~uintptr(0))     // -1
+HWND_NOTOPMOST :: HWND(~uintptr(0) - 1) // -2
 
 CW_USEDEFAULT      : c_int : -2147483648
 
