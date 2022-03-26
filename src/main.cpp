@@ -117,6 +117,9 @@ i32 system_exec_command_line_app(char const *name, char const *fmt, ...) {
 		gb_printf_err("%s\n\n", cmd_line);
 	}
 	exit_code = system(cmd_line);
+	if (WIFEXITED(exit_code)) {
+		exit_code = WEXITSTATUS(exit_code);
+	}
 #endif
 
 	if (exit_code) {
