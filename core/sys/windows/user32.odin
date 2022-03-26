@@ -97,6 +97,7 @@ foreign user32 {
 	LoadCursorW :: proc(hInstance: HINSTANCE, lpCursorName: LPCWSTR) -> HCURSOR ---
 
 	GetClientRect :: proc(hWnd: HWND, lpRect: ^RECT) -> BOOL ---
+	ClientToScreen :: proc(hWnd: HWND, lpPoint: LPPOINT) -> BOOL ---
 	SetWindowPos :: proc(
 		hWnd: HWND,
 		hWndInsertAfter: HWND,
