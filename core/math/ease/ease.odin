@@ -1,3 +1,4 @@
+// easing procedures and flux easing used for animations
 package ease
 
 import "core:math"
@@ -335,9 +336,8 @@ Flux_Tween :: struct($T: typeid) {
 	diff: T,
 	goal: T,
 
-	// using ticks for timing instead
-	delay_tick_start: time.Tick,
-	delay: time.Duration,
+	delay: f64, // in seconds
+	delay_delta: f64,
 	duration: time.Duration,
 
 	progress: f64,
@@ -379,7 +379,7 @@ flux_to :: proc(
 	goal: f32, 
 	type: Ease = .Quadratic_Out,
 	duration: time.Duration = time.Second, 
-	delay: time.Duration = 0,
+	delay: f64 = 0,
 ) -> (tween: ^Flux_Tween(T)) where intrinsics.type_is_float(T) {
 	if res, ok := &flux.values[value]; ok {
 		tween = res
@@ -393,7 +393,6 @@ flux_to :: proc(
 		goal = goal, 
 		duration = duration,
 		delay = delay,
-		delay_tick_start = time.tick_now(),
 		type = type,
 		data = value,
 	}
@@ -416,17 +415,24 @@ flux_tween_init :: proc(tween: ^Flux_Tween($T), duration: time.Duration) where i
 // deletes tween from the map after completion
 flux_update :: proc(flux: ^Flux_Map($T), dt: f64) where intrinsics.type_is_float(T) {
 	size := len(flux.values)
-	now := time.tick_now()
+	dt := dt
 
 	for key, tween in &flux.values {
-		if tween.delay != 0 {
-			diff := time.tick_diff(tween.delay_tick_start, now)
+		delay_remainder := f64(0)
 
-			// when diff reached delay, stop delaying
-			if diff > tween.delay {
+		if tween.delay > 0 {
+			// Update delay
+			tween.delay -= dt
+
+			if tween.delay < 0 {
+        // We finished the delay, but in doing so consumed part of this frame's `dt` budget.
+        // Keep track of it so we can apply it to this tween without affecting others.				
+				delay_remainder = tween.delay
+				// We're done with this delay.
 				tween.delay = 0
 			}
 		} else {
+      // We either had no delay, or the delay has been consumed.
 			if !tween.inited {
 				flux_tween_init(&tween, tween.duration)
 				
@@ -435,7 +441,10 @@ flux_update :: proc(flux: ^Flux_Map($T), dt: f64) where intrinsics.type_is_float
 				}
 			} 
 
-			tween.progress += tween.rate * dt
+			// If part of the `dt` budget was consumed this frame, then `delay_remainder` will be
+			// that remainder, a negative value. Adding it to `dt` applies what's left of the `dt`
+			// to the tween so it advances properly, instead of too much or little.
+			tween.progress += tween.rate * (dt + delay_remainder)
 			x := tween.progress >= 1 ? 1 : ease(tween.type, tween.progress)
 			tween.value^ = tween.start + tween.diff * T(x)
 
@@ -463,4 +472,14 @@ flux_stop :: proc(flux: ^Flux_Map($T), key: ^f32) -> bool where intrinsics.type_
 	}
 
 	return false
+}
+
+// returns the amount of time left for the tween animation, if the key exists in the map
+// returns 0 if the tween doesnt exist on the map
+flux_tween_time_left :: proc(flux: Flux_Map($T), key: ^T) -> f64 {
+	if tween, ok := flux.values[key]; ok {
+		return ((1 - tween.progress) * tween.rate) + tween.delay
+	} else {
+		return 0
+	}
 }
