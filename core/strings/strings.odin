@@ -286,9 +286,8 @@ concatenate :: proc(a: []string, allocator := context.allocator) -> string {
 }
 
 /*
-
 	`rune_offset` and `rune_length` are in runes, not bytes.
-	If `rune_length` <= 0, then it'll return the remainder of the string starting with `rune_offset`.
+	If `rune_length` <= 0, then it'll return the remainder of the string starting at `rune_offset`.
 
 	strings.cut("some example text", 0, 4) -> "some"
 	strings.cut("some example text", 2, 2) -> "me"
@@ -296,26 +295,48 @@ concatenate :: proc(a: []string, allocator := context.allocator) -> string {
 */
 cut :: proc(s: string, rune_offset := int(0), rune_length := int(0), allocator := context.allocator) -> (res: string) {
 	s := s; rune_length := rune_length
-	l := utf8.rune_count_in_string(s)
+	context.allocator = allocator
 
-	if rune_offset >= l { return "" }
+	// If we signal that we want the entire remainder (length <= 0) *and*
+	// the offset is zero, then we can early out by cloning the input
 	if rune_offset == 0 && rune_length <= 0 {
-		return clone(s, allocator)
+		return clone(s)
 	}
-	if rune_length == 0 { rune_length = l }
 
+	// We need to know if we have enough runes to cover offset + length.
+	rune_count := utf8.rune_count_in_string(s)
+
+	// We're asking for a substring starting after the end of the input string.
+	// That's just an empty string.
+	if rune_offset >= rune_count {
+		return ""
+	}
+
+	// If we don't specify the length of the substring, use the remainder.
+	if rune_length <= 0 {
+		rune_length = rune_count - rune_offset
+	}
+
+	// We don't yet know how many bytes we need exactly.
+	// But we do know it's bounded by the number of runes * 4 bytes,
+	// and can be no more than the size of the input string.
 	bytes_needed := min(rune_length * 4, len(s))
-	buf := make([]u8, bytes_needed, allocator)
+	buf := make([]u8, bytes_needed)
 
 	byte_offset := 0
-	for i := 0; i < l; i += 1 {
+	for i := 0; i < rune_count; i += 1 {
 		_, w := utf8.decode_rune_in_string(s)
+
+		// If the rune is part of the substring, copy it to the output buffer.
 		if i >= rune_offset {
 			for j := 0; j < w; j += 1 {
 				buf[byte_offset+j] = s[j]
 			}
 			byte_offset += w
 		}
+
+		// We're done if we reach the end of the input string, *or*
+		// if we've reached a specified length in runes.
 		if rune_length > 0 {
 			if i == rune_offset + rune_length - 1 { break }
 		}
