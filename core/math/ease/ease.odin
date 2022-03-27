@@ -25,7 +25,7 @@ quadratic_out :: proc "contextless" (p: $T) -> T where intrinsics.type_is_float(
 // y = -(1/2)((2x-1)*(2x-3) - 1) ; [0.5, 1]
 quadratic_in_out :: proc "contextless" (p: $T) -> T where intrinsics.type_is_float(T) {
 	if p < 0.5 {
-		return 2 * p * p;
+		return 2 * p * p
 	}	else {
 		return (-2 * p * p) + (4 * p) - 1
 	}
@@ -337,7 +337,6 @@ Flux_Tween :: struct($T: typeid) {
 	goal: T,
 
 	delay: f64, // in seconds
-	delay_delta: f64,
 	duration: time.Duration,
 
 	progress: f64,
@@ -414,25 +413,24 @@ flux_tween_init :: proc(tween: ^Flux_Tween($T), duration: time.Duration) where i
 // calls callbacks in all stages, when they're filled
 // deletes tween from the map after completion
 flux_update :: proc(flux: ^Flux_Map($T), dt: f64) where intrinsics.type_is_float(T) {
-	size := len(flux.values)
-	dt := dt
-
 	for key, tween in &flux.values {
 		delay_remainder := f64(0)
 
+		// Update delay if necessary.
 		if tween.delay > 0 {
-			// Update delay
 			tween.delay -= dt
 
 			if tween.delay < 0 {
-        // We finished the delay, but in doing so consumed part of this frame's `dt` budget.
-        // Keep track of it so we can apply it to this tween without affecting others.				
+				// We finished the delay, but in doing so consumed part of this frame's `dt` budget.
+				// Keep track of it so we can apply it to this tween without affecting others.
 				delay_remainder = tween.delay
 				// We're done with this delay.
 				tween.delay = 0
 			}
-		} else {
-      // We either had no delay, or the delay has been consumed.
+		}
+
+		// We either had no delay, or the delay has been consumed.
+		if tween.delay <= 0 {
 			if !tween.inited {
 				flux_tween_init(&tween, tween.duration)
 				
