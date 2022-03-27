@@ -708,13 +708,19 @@ Struct_Type :: struct {
 	name_count:    int,
 }
 
+Union_Type_Kind :: enum u8 {
+	Normal,
+	maybe,
+	no_nil,
+	shared_nil,
+}
+
 Union_Type :: struct {
 	using node: Expr,
 	tok_pos:       tokenizer.Pos,
 	poly_params:   ^Field_List,
 	align:         ^Expr,
-	is_maybe:      bool,
-	is_no_nil:     bool,
+	kind:          Union_Type_Kind,
 	where_token:   tokenizer.Token,
 	where_clauses: []^Expr,
 	variants:      []^Expr,

@@ -118,7 +118,7 @@ Option :: enum {
 }
 Options :: distinct bit_set[Option]
 
-Error :: union {
+Error :: union #shared_nil {
 	General_Image_Error,
 	PNG_Error,
 
@@ -137,6 +137,7 @@ General_Image_Error :: enum {
 }
 
 PNG_Error :: enum {
+	None = 0,
 	Invalid_PNG_Signature,
 	IHDR_Not_First_Chunk,
 	IHDR_Corrupt,

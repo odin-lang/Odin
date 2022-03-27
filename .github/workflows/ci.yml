@@ -7,9 +7,9 @@ jobs:
     steps:
       - uses: actions/checkout@v1
       - name: Download LLVM, botan
-        run: sudo apt-get install llvm-11 clang-11 llvm libbotan-2-dev botan
+        run: sudo apt-get install llvm-11 clang-11 libbotan-2-dev botan
       - name: build odin
-        run: make release
+        run: ./build_odin.sh release
       - name: Odin version
         run: ./odin version
         timeout-minutes: 1
@@ -38,8 +38,14 @@ jobs:
           cd tests/vendor
           make
         timeout-minutes: 10
+      - name: Odin issues tests
+        run: tests/issues/run.sh
+        timeout-minutes: 10
       - name: Odin check examples/all for Linux i386
         run: ./odin check examples/all -vet -strict-style -target:linux_i386
+        timeout-minutes: 10
+      - name: Odin check examples/all for FreeBSD amd64
+        run: ./odin check examples/all -vet -strict-style -target:freebsd_amd64
         timeout-minutes: 10
       - name: Odin check examples/all for OpenBSD amd64
         run: ./odin check examples/all -vet -strict-style -target:openbsd_amd64
@@ -55,7 +61,7 @@ jobs:
           TMP_PATH=$(xcrun --show-sdk-path)/user/include
           echo "CPATH=$TMP_PATH" >> $GITHUB_ENV
       - name: build odin
-        run: make release
+        run: ./build_odin.sh release
       - name: Odin version
         run: ./odin version
         timeout-minutes: 1
@@ -84,8 +90,14 @@ jobs:
           cd tests/vendor
           make
         timeout-minutes: 10
+      - name: Odin issues tests
+        run: tests/issues/run.sh
+        timeout-minutes: 10
       - name: Odin check examples/all for Darwin arm64
         run: ./odin check examples/all -vet -strict-style -target:darwin_arm64
+        timeout-minutes: 10
+      - name: Odin check examples/all for Linux arm64
+        run: ./odin check examples/all -vet -strict-style -target:linux_arm64
         timeout-minutes: 10
   build_windows:
     runs-on: windows-2019
@@ -146,6 +158,12 @@ jobs:
           call "C:\Program Files (x86)\Microsoft Visual Studio\2019\Enterprise\VC\Auxiliary\Build\vcvars64.bat
           cd tests\core\math\big
           call build.bat
+        timeout-minutes: 10
+      - name: Odin issues tests
+        shell: cmd
+        run: |
+          call "C:\Program Files (x86)\Microsoft Visual Studio\2019\Enterprise\VC\Auxiliary\Build\vcvars64.bat
+          call tests\issues\run.bat
         timeout-minutes: 10
       - name: Odin check examples/all for Windows 32bits
         shell: cmd

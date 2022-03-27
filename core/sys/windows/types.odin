@@ -21,7 +21,15 @@ HINSTANCE :: HANDLE
 HMODULE :: distinct HINSTANCE
 HRESULT :: distinct LONG
 HWND :: distinct HANDLE
+HDC :: distinct HANDLE
 HMONITOR :: distinct HANDLE
+HICON :: distinct HANDLE
+HCURSOR :: distinct HANDLE
+HMENU :: distinct HANDLE
+HBRUSH :: distinct HANDLE
+HGDIOBJ :: distinct HANDLE
+HBITMAP :: distinct HANDLE
+HGLOBAL :: distinct HANDLE
 BOOL :: distinct b32
 BYTE :: distinct u8
 BOOLEAN :: distinct b8
@@ -42,9 +50,15 @@ PULONG_PTR :: ^ULONG_PTR
 LPULONG_PTR :: ^ULONG_PTR
 DWORD_PTR :: ULONG_PTR
 LONG_PTR :: int
+UINT_PTR :: uintptr
 ULONG :: c_ulong
 UCHAR :: BYTE
 NTSTATUS :: c.long
+LPARAM :: LONG_PTR
+WPARAM :: UINT_PTR
+LRESULT :: LONG_PTR
+LPRECT :: ^RECT
+LPPOINT :: ^POINT
 
 UINT8  ::  u8
 UINT16 :: u16
@@ -71,6 +85,7 @@ PBOOL :: ^BOOL
 LPBOOL :: ^BOOL
 LPCSTR :: cstring
 LPCWSTR :: wstring
+LPCTSTR :: wstring
 LPDWORD :: ^DWORD
 PCSTR :: cstring
 PCWSTR :: wstring
@@ -81,7 +96,8 @@ LPPROCESS_INFORMATION :: ^PROCESS_INFORMATION
 PSECURITY_ATTRIBUTES :: ^SECURITY_ATTRIBUTES
 LPSECURITY_ATTRIBUTES :: ^SECURITY_ATTRIBUTES
 LPSTARTUPINFO :: ^STARTUPINFO
-PVOID  :: rawptr
+VOID :: rawptr
+PVOID :: rawptr
 LPVOID :: rawptr
 PINT :: ^INT
 LPINT :: ^INT
@@ -178,6 +194,82 @@ GetFileExInfoStandard: GET_FILEEX_INFO_LEVELS : 0
 GetFileExMaxInfoLevel: GET_FILEEX_INFO_LEVELS : 1
 
 
+WNDPROC :: #type proc "stdcall" (HWND, UINT, WPARAM, LPARAM) -> LRESULT
+
+WNDCLASSA :: struct {
+	style: UINT,
+	lpfnWndProc: WNDPROC,
+	cbClsExtra: c_int,
+	cbWndExtra: c_int,
+	hInstance: HINSTANCE,
+	hIcon: HICON,
+	hCursor: HCURSOR,
+	hbrBackground: HBRUSH,
+	lpszMenuName: LPCSTR,
+	lpszClassName: LPCSTR,
+}
+
+WNDCLASSW :: struct {
+	style: UINT,
+	lpfnWndProc: WNDPROC,
+	cbClsExtra: c_int,
+	cbWndExtra: c_int,
+	hInstance: HINSTANCE,
+	hIcon: HICON,
+	hCursor: HCURSOR,
+	hbrBackground: HBRUSH,
+	lpszMenuName: LPCWSTR,
+	lpszClassName: LPCWSTR,
+}
+
+WNDCLASSEXA :: struct {
+	cbSize: UINT,
+	style: UINT,
+	lpfnWndProc: WNDPROC,
+	cbClsExtra: c_int,
+	cbWndExtra: c_int,
+	hInstance: HINSTANCE,
+	hIcon: HICON,
+	hCursor: HCURSOR,
+	hbrBackground: HBRUSH,
+	lpszMenuName: LPCSTR,
+	lpszClassName: LPCSTR,
+	hIconSm: HICON,
+}
+
+WNDCLASSEXW :: struct {
+	cbSize: UINT,
+	style: UINT,
+	lpfnWndProc: WNDPROC,
+	cbClsExtra: c_int,
+	cbWndExtra: c_int,
+	hInstance: HINSTANCE,
+	hIcon: HICON,
+	hCursor: HCURSOR,
+	hbrBackground: HBRUSH,
+	lpszMenuName: LPCWSTR,
+	lpszClassName: LPCWSTR,
+	hIconSm: HICON,
+}
+
+MSG :: struct {
+	hwnd: HWND,
+	message: UINT,
+	wParam: WPARAM,
+	lParam: LPARAM,
+	time: DWORD,
+	pt: POINT,
+}
+
+PAINTSTRUCT :: struct {
+	hdc: HDC,
+	fErase: BOOL,
+	rcPaint: RECT,
+	fRestore: BOOL,
+	fIncUpdate: BOOL,
+	rgbReserved: [32]BYTE,
+}
+
 WIN32_FIND_DATAW :: struct {
 	dwFileAttributes: DWORD,
 	ftCreationTime: FILETIME,
@@ -190,6 +282,574 @@ WIN32_FIND_DATAW :: struct {
 	cFileName: [260]wchar_t, // #define MAX_PATH 260
 	cAlternateFileName: [14]wchar_t,
 }
+
+CREATESTRUCTA :: struct {
+	lpCreateParams: LPVOID,
+	hInstance:      HINSTANCE,
+	hMenu:          HMENU,
+	hwndParent:     HWND,
+	cy:             c_int,
+	cx:             c_int,
+	y:              c_int,
+	x:              c_int,
+	style:          LONG,
+	lpszName:       LPCSTR,
+	lpszClass:      LPCSTR,
+	dwExStyle:      DWORD,
+}
+
+CREATESTRUCTW:: struct {
+	lpCreateParams: LPVOID,
+	hInstance:      HINSTANCE,
+	hMenu:          HMENU,
+	hwndParent:     HWND,
+	cy:             c_int,
+	cx:             c_int,
+	y:              c_int,
+	x:              c_int,
+	style:          LONG,
+	lpszName:       LPCWSTR,
+	lpszClass:      LPCWSTR,
+	dwExStyle:      DWORD,
+}
+
+// MessageBox() Flags
+MB_OK                :: 0x00000000
+MB_OKCANCEL          :: 0x00000001
+MB_ABORTRETRYIGNORE  :: 0x00000002
+MB_YESNOCANCEL       :: 0x00000003
+MB_YESNO             :: 0x00000004
+MB_RETRYCANCEL       :: 0x00000005
+MB_CANCELTRYCONTINUE :: 0x00000006
+
+MB_ICONHAND        :: 0x00000010
+MB_ICONQUESTION    :: 0x00000020
+MB_ICONEXCLAMATION :: 0x00000030
+MB_ICONASTERISK    :: 0x00000040
+MB_USERICON        :: 0x00000080
+MB_ICONWARNING     :: MB_ICONEXCLAMATION
+MB_ICONERROR       :: MB_ICONHAND
+MB_ICONINFORMATION :: MB_ICONASTERISK
+MB_ICONSTOP        :: MB_ICONHAND
+
+MB_DEFBUTTON1 :: 0x00000000
+MB_DEFBUTTON2 :: 0x00000100
+MB_DEFBUTTON3 :: 0x00000200
+MB_DEFBUTTON4 :: 0x00000300
+
+MB_APPLMODAL   :: 0x00000000
+MB_SYSTEMMODAL :: 0x00001000
+MB_TASKMODAL   :: 0x00002000
+MB_HELP        :: 0x00004000 // Help Button
+
+MB_NOFOCUS              :: 0x00008000
+MB_SETFOREGROUND        :: 0x00010000
+MB_DEFAULT_DESKTOP_ONLY :: 0x00020000
+MB_TOPMOST              :: 0x00040000
+MB_RIGHT                :: 0x00080000
+MB_RTLREADING           :: 0x00100000
+
+MB_SERVICE_NOTIFICATION      :: 0x00200000
+MB_SERVICE_NOTIFICATION_NT3X :: 0x00040000
+
+MB_TYPEMASK :: 0x0000000F
+MB_ICONMASK :: 0x000000F0
+MB_DEFMASK  :: 0x00000F00
+MB_MODEMASK :: 0x00003000
+MB_MISCMASK :: 0x0000C000
+
+// Dialog Box Command IDs
+IDOK       :: 1
+IDCANCEL   :: 2
+IDABORT    :: 3
+IDRETRY    :: 4
+IDIGNORE   :: 5
+IDYES      :: 6
+IDNO       :: 7
+IDCLOSE    :: 8
+IDHELP     :: 9
+IDTRYAGAIN :: 10
+IDCONTINUE :: 11
+IDTIMEOUT  :: 32000
+
+CS_VREDRAW         : UINT : 0x0001
+CS_HREDRAW         : UINT : 0x0002
+CS_DBLCLKS         : UINT : 0x0008
+CS_OWNDC           : UINT : 0x0020
+CS_CLASSDC         : UINT : 0x0040
+CS_PARENTDC        : UINT : 0x0080
+CS_NOCLOSE         : UINT : 0x0200
+CS_SAVEBITS        : UINT : 0x0800
+CS_BYTEALIGNCLIENT : UINT : 0x1000
+CS_BYTEALIGNWINDOW : UINT : 0x2000
+CS_GLOBALCLASS     : UINT : 0x4000
+CS_DROPSHADOW      : UINT : 0x0002_0000
+
+GWL_EXSTYLE    : c_int : -20
+GWLP_HINSTANCE : c_int : -6
+GWLP_ID        : c_int : -12
+GWL_STYLE      : c_int : -16
+GWLP_USERDATA  : c_int : -21
+GWLP_WNDPROC   : c_int : -4
+
+WS_BORDER           : UINT : 0x0080_0000
+WS_CAPTION          : UINT : 0x00C0_0000
+WS_CHILD            : UINT : 0x4000_0000
+WS_CHILDWINDOW      : UINT : WS_CHILD
+WS_CLIPCHILDREN     : UINT : 0x0200_0000
+WS_CLIPSIBLINGS     : UINT : 0x0400_0000
+WS_DISABLED         : UINT : 0x0800_0000
+WS_DLGFRAME         : UINT : 0x0040_0000
+WS_GROUP            : UINT : 0x0002_0000
+WS_HSCROLL          : UINT : 0x0010_0000
+WS_ICONIC           : UINT : 0x2000_0000
+WS_MAXIMIZE         : UINT : 0x0100_0000
+WS_MAXIMIZEBOX      : UINT : 0x0001_0000
+WS_MINIMIZE         : UINT : 0x2000_0000
+WS_MINIMIZEBOX      : UINT : 0x0002_0000
+WS_OVERLAPPED       : UINT : 0x0000_0000
+WS_OVERLAPPEDWINDOW : UINT : WS_OVERLAPPED | WS_CAPTION | WS_SYSMENU | WS_THICKFRAME | WS_MINIMIZEBOX | WS_MAXIMIZEBOX
+WS_POPUP			: UINT : 0x8000_0000
+WS_POPUPWINDOW      : UINT : WS_POPUP | WS_BORDER | WS_SYSMENU
+WS_SIZEBOX          : UINT : 0x0004_0000
+WS_SYSMENU          : UINT : 0x0008_0000
+WS_TABSTOP          : UINT : 0x0001_0000
+WS_THICKFRAME       : UINT : 0x0004_0000
+WS_TILED            : UINT : 0x0000_0000
+WS_TILEDWINDOW      : UINT : WS_OVERLAPPED | WS_CAPTION | WS_SYSMENU | WS_THICKFRAME | WS_MINIMIZE | WS_MAXIMIZE
+WS_VISIBLE          : UINT : 0x1000_0000
+WS_VSCROLL          : UINT : 0x0020_0000
+
+QS_ALLEVENTS      : UINT : QS_INPUT | QS_POSTMESSAGE | QS_TIMER | QS_PAINT | QS_HOTKEY
+QS_ALLINPUT       : UINT : QS_INPUT | QS_POSTMESSAGE | QS_TIMER | QS_PAINT | QS_HOTKEY | QS_SENDMESSAGE
+QS_ALLPOSTMESSAGE : UINT : 0x0100
+QS_HOTKEY         : UINT : 0x0080
+QS_INPUT          : UINT : QS_MOUSE | QS_KEY | QS_RAWINPUT
+QS_KEY            : UINT : 0x0001
+QS_MOUSE          : UINT : QS_MOUSEMOVE | QS_MOUSEBUTTON
+QS_MOUSEBUTTON    : UINT : 0x0004
+QS_MOUSEMOVE      : UINT : 0x0002
+QS_PAINT          : UINT : 0x0020
+QS_POSTMESSAGE    : UINT : 0x0008
+QS_RAWINPUT       : UINT : 0x0400
+QS_SENDMESSAGE    : UINT : 0x0040
+QS_TIMER          : UINT : 0x0010
+
+PM_NOREMOVE : UINT : 0x0000
+PM_REMOVE   : UINT : 0x0001
+PM_NOYIELD  : UINT : 0x0002
+
+PM_QS_INPUT       : UINT : QS_INPUT << 16
+PM_QS_PAINT       : UINT : QS_PAINT << 16
+PM_QS_POSTMESSAGE : UINT : (QS_POSTMESSAGE | QS_HOTKEY | QS_TIMER) << 16
+PM_QS_SENDMESSAGE : UINT : QS_SENDMESSAGE << 16
+
+SW_HIDE            : c_int : 0
+SW_SHOWNORMAL      : c_int : SW_NORMAL
+SW_NORMAL          : c_int : 1
+SW_SHOWMINIMIZED   : c_int : 2
+SW_SHOWMAXIMIZED   : c_int : SW_MAXIMIZE
+SW_MAXIMIZE        : c_int : 3
+SW_SHOWNOACTIVATE  : c_int : 4
+SW_SHOW            : c_int : 5
+SW_MINIMIZE        : c_int : 6
+SW_SHOWMINNOACTIVE : c_int : 7
+SW_SHOWNA          : c_int : 8
+SW_RESTORE         : c_int : 9
+SW_SHOWDEFAULT     : c_int : 10
+SW_FORCEMINIMIZE   : c_int : 11
+
+// SetWindowPos Flags
+SWP_NOSIZE         :: 0x0001
+SWP_NOMOVE         :: 0x0002
+SWP_NOZORDER       :: 0x0004
+SWP_NOREDRAW       :: 0x0008
+SWP_NOACTIVATE     :: 0x0010
+SWP_FRAMECHANGED   :: 0x0020 // The frame changed: send WM_NCCALCSIZE
+SWP_SHOWWINDOW     :: 0x0040
+SWP_HIDEWINDOW     :: 0x0080
+SWP_NOCOPYBITS     :: 0x0100
+SWP_NOOWNERZORDER  :: 0x0200 // Don't do owner Z ordering
+SWP_NOSENDCHANGING :: 0x0400 // Don't send WM_WINDOWPOSCHANGING
+
+SWP_DRAWFRAME    :: SWP_FRAMECHANGED
+SWP_NOREPOSITION :: SWP_NOOWNERZORDER
+
+SWP_DEFERERASE     :: 0x2000 // same as SWP_DEFERDRAWING
+SWP_ASYNCWINDOWPOS :: 0x4000 // same as SWP_CREATESPB
+
+HWND_TOP       :: HWND( uintptr(0))     //  0
+HWND_BOTTOM    :: HWND( uintptr(1))     //  1
+HWND_TOPMOST   :: HWND(~uintptr(0))     // -1
+HWND_NOTOPMOST :: HWND(~uintptr(0) - 1) // -2
+
+// GetSystemMetrics() codes
+SM_CXSCREEN          :: 0
+SM_CYSCREEN          :: 1
+SM_CXVSCROLL         :: 2
+SM_CYHSCROLL         :: 3
+SM_CYCAPTION         :: 4
+SM_CXBORDER          :: 5
+SM_CYBORDER          :: 6
+SM_CXDLGFRAME        :: 7
+SM_CYDLGFRAME        :: 8
+SM_CYVTHUMB          :: 9
+SM_CXHTHUMB          :: 10
+SM_CXICON            :: 11
+SM_CYICON            :: 12
+SM_CXCURSOR          :: 13
+SM_CYCURSOR          :: 14
+SM_CYMENU            :: 15
+SM_CXFULLSCREEN      :: 16
+SM_CYFULLSCREEN      :: 17
+SM_CYKANJIWINDOW     :: 18
+SM_MOUSEPRESENT      :: 19
+SM_CYVSCROLL         :: 20
+SM_CXHSCROLL         :: 21
+SM_DEBUG             :: 22
+SM_SWAPBUTTON        :: 23
+SM_RESERVED1         :: 24
+SM_RESERVED2         :: 25
+SM_RESERVED3         :: 26
+SM_RESERVED4         :: 27
+SM_CXMIN             :: 28
+SM_CYMIN             :: 29
+SM_CXSIZE            :: 30
+SM_CYSIZE            :: 31
+SM_CXFRAME           :: 32
+SM_CYFRAME           :: 33
+SM_CXMINTRACK        :: 34
+SM_CYMINTRACK        :: 35
+SM_CXDOUBLECLK       :: 36
+SM_CYDOUBLECLK       :: 37
+SM_CXICONSPACING     :: 38
+SM_CYICONSPACING     :: 39
+SM_MENUDROPALIGNMENT :: 40
+SM_PENWINDOWS        :: 41
+SM_DBCSENABLED       :: 42
+SM_CMOUSEBUTTONS     :: 43
+
+SM_CXFIXEDFRAME :: SM_CXDLGFRAME  // ;win40 name change
+SM_CYFIXEDFRAME :: SM_CYDLGFRAME  // ;win40 name change
+SM_CXSIZEFRAME  :: SM_CXFRAME     // ;win40 name change
+SM_CYSIZEFRAME  :: SM_CYFRAME     // ;win40 name change
+
+SM_SECURE       :: 44
+SM_CXEDGE       :: 45
+SM_CYEDGE       :: 46
+SM_CXMINSPACING :: 47
+SM_CYMINSPACING :: 48
+SM_CXSMICON     :: 49
+SM_CYSMICON     :: 50
+SM_CYSMCAPTION  :: 51
+SM_CXSMSIZE     :: 52
+SM_CYSMSIZE     :: 53
+SM_CXMENUSIZE   :: 54
+SM_CYMENUSIZE   :: 55
+SM_ARRANGE      :: 56
+SM_CXMINIMIZED  :: 57
+SM_CYMINIMIZED  :: 58
+SM_CXMAXTRACK   :: 59
+SM_CYMAXTRACK   :: 60
+SM_CXMAXIMIZED  :: 61
+SM_CYMAXIMIZED  :: 62
+SM_NETWORK      :: 63
+SM_CLEANBOOT    :: 67
+SM_CXDRAG       :: 68
+SM_CYDRAG       :: 69
+
+SM_SHOWSOUNDS        :: 70
+SM_CXMENUCHECK       :: 71   // Use instead of GetMenuCheckMarkDimensions()!
+SM_CYMENUCHECK       :: 72
+SM_SLOWMACHINE       :: 73
+SM_MIDEASTENABLED    :: 74
+SM_MOUSEWHEELPRESENT :: 75
+SM_XVIRTUALSCREEN    :: 76
+SM_YVIRTUALSCREEN    :: 77
+SM_CXVIRTUALSCREEN   :: 78
+SM_CYVIRTUALSCREEN   :: 79
+SM_CMONITORS         :: 80
+SM_SAMEDISPLAYFORMAT :: 81
+SM_IMMENABLED        :: 82
+SM_CXFOCUSBORDER     :: 83
+SM_CYFOCUSBORDER     :: 84
+SM_TABLETPC          :: 86
+SM_MEDIACENTER       :: 87
+SM_STARTER           :: 88
+SM_SERVERR2          :: 89
+
+SM_MOUSEHORIZONTALWHEELPRESENT :: 91
+
+SM_CXPADDEDBORDER :: 92
+SM_DIGITIZER      :: 94
+SM_MAXIMUMTOUCHES :: 95
+SM_CMETRICS       :: 97
+
+SM_REMOTESESSION        :: 0x1000
+SM_SHUTTINGDOWN         :: 0x2000
+SM_REMOTECONTROL        :: 0x2001
+SM_CARETBLINKINGENABLED :: 0x2002
+SM_CONVERTIBLESLATEMODE :: 0x2003
+SM_SYSTEMDOCKED         :: 0x2004
+
+CW_USEDEFAULT : c_int : -2147483648
+
+SIZE_RESTORED  :: 0
+SIZE_MINIMIZED :: 1
+SIZE_MAXIMIZED :: 2
+SIZE_MAXSHOW   :: 3
+SIZE_MAXHIDE   :: 4
+
+WMSZ_LEFT        :: 1
+WMSZ_RIGHT       :: 2
+WMSZ_TOP         :: 3
+WMSZ_TOPLEFT     :: 4
+WMSZ_TOPRIGHT    :: 5
+WMSZ_BOTTOM      :: 6
+WMSZ_BOTTOMLEFT  :: 7
+WMSZ_BOTTOMRIGHT :: 8
+
+// Key State Masks for Mouse Messages
+MK_LBUTTON  :: 0x0001
+MK_RBUTTON  :: 0x0002
+MK_SHIFT    :: 0x0004
+MK_CONTROL  :: 0x0008
+MK_MBUTTON  :: 0x0010
+MK_XBUTTON1 :: 0x0020
+MK_XBUTTON2 :: 0x0040
+
+_IDC_APPSTARTING := rawptr(uintptr(32650))
+_IDC_ARROW       := rawptr(uintptr(32512))
+_IDC_CROSS       := rawptr(uintptr(32515))
+_IDC_HAND        := rawptr(uintptr(32649))
+_IDC_HELP        := rawptr(uintptr(32651))
+_IDC_IBEAM       := rawptr(uintptr(32513))
+_IDC_ICON        := rawptr(uintptr(32641))
+_IDC_NO          := rawptr(uintptr(32648))
+_IDC_SIZE        := rawptr(uintptr(32640))
+_IDC_SIZEALL     := rawptr(uintptr(32646))
+_IDC_SIZENESW    := rawptr(uintptr(32643))
+_IDC_SIZENS      := rawptr(uintptr(32645))
+_IDC_SIZENWSE    := rawptr(uintptr(32642))
+_IDC_SIZEWE      := rawptr(uintptr(32644))
+_IDC_UPARROW     := rawptr(uintptr(32516))
+_IDC_WAIT        := rawptr(uintptr(32514))
+
+IDC_APPSTARTING := cstring(_IDC_APPSTARTING)
+IDC_ARROW       := cstring(_IDC_ARROW)
+IDC_CROSS       := cstring(_IDC_CROSS)
+IDC_HAND        := cstring(_IDC_HAND)
+IDC_HELP        := cstring(_IDC_HELP)
+IDC_IBEAM       := cstring(_IDC_IBEAM)
+IDC_ICON        := cstring(_IDC_ICON)
+IDC_NO          := cstring(_IDC_NO)
+IDC_SIZE        := cstring(_IDC_SIZE)
+IDC_SIZEALL     := cstring(_IDC_SIZEALL)
+IDC_SIZENESW    := cstring(_IDC_SIZENESW)
+IDC_SIZENS      := cstring(_IDC_SIZENS)
+IDC_SIZENWSE    := cstring(_IDC_SIZENWSE)
+IDC_SIZEWE      := cstring(_IDC_SIZEWE)
+IDC_UPARROW     := cstring(_IDC_UPARROW)
+IDC_WAIT        := cstring(_IDC_WAIT)
+
+
+_IDI_APPLICATION := rawptr(uintptr(32512))
+_IDI_HAND        := rawptr(uintptr(32513))
+_IDI_QUESTION    := rawptr(uintptr(32514))
+_IDI_EXCLAMATION := rawptr(uintptr(32515))
+_IDI_ASTERISK    := rawptr(uintptr(32516))
+_IDI_WINLOGO     := rawptr(uintptr(32517))
+_IDI_SHIELD      := rawptr(uintptr(32518))
+IDI_APPLICATION  := cstring(_IDI_APPLICATION)
+IDI_HAND         := cstring(_IDI_HAND)
+IDI_QUESTION     := cstring(_IDI_QUESTION)
+IDI_EXCLAMATION  := cstring(_IDI_EXCLAMATION)
+IDI_ASTERISK     := cstring(_IDI_ASTERISK)
+IDI_WINLOGO      := cstring(_IDI_WINLOGO)
+IDI_SHIELD       := cstring(_IDI_SHIELD)
+IDI_WARNING      := IDI_EXCLAMATION
+IDI_ERROR        := IDI_HAND
+IDI_INFORMATION  := IDI_ASTERISK
+
+
+// DIB color table identifiers
+DIB_RGB_COLORS :: 0
+DIB_PAL_COLORS :: 1
+
+// constants for CreateDIBitmap
+CBM_INIT :: 0x04 // initialize bitmap
+
+// Region Flags
+ERROR         :: 0
+NULLREGION    :: 1
+SIMPLEREGION  :: 2
+COMPLEXREGION :: 3
+RGN_ERROR     :: ERROR
+
+// StretchBlt() Modes
+BLACKONWHITE      :: 1
+WHITEONBLACK      :: 2
+COLORONCOLOR      :: 3
+HALFTONE          :: 4
+MAXSTRETCHBLTMODE :: 4
+
+// Binary raster ops
+R2_BLACK       :: 1  // 0
+R2_NOTMERGEPEN :: 2  // DPon
+R2_MASKNOTPEN  :: 3  // DPna
+R2_NOTCOPYPEN  :: 4  // PN
+R2_MASKPENNOT  :: 5  // PDna
+R2_NOT         :: 6  // Dn
+R2_XORPEN      :: 7  // DPx
+R2_NOTMASKPEN  :: 8  // DPan
+R2_MASKPEN     :: 9  // DPa
+R2_NOTXORPEN   :: 10 // DPxn
+R2_NOP         :: 11 // D
+R2_MERGENOTPEN :: 12 // DPno
+R2_COPYPEN     :: 13 // P
+R2_MERGEPENNOT :: 14 // PDno
+R2_MERGEPEN    :: 15 // DPo
+R2_WHITE       :: 16 // 1
+R2_LAST        :: 16
+
+// Ternary raster operations
+SRCCOPY        : DWORD : 0x00CC0020 // dest = source
+SRCPAINT       : DWORD : 0x00EE0086 // dest = source OR dest
+SRCAND         : DWORD : 0x008800C6 // dest = source AND dest
+SRCINVERT      : DWORD : 0x00660046 // dest = source XOR dest
+SRCERASE       : DWORD : 0x00440328 // dest = source AND (NOT dest)
+NOTSRCCOPY     : DWORD : 0x00330008 // dest = (NOT source)
+NOTSRCERASE    : DWORD : 0x001100A6 // dest = (NOT src) AND (NOT dest)
+MERGECOPY      : DWORD : 0x00C000CA // dest = (source AND pattern
+MERGEPAINT     : DWORD : 0x00BB0226 // dest = (NOT source) OR dest
+PATCOPY        : DWORD : 0x00F00021 // dest = pattern
+PATPAINT       : DWORD : 0x00FB0A09 // dest = DPSnoo
+PATINVERT      : DWORD : 0x005A0049 // dest = pattern XOR dest
+DSTINVERT      : DWORD : 0x00550009 // dest = (NOT dest)
+BLACKNESS      : DWORD : 0x00000042 // dest = BLACK
+WHITENESS      : DWORD : 0x00FF0062 // dest = WHITE
+NOMIRRORBITMAP : DWORD : 0x80000000 // Do not Mirror the bitmap in this call
+CAPTUREBLT     : DWORD : 0x40000000 // Include layered windows
+
+// Stock Logical Objects
+WHITE_BRUSH         :: 0
+LTGRAY_BRUSH        :: 1
+GRAY_BRUSH          :: 2
+DKGRAY_BRUSH        :: 3
+BLACK_BRUSH         :: 4
+NULL_BRUSH          :: 5
+HOLLOW_BRUSH        :: NULL_BRUSH
+WHITE_PEN           :: 6
+BLACK_PEN           :: 7
+NULL_PEN            :: 8
+OEM_FIXED_FONT      :: 10
+ANSI_FIXED_FONT     :: 11
+ANSI_VAR_FONT       :: 12
+SYSTEM_FONT         :: 13
+DEVICE_DEFAULT_FONT :: 14
+DEFAULT_PALETTE     :: 15
+SYSTEM_FIXED_FONT   :: 16
+DEFAULT_GUI_FONT    :: 17
+DC_BRUSH            :: 18
+DC_PEN              :: 19
+STOCK_LAST          :: 19
+
+CLR_INVALID :: 0xFFFFFFFF
+
+RGBQUAD :: struct {
+	rgbBlue: BYTE,
+	rgbGreen: BYTE,
+	rgbRed: BYTE,
+	rgbReserved: BYTE,
+}
+
+PIXELFORMATDESCRIPTOR :: struct {
+	nSize: WORD,
+	nVersion: WORD,
+	dwFlags: DWORD,
+	iPixelType: BYTE,
+	cColorBits: BYTE,
+	cRedBits: BYTE,
+	cRedShift: BYTE,
+	cGreenBits: BYTE,
+	cGreenShift: BYTE,
+	cBlueBits: BYTE,
+	cBlueShift: BYTE,
+	cAlphaBits: BYTE,
+	cAlphaShift: BYTE,
+	cAccumBits: BYTE,
+	cAccumRedBits: BYTE,
+	cAccumGreenBits: BYTE,
+	cAccumBlueBits: BYTE,
+	cAccumAlphaBits: BYTE,
+	cDepthBits: BYTE,
+	cStencilBits: BYTE,
+	cAuxBuffers: BYTE,
+	iLayerType: BYTE,
+	bReserved: BYTE,
+	dwLayerMask: DWORD,
+	dwVisibleMask: DWORD,
+	dwDamageMask: DWORD,
+}
+
+BITMAPINFOHEADER :: struct {
+	biSize: DWORD,
+	biWidth: LONG,
+	biHeight: LONG,
+	biPlanes: WORD,
+	biBitCount: WORD,
+	biCompression: DWORD,
+	biSizeImage: DWORD,
+	biXPelsPerMeter: LONG,
+	biYPelsPerMeter: LONG,
+	biClrUsed: DWORD,
+	biClrImportant: DWORD,
+}
+
+BITMAPINFO :: struct {
+	bmiHeader: BITMAPINFOHEADER,
+	bmiColors: [1]RGBQUAD,
+}
+
+// pixel types
+PFD_TYPE_RGBA       :: 0
+PFD_TYPE_COLORINDEX :: 1
+
+// layer types
+PFD_MAIN_PLANE     :: 0
+PFD_OVERLAY_PLANE  :: 1
+PFD_UNDERLAY_PLANE :: -1
+
+// PIXELFORMATDESCRIPTOR flags
+PFD_DOUBLEBUFFER         :: 0x00000001
+PFD_STEREO               :: 0x00000002
+PFD_DRAW_TO_WINDOW       :: 0x00000004
+PFD_DRAW_TO_BITMAP       :: 0x00000008
+PFD_SUPPORT_GDI          :: 0x00000010
+PFD_SUPPORT_OPENGL       :: 0x00000020
+PFD_GENERIC_FORMAT       :: 0x00000040
+PFD_NEED_PALETTE         :: 0x00000080
+PFD_NEED_SYSTEM_PALETTE  :: 0x00000100
+PFD_SWAP_EXCHANGE        :: 0x00000200
+PFD_SWAP_COPY            :: 0x00000400
+PFD_SWAP_LAYER_BUFFERS   :: 0x00000800
+PFD_GENERIC_ACCELERATED  :: 0x00001000
+PFD_SUPPORT_DIRECTDRAW   :: 0x00002000
+PFD_DIRECT3D_ACCELERATED :: 0x00004000
+PFD_SUPPORT_COMPOSITION  :: 0x00008000
+
+// PIXELFORMATDESCRIPTOR flags for use in ChoosePixelFormat only
+PFD_DEPTH_DONTCARE        :: 0x20000000
+PFD_DOUBLEBUFFER_DONTCARE :: 0x40000000
+PFD_STEREO_DONTCARE       :: 0x80000000
+
+// constants for the biCompression field
+BI_RGB       :: 0
+BI_RLE8      :: 1
+BI_RLE4      :: 2
+BI_BITFIELDS :: 3
+BI_JPEG      :: 4
+BI_PNG       :: 5
 
 WSA_FLAG_OVERLAPPED: DWORD : 0x01
 WSA_FLAG_NO_HANDLE_INHERIT: DWORD : 0x80
@@ -379,6 +1039,15 @@ FILE_TYPE_PIPE :: 0x0003
 RECT  :: struct {left, top, right, bottom: LONG}
 POINT :: struct {x, y: LONG}
 
+WINDOWPOS :: struct {
+	hwnd: HWND,
+	hwndInsertAfter: HWND,
+	x: c_int,
+	y: c_int,
+	cx: c_int,
+	cy: c_int,
+	flags: UINT,
+}
 
 when size_of(uintptr) == 4 {
 	WSADATA :: struct {
@@ -578,7 +1247,7 @@ PROCESS_INFORMATION :: struct {
 }
 
 // FYI: This is STARTUPINFOW, not STARTUPINFOA
-STARTUPINFO :: struct #packed {
+STARTUPINFO :: struct {
 	cb: DWORD,
 	lpReserved: LPWSTR,
 	lpDesktop: LPWSTR,
@@ -784,17 +1453,17 @@ SYSTEM_INFO :: struct {
 
 // https://docs.microsoft.com/en-us/windows-hardware/drivers/ddi/wdm/ns-wdm-_osversioninfoexw
 OSVERSIONINFOEXW :: struct {
-    dwOSVersionInfoSize: ULONG,
-    dwMajorVersion:      ULONG,
-    dwMinorVersion:      ULONG,
-    dwBuildNumber:       ULONG,
-    dwPlatformId:        ULONG,
-    szCSDVersion:        [128]WCHAR,
-    wServicePackMajor:   USHORT,
-    wServicePackMinor:   USHORT,
-    wSuiteMask:          USHORT,
-    wProductType:        UCHAR,
-    wReserved:           UCHAR,
+	dwOSVersionInfoSize: ULONG,
+	dwMajorVersion:      ULONG,
+	dwMinorVersion:      ULONG,
+	dwBuildNumber:       ULONG,
+	dwPlatformId:        ULONG,
+	szCSDVersion:        [128]WCHAR,
+	wServicePackMajor:   USHORT,
+	wServicePackMinor:   USHORT,
+	wSuiteMask:          USHORT,
+	wProductType:        UCHAR,
+	wReserved:           UCHAR,
 }
 
 // https://docs.microsoft.com/en-us/windows/win32/api/winnt/ns-winnt-quota_limits
@@ -837,24 +1506,24 @@ PROFILEINFOW :: struct {
 	lpDefaultPath: LPWSTR,
 	lpServerName: LPWSTR,
 	lpPolicyPath: LPWSTR,
-  	hProfile: HANDLE,
+	hProfile: HANDLE,
 }
 
 // Used in LookupAccountNameW
 SID_NAME_USE :: distinct DWORD
 
 SID_TYPE :: enum SID_NAME_USE {
-  User = 1,
-  Group,
-  Domain,
-  Alias,
-  WellKnownGroup,
-  DeletedAccount,
-  Invalid,
-  Unknown,
-  Computer,
-  Label,
-  LogonSession,
+	User = 1,
+	Group,
+	Domain,
+	Alias,
+	WellKnownGroup,
+	DeletedAccount,
+	Invalid,
+	Unknown,
+	Computer,
+	Label,
+	LogonSession,
 }
 
 SECURITY_MAX_SID_SIZE :: 68
@@ -869,7 +1538,7 @@ SID :: struct #packed {
 #assert(size_of(SID) == SECURITY_MAX_SID_SIZE)
 
 SID_IDENTIFIER_AUTHORITY :: struct #packed {
-    Value: [6]u8,
+	Value: [6]u8,
 }
 
 // For NetAPI32
@@ -901,11 +1570,11 @@ USER_INFO_FLAG :: enum DWORD {
 	Passwd_Cant_Change              = 6,  // 1 <<  6: 0x0040,
 	Encrypted_Text_Password_Allowed = 7,  // 1 <<  7: 0x0080,
 
-    Temp_Duplicate_Account          = 8,  // 1 <<  8: 0x0100,
-    Normal_Account                  = 9,  // 1 <<  9: 0x0200,
-    InterDomain_Trust_Account       = 11, // 1 << 11: 0x0800,
-    Workstation_Trust_Account       = 12, // 1 << 12: 0x1000,
-    Server_Trust_Account            = 13, // 1 << 13: 0x2000,
+	Temp_Duplicate_Account          = 8,  // 1 <<  8: 0x0100,
+	Normal_Account                  = 9,  // 1 <<  9: 0x0200,
+	InterDomain_Trust_Account       = 11, // 1 << 11: 0x0800,
+	Workstation_Trust_Account       = 12, // 1 << 12: 0x1000,
+	Server_Trust_Account            = 13, // 1 << 13: 0x2000,
 }
 USER_INFO_FLAGS :: distinct bit_set[USER_INFO_FLAG]
 

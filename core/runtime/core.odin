@@ -136,6 +136,7 @@ Type_Info_Union :: struct {
 	custom_align: bool,
 	no_nil:       bool,
 	maybe:        bool,
+	shared_nil:   bool,
 }
 Type_Info_Enum :: struct {
 	base:      ^Type_Info,
@@ -451,7 +452,7 @@ Odin_Endian_Type :: type_of(ODIN_ENDIAN)
 // This is probably only useful for freestanding targets
 foreign {
 	@(link_name="__$startup_runtime")
-	_startup_runtime :: proc() ---
+	_startup_runtime :: proc "odin" () ---
 }
 
 @(link_name="__$cleanup_runtime")
@@ -513,16 +514,18 @@ __type_info_of :: proc "contextless" (id: typeid) -> ^Type_Info #no_bounds_check
 	return &type_table[n]
 }
 
-typeid_base :: proc "contextless" (id: typeid) -> typeid {
-	ti := type_info_of(id)
-	ti = type_info_base(ti)
-	return ti.id
+when !ODIN_DISALLOW_RTTI {
+	typeid_base :: proc "contextless" (id: typeid) -> typeid {
+		ti := type_info_of(id)
+		ti = type_info_base(ti)
+		return ti.id
+	}
+	typeid_core :: proc "contextless" (id: typeid) -> typeid {
+		ti := type_info_core(type_info_of(id))
+		return ti.id
+	}
+	typeid_base_without_enum :: typeid_core
 }
-typeid_core :: proc "contextless" (id: typeid) -> typeid {
-	ti := type_info_core(type_info_of(id))
-	return ti.id
-}
-typeid_base_without_enum :: typeid_core
 
 
 

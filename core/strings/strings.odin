@@ -339,6 +339,25 @@ _split_iterator :: proc(s: ^string, sep: string, sep_save: int) -> (res: string,
 	return
 }
 
+@private
+_split_by_byte_iterator :: proc(s: ^string, sep: u8) -> (res: string, ok: bool) {
+	m := index_byte(s^, sep)
+	if m < 0 {
+		// not found
+		res = s[:]
+		ok = res != ""
+		s^ = {}
+	} else {
+		res = s[:m]
+		ok = true
+		s^ = s[m+1:]
+	}
+	return
+}
+
+split_by_byte_iterator :: proc(s: ^string, sep: u8) -> (string, bool) {
+	return _split_by_byte_iterator(s, sep)
+}
 
 split_iterator :: proc(s: ^string, sep: string) -> (string, bool) {
 	return _split_iterator(s, sep, 0)
@@ -1345,4 +1364,36 @@ fields_proc :: proc(s: string, f: proc(rune) -> bool, allocator := context.alloc
 	}
 
 	return substrings[:]
+}
+
+
+// `fields_iterator` returns the first run of characters in `s` that does not contain white space, defined by `unicode.is_space`
+// `s` will then start from any space after the substring, or be an empty string if the substring was the remaining characters
+fields_iterator :: proc(s: ^string) -> (field: string, ok: bool) {
+	start, end := -1, -1
+	for r, offset in s {
+		end = offset
+		if unicode.is_space(r) {
+			if start >= 0 {
+				field = s[start : end]
+				ok = true
+				s^ = s[end:]
+				return
+			}
+		} else {
+			if start < 0 {
+				start = end
+			}
+		}
+	}
+
+	// if either of these are true, the string did not contain any characters
+	if end < 0 || start < 0 {
+		return "", false
+	}
+
+	field = s[start:]
+	ok = true
+	s^ = s[len(s):]
+	return
 }

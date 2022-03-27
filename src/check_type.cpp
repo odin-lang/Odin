@@ -675,22 +675,31 @@ void check_union_type(CheckerContext *ctx, Type *union_type, Ast *node, Array<Op
 			}
 			if (ok) {
 				array_add(&variants, t);
+
+				if (ut->kind == UnionType_shared_nil) {
+					if (!type_has_nil(t)) {
+						gbString s = type_to_string(t);
+						error(node, "Each variant of a union with #shared_nil must have a 'nil' value, got %s", s);
+						gb_string_free(s);
+					}
+				}
 			}
 		}
 	}
 
 	union_type->Union.variants = slice_from_array(variants);
-	union_type->Union.no_nil = ut->no_nil;
-	union_type->Union.maybe = ut->maybe;
-	if (union_type->Union.no_nil) {
+	union_type->Union.kind = ut->kind;
+	switch (ut->kind) {
+	case UnionType_no_nil:
 		if (variants.count < 2) {
 			error(ut->align, "A union with #no_nil must have at least 2 variants");
 		}
-	}
-	if (union_type->Union.maybe) {
+		break;
+	case UnionType_maybe:
 		if (variants.count != 1) {
 			error(ut->align, "A union with #maybe must have at 1 variant, got %lld", cast(long long)variants.count);
 		}
+		break;
 	}
 
 	if (ut->align != nullptr) {
@@ -1960,20 +1969,6 @@ bool check_procedure_type(CheckerContext *ctx, Type *type, Ast *proc_type_node, 
 	if (params)  param_count  = params ->Tuple.variables.count;
 	if (results) result_count = results->Tuple.variables.count;
 
-	if (param_count > 0) {
-		for_array(i, params->Tuple.variables) {
-			Entity *param = params->Tuple.variables[i];
-			if (param->kind == Entity_Variable) {
-				ParameterValue pv = param->Variable.param_value;
-				if (pv.kind == ParameterValue_Constant &&
-				    pv.value.kind == ExactValue_Procedure) {
-					type->Proc.has_proc_default_values = true;
-					break;
-				}
-			}
-		}
-	}
-
 	if (result_count > 0) {
 		Entity *first = results->Tuple.variables[0];
 		type->Proc.has_named_results = first->token.string != "";
@@ -2031,10 +2026,14 @@ bool check_procedure_type(CheckerContext *ctx, Type *type, Ast *proc_type_node, 
 	if (param_count > 0) {
 		Entity *end = params->Tuple.variables[param_count-1];
 		if (end->flags&EntityFlag_CVarArg) {
-			if (cc == ProcCC_StdCall || cc == ProcCC_CDecl) {
+			switch (cc) {
+			default:
 				type->Proc.c_vararg = true;
-			} else {
+				break;
+			case ProcCC_Odin:
+			case ProcCC_Contextless:
 				error(end->token, "Calling convention does not support #c_vararg");
+				break;
 			}
 		}
 	}
@@ -2170,7 +2169,7 @@ void init_map_entry_type(Type *type) {
 
 	/*
 	struct {
-		hash:  runtime.Map_Hash,
+		hash:  uintptr,
 		next:  int,
 		key:   Key,
 		value: Value,
@@ -3026,6 +3025,8 @@ Type *check_type_expr(CheckerContext *ctx, Ast *e, Type *named_type) {
 		type = t_invalid;
 	}
 	set_base_type(named_type, type);
+
+	check_rtti_type_disallowed(e, type, "Use of a type, %s, which has been disallowed");
 
 	return type;
 }

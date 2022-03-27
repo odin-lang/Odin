@@ -29,6 +29,23 @@ bool is_operand_undef(Operand o) {
 	return o.mode == Addressing_Value && o.type == t_untyped_undef;
 }
 
+bool check_rtti_type_disallowed(Token const &token, Type *type, char const *format) {
+	if (build_context.disallow_rtti && type) {
+		if (is_type_any(type)) {
+			gbString t = type_to_string(type);
+			error(token, format, t);
+			gb_string_free(t);
+			return true;
+		}
+	}
+	return false;
+}
+
+bool check_rtti_type_disallowed(Ast *expr, Type *type, char const *format) {
+	GB_ASSERT(expr != nullptr);
+	return check_rtti_type_disallowed(ast_token(expr), type, format);
+}
+
 void scope_reset(Scope *scope) {
 	if (scope == nullptr) return;
 
@@ -875,7 +892,8 @@ void init_universal(void) {
 
 // Types
 	for (isize i = 0; i < gb_count_of(basic_types); i++) {
-		add_global_type_entity(basic_types[i].Basic.name, &basic_types[i]);
+		String const &name = basic_types[i].Basic.name;
+		add_global_type_entity(name, &basic_types[i]);
 	}
 	add_global_type_entity(str_lit("byte"), &basic_types[Basic_u8]);
 
@@ -977,6 +995,8 @@ void init_universal(void) {
 	add_global_bool_constant("ODIN_USE_SEPARATE_MODULES",     bc->use_separate_modules);
 	add_global_bool_constant("ODIN_TEST",                     bc->command_kind == Command_test);
 	add_global_bool_constant("ODIN_NO_ENTRY_POINT",           bc->no_entry_point);
+	add_global_bool_constant("ODIN_FOREIGN_ERROR_PROCEDURES", bc->ODIN_FOREIGN_ERROR_PROCEDURES);
+	add_global_bool_constant("ODIN_DISALLOW_RTTI",            bc->disallow_rtti);
 
 
 // Builtin Procedures
@@ -1669,6 +1689,10 @@ void add_implicit_entity(CheckerContext *c, Ast *clause, Entity *e) {
 void add_type_info_type(CheckerContext *c, Type *t) {
 	void add_type_info_type_internal(CheckerContext *c, Type *t);
 
+	if (build_context.disallow_rtti) {
+		return;
+	}
+
 	mutex_lock(&c->info->type_info_mutex);
 	add_type_info_type_internal(c, t);
 	mutex_unlock(&c->info->type_info_mutex);
@@ -2181,21 +2205,25 @@ void generate_minimum_dependency_set(Checker *c, Entity *start) {
 	ptr_set_init(&c->info.minimum_dependency_set, heap_allocator(), min_dep_set_cap);
 	ptr_set_init(&c->info.minimum_dependency_type_info_set, heap_allocator());
 
-	String required_runtime_entities[] = {
+#define FORCE_ADD_RUNTIME_ENTITIES(condition, ...) do {                                              \
+	if (condition) {                                                                             \
+		String entities[] = {__VA_ARGS__};                                                   \
+		for (isize i = 0; i < gb_count_of(entities); i++) {                                  \
+			force_add_dependency_entity(c, c->info.runtime_package->scope, entities[i]); \
+		}                                                                                    \
+	}                                                                                            \
+} while (0)
+
+	// required runtime entities
+	FORCE_ADD_RUNTIME_ENTITIES(true,
 		// Odin types
-		str_lit("Type_Info"),
 		str_lit("Source_Code_Location"),
 		str_lit("Context"),
 		str_lit("Allocator"),
 		str_lit("Logger"),
 
-		// Global variables
-		str_lit("args__"),
-		str_lit("type_table"),
-
 		// Odin internal procedures
 		str_lit("__init_context"),
-		str_lit("__type_info_of"),
 		str_lit("cstring_to_string"),
 		str_lit("_cleanup_runtime"),
 
@@ -2228,35 +2256,36 @@ void generate_minimum_dependency_set(Checker *c, Entity *start) {
 		// WASM Specific
 		str_lit("__ashlti3"),
 		str_lit("__multi3"),
-	};
-	for (isize i = 0; i < gb_count_of(required_runtime_entities); i++) {
-		force_add_dependency_entity(c, c->info.runtime_package->scope, required_runtime_entities[i]);
-	}
+	);
 
-	if (build_context.no_crt) {
-		String required_no_crt_entities[] = {
-			// NOTE(bill): Only if these exist
-			str_lit("_tls_index"),
-			str_lit("_fltused"),
-		};
-		for (isize i = 0; i < gb_count_of(required_no_crt_entities); i++) {
-			force_add_dependency_entity(c, c->info.runtime_package->scope, required_no_crt_entities[i]);
-		}
-	}
+	FORCE_ADD_RUNTIME_ENTITIES(!build_context.disallow_rtti,
+		// Odin types
+		str_lit("Type_Info"),
 
-	if (!build_context.no_bounds_check) {
-		String bounds_check_entities[] = {
-			// Bounds checking related procedures
-			str_lit("bounds_check_error"),
-			str_lit("matrix_bounds_check_error"),
-			str_lit("slice_expr_error_hi"),
-			str_lit("slice_expr_error_lo_hi"),
-			str_lit("multi_pointer_slice_expr_error"),
-		};
-		for (isize i = 0; i < gb_count_of(bounds_check_entities); i++) {
-			force_add_dependency_entity(c, c->info.runtime_package->scope, bounds_check_entities[i]);
-		}
-	}
+		// Global variables
+		str_lit("type_table"),
+		str_lit("__type_info_of"),
+	);
+
+	FORCE_ADD_RUNTIME_ENTITIES(!build_context.no_entry_point,
+		// Global variables
+		str_lit("args__"),
+	);
+
+	FORCE_ADD_RUNTIME_ENTITIES((build_context.no_crt && !is_arch_wasm()),
+		// NOTE(bill): Only if these exist
+		str_lit("_tls_index"),
+		str_lit("_fltused"),
+	);
+
+	FORCE_ADD_RUNTIME_ENTITIES(!build_context.no_bounds_check,
+		// Bounds checking related procedures
+		str_lit("bounds_check_error"),
+		str_lit("matrix_bounds_check_error"),
+		str_lit("slice_expr_error_hi"),
+		str_lit("slice_expr_error_lo_hi"),
+		str_lit("multi_pointer_slice_expr_error"),
+	);
 
 	for_array(i, c->info.definitions) {
 		Entity *e = c->info.definitions[i];
@@ -2378,6 +2407,8 @@ void generate_minimum_dependency_set(Checker *c, Entity *start) {
 		start->flags |= EntityFlag_Used;
 		add_dependency_to_set(c, start);
 	}
+
+#undef FORCE_ADD_RUNTIME_ENTITIES
 }
 
 bool is_entity_a_dependency(Entity *e) {
@@ -2625,6 +2656,15 @@ Array<Entity *> proc_group_entities(CheckerContext *c, Operand o) {
 	}
 	return procs;
 }
+
+Array<Entity *> proc_group_entities_cloned(CheckerContext *c, Operand o) {
+	auto entities = proc_group_entities(c, o);
+	if (entities.count == 0) {
+		return {};
+	}
+	return array_clone(permanent_allocator(), entities);
+}
+
 
 
 

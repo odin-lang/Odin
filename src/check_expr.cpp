@@ -4872,25 +4872,16 @@ bool is_expr_constant_zero(Ast *expr) {
 	return false;
 }
 
-
-CALL_ARGUMENT_CHECKER(check_call_arguments_internal) {
-	ast_node(ce, CallExpr, call);
-	GB_ASSERT(is_type_proc(proc_type));
-	proc_type = base_type(proc_type);
-	TypeProc *pt = &proc_type->Proc;
-
+isize get_procedure_param_count_excluding_defaults(Type *pt, isize *param_count_) {
+	GB_ASSERT(pt != nullptr);
+	GB_ASSERT(pt->kind == Type_Proc);
 	isize param_count = 0;
 	isize param_count_excluding_defaults = 0;
-	bool variadic = pt->variadic;
-	bool vari_expand = (ce->ellipsis.pos.line != 0);
-	i64 score = 0;
-	bool show_error = show_error_mode == CallArgumentMode_ShowErrors;
-
-
+	bool variadic = pt->Proc.variadic;
 	TypeTuple *param_tuple = nullptr;
 
-	if (pt->params != nullptr) {
-		param_tuple = &pt->params->Tuple;
+	if (pt->Proc.params != nullptr) {
+		param_tuple = &pt->Proc.params->Tuple;
 
 		param_count = param_tuple->variables.count;
 		if (variadic) {
@@ -4929,6 +4920,31 @@ CALL_ARGUMENT_CHECKER(check_call_arguments_internal) {
 			break;
 		}
 	}
+
+	if (param_count_) *param_count_ = param_count;
+	return param_count_excluding_defaults;
+}
+
+
+CALL_ARGUMENT_CHECKER(check_call_arguments_internal) {
+	ast_node(ce, CallExpr, call);
+	GB_ASSERT(is_type_proc(proc_type));
+	proc_type = base_type(proc_type);
+	TypeProc *pt = &proc_type->Proc;
+
+	isize param_count = 0;
+	isize param_count_excluding_defaults = get_procedure_param_count_excluding_defaults(proc_type, &param_count);
+	bool variadic = pt->variadic;
+	bool vari_expand = (ce->ellipsis.pos.line != 0);
+	i64 score = 0;
+	bool show_error = show_error_mode == CallArgumentMode_ShowErrors;
+
+
+	TypeTuple *param_tuple = nullptr;
+	if (pt->params != nullptr) {
+		param_tuple = &pt->params->Tuple;
+	}
+
 
 	CallArgumentError err = CallArgumentError_None;
 	Type *final_proc_type = proc_type;
@@ -5602,7 +5618,37 @@ CallArgumentData check_call_arguments(CheckerContext *c, Operand *operand, Type 
 	if (operand->mode == Addressing_ProcGroup) {
 		check_entity_decl(c, operand->proc_group, nullptr, nullptr);
 
-		Array<Entity *> procs = proc_group_entities(c, *operand);
+		auto procs = proc_group_entities_cloned(c, *operand);
+
+		if (procs.count > 1) {
+			isize max_arg_count = args.count;
+			for_array(i, args) {
+				// NOTE(bill): The only thing that may have multiple values
+				// will be a call expression (assuming `or_return` and `()` will be stripped)
+				Ast *arg = strip_or_return_expr(args[i]);
+				if (arg && arg->kind == Ast_CallExpr) {
+					max_arg_count = ISIZE_MAX;
+					break;
+				}
+			}
+
+			for (isize proc_index = 0; proc_index < procs.count; /**/) {
+				Entity *proc = procs[proc_index];
+				Type *pt = base_type(proc->type);
+				if (!(pt != nullptr && is_type_proc(pt))) {
+					continue;
+				}
+
+				isize param_count = 0;
+				isize param_count_excluding_defaults = get_procedure_param_count_excluding_defaults(pt, &param_count);
+
+				if (param_count_excluding_defaults > max_arg_count) {
+					array_unordered_remove(&procs, proc_index);
+				} else {
+					proc_index++;
+				}
+			}
+		}
 
 		if (procs.count == 1) {
 			Ast *ident = operand->expr;
@@ -5631,6 +5677,7 @@ CallArgumentData check_call_arguments(CheckerContext *c, Operand *operand, Type 
 			}
 			return data;
 		}
+
 
 		Entity **lhs = nullptr;
 		isize lhs_count = -1;
@@ -8953,6 +9000,7 @@ ExprKind check_expr_base_internal(CheckerContext *c, Operand *o, Ast *node, Type
 
 	o->mode = Addressing_Invalid;
 	o->type = t_invalid;
+	o->value = {ExactValue_Invalid};
 
 	switch (node->kind) {
 	default:
@@ -9352,6 +9400,8 @@ ExprKind check_expr_base(CheckerContext *c, Operand *o, Ast *node, Type *type_hi
 	if (o->type != nullptr && is_type_untyped(o->type)) {
 		add_untyped(c, node, o->mode, o->type, o->value);
 	}
+	check_rtti_type_disallowed(node, o->type, "An expression is using a type, %s, which has been disallowed");
+
 	add_type_and_value(c->info, node, o->mode, o->type, o->value);
 	return kind;
 }
@@ -9997,8 +10047,11 @@ gbString write_expr_to_string(gbString str, Ast *node, bool shorthand) {
 			str = write_expr_to_string(str, st->polymorphic_params, shorthand);
 			str = gb_string_appendc(str, ") ");
 		}
-		if (st->no_nil) str = gb_string_appendc(str, "#no_nil ");
-		if (st->maybe)  str = gb_string_appendc(str, "#maybe ");
+		switch (st->kind) {
+		case UnionType_maybe:      str = gb_string_appendc(str, "#maybe ");      break;
+		case UnionType_no_nil:     str = gb_string_appendc(str, "#no_nil ");     break;
+		case UnionType_shared_nil: str = gb_string_appendc(str, "#shared_nil "); break;
+		}
 		if (st->align) {
 			str = gb_string_appendc(str, "#align ");
 			str = write_expr_to_string(str, st->align, shorthand);
