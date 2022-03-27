@@ -107,6 +107,7 @@ foreign user32 {
 		cy: c_int,
 		uFlags: UINT,
 	) -> BOOL ---
+	GetSystemMetrics :: proc(nIndex: c_int) -> c_int ---
 
 	GetWindowDC :: proc(hWnd: HWND) -> HDC ---
 	GetDC :: proc(hWnd: HWND) -> HDC ---
