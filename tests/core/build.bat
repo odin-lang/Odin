@@ -63,3 +63,8 @@ echo ---
 echo Running core:reflect tests
 echo ---
 %PATH_TO_ODIN% run reflect %COMMON%
+
+echo ---
+echo Running core:thread/pool tests
+echo ---
+%PATH_TO_ODIN% run thread/pool %COMMON%

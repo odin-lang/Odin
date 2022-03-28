@@ -2,7 +2,7 @@ ODIN=../../odin
 PYTHON=$(shell which python3)
 
 all: download_test_assets image_test compress_test strings_test hash_test crypto_test noise_test encoding_test \
-	 math_test linalg_glsl_math_test filepath_test reflect_test os_exit_test
+	 math_test linalg_glsl_math_test filepath_test reflect_test os_exit_test thread_pool_test
 
 download_test_assets:
 	$(PYTHON) download_assets.py
@@ -44,3 +44,6 @@ reflect_test:
 
 os_exit_test:
 	$(ODIN) run os/test_core_os_exit.odin -out=test_core_os_exit && exit 1 || exit 0
+
+thread_pool_test:
+	$(ODIN) run thread/pool/test_core_thread_pool.odin -out=test_core_thread_pool && exit 1 || exit 0
