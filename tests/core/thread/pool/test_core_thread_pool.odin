@@ -103,7 +103,7 @@ tests :: proc(t: ^testing.T) {
 	for !pool.is_empty(&tp) {
 		if pool.num_done(&tp)>0 {
 			for t in pool.pop_done(&tp) {
-				fmt.printf("Done task number %i\n", t.user_index)
+				//fmt.printf("Done task number %i\n", t.user_index)
 				num_tasks_done += 1
 				}
 		}
@@ -142,5 +142,9 @@ main :: proc() {
 		fmt.printf("BATCH ITERATION %i/%i\n", i, NUM_ITERATIONS)
 		tests(&t)
 	}
-	fmt.printf("All %i iterations successful\n", NUM_ITERATIONS)
+	fmt.printf("All %i iterations finished\n", NUM_ITERATIONS)
+	fmt.printf("%v/%v tests successful.\n", TEST_count - TEST_fail, TEST_count)
+	if TEST_fail > 0 {
+		os.exit(1)
+	}
 }

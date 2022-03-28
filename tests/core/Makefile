@@ -46,4 +46,4 @@ os_exit_test:
 	$(ODIN) run os/test_core_os_exit.odin -out=test_core_os_exit && exit 1 || exit 0
 
 thread_pool_test:
-	$(ODIN) run thread/pool/test_core_thread_pool.odin -out=test_core_thread_pool && exit 1 || exit 0
+	$(ODIN) run thread/pool/test_core_thread_pool.odin -out=test_core_thread_pool
