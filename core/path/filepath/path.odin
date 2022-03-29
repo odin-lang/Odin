@@ -122,6 +122,7 @@ clean :: proc(path: string, allocator := context.allocator) -> string {
 		vol_and_path = original_path,
 		vol_len = vol_len,
 	}
+	defer lazy_buffer_destroy(out)
 
 	r, dot_dot := 0, 0
 	if rooted {
@@ -170,7 +171,6 @@ clean :: proc(path: string, allocator := context.allocator) -> string {
 	cleaned, new_allocation := from_slash(s)
 	if new_allocation {
 		delete(s)
-		lazy_buffer_destroy(out)
 	}
 	return cleaned
 }
