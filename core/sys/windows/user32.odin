@@ -192,3 +192,7 @@ CreateWindowW :: #force_inline proc "stdcall" (
 		lpParam,
 	)
 }
+
+GET_SC_WPARAM :: #force_inline proc(wparam: WPARAM) -> i32 {
+	return i32(wparam) & 0xFFF0
+}
