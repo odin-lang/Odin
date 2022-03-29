@@ -220,9 +220,11 @@ get_escape :: proc(chunk: string) -> (r: rune, next_chunk: string, err: Match_Er
 //
 
 glob :: proc(pattern: string, allocator := context.allocator) -> (matches: []string, err: Match_Error) {
+	context.allocator = allocator
+
 	if !has_meta(pattern) {
 		// TODO(bill): os.lstat on here to check for error
-		m := make([]string, 1, allocator)
+		m := make([]string, 1)
 		m[0] = pattern
 		return m[:], .None
 	}
@@ -232,6 +234,7 @@ glob :: proc(pattern: string, allocator := context.allocator) -> (matches: []str
 	when ODIN_OS == .Windows {
 		temp_buf: [8]byte
 		volume_len, dir = clean_glob_path_windows(dir, temp_buf[:])
+
 	} else {
 		dir = clean_glob_path(dir)
 	}
@@ -246,7 +249,7 @@ glob :: proc(pattern: string, allocator := context.allocator) -> (matches: []str
 	if err != .None {
 		return
 	}
-	dmatches := make([dynamic]string, 0, 0, allocator)
+	dmatches := make([dynamic]string, 0, 0)
 	for d in m {
 		dmatches, err = _glob(d, file, &dmatches)
 		if err != .None {
@@ -258,11 +261,13 @@ glob :: proc(pattern: string, allocator := context.allocator) -> (matches: []str
 	}
 	return
 }
-_glob :: proc(dir, pattern: string, matches: ^[dynamic]string) -> (m: [dynamic]string, e: Match_Error) {
+_glob :: proc(dir, pattern: string, matches: ^[dynamic]string, allocator := context.allocator) -> (m: [dynamic]string, e: Match_Error) {
+	context.allocator = allocator
+
 	if matches != nil {
 		m = matches^
 	} else {
-		m = make([dynamic]string, 0, 0, context.allocator)
+		m = make([dynamic]string, 0, 0)
 	}
 
 
@@ -275,6 +280,7 @@ _glob :: proc(dir, pattern: string, matches: ^[dynamic]string) -> (m: [dynamic]s
 	{
 		file_info, ferr := os.fstat(d)
 		defer os.file_info_delete(file_info)
+
 		if ferr != 0 {
 			return
 		}
