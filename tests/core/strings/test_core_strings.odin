@@ -1,4 +1,4 @@
-package test_core_image
+package test_core_strings
 
 import "core:strings"
 import "core:testing"

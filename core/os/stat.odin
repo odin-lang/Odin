@@ -2,7 +2,6 @@ package os
 
 import "core:time"
 
-
 File_Info :: struct {
 	fullpath: string,
 	name:     string,
