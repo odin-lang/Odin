@@ -194,6 +194,8 @@ GetFileExInfoStandard: GET_FILEEX_INFO_LEVELS : 0
 GetFileExMaxInfoLevel: GET_FILEEX_INFO_LEVELS : 1
 
 
+TIMERPROC :: #type proc "stdcall" (HWND, UINT, UINT_PTR, DWORD)
+
 WNDPROC :: #type proc "stdcall" (HWND, UINT, WPARAM, LPARAM) -> LRESULT
 
 WNDCLASSA :: struct {
@@ -617,6 +619,9 @@ MK_CONTROL  :: 0x0008
 MK_MBUTTON  :: 0x0010
 MK_XBUTTON1 :: 0x0020
 MK_XBUTTON2 :: 0x0040
+
+USER_TIMER_MAXIMUM :: 0x7FFFFFFF
+USER_TIMER_MINIMUM :: 0x0000000A
 
 _IDC_APPSTARTING := rawptr(uintptr(32650))
 _IDC_ARROW       := rawptr(uintptr(32512))
