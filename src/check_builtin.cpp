@@ -379,7 +379,7 @@ bool check_builtin_objc_procedure(CheckerContext *c, Operand *operand, Ast *call
 	}
 }
 
-bool check_atomic_memory_order_argument(CheckerContext *c, Ast *expr, String const &builtin_name, char const *extra_message = nullptr) {
+bool check_atomic_memory_order_argument(CheckerContext *c, Ast *expr, String const &builtin_name, OdinAtomicMemoryOrder *memory_order_, char const *extra_message = nullptr) {
 	Operand x = {};
 	check_expr_with_type_hint(c, &x, expr, t_atomic_memory_order);
 	if (x.mode == Addressing_Invalid) {
@@ -399,6 +399,9 @@ bool check_atomic_memory_order_argument(CheckerContext *c, Ast *expr, String con
 	if (value < 0 || value >= OdinAtomicMemoryOrder_COUNT) {
 		error(x.expr, "Illegal Atomic_Memory_Order value, got %lld", cast(long long)value);
 		return false;
+	}
+	if (memory_order_) {
+		*memory_order_ = cast(OdinAtomicMemoryOrder)value;
 	}
 
 	return true;
@@ -3232,7 +3235,7 @@ bool check_builtin_procedure(CheckerContext *c, Operand *operand, Ast *call, i32
 
 	case BuiltinProc_atomic_thread_fence:
 	case BuiltinProc_atomic_signal_fence:
-		if (!check_atomic_memory_order_argument(c, ce->args[0], builtin_name)) {
+		if (!check_atomic_memory_order_argument(c, ce->args[0], builtin_name, nullptr)) {
 			return false;
 		}
 		operand->mode = Addressing_NoValue;
@@ -3269,8 +3272,16 @@ bool check_builtin_procedure(CheckerContext *c, Operand *operand, Ast *call, i32
 			check_expr_with_type_hint(c, &x, ce->args[1], elem);
 			check_assignment(c, &x, elem, builtin_name);
 
-			if (!check_atomic_memory_order_argument(c, ce->args[2], builtin_name)) {
+			OdinAtomicMemoryOrder memory_order = {};
+			if (!check_atomic_memory_order_argument(c, ce->args[2], builtin_name, &memory_order)) {
 				return false;
+			}
+			switch (memory_order) {
+			case OdinAtomicMemoryOrder_consume:
+			case OdinAtomicMemoryOrder_acquire:
+			case OdinAtomicMemoryOrder_acq_rel:
+				error(ce->args[2], "Illegal memory order .%s for %.*s", OdinAtomicMemoryOrder_strings[memory_order], LIT(builtin_name));
+				break;
 			}
 
 			operand->type = nullptr;
@@ -3303,8 +3314,16 @@ bool check_builtin_procedure(CheckerContext *c, Operand *operand, Ast *call, i32
 				return false;
 			}
 
-			if (!check_atomic_memory_order_argument(c, ce->args[1], builtin_name)) {
+			OdinAtomicMemoryOrder memory_order = {};
+			if (!check_atomic_memory_order_argument(c, ce->args[1], builtin_name, &memory_order)) {
 				return false;
+			}
+
+			switch (memory_order) {
+			case OdinAtomicMemoryOrder_release:
+			case OdinAtomicMemoryOrder_acq_rel:
+				error(ce->args[1], "Illegal memory order .%s for %.*s", OdinAtomicMemoryOrder_strings[memory_order], LIT(builtin_name));
+				break;
 			}
 
 			operand->type = elem;
@@ -3352,7 +3371,7 @@ bool check_builtin_procedure(CheckerContext *c, Operand *operand, Ast *call, i32
 			check_assignment(c, &x, elem, builtin_name);
 
 
-			if (!check_atomic_memory_order_argument(c, ce->args[2], builtin_name)) {
+			if (!check_atomic_memory_order_argument(c, ce->args[2], builtin_name, nullptr)) {
 				return false;
 			}
 
@@ -3396,11 +3415,70 @@ bool check_builtin_procedure(CheckerContext *c, Operand *operand, Ast *call, i32
 			check_assignment(c, &x, elem, builtin_name);
 			check_assignment(c, &y, elem, builtin_name);
 
-			if (!check_atomic_memory_order_argument(c, ce->args[3], builtin_name, "success ordering")) {
+			OdinAtomicMemoryOrder success_memory_order = {};
+			OdinAtomicMemoryOrder failure_memory_order = {};
+			if (!check_atomic_memory_order_argument(c, ce->args[3], builtin_name, &success_memory_order, "success ordering")) {
 				return false;
 			}
-			if (!check_atomic_memory_order_argument(c, ce->args[4], builtin_name, "failure ordering")) {
+			if (!check_atomic_memory_order_argument(c, ce->args[4], builtin_name, &failure_memory_order, "failure ordering")) {
 				return false;
+			}
+
+			bool invalid_combination = false;
+
+			switch (success_memory_order) {
+			case OdinAtomicMemoryOrder_relaxed:
+			case OdinAtomicMemoryOrder_release:
+				if (failure_memory_order != OdinAtomicMemoryOrder_relaxed) {
+					invalid_combination = true;
+				}
+				break;
+			case OdinAtomicMemoryOrder_consume:
+				switch (failure_memory_order) {
+				case OdinAtomicMemoryOrder_relaxed:
+				case OdinAtomicMemoryOrder_consume:
+					break;
+				default:
+					invalid_combination = true;
+					break;
+				}
+				break;
+			case OdinAtomicMemoryOrder_acquire:
+			case OdinAtomicMemoryOrder_acq_rel:
+				switch (failure_memory_order) {
+				case OdinAtomicMemoryOrder_relaxed:
+				case OdinAtomicMemoryOrder_consume:
+				case OdinAtomicMemoryOrder_acquire:
+					break;
+				default:
+					invalid_combination = true;
+					break;
+				}
+				break;
+			case OdinAtomicMemoryOrder_seq_cst:
+				switch (failure_memory_order) {
+				case OdinAtomicMemoryOrder_relaxed:
+				case OdinAtomicMemoryOrder_consume:
+				case OdinAtomicMemoryOrder_acquire:
+				case OdinAtomicMemoryOrder_seq_cst:
+					break;
+				default:
+					invalid_combination = true;
+					break;
+				}
+				break;
+			default:
+				invalid_combination = true;
+				break;
+			}
+
+
+			if (invalid_combination) {
+				error(ce->args[3], "Illegal memory order pairing for %.*s, success = .%s, failure = .%s",
+					LIT(builtin_name),
+					OdinAtomicMemoryOrder_strings[success_memory_order],
+					OdinAtomicMemoryOrder_strings[failure_memory_order]
+				);
 			}
 
 			operand->mode = Addressing_OptionalOk;

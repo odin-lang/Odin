@@ -693,13 +693,22 @@ gb_global Type *t_objc_SEL   = nullptr;
 gb_global Type *t_objc_Class = nullptr;
 
 enum OdinAtomicMemoryOrder : i32 {
-	OdinAtomicMemoryOrder_relaxed = 0,
-	OdinAtomicMemoryOrder_consume = 1,
+	OdinAtomicMemoryOrder_relaxed = 0, // unordered
+	OdinAtomicMemoryOrder_consume = 1, // monotonic
 	OdinAtomicMemoryOrder_acquire = 2,
 	OdinAtomicMemoryOrder_release = 3,
 	OdinAtomicMemoryOrder_acq_rel = 4,
 	OdinAtomicMemoryOrder_seq_cst = 5,
 	OdinAtomicMemoryOrder_COUNT,
+};
+
+char const *OdinAtomicMemoryOrder_strings[OdinAtomicMemoryOrder_COUNT] = {
+	"relaxed",
+	"consume",
+	"acquire",
+	"release",
+	"acq_rel",
+	"seq_cst",
 };
 
 gb_global Type *t_atomic_memory_order = nullptr;
