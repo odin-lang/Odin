@@ -22,8 +22,10 @@ _O_APPEND    :: 0o2000
 _O_NONBLOCK  :: 0o4000
 _O_LARGEFILE :: 0o100000
 _O_DIRECTORY :: 0o200000
+_O_NOFOLLOW  :: 0o400000
 _O_SYNC      :: 0o4010000
 _O_CLOEXEC   :: 0o2000000
+_O_PATH      :: 0o10000000
 
 _open :: proc(name: string, flags: File_Flags, perm: File_Mode) -> (Handle, Error) {
 	cstr := strings.clone_to_cstring(name, context.temp_allocator)
@@ -66,7 +68,7 @@ _name :: proc(fd: Handle, allocator := context.allocator) -> string {
 
 	realpath: string
 	err: Error
-	if realpath, err = _read_link_cstr(cstring(&buf[0])); err != nil || realpath[0] != '/' {
+	if realpath, err = _read_link_cstr(cstring(&buf[0]), allocator); err != nil || realpath[0] != '/' {
 		return ""
 	}
 	return realpath
