@@ -77,7 +77,7 @@ atomic_mutex_unlock :: proc(m: ^Atomic_Mutex) {
 
 // atomic_mutex_try_lock tries to lock m, will return true on success, and false on failure
 atomic_mutex_try_lock :: proc(m: ^Atomic_Mutex) -> bool {
-	_, ok := atomic_compare_exchange_strong_explicit(&m.state, .Unlocked, .Locked, .acquire, .acquire)
+	_, ok := atomic_compare_exchange_strong_explicit(&m.state, .Unlocked, .Locked, .acquire, .consume)
 	return ok
 }
 
