@@ -427,7 +427,6 @@ i32 linker_stage(lbGenerator *gen) {
 					// dynamic or static system lib, just link regularly searching system library paths
 					lib_str = gb_string_append_fmt(lib_str, " -l%.*s ", LIT(lib));
 				}
-
 			}
 		}
 
@@ -512,12 +511,10 @@ i32 linker_stage(lbGenerator *gen) {
 		defer (gb_string_free(platform_lib_str));
 		if (build_context.metrics.os == TargetOs_darwin) {
 			platform_lib_str = gb_string_appendc(platform_lib_str, "-lSystem -lm -Wl,-syslibroot /Library/Developer/CommandLineTools/SDKs/MacOSX.sdk -L/usr/local/lib");
+		} else if (build_context.no_crt) {
+			link_settings = gb_string_append_fmt(link_settings, "-nostdlib ");
 		} else {
-			if (build_context.no_crt) {
-				link_settings = gb_string_append_fmt(link_settings, "-nostdlib ");
-			} else {
-				platform_lib_str = gb_string_appendc(platform_lib_str, "-lc -lm");
-			}
+			platform_lib_str = gb_string_appendc(platform_lib_str, "-lc -lm");
 		}
 
 		if (build_context.metrics.os == TargetOs_darwin) {
