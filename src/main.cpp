@@ -436,6 +436,10 @@ i32 linker_stage(lbGenerator *gen) {
 		String output_ext = {};
 		gbString link_settings = gb_string_make_reserve(heap_allocator(), 32);
 
+		if (build_context.no_crt) {
+			link_settings = gb_string_append_fmt(link_settings, "-nostdlib ");
+		}
+
 		// NOTE(dweiler): We use clang as a frontend for the linker as there are
 		// other runtime and compiler support libraries that need to be linked in
 		// very specific orders such as libgcc_s, ld-linux-so, unwind, etc.
