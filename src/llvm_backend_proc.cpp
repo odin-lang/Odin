@@ -1738,7 +1738,7 @@ lbValue lb_build_builtin_proc(lbProcedure *p, Ast *expr, TypeAndValue const &tv,
 		}
 
 		// TODO(bill): Figure out how to make it weak
-		LLVMBool single_threaded = weak;
+		LLVMBool single_threaded = false;
 
 		LLVMValueRef value = LLVMBuildAtomicCmpXchg(
 			p->builder, address.value,
@@ -1747,6 +1747,7 @@ lbValue lb_build_builtin_proc(lbProcedure *p, Ast *expr, TypeAndValue const &tv,
 			failure_ordering,
 			single_threaded
 		);
+		LLVMSetWeak(value, weak);
 
 		if (tv.type->kind == Type_Tuple) {
 			Type *fix_typed = alloc_type_tuple();
