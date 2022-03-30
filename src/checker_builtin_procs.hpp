@@ -260,6 +260,8 @@ BuiltinProc__type_end,
 
 	BuiltinProc_constant_utf16_cstring,
 
+	BuiltinProc_wasm_memory_grow,
+	BuiltinProc_wasm_memory_size,
 
 	BuiltinProc_COUNT,
 };
@@ -523,4 +525,6 @@ gb_global BuiltinProc builtin_procs[BuiltinProc_COUNT] = {
 
 	{STR_LIT("constant_utf16_cstring"), 1, false, Expr_Expr, BuiltinProcPkg_intrinsics},
 
+	{STR_LIT("wasm_memory_grow"), 2, false, Expr_Expr, BuiltinProcPkg_intrinsics},
+	{STR_LIT("wasm_memory_size"), 1, false, Expr_Expr, BuiltinProcPkg_intrinsics},
 };

@@ -2207,6 +2207,45 @@ lbValue lb_build_builtin_proc(lbProcedure *p, Ast *expr, TypeAndValue const &tv,
 			return res;
 
 		}
+
+	case BuiltinProc_wasm_memory_grow:
+		{
+			char const *name = "llvm.wasm.memory.grow";
+			LLVMTypeRef types[1] = {
+				lb_type(p->module, t_uintptr),
+			};
+			unsigned id = LLVMLookupIntrinsicID(name, gb_strlen(name));
+			GB_ASSERT_MSG(id != 0, "Unable to find %s", name, LLVMPrintTypeToString(types[0]));
+			LLVMValueRef ip = LLVMGetIntrinsicDeclaration(p->module->mod, id, types, gb_count_of(types));
+
+			LLVMValueRef args[2] = {};
+			args[0] = lb_emit_conv(p, lb_build_expr(p, ce->args[0]), t_uintptr).value;
+			args[1] = lb_emit_conv(p, lb_build_expr(p, ce->args[1]), t_uintptr).value;
+
+			lbValue res = {};
+			res.type = tv.type;
+			res.value = LLVMBuildCall(p->builder, ip, args, gb_count_of(args), "");
+			return res;
+		}
+	case BuiltinProc_wasm_memory_size:
+		{
+			char const *name = "llvm.wasm.memory.size";
+			LLVMTypeRef types[1] = {
+				lb_type(p->module, t_uintptr),
+			};
+			unsigned id = LLVMLookupIntrinsicID(name, gb_strlen(name));
+			GB_ASSERT_MSG(id != 0, "Unable to find %s", name, LLVMPrintTypeToString(types[0]));
+			LLVMValueRef ip = LLVMGetIntrinsicDeclaration(p->module->mod, id, types, gb_count_of(types));
+
+			LLVMValueRef args[1] = {};
+			args[0] = lb_emit_conv(p, lb_build_expr(p, ce->args[0]), t_uintptr).value;
+
+			lbValue res = {};
+			res.type = tv.type;
+			res.value = LLVMBuildCall(p->builder, ip, args, gb_count_of(args), "");
+			return res;
+		}
+
 	}
 
 	GB_PANIC("Unhandled built-in procedure %.*s", LIT(builtin_procs[id].name));

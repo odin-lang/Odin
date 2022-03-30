@@ -304,7 +304,7 @@ bool check_builtin_objc_procedure(CheckerContext *c, Operand *operand, Ast *call
 		} else if (!is_operand_value(self) || !check_is_assignable_to(c, &self, t_objc_id)) {
 			gbString e = expr_to_string(self.expr);
 			gbString t = type_to_string(self.type);
-			error(self.expr, "'%.*s' expected a type or value derived from intrinsics.objc_object, got '%s' of type %s %d", LIT(builtin_name), e, t, self.type->kind);
+			error(self.expr, "'%.*s' expected a type or value derived from intrinsics.objc_object, got '%s' of type %s", LIT(builtin_name), e, t);
 			gb_string_free(t);
 			gb_string_free(e);
 			return false;
@@ -4110,6 +4110,73 @@ bool check_builtin_procedure(CheckerContext *c, Operand *operand, Ast *call, i32
 			break;
 		}
 
+
+	case BuiltinProc_wasm_memory_grow:
+		{
+			if (!is_arch_wasm()) {
+				error(call, "'%.*s' is only allowed on wasm targets", LIT(builtin_name));
+				return false;
+			}
+
+			Operand index = {};
+			Operand delta = {};
+			check_expr(c, &index, ce->args[0]); if (index.mode == Addressing_Invalid) return false;
+			check_expr(c, &delta, ce->args[1]); if (delta.mode == Addressing_Invalid) return false;
+
+			convert_to_typed(c, &index, t_uintptr); if (index.mode == Addressing_Invalid) return false;
+			convert_to_typed(c, &delta, t_uintptr); if (delta.mode == Addressing_Invalid) return false;
+
+			if (!is_operand_value(index) || !check_is_assignable_to(c, &index, t_uintptr)) {
+				gbString e = expr_to_string(index.expr);
+				gbString t = type_to_string(index.type);
+				error(index.expr, "'%.*s' expected a uintptr for the memory index, got '%s' of type %s", LIT(builtin_name), e, t);
+				gb_string_free(t);
+				gb_string_free(e);
+				return false;
+			}
+
+			if (!is_operand_value(delta) || !check_is_assignable_to(c, &delta, t_uintptr)) {
+				gbString e = expr_to_string(delta.expr);
+				gbString t = type_to_string(delta.type);
+				error(delta.expr, "'%.*s' expected a uintptr for the memory delta, got '%s' of type %s", LIT(builtin_name), e, t);
+				gb_string_free(t);
+				gb_string_free(e);
+				return false;
+			}
+
+			operand->mode = Addressing_Value;
+			operand->type = t_int;
+			operand->value = {};
+			break;
+		}
+		break;
+	case BuiltinProc_wasm_memory_size:
+		{
+			if (!is_arch_wasm()) {
+				error(call, "'%.*s' is only allowed on wasm targets", LIT(builtin_name));
+				return false;
+			}
+
+			Operand index = {};
+			check_expr(c, &index, ce->args[0]); if (index.mode == Addressing_Invalid) return false;
+
+			convert_to_typed(c, &index, t_uintptr); if (index.mode == Addressing_Invalid) return false;
+
+			if (!is_operand_value(index) || !check_is_assignable_to(c, &index, t_uintptr)) {
+				gbString e = expr_to_string(index.expr);
+				gbString t = type_to_string(index.type);
+				error(index.expr, "'%.*s' expected a uintptr for the memory index, got '%s' of type %s", LIT(builtin_name), e, t);
+				gb_string_free(t);
+				gb_string_free(e);
+				return false;
+			}
+
+			operand->mode = Addressing_Value;
+			operand->type = t_int;
+			operand->value = {};
+			break;
+		}
+		break;
 
 	}
 
