@@ -473,7 +473,7 @@ Entity *scope_insert_with_name(Scope *s, String const &name, Entity *entity, boo
 
 	if (use_mutex) mutex_lock(&s->mutex);
 	defer (if (use_mutex) mutex_unlock(&s->mutex));
-	
+
 	found = string_map_get(&s->elements, key);
 
 	if (found) {
@@ -735,7 +735,7 @@ AstPackage *get_core_package(CheckerInfo *info, String name) {
 	if (found == nullptr) {
 		gb_printf_err("Name: %.*s\n", LIT(name));
 		gb_printf_err("Fullpath: %.*s\n", LIT(path));
-		
+
 		for_array(i, info->packages.entries) {
 			auto *entry = &info->packages.entries[i];
 			gb_printf_err("%.*s\n", LIT(entry->key.string));
@@ -949,7 +949,7 @@ void init_universal(void) {
 		add_global_enum_constant(fields, "ODIN_ARCH", bc->metrics.arch);
 		add_global_string_constant("ODIN_ARCH_STRING", target_arch_names[bc->metrics.arch]);
 	}
-	
+
 	{
 		GlobalEnumValue values[BuildMode_COUNT] = {
 			{"Executable", BuildMode_Executable},
@@ -4453,7 +4453,7 @@ void check_add_foreign_import_decl(CheckerContext *ctx, Ast *decl) {
 
 	if (has_asm_extension(fullpath)) {
 		if (build_context.metrics.arch != TargetArch_amd64 ||
-		    build_context.metrics.os   != TargetOs_windows) {
+		    (build_context.metrics.os  != TargetOs_windows && build_context.metrics.os != TargetOs_linux)) {
 			error(decl, "Assembly files are not yet supported on this platform: %.*s_%.*s",
 			      LIT(target_os_names[build_context.metrics.os]), LIT(target_arch_names[build_context.metrics.arch]));
 		}

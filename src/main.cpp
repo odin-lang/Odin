@@ -381,6 +381,10 @@ i32 linker_stage(lbGenerator *gen) {
 		gbString lib_str = gb_string_make(heap_allocator(), "-L/");
 		defer (gb_string_free(lib_str));
 
+		StringSet asm_files = {};
+		string_set_init(&asm_files, heap_allocator(), 64);
+		defer (string_set_destroy(&asm_files));
+
 		for_array(i, gen->default_module.foreign_library_paths) {
 			String lib = gen->default_module.foreign_library_paths[i];
 
@@ -417,11 +421,36 @@ i32 linker_stage(lbGenerator *gen) {
 					// NOTE(vassvik): it is the user's responsibility to make sure the shared library files are visible
 					//                at runtimeto the executable
 					lib_str = gb_string_append_fmt(lib_str, " -l:\"%s/%.*s\" ", cwd, LIT(lib));
+				} else if (has_asm_extension(lib)) {
+					string_set_add(&asm_files, lib);
 				} else {
 					// dynamic or static system lib, just link regularly searching system library paths
 					lib_str = gb_string_append_fmt(lib_str, " -l%.*s ", LIT(lib));
 				}
+
 			}
+		}
+
+		for_array(i, asm_files.entries) {
+			String asm_file = asm_files.entries[i].value;
+			String obj_file = concatenate_strings(permanent_allocator(), asm_file, str_lit(".o"));
+
+			result = system_exec_command_line_app("nasm",
+				"nasm "
+				"-f elf64 "
+				"\"%.*s\" "
+				"-o \"%.*s\" "
+				"%.*s "
+				"",
+				LIT(asm_file),
+				LIT(obj_file),
+				LIT(build_context.extra_assembler_flags)
+			);
+
+			if (result) {
+				return result;
+			}
+			array_add(&gen->output_object_paths, obj_file);
 		}
 
 		gbString object_files = gb_string_make(heap_allocator(), "");
@@ -436,9 +465,6 @@ i32 linker_stage(lbGenerator *gen) {
 		String output_ext = {};
 		gbString link_settings = gb_string_make_reserve(heap_allocator(), 32);
 
-		if (build_context.no_crt) {
-			link_settings = gb_string_append_fmt(link_settings, "-nostdlib ");
-		}
 
 		// NOTE(dweiler): We use clang as a frontend for the linker as there are
 		// other runtime and compiler support libraries that need to be linked in
@@ -487,7 +513,11 @@ i32 linker_stage(lbGenerator *gen) {
 		if (build_context.metrics.os == TargetOs_darwin) {
 			platform_lib_str = gb_string_appendc(platform_lib_str, "-lSystem -lm -Wl,-syslibroot /Library/Developer/CommandLineTools/SDKs/MacOSX.sdk -L/usr/local/lib");
 		} else {
-			platform_lib_str = gb_string_appendc(platform_lib_str, "-lc -lm");
+			if (build_context.no_crt) {
+				link_settings = gb_string_append_fmt(link_settings, "-nostdlib ");
+			} else {
+				platform_lib_str = gb_string_appendc(platform_lib_str, "-lc -lm");
+			}
 		}
 
 		if (build_context.metrics.os == TargetOs_darwin) {
