@@ -1372,12 +1372,20 @@ lbValue lb_build_builtin_proc(lbProcedure *p, Ast *expr, TypeAndValue const &tv,
 		if (build_context.metrics.arch == TargetArch_i386 ||
 		    build_context.metrics.arch == TargetArch_amd64) {
 			LLVMTypeRef func_type = LLVMFunctionType(LLVMVoidTypeInContext(p->module->ctx), nullptr, 0, false);
-			LLVMValueRef the_asm = llvm_get_inline_asm(func_type, str_lit("pause"), {});
+			LLVMValueRef the_asm = llvm_get_inline_asm(func_type, str_lit("pause"), {}, true);
 			GB_ASSERT(the_asm != nullptr);
 			LLVMBuildCall2(p->builder, func_type, the_asm, nullptr, 0, "");
 		} else if (build_context.metrics.arch == TargetArch_arm64) {
 			LLVMTypeRef func_type = LLVMFunctionType(LLVMVoidTypeInContext(p->module->ctx), nullptr, 0, false);
-			LLVMValueRef the_asm = llvm_get_inline_asm(func_type, str_lit("yield"), {});
+			// NOTE(bill, 2022-03-30): `isb` appears to a better option that `yield`
+			// See: https://bugs.java.com/bugdatabase/view_bug.do?bug_id=8258604
+			LLVMValueRef the_asm = llvm_get_inline_asm(func_type, str_lit("isb"), {}, true);
+			GB_ASSERT(the_asm != nullptr);
+			LLVMBuildCall2(p->builder, func_type, the_asm, nullptr, 0, "");
+		} else {
+			// NOTE: default to something to prevent optimization
+			LLVMTypeRef func_type = LLVMFunctionType(LLVMVoidTypeInContext(p->module->ctx), nullptr, 0, false);
+			LLVMValueRef the_asm = llvm_get_inline_asm(func_type, str_lit(""), {}, true);
 			GB_ASSERT(the_asm != nullptr);
 			LLVMBuildCall2(p->builder, func_type, the_asm, nullptr, 0, "");
 		}
@@ -1794,18 +1802,18 @@ lbValue lb_build_builtin_proc(lbProcedure *p, Ast *expr, TypeAndValue const &tv,
 
 		switch (id) {
 		case BuiltinProc_atomic_cxchg:                        success_ordering = LLVMAtomicOrderingSequentiallyConsistent; failure_ordering = LLVMAtomicOrderingSequentiallyConsistent; weak = false; break;
-		case BuiltinProc_atomic_cxchg_acq:                    success_ordering = LLVMAtomicOrderingAcquire;                failure_ordering = LLVMAtomicOrderingSequentiallyConsistent; weak = false; break;
-		case BuiltinProc_atomic_cxchg_rel:                    success_ordering = LLVMAtomicOrderingRelease;                failure_ordering = LLVMAtomicOrderingSequentiallyConsistent; weak = false; break;
-		case BuiltinProc_atomic_cxchg_acqrel:                 success_ordering = LLVMAtomicOrderingAcquireRelease;         failure_ordering = LLVMAtomicOrderingSequentiallyConsistent; weak = false; break;
+		case BuiltinProc_atomic_cxchg_acq:                    success_ordering = LLVMAtomicOrderingAcquire;                failure_ordering = LLVMAtomicOrderingMonotonic;              weak = false; break;
+		case BuiltinProc_atomic_cxchg_rel:                    success_ordering = LLVMAtomicOrderingRelease;                failure_ordering = LLVMAtomicOrderingMonotonic;              weak = false; break;
+		case BuiltinProc_atomic_cxchg_acqrel:                 success_ordering = LLVMAtomicOrderingAcquireRelease;         failure_ordering = LLVMAtomicOrderingMonotonic;              weak = false; break;
 		case BuiltinProc_atomic_cxchg_relaxed:                success_ordering = LLVMAtomicOrderingMonotonic;              failure_ordering = LLVMAtomicOrderingMonotonic;              weak = false; break;
 		case BuiltinProc_atomic_cxchg_failrelaxed:            success_ordering = LLVMAtomicOrderingSequentiallyConsistent; failure_ordering = LLVMAtomicOrderingMonotonic;              weak = false; break;
 		case BuiltinProc_atomic_cxchg_failacq:                success_ordering = LLVMAtomicOrderingSequentiallyConsistent; failure_ordering = LLVMAtomicOrderingAcquire;                weak = false; break;
 		case BuiltinProc_atomic_cxchg_acq_failrelaxed:        success_ordering = LLVMAtomicOrderingAcquire;                failure_ordering = LLVMAtomicOrderingMonotonic;              weak = false; break;
 		case BuiltinProc_atomic_cxchg_acqrel_failrelaxed:     success_ordering = LLVMAtomicOrderingAcquireRelease;         failure_ordering = LLVMAtomicOrderingMonotonic;              weak = false; break;
 		case BuiltinProc_atomic_cxchgweak:                    success_ordering = LLVMAtomicOrderingSequentiallyConsistent; failure_ordering = LLVMAtomicOrderingSequentiallyConsistent; weak = false; break;
-		case BuiltinProc_atomic_cxchgweak_acq:                success_ordering = LLVMAtomicOrderingAcquire;                failure_ordering = LLVMAtomicOrderingSequentiallyConsistent; weak = true;  break;
-		case BuiltinProc_atomic_cxchgweak_rel:                success_ordering = LLVMAtomicOrderingRelease;                failure_ordering = LLVMAtomicOrderingSequentiallyConsistent; weak = true;  break;
-		case BuiltinProc_atomic_cxchgweak_acqrel:             success_ordering = LLVMAtomicOrderingAcquireRelease;         failure_ordering = LLVMAtomicOrderingSequentiallyConsistent; weak = true;  break;
+		case BuiltinProc_atomic_cxchgweak_acq:                success_ordering = LLVMAtomicOrderingAcquire;                failure_ordering = LLVMAtomicOrderingMonotonic;              weak = true;  break;
+		case BuiltinProc_atomic_cxchgweak_rel:                success_ordering = LLVMAtomicOrderingRelease;                failure_ordering = LLVMAtomicOrderingMonotonic;              weak = true;  break;
+		case BuiltinProc_atomic_cxchgweak_acqrel:             success_ordering = LLVMAtomicOrderingAcquireRelease;         failure_ordering = LLVMAtomicOrderingMonotonic;              weak = true;  break;
 		case BuiltinProc_atomic_cxchgweak_relaxed:            success_ordering = LLVMAtomicOrderingMonotonic;              failure_ordering = LLVMAtomicOrderingMonotonic;              weak = true;  break;
 		case BuiltinProc_atomic_cxchgweak_failrelaxed:        success_ordering = LLVMAtomicOrderingSequentiallyConsistent; failure_ordering = LLVMAtomicOrderingMonotonic;              weak = true;  break;
 		case BuiltinProc_atomic_cxchgweak_failacq:            success_ordering = LLVMAtomicOrderingSequentiallyConsistent; failure_ordering = LLVMAtomicOrderingAcquire;                weak = true;  break;
