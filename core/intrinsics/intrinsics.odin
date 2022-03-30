@@ -201,6 +201,10 @@ type_equal_proc  :: proc($T: typeid) -> (equal:  proc "contextless" (rawptr, raw
 type_hasher_proc :: proc($T: typeid) -> (hasher: proc "contextless" (data: rawptr, seed: uintptr) -> uintptr) where type_is_comparable(T) ---
 
 
+// WASM targets only
+wasm_memory_grow :: proc(index, delta: uintptr) -> int ---
+wasm_memory_size :: proc(index: uintptr)        -> int ---
+
 // Internal compiler use only
 
 __entry_point :: proc() ---
