@@ -1,6 +1,8 @@
 //+build linux, darwin, freebsd, openbsd
 package time
 
+import "core:intrinsics"
+
 IS_SUPPORTED :: true // NOTE: Times on Darwin are UTC.
 
 when ODIN_OS == .Darwin {
@@ -9,18 +11,17 @@ when ODIN_OS == .Darwin {
 	foreign import libc "system:c"
 }
 
-
-@(default_calling_convention="c")
-foreign libc {
-	@(link_name="clock_gettime") _unix_clock_gettime :: proc(clock_id: u64, timespec: ^TimeSpec) -> i32 ---
-	@(link_name="sleep")         _unix_sleep         :: proc(seconds: u32) -> i32 ---
-	@(link_name="nanosleep")     _unix_nanosleep     :: proc(requested: ^TimeSpec, remaining: ^TimeSpec) -> i32 ---
-}
-
 TimeSpec :: struct {
 	tv_sec  : i64,  /* seconds */
 	tv_nsec : i64,  /* nanoseconds */
 }
+
+@(default_calling_convention="c")
+foreign libc {
+	@(link_name="sleep")         _unix_sleep         :: proc(seconds: u32) -> i32 ---
+	@(link_name="nanosleep")     _unix_nanosleep     :: proc(requested: ^TimeSpec, remaining: ^TimeSpec) -> i32 ---
+}
+
 
 when ODIN_OS == .OpenBSD {
 	CLOCK_REALTIME           :: 0
@@ -51,6 +52,9 @@ when ODIN_OS == .OpenBSD {
 CLOCK_SYSTEM   :: CLOCK_REALTIME
 CLOCK_CALENDAR :: CLOCK_MONOTONIC
 
+_unix_clock_gettime :: proc "contextless" (clock_id: u64, timespec: rawptr) -> int {
+	return int(intrinsics.syscall(228, uintptr(clock_id), uintptr(rawptr(timespec))))
+}
 
 clock_gettime :: proc "contextless" (clock_id: u64) -> TimeSpec {
 	ts : TimeSpec // NOTE(tetra): Do we need to initialize this?
