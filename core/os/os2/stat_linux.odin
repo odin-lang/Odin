@@ -82,37 +82,49 @@ OS_Stat :: struct {
 	_reserve3:     i64,
 }
 
+
 _fstat :: proc(fd: Handle, allocator := context.allocator) -> (File_Info, Error) {
-	return File_Info{}, nil
-}
-
-_stat :: proc(name: string, allocator := context.allocator) -> (File_Info, Error) {
-	return File_Info{}, nil
-}
-
-_lstat :: proc(name: string, allocator := context.allocator) -> (File_Info, Error) {
-	cstr := strings.clone_to_cstring(name)
-	defer delete(cstr)
-
 	s: OS_Stat
-	result := unix.sys_lstat(cstr, &s)
+	result := unix.sys_fstat(int(fd), &s)
 	if result < 0 {
-		return {}, _get_platform_error(int(unix.get_errno(result)))
+		return {}, _get_platform_error(result)
 	}
 
+	// TODO: As of Linux 4.11, the new statx syscall can retrieve creation_time
 	fi := File_Info {
-		fullpath = "",
+		fullpath = _name(fd, allocator),
 		name = "",
 		size = s.size,
 		mode = 0,
 		is_dir = S_ISDIR(s.mode),
-		creation_time = time.Time{0}, // linux does not track this
-		//TODO
-		modification_time = time.Time{0},
-		access_time = time.Time{0},
+		modification_time = time.Time {s.modified.seconds},
+		access_time = time.Time {s.last_access.seconds},
+		creation_time = time.Time{0}, // regular stat does not provide this
 	}
-	
+
+	fi.name = filepath.base(fi.fullpath)
 	return fi, nil
+}
+
+// NOTE: _stat and _lstat are using _fstat to avoid a race condition when populating fullpath
+_stat :: proc(name: string, allocator := context.allocator) -> (File_Info, Error) {
+	cstr := strings.clone_to_cstring(name, context.temp_allocator)
+	fd := unix.sys_open(cstr, _O_RDONLY)
+	if fd < 0 {
+		return {}, _get_platform_error(fd)
+	}
+	defer unix.sys_close(fd)
+	return _fstat(Handle(fd), allocator)
+}
+
+_lstat :: proc(name: string, allocator := context.allocator) -> (File_Info, Error) {
+	cstr := strings.clone_to_cstring(name, context.temp_allocator)
+	fd := unix.sys_open(cstr, _O_RDONLY | _O_PATH | _O_NOFOLLOW)
+	if fd < 0 {
+		return {}, _get_platform_error(fd)
+	}
+	defer unix.sys_close(fd)
+	return _fstat(Handle(fd), allocator)
 }
 
 _same_file :: proc(fi1, fi2: File_Info) -> bool {
