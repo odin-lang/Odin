@@ -38,6 +38,9 @@ atomic_mutex_lock :: proc(m: ^Atomic_Mutex) {
 			}
 		}
 
+		// Set just in case 100 iterations did not do it
+		new_state = .Waiting
+
 		for {
 			if atomic_exchange_acquire(&m.state, .Waiting) == .Unlocked {
 				return
@@ -49,11 +52,7 @@ atomic_mutex_lock :: proc(m: ^Atomic_Mutex) {
 	}
 
 
-	switch v := atomic_exchange_acquire(&m.state, .Locked); v {
-	case .Unlocked:
-		// Okay
-	case: fallthrough
-	case .Locked, .Waiting:
+	if v := atomic_exchange_acquire(&m.state, .Locked); v != .Unlocked {
 		lock_slow(m, v)
 	}
 }
