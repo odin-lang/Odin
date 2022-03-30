@@ -26,7 +26,7 @@ INVALID_TASK_ID :: Task_Id(-1)
 Pool :: struct {
 	allocator:             mem.Allocator,
 	mutex:                 sync.Mutex,
-	sem_available:         sync.Semaphore,
+	sem_available:         sync.Sema,
 	processing_task_count: int, // atomic
 	is_running:            bool,
 
@@ -40,14 +40,14 @@ pool_init :: proc(pool: ^Pool, thread_count: int, allocator := context.allocator
 		pool := (^Pool)(t.data)
 
 		for pool.is_running {
-			sync.semaphore_wait_for(&pool.sem_available)
+			sync.sema_wait(&pool.sem_available)
 
 			if task, ok := pool_try_and_pop_task(pool); ok {
 				pool_do_work(pool, &task)
 			}
 		}
 
-		sync.semaphore_post(&pool.sem_available, 1)
+		sync.sema_post(&pool.sem_available, 1)
 	}
 
 
@@ -56,8 +56,6 @@ pool_init :: proc(pool: ^Pool, thread_count: int, allocator := context.allocator
 	pool.tasks = make([dynamic]Task)
 	pool.threads = make([]^Thread, thread_count)
 
-	sync.mutex_init(&pool.mutex)
-	sync.semaphore_init(&pool.sem_available)
 	pool.is_running = true
 
 	for _, i in pool.threads {
@@ -76,9 +74,6 @@ pool_destroy :: proc(pool: ^Pool) {
 	}
 
 	delete(pool.threads, pool.allocator)
-
-	sync.mutex_destroy(&pool.mutex)
-	sync.semaphore_destroy(&pool.sem_available)
 }
 
 pool_start :: proc(pool: ^Pool) {
@@ -90,7 +85,7 @@ pool_start :: proc(pool: ^Pool) {
 pool_join :: proc(pool: ^Pool) {
 	pool.is_running = false
 
-	sync.semaphore_post(&pool.sem_available, len(pool.threads))
+	sync.sema_post(&pool.sem_available, len(pool.threads))
 
 	yield()
 
@@ -109,7 +104,7 @@ pool_add_task :: proc(pool: ^Pool, procedure: Task_Proc, data: rawptr, user_inde
 	task.user_index = user_index
 
 	append(&pool.tasks, task)
-	sync.semaphore_post(&pool.sem_available, 1)
+	sync.sema_post(&pool.sem_available, 1)
 }
 
 pool_try_and_pop_task :: proc(pool: ^Pool) -> (task: Task, got_task: bool = false) {
@@ -140,7 +135,7 @@ pool_wait_and_process :: proc(pool: ^Pool) {
 		// Safety kick
 		if len(pool.tasks) != 0 && intrinsics.atomic_load(&pool.processing_task_count) == 0 {
 			sync.mutex_lock(&pool.mutex)
-			sync.semaphore_post(&pool.sem_available, len(pool.tasks))
+			sync.sema_post(&pool.sem_available, len(pool.tasks))
 			sync.mutex_unlock(&pool.mutex)
 		}
 

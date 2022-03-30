@@ -1,168 +1,79 @@
-package sync
+package sync2
 
 import "core:intrinsics"
 
-Ordering :: enum {
-	Relaxed, // Monotonic
-	Release,
-	Acquire,
-	Acquire_Release,
-	Sequentially_Consistent,
-}
+cpu_relax :: intrinsics.cpu_relax
 
-strongest_failure_ordering_table := [Ordering]Ordering{
-	.Relaxed                 = .Relaxed,
-	.Release                 = .Relaxed,
-	.Acquire                 = .Acquire,
-	.Acquire_Release         = .Acquire,
-	.Sequentially_Consistent = .Sequentially_Consistent,
-}
+atomic_fence         :: intrinsics.atomic_fence
+atomic_fence_acquire :: intrinsics.atomic_fence_acq
+atomic_fence_release :: intrinsics.atomic_fence_rel
+atomic_fence_acqrel  :: intrinsics.atomic_fence_acqrel
 
-strongest_failure_ordering :: #force_inline proc(order: Ordering) -> Ordering {
-	return strongest_failure_ordering_table[order]
-}
+atomic_store           :: intrinsics.atomic_store
+atomic_store_release   :: intrinsics.atomic_store_rel
+atomic_store_relaxed   :: intrinsics.atomic_store_relaxed
+atomic_store_unordered :: intrinsics.atomic_store_unordered
 
-fence :: #force_inline proc($order: Ordering) {
-	     when order == .Relaxed                 { #panic("there is no such thing as a relaxed fence") }
-	else when order == .Release                 { intrinsics.atomic_fence_rel()                       }
-	else when order == .Acquire                 { intrinsics.atomic_fence_acq()                       }
-	else when order == .Acquire_Release         { intrinsics.atomic_fence_acqrel()                    }
-	else when order == .Sequentially_Consistent { intrinsics.atomic_fence()                           }
-	else { #panic("unknown order") }
-}
+atomic_load           :: intrinsics.atomic_load
+atomic_load_acquire   :: intrinsics.atomic_load_acq
+atomic_load_relaxed   :: intrinsics.atomic_load_relaxed
+atomic_load_unordered :: intrinsics.atomic_load_unordered
 
+atomic_add          :: intrinsics.atomic_add
+atomic_add_acquire  :: intrinsics.atomic_add_acq
+atomic_add_release  :: intrinsics.atomic_add_rel
+atomic_add_acqrel   :: intrinsics.atomic_add_acqrel
+atomic_add_relaxed  :: intrinsics.atomic_add_relaxed
+atomic_sub          :: intrinsics.atomic_sub
+atomic_sub_acquire  :: intrinsics.atomic_sub_acq
+atomic_sub_release  :: intrinsics.atomic_sub_rel
+atomic_sub_acqrel   :: intrinsics.atomic_sub_acqrel
+atomic_sub_relaxed  :: intrinsics.atomic_sub_relaxed
+atomic_and          :: intrinsics.atomic_and
+atomic_and_acquire  :: intrinsics.atomic_and_acq
+atomic_and_release  :: intrinsics.atomic_and_rel
+atomic_and_acqrel   :: intrinsics.atomic_and_acqrel
+atomic_and_relaxed  :: intrinsics.atomic_and_relaxed
+atomic_nand         :: intrinsics.atomic_nand
+atomic_nand_acquire :: intrinsics.atomic_nand_acq
+atomic_nand_release :: intrinsics.atomic_nand_rel
+atomic_nand_acqrel  :: intrinsics.atomic_nand_acqrel
+atomic_nand_relaxed :: intrinsics.atomic_nand_relaxed
+atomic_or           :: intrinsics.atomic_or
+atomic_or_acquire   :: intrinsics.atomic_or_acq
+atomic_or_release   :: intrinsics.atomic_or_rel
+atomic_or_acqrel    :: intrinsics.atomic_or_acqrel
+atomic_or_relaxed   :: intrinsics.atomic_or_relaxed
+atomic_xor          :: intrinsics.atomic_xor
+atomic_xor_acquire  :: intrinsics.atomic_xor_acq
+atomic_xor_release  :: intrinsics.atomic_xor_rel
+atomic_xor_acqrel   :: intrinsics.atomic_xor_acqrel
+atomic_xor_relaxed  :: intrinsics.atomic_xor_relaxed
 
-atomic_store :: #force_inline proc(dst: ^$T, val: T, $order: Ordering) {
-	     when order == .Relaxed                 { intrinsics.atomic_store_relaxed(dst, val) }
-	else when order == .Release                 { intrinsics.atomic_store_rel(dst, val) }
-	else when order == .Sequentially_Consistent { intrinsics.atomic_store(dst, val) }
-	else when order == .Acquire                 { #panic("there is not such thing as an acquire store") }
-	else when order == .Acquire_Release         { #panic("there is not such thing as an acquire/release store") }
-	else { #panic("unknown order") }
-}
+atomic_exchange         :: intrinsics.atomic_xchg
+atomic_exchange_acquire :: intrinsics.atomic_xchg_acq
+atomic_exchange_release :: intrinsics.atomic_xchg_rel
+atomic_exchange_acqrel  :: intrinsics.atomic_xchg_acqrel
+atomic_exchange_relaxed :: intrinsics.atomic_xchg_relaxed
 
-atomic_load :: #force_inline proc(dst: ^$T, $order: Ordering) -> T {
-	     when order == .Relaxed                 { return intrinsics.atomic_load_relaxed(dst) }
-	else when order == .Acquire                 { return intrinsics.atomic_load_acq(dst) }
-	else when order == .Sequentially_Consistent { return intrinsics.atomic_load(dst) }
-	else when order == .Release                 { #panic("there is no such thing as a release load") }
-	else when order == .Acquire_Release         { #panic("there is no such thing as an acquire/release load") }
-	else { #panic("unknown order") }
-}
+// Returns value and optional ok boolean
+atomic_compare_exchange_strong                     :: intrinsics.atomic_cxchg
+atomic_compare_exchange_strong_acquire             :: intrinsics.atomic_cxchg_acq
+atomic_compare_exchange_strong_release             :: intrinsics.atomic_cxchg_rel
+atomic_compare_exchange_strong_acqrel              :: intrinsics.atomic_cxchg_acqrel
+atomic_compare_exchange_strong_relaxed             :: intrinsics.atomic_cxchg_relaxed
+atomic_compare_exchange_strong_failrelaxed         :: intrinsics.atomic_cxchg_failrelaxed
+atomic_compare_exchange_strong_failacquire         :: intrinsics.atomic_cxchg_failacq
+atomic_compare_exchange_strong_acquire_failrelaxed :: intrinsics.atomic_cxchg_acq_failrelaxed
+atomic_compare_exchange_strong_acqrel_failrelaxed  :: intrinsics.atomic_cxchg_acqrel_failrelaxed
 
-atomic_swap :: #force_inline proc(dst: ^$T, val: T, $order: Ordering) -> T {
-	     when order == .Relaxed                 { return intrinsics.atomic_xchg_relaxed(dst, val) }
-	else when order == .Release                 { return intrinsics.atomic_xchg_rel(dst, val)     }
-	else when order == .Acquire                 { return intrinsics.atomic_xchg_acq(dst, val)     }
-	else when order == .Acquire_Release         { return intrinsics.atomic_xchg_acqrel(dst, val)  }
-	else when order == .Sequentially_Consistent { return intrinsics.atomic_xchg(dst, val)         }
-	else { #panic("unknown order") }
-}
-
-atomic_compare_exchange :: #force_inline proc(dst: ^$T, old, new: T, $success, $failure: Ordering) -> (val: T, ok: bool) {
-	when failure == .Relaxed {
-		     when success == .Relaxed                 { return intrinsics.atomic_cxchg_relaxed(dst, old, new) }
-		else when success == .Acquire                 { return intrinsics.atomic_cxchg_acq_failrelaxed(dst, old, new) }
-		else when success == .Acquire_Release         { return intrinsics.atomic_cxchg_acqrel_failrelaxed(dst, old, new) }
-		else when success == .Sequentially_Consistent { return intrinsics.atomic_cxchg_failrelaxed(dst, old, new) }
-		else when success == .Release                 { return intrinsics.atomic_cxchg_rel(dst, old, new) }
-		else { #panic("an unknown ordering combination") }
-	} else when failure == .Acquire {
-		     when success == .Release { return intrinsics.atomic_cxchg_acqrel(dst, old, new) }
-		else when success == .Acquire { return intrinsics.atomic_cxchg_acq(dst, old, new) }
-		else { #panic("an unknown ordering combination") }
-	} else when failure == .Sequentially_Consistent {
-		when success == .Sequentially_Consistent { return intrinsics.atomic_cxchg(dst, old, new) }
-		else { #panic("an unknown ordering combination") }
-	} else when failure == .Acquire_Release {
-		#panic("there is not such thing as an acquire/release failure ordering")
-	} else when failure == .Release {
-		when success == .Acquire { return instrinsics.atomic_cxchg_failacq(dst, old, new) }
-		else { #panic("an unknown ordering combination") }
-	} else {
-		return T{}, false
-	}
-
-}
-
-atomic_compare_exchange_weak :: #force_inline proc(dst: ^$T, old, new: T, $success, $failure: Ordering) -> (val: T, ok: bool) {
-	when failure == .Relaxed {
-		     when success == .Relaxed                 { return intrinsics.atomic_cxchgweak_relaxed(dst, old, new) }
-		else when success == .Acquire                 { return intrinsics.atomic_cxchgweak_acq_failrelaxed(dst, old, new) }
-		else when success == .Acquire_Release         { return intrinsics.atomic_cxchgweak_acqrel_failrelaxed(dst, old, new) }
-		else when success == .Sequentially_Consistent { return intrinsics.atomic_cxchgweak_failrelaxed(dst, old, new) }
-		else when success == .Release                 { return intrinsics.atomic_cxchgweak_rel(dst, old, new) }
-		else { #panic("an unknown ordering combination") }
-	} else when failure == .Acquire {
-		     when success == .Release { return intrinsics.atomic_cxchgweak_acqrel(dst, old, new) }
-		else when success == .Acquire { return intrinsics.atomic_cxchgweak_acq(dst, old, new) }
-		else { #panic("an unknown ordering combination") }
-	} else when failure == .Sequentially_Consistent {
-		when success == .Sequentially_Consistent { return intrinsics.atomic_cxchgweak(dst, old, new) }
-		else { #panic("an unknown ordering combination") }
-	} else when failure == .Acquire_Release {
-		#panic("there is not such thing as an acquire/release failure ordering")
-	} else when failure == .Release {
-		when success == .Acquire { return intrinsics.atomic_cxchgweak_failacq(dst, old, new) }
-		else { #panic("an unknown ordering combination") }
-	} else {
-		return T{}, false
-	}
-
-}
-
-
-atomic_add :: #force_inline proc(dst: ^$T, val: T, $order: Ordering) -> T {
-	     when order == .Relaxed                 { return intrinsics.atomic_add_relaxed(dst, val) }
-	else when order == .Release                 { return intrinsics.atomic_add_rel(dst, val) }
-	else when order == .Acquire                 { return intrinsics.atomic_add_acq(dst, val) }
-	else when order == .Acquire_Release         { return intrinsics.atomic_add_acqrel(dst, val) }
-	else when order == .Sequentially_Consistent { return intrinsics.atomic_add(dst, val) }
-	else { #panic("unknown order") }
-}
-
-atomic_sub :: #force_inline proc(dst: ^$T, val: T, $order: Ordering) -> T {
-	     when order == .Relaxed                 { return intrinsics.atomic_sub_relaxed(dst, val) }
-	else when order == .Release                 { return intrinsics.atomic_sub_rel(dst, val) }
-	else when order == .Acquire                 { return intrinsics.atomic_sub_acq(dst, val) }
-	else when order == .Acquire_Release         { return intrinsics.atomic_sub_acqrel(dst, val) }
-	else when order == .Sequentially_Consistent { return intrinsics.atomic_sub(dst, val) }
-	else { #panic("unknown order") }
-}
-
-atomic_and :: #force_inline proc(dst: ^$T, val: T, $order: Ordering) -> T {
-	     when order == .Relaxed                 { return intrinsics.atomic_and_relaxed(dst, val) }
-	else when order == .Release                 { return intrinsics.atomic_and_rel(dst, val) }
-	else when order == .Acquire                 { return intrinsics.atomic_and_acq(dst, val) }
-	else when order == .Acquire_Release         { return intrinsics.atomic_and_acqrel(dst, val) }
-	else when order == .Sequentially_Consistent { return intrinsics.atomic_and(dst, val) }
-	else { #panic("unknown order") }
-}
-
-atomic_nand :: #force_inline proc(dst: ^$T, val: T, $order: Ordering) -> T {
-	     when order == .Relaxed                 { return intrinsics.atomic_nand_relaxed(dst, val) }
-	else when order == .Release                 { return intrinsics.atomic_nand_rel(dst, val) }
-	else when order == .Acquire                 { return intrinsics.atomic_nand_acq(dst, val) }
-	else when order == .Acquire_Release         { return intrinsics.atomic_nand_acqrel(dst, val) }
-	else when order == .Sequentially_Consistent { return intrinsics.atomic_nand(dst, val) }
-	else { #panic("unknown order") }
-}
-
-atomic_or :: #force_inline proc(dst: ^$T, val: T, $order: Ordering) -> T {
-	     when order == .Relaxed                 { return intrinsics.atomic_or_relaxed(dst, val) }
-	else when order == .Release                 { return intrinsics.atomic_or_rel(dst, val) }
-	else when order == .Acquire                 { return intrinsics.atomic_or_acq(dst, val) }
-	else when order == .Acquire_Release         { return intrinsics.atomic_or_acqrel(dst, val) }
-	else when order == .Sequentially_Consistent { return intrinsics.atomic_or(dst, val) }
-	else { #panic("unknown order") }
-}
-
-atomic_xor :: #force_inline proc(dst: ^$T, val: T, $order: Ordering) -> T {
-	     when order == .Relaxed                 { return intrinsics.atomic_xor_relaxed(dst, val) }
-	else when order == .Release                 { return intrinsics.atomic_xor_rel(dst, val) }
-	else when order == .Acquire                 { return intrinsics.atomic_xor_acq(dst, val) }
-	else when order == .Acquire_Release         { return intrinsics.atomic_xor_acqrel(dst, val) }
-	else when order == .Sequentially_Consistent { return intrinsics.atomic_xor(dst, val) }
-	else { #panic("unknown order") }
-}
-
+// Returns value and optional ok boolean
+atomic_compare_exchange_weak                     :: intrinsics.atomic_cxchgweak
+atomic_compare_exchange_weak_acquire             :: intrinsics.atomic_cxchgweak_acq
+atomic_compare_exchange_weak_release             :: intrinsics.atomic_cxchgweak_rel
+atomic_compare_exchange_weak_acqrel              :: intrinsics.atomic_cxchgweak_acqrel
+atomic_compare_exchange_weak_relaxed             :: intrinsics.atomic_cxchgweak_relaxed
+atomic_compare_exchange_weak_failrelaxed         :: intrinsics.atomic_cxchgweak_failrelaxed
+atomic_compare_exchange_weak_failacquire         :: intrinsics.atomic_cxchgweak_failacq
+atomic_compare_exchange_weak_acquire_failrelaxed :: intrinsics.atomic_cxchgweak_acq_failrelaxed
+atomic_compare_exchange_weak_acqrel_failrelaxed  :: intrinsics.atomic_cxchgweak_acqrel_failrelaxed

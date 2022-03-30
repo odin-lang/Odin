@@ -4,7 +4,7 @@ package thread
 
 import "core:runtime"
 import "core:intrinsics"
-import sync "core:sync/sync2"
+import "core:sync"
 import "core:sys/unix"
 
 Thread_State :: enum u8 {

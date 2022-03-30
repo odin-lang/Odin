@@ -3,7 +3,7 @@
 package thread
 
 import "core:runtime"
-import sync "core:sync/sync2"
+import "core:sync"
 import win32 "core:sys/windows"
 
 Thread_Os_Specific :: struct {
