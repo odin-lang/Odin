@@ -62,77 +62,44 @@ syscall :: proc(id: uintptr, args: ..uintptr) -> uintptr ---
 
 
 // Atomics
-atomic_fence        :: proc() ---
-atomic_fence_acq    :: proc() ---
-atomic_fence_rel    :: proc() ---
-atomic_fence_acqrel :: proc() ---
+Atomic_Memory_Order :: enum {
+	relaxed = 0, // unordered
+	consume = 1, // monotonic
+	acquire = 2,
+	release = 3,
+	acq_rel = 4,
+	seq_cst = 5,
+}
 
-atomic_store           :: proc(dst: ^$T, val: T) ---
-atomic_store_rel       :: proc(dst: ^$T, val: T) ---
-atomic_store_relaxed   :: proc(dst: ^$T, val: T) ---
-atomic_store_unordered :: proc(dst: ^$T, val: T) ---
+atomic_thread_fence :: proc(order: Atomic_Memory_Order) ---
+atomic_signal_fence :: proc(order: Atomic_Memory_Order) ---
+
+atomic_store          :: proc(dst: ^$T, val: T) ---
+atomic_store_explicit :: proc(dst: ^$T, val: T, order: Atomic_Memory_Order) ---
 
 atomic_load           :: proc(dst: ^$T) -> T ---
-atomic_load_acq       :: proc(dst: ^$T) -> T ---
-atomic_load_relaxed   :: proc(dst: ^$T) -> T ---
-atomic_load_unordered :: proc(dst: ^$T) -> T ---
+atomic_load_explicit  :: proc(dst: ^$T, order: Atomic_Memory_Order) -> T ---
 
-atomic_add          :: proc(dst; ^$T, val: T) -> T ---
-atomic_add_acq      :: proc(dst; ^$T, val: T) -> T ---
-atomic_add_rel      :: proc(dst; ^$T, val: T) -> T ---
-atomic_add_acqrel   :: proc(dst; ^$T, val: T) -> T ---
-atomic_add_relaxed  :: proc(dst; ^$T, val: T) -> T ---
-atomic_sub          :: proc(dst; ^$T, val: T) -> T ---
-atomic_sub_acq      :: proc(dst; ^$T, val: T) -> T ---
-atomic_sub_rel      :: proc(dst; ^$T, val: T) -> T ---
-atomic_sub_acqrel   :: proc(dst; ^$T, val: T) -> T ---
-atomic_sub_relaxed  :: proc(dst; ^$T, val: T) -> T ---
-atomic_and          :: proc(dst; ^$T, val: T) -> T ---
-atomic_and_acq      :: proc(dst; ^$T, val: T) -> T ---
-atomic_and_rel      :: proc(dst; ^$T, val: T) -> T ---
-atomic_and_acqrel   :: proc(dst; ^$T, val: T) -> T ---
-atomic_and_relaxed  :: proc(dst; ^$T, val: T) -> T ---
-atomic_nand         :: proc(dst; ^$T, val: T) -> T ---
-atomic_nand_acq     :: proc(dst; ^$T, val: T) -> T ---
-atomic_nand_rel     :: proc(dst; ^$T, val: T) -> T ---
-atomic_nand_acqrel  :: proc(dst; ^$T, val: T) -> T ---
-atomic_nand_relaxed :: proc(dst; ^$T, val: T) -> T ---
-atomic_or           :: proc(dst; ^$T, val: T) -> T ---
-atomic_or_acq       :: proc(dst; ^$T, val: T) -> T ---
-atomic_or_rel       :: proc(dst; ^$T, val: T) -> T ---
-atomic_or_acqrel    :: proc(dst; ^$T, val: T) -> T ---
-atomic_or_relaxed   :: proc(dst; ^$T, val: T) -> T ---
-atomic_xor          :: proc(dst; ^$T, val: T) -> T ---
-atomic_xor_acq      :: proc(dst; ^$T, val: T) -> T ---
-atomic_xor_rel      :: proc(dst; ^$T, val: T) -> T ---
-atomic_xor_acqrel   :: proc(dst; ^$T, val: T) -> T ---
-atomic_xor_relaxed  :: proc(dst; ^$T, val: T) -> T ---
+atomic_add               :: proc(dst; ^$T, val: T) -> T ---
+atomic_add_explicit      :: proc(dst; ^$T, val: T, order: Atomic_Memory_Order) -> T ---
+atomic_sub               :: proc(dst; ^$T, val: T) -> T ---
+atomic_sub_explicit      :: proc(dst; ^$T, val: T, order: Atomic_Memory_Order) -> T ---
+atomic_and               :: proc(dst; ^$T, val: T) -> T ---
+atomic_and_explicit      :: proc(dst; ^$T, val: T, order: Atomic_Memory_Order) -> T ---
+atomic_nand              :: proc(dst; ^$T, val: T) -> T ---
+atomic_nand_explicit     :: proc(dst; ^$T, val: T, order: Atomic_Memory_Order) -> T ---
+atomic_or                :: proc(dst; ^$T, val: T) -> T ---
+atomic_or_explicit       :: proc(dst; ^$T, val: T, order: Atomic_Memory_Order) -> T ---
+atomic_xor               :: proc(dst; ^$T, val: T) -> T ---
+atomic_xor_explicit      :: proc(dst; ^$T, val: T, order: Atomic_Memory_Order) -> T ---
+atomic_exchange          :: proc(dst; ^$T, val: T) -> T ---
+atomic_exchange_explicit :: proc(dst; ^$T, val: T, order: Atomic_Memory_Order) -> T ---
 
-atomic_xchg         :: proc(dst; ^$T, val: T) -> T ---
-atomic_xchg_acq     :: proc(dst; ^$T, val: T) -> T ---
-atomic_xchg_rel     :: proc(dst; ^$T, val: T) -> T ---
-atomic_xchg_acqrel  :: proc(dst; ^$T, val: T) -> T ---
-atomic_xchg_relaxed :: proc(dst; ^$T, val: T) -> T ---
+atomic_compare_exchange_strong          :: proc(dst: ^$T, old, new: T) -> (T, bool) #optional_ok ---
+atomic_compare_exchange_strong_explicit :: proc(dst: ^$T, old, new: T, success, failure: Atomic_Memory_Order) -> (T, bool) #optional_ok ---
+atomic_compare_exchange_weak            :: proc(dst: ^$T, old, new: T) -> (T, bool) #optional_ok ---
+atomic_compare_exchange_weak_explicit   :: proc(dst: ^$T, old, new: T, success, failure: Atomic_Memory_Order) -> (T, bool) #optional_ok ---
 
-atomic_cxchg                    :: proc(dst: ^$T, old, new: T) -> (T, bool) #optional_ok ---
-atomic_cxchg_acq                :: proc(dst: ^$T, old, new: T) -> (T, bool) #optional_ok ---
-atomic_cxchg_rel                :: proc(dst: ^$T, old, new: T) -> (T, bool) #optional_ok ---
-atomic_cxchg_acqrel             :: proc(dst: ^$T, old, new: T) -> (T, bool) #optional_ok ---
-atomic_cxchg_relaxed            :: proc(dst: ^$T, old, new: T) -> (T, bool) #optional_ok ---
-atomic_cxchg_failrelaxed        :: proc(dst: ^$T, old, new: T) -> (T, bool) #optional_ok ---
-atomic_cxchg_failacq            :: proc(dst: ^$T, old, new: T) -> (T, bool) #optional_ok ---
-atomic_cxchg_acq_failrelaxed    :: proc(dst: ^$T, old, new: T) -> (T, bool) #optional_ok ---
-atomic_cxchg_acqrel_failrelaxed :: proc(dst: ^$T, old, new: T) -> (T, bool) #optional_ok ---
-
-atomic_cxchgweak                    :: proc(dst: ^$T, old, new: T) -> (T, bool) #optional_ok ---
-atomic_cxchgweak_acq                :: proc(dst: ^$T, old, new: T) -> (T, bool) #optional_ok ---
-atomic_cxchgweak_rel                :: proc(dst: ^$T, old, new: T) -> (T, bool) #optional_ok ---
-atomic_cxchgweak_acqrel             :: proc(dst: ^$T, old, new: T) -> (T, bool) #optional_ok ---
-atomic_cxchgweak_relaxed            :: proc(dst: ^$T, old, new: T) -> (T, bool) #optional_ok ---
-atomic_cxchgweak_failrelaxed        :: proc(dst: ^$T, old, new: T) -> (T, bool) #optional_ok ---
-atomic_cxchgweak_failacq            :: proc(dst: ^$T, old, new: T) -> (T, bool) #optional_ok ---
-atomic_cxchgweak_acq_failrelaxed    :: proc(dst: ^$T, old, new: T) -> (T, bool) #optional_ok ---
-atomic_cxchgweak_acqrel_failrelaxed :: proc(dst: ^$T, old, new: T) -> (T, bool) #optional_ok ---
 
 // Constant type tests
 
