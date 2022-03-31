@@ -3,13 +3,21 @@
 package thread
 
 import "core:runtime"
+import "core:intrinsics"
 import "core:sync"
 import win32 "core:sys/windows"
+
+Thread_State :: enum u8 {
+	Started,
+	Joined,
+	Done,
+}
 
 Thread_Os_Specific :: struct {
 	win32_thread:    win32.HANDLE,
 	win32_thread_id: win32.DWORD,
-	done: bool, // see note in `is_done`
+	mutex:           sync.Mutex,
+	flags:           bit_set[Thread_State; u8],
 }
 
 _thread_priority_map := [Thread_Priority]i32{
@@ -26,15 +34,16 @@ _create :: proc(procedure: Thread_Proc, priority := Thread_Priority.Normal) -> ^
 		context = t.init_context.? or_else runtime.default_context()
 		
 		t.id = sync.current_thread_id()
+
 		t.procedure(t)
+
+		intrinsics.atomic_store(&t.flags, t.flags + {.Done})
 
 		if t.init_context == nil {
 			if context.temp_allocator.data == &runtime.global_default_temp_allocator_data {
 				runtime.default_temp_allocator_destroy(auto_cast context.temp_allocator.data)
 			}
 		}
-
-		sync.atomic_store(&t.done, true)
 		return 0
 	}
 
@@ -61,23 +70,31 @@ _create :: proc(procedure: Thread_Proc, priority := Thread_Priority.Normal) -> ^
 	return thread
 }
 
-_start :: proc(thread: ^Thread) {
-	win32.ResumeThread(thread.win32_thread)
+_start :: proc(t: ^Thread) {
+	sync.guard(&t.mutex)
+	t.flags += {.Started}
+	win32.ResumeThread(t.win32_thread)
 }
 
-_is_done :: proc(using thread: ^Thread) -> bool {
+_is_done :: proc(t: ^Thread) -> bool {
 	// NOTE(tetra, 2019-10-31): Apparently using wait_for_single_object and
 	// checking if it didn't time out immediately, is not good enough,
 	// so we do it this way instead.
-	return sync.atomic_load(&done)
+	return .Done in sync.atomic_load(&t.flags)
 }
 
-_join :: proc(using thread: ^Thread) {
-	if win32_thread != win32.INVALID_HANDLE {
-		win32.WaitForSingleObject(win32_thread, win32.INFINITE)
-		win32.CloseHandle(win32_thread)
-		win32_thread = win32.INVALID_HANDLE
+_join :: proc(t: ^Thread) {
+	sync.guard(&t.mutex)
+
+	if .Joined in t.flags || t.win32_thread == win32.INVALID_HANDLE {
+		return
 	}
+
+	win32.WaitForSingleObject(t.win32_thread, win32.INFINITE)
+	win32.CloseHandle(t.win32_thread)
+	t.win32_thread = win32.INVALID_HANDLE
+
+	t.flags += {.Joined}
 }
 
 _join_multiple :: proc(threads: ..^Thread) {
