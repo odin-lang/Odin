@@ -146,10 +146,10 @@ Auto_Reset_Event :: struct {
 }
 
 auto_reset_event_signal :: proc(e: ^Auto_Reset_Event) {
-	old_status := atomic_load_explicit(&e.status, .seq_cst)
+	old_status := atomic_load_explicit(&e.status, .relaxed)
 	for {
 		new_status := old_status + 1 if old_status < 1 else 1
-		if _, ok := atomic_compare_exchange_weak_explicit(&e.status, old_status, new_status, .seq_cst, .seq_cst); ok {
+		if _, ok := atomic_compare_exchange_weak_explicit(&e.status, old_status, new_status, .release, .relaxed); ok {
 			break
 		}
 
