@@ -41,6 +41,13 @@ config_darwin() {
 	LDFLAGS="$LDFLAGS -lLLVM-C"
 }
 
+config_freebsd() {
+	LLVM_CONFIG=/usr/local/bin/llvm-config11
+
+	CFLAGS="$CFLAGS $($LLVM_CONFIG --cxxflags --ldflags)"
+	LDFLAGS="$LDFLAGS $($LLVM_CONFIG --libs core native --system-libs)"
+}
+
 config_openbsd() {
 	LLVM_CONFIG=/usr/local/bin/llvm-config
 
@@ -107,6 +114,9 @@ Darwin)
 	;;
 OpenBSD)
 	config_openbsd
+	;;
+FreeBSD)
+	config_freebsd
 	;;
 *)
 	panic "Platform unsupported!"

@@ -330,6 +330,13 @@ char const *inline_asm_dialect_strings[InlineAsmDialect_COUNT] = {
 	"intel",
 };
 
+enum UnionTypeKind : u8 {
+	UnionType_Normal     = 0,
+	UnionType_maybe      = 1,
+	UnionType_no_nil     = 2,
+	UnionType_shared_nil = 3,
+};
+
 #define AST_KINDS \
 	AST_KIND(Ident,          "identifier",      struct { \
 		Token   token;  \
@@ -678,8 +685,7 @@ AST_KIND(_TypeBegin, "", bool) \
 		Slice<Ast *> variants;      \
 		Ast *polymorphic_params;    \
 		Ast *        align;         \
-		bool         maybe;         \
-		bool         no_nil;        \
+		UnionTypeKind kind;       \
 		Token where_token;          \
 		Slice<Ast *> where_clauses; \
 	}) \

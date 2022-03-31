@@ -6,6 +6,7 @@ import c "core:c/libc"
 
 when ODIN_OS == .Windows { foreign import stbi "../lib/stb_image.lib" }
 when ODIN_OS == .Linux   { foreign import stbi "../lib/stb_image.a"   }
+when ODIN_OS == .Darwin  { foreign import stbi "../lib/stb_image.a"   }
 
 #assert(size_of(b32) == size_of(c.int))
 

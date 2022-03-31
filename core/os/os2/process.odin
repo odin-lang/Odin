@@ -1,6 +1,6 @@
 package os2
 
-import sync "core:sync/sync2"
+import "core:sync"
 import "core:time"
 import "core:runtime"
 

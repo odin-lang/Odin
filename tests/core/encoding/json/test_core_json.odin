@@ -88,5 +88,5 @@ marshal_json :: proc(t: ^testing.T) {
    
 	_, err := json.marshal(my_struct)
 	
-	expect(t, err == .None, "expected json error to be none")
+	expect(t, err == nil, "expected json error to be none")
 }
