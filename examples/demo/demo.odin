@@ -1145,29 +1145,29 @@ threading_example :: proc() {
 		}
 	}
 
-	{ // Thread Pool
-		fmt.println("\n## Thread Pool")
-		task_proc :: proc(t: ^thread.Task) {
-			index := t.user_index % len(prefix_table)
-			for iteration in 1..=5 {
-				fmt.printf("Worker Task %d is on iteration %d\n", t.user_index, iteration)
-				fmt.printf("`%s`: iteration %d\n", prefix_table[index], iteration)
-				time.sleep(1 * time.Millisecond)
-			}
-		}
+	// { // Thread Pool
+	// 	fmt.println("\n## Thread Pool")
+	// 	task_proc :: proc(t: ^thread.Task) {
+	// 		index := t.user_index % len(prefix_table)
+	// 		for iteration in 1..=5 {
+	// 			fmt.printf("Worker Task %d is on iteration %d\n", t.user_index, iteration)
+	// 			fmt.printf("`%s`: iteration %d\n", prefix_table[index], iteration)
+	// 			time.sleep(1 * time.Millisecond)
+	// 		}
+	// 	}
 
-		pool: thread.Pool
-		thread.pool_init(pool=&pool, thread_count=3)
-		defer thread.pool_destroy(&pool)
+	// 	pool: thread.Pool
+	// 	thread.pool_init(pool=&pool, thread_count=3)
+	// 	defer thread.pool_destroy(&pool)
 
 
-		for i in 0..<30 {
-			thread.pool_add_task(pool=&pool, procedure=task_proc, data=nil, user_index=i)
-		}
+	// 	for i in 0..<30 {
+	// 		thread.pool_add_task(pool=&pool, procedure=task_proc, data=nil, user_index=i)
+	// 	}
 
-		thread.pool_start(&pool)
-		thread.pool_wait_and_process(&pool)
-	}
+	// 	thread.pool_start(&pool)
+	// 	thread.pool_wait_and_process(&pool)
+	// }
 }
 
 
