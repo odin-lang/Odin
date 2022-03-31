@@ -96,7 +96,6 @@ import sort           "core:sort"
 import strconv        "core:strconv"
 import strings        "core:strings"
 import sync           "core:sync"
-import sync2          "core:sync/sync2"
 import testing        "core:testing"
 import scanner        "core:text/scanner"
 import thread         "core:thread"
@@ -187,7 +186,6 @@ _ :: sort
 _ :: strconv
 _ :: strings
 _ :: sync
-_ :: sync2
 _ :: testing
 _ :: scanner
 _ :: thread

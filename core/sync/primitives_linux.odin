@@ -1,23 +1,13 @@
-//+build darwin
+//+build linux
 //+private
-package sync2
+package sync
 
-import "core:c"
+import "core:sys/unix"
 import "core:time"
-import "core:intrinsics"
-
-foreign import pthread "System.framework"
 
 _current_thread_id :: proc "contextless" () -> int {
-	tid: u64
-	// NOTE(Oskar): available from OSX 10.6 and iOS 3.2.
-	// For older versions there is `syscall(SYS_thread_selfid)`, but not really
-	// the same thing apparently.
-	foreign pthread { pthread_threadid_np :: proc "c" (rawptr, ^u64) -> c.int --- }
-	pthread_threadid_np(nil, &tid)
-	return int(tid)
+	return unix.sys_gettid()
 }
-
 
 
 _Mutex :: struct {

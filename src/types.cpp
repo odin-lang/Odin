@@ -692,6 +692,28 @@ gb_global Type *t_objc_id    = nullptr;
 gb_global Type *t_objc_SEL   = nullptr;
 gb_global Type *t_objc_Class = nullptr;
 
+enum OdinAtomicMemoryOrder : i32 {
+	OdinAtomicMemoryOrder_relaxed = 0, // unordered
+	OdinAtomicMemoryOrder_consume = 1, // monotonic
+	OdinAtomicMemoryOrder_acquire = 2,
+	OdinAtomicMemoryOrder_release = 3,
+	OdinAtomicMemoryOrder_acq_rel = 4,
+	OdinAtomicMemoryOrder_seq_cst = 5,
+	OdinAtomicMemoryOrder_COUNT,
+};
+
+char const *OdinAtomicMemoryOrder_strings[OdinAtomicMemoryOrder_COUNT] = {
+	"Relaxed",
+	"Consume",
+	"Acquire",
+	"Release",
+	"Acq_Rel",
+	"Seq_Cst",
+};
+
+gb_global Type *t_atomic_memory_order = nullptr;
+
+
 
 
 gb_global RecursiveMutex g_type_mutex;

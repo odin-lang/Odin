@@ -1,6 +1,6 @@
 //+private
 //+build windows
-package sync2
+package sync
 
 import "core:time"
 

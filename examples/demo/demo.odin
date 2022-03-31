@@ -1147,7 +1147,7 @@ threading_example :: proc() {
 
 	{ // Thread Pool
 		fmt.println("\n## Thread Pool")
-		task_proc :: proc(t: ^thread.Task) {
+		task_proc :: proc(t: thread.Task) {
 			index := t.user_index % len(prefix_table)
 			for iteration in 1..=5 {
 				fmt.printf("Worker Task %d is on iteration %d\n", t.user_index, iteration)
@@ -1157,7 +1157,7 @@ threading_example :: proc() {
 		}
 
 		pool: thread.Pool
-		thread.pool_init(pool=&pool, thread_count=3)
+		thread.pool_init(pool=&pool, thread_count=3, allocator=context.allocator)
 		defer thread.pool_destroy(&pool)
 
 
@@ -1166,7 +1166,7 @@ threading_example :: proc() {
 		}
 
 		thread.pool_start(&pool)
-		thread.pool_wait_and_process(&pool)
+		thread.pool_finish(&pool)
 	}
 }
 
