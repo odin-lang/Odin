@@ -379,6 +379,35 @@ bool check_builtin_objc_procedure(CheckerContext *c, Operand *operand, Ast *call
 	}
 }
 
+bool check_atomic_memory_order_argument(CheckerContext *c, Ast *expr, String const &builtin_name, OdinAtomicMemoryOrder *memory_order_, char const *extra_message = nullptr) {
+	Operand x = {};
+	check_expr_with_type_hint(c, &x, expr, t_atomic_memory_order);
+	if (x.mode == Addressing_Invalid) {
+		return false;
+	}
+	if (!are_types_identical(x.type, t_atomic_memory_order) || x.mode != Addressing_Constant)  {
+		gbString str = type_to_string(x.type);
+		if (extra_message) {
+			error(x.expr, "Expected a constant Atomic_Memory_Order value for the %s of '%.*s', got %s", extra_message, LIT(builtin_name), str);
+		} else {
+			error(x.expr, "Expected a constant Atomic_Memory_Order value for '%.*s', got %s", LIT(builtin_name), str);
+		}
+		gb_string_free(str);
+		return false;
+	}
+	i64 value = exact_value_to_i64(x.value);
+	if (value < 0 || value >= OdinAtomicMemoryOrder_COUNT) {
+		error(x.expr, "Illegal Atomic_Memory_Order value, got %lld", cast(long long)value);
+		return false;
+	}
+	if (memory_order_) {
+		*memory_order_ = cast(OdinAtomicMemoryOrder)value;
+	}
+
+	return true;
+
+}
+
 bool check_builtin_procedure(CheckerContext *c, Operand *operand, Ast *call, i32 id, Type *type_hint) {
 	ast_node(ce, CallExpr, call);
 	if (ce->inlining != ProcInlining_none) {
@@ -421,6 +450,11 @@ bool check_builtin_procedure(CheckerContext *c, Operand *operand, Ast *call, i32
 	case BuiltinProc_objc_register_selector: 
 	case BuiltinProc_objc_register_class: 
 		// NOTE(bill): The first arg may be a Type, this will be checked case by case
+		break;
+
+	case BuiltinProc_atomic_thread_fence:
+	case BuiltinProc_atomic_signal_fence:
+		// NOTE(bill): first type will require a type hint
 		break;
 
 	case BuiltinProc_DIRECTIVE: {
@@ -3198,11 +3232,27 @@ bool check_builtin_procedure(CheckerContext *c, Operand *operand, Ast *call, i32
 		break;
 
 
-	case BuiltinProc_atomic_fence:
-	case BuiltinProc_atomic_fence_acq:
-	case BuiltinProc_atomic_fence_rel:
-	case BuiltinProc_atomic_fence_acqrel:
-		operand->mode = Addressing_NoValue;
+
+	case BuiltinProc_atomic_thread_fence:
+	case BuiltinProc_atomic_signal_fence:
+		{
+			OdinAtomicMemoryOrder memory_order = {};
+			if (!check_atomic_memory_order_argument(c, ce->args[0], builtin_name, &memory_order)) {
+				return false;
+			}
+			switch (memory_order) {
+			case OdinAtomicMemoryOrder_acquire:
+			case OdinAtomicMemoryOrder_release:
+			case OdinAtomicMemoryOrder_acq_rel:
+			case OdinAtomicMemoryOrder_seq_cst:
+				break;
+			default:
+				error(ce->args[0], "Illegal memory ordering for '%.*s', got .%s", LIT(builtin_name), OdinAtomicMemoryOrder_strings[memory_order]);
+				break;
+			}
+
+			operand->mode = Addressing_NoValue;
+		}
 		break;
 
 	case BuiltinProc_volatile_store:
@@ -3210,9 +3260,6 @@ bool check_builtin_procedure(CheckerContext *c, Operand *operand, Ast *call, i32
 	case BuiltinProc_unaligned_store:
 		/*fallthrough*/
 	case BuiltinProc_atomic_store:
-	case BuiltinProc_atomic_store_rel:
-	case BuiltinProc_atomic_store_relaxed:
-	case BuiltinProc_atomic_store_unordered:
 		{
 			Type *elem = nullptr;
 			if (!is_type_normal_pointer(operand->type, &elem)) {
@@ -3228,14 +3275,40 @@ bool check_builtin_procedure(CheckerContext *c, Operand *operand, Ast *call, i32
 			break;
 		}
 
+	case BuiltinProc_atomic_store_explicit:
+		{
+			Type *elem = nullptr;
+			if (!is_type_normal_pointer(operand->type, &elem)) {
+				error(operand->expr, "Expected a pointer for '%.*s'", LIT(builtin_name));
+				return false;
+			}
+			Operand x = {};
+			check_expr_with_type_hint(c, &x, ce->args[1], elem);
+			check_assignment(c, &x, elem, builtin_name);
+
+			OdinAtomicMemoryOrder memory_order = {};
+			if (!check_atomic_memory_order_argument(c, ce->args[2], builtin_name, &memory_order)) {
+				return false;
+			}
+			switch (memory_order) {
+			case OdinAtomicMemoryOrder_consume:
+			case OdinAtomicMemoryOrder_acquire:
+			case OdinAtomicMemoryOrder_acq_rel:
+				error(ce->args[2], "Illegal memory order .%s for '%.*s'", OdinAtomicMemoryOrder_strings[memory_order], LIT(builtin_name));
+				break;
+			}
+
+			operand->type = nullptr;
+			operand->mode = Addressing_NoValue;
+			break;
+		}
+
+
 	case BuiltinProc_volatile_load:
 		/*fallthrough*/
 	case BuiltinProc_unaligned_load:
 		/*fallthrough*/
 	case BuiltinProc_atomic_load:
-	case BuiltinProc_atomic_load_acq:
-	case BuiltinProc_atomic_load_relaxed:
-	case BuiltinProc_atomic_load_unordered:
 		{
 			Type *elem = nullptr;
 			if (!is_type_normal_pointer(operand->type, &elem)) {
@@ -3247,41 +3320,38 @@ bool check_builtin_procedure(CheckerContext *c, Operand *operand, Ast *call, i32
 			break;
 		}
 
+	case BuiltinProc_atomic_load_explicit:
+		{
+			Type *elem = nullptr;
+			if (!is_type_normal_pointer(operand->type, &elem)) {
+				error(operand->expr, "Expected a pointer for '%.*s'", LIT(builtin_name));
+				return false;
+			}
+
+			OdinAtomicMemoryOrder memory_order = {};
+			if (!check_atomic_memory_order_argument(c, ce->args[1], builtin_name, &memory_order)) {
+				return false;
+			}
+
+			switch (memory_order) {
+			case OdinAtomicMemoryOrder_release:
+			case OdinAtomicMemoryOrder_acq_rel:
+				error(ce->args[1], "Illegal memory order .%s for '%.*s'", OdinAtomicMemoryOrder_strings[memory_order], LIT(builtin_name));
+				break;
+			}
+
+			operand->type = elem;
+			operand->mode = Addressing_Value;
+			break;
+		}
+
 	case BuiltinProc_atomic_add:
-	case BuiltinProc_atomic_add_acq:
-	case BuiltinProc_atomic_add_rel:
-	case BuiltinProc_atomic_add_acqrel:
-	case BuiltinProc_atomic_add_relaxed:
 	case BuiltinProc_atomic_sub:
-	case BuiltinProc_atomic_sub_acq:
-	case BuiltinProc_atomic_sub_rel:
-	case BuiltinProc_atomic_sub_acqrel:
-	case BuiltinProc_atomic_sub_relaxed:
 	case BuiltinProc_atomic_and:
-	case BuiltinProc_atomic_and_acq:
-	case BuiltinProc_atomic_and_rel:
-	case BuiltinProc_atomic_and_acqrel:
-	case BuiltinProc_atomic_and_relaxed:
 	case BuiltinProc_atomic_nand:
-	case BuiltinProc_atomic_nand_acq:
-	case BuiltinProc_atomic_nand_rel:
-	case BuiltinProc_atomic_nand_acqrel:
-	case BuiltinProc_atomic_nand_relaxed:
 	case BuiltinProc_atomic_or:
-	case BuiltinProc_atomic_or_acq:
-	case BuiltinProc_atomic_or_rel:
-	case BuiltinProc_atomic_or_acqrel:
-	case BuiltinProc_atomic_or_relaxed:
 	case BuiltinProc_atomic_xor:
-	case BuiltinProc_atomic_xor_acq:
-	case BuiltinProc_atomic_xor_rel:
-	case BuiltinProc_atomic_xor_acqrel:
-	case BuiltinProc_atomic_xor_relaxed:
-	case BuiltinProc_atomic_xchg:
-	case BuiltinProc_atomic_xchg_acq:
-	case BuiltinProc_atomic_xchg_rel:
-	case BuiltinProc_atomic_xchg_acqrel:
-	case BuiltinProc_atomic_xchg_relaxed:
+	case BuiltinProc_atomic_exchange:
 		{
 			Type *elem = nullptr;
 			if (!is_type_normal_pointer(operand->type, &elem)) {
@@ -3297,25 +3367,35 @@ bool check_builtin_procedure(CheckerContext *c, Operand *operand, Ast *call, i32
 			break;
 		}
 
-	case BuiltinProc_atomic_cxchg:
-	case BuiltinProc_atomic_cxchg_acq:
-	case BuiltinProc_atomic_cxchg_rel:
-	case BuiltinProc_atomic_cxchg_acqrel:
-	case BuiltinProc_atomic_cxchg_relaxed:
-	case BuiltinProc_atomic_cxchg_failrelaxed:
-	case BuiltinProc_atomic_cxchg_failacq:
-	case BuiltinProc_atomic_cxchg_acq_failrelaxed:
-	case BuiltinProc_atomic_cxchg_acqrel_failrelaxed:
+	case BuiltinProc_atomic_add_explicit:
+	case BuiltinProc_atomic_sub_explicit:
+	case BuiltinProc_atomic_and_explicit:
+	case BuiltinProc_atomic_nand_explicit:
+	case BuiltinProc_atomic_or_explicit:
+	case BuiltinProc_atomic_xor_explicit:
+	case BuiltinProc_atomic_exchange_explicit:
+		{
+			Type *elem = nullptr;
+			if (!is_type_normal_pointer(operand->type, &elem)) {
+				error(operand->expr, "Expected a pointer for '%.*s'", LIT(builtin_name));
+				return false;
+			}
+			Operand x = {};
+			check_expr_with_type_hint(c, &x, ce->args[1], elem);
+			check_assignment(c, &x, elem, builtin_name);
 
-	case BuiltinProc_atomic_cxchgweak:
-	case BuiltinProc_atomic_cxchgweak_acq:
-	case BuiltinProc_atomic_cxchgweak_rel:
-	case BuiltinProc_atomic_cxchgweak_acqrel:
-	case BuiltinProc_atomic_cxchgweak_relaxed:
-	case BuiltinProc_atomic_cxchgweak_failrelaxed:
-	case BuiltinProc_atomic_cxchgweak_failacq:
-	case BuiltinProc_atomic_cxchgweak_acq_failrelaxed:
-	case BuiltinProc_atomic_cxchgweak_acqrel_failrelaxed:
+
+			if (!check_atomic_memory_order_argument(c, ce->args[2], builtin_name, nullptr)) {
+				return false;
+			}
+
+			operand->type = elem;
+			operand->mode = Addressing_Value;
+			break;
+		}
+
+	case BuiltinProc_atomic_compare_exchange_strong:
+	case BuiltinProc_atomic_compare_exchange_weak:
 		{
 			Type *elem = nullptr;
 			if (!is_type_normal_pointer(operand->type, &elem)) {
@@ -3333,7 +3413,92 @@ bool check_builtin_procedure(CheckerContext *c, Operand *operand, Ast *call, i32
 			operand->type = elem;
 			break;
 		}
-		break;
+
+	case BuiltinProc_atomic_compare_exchange_strong_explicit:
+	case BuiltinProc_atomic_compare_exchange_weak_explicit:
+		{
+			Type *elem = nullptr;
+			if (!is_type_normal_pointer(operand->type, &elem)) {
+				error(operand->expr, "Expected a pointer for '%.*s'", LIT(builtin_name));
+				return false;
+			}
+			Operand x = {};
+			Operand y = {};
+			check_expr_with_type_hint(c, &x, ce->args[1], elem);
+			check_expr_with_type_hint(c, &y, ce->args[2], elem);
+			check_assignment(c, &x, elem, builtin_name);
+			check_assignment(c, &y, elem, builtin_name);
+
+			OdinAtomicMemoryOrder success_memory_order = {};
+			OdinAtomicMemoryOrder failure_memory_order = {};
+			if (!check_atomic_memory_order_argument(c, ce->args[3], builtin_name, &success_memory_order, "success ordering")) {
+				return false;
+			}
+			if (!check_atomic_memory_order_argument(c, ce->args[4], builtin_name, &failure_memory_order, "failure ordering")) {
+				return false;
+			}
+
+			bool invalid_combination = false;
+
+			switch (success_memory_order) {
+			case OdinAtomicMemoryOrder_relaxed:
+			case OdinAtomicMemoryOrder_release:
+				if (failure_memory_order != OdinAtomicMemoryOrder_relaxed) {
+					invalid_combination = true;
+				}
+				break;
+			case OdinAtomicMemoryOrder_consume:
+				switch (failure_memory_order) {
+				case OdinAtomicMemoryOrder_relaxed:
+				case OdinAtomicMemoryOrder_consume:
+					break;
+				default:
+					invalid_combination = true;
+					break;
+				}
+				break;
+			case OdinAtomicMemoryOrder_acquire:
+			case OdinAtomicMemoryOrder_acq_rel:
+				switch (failure_memory_order) {
+				case OdinAtomicMemoryOrder_relaxed:
+				case OdinAtomicMemoryOrder_consume:
+				case OdinAtomicMemoryOrder_acquire:
+					break;
+				default:
+					invalid_combination = true;
+					break;
+				}
+				break;
+			case OdinAtomicMemoryOrder_seq_cst:
+				switch (failure_memory_order) {
+				case OdinAtomicMemoryOrder_relaxed:
+				case OdinAtomicMemoryOrder_consume:
+				case OdinAtomicMemoryOrder_acquire:
+				case OdinAtomicMemoryOrder_seq_cst:
+					break;
+				default:
+					invalid_combination = true;
+					break;
+				}
+				break;
+			default:
+				invalid_combination = true;
+				break;
+			}
+
+
+			if (invalid_combination) {
+				error(ce->args[3], "Illegal memory order pairing for '%.*s', success = .%s, failure = .%s",
+					LIT(builtin_name),
+					OdinAtomicMemoryOrder_strings[success_memory_order],
+					OdinAtomicMemoryOrder_strings[failure_memory_order]
+				);
+			}
+
+			operand->mode = Addressing_OptionalOk;
+			operand->type = elem;
+			break;
+		}
 
 	case BuiltinProc_fixed_point_mul:
 	case BuiltinProc_fixed_point_div:

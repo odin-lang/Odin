@@ -1606,36 +1606,26 @@ lbValue lb_build_builtin_proc(lbProcedure *p, Ast *expr, TypeAndValue const &tv,
 		}
 
 
-
-	case BuiltinProc_atomic_fence:
-		LLVMBuildFence(p->builder, LLVMAtomicOrderingSequentiallyConsistent, false, "");
+	// TODO(bill): Which is correct?
+	case BuiltinProc_atomic_thread_fence:
+		LLVMBuildFence(p->builder, llvm_atomic_ordering_from_odin(ce->args[0]), false, "");
 		return {};
-	case BuiltinProc_atomic_fence_acq:
-		LLVMBuildFence(p->builder, LLVMAtomicOrderingAcquire, false, "");
-		return {};
-	case BuiltinProc_atomic_fence_rel:
-		LLVMBuildFence(p->builder, LLVMAtomicOrderingRelease, false, "");
-		return {};
-	case BuiltinProc_atomic_fence_acqrel:
-		LLVMBuildFence(p->builder, LLVMAtomicOrderingAcquireRelease, false, "");
+	case BuiltinProc_atomic_signal_fence:
+		LLVMBuildFence(p->builder, llvm_atomic_ordering_from_odin(ce->args[0]), true, "");
 		return {};
 
 	case BuiltinProc_volatile_store:
 	case BuiltinProc_atomic_store:
-	case BuiltinProc_atomic_store_rel:
-	case BuiltinProc_atomic_store_relaxed:
-	case BuiltinProc_atomic_store_unordered: {
+	case BuiltinProc_atomic_store_explicit: {
 		lbValue dst = lb_build_expr(p, ce->args[0]);
 		lbValue val = lb_build_expr(p, ce->args[1]);
 		val = lb_emit_conv(p, val, type_deref(dst.type));
 
 		LLVMValueRef instr = LLVMBuildStore(p->builder, val.value, dst.value);
 		switch (id) {
-		case BuiltinProc_volatile_store:         LLVMSetVolatile(instr, true);                                     break;
-		case BuiltinProc_atomic_store:           LLVMSetOrdering(instr, LLVMAtomicOrderingSequentiallyConsistent); break;
-		case BuiltinProc_atomic_store_rel:       LLVMSetOrdering(instr, LLVMAtomicOrderingRelease);                break;
-		case BuiltinProc_atomic_store_relaxed:   LLVMSetOrdering(instr, LLVMAtomicOrderingMonotonic);              break;
-		case BuiltinProc_atomic_store_unordered: LLVMSetOrdering(instr, LLVMAtomicOrderingUnordered);              break;
+		case BuiltinProc_volatile_store:        LLVMSetVolatile(instr, true);                                        break;
+		case BuiltinProc_atomic_store:          LLVMSetOrdering(instr, LLVMAtomicOrderingSequentiallyConsistent);    break;
+		case BuiltinProc_atomic_store_explicit: LLVMSetOrdering(instr, llvm_atomic_ordering_from_odin(ce->args[2])); break;
 		}
 
 		LLVMSetAlignment(instr, cast(unsigned)type_align_of(type_deref(dst.type)));
@@ -1645,18 +1635,14 @@ lbValue lb_build_builtin_proc(lbProcedure *p, Ast *expr, TypeAndValue const &tv,
 
 	case BuiltinProc_volatile_load:
 	case BuiltinProc_atomic_load:
-	case BuiltinProc_atomic_load_acq:
-	case BuiltinProc_atomic_load_relaxed:
-	case BuiltinProc_atomic_load_unordered: {
+	case BuiltinProc_atomic_load_explicit: {
 		lbValue dst = lb_build_expr(p, ce->args[0]);
 
 		LLVMValueRef instr = LLVMBuildLoad(p->builder, dst.value, "");
 		switch (id) {
-		case BuiltinProc_volatile_load:         LLVMSetVolatile(instr, true);                                     break;
-		case BuiltinProc_atomic_load:           LLVMSetOrdering(instr, LLVMAtomicOrderingSequentiallyConsistent); break;
-		case BuiltinProc_atomic_load_acq:       LLVMSetOrdering(instr, LLVMAtomicOrderingAcquire);                break;
-		case BuiltinProc_atomic_load_relaxed:   LLVMSetOrdering(instr, LLVMAtomicOrderingMonotonic);              break;
-		case BuiltinProc_atomic_load_unordered: LLVMSetOrdering(instr, LLVMAtomicOrderingUnordered);              break;
+		case BuiltinProc_volatile_load:        LLVMSetVolatile(instr, true);                                        break;
+		case BuiltinProc_atomic_load:          LLVMSetOrdering(instr, LLVMAtomicOrderingSequentiallyConsistent);    break;
+		case BuiltinProc_atomic_load_explicit: LLVMSetOrdering(instr, llvm_atomic_ordering_from_odin(ce->args[1])); break;
 		}
 		LLVMSetAlignment(instr, cast(unsigned)type_align_of(type_deref(dst.type)));
 
@@ -1686,40 +1672,19 @@ lbValue lb_build_builtin_proc(lbProcedure *p, Ast *expr, TypeAndValue const &tv,
 		}
 
 	case BuiltinProc_atomic_add:
-	case BuiltinProc_atomic_add_acq:
-	case BuiltinProc_atomic_add_rel:
-	case BuiltinProc_atomic_add_acqrel:
-	case BuiltinProc_atomic_add_relaxed:
 	case BuiltinProc_atomic_sub:
-	case BuiltinProc_atomic_sub_acq:
-	case BuiltinProc_atomic_sub_rel:
-	case BuiltinProc_atomic_sub_acqrel:
-	case BuiltinProc_atomic_sub_relaxed:
 	case BuiltinProc_atomic_and:
-	case BuiltinProc_atomic_and_acq:
-	case BuiltinProc_atomic_and_rel:
-	case BuiltinProc_atomic_and_acqrel:
-	case BuiltinProc_atomic_and_relaxed:
 	case BuiltinProc_atomic_nand:
-	case BuiltinProc_atomic_nand_acq:
-	case BuiltinProc_atomic_nand_rel:
-	case BuiltinProc_atomic_nand_acqrel:
-	case BuiltinProc_atomic_nand_relaxed:
 	case BuiltinProc_atomic_or:
-	case BuiltinProc_atomic_or_acq:
-	case BuiltinProc_atomic_or_rel:
-	case BuiltinProc_atomic_or_acqrel:
-	case BuiltinProc_atomic_or_relaxed:
 	case BuiltinProc_atomic_xor:
-	case BuiltinProc_atomic_xor_acq:
-	case BuiltinProc_atomic_xor_rel:
-	case BuiltinProc_atomic_xor_acqrel:
-	case BuiltinProc_atomic_xor_relaxed:
-	case BuiltinProc_atomic_xchg:
-	case BuiltinProc_atomic_xchg_acq:
-	case BuiltinProc_atomic_xchg_rel:
-	case BuiltinProc_atomic_xchg_acqrel:
-	case BuiltinProc_atomic_xchg_relaxed: {
+	case BuiltinProc_atomic_exchange:
+	case BuiltinProc_atomic_add_explicit:
+	case BuiltinProc_atomic_sub_explicit:
+	case BuiltinProc_atomic_and_explicit:
+	case BuiltinProc_atomic_nand_explicit:
+	case BuiltinProc_atomic_or_explicit:
+	case BuiltinProc_atomic_xor_explicit:
+	case BuiltinProc_atomic_exchange_explicit: {
 		lbValue dst = lb_build_expr(p, ce->args[0]);
 		lbValue val = lb_build_expr(p, ce->args[1]);
 		val = lb_emit_conv(p, val, type_deref(dst.type));
@@ -1728,41 +1693,20 @@ lbValue lb_build_builtin_proc(lbProcedure *p, Ast *expr, TypeAndValue const &tv,
 		LLVMAtomicOrdering ordering = {};
 
 		switch (id) {
-		case BuiltinProc_atomic_add:          op = LLVMAtomicRMWBinOpAdd;  ordering = LLVMAtomicOrderingSequentiallyConsistent; break;
-		case BuiltinProc_atomic_add_acq:      op = LLVMAtomicRMWBinOpAdd;  ordering = LLVMAtomicOrderingAcquire; break;
-		case BuiltinProc_atomic_add_rel:      op = LLVMAtomicRMWBinOpAdd;  ordering = LLVMAtomicOrderingRelease; break;
-		case BuiltinProc_atomic_add_acqrel:   op = LLVMAtomicRMWBinOpAdd;  ordering = LLVMAtomicOrderingAcquireRelease; break;
-		case BuiltinProc_atomic_add_relaxed:  op = LLVMAtomicRMWBinOpAdd;  ordering = LLVMAtomicOrderingMonotonic; break;
-		case BuiltinProc_atomic_sub:          op = LLVMAtomicRMWBinOpSub;  ordering = LLVMAtomicOrderingSequentiallyConsistent; break;
-		case BuiltinProc_atomic_sub_acq:      op = LLVMAtomicRMWBinOpSub;  ordering = LLVMAtomicOrderingAcquire; break;
-		case BuiltinProc_atomic_sub_rel:      op = LLVMAtomicRMWBinOpSub;  ordering = LLVMAtomicOrderingRelease; break;
-		case BuiltinProc_atomic_sub_acqrel:   op = LLVMAtomicRMWBinOpSub;  ordering = LLVMAtomicOrderingAcquireRelease; break;
-		case BuiltinProc_atomic_sub_relaxed:  op = LLVMAtomicRMWBinOpSub;  ordering = LLVMAtomicOrderingMonotonic; break;
-		case BuiltinProc_atomic_and:          op = LLVMAtomicRMWBinOpAnd;  ordering = LLVMAtomicOrderingSequentiallyConsistent; break;
-		case BuiltinProc_atomic_and_acq:      op = LLVMAtomicRMWBinOpAnd;  ordering = LLVMAtomicOrderingAcquire; break;
-		case BuiltinProc_atomic_and_rel:      op = LLVMAtomicRMWBinOpAnd;  ordering = LLVMAtomicOrderingRelease; break;
-		case BuiltinProc_atomic_and_acqrel:   op = LLVMAtomicRMWBinOpAnd;  ordering = LLVMAtomicOrderingAcquireRelease; break;
-		case BuiltinProc_atomic_and_relaxed:  op = LLVMAtomicRMWBinOpAnd;  ordering = LLVMAtomicOrderingMonotonic; break;
-		case BuiltinProc_atomic_nand:         op = LLVMAtomicRMWBinOpNand; ordering = LLVMAtomicOrderingSequentiallyConsistent; break;
-		case BuiltinProc_atomic_nand_acq:     op = LLVMAtomicRMWBinOpNand; ordering = LLVMAtomicOrderingAcquire; break;
-		case BuiltinProc_atomic_nand_rel:     op = LLVMAtomicRMWBinOpNand; ordering = LLVMAtomicOrderingRelease; break;
-		case BuiltinProc_atomic_nand_acqrel:  op = LLVMAtomicRMWBinOpNand; ordering = LLVMAtomicOrderingAcquireRelease; break;
-		case BuiltinProc_atomic_nand_relaxed: op = LLVMAtomicRMWBinOpNand; ordering = LLVMAtomicOrderingMonotonic; break;
-		case BuiltinProc_atomic_or:           op = LLVMAtomicRMWBinOpOr;   ordering = LLVMAtomicOrderingSequentiallyConsistent; break;
-		case BuiltinProc_atomic_or_acq:       op = LLVMAtomicRMWBinOpOr;   ordering = LLVMAtomicOrderingAcquire; break;
-		case BuiltinProc_atomic_or_rel:       op = LLVMAtomicRMWBinOpOr;   ordering = LLVMAtomicOrderingRelease; break;
-		case BuiltinProc_atomic_or_acqrel:    op = LLVMAtomicRMWBinOpOr;   ordering = LLVMAtomicOrderingAcquireRelease; break;
-		case BuiltinProc_atomic_or_relaxed:   op = LLVMAtomicRMWBinOpOr;   ordering = LLVMAtomicOrderingMonotonic; break;
-		case BuiltinProc_atomic_xor:          op = LLVMAtomicRMWBinOpXor;  ordering = LLVMAtomicOrderingSequentiallyConsistent; break;
-		case BuiltinProc_atomic_xor_acq:      op = LLVMAtomicRMWBinOpXor;  ordering = LLVMAtomicOrderingAcquire; break;
-		case BuiltinProc_atomic_xor_rel:      op = LLVMAtomicRMWBinOpXor;  ordering = LLVMAtomicOrderingRelease; break;
-		case BuiltinProc_atomic_xor_acqrel:   op = LLVMAtomicRMWBinOpXor;  ordering = LLVMAtomicOrderingAcquireRelease; break;
-		case BuiltinProc_atomic_xor_relaxed:  op = LLVMAtomicRMWBinOpXor;  ordering = LLVMAtomicOrderingMonotonic; break;
-		case BuiltinProc_atomic_xchg:         op = LLVMAtomicRMWBinOpXchg; ordering = LLVMAtomicOrderingSequentiallyConsistent; break;
-		case BuiltinProc_atomic_xchg_acq:     op = LLVMAtomicRMWBinOpXchg; ordering = LLVMAtomicOrderingAcquire; break;
-		case BuiltinProc_atomic_xchg_rel:     op = LLVMAtomicRMWBinOpXchg; ordering = LLVMAtomicOrderingRelease; break;
-		case BuiltinProc_atomic_xchg_acqrel:  op = LLVMAtomicRMWBinOpXchg; ordering = LLVMAtomicOrderingAcquireRelease; break;
-		case BuiltinProc_atomic_xchg_relaxed: op = LLVMAtomicRMWBinOpXchg; ordering = LLVMAtomicOrderingMonotonic; break;
+		case BuiltinProc_atomic_add:               op = LLVMAtomicRMWBinOpAdd;  ordering = LLVMAtomicOrderingSequentiallyConsistent;    break;
+		case BuiltinProc_atomic_sub:               op = LLVMAtomicRMWBinOpSub;  ordering = LLVMAtomicOrderingSequentiallyConsistent;    break;
+		case BuiltinProc_atomic_and:               op = LLVMAtomicRMWBinOpAnd;  ordering = LLVMAtomicOrderingSequentiallyConsistent;    break;
+		case BuiltinProc_atomic_nand:              op = LLVMAtomicRMWBinOpNand; ordering = LLVMAtomicOrderingSequentiallyConsistent;    break;
+		case BuiltinProc_atomic_or:                op = LLVMAtomicRMWBinOpOr;   ordering = LLVMAtomicOrderingSequentiallyConsistent;    break;
+		case BuiltinProc_atomic_xor:               op = LLVMAtomicRMWBinOpXor;  ordering = LLVMAtomicOrderingSequentiallyConsistent;    break;
+		case BuiltinProc_atomic_exchange:          op = LLVMAtomicRMWBinOpXchg; ordering = LLVMAtomicOrderingSequentiallyConsistent;    break;
+		case BuiltinProc_atomic_add_explicit:      op = LLVMAtomicRMWBinOpAdd;  ordering = llvm_atomic_ordering_from_odin(ce->args[2]); break;
+		case BuiltinProc_atomic_sub_explicit:      op = LLVMAtomicRMWBinOpSub;  ordering = llvm_atomic_ordering_from_odin(ce->args[2]); break;
+		case BuiltinProc_atomic_and_explicit:      op = LLVMAtomicRMWBinOpAnd;  ordering = llvm_atomic_ordering_from_odin(ce->args[2]); break;
+		case BuiltinProc_atomic_nand_explicit:     op = LLVMAtomicRMWBinOpNand; ordering = llvm_atomic_ordering_from_odin(ce->args[2]); break;
+		case BuiltinProc_atomic_or_explicit:       op = LLVMAtomicRMWBinOpOr;   ordering = llvm_atomic_ordering_from_odin(ce->args[2]); break;
+		case BuiltinProc_atomic_xor_explicit:      op = LLVMAtomicRMWBinOpXor;  ordering = llvm_atomic_ordering_from_odin(ce->args[2]); break;
+		case BuiltinProc_atomic_exchange_explicit: op = LLVMAtomicRMWBinOpXchg; ordering = llvm_atomic_ordering_from_odin(ce->args[2]); break;
 		}
 
 		lbValue res = {};
@@ -1771,24 +1715,10 @@ lbValue lb_build_builtin_proc(lbProcedure *p, Ast *expr, TypeAndValue const &tv,
 		return res;
 	}
 
-	case BuiltinProc_atomic_cxchg:
-	case BuiltinProc_atomic_cxchg_acq:
-	case BuiltinProc_atomic_cxchg_rel:
-	case BuiltinProc_atomic_cxchg_acqrel:
-	case BuiltinProc_atomic_cxchg_relaxed:
-	case BuiltinProc_atomic_cxchg_failrelaxed:
-	case BuiltinProc_atomic_cxchg_failacq:
-	case BuiltinProc_atomic_cxchg_acq_failrelaxed:
-	case BuiltinProc_atomic_cxchg_acqrel_failrelaxed:
-	case BuiltinProc_atomic_cxchgweak:
-	case BuiltinProc_atomic_cxchgweak_acq:
-	case BuiltinProc_atomic_cxchgweak_rel:
-	case BuiltinProc_atomic_cxchgweak_acqrel:
-	case BuiltinProc_atomic_cxchgweak_relaxed:
-	case BuiltinProc_atomic_cxchgweak_failrelaxed:
-	case BuiltinProc_atomic_cxchgweak_failacq:
-	case BuiltinProc_atomic_cxchgweak_acq_failrelaxed:
-	case BuiltinProc_atomic_cxchgweak_acqrel_failrelaxed: {
+	case BuiltinProc_atomic_compare_exchange_strong:
+	case BuiltinProc_atomic_compare_exchange_weak:
+	case BuiltinProc_atomic_compare_exchange_strong_explicit:
+	case BuiltinProc_atomic_compare_exchange_weak_explicit: {
 		lbValue address = lb_build_expr(p, ce->args[0]);
 		Type *elem = type_deref(address.type);
 		lbValue old_value = lb_build_expr(p, ce->args[1]);
@@ -1801,28 +1731,14 @@ lbValue lb_build_builtin_proc(lbProcedure *p, Ast *expr, TypeAndValue const &tv,
 		LLVMBool weak = false;
 
 		switch (id) {
-		case BuiltinProc_atomic_cxchg:                        success_ordering = LLVMAtomicOrderingSequentiallyConsistent; failure_ordering = LLVMAtomicOrderingSequentiallyConsistent; weak = false; break;
-		case BuiltinProc_atomic_cxchg_acq:                    success_ordering = LLVMAtomicOrderingAcquire;                failure_ordering = LLVMAtomicOrderingMonotonic;              weak = false; break;
-		case BuiltinProc_atomic_cxchg_rel:                    success_ordering = LLVMAtomicOrderingRelease;                failure_ordering = LLVMAtomicOrderingMonotonic;              weak = false; break;
-		case BuiltinProc_atomic_cxchg_acqrel:                 success_ordering = LLVMAtomicOrderingAcquireRelease;         failure_ordering = LLVMAtomicOrderingMonotonic;              weak = false; break;
-		case BuiltinProc_atomic_cxchg_relaxed:                success_ordering = LLVMAtomicOrderingMonotonic;              failure_ordering = LLVMAtomicOrderingMonotonic;              weak = false; break;
-		case BuiltinProc_atomic_cxchg_failrelaxed:            success_ordering = LLVMAtomicOrderingSequentiallyConsistent; failure_ordering = LLVMAtomicOrderingMonotonic;              weak = false; break;
-		case BuiltinProc_atomic_cxchg_failacq:                success_ordering = LLVMAtomicOrderingSequentiallyConsistent; failure_ordering = LLVMAtomicOrderingAcquire;                weak = false; break;
-		case BuiltinProc_atomic_cxchg_acq_failrelaxed:        success_ordering = LLVMAtomicOrderingAcquire;                failure_ordering = LLVMAtomicOrderingMonotonic;              weak = false; break;
-		case BuiltinProc_atomic_cxchg_acqrel_failrelaxed:     success_ordering = LLVMAtomicOrderingAcquireRelease;         failure_ordering = LLVMAtomicOrderingMonotonic;              weak = false; break;
-		case BuiltinProc_atomic_cxchgweak:                    success_ordering = LLVMAtomicOrderingSequentiallyConsistent; failure_ordering = LLVMAtomicOrderingSequentiallyConsistent; weak = false; break;
-		case BuiltinProc_atomic_cxchgweak_acq:                success_ordering = LLVMAtomicOrderingAcquire;                failure_ordering = LLVMAtomicOrderingMonotonic;              weak = true;  break;
-		case BuiltinProc_atomic_cxchgweak_rel:                success_ordering = LLVMAtomicOrderingRelease;                failure_ordering = LLVMAtomicOrderingMonotonic;              weak = true;  break;
-		case BuiltinProc_atomic_cxchgweak_acqrel:             success_ordering = LLVMAtomicOrderingAcquireRelease;         failure_ordering = LLVMAtomicOrderingMonotonic;              weak = true;  break;
-		case BuiltinProc_atomic_cxchgweak_relaxed:            success_ordering = LLVMAtomicOrderingMonotonic;              failure_ordering = LLVMAtomicOrderingMonotonic;              weak = true;  break;
-		case BuiltinProc_atomic_cxchgweak_failrelaxed:        success_ordering = LLVMAtomicOrderingSequentiallyConsistent; failure_ordering = LLVMAtomicOrderingMonotonic;              weak = true;  break;
-		case BuiltinProc_atomic_cxchgweak_failacq:            success_ordering = LLVMAtomicOrderingSequentiallyConsistent; failure_ordering = LLVMAtomicOrderingAcquire;                weak = true;  break;
-		case BuiltinProc_atomic_cxchgweak_acq_failrelaxed:    success_ordering = LLVMAtomicOrderingAcquire;                failure_ordering = LLVMAtomicOrderingMonotonic;              weak = true;  break;
-		case BuiltinProc_atomic_cxchgweak_acqrel_failrelaxed: success_ordering = LLVMAtomicOrderingAcquireRelease;         failure_ordering = LLVMAtomicOrderingMonotonic;              weak = true;  break;
+		case BuiltinProc_atomic_compare_exchange_strong:          success_ordering = LLVMAtomicOrderingSequentiallyConsistent;    failure_ordering = LLVMAtomicOrderingSequentiallyConsistent;    weak = false; break;
+		case BuiltinProc_atomic_compare_exchange_weak:            success_ordering = LLVMAtomicOrderingSequentiallyConsistent;    failure_ordering = LLVMAtomicOrderingSequentiallyConsistent;    weak = true;  break;
+		case BuiltinProc_atomic_compare_exchange_strong_explicit: success_ordering = llvm_atomic_ordering_from_odin(ce->args[3]); failure_ordering = llvm_atomic_ordering_from_odin(ce->args[4]); weak = false; break;
+		case BuiltinProc_atomic_compare_exchange_weak_explicit:   success_ordering = llvm_atomic_ordering_from_odin(ce->args[3]); failure_ordering = llvm_atomic_ordering_from_odin(ce->args[4]); weak = true;  break;
 		}
 
 		// TODO(bill): Figure out how to make it weak
-		LLVMBool single_threaded = weak;
+		LLVMBool single_threaded = false;
 
 		LLVMValueRef value = LLVMBuildAtomicCmpXchg(
 			p->builder, address.value,
@@ -1831,6 +1747,7 @@ lbValue lb_build_builtin_proc(lbProcedure *p, Ast *expr, TypeAndValue const &tv,
 			failure_ordering,
 			single_threaded
 		);
+		LLVMSetWeak(value, weak);
 
 		if (tv.type->kind == Type_Tuple) {
 			Type *fix_typed = alloc_type_tuple();

@@ -1,6 +1,6 @@
 //+private
 //+build linux
-package sync2
+package sync
 
 import "core:c"
 import "core:time"
@@ -13,12 +13,6 @@ FUTEX_PRIVATE_FLAG :: 128
 
 FUTEX_WAIT_PRIVATE :: (FUTEX_WAIT | FUTEX_PRIVATE_FLAG)
 FUTEX_WAKE_PRIVATE :: (FUTEX_WAKE | FUTEX_PRIVATE_FLAG)
-
-foreign import libc "system:c"
-
-foreign libc {
-	__errno_location :: proc "c" () -> ^c.int ---	
-}
 
 ESUCCESS  :: 0
 EINTR     :: -4

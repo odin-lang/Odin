@@ -1,4 +1,4 @@
-package sync2
+package sync
 
 import "core:time"
 
@@ -24,7 +24,7 @@ atomic_mutex_lock :: proc(m: ^Atomic_Mutex) {
 		new_state := curr_state // Make a copy of it
 
 		spin_lock: for spin in 0..<i32(100) {
-			state, ok := atomic_compare_exchange_weak_acquire(&m.state, .Unlocked, new_state)
+			state, ok := atomic_compare_exchange_weak_explicit(&m.state, .Unlocked, new_state, .Acquire, .Consume)
 			if ok {
 				return
 			}
@@ -42,7 +42,7 @@ atomic_mutex_lock :: proc(m: ^Atomic_Mutex) {
 		new_state = .Waiting
 
 		for {
-			if atomic_exchange_acquire(&m.state, .Waiting) == .Unlocked {
+			if atomic_exchange_explicit(&m.state, .Waiting, .Acquire) == .Unlocked {
 				return
 			}
 			
@@ -52,7 +52,7 @@ atomic_mutex_lock :: proc(m: ^Atomic_Mutex) {
 	}
 
 
-	if v := atomic_exchange_acquire(&m.state, .Locked); v != .Unlocked {
+	if v := atomic_exchange_explicit(&m.state, .Locked, .Acquire); v != .Unlocked {
 		lock_slow(m, v)
 	}
 }
@@ -65,7 +65,7 @@ atomic_mutex_unlock :: proc(m: ^Atomic_Mutex) {
 	}
 
 
-	switch atomic_exchange_release(&m.state, .Unlocked) {
+	switch atomic_exchange_explicit(&m.state, .Unlocked, .Release) {
 	case .Unlocked:
 		unreachable()
 	case .Locked:
@@ -77,7 +77,7 @@ atomic_mutex_unlock :: proc(m: ^Atomic_Mutex) {
 
 // atomic_mutex_try_lock tries to lock m, will return true on success, and false on failure
 atomic_mutex_try_lock :: proc(m: ^Atomic_Mutex) -> bool {
-	_, ok := atomic_compare_exchange_strong_acquire(&m.state, .Unlocked, .Locked)
+	_, ok := atomic_compare_exchange_strong_explicit(&m.state, .Unlocked, .Locked, .Acquire, .Consume)
 	return ok
 }
 
@@ -290,7 +290,7 @@ Queue_Item :: struct {
 
 @(private="file")
 queue_item_wait :: proc(item: ^Queue_Item) {
-	for atomic_load_acquire(&item.futex) == 0 {
+	for atomic_load_explicit(&item.futex, .Acquire) == 0 {
 		futex_wait(&item.futex, 0)
 		cpu_relax()
 	}
@@ -298,7 +298,7 @@ queue_item_wait :: proc(item: ^Queue_Item) {
 @(private="file")
 queue_item_wait_with_timeout :: proc(item: ^Queue_Item, duration: time.Duration) -> bool {
 	start := time.tick_now()
-	for atomic_load_acquire(&item.futex) == 0 {
+	for atomic_load_explicit(&item.futex, .Acquire) == 0 {
 		remaining := duration - time.tick_since(start)
 		if remaining < 0 {
 			return false
@@ -312,7 +312,7 @@ queue_item_wait_with_timeout :: proc(item: ^Queue_Item, duration: time.Duration)
 }
 @(private="file")
 queue_item_signal :: proc(item: ^Queue_Item) {
-	atomic_store_release(&item.futex, 1)
+	atomic_store_explicit(&item.futex, 1, .Release)
 	futex_signal(&item.futex)
 }
 
