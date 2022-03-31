@@ -2,9 +2,6 @@
 package sys_windows
 
 import "core:c"
-import "core:intrinsics"
-
-L :: intrinsics.constant_utf16_cstring
 
 c_char     :: c.char
 c_uchar    :: c.uchar
