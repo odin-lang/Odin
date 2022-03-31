@@ -6,12 +6,12 @@ cpu_relax :: intrinsics.cpu_relax
 
 /*
 Atomic_Memory_Order :: enum {
-	relaxed = 0,
-	consume = 1,
-	acquire = 2,
-	release = 3,
-	acq_rel = 4,
-	seq_cst = 5,
+	Relaxed = 0,
+	Consume = 1,
+	Acquire = 2,
+	Release = 3,
+	Acq_Rel = 4,
+	Seq_Cst = 5,
 }
 */
 Atomic_Memory_Order :: intrinsics.Atomic_Memory_Order

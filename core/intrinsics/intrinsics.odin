@@ -63,12 +63,12 @@ syscall :: proc(id: uintptr, args: ..uintptr) -> uintptr ---
 
 // Atomics
 Atomic_Memory_Order :: enum {
-	relaxed = 0, // unordered
-	consume = 1, // monotonic
-	acquire = 2,
-	release = 3,
-	acq_rel = 4,
-	seq_cst = 5,
+	Relaxed = 0, // Unordered
+	Consume = 1, // Monotonic
+	Acquire = 2,
+	Release = 3,
+	Acq_Rel = 4,
+	Seq_Cst = 5,
 }
 
 atomic_thread_fence :: proc(order: Atomic_Memory_Order) ---

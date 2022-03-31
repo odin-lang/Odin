@@ -146,10 +146,10 @@ Auto_Reset_Event :: struct {
 }
 
 auto_reset_event_signal :: proc(e: ^Auto_Reset_Event) {
-	old_status := atomic_load_explicit(&e.status, .relaxed)
+	old_status := atomic_load_explicit(&e.status, .Relaxed)
 	for {
 		new_status := old_status + 1 if old_status < 1 else 1
-		if _, ok := atomic_compare_exchange_weak_explicit(&e.status, old_status, new_status, .release, .relaxed); ok {
+		if _, ok := atomic_compare_exchange_weak_explicit(&e.status, old_status, new_status, .Release, .Relaxed); ok {
 			break
 		}
 
@@ -160,7 +160,7 @@ auto_reset_event_signal :: proc(e: ^Auto_Reset_Event) {
 }
 
 auto_reset_event_wait :: proc(e: ^Auto_Reset_Event) {
-	old_status := atomic_sub_explicit(&e.status, 1, .acquire)
+	old_status := atomic_sub_explicit(&e.status, 1, .Acquire)
 	if old_status < 1 {
 		sema_wait(&e.sema)
 	}
@@ -174,14 +174,14 @@ Ticket_Mutex :: struct {
 }
 
 ticket_mutex_lock :: #force_inline proc(m: ^Ticket_Mutex) {
-	ticket := atomic_add_explicit(&m.ticket, 1, .relaxed)
-	for ticket != atomic_load_explicit(&m.serving, .acquire) {
+	ticket := atomic_add_explicit(&m.ticket, 1, .Relaxed)
+	for ticket != atomic_load_explicit(&m.serving, .Acquire) {
 		cpu_relax()
 	}
 }
 
 ticket_mutex_unlock :: #force_inline proc(m: ^Ticket_Mutex) {
-	atomic_add_explicit(&m.serving, 1, .relaxed)
+	atomic_add_explicit(&m.serving, 1, .Relaxed)
 }
 @(deferred_in=ticket_mutex_unlock)
 ticket_mutex_guard :: proc(m: ^Ticket_Mutex) -> bool {
@@ -196,18 +196,18 @@ Benaphore :: struct {
 }
 
 benaphore_lock :: proc(b: ^Benaphore) {
-	if atomic_add_explicit(&b.counter, 1, .acquire) > 1 {
+	if atomic_add_explicit(&b.counter, 1, .Acquire) > 1 {
 		sema_wait(&b.sema)
 	}
 }
 
 benaphore_try_lock :: proc(b: ^Benaphore) -> bool {
-	v, _ := atomic_compare_exchange_strong_explicit(&b.counter, 1, 0, .acquire, .acquire)
+	v, _ := atomic_compare_exchange_strong_explicit(&b.counter, 1, 0, .Acquire, .Acquire)
 	return v == 0
 }
 
 benaphore_unlock :: proc(b: ^Benaphore) {
-	if atomic_sub_explicit(&b.counter, 1, .release) > 0 {
+	if atomic_sub_explicit(&b.counter, 1, .Release) > 0 {
 		sema_post(&b.sema)
 	}
 }
@@ -227,7 +227,7 @@ Recursive_Benaphore :: struct {
 
 recursive_benaphore_lock :: proc(b: ^Recursive_Benaphore) {
 	tid := current_thread_id()
-	if atomic_add_explicit(&b.counter, 1, .acquire) > 1 {
+	if atomic_add_explicit(&b.counter, 1, .Acquire) > 1 {
 		if tid != b.owner {
 			sema_wait(&b.sema)
 		}
@@ -240,10 +240,10 @@ recursive_benaphore_lock :: proc(b: ^Recursive_Benaphore) {
 recursive_benaphore_try_lock :: proc(b: ^Recursive_Benaphore) -> bool {
 	tid := current_thread_id()
 	if b.owner == tid {
-		atomic_add_explicit(&b.counter, 1, .acquire)
+		atomic_add_explicit(&b.counter, 1, .Acquire)
 	}
 
-	if v, _ := atomic_compare_exchange_strong_explicit(&b.counter, 1, 0, .acquire, .acquire); v != 0 {
+	if v, _ := atomic_compare_exchange_strong_explicit(&b.counter, 1, 0, .Acquire, .Acquire); v != 0 {
 		return false
 	}
 	// inside the lock
@@ -260,7 +260,7 @@ recursive_benaphore_unlock :: proc(b: ^Recursive_Benaphore) {
 	if recursion == 0 {
 		b.owner = 0
 	}
-	if atomic_sub_explicit(&b.counter, 1, .release) > 0 {
+	if atomic_sub_explicit(&b.counter, 1, .Release) > 0 {
 		if recursion == 0 {
 			sema_post(&b.sema)
 		}
@@ -293,12 +293,12 @@ once_do :: proc(o: ^Once, fn: proc()) {
 		defer mutex_unlock(&o.m)
 		if !o.done {
 			fn()
-			atomic_store_explicit(&o.done, true, .release)
+			atomic_store_explicit(&o.done, true, .Release)
 		}
 	}
 
 	
-	if atomic_load_explicit(&o.done, .acquire) == false {
+	if atomic_load_explicit(&o.done, .Acquire) == false {
 		do_slow(o, fn)
 	}
 }

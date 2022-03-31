@@ -703,12 +703,12 @@ enum OdinAtomicMemoryOrder : i32 {
 };
 
 char const *OdinAtomicMemoryOrder_strings[OdinAtomicMemoryOrder_COUNT] = {
-	"relaxed",
-	"consume",
-	"acquire",
-	"release",
-	"acq_rel",
-	"seq_cst",
+	"Relaxed",
+	"Consume",
+	"Acquire",
+	"Release",
+	"Acq_Rel",
+	"Seq_Cst",
 };
 
 gb_global Type *t_atomic_memory_order = nullptr;
