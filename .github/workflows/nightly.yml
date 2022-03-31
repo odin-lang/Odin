@@ -41,7 +41,7 @@ jobs:
     steps:
       - uses: actions/checkout@v1
       - name: (Linux) Download LLVM
-        run: sudo apt-get install llvm-11 clang-11 llvm
+        run: sudo apt-get install llvm-11 clang-11
       - name: build odin
         run: make nightly
       - name: Odin run
@@ -129,7 +129,7 @@ jobs:
         run: |
           echo Authorizing B2 account
           b2 authorize-account "$APPID" "$APPKEY"
-          
+
           echo Uploading artifcates to B2
           chmod +x ./ci/upload_create_nightly.sh
           ./ci/upload_create_nightly.sh "$BUCKET" windows-amd64 windows_artifacts/
@@ -141,7 +141,7 @@ jobs:
 
           echo Creating nightly.json
           python3 ci/create_nightly_json.py "$BUCKET" > nightly.json
-          
+
           echo Uploading nightly.json
           b2 upload-file "$BUCKET" nightly.json nightly.json
 
