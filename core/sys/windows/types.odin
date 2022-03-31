@@ -3,6 +3,8 @@ package sys_windows
 
 import "core:c"
 
+L :: intrinsics.constant_utf16_cstring
+
 c_char     :: c.char
 c_uchar    :: c.uchar
 c_int      :: c.int
