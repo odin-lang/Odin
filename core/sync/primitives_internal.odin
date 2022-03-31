@@ -1,5 +1,5 @@
 //+private
-package sync2
+package sync
 
 when #config(ODIN_SYNC_RECURSIVE_MUTEX_USE_FUTEX, true) {
 	_Recursive_Mutex :: struct {

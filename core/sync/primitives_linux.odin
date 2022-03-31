@@ -1,6 +1,6 @@
 //+build linux
 //+private
-package sync2
+package sync
 
 import "core:sys/unix"
 

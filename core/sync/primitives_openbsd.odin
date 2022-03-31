@@ -1,6 +1,6 @@
 //+build openbsd
 //+private
-package sync2
+package sync
 
 import "core:os"
 

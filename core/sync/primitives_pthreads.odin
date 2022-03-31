@@ -1,6 +1,6 @@
 //+build linux, freebsd, openbsd
 //+private
-package sync2
+package sync
 
 import "core:time"
 import "core:sys/unix"
