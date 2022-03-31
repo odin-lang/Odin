@@ -992,12 +992,12 @@ void init_universal(void) {
 
 	{
 		GlobalEnumValue values[OdinAtomicMemoryOrder_COUNT] = {
-			{"relaxed", OdinAtomicMemoryOrder_relaxed},
-			{"consume", OdinAtomicMemoryOrder_consume},
-			{"acquire", OdinAtomicMemoryOrder_acquire},
-			{"release", OdinAtomicMemoryOrder_release},
-			{"acq_rel", OdinAtomicMemoryOrder_acq_rel},
-			{"seq_cst", OdinAtomicMemoryOrder_seq_cst},
+			{OdinAtomicMemoryOrder_strings[OdinAtomicMemoryOrder_relaxed], OdinAtomicMemoryOrder_relaxed},
+			{OdinAtomicMemoryOrder_strings[OdinAtomicMemoryOrder_consume], OdinAtomicMemoryOrder_consume},
+			{OdinAtomicMemoryOrder_strings[OdinAtomicMemoryOrder_acquire], OdinAtomicMemoryOrder_acquire},
+			{OdinAtomicMemoryOrder_strings[OdinAtomicMemoryOrder_release], OdinAtomicMemoryOrder_release},
+			{OdinAtomicMemoryOrder_strings[OdinAtomicMemoryOrder_acq_rel], OdinAtomicMemoryOrder_acq_rel},
+			{OdinAtomicMemoryOrder_strings[OdinAtomicMemoryOrder_seq_cst], OdinAtomicMemoryOrder_seq_cst},
 		};
 
 		add_global_enum_type(str_lit("Atomic_Memory_Order"), values, gb_count_of(values), &t_atomic_memory_order);
