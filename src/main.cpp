@@ -117,6 +117,9 @@ i32 system_exec_command_line_app(char const *name, char const *fmt, ...) {
 		gb_printf_err("%s\n\n", cmd_line);
 	}
 	exit_code = system(cmd_line);
+	if (WIFEXITED(exit_code)) {
+		exit_code = WEXITSTATUS(exit_code);
+	}
 #endif
 
 	if (exit_code) {
@@ -432,6 +435,10 @@ i32 linker_stage(lbGenerator *gen) {
 		// typically executable files on *NIX systems don't have extensions.
 		String output_ext = {};
 		gbString link_settings = gb_string_make_reserve(heap_allocator(), 32);
+
+		if (build_context.no_crt) {
+			link_settings = gb_string_append_fmt(link_settings, "-nostdlib ");
+		}
 
 		// NOTE(dweiler): We use clang as a frontend for the linker as there are
 		// other runtime and compiler support libraries that need to be linked in

@@ -1176,10 +1176,35 @@ void lb_emit_store_union_variant_tag(lbProcedure *p, lbValue parent, Type *varia
 }
 
 void lb_emit_store_union_variant(lbProcedure *p, lbValue parent, lbValue variant, Type *variant_type) {
-	lbValue underlying = lb_emit_conv(p, parent, alloc_type_pointer(variant_type));
+	Type *pt = base_type(type_deref(parent.type));
+	GB_ASSERT(pt->kind == Type_Union);
+	if (pt->Union.kind == UnionType_shared_nil) {
+		lbBlock *if_nil     = lb_create_block(p, "shared_nil.if_nil");
+		lbBlock *if_not_nil = lb_create_block(p, "shared_nil.if_not_nil");
+		lbBlock *done       = lb_create_block(p, "shared_nil.done");
 
-	lb_emit_store(p, underlying, variant);
-	lb_emit_store_union_variant_tag(p, parent, variant_type);
+		lbValue cond_is_nil = lb_emit_comp_against_nil(p, Token_CmpEq, variant);
+		lb_emit_if(p, cond_is_nil, if_nil, if_not_nil);
+
+		lb_start_block(p, if_nil);
+		lb_emit_store(p, parent, lb_const_nil(p->module, type_deref(parent.type)));
+		lb_emit_jump(p, done);
+
+		lb_start_block(p, if_not_nil);
+		lbValue underlying = lb_emit_conv(p, parent, alloc_type_pointer(variant_type));
+		lb_emit_store(p, underlying, variant);
+		lb_emit_store_union_variant_tag(p, parent, variant_type);
+		lb_emit_jump(p, done);
+
+		lb_start_block(p, done);
+
+
+	} else {
+		lbValue underlying = lb_emit_conv(p, parent, alloc_type_pointer(variant_type));
+
+		lb_emit_store(p, underlying, variant);
+		lb_emit_store_union_variant_tag(p, parent, variant_type);
+	}
 }
 
 
@@ -2312,7 +2337,7 @@ LLVMValueRef lb_find_or_add_entity_string_ptr(lbModule *m, String const &str) {
 
 		LLVMValueRef global_data = LLVMAddGlobal(m->mod, LLVMTypeOf(data), name);
 		LLVMSetInitializer(global_data, data);
-		LLVMSetLinkage(global_data, LLVMInternalLinkage);
+		LLVMSetLinkage(global_data, LLVMPrivateLinkage);
 
 		LLVMValueRef ptr = LLVMConstInBoundsGEP(global_data, indices, 2);
 		string_map_set(&m->const_strings, key, ptr);
@@ -2354,7 +2379,7 @@ lbValue lb_find_or_add_entity_string_byte_slice(lbModule *m, String const &str) 
 	}
 	LLVMValueRef global_data = LLVMAddGlobal(m->mod, LLVMTypeOf(data), name);
 	LLVMSetInitializer(global_data, data);
-	LLVMSetLinkage(global_data, LLVMInternalLinkage);
+	LLVMSetLinkage(global_data, LLVMPrivateLinkage);
 
 	LLVMValueRef ptr = nullptr;
 	if (str.len != 0) {
@@ -2590,7 +2615,7 @@ lbValue lb_generate_global_array(lbModule *m, Type *elem_type, i64 count, String
 	g.value = LLVMAddGlobal(m->mod, lb_type(m, t), text);
 	g.type = alloc_type_pointer(t);
 	LLVMSetInitializer(g.value, LLVMConstNull(lb_type(m, t)));
-	LLVMSetLinkage(g.value, LLVMInternalLinkage);
+	LLVMSetLinkage(g.value, LLVMPrivateLinkage);
 	string_map_set(&m->members, s, g);
 	return g;
 }
@@ -2602,6 +2627,9 @@ lbValue lb_build_cond(lbProcedure *p, Ast *cond, lbBlock *true_block, lbBlock *f
 	GB_ASSERT(true_block  != nullptr);
 	GB_ASSERT(false_block != nullptr);
 
+	// Use to signal not to do compile time short circuit for consts
+	lbValue no_comptime_short_circuit = {};
+
 	switch (cond->kind) {
 	case_ast_node(pe, ParenExpr, cond);
 		return lb_build_cond(p, pe->expr, true_block, false_block);
@@ -2609,7 +2637,11 @@ lbValue lb_build_cond(lbProcedure *p, Ast *cond, lbBlock *true_block, lbBlock *f
 
 	case_ast_node(ue, UnaryExpr, cond);
 		if (ue->op.kind == Token_Not) {
-			return lb_build_cond(p, ue->expr, false_block, true_block);
+			lbValue cond_val = lb_build_cond(p, ue->expr, false_block, true_block);
+			if (cond_val.value && LLVMIsConstant(cond_val.value)) {
+				return lb_const_bool(p->module, cond_val.type, LLVMConstIntGetZExtValue(cond_val.value) == 0);
+			}
+			return no_comptime_short_circuit;
 		}
 	case_end;
 
@@ -2618,12 +2650,14 @@ lbValue lb_build_cond(lbProcedure *p, Ast *cond, lbBlock *true_block, lbBlock *f
 			lbBlock *block = lb_create_block(p, "cmp.and");
 			lb_build_cond(p, be->left, block, false_block);
 			lb_start_block(p, block);
-			return lb_build_cond(p, be->right, true_block, false_block);
+			lb_build_cond(p, be->right, true_block, false_block);
+			return no_comptime_short_circuit;
 		} else if (be->op.kind == Token_CmpOr) {
 			lbBlock *block = lb_create_block(p, "cmp.or");
 			lb_build_cond(p, be->left, true_block, block);
 			lb_start_block(p, block);
-			return lb_build_cond(p, be->right, true_block, false_block);
+			lb_build_cond(p, be->right, true_block, false_block);
+			return no_comptime_short_circuit;
 		}
 	case_end;
 	}

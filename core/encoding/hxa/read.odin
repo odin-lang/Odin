@@ -39,6 +39,9 @@ read :: proc(data: []byte, filename := "<input>", print_error := false, allocato
 	read_value :: proc(r: ^Reader, $T: typeid) -> (value: T, err: Read_Error) {
 		remaining := len(r.data) - r.offset
 		if remaining < size_of(T) {
+			if r.print_error {
+				fmt.eprintf("file '%s' failed to read value at offset %v\n", r.filename, r.offset)
+			}
 			err = .Short_Read
 			return
 		}
@@ -51,6 +54,10 @@ read :: proc(data: []byte, filename := "<input>", print_error := false, allocato
 	read_array :: proc(r: ^Reader, $T: typeid, count: int) -> (value: []T, err: Read_Error) {
 		remaining := len(r.data) - r.offset
 		if remaining < size_of(T)*count {
+			if r.print_error {
+				fmt.eprintf("file '%s' failed to read array of %d elements at offset %v\n",
+							r.filename, count, r.offset)
+			}
 			err = .Short_Read
 			return
 		}
@@ -82,7 +89,8 @@ read :: proc(data: []byte, filename := "<input>", print_error := false, allocato
 			type := read_value(r, Meta_Value_Type) or_return
 			if type > max(Meta_Value_Type) {
 				if r.print_error {
-					fmt.eprintf("HxA Error: file '%s' has meta value type %d. Maximum value is ", r.filename, u8(type), u8(max(Meta_Value_Type)))
+					fmt.eprintf("HxA Error: file '%s' has meta value type %d. Maximum value is %d\n",
+								r.filename, u8(type), u8(max(Meta_Value_Type)))
 				}
 				err = .Invalid_Data
 				return
@@ -114,7 +122,8 @@ read :: proc(data: []byte, filename := "<input>", print_error := false, allocato
 			type := read_value(r, Layer_Data_Type) or_return
 			if type > max(type) {
 				if r.print_error {
-					fmt.eprintf("HxA Error: file '%s' has layer data type %d. Maximum value is ", r.filename, u8(type), u8(max(Layer_Data_Type)))
+					fmt.eprintf("HxA Error: file '%s' has layer data type %d. Maximum value is %d\n",
+								r.filename, u8(type), u8(max(Layer_Data_Type)))
 				}
 				err = .Invalid_Data
 				return
@@ -134,13 +143,23 @@ read :: proc(data: []byte, filename := "<input>", print_error := false, allocato
 	}
 
 	if len(data) < size_of(Header) {
+		if print_error {
+			fmt.eprintf("HxA Error: file '%s' has no header\n", filename)
+		}
+		err = .Short_Read
 		return
 	}
 
 	context.allocator = allocator
 
 	header := cast(^Header)raw_data(data)
-	assert(header.magic_number == MAGIC_NUMBER)
+	if (header.magic_number != MAGIC_NUMBER) {
+		if print_error {
+			fmt.eprintf("HxA Error: file '%s' has invalid magic number 0x%x\n", filename, header.magic_number)
+		}
+		err = .Invalid_Data
+		return
+	}
 
 	r := &Reader{
 		filename    = filename,
@@ -150,6 +169,7 @@ read :: proc(data: []byte, filename := "<input>", print_error := false, allocato
 	}
 
 	node_count := 0
+	file.header = header^
 	file.nodes = make([]Node, header.internal_node_count)
 	defer if err != nil {
 		nodes_destroy(file.nodes)
@@ -162,7 +182,8 @@ read :: proc(data: []byte, filename := "<input>", print_error := false, allocato
 		type := read_value(r, Node_Type) or_return
 		if type > max(Node_Type) {
 			if r.print_error {
-				fmt.eprintf("HxA Error: file '%s' has node type %d. Maximum value is ", r.filename, u8(type), u8(max(Node_Type)))
+				fmt.eprintf("HxA Error: file '%s' has node type %d. Maximum value is %d\n",
+							r.filename, u8(type), u8(max(Node_Type)))
 			}
 			err = .Invalid_Data
 			return
