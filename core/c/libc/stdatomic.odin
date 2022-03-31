@@ -47,9 +47,9 @@ kill_dependency :: #force_inline proc(value: $T) -> T {
 
 // 7.17.4 Fences
 atomic_thread_fence :: #force_inline proc(order: memory_order) {
-	switch order {
-	case .relaxed: intrinsics.atomic_thread_fence(.relaxed)
-	case .consume: intrinsics.atomic_thread_fence(.consume)
+	assert(order != .relaxed)
+	assert(order != .consume)
+	#partial switch order {
 	case .acquire: intrinsics.atomic_thread_fence(.acquire)
 	case .release: intrinsics.atomic_thread_fence(.release)
 	case .acq_rel: intrinsics.atomic_thread_fence(.acq_rel)
@@ -58,9 +58,9 @@ atomic_thread_fence :: #force_inline proc(order: memory_order) {
 }
 
 atomic_signal_fence :: #force_inline proc(order: memory_order) {
-	switch order {
-	case .relaxed: intrinsics.atomic_signal_fence(.relaxed)
-	case .consume: intrinsics.atomic_signal_fence(.consume)
+	assert(order != .relaxed)
+	assert(order != .consume)
+	#partial switch order {
 	case .acquire: intrinsics.atomic_signal_fence(.acquire)
 	case .release: intrinsics.atomic_signal_fence(.release)
 	case .acq_rel: intrinsics.atomic_signal_fence(.acq_rel)

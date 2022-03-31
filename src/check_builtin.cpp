@@ -3235,10 +3235,24 @@ bool check_builtin_procedure(CheckerContext *c, Operand *operand, Ast *call, i32
 
 	case BuiltinProc_atomic_thread_fence:
 	case BuiltinProc_atomic_signal_fence:
-		if (!check_atomic_memory_order_argument(c, ce->args[0], builtin_name, nullptr)) {
-			return false;
+		{
+			OdinAtomicMemoryOrder memory_order = {};
+			if (!check_atomic_memory_order_argument(c, ce->args[0], builtin_name, &memory_order)) {
+				return false;
+			}
+			switch (memory_order) {
+			case OdinAtomicMemoryOrder_acquire:
+			case OdinAtomicMemoryOrder_release:
+			case OdinAtomicMemoryOrder_acq_rel:
+			case OdinAtomicMemoryOrder_seq_cst:
+				break;
+			default:
+				error(ce->args[0], "Illegal memory ordering for '%.*s', got .%s", LIT(builtin_name), OdinAtomicMemoryOrder_strings[memory_order]);
+				break;
+			}
+
+			operand->mode = Addressing_NoValue;
 		}
-		operand->mode = Addressing_NoValue;
 		break;
 
 	case BuiltinProc_volatile_store:
@@ -3280,7 +3294,7 @@ bool check_builtin_procedure(CheckerContext *c, Operand *operand, Ast *call, i32
 			case OdinAtomicMemoryOrder_consume:
 			case OdinAtomicMemoryOrder_acquire:
 			case OdinAtomicMemoryOrder_acq_rel:
-				error(ce->args[2], "Illegal memory order .%s for %.*s", OdinAtomicMemoryOrder_strings[memory_order], LIT(builtin_name));
+				error(ce->args[2], "Illegal memory order .%s for '%.*s'", OdinAtomicMemoryOrder_strings[memory_order], LIT(builtin_name));
 				break;
 			}
 
@@ -3322,7 +3336,7 @@ bool check_builtin_procedure(CheckerContext *c, Operand *operand, Ast *call, i32
 			switch (memory_order) {
 			case OdinAtomicMemoryOrder_release:
 			case OdinAtomicMemoryOrder_acq_rel:
-				error(ce->args[1], "Illegal memory order .%s for %.*s", OdinAtomicMemoryOrder_strings[memory_order], LIT(builtin_name));
+				error(ce->args[1], "Illegal memory order .%s for '%.*s'", OdinAtomicMemoryOrder_strings[memory_order], LIT(builtin_name));
 				break;
 			}
 
@@ -3474,7 +3488,7 @@ bool check_builtin_procedure(CheckerContext *c, Operand *operand, Ast *call, i32
 
 
 			if (invalid_combination) {
-				error(ce->args[3], "Illegal memory order pairing for %.*s, success = .%s, failure = .%s",
+				error(ce->args[3], "Illegal memory order pairing for '%.*s', success = .%s, failure = .%s",
 					LIT(builtin_name),
 					OdinAtomicMemoryOrder_strings[success_memory_order],
 					OdinAtomicMemoryOrder_strings[failure_memory_order]
