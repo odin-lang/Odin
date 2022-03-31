@@ -94,91 +94,32 @@ when #config(ODIN_SYNC_RECURSIVE_MUTEX_USE_FUTEX, true) {
 
 
 when ODIN_OS != .Windows {
-	RW_Mutex_State :: distinct uint
-	RW_Mutex_State_Half_Width :: size_of(RW_Mutex_State)*8/2
-	RW_Mutex_State_Is_Writing :: RW_Mutex_State(1)
-	RW_Mutex_State_Writer     :: RW_Mutex_State(1)<<1
-	RW_Mutex_State_Reader     :: RW_Mutex_State(1)<<RW_Mutex_State_Half_Width
-
-	RW_Mutex_State_Writer_Mask :: RW_Mutex_State(1<<(RW_Mutex_State_Half_Width-1) - 1) << 1
-	RW_Mutex_State_Reader_Mask :: RW_Mutex_State(1<<(RW_Mutex_State_Half_Width-1) - 1) << RW_Mutex_State_Half_Width
-
-
 	_RW_Mutex :: struct {
-		// NOTE(bill): pthread_rwlock_t cannot be used since pthread_rwlock_destroy is required on some platforms
-		// TODO(bill): Can we determine which platforms exactly?
-		state: RW_Mutex_State,
-		mutex: Mutex,
-		sema:  Sema,
+		mutex: Atomic_RW_Mutex,
 	}
 
 	_rw_mutex_lock :: proc(rw: ^RW_Mutex) {
-		_ = atomic_add(&rw.impl.state, RW_Mutex_State_Writer)
-		mutex_lock(&rw.impl.mutex)
-
-		state := atomic_or(&rw.impl.state, RW_Mutex_State_Writer)
-		if state & RW_Mutex_State_Reader_Mask != 0 {
-			sema_wait(&rw.impl.sema)
-		}
+		atomic_rw_mutex_lock(&rw.impl.mutex)
 	}
 
 	_rw_mutex_unlock :: proc(rw: ^RW_Mutex) {
-		_ = atomic_and(&rw.impl.state, ~RW_Mutex_State_Is_Writing)
-		mutex_unlock(&rw.impl.mutex)
+		atomic_rw_mutex_unlock(&rw.impl.mutex)
 	}
 
 	_rw_mutex_try_lock :: proc(rw: ^RW_Mutex) -> bool {
-		if mutex_try_lock(&rw.impl.mutex) {
-			state := atomic_load(&rw.impl.state)
-			if state & RW_Mutex_State_Reader_Mask == 0 {
-				_ = atomic_or(&rw.impl.state, RW_Mutex_State_Is_Writing)
-				return true
-			}
-
-			mutex_unlock(&rw.impl.mutex)
-		}
-		return false
+		return atomic_rw_mutex_try_lock(&rw.impl.mutex)
 	}
 
 	_rw_mutex_shared_lock :: proc(rw: ^RW_Mutex) {
-		state := atomic_load(&rw.impl.state)
-		for state & (RW_Mutex_State_Is_Writing|RW_Mutex_State_Writer_Mask) == 0 {
-			ok: bool
-			state, ok = atomic_compare_exchange_weak(&rw.impl.state, state, state + RW_Mutex_State_Reader)
-			if ok {
-				return
-			}
-		}
-
-		mutex_lock(&rw.impl.mutex)
-		_ = atomic_add(&rw.impl.state, RW_Mutex_State_Reader)
-		mutex_unlock(&rw.impl.mutex)
+		atomic_rw_mutex_shared_lock(&rw.impl.mutex)
 	}
 
 	_rw_mutex_shared_unlock :: proc(rw: ^RW_Mutex) {
-		state := atomic_sub(&rw.impl.state, RW_Mutex_State_Reader)
-
-		if (state & RW_Mutex_State_Reader_Mask == RW_Mutex_State_Reader) &&
-		   (state & RW_Mutex_State_Is_Writing != 0) {
-		   	sema_post(&rw.impl.sema)
-		}
+		atomic_rw_mutex_shared_unlock(&rw.impl.mutex)
 	}
 
 	_rw_mutex_try_shared_lock :: proc(rw: ^RW_Mutex) -> bool {
-		state := atomic_load(&rw.impl.state)
-		if state & (RW_Mutex_State_Is_Writing|RW_Mutex_State_Writer_Mask) == 0 {
-			_, ok := atomic_compare_exchange_strong(&rw.impl.state, state, state + RW_Mutex_State_Reader)
-			if ok {
-				return true
-			}
-		}
-		if mutex_try_lock(&rw.impl.mutex) {
-			_ = atomic_add(&rw.impl.state, RW_Mutex_State_Reader)
-			mutex_unlock(&rw.impl.mutex)
-			return true
-		}
-
-		return false
+		return atomic_rw_mutex_try_shared_lock(&rw.impl.mutex)
 	}
 
 }
