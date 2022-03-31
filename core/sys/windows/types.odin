@@ -2,6 +2,7 @@
 package sys_windows
 
 import "core:c"
+import "core:intrinsics"
 
 L :: intrinsics.constant_utf16_cstring
 
