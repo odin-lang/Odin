@@ -123,6 +123,11 @@ foreign user32 {
 	BeginPaint :: proc(hWnd: HWND, lpPaint: ^PAINTSTRUCT) -> HDC ---
 	EndPaint :: proc(hWnd: HWND, lpPaint: ^PAINTSTRUCT) -> BOOL ---
 
+	GetCapture :: proc() -> HWND ---
+	SetCapture :: proc(hWnd: HWND) -> HWND ---
+	ReleaseCapture :: proc() -> BOOL ---
+	TrackMouseEvent :: proc(lpEventTrack: LPTRACKMOUSEEVENT) -> BOOL ---
+
 	GetKeyState :: proc(nVirtKey: c_int) -> SHORT ---
 	GetAsyncKeyState :: proc(vKey: c_int) -> SHORT ---
 
