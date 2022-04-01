@@ -10,18 +10,18 @@ foreign user32 {
 	GetClassInfoExA :: proc(hInsatnce: HINSTANCE, lpszClass: LPCSTR, lpwcx: ^WNDCLASSEXA) -> BOOL ---
 	GetClassInfoExW :: proc(hInsatnce: HINSTANCE, lpszClass: LPCWSTR, lpwcx: ^WNDCLASSEXW) -> BOOL ---
 
-	GetClassLongPtrA :: proc(hWnd: HWND, nIndex: c_int) -> DWORD ---
-	GetClassLongPtrW :: proc(hWnd: HWND, nIndex: c_int) -> DWORD ---
-	SetClassLongPtrA :: proc(hWnd: HWND, nIndex: c_int, dwNewLong: LONG_PTR) -> ULONG_PTR ---
-	SetClassLongPtrW :: proc(hWnd: HWND, nIndex: c_int, dwNewLong: LONG_PTR) -> ULONG_PTR ---
+	GetClassLongA :: proc(hWnd: HWND, nIndex: c_int) -> DWORD ---
+	GetClassLongW :: proc(hWnd: HWND, nIndex: c_int) -> DWORD ---
+	SetClassLongA :: proc(hWnd: HWND, nIndex: c_int, dwNewLong: LONG) -> DWORD ---
+	SetClassLongW :: proc(hWnd: HWND, nIndex: c_int, dwNewLong: LONG) -> DWORD ---
+
+	GetWindowLongA :: proc(hWnd: HWND, nIndex: c_int) -> LONG ---
+	GetWindowLongW :: proc(hWnd: HWND, nIndex: c_int) -> LONG ---
+	SetWindowLongA :: proc(hWnd: HWND, nIndex: c_int, dwNewLong: LONG) -> LONG ---
+	SetWindowLongW :: proc(hWnd: HWND, nIndex: c_int, dwNewLong: LONG) -> LONG ---
 
 	GetClassNameA :: proc(hWnd: HWND, lpClassName: LPSTR, nMaxCount: c_int) -> c_int ---
 	GetClassNameW :: proc(hWnd: HWND, lpClassName: LPWSTR, nMaxCount: c_int) -> c_int ---
-
-	GetWindowLongPtrA :: proc(hWnd: HWND, nIndex: c_int) -> LONG_PTR ---
-	GetWindowLongPtrW :: proc(hWnd: HWND, nIndex: c_int) -> LONG_PTR ---
-	SetWindowLongPtrA :: proc(hWnd: HWND, nIndex: c_int, dwNewLong: LONG_PTR) -> LONG_PTR ---
-	SetWindowLongPtrW :: proc(hWnd: HWND, nIndex: c_int, dwNewLong: LONG_PTR) -> LONG_PTR ---
 
 	RegisterClassA :: proc(lpWndClass: ^WNDCLASSA) -> ATOM ---
 	RegisterClassW :: proc(lpWndClass: ^WNDCLASSW) -> ATOM ---
@@ -196,6 +196,31 @@ CreateWindowW :: #force_inline proc "stdcall" (
 		hInstance,
 		lpParam,
 	)
+}
+
+when ODIN_ARCH == .amd64 {
+	@(default_calling_convention="stdcall")
+	foreign user32 {
+		GetClassLongPtrA :: proc(hWnd: HWND, nIndex: c_int) -> ULONG_PTR ---
+		GetClassLongPtrW :: proc(hWnd: HWND, nIndex: c_int) -> ULONG_PTR ---
+		SetClassLongPtrA :: proc(hWnd: HWND, nIndex: c_int, dwNewLong: LONG_PTR) -> ULONG_PTR ---
+		SetClassLongPtrW :: proc(hWnd: HWND, nIndex: c_int, dwNewLong: LONG_PTR) -> ULONG_PTR ---
+
+		GetWindowLongPtrA :: proc(hWnd: HWND, nIndex: c_int) -> LONG_PTR ---
+		GetWindowLongPtrW :: proc(hWnd: HWND, nIndex: c_int) -> LONG_PTR ---
+		SetWindowLongPtrA :: proc(hWnd: HWND, nIndex: c_int, dwNewLong: LONG_PTR) -> LONG_PTR ---
+		SetWindowLongPtrW :: proc(hWnd: HWND, nIndex: c_int, dwNewLong: LONG_PTR) -> LONG_PTR ---
+	}
+} else when ODIN_ARCH == .i386 {
+	GetClassLongPtrA :: GetClassLongA
+	GetClassLongPtrW :: GetClassLongW
+	SetClassLongPtrA :: SetClassLongA
+	SetClassLongPtrW :: SetClassLongW
+
+	GetWindowLongPtrA :: GetWindowLongA
+	GetWindowLongPtrW :: GetWindowLongW
+	SetWindowLongPtrA :: GetWindowLongA
+	SetWindowLongPtrW :: GetWindowLongW
 }
 
 GET_SC_WPARAM :: #force_inline proc(wparam: WPARAM) -> i32 {
