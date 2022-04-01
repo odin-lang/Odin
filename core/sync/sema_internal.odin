@@ -25,7 +25,7 @@ when #config(ODIN_SYNC_SEMA_USE_FUTEX, true) {
 				futex_wait(&s.impl.count, u32(original_count))
 				original_count = s.impl.count
 			}
-			if original_count == atomic_compare_exchange_strong(&s.impl.count, original_count-1, original_count) {
+			if original_count == atomic_compare_exchange_strong(&s.impl.count, original_count, original_count-1) {
 				return
 			}
 		}
@@ -49,7 +49,7 @@ when #config(ODIN_SYNC_SEMA_USE_FUTEX, true) {
 				}
 				original_count = s.impl.count
 			}
-			if original_count == atomic_compare_exchange_strong(&s.impl.count, original_count-1, original_count) {
+			if original_count == atomic_compare_exchange_strong(&s.impl.count, original_count, original_count-1) {
 				return true
 			}
 		}
