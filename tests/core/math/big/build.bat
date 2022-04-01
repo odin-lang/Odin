@@ -10,8 +10,5 @@ echo ---
 echo Running core:math/big tests
 echo ---
 
-rem Fails
-:%PATH_TO_ODIN% build . %COMMON% -o:speed -out:%OUT_NAME%
-rem Passes
-%PATH_TO_ODIN% build . %COMMON% -o:size -out:%OUT_NAME%
+%PATH_TO_ODIN% build . %COMMON% -o:speed -out:%OUT_NAME%
 python3 test.py %TEST_ARGS%
