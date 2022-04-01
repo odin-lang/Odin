@@ -10,7 +10,7 @@ when #config(ODIN_SYNC_RECURSIVE_MUTEX_USE_FUTEX, true) {
 	_recursive_mutex_lock :: proc(m: ^Recursive_Mutex) {
 		tid := Futex(current_thread_id())
 		for {
-			prev_owner := atomic_compare_exchange_strong_explicit(&m.impl.owner, tid, 0, .Acquire, .Acquire)
+			prev_owner := atomic_compare_exchange_strong_explicit(&m.impl.owner, 0, tid, .Acquire, .Acquire)
 			switch prev_owner {
 			case 0, tid:
 				m.impl.recursion += 1
@@ -36,7 +36,7 @@ when #config(ODIN_SYNC_RECURSIVE_MUTEX_USE_FUTEX, true) {
 
 	_recursive_mutex_try_lock :: proc(m: ^Recursive_Mutex) -> bool {
 		tid := Futex(current_thread_id())
-		prev_owner := atomic_compare_exchange_strong_explicit(&m.impl.owner, tid, 0, .Acquire, .Acquire)
+		prev_owner := atomic_compare_exchange_strong_explicit(&m.impl.owner, 0, tid, .Acquire, .Acquire)
 		switch prev_owner {
 		case 0, tid:
 			m.impl.recursion += 1
