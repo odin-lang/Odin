@@ -449,6 +449,7 @@ bool check_builtin_procedure(CheckerContext *c, Operand *operand, Ast *call, i32
 	case BuiltinProc_objc_find_class: 
 	case BuiltinProc_objc_register_selector: 
 	case BuiltinProc_objc_register_class: 
+	case BuiltinProc_atomic_type_is_lock_free:
 		// NOTE(bill): The first arg may be a Type, this will be checked case by case
 		break;
 
@@ -3232,6 +3233,35 @@ bool check_builtin_procedure(CheckerContext *c, Operand *operand, Ast *call, i32
 		break;
 
 
+	case BuiltinProc_atomic_type_is_lock_free:
+		{
+			Ast *expr = ce->args[0];
+			Operand o = {};
+			check_expr_or_type(c, &o, expr);
+
+			if (o.mode == Addressing_Invalid || o.mode == Addressing_Builtin) {
+				return false;
+			}
+			if (o.type == nullptr || o.type == t_invalid || is_type_asm_proc(o.type)) {
+				error(o.expr, "Invalid argument to '%.*s'", LIT(builtin_name));
+				return false;
+			}
+			if (is_type_polymorphic(o.type)) {
+				error(o.expr, "'%.*s' of polymorphic type cannot be determined", LIT(builtin_name));
+				return false;
+			}
+			if (is_type_untyped(o.type)) {
+				error(o.expr, "'%.*s' of untyped type is not allowed", LIT(builtin_name));
+				return false;
+			}
+			Type *t = o.type;
+			bool is_lock_free = is_type_lock_free(t);
+
+			operand->mode = Addressing_Constant;
+			operand->type = t_untyped_bool;
+			operand->value = exact_value_bool(is_lock_free);
+			break;
+		}
 
 	case BuiltinProc_atomic_thread_fence:
 	case BuiltinProc_atomic_signal_fence:
