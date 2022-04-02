@@ -71,6 +71,8 @@ Atomic_Memory_Order :: enum {
 	Seq_Cst = 5,
 }
 
+atomic_type_is_lock_free :: proc($T: typeid) -> bool ---
+
 atomic_thread_fence :: proc(order: Atomic_Memory_Order) ---
 atomic_signal_fence :: proc(order: Atomic_Memory_Order) ---
 
