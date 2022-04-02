@@ -30,6 +30,7 @@ HBRUSH :: distinct HANDLE
 HGDIOBJ :: distinct HANDLE
 HBITMAP :: distinct HANDLE
 HGLOBAL :: distinct HANDLE
+HHOOK :: distinct HANDLE
 BOOL :: distinct b32
 BYTE :: distinct u8
 BOOLEAN :: distinct b8
@@ -96,6 +97,7 @@ LPPROCESS_INFORMATION :: ^PROCESS_INFORMATION
 PSECURITY_ATTRIBUTES :: ^SECURITY_ATTRIBUTES
 LPSECURITY_ATTRIBUTES :: ^SECURITY_ATTRIBUTES
 LPSTARTUPINFO :: ^STARTUPINFO
+LPTRACKMOUSEEVENT :: ^TRACKMOUSEEVENT
 VOID :: rawptr
 PVOID :: rawptr
 LPVOID :: rawptr
@@ -198,6 +200,24 @@ TIMERPROC :: #type proc "stdcall" (HWND, UINT, UINT_PTR, DWORD)
 
 WNDPROC :: #type proc "stdcall" (HWND, UINT, WPARAM, LPARAM) -> LRESULT
 
+HOOKPROC :: #type proc "stdcall" (code: c_int, wParam: WPARAM, lParam: LPARAM) -> LRESULT
+
+CWPRETSTRUCT :: struct {
+	lResult: LRESULT,
+	lParam: LPARAM,
+	wParam: WPARAM,
+	message: UINT,
+	hwnd: HWND,
+}
+
+KBDLLHOOKSTRUCT :: struct {
+	vkCode: DWORD,
+	scanCode: DWORD,
+	flags: DWORD,
+	time: DWORD,
+	dwExtraInfo: ULONG_PTR,
+}
+
 WNDCLASSA :: struct {
 	style: UINT,
 	lpfnWndProc: WNDPROC,
@@ -270,6 +290,13 @@ PAINTSTRUCT :: struct {
 	fRestore: BOOL,
 	fIncUpdate: BOOL,
 	rgbReserved: [32]BYTE,
+}
+
+TRACKMOUSEEVENT :: struct {
+	cbSize: DWORD,
+	dwFlags: DWORD,
+	hwndTrack: HWND,
+	dwHoverTime: DWORD,
 }
 
 WIN32_FIND_DATAW :: struct {
@@ -387,13 +414,6 @@ CS_BYTEALIGNWINDOW : UINT : 0x2000
 CS_GLOBALCLASS     : UINT : 0x4000
 CS_DROPSHADOW      : UINT : 0x0002_0000
 
-GWL_EXSTYLE    : c_int : -20
-GWLP_HINSTANCE : c_int : -6
-GWLP_ID        : c_int : -12
-GWL_STYLE      : c_int : -16
-GWLP_USERDATA  : c_int : -21
-GWLP_WNDPROC   : c_int : -4
-
 WS_BORDER           : UINT : 0x0080_0000
 WS_CAPTION          : UINT : 0x00C0_0000
 WS_CHILD            : UINT : 0x4000_0000
@@ -484,6 +504,48 @@ HWND_TOP       :: HWND( uintptr(0))     //  0
 HWND_BOTTOM    :: HWND( uintptr(1))     //  1
 HWND_TOPMOST   :: HWND(~uintptr(0))     // -1
 HWND_NOTOPMOST :: HWND(~uintptr(0) - 1) // -2
+
+// Window field offsets for GetWindowLong()
+GWL_STYLE   :: -16
+GWL_EXSTYLE :: -20
+GWL_ID      :: -12
+
+when ODIN_ARCH == .i386 {
+	GWL_WNDPROC    :: -4
+	GWL_HINSTANCE  :: -6
+	GWL_HWNDPARENT :: -8
+	GWL_USERDATA   :: -21
+}
+
+GWLP_WNDPROC    :: -4
+GWLP_HINSTANCE  :: -6
+GWLP_HWNDPARENT :: -8
+GWLP_USERDATA   :: -21
+GWLP_ID         :: -12
+
+// Class field offsets for GetClassLong()
+GCL_CBWNDEXTRA :: -18
+GCL_CBCLSEXTRA :: -20
+GCL_STYLE      :: -26
+GCW_ATOM       :: -32
+
+when ODIN_ARCH == .i386 {
+	GCL_MENUNAME      :: -8
+	GCL_HBRBACKGROUND :: -10
+	GCL_HCURSOR       :: -12
+	GCL_HICON         :: -14
+	GCL_HMODULE       :: -16
+	GCL_WNDPROC       :: -24
+	GCL_HICONSM       :: -34
+}
+
+GCLP_MENUNAME      :: -8
+GCLP_HBRBACKGROUND :: -10
+GCLP_HCURSOR       :: -12
+GCLP_HICON         :: -14
+GCLP_HMODULE       :: -16
+GCLP_WNDPROC       :: -24
+GCLP_HICONSM       :: -34
 
 // GetSystemMetrics() codes
 SM_CXSCREEN          :: 0
@@ -645,8 +707,76 @@ MK_MBUTTON  :: 0x0010
 MK_XBUTTON1 :: 0x0020
 MK_XBUTTON2 :: 0x0040
 
+// Value for rolling one detent
+WHEEL_DELTA :: 120
+
+// Setting to scroll one page for SPI_GET/SETWHEELSCROLLLINES
+WHEEL_PAGESCROLL :: max(UINT)
+
+// XButton values are WORD flags
+XBUTTON1 :: 0x0001
+XBUTTON2 :: 0x0002
+// Were there to be an XBUTTON3, its value would be 0x0004
+
+MAPVK_VK_TO_VSC    :: 0
+MAPVK_VSC_TO_VK    :: 1
+MAPVK_VK_TO_CHAR   :: 2
+MAPVK_VSC_TO_VK_EX :: 3
+MAPVK_VK_TO_VSC_EX :: 4
+
+TME_HOVER     :: 0x00000001
+TME_LEAVE     :: 0x00000002
+TME_NONCLIENT :: 0x00000010
+TME_QUERY     :: 0x40000000
+TME_CANCEL    :: 0x80000000
+HOVER_DEFAULT :: 0xFFFFFFFF
+
 USER_TIMER_MAXIMUM :: 0x7FFFFFFF
 USER_TIMER_MINIMUM :: 0x0000000A
+
+
+// SetWindowsHook() codes
+WH_MIN             :: -1
+WH_MSGFILTER       :: -1
+WH_JOURNALRECORD   :: 0
+WH_JOURNALPLAYBACK :: 1
+WH_KEYBOARD        :: 2
+WH_GETMESSAGE      :: 3
+WH_CALLWNDPROC     :: 4
+WH_CBT             :: 5
+WH_SYSMSGFILTER    :: 6
+WH_MOUSE           :: 7
+WH_HARDWARE        :: 8
+WH_DEBUG           :: 9
+WH_SHELL           :: 10
+WH_FOREGROUNDIDLE  :: 11
+WH_CALLWNDPROCRET  :: 12
+WH_KEYBOARD_LL     :: 13
+WH_MOUSE_LL        :: 14
+WH_MAX             :: 14
+WH_MINHOOK         :: WH_MIN
+WH_MAXHOOK         :: WH_MAX
+
+// Hook Codes
+HC_ACTION      :: 0
+HC_GETNEXT     :: 1
+HC_SKIP        :: 2
+HC_NOREMOVE    :: 3
+HC_NOREM       :: HC_NOREMOVE
+HC_SYSMODALON  :: 4
+HC_SYSMODALOFF :: 5
+
+// CBT Hook Codes
+HCBT_MOVESIZE     :: 0
+HCBT_MINMAX       :: 1
+HCBT_QS           :: 2
+HCBT_CREATEWND    :: 3
+HCBT_DESTROYWND   :: 4
+HCBT_ACTIVATE     :: 5
+HCBT_CLICKSKIPPED :: 6
+HCBT_KEYSKIPPED   :: 7
+HCBT_SYSCOMMAND   :: 8
+HCBT_SETFOCUS     :: 9
 
 _IDC_APPSTARTING := rawptr(uintptr(32650))
 _IDC_ARROW       := rawptr(uintptr(32512))
