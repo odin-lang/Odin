@@ -3392,6 +3392,21 @@ bool check_builtin_procedure(CheckerContext *c, Operand *operand, Ast *call, i32
 			check_expr_with_type_hint(c, &x, ce->args[1], elem);
 			check_assignment(c, &x, elem, builtin_name);
 
+			Type *t = type_deref(operand->type);
+			switch (id) {
+			case BuiltinProc_atomic_add:
+			case BuiltinProc_atomic_sub:
+				if (!is_type_numeric(t)) {
+					gbString str = type_to_string(t);
+					error(operand->expr, "Expected a numeric type for '%.*s', got %s", LIT(builtin_name), str);
+					gb_string_free(str);
+				} else if (is_type_different_to_arch_endianness(t)) {
+					gbString str = type_to_string(t);
+					error(operand->expr, "Expected a numeric type of the same platform endianness for '%.*s', got %s", LIT(builtin_name), str);
+					gb_string_free(str);
+				}
+			}
+
 			operand->type = elem;
 			operand->mode = Addressing_Value;
 			break;
@@ -3419,6 +3434,22 @@ bool check_builtin_procedure(CheckerContext *c, Operand *operand, Ast *call, i32
 				return false;
 			}
 
+			Type *t = type_deref(operand->type);
+			switch (id) {
+			case BuiltinProc_atomic_add_explicit:
+			case BuiltinProc_atomic_sub_explicit:
+				if (!is_type_numeric(t)) {
+					gbString str = type_to_string(t);
+					error(operand->expr, "Expected a numeric type for '%.*s', got %s", LIT(builtin_name), str);
+					gb_string_free(str);
+				} else if (is_type_different_to_arch_endianness(t)) {
+					gbString str = type_to_string(t);
+					error(operand->expr, "Expected a numeric type of the same platform endianness for '%.*s', got %s", LIT(builtin_name), str);
+					gb_string_free(str);
+				}
+				break;
+			}
+
 			operand->type = elem;
 			operand->mode = Addressing_Value;
 			break;
@@ -3438,6 +3469,13 @@ bool check_builtin_procedure(CheckerContext *c, Operand *operand, Ast *call, i32
 			check_expr_with_type_hint(c, &y, ce->args[2], elem);
 			check_assignment(c, &x, elem, builtin_name);
 			check_assignment(c, &y, elem, builtin_name);
+
+			Type *t = type_deref(operand->type);
+			if (!is_type_comparable(t)) {
+				gbString str = type_to_string(t);
+				error(operand->expr, "Expected a comparable type for '%.*s', got %s", LIT(builtin_name), str);
+				gb_string_free(str);
+			}
 
 			operand->mode = Addressing_OptionalOk;
 			operand->type = elem;
@@ -3466,6 +3504,13 @@ bool check_builtin_procedure(CheckerContext *c, Operand *operand, Ast *call, i32
 			}
 			if (!check_atomic_memory_order_argument(c, ce->args[4], builtin_name, &failure_memory_order, "failure ordering")) {
 				return false;
+			}
+
+			Type *t = type_deref(operand->type);
+			if (!is_type_comparable(t)) {
+				gbString str = type_to_string(t);
+				error(operand->expr, "Expected a comparable type for '%.*s', got %s", LIT(builtin_name), str);
+				gb_string_free(str);
 			}
 
 			bool invalid_combination = false;
