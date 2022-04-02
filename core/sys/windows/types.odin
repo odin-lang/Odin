@@ -96,6 +96,7 @@ LPPROCESS_INFORMATION :: ^PROCESS_INFORMATION
 PSECURITY_ATTRIBUTES :: ^SECURITY_ATTRIBUTES
 LPSECURITY_ATTRIBUTES :: ^SECURITY_ATTRIBUTES
 LPSTARTUPINFO :: ^STARTUPINFO
+LPTRACKMOUSEEVENT :: ^TRACKMOUSEEVENT
 VOID :: rawptr
 PVOID :: rawptr
 LPVOID :: rawptr
@@ -272,6 +273,13 @@ PAINTSTRUCT :: struct {
 	rgbReserved: [32]BYTE,
 }
 
+TRACKMOUSEEVENT :: struct {
+	cbSize: DWORD,
+	dwFlags: DWORD,
+	hwndTrack: HWND,
+	dwHoverTime: DWORD,
+}
+
 WIN32_FIND_DATAW :: struct {
 	dwFileAttributes: DWORD,
 	ftCreationTime: FILETIME,
@@ -387,13 +395,6 @@ CS_BYTEALIGNWINDOW : UINT : 0x2000
 CS_GLOBALCLASS     : UINT : 0x4000
 CS_DROPSHADOW      : UINT : 0x0002_0000
 
-GWL_EXSTYLE    : c_int : -20
-GWLP_HINSTANCE : c_int : -6
-GWLP_ID        : c_int : -12
-GWL_STYLE      : c_int : -16
-GWLP_USERDATA  : c_int : -21
-GWLP_WNDPROC   : c_int : -4
-
 WS_BORDER           : UINT : 0x0080_0000
 WS_CAPTION          : UINT : 0x00C0_0000
 WS_CHILD            : UINT : 0x4000_0000
@@ -484,6 +485,48 @@ HWND_TOP       :: HWND( uintptr(0))     //  0
 HWND_BOTTOM    :: HWND( uintptr(1))     //  1
 HWND_TOPMOST   :: HWND(~uintptr(0))     // -1
 HWND_NOTOPMOST :: HWND(~uintptr(0) - 1) // -2
+
+// Window field offsets for GetWindowLong()
+GWL_STYLE   :: -16
+GWL_EXSTYLE :: -20
+GWL_ID      :: -12
+
+when ODIN_ARCH == .i386 {
+	GWL_WNDPROC    :: -4
+	GWL_HINSTANCE  :: -6
+	GWL_HWNDPARENT :: -8
+	GWL_USERDATA   :: -21
+}
+
+GWLP_WNDPROC    :: -4
+GWLP_HINSTANCE  :: -6
+GWLP_HWNDPARENT :: -8
+GWLP_USERDATA   :: -21
+GWLP_ID         :: -12
+
+// Class field offsets for GetClassLong()
+GCL_CBWNDEXTRA :: -18
+GCL_CBCLSEXTRA :: -20
+GCL_STYLE      :: -26
+GCW_ATOM       :: -32
+
+when ODIN_ARCH == .i386 {
+	GCL_MENUNAME      :: -8
+	GCL_HBRBACKGROUND :: -10
+	GCL_HCURSOR       :: -12
+	GCL_HICON         :: -14
+	GCL_HMODULE       :: -16
+	GCL_WNDPROC       :: -24
+	GCL_HICONSM       :: -34
+}
+
+GCLP_MENUNAME      :: -8
+GCLP_HBRBACKGROUND :: -10
+GCLP_HCURSOR       :: -12
+GCLP_HICON         :: -14
+GCLP_HMODULE       :: -16
+GCLP_WNDPROC       :: -24
+GCLP_HICONSM       :: -34
 
 // GetSystemMetrics() codes
 SM_CXSCREEN          :: 0
@@ -644,6 +687,13 @@ MK_CONTROL  :: 0x0008
 MK_MBUTTON  :: 0x0010
 MK_XBUTTON1 :: 0x0020
 MK_XBUTTON2 :: 0x0040
+
+TME_HOVER     :: 0x00000001
+TME_LEAVE     :: 0x00000002
+TME_NONCLIENT :: 0x00000010
+TME_QUERY     :: 0x40000000
+TME_CANCEL    :: 0x80000000
+HOVER_DEFAULT :: 0xFFFFFFFF
 
 USER_TIMER_MAXIMUM :: 0x7FFFFFFF
 USER_TIMER_MINIMUM :: 0x0000000A
