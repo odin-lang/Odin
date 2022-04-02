@@ -131,6 +131,9 @@ foreign user32 {
 	GetKeyState :: proc(nVirtKey: c_int) -> SHORT ---
 	GetAsyncKeyState :: proc(vKey: c_int) -> SHORT ---
 
+	MapVirtualKeyA :: proc(uCode: UINT, uMapType: UINT) -> UINT ---
+	MapVirtualKeyW :: proc(uCode: UINT, uMapType: UINT) -> UINT ---
+
 	SetWindowsHookExA :: proc(idHook: c_int, lpfn: HOOKPROC, hmod: HINSTANCE, dwThreadId: DWORD) -> HHOOK ---
 	SetWindowsHookExW :: proc(idHook: c_int, lpfn: HOOKPROC, hmod: HINSTANCE, dwThreadId: DWORD) -> HHOOK ---
 	UnhookWindowsHookEx :: proc(hhk: HHOOK) -> BOOL ---
@@ -228,6 +231,22 @@ when ODIN_ARCH == .amd64 {
 	SetWindowLongPtrW :: GetWindowLongW
 }
 
-GET_SC_WPARAM :: #force_inline proc(wparam: WPARAM) -> i32 {
-	return i32(wparam) & 0xFFF0
+GET_SC_WPARAM :: #force_inline proc "contextless" (wParam: WPARAM) -> c_int {
+	return c_int(wParam) & 0xFFF0
+}
+
+GET_WHEEL_DELTA_WPARAM :: #force_inline proc "contextless" (wParam: WPARAM) -> c_short {
+	return cast(c_short)HIWORD(cast(DWORD)wParam)
+}
+
+GET_KEYSTATE_WPARAM :: #force_inline proc "contextless" (wParam: WPARAM) -> WORD {
+	return LOWORD(cast(DWORD)wParam)
+}
+
+GET_NCHITTEST_WPARAM :: #force_inline proc "contextless" (wParam: WPARAM) -> c_short {
+	return cast(c_short)LOWORD(cast(DWORD)wParam)
+}
+
+GET_XBUTTON_WPARAM ::  #force_inline proc "contextless" (wParam: WPARAM) -> WORD {
+	return HIWORD(cast(DWORD)wParam)
 }
