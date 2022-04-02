@@ -707,6 +707,23 @@ MK_MBUTTON  :: 0x0010
 MK_XBUTTON1 :: 0x0020
 MK_XBUTTON2 :: 0x0040
 
+// Value for rolling one detent
+WHEEL_DELTA :: 120
+
+// Setting to scroll one page for SPI_GET/SETWHEELSCROLLLINES
+WHEEL_PAGESCROLL :: max(UINT)
+
+// XButton values are WORD flags
+XBUTTON1 :: 0x0001
+XBUTTON2 :: 0x0002
+// Were there to be an XBUTTON3, its value would be 0x0004
+
+MAPVK_VK_TO_VSC    :: 0
+MAPVK_VSC_TO_VK    :: 1
+MAPVK_VK_TO_CHAR   :: 2
+MAPVK_VSC_TO_VK_EX :: 3
+MAPVK_VK_TO_VSC_EX :: 4
+
 TME_HOVER     :: 0x00000001
 TME_LEAVE     :: 0x00000002
 TME_NONCLIENT :: 0x00000010
