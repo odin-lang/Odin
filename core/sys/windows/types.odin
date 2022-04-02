@@ -30,6 +30,7 @@ HBRUSH :: distinct HANDLE
 HGDIOBJ :: distinct HANDLE
 HBITMAP :: distinct HANDLE
 HGLOBAL :: distinct HANDLE
+HHOOK :: distinct HANDLE
 BOOL :: distinct b32
 BYTE :: distinct u8
 BOOLEAN :: distinct b8
@@ -198,6 +199,24 @@ GetFileExMaxInfoLevel: GET_FILEEX_INFO_LEVELS : 1
 TIMERPROC :: #type proc "stdcall" (HWND, UINT, UINT_PTR, DWORD)
 
 WNDPROC :: #type proc "stdcall" (HWND, UINT, WPARAM, LPARAM) -> LRESULT
+
+HOOKPROC :: #type proc "stdcall" (code: c_int, wParam: WPARAM, lParam: LPARAM) -> LRESULT
+
+CWPRETSTRUCT :: struct {
+	lResult: LRESULT,
+	lParam: LPARAM,
+	wParam: WPARAM,
+	message: UINT,
+	hwnd: HWND,
+}
+
+KBDLLHOOKSTRUCT :: struct {
+	vkCode: DWORD,
+	scanCode: DWORD,
+	flags: DWORD,
+	time: DWORD,
+	dwExtraInfo: ULONG_PTR,
+}
 
 WNDCLASSA :: struct {
 	style: UINT,
@@ -697,6 +716,50 @@ HOVER_DEFAULT :: 0xFFFFFFFF
 
 USER_TIMER_MAXIMUM :: 0x7FFFFFFF
 USER_TIMER_MINIMUM :: 0x0000000A
+
+
+// SetWindowsHook() codes
+WH_MIN             :: -1
+WH_MSGFILTER       :: -1
+WH_JOURNALRECORD   :: 0
+WH_JOURNALPLAYBACK :: 1
+WH_KEYBOARD        :: 2
+WH_GETMESSAGE      :: 3
+WH_CALLWNDPROC     :: 4
+WH_CBT             :: 5
+WH_SYSMSGFILTER    :: 6
+WH_MOUSE           :: 7
+WH_HARDWARE        :: 8
+WH_DEBUG           :: 9
+WH_SHELL           :: 10
+WH_FOREGROUNDIDLE  :: 11
+WH_CALLWNDPROCRET  :: 12
+WH_KEYBOARD_LL     :: 13
+WH_MOUSE_LL        :: 14
+WH_MAX             :: 14
+WH_MINHOOK         :: WH_MIN
+WH_MAXHOOK         :: WH_MAX
+
+// Hook Codes
+HC_ACTION      :: 0
+HC_GETNEXT     :: 1
+HC_SKIP        :: 2
+HC_NOREMOVE    :: 3
+HC_NOREM       :: HC_NOREMOVE
+HC_SYSMODALON  :: 4
+HC_SYSMODALOFF :: 5
+
+// CBT Hook Codes
+HCBT_MOVESIZE     :: 0
+HCBT_MINMAX       :: 1
+HCBT_QS           :: 2
+HCBT_CREATEWND    :: 3
+HCBT_DESTROYWND   :: 4
+HCBT_ACTIVATE     :: 5
+HCBT_CLICKSKIPPED :: 6
+HCBT_KEYSKIPPED   :: 7
+HCBT_SYSCOMMAND   :: 8
+HCBT_SETFOCUS     :: 9
 
 _IDC_APPSTARTING := rawptr(uintptr(32650))
 _IDC_ARROW       := rawptr(uintptr(32512))
