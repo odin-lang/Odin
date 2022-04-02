@@ -27,6 +27,8 @@ _O_SYNC      :: 0o4010000
 _O_CLOEXEC   :: 0o2000000
 _O_PATH      :: 0o10000000
 
+_AT_FDCWD :: -100
+
 _open :: proc(name: string, flags: File_Flags, perm: File_Mode) -> (Handle, Error) {
 	cstr := strings.clone_to_cstring(name, context.temp_allocator)
 
@@ -250,8 +252,12 @@ _lchown :: proc(name: string, uid, gid: int) -> Error {
 }
 
 _chtimes :: proc(name: string, atime, mtime: time.Time) -> Error {
-	//TODO
-	return nil
+	name_cstr := strings.clone_to_cstring(name, context.temp_allocator)
+	times := [2]Unix_File_Time {
+		{ atime._nsec, 0 },
+		{ mtime._nsec, 0 },
+	}
+	return _ok_or_error(unix.sys_utimensat(_AT_FDCWD, name_cstr, &times, 0))
 }
 
 _exists :: proc(name: string) -> bool {

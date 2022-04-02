@@ -1779,6 +1779,12 @@ sys_fork :: proc() -> int {
 	}
 }
 
+// NOTE: Unsure about if this works directly on 32 bit archs. It may need 32 bit version of the time struct.
+//       As of Linux 5.1, there is a utimensat_time64 function.  Maybe use this in the future?
+sys_utimensat :: proc(dfd: int, path: cstring, times: rawptr, flags: int) -> int {
+	return int(intrinsics.syscall(SYS_utimensat, uintptr(dfd), uintptr(rawptr(path)), uintptr(times), uintptr(flags)))
+}
+
 get_errno :: proc(res: int) -> i32 {
 	if res < 0 && res > -4096 {
 		return i32(-res)
