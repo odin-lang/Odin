@@ -831,8 +831,8 @@ bool check_builtin_procedure(CheckerContext *c, Operand *operand, Ast *call, i32
 			}
 
 		} else if (name == "assert") {
-			if (ce->args.count != 1) {
-				error(call, "'#assert' expects 1 argument, got %td", ce->args.count);
+			if (ce->args.count != 1 && ce->args.count != 2) {
+				error(call, "'#assert' expects either 1 or 2 arguments, got %td", ce->args.count);
 				return false;
 			}
 			if (!is_type_boolean(operand->type) || operand->mode != Addressing_Constant) {
@@ -841,15 +841,37 @@ bool check_builtin_procedure(CheckerContext *c, Operand *operand, Ast *call, i32
 				gb_string_free(str);
 				return false;
 			}
+			if (ce->args.count == 2) {
+				Ast *arg = unparen_expr(ce->args[1]);
+				if (arg == nullptr || arg->kind != Ast_BasicLit || arg->BasicLit.token.kind != Token_String) {
+					gbString str = expr_to_string(arg);
+					error(call, "'%s' is not a constant string", str);
+					gb_string_free(str);
+					return false;
+				}
+			}
+
 			if (!operand->value.value_bool) {
-				gbString arg = expr_to_string(ce->args[0]);
-				error(call, "Compile time assertion: %s", arg);
+				gbString arg1 = expr_to_string(ce->args[0]);
+				gbString arg2 = {};
+
+				if (ce->args.count == 1) {
+					error(call, "Compile time assertion: %s", arg1);
+				} else {
+					arg2 = expr_to_string(ce->args[1]);
+					error(call, "Compile time assertion: %s (%s)", arg1, arg2);
+				}			
+				
 				if (c->proc_name != "") {
 					gbString str = type_to_string(c->curr_proc_sig);
 					error_line("\tCalled within '%.*s' :: %s\n", LIT(c->proc_name), str);
 					gb_string_free(str);
 				}
-				gb_string_free(arg);
+
+				gb_string_free(arg1);
+				if (ce->args.count == 2) {
+					gb_string_free(arg2);
+				}
 			}
 
 			operand->type = t_untyped_bool;
