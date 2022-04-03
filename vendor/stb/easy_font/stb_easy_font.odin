@@ -12,12 +12,12 @@ draw_segs :: proc(x, y: f32, segs: []u8, vertical: bool, c: color, vbuf: []byte,
 	x, y, offset := x, y, offset
 	for i in 0..<len(segs) {
 		n := segs[i] & 7
-		x += f32((segs[i]>>31) & 1)
+		x += f32((segs[i]>>3) & 1)
 		if n != 0 && offset+64 <= len(vbuf) {
 			y0 := y + f32(segs[i]>>4)
 			for j in 0..<4 {
-				(^f32)(&vbuf[offset+0])^    = x  + ((vertical ? 1 : len) if j==1 || j==2 else 0)
-				(^f32)(&vbuf[offset+4])^    = y0 + ((vertical ? len : 1) if     j >= 2   else 0)
+				(^f32)(&vbuf[offset+0])^    = x  + f32((vertical ? 1 : n) if j==1 || j==2 else 0)
+				(^f32)(&vbuf[offset+4])^    = y0 + f32((vertical ? n : 1) if     j >= 2   else 0)				
 				(^f32)(&vbuf[offset+8])^    = 0
 				(^color)(&vbuf[offset+12])^ = c
 				offset += 16
@@ -53,7 +53,7 @@ print :: proc(x, y: f32, text: string, color: color, vertex_buffer: []byte) -> i
 			num_h := charinfo[c-32 + 1].h_seg - h_seg
 			num_v := charinfo[c-32 + 1].v_seg - v_seg
 			offset = draw_segs(x, y_ch, hseg[h_seg:][:num_h], false, color, vertex_buffer, offset)
-			offset = draw_segs(x, y_ch, hseg[v_seg:][:num_v], true, color, vertex_buffer, offset)
+			offset = draw_segs(x, y_ch, vseg[v_seg:][:num_v], true, color, vertex_buffer, offset)
 			x += f32(advance & 15)
 			x += _spacing_val
 		}
