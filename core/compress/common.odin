@@ -128,7 +128,6 @@ Deflate_Error :: enum {
 	BType_3,
 }
 
-
 // General I/O context for ZLIB, LZW, etc.
 Context_Memory_Input :: struct #packed {
 	input_data:        []u8,
@@ -150,7 +149,6 @@ when size_of(rawptr) == 8 {
 	// e.g. `-target:windows_i386`
 	#assert(size_of(Context_Memory_Input) == 52)
 }
-
 
 Context_Stream_Input :: struct #packed {
 	input_data:        []u8,
@@ -184,8 +182,6 @@ Context_Stream_Input :: struct #packed {
 	Bit and byte readers may be merged so that reading bytes will grab them from the bit buffer first.
 	This simplifies end-of-stream handling where bits may be left in the bit buffer.
 */
-
-// TODO: Make these return compress.Error errors.
 
 input_size_from_memory :: proc(z: ^Context_Memory_Input) -> (res: i64, err: Error) {
 	return i64(len(z.input_data)), nil
