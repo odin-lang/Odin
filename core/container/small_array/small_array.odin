@@ -25,14 +25,14 @@ slice :: proc(a: ^$A/Small_Array($N, $T)) -> []T {
 }
 
 
-get :: proc(a: $A/Small_Array($N, $T), index: int, loc := #caller_location) -> T {
+get :: proc(a: $A/Small_Array($N, $T), index: int) -> T {
 	return a.data[index]
 }
-get_ptr :: proc(a: $A/Small_Array($N, $T), index: int, loc := #caller_location) -> ^T {
+get_ptr :: proc(a: ^$A/Small_Array($N, $T), index: int) -> ^T {
 	return &a.data[index]
 }
 
-set :: proc(a: ^$A/Small_Array($N, $T), index: int, item: T, loc := #caller_location) {
+set :: proc(a: ^$A/Small_Array($N, $T), index: int, item: T) {
 	a.data[index] = item
 }
 
