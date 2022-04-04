@@ -1500,7 +1500,7 @@ run_png_suite :: proc(t: ^testing.T, suite: []PNG_Test) -> (subtotal: int) {
 				passed &= dims_pass
 
 				hash   := hash.crc32(pixels)
-				error  = fmt.tprintf("%v test %v hash is %08x, expected %08x.", file.file, count, hash, test.hash)
+				error  = fmt.tprintf("%v test %v hash is %08x, expected %08x with %v.", file.file, count, hash, test.hash, test.options)
 				expect(t, test.hash == hash, error)
 
 				passed &= test.hash == hash
