@@ -58,6 +58,13 @@ to_valid_utf8 :: proc(s, replacement: string, allocator := context.allocator) ->
 	return to_string(b)
 }
 
+/*
+	returns the input string `s` with all runes set to lowered case
+	always allocates using the `allocator`
+
+	strings.to_lower("test") -> test	
+	strings.to_lower("Test") -> test	
+*/
 to_lower :: proc(s: string, allocator := context.allocator) -> string {
 	b: Builder
 	init_builder(&b, 0, len(s), allocator)
@@ -66,6 +73,14 @@ to_lower :: proc(s: string, allocator := context.allocator) -> string {
 	}
 	return to_string(b)
 }
+
+/*
+	returns the input string `s` with all runes set to upper case
+	always allocates using the `allocator`
+
+	strings.to_lower("test") -> TEST
+	strings.to_lower("Test") -> TEST
+*/
 to_upper :: proc(s: string, allocator := context.allocator) -> string {
 	b: Builder
 	init_builder(&b, 0, len(s), allocator)
@@ -75,13 +90,13 @@ to_upper :: proc(s: string, allocator := context.allocator) -> string {
 	return to_string(b)
 }
 
-
-
-
+// returns true when the `c` rune is a space, '-' or '_' 
+// useful when treating strings like words in a text editor or html paths 
 is_delimiter :: proc(c: rune) -> bool {
 	return c == '-' || c == '_' || is_space(c)
 }
 
+// returns true when the `r` rune is a non alpha or `unicode.is_space` rune
 is_separator :: proc(r: rune) -> bool {
 	if r <= 0x7f {
 		switch r {
@@ -101,7 +116,10 @@ is_separator :: proc(r: rune) -> bool {
 	return unicode.is_space(r)
 }
 
-
+/*
+	iterator that loops through the string and calls the callback with the `prev`, `curr` and `next` rune
+	on empty string `s` the callback gets called once with empty runes
+*/
 string_case_iterator :: proc(w: io.Writer, s: string, callback: proc(w: io.Writer, prev, curr, next: rune)) {
 	prev, curr: rune
 	for next in s {
@@ -122,8 +140,9 @@ string_case_iterator :: proc(w: io.Writer, s: string, callback: proc(w: io.Write
 	}
 }
 
-
 to_lower_camel_case :: to_camel_case
+
+// converts the `s` string to "lowerCamelCase"
 to_camel_case :: proc(s: string, allocator := context.allocator) -> string {
 	s := s
 	s = trim_space(s)
@@ -147,6 +166,8 @@ to_camel_case :: proc(s: string, allocator := context.allocator) -> string {
 }
 
 to_upper_camel_case :: to_pascal_case
+
+// converts the `s` string to "PascalCase"
 to_pascal_case :: proc(s: string, allocator := context.allocator) -> string {
 	s := s
 	s = trim_space(s)
@@ -169,6 +190,15 @@ to_pascal_case :: proc(s: string, allocator := context.allocator) -> string {
 	return to_string(b)
 }
 
+/* 
+	returns the `s` string to words seperated by the given `delimiter` rune
+	all runes will be upper or lowercased based on the `all_uppercase` bool
+
+	strings.to_delimiter_case("Hello World", '_', false) -> hello_world
+	strings.to_delimiter_case("Hello World", ' ', true) -> HELLO WORLD
+	strings.to_delimiter_case("Hello World", ' ', true) -> HELLO WORLD
+	strings.to_delimiter_case("aBC", '_', false) -> a_b_c
+*/
 to_delimiter_case :: proc(s: string, delimiter: rune, all_upper_case: bool, allocator := context.allocator) -> string {
 	s := s
 	s = trim_space(s)
@@ -208,24 +238,34 @@ to_delimiter_case :: proc(s: string, delimiter: rune, all_upper_case: bool, allo
 	return to_string(b)
 }
 
-
+/* 
+	converts the `s` string to "snake_case" with all runes lowercased
+	
+	strings.to_snake_case("HelloWorld") -> hello_world
+	strings.to_snake_case("Hello World") -> hello_world
+*/
 to_snake_case :: proc(s: string, allocator := context.allocator) -> string {
 	return to_delimiter_case(s, '_', false, allocator)
 }
 
 to_screaming_snake_case :: to_upper_snake_case
+
+// converts the `s` string to "SNAKE_CASE" with all runes uppercased
 to_upper_snake_case :: proc(s: string, allocator := context.allocator) -> string {
 	return to_delimiter_case(s, '_', true, allocator)
 }
 
+// converts the `s` string to "kebab-case" with all runes lowercased
 to_kebab_case :: proc(s: string, allocator := context.allocator) -> string {
 	return to_delimiter_case(s, '-', false, allocator)
 }
 
-to_upper_case :: proc(s: string, allocator := context.allocator) -> string {
+// converts the `s` string to "KEBAB-CASE" with all runes uppercased
+to_upper_kebab_case :: proc(s: string, allocator := context.allocator) -> string {
 	return to_delimiter_case(s, '-', true, allocator)
 }
 
+// converts the `s` string to "Ada_case"
 to_ada_case :: proc(s: string, allocator := context.allocator) -> string {
 	delimiter :: '_'
 
