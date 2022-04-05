@@ -2550,6 +2550,7 @@ int main(int arg_count, char const **arg_ptr) {
 	String command = args[1];
 	String init_filename = {};
 	String run_args_string = {};
+	isize  last_non_run_arg = args.count;
 
 	bool run_output = false;
 	if (command == "run" || command == "test") {
@@ -2565,7 +2566,6 @@ int main(int arg_count, char const **arg_ptr) {
 		Array<String> run_args = array_make<String>(heap_allocator(), 0, arg_count);
 		defer (array_free(&run_args));
 
-		isize last_non_run_arg = args.count;
 		for_array(i, args) {
 			if (args[i] == "--") {
 				last_non_run_arg = i;
@@ -2675,7 +2675,15 @@ int main(int arg_count, char const **arg_ptr) {
 		// The command must be build, run, test, check, or another that takes a directory or filename.
 		if (!path_is_directory(init_filename)) {
 			// Input package is a filename. We allow this only if `-file` was given, otherwise we exit with an error message.
-			if (!(args.count > 3 && args[3] == "-file")) {
+			bool single_file_package = false;
+			for_array(i, args) {
+				if (i >= 3 && i <= last_non_run_arg && args[i] == "-file") {
+					single_file_package = true;
+					break;
+				}
+			}
+
+			if (!single_file_package) {
 				gb_printf_err("ERROR: `%.*s %.*s` takes a package as its first argument.\n", LIT(args[0]), LIT(command));
 				gb_printf_err("Did you mean `%.*s %.*s %.*s -file`?\n", LIT(args[0]), LIT(command), LIT(init_filename));
 				gb_printf_err("The `-file` flag tells it to treat a file as a self-contained package.\n");
