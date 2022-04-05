@@ -19,7 +19,7 @@ jobs:
         shell: cmd
         run: |
           call "C:\Program Files (x86)\Microsoft Visual Studio\2019\Enterprise\VC\Auxiliary\Build\vcvars64.bat
-          odin run examples/demo/demo.odin
+          odin run examples/demo
       - name: Copy artifacts
         run: |
           rm bin/llvm/windows/LLVM-C.lib
@@ -45,7 +45,7 @@ jobs:
       - name: build odin
         run: make nightly
       - name: Odin run
-        run: ./odin run examples/demo/demo.odin
+        run: ./odin run examples/demo
       - name: Copy artifacts
         run: |
           mkdir dist
@@ -72,7 +72,7 @@ jobs:
       - name: build odin
         run: make nightly
       - name: Odin run
-        run: ./odin run examples/demo/demo.odin
+        run: ./odin run examples/demo
       - name: Copy artifacts
         run: |
           mkdir dist
