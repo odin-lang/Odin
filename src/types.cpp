@@ -2218,6 +2218,17 @@ bool elem_type_can_be_constant(Type *t) {
 	return true;
 }
 
+bool is_type_lock_free(Type *t) {
+	t = core_type(t);
+	if (t == t_invalid) {
+		return false;
+	}
+	i64 sz = type_size_of(t);
+	// TODO(bill): Figure this out correctly
+	return sz <= build_context.max_align;
+}
+
+
 
 bool is_type_comparable(Type *t) {
 	t = base_type(t);
