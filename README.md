@@ -58,6 +58,10 @@ main :: proc() {
 
 Instructions for downloading and installing the Odin compiler and libraries.
 
+#### [Nightly Builds]https://odin-lang.org/docs/nightly/)
+
+Get the latest nightly builds of Odin.
+
 ### Learning Odin
 
 #### [Overview of Odin](https://odin-lang.org/docs/overview)
@@ -68,6 +72,10 @@ An overview of the Odin programming language.
 
 Answers to common questions about Odin.
 
+#### [Packages](https://pkg.odin-lang.org/)
+
+Documentation for all the official packages part of the [core](https://pkg.odin-lang.org/core/) and [vendor](https://pkg.odin-lang.org/vendor/) library collections.
+
 #### [The Odin Wiki](https://github.com/odin-lang/Odin/wiki)
 
 A wiki maintained by the Odin community.
@@ -75,12 +83,6 @@ A wiki maintained by the Odin community.
 #### [Odin Discord](https://discord.gg/sVBPHEv)
 
 Get live support and talk with other odiners on the Odin Discord.
-
-### References
-
-#### [Language Specification](https://odin-lang.org/docs/spec/)
-
-The official Odin Language specification.
 
 ### Articles
 
