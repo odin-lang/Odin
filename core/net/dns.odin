@@ -17,6 +17,7 @@
 package net
 
 import "core:mem"
+import "core:slice"
 import "core:strings"
 import "core:time"
 import "core:os"
@@ -288,10 +289,8 @@ get_dns_records_from_nameservers :: proc(hostname: string, type: DNS_Record_Type
 	return
 }
 
-// `records` slice is also destroyed.
-destroy_dns_records :: proc(records: []DNS_Record, allocator := context.allocator) {
-	context.allocator = allocator
-
+// `records` is not destroyed.
+_destroy_dns_records :: proc(records: []DNS_Record) {
 	for rec in records {
 		switch r in rec {
 		case DNS_Record_IP4:
@@ -321,7 +320,12 @@ destroy_dns_records :: proc(records: []DNS_Record, allocator := context.allocato
 			delete(r.target)
 		}
 	}
+}
 
+// `records` slice is also destroyed.
+destroy_dns_records :: proc(records: []DNS_Record, allocator := context.allocator) {
+	context.allocator = allocator
+	_destroy_dns_records(records)
 	delete(records, allocator)
 }
 
@@ -714,10 +718,6 @@ parse_record :: proc(packet: []u8, cur_off: ^int, filter: DNS_Record_Type = nil)
 				return
 			}
 
-			priority: u16be = mem.slice_data_cast([]u16be, data)[0]
-			weight:   u16be = mem.slice_data_cast([]u16be, data)[1]
-			port:     u16be = mem.slice_data_cast([]u16be, data)[2]
-			target, _ := decode_hostname(packet, data_off + (size_of(u16be) * 3)) or_return
 
 			// NOTE(tetra): Srv record name should be of the form '_servicename._protocol.hostname'
 			// The record name is the name of the record.
@@ -732,6 +732,10 @@ parse_record :: proc(packet: []u8, cur_off: ^int, filter: DNS_Record_Type = nil)
 				return
 			}
 			service_name, protocol_name := parts[0], parts[1]
+			priority: u16be = mem.slice_data_cast([]u16be, data)[0]
+			weight:   u16be = mem.slice_data_cast([]u16be, data)[1]
+			port:     u16be = mem.slice_data_cast([]u16be, data)[2]
+			target, _ := decode_hostname(packet, data_off + (size_of(u16be) * 3)) or_return
 
 			_record = DNS_Record_SRV{
 				base = DNS_Record_Base{
@@ -800,14 +804,13 @@ parse_response :: proc(response: []u8, filter: DNS_Record_Type = nil, allocator 
 		return
 	}
 
-	_records := make([dynamic]DNS_Record, 0)
-
 	dns_hdr_chunks := mem.slice_data_cast([]u16be, response[:header_size_bytes])
 	hdr := unpack_dns_header(dns_hdr_chunks[0], dns_hdr_chunks[1])
 	if !hdr.is_response {
 		return
 	}
 
+	// Expecting to only get back the 1 question we sent
 	question_count := int(dns_hdr_chunks[2])
 	if question_count != 1 {
 		return
@@ -830,44 +833,77 @@ parse_response :: proc(response: []u8, filter: DNS_Record_Type = nil, allocator 
 		cur_idx += hn_sz + dq_sz
 	}
 
+	_records := [512]DNS_Record{}
+	record_count := 0
 	for i := 0; i < answer_count; i += 1 {
 		if cur_idx == len(response) {
-			continue
+			_destroy_dns_records(_records[:])
+			return
 		}
 
-		rec := parse_record(response, &cur_idx, filter) or_return
+		rec, r_ok := parse_record(response, &cur_idx, filter)
+		if !r_ok {
+			_destroy_dns_records(_records[:])
+			return
+		}
 		if rec == nil {
 			continue
 		}
+		if record_count >= len(_records) {
+			_destroy_dns_records(_records[:])
+			return
+		}
 
-		append(&_records, rec)
+		_records[record_count] = rec
+		record_count += 1
 	}
 
 	for i := 0; i < authority_count; i += 1 {
 		if cur_idx == len(response) {
-			continue
+			_destroy_dns_records(_records[:])
+			return
 		}
 
-		rec := parse_record(response, &cur_idx, filter) or_return
+		rec, r_ok := parse_record(response, &cur_idx, filter)
+		if !r_ok {
+			_destroy_dns_records(_records[:])
+			return
+		}
 		if rec == nil {
 			continue
 		}
+		if record_count >= len(_records) {
+			_destroy_dns_records(_records[:])
+			return
+		}
 
-		append(&_records, rec)
+		_records[record_count] = rec
+		record_count += 1
 	}
 
 	for i := 0; i < additional_count; i += 1 {
 		if cur_idx == len(response) {
-			continue
+			_destroy_dns_records(_records[:])
+			return
 		}
 
-		rec := parse_record(response, &cur_idx, filter) or_return
+		rec, r_ok := parse_record(response, &cur_idx, filter)
+		if !r_ok {
+			_destroy_dns_records(_records[:])
+			return
+		}
 		if rec == nil {
 			continue
 		}
+		if record_count >= len(_records) {
+			_destroy_dns_records(_records[:])
+			return
+		}
 
-		append(&_records, rec)
+		_records[record_count] = rec
+		record_count += 1
 	}
 
-	return _records[:], true
+	out_records := slice.clone(_records[:record_count])
+	return out_records, true
 }
