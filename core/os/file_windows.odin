@@ -320,9 +320,6 @@ stderr := get_std_handle(uint(win32.STD_ERROR_HANDLE))
 
 get_std_handle :: proc "contextless" (h: uint) -> Handle {
 	fd := win32.GetStdHandle(win32.DWORD(h))
-	when size_of(uintptr) == 8 {
-		win32.SetHandleInformation(fd, win32.HANDLE_FLAG_INHERIT, 0)
-	}
 	return Handle(fd)
 }
 
