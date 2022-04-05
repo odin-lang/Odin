@@ -9,6 +9,7 @@ import "core:c"
 import "core:strconv"
 import "core:intrinsics"
 import "core:sys/unix"
+import "core:mem"
 
 Handle    :: distinct i32
 Pid       :: distinct i32
@@ -173,6 +174,13 @@ SEEK_END   :: 2
 SEEK_DATA  :: 3
 SEEK_HOLE  :: 4
 SEEK_MAX   :: SEEK_HOLE
+
+PROT_READ  :: 1
+PROT_WRITE :: 2
+PROT_EXEC  :: 4
+
+MAP_PRIVATE   :: 0x2
+MAP_ANONYMOUS :: 0x20
 
 // NOTE(zangent): These are OS specific!
 // Do not mix these up!
@@ -403,6 +411,18 @@ _unix_mkdir :: proc(path: cstring, mode: u32) -> int {
 	}
 }
 
+_unix_mmap :: proc(addr: rawptr, length: uint, prot: c.int, flags: c.int, fd: c.int, offset: int) -> int {
+	return int(intrinsics.syscall(unix.SYS_mmap, uintptr(addr), uintptr(length), uintptr(prot), uintptr(flags), uintptr(fd), uintptr(offset)))
+}
+
+_unix_mremap :: proc(old_addr: rawptr, old_length: uint, new_length: uint, flags: c.int, new_addr: rawptr) -> int {
+	return int(intrinsics.syscall(unix.SYS_mremap, uintptr(old_addr), uintptr(old_length), uintptr(new_length), uintptr(flags), uintptr(new_addr)))
+}
+
+_unix_munmap :: proc(addr: rawptr, length: uint) -> int {
+	return int(intrinsics.syscall(unix.SYS_munmap, uintptr(addr), uintptr(length)))
+}
+
 foreign libc {
 	@(link_name="__errno_location") __errno_location    :: proc() -> ^int ---
 
@@ -446,6 +466,7 @@ _get_errno :: proc(res: int) -> Errno {
 get_last_error :: proc() -> int {
 	return __errno_location()^
 }
+
 
 personality :: proc(persona: u64) -> (Errno) {
 	res := _unix_personality(persona)
@@ -752,6 +773,51 @@ access :: proc(path: string, mask: int) -> (bool, Errno) {
 	return true, ERROR_NONE
 }
 
+when ODIN_NO_CRT {
+
+// TODO(cloin): These suck. Make a better virtual mem pool manager
+heap_alloc :: proc(size: int) -> rawptr {
+	assert(size >= 0)
+	data := _unix_mmap(nil, c.size_t(size + size_of(u64)), PROT_READ | PROT_WRITE, MAP_PRIVATE | MAP_ANONYMOUS, 0, 0)
+	dataptr := rawptr(uintptr(data))
+	if data <= 0 {
+		return dataptr
+	}
+
+	(^u64)(dataptr)^ = u64(size)
+	outptr := rawptr(uintptr(data) + size_of(u64))
+	mem.zero(outptr, size)
+	return outptr
+}
+
+heap_resize :: proc(ptr: rawptr, new_size: int) -> rawptr {
+	// NOTE: _unix_realloc doesn't guarantee new memory will be zeroed on
+	// POSIX platforms. Ensure your caller takes this into account.
+
+	inptr := rawptr(uintptr(ptr) - size_of(u64))
+	old_size := (^u64)(inptr)^
+	data := _unix_mremap(inptr, uint(old_size), uint(new_size), MAP_PRIVATE | MAP_ANONYMOUS, nil)
+	dataptr := rawptr(uintptr(data))
+	if (data <= 0) {
+		return dataptr
+	}
+
+	(^u64)(dataptr)^ = u64(new_size)
+	outptr := rawptr(uintptr(dataptr) + size_of(u64))
+	return outptr
+}
+
+heap_free :: proc(ptr: rawptr) {
+	if ptr == nil {
+		return
+	}
+
+	inptr := rawptr(uintptr(ptr) - size_of(u64))
+	old_size := (^u64)(inptr)^
+	_unix_munmap(ptr, c.size_t(old_size))
+}
+
+} else {
 heap_alloc :: proc(size: int) -> rawptr {
 	assert(size >= 0)
 	return _unix_calloc(1, c.size_t(size))
@@ -766,6 +832,8 @@ heap_resize :: proc(ptr: rawptr, new_size: int) -> rawptr {
 heap_free :: proc(ptr: rawptr) {
 	_unix_free(ptr)
 }
+}
+
 
 getenv :: proc(name: string) -> (string, bool) {
 	path_str := strings.clone_to_cstring(name, context.temp_allocator)
@@ -805,9 +873,17 @@ set_current_directory :: proc(path: string) -> (err: Errno) {
 	return ERROR_NONE
 }
 
+when ODIN_NO_CRT {
+exit :: proc (code: int) -> ! {
+	runtime._cleanup_runtime_contextless()
+	intrinsics.syscall(unix.SYS_exit, c.int(code))
+	unreachable()
+}
+} else {
 exit :: proc "contextless" (code: int) -> ! {
 	runtime._cleanup_runtime_contextless()
 	_unix_exit(c.int(code))
+}
 }
 
 current_thread_id :: proc "contextless" () -> int {

@@ -35,6 +35,13 @@ void lb_add_foreign_library_path(lbModule *m, Entity *e) {
 			continue;
 		}
 
+		// If the user has specified no_crt here, they probably don't want libc.
+		// Doing this, rather than going through and trying to enforce it per
+		// foreign block in core, as an additional safety measure
+		if (build_context.no_crt && str_eq(STR_LIT("c"), library_path)) {
+			continue;
+		}
+
 		bool ok = true;
 		for_array(path_index, m->foreign_library_paths) {
 			String path = m->foreign_library_paths[path_index];
@@ -489,17 +496,17 @@ lbValue lb_gen_map_header(lbProcedure *p, lbValue map_val_ptr, Type *map_type) {
 	GB_ASSERT(map_type->Map.entry_type->kind == Type_Struct);
 	map_type->Map.entry_type->cached_size = -1;
 	map_type->Map.entry_type->Struct.are_offsets_set = false;
-	
+
 	i64 entry_size   = type_size_of  (map_type->Map.entry_type);
 	i64 entry_align  = type_align_of (map_type->Map.entry_type);
-	
+
 	i64 key_offset = type_offset_of(map_type->Map.entry_type, 2);
 	i64 key_size   = type_size_of  (map_type->Map.key);
 
 	i64 value_offset = type_offset_of(map_type->Map.entry_type, 3);
 	i64 value_size   = type_size_of  (map_type->Map.value);
-	
-	
+
+
 	Type *map_header_base = base_type(t_map_header);
 	GB_ASSERT(map_header_base->Struct.fields.count == 8);
 	Type *raw_map_ptr_type = map_header_base->Struct.fields[0]->type;
@@ -512,10 +519,10 @@ lbValue lb_gen_map_header(lbProcedure *p, lbValue map_val_ptr, Type *map_type) {
 	const_values[5] = lb_const_int(p->module, t_int,        key_size)    .value;
 	const_values[6] = lb_const_int(p->module, t_uintptr,    value_offset).value;
 	const_values[7] = lb_const_int(p->module, t_int,        value_size)  .value;
-	
+
 	LLVMValueRef const_value = llvm_const_named_struct(p->module, t_map_header, const_values, gb_count_of(const_values));
 	LLVMBuildStore(p->builder, const_value, h.addr.value);
-	
+
 	// NOTE(bill): Removes unnecessary allocation if split gep
 	lbValue gep0 = lb_emit_struct_ep(p, h.addr, 0);
 	lbValue m = lb_emit_conv(p, map_val_ptr, type_deref(gep0.type));
@@ -792,9 +799,9 @@ lbProcedure *lb_create_startup_runtime(lbModule *main_module, lbProcedure *start
 			var->is_initialized = true;
 		}
 	}
-	
+
 	CheckerInfo *info = main_module->gen->info;
-	
+
 	for (Entity *e : info->init_procedures) {
 		lbValue value = lb_find_procedure_value_from_entity(main_module, e);
 		lb_emit_call(p, value, {}, ProcInlining_none, false);
@@ -825,7 +832,7 @@ lbProcedure *lb_create_main_procedure(lbModule *m, lbProcedure *startup_runtime)
 	Type *results = alloc_type_tuple();
 
 	Type *t_ptr_cstring = alloc_type_pointer(t_cstring);
-	
+
 	bool call_cleanup = true;
 
 	bool has_args = false;
@@ -873,7 +880,7 @@ lbProcedure *lb_create_main_procedure(lbModule *m, lbProcedure *startup_runtime)
 		lbAddr args = lb_addr(lb_find_runtime_value(p->module, str_lit("args__")));
 		lb_fill_slice(p, args, argv, argc);
 	}
-	
+
 	lbValue startup_runtime_value = {startup_runtime->value, startup_runtime->type};
 	lb_emit_call(p, startup_runtime_value, {}, ProcInlining_none, false);
 
@@ -933,12 +940,12 @@ lbProcedure *lb_create_main_procedure(lbModule *m, lbProcedure *startup_runtime)
 		}
 	}
 
-	
+
 	if (call_cleanup) {
 		lbValue cleanup_runtime_value = lb_find_runtime_value(m, str_lit("_cleanup_runtime"));
 		lb_emit_call(p, cleanup_runtime_value, {}, ProcInlining_none, false);
 	}
-	
+
 
 	if (is_dll_main) {
 		LLVMBuildRet(p->builder, LLVMConstInt(lb_type(m, t_i32), 1, false));
@@ -947,13 +954,13 @@ lbProcedure *lb_create_main_procedure(lbModule *m, lbProcedure *startup_runtime)
 	}
 
 	lb_end_procedure_body(p);
-	
+
 
 	LLVMSetLinkage(p->value, LLVMExternalLinkage);
 	if (is_arch_wasm()) {
 		lb_set_wasm_export_attributes(p->value, p->name);
 	}
-	
+
 
 	if (!m->debug_builder && LLVMVerifyFunction(p->value, LLVMReturnStatusAction)) {
 		gb_printf_err("LLVM CODE GEN FAILED FOR PROCEDURE: %s\n", "main");
@@ -1208,7 +1215,7 @@ void lb_generate_code(lbGenerator *gen) {
 	auto *min_dep_set = &info->minimum_dependency_set;
 
 	switch (build_context.metrics.arch) {
-	case TargetArch_amd64: 
+	case TargetArch_amd64:
 	case TargetArch_i386:
 		LLVMInitializeX86TargetInfo();
 		LLVMInitializeX86Target();
@@ -1244,7 +1251,7 @@ void lb_generate_code(lbGenerator *gen) {
 		break;
 	}
 
-	
+
 	if (build_context.microarch == "native") {
 		LLVMInitializeNativeTarget();
 	}
@@ -1584,7 +1591,7 @@ void lb_generate_code(lbGenerator *gen) {
 			LLVMSetLinkage(g.value, LLVMExternalLinkage);
 			LLVMSetExternallyInitialized(g.value, true);
 			lb_add_foreign_library_path(m, e->Variable.foreign_library);
-			
+
 			lb_set_wasm_import_attributes(g.value, e, name);
 		} else {
 			LLVMSetInitializer(g.value, LLVMConstNull(lb_type(m, e->type)));
@@ -1600,7 +1607,7 @@ void lb_generate_code(lbGenerator *gen) {
 			}
 		}
 		lb_set_linkage_from_entity_flags(m, g.value, e->flags);
-		
+
 		if (e->Variable.link_section.len > 0) {
 			LLVMSetSection(g.value, alloc_cstring(permanent_allocator(), e->Variable.link_section));
 		}
@@ -1779,7 +1786,7 @@ void lb_generate_code(lbGenerator *gen) {
 
 	for_array(i, gen->modules.entries) {
 		lbModule *m = gen->modules.entries[i].value;
-		
+
 		lb_run_remove_unused_function_pass(m);
 		lb_run_remove_unused_globals_pass(m);
 
@@ -1859,7 +1866,7 @@ void lb_generate_code(lbGenerator *gen) {
 	}
 
 	TIME_SECTION("LLVM Object Generation");
-	
+
 	isize non_empty_module_count = 0;
 	for_array(j, gen->modules.entries) {
 		lbModule *m = gen->modules.entries[j].value;
