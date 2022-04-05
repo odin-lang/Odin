@@ -6,10 +6,10 @@ set COMMON=-collection:tests=tests -out:tests\issues\build\test_issue
 
 @echo on
 
-.\odin build tests\issues\test_issue_829.odin %COMMON%
+.\odin build tests\issues\test_issue_829.odin %COMMON% -file
 tests\issues\build\test_issue
 
-.\odin build tests\issues\test_issue_1592.odin %COMMON%
+.\odin build tests\issues\test_issue_1592.odin %COMMON% -file
 tests\issues\build\test_issue
 
 @echo off
