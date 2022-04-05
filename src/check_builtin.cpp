@@ -449,6 +449,7 @@ bool check_builtin_procedure(CheckerContext *c, Operand *operand, Ast *call, i32
 	case BuiltinProc_objc_find_class: 
 	case BuiltinProc_objc_register_selector: 
 	case BuiltinProc_objc_register_class: 
+	case BuiltinProc_atomic_type_is_lock_free:
 		// NOTE(bill): The first arg may be a Type, this will be checked case by case
 		break;
 
@@ -830,8 +831,8 @@ bool check_builtin_procedure(CheckerContext *c, Operand *operand, Ast *call, i32
 			}
 
 		} else if (name == "assert") {
-			if (ce->args.count != 1) {
-				error(call, "'#assert' expects 1 argument, got %td", ce->args.count);
+			if (ce->args.count != 1 && ce->args.count != 2) {
+				error(call, "'#assert' expects either 1 or 2 arguments, got %td", ce->args.count);
 				return false;
 			}
 			if (!is_type_boolean(operand->type) || operand->mode != Addressing_Constant) {
@@ -840,15 +841,37 @@ bool check_builtin_procedure(CheckerContext *c, Operand *operand, Ast *call, i32
 				gb_string_free(str);
 				return false;
 			}
+			if (ce->args.count == 2) {
+				Ast *arg = unparen_expr(ce->args[1]);
+				if (arg == nullptr || arg->kind != Ast_BasicLit || arg->BasicLit.token.kind != Token_String) {
+					gbString str = expr_to_string(arg);
+					error(call, "'%s' is not a constant string", str);
+					gb_string_free(str);
+					return false;
+				}
+			}
+
 			if (!operand->value.value_bool) {
-				gbString arg = expr_to_string(ce->args[0]);
-				error(call, "Compile time assertion: %s", arg);
+				gbString arg1 = expr_to_string(ce->args[0]);
+				gbString arg2 = {};
+
+				if (ce->args.count == 1) {
+					error(call, "Compile time assertion: %s", arg1);
+				} else {
+					arg2 = expr_to_string(ce->args[1]);
+					error(call, "Compile time assertion: %s (%s)", arg1, arg2);
+				}			
+				
 				if (c->proc_name != "") {
 					gbString str = type_to_string(c->curr_proc_sig);
 					error_line("\tCalled within '%.*s' :: %s\n", LIT(c->proc_name), str);
 					gb_string_free(str);
 				}
-				gb_string_free(arg);
+
+				gb_string_free(arg1);
+				if (ce->args.count == 2) {
+					gb_string_free(arg2);
+				}
 			}
 
 			operand->type = t_untyped_bool;
@@ -3232,6 +3255,35 @@ bool check_builtin_procedure(CheckerContext *c, Operand *operand, Ast *call, i32
 		break;
 
 
+	case BuiltinProc_atomic_type_is_lock_free:
+		{
+			Ast *expr = ce->args[0];
+			Operand o = {};
+			check_expr_or_type(c, &o, expr);
+
+			if (o.mode == Addressing_Invalid || o.mode == Addressing_Builtin) {
+				return false;
+			}
+			if (o.type == nullptr || o.type == t_invalid || is_type_asm_proc(o.type)) {
+				error(o.expr, "Invalid argument to '%.*s'", LIT(builtin_name));
+				return false;
+			}
+			if (is_type_polymorphic(o.type)) {
+				error(o.expr, "'%.*s' of polymorphic type cannot be determined", LIT(builtin_name));
+				return false;
+			}
+			if (is_type_untyped(o.type)) {
+				error(o.expr, "'%.*s' of untyped type is not allowed", LIT(builtin_name));
+				return false;
+			}
+			Type *t = o.type;
+			bool is_lock_free = is_type_lock_free(t);
+
+			operand->mode = Addressing_Constant;
+			operand->type = t_untyped_bool;
+			operand->value = exact_value_bool(is_lock_free);
+			break;
+		}
 
 	case BuiltinProc_atomic_thread_fence:
 	case BuiltinProc_atomic_signal_fence:
@@ -3362,6 +3414,21 @@ bool check_builtin_procedure(CheckerContext *c, Operand *operand, Ast *call, i32
 			check_expr_with_type_hint(c, &x, ce->args[1], elem);
 			check_assignment(c, &x, elem, builtin_name);
 
+			Type *t = type_deref(operand->type);
+			switch (id) {
+			case BuiltinProc_atomic_add:
+			case BuiltinProc_atomic_sub:
+				if (!is_type_numeric(t)) {
+					gbString str = type_to_string(t);
+					error(operand->expr, "Expected a numeric type for '%.*s', got %s", LIT(builtin_name), str);
+					gb_string_free(str);
+				} else if (is_type_different_to_arch_endianness(t)) {
+					gbString str = type_to_string(t);
+					error(operand->expr, "Expected a numeric type of the same platform endianness for '%.*s', got %s", LIT(builtin_name), str);
+					gb_string_free(str);
+				}
+			}
+
 			operand->type = elem;
 			operand->mode = Addressing_Value;
 			break;
@@ -3389,6 +3456,22 @@ bool check_builtin_procedure(CheckerContext *c, Operand *operand, Ast *call, i32
 				return false;
 			}
 
+			Type *t = type_deref(operand->type);
+			switch (id) {
+			case BuiltinProc_atomic_add_explicit:
+			case BuiltinProc_atomic_sub_explicit:
+				if (!is_type_numeric(t)) {
+					gbString str = type_to_string(t);
+					error(operand->expr, "Expected a numeric type for '%.*s', got %s", LIT(builtin_name), str);
+					gb_string_free(str);
+				} else if (is_type_different_to_arch_endianness(t)) {
+					gbString str = type_to_string(t);
+					error(operand->expr, "Expected a numeric type of the same platform endianness for '%.*s', got %s", LIT(builtin_name), str);
+					gb_string_free(str);
+				}
+				break;
+			}
+
 			operand->type = elem;
 			operand->mode = Addressing_Value;
 			break;
@@ -3408,6 +3491,13 @@ bool check_builtin_procedure(CheckerContext *c, Operand *operand, Ast *call, i32
 			check_expr_with_type_hint(c, &y, ce->args[2], elem);
 			check_assignment(c, &x, elem, builtin_name);
 			check_assignment(c, &y, elem, builtin_name);
+
+			Type *t = type_deref(operand->type);
+			if (!is_type_comparable(t)) {
+				gbString str = type_to_string(t);
+				error(operand->expr, "Expected a comparable type for '%.*s', got %s", LIT(builtin_name), str);
+				gb_string_free(str);
+			}
 
 			operand->mode = Addressing_OptionalOk;
 			operand->type = elem;
@@ -3436,6 +3526,13 @@ bool check_builtin_procedure(CheckerContext *c, Operand *operand, Ast *call, i32
 			}
 			if (!check_atomic_memory_order_argument(c, ce->args[4], builtin_name, &failure_memory_order, "failure ordering")) {
 				return false;
+			}
+
+			Type *t = type_deref(operand->type);
+			if (!is_type_comparable(t)) {
+				gbString str = type_to_string(t);
+				error(operand->expr, "Expected a comparable type for '%.*s', got %s", LIT(builtin_name), str);
+				gb_string_free(str);
 			}
 
 			bool invalid_combination = false;

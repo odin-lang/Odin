@@ -2009,6 +2009,7 @@ void print_show_help(String const arg0, String const &command) {
 		print_usage_line(1, "-define:<name>=<expression>");
 		print_usage_line(2, "Defines a global constant with a value");
 		print_usage_line(2, "Example: -define:SPAM=123");
+		print_usage_line(2, "To use:  #config(SPAM, default_value)");
 		print_usage_line(0, "");
 	}
 

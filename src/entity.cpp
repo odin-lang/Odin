@@ -45,9 +45,9 @@ enum EntityFlag : u64 {
 	EntityFlag_NoAlias       = 1ull<<9,
 	EntityFlag_TypeField     = 1ull<<10,
 	EntityFlag_Value         = 1ull<<11,
-	EntityFlag_Sret          = 1ull<<12,
-	EntityFlag_ByVal         = 1ull<<13,
-	EntityFlag_BitFieldValue = 1ull<<14,
+
+
+
 	EntityFlag_PolyConst     = 1ull<<15,
 	EntityFlag_NotExported   = 1ull<<16,
 	EntityFlag_ConstInput    = 1ull<<17,
