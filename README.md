@@ -58,7 +58,7 @@ main :: proc() {
 
 Instructions for downloading and installing the Odin compiler and libraries.
 
-#### [Nightly Builds]https://odin-lang.org/docs/nightly/)
+#### [Nightly Builds](https://odin-lang.org/docs/nightly/)
 
 Get the latest nightly builds of Odin.
 
