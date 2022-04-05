@@ -20,12 +20,12 @@ open :: proc(path: string, mode: int = O_RDONLY, perm: int = 0) -> (Handle, Errn
 	case O_RDWR:   access = win32.FILE_GENERIC_READ | win32.FILE_GENERIC_WRITE
 	}
 
+	if mode&O_CREATE != 0 {
+		access |= win32.FILE_GENERIC_WRITE
+	}
 	if mode&O_APPEND != 0 {
 		access &~= win32.FILE_GENERIC_WRITE
 		access |=  win32.FILE_APPEND_DATA
-	}
-	if mode&O_CREATE != 0 {
-		access |= win32.FILE_GENERIC_WRITE
 	}
 
 	share_mode := win32.FILE_SHARE_READ|win32.FILE_SHARE_WRITE
