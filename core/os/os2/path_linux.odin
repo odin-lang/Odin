@@ -24,11 +24,16 @@ _is_path_separator :: proc(c: byte) -> bool {
 }
 
 _mkdir :: proc(path: string, perm: File_Mode) -> Error {
+	// NOTE: These modes would require sys_mknod, however, that would require
+	//       additional arguments to this function.
 	if perm & (File_Mode_Named_Pipe | File_Mode_Device | File_Mode_Char_Device | File_Mode_Sym_Link) != 0 {
 		return .Invalid_Argument
 	}
 
-	path_cstr := strings.clone_to_cstring(path, context.temp_allocator)
+	path_cstr, allocated := _name_to_cstring(path)
+	defer if allocated {
+		delete(path_cstr)
+	}
 	return _ok_or_error(unix.sys_mkdir(path_cstr, int(perm & 0o777)))
 }
 
@@ -69,7 +74,19 @@ _mkdir_all :: proc(path: string, perm: File_Mode) -> Error {
 	}
 
 	// need something we can edit, and use to generate cstrings
-	path_bytes := make([]u8, len(path) + 1, context.temp_allocator)
+	allocated: bool
+	path_bytes: []u8
+	if len(path) > _CSTRING_NAME_HEAP_THRESHOLD {
+		allocated = true
+		path_bytes = make([]u8, len(path) + 1)
+	} else {
+		path_bytes = make([]u8, len(path) + 1, context.temp_allocator)
+	}
+	defer if allocated {
+		delete(path_bytes)
+	}
+
+	// NULL terminate the byte slice to make it a valid cstring
 	copy(path_bytes, path)
 	path_bytes[len(path)] = 0
 
@@ -165,12 +182,15 @@ _remove_all :: proc(path: string) -> Error {
 		return nil
 	}
 
-	cstr := strings.clone_to_cstring(path, context.temp_allocator)
+	path_cstr, allocated := _name_to_cstring(path)
+	defer if allocated {
+		delete(path_cstr)
+	}
 
-	handle_i := unix.sys_open(cstr, _OPENDIR_FLAGS)
+	handle_i := unix.sys_open(path_cstr, _OPENDIR_FLAGS)
 	switch handle_i {
 	case -ENOTDIR:
-		return _ok_or_error(unix.sys_unlink(cstr))
+		return _ok_or_error(unix.sys_unlink(path_cstr))
 	case -4096..<0:
 		return _get_platform_error(handle_i)
 	}
@@ -178,7 +198,7 @@ _remove_all :: proc(path: string) -> Error {
 	fd := Handle(handle_i)
 	defer close(fd)
 	_remove_all_dir(fd) or_return
-	return _ok_or_error(unix.sys_rmdir(cstr))
+	return _ok_or_error(unix.sys_rmdir(path_cstr))
 }
 
 _getwd :: proc(allocator := context.allocator) -> (string, Error) {
@@ -203,6 +223,9 @@ _getwd :: proc(allocator := context.allocator) -> (string, Error) {
 }
 
 _setwd :: proc(dir: string) -> Error {
-	dir_cstr := strings.clone_to_cstring(dir, context.temp_allocator)
+	dir_cstr, allocated := _name_to_cstring(dir)
+	defer if allocated {
+		delete(dir_cstr)
+	}
 	return _ok_or_error(unix.sys_chdir(dir_cstr))
 }

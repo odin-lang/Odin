@@ -29,8 +29,13 @@ _O_PATH      :: 0o10000000
 
 _AT_FDCWD :: -100
 
+_CSTRING_NAME_HEAP_THRESHOLD :: 512
+
 _open :: proc(name: string, flags: File_Flags, perm: File_Mode) -> (Handle, Error) {
-	cstr := strings.clone_to_cstring(name, context.temp_allocator)
+	name_cstr, allocated := _name_to_cstring(name)
+	defer if allocated {
+		delete(name_cstr)
+	}
 
 	flags_i: int
 	switch flags & O_RDONLY|O_WRONLY|O_RDWR {
@@ -46,7 +51,7 @@ _open :: proc(name: string, flags: File_Flags, perm: File_Mode) -> (Handle, Erro
 	flags_i |= (_O_TRUNC * int(.Trunc in flags))
 	flags_i |= (_O_CLOEXEC * int(.Close_On_Exec in flags))
 
-	handle_i := unix.sys_open(cstr, flags_i, int(perm))
+	handle_i := unix.sys_open(name_cstr, flags_i, int(perm))
 	if handle_i < 0 {
 		return INVALID_HANDLE, _get_platform_error(handle_i)
 	}
@@ -174,7 +179,10 @@ _truncate :: proc(fd: Handle, size: i64) -> Error {
 }
 
 _remove :: proc(name: string) -> Error {
-	name_cstr := strings.clone_to_cstring(name, context.temp_allocator)
+	name_cstr, allocated := _name_to_cstring(name)
+	defer if allocated {
+		delete(name_cstr)
+	}
 
 	handle_i := unix.sys_open(name_cstr, int(File_Flags.Read))
 	if handle_i < 0 {
@@ -189,20 +197,41 @@ _remove :: proc(name: string) -> Error {
 }
 
 _rename :: proc(old_name, new_name: string) -> Error {
-	old_name_cstr := strings.clone_to_cstring(old_name, context.temp_allocator)
-	new_name_cstr := strings.clone_to_cstring(new_name, context.temp_allocator)
+	old_name_cstr, old_allocated := _name_to_cstring(old_name)
+	new_name_cstr, new_allocated := _name_to_cstring(new_name)
+	defer if old_allocated {
+		delete(old_name_cstr)
+	}
+	defer if new_allocated {
+		delete(new_name_cstr)
+	}
+
 	return _ok_or_error(unix.sys_rename(old_name_cstr, new_name_cstr))
 }
 
 _link :: proc(old_name, new_name: string) -> Error {
-	old_name_cstr := strings.clone_to_cstring(old_name, context.temp_allocator)
-	new_name_cstr := strings.clone_to_cstring(new_name, context.temp_allocator)
+	old_name_cstr, old_allocated := _name_to_cstring(old_name)
+	new_name_cstr, new_allocated := _name_to_cstring(new_name)
+	defer if old_allocated {
+		delete(old_name_cstr)
+	}
+	defer if new_allocated {
+		delete(new_name_cstr)
+	}
+
 	return _ok_or_error(unix.sys_link(old_name_cstr, new_name_cstr))
 }
 
 _symlink :: proc(old_name, new_name: string) -> Error {
-	old_name_cstr := strings.clone_to_cstring(old_name, context.temp_allocator)
-	new_name_cstr := strings.clone_to_cstring(new_name, context.temp_allocator)
+	old_name_cstr, old_allocated := _name_to_cstring(old_name)
+	new_name_cstr, new_allocated := _name_to_cstring(new_name)
+	defer if old_allocated {
+		delete(old_name_cstr)
+	}
+	defer if new_allocated {
+		delete(new_name_cstr)
+	}
+
 	return _ok_or_error(unix.sys_symlink(old_name_cstr, new_name_cstr))
 }
 
@@ -225,12 +254,18 @@ _read_link_cstr :: proc(name_cstr: cstring, allocator := context.allocator) -> (
 }
 
 _read_link :: proc(name: string, allocator := context.allocator) -> (string, Error) {
-	name_cstr := strings.clone_to_cstring(name, context.temp_allocator)
+	name_cstr, allocated := _name_to_cstring(name)
+	defer if allocated {
+		delete(name_cstr)
+	}
 	return _read_link_cstr(name_cstr, allocator)
 }
 
 _unlink :: proc(name: string) -> Error {
-	name_cstr := strings.clone_to_cstring(name, context.temp_allocator)
+	name_cstr, allocated := _name_to_cstring(name)
+	defer if allocated {
+		delete(name_cstr)
+	}
 	return _ok_or_error(unix.sys_unlink(name_cstr))
 }
 
@@ -247,12 +282,18 @@ _chown :: proc(fd: Handle, uid, gid: int) -> Error {
 }
 
 _lchown :: proc(name: string, uid, gid: int) -> Error {
-	name_cstr := strings.clone_to_cstring(name, context.temp_allocator)
+	name_cstr, allocated := _name_to_cstring(name)
+	defer if allocated {
+		delete(name_cstr)
+	}
 	return _ok_or_error(unix.sys_lchown(name_cstr, uid, gid))
 }
 
 _chtimes :: proc(name: string, atime, mtime: time.Time) -> Error {
-	name_cstr := strings.clone_to_cstring(name, context.temp_allocator)
+	name_cstr, allocated := _name_to_cstring(name)
+	defer if allocated {
+		delete(name_cstr)
+	}
 	times := [2]Unix_File_Time {
 		{ atime._nsec, 0 },
 		{ mtime._nsec, 0 },
@@ -261,7 +302,10 @@ _chtimes :: proc(name: string, atime, mtime: time.Time) -> Error {
 }
 
 _exists :: proc(name: string) -> bool {
-	name_cstr := strings.clone_to_cstring(name, context.temp_allocator)
+	name_cstr, allocated := _name_to_cstring(name)
+	defer if allocated {
+		delete(name_cstr)
+	}
 	return unix.sys_access(name_cstr, F_OK) == 0
 }
 
@@ -281,4 +325,18 @@ _is_dir :: proc(fd: Handle) -> bool {
 		return false
 	}
 	return S_ISDIR(s.mode)
+}
+
+// Ideally we want to use the temp_allocator.  PATH_MAX on Linux is commonly
+// defined as 512, however, it is well known that paths can exceed that limit.
+// So, in theory you could have a path larger than the entire temp_allocator's
+// buffer.  Therefor any large paths will use context.allocator.
+_name_to_cstring :: proc(path: string) -> (cpath: cstring, allocated: bool) {
+	if len(path) > _CSTRING_NAME_HEAP_THRESHOLD {
+		cpath = strings.clone_to_cstring(path)
+		allocated = true
+		return
+	}
+	cpath = strings.clone_to_cstring(path, context.temp_allocator)
+	return
 }
