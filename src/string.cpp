@@ -245,14 +245,13 @@ gb_inline isize string_extension_position(String const &str) {
 	return dot_pos;
 }
 
-String path_extension(String const &str) {
+String path_extension(String const &str, bool include_dot = true) {
 	isize pos = string_extension_position(str);
 	if (pos < 0) {
 		return make_string(nullptr, 0);
 	}
-	return substring(str, pos, str.len);
+	return substring(str, include_dot ? pos : pos + 1, str.len);
 }
-
 
 String string_trim_whitespace(String str) {
 	while (str.len > 0 && rune_is_whitespace(str[str.len-1])) {
@@ -328,7 +327,10 @@ String directory_from_path(String const &s) {
 			break;
 		}
 	}
-	return substring(s, 0, i);
+	if (i >= 0) {
+		return substring(s, 0, i);	
+	}
+	return substring(s, 0, 0);
 }
 
 String concatenate_strings(gbAllocator a, String const &x, String const &y) {

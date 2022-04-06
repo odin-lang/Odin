@@ -269,6 +269,7 @@ bin/
 # - Linux/MacOS
 odin
 odin.dSYM
+*.bin
 
 # shared collection
 shared/
