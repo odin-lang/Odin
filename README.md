@@ -11,7 +11,7 @@
         <img src="https://img.shields.io/badge/platforms-Windows%20|%20Linux%20|%20macOS-green.svg">
     </a>
     <br>
-    <a href="https://discord.gg/hnwN2Rj">
+    <a href="https://discord.gg/odinlang">
         <img src="https://img.shields.io/discord/568138951836172421?logo=discord">
     </a>
     <a href="https://github.com/odin-lang/odin/actions">
