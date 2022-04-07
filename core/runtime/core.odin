@@ -565,7 +565,7 @@ __init_context :: proc "contextless" (c: ^Context) {
 		return
 	}
 
-	// NOTE(bill): Do not initialize these procedures with a call as they are not defined with the "contexless" calling convention
+	// NOTE(bill): Do not initialize these procedures with a call as they are not defined with the "contextless" calling convention
 	c.allocator.procedure = default_allocator_proc
 	c.allocator.data = nil
 
