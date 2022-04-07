@@ -15,6 +15,14 @@ HIWORD :: #force_inline proc "contextless" (x: DWORD) -> WORD {
 	return WORD(x >> 16)
 }
 
+GET_X_LPARAM :: #force_inline proc "contextless" (lp: LPARAM) -> c_int {
+	return cast(c_int)cast(c_short)LOWORD(cast(DWORD)lp)
+}
+
+GET_Y_LPARAM :: #force_inline proc "contextless" (lp: LPARAM) -> c_int {
+	return cast(c_int)cast(c_short)HIWORD(cast(DWORD)lp)
+}
+
 utf8_to_utf16 :: proc(s: string, allocator := context.temp_allocator) -> []u16 {
 	if len(s) < 1 {
 		return nil
