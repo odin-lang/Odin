@@ -17,13 +17,19 @@ Marshal_Error :: union #shared_nil {
 	io.Error,
 }
 
-marshal :: proc(v: any, allocator := context.allocator) -> (data: []byte, err: Marshal_Error) {
+Pretty :: struct {
+	apply: bool,
+	indentation: int,
+}
+
+marshal :: proc(v: any, pretty: Pretty = {}, allocator := context.allocator) -> (data: []byte, err: Marshal_Error) {
 	b := strings.make_builder(allocator)
 	defer if err != nil {
 		strings.destroy_builder(&b)
 	}
 
-	marshal_to_builder(&b, v) or_return
+	pretty := pretty
+	marshal_to_builder(&b, v, &pretty) or_return
 	
 	if len(b.buf) != 0 {
 		data = b.buf[:]
@@ -31,11 +37,11 @@ marshal :: proc(v: any, allocator := context.allocator) -> (data: []byte, err: M
 	return data, nil
 }
 
-marshal_to_builder :: proc(b: ^strings.Builder, v: any) -> Marshal_Error {
-	return marshal_to_writer(strings.to_writer(b), v)
+marshal_to_builder :: proc(b: ^strings.Builder, v: any, pretty: ^Pretty) -> Marshal_Error {
+	return marshal_to_writer(strings.to_writer(b), v, pretty)
 }
 
-marshal_to_writer :: proc(w: io.Writer, v: any) -> (err: Marshal_Error) {
+marshal_to_writer :: proc(w: io.Writer, v: any, pretty: ^Pretty) -> (err: Marshal_Error) {
 	if v == nil {
 		io.write_string(w, "null") or_return
 		return
@@ -166,52 +172,53 @@ marshal_to_writer :: proc(w: io.Writer, v: any) -> (err: Marshal_Error) {
 		return .Unsupported_Type
 
 	case runtime.Type_Info_Array:
-		io.write_byte(w, '[') or_return
+		pretty_start(w, '[', pretty) or_return
 		for i in 0..<info.count {
-			if i > 0 { io.write_string(w, ", ") or_return }
+			pretty_iteration(w, i, pretty) or_return
 
 			data := uintptr(v.data) + uintptr(i*info.elem_size)
-			marshal_to_writer(w, any{rawptr(data), info.elem.id}) or_return
+			marshal_to_writer(w, any{rawptr(data), info.elem.id}, pretty) or_return
 		}
-		io.write_byte(w, ']') or_return
+		pretty_end(w, ']', pretty) or_return
 		
 	case runtime.Type_Info_Enumerated_Array:
 		index := runtime.type_info_base(info.index).variant.(runtime.Type_Info_Enum)
-		io.write_byte(w, '[') or_return
+		pretty_start(w, '[', pretty) or_return
 		for i in 0..<info.count {
-			if i > 0 { io.write_string(w, ", ") or_return }
+			pretty_iteration(w, i, pretty) or_return
 
 			data := uintptr(v.data) + uintptr(i*info.elem_size)
-			marshal_to_writer(w, any{rawptr(data), info.elem.id}) or_return
+			marshal_to_writer(w, any{rawptr(data), info.elem.id}, pretty) or_return
 		}
-		io.write_byte(w, ']') or_return
+		pretty_end(w, ']', pretty) or_return
 		
 	case runtime.Type_Info_Dynamic_Array:
-		io.write_byte(w, '[') or_return
+		pretty_start(w, '[', pretty) or_return
 		array := cast(^mem.Raw_Dynamic_Array)v.data
 		for i in 0..<array.len {
-			if i > 0 { io.write_string(w, ", ") or_return }
+			pretty_iteration(w, i, pretty) or_return
 
 			data := uintptr(array.data) + uintptr(i*info.elem_size)
-			marshal_to_writer(w, any{rawptr(data), info.elem.id}) or_return
+			marshal_to_writer(w, any{rawptr(data), info.elem.id}, pretty) or_return
 		}
-		io.write_byte(w, ']') or_return
+		pretty_end(w, ']', pretty) or_return
 
 	case runtime.Type_Info_Slice:
-		io.write_byte(w, '[') or_return
+		pretty_start(w, '[', pretty) or_return
 		slice := cast(^mem.Raw_Slice)v.data
 		for i in 0..<slice.len {
-			if i > 0 { io.write_string(w, ", ") or_return }
+			pretty_iteration(w, i, pretty) or_return
 
 			data := uintptr(slice.data) + uintptr(i*info.elem_size)
-			marshal_to_writer(w, any{rawptr(data), info.elem.id}) or_return
+			marshal_to_writer(w, any{rawptr(data), info.elem.id}, pretty) or_return
 		}
-		io.write_byte(w, ']') or_return
+		pretty_end(w, ']', pretty) or_return
 
 	case runtime.Type_Info_Map:
 		m := (^mem.Raw_Map)(v.data)
 
-		io.write_byte(w, '{') or_return
+		pretty_start(w, '{', pretty) or_return
+
 		if m != nil {
 			if info.generated_struct == nil {
 				return .Unsupported_Type
@@ -223,31 +230,35 @@ marshal_to_writer :: proc(w: io.Writer, v: any) -> (err: Marshal_Error) {
 			entry_size := ed.elem_size
 
 			for i in 0..<entries.len {
-				if i > 0 { io.write_string(w, ", ") or_return }
+				pretty_iteration(w, i, pretty) or_return
 
 				data := uintptr(entries.data) + uintptr(i*entry_size)
 				key   := rawptr(data + entry_type.offsets[2])
 				value := rawptr(data + entry_type.offsets[3])
 
-				marshal_to_writer(w, any{key, info.key.id})     or_return
+				marshal_to_writer(w, any{key, info.key.id}, pretty)     or_return
 				io.write_string(w, ": ")                        or_return
-				marshal_to_writer(w, any{value, info.value.id}) or_return
+				marshal_to_writer(w, any{value, info.value.id}, pretty) or_return
 			}
 		}
-		io.write_byte(w, '}') or_return
+
+		pretty_end(w, '}', pretty) or_return
 
 	case runtime.Type_Info_Struct:
-		io.write_byte(w, '{') or_return
+		pretty_start(w, '{', pretty) or_return
+
 		for name, i in info.names {
-			if i > 0 { io.write_string(w, ", ") or_return }
+			pretty_iteration(w, i, pretty) or_return
+
 			io.write_quoted_string(w, name) or_return
 			io.write_string(w, ": ") or_return
 
 			id := info.types[i].id
 			data := rawptr(uintptr(v.data) + info.offsets[i])
-			marshal_to_writer(w, any{data, id}) or_return
+			marshal_to_writer(w, any{data, id}, pretty) or_return
 		}
-		io.write_byte(w, '}') or_return
+
+		pretty_end(w, '}', pretty) or_return
 
 	case runtime.Type_Info_Union:
 		tag_ptr := uintptr(v.data) + info.tag_offset
@@ -270,11 +281,11 @@ marshal_to_writer :: proc(w: io.Writer, v: any) -> (err: Marshal_Error) {
 			io.write_string(w, "null") or_return
 		} else {
 			id := info.variants[tag-1].id
-			return marshal_to_writer(w, any{v.data, id})
+			return marshal_to_writer(w, any{v.data, id}, pretty)
 		}
 
 	case runtime.Type_Info_Enum:
-		return marshal_to_writer(w, any{v.data, info.base.id})
+		return marshal_to_writer(w, any{v.data, info.base.id}, pretty)
 
 	case runtime.Type_Info_Bit_Set:
 		is_bit_set_different_endian_to_platform :: proc(ti: ^runtime.Type_Info) -> bool {
@@ -328,5 +339,50 @@ marshal_to_writer :: proc(w: io.Writer, v: any) -> (err: Marshal_Error) {
 		return .Unsupported_Type
 	}
 
+	return
+}
+
+// insert the wanted byte, push newline, increase indentation
+pretty_start :: proc(w: io.Writer, c: byte, using pretty: ^Pretty) -> (err: Marshal_Error) {
+	io.write_byte(w, c) or_return
+	
+	if apply {
+		io.write_byte(w, '\n') or_return
+	}
+
+	indentation += 1
+	return
+}
+
+// insert comma and newline when iteration > 0 and add tab per indentation
+pretty_iteration :: proc(w: io.Writer, iteration: int, using pretty: ^Pretty) -> (err: Marshal_Error) {
+	if iteration > 0 {
+		io.write_string(w, ", ") or_return
+
+		if apply {
+			io.write_byte(w, '\n') or_return
+		}
+	}
+
+	for _ in 0..<indentation {
+		io.write_byte(w, '\t') or_return
+	}
+
+	return
+}
+
+// decrease indentation, insert newline, insert tab per indentation and write wanted byte
+pretty_end :: proc(w: io.Writer, c: byte, using pretty: ^Pretty) -> (err: Marshal_Error) {
+	indentation -= 1
+
+	if apply {
+		io.write_byte(w, '\n') or_return
+
+		for _ in 0..<indentation {
+			io.write_byte(w, '\t') or_return
+		}
+	}
+
+	io.write_byte(w, c) or_return
 	return
 }
