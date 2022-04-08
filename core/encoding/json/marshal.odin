@@ -22,13 +22,13 @@ Pretty :: struct {
 	indentation: int,
 }
 
-marshal :: proc(v: any, pretty: Pretty = {}, allocator := context.allocator) -> (data: []byte, err: Marshal_Error) {
+marshal :: proc(v: any, pretty_print := false, allocator := context.allocator) -> (data: []byte, err: Marshal_Error) {
 	b := strings.make_builder(allocator)
 	defer if err != nil {
 		strings.destroy_builder(&b)
 	}
 
-	pretty := pretty
+	pretty := Pretty { apply = pretty_print }
 	marshal_to_builder(&b, v, &pretty) or_return
 	
 	if len(b.buf) != 0 {
