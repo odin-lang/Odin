@@ -1812,19 +1812,19 @@ sys_fork :: proc "contextless" () -> int {
 }
 
 sys_mmap :: proc "contextless" (addr: rawptr, length: uint, prot, flags, fd: int, offset: uintptr) -> int {
-	return int(intrinsics.syscall(unix.SYS_mmap, uintptr(addr), uintptr(length), uintptr(prot), uintptr(flags), uintptr(fd), offset))
+	return int(intrinsics.syscall(SYS_mmap, uintptr(addr), uintptr(length), uintptr(prot), uintptr(flags), uintptr(fd), offset))
 }
 
 sys_munmap :: proc "contextless" (addr: rawptr, length: uint) -> int {
-	return int(intrinsics.syscall(unix.SYS_munmap, uintptr(addr), uintptr(length)))
+	return int(intrinsics.syscall(SYS_munmap, uintptr(addr), uintptr(length)))
 }
 
 sys_mprotect :: proc "contextless" (addr: rawptr, length: uint, prot: int) -> int {
-	return int(intrinsics.syscall(unix.SYS_mprotect, uintptr(addr), uintptr(length), uintptr(prot)))
+	return int(intrinsics.syscall(SYS_mprotect, uintptr(addr), uintptr(length), uintptr(prot)))
 }
 
 sys_madvise :: proc "contextless" (addr: rawptr, length: uint, advice: int) -> int {
-	return int(intrinsics.syscall(unix.SYS_madvise, uintptr(addr), uintptr(length), uintptr(advice)))
+	return int(intrinsics.syscall(SYS_madvise, uintptr(addr), uintptr(length), uintptr(advice)))
 }
 
 
