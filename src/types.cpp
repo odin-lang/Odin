@@ -165,9 +165,8 @@ struct TypeUnion {
 
 	i16           tag_size;
 	bool          is_polymorphic;
-	bool          is_poly_specialized : 1;
-	bool          no_nil              : 1;
-	bool          maybe               : 1;
+	bool          is_poly_specialized;
+	UnionTypeKind kind;
 };
 
 struct TypeProc {
@@ -186,7 +185,6 @@ struct TypeProc {
 	bool     c_vararg;
 	bool     is_polymorphic;
 	bool     is_poly_specialized;
-	bool     has_proc_default_values;
 	bool     has_named_results;
 	bool     diverging; // no return
 	bool     return_by_pointer;
@@ -693,6 +691,28 @@ gb_global Type *t_objc_class    = nullptr;
 gb_global Type *t_objc_id    = nullptr;
 gb_global Type *t_objc_SEL   = nullptr;
 gb_global Type *t_objc_Class = nullptr;
+
+enum OdinAtomicMemoryOrder : i32 {
+	OdinAtomicMemoryOrder_relaxed = 0, // unordered
+	OdinAtomicMemoryOrder_consume = 1, // monotonic
+	OdinAtomicMemoryOrder_acquire = 2,
+	OdinAtomicMemoryOrder_release = 3,
+	OdinAtomicMemoryOrder_acq_rel = 4,
+	OdinAtomicMemoryOrder_seq_cst = 5,
+	OdinAtomicMemoryOrder_COUNT,
+};
+
+char const *OdinAtomicMemoryOrder_strings[OdinAtomicMemoryOrder_COUNT] = {
+	"Relaxed",
+	"Consume",
+	"Acquire",
+	"Release",
+	"Acq_Rel",
+	"Seq_Cst",
+};
+
+gb_global Type *t_atomic_memory_order = nullptr;
+
 
 
 
@@ -1665,7 +1685,7 @@ bool is_type_map(Type *t) {
 
 bool is_type_union_maybe_pointer(Type *t) {
 	t = base_type(t);
-	if (t->kind == Type_Union && t->Union.maybe) {
+	if (t->kind == Type_Union && t->Union.kind == UnionType_maybe) {
 		if (t->Union.variants.count == 1) {
 			Type *v = t->Union.variants[0];
 			return is_type_pointer(v) || is_type_multi_pointer(v);
@@ -1677,7 +1697,7 @@ bool is_type_union_maybe_pointer(Type *t) {
 
 bool is_type_union_maybe_pointer_original_alignment(Type *t) {
 	t = base_type(t);
-	if (t->kind == Type_Union && t->Union.maybe) {
+	if (t->kind == Type_Union && t->Union.kind == UnionType_maybe) {
 		if (t->Union.variants.count == 1) {
 			Type *v = t->Union.variants[0];
 			if (is_type_pointer(v) || is_type_multi_pointer(v)) {
@@ -2169,7 +2189,7 @@ bool type_has_nil(Type *t) {
 	case Type_Map:
 		return true;
 	case Type_Union:
-		return !t->Union.no_nil;
+		return t->Union.kind != UnionType_no_nil;
 	case Type_Struct:
 		if (is_type_soa_struct(t)) {
 			switch (t->Struct.soa_kind) {
@@ -2197,6 +2217,17 @@ bool elem_type_can_be_constant(Type *t) {
 	}
 	return true;
 }
+
+bool is_type_lock_free(Type *t) {
+	t = core_type(t);
+	if (t == t_invalid) {
+		return false;
+	}
+	i64 sz = type_size_of(t);
+	// TODO(bill): Figure this out correctly
+	return sz <= build_context.max_align;
+}
+
 
 
 bool is_type_comparable(Type *t) {
@@ -2455,7 +2486,7 @@ bool are_types_identical_internal(Type *x, Type *y, bool check_tuple_names) {
 		if (y->kind == Type_Union) {
 			if (x->Union.variants.count == y->Union.variants.count &&
 			    x->Union.custom_align == y->Union.custom_align &&
-			    x->Union.no_nil == y->Union.no_nil) {
+			    x->Union.kind == y->Union.kind) {
 				// NOTE(bill): zeroth variant is nullptr
 				for_array(i, x->Union.variants) {
 					if (!are_types_identical(x->Union.variants[i], y->Union.variants[i])) {
@@ -2599,7 +2630,7 @@ i64 union_variant_index(Type *u, Type *v) {
 	for_array(i, u->Union.variants) {
 		Type *vt = u->Union.variants[i];
 		if (are_types_identical(v, vt)) {
-			if (u->Union.no_nil) {
+			if (u->Union.kind == UnionType_no_nil) {
 				return cast(i64)(i+0);
 			} else {
 				return cast(i64)(i+1);
@@ -4022,8 +4053,11 @@ gbString write_type_to_string(gbString str, Type *type, bool shorthand=false) {
 
 	case Type_Union:
 		str = gb_string_appendc(str, "union");
-		if (type->Union.no_nil != 0) str = gb_string_appendc(str, " #no_nil");
-		if (type->Union.maybe != 0)  str = gb_string_appendc(str, " #maybe");
+		switch (type->Union.kind) {
+		case UnionType_maybe:      str = gb_string_appendc(str, " #maybe");      break;
+		case UnionType_no_nil:     str = gb_string_appendc(str, " #no_nil");     break;
+		case UnionType_shared_nil: str = gb_string_appendc(str, " #shared_nil"); break;
+		}
 		if (type->Union.custom_align != 0) str = gb_string_append_fmt(str, " #align %d", cast(int)type->Union.custom_align);
 		str = gb_string_appendc(str, " {");
 		for_array(i, type->Union.variants) {

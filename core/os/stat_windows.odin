@@ -80,7 +80,7 @@ stat :: proc(name: string, allocator := context.allocator) -> (File_Info, Errno)
 	return _stat(name, attrs, allocator)
 }
 
-fstat :: proc(fd: Handle, allocator := context.allocator) -> (File_Info, Errno) {
+fstat :: proc(fd: Handle, allocator := context.allocator) -> (fi: File_Info, errno: Errno) {
 	if fd == 0 {
 		return {}, ERROR_INVALID_HANDLE
 	}
@@ -94,14 +94,14 @@ fstat :: proc(fd: Handle, allocator := context.allocator) -> (File_Info, Errno) 
 	h := win32.HANDLE(fd)
 	switch win32.GetFileType(h) {
 	case win32.FILE_TYPE_PIPE, win32.FILE_TYPE_CHAR:
-		fi: File_Info
-		fi.fullpath = path
 		fi.name = basename(path)
 		fi.mode |= file_type_mode(h)
-		return fi, ERROR_NONE
+		errno = ERROR_NONE
+	case:
+		fi, errno = file_info_from_get_file_information_by_handle(path, h)
 	}
-
-	return file_info_from_get_file_information_by_handle(path, h)
+	fi.fullpath = path
+	return
 }
 
 

@@ -1,4 +1,4 @@
-package test_core_image
+package test_core_strings
 
 import "core:strings"
 import "core:testing"
@@ -32,6 +32,7 @@ main :: proc() {
 	test_index_any_larger_string_not_found(&t)
 	test_index_any_small_string_found(&t)
 	test_index_any_larger_string_found(&t)
+	test_cut(&t)
 
 	fmt.printf("%v/%v tests successful.\n", TEST_count - TEST_fail, TEST_count)
 	if TEST_fail > 0 {
@@ -42,7 +43,6 @@ main :: proc() {
 @test
 test_index_any_small_string_not_found :: proc(t: ^testing.T) {
 	index := strings.index_any(".", "/:\"")
-	log(t, index)
 	expect(t, index == -1, "index_any should be negative")
 }
 
@@ -62,4 +62,31 @@ test_index_any_small_string_found :: proc(t: ^testing.T) {
 test_index_any_larger_string_found :: proc(t: ^testing.T) {
 	index := strings.index_any("aaaaaaaa:aaaaaaaa", "/:\"")
 	expect(t, index == 8, "index_any should be 8")
+}
+
+Cut_Test :: struct {
+	input:  string,
+	offset: int,
+	length: int,
+	output: string,
+}
+
+cut_tests :: []Cut_Test{
+	{"some example text", 0, 4, "some"        },
+	{"some example text", 2, 2, "me"          },
+	{"some example text", 5, 7, "example"     },
+	{"some example text", 5, 0, "example text"},
+	{"恥ずべきフクロウ",        4, 0, "フクロウ"       },
+}
+
+@test
+test_cut :: proc(t: ^testing.T) {
+	for test in cut_tests {
+		res := strings.cut(test.input, test.offset, test.length)
+		defer delete(res)
+
+		msg := fmt.tprintf("cut(\"%v\", %v, %v) expected to return \"%v\", got \"%v\"",
+			test.input, test.offset, test.length, test.output, res)
+		expect(t, res == test.output, msg)
+	}
 }

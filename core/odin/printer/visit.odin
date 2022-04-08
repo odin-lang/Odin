@@ -1046,8 +1046,11 @@ visit_expr :: proc(p: ^Printer, expr: ^ast.Expr, options := List_Options{}) {
 
 		push_poly_params(p, v.poly_params)
 
-		if v.is_maybe {
-			push_ident_token(p, "#maybe", 1)
+		switch v.kind {
+		case .Normal:
+		case .maybe:      push_ident_token(p, "#maybe", 1)
+		case .no_nil:     push_ident_token(p, "#no_nil", 1)
+		case .shared_nil: push_ident_token(p, "#shared_nil", 1)
 		}
 
 		push_where_clauses(p, v.where_clauses)

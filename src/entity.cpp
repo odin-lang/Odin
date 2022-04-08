@@ -45,9 +45,9 @@ enum EntityFlag : u64 {
 	EntityFlag_NoAlias       = 1ull<<9,
 	EntityFlag_TypeField     = 1ull<<10,
 	EntityFlag_Value         = 1ull<<11,
-	EntityFlag_Sret          = 1ull<<12,
-	EntityFlag_ByVal         = 1ull<<13,
-	EntityFlag_BitFieldValue = 1ull<<14,
+
+
+
 	EntityFlag_PolyConst     = 1ull<<15,
 	EntityFlag_NotExported   = 1ull<<16,
 	EntityFlag_ConstInput    = 1ull<<17,
@@ -114,6 +114,16 @@ struct ParameterValue {
 		Ast *ast_value;
 	};
 };
+
+bool has_parameter_value(ParameterValue const &param_value) {
+	if (param_value.kind != ParameterValue_Invalid) {
+		return true;
+	}
+	if (param_value.original_ast_expr != nullptr) {
+		return true;
+	}
+	return false;
+}
 
 enum EntityConstantFlags : u32 {
 	EntityConstantFlag_ImplicitEnumValue = 1<<0,

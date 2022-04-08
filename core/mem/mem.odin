@@ -16,7 +16,7 @@ zero_explicit :: proc "contextless" (data: rawptr, len: int) -> rawptr {
 	// equivalent semantics to those provided by the C11 Annex K 3.7.4.1
 	// memset_s call.
 	intrinsics.mem_zero_volatile(data, len) // Use the volatile mem_zero
-	intrinsics.atomic_fence() // Prevent reordering
+	intrinsics.atomic_thread_fence(.Seq_Cst) // Prevent reordering
 	return data
 }
 zero_item :: proc "contextless" (item: $P/^$T) {

@@ -33,6 +33,10 @@ import "core:math/big"
 		core and vendor library collections.
 	Nightly Builds - https://odin-lang.org/docs/nightly/
 		Get the latest nightly builds of Odin.
+	More Odin Examples - https://github.com/odin-lang/examples
+		This repository contains examples of how certain things can be accomplished 
+		in idiomatic Odin, allowing you learn its semantics, as well as how to use 
+		parts of the core and vendor package collections.
 */
 
 the_basics :: proc() {
@@ -1107,11 +1111,6 @@ prefix_table := [?]string{
 }
 
 threading_example :: proc() {
-	if ODIN_OS == .Darwin {
-		// TODO: Fix threads on darwin/macOS
-		return
-	}
-
 	fmt.println("\n# threading_example")
 
 	{ // Basic Threads
@@ -1152,7 +1151,7 @@ threading_example :: proc() {
 
 	{ // Thread Pool
 		fmt.println("\n## Thread Pool")
-		task_proc :: proc(t: ^thread.Task) {
+		task_proc :: proc(t: thread.Task) {
 			index := t.user_index % len(prefix_table)
 			for iteration in 1..=5 {
 				fmt.printf("Worker Task %d is on iteration %d\n", t.user_index, iteration)
@@ -1162,7 +1161,7 @@ threading_example :: proc() {
 		}
 
 		pool: thread.Pool
-		thread.pool_init(pool=&pool, thread_count=3)
+		thread.pool_init(pool=&pool, thread_count=3, allocator=context.allocator)
 		defer thread.pool_destroy(&pool)
 
 
@@ -1171,7 +1170,7 @@ threading_example :: proc() {
 		}
 
 		thread.pool_start(&pool)
-		thread.pool_wait_and_process(&pool)
+		thread.pool_finish(&pool)
 	}
 }
 
@@ -2424,6 +2423,13 @@ matrix_type :: proc() {
 }
 
 main :: proc() {
+	/*
+		For More Odin Examples - https://github.com/odin-lang/examples
+			This repository contains examples of how certain things can be accomplished 
+			in idiomatic Odin, allowing you learn its semantics, as well as how to use 
+			parts of the core and vendor package collections.
+	*/
+
 	when true {
 		the_basics()
 		control_flow()

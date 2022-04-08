@@ -2005,3 +2005,25 @@ lbValue lb_handle_objc_send(lbProcedure *p, Ast *expr) {
 }
 
 
+
+
+LLVMAtomicOrdering llvm_atomic_ordering_from_odin(ExactValue const &value) {
+	GB_ASSERT(value.kind == ExactValue_Integer);
+	i64 v = exact_value_to_i64(value);
+	switch (v) {
+	case OdinAtomicMemoryOrder_relaxed: return LLVMAtomicOrderingUnordered;
+	case OdinAtomicMemoryOrder_consume: return LLVMAtomicOrderingMonotonic;
+	case OdinAtomicMemoryOrder_acquire: return LLVMAtomicOrderingAcquire;
+	case OdinAtomicMemoryOrder_release: return LLVMAtomicOrderingRelease;
+	case OdinAtomicMemoryOrder_acq_rel: return LLVMAtomicOrderingAcquireRelease;
+	case OdinAtomicMemoryOrder_seq_cst: return LLVMAtomicOrderingSequentiallyConsistent;
+	}
+	GB_PANIC("Unknown atomic ordering");
+	return LLVMAtomicOrderingSequentiallyConsistent;
+}
+
+
+LLVMAtomicOrdering llvm_atomic_ordering_from_odin(Ast *expr) {
+	ExactValue value = type_and_value_of_expr(expr).value;
+	return llvm_atomic_ordering_from_odin(value);
+}
