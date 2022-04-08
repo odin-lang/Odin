@@ -829,15 +829,16 @@ struct GlobalEnumValue {
 	i64 value;
 };
 
-Slice<Entity *> add_global_enum_type(String const &type_name, GlobalEnumValue *values, isize value_count) {
+Slice<Entity *> add_global_enum_type(String const &type_name, GlobalEnumValue *values, isize value_count, Type **enum_type_ = nullptr) {
 	Scope *scope = create_scope(nullptr, builtin_pkg->scope);
-	Entity *e = alloc_entity_type_name(scope, make_token_ident(type_name), nullptr, EntityState_Resolved);
+	Entity *entity = alloc_entity_type_name(scope, make_token_ident(type_name), nullptr, EntityState_Resolved);
 
 	Type *enum_type = alloc_type_enum();
-	Type *named_type = alloc_type_named(type_name, enum_type, e);
+	Type *named_type = alloc_type_named(type_name, enum_type, entity);
 	set_base_type(named_type, enum_type);
 	enum_type->Enum.base_type = t_int;
 	enum_type->Enum.scope = scope;
+	entity->type = named_type;
 
 	auto fields = array_make<Entity *>(permanent_allocator(), value_count);
 	for (isize i = 0; i < value_count; i++) {
@@ -857,6 +858,9 @@ Slice<Entity *> add_global_enum_type(String const &type_name, GlobalEnumValue *v
 	enum_type->Enum.max_value_index = value_count-1;
 	enum_type->Enum.min_value = &enum_type->Enum.fields[enum_type->Enum.min_value_index]->Constant.value;
 	enum_type->Enum.max_value = &enum_type->Enum.fields[enum_type->Enum.max_value_index]->Constant.value;
+
+
+	if (enum_type_) *enum_type_ = named_type;
 
 	return slice_from_array(fields);
 }
@@ -984,6 +988,21 @@ void init_universal(void) {
 
 		auto fields = add_global_enum_type(str_lit("Odin_Error_Pos_Style_Type"), values, gb_count_of(values));
 		add_global_enum_constant(fields, "ODIN_ERROR_POS_STYLE", build_context.ODIN_ERROR_POS_STYLE);
+	}
+
+	{
+		GlobalEnumValue values[OdinAtomicMemoryOrder_COUNT] = {
+			{OdinAtomicMemoryOrder_strings[OdinAtomicMemoryOrder_relaxed], OdinAtomicMemoryOrder_relaxed},
+			{OdinAtomicMemoryOrder_strings[OdinAtomicMemoryOrder_consume], OdinAtomicMemoryOrder_consume},
+			{OdinAtomicMemoryOrder_strings[OdinAtomicMemoryOrder_acquire], OdinAtomicMemoryOrder_acquire},
+			{OdinAtomicMemoryOrder_strings[OdinAtomicMemoryOrder_release], OdinAtomicMemoryOrder_release},
+			{OdinAtomicMemoryOrder_strings[OdinAtomicMemoryOrder_acq_rel], OdinAtomicMemoryOrder_acq_rel},
+			{OdinAtomicMemoryOrder_strings[OdinAtomicMemoryOrder_seq_cst], OdinAtomicMemoryOrder_seq_cst},
+		};
+
+		add_global_enum_type(str_lit("Atomic_Memory_Order"), values, gb_count_of(values), &t_atomic_memory_order);
+		GB_ASSERT(t_atomic_memory_order->kind == Type_Named);
+		scope_insert(intrinsics_pkg->scope, t_atomic_memory_order->Named.type_name);
 	}
 
 
@@ -2656,6 +2675,15 @@ Array<Entity *> proc_group_entities(CheckerContext *c, Operand o) {
 	}
 	return procs;
 }
+
+Array<Entity *> proc_group_entities_cloned(CheckerContext *c, Operand o) {
+	auto entities = proc_group_entities(c, o);
+	if (entities.count == 0) {
+		return {};
+	}
+	return array_clone(permanent_allocator(), entities);
+}
+
 
 
 

@@ -342,6 +342,7 @@ MEM_TOP_DOWN    :: 0x100000
 MEM_LARGE_PAGES :: 0x20000000
 MEM_4MB_PAGES   :: 0x80000000
 
+@(default_calling_convention="stdcall")
 foreign kernel32 {
 	VirtualAlloc :: proc(
 		lpAddress: LPVOID,
@@ -484,6 +485,7 @@ LowMemoryResourceNotification  :: MEMORY_RESOURCE_NOTIFICATION_TYPE.LowMemoryRes
 HighMemoryResourceNotification :: MEMORY_RESOURCE_NOTIFICATION_TYPE.HighMemoryResourceNotification
 
 
+@(default_calling_convention="stdcall")
 foreign kernel32 {
 	CreateMemoryResourceNotification :: proc(
 		NotificationType: MEMORY_RESOURCE_NOTIFICATION_TYPE,
@@ -499,6 +501,7 @@ FILE_CACHE_MAX_HARD_DISABLE :: DWORD(0x00000002)
 FILE_CACHE_MIN_HARD_ENABLE  :: DWORD(0x00000004)
 FILE_CACHE_MIN_HARD_DISABLE :: DWORD(0x00000008)
 
+@(default_calling_convention="stdcall")
 foreign kernel32 {
 	GetSystemFileCacheSize :: proc(
 		lpMinimumFileCacheSize: PSIZE_T,
@@ -528,6 +531,7 @@ WIN32_MEMORY_RANGE_ENTRY :: struct {
 
 PWIN32_MEMORY_RANGE_ENTRY :: ^WIN32_MEMORY_RANGE_ENTRY
 
+@(default_calling_convention="stdcall")
 foreign kernel32 {
 	PrefetchVirtualMemory :: proc(
 		hProcess: HANDLE,
@@ -585,6 +589,7 @@ foreign kernel32 {
 
 MEHC_PATROL_SCRUBBER_PRESENT :: ULONG(0x1)
 
+@(default_calling_convention="stdcall")
 foreign kernel32 {
 	GetMemoryErrorHandlingCapabilities :: proc(
 		Capabilities: PULONG,
@@ -593,6 +598,7 @@ foreign kernel32 {
 
 PBAD_MEMORY_CALLBACK_ROUTINE :: #type proc "stdcall" ()
 
+@(default_calling_convention="stdcall")
 foreign kernel32 {
 	RegisterBadMemoryNotification :: proc(
 		Callback: PBAD_MEMORY_CALLBACK_ROUTINE,
@@ -613,6 +619,7 @@ VmOfferPriorityLow         :: OFFER_PRIORITY.VmOfferPriorityLow
 VmOfferPriorityBelowNormal :: OFFER_PRIORITY.VmOfferPriorityBelowNormal
 VmOfferPriorityNormal      :: OFFER_PRIORITY.VmOfferPriorityNormal
 
+@(default_calling_convention="stdcall")
 foreign kernel32 {
 	OfferVirtualMemory :: proc(
 		VirtualAddress: PVOID,
@@ -677,6 +684,7 @@ WIN32_MEMORY_REGION_INFORMATION_u_s_Bitfield :: distinct ULONG
 	Reserved       : 32-6,
 }*/
 
+@(default_calling_convention="stdcall")
 foreign kernel32 {
 	QueryVirtualMemoryInformation :: proc(
 		Process: HANDLE,
@@ -701,7 +709,7 @@ foreign kernel32 {
 
 NUMA_NO_PREFERRED_NODE :: 0xffffffff
 
-MapViewOfFile2 :: #force_inline proc(
+MapViewOfFile2 :: #force_inline proc "stdcall" (
 	FileMappingHandle: HANDLE,
 	ProcessHandle: HANDLE,
 	Offset: ULONG64,
@@ -722,6 +730,7 @@ MapViewOfFile2 :: #force_inline proc(
 	)
 }
 
+@(default_calling_convention="stdcall")
 foreign kernel32 {
 	UnmapViewOfFile2 :: proc(
 		ProcessHandle: HANDLE,

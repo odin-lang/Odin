@@ -1,7 +1,7 @@
 //+private
 package mem_virtual
 
-import sync "core:sync/sync2"
+import "core:sync"
 
 Platform_Memory_Block :: struct {
 	block:      Memory_Block,
