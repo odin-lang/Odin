@@ -1308,7 +1308,9 @@ bool init_build_paths(String init_filename) {
 
 	// Do we have an extension? We might not if the output filename was supplied.
 	if (bc->build_paths[BuildPath_Output].ext.len == 0) {
-		bc->build_paths[BuildPath_Output].ext = copy_string(ha, output_extension);
+		if (build_context.metrics.os == TargetOs_windows || build_context.build_mode != BuildMode_Executable) {
+			bc->build_paths[BuildPath_Output].ext = copy_string(ha, output_extension);
+		}
 	}
 
 	// Check if output path is a directory.

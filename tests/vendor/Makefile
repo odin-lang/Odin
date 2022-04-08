@@ -10,4 +10,4 @@ endif
 all: botan_test
 
 botan_test:
-	$(ODIN) run botan -out=botan_hash -o:speed -no-bounds-check $(ODINFLAGS)
+	$(ODIN) run botan -out=test_botan_hash -o:speed -no-bounds-check $(ODINFLAGS)
