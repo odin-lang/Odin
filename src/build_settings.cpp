@@ -1281,21 +1281,7 @@ bool init_build_paths(String init_filename) {
 		output_name        = remove_extension_from_path(output_name);
 		output_name        = copy_string(ha, string_trim_whitespace(output_name));
 
-		/*
-		NOTE(Jeroen): This fallback substitution can't be made at this stage.
-		if (gen->output_name.len == 0) {
-			gen->output_name = c->info.init_scope->pkg->name;
-		}
-		*/
 		Path output_path = path_from_string(ha, output_name);
-
-		#ifndef GB_SYSTEM_WINDOWS
-			char cwd[4096];
-			getcwd(&cwd[0], 4096);
-
-			const u8 * cwd_str = (const u8 *)&cwd[0];
-			output_path.basename = copy_string(ha, make_string(cwd_str, strlen(cwd)));
-		#endif
 
 		// Replace extension.
 		if (output_path.ext.len > 0) {
