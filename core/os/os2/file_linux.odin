@@ -331,12 +331,12 @@ _is_dir :: proc(fd: Handle) -> bool {
 // defined as 512, however, it is well known that paths can exceed that limit.
 // So, in theory you could have a path larger than the entire temp_allocator's
 // buffer.  Therefor any large paths will use context.allocator.
-_name_to_cstring :: proc(path: string) -> (cpath: cstring, allocated: bool) {
-	if len(path) > _CSTRING_NAME_HEAP_THRESHOLD {
-		cpath = strings.clone_to_cstring(path)
+_name_to_cstring :: proc(name: string) -> (cname: cstring, allocated: bool) {
+	if len(name) > _CSTRING_NAME_HEAP_THRESHOLD {
+		cname = strings.clone_to_cstring(name)
 		allocated = true
 		return
 	}
-	cpath = strings.clone_to_cstring(path, context.temp_allocator)
+	cname = strings.clone_to_cstring(name, context.temp_allocator)
 	return
 }
