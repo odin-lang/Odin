@@ -93,6 +93,34 @@ aprintf :: proc(fmt: string, args: ..any) -> string {
 	return strings.to_string(str)
 }
 
+// caprint procedure return a cstring that was allocated with the current context
+// They must be freed accordingly
+caprint :: proc(args: ..any, sep := " ") -> cstring {
+	str: strings.Builder
+	strings.init_builder(&str)
+	sbprint(buf=&str, args=args, sep=sep)
+	strings.write_byte(&str, 0)
+	return strings.to_cstring(str)
+}
+// caprintln procedure return a cstring that was allocated with the current context
+// They must be freed accordingly
+caprintln :: proc(args: ..any, sep := " ") -> cstring {
+	str: strings.Builder
+	strings.init_builder(&str)
+	sbprintln(buf=&str, args=args, sep=sep)
+	strings.write_byte(&str, 0)
+	return strings.to_cstring(str)
+}
+
+// caprintf procedure return a cstring that was allocated with the current context
+// They must be freed accordingly
+caprintf :: proc(fmt: string, args: ..any) -> cstring {
+	str: strings.Builder
+	strings.init_builder(&str)
+	sbprintf(&str, fmt, ..args)
+	strings.write_byte(&str, 0)
+	return strings.to_cstring(str)
+}
 
 // tprint procedure return a string that was allocated with the current context's temporary allocator
 tprint :: proc(args: ..any, sep := " ") -> string {
