@@ -146,6 +146,12 @@ to_string :: proc(b: Builder) -> string {
 	return string(b.buf[:])
 }
 
+// cast the builder byte buffer to a cstring and return it. assert that the buffer ends with a terminating nul byte.
+to_cstring :: proc(b: Builder) -> cstring {
+	assert(b.buf[len(b.buf)-1] == 0)
+	return cstring(&b.buf[0])
+}
+
 // return the length of the builder byte buffer
 builder_len :: proc(b: Builder) -> int {
 	return len(b.buf)

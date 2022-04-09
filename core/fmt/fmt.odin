@@ -116,6 +116,30 @@ tprintf :: proc(fmt: string, args: ..any) -> string {
 	return strings.to_string(str)
 }
 
+// ctprint procedure returns a cstring that was allocated with the current context's temporary allocator
+ctprint :: proc(args: ..any, sep := " ") -> cstring {
+	str: strings.Builder
+	strings.init_builder(&str, context.temp_allocator)
+	sbprint(buf=&str, args=args, sep=sep)
+	strings.write_byte(&str, 0)
+	return strings.to_cstring(str)
+}
+// ctprintln procedure returns a cstring that was allocated with the current context's temporary allocator
+ctprintln :: proc(args: ..any, sep := " ") -> cstring {
+	str: strings.Builder
+	strings.init_builder(&str, context.temp_allocator)
+	sbprintln(buf=&str, args=args, sep=sep)
+	strings.write_byte(&str, 0)
+	return strings.to_cstring(str)
+}
+// ctprintf procedure returns a cstring that was allocated with the current context's temporary allocator
+ctprintf :: proc(fmt: string, args: ..any) -> cstring {
+	str: strings.Builder
+	strings.init_builder(&str, context.temp_allocator)
+	sbprintf(&str, fmt, ..args)
+	strings.write_byte(&str, 0)
+	return strings.to_cstring(str);
+}
 
 // bprint procedures return a string using a buffer from an array
 bprint :: proc(buf: []byte, args: ..any, sep := " ") -> string {
