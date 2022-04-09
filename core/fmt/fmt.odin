@@ -138,7 +138,7 @@ ctprintf :: proc(fmt: string, args: ..any) -> cstring {
 	strings.init_builder(&str, context.temp_allocator)
 	sbprintf(&str, fmt, ..args)
 	strings.write_byte(&str, 0)
-	return strings.to_cstring(str);
+	return strings.to_cstring(str)
 }
 
 // bprint procedures return a string using a buffer from an array
