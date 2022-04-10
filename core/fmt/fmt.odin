@@ -100,7 +100,7 @@ caprint :: proc(args: ..any, sep := " ") -> cstring {
 	strings.init_builder(&str)
 	sbprint(buf=&str, args=args, sep=sep)
 	strings.write_byte(&str, 0)
-	return strings.to_cstring(str)
+	return strings.to_cstring(&str)
 }
 // caprintln procedure return a cstring that was allocated with the current context
 // They must be freed accordingly
@@ -109,7 +109,7 @@ caprintln :: proc(args: ..any, sep := " ") -> cstring {
 	strings.init_builder(&str)
 	sbprintln(buf=&str, args=args, sep=sep)
 	strings.write_byte(&str, 0)
-	return strings.to_cstring(str)
+	return strings.to_cstring(&str)
 }
 
 // caprintf procedure return a cstring that was allocated with the current context
@@ -119,7 +119,7 @@ caprintf :: proc(fmt: string, args: ..any) -> cstring {
 	strings.init_builder(&str)
 	sbprintf(&str, fmt, ..args)
 	strings.write_byte(&str, 0)
-	return strings.to_cstring(str)
+	return strings.to_cstring(&str)
 }
 
 // tprint procedure return a string that was allocated with the current context's temporary allocator
@@ -150,7 +150,7 @@ ctprint :: proc(args: ..any, sep := " ") -> cstring {
 	strings.init_builder(&str, context.temp_allocator)
 	sbprint(buf=&str, args=args, sep=sep)
 	strings.write_byte(&str, 0)
-	return strings.to_cstring(str)
+	return strings.to_cstring(&str)
 }
 // ctprintln procedure returns a cstring that was allocated with the current context's temporary allocator
 ctprintln :: proc(args: ..any, sep := " ") -> cstring {
@@ -158,7 +158,7 @@ ctprintln :: proc(args: ..any, sep := " ") -> cstring {
 	strings.init_builder(&str, context.temp_allocator)
 	sbprintln(buf=&str, args=args, sep=sep)
 	strings.write_byte(&str, 0)
-	return strings.to_cstring(str)
+	return strings.to_cstring(&str)
 }
 // ctprintf procedure returns a cstring that was allocated with the current context's temporary allocator
 ctprintf :: proc(fmt: string, args: ..any) -> cstring {
@@ -166,7 +166,7 @@ ctprintf :: proc(fmt: string, args: ..any) -> cstring {
 	strings.init_builder(&str, context.temp_allocator)
 	sbprintf(&str, fmt, ..args)
 	strings.write_byte(&str, 0)
-	return strings.to_cstring(str)
+	return strings.to_cstring(&str)
 }
 
 // bprint procedures return a string using a buffer from an array

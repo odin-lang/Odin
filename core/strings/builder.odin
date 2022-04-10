@@ -146,9 +146,13 @@ to_string :: proc(b: Builder) -> string {
 	return string(b.buf[:])
 }
 
-// cast the builder byte buffer to a cstring and return it. assert that the buffer ends with a terminating nul byte.
-to_cstring :: proc(b: Builder) -> cstring {
-	assert(b.buf[len(b.buf)-1] == 0)
+// cast the builder byte buffer to a cstring and return it. ensure that the buffer ends with a terminating nul byte. return nil if that fails
+to_cstring :: proc(b: ^Builder) -> cstring {
+	if len := len(b.buf); len == 0 ||  b.buf[len - 1] != 0 {
+		if n := write_byte(b, 0); n != 1 {
+			return nil
+		}
+	}
 	return cstring(&b.buf[0])
 }
 
