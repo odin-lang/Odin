@@ -17,8 +17,8 @@ Marshal_Error :: union #shared_nil {
 	io.Error,
 }
 
+// indentation count, more options could be added to the struct later
 Pretty :: struct {
-	apply: bool,
 	indentation: int,
 }
 
@@ -28,8 +28,8 @@ marshal :: proc(v: any, pretty_print := false, allocator := context.allocator) -
 		strings.destroy_builder(&b)
 	}
 
-	pretty := Pretty { apply = pretty_print }
-	marshal_to_builder(&b, v, &pretty) or_return
+	pretty: Pretty
+	marshal_to_builder(&b, v, pretty_print ? &pretty : nil) or_return
 	
 	if len(b.buf) != 0 {
 		data = b.buf[:]
@@ -37,11 +37,11 @@ marshal :: proc(v: any, pretty_print := false, allocator := context.allocator) -
 	return data, nil
 }
 
-marshal_to_builder :: proc(b: ^strings.Builder, v: any, pretty: ^Pretty) -> Marshal_Error {
+marshal_to_builder :: proc(b: ^strings.Builder, v: any, pretty: ^Pretty = nil) -> Marshal_Error {
 	return marshal_to_writer(strings.to_writer(b), v, pretty)
 }
 
-marshal_to_writer :: proc(w: io.Writer, v: any, pretty: ^Pretty) -> (err: Marshal_Error) {
+marshal_to_writer :: proc(w: io.Writer, v: any, pretty: ^Pretty = nil) -> (err: Marshal_Error) {
 	if v == nil {
 		io.write_string(w, "null") or_return
 		return
@@ -343,42 +343,43 @@ marshal_to_writer :: proc(w: io.Writer, v: any, pretty: ^Pretty) -> (err: Marsha
 }
 
 // insert the wanted byte, push newline, increase indentation
-pretty_start :: proc(w: io.Writer, c: byte, using pretty: ^Pretty) -> (err: Marshal_Error) {
+pretty_start :: proc(w: io.Writer, c: byte, pretty: ^Pretty) -> (err: Marshal_Error) {
 	io.write_byte(w, c) or_return
 	
-	if apply {
+	if pretty != nil {
 		io.write_byte(w, '\n') or_return
+		pretty.indentation += 1
 	}
 
-	indentation += 1
 	return
 }
 
 // insert comma and newline when iteration > 0 and add tab per indentation
-pretty_iteration :: proc(w: io.Writer, iteration: int, using pretty: ^Pretty) -> (err: Marshal_Error) {
+pretty_iteration :: proc(w: io.Writer, iteration: int, pretty: ^Pretty) -> (err: Marshal_Error) {
 	if iteration > 0 {
 		io.write_string(w, ", ") or_return
 
-		if apply {
+		if pretty != nil {
 			io.write_byte(w, '\n') or_return
 		}
 	}
 
-	for _ in 0..<indentation {
-		io.write_byte(w, '\t') or_return
+	if pretty != nil {
+		for _ in 0..<pretty.indentation {
+			io.write_byte(w, '\t') or_return
+		}
 	}
 
 	return
 }
 
 // decrease indentation, insert newline, insert tab per indentation and write wanted byte
-pretty_end :: proc(w: io.Writer, c: byte, using pretty: ^Pretty) -> (err: Marshal_Error) {
-	indentation -= 1
-
-	if apply {
+pretty_end :: proc(w: io.Writer, c: byte, pretty: ^Pretty) -> (err: Marshal_Error) {
+	if pretty != nil {
+		pretty.indentation -= 1
 		io.write_byte(w, '\n') or_return
 
-		for _ in 0..<indentation {
+		for _ in 0..<pretty.indentation {
 			io.write_byte(w, '\t') or_return
 		}
 	}
