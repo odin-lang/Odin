@@ -210,11 +210,6 @@ load_from_context :: proc(ctx: ^$C, options := Options{}, allocator := context.a
 	context.allocator = allocator
 	options := options
 
-	if .alpha_drop_if_present in options || .alpha_premultiply in options {
-		// TODO: Implement.
-		// As stated in image/common, unimplemented options are ignored.
-	}
-
 	if .info in options {
 		options |= {.return_metadata, .do_not_decompress_image}
 		options -= {.info}
@@ -258,19 +253,19 @@ load_from_context :: proc(ctx: ^$C, options := Options{}, allocator := context.a
 
 	img.width    = int(header.width)
 	img.height   = int(header.height)
-	img.channels = 4
+	img.channels = 4 if .alpha_add_if_missing in options else int(header.channels)
 	img.depth    = 8
 
 	if .do_not_decompress_image in options {
+		img.channels = int(header.channels)
 		return
 	}
 
-	bytes_needed := image.compute_buffer_size(int(header.width), int(header.height), 4, 8)
+	bytes_needed := image.compute_buffer_size(int(header.width), int(header.height), img.channels, 8)
 
 	if !resize(&img.pixels.buf, bytes_needed) {
 	 	return img, mem.Allocator_Error.Out_Of_Memory
 	}
-	pixels := mem.slice_data_cast([]RGBA_Pixel, img.pixels.buf[:])
 
 	/*
 		Decode loop starts here.
@@ -278,6 +273,7 @@ load_from_context :: proc(ctx: ^$C, options := Options{}, allocator := context.a
 	seen: [64]RGBA_Pixel
 	pix := RGBA_Pixel{0, 0, 0, 255}
 	seen[qoi_hash(pix)] = pix
+	pixels := img.pixels.buf[:]
 
 	decode: for len(pixels) > 0 {
 		data := image.read_u8(ctx) or_return
@@ -330,13 +326,13 @@ load_from_context :: proc(ctx: ^$C, options := Options{}, allocator := context.a
 					}
 
 				case .RUN:
-					if length := int(data & 63) + 1; length > len(pixels) {
+					if length := int(data & 63) + 1; (length * img.channels) > len(pixels) {
 						return img, .Corrupt
 					} else {
-						#no_bounds_check for i in 0..<length {
-							pixels[i] = pix
+						#no_bounds_check for in 0..<length {
+							copy(pixels, pix[:img.channels])
+							pixels = pixels[img.channels:]
 						}
-						pixels = pixels[length:]
 					}
 
 					continue decode
@@ -347,8 +343,8 @@ load_from_context :: proc(ctx: ^$C, options := Options{}, allocator := context.a
 		}
 
 		#no_bounds_check {
-			pixels[0] = pix
-			pixels = pixels[1:]
+			copy(pixels, pix[:img.channels])
+			pixels = pixels[img.channels:]
 		}
 	}
 
@@ -357,6 +353,11 @@ load_from_context :: proc(ctx: ^$C, options := Options{}, allocator := context.a
 	if trailer_err != nil || trailer != 0x1 {
 		return img, .Missing_Or_Corrupt_Trailer
 	}
+
+	if .alpha_premultiply in options && !image.alpha_drop_if_present(img, options) {
+		return img, .Post_Processing_Error
+	}
+
 	return
 }
 
