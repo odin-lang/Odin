@@ -25,9 +25,6 @@ import "core:io"
 import "core:mem"
 import "core:intrinsics"
 
-import "core:fmt"
-
-
 // Limit chunk sizes.
 // By default: IDAT = 8k x 8k x 16-bits + 8k filter bytes.
 // The total number of pixels defaults to 64 Megapixel and can be tuned in image/common.odin.
@@ -600,16 +597,13 @@ load_from_context :: proc(ctx: ^$C, options := Options{}, allocator := context.a
 
 			if .Paletted in header.color_type {
 				if len(c.data) > 256 {
-					fmt.printf("[PLTE] tRNS length: %v\n", len(c.data))
 					return img, .TNRS_Invalid_Length
 				}
 			} else if .Color in header.color_type {
 				if len(c.data) != 6 {
-					fmt.printf("[COLOR] tRNS length: %v\n", len(c.data))
 					return img, .TNRS_Invalid_Length
 				}
 			} else if len(c.data) != 2 {
-				fmt.printf("[GRAY] tRNS length: %v\n", len(c.data))
 				return img, .TNRS_Invalid_Length
 			}
 
