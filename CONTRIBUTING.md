@@ -1,12 +1,14 @@
-# The Proposal Process
+# CONTRIBUTING
 
-## Introduction
+## The Proposal Process
+
+### Introduction
 
 The Odin project's development process is driven by design and pragmatism. Significant changes to the language, libraries, or tools _must_ be first discussed, and maybe formally documented, before they can be implemented.
 
 This document describes the process for proposing, documenting, and implementing changes to the Odin project.
 
-## The Proposal Process
+### The Proposal Process
 
 The proposal process is the process for reviewing a proposal and reaching a decision about whether to accept or decline the proposal.
 
@@ -32,7 +34,7 @@ The proposal process is the process for reviewing a proposal and reaching a deci
 
 After the proposal is accepted or declined, implementation of the proposal proceeds in the same way as any other contribution to the project.
 
-## Design Documents
+### Design Documents
 
 The design document should follow this template:
 
