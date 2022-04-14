@@ -5495,6 +5495,17 @@ Buffer_contents :: #force_inline proc(self: ^Buffer) -> []byte {
 Buffer_contentsPointer :: #force_inline proc(self: ^Buffer) -> rawptr {
 	return msgSend(rawptr, self, "contents")
 }
+@(objc_type=Buffer, objc_name="contentsAsSlice")
+Buffer_contentsAsSlice :: #force_inline proc(self: ^Buffer, $T: typeid/[]$E) -> T {
+	contents := msgSend([^]byte, self, "contents")
+	length := Buffer_length(self)
+	return mem.slice_data_cast(T, contents[:length])
+}
+@(objc_type=Buffer, objc_name="contentsAsType")
+Buffer_contentsAsType :: #force_inline proc(self: ^Buffer, $T: typeid, offset: uintptr = 0) -> ^T {
+	ptr := msgSend(rawptr, self, "contents")
+	return (^T)(uintptr(ptr) + offset)
+}
 @(objc_type=Buffer, objc_name="didModifyRange")
 Buffer_didModifyRange :: #force_inline proc(self: ^Buffer, range: NS.Range) {
 	msgSend(nil, self, "didModifyRange:", range)
