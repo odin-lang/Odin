@@ -6490,35 +6490,35 @@ Device_newCommandQueueWithMaxCommandBufferCount :: #force_inline proc(self: ^Dev
 	return msgSend(^CommandQueue, self, "newCommandQueueWithMaxCommandBufferCount:", maxCommandBufferCount)
 }
 @(objc_type=Device, objc_name="newComputePipelineStateWithDescriptorWithCompletionHandler")
-Device_newComputePipelineStateWithDescriptorWithCompletionHandler :: #force_inline proc(self: ^Device, descriptor: ^ComputePipelineDescriptor, options: PipelineOption, completionHandler: NewComputePipelineStateWithReflectionCompletionHandler) {
-	msgSend(nil, self, "newComputePipelineStateWithDescriptor:options:completionHandler:", descriptor, options, completionHandler)
+Device_newComputePipelineStateWithDescriptorWithCompletionHandler :: #force_inline proc(self: ^Device, descriptor: ^ComputePipelineDescriptor, options: PipelineOption, completionHandler: NewComputePipelineStateWithReflectionCompletionHandler) -> ^ComputePipelineState {
+	return msgSend(^ComputePipelineState, self, "newComputePipelineStateWithDescriptor:options:completionHandler:", descriptor, options, completionHandler)
 }
 @(objc_type=Device, objc_name="newComputePipelineStateWithDescriptorWithReflection")
-Device_newComputePipelineStateWithDescriptorWithReflection :: #force_inline proc(self: ^Device, descriptor: ^ComputePipelineDescriptor, options: PipelineOption, reflection: ^AutoreleasedComputePipelineReflection) -> (device: ^Device, error: ^NS.Error) {
-	device = msgSend(^Device, self, "newComputePipelineStateWithDescriptor:options:reflection:error:", descriptor, options, reflection, &error)
+Device_newComputePipelineStateWithDescriptorWithReflection :: #force_inline proc(self: ^Device, descriptor: ^ComputePipelineDescriptor, options: PipelineOption, reflection: ^AutoreleasedComputePipelineReflection) -> (res: ^ComputePipelineState, error: ^NS.Error) {
+	res = msgSend(^ComputePipelineState, self, "newComputePipelineStateWithDescriptor:options:reflection:error:", descriptor, options, reflection, &error)
 	return
 }
 @(objc_type=Device, objc_name="newComputePipelineStateWithFunctionWithCompletionHandler")
-Device_newComputePipelineStateWithFunctionWithCompletionHandler :: #force_inline proc(self: ^Device, computeFunction: ^Function, completionHandler: NewComputePipelineStateCompletionHandler) {
-	msgSend(nil, self, "newComputePipelineStateWithFunction:completionHandler:", computeFunction, completionHandler)
+Device_newComputePipelineStateWithFunctionWithCompletionHandler :: #force_inline proc(self: ^Device, computeFunction: ^Function, completionHandler: NewComputePipelineStateCompletionHandler) -> ^ComputePipelineState {
+	return msgSend(^ComputePipelineState, self, "newComputePipelineStateWithFunction:completionHandler:", computeFunction, completionHandler)
 }
 @(objc_type=Device, objc_name="newComputePipelineStateWithFunction")
-Device_newComputePipelineStateWithFunction :: #force_inline proc(self: ^Device, computeFunction: ^Function) -> (res: ^Device, error: ^NS.Error) {
-	res = msgSend(^Device, self, "newComputePipelineStateWithFunction:error:", computeFunction, &error)
+Device_newComputePipelineStateWithFunction :: #force_inline proc(self: ^Device, computeFunction: ^Function) -> (res: ^ComputePipelineState, error: ^NS.Error) {
+	res = msgSend(^ComputePipelineState, self, "newComputePipelineStateWithFunction:error:", computeFunction, &error)
 	return
 }
 @(objc_type=Device, objc_name="newComputePipelineStateWithFunctionWithOptionsAndCompletionHandler")
-Device_newComputePipelineStateWithFunctionWithOptionsAndCompletionHandler :: #force_inline proc(self: ^Device, computeFunction: ^Function, options: PipelineOption, completionHandler: NewComputePipelineStateWithReflectionCompletionHandler) {
-	msgSend(nil, self, "newComputePipelineStateWithFunction:options:completionHandler:", computeFunction, options, completionHandler)
+Device_newComputePipelineStateWithFunctionWithOptionsAndCompletionHandler :: #force_inline proc(self: ^Device, computeFunction: ^Function, options: PipelineOption, completionHandler: NewComputePipelineStateWithReflectionCompletionHandler) -> (res: ^ComputePipelineState) {
+	return msgSend(^ComputePipelineState, self, "newComputePipelineStateWithFunction:options:completionHandler:", computeFunction, options, completionHandler)
 }
 @(objc_type=Device, objc_name="newComputePipelineStateWithFunctionWithReflection")
-Device_newComputePipelineStateWithFunctionWithReflection :: #force_inline proc(self: ^Device, computeFunction: ^Function, options: PipelineOption, reflection: ^AutoreleasedComputePipelineReflection) -> (device: ^Device, error: ^NS.Error) {
-	device = msgSend(^Device, self, "newComputePipelineStateWithFunction:options:reflection:error:", computeFunction, options, reflection, &error)
+Device_newComputePipelineStateWithFunctionWithReflection :: #force_inline proc(self: ^Device, computeFunction: ^Function, options: PipelineOption, reflection: ^AutoreleasedComputePipelineReflection) -> (res: ^ComputePipelineState, error: ^NS.Error) {
+	res = msgSend(^ComputePipelineState, self, "newComputePipelineStateWithFunction:options:reflection:error:", computeFunction, options, reflection, &error)
 	return
 }
 @(objc_type=Device, objc_name="newCounterSampleBuffer")
-Device_newCounterSampleBuffer :: #force_inline proc(self: ^Device, descriptor: ^CounterSampleBufferDescriptor) -> (device: ^Device, error: ^NS.Error) {
-	device = msgSend(^Device, self, "newCounterSampleBufferWithDescriptor:error:", descriptor, &error)
+Device_newCounterSampleBuffer :: #force_inline proc(self: ^Device, descriptor: ^CounterSampleBufferDescriptor) -> (counter: ^Counter, error: ^NS.Error) {
+	counter = msgSend(^Counter, self, "newCounterSampleBufferWithDescriptor:error:", descriptor, &error)
 	return
 }
 @(objc_type=Device, objc_name="newDefaultLibrary")
