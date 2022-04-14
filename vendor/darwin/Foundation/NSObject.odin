@@ -53,7 +53,10 @@ autorelease :: proc(self: ^Object) {
 retainCount :: proc(self: ^Object) -> UInteger {
 	return msgSend(UInteger, self, "retainCount")
 }
-
+@(objc_type=Object, objc_name="class")
+class :: proc(self: ^Object) -> Class {
+	return msgSend(Class, self, "class")
+}
 
 @(objc_type=Object, objc_name="hash")
 hash :: proc(self: ^Object) -> UInteger {

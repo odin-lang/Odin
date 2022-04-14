@@ -49,6 +49,10 @@ StringCompareOption :: enum UInteger {
 
 unichar :: distinct u16
 
+@(link_prefix="NS", default_calling_convention="c")
+foreign Foundation {
+	StringFromClass :: proc(cls: Class) -> ^String ---
+}
 
 AT :: MakeConstantString
 MakeConstantString :: proc "c" (#const c: cstring) -> ^String {
