@@ -4474,16 +4474,16 @@ TextureDescriptor_storageMode :: #force_inline proc(self: ^TextureDescriptor) ->
 TextureDescriptor_swizzle :: #force_inline proc(self: ^TextureDescriptor) -> TextureSwizzleChannels {
 	return msgSend(TextureSwizzleChannels, self, "swizzle")
 }
-@(objc_type=TextureDescriptor, objc_name="texture2DDescriptor", objc_is_class_method=true)
-TextureDescriptor_texture2DDescriptor :: #force_inline proc(pixelFormat: PixelFormat, width: NS.UInteger, height: NS.UInteger, mipmapped: BOOL) -> ^TextureDescriptor {
+@(objc_type=TextureDescriptor, objc_name="texture2DDescriptorWithPixelFormat", objc_is_class_method=true)
+TextureDescriptor_texture2DDescriptorWithPixelFormat :: #force_inline proc(pixelFormat: PixelFormat, width: NS.UInteger, height: NS.UInteger, mipmapped: BOOL) -> ^TextureDescriptor {
 	return msgSend(^TextureDescriptor, TextureDescriptor, "texture2DDescriptorWithPixelFormat:width:height:mipmapped:", pixelFormat, width, height, mipmapped)
 }
-@(objc_type=TextureDescriptor, objc_name="textureBufferDescriptor", objc_is_class_method=true)
-TextureDescriptor_textureBufferDescriptor :: #force_inline proc(pixelFormat: PixelFormat, width: NS.UInteger, resourceOptions: ResourceOptions, usage: TextureUsage) -> ^TextureDescriptor {
+@(objc_type=TextureDescriptor, objc_name="textureBufferDescriptorWithPixelFormat", objc_is_class_method=true)
+TextureDescriptor_textureBufferDescriptorWithPixelFormat :: #force_inline proc(pixelFormat: PixelFormat, width: NS.UInteger, resourceOptions: ResourceOptions, usage: TextureUsage) -> ^TextureDescriptor {
 	return msgSend(^TextureDescriptor, TextureDescriptor, "textureBufferDescriptorWithPixelFormat:width:resourceOptions:usage:", pixelFormat, width, resourceOptions, usage)
 }
-@(objc_type=TextureDescriptor, objc_name="textureCubeDescriptor", objc_is_class_method=true)
-TextureDescriptor_textureCubeDescriptor :: #force_inline proc(pixelFormat: PixelFormat, size: NS.UInteger, mipmapped: BOOL) -> ^TextureDescriptor {
+@(objc_type=TextureDescriptor, objc_name="textureCubeDescriptorWithPixelFormat", objc_is_class_method=true)
+TextureDescriptor_textureCubeDescriptorWithPixelFormat :: #force_inline proc(pixelFormat: PixelFormat, size: NS.UInteger, mipmapped: BOOL) -> ^TextureDescriptor {
 	return msgSend(^TextureDescriptor, TextureDescriptor, "textureCubeDescriptorWithPixelFormat:size:mipmapped:", pixelFormat, size, mipmapped)
 }
 @(objc_type=TextureDescriptor, objc_name="textureType")
@@ -7683,7 +7683,7 @@ RenderCommandEncoder_drawPrimitivesWithInstanceCount :: #force_inline proc(self:
 	msgSend(nil, self, "drawPrimitives:vertexStart:vertexCount:instanceCount:", primitiveType, vertexStart, vertexCount, instanceCount)
 }
 @(objc_type=RenderCommandEncoder, objc_name="drawPrimitivesWithInstances")
-RenderCommandEncoder_drawPrimitivesWithInstance :: #force_inline proc(self: ^RenderCommandEncoder, primitiveType: PrimitiveType, vertexStart: NS.UInteger, vertexCount: NS.UInteger, instanceCount: NS.UInteger, baseInstance: NS.UInteger) {
+RenderCommandEncoder_drawPrimitivesWithInstances :: #force_inline proc(self: ^RenderCommandEncoder, primitiveType: PrimitiveType, vertexStart: NS.UInteger, vertexCount: NS.UInteger, instanceCount: NS.UInteger, baseInstance: NS.UInteger) {
 	msgSend(nil, self, "drawPrimitives:vertexStart:vertexCount:instanceCount:baseInstance:", primitiveType, vertexStart, vertexCount, instanceCount, baseInstance)
 }
 @(objc_type=RenderCommandEncoder, objc_name="executeCommandsInBuffer")
