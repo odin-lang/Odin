@@ -786,6 +786,10 @@ HOVER_DEFAULT :: 0xFFFFFFFF
 USER_TIMER_MAXIMUM :: 0x7FFFFFFF
 USER_TIMER_MINIMUM :: 0x0000000A
 
+// WM_ACTIVATE state values
+WA_INACTIVE    :: 0
+WA_ACTIVE      :: 1
+WA_CLICKACTIVE :: 2
 
 // SetWindowsHook() codes
 WH_MIN             :: -1
