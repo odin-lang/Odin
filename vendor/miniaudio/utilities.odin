@@ -1,5 +1,7 @@
 package miniaudio
 
+import c "core:c/libc"
+
 when ODIN_OS == .Windows {
 	foreign import lib "lib/miniaudio.lib"
 } else when ODIN_OS == .Linux {
@@ -10,13 +12,6 @@ when ODIN_OS == .Windows {
 
 @(default_calling_convention="c", link_prefix="ma_")
 foreign lib {
-	/*
-	Adjust buffer size based on a scaling factor.
-
-	This just multiplies the base size by the scaling factor, making sure it's a size of at least 1.
-	*/
-	scale_buffer_size :: proc(baseBufferSize: u32, scale: f32) -> u32 ---
-
 	/*
 	Calculates a buffer size in milliseconds from the specified number of frames and sample rate.
 	*/
@@ -51,9 +46,14 @@ foreign lib {
 
 
 	/*
-	Clips f32 samples.
+	Clips samples.
 	*/
-	clip_samples_f32 :: proc(p: [^]f32, sampleCount: u64) ---
+	clip_samples_u8  :: proc(pDst: [^]u8,  pSrc: [^]i16, count: u64) ---
+	clip_samples_s16 :: proc(pDst: [^]i16, pSrc: [^]i32, count: u64) ---
+	clip_samples_s24 :: proc(pDst: [^]u8,  pSrc: [^]i64, count: u64) ---
+	clip_samples_s32 :: proc(pDst: [^]i32, pSrc: [^]i64, count: u64) ---
+	clip_samples_f32 :: proc(pDst,         pSrc: [^]f32, count: u64) ---
+	clip_pcm_frames	 :: proc(pDst,         pSrc: rawptr, frameCount: u64, format: format, channels: u32) ---
 
 	/*
 	Helper for applying a volume factor to samples.
@@ -86,20 +86,26 @@ foreign lib {
 	apply_volume_factor_pcm_frames_f32 :: proc(pFrames: [^]f32, frameCount: u64, channels: u32, factor: f32) ---
 	apply_volume_factor_pcm_frames     :: proc(pFrames: rawptr, frameCount: u64, format: format, channels: u32, factor: f32) ---
 
+	copy_and_apply_volume_factor_per_channel_f32 :: proc(pFramesOut, pFramesIn: [^]f32, frameCount: u64, channels: u32, pChannelGains: [^]f32) ---
+
+
+	ma_copy_and_apply_volume_and_clip_samples_u8  :: proc(pDst: [^]u8,  pSrc: [^]i16, count: u64, volume: f32) ---
+	ma_copy_and_apply_volume_and_clip_samples_s16 :: proc(pDst: [^]i16, pSrc: [^]i32, count: u64, volume: f32) ---
+	ma_copy_and_apply_volume_and_clip_samples_s24 :: proc(pDst: [^]u8,  pSrc: [^]i64, count: u64, volume: f32) ---
+	ma_copy_and_apply_volume_and_clip_samples_s32 :: proc(pDst: [^]i32, pSrc: [^]i64, count: u64, volume: f32) ---
+	ma_copy_and_apply_volume_and_clip_samples_f32 :: proc(pDst,         pSrc: [^]f32, count: u64, volume: f32) ---
+	ma_copy_and_apply_volume_and_clip_pcm_frames 	:: proc(pDst,         pSrc: rawptr, frameCount: u64, format: format, channels: u32, volume: f32) ---
+
 
 	/*
 	Helper for converting a linear factor to gain in decibels.
 	*/
-	factor_to_gain_db :: proc(factor: f32) -> f32 ---
+	volume_linear_to_db :: proc(factor: f32) -> f32 ---
 
 	/*
 	Helper for converting gain in decibels to a linear factor.
 	*/
-	gain_db_to_factor :: proc(gain: f32) -> f32 ---
-}
-
-zero_pcm_frames :: #force_inline proc "c" (p: rawptr, frameCount: u64, format: format, channels: u32) { 
-	silence_pcm_frames(p, frameCount, format, channels)
+	volume_db_to_linear :: proc(gain: f32) -> f32 ---
 }
 
 offset_pcm_frames_ptr_f32 :: #force_inline proc "c" (p: [^]f32, offsetInFrames: u64, channels: u32) -> [^]f32 {
@@ -109,23 +115,20 @@ offset_pcm_frames_const_ptr_f32 :: #force_inline proc "c" (p: [^]f32, offsetInFr
 	return cast([^]f32)offset_pcm_frames_ptr(p, offsetInFrames, .f32, channels)
 }
 
-clip_pcm_frames_f32 :: #force_inline proc "c" (p: [^]f32, frameCount: u64, channels: u32) { 
-	clip_samples_f32(p, frameCount*u64(channels)) 
-}
-
 
 data_source :: struct {}
+
+DATA_SOURCE_SELF_MANAGED_RANGE_AND_LOOP_POINT :: 0x00000001
 
 data_source_vtable :: struct {
 	onRead:          proc "c" (pDataSource: ^data_source, pFramesOut: rawptr, frameCount: u64, pFramesRead: ^u64) -> result,
 	onSeek:          proc "c" (pDataSource: ^data_source, frameIndex: u64) -> result,
-	onMap:           proc "c" (pDataSource: ^data_source, ppFramesOut: ^rawptr, pFrameCount: ^u64) -> result,   /* Returns MA_AT_END if the end has been reached. This should be considered successful. */
-	onUnmap:         proc "c" (pDataSource: ^data_source, frameCount: u64) -> result,
-	onGetDataFormat: proc "c" (pDataSource: ^data_source, pFormat: ^format, pChannels: ^u32, pSampleRate: ^u32) -> result,
+	onGetDataFormat: proc "c" (pDataSource: ^data_source, pFormat: ^format, pChannels: ^u32, pSampleRate: ^u32, pChannelMap: [^]channel, channelMapCap: c.size_t) -> result,
 	onGetCursor:     proc "c" (pDataSource: ^data_source, pCursor: ^u64) -> result,
 	onGetLength:     proc "c" (pDataSource: ^data_source, pLength: ^u64) -> result,
+	onSetLooping:    proc "c" (pDataSource: ^data_source, isLooping: b32) -> result,
+	flags:           u32,
 } 
-data_source_callbacks :: data_source_vtable  /* TODO: Remove ma_data_source_callbacks in version 0.11. */
 
 data_source_get_next_proc :: proc "c" (pDataSource: ^data_source) -> ^data_source
 
@@ -134,45 +137,43 @@ data_source_config :: struct {
 }
 
 data_source_base :: struct {
-	cb: data_source_callbacks,    /* TODO: Remove this. */
-
-	/* Variables below are placeholder and not yet used. */
 	vtable:           ^data_source_vtable,
 	rangeBegInFrames: u64,
-	rangeEndInFrames: u64,                   /* Set to -1 for unranged (default). */
-	loopBegInFrames:  u64,                   /* Relative to rangeBegInFrames. */
-	loopEndInFrames:  u64,                   /* Relative to rangeBegInFrames. Set to -1 for the end of the range. */
-	pCurrent:         ^data_source,                  /* When non-NULL, the data source being initialized will act as a proxy and will route all operations to pCurrent. Used in conjunction with pNext/onGetNext for seamless chaining. */
-	pNext:            ^data_source,                  /* When set to NULL, onGetNext will be used. */
-	onGetNext:        ^data_source_get_next_proc,   /* Will be used when pNext is NULL. If both are NULL, no next will be used. */
+	rangeEndInFrames: u64,                        /* Set to -1 for unranged (default). */
+	loopBegInFrames:  u64,                        /* Relative to rangeBegInFrames. */
+	loopEndInFrames:  u64,                        /* Relative to rangeBegInFrames. Set to -1 for the end of the range. */
+	pCurrent:         ^data_source,               /* When non-NULL, the data source being initialized will act as a proxy and will route all operations to pCurrent. Used in conjunction with pNext/onGetNext for seamless chaining. */
+	pNext:            ^data_source,               /* When set to NULL, onGetNext will be used. */
+	onGetNext:        data_source_get_next_proc,  /* Will be used when pNext is NULL. If both are NULL, no next will be used. */
+	isLooping:        b32, /*atomic*/
 }
 
 @(default_calling_convention="c", link_prefix="ma_")
 foreign lib {
-	ma_data_source_config_init :: proc() -> data_source_config ---
+	data_source_config_init :: proc() -> data_source_config ---
 	
-	data_source_init                     :: proc(pConfig: ^data_source_config, pDataSource: ^data_source) -> result ---
-	data_source_uninit                   :: proc(pDataSource: ^data_source) ---
-	data_source_read_pcm_frames          :: proc(pDataSource: ^data_source, pFramesOut: rawptr, frameCount: u64, pFramesRead: ^u64, loop: b32) -> result ---   /* Must support pFramesOut = NULL in which case a forward seek should be performed. */
-	data_source_seek_pcm_frames          :: proc(pDataSource: ^data_source, frameCount: u64, pFramesSeeked: ^u64, loop: b32) -> result --- /* Can only seek forward. Equivalent to ma_data_source_read_pcm_frames(pDataSource, NULL, frameCount); */
-	data_source_seek_to_pcm_frame        :: proc(pDataSource: ^data_source, frameIndex: u64) -> result ---
-	data_source_map                      :: proc(pDataSource: ^data_source, ppFramesOut: ^rawptr, pFrameCount: ^u64) -> result ---   /* Returns MA_NOT_IMPLEMENTED if mapping is not supported. */
-	data_source_unmap                    :: proc(pDataSource: ^data_source, frameCount: u64) -> result ---       /* Returns MA_AT_END if the end has been reached. */
-	data_source_get_data_format          :: proc(pDataSource: ^data_source, pFormat: ^format, pChannels: ^u32, pSampleRate: ^u32) -> result ---
-	data_source_get_cursor_in_pcm_frames :: proc(pDataSource: ^data_source, pCursor: ^u64) -> result ---
-	data_source_get_length_in_pcm_frames :: proc(pDataSource: ^data_source, pLength: ^u64) -> result ---    /* Returns MA_NOT_IMPLEMENTED if the length is unknown or cannot be determined. Decoders can return this. */
-	// #if defined(MA_EXPERIMENTAL__DATA_LOOPING_AND_CHAINING)
-	// MA_API ma_result ma_data_source_set_range_in_pcm_frames(ma_data_source* pDataSource, ma_uint64 rangeBegInFrames, ma_uint64 rangeEndInFrames);
-	// MA_API void ma_data_source_get_range_in_pcm_frames(ma_data_source* pDataSource, ma_uint64* pRangeBegInFrames, ma_uint64* pRangeEndInFrames);
-	// MA_API ma_result ma_data_source_set_loop_point_in_pcm_frames(ma_data_source* pDataSource, ma_uint64 loopBegInFrames, ma_uint64 loopEndInFrames);
-	// MA_API void ma_data_source_get_loop_point_in_pcm_frames(ma_data_source* pDataSource, ma_uint64* pLoopBegInFrames, ma_uint64* pLoopEndInFrames);
-	// MA_API ma_result ma_data_source_set_current(ma_data_source* pDataSource, ma_data_source* pCurrentDataSource);
-	// MA_API ma_data_source* ma_data_source_get_current(ma_data_source* pDataSource);
-	// MA_API ma_result ma_data_source_set_next(ma_data_source* pDataSource, ma_data_source* pNextDataSource);
-	// MA_API ma_data_source* ma_data_source_get_next(ma_data_source* pDataSource);
-	// MA_API ma_result ma_data_source_set_next_callback(ma_data_source* pDataSource, ma_data_source_get_next_proc onGetNext);
-	// MA_API ma_data_source_get_next_proc ma_data_source_get_next_callback(ma_data_source* pDataSource);
-	// #endif
+	data_source_init                         :: proc(pConfig: ^data_source_config, pDataSource: ^data_source) -> result ---
+	data_source_uninit                       :: proc(pDataSource: ^data_source) ---
+	data_source_read_pcm_frames              :: proc(pDataSource: ^data_source, pFramesOut: rawptr, frameCount: u64, pFramesRead: ^u64) -> result ---   /* Must support pFramesOut = NULL in which case a forward seek should be performed. */
+	data_source_seek_pcm_frames              :: proc(pDataSource: ^data_source, frameCount: u64, pFramesSeeked: ^u64) -> result --- /* Can only seek forward. Equivalent to ma_data_source_read_pcm_frames(pDataSource, NULL, frameCount); */
+	data_source_seek_to_pcm_frame            :: proc(pDataSource: ^data_source, frameIndex: u64) -> result ---
+	data_source_get_data_format              :: proc(pDataSource: ^data_source, pFormat: ^format, pChannels: ^u32, pSampleRate: ^u32, pChannelMap: [^]channel, channelMapCap: c.size_t) -> result ---
+	data_source_get_cursor_in_pcm_frames     :: proc(pDataSource: ^data_source, pCursor: ^u64) -> result ---
+	data_source_get_length_in_pcm_frames     :: proc(pDataSource: ^data_source, pLength: ^u64) -> result ---    /* Returns MA_NOT_IMPLEMENTED if the length is unknown or cannot be determined. Decoders can return this. */
+	data_source_get_cursor_in_seconds        :: proc(pDataSource: ^data_source, pCursor: ^f32) -> result ---
+	data_source_get_length_in_seconds        :: proc(pDataSource: ^data_source, pLength: ^f32) -> result ---
+	data_source_set_looping                  :: proc(pDataSource: ^data_source, isLooping: b32) -> result ---
+	data_source_is_looping                   :: proc(pDataSource: ^data_source) -> b32 ---
+	data_source_set_range_in_pcm_frames      :: proc(pDataSource: ^data_source, rangeBegInFrames: u64, rangeEndInFrames: u64) -> result ---
+	data_source_get_range_in_pcm_frames      :: proc(pDataSource: ^data_source, pRangeBegInFrames: ^u64, pRangeEndInFrames: ^u64) ---
+	data_source_set_loop_point_in_pcm_frames :: proc(pDataSource: ^data_source, loopBegInFrames: u64, loopEndInFrames: u64) -> result ---
+	data_source_get_loop_point_in_pcm_frames :: proc(pDataSource: ^data_source, pLoopBegInFrames: ^u64, pLoopEndInFrames: ^u64) ---
+	data_source_set_current                  :: proc(pDataSource: ^data_source, pCurrentDataSource: ^data_source) -> result ---
+	data_source_get_current                  :: proc(pDataSource: ^data_source) -> ^data_source ---
+	data_source_set_next                     :: proc(pDataSource: ^data_source, pNextDataSource: ^data_source) -> result ---
+	data_source_get_next                     :: proc(pDataSource: ^data_source) -> ^data_source ---
+	data_source_set_next_callback            :: proc(pDataSource: ^data_source, onGetNext: ^data_source_get_next_proc) -> result ---
+	data_source_get_next_callback            :: proc(pDataSource: ^data_source) -> ^data_source_get_next_proc ---
 }
 
 
@@ -180,6 +181,7 @@ audio_buffer_ref :: struct {
 	ds:           data_source_base,
 	format:       format,
 	channels:     u32,
+	sampleRate:   u32,
 	cursor:       u64,
 	sizeInFrames: u64,
 	pData:        rawptr,
@@ -204,6 +206,7 @@ foreign lib {
 audio_buffer_config :: struct {
 	format:              format,
 	channels:            u32,
+	sampleRate:          u32,
 	sizeInFrames:        u64,
 	pData:               rawptr,  /* If set to NULL, will allocate a block of memory for you. */
 	allocationCallbacks: allocation_callbacks,
@@ -233,4 +236,66 @@ foreign lib {
 	audio_buffer_get_cursor_in_pcm_frames :: proc(pAudioBuffer: ^audio_buffer, pCursor: ^u64) -> result ---
 	audio_buffer_get_length_in_pcm_frames :: proc(pAudioBuffer: ^audio_buffer, pLength: ^u64) -> result ---
 	audio_buffer_get_available_frames     :: proc(pAudioBuffer: ^audio_buffer, pAvailableFrames: ^u64) -> result ---
+}
+
+/*
+Paged Audio Buffer
+==================
+A paged audio buffer is made up of a linked list of pages. It's expandable, but not shrinkable. It
+can be used for cases where audio data is streamed in asynchronously while allowing data to be read
+at the same time.
+
+This is lock-free, but not 100% thread safe. You can append a page and read from the buffer across
+simultaneously across different threads, however only one thread at a time can append, and only one
+thread at a time can read and seek.
+*/
+paged_audio_buffer_page :: struct {
+	pNext:        ^paged_audio_buffer_page, /*atomic*/
+	sizeInFrames: u64,
+	pAudioData:   [1]u8,
+};
+
+paged_audio_buffer_data :: struct {
+	format:   format,
+	channels: u32,
+	head:     paged_audio_buffer_page,                /* Dummy head for the lock-free algorithm. Always has a size of 0. */
+	pTail:    ^paged_audio_buffer_page, /*atomic*/    /* Never null. Initially set to &head. */
+}
+
+@(default_calling_convention="c", link_prefix="ma_")
+foreign lib {
+	paged_audio_buffer_data_init                     :: proc(format: format, channels: u32, pData: ^paged_audio_buffer_data) -> result ---
+	paged_audio_buffer_data_uninit                   :: proc(pData: ^paged_audio_buffer_data, pAllocationCallbacks: ^allocation_callbacks) ---
+	paged_audio_buffer_data_get_head                 :: proc(pData: ^paged_audio_buffer_data) -> ^paged_audio_buffer_page ---
+	paged_audio_buffer_data_get_tail                 :: proc(pData: ^paged_audio_buffer_data) -> ^paged_audio_buffer_page ---
+	paged_audio_buffer_data_get_length_in_pcm_frames :: proc(pData: ^paged_audio_buffer_data, pLength: ^u64) -> result ---
+	paged_audio_buffer_data_allocate_page            :: proc(pData: ^paged_audio_buffer_data, pageSizeInFrames: u64, pInitialData: rawptr, pAllocationCallbacks: ^allocation_callbacks, ppPage: ^^paged_audio_buffer_page) -> result ---
+	paged_audio_buffer_data_free_page                :: proc(pData: ^paged_audio_buffer_data, pPage: ^paged_audio_buffer_page, pAllocationCallbacks: ^allocation_callbacks) -> result ---
+	paged_audio_buffer_data_append_page              :: proc(pData: ^paged_audio_buffer_data, pPage: ^paged_audio_buffer_page) -> result ---
+	paged_audio_buffer_data_allocate_and_append_page :: proc(pData: ^paged_audio_buffer_data, pageSizeInFrames: u32, pInitialData: rawptr, pAllocationCallbacks: ^allocation_callbacks) -> result ---
+}
+
+
+paged_audio_buffer_config :: struct {
+	pData: ^paged_audio_buffer_data,  /* Must not be null. */
+}
+
+paged_audio_buffer :: struct {
+	ds:             data_source_base,
+	pData:          ^paged_audio_buffer_data,  /* Audio data is read from here. Cannot be null. */
+	pCurrent:       ^paged_audio_buffer_page,
+	relativeCursor: u64,                       /* Relative to the current page. */
+	absoluteCursor: u64,
+}
+
+@(default_calling_convention="c", link_prefix="ma_")
+foreign lib {
+	paged_audio_buffer_config_init :: proc(pData: ^paged_audio_buffer_data) -> paged_audio_buffer_config ---
+
+	paged_audio_buffer_init                     :: proc(pConfig: ^paged_audio_buffer_config, pPagedAudioBuffer: ^paged_audio_buffer) -> result ---
+	paged_audio_buffer_uninit                   :: proc(pPagedAudioBuffer: ^paged_audio_buffer) ---
+	paged_audio_buffer_read_pcm_frames          :: proc(pPagedAudioBuffer: ^paged_audio_buffer, pFramesOut: rawptr, frameCount: u64, pFramesRead: ^u64) -> result ---   /* Returns MA_AT_END if no more pages available. */
+	paged_audio_buffer_seek_to_pcm_frame        :: proc(pPagedAudioBuffer: ^paged_audio_buffer, frameIndex: u64) -> result ---
+	paged_audio_buffer_get_cursor_in_pcm_frames :: proc(pPagedAudioBuffer: ^paged_audio_buffer, pCursor: ^u64) -> result ---
+	paged_audio_buffer_get_length_in_pcm_frames :: proc(pPagedAudioBuffer: ^paged_audio_buffer, pLength: ^u64) -> result ---
 }

@@ -13,13 +13,15 @@ when ODIN_OS == .Windows {
 handle :: distinct rawptr
 
 
-/* SIMD alignment in bytes. Currently set to 64 bytes in preparation for future AVX-512 optimizations. */
-SIMD_ALIGNMENT :: 64
+/* SIMD alignment in bytes. Currently set to 32 bytes in preparation for future AVX optimizations. */
+SIMD_ALIGNMENT :: 32
 
-LOG_LEVEL_DEBUG   :: 4
-LOG_LEVEL_INFO    :: 3
-LOG_LEVEL_WARNING :: 2
-LOG_LEVEL_ERROR   :: 1
+log_level :: enum c.int {
+	LOG_LEVEL_DEBUG   = 4,
+	LOG_LEVEL_INFO    = 3,
+	LOG_LEVEL_WARNING = 2,
+	LOG_LEVEL_ERROR   = 1,	
+}
 
 
 channel :: enum u8 {
@@ -158,11 +160,11 @@ result :: enum c.int {
 	FAILED_TO_STOP_BACKEND_DEVICE               = -303,
 } 
 
+
 MIN_CHANNELS :: 1
-MAX_CHANNELS :: 32
+MAX_CHANNELS :: 254
 
 MAX_FILTER_ORDER :: 8
-
 
 
 stream_format :: enum c.int {
@@ -175,9 +177,9 @@ stream_layout :: enum c.int {
 }
 
 dither_mode :: enum c.int {
-    	none = 0,
-    	rectangle,
-    	triangle,
+	none = 0,
+	rectangle,
+	triangle,
 }
 
 format :: enum c.int {
@@ -191,6 +193,7 @@ format :: enum c.int {
 	s24     = 3,     /* Tightly packed. 3 bytes per sample. */
 	s32     = 4,
 	f32     = 5,
+	count,
 }
 
 standard_sample_rate :: enum u32 {
@@ -224,7 +227,6 @@ channel_mix_mode :: enum c.int {
 	rectangular = 0,   /* Simple averaging based on the plane(s) the channel is sitting on. */
 	simple,            /* Drop excess channels; zeroed out extra channels. */
 	custom_weights,    /* Use custom weights specified in ma_channel_router_config. */
-	planar_blend = rectangular,
 	default = rectangular,
 }
 
@@ -257,6 +259,10 @@ lcg :: struct {
 	state: i32,
 }
 
+
+/* Spinlocks are 32-bit for compatibility reasons. */
+spinlock :: distinct u32
+
 NO_THREADING :: false
 
 when !NO_THREADING {
@@ -272,8 +278,6 @@ thread_priority :: enum c.int {
 	default  =  0,
 }
 
-/* Spinlocks are 32-bit for compatibility reasons. */
-spinlock :: distinct u32
 
 when ODIN_OS == .Windows {
 	thread    :: distinct rawptr
@@ -295,69 +299,6 @@ when ODIN_OS == .Windows {
 		lock: unix.pthread_mutex_t,
 		cond: unix.pthread_cond_t,
 	}
-}
-
-	
-@(default_calling_convention="c", link_prefix="ma_")
-foreign lib {
-	/*
-	Locks a spinlock.
-	*/
-	spinlock_lock :: proc(/*volatile*/ pSpinlock: ^spinlock) -> result ---
-
-	/*
-	Locks a spinlock, but does not yield() when looping.
-	*/
-	spinlock_lock_noyield :: proc(/*volatile*/ pSpinlock: ^spinlock) -> result ---
-
-	/*
-	Unlocks a spinlock.
-	*/
-	spinlock_unlock :: proc(/*volatile*/ pSpinlock: ^spinlock) -> result ---
-
-
-	/*
-	Creates a mutex.
-
-	A mutex must be created from a valid context. A mutex is initially unlocked.
-	*/
-	mutex_init :: proc(pMutex: ^mutex) -> result ---
-
-	/*
-	Deletes a mutex.
-	*/
-	mutex_uninit :: proc(pMutex: ^mutex) ---
-
-	/*
-	Locks a mutex with an infinite timeout.
-	*/
-	mutex_lock :: proc(pMutex: ^mutex) ---
-
-	/*
-	Unlocks a mutex.
-	*/
-	mutex_unlock :: proc(pMutex: ^mutex) ---
-
-
-	/*
-	Initializes an auto-reset event.
-	*/
-	event_init :: proc(pEvent: ^event) -> result ---
-
-	/*
-	Uninitializes an auto-reset event.
-	*/
-	event_uninit :: proc(pEvent: ^event) ---
-
-	/*
-	Waits for the specified auto-reset event to become signalled.
-	*/
-	event_wait :: proc(pEvent: ^event) -> result ---
-
-	/*
-	Signals the specified auto-reset event.
-	*/
-	event_signal :: proc(pEvent: ^event) -> result ---
 }
 
 }  /* NO_THREADING */
@@ -385,17 +326,22 @@ foreign lib {
 	result_description :: proc(result: result) -> cstring ---
 
 	/*
-	malloc(). Calls MA_MALLOC().
+	malloc()
 	*/
 	malloc :: proc(sz: c.size_t, pAllocationCallbacks: ^allocation_callbacks) -> rawptr ---
 
 	/*
-	realloc(). Calls MA_REALLOC().
+	calloc()
+	*/
+	calloc :: proc(sz: c.size_t, pAllocationCallbacks: ^allocation_callbacks) -> rawptr ---
+
+	/*
+	realloc()
 	*/
 	realloc :: proc(p: rawptr, sz: c.size_t, pAllocationCallbacks: ^allocation_callbacks) -> rawptr ---
 
 	/*
-	free(). Calls MA_FREE().
+	free()
 	*/
 	free :: proc(p: rawptr, pAllocationCallbacks: ^allocation_callbacks) ---
 
@@ -417,7 +363,7 @@ foreign lib {
 	/*
 	Blends two frames in floating point format.
 	*/
-	blend_f32 :: proc(pOut, pInA, pInB: ^f32, factor: f32, channels: u32) ---
+	blend_f32 :: proc(pOut, pInA, pInB: [^]f32, factor: f32, channels: u32) ---
 
 	/*
 	Retrieves the size of a sample in bytes for the given format.
