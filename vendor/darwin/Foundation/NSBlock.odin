@@ -2,6 +2,21 @@ package objc_Foundation
 
 import "core:intrinsics"
 
+@(objc_class="NSConcreteGlobalBlock")
+Block :: struct {using _: Object}
+
+@(objc_type=Block, objc_name="createGlobal", objc_is_class_method=true)
+Block_createGlobal :: proc "c" (user_data: rawptr, user_proc: proc "c" (user_data: rawptr)) -> ^Block {
+	return Block_createInternal(true, user_data, user_proc)
+}
+
+@(objc_type=Block, objc_name="createLocal", objc_is_class_method=true)
+Block_createLocal :: proc "c" (user_data: rawptr, user_proc: proc "c" (user_data: rawptr)) -> ^Block {
+	return Block_createInternal(false, user_data, user_proc)
+}
+
+
+@(private)
 Internal_Block_Literal_Base :: struct {
 	isa:        ^intrinsics.objc_class,
 	flags:      u32,
@@ -10,6 +25,7 @@ Internal_Block_Literal_Base :: struct {
 	descriptor: ^Block_Descriptor,
 }
 
+@(private)
 Internal_Block_Literal :: struct {
 	using base: Internal_Block_Literal_Base,
 	// Imported Variables
@@ -17,6 +33,7 @@ Internal_Block_Literal :: struct {
 	user_data:  rawptr,
 }
 
+@(private)
 Block_Descriptor :: struct {
 	reserved:       uint,
 	size:           uint,
@@ -25,15 +42,11 @@ Block_Descriptor :: struct {
 	signature:      cstring,
 }
 
+@(private)
 global_block_descriptor := Block_Descriptor{
 	reserved = 0,
 	size     = size_of(Internal_Block_Literal),
 }
-
-
-@(objc_class="NSConcreteGlobalBlock")
-Block :: struct {using _: Object}
-
 
 @(private="file")
 Block_createInternal :: proc "c" (is_global: bool, user_data: rawptr, user_proc: proc "c" (user_data: rawptr)) -> ^Block {
@@ -65,15 +78,4 @@ Block_createInternal :: proc "c" (is_global: bool, user_data: rawptr, user_proc:
 	bl.user_data = user_data
 
 	return auto_cast bl
-}
-
-@(objc_type=Block, objc_name="createGlobal", objc_is_class_method=true)
-Block_createGlobal :: proc "c" (user_data: rawptr, user_proc: proc "c" (user_data: rawptr)) -> ^Block {
-	return Block_createInternal(true, user_data, user_proc)
-}
-
-
-@(objc_type=Block, objc_name="createLocal", objc_is_class_method=true)
-Block_createLocal :: proc "c" (user_data: rawptr, user_proc: proc "c" (user_data: rawptr)) -> ^Block {
-	return Block_createInternal(false, user_data, user_proc)
 }
