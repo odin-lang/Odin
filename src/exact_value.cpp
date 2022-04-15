@@ -591,6 +591,7 @@ failure:
 i32 exact_value_order(ExactValue const &v) {
 	switch (v.kind) {
 	case ExactValue_Invalid:
+	case ExactValue_Compound:
 		return 0;
 	case ExactValue_Bool:
 	case ExactValue_String:
@@ -607,8 +608,6 @@ i32 exact_value_order(ExactValue const &v) {
 		return 6;
 	case ExactValue_Procedure:
 		return 7;
-	// case ExactValue_Compound:
-		// return 8;
 
 	default:
 		GB_PANIC("How'd you get here? Invalid Value.kind %d", v.kind);

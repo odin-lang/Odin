@@ -8161,7 +8161,10 @@ ExprKind check_compound_literal(CheckerContext *c, Operand *o, Ast *node, Type *
 	case Type_Basic: {
 		if (!is_type_any(t)) {
 			if (cl->elems.count != 0) {
-				error(node, "Illegal compound literal");
+				gbString s = type_to_string(t);
+				error(node, "Illegal compound literal, %s cannot be used as a compound literal with fields", s);
+				gb_string_free(s);
+				is_constant = false;
 			}
 			break;
 		}
