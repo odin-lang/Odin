@@ -213,6 +213,37 @@ time_add :: proc(t: Time, d: Duration) -> Time {
 	return Time{t._nsec + i64(d)}
 }
 
+// Accurate sleep borrowed from: https://blat-blatnik.github.io/computerBear/making-accurate-sleep-function/
+accurate_sleep :: proc(d: Duration) {
+	to_sleep, estimate, mean, m2, count: Duration
+
+	to_sleep = d
+	estimate = 5 * Millisecond
+	mean = 5 * Millisecond
+	count = 1
+
+	for to_sleep > estimate {
+		start := tick_now()
+		sleep(1 * Millisecond)
+
+		observed := tick_since(start)
+		to_sleep -= observed
+
+		count += 1
+
+		delta := observed - mean
+		mean += delta / count
+		m2 += delta * (observed - mean)
+		stddev := intrinsics.sqrt(f64(m2) / f64(count - 1))
+		estimate = mean + Duration(stddev)
+	}
+
+	start := tick_now()
+	for to_sleep > tick_since(start) {
+		intrinsics.cpu_relax() // prevent the spinlock from taking the thread hostage, still accurate enough
+		// NOTE: it is possible that sometimes cpu can relax a bit too much, in that case it should spinlock freely for a while (TODO)
+	}
+}
 
 ABSOLUTE_ZERO_YEAR :: i64(-292277022399) // Day is chosen so that 2001-01-01 is Monday in the calculations
 ABSOLUTE_TO_INTERNAL :: i64(-9223371966579724800) // i64((ABSOLUTE_ZERO_YEAR - 1) * 365.2425 * SECONDS_PER_DAY);
