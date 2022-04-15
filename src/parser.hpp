@@ -46,6 +46,7 @@ enum ParseFileError {
 	ParseFile_InvalidToken,
 	ParseFile_GeneralError,
 	ParseFile_FileTooLarge,
+	ParseFile_DirectoryAlreadyExists,
 
 	ParseFile_Count,
 };
@@ -78,9 +79,11 @@ struct ImportedFile {
 };
 
 enum AstFileFlag : u32 {
-	AstFile_IsPrivate = 1<<0,
-	AstFile_IsTest    = 1<<1,
-	AstFile_IsLazy    = 1<<2,
+	AstFile_IsPrivatePkg = 1<<0,
+	AstFile_IsPrivateFile = 1<<1,
+
+	AstFile_IsTest    = 1<<3,
+	AstFile_IsLazy    = 1<<4,
 };
 
 enum AstDelayQueueKind {
@@ -94,8 +97,6 @@ struct AstFile {
 	u32          flags;
 	AstPackage * pkg;
 	Scope *      scope;
-
-	Arena  arena;
 
 	Ast *        pkg_decl;
 	String       fullpath;
@@ -226,6 +227,8 @@ enum ProcInlining {
 enum ProcTag {
 	ProcTag_bounds_check    = 1<<0,
 	ProcTag_no_bounds_check = 1<<1,
+	ProcTag_type_assert     = 1<<2,
+	ProcTag_no_type_assert  = 1<<3,
 
 	ProcTag_require_results = 1<<4,
 	ProcTag_optional_ok     = 1<<5,
@@ -245,24 +248,44 @@ enum ProcCallingConvention : i32 {
 
 	ProcCC_InlineAsm   = 8,
 
+	ProcCC_Win64       = 9,
+	ProcCC_SysV        = 10,
+
+
 	ProcCC_MAX,
 
 
 	ProcCC_ForeignBlockDefault = -1,
 };
 
+char const *proc_calling_convention_strings[ProcCC_MAX] = {
+	"",
+	"odin",
+	"contextless",
+	"cdecl",
+	"stdcall",
+	"fastcall",
+	"none",
+	"naked",
+	"inlineasm",
+	"win64",
+	"sysv",
+};
+
 ProcCallingConvention default_calling_convention(void) {
 	return ProcCC_Odin;
 }
 
-enum StateFlag : u16 {
+enum StateFlag : u8 {
 	StateFlag_bounds_check    = 1<<0,
 	StateFlag_no_bounds_check = 1<<1,
+	StateFlag_type_assert     = 1<<2,
+	StateFlag_no_type_assert  = 1<<3,
 
-	StateFlag_BeenHandled = 1<<15,
+	StateFlag_BeenHandled = 1<<7,
 };
 
-enum ViralStateFlag : u16 {
+enum ViralStateFlag : u8 {
 	ViralStateFlag_ContainsDeferredProcedure = 1<<0,
 };
 
@@ -276,6 +299,7 @@ enum FieldFlag : u32 {
 	FieldFlag_auto_cast = 1<<4,
 	FieldFlag_const     = 1<<5,
 	FieldFlag_any_int   = 1<<6,
+	FieldFlag_subtype   = 1<<7,
 
 	// Internal use by the parser only
 	FieldFlag_Tags      = 1<<10,
@@ -283,7 +307,7 @@ enum FieldFlag : u32 {
 
 	// Parameter List Restrictions
 	FieldFlag_Signature = FieldFlag_ellipsis|FieldFlag_using|FieldFlag_no_alias|FieldFlag_c_vararg|FieldFlag_auto_cast|FieldFlag_const|FieldFlag_any_int,
-	FieldFlag_Struct    = FieldFlag_using|FieldFlag_Tags,
+	FieldFlag_Struct    = FieldFlag_using|FieldFlag_subtype|FieldFlag_Tags,
 };
 
 enum StmtAllowFlag {
@@ -304,6 +328,13 @@ char const *inline_asm_dialect_strings[InlineAsmDialect_COUNT] = {
 	"",
 	"att",
 	"intel",
+};
+
+enum UnionTypeKind : u8 {
+	UnionType_Normal     = 0,
+	UnionType_maybe      = 1,
+	UnionType_no_nil     = 2,
+	UnionType_shared_nil = 3,
 };
 
 #define AST_KINDS \
@@ -344,6 +375,7 @@ char const *inline_asm_dialect_strings[InlineAsmDialect_COUNT] = {
 		Slice<Ast *> elems; \
 		Token open, close; \
 		i64 max_count; \
+		Ast *tag; \
 	}) \
 AST_KIND(_ExprBegin,  "",  bool) \
 	AST_KIND(BadExpr,      "bad expression",         struct { Token begin, end; }) \
@@ -383,6 +415,12 @@ AST_KIND(_ExprBegin,  "",  bool) \
 		void *sce_temp_data; \
 	}) \
 	AST_KIND(FieldValue,      "field value",              struct { Token eq; Ast *field, *value; }) \
+	AST_KIND(EnumFieldValue,  "enum field value",         struct { \
+		Ast *name;          \
+		Ast *value;         \
+		CommentGroup *docs; \
+		CommentGroup *comment; \
+	}) \
 	AST_KIND(TernaryIfExpr,   "ternary if expression",    struct { Ast *x, *cond, *y; }) \
 	AST_KIND(TernaryWhenExpr, "ternary when expression",  struct { Ast *x, *cond, *y; }) \
 	AST_KIND(OrElseExpr,      "or_else expression",       struct { Ast *x; Token token; Ast *y; }) \
@@ -424,11 +462,13 @@ AST_KIND(_StmtBegin,     "", bool) \
 	}) \
 AST_KIND(_ComplexStmtBegin, "", bool) \
 	AST_KIND(BlockStmt, "block statement", struct { \
+		Scope *scope; \
 		Slice<Ast *> stmts; \
 		Ast *label;         \
 		Token open, close; \
 	}) \
 	AST_KIND(IfStmt, "if statement", struct { \
+		Scope *scope; \
 		Token token;     \
 		Ast *label;      \
 		Ast * init;      \
@@ -449,6 +489,7 @@ AST_KIND(_ComplexStmtBegin, "", bool) \
 		Slice<Ast *> results; \
 	}) \
 	AST_KIND(ForStmt, "for statement", struct { \
+		Scope *scope; \
 		Token token; \
 		Ast *label; \
 		Ast *init; \
@@ -457,6 +498,7 @@ AST_KIND(_ComplexStmtBegin, "", bool) \
 		Ast *body; \
 	}) \
 	AST_KIND(RangeStmt, "range statement", struct { \
+		Scope *scope; \
 		Token token; \
 		Ast *label; \
 		Slice<Ast *> vals; \
@@ -465,6 +507,7 @@ AST_KIND(_ComplexStmtBegin, "", bool) \
 		Ast *body; \
 	}) \
 	AST_KIND(UnrollRangeStmt, "#unroll range statement", struct { \
+		Scope *scope; \
 		Token unroll_token; \
 		Token for_token; \
 		Ast *val0; \
@@ -474,12 +517,14 @@ AST_KIND(_ComplexStmtBegin, "", bool) \
 		Ast *body; \
 	}) \
 	AST_KIND(CaseClause, "case clause", struct { \
+		Scope *scope; \
 		Token token;             \
 		Slice<Ast *> list;   \
 		Slice<Ast *> stmts;  \
 		Entity *implicit_entity; \
 	}) \
 	AST_KIND(SwitchStmt, "switch statement", struct { \
+		Scope *scope; \
 		Token token;  \
 		Ast *label;   \
 		Ast *init;    \
@@ -488,6 +533,7 @@ AST_KIND(_ComplexStmtBegin, "", bool) \
 		bool partial; \
 	}) \
 	AST_KIND(TypeSwitchStmt, "type switch statement", struct { \
+		Scope *scope; \
 		Token token; \
 		Ast *label;  \
 		Ast *tag;    \
@@ -589,6 +635,7 @@ AST_KIND(_TypeBegin, "", bool) \
 		Ast * specialization;  \
 	}) \
 	AST_KIND(ProcType, "procedure type", struct { \
+		Scope *scope; \
 		Token token;   \
 		Ast *params;  \
 		Ast *results; \
@@ -621,6 +668,7 @@ AST_KIND(_TypeBegin, "", bool) \
 		Ast *tag;  \
 	}) \
 	AST_KIND(StructType, "struct type", struct { \
+		Scope *scope; \
 		Token token;                \
 		Slice<Ast *> fields;        \
 		isize field_count;          \
@@ -632,16 +680,17 @@ AST_KIND(_TypeBegin, "", bool) \
 		bool is_raw_union;          \
 	}) \
 	AST_KIND(UnionType, "union type", struct { \
+		Scope *scope; \
 		Token        token;         \
 		Slice<Ast *> variants;      \
 		Ast *polymorphic_params;    \
 		Ast *        align;         \
-		bool         maybe;         \
-		bool         no_nil;        \
+		UnionTypeKind kind;       \
 		Token where_token;          \
 		Slice<Ast *> where_clauses; \
 	}) \
 	AST_KIND(EnumType, "enum type", struct { \
+		Scope *scope; \
 		Token        token; \
 		Ast *        base_type; \
 		Slice<Ast *> fields; /* FieldValue */ \
@@ -666,7 +715,7 @@ AST_KIND(_TypeBegin, "", bool) \
 	}) \
 AST_KIND(_TypeEnd,  "", bool)
 
-enum AstKind {
+enum AstKind : u16 {
 	Ast_Invalid,
 #define AST_KIND(_kind_name_, ...) GB_JOIN2(Ast_, _kind_name_),
 	AST_KINDS
@@ -695,21 +744,19 @@ isize const ast_variant_sizes[] = {
 };
 
 struct AstCommonStuff {
-	AstKind      kind;
-	u16          state_flags;
-	u16          viral_state_flags;
-	AstFile *    file;
-	Scope *      scope;
-	TypeAndValue tav; // TODO(bill): Make this a pointer to minimize pointer size
+	AstKind      kind; // u16
+	u8           state_flags;
+	u8           viral_state_flags;
+	i32          file_id;
+	TypeAndValue tav; // TODO(bill): Make this a pointer to minimize 'Ast' size
 };
 
 struct Ast {
-	AstKind      kind;
-	u16          state_flags;
-	u16          viral_state_flags;
-	AstFile *    file;
-	Scope *      scope;
-	TypeAndValue tav; // TODO(bill): Make this a pointer to minimize pointer size
+	AstKind      kind; // u16
+	u8           state_flags;
+	u8           viral_state_flags;
+	i32          file_id;
+	TypeAndValue tav; // TODO(bill): Make this a pointer to minimize 'Ast' size
 
 	// IMPORTANT NOTE(bill): This must be at the end since the AST is allocated to be size of the variant
 	union {
@@ -717,6 +764,17 @@ struct Ast {
 	AST_KINDS
 #undef AST_KIND
 	};
+	
+	
+	// NOTE(bill): I know I dislike methods but this is hopefully a temporary thing 
+	// for refactoring purposes
+	gb_inline AstFile *file() const {
+		// NOTE(bill): This doesn't need to call get_ast_file_from_id which 
+		return global_files[this->file_id];
+	}
+	gb_inline AstFile *thread_safe_file() const {
+		return thread_safe_get_ast_file_from_id(this->file_id);
+	}
 };
 
 
@@ -748,10 +806,10 @@ gb_inline bool is_ast_when_stmt(Ast *node) {
 	return node->kind == Ast_WhenStmt;
 }
 
-gb_global gb_thread_local Arena global_ast_arena = {};
+gb_global gb_thread_local Arena global_thread_local_ast_arena = {};
 
 gbAllocator ast_allocator(AstFile *f) {
-	Arena *arena = f ? &f->arena : &global_ast_arena;
+	Arena *arena = &global_thread_local_ast_arena;
 	return arena_allocator(arena);
 }
 

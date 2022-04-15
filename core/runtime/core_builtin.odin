@@ -386,12 +386,13 @@ insert_at_elem :: proc(array: ^$T/[dynamic]$E, index: int, arg: E, loc := #calle
 	if array == nil {
 		return
 	}
-	n := len(array)
+	n := max(len(array), index)
 	m :: 1
-	resize(array, n+m, loc)
-	if n+m <= len(array) {
+	new_size := n + m
+
+	if resize(array, new_size, loc) {
 		when size_of(E) != 0 {
-			copy(array[index+m:], array[index:])
+			copy(array[index + m:], array[index:])
 			array[index] = arg
 		}
 		ok = true
@@ -409,12 +410,13 @@ insert_at_elems :: proc(array: ^$T/[dynamic]$E, index: int, args: ..E, loc := #c
 		return
 	}
 
-	n := len(array)
+	n := max(len(array), index)
 	m := len(args)
-	resize(array, n+m, loc)
-	if n+m <= len(array) {
+	new_size := n + m
+
+	if resize(array, new_size, loc) {
 		when size_of(E) != 0 {
-			copy(array[index+m:], array[index:])
+			copy(array[index + m:], array[index:])
 			copy(array[index:], args)
 		}
 		ok = true
@@ -427,17 +429,18 @@ insert_at_elem_string :: proc(array: ^$T/[dynamic]$E/u8, index: int, arg: string
 	if array == nil {
 		return
 	}
-	if len(args) == 0 {
+	if len(arg) == 0 {
 		ok = true
 		return
 	}
 
-	n := len(array)
-	m := len(args)
-	resize(array, n+m, loc)
-	if n+m <= len(array) {
+	n := max(len(array), index)
+	m := len(arg)
+	new_size := n + m
+
+	if resize(array, new_size, loc) {
 		copy(array[index+m:], array[index:])
-		copy(array[index:], args)
+		copy(array[index:], arg)
 		ok = true
 	}
 	return
@@ -614,6 +617,10 @@ raw_data :: proc{raw_array_data, raw_slice_data, raw_dynamic_array_data, raw_str
 @(disabled=ODIN_DISABLE_ASSERT)
 assert :: proc(condition: bool, message := "", loc := #caller_location) {
 	if !condition {
+		// NOTE(bill): This is wrapped in a procedure call
+		// to improve performance to make the CPU not
+		// execute speculatively, making it about an order of
+		// magnitude faster
 		proc(message: string, loc: Source_Code_Location) {
 			p := context.assertion_failure_proc
 			if p == nil {

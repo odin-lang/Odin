@@ -118,6 +118,11 @@ struct AttributeContext {
 	bool    init                : 1;
 	bool    set_cold            : 1;
 	u32 optimization_mode; // ProcedureOptimizationMode
+
+	String  objc_class;
+	String  objc_name;
+	bool    objc_is_class_method;
+	Type *  objc_type;
 };
 
 AttributeContext make_attribute_context(String link_prefix) {
@@ -267,6 +272,17 @@ struct UntypedExprInfo {
 typedef PtrMap<Ast *, ExprInfo *> UntypedExprInfoMap; 
 typedef MPMCQueue<ProcInfo *> ProcBodyQueue;
 
+enum ObjcMsgKind : u32 {
+	ObjcMsg_normal,
+	ObjcMsg_fpret,
+	ObjcMsg_fp2ret,
+	ObjcMsg_stret,
+};
+struct ObjcMsgData {
+	ObjcMsgKind kind;
+	Type *proc_type;
+};
+
 // CheckerInfo stores all the symbol information for a type-checked program
 struct CheckerInfo {
 	Checker *checker;
@@ -338,6 +354,10 @@ struct CheckerInfo {
 	MPMCQueue<Entity *> required_global_variable_queue;
 	MPMCQueue<Entity *> required_foreign_imports_through_force_queue;
 
+	MPMCQueue<Ast *> intrinsics_entry_point_usage;
+
+	BlockingMutex objc_types_mutex;
+	PtrMap<Ast *, ObjcMsgData> objc_msgSend_types;
 };
 
 struct CheckerContext {
@@ -410,7 +430,6 @@ gb_global AstPackage *config_pkg      = nullptr;
 TypeAndValue type_and_value_of_expr (Ast *expr);
 Type *       type_of_expr           (Ast *expr);
 Entity *     implicit_entity_of_node(Ast *clause);
-Scope *      scope_of_node          (Ast *node);
 DeclInfo *   decl_info_of_ident     (Ast *ident);
 DeclInfo *   decl_info_of_entity    (Entity * e);
 AstFile *    ast_file_of_filename   (CheckerInfo *i, String   filename);
@@ -424,7 +443,7 @@ Entity *entity_of_node(Ast *expr);
 Entity *scope_lookup_current(Scope *s, String const &name);
 Entity *scope_lookup (Scope *s, String const &name);
 void    scope_lookup_parent (Scope *s, String const &name, Scope **scope_, Entity **entity_);
-Entity *scope_insert (Scope *s, Entity *entity);
+Entity *scope_insert (Scope *s, Entity *entity, bool use_mutex=true);
 
 
 void      add_type_and_value      (CheckerInfo *i, Ast *expression, AddressingMode mode, Type *type, ExactValue value);

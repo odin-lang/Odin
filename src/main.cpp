@@ -74,16 +74,16 @@ i32 system_exec_command_line_app(char const *name, char const *fmt, ...) {
 	isize cmd_len = 0;
 	va_list va;
 	i32 exit_code = 0;
-	
+
 	va_start(va, fmt);
 	cmd_len = gb_snprintf_va(cmd_line, cmd_cap-1, fmt, va);
 	va_end(va);
-	
+
 #if defined(GB_SYSTEM_WINDOWS)
 	STARTUPINFOW start_info = {gb_size_of(STARTUPINFOW)};
 	PROCESS_INFORMATION pi = {0};
 	String16 wcmd = {};
-	
+
 	start_info.dwFlags = STARTF_USESTDHANDLES | STARTF_USESHOWWINDOW;
 	start_info.wShowWindow = SW_SHOW;
 	start_info.hStdInput   = GetStdHandle(STD_INPUT_HANDLE);
@@ -117,12 +117,15 @@ i32 system_exec_command_line_app(char const *name, char const *fmt, ...) {
 		gb_printf_err("%s\n\n", cmd_line);
 	}
 	exit_code = system(cmd_line);
+	if (WIFEXITED(exit_code)) {
+		exit_code = WEXITSTATUS(exit_code);
+	}
 #endif
-	
+
 	if (exit_code) {
 		exit(exit_code);
 	}
-	
+
 	return exit_code;
 }
 
@@ -137,7 +140,7 @@ i32 linker_stage(lbGenerator *gen) {
 
 	if (is_arch_wasm()) {
 		timings_start_section(timings, str_lit("wasm-ld"));
-		
+
 	#if defined(GB_SYSTEM_WINDOWS)
 		result = system_exec_command_line_app("wasm-ld",
 			"\"%.*s\\bin\\wasm-ld\" \"%.*s.wasm.o\" -o \"%.*s.wasm\" %.*s %.*s",
@@ -177,7 +180,6 @@ i32 linker_stage(lbGenerator *gen) {
 
 		gbString lib_str = gb_string_make(heap_allocator(), "");
 		defer (gb_string_free(lib_str));
-		char lib_str_buf[1024] = {0};
 
 		char const *output_ext = "exe";
 		gbString link_settings = gb_string_make_reserve(heap_allocator(), 256);
@@ -213,25 +215,40 @@ i32 linker_stage(lbGenerator *gen) {
 			add_path(find_result.vs_library_path);
 		}
 
+
+		StringSet libs = {};
+		string_set_init(&libs, heap_allocator(), 64);
+		defer (string_set_destroy(&libs));
+
+		StringSet asm_files = {};
+		string_set_init(&asm_files, heap_allocator(), 64);
+		defer (string_set_destroy(&asm_files));
+
 		for_array(j, gen->modules.entries) {
 			lbModule *m = gen->modules.entries[j].value;
 			for_array(i, m->foreign_library_paths) {
 				String lib = m->foreign_library_paths[i];
-				GB_ASSERT(lib.len < gb_count_of(lib_str_buf)-1);
-				gb_snprintf(lib_str_buf, gb_size_of(lib_str_buf),
-							" \"%.*s\"", LIT(lib));
-				lib_str = gb_string_appendc(lib_str, lib_str_buf);
+				if (has_asm_extension(lib)) {
+					string_set_add(&asm_files, lib);
+				} else {
+					string_set_add(&libs, lib);
+				}
 			}
 		}
 
 		for_array(i, gen->default_module.foreign_library_paths) {
 			String lib = gen->default_module.foreign_library_paths[i];
-			GB_ASSERT(lib.len < gb_count_of(lib_str_buf)-1);
-			gb_snprintf(lib_str_buf, gb_size_of(lib_str_buf),
-						" \"%.*s\"", LIT(lib));
-			lib_str = gb_string_appendc(lib_str, lib_str_buf);
+			if (has_asm_extension(lib)) {
+				string_set_add(&asm_files, lib);
+			} else {
+				string_set_add(&libs, lib);
+			}
 		}
 
+		for_array(i, libs.entries) {
+			String lib = libs.entries[i].value;
+			lib_str = gb_string_append_fmt(lib_str, " \"%.*s\"", LIT(lib));
+		}
 
 
 		if (build_context.build_mode == BuildMode_DynamicLibrary) {
@@ -255,6 +272,27 @@ i32 linker_stage(lbGenerator *gen) {
 			link_settings = gb_string_append_fmt(link_settings, " /DEBUG");
 		}
 
+		for_array(i, asm_files.entries) {
+			String asm_file = asm_files.entries[i].value;
+			String obj_file = concatenate_strings(permanent_allocator(), asm_file, str_lit(".obj"));
+
+			result = system_exec_command_line_app("nasm",
+				"\"%.*s\\bin\\nasm\\windows\\nasm.exe\" \"%.*s\" "
+				"-f win64 "
+				"-o \"%.*s\" "
+				"%.*s "
+				"",
+				LIT(build_context.ODIN_ROOT), LIT(asm_file),
+				LIT(obj_file),
+				LIT(build_context.extra_assembler_flags)
+			);
+
+			if (result) {
+				return result;
+			}
+			array_add(&gen->output_object_paths, obj_file);
+		}
+
 		gbString object_files = gb_string_make(heap_allocator(), "");
 		defer (gb_string_free(object_files));
 		for_array(i, gen->output_object_paths) {
@@ -270,7 +308,7 @@ i32 linker_stage(lbGenerator *gen) {
 					LIT(output_base),
 					LIT(build_context.resource_filepath)
 				);
-				
+
 				if (result) {
 					return result;
 				}
@@ -305,11 +343,11 @@ i32 linker_stage(lbGenerator *gen) {
 					lib_str
 				);
 			}
-			
+
 			if (result) {
 				return result;
 			}
-			
+
 		} else { // lld
 			result = system_exec_command_line_app("msvc-lld-link",
 				"\"%.*s\\bin\\lld-link\" %s -OUT:\"%.*s.%s\" %s "
@@ -325,10 +363,10 @@ i32 linker_stage(lbGenerator *gen) {
 				LIT(build_context.extra_linker_flags),
 				lib_str
 			);
-			  
-			  if (result) {
+
+			if (result) {
 				return result;
-			  }
+			}
 		}
 	#else
 		timings_start_section(timings, str_lit("ld-link"));
@@ -349,7 +387,7 @@ i32 linker_stage(lbGenerator *gen) {
 			// NOTE(zangent): Sometimes, you have to use -framework on MacOS.
 			//   This allows you to specify '-f' in a #foreign_system_library,
 			//   without having to implement any new syntax specifically for MacOS.
-			#if defined(GB_SYSTEM_OSX)
+			if (build_context.metrics.os == TargetOs_darwin) {
 				if (string_ends_with(lib, str_lit(".framework"))) {
 					// framework thingie
 					String lib_name = lib;
@@ -365,14 +403,14 @@ i32 linker_stage(lbGenerator *gen) {
 					// dynamic or static system lib, just link regularly searching system library paths
 					lib_str = gb_string_append_fmt(lib_str, " -l%.*s ", LIT(lib));
 				}
-			#else
+			} else {
 				// NOTE(vassvik): static libraries (.a files) in linux can be linked to directly using the full path,
 				//                since those are statically linked to at link time. shared libraries (.so) has to be
 				//                available at runtime wherever the executable is run, so we make require those to be
 				//                local to the executable (unless the system collection is used, in which case we search
 				//                the system library paths for the library file).
-				if (string_ends_with(lib, str_lit(".a"))) {
-					// static libs, absolute full path relative to the file in which the lib was imported from
+				if (string_ends_with(lib, str_lit(".a")) || string_ends_with(lib, str_lit(".o"))) {
+					// static libs and object files, absolute full path relative to the file in which the lib was imported from
 					lib_str = gb_string_append_fmt(lib_str, " -l:\"%.*s\" ", LIT(lib));
 				} else if (string_ends_with(lib, str_lit(".so"))) {
 					// dynamic lib, relative path to executable
@@ -383,7 +421,7 @@ i32 linker_stage(lbGenerator *gen) {
 					// dynamic or static system lib, just link regularly searching system library paths
 					lib_str = gb_string_append_fmt(lib_str, " -l%.*s ", LIT(lib));
 				}
-			#endif
+			}
 		}
 
 		gbString object_files = gb_string_make(heap_allocator(), "");
@@ -397,39 +435,45 @@ i32 linker_stage(lbGenerator *gen) {
 		// typically executable files on *NIX systems don't have extensions.
 		String output_ext = {};
 		gbString link_settings = gb_string_make_reserve(heap_allocator(), 32);
-		char const *linker;
-		if (build_context.build_mode == BuildMode_DynamicLibrary) {
-			// NOTE(tetra, 2020-11-06): __$startup_runtime must be called at DLL load time.
-			// Clang, for some reason, won't let us pass the '-init' flag that lets us do this,
-			// so use ld instead.
-			// :UseLDForShared
-			linker = "ld";
-			link_settings = gb_string_appendc(link_settings, "-init '__$startup_runtime' ");
-			// Shared libraries are .dylib on MacOS and .so on Linux.
-			#if defined(GB_SYSTEM_OSX)
-				output_ext = STR_LIT(".dylib");
-				link_settings = gb_string_appendc(link_settings, "-dylib -dynamic ");
-			#else
-				output_ext = STR_LIT(".so");
-				link_settings = gb_string_appendc(link_settings, "-shared ");
-			#endif
-		} else {
-			#if defined(GB_SYSTEM_OSX)
-				linker = "ld";
-			#else
-				// TODO(zangent): Figure out how to make ld work on Linux.
-				//   It probably has to do with including the entire CRT, but
-				//   that's quite a complicated issue to solve while remaining distro-agnostic.
-				//   Clang can figure out linker flags for us, and that's good enough _for now_.
-				linker = "clang -Wno-unused-command-line-argument";
-			#endif
+
+		if (build_context.no_crt) {
+			link_settings = gb_string_append_fmt(link_settings, "-nostdlib ");
 		}
 
-		if (build_context.metrics.os == TargetOs_linux) {
+		// NOTE(dweiler): We use clang as a frontend for the linker as there are
+		// other runtime and compiler support libraries that need to be linked in
+		// very specific orders such as libgcc_s, ld-linux-so, unwind, etc.
+		// These are not always typically inside /lib, /lib64, or /usr versions
+		// of that, e.g libgcc.a is in /usr/lib/gcc/{version}, and can vary on
+		// the distribution of Linux even. The gcc or clang specs is the only
+		// reliable way to query this information to call ld directly.
+		if (build_context.build_mode == BuildMode_DynamicLibrary) {
+			// NOTE(dweiler): Let the frontend know we're building a shared library
+			// so it doesn't generate symbols which cannot be relocated.
+			link_settings = gb_string_appendc(link_settings, "-shared ");
+
+			// NOTE(dweiler): _odin_entry_point must be called at initialization
+			// time of the shared object, similarly, _odin_exit_point must be called
+			// at deinitialization. We can pass both -init and -fini to the linker by
+			// using a comma separated list of arguments to -Wl.
+			//
+			// This previously used ld but ld cannot actually build a shared library
+			// correctly this way since all the other dependencies provided implicitly
+			// by the compiler frontend are still needed and most of the command
+			// line arguments prepared previously are incompatible with ld.
+			//
+			// Shared libraries are .dylib on MacOS and .so on Linux.
+			if (build_context.metrics.os == TargetOs_darwin) {
+				output_ext = STR_LIT(".dylib");
+			} else {
+				output_ext = STR_LIT(".so");
+			}
+			link_settings = gb_string_appendc(link_settings, "-Wl,-init,'_odin_entry_point' ");
+			link_settings = gb_string_appendc(link_settings, "-Wl,-fini,'_odin_exit_point' ");
+		} else if (build_context.metrics.os != TargetOs_openbsd) {
+			// OpenBSD defaults to PIE executable. do not pass -no-pie for it.
 			link_settings = gb_string_appendc(link_settings, "-no-pie ");
 		}
-
-
 		if (build_context.out_filepath.len > 0) {
 			//NOTE(thebirk): We have a custom -out arguments, so we should use the extension from that
 			isize pos = string_extension_position(build_context.out_filepath);
@@ -438,35 +482,40 @@ i32 linker_stage(lbGenerator *gen) {
 			}
 		}
 
-		result = system_exec_command_line_app("ld-link",
-			"%s %s -o \"%.*s%.*s\" %s "
-			" %s "
-			" %.*s "
-			" %.*s "
-			" %s "
-			#if defined(GB_SYSTEM_OSX)
-				// This sets a requirement of Mountain Lion and up, but the compiler doesn't work without this limit.
-				// NOTE: If you change this (although this minimum is as low as you can go with Odin working)
-				//       make sure to also change the 'mtriple' param passed to 'opt'
-				#if defined(GB_CPU_ARM)
-				" -macosx_version_min 11.0.0 "
-				#else
-				" -macosx_version_min 10.8.0 "
-				#endif
-				// This points the linker to where the entry point is
-				" -e _main "
-			#endif
-			, linker, object_files, LIT(output_base), LIT(output_ext),
-			#if defined(GB_SYSTEM_OSX)
-			  "-lSystem -lm -syslibroot /Library/Developer/CommandLineTools/SDKs/MacOSX.sdk -L/usr/local/lib",
-			#else
-			  "-lc -lm",
-			#endif
-			lib_str,
-			LIT(build_context.link_flags),
-			LIT(build_context.extra_linker_flags),
-			link_settings);
-		
+		gbString platform_lib_str = gb_string_make(heap_allocator(), "");
+		defer (gb_string_free(platform_lib_str));
+		if (build_context.metrics.os == TargetOs_darwin) {
+			platform_lib_str = gb_string_appendc(platform_lib_str, "-lSystem -lm -Wl,-syslibroot /Library/Developer/CommandLineTools/SDKs/MacOSX.sdk -L/usr/local/lib");
+		} else {
+			platform_lib_str = gb_string_appendc(platform_lib_str, "-lc -lm");
+		}
+
+		if (build_context.metrics.os == TargetOs_darwin) {
+			// This sets a requirement of Mountain Lion and up, but the compiler doesn't work without this limit.
+			// NOTE: If you change this (although this minimum is as low as you can go with Odin working)
+			//       make sure to also change the 'mtriple' param passed to 'opt'
+			if (build_context.metrics.arch == TargetArch_arm64) {
+				link_settings = gb_string_appendc(link_settings, " -mmacosx-version-min=12.0.0 ");
+			} else {
+				link_settings = gb_string_appendc(link_settings, " -mmacosx-version-min=10.8.0 ");
+			}
+			// This points the linker to where the entry point is
+			link_settings = gb_string_appendc(link_settings, " -e _main ");
+		}
+
+		gbString link_command_line = gb_string_make(heap_allocator(), "clang -Wno-unused-command-line-argument ");
+		defer (gb_string_free(link_command_line));
+
+		link_command_line = gb_string_appendc(link_command_line, object_files);
+		link_command_line = gb_string_append_fmt(link_command_line, " -o \"%.*s%.*s\" ", LIT(output_base), LIT(output_ext));
+		link_command_line = gb_string_append_fmt(link_command_line, " %s ", platform_lib_str);
+		link_command_line = gb_string_append_fmt(link_command_line, " %s ", lib_str);
+		link_command_line = gb_string_append_fmt(link_command_line, " %.*s ", LIT(build_context.link_flags));
+		link_command_line = gb_string_append_fmt(link_command_line, " %.*s ", LIT(build_context.extra_linker_flags));
+		link_command_line = gb_string_append_fmt(link_command_line, " %s ", link_settings);
+
+		result = system_exec_command_line_app("ld-link", link_command_line);
+
 		if (result) {
 			return result;
 		}
@@ -478,7 +527,7 @@ i32 linker_stage(lbGenerator *gen) {
 			result = system_exec_command_line_app("dsymutil",
 				"dsymutil %.*s%.*s", LIT(output_base), LIT(output_ext)
 			);
-			
+
 			if (result) {
 				return result;
 			}
@@ -536,54 +585,26 @@ void usage(String argv0) {
 	print_usage_line(0, "Usage:");
 	print_usage_line(1, "%.*s command [arguments]", LIT(argv0));
 	print_usage_line(0, "Commands:");
-	print_usage_line(1, "build     compile .odin file, or directory of .odin files, as an executable.");
-	print_usage_line(1, "          one must contain the program's entry point, all must be in the same package.");
-	print_usage_line(1, "run       same as 'build', but also then runs the newly compiled executable.");
-	print_usage_line(1, "check     parse and type check .odin file");
-	print_usage_line(1, "query     parse, type check, and output a .json file containing information about the program");
-	print_usage_line(1, "doc       generate documentation .odin file, or directory of .odin files");
-	print_usage_line(1, "version   print version");
-	print_usage_line(1, "report    print information useful to reporting a bug");
+	print_usage_line(1, "build             compile directory of .odin files, as an executable.");
+	print_usage_line(1, "                  one must contain the program's entry point, all must be in the same package.");
+	print_usage_line(1, "run               same as 'build', but also then runs the newly compiled executable.");
+	print_usage_line(1, "check             parse, and type check a directory of .odin files");
+	print_usage_line(1, "query             parse, type check, and output a .json file containing information about the program");
+	print_usage_line(1, "strip-semicolon   parse, type check, and remove unneeded semicolons from the entire program");
+	print_usage_line(1, "test              build ands runs procedures with the attribute @(test) in the initial package");
+	print_usage_line(1, "doc               generate documentation on a directory of .odin files");
+	print_usage_line(1, "version           print version");
+	print_usage_line(1, "report            print information useful to reporting a bug");
 	print_usage_line(0, "");
-	print_usage_line(0, "For more information of flags, apply the flag to see what is possible");
-	print_usage_line(1, "-help");
-}
-
-
-bool string_is_valid_identifier(String str) {
-	if (str.len <= 0) return false;
-
-	isize rune_count = 0;
-
-	isize w = 0;
-	isize offset = 0;
-	while (offset < str.len) {
-		Rune r = 0;
-		w = utf8_decode(str.text, str.len, &r);
-		if (r == GB_RUNE_INVALID) {
-			return false;
-		}
-
-		if (rune_count == 0) {
-			if (!rune_is_letter(r)) {
-				return false;
-			}
-		} else {
-			if (!rune_is_letter(r) && !rune_is_digit(r)) {
-				return false;
-			}
-		}
-		rune_count += 1;
-		offset += w;
-	}
-
-	return true;
+	print_usage_line(0, "For further details on a command, use -help after the command name");
+	print_usage_line(1, "e.g. odin build -help");
 }
 
 enum BuildFlagKind {
 	BuildFlag_Invalid,
 
 	BuildFlag_Help,
+	BuildFlag_SingleFile,
 
 	BuildFlag_OutFile,
 	BuildFlag_OptimizationLevel,
@@ -617,7 +638,12 @@ enum BuildFlagKind {
 	BuildFlag_UseLLVMApi,
 	BuildFlag_IgnoreUnknownAttributes,
 	BuildFlag_ExtraLinkerFlags,
+	BuildFlag_ExtraAssemblerFlags,
 	BuildFlag_Microarch,
+	BuildFlag_TargetFeatures,
+
+	BuildFlag_RelocMode,
+	BuildFlag_DisableRedZone,
 
 	BuildFlag_TestName,
 
@@ -626,6 +652,8 @@ enum BuildFlagKind {
 	BuildFlag_InsertSemicolon,
 	BuildFlag_StrictStyle,
 	BuildFlag_StrictStyleInitOnly,
+	BuildFlag_ForeignErrorProcedures,
+	BuildFlag_DisallowRTTI,
 
 	BuildFlag_Compact,
 	BuildFlag_GlobalDefinitions,
@@ -638,9 +666,9 @@ enum BuildFlagKind {
 	BuildFlag_IgnoreWarnings,
 	BuildFlag_WarningsAsErrors,
 	BuildFlag_VerboseErrors,
-	
+
 	// internal use only
-	BuildFlag_InternalIgnoreLazy, 
+	BuildFlag_InternalIgnoreLazy,
 
 #if defined(GB_SYSTEM_WINDOWS)
 	BuildFlag_IgnoreVsSearch,
@@ -735,68 +763,80 @@ ExactValue build_param_to_exact_value(String name, String param) {
 
 bool parse_build_flags(Array<String> args) {
 	auto build_flags = array_make<BuildFlag>(heap_allocator(), 0, BuildFlag_COUNT);
-	add_flag(&build_flags, BuildFlag_Help,              str_lit("help"),                BuildFlagParam_None, Command_all);
-	add_flag(&build_flags, BuildFlag_OutFile,           str_lit("out"),                 BuildFlagParam_String, Command__does_build &~ Command_test);
-	add_flag(&build_flags, BuildFlag_OptimizationLevel, str_lit("opt"),                 BuildFlagParam_Integer, Command__does_build);
-	add_flag(&build_flags, BuildFlag_OptimizationMode,  str_lit("o"),                   BuildFlagParam_String, Command__does_build);
-	add_flag(&build_flags, BuildFlag_OptimizationMode,  str_lit("O"),                   BuildFlagParam_String, Command__does_build);
-	add_flag(&build_flags, BuildFlag_ShowTimings,       str_lit("show-timings"),        BuildFlagParam_None, Command__does_check);
-	add_flag(&build_flags, BuildFlag_ShowMoreTimings,   str_lit("show-more-timings"),   BuildFlagParam_None, Command__does_check);
-	add_flag(&build_flags, BuildFlag_ExportTimings,     str_lit("export-timings"),      BuildFlagParam_String, Command__does_check);
-	add_flag(&build_flags, BuildFlag_ExportTimingsFile, str_lit("export-timings-file"), BuildFlagParam_String, Command__does_check);
-	add_flag(&build_flags, BuildFlag_ShowUnused,        str_lit("show-unused"),         BuildFlagParam_None, Command_check);
-	add_flag(&build_flags, BuildFlag_ShowUnusedWithLocation, str_lit("show-unused-with-location"), BuildFlagParam_None, Command_check);
-	add_flag(&build_flags, BuildFlag_ShowSystemCalls,   str_lit("show-system-calls"),   BuildFlagParam_None, Command_all);
-	add_flag(&build_flags, BuildFlag_ThreadCount,       str_lit("thread-count"),        BuildFlagParam_Integer, Command_all);
-	add_flag(&build_flags, BuildFlag_KeepTempFiles,     str_lit("keep-temp-files"),     BuildFlagParam_None, Command__does_build|Command_strip_semicolon);
-	add_flag(&build_flags, BuildFlag_Collection,        str_lit("collection"),          BuildFlagParam_String, Command__does_check);
-	add_flag(&build_flags, BuildFlag_Define,            str_lit("define"),              BuildFlagParam_String, Command__does_check, true);
-	add_flag(&build_flags, BuildFlag_BuildMode,         str_lit("build-mode"),          BuildFlagParam_String, Command__does_build); // Commands_build is not used to allow for a better error message
-	add_flag(&build_flags, BuildFlag_Target,            str_lit("target"),              BuildFlagParam_String, Command__does_check);
-	add_flag(&build_flags, BuildFlag_Debug,             str_lit("debug"),               BuildFlagParam_None, Command__does_check);
-	add_flag(&build_flags, BuildFlag_DisableAssert,     str_lit("disable-assert"),      BuildFlagParam_None, Command__does_check);
-	add_flag(&build_flags, BuildFlag_NoBoundsCheck,     str_lit("no-bounds-check"),     BuildFlagParam_None, Command__does_check);
-	add_flag(&build_flags, BuildFlag_NoDynamicLiterals, str_lit("no-dynamic-literals"), BuildFlagParam_None, Command__does_check);
-	add_flag(&build_flags, BuildFlag_NoCRT,             str_lit("no-crt"),              BuildFlagParam_None, Command__does_build);
-	add_flag(&build_flags, BuildFlag_NoEntryPoint,      str_lit("no-entry-point"),      BuildFlagParam_None, Command__does_check &~ Command_test);
-	add_flag(&build_flags, BuildFlag_UseLLD,            str_lit("lld"),                 BuildFlagParam_None, Command__does_build);
-	add_flag(&build_flags, BuildFlag_UseSeparateModules,str_lit("use-separate-modules"),BuildFlagParam_None, Command__does_build);
-	add_flag(&build_flags, BuildFlag_ThreadedChecker,   str_lit("threaded-checker"),    BuildFlagParam_None, Command__does_check);
-	add_flag(&build_flags, BuildFlag_NoThreadedChecker, str_lit("no-threaded-checker"), BuildFlagParam_None, Command__does_check);
-	add_flag(&build_flags, BuildFlag_ShowDebugMessages, str_lit("show-debug-messages"), BuildFlagParam_None, Command_all);
-	add_flag(&build_flags, BuildFlag_Vet,               str_lit("vet"),                 BuildFlagParam_None, Command__does_check);
-	add_flag(&build_flags, BuildFlag_VetExtra,          str_lit("vet-extra"),           BuildFlagParam_None, Command__does_check);
-	add_flag(&build_flags, BuildFlag_UseLLVMApi,        str_lit("llvm-api"),            BuildFlagParam_None, Command__does_build);
-	add_flag(&build_flags, BuildFlag_IgnoreUnknownAttributes, str_lit("ignore-unknown-attributes"), BuildFlagParam_None, Command__does_check);
-	add_flag(&build_flags, BuildFlag_ExtraLinkerFlags,  str_lit("extra-linker-flags"),              BuildFlagParam_String, Command__does_build);
-	add_flag(&build_flags, BuildFlag_Microarch,         str_lit("microarch"),                       BuildFlagParam_String, Command__does_build);
+	add_flag(&build_flags, BuildFlag_Help,                    str_lit("help"),                      BuildFlagParam_None,    Command_all);
+	add_flag(&build_flags, BuildFlag_SingleFile,              str_lit("file"),                      BuildFlagParam_None,    Command__does_build | Command__does_check);
+	add_flag(&build_flags, BuildFlag_OutFile,                 str_lit("out"),                       BuildFlagParam_String,  Command__does_build &~ Command_test);
+	add_flag(&build_flags, BuildFlag_OptimizationLevel,       str_lit("opt"),                       BuildFlagParam_Integer, Command__does_build);
+	add_flag(&build_flags, BuildFlag_OptimizationMode,        str_lit("o"),                         BuildFlagParam_String,  Command__does_build);
+	add_flag(&build_flags, BuildFlag_OptimizationMode,        str_lit("O"),                         BuildFlagParam_String,  Command__does_build);
+	add_flag(&build_flags, BuildFlag_ShowTimings,             str_lit("show-timings"),              BuildFlagParam_None,    Command__does_check);
+	add_flag(&build_flags, BuildFlag_ShowMoreTimings,         str_lit("show-more-timings"),         BuildFlagParam_None,    Command__does_check);
+	add_flag(&build_flags, BuildFlag_ExportTimings,           str_lit("export-timings"),            BuildFlagParam_String,  Command__does_check);
+	add_flag(&build_flags, BuildFlag_ExportTimingsFile,       str_lit("export-timings-file"),       BuildFlagParam_String,  Command__does_check);
+	add_flag(&build_flags, BuildFlag_ShowUnused,              str_lit("show-unused"),               BuildFlagParam_None,    Command_check);
+	add_flag(&build_flags, BuildFlag_ShowUnusedWithLocation,  str_lit("show-unused-with-location"), BuildFlagParam_None,    Command_check);
+	add_flag(&build_flags, BuildFlag_ShowSystemCalls,         str_lit("show-system-calls"),         BuildFlagParam_None,    Command_all);
+	add_flag(&build_flags, BuildFlag_ThreadCount,             str_lit("thread-count"),              BuildFlagParam_Integer, Command_all);
+	add_flag(&build_flags, BuildFlag_KeepTempFiles,           str_lit("keep-temp-files"),           BuildFlagParam_None,    Command__does_build | Command_strip_semicolon);
+	add_flag(&build_flags, BuildFlag_Collection,              str_lit("collection"),                BuildFlagParam_String,  Command__does_check);
+	add_flag(&build_flags, BuildFlag_Define,                  str_lit("define"),                    BuildFlagParam_String,  Command__does_check, true);
+	add_flag(&build_flags, BuildFlag_BuildMode,               str_lit("build-mode"),                BuildFlagParam_String,  Command__does_build); // Commands_build is not used to allow for a better error message
+	add_flag(&build_flags, BuildFlag_Target,                  str_lit("target"),                    BuildFlagParam_String,  Command__does_check);
+	add_flag(&build_flags, BuildFlag_Debug,                   str_lit("debug"),                     BuildFlagParam_None,    Command__does_check);
+	add_flag(&build_flags, BuildFlag_DisableAssert,           str_lit("disable-assert"),            BuildFlagParam_None,    Command__does_check);
+	add_flag(&build_flags, BuildFlag_NoBoundsCheck,           str_lit("no-bounds-check"),           BuildFlagParam_None,    Command__does_check);
+	add_flag(&build_flags, BuildFlag_NoDynamicLiterals,       str_lit("no-dynamic-literals"),       BuildFlagParam_None,    Command__does_check);
+	add_flag(&build_flags, BuildFlag_NoCRT,                   str_lit("no-crt"),                    BuildFlagParam_None,    Command__does_build);
+	add_flag(&build_flags, BuildFlag_NoEntryPoint,            str_lit("no-entry-point"),            BuildFlagParam_None,    Command__does_check &~ Command_test);
+	add_flag(&build_flags, BuildFlag_UseLLD,                  str_lit("lld"),                       BuildFlagParam_None,    Command__does_build);
+	add_flag(&build_flags, BuildFlag_UseSeparateModules,      str_lit("use-separate-modules"),      BuildFlagParam_None,    Command__does_build);
+	add_flag(&build_flags, BuildFlag_ThreadedChecker,         str_lit("threaded-checker"),          BuildFlagParam_None,    Command__does_check);
+	add_flag(&build_flags, BuildFlag_NoThreadedChecker,       str_lit("no-threaded-checker"),       BuildFlagParam_None,    Command__does_check);
+	add_flag(&build_flags, BuildFlag_ShowDebugMessages,       str_lit("show-debug-messages"),       BuildFlagParam_None,    Command_all);
+	add_flag(&build_flags, BuildFlag_Vet,                     str_lit("vet"),                       BuildFlagParam_None,    Command__does_check);
+	add_flag(&build_flags, BuildFlag_VetExtra,                str_lit("vet-extra"),                 BuildFlagParam_None,    Command__does_check);
+	add_flag(&build_flags, BuildFlag_UseLLVMApi,              str_lit("llvm-api"),                  BuildFlagParam_None,    Command__does_build);
+	add_flag(&build_flags, BuildFlag_IgnoreUnknownAttributes, str_lit("ignore-unknown-attributes"), BuildFlagParam_None,    Command__does_check);
+	add_flag(&build_flags, BuildFlag_ExtraLinkerFlags,        str_lit("extra-linker-flags"),        BuildFlagParam_String,  Command__does_build);
+	add_flag(&build_flags, BuildFlag_ExtraAssemblerFlags,     str_lit("extra-assembler-flags"),     BuildFlagParam_String,  Command__does_build);
+	add_flag(&build_flags, BuildFlag_Microarch,               str_lit("microarch"),                 BuildFlagParam_String,  Command__does_build);
+	add_flag(&build_flags, BuildFlag_TargetFeatures,          str_lit("target-features"),           BuildFlagParam_String,  Command__does_build);
 
-	add_flag(&build_flags, BuildFlag_TestName,         str_lit("test-name"),                       BuildFlagParam_String, Command_test);
+	add_flag(&build_flags, BuildFlag_RelocMode,               str_lit("reloc-mode"),                BuildFlagParam_String,  Command__does_build);
+	add_flag(&build_flags, BuildFlag_DisableRedZone,          str_lit("disable-red-zone"),          BuildFlagParam_None,    Command__does_build);
 
-	add_flag(&build_flags, BuildFlag_DisallowDo,            str_lit("disallow-do"),              BuildFlagParam_None, Command__does_check);
-	add_flag(&build_flags, BuildFlag_DefaultToNilAllocator, str_lit("default-to-nil-allocator"), BuildFlagParam_None, Command__does_check);
-	add_flag(&build_flags, BuildFlag_InsertSemicolon,       str_lit("insert-semicolon"),         BuildFlagParam_None, Command__does_check);
-	add_flag(&build_flags, BuildFlag_StrictStyle,           str_lit("strict-style"),             BuildFlagParam_None, Command__does_check);
-	add_flag(&build_flags, BuildFlag_StrictStyleInitOnly,   str_lit("strict-style-init-only"),   BuildFlagParam_None, Command__does_check);
-	add_flag(&build_flags, BuildFlag_Compact,           str_lit("compact"),            BuildFlagParam_None, Command_query);
-	add_flag(&build_flags, BuildFlag_GlobalDefinitions, str_lit("global-definitions"), BuildFlagParam_None, Command_query);
-	add_flag(&build_flags, BuildFlag_GoToDefinitions,   str_lit("go-to-definitions"),  BuildFlagParam_None, Command_query);
+	add_flag(&build_flags, BuildFlag_TestName,                str_lit("test-name"),                 BuildFlagParam_String,  Command_test);
 
-	add_flag(&build_flags, BuildFlag_Short,         str_lit("short"),        BuildFlagParam_None, Command_doc);
-	add_flag(&build_flags, BuildFlag_AllPackages,   str_lit("all-packages"), BuildFlagParam_None, Command_doc);
-	add_flag(&build_flags, BuildFlag_DocFormat,     str_lit("doc-format"),   BuildFlagParam_None, Command_doc);
+	add_flag(&build_flags, BuildFlag_DisallowDo,              str_lit("disallow-do"),               BuildFlagParam_None,    Command__does_check);
+	add_flag(&build_flags, BuildFlag_DefaultToNilAllocator,   str_lit("default-to-nil-allocator"),  BuildFlagParam_None,    Command__does_check);
+	add_flag(&build_flags, BuildFlag_InsertSemicolon,         str_lit("insert-semicolon"),          BuildFlagParam_None,    Command__does_check);
+	add_flag(&build_flags, BuildFlag_StrictStyle,             str_lit("strict-style"),              BuildFlagParam_None,    Command__does_check);
+	add_flag(&build_flags, BuildFlag_StrictStyleInitOnly,     str_lit("strict-style-init-only"),    BuildFlagParam_None,    Command__does_check);
+	add_flag(&build_flags, BuildFlag_ForeignErrorProcedures,  str_lit("foreign-error-procedures"),  BuildFlagParam_None,    Command__does_check);
 
-	add_flag(&build_flags, BuildFlag_IgnoreWarnings,   str_lit("ignore-warnings"),    BuildFlagParam_None, Command_all);
-	add_flag(&build_flags, BuildFlag_WarningsAsErrors, str_lit("warnings-as-errors"), BuildFlagParam_None, Command_all);
-	add_flag(&build_flags, BuildFlag_VerboseErrors,    str_lit("verbose-errors"),     BuildFlagParam_None, Command_all);
-	
-	add_flag(&build_flags, BuildFlag_InternalIgnoreLazy, str_lit("internal-ignore-lazy"), BuildFlagParam_None, Command_all);
+	add_flag(&build_flags, BuildFlag_DisallowRTTI,            str_lit("disallow-rtti"),             BuildFlagParam_None,    Command__does_check);
+
+
+	add_flag(&build_flags, BuildFlag_Compact,                 str_lit("compact"),                   BuildFlagParam_None,    Command_query);
+	add_flag(&build_flags, BuildFlag_GlobalDefinitions,       str_lit("global-definitions"),        BuildFlagParam_None,    Command_query);
+	add_flag(&build_flags, BuildFlag_GoToDefinitions,         str_lit("go-to-definitions"),         BuildFlagParam_None,    Command_query);
+
+
+	add_flag(&build_flags, BuildFlag_Short,                   str_lit("short"),                     BuildFlagParam_None,    Command_doc);
+	add_flag(&build_flags, BuildFlag_AllPackages,             str_lit("all-packages"),              BuildFlagParam_None,    Command_doc);
+	add_flag(&build_flags, BuildFlag_DocFormat,               str_lit("doc-format"),                BuildFlagParam_None,    Command_doc);
+
+	add_flag(&build_flags, BuildFlag_IgnoreWarnings,          str_lit("ignore-warnings"),           BuildFlagParam_None,    Command_all);
+	add_flag(&build_flags, BuildFlag_WarningsAsErrors,        str_lit("warnings-as-errors"),        BuildFlagParam_None,    Command_all);
+	add_flag(&build_flags, BuildFlag_VerboseErrors,           str_lit("verbose-errors"),            BuildFlagParam_None,    Command_all);
+
+	add_flag(&build_flags, BuildFlag_InternalIgnoreLazy,      str_lit("internal-ignore-lazy"),      BuildFlagParam_None,    Command_all);
 
 #if defined(GB_SYSTEM_WINDOWS)
-	add_flag(&build_flags, BuildFlag_IgnoreVsSearch, str_lit("ignore-vs-search"),  BuildFlagParam_None, Command__does_build);
-	add_flag(&build_flags, BuildFlag_ResourceFile,   str_lit("resource"),          BuildFlagParam_String, Command__does_build);
-	add_flag(&build_flags, BuildFlag_WindowsPdbName, str_lit("pdb-name"),          BuildFlagParam_String, Command__does_build);
-	add_flag(&build_flags, BuildFlag_Subsystem,      str_lit("subsystem"),         BuildFlagParam_String, Command__does_build);
+	add_flag(&build_flags, BuildFlag_IgnoreVsSearch,          str_lit("ignore-vs-search"),          BuildFlagParam_None,    Command__does_build);
+	add_flag(&build_flags, BuildFlag_ResourceFile,            str_lit("resource"),                  BuildFlagParam_String,  Command__does_build);
+	add_flag(&build_flags, BuildFlag_WindowsPdbName,          str_lit("pdb-name"),                  BuildFlagParam_String,  Command__does_build);
+	add_flag(&build_flags, BuildFlag_Subsystem,               str_lit("subsystem"),                 BuildFlagParam_String,  Command__does_build);
 #endif
 
 
@@ -1243,7 +1283,7 @@ bool parse_build_flags(Array<String> args) {
 							} else {
 								gb_printf_err("Unknown build mode '%.*s'\n", LIT(str));
 								gb_printf_err("Valid build modes:\n");
-								gb_printf_err("\tdll, shared\n");
+								gb_printf_err("\tdll, shared, dynamic\n");
 								gb_printf_err("\tobj, object\n");
 								gb_printf_err("\texe\n");
 								gb_printf_err("\tasm, assembly, assembler\n");
@@ -1314,17 +1354,51 @@ bool parse_build_flags(Array<String> args) {
 						case BuildFlag_IgnoreUnknownAttributes:
 							build_context.ignore_unknown_attributes = true;
 							break;
-						case BuildFlag_ExtraLinkerFlags: {
+						case BuildFlag_ExtraLinkerFlags:
 							GB_ASSERT(value.kind == ExactValue_String);
 							build_context.extra_linker_flags = value.value_string;
 							break;
-						}
+						case BuildFlag_ExtraAssemblerFlags:
+							GB_ASSERT(value.kind == ExactValue_String);
+							build_context.extra_assembler_flags = value.value_string;
+							break;
 						case BuildFlag_Microarch: {
 							GB_ASSERT(value.kind == ExactValue_String);
 							build_context.microarch = value.value_string;
 							string_to_lower(&build_context.microarch);
 							break;
 						}
+						case BuildFlag_TargetFeatures: {
+							GB_ASSERT(value.kind == ExactValue_String);
+							build_context.target_features = value.value_string;
+							string_to_lower(&build_context.target_features);
+							break;
+						}
+						case BuildFlag_RelocMode: {
+							GB_ASSERT(value.kind == ExactValue_String);
+							String v = value.value_string;
+							if (v == "default") {
+								build_context.reloc_mode = RelocMode_Default;
+							} else if (v == "static") {
+								build_context.reloc_mode = RelocMode_Static;
+							} else if (v == "pic") {
+								build_context.reloc_mode = RelocMode_PIC;
+							} else if (v == "dynamic-no-pic") {
+								build_context.reloc_mode = RelocMode_DynamicNoPIC;
+							} else {
+								gb_printf_err("-reloc-mode flag expected one of the following\n");
+								gb_printf_err("\tdefault\n");
+								gb_printf_err("\tstatic\n");
+								gb_printf_err("\tpic\n");
+								gb_printf_err("\tdynamic-no-pic\n");
+								bad_flags = true;
+							}
+
+							break;
+						}
+						case BuildFlag_DisableRedZone:
+							build_context.disable_red_zone = true;
+							break;
 						case BuildFlag_TestName: {
 							GB_ASSERT(value.kind == ExactValue_String);
 							{
@@ -1343,8 +1417,14 @@ bool parse_build_flags(Array<String> args) {
 						case BuildFlag_DisallowDo:
 							build_context.disallow_do = true;
 							break;
+						case BuildFlag_DisallowRTTI:
+							build_context.disallow_rtti = true;
+							break;
 						case BuildFlag_DefaultToNilAllocator:
 							build_context.ODIN_DEFAULT_TO_NIL_ALLOCATOR = true;
+							break;
+						case BuildFlag_ForeignErrorProcedures:
+							build_context.ODIN_FOREIGN_ERROR_PROCEDURES = true;
 							break;
 						case BuildFlag_InsertSemicolon: {
 							gb_printf_err("-insert-semicolon flag is not required any more\n");
@@ -1777,7 +1857,7 @@ void show_timings(Checker *c, Timings *t) {
 
 void remove_temp_files(lbGenerator *gen) {
 	if (build_context.keep_temp_files) return;
-	
+
 	TIME_SECTION("remove keep temp files");
 
 	for_array(i, gen->output_temp_paths) {
@@ -1801,32 +1881,47 @@ void remove_temp_files(lbGenerator *gen) {
 
 void print_show_help(String const arg0, String const &command) {
 	print_usage_line(0, "%.*s is a tool for managing Odin source code", LIT(arg0));
-	print_usage_line(0, "Usage");
+	print_usage_line(0, "Usage:");
 	print_usage_line(1, "%.*s %.*s [arguments]", LIT(arg0), LIT(command));
 	print_usage_line(0, "");
 
 	if (command == "build") {
-		print_usage_line(1, "build     compile .odin file, or directory of .odin files, as an executable.");
-		print_usage_line(1, "          one must contain the program's entry point, all must be in the same package.");
-	} else if (command == "run") {
-		print_usage_line(1, "run       same as 'build', but also then runs the newly compiled executable.");
-	} else if (command == "check") {
-		print_usage_line(1, "check     parse and type check .odin file(s)");
-	} else if (command == "test") {
-		print_usage_line(1, "test      build ands runs procedures with the attribute @(test) in the initial package");
-	} else if (command == "query") {
-		print_usage_line(1, "query     [experimental] parse, type check, and output a .json file containing information about the program");
-	} else if (command == "doc") {
-		print_usage_line(1, "doc       generate documentation from a .odin file, or directory of .odin files");
+		print_usage_line(1, "build   Compile directory of .odin files as an executable.");
+		print_usage_line(2, "One must contain the program's entry point, all must be in the same package.");
+		print_usage_line(2, "Use `-file` to build a single file instead.");
 		print_usage_line(2, "Examples:");
-		print_usage_line(3, "odin doc core/path");
-		print_usage_line(3, "odin doc core/path core/path/filepath");
+		print_usage_line(3, "odin build .                    # Build package in current directory");
+		print_usage_line(3, "odin build <dir>                # Build package in <dir>");
+		print_usage_line(3, "odin build filename.odin -file  # Build single-file package, must contain entry point.");
+	} else if (command == "run") {
+		print_usage_line(1, "run     Same as 'build', but also then runs the newly compiled executable.");
+		print_usage_line(2, "Append an empty flag and then the args, '-- <args>', to specify args for the output.");
+		print_usage_line(2, "Examples:");
+		print_usage_line(3, "odin run .                    # Build and run package in current directory");
+		print_usage_line(3, "odin run <dir>                # Build and run package in <dir>");
+		print_usage_line(3, "odin run filename.odin -file  # Build and run single-file package, must contain entry point.");
+	} else if (command == "check") {
+		print_usage_line(1, "check   Parse and type check directory of .odin files");
+		print_usage_line(2, "Examples:");
+		print_usage_line(3, "odin check .                    # Type check package in current directory");
+		print_usage_line(3, "odin check <dir>                # Type check package in <dir>");
+		print_usage_line(3, "odin check filename.odin -file  # Type check single-file package, must contain entry point.");
+	} else if (command == "test") {
+		print_usage_line(1, "test      Build ands runs procedures with the attribute @(test) in the initial package");
+	} else if (command == "query") {
+		print_usage_line(1, "query     [experimental] Parse, type check, and output a .json file containing information about the program");
+	} else if (command == "doc") {
+		print_usage_line(1, "doc       generate documentation from a directory of .odin files");
+		print_usage_line(2, "Examples:");
+		print_usage_line(3, "odin doc .                    # Generate documentation on package in current directory");
+		print_usage_line(3, "odin doc <dir>                # Generate documentation on package in <dir>");
+		print_usage_line(3, "odin doc filename.odin -file  # Generate documentation on single-file package.");
 	} else if (command == "version") {
 		print_usage_line(1, "version   print version");
 	} else if (command == "strip-semicolon") {
 		print_usage_line(1, "strip-semicolon");
-		print_usage_line(2, "parse and type check .odin file(s) and then remove unneeded semicolons from the entire project");
-	} 
+		print_usage_line(2, "Parse and type check .odin file(s) and then remove unneeded semicolons from the entire project");
+	}
 
 	bool doc = command == "doc";
 	bool build = command == "build";
@@ -1839,6 +1934,13 @@ void print_show_help(String const arg0, String const &command) {
 	print_usage_line(0, "");
 	print_usage_line(1, "Flags");
 	print_usage_line(0, "");
+
+	if (check) {
+		print_usage_line(1, "-file");
+		print_usage_line(2, "Tells `%.*s %.*s` to treat the given file as a self-contained package.", LIT(arg0), LIT(command));
+		print_usage_line(2, "This means that `<dir>/a.odin` won't have access to `<dir>/b.odin`'s contents.");
+		print_usage_line(0, "");
+	}
 
 	if (doc) {
 		print_usage_line(1, "-short");
@@ -1930,6 +2032,7 @@ void print_show_help(String const arg0, String const &command) {
 		print_usage_line(1, "-define:<name>=<expression>");
 		print_usage_line(2, "Defines a global constant with a value");
 		print_usage_line(2, "Example: -define:SPAM=123");
+		print_usage_line(2, "To use:  #config(SPAM, default_value)");
 		print_usage_line(0, "");
 	}
 
@@ -2032,12 +2135,29 @@ void print_show_help(String const arg0, String const &command) {
 		print_usage_line(2, "Adds extra linker specific flags in a string");
 		print_usage_line(0, "");
 
+		print_usage_line(1, "-extra-assembler-flags:<string>");
+		print_usage_line(2, "Adds extra assembler specific flags in a string");
+		print_usage_line(0, "");
+
+
 		print_usage_line(1, "-microarch:<string>");
 		print_usage_line(2, "Specifies the specific micro-architecture for the build in a string");
 		print_usage_line(2, "Examples:");
 		print_usage_line(3, "-microarch:sandybridge");
 		print_usage_line(3, "-microarch:native");
 		print_usage_line(0, "");
+
+		print_usage_line(1, "-reloc-mode:<string>");
+		print_usage_line(2, "Specifies the reloc mode");
+		print_usage_line(2, "Options:");
+		print_usage_line(3, "default");
+		print_usage_line(3, "static");
+		print_usage_line(3, "pic");
+		print_usage_line(3, "dynamic-no-pic");
+		print_usage_line(0, "");
+
+		print_usage_line(1, "-disable-red-zone");
+		print_usage_line(2, "Disable red zone on a supported freestanding target");
 	}
 
 	if (check) {
@@ -2052,7 +2172,7 @@ void print_show_help(String const arg0, String const &command) {
 		print_usage_line(1, "-strict-style");
 		print_usage_line(2, "Errs on unneeded tokens, such as unneeded semicolons");
 		print_usage_line(0, "");
-		
+
 		print_usage_line(1, "-strict-style-init-only");
 		print_usage_line(2, "Errs on unneeded tokens, such as unneeded semicolons, only on the initial project");
 		print_usage_line(0, "");
@@ -2068,6 +2188,11 @@ void print_show_help(String const arg0, String const &command) {
 		print_usage_line(1, "-verbose-errors");
 		print_usage_line(2, "Prints verbose error messages showing the code on that line and the location in that line");
 		print_usage_line(0, "");
+
+		print_usage_line(1, "-foreign-error-procedures");
+		print_usage_line(2, "States that the error procedues used in the runtime are defined in a separate translation unit");
+		print_usage_line(0, "");
+
 	}
 
 	if (run_or_build) {
@@ -2217,7 +2342,7 @@ gbFileError write_file_with_stripped_tokens(gbFile *f, AstFile *file, i64 *writt
 			}
 			written += to_write;
 			prev_offset = token_pos_end(*token).offset;
-		} 
+		}
 		if (token->flags & TokenFlag_Replace) {
 			if (token->kind == Token_Ellipsis) {
 				if (!gb_file_write(f, "..=", 3)) {
@@ -2236,7 +2361,7 @@ gbFileError write_file_with_stripped_tokens(gbFile *f, AstFile *file, i64 *writt
 		}
 		written += to_write;
 	}
-	
+
 	if (written_) *written_ = written;
 	return err;
 }
@@ -2247,14 +2372,14 @@ int strip_semicolons(Parser *parser) {
 		AstPackage *pkg = parser->packages[i];
 		file_count += pkg->files.count;
 	}
-	
+
 	auto generated_files = array_make<StripSemicolonFile>(permanent_allocator(), 0, file_count);
-	
+
 	for_array(i, parser->packages) {
 		AstPackage *pkg = parser->packages[i];
 		for_array(j, pkg->files) {
 			AstFile *file = pkg->files[j];
-			
+
 			bool nothing_to_change = true;
 			for_array(i, file->tokens) {
 				Token *token = &file->tokens[i];
@@ -2263,29 +2388,29 @@ int strip_semicolons(Parser *parser) {
 					break;
 				}
 			}
-			
+
 			if (nothing_to_change) {
 				continue;
 			}
-			
+
 			String old_fullpath = copy_string(permanent_allocator(), file->fullpath);
-				
+
 			// assumes .odin extension
 			String fullpath_base = substring(old_fullpath, 0, old_fullpath.len-5);
-			
+
 			String old_fullpath_backup = concatenate_strings(permanent_allocator(), fullpath_base, str_lit("~backup.odin-temp"));
 			String new_fullpath = concatenate_strings(permanent_allocator(), fullpath_base, str_lit("~temp.odin-temp"));
-			
+
 			array_add(&generated_files, StripSemicolonFile{old_fullpath, old_fullpath_backup, new_fullpath, file});
 		}
 	}
-	
+
 	gb_printf_err("File count to be stripped of unneeded tokens: %td\n", generated_files.count);
-	
-	
+
+
 	isize generated_count = 0;
 	bool failed = false;
-	
+
 	for_array(i, generated_files) {
 		auto *file = &generated_files[i];
 		char const *filename = cast(char const *)file->new_fullpath.text;
@@ -2293,15 +2418,15 @@ int strip_semicolons(Parser *parser) {
 		defer (if (err != gbFileError_None) {
 			failed = true;
 		});
-		
-		gbFile f = {}; 
+
+		gbFile f = {};
 		err = gb_file_create(&f, filename);
 		if (err) {
 			break;
 		}
 		defer (err = gb_file_close(&f));
 		generated_count += 1;
-		
+
 		i64 written = 0;
 		defer (err = gb_file_truncate(&f, written));
 
@@ -2322,23 +2447,23 @@ int strip_semicolons(Parser *parser) {
 		}
 		return 1;
 	}
-	
+
 	isize overwritten_files = 0;
-	
+
 	for_array(i, generated_files) {
 		auto *file = &generated_files[i];
-		
+
 		char const *old_fullpath = cast(char const *)file->old_fullpath.text;
 		char const *old_fullpath_backup = cast(char const *)file->old_fullpath_backup.text;
 		char const *new_fullpath = cast(char const *)file->new_fullpath.text;
-		
+
 		debugf("Copy '%s' to '%s'\n", old_fullpath, old_fullpath_backup);
 		if (!gb_file_copy(old_fullpath, old_fullpath_backup, false)) {
 			gb_printf_err("failed to copy '%s' to '%s'\n", old_fullpath, old_fullpath_backup);
 			failed = true;
 			break;
 		}
-		
+
 		debugf("Copy '%s' to '%s'\n", new_fullpath, old_fullpath);
 
 		if (!gb_file_copy(new_fullpath, old_fullpath, false)) {
@@ -2355,19 +2480,19 @@ int strip_semicolons(Parser *parser) {
 		if (!gb_file_remove(old_fullpath_backup)) {
 			gb_printf_err("failed to remove '%s'\n", old_fullpath_backup);
 		}
-		
+
 		overwritten_files++;
 	}
-	
+
 	if (!build_context.keep_temp_files) {
 		for_array(i, generated_files) {
 			auto *file = &generated_files[i];
 			char const *filename = nullptr;
 			filename = cast(char const *)file->new_fullpath.text;
-			
+
 			debugf("Remove '%s'\n", filename);
 			GB_ASSERT_MSG(gb_file_remove(filename), "unable to delete file %s", filename);
-			
+
 			filename = cast(char const *)file->old_fullpath_backup.text;
 			debugf("Remove '%s'\n", filename);
 			if (gb_file_exists(filename) && !gb_file_remove(filename)) {
@@ -2378,14 +2503,12 @@ int strip_semicolons(Parser *parser) {
 			}
 		}
 	}
-	
+
 	gb_printf_err("Files stripped of unneeded token: %td\n", generated_files.count);
-	
-	
+
+
 	return cast(int)failed;
 }
-
-
 
 int main(int arg_count, char const **arg_ptr) {
 	if (arg_count < 2) {
@@ -2397,10 +2520,11 @@ int main(int arg_count, char const **arg_ptr) {
 	defer (timings_destroy(&global_timings));
 
 	MAIN_TIME_SECTION("initialization");
-	
+
 	virtual_memory_init();
 	mutex_init(&fullpath_mutex);
 	mutex_init(&hash_exact_value_mutex);
+	mutex_init(&global_type_name_objc_metadata_mutex);
 
 	init_string_buffer_memory();
 	init_string_interner();
@@ -2426,6 +2550,7 @@ int main(int arg_count, char const **arg_ptr) {
 	String command = args[1];
 	String init_filename = {};
 	String run_args_string = {};
+	isize  last_non_run_arg = args.count;
 
 	bool run_output = false;
 	if (command == "run" || command == "test") {
@@ -2441,7 +2566,6 @@ int main(int arg_count, char const **arg_ptr) {
 		Array<String> run_args = array_make<String>(heap_allocator(), 0, arg_count);
 		defer (array_free(&run_args));
 
-		isize last_non_run_arg = args.count;
 		for_array(i, args) {
 			if (args[i] == "--") {
 				last_non_run_arg = i;
@@ -2454,6 +2578,7 @@ int main(int arg_count, char const **arg_ptr) {
 
 		args = array_slice(args, 0, last_non_run_arg);
 		run_args_string = string_join_and_quote(heap_allocator(), run_args);
+
 		init_filename = args[2];
 		run_output = true;
 
@@ -2541,8 +2666,30 @@ int main(int arg_count, char const **arg_ptr) {
 		return 1;
 	}
 
-	if (init_filename == "-help") {
+	if (init_filename == "-help" ||
+	    init_filename == "--help") {
 		build_context.show_help = true;
+	}
+
+	if (init_filename.len > 0 && !build_context.show_help) {
+		// The command must be build, run, test, check, or another that takes a directory or filename.
+		if (!path_is_directory(init_filename)) {
+			// Input package is a filename. We allow this only if `-file` was given, otherwise we exit with an error message.
+			bool single_file_package = false;
+			for_array(i, args) {
+				if (i >= 3 && i <= last_non_run_arg && args[i] == "-file") {
+					single_file_package = true;
+					break;
+				}
+			}
+
+			if (!single_file_package) {
+				gb_printf_err("ERROR: `%.*s %.*s` takes a package as its first argument.\n", LIT(args[0]), LIT(command));
+				gb_printf_err("Did you mean `%.*s %.*s %.*s -file`?\n", LIT(args[0]), LIT(command), LIT(init_filename));
+				gb_printf_err("The `-file` flag tells it to treat a file as a self-contained package.\n");
+				return 1;
+			}
+		}
 	}
 
 	build_context.command = command;
@@ -2559,7 +2706,7 @@ int main(int arg_count, char const **arg_ptr) {
 	// NOTE(bill): add 'shared' directory if it is not already set
 	if (!find_library_collection_path(str_lit("shared"), nullptr)) {
 		add_library_collection(str_lit("shared"),
-							   get_fullpath_relative(heap_allocator(), odin_root_dir(), str_lit("shared")));
+			get_fullpath_relative(heap_allocator(), odin_root_dir(), str_lit("shared")));
 	}
 
 
@@ -2571,7 +2718,7 @@ int main(int arg_count, char const **arg_ptr) {
 
 	init_global_thread_pool();
 	defer (thread_pool_destroy(&global_thread_pool));
-	
+
 	init_universal();
 	// TODO(bill): prevent compiling without a linker
 
@@ -2603,7 +2750,7 @@ int main(int arg_count, char const **arg_ptr) {
 	if (any_errors()) {
 		return 1;
 	}
-	
+
 	if (build_context.command_kind == Command_strip_semicolon) {
 		return strip_semicolons(parser);
 	}
@@ -2657,7 +2804,7 @@ int main(int arg_count, char const **arg_ptr) {
 	}
 
 	remove_temp_files(gen);
-	
+
 	if (build_context.show_timings) {
 		show_timings(checker, &global_timings);
 	}

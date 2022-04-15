@@ -1,5 +1,5 @@
 // The path/filepath package uses either forward slashes or backslashes depending on the operating system
-// To process paths usch as URLs that depend on forward slashes regardless of the OS, use the path package
+// To process paths such as URLs that depend on forward slashes regardless of the OS, use the path package
 package filepath
 
 import "core:strings"
@@ -8,7 +8,7 @@ import "core:strings"
 is_separator :: proc(c: byte) -> bool {
 	switch c {
 	case '/':  return true
-	case '\\': return ODIN_OS == "windows"
+	case '\\': return ODIN_OS == .Windows
 	}
 	return false
 }
@@ -32,7 +32,7 @@ volume_name :: proc(path: string) -> string {
 }
 
 volume_name_len :: proc(path: string) -> int {
-	if ODIN_OS == "windows" {
+	if ODIN_OS == .Windows {
 		if len(path) < 2 {
 			return 0
 		}
@@ -122,6 +122,7 @@ clean :: proc(path: string, allocator := context.allocator) -> string {
 		vol_and_path = original_path,
 		vol_len = vol_len,
 	}
+	defer lazy_buffer_destroy(out)
 
 	r, dot_dot := 0, 0
 	if rooted {
@@ -170,7 +171,6 @@ clean :: proc(path: string, allocator := context.allocator) -> string {
 	cleaned, new_allocation := from_slash(s)
 	if new_allocation {
 		delete(s)
-		lazy_buffer_destroy(out)
 	}
 	return cleaned
 }
@@ -284,13 +284,14 @@ rel :: proc(base_path, target_path: string, allocator := context.allocator) -> (
 }
 
 dir :: proc(path: string, allocator := context.allocator) -> string {
+        context.allocator = allocator
 	vol := volume_name(path)
 	i := len(path) - 1
 	for i >= len(vol) && !is_separator(path[i]) {
 		i -= 1
 	}
-	dir := clean(path[len(vol) : i+1], allocator)
-	defer delete(dir, allocator)
+	dir := clean(path[len(vol) : i+1])
+	defer delete(dir)
 	if dir == "." && len(vol) > 2 {
 		return strings.clone(vol)
 	}
@@ -299,6 +300,11 @@ dir :: proc(path: string, allocator := context.allocator) -> string {
 
 
 
+// Splits the PATH-like `path` string, returning an array of its separated components (delete after use).
+// For Windows the separator is `;`, for Unix it's  `:`.
+// An empty string returns nil. A non-empty string with no separators returns a 1-element array.
+// Any empty components will be included, e.g. `a::b` will return a 3-element array, as will `::`.
+// Separators within pairs of double-quotes will be ignored and stripped, e.g. `"a:b"c:d` will return []{`a:bc`, `d`}.
 split_list :: proc(path: string, allocator := context.allocator) -> []string {
 	if path == "" {
 		return nil
@@ -321,7 +327,7 @@ split_list :: proc(path: string, allocator := context.allocator) -> []string {
 	}
 
 	start, quote = 0, false
-	list := make([]string, count, allocator)
+	list := make([]string, count + 1, allocator)
 	index := 0
 	for i := 0; i < len(path); i += 1 {
 		c := path[i]
@@ -335,6 +341,7 @@ split_list :: proc(path: string, allocator := context.allocator) -> []string {
 		}
 	}
 	assert(index == count)
+	list[index] = path[start:]
 
 	for s0, i in list {
 		s, new := strings.replace_all(s0, `"`, ``, allocator)

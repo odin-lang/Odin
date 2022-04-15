@@ -83,9 +83,20 @@ int i32_cmp(i32 x, i32 y) {
 u32 fnv32a(void const *data, isize len) {
 	u8 const *bytes = cast(u8 const *)data;
 	u32 h = 0x811c9dc5;
-	for (isize i = 0; i < len; i++) {
-		u32 b = cast(u32)bytes[i];
-		h = (h ^ b) * 0x01000193;
+	
+	for (; len >= 8; len -= 8, bytes += 8) {
+		h = (h ^ bytes[0]) * 0x01000193;
+		h = (h ^ bytes[1]) * 0x01000193;
+		h = (h ^ bytes[2]) * 0x01000193;
+		h = (h ^ bytes[3]) * 0x01000193;
+		h = (h ^ bytes[4]) * 0x01000193;
+		h = (h ^ bytes[5]) * 0x01000193;
+		h = (h ^ bytes[6]) * 0x01000193;
+		h = (h ^ bytes[7]) * 0x01000193;
+	}
+
+	while (len--) {
+		h = (h ^ *bytes++) * 0x01000193;
 	}
 	return h;
 }
@@ -93,20 +104,48 @@ u32 fnv32a(void const *data, isize len) {
 u64 fnv64a(void const *data, isize len) {
 	u8 const *bytes = cast(u8 const *)data;
 	u64 h = 0xcbf29ce484222325ull;
-	for (isize i = 0; i < len; i++) {
-		u64 b = cast(u64)bytes[i];
-		h = (h ^ b) * 0x100000001b3ull;
+	
+	for (; len >= 8; len -= 8, bytes += 8) {
+		h = (h ^ bytes[0]) * 0x100000001b3ull;
+		h = (h ^ bytes[1]) * 0x100000001b3ull;
+		h = (h ^ bytes[2]) * 0x100000001b3ull;
+		h = (h ^ bytes[3]) * 0x100000001b3ull;
+		h = (h ^ bytes[4]) * 0x100000001b3ull;
+		h = (h ^ bytes[5]) * 0x100000001b3ull;
+		h = (h ^ bytes[6]) * 0x100000001b3ull;
+		h = (h ^ bytes[7]) * 0x100000001b3ull;
+	}
+
+	while (len--) {
+		h = (h ^ *bytes++) * 0x100000001b3ull;
 	}
 	return h;
 }
 
 u64 u64_digit_value(Rune r) {
-	if ('0' <= r && r <= '9') {
-		return r - '0';
-	} else if ('a' <= r && r <= 'f') {
-		return r - 'a' + 10;
-	} else if ('A' <= r && r <= 'F') {
-		return r - 'A' + 10;
+	switch (r) {
+	case '0': return 0;
+	case '1': return 1;
+	case '2': return 2;
+	case '3': return 3;
+	case '4': return 4;
+	case '5': return 5;
+	case '6': return 6;
+	case '7': return 7;
+	case '8': return 8;
+	case '9': return 9;
+	case 'a': return 10;
+	case 'b': return 11;
+	case 'c': return 12;
+	case 'd': return 13;
+	case 'e': return 14;
+	case 'f': return 15;
+	case 'A': return 10;
+	case 'B': return 11;
+	case 'C': return 12;
+	case 'D': return 13;
+	case 'E': return 14;
+	case 'F': return 15;
 	}
 	return 16; // NOTE(bill): Larger than highest possible
 }
@@ -809,7 +848,7 @@ ReadDirectoryError read_directory(String path, Array<FileInfo> *fi) {
 
 	return ReadDirectory_None;
 }
-#elif defined(GB_SYSTEM_LINUX) || defined(GB_SYSTEM_OSX) || defined(GB_SYSTEM_FREEBSD)
+#elif defined(GB_SYSTEM_LINUX) || defined(GB_SYSTEM_OSX) || defined(GB_SYSTEM_FREEBSD) || defined(GB_SYSTEM_OPENBSD)
 
 #include <dirent.h>
 
@@ -982,7 +1021,7 @@ LoadedFileError load_file_32(char const *fullpath, LoadedFile *memory_mapped_fil
 	#endif
 	}
 	
-	gbFileContents fc = gb_file_read_contents(heap_allocator(), true, fullpath);
+	gbFileContents fc = gb_file_read_contents(permanent_allocator(), true, fullpath);
 
 	if (fc.size > I32_MAX) {
 		err = LoadedFile_FileTooLarge;

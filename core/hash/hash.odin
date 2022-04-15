@@ -47,17 +47,34 @@ adler32 :: proc(data: []byte, seed := u32(1)) -> u32 #no_bounds_check {
 }
 
 @(optimization_mode="speed")
-djb2 :: proc(data: []byte) -> u32 {
-	hash: u32 = 5381
+djb2 :: proc(data: []byte, seed := u32(5381)) -> u32 {
+	hash: u32 = seed
 	for b in data {
 		hash = (hash << 5) + hash + u32(b) // hash * 33 + u32(b)
 	}
 	return hash
 }
 
+djbx33a :: proc(data: []byte, seed := u32(5381)) -> (result: [16]byte) #no_bounds_check {
+	state := [4]u32{seed, seed, seed, seed}
+	
+	s: u32 = 0
+	for p in data {
+		state[s] = (state[s] << 5) + state[s] + u32(p) // hash * 33 + u32(b)
+		s = (s + 1) & 3
+	}
+	
+	
+	(^u32le)(&result[0])^  = u32le(state[0])
+	(^u32le)(&result[4])^  = u32le(state[1])
+	(^u32le)(&result[8])^  = u32le(state[2])
+	(^u32le)(&result[12])^ = u32le(state[3])
+	return
+}
+
 @(optimization_mode="speed")
-fnv32 :: proc(data: []byte) -> u32 {
-	h: u32 = 0x811c9dc5
+fnv32 :: proc(data: []byte, seed := u32(0x811c9dc5)) -> u32 {
+	h: u32 = seed
 	for b in data {
 		h = (h * 0x01000193) ~ u32(b)
 	}
@@ -65,8 +82,8 @@ fnv32 :: proc(data: []byte) -> u32 {
 }
 
 @(optimization_mode="speed")
-fnv64 :: proc(data: []byte) -> u64 {
-	h: u64 = 0xcbf29ce484222325
+fnv64 :: proc(data: []byte, seed := u64(0xcbf29ce484222325)) -> u64 {
+	h: u64 = seed
 	for b in data {
 		h = (h * 0x100000001b3) ~ u64(b)
 	}
@@ -74,8 +91,8 @@ fnv64 :: proc(data: []byte) -> u64 {
 }
 
 @(optimization_mode="speed")
-fnv32a :: proc(data: []byte) -> u32 {
-	h: u32 = 0x811c9dc5
+fnv32a :: proc(data: []byte, seed := u32(0x811c9dc5)) -> u32 {
+	h: u32 = seed
 	for b in data {
 		h = (h ~ u32(b)) * 0x01000193
 	}
@@ -83,8 +100,8 @@ fnv32a :: proc(data: []byte) -> u32 {
 }
 
 @(optimization_mode="speed")
-fnv64a :: proc(data: []byte) -> u64 {
-	h: u64 = 0xcbf29ce484222325
+fnv64a :: proc(data: []byte, seed := u64(0xcbf29ce484222325)) -> u64 {
+	h: u64 = seed
 	for b in data {
 		h = (h ~ u64(b)) * 0x100000001b3
 	}
@@ -92,8 +109,8 @@ fnv64a :: proc(data: []byte) -> u64 {
 }
 
 @(optimization_mode="speed")
-jenkins :: proc(data: []byte) -> u32 {
-	hash: u32 = 0
+jenkins :: proc(data: []byte, seed := u32(0)) -> u32 {
+	hash: u32 = seed
 	for b in data {
 		hash += u32(b)
 		hash += hash << 10
@@ -106,11 +123,11 @@ jenkins :: proc(data: []byte) -> u32 {
 }
 
 @(optimization_mode="speed")
-murmur32 :: proc(data: []byte) -> u32 {
+murmur32 :: proc(data: []byte, seed := u32(0)) -> u32 {
 	c1_32: u32 : 0xcc9e2d51
 	c2_32: u32 : 0x1b873593
 
-	h1: u32 = 0
+	h1: u32 = seed
 	nblocks := len(data)/4
 	p := raw_data(data)
 	p1 := mem.ptr_offset(p, 4*nblocks)
@@ -134,7 +151,7 @@ murmur32 :: proc(data: []byte) -> u32 {
 		k1 ~= u32(tail[2]) << 16
 		fallthrough
 	case 2:
-		k1 ~= u32(tail[2]) << 8
+		k1 ~= u32(tail[1]) << 8
 		fallthrough
 	case 1:
 		k1 ~= u32(tail[0])
@@ -156,14 +173,12 @@ murmur32 :: proc(data: []byte) -> u32 {
 }
 
 @(optimization_mode="speed")
-murmur64 :: proc(data: []byte) -> u64 {
-	SEED :: 0x9747b28c
-
+murmur64 :: proc(data: []byte, seed := u64(0x9747b28c)) -> u64 {
 	when size_of(int) == 8 {
 		m :: 0xc6a4a7935bd1e995
 		r :: 47
 
-		h: u64 = SEED ~ (u64(len(data)) * m)
+		h: u64 = seed ~ (u64(len(data)) * m)
 		data64 := mem.slice_ptr(cast(^u64)raw_data(data), len(data)/size_of(u64))
 
 		for _, i in data64 {
@@ -198,8 +213,8 @@ murmur64 :: proc(data: []byte) -> u64 {
 		m :: 0x5bd1e995
 		r :: 24
 
-		h1 := u32(SEED) ~ u32(len(data))
-		h2 := u32(SEED) >> 32
+		h1 := u32(seed) ~ u32(len(data))
+		h2 := u32(seed) >> 32
 		data32 := mem.slice_ptr(cast(^u32)raw_data(data), len(data)/size_of(u32))
 		len := len(data)
 		i := 0
@@ -262,8 +277,8 @@ murmur64 :: proc(data: []byte) -> u64 {
 }
 
 @(optimization_mode="speed")
-sdbm :: proc(data: []byte) -> u32 {
-	hash: u32 = 0
+sdbm :: proc(data: []byte, seed := u32(0)) -> u32 {
+	hash: u32 = seed
 	for b in data {
 		hash = u32(b) + (hash<<6) + (hash<<16) - hash
 	}

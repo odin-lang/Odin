@@ -4,8 +4,10 @@ package libc
 
 import "core:intrinsics"
 
-when ODIN_OS == "windows" {
+when ODIN_OS == .Windows {
 	foreign import libc "system:libucrt.lib"
+} else when ODIN_OS == .Darwin {
+	foreign import libc "system:System.framework"
 } else {
 	foreign import libc "system:c"
 }

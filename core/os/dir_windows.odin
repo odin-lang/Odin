@@ -82,6 +82,7 @@ read_dir :: proc(fd: Handle, n: int, allocator := context.allocator) -> (fi: []F
 	wpath_search[len(wpath)+2] = 0
 
 	path := cleanpath_from_buf(wpath)
+	defer delete(path)
 
 	find_data := &win32.WIN32_FIND_DATAW{}
 	find_handle := win32.FindFirstFileW(raw_data(wpath_search), find_data)

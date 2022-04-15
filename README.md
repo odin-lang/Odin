@@ -11,7 +11,7 @@
         <img src="https://img.shields.io/badge/platforms-Windows%20|%20Linux%20|%20macOS-green.svg">
     </a>
     <br>
-    <a href="https://discord.gg/hnwN2Rj">
+    <a href="https://discord.gg/odinlang">
         <img src="https://img.shields.io/discord/568138951836172421?logo=discord">
     </a>
     <a href="https://github.com/odin-lang/odin/actions">
@@ -58,6 +58,10 @@ main :: proc() {
 
 Instructions for downloading and installing the Odin compiler and libraries.
 
+#### [Nightly Builds](https://odin-lang.org/docs/nightly/)
+
+Get the latest nightly builds of Odin.
+
 ### Learning Odin
 
 #### [Overview of Odin](https://odin-lang.org/docs/overview)
@@ -68,6 +72,10 @@ An overview of the Odin programming language.
 
 Answers to common questions about Odin.
 
+#### [Packages](https://pkg.odin-lang.org/)
+
+Documentation for all the official packages part of the [core](https://pkg.odin-lang.org/core/) and [vendor](https://pkg.odin-lang.org/vendor/) library collections.
+
 #### [The Odin Wiki](https://github.com/odin-lang/Odin/wiki)
 
 A wiki maintained by the Odin community.
@@ -76,15 +84,9 @@ A wiki maintained by the Odin community.
 
 Get live support and talk with other odiners on the Odin Discord.
 
-### References
-
-#### [Language Specification](https://odin-lang.org/docs/spec/)
-
-The official Odin Language specification.
-
 ### Articles
 
-#### [The Odin Blog](https://odin-lang.org/blog)
+#### [The Odin Blog](https://odin-lang.org/news/)
 
 The official blog of the Odin programming language, featuring announcements, news, and in-depth articles by the Odin team and guests.
 

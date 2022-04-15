@@ -212,29 +212,29 @@ euler_angles_zxy_from_quaternion_f32 :: proc(q: Quaternionf32) -> (t1, t2, t3: f
 
 matrix3_from_euler_angle_x_f32 :: proc(angle_x: f32) -> (m: Matrix3f32) {
 	cos_x, sin_x := math.cos(angle_x), math.sin(angle_x)
-	m[0][0] = 1
-	m[1][1] = +cos_x
-	m[2][1] = +sin_x
-	m[1][2] = -sin_x
-	m[2][2] = +cos_x
+	m[0, 0] = 1
+	m[1, 1] = +cos_x
+	m[1, 2] = +sin_x
+	m[2, 1] = -sin_x
+	m[2, 2] = +cos_x
 	return
 }
 matrix3_from_euler_angle_y_f32 :: proc(angle_y: f32) -> (m: Matrix3f32) {
 	cos_y, sin_y := math.cos(angle_y), math.sin(angle_y)
-	m[0][0] = +cos_y
-	m[2][0] = -sin_y
-	m[1][1] = 1
-	m[0][2] = +sin_y
-	m[2][2] = +cos_y
+	m[0, 0] = +cos_y
+	m[0, 2] = -sin_y
+	m[1, 1] = 1
+	m[2, 0] = +sin_y
+	m[2, 2] = +cos_y
 	return
 }
 matrix3_from_euler_angle_z_f32 :: proc(angle_z: f32) -> (m: Matrix3f32) {
 	cos_z, sin_z := math.cos(angle_z), math.sin(angle_z)
-	m[0][0] = +cos_z
-	m[1][0] = +sin_z
-	m[1][1] = +cos_z
-	m[0][1] = -sin_z
-	m[2][2] = 1
+	m[0, 0] = +cos_z
+	m[0, 1] = +sin_z
+	m[1, 1] = +cos_z
+	m[1, 0] = -sin_z
+	m[2, 2] = 1
 	return
 }
 
@@ -242,31 +242,31 @@ matrix3_from_euler_angle_z_f32 :: proc(angle_z: f32) -> (m: Matrix3f32) {
 matrix3_from_derived_euler_angle_x_f32 :: proc(angle_x: f32, angular_velocity_x: f32) -> (m: Matrix3f32) {
 	cos_x := math.cos(angle_x) * angular_velocity_x
 	sin_x := math.sin(angle_x) * angular_velocity_x
-	m[0][0] = 1
-	m[1][1] = +cos_x
-	m[2][1] = +sin_x
-	m[1][2] = -sin_x
-	m[2][2] = +cos_x
+	m[0, 0] = 1
+	m[1, 1] = +cos_x
+	m[1, 2] = +sin_x
+	m[2, 1] = -sin_x
+	m[2, 2] = +cos_x
 	return
 }
 matrix3_from_derived_euler_angle_y_f32 :: proc(angle_y: f32, angular_velocity_y: f32) -> (m: Matrix3f32) {
 	cos_y := math.cos(angle_y) * angular_velocity_y
 	sin_y := math.sin(angle_y) * angular_velocity_y
-	m[0][0] = +cos_y
-	m[2][0] = -sin_y
-	m[1][1] = 1
-	m[0][2] = +sin_y
-	m[2][2] = +cos_y
+	m[0, 0] = +cos_y
+	m[0, 2] = -sin_y
+	m[1, 1] = 1
+	m[2, 0] = +sin_y
+	m[2, 2] = +cos_y
 	return
 }
 matrix3_from_derived_euler_angle_z_f32 :: proc(angle_z: f32, angular_velocity_z: f32) -> (m: Matrix3f32) {
 	cos_z := math.cos(angle_z) * angular_velocity_z
 	sin_z := math.sin(angle_z) * angular_velocity_z
-	m[0][0] = +cos_z
-	m[1][0] = +sin_z
-	m[1][1] = +cos_z
-	m[0][1] = -sin_z
-	m[2][2] = 1
+	m[0, 0] = +cos_z
+	m[0, 1] = +sin_z
+	m[1, 1] = +cos_z
+	m[1, 0] = -sin_z
+	m[2, 2] = 1
 	return
 }
 
@@ -274,14 +274,14 @@ matrix3_from_derived_euler_angle_z_f32 :: proc(angle_z: f32, angular_velocity_z:
 matrix3_from_euler_angles_xy_f32 :: proc(angle_x, angle_y: f32) -> (m: Matrix3f32) {
 	cos_x, sin_x := math.cos(angle_x), math.sin(angle_x)
 	cos_y, sin_y := math.cos(angle_y), math.sin(angle_y)
-	m[0][0] = cos_y
-	m[1][0] = -sin_x * - sin_y
-	m[2][0] = -cos_x * - sin_y
-	m[1][1] = cos_x
-	m[2][1] = sin_x
-	m[0][2] = sin_y
-	m[1][2] = -sin_x * cos_y
-	m[2][2] = cos_x * cos_y
+	m[0, 0] = cos_y
+	m[0, 1] = -sin_x * - sin_y
+	m[0, 2] = -cos_x * - sin_y
+	m[1, 1] = cos_x
+	m[1, 2] = sin_x
+	m[2, 0] = sin_y
+	m[2, 1] = -sin_x * cos_y
+	m[2, 2] = cos_x * cos_y
 	return
 }
 
@@ -289,14 +289,14 @@ matrix3_from_euler_angles_xy_f32 :: proc(angle_x, angle_y: f32) -> (m: Matrix3f3
 matrix3_from_euler_angles_yx_f32 :: proc(angle_y, angle_x: f32) -> (m: Matrix3f32) {
 	cos_x, sin_x := math.cos(angle_x), math.sin(angle_x)
 	cos_y, sin_y := math.cos(angle_y), math.sin(angle_y)
-	m[0][0] = cos_y
-	m[2][0] = -sin_y
-	m[0][1] = sin_y*sin_x
-	m[1][1] = cos_x
-	m[2][1] = cos_y*sin_x
-	m[0][2] = sin_y*cos_x
-	m[1][2] = -sin_x
-	m[2][2] = cos_y*cos_x
+	m[0, 0] = cos_y
+	m[0, 2] = -sin_y
+	m[1, 0] = sin_y*sin_x
+	m[1, 1] = cos_x
+	m[1, 2] = cos_y*sin_x
+	m[2, 0] = sin_y*cos_x
+	m[2, 1] = -sin_x
+	m[2, 2] = cos_y*cos_x
 	return
 }
 
@@ -322,15 +322,15 @@ matrix3_from_euler_angles_xyz_f32 :: proc(t1, t2, t3: f32) -> (m: Matrix3f32) {
 	s2 := math.sin(-t2)
 	s3 := math.sin(-t3)
 
-	m[0][0] = c2 * c3
-	m[0][1] =-c1 * s3 + s1 * s2 * c3
-	m[0][2] = s1 * s3 + c1 * s2 * c3
-	m[1][0] = c2 * s3
-	m[1][1] = c1 * c3 + s1 * s2 * s3
-	m[1][2] =-s1 * c3 + c1 * s2 * s3
-	m[2][0] =-s2
-	m[2][1] = s1 * c2
-	m[2][2] = c1 * c2
+	m[0, 0] = c2 * c3
+	m[1, 0] =-c1 * s3 + s1 * s2 * c3
+	m[2, 0] = s1 * s3 + c1 * s2 * c3
+	m[0, 1] = c2 * s3
+	m[1, 1] = c1 * c3 + s1 * s2 * s3
+	m[2, 1] =-s1 * c3 + c1 * s2 * s3
+	m[0, 2] =-s2
+	m[1, 2] = s1 * c2
+	m[2, 2] = c1 * c2
 	return
 }
 
@@ -342,15 +342,15 @@ matrix3_from_euler_angles_yxz_f32 :: proc(yaw, pitch, roll: f32) -> (m: Matrix3f
 	cb := math.cos(roll)
 	sb := math.sin(roll)
 
-	m[0][0] = ch * cb + sh * sp * sb
-	m[0][1] = sb * cp
-	m[0][2] = -sh * cb + ch * sp * sb
-	m[1][0] = -ch * sb + sh * sp * cb
-	m[1][1] = cb * cp
-	m[1][2] = sb * sh + ch * sp * cb
-	m[2][0] = sh * cp
-	m[2][1] = -sp
-	m[2][2] = ch * cp
+	m[0, 0] = ch * cb + sh * sp * sb
+	m[1, 0] = sb * cp
+	m[2, 0] = -sh * cb + ch * sp * sb
+	m[0, 1] = -ch * sb + sh * sp * cb
+	m[1, 1] = cb * cp
+	m[2, 1] = sb * sh + ch * sp * cb
+	m[0, 2] = sh * cp
+	m[1, 2] = -sp
+	m[2, 2] = ch * cp
 	return
 }
 
@@ -362,15 +362,15 @@ matrix3_from_euler_angles_xzx_f32 :: proc(t1, t2, t3: f32) -> (m: Matrix3f32) {
 	c3 := math.cos(t3)
 	s3 := math.sin(t3)
 
-	m[0][0] = c2
-	m[0][1] = c1 * s2
-	m[0][2] = s1 * s2
-	m[1][0] =-c3 * s2
-	m[1][1] = c1 * c2 * c3 - s1 * s3
-	m[1][2] = c1 * s3 + c2 * c3 * s1
-	m[2][0] = s2 * s3
-	m[2][1] =-c3 * s1 - c1 * c2 * s3
-	m[2][2] = c1 * c3 - c2 * s1 * s3
+	m[0, 0] = c2
+	m[1, 0] = c1 * s2
+	m[2, 0] = s1 * s2
+	m[0, 1] =-c3 * s2
+	m[1, 1] = c1 * c2 * c3 - s1 * s3
+	m[2, 1] = c1 * s3 + c2 * c3 * s1
+	m[0, 2] = s2 * s3
+	m[1, 2] =-c3 * s1 - c1 * c2 * s3
+	m[2, 2] = c1 * c3 - c2 * s1 * s3
 	return
 }
 
@@ -382,15 +382,15 @@ matrix3_from_euler_angles_xyx_f32 :: proc(t1, t2, t3: f32) -> (m: Matrix3f32) {
 	c3 := math.cos(t3)
 	s3 := math.sin(t3)
 
-	m[0][0] = c2
-	m[0][1] = s1 * s2
-	m[0][2] =-c1 * s2
-	m[1][0] = s2 * s3
-	m[1][1] = c1 * c3 - c2 * s1 * s3
-	m[1][2] = c3 * s1 + c1 * c2 * s3
-	m[2][0] = c3 * s2
-	m[2][1] =-c1 * s3 - c2 * c3 * s1
-	m[2][2] = c1 * c2 * c3 - s1 * s3
+	m[0, 0] = c2
+	m[1, 0] = s1 * s2
+	m[2, 0] =-c1 * s2
+	m[0, 1] = s2 * s3
+	m[1, 1] = c1 * c3 - c2 * s1 * s3
+	m[2, 1] = c3 * s1 + c1 * c2 * s3
+	m[0, 2] = c3 * s2
+	m[1, 2] =-c1 * s3 - c2 * c3 * s1
+	m[2, 2] = c1 * c2 * c3 - s1 * s3
 	return
 }
 
@@ -402,15 +402,15 @@ matrix3_from_euler_angles_yxy_f32 :: proc(t1, t2, t3: f32) -> (m: Matrix3f32) {
 	c3 := math.cos(t3)
 	s3 := math.sin(t3)
 
-	m[0][0] = c1 * c3 - c2 * s1 * s3
-	m[0][1] = s2* s3
-	m[0][2] =-c3 * s1 - c1 * c2 * s3
-	m[1][0] = s1 * s2
-	m[1][1] = c2
-	m[1][2] = c1 * s2
-	m[2][0] = c1 * s3 + c2 * c3 * s1
-	m[2][1] =-c3 * s2
-	m[2][2] = c1 * c2 * c3 - s1 * s3
+	m[0, 0] = c1 * c3 - c2 * s1 * s3
+	m[1, 0] = s2* s3
+	m[2, 0] =-c3 * s1 - c1 * c2 * s3
+	m[0, 1] = s1 * s2
+	m[1, 1] = c2
+	m[2, 1] = c1 * s2
+	m[0, 2] = c1 * s3 + c2 * c3 * s1
+	m[1, 2] =-c3 * s2
+	m[2, 2] = c1 * c2 * c3 - s1 * s3
 	return
 }
 
@@ -422,15 +422,15 @@ matrix3_from_euler_angles_yzy_f32 :: proc(t1, t2, t3: f32) -> (m: Matrix3f32) {
 	c3 := math.cos(t3)
 	s3 := math.sin(t3)
 
-	m[0][0] = c1 * c2 * c3 - s1 * s3
-	m[0][1] = c3 * s2
-	m[0][2] =-c1 * s3 - c2 * c3 * s1
-	m[1][0] =-c1 * s2
-	m[1][1] = c2
-	m[1][2] = s1 * s2
-	m[2][0] = c3 * s1 + c1 * c2 * s3
-	m[2][1] = s2 * s3
-	m[2][2] = c1 * c3 - c2 * s1 * s3
+	m[0, 0] = c1 * c2 * c3 - s1 * s3
+	m[1, 0] = c3 * s2
+	m[2, 0] =-c1 * s3 - c2 * c3 * s1
+	m[0, 1] =-c1 * s2
+	m[1, 1] = c2
+	m[2, 1] = s1 * s2
+	m[0, 2] = c3 * s1 + c1 * c2 * s3
+	m[1, 2] = s2 * s3
+	m[2, 2] = c1 * c3 - c2 * s1 * s3
 	return
 }
 
@@ -442,15 +442,15 @@ matrix3_from_euler_angles_zyz_f32 :: proc(t1, t2, t3: f32) -> (m: Matrix3f32) {
 	c3 := math.cos(t3)
 	s3 := math.sin(t3)
 
-	m[0][0] = c1 * c2 * c3 - s1 * s3
-	m[0][1] = c1 * s3 + c2 * c3 * s1
-	m[0][2] =-c3 * s2
-	m[1][0] =-c3 * s1 - c1 * c2 * s3
-	m[1][1] = c1 * c3 - c2 * s1 * s3
-	m[1][2] = s2 * s3
-	m[2][0] = c1 * s2
-	m[2][1] = s1 * s2
-	m[2][2] = c2
+	m[0, 0] = c1 * c2 * c3 - s1 * s3
+	m[1, 0] = c1 * s3 + c2 * c3 * s1
+	m[2, 0] =-c3 * s2
+	m[0, 1] =-c3 * s1 - c1 * c2 * s3
+	m[1, 1] = c1 * c3 - c2 * s1 * s3
+	m[2, 1] = s2 * s3
+	m[0, 2] = c1 * s2
+	m[1, 2] = s1 * s2
+	m[2, 2] = c2
 	return
 }
 
@@ -462,15 +462,15 @@ matrix3_from_euler_angles_zxz_f32 :: proc(t1, t2, t3: f32) -> (m: Matrix3f32) {
 	c3 := math.cos(t3)
 	s3 := math.sin(t3)
 
-	m[0][0] = c1 * c3 - c2 * s1 * s3
-	m[0][1] = c3 * s1 + c1 * c2 * s3
-	m[0][2] = s2 *s3
-	m[1][0] =-c1 * s3 - c2 * c3 * s1
-	m[1][1] = c1 * c2 * c3 - s1 * s3
-	m[1][2] = c3 * s2
-	m[2][0] = s1 * s2
-	m[2][1] =-c1 * s2
-	m[2][2] = c2
+	m[0, 0] = c1 * c3 - c2 * s1 * s3
+	m[1, 0] = c3 * s1 + c1 * c2 * s3
+	m[2, 0] = s2 *s3
+	m[0, 1] =-c1 * s3 - c2 * c3 * s1
+	m[1, 1] = c1 * c2 * c3 - s1 * s3
+	m[2, 1] = c3 * s2
+	m[0, 2] = s1 * s2
+	m[1, 2] =-c1 * s2
+	m[2, 2] = c2
 	return
 }
 
@@ -483,15 +483,15 @@ matrix3_from_euler_angles_xzy_f32 :: proc(t1, t2, t3: f32) -> (m: Matrix3f32) {
 	c3 := math.cos(t3)
 	s3 := math.sin(t3)
 
-	m[0][0] = c2 * c3
-	m[0][1] = s1 * s3 + c1 * c3 * s2
-	m[0][2] = c3 * s1 * s2 - c1 * s3
-	m[1][0] =-s2
-	m[1][1] = c1 * c2
-	m[1][2] = c2 * s1
-	m[2][0] = c2 * s3
-	m[2][1] = c1 * s2 * s3 - c3 * s1
-	m[2][2] = c1 * c3 + s1 * s2 *s3
+	m[0, 0] = c2 * c3
+	m[1, 0] = s1 * s3 + c1 * c3 * s2
+	m[2, 0] = c3 * s1 * s2 - c1 * s3
+	m[0, 1] =-s2
+	m[1, 1] = c1 * c2
+	m[2, 1] = c2 * s1
+	m[0, 2] = c2 * s3
+	m[1, 2] = c1 * s2 * s3 - c3 * s1
+	m[2, 2] = c1 * c3 + s1 * s2 *s3
 	return
 }
 
@@ -503,15 +503,15 @@ matrix3_from_euler_angles_yzx_f32 :: proc(t1, t2, t3: f32) -> (m: Matrix3f32) {
 	c3 := math.cos(t3)
 	s3 := math.sin(t3)
 
-	m[0][0] = c1 * c2
-	m[0][1] = s2
-	m[0][2] =-c2 * s1
-	m[1][0] = s1 * s3 - c1 * c3 * s2
-	m[1][1] = c2 * c3
-	m[1][2] = c1 * s3 + c3 * s1 * s2
-	m[2][0] = c3 * s1 + c1 * s2 * s3
-	m[2][1] =-c2 * s3
-	m[2][2] = c1 * c3 - s1 * s2 * s3
+	m[0, 0] = c1 * c2
+	m[1, 0] = s2
+	m[2, 0] =-c2 * s1
+	m[0, 1] = s1 * s3 - c1 * c3 * s2
+	m[1, 1] = c2 * c3
+	m[2, 1] = c1 * s3 + c3 * s1 * s2
+	m[0, 2] = c3 * s1 + c1 * s2 * s3
+	m[1, 2] =-c2 * s3
+	m[2, 2] = c1 * c3 - s1 * s2 * s3
 	return
 }
 
@@ -523,15 +523,15 @@ matrix3_from_euler_angles_zyx_f32 :: proc(t1, t2, t3: f32) -> (m: Matrix3f32) {
 	c3 := math.cos(t3)
 	s3 := math.sin(t3)
 
-	m[0][0] = c1 * c2
-	m[0][1] = c2 * s1
-	m[0][2] =-s2
-	m[1][0] = c1 * s2 * s3 - c3 * s1
-	m[1][1] = c1 * c3 + s1 * s2 * s3
-	m[1][2] = c2 * s3
-	m[2][0] = s1 * s3 + c1 * c3 * s2
-	m[2][1] = c3 * s1 * s2 - c1 * s3
-	m[2][2] = c2 * c3
+	m[0, 0] = c1 * c2
+	m[1, 0] = c2 * s1
+	m[2, 0] =-s2
+	m[0, 1] = c1 * s2 * s3 - c3 * s1
+	m[1, 1] = c1 * c3 + s1 * s2 * s3
+	m[2, 1] = c2 * s3
+	m[0, 2] = s1 * s3 + c1 * c3 * s2
+	m[1, 2] = c3 * s1 * s2 - c1 * s3
+	m[2, 2] = c2 * c3
 	return
 }
 
@@ -543,15 +543,15 @@ matrix3_from_euler_angles_zxy_f32 :: proc(t1, t2, t3: f32) -> (m: Matrix3f32) {
 	c3 := math.cos(t3)
 	s3 := math.sin(t3)
 
-	m[0][0] = c1 * c3 - s1 * s2 * s3
-	m[0][1] = c3 * s1 + c1 * s2 * s3
-	m[0][2] =-c2 * s3
-	m[1][0] =-c2 * s1
-	m[1][1] = c1 * c2
-	m[1][2] = s2
-	m[2][0] = c1 * s3 + c3 * s1 * s2
-	m[2][1] = s1 * s3 - c1 * c3 * s2
-	m[2][2] = c2 * c3
+	m[0, 0] = c1 * c3 - s1 * s2 * s3
+	m[1, 0] = c3 * s1 + c1 * s2 * s3
+	m[2, 0] =-c2 * s3
+	m[0, 1] =-c2 * s1
+	m[1, 1] = c1 * c2
+	m[2, 1] = s2
+	m[0, 2] = c1 * s3 + c3 * s1 * s2
+	m[1, 2] = s1 * s3 - c1 * c3 * s2
+	m[2, 2] = c2 * c3
 	return
 }
 
@@ -564,25 +564,25 @@ matrix3_from_yaw_pitch_roll_f32 :: proc(yaw, pitch, roll: f32) -> (m: Matrix3f32
 	cb := math.cos(roll)
 	sb := math.sin(roll)
 
-	m[0][0] = ch * cb + sh * sp * sb
-	m[0][1] = sb * cp
-	m[0][2] = -sh * cb + ch * sp * sb
-	m[1][0] = -ch * sb + sh * sp * cb
-	m[1][1] = cb * cp
-	m[1][2] = sb * sh + ch * sp * cb
-	m[2][0] = sh * cp
-	m[2][1] = -sp
-	m[2][2] = ch * cp
+	m[0, 0] = ch * cb + sh * sp * sb
+	m[1, 0] = sb * cp
+	m[2, 0] = -sh * cb + ch * sp * sb
+	m[0, 1] = -ch * sb + sh * sp * cb
+	m[1, 1] = cb * cp
+	m[2, 1] = sb * sh + ch * sp * cb
+	m[0, 2] = sh * cp
+	m[1, 2] = -sp
+	m[2, 2] = ch * cp
 	return m
 }
 
 euler_angles_xyz_from_matrix3_f32 :: proc(m: Matrix3f32) -> (t1, t2, t3: f32) {
-	T1 := math.atan2(m[2][1], m[2][2])
-	C2 := math.sqrt(m[0][0]*m[0][0] + m[1][0]*m[1][0])
-	T2 := math.atan2(-m[2][0], C2)
+	T1 := math.atan2(m[1, 2], m[2, 2])
+	C2 := math.sqrt(m[0, 0]*m[0, 0] + m[0, 1]*m[0, 1])
+	T2 := math.atan2(-m[0, 2], C2)
 	S1 := math.sin(T1)
 	C1 := math.cos(T1)
-	T3 := math.atan2(S1*m[0][2] - C1*m[0][1], C1*m[1][1] - S1*m[1][2])
+	T3 := math.atan2(S1*m[2, 0] - C1*m[1, 0], C1*m[1, 1] - S1*m[2, 1])
 	t1 = -T1
 	t2 = -T2
 	t3 = -T3
@@ -590,12 +590,12 @@ euler_angles_xyz_from_matrix3_f32 :: proc(m: Matrix3f32) -> (t1, t2, t3: f32) {
 }
 
 euler_angles_yxz_from_matrix3_f32 :: proc(m: Matrix3f32) -> (t1, t2, t3: f32) {
-	T1 := math.atan2(m[2][0], m[2][2])
-	C2 := math.sqrt(m[0][1]*m[0][1] + m[1][1]*m[1][1])
-	T2 := math.atan2(-m[2][1], C2)
+	T1 := math.atan2(m[0, 2], m[2, 2])
+	C2 := math.sqrt(m[1, 0]*m[1, 0] + m[1, 1]*m[1, 1])
+	T2 := math.atan2(-m[1, 2], C2)
 	S1 := math.sin(T1)
 	C1 := math.cos(T1)
-	T3 := math.atan2(S1*m[1][2] - C1*m[1][0], C1*m[0][0] - S1*m[0][2])
+	T3 := math.atan2(S1*m[2, 1] - C1*m[0, 1], C1*m[0, 0] - S1*m[2, 0])
 	t1 = T1
 	t2 = T2
 	t3 = T3
@@ -603,12 +603,12 @@ euler_angles_yxz_from_matrix3_f32 :: proc(m: Matrix3f32) -> (t1, t2, t3: f32) {
 }
 
 euler_angles_xzx_from_matrix3_f32 :: proc(m: Matrix3f32) -> (t1, t2, t3: f32) {
-	T1 := math.atan2(m[0][2], m[0][1])
-	S2 := math.sqrt(m[1][0]*m[1][0] + m[2][0]*m[2][0])
-	T2 := math.atan2(S2, m[0][0])
+	T1 := math.atan2(m[2, 0], m[1, 0])
+	S2 := math.sqrt(m[0, 1]*m[0, 1] + m[0, 2]*m[0, 2])
+	T2 := math.atan2(S2, m[0, 0])
 	S1 := math.sin(T1)
 	C1 := math.cos(T1)
-	T3 := math.atan2(C1*m[1][2] - S1*m[1][1], C1*m[2][2] - S1*m[2][1])
+	T3 := math.atan2(C1*m[2, 1] - S1*m[1, 1], C1*m[2, 2] - S1*m[1, 2])
 	t1 = T1
 	t2 = T2
 	t3 = T3
@@ -616,12 +616,12 @@ euler_angles_xzx_from_matrix3_f32 :: proc(m: Matrix3f32) -> (t1, t2, t3: f32) {
 }
 
 euler_angles_xyx_from_matrix3_f32 :: proc(m: Matrix3f32) -> (t1, t2, t3: f32) {
-	T1 := math.atan2(m[0][1], -m[0][2])
-	S2 := math.sqrt(m[1][0]*m[1][0] + m[2][0]*m[2][0])
-	T2 := math.atan2(S2, m[0][0])
+	T1 := math.atan2(m[1, 0], -m[2, 0])
+	S2 := math.sqrt(m[0, 1]*m[0, 1] + m[0, 2]*m[0, 2])
+	T2 := math.atan2(S2, m[0, 0])
 	S1 := math.sin(T1)
 	C1 := math.cos(T1)
-	T3 := math.atan2(-C1*m[2][1] - S1*m[2][2], C1*m[1][1] + S1*m[1][2])
+	T3 := math.atan2(-C1*m[1, 2] - S1*m[2, 2], C1*m[1, 1] + S1*m[2, 1])
 	t1 = T1
 	t2 = T2
 	t3 = T3
@@ -629,12 +629,12 @@ euler_angles_xyx_from_matrix3_f32 :: proc(m: Matrix3f32) -> (t1, t2, t3: f32) {
 }
 
 euler_angles_yxy_from_matrix3_f32 :: proc(m: Matrix3f32) -> (t1, t2, t3: f32) {
-	T1 := math.atan2(m[1][0], m[1][2])
-	S2 := math.sqrt(m[0][1]*m[0][1] + m[2][1]*m[2][1])
-	T2 := math.atan2(S2, m[1][1])
+	T1 := math.atan2(m[0, 1], m[2, 1])
+	S2 := math.sqrt(m[1, 0]*m[1, 0] + m[1, 2]*m[1, 2])
+	T2 := math.atan2(S2, m[1, 1])
 	S1 := math.sin(T1)
 	C1 := math.cos(T1)
-	T3 := math.atan2(C1*m[2][0] - S1*m[2][2], C1*m[0][0] - S1*m[0][2])
+	T3 := math.atan2(C1*m[0, 2] - S1*m[2, 2], C1*m[0, 0] - S1*m[2, 0])
 	t1 = T1
 	t2 = T2
 	t3 = T3
@@ -642,24 +642,24 @@ euler_angles_yxy_from_matrix3_f32 :: proc(m: Matrix3f32) -> (t1, t2, t3: f32) {
 }
 
 euler_angles_yzy_from_matrix3_f32 :: proc(m: Matrix3f32) -> (t1, t2, t3: f32) {
-	T1 := math.atan2(m[1][2], -m[1][0])
-	S2 := math.sqrt(m[0][1]*m[0][1] + m[2][1]*m[2][1])
-	T2 := math.atan2(S2, m[1][1])
+	T1 := math.atan2(m[2, 1], -m[0, 1])
+	S2 := math.sqrt(m[1, 0]*m[1, 0] + m[1, 2]*m[1, 2])
+	T2 := math.atan2(S2, m[1, 1])
 	S1 := math.sin(T1)
 	C1 := math.cos(T1)
-	T3 := math.atan2(-S1*m[0][0] - C1*m[0][2], S1*m[2][0] + C1*m[2][2])
+	T3 := math.atan2(-S1*m[0, 0] - C1*m[2, 0], S1*m[0, 2] + C1*m[2, 2])
 	t1 = T1
 	t2 = T2
 	t3 = T3
 	return
 }
 euler_angles_zyz_from_matrix3_f32 :: proc(m: Matrix3f32) -> (t1, t2, t3: f32) {
-	T1 := math.atan2(m[2][1], m[2][0])
-	S2 := math.sqrt(m[0][2]*m[0][2] + m[1][2]*m[1][2])
-	T2 := math.atan2(S2, m[2][2])
+	T1 := math.atan2(m[1, 2], m[0, 2])
+	S2 := math.sqrt(m[2, 0]*m[2, 0] + m[2, 1]*m[2, 1])
+	T2 := math.atan2(S2, m[2, 2])
 	S1 := math.sin(T1)
 	C1 := math.cos(T1)
-	T3 := math.atan2(C1*m[0][1] - S1*m[0][0], C1*m[1][1] - S1*m[1][0])
+	T3 := math.atan2(C1*m[1, 0] - S1*m[0, 0], C1*m[1, 1] - S1*m[0, 1])
 	t1 = T1
 	t2 = T2
 	t3 = T3
@@ -667,12 +667,12 @@ euler_angles_zyz_from_matrix3_f32 :: proc(m: Matrix3f32) -> (t1, t2, t3: f32) {
 }
 
 euler_angles_zxz_from_matrix3_f32 :: proc(m: Matrix3f32) -> (t1, t2, t3: f32) {
-	T1 := math.atan2(m[2][0], -m[2][1])
-	S2 := math.sqrt(m[0][2]*m[0][2] + m[1][2]*m[1][2])
-	T2 := math.atan2(S2, m[2][2])
+	T1 := math.atan2(m[0, 2], -m[1, 2])
+	S2 := math.sqrt(m[2, 0]*m[2, 0] + m[2, 1]*m[2, 1])
+	T2 := math.atan2(S2, m[2, 2])
 	S1 := math.sin(T1)
 	C1 := math.cos(T1)
-	T3 := math.atan2(-C1*m[1][0] - S1*m[1][1], C1*m[0][0] + S1*m[0][1])
+	T3 := math.atan2(-C1*m[0, 1] - S1*m[1, 1], C1*m[0, 0] + S1*m[1, 0])
 	t1 = T1
 	t2 = T2
 	t3 = T3
@@ -680,12 +680,12 @@ euler_angles_zxz_from_matrix3_f32 :: proc(m: Matrix3f32) -> (t1, t2, t3: f32) {
 }
 
 euler_angles_xzy_from_matrix3_f32 :: proc(m: Matrix3f32) -> (t1, t2, t3: f32) {
-	T1 := math.atan2(m[1][2], m[1][1])
-	C2 := math.sqrt(m[0][0]*m[0][0] + m[2][0]*m[2][0])
-	T2 := math.atan2(-m[1][0], C2)
+	T1 := math.atan2(m[2, 1], m[1, 1])
+	C2 := math.sqrt(m[0, 0]*m[0, 0] + m[0, 2]*m[0, 2])
+	T2 := math.atan2(-m[0, 1], C2)
 	S1 := math.sin(T1)
 	C1 := math.cos(T1)
-	T3 := math.atan2(S1*m[0][1] - C1*m[0][2], C1*m[2][2] - S1*m[2][1])
+	T3 := math.atan2(S1*m[1, 0] - C1*m[2, 0], C1*m[2, 2] - S1*m[1, 2])
 	t1 = T1
 	t2 = T2
 	t3 = T3
@@ -693,12 +693,12 @@ euler_angles_xzy_from_matrix3_f32 :: proc(m: Matrix3f32) -> (t1, t2, t3: f32) {
 }
 
 euler_angles_yzx_from_matrix3_f32 :: proc(m: Matrix3f32) -> (t1, t2, t3: f32) {
-	T1 := math.atan2(-m[0][2], m[0][0])
-	C2 := math.sqrt(m[1][1]*m[1][1] + m[2][1]*m[2][1])
-	T2 := math.atan2(m[0][1], C2)
+	T1 := math.atan2(-m[2, 0], m[0, 0])
+	C2 := math.sqrt(m[1, 1]*m[1, 1] + m[1, 2]*m[1, 2])
+	T2 := math.atan2(m[1, 0], C2)
 	S1 := math.sin(T1)
 	C1 := math.cos(T1)
-	T3 := math.atan2(S1*m[1][0] + C1*m[1][2], S1*m[2][0] + C1*m[2][2])
+	T3 := math.atan2(S1*m[0, 1] + C1*m[2, 1], S1*m[0, 2] + C1*m[2, 2])
 	t1 = T1
 	t2 = T2
 	t3 = T3
@@ -706,12 +706,12 @@ euler_angles_yzx_from_matrix3_f32 :: proc(m: Matrix3f32) -> (t1, t2, t3: f32) {
 }
 
 euler_angles_zyx_from_matrix3_f32 :: proc(m: Matrix3f32) -> (t1, t2, t3: f32) {
-	T1 := math.atan2(m[0][1], m[0][0])
-	C2 := math.sqrt(m[1][2]*m[1][2] + m[2][2]*m[2][2])
-	T2 := math.atan2(-m[0][2], C2)
+	T1 := math.atan2(m[1, 0], m[0, 0])
+	C2 := math.sqrt(m[2, 1]*m[2, 1] + m[2, 2]*m[2, 2])
+	T2 := math.atan2(-m[2, 0], C2)
 	S1 := math.sin(T1)
 	C1 := math.cos(T1)
-	T3 := math.atan2(S1*m[2][0] - C1*m[2][1], C1*m[1][1] - S1*m[1][0])
+	T3 := math.atan2(S1*m[0, 2] - C1*m[1, 2], C1*m[1, 1] - S1*m[0, 1])
 	t1 = T1
 	t2 = T2
 	t3 = T3
@@ -719,12 +719,12 @@ euler_angles_zyx_from_matrix3_f32 :: proc(m: Matrix3f32) -> (t1, t2, t3: f32) {
 }
 
 euler_angles_zxy_from_matrix3_f32 :: proc(m: Matrix3f32) -> (t1, t2, t3: f32) {
-	T1 := math.atan2(-m[1][0], m[1][1])
-	C2 := math.sqrt(m[0][2]*m[0][2] + m[2][2]*m[2][2])
-	T2 := math.atan2(m[1][2], C2)
+	T1 := math.atan2(-m[0, 1], m[1, 1])
+	C2 := math.sqrt(m[2, 0]*m[2, 0] + m[2, 2]*m[2, 2])
+	T2 := math.atan2(m[2, 1], C2)
 	S1 := math.sin(T1)
 	C1 := math.cos(T1)
-	T3 := math.atan2(C1*m[2][0] + S1*m[2][1], C1*m[0][0] + S1*m[0][1])
+	T3 := math.atan2(C1*m[0, 2] + S1*m[1, 2], C1*m[0, 0] + S1*m[1, 0])
 	t1 = T1
 	t2 = T2
 	t3 = T3
@@ -737,32 +737,32 @@ euler_angles_zxy_from_matrix3_f32 :: proc(m: Matrix3f32) -> (t1, t2, t3: f32) {
 
 matrix4_from_euler_angle_x_f32 :: proc(angle_x: f32) -> (m: Matrix4f32) {
 	cos_x, sin_x := math.cos(angle_x), math.sin(angle_x)
-	m[0][0] = 1
-	m[1][1] = +cos_x
-	m[2][1] = +sin_x
-	m[1][2] = -sin_x
-	m[2][2] = +cos_x
-	m[3][3] = 1
+	m[0, 0] = 1
+	m[1, 1] = +cos_x
+	m[1, 2] = +sin_x
+	m[2, 1] = -sin_x
+	m[2, 2] = +cos_x
+	m[3, 3] = 1
 	return
 }
 matrix4_from_euler_angle_y_f32 :: proc(angle_y: f32) -> (m: Matrix4f32) {
 	cos_y, sin_y := math.cos(angle_y), math.sin(angle_y)
-	m[0][0] = +cos_y
-	m[2][0] = -sin_y
-	m[1][1] = 1
-	m[0][2] = +sin_y
-	m[2][2] = +cos_y
-	m[3][3] = 1
+	m[0, 0] = +cos_y
+	m[0, 2] = -sin_y
+	m[1, 1] = 1
+	m[2, 0] = +sin_y
+	m[2, 2] = +cos_y
+	m[3, 3] = 1
 	return
 }
 matrix4_from_euler_angle_z_f32 :: proc(angle_z: f32) -> (m: Matrix4f32) {
 	cos_z, sin_z := math.cos(angle_z), math.sin(angle_z)
-	m[0][0] = +cos_z
-	m[1][0] = +sin_z
-	m[1][1] = +cos_z
-	m[0][1] = -sin_z
-	m[2][2] = 1
-	m[3][3] = 1
+	m[0, 0] = +cos_z
+	m[0, 1] = +sin_z
+	m[1, 1] = +cos_z
+	m[1, 0] = -sin_z
+	m[2, 2] = 1
+	m[3, 3] = 1
 	return
 }
 
@@ -770,34 +770,34 @@ matrix4_from_euler_angle_z_f32 :: proc(angle_z: f32) -> (m: Matrix4f32) {
 matrix4_from_derived_euler_angle_x_f32 :: proc(angle_x: f32, angular_velocity_x: f32) -> (m: Matrix4f32) {
 	cos_x := math.cos(angle_x) * angular_velocity_x
 	sin_x := math.sin(angle_x) * angular_velocity_x
-	m[0][0] = 1
-	m[1][1] = +cos_x
-	m[2][1] = +sin_x
-	m[1][2] = -sin_x
-	m[2][2] = +cos_x
-	m[3][3] = 1
+	m[0, 0] = 1
+	m[1, 1] = +cos_x
+	m[1, 2] = +sin_x
+	m[2, 1] = -sin_x
+	m[2, 2] = +cos_x
+	m[3, 3] = 1
 	return
 }
 matrix4_from_derived_euler_angle_y_f32 :: proc(angle_y: f32, angular_velocity_y: f32) -> (m: Matrix4f32) {
 	cos_y := math.cos(angle_y) * angular_velocity_y
 	sin_y := math.sin(angle_y) * angular_velocity_y
-	m[0][0] = +cos_y
-	m[2][0] = -sin_y
-	m[1][1] = 1
-	m[0][2] = +sin_y
-	m[2][2] = +cos_y
-	m[3][3] = 1
+	m[0, 0] = +cos_y
+	m[0, 2] = -sin_y
+	m[1, 1] = 1
+	m[2, 0] = +sin_y
+	m[2, 2] = +cos_y
+	m[3, 3] = 1
 	return
 }
 matrix4_from_derived_euler_angle_z_f32 :: proc(angle_z: f32, angular_velocity_z: f32) -> (m: Matrix4f32) {
 	cos_z := math.cos(angle_z) * angular_velocity_z
 	sin_z := math.sin(angle_z) * angular_velocity_z
-	m[0][0] = +cos_z
-	m[1][0] = +sin_z
-	m[1][1] = +cos_z
-	m[0][1] = -sin_z
-	m[2][2] = 1
-	m[3][3] = 1
+	m[0, 0] = +cos_z
+	m[0, 1] = +sin_z
+	m[1, 1] = +cos_z
+	m[1, 0] = -sin_z
+	m[2, 2] = 1
+	m[3, 3] = 1
 	return
 }
 
@@ -805,15 +805,15 @@ matrix4_from_derived_euler_angle_z_f32 :: proc(angle_z: f32, angular_velocity_z:
 matrix4_from_euler_angles_xy_f32 :: proc(angle_x, angle_y: f32) -> (m: Matrix4f32) {
 	cos_x, sin_x := math.cos(angle_x), math.sin(angle_x)
 	cos_y, sin_y := math.cos(angle_y), math.sin(angle_y)
-	m[0][0] = cos_y
-	m[1][0] = -sin_x * - sin_y
-	m[2][0] = -cos_x * - sin_y
-	m[1][1] = cos_x
-	m[2][1] = sin_x
-	m[0][2] = sin_y
-	m[1][2] = -sin_x * cos_y
-	m[2][2] = cos_x * cos_y
-	m[3][3] = 1
+	m[0, 0] = cos_y
+	m[0, 1] = -sin_x * - sin_y
+	m[0, 2] = -cos_x * - sin_y
+	m[1, 1] = cos_x
+	m[1, 2] = sin_x
+	m[2, 0] = sin_y
+	m[2, 1] = -sin_x * cos_y
+	m[2, 2] = cos_x * cos_y
+	m[3, 3] = 1
 	return
 }
 
@@ -821,15 +821,15 @@ matrix4_from_euler_angles_xy_f32 :: proc(angle_x, angle_y: f32) -> (m: Matrix4f3
 matrix4_from_euler_angles_yx_f32 :: proc(angle_y, angle_x: f32) -> (m: Matrix4f32) {
 	cos_x, sin_x := math.cos(angle_x), math.sin(angle_x)
 	cos_y, sin_y := math.cos(angle_y), math.sin(angle_y)
-	m[0][0] = cos_y
-	m[2][0] = -sin_y
-	m[0][1] = sin_y*sin_x
-	m[1][1] = cos_x
-	m[2][1] = cos_y*sin_x
-	m[0][2] = sin_y*cos_x
-	m[1][2] = -sin_x
-	m[2][2] = cos_y*cos_x
-	m[3][3] = 1
+	m[0, 0] = cos_y
+	m[0, 2] = -sin_y
+	m[1, 0] = sin_y*sin_x
+	m[1, 1] = cos_x
+	m[1, 2] = cos_y*sin_x
+	m[2, 0] = sin_y*cos_x
+	m[2, 1] = -sin_x
+	m[2, 2] = cos_y*cos_x
+	m[3, 3] = 1
 	return
 }
 
@@ -855,22 +855,22 @@ matrix4_from_euler_angles_xyz_f32 :: proc(t1, t2, t3: f32) -> (m: Matrix4f32) {
 	s2 := math.sin(-t2)
 	s3 := math.sin(-t3)
 
-	m[0][0] = c2 * c3
-	m[0][1] =-c1 * s3 + s1 * s2 * c3
-	m[0][2] = s1 * s3 + c1 * s2 * c3
-	m[0][3] = 0
-	m[1][0] = c2 * s3
-	m[1][1] = c1 * c3 + s1 * s2 * s3
-	m[1][2] =-s1 * c3 + c1 * s2 * s3
-	m[1][3] = 0
-	m[2][0] =-s2
-	m[2][1] = s1 * c2
-	m[2][2] = c1 * c2
-	m[2][3] = 0
-	m[3][0] = 0
-	m[3][1] = 0
-	m[3][2] = 0
-	m[3][3] = 1
+	m[0, 0] = c2 * c3
+	m[1, 0] =-c1 * s3 + s1 * s2 * c3
+	m[2, 0] = s1 * s3 + c1 * s2 * c3
+	m[3, 0] = 0
+	m[0, 1] = c2 * s3
+	m[1, 1] = c1 * c3 + s1 * s2 * s3
+	m[2, 1] =-s1 * c3 + c1 * s2 * s3
+	m[3, 1] = 0
+	m[0, 2] =-s2
+	m[1, 2] = s1 * c2
+	m[2, 2] = c1 * c2
+	m[3, 2] = 0
+	m[0, 3] = 0
+	m[1, 3] = 0
+	m[2, 3] = 0
+	m[3, 3] = 1
 	return
 }
 
@@ -882,22 +882,22 @@ matrix4_from_euler_angles_yxz_f32 :: proc(yaw, pitch, roll: f32) -> (m: Matrix4f
 	cb := math.cos(roll)
 	sb := math.sin(roll)
 
-	m[0][0] = ch * cb + sh * sp * sb
-	m[0][1] = sb * cp
-	m[0][2] = -sh * cb + ch * sp * sb
-	m[0][3] = 0
-	m[1][0] = -ch * sb + sh * sp * cb
-	m[1][1] = cb * cp
-	m[1][2] = sb * sh + ch * sp * cb
-	m[1][3] = 0
-	m[2][0] = sh * cp
-	m[2][1] = -sp
-	m[2][2] = ch * cp
-	m[2][3] = 0
-	m[3][0] = 0
-	m[3][1] = 0
-	m[3][2] = 0
-	m[3][3] = 1
+	m[0, 0] = ch * cb + sh * sp * sb
+	m[1, 0] = sb * cp
+	m[2, 0] = -sh * cb + ch * sp * sb
+	m[3, 0] = 0
+	m[0, 1] = -ch * sb + sh * sp * cb
+	m[1, 1] = cb * cp
+	m[2, 1] = sb * sh + ch * sp * cb
+	m[3, 1] = 0
+	m[0, 2] = sh * cp
+	m[1, 2] = -sp
+	m[2, 2] = ch * cp
+	m[3, 2] = 0
+	m[0, 3] = 0
+	m[1, 3] = 0
+	m[2, 3] = 0
+	m[3, 3] = 1
 	return
 }
 
@@ -909,22 +909,22 @@ matrix4_from_euler_angles_xzx_f32 :: proc(t1, t2, t3: f32) -> (m: Matrix4f32) {
 	c3 := math.cos(t3)
 	s3 := math.sin(t3)
 
-	m[0][0] = c2
-	m[0][1] = c1 * s2
-	m[0][2] = s1 * s2
-	m[0][3] = 0
-	m[1][0] =-c3 * s2
-	m[1][1] = c1 * c2 * c3 - s1 * s3
-	m[1][2] = c1 * s3 + c2 * c3 * s1
-	m[1][3] = 0
-	m[2][0] = s2 * s3
-	m[2][1] =-c3 * s1 - c1 * c2 * s3
-	m[2][2] = c1 * c3 - c2 * s1 * s3
-	m[2][3] = 0
-	m[3][0] = 0
-	m[3][1] = 0
-	m[3][2] = 0
-	m[3][3] = 1
+	m[0, 0] = c2
+	m[1, 0] = c1 * s2
+	m[2, 0] = s1 * s2
+	m[3, 0] = 0
+	m[0, 1] =-c3 * s2
+	m[1, 1] = c1 * c2 * c3 - s1 * s3
+	m[2, 1] = c1 * s3 + c2 * c3 * s1
+	m[3, 1] = 0
+	m[0, 2] = s2 * s3
+	m[1, 2] =-c3 * s1 - c1 * c2 * s3
+	m[2, 2] = c1 * c3 - c2 * s1 * s3
+	m[3, 2] = 0
+	m[0, 3] = 0
+	m[1, 3] = 0
+	m[2, 3] = 0
+	m[3, 3] = 1
 	return
 }
 
@@ -936,22 +936,22 @@ matrix4_from_euler_angles_xyx_f32 :: proc(t1, t2, t3: f32) -> (m: Matrix4f32) {
 	c3 := math.cos(t3)
 	s3 := math.sin(t3)
 
-	m[0][0] = c2
-	m[0][1] = s1 * s2
-	m[0][2] =-c1 * s2
-	m[0][3] = 0
-	m[1][0] = s2 * s3
-	m[1][1] = c1 * c3 - c2 * s1 * s3
-	m[1][2] = c3 * s1 + c1 * c2 * s3
-	m[1][3] = 0
-	m[2][0] = c3 * s2
-	m[2][1] =-c1 * s3 - c2 * c3 * s1
-	m[2][2] = c1 * c2 * c3 - s1 * s3
-	m[2][3] = 0
-	m[3][0] = 0
-	m[3][1] = 0
-	m[3][2] = 0
-	m[3][3] = 1
+	m[0, 0] = c2
+	m[1, 0] = s1 * s2
+	m[2, 0] =-c1 * s2
+	m[3, 0] = 0
+	m[0, 1] = s2 * s3
+	m[1, 1] = c1 * c3 - c2 * s1 * s3
+	m[2, 1] = c3 * s1 + c1 * c2 * s3
+	m[3, 1] = 0
+	m[0, 2] = c3 * s2
+	m[1, 2] =-c1 * s3 - c2 * c3 * s1
+	m[2, 2] = c1 * c2 * c3 - s1 * s3
+	m[3, 2] = 0
+	m[0, 3] = 0
+	m[1, 3] = 0
+	m[2, 3] = 0
+	m[3, 3] = 1
 	return
 }
 
@@ -963,22 +963,22 @@ matrix4_from_euler_angles_yxy_f32 :: proc(t1, t2, t3: f32) -> (m: Matrix4f32) {
 	c3 := math.cos(t3)
 	s3 := math.sin(t3)
 
-	m[0][0] = c1 * c3 - c2 * s1 * s3
-	m[0][1] = s2* s3
-	m[0][2] =-c3 * s1 - c1 * c2 * s3
-	m[0][3] = 0
-	m[1][0] = s1 * s2
-	m[1][1] = c2
-	m[1][2] = c1 * s2
-	m[1][3] = 0
-	m[2][0] = c1 * s3 + c2 * c3 * s1
-	m[2][1] =-c3 * s2
-	m[2][2] = c1 * c2 * c3 - s1 * s3
-	m[2][3] = 0
-	m[3][0] = 0
-	m[3][1] = 0
-	m[3][2] = 0
-	m[3][3] = 1
+	m[0, 0] = c1 * c3 - c2 * s1 * s3
+	m[1, 0] = s2* s3
+	m[2, 0] =-c3 * s1 - c1 * c2 * s3
+	m[3, 0] = 0
+	m[0, 1] = s1 * s2
+	m[1, 1] = c2
+	m[2, 1] = c1 * s2
+	m[3, 1] = 0
+	m[0, 2] = c1 * s3 + c2 * c3 * s1
+	m[1, 2] =-c3 * s2
+	m[2, 2] = c1 * c2 * c3 - s1 * s3
+	m[3, 2] = 0
+	m[0, 3] = 0
+	m[1, 3] = 0
+	m[2, 3] = 0
+	m[3, 3] = 1
 	return
 }
 
@@ -990,22 +990,22 @@ matrix4_from_euler_angles_yzy_f32 :: proc(t1, t2, t3: f32) -> (m: Matrix4f32) {
 	c3 := math.cos(t3)
 	s3 := math.sin(t3)
 
-	m[0][0] = c1 * c2 * c3 - s1 * s3
-	m[0][1] = c3 * s2
-	m[0][2] =-c1 * s3 - c2 * c3 * s1
-	m[0][3] = 0
-	m[1][0] =-c1 * s2
-	m[1][1] = c2
-	m[1][2] = s1 * s2
-	m[1][3] = 0
-	m[2][0] = c3 * s1 + c1 * c2 * s3
-	m[2][1] = s2 * s3
-	m[2][2] = c1 * c3 - c2 * s1 * s3
-	m[2][3] = 0
-	m[3][0] = 0
-	m[3][1] = 0
-	m[3][2] = 0
-	m[3][3] = 1
+	m[0, 0] = c1 * c2 * c3 - s1 * s3
+	m[1, 0] = c3 * s2
+	m[2, 0] =-c1 * s3 - c2 * c3 * s1
+	m[3, 0] = 0
+	m[0, 1] =-c1 * s2
+	m[1, 1] = c2
+	m[2, 1] = s1 * s2
+	m[3, 1] = 0
+	m[0, 2] = c3 * s1 + c1 * c2 * s3
+	m[1, 2] = s2 * s3
+	m[2, 2] = c1 * c3 - c2 * s1 * s3
+	m[3, 2] = 0
+	m[0, 3] = 0
+	m[1, 3] = 0
+	m[2, 3] = 0
+	m[3, 3] = 1
 	return
 }
 
@@ -1017,22 +1017,22 @@ matrix4_from_euler_angles_zyz_f32 :: proc(t1, t2, t3: f32) -> (m: Matrix4f32) {
 	c3 := math.cos(t3)
 	s3 := math.sin(t3)
 
-	m[0][0] = c1 * c2 * c3 - s1 * s3
-	m[0][1] = c1 * s3 + c2 * c3 * s1
-	m[0][2] =-c3 * s2
-	m[0][3] = 0
-	m[1][0] =-c3 * s1 - c1 * c2 * s3
-	m[1][1] = c1 * c3 - c2 * s1 * s3
-	m[1][2] = s2 * s3
-	m[1][3] = 0
-	m[2][0] = c1 * s2
-	m[2][1] = s1 * s2
-	m[2][2] = c2
-	m[2][3] = 0
-	m[3][0] = 0
-	m[3][1] = 0
-	m[3][2] = 0
-	m[3][3] = 1
+	m[0, 0] = c1 * c2 * c3 - s1 * s3
+	m[1, 0] = c1 * s3 + c2 * c3 * s1
+	m[2, 0] =-c3 * s2
+	m[3, 0] = 0
+	m[0, 1] =-c3 * s1 - c1 * c2 * s3
+	m[1, 1] = c1 * c3 - c2 * s1 * s3
+	m[2, 1] = s2 * s3
+	m[3, 1] = 0
+	m[0, 2] = c1 * s2
+	m[1, 2] = s1 * s2
+	m[2, 2] = c2
+	m[3, 2] = 0
+	m[0, 3] = 0
+	m[1, 3] = 0
+	m[2, 3] = 0
+	m[3, 3] = 1
 	return
 }
 
@@ -1044,22 +1044,22 @@ matrix4_from_euler_angles_zxz_f32 :: proc(t1, t2, t3: f32) -> (m: Matrix4f32) {
 	c3 := math.cos(t3)
 	s3 := math.sin(t3)
 
-	m[0][0] = c1 * c3 - c2 * s1 * s3
-	m[0][1] = c3 * s1 + c1 * c2 * s3
-	m[0][2] = s2 *s3
-	m[0][3] = 0
-	m[1][0] =-c1 * s3 - c2 * c3 * s1
-	m[1][1] = c1 * c2 * c3 - s1 * s3
-	m[1][2] = c3 * s2
-	m[1][3] = 0
-	m[2][0] = s1 * s2
-	m[2][1] =-c1 * s2
-	m[2][2] = c2
-	m[2][3] = 0
-	m[3][0] = 0
-	m[3][1] = 0
-	m[3][2] = 0
-	m[3][3] = 1
+	m[0, 0] = c1 * c3 - c2 * s1 * s3
+	m[1, 0] = c3 * s1 + c1 * c2 * s3
+	m[2, 0] = s2 *s3
+	m[3, 0] = 0
+	m[0, 1] =-c1 * s3 - c2 * c3 * s1
+	m[1, 1] = c1 * c2 * c3 - s1 * s3
+	m[2, 1] = c3 * s2
+	m[3, 1] = 0
+	m[0, 2] = s1 * s2
+	m[1, 2] =-c1 * s2
+	m[2, 2] = c2
+	m[3, 2] = 0
+	m[0, 3] = 0
+	m[1, 3] = 0
+	m[2, 3] = 0
+	m[3, 3] = 1
 	return
 }
 
@@ -1072,22 +1072,22 @@ matrix4_from_euler_angles_xzy_f32 :: proc(t1, t2, t3: f32) -> (m: Matrix4f32) {
 	c3 := math.cos(t3)
 	s3 := math.sin(t3)
 
-	m[0][0] = c2 * c3
-	m[0][1] = s1 * s3 + c1 * c3 * s2
-	m[0][2] = c3 * s1 * s2 - c1 * s3
-	m[0][3] = 0
-	m[1][0] =-s2
-	m[1][1] = c1 * c2
-	m[1][2] = c2 * s1
-	m[1][3] = 0
-	m[2][0] = c2 * s3
-	m[2][1] = c1 * s2 * s3 - c3 * s1
-	m[2][2] = c1 * c3 + s1 * s2 *s3
-	m[2][3] = 0
-	m[3][0] = 0
-	m[3][1] = 0
-	m[3][2] = 0
-	m[3][3] = 1
+	m[0, 0] = c2 * c3
+	m[1, 0] = s1 * s3 + c1 * c3 * s2
+	m[2, 0] = c3 * s1 * s2 - c1 * s3
+	m[3, 0] = 0
+	m[0, 1] =-s2
+	m[1, 1] = c1 * c2
+	m[2, 1] = c2 * s1
+	m[3, 1] = 0
+	m[0, 2] = c2 * s3
+	m[1, 2] = c1 * s2 * s3 - c3 * s1
+	m[2, 2] = c1 * c3 + s1 * s2 *s3
+	m[3, 2] = 0
+	m[0, 3] = 0
+	m[1, 3] = 0
+	m[2, 3] = 0
+	m[3, 3] = 1
 	return
 }
 
@@ -1099,22 +1099,22 @@ matrix4_from_euler_angles_yzx_f32 :: proc(t1, t2, t3: f32) -> (m: Matrix4f32) {
 	c3 := math.cos(t3)
 	s3 := math.sin(t3)
 
-	m[0][0] = c1 * c2
-	m[0][1] = s2
-	m[0][2] =-c2 * s1
-	m[0][3] = 0
-	m[1][0] = s1 * s3 - c1 * c3 * s2
-	m[1][1] = c2 * c3
-	m[1][2] = c1 * s3 + c3 * s1 * s2
-	m[1][3] = 0
-	m[2][0] = c3 * s1 + c1 * s2 * s3
-	m[2][1] =-c2 * s3
-	m[2][2] = c1 * c3 - s1 * s2 * s3
-	m[2][3] = 0
-	m[3][0] = 0
-	m[3][1] = 0
-	m[3][2] = 0
-	m[3][3] = 1
+	m[0, 0] = c1 * c2
+	m[1, 0] = s2
+	m[2, 0] =-c2 * s1
+	m[3, 0] = 0
+	m[0, 1] = s1 * s3 - c1 * c3 * s2
+	m[1, 1] = c2 * c3
+	m[2, 1] = c1 * s3 + c3 * s1 * s2
+	m[3, 1] = 0
+	m[0, 2] = c3 * s1 + c1 * s2 * s3
+	m[1, 2] =-c2 * s3
+	m[2, 2] = c1 * c3 - s1 * s2 * s3
+	m[3, 2] = 0
+	m[0, 3] = 0
+	m[1, 3] = 0
+	m[2, 3] = 0
+	m[3, 3] = 1
 	return
 }
 
@@ -1126,22 +1126,22 @@ matrix4_from_euler_angles_zyx_f32 :: proc(t1, t2, t3: f32) -> (m: Matrix4f32) {
 	c3 := math.cos(t3)
 	s3 := math.sin(t3)
 
-	m[0][0] = c1 * c2
-	m[0][1] = c2 * s1
-	m[0][2] =-s2
-	m[0][3] = 0
-	m[1][0] = c1 * s2 * s3 - c3 * s1
-	m[1][1] = c1 * c3 + s1 * s2 * s3
-	m[1][2] = c2 * s3
-	m[1][3] = 0
-	m[2][0] = s1 * s3 + c1 * c3 * s2
-	m[2][1] = c3 * s1 * s2 - c1 * s3
-	m[2][2] = c2 * c3
-	m[2][3] = 0
-	m[3][0] = 0
-	m[3][1] = 0
-	m[3][2] = 0
-	m[3][3] = 1
+	m[0, 0] = c1 * c2
+	m[1, 0] = c2 * s1
+	m[2, 0] =-s2
+	m[3, 0] = 0
+	m[0, 1] = c1 * s2 * s3 - c3 * s1
+	m[1, 1] = c1 * c3 + s1 * s2 * s3
+	m[2, 1] = c2 * s3
+	m[3, 1] = 0
+	m[0, 2] = s1 * s3 + c1 * c3 * s2
+	m[1, 2] = c3 * s1 * s2 - c1 * s3
+	m[2, 2] = c2 * c3
+	m[3, 2] = 0
+	m[0, 3] = 0
+	m[1, 3] = 0
+	m[2, 3] = 0
+	m[3, 3] = 1
 	return
 }
 
@@ -1153,22 +1153,22 @@ matrix4_from_euler_angles_zxy_f32 :: proc(t1, t2, t3: f32) -> (m: Matrix4f32) {
 	c3 := math.cos(t3)
 	s3 := math.sin(t3)
 
-	m[0][0] = c1 * c3 - s1 * s2 * s3
-	m[0][1] = c3 * s1 + c1 * s2 * s3
-	m[0][2] =-c2 * s3
-	m[0][3] = 0
-	m[1][0] =-c2 * s1
-	m[1][1] = c1 * c2
-	m[1][2] = s2
-	m[1][3] = 0
-	m[2][0] = c1 * s3 + c3 * s1 * s2
-	m[2][1] = s1 * s3 - c1 * c3 * s2
-	m[2][2] = c2 * c3
-	m[2][3] = 0
-	m[3][0] = 0
-	m[3][1] = 0
-	m[3][2] = 0
-	m[3][3] = 1
+	m[0, 0] = c1 * c3 - s1 * s2 * s3
+	m[1, 0] = c3 * s1 + c1 * s2 * s3
+	m[2, 0] =-c2 * s3
+	m[3, 0] = 0
+	m[0, 1] =-c2 * s1
+	m[1, 1] = c1 * c2
+	m[2, 1] = s2
+	m[3, 1] = 0
+	m[0, 2] = c1 * s3 + c3 * s1 * s2
+	m[1, 2] = s1 * s3 - c1 * c3 * s2
+	m[2, 2] = c2 * c3
+	m[3, 2] = 0
+	m[0, 3] = 0
+	m[1, 3] = 0
+	m[2, 3] = 0
+	m[3, 3] = 1
 	return
 }
 
@@ -1181,32 +1181,32 @@ matrix4_from_yaw_pitch_roll_f32 :: proc(yaw, pitch, roll: f32) -> (m: Matrix4f32
 	cb := math.cos(roll)
 	sb := math.sin(roll)
 
-	m[0][0] = ch * cb + sh * sp * sb
-	m[0][1] = sb * cp
-	m[0][2] = -sh * cb + ch * sp * sb
-	m[0][3] = 0
-	m[1][0] = -ch * sb + sh * sp * cb
-	m[1][1] = cb * cp
-	m[1][2] = sb * sh + ch * sp * cb
-	m[1][3] = 0
-	m[2][0] = sh * cp
-	m[2][1] = -sp
-	m[2][2] = ch * cp
-	m[2][3] = 0
-	m[3][0] = 0
-	m[3][1] = 0
-	m[3][2] = 0
-	m[3][3] = 1
+	m[0, 0] = ch * cb + sh * sp * sb
+	m[1, 0] = sb * cp
+	m[2, 0] = -sh * cb + ch * sp * sb
+	m[3, 0] = 0
+	m[0, 1] = -ch * sb + sh * sp * cb
+	m[1, 1] = cb * cp
+	m[2, 1] = sb * sh + ch * sp * cb
+	m[3, 1] = 0
+	m[0, 2] = sh * cp
+	m[1, 2] = -sp
+	m[2, 2] = ch * cp
+	m[3, 2] = 0
+	m[0, 3] = 0
+	m[1, 3] = 0
+	m[2, 3] = 0
+	m[3, 3] = 1
 	return m
 }
 
 euler_angles_xyz_from_matrix4_f32 :: proc(m: Matrix4f32) -> (t1, t2, t3: f32) {
-	T1 := math.atan2(m[2][1], m[2][2])
-	C2 := math.sqrt(m[0][0]*m[0][0] + m[1][0]*m[1][0])
-	T2 := math.atan2(-m[2][0], C2)
+	T1 := math.atan2(m[1, 2], m[2, 2])
+	C2 := math.sqrt(m[0, 0]*m[0, 0] + m[0, 1]*m[0, 1])
+	T2 := math.atan2(-m[0, 2], C2)
 	S1 := math.sin(T1)
 	C1 := math.cos(T1)
-	T3 := math.atan2(S1*m[0][2] - C1*m[0][1], C1*m[1][1] - S1*m[1][2])
+	T3 := math.atan2(S1*m[2, 0] - C1*m[1, 0], C1*m[1, 1] - S1*m[2, 1])
 	t1 = -T1
 	t2 = -T2
 	t3 = -T3
@@ -1214,12 +1214,12 @@ euler_angles_xyz_from_matrix4_f32 :: proc(m: Matrix4f32) -> (t1, t2, t3: f32) {
 }
 
 euler_angles_yxz_from_matrix4_f32 :: proc(m: Matrix4f32) -> (t1, t2, t3: f32) {
-	T1 := math.atan2(m[2][0], m[2][2])
-	C2 := math.sqrt(m[0][1]*m[0][1] + m[1][1]*m[1][1])
-	T2 := math.atan2(-m[2][1], C2)
+	T1 := math.atan2(m[0, 2], m[2, 2])
+	C2 := math.sqrt(m[1, 0]*m[1, 0] + m[1, 1]*m[1, 1])
+	T2 := math.atan2(-m[1, 2], C2)
 	S1 := math.sin(T1)
 	C1 := math.cos(T1)
-	T3 := math.atan2(S1*m[1][2] - C1*m[1][0], C1*m[0][0] - S1*m[0][2])
+	T3 := math.atan2(S1*m[2, 1] - C1*m[0, 1], C1*m[0, 0] - S1*m[2, 0])
 	t1 = T1
 	t2 = T2
 	t3 = T3
@@ -1227,12 +1227,12 @@ euler_angles_yxz_from_matrix4_f32 :: proc(m: Matrix4f32) -> (t1, t2, t3: f32) {
 }
 
 euler_angles_xzx_from_matrix4_f32 :: proc(m: Matrix4f32) -> (t1, t2, t3: f32) {
-	T1 := math.atan2(m[0][2], m[0][1])
-	S2 := math.sqrt(m[1][0]*m[1][0] + m[2][0]*m[2][0])
-	T2 := math.atan2(S2, m[0][0])
+	T1 := math.atan2(m[2, 0], m[1, 0])
+	S2 := math.sqrt(m[0, 1]*m[0, 1] + m[0, 2]*m[0, 2])
+	T2 := math.atan2(S2, m[0, 0])
 	S1 := math.sin(T1)
 	C1 := math.cos(T1)
-	T3 := math.atan2(C1*m[1][2] - S1*m[1][1], C1*m[2][2] - S1*m[2][1])
+	T3 := math.atan2(C1*m[2, 1] - S1*m[1, 1], C1*m[2, 2] - S1*m[1, 2])
 	t1 = T1
 	t2 = T2
 	t3 = T3
@@ -1240,12 +1240,12 @@ euler_angles_xzx_from_matrix4_f32 :: proc(m: Matrix4f32) -> (t1, t2, t3: f32) {
 }
 
 euler_angles_xyx_from_matrix4_f32 :: proc(m: Matrix4f32) -> (t1, t2, t3: f32) {
-	T1 := math.atan2(m[0][1], -m[0][2])
-	S2 := math.sqrt(m[1][0]*m[1][0] + m[2][0]*m[2][0])
-	T2 := math.atan2(S2, m[0][0])
+	T1 := math.atan2(m[1, 0], -m[2, 0])
+	S2 := math.sqrt(m[0, 1]*m[0, 1] + m[0, 2]*m[0, 2])
+	T2 := math.atan2(S2, m[0, 0])
 	S1 := math.sin(T1)
 	C1 := math.cos(T1)
-	T3 := math.atan2(-C1*m[2][1] - S1*m[2][2], C1*m[1][1] + S1*m[1][2])
+	T3 := math.atan2(-C1*m[1, 2] - S1*m[2, 2], C1*m[1, 1] + S1*m[2, 1])
 	t1 = T1
 	t2 = T2
 	t3 = T3
@@ -1253,12 +1253,12 @@ euler_angles_xyx_from_matrix4_f32 :: proc(m: Matrix4f32) -> (t1, t2, t3: f32) {
 }
 
 euler_angles_yxy_from_matrix4_f32 :: proc(m: Matrix4f32) -> (t1, t2, t3: f32) {
-	T1 := math.atan2(m[1][0], m[1][2])
-	S2 := math.sqrt(m[0][1]*m[0][1] + m[2][1]*m[2][1])
-	T2 := math.atan2(S2, m[1][1])
+	T1 := math.atan2(m[0, 1], m[2, 1])
+	S2 := math.sqrt(m[1, 0]*m[1, 0] + m[1, 2]*m[1, 2])
+	T2 := math.atan2(S2, m[1, 1])
 	S1 := math.sin(T1)
 	C1 := math.cos(T1)
-	T3 := math.atan2(C1*m[2][0] - S1*m[2][2], C1*m[0][0] - S1*m[0][2])
+	T3 := math.atan2(C1*m[0, 2] - S1*m[2, 2], C1*m[0, 0] - S1*m[2, 0])
 	t1 = T1
 	t2 = T2
 	t3 = T3
@@ -1266,24 +1266,24 @@ euler_angles_yxy_from_matrix4_f32 :: proc(m: Matrix4f32) -> (t1, t2, t3: f32) {
 }
 
 euler_angles_yzy_from_matrix4_f32 :: proc(m: Matrix4f32) -> (t1, t2, t3: f32) {
-	T1 := math.atan2(m[1][2], -m[1][0])
-	S2 := math.sqrt(m[0][1]*m[0][1] + m[2][1]*m[2][1])
-	T2 := math.atan2(S2, m[1][1])
+	T1 := math.atan2(m[2, 1], -m[0, 1])
+	S2 := math.sqrt(m[1, 0]*m[1, 0] + m[1, 2]*m[1, 2])
+	T2 := math.atan2(S2, m[1, 1])
 	S1 := math.sin(T1)
 	C1 := math.cos(T1)
-	T3 := math.atan2(-S1*m[0][0] - C1*m[0][2], S1*m[2][0] + C1*m[2][2])
+	T3 := math.atan2(-S1*m[0, 0] - C1*m[2, 0], S1*m[0, 2] + C1*m[2, 2])
 	t1 = T1
 	t2 = T2
 	t3 = T3
 	return
 }
 euler_angles_zyz_from_matrix4_f32 :: proc(m: Matrix4f32) -> (t1, t2, t3: f32) {
-	T1 := math.atan2(m[2][1], m[2][0])
-	S2 := math.sqrt(m[0][2]*m[0][2] + m[1][2]*m[1][2])
-	T2 := math.atan2(S2, m[2][2])
+	T1 := math.atan2(m[1, 2], m[0, 2])
+	S2 := math.sqrt(m[2, 0]*m[2, 0] + m[2, 1]*m[2, 1])
+	T2 := math.atan2(S2, m[2, 2])
 	S1 := math.sin(T1)
 	C1 := math.cos(T1)
-	T3 := math.atan2(C1*m[0][1] - S1*m[0][0], C1*m[1][1] - S1*m[1][0])
+	T3 := math.atan2(C1*m[1, 0] - S1*m[0, 0], C1*m[1, 1] - S1*m[0, 1])
 	t1 = T1
 	t2 = T2
 	t3 = T3
@@ -1291,12 +1291,12 @@ euler_angles_zyz_from_matrix4_f32 :: proc(m: Matrix4f32) -> (t1, t2, t3: f32) {
 }
 
 euler_angles_zxz_from_matrix4_f32 :: proc(m: Matrix4f32) -> (t1, t2, t3: f32) {
-	T1 := math.atan2(m[2][0], -m[2][1])
-	S2 := math.sqrt(m[0][2]*m[0][2] + m[1][2]*m[1][2])
-	T2 := math.atan2(S2, m[2][2])
+	T1 := math.atan2(m[0, 2], -m[1, 2])
+	S2 := math.sqrt(m[2, 0]*m[2, 0] + m[2, 1]*m[2, 1])
+	T2 := math.atan2(S2, m[2, 2])
 	S1 := math.sin(T1)
 	C1 := math.cos(T1)
-	T3 := math.atan2(-C1*m[1][0] - S1*m[1][1], C1*m[0][0] + S1*m[0][1])
+	T3 := math.atan2(-C1*m[0, 1] - S1*m[1, 1], C1*m[0, 0] + S1*m[1, 0])
 	t1 = T1
 	t2 = T2
 	t3 = T3
@@ -1304,12 +1304,12 @@ euler_angles_zxz_from_matrix4_f32 :: proc(m: Matrix4f32) -> (t1, t2, t3: f32) {
 }
 
 euler_angles_xzy_from_matrix4_f32 :: proc(m: Matrix4f32) -> (t1, t2, t3: f32) {
-	T1 := math.atan2(m[1][2], m[1][1])
-	C2 := math.sqrt(m[0][0]*m[0][0] + m[2][0]*m[2][0])
-	T2 := math.atan2(-m[1][0], C2)
+	T1 := math.atan2(m[2, 1], m[1, 1])
+	C2 := math.sqrt(m[0, 0]*m[0, 0] + m[0, 2]*m[0, 2])
+	T2 := math.atan2(-m[0, 1], C2)
 	S1 := math.sin(T1)
 	C1 := math.cos(T1)
-	T3 := math.atan2(S1*m[0][1] - C1*m[0][2], C1*m[2][2] - S1*m[2][1])
+	T3 := math.atan2(S1*m[1, 0] - C1*m[2, 0], C1*m[2, 2] - S1*m[1, 2])
 	t1 = T1
 	t2 = T2
 	t3 = T3
@@ -1317,12 +1317,12 @@ euler_angles_xzy_from_matrix4_f32 :: proc(m: Matrix4f32) -> (t1, t2, t3: f32) {
 }
 
 euler_angles_yzx_from_matrix4_f32 :: proc(m: Matrix4f32) -> (t1, t2, t3: f32) {
-	T1 := math.atan2(-m[0][2], m[0][0])
-	C2 := math.sqrt(m[1][1]*m[1][1] + m[2][1]*m[2][1])
-	T2 := math.atan2(m[0][1], C2)
+	T1 := math.atan2(-m[2, 0], m[0, 0])
+	C2 := math.sqrt(m[1, 1]*m[1, 1] + m[1, 2]*m[1, 2])
+	T2 := math.atan2(m[1, 0], C2)
 	S1 := math.sin(T1)
 	C1 := math.cos(T1)
-	T3 := math.atan2(S1*m[1][0] + C1*m[1][2], S1*m[2][0] + C1*m[2][2])
+	T3 := math.atan2(S1*m[0, 1] + C1*m[2, 1], S1*m[0, 2] + C1*m[2, 2])
 	t1 = T1
 	t2 = T2
 	t3 = T3
@@ -1330,12 +1330,12 @@ euler_angles_yzx_from_matrix4_f32 :: proc(m: Matrix4f32) -> (t1, t2, t3: f32) {
 }
 
 euler_angles_zyx_from_matrix4_f32 :: proc(m: Matrix4f32) -> (t1, t2, t3: f32) {
-	T1 := math.atan2(m[0][1], m[0][0])
-	C2 := math.sqrt(m[1][2]*m[1][2] + m[2][2]*m[2][2])
-	T2 := math.atan2(-m[0][2], C2)
+	T1 := math.atan2(m[1, 0], m[0, 0])
+	C2 := math.sqrt(m[2, 1]*m[2, 1] + m[2, 2]*m[2, 2])
+	T2 := math.atan2(-m[2, 0], C2)
 	S1 := math.sin(T1)
 	C1 := math.cos(T1)
-	T3 := math.atan2(S1*m[2][0] - C1*m[2][1], C1*m[1][1] - S1*m[1][0])
+	T3 := math.atan2(S1*m[0, 2] - C1*m[1, 2], C1*m[1, 1] - S1*m[0, 1])
 	t1 = T1
 	t2 = T2
 	t3 = T3
@@ -1343,12 +1343,12 @@ euler_angles_zyx_from_matrix4_f32 :: proc(m: Matrix4f32) -> (t1, t2, t3: f32) {
 }
 
 euler_angles_zxy_from_matrix4_f32 :: proc(m: Matrix4f32) -> (t1, t2, t3: f32) {
-	T1 := math.atan2(-m[1][0], m[1][1])
-	C2 := math.sqrt(m[0][2]*m[0][2] + m[2][2]*m[2][2])
-	T2 := math.atan2(m[1][2], C2)
+	T1 := math.atan2(-m[0, 1], m[1, 1])
+	C2 := math.sqrt(m[2, 0]*m[2, 0] + m[2, 2]*m[2, 2])
+	T2 := math.atan2(m[2, 1], C2)
 	S1 := math.sin(T1)
 	C1 := math.cos(T1)
-	T3 := math.atan2(C1*m[2][0] + S1*m[2][1], C1*m[0][0] + S1*m[0][1])
+	T3 := math.atan2(C1*m[0, 2] + S1*m[1, 2], C1*m[0, 0] + S1*m[1, 0])
 	t1 = T1
 	t2 = T2
 	t3 = T3

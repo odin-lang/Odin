@@ -2,6 +2,12 @@ package rand
 
 import "core:math"
 
+
+// norm_float64 returns a normally distributed f64 in the range -max(f64) through +max(f64) inclusive,
+// with a standard normal distribution with a mean of 0 and standard deviation of 1.
+//
+// sample = norm_float64() * std_dev + mean
+//
 //
 //    Normal distribution
 //
@@ -10,12 +16,6 @@ import "core:math"
 //    Submitted: 2000-04-15. Published: 2000-10-02.
 //    https://www.jstatsoft.org/index.php/jss/article/view/v005i08/ziggurat.pdf [pdf]
 //    https://www.jstatsoft.org/article/view/v005i08 [web page]
-//
-
-// norm_float64 returns a normally distributed f64 in the range -max(f64) through +max(f64) inclusive,
-// with a standard normal distribution with a mean of 0 and standard deviation of 1.
-//
-// sample = norm_float64() * std_dev + mean
 //
 norm_float64 :: proc(r: ^Rand = nil) -> f64 {
 	rn :: 3.442619855899
@@ -49,7 +49,6 @@ norm_float64 :: proc(r: ^Rand = nil) -> f64 {
 		0x7da61a1e, 0x7d72a0fb, 0x7d30e097, 0x7cd9b4ab, 0x7c600f1a,
 		0x7ba90bdc, 0x7a722176, 0x77d664e5,
 	}
-
 	@(static)
 	wn := [128]f32{
 		1.7290405e-09, 1.2680929e-10, 1.6897518e-10, 1.9862688e-10,
@@ -85,7 +84,6 @@ norm_float64 :: proc(r: ^Rand = nil) -> f64 {
 		1.2601323e-09, 1.2857697e-09, 1.3146202e-09, 1.347784e-09,
 		1.3870636e-09, 1.4357403e-09, 1.5008659e-09, 1.6030948e-09,
 	}
-
 	@(static)
 	fn := [128]f32{
 		1.00000000,  0.9635997,   0.9362827,   0.9130436,   0.89228165,

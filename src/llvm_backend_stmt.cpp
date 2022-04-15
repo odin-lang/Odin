@@ -212,8 +212,9 @@ void lb_open_scope(lbProcedure *p, Scope *s) {
 			unsigned column = cast(unsigned)token.pos.column;
 
 			LLVMMetadataRef file = nullptr;
-			if (s->node->file != nullptr) {
-				file = lb_get_llvm_metadata(m, s->node->file);
+			AstFile *ast_file = s->node->file();
+			if (ast_file != nullptr) {
+				file = lb_get_llvm_metadata(m, ast_file);
 			}
 			LLVMMetadataRef scope = nullptr;
 			if (p->scope_stack.count > 0) {
@@ -1484,7 +1485,14 @@ void lb_build_return_stmt_internal(lbProcedure *p, lbValue const &res) {
 
 	if (return_by_pointer) {
 		if (res.value != nullptr) {
-			LLVMBuildStore(p->builder, res.value, p->return_ptr.addr.value);
+			LLVMValueRef res_val = res.value;
+			i64 sz = type_size_of(res.type);
+			if (LLVMIsALoadInst(res_val) && sz > build_context.word_size) {
+				lbValue ptr = lb_address_from_load_or_generate_local(p, res);
+				lb_mem_copy_non_overlapping(p, p->return_ptr.addr, ptr, lb_const_int(p->module, t_int, sz));
+			} else {
+				LLVMBuildStore(p->builder, res_val, p->return_ptr.addr.value);
+			}
 		} else {
 			LLVMBuildStore(p->builder, LLVMConstNull(p->abi_function_type->ret.type), p->return_ptr.addr.value);
 		}
@@ -1624,7 +1632,7 @@ void lb_build_return_stmt(lbProcedure *p, Slice<Ast *> const &return_results) {
 
 void lb_build_if_stmt(lbProcedure *p, Ast *node) {
 	ast_node(is, IfStmt, node);
-	lb_open_scope(p, node->scope); // Scope #1
+	lb_open_scope(p, is->scope); // Scope #1
 	defer (lb_close_scope(p, lbDeferExit_Default, nullptr));
 
 	if (is->init != nullptr) {
@@ -1644,13 +1652,16 @@ void lb_build_if_stmt(lbProcedure *p, Ast *node) {
 	}
 
 	lbValue cond = lb_build_cond(p, is->cond, then, else_);
+	// Note `cond.value` only set for non-and/or conditions and const negs so that the `LLVMIsConstant()`
+	// and `LLVMConstIntGetZExtValue()` calls below will be valid and `LLVMInstructionEraseFromParent()`
+	// will target the correct (& only) branch statement
 
 	if (is->label != nullptr) {
 		lbTargetList *tl = lb_push_target_list(p, is->label, done, nullptr, nullptr);
 		tl->is_block = true;
 	}
 
-	if (LLVMIsConstant(cond.value)) {
+	if (cond.value && LLVMIsConstant(cond.value)) {
 		// NOTE(bill): Do a compile time short circuit for when the condition is constantly known.
 		// This done manually rather than relying on the SSA passes because sometimes the SSA passes
 		// miss some even if they are constantly known, especially with few optimization passes.
@@ -1674,7 +1685,7 @@ void lb_build_if_stmt(lbProcedure *p, Ast *node) {
 				lb_emit_jump(p, else_);
 				lb_start_block(p, else_);
 
-				lb_open_scope(p, is->else_stmt->scope);
+				lb_open_scope(p, scope_of_node(is->else_stmt));
 				lb_build_stmt(p, is->else_stmt);
 				lb_close_scope(p, lbDeferExit_Default, nullptr);
 			}
@@ -1691,7 +1702,7 @@ void lb_build_if_stmt(lbProcedure *p, Ast *node) {
 		if (is->else_stmt != nullptr) {
 			lb_start_block(p, else_);
 
-			lb_open_scope(p, is->else_stmt->scope);
+			lb_open_scope(p, scope_of_node(is->else_stmt));
 			lb_build_stmt(p, is->else_stmt);
 			lb_close_scope(p, lbDeferExit_Default, nullptr);
 
@@ -1709,7 +1720,7 @@ void lb_build_if_stmt(lbProcedure *p, Ast *node) {
 void lb_build_for_stmt(lbProcedure *p, Ast *node) {
 	ast_node(fs, ForStmt, node);
 
-	lb_open_scope(p, node->scope); // Open Scope here
+	lb_open_scope(p, fs->scope); // Open Scope here
 
 	if (fs->init != nullptr) {
 	#if 1
@@ -1758,6 +1769,8 @@ void lb_build_for_stmt(lbProcedure *p, Ast *node) {
 }
 
 void lb_build_assign_stmt_array(lbProcedure *p, TokenKind op, lbAddr const &lhs, lbValue const &value) {
+	GB_ASSERT(op != Token_Eq);
+
 	Type *lhs_type = lb_addr_type(lhs);
 	Type *array_type = base_type(lhs_type);
 	GB_ASSERT(is_type_array_like(array_type));
@@ -1787,7 +1800,6 @@ void lb_build_assign_stmt_array(lbProcedure *p, TokenKind op, lbAddr const &lhs,
 			}
 			indices[index_count++] = index;
 		}
-		gb_sort_array(indices, index_count, gb_i32_cmp(0));
 
 		lbValue lhs_ptrs[4] = {};
 		lbValue x_loads[4]  = {};
@@ -1832,7 +1844,6 @@ void lb_build_assign_stmt_array(lbProcedure *p, TokenKind op, lbAddr const &lhs,
 			}
 			indices[index_count++] = index;
 		}
-		gb_sort_array(indices.data, index_count, gb_i32_cmp(0));
 
 		lbValue lhs_ptrs[4] = {};
 		lbValue x_loads[4]  = {};
@@ -1860,11 +1871,7 @@ void lb_build_assign_stmt_array(lbProcedure *p, TokenKind op, lbAddr const &lhs,
 
 
 	lbValue x = lb_addr_get_ptr(p, lhs);
-
-
 	if (inline_array_arith) {
-	#if 1
-		#if 1
 		unsigned n = cast(unsigned)count;
 
 		auto lhs_ptrs = slice_make<lbValue>(temporary_allocator(), n);
@@ -1888,50 +1895,6 @@ void lb_build_assign_stmt_array(lbProcedure *p, TokenKind op, lbAddr const &lhs,
 		for (unsigned i = 0; i < n; i++) {
 			lb_emit_store(p, lhs_ptrs[i], ops[i]);
 		}
-
-		#else
-		lbValue y = lb_address_from_load_or_generate_local(p, rhs);
-
-		unsigned n = cast(unsigned)count;
-
-		auto lhs_ptrs = slice_make<lbValue>(temporary_allocator(), n);
-		auto rhs_ptrs = slice_make<lbValue>(temporary_allocator(), n);
-		auto x_loads  = slice_make<lbValue>(temporary_allocator(), n);
-		auto y_loads  = slice_make<lbValue>(temporary_allocator(), n);
-		auto ops      = slice_make<lbValue>(temporary_allocator(), n);
-
-		for (unsigned i = 0; i < n; i++) {
-			lhs_ptrs[i] = lb_emit_array_epi(p, x, i);
-		}
-		for (unsigned i = 0; i < n; i++) {
-			rhs_ptrs[i] = lb_emit_array_epi(p, y, i);
-		}
-		for (unsigned i = 0; i < n; i++) {
-			x_loads[i] = lb_emit_load(p, lhs_ptrs[i]);
-		}
-		for (unsigned i = 0; i < n; i++) {
-			y_loads[i] = lb_emit_load(p, rhs_ptrs[i]);
-		}
-		for (unsigned i = 0; i < n; i++) {
-			ops[i] = lb_emit_arith(p, op, x_loads[i], y_loads[i], elem_type);
-		}
-		for (unsigned i = 0; i < n; i++) {
-			lb_emit_store(p, lhs_ptrs[i], ops[i]);
-		}
-		#endif
-	#else
-		lbValue y = lb_address_from_load_or_generate_local(p, rhs);
-
-		for (i64 i = 0; i < count; i++) {
-			lbValue a_ptr = lb_emit_array_epi(p, x, i);
-			lbValue b_ptr = lb_emit_array_epi(p, y, i);
-
-			lbValue a = lb_emit_load(p, a_ptr);
-			lbValue b = lb_emit_load(p, b_ptr);
-			lbValue c = lb_emit_arith(p, op, a, b, elem_type);
-			lb_emit_store(p, a_ptr, c);
-		}
-	#endif
 	} else {
 		lbValue y = lb_address_from_load_or_generate_local(p, rhs);
 
@@ -2031,6 +1994,13 @@ void lb_build_stmt(lbProcedure *p, Ast *node) {
 			out |= StateFlag_no_bounds_check;
 			out &= ~StateFlag_bounds_check;
 		}
+		if (in & StateFlag_no_type_assert) {
+			out |= StateFlag_no_type_assert;
+			out &= ~StateFlag_type_assert;
+		} else if (in & StateFlag_type_assert) {
+			out |= StateFlag_type_assert;
+			out &= ~StateFlag_no_type_assert;
+		}
 
 		p->state_flags = out;
 	}
@@ -2055,7 +2025,7 @@ void lb_build_stmt(lbProcedure *p, Ast *node) {
 			tl->is_block = true;
 		}
 
-		lb_open_scope(p, node->scope);
+		lb_open_scope(p, bs->scope);
 		lb_build_stmt_list(p, bs->stmts);
 		lb_close_scope(p, lbDeferExit_Default, nullptr);
 
@@ -2136,15 +2106,15 @@ void lb_build_stmt(lbProcedure *p, Ast *node) {
 	case_end;
 
 	case_ast_node(rs, RangeStmt, node);
-		lb_build_range_stmt(p, rs, node->scope);
+		lb_build_range_stmt(p, rs, rs->scope);
 	case_end;
 
 	case_ast_node(rs, UnrollRangeStmt, node);
-		lb_build_unroll_range_stmt(p, rs, node->scope);
+		lb_build_unroll_range_stmt(p, rs, rs->scope);
 	case_end;
 
 	case_ast_node(ss, SwitchStmt, node);
-		lb_build_switch_stmt(p, ss, node->scope);
+		lb_build_switch_stmt(p, ss, ss->scope);
 	case_end;
 
 	case_ast_node(ss, TypeSwitchStmt, node);
@@ -2180,6 +2150,7 @@ void lb_build_stmt(lbProcedure *p, Ast *node) {
 			lb_emit_defer_stmts(p, lbDeferExit_Branch, block);
 		}
 		lb_emit_jump(p, block);
+		lb_start_block(p, lb_create_block(p, "unreachable"));
 	case_end;
 	}
 }
@@ -2211,10 +2182,6 @@ void lb_build_defer_stmt(lbProcedure *p, lbDefer const &d) {
 	lb_start_block(p, b);
 	if (d.kind == lbDefer_Node) {
 		lb_build_stmt(p, d.stmt);
-	} else if (d.kind == lbDefer_Instr) {
-		// NOTE(bill): Need to make a new copy
-		LLVMValueRef instr = LLVMInstructionClone(d.instr.value);
-		LLVMInsertIntoBuilder(p->builder, instr);
 	} else if (d.kind == lbDefer_Proc) {
 		lb_emit_call(p, d.proc.deferred, d.proc.result_as_args);
 	}

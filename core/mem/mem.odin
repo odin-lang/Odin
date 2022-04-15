@@ -3,6 +3,12 @@ package mem
 import "core:runtime"
 import "core:intrinsics"
 
+Byte     :: 1
+Kilobyte :: 1024 * Byte
+Megabyte :: 1024 * Kilobyte
+Gigabyte :: 1024 * Megabyte
+Terabyte :: 1024 * Gigabyte
+
 set :: proc "contextless" (data: rawptr, value: byte, len: int) -> rawptr {
 	return runtime.memset(data, i32(value), len)
 }
@@ -16,7 +22,7 @@ zero_explicit :: proc "contextless" (data: rawptr, len: int) -> rawptr {
 	// equivalent semantics to those provided by the C11 Annex K 3.7.4.1
 	// memset_s call.
 	intrinsics.mem_zero_volatile(data, len) // Use the volatile mem_zero
-	intrinsics.atomic_fence() // Prevent reordering
+	intrinsics.atomic_thread_fence(.Seq_Cst) // Prevent reordering
 	return data
 }
 zero_item :: proc "contextless" (item: $P/^$T) {
@@ -191,11 +197,6 @@ any_to_bytes :: proc "contextless" (val: any) -> []byte {
 	return transmute([]byte)Raw_Slice{val.data, size}
 }
 
-
-kilobytes :: proc "contextless" (x: int) -> int { return          (x) * 1024 }
-megabytes :: proc "contextless" (x: int) -> int { return kilobytes(x) * 1024 }
-gigabytes :: proc "contextless" (x: int) -> int { return megabytes(x) * 1024 }
-terabytes :: proc "contextless" (x: int) -> int { return gigabytes(x) * 1024 }
 
 is_power_of_two :: proc "contextless" (x: uintptr) -> bool {
 	if x <= 0 {

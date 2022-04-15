@@ -20,13 +20,6 @@ windows_trap_type_assertion :: proc "contextless" () -> ! {
 }
 
 when ODIN_NO_CRT {
-	@(private, export, link_name="_tls_index")
-	_tls_index: u32
-
-	@(private, export, link_name="_fltused")
-	_fltused: i32 = 0x9875
-	
-	@(private, export, link_name="__chkstk")
-	__chkstk :: proc "c" (rawptr) {
-	}
+	@(require)
+	foreign import crt_lib "procs_windows_amd64.asm"
 }

@@ -7,14 +7,14 @@ import os.path
 import math
 
 file_and_urls = [
-    ("vk_platform.h",  'https://raw.githubusercontent.com/KhronosGroup/Vulkan-Headers/master/include/vulkan/vk_platform.h',  True),
-    ("vulkan_core.h",  'https://raw.githubusercontent.com/KhronosGroup/Vulkan-Headers/master/include/vulkan/vulkan_core.h',  False),
-    ("vk_layer.h",     'https://raw.githubusercontent.com/KhronosGroup/Vulkan-Headers/master/include/vulkan/vk_layer.h',     True),
-    ("vk_icd.h",       'https://raw.githubusercontent.com/KhronosGroup/Vulkan-Headers/master/include/vulkan/vk_icd.h',       True),
-    ("vulkan_win32.h", 'https://raw.githubusercontent.com/KhronosGroup/Vulkan-Headers/master/include/vulkan/vulkan_win32.h', False),
-    ("vulkan_metal.h", 'https://raw.githubusercontent.com/KhronosGroup/Vulkan-Headers/master/include/vulkan/vulkan_metal.h', False),
-    ("vulkan_macos.h", 'https://raw.githubusercontent.com/KhronosGroup/Vulkan-Headers/master/include/vulkan/vulkan_macos.h', False),
-    ("vulkan_ios.h",   'https://raw.githubusercontent.com/KhronosGroup/Vulkan-Headers/master/include/vulkan/vulkan_ios.h',   False),
+    ("vk_platform.h",  'https://raw.githubusercontent.com/KhronosGroup/Vulkan-Headers/main/include/vulkan/vk_platform.h',  True),
+    ("vulkan_core.h",  'https://raw.githubusercontent.com/KhronosGroup/Vulkan-Headers/main/include/vulkan/vulkan_core.h',  False),
+    ("vk_layer.h",     'https://raw.githubusercontent.com/KhronosGroup/Vulkan-Headers/main/include/vulkan/vk_layer.h',     True),
+    ("vk_icd.h",       'https://raw.githubusercontent.com/KhronosGroup/Vulkan-Headers/main/include/vulkan/vk_icd.h',       True),
+    ("vulkan_win32.h", 'https://raw.githubusercontent.com/KhronosGroup/Vulkan-Headers/main/include/vulkan/vulkan_win32.h', False),
+    ("vulkan_metal.h", 'https://raw.githubusercontent.com/KhronosGroup/Vulkan-Headers/main/include/vulkan/vulkan_metal.h', False),
+    ("vulkan_macos.h", 'https://raw.githubusercontent.com/KhronosGroup/Vulkan-Headers/main/include/vulkan/vulkan_macos.h', False),
+    ("vulkan_ios.h",   'https://raw.githubusercontent.com/KhronosGroup/Vulkan-Headers/main/include/vulkan/vulkan_ios.h',   False),
 ]
 
 for file, url, _ in file_and_urls:
@@ -125,7 +125,7 @@ def to_snake_case(name):
     s1 = re.sub('(.)([A-Z][a-z]+)', r'\1_\2', name)
     return re.sub('([a-z0-9])([A-Z])', r'\1_\2', s1).lower()
 
-ext_suffixes = ["KHR", "EXT", "AMD", "NV", "NVX", "GOOGLE"]
+ext_suffixes = ["KHR", "EXT", "AMD", "NV", "NVX", "GOOGLE", "KHX"]
 ext_suffixes_title = [ext.title() for ext in ext_suffixes]
 
 
@@ -254,9 +254,19 @@ def parse_constants(f):
         f.write("{}{} :: {}\n".format(name, "".rjust(max_len-len(name)), value))
 
     f.write("\n// Vendor Constants\n")
-    data = re.findall(r"#define VK_((?:"+'|'.join(ext_suffixes)+r")\w+)\s*(.*?)\n", src, re.S)
+    fixes = '|'.join(ext_suffixes)
+    inner = r"((?:(?:" + fixes + r")\w+)|(?:\w+" + fixes + r"))"
+    pattern = r"#define\s+VK_" + inner + r"\s*(.*?)\n"
+    data = re.findall(pattern, src, re.S)
+
+    number_suffix_re = re.compile(r"(\d+)[UuLlFf]")
+
     max_len = max(len(name) for name, value in data)
     for name, value in data:
+        value = remove_prefix(value, 'VK_')
+        v = number_suffix_re.findall(value)
+        if v:
+            value = v[0]
         f.write("{}{} :: {}\n".format(name, "".rjust(max_len-len(name)), value))
     f.write("\n")
 
@@ -444,7 +454,7 @@ procedure_map = {}
 def parse_procedures(f):
     data = re.findall(r"typedef (\w+\*?) \(\w+ \*(\w+)\)\((.+?)\);", src, re.S)
 
-    ff = []
+    group_ff = {"Loader":[], "Misc":[], "Instance":[], "Device":[]}
 
     for rt, name, fields in data:
         proc_name = no_vk(name)
@@ -464,18 +474,32 @@ def parse_procedures(f):
             ts += " -> {}".format(rt_str)
 
         procedure_map[proc_name] = ts
-        ff.append( (proc_name, ts) )
 
-    max_len = max(len(n) for n, t in ff)
+        fields_types_name = [do_type(t) for t in re.findall(r"(?:\s*|)(.+?)\s*\w+(?:,|$)", fields)]
+        table_name = fields_types_name[0]
+        nn = (proc_name, ts)
+        if table_name in ('Device', 'Queue', 'CommandBuffer') and proc_name != 'GetDeviceProcAddr':
+            group_ff["Device"].append(nn)
+        elif table_name in ('Instance', 'PhysicalDevice') or proc_name == 'GetDeviceProcAddr':
+            group_ff["Instance"].append(nn)
+        elif table_name in ('rawptr', '', 'DebugReportFlagsEXT') or proc_name == 'GetInstanceProcAddr':
+            group_ff["Misc"].append(nn)
+        else:
+            group_ff["Loader"].append(nn)
+
 
     f.write("import \"core:c\"\n\n")
-    f.write("// Procedure Types\n\n");
-    for n, t in ff:
-        f.write("{} :: #type {}\n".format(n.ljust(max_len), t.replace('"c"', '"system"')))
+    for group_name, ff in group_ff.items():
+        ff.sort()
+        f.write("// {} Procedure Types\n".format(group_name))
+        max_len = max(len(n) for n, t in ff)
+        for n, t in ff:
+            f.write("{} :: #type {}\n".format(n.ljust(max_len), t.replace('"c"', '"system"')))
+        f.write("\n")
 
 def group_functions(f):
     data = re.findall(r"typedef (\w+\*?) \(\w+ \*(\w+)\)\((.+?)\);", src, re.S)
-    group_map = {"Instance":[], "Device":[], "Loader":[]}
+    group_map = {"Loader":[], "Instance":[], "Device":[]}
 
     for rt, vkname, fields in data:
         fields_types_name = [do_type(t) for t in re.findall(r"(?:\s*|)(.+?)\s*\w+(?:,|$)", fields)]
@@ -493,6 +517,8 @@ def group_functions(f):
             pass
         else:
             group_map["Loader"].append(nn)
+    for _, group in group_map.items():
+        group.sort()
 
     for group_name, group_lines in group_map.items():
         f.write("// {} Procedures\n".format(group_name))
@@ -502,7 +528,7 @@ def group_functions(f):
             f.write('{}: {}\n'.format(remove_prefix(name, "Proc"), name.rjust(max_len)))
         f.write("\n")
 
-    f.write("load_proc_addresses :: proc(set_proc_address: SetProcAddressType) {\n")
+    f.write("load_proc_addresses_custom :: proc(set_proc_address: SetProcAddressType) {\n")
     for group_name, group_lines in group_map.items():
         f.write("\t// {} Procedures\n".format(group_name))
         max_len = max(len(name) for name, _ in group_lines)
@@ -514,7 +540,77 @@ def group_functions(f):
                 remove_prefix(vk_name, 'Proc'),
             ))
         f.write("\n")
-    f.write("}\n")
+    f.write("}\n\n")
+
+    f.write("// Device Procedure VTable\n")
+    f.write("Device_VTable :: struct {\n")
+    max_len = max(len(name) for name, _ in group_map["Device"])
+    for name, vk_name in group_map["Device"]:
+        f.write('\t{}: {},\n'.format(remove_prefix(name, "Proc"), name.rjust(max_len)))
+    f.write("}\n\n")
+
+    f.write("load_proc_addresses_device_vtable :: proc(device: Device, vtable: ^Device_VTable) {\n")
+    for name, vk_name in group_map["Device"]:
+        k = max_len - len(name)
+        f.write('\tvtable.{}{} = auto_cast GetDeviceProcAddr(device, "vk{}")\n'.format(
+            remove_prefix(name, 'Proc'),
+            "".ljust(k),
+            remove_prefix(vk_name, 'Proc'),
+        ))
+    f.write("}\n\n")
+
+    f.write("load_proc_addresses_device :: proc(device: Device) {\n")
+    max_len = max(len(name) for name, _ in group_map["Device"])
+    for name, vk_name in group_map["Device"]:
+        k = max_len - len(name)
+        f.write('\t{}{} = auto_cast GetDeviceProcAddr(device, "vk{}")\n'.format(
+            remove_prefix(name, 'Proc'),
+            "".ljust(k),
+            remove_prefix(vk_name, 'Proc'),
+        ))
+    f.write("}\n\n")
+
+    f.write("load_proc_addresses_instance :: proc(instance: Instance) {\n")
+    max_len = max(len(name) for name, _ in group_map["Instance"])
+    for name, vk_name in group_map["Instance"]:
+        k = max_len - len(name)
+        f.write('\t{}{} = auto_cast GetInstanceProcAddr(instance, "vk{}")\n'.format(
+            remove_prefix(name, 'Proc'),
+            "".ljust(k),
+            remove_prefix(vk_name, 'Proc'),
+        ))
+    f.write("\n\t// Device Procedures (may call into dispatch)\n")
+    max_len = max(len(name) for name, _ in group_map["Device"])
+    for name, vk_name in group_map["Device"]:
+        k = max_len - len(name)
+        f.write('\t{}{} = auto_cast GetInstanceProcAddr(instance, "vk{}")\n'.format(
+            remove_prefix(name, 'Proc'),
+            "".ljust(k),
+            remove_prefix(vk_name, 'Proc'),
+        ))
+    f.write("}\n\n")
+
+    f.write("load_proc_addresses_global :: proc(vk_get_instance_proc_addr: rawptr) {\n")
+    f.write("\tGetInstanceProcAddr = auto_cast vk_get_instance_proc_addr\n\n")
+    max_len = max(len(name) for name, _ in group_map["Loader"])
+    for name, vk_name in group_map["Loader"]:
+        k = max_len - len(name)
+        f.write('\t{}{} = auto_cast GetInstanceProcAddr(nil, "vk{}")\n'.format(
+            remove_prefix(name, 'Proc'),
+            "".ljust(k),
+            remove_prefix(vk_name, 'Proc'),
+        ))
+    f.write("}\n\n")
+
+    f.write("""
+load_proc_addresses :: proc{
+\tload_proc_addresses_global,
+\tload_proc_addresses_instance,
+\tload_proc_addresses_device,
+\tload_proc_addresses_device_vtable,
+\tload_proc_addresses_custom,
+}\n
+"""[1::])
 
 
 
@@ -566,32 +662,29 @@ MAX_MEMORY_TYPES              :: 32
 MAX_MEMORY_HEAPS              :: 16
 MAX_EXTENSION_NAME_SIZE       :: 256
 MAX_DESCRIPTION_SIZE          :: 256
-MAX_DEVICE_GROUP_SIZE_KHX     :: 32
 MAX_DEVICE_GROUP_SIZE         :: 32
 LUID_SIZE_KHX                 :: 8
-LUID_SIZE_KHR                 :: 8
 LUID_SIZE                     :: 8
-MAX_DRIVER_NAME_SIZE_KHR      :: 256
-MAX_DRIVER_INFO_SIZE_KHR      :: 256
-MAX_QUEUE_FAMILY_EXTERNAL     :: ~u32(0)-1
+MAX_QUEUE_FAMILY_EXTERNAL     :: ~u32(1)
 MAX_GLOBAL_PRIORITY_SIZE_EXT  :: 16
+QUEUE_FAMILY_EXTERNAL         :: MAX_QUEUE_FAMILY_EXTERNAL
 
 """[1::])
     parse_constants(f)
     parse_handles_def(f)
     f.write("\n\n")
     parse_flags_def(f)
-    with open("../enums.odin", 'w', encoding='utf-8') as f:
-        f.write(BASE)
-        f.write("\n")
-        parse_enums(f)
-        f.write("\n\n")
-    with open("../structs.odin", 'w', encoding='utf-8') as f:
-        f.write(BASE)
-        f.write("""
+with open("../enums.odin", 'w', encoding='utf-8') as f:
+    f.write(BASE)
+    f.write("\n")
+    parse_enums(f)
+    f.write("\n\n")
+with open("../structs.odin", 'w', encoding='utf-8') as f:
+    f.write(BASE)
+    f.write("""
 import "core:c"
 
-when ODIN_OS == "windows" {
+when ODIN_OS == .Windows {
 \timport win32 "core:sys/windows"
 
 \tHINSTANCE           :: win32.HINSTANCE
@@ -622,13 +715,12 @@ CAMetalLayer :: struct {}
 
 /********************************/
 """)
-        f.write("\n")
-        parse_structs(f)
-        f.write("\n\n")
-    with open("../procedures.odin", 'w', encoding='utf-8') as f:
-        f.write(BASE)
-        f.write("\n")
-        parse_procedures(f)
-        f.write("\n")
-        group_functions(f)
-        f.write("\n\n")
+    f.write("\n")
+    parse_structs(f)
+    f.write("\n\n")
+with open("../procedures.odin", 'w', encoding='utf-8') as f:
+    f.write(BASE)
+    f.write("\n")
+    parse_procedures(f)
+    f.write("\n")
+    group_functions(f)

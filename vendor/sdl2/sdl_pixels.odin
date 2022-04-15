@@ -2,10 +2,11 @@ package sdl2
 
 import "core:c"
 
-when ODIN_OS == "windows" { foreign import lib "SDL2.lib"    }
-when ODIN_OS == "linux"   { foreign import lib "system:SDL2" }
-when ODIN_OS == "darwin"  { foreign import lib "system:SDL2" }
-when ODIN_OS == "freebsd" { foreign import lib "system:SDL2" }
+when ODIN_OS == .Windows {
+	foreign import lib "SDL2.lib"
+} else {
+	foreign import lib "system:SDL2"
+}
 
 ALPHA_OPAQUE      :: 255
 ALPHA_TRANSPARENT ::   0
@@ -156,10 +157,10 @@ PixelFormatEnum :: enum u32 {
 	ARGB2101010 = 1<<28 | PIXELTYPE_PACKED32<<24 | PACKEDORDER_ARGB<<20 | PACKEDLAYOUT_2101010<<16 | 32<<8 | 4<<0,
 
 	/* Aliases for RGBA byte arrays of color data, for the current platform */
-	RGBA32 = RGBA8888 when ODIN_ENDIAN == "big" else ABGR8888,
-	ARGB32 = ARGB8888 when ODIN_ENDIAN == "big" else BGRA8888,
-	BGRA32 = BGRA8888 when ODIN_ENDIAN == "big" else ARGB8888,
-	ABGR32 = ABGR8888 when ODIN_ENDIAN == "big" else RGBA8888,
+	RGBA32 = RGBA8888 when ODIN_ENDIAN == .Big else ABGR8888,
+	ARGB32 = ARGB8888 when ODIN_ENDIAN == .Big else BGRA8888,
+	BGRA32 = BGRA8888 when ODIN_ENDIAN == .Big else ARGB8888,
+	ABGR32 = ABGR8888 when ODIN_ENDIAN == .Big else RGBA8888,
 
 	YV12 =      /**< Planar mode: Y + V + U  (3 planes) */
 		'Y'<<24 | 'V'<<16 | '1'<<8 | '2'<<0,

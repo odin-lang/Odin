@@ -32,7 +32,7 @@ nil_allocator :: proc() -> Allocator {
 
 
 
-when ODIN_OS == "freestanding" {
+when ODIN_OS == .Freestanding {
 	default_allocator_proc :: nil_allocator_proc
 	default_allocator :: nil_allocator
 } 

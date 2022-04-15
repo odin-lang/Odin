@@ -334,11 +334,11 @@ is_relative_slice :: proc(info: ^Type_Info) -> bool {
 
 
 
-write_typeid_builder :: proc(buf: ^strings.Builder, id: typeid) {
-	write_type(buf, type_info_of(id))
+write_typeid_builder :: proc(buf: ^strings.Builder, id: typeid, n_written: ^int = nil) -> (n: int, err: io.Error) {
+	return write_type_writer(strings.to_writer(buf), type_info_of(id))
 }
-write_typeid_writer :: proc(writer: io.Writer, id: typeid) {
-	write_type(writer, type_info_of(id))
+write_typeid_writer :: proc(writer: io.Writer, id: typeid, n_written: ^int = nil) -> (n: int, err: io.Error) {
+	return write_type_writer(writer, type_info_of(id), n_written)
 }
 
 write_typeid :: proc{
@@ -472,6 +472,9 @@ write_type_writer :: proc(w: io.Writer, ti: ^Type_Info, n_written: ^int = nil) -
 		write_type(w, info.elem,             &n) or_return
 
 	case Type_Info_Enumerated_Array:
+		if info.is_sparse {
+			io.write_string(w, "#sparse", &n) or_return
+		}
 		io.write_string(w, "[",   &n) or_return
 		write_type(w, info.index, &n) or_return
 		io.write_string(w, "]",   &n) or_return

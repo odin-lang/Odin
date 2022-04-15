@@ -1,14 +1,14 @@
-#if defined(GB_SYSTEM_FREEBSD)
+#if defined(GB_SYSTEM_FREEBSD) || defined(GB_SYSTEM_OPENBSD)
 #include <sys/types.h>
 #include <sys/sysctl.h>
 #endif
 
 
 // #if defined(GB_SYSTEM_WINDOWS)
-#define DEFAULT_TO_THREADED_CHECKER
+// #define DEFAULT_TO_THREADED_CHECKER
 // #endif
 
-enum TargetOsKind {
+enum TargetOsKind : u16 {
 	TargetOs_Invalid,
 
 	TargetOs_windows,
@@ -16,6 +16,7 @@ enum TargetOsKind {
 	TargetOs_linux,
 	TargetOs_essence,
 	TargetOs_freebsd,
+	TargetOs_openbsd,
 	
 	TargetOs_wasi,
 	TargetOs_js,
@@ -25,11 +26,11 @@ enum TargetOsKind {
 	TargetOs_COUNT,
 };
 
-enum TargetArchKind {
+enum TargetArchKind : u16 {
 	TargetArch_Invalid,
 
 	TargetArch_amd64,
-	TargetArch_386,
+	TargetArch_i386,
 	TargetArch_arm64,
 	TargetArch_wasm32,
 	TargetArch_wasm64,
@@ -37,7 +38,7 @@ enum TargetArchKind {
 	TargetArch_COUNT,
 };
 
-enum TargetEndianKind {
+enum TargetEndianKind : u8 {
 	TargetEndian_Invalid,
 
 	TargetEndian_Little,
@@ -46,6 +47,16 @@ enum TargetEndianKind {
 	TargetEndian_COUNT,
 };
 
+enum TargetABIKind : u16 {
+	TargetABI_Default,
+
+	TargetABI_Win64,
+	TargetABI_SysV,
+
+	TargetABI_COUNT,
+};
+
+
 String target_os_names[TargetOs_COUNT] = {
 	str_lit(""),
 	str_lit("windows"),
@@ -53,6 +64,7 @@ String target_os_names[TargetOs_COUNT] = {
 	str_lit("linux"),
 	str_lit("essence"),
 	str_lit("freebsd"),
+	str_lit("openbsd"),
 	
 	str_lit("wasi"),
 	str_lit("js"),
@@ -63,7 +75,7 @@ String target_os_names[TargetOs_COUNT] = {
 String target_arch_names[TargetArch_COUNT] = {
 	str_lit(""),
 	str_lit("amd64"),
-	str_lit("386"),
+	str_lit("i386"),
 	str_lit("arm64"),
 	str_lit("wasm32"),
 	str_lit("wasm64"),
@@ -73,6 +85,12 @@ String target_endian_names[TargetEndian_COUNT] = {
 	str_lit(""),
 	str_lit("little"),
 	str_lit("big"),
+};
+
+String target_abi_names[TargetABI_COUNT] = {
+	str_lit(""),
+	str_lit("win64"),
+	str_lit("sysv"),
 };
 
 TargetEndianKind target_endians[TargetArch_COUNT] = {
@@ -98,6 +116,7 @@ struct TargetMetrics {
 	isize          max_align;
 	String         target_triplet;
 	String         target_data_layout;
+	TargetABIKind  abi;
 };
 
 
@@ -119,6 +138,8 @@ enum BuildModeKind {
 	BuildMode_Object,
 	BuildMode_Assembly,
 	BuildMode_LLVM_IR,
+
+	BuildMode_COUNT,
 };
 
 enum CommandKind : u32 {
@@ -163,19 +184,34 @@ enum TimingsExportFormat : i32 {
 	TimingsExportCSV         = 2,
 };
 
+enum ErrorPosStyle {
+	ErrorPosStyle_Default, // path(line:column) msg
+	ErrorPosStyle_Unix,    // path:line:column: msg
+
+	ErrorPosStyle_COUNT
+};
+
+enum RelocMode : u8 {
+	RelocMode_Default,
+	RelocMode_Static,
+	RelocMode_PIC,
+	RelocMode_DynamicNoPIC,
+};
+
 // This stores the information for the specify architecture of this build
 struct BuildContext {
 	// Constants
 	String ODIN_OS;      // target operating system
 	String ODIN_ARCH;    // target architecture
-	String ODIN_ENDIAN;  // target endian
 	String ODIN_VENDOR;  // compiler vendor
 	String ODIN_VERSION; // compiler version
 	String ODIN_ROOT;    // Odin ROOT
-	String ODIN_BUILD_MODE;
 	bool   ODIN_DEBUG;   // Odin in debug mode
 	bool   ODIN_DISABLE_ASSERT; // Whether the default 'assert' et al is disabled in code or not
 	bool   ODIN_DEFAULT_TO_NIL_ALLOCATOR; // Whether the default allocator is a "nil" allocator or not (i.e. it does nothing)
+	bool   ODIN_FOREIGN_ERROR_PROCEDURES;
+
+	ErrorPosStyle ODIN_ERROR_POS_STYLE;
 
 	TargetEndianKind endian_kind;
 
@@ -196,7 +232,9 @@ struct BuildContext {
 	bool   has_resource;
 	String link_flags;
 	String extra_linker_flags;
+	String extra_assembler_flags;
 	String microarch;
+	String target_features;
 	BuildModeKind build_mode;
 	bool   generate_docs;
 	i32    optimization_level;
@@ -242,6 +280,12 @@ struct BuildContext {
 	
 	bool copy_file_contents;
 
+	bool disallow_rtti;
+
+	RelocMode reloc_mode;
+	bool disable_red_zone;
+
+
 	u32 cmd_doc_flags;
 	Array<String> extra_packages;
 
@@ -253,6 +297,7 @@ struct BuildContext {
 	isize      thread_count;
 
 	PtrMap<char const *, ExactValue> defined_values;
+
 };
 
 
@@ -267,9 +312,9 @@ bool global_ignore_warnings(void) {
 }
 
 
-gb_global TargetMetrics target_windows_386 = {
+gb_global TargetMetrics target_windows_i386 = {
 	TargetOs_windows,
-	TargetArch_386,
+	TargetArch_i386,
 	4,
 	8,
 	str_lit("i386-pc-windows-msvc"),
@@ -283,9 +328,9 @@ gb_global TargetMetrics target_windows_amd64 = {
 	str_lit("e-m:w-i64:64-f80:128-n8:16:32:64-S128"),
 };
 
-gb_global TargetMetrics target_linux_386 = {
+gb_global TargetMetrics target_linux_i386 = {
 	TargetOs_linux,
-	TargetArch_386,
+	TargetArch_i386,
 	4,
 	8,
 	str_lit("i386-pc-linux-gnu"),
@@ -298,6 +343,14 @@ gb_global TargetMetrics target_linux_amd64 = {
 	16,
 	str_lit("x86_64-pc-linux-gnu"),
 	str_lit("e-m:w-i64:64-f80:128-n8:16:32:64-S128"),
+};
+gb_global TargetMetrics target_linux_arm64 = {
+	TargetOs_linux,
+	TargetArch_arm64,
+	8,
+	16,
+	str_lit("aarch64-linux-elf"),
+	str_lit("e-m:e-i8:8:32-i16:32-i64:64-i128:128-n32:64-S128"),
 };
 
 gb_global TargetMetrics target_darwin_amd64 = {
@@ -318,9 +371,9 @@ gb_global TargetMetrics target_darwin_arm64 = {
 	str_lit("e-m:o-i64:64-i128:128-n32:64-S128"), // TODO(bill): Is this correct?
 };
 
-gb_global TargetMetrics target_freebsd_386 = {
+gb_global TargetMetrics target_freebsd_i386 = {
 	TargetOs_freebsd,
-	TargetArch_386,
+	TargetArch_i386,
 	4,
 	8,
 	str_lit("i386-unknown-freebsd-elf"),
@@ -333,6 +386,15 @@ gb_global TargetMetrics target_freebsd_amd64 = {
 	16,
 	str_lit("x86_64-unknown-freebsd-elf"),
 	str_lit("e-m:w-i64:64-f80:128-n8:16:32:64-S128"),
+};
+
+gb_global TargetMetrics target_openbsd_amd64 = {
+	TargetOs_openbsd,
+	TargetArch_amd64,
+	8,
+	16,
+	str_lit("x86_64-unknown-openbsd-elf"),
+	str_lit("e-m:e-p270:32:32-p271:32:32-p272:64:64-i64:64-f80:128-n8:16:32:64-S128"),
 };
 
 gb_global TargetMetrics target_essence_amd64 = {
@@ -380,6 +442,16 @@ gb_global TargetMetrics target_wasi_wasm32 = {
 // 	str_lit(""),
 // };
 
+gb_global TargetMetrics target_freestanding_amd64_sysv = {
+	TargetOs_freestanding,
+	TargetArch_amd64,
+	8,
+	16,
+	str_lit("x86_64-pc-none-gnu"),
+	str_lit("e-m:w-i64:64-f80:128-n8:16:32:64-S128"),
+	TargetABI_SysV,
+};
+
 
 
 struct NamedTargetMetrics {
@@ -391,16 +463,19 @@ gb_global NamedTargetMetrics named_targets[] = {
 	{ str_lit("darwin_amd64"),        &target_darwin_amd64   },
 	{ str_lit("darwin_arm64"),        &target_darwin_arm64   },
 	{ str_lit("essence_amd64"),       &target_essence_amd64  },
-	{ str_lit("linux_386"),           &target_linux_386      },
+	{ str_lit("linux_i386"),          &target_linux_i386     },
 	{ str_lit("linux_amd64"),         &target_linux_amd64    },
-	{ str_lit("windows_386"),         &target_windows_386    },
+	{ str_lit("linux_arm64"),         &target_linux_arm64    },
+	{ str_lit("windows_i386"),        &target_windows_i386   },
 	{ str_lit("windows_amd64"),       &target_windows_amd64  },
-	{ str_lit("freebsd_386"),         &target_freebsd_386    },
+	{ str_lit("freebsd_i386"),        &target_freebsd_i386   },
 	{ str_lit("freebsd_amd64"),       &target_freebsd_amd64  },
+	{ str_lit("openbsd_amd64"),       &target_openbsd_amd64  },
 	{ str_lit("freestanding_wasm32"), &target_freestanding_wasm32 },
 	{ str_lit("wasi_wasm32"),         &target_wasi_wasm32 },
 	{ str_lit("js_wasm32"),           &target_js_wasm32 },
-	// { str_lit("freestanding_wasm64"), &target_freestanding_wasm64 },
+
+	{ str_lit("freestanding_amd64_sysv"), &target_freestanding_amd64_sysv },
 };
 
 NamedTargetMetrics *selected_target_metrics;
@@ -523,13 +598,34 @@ bool allow_check_foreign_filepath(void) {
 	return true;
 }
 
-
 // TODO(bill): OS dependent versions for the BuildContext
 // join_path
 // is_dir
 // is_file
 // is_abs_path
 // has_subdir
+
+enum TargetFileValidity : u8 {
+	TargetFileValidity_Invalid,
+
+	TargetFileValidity_Writable_File,
+	TargetFileValidity_No_Write_Permission,
+	TargetFileValidity_Directory,
+
+	TargetTargetFileValidity_COUNT,
+};
+
+TargetFileValidity set_output_filename(void) {
+	// Assembles the output filename from build_context information.
+	// Returns `true`  if it doesn't exist or is a file.
+	// Returns `false` if a directory or write-protected file.
+
+
+
+
+	return TargetFileValidity_Writable_File;
+}
+
 
 String const WIN32_SEPARATOR_STRING = {cast(u8 *)"\\", 1};
 String const NIX_SEPARATOR_STRING   = {cast(u8 *)"/",  1};
@@ -702,10 +798,38 @@ String internal_odin_root_dir(void) {
 		len = readlink("/proc/curproc/exe", &path_buf[0], path_buf.count);
 #elif defined(GB_SYSTEM_DRAGONFLYBSD)
 		len = readlink("/proc/curproc/file", &path_buf[0], path_buf.count);
-#else
+#elif defined(GB_SYSTEM_LINUX)
 		len = readlink("/proc/self/exe", &path_buf[0], path_buf.count);
+#elif defined(GB_SYSTEM_OPENBSD)
+		int error;
+		int mib[] = {
+			CTL_KERN,
+			KERN_PROC_ARGS,
+			getpid(),
+			KERN_PROC_ARGV,
+		};
+		// get argv size
+		error = sysctl(mib, 4, NULL, (size_t *) &len, NULL, 0);
+		if (error == -1) {
+			// sysctl error
+			return make_string(nullptr, 0);
+		}
+		// get argv
+		char **argv = (char **)gb_malloc(len);
+		error = sysctl(mib, 4, argv, (size_t *) &len, NULL, 0);
+		if (error == -1) {
+			// sysctl error
+			gb_mfree(argv);
+			return make_string(nullptr, 0);
+		}
+		// copy argv[0] to path_buf
+		len = gb_strlen(argv[0]);
+		if(len < path_buf.count) {
+			gb_memmove(&path_buf[0], argv[0], len);
+		}
+		gb_mfree(argv);
 #endif
-		if(len == 0) {
+		if(len == 0 || len == -1) {
 			return make_string(nullptr, 0);
 		}
 		if (len < path_buf.count) {
@@ -821,6 +945,34 @@ bool show_error_line(void) {
 	return build_context.show_error_line;
 }
 
+bool has_asm_extension(String const &path) {
+	String ext = path_extension(path);
+	if (ext == ".asm") {
+		return true;
+	} else if (ext == ".s") {
+		return true;
+	} else if (ext == ".S") {
+		return true;
+	}
+	return false;
+}
+
+// temporary
+char *token_pos_to_string(TokenPos const &pos) {
+	gbString s = gb_string_make_reserve(temporary_allocator(), 128);
+	String file = get_file_path_string(pos.file_id);
+	switch (build_context.ODIN_ERROR_POS_STYLE) {
+	default: /*fallthrough*/
+	case ErrorPosStyle_Default:
+		s = gb_string_append_fmt(s, "%.*s(%d:%d)", LIT(file), pos.line, pos.column);
+		break;
+	case ErrorPosStyle_Unix:
+		s = gb_string_append_fmt(s, "%.*s:%d:%d:", LIT(file), pos.line, pos.column);
+		break;
+	}
+	return s;
+}
+
 
 void init_build_context(TargetMetrics *cross_target) {
 	BuildContext *bc = &build_context;
@@ -833,25 +985,31 @@ void init_build_context(TargetMetrics *cross_target) {
 	bc->ODIN_VENDOR  = str_lit("odin");
 	bc->ODIN_VERSION = ODIN_VERSION;
 	bc->ODIN_ROOT    = odin_root_dir();
-	switch (bc->build_mode) {
-	default:
-	case BuildMode_Executable:
-		bc->ODIN_BUILD_MODE = str_lit("executable");
-		break;
-	case BuildMode_DynamicLibrary:
-		bc->ODIN_BUILD_MODE = str_lit("dynamic");
-		break;
-	case BuildMode_Object:
-		bc->ODIN_BUILD_MODE = str_lit("object");
-		break;
-	case BuildMode_Assembly:
-		bc->ODIN_BUILD_MODE = str_lit("assembly");
-		break;
-	case BuildMode_LLVM_IR:
-		bc->ODIN_BUILD_MODE = str_lit("llvm-ir");
-		break;
+
+	{
+		char const *found = gb_get_env("ODIN_ERROR_POS_STYLE", permanent_allocator());
+		if (found) {
+			ErrorPosStyle kind = ErrorPosStyle_Default;
+			String style = make_string_c(found);
+			style = string_trim_whitespace(style);
+			if (style == "" || style == "default" || style == "odin") {
+				kind = ErrorPosStyle_Default;
+			} else if (style == "unix" || style == "gcc" || style == "clang" || style == "llvm") {
+				kind = ErrorPosStyle_Unix;
+			} else {
+				gb_printf_err("Invalid ODIN_ERROR_POS_STYLE: got %.*s\n", LIT(style));
+				gb_printf_err("Valid formats:\n");
+				gb_printf_err("\t\"default\" or \"odin\"\n");
+				gb_printf_err("\t\tpath(line:column) message\n");
+				gb_printf_err("\t\"unix\"\n");
+				gb_printf_err("\t\tpath:line:column: message\n");
+				gb_exit(1);
+			}
+
+			build_context.ODIN_ERROR_POS_STYLE = kind;
+		}
 	}
-	
+
 	bc->copy_file_contents = true;
 
 	TargetMetrics *metrics = nullptr;
@@ -867,18 +1025,22 @@ void init_build_context(TargetMetrics *cross_target) {
 			#endif
 		#elif defined(GB_SYSTEM_FREEBSD)
 			metrics = &target_freebsd_amd64;
+		#elif defined(GB_SYSTEM_OPENBSD)
+			metrics = &target_openbsd_amd64;
+		#elif defined(GB_CPU_ARM)
+			metrics = &target_linux_arm64;
 		#else
 			metrics = &target_linux_amd64;
 		#endif
 	#else
 		#if defined(GB_SYSTEM_WINDOWS)
-			metrics = &target_windows_386;
+			metrics = &target_windows_i386;
 		#elif defined(GB_SYSTEM_OSX)
 			#error "Build Error: Unsupported architecture"
 		#elif defined(GB_SYSTEM_FREEBSD)
-			metrics = &target_freebsd_386;
+			metrics = &target_freebsd_i386;
 		#else
-			metrics = &target_linux_386;
+			metrics = &target_linux_i386;
 		#endif
 	#endif
 
@@ -897,7 +1059,6 @@ void init_build_context(TargetMetrics *cross_target) {
 	bc->metrics = *metrics;
 	bc->ODIN_OS     = target_os_names[metrics->os];
 	bc->ODIN_ARCH   = target_arch_names[metrics->arch];
-	bc->ODIN_ENDIAN = target_endian_names[target_endians[metrics->arch]];
 	bc->endian_kind = target_endians[metrics->arch];
 	bc->word_size   = metrics->word_size;
 	bc->max_align   = metrics->max_align;
@@ -907,6 +1068,21 @@ void init_build_context(TargetMetrics *cross_target) {
 	bc->threaded_checker = true;
 	#endif
 
+	if (bc->disable_red_zone) {
+		if (!!is_arch_wasm() && bc->metrics.os == TargetOs_freestanding) {
+			gb_printf_err("-disable-red-zone is not support for this target");
+			gb_exit(1);
+		}
+	}
+
+	if (bc->metrics.os == TargetOs_freestanding) {
+		bc->no_entry_point = true;
+	} else {
+		if (bc->disallow_rtti) {
+			gb_printf_err("-disallow-rtti is only allowed on freestanding targets\n");
+			gb_exit(1);
+		}
+	}
 
 	// NOTE(zangent): The linker flags to set the build architecture are different
 	// across OSs. It doesn't make sense to allocate extra data on the heap
@@ -924,8 +1100,11 @@ void init_build_context(TargetMetrics *cross_target) {
 		case TargetOs_freebsd:
 			bc->link_flags = str_lit("-arch x86-64 ");
 			break;
+		case TargetOs_openbsd:
+			bc->link_flags = str_lit("-arch x86-64 ");
+			break;
 		}
-	} else if (bc->metrics.arch == TargetArch_386) {
+	} else if (bc->metrics.arch == TargetArch_i386) {
 		switch (bc->metrics.os) {
 		case TargetOs_windows:
 			bc->link_flags = str_lit("/machine:x86 ");
@@ -946,6 +1125,9 @@ void init_build_context(TargetMetrics *cross_target) {
 		case TargetOs_darwin:
 			bc->link_flags = str_lit("-arch arm64 ");
 			break;
+		case TargetOs_linux:
+			bc->link_flags = str_lit("-arch aarch64 ");
+			break;
 		}
 	} else if (is_arch_wasm()) {
 		gbString link_flags = gb_string_make(heap_allocator(), " ");
@@ -955,20 +1137,22 @@ void init_build_context(TargetMetrics *cross_target) {
 		if (bc->metrics.arch == TargetArch_wasm64) {
 			link_flags = gb_string_appendc(link_flags, "-mwas64 ");
 		}
-		if (bc->metrics.os == TargetOs_freestanding) {
+		if (bc->no_entry_point) {
 			link_flags = gb_string_appendc(link_flags, "--no-entry ");
 		}
 		
 		bc->link_flags = make_string_c(link_flags);
 		
 		// Disallow on wasm
-		build_context.use_separate_modules = false;
+		bc->use_separate_modules = false;
 	} else {
 		gb_printf_err("Compiler Error: Unsupported architecture\n");
 		gb_exit(1);
 	}
 
 	bc->optimization_level = gb_clamp(bc->optimization_level, 0, 3);
+
+
 
 	#undef LINK_FLAG_X64
 	#undef LINK_FLAG_386

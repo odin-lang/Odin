@@ -101,6 +101,9 @@ foreign user32 {
 	}
 	@(link_name="GetCursorPos")     get_cursor_pos      :: proc(p: ^Point) -> Bool ---
 	@(link_name="SetCursorPos")     set_cursor_pos      :: proc(x, y: i32) -> Bool ---
+	@(link_name="GetCapure")        get_capture         :: proc(hwnd: Hwnd) -> Hwnd ---
+	@(link_name="SetCapture")       set_capture         :: proc(hwnd: Hwnd) -> Hwnd ---
+	@(link_name="ReleaseCapture")   release_capture     :: proc() -> Bool ---
 	@(link_name="ScreenToClient")   screen_to_client    :: proc(h: Hwnd, p: ^Point) -> Bool ---
 	@(link_name="ClientToScreen")   client_to_screen    :: proc(h: Hwnd, p: ^Point) -> Bool ---
 	@(link_name="PostQuitMessage")  post_quit_message   :: proc(exit_code: i32) ---
@@ -108,6 +111,8 @@ foreign user32 {
 	@(link_name="SetWindowTextW")   set_window_text_w   :: proc(hwnd: Hwnd, c_string: Wstring) -> Bool ---
 	@(link_name="RegisterClassA")   register_class_a    :: proc(wc: ^Wnd_Class_A) -> i16 ---
 	@(link_name="RegisterClassW")   register_class_w    :: proc(wc: ^Wnd_Class_W) -> i16 ---
+	@(link_name="UnregisterClassA") unregister_class_a  :: proc(class_name: cstring, instance: Hinstance) -> Bool ---
+	@(link_name="UnregisterClassW") unregister_class_w  :: proc(class_name: Wstring, instance: Hinstance) -> Bool ---
 	@(link_name="RegisterClassExA") register_class_ex_a :: proc(wc: ^Wnd_Class_Ex_A) -> i16 ---
 	@(link_name="RegisterClassExW") register_class_ex_w :: proc(wc: ^Wnd_Class_Ex_W) -> i16 ---
 

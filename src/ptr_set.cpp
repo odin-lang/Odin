@@ -24,7 +24,9 @@ template <typename T> void ptr_set_reserve(PtrSet<T> *h, isize cap);
 
 template <typename T>
 void ptr_set_init(PtrSet<T> *s, gbAllocator a, isize capacity) {
-	capacity = next_pow2_isize(gb_max(16, capacity));
+	if (capacity != 0) {
+		capacity = next_pow2_isize(gb_max(16, capacity));
+	}
 
 	slice_init(&s->hashes,  a, capacity);
 	array_init(&s->entries, a, 0, capacity);
@@ -134,6 +136,15 @@ template <typename T>
 gb_inline bool ptr_set_exists(PtrSet<T> *s, T ptr) {
 	isize index = ptr_set__find(s, ptr).entry_index;
 	return index != MAP_SENTINEL;
+}
+
+template <typename T>
+gb_inline isize ptr_entry_index(PtrSet<T> *s, T ptr) {
+	isize index = ptr_set__find(s, ptr).entry_index;
+	if (index != MAP_SENTINEL) {
+		return index;
+	}
+	return -1;
 }
 
 // Returns true if it already exists

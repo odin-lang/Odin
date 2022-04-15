@@ -20,16 +20,22 @@ import "../util"
     High level API
 */
 
+DIGEST_SIZE_128 :: 16
+DIGEST_SIZE_160 :: 20
+DIGEST_SIZE_192 :: 24
+DIGEST_SIZE_224 :: 28
+DIGEST_SIZE_256 :: 32
+
 // hash_string_128_3 will hash the given input and return the
 // computed hash
-hash_string_128_3 :: proc(data: string) -> [16]byte {
+hash_string_128_3 :: proc(data: string) -> [DIGEST_SIZE_128]byte {
     return hash_bytes_128_3(transmute([]byte)(data))
 }
 
 // hash_bytes_128_3 will hash the given input and return the
 // computed hash
-hash_bytes_128_3 :: proc(data: []byte) -> [16]byte {
-    hash: [16]byte
+hash_bytes_128_3 :: proc(data: []byte) -> [DIGEST_SIZE_128]byte {
+    hash: [DIGEST_SIZE_128]byte
     ctx: Haval_Context
     ctx.hashbitlen = 128
     ctx.rounds = 3
@@ -40,10 +46,31 @@ hash_bytes_128_3 :: proc(data: []byte) -> [16]byte {
     return hash
 }
 
+// hash_string_to_buffer_128_3 will hash the given input and assign the
+// computed hash to the second parameter.
+// It requires that the destination buffer is at least as big as the digest size
+hash_string_to_buffer_128_3 :: proc(data: string, hash: []byte) {
+    hash_bytes_to_buffer_128_3(transmute([]byte)(data), hash)
+}
+
+// hash_bytes_to_buffer_128_3 will hash the given input and write the
+// computed hash into the second parameter.
+// It requires that the destination buffer is at least as big as the digest size
+hash_bytes_to_buffer_128_3 :: proc(data, hash: []byte) {
+    assert(len(hash) >= DIGEST_SIZE_128, "Size of destination buffer is smaller than the digest size")
+    ctx: Haval_Context
+    ctx.hashbitlen = 128
+    ctx.rounds = 3
+    init(&ctx)
+    ctx.str_len = u32(len(data))
+    update(&ctx, data)
+    final(&ctx, hash)
+}
+
 // hash_stream_128_3 will read the stream in chunks and compute a
 // hash from its contents
-hash_stream_128_3 :: proc(s: io.Stream) -> ([16]byte, bool) {
-    hash: [16]byte
+hash_stream_128_3 :: proc(s: io.Stream) -> ([DIGEST_SIZE_128]byte, bool) {
+    hash: [DIGEST_SIZE_128]byte
     ctx: Haval_Context
     ctx.hashbitlen = 128
     ctx.rounds = 3
@@ -64,7 +91,7 @@ hash_stream_128_3 :: proc(s: io.Stream) -> ([16]byte, bool) {
 
 // hash_file_128_3 will read the file provided by the given handle
 // and compute a hash
-hash_file_128_3 :: proc(hd: os.Handle, load_at_once := false) -> ([16]byte, bool) {
+hash_file_128_3 :: proc(hd: os.Handle, load_at_once := false) -> ([DIGEST_SIZE_128]byte, bool) {
     if !load_at_once {
         return hash_stream_128_3(os.stream_from_handle(hd))
     } else {
@@ -72,7 +99,7 @@ hash_file_128_3 :: proc(hd: os.Handle, load_at_once := false) -> ([16]byte, bool
             return hash_bytes_128_3(buf[:]), ok
         }
     }
-    return [16]byte{}, false
+    return [DIGEST_SIZE_128]byte{}, false
 }
 
 hash_128_3 :: proc {
@@ -80,18 +107,20 @@ hash_128_3 :: proc {
     hash_file_128_3,
     hash_bytes_128_3,
     hash_string_128_3,
+    hash_bytes_to_buffer_128_3,
+    hash_string_to_buffer_128_3,
 }
 
 // hash_string_128_4 will hash the given input and return the
 // computed hash
-hash_string_128_4 :: proc(data: string) -> [16]byte {
+hash_string_128_4 :: proc(data: string) -> [DIGEST_SIZE_128]byte {
     return hash_bytes_128_4(transmute([]byte)(data))
 }
 
 // hash_bytes_128_4 will hash the given input and return the
 // computed hash
-hash_bytes_128_4 :: proc(data: []byte) -> [16]byte {
-    hash: [16]byte
+hash_bytes_128_4 :: proc(data: []byte) -> [DIGEST_SIZE_128]byte {
+    hash: [DIGEST_SIZE_128]byte
     ctx: Haval_Context
     ctx.hashbitlen = 128
     ctx.rounds = 4
@@ -102,10 +131,31 @@ hash_bytes_128_4 :: proc(data: []byte) -> [16]byte {
     return hash
 }
 
+// hash_string_to_buffer_128_4 will hash the given input and assign the
+// computed hash to the second parameter.
+// It requires that the destination buffer is at least as big as the digest size
+hash_string_to_buffer_128_4 :: proc(data: string, hash: []byte) {
+    hash_bytes_to_buffer_128_4(transmute([]byte)(data), hash)
+}
+
+// hash_bytes_to_buffer_128_4 will hash the given input and write the
+// computed hash into the second parameter.
+// It requires that the destination buffer is at least as big as the digest size
+hash_bytes_to_buffer_128_4 :: proc(data, hash: []byte) {
+    assert(len(hash) >= DIGEST_SIZE_128, "Size of destination buffer is smaller than the digest size")
+    ctx: Haval_Context
+    ctx.hashbitlen = 128
+    ctx.rounds = 4
+    init(&ctx)
+    ctx.str_len = u32(len(data))
+    update(&ctx, data)
+    final(&ctx, hash)
+}
+
 // hash_stream_128_4 will read the stream in chunks and compute a
 // hash from its contents
-hash_stream_128_4 :: proc(s: io.Stream) -> ([16]byte, bool) {
-    hash: [16]byte
+hash_stream_128_4 :: proc(s: io.Stream) -> ([DIGEST_SIZE_128]byte, bool) {
+    hash: [DIGEST_SIZE_128]byte
     ctx: Haval_Context
     ctx.hashbitlen = 128
     ctx.rounds = 4
@@ -126,7 +176,7 @@ hash_stream_128_4 :: proc(s: io.Stream) -> ([16]byte, bool) {
 
 // hash_file_128_4 will read the file provided by the given handle
 // and compute a hash
-hash_file_128_4 :: proc(hd: os.Handle, load_at_once := false) -> ([16]byte, bool) {
+hash_file_128_4 :: proc(hd: os.Handle, load_at_once := false) -> ([DIGEST_SIZE_128]byte, bool) {
     if !load_at_once {
         return hash_stream_128_4(os.stream_from_handle(hd))
     } else {
@@ -134,7 +184,7 @@ hash_file_128_4 :: proc(hd: os.Handle, load_at_once := false) -> ([16]byte, bool
             return hash_bytes_128_4(buf[:]), ok
         }
     }
-    return [16]byte{}, false
+    return [DIGEST_SIZE_128]byte{}, false
 }
 
 hash_128_4 :: proc {
@@ -142,18 +192,20 @@ hash_128_4 :: proc {
     hash_file_128_4,
     hash_bytes_128_4,
     hash_string_128_4,
+    hash_bytes_to_buffer_128_4,
+    hash_string_to_buffer_128_4,
 }
 
 // hash_string_128_5 will hash the given input and return the
 // computed hash
-hash_string_128_5 :: proc(data: string) -> [16]byte {
+hash_string_128_5 :: proc(data: string) -> [DIGEST_SIZE_128]byte {
     return hash_bytes_128_5(transmute([]byte)(data))
 }
 
 // hash_bytes_128_5 will hash the given input and return the
 // computed hash
-hash_bytes_128_5 :: proc(data: []byte) -> [16]byte {
-    hash: [16]byte
+hash_bytes_128_5 :: proc(data: []byte) -> [DIGEST_SIZE_128]byte {
+    hash: [DIGEST_SIZE_128]byte
     ctx: Haval_Context
     ctx.hashbitlen = 128
     ctx.rounds = 5
@@ -164,10 +216,31 @@ hash_bytes_128_5 :: proc(data: []byte) -> [16]byte {
     return hash
 }
 
+// hash_string_to_buffer_128_5 will hash the given input and assign the
+// computed hash to the second parameter.
+// It requires that the destination buffer is at least as big as the digest size
+hash_string_to_buffer_128_5 :: proc(data: string, hash: []byte) {
+    hash_bytes_to_buffer_128_5(transmute([]byte)(data), hash)
+}
+
+// hash_bytes_to_buffer_128_5 will hash the given input and write the
+// computed hash into the second parameter.
+// It requires that the destination buffer is at least as big as the digest size
+hash_bytes_to_buffer_128_5 :: proc(data, hash: []byte) {
+    assert(len(hash) >= DIGEST_SIZE_128, "Size of destination buffer is smaller than the digest size")
+    ctx: Haval_Context
+    ctx.hashbitlen = 128
+    ctx.rounds = 5
+    init(&ctx)
+    ctx.str_len = u32(len(data))
+    update(&ctx, data)
+    final(&ctx, hash)
+}
+
 // hash_stream_128_5 will read the stream in chunks and compute a
 // hash from its contents
-hash_stream_128_5 :: proc(s: io.Stream) -> ([16]byte, bool) {
-    hash: [16]byte
+hash_stream_128_5 :: proc(s: io.Stream) -> ([DIGEST_SIZE_128]byte, bool) {
+    hash: [DIGEST_SIZE_128]byte
     ctx: Haval_Context
     ctx.hashbitlen = 128
     ctx.rounds = 5
@@ -188,7 +261,7 @@ hash_stream_128_5 :: proc(s: io.Stream) -> ([16]byte, bool) {
 
 // hash_file_128_5 will read the file provided by the given handle
 // and compute a hash
-hash_file_128_5 :: proc(hd: os.Handle, load_at_once := false) -> ([16]byte, bool) {
+hash_file_128_5 :: proc(hd: os.Handle, load_at_once := false) -> ([DIGEST_SIZE_128]byte, bool) {
     if !load_at_once {
         return hash_stream_128_5(os.stream_from_handle(hd))
     } else {
@@ -196,7 +269,7 @@ hash_file_128_5 :: proc(hd: os.Handle, load_at_once := false) -> ([16]byte, bool
             return hash_bytes_128_5(buf[:]), ok
         }
     }
-    return [16]byte{}, false
+    return [DIGEST_SIZE_128]byte{}, false
 }
 
 hash_128_5 :: proc {
@@ -204,18 +277,20 @@ hash_128_5 :: proc {
     hash_file_128_5,
     hash_bytes_128_5,
     hash_string_128_5,
+    hash_bytes_to_buffer_128_5,
+    hash_string_to_buffer_128_5,
 }
 
 // hash_string_160_3 will hash the given input and return the
 // computed hash
-hash_string_160_3 :: proc(data: string) -> [20]byte {
+hash_string_160_3 :: proc(data: string) -> [DIGEST_SIZE_160]byte {
     return hash_bytes_160_3(transmute([]byte)(data))
 }
 
 // hash_bytes_160_3 will hash the given input and return the
 // computed hash
-hash_bytes_160_3 :: proc(data: []byte) -> [20]byte {
-    hash: [20]byte
+hash_bytes_160_3 :: proc(data: []byte) -> [DIGEST_SIZE_160]byte {
+    hash: [DIGEST_SIZE_160]byte
     ctx: Haval_Context
     ctx.hashbitlen = 160
     ctx.rounds = 3
@@ -226,10 +301,31 @@ hash_bytes_160_3 :: proc(data: []byte) -> [20]byte {
     return hash
 }
 
+// hash_string_to_buffer_160_3 will hash the given input and assign the
+// computed hash to the second parameter.
+// It requires that the destination buffer is at least as big as the digest size
+hash_string_to_buffer_160_3 :: proc(data: string, hash: []byte) {
+    hash_bytes_to_buffer_160_3(transmute([]byte)(data), hash)
+}
+
+// hash_bytes_to_buffer_160_3 will hash the given input and write the
+// computed hash into the second parameter.
+// It requires that the destination buffer is at least as big as the digest size
+hash_bytes_to_buffer_160_3 :: proc(data, hash: []byte) {
+    assert(len(hash) >= DIGEST_SIZE_160, "Size of destination buffer is smaller than the digest size")
+    ctx: Haval_Context
+    ctx.hashbitlen = 160
+    ctx.rounds = 3
+    init(&ctx)
+    ctx.str_len = u32(len(data))
+    update(&ctx, data)
+    final(&ctx, hash)
+}
+
 // hash_stream_160_3 will read the stream in chunks and compute a
 // hash from its contents
-hash_stream_160_3 :: proc(s: io.Stream) -> ([20]byte, bool) {
-    hash: [20]byte
+hash_stream_160_3 :: proc(s: io.Stream) -> ([DIGEST_SIZE_160]byte, bool) {
+    hash: [DIGEST_SIZE_160]byte
     ctx: Haval_Context
     ctx.hashbitlen = 160
     ctx.rounds = 3
@@ -250,7 +346,7 @@ hash_stream_160_3 :: proc(s: io.Stream) -> ([20]byte, bool) {
 
 // hash_file_160_3 will read the file provided by the given handle
 // and compute a hash
-hash_file_160_3 :: proc(hd: os.Handle, load_at_once := false) -> ([20]byte, bool) {
+hash_file_160_3 :: proc(hd: os.Handle, load_at_once := false) -> ([DIGEST_SIZE_160]byte, bool) {
     if !load_at_once {
         return hash_stream_160_3(os.stream_from_handle(hd))
     } else {
@@ -258,7 +354,7 @@ hash_file_160_3 :: proc(hd: os.Handle, load_at_once := false) -> ([20]byte, bool
             return hash_bytes_160_3(buf[:]), ok
         }
     }
-    return [20]byte{}, false
+    return [DIGEST_SIZE_160]byte{}, false
 }
 
 hash_160_3 :: proc {
@@ -266,18 +362,20 @@ hash_160_3 :: proc {
     hash_file_160_3,
     hash_bytes_160_3,
     hash_string_160_3,
+    hash_bytes_to_buffer_160_3,
+    hash_string_to_buffer_160_3,
 }
 
 // hash_string_160_4 will hash the given input and return the
 // computed hash
-hash_string_160_4 :: proc(data: string) -> [20]byte {
+hash_string_160_4 :: proc(data: string) -> [DIGEST_SIZE_160]byte {
     return hash_bytes_160_4(transmute([]byte)(data))
 }
 
 // hash_bytes_160_4 will hash the given input and return the
 // computed hash
-hash_bytes_160_4 :: proc(data: []byte) -> [20]byte {
-    hash: [20]byte
+hash_bytes_160_4 :: proc(data: []byte) -> [DIGEST_SIZE_160]byte {
+    hash: [DIGEST_SIZE_160]byte
     ctx: Haval_Context
     ctx.hashbitlen = 160
     ctx.rounds = 4
@@ -288,10 +386,31 @@ hash_bytes_160_4 :: proc(data: []byte) -> [20]byte {
     return hash
 }
 
+// hash_string_to_buffer_160_4 will hash the given input and assign the
+// computed hash to the second parameter.
+// It requires that the destination buffer is at least as big as the digest size
+hash_string_to_buffer_160_4 :: proc(data: string, hash: []byte) {
+    hash_bytes_to_buffer_160_4(transmute([]byte)(data), hash)
+}
+
+// hash_bytes_to_buffer_160_4 will hash the given input and write the
+// computed hash into the second parameter.
+// It requires that the destination buffer is at least as big as the digest size
+hash_bytes_to_buffer_160_4 :: proc(data, hash: []byte) {
+    assert(len(hash) >= DIGEST_SIZE_160, "Size of destination buffer is smaller than the digest size")
+    ctx: Haval_Context
+    ctx.hashbitlen = 160
+    ctx.rounds = 4
+    init(&ctx)
+    ctx.str_len = u32(len(data))
+    update(&ctx, data)
+    final(&ctx, hash)
+}
+
 // hash_stream_160_4 will read the stream in chunks and compute a
 // hash from its contents
-hash_stream_160_4 :: proc(s: io.Stream) -> ([20]byte, bool) {
-    hash: [20]byte
+hash_stream_160_4 :: proc(s: io.Stream) -> ([DIGEST_SIZE_160]byte, bool) {
+    hash: [DIGEST_SIZE_160]byte
     ctx: Haval_Context
     ctx.hashbitlen = 160
     ctx.rounds = 4
@@ -312,7 +431,7 @@ hash_stream_160_4 :: proc(s: io.Stream) -> ([20]byte, bool) {
 
 // hash_file_160_4 will read the file provided by the given handle
 // and compute a hash
-hash_file_160_4 :: proc(hd: os.Handle, load_at_once := false) -> ([20]byte, bool) {
+hash_file_160_4 :: proc(hd: os.Handle, load_at_once := false) -> ([DIGEST_SIZE_160]byte, bool) {
     if !load_at_once {
         return hash_stream_160_4(os.stream_from_handle(hd))
     } else {
@@ -320,7 +439,7 @@ hash_file_160_4 :: proc(hd: os.Handle, load_at_once := false) -> ([20]byte, bool
             return hash_bytes_160_4(buf[:]), ok
         }
     }
-    return [20]byte{}, false
+    return [DIGEST_SIZE_160]byte{}, false
 }
 
 hash_160_4 :: proc {
@@ -328,18 +447,20 @@ hash_160_4 :: proc {
     hash_file_160_4,
     hash_bytes_160_4,
     hash_string_160_4,
+    hash_bytes_to_buffer_160_4,
+    hash_string_to_buffer_160_4,
 }
 
 // hash_string_160_5 will hash the given input and return the
 // computed hash
-hash_string_160_5 :: proc(data: string) -> [20]byte {
+hash_string_160_5 :: proc(data: string) -> [DIGEST_SIZE_160]byte {
     return hash_bytes_160_5(transmute([]byte)(data))
 }
 
 // hash_bytes_160_5 will hash the given input and return the
 // computed hash
-hash_bytes_160_5 :: proc(data: []byte) -> [20]byte {
-    hash: [20]byte
+hash_bytes_160_5 :: proc(data: []byte) -> [DIGEST_SIZE_160]byte {
+    hash: [DIGEST_SIZE_160]byte
     ctx: Haval_Context
     ctx.hashbitlen = 160
     ctx.rounds = 5
@@ -350,10 +471,31 @@ hash_bytes_160_5 :: proc(data: []byte) -> [20]byte {
     return hash
 }
 
+// hash_string_to_buffer_160_5 will hash the given input and assign the
+// computed hash to the second parameter.
+// It requires that the destination buffer is at least as big as the digest size
+hash_string_to_buffer_160_5 :: proc(data: string, hash: []byte) {
+    hash_bytes_to_buffer_160_5(transmute([]byte)(data), hash)
+}
+
+// hash_bytes_to_buffer_160_5 will hash the given input and write the
+// computed hash into the second parameter.
+// It requires that the destination buffer is at least as big as the digest size
+hash_bytes_to_buffer_160_5 :: proc(data, hash: []byte) {
+    assert(len(hash) >= DIGEST_SIZE_160, "Size of destination buffer is smaller than the digest size")
+    ctx: Haval_Context
+    ctx.hashbitlen = 160
+    ctx.rounds = 5
+    init(&ctx)
+    ctx.str_len = u32(len(data))
+    update(&ctx, data)
+    final(&ctx, hash)
+}
+
 // hash_stream_160_5 will read the stream in chunks and compute a
 // hash from its contents
-hash_stream_160_5 :: proc(s: io.Stream) -> ([20]byte, bool) {
-    hash: [20]byte
+hash_stream_160_5 :: proc(s: io.Stream) -> ([DIGEST_SIZE_160]byte, bool) {
+    hash: [DIGEST_SIZE_160]byte
     ctx: Haval_Context
     ctx.hashbitlen = 160
     ctx.rounds = 5
@@ -374,7 +516,7 @@ hash_stream_160_5 :: proc(s: io.Stream) -> ([20]byte, bool) {
 
 // hash_file_160_5 will read the file provided by the given handle
 // and compute a hash
-hash_file_160_5 :: proc(hd: os.Handle, load_at_once := false) -> ([20]byte, bool) {
+hash_file_160_5 :: proc(hd: os.Handle, load_at_once := false) -> ([DIGEST_SIZE_160]byte, bool) {
     if !load_at_once {
         return hash_stream_160_5(os.stream_from_handle(hd))
     } else {
@@ -382,7 +524,7 @@ hash_file_160_5 :: proc(hd: os.Handle, load_at_once := false) -> ([20]byte, bool
             return hash_bytes_160_5(buf[:]), ok
         }
     }
-    return [20]byte{}, false
+    return [DIGEST_SIZE_160]byte{}, false
 }
 
 hash_160_5 :: proc {
@@ -390,18 +532,20 @@ hash_160_5 :: proc {
     hash_file_160_5,
     hash_bytes_160_5,
     hash_string_160_5,
+    hash_bytes_to_buffer_160_5,
+    hash_string_to_buffer_160_5,
 }
 
 // hash_string_192_3 will hash the given input and return the
 // computed hash
-hash_string_192_3 :: proc(data: string) -> [24]byte {
+hash_string_192_3 :: proc(data: string) -> [DIGEST_SIZE_192]byte {
     return hash_bytes_192_3(transmute([]byte)(data))
 }
 
 // hash_bytes_192_3 will hash the given input and return the
 // computed hash
-hash_bytes_192_3 :: proc(data: []byte) -> [24]byte {
-    hash: [24]byte
+hash_bytes_192_3 :: proc(data: []byte) -> [DIGEST_SIZE_192]byte {
+    hash: [DIGEST_SIZE_192]byte
     ctx: Haval_Context
     ctx.hashbitlen = 192
     ctx.rounds = 3
@@ -412,10 +556,31 @@ hash_bytes_192_3 :: proc(data: []byte) -> [24]byte {
     return hash
 }
 
+// hash_string_to_buffer_192_3 will hash the given input and assign the
+// computed hash to the second parameter.
+// It requires that the destination buffer is at least as big as the digest size
+hash_string_to_buffer_192_3 :: proc(data: string, hash: []byte) {
+    hash_bytes_to_buffer_192_3(transmute([]byte)(data), hash)
+}
+
+// hash_bytes_to_buffer_192_3 will hash the given input and write the
+// computed hash into the second parameter.
+// It requires that the destination buffer is at least as big as the digest size
+hash_bytes_to_buffer_192_3 :: proc(data, hash: []byte) {
+    assert(len(hash) >= DIGEST_SIZE_192, "Size of destination buffer is smaller than the digest size")
+    ctx: Haval_Context
+    ctx.hashbitlen = 192
+    ctx.rounds = 3
+    init(&ctx)
+    ctx.str_len = u32(len(data))
+    update(&ctx, data)
+    final(&ctx, hash)
+}
+
 // hash_stream_192_3 will read the stream in chunks and compute a
 // hash from its contents
-hash_stream_192_3 :: proc(s: io.Stream) -> ([24]byte, bool) {
-    hash: [24]byte
+hash_stream_192_3 :: proc(s: io.Stream) -> ([DIGEST_SIZE_192]byte, bool) {
+    hash: [DIGEST_SIZE_192]byte
     ctx: Haval_Context
     ctx.hashbitlen = 192
     ctx.rounds = 3
@@ -436,7 +601,7 @@ hash_stream_192_3 :: proc(s: io.Stream) -> ([24]byte, bool) {
 
 // hash_file_192_3 will read the file provided by the given handle
 // and compute a hash
-hash_file_192_3 :: proc(hd: os.Handle, load_at_once := false) -> ([24]byte, bool) {
+hash_file_192_3 :: proc(hd: os.Handle, load_at_once := false) -> ([DIGEST_SIZE_192]byte, bool) {
     if !load_at_once {
         return hash_stream_192_3(os.stream_from_handle(hd))
     } else {
@@ -444,7 +609,7 @@ hash_file_192_3 :: proc(hd: os.Handle, load_at_once := false) -> ([24]byte, bool
             return hash_bytes_192_3(buf[:]), ok
         }
     }
-    return [24]byte{}, false
+    return [DIGEST_SIZE_192]byte{}, false
 }
 
 hash_192_3 :: proc {
@@ -452,18 +617,20 @@ hash_192_3 :: proc {
     hash_file_192_3,
     hash_bytes_192_3,
     hash_string_192_3,
+    hash_bytes_to_buffer_192_3,
+    hash_string_to_buffer_192_3,
 }
 
 // hash_string_192_4 will hash the given input and return the
 // computed hash
-hash_string_192_4 :: proc(data: string) -> [24]byte {
+hash_string_192_4 :: proc(data: string) -> [DIGEST_SIZE_192]byte {
     return hash_bytes_192_4(transmute([]byte)(data))
 }
 
 // hash_bytes_192_4 will hash the given input and return the
 // computed hash
-hash_bytes_192_4 :: proc(data: []byte) -> [24]byte {
-    hash: [24]byte
+hash_bytes_192_4 :: proc(data: []byte) -> [DIGEST_SIZE_192]byte {
+    hash: [DIGEST_SIZE_192]byte
     ctx: Haval_Context
     ctx.hashbitlen = 192
     ctx.rounds = 4
@@ -474,10 +641,31 @@ hash_bytes_192_4 :: proc(data: []byte) -> [24]byte {
     return hash
 }
 
+// hash_string_to_buffer_192_4 will hash the given input and assign the
+// computed hash to the second parameter.
+// It requires that the destination buffer is at least as big as the digest size
+hash_string_to_buffer_192_4 :: proc(data: string, hash: []byte) {
+    hash_bytes_to_buffer_192_4(transmute([]byte)(data), hash)
+}
+
+// hash_bytes_to_buffer_192_4 will hash the given input and write the
+// computed hash into the second parameter.
+// It requires that the destination buffer is at least as big as the digest size
+hash_bytes_to_buffer_192_4 :: proc(data, hash: []byte) {
+    assert(len(hash) >= DIGEST_SIZE_192, "Size of destination buffer is smaller than the digest size")
+    ctx: Haval_Context
+    ctx.hashbitlen = 192
+    ctx.rounds = 4
+    init(&ctx)
+    ctx.str_len = u32(len(data))
+    update(&ctx, data)
+    final(&ctx, hash)
+}
+
 // hash_stream_192_4 will read the stream in chunks and compute a
 // hash from its contents
-hash_stream_192_4 :: proc(s: io.Stream) -> ([24]byte, bool) {
-    hash: [24]byte
+hash_stream_192_4 :: proc(s: io.Stream) -> ([DIGEST_SIZE_192]byte, bool) {
+    hash: [DIGEST_SIZE_192]byte
     ctx: Haval_Context
     ctx.hashbitlen = 192
     ctx.rounds = 4
@@ -498,7 +686,7 @@ hash_stream_192_4 :: proc(s: io.Stream) -> ([24]byte, bool) {
 
 // hash_file_192_4 will read the file provided by the given handle
 // and compute a hash
-hash_file_192_4 :: proc(hd: os.Handle, load_at_once := false) -> ([24]byte, bool) {
+hash_file_192_4 :: proc(hd: os.Handle, load_at_once := false) -> ([DIGEST_SIZE_192]byte, bool) {
     if !load_at_once {
         return hash_stream_192_4(os.stream_from_handle(hd))
     } else {
@@ -506,7 +694,7 @@ hash_file_192_4 :: proc(hd: os.Handle, load_at_once := false) -> ([24]byte, bool
             return hash_bytes_192_4(buf[:]), ok
         }
     }
-    return [24]byte{}, false
+    return [DIGEST_SIZE_192]byte{}, false
 }
 
 hash_192_4 :: proc {
@@ -514,18 +702,20 @@ hash_192_4 :: proc {
     hash_file_192_4,
     hash_bytes_192_4,
     hash_string_192_4,
+    hash_bytes_to_buffer_192_4,
+    hash_string_to_buffer_192_4,
 }
 
 // hash_string_192_5 will hash the given input and return the
 // computed hash
-hash_string_192_5 :: proc(data: string) -> [24]byte {
+hash_string_192_5 :: proc(data: string) -> [DIGEST_SIZE_192]byte {
     return hash_bytes_192_5(transmute([]byte)(data))
 }
 
-// hash_bytes_224_5 will hash the given input and return the
+// hash_bytes_2DIGEST_SIZE_192_5 will hash the given input and return the
 // computed hash
-hash_bytes_192_5 :: proc(data: []byte) -> [24]byte {
-    hash: [24]byte
+hash_bytes_192_5 :: proc(data: []byte) -> [DIGEST_SIZE_192]byte {
+    hash: [DIGEST_SIZE_192]byte
     ctx: Haval_Context
     ctx.hashbitlen = 192
     ctx.rounds = 5
@@ -536,10 +726,31 @@ hash_bytes_192_5 :: proc(data: []byte) -> [24]byte {
     return hash
 }
 
+// hash_string_to_buffer_192_5 will hash the given input and assign the
+// computed hash to the second parameter.
+// It requires that the destination buffer is at least as big as the digest size
+hash_string_to_buffer_192_5 :: proc(data: string, hash: []byte) {
+    hash_bytes_to_buffer_192_5(transmute([]byte)(data), hash)
+}
+
+// hash_bytes_to_buffer_192_5 will hash the given input and write the
+// computed hash into the second parameter.
+// It requires that the destination buffer is at least as big as the digest size
+hash_bytes_to_buffer_192_5 :: proc(data, hash: []byte) {
+    assert(len(hash) >= DIGEST_SIZE_192, "Size of destination buffer is smaller than the digest size")
+    ctx: Haval_Context
+    ctx.hashbitlen = 192
+    ctx.rounds = 5
+    init(&ctx)
+    ctx.str_len = u32(len(data))
+    update(&ctx, data)
+    final(&ctx, hash)
+}
+
 // hash_stream_192_5 will read the stream in chunks and compute a
 // hash from its contents
-hash_stream_192_5 :: proc(s: io.Stream) -> ([24]byte, bool) {
-    hash: [24]byte
+hash_stream_192_5 :: proc(s: io.Stream) -> ([DIGEST_SIZE_192]byte, bool) {
+    hash: [DIGEST_SIZE_192]byte
     ctx: Haval_Context
     ctx.hashbitlen = 192
     ctx.rounds = 5
@@ -560,7 +771,7 @@ hash_stream_192_5 :: proc(s: io.Stream) -> ([24]byte, bool) {
 
 // hash_file_192_5 will read the file provided by the given handle
 // and compute a hash
-hash_file_192_5 :: proc(hd: os.Handle, load_at_once := false) -> ([24]byte, bool) {
+hash_file_192_5 :: proc(hd: os.Handle, load_at_once := false) -> ([DIGEST_SIZE_192]byte, bool) {
     if !load_at_once {
         return hash_stream_192_5(os.stream_from_handle(hd))
     } else {
@@ -568,7 +779,7 @@ hash_file_192_5 :: proc(hd: os.Handle, load_at_once := false) -> ([24]byte, bool
             return hash_bytes_192_5(buf[:]), ok
         }
     }
-    return [24]byte{}, false
+    return [DIGEST_SIZE_192]byte{}, false
 }
 
 hash_192_5 :: proc {
@@ -576,18 +787,20 @@ hash_192_5 :: proc {
     hash_file_192_5,
     hash_bytes_192_5,
     hash_string_192_5,
+    hash_bytes_to_buffer_192_5,
+    hash_string_to_buffer_192_5,
 }
 
 // hash_string_224_3 will hash the given input and return the
 // computed hash
-hash_string_224_3 :: proc(data: string) -> [28]byte {
+hash_string_224_3 :: proc(data: string) -> [DIGEST_SIZE_224]byte {
     return hash_bytes_224_3(transmute([]byte)(data))
 }
 
 // hash_bytes_224_3 will hash the given input and return the
 // computed hash
-hash_bytes_224_3 :: proc(data: []byte) -> [28]byte {
-    hash: [28]byte
+hash_bytes_224_3 :: proc(data: []byte) -> [DIGEST_SIZE_224]byte {
+    hash: [DIGEST_SIZE_224]byte
     ctx: Haval_Context
     ctx.hashbitlen = 224
     ctx.rounds = 3
@@ -598,10 +811,31 @@ hash_bytes_224_3 :: proc(data: []byte) -> [28]byte {
     return hash
 }
 
+// hash_string_to_buffer_224_3 will hash the given input and assign the
+// computed hash to the second parameter.
+// It requires that the destination buffer is at least as big as the digest size
+hash_string_to_buffer_224_3 :: proc(data: string, hash: []byte) {
+    hash_bytes_to_buffer_224_3(transmute([]byte)(data), hash)
+}
+
+// hash_bytes_to_buffer_224_3 will hash the given input and write the
+// computed hash into the second parameter.
+// It requires that the destination buffer is at least as big as the digest size
+hash_bytes_to_buffer_224_3 :: proc(data, hash: []byte) {
+    assert(len(hash) >= DIGEST_SIZE_224, "Size of destination buffer is smaller than the digest size")
+    ctx: Haval_Context
+    ctx.hashbitlen = 224
+    ctx.rounds = 3
+    init(&ctx)
+    ctx.str_len = u32(len(data))
+    update(&ctx, data)
+    final(&ctx, hash)
+}
+
 // hash_stream_224_3 will read the stream in chunks and compute a
 // hash from its contents
-hash_stream_224_3 :: proc(s: io.Stream) -> ([28]byte, bool) {
-    hash: [28]byte
+hash_stream_224_3 :: proc(s: io.Stream) -> ([DIGEST_SIZE_224]byte, bool) {
+    hash: [DIGEST_SIZE_224]byte
     ctx: Haval_Context
     ctx.hashbitlen = 224
     ctx.rounds = 3
@@ -622,7 +856,7 @@ hash_stream_224_3 :: proc(s: io.Stream) -> ([28]byte, bool) {
 
 // hash_file_224_3 will read the file provided by the given handle
 // and compute a hash
-hash_file_224_3 :: proc(hd: os.Handle, load_at_once := false) -> ([28]byte, bool) {
+hash_file_224_3 :: proc(hd: os.Handle, load_at_once := false) -> ([DIGEST_SIZE_224]byte, bool) {
     if !load_at_once {
         return hash_stream_224_3(os.stream_from_handle(hd))
     } else {
@@ -630,7 +864,7 @@ hash_file_224_3 :: proc(hd: os.Handle, load_at_once := false) -> ([28]byte, bool
             return hash_bytes_224_3(buf[:]), ok
         }
     }
-    return [28]byte{}, false
+    return [DIGEST_SIZE_224]byte{}, false
 }
 
 hash_224_3 :: proc {
@@ -638,18 +872,20 @@ hash_224_3 :: proc {
     hash_file_224_3,
     hash_bytes_224_3,
     hash_string_224_3,
+    hash_bytes_to_buffer_224_3,
+    hash_string_to_buffer_224_3,
 }
 
 // hash_string_224_4 will hash the given input and return the
 // computed hash
-hash_string_224_4 :: proc(data: string) -> [28]byte {
+hash_string_224_4 :: proc(data: string) -> [DIGEST_SIZE_224]byte {
     return hash_bytes_224_4(transmute([]byte)(data))
 }
 
 // hash_bytes_224_4 will hash the given input and return the
 // computed hash
-hash_bytes_224_4 :: proc(data: []byte) -> [28]byte {
-    hash: [28]byte
+hash_bytes_224_4 :: proc(data: []byte) -> [DIGEST_SIZE_224]byte {
+    hash: [DIGEST_SIZE_224]byte
     ctx: Haval_Context
     ctx.hashbitlen = 224
     ctx.rounds = 4
@@ -660,10 +896,31 @@ hash_bytes_224_4 :: proc(data: []byte) -> [28]byte {
     return hash
 }
 
+// hash_string_to_buffer_224_4 will hash the given input and assign the
+// computed hash to the second parameter.
+// It requires that the destination buffer is at least as big as the digest size
+hash_string_to_buffer_224_4 :: proc(data: string, hash: []byte) {
+    hash_bytes_to_buffer_224_4(transmute([]byte)(data), hash)
+}
+
+// hash_bytes_to_buffer_224_4 will hash the given input and write the
+// computed hash into the second parameter.
+// It requires that the destination buffer is at least as big as the digest size
+hash_bytes_to_buffer_224_4 :: proc(data, hash: []byte) {
+    assert(len(hash) >= DIGEST_SIZE_224, "Size of destination buffer is smaller than the digest size")
+    ctx: Haval_Context
+    ctx.hashbitlen = 224
+    ctx.rounds = 4
+    init(&ctx)
+    ctx.str_len = u32(len(data))
+    update(&ctx, data)
+    final(&ctx, hash)
+}
+
 // hash_stream_224_4 will read the stream in chunks and compute a
 // hash from its contents
-hash_stream_224_4 :: proc(s: io.Stream) -> ([28]byte, bool) {
-    hash: [28]byte
+hash_stream_224_4 :: proc(s: io.Stream) -> ([DIGEST_SIZE_224]byte, bool) {
+    hash: [DIGEST_SIZE_224]byte
     ctx: Haval_Context
     ctx.hashbitlen = 224
     ctx.rounds = 4
@@ -684,7 +941,7 @@ hash_stream_224_4 :: proc(s: io.Stream) -> ([28]byte, bool) {
 
 // hash_file_224_4 will read the file provided by the given handle
 // and compute a hash
-hash_file_224_4 :: proc(hd: os.Handle, load_at_once := false) -> ([28]byte, bool) {
+hash_file_224_4 :: proc(hd: os.Handle, load_at_once := false) -> ([DIGEST_SIZE_224]byte, bool) {
     if !load_at_once {
         return hash_stream_224_4(os.stream_from_handle(hd))
     } else {
@@ -692,7 +949,7 @@ hash_file_224_4 :: proc(hd: os.Handle, load_at_once := false) -> ([28]byte, bool
             return hash_bytes_224_4(buf[:]), ok
         }
     }
-    return [28]byte{}, false
+    return [DIGEST_SIZE_224]byte{}, false
 }
 
 hash_224_4 :: proc {
@@ -700,18 +957,20 @@ hash_224_4 :: proc {
     hash_file_224_4,
     hash_bytes_224_4,
     hash_string_224_4,
+    hash_bytes_to_buffer_224_4,
+    hash_string_to_buffer_224_4,
 }
 
 // hash_string_224_5 will hash the given input and return the
 // computed hash
-hash_string_224_5 :: proc(data: string) -> [28]byte {
+hash_string_224_5 :: proc(data: string) -> [DIGEST_SIZE_224]byte {
     return hash_bytes_224_5(transmute([]byte)(data))
 }
 
 // hash_bytes_224_5 will hash the given input and return the
 // computed hash
-hash_bytes_224_5 :: proc(data: []byte) -> [28]byte {
-    hash: [28]byte
+hash_bytes_224_5 :: proc(data: []byte) -> [DIGEST_SIZE_224]byte {
+    hash: [DIGEST_SIZE_224]byte
     ctx: Haval_Context
     ctx.hashbitlen = 224
     ctx.rounds = 5
@@ -722,10 +981,31 @@ hash_bytes_224_5 :: proc(data: []byte) -> [28]byte {
     return hash
 }
 
+// hash_string_to_buffer_224_5 will hash the given input and assign the
+// computed hash to the second parameter.
+// It requires that the destination buffer is at least as big as the digest size
+hash_string_to_buffer_224_5 :: proc(data: string, hash: []byte) {
+    hash_bytes_to_buffer_224_5(transmute([]byte)(data), hash)
+}
+
+// hash_bytes_to_buffer_224_5 will hash the given input and write the
+// computed hash into the second parameter.
+// It requires that the destination buffer is at least as big as the digest size
+hash_bytes_to_buffer_224_5 :: proc(data, hash: []byte) {
+    assert(len(hash) >= DIGEST_SIZE_224, "Size of destination buffer is smaller than the digest size")
+    ctx: Haval_Context
+    ctx.hashbitlen = 224
+    ctx.rounds = 5
+    init(&ctx)
+    ctx.str_len = u32(len(data))
+    update(&ctx, data)
+    final(&ctx, hash)
+}
+
 // hash_stream_224_5 will read the stream in chunks and compute a
 // hash from its contents
-hash_stream_224_5 :: proc(s: io.Stream) -> ([28]byte, bool) {
-    hash: [28]byte
+hash_stream_224_5 :: proc(s: io.Stream) -> ([DIGEST_SIZE_224]byte, bool) {
+    hash: [DIGEST_SIZE_224]byte
     ctx: Haval_Context
     ctx.hashbitlen = 224
     ctx.rounds = 5
@@ -746,7 +1026,7 @@ hash_stream_224_5 :: proc(s: io.Stream) -> ([28]byte, bool) {
 
 // hash_file_224_5 will read the file provided by the given handle
 // and compute a hash
-hash_file_224_5 :: proc(hd: os.Handle, load_at_once := false) -> ([28]byte, bool) {
+hash_file_224_5 :: proc(hd: os.Handle, load_at_once := false) -> ([DIGEST_SIZE_224]byte, bool) {
     if !load_at_once {
         return hash_stream_224_5(os.stream_from_handle(hd))
     } else {
@@ -754,7 +1034,7 @@ hash_file_224_5 :: proc(hd: os.Handle, load_at_once := false) -> ([28]byte, bool
             return hash_bytes_224_5(buf[:]), ok
         }
     }
-    return [28]byte{}, false
+    return [DIGEST_SIZE_224]byte{}, false
 }
 
 hash_224_5 :: proc {
@@ -762,18 +1042,20 @@ hash_224_5 :: proc {
     hash_file_224_5,
     hash_bytes_224_5,
     hash_string_224_5,
+    hash_bytes_to_buffer_224_5,
+    hash_string_to_buffer_224_5,
 }
 
 // hash_string_256_3 will hash the given input and return the
 // computed hash
-hash_string_256_3 :: proc(data: string) -> [32]byte {
+hash_string_256_3 :: proc(data: string) -> [DIGEST_SIZE_256]byte {
     return hash_bytes_256_3(transmute([]byte)(data))
 }
 
 // hash_bytes_256_3 will hash the given input and return the
 // computed hash
-hash_bytes_256_3 :: proc(data: []byte) -> [32]byte {
-    hash: [32]byte
+hash_bytes_256_3 :: proc(data: []byte) -> [DIGEST_SIZE_256]byte {
+    hash: [DIGEST_SIZE_256]byte
     ctx: Haval_Context
     ctx.hashbitlen = 256
     ctx.rounds = 3
@@ -784,10 +1066,31 @@ hash_bytes_256_3 :: proc(data: []byte) -> [32]byte {
     return hash
 }
 
+// hash_string_to_buffer_256_3 will hash the given input and assign the
+// computed hash to the second parameter.
+// It requires that the destination buffer is at least as big as the digest size
+hash_string_to_buffer_256_3 :: proc(data: string, hash: []byte) {
+    hash_bytes_to_buffer_256_3(transmute([]byte)(data), hash)
+}
+
+// hash_bytes_to_buffer_256_3 will hash the given input and write the
+// computed hash into the second parameter.
+// It requires that the destination buffer is at least as big as the digest size
+hash_bytes_to_buffer_256_3 :: proc(data, hash: []byte) {
+    assert(len(hash) >= DIGEST_SIZE_256, "Size of destination buffer is smaller than the digest size")
+    ctx: Haval_Context
+    ctx.hashbitlen = 256
+    ctx.rounds = 3
+    init(&ctx)
+    ctx.str_len = u32(len(data))
+    update(&ctx, data)
+    final(&ctx, hash)
+}
+
 // hash_stream_256_3 will read the stream in chunks and compute a
 // hash from its contents
-hash_stream_256_3 :: proc(s: io.Stream) -> ([32]byte, bool) {
-    hash: [32]byte
+hash_stream_256_3 :: proc(s: io.Stream) -> ([DIGEST_SIZE_256]byte, bool) {
+    hash: [DIGEST_SIZE_256]byte
     ctx: Haval_Context
     ctx.hashbitlen = 256
     ctx.rounds = 3
@@ -808,7 +1111,7 @@ hash_stream_256_3 :: proc(s: io.Stream) -> ([32]byte, bool) {
 
 // hash_file_256_3 will read the file provided by the given handle
 // and compute a hash
-hash_file_256_3 :: proc(hd: os.Handle, load_at_once := false) -> ([32]byte, bool) {
+hash_file_256_3 :: proc(hd: os.Handle, load_at_once := false) -> ([DIGEST_SIZE_256]byte, bool) {
     if !load_at_once {
         return hash_stream_256_3(os.stream_from_handle(hd))
     } else {
@@ -816,7 +1119,7 @@ hash_file_256_3 :: proc(hd: os.Handle, load_at_once := false) -> ([32]byte, bool
             return hash_bytes_256_3(buf[:]), ok
         }
     }
-    return [32]byte{}, false
+    return [DIGEST_SIZE_256]byte{}, false
 }
 
 hash_256_3 :: proc {
@@ -824,18 +1127,20 @@ hash_256_3 :: proc {
     hash_file_256_3,
     hash_bytes_256_3,
     hash_string_256_3,
+    hash_bytes_to_buffer_256_3,
+    hash_string_to_buffer_256_3,
 }
 
 // hash_string_256_4 will hash the given input and return the
 // computed hash
-hash_string_256_4 :: proc(data: string) -> [32]byte {
+hash_string_256_4 :: proc(data: string) -> [DIGEST_SIZE_256]byte {
     return hash_bytes_256_4(transmute([]byte)(data))
 }
 
 // hash_bytes_256_4 will hash the given input and return the
 // computed hash
-hash_bytes_256_4 :: proc(data: []byte) -> [32]byte {
-    hash: [32]byte
+hash_bytes_256_4 :: proc(data: []byte) -> [DIGEST_SIZE_256]byte {
+    hash: [DIGEST_SIZE_256]byte
     ctx: Haval_Context
     ctx.hashbitlen = 256
     ctx.rounds = 4
@@ -846,10 +1151,31 @@ hash_bytes_256_4 :: proc(data: []byte) -> [32]byte {
     return hash
 }
 
+// hash_string_to_buffer_256_4 will hash the given input and assign the
+// computed hash to the second parameter.
+// It requires that the destination buffer is at least as big as the digest size
+hash_string_to_buffer_256_4 :: proc(data: string, hash: []byte) {
+    hash_bytes_to_buffer_256_4(transmute([]byte)(data), hash)
+}
+
+// hash_bytes_to_buffer_256_4 will hash the given input and write the
+// computed hash into the second parameter.
+// It requires that the destination buffer is at least as big as the digest size
+hash_bytes_to_buffer_256_4 :: proc(data, hash: []byte) {
+    assert(len(hash) >= DIGEST_SIZE_256, "Size of destination buffer is smaller than the digest size")
+    ctx: Haval_Context
+    ctx.hashbitlen = 256
+    ctx.rounds = 4
+    init(&ctx)
+    ctx.str_len = u32(len(data))
+    update(&ctx, data)
+    final(&ctx, hash)
+}
+
 // hash_stream_256_4 will read the stream in chunks and compute a
 // hash from its contents
-hash_stream_256_4 :: proc(s: io.Stream) -> ([32]byte, bool) {
-    hash: [32]byte
+hash_stream_256_4 :: proc(s: io.Stream) -> ([DIGEST_SIZE_256]byte, bool) {
+    hash: [DIGEST_SIZE_256]byte
     ctx: Haval_Context
     ctx.hashbitlen = 256
     ctx.rounds = 4
@@ -870,7 +1196,7 @@ hash_stream_256_4 :: proc(s: io.Stream) -> ([32]byte, bool) {
 
 // hash_file_256_4 will read the file provided by the given handle
 // and compute a hash
-hash_file_256_4 :: proc(hd: os.Handle, load_at_once := false) -> ([32]byte, bool) {
+hash_file_256_4 :: proc(hd: os.Handle, load_at_once := false) -> ([DIGEST_SIZE_256]byte, bool) {
     if !load_at_once {
         return hash_stream_256_4(os.stream_from_handle(hd))
     } else {
@@ -878,7 +1204,7 @@ hash_file_256_4 :: proc(hd: os.Handle, load_at_once := false) -> ([32]byte, bool
             return hash_bytes_256_4(buf[:]), ok
         }
     }
-    return [32]byte{}, false
+    return [DIGEST_SIZE_256]byte{}, false
 }
 
 hash_256_4 :: proc {
@@ -886,18 +1212,20 @@ hash_256_4 :: proc {
     hash_file_256_4,
     hash_bytes_256_4,
     hash_string_256_4,
+    hash_bytes_to_buffer_256_4,
+    hash_string_to_buffer_256_4,
 }
 
 // hash_string_256_5 will hash the given input and return the
 // computed hash
-hash_string_256_5 :: proc(data: string) -> [32]byte {
+hash_string_256_5 :: proc(data: string) -> [DIGEST_SIZE_256]byte {
     return hash_bytes_256_5(transmute([]byte)(data))
 }
 
 // hash_bytes_256_5 will hash the given input and return the
 // computed hash
-hash_bytes_256_5 :: proc(data: []byte) -> [32]byte {
-    hash: [32]byte
+hash_bytes_256_5 :: proc(data: []byte) -> [DIGEST_SIZE_256]byte {
+    hash: [DIGEST_SIZE_256]byte
     ctx: Haval_Context
     ctx.hashbitlen = 256
     ctx.rounds = 5
@@ -908,10 +1236,32 @@ hash_bytes_256_5 :: proc(data: []byte) -> [32]byte {
     return hash
 }
 
+// hash_string_to_buffer_256_5 will hash the given input and assign the
+// computed hash to the second parameter.
+// It requires that the destination buffer is at least as big as the digest size
+hash_string_to_buffer_256_5 :: proc(data: string, hash: []byte) {
+    hash_bytes_to_buffer_256_5(transmute([]byte)(data), hash)
+}
+
+// hash_bytes_to_buffer_256_5 will hash the given input and write the
+// computed hash into the second parameter.
+// It requires that the destination buffer is at least as big as the digest size
+hash_bytes_to_buffer_256_5 :: proc(data, hash: []byte) {
+    assert(len(hash) >= DIGEST_SIZE_256, "Size of destination buffer is smaller than the digest size")
+    ctx: Haval_Context
+    ctx.hashbitlen = 256
+    ctx.rounds = 5
+    init(&ctx)
+    ctx.str_len = u32(len(data))
+    update(&ctx, data)
+    final(&ctx, hash)
+}
+
+
 // hash_stream_256_5 will read the stream in chunks and compute a
 // hash from its contents
-hash_stream_256_5 :: proc(s: io.Stream) -> ([32]byte, bool) {
-    hash: [32]byte
+hash_stream_256_5 :: proc(s: io.Stream) -> ([DIGEST_SIZE_256]byte, bool) {
+    hash: [DIGEST_SIZE_256]byte
     ctx: Haval_Context
     ctx.hashbitlen = 256
     ctx.rounds = 5
@@ -932,7 +1282,7 @@ hash_stream_256_5 :: proc(s: io.Stream) -> ([32]byte, bool) {
 
 // hash_file_256_5 will read the file provided by the given handle
 // and compute a hash
-hash_file_256_5 :: proc(hd: os.Handle, load_at_once := false) -> ([32]byte, bool) {
+hash_file_256_5 :: proc(hd: os.Handle, load_at_once := false) -> ([DIGEST_SIZE_256]byte, bool) {
     if !load_at_once {
         return hash_stream_256_5(os.stream_from_handle(hd))
     } else {
@@ -940,7 +1290,7 @@ hash_file_256_5 :: proc(hd: os.Handle, load_at_once := false) -> ([32]byte, bool
             return hash_bytes_256_5(buf[:]), ok
         }
     }
-    return [32]byte{}, false
+    return [DIGEST_SIZE_256]byte{}, false
 }
 
 hash_256_5 :: proc {
@@ -948,6 +1298,8 @@ hash_256_5 :: proc {
     hash_file_256_5,
     hash_bytes_256_5,
     hash_string_256_5,
+    hash_bytes_to_buffer_256_5,
+    hash_string_to_buffer_256_5,
 }
 
 /*
@@ -980,7 +1332,7 @@ update :: proc(ctx: ^Haval_Context, data: []byte) {
     }
     ctx.count[1] += str_len >> 29
 
-    when ODIN_ENDIAN == "little" {
+    when ODIN_ENDIAN == .Little {
         if rmd_len + str_len >= 128 {
             copy(util.slice_to_bytes(ctx.block[:])[rmd_len:], data[:fill_len])
             block(ctx, ctx.rounds)

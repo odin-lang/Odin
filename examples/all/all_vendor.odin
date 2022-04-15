@@ -1,26 +1,40 @@
-//+build windows
 package all
 
-import glfw   "vendor:glfw"
-import gl     "vendor:OpenGL"
-import rl     "vendor:raylib"
-import PM     "vendor:portmidi"
+import botan     "vendor:botan"
+import ENet      "vendor:ENet"
+import gl        "vendor:OpenGL"
+import glfw      "vendor:glfw"
+import microui   "vendor:microui"
+import miniaudio "vendor:miniaudio"
+import PM        "vendor:portmidi"
+import rl        "vendor:raylib"
+
 import SDL    "vendor:sdl2"
-import IMG    "vendor:sdl2/image"
 import SDLNet "vendor:sdl2/net"
+import IMG    "vendor:sdl2/image"
 import MIX    "vendor:sdl2/mixer"
 import TTF    "vendor:sdl2/ttf"
-import vk     "vendor:vulkan"
-import ENet   "vendor:ENet"
 
-_ :: glfw
+import vk "vendor:vulkan"
+
+import NS  "vendor:darwin/Foundation"
+import MTL "vendor:darwin/Metal"
+import CA  "vendor:darwin/QuartzCore"
+
+_ :: botan
+_ :: ENet
 _ :: gl
-_ :: rl
+_ :: glfw
+_ :: microui
+_ :: miniaudio
 _ :: PM
+_ :: rl
 _ :: SDL
-_ :: IMG
 _ :: SDLNet
+_ :: IMG
 _ :: MIX
 _ :: TTF
 _ :: vk
-_ :: ENet
+_ :: NS
+_ :: MTL
+_ :: CA

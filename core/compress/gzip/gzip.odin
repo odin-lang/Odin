@@ -66,7 +66,8 @@ OS :: enum u8 {
 	_Unknown     = 14,
 	Unknown      = 255,
 }
-OS_Name :: #partial [OS]string{
+OS_Name :: #sparse[OS]string{
+	._Unknown     = "",
 	.FAT          = "FAT",
 	.Amiga        = "Amiga",
 	.VMS          = "VMS/OpenVMS",
@@ -99,7 +100,7 @@ E_GZIP    :: compress.GZIP_Error
 E_ZLIB    :: compress.ZLIB_Error
 E_Deflate :: compress.Deflate_Error
 
-GZIP_MAX_PAYLOAD_SIZE :: int(max(u32le))
+GZIP_MAX_PAYLOAD_SIZE :: i64(max(u32le))
 
 load :: proc{load_from_slice, load_from_file, load_from_context}
 
@@ -135,7 +136,7 @@ load_from_context :: proc(z: ^$C, buf: ^bytes.Buffer, known_gzip_size := -1, exp
 
 	z.output = buf
 
-	if expected_output_size > GZIP_MAX_PAYLOAD_SIZE {
+	if i64(expected_output_size) > i64(GZIP_MAX_PAYLOAD_SIZE) {
 		return E_GZIP.Payload_Size_Exceeds_Max_Payload
 	}
 
