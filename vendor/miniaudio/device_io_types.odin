@@ -18,12 +18,13 @@ SUPPORT_WEBAUDIO   :: false // ODIN_OS == .Emscripten
 SUPPORT_CUSTOM     :: true
 SUPPORT_NULL       :: true // ODIN_OS != .Emscripten
 
-STATE_UNINITIALIZED :: 0
-STATE_STOPPED       :: 1   /* The device's default state after initialization. */
-STATE_STARTED       :: 2   /* The device is started and is requesting and/or delivering audio data. */
-STATE_STARTING      :: 3   /* Transitioning from a stopped state to started. */
-STATE_STOPPING      :: 4   /* Transitioning from a started state to stopped. */
-
+device_state :: enum c.int {
+  uninitialized = 0,
+  stopped       = 1,  /* The device's default state after initialization. */
+  started       = 2,  /* The device is started and is requesting and/or delivering audio data. */
+  starting      = 3,  /* Transitioning from a stopped state to started. */
+  stopping      = 4,  /* Transitioning from a started state to stopped. */
+}
 
 
 when SUPPORT_WASAPI {
@@ -55,6 +56,96 @@ backend :: enum c.int {
 
 BACKEND_COUNT :: len(backend)
 
+
+/*
+Device job thread. This is used by backends that require asynchronous processing of certain
+operations. It is not used by all backends.
+
+The device job thread is made up of a thread and a job queue. You can post a job to the thread with
+ma_device_job_thread_post(). The thread will do the processing of the job.
+*/
+device_job_thread_config :: struct {
+	noThread:         b32, /* Set this to true if you want to process jobs yourself. */
+	jobQueueCapacity: u32,
+	jobQueueFlags:    u32,
+}
+
+device_job_thread :: struct {
+	thread:     thread,
+	jobQueue:   job_queue,
+	_hasThread: b32,
+}
+
+
+/* Device notification types. */
+device_notification_type :: enum c.int {
+	started,
+	stopped,
+	rerouted,
+	interruption_began,
+	interruption_ended,
+}
+
+device_notification :: struct {
+	pDevice: ^device,
+	type:    device_notification_type,
+	data: struct #raw_union {
+		started: struct {
+			_unused: c.int,
+		},
+		stopped: struct {
+			_unused: c.int,
+		},
+		rerouted: struct {
+			_unused: c.int,
+		},
+		interruption: struct {
+			_unused: c.int,
+		},
+	},
+}
+
+/*
+The notification callback for when the application should be notified of a change to the device.
+
+This callback is used for notifying the application of changes such as when the device has started,
+stopped, rerouted or an interruption has occurred. Note that not all backends will post all
+notification types. For example, some backends will perform automatic stream routing without any
+kind of notification to the host program which means miniaudio will never know about it and will
+never be able to fire the rerouted notification. You should keep this in mind when designing your
+program.
+
+The stopped notification will *not* get fired when a device is rerouted.
+
+
+Parameters
+----------
+pNotification (in)
+    A pointer to a structure containing information about the event. Use the `pDevice` member of
+    this object to retrieve the relevant device. The `type` member can be used to discriminate
+    against each of the notification types.
+
+
+Remarks
+-------
+Do not restart or uninitialize the device from the callback.
+
+Not all notifications will be triggered by all backends, however the started and stopped events
+should be reliable for all backends. Some backends do not have a good way to detect device
+stoppages due to unplugging the device which may result in the stopped callback not getting
+fired. This has been observed with at least one BSD variant.
+
+The rerouted notification is fired *after* the reroute has occurred. The stopped notification will
+*not* get fired when a device is rerouted. The following backends are known to do automatic stream
+rerouting, but do not have a way to be notified of the change:
+
+  * DirectSound
+
+The interruption notifications are used on mobile platforms for detecting when audio is interrupted
+due to things like an incoming phone call. Currently this is only implemented on iOS. None of the
+Android backends will report this notification.
+*/
+device_notification_proc :: proc "c" (pNotification: ^device_notification)
 
 /*
 The callback for processing audio data from the device.
@@ -96,9 +187,11 @@ callback. The following APIs cannot be called from inside the callback:
 
 The proper way to stop the device is to call `ma_device_stop()` from a different thread, normally the main application thread.
 */
-device_callback_proc :: proc "c" (pDevice: ^device, pOutput: rawptr, pInput: rawptr, frameCount: u32)
+device_data_proc :: proc "c" (pDevice: ^device, pOutput, pInput: rawptr, frameCount: u32)
 
 /*
+DEPRECATED. Use ma_device_notification_proc instead.
+
 The callback for when the device has been stopped.
 
 This will be called when the device is stopped explicitly with `ma_device_stop()` and also called implicitly when the device is stopped through external forces
@@ -108,48 +201,15 @@ such as being unplugged or an internal error occuring.
 Parameters
 ----------
 pDevice (in)
-	A pointer to the device that has just stopped.
+    A pointer to the device that has just stopped.
 
 
 Remarks
 -------
 Do not restart or uninitialize the device from the callback.
 */
-stop_proc :: proc "c" (pDevice: ^device)
+stop_proc :: proc "c" (pDevice: ^device)  /* DEPRECATED. Use ma_device_notification_proc instead. */
 
-/*
-The callback for handling log messages.
-
-
-Parameters
-----------
-pContext (in)
-	A pointer to the context the log message originated from.
-
-pDevice (in)
-	A pointer to the device the log message originate from, if any. This can be null, in which case the message came from the context.
-
-logLevel (in)
-	The log level. This can be one of the following:
-
-	+----------------------+
-	| Log Level            |
-	+----------------------+
-	| MA_LOG_LEVEL_DEBUG   |
-	| MA_LOG_LEVEL_INFO    |
-	| MA_LOG_LEVEL_WARNING |
-	| MA_LOG_LEVEL_ERROR   |
-	+----------------------+
-
-message (in)
-	The log message.
-
-
-Remarks
--------
-Do not modify the state of the device from inside the callback.
-*/
-log_proc :: proc "c" (pContext: context_type, pDevice: ^device, logLevel: u32, message: cstring)
 
 device_type :: enum c.int {
 	playback = 1,
@@ -279,29 +339,14 @@ device_id :: struct #raw_union {
 
 DATA_FORMAT_FLAG_EXCLUSIVE_MODE :: 1 << 1    /* If set, this is supported in exclusive mode. Otherwise not natively supported by exclusive mode. */
 
+MAX_DEVICE_NAME_LENGTH :: 255
+
 device_info :: struct {
 	/* Basic info. This is the only information guaranteed to be filled in during device enumeration. */
 	id:        device_id,
-	name:      [256]byte,
+	name:      [MAX_DEVICE_NAME_LENGTH + 1]c.char, /* +1 for null terminator. */
 	isDefault: b32,
 
-	/*
-	Detailed info. As much of this is filled as possible with ma_context_get_device_info(). Note that you are allowed to initialize
-	a device with settings outside of this range, but it just means the data will be converted using miniaudio's data conversion
-	pipeline before sending the data to/from the device. Most programs will need to not worry about these values, but it's provided
-	here mainly for informational purposes or in the rare case that someone might find it useful.
-
-	These will be set to 0 when returned by ma_context_enumerate_devices() or ma_context_get_devices().
-	*/
-	formatCount:   u32,
-	formats:       [format]format,
-	minChannels:   u32,
-	maxChannels:   u32,
-	minSampleRate: u32,
-	maxSampleRate: u32,
-
-
-	/* Experimental. Don't use these right now. */
 	nativeDataFormatCount: u32,
 	nativeDataFormats: [/*len(format_count) * standard_sample_rate.rate_count * MAX_CHANNELS*/ 64]struct { /* Not sure how big to make this. There can be *many* permutations for virtual devices which can support anything. */
 		format:     format, /* Sample format. If set to ma_format_unknown, all sample formats are supported. */
@@ -312,31 +357,26 @@ device_info :: struct {
 }
 
 device_config :: struct {
-	deviceType:               device_type,
-	sampleRate:               u32,
-	periodSizeInFrames:       u32,
-	periodSizeInMilliseconds: u32,
-	periods:                  u32,
-	performanceProfile:       performance_profile,
-	noPreZeroedOutputBuffer:  b8,   /* When set to true, the contents of the output buffer passed into the data callback will be left undefined rather than initialized to zero. */
-	noClip:                   b8,                    /* When set to true, the contents of the output buffer passed into the data callback will be clipped after returning. Only applies when the playback sample format is f32. */
-	dataCallback:             device_callback_proc,
-	stopCallback:             stop_proc,
-	pUserData: rawptr,
-	resampling: struct {
-		algorithm: resample_algorithm,
-		linear: struct {
-			lpfOrder: u32,
-		},
-		speex: struct {
-			quality: c.int,
-		},
-	},
+	deviceType:                 device_type,
+	sampleRate:                 u32,
+	periodSizeInFrames:         u32,
+	periodSizeInMilliseconds:   u32,
+	periods:                    u32,
+	performanceProfile:         performance_profile,
+	noPreSilencedOutputBuffer:  b8,   /* When set to true, the contents of the output buffer passed into the data callback will be left undefined rather than initialized to zero. */
+	noClip:                     b8,   /* When set to true, the contents of the output buffer passed into the data callback will be clipped after returning. Only applies when the playback sample format is f32. */
+	noDisableDenormals:         b8,   /* Do not disable denormals when firing the data callback. */
+  noFixedSizedCallback:       b8,   /* Disables strict fixed-sized data callbacks. Setting this to true will result in the period size being treated only as a hint to the backend. This is an optimization for those who don't need fixed sized callbacks. */
+	dataCallback:               device_data_proc,
+	notificationCallback:       device_notification_proc,
+	stopCallback:               stop_proc,
+	pUserData:                  rawptr,
+	resampling:                 resampler_config,
 	playback: struct {
 		pDeviceID:      ^device_id,
 		format:         format,
 		channels:       u32,
-		channelMap:     [MAX_CHANNELS]channel,
+		channelMap:     [^]channel,
 		channelMixMode: channel_mix_mode,
 		shareMode:      share_mode,
 	},
@@ -344,7 +384,7 @@ device_config :: struct {
 		pDeviceID:      ^device_id,
 		format:         format,
 		channels:       u32,
-		channelMap:     [MAX_CHANNELS]channel,
+		channelMap:     [^]channel,
 		channelMixMode: channel_mix_mode,
 		shareMode:      share_mode,
 	},
@@ -373,9 +413,10 @@ device_config :: struct {
 		recordingPreset: opensl_recording_preset,
 	},
 	aaudio: struct {
-		usage:       aaudio_usage,
-		contentType: aaudio_content_type,
-		inputPreset: aaudio_input_preset,
+		usage:                   aaudio_usage,
+		contentType:             aaudio_content_type,
+		inputPreset:             aaudio_input_preset,
+		noAutoStartAfterReroute: b32,
 	},
 }
 
@@ -425,14 +466,14 @@ to many devices. A device is created from a context.
 The general flow goes like this:
 
   1) A context is created with `onContextInit()`
-	 1a) Available devices can be enumerated with `onContextEnumerateDevices()` if required.
-	 1b) Detailed information about a device can be queried with `onContextGetDeviceInfo()` if required.
+     1a) Available devices can be enumerated with `onContextEnumerateDevices()` if required.
+     1b) Detailed information about a device can be queried with `onContextGetDeviceInfo()` if required.
   2) A device is created from the context that was created in the first step using `onDeviceInit()`, and optionally a device ID that was
-	 selected from device enumeration via `onContextEnumerateDevices()`.
+     selected from device enumeration via `onContextEnumerateDevices()`.
   3) A device is started or stopped with `onDeviceStart()` / `onDeviceStop()`
   4) Data is delivered to and from the device by the backend. This is always done based on the native format returned by the prior call
-	 to `onDeviceInit()`. Conversion between the device's native format and the format requested by the application will be handled by
-	 miniaudio internally.
+     to `onDeviceInit()`. Conversion between the device's native format and the format requested by the application will be handled by
+     miniaudio internally.
 
 Initialization of the context is quite simple. You need to do any necessary initialization of internal objects and then output the
 callbacks defined in this structure.
@@ -440,7 +481,7 @@ callbacks defined in this structure.
 Once the context has been initialized you can initialize a device. Before doing so, however, the application may want to know which
 physical devices are available. This is where `onContextEnumerateDevices()` comes in. This is fairly simple. For each device, fire the
 given callback with, at a minimum, the basic information filled out in `ma_device_info`. When the callback returns `MA_FALSE`, enumeration
-needs to stop and the `onContextEnumerateDevices()` function return with a success code.
+needs to stop and the `onContextEnumerateDevices()` function returns with a success code.
 
 Detailed device information can be retrieved from a device ID using `onContextGetDeviceInfo()`. This takes as input the device type and ID,
 and on output returns detailed information about the device in `ma_device_info`. The `onContextGetDeviceInfo()` callback must handle the
@@ -455,7 +496,7 @@ internally by miniaudio.
 
 On input, if the sample format is set to `ma_format_unknown`, the backend is free to use whatever sample format it desires, so long as it's
 supported by miniaudio. When the channel count is set to 0, the backend should use the device's native channel count. The same applies for
-sample rate. For the channel map, the default should be used when `ma_channel_map_blank()` returns true (all channels set to
+sample rate. For the channel map, the default should be used when `ma_channel_map_is_blank()` returns true (all channels set to
 `MA_CHANNEL_NONE`). On input, the `periodSizeInFrames` or `periodSizeInMilliseconds` option should always be set. The backend should
 inspect both of these variables. If `periodSizeInFrames` is set, it should take priority, otherwise it needs to be derived from the period
 size in milliseconds (`periodSizeInMilliseconds`) and the sample rate, keeping in mind that the sample rate may be 0, in which case the
@@ -474,14 +515,17 @@ This allows miniaudio to then process any necessary data conversion and then pas
 If the backend requires absolute flexibility with it's data delivery, it can optionally implement the `onDeviceDataLoop()` callback
 which will allow it to implement the logic that will run on the audio thread. This is much more advanced and is completely optional.
 
-The audio thread should run data delivery logic in a loop while `ma_device_get_state() == MA_STATE_STARTED` and no errors have been
+The audio thread should run data delivery logic in a loop while `ma_device_get_state() == ma_device_state_started` and no errors have been
 encounted. Do not start or stop the device here. That will be handled from outside the `onDeviceDataLoop()` callback.
 
 The invocation of the `onDeviceDataLoop()` callback will be handled by miniaudio. When you start the device, miniaudio will fire this
-callback. When the device is stopped, the `ma_device_get_state() == MA_STATE_STARTED` condition will fail and the loop will be terminated
+callback. When the device is stopped, the `ma_device_get_state() == ma_device_state_started` condition will fail and the loop will be terminated
 which will then fall through to the part that stops the device. For an example on how to implement the `onDeviceDataLoop()` callback,
 look at `ma_device_audio_thread__default_read_write()`. Implement the `onDeviceDataLoopWakeup()` callback if you need a mechanism to
 wake up the audio thread.
+
+If the backend supports an optimized retrieval of device information from an initialized `ma_device` object, it should implement the
+`onDeviceGetInfo()` callback. This is optional, in which case it will fall back to `onContextGetDeviceInfo()` which is less efficient.
 */
 backend_callbacks :: struct {
 	onContextInit:              proc "c" (pContext: ^context_type, pConfig: ^context_config, pCallbacks: ^backend_callbacks) -> result,
@@ -496,10 +540,10 @@ backend_callbacks :: struct {
 	onDeviceWrite:              proc "c" (pDevice: ^device, pFrames: rawptr, frameCount: u32, pFramesWritten: ^u32) -> result,
 	onDeviceDataLoop:           proc "c" (pDevice: ^device) -> result,
 	onDeviceDataLoopWakeup:     proc "c" (pDevice: ^device) -> result,
+	onDeviceGetInfo:            proc "c" (pDevice: ^device, type: device_type, pDeviceInfo: ^device_info) -> result,
 }
 
 context_config :: struct {
-	logCallback: log_proc, /* Legacy logging callback. Will be removed in version 0.11. */
 	pLog: ^log,
 	threadPriority: thread_priority,
 	threadStackSize: c.size_t,
@@ -538,7 +582,7 @@ context_command__wasapi :: struct {
 			deviceType:           device_type,
 			pAudioClient:         rawptr,
 			ppAudioClientService: ^rawptr,
-			pResult:              ^rawptr, /* The result from creating the audio client service. */
+			pResult:              ^result, /* The result from creating the audio client service. */
 		},
 		releaseAudioClient: struct {
 			pDevice:    ^device,
@@ -548,21 +592,20 @@ context_command__wasapi :: struct {
 }
 
 context_type :: struct {
-	callbacks: backend_callbacks,
-	backend: backend,                 /* DirectSound, ALSA, etc. */
-	pLog: ^log,
-	log: log,                         /* Only used if the log is owned by the context. The pLog member will be set to &log in this case. */
-	logCallback: log_proc,            /* Legacy callback. Will be removed in version 0.11. */
-	threadPriority: thread_priority,
-	threadStackSize: c.size_t,
-	pUserData: rawptr,
-	allocationCallbacks: allocation_callbacks,
-	deviceEnumLock: mutex,            /* Used to make ma_context_get_devices() thread safe. */
-	deviceInfoLock: mutex,            /* Used to make ma_context_get_device_info() thread safe. */
-	deviceInfoCapacity: u32,          /* Total capacity of pDeviceInfos. */
+	callbacks:               backend_callbacks,
+	backend:                 backend,          /* DirectSound, ALSA, etc. */
+	pLog:                    ^log,
+	log:                     log,              /* Only used if the log is owned by the context. The pLog member will be set to &log in this case. */
+	threadPriority:          thread_priority,
+	threadStackSize:         c.size_t,
+	pUserData:               rawptr,
+	allocationCallbacks:     allocation_callbacks,
+	deviceEnumLock:          mutex,            /* Used to make ma_context_get_devices() thread safe. */
+	deviceInfoLock:          mutex,            /* Used to make ma_context_get_device_info() thread safe. */
+	deviceInfoCapacity:      u32,          		 /* Total capacity of pDeviceInfos. */
 	playbackDeviceInfoCount: u32,
-	captureDeviceInfoCount: u32,
-	pDeviceInfos: [^]device_info,     /* Playback devices first, then capture. */
+	captureDeviceInfoCount:  u32,
+	pDeviceInfos:            [^]device_info,   /* Playback devices first, then capture. */
 
 	using _: struct #raw_union {
 		wasapi: (struct {
@@ -575,7 +618,7 @@ context_type :: struct {
 		} when SUPPORT_WASAPI else struct {}),
 		
 		dsound: (struct {
-			DSoundDLL:                    handle,
+			hDSoundDLL:                   handle,
 			DirectSoundCreate:            proc "system" (),
 			DirectSoundEnumerateA:        proc "system" (),
 			DirectSoundCaptureCreate:     proc "system" (),
@@ -741,6 +784,8 @@ context_type :: struct {
 
 			/*pa_mainloop**/ pMainLoop:     rawptr,
 			/*pa_context**/  pPulseContext: rawptr,
+			pApplicationName:               cstring, /* Set when the context is initialized. Used by devices for their local pa_context objects. */
+      pServerName:                    cstring, /* Set when the context is initialized. Used by devices for their local pa_context objects. */
 		} when SUPPORT_PULSEAUDIO else struct {}),
 		
 		jack: (struct {
@@ -762,7 +807,7 @@ context_type :: struct {
 			jack_port_get_buffer:          proc "system" (),
 			jack_free:                     proc "system" (),
 
-			pClientName:    [^]c.char,
+			pClientName:    cstring,
 			tryStartServer: b32,
 		} when SUPPORT_JACK else struct {}),
 
@@ -817,7 +862,7 @@ context_type :: struct {
 		} when SUPPORT_SNDIO else struct {}),
 
 		audio4: (struct {
-			_unused: cint,
+			_unused: c.int,
 		} when SUPPORT_AUDIO4 else struct {}),
 
 		oss: (struct {
@@ -855,6 +900,7 @@ context_type :: struct {
 			AAudioStream_getFramesPerBurst:                proc "system" (),
 			AAudioStream_requestStart:                     proc "system" (),
 			AAudioStream_requestStop:                      proc "system" (),
+			jobThread:                                     device_job_thread, /* For processing operations outside of the error callback, specifically device disconnections and rerouting. */
 		} when SUPPORT_AAUDIO else struct {}),
 
 		opensl: (struct {
@@ -921,37 +967,40 @@ context_type :: struct {
 }
 
 device :: struct {
-	pContext:                ^context_type,
-	type:                    device_type,
-	sampleRate:              u32,
-	state:                   u32, /*atomic*/        /* The state of the device is variable and can change at any time on any thread. Must be used atomically. */
-	onData:                  device_callback_proc,  /* Set once at initialization time and should not be changed after. */
-	onStop:                  stop_proc,             /* Set once at initialization time and should not be changed after. */
-	pUserData:               rawptr,                /* Application defined data. */
-	startStopLock:           mutex,
-	wakeupEvent:             event,
-	startEvent:              event,
-	stopEvent:               event,
-	device_thread:           thread,
-	workResult:              result,                /* This is set by the worker thread after it's finished doing a job. */
-	isOwnerOfContext:        b8,                    /* When set to true, uninitializing the device will also uninitialize the context. Set to true when NULL is passed into ma_device_init(). */
-	noPreZeroedOutputBuffer: b8,
-	noClip:                  b8,
-	masterVolumeFactor:      f32, /*atomic*/        /* Linear 0..1. Can be read and written simultaneously by different threads. Must be used atomically. */
-	duplexRB:                duplex_rb,             /* Intermediary buffer for duplex device on asynchronous backends. */
+	pContext:                  ^context_type,
+	type:                      device_type,
+	sampleRate:                u32,
+	state:                     u32, /*atomic*/            /* The state of the device is variable and can change at any time on any thread. Must be used atomically. */
+	onData:                    device_data_proc,          /* Set once at initialization time and should not be changed after. */
+	onNotification:            device_notification_proc,  /* Set once at initialization time and should not be changed after. */
+	onStop:                    stop_proc,                 /* DEPRECATED. Use the notification callback instead. Set once at initialization time and should not be changed after. */
+	pUserData:                 rawptr,                    /* Application defined data. */
+	startStopLock:             mutex,
+	wakeupEvent:               event,
+	startEvent:                event,
+	stopEvent:                 event,
+	device_thread:             thread,
+	workResult:                result,                /* This is set by the worker thread after it's finished doing a job. */
+	isOwnerOfContext:          b8,                    /* When set to true, uninitializing the device will also uninitialize the context. Set to true when NULL is passed into ma_device_init(). */
+	noPreSilencedOutputBuffer: b8,
+	noClip:                    b8,
+	noDisableDenormals:        b8,
+  noFixedSizedCallback:      b8,
+	masterVolumeFactor:        f32, /*atomic*/        /* Linear 0..1. Can be read and written simultaneously by different threads. Must be used atomically. */
+	duplexRB:                  duplex_rb,             /* Intermediary buffer for duplex device on asynchronous backends. */
 	resampling: struct {
-		algorithm: resample_algorithm,
+		algorithm:        resample_algorithm,
+		pBackendVTable:   ^resampling_backend_vtable,
+		pBackendUserData: rawptr,
 		linear: struct {
 			lpfOrder: u32,
 		},
-		speex: struct {
-			quality: c.int,
-		},
 	},
 	playback: struct {
-		id:                         device_id,             /* If using an explicit device, will be set to a copy of the ID used for initialization. Otherwise cleared to 0. */
-		name:                       [256]byte,             /* Maybe temporary. Likely to be replaced with a query API. */
-		shareMode:                  share_mode,            /* Set to whatever was passed in when the device was initialized. */
+		pID:                        ^device_id,                           /* Set to NULL if using default ID, otherwise set to the address of "id". */
+		id:                         device_id,                            /* If using an explicit device, will be set to a copy of the ID used for initialization. Otherwise cleared to 0. */
+		name:                       [MAX_DEVICE_NAME_LENGTH + 1]c.char,   /* Maybe temporary. Likely to be replaced with a query API. */
+		shareMode:                  share_mode,                           /* Set to whatever was passed in when the device was initialized. */
 		playback_format:            format,
 		channels:                   u32,
 		channelMap:                 [MAX_CHANNELS]channel,
@@ -963,11 +1012,19 @@ device :: struct {
 		internalPeriods:            u32,
 		channelMixMode:             channel_mix_mode,
 		converter:                  data_converter,
+		pIntermediaryBuffer:        rawptr,  /* For implementing fixed sized buffer callbacks. Will be null if using variable sized callbacks. */
+		intermediaryBufferCap:      u32,
+		intermediaryBufferLen:      u32,     /* How many valid frames are sitting in the intermediary buffer. */
+		pInputCache:                rawptr,  /* In external format. Can be null. */
+		inputCacheCap:              u64,
+		inputCacheConsumed:         u64,
+		inputCacheRemaining:        u64,
 	},
 	capture: struct {
-		id:                         device_id,             /* If using an explicit device, will be set to a copy of the ID used for initialization. Otherwise cleared to 0. */
-		name:                       [256]byte,             /* Maybe temporary. Likely to be replaced with a query API. */
-		shareMode:                  share_mode,            /* Set to whatever was passed in when the device was initialized. */
+		pID:                        ^device_id,                           /* Set to NULL if using default ID, otherwise set to the address of "id". */
+		id:                         device_id,                            /* If using an explicit device, will be set to a copy of the ID used for initialization. Otherwise cleared to 0. */
+		name:                       [MAX_DEVICE_NAME_LENGTH + 1]c.char,   /* Maybe temporary. Likely to be replaced with a query API. */
+		shareMode:                  share_mode,                           /* Set to whatever was passed in when the device was initialized. */
 		capture_format:             format,
 		channels:                   u32,
 		channelMap:                 [MAX_CHANNELS]channel,
@@ -979,6 +1036,9 @@ device :: struct {
 		internalPeriods:            u32,
 		channelMixMode:             channel_mix_mode,
 		converter:                  data_converter,
+		pIntermediaryBuffer:        rawptr,  /* For implementing fixed sized buffer callbacks. Will be null if using variable sized callbacks. */
+		intermediaryBufferCap:      u32,
+		intermediaryBufferLen:      u32,     /* How many valid frames are sitting in the intermediary buffer. */
 	},
 
 	using _: struct #raw_union {
@@ -991,7 +1051,7 @@ device :: struct {
 			notificationClient: IMMNotificationClient,
 			/*HANDLE*/ hEventPlayback: handle,                    /* Auto reset. Initialized to signaled. */
 			/*HANDLE*/ hEventCapture: handle,                     /* Auto reset. Initialized to unsignaled. */
-			actualPeriodSizeInFramesPlayback: u32,             /* Value from GetBufferSize(). internalPeriodSizeInFrames is not set to the _actual_ buffer size when low-latency shared mode is being used due to the way the IAudioClient3 API works. */
+			actualPeriodSizeInFramesPlayback: u32,                /* Value from GetBufferSize(). internalPeriodSizeInFrames is not set to the _actual_ buffer size when low-latency shared mode is being used due to the way the IAudioClient3 API works. */
 			actualPeriodSizeInFramesCapture: u32,
 			originalPeriodSizeInFrames: u32,
 			originalPeriodSizeInMilliseconds: u32,
@@ -999,8 +1059,14 @@ device :: struct {
 			originalPerformanceProfile: performance_profile,
 			periodSizeInFramesPlayback: u32,
 			periodSizeInFramesCapture: u32,
-			isStartedCapture: b32, /*atomic*/                   /* Can be read and written simultaneously across different threads. Must be used atomically, and must be 32-bit. */
-			isStartedPlayback: b32, /*atomic*/                  /* Can be read and written simultaneously across different threads. Must be used atomically, and must be 32-bit. */
+			pMappedBufferCapture: rawptr,
+			mappedBufferCaptureCap: u32,
+			mappedBufferCaptureLen: u32,
+			pMappedBufferPlayback: rawptr,
+			mappedBufferPlaybackCap: u32,
+			mappedBufferPlaybackLen: u32,
+			isStartedCapture: b32, /*atomic*/                  /* Can be read and written simultaneously across different threads. Must be used atomically, and must be 32-bit. */
+			isStartedPlayback: b32, /*atomic*/                 /* Can be read and written simultaneously across different threads. Must be used atomically, and must be 32-bit. */
 			noAutoConvertSRC: b8,                              /* When set to true, disables the use of AUDCLNT_STREAMFLAGS_AUTOCONVERTPCM. */
 			noDefaultQualitySRC: b8,                           /* When set to true, disables the use of AUDCLNT_STREAMFLAGS_SRC_DEFAULT_QUALITY. */
 			noHardwareOffloading: b8,
@@ -1049,14 +1115,16 @@ device :: struct {
 		} when SUPPORT_ALSA else struct {}),
 
 		pulse: (struct {
+			/*pa_mainloop**/ pMainLoop: rawptr,
+    	/*pa_context**/ pPulseContext: rawptr,
 			/*pa_stream**/ pStreamPlayback: rawptr,
 			/*pa_stream**/ pStreamCapture: rawptr,
 		} when SUPPORT_PULSEAUDIO else struct {}),
 		
 		jack: (struct {
 			/*jack_client_t**/ pClient: rawptr,
-			/*jack_port_t**/ pPortsPlayback: [MAX_CHANNELS]rawptr,
-			/*jack_port_t**/ pPortsCapture:  [MAX_CHANNELS]rawptr,
+			/*jack_port_t**/ pPortsPlayback: [^]rawptr,
+			/*jack_port_t**/ pPortsCapture:  [^]rawptr,
 			pIntermediaryBufferPlayback: [^]f32, /* Typed as a float because JACK is always floating point. */
 			pIntermediaryBufferCapture: [^]f32,
 		} when SUPPORT_JACK else struct {}),
@@ -1079,6 +1147,7 @@ device :: struct {
 			isSwitchingCaptureDevice: b32,    /* <-- Set to true when the default device has changed and miniaudio is in the process of switching. */
 			pRouteChangeHandler: rawptr,             /* Only used on mobile platforms. Obj-C object for handling route changes. */
 		} when SUPPORT_COREAUDIO else struct {}),
+
 		sndio: (struct {
 			handlePlayback: rawptr,
 			handleCapture: rawptr,
@@ -1099,6 +1168,10 @@ device :: struct {
 		aaudio: (struct {
 			/*AAudioStream**/ pStreamPlayback: rawptr,
 			/*AAudioStream**/ pStreamCapture: rawptr,
+			usage: aaudio_usage,
+			contentType: aaudio_content_type,
+			inputPreset: aaudio_input_preset,
+			noAutoStartAfterReroute: b32,
 		} when SUPPORT_AAUDIO else struct {}),
 
 		opensl: (struct {
