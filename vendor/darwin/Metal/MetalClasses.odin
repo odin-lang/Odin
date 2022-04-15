@@ -6588,6 +6588,7 @@ Device_newHeap :: #force_inline proc(self: ^Device, descriptor: ^HeapDescriptor)
 Device_newIndirectCommandBuffer :: #force_inline proc(self: ^Device, descriptor: ^IndirectCommandBufferDescriptor, maxCount: NS.UInteger, options: ResourceOptions) -> ^IndirectCommandBuffer {
 	return msgSend(^IndirectCommandBuffer, self, "newIndirectCommandBufferWithDescriptor:maxCommandCount:options:", descriptor, maxCount, options)
 }
+
 @(objc_type=Device, objc_name="newLibraryWithData")
 Device_newLibraryWithData :: #force_inline proc(self: ^Device, data: dispatch_data_t) -> (library: ^Library, error: ^NS.Error) {
 	library = msgSend(^Library, self, "newLibraryWithData:error:", data, &error)
@@ -6626,6 +6627,7 @@ Device_newLibrary :: proc{
 Device_newRasterizationRateMap :: #force_inline proc(self: ^Device, descriptor: ^RasterizationRateMapDescriptor) -> ^RasterizationRateMap {
 	return msgSend(^RasterizationRateMap, self, "newRasterizationRateMapWithDescriptor:", descriptor)
 }
+
 @(objc_type=Device, objc_name="newRenderPipelineStateWithDescriptorWithCompletionHandler")
 Device_newRenderPipelineStateWithDescriptorWithCompletionHandler :: #force_inline proc(self: ^Device, descriptor: ^RenderPipelineDescriptor, completionHandler: NewRenderPipelineStateCompletionHandler) -> ^RenderPipelineState {
 	return msgSend(^RenderPipelineState, self, "newRenderPipelineStateWithDescriptor:completionHandler:", descriptor, completionHandler)
