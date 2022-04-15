@@ -34,8 +34,9 @@ global_block_descriptor := Block_Descriptor{
 @(objc_class="NSConcreteGlobalBlock")
 Block :: struct {using _: Object}
 
-@(objc_type=Block, objc_name="create", objc_is_class_method=true)
-Block_create :: proc "c" (user_data: rawptr, user_proc: proc "c" (user_data: rawptr)) -> ^Block {
+
+@(private="file")
+Block_createInternal :: proc "c" (is_global: bool, user_data: rawptr, user_proc: proc "c" (user_data: rawptr)) -> ^Block {
 	// Set to true on blocks that have captures (and thus are not true
 	// global blocks) but are known not to escape for various other
 	// reasons. For backward compatibility with old runtimes, whenever
@@ -55,13 +56,24 @@ Block_create :: proc "c" (user_data: rawptr, user_proc: proc "c" (user_data: raw
 	cls := intrinsics.objc_find_class("NSConcreteGlobalBlock")
 	bl := (^Internal_Block_Literal)(AllocateObject(cls, extraBytes, nil))
 	bl.isa = cls
-	bl.flags = BLOCK_IS_GLOBAL
+	bl.flags = BLOCK_IS_GLOBAL if is_global else 0
 	bl.invoke = proc "c" (bl: ^Internal_Block_Literal) {
 		bl.user_proc(bl.user_data)
 	}
 	bl.descriptor = &global_block_descriptor
 	bl.user_proc = user_proc
 	bl.user_data = user_data
-	
+
 	return auto_cast bl
+}
+
+@(objc_type=Block, objc_name="createGlobal", objc_is_class_method=true)
+Block_createGlobal :: proc "c" (user_data: rawptr, user_proc: proc "c" (user_data: rawptr)) -> ^Block {
+	return Block_createInternal(true, user_data, user_proc)
+}
+
+
+@(objc_type=Block, objc_name="createLocal", objc_is_class_method=true)
+Block_createLocal :: proc "c" (user_data: rawptr, user_proc: proc "c" (user_data: rawptr)) -> ^Block {
+	return Block_createInternal(false, user_data, user_proc)
 }
