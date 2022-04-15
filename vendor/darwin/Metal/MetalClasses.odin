@@ -6442,12 +6442,12 @@ Device_maxTransferRate :: #force_inline proc(self: ^Device) -> u64 {
 	return msgSend(u64, self, "maxTransferRate")
 }
 @(objc_type=Device, objc_name="minimumLinearTextureAlignmentForPixelFormat")
-Device_minimumLinearTextureAlignmentForPixelFormat :: #force_inline proc(self: ^Device, format: PixelFormat) -> ^Device {
-	return msgSend(^Device, self, "minimumLinearTextureAlignmentForPixelFormat:", format)
+Device_minimumLinearTextureAlignmentForPixelFormat :: #force_inline proc(self: ^Device, format: PixelFormat) -> NS.UInteger {
+	return msgSend(NS.UInteger, self, "minimumLinearTextureAlignmentForPixelFormat:", format)
 }
 @(objc_type=Device, objc_name="minimumTextureBufferAlignmentForPixelFormat")
-Device_minimumTextureBufferAlignmentForPixelFormat :: #force_inline proc(self: ^Device, format: PixelFormat) -> ^Device {
-	return msgSend(^Device, self, "minimumTextureBufferAlignmentForPixelFormat:", format)
+Device_minimumTextureBufferAlignmentForPixelFormat :: #force_inline proc(self: ^Device, format: PixelFormat) -> NS.UInteger {
+	return msgSend(NS.UInteger, self, "minimumTextureBufferAlignmentForPixelFormat:", format)
 }
 @(objc_type=Device, objc_name="name")
 Device_name :: #force_inline proc(self: ^Device) -> ^NS.String {
@@ -6527,6 +6527,17 @@ Device_newComputePipelineStateWithFunctionWithReflection :: #force_inline proc(s
 	res = msgSend(^ComputePipelineState, self, "newComputePipelineStateWithFunction:options:reflection:error:", computeFunction, options, reflection, &error)
 	return
 }
+
+@(objc_type=Device, objc_name="newComputePipelineState")
+Device_newComputePipelineState :: proc{
+	Device_newComputePipelineStateWithDescriptorWithCompletionHandler,
+	Device_newComputePipelineStateWithDescriptorWithReflection,
+	Device_newComputePipelineStateWithFunctionWithCompletionHandler,
+	Device_newComputePipelineStateWithFunction,
+	Device_newComputePipelineStateWithFunctionWithOptionsAndCompletionHandler,
+	Device_newComputePipelineStateWithFunctionWithReflection,
+}
+
 @(objc_type=Device, objc_name="newCounterSampleBuffer")
 Device_newCounterSampleBuffer :: #force_inline proc(self: ^Device, descriptor: ^CounterSampleBufferDescriptor) -> (counter: ^Counter, error: ^NS.Error) {
 	counter = msgSend(^Counter, self, "newCounterSampleBufferWithDescriptor:error:", descriptor, &error)
@@ -6595,6 +6606,16 @@ Device_newLibraryWithURL :: #force_inline proc(self: ^Device, url: ^NS.URL) -> (
 	library = msgSend(^Library, self, "newLibraryWithURL:error:", url, &error)
 	return
 }
+@(objc_type=Device, objc_name="newLibrary")
+Device_newLibrary :: proc{
+	Device_newLibraryWithData,
+	Device_newLibraryWithFile,
+	Device_newLibraryWithSourceWithCompletionHandler,
+	Device_newLibraryWithSource,
+	Device_newLibraryWithURL,
+}
+
+
 @(objc_type=Device, objc_name="newRasterizationRateMap")
 Device_newRasterizationRateMap :: #force_inline proc(self: ^Device, descriptor: ^RasterizationRateMapDescriptor) -> ^RasterizationRateMap {
 	return msgSend(^RasterizationRateMap, self, "newRasterizationRateMapWithDescriptor:", descriptor)
@@ -6603,8 +6624,8 @@ Device_newRasterizationRateMap :: #force_inline proc(self: ^Device, descriptor: 
 Device_newRenderPipelineStateWithDescriptorWithCompletionHandler :: #force_inline proc(self: ^Device, descriptor: ^RenderPipelineDescriptor, completionHandler: NewRenderPipelineStateCompletionHandler) -> ^RenderPipelineState {
 	return msgSend(^RenderPipelineState, self, "newRenderPipelineStateWithDescriptor:completionHandler:", descriptor, completionHandler)
 }
-@(objc_type=Device, objc_name="newRenderPipelineState")
-Device_newRenderPipelineState :: #force_inline proc(self: ^Device, descriptor: ^RenderPipelineDescriptor) -> (pipeline: ^RenderPipelineState, error: ^NS.Error) {
+@(objc_type=Device, objc_name="newRenderPipelineStateWithDescriptor")
+Device_newRenderPipelineStateWithDescriptor :: #force_inline proc(self: ^Device, descriptor: ^RenderPipelineDescriptor) -> (pipeline: ^RenderPipelineState, error: ^NS.Error) {
 	pipeline = msgSend(^RenderPipelineState, self, "newRenderPipelineStateWithDescriptor:error:", descriptor, &error)
 	return
 }
@@ -6626,6 +6647,17 @@ Device_newRenderPipelineStateWithTileDescriptorWithReflection :: #force_inline p
 	pipeline = msgSend(^RenderPipelineState, self, "newRenderPipelineStateWithTileDescriptor:options:reflection:error:", descriptor, options, reflection, &error)
 	return
 }
+@(objc_type=Device, objc_name="newRenderPipelineState")
+Device_newRenderPipelineState :: proc{
+	Device_newRenderPipelineStateWithDescriptorWithCompletionHandler,
+	Device_newRenderPipelineStateWithDescriptor,
+	Device_newRenderPipelineStateWithDescriptorWithOptionsAndCompletionHandler,
+	Device_newRenderPipelineStateWithDescriptorWithReflection,
+	Device_newRenderPipelineStateWithTileDescriptorWithCompletionHandler,
+	Device_newRenderPipelineStateWithTileDescriptorWithReflection,
+}
+
+
 @(objc_type=Device, objc_name="newSamplerState")
 Device_newSamplerState :: #force_inline proc(self: ^Device, descriptor: ^SamplerDescriptor) -> ^SamplerState {
 	return msgSend(^SamplerState, self, "newSamplerStateWithDescriptor:", descriptor)
