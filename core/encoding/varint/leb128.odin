@@ -10,8 +10,6 @@
 // the LEB128 format as used by DWARF debug info, Android .dex and other file formats.
 package varint
 
-import "core:fmt"
-
 // In theory we should use the bigint package. In practice, varints bigger than this indicate a corrupted file.
 // Instead we'll set limits on the values we'll encode/decode
 // 18 * 7 bits = 126, which means that a possible 19th byte may at most be `0b0000_0011`.
@@ -25,31 +23,46 @@ Error :: enum {
 
 // Decode a slice of bytes encoding an unsigned LEB128 integer into value and number of bytes used.
 // Returns `size` == 0 for an invalid value, empty slice, or a varint > 18 bytes.
-decode_uleb128 :: proc(buf: []u8) -> (val: u128, size: int, err: Error) {
-	more := true
+decode_uleb128_buffer :: proc(buf: []u8) -> (val: u128, size: int, err: Error) {
+	if len(buf) == 0 {
+		return 0, 0, .Buffer_Too_Small
+	}
 
-	for v, i in buf {
-		size = i + 1
-
-		// 18 * 7 bits = 126, which means that a possible 19th byte may at most be 0b0000_0011.
-		if size > LEB128_MAX_BYTES || size == LEB128_MAX_BYTES && v > 0b0000_0011 {
-			return 0, 0, .Value_Too_Large
-		}
-
-		val |= u128(v & 0x7f) << uint(i * 7)
-
-		if v < 128 {
-			more = false
-			break
+	for v in buf {
+		val, size, err = decode_uleb128_byte(v, size, val)
+		if err != .Buffer_Too_Small {
+			return
 		}
 	}
 
-	// If the buffer runs out before the number ends, return an error.
-	if more {
-		return 0, 0, .Buffer_Too_Small
+	if err == .Buffer_Too_Small {
+		val, size = 0, 0
 	}
 	return
 }
+
+// Decodes an unsigned LEB128 integer into value a byte at a time.
+// Returns `.None` when decoded properly, `.Value_Too_Large` when they value
+// exceeds the limits of a u128, and `.Buffer_Too_Small` when it's not yet fully decoded.
+decode_uleb128_byte :: proc(input: u8, offset: int, accumulator: u128) -> (val: u128, size: int, err: Error) {
+	size = offset + 1
+
+	// 18 * 7 bits = 126, which means that a possible 19th byte may at most be 0b0000_0011.
+	if size > LEB128_MAX_BYTES || size == LEB128_MAX_BYTES && input > 0b0000_0011 {
+		return 0, 0, .Value_Too_Large
+	}
+
+	val = accumulator | u128(input & 0x7f) << uint(offset * 7)
+
+	if input < 128 {
+		// We're done
+		return
+	}
+
+	// If the buffer runs out before the number ends, return an error.
+	return val, size, .Buffer_Too_Small
+}
+decode_uleb128 :: proc {decode_uleb128_buffer, decode_uleb128_byte}
 
 // Decode a slice of bytes encoding a signed LEB128 integer into value and number of bytes used.
 // Returns `size` == 0 for an invalid value, empty slice, or a varint > 18 bytes.
@@ -89,7 +102,6 @@ encode_uleb128 :: proc(buf: []u8, val: u128) -> (size: int, err: Error) {
 		size += 1
 
 		if size > len(buf) {
-			fmt.println(val, buf[:size - 1])
 			return 0, .Buffer_Too_Small
 		}
 
