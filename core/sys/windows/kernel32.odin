@@ -92,6 +92,20 @@ foreign kernel32 {
 	CreateSemaphoreW :: proc(attributes: LPSECURITY_ATTRIBUTES, initial_count, maximum_count: LONG, name: LPCSTR) -> HANDLE ---
 	ReleaseSemaphore :: proc(semaphore: HANDLE, release_count: LONG, previous_count: ^LONG) -> BOOL ---
 
+	CreateWaitableTimerW :: proc(
+		lpTimerAttributes: LPSECURITY_ATTRIBUTES,
+		bManualReset: BOOL,
+		lpTimerName: LPCWSTR,
+	) -> HANDLE ---
+	SetWaitableTimerEx :: proc(
+		hTimer: HANDLE,
+		lpDueTime: ^LARGE_INTEGER,
+		lPeriod: LONG,
+		pfnCompletionRoutine: PTIMERAPCROUTINE,
+		lpArgToCompletionRoutine: LPVOID,
+		WakeContext: PREASON_CONTEXT,
+		TolerableDelay: ULONG,
+	) -> BOOL ---
 	WaitForSingleObject :: proc(hHandle: HANDLE, dwMilliseconds: DWORD) -> DWORD ---
 	Sleep :: proc(dwMilliseconds: DWORD) ---
 	GetProcessId :: proc(handle: HANDLE) -> DWORD ---
