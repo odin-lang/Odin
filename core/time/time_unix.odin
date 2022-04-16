@@ -1,8 +1,6 @@
 //+build linux, darwin, freebsd, openbsd
 package time
 
-import "core:sys/unix"
-
 IS_SUPPORTED :: true // NOTE: Times on Darwin are UTC.
 
 when ODIN_OS == .Darwin {
@@ -19,8 +17,18 @@ foreign libc {
 	@(link_name="nanosleep")     _unix_nanosleep     :: proc(requested: ^TimeSpec, remaining: ^TimeSpec) -> i32 ---
 }
 
+foreign import "system:pthread"
+
+import "core:c"
+
+@(private="file")
+@(default_calling_convention="c")
+foreign pthread {
+	sched_yield :: proc() -> c.int ---
+}
+
 _yield :: proc "contextless" () {
-	unix.sched_yield()
+	sched_yield()
 }
 
 TimeSpec :: struct {
