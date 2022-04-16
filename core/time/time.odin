@@ -214,12 +214,17 @@ time_add :: proc(t: Time, d: Duration) -> Time {
 }
 
 // Accurate sleep borrowed from: https://blat-blatnik.github.io/computerBear/making-accurate-sleep-function/
+//
+// Accuracy seems to be pretty good out of the box on Linux, to within around 4µs worst case.
+// On Windows it depends but is comparable with regular sleep in the worst case.
+// To get the same kind of accuracy as on Linux, have your program call `win32.time_begin_period(1)` to
+// tell Windows to use a more accurate timer for your process.
 accurate_sleep :: proc(d: Duration) {
 	to_sleep, estimate, mean, m2, count: Duration
 
 	to_sleep = d
 	estimate = 5 * Millisecond
-	mean = 5 * Millisecond
+	mean     = 5 * Millisecond
 	count = 1
 
 	for to_sleep > estimate {
