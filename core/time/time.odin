@@ -213,10 +213,6 @@ time_add :: proc(t: Time, d: Duration) -> Time {
 	return Time{t._nsec + i64(d)}
 }
 
-yield :: proc "contextless" () {
-	_yield()
-}
-
 // Accurate sleep borrowed from: https://blat-blatnik.github.io/computerBear/making-accurate-sleep-function/
 accurate_sleep :: proc(d: Duration) {
 	to_sleep, estimate, mean, m2, count: Duration
@@ -245,7 +241,7 @@ accurate_sleep :: proc(d: Duration) {
 	start := tick_now()
 	for to_sleep > tick_since(start) {
 		// prevent the spinlock from taking the thread hostage, still accurate enough
-		yield()
+		_yield()
 		// NOTE: it might be possible that it yields for too long, in that case it should spinlock freely for a while
 		// TODO: needs actual testing done to check if that's the case
 	}
