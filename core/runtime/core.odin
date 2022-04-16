@@ -401,6 +401,7 @@ Raw_Cstring :: struct {
 		Linux,
 		Essence,
 		FreeBSD,
+		OpenBSD,
 		WASI,
 		JS,
 		Freestanding,
