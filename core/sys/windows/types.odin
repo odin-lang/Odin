@@ -123,6 +123,8 @@ PCONDITION_VARIABLE :: ^CONDITION_VARIABLE
 PLARGE_INTEGER :: ^LARGE_INTEGER
 PSRWLOCK :: ^SRWLOCK
 
+MMRESULT :: UINT
+
 SOCKET :: distinct uintptr // TODO
 socklen_t :: c_int
 ADDRESS_FAMILY :: USHORT
@@ -195,6 +197,56 @@ GET_FILEEX_INFO_LEVELS :: distinct i32
 GetFileExInfoStandard: GET_FILEEX_INFO_LEVELS : 0
 GetFileExMaxInfoLevel: GET_FILEEX_INFO_LEVELS : 1
 
+// String resource number bases (internal use)
+
+MMSYSERR_BASE :: 0
+WAVERR_BASE   :: 32
+MIDIERR_BASE  :: 64
+TIMERR_BASE   :: 96
+JOYERR_BASE   :: 160
+MCIERR_BASE   :: 256
+MIXERR_BASE   :: 1024
+
+MCI_STRING_OFFSET :: 512
+MCI_VD_OFFSET     :: 1024
+MCI_CD_OFFSET     :: 1088
+MCI_WAVE_OFFSET   :: 1152
+MCI_SEQ_OFFSET    :: 1216
+
+// timer error return values
+TIMERR_NOERROR :: 0                // no error
+TIMERR_NOCANDO :: TIMERR_BASE + 1  // request not completed
+TIMERR_STRUCT  :: TIMERR_BASE + 33 // time struct size
+
+DIAGNOSTIC_REASON_VERSION :: 0
+
+DIAGNOSTIC_REASON_SIMPLE_STRING   :: 0x00000001
+DIAGNOSTIC_REASON_DETAILED_STRING :: 0x00000002
+DIAGNOSTIC_REASON_NOT_SPECIFIED   :: 0x80000000
+
+// Defines for power request APIs
+
+POWER_REQUEST_CONTEXT_VERSION :: DIAGNOSTIC_REASON_VERSION
+
+POWER_REQUEST_CONTEXT_SIMPLE_STRING   :: DIAGNOSTIC_REASON_SIMPLE_STRING
+POWER_REQUEST_CONTEXT_DETAILED_STRING :: DIAGNOSTIC_REASON_DETAILED_STRING
+
+REASON_CONTEXT :: struct {
+	Version: ULONG,
+	Flags: DWORD,
+	Reason: struct #raw_union {
+		Detailed: struct {
+			LocalizedReasonModule: HMODULE,
+			LocalizedReasonId: ULONG,
+			ReasonStringCount: ULONG,
+			ReasonStrings: ^LPWSTR,
+		},
+		SimpleReasonString: LPWSTR,
+	},
+}
+PREASON_CONTEXT :: ^REASON_CONTEXT
+
+PTIMERAPCROUTINE :: #type proc "stdcall" (lpArgToCompletionRoutine: LPVOID, dwTimerLowValue, dwTimerHighValue: DWORD)
 
 TIMERPROC :: #type proc "stdcall" (HWND, UINT, UINT_PTR, DWORD)
 
@@ -734,6 +786,10 @@ HOVER_DEFAULT :: 0xFFFFFFFF
 USER_TIMER_MAXIMUM :: 0x7FFFFFFF
 USER_TIMER_MINIMUM :: 0x0000000A
 
+// WM_ACTIVATE state values
+WA_INACTIVE    :: 0
+WA_ACTIVE      :: 1
+WA_CLICKACTIVE :: 2
 
 // SetWindowsHook() codes
 WH_MIN             :: -1
