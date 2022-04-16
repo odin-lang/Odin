@@ -1,6 +1,8 @@
 //+build linux, darwin, freebsd, openbsd
 package time
 
+import "core:sys/unix"
+
 IS_SUPPORTED :: true // NOTE: Times on Darwin are UTC.
 
 when ODIN_OS == .Darwin {
@@ -15,6 +17,10 @@ foreign libc {
 	@(link_name="clock_gettime") _unix_clock_gettime :: proc(clock_id: u64, timespec: ^TimeSpec) -> i32 ---
 	@(link_name="sleep")         _unix_sleep         :: proc(seconds: u32) -> i32 ---
 	@(link_name="nanosleep")     _unix_nanosleep     :: proc(requested: ^TimeSpec, remaining: ^TimeSpec) -> i32 ---
+}
+
+_yield :: proc "contextless" () {
+	unix.sched_yield()
 }
 
 TimeSpec :: struct {
