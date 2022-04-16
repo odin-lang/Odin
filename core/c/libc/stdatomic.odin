@@ -70,7 +70,7 @@ atomic_signal_fence :: #force_inline proc(order: memory_order) {
 
 // 7.17.5 Lock-free property
 atomic_is_lock_free :: #force_inline proc(obj: ^$T) -> bool {
-	return size_of(T) <= 8 && (intrinsics.type_is_integer(T) || intrinsics.type_is_pointer(T))
+	return intrinsics.atomic_type_is_lock_free(T)
 }
 
 // 7.17.6 Atomic integer types

@@ -202,7 +202,7 @@ benaphore_lock :: proc(b: ^Benaphore) {
 }
 
 benaphore_try_lock :: proc(b: ^Benaphore) -> bool {
-	v, _ := atomic_compare_exchange_strong_explicit(&b.counter, 1, 0, .Acquire, .Acquire)
+	v, _ := atomic_compare_exchange_strong_explicit(&b.counter, 0, 1, .Acquire, .Acquire)
 	return v == 0
 }
 
@@ -243,7 +243,7 @@ recursive_benaphore_try_lock :: proc(b: ^Recursive_Benaphore) -> bool {
 		atomic_add_explicit(&b.counter, 1, .Acquire)
 	}
 
-	if v, _ := atomic_compare_exchange_strong_explicit(&b.counter, 1, 0, .Acquire, .Acquire); v != 0 {
+	if v, _ := atomic_compare_exchange_strong_explicit(&b.counter, 0, 1, .Acquire, .Acquire); v != 0 {
 		return false
 	}
 	// inside the lock

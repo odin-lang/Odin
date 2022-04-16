@@ -598,13 +598,34 @@ bool allow_check_foreign_filepath(void) {
 	return true;
 }
 
-
 // TODO(bill): OS dependent versions for the BuildContext
 // join_path
 // is_dir
 // is_file
 // is_abs_path
 // has_subdir
+
+enum TargetFileValidity : u8 {
+	TargetFileValidity_Invalid,
+
+	TargetFileValidity_Writable_File,
+	TargetFileValidity_No_Write_Permission,
+	TargetFileValidity_Directory,
+
+	TargetTargetFileValidity_COUNT,
+};
+
+TargetFileValidity set_output_filename(void) {
+	// Assembles the output filename from build_context information.
+	// Returns `true`  if it doesn't exist or is a file.
+	// Returns `false` if a directory or write-protected file.
+
+
+
+
+	return TargetFileValidity_Writable_File;
+}
+
 
 String const WIN32_SEPARATOR_STRING = {cast(u8 *)"\\", 1};
 String const NIX_SEPARATOR_STRING   = {cast(u8 *)"/",  1};

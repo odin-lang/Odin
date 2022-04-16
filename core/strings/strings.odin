@@ -1804,7 +1804,7 @@ fields_iterator :: proc(s: ^string) -> (field: string, ok: bool) {
 		return "", false
 	}
 
-	field = s[:len(s)]
+	field = s[start:]
 	ok = true
 	s^ = s[len(s):]
 	return

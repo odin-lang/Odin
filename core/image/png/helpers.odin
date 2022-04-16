@@ -242,17 +242,16 @@ srgb :: proc(c: image.PNG_Chunk) -> (res: sRGB, ok: bool) {
 }
 
 plte :: proc(c: image.PNG_Chunk) -> (res: PLTE, ok: bool) {
-	if c.header.type != .PLTE {
+	if c.header.type != .PLTE || c.header.length % 3 != 0 || c.header.length > 768 {
 		return {}, false
 	}
 
-	i := 0; j := 0; ok = true
-	for j < int(c.header.length) {
-		res.entries[i] = {c.data[j], c.data[j+1], c.data[j+2]}
-		i += 1; j += 3
+	plte := mem.slice_data_cast([]image.RGB_Pixel, c.data[:])
+	for color, i in plte {
+		res.entries[i] = color
 	}
-	res.used = u16(i)
-	return
+	res.used = u16(len(plte))
+	return res, true
 }
 
 splt :: proc(c: image.PNG_Chunk) -> (res: sPLT, ok: bool) {
