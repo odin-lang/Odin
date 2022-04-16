@@ -66,32 +66,46 @@ decode_uleb128 :: proc {decode_uleb128_buffer, decode_uleb128_byte}
 
 // Decode a slice of bytes encoding a signed LEB128 integer into value and number of bytes used.
 // Returns `size` == 0 for an invalid value, empty slice, or a varint > 18 bytes.
-decode_ileb128 :: proc(buf: []u8) -> (val: i128, size: int, err: Error) {
-	shift: uint
-
+decode_ileb128_buffer :: proc(buf: []u8) -> (val: i128, size: int, err: Error) {
 	if len(buf) == 0 {
 		return 0, 0, .Buffer_Too_Small
 	}
 
 	for v in buf {
-		size += 1
-
-		// 18 * 7 bits = 126, which including sign means we can have a 19th byte.
-		if size > LEB128_MAX_BYTES || size == LEB128_MAX_BYTES && v > 0x7f {
-			return 0, 0, .Value_Too_Large
+		val, size, err = decode_ileb128_byte(v, size, val)
+		if err != .Buffer_Too_Small {
+			return
 		}
-
-		val |= i128(v & 0x7f) << shift
-		shift += 7
-
-		if v < 128 { break }
 	}
 
-	if buf[size - 1] & 0x40 == 0x40 {
-		val |= max(i128) << shift
+	if err == .Buffer_Too_Small {
+		val, size = 0, 0
 	}
 	return
 }
+
+// Decode a a signed LEB128 integer into value and number of bytes used, one byte at a time.
+// Returns `size` == 0 for an invalid value, empty slice, or a varint > 18 bytes.
+decode_ileb128_byte :: proc(input: u8, offset: int, accumulator: i128) -> (val: i128, size: int, err: Error) {
+	size = offset + 1
+	shift := uint(offset * 7)
+
+	// 18 * 7 bits = 126, which including sign means we can have a 19th byte.
+	if size > LEB128_MAX_BYTES || size == LEB128_MAX_BYTES && input > 0x7f {
+		return 0, 0, .Value_Too_Large
+	}
+
+	val = accumulator | i128(input & 0x7f) << shift
+
+	if input < 128 {
+		if input & 0x40 == 0x40 {
+			val |= max(i128) << (shift + 7)
+		}
+		return val, size, .None
+	}
+	return val, size, .Buffer_Too_Small
+}
+decode_ileb128 :: proc{decode_ileb128_buffer, decode_ileb128_byte}
 
 // Encode `val` into `buf` as an unsigned LEB128 encoded series of bytes.
 // `buf` must be appropriately sized.
