@@ -10,18 +10,18 @@ foreign user32 {
 	GetClassInfoExA :: proc(hInsatnce: HINSTANCE, lpszClass: LPCSTR, lpwcx: ^WNDCLASSEXA) -> BOOL ---
 	GetClassInfoExW :: proc(hInsatnce: HINSTANCE, lpszClass: LPCWSTR, lpwcx: ^WNDCLASSEXW) -> BOOL ---
 
-	GetClassLongPtrA :: proc(hWnd: HWND, nIndex: c_int) -> DWORD ---
-	GetClassLongPtrW :: proc(hWnd: HWND, nIndex: c_int) -> DWORD ---
-	SetClassLongPtrA :: proc(hWnd: HWND, nIndex: c_int, dwNewLong: LONG_PTR) -> ULONG_PTR ---
-	SetClassLongPtrW :: proc(hWnd: HWND, nIndex: c_int, dwNewLong: LONG_PTR) -> ULONG_PTR ---
+	GetClassLongA :: proc(hWnd: HWND, nIndex: c_int) -> DWORD ---
+	GetClassLongW :: proc(hWnd: HWND, nIndex: c_int) -> DWORD ---
+	SetClassLongA :: proc(hWnd: HWND, nIndex: c_int, dwNewLong: LONG) -> DWORD ---
+	SetClassLongW :: proc(hWnd: HWND, nIndex: c_int, dwNewLong: LONG) -> DWORD ---
+
+	GetWindowLongA :: proc(hWnd: HWND, nIndex: c_int) -> LONG ---
+	GetWindowLongW :: proc(hWnd: HWND, nIndex: c_int) -> LONG ---
+	SetWindowLongA :: proc(hWnd: HWND, nIndex: c_int, dwNewLong: LONG) -> LONG ---
+	SetWindowLongW :: proc(hWnd: HWND, nIndex: c_int, dwNewLong: LONG) -> LONG ---
 
 	GetClassNameA :: proc(hWnd: HWND, lpClassName: LPSTR, nMaxCount: c_int) -> c_int ---
 	GetClassNameW :: proc(hWnd: HWND, lpClassName: LPWSTR, nMaxCount: c_int) -> c_int ---
-
-	GetWindowLongPtrA :: proc(hWnd: HWND, nIndex: c_int) -> LONG_PTR ---
-	GetWindowLongPtrW :: proc(hWnd: HWND, nIndex: c_int) -> LONG_PTR ---
-	SetWindowLongPtrA :: proc(hWnd: HWND, nIndex: c_int, dwNewLong: LONG_PTR) -> LONG_PTR ---
-	SetWindowLongPtrW :: proc(hWnd: HWND, nIndex: c_int, dwNewLong: LONG_PTR) -> LONG_PTR ---
 
 	RegisterClassA :: proc(lpWndClass: ^WNDCLASSA) -> ATOM ---
 	RegisterClassW :: proc(lpWndClass: ^WNDCLASSW) -> ATOM ---
@@ -123,8 +123,21 @@ foreign user32 {
 	BeginPaint :: proc(hWnd: HWND, lpPaint: ^PAINTSTRUCT) -> HDC ---
 	EndPaint :: proc(hWnd: HWND, lpPaint: ^PAINTSTRUCT) -> BOOL ---
 
+	GetCapture :: proc() -> HWND ---
+	SetCapture :: proc(hWnd: HWND) -> HWND ---
+	ReleaseCapture :: proc() -> BOOL ---
+	TrackMouseEvent :: proc(lpEventTrack: LPTRACKMOUSEEVENT) -> BOOL ---
+
 	GetKeyState :: proc(nVirtKey: c_int) -> SHORT ---
 	GetAsyncKeyState :: proc(vKey: c_int) -> SHORT ---
+
+	MapVirtualKeyA :: proc(uCode: UINT, uMapType: UINT) -> UINT ---
+	MapVirtualKeyW :: proc(uCode: UINT, uMapType: UINT) -> UINT ---
+
+	SetWindowsHookExA :: proc(idHook: c_int, lpfn: HOOKPROC, hmod: HINSTANCE, dwThreadId: DWORD) -> HHOOK ---
+	SetWindowsHookExW :: proc(idHook: c_int, lpfn: HOOKPROC, hmod: HINSTANCE, dwThreadId: DWORD) -> HHOOK ---
+	UnhookWindowsHookEx :: proc(hhk: HHOOK) -> BOOL ---
+	CallNextHookEx :: proc(hhk: HHOOK, nCode: c_int, wParam: WPARAM, lParam: LPARAM) -> LRESULT ---
 
 	SetTimer :: proc(hWnd: HWND, nIDEvent: UINT_PTR, uElapse: UINT, lpTimerFunc: TIMERPROC) -> UINT_PTR ---
 	KillTimer :: proc(hWnd: HWND, uIDEvent: UINT_PTR) -> BOOL ---
@@ -193,6 +206,47 @@ CreateWindowW :: #force_inline proc "stdcall" (
 	)
 }
 
-GET_SC_WPARAM :: #force_inline proc(wparam: WPARAM) -> i32 {
-	return i32(wparam) & 0xFFF0
+when ODIN_ARCH == .amd64 {
+	@(default_calling_convention="stdcall")
+	foreign user32 {
+		GetClassLongPtrA :: proc(hWnd: HWND, nIndex: c_int) -> ULONG_PTR ---
+		GetClassLongPtrW :: proc(hWnd: HWND, nIndex: c_int) -> ULONG_PTR ---
+		SetClassLongPtrA :: proc(hWnd: HWND, nIndex: c_int, dwNewLong: LONG_PTR) -> ULONG_PTR ---
+		SetClassLongPtrW :: proc(hWnd: HWND, nIndex: c_int, dwNewLong: LONG_PTR) -> ULONG_PTR ---
+
+		GetWindowLongPtrA :: proc(hWnd: HWND, nIndex: c_int) -> LONG_PTR ---
+		GetWindowLongPtrW :: proc(hWnd: HWND, nIndex: c_int) -> LONG_PTR ---
+		SetWindowLongPtrA :: proc(hWnd: HWND, nIndex: c_int, dwNewLong: LONG_PTR) -> LONG_PTR ---
+		SetWindowLongPtrW :: proc(hWnd: HWND, nIndex: c_int, dwNewLong: LONG_PTR) -> LONG_PTR ---
+	}
+} else when ODIN_ARCH == .i386 {
+	GetClassLongPtrA :: GetClassLongA
+	GetClassLongPtrW :: GetClassLongW
+	SetClassLongPtrA :: SetClassLongA
+	SetClassLongPtrW :: SetClassLongW
+
+	GetWindowLongPtrA :: GetWindowLongA
+	GetWindowLongPtrW :: GetWindowLongW
+	SetWindowLongPtrA :: GetWindowLongA
+	SetWindowLongPtrW :: GetWindowLongW
+}
+
+GET_SC_WPARAM :: #force_inline proc "contextless" (wParam: WPARAM) -> c_int {
+	return c_int(wParam) & 0xFFF0
+}
+
+GET_WHEEL_DELTA_WPARAM :: #force_inline proc "contextless" (wParam: WPARAM) -> c_short {
+	return cast(c_short)HIWORD(cast(DWORD)wParam)
+}
+
+GET_KEYSTATE_WPARAM :: #force_inline proc "contextless" (wParam: WPARAM) -> WORD {
+	return LOWORD(cast(DWORD)wParam)
+}
+
+GET_NCHITTEST_WPARAM :: #force_inline proc "contextless" (wParam: WPARAM) -> c_short {
+	return cast(c_short)LOWORD(cast(DWORD)wParam)
+}
+
+GET_XBUTTON_WPARAM ::  #force_inline proc "contextless" (wParam: WPARAM) -> WORD {
+	return HIWORD(cast(DWORD)wParam)
 }

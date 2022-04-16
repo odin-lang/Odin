@@ -33,6 +33,10 @@ import "core:math/big"
 		core and vendor library collections.
 	Nightly Builds - https://odin-lang.org/docs/nightly/
 		Get the latest nightly builds of Odin.
+	More Odin Examples - https://github.com/odin-lang/examples
+		This repository contains examples of how certain things can be accomplished 
+		in idiomatic Odin, allowing you learn its semantics, as well as how to use 
+		parts of the core and vendor package collections.
 */
 
 the_basics :: proc() {
@@ -2419,6 +2423,13 @@ matrix_type :: proc() {
 }
 
 main :: proc() {
+	/*
+		For More Odin Examples - https://github.com/odin-lang/examples
+			This repository contains examples of how certain things can be accomplished 
+			in idiomatic Odin, allowing you learn its semantics, as well as how to use 
+			parts of the core and vendor package collections.
+	*/
+
 	when true {
 		the_basics()
 		control_flow()

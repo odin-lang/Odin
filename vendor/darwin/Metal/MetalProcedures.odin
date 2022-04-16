@@ -12,3 +12,8 @@ foreign Metal {
 	CreateSystemDefaultDevice  :: proc() -> ^Device ---
 	RemoveDeviceObserver       :: proc(observer: id) ---
 }
+
+
+new :: proc($T: typeid) -> ^T where intrinsics.type_is_subtype_of(T, NS.Object) {
+	return T.alloc()->init()
+}

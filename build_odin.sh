@@ -102,7 +102,7 @@ build_odin() {
 }
 
 run_demo() {
-	./odin run examples/demo/demo.odin
+	./odin run examples/demo/demo.odin -file
 }
 
 case $OS in
