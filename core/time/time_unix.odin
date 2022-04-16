@@ -17,6 +17,20 @@ foreign libc {
 	@(link_name="nanosleep")     _unix_nanosleep     :: proc(requested: ^TimeSpec, remaining: ^TimeSpec) -> i32 ---
 }
 
+foreign import "system:pthread"
+
+import "core:c"
+
+@(private="file")
+@(default_calling_convention="c")
+foreign pthread {
+	sched_yield :: proc() -> c.int ---
+}
+
+_yield :: proc "contextless" () {
+	sched_yield()
+}
+
 TimeSpec :: struct {
 	tv_sec  : i64,  /* seconds */
 	tv_nsec : i64,  /* nanoseconds */
