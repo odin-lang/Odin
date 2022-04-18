@@ -57,6 +57,7 @@ Image :: struct {
 }
 
 Image_Metadata :: union {
+	^Netpbm_Info,
 	^PNG_Info,
 	^QOI_Info,
 }
@@ -152,6 +153,7 @@ Options :: distinct bit_set[Option]
 
 Error :: union #shared_nil {
 	General_Image_Error,
+	Netpbm_Error,
 	PNG_Error,
 	QOI_Error,
 
@@ -169,6 +171,50 @@ General_Image_Error :: enum {
 	Image_Does_Not_Adhere_to_Spec,
 	Invalid_Input_Image,
 	Invalid_Output,
+}
+
+/*
+	Netpbm-specific definitions
+*/
+Netpbm_Format :: enum {
+	P1, P2, P3, P4, P5, P6, P7, Pf, PF,
+}
+
+Netpbm_Header :: struct {
+	format:        Netpbm_Format,
+	width:         int,
+	height:        int,
+	channels:      int,
+	depth:         int,
+	maxval:        int,
+	tupltype:      string,
+	scale:         f32,
+	little_endian: bool,
+}
+
+Netpbm_Info :: struct {
+	header: Netpbm_Header,
+}
+
+Netpbm_Error :: enum {
+	None = 0,
+
+	// reading
+	File_Not_Readable,
+	Invalid_Signature,
+	Invalid_Header_Token_Character,
+	Incomplete_Header,
+	Invalid_Header_Value,
+	Duplicate_Header_Field,
+	Buffer_Too_Small,
+	Invalid_Buffer_ASCII_Token,
+	Invalid_Buffer_Value,
+
+	// writing
+	File_Not_Writable,
+	Invalid_Format,
+	Invalid_Number_Of_Channels,
+	Invalid_Image_Depth,
 }
 
 /*
