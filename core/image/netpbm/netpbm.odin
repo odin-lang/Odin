@@ -104,7 +104,7 @@ write_to_buffer :: proc(img: Image, allocator := context.allocator) -> (buffer: 
 	//? validation
 	if header.format in (PBM + PGM + Formats{.Pf}) && img.channels != 1 \
 	|| header.format in (PPM + Formats{.PF}) && img.channels != 3 {
-		err = Format_Error.Invalid_Number_Of_Channels
+		err = .Invalid_Number_Of_Channels
 		return
 	}
 

@@ -167,6 +167,7 @@ Error :: union #shared_nil {
 General_Image_Error :: enum {
 	None = 0,
 	Invalid_Image_Dimensions,
+	Invalid_Number_Of_Channels,
 	Image_Dimensions_Too_Large,
 	Image_Does_Not_Adhere_to_Spec,
 	Invalid_Input_Image,
@@ -213,7 +214,6 @@ Netpbm_Error :: enum {
 	// writing
 	File_Not_Writable,
 	Invalid_Format,
-	Invalid_Number_Of_Channels,
 	Invalid_Image_Depth,
 }
 
@@ -339,7 +339,6 @@ PNG_Interlace_Method :: enum u8 {
 QOI_Error :: enum {
 	None = 0,
 	Invalid_QOI_Signature,
-	Invalid_Number_Of_Channels, // QOI allows 3 or 4 channel data.
 	Invalid_Bit_Depth,          // QOI supports only 8-bit images, error only returned from writer.
 	Invalid_Color_Space,        // QOI allows 0 = sRGB or 1 = linear.
 	Corrupt,                    // More data than pixels to decode into, for example.
