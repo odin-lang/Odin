@@ -281,6 +281,11 @@ parse_object :: proc(p: ^Parser) -> (value: Value, err: Error) {
 
 // IMPORTANT NOTE(bill): unquote_string assumes a mostly valid string
 unquote_string :: proc(token: Token, spec: Specification, allocator := context.allocator) -> (value: string, err: Error) {
+	if allocator.data == nil {
+		// We were called from `unmarshal_count_array`, return early.
+		return "", nil
+	}
+
 	get_u2_rune :: proc(s: string) -> rune {
 		if len(s) < 4 || s[0] != '\\' || s[1] != 'x' {
 			return -1
