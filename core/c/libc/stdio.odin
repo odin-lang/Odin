@@ -78,6 +78,56 @@ when ODIN_OS == .Linux {
 	}
 }
 
+when ODIN_OS == .OpenBSD {
+	fpos_t :: distinct i64
+
+	_IOFBF :: 0
+	_IOLBF :: 1
+	_IONBF :: 1
+
+	BUFSIZ :: 1024
+
+	EOF :: int(-1)
+
+	FOPEN_MAX	:: 20
+	FILENAME_MAX	:: 1024
+
+	SEEK_SET :: 0
+	SEEK_CUR :: 1
+	SEEK_END :: 2
+
+	foreign libc {
+		stderr: ^FILE
+		stdin:  ^FILE
+		stdout: ^FILE
+	}
+}
+
+when ODIN_OS == .FreeBSD {
+	fpos_t :: distinct i64
+
+	_IOFBF :: 0
+	_IOLBF :: 1
+	_IONBF :: 1
+
+	BUFSIZ :: 1024
+
+	EOF :: int(-1)
+
+	FOPEN_MAX	:: 20
+	FILENAME_MAX	:: 1024
+
+	SEEK_SET :: 0
+	SEEK_CUR :: 1
+	SEEK_END :: 2
+
+	foreign libc {
+		stderr: ^FILE
+		stdin:  ^FILE
+		stdout: ^FILE
+	}
+}
+
 when ODIN_OS == .Darwin {
 	fpos_t :: distinct i64
 	

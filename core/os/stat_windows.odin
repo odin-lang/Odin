@@ -80,7 +80,7 @@ stat :: proc(name: string, allocator := context.allocator) -> (File_Info, Errno)
 	return _stat(name, attrs, allocator)
 }
 
-fstat :: proc(fd: Handle, allocator := context.allocator) -> (File_Info, Errno) {
+fstat :: proc(fd: Handle, allocator := context.allocator) -> (fi: File_Info, errno: Errno) {
 	if fd == 0 {
 		return {}, ERROR_INVALID_HANDLE
 	}
@@ -94,14 +94,14 @@ fstat :: proc(fd: Handle, allocator := context.allocator) -> (File_Info, Errno) 
 	h := win32.HANDLE(fd)
 	switch win32.GetFileType(h) {
 	case win32.FILE_TYPE_PIPE, win32.FILE_TYPE_CHAR:
-		fi: File_Info
-		fi.fullpath = path
 		fi.name = basename(path)
 		fi.mode |= file_type_mode(h)
-		return fi, ERROR_NONE
+		errno = ERROR_NONE
+	case:
+		fi, errno = file_info_from_get_file_information_by_handle(path, h)
 	}
-
-	return file_info_from_get_file_information_by_handle(path, h)
+	fi.fullpath = path
+	return
 }
 
 
@@ -132,26 +132,11 @@ cleanpath_strip_prefix :: proc(buf: []u16) -> []u16 {
 
 @(private)
 cleanpath_from_handle :: proc(fd: Handle) -> (string, Errno) {
-	if fd == 0 {
-		return "", ERROR_INVALID_HANDLE
+	buf, err := cleanpath_from_handle_u16(fd)
+	if err != 0 {
+		return "", err
 	}
-	h := win32.HANDLE(fd)
-
-	MAX_PATH := win32.DWORD(260) + 1
-	buf: []u16
-	for {
-		buf = make([]u16, MAX_PATH, context.temp_allocator)
-		err := win32.GetFinalPathNameByHandleW(h, raw_data(buf), MAX_PATH, 0)
-		switch Errno(err) {
-		case ERROR_PATH_NOT_FOUND, ERROR_INVALID_PARAMETER:
-			return "", Errno(err)
-		case ERROR_NOT_ENOUGH_MEMORY:
-			MAX_PATH = MAX_PATH*2 + 1
-			continue
-		}
-		break
-	}
-	return cleanpath_from_buf(buf), ERROR_NONE
+	return win32.utf16_to_utf8(buf, context.allocator), err
 }
 @(private)
 cleanpath_from_handle_u16 :: proc(fd: Handle) -> ([]u16, Errno) {
@@ -160,21 +145,13 @@ cleanpath_from_handle_u16 :: proc(fd: Handle) -> ([]u16, Errno) {
 	}
 	h := win32.HANDLE(fd)
 
-	MAX_PATH := win32.DWORD(260) + 1
-	buf: []u16
-	for {
-		buf = make([]u16, MAX_PATH, context.temp_allocator)
-		err := win32.GetFinalPathNameByHandleW(h, raw_data(buf), MAX_PATH, 0)
-		switch Errno(err) {
-		case ERROR_PATH_NOT_FOUND, ERROR_INVALID_PARAMETER:
-			return nil, Errno(err)
-		case ERROR_NOT_ENOUGH_MEMORY:
-			MAX_PATH = MAX_PATH*2 + 1
-			continue
-		}
-		break
+	n := win32.GetFinalPathNameByHandleW(h, nil, 0, 0)
+	if n == 0 {
+		return nil, Errno(win32.GetLastError())
 	}
-	return cleanpath_strip_prefix(buf), ERROR_NONE
+	buf := make([]u16, max(n, win32.DWORD(260))+1, context.temp_allocator)
+	buf_len := win32.GetFinalPathNameByHandleW(h, raw_data(buf), n, 0)
+	return buf[:buf_len], ERROR_NONE
 }
 @(private)
 cleanpath_from_buf :: proc(buf: []u16) -> string {

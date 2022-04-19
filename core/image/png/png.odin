@@ -25,16 +25,10 @@ import "core:io"
 import "core:mem"
 import "core:intrinsics"
 
-/*
-	67_108_864 pixels max by default.
-	Maximum allowed dimensions are capped at 65535 * 65535.
-*/
-MAX_DIMENSIONS    :: min(#config(PNG_MAX_DIMENSIONS, 8192 * 8192), 65535 * 65535)
+// Limit chunk sizes.
+// By default: IDAT = 8k x 8k x 16-bits + 8k filter bytes.
+// The total number of pixels defaults to 64 Megapixel and can be tuned in image/common.odin.
 
-/*
-	Limit chunk sizes.
-		By default: IDAT = 8k x 8k x 16-bits + 8k filter bytes.
-*/
 _MAX_IDAT_DEFAULT :: ( 8192 /* Width */ *  8192 /* Height */ * 2 /* 16-bit */) +  8192 /* Filter bytes */
 _MAX_IDAT         :: (65535 /* Width */ * 65535 /* Height */ * 2 /* 16-bit */) + 65535 /* Filter bytes */
 
@@ -64,7 +58,7 @@ Row_Filter :: enum u8 {
 	Paeth   = 4,
 }
 
-PLTE_Entry    :: [3]u8
+PLTE_Entry :: image.RGB_Pixel
 
 PLTE :: struct #packed {
 	entries: [256]PLTE_Entry,
@@ -259,7 +253,7 @@ read_header :: proc(ctx: ^$C) -> (image.PNG_IHDR, Error) {
 	header := (^image.PNG_IHDR)(raw_data(c.data))^
 	// Validate IHDR
 	using header
-	if width == 0 || height == 0 || u128(width) * u128(height) > MAX_DIMENSIONS {
+	if width == 0 || height == 0 || u128(width) * u128(height) > image.MAX_DIMENSIONS {
 		return {}, .Invalid_Image_Dimensions
 	}
 
@@ -366,6 +360,10 @@ load_from_context :: proc(ctx: ^$C, options := Options{}, allocator := context.a
 		options -= {.info}
 	}
 
+	if .return_header in options && .return_metadata in options {
+		options -= {.return_header}
+	}
+
 	if .alpha_drop_if_present in options && .alpha_add_if_missing in options {
 		return {}, compress.General_Error.Incompatible_Options
 	}
@@ -392,7 +390,7 @@ load_from_context :: proc(ctx: ^$C, options := Options{}, allocator := context.a
 
 	idat_length := u64(0)
 
-	c:		image.PNG_Chunk
+	c:	image.PNG_Chunk
 	ch:     image.PNG_Chunk_Header
 	e:      io.Error
 
@@ -473,6 +471,10 @@ load_from_context :: proc(ctx: ^$C, options := Options{}, allocator := context.a
 			}
 			info.header = h
 
+			if .return_header in options && .return_metadata not_in options && .do_not_decompress_image not_in options {
+				return img, nil
+			}
+
 		case .PLTE:
 			seen_plte = true
 			// PLTE must appear before IDAT and can't appear for color types 0, 4.
@@ -540,9 +542,6 @@ load_from_context :: proc(ctx: ^$C, options := Options{}, allocator := context.a
 			seen_iend = true
 
 		case .bKGD:
-
-			// TODO: Make sure that 16-bit bKGD + tRNS chunks return u16 instead of u16be
-
 			c = read_chunk(ctx) or_return
 			seen_bkgd = true
 			if .return_metadata in options {
@@ -594,23 +593,36 @@ load_from_context :: proc(ctx: ^$C, options := Options{}, allocator := context.a
 			*/
 
 			final_image_channels += 1
-
 			seen_trns = true
+
+			if .Paletted in header.color_type {
+				if len(c.data) > 256 {
+					return img, .TNRS_Invalid_Length
+				}
+			} else if .Color in header.color_type {
+				if len(c.data) != 6 {
+					return img, .TNRS_Invalid_Length
+				}
+			} else if len(c.data) != 2 {
+				return img, .TNRS_Invalid_Length
+			}
+
 			if info.header.bit_depth < 8 && .Paletted not_in info.header.color_type {
 				// Rescale tRNS data so key matches intensity
-				dsc := depth_scale_table
+				dsc   := depth_scale_table
 				scale := dsc[info.header.bit_depth]
 				if scale != 1 {
 					key := mem.slice_data_cast([]u16be, c.data)[0] * u16be(scale)
 					c.data = []u8{0, u8(key & 255)}
 				}
 			}
+
 			trns = c
 
-		case .iDOT, .CbGI:
+		case .iDOT, .CgBI:
 			/*
 				iPhone PNG bastardization that doesn't adhere to spec with broken IDAT chunk.
-				We're not going to add support for it. If you have the misfortunte of coming
+				We're not going to add support for it. If you have the misfortune of coming
 				across one of these files, use a utility to defry it.
 			*/
 			return img, .Image_Does_Not_Adhere_to_Spec
@@ -633,6 +645,10 @@ load_from_context :: proc(ctx: ^$C, options := Options{}, allocator := context.a
 
 	if !seen_idat {
 		return img, .IDAT_Missing
+	}
+
+	if .Paletted in header.color_type && !seen_plte {
+		return img, .PLTE_Missing
 	}
 
 	/*
@@ -683,15 +699,6 @@ load_from_context :: proc(ctx: ^$C, options := Options{}, allocator := context.a
 		return {}, defilter_error
 	}
 
-	/*
-		Now we'll handle the relocoring of paletted images, handling of tRNS chunks,
-		and we'll expand grayscale images to RGB(A).
-
-		For the sake of convenience we return only RGB(A) images. In the future we
-		may supply an option to return Gray/Gray+Alpha as-is, in which case RGB(A)
-		will become the default.
-	*/
-
 	if .Paletted in header.color_type && .do_not_expand_indexed in options {
 		return img, nil
 	}
@@ -699,7 +706,10 @@ load_from_context :: proc(ctx: ^$C, options := Options{}, allocator := context.a
 		return img, nil
 	}
 
-
+	/*
+		Now we're going to optionally apply various post-processing stages,
+		to for example expand grayscale, apply a palette, premultiply alpha, etc.
+	*/
 	raw_image_channels := img.channels
 	out_image_channels := 3
 
@@ -1203,7 +1213,6 @@ load_from_context :: proc(ctx: ^$C, options := Options{}, allocator := context.a
 
 	return img, nil
 }
-
 
 filter_paeth :: #force_inline proc(left, up, up_left: u8) -> u8 {
 	aa, bb, cc := i16(left), i16(up), i16(up_left)

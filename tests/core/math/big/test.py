@@ -17,7 +17,6 @@ import gc
 from enum import Enum
 import argparse
 
-
 parser = argparse.ArgumentParser(
 	description     = "Odin core:math/big test suite",
 	epilog          = "By default we run regression and random tests with preset parameters.",
@@ -163,6 +162,8 @@ def load(export_name, args, res):
 	export_name.restype  = res
 	return export_name
 
+
+
 #
 # Result values will be passed in a struct { res: cstring, err: Error }
 #
@@ -170,7 +171,11 @@ class Res(Structure):
 	_fields_ = [("res", c_char_p), ("err", c_uint64)]
 
 initialize_constants = load(l.test_initialize_constants, [], c_uint64)
-print("initialize_constants: ", initialize_constants())
+
+NAILS    = initialize_constants()
+LEG_BITS = 64 - NAILS
+
+print("LEG BITS: ", LEG_BITS)
 
 error_string = load(l.test_error_string, [c_byte], c_char_p)
 
@@ -407,7 +412,7 @@ def test_shl_leg(a = 0, digits = 0, expected_error = Error.Okay):
 	res   = int_shl_leg(*args)
 	expected_result = None
 	if expected_error == Error.Okay:
-		expected_result = a << (digits * 60)
+		expected_result = a << (digits * LEG_BITS)
 	return test("test_shl_leg", res, [a, digits], expected_error, expected_result)
 
 def test_shr_leg(a = 0, digits = 0, expected_error = Error.Okay):
@@ -419,7 +424,7 @@ def test_shr_leg(a = 0, digits = 0, expected_error = Error.Okay):
 			# Don't pass negative numbers. We have a shr_signed.
 			return False
 		else:
-			expected_result = a >> (digits * 60)
+			expected_result = a >> (digits * LEG_BITS)
 		
 	return test("test_shr_leg", res, [a, digits], expected_error, expected_result)
 

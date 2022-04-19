@@ -46,10 +46,10 @@ Options :: struct {
 	level: u8,
 }
 
-Error     :: compress.Error
-E_General :: compress.General_Error
-E_ZLIB    :: compress.ZLIB_Error
-E_Deflate :: compress.Deflate_Error
+Error         :: compress.Error
+General_Error :: compress.General_Error
+ZLIB_Error    :: compress.ZLIB_Error
+Deflate_Error :: compress.Deflate_Error
 
 DEFLATE_MAX_CHUNK_SIZE   :: 65535
 DEFLATE_MAX_LITERAL_SIZE :: 65535
@@ -258,7 +258,7 @@ build_huffman :: proc(z: ^Huffman_Table, code_lengths: []u8) -> (err: Error) {
 
 	for i in 1 ..< HUFFMAN_MAX_BITS {
 		if sizes[i] > (1 << uint(i)) {
-			return E_Deflate.Huffman_Bad_Sizes
+			return .Huffman_Bad_Sizes
 		}
 	}
 	code := int(0)
@@ -270,7 +270,7 @@ build_huffman :: proc(z: ^Huffman_Table, code_lengths: []u8) -> (err: Error) {
 		code = code + sizes[i]
 		if sizes[i] != 0 {
 			if code - 1 >= (1 << u16(i)) {
-				return E_Deflate.Huffman_Bad_Code_Lengths
+				return .Huffman_Bad_Code_Lengths
 			}
 		}
 		z.maxcode[i] = code << (HUFFMAN_MAX_BITS - uint(i))
@@ -314,15 +314,15 @@ decode_huffman_slowpath :: proc(z: ^$C, t: ^Huffman_Table) -> (r: u16, err: Erro
 		s += 1
 	}
 	if s >= 16 {
-		return 0, E_Deflate.Bad_Huffman_Code
+		return 0, .Bad_Huffman_Code
 	}
 	// code size is s, so:
 	b := (k >> (16-s)) - int(t.firstcode[s]) + int(t.firstsymbol[s])
 	if b >= size_of(t.size) {
-		return 0, E_Deflate.Bad_Huffman_Code
+		return 0, .Bad_Huffman_Code
 	}
 	if t.size[b] != s {
-		return 0, E_Deflate.Bad_Huffman_Code
+		return 0, .Bad_Huffman_Code
 	}
 
 	compress.consume_bits_lsb(z, s)
@@ -335,11 +335,11 @@ decode_huffman_slowpath :: proc(z: ^$C, t: ^Huffman_Table) -> (r: u16, err: Erro
 decode_huffman :: proc(z: ^$C, t: ^Huffman_Table) -> (r: u16, err: Error) #no_bounds_check {
 	if z.num_bits < 16 {
 		if z.num_bits > 63 {
-			return 0, E_ZLIB.Code_Buffer_Malformed
+			return 0, .Code_Buffer_Malformed
 		}
 		compress.refill_lsb(z)
 		if z.num_bits > 63 {
-			return 0, E_General.Stream_Too_Short
+			return 0, .Stream_Too_Short
 		}
 	}
 	#no_bounds_check b := t.fast[z.code_buffer & ZFAST_MASK]
@@ -361,7 +361,7 @@ parse_huffman_block :: proc(z: ^$C, z_repeat, z_offset: ^Huffman_Table) -> (err:
 		if value < 256 {
 			e := write_byte(z, u8(value))
 			if e != .None {
-				return E_General.Output_Too_Short
+				return .Output_Too_Short
 			}
 		} else {
 			if value == 256 {
@@ -377,7 +377,7 @@ parse_huffman_block :: proc(z: ^$C, z_repeat, z_offset: ^Huffman_Table) -> (err:
 
 			value, e = decode_huffman(z, z_offset)
 			if e != nil {
-				return E_Deflate.Bad_Huffman_Code
+				return .Bad_Huffman_Code
 			}
 
 			distance := Z_DIST_BASE[value]
@@ -387,7 +387,7 @@ parse_huffman_block :: proc(z: ^$C, z_repeat, z_offset: ^Huffman_Table) -> (err:
 
 			if z.bytes_written < i64(distance) {
 				// Distance is longer than we've decoded so far.
-				return E_Deflate.Bad_Distance
+				return .Bad_Distance
 			}
 
 			/*
@@ -405,14 +405,14 @@ parse_huffman_block :: proc(z: ^$C, z_repeat, z_offset: ^Huffman_Table) -> (err:
 					c := z.output.buf[z.bytes_written - i64(distance)]
 					e := repl_byte(z, length, c)
 					if e != .None {
-						return E_General.Output_Too_Short
+						return .Output_Too_Short
 					}
 				}
 			} else {
 				if length > 0 {
 					e := repl_bytes(z, length, distance)
 					if e != .None {
-						return E_General.Output_Too_Short
+						return .Output_Too_Short
 					}
 				}
 			}
@@ -432,25 +432,25 @@ inflate_from_context :: proc(using ctx: ^compress.Context_Memory_Input, raw := f
 	if !raw {
 		size, size_err := compress.input_size(ctx)
 		if size < 6 || size_err != nil {
-			return E_General.Stream_Too_Short
+			return .Stream_Too_Short
 		}
 
 		cmf, _ := compress.read_u8(ctx)
 
 		method := Compression_Method(cmf & 0xf)
 		if method != .DEFLATE {
-			return E_General.Unknown_Compression_Method
+			return .Unknown_Compression_Method
 		}
 
 		if cinfo := (cmf >> 4) & 0xf; cinfo > 7 {
-			return E_ZLIB.Unsupported_Window_Size
+			return .Unsupported_Window_Size
 		}
 		flg, _ := compress.read_u8(ctx)
 
 		fcheck := flg & 0x1f
 		fcheck_computed := (cmf << 8 | flg) & 0x1f
 		if fcheck != fcheck_computed {
-			return E_General.Checksum_Failed
+			return .Checksum_Failed
 		}
 
 		/*
@@ -458,7 +458,7 @@ inflate_from_context :: proc(using ctx: ^compress.Context_Memory_Input, raw := f
 			They're application specific and PNG doesn't use them.
 		*/
 		if fdict := (flg >> 5) & 1; fdict != 0 {
-			return E_ZLIB.FDICT_Unsupported
+			return .FDICT_Unsupported
 		}
 
 		// flevel  := Compression_Level((flg >> 6) & 3);
@@ -485,7 +485,7 @@ inflate_from_context :: proc(using ctx: ^compress.Context_Memory_Input, raw := f
 		output_hash := hash.adler32(ctx.output.buf[:])
 
 		if output_hash != u32(adler) {
-			return E_General.Checksum_Failed
+			return .Checksum_Failed
 		}
 	}
 	return nil
@@ -555,7 +555,7 @@ inflate_raw :: proc(z: ^$C, expected_output_size := -1, allocator := context.all
 
 
 			if ~uncompressed_len != length_check {
-				return E_Deflate.Len_Nlen_Mismatch
+				return .Len_Nlen_Mismatch
 			}
 
 			/*
@@ -571,7 +571,7 @@ inflate_raw :: proc(z: ^$C, expected_output_size := -1, allocator := context.all
 			assert(uncompressed_len == 0)
 
 		case 3:
-			return E_Deflate.BType_3
+			return .BType_3
 		case:
 			// fmt.printf("Err: %v | Final: %v | Type: %v\n", err, final, type)
 			if type == 1 {
@@ -604,7 +604,7 @@ inflate_raw :: proc(z: ^$C, expected_output_size := -1, allocator := context.all
 					c = decode_huffman(z, codelength_ht) or_return
 
 					if c < 0 || c >= 19 {
-						return E_Deflate.Huffman_Bad_Code_Lengths
+						return .Huffman_Bad_Code_Lengths
 					}
 					if c < 16 {
 						lencodes[n] = u8(c)
@@ -616,7 +616,7 @@ inflate_raw :: proc(z: ^$C, expected_output_size := -1, allocator := context.all
 						case 16:
 							c = u16(compress.read_bits_no_refill_lsb(z, 2) + 3)
 							if n == 0 {
-								return E_Deflate.Huffman_Bad_Code_Lengths
+								return .Huffman_Bad_Code_Lengths
 							}
 							fill = lencodes[n - 1]
 						case 17:
@@ -624,11 +624,11 @@ inflate_raw :: proc(z: ^$C, expected_output_size := -1, allocator := context.all
 						case 18:
 							c = u16(compress.read_bits_no_refill_lsb(z, 7) + 11)
 						case:
-								return E_Deflate.Huffman_Bad_Code_Lengths
+								return .Huffman_Bad_Code_Lengths
 						}
 
 						if ntot - n < u32(c) {
-							return E_Deflate.Huffman_Bad_Code_Lengths
+							return .Huffman_Bad_Code_Lengths
 						}
 
 						nc := n + u32(c)
@@ -639,7 +639,7 @@ inflate_raw :: proc(z: ^$C, expected_output_size := -1, allocator := context.all
 				}
 
 				if n != ntot {
-					return E_Deflate.Huffman_Bad_Code_Lengths
+					return .Huffman_Bad_Code_Lengths
 				}
 
 				build_huffman(z_repeat, lencodes[:hlit])     or_return
@@ -677,4 +677,4 @@ inflate_from_byte_array_raw :: proc(input: []u8, buf: ^bytes.Buffer, raw := fals
 	return inflate_raw(z=&ctx, expected_output_size=expected_output_size)
 }
 
-inflate :: proc{inflate_from_context, inflate_from_byte_array};
+inflate :: proc{inflate_from_context, inflate_from_byte_array}

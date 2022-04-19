@@ -142,9 +142,7 @@ fpe_t                :: ^fpe_struct
 
 when ODIN_OS == .Windows {
     foreign import botan_lib "botan.lib"
-} else when ODIN_OS == .Linux {
-    foreign import botan_lib "system:botan-2"
-} else when ODIN_OS == .Darwin {
+} else {
     foreign import botan_lib "system:botan-2"
 }
 

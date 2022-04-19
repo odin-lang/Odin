@@ -10,6 +10,53 @@ _ :: builtin
 _ :: bits
 _ :: mem
 
+/*
+	Turn a pointer and a length into a slice.
+*/
+from_ptr :: proc "contextless" (ptr: ^$T, count: int) -> []T {
+    return ([^]T)(ptr)[:count]
+}
+
+/*
+	Turn a pointer and a length into a byte slice.
+*/
+bytes_from_ptr :: proc "contextless" (ptr: rawptr, byte_count: int) -> []byte {
+    return ([^]byte)(ptr)[:byte_count]
+}
+
+/*
+	Turn a slice into a byte slice.
+
+	See `slice.reinterpret` to go the other way.
+*/
+to_bytes :: proc "contextless" (s: []$T) -> []byte {
+	return ([^]byte)(raw_data(s))[:len(s) * size_of(T)]
+}
+
+/*
+	Turn a slice of one type, into a slice of another type.
+
+	Only converts the type and length of the slice itself.
+	The length is rounded down to the nearest whole number of items.
+
+	```
+	large_items := []i64{1, 2, 3, 4}
+	small_items := slice.reinterpret([]i32, large_items)
+	assert(len(small_items) == 8)
+	```
+	```
+	small_items := []byte{1, 0, 0, 0, 0, 0, 0, 0,
+	                      2, 0, 0, 0}
+	large_items := slice.reinterpret([]i64, small_items)
+	assert(len(large_items) == 1) // only enough bytes to make 1 x i64; two would need at least 8 bytes.
+	```
+*/
+reinterpret :: proc "contextless" ($T: typeid/[]$U, s: []$V) -> []U {
+	bytes := to_bytes(s)
+	n := len(bytes) / size_of(U)
+	return ([^]U)(raw_data(bytes))[:n]
+}
+
 
 swap :: proc(array: $T/[]$E, a, b: int) {
 	when size_of(E) > 8 {
@@ -304,7 +351,7 @@ filter :: proc(s: $S/[]$U, f: proc(U) -> bool, allocator := context.allocator) -
 	return r[:]
 }
 
-scanner :: proc (s: $S/[]$U, initializer: $V, f: proc(V, U)->V, allocator := context.allocator) -> []V {
+scanner :: proc (s: $S/[]$U, initializer: $V, f: proc(V, U) -> V, allocator := context.allocator) -> []V {
 	if len(s) == 0 { return {} }
 
 	res := make([]V, len(s), allocator)
@@ -344,15 +391,106 @@ max :: proc(s: $S/[]$T) -> (res: T, ok: bool) where intrinsics.type_is_ordered(T
 	return
 }
 
+min_max :: proc(s: $S/[]$T) -> (min, max: T, ok: bool) where intrinsics.type_is_ordered(T) {
+	if len(s) != 0 {
+		min, max = s[0], s[0]
+		ok = true
+		for v in s[1:] {
+			min = builtin.min(min, v)
+			max = builtin.max(max, v)
+		}
+	}
+	return
+}
 
-dot_product :: proc(a, b: $S/[]$T) -> T
+any_of :: proc(s: $S/[]$T, value: T) -> bool where intrinsics.type_is_comparable(T) {
+	for v in s {
+		if v == value {
+			return true
+		}
+	}
+	return false
+}
+
+none_of :: proc(s: $S/[]$T, value: T) -> bool where intrinsics.type_is_comparable(T) {
+	for v in s {
+		if v == value {
+			return false
+		}
+	}
+	return true
+}
+
+all_of :: proc(s: $S/[]$T, value: T) -> bool where intrinsics.type_is_comparable(T) {
+	if len(s) == 0 {
+		return false
+	}
+	for v in s {
+		if v != value {
+			return false
+		}
+	}
+	return true
+}
+
+
+any_of_proc :: proc(s: $S/[]$T, f: proc(T) -> bool) -> bool {
+	for v in s {
+		if f(v) {
+			return true
+		}
+	}
+	return false
+}
+
+none_of_proc :: proc(s: $S/[]$T, f: proc(T) -> bool) -> bool {
+	for v in s {
+		if f(v) {
+			return false
+		}
+	}
+	return true
+}
+
+all_of_proc :: proc(s: $S/[]$T, f: proc(T) -> bool) -> bool {
+	if len(s) == 0 {
+		return false
+	}
+	for v in s {
+		if !f(v) {
+			return false
+		}
+	}
+	return true
+}
+
+
+count :: proc(s: $S/[]$T, value: T) -> (n: int) where intrinsics.type_is_comparable(T) {
+	for v in s {
+		if v == value {
+			n += 1
+		}
+	}
+	return
+}
+
+count_proc :: proc(s: $S/[]$T, f: proc(T) -> bool) -> (n: int) {
+	for v in s {
+		if f(v) {
+			n += 1
+		}
+	}
+	return
+}
+
+
+dot_product :: proc(a, b: $S/[]$T) -> (r: T, ok: bool)
 	where intrinsics.type_is_numeric(T) {
 	if len(a) != len(b) {
-		panic("slice.dot_product: slices of unequal length")
+		return
 	}
-	r: T
 	#no_bounds_check for _, i in a {
 		r += a[i] * b[i]
 	}
-	return r
+	return r, true
 }

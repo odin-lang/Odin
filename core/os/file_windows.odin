@@ -20,12 +20,12 @@ open :: proc(path: string, mode: int = O_RDONLY, perm: int = 0) -> (Handle, Errn
 	case O_RDWR:   access = win32.FILE_GENERIC_READ | win32.FILE_GENERIC_WRITE
 	}
 
+	if mode&O_CREATE != 0 {
+		access |= win32.FILE_GENERIC_WRITE
+	}
 	if mode&O_APPEND != 0 {
 		access &~= win32.FILE_GENERIC_WRITE
 		access |=  win32.FILE_APPEND_DATA
-	}
-	if mode&O_CREATE != 0 {
-		access |= win32.FILE_GENERIC_WRITE
 	}
 
 	share_mode := win32.FILE_SHARE_READ|win32.FILE_SHARE_WRITE
@@ -113,7 +113,7 @@ read_console :: proc(handle: win32.HANDLE, b: []byte) -> (n: int, err: Errno) {
 		if max_read == 0 {
 			break
 		}
-
+		
 		single_read_length: u32
 		ok := win32.ReadConsoleW(handle, &buf16[0], max_read, &single_read_length, nil)
 		if !ok {
@@ -320,9 +320,6 @@ stderr := get_std_handle(uint(win32.STD_ERROR_HANDLE))
 
 get_std_handle :: proc "contextless" (h: uint) -> Handle {
 	fd := win32.GetStdHandle(win32.DWORD(h))
-	when size_of(uintptr) == 8 {
-		win32.SetHandleInformation(fd, win32.HANDLE_FLAG_INHERIT, 0)
-	}
 	return Handle(fd)
 }
 

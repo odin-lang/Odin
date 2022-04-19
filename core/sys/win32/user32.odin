@@ -111,6 +111,8 @@ foreign user32 {
 	@(link_name="SetWindowTextW")   set_window_text_w   :: proc(hwnd: Hwnd, c_string: Wstring) -> Bool ---
 	@(link_name="RegisterClassA")   register_class_a    :: proc(wc: ^Wnd_Class_A) -> i16 ---
 	@(link_name="RegisterClassW")   register_class_w    :: proc(wc: ^Wnd_Class_W) -> i16 ---
+	@(link_name="UnregisterClassA") unregister_class_a  :: proc(class_name: cstring, instance: Hinstance) -> Bool ---
+	@(link_name="UnregisterClassW") unregister_class_w  :: proc(class_name: Wstring, instance: Hinstance) -> Bool ---
 	@(link_name="RegisterClassExA") register_class_ex_a :: proc(wc: ^Wnd_Class_Ex_A) -> i16 ---
 	@(link_name="RegisterClassExW") register_class_ex_w :: proc(wc: ^Wnd_Class_Ex_W) -> i16 ---
 

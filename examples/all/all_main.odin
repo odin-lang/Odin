@@ -54,12 +54,14 @@ import base64         "core:encoding/base64"
 import csv            "core:encoding/csv"
 import hxa            "core:encoding/hxa"
 import json           "core:encoding/json"
+import varint         "core:encoding/varint"
 
 import fmt            "core:fmt"
 import hash           "core:hash"
 
 import image          "core:image"
 import png            "core:image/png"
+import qoi            "core:image/qoi"
 
 import io             "core:io"
 import log            "core:log"
@@ -95,7 +97,6 @@ import sort           "core:sort"
 import strconv        "core:strconv"
 import strings        "core:strings"
 import sync           "core:sync"
-import sync2          "core:sync/sync2"
 import testing        "core:testing"
 import scanner        "core:text/scanner"
 import thread         "core:thread"
@@ -103,6 +104,7 @@ import time           "core:time"
 
 import unicode        "core:unicode"
 import utf8           "core:unicode/utf8"
+import utf8string     "core:unicode/utf8/utf8string"
 import utf16          "core:unicode/utf16"
 
 main :: proc(){}
@@ -153,10 +155,12 @@ _ :: base64
 _ :: csv
 _ :: hxa
 _ :: json
+_ :: varint
 _ :: fmt
 _ :: hash
 _ :: image
 _ :: png
+_ :: qoi
 _ :: io
 _ :: log
 _ :: math
@@ -184,11 +188,11 @@ _ :: sort
 _ :: strconv
 _ :: strings
 _ :: sync
-_ :: sync2
 _ :: testing
 _ :: scanner
 _ :: thread
 _ :: time
 _ :: unicode
 _ :: utf8
+_ :: utf8string
 _ :: utf16

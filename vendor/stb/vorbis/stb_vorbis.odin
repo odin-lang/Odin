@@ -5,6 +5,7 @@ import c "core:c/libc"
 
 when ODIN_OS == .Windows { foreign import lib "../lib/stb_vorbis.lib" }
 when ODIN_OS == .Linux   { foreign import lib "../lib/stb_vorbis.a"   }
+when ODIN_OS == .Darwin  { foreign import lib "../lib/stb_vorbis.a"   }
 
 
 

@@ -1,6 +1,7 @@
 package dynamic_bit_array
 
 import "core:intrinsics"
+import "core:mem"
 
 /*
 	Note that these constants are dependent on the backing being a u64.
@@ -16,15 +17,16 @@ INDEX_MASK  :: 63
 NUM_BITS :: 64
 
 Bit_Array :: struct {
-	bits: [dynamic]u64,
-	bias: int,
-	max_index: int,
+	bits:         [dynamic]u64,
+	bias:         int,
+	max_index:    int,
+	free_pointer: bool,
 }
 
 Bit_Array_Iterator :: struct {
-	array: ^Bit_Array,
+	array:    ^Bit_Array,
 	word_idx: int,
-	bit_idx: uint,
+	bit_idx:  uint,
 }
 
 // In:
@@ -170,7 +172,7 @@ set :: proc(ba: ^Bit_Array, #any_int index: uint, allocator := context.allocator
 }
 
 // A helper function to create a `Bit_Array` with optional bias, in case your smallest index is non-zero (including negative).
-create :: proc(max_index: int, min_index := 0, allocator := context.allocator) -> (res: Bit_Array, ok: bool) #optional_ok {
+create :: proc(max_index: int, min_index := 0, allocator := context.allocator) -> (res: ^Bit_Array, ok: bool) #optional_ok {
 	context.allocator = allocator
 	size_in_bits := max_index - min_index
 
@@ -178,23 +180,26 @@ create :: proc(max_index: int, min_index := 0, allocator := context.allocator) -
 
 	legs := size_in_bits >> INDEX_SHIFT
 
-	res = Bit_Array{
-		bias = min_index,
-		max_index = max_index,
-	}
-	return res, resize_if_needed(&res, legs)
+	res = new(Bit_Array)
+	res.bias         = min_index
+	res.max_index    = max_index
+	res.free_pointer = true
+	return res, resize_if_needed(res, legs)
 }
 
 // Sets all bits to `false`.
 clear :: proc(ba: ^Bit_Array) {
 	if ba == nil { return }
-	ba.bits = {}
+	mem.zero_slice(ba.bits[:])
 }
 
 // Releases the memory used by the `Bit_Array`.
 destroy :: proc(ba: ^Bit_Array) {
 	if ba == nil { return }
 	delete(ba.bits)
+	if ba.free_pointer { // Only free if this Bit_Array was created using `create`, not when on the stack.
+		free(ba)
+	}
 }
 
 // Resizes the `Bit_Array`. For internal use.

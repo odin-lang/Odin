@@ -35,3 +35,7 @@ _tick_now :: proc "contextless" () -> Tick {
 	_nsec := mul_div_u64(i64(now), 1e9, i64(qpc_frequency))
 	return Tick{_nsec = _nsec}
 }
+
+_yield :: proc "contextless" () {
+	win32.SwitchToThread()
+}

@@ -33,3 +33,10 @@ ComparisonResult :: enum Integer {
 }
 
 NotFound :: IntegerMax
+
+Float :: distinct (f32 when size_of(uint) == 4 else f64)
+
+Size :: struct {
+	width:  Float,
+	height: Float,
+}

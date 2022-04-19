@@ -1,4 +1,4 @@
-//+build linux, darwin, freebsd
+//+build linux, darwin, freebsd, openbsd
 package filepath
 
 when ODIN_OS == .Darwin {
@@ -58,6 +58,11 @@ when ODIN_OS == .Darwin {
 	@(private)
 	foreign libc {
 		@(link_name="__error")          __error :: proc() -> ^i32 ---
+	}
+} else when ODIN_OS == .OpenBSD {
+	@(private)
+	foreign libc {
+		@(link_name="__errno")		__error :: proc() -> ^i32 ---
 	}
 } else {
 	@(private)

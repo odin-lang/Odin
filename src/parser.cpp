@@ -1071,15 +1071,14 @@ Ast *ast_struct_type(AstFile *f, Token token, Slice<Ast *> fields, isize field_c
 }
 
 
-Ast *ast_union_type(AstFile *f, Token token, Array<Ast *> const &variants, Ast *polymorphic_params, Ast *align, bool no_nil, bool maybe,
+Ast *ast_union_type(AstFile *f, Token token, Array<Ast *> const &variants, Ast *polymorphic_params, Ast *align, UnionTypeKind kind,
                     Token where_token, Array<Ast *> const &where_clauses) {
 	Ast *result = alloc_ast_node(f, Ast_UnionType);
 	result->UnionType.token              = token;
 	result->UnionType.variants           = slice_from_array(variants);
 	result->UnionType.polymorphic_params = polymorphic_params;
 	result->UnionType.align              = align;
-	result->UnionType.no_nil             = no_nil;
-	result->UnionType.maybe              = maybe;
+	result->UnionType.kind               = kind;
 	result->UnionType.where_token        = where_token;
 	result->UnionType.where_clauses      = slice_from_array(where_clauses);
 	return result;
@@ -1538,7 +1537,7 @@ void fix_advance_to_next_stmt(AstFile *f) {
 Token expect_closing(AstFile *f, TokenKind kind, String context) {
 	if (f->curr_token.kind != kind &&
 	    f->curr_token.kind == Token_Semicolon &&
-	    f->curr_token.string == "\n") {
+	    (f->curr_token.string == "\n" || f->curr_token.kind == Token_EOF)) {
 		Token tok = f->prev_token;
 		tok.pos.column += cast(i32)tok.string.len;
 		syntax_error(tok, "Missing ',' before newline in %.*s", LIT(context));
@@ -1560,6 +1559,7 @@ void assign_removal_flag_to_semicolon(AstFile *f) {
 			switch (curr_token->kind) {
 			case Token_CloseBrace:
 			case Token_CloseParen:
+			case Token_EOF:
 				ok = true;
 				break;
 			}
@@ -1576,7 +1576,7 @@ void assign_removal_flag_to_semicolon(AstFile *f) {
 	}
 }
 
-void expect_semicolon(AstFile *f, Ast *s) {
+void expect_semicolon(AstFile *f) {
 	Token prev_token = {};
 
 	if (allow_token(f, Token_Semicolon)) {
@@ -1601,17 +1601,17 @@ void expect_semicolon(AstFile *f, Ast *s) {
 	if (f->curr_token.kind == Token_EOF) {
 		return;
 	}
-
-	if (s != nullptr) {
-		return;
-	} 
 	switch (f->curr_token.kind) {
 	case Token_EOF:
 		return;
 	}
-	String p = token_to_string(f->curr_token);
-	syntax_error(prev_token, "Expected ';', got %.*s", LIT(p));
-	fix_advance_to_next_stmt(f);
+
+	if (f->curr_token.pos.line == f->prev_token.pos.line) {
+		String p = token_to_string(f->curr_token);
+		prev_token.pos = token_pos_end(prev_token);
+		syntax_error(prev_token, "Expected ';', got %.*s", LIT(p));
+		fix_advance_to_next_stmt(f);
+	}
 }
 
 
@@ -2474,6 +2474,9 @@ Ast *parse_operand(AstFile *f, bool lhs) {
 		Ast *align = nullptr;
 		bool no_nil = false;
 		bool maybe = false;
+		bool shared_nil = false;
+
+		UnionTypeKind union_kind = UnionType_Normal;
 
 		Token start_token = f->curr_token;
 
@@ -2500,6 +2503,11 @@ Ast *parse_operand(AstFile *f, bool lhs) {
 					syntax_error(tag, "Duplicate union tag '#%.*s'", LIT(tag.string));
 				}
 				no_nil = true;
+			} else if (tag.string == "shared_nil") {
+				if (shared_nil) {
+					syntax_error(tag, "Duplicate union tag '#%.*s'", LIT(tag.string));
+				}
+				shared_nil = true;
 			} else if (tag.string == "maybe") {
 				if (maybe) {
 					syntax_error(tag, "Duplicate union tag '#%.*s'", LIT(tag.string));
@@ -2511,6 +2519,21 @@ Ast *parse_operand(AstFile *f, bool lhs) {
 		}
 		if (no_nil && maybe) {
 			syntax_error(f->curr_token, "#maybe and #no_nil cannot be applied together");
+		}
+		if (no_nil && shared_nil) {
+			syntax_error(f->curr_token, "#shared_nil and #no_nil cannot be applied together");
+		}
+		if (shared_nil && maybe) {
+			syntax_error(f->curr_token, "#maybe and #shared_nil cannot be applied together");
+		}
+
+
+		if (maybe) {
+			union_kind = UnionType_maybe;
+		} else if (no_nil) {
+			union_kind = UnionType_no_nil;
+		} else if (shared_nil) {
+			union_kind = UnionType_shared_nil;
 		}
 
 		skip_possible_newline_for_literal(f);
@@ -2543,7 +2566,7 @@ Ast *parse_operand(AstFile *f, bool lhs) {
 
 		Token close = expect_closing_brace_of_field_list(f);
 
-		return ast_union_type(f, token, variants, polymorphic_params, align, no_nil, maybe, where_token, where_clauses);
+		return ast_union_type(f, token, variants, polymorphic_params, align, union_kind, where_token, where_clauses);
 	} break;
 
 	case Token_enum: {
@@ -3180,7 +3203,7 @@ Ast *parse_foreign_block(AstFile *f, Token token) {
 	Ast *body = ast_block_stmt(f, decls, open, close);
 
 	Ast *decl = ast_foreign_block_decl(f, token, foreign_library, body, docs);
-	expect_semicolon(f, decl);
+	expect_semicolon(f);
 	return decl;
 }
 
@@ -3226,15 +3249,11 @@ Ast *parse_value_decl(AstFile *f, Array<Ast *> names, CommentGroup *docs) {
 	}
 
 	if (f->expr_level >= 0) {
-		Ast *end = nullptr;
-		if (!is_mutable && values.count > 0) {
-			end = values[values.count-1];
-		}
 		if (f->curr_token.kind == Token_CloseBrace &&
 		    f->curr_token.pos.line == f->prev_token.pos.line) {
 
 		} else {
-			expect_semicolon(f, end);
+			expect_semicolon(f);
 		}
 	}
 
@@ -4142,11 +4161,7 @@ Ast *parse_return_stmt(AstFile *f) {
 		advance_token(f);
 	}
 
-	Ast *end = nullptr;
-	if (results.count > 0) {
-		end = results[results.count-1];
-	}
-	expect_semicolon(f, end);
+	expect_semicolon(f);
 	return ast_return_stmt(f, token, results);
 }
 
@@ -4397,7 +4412,7 @@ Ast *parse_import_decl(AstFile *f, ImportDeclKind kind) {
 		syntax_error(import_name, "'using import' is not allowed, please use the import name explicitly");
 	}
 
-	expect_semicolon(f, s);
+	expect_semicolon(f);
 	return s;
 }
 
@@ -4455,7 +4470,7 @@ Ast *parse_foreign_decl(AstFile *f) {
 		} else {
 			s = ast_foreign_import_decl(f, token, filepaths, lib_name, docs, f->line_comment);
 		}
-		expect_semicolon(f, s);
+		expect_semicolon(f);
 		return s;
 	}
 	}
@@ -4594,7 +4609,7 @@ Ast *parse_stmt(AstFile *f) {
 	case Token_Not:
 	case Token_And:
 		s = parse_simple_stmt(f, StmtAllowFlag_Label);
-		expect_semicolon(f, s);
+		expect_semicolon(f);
 		return s;
 
 
@@ -4622,7 +4637,7 @@ Ast *parse_stmt(AstFile *f) {
 			label = parse_ident(f);
 		}
 		s = ast_branch_stmt(f, token, label);
-		expect_semicolon(f, s);
+		expect_semicolon(f);
 		return s;
 	}
 
@@ -4637,12 +4652,12 @@ Ast *parse_stmt(AstFile *f) {
 		Array<Ast *> list = parse_lhs_expr_list(f);
 		if (list.count == 0) {
 			syntax_error(token, "Illegal use of 'using' statement");
-			expect_semicolon(f, nullptr);
+			expect_semicolon(f);
 			return ast_bad_stmt(f, token, f->curr_token);
 		}
 
 		if (f->curr_token.kind != Token_Colon) {
-			expect_semicolon(f, list[list.count-1]);
+			expect_semicolon(f);
 			return ast_using_stmt(f, token, list);
 		}
 		expect_token_after(f, Token_Colon, "identifier list");
@@ -4699,13 +4714,13 @@ Ast *parse_stmt(AstFile *f) {
 		} else if (tag == "assert" || tag == "panic") {
 			Ast *t = ast_basic_directive(f, hash_token, name);
 			Ast *stmt = ast_expr_stmt(f, parse_call_expr(f, t));
-			expect_semicolon(f, stmt);
+			expect_semicolon(f);
 			return stmt;
 		} else if (name.string == "force_inline" ||
 		           name.string == "force_no_inline") {
 			Ast *expr = parse_force_inlining_operand(f, name);
 			Ast *stmt =  ast_expr_stmt(f, expr);
-			expect_semicolon(f, stmt);
+			expect_semicolon(f);
 			return stmt;
 		} else if (tag == "unroll") {
 			return parse_unrolled_for_loop(f, name);
@@ -4727,7 +4742,7 @@ Ast *parse_stmt(AstFile *f) {
 
 	case Token_Semicolon:
 		s = ast_empty_stmt(f, token);
-		expect_semicolon(f, nullptr);
+		expect_semicolon(f);
 		return s;
 	}
 
@@ -5585,7 +5600,7 @@ bool parse_file(Parser *p, AstFile *f) {
 	}
 
 	Ast *pd = ast_package_decl(f, f->package_token, package_name, docs, f->line_comment);
-	expect_semicolon(f, pd);
+	expect_semicolon(f);
 	f->pkg_decl = pd;
 
 	if (f->error_count == 0) {
@@ -5718,6 +5733,22 @@ ParseFileError parse_packages(Parser *p, String init_filename) {
 		if (!string_ends_with(init_fullpath, ext)) {
 			error_line("Expected either a directory or a .odin file, got '%.*s'\n", LIT(init_filename));
 			return ParseFile_WrongExtension;
+		}
+	} else if (init_fullpath.len != 0) {
+		String path = init_fullpath;
+		if (path[path.len-1] == '/') {
+			path.len -= 1;
+		}
+		if ((build_context.command_kind & Command__does_build) &&
+		    build_context.build_mode == BuildMode_Executable) {
+			String short_path = filename_from_path(path);
+			char *cpath = alloc_cstring(heap_allocator(), short_path);
+			defer (gb_free(heap_allocator(), cpath));
+
+			if (gb_file_exists(cpath)) {
+			    	error_line("Please specify the executable name with -out:<string> as a directory exists with the same name in the current working directory");
+			    	return ParseFile_DirectoryAlreadyExists;
+			}
 		}
 	}
 	

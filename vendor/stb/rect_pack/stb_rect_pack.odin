@@ -6,6 +6,7 @@ import c "core:c/libc"
 
 when ODIN_OS == .Windows { foreign import lib "../lib/stb_rect_pack.lib" }
 when ODIN_OS == .Linux   { foreign import lib "../lib/stb_rect_pack.a"   }
+when ODIN_OS == .Darwin  { foreign import lib "../lib/stb_rect_pack.a"   }
 
 Coord :: distinct c.int
 _MAXVAL :: max(Coord)

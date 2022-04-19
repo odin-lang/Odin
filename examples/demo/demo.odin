@@ -33,6 +33,10 @@ import "core:math/big"
 		core and vendor library collections.
 	Nightly Builds - https://odin-lang.org/docs/nightly/
 		Get the latest nightly builds of Odin.
+	More Odin Examples - https://github.com/odin-lang/examples
+		This repository contains examples of how certain things can be accomplished 
+		in idiomatic Odin, allowing you learn its semantics, as well as how to use 
+		parts of the core and vendor package collections.
 */
 
 the_basics :: proc() {
@@ -94,6 +98,7 @@ the_basics :: proc() {
 		z: f64 // `z` is typed of type `f64` (64-bit floating point number)
 		z = 1  // `1` is an untyped integer literal which can be implicitly converted to `f64`
 				// No need for any suffixes or decimal places like in other languages
+				// (with the exception of negative zero, which must be given as `-0.0`)
 				// CONSTANTS JUST WORK!!!
 
 
@@ -1106,11 +1111,6 @@ prefix_table := [?]string{
 }
 
 threading_example :: proc() {
-	if ODIN_OS == .Darwin {
-		// TODO: Fix threads on darwin/macOS
-		return
-	}
-
 	fmt.println("\n# threading_example")
 
 	{ // Basic Threads
@@ -1151,7 +1151,7 @@ threading_example :: proc() {
 
 	{ // Thread Pool
 		fmt.println("\n## Thread Pool")
-		task_proc :: proc(t: ^thread.Task) {
+		task_proc :: proc(t: thread.Task) {
 			index := t.user_index % len(prefix_table)
 			for iteration in 1..=5 {
 				fmt.printf("Worker Task %d is on iteration %d\n", t.user_index, iteration)
@@ -1161,7 +1161,7 @@ threading_example :: proc() {
 		}
 
 		pool: thread.Pool
-		thread.pool_init(pool=&pool, thread_count=3)
+		thread.pool_init(pool=&pool, thread_count=3, allocator=context.allocator)
 		defer thread.pool_destroy(&pool)
 
 
@@ -1170,7 +1170,7 @@ threading_example :: proc() {
 		}
 
 		thread.pool_start(&pool)
-		thread.pool_wait_and_process(&pool)
+		thread.pool_finish(&pool)
 	}
 }
 
@@ -1714,7 +1714,6 @@ deprecated_attribute :: proc() {
 }
 
 range_statements_with_multiple_return_values :: proc() {
-	// IMPORTANT NOTE(bill, 2019-11-02): This feature is subject to be changed/removed
 	fmt.println("\n#range statements with multiple return values")
 	My_Iterator :: struct {
 		index: int,
@@ -2004,7 +2003,6 @@ relative_data_types :: proc() {
 
 or_else_operator :: proc() {
 	fmt.println("\n#'or_else'")
-	// IMPORTANT NOTE: 'or_else' is an experimental feature and subject to change/removal
 	{
 		m: map[string]int
 		i: int
@@ -2035,8 +2033,6 @@ or_else_operator :: proc() {
 
 or_return_operator :: proc() {
 	fmt.println("\n#'or_return'")
-	// IMPORTANT NOTE: 'or_return' is an experimental feature and subject to change/removal
-	//
 	// The concept of 'or_return' will work by popping off the end value in a multiple
 	// valued expression and checking whether it was not 'nil' or 'false', and if so,
 	// set the end return value to value if possible. If the procedure only has one
@@ -2427,6 +2423,13 @@ matrix_type :: proc() {
 }
 
 main :: proc() {
+	/*
+		For More Odin Examples - https://github.com/odin-lang/examples
+			This repository contains examples of how certain things can be accomplished 
+			in idiomatic Odin, allowing you learn its semantics, as well as how to use 
+			parts of the core and vendor package collections.
+	*/
+
 	when true {
 		the_basics()
 		control_flow()

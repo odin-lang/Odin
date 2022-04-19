@@ -5,7 +5,7 @@
 	List of contributors:
 		Jeroen van Rijn: Initial implementation.
 
-	A test suite for PNG.
+	A test suite for PNG + QOI.
 */
 package test_core_image
 
@@ -14,6 +14,7 @@ import "core:testing"
 import "core:compress"
 import "core:image"
 import "core:image/png"
+import "core:image/qoi"
 
 import "core:bytes"
 import "core:hash"
@@ -32,23 +33,21 @@ TEST_count := 0
 TEST_fail  := 0
 
 when ODIN_TEST {
-    expect  :: testing.expect
-    log     :: testing.log
+	expect  :: testing.expect
+	log     :: testing.log
 } else {
-    expect  :: proc(t: ^testing.T, condition: bool, message: string, loc := #caller_location) {
-        fmt.printf("[%v] ", loc)
-        TEST_count += 1
-        if !condition {
-            TEST_fail += 1
-            fmt.println(message)
-            return
-        }
-        fmt.println(" PASS")
-    }
-    log     :: proc(t: ^testing.T, v: any, loc := #caller_location) {
-        fmt.printf("[%v] ", loc)
-        fmt.printf("log: %v\n", v)
-    }
+	expect  :: proc(t: ^testing.T, condition: bool, message: string, loc := #caller_location) {
+		TEST_count += 1
+		if !condition {
+			TEST_fail += 1
+			fmt.printf("[%v] %v\n", loc, message)
+			return
+		}
+	}
+	log     :: proc(t: ^testing.T, v: any, loc := #caller_location) {
+		fmt.printf("[%v] ", loc)
+		fmt.printf("log: %v\n", v)
+	}
 }
 I_Error :: image.Error
 
@@ -57,6 +56,9 @@ main :: proc() {
 	png_test(&t)
 
 	fmt.printf("%v/%v tests successful.\n", TEST_count - TEST_fail, TEST_count)
+	if TEST_fail > 0 {
+		os.exit(1)
+	}
 }
 
 PNG_Test :: struct {
@@ -1498,11 +1500,34 @@ run_png_suite :: proc(t: ^testing.T, suite: []PNG_Test) -> (subtotal: int) {
 
 				passed &= dims_pass
 
-				hash   := hash.crc32(pixels)
-				error  = fmt.tprintf("%v test %v hash is %08x, expected %08x.", file.file, count, hash, test.hash)
-				expect(t, test.hash == hash, error)
+				png_hash   := hash.crc32(pixels)
+				error  = fmt.tprintf("%v test %v hash is %08x, expected %08x with %v.", file.file, count, png_hash, test.hash, test.options)
+				expect(t, test.hash == png_hash, error)
 
-				passed &= test.hash == hash
+				passed &= test.hash == png_hash
+
+				// Roundtrip through QOI to test the QOI encoder and decoder.
+				if passed && img.depth == 8 && (img.channels == 3 || img.channels == 4) {
+					qoi_buffer: bytes.Buffer
+					defer bytes.buffer_destroy(&qoi_buffer)
+					qoi_save_err := qoi.save(&qoi_buffer, img)
+
+					error  = fmt.tprintf("%v test %v QOI save failed with %v.", file.file, count, qoi_save_err)
+					expect(t, qoi_save_err == nil, error)
+
+					if qoi_save_err == nil {
+						qoi_img, qoi_load_err := qoi.load(qoi_buffer.buf[:])
+						defer qoi.destroy(qoi_img)
+
+						error  = fmt.tprintf("%v test %v QOI load failed with %v.", file.file, count, qoi_load_err)
+						expect(t, qoi_load_err == nil, error)
+
+						qoi_hash := hash.crc32(qoi_img.pixels.buf[:])
+						error  = fmt.tprintf("%v test %v QOI load hash is %08x, expected it match PNG's %08x with %v.", file.file, count, qoi_hash, png_hash, test.options)
+						expect(t, qoi_hash == png_hash, error)
+					}
+				}
+
 				if .return_metadata in test.options {
 
 					if v, ok := img.metadata.(^image.PNG_Info); ok {

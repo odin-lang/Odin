@@ -558,9 +558,11 @@ OdinDocTypeIndex odin_doc_type(OdinDocWriter *w, Type *type) {
 	case Type_Union:
 		doc_type.kind = OdinDocType_Union;
 		if (type->Union.is_polymorphic) { doc_type.flags |= OdinDocTypeFlag_Union_polymorphic; }
-		if (type->Union.no_nil)         { doc_type.flags |= OdinDocTypeFlag_Union_no_nil; }
-		if (type->Union.maybe)          { doc_type.flags |= OdinDocTypeFlag_Union_maybe; }
-
+		switch (type->Union.kind) {
+		case UnionType_maybe:      doc_type.flags |= OdinDocTypeFlag_Union_maybe;      break;
+		case UnionType_no_nil:     doc_type.flags |= OdinDocTypeFlag_Union_no_nil;     break;
+		case UnionType_shared_nil: doc_type.flags |= OdinDocTypeFlag_Union_shared_nil; break;
+		}
 		{
 			auto variants = array_make<OdinDocTypeIndex>(heap_allocator(), type->Union.variants.count);
 			defer (array_free(&variants));

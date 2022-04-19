@@ -624,6 +624,9 @@ struct lbGlobalVariable {
 };
 
 lbProcedure *lb_create_startup_type_info(lbModule *m) {
+	if (build_context.disallow_rtti) {
+		return nullptr;
+	}
 	LLVMPassManagerRef default_function_pass_manager = LLVMCreateFunctionPassManagerForModule(m->mod);
 	lb_populate_function_pass_manager(m, default_function_pass_manager, false, build_context.optimization_level);
 	LLVMFinalizeFunctionPassManager(default_function_pass_manager);
@@ -711,7 +714,9 @@ lbProcedure *lb_create_startup_runtime(lbModule *main_module, lbProcedure *start
 
 	lb_begin_procedure_body(p);
 
-	LLVMBuildCall2(p->builder, LLVMGetElementType(lb_type(main_module, startup_type_info->type)), startup_type_info->value, nullptr, 0, "");
+	if (startup_type_info) {
+		LLVMBuildCall2(p->builder, LLVMGetElementType(lb_type(main_module, startup_type_info->type)), startup_type_info->value, nullptr, 0, "");
+	}
 
 	if (objc_names) {
 		LLVMBuildCall2(p->builder, LLVMGetElementType(lb_type(main_module, objc_names->type)), objc_names->value, nullptr, 0, "");
@@ -996,6 +1001,19 @@ String lb_filepath_obj_for_module(lbModule *m) {
 			case TargetOs_essence:
 				ext = STR_LIT(".o");
 				break;
+
+			case TargetOs_freestanding:
+				switch (build_context.metrics.abi) {
+				default:
+				case TargetABI_Default:
+				case TargetABI_SysV:
+					ext = STR_LIT(".o");
+					break;
+				case TargetABI_Win64:
+					ext = STR_LIT(".obj");
+					break;
+				}
+				break;
 			}
 		}
 	}
@@ -1248,6 +1266,8 @@ void lb_generate_code(lbGenerator *gen) {
 	LLVMCodeModel code_mode = LLVMCodeModelDefault;
 	if (is_arch_wasm()) {
 		code_mode = LLVMCodeModelJITDefault;
+	} else if (build_context.metrics.os == TargetOs_freestanding) {
+		code_mode = LLVMCodeModelKernel;
 	}
 
 	char const *host_cpu_name = LLVMGetHostCPUName();
@@ -1270,8 +1290,16 @@ void lb_generate_code(lbGenerator *gen) {
 		// x86-64-v3: (close to Haswell) AVX, AVX2, BMI1, BMI2, F16C, FMA, LZCNT, MOVBE, XSAVE
 		// x86-64-v4: AVX512F, AVX512BW, AVX512CD, AVX512DQ, AVX512VL
 		if (ODIN_LLVM_MINIMUM_VERSION_12) {
-			llvm_cpu = "x86-64-v2";
+			if (build_context.metrics.os == TargetOs_freestanding) {
+				llvm_cpu = "x86-64";
+			} else {
+				llvm_cpu = "x86-64-v2";
+			}
 		}
+	}
+
+	if (build_context.target_features.len != 0) {
+		llvm_features = alloc_cstring(permanent_allocator(), build_context.target_features);
 	}
 
 	// GB_ASSERT_MSG(LLVMTargetHasAsmBackend(target));
@@ -1293,6 +1321,24 @@ void lb_generate_code(lbGenerator *gen) {
 	LLVMRelocMode reloc_mode = LLVMRelocDefault;
 	if (build_context.build_mode == BuildMode_DynamicLibrary) {
 		reloc_mode = LLVMRelocPIC;
+	}
+
+	switch (build_context.reloc_mode) {
+	case RelocMode_Default:
+		if (build_context.metrics.os == TargetOs_openbsd) {
+			// Always use PIC for OpenBSD: it defaults to PIE
+			reloc_mode = LLVMRelocPIC;
+		}
+		break;
+	case RelocMode_Static:
+		reloc_mode = LLVMRelocStatic;
+		break;
+	case RelocMode_PIC:
+		reloc_mode = LLVMRelocPIC;
+		break;
+	case RelocMode_DynamicNoPIC:
+		reloc_mode = LLVMRelocDynamicNoPic;
+		break;
 	}
 
 	for_array(i, gen->modules.entries) {
@@ -1361,7 +1407,7 @@ void lb_generate_code(lbGenerator *gen) {
 
 	TIME_SECTION("LLVM Global Variables");
 
-	{
+	if (!build_context.disallow_rtti) {
 		lbModule *m = default_module;
 
 		{ // Add type info data
@@ -1468,9 +1514,8 @@ void lb_generate_code(lbGenerator *gen) {
 			if ((e->scope->flags&ScopeFlag_Init) && name == "main") {
 				GB_ASSERT(e == info->entry_point);
 			}
-			if (e->Procedure.is_export ||
-			    (e->Procedure.link_name.len > 0) ||
-			    ((e->scope->flags&ScopeFlag_File) && e->Procedure.link_name.len > 0)) {
+			if (build_context.command_kind == Command_test &&
+			    (e->Procedure.is_export || e->Procedure.link_name.len > 0)) {
 				String link_name = e->Procedure.link_name;
 				if (e->pkg->kind == Package_Runtime) {
 					if (link_name == "main"           ||
@@ -1692,6 +1737,11 @@ void lb_generate_code(lbGenerator *gen) {
 			lbProcedure *p = m->procedures_to_generate[i];
 			lb_generate_procedure(m, p);
 		}
+	}
+
+	if (build_context.command_kind == Command_test && !already_has_entry_point) {
+		TIME_SECTION("LLVM main");
+		lb_create_main_procedure(default_module, startup_runtime);
 	}
 
 	for_array(j, gen->modules.entries) {

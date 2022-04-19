@@ -3,10 +3,11 @@ package sdl2
 import "core:c"
 import vk "vendor:vulkan"
 
-when ODIN_OS == .Windows { foreign import lib "SDL2.lib"    }
-when ODIN_OS == .Linux   { foreign import lib "system:SDL2" }
-when ODIN_OS == .Darwin  { foreign import lib "system:SDL2" }
-when ODIN_OS == .FreeBSD { foreign import lib "system:SDL2" }
+when ODIN_OS == .Windows {
+	foreign import lib "SDL2.lib"
+} else {
+	foreign import lib "system:SDL2"
+}
 
 VkInstance   :: vk.Instance
 VkSurfaceKHR :: vk.SurfaceKHR
