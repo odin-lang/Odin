@@ -61,6 +61,7 @@ import hash           "core:hash"
 
 import image          "core:image"
 import png            "core:image/png"
+import qoi            "core:image/qoi"
 
 import io             "core:io"
 import log            "core:log"
@@ -159,6 +160,7 @@ _ :: fmt
 _ :: hash
 _ :: image
 _ :: png
+_ :: qoi
 _ :: io
 _ :: log
 _ :: math
