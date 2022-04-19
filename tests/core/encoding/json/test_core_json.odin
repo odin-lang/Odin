@@ -71,7 +71,8 @@ parse_json :: proc(t: ^testing.T) {
    
 	_, err := json.parse(transmute([]u8)json_data)
 
-	expect(t, err == .None, "expected json error to be none")
+	msg := fmt.tprintf("Expected `json.parse` to return nil, got %v", err)
+	expect(t, err == nil, msg)
 }
 
 @test
@@ -88,8 +89,8 @@ marshal_json :: proc(t: ^testing.T) {
 	}
    
 	_, err := json.marshal(my_struct)
-	
-	expect(t, err == nil, "expected json error to be none")
+	msg := fmt.tprintf("Expected `json.marshal` to return nil, got %v", err)
+	expect(t, err == nil, msg)
 }
 
 PRODUCTS := `
@@ -97,7 +98,7 @@ PRODUCTS := `
 	"cash":     "0",
 	"products": [
 		{
-			"name": "Cog Cola",
+			"name": "Cog\nCola",
 			"cost":  "3",
 			"owned": "1",
 
@@ -204,7 +205,7 @@ original_data := Game_Marshal{
 	cash = "0",
 	products = {
 		{
-			name       = "Cog Cola",
+			name       = "Cog\nCola",
 			cost       = "3",
 			owned      = "1",
 			profit     = "4",
@@ -331,13 +332,14 @@ unmarshal_json :: proc(t: ^testing.T) {
 	err := json.unmarshal(transmute([]u8)PRODUCTS, &g, json.DEFAULT_SPECIFICATION)
 	defer cleanup(g)
 
-	expect(t, err == nil, "Expected json error to be nil")
+	msg := fmt.tprintf("Expected `json.unmarshal` to return nil, got %v", err)
+	expect(t, err == nil, msg)
 
-	msg := fmt.tprintf("Expected %v products to have been unmarshaled, got %v", len(original_data.products), len(g.products))
+	msg = fmt.tprintf("Expected %v products to have been unmarshaled, got %v", len(original_data.products), len(g.products))
 	expect(t, len(g.products) == len(original_data.products), msg)
 
-	msg  = fmt.tprintf("Expected cash to have been unmarshaled as %v, got %v", original_data.cash, g.cash)
-	expect(t, original_data.cash == g.cash, "Cash unmarshaled improperly")
+	msg = fmt.tprintf("Expected cash to have been unmarshaled as %v, got %v", original_data.cash, g.cash)
+	expect(t, original_data.cash == g.cash, msg)
 
 	for p, i in g.products {
 		expect(t, p == original_data.products[i], "Producted unmarshaled improperly")
