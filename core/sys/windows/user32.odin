@@ -60,6 +60,12 @@ foreign user32 {
 	DestroyWindow :: proc(hWnd: HWND) -> BOOL ---
 
 	ShowWindow :: proc(hWnd: HWND, nCmdShow: c_int) -> BOOL ---
+	BringWindowToTop :: proc(hWnd: HWND) -> BOOL ---
+	GetTopWindow :: proc(hWnd: HWND) -> HWND ---
+	SetForegroundWindow :: proc(hWnd: HWND) -> BOOL ---
+	GetForegroundWindow :: proc() -> HWND ---
+	SetActiveWindow :: proc(hWnd: HWND) -> HWND ---
+	GetActiveWindow :: proc() -> HWND ---
 
 	GetMessageA :: proc(lpMsg: ^MSG, hWnd: HWND, wMsgFilterMin: UINT, wMsgFilterMax: UINT) -> BOOL ---
 	GetMessageW :: proc(lpMsg: ^MSG, hWnd: HWND, wMsgFilterMin: UINT, wMsgFilterMax: UINT) -> BOOL ---
