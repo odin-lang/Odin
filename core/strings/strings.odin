@@ -1833,16 +1833,15 @@ levenshtein_distance :: proc(a, b: string, allocator := context.allocator) -> in
 
 	if n + 1 > len(LEVENSHTEIN_DEFAULT_COSTS) {
 		costs = make([]int, n + 1, allocator)
+		for k in 0..=n {
+			costs[k] = k
+		}
 	} else {
 		costs = LEVENSHTEIN_DEFAULT_COSTS
 	}
 
 	defer if n + 1 > len(LEVENSHTEIN_DEFAULT_COSTS) {
 		delete(costs, allocator)
-	}
-
-	for k in 0..=n {
-		costs[k] = k
 	}
 
 	i: int
