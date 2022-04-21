@@ -15,7 +15,7 @@ clone :: proc(s: string, allocator := context.allocator, loc := #caller_location
 }
 
 // returns a clone of the string `s` allocated using the `allocator` as a cstring
-// a nul byte is appended to the clone, to make the cstring safe 
+// a nul byte is appended to the clone, to make the cstring safe
 clone_to_cstring :: proc(s: string, allocator := context.allocator, loc := #caller_location) -> cstring {
 	c := make([]byte, len(s)+1, allocator, loc)
 	copy(c, s)
@@ -37,7 +37,7 @@ string_from_nul_terminated_ptr :: proc(ptr: ^byte, len: int) -> string {
 	return s
 }
 
-// returns the raw ^byte start of the string `str` 
+// returns the raw ^byte start of the string `str`
 ptr_from_string :: proc(str: string) -> ^byte {
 	d := transmute(mem.Raw_String)str
 	return d.data
@@ -969,7 +969,7 @@ count :: proc(s, substr: string) -> int {
 	repeats the string `s` multiple `count` times and returns the allocated string
 	panics when `count` is below 0
 
-	strings.repeat("abc", 2) -> "abcabc" 
+	strings.repeat("abc", 2) -> "abcabc"
 */
 repeat :: proc(s: string, count: int, allocator := context.allocator) -> string {
 	if count < 0 {
@@ -1378,7 +1378,7 @@ split_multi :: proc(s: string, substrs: []string, allocator := context.allocator
 
 	// skip when no results
 	if substrings_found < 1 {
-		return 
+		return
 	}
 
 	buf = make([]string, substrings_found + 1, allocator)
@@ -1812,16 +1812,35 @@ fields_iterator :: proc(s: ^string) -> (field: string, ok: bool) {
 
 // `levenshtein_distance` returns the Levenshtein edit distance between 2 strings.
 // This is a single-row-version of the Wagner–Fischer algorithm, based on C code by Martin Ettl.
-// Note: allocator isn't used if the length of string b in runes is smaller than 70.
+// Note: allocator isn't used if the length of string b in runes is smaller than 256.
 levenshtein_distance :: proc(a, b: string, allocator := context.allocator) -> int {
 	LEVENSHTEIN_DEFAULT_COSTS: []int : {
-		0,  1,  2,  3,  4,  5,  6,  7,  8,  9,
-		10, 11, 12, 13, 14, 15, 16, 17, 18, 19,
-		20, 21, 22, 23, 24, 25, 26, 27, 28, 29,
-		30, 31, 32, 33, 34, 35, 36, 37, 38, 39,
-		40, 41, 42, 43, 44, 45, 46, 47, 48, 49,
-		50, 51, 52, 53, 54, 55, 56, 57, 58, 59,
-		60, 61, 62, 63, 64, 65, 66, 67, 68, 69,
+		0,   1,   2,   3,   4,   5,   6,   7,   8,   9,
+		10,  11,  12,  13,  14,  15,  16,  17,  18,  19,
+		20,  21,  22,  23,  24,  25,  26,  27,  28,  29,
+		30,  31,  32,  33,  34,  35,  36,  37,  38,  39,
+		40,  41,  42,  43,  44,  45,  46,  47,  48,  49,
+		50,  51,  52,  53,  54,  55,  56,  57,  58,  59,
+		60,  61,  62,  63,  64,  65,  66,  67,  68,  69,
+		70,  71,  72,  73,  74,  75,  76,  77,  78,  79,
+		80,  81,  82,  83,  84,  85,  86,  87,  88,  89,
+		90,  91,  92,  93,  94,  95,  96,  97,  98,  99,
+		100, 101, 102, 103, 104, 105, 106, 107, 108, 109,
+		110, 111, 112, 113, 114, 115, 116, 117, 118, 119,
+		120, 121, 122, 123, 124, 125, 126, 127, 128, 129,
+		130, 131, 132, 133, 134, 135, 136, 137, 138, 139,
+		140, 141, 142, 143, 144, 145, 146, 147, 148, 149,
+		150, 151, 152, 153, 154, 155, 156, 157, 158, 159,
+		160, 161, 162, 163, 164, 165, 166, 167, 168, 169,
+		170, 171, 172, 173, 174, 175, 176, 177, 178, 179,
+		180, 181, 182, 183, 184, 185, 186, 187, 188, 189,
+		190, 191, 192, 193, 194, 195, 196, 197, 198, 199,
+		200, 201, 202, 203, 204, 205, 206, 207, 208, 209,
+		210, 211, 212, 213, 214, 215, 216, 217, 218, 219,
+		220, 221, 222, 223, 224, 225, 226, 227, 228, 229,
+		230, 231, 232, 233, 234, 235, 236, 237, 238, 239,
+		240, 241, 242, 243, 244, 245, 246, 247, 248, 249,
+		250, 251, 252, 253, 254, 255,
 	}
 
 	m, n := utf8.rune_count_in_string(a), utf8.rune_count_in_string(b)
