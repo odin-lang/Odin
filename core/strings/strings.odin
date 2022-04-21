@@ -1826,8 +1826,12 @@ levenshtein_distance :: proc(a, b: string, allocator := context.allocator) -> in
 
 	m, n := utf8.rune_count_in_string(a), utf8.rune_count_in_string(b)
 
-	if m == 0 do return n
-	if n == 0 do return m
+	if m == 0 {
+		return n
+	}
+	if n == 0 {
+		return m
+	}
 
 	costs: []int
 
