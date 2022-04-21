@@ -1809,3 +1809,62 @@ fields_iterator :: proc(s: ^string) -> (field: string, ok: bool) {
 	s^ = s[len(s):]
 	return
 }
+
+// `levenshtein_distance` returns the Levenshtein edit distance between 2 strings.
+// This is a single-row-version of the Wagner–Fischer algorithm, based on C code by Martin Ettl.
+// Note: allocator isn't used if the length of string b in runes is smaller than 70.
+levenshtein_distance :: proc(a, b: string, allocator := context.allocator) -> int {
+	LEVENSHTEIN_DEFAULT_COSTS: []int : {
+		0,  1,  2,  3,  4,  5,  6,  7,  8,  9,
+		10, 11, 12, 13, 14, 15, 16, 17, 18, 19,
+		20, 21, 22, 23, 24, 25, 26, 27, 28, 29,
+		30, 31, 32, 33, 34, 35, 36, 37, 38, 39,
+		40, 41, 42, 43, 44, 45, 46, 47, 48, 49,
+		50, 51, 52, 53, 54, 55, 56, 57, 58, 59,
+		60, 61, 62, 63, 64, 65, 66, 67, 68, 69,
+	}
+
+	m, n := utf8.rune_count_in_string(a), utf8.rune_count_in_string(b)
+
+	if m == 0 do return n
+	if n == 0 do return m
+
+	costs: []int
+
+	if n + 1 > len(LEVENSHTEIN_DEFAULT_COSTS) {
+		costs = make([]int, n + 1, allocator)
+	} else {
+		costs = LEVENSHTEIN_DEFAULT_COSTS
+	}
+
+	defer if n + 1 > len(LEVENSHTEIN_DEFAULT_COSTS) {
+		delete(costs, allocator)
+	}
+
+	for k in 0..=n {
+		costs[k] = k
+	}
+
+	i: int
+	for c1 in a {
+		costs[0] = i + 1
+		corner := i
+		j: int
+		for c2 in b {
+			upper := costs[j + 1]
+			if c1 == c2 {
+				costs[j + 1] = corner
+			} else {
+				t := upper if upper < corner else corner
+				costs[j + 1] = (costs[j] if costs[j] < t else t) + 1
+			}
+
+			corner = upper
+			j += 1
+		}
+
+		i += 1
+	}
+
+	return costs[n]
+}
