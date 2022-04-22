@@ -14,6 +14,8 @@ package shoco
 import "core:intrinsics"
 import "core:compress"
 
+import "core:fmt"
+
 Shoco_Pack :: struct {
 	word:           u32,
 	bytes_packed:   i8,
@@ -29,8 +31,8 @@ Shoco_Model :: struct {
 	max_char:             u8,
 	characters_by_id:     []u8,
 	ids_by_character:     [256]i16,
-	successors_by_bigram: [][]i8,
-	successors_reversed:  [][]u8,
+	successors_by_bigram: []i8,
+	successors_reversed:  []u8,
 
 	character_count:      u8,
 	successor_count:      u8,
@@ -74,19 +76,15 @@ find_best_encoding :: proc(indices: []i16, n_consecutive: i8, model := DEFAULT_M
 }
 
 validate_model :: proc(model: Shoco_Model) -> (int, compress.Error) {
-	if len(model.successors_reversed) != int(model.max_char - model.min_char) {
-		return 0, .Unknown_Compression_Method
-	}
-
 	if len(model.characters_by_id) != int(model.character_count) {
 		return 0, .Unknown_Compression_Method
 	}
 
-	if len(model.successors_by_bigram) != int(model.character_count) || len(model.successors_by_bigram[0]) != int(model.character_count) {
+	if len(model.successors_by_bigram) != int(model.character_count) * int(model.character_count) {
 		return 0, .Unknown_Compression_Method
 	}
 
-	if len(model.successors_reversed[0]) != int(model.successor_count) {
+	if len(model.successors_reversed) != int(model.successor_count) * int(model.max_char - model.min_char) {
 		return 0, .Unknown_Compression_Method
 	}
 
@@ -155,7 +153,11 @@ decompress_slice_to_output_buffer :: proc(input: []u8, output: []u8, model := DE
 				offset = pack.offsets[i]
 				mask   = pack.masks[i]
 
-				last_chr = model.successors_reversed[last_chr - model.min_char][(code >> offset) & u32(mask)]
+				index_major := u32(last_chr - model.min_char) * u32(model.successor_count)
+				index_minor := (code >> offset) & u32(mask)
+
+				last_chr = model.successors_reversed[index_major + index_minor]
+
 				output[out + i] = last_chr
 			}
 
@@ -242,7 +244,7 @@ compress_string_to_buffer :: proc(input: string, output: []u8, model := DEFAULT_
 					break
 				}
 
-				successor_index := model.successors_by_bigram[last_chr_index][current_index]
+				successor_index := model.successors_by_bigram[last_chr_index * i16(model.character_count) + current_index]
 				if successor_index < 0 {
 					break
 				}
