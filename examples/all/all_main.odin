@@ -10,6 +10,7 @@ import c              "core:c"
 import libc           "core:c/libc"
 
 import compress       "core:compress"
+import shoco          "core:compress/shoco"
 import gzip           "core:compress/gzip"
 import zlib           "core:compress/zlib"
 
@@ -115,6 +116,7 @@ _ :: bytes
 _ :: c
 _ :: libc
 _ :: compress
+_ :: shoco
 _ :: gzip
 _ :: zlib
 _ :: bit_array
