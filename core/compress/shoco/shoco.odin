@@ -14,8 +14,6 @@ package shoco
 import "core:intrinsics"
 import "core:compress"
 
-import "core:fmt"
-
 Shoco_Pack :: struct {
 	word:           u32,
 	bytes_packed:   i8,
