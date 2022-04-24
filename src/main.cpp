@@ -46,6 +46,7 @@ gb_global Timings global_timings = {0};
 #include "checker.cpp"
 #include "docs.cpp"
 
+
 #include "llvm_backend.cpp"
 
 #if defined(GB_SYSTEM_OSX)
@@ -56,7 +57,15 @@ gb_global Timings global_timings = {0};
 #endif
 
 #include "query_data.cpp"
+
+
+#if defined(GB_SYSTEM_WINDOWS)
+// NOTE(IC): In order to find Visual C++ paths without relying on environment variables.
+#include "microsoft_craziness.h"
+#endif
+
 #include "bug_report.cpp"
+
 
 // NOTE(bill): 'name' is used in debugging and profiling modes
 i32 system_exec_command_line_app(char const *name, char const *fmt, ...) {
@@ -121,35 +130,34 @@ i32 system_exec_command_line_app(char const *name, char const *fmt, ...) {
 }
 
 
+
+
 i32 linker_stage(lbGenerator *gen) {
 	i32 result = 0;
 	Timings *timings = &global_timings;
 
-	String output_filename = path_to_string(heap_allocator(), build_context.build_paths[BuildPath_Output]);
-	debugf("Linking %.*s\n", LIT(output_filename));
-
-	// TOOD(Jeroen): Make a `build_paths[BuildPath_Object] to avoid `%.*s.o`.
+	String output_base = gen->output_base;
 
 	if (is_arch_wasm()) {
 		timings_start_section(timings, str_lit("wasm-ld"));
 
 	#if defined(GB_SYSTEM_WINDOWS)
 		result = system_exec_command_line_app("wasm-ld",
-			"\"%.*s\\bin\\wasm-ld\" \"%.*s.o\" -o \"%.*s\" %.*s %.*s",
+			"\"%.*s\\bin\\wasm-ld\" \"%.*s.wasm.o\" -o \"%.*s.wasm\" %.*s %.*s",
 			LIT(build_context.ODIN_ROOT),
-			LIT(output_filename), LIT(output_filename), LIT(build_context.link_flags), LIT(build_context.extra_linker_flags));
+			LIT(output_base), LIT(output_base), LIT(build_context.link_flags), LIT(build_context.extra_linker_flags));
 	#else
 		result = system_exec_command_line_app("wasm-ld",
-			"wasm-ld \"%.*s.o\" -o \"%.*s\" %.*s %.*s",
-			LIT(output_filename), LIT(output_filename), LIT(build_context.link_flags), LIT(build_context.extra_linker_flags));
+			"wasm-ld \"%.*s.wasm.o\" -o \"%.*s.wasm\" %.*s %.*s",
+			LIT(output_base), LIT(output_base), LIT(build_context.link_flags), LIT(build_context.extra_linker_flags));
 	#endif
 		return result;
 	}
 
 	if (build_context.cross_compiling && selected_target_metrics->metrics == &target_essence_amd64) {
-#if defined(GB_SYSTEM_UNIX) 
+#ifdef GB_SYSTEM_UNIX
 		result = system_exec_command_line_app("linker", "x86_64-essence-gcc \"%.*s.o\" -o \"%.*s\" %.*s %.*s",
-			LIT(output_filename), LIT(output_filename), LIT(build_context.link_flags), LIT(build_context.extra_linker_flags));
+			LIT(output_base), LIT(output_base), LIT(build_context.link_flags), LIT(build_context.extra_linker_flags));
 #else
 		gb_printf_err("Linking for cross compilation for this platform is not yet supported (%.*s %.*s)\n",
 			LIT(target_os_names[build_context.metrics.os]),
@@ -173,11 +181,28 @@ i32 linker_stage(lbGenerator *gen) {
 		gbString lib_str = gb_string_make(heap_allocator(), "");
 		defer (gb_string_free(lib_str));
 
+		char const *output_ext = "exe";
 		gbString link_settings = gb_string_make_reserve(heap_allocator(), 256);
 		defer (gb_string_free(link_settings));
 
+
+		// NOTE(ic): It would be nice to extend this so that we could specify the Visual Studio version that we want instead of defaulting to the latest.
+		Find_Result_Utf8 find_result = find_visual_studio_and_windows_sdk_utf8();
+
+		if (find_result.windows_sdk_version == 0) {
+			gb_printf_err("Windows SDK not found.\n");
+			exit(1);
+		}
+
+		if (build_context.ignore_microsoft_magic) {
+			find_result = {};
+		}
+
 		// Add library search paths.
-		if (build_context.build_paths[BuildPath_VS_LIB].basename.len > 0) {
+		if (find_result.vs_library_path.len > 0) {
+			GB_ASSERT(find_result.windows_sdk_um_library_path.len > 0);
+			GB_ASSERT(find_result.windows_sdk_ucrt_library_path.len > 0);
+
 			String path = {};
 			auto add_path = [&](String path) {
 				if (path[path.len-1] == '\\') {
@@ -185,9 +210,9 @@ i32 linker_stage(lbGenerator *gen) {
 				}
 				link_settings = gb_string_append_fmt(link_settings, " /LIBPATH:\"%.*s\"", LIT(path));
 			};
-			add_path(build_context.build_paths[BuildPath_Win_SDK_UM_Lib].basename);
-			add_path(build_context.build_paths[BuildPath_Win_SDK_UCRT_Lib].basename);
-			add_path(build_context.build_paths[BuildPath_VS_LIB].basename);
+			add_path(find_result.windows_sdk_um_library_path);
+			add_path(find_result.windows_sdk_ucrt_library_path);
+			add_path(find_result.vs_library_path);
 		}
 
 
@@ -227,14 +252,14 @@ i32 linker_stage(lbGenerator *gen) {
 
 
 		if (build_context.build_mode == BuildMode_DynamicLibrary) {
+			output_ext = "dll";
 			link_settings = gb_string_append_fmt(link_settings, " /DLL");
 		} else {
 			link_settings = gb_string_append_fmt(link_settings, " /ENTRY:mainCRTStartup");
 		}
 
 		if (build_context.pdb_filepath != "") {
-			String pdb_path = path_to_string(heap_allocator(), build_context.build_paths[BuildPath_PDB]);
-			link_settings = gb_string_append_fmt(link_settings, " /PDB:%.*s", LIT(pdb_path));
+			link_settings = gb_string_append_fmt(link_settings, " /PDB:%.*s", LIT(build_context.pdb_filepath));
 		}
 
 		if (build_context.no_crt) {
@@ -275,21 +300,13 @@ i32 linker_stage(lbGenerator *gen) {
 			object_files = gb_string_append_fmt(object_files, "\"%.*s\" ", LIT(object_path));
 		}
 
-		String vs_exe_path = path_to_string(heap_allocator(), build_context.build_paths[BuildPath_VS_EXE]);
-		defer (gb_free(heap_allocator(), vs_exe_path.text));
-
 		char const *subsystem_str = build_context.use_subsystem_windows ? "WINDOWS" : "CONSOLE";
 		if (!build_context.use_lld) { // msvc
 			if (build_context.has_resource) {
-				String rc_path  = path_to_string(heap_allocator(), build_context.build_paths[BuildPath_RC]);
-				String res_path = path_to_string(heap_allocator(), build_context.build_paths[BuildPath_RES]);
-				defer (gb_free(heap_allocator(), rc_path.text));
-				defer (gb_free(heap_allocator(), res_path.text));
-
 				result = system_exec_command_line_app("msvc-link",
-					"\"rc.exe\" /nologo /fo \"%.*s\" \"%.*s\"",
-					LIT(res_path),
-					LIT(rc_path)
+					"\"rc.exe\" /nologo /fo \"%.*s.res\" \"%.*s.rc\"",
+					LIT(output_base),
+					LIT(build_context.resource_filepath)
 				);
 
 				if (result) {
@@ -297,13 +314,13 @@ i32 linker_stage(lbGenerator *gen) {
 				}
 
 				result = system_exec_command_line_app("msvc-link",
-					"\"%.*slink.exe\" %s \"%.*s\" -OUT:\"%.*s\" %s "
+					"\"%.*slink.exe\" %s \"%.*s.res\" -OUT:\"%.*s.%s\" %s "
 					"/nologo /incremental:no /opt:ref /subsystem:%s "
 					" %.*s "
 					" %.*s "
 					" %s "
 					"",
-					LIT(vs_exe_path), object_files, LIT(res_path), LIT(output_filename),
+					LIT(find_result.vs_exe_path), object_files, LIT(output_base), LIT(output_base), output_ext,
 					link_settings,
 					subsystem_str,
 					LIT(build_context.link_flags),
@@ -312,13 +329,13 @@ i32 linker_stage(lbGenerator *gen) {
 				  );
 			} else {
 				result = system_exec_command_line_app("msvc-link",
-					"\"%.*slink.exe\" %s -OUT:\"%.*s\" %s "
+					"\"%.*slink.exe\" %s -OUT:\"%.*s.%s\" %s "
 					"/nologo /incremental:no /opt:ref /subsystem:%s "
 					" %.*s "
 					" %.*s "
 					" %s "
 					"",
-					LIT(vs_exe_path), object_files, LIT(output_filename),
+					LIT(find_result.vs_exe_path), object_files, LIT(output_base), output_ext,
 					link_settings,
 					subsystem_str,
 					LIT(build_context.link_flags),
@@ -333,13 +350,13 @@ i32 linker_stage(lbGenerator *gen) {
 
 		} else { // lld
 			result = system_exec_command_line_app("msvc-lld-link",
-				"\"%.*s\\bin\\lld-link\" %s -OUT:\"%.*s\" %s "
+				"\"%.*s\\bin\\lld-link\" %s -OUT:\"%.*s.%s\" %s "
 				"/nologo /incremental:no /opt:ref /subsystem:%s "
 				" %.*s "
 				" %.*s "
 				" %s "
 				"",
-				LIT(build_context.ODIN_ROOT), object_files, LIT(output_filename),
+				LIT(build_context.ODIN_ROOT), object_files, LIT(output_base),output_ext,
 				link_settings,
 				subsystem_str,
 				LIT(build_context.link_flags),
@@ -398,7 +415,7 @@ i32 linker_stage(lbGenerator *gen) {
 				} else if (string_ends_with(lib, str_lit(".so"))) {
 					// dynamic lib, relative path to executable
 					// NOTE(vassvik): it is the user's responsibility to make sure the shared library files are visible
-					//                at runtime to the executable
+					//                at runtimeto the executable
 					lib_str = gb_string_append_fmt(lib_str, " -l:\"%s/%.*s\" ", cwd, LIT(lib));
 				} else {
 					// dynamic or static system lib, just link regularly searching system library paths
@@ -414,6 +431,9 @@ i32 linker_stage(lbGenerator *gen) {
 			object_files = gb_string_append_fmt(object_files, "\"%.*s\" ", LIT(object_path));
 		}
 
+		// Unlike the Win32 linker code, the output_ext includes the dot, because
+		// typically executable files on *NIX systems don't have extensions.
+		String output_ext = {};
 		gbString link_settings = gb_string_make_reserve(heap_allocator(), 32);
 
 		if (build_context.no_crt) {
@@ -441,11 +461,25 @@ i32 linker_stage(lbGenerator *gen) {
 			// correctly this way since all the other dependencies provided implicitly
 			// by the compiler frontend are still needed and most of the command
 			// line arguments prepared previously are incompatible with ld.
+			//
+			// Shared libraries are .dylib on MacOS and .so on Linux.
+			if (build_context.metrics.os == TargetOs_darwin) {
+				output_ext = STR_LIT(".dylib");
+			} else {
+				output_ext = STR_LIT(".so");
+			}
 			link_settings = gb_string_appendc(link_settings, "-Wl,-init,'_odin_entry_point' ");
 			link_settings = gb_string_appendc(link_settings, "-Wl,-fini,'_odin_exit_point' ");
 		} else if (build_context.metrics.os != TargetOs_openbsd) {
 			// OpenBSD defaults to PIE executable. do not pass -no-pie for it.
 			link_settings = gb_string_appendc(link_settings, "-no-pie ");
+		}
+		if (build_context.out_filepath.len > 0) {
+			//NOTE(thebirk): We have a custom -out arguments, so we should use the extension from that
+			isize pos = string_extension_position(build_context.out_filepath);
+			if (pos > 0) {
+				output_ext = substring(build_context.out_filepath, pos, build_context.out_filepath.len);
+			}
 		}
 
 		gbString platform_lib_str = gb_string_make(heap_allocator(), "");
@@ -473,7 +507,7 @@ i32 linker_stage(lbGenerator *gen) {
 		defer (gb_string_free(link_command_line));
 
 		link_command_line = gb_string_appendc(link_command_line, object_files);
-		link_command_line = gb_string_append_fmt(link_command_line, " -o \"%.*s\" ", LIT(output_filename));
+		link_command_line = gb_string_append_fmt(link_command_line, " -o \"%.*s%.*s\" ", LIT(output_base), LIT(output_ext));
 		link_command_line = gb_string_append_fmt(link_command_line, " %s ", platform_lib_str);
 		link_command_line = gb_string_append_fmt(link_command_line, " %s ", lib_str);
 		link_command_line = gb_string_append_fmt(link_command_line, " %.*s ", LIT(build_context.link_flags));
@@ -490,7 +524,9 @@ i32 linker_stage(lbGenerator *gen) {
 		if (build_context.ODIN_DEBUG) {
 			// NOTE: macOS links DWARF symbols dynamically. Dsymutil will map the stubs in the exe
 			// to the symbols in the object file
-			result = system_exec_command_line_app("dsymutil", "dsymutil %.*s", LIT(output_filename));
+			result = system_exec_command_line_app("dsymutil",
+				"dsymutil %.*s%.*s", LIT(output_base), LIT(output_ext)
+			);
 
 			if (result) {
 				return result;
@@ -1490,10 +1526,6 @@ bool parse_build_flags(Array<String> args) {
 									gb_printf_err("Invalid -resource path %.*s, missing .rc\n", LIT(path));
 									bad_flags = true;
 									break;
-								} else if (!gb_file_exists((const char *)path.text)) {
-									gb_printf_err("Invalid -resource path %.*s, file does not exist.\n", LIT(path));
-									bad_flags = true;
-									break;
 								}
 								build_context.resource_filepath = substring(path, 0, string_extension_position(path));
 								build_context.has_resource = true;
@@ -1508,11 +1540,6 @@ bool parse_build_flags(Array<String> args) {
 							String path = value.value_string;
 							path = string_trim_whitespace(path);
 							if (is_build_flag_path_valid(path)) {
-								if (path_is_directory(path)) {
-									gb_printf_err("Invalid -pdb-name path. %.*s, is a directory.\n", LIT(path));
-									bad_flags = true;
-									break;									
-								}
 								// #if defined(GB_SYSTEM_WINDOWS)
 								// 	String ext = path_extension(path);
 								// 	if (ext != ".pdb") {
@@ -2639,8 +2666,6 @@ int main(int arg_count, char const **arg_ptr) {
 		return 1;
 	}
 
-	init_filename = copy_string(permanent_allocator(), init_filename);
-
 	if (init_filename == "-help" ||
 	    init_filename == "--help") {
 		build_context.show_help = true;
@@ -2663,12 +2688,6 @@ int main(int arg_count, char const **arg_ptr) {
 				gb_printf_err("Did you mean `%.*s %.*s %.*s -file`?\n", LIT(args[0]), LIT(command), LIT(init_filename));
 				gb_printf_err("The `-file` flag tells it to treat a file as a self-contained package.\n");
 				return 1;
-			} else {
-				String const ext = str_lit(".odin");
-				if (!string_ends_with(init_filename, ext)) {
-					gb_printf_err("Expected either a directory or a .odin file, got '%.*s'\n", LIT(init_filename));
-					return 1;
-				}
 			}
 		}
 	}
@@ -2690,23 +2709,12 @@ int main(int arg_count, char const **arg_ptr) {
 			get_fullpath_relative(heap_allocator(), odin_root_dir(), str_lit("shared")));
 	}
 
+
 	init_build_context(selected_target_metrics ? selected_target_metrics->metrics : nullptr);
 	// if (build_context.word_size == 4 && build_context.metrics.os != TargetOs_js) {
 	// 	print_usage_line(0, "%.*s 32-bit is not yet supported for this platform", LIT(args[0]));
 	// 	return 1;
 	// }
-
-	// Set and check build paths...
-	if (!init_build_paths(init_filename)) {
-		return 1;
-	}
-
-	if (build_context.show_debug_messages) {
-		for_array(i, build_context.build_paths) {
-			String build_path = path_to_string(heap_allocator(), build_context.build_paths[i]);
-			debugf("build_paths[%ld]: %.*s\n", i, LIT(build_path));
-		}		
-	}
 
 	init_global_thread_pool();
 	defer (thread_pool_destroy(&global_thread_pool));
@@ -2724,8 +2732,6 @@ int main(int arg_count, char const **arg_ptr) {
 	}
 	defer (destroy_parser(parser));
 
-	// TODO(jeroen): Remove the `init_filename` param.
-	// Let's put that on `build_context.build_paths[0]` instead.
 	if (parse_packages(parser, init_filename) != ParseFile_None) {
 		return 1;
 	}
@@ -2804,14 +2810,16 @@ int main(int arg_count, char const **arg_ptr) {
 	}
 
 	if (run_output) {
-		String exe_name = path_to_string(heap_allocator(), build_context.build_paths[BuildPath_Output]);
-		defer (gb_free(heap_allocator(), exe_name.text));
-
 	#if defined(GB_SYSTEM_WINDOWS)
-		return system_exec_command_line_app("odin run", "%.*s %.*s", LIT(exe_name), LIT(run_args_string));
+		return system_exec_command_line_app("odin run", "%.*s.exe %.*s", LIT(gen->output_base), LIT(run_args_string));
 	#else
-		return system_exec_command_line_app("odin run", "\"%.*s\" %.*s", LIT(exe_name), LIT(run_args_string));
+		//NOTE(thebirk): This whole thing is a little leaky
+		String output_ext = {};
+		String complete_path = concatenate_strings(permanent_allocator(), gen->output_base, output_ext);
+		complete_path = path_to_full_path(permanent_allocator(), complete_path);
+		return system_exec_command_line_app("odin run", "\"%.*s\" %.*s", LIT(complete_path), LIT(run_args_string));
 	#endif
 	}
+
 	return 0;
 }

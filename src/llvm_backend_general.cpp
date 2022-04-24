@@ -87,6 +87,7 @@ bool lb_init_generator(lbGenerator *gen, Checker *c) {
 		return false;
 	}
 
+
 	String init_fullpath = c->parser->init_fullpath;
 
 	if (build_context.out_filepath.len == 0) {
