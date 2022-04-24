@@ -1,7 +1,7 @@
-all: debug demo
+all: debug
 
 demo:
-	./odin run examples/demo/demo.odin
+	./odin run examples/demo
 
 report:
 	./odin report
