@@ -3,6 +3,7 @@
 #include <sys/sysctl.h>
 #endif
 
+
 // #if defined(GB_SYSTEM_WINDOWS)
 // #define DEFAULT_TO_THREADED_CHECKER
 // #endif
@@ -197,22 +198,6 @@ enum RelocMode : u8 {
 	RelocMode_DynamicNoPIC,
 };
 
-enum BuildPath : u8 {
-	BuildPath_Main_Package,     // Input  Path to the package directory (or file) we're building.
-	BuildPath_RC,               // Input  Path for .rc  file, can be set with `-resource:`.
-	BuildPath_RES,              // Output Path for .res file, generated from previous.
-	BuildPath_Win_SDK_Root,     // windows_sdk_root
-	BuildPath_Win_SDK_UM_Lib,   // windows_sdk_um_library_path
-	BuildPath_Win_SDK_UCRT_Lib, // windows_sdk_ucrt_library_path
-	BuildPath_VS_EXE,           // vs_exe_path
-	BuildPath_VS_LIB,           // vs_library_path
-
-	BuildPath_Output,           // Output Path for .exe, .dll, .so, etc. Can be overridden with `-out:`.
-	BuildPath_PDB,              // Output Path for .pdb file, can be overridden with `-pdb-name:`.
-
-	BuildPathCOUNT,
-};
-
 // This stores the information for the specify architecture of this build
 struct BuildContext {
 	// Constants
@@ -241,13 +226,9 @@ struct BuildContext {
 
 	bool show_help;
 
-	Array<Path> build_paths;   // Contains `Path` objects to output filename, pdb, resource and intermediate files.
-	                           // BuildPath enum contains the indices of paths we know *before* the work starts.
-
 	String out_filepath;
 	String resource_filepath;
 	String pdb_filepath;
-
 	bool   has_resource;
 	String link_flags;
 	String extra_linker_flags;
@@ -318,6 +299,8 @@ struct BuildContext {
 	PtrMap<char const *, ExactValue> defined_values;
 
 };
+
+
 
 gb_global BuildContext build_context = {0};
 
@@ -621,6 +604,28 @@ bool allow_check_foreign_filepath(void) {
 // is_file
 // is_abs_path
 // has_subdir
+
+enum TargetFileValidity : u8 {
+	TargetFileValidity_Invalid,
+
+	TargetFileValidity_Writable_File,
+	TargetFileValidity_No_Write_Permission,
+	TargetFileValidity_Directory,
+
+	TargetTargetFileValidity_COUNT,
+};
+
+TargetFileValidity set_output_filename(void) {
+	// Assembles the output filename from build_context information.
+	// Returns `true`  if it doesn't exist or is a file.
+	// Returns `false` if a directory or write-protected file.
+
+
+
+
+	return TargetFileValidity_Writable_File;
+}
+
 
 String const WIN32_SEPARATOR_STRING = {cast(u8 *)"\\", 1};
 String const NIX_SEPARATOR_STRING   = {cast(u8 *)"/",  1};
@@ -968,6 +973,7 @@ char *token_pos_to_string(TokenPos const &pos) {
 	return s;
 }
 
+
 void init_build_context(TargetMetrics *cross_target) {
 	BuildContext *bc = &build_context;
 
@@ -1146,166 +1152,8 @@ void init_build_context(TargetMetrics *cross_target) {
 
 	bc->optimization_level = gb_clamp(bc->optimization_level, 0, 3);
 
+
+
 	#undef LINK_FLAG_X64
 	#undef LINK_FLAG_386
-}
-
-#if defined(GB_SYSTEM_WINDOWS)
-// NOTE(IC): In order to find Visual C++ paths without relying on environment variables.
-// NOTE(Jeroen): No longer needed in `main.cpp -> linker_stage`. We now resolve those paths in `init_build_paths`.
-#include "microsoft_craziness.h"
-#endif
-
-// NOTE(Jeroen): Set/create the output and other paths and report an error as appropriate.
-// We've previously called `parse_build_flags`, so `out_filepath` should be set.
-bool init_build_paths(String init_filename) {
-	gbAllocator   ha = heap_allocator();
-	BuildContext *bc = &build_context;
-
-	// NOTE(Jeroen): We're pre-allocating BuildPathCOUNT slots so that certain paths are always at the same enumerated index.
-	array_init(&bc->build_paths, permanent_allocator(), BuildPathCOUNT);
-
-	// [BuildPathMainPackage] Turn given init path into a `Path`, which includes normalizing it into a full path.
-	bc->build_paths[BuildPath_Main_Package] = path_from_string(ha, init_filename);
-
-	bool produces_output_file = false;
-	if (bc->command_kind == Command_doc && bc->cmd_doc_flags & CmdDocFlag_DocFormat) {
-		produces_output_file = true;
-	} else if (bc->command_kind & Command__does_build) {
-		produces_output_file = true;
-	}
-
-	if (!produces_output_file) {
-		// Command doesn't produce output files. We're done.
-		return true;
-	}
-
-	#if defined(GB_SYSTEM_WINDOWS)
-		if (bc->resource_filepath.len > 0) {
-			bc->build_paths[BuildPath_RC]      = path_from_string(ha, bc->resource_filepath);
-			bc->build_paths[BuildPath_RES]     = path_from_string(ha, bc->resource_filepath);
-			bc->build_paths[BuildPath_RC].ext  = copy_string(ha, STR_LIT("rc"));
-			bc->build_paths[BuildPath_RES].ext = copy_string(ha, STR_LIT("res"));
-		}
-
-		if (bc->pdb_filepath.len > 0) {
-			bc->build_paths[BuildPath_PDB]          = path_from_string(ha, bc->pdb_filepath);
-		}
-
-		if ((bc->command_kind & Command__does_build) && (!bc->ignore_microsoft_magic)) {
-			// NOTE(ic): It would be nice to extend this so that we could specify the Visual Studio version that we want instead of defaulting to the latest.
-			Find_Result_Utf8 find_result = find_visual_studio_and_windows_sdk_utf8();
-
-			if (find_result.windows_sdk_version == 0) {
-				gb_printf_err("Windows SDK not found.\n");
-				return false;
-			}
-
-			GB_ASSERT(find_result.windows_sdk_um_library_path.len > 0);
-			GB_ASSERT(find_result.windows_sdk_ucrt_library_path.len > 0);
-
-			if (find_result.windows_sdk_root.len > 0) {
-				bc->build_paths[BuildPath_Win_SDK_Root]     = path_from_string(ha, find_result.windows_sdk_root);
-			}
-
-			if (find_result.windows_sdk_um_library_path.len > 0) {
-				bc->build_paths[BuildPath_Win_SDK_UM_Lib]   = path_from_string(ha, find_result.windows_sdk_um_library_path);
-			}
-
-			if (find_result.windows_sdk_ucrt_library_path.len > 0) {
-				bc->build_paths[BuildPath_Win_SDK_UCRT_Lib] = path_from_string(ha, find_result.windows_sdk_ucrt_library_path);
-			}
-
-			if (find_result.vs_exe_path.len > 0) {
-				bc->build_paths[BuildPath_VS_EXE]           = path_from_string(ha, find_result.vs_exe_path);
-			}
-
-			if (find_result.vs_library_path.len > 0) {
-				bc->build_paths[BuildPath_VS_LIB]           = path_from_string(ha, find_result.vs_library_path);
-			}
-
-			gb_free(ha, find_result.windows_sdk_root.text);
-			gb_free(ha, find_result.windows_sdk_um_library_path.text);
-			gb_free(ha, find_result.windows_sdk_ucrt_library_path.text);
-			gb_free(ha, find_result.vs_exe_path.text);
-			gb_free(ha, find_result.vs_library_path.text);
-
-		}
-	#endif
-
-	// All the build targets and OSes.
-	String output_extension;
-
-	if (bc->command_kind == Command_doc && bc->cmd_doc_flags & CmdDocFlag_DocFormat) {
-		output_extension = STR_LIT("odin-doc");
-	} else if (is_arch_wasm()) {
-		output_extension = STR_LIT("wasm");
-	} else if (build_context.build_mode == BuildMode_Executable) {
-		// By default use a .bin executable extension.
-		output_extension = STR_LIT("bin");
-
-		if (build_context.metrics.os == TargetOs_windows) {
-			output_extension = STR_LIT("exe");
-		} else if (build_context.cross_compiling && selected_target_metrics->metrics == &target_essence_amd64) {
-			output_extension = make_string(nullptr, 0);
-		}
-	} else if (build_context.build_mode == BuildMode_DynamicLibrary) {
-		// By default use a .so shared library extension.
-		output_extension = STR_LIT("so");
-
-		if (build_context.metrics.os == TargetOs_windows) {
-			output_extension = STR_LIT("dll");
-		} else if (build_context.metrics.os == TargetOs_darwin) {
-			output_extension = STR_LIT("dylib");
-		}
-	} else if (build_context.build_mode == BuildMode_Object) {
-		// By default use a .o object extension.
-		output_extension = STR_LIT("o");
-
-		if (build_context.metrics.os == TargetOs_windows) {
-			output_extension = STR_LIT("obj");
-		}
-	} else if (build_context.build_mode == BuildMode_Assembly) {
-		// By default use a .S asm extension.
-		output_extension = STR_LIT("S");
-	} else if (build_context.build_mode == BuildMode_LLVM_IR) {
-		output_extension = STR_LIT("ll");
-	} else {
-		GB_PANIC("Unhandled build mode/target combination.\n");
-	}
-
-	if (bc->out_filepath.len > 0) {
-		bc->build_paths[BuildPath_Output] = path_from_string(ha, bc->out_filepath);
-	} else {
-		String output_name = remove_directory_from_path(init_filename);
-		output_name        = remove_extension_from_path(output_name);
-		output_name        = copy_string(ha, string_trim_whitespace(output_name));
-
-		Path output_path = path_from_string(ha, output_name);
-
-		// Replace extension.
-		if (output_path.ext.len > 0) {
-			gb_free(ha, output_path.ext.text);
-		}
-		output_path.ext  = copy_string(ha, output_extension);
-
-		bc->build_paths[BuildPath_Output] = output_path;
-	}
-
-	// Do we have an extension? We might not if the output filename was supplied.
-	if (bc->build_paths[BuildPath_Output].ext.len == 0) {
-		if (build_context.metrics.os == TargetOs_windows || build_context.build_mode != BuildMode_Executable) {
-			bc->build_paths[BuildPath_Output].ext = copy_string(ha, output_extension);
-		}
-	}
-
-	// Check if output path is a directory.
-	if (path_is_directory(bc->build_paths[BuildPath_Output])) {
-		String output_file = path_to_string(ha, bc->build_paths[BuildPath_Output]);
-		defer (gb_free(ha, output_file.text));
-		gb_printf_err("Output path %.*s is a directory.\n", LIT(output_file));
-		return false;
-	}
-
-	return true;
 }

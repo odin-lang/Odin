@@ -1,17 +1,18 @@
 #!/bin/bash
-ODIN=../../odin
-COMMON="-collection:tests=.. -out:build/test_issue.bin"
-
 set -eu
-mkdir -p build
+
+mkdir -p tests/issues/build
+
+COMMON="-collection:tests=tests -out:tests/issues/build/test_issue"
+
 set -x
 
-$ODIN build test_issue_829.odin $COMMON -file
-build/test_issue.bin
+./odin build tests/issues/test_issue_829.odin $COMMON -file
+tests/issues/build/test_issue
 
-$ODIN build test_issue_1592.odin $COMMON -file
-build/test_issue.bin
+./odin build tests/issues/test_issue_1592.odin $COMMON -file
+tests/issues/build/test_issue
 
 set +x
 
-rm -rf build
+rm -rf tests/issues/build
