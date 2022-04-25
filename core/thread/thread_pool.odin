@@ -113,9 +113,8 @@ pool_join :: proc(pool: ^Pool) {
 // the thread pool. You can even add tasks from inside other tasks.
 //
 // Each task also needs an allocator which it either owns, or which is thread
-// safe. By default, allocations in the task are disabled by use of the
-// nil_allocator.
-pool_add_task :: proc(pool: ^Pool, procedure: Task_Proc, data: rawptr, user_index: int = 0, allocator := context.allocator) {
+// safe. 
+pool_add_task :: proc(pool: ^Pool, procedure: Task_Proc, data: rawptr, user_index: int = 0, allocator: mem.Allocator) {
 	sync.guard(&pool.mutex)
 
 	append(&pool.tasks, Task{
