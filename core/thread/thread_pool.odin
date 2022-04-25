@@ -47,7 +47,7 @@ Pool :: struct {
 // it is destroyed. 
 //
 // The thread pool requires an allocator which it either owns, or which is thread safe.
-pool_init :: proc(pool: ^Pool, thread_count: int, allocator: mem.Allocator) {
+pool_init :: proc(pool: ^Pool, allocator: mem.Allocator, thread_count: int) {
 	context.allocator = allocator
 	pool.allocator = allocator
 	pool.tasks      = make([dynamic]Task)
@@ -114,7 +114,7 @@ pool_join :: proc(pool: ^Pool) {
 //
 // Each task also needs an allocator which it either owns, or which is thread
 // safe. 
-pool_add_task :: proc(pool: ^Pool, procedure: Task_Proc, data: rawptr, user_index: int = 0, allocator: mem.Allocator) {
+pool_add_task :: proc(pool: ^Pool, allocator: mem.Allocator, procedure: Task_Proc, data: rawptr, user_index: int = 0) {
 	sync.guard(&pool.mutex)
 
 	append(&pool.tasks, Task{
