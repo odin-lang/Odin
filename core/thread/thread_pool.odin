@@ -44,7 +44,7 @@ Pool :: struct {
 }
 
 // Once initialized, the pool's memory address is not allowed to change until
-// it is destroyed. If thread_count < 1, thread count 1 will be used.
+// it is destroyed. 
 //
 // The thread pool requires an allocator which it either owns, or which is thread safe.
 pool_init :: proc(pool: ^Pool, thread_count: int, allocator: mem.Allocator) {
