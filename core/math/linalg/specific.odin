@@ -479,21 +479,21 @@ angle_from_quaternion_f16 :: proc(q: Quaternionf16) -> f16 {
 		return math.asin(q.x*q.x + q.y*q.y + q.z*q.z) * 2
 	}
 
-	return math.cos(q.x) * 2
+	return math.acos(q.w) * 2
 }
 angle_from_quaternion_f32 :: proc(q: Quaternionf32) -> f32 {
 	if abs(q.w) > math.SQRT_THREE*0.5 {
 		return math.asin(q.x*q.x + q.y*q.y + q.z*q.z) * 2
 	}
 
-	return math.cos(q.x) * 2
+	return math.acos(q.w) * 2
 }
 angle_from_quaternion_f64 :: proc(q: Quaternionf64) -> f64 {
 	if abs(q.w) > math.SQRT_THREE*0.5 {
 		return math.asin(q.x*q.x + q.y*q.y + q.z*q.z) * 2
 	}
 
-	return math.cos(q.x) * 2
+	return math.acos(q.w) * 2
 }
 angle_from_quaternion :: proc{
 	angle_from_quaternion_f16,

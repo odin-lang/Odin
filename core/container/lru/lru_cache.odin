@@ -60,19 +60,27 @@ clear :: proc(c: ^$C/Cache($Key, $Value), call_on_remove: bool) {
 set :: proc(c: ^$C/Cache($Key, $Value), key: Key, value: Value) -> runtime.Allocator_Error {
 	if e, ok := c.entries[key]; ok {
 		e.value = value
+		_pop_node(c, e)
+		_push_front_node(c, e)
 		return nil
 	}
 
-	e := new(Node(Key, Value), c.node_allocator) or_return
-	e.key = key
-	e.value = value
-
-	_push_front_node(c, e)
-	if c.count > c.capacity {
-		_remove_node(c, c.tail)
+	e : ^Node(Key, Value) = nil
+	assert(c.count <= c.capacity)
+	if c.count == c.capacity {
+		e = c.tail
+		_remove_node(c, e)
+	}
+	else {
+		c.count += 1
+		e = new(Node(Key, Value), c.node_allocator) or_return
 	}
 
+	e.key = key
+	e.value = value
+	_push_front_node(c, e)
 	c.entries[key] = e
+
 	return nil
 }
 
@@ -122,6 +130,8 @@ remove :: proc(c: ^$C/Cache($Key, $Value), key: Key) -> bool {
 		return false
 	}
 	_remove_node(c, e)
+	free(node, c.node_allocator)
+	c.count -= 1
 	return true
 }
 
@@ -143,14 +153,9 @@ _remove_node :: proc(c: ^$C/Cache($Key, $Value), node: ^Node(Key, Value)) {
 	node.prev = nil
 	node.next = nil
 
-	c.count -= 1
-
 	delete_key(&c.entries, node.key)
 
 	_call_on_remove(c, node)
-
-	free(node, c.node_allocator)
-
 }
 
 @(private)
@@ -171,14 +176,18 @@ _push_front_node :: proc(c: ^$C/Cache($Key, $Value), e: ^Node(Key, Value)) {
 		c.tail = e
 	}
 	e.prev = nil
-
-	c.count += 1
 }
 
 @(private)
 _pop_node :: proc(c: ^$C/Cache($Key, $Value), e: ^Node(Key, Value)) {
 	if e == nil {
 		return
+	}
+	if c.head == e {
+		c.head = e.next
+	}
+	if c.tail == e {
+		c.tail = e.prev
 	}
 	if e.prev != nil {
 		e.prev.next = e.next
