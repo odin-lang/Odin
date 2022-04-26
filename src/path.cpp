@@ -1,6 +1,46 @@
 /*
 	Path handling utilities.
 */
+String remove_extension_from_path(String const &s) {
+	for (isize i = s.len-1; i >= 0; i--) {
+		if (s[i] == '.') {
+			return substring(s, 0, i);
+		}
+	}
+	return s;
+}
+
+String remove_directory_from_path(String const &s) {
+	isize len = 0;
+	for (isize i = s.len-1; i >= 0; i--) {
+		if (s[i] == '/' ||
+		    s[i] == '\\') {
+			break;
+		}
+		len += 1;
+	}
+	return substring(s, s.len-len, s.len);
+}
+
+bool path_is_directory(String path);
+
+String directory_from_path(String const &s) {
+	if (path_is_directory(s)) {
+		return s;
+	}
+
+	isize i = s.len-1;
+	for (; i >= 0; i--) {
+		if (s[i] == '/' ||
+		    s[i] == '\\') {
+			break;
+		}
+	}
+	if (i >= 0) {
+		return substring(s, 0, i);	
+	}
+	return substring(s, 0, 0);
+}
 
 #if defined(GB_SYSTEM_WINDOWS)
 	bool path_is_directory(String path) {
@@ -98,11 +138,15 @@ Path path_from_string(gbAllocator a, String const &path) {
 	String fullpath = path_to_full_path(a, path);
 	defer (gb_free(heap_allocator(), fullpath.text));
 
-	res.basename     = directory_from_path(fullpath);
-	res.basename     = copy_string(a, res.basename);
+	res.basename = directory_from_path(fullpath);	
+	res.basename = copy_string(a, res.basename);
 
-	if (string_ends_with(fullpath, '/')) {
+	if (path_is_directory(fullpath)) {
 		// It's a directory. We don't need to tinker with the name and extension.
+		// It could have a superfluous trailing `/`. Remove it if so.
+		if (res.basename.len > 0 && res.basename.text[res.basename.len - 1] == '/') {
+			res.basename.len--;
+		}
 		return res;
 	}
 
@@ -114,6 +158,23 @@ Path path_from_string(gbAllocator a, String const &path) {
 	res.ext          = path_extension(fullpath, false); // false says not to include the dot.
 	res.ext          = copy_string(a, res.ext);
 	return res;
+}
+
+// NOTE(Jeroen): Takes a path String and returns the last path element.
+String last_path_element(String const &path) {
+	isize count = 0;
+	u8 * start = (u8 *)(&path.text[path.len - 1]);
+	for (isize length = path.len; length > 0 && path.text[length - 1] != '/'; length--) {
+		count++;
+		start--;
+	}
+	if (count > 0) {
+		start++; // Advance past the `/` and return the substring.
+		String res = make_string(start, count);
+		return res;
+	}
+	// Must be a root path like `/` or `C:/`, return empty String.
+	return STR_LIT("");
 }
 
 bool path_is_directory(Path path) {

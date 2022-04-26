@@ -1276,16 +1276,44 @@ bool init_build_paths(String init_filename) {
 
 	if (bc->out_filepath.len > 0) {
 		bc->build_paths[BuildPath_Output] = path_from_string(ha, bc->out_filepath);
+		if (build_context.metrics.os == TargetOs_windows) {
+			String output_file = path_to_string(ha, bc->build_paths[BuildPath_Output]);
+			defer (gb_free(ha, output_file.text));
+			if (path_is_directory(bc->build_paths[BuildPath_Output])) {
+				gb_printf_err("Output path %.*s is a directory.\n", LIT(output_file));
+				return false;
+			} else if (bc->build_paths[BuildPath_Output].ext.len == 0) {
+				gb_printf_err("Output path %.*s must have an appropriate extension.\n", LIT(output_file));
+				return false;				
+			}
+		}
 	} else {
-		String output_name = remove_directory_from_path(init_filename);
-		output_name        = remove_extension_from_path(output_name);
-		output_name        = copy_string(ha, string_trim_whitespace(output_name));
+		Path output_path;
 
-		Path output_path = path_from_string(ha, output_name);
+		if (str_eq(init_filename, str_lit("."))) {
+			// We must name the output file after the current directory.
+			debugf("Output name will be created from current base name %.*s.\n", LIT(bc->build_paths[BuildPath_Main_Package].basename));
+			String last_element  = last_path_element(bc->build_paths[BuildPath_Main_Package].basename);
 
-		// Replace extension.
-		if (output_path.ext.len > 0) {
-			gb_free(ha, output_path.ext.text);
+			if (last_element.len == 0) {
+				gb_printf_err("The output name is created from the last path element. `%.*s` has none. Use `-out:output_name.ext` to set it.\n", LIT(bc->build_paths[BuildPath_Main_Package].basename));
+				return false;
+			}
+			output_path.basename = copy_string(ha, bc->build_paths[BuildPath_Main_Package].basename);
+			output_path.name     = copy_string(ha, last_element);
+
+		} else {
+			// Init filename was not 'current path'.
+			// Contruct the output name from the path elements as usual.
+			String output_name = remove_directory_from_path(init_filename);
+			output_name        = remove_extension_from_path(output_name);
+			output_name        = copy_string(ha, string_trim_whitespace(output_name));
+			output_path        = path_from_string(ha, output_name);
+
+			// Replace extension.
+			if (output_path.ext.len > 0) {
+				gb_free(ha, output_path.ext.text);
+			}
 		}
 		output_path.ext  = copy_string(ha, output_extension);
 
