@@ -11,6 +11,7 @@ package util
 */
 
 import "core:mem"
+_ :: mem
 
 // @note(bp): this can replace the other two
 cast_slice :: #force_inline proc "contextless" ($D: typeid/[]$DE, src: $S/[]$SE) -> D {
