@@ -6,53 +6,19 @@ import "core:time"
 
 when #config(ODIN_SYNC_SEMA_USE_FUTEX, true) {
 	_Sema :: struct {
-		count: Futex,
+		sema: Atomic_Sema,
 	}
 
 	_sema_post :: proc(s: ^Sema, count := 1) {
-		atomic_add_explicit(&s.impl.count, Futex(count), .Release)
-		if count == 1 {
-			futex_signal(&s.impl.count)
-		} else {
-			futex_broadcast(&s.impl.count)
-		}
+		atomic_sema_post(&s.impl.sema, count)
 	}
 
 	_sema_wait :: proc(s: ^Sema) {
-		for {
-			original_count := atomic_load_explicit(&s.impl.count, .Relaxed)
-			for original_count == 0 {
-				futex_wait(&s.impl.count, u32(original_count))
-				original_count = s.impl.count
-			}
-			if original_count == atomic_compare_exchange_strong_explicit(&s.impl.count, original_count, original_count-1, .Acquire, .Acquire) {
-				return
-			}
-		}
+		atomic_sema_wait(&s.impl.sema)
 	}
 
 	_sema_wait_with_timeout :: proc(s: ^Sema, duration: time.Duration) -> bool {
-		if duration <= 0 {
-			return false
-		}
-		for {
-		
-			original_count := atomic_load_explicit(&s.impl.count, .Relaxed)
-			for start := time.tick_now(); original_count == 0; /**/ {
-				remaining := duration - time.tick_since(start)
-				if remaining < 0 {
-					return false
-				}
-				
-				if !futex_wait_with_timeout(&s.impl.count, u32(original_count), remaining) {
-					return false
-				}
-				original_count = s.impl.count
-			}
-			if original_count == atomic_compare_exchange_strong_explicit(&s.impl.count, original_count, original_count-1, .Acquire, .Acquire) {
-				return true
-			}
-		}
+		return atomic_sema_wait_with_timeout(&s.impl.sema, duration)
 	}
 } else {
 	_Sema :: struct {
