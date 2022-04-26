@@ -1338,14 +1338,14 @@ ParameterValue handle_parameter_value(CheckerContext *ctx, Type *in_type, Type *
 							}
 						}
 					}
-				} else if (allow_caller_location && o.mode == Addressing_Context) {
+				} else if (allow_caller_location && (o.mode == Addressing_Context || are_types_identical(o.type, t_source_code_location))) {
 					param_value.kind = ParameterValue_Value;
 					param_value.ast_value = expr;
 				} else if (o.value.kind != ExactValue_Invalid) {
 					param_value.kind = ParameterValue_Constant;
 					param_value.value = o.value;
 				} else {
-					error(expr, "Default parameter must be a constant, %d", o.mode);
+					error(expr, "Default parameter must be a constant");
 				}
 			}
 		} else {
