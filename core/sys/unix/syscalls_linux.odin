@@ -1524,18 +1524,26 @@ AT_REMOVEDIR        :: uintptr(0x200)
 AT_SYMLINK_FOLLOW   :: uintptr(0x400)
 AT_SYMLINK_NOFOLLOW :: uintptr(0x100)
 
-PROT_NONE  :: 0x0
-PROT_READ  :: 0x1
-PROT_WRITE :: 0x2
-PROT_EXEC  :: 0x4
+// mmap flags
+PROT_NONE      :: 0x0
+PROT_READ      :: 0x1
+PROT_WRITE     :: 0x2
+PROT_EXEC      :: 0x4
 PROT_GROWSDOWN :: 0x01000000
-PROT_GROWSUP :: 0x02000000
+PROT_GROWSUP   :: 0x02000000
 
-MAP_FIXED     :: 0x1
-MAP_PRIVATE   :: 0x2
-MAP_SHARED    :: 0x4
-MAP_ANONYMOUS :: 0x20
+MAP_FIXED           :: 0x10
+MAP_SHARED          :: 0x1
+MAP_PRIVATE         :: 0x2
+MAP_SHARED_VALIDATE :: 0x3
+MAP_ANONYMOUS       :: 0x20
 
+// mremap flags
+MREMAP_MAYMOVE   :: 1
+MREMAP_FIXED     :: 2
+MREMAP_DONTUNMAP :: 4
+
+// madvise flags
 MADV_NORMAL      :: 0
 MADV_RANDOM      :: 1
 MADV_SEQUENTIAL  :: 2
@@ -1813,6 +1821,10 @@ sys_fork :: proc "contextless" () -> int {
 
 sys_mmap :: proc "contextless" (addr: rawptr, length: uint, prot, flags, fd: int, offset: uintptr) -> int {
 	return int(intrinsics.syscall(SYS_mmap, uintptr(addr), uintptr(length), uintptr(prot), uintptr(flags), uintptr(fd), offset))
+}
+
+sys_mremap :: proc "contextless" (addr: rawptr, old_length, new_length: uint, flags: int, new_addr: rawptr = nil) -> int {
+	return int(intrinsics.syscall(SYS_mremap, uintptr(addr), uintptr(old_length), uintptr(new_length), uintptr(flags), uintptr(new_addr)))
 }
 
 sys_munmap :: proc "contextless" (addr: rawptr, length: uint) -> int {
