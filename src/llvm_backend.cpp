@@ -967,7 +967,12 @@ lbProcedure *lb_create_main_procedure(lbModule *m, lbProcedure *startup_runtime)
 }
 
 String lb_filepath_ll_for_module(lbModule *m) {
-	String path = m->gen->output_base;
+	String path = concatenate3_strings(permanent_allocator(),
+		build_context.build_paths[BuildPath_Output].basename,
+		STR_LIT("/"),
+		build_context.build_paths[BuildPath_Output].name
+	);
+
 	if (m->pkg) {
 		path = concatenate3_strings(permanent_allocator(), path, STR_LIT("-"), m->pkg->name);
 	} else if (USE_SEPARATE_MODULES) {
@@ -978,7 +983,12 @@ String lb_filepath_ll_for_module(lbModule *m) {
 	return path;
 }
 String lb_filepath_obj_for_module(lbModule *m) {
-	String path = m->gen->output_base;
+	String path = concatenate3_strings(permanent_allocator(),
+		build_context.build_paths[BuildPath_Output].basename,
+		STR_LIT("/"),
+		build_context.build_paths[BuildPath_Output].name
+	);
+
 	if (m->pkg) {
 		path = concatenate3_strings(permanent_allocator(), path, STR_LIT("-"), m->pkg->name);
 	}
