@@ -4,6 +4,8 @@ package filepath
 
 import "core:strings"
 
+SEPARATOR_CHARS :: `/\`
+
 // is_separator checks whether the byte is a valid separator character
 is_separator :: proc(c: byte) -> bool {
 	switch c {
@@ -69,6 +71,16 @@ volume_name_len :: proc(path: string) -> int {
 	return 0
 }
 
+/*
+	Gets the file name and extension from a path.
+
+	i.e:
+	  'path/to/name.tar.gz' -> 'name.tar.gz'
+	  'path/to/name.txt'    -> 'name.txt'
+	  'path/to/name'        -> 'name'
+
+	Returns "." if the path is an empty string.
+*/
 base :: proc(path: string) -> string {
 	if path == "" {
 		return "."
@@ -94,6 +106,118 @@ base :: proc(path: string) -> string {
 	return path
 }
 
+/*
+	Gets the name of a file from a path.
+
+	The stem of a file is such that stem(path) + ext(path) = base(path).
+
+	Only the last dot is considered when splitting the file extension.
+	See `short_stem`.
+
+	i.e:
+	  'name.tar.gz' -> 'name.tar'
+	  'name.txt'    -> 'name'
+
+	Returns an empty string if there is no stem. e.g: '.gitignore'.
+	Returns an empty string if there's a trailing path separator.
+*/
+stem :: proc(path: string) -> string {
+	if len(path) > 0 && is_separator(path[len(path) - 1]) {
+		// NOTE(tetra): Trailing separator
+		return ""
+	}
+
+	// NOTE(tetra): Get the basename
+	path := path
+	if i := strings.last_index_any(path, SEPARATOR_CHARS); i != -1 {
+		path = path[i+1:]
+	}
+
+	if i := strings.last_index_byte(path, '.'); i != -1 {
+		return path[:i]
+	}
+
+	return path
+}
+
+/*
+	Gets the name of a file from a path.
+
+	The short stem is such that short_stem(path) + long_ext(path) = base(path).
+
+	The first dot is used to split off the file extension, unlike `stem` which uses the last dot.
+
+	i.e:
+	  'name.tar.gz' -> 'name'
+	  'name.txt'    -> 'name'
+
+	Returns an empty string if there is no stem. e.g: '.gitignore'.
+	Returns an empty string if there's a trailing path separator.
+*/
+short_stem :: proc(path: string) -> string {
+	s := stem(path)
+	if i := strings.index_byte(s, '.'); i != -1 {
+		return s[:i]
+	}
+	return s
+}
+
+/*
+	Gets the file extension from a path, including the dot.
+
+	The file extension is such that stem(path) + ext(path) = base(path).
+
+	Only the last dot is considered when splitting the file extension.
+	See `long_ext`.
+
+	i.e:
+	  'name.tar.gz' -> '.gz'
+	  'name.txt'    -> '.txt'
+
+	Returns an empty string if there is no dot.
+	Returns an empty string if there is a trailing path separator.
+*/
+ext :: proc(path: string) -> string {
+	for i := len(path)-1; i >= 0 && !is_separator(path[i]); i -= 1 {
+		if path[i] == '.' {
+			return path[i:]
+		}
+	}
+	return ""
+}
+
+/*
+	Gets the file extension from a path, including the dot.
+
+	The long file extension is such that short_stem(path) + long_ext(path) = base(path).
+
+	The first dot is used to split off the file extension, unlike `ext` which uses the last dot.
+
+	i.e:
+	  'name.tar.gz' -> '.tar.gz'
+	  'name.txt'    -> '.txt'
+
+	Returns an empty string if there is no dot.
+	Returns an empty string if there is a trailing path separator.
+*/
+long_ext :: proc(path: string) -> string {
+	if len(path) > 0 && is_separator(path[len(path) - 1]) {
+		// NOTE(tetra): Trailing separator
+		return ""
+	}
+
+	// NOTE(tetra): Get the basename
+	path := path
+	if i := strings.last_index_any(path, SEPARATOR_CHARS); i != -1 {
+		path = path[i+1:]
+	}
+
+	if i := strings.index_byte(path, '.'); i != -1 {
+		return path[i:]
+	}
+
+	return ""
+}
 
 clean :: proc(path: string, allocator := context.allocator) -> string {
 	context.allocator = allocator
@@ -187,15 +311,6 @@ to_slash :: proc(path: string, allocator := context.allocator) -> (new_path: str
 		return path, false
 	}
 	return strings.replace_all(path, SEPARATOR_STRING, "/", allocator)
-}
-
-ext :: proc(path: string) -> string {
-	for i := len(path)-1; i >= 0 && !is_separator(path[i]); i -= 1 {
-		if path[i] == '.' {
-			return path[i:]
-		}
-	}
-	return ""
 }
 
 
