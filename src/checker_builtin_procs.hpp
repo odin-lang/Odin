@@ -158,6 +158,7 @@ BuiltinProc__type_simple_boolean_begin,
 
 	BuiltinProc_type_is_named,
 	BuiltinProc_type_is_pointer,
+	BuiltinProc_type_is_multi_pointer,
 	BuiltinProc_type_is_array,
 	BuiltinProc_type_is_enumerated_array,
 	BuiltinProc_type_is_slice,
@@ -376,6 +377,7 @@ gb_global BuiltinProc builtin_procs[BuiltinProc_COUNT] = {
 
 	{STR_LIT("type_is_named"),             1, false, Expr_Expr, BuiltinProcPkg_intrinsics},
 	{STR_LIT("type_is_pointer"),           1, false, Expr_Expr, BuiltinProcPkg_intrinsics},
+	{STR_LIT("type_is_multi_pointer"),      1, false, Expr_Expr, BuiltinProcPkg_intrinsics},
 	{STR_LIT("type_is_array"),             1, false, Expr_Expr, BuiltinProcPkg_intrinsics},
 	{STR_LIT("type_is_enumerated_array"),  1, false, Expr_Expr, BuiltinProcPkg_intrinsics},
 	{STR_LIT("type_is_slice"),             1, false, Expr_Expr, BuiltinProcPkg_intrinsics},
