@@ -292,8 +292,9 @@ bool odin_doc_append_comment_group_string(Array<u8> *buf, CommentGroup *g) {
 		String comment = g->list[i].string;
 		String original_comment = comment;
 
-		bool slash_slash = comment[1] == '/';
+		bool slash_slash = false;
 		if (comment[1] == '/') {
+			slash_slash = true;
 			comment.text += 2;
 			comment.len  -= 2;
 		} else if (comment[1] == '*') {
@@ -330,7 +331,7 @@ bool odin_doc_append_comment_group_string(Array<u8> *buf, CommentGroup *g) {
 					}
 				}
 				String line = substring(comment, pos, end);
-				pos = end+1;
+				pos = end;
 				String trimmed_line = string_trim_whitespace(line);
 				if (trimmed_line.len == 0) {
 					if (count == 0) {
@@ -482,7 +483,7 @@ OdinDocTypeIndex odin_doc_type(OdinDocWriter *w, Type *type) {
 	for_array(i, w->type_cache.entries) {
 		// NOTE(bill): THIS IS SLOW
 		Type *other = w->type_cache.entries[i].key;
-		if (are_types_identical(type, other)) {
+		if (are_types_identical_unique_tuples(type, other)) {
 			OdinDocTypeIndex index = w->type_cache.entries[i].value;
 			map_set(&w->type_cache, type, index);
 			return index;
@@ -511,10 +512,16 @@ OdinDocTypeIndex odin_doc_type(OdinDocWriter *w, Type *type) {
 		doc_type.entities = odin_doc_add_entity_as_slice(w, type->Named.type_name);
 		break;
 	case Type_Generic:
-		doc_type.kind = OdinDocType_Generic;
-		doc_type.name = odin_doc_write_string(w, type->Generic.name);
-		if (type->Generic.specialized) {
-			doc_type.types = odin_doc_type_as_slice(w, type->Generic.specialized);
+		{
+			String name = type->Generic.name;
+			if (type->Generic.entity) {
+				name = type->Generic.entity->token.string;
+			}
+			doc_type.kind = OdinDocType_Generic;
+			doc_type.name = odin_doc_write_string(w, name);
+			if (type->Generic.specialized) {
+				doc_type.types = odin_doc_type_as_slice(w, type->Generic.specialized);
+			}
 		}
 		break;
 	case Type_Pointer:
@@ -598,14 +605,25 @@ OdinDocTypeIndex odin_doc_type(OdinDocWriter *w, Type *type) {
 				}
 				doc_type.where_clauses = odin_doc_where_clauses(w, st->where_clauses);
 			}
+
+			auto tags = array_make<OdinDocString>(heap_allocator(), type->Struct.fields.count);
+			defer (array_free(&tags));
+
+			for_array(i, type->Struct.fields) {
+				tags[i] = odin_doc_write_string(w, type->Struct.tags[i]);
+			}
+
+			doc_type.tags = odin_write_slice(w, tags.data, tags.count);
 		}
 		break;
 	case Type_Union:
 		doc_type.kind = OdinDocType_Union;
 		if (type->Union.is_polymorphic) { doc_type.flags |= OdinDocTypeFlag_Union_polymorphic; }
-		if (type->Union.no_nil)         { doc_type.flags |= OdinDocTypeFlag_Union_no_nil; }
-		if (type->Union.maybe)          { doc_type.flags |= OdinDocTypeFlag_Union_maybe; }
-
+		switch (type->Union.kind) {
+		case UnionType_maybe:      doc_type.flags |= OdinDocTypeFlag_Union_maybe;      break;
+		case UnionType_no_nil:     doc_type.flags |= OdinDocTypeFlag_Union_no_nil;     break;
+		case UnionType_shared_nil: doc_type.flags |= OdinDocTypeFlag_Union_shared_nil; break;
+		}
 		{
 			auto variants = array_make<OdinDocTypeIndex>(heap_allocator(), type->Union.variants.count);
 			defer (array_free(&variants));
@@ -667,40 +685,7 @@ OdinDocTypeIndex odin_doc_type(OdinDocWriter *w, Type *type) {
 			types[1] = odin_doc_type(w, type->Proc.results);
 			doc_type.types = odin_write_slice(w, types, gb_count_of(types));
 
-			String calling_convention = {};
-			switch (type->Proc.calling_convention) {
-			case ProcCC_Invalid:
-				// no need
-				break;
-			case ProcCC_Odin:
-				if (default_calling_convention() != ProcCC_Odin) {
-					calling_convention = str_lit("odin");
-				}
-				break;
-			case ProcCC_Contextless:
-				if (default_calling_convention() != ProcCC_Contextless) {
-					calling_convention = str_lit("contextless");
-				}
-				break;
-			case ProcCC_CDecl:
-				calling_convention = str_lit("cdecl");
-				break;
-			case ProcCC_StdCall:
-				calling_convention = str_lit("stdcall");
-				break;
-			case ProcCC_FastCall:
-				calling_convention = str_lit("fastcall");
-				break;
-			case ProcCC_None:
-				calling_convention = str_lit("none");
-				break;
-			case ProcCC_Naked:
-				calling_convention = str_lit("naked");
-				break;
-			case ProcCC_InlineAsm:
-				calling_convention = str_lit("inline-assembly");
-				break;
-			}
+			String calling_convention = make_string_c(proc_calling_convention_strings[type->Proc.calling_convention]);
 			doc_type.calling_convention = odin_doc_write_string(w, calling_convention);
 		}
 		break;
@@ -795,11 +780,21 @@ OdinDocEntityIndex odin_doc_add_entity(OdinDocWriter *w, Entity *e) {
 		comment = e->decl_info->comment;
 		docs = e->decl_info->docs;
 	}
+	if (e->kind == Entity_Variable) {
+		if (!comment) { comment          = e->Variable.comment; }
+		if (!docs)    { docs             = e->Variable.docs; }
+	} else if (e->kind == Entity_Constant) {
+		if (!comment) { comment          = e->Constant.comment; }
+		if (!docs)    { docs             = e->Constant.docs; }
+	}
 
+	String name = e->token.string;
 	String link_name = {};
+	TokenPos pos = e->token.pos;
 
 	OdinDocEntityKind kind = OdinDocEntity_Invalid;
-	u32 flags = 0;
+	u64 flags = 0;
+	i32 field_group_index = -1;
 
 	switch (e->kind) {
 	case Entity_Invalid:     kind = OdinDocEntity_Invalid;     break;
@@ -810,6 +805,7 @@ OdinDocEntityIndex odin_doc_add_entity(OdinDocWriter *w, Entity *e) {
 	case Entity_ProcGroup:   kind = OdinDocEntity_ProcGroup;   break;
 	case Entity_ImportName:  kind = OdinDocEntity_ImportName;  break;
 	case Entity_LibraryName: kind = OdinDocEntity_LibraryName; break;
+	case Entity_Builtin:     kind = OdinDocEntity_Builtin;     break;
 	}
 
 	switch (e->kind) {
@@ -829,11 +825,32 @@ OdinDocEntityIndex odin_doc_add_entity(OdinDocWriter *w, Entity *e) {
 		if (init_expr == nullptr) {
 			init_expr = e->Variable.init_expr;
 		}
+		field_group_index = e->Variable.field_group_index;
+		break;
+	case Entity_Constant:
+		field_group_index = e->Constant.field_group_index;
 		break;
 	case Entity_Procedure:
 		if (e->Procedure.is_foreign) { flags |= OdinDocEntityFlag_Foreign; }
 		if (e->Procedure.is_export)  { flags |= OdinDocEntityFlag_Export;  }
 		link_name = e->Procedure.link_name;
+		break;
+	case Entity_Builtin:
+		{
+			auto bp = builtin_procs[e->Builtin.id];
+			pos = {};
+			name = bp.name;
+			switch (bp.pkg) {
+			case BuiltinProcPkg_builtin:
+				flags |= OdinDocEntityFlag_Builtin_Pkg_Builtin;
+				break;
+			case BuiltinProcPkg_intrinsics:
+				flags |= OdinDocEntityFlag_Builtin_Pkg_Intrinsics;
+				break;
+			default:
+				GB_PANIC("Unhandled BuiltinProcPkg");
+			}
+		}
 		break;
 	}
 
@@ -844,6 +861,9 @@ OdinDocEntityIndex odin_doc_add_entity(OdinDocWriter *w, Entity *e) {
 		if (e->flags & EntityFlag_Ellipsis)   { flags |= OdinDocEntityFlag_Param_Ellipsis; }
 		if (e->flags & EntityFlag_NoAlias)    { flags |= OdinDocEntityFlag_Param_NoAlias;  }
 		if (e->flags & EntityFlag_AnyInt)     { flags |= OdinDocEntityFlag_Param_AnyInt;   }
+	}
+	if (e->scope && (e->scope->flags & (ScopeFlag_File|ScopeFlag_Pkg)) && !is_entity_exported(e)) {
+		flags |= OdinDocEntityFlag_Private;
 	}
 
 	OdinDocString init_string = {};
@@ -867,12 +887,13 @@ OdinDocEntityIndex odin_doc_add_entity(OdinDocWriter *w, Entity *e) {
 
 	doc_entity.kind = kind;
 	doc_entity.flags = flags;
-	doc_entity.pos = odin_doc_token_pos_cast(w, e->token.pos);
-	doc_entity.name = odin_doc_write_string(w, e->token.string);
+	doc_entity.pos = odin_doc_token_pos_cast(w, pos);
+	doc_entity.name = odin_doc_write_string(w, name);
 	doc_entity.type = 0; // Set later
 	doc_entity.init_string = init_string;
 	doc_entity.comment = odin_doc_comment_group_string(w, comment);
 	doc_entity.docs = odin_doc_comment_group_string(w, docs);
+	doc_entity.field_group_index = field_group_index;
 	doc_entity.foreign_library = 0; // Set later
 	doc_entity.link_name = odin_doc_write_string(w, link_name);
 	if (e->decl_info != nullptr) {
@@ -944,7 +965,7 @@ void odin_doc_update_entities(OdinDocWriter *w) {
 
 
 
-OdinDocArray<OdinDocEntityIndex> odin_doc_add_pkg_entities(OdinDocWriter *w, AstPackage *pkg) {
+OdinDocArray<OdinDocScopeEntry> odin_doc_add_pkg_entries(OdinDocWriter *w, AstPackage *pkg) {
 	if (pkg->scope == nullptr) {
 		return {};
 	}
@@ -952,14 +973,14 @@ OdinDocArray<OdinDocEntityIndex> odin_doc_add_pkg_entities(OdinDocWriter *w, Ast
 		return {};
 	}
 
-	auto entities = array_make<Entity *>(heap_allocator(), 0, pkg->scope->elements.entries.count);
-	defer (array_free(&entities));
+	auto entries = array_make<OdinDocScopeEntry>(heap_allocator(), 0, w->entity_cache.entries.count);
+	defer (array_free(&entries));
 
 	for_array(i, pkg->scope->elements.entries) {
+		String name = pkg->scope->elements.entries[i].key.string;
 		Entity *e = pkg->scope->elements.entries[i].value;
 		switch (e->kind) {
 		case Entity_Invalid:
-		case Entity_Builtin:
 		case Entity_Nil:
 		case Entity_Label:
 			continue;
@@ -970,34 +991,27 @@ OdinDocArray<OdinDocEntityIndex> odin_doc_add_pkg_entities(OdinDocWriter *w, Ast
 		case Entity_ProcGroup:
 		case Entity_ImportName:
 		case Entity_LibraryName:
+		case Entity_Builtin:
 			// Fine
 			break;
 		}
-		array_add(&entities, e);
-	}
-	gb_sort_array(entities.data, entities.count, cmp_entities_for_printing);
-
-	auto entity_indices = array_make<OdinDocEntityIndex>(heap_allocator(), 0, w->entity_cache.entries.count);
-	defer (array_free(&entity_indices));
-
-	for_array(i, entities) {
-		Entity *e = entities[i];
 		if (e->pkg != pkg) {
 			continue;
 		}
-		if (!is_entity_exported(e)) {
+		if (!is_entity_exported(e, true)) {
 			continue;
 		}
 		if (e->token.string.len == 0) {
 			continue;
 		}
 
-		OdinDocEntityIndex doc_entity_index = 0;
-		doc_entity_index = odin_doc_add_entity(w, e);
-		array_add(&entity_indices, doc_entity_index);
+		OdinDocScopeEntry entry = {};
+		entry.name = odin_doc_write_string(w, name);
+		entry.entity = odin_doc_add_entity(w, e);
+		array_add(&entries, entry);
 	}
 
-	return odin_write_slice(w, entity_indices.data, entity_indices.count);
+	return odin_write_slice(w, entries.data, entries.count);
 }
 
 
@@ -1065,7 +1079,7 @@ void odin_doc_write_docs(OdinDocWriter *w) {
 		}
 
 		doc_pkg.files = odin_write_slice(w, file_indices.data, file_indices.count);
-		doc_pkg.entities = odin_doc_add_pkg_entities(w, pkg);
+		doc_pkg.entries = odin_doc_add_pkg_entries(w, pkg);
 
 		if (dst) {
 			*dst = doc_pkg;

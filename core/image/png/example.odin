@@ -189,7 +189,7 @@ write_image_as_ppm :: proc(filename: string, image: ^image.Image) -> (success: b
 	img := image
 
 	// PBM 16-bit images are big endian
-	when ODIN_ENDIAN == "little" {
+	when ODIN_ENDIAN == .Little {
 		if img.depth == 16 {
 			// The pixel components are in Big Endian. Let's byteswap back.
 			input  := mem.slice_data_cast([]u16,   img.pixels.buf[:])
@@ -207,7 +207,7 @@ write_image_as_ppm :: proc(filename: string, image: ^image.Image) -> (success: b
 	}
 
 	mode: int = 0
-	when ODIN_OS == "linux" || ODIN_OS == "darwin" {
+	when ODIN_OS == .Linux || ODIN_OS == .Darwin {
 		// NOTE(justasd): 644 (owner read, write; group read; others read)
 		mode = S_IRUSR | S_IWUSR | S_IRGRP | S_IROTH
 	}

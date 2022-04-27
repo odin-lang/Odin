@@ -48,12 +48,6 @@ LLVMBool lb_must_preserve_predicate_callback(LLVMValueRef value, void *user_data
 	return LLVMIsAAllocaInst(value) != nullptr;
 }
 
-void lb_add_must_preserve_predicate_pass(lbModule *m, LLVMPassManagerRef fpm, i32 optimization_level) {
-	if (false && optimization_level == 0 && m->debug_builder) {
-		// LLVMAddInternalizePassWithMustPreservePredicate(fpm, m, lb_must_preserve_predicate_callback);
-	}
-}
-
 
 #if LLVM_VERSION_MAJOR < 12
 #define LLVM_ADD_CONSTANT_VALUE_PASS(fpm) LLVMAddConstantPropagationPass(fpm)
@@ -61,16 +55,15 @@ void lb_add_must_preserve_predicate_pass(lbModule *m, LLVMPassManagerRef fpm, i3
 #define LLVM_ADD_CONSTANT_VALUE_PASS(fpm) 
 #endif
 
-void lb_basic_populate_function_pass_manager(LLVMPassManagerRef fpm) {
-	LLVMAddPromoteMemoryToRegisterPass(fpm);
-	LLVMAddMergedLoadStoreMotionPass(fpm);
-	LLVM_ADD_CONSTANT_VALUE_PASS(fpm);
-	LLVMAddEarlyCSEPass(fpm);
-
-	// LLVM_ADD_CONSTANT_VALUE_PASS(fpm);
-	// LLVMAddMergedLoadStoreMotionPass(fpm);
-	// LLVMAddPromoteMemoryToRegisterPass(fpm);
-	// LLVMAddCFGSimplificationPass(fpm);
+void lb_basic_populate_function_pass_manager(LLVMPassManagerRef fpm, i32 optimization_level) {
+	if (false && optimization_level == 0 && build_context.ODIN_DEBUG) {
+		LLVMAddMergedLoadStoreMotionPass(fpm);
+	} else {
+		LLVMAddPromoteMemoryToRegisterPass(fpm);
+		LLVMAddMergedLoadStoreMotionPass(fpm);
+		LLVM_ADD_CONSTANT_VALUE_PASS(fpm);
+		LLVMAddEarlyCSEPass(fpm);
+	}
 }
 
 void lb_populate_function_pass_manager(lbModule *m, LLVMPassManagerRef fpm, bool ignore_memcpy_pass, i32 optimization_level) {
@@ -78,14 +71,12 @@ void lb_populate_function_pass_manager(lbModule *m, LLVMPassManagerRef fpm, bool
 	// TODO(bill): Determine which opt definitions should exist in the first place
 	optimization_level = gb_clamp(optimization_level, 0, 2);
 
-	lb_add_must_preserve_predicate_pass(m, fpm, optimization_level);
-
 	if (ignore_memcpy_pass) {
-		lb_basic_populate_function_pass_manager(fpm);
+		lb_basic_populate_function_pass_manager(fpm, optimization_level);
 		return;
 	} else if (optimization_level == 0) {
 		LLVMAddMemCpyOptPass(fpm);
-		lb_basic_populate_function_pass_manager(fpm);
+		lb_basic_populate_function_pass_manager(fpm, optimization_level);
 		return;
 	}
 
@@ -96,7 +87,7 @@ void lb_populate_function_pass_manager(lbModule *m, LLVMPassManagerRef fpm, bool
 	LLVMPassManagerBuilderPopulateFunctionPassManager(pmb, fpm);
 #else
 	LLVMAddMemCpyOptPass(fpm);
-	lb_basic_populate_function_pass_manager(fpm);
+	lb_basic_populate_function_pass_manager(fpm, optimization_level);
 
 	LLVMAddSCCPPass(fpm);
 
@@ -114,11 +105,9 @@ void lb_populate_function_pass_manager_specific(lbModule *m, LLVMPassManagerRef 
 	// TODO(bill): Determine which opt definitions should exist in the first place
 	optimization_level = gb_clamp(optimization_level, 0, 2);
 
-	lb_add_must_preserve_predicate_pass(m, fpm, optimization_level);
-
 	if (optimization_level == 0) {
 		LLVMAddMemCpyOptPass(fpm);
-		lb_basic_populate_function_pass_manager(fpm);
+		lb_basic_populate_function_pass_manager(fpm, optimization_level);
 		return;
 	}
 
@@ -191,6 +180,9 @@ void lb_populate_module_pass_manager(LLVMTargetMachineRef target_machine, LLVMPa
 	// NOTE(bill): Treat -opt:3 as if it was -opt:2
 	// TODO(bill): Determine which opt definitions should exist in the first place
 	optimization_level = gb_clamp(optimization_level, 0, 2);
+	if (optimization_level == 0 && build_context.ODIN_DEBUG) {
+		return;
+	}
 
 	LLVMAddAlwaysInlinerPass(mpm);
 	LLVMAddStripDeadPrototypesPass(mpm);

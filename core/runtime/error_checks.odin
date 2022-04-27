@@ -1,7 +1,7 @@
 package runtime
 
 bounds_trap :: proc "contextless" () -> ! {
-	when ODIN_OS == "windows" {
+	when ODIN_OS == .Windows {
 		windows_trap_array_bounds()
 	} else {
 		trap()
@@ -9,7 +9,7 @@ bounds_trap :: proc "contextless" () -> ! {
 }
 
 type_assertion_trap :: proc "contextless" () -> ! {
-	when ODIN_OS == "windows" {
+	when ODIN_OS == .Windows {
 		windows_trap_type_assertion()
 	} else {
 		trap()
@@ -21,11 +21,12 @@ bounds_check_error :: proc "contextless" (file: string, line, column: i32, index
 	if 0 <= index && index < count {
 		return
 	}
+	@(cold)
 	handle_error :: proc "contextless" (file: string, line, column: i32, index, count: int) {
 		print_caller_location(Source_Code_Location{file, line, column, ""})
 		print_string(" Index ")
 		print_i64(i64(index))
-		print_string(" is out of bounds range 0:")
+		print_string(" is out of range 0..<")
 		print_i64(i64(count))
 		print_byte('\n')
 		bounds_trap()
@@ -35,11 +36,11 @@ bounds_check_error :: proc "contextless" (file: string, line, column: i32, index
 
 slice_handle_error :: proc "contextless" (file: string, line, column: i32, lo, hi: int, len: int) -> ! {
 	print_caller_location(Source_Code_Location{file, line, column, ""})
-	print_string(" Invalid slice indices: ")
+	print_string(" Invalid slice indices ")
 	print_i64(i64(lo))
 	print_string(":")
 	print_i64(i64(hi))
-	print_string(":")
+	print_string(" is out of range 0..<")
 	print_i64(i64(len))
 	print_byte('\n')
 	bounds_trap()
@@ -47,7 +48,7 @@ slice_handle_error :: proc "contextless" (file: string, line, column: i32, lo, h
 
 multi_pointer_slice_handle_error :: proc "contextless" (file: string, line, column: i32, lo, hi: int) -> ! {
 	print_caller_location(Source_Code_Location{file, line, column, ""})
-	print_string(" Invalid slice indices: ")
+	print_string(" Invalid slice indices ")
 	print_i64(i64(lo))
 	print_string(":")
 	print_i64(i64(hi))
@@ -81,13 +82,14 @@ dynamic_array_expr_error :: proc "contextless" (file: string, line, column: i32,
 	if 0 <= low && low <= high && high <= max {
 		return
 	}
+	@(cold)
 	handle_error :: proc "contextless" (file: string, line, column: i32, low, high, max: int) {
 		print_caller_location(Source_Code_Location{file, line, column, ""})
-		print_string(" Invalid dynamic array values: ")
+		print_string(" Invalid dynamic array indices ")
 		print_i64(i64(low))
 		print_string(":")
 		print_i64(i64(high))
-		print_string(":")
+		print_string(" is out of range 0..<")
 		print_i64(i64(max))
 		print_byte('\n')
 		bounds_trap()
@@ -97,17 +99,18 @@ dynamic_array_expr_error :: proc "contextless" (file: string, line, column: i32,
 
 
 matrix_bounds_check_error :: proc "contextless" (file: string, line, column: i32, row_index, column_index, row_count, column_count: int) {
-	if 0 <= row_index && row_index < row_count && 
+	if 0 <= row_index && row_index < row_count &&
 	   0 <= column_index && column_index < column_count {
 		return
 	}
+	@(cold)
 	handle_error :: proc "contextless" (file: string, line, column: i32, row_index, column_index, row_count, column_count: int) {
 		print_caller_location(Source_Code_Location{file, line, column, ""})
 		print_string(" Matrix indices [")
 		print_i64(i64(row_index))
 		print_string(", ")
 		print_i64(i64(column_index))
-		print_string(" is out of bounds range [0..<")
+		print_string(" is out of range [0..<")
 		print_i64(i64(row_count))
 		print_string(", 0..<")
 		print_i64(i64(column_count))
@@ -119,71 +122,101 @@ matrix_bounds_check_error :: proc "contextless" (file: string, line, column: i32
 }
 
 
-type_assertion_check :: proc "contextless" (ok: bool, file: string, line, column: i32, from, to: typeid) {
-	if ok {
-		return
-	}
-	handle_error :: proc "contextless" (file: string, line, column: i32, from, to: typeid) {
-		print_caller_location(Source_Code_Location{file, line, column, ""})
-		print_string(" Invalid type assertion from ")
-		print_typeid(from)
-		print_string(" to ")
-		print_typeid(to)
-		print_byte('\n')
-		type_assertion_trap()
-	}
-	handle_error(file, line, column, from, to)
-}
-
-type_assertion_check2 :: proc "contextless" (ok: bool, file: string, line, column: i32, from, to: typeid, from_data: rawptr) {
-	if ok {
-		return
+when ODIN_DISALLOW_RTTI {
+	type_assertion_check :: proc "contextless" (ok: bool, file: string, line, column: i32) {
+		if ok {
+			return
+		}
+		@(cold)
+		handle_error :: proc "contextless" (file: string, line, column: i32) {
+			print_caller_location(Source_Code_Location{file, line, column, ""})
+			print_string(" Invalid type assertion\n")
+			type_assertion_trap()
+		}
+		handle_error(file, line, column)
 	}
 
-	variant_type :: proc "contextless" (id: typeid, data: rawptr) -> typeid {
-		if id == nil || data == nil {
+	type_assertion_check2 :: proc "contextless" (ok: bool, file: string, line, column: i32) {
+		if ok {
+			return
+		}
+		@(cold)
+		handle_error :: proc "contextless" (file: string, line, column: i32) {
+			print_caller_location(Source_Code_Location{file, line, column, ""})
+			print_string(" Invalid type assertion\n")
+			type_assertion_trap()
+		}
+		handle_error(file, line, column)
+	}
+} else {
+	type_assertion_check :: proc "contextless" (ok: bool, file: string, line, column: i32, from, to: typeid) {
+		if ok {
+			return
+		}
+		@(cold)
+		handle_error :: proc "contextless" (file: string, line, column: i32, from, to: typeid) {
+			print_caller_location(Source_Code_Location{file, line, column, ""})
+			print_string(" Invalid type assertion from ")
+			print_typeid(from)
+			print_string(" to ")
+			print_typeid(to)
+			print_byte('\n')
+			type_assertion_trap()
+		}
+		handle_error(file, line, column, from, to)
+	}
+
+	type_assertion_check2 :: proc "contextless" (ok: bool, file: string, line, column: i32, from, to: typeid, from_data: rawptr) {
+		if ok {
+			return
+		}
+
+		variant_type :: proc "contextless" (id: typeid, data: rawptr) -> typeid {
+			if id == nil || data == nil {
+				return id
+			}
+			ti := type_info_base(type_info_of(id))
+			#partial switch v in ti.variant {
+			case Type_Info_Any:
+				return (^any)(data).id
+			case Type_Info_Union:
+				tag_ptr := uintptr(data) + v.tag_offset
+				idx := 0
+				switch v.tag_type.size {
+				case 1:  idx = int((^u8)(tag_ptr)^)   - 1
+				case 2:  idx = int((^u16)(tag_ptr)^)  - 1
+				case 4:  idx = int((^u32)(tag_ptr)^)  - 1
+				case 8:  idx = int((^u64)(tag_ptr)^)  - 1
+				case 16: idx = int((^u128)(tag_ptr)^) - 1
+				}
+				if idx < 0 {
+					return nil
+				} else if idx < len(v.variants) {
+					return v.variants[idx].id
+				}
+			}
 			return id
 		}
-		ti := type_info_base(type_info_of(id))
-		#partial switch v in ti.variant {
-		case Type_Info_Any:
-			return (^any)(data).id
-		case Type_Info_Union:
-			tag_ptr := uintptr(data) + v.tag_offset
-			idx := 0
-			switch v.tag_type.size {
-			case 1:  idx = int((^u8)(tag_ptr)^)   - 1
-			case 2:  idx = int((^u16)(tag_ptr)^)  - 1
-			case 4:  idx = int((^u32)(tag_ptr)^)  - 1
-			case 8:  idx = int((^u64)(tag_ptr)^)  - 1
-			case 16: idx = int((^u128)(tag_ptr)^) - 1
+
+		@(cold)
+		handle_error :: proc "contextless" (file: string, line, column: i32, from, to: typeid, from_data: rawptr) {
+
+			actual := variant_type(from, from_data)
+
+			print_caller_location(Source_Code_Location{file, line, column, ""})
+			print_string(" Invalid type assertion from ")
+			print_typeid(from)
+			print_string(" to ")
+			print_typeid(to)
+			if actual != from {
+				print_string(", actual type: ")
+				print_typeid(actual)
 			}
-			if idx < 0 {
-				return nil
-			} else if idx < len(v.variants) {
-				return v.variants[idx].id
-			}
+			print_byte('\n')
+			type_assertion_trap()
 		}
-		return id
+		handle_error(file, line, column, from, to, from_data)
 	}
-
-	handle_error :: proc "contextless" (file: string, line, column: i32, from, to: typeid, from_data: rawptr) {
-
-		actual := variant_type(from, from_data)
-
-		print_caller_location(Source_Code_Location{file, line, column, ""})
-		print_string(" Invalid type assertion from ")
-		print_typeid(from)
-		print_string(" to ")
-		print_typeid(to)
-		if actual != from {
-			print_string(", actual type: ")
-			print_typeid(actual)
-		}
-		print_byte('\n')
-		type_assertion_trap()
-	}
-	handle_error(file, line, column, from, to, from_data)
 }
 
 
@@ -191,6 +224,7 @@ make_slice_error_loc :: #force_inline proc "contextless" (loc := #caller_locatio
 	if 0 <= len {
 		return
 	}
+	@(cold)
 	handle_error :: proc "contextless" (loc: Source_Code_Location, len: int) {
 		print_caller_location(loc)
 		print_string(" Invalid slice length for make: ")
@@ -205,6 +239,7 @@ make_dynamic_array_error_loc :: #force_inline proc "contextless" (using loc := #
 	if 0 <= len && len <= cap {
 		return
 	}
+	@(cold)
 	handle_error :: proc "contextless" (loc: Source_Code_Location, len, cap: int) {
 		print_caller_location(loc)
 		print_string(" Invalid dynamic array parameters for make: ")
@@ -221,6 +256,7 @@ make_map_expr_error_loc :: #force_inline proc "contextless" (loc := #caller_loca
 	if 0 <= cap {
 		return
 	}
+	@(cold)
 	handle_error :: proc "contextless" (loc: Source_Code_Location, cap: int) {
 		print_caller_location(loc)
 		print_string(" Invalid map capacity for make: ")

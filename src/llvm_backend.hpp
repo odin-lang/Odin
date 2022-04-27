@@ -144,6 +144,9 @@ struct lbModule {
 	PtrMap<void *, LLVMMetadataRef> debug_values; 
 
 	Array<lbIncompleteDebugType> debug_incomplete_types;
+
+	StringMap<lbAddr> objc_classes;
+	StringMap<lbAddr> objc_selectors;
 };
 
 struct lbGenerator {
@@ -204,7 +207,6 @@ enum lbDeferExitKind {
 
 enum lbDeferKind {
 	lbDefer_Node,
-	lbDefer_Instr,
 	lbDefer_Proc,
 };
 
@@ -215,8 +217,6 @@ struct lbDefer {
 	lbBlock *   block;
 	union {
 		Ast *stmt;
-		// NOTE(bill): 'instr' will be copied every time to create a new one
-		lbValue instr;
 		struct {
 			lbValue deferred;
 			Array<lbValue> result_as_args;
@@ -235,6 +235,7 @@ struct lbTargetList {
 
 enum lbProcedureFlag : u32 {
 	lbProcedureFlag_WithoutMemcpyPass = 1<<0,
+	lbProcedureFlag_DebugAllocaCopy = 1<<1,
 };
 
 struct lbCopyElisionHint {
@@ -270,7 +271,6 @@ struct lbProcedure {
 	bool            is_done;
 
 	lbAddr           return_ptr;
-	Array<lbValue>   params;
 	Array<lbDefer>   defer_stmts;
 	Array<lbBlock *> blocks;
 	Array<lbBranchBlocks> branch_blocks;
@@ -296,7 +296,6 @@ struct lbProcedure {
 
 
 bool lb_init_generator(lbGenerator *gen, Checker *c);
-void lb_generate_module(lbGenerator *gen);
 
 String lb_mangle_name(lbModule *m, Entity *e);
 String lb_get_entity_name(lbModule *m, Entity *e, String name = {});
@@ -369,7 +368,7 @@ lbContextData *lb_push_context_onto_stack(lbProcedure *p, lbAddr ctx);
 lbContextData *lb_push_context_onto_stack_from_implicit_parameter(lbProcedure *p);
 
 
-lbAddr lb_add_global_generated(lbModule *m, Type *type, lbValue value={});
+lbAddr lb_add_global_generated(lbModule *m, Type *type, lbValue value={}, Entity **entity_=nullptr);
 lbAddr lb_add_local(lbProcedure *p, Type *type, Entity *e=nullptr, bool zero_init=true, i32 param_index=0, bool force_no_init=false);
 
 void lb_add_foreign_library_path(lbModule *m, Entity *e);
@@ -549,6 +548,10 @@ lbCallingConventionKind const lb_calling_convention_map[ProcCC_MAX] = {
 	lbCallingConvention_C,            // ProcCC_None,
 	lbCallingConvention_C,            // ProcCC_Naked,
 	lbCallingConvention_C,            // ProcCC_InlineAsm,
+
+	lbCallingConvention_Win64,        // ProcCC_Win64,
+	lbCallingConvention_X86_64_SysV,  // ProcCC_SysV,
+
 };
 
 enum : LLVMDWARFTypeEncoding {

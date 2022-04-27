@@ -42,9 +42,9 @@ rat_set_f64 :: proc(dst: ^Rat, f: f64, allocator := context.allocator) -> (err: 
 	dst.a.sign = .Negative if f < 0 else .Zero_or_Positive
 	
 	if shift > 0 {
-		internal_int_shl_digit(&dst.b, shift) or_return
+		internal_int_shl(&dst.b, &dst.b, shift) or_return
 	} else {
-		internal_int_shl_digit(&dst.a, -shift) or_return
+		internal_int_shl(&dst.a, &dst.a, -shift) or_return
 	}
 	
 	return internal_rat_norm(dst)
@@ -112,14 +112,14 @@ rat_set_u64 :: proc(dst: ^Rat, x: u64, allocator := context.allocator) -> (err: 
 	assert_if_nil(dst)
 	context.allocator = allocator
 	internal_set(&dst.a, x) or_return
-	internal_set(&dst.a, 1) or_return
+	internal_set(&dst.b, 1) or_return
 	return
 }
 rat_set_i64 :: proc(dst: ^Rat, x: i64, allocator := context.allocator) -> (err: Error) {
 	assert_if_nil(dst)
 	context.allocator = allocator
 	internal_set(&dst.a, x) or_return
-	internal_set(&dst.a, 1) or_return
+	internal_set(&dst.b, 1) or_return
 	return
 }
 
@@ -265,7 +265,7 @@ rat_mul_rat :: proc(dst, x, y: ^Rat, allocator := context.allocator) -> (err: Er
 		return
 	}
 	
-	int_sub(&dst.a, &x.a, &y.a)                or_return
+	int_mul(&dst.a, &x.a, &y.a)                or_return
 	internal_int_mul_denom(&dst.b, &x.b, &y.b) or_return
 	return internal_rat_norm(dst)
 }
@@ -389,9 +389,9 @@ internal_rat_to_float :: proc($T: typeid, z: ^Rat, allocator := context.allocato
 	internal_int_abs(b2, b) or_return
 	
 	if shift := MSIZE2 - exp; shift > 0 {
-		internal_int_shl_digit(a2, shift) or_return
-	} else {
-		internal_int_shl_digit(b2, -shift) or_return
+		internal_int_shl(a2, a2, shift) or_return
+	} else if shift < 0 {
+		internal_int_shl(b2, b2, -shift) or_return
 	}
 	
 	q, r := &Int{}, &Int{}

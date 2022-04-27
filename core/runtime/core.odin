@@ -33,6 +33,11 @@ Calling_Convention :: enum u8 {
 
 	None        = 6,
 	Naked       = 7,
+
+	_           = 8, // reserved
+
+	Win64       = 9,
+	SysV        = 10,
 }
 
 Type_Info_Enum_Value :: distinct i64
@@ -95,6 +100,7 @@ Type_Info_Enumerated_Array :: struct {
 	count:     int,
 	min_value: Type_Info_Enum_Value,
 	max_value: Type_Info_Enum_Value,
+	is_sparse: bool,
 }
 Type_Info_Dynamic_Array :: struct {elem: ^Type_Info, elem_size: int}
 Type_Info_Slice         :: struct {elem: ^Type_Info, elem_size: int}
@@ -130,6 +136,7 @@ Type_Info_Union :: struct {
 	custom_align: bool,
 	no_nil:       bool,
 	maybe:        bool,
+	shared_nil:   bool,
 }
 Type_Info_Enum :: struct {
 	base:      ^Type_Info,
@@ -345,7 +352,6 @@ Context :: struct {
 	assertion_failure_proc: Assertion_Failure_Proc,
 	logger:                 Logger,
 
-	user_data:  any,
 	user_ptr:   rawptr,
 	user_index: int,
 
@@ -386,6 +392,59 @@ Raw_Cstring :: struct {
 }
 
 
+/*
+	// Defined internally by the compiler
+	Odin_OS_Type :: enum int {
+		Unknown,
+		Windows,
+		Darwin,
+		Linux,
+		Essence,
+		FreeBSD,
+		OpenBSD,
+		WASI,
+		JS,
+		Freestanding,
+	}
+*/
+Odin_OS_Type :: type_of(ODIN_OS)
+
+/*
+	// Defined internally by the compiler
+	Odin_Arch_Type :: enum int {
+		Unknown,
+		amd64,
+		i386,
+		arm64,
+		wasm32,
+		wasm64,
+	}
+*/
+Odin_Arch_Type :: type_of(ODIN_ARCH)
+
+/*
+	// Defined internally by the compiler
+	Odin_Build_Mode_Type :: enum int {
+		Executable,
+		Dynamic,
+		Object,
+		Assembly,
+		LLVM_IR,
+	}
+*/
+Odin_Build_Mode_Type :: type_of(ODIN_BUILD_MODE)
+
+/*
+	// Defined internally by the compiler
+	Odin_Endian_Type :: enum int {
+		Unknown,
+		Little,
+		Big,
+	}
+*/
+Odin_Endian_Type :: type_of(ODIN_ENDIAN)
+
+
 /////////////////////////////
 // Init Startup Procedures //
 /////////////////////////////
@@ -394,12 +453,17 @@ Raw_Cstring :: struct {
 // This is probably only useful for freestanding targets
 foreign {
 	@(link_name="__$startup_runtime")
-	_startup_runtime :: proc() ---
+	_startup_runtime :: proc "odin" () ---
 }
 
 @(link_name="__$cleanup_runtime")
 _cleanup_runtime :: proc() {
 	default_temp_allocator_destroy(&global_default_temp_allocator_data)
+}
+
+_cleanup_runtime_contextless :: proc "contextless" () {
+	context = default_context()
+	_cleanup_runtime()
 }
 
 
@@ -451,16 +515,18 @@ __type_info_of :: proc "contextless" (id: typeid) -> ^Type_Info #no_bounds_check
 	return &type_table[n]
 }
 
-typeid_base :: proc "contextless" (id: typeid) -> typeid {
-	ti := type_info_of(id)
-	ti = type_info_base(ti)
-	return ti.id
+when !ODIN_DISALLOW_RTTI {
+	typeid_base :: proc "contextless" (id: typeid) -> typeid {
+		ti := type_info_of(id)
+		ti = type_info_base(ti)
+		return ti.id
+	}
+	typeid_core :: proc "contextless" (id: typeid) -> typeid {
+		ti := type_info_core(type_info_of(id))
+		return ti.id
+	}
+	typeid_base_without_enum :: typeid_core
 }
-typeid_core :: proc "contextless" (id: typeid) -> typeid {
-	ti := type_info_core(type_info_of(id))
-	return ti.id
-}
-typeid_base_without_enum :: typeid_core
 
 
 
@@ -500,7 +566,7 @@ __init_context :: proc "contextless" (c: ^Context) {
 		return
 	}
 
-	// NOTE(bill): Do not initialize these procedures with a call as they are not defined with the "contexless" calling convention
+	// NOTE(bill): Do not initialize these procedures with a call as they are not defined with the "contextless" calling convention
 	c.allocator.procedure = default_allocator_proc
 	c.allocator.data = nil
 
@@ -516,7 +582,7 @@ __init_context :: proc "contextless" (c: ^Context) {
 }
 
 default_assertion_failure_proc :: proc(prefix, message: string, loc: Source_Code_Location) -> ! {
-	when ODIN_OS == "freestanding" {
+	when ODIN_OS == .Freestanding {
 		// Do nothing
 	} else {
 		print_caller_location(loc)

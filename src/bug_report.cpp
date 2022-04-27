@@ -17,6 +17,11 @@
 	#include <sys/sysctl.h>
 #endif
 
+#if defined(GB_SYSTEM_OPENBSD)
+	#include <sys/sysctl.h>
+	#include <sys/utsname.h>
+#endif
+
 /*
 	NOTE(Jeroen): This prints the Windows product edition only, to be called from `print_platform_details`.
 */
@@ -140,7 +145,7 @@ void report_windows_product_type(DWORD ProductType) {
 		break;
 
 	default:
-		gb_printf("Unknown Edition (%08x)", ProductType);
+		gb_printf("Unknown Edition (%08x)", cast(unsigned)ProductType);
 	}
 }
 #endif
@@ -242,6 +247,14 @@ void report_ram_info() {
 		if (sysctl(sysctls, 2, &ram_amount, &val_size, NULL, 0) != -1) {
 			gb_printf("%lld MiB\n", ram_amount / gb_megabytes(1));
 		}
+	#elif defined(GB_SYSTEM_OPENBSD)
+		uint64_t ram_amount;
+		size_t   val_size = sizeof(ram_amount);
+
+		int sysctls[] = { CTL_HW, HW_PHYSMEM64 };
+		if (sysctl(sysctls, 2, &ram_amount, &val_size, NULL, 0) != -1) {
+			gb_printf("%lld MiB\n", ram_amount / gb_megabytes(1));
+		}
 	#else
 		gb_printf("Unknown.\n");
 	#endif
@@ -316,14 +329,14 @@ void print_bug_report_help() {
 			}
 
 			if (false) {
-				gb_printf("dwMajorVersion:    %d\n", osvi.dwMajorVersion);
-				gb_printf("dwMinorVersion:    %d\n", osvi.dwMinorVersion);
-				gb_printf("dwBuildNumber:     %d\n", osvi.dwBuildNumber);
-				gb_printf("dwPlatformId:      %d\n", osvi.dwPlatformId);
-				gb_printf("wServicePackMajor: %d\n", osvi.wServicePackMajor);
-				gb_printf("wServicePackMinor: %d\n", osvi.wServicePackMinor);
-				gb_printf("wSuiteMask:        %d\n", osvi.wSuiteMask);
-				gb_printf("wProductType:      %d\n", osvi.wProductType);
+				gb_printf("dwMajorVersion:    %u\n", cast(unsigned)osvi.dwMajorVersion);
+				gb_printf("dwMinorVersion:    %u\n", cast(unsigned)osvi.dwMinorVersion);
+				gb_printf("dwBuildNumber:     %u\n", cast(unsigned)osvi.dwBuildNumber);
+				gb_printf("dwPlatformId:      %u\n", cast(unsigned)osvi.dwPlatformId);
+				gb_printf("wServicePackMajor: %u\n", cast(unsigned)osvi.wServicePackMajor);
+				gb_printf("wServicePackMinor: %u\n", cast(unsigned)osvi.wServicePackMinor);
+				gb_printf("wSuiteMask:        %u\n", cast(unsigned)osvi.wSuiteMask);
+				gb_printf("wProductType:      %u\n", cast(unsigned)osvi.wProductType);
 			}
 
 			gb_printf("Windows ");
@@ -441,18 +454,18 @@ void print_bug_report_help() {
 				TEXT("DisplayVersion"),
 				RRF_RT_REG_SZ,
 				ValueType,
-				&DisplayVersion,
+				DisplayVersion,
 				&ValueSize
 			);
 
 			if (status == 0x0) {
-				gb_printf(" (version: %s)", &DisplayVersion);
+				gb_printf(" (version: %s)", DisplayVersion);
 			}
 
 			/*
 				Now print build number.
 			*/
-			gb_printf(", build %d", osvi.dwBuildNumber);
+			gb_printf(", build %u", cast(unsigned)osvi.dwBuildNumber);
 
 			ValueSize = sizeof(UBR);
 			status = RegGetValue(
@@ -466,18 +479,18 @@ void print_bug_report_help() {
 			);
 
 			if (status == 0x0) {
-				gb_printf(".%d", UBR);
+				gb_printf(".%u", cast(unsigned)UBR);
 			}
 			gb_printf("\n");
 		}
 
 	#elif defined(GB_SYSTEM_LINUX)
 		/*
-			Try to parse `/usr/lib/os-release` for `PRETTY_NAME="Ubuntu 20.04.3 LTS`
+			Try to parse `/etc/os-release` for `PRETTY_NAME="Ubuntu 20.04.3 LTS`
 		*/
 		gbAllocator a = heap_allocator();
 
-		gbFileContents release = gb_file_read_contents(a, 1, "/usr/lib/os-release");
+		gbFileContents release = gb_file_read_contents(a, 1, "/etc/os-release");
 		defer (gb_file_free_contents(&release));
 
 		b32 found = 0;
@@ -643,6 +656,14 @@ void print_bug_report_help() {
 		} else {
 			gb_printf("macOS: Unknown\n");
 		}			
+	#elif defined(GB_SYSTEM_OPENBSD)
+		struct utsname un;
+		
+		if (uname(&un) != -1) {
+			gb_printf("%s %s %s %s\n", un.sysname, un.release, un.version, un.machine);
+		} else {
+			gb_printf("OpenBSD: Unknown\n");    
+		}
 	#else
 		gb_printf("Unknown\n");
 

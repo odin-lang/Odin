@@ -1,9 +1,9 @@
-//+build linux, darwin, freebsd
+//+build linux, darwin, freebsd, openbsd
 package time
 
 IS_SUPPORTED :: true // NOTE: Times on Darwin are UTC.
 
-when ODIN_OS == "darwin" {
+when ODIN_OS == .Darwin {
 	foreign import libc "System.framework"
 } else  {
 	foreign import libc "system:c"
@@ -17,21 +17,47 @@ foreign libc {
 	@(link_name="nanosleep")     _unix_nanosleep     :: proc(requested: ^TimeSpec, remaining: ^TimeSpec) -> i32 ---
 }
 
+foreign import "system:pthread"
+
+import "core:c"
+
+@(private="file")
+@(default_calling_convention="c")
+foreign pthread {
+	sched_yield :: proc() -> c.int ---
+}
+
+_yield :: proc "contextless" () {
+	sched_yield()
+}
+
 TimeSpec :: struct {
 	tv_sec  : i64,  /* seconds */
 	tv_nsec : i64,  /* nanoseconds */
 }
 
-CLOCK_REALTIME           :: 0 // NOTE(tetra): May jump in time, when user changes the system time.
-CLOCK_MONOTONIC          :: 1 // NOTE(tetra): May stand still while system is asleep.
-CLOCK_PROCESS_CPUTIME_ID :: 2
-CLOCK_THREAD_CPUTIME_ID  :: 3
-CLOCK_MONOTONIC_RAW      :: 4 // NOTE(tetra): "RAW" means: Not adjusted by NTP.
-CLOCK_REALTIME_COARSE    :: 5 // NOTE(tetra): "COARSE" clocks are apparently much faster, but not "fine-grained."
-CLOCK_MONOTONIC_COARSE   :: 6
-CLOCK_BOOTTIME           :: 7 // NOTE(tetra): Same as MONOTONIC, except also including time system was asleep.
-CLOCK_REALTIME_ALARM     :: 8
-CLOCK_BOOTTIME_ALARM     :: 9
+when ODIN_OS == .OpenBSD {
+	CLOCK_REALTIME           :: 0
+	CLOCK_PROCESS_CPUTIME_ID :: 2
+	CLOCK_MONOTONIC          :: 3
+	CLOCK_THREAD_CPUTIME_ID  :: 4
+	CLOCK_UPTIME             :: 5
+	CLOCK_BOOTTIME           :: 6
+
+	// CLOCK_MONOTONIC_RAW doesn't exist, use CLOCK_MONOTONIC
+	CLOCK_MONOTONIC_RAW :: CLOCK_MONOTONIC
+} else {
+	CLOCK_REALTIME           :: 0 // NOTE(tetra): May jump in time, when user changes the system time.
+	CLOCK_MONOTONIC          :: 1 // NOTE(tetra): May stand still while system is asleep.
+	CLOCK_PROCESS_CPUTIME_ID :: 2
+	CLOCK_THREAD_CPUTIME_ID  :: 3
+	CLOCK_MONOTONIC_RAW      :: 4 // NOTE(tetra): "RAW" means: Not adjusted by NTP.
+	CLOCK_REALTIME_COARSE    :: 5 // NOTE(tetra): "COARSE" clocks are apparently much faster, but not "fine-grained."
+	CLOCK_MONOTONIC_COARSE   :: 6
+	CLOCK_BOOTTIME           :: 7 // NOTE(tetra): Same as MONOTONIC, except also including time system was asleep.
+	CLOCK_REALTIME_ALARM     :: 8
+	CLOCK_BOOTTIME_ALARM     :: 9
+}
 
 // TODO(tetra, 2019-11-05): The original implementation of this package for Darwin used this constants.
 // I do not know if Darwin programmers are used to the existance of these constants or not, so

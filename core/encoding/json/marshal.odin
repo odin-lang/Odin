@@ -8,17 +8,18 @@ import "core:strings"
 import "core:io"
 
 Marshal_Data_Error :: enum {
+	None,
 	Unsupported_Type,
 }
 
-Marshal_Error :: union {
+Marshal_Error :: union #shared_nil {
 	Marshal_Data_Error,
 	io.Error,
 }
 
 marshal :: proc(v: any, allocator := context.allocator) -> (data: []byte, err: Marshal_Error) {
 	b := strings.make_builder(allocator)
-	defer if err != .None {
+	defer if err != nil {
 		strings.destroy_builder(&b)
 	}
 
@@ -27,7 +28,7 @@ marshal :: proc(v: any, allocator := context.allocator) -> (data: []byte, err: M
 	if len(b.buf) != 0 {
 		data = b.buf[:]
 	}
-	return data, .None
+	return data, nil
 }
 
 marshal_to_builder :: proc(b: ^strings.Builder, v: any) -> Marshal_Error {
@@ -285,8 +286,8 @@ marshal_to_writer :: proc(w: io.Writer, v: any) -> (err: Marshal_Error) {
 			case runtime.Type_Info_Integer:
 				switch info.endianness {
 				case .Platform: return false
-				case .Little:   return ODIN_ENDIAN != "little"
-				case .Big:      return ODIN_ENDIAN != "big"
+				case .Little:   return ODIN_ENDIAN != .Little
+				case .Big:      return ODIN_ENDIAN != .Big
 				}
 			}
 			return false

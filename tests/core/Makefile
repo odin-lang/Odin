@@ -1,29 +1,46 @@
 ODIN=../../odin
 PYTHON=$(shell which python3)
 
-all: download_test_assets image_test compress_test strings_test hash_test crypto_test encoding_test
+all: download_test_assets image_test compress_test strings_test hash_test crypto_test noise_test encoding_test \
+	 math_test linalg_glsl_math_test filepath_test reflect_test os_exit_test
 
 download_test_assets:
 	$(PYTHON) download_assets.py
 
 image_test:
-	$(ODIN) run image/test_core_image.odin -out=test_image -o:speed -no-bounds-check
+	$(ODIN) run image/test_core_image.odin -file -out:test_core_image
 
 compress_test:
-	$(ODIN) run compress/test_core_compress.odin -out=test_compress -o:speed -no-bounds-check
+	$(ODIN) run compress/test_core_compress.odin -file -out:test_core_compress
 
 strings_test:
-	$(ODIN) run strings/test_core_strings.odin -out=test_strings -o:speed -no-bounds-check
-
-odin_test:
-	$(ODIN) run odin -out=test_odin -o:speed -no-bounds-check
+	$(ODIN) run strings/test_core_strings.odin -file -out:test_core_strings
 
 hash_test:
-	$(ODIN) run hash -out=test_hash -o:speed -no-bounds-check
+	$(ODIN) run hash -o:speed -no-bounds-check -out:test_hash 
 
 crypto_test:
-	$(ODIN) run crypto -out=crypto_hash -o:speed -no-bounds-check
+	$(ODIN) run crypto -o:speed -no-bounds-check -out:test_crypto_hash 
+
+noise_test:
+	$(ODIN) run math/noise -out:test_noise
 
 encoding_test:
-	$(ODIN) run encoding/json -out=test_encoding_json -o:speed -no-bounds-check
-	$(ODIN) run encoding/xml  -out=test_encoding_xml  -o:speed -no-bounds-check
+	$(ODIN) run encoding/hxa -collection:tests=.. -out:test_hxa
+	$(ODIN) run encoding/json -out:test_json
+	$(ODIN) run encoding/varint -out:test_varint
+
+math_test:
+	$(ODIN) run math/test_core_math.odin -file -collection:tests=.. -out:test_core_math
+
+linalg_glsl_math_test:
+	$(ODIN) run math/linalg/glsl/test_linalg_glsl_math.odin -file -collection:tests=.. -out:test_linalg_glsl_math
+
+filepath_test:
+	$(ODIN) run path/filepath/test_core_filepath.odin -file -collection:tests=.. -out:test_core_filepath
+
+reflect_test:
+	$(ODIN) run reflect/test_core_reflect.odin -file -collection:tests=.. -out:test_core_reflect
+
+os_exit_test:
+	$(ODIN) run os/test_core_os_exit.odin -file -out:test_core_os_exit && exit 1 || exit 0

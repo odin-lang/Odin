@@ -50,7 +50,10 @@ def try_download_file(url, out_file):
 	 	print("Could not download", url)
 	 	return 1	
 
-def try_download_and_unpack_zip(url, out_file, extract_path):
+def try_download_and_unpack_zip(suite):
+	url      = ASSETS_BASE_URL.format(suite, "{}.zip".format(suite))
+	out_file = DOWNLOAD_BASE_PATH.format(suite) + "/{}.zip".format(suite)
+
 	print("\tDownloading {} to {}.".format(url, out_file))
 
 	if try_download_file(url, out_file) is not None:
@@ -62,6 +65,7 @@ def try_download_and_unpack_zip(url, out_file, extract_path):
 		with zipfile.ZipFile(out_file) as z:
 			for file in z.filelist:
 				filename = file.filename
+				extract_path = DOWNLOAD_BASE_PATH.format(suite)
 
 				print("\t\tExtracting: {}".format(filename))
 				z.extract(file, extract_path)
@@ -69,56 +73,25 @@ def try_download_and_unpack_zip(url, out_file, extract_path):
 		print("Could not extract ZIP file")
 		return 2
 
-def download_png_assets():
-	suite = "PNG"
-	url          = ASSETS_BASE_URL.format(suite, "{}.zip".format(suite))
-	out_file     = DOWNLOAD_BASE_PATH.format(suite) + "/{}.zip".format(suite)
-	extract_path = DOWNLOAD_BASE_PATH.format(suite)
 
+def main():
 	print("Downloading PNG assets")
 
 	# Make PNG assets path
 	try:
-		path = DOWNLOAD_BASE_PATH.format(suite)
+		path = DOWNLOAD_BASE_PATH.format("PNG")
 		os.makedirs(path)
 	except FileExistsError:
 		pass
 
 	# Try downloading and unpacking the PNG assets
-	r = try_download_and_unpack_zip(url, out_file, extract_path)
+	r = try_download_and_unpack_zip("PNG")
 	if r is not None:
 		return r
 
 	# We could fall back on downloading the PNG files individually, but it's slow
 
 	print("Done downloading PNG assets")
-
-def download_unicode_assets():
-	suite = "XML"
-	url          = "https://www.w3.org/2003/entities/2007xml/unicode.xml.zip"
-	out_file     = DOWNLOAD_BASE_PATH.format(suite) + "/{}.zip".format(suite)
-	extract_path = DOWNLOAD_BASE_PATH.format(suite)
-
-	print("Downloading {}.".format(url))
-
-	# Make XML assets path
-	try:
-		path = DOWNLOAD_BASE_PATH.format(suite)
-		os.makedirs(path)
-	except FileExistsError:
-		pass
-
-	# Try downloading and unpacking the assets
-	r = try_download_and_unpack_zip(url, out_file, extract_path)
-	if r is not None:
-		return r
-
-	print("Done downloading Unicode/XML assets")
-
-def main():
-	download_png_assets()
-	download_unicode_assets()
-
 	return 0
 
 if __name__ == '__main__':

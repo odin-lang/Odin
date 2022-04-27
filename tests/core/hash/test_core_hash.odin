@@ -5,6 +5,7 @@ import "core:hash"
 import "core:time"
 import "core:testing"
 import "core:fmt"
+import "core:os"
 
 TEST_count := 0
 TEST_fail  := 0
@@ -17,12 +18,13 @@ when ODIN_TEST {
 		TEST_count += 1
 		if !condition {
 			TEST_fail += 1
-			fmt.printf("[%v] %v", loc, message)
+			fmt.printf("[%v] %v\n", loc, message)
 			return
 		}
 	}
 	log     :: proc(t: ^testing.T, v: any, loc := #caller_location) {
-		fmt.printf("[%v] LOG:\n\t%v\n", loc, v)
+		fmt.printf("[%v] ", loc)
+		fmt.printf("log: %v\n", v)
 	}
 }
 
@@ -31,7 +33,10 @@ main :: proc() {
 	test_benchmark_runner(&t)
 	test_xxhash_vectors(&t)
 	test_crc64_vectors(&t)
-	fmt.printf("\n%v/%v tests successful.\n", TEST_count - TEST_fail, TEST_count)
+	fmt.printf("%v/%v tests successful.\n", TEST_count - TEST_fail, TEST_count)
+	if TEST_fail > 0 {
+		os.exit(1)
+	}
 }
 
 /*

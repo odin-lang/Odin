@@ -7,6 +7,9 @@
 # User-specific files (MonoDevelop/Xamarin Studio)
 *.userprefs
 
+# For macOS
+.DS_Store
+
 # Build results
 [Dd]ebug/
 [Dd]ebugPublic/
@@ -276,3 +279,5 @@ shared/
 *.ll
 
 *.sublime-workspace
+examples/bug/
+build.sh

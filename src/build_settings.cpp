@@ -1,14 +1,13 @@
-#if defined(GB_SYSTEM_FREEBSD)
+#if defined(GB_SYSTEM_FREEBSD) || defined(GB_SYSTEM_OPENBSD)
 #include <sys/types.h>
 #include <sys/sysctl.h>
 #endif
 
-
 // #if defined(GB_SYSTEM_WINDOWS)
-#define DEFAULT_TO_THREADED_CHECKER
+// #define DEFAULT_TO_THREADED_CHECKER
 // #endif
 
-enum TargetOsKind {
+enum TargetOsKind : u16 {
 	TargetOs_Invalid,
 
 	TargetOs_windows,
@@ -16,6 +15,7 @@ enum TargetOsKind {
 	TargetOs_linux,
 	TargetOs_essence,
 	TargetOs_freebsd,
+	TargetOs_openbsd,
 	
 	TargetOs_wasi,
 	TargetOs_js,
@@ -25,11 +25,11 @@ enum TargetOsKind {
 	TargetOs_COUNT,
 };
 
-enum TargetArchKind {
+enum TargetArchKind : u16 {
 	TargetArch_Invalid,
 
 	TargetArch_amd64,
-	TargetArch_386,
+	TargetArch_i386,
 	TargetArch_arm64,
 	TargetArch_wasm32,
 	TargetArch_wasm64,
@@ -37,7 +37,7 @@ enum TargetArchKind {
 	TargetArch_COUNT,
 };
 
-enum TargetEndianKind {
+enum TargetEndianKind : u8 {
 	TargetEndian_Invalid,
 
 	TargetEndian_Little,
@@ -46,6 +46,16 @@ enum TargetEndianKind {
 	TargetEndian_COUNT,
 };
 
+enum TargetABIKind : u16 {
+	TargetABI_Default,
+
+	TargetABI_Win64,
+	TargetABI_SysV,
+
+	TargetABI_COUNT,
+};
+
+
 String target_os_names[TargetOs_COUNT] = {
 	str_lit(""),
 	str_lit("windows"),
@@ -53,6 +63,7 @@ String target_os_names[TargetOs_COUNT] = {
 	str_lit("linux"),
 	str_lit("essence"),
 	str_lit("freebsd"),
+	str_lit("openbsd"),
 	
 	str_lit("wasi"),
 	str_lit("js"),
@@ -63,7 +74,7 @@ String target_os_names[TargetOs_COUNT] = {
 String target_arch_names[TargetArch_COUNT] = {
 	str_lit(""),
 	str_lit("amd64"),
-	str_lit("386"),
+	str_lit("i386"),
 	str_lit("arm64"),
 	str_lit("wasm32"),
 	str_lit("wasm64"),
@@ -73,6 +84,12 @@ String target_endian_names[TargetEndian_COUNT] = {
 	str_lit(""),
 	str_lit("little"),
 	str_lit("big"),
+};
+
+String target_abi_names[TargetABI_COUNT] = {
+	str_lit(""),
+	str_lit("win64"),
+	str_lit("sysv"),
 };
 
 TargetEndianKind target_endians[TargetArch_COUNT] = {
@@ -98,6 +115,7 @@ struct TargetMetrics {
 	isize          max_align;
 	String         target_triplet;
 	String         target_data_layout;
+	TargetABIKind  abi;
 };
 
 
@@ -119,6 +137,8 @@ enum BuildModeKind {
 	BuildMode_Object,
 	BuildMode_Assembly,
 	BuildMode_LLVM_IR,
+
+	BuildMode_COUNT,
 };
 
 enum CommandKind : u32 {
@@ -163,19 +183,50 @@ enum TimingsExportFormat : i32 {
 	TimingsExportCSV         = 2,
 };
 
+enum ErrorPosStyle {
+	ErrorPosStyle_Default, // path(line:column) msg
+	ErrorPosStyle_Unix,    // path:line:column: msg
+
+	ErrorPosStyle_COUNT
+};
+
+enum RelocMode : u8 {
+	RelocMode_Default,
+	RelocMode_Static,
+	RelocMode_PIC,
+	RelocMode_DynamicNoPIC,
+};
+
+enum BuildPath : u8 {
+	BuildPath_Main_Package,     // Input  Path to the package directory (or file) we're building.
+	BuildPath_RC,               // Input  Path for .rc  file, can be set with `-resource:`.
+	BuildPath_RES,              // Output Path for .res file, generated from previous.
+	BuildPath_Win_SDK_Root,     // windows_sdk_root
+	BuildPath_Win_SDK_UM_Lib,   // windows_sdk_um_library_path
+	BuildPath_Win_SDK_UCRT_Lib, // windows_sdk_ucrt_library_path
+	BuildPath_VS_EXE,           // vs_exe_path
+	BuildPath_VS_LIB,           // vs_library_path
+
+	BuildPath_Output,           // Output Path for .exe, .dll, .so, etc. Can be overridden with `-out:`.
+	BuildPath_PDB,              // Output Path for .pdb file, can be overridden with `-pdb-name:`.
+
+	BuildPathCOUNT,
+};
+
 // This stores the information for the specify architecture of this build
 struct BuildContext {
 	// Constants
 	String ODIN_OS;      // target operating system
 	String ODIN_ARCH;    // target architecture
-	String ODIN_ENDIAN;  // target endian
 	String ODIN_VENDOR;  // compiler vendor
 	String ODIN_VERSION; // compiler version
 	String ODIN_ROOT;    // Odin ROOT
-	String ODIN_BUILD_MODE;
 	bool   ODIN_DEBUG;   // Odin in debug mode
 	bool   ODIN_DISABLE_ASSERT; // Whether the default 'assert' et al is disabled in code or not
 	bool   ODIN_DEFAULT_TO_NIL_ALLOCATOR; // Whether the default allocator is a "nil" allocator or not (i.e. it does nothing)
+	bool   ODIN_FOREIGN_ERROR_PROCEDURES;
+
+	ErrorPosStyle ODIN_ERROR_POS_STYLE;
 
 	TargetEndianKind endian_kind;
 
@@ -190,14 +241,19 @@ struct BuildContext {
 
 	bool show_help;
 
+	Array<Path> build_paths;   // Contains `Path` objects to output filename, pdb, resource and intermediate files.
+	                           // BuildPath enum contains the indices of paths we know *before* the work starts.
+
 	String out_filepath;
 	String resource_filepath;
 	String pdb_filepath;
+
 	bool   has_resource;
 	String link_flags;
 	String extra_linker_flags;
 	String extra_assembler_flags;
 	String microarch;
+	String target_features;
 	BuildModeKind build_mode;
 	bool   generate_docs;
 	i32    optimization_level;
@@ -243,6 +299,12 @@ struct BuildContext {
 	
 	bool copy_file_contents;
 
+	bool disallow_rtti;
+
+	RelocMode reloc_mode;
+	bool disable_red_zone;
+
+
 	u32 cmd_doc_flags;
 	Array<String> extra_packages;
 
@@ -254,9 +316,8 @@ struct BuildContext {
 	isize      thread_count;
 
 	PtrMap<char const *, ExactValue> defined_values;
+
 };
-
-
 
 gb_global BuildContext build_context = {0};
 
@@ -268,9 +329,9 @@ bool global_ignore_warnings(void) {
 }
 
 
-gb_global TargetMetrics target_windows_386 = {
+gb_global TargetMetrics target_windows_i386 = {
 	TargetOs_windows,
-	TargetArch_386,
+	TargetArch_i386,
 	4,
 	8,
 	str_lit("i386-pc-windows-msvc"),
@@ -284,9 +345,9 @@ gb_global TargetMetrics target_windows_amd64 = {
 	str_lit("e-m:w-i64:64-f80:128-n8:16:32:64-S128"),
 };
 
-gb_global TargetMetrics target_linux_386 = {
+gb_global TargetMetrics target_linux_i386 = {
 	TargetOs_linux,
-	TargetArch_386,
+	TargetArch_i386,
 	4,
 	8,
 	str_lit("i386-pc-linux-gnu"),
@@ -299,6 +360,14 @@ gb_global TargetMetrics target_linux_amd64 = {
 	16,
 	str_lit("x86_64-pc-linux-gnu"),
 	str_lit("e-m:w-i64:64-f80:128-n8:16:32:64-S128"),
+};
+gb_global TargetMetrics target_linux_arm64 = {
+	TargetOs_linux,
+	TargetArch_arm64,
+	8,
+	16,
+	str_lit("aarch64-linux-elf"),
+	str_lit("e-m:e-i8:8:32-i16:32-i64:64-i128:128-n32:64-S128"),
 };
 
 gb_global TargetMetrics target_darwin_amd64 = {
@@ -319,9 +388,9 @@ gb_global TargetMetrics target_darwin_arm64 = {
 	str_lit("e-m:o-i64:64-i128:128-n32:64-S128"), // TODO(bill): Is this correct?
 };
 
-gb_global TargetMetrics target_freebsd_386 = {
+gb_global TargetMetrics target_freebsd_i386 = {
 	TargetOs_freebsd,
-	TargetArch_386,
+	TargetArch_i386,
 	4,
 	8,
 	str_lit("i386-unknown-freebsd-elf"),
@@ -334,6 +403,15 @@ gb_global TargetMetrics target_freebsd_amd64 = {
 	16,
 	str_lit("x86_64-unknown-freebsd-elf"),
 	str_lit("e-m:w-i64:64-f80:128-n8:16:32:64-S128"),
+};
+
+gb_global TargetMetrics target_openbsd_amd64 = {
+	TargetOs_openbsd,
+	TargetArch_amd64,
+	8,
+	16,
+	str_lit("x86_64-unknown-openbsd-elf"),
+	str_lit("e-m:e-p270:32:32-p271:32:32-p272:64:64-i64:64-f80:128-n8:16:32:64-S128"),
 };
 
 gb_global TargetMetrics target_essence_amd64 = {
@@ -381,6 +459,16 @@ gb_global TargetMetrics target_wasi_wasm32 = {
 // 	str_lit(""),
 // };
 
+gb_global TargetMetrics target_freestanding_amd64_sysv = {
+	TargetOs_freestanding,
+	TargetArch_amd64,
+	8,
+	16,
+	str_lit("x86_64-pc-none-gnu"),
+	str_lit("e-m:w-i64:64-f80:128-n8:16:32:64-S128"),
+	TargetABI_SysV,
+};
+
 
 
 struct NamedTargetMetrics {
@@ -392,16 +480,19 @@ gb_global NamedTargetMetrics named_targets[] = {
 	{ str_lit("darwin_amd64"),        &target_darwin_amd64   },
 	{ str_lit("darwin_arm64"),        &target_darwin_arm64   },
 	{ str_lit("essence_amd64"),       &target_essence_amd64  },
-	{ str_lit("linux_386"),           &target_linux_386      },
+	{ str_lit("linux_i386"),          &target_linux_i386     },
 	{ str_lit("linux_amd64"),         &target_linux_amd64    },
-	{ str_lit("windows_386"),         &target_windows_386    },
+	{ str_lit("linux_arm64"),         &target_linux_arm64    },
+	{ str_lit("windows_i386"),        &target_windows_i386   },
 	{ str_lit("windows_amd64"),       &target_windows_amd64  },
-	{ str_lit("freebsd_386"),         &target_freebsd_386    },
+	{ str_lit("freebsd_i386"),        &target_freebsd_i386   },
 	{ str_lit("freebsd_amd64"),       &target_freebsd_amd64  },
+	{ str_lit("openbsd_amd64"),       &target_openbsd_amd64  },
 	{ str_lit("freestanding_wasm32"), &target_freestanding_wasm32 },
 	{ str_lit("wasi_wasm32"),         &target_wasi_wasm32 },
 	{ str_lit("js_wasm32"),           &target_js_wasm32 },
-	// { str_lit("freestanding_wasm64"), &target_freestanding_wasm64 },
+
+	{ str_lit("freestanding_amd64_sysv"), &target_freestanding_amd64_sysv },
 };
 
 NamedTargetMetrics *selected_target_metrics;
@@ -523,7 +614,6 @@ bool allow_check_foreign_filepath(void) {
 	}
 	return true;
 }
-
 
 // TODO(bill): OS dependent versions for the BuildContext
 // join_path
@@ -703,10 +793,38 @@ String internal_odin_root_dir(void) {
 		len = readlink("/proc/curproc/exe", &path_buf[0], path_buf.count);
 #elif defined(GB_SYSTEM_DRAGONFLYBSD)
 		len = readlink("/proc/curproc/file", &path_buf[0], path_buf.count);
-#else
+#elif defined(GB_SYSTEM_LINUX)
 		len = readlink("/proc/self/exe", &path_buf[0], path_buf.count);
+#elif defined(GB_SYSTEM_OPENBSD)
+		int error;
+		int mib[] = {
+			CTL_KERN,
+			KERN_PROC_ARGS,
+			getpid(),
+			KERN_PROC_ARGV,
+		};
+		// get argv size
+		error = sysctl(mib, 4, NULL, (size_t *) &len, NULL, 0);
+		if (error == -1) {
+			// sysctl error
+			return make_string(nullptr, 0);
+		}
+		// get argv
+		char **argv = (char **)gb_malloc(len);
+		error = sysctl(mib, 4, argv, (size_t *) &len, NULL, 0);
+		if (error == -1) {
+			// sysctl error
+			gb_mfree(argv);
+			return make_string(nullptr, 0);
+		}
+		// copy argv[0] to path_buf
+		len = gb_strlen(argv[0]);
+		if(len < path_buf.count) {
+			gb_memmove(&path_buf[0], argv[0], len);
+		}
+		gb_mfree(argv);
 #endif
-		if(len == 0) {
+		if(len == 0 || len == -1) {
 			return make_string(nullptr, 0);
 		}
 		if (len < path_buf.count) {
@@ -834,6 +952,21 @@ bool has_asm_extension(String const &path) {
 	return false;
 }
 
+// temporary
+char *token_pos_to_string(TokenPos const &pos) {
+	gbString s = gb_string_make_reserve(temporary_allocator(), 128);
+	String file = get_file_path_string(pos.file_id);
+	switch (build_context.ODIN_ERROR_POS_STYLE) {
+	default: /*fallthrough*/
+	case ErrorPosStyle_Default:
+		s = gb_string_append_fmt(s, "%.*s(%d:%d)", LIT(file), pos.line, pos.column);
+		break;
+	case ErrorPosStyle_Unix:
+		s = gb_string_append_fmt(s, "%.*s:%d:%d:", LIT(file), pos.line, pos.column);
+		break;
+	}
+	return s;
+}
 
 void init_build_context(TargetMetrics *cross_target) {
 	BuildContext *bc = &build_context;
@@ -846,25 +979,31 @@ void init_build_context(TargetMetrics *cross_target) {
 	bc->ODIN_VENDOR  = str_lit("odin");
 	bc->ODIN_VERSION = ODIN_VERSION;
 	bc->ODIN_ROOT    = odin_root_dir();
-	switch (bc->build_mode) {
-	default:
-	case BuildMode_Executable:
-		bc->ODIN_BUILD_MODE = str_lit("executable");
-		break;
-	case BuildMode_DynamicLibrary:
-		bc->ODIN_BUILD_MODE = str_lit("dynamic");
-		break;
-	case BuildMode_Object:
-		bc->ODIN_BUILD_MODE = str_lit("object");
-		break;
-	case BuildMode_Assembly:
-		bc->ODIN_BUILD_MODE = str_lit("assembly");
-		break;
-	case BuildMode_LLVM_IR:
-		bc->ODIN_BUILD_MODE = str_lit("llvm-ir");
-		break;
+
+	{
+		char const *found = gb_get_env("ODIN_ERROR_POS_STYLE", permanent_allocator());
+		if (found) {
+			ErrorPosStyle kind = ErrorPosStyle_Default;
+			String style = make_string_c(found);
+			style = string_trim_whitespace(style);
+			if (style == "" || style == "default" || style == "odin") {
+				kind = ErrorPosStyle_Default;
+			} else if (style == "unix" || style == "gcc" || style == "clang" || style == "llvm") {
+				kind = ErrorPosStyle_Unix;
+			} else {
+				gb_printf_err("Invalid ODIN_ERROR_POS_STYLE: got %.*s\n", LIT(style));
+				gb_printf_err("Valid formats:\n");
+				gb_printf_err("\t\"default\" or \"odin\"\n");
+				gb_printf_err("\t\tpath(line:column) message\n");
+				gb_printf_err("\t\"unix\"\n");
+				gb_printf_err("\t\tpath:line:column: message\n");
+				gb_exit(1);
+			}
+
+			build_context.ODIN_ERROR_POS_STYLE = kind;
+		}
 	}
-	
+
 	bc->copy_file_contents = true;
 
 	TargetMetrics *metrics = nullptr;
@@ -880,18 +1019,22 @@ void init_build_context(TargetMetrics *cross_target) {
 			#endif
 		#elif defined(GB_SYSTEM_FREEBSD)
 			metrics = &target_freebsd_amd64;
+		#elif defined(GB_SYSTEM_OPENBSD)
+			metrics = &target_openbsd_amd64;
+		#elif defined(GB_CPU_ARM)
+			metrics = &target_linux_arm64;
 		#else
 			metrics = &target_linux_amd64;
 		#endif
 	#else
 		#if defined(GB_SYSTEM_WINDOWS)
-			metrics = &target_windows_386;
+			metrics = &target_windows_i386;
 		#elif defined(GB_SYSTEM_OSX)
 			#error "Build Error: Unsupported architecture"
 		#elif defined(GB_SYSTEM_FREEBSD)
-			metrics = &target_freebsd_386;
+			metrics = &target_freebsd_i386;
 		#else
-			metrics = &target_linux_386;
+			metrics = &target_linux_i386;
 		#endif
 	#endif
 
@@ -910,7 +1053,6 @@ void init_build_context(TargetMetrics *cross_target) {
 	bc->metrics = *metrics;
 	bc->ODIN_OS     = target_os_names[metrics->os];
 	bc->ODIN_ARCH   = target_arch_names[metrics->arch];
-	bc->ODIN_ENDIAN = target_endian_names[target_endians[metrics->arch]];
 	bc->endian_kind = target_endians[metrics->arch];
 	bc->word_size   = metrics->word_size;
 	bc->max_align   = metrics->max_align;
@@ -920,6 +1062,21 @@ void init_build_context(TargetMetrics *cross_target) {
 	bc->threaded_checker = true;
 	#endif
 
+	if (bc->disable_red_zone) {
+		if (!!is_arch_wasm() && bc->metrics.os == TargetOs_freestanding) {
+			gb_printf_err("-disable-red-zone is not support for this target");
+			gb_exit(1);
+		}
+	}
+
+	if (bc->metrics.os == TargetOs_freestanding) {
+		bc->no_entry_point = true;
+	} else {
+		if (bc->disallow_rtti) {
+			gb_printf_err("-disallow-rtti is only allowed on freestanding targets\n");
+			gb_exit(1);
+		}
+	}
 
 	// NOTE(zangent): The linker flags to set the build architecture are different
 	// across OSs. It doesn't make sense to allocate extra data on the heap
@@ -937,8 +1094,11 @@ void init_build_context(TargetMetrics *cross_target) {
 		case TargetOs_freebsd:
 			bc->link_flags = str_lit("-arch x86-64 ");
 			break;
+		case TargetOs_openbsd:
+			bc->link_flags = str_lit("-arch x86-64 ");
+			break;
 		}
-	} else if (bc->metrics.arch == TargetArch_386) {
+	} else if (bc->metrics.arch == TargetArch_i386) {
 		switch (bc->metrics.os) {
 		case TargetOs_windows:
 			bc->link_flags = str_lit("/machine:x86 ");
@@ -959,6 +1119,9 @@ void init_build_context(TargetMetrics *cross_target) {
 		case TargetOs_darwin:
 			bc->link_flags = str_lit("-arch arm64 ");
 			break;
+		case TargetOs_linux:
+			bc->link_flags = str_lit("-arch aarch64 ");
+			break;
 		}
 	} else if (is_arch_wasm()) {
 		gbString link_flags = gb_string_make(heap_allocator(), " ");
@@ -968,14 +1131,14 @@ void init_build_context(TargetMetrics *cross_target) {
 		if (bc->metrics.arch == TargetArch_wasm64) {
 			link_flags = gb_string_appendc(link_flags, "-mwas64 ");
 		}
-		if (bc->metrics.os == TargetOs_freestanding) {
+		if (bc->no_entry_point) {
 			link_flags = gb_string_appendc(link_flags, "--no-entry ");
 		}
 		
 		bc->link_flags = make_string_c(link_flags);
 		
 		// Disallow on wasm
-		build_context.use_separate_modules = false;
+		bc->use_separate_modules = false;
 	} else {
 		gb_printf_err("Compiler Error: Unsupported architecture\n");
 		gb_exit(1);
@@ -985,4 +1148,192 @@ void init_build_context(TargetMetrics *cross_target) {
 
 	#undef LINK_FLAG_X64
 	#undef LINK_FLAG_386
+}
+
+#if defined(GB_SYSTEM_WINDOWS)
+// NOTE(IC): In order to find Visual C++ paths without relying on environment variables.
+// NOTE(Jeroen): No longer needed in `main.cpp -> linker_stage`. We now resolve those paths in `init_build_paths`.
+#include "microsoft_craziness.h"
+#endif
+
+// NOTE(Jeroen): Set/create the output and other paths and report an error as appropriate.
+// We've previously called `parse_build_flags`, so `out_filepath` should be set.
+bool init_build_paths(String init_filename) {
+	gbAllocator   ha = heap_allocator();
+	BuildContext *bc = &build_context;
+
+	// NOTE(Jeroen): We're pre-allocating BuildPathCOUNT slots so that certain paths are always at the same enumerated index.
+	array_init(&bc->build_paths, permanent_allocator(), BuildPathCOUNT);
+
+	// [BuildPathMainPackage] Turn given init path into a `Path`, which includes normalizing it into a full path.
+	bc->build_paths[BuildPath_Main_Package] = path_from_string(ha, init_filename);
+
+	bool produces_output_file = false;
+	if (bc->command_kind == Command_doc && bc->cmd_doc_flags & CmdDocFlag_DocFormat) {
+		produces_output_file = true;
+	} else if (bc->command_kind & Command__does_build) {
+		produces_output_file = true;
+	}
+
+	if (!produces_output_file) {
+		// Command doesn't produce output files. We're done.
+		return true;
+	}
+
+	#if defined(GB_SYSTEM_WINDOWS)
+		if (bc->resource_filepath.len > 0) {
+			bc->build_paths[BuildPath_RC]      = path_from_string(ha, bc->resource_filepath);
+			bc->build_paths[BuildPath_RES]     = path_from_string(ha, bc->resource_filepath);
+			bc->build_paths[BuildPath_RC].ext  = copy_string(ha, STR_LIT("rc"));
+			bc->build_paths[BuildPath_RES].ext = copy_string(ha, STR_LIT("res"));
+		}
+
+		if (bc->pdb_filepath.len > 0) {
+			bc->build_paths[BuildPath_PDB]          = path_from_string(ha, bc->pdb_filepath);
+		}
+
+		if ((bc->command_kind & Command__does_build) && (!bc->ignore_microsoft_magic)) {
+			// NOTE(ic): It would be nice to extend this so that we could specify the Visual Studio version that we want instead of defaulting to the latest.
+			Find_Result_Utf8 find_result = find_visual_studio_and_windows_sdk_utf8();
+
+			if (find_result.windows_sdk_version == 0) {
+				gb_printf_err("Windows SDK not found.\n");
+				return false;
+			}
+
+			GB_ASSERT(find_result.windows_sdk_um_library_path.len > 0);
+			GB_ASSERT(find_result.windows_sdk_ucrt_library_path.len > 0);
+
+			if (find_result.windows_sdk_root.len > 0) {
+				bc->build_paths[BuildPath_Win_SDK_Root]     = path_from_string(ha, find_result.windows_sdk_root);
+			}
+
+			if (find_result.windows_sdk_um_library_path.len > 0) {
+				bc->build_paths[BuildPath_Win_SDK_UM_Lib]   = path_from_string(ha, find_result.windows_sdk_um_library_path);
+			}
+
+			if (find_result.windows_sdk_ucrt_library_path.len > 0) {
+				bc->build_paths[BuildPath_Win_SDK_UCRT_Lib] = path_from_string(ha, find_result.windows_sdk_ucrt_library_path);
+			}
+
+			if (find_result.vs_exe_path.len > 0) {
+				bc->build_paths[BuildPath_VS_EXE]           = path_from_string(ha, find_result.vs_exe_path);
+			}
+
+			if (find_result.vs_library_path.len > 0) {
+				bc->build_paths[BuildPath_VS_LIB]           = path_from_string(ha, find_result.vs_library_path);
+			}
+
+			gb_free(ha, find_result.windows_sdk_root.text);
+			gb_free(ha, find_result.windows_sdk_um_library_path.text);
+			gb_free(ha, find_result.windows_sdk_ucrt_library_path.text);
+			gb_free(ha, find_result.vs_exe_path.text);
+			gb_free(ha, find_result.vs_library_path.text);
+
+		}
+	#endif
+
+	// All the build targets and OSes.
+	String output_extension;
+
+	if (bc->command_kind == Command_doc && bc->cmd_doc_flags & CmdDocFlag_DocFormat) {
+		output_extension = STR_LIT("odin-doc");
+	} else if (is_arch_wasm()) {
+		output_extension = STR_LIT("wasm");
+	} else if (build_context.build_mode == BuildMode_Executable) {
+		// By default use a .bin executable extension.
+		output_extension = STR_LIT("bin");
+
+		if (build_context.metrics.os == TargetOs_windows) {
+			output_extension = STR_LIT("exe");
+		} else if (build_context.cross_compiling && selected_target_metrics->metrics == &target_essence_amd64) {
+			output_extension = make_string(nullptr, 0);
+		}
+	} else if (build_context.build_mode == BuildMode_DynamicLibrary) {
+		// By default use a .so shared library extension.
+		output_extension = STR_LIT("so");
+
+		if (build_context.metrics.os == TargetOs_windows) {
+			output_extension = STR_LIT("dll");
+		} else if (build_context.metrics.os == TargetOs_darwin) {
+			output_extension = STR_LIT("dylib");
+		}
+	} else if (build_context.build_mode == BuildMode_Object) {
+		// By default use a .o object extension.
+		output_extension = STR_LIT("o");
+
+		if (build_context.metrics.os == TargetOs_windows) {
+			output_extension = STR_LIT("obj");
+		}
+	} else if (build_context.build_mode == BuildMode_Assembly) {
+		// By default use a .S asm extension.
+		output_extension = STR_LIT("S");
+	} else if (build_context.build_mode == BuildMode_LLVM_IR) {
+		output_extension = STR_LIT("ll");
+	} else {
+		GB_PANIC("Unhandled build mode/target combination.\n");
+	}
+
+	if (bc->out_filepath.len > 0) {
+		bc->build_paths[BuildPath_Output] = path_from_string(ha, bc->out_filepath);
+		if (build_context.metrics.os == TargetOs_windows) {
+			String output_file = path_to_string(ha, bc->build_paths[BuildPath_Output]);
+			defer (gb_free(ha, output_file.text));
+			if (path_is_directory(bc->build_paths[BuildPath_Output])) {
+				gb_printf_err("Output path %.*s is a directory.\n", LIT(output_file));
+				return false;
+			} else if (bc->build_paths[BuildPath_Output].ext.len == 0) {
+				gb_printf_err("Output path %.*s must have an appropriate extension.\n", LIT(output_file));
+				return false;				
+			}
+		}
+	} else {
+		Path output_path;
+
+		if (str_eq(init_filename, str_lit("."))) {
+			// We must name the output file after the current directory.
+			debugf("Output name will be created from current base name %.*s.\n", LIT(bc->build_paths[BuildPath_Main_Package].basename));
+			String last_element  = last_path_element(bc->build_paths[BuildPath_Main_Package].basename);
+
+			if (last_element.len == 0) {
+				gb_printf_err("The output name is created from the last path element. `%.*s` has none. Use `-out:output_name.ext` to set it.\n", LIT(bc->build_paths[BuildPath_Main_Package].basename));
+				return false;
+			}
+			output_path.basename = copy_string(ha, bc->build_paths[BuildPath_Main_Package].basename);
+			output_path.name     = copy_string(ha, last_element);
+
+		} else {
+			// Init filename was not 'current path'.
+			// Contruct the output name from the path elements as usual.
+			String output_name = remove_directory_from_path(init_filename);
+			output_name        = remove_extension_from_path(output_name);
+			output_name        = copy_string(ha, string_trim_whitespace(output_name));
+			output_path        = path_from_string(ha, output_name);
+
+			// Replace extension.
+			if (output_path.ext.len > 0) {
+				gb_free(ha, output_path.ext.text);
+			}
+		}
+		output_path.ext  = copy_string(ha, output_extension);
+
+		bc->build_paths[BuildPath_Output] = output_path;
+	}
+
+	// Do we have an extension? We might not if the output filename was supplied.
+	if (bc->build_paths[BuildPath_Output].ext.len == 0) {
+		if (build_context.metrics.os == TargetOs_windows || build_context.build_mode != BuildMode_Executable) {
+			bc->build_paths[BuildPath_Output].ext = copy_string(ha, output_extension);
+		}
+	}
+
+	// Check if output path is a directory.
+	if (path_is_directory(bc->build_paths[BuildPath_Output])) {
+		String output_file = path_to_string(ha, bc->build_paths[BuildPath_Output]);
+		defer (gb_free(ha, output_file.text));
+		gb_printf_err("Output path %.*s is a directory.\n", LIT(output_file));
+		return false;
+	}
+
+	return true;
 }

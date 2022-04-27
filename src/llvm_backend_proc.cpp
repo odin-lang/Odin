@@ -57,11 +57,12 @@ void lb_mem_copy_non_overlapping(lbProcedure *p, lbValue dst, lbValue src, lbVal
 	LLVMBuildCall(p->builder, ip, args, gb_count_of(args), "");
 }
 
+
 lbProcedure *lb_create_procedure(lbModule *m, Entity *entity, bool ignore_body) {
 	GB_ASSERT(entity != nullptr);
 	GB_ASSERT(entity->kind == Entity_Procedure);
 	if (!entity->Procedure.is_foreign) {
-		GB_ASSERT(entity->flags & EntityFlag_ProcBodyChecked);
+		GB_ASSERT_MSG(entity->flags & EntityFlag_ProcBodyChecked, "%.*s :: %s", LIT(entity->token.string), type_to_string(entity->type));
 	}
 
 	String link_name = {};
@@ -107,7 +108,6 @@ lbProcedure *lb_create_procedure(lbModule *m, Entity *entity, bool ignore_body) 
 
 	gbAllocator a = heap_allocator();
 	p->children.allocator      = a;
-	p->params.allocator        = a;
 	p->defer_stmts.allocator   = a;
 	p->blocks.allocator        = a;
 	p->branch_blocks.allocator = a;
@@ -133,6 +133,10 @@ lbProcedure *lb_create_procedure(lbModule *m, Entity *entity, bool ignore_body) 
 
 	if (pt->Proc.calling_convention == ProcCC_Naked) {
 		lb_add_attribute_to_proc(m, p->value, "naked");
+	}
+
+	if (!entity->Procedure.is_foreign && build_context.disable_red_zone) {
+		lb_add_attribute_to_proc(m, p->value, "noredzone");
 	}
 
 	switch (p->inlining) {
@@ -164,14 +168,6 @@ lbProcedure *lb_create_procedure(lbModule *m, Entity *entity, bool ignore_body) 
 		break;
 	}
 
-
-
-	// lbCallingConventionKind cc_kind = lbCallingConvention_C;
-	// // TODO(bill): Clean up this logic
-	// if (build_context.metrics.os != TargetOs_js)  {
-	// 	cc_kind = lb_calling_convention_map[pt->Proc.calling_convention];
-	// }
-	// LLVMSetFunctionCallConv(p->value, cc_kind);
 	lbValue proc_value = {p->value, p->type};
 	lb_add_entity(m, entity,  proc_value);
 	lb_add_member(m, p->name, proc_value);
@@ -304,7 +300,7 @@ lbProcedure *lb_create_procedure(lbModule *m, Entity *entity, bool ignore_body) 
 lbProcedure *lb_create_dummy_procedure(lbModule *m, String link_name, Type *type) {
 	{
 		lbValue *found = string_map_get(&m->members, link_name);
-		GB_ASSERT(found == nullptr);
+		GB_ASSERT_MSG(found == nullptr, "failed to create dummy procedure for: %.*s", LIT(link_name));
 	}
 
 	lbProcedure *p = gb_alloc_item(permanent_allocator(), lbProcedure);
@@ -323,7 +319,6 @@ lbProcedure *lb_create_dummy_procedure(lbModule *m, String link_name, Type *type
 
 	gbAllocator a = permanent_allocator();
 	p->children.allocator      = a;
-	p->params.allocator        = a;
 	p->defer_stmts.allocator   = a;
 	p->blocks.allocator        = a;
 	p->branch_blocks.allocator = a;
@@ -452,7 +447,7 @@ void lb_begin_procedure_body(lbProcedure *p) {
 
 			Type *ptr_type = alloc_type_pointer(reduce_tuple_to_single_type(p->type->Proc.results));
 			Entity *e = alloc_entity_param(nullptr, make_token_ident(name), ptr_type, false, false);
-			e->flags |= EntityFlag_Sret | EntityFlag_NoAlias;
+			e->flags |= EntityFlag_NoAlias;
 
 			return_ptr_value.value = LLVMGetParam(p->value, 0);
 			LLVMSetValueName2(return_ptr_value.value, cast(char const *)name.text, name.len);
@@ -475,44 +470,42 @@ void lb_begin_procedure_body(lbProcedure *p) {
 				}
 
 				lbArgType *arg_type = &ft->args[param_index];
+				defer (param_index += 1);
+
 				if (arg_type->kind == lbArg_Ignore) {
 					continue;
 				} else if (arg_type->kind == lbArg_Direct) {
-					lbParamPasskind kind = lbParamPass_Value;
-					LLVMTypeRef param_type = lb_type(p->module, e->type);
-					if (param_type != arg_type->type) {
-						kind = lbParamPass_BitCast;
+					if (e->token.string.len != 0 && !is_blank_ident(e->token.string)) {
+						LLVMTypeRef param_type = lb_type(p->module, e->type);
+						LLVMValueRef original_value = LLVMGetParam(p->value, param_offset+param_index);
+						LLVMValueRef value = OdinLLVMBuildTransmute(p, original_value, param_type);
+
+						lbValue param = {};
+						param.value = value;
+						param.type = e->type;
+
+						lbValue ptr = lb_address_from_load_or_generate_local(p, param);
+						GB_ASSERT(LLVMIsAAllocaInst(ptr.value));
+						lb_add_entity(p->module, e, ptr);
+
+						lbBlock *block = p->decl_block;
+						if (original_value != value) {
+							block = p->curr_block;
+						}
+						LLVMValueRef debug_storage_value = value;
+						if (original_value != value && LLVMIsALoadInst(value)) {
+							debug_storage_value = LLVMGetOperand(value, 0);
+						}
+						lb_add_debug_param_variable(p, debug_storage_value, e->type, e->token, param_index+1, block);
 					}
-					LLVMValueRef value = LLVMGetParam(p->value, param_offset+param_index);
-
-					value = OdinLLVMBuildTransmute(p, value, param_type);
-
-					lbValue param = {};
-					param.value = value;
-					param.type = e->type;
-					array_add(&p->params, param);
-
-					if (e->token.string.len != 0) {
-						lbAddr l = lb_add_local(p, e->type, e, false, param_index);
-						lb_addr_store(p, l, param);
-					}
-
-					param_index += 1;
 				} else if (arg_type->kind == lbArg_Indirect) {
-					LLVMValueRef value_ptr = LLVMGetParam(p->value, param_offset+param_index);
-					LLVMValueRef value = LLVMBuildLoad(p->builder, value_ptr, "");
-
-					lbValue param = {};
-					param.value = value;
-					param.type = e->type;
-					array_add(&p->params, param);
-
-					lbValue ptr = {};
-					ptr.value = value_ptr;
-					ptr.type = alloc_type_pointer(e->type);
-
-					lb_add_entity(p->module, e, ptr);
-					param_index += 1;
+					if (e->token.string.len != 0 && !is_blank_ident(e->token.string)) {
+						lbValue ptr = {};
+						ptr.value = LLVMGetParam(p->value, param_offset+param_index);
+						ptr.type = alloc_type_pointer(e->type);
+						lb_add_entity(p->module, e, ptr);
+						lb_add_debug_param_variable(p, ptr.value, e->type, e->token, param_index+1, p->decl_block);
+					}
 				}
 			}
 		}
@@ -735,6 +728,10 @@ lbValue lb_emit_call_internal(lbProcedure *p, lbValue value, lbValue return_ptr,
 		}
 
 		LLVMValueRef ret = LLVMBuildCall2(p->builder, fnp, fn, args, arg_count, "");
+
+		if (return_ptr.value != nullptr) {
+			LLVMAddCallSiteAttribute(ret, 1, lb_create_enum_attribute_with_type(p->module->ctx, "sret", LLVMTypeOf(args[0])));
+		}
 
 		switch (inlining) {
 		case ProcInlining_none:
@@ -1049,7 +1046,7 @@ lbValue lb_build_builtin_proc(lbProcedure *p, Ast *expr, TypeAndValue const &tv,
 			return lb_string_len(p, v);
 		} else if (is_type_array(t)) {
 			GB_PANIC("Array lengths are constant");
-		} else if (is_type_slice(t)) {
+		} else if (is_type_slice(t) || is_type_relative_slice(t)) {
 			return lb_slice_len(p, v);
 		} else if (is_type_dynamic_array(t)) {
 			return lb_dynamic_array_len(p, v);
@@ -1075,7 +1072,7 @@ lbValue lb_build_builtin_proc(lbProcedure *p, Ast *expr, TypeAndValue const &tv,
 			GB_PANIC("Unreachable");
 		} else if (is_type_array(t)) {
 			GB_PANIC("Array lengths are constant");
-		} else if (is_type_slice(t)) {
+		} else if (is_type_slice(t) || is_type_relative_slice(t)) {
 			return lb_slice_len(p, v);
 		} else if (is_type_dynamic_array(t)) {
 			return lb_dynamic_array_cap(p, v);
@@ -1372,15 +1369,23 @@ lbValue lb_build_builtin_proc(lbProcedure *p, Ast *expr, TypeAndValue const &tv,
 		}
 
 	case BuiltinProc_cpu_relax:
-		if (build_context.metrics.arch == TargetArch_386 ||
+		if (build_context.metrics.arch == TargetArch_i386 ||
 		    build_context.metrics.arch == TargetArch_amd64) {
 			LLVMTypeRef func_type = LLVMFunctionType(LLVMVoidTypeInContext(p->module->ctx), nullptr, 0, false);
-			LLVMValueRef the_asm = llvm_get_inline_asm(func_type, str_lit("pause"), {});
+			LLVMValueRef the_asm = llvm_get_inline_asm(func_type, str_lit("pause"), {}, true);
 			GB_ASSERT(the_asm != nullptr);
 			LLVMBuildCall2(p->builder, func_type, the_asm, nullptr, 0, "");
 		} else if (build_context.metrics.arch == TargetArch_arm64) {
 			LLVMTypeRef func_type = LLVMFunctionType(LLVMVoidTypeInContext(p->module->ctx), nullptr, 0, false);
-			LLVMValueRef the_asm = llvm_get_inline_asm(func_type, str_lit("yield"), {});
+			// NOTE(bill, 2022-03-30): `isb` appears to a better option that `yield`
+			// See: https://bugs.java.com/bugdatabase/view_bug.do?bug_id=8258604
+			LLVMValueRef the_asm = llvm_get_inline_asm(func_type, str_lit("isb"), {}, true);
+			GB_ASSERT(the_asm != nullptr);
+			LLVMBuildCall2(p->builder, func_type, the_asm, nullptr, 0, "");
+		} else {
+			// NOTE: default to something to prevent optimization
+			LLVMTypeRef func_type = LLVMFunctionType(LLVMVoidTypeInContext(p->module->ctx), nullptr, 0, false);
+			LLVMValueRef the_asm = llvm_get_inline_asm(func_type, str_lit(""), {}, true);
 			GB_ASSERT(the_asm != nullptr);
 			LLVMBuildCall2(p->builder, func_type, the_asm, nullptr, 0, "");
 		}
@@ -1409,14 +1414,23 @@ lbValue lb_build_builtin_proc(lbProcedure *p, Ast *expr, TypeAndValue const &tv,
 
 	case BuiltinProc_read_cycle_counter:
 		{
-			char const *name = "llvm.readcyclecounter";
-			unsigned id = LLVMLookupIntrinsicID(name, gb_strlen(name));
-			GB_ASSERT_MSG(id != 0, "Unable to find %s", name);
-			LLVMValueRef ip = LLVMGetIntrinsicDeclaration(p->module->mod, id, nullptr, 0);
-
 			lbValue res = {};
-			res.value = LLVMBuildCall(p->builder, ip, nullptr, 0, "");
 			res.type = tv.type;
+
+			if (build_context.metrics.arch == TargetArch_arm64) {
+				LLVMTypeRef func_type = LLVMFunctionType(LLVMInt64TypeInContext(p->module->ctx), nullptr, 0, false);
+				bool has_side_effects = false;
+				LLVMValueRef the_asm = llvm_get_inline_asm(func_type, str_lit("mrs x9, cntvct_el0"), str_lit("=r"), has_side_effects);
+				GB_ASSERT(the_asm != nullptr);
+				res.value = LLVMBuildCall2(p->builder, func_type, the_asm, nullptr, 0, "");
+			} else {
+				char const *name = "llvm.readcyclecounter";
+				unsigned id = LLVMLookupIntrinsicID(name, gb_strlen(name));
+				GB_ASSERT_MSG(id != 0, "Unable to find %s", name);
+				LLVMValueRef ip = LLVMGetIntrinsicDeclaration(p->module->mod, id, nullptr, 0);
+
+				res.value = LLVMBuildCall(p->builder, ip, nullptr, 0, "");
+			}
 			return res;
 		}
 
@@ -1592,36 +1606,26 @@ lbValue lb_build_builtin_proc(lbProcedure *p, Ast *expr, TypeAndValue const &tv,
 		}
 
 
-
-	case BuiltinProc_atomic_fence:
-		LLVMBuildFence(p->builder, LLVMAtomicOrderingSequentiallyConsistent, false, "");
+	// TODO(bill): Which is correct?
+	case BuiltinProc_atomic_thread_fence:
+		LLVMBuildFence(p->builder, llvm_atomic_ordering_from_odin(ce->args[0]), false, "");
 		return {};
-	case BuiltinProc_atomic_fence_acq:
-		LLVMBuildFence(p->builder, LLVMAtomicOrderingAcquire, false, "");
-		return {};
-	case BuiltinProc_atomic_fence_rel:
-		LLVMBuildFence(p->builder, LLVMAtomicOrderingRelease, false, "");
-		return {};
-	case BuiltinProc_atomic_fence_acqrel:
-		LLVMBuildFence(p->builder, LLVMAtomicOrderingAcquireRelease, false, "");
+	case BuiltinProc_atomic_signal_fence:
+		LLVMBuildFence(p->builder, llvm_atomic_ordering_from_odin(ce->args[0]), true, "");
 		return {};
 
 	case BuiltinProc_volatile_store:
 	case BuiltinProc_atomic_store:
-	case BuiltinProc_atomic_store_rel:
-	case BuiltinProc_atomic_store_relaxed:
-	case BuiltinProc_atomic_store_unordered: {
+	case BuiltinProc_atomic_store_explicit: {
 		lbValue dst = lb_build_expr(p, ce->args[0]);
 		lbValue val = lb_build_expr(p, ce->args[1]);
 		val = lb_emit_conv(p, val, type_deref(dst.type));
 
 		LLVMValueRef instr = LLVMBuildStore(p->builder, val.value, dst.value);
 		switch (id) {
-		case BuiltinProc_volatile_store:         LLVMSetVolatile(instr, true);                                     break;
-		case BuiltinProc_atomic_store:           LLVMSetOrdering(instr, LLVMAtomicOrderingSequentiallyConsistent); break;
-		case BuiltinProc_atomic_store_rel:       LLVMSetOrdering(instr, LLVMAtomicOrderingRelease);                break;
-		case BuiltinProc_atomic_store_relaxed:   LLVMSetOrdering(instr, LLVMAtomicOrderingMonotonic);              break;
-		case BuiltinProc_atomic_store_unordered: LLVMSetOrdering(instr, LLVMAtomicOrderingUnordered);              break;
+		case BuiltinProc_volatile_store:        LLVMSetVolatile(instr, true);                                        break;
+		case BuiltinProc_atomic_store:          LLVMSetOrdering(instr, LLVMAtomicOrderingSequentiallyConsistent);    break;
+		case BuiltinProc_atomic_store_explicit: LLVMSetOrdering(instr, llvm_atomic_ordering_from_odin(ce->args[2])); break;
 		}
 
 		LLVMSetAlignment(instr, cast(unsigned)type_align_of(type_deref(dst.type)));
@@ -1631,18 +1635,14 @@ lbValue lb_build_builtin_proc(lbProcedure *p, Ast *expr, TypeAndValue const &tv,
 
 	case BuiltinProc_volatile_load:
 	case BuiltinProc_atomic_load:
-	case BuiltinProc_atomic_load_acq:
-	case BuiltinProc_atomic_load_relaxed:
-	case BuiltinProc_atomic_load_unordered: {
+	case BuiltinProc_atomic_load_explicit: {
 		lbValue dst = lb_build_expr(p, ce->args[0]);
 
 		LLVMValueRef instr = LLVMBuildLoad(p->builder, dst.value, "");
 		switch (id) {
-		case BuiltinProc_volatile_load:         LLVMSetVolatile(instr, true);                                     break;
-		case BuiltinProc_atomic_load:           LLVMSetOrdering(instr, LLVMAtomicOrderingSequentiallyConsistent); break;
-		case BuiltinProc_atomic_load_acq:       LLVMSetOrdering(instr, LLVMAtomicOrderingAcquire);                break;
-		case BuiltinProc_atomic_load_relaxed:   LLVMSetOrdering(instr, LLVMAtomicOrderingMonotonic);              break;
-		case BuiltinProc_atomic_load_unordered: LLVMSetOrdering(instr, LLVMAtomicOrderingUnordered);              break;
+		case BuiltinProc_volatile_load:        LLVMSetVolatile(instr, true);                                        break;
+		case BuiltinProc_atomic_load:          LLVMSetOrdering(instr, LLVMAtomicOrderingSequentiallyConsistent);    break;
+		case BuiltinProc_atomic_load_explicit: LLVMSetOrdering(instr, llvm_atomic_ordering_from_odin(ce->args[1])); break;
 		}
 		LLVMSetAlignment(instr, cast(unsigned)type_align_of(type_deref(dst.type)));
 
@@ -1672,40 +1672,19 @@ lbValue lb_build_builtin_proc(lbProcedure *p, Ast *expr, TypeAndValue const &tv,
 		}
 
 	case BuiltinProc_atomic_add:
-	case BuiltinProc_atomic_add_acq:
-	case BuiltinProc_atomic_add_rel:
-	case BuiltinProc_atomic_add_acqrel:
-	case BuiltinProc_atomic_add_relaxed:
 	case BuiltinProc_atomic_sub:
-	case BuiltinProc_atomic_sub_acq:
-	case BuiltinProc_atomic_sub_rel:
-	case BuiltinProc_atomic_sub_acqrel:
-	case BuiltinProc_atomic_sub_relaxed:
 	case BuiltinProc_atomic_and:
-	case BuiltinProc_atomic_and_acq:
-	case BuiltinProc_atomic_and_rel:
-	case BuiltinProc_atomic_and_acqrel:
-	case BuiltinProc_atomic_and_relaxed:
 	case BuiltinProc_atomic_nand:
-	case BuiltinProc_atomic_nand_acq:
-	case BuiltinProc_atomic_nand_rel:
-	case BuiltinProc_atomic_nand_acqrel:
-	case BuiltinProc_atomic_nand_relaxed:
 	case BuiltinProc_atomic_or:
-	case BuiltinProc_atomic_or_acq:
-	case BuiltinProc_atomic_or_rel:
-	case BuiltinProc_atomic_or_acqrel:
-	case BuiltinProc_atomic_or_relaxed:
 	case BuiltinProc_atomic_xor:
-	case BuiltinProc_atomic_xor_acq:
-	case BuiltinProc_atomic_xor_rel:
-	case BuiltinProc_atomic_xor_acqrel:
-	case BuiltinProc_atomic_xor_relaxed:
-	case BuiltinProc_atomic_xchg:
-	case BuiltinProc_atomic_xchg_acq:
-	case BuiltinProc_atomic_xchg_rel:
-	case BuiltinProc_atomic_xchg_acqrel:
-	case BuiltinProc_atomic_xchg_relaxed: {
+	case BuiltinProc_atomic_exchange:
+	case BuiltinProc_atomic_add_explicit:
+	case BuiltinProc_atomic_sub_explicit:
+	case BuiltinProc_atomic_and_explicit:
+	case BuiltinProc_atomic_nand_explicit:
+	case BuiltinProc_atomic_or_explicit:
+	case BuiltinProc_atomic_xor_explicit:
+	case BuiltinProc_atomic_exchange_explicit: {
 		lbValue dst = lb_build_expr(p, ce->args[0]);
 		lbValue val = lb_build_expr(p, ce->args[1]);
 		val = lb_emit_conv(p, val, type_deref(dst.type));
@@ -1714,41 +1693,20 @@ lbValue lb_build_builtin_proc(lbProcedure *p, Ast *expr, TypeAndValue const &tv,
 		LLVMAtomicOrdering ordering = {};
 
 		switch (id) {
-		case BuiltinProc_atomic_add:          op = LLVMAtomicRMWBinOpAdd;  ordering = LLVMAtomicOrderingSequentiallyConsistent; break;
-		case BuiltinProc_atomic_add_acq:      op = LLVMAtomicRMWBinOpAdd;  ordering = LLVMAtomicOrderingAcquire; break;
-		case BuiltinProc_atomic_add_rel:      op = LLVMAtomicRMWBinOpAdd;  ordering = LLVMAtomicOrderingRelease; break;
-		case BuiltinProc_atomic_add_acqrel:   op = LLVMAtomicRMWBinOpAdd;  ordering = LLVMAtomicOrderingAcquireRelease; break;
-		case BuiltinProc_atomic_add_relaxed:  op = LLVMAtomicRMWBinOpAdd;  ordering = LLVMAtomicOrderingMonotonic; break;
-		case BuiltinProc_atomic_sub:          op = LLVMAtomicRMWBinOpSub;  ordering = LLVMAtomicOrderingSequentiallyConsistent; break;
-		case BuiltinProc_atomic_sub_acq:      op = LLVMAtomicRMWBinOpSub;  ordering = LLVMAtomicOrderingAcquire; break;
-		case BuiltinProc_atomic_sub_rel:      op = LLVMAtomicRMWBinOpSub;  ordering = LLVMAtomicOrderingRelease; break;
-		case BuiltinProc_atomic_sub_acqrel:   op = LLVMAtomicRMWBinOpSub;  ordering = LLVMAtomicOrderingAcquireRelease; break;
-		case BuiltinProc_atomic_sub_relaxed:  op = LLVMAtomicRMWBinOpSub;  ordering = LLVMAtomicOrderingMonotonic; break;
-		case BuiltinProc_atomic_and:          op = LLVMAtomicRMWBinOpAnd;  ordering = LLVMAtomicOrderingSequentiallyConsistent; break;
-		case BuiltinProc_atomic_and_acq:      op = LLVMAtomicRMWBinOpAnd;  ordering = LLVMAtomicOrderingAcquire; break;
-		case BuiltinProc_atomic_and_rel:      op = LLVMAtomicRMWBinOpAnd;  ordering = LLVMAtomicOrderingRelease; break;
-		case BuiltinProc_atomic_and_acqrel:   op = LLVMAtomicRMWBinOpAnd;  ordering = LLVMAtomicOrderingAcquireRelease; break;
-		case BuiltinProc_atomic_and_relaxed:  op = LLVMAtomicRMWBinOpAnd;  ordering = LLVMAtomicOrderingMonotonic; break;
-		case BuiltinProc_atomic_nand:         op = LLVMAtomicRMWBinOpNand; ordering = LLVMAtomicOrderingSequentiallyConsistent; break;
-		case BuiltinProc_atomic_nand_acq:     op = LLVMAtomicRMWBinOpNand; ordering = LLVMAtomicOrderingAcquire; break;
-		case BuiltinProc_atomic_nand_rel:     op = LLVMAtomicRMWBinOpNand; ordering = LLVMAtomicOrderingRelease; break;
-		case BuiltinProc_atomic_nand_acqrel:  op = LLVMAtomicRMWBinOpNand; ordering = LLVMAtomicOrderingAcquireRelease; break;
-		case BuiltinProc_atomic_nand_relaxed: op = LLVMAtomicRMWBinOpNand; ordering = LLVMAtomicOrderingMonotonic; break;
-		case BuiltinProc_atomic_or:           op = LLVMAtomicRMWBinOpOr;   ordering = LLVMAtomicOrderingSequentiallyConsistent; break;
-		case BuiltinProc_atomic_or_acq:       op = LLVMAtomicRMWBinOpOr;   ordering = LLVMAtomicOrderingAcquire; break;
-		case BuiltinProc_atomic_or_rel:       op = LLVMAtomicRMWBinOpOr;   ordering = LLVMAtomicOrderingRelease; break;
-		case BuiltinProc_atomic_or_acqrel:    op = LLVMAtomicRMWBinOpOr;   ordering = LLVMAtomicOrderingAcquireRelease; break;
-		case BuiltinProc_atomic_or_relaxed:   op = LLVMAtomicRMWBinOpOr;   ordering = LLVMAtomicOrderingMonotonic; break;
-		case BuiltinProc_atomic_xor:          op = LLVMAtomicRMWBinOpXor;  ordering = LLVMAtomicOrderingSequentiallyConsistent; break;
-		case BuiltinProc_atomic_xor_acq:      op = LLVMAtomicRMWBinOpXor;  ordering = LLVMAtomicOrderingAcquire; break;
-		case BuiltinProc_atomic_xor_rel:      op = LLVMAtomicRMWBinOpXor;  ordering = LLVMAtomicOrderingRelease; break;
-		case BuiltinProc_atomic_xor_acqrel:   op = LLVMAtomicRMWBinOpXor;  ordering = LLVMAtomicOrderingAcquireRelease; break;
-		case BuiltinProc_atomic_xor_relaxed:  op = LLVMAtomicRMWBinOpXor;  ordering = LLVMAtomicOrderingMonotonic; break;
-		case BuiltinProc_atomic_xchg:         op = LLVMAtomicRMWBinOpXchg; ordering = LLVMAtomicOrderingSequentiallyConsistent; break;
-		case BuiltinProc_atomic_xchg_acq:     op = LLVMAtomicRMWBinOpXchg; ordering = LLVMAtomicOrderingAcquire; break;
-		case BuiltinProc_atomic_xchg_rel:     op = LLVMAtomicRMWBinOpXchg; ordering = LLVMAtomicOrderingRelease; break;
-		case BuiltinProc_atomic_xchg_acqrel:  op = LLVMAtomicRMWBinOpXchg; ordering = LLVMAtomicOrderingAcquireRelease; break;
-		case BuiltinProc_atomic_xchg_relaxed: op = LLVMAtomicRMWBinOpXchg; ordering = LLVMAtomicOrderingMonotonic; break;
+		case BuiltinProc_atomic_add:               op = LLVMAtomicRMWBinOpAdd;  ordering = LLVMAtomicOrderingSequentiallyConsistent;    break;
+		case BuiltinProc_atomic_sub:               op = LLVMAtomicRMWBinOpSub;  ordering = LLVMAtomicOrderingSequentiallyConsistent;    break;
+		case BuiltinProc_atomic_and:               op = LLVMAtomicRMWBinOpAnd;  ordering = LLVMAtomicOrderingSequentiallyConsistent;    break;
+		case BuiltinProc_atomic_nand:              op = LLVMAtomicRMWBinOpNand; ordering = LLVMAtomicOrderingSequentiallyConsistent;    break;
+		case BuiltinProc_atomic_or:                op = LLVMAtomicRMWBinOpOr;   ordering = LLVMAtomicOrderingSequentiallyConsistent;    break;
+		case BuiltinProc_atomic_xor:               op = LLVMAtomicRMWBinOpXor;  ordering = LLVMAtomicOrderingSequentiallyConsistent;    break;
+		case BuiltinProc_atomic_exchange:          op = LLVMAtomicRMWBinOpXchg; ordering = LLVMAtomicOrderingSequentiallyConsistent;    break;
+		case BuiltinProc_atomic_add_explicit:      op = LLVMAtomicRMWBinOpAdd;  ordering = llvm_atomic_ordering_from_odin(ce->args[2]); break;
+		case BuiltinProc_atomic_sub_explicit:      op = LLVMAtomicRMWBinOpSub;  ordering = llvm_atomic_ordering_from_odin(ce->args[2]); break;
+		case BuiltinProc_atomic_and_explicit:      op = LLVMAtomicRMWBinOpAnd;  ordering = llvm_atomic_ordering_from_odin(ce->args[2]); break;
+		case BuiltinProc_atomic_nand_explicit:     op = LLVMAtomicRMWBinOpNand; ordering = llvm_atomic_ordering_from_odin(ce->args[2]); break;
+		case BuiltinProc_atomic_or_explicit:       op = LLVMAtomicRMWBinOpOr;   ordering = llvm_atomic_ordering_from_odin(ce->args[2]); break;
+		case BuiltinProc_atomic_xor_explicit:      op = LLVMAtomicRMWBinOpXor;  ordering = llvm_atomic_ordering_from_odin(ce->args[2]); break;
+		case BuiltinProc_atomic_exchange_explicit: op = LLVMAtomicRMWBinOpXchg; ordering = llvm_atomic_ordering_from_odin(ce->args[2]); break;
 		}
 
 		lbValue res = {};
@@ -1757,24 +1715,10 @@ lbValue lb_build_builtin_proc(lbProcedure *p, Ast *expr, TypeAndValue const &tv,
 		return res;
 	}
 
-	case BuiltinProc_atomic_cxchg:
-	case BuiltinProc_atomic_cxchg_acq:
-	case BuiltinProc_atomic_cxchg_rel:
-	case BuiltinProc_atomic_cxchg_acqrel:
-	case BuiltinProc_atomic_cxchg_relaxed:
-	case BuiltinProc_atomic_cxchg_failrelaxed:
-	case BuiltinProc_atomic_cxchg_failacq:
-	case BuiltinProc_atomic_cxchg_acq_failrelaxed:
-	case BuiltinProc_atomic_cxchg_acqrel_failrelaxed:
-	case BuiltinProc_atomic_cxchgweak:
-	case BuiltinProc_atomic_cxchgweak_acq:
-	case BuiltinProc_atomic_cxchgweak_rel:
-	case BuiltinProc_atomic_cxchgweak_acqrel:
-	case BuiltinProc_atomic_cxchgweak_relaxed:
-	case BuiltinProc_atomic_cxchgweak_failrelaxed:
-	case BuiltinProc_atomic_cxchgweak_failacq:
-	case BuiltinProc_atomic_cxchgweak_acq_failrelaxed:
-	case BuiltinProc_atomic_cxchgweak_acqrel_failrelaxed: {
+	case BuiltinProc_atomic_compare_exchange_strong:
+	case BuiltinProc_atomic_compare_exchange_weak:
+	case BuiltinProc_atomic_compare_exchange_strong_explicit:
+	case BuiltinProc_atomic_compare_exchange_weak_explicit: {
 		lbValue address = lb_build_expr(p, ce->args[0]);
 		Type *elem = type_deref(address.type);
 		lbValue old_value = lb_build_expr(p, ce->args[1]);
@@ -1787,28 +1731,14 @@ lbValue lb_build_builtin_proc(lbProcedure *p, Ast *expr, TypeAndValue const &tv,
 		LLVMBool weak = false;
 
 		switch (id) {
-		case BuiltinProc_atomic_cxchg:                        success_ordering = LLVMAtomicOrderingSequentiallyConsistent; failure_ordering = LLVMAtomicOrderingSequentiallyConsistent; weak = false; break;
-		case BuiltinProc_atomic_cxchg_acq:                    success_ordering = LLVMAtomicOrderingAcquire;                failure_ordering = LLVMAtomicOrderingSequentiallyConsistent; weak = false; break;
-		case BuiltinProc_atomic_cxchg_rel:                    success_ordering = LLVMAtomicOrderingRelease;                failure_ordering = LLVMAtomicOrderingSequentiallyConsistent; weak = false; break;
-		case BuiltinProc_atomic_cxchg_acqrel:                 success_ordering = LLVMAtomicOrderingAcquireRelease;         failure_ordering = LLVMAtomicOrderingSequentiallyConsistent; weak = false; break;
-		case BuiltinProc_atomic_cxchg_relaxed:                success_ordering = LLVMAtomicOrderingMonotonic;              failure_ordering = LLVMAtomicOrderingMonotonic;              weak = false; break;
-		case BuiltinProc_atomic_cxchg_failrelaxed:            success_ordering = LLVMAtomicOrderingSequentiallyConsistent; failure_ordering = LLVMAtomicOrderingMonotonic;              weak = false; break;
-		case BuiltinProc_atomic_cxchg_failacq:                success_ordering = LLVMAtomicOrderingSequentiallyConsistent; failure_ordering = LLVMAtomicOrderingAcquire;                weak = false; break;
-		case BuiltinProc_atomic_cxchg_acq_failrelaxed:        success_ordering = LLVMAtomicOrderingAcquire;                failure_ordering = LLVMAtomicOrderingMonotonic;              weak = false; break;
-		case BuiltinProc_atomic_cxchg_acqrel_failrelaxed:     success_ordering = LLVMAtomicOrderingAcquireRelease;         failure_ordering = LLVMAtomicOrderingMonotonic;              weak = false; break;
-		case BuiltinProc_atomic_cxchgweak:                    success_ordering = LLVMAtomicOrderingSequentiallyConsistent; failure_ordering = LLVMAtomicOrderingSequentiallyConsistent; weak = false; break;
-		case BuiltinProc_atomic_cxchgweak_acq:                success_ordering = LLVMAtomicOrderingAcquire;                failure_ordering = LLVMAtomicOrderingSequentiallyConsistent; weak = true;  break;
-		case BuiltinProc_atomic_cxchgweak_rel:                success_ordering = LLVMAtomicOrderingRelease;                failure_ordering = LLVMAtomicOrderingSequentiallyConsistent; weak = true;  break;
-		case BuiltinProc_atomic_cxchgweak_acqrel:             success_ordering = LLVMAtomicOrderingAcquireRelease;         failure_ordering = LLVMAtomicOrderingSequentiallyConsistent; weak = true;  break;
-		case BuiltinProc_atomic_cxchgweak_relaxed:            success_ordering = LLVMAtomicOrderingMonotonic;              failure_ordering = LLVMAtomicOrderingMonotonic;              weak = true;  break;
-		case BuiltinProc_atomic_cxchgweak_failrelaxed:        success_ordering = LLVMAtomicOrderingSequentiallyConsistent; failure_ordering = LLVMAtomicOrderingMonotonic;              weak = true;  break;
-		case BuiltinProc_atomic_cxchgweak_failacq:            success_ordering = LLVMAtomicOrderingSequentiallyConsistent; failure_ordering = LLVMAtomicOrderingAcquire;                weak = true;  break;
-		case BuiltinProc_atomic_cxchgweak_acq_failrelaxed:    success_ordering = LLVMAtomicOrderingAcquire;                failure_ordering = LLVMAtomicOrderingMonotonic;              weak = true;  break;
-		case BuiltinProc_atomic_cxchgweak_acqrel_failrelaxed: success_ordering = LLVMAtomicOrderingAcquireRelease;         failure_ordering = LLVMAtomicOrderingMonotonic;              weak = true;  break;
+		case BuiltinProc_atomic_compare_exchange_strong:          success_ordering = LLVMAtomicOrderingSequentiallyConsistent;    failure_ordering = LLVMAtomicOrderingSequentiallyConsistent;    weak = false; break;
+		case BuiltinProc_atomic_compare_exchange_weak:            success_ordering = LLVMAtomicOrderingSequentiallyConsistent;    failure_ordering = LLVMAtomicOrderingSequentiallyConsistent;    weak = true;  break;
+		case BuiltinProc_atomic_compare_exchange_strong_explicit: success_ordering = llvm_atomic_ordering_from_odin(ce->args[3]); failure_ordering = llvm_atomic_ordering_from_odin(ce->args[4]); weak = false; break;
+		case BuiltinProc_atomic_compare_exchange_weak_explicit:   success_ordering = llvm_atomic_ordering_from_odin(ce->args[3]); failure_ordering = llvm_atomic_ordering_from_odin(ce->args[4]); weak = true;  break;
 		}
 
 		// TODO(bill): Figure out how to make it weak
-		LLVMBool single_threaded = weak;
+		LLVMBool single_threaded = false;
 
 		LLVMValueRef value = LLVMBuildAtomicCmpXchg(
 			p->builder, address.value,
@@ -1817,6 +1747,7 @@ lbValue lb_build_builtin_proc(lbProcedure *p, Ast *expr, TypeAndValue const &tv,
 			failure_ordering,
 			single_threaded
 		);
+		LLVMSetWeak(value, weak);
 
 		if (tv.type->kind == Type_Tuple) {
 			Type *fix_typed = alloc_type_tuple();
@@ -1961,6 +1892,14 @@ lbValue lb_build_builtin_proc(lbProcedure *p, Ast *expr, TypeAndValue const &tv,
 			return res;
 		}
 		
+	case BuiltinProc___entry_point:
+		if (p->module->info->entry_point) {
+			lbValue entry_point = lb_find_procedure_value_from_entity(p->module, p->module->info->entry_point);
+			GB_ASSERT(entry_point.value != nullptr);
+			lb_emit_call(p, entry_point, {});
+		}
+		return {};
+
 	case BuiltinProc_syscall:
 		{
 			unsigned arg_count = cast(unsigned)ce->args.count;
@@ -2021,7 +1960,7 @@ lbValue lb_build_builtin_proc(lbProcedure *p, Ast *expr, TypeAndValue const &tv,
 					inline_asm = llvm_get_inline_asm(func_type, make_string_c(asm_string), make_string_c(constraints));
 				}
 				break;
-			case TargetArch_386:
+			case TargetArch_i386:
 				{
 					GB_ASSERT(arg_count <= 7);
 					
@@ -2054,26 +1993,47 @@ lbValue lb_build_builtin_proc(lbProcedure *p, Ast *expr, TypeAndValue const &tv,
 				break;
 			case TargetArch_arm64:
 				{
-					GB_ASSERT(arg_count <= 7);
-					
-					char asm_string[] = "svc #0";
-					gbString constraints = gb_string_make(heap_allocator(), "={x0}");
-					for (unsigned i = 0; i < arg_count; i++) {
-						constraints = gb_string_appendc(constraints, ",{");
-						static char const *regs[] = {
-							"x8",
-							"x0",
-							"x1",
-							"x2",
-							"x3",
-							"x4",
-							"x5",
-						};
-						constraints = gb_string_appendc(constraints, regs[i]);
-						constraints = gb_string_appendc(constraints, "}");
-					}
+                    GB_ASSERT(arg_count <= 7);
+                    
+                    if(build_context.metrics.os == TargetOs_darwin) {
+                        char asm_string[] = "svc #0x80";
+                        gbString constraints = gb_string_make(heap_allocator(), "={x0}");
+                        for (unsigned i = 0; i < arg_count; i++) {
+                            constraints = gb_string_appendc(constraints, ",{");
+                            static char const *regs[] = {
+                                "x16",
+                                "x0",
+                                "x1",
+                                "x2",
+                                "x3",
+                                "x4",
+                                "x5",
+                            };
+                            constraints = gb_string_appendc(constraints, regs[i]);
+                            constraints = gb_string_appendc(constraints, "}");
+                        }
 
-					inline_asm = llvm_get_inline_asm(func_type, make_string_c(asm_string), make_string_c(constraints));
+                        inline_asm = llvm_get_inline_asm(func_type, make_string_c(asm_string), make_string_c(constraints));
+                    } else {
+                        char asm_string[] = "svc #0";
+                        gbString constraints = gb_string_make(heap_allocator(), "={x0}");
+                        for (unsigned i = 0; i < arg_count; i++) {
+                            constraints = gb_string_appendc(constraints, ",{");
+                            static char const *regs[] = {
+                                "x8",
+                                "x0",
+                                "x1",
+                                "x2",
+                                "x3",
+                                "x4",
+                                "x5",
+                            };
+                            constraints = gb_string_appendc(constraints, regs[i]);
+                            constraints = gb_string_appendc(constraints, "}");
+                        }
+
+                        inline_asm = llvm_get_inline_asm(func_type, make_string_c(asm_string), make_string_c(constraints));
+                    }
 				}
 				break;
 			default:
@@ -2085,6 +2045,124 @@ lbValue lb_build_builtin_proc(lbProcedure *p, Ast *expr, TypeAndValue const &tv,
 			res.type = t_uintptr;
 			return res;
 		}
+
+	case BuiltinProc_objc_send:
+		return lb_handle_objc_send(p, expr);
+
+	case BuiltinProc_objc_find_selector:     return lb_handle_objc_find_selector(p, expr);
+	case BuiltinProc_objc_find_class:        return lb_handle_objc_find_class(p, expr);
+	case BuiltinProc_objc_register_selector: return lb_handle_objc_register_selector(p, expr);
+	case BuiltinProc_objc_register_class:    return lb_handle_objc_register_class(p, expr);
+
+
+	case BuiltinProc_constant_utf16_cstring:
+		{
+			auto const encode_surrogate_pair = [](Rune r, u16 *r1, u16 *r2) {
+				if (r < 0x10000 || r > 0x10ffff) {
+					*r1 = 0xfffd;
+					*r2 = 0xfffd;
+				} else {
+					r -= 0x10000;
+					*r1 = 0xd800 + ((r>>10)&0x3ff);
+					*r2 = 0xdc00 + (r&0x3ff);
+				}
+			};
+
+			lbModule *m = p->module;
+
+			auto tav = type_and_value_of_expr(ce->args[0]);
+			GB_ASSERT(tav.value.kind == ExactValue_String);
+			String value = tav.value.value_string;
+
+			LLVMTypeRef llvm_u16 = lb_type(m, t_u16);
+
+			isize max_len = value.len*2 + 1;
+			LLVMValueRef *buffer = gb_alloc_array(temporary_allocator(), LLVMValueRef, max_len);
+			isize n = 0;
+			while (value.len > 0) {
+				Rune r = 0;
+				isize w = gb_utf8_decode(value.text, value.len, &r);
+				value.text += w;
+				value.len  -= w;
+				if ((0 <= r && r < 0xd800) || (0xe000 <= r && r < 0x10000)) {
+					buffer[n++] = LLVMConstInt(llvm_u16, cast(u16)r, false);
+				} else if (0x10000 <= r && r <= 0x10ffff) {
+					u16 r1, r2;
+					encode_surrogate_pair(r, &r1, &r2);
+					buffer[n++] = LLVMConstInt(llvm_u16, r1, false);
+					buffer[n++] = LLVMConstInt(llvm_u16, r2, false);
+				} else {
+					buffer[n++] = LLVMConstInt(llvm_u16, 0xfffd, false);
+				}
+			}
+
+			buffer[n++] = LLVMConstInt(llvm_u16, 0, false);
+
+			LLVMValueRef array = LLVMConstArray(llvm_u16, buffer, cast(unsigned int)n);
+
+			char *name = nullptr;
+			{
+				isize max_len = 7+8+1;
+				name = gb_alloc_array(permanent_allocator(), char, max_len);
+				u32 id = m->gen->global_array_index.fetch_add(1);
+				isize len = gb_snprintf(name, max_len, "csbs$%x", id);
+				len -= 1;
+			}
+			LLVMValueRef global_data = LLVMAddGlobal(m->mod, LLVMTypeOf(array), name);
+			LLVMSetInitializer(global_data, array);
+			LLVMSetLinkage(global_data, LLVMInternalLinkage);
+
+
+
+			LLVMValueRef indices[] = {
+				LLVMConstInt(lb_type(m, t_u32), 0, false),
+				LLVMConstInt(lb_type(m, t_u32), 0, false),
+			};
+			lbValue res = {};
+			res.type = tv.type;
+			res.value = LLVMBuildInBoundsGEP(p->builder, global_data, indices, gb_count_of(indices), "");
+			return res;
+
+		}
+
+	case BuiltinProc_wasm_memory_grow:
+		{
+			char const *name = "llvm.wasm.memory.grow";
+			LLVMTypeRef types[1] = {
+				lb_type(p->module, t_uintptr),
+			};
+			unsigned id = LLVMLookupIntrinsicID(name, gb_strlen(name));
+			GB_ASSERT_MSG(id != 0, "Unable to find %s", name, LLVMPrintTypeToString(types[0]));
+			LLVMValueRef ip = LLVMGetIntrinsicDeclaration(p->module->mod, id, types, gb_count_of(types));
+
+			LLVMValueRef args[2] = {};
+			args[0] = lb_emit_conv(p, lb_build_expr(p, ce->args[0]), t_uintptr).value;
+			args[1] = lb_emit_conv(p, lb_build_expr(p, ce->args[1]), t_uintptr).value;
+
+			lbValue res = {};
+			res.type = tv.type;
+			res.value = LLVMBuildCall(p->builder, ip, args, gb_count_of(args), "");
+			return res;
+		}
+	case BuiltinProc_wasm_memory_size:
+		{
+			char const *name = "llvm.wasm.memory.size";
+			LLVMTypeRef types[1] = {
+				lb_type(p->module, t_uintptr),
+			};
+			unsigned id = LLVMLookupIntrinsicID(name, gb_strlen(name));
+			GB_ASSERT_MSG(id != 0, "Unable to find %s", name, LLVMPrintTypeToString(types[0]));
+			LLVMValueRef ip = LLVMGetIntrinsicDeclaration(p->module->mod, id, types, gb_count_of(types));
+
+			LLVMValueRef args[1] = {};
+			args[0] = lb_emit_conv(p, lb_build_expr(p, ce->args[0]), t_uintptr).value;
+
+			lbValue res = {};
+			res.type = tv.type;
+			res.value = LLVMBuildCall(p->builder, ip, args, gb_count_of(args), "");
+			return res;
+		}
+
 	}
 
 	GB_PANIC("Unhandled built-in procedure %.*s", LIT(builtin_procs[id].name));

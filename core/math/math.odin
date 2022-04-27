@@ -396,7 +396,7 @@ trunc_f16   :: proc "contextless" (x: f16) -> f16 {
 		e := (x >> shift) & mask - bias
 
 		if e < shift {
-			x &= ~(1 << (shift-e)) - 1
+			x &~= 1 << (shift-e) - 1
 		}
 		return transmute(f16)x
 	}
@@ -428,7 +428,7 @@ trunc_f32   :: proc "contextless" (x: f32) -> f32 {
 		e := (x >> shift) & mask - bias
 
 		if e < shift {
-			x &= ~(1 << (shift-e)) - 1
+			x &~= 1 << (shift-e) - 1
 		}
 		return transmute(f32)x
 	}
@@ -460,7 +460,7 @@ trunc_f64   :: proc "contextless" (x: f64) -> f64 {
 		e := (x >> shift) & mask - bias
 
 		if e < shift {
-			x &= ~(1 << (shift-e)) - 1
+			x &~= 1 << (shift-e) - 1
 		}
 		return transmute(f64)x
 	}
@@ -473,6 +473,7 @@ trunc_f64   :: proc "contextless" (x: f64) -> f64 {
 }
 trunc_f64le :: proc "contextless" (x: f64le) -> f64le { return #force_inline f64le(trunc_f64(f64(x))) }
 trunc_f64be :: proc "contextless" (x: f64be) -> f64be { return #force_inline f64be(trunc_f64(f64(x))) }
+// Removes the fractional part of the value, i.e. rounds towards zero.
 trunc       :: proc{
 	trunc_f16, trunc_f16le, trunc_f16be,
 	trunc_f32, trunc_f32le, trunc_f32be, 
@@ -958,7 +959,7 @@ classify_f16   :: proc "contextless" (x: f16)   -> Float_Class {
 			return .Neg_Zero
 		}
 		return .Zero
-	case x*0.5 == x:
+	case x*0.25 == x:
 		if x < 0 {
 			return .Neg_Inf
 		}
@@ -1027,6 +1028,8 @@ classify_f64   :: proc "contextless" (x: f64)   -> Float_Class {
 }
 classify_f64le :: proc "contextless" (x: f64le) -> Float_Class { return #force_inline classify_f64(f64(x)) }
 classify_f64be :: proc "contextless" (x: f64be) -> Float_Class { return #force_inline classify_f64(f64(x)) }
+// Returns the `Float_Class` of the value, i.e. whether normal, subnormal, zero, negative zero, NaN, infinity or
+// negative infinity.
 classify       :: proc{
 	classify_f16, classify_f16le, classify_f16be,
 	classify_f32, classify_f32le, classify_f32be,
@@ -1196,13 +1199,14 @@ sum :: proc "contextless" (x: $T/[]$E) -> (res: E)
 
 prod :: proc "contextless" (x: $T/[]$E) -> (res: E)
 	where intrinsics.type_is_numeric(E) {
+	res = 1
 	for i in x {
 		res *= i
 	}
 	return
 }
 
-cumsum_inplace :: proc "contextless" (x: $T/[]$E) -> T
+cumsum_inplace :: proc "contextless" (x: $T/[]$E)
 	where intrinsics.type_is_numeric(E) {
 	for i in 1..<len(x) {
 		x[i] = x[i-1] + x[i]
@@ -1715,3 +1719,21 @@ F32_BIAS  :: 0x7f
 F64_MASK  :: 0x7ff
 F64_SHIFT :: 64 - 12
 F64_BIAS  :: 0x3ff
+
+INF_F16     :f16: 0h7C00
+NEG_INF_F16 :f16: 0hFC00
+
+SNAN_F16    :f16: 0h7C01
+QNAN_F16    :f16: 0h7E01
+
+INF_F32     :f32: 0h7F80_0000
+NEG_INF_F32 :f32: 0hFF80_0000
+
+SNAN_F32    :f32: 0hFF80_0001
+QNAN_F32    :f32: 0hFFC0_0001
+
+INF_F64     :f64: 0h7FF0_0000_0000_0000
+NEG_INF_F64 :f64: 0hFFF0_0000_0000_0000
+
+SNAN_F64    :f64: 0h7FF0_0000_0000_0001
+QNAN_F64    :f64: 0h7FF8_0000_0000_0001

@@ -23,6 +23,7 @@ log_f32         :: proc "c" (x: f32) -> f32 { return math.ln(x) }
 exp2_f32        :: proc "c" (x: f32) -> f32 { return math.pow(f32(2), x) }
 sign_f32        :: proc "c" (x: f32) -> f32 { return math.sign(x) }
 floor_f32       :: proc "c" (x: f32) -> f32 { return math.floor(x) }
+round_f32       :: proc "c" (x: f32) -> f32 { return math.round(x) }
 ceil_f32        :: proc "c" (x: f32) -> f32 { return math.ceil(x) }
 mod_f32         :: proc "c" (x, y: f32) -> f32 { return math.mod(x, y) }
 fract_f32 :: proc "c" (x: f32) -> f32 {
@@ -53,6 +54,7 @@ log_f64         :: proc "c" (x: f64) -> f64 { return math.ln(x) }
 exp2_f64        :: proc "c" (x: f64) -> f64 { return math.pow(f64(2), x) }
 sign_f64        :: proc "c" (x: f64) -> f64 { return math.sign(x) }
 floor_f64       :: proc "c" (x: f64) -> f64 { return math.floor(x) }
+round_f64       :: proc "c" (x: f64) -> f64 { return math.round(x) }
 ceil_f64        :: proc "c" (x: f64) -> f64 { return math.ceil(x) }
 mod_f64         :: proc "c" (x, y: f64) -> f64 { return math.mod(x, y) }
 fract_f64 :: proc "c" (x: f64) -> f64 {

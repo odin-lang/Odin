@@ -3,6 +3,9 @@ package sys_windows
 
 import "core:strings"
 import "core:sys/win32"
+import "core:intrinsics"
+
+L :: intrinsics.constant_utf16_cstring
 
 LOWORD :: #force_inline proc "contextless" (x: DWORD) -> WORD {
 	return WORD(x & 0xffff)
@@ -10,6 +13,14 @@ LOWORD :: #force_inline proc "contextless" (x: DWORD) -> WORD {
 
 HIWORD :: #force_inline proc "contextless" (x: DWORD) -> WORD {
 	return WORD(x >> 16)
+}
+
+GET_X_LPARAM :: #force_inline proc "contextless" (lp: LPARAM) -> c_int {
+	return cast(c_int)cast(c_short)LOWORD(cast(DWORD)lp)
+}
+
+GET_Y_LPARAM :: #force_inline proc "contextless" (lp: LPARAM) -> c_int {
+	return cast(c_int)cast(c_short)HIWORD(cast(DWORD)lp)
 }
 
 utf8_to_utf16 :: proc(s: string, allocator := context.temp_allocator) -> []u16 {
@@ -45,7 +56,9 @@ utf8_to_wstring :: proc(s: string, allocator := context.temp_allocator) -> wstri
 	return nil
 }
 
-wstring_to_utf8 :: proc(s: wstring, N: int, allocator := context.temp_allocator) -> string {
+wstring_to_utf8 :: proc(s: wstring, N: int, allocator := context.temp_allocator) -> (res: string) {
+	context.allocator = allocator
+
 	if N <= 0 {
 		return ""
 	}
@@ -60,7 +73,7 @@ wstring_to_utf8 :: proc(s: wstring, N: int, allocator := context.temp_allocator)
 	// also null terminated.
 	// If N != -1 it assumes the wide string is not null terminated and the resulting string
 	// will not be null terminated, we therefore have to force it to be null terminated manually.
-	text := make([]byte, n+1 if N != -1 else n, allocator)
+	text := make([]byte, n+1 if N != -1 else n)
 
 	n1 := WideCharToMultiByte(CP_UTF8, WC_ERR_INVALID_CHARS, s, i32(N), raw_data(text), n, nil, nil)
 	if n1 == 0 {
@@ -74,7 +87,6 @@ wstring_to_utf8 :: proc(s: wstring, N: int, allocator := context.temp_allocator)
 			break
 		}
 	}
-
 	return string(text[:n])
 }
 
