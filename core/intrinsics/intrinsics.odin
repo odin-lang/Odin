@@ -141,6 +141,7 @@ type_is_valid_matrix_elements :: proc($T: typeid) -> bool ---
 
 type_is_named            :: proc($T: typeid) -> bool ---
 type_is_pointer          :: proc($T: typeid) -> bool ---
+type_is_multi_pointer    :: proc($T: typeid) -> bool ---
 type_is_array            :: proc($T: typeid) -> bool ---
 type_is_enumerated_array :: proc($T: typeid) -> bool ---
 type_is_slice            :: proc($T: typeid) -> bool ---
