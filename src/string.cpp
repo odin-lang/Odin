@@ -245,14 +245,13 @@ gb_inline isize string_extension_position(String const &str) {
 	return dot_pos;
 }
 
-String path_extension(String const &str) {
+String path_extension(String const &str, bool include_dot = true) {
 	isize pos = string_extension_position(str);
 	if (pos < 0) {
 		return make_string(nullptr, 0);
 	}
-	return substring(str, pos, str.len);
+	return substring(str, include_dot ? pos : pos + 1, str.len);
 }
-
 
 String string_trim_whitespace(String str) {
 	while (str.len > 0 && rune_is_whitespace(str[str.len-1])) {
@@ -297,38 +296,6 @@ String filename_from_path(String s) {
 		return substring(s, j+1, s.len);
 	}
 	return make_string(nullptr, 0);
-}
-
-String remove_extension_from_path(String const &s) {
-	for (isize i = s.len-1; i >= 0; i--) {
-		if (s[i] == '.') {
-			return substring(s, 0, i);
-		}
-	}
-	return s;
-}
-
-String remove_directory_from_path(String const &s) {
-	isize len = 0;
-	for (isize i = s.len-1; i >= 0; i--) {
-		if (s[i] == '/' ||
-		    s[i] == '\\') {
-			break;
-		}
-		len += 1;
-	}
-	return substring(s, s.len-len, s.len);
-}
-
-String directory_from_path(String const &s) {
-	isize i = s.len-1;
-	for (; i >= 0; i--) {
-		if (s[i] == '/' ||
-		    s[i] == '\\') {
-			break;
-		}
-	}
-	return substring(s, 0, i);
 }
 
 String concatenate_strings(gbAllocator a, String const &x, String const &y) {
