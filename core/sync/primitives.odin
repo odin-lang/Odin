@@ -195,7 +195,7 @@ sema_wait_with_timeout :: proc(s: ^Sema, duration: time.Duration) -> bool {
 Futex :: distinct u32
 
 futex_wait :: proc(f: ^Futex, expected: u32) {
-	if u32(atomic_load(f)) != expected {
+	if u32(atomic_load_explicit(f, .Acquire)) != expected {
 		return
 	}
 	
@@ -204,7 +204,7 @@ futex_wait :: proc(f: ^Futex, expected: u32) {
 
 // returns true if the wait happened within the duration, false if it exceeded the time duration
 futex_wait_with_timeout :: proc(f: ^Futex, expected: u32, duration: time.Duration) -> bool {
-	if u32(atomic_load(f)) != expected {
+	if u32(atomic_load_explicit(f, .Acquire)) != expected {
 		return true
 	}
 	if duration <= 0 {
