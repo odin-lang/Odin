@@ -3360,7 +3360,7 @@ VERSIONED_DEVICE_REMOVED_EXTENDED_DATA :: struct {
 }
 
 
-IDeviceRemovedExtendedDataSettings_UUID_SRING :: "82BC481C-6B9B-4030-AEDB-7EE3D1DF1E63"
+IDeviceRemovedExtendedDataSettings_UUID_STRING :: "82BC481C-6B9B-4030-AEDB-7EE3D1DF1E63"
 IDeviceRemovedExtendedDataSettings_UUID := &IID{0x82BC481C, 0x6B9B, 0x4030, {0xAE, 0xDB, 0x7E, 0xE3, 0xD1, 0xDF, 0x1E, 0x63}}
 IDeviceRemovedExtendedDataSettings :: struct #raw_union {
 	#subtype iunknown: IUnknown,
