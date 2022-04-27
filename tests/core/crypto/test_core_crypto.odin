@@ -36,6 +36,8 @@ import "core:crypto/sm3"
 import "core:crypto/jh"
 import "core:crypto/groestl"
 import "core:crypto/haval"
+import "core:crypto/siphash"
+import "core:os"
 
 TEST_count := 0
 TEST_fail  := 0
@@ -52,8 +54,9 @@ when ODIN_TEST {
 			return
 		}
 	}
-	log     :: proc(t: ^testing.T, v: any, loc := #caller_location) {
-		fmt.printf("[%v] LOG:\n\t%v\n", loc, v)
+	log :: proc(t: ^testing.T, v: any, loc := #caller_location) {
+		fmt.printf("[%v] ", loc)
+		fmt.printf("log: %v\n", v)
 	}
 }
 
@@ -111,6 +114,7 @@ main :: proc() {
 	test_haval_192(&t)
 	test_haval_224(&t)
 	test_haval_256(&t)
+	test_siphash_2_4(&t)
 
 	// "modern" crypto tests
 	test_chacha20(&t)
@@ -121,7 +125,10 @@ main :: proc() {
 
 	bench_modern(&t)
 
-	fmt.printf("\n%v/%v tests successful.\n", TEST_count - TEST_fail, TEST_count)
+	fmt.printf("%v/%v tests successful.\n", TEST_count - TEST_fail, TEST_count)
+	if TEST_fail > 0 {
+		os.exit(1)
+	}
 }
 
 TestHash :: struct {
@@ -198,7 +205,7 @@ test_md5 :: proc(t: ^testing.T) {
 
 @(test)
 test_sha1 :: proc(t: ^testing.T) {
-	// Test vectors from 
+	// Test vectors from
 	// https://csrc.nist.gov/csrc/media/projects/cryptographic-standards-and-guidelines/documents/examples/sha_all.pdf
 	// https://www.di-mgt.com.au/sha_testvectors.html
 	test_vectors := [?]TestHash {
@@ -220,7 +227,7 @@ test_sha1 :: proc(t: ^testing.T) {
 
 @(test)
 test_sha224 :: proc(t: ^testing.T) {
-	// Test vectors from 
+	// Test vectors from
 	// https://csrc.nist.gov/csrc/media/projects/cryptographic-standards-and-guidelines/documents/examples/sha_all.pdf
 	// https://www.di-mgt.com.au/sha_testvectors.html
 	test_vectors := [?]TestHash {
@@ -238,7 +245,7 @@ test_sha224 :: proc(t: ^testing.T) {
 
 @(test)
 test_sha256 :: proc(t: ^testing.T) {
-	// Test vectors from 
+	// Test vectors from
 	// https://csrc.nist.gov/csrc/media/projects/cryptographic-standards-and-guidelines/documents/examples/sha_all.pdf
 	// https://www.di-mgt.com.au/sha_testvectors.html
 	test_vectors := [?]TestHash {
@@ -256,7 +263,7 @@ test_sha256 :: proc(t: ^testing.T) {
 
 @(test)
 test_sha384 :: proc(t: ^testing.T) {
-	// Test vectors from 
+	// Test vectors from
 	// https://csrc.nist.gov/csrc/media/projects/cryptographic-standards-and-guidelines/documents/examples/sha_all.pdf
 	// https://www.di-mgt.com.au/sha_testvectors.html
 	test_vectors := [?]TestHash {
@@ -274,7 +281,7 @@ test_sha384 :: proc(t: ^testing.T) {
 
 @(test)
 test_sha512 :: proc(t: ^testing.T) {
-	// Test vectors from 
+	// Test vectors from
 	// https://csrc.nist.gov/csrc/media/projects/cryptographic-standards-and-guidelines/documents/examples/sha_all.pdf
 	// https://www.di-mgt.com.au/sha_testvectors.html
 	test_vectors := [?]TestHash {
@@ -292,7 +299,7 @@ test_sha512 :: proc(t: ^testing.T) {
 
 @(test)
 test_sha3_224 :: proc(t: ^testing.T) {
-	// Test vectors from 
+	// Test vectors from
 	// https://csrc.nist.gov/csrc/media/projects/cryptographic-standards-and-guidelines/documents/examples/sha_all.pdf
 	// https://www.di-mgt.com.au/sha_testvectors.html
 	test_vectors := [?]TestHash {
@@ -314,7 +321,7 @@ test_sha3_224 :: proc(t: ^testing.T) {
 
 @(test)
 test_sha3_256 :: proc(t: ^testing.T) {
-	// Test vectors from 
+	// Test vectors from
 	// https://csrc.nist.gov/csrc/media/projects/cryptographic-standards-and-guidelines/documents/examples/sha_all.pdf
 	// https://www.di-mgt.com.au/sha_testvectors.html
 	test_vectors := [?]TestHash {
@@ -336,7 +343,7 @@ test_sha3_256 :: proc(t: ^testing.T) {
 
 @(test)
 test_sha3_384 :: proc(t: ^testing.T) {
-	// Test vectors from 
+	// Test vectors from
 	// https://csrc.nist.gov/csrc/media/projects/cryptographic-standards-and-guidelines/documents/examples/sha_all.pdf
 	// https://www.di-mgt.com.au/sha_testvectors.html
 	test_vectors := [?]TestHash {
@@ -358,7 +365,7 @@ test_sha3_384 :: proc(t: ^testing.T) {
 
 @(test)
 test_sha3_512 :: proc(t: ^testing.T) {
-	// Test vectors from 
+	// Test vectors from
 	// https://csrc.nist.gov/csrc/media/projects/cryptographic-standards-and-guidelines/documents/examples/sha_all.pdf
 	// https://www.di-mgt.com.au/sha_testvectors.html
 	test_vectors := [?]TestHash {
@@ -408,7 +415,7 @@ test_shake_256 :: proc(t: ^testing.T) {
 
 @(test)
 test_keccak_224 :: proc(t: ^testing.T) {
-	// Test vectors from 
+	// Test vectors from
 	// https://csrc.nist.gov/csrc/media/projects/cryptographic-standards-and-guidelines/documents/examples/sha_all.pdf
 	// https://www.di-mgt.com.au/sha_testvectors.html
 	test_vectors := [?]TestHash {
@@ -424,7 +431,7 @@ test_keccak_224 :: proc(t: ^testing.T) {
 
 @(test)
 test_keccak_256 :: proc(t: ^testing.T) {
-	// Test vectors from 
+	// Test vectors from
 	// https://csrc.nist.gov/csrc/media/projects/cryptographic-standards-and-guidelines/documents/examples/sha_all.pdf
 	// https://www.di-mgt.com.au/sha_testvectors.html
 	test_vectors := [?]TestHash {
@@ -440,7 +447,7 @@ test_keccak_256 :: proc(t: ^testing.T) {
 
 @(test)
 test_keccak_384 :: proc(t: ^testing.T) {
-	// Test vectors from 
+	// Test vectors from
 	// https://csrc.nist.gov/csrc/media/projects/cryptographic-standards-and-guidelines/documents/examples/sha_all.pdf
 	// https://www.di-mgt.com.au/sha_testvectors.html
 	test_vectors := [?]TestHash {
@@ -456,7 +463,7 @@ test_keccak_384 :: proc(t: ^testing.T) {
 
 @(test)
 test_keccak_512 :: proc(t: ^testing.T) {
-	// Test vectors from 
+	// Test vectors from
 	// https://csrc.nist.gov/csrc/media/projects/cryptographic-standards-and-guidelines/documents/examples/sha_all.pdf
 	// https://www.di-mgt.com.au/sha_testvectors.html
 	test_vectors := [?]TestHash {
@@ -472,7 +479,7 @@ test_keccak_512 :: proc(t: ^testing.T) {
 
 @(test)
 test_whirlpool :: proc(t: ^testing.T) {
-	// Test vectors from 
+	// Test vectors from
 	// https://web.archive.org/web/20171129084214/http://www.larc.usp.br/~pbarreto/WhirlpoolPage.html
 	test_vectors := [?]TestHash {
 		TestHash{"19fa61d75522a4669b44e39c1d2e1726c530232130d407f89afee0964997f7a73e83be698b288febcf88e3e03c4f0757ea8964e59b63d93708b138cc42a66eb3", ""},
@@ -628,7 +635,7 @@ test_blake2s :: proc(t: ^testing.T) {
 
 @(test)
 test_ripemd_128 :: proc(t: ^testing.T) {
-	// Test vectors from 
+	// Test vectors from
 	// https://homes.esat.kuleuven.be/~bosselae/ripemd160.html
 	test_vectors := [?]TestHash {
 		TestHash{"cdf26213a150dc3ecb610f18f6b38b46", ""},
@@ -648,7 +655,7 @@ test_ripemd_128 :: proc(t: ^testing.T) {
 
 @(test)
 test_ripemd_160 :: proc(t: ^testing.T) {
-	// Test vectors from 
+	// Test vectors from
 	// https://homes.esat.kuleuven.be/~bosselae/ripemd160.html
 	test_vectors := [?]TestHash {
 		TestHash{"9c1185a5c5e9fc54612808977ee8f548b2258d31", ""},
@@ -668,7 +675,7 @@ test_ripemd_160 :: proc(t: ^testing.T) {
 
 @(test)
 test_ripemd_256 :: proc(t: ^testing.T) {
-	// Test vectors from 
+	// Test vectors from
 	// https://homes.esat.kuleuven.be/~bosselae/ripemd160.html
 	test_vectors := [?]TestHash {
 		TestHash{"02ba4c4e5f8ecd1877fc52d64d30e37a2d9774fb1e5d026380ae0168e3c5522d", ""},
@@ -677,7 +684,7 @@ test_ripemd_256 :: proc(t: ^testing.T) {
 		TestHash{"87e971759a1ce47a514d5c914c392c9018c7c46bc14465554afcdf54a5070c0e", "message digest"},
 		TestHash{"649d3034751ea216776bf9a18acc81bc7896118a5197968782dd1fd97d8d5133", "abcdefghijklmnopqrstuvwxyz"},
 		TestHash{"3843045583aac6c8c8d9128573e7a9809afb2a0f34ccc36ea9e72f16f6368e3f", "abcdbcdecdefdefgefghfghighijhijkijkljklmklmnlmnomnopnopq"},
-		TestHash{"5740a408ac16b720b84424ae931cbb1fe363d1d0bf4017f1a89f7ea6de77a0b8", "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789"}, 
+		TestHash{"5740a408ac16b720b84424ae931cbb1fe363d1d0bf4017f1a89f7ea6de77a0b8", "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789"},
 	}
 	for v, _ in test_vectors {
 		computed     := ripemd.hash_256(v.str)
@@ -688,7 +695,7 @@ test_ripemd_256 :: proc(t: ^testing.T) {
 
 @(test)
 test_ripemd_320 :: proc(t: ^testing.T) {
-	// Test vectors from 
+	// Test vectors from
 	// https://homes.esat.kuleuven.be/~bosselae/ripemd160.html
 	test_vectors := [?]TestHash {
 		TestHash{"22d65d5661536cdc75c1fdf5c6de7b41b9f27325ebc61e8557177d705a0ec880151c3a32a00899b8", ""},
@@ -813,7 +820,7 @@ test_sm3 :: proc(t: ^testing.T) {
 	test_vectors := [?]TestHash {
 		TestHash{"1ab21d8355cfa17f8e61194831e81a8f22bec8c728fefb747ed035eb5082aa2b", ""},
 		TestHash{"66c7f0f462eeedd9d1f2d46bdc10e4e24167c4875cf2f7a2297da02b8f4ba8e0", "abc"},
-		TestHash{"debe9ff92275b8a138604889c18e5a4d6fdb70e5387e5765293dcba39c0c5732", "abcdabcdabcdabcdabcdabcdabcdabcdabcdabcdabcdabcdabcdabcdabcdabcd"}, 
+		TestHash{"debe9ff92275b8a138604889c18e5a4d6fdb70e5387e5765293dcba39c0c5732", "abcdabcdabcdabcdabcdabcdabcdabcdabcdabcdabcdabcdabcdabcdabcdabcd"},
 		TestHash{"5fdfe814b8573ca021983970fc79b2218c9570369b4859684e2e4c3fc76cb8ea", "The quick brown fox jumps over the lazy dog"},
 		TestHash{"ca27d14a42fc04c1e5ecf574a95a8c2d70ecb5805e9b429026ccac8f28b20098", "The quick brown fox jumps over the lazy cog"},
 	}
@@ -945,7 +952,7 @@ test_haval_128 :: proc(t: ^testing.T) {
 		TestHash{"3caf4a79e81adcd6d1716bcc1cef4573", "message digest"},
 		TestHash{"dc502247fb3eb8376109eda32d361d82", "abcdefghijklmnopqrstuvwxyz"},
 		TestHash{"44068770868768964d1f2c3bff4aa3d8", "abcdbcdecdefdefgefghfghighijhijkijkljklmklmnlmnomnopnopq"},
-		TestHash{"de5eb3f7d9eb08fae7a07d68e3047ec6", "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789"},  
+		TestHash{"de5eb3f7d9eb08fae7a07d68e3047ec6", "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789"},
 	}
 	for v, _ in test_vectors_3 {
 		computed     := haval.hash_128_3(v.str)
@@ -981,7 +988,7 @@ test_haval_160 :: proc(t: ^testing.T) {
 		TestHash{"43a47f6f1c016207f08be8115c0977bf155346da", "message digest"},
 		TestHash{"eba9fa6050f24c07c29d1834a60900ea4e32e61b", "abcdefghijklmnopqrstuvwxyz"},
 		TestHash{"c30bce448cf8cfe957c141e90c0a063497cdfeeb", "abcdbcdecdefdefgefghfghighijhijkijkljklmklmnlmnomnopnopq"},
-		TestHash{"97dc988d97caae757be7523c4e8d4ea63007a4b9", "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789"}, 
+		TestHash{"97dc988d97caae757be7523c4e8d4ea63007a4b9", "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789"},
 	}
 	for v, _ in test_vectors_3 {
 		computed     := haval.hash_160_3(v.str)
@@ -1098,5 +1105,46 @@ test_haval_256 :: proc(t: ^testing.T) {
 		computed     := haval.hash_256_5(v.str)
 		computed_str := hex_string(computed[:])
 		expect(t, computed_str == v.hash, fmt.tprintf("Expected: %s for input of %s, but got %s instead", v.hash, v.str, computed_str))
+	}
+}
+
+@(test)
+test_siphash_2_4 :: proc(t: ^testing.T) {
+	// Test vectors from
+	// https://github.com/veorq/SipHash/blob/master/vectors.h
+	test_vectors := [?]u64 {
+		0x726fdb47dd0e0e31, 0x74f839c593dc67fd, 0x0d6c8009d9a94f5a, 0x85676696d7fb7e2d,
+		0xcf2794e0277187b7, 0x18765564cd99a68d, 0xcbc9466e58fee3ce, 0xab0200f58b01d137,
+		0x93f5f5799a932462, 0x9e0082df0ba9e4b0, 0x7a5dbbc594ddb9f3, 0xf4b32f46226bada7,
+		0x751e8fbc860ee5fb, 0x14ea5627c0843d90, 0xf723ca908e7af2ee, 0xa129ca6149be45e5,
+		0x3f2acc7f57c29bdb, 0x699ae9f52cbe4794, 0x4bc1b3f0968dd39c, 0xbb6dc91da77961bd,
+		0xbed65cf21aa2ee98, 0xd0f2cbb02e3b67c7, 0x93536795e3a33e88, 0xa80c038ccd5ccec8,
+		0xb8ad50c6f649af94, 0xbce192de8a85b8ea, 0x17d835b85bbb15f3, 0x2f2e6163076bcfad,
+		0xde4daaaca71dc9a5, 0xa6a2506687956571, 0xad87a3535c49ef28, 0x32d892fad841c342,
+		0x7127512f72f27cce, 0xa7f32346f95978e3, 0x12e0b01abb051238, 0x15e034d40fa197ae,
+		0x314dffbe0815a3b4, 0x027990f029623981, 0xcadcd4e59ef40c4d, 0x9abfd8766a33735c,
+		0x0e3ea96b5304a7d0, 0xad0c42d6fc585992, 0x187306c89bc215a9, 0xd4a60abcf3792b95,
+		0xf935451de4f21df2, 0xa9538f0419755787, 0xdb9acddff56ca510, 0xd06c98cd5c0975eb,
+		0xe612a3cb9ecba951, 0xc766e62cfcadaf96, 0xee64435a9752fe72, 0xa192d576b245165a,
+		0x0a8787bf8ecb74b2, 0x81b3e73d20b49b6f, 0x7fa8220ba3b2ecea, 0x245731c13ca42499,
+		0xb78dbfaf3a8d83bd, 0xea1ad565322a1a0b, 0x60e61c23a3795013, 0x6606d7e446282b93,
+		0x6ca4ecb15c5f91e1, 0x9f626da15c9625f3, 0xe51b38608ef25f57, 0x958a324ceb064572,
+	}
+
+	key: [16]byte
+	for i in 0..<16 {
+		key[i] = byte(i)
+	}
+
+	for i in 0..<len(test_vectors) {
+		data := make([]byte, i)
+		for j in 0..<i {
+			data[j] = byte(j)
+		}
+
+		vector   := test_vectors[i]
+		computed := siphash.sum_2_4(data[:], key[:])
+
+		expect(t, computed == vector, fmt.tprintf("Expected: 0x%x for input of %v, but got 0x%x instead", vector, data, computed))
 	}
 }

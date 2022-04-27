@@ -1,11 +1,9 @@
 /*
 	Copyright 2021 Jeroen van Rijn <nom@duclavier.com>.
 	Made available under Odin's BSD-3 license.
-
-	An arbitrary precision mathematics implementation in Odin.
-	For the theoretical underpinnings, see Knuth's The Art of Computer Programming, Volume 2, section 4.3.
-	The code started out as an idiomatic source port of libTomMath, which is in the public domain, with thanks.
 */
+
+
 package math_big
 
 import "core:intrinsics"
@@ -158,13 +156,14 @@ Error :: enum int {
 	Invalid_Pointer         = 2,
 	Invalid_Argument        = 3,
 
-	Assignment_To_Immutable = 4,
-	Max_Iterations_Reached  = 5,
-	Buffer_Overflow         = 6,
-	Integer_Overflow        = 7,
+	Assignment_To_Immutable = 10,
+	Max_Iterations_Reached  = 11,
+	Buffer_Overflow         = 12,
+	Integer_Overflow        = 13,
+	Integer_Underflow       = 14,
 
-	Division_by_Zero        = 8,
-	Math_Domain_Error       = 9,
+	Division_by_Zero        = 30,
+	Math_Domain_Error       = 31,
 
 	Cannot_Open_File        = 50,
 	Cannot_Read_File        = 51,
@@ -173,7 +172,7 @@ Error :: enum int {
 	Unimplemented           = 127,
 }
 
-Error_String :: #partial [Error]string{
+Error_String :: #sparse[Error]string{
 	.Okay                    = "Okay",
 	.Out_Of_Memory           = "Out of memory",
 	.Invalid_Pointer         = "Invalid pointer",
@@ -183,6 +182,7 @@ Error_String :: #partial [Error]string{
 	.Max_Iterations_Reached  = "Max iterations reached",
 	.Buffer_Overflow         = "Buffer overflow",
 	.Integer_Overflow        = "Integer overflow",
+	.Integer_Underflow       = "Integer underflow",
 
 	.Division_by_Zero        = "Division by zero",
 	.Math_Domain_Error       = "Math domain error",
@@ -215,7 +215,7 @@ _MIN_DIGIT_COUNT :: max(3, ((size_of(u128) + _DIGIT_BITS) - 1) / _DIGIT_BITS)
 /*
 	Maximum number of digits.
 	- Must be small enough such that `_bit_count` does not overflow.
- 	- Must be small enough such that `_radix_size` for base 2 does not overflow.
+	- Must be small enough such that `_radix_size` for base 2 does not overflow.
 	`_radix_size` needs two additional bytes for zero termination and sign.
 */
 _MAX_BIT_COUNT   :: (max(int) - 2)
@@ -251,7 +251,7 @@ Order :: enum i8 {
 }
 
 Endianness :: enum i8 {
-   Little   = -1,
-   Platform =  0,
-   Big      =  1,
-};
+	Little   = -1,
+	Platform =  0,
+	Big      =  1,
+}

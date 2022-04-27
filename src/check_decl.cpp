@@ -174,6 +174,10 @@ void check_init_constant(CheckerContext *ctx, Entity *e, Operand *operand) {
 		return;
 	}
 
+	if (is_type_proc(e->type)) {
+		error(e->token, "Illegal declaration of a constant procedure value");
+	}
+
 	e->parent_proc_decl = ctx->curr_proc_decl;
 
 	e->Constant.value = operand->value;
@@ -238,6 +242,51 @@ isize total_attribute_count(DeclInfo *decl) {
 	return attribute_count;
 }
 
+Type *clone_enum_type(CheckerContext *ctx, Type *original_enum_type, Type *named_type) {
+	// NOTE(bill, 2022-02-05): Stupid edge case for `distinct` declarations
+	//
+	//         X :: enum {A, B, C}
+	//         Y :: distinct X
+	//
+	// To make Y be just like X, it will need to copy the elements of X and change their type
+	// so that they match Y rather than X.
+	GB_ASSERT(original_enum_type != nullptr);
+	GB_ASSERT(named_type != nullptr);
+	GB_ASSERT(original_enum_type->kind == Type_Enum);
+	GB_ASSERT(named_type->kind == Type_Named);
+
+	Scope *parent = original_enum_type->Enum.scope->parent;
+	Scope *scope = create_scope(nullptr, parent);
+
+
+	Type *et = alloc_type_enum();
+	et->Enum.base_type = original_enum_type->Enum.base_type;
+	et->Enum.min_value = original_enum_type->Enum.min_value;
+	et->Enum.max_value = original_enum_type->Enum.max_value;
+	et->Enum.min_value_index = original_enum_type->Enum.min_value_index;
+	et->Enum.max_value_index = original_enum_type->Enum.max_value_index;
+	et->Enum.scope = scope;
+
+	auto fields = array_make<Entity *>(permanent_allocator(), original_enum_type->Enum.fields.count);
+	for_array(i, fields) {
+		Entity *old = original_enum_type->Enum.fields[i];
+
+		Entity *e = alloc_entity_constant(scope, old->token, named_type, old->Constant.value);
+		e->file = old->file;
+		e->identifier = clone_ast(old->identifier);
+		e->flags |= EntityFlag_Visited;
+		e->state = EntityState_Resolved;
+		e->Constant.flags = old->Constant.flags;
+		e->Constant.docs = old->Constant.docs;
+		e->Constant.comment = old->Constant.comment;
+
+		fields[i] = e;
+		add_entity(ctx, scope, nullptr, e);
+		add_entity_use(ctx, e->identifier, e);
+	}
+	et->Enum.fields = fields;
+	return et;
+}
 
 void check_type_decl(CheckerContext *ctx, Entity *e, Ast *init_expr, Type *def) {
 	GB_ASSERT(e->type == nullptr);
@@ -258,7 +307,11 @@ void check_type_decl(CheckerContext *ctx, Entity *e, Ast *init_expr, Type *def) 
 	Type *bt = check_type_expr(ctx, te, named);
 	check_type_path_pop(ctx);
 
-	named->Named.base = base_type(bt);
+	Type *base = base_type(bt);
+	if (is_distinct && bt->kind == Type_Named && base->kind == Type_Enum) {
+		base = clone_enum_type(ctx, base, named);
+	}
+	named->Named.base = base;
 
 	if (is_distinct && is_type_typeid(e->type)) {
 		error(init_expr, "'distinct' cannot be applied to 'typeid'");
@@ -289,6 +342,13 @@ void check_type_decl(CheckerContext *ctx, Entity *e, Ast *init_expr, Type *def) 
 	if (decl != nullptr) {
 		AttributeContext ac = {};
 		check_decl_attributes(ctx, decl->attributes, type_decl_attribute, &ac);
+		if (e->kind == Entity_TypeName && ac.objc_class != "") {
+			e->TypeName.objc_class_name = ac.objc_class;
+
+			if (type_size_of(e->type) > 0) {
+				error(e->token, "@(objc_class) marked type must be of zero size");
+			}
+		}
 	}
 
 
@@ -380,12 +440,56 @@ void check_const_decl(CheckerContext *ctx, Entity *e, Ast *type_expr, Ast *init,
 
 	if (type_expr) {
 		e->type = check_type(ctx, type_expr);
+		if (are_types_identical(e->type, t_typeid)) {
+			e->type = nullptr;
+			e->kind = Entity_TypeName;
+			check_type_decl(ctx, e, init, named_type);
+			return;
+		}
 	}
 
 	Operand operand = {};
 
 	if (init != nullptr) {
-		Entity *entity = nullptr;
+		Entity *entity = check_entity_from_ident_or_selector(ctx, init, false);
+		if (entity != nullptr && entity->kind == Entity_TypeName) {
+			// @TypeAliasingProblem
+			// NOTE(bill, 2022-02-03): This is used to solve the problem caused by type aliases
+			// being "confused" as constants
+			//
+			//         A :: B
+			//         C :: proc "c" (^A)
+			//         B :: struct {x: C}
+			//
+			//     A gets evaluated first, and then checks B.
+			//     B then checks C.
+			//     C then tries to check A which is unresolved but thought to be a constant.
+			//     Therefore within C's check, A errs as "not a type".
+			//
+			// This is because a const declaration may or may not be a type and this cannot
+			// be determined from a syntactical standpoint.
+			// This check allows the compiler to override the entity to be checked as a type.
+			//
+			// There is no problem if B is prefixed with the `#type` helper enforcing at
+			// both a syntax and semantic level that B must be a type.
+			//
+			//         A :: #type B
+			//
+			// This approach is not fool proof and can fail in case such as:
+			//
+			//         X :: type_of(x)
+			//         X :: Foo(int).Type
+			//
+			// Since even these kind of declarations may cause weird checking cycles.
+			// For the time being, these are going to be treated as an unfortunate error
+			// until there is a proper delaying system to try declaration again if they
+			// have failed.
+
+			e->kind = Entity_TypeName;
+			check_type_decl(ctx, e, init, named_type);
+			return;
+		}
+		entity = nullptr;
 		if (init->kind == Ast_Ident) {
 			entity = check_ident(ctx, &operand, init, nullptr, e->type, true);
 		} else if (init->kind == Ast_SelectorExpr) {
@@ -732,6 +836,63 @@ void check_proc_decl(CheckerContext *ctx, Entity *e, DeclInfo *d) {
 	}
 	e->Procedure.optimization_mode = cast(ProcedureOptimizationMode)ac.optimization_mode;
 
+	if (ac.objc_name.len || ac.objc_is_class_method || ac.objc_type) {
+		if (ac.objc_name.len == 0 && ac.objc_is_class_method) {
+			error(e->token, "@(objc_name) is required with @(objc_is_class_method)");
+		} else if (ac.objc_type == nullptr) {
+			error(e->token, "@(objc_name) requires that @(objc_type) to be set");
+		} else if (ac.objc_name.len == 0 && ac.objc_type) {
+			error(e->token, "@(objc_name) is required with @(objc_type)");
+		} else {
+			Type *t = ac.objc_type;
+			if (t->kind == Type_Named) {
+				Entity *tn = t->Named.type_name;
+
+				GB_ASSERT(tn->kind == Entity_TypeName);
+
+				if (tn->scope != e->scope) {
+					error(e->token, "@(objc_name) attribute may only be applied to procedures and types within the same scope");
+				} else {
+					mutex_lock(&global_type_name_objc_metadata_mutex);
+					defer (mutex_unlock(&global_type_name_objc_metadata_mutex));
+
+					if (!tn->TypeName.objc_metadata) {
+						tn->TypeName.objc_metadata = create_type_name_obj_c_metadata();
+					}
+					auto *md = tn->TypeName.objc_metadata;
+					mutex_lock(md->mutex);
+					defer (mutex_unlock(md->mutex));
+
+					if (!ac.objc_is_class_method) {
+						bool ok = true;
+						for (TypeNameObjCMetadataEntry const &entry : md->value_entries) {
+							if (entry.name == ac.objc_name) {
+								error(e->token, "Previous declaration of @(objc_name=\"%.*s\")", LIT(ac.objc_name));
+								ok = false;
+								break;
+							}
+						}
+						if (ok) {
+							array_add(&md->value_entries, TypeNameObjCMetadataEntry{ac.objc_name, e});
+						}
+					} else {
+						bool ok = true;
+						for (TypeNameObjCMetadataEntry const &entry : md->type_entries) {
+							if (entry.name == ac.objc_name) {
+								error(e->token, "Previous declaration of @(objc_name=\"%.*s\")", LIT(ac.objc_name));
+								ok = false;
+								break;
+							}
+						}
+						if (ok) {
+							array_add(&md->type_entries, TypeNameObjCMetadataEntry{ac.objc_name, e});
+						}
+					}
+				}
+			}
+		}
+	}
+
 
 	switch (e->Procedure.optimization_mode) {
 	case ProcedureOptimizationMode_None:
@@ -777,21 +938,23 @@ void check_proc_decl(CheckerContext *ctx, Entity *e, DeclInfo *d) {
 
 
 	if (e->pkg != nullptr && e->token.string == "main") {
-		if (pt->param_count != 0 ||
-		    pt->result_count != 0) {
-			gbString str = type_to_string(proc_type);
-			error(e->token, "Procedure type of 'main' was expected to be 'proc()', got %s", str);
-			gb_string_free(str);
-		}
-		if (pt->calling_convention != default_calling_convention()) {
-			error(e->token, "Procedure 'main' cannot have a custom calling convention");
-		}
-		pt->calling_convention = default_calling_convention();
-		if (e->pkg->kind == Package_Init) {
-			if (ctx->info->entry_point != nullptr) {
-				error(e->token, "Redeclaration of the entry pointer procedure 'main'");
-			} else {
-				ctx->info->entry_point = e;
+		if (e->pkg->kind != Package_Runtime) {
+			if (pt->param_count != 0 ||
+			    pt->result_count != 0) {
+				gbString str = type_to_string(proc_type);
+				error(e->token, "Procedure type of 'main' was expected to be 'proc()', got %s", str);
+				gb_string_free(str);
+			}
+			if (pt->calling_convention != default_calling_convention()) {
+				error(e->token, "Procedure 'main' cannot have a custom calling convention");
+			}
+			pt->calling_convention = default_calling_convention();
+			if (e->pkg->kind == Package_Init) {
+				if (ctx->info->entry_point != nullptr) {
+					error(e->token, "Redeclaration of the entry pointer procedure 'main'");
+				} else {
+					ctx->info->entry_point = e;
+				}
 			}
 		}
 	}
@@ -924,7 +1087,9 @@ void check_proc_decl(CheckerContext *ctx, Entity *e, DeclInfo *d) {
 				      "\tother at %s",
 				      LIT(name), token_pos_to_string(pos));
 			} else if (name == "main") {
-				error(d->proc_lit, "The link name 'main' is reserved for internal use");
+				if (d->entity->pkg->kind != Package_Runtime) {
+					error(d->proc_lit, "The link name 'main' is reserved for internal use");
+				}
 			} else {
 				string_map_set(fp, key, e);
 			}
@@ -970,6 +1135,12 @@ void check_global_variable_decl(CheckerContext *ctx, Entity *&e, Ast *type_expr,
 		error(e->token, "@(static) is not supported for global variables, nor required");
 	}
 	ac.link_name = handle_link_name(ctx, e->token, ac.link_name, ac.link_prefix);
+
+	if (is_arch_wasm() && e->Variable.thread_local_model.len != 0) {
+		e->Variable.thread_local_model.len = 0;
+		// NOTE(bill): ignore this message for the time begin
+		// error(e->token, "@(thread_local) is not supported for this target platform");
+	}
 
 	String context_name = str_lit("variable declaration");
 
@@ -1046,6 +1217,8 @@ void check_global_variable_decl(CheckerContext *ctx, Entity *&e, Ast *type_expr,
 	Operand o = {};
 	check_expr_with_type_hint(ctx, &o, init_expr, e->type);
 	check_init_variable(ctx, e, &o, str_lit("variable declaration"));
+
+	check_rtti_type_disallowed(e->token, e->type, "A variable declaration is using a type, %s, which has been disallowed");
 }
 
 void check_proc_group_decl(CheckerContext *ctx, Entity *&pg_entity, DeclInfo *d) {
@@ -1303,7 +1476,7 @@ void check_proc_body(CheckerContext *ctx_, Token token, DeclInfo *decl, Type *ty
 				if (t->kind == Type_Struct) {
 					Scope *scope = t->Struct.scope;
 					GB_ASSERT(scope != nullptr);
-					for_array(i, scope->elements.entries) {
+					MUTEX_GUARD_BLOCK(scope->mutex) for_array(i, scope->elements.entries) {
 						Entity *f = scope->elements.entries[i].value;
 						if (f->kind == Entity_Variable) {
 							Entity *uvar = alloc_entity_using_variable(e, f->token, f->type, nullptr);
@@ -1321,11 +1494,10 @@ void check_proc_body(CheckerContext *ctx_, Token token, DeclInfo *decl, Type *ty
 		}
 	}
 
-
-	for_array(i, using_entities) {
+	MUTEX_GUARD_BLOCK(ctx->scope->mutex) for_array(i, using_entities) {
 		Entity *e = using_entities[i].e;
 		Entity *uvar = using_entities[i].uvar;
-		Entity *prev = scope_insert(ctx->scope, uvar);
+		Entity *prev = scope_insert(ctx->scope, uvar, false);
 		if (prev != nullptr) {
 			error(e->token, "Namespace collision while 'using' procedure argument '%.*s' of: %.*s", LIT(e->token.string), LIT(prev->token.string));
 			error_line("%.*s != %.*s\n", LIT(uvar->token.string), LIT(prev->token.string));

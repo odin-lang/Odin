@@ -47,29 +47,30 @@ kill_dependency :: #force_inline proc(value: $T) -> T {
 
 // 7.17.4 Fences
 atomic_thread_fence :: #force_inline proc(order: memory_order) {
-	switch (order) {
-	case .relaxed:
-		return
-	case .consume:
-		intrinsics.atomic_fence_acq()
-	case .acquire:
-		intrinsics.atomic_fence_acq()
-	case .release:
-		intrinsics.atomic_fence_rel()
-	case .acq_rel:
-		intrinsics.atomic_fence_acqrel()
-	case .seq_cst:
-		intrinsics.atomic_fence_acqrel()
+	assert(order != .relaxed)
+	assert(order != .consume)
+	#partial switch order {
+	case .acquire: intrinsics.atomic_thread_fence(.Acquire)
+	case .release: intrinsics.atomic_thread_fence(.Release)
+	case .acq_rel: intrinsics.atomic_thread_fence(.Acq_Rel)
+	case .seq_cst: intrinsics.atomic_thread_fence(.Seq_Cst)
 	}
 }
 
 atomic_signal_fence :: #force_inline proc(order: memory_order) {
-	atomic_thread_fence(order)
+	assert(order != .relaxed)
+	assert(order != .consume)
+	#partial switch order {
+	case .acquire: intrinsics.atomic_signal_fence(.Acquire)
+	case .release: intrinsics.atomic_signal_fence(.Release)
+	case .acq_rel: intrinsics.atomic_signal_fence(.Acq_Rel)
+	case .seq_cst: intrinsics.atomic_signal_fence(.Seq_Cst)
+	}
 }
 
 // 7.17.5 Lock-free property
 atomic_is_lock_free :: #force_inline proc(obj: ^$T) -> bool {
-	return size_of(T) <= 8 && (intrinsics.type_is_integer(T) || intrinsics.type_is_pointer(T))
+	return intrinsics.atomic_type_is_lock_free(T)
 }
 
 // 7.17.6 Atomic integer types
@@ -121,13 +122,10 @@ atomic_store_explicit :: #force_inline proc(object: ^$T, desired: T, order: memo
 	assert(order != .acquire)
 	assert(order != .acq_rel)
 
-	#partial switch (order) {
-	case .relaxed:
-		intrinsics.atomic_store_relaxed(object, desired)
-	case .release:
-		intrinsics.atomic_store_rel(object, desired)
-	case .seq_cst:
-		intrinsics.atomic_store(object, desired)
+	#partial switch order {
+	case .relaxed: intrinsics.atomic_store_explicit(object, desired, .Relaxed)
+	case .release: intrinsics.atomic_store_explicit(object, desired, .Release)
+	case .seq_cst: intrinsics.atomic_store_explicit(object, desired, .Seq_Cst)
 	}
 }
 
@@ -139,36 +137,26 @@ atomic_load_explicit :: #force_inline proc(object: ^$T, order: memory_order) {
 	assert(order != .release)
 	assert(order != .acq_rel)
 
-	#partial switch (order) {
-	case .relaxed:
-		return intrinsics.atomic_load_relaxed(object)
-	case .consume:
-		return intrinsics.atomic_load_acq(object)
-	case .acquire:
-		return intrinsics.atomic_load_acq(object)
-	case .seq_cst:
-		return intrinsics.atomic_load(object)
+	#partial switch order {
+	case .relaxed: return intrinsics.atomic_load_explicit(object, .Relaxed)
+	case .consume: return intrinsics.atomic_load_explicit(object, .Consume)
+	case .acquire: return intrinsics.atomic_load_explicit(object, .Acquire)
+	case .seq_cst: return intrinsics.atomic_load_explicit(object, .Seq_Cst)
 	}
 }
 
 atomic_exchange :: #force_inline proc(object: ^$T, desired: T) -> T {
-	return intrinsics.atomic_xchg(object, desired)
+	return intrinsics.atomic_exchange(object, desired)
 }
 
 atomic_exchange_explicit :: #force_inline proc(object: ^$T, desired: T, order: memory_order) -> T {
-	switch (order) {
-	case .relaxed:
-		return intrinsics.atomic_xchg_relaxed(object, desired)
-	case .consume:
-		return intrinsics.atomic_xchg_acq(object, desired)
-	case .acquire:
-		return intrinsics.atomic_xchg_acq(object, desired)
-	case .release:
-		return intrinsics.atomic_xchg_rel(object, desired)
-	case .acq_rel:
-		return intrinsics.atomic_xchg_acqrel(object, desired)
-	case .seq_cst:
-		return intrinsics.atomic_xchg(object, desired)
+	switch order {
+	case .relaxed: return intrinsics.atomic_exchange_explicit(object, desired, .Relaxed)
+	case .consume: return intrinsics.atomic_exchange_explicit(object, desired, .Consume)
+	case .acquire: return intrinsics.atomic_exchange_explicit(object, desired, .Acquire)
+	case .release: return intrinsics.atomic_exchange_explicit(object, desired, .Release)
+	case .acq_rel: return intrinsics.atomic_exchange_explicit(object, desired, .Acq_Rel)
+	case .seq_cst: return intrinsics.atomic_exchange_explicit(object, desired, .Seq_Cst)
 	}
 	return false
 }
@@ -189,102 +177,104 @@ atomic_exchange_explicit :: #force_inline proc(object: ^$T, desired: T, order: m
 // 	[success = seq_cst, failure = acquire] => failacq
 // 	[success = acquire, failure = relaxed] => acq_failrelaxed
 // 	[success = acq_rel, failure = relaxed] => acqrel_failrelaxed
-atomic_compare_exchange_strong :: #force_inline proc(object, expected: ^$T, desired: T) {
-	value, ok := intrinsics.atomic_cxchg(object, expected^, desired)
+atomic_compare_exchange_strong :: #force_inline proc(object, expected: ^$T, desired: T) -> bool {
+	value, ok := intrinsics.atomic_compare_exchange_strong(object, expected^, desired)
 	if !ok { expected^ = value } 
 	return ok
 }
 
-atomic_compare_exchange_strong_explicit :: #force_inline proc(object, expected: ^$T, desired: T, success, failure: memory_order) {
+atomic_compare_exchange_strong_explicit :: #force_inline proc(object, expected: ^$T, desired: T, success, failure: memory_order) -> bool {
 	assert(failure != .release)
 	assert(failure != .acq_rel)
 
 	value: T; ok: bool
-	#partial switch (failure) {
+	#partial switch failure {
 	case .seq_cst:
 		assert(success != .relaxed)
-		#partial switch (success) {
+		#partial switch success {
 		case .seq_cst:
-			value, ok := intrinsics.atomic_cxchg(object, expected^, desired)
+			value, ok = intrinsics.atomic_compare_exchange_strong_explicit(object, expected^, desired, .Seq_Cst, .Seq_Cst)
 		case .acquire:
-			value, ok := intrinsics.atomic_cxchg_acq(object, expected^, desired)
+			value, ok = intrinsics.atomic_compare_exchange_strong_explicit(object, expected^, desired, .Acquire, .Seq_Cst)
 		case .consume:
-			value, ok := intrinsics.atomic_cxchg_acq(object, expected^, desired)
+			value, ok = intrinsics.atomic_compare_exchange_strong_explicit(object, expected^, desired, .Consume, .Seq_Cst)
 		case .release:
-			value, ok := intrinsics.atomic_cxchg_rel(object, expected^, desired)
+			value, ok = intrinsics.atomic_compare_exchange_strong_explicit(object, expected^, desired, .Release, .Seq_Cst)
 		case .acq_rel:
-			value, ok := intrinsics.atomic_cxchg_acqrel(object, expected^, desired)
+			value, ok = intrinsics.atomic_compare_exchange_strong_explicit(object, expected^, desired, .Acq_Rel, .Seq_Cst)
 		}
 	case .relaxed:
 		assert(success != .release)
-		#partial switch (success) {
+		#partial switch success {
 		case .relaxed:
-			value, ok := intrinsics.atomic_cxchg_relaxed(object, expected^, desired)
+			value, ok = intrinsics.atomic_compare_exchange_strong_explicit(object, expected^, desired, .Relaxed, .Relaxed)
 		case .seq_cst:
-			value, ok := intrinsics.atomic_cxchg_failrelaxed(object, expected^, desired)
+			value, ok = intrinsics.atomic_compare_exchange_strong_explicit(object, expected^, desired, .Seq_Cst, .Relaxed)
 		case .acquire:
-			value, ok := intrinsics.atomic_cxchg_acq_failrelaxed(object, expected^, desired)
+			value, ok = intrinsics.atomic_compare_exchange_strong_explicit(object, expected^, desired, .Acquire, .Relaxed)
 		case .consume:
-			value, ok := intrinsics.atomic_cxchg_acq_failrelaxed(object, expected^, desired)
+			value, ok = intrinsics.atomic_compare_exchange_strong_explicit(object, expected^, desired, .Consume, .Relaxed)
 		case .acq_rel:
-			value, ok := intrinsics.atomic_cxchg_acqrel_failrelaxed(object, expected^, desired)
+			value, ok = intrinsics.atomic_compare_exchange_strong_explicit(object, expected^, desired, .Acq_Rel, .Relaxed)
 		}
 	case .consume:
-		fallthrough
+		assert(success == .seq_cst)
+		value, ok = intrinsics.atomic_compare_exchange_strong_explicit(object, expected^, desired, .Seq_Cst, .Consume)
 	case .acquire:
 		assert(success == .seq_cst)
-		value, ok := intrinsics.atomic_cxchg_failacq(object, expected^, desired)
+		value, ok = intrinsics.atomic_compare_exchange_strong_explicit(object, expected^, desired, .Seq_Cst, .Acquire)
 
 	}
 	if !ok { expected^ = value }
 	return ok
 }
 
-atomic_compare_exchange_weak :: #force_inline proc(object, expected: ^$T, desired: T) {
-	value, ok := intrinsics.atomic_cxchgweak(object, expected^, desired)
+atomic_compare_exchange_weak :: #force_inline proc(object, expected: ^$T, desired: T) -> bool {
+	value, ok := intrinsics.atomic_compare_exchange_weak(object, expected^, desired)
 	if !ok { expected^ = value }
 	return ok
 }
 
-atomic_compare_exchange_weak_explicit :: #force_inline proc(object, expected: ^$T, desited: T, success, failure: memory_order) {
+atomic_compare_exchange_weak_explicit :: #force_inline proc(object, expected: ^$T, desited: T, success, failure: memory_order) -> bool {
 	assert(failure != .release)
 	assert(failure != .acq_rel)
 
 	value: T; ok: bool
-	#partial switch (failure) {
+	#partial switch failure {
 	case .seq_cst:
 		assert(success != .relaxed)
-		#partial switch (success) {
+		#partial switch success {
 		case .seq_cst:
-			value, ok := intrinsics.atomic_cxchgweak(object, expected^, desired)
+			value, ok = intrinsics.atomic_compare_exchange_weak_explicit(object, expected^, desired, .Seq_Cst, .Seq_Cst)
 		case .acquire:
-			value, ok := intrinsics.atomic_cxchgweak_acq(object, expected^, desired)
+			value, ok = intrinsics.atomic_compare_exchange_weak_explicit(object, expected^, desired, .Acquire, .Seq_Cst)
 		case .consume:
-			value, ok := intrinsics.atomic_cxchgweak_acq(object, expected^, desired)
+			value, ok = intrinsics.atomic_compare_exchange_weak_explicit(object, expected^, desired, .Consume, .Seq_Cst)
 		case .release:
-			value, ok := intrinsics.atomic_cxchgweak_rel(object, expected^, desired)
+			value, ok = intrinsics.atomic_compare_exchange_weak_explicit(object, expected^, desired, .Release, .Seq_Cst)
 		case .acq_rel:
-			value, ok := intrinsics.atomic_cxchgweak_acqrel(object, expected^, desired)
+			value, ok = intrinsics.atomic_compare_exchange_weak_explicit(object, expected^, desired, .Acq_Rel, .Seq_Cst)
 		}
 	case .relaxed:
 		assert(success != .release)
-		#partial switch (success) {
+		#partial switch success {
 		case .relaxed:
-			value, ok := intrinsics.atomic_cxchgweak_relaxed(object, expected^, desired)
+			value, ok = intrinsics.atomic_compare_exchange_weak_explicit(object, expected^, desired, .Relaxed, .Relaxed)
 		case .seq_cst:
-			value, ok := intrinsics.atomic_cxchgweak_failrelaxed(object, expected^, desired)
+			value, ok = intrinsics.atomic_compare_exchange_weak_explicit(object, expected^, desired, .Seq_Cst, .Relaxed)
 		case .acquire:
-			value, ok := intrinsics.atomic_cxchgweak_acq_failrelaxed(object, expected^, desired)
+			value, ok = intrinsics.atomic_compare_exchange_weak_explicit(object, expected^, desired, .Acquire, .Relaxed)
 		case .consume:
-			value, ok := intrinsics.atomic_cxchgweak_acq_failrelaxed(object, expected^, desired)
+			value, ok = intrinsics.atomic_compare_exchange_weak_explicit(object, expected^, desired, .Consume, .Relaxed)
 		case .acq_rel:
-			value, ok := intrinsics.atomic_cxchgweak_acqrel_failrelaxed(object, expected^, desired)
+			value, ok = intrinsics.atomic_compare_exchange_weak_explicit(object, expected^, desired, .Acq_Rel, .Relaxed)
 		}
 	case .consume:
-		fallthrough
+		assert(success == .seq_cst)
+		value, ok = intrinsics.atomic_compare_exchange_weak_explicit(object, expected^, desired, .Seq_Cst, .Consume)
 	case .acquire:
 		assert(success == .seq_cst)
-		value, ok := intrinsics.atomic_cxchgweak_failacq(object, expected^, desired)
+		value, ok = intrinsics.atomic_compare_exchange_weak_explicit(object, expected^, desired, .Seq_Cst, .Acquire)
 
 	}
 	if !ok { expected^ = value }
@@ -297,19 +287,14 @@ atomic_fetch_add :: #force_inline proc(object: ^$T, operand: T) -> T {
 }
 
 atomic_fetch_add_explicit :: #force_inline proc(object: ^$T, operand: T, order: memory_order) -> T {
-	switch (order) {
-	case .relaxed:
-		return intrinsics.atomic_add_relaxed(object, operand)
-	case .consume:
-		return intrinsics.atomic_add_acq(object, operand)
-	case .acquire:
-		return intrinsics.atomic_add_acq(object, operand)
-	case .release:
-		return intrinsics.atomic_add_rel(object, operand)
-	case .acq_rel:
-		return intrinsics.atomic_add_acqrel(object, operand)
-	case .seq_cst:
-		return intrinsics.atomic_add(object, operand)
+	switch order {
+	case .relaxed: return intrinsics.atomic_add_explicit(object, operand, .Relaxed)
+	case .consume: return intrinsics.atomic_add_explicit(object, operand, .Consume)
+	case .acquire: return intrinsics.atomic_add_explicit(object, operand, .Acquire)
+	case .release: return intrinsics.atomic_add_explicit(object, operand, .Release)
+	case .acq_rel: return intrinsics.atomic_add_explicit(object, operand, .Acq_Rel)
+	case: fallthrough
+	case .seq_cst: return intrinsics.atomic_add_explicit(object, operand, .Seq_Cst)
 	}
 }
 
@@ -318,19 +303,14 @@ atomic_fetch_sub :: #force_inline proc(object: ^$T, operand: T) -> T {
 }
 
 atomic_fetch_sub_explicit :: #force_inline proc(object: ^$T, operand: T, order: memory_order) -> T {
-	switch (order) {
-	case .relaxed:
-		return intrinsics.atomic_sub_relaxed(object, operand)
-	case .consume:
-		return intrinsics.atomic_sub_acq(object, operand)
-	case .acquire:
-		return intrinsics.atomic_sub_acq(object, operand)
-	case .release:
-		return intrinsics.atomic_sub_rel(object, operand)
-	case .acq_rel:
-		return intrinsics.atomic_sub_acqrel(object, operand)
-	case .seq_cst:
-		return intrinsics.atomic_sub(object, operand)
+	switch order {
+	case .relaxed: return intrinsics.atomic_sub_explicit(object, operand, .Relaxed)
+	case .consume: return intrinsics.atomic_sub_explicit(object, operand, .Consume)
+	case .acquire: return intrinsics.atomic_sub_explicit(object, operand, .Acquire)
+	case .release: return intrinsics.atomic_sub_explicit(object, operand, .Release)
+	case .acq_rel: return intrinsics.atomic_sub_explicit(object, operand, .Acq_Rel)
+	case: fallthrough
+	case .seq_cst: return intrinsics.atomic_sub_explicit(object, operand, .Seq_Cst)
 	}
 }
 
@@ -339,19 +319,14 @@ atomic_fetch_or :: #force_inline proc(object: ^$T, operand: T) -> T {
 }
 
 atomic_fetch_or_explicit :: #force_inline proc(object: ^$T, operand: T, order: memory_order) -> T {
-	switch (order) {
-	case .relaxed:
-		return intrinsics.atomic_or_relaxed(object, operand)
-	case .consume:
-		return intrinsics.atomic_or_acq(object, operand)
-	case .acquire:
-		return intrinsics.atomic_or_acq(object, operand)
-	case .release:
-		return intrinsics.atomic_or_rel(object, operand)
-	case .acq_rel:
-		return intrinsics.atomic_or_acqrel(object, operand)
-	case .seq_cst:
-		return intrinsics.atomic_or(object, operand)
+	switch order {
+	case .relaxed: return intrinsics.atomic_or_explicit(object, operand, .Relaxed)
+	case .consume: return intrinsics.atomic_or_explicit(object, operand, .Consume)
+	case .acquire: return intrinsics.atomic_or_explicit(object, operand, .Acquire)
+	case .release: return intrinsics.atomic_or_explicit(object, operand, .Release)
+	case .acq_rel: return intrinsics.atomic_or_explicit(object, operand, .Acq_Rel)
+	case: fallthrough
+	case .seq_cst: return intrinsics.atomic_or_explicit(object, operand, .Seq_Cst)
 	}
 }
 
@@ -360,19 +335,14 @@ atomic_fetch_xor :: #force_inline proc(object: ^$T, operand: T) -> T {
 }
 
 atomic_fetch_xor_explicit :: #force_inline proc(object: ^$T, operand: T, order: memory_order) -> T {
-	switch (order) {
-	case .relaxed:
-		return intrinsics.atomic_xor_relaxed(object, operand)
-	case .consume:
-		return intrinsics.atomic_xor_acq(object, operand)
-	case .acquire:
-		return intrinsics.atomic_xor_acq(object, operand)
-	case .release:
-		return intrinsics.atomic_xor_rel(object, operand)
-	case .acq_rel:
-		return intrinsics.atomic_xor_acqrel(object, operand)
-	case .seq_cst:
-		return intrinsics.atomic_xor(object, operand)
+	switch order {
+	case .relaxed: return intrinsics.atomic_xor_explicit(object, operand, .Relaxed)
+	case .consume: return intrinsics.atomic_xor_explicit(object, operand, .Consume)
+	case .acquire: return intrinsics.atomic_xor_explicit(object, operand, .Acquire)
+	case .release: return intrinsics.atomic_xor_explicit(object, operand, .Release)
+	case .acq_rel: return intrinsics.atomic_xor_explicit(object, operand, .Acq_Rel)
+	case: fallthrough
+	case .seq_cst: return intrinsics.atomic_xor_explicit(object, operand, .Seq_Cst)
 	}
 }
 
@@ -380,19 +350,14 @@ atomic_fetch_and :: #force_inline proc(object: ^$T, operand: T) -> T {
 	return intrinsics.atomic_and(object, operand)
 }
 atomic_fetch_and_explicit :: #force_inline proc(object: ^$T, operand: T, order: memory_order) -> T {
-	switch (order) {
-	case .relaxed:
-		return intrinsics.atomic_and_relaxed(object, operand)
-	case .consume:
-		return intrinsics.atomic_and_acq(object, operand)
-	case .acquire:
-		return intrinsics.atomic_and_acq(object, operand)
-	case .release:
-		return intrinsics.atomic_and_rel(object, operand)
-	case .acq_rel:
-		return intrinsics.atomic_and_acqrel(object, operand)
-	case .seq_cst:
-		return intrinsics.atomic_and(object, operand)
+	switch order {
+	case .relaxed: return intrinsics.atomic_and_explicit(object, operand, .Relaxed)
+	case .consume: return intrinsics.atomic_and_explicit(object, operand, .Consume)
+	case .acquire: return intrinsics.atomic_and_explicit(object, operand, .Acquire)
+	case .release: return intrinsics.atomic_and_explicit(object, operand, .Release)
+	case .acq_rel: return intrinsics.atomic_and_explicit(object, operand, .Acq_Rel)
+	case: fallthrough
+	case .seq_cst: return intrinsics.atomic_and_explicit(object, operand, .Seq_Cst)
 	}
 }
 

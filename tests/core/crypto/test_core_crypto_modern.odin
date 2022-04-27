@@ -308,7 +308,7 @@ test_x25519 :: proc(t: ^testing.T) {
 test_rand_bytes :: proc(t: ^testing.T) {
 	log(t, "Testing rand_bytes")
 
-	if ODIN_OS != "linux" {
+	if ODIN_OS != .Linux {
 		log(t, "rand_bytes not supported - skipping")
 		return
 	}

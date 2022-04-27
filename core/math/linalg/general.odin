@@ -1,6 +1,7 @@
 package linalg
 
 import "core:math"
+import "core:builtin"
 import "core:intrinsics"
 
 // Generic
@@ -60,14 +61,7 @@ quaternion256_dot :: proc(a, b: $T/quaternion256) -> (c: f64) {
 dot :: proc{scalar_dot, vector_dot, quaternion64_dot, quaternion128_dot, quaternion256_dot}
 
 inner_product :: dot
-outer_product :: proc(a: $A/[$M]$E, b: $B/[$N]E) -> (out: [M][N]E) where IS_NUMERIC(E) #no_bounds_check {
-	for i in 0..<M {
-		for j in 0..<N {
-			out[i][j] = a[i]*b[j]
-		}
-	}
-	return
-}
+outer_product :: builtin.outer_product
 
 quaternion_inverse :: proc(q: $Q) -> Q where IS_QUATERNION(Q) {
 	return conj(q) * quaternion(1.0/dot(q, q), 0, 0, 0)
@@ -163,65 +157,28 @@ identity :: proc($T: typeid/[$N][N]$E) -> (m: T) #no_bounds_check {
 	return m
 }
 
-trace :: proc(m: $T/[$N][N]$E) -> (tr: E) {
-	for i in 0..<N {
-		tr += m[i][i]
-	}
-	return
-}
+trace :: builtin.matrix_trace
+transpose :: builtin.transpose
 
-transpose :: proc(a: $T/[$N][$M]$E) -> (m: (T when N == M else [M][N]E)) #no_bounds_check {
-	for j in 0..<M {
-		for i in 0..<N {
-			m[j][i] = a[i][j]
-		}
-	}
-	return
-}
-
-matrix_mul :: proc(a, b: $M/[$N][N]$E) -> (c: M)
+matrix_mul :: proc(a, b: $M/matrix[$N, N]$E) -> (c: M)
 	where !IS_ARRAY(E), IS_NUMERIC(E) #no_bounds_check {
-	for i in 0..<N {
-		for k in 0..<N {
-			for j in 0..<N {
-				c[k][i] += a[j][i] * b[k][j]
-			}
-		}
-	}
-	return
+	return a * b
 }
 
-matrix_comp_mul :: proc(a, b: $M/[$J][$I]$E) -> (c: M)
+matrix_comp_mul :: proc(a, b: $M/matrix[$I, $J]$E) -> (c: M)
 	where !IS_ARRAY(E), IS_NUMERIC(E) #no_bounds_check {
-	for j in 0..<J {
-		for i in 0..<I {
-			c[j][i] = a[j][i] * b[j][i]
-		}
-	}
-	return
+	return hadamard_product(a, b)
 }
 
-matrix_mul_differ :: proc(a: $A/[$J][$I]$E, b: $B/[$K][J]E) -> (c: [K][I]E)
+matrix_mul_differ :: proc(a: $A/matrix[$I, $J]$E, b: $B/matrix[J, $K]E) -> (c: matrix[I, K]E)
 	where !IS_ARRAY(E), IS_NUMERIC(E), I != K #no_bounds_check {
-	for k in 0..<K {
-		for j in 0..<J {
-			for i in 0..<I {
-				c[k][i] += a[j][i] * b[k][j]
-			}
-		}
-	}
-	return
+	return a * b
 }
 
 
-matrix_mul_vector :: proc(a: $A/[$I][$J]$E, b: $B/[I]E) -> (c: B)
+matrix_mul_vector :: proc(a: $A/matrix[$I, $J]$E, b: $B/[J]E) -> (c: B)
 	where !IS_ARRAY(E), IS_NUMERIC(E) #no_bounds_check {
-	for i in 0..<I {
-		for j in 0..<J {
-			c[j] += a[i][j] * b[i]
-		}
-	}
-	return
+	return a * b
 }
 
 quaternion_mul_quaternion :: proc(q1, q2: $Q) -> Q where IS_QUATERNION(Q) {
@@ -270,8 +227,8 @@ mul :: proc{
 vector_to_ptr :: proc(v: ^$V/[$N]$E) -> ^E where IS_NUMERIC(E), N > 0 #no_bounds_check {
 	return &v[0]
 }
-matrix_to_ptr :: proc(m: ^$A/[$I][$J]$E) -> ^E where IS_NUMERIC(E), I > 0, J > 0 #no_bounds_check {
-	return &m[0][0]
+matrix_to_ptr :: proc(m: ^$A/matrix[$I, $J]$E) -> ^E where IS_NUMERIC(E), I > 0, J > 0 #no_bounds_check {
+	return &m[0, 0]
 }
 
 to_ptr :: proc{vector_to_ptr, matrix_to_ptr}
@@ -330,10 +287,10 @@ array_cast :: proc(v: $A/[$N]$T, $Elem_Type: typeid) -> (w: [N]Elem_Type) #no_bo
 	return
 }
 
-matrix_cast :: proc(v: $A/[$M][$N]$T, $Elem_Type: typeid) -> (w: [M][N]Elem_Type) #no_bounds_check {
-	for i in 0..<M {
-		for j in 0..<N {
-			w[i][j] = Elem_Type(v[i][j])
+matrix_cast :: proc(v: $A/matrix[$M, $N]$T, $Elem_Type: typeid) -> (w: matrix[M, N]Elem_Type) #no_bounds_check {
+	for j in 0..<N {
+		for i in 0..<M {
+			w[i, j] = Elem_Type(v[i, j])
 		}
 	}
 	return
@@ -357,6 +314,6 @@ to_uint :: #force_inline proc(v: $A/[$N]$T) -> [N]uint { return array_cast(v, ui
 to_complex32     :: #force_inline proc(v: $A/[$N]$T) -> [N]complex32     { return array_cast(v, complex32)     }
 to_complex64     :: #force_inline proc(v: $A/[$N]$T) -> [N]complex64     { return array_cast(v, complex64)     }
 to_complex128    :: #force_inline proc(v: $A/[$N]$T) -> [N]complex128    { return array_cast(v, complex128)    }
-to_quaternion64  :: #force_inline proc(v: $A/[$N]$T) -> [N]quaternion64 { return array_cast(v, quaternion64) }
+to_quaternion64  :: #force_inline proc(v: $A/[$N]$T) -> [N]quaternion64  { return array_cast(v, quaternion64)  }
 to_quaternion128 :: #force_inline proc(v: $A/[$N]$T) -> [N]quaternion128 { return array_cast(v, quaternion128) }
 to_quaternion256 :: #force_inline proc(v: $A/[$N]$T) -> [N]quaternion256 { return array_cast(v, quaternion256) }

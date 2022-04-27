@@ -96,7 +96,7 @@ XXH3_128_canonical_from_hash :: proc(hash: XXH128_hash_t) -> (canonical: XXH128_
 	#assert(size_of(XXH128_canonical) == size_of(XXH128_hash_t))
 
 	t := hash
-	when ODIN_ENDIAN == "little" {
+	when ODIN_ENDIAN == .Little {
 		t.high = byte_swap(t.high)
 		t.low  = byte_swap(t.low)
 	}

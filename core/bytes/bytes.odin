@@ -5,9 +5,8 @@ import "core:unicode"
 import "core:unicode/utf8"
 
 clone :: proc(s: []byte, allocator := context.allocator, loc := #caller_location) -> []byte {
-	c := make([]byte, len(s)+1, allocator, loc)
+	c := make([]byte, len(s), allocator, loc)
 	copy(c, s)
-	c[len(s)] = 0
 	return c[:len(s)]
 }
 
@@ -219,60 +218,36 @@ split_after_n :: proc(s, sep: []byte, n: int, allocator := context.allocator) ->
 
 
 @private
-_split_iterator :: proc(s: ^[]byte, sep: []byte, sep_save, n: int) -> (res: []byte, ok: bool) {
-	s, n := s, n
-
-	if n == 0 {
-		return
-	}
-
-	if sep == nil {
+_split_iterator :: proc(s: ^[]byte, sep: []byte, sep_save: int) -> (res: []byte, ok: bool) {
+	if len(sep) == 0 {
 		res = s[:]
 		ok = true
 		s^ = s[len(s):]
 		return
 	}
 
-	if n < 0 {
-		n = count(s^, sep) + 1
-	}
-
-	n -= 1
-
-	i := 0
-	for ; i < n; i += 1 {
-		m := index(s^, sep)
-		if m < 0 {
-			break
-		}
+	m := index(s^, sep)
+	if m < 0 {
+		// not found
+		res = s[:]
+		ok = len(res) != 0
+		s^ = s[len(s):]
+	} else {
 		res = s[:m+sep_save]
 		ok = true
 		s^ = s[m+len(sep):]
-		return
 	}
-	res = s[:]
-	ok = res != nil
-	s^ = s[len(s):]
 	return
 }
 
 
 split_iterator :: proc(s: ^[]byte, sep: []byte) -> ([]byte, bool) {
-	return _split_iterator(s, sep, 0, -1)
-}
-
-split_n_iterator :: proc(s: ^[]byte, sep: []byte, n: int) -> ([]byte, bool) {
-	return _split_iterator(s, sep, 0, n)
+	return _split_iterator(s, sep, 0)
 }
 
 split_after_iterator :: proc(s: ^[]byte, sep: []byte) -> ([]byte, bool) {
-	return _split_iterator(s, sep, len(sep), -1)
+	return _split_iterator(s, sep, len(sep))
 }
-
-split_after_n_iterator :: proc(s: ^[]byte, sep: []byte, n: int) -> ([]byte, bool) {
-	return _split_iterator(s, sep, len(sep), n)
-}
-
 
 
 index_byte :: proc(s: []byte, c: byte) -> int {
@@ -1143,7 +1118,7 @@ fields_proc :: proc(s: []byte, f: proc(rune) -> bool, allocator := context.alloc
 	}
 
 	if start >= 0 {
-		append(&subslices, s[start : end])
+		append(&subslices, s[start : len(s)])
 	}
 
 	return subslices[:]

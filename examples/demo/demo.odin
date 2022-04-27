@@ -11,22 +11,32 @@ import "core:intrinsics"
 import "core:math/big"
 
 /*
-	The Odin programming language is fast, concise, readable, pragmatic and open sourced.
-	It is designed with the intent of replacing C with the following goals:
-	 * simplicity
-	 * high performance
-	 * built for modern systems
-	 * joy of programming
+	Odin is a general-purpose programming language with distinct typing built
+	for high performance, modern systems and data-oriented programming.
+
+	Odin is the C alternative for the Joy of Programming.
 
 	# Installing Odin
 	Getting Started - https://odin-lang.org/docs/install/
 		Instructions for downloading and install the Odin compiler and libraries.
 
 	# Learning Odin
+	Getting Started - https://odin-lang.org/docs/install/
+		Getting Started with Odin. Downloading, installing, and getting your
+		first program to compile and run.
 	Overview of Odin - https://odin-lang.org/docs/overview/
-		An overview of the Odin programming language.
+		An overview of the Odin programming language and its features.
 	Frequently Asked Questions (FAQ) - https://odin-lang.org/docs/faq/
 		Answers to common questions about Odin.
+	Packages - https://pkg.odin-lang.org/
+		Documentation for all the official packages part of the
+		core and vendor library collections.
+	Nightly Builds - https://odin-lang.org/docs/nightly/
+		Get the latest nightly builds of Odin.
+	More Odin Examples - https://github.com/odin-lang/examples
+		This repository contains examples of how certain things can be accomplished 
+		in idiomatic Odin, allowing you learn its semantics, as well as how to use 
+		parts of the core and vendor package collections.
 */
 
 the_basics :: proc() {
@@ -88,6 +98,7 @@ the_basics :: proc() {
 		z: f64 // `z` is typed of type `f64` (64-bit floating point number)
 		z = 1  // `1` is an untyped integer literal which can be implicitly converted to `f64`
 				// No need for any suffixes or decimal places like in other languages
+				// (with the exception of negative zero, which must be given as `-0.0`)
 				// CONSTANTS JUST WORK!!!
 
 
@@ -244,10 +255,10 @@ control_flow :: proc() {
 		// A switch statement is another way to write a sequence of if-else statements.
 		// In Odin, the default case is denoted as a case without any expression.
 
-		switch arch := ODIN_ARCH; arch {
-		case "386":
+		#partial switch arch := ODIN_ARCH; arch {
+		case .i386:
 			fmt.println("32-bit")
-		case "amd64":
+		case .amd64:
 			fmt.println("64-bit")
 		case: // default
 			fmt.println("Unsupported architecture")
@@ -363,12 +374,12 @@ control_flow :: proc() {
 		*/
 
 		// Example
-		when ODIN_ARCH == "386" {
+		when ODIN_ARCH == .i386 {
 			fmt.println("32 bit")
-		} else when ODIN_ARCH == "amd64" {
+		} else when ODIN_ARCH == .amd64 {
 			fmt.println("64 bit")
 		} else {
-			fmt.println("Unsupported architecture")
+			fmt.println("Unknown architecture")
 		}
 		// The when statement is very useful for writing platform specific code.
 		// This is akin to the #if construct in C’s preprocessor however, in Odin,
@@ -1100,11 +1111,6 @@ prefix_table := [?]string{
 }
 
 threading_example :: proc() {
-	if ODIN_OS == "darwin" {
-		// TODO: Fix threads on darwin/macOS
-		return
-	}
-
 	fmt.println("\n# threading_example")
 
 	{ // Basic Threads
@@ -1145,7 +1151,7 @@ threading_example :: proc() {
 
 	{ // Thread Pool
 		fmt.println("\n## Thread Pool")
-		task_proc :: proc(t: ^thread.Task) {
+		task_proc :: proc(t: thread.Task) {
 			index := t.user_index % len(prefix_table)
 			for iteration in 1..=5 {
 				fmt.printf("Worker Task %d is on iteration %d\n", t.user_index, iteration)
@@ -1155,16 +1161,17 @@ threading_example :: proc() {
 		}
 
 		pool: thread.Pool
-		thread.pool_init(pool=&pool, thread_count=3)
+		thread.pool_init(pool=&pool, thread_count=3, allocator=context.allocator)
 		defer thread.pool_destroy(&pool)
 
 
 		for i in 0..<30 {
-			thread.pool_add_task(pool=&pool, procedure=task_proc, data=nil, user_index=i)
+			// be mindful of the allocator used for tasks. The allocator needs to be thread safe, or be owned by the task for exclusive use 
+			thread.pool_add_task(pool=&pool, procedure=task_proc, data=nil, user_index=i, allocator=context.allocator)
 		}
 
 		thread.pool_start(&pool)
-		thread.pool_wait_and_process(&pool)
+		thread.pool_finish(&pool)
 	}
 }
 
@@ -1606,13 +1613,13 @@ where_clauses :: proc() {
 }
 
 
-when ODIN_OS == "windows" {
+when ODIN_OS == .Windows {
 	foreign import kernel32 "system:kernel32.lib"
 }
 
 foreign_system :: proc() {
 	fmt.println("\n#foreign system")
-	when ODIN_OS == "windows" {
+	when ODIN_OS == .Windows {
 		// It is sometimes necessarily to interface with foreign code,
 		// such as a C library. In Odin, this is achieved through the
 		// foreign system. You can “import” a library into the code
@@ -1708,7 +1715,6 @@ deprecated_attribute :: proc() {
 }
 
 range_statements_with_multiple_return_values :: proc() {
-	// IMPORTANT NOTE(bill, 2019-11-02): This feature is subject to be changed/removed
 	fmt.println("\n#range statements with multiple return values")
 	My_Iterator :: struct {
 		index: int,
@@ -1921,14 +1927,14 @@ constant_literal_expressions :: proc() {
 
 	fmt.println("-------")
 
-	Partial_Baz :: enum{A=5, B, C, D=16}
-	#assert(len(Partial_Baz) < len(#partial [Partial_Baz]int))
-	PARTIAL_ENUM_ARRAY_CONST :: #partial [Partial_Baz]int{.A ..= .C = 1, .D = 16}
+	Sparse_Baz :: enum{A=5, B, C, D=16}
+	#assert(len(Sparse_Baz) < len(#sparse[Sparse_Baz]int))
+	SPARSE_ENUM_ARRAY_CONST :: #sparse[Sparse_Baz]int{.A ..= .C = 1, .D = 16}
 
-	fmt.println(PARTIAL_ENUM_ARRAY_CONST[.A])
-	fmt.println(PARTIAL_ENUM_ARRAY_CONST[.B])
-	fmt.println(PARTIAL_ENUM_ARRAY_CONST[.C])
-	fmt.println(PARTIAL_ENUM_ARRAY_CONST[.D])
+	fmt.println(SPARSE_ENUM_ARRAY_CONST[.A])
+	fmt.println(SPARSE_ENUM_ARRAY_CONST[.B])
+	fmt.println(SPARSE_ENUM_ARRAY_CONST[.C])
+	fmt.println(SPARSE_ENUM_ARRAY_CONST[.D])
 
 	fmt.println("-------")
 
@@ -1998,7 +2004,6 @@ relative_data_types :: proc() {
 
 or_else_operator :: proc() {
 	fmt.println("\n#'or_else'")
-	// IMPORTANT NOTE: 'or_else' is an experimental feature and subject to change/removal
 	{
 		m: map[string]int
 		i: int
@@ -2029,8 +2034,6 @@ or_else_operator :: proc() {
 
 or_return_operator :: proc() {
 	fmt.println("\n#'or_return'")
-	// IMPORTANT NOTE: 'or_return' is an experimental feature and subject to change/removal
-	//
 	// The concept of 'or_return' will work by popping off the end value in a multiple
 	// valued expression and checking whether it was not 'nil' or 'false', and if so,
 	// set the end return value to value if possible. If the procedure only has one
@@ -2421,6 +2424,13 @@ matrix_type :: proc() {
 }
 
 main :: proc() {
+	/*
+		For More Odin Examples - https://github.com/odin-lang/examples
+			This repository contains examples of how certain things can be accomplished 
+			in idiomatic Odin, allowing you learn its semantics, as well as how to use 
+			parts of the core and vendor package collections.
+	*/
+
 	when true {
 		the_basics()
 		control_flow()

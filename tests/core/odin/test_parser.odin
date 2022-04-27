@@ -2,7 +2,7 @@ package test_core_odin_parser
 
 import "core:testing"
 import "core:fmt"
-
+import "core:os"
 import "core:odin/parser"
 
 
@@ -22,7 +22,8 @@ when ODIN_TEST {
 		}
 	}
 	log     :: proc(t: ^testing.T, v: any, loc := #caller_location) {
-		fmt.printf("[%v] LOG:\n\t%v\n", loc, v)
+		fmt.printf("[%v] ", loc)
+		fmt.printf("log: %v\n", v)
 	}
 }
 
@@ -30,8 +31,12 @@ main :: proc() {
 	t := testing.T{}
 	test_parse_demo(&t)
 
-	fmt.printf("\n%v/%v tests successful.\n", TEST_count - TEST_fail, TEST_count)
+	fmt.printf("%v/%v tests successful.\n", TEST_count - TEST_fail, TEST_count)
+	if TEST_fail > 0 {
+		os.exit(1)
+	}
 }
+
 
 @test
 test_parse_demo :: proc(t: ^testing.T) {

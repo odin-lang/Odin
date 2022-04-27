@@ -473,6 +473,25 @@ floor_dvec3 :: proc "c" (x: dvec3) -> dvec3 { return {floor(x.x), floor(x.y), fl
 floor_dvec4 :: proc "c" (x: dvec4) -> dvec4 { return {floor(x.x), floor(x.y), floor(x.z), floor(x.w)} }
 
 
+
+round :: proc{
+	round_f32,
+	round_f64,
+	round_vec2,
+	round_vec3,
+	round_vec4,
+	round_dvec2,
+	round_dvec3,
+	round_dvec4,
+}
+round_vec2 :: proc "c" (x: vec2) -> vec2 { return {round(x.x), round(x.y)} }
+round_vec3 :: proc "c" (x: vec3) -> vec3 { return {round(x.x), round(x.y), round(x.z)} }
+round_vec4 :: proc "c" (x: vec4) -> vec4 { return {round(x.x), round(x.y), round(x.z), round(x.w)} }
+round_dvec2 :: proc "c" (x: dvec2) -> dvec2 { return {round(x.x), round(x.y)} }
+round_dvec3 :: proc "c" (x: dvec3) -> dvec3 { return {round(x.x), round(x.y), round(x.z)} }
+round_dvec4 :: proc "c" (x: dvec4) -> dvec4 { return {round(x.x), round(x.y), round(x.z), round(x.w)} }
+
+
 ceil :: proc{
 	ceil_f32,
 	ceil_f64,
@@ -693,23 +712,22 @@ saturate :: proc{
 	saturate_uvec3,
 	saturate_uvec4,
 }
-saturate_i32  :: proc "c" (x, y, z: i32) -> i32   { return builtin.clamp(x, 0, 1) }
-saturate_u32  :: proc "c" (x, y, z: u32) -> u32   { return builtin.clamp(x, 0, 1) }
-saturate_f32  :: proc "c" (x, y, z: f32) -> f32   { return builtin.clamp(x, 0, 1) }
-saturate_f64  :: proc "c" (x, y, z: f64) -> f64   { return builtin.clamp(x, 0, 1) }
-saturate_vec2 :: proc "c" (x, y, z: vec2) -> vec2 { return {builtin.clamp(x.x, 0, 1), builtin.clamp(x.y, 0, 1)} }
-saturate_vec3 :: proc "c" (x, y, z: vec3) -> vec3 { return {builtin.clamp(x.x, 0, 1), builtin.clamp(x.y, 0, 1), builtin.clamp(x.z, 0, 1)} }
-saturate_vec4 :: proc "c" (x, y, z: vec4) -> vec4 { return {builtin.clamp(x.x, 0, 1), builtin.clamp(x.y, 0, 1), builtin.clamp(x.z, 0, 1), builtin.clamp(x.w, 0, 1)} }
-saturate_dvec2 :: proc "c" (x, y, z: dvec2) -> dvec2 { return {builtin.clamp(x.x, 0, 1), builtin.clamp(x.y, 0, 1)} }
-saturate_dvec3 :: proc "c" (x, y, z: dvec3) -> dvec3 { return {builtin.clamp(x.x, 0, 1), builtin.clamp(x.y, 0, 1), builtin.clamp(x.z, 0, 1)} }
-saturate_dvec4 :: proc "c" (x, y, z: dvec4) -> dvec4 { return {builtin.clamp(x.x, 0, 1), builtin.clamp(x.y, 0, 1), builtin.clamp(x.z, 0, 1), builtin.clamp(x.w, 0, 1)} }
-saturate_ivec2 :: proc "c" (x, y, z: ivec2) -> ivec2 { return {builtin.clamp(x.x, 0, 1), builtin.clamp(x.y, 0, 1)} }
-saturate_ivec3 :: proc "c" (x, y, z: ivec3) -> ivec3 { return {builtin.clamp(x.x, 0, 1), builtin.clamp(x.y, 0, 1), builtin.clamp(x.z, 0, 1)} }
-saturate_ivec4 :: proc "c" (x, y, z: ivec4) -> ivec4 { return {builtin.clamp(x.x, 0, 1), builtin.clamp(x.y, 0, 1), builtin.clamp(x.z, 0, 1), builtin.clamp(x.w, 0, 1)} }
-saturate_uvec2 :: proc "c" (x, y, z: uvec2) -> uvec2 { return {builtin.clamp(x.x, 0, 1), builtin.clamp(x.y, 0, 1)} }
-saturate_uvec3 :: proc "c" (x, y, z: uvec3) -> uvec3 { return {builtin.clamp(x.x, 0, 1), builtin.clamp(x.y, 0, 1), builtin.clamp(x.z, 0, 1)} }
-saturate_uvec4 :: proc "c" (x, y, z: uvec4) -> uvec4 { return {builtin.clamp(x.x, 0, 1), builtin.clamp(x.y, 0, 1), builtin.clamp(x.z, 0, 1), builtin.clamp(x.w, 0, 1)} }
-
+saturate_i32  :: proc "c" (v: i32) -> i32   { return builtin.clamp(v, 0, 1) }
+saturate_u32  :: proc "c" (v: u32) -> u32   { return builtin.clamp(v, 0, 1) }
+saturate_f32  :: proc "c" (v: f32) -> f32   { return builtin.clamp(v, 0, 1) }
+saturate_f64  :: proc "c" (v: f64) -> f64   { return builtin.clamp(v, 0, 1) }
+saturate_vec2 :: proc "c" (v: vec2) -> vec2 { return {builtin.clamp(v.x, 0, 1), builtin.clamp(v.y, 0, 1)} }
+saturate_vec3 :: proc "c" (v: vec3) -> vec3 { return {builtin.clamp(v.x, 0, 1), builtin.clamp(v.y, 0, 1), builtin.clamp(v.z, 0, 1)} }
+saturate_vec4 :: proc "c" (v: vec4) -> vec4 { return {builtin.clamp(v.x, 0, 1), builtin.clamp(v.y, 0, 1), builtin.clamp(v.z, 0, 1), builtin.clamp(v.w, 0, 1)} }
+saturate_dvec2 :: proc "c" (v: dvec2) -> dvec2 { return {builtin.clamp(v.x, 0, 1), builtin.clamp(v.y, 0, 1)} }
+saturate_dvec3 :: proc "c" (v: dvec3) -> dvec3 { return {builtin.clamp(v.x, 0, 1), builtin.clamp(v.y, 0, 1), builtin.clamp(v.z, 0, 1)} }
+saturate_dvec4 :: proc "c" (v: dvec4) -> dvec4 { return {builtin.clamp(v.x, 0, 1), builtin.clamp(v.y, 0, 1), builtin.clamp(v.z, 0, 1), builtin.clamp(v.w, 0, 1)} }
+saturate_ivec2 :: proc "c" (v: ivec2) -> ivec2 { return {builtin.clamp(v.x, 0, 1), builtin.clamp(v.y, 0, 1)} }
+saturate_ivec3 :: proc "c" (v: ivec3) -> ivec3 { return {builtin.clamp(v.x, 0, 1), builtin.clamp(v.y, 0, 1), builtin.clamp(v.z, 0, 1)} }
+saturate_ivec4 :: proc "c" (v: ivec4) -> ivec4 { return {builtin.clamp(v.x, 0, 1), builtin.clamp(v.y, 0, 1), builtin.clamp(v.z, 0, 1), builtin.clamp(v.w, 0, 1)} }
+saturate_uvec2 :: proc "c" (v: uvec2) -> uvec2 { return {builtin.clamp(v.x, 0, 1), builtin.clamp(v.y, 0, 1)} }
+saturate_uvec3 :: proc "c" (v: uvec3) -> uvec3 { return {builtin.clamp(v.x, 0, 1), builtin.clamp(v.y, 0, 1), builtin.clamp(v.z, 0, 1)} }
+saturate_uvec4 :: proc "c" (v: uvec4) -> uvec4 { return {builtin.clamp(v.x, 0, 1), builtin.clamp(v.y, 0, 1), builtin.clamp(v.z, 0, 1), builtin.clamp(v.w, 0, 1)} }
 
 mix :: proc{
 	mix_f32,
@@ -1597,7 +1615,7 @@ quatNlerp :: proc "c" (a, b: quat, t: f32) -> (c: quat) {
 	c.y = a.y + (b.y-a.y)*t
 	c.z = a.z + (b.z-a.z)*t
 	c.w = a.w + (b.w-a.w)*t
-	return c/builtin.abs(c)
+	return c/quat(builtin.abs(c))
 }
 
 quatSlerp :: proc "c" (x, y: quat, t: f32) -> (q: quat) {
@@ -1699,7 +1717,7 @@ dquatNlerp :: proc "c" (a, b: dquat, t: f64) -> (c: dquat) {
 	c.y = a.y + (b.y-a.y)*t
 	c.z = a.z + (b.z-a.z)*t
 	c.w = a.w + (b.w-a.w)*t
-	return c/builtin.abs(c)
+	return c/dquat(builtin.abs(c))
 }
 
 dquatSlerp :: proc "c" (x, y: dquat, t: f64) -> (q: dquat) {

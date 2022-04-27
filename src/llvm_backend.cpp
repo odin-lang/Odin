@@ -624,6 +624,9 @@ struct lbGlobalVariable {
 };
 
 lbProcedure *lb_create_startup_type_info(lbModule *m) {
+	if (build_context.disallow_rtti) {
+		return nullptr;
+	}
 	LLVMPassManagerRef default_function_pass_manager = LLVMCreateFunctionPassManagerForModule(m->mod);
 	lb_populate_function_pass_manager(m, default_function_pass_manager, false, build_context.optimization_level);
 	LLVMFinalizeFunctionPassManager(default_function_pass_manager);
@@ -652,7 +655,54 @@ lbProcedure *lb_create_startup_type_info(lbModule *m) {
 	return p;
 }
 
-lbProcedure *lb_create_startup_runtime(lbModule *main_module, lbProcedure *startup_type_info, Array<lbGlobalVariable> &global_variables) { // Startup Runtime
+lbProcedure *lb_create_objc_names(lbModule *main_module) {
+	if (build_context.metrics.os != TargetOs_darwin) {
+		return nullptr;
+	}
+	Type *proc_type = alloc_type_proc(nullptr, nullptr, 0, nullptr, 0, false, ProcCC_CDecl);
+	lbProcedure *p = lb_create_dummy_procedure(main_module, str_lit("__$init_objc_names"), proc_type);
+	p->is_startup = true;
+	return p;
+}
+
+void lb_finalize_objc_names(lbProcedure *p) {
+	if (p == nullptr) {
+		return;
+	}
+	lbModule *m = p->module;
+
+	LLVMPassManagerRef default_function_pass_manager = LLVMCreateFunctionPassManagerForModule(m->mod);
+	lb_populate_function_pass_manager(m, default_function_pass_manager, false, build_context.optimization_level);
+	LLVMFinalizeFunctionPassManager(default_function_pass_manager);
+
+
+	auto args = array_make<lbValue>(permanent_allocator(), 1);
+
+	LLVMSetLinkage(p->value, LLVMInternalLinkage);
+	lb_begin_procedure_body(p);
+	for_array(i, m->objc_classes.entries) {
+		auto const &entry = m->objc_classes.entries[i];
+		String name = entry.key.string;
+		args[0] = lb_const_value(m, t_cstring, exact_value_string(name));
+		lbValue ptr = lb_emit_runtime_call(p, "objc_lookUpClass", args);
+		lb_addr_store(p, entry.value, ptr);
+	}
+
+	for_array(i, m->objc_selectors.entries) {
+		auto const &entry = m->objc_selectors.entries[i];
+		String name = entry.key.string;
+		args[0] = lb_const_value(m, t_cstring, exact_value_string(name));
+		lbValue ptr = lb_emit_runtime_call(p, "sel_registerName", args);
+		lb_addr_store(p, entry.value, ptr);
+	}
+
+	lb_end_procedure_body(p);
+
+	lb_run_function_pass_manager(default_function_pass_manager, p);
+
+}
+
+lbProcedure *lb_create_startup_runtime(lbModule *main_module, lbProcedure *startup_type_info, lbProcedure *objc_names, Array<lbGlobalVariable> &global_variables) { // Startup Runtime
 	LLVMPassManagerRef default_function_pass_manager = LLVMCreateFunctionPassManagerForModule(main_module->mod);
 	lb_populate_function_pass_manager(main_module, default_function_pass_manager, false, build_context.optimization_level);
 	LLVMFinalizeFunctionPassManager(default_function_pass_manager);
@@ -664,7 +714,13 @@ lbProcedure *lb_create_startup_runtime(lbModule *main_module, lbProcedure *start
 
 	lb_begin_procedure_body(p);
 
-	LLVMBuildCall2(p->builder, LLVMGetElementType(lb_type(main_module, startup_type_info->type)), startup_type_info->value, nullptr, 0, "");
+	if (startup_type_info) {
+		LLVMBuildCall2(p->builder, LLVMGetElementType(lb_type(main_module, startup_type_info->type)), startup_type_info->value, nullptr, 0, "");
+	}
+
+	if (objc_names) {
+		LLVMBuildCall2(p->builder, LLVMGetElementType(lb_type(main_module, objc_names->type)), objc_names->value, nullptr, 0, "");
+	}
 
 	for_array(i, global_variables) {
 		auto *var = &global_variables[i];
@@ -783,7 +839,7 @@ lbProcedure *lb_create_main_procedure(lbModule *m, lbProcedure *startup_runtime)
 		params->Tuple.variables[1] = alloc_entity_param(nullptr, make_token_ident("fdwReason"),  t_u32,    false, true);
 		params->Tuple.variables[2] = alloc_entity_param(nullptr, make_token_ident("lpReserved"), t_rawptr, false, true);
 		call_cleanup = false;
-	} else if (build_context.metrics.os == TargetOs_windows && (build_context.metrics.arch == TargetArch_386 || build_context.no_crt)) {
+	} else if (build_context.metrics.os == TargetOs_windows && (build_context.metrics.arch == TargetArch_i386 || build_context.no_crt)) {
 		name = str_lit("mainCRTStartup");
 	} else if (is_arch_wasm()) {
 		name = str_lit("_start");
@@ -873,7 +929,7 @@ lbProcedure *lb_create_main_procedure(lbModule *m, lbProcedure *startup_runtime)
 	} else {
 		if (m->info->entry_point != nullptr) {
 			lbValue entry_point = lb_find_procedure_value_from_entity(m, m->info->entry_point);
-			lb_emit_call(p, entry_point, {});
+			lb_emit_call(p, entry_point, {}, ProcInlining_no_inline);
 		}
 	}
 
@@ -911,7 +967,12 @@ lbProcedure *lb_create_main_procedure(lbModule *m, lbProcedure *startup_runtime)
 }
 
 String lb_filepath_ll_for_module(lbModule *m) {
-	String path = m->gen->output_base;
+	String path = concatenate3_strings(permanent_allocator(),
+		build_context.build_paths[BuildPath_Output].basename,
+		STR_LIT("/"),
+		build_context.build_paths[BuildPath_Output].name
+	);
+
 	if (m->pkg) {
 		path = concatenate3_strings(permanent_allocator(), path, STR_LIT("-"), m->pkg->name);
 	} else if (USE_SEPARATE_MODULES) {
@@ -922,7 +983,12 @@ String lb_filepath_ll_for_module(lbModule *m) {
 	return path;
 }
 String lb_filepath_obj_for_module(lbModule *m) {
-	String path = m->gen->output_base;
+	String path = concatenate3_strings(permanent_allocator(),
+		build_context.build_paths[BuildPath_Output].basename,
+		STR_LIT("/"),
+		build_context.build_paths[BuildPath_Output].name
+	);
+
 	if (m->pkg) {
 		path = concatenate3_strings(permanent_allocator(), path, STR_LIT("-"), m->pkg->name);
 	}
@@ -944,6 +1010,19 @@ String lb_filepath_obj_for_module(lbModule *m) {
 			case TargetOs_linux:
 			case TargetOs_essence:
 				ext = STR_LIT(".o");
+				break;
+
+			case TargetOs_freestanding:
+				switch (build_context.metrics.abi) {
+				default:
+				case TargetABI_Default:
+				case TargetABI_SysV:
+					ext = STR_LIT(".o");
+					break;
+				case TargetABI_Win64:
+					ext = STR_LIT(".obj");
+					break;
+				}
 				break;
 			}
 		}
@@ -1140,7 +1219,7 @@ void lb_generate_code(lbGenerator *gen) {
 
 	switch (build_context.metrics.arch) {
 	case TargetArch_amd64: 
-	case TargetArch_386:
+	case TargetArch_i386:
 		LLVMInitializeX86TargetInfo();
 		LLVMInitializeX86Target();
 		LLVMInitializeX86TargetMC();
@@ -1197,6 +1276,8 @@ void lb_generate_code(lbGenerator *gen) {
 	LLVMCodeModel code_mode = LLVMCodeModelDefault;
 	if (is_arch_wasm()) {
 		code_mode = LLVMCodeModelJITDefault;
+	} else if (build_context.metrics.os == TargetOs_freestanding) {
+		code_mode = LLVMCodeModelKernel;
 	}
 
 	char const *host_cpu_name = LLVMGetHostCPUName();
@@ -1219,8 +1300,16 @@ void lb_generate_code(lbGenerator *gen) {
 		// x86-64-v3: (close to Haswell) AVX, AVX2, BMI1, BMI2, F16C, FMA, LZCNT, MOVBE, XSAVE
 		// x86-64-v4: AVX512F, AVX512BW, AVX512CD, AVX512DQ, AVX512VL
 		if (ODIN_LLVM_MINIMUM_VERSION_12) {
-			llvm_cpu = "x86-64-v2";
+			if (build_context.metrics.os == TargetOs_freestanding) {
+				llvm_cpu = "x86-64";
+			} else {
+				llvm_cpu = "x86-64-v2";
+			}
 		}
+	}
+
+	if (build_context.target_features.len != 0) {
+		llvm_features = alloc_cstring(permanent_allocator(), build_context.target_features);
 	}
 
 	// GB_ASSERT_MSG(LLVMTargetHasAsmBackend(target));
@@ -1238,12 +1327,36 @@ void lb_generate_code(lbGenerator *gen) {
 	// NOTE(bill, 2021-05-04): Target machines must be unique to each module because they are not thread safe
 	auto target_machines = array_make<LLVMTargetMachineRef>(permanent_allocator(), gen->modules.entries.count);
 
+	// NOTE(dweiler): Dynamic libraries require position-independent code.
+	LLVMRelocMode reloc_mode = LLVMRelocDefault;
+	if (build_context.build_mode == BuildMode_DynamicLibrary) {
+		reloc_mode = LLVMRelocPIC;
+	}
+
+	switch (build_context.reloc_mode) {
+	case RelocMode_Default:
+		if (build_context.metrics.os == TargetOs_openbsd) {
+			// Always use PIC for OpenBSD: it defaults to PIE
+			reloc_mode = LLVMRelocPIC;
+		}
+		break;
+	case RelocMode_Static:
+		reloc_mode = LLVMRelocStatic;
+		break;
+	case RelocMode_PIC:
+		reloc_mode = LLVMRelocPIC;
+		break;
+	case RelocMode_DynamicNoPIC:
+		reloc_mode = LLVMRelocDynamicNoPic;
+		break;
+	}
+
 	for_array(i, gen->modules.entries) {
 		target_machines[i] = LLVMCreateTargetMachine(
 			target, target_triple, llvm_cpu,
 			llvm_features,
 			code_gen_level,
-			LLVMRelocDefault,
+			reloc_mode,
 			code_mode);
 		LLVMSetModuleDataLayout(gen->modules.entries[i].value->mod, LLVMCreateTargetDataLayout(target_machines[i]));
 	}
@@ -1304,7 +1417,7 @@ void lb_generate_code(lbGenerator *gen) {
 
 	TIME_SECTION("LLVM Global Variables");
 
-	{
+	if (!build_context.disallow_rtti) {
 		lbModule *m = default_module;
 
 		{ // Add type info data
@@ -1399,30 +1512,30 @@ void lb_generate_code(lbGenerator *gen) {
 
 
 	isize global_variable_max_count = 0;
-	Entity *entry_point = info->entry_point;
-	bool has_dll_main = false;
-	bool has_win_main = false;
+	bool already_has_entry_point = false;
 
 	for_array(i, info->entities) {
 		Entity *e = info->entities[i];
 		String name = e->token.string;
 
-		bool is_global = e->pkg != nullptr;
-
 		if (e->kind == Entity_Variable) {
 			global_variable_max_count++;
-		} else if (e->kind == Entity_Procedure && !is_global) {
+		} else if (e->kind == Entity_Procedure) {
 			if ((e->scope->flags&ScopeFlag_Init) && name == "main") {
-				GB_ASSERT(e == entry_point);
-				// entry_point = e;
+				GB_ASSERT(e == info->entry_point);
 			}
-			if (e->Procedure.is_export ||
-			    (e->Procedure.link_name.len > 0) ||
-			    ((e->scope->flags&ScopeFlag_File) && e->Procedure.link_name.len > 0)) {
-				if (!has_dll_main && name == "DllMain") {
-					has_dll_main = true;
-				} else if (!has_win_main && name == "WinMain") {
-					has_win_main = true;
+			if (build_context.command_kind == Command_test &&
+			    (e->Procedure.is_export || e->Procedure.link_name.len > 0)) {
+				String link_name = e->Procedure.link_name;
+				if (e->pkg->kind == Package_Runtime) {
+					if (link_name == "main"           ||
+					    link_name == "DllMain"        ||
+					    link_name == "WinMain"        ||
+					    link_name == "wWinMain"       ||
+					    link_name == "mainCRTStartup" ||
+					    link_name == "_start") {
+						already_has_entry_point = true;
+					}
 				}
 			}
 		}
@@ -1560,6 +1673,14 @@ void lb_generate_code(lbGenerator *gen) {
 		}
 	}
 
+	TIME_SECTION("LLVM Runtime Type Information Creation");
+	lbProcedure *startup_type_info = lb_create_startup_type_info(default_module);
+
+	lbProcedure *objc_names = lb_create_objc_names(default_module);
+
+	TIME_SECTION("LLVM Runtime Startup Creation (Global Variables)");
+	lbProcedure *startup_runtime = lb_create_startup_runtime(default_module, startup_type_info, objc_names, global_variables);
+	gb_unused(startup_runtime);
 
 	TIME_SECTION("LLVM Global Procedures and Types");
 	for_array(i, info->entities) {
@@ -1619,14 +1740,6 @@ void lb_generate_code(lbGenerator *gen) {
 		}
 	}
 
-
-	TIME_SECTION("LLVM Runtime Type Information Creation");
-	lbProcedure *startup_type_info = lb_create_startup_type_info(default_module);
-
-	TIME_SECTION("LLVM Runtime Startup Creation (Global Variables)");
-	lbProcedure *startup_runtime = lb_create_startup_runtime(default_module, startup_type_info, global_variables);
-
-
 	TIME_SECTION("LLVM Procedure Generation");
 	for_array(j, gen->modules.entries) {
 		lbModule *m = gen->modules.entries[j].value;
@@ -1636,8 +1749,7 @@ void lb_generate_code(lbGenerator *gen) {
 		}
 	}
 
-
-	if (!(build_context.build_mode == BuildMode_DynamicLibrary && !has_dll_main)) {
+	if (build_context.command_kind == Command_test && !already_has_entry_point) {
 		TIME_SECTION("LLVM main");
 		lb_create_main_procedure(default_module, startup_runtime);
 	}
@@ -1651,6 +1763,8 @@ void lb_generate_code(lbGenerator *gen) {
 		}
 	}
 
+	lb_finalize_objc_names(objc_names);
+
 	if (build_context.ODIN_DEBUG) {
 		TIME_SECTION("LLVM Debug Info Complete Types and Finalize");
 		for_array(j, gen->modules.entries) {
@@ -1661,6 +1775,7 @@ void lb_generate_code(lbGenerator *gen) {
 			}
 		}
 	}
+
 
 
 	TIME_SECTION("LLVM Function Pass");

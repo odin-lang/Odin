@@ -6,12 +6,40 @@
 		Jeroen van Rijn: Initial implementation, optimization.
 		Ginger Bill:     Cosmetic changes.
 */
+
+// package image implements a general 2D image library to be used with other image related packages
 package image
 
 import "core:bytes"
 import "core:mem"
 import "core:compress"
 import "core:runtime"
+
+/*
+	67_108_864 pixels max by default.
+
+	For QOI, the Worst case scenario means all pixels will be encoded as RGBA literals, costing 5 bytes each.
+	This caps memory usage at 320 MiB.
+
+	The tunable is limited to 4_294_836_225 pixels maximum, or 4 GiB per 8-bit channel.
+	It is not advised to tune it this large.
+
+	The 64 Megapixel default is considered to be a decent upper bound you won't run into in practice,
+	except in very specific circumstances.
+
+*/
+MAX_DIMENSIONS :: min(#config(MAX_DIMENSIONS, 8192 * 8192), 65535 * 65535)
+
+// Color
+RGB_Pixel     :: [3]u8
+RGBA_Pixel    :: [4]u8
+RGB_Pixel_16  :: [3]u16
+RGBA_Pixel_16 :: [4]u16
+// Grayscale
+G_Pixel       :: [1]u8
+GA_Pixel      :: [2]u8
+G_Pixel_16    :: [1]u16
+GA_Pixel_16   :: [2]u16
 
 Image :: struct {
 	width:         int,
@@ -24,14 +52,16 @@ Image :: struct {
 		For convenience, we return them as u16 so we don't need to switch on the type
 		in our viewer, and can just test against nil.
 	*/
-	background:    Maybe([3]u16),
-
+	background:    Maybe(RGB_Pixel_16),
 	metadata:      Image_Metadata,
 }
 
 Image_Metadata :: union {
 	^PNG_Info,
+	^QOI_Info,
 }
+
+
 
 /*
 	IMPORTANT: `.do_not_expand_*` options currently skip handling of the `alpha_*` options,
@@ -44,13 +74,13 @@ Image_Metadata :: union {
 /*
 Image_Option:
 	`.info`
-		This option behaves as `.return_ihdr` and `.do_not_decompress_image` and can be used
+		This option behaves as `.return_metadata` and `.do_not_decompress_image` and can be used
 		to gather an image's dimensions and color information.
 
 	`.return_header`
-		Fill out img.sidecar.header with the image's format-specific header struct.
+		Fill out img.metadata.header with the image's format-specific header struct.
 		If we only care about the image specs, we can set `.return_header` +
-		`.do_not_decompress_image`, or `.info`, which works as if both of these were set.
+		`.do_not_decompress_image`, or `.info`.
 
 	`.return_metadata`
 		Returns all chunks not needed to decode the data.
@@ -86,7 +116,7 @@ Image_Option:
 
 	`.alpha_premultiply`
 		If the image has an alpha channel, returns image data as follows:
-			RGB  *= A, Gray = Gray *= A
+			RGB *= A, Gray = Gray *= A
 
 	`.blend_background`
 		If a bKGD chunk is present in a PNG, we normally just set `img.background`
@@ -101,24 +131,29 @@ Image_Option:
 */
 
 Option :: enum {
+	// LOAD OPTIONS
 	info = 0,
 	do_not_decompress_image,
 	return_header,
 	return_metadata,
-	alpha_add_if_missing,
-	alpha_drop_if_present,
-	alpha_premultiply,
-	blend_background,
+	alpha_add_if_missing,          // Ignored for QOI. Always returns RGBA8.
+	alpha_drop_if_present,         // Unimplemented for QOI. Returns error.
+	alpha_premultiply,             // Unimplemented for QOI. Returns error.
+	blend_background,              // Ignored for non-PNG formats
 	// Unimplemented
 	do_not_expand_grayscale,
 	do_not_expand_indexed,
 	do_not_expand_channels,
+
+	// SAVE OPTIONS
+	qoi_all_channels_linear,       // QOI, informative info. If not set, defaults to sRGB with linear alpha.
 }
 Options :: distinct bit_set[Option]
 
-Error :: union {
+Error :: union #shared_nil {
 	General_Image_Error,
 	PNG_Error,
+	QOI_Error,
 
 	compress.Error,
 	compress.General_Error,
@@ -132,9 +167,15 @@ General_Image_Error :: enum {
 	Invalid_Image_Dimensions,
 	Image_Dimensions_Too_Large,
 	Image_Does_Not_Adhere_to_Spec,
+	Invalid_Input_Image,
+	Invalid_Output,
 }
 
+/*
+	PNG-specific definitions
+*/
 PNG_Error :: enum {
+	None = 0,
 	Invalid_PNG_Signature,
 	IHDR_Not_First_Chunk,
 	IHDR_Corrupt,
@@ -144,7 +185,9 @@ PNG_Error :: enum {
 	IDAT_Size_Too_Large,
 	PLTE_Encountered_Unexpectedly,
 	PLTE_Invalid_Length,
+	PLTE_Missing,
 	TRNS_Encountered_Unexpectedly,
+	TNRS_Invalid_Length,
 	BKGD_Invalid_Length,
 	Unknown_Color_Type,
 	Invalid_Color_Bit_Depth_Combo,
@@ -155,9 +198,6 @@ PNG_Error :: enum {
 	Invalid_Chunk_Length,
 }
 
-/*
-	PNG-specific structs
-*/
 PNG_Info :: struct {
 	header: PNG_IHDR,
 	chunks: [dynamic]PNG_Chunk,
@@ -220,7 +260,7 @@ PNG_Chunk_Type :: enum u32be {
 
 	*/
 	iDOT = 'i' << 24 | 'D' << 16 | 'O' << 8 | 'T',
-	CbGI = 'C' << 24 | 'b' << 16 | 'H' << 8 | 'I',
+	CgBI = 'C' << 24 | 'g' << 16 | 'B' << 8 | 'I',
 }
 
 PNG_IHDR :: struct #packed {
@@ -248,16 +288,58 @@ PNG_Interlace_Method :: enum u8 {
 }
 
 /*
-	Functions to help with image buffer calculations
+	QOI-specific definitions
 */
+QOI_Error :: enum {
+	None = 0,
+	Invalid_QOI_Signature,
+	Invalid_Number_Of_Channels, // QOI allows 3 or 4 channel data.
+	Invalid_Bit_Depth,          // QOI supports only 8-bit images, error only returned from writer.
+	Invalid_Color_Space,        // QOI allows 0 = sRGB or 1 = linear.
+	Corrupt,                    // More data than pixels to decode into, for example.
+	Missing_Or_Corrupt_Trailer, // Image seemed to have decoded okay, but trailer is missing or corrupt.
+}
+
+QOI_Magic :: u32be(0x716f6966)      // "qoif"
+
+QOI_Color_Space :: enum u8 {
+	sRGB   = 0,
+	Linear = 1,
+}
+
+QOI_Header :: struct #packed {
+	magic:       u32be,
+	width:       u32be,
+	height:      u32be,
+	channels:    u8,
+	color_space: QOI_Color_Space,
+}
+#assert(size_of(QOI_Header) == 14)
+
+QOI_Info :: struct {
+	header: QOI_Header,
+}
+
+TGA_Header :: struct #packed {
+	id_length:        u8,
+	color_map_type:   u8,
+	data_type_code:   u8,
+	color_map_origin: u16le,
+	color_map_length: u16le,
+	color_map_depth:  u8,
+	origin:           [2]u16le,
+	dimensions:       [2]u16le,
+	bits_per_pixel:   u8,
+	image_descriptor: u8,
+}
+#assert(size_of(TGA_Header) == 18)
+
+// Function to help with image buffer calculations
 compute_buffer_size :: proc(width, height, channels, depth: int, extra_row_bytes := int(0)) -> (size: int) {
 	size = ((((channels * width * depth) + 7) >> 3) + extra_row_bytes) * height
 	return
 }
 
-/*
-	For when you have an RGB(A) image, but want a particular channel.
-*/
 Channel :: enum u8 {
 	R = 1,
 	G = 2,
@@ -265,7 +347,13 @@ Channel :: enum u8 {
 	A = 4,
 }
 
+// When you have an RGB(A) image, but want a particular channel.
 return_single_channel :: proc(img: ^Image, channel: Channel) -> (res: ^Image, ok: bool) {
+	// Were we actually given a valid image?
+	if img == nil {
+		return nil, false
+	}
+
 	ok = false
 	t: bytes.Buffer
 
@@ -295,7 +383,7 @@ return_single_channel :: proc(img: ^Image, channel: Channel) -> (res: ^Image, ok
 			o = o[1:]
 		}
 	case 16:
-		buffer_size := compute_buffer_size(img.width, img.height, 2, 8)
+		buffer_size := compute_buffer_size(img.width, img.height, 1, 16)
 		t = bytes.Buffer{}
 		resize(&t.buf, buffer_size)
 
@@ -322,4 +410,725 @@ return_single_channel :: proc(img: ^Image, channel: Channel) -> (res: ^Image, ok
 	res.metadata      = img.metadata
 
 	return res, true
+}
+
+// Does the image have 1 or 2 channels, a valid bit depth (8 or 16),
+// Is the pointer valid, are the dimenions valid?
+is_valid_grayscale_image :: proc(img: ^Image) -> (ok: bool) {
+	// Were we actually given a valid image?
+	if img == nil {
+		return false
+	}
+
+	// Are we a Gray or Gray + Alpha image?
+	if img.channels != 1 && img.channels != 2 {
+		return false
+	}
+
+	// Do we have an acceptable bit depth?
+	if img.depth != 8 && img.depth != 16 {
+		return false
+	}
+
+	// This returns 0 if any of the inputs is zero.
+	bytes_expected := compute_buffer_size(img.width, img.height, img.channels, img.depth)
+
+	// If the dimenions are invalid or the buffer size doesn't match the image characteristics, bail.
+	if bytes_expected == 0 || bytes_expected != len(img.pixels.buf) || img.width * img.height > MAX_DIMENSIONS {
+		return false
+	}
+
+	return true
+}
+
+// Does the image have 3 or 4 channels, a valid bit depth (8 or 16),
+// Is the pointer valid, are the dimenions valid?
+is_valid_color_image :: proc(img: ^Image) -> (ok: bool) {
+	// Were we actually given a valid image?
+	if img == nil {
+		return false
+	}
+
+	// Are we an RGB or RGBA image?
+	if img.channels != 3 && img.channels != 4 {
+		return false
+	}
+
+	// Do we have an acceptable bit depth?
+	if img.depth != 8 && img.depth != 16 {
+		return false
+	}
+
+	// This returns 0 if any of the inputs is zero.
+	bytes_expected := compute_buffer_size(img.width, img.height, img.channels, img.depth)
+
+	// If the dimenions are invalid or the buffer size doesn't match the image characteristics, bail.
+	if bytes_expected == 0 || bytes_expected != len(img.pixels.buf) || img.width * img.height > MAX_DIMENSIONS {
+		return false
+	}
+
+	return true
+}
+
+// Does the image have 1..4 channels, a valid bit depth (8 or 16),
+// Is the pointer valid, are the dimenions valid?
+is_valid_image :: proc(img: ^Image) -> (ok: bool) {
+	// Were we actually given a valid image?
+	if img == nil {
+		return false
+	}
+
+	return is_valid_color_image(img) || is_valid_grayscale_image(img)
+}
+
+Alpha_Key :: union {
+	GA_Pixel,
+	RGBA_Pixel,
+	GA_Pixel_16,
+	RGBA_Pixel_16,
+}
+
+/*
+	Add alpha channel if missing, in-place.
+
+	Expects 1..4 channels (Gray, Gray + Alpha, RGB, RGBA).
+	Any other number of channels will be considered an error, returning `false` without modifying the image.
+	If the input image already has an alpha channel, it'll return `true` early (without considering optional keyed alpha).
+
+	If an image doesn't already have an alpha channel:
+	If the optional `alpha_key` is provided, it will be resolved as follows:
+		- For RGB,  if pix = key.rgb -> pix = {0, 0, 0, key.a}
+		- For Gray, if pix = key.r  -> pix = {0, key.g}
+	Otherwise, an opaque alpha channel will be added.
+*/
+alpha_add_if_missing :: proc(img: ^Image, alpha_key := Alpha_Key{}, allocator := context.allocator) -> (ok: bool) {
+	context.allocator = allocator
+
+	if !is_valid_image(img) {
+		return false
+	}
+
+	// We should now have a valid Image with 1..4 channels. Do we already have alpha?
+	if img.channels == 2 || img.channels == 4 {
+		// We're done.
+		return true
+	}
+
+	channels     := img.channels + 1
+	bytes_wanted := compute_buffer_size(img.width, img.height, channels, img.depth)
+
+	buf := bytes.Buffer{}
+
+	// Can we allocate the return buffer?
+	if !resize(&buf.buf, bytes_wanted) {
+		delete(buf.buf)
+		return false
+	}
+
+	switch img.depth {
+	case 8:
+		switch channels {
+		case 2:
+			// Turn Gray into Gray + Alpha
+			inp := mem.slice_data_cast([]G_Pixel,  img.pixels.buf[:])
+			out := mem.slice_data_cast([]GA_Pixel, buf.buf[:])
+
+			if key, key_ok := alpha_key.(GA_Pixel); key_ok {
+				// We have keyed alpha.
+				o: GA_Pixel
+				for p in inp {
+					if p == key.r {
+						o = GA_Pixel{0, key.g}
+					} else {
+						o = GA_Pixel{p.r, 255}
+					}
+					out[0] = o
+					out = out[1:]
+				}
+			} else {
+				// No keyed alpha, just make all pixels opaque.
+				o := GA_Pixel{0, 255}
+				for p in inp {
+					o.r    = p.r
+					out[0] = o
+					out = out[1:]
+				}
+			}
+
+		case 4:
+			// Turn RGB into RGBA
+			inp := mem.slice_data_cast([]RGB_Pixel,  img.pixels.buf[:])
+			out := mem.slice_data_cast([]RGBA_Pixel, buf.buf[:])
+
+			if key, key_ok := alpha_key.(RGBA_Pixel); key_ok {
+				// We have keyed alpha.
+				o: RGBA_Pixel
+				for p in inp {
+					if p == key.rgb {
+						o = RGBA_Pixel{0, 0, 0, key.a}
+					} else {
+						o = RGBA_Pixel{p.r, p.g, p.b, 255}
+					}
+					out[0] = o
+					out = out[1:]
+				}
+			} else {
+				// No keyed alpha, just make all pixels opaque.
+				o := RGBA_Pixel{0, 0, 0, 255}
+				for p in inp {
+					o.rgb  = p
+					out[0] = o
+					out = out[1:]
+				}
+			}
+		case:
+			// We shouldn't get here.
+			unreachable()
+		}
+	case 16:
+		switch channels {
+		case 2:
+			// Turn Gray into Gray + Alpha
+			inp := mem.slice_data_cast([]G_Pixel_16,  img.pixels.buf[:])
+			out := mem.slice_data_cast([]GA_Pixel_16, buf.buf[:])
+
+			if key, key_ok := alpha_key.(GA_Pixel_16); key_ok {
+				// We have keyed alpha.
+				o: GA_Pixel_16
+				for p in inp {
+					if p == key.r {
+						o = GA_Pixel_16{0, key.g}
+					} else {
+						o = GA_Pixel_16{p.r, 65535}
+					}
+					out[0] = o
+					out = out[1:]
+				}
+			} else {
+				// No keyed alpha, just make all pixels opaque.
+				o := GA_Pixel_16{0, 65535}
+				for p in inp {
+					o.r    = p.r
+					out[0] = o
+					out = out[1:]
+				}
+			}
+
+		case 4:
+			// Turn RGB into RGBA
+			inp := mem.slice_data_cast([]RGB_Pixel_16,  img.pixels.buf[:])
+			out := mem.slice_data_cast([]RGBA_Pixel_16, buf.buf[:])
+
+			if key, key_ok := alpha_key.(RGBA_Pixel_16); key_ok {
+				// We have keyed alpha.
+				o: RGBA_Pixel_16
+				for p in inp {
+					if p == key.rgb {
+						o = RGBA_Pixel_16{0, 0, 0, key.a}
+					} else {
+						o = RGBA_Pixel_16{p.r, p.g, p.b, 65535}
+					}
+					out[0] = o
+					out = out[1:]
+				}
+			} else {
+				// No keyed alpha, just make all pixels opaque.
+				o := RGBA_Pixel_16{0, 0, 0, 65535}
+				for p in inp {
+					o.rgb  = p
+					out[0] = o
+					out = out[1:]
+				}
+			}
+		case:
+			// We shouldn't get here.
+			unreachable()
+		}
+	}
+
+	// If we got here, that means we've now got a buffer with the alpha channel added.
+	// Destroy the old pixel buffer and replace it with the new one, and update the channel count.
+	bytes.buffer_destroy(&img.pixels)
+	img.pixels   = buf
+	img.channels = channels
+	return true
+}
+alpha_apply_keyed_alpha :: alpha_add_if_missing
+
+/*
+	Drop alpha channel if present, in-place.
+
+	Expects 1..4 channels (Gray, Gray + Alpha, RGB, RGBA).
+	Any other number of channels will be considered an error, returning `false` without modifying the image.
+
+	Of the `options`, the following are considered:
+	`.alpha_premultiply`
+		If the image has an alpha channel, returns image data as follows:
+			RGB *= A, Gray = Gray *= A
+
+	`.blend_background`
+		If `img.background` is set, it'll be blended in like this:
+			RGB = (1 - A) * Background + A * RGB
+
+	If an image has 1 (Gray) or 3 (RGB) channels, it'll return early without modifying the image,
+	with one exception: `alpha_key` and `img.background` are present, and `.blend_background` is set.
+
+	In this case a keyed alpha pixel will be replaced with the background color.
+*/
+alpha_drop_if_present :: proc(img: ^Image, options := Options{}, alpha_key := Alpha_Key{}, allocator := context.allocator) -> (ok: bool) {
+	context.allocator = allocator
+
+	if !is_valid_image(img) {
+		return false
+	}
+
+	// Do we have a background to blend?
+	will_it_blend := false
+	switch v in img.background {
+	case RGB_Pixel_16: will_it_blend = true if .blend_background in options else false
+	}
+
+	// Do we have keyed alpha?
+	keyed := false
+	switch v in alpha_key {
+	case GA_Pixel:      keyed = true if img.channels == 1 && img.depth ==  8 else false
+	case RGBA_Pixel:    keyed = true if img.channels == 3 && img.depth ==  8 else false
+	case GA_Pixel_16:   keyed = true if img.channels == 1 && img.depth == 16 else false
+	case RGBA_Pixel_16: keyed = true if img.channels == 3 && img.depth == 16 else false
+	}
+
+	// We should now have a valid Image with 1..4 channels. Do we have alpha?
+	if img.channels == 1 || img.channels == 3 {
+		if !(will_it_blend && keyed) {
+			// We're done
+			return true
+		}
+	}
+
+	// # of destination channels
+	channels := 1 if img.channels < 3 else 3
+
+	bytes_wanted := compute_buffer_size(img.width, img.height, channels, img.depth)
+	buf := bytes.Buffer{}
+
+	// Can we allocate the return buffer?
+	if !resize(&buf.buf, bytes_wanted) {
+		delete(buf.buf)
+		return false
+	}
+
+	switch img.depth {
+	case 8:
+		switch img.channels {
+		case 1: // Gray to Gray, but we should have keyed alpha + background.
+			inp := mem.slice_data_cast([]G_Pixel, img.pixels.buf[:])
+			out := mem.slice_data_cast([]G_Pixel, buf.buf[:])
+
+			key := alpha_key.(GA_Pixel).r
+			bg  := G_Pixel{}
+			if temp_bg, temp_bg_ok := img.background.(RGB_Pixel_16); temp_bg_ok {
+				// Background is RGB 16-bit, take just the red channel's topmost byte.
+				bg = u8(temp_bg.r >> 8)
+			}
+
+			for p in inp {
+				out[0] = bg if p == key else p
+				out    = out[1:]
+			}
+
+		case 2: // Gray + Alpha to Gray, no keyed alpha but we can have a background.
+			inp := mem.slice_data_cast([]GA_Pixel, img.pixels.buf[:])
+			out := mem.slice_data_cast([]G_Pixel,  buf.buf[:])
+
+			if will_it_blend {
+				// Blend with background "color", then drop alpha.
+				bg  := f32(0.0)
+				if temp_bg, temp_bg_ok := img.background.(RGB_Pixel_16); temp_bg_ok {
+					// Background is RGB 16-bit, take just the red channel's topmost byte.
+					bg = f32(temp_bg.r >> 8)
+				}
+
+				for p in inp {
+					a := f32(p.g) / 255.0
+					c := ((1.0 - a) * bg + a * f32(p.r))
+					out[0] = u8(c)
+					out    = out[1:]
+				}
+
+			} else if .alpha_premultiply in options {
+				// Premultiply component with alpha, then drop alpha.
+				for p in inp {
+					a := f32(p.g) / 255.0
+					c := f32(p.r) * a
+					out[0] = u8(c)
+					out    = out[1:]
+				}
+			} else {
+				// Just drop alpha on the floor.
+				for p in inp {
+					out[0] = p.r
+					out    = out[1:]
+				}
+			}
+
+		case 3: // RGB to RGB, but we should have keyed alpha + background.
+			inp := mem.slice_data_cast([]RGB_Pixel, img.pixels.buf[:])
+			out := mem.slice_data_cast([]RGB_Pixel, buf.buf[:])
+
+			key := alpha_key.(RGBA_Pixel)
+			bg  := RGB_Pixel{}
+			if temp_bg, temp_bg_ok := img.background.(RGB_Pixel_16); temp_bg_ok {
+				// Background is RGB 16-bit, squash down to 8 bits.
+				bg = {u8(temp_bg.r >> 8), u8(temp_bg.g >> 8), u8(temp_bg.b >> 8)}
+			}
+
+			for p in inp {
+				out[0] = bg if p == key.rgb else p
+				out    = out[1:]
+			}
+
+		case 4: // RGBA to RGB, no keyed alpha but we can have a background or need to premultiply.
+			inp := mem.slice_data_cast([]RGBA_Pixel, img.pixels.buf[:])
+			out := mem.slice_data_cast([]RGB_Pixel,  buf.buf[:])
+
+			if will_it_blend {
+				// Blend with background "color", then drop alpha.
+				bg := [3]f32{}
+				if temp_bg, temp_bg_ok := img.background.(RGB_Pixel_16); temp_bg_ok {
+					// Background is RGB 16-bit, take just the red channel's topmost byte.
+					bg = {f32(temp_bg.r >> 8), f32(temp_bg.g >> 8), f32(temp_bg.b >> 8)}
+				}
+
+				for p in inp {
+					a   := f32(p.a) / 255.0
+					rgb := [3]f32{f32(p.r), f32(p.g), f32(p.b)}
+					c   := ((1.0 - a) * bg + a * rgb)
+
+					out[0] = {u8(c.r), u8(c.g), u8(c.b)}
+					out    = out[1:]
+				}
+
+			} else if .alpha_premultiply in options {
+				// Premultiply component with alpha, then drop alpha.
+				for p in inp {
+					a   := f32(p.a) / 255.0
+					rgb := [3]f32{f32(p.r), f32(p.g), f32(p.b)}
+					c   := rgb * a
+
+					out[0] = {u8(c.r), u8(c.g), u8(c.b)}
+					out    = out[1:]
+				}
+			} else {
+				// Just drop alpha on the floor.
+				for p in inp {
+					out[0] = p.rgb
+					out    = out[1:]
+				}
+			}
+		}
+
+	case 16:
+		switch img.channels {
+		case 1: // Gray to Gray, but we should have keyed alpha + background.
+			inp := mem.slice_data_cast([]G_Pixel_16, img.pixels.buf[:])
+			out := mem.slice_data_cast([]G_Pixel_16, buf.buf[:])
+
+			key := alpha_key.(GA_Pixel_16).r
+			bg  := G_Pixel_16{}
+			if temp_bg, temp_bg_ok := img.background.(RGB_Pixel_16); temp_bg_ok {
+				// Background is RGB 16-bit, take just the red channel.
+				bg = temp_bg.r
+			}
+
+			for p in inp {
+				out[0] = bg if p == key else p
+				out    = out[1:]
+			}
+
+		case 2: // Gray + Alpha to Gray, no keyed alpha but we can have a background.
+			inp := mem.slice_data_cast([]GA_Pixel_16, img.pixels.buf[:])
+			out := mem.slice_data_cast([]G_Pixel_16,  buf.buf[:])
+
+			if will_it_blend {
+				// Blend with background "color", then drop alpha.
+				bg  := f32(0.0)
+				if temp_bg, temp_bg_ok := img.background.(RGB_Pixel_16); temp_bg_ok {
+					// Background is RGB 16-bit, take just the red channel.
+					bg = f32(temp_bg.r)
+				}
+
+				for p in inp {
+					a := f32(p.g) / 65535.0
+					c := ((1.0 - a) * bg + a * f32(p.r))
+					out[0] = u16(c)
+					out    = out[1:]
+				}
+
+			} else if .alpha_premultiply in options {
+				// Premultiply component with alpha, then drop alpha.
+				for p in inp {
+					a := f32(p.g) / 65535.0
+					c := f32(p.r) * a
+					out[0] = u16(c)
+					out    = out[1:]
+				}
+			} else {
+				// Just drop alpha on the floor.
+				for p in inp {
+					out[0] = p.r
+					out    = out[1:]
+				}
+			}
+
+		case 3: // RGB to RGB, but we should have keyed alpha + background.
+			inp := mem.slice_data_cast([]RGB_Pixel_16, img.pixels.buf[:])
+			out := mem.slice_data_cast([]RGB_Pixel_16, buf.buf[:])
+
+			key := alpha_key.(RGBA_Pixel_16)
+			bg  := img.background.(RGB_Pixel_16)
+
+			for p in inp {
+				out[0] = bg if p == key.rgb else p
+				out    = out[1:]
+			}
+
+		case 4: // RGBA to RGB, no keyed alpha but we can have a background or need to premultiply.
+			inp := mem.slice_data_cast([]RGBA_Pixel_16, img.pixels.buf[:])
+			out := mem.slice_data_cast([]RGB_Pixel_16,  buf.buf[:])
+
+			if will_it_blend {
+				// Blend with background "color", then drop alpha.
+				bg := [3]f32{}
+				if temp_bg, temp_bg_ok := img.background.(RGB_Pixel_16); temp_bg_ok {
+					// Background is RGB 16-bit, convert to [3]f32 to blend.
+					bg = {f32(temp_bg.r), f32(temp_bg.g), f32(temp_bg.b)}
+				}
+
+				for p in inp {
+					a   := f32(p.a) / 65535.0
+					rgb := [3]f32{f32(p.r), f32(p.g), f32(p.b)}
+					c   := ((1.0 - a) * bg + a * rgb)
+
+					out[0] = {u16(c.r), u16(c.g), u16(c.b)}
+					out    = out[1:]
+				}
+
+			} else if .alpha_premultiply in options {
+				// Premultiply component with alpha, then drop alpha.
+				for p in inp {
+					a   := f32(p.a) / 65535.0
+					rgb := [3]f32{f32(p.r), f32(p.g), f32(p.b)}
+					c   := rgb * a
+
+					out[0] = {u16(c.r), u16(c.g), u16(c.b)}
+					out    = out[1:]
+				}
+			} else {
+				// Just drop alpha on the floor.
+				for p in inp {
+					out[0] = p.rgb
+					out    = out[1:]
+				}
+			}
+		}
+
+	case:
+		unreachable()
+	}
+
+	// If we got here, that means we've now got a buffer with the alpha channel dropped.
+	// Destroy the old pixel buffer and replace it with the new one, and update the channel count.
+	bytes.buffer_destroy(&img.pixels)
+	img.pixels   = buf
+	img.channels = channels
+	return true
+}
+
+// Apply palette to 8-bit single-channel image and return an 8-bit RGB image, in-place.
+// If the image given is not a valid 8-bit single channel image, the procedure will return `false` early.
+apply_palette_rgb :: proc(img: ^Image, palette: [256]RGB_Pixel, allocator := context.allocator) -> (ok: bool) {
+	context.allocator = allocator
+
+	if img == nil || img.channels != 1 || img.depth != 8 {
+		return false
+	}
+
+	bytes_expected := compute_buffer_size(img.width, img.height, 1, 8)
+	if bytes_expected == 0 || bytes_expected != len(img.pixels.buf) || img.width * img.height > MAX_DIMENSIONS {
+		return false
+	}
+
+	// Can we allocate the return buffer?
+	buf := bytes.Buffer{}
+	bytes_wanted := compute_buffer_size(img.width, img.height, 3, 8)
+	if !resize(&buf.buf, bytes_wanted) {
+		delete(buf.buf)
+		return false
+	}
+
+	out := mem.slice_data_cast([]RGB_Pixel, buf.buf[:])
+
+	// Apply the palette
+	for p, i in img.pixels.buf {
+		out[i] = palette[p]
+	}
+
+	// If we got here, that means we've now got a buffer with the alpha channel dropped.
+	// Destroy the old pixel buffer and replace it with the new one, and update the channel count.
+	bytes.buffer_destroy(&img.pixels)
+	img.pixels   = buf
+	img.channels = 3
+	return true
+}
+
+// Apply palette to 8-bit single-channel image and return an 8-bit RGBA image, in-place.
+// If the image given is not a valid 8-bit single channel image, the procedure will return `false` early.
+apply_palette_rgba :: proc(img: ^Image, palette: [256]RGBA_Pixel, allocator := context.allocator) -> (ok: bool) {
+	context.allocator = allocator
+
+	if img == nil || img.channels != 1 || img.depth != 8 {
+		return false
+	}
+
+	bytes_expected := compute_buffer_size(img.width, img.height, 1, 8)
+	if bytes_expected == 0 || bytes_expected != len(img.pixels.buf) || img.width * img.height > MAX_DIMENSIONS {
+		return false
+	}
+
+	// Can we allocate the return buffer?
+	buf := bytes.Buffer{}
+	bytes_wanted := compute_buffer_size(img.width, img.height, 4, 8)
+	if !resize(&buf.buf, bytes_wanted) {
+		delete(buf.buf)
+		return false
+	}
+
+	out := mem.slice_data_cast([]RGBA_Pixel, buf.buf[:])
+
+	// Apply the palette
+	for p, i in img.pixels.buf {
+		out[i] = palette[p]
+	}
+
+	// If we got here, that means we've now got a buffer with the alpha channel dropped.
+	// Destroy the old pixel buffer and replace it with the new one, and update the channel count.
+	bytes.buffer_destroy(&img.pixels)
+	img.pixels   = buf
+	img.channels = 4
+	return true
+}
+apply_palette :: proc{apply_palette_rgb, apply_palette_rgba}
+
+
+// Replicates grayscale values into RGB(A) 8- or 16-bit images as appropriate.
+// Returns early with `false` if already an RGB(A) image.
+expand_grayscale :: proc(img: ^Image, allocator := context.allocator) -> (ok: bool) {
+	context.allocator = allocator
+
+	if !is_valid_grayscale_image(img) {
+		return false
+	}
+
+	// We should have 1 or 2 channels of 8- or 16 bits now. We need to turn that into 3 or 4.
+	// Can we allocate the return buffer?
+	buf := bytes.Buffer{}
+	bytes_wanted := compute_buffer_size(img.width, img.height, img.channels + 2, img.depth)
+	if !resize(&buf.buf, bytes_wanted) {
+		delete(buf.buf)
+		return false
+	}
+
+	switch img.depth {
+		case 8:
+			switch img.channels {
+			case 1: // Turn Gray into RGB
+				out := mem.slice_data_cast([]RGB_Pixel, buf.buf[:])
+
+				for p in img.pixels.buf {
+					out[0] = p // Broadcast gray value into RGB components.
+					out    = out[1:]
+				}
+
+			case 2: // Turn Gray + Alpha into RGBA
+				inp := mem.slice_data_cast([]GA_Pixel,   img.pixels.buf[:])
+				out := mem.slice_data_cast([]RGBA_Pixel, buf.buf[:])
+
+				for p in inp {
+					out[0].rgb = p.r // Gray component.
+					out[0].a   = p.g // Alpha component.
+				}
+
+			case:
+				unreachable()
+			}
+
+		case 16:
+			switch img.channels {
+			case 1: // Turn Gray into RGB
+				inp := mem.slice_data_cast([]u16, img.pixels.buf[:])
+				out := mem.slice_data_cast([]RGB_Pixel_16, buf.buf[:])
+
+				for p in inp {
+					out[0] = p // Broadcast gray value into RGB components.
+					out    = out[1:]
+				}
+
+			case 2: // Turn Gray + Alpha into RGBA
+				inp := mem.slice_data_cast([]GA_Pixel_16,   img.pixels.buf[:])
+				out := mem.slice_data_cast([]RGBA_Pixel_16, buf.buf[:])
+
+				for p in inp {
+					out[0].rgb = p.r // Gray component.
+					out[0].a   = p.g // Alpha component.
+				}
+
+			case:
+				unreachable()
+			}
+
+		case:
+			unreachable()
+	}
+
+
+	// If we got here, that means we've now got a buffer with the extra alpha channel.
+	// Destroy the old pixel buffer and replace it with the new one, and update the channel count.
+	bytes.buffer_destroy(&img.pixels)
+	img.pixels   = buf
+	img.channels += 2
+	return true
+}
+
+/*
+	Helper functions to read and write data from/to a Context, etc.
+*/
+@(optimization_mode="speed")
+read_data :: proc(z: $C, $T: typeid) -> (res: T, err: compress.General_Error) {
+	if r, e := compress.read_data(z, T); e != .None {
+		return {}, .Stream_Too_Short
+	} else {
+		return r, nil
+	}
+}
+
+@(optimization_mode="speed")
+read_u8 :: proc(z: $C) -> (res: u8, err: compress.General_Error) {
+	if r, e := compress.read_u8(z); e != .None {
+		return {}, .Stream_Too_Short
+	} else {
+		return r, nil
+	}
+}
+
+write_bytes :: proc(buf: ^bytes.Buffer, data: []u8) -> (err: compress.General_Error) {
+	if len(data) == 0 {
+		return nil
+	} else if len(data) == 1 {
+		if bytes.buffer_write_byte(buf, data[0]) != nil {
+			return compress.General_Error.Resize_Failed
+		}
+	} else if n, _ := bytes.buffer_write(buf, data); n != len(data) {
+		return compress.General_Error.Resize_Failed
+	}
+	return nil
 }

@@ -5,6 +5,9 @@
 	List of contributors:
 		Jeroen van Rijn: Initial implementation, optimization.
 */
+
+
+// package compress is a collection of utilities to aid with other compression packages
 package compress
 
 import "core:io"
@@ -44,7 +47,7 @@ when size_of(uintptr) == 8 {
 }
 
 
-Error :: union {
+Error :: union #shared_nil {
 	General_Error,
 	Deflate_Error,
 	ZLIB_Error,
@@ -55,6 +58,7 @@ Error :: union {
 }
 
 General_Error :: enum {
+	None = 0,
 	File_Not_Found,
 	Cannot_Open_File,
 	File_Too_Short,
@@ -73,6 +77,7 @@ General_Error :: enum {
 }
 
 GZIP_Error :: enum {
+	None = 0,
 	Invalid_GZIP_Signature,
 	Reserved_Flag_Set,
 	Invalid_Extra_Data,
@@ -97,6 +102,7 @@ GZIP_Error :: enum {
 }
 
 ZIP_Error :: enum {
+	None = 0,
 	Invalid_ZIP_File_Signature,
 	Unexpected_Signature,
 	Insert_Next_Disk,
@@ -104,6 +110,7 @@ ZIP_Error :: enum {
 }
 
 ZLIB_Error :: enum {
+	None = 0,
 	Unsupported_Window_Size,
 	FDICT_Unsupported,
 	Unsupported_Compression_Level,
@@ -111,6 +118,7 @@ ZLIB_Error :: enum {
 }
 
 Deflate_Error :: enum {
+	None = 0,
 	Huffman_Bad_Sizes,
 	Huffman_Bad_Code_Lengths,
 	Inflate_Error,
@@ -119,7 +127,6 @@ Deflate_Error :: enum {
 	Len_Nlen_Mismatch,
 	BType_3,
 }
-
 
 // General I/O context for ZLIB, LZW, etc.
 Context_Memory_Input :: struct #packed {
@@ -136,7 +143,12 @@ Context_Memory_Input :: struct #packed {
 	size_packed:       i64,
 	size_unpacked:     i64,
 }
-#assert(size_of(Context_Memory_Input) == 64)
+when size_of(rawptr) == 8 {
+	#assert(size_of(Context_Memory_Input) == 64)
+} else {
+	// e.g. `-target:windows_i386`
+	#assert(size_of(Context_Memory_Input) == 52)
+}
 
 Context_Stream_Input :: struct #packed {
 	input_data:        []u8,
@@ -170,8 +182,6 @@ Context_Stream_Input :: struct #packed {
 	Bit and byte readers may be merged so that reading bytes will grab them from the bit buffer first.
 	This simplifies end-of-stream handling where bits may be left in the bit buffer.
 */
-
-// TODO: Make these return compress.Error errors.
 
 input_size_from_memory :: proc(z: ^Context_Memory_Input) -> (res: i64, err: Error) {
 	return i64(len(z.input_data)), nil
@@ -470,4 +480,4 @@ discard_to_next_byte_lsb_from_stream :: proc(z: ^Context_Stream_Input) {
 	consume_bits_lsb(z, discard)
 }
 
-discard_to_next_byte_lsb :: proc{discard_to_next_byte_lsb_from_memory, discard_to_next_byte_lsb_from_stream};
+discard_to_next_byte_lsb :: proc{discard_to_next_byte_lsb_from_memory, discard_to_next_byte_lsb_from_stream}

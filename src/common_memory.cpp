@@ -139,6 +139,7 @@ struct PlatformMemoryBlock {
 };
 
 
+gb_global std::atomic<isize> global_platform_memory_total_usage;
 gb_global PlatformMemoryBlock global_platform_memory_block_sentinel;
 
 PlatformMemoryBlock *platform_virtual_memory_alloc(isize total_size);
@@ -158,10 +159,17 @@ void platform_virtual_memory_protect(void *memory, isize size);
 
 	PlatformMemoryBlock *platform_virtual_memory_alloc(isize total_size) {
 		PlatformMemoryBlock *pmblock = (PlatformMemoryBlock *)VirtualAlloc(0, total_size, MEM_RESERVE|MEM_COMMIT, PAGE_READWRITE);
-		GB_ASSERT_MSG(pmblock != nullptr, "Out of Virtual Memory, oh no...");
+		if (pmblock == nullptr) {
+			gb_printf_err("Out of Virtual memory, oh no...\n");
+			gb_printf_err("Requested: %lld bytes\n", cast(long long)total_size);
+			gb_printf_err("Total Usage: %lld bytes\n", cast(long long)global_platform_memory_total_usage);
+			GB_ASSERT_MSG(pmblock != nullptr, "Out of Virtual Memory, oh no...");
+		}
+		global_platform_memory_total_usage += total_size;
 		return pmblock;
 	}
 	void platform_virtual_memory_free(PlatformMemoryBlock *block) {
+		global_platform_memory_total_usage -= block->total_size;
 		GB_ASSERT(VirtualFree(block, 0, MEM_RELEASE));
 	}
 	void platform_virtual_memory_protect(void *memory, isize size) {
@@ -180,11 +188,18 @@ void platform_virtual_memory_protect(void *memory, isize size);
 	
 	PlatformMemoryBlock *platform_virtual_memory_alloc(isize total_size) {
 		PlatformMemoryBlock *pmblock = (PlatformMemoryBlock *)mmap(nullptr, total_size, PROT_READ | PROT_WRITE, MAP_ANONYMOUS | MAP_PRIVATE, -1, 0);
-		GB_ASSERT_MSG(pmblock != nullptr, "Out of Virtual Memory, oh no...");
+		if (pmblock == nullptr) {
+			gb_printf_err("Out of Virtual memory, oh no...\n");
+			gb_printf_err("Requested: %lld bytes\n", cast(long long)total_size);
+			gb_printf_err("Total Usage: %lld bytes\n", cast(long long)global_platform_memory_total_usage);
+			GB_ASSERT_MSG(pmblock != nullptr, "Out of Virtual Memory, oh no...");
+		}
+		global_platform_memory_total_usage += total_size;
 		return pmblock;
 	}
 	void platform_virtual_memory_free(PlatformMemoryBlock *block) {
 		isize size = block->total_size;
+		global_platform_memory_total_usage -= size;
 		munmap(block, size);
 	}
 	void platform_virtual_memory_protect(void *memory, isize size) {
@@ -325,18 +340,32 @@ GB_ALLOCATOR_PROC(heap_allocator_proc) {
 // TODO(bill): Throughly test!
 	switch (type) {
 #if defined(GB_COMPILER_MSVC)
-	case gbAllocation_Alloc: {
-		isize aligned_size = align_formula_isize(size, alignment);
-		// TODO(bill): Make sure this is aligned correctly
-		ptr = HeapAlloc(GetProcessHeap(), HEAP_ZERO_MEMORY, aligned_size);
-	} break;
-	case gbAllocation_Free:
-		HeapFree(GetProcessHeap(), 0, old_memory);
+	case gbAllocation_Alloc:
+		if (size == 0) {
+			return NULL;
+		} else {
+			isize aligned_size = align_formula_isize(size, alignment);
+			// TODO(bill): Make sure this is aligned correctly
+			ptr = HeapAlloc(GetProcessHeap(), HEAP_ZERO_MEMORY, aligned_size);
+		}
 		break;
-	case gbAllocation_Resize: {
-		isize aligned_size = align_formula_isize(size, alignment);
-		ptr = HeapReAlloc(GetProcessHeap(), HEAP_ZERO_MEMORY, old_memory, aligned_size);
-	} break;
+	case gbAllocation_Free:
+		if (old_memory != nullptr) {
+			HeapFree(GetProcessHeap(), 0, old_memory);
+		}
+		break;
+	case gbAllocation_Resize:
+		if (old_memory != nullptr && size > 0) {
+			isize aligned_size = align_formula_isize(size, alignment);
+			ptr = HeapReAlloc(GetProcessHeap(), HEAP_ZERO_MEMORY, old_memory, aligned_size);
+		} else if (old_memory != nullptr) {
+			HeapFree(GetProcessHeap(), 0, old_memory);
+		} else if (size != 0) {
+			isize aligned_size = align_formula_isize(size, alignment);
+			// TODO(bill): Make sure this is aligned correctly
+			ptr = HeapAlloc(GetProcessHeap(), HEAP_ZERO_MEMORY, aligned_size);
+		}
+		break;
 #elif defined(GB_SYSTEM_LINUX)
 	// TODO(bill): *nix version that's decent
 	case gbAllocation_Alloc: {

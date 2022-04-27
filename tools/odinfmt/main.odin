@@ -114,7 +114,6 @@ main :: proc() {
 		filepath.walk(path, walk_files);
 
 		for file in files {
-			fmt.println(file);
 
 			backup_path := strings.concatenate({file, "_bk"});
 			defer delete(backup_path);

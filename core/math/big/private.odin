@@ -15,6 +15,8 @@
 
 	These aren't exported for the same reasons.
 */
+
+
 package math_big
 
 import "core:intrinsics"
@@ -211,12 +213,12 @@ _private_int_mul_toom :: proc(dest, a, b: ^Int, allocator := context.allocator) 
 	/*
 		P = b1*x^4+ S2*x^3+ S1*x^2+ a1*x + a0;
 	*/
-	internal_shl_digit(b1, 4 * B)               or_return
-	internal_shl_digit(S2, 3 * B)               or_return
+	_private_int_shl_leg(b1, 4 * B)             or_return
+	_private_int_shl_leg(S2, 3 * B)             or_return
 	internal_add(b1, b1, S2)                    or_return
-	internal_shl_digit(S1, 2 * B)               or_return
+	_private_int_shl_leg(S1, 2 * B)             or_return
 	internal_add(b1, b1, S1)                    or_return
-	internal_shl_digit(a1, 1 * B)               or_return
+	_private_int_shl_leg(a1, 1 * B)             or_return
 	internal_add(b1, b1, a1)                    or_return
 	internal_add(dest, b1, a0)                  or_return
 
@@ -317,8 +319,8 @@ _private_int_mul_karatsuba :: proc(dest, a, b: ^Int, allocator := context.alloca
 	/*
 		shift by B.
 	*/
-	internal_shl_digit(t1, B)       or_return /* t1 = (x0y0 + x1y1 - (x1-x0)*(y1-y0))<<B */
-	internal_shl_digit(x1y1, B * 2) or_return /* x1y1 = x1y1 << 2*B */
+	_private_int_shl_leg(t1, B)       or_return /* t1 = (x0y0 + x1y1 - (x1-x0)*(y1-y0))<<B */
+	_private_int_shl_leg(x1y1, B * 2) or_return /* x1y1 = x1y1 << 2*B */
 
 	internal_add(t1, x0y0, t1)      or_return /* t1 = x0y0 + t1 */
 	internal_add(dest, t1, x1y1)    or_return /* t1 = x0y0 + t1 + x1y1 */
@@ -588,7 +590,7 @@ _private_int_mul_balance :: proc(dest, a, b: ^Int, allocator := context.allocato
 		/*
 			Shift `tmp` to the correct position.
 		*/
-		internal_shl_digit(tmp, b_size * i)                          or_return
+		_private_int_shl_leg(tmp, b_size * i)                          or_return
 
 		/*
 			Add to output. No carry needed.
@@ -606,7 +608,7 @@ _private_int_mul_balance :: proc(dest, a, b: ^Int, allocator := context.allocato
 		internal_clamp(a0)
 
 		internal_mul(tmp, a0, b)                                     or_return
-		internal_shl_digit(tmp, b_size * i)                          or_return
+		_private_int_shl_leg(tmp, b_size * i)                          or_return
 		internal_add(r, r, tmp)                                      or_return
 	}
 
@@ -840,8 +842,8 @@ _private_int_sqr_karatsuba :: proc(dest, src: ^Int, allocator := context.allocat
 	/*
 		Shift by B.
 	*/
-	internal_shl_digit(t1, B) or_return
-	internal_shl_digit(x1x1, B * 2) or_return
+	_private_int_shl_leg(t1, B) or_return
+	_private_int_shl_leg(x1x1, B * 2) or_return
 	internal_add(t1, t1, x0x0) or_return
 	internal_add(dest, t1, x1x1) or_return
 
@@ -942,10 +944,10 @@ _private_int_sqr_toom :: proc(dest, src: ^Int, allocator := context.allocator) -
 	internal_sub(dest, dest, S0) or_return
 	/** \\P = S4*x^4 + S3*x^3 + S2*x^2 + S1*x + S0; */
 	/** P = a2*x^4 + a1*x^3 + b*x^2 + a0*x + S0; */
-	internal_shl_digit(  a2, 4 * B) or_return
-	internal_shl_digit(  a1, 3 * B) or_return
-	internal_shl_digit(dest, 2 * B) or_return
-	internal_shl_digit(  a0, 1 * B) or_return
+	_private_int_shl_leg(  a2, 4 * B) or_return
+	_private_int_shl_leg(  a1, 3 * B) or_return
+	_private_int_shl_leg(dest, 2 * B) or_return
+	_private_int_shl_leg(  a0, 1 * B) or_return
 
 	internal_add(a2, a2, a1) or_return
 	internal_add(dest, dest, a2) or_return
@@ -1069,7 +1071,7 @@ _private_int_div_school :: proc(quotient, remainder, numerator, denominator: ^In
 		y = y*b**{n-t}
 	*/
 
-	internal_shl_digit(y, n - t) or_return
+	_private_int_shl_leg(y, n - t) or_return
 
 	gte := internal_gte(x, y)
 	for gte {
@@ -1081,7 +1083,7 @@ _private_int_div_school :: proc(quotient, remainder, numerator, denominator: ^In
 	/*
 		Reset y by shifting it back down.
 	*/
-	internal_shr_digit(y, n - t)
+	_private_int_shr_leg(y, n - t)
 
 	/*
 		Step 3. for i from n down to (t + 1).
@@ -1146,7 +1148,7 @@ _private_int_div_school :: proc(quotient, remainder, numerator, denominator: ^In
 			Step 3.3 x = x - q{i-t-1} * y * b**{i-t-1}
 		*/
 		int_mul_digit(t1, y, q.digit[(i - t) - 1]) or_return
-		internal_shl_digit(t1, (i - t) - 1) or_return
+		_private_int_shl_leg(t1, (i - t) - 1) or_return
 		internal_sub(x, x, t1) or_return
 
 		/*
@@ -1154,7 +1156,7 @@ _private_int_div_school :: proc(quotient, remainder, numerator, denominator: ^In
 		*/
 		if x.sign == .Negative {
 			internal_copy(t1, y) or_return
-			internal_shl_digit(t1, (i - t) - 1) or_return
+			_private_int_shl_leg(t1, (i - t) - 1) or_return
 			internal_add(x, x, t1) or_return
 
 			q.digit[(i - t) - 1] = (q.digit[(i - t) - 1] - 1) & _MASK
@@ -1220,7 +1222,7 @@ _private_div_recursion :: proc(quotient, remainder, a, b: ^Int, allocator := con
 	/*
 		A1 = (R1 * beta^(2k)) + (A % beta^(2k)) - (Q1 * B0 * beta^k)
 	*/
-	internal_shl_digit(R1, 2 * k) or_return
+	_private_int_shl_leg(R1, 2 * k) or_return
 	internal_add(A1, R1, t) or_return
 	internal_mul(t, Q1, B0) or_return
 
@@ -1246,7 +1248,7 @@ _private_div_recursion :: proc(quotient, remainder, a, b: ^Int, allocator := con
 	/*
 		A2 = (R0*beta^k) +  (A1 % beta^k) - (Q0*B0)
 	*/
-	internal_shl_digit(R0, k) or_return
+	_private_int_shl_leg(R0, k) or_return
 	internal_add(A2, R0, t) or_return
 	internal_mul(t, Q0, B0) or_return
 	internal_sub(A2, A2, t) or_return
@@ -1262,7 +1264,7 @@ _private_div_recursion :: proc(quotient, remainder, a, b: ^Int, allocator := con
 	/*
 		Return q = (Q1*beta^k) + Q0, r = A2.
 	*/
-	internal_shl_digit(Q1, k) or_return
+	_private_int_shl_leg(Q1, k) or_return
 	internal_add(quotient, Q1, Q0) or_return
 
 	return internal_copy(remainder, A2)
@@ -1923,7 +1925,7 @@ _private_int_montgomery_reduce :: proc(x, n: ^Int, rho: DIGIT, allocator := cont
 		x = x/b**n.used.
 	*/
 	internal_clamp(x)
-	internal_shr_digit(x, n.used)
+	_private_int_shr_leg(x, n.used)
 
 	/*
 		if x >= n then x = x - n
@@ -2026,7 +2028,7 @@ _private_int_reduce :: proc(x, m, mu: ^Int, allocator := context.allocator) -> (
 	/*
 		q1 = x / b**(k-1)
 	*/
-	internal_shr_digit(q, um - 1)
+	_private_int_shr_leg(q, um - 1)
 
 	/*
 		According to HAC this optimization is ok.
@@ -2040,7 +2042,7 @@ _private_int_reduce :: proc(x, m, mu: ^Int, allocator := context.allocator) -> (
 	/*
 		q3 = q2 / b**(k+1)
 	*/
-	internal_shr_digit(q, um + 1)
+	_private_int_shr_leg(q, um + 1)
 
 	/*
 		x = x mod b**(k+1), quick (no division)
@@ -2062,7 +2064,7 @@ _private_int_reduce :: proc(x, m, mu: ^Int, allocator := context.allocator) -> (
 	*/
 	if internal_is_negative(x) {
 		internal_set(q, 1)                                           or_return
-		internal_shl_digit(q, um + 1)                                or_return
+		_private_int_shl_leg(q, um + 1)                                or_return
 		internal_add(x, x, q)                                        or_return
 	}
 
@@ -3190,6 +3192,74 @@ _private_copy_digits :: proc(dest, src: ^Int, digits: int, offset := int(0)) -> 
 	digits = min(digits, len(src.digit), len(dest.digit))
 	mem.copy_non_overlapping(&dest.digit[0], &src.digit[offset], size_of(DIGIT) * digits)
 	return nil
+}
+
+
+/*
+	Shift left by `digits` * _DIGIT_BITS bits.
+*/
+_private_int_shl_leg :: proc(quotient: ^Int, digits: int, allocator := context.allocator) -> (err: Error) {
+	context.allocator = allocator
+
+	if digits <= 0 { return nil }
+
+	/*
+		No need to shift a zero.
+	*/
+	if #force_inline internal_is_zero(quotient) {
+		return nil
+	}
+
+	/*
+		Resize `quotient` to accomodate extra digits.
+	*/
+	#force_inline internal_grow(quotient, quotient.used + digits) or_return
+
+	/*
+		Increment the used by the shift amount then copy upwards.
+	*/
+
+	/*
+		Much like `_private_int_shr_leg`, this is implemented using a sliding window,
+		except the window goes the other way around.
+	*/
+	#no_bounds_check for x := quotient.used; x > 0; x -= 1 {
+		quotient.digit[x+digits-1] = quotient.digit[x-1]
+	}
+
+	quotient.used += digits
+	mem.zero_slice(quotient.digit[:digits])
+	return nil
+}
+
+/*
+	Shift right by `digits` * _DIGIT_BITS bits.
+*/
+_private_int_shr_leg :: proc(quotient: ^Int, digits: int, allocator := context.allocator) -> (err: Error) {
+	context.allocator = allocator
+
+	if digits <= 0 { return nil }
+
+	/*
+		If digits > used simply zero and return.
+	*/
+	if digits > quotient.used { return internal_zero(quotient) }
+
+	/*
+		Much like `int_shl_digit`, this is implemented using a sliding window,
+		except the window goes the other way around.
+
+		b-2 | b-1 | b0 | b1 | b2 | ... | bb |   ---->
+					/\                   |      ---->
+					 \-------------------/      ---->
+	*/
+
+	#no_bounds_check for x := 0; x < (quotient.used - digits); x += 1 {
+		quotient.digit[x] = quotient.digit[x + digits]
+	}
+	quotient.used -= digits
+	internal_zero_unused(quotient)
+	return internal_clamp(quotient)
 }
 
 /*	

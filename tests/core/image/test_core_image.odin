@@ -5,7 +5,7 @@
 	List of contributors:
 		Jeroen van Rijn: Initial implementation.
 
-	A test suite for PNG.
+	A test suite for PNG + QOI.
 */
 package test_core_image
 
@@ -14,6 +14,7 @@ import "core:testing"
 import "core:compress"
 import "core:image"
 import "core:image/png"
+import "core:image/qoi"
 
 import "core:bytes"
 import "core:hash"
@@ -25,8 +26,8 @@ import "core:time"
 
 import "core:runtime"
 
-WRITE_PPM_ON_FAIL     :: #config(WRITE_PPM_ON_FAIL, false)
-TEST_FILE_PATH_PREFIX :: "tests/core/assets/PNG"
+WRITE_PPM_ON_FAIL :: #config(WRITE_PPM_ON_FAIL, false)
+TEST_SUITE_PATH   :: "assets/PNG"
 
 TEST_count := 0
 TEST_fail  := 0
@@ -44,30 +45,20 @@ when ODIN_TEST {
 		}
 	}
 	log     :: proc(t: ^testing.T, v: any, loc := #caller_location) {
-		fmt.printf("[%v] LOG:\n\t%v\n", loc, v)
+		fmt.printf("[%v] ", loc)
+		fmt.printf("log: %v\n", v)
 	}
 }
-
 I_Error :: image.Error
 
 main :: proc() {
 	t := testing.T{}
 	png_test(&t)
 
-	fmt.printf("\n%v/%v tests successful.\n", TEST_count - TEST_fail, TEST_count)
-}
-
-test_file_path :: proc(filename: string, extension := "png") -> (path: string) {
-
-	path = fmt.tprintf("%v%v/%v.%v", ODIN_ROOT, TEST_FILE_PATH_PREFIX, filename, extension)
-	temp := transmute([]u8)path
-
-	for r, i in path {
-		if r == '\\' {
-			temp[i] = '/'
-		}
+	fmt.printf("%v/%v tests successful.\n", TEST_count - TEST_fail, TEST_count)
+	if TEST_fail > 0 {
+		os.exit(1)
 	}
-	return path
 }
 
 PNG_Test :: struct {
@@ -1472,7 +1463,7 @@ run_png_suite :: proc(t: ^testing.T, suite: []PNG_Test) -> (subtotal: int) {
 	context = runtime.default_context()
 
 	for file in suite {
-		test_file := test_file_path(file.file)
+		test_file := fmt.tprintf("%v/%v.png", TEST_SUITE_PATH, file.file)
 
 		img: ^png.Image
 		err: png.Error
@@ -1509,11 +1500,34 @@ run_png_suite :: proc(t: ^testing.T, suite: []PNG_Test) -> (subtotal: int) {
 
 				passed &= dims_pass
 
-				hash   := hash.crc32(pixels)
-				error  = fmt.tprintf("%v test %v hash is %08x, expected %08x.", file.file, count, hash, test.hash)
-				expect(t, test.hash == hash, error)
+				png_hash   := hash.crc32(pixels)
+				error  = fmt.tprintf("%v test %v hash is %08x, expected %08x with %v.", file.file, count, png_hash, test.hash, test.options)
+				expect(t, test.hash == png_hash, error)
 
-				passed &= test.hash == hash
+				passed &= test.hash == png_hash
+
+				// Roundtrip through QOI to test the QOI encoder and decoder.
+				if passed && img.depth == 8 && (img.channels == 3 || img.channels == 4) {
+					qoi_buffer: bytes.Buffer
+					defer bytes.buffer_destroy(&qoi_buffer)
+					qoi_save_err := qoi.save(&qoi_buffer, img)
+
+					error  = fmt.tprintf("%v test %v QOI save failed with %v.", file.file, count, qoi_save_err)
+					expect(t, qoi_save_err == nil, error)
+
+					if qoi_save_err == nil {
+						qoi_img, qoi_load_err := qoi.load(qoi_buffer.buf[:])
+						defer qoi.destroy(qoi_img)
+
+						error  = fmt.tprintf("%v test %v QOI load failed with %v.", file.file, count, qoi_load_err)
+						expect(t, qoi_load_err == nil, error)
+
+						qoi_hash := hash.crc32(qoi_img.pixels.buf[:])
+						error  = fmt.tprintf("%v test %v QOI load hash is %08x, expected it match PNG's %08x with %v.", file.file, count, qoi_hash, png_hash, test.options)
+						expect(t, qoi_hash == png_hash, error)
+					}
+				}
+
 				if .return_metadata in test.options {
 
 					if v, ok := img.metadata.(^image.PNG_Info); ok {
@@ -1778,7 +1792,7 @@ write_image_as_ppm :: proc(filename: string, image: ^image.Image) -> (success: b
 	img := image
 
 	// PBM 16-bit images are big endian
-	when ODIN_ENDIAN == "little" {
+	when ODIN_ENDIAN == .Little {
 		if img.depth == 16 {
 			// The pixel components are in Big Endian. Let's byteswap back.
 			input  := mem.slice_data_cast([]u16,   img.pixels.buf[:])
@@ -1796,7 +1810,7 @@ write_image_as_ppm :: proc(filename: string, image: ^image.Image) -> (success: b
 	}
 
 	mode: int = 0
-	when ODIN_OS == "linux" || ODIN_OS == "darwin" {
+	when ODIN_OS == .Linux || ODIN_OS == .Darwin {
 		// NOTE(justasd): 644 (owner read, write; group read; others read)
 		mode = S_IRUSR | S_IWUSR | S_IRGRP | S_IROTH
 	}
