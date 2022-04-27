@@ -287,12 +287,10 @@ atomic_recursive_mutex_guard :: proc(m: ^Atomic_Recursive_Mutex) -> bool {
 // An Atomic_Cond must not be copied after first use
 Atomic_Cond :: struct {
 	state: Futex,
-	prev:  u32,
 }
 
 atomic_cond_wait :: proc(c: ^Atomic_Cond, m: ^Atomic_Mutex) {
-	state := u32(atomic_load(&c.state))
-	atomic_store(&c.prev, state)
+	state := u32(atomic_load_explicit(&c.state, .Relaxed))
 	unlock(m)
 	futex_wait(&c.state, state)
 	lock(m)
@@ -309,14 +307,12 @@ atomic_cond_wait_with_timeout :: proc(c: ^Atomic_Cond, m: ^Atomic_Mutex, duratio
 
 
 atomic_cond_signal :: proc(c: ^Atomic_Cond) {
-	state := 1 + atomic_load(&c.prev)
-	atomic_store(&c.state, Futex(state))
+	atomic_add_explicit(&c.state, 1, .Relaxed)
 	futex_signal(&c.state)
 }
 
 atomic_cond_broadcast :: proc(c: ^Atomic_Cond) {
-	state := 1 + atomic_load(&c.prev)
-	atomic_store(&c.state, Futex(state))
+	atomic_add_explicit(&c.state, 1, .Relaxed)
 	futex_broadcast(&c.state)
 }
 
