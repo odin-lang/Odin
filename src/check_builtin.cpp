@@ -3926,6 +3926,37 @@ bool check_builtin_procedure(CheckerContext *c, Operand *operand, Ast *call, i32
 			break;
 		}
 		break;
+	case BuiltinProc_type_field_type:
+		{
+			Operand op = {};
+			Type *bt = check_type(c, ce->args[0]);
+			Type *type = base_type(bt);
+			if (type == nullptr || type == t_invalid) {
+				error(ce->args[0], "Expected a type for '%.*s'", LIT(builtin_name));
+				return false;
+			}
+			Operand x = {};
+			check_expr(c, &x, ce->args[1]);
+
+			if (!is_type_string(x.type) || x.mode != Addressing_Constant || x.value.kind != ExactValue_String) {
+				error(ce->args[1], "Expected a const string for field argument");
+				return false;
+			}
+
+			String field_name = x.value.value_string;
+
+			Selection sel = lookup_field(type, field_name, false);
+			if (sel.index.count == 0) {
+				gbString t = type_to_string(type);
+				error(ce->args[1], "'%.*s' is not a field of type %s", LIT(field_name), t);
+				gb_string_free(t);
+				return false;
+			}
+			operand->mode = Addressing_Type;
+			operand->type = sel.entity->type;
+			break;
+		}
+		break;
 
 	case BuiltinProc_type_is_specialization_of:
 		{
