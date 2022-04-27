@@ -3846,7 +3846,8 @@ DEBUG_COMMAND_LIST_GPU_BASED_VALIDATION_SETTINGS :: struct {
 }
 
 
-IDebugCommandList1_UUID :: "102ca951-311b-4b01-b11f-ecb83e061b37"
+IDebugCommandList1_UUID_STRING :: "102ca951-311b-4b01-b11f-ecb83e061b37"
+IDebugCommandList1_UUID := &IID{0x102ca951, 0x311b, 0x4b01, {0xb1, 0x1f, 0xec, 0xb8, 0x3e, 0x06, 0x1b, 0x37}}
 IDebugCommandList1 :: struct #raw_union {
 	#subtype iunknown: IUnknown,
 	using id3d12debugcommandlist1_vtable: ^IDebugCommandList1_VTable,
@@ -3859,7 +3860,8 @@ IDebugCommandList1_VTable :: struct {
 }
 
 
-IDebugCommandList_UUID :: "09e0bf36-54ac-484f-8847-4baeeab6053f"
+IDebugCommandList_UUID_STRING :: "09e0bf36-54ac-484f-8847-4baeeab6053f"
+IDebugCommandList_UUID := &IID{0x09e0bf36, 0x54ac, 0x484f, {0x88, 0x47, 0x4b, 0xae, 0xea, 0xb6, 0x05, 0x3f}}
 IDebugCommandList :: struct #raw_union {
 	#subtype iunknown: IUnknown,
 	using id3d12debugcommandlist_vtable: ^IDebugCommandList_VTable,
@@ -3872,7 +3874,8 @@ IDebugCommandList_VTable :: struct {
 }
 
 
-IDebugCommandList2_UUID :: "aeb575cf-4e06-48be-ba3b-c450fc96652e"
+IDebugCommandList2_UUID_STRING :: "aeb575cf-4e06-48be-ba3b-c450fc96652e"
+IDebugCommandList2_UUID := &IID{0xaeb575cf, 0x4e06, 0x48be, {0xba, 0x3b, 0xc4, 0x50, 0xfc, 0x96, 0x65, 0x2e}}
 IDebugCommandList2 :: struct #raw_union {
 	#subtype id3d12debugcommandlist: IDebugCommandList,
 	using id3d12debugcommandlist2_vtable: ^IDebugCommandList2_VTable,
@@ -3884,7 +3887,8 @@ IDebugCommandList2_VTable :: struct {
 }
 
 
-ISharingContract_UUID :: "0adf7d52-929c-4e61-addb-ffed30de66ef"
+ISharingContract_UUID_STRING :: "0adf7d52-929c-4e61-addb-ffed30de66ef"
+ISharingContract_UUID := &IID{0x0adf7d52, 0x929c, 0x4e61, {0xad, 0xdb, 0xff, 0xed, 0x30, 0xde, 0x66, 0xef}}
 ISharingContract :: struct #raw_union {
 	#subtype iunknown: IUnknown,
 	using id3d12sharingcontract_vtable: ^ISharingContract_VTable,
@@ -4789,7 +4793,8 @@ INFO_QUEUE_FILTER :: struct {
 }
 
 
-IInfoQueue_UUID :: "0742a90b-c387-483f-b946-30a7e4e61458"
+IInfoQueue_UUID_STRING :: "0742a90b-c387-483f-b946-30a7e4e61458"
+IInfoQueue_UUID := &IID{0x0742a90b, 0xc387, 0x483f, {0xb9, 0x46, 0x30, 0xa7, 0xe4, 0xe6, 0x14, 0x58}}
 IInfoQueue :: struct #raw_union {
 	#subtype iunknown: IUnknown,
 	using id3d12infoqueue_vtable: ^IInfoQueue_VTable,
@@ -4861,7 +4866,8 @@ SHADING_RATE_COMBINER :: enum i32 {
 }
 
 
-IGraphicsCommandList5_UUID :: "55050859-4024-474c-87f5-6472eaee44ea"
+IGraphicsCommandList5_UUID_STRING :: "55050859-4024-474c-87f5-6472eaee44ea"
+IGraphicsCommandList5_UUID := &IID{0x55050859, 0x4024, 0x474c, {0x87, 0xf5, 0x64, 0x72, 0xea, 0xee, 0x44, 0xea}}
 IGraphicsCommandList5 :: struct #raw_union {
 	#subtype id3d12graphicscommandlist4: IGraphicsCommandList4,
 	using id3d12graphicscommandlist5_vtable: ^IGraphicsCommandList5_VTable,
@@ -4879,7 +4885,8 @@ DISPATCH_MESH_ARGUMENTS :: struct {
 }
 
 
-IGraphicsCommandList6_UUID :: "c3827890-e548-4cfa-96cf-5689a9370f80"
+IGraphicsCommandList6_UUID_STRING :: "c3827890-e548-4cfa-96cf-5689a9370f80"
+IGraphicsCommandList6_UUID := &IID{0xc3827890, 0xe548, 0x4cfa, {0x96, 0xcf, 0x56, 0x89, 0xa9, 0x37, 0x0f, 0x80}}
 IGraphicsCommandList6 :: struct #raw_union {
 	#subtype id3d12graphicscommandlist5: IGraphicsCommandList5,
 	using id3d12graphicscommandlist6_vtable: ^IGraphicsCommandList6_VTable,
