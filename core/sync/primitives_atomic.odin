@@ -400,30 +400,28 @@ atomic_cond_broadcast :: proc(c: ^Atomic_Cond) {
 //
 // An Atomic_Sema must not be copied after first use
 Atomic_Sema :: struct {
-	mutex: Atomic_Mutex,
-	cond:  Atomic_Cond,
-	count: int,
+	count: Futex,
 }
 
 atomic_sema_post :: proc(s: ^Atomic_Sema, count := 1) {
-	atomic_mutex_lock(&s.mutex)
-	defer atomic_mutex_unlock(&s.mutex)
-
-	s.count += count
-	atomic_cond_signal(&s.cond)
+	atomic_add_explicit(&s.count, Futex(count), .Release)
+	if count == 1 {
+		futex_signal(&s.count)
+	} else {
+		futex_broadcast(&s.count)
+	}
 }
 
 atomic_sema_wait :: proc(s: ^Atomic_Sema) {
-	atomic_mutex_lock(&s.mutex)
-	defer atomic_mutex_unlock(&s.mutex)
-
-	for s.count == 0 {
-		atomic_cond_wait(&s.cond, &s.mutex)
-	}
-
-	s.count -= 1
-	if s.count > 0 {
-		atomic_cond_signal(&s.cond)
+	for {
+		original_count := atomic_load_explicit(&s.count, .Relaxed)
+		for original_count == 0 {
+			futex_wait(&s.count, u32(original_count))
+			original_count = s.count
+		}
+		if original_count == atomic_compare_exchange_strong_explicit(&s.count, original_count, original_count-1, .Acquire, .Acquire) {
+			return
+		}
 	}
 }
 
@@ -431,25 +429,22 @@ atomic_sema_wait_with_timeout :: proc(s: ^Atomic_Sema, duration: time.Duration) 
 	if duration <= 0 {
 		return false
 	}
-	atomic_mutex_lock(&s.mutex)
-	defer atomic_mutex_unlock(&s.mutex)
-	
-	start := time.tick_now()
+	for {
 
-	for s.count == 0 {
-		remaining := duration - time.tick_since(start)
-		if remaining < 0 {
-			return false
+		original_count := atomic_load_explicit(&s.count, .Relaxed)
+		for start := time.tick_now(); original_count == 0; /**/ {
+			remaining := duration - time.tick_since(start)
+			if remaining < 0 {
+				return false
+			}
+
+			if !futex_wait_with_timeout(&s.count, u32(original_count), remaining) {
+				return false
+			}
+			original_count = s.count
 		}
-		
-		if !atomic_cond_wait_with_timeout(&s.cond, &s.mutex, remaining) {
-			return false
+		if original_count == atomic_compare_exchange_strong_explicit(&s.count, original_count, original_count-1, .Acquire, .Acquire) {
+			return true
 		}
 	}
-
-	s.count -= 1
-	if s.count > 0 {
-		atomic_cond_signal(&s.cond)
-	}
-	return true
 }
