@@ -44,10 +44,10 @@ Pool :: struct {
 }
 
 // Once initialized, the pool's memory address is not allowed to change until
-// it is destroyed. If thread_count < 1, thread count 1 will be used.
+// it is destroyed. 
 //
 // The thread pool requires an allocator which it either owns, or which is thread safe.
-pool_init :: proc(pool: ^Pool, thread_count: int, allocator: mem.Allocator) {
+pool_init :: proc(pool: ^Pool, allocator: mem.Allocator, thread_count: int) {
 	context.allocator = allocator
 	pool.allocator = allocator
 	pool.tasks      = make([dynamic]Task)
@@ -113,9 +113,8 @@ pool_join :: proc(pool: ^Pool) {
 // the thread pool. You can even add tasks from inside other tasks.
 //
 // Each task also needs an allocator which it either owns, or which is thread
-// safe. By default, allocations in the task are disabled by use of the
-// nil_allocator.
-pool_add_task :: proc(pool: ^Pool, procedure: Task_Proc, data: rawptr, user_index: int = 0, allocator := context.allocator) {
+// safe. 
+pool_add_task :: proc(pool: ^Pool, allocator: mem.Allocator, procedure: Task_Proc, data: rawptr, user_index: int = 0) {
 	sync.guard(&pool.mutex)
 
 	append(&pool.tasks, Task{
