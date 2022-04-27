@@ -5,8 +5,9 @@ import sys
 import os
 import zipfile
 
+TEST_SUITES        = ['PNG', 'XML']
 DOWNLOAD_BASE_PATH = "assets/{}"
-ASSETS_BASE_URL    = "https://raw.githubusercontent.com/Kelimion/compress-odin/master/tests/assets/{}/{}"
+ASSETS_BASE_URL    = "https://raw.githubusercontent.com/odin-lang/test-assets/master/{}/{}"
 PNG_IMAGES         = [
 	"basi0g01.png", "basi0g02.png", "basi0g04.png", "basi0g08.png", "basi0g16.png", "basi2c08.png",
 	"basi2c16.png", "basi3p01.png", "basi3p02.png", "basi3p04.png", "basi3p08.png", "basi4a08.png",
@@ -73,25 +74,27 @@ def try_download_and_unpack_zip(suite):
 		print("Could not extract ZIP file")
 		return 2
 
-
 def main():
-	print("Downloading PNG assets")
+	for suite in TEST_SUITES:
+		print("Downloading {} assets".format(suite))
 
-	# Make PNG assets path
-	try:
-		path = DOWNLOAD_BASE_PATH.format("PNG")
-		os.makedirs(path)
-	except FileExistsError:
-		pass
+		# Make assets path
+		try:
+			path = DOWNLOAD_BASE_PATH.format(suite)
+			os.makedirs(path)
+		except FileExistsError:
+			pass
 
-	# Try downloading and unpacking the PNG assets
-	r = try_download_and_unpack_zip("PNG")
-	if r is not None:
-		return r
+		# Try downloading and unpacking the assets
+		r = try_download_and_unpack_zip(suite)
+		if r is not None:
+			return r
 
-	# We could fall back on downloading the PNG files individually, but it's slow
+		# We could fall back on downloading the PNG files individually, but it's slow
+		print("Done downloading {} assets.".format(suite))
 
-	print("Done downloading PNG assets")
+
+
 	return 0
 
 if __name__ == '__main__':

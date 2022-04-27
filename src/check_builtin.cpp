@@ -29,6 +29,7 @@ BuiltinTypeIsProc *builtin_type_is_procs[BuiltinProc__type_simple_boolean_end - 
 
 	is_type_named,
 	is_type_pointer,
+	is_type_multi_pointer,
 	is_type_array,
 	is_type_enumerated_array,
 	is_type_slice,
@@ -3866,6 +3867,7 @@ bool check_builtin_procedure(CheckerContext *c, Operand *operand, Ast *call, i32
 	case BuiltinProc_type_is_valid_matrix_elements:
 	case BuiltinProc_type_is_named:
 	case BuiltinProc_type_is_pointer:
+	case BuiltinProc_type_is_multi_pointer:
 	case BuiltinProc_type_is_array:
 	case BuiltinProc_type_is_enumerated_array:
 	case BuiltinProc_type_is_slice:
