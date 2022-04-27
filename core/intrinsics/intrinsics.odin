@@ -153,6 +153,7 @@ type_is_specialization_of :: proc($T, $S: typeid) -> bool ---
 type_is_variant_of :: proc($U, $V: typeid) -> bool where type_is_union(U) ---
 
 type_has_field :: proc($T: typeid, $name: string) -> bool ---
+type_field_type :: proc($T: typeid, $name: string) -> typeid ---
 
 type_proc_parameter_count :: proc($T: typeid) -> int where type_is_proc(T) ---
 type_proc_return_count    :: proc($T: typeid) -> int where type_is_proc(T) ---
