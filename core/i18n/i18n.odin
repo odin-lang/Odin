@@ -2,7 +2,7 @@ package i18n
 /*
 	Internationalization helpers.
 
-	Copyright 2021 Jeroen van Rijn <nom@duclavier.com>.
+	Copyright 2021-2022 Jeroen van Rijn <nom@duclavier.com>.
 	Made available under Odin's BSD-3 license.
 
 	List of contributors:
@@ -26,8 +26,11 @@ MAX_PLURALS :: min(max(#config(ODIN_i18N_MAX_PLURAL_FORMS, 10), 1), 255)
 /*
 	The main data structure. This can be generated from various different file formats, as long as we have a parser for them.
 */
+
+Section :: map[string][]string
+
 Translation :: struct {
-	k_v:    map[string]map[string][]string,
+	k_v:    map[string]Section, // k_v[section][key][plural_form] = ...
 	intern: strings.Intern,
 
 	pluralize: proc(number: int) -> int,
@@ -39,6 +42,7 @@ Error :: enum {
 	*/
 	None = 0,
 	Empty_Translation_Catalog,
+	Duplicate_Key,
 
 	/*
 		Couldn't find, open or read file.
@@ -57,6 +61,17 @@ Error :: enum {
 	MO_File_Unsupported_Version,
 	MO_File_Invalid,
 	MO_File_Incorrect_Plural_Count,
+
+	/*
+		Qt Linguist *.TS file errors.
+	*/
+	TS_File_Parse_Error,
+	TS_File_Expected_Context,
+	TS_File_Expected_Context_Name,
+	TS_File_Expected_Source,
+	TS_File_Expected_Translation,
+	TS_File_Expected_NumerusForm,
+
 }
 
 /*
@@ -92,7 +107,7 @@ get_by_section :: proc(section, key: string, number := 0, catalog: ^Translation 
 	if catalog.pluralize != nil {
 		plural = catalog.pluralize(number)
 	}
-	return get_by_slot(key, plural, catalog)
+	return get_by_slot(section, key, plural, catalog)
 }
 get :: proc{get_single_section, get_by_section}
 
