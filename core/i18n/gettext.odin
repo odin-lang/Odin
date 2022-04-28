@@ -57,6 +57,10 @@ parse_mo_from_slice :: proc(data: []u8, pluralizer: proc(int) -> int = nil, allo
 	translation.pluralize = pluralizer
 	strings.intern_init(&translation.intern, allocator, allocator)
 
+	// Gettext MO files only have one section.
+	translation.k_v[""] = {}
+	section := &translation.k_v[""]
+
 	for n := u32(0); n < count; n += 1 {
 		/*
 			Grab string's original length and offset.
@@ -94,7 +98,7 @@ parse_mo_from_slice :: proc(data: []u8, pluralizer: proc(int) -> int = nil, allo
 		for k in keys {
 			interned_key := strings.intern_get(&translation.intern, string(k))
 
-			interned_vals: [MAX_PLURALS]string = {}
+			interned_vals := make([]string, len(keys))
 			last_val: string
 
 			i := 0
@@ -103,10 +107,7 @@ parse_mo_from_slice :: proc(data: []u8, pluralizer: proc(int) -> int = nil, allo
 				last_val = interned_vals[i]
 				i += 1
 			}
-			for ; i < MAX_PLURALS; i += 1 {
-				interned_vals[i] = last_val
-			}
-			translation.k_v[interned_key] = interned_vals
+			section[interned_key] = interned_vals
 		}
 		delete(vals)
 		delete(keys)
