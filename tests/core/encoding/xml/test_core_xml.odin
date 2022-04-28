@@ -224,7 +224,7 @@ doc_to_string :: proc(doc: ^xml.Document) -> (result: string) {
 			written += wprintf(writer, "[DOCTYPE]  %v\n", doc.doctype.ident)
 
 			if len(doc.doctype.rest) > 0 {
-				wprintf(writer, "\t%v\n", doc.doctype.rest)
+			 	wprintf(writer, "\t%v\n", doc.doctype.rest)
 			}
 		}
 
@@ -232,17 +232,16 @@ doc_to_string :: proc(doc: ^xml.Document) -> (result: string) {
 			written += wprintf(writer, "[Pre-root comment]  %v\n", comment)
 		}
 
-		if doc.root != nil {
-			wprintln(writer, " --- ")
-			print_element(writer, doc.root)
-			wprintln(writer, " --- ")		
+		if doc.element_count > 0 {
+		 	wprintln(writer, " --- ")
+		 	print_element(writer, doc, 0)
+		 	wprintln(writer, " --- ")
 		 }
 
 		return written, .None
 	}
 
-	print_element :: proc(writer: io.Writer, element: ^xml.Element, indent := 0) -> (written: int, err: io.Error) {
-		if element == nil { return }
+	print_element :: proc(writer: io.Writer, doc: ^xml.Document, element_id: xml.Element_ID, indent := 0) -> (written: int, err: io.Error) {
 		using fmt
 
 		tab :: proc(writer: io.Writer, indent: int) {
@@ -252,6 +251,8 @@ doc_to_string :: proc(doc: ^xml.Document) -> (result: string) {
 		}
 
 		tab(writer, indent)
+
+		element := doc.elements[element_id]
 
 		if element.kind == .Element {
 			wprintf(writer, "<%v>\n", element.ident)
@@ -266,7 +267,7 @@ doc_to_string :: proc(doc: ^xml.Document) -> (result: string) {
 			}
 
 			for child in element.children {
-				print_element(writer, child, indent + 1)
+				print_element(writer, doc, child, indent + 1)
 			}
 		} else if element.kind == .Comment {
 			wprintf(writer, "[COMMENT] %v\n", element.value)

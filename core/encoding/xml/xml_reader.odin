@@ -1,8 +1,7 @@
-package xml
 /*
 	An XML 1.0 / 1.1 parser
 
-	Copyright 2021 Jeroen van Rijn <nom@duclavier.com>.
+	Copyright 2021-2022 Jeroen van Rijn <nom@duclavier.com>.
 	Made available under Odin's BSD-3 license.
 
 	A from-scratch XML implementation, loosely modelled on the [spec](https://www.w3.org/TR/2006/REC-xml11-20060816).
@@ -25,12 +24,17 @@ package xml
 	List of contributors:
 		Jeroen van Rijn: Initial implementation.
 */
+package xml
+// An XML 1.0 / 1.1 parser
 
 import "core:bytes"
-import "core:strings"
 import "core:encoding/entity"
+import "core:intrinsics"
 import "core:mem"
 import "core:os"
+import "core:strings"
+
+likely :: intrinsics.expect
 
 DEFAULT_Options :: Options{
 	flags            = {
@@ -88,7 +92,9 @@ Option_Flag :: enum {
 Option_Flags :: bit_set[Option_Flag; u16]
 
 Document :: struct {
-	root:     ^Element,
+	elements:      [dynamic]Element,
+	element_count: Element_ID,
+
 	prolog:   Attributes,
 	encoding: Encoding,
 
@@ -129,8 +135,8 @@ Element :: struct {
 		Comment,
 	},
 
-	parent:   ^Element,
-	children: [dynamic]^Element,
+	parent:   Element_ID,
+	children: [dynamic]Element_ID,
 }
 
 Attr :: struct {
@@ -185,7 +191,7 @@ Error :: enum {
 
 	No_DocType,
 	Too_Many_DocTypes,
-	DocType_Must_Proceed_Elements,
+	DocType_Must_Preceed_Elements,
 
 	/*
 		If a DOCTYPE is present _or_ the caller
@@ -237,12 +243,16 @@ parse_from_slice :: proc(data: []u8, options := DEFAULT_Options, path := "", err
 	doc.tokenizer = t
 	doc.input     = data
 
+	doc.elements = make([dynamic]Element, 1024, 1024, allocator)
+
 	// strings.intern_init(&doc.intern, allocator, allocator)
 
 	err =            .Unexpected_Token
-	element, parent: ^Element
+	element, parent: Element_ID
 
-	tag_is_open := false
+	tag_is_open   := false
+	first_element := true
+	open: Token
 
 	/*
 		If a DOCTYPE is present, the root tag has to match.
@@ -252,6 +262,7 @@ parse_from_slice :: proc(data: []u8, options := DEFAULT_Options, path := "", err
 
 	loop: for {
 		skip_whitespace(t)
+		// NOTE(Jeroen): This is faster as a switch.
 		switch t.ch {
 		case '<':
 			/*
@@ -259,35 +270,85 @@ parse_from_slice :: proc(data: []u8, options := DEFAULT_Options, path := "", err
 			*/
 			advance_rune(t)
 
-			open := scan(t)
-			#partial switch open.kind {
-
-			case .Question:
+			open = scan(t)
+			// NOTE(Jeroen): We're not using a switch because this if-else chain ordered by likelihood is 2.5% faster at -o:size and -o:speed.
+			if likely(open.kind, Token_Kind.Ident) == .Ident {
 				/*
-					<?xml
+					e.g. <odin - Start of new element.
 				*/
-				next := scan(t)
-				#partial switch next.kind {
-				case .Ident:
-					if len(next.text) == 3 && strings.to_lower(next.text, context.temp_allocator) == "xml" {
-						parse_prolog(doc) or_return
-					} else if len(doc.prolog) > 0 {
-						/*
-							We've already seen a prolog.
-						*/
-						return doc, .Too_Many_Prologs
-					} else {
-						/*
-							Could be `<?xml-stylesheet`, etc. Ignore it.
-						*/
-						skip_element(t) or_return
+				element = new_element(doc)
+				tag_is_open = true
+
+				if first_element {
+					/*
+						First element.
+					*/
+					parent   = element
+					first_element = false
+				} else {
+					append(&doc.elements[parent].children, element)
+				}
+
+				doc.elements[element].parent = parent
+				doc.elements[element].ident  = open.text
+
+				parse_attributes(doc, &doc.elements[element].attribs) or_return
+
+				/*
+					If a DOCTYPE is present _or_ the caller
+					asked for a specific DOCTYPE and the DOCTYPE
+					and root tag don't match, we return .Invalid_Root_Tag.
+				*/
+				if element == 0 { // Root tag?
+					if len(expected_doctype) > 0 && expected_doctype != open.text {
+						error(t, t.offset, "Root Tag doesn't match DOCTYPE. Expected: %v, got: %v\n", expected_doctype, open.text)
+						return doc, .Invalid_DocType
 					}
+				}
+
+				/*
+					One of these should follow:
+					- `>`,  which means we've just opened this tag and expect a later element to close it.
+					- `/>`, which means this is an 'empty' or self-closing tag.
+				*/
+				end_token := scan(t)
+				#partial switch end_token.kind {
+				case .Gt:
+					/*
+						We're now the new parent.
+					*/
+					parent = element
+
+				case .Slash:
+					/*
+						Empty tag. Close it.
+					*/
+					expect(t, .Gt) or_return
+					parent      = doc.elements[element].parent
+					element     = parent
+					tag_is_open = false
+
 				case:
-					error(t, t.offset, "Expected \"<?xml\", got \"<?%v\".", next.text)
+					error(t, t.offset, "Expected close tag, got: %#v\n", end_token)
 					return
 				}
 
-			case .Exclaim:
+			} else if open.kind == .Slash {
+				/*
+					Close tag.
+				*/
+				ident := expect(t, .Ident) or_return
+				_      = expect(t, .Gt)    or_return
+
+				if doc.elements[element].ident != ident.text {
+					error(t, t.offset, "Mismatched Closing Tag. Expected %v, got %v\n", doc.elements[element].ident, ident.text)
+					return doc, .Mismatched_Closing_Tag
+				}
+				parent      = doc.elements[element].parent
+				element     = parent
+				tag_is_open = false
+
+			} else if open.kind == .Exclaim {
 				/*
 					<!
 				*/
@@ -299,8 +360,8 @@ parse_from_slice :: proc(data: []u8, options := DEFAULT_Options, path := "", err
 						if len(doc.doctype.ident) > 0 {
 							return doc, .Too_Many_DocTypes
 						}
-						if doc.root != nil {
-							return doc, .DocType_Must_Proceed_Elements
+						if doc.element_count > 0 {
+							return doc, .DocType_Must_Preceed_Elements
 						}
 						parse_doctype(doc) or_return
 
@@ -327,14 +388,14 @@ parse_from_slice :: proc(data: []u8, options := DEFAULT_Options, path := "", err
 					comment := scan_comment(t) or_return
 
 					if .Intern_Comments in opts.flags {
-						if doc.root == nil {
+						if len(doc.elements) == 0 {
 							append(&doc.comments, comment)
 						} else {
-							el := new(Element)
-							el.parent = element
-							el.kind   = .Comment
-							el.value  = comment
-							append(&element.children, el)
+							el := new_element(doc)
+							doc.elements[el].parent = element
+							doc.elements[el].kind   = .Comment
+							doc.elements[el].value  = comment
+							append(&doc.elements[element].children, el)
 						}
 					}
 
@@ -343,83 +404,32 @@ parse_from_slice :: proc(data: []u8, options := DEFAULT_Options, path := "", err
 					return
 				}
 
-			case .Ident:
+			} else if open.kind == .Question {
 				/*
-					e.g. <odin - Start of new element.
+					<?xml
 				*/
-				element = new(Element)
-				tag_is_open = true
-
-				if doc.root == nil {
-					/*
-						First element.
-					*/
-					doc.root = element
-					parent   = element
-				} else {
-					append(&parent.children, element)
-				}
-
-				element.parent = parent
-				element.ident  = open.text
-
-				parse_attributes(doc, &element.attribs) or_return
-
-				/*
-					If a DOCTYPE is present _or_ the caller
-					asked for a specific DOCTYPE and the DOCTYPE
-					and root tag don't match, we return .Invalid_Root_Tag.
-				*/
-				if element == doc.root {
-					if len(expected_doctype) > 0 && expected_doctype != open.text {
-						error(t, t.offset, "Root Tag doesn't match DOCTYPE. Expected: %v, got: %v\n", expected_doctype, open.text)
-						return doc, .Invalid_DocType
+				next := scan(t)
+				#partial switch next.kind {
+				case .Ident:
+					if len(next.text) == 3 && strings.to_lower(next.text, context.temp_allocator) == "xml" {
+						parse_prolog(doc) or_return
+					} else if len(doc.prolog) > 0 {
+						/*
+							We've already seen a prolog.
+						*/
+						return doc, .Too_Many_Prologs
+					} else {
+						/*
+							Could be `<?xml-stylesheet`, etc. Ignore it.
+						*/
+						skip_element(t) or_return
 					}
-				}
-
-				/*
-					One of these should follow:
-					- `>`,  which means we've just opened this tag and expect a later element to close it.
-					- `/>`, which means this is an 'empty' or self-closing tag.
-				*/
-				end_token := scan(t)
-				#partial switch end_token.kind {
-				case .Gt:
-					/*
-						We're now the new parent.
-					*/
-					parent = element
-
-				case .Slash:
-					/*
-						Empty tag. Close it.
-					*/
-					expect(t, .Gt) or_return
-					parent      = element.parent
-					element     = parent
-					tag_is_open = false
-
 				case:
-					error(t, t.offset, "Expected close tag, got: %#v\n", end_token)
+					error(t, t.offset, "Expected \"<?xml\", got \"<?%v\".", next.text)
 					return
 				}
 
-			case .Slash:
-				/*
-					Close tag.
-				*/
-				ident := expect(t, .Ident) or_return
-				_      = expect(t, .Gt)    or_return
-
-				if element.ident != ident.text {
-					error(t, t.offset, "Mismatched Closing Tag. Expected %v, got %v\n", element.ident, ident.text)
-					return doc, .Mismatched_Closing_Tag
-				}
-				parent      = element.parent
-				element     = parent
-				tag_is_open = false
-
-			case:
+			} else {
 				error(t, t.offset, "Invalid Token after <: %#v\n", open)
 				return
 			}
@@ -442,7 +452,7 @@ parse_from_slice :: proc(data: []u8, options := DEFAULT_Options, path := "", err
 			needs_processing |= .Decode_SGML_Entities in opts.flags
 
 			if !needs_processing {
-				element.value = body_text
+				doc.elements[element].value = body_text
 				continue
 			}
 
@@ -464,10 +474,10 @@ parse_from_slice :: proc(data: []u8, options := DEFAULT_Options, path := "", err
 
 			decoded, decode_err := entity.decode_xml(body_text, decode_opts)
 			if decode_err == .None {
-				element.value = decoded
+				doc.elements[element].value = decoded
 				append(&doc.strings_to_free, decoded)
 			} else {
-				element.value = body_text
+				doc.elements[element].value = body_text
 			}
 		}
 	}
@@ -480,6 +490,7 @@ parse_from_slice :: proc(data: []u8, options := DEFAULT_Options, path := "", err
 		return doc, .No_DocType
 	}
 
+	resize(&doc.elements, int(doc.element_count))
 	return doc, .None
 }
 
@@ -497,26 +508,14 @@ parse_from_file :: proc(filename: string, options := DEFAULT_Options, error_hand
 
 parse :: proc { parse_from_file, parse_from_slice }
 
-free_element :: proc(element: ^Element) {
-	if element == nil { return }
-
-	for child in element.children {
-		/*
-			NOTE: Recursive.
-
-			Could be rewritten so it adds them to a list of pointers to free.
-		*/
-		free_element(child)
-	}
-	delete(element.attribs)
-	delete(element.children)
-	free(element)
-}
-
 destroy :: proc(doc: ^Document) {
 	if doc == nil { return }
 
-	free_element(doc.root)
+	for el in doc.elements {
+		delete(el.attribs)
+		delete(el.children)
+	}
+	delete(doc.elements)
 
 	delete(doc.prolog)
 	delete(doc.comments)
@@ -686,4 +685,25 @@ parse_doctype :: proc(doc: ^Document) -> (err: Error) {
 	*/
 	doc.doctype.rest = string(t.src[offset : t.offset - 1])
 	return .None
+}
+
+Element_ID :: u32
+
+new_element :: proc(doc: ^Document) -> (id: Element_ID) {
+	element_space := len(doc.elements)
+
+	// Need to resize
+	if int(doc.element_count) + 1 > element_space {
+		if element_space < 65536 {
+			element_space *= 2
+		} else {
+			element_space += 65536
+		}
+		resize(&doc.elements, element_space)
+	}
+
+	cur := doc.element_count
+	doc.element_count += 1
+
+	return cur
 }

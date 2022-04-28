@@ -1,8 +1,7 @@
-package xml
 /*
 	An XML 1.0 / 1.1 parser
 
-	Copyright 2021 Jeroen van Rijn <nom@duclavier.com>.
+	Copyright 2021-2022 Jeroen van Rijn <nom@duclavier.com>.
 	Made available under Odin's BSD-3 license.
 
 	A from-scratch XML implementation, loosely modeled on the [spec](https://www.w3.org/TR/2006/REC-xml11-20060816).
@@ -10,6 +9,8 @@ package xml
 	List of contributors:
 		Jeroen van Rijn: Initial implementation.
 */
+package xml
+
 import "core:io"
 import "core:fmt"
 
@@ -40,17 +41,16 @@ print :: proc(writer: io.Writer, doc: ^Document) -> (written: int, err: io.Error
 		written += wprintf(writer, "[Pre-root comment]  %v\n", comment)
 	}
 
-	if doc.root != nil {
+	if len(doc.elements) > 0 {
 	 	wprintln(writer, " --- ")
-	 	print_element(writer, doc.root)
-	 	wprintln(writer, " --- ")		
+	 	print_element(writer, doc, 0)
+	 	wprintln(writer, " --- ")
 	 }
 
 	return written, .None
 }
 
-print_element :: proc(writer: io.Writer, element: ^Element, indent := 0) -> (written: int, err: io.Error) {
-	if element == nil { return }
+print_element :: proc(writer: io.Writer, doc: ^Document, element_id: Element_ID, indent := 0) -> (written: int, err: io.Error) {
 	using fmt
 
 	tab :: proc(writer: io.Writer, indent: int) {
@@ -60,6 +60,8 @@ print_element :: proc(writer: io.Writer, element: ^Element, indent := 0) -> (wri
 	}
 
 	tab(writer, indent)
+
+	element := doc.elements[element_id]
 
 	if element.kind == .Element {
 		wprintf(writer, "<%v>\n", element.ident)
@@ -74,7 +76,7 @@ print_element :: proc(writer: io.Writer, element: ^Element, indent := 0) -> (wri
 		}
 
 		for child in element.children {
-			print_element(writer, child, indent + 1)
+			print_element(writer, doc, child, indent + 1)
 		}
 	} else if element.kind == .Comment {
 		wprintf(writer, "[COMMENT] %v\n", element.value)
