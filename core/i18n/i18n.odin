@@ -15,18 +15,19 @@ import "core:strings"
 	- Support for more translation catalog file formats.
 */
 
-MAX_PLURALS :: 10
-
 /*
 	Currently active catalog.
 */
 ACTIVE: ^Translation
 
+// Allow between 1 and 255 plural forms. Default: 10.
+MAX_PLURALS :: min(max(#config(ODIN_i18N_MAX_PLURAL_FORMS, 10), 1), 255)
+
 /*
 	The main data structure. This can be generated from various different file formats, as long as we have a parser for them.
 */
 Translation :: struct {
-	k_v:    map[string][MAX_PLURALS]string,
+	k_v:    map[string]map[string][]string,
 	intern: strings.Intern,
 
 	pluralize: proc(number: int) -> int,
@@ -64,7 +65,7 @@ Error :: enum {
 	- get(key, number), which returns the appropriate plural from the active catalog, or
 	- get(key, number, catalog) to grab text from a specific one.
 */
-get :: proc(key: string, number := 0, catalog: ^Translation = ACTIVE) -> (value: string) {
+get_single_section :: proc(key: string, number := 0, catalog: ^Translation = ACTIVE) -> (value: string) {
 	/*
 		A lot of languages use singular for 1 item and plural for 0 or more than 1 items. This is our default pluralize rule.
 	*/
@@ -78,16 +79,47 @@ get :: proc(key: string, number := 0, catalog: ^Translation = ACTIVE) -> (value:
 
 /*
 	Several ways to use:
+	- get(section, key), which defaults to the singular form and i18n.ACTIVE catalog, or
+	- get(section, key, number), which returns the appropriate plural from the active catalog, or
+	- get(section, key, number, catalog) to grab text from a specific one.
+*/
+get_by_section :: proc(section, key: string, number := 0, catalog: ^Translation = ACTIVE) -> (value: string) {
+	/*
+		A lot of languages use singular for 1 item and plural for 0 or more than 1 items. This is our default pluralize rule.
+	*/
+	plural := 1 if number != 1 else 0
+
+	if catalog.pluralize != nil {
+		plural = catalog.pluralize(number)
+	}
+	return get_by_slot(key, plural, catalog)
+}
+get :: proc{get_single_section, get_by_section}
+
+/*
+	Several ways to use:
 	- get_by_slot(key), which defaults to the singular form and i18n.ACTIVE catalog, or
 	- get_by_slot(key, slot), which returns the requested plural from the active catalog, or
 	- get_by_slot(key, slot, catalog) to grab text from a specific one.
 
 	If a file format parser doesn't (yet) support plural slots, each of the slots will point at the same string.
 */
-get_by_slot :: proc(key: string, slot := 0, catalog: ^Translation = ACTIVE) -> (value: string) {
-	if catalog == nil {
+get_by_slot_single_section :: proc(key: string, slot := 0, catalog: ^Translation = ACTIVE) -> (value: string) {
+	return get_by_slot_by_section("", key, slot, catalog)
+}
+
+/*
+	Several ways to use:
+	- get_by_slot(key), which defaults to the singular form and i18n.ACTIVE catalog, or
+	- get_by_slot(key, slot), which returns the requested plural from the active catalog, or
+	- get_by_slot(key, slot, catalog) to grab text from a specific one.
+
+	If a file format parser doesn't (yet) support plural slots, each of the slots will point at the same string.
+*/
+get_by_slot_by_section :: proc(section, key: string, slot := 0, catalog: ^Translation = ACTIVE) -> (value: string) {
+	if catalog == nil || section not_in catalog.k_v {
 		/*
-			Return the key if the catalog catalog hasn't been initialized yet.
+			Return the key if the catalog catalog hasn't been initialized yet, or the section is not present.
 		*/
 		return key
 	}
@@ -95,12 +127,13 @@ get_by_slot :: proc(key: string, slot := 0, catalog: ^Translation = ACTIVE) -> (
 	/*
 		Return the translation from the requested slot if this key is known, else return the key.
 	*/
-	if translations, ok := catalog.k_v[key]; ok {
-		plural := min(max(0, slot), MAX_PLURALS - 1)
+	if translations, ok := catalog.k_v[section][key]; ok {
+		plural := min(max(0, slot), len(catalog.k_v[section][key]) - 1)
 		return translations[plural]
 	}
 	return key
 }
+get_by_slot :: proc{get_by_slot_single_section, get_by_slot_by_section}
 
 /*
 	Same for destroy:
@@ -110,6 +143,12 @@ get_by_slot :: proc(key: string, slot := 0, catalog: ^Translation = ACTIVE) -> (
 destroy :: proc(catalog: ^Translation = ACTIVE) {
 	if catalog != nil {
 		strings.intern_destroy(&catalog.intern)
+		for section in &catalog.k_v {
+			for key in &catalog.k_v[section] {
+				delete(catalog.k_v[section][key])
+			}
+			delete(catalog.k_v[section])
+		}
 		delete(catalog.k_v)
 		free(catalog)
 	}
