@@ -630,6 +630,7 @@ enum BuildFlagKind {
 	BuildFlag_IgnoreWarnings,
 	BuildFlag_WarningsAsErrors,
 	BuildFlag_VerboseErrors,
+	BuildFlag_ErrorPosStyle,
 
 	// internal use only
 	BuildFlag_InternalIgnoreLazy,
@@ -793,6 +794,7 @@ bool parse_build_flags(Array<String> args) {
 	add_flag(&build_flags, BuildFlag_IgnoreWarnings,          str_lit("ignore-warnings"),           BuildFlagParam_None,    Command_all);
 	add_flag(&build_flags, BuildFlag_WarningsAsErrors,        str_lit("warnings-as-errors"),        BuildFlagParam_None,    Command_all);
 	add_flag(&build_flags, BuildFlag_VerboseErrors,           str_lit("verbose-errors"),            BuildFlagParam_None,    Command_all);
+	add_flag(&build_flags, BuildFlag_ErrorPosStyle,           str_lit("error-pos-style"),           BuildFlagParam_String,  Command_all);
 
 	add_flag(&build_flags, BuildFlag_InternalIgnoreLazy,      str_lit("internal-ignore-lazy"),      BuildFlagParam_None,    Command_all);
 
@@ -1472,6 +1474,15 @@ bool parse_build_flags(Array<String> args) {
 						case BuildFlag_VerboseErrors:
 							build_context.show_error_line = true;
 							break;
+
+						case BuildFlag_ErrorPosStyle:
+							GB_ASSERT(value.kind == ExactValue_String);
+							build_context.ODIN_ERROR_POS_STYLE = ErrorPosStyle_Default;
+							if (value.value_string == "unix" || value.value_string == "UNIX") {
+								build_context.ODIN_ERROR_POS_STYLE = ErrorPosStyle_Unix;
+							}
+							break;
+
 						case BuildFlag_InternalIgnoreLazy:
 							build_context.ignore_lazy = true;
 							break;
