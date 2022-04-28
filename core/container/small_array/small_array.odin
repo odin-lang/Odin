@@ -86,7 +86,7 @@ pop_back_safe :: proc(a: ^$A/Small_Array($N, $T)) -> (item: T, ok: bool) {
 	return
 }
 
-pop_front_safe :: proc(a: ^$A/Small_Array($N, $T)) -> (T, bool) {
+pop_front_safe :: proc(a: ^$A/Small_Array($N, $T)) -> (item: T, ok: bool) {
 	if N > 0 && a.len > 0 {
 		item = a.data[0]
 		s := slice(a)
