@@ -154,11 +154,7 @@ shoco_test :: proc(t: ^testing.T) {
 		expected_raw        := len(v.raw)
 		expected_compressed := len(v.compressed)
 
-		biggest_unpacked := shoco.decompress_bound(expected_compressed)
-		biggest_packed   := shoco.compress_bound(expected_raw)
-
-		buffer := make([]u8, max(biggest_packed, biggest_unpacked))
-		defer delete(buffer)
+		buffer: [10240]u8
 
 		size, err := shoco.decompress(v.compressed, buffer[:])
 		msg := fmt.tprintf("Expected `decompress` to return `nil`, got %v", err)
