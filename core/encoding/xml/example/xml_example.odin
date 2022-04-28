@@ -1,52 +1,85 @@
 package xml_example
 
 import "core:encoding/xml"
-import "core:os"
 import "core:mem"
 import "core:fmt"
 import "core:time"
 import "core:strings"
 import "core:hash"
 
+N :: 1
+
 example :: proc() {
 	using fmt
 
-	doc: ^xml.Document
-	err: xml.Error
+	docs:  [N]^xml.Document
+	errs:  [N]xml.Error
+	times: [N]time.Duration
+
+	defer for round in 0..<N {
+		xml.destroy(docs[round])
+	}
 
 	DOC :: #load("../../../../tests/core/assets/XML/unicode.xml")
+	input := DOC
 
-	parse_duration: time.Duration
-	{
-		time.SCOPED_TICK_DURATION(&parse_duration)
-		doc, err = xml.parse(DOC, xml.Options{flags={.Ignore_Unsupported}})
+	for round in 0..<N {
+		start := time.tick_now()
+
+		docs[round], errs[round] = xml.parse(input, xml.Options{
+			flags={.Ignore_Unsupported},
+			expected_doctype = "",
+		})
+
+		end   := time.tick_now()
+		times[round] = time.tick_diff(start, end)
 	}
-	defer xml.destroy(doc)
 
-	ms := time.duration_milliseconds(parse_duration)
-	speed := (f64(1000.0) / ms) * f64(len(DOC)) / 1_024.0 / 1_024.0
-	fmt.printf("Parse time: %v bytes in %.2f ms (%.2f MiB/s).\n", len(DOC), ms, speed)
+	fastest := time.Duration(max(i64))
+	slowest := time.Duration(0)
+	total   := time.Duration(0)
 
-	if err != .None {
-		printf("Load/Parse error: %v\n", err)
-		if err == .File_Error {
+	for round in 0..<N {
+		fastest = min(fastest, times[round])
+		slowest = max(slowest, times[round])
+		total  += times[round]
+	}
+
+	fastest_ms := time.duration_milliseconds(fastest)
+	slowest_ms := time.duration_milliseconds(slowest)
+	average_ms := time.duration_milliseconds(time.Duration(f64(total) / f64(N)))
+
+	fastest_speed := (f64(1000.0) / fastest_ms) * f64(len(DOC)) / 1_024.0 / 1_024.0
+	slowest_speed := (f64(1000.0) / slowest_ms) * f64(len(DOC)) / 1_024.0 / 1_024.0
+	average_speed := (f64(1000.0) / average_ms) * f64(len(DOC)) / 1_024.0 / 1_024.0
+
+	fmt.printf("N = %v\n", N)
+	fmt.printf("[Fastest]: %v bytes in %.2f ms (%.2f MiB/s).\n", len(input), fastest_ms, fastest_speed)
+	fmt.printf("[Slowest]: %v bytes in %.2f ms (%.2f MiB/s).\n", len(input), slowest_ms, slowest_speed)
+	fmt.printf("[Average]: %v bytes in %.2f ms (%.2f MiB/s).\n", len(input), average_ms, average_speed)
+
+	if errs[0] != .None {
+		printf("Load/Parse error: %v\n", errs[0])
+		if errs[0] == .File_Error {
 			println("\"unicode.xml\" not found. Did you run \"tests\\download_assets.py\"?")
 		}
-		os.exit(1)
+		return
 	}
 
-	println("\"unicode.xml\" loaded and parsed.")
-
-	charlist, charlist_ok := xml.find_child_by_ident(doc.root, "charlist")
+	charlist, charlist_ok := xml.find_child_by_ident(docs[0], 0, "charlist")
 	if !charlist_ok {
-		eprintln("Could not locate top-level `<charlist>` tag.")
-		os.exit(1)
+	 	eprintln("Could not locate top-level `<charlist>` tag.")
+	 	return
 	}
 
-	printf("Found `<charlist>` with %v children.\n", len(charlist.children))
+	printf("Found `<charlist>` with %v children, %v elements total\n", len(docs[0].elements[charlist].children), docs[0].element_count)
 
-	crc32 := doc_hash(doc)
+	crc32 := doc_hash(docs[0])
 	printf("[%v] CRC32: 0x%08x\n", "🎉" if crc32 == 0xcaa042b9 else "🤬", crc32)
+
+	for round in 0..<N {
+		defer xml.destroy(docs[round])
+	}
 }
 
 doc_hash :: proc(doc: ^xml.Document, print := false) -> (crc32: u32) {

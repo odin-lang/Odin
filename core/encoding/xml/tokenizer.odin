@@ -1,3 +1,14 @@
+/*
+	An XML 1.0 / 1.1 parser
+
+	Copyright 2021-2022 Jeroen van Rijn <nom@duclavier.com>.
+	Made available under Odin's BSD-3 license.
+
+	A from-scratch XML implementation, loosely modeled on the [spec](https://www.w3.org/TR/2006/REC-xml11-20060816).
+
+	List of contributors:
+		Jeroen van Rijn: Initial implementation.
+*/
 package xml
 
 import "core:fmt"
