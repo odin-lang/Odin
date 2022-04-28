@@ -168,6 +168,21 @@ TESTS :: []TEST{
 		err       = .Invalid_DocType,
 		crc32     = 0x49b83d0a,
 	},
+
+	/*
+		Parse the 8.2 MiB unicode.xml for good measure.
+	*/
+	{
+		filename  = "unicode.xml",
+		options   = {
+			flags            = {
+				.Ignore_Unsupported,
+			},
+			expected_doctype = "",
+		},
+		err       = .None,
+		crc32     = 0xcaa042b9,
+	},
 }
 
 when ODIN_TEST {
