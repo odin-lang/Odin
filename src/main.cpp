@@ -1478,12 +1478,12 @@ bool parse_build_flags(Array<String> args) {
 						case BuildFlag_ErrorPosStyle:
 							GB_ASSERT(value.kind == ExactValue_String);
 
-							if (str_eq_ignore_case(value.value_string, str_lit("odin"))) {
+							if (str_eq_ignore_case(value.value_string, str_lit("odin")) || str_eq_ignore_case(value.value_string, str_lit("default"))) {
 								build_context.ODIN_ERROR_POS_STYLE = ErrorPosStyle_Default;
 							} else if (str_eq_ignore_case(value.value_string, str_lit("unix"))) {
 								build_context.ODIN_ERROR_POS_STYLE = ErrorPosStyle_Unix;
 							} else {
-								gb_printf_err("-error-pos-style options are 'unix' and 'odin'\n");
+								gb_printf_err("-error-pos-style options are 'unix', 'odin' and 'default' (odin)\n");
 								bad_flags = true;
 							}
 							break;
