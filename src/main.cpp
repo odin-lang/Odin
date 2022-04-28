@@ -1477,9 +1477,14 @@ bool parse_build_flags(Array<String> args) {
 
 						case BuildFlag_ErrorPosStyle:
 							GB_ASSERT(value.kind == ExactValue_String);
-							build_context.ODIN_ERROR_POS_STYLE = ErrorPosStyle_Default;
-							if (value.value_string == "unix" || value.value_string == "UNIX") {
+
+							if (str_eq_ignore_case(value.value_string, str_lit("odin"))) {
+								build_context.ODIN_ERROR_POS_STYLE = ErrorPosStyle_Default;
+							} else if (str_eq_ignore_case(value.value_string, str_lit("unix"))) {
 								build_context.ODIN_ERROR_POS_STYLE = ErrorPosStyle_Unix;
+							} else {
+								gb_printf_err("-error-pos-style options are 'unix' and 'odin'\n");
+								bad_flags = true;
 							}
 							break;
 
