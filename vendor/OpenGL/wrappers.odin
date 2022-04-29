@@ -70,7 +70,7 @@ when !ODIN_DEBUG {
 
 	// VERSION_1_2
 	DrawRangeElements :: proc "c" (mode, start, end: u32, count: i32, type: u32, indices: rawptr)                                               { impl_DrawRangeElements(mode, start, end, count, type, indices)                                           }
-	TexImage3D        :: proc "c" (target: u32, level, internalformat, width, height, depth, border: i32, format, type: u32, pixels: rawptr)    { impl_TexImage3D(target, level, internalformat, width, height, depth, border, format, type, pixels)       }
+	TexImage3D        :: proc "c" (target: u32, level, internalformat, width, height, depth, border: i32, format, type: u32, data: rawptr)    { impl_TexImage3D(target, level, internalformat, width, height, depth, border, format, type, data)       }
 	TexSubImage3D     :: proc "c" (target: u32, level, xoffset, yoffset, zoffset, width, height, depth: i32, format, type: u32, pixels: rawptr) { impl_TexSubImage3D(target, level, xoffset, yoffset, zoffset, width, height, depth, format, type, pixels) }
 	CopyTexSubImage3D :: proc "c" (target: u32, level, xoffset, yoffset, zoffset, x, y, width, height: i32)                                     { impl_CopyTexSubImage3D(target, level, xoffset, yoffset, zoffset, x, y, width, height)                    }
 
