@@ -92,15 +92,15 @@ parse_qt_linguist_from_slice :: proc(data: []u8, options := DEFAULT_PARSE_OPTION
 				return translation, .TS_File_Expected_Translation
 			}
 
-			source := ts.elements[source_id]
-			xlat   := ts.elements[translation_id]
+			source := strings.intern_get(&translation.intern, ts.elements[source_id].value)
+			xlat   := strings.intern_get(&translation.intern, ts.elements[translation_id].value)
 
-			if source.value in section {
+			if source in section {
 				return translation, .Duplicate_Key
 			}
 
 			if has_plurals {
-				if xlat.value != "" {
+				if xlat != "" {
 					return translation, .TS_File_Expected_NumerusForm
 				}
 
@@ -116,7 +116,7 @@ parse_qt_linguist_from_slice :: proc(data: []u8, options := DEFAULT_PARSE_OPTION
 				if num_plurals < 2 {
 					return translation, .TS_File_Expected_NumerusForm
 				}
-				section[source.value] = make([]string, num_plurals)
+				section[source] = make([]string, num_plurals)
 
 				num_plurals = 0
 				for {
@@ -124,15 +124,15 @@ parse_qt_linguist_from_slice :: proc(data: []u8, options := DEFAULT_PARSE_OPTION
 					if !numerus_found {
 						break
 					}
-					numerus := ts.elements[numerus_id]
-					section[source.value][num_plurals] = strings.intern_get(&translation.intern, numerus.value)
+					numerus := strings.intern_get(&translation.intern, ts.elements[numerus_id].value)
+					section[source][num_plurals] = numerus
 
 					num_plurals += 1
 				}
 			} else {
 				// Single translation
-				section[source.value] = make([]string, 1)
-				section[source.value][0] = strings.intern_get(&translation.intern, xlat.value)
+				section[source] = make([]string, 1)
+				section[source][0] = xlat
 			}
 
 			nth += 1
