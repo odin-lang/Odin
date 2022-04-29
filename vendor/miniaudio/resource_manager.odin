@@ -218,7 +218,7 @@ foreign lib {
 	/* Init. */
 	resource_manager_init    :: proc(pConfig: ^resource_manager_config, pResourceManager: ^resource_manager) -> result ---
 	resource_manager_uninit  :: proc(pResourceManager: ^resource_manager) ---
-	resource_manager_get_log :: proc(pResourceManager: ^resource_manager) -> ^log ---;
+	resource_manager_get_log :: proc(pResourceManager: ^resource_manager) -> ^log ---
 
 	/* Registration. */
 	resource_manager_register_file           :: proc(pResourceManager: ^resource_manager, pFilePath: cstring, flags: u32) -> result ---

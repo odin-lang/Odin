@@ -156,7 +156,7 @@ node_base :: struct {
 	_outputBuses: [MAX_NODE_LOCAL_BUS_COUNT]node_output_bus,
 	_pHeap:       rawptr,   /* A heap allocation for internal use only. pInputBuses and/or pOutputBuses will point to this if the bus count exceeds MA_MAX_NODE_LOCAL_BUS_COUNT. */
 	_ownsHeap:    b32,      /* If set to true, the node owns the heap allocation and _pHeap will be freed in ma_node_uninit(). */
-};
+}
 
 @(default_calling_convention="c", link_prefix="ma_")
 foreign lib {
@@ -199,7 +199,7 @@ node_graph :: struct {
 
 	/* Read and written by multiple threads. */
 	isReading:            b32, /*atomic*/
-};
+}
 
 @(default_calling_convention="c", link_prefix="ma_")
 foreign lib {
