@@ -87,7 +87,6 @@ Option_Flag :: enum {
 		If a tag body has a comment, it will be stripped unless this option is given.
 	*/
 	Keep_Tag_Body_Comments,
-
 }
 Option_Flags :: bit_set[Option_Flag; u16]
 
