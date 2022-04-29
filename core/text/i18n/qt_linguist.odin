@@ -27,7 +27,7 @@ TS_XML_Options := xml.Options{
 	expected_doctype = "TS",
 }
 
-parse_qt_linguist_from_slice :: proc(data: []u8, pluralizer: proc(int) -> int = nil, allocator := context.allocator) -> (translation: ^Translation, err: Error) {
+parse_qt_linguist_from_slice :: proc(data: []u8, options := DEFAULT_PARSE_OPTIONS, pluralizer: proc(int) -> int = nil, allocator := context.allocator) -> (translation: ^Translation, err: Error) {
 	context.allocator = allocator
 
 	ts, xml_err := xml.parse(data, TS_XML_Options)
@@ -59,7 +59,7 @@ parse_qt_linguist_from_slice :: proc(data: []u8, pluralizer: proc(int) -> int = 
 			return translation, .TS_File_Expected_Context_Name,
 		}
 
-		section_name := ts.elements[section_name_id].value
+		section_name := "" if options.merge_sections else ts.elements[section_name_id].value
 
 		if section_name not_in translation.k_v {
 			translation.k_v[section_name] = {}
@@ -139,7 +139,7 @@ parse_qt_linguist_from_slice :: proc(data: []u8, pluralizer: proc(int) -> int = 
 	return
 }
 
-parse_qt_linguist_file :: proc(filename: string, pluralizer: proc(int) -> int = nil, allocator := context.allocator) -> (translation: ^Translation, err: Error) {
+parse_qt_linguist_file :: proc(filename: string, options := DEFAULT_PARSE_OPTIONS, pluralizer: proc(int) -> int = nil, allocator := context.allocator) -> (translation: ^Translation, err: Error) {
 	context.allocator = allocator
 
 	data, data_ok := os.read_entire_file(filename)
@@ -147,7 +147,7 @@ parse_qt_linguist_file :: proc(filename: string, pluralizer: proc(int) -> int = 
 
 	if !data_ok { return {}, .File_Error }
 
-	return parse_qt_linguist_from_slice(data, pluralizer)
+	return parse_qt_linguist_from_slice(data, options, pluralizer, allocator)
 }
 
 parse_qt :: proc { parse_qt_linguist_file, parse_qt_linguist_from_slice }

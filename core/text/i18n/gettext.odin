@@ -8,6 +8,9 @@ package i18n
 	A from-scratch implementation based after the specification found here:
 		https://www.gnu.org/software/gettext/manual/html_node/MO-Files.html
 
+	Options are ignored as they're not applicable to this format.
+	They're part of the signature for consistency with other catalog formats.
+
 	List of contributors:
 		Jeroen van Rijn: Initial implementation.
 */
@@ -15,7 +18,7 @@ import "core:os"
 import "core:strings"
 import "core:bytes"
 
-parse_mo_from_slice :: proc(data: []u8, pluralizer: proc(int) -> int = nil, allocator := context.allocator) -> (translation: ^Translation, err: Error) {
+parse_mo_from_slice :: proc(data: []u8, options := DEFAULT_PARSE_OPTIONS, pluralizer: proc(int) -> int = nil, allocator := context.allocator) -> (translation: ^Translation, err: Error) {
 	context.allocator = allocator
 	/*
 		An MO file should have at least a 4-byte magic, 2 x 2 byte version info,
@@ -115,7 +118,7 @@ parse_mo_from_slice :: proc(data: []u8, pluralizer: proc(int) -> int = nil, allo
 	return
 }
 
-parse_mo_file :: proc(filename: string, pluralizer: proc(int) -> int = nil, allocator := context.allocator) -> (translation: ^Translation, err: Error) {
+parse_mo_file :: proc(filename: string, options := DEFAULT_PARSE_OPTIONS, pluralizer: proc(int) -> int = nil, allocator := context.allocator) -> (translation: ^Translation, err: Error) {
 	context.allocator = allocator
 
 	data, data_ok := os.read_entire_file(filename)
@@ -123,7 +126,7 @@ parse_mo_file :: proc(filename: string, pluralizer: proc(int) -> int = nil, allo
 
 	if !data_ok { return {}, .File_Error }
 
-	return parse_mo_from_slice(data, pluralizer)
+	return parse_mo_from_slice(data, options, pluralizer, allocator)
 }
 
 parse_mo :: proc { parse_mo_file, parse_mo_from_slice }
