@@ -253,7 +253,7 @@ paged_audio_buffer_page :: struct {
 	pNext:        ^paged_audio_buffer_page, /*atomic*/
 	sizeInFrames: u64,
 	pAudioData:   [1]u8,
-};
+}
 
 paged_audio_buffer_data :: struct {
 	format:   format,
