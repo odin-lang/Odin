@@ -1250,14 +1250,14 @@ impl_VertexAttribLFormat:             proc "c" (attribindex: u32, size: i32, typ
 impl_VertexAttribBinding:             proc "c" (attribindex: u32, bindingindex: u32)
 impl_VertexBindingDivisor:            proc "c" (bindingindex: u32, divisor: u32)
 impl_DebugMessageControl:             proc "c" (source: u32, type: u32, severity: u32, count: i32, ids: [^]u32, enabled: bool)
-impl_DebugMessageInsert:              proc "c" (source: u32, type: u32, id: u32, severity: u32, length: i32, buf: [^]u8)
+impl_DebugMessageInsert:              proc "c" (source: u32, type: u32, id: u32, severity: u32, length: i32, message: cstring)
 impl_DebugMessageCallback:            proc "c" (callback: debug_proc_t, userParam: rawptr)
 impl_GetDebugMessageLog:              proc "c" (count: u32, bufSize: i32, sources: [^]u32, types: [^]u32, ids: [^]u32, severities: [^]u32, lengths: [^]i32, messageLog: [^]u8) -> u32
 impl_PushDebugGroup:                  proc "c" (source: u32, id: u32, length: i32, message: cstring)
 impl_PopDebugGroup:                   proc "c" ()
-impl_ObjectLabel:                     proc "c" (identifier: u32, name: u32, length: i32, label: [^]u8)
+impl_ObjectLabel:                     proc "c" (identifier: u32, name: u32, length: i32, label: cstring)
 impl_GetObjectLabel:                  proc "c" (identifier: u32, name: u32, bufSize: i32, length: ^i32, label: [^]u8)
-impl_ObjectPtrLabel:                  proc "c" (ptr: rawptr, length: i32, label: [^]u8)
+impl_ObjectPtrLabel:                  proc "c" (ptr: rawptr, length: i32, label: cstring)
 impl_GetObjectPtrLabel:               proc "c" (ptr: rawptr, bufSize: i32, length: ^i32, label: [^]u8)
 
 load_4_3 :: proc(set_proc_address: Set_Proc_Address_Type) {
