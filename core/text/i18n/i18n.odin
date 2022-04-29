@@ -163,16 +163,20 @@ get_by_slot :: proc{get_by_slot_single_section, get_by_slot_by_section}
 	- destroy(), to clean up the currently active catalog catalog i18n.ACTIVE
 	- destroy(catalog), to clean up a specific catalog.
 */
-destroy :: proc(catalog: ^Translation = ACTIVE) {
-	if catalog != nil {
-		strings.intern_destroy(&catalog.intern)
-		for section in &catalog.k_v {
-			for key in &catalog.k_v[section] {
-				delete(catalog.k_v[section][key])
-			}
-			delete(catalog.k_v[section])
-		}
-		delete(catalog.k_v)
-		free(catalog)
+destroy :: proc(catalog: ^Translation = ACTIVE, allocator := context.allocator) {
+	context.allocator = allocator
+
+	if catalog == nil {
+		return
 	}
+
+	for section in &catalog.k_v {
+		for key in &catalog.k_v[section] {
+			delete(catalog.k_v[section][key])
+		}
+		delete(catalog.k_v[section])
+	}
+	delete(catalog.k_v)
+	strings.intern_destroy(&catalog.intern)
+	free(catalog)
 }
