@@ -10,13 +10,13 @@
 	</message>
 </context>
 <context>
-		<name>apple_count</name>
-		<message numerus="yes">
-			<source>%d apple(s)</source>
-			<translation>
-				<numerusform>%d appel</numerusform>
-				<numerusform>%d appels</numerusform>
-			</translation>
-		</message>
-	</context>
+	<name>apple_count</name>
+	<message numerus="yes">
+		<source>%d apple(s)</source>
+		<translation>
+		<numerusform>%d appel</numerusform>
+			<numerusform>%d appels</numerusform>
+		</translation>
+	</message>
+</context>
 </TS>

@@ -59,7 +59,10 @@ parse_qt_linguist_from_slice :: proc(data: []u8, options := DEFAULT_PARSE_OPTION
 			return translation, .TS_File_Expected_Context_Name,
 		}
 
-		section_name := "" if options.merge_sections else ts.elements[section_name_id].value
+		section_name := strings.intern_get(&translation.intern, "")
+		if !options.merge_sections {
+			section_name = strings.intern_get(&translation.intern, ts.elements[section_name_id].value)
+		}
 
 		if section_name not_in translation.k_v {
 			translation.k_v[section_name] = {}
