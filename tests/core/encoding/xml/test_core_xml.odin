@@ -27,7 +27,7 @@ TEST :: struct {
 /*
 	Relative to ODIN_ROOT
 */
-TEST_FILE_PATH_PREFIX :: "tests/core/assets/XML"
+TEST_FILE_PATH_PREFIX :: "tests/core/assets"
 
 TESTS :: []TEST{
 	/*
@@ -36,22 +36,11 @@ TESTS :: []TEST{
 
 	{
 		/*
-		<?xml version="1.0" encoding="utf-8"?>
-		<!DOCTYPE 恥ずべきフクロウ>
-		<恥ずべきフクロウ 올빼미_id="Foozle&#32;<![CDATA[<greeting>Hello, world!"</greeting>]]>Barzle">
-		<부끄러운:barzle>
-			<name foo:bar="birmese">ရှက်စရာ ဇီးကွက်</name>
-			<nickname>Owl of Shame</nickname>
-			<data>More CDATA <![CDATA[<greeting>Hello, world!</greeting><![CDATA] <$]]> Nonsense.</data>
-		</부끄러운:barzle>
-		*/
-
-		/*
 			Tests UTF-8 idents and values.
 			Test namespaced ident.
 			Tests that nested partial CDATA start doesn't trip up parser.
 		*/
-		filename  = "utf8.xml",
+		filename  = "XML/utf8.xml",
 		options   = {
 			flags = {
 				.Ignore_Unsupported, .Intern_Comments,
@@ -66,7 +55,7 @@ TESTS :: []TEST{
 			Same as above.
 			Unbox CDATA in data tag.
 		*/
-		filename  = "utf8.xml",
+		filename  = "XML/utf8.xml",
 		options   = {
 			flags = {
 				.Ignore_Unsupported, .Intern_Comments, .Unbox_CDATA,
@@ -81,7 +70,7 @@ TESTS :: []TEST{
 			Simple Qt TS translation file.
 			`core:i18n` requires it to be parsed properly.
 		*/
-		filename  = "nl_NL-qt-ts.ts",
+		filename  = "I18N/nl_NL-qt-ts.ts",
 		options   = {
 			flags = {
 				.Ignore_Unsupported, .Intern_Comments, .Unbox_CDATA, .Decode_SGML_Entities,
@@ -96,7 +85,7 @@ TESTS :: []TEST{
 			Simple XLiff 1.2 file.
 			`core:i18n` requires it to be parsed properly.
 		*/
-		filename  = "nl_NL-xliff-1.2.xliff",
+		filename  = "I18N/nl_NL-xliff-1.2.xliff",
 		options   = {
 			flags = {
 				.Ignore_Unsupported, .Intern_Comments, .Unbox_CDATA, .Decode_SGML_Entities,
@@ -111,7 +100,7 @@ TESTS :: []TEST{
 			Simple XLiff 2.0 file.
 			`core:i18n` requires it to be parsed properly.
 		*/
-		filename  = "nl_NL-xliff-2.0.xliff",
+		filename  = "I18N/nl_NL-xliff-2.0.xliff",
 		options   = {
 			flags = {
 				.Ignore_Unsupported, .Intern_Comments, .Unbox_CDATA, .Decode_SGML_Entities,
@@ -122,7 +111,7 @@ TESTS :: []TEST{
 	},
 
 	{
-		filename  = "entities.html",
+		filename  = "XML/entities.html",
 		options   = {
 			flags = {
 				.Ignore_Unsupported, .Intern_Comments,
@@ -133,7 +122,7 @@ TESTS :: []TEST{
 	},
 
 	{
-		filename  = "entities.html",
+		filename  = "XML/entities.html",
 		options   = {
 			flags = {
 				.Ignore_Unsupported, .Intern_Comments, .Unbox_CDATA,
@@ -144,7 +133,7 @@ TESTS :: []TEST{
 	},
 
 	{
-		filename  = "entities.html",
+		filename  = "XML/entities.html",
 		options   = {
 			flags = {
 				.Ignore_Unsupported, .Intern_Comments, .Unbox_CDATA, .Decode_SGML_Entities,
@@ -158,7 +147,7 @@ TESTS :: []TEST{
 		Then we test that certain errors are returned as expected.
 	*/
 	{
-		filename  = "utf8.xml",
+		filename  = "XML/utf8.xml",
 		options   = {
 			flags            = {
 				.Ignore_Unsupported, .Intern_Comments,
@@ -173,7 +162,7 @@ TESTS :: []TEST{
 		Parse the 8.2 MiB unicode.xml for good measure.
 	*/
 	{
-		filename  = "unicode.xml",
+		filename  = "XML/unicode.xml",
 		options   = {
 			flags            = {
 				.Ignore_Unsupported,
