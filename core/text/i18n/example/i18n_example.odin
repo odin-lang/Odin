@@ -2,7 +2,7 @@ package i18n_example
 
 import "core:mem"
 import "core:fmt"
-import "core:i18n"
+import "core:text/i18n"
 
 _T :: i18n.get
 
@@ -31,6 +31,7 @@ mo :: proc() {
 
 	/*
 		For ease of use, pluralized lookup can use both singular and plural form as key for the same translation.
+		This is a quirk of the GetText format which has separate keys for their different plurals.
 	*/
 	println("-----")
 	printf(_T("There is %d leaf.\n", 1), 1)
@@ -54,7 +55,7 @@ qt :: proc() {
 	/*
 		Parse QT file and set it as the active translation so we can omit `get`'s "catalog" parameter.
 	*/
-	i18n.ACTIVE, err = i18n.parse_qt(#load("../../../tests/core/assets/XML/nl_NL-qt-ts.ts"))
+	i18n.ACTIVE, err = i18n.parse_qt(#load("../../../../tests/core/assets/XML/nl_NL-qt-ts.ts"))
 	defer i18n.destroy()
 
 	fmt.printf("parse_qt returned %v\n", err)
