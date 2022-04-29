@@ -74,6 +74,14 @@ Error :: enum {
 
 }
 
+Parse_Options :: struct {
+	merge_sections: bool,
+}
+
+DEFAULT_PARSE_OPTIONS :: Parse_Options{
+	merge_sections = false,
+}
+
 /*
 	Several ways to use:
 	- get(key), which defaults to the singular form and i18n.ACTIVE catalog, or

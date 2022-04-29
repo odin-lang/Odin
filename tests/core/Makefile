@@ -26,9 +26,10 @@ noise_test:
 	$(ODIN) run math/noise -out:test_noise
 
 encoding_test:
-	$(ODIN) run encoding/hxa -collection:tests=.. -out:test_hxa
-	$(ODIN) run encoding/json -out:test_json
+	$(ODIN) run encoding/hxa    -out:test_hxa -collection:tests=..
+	$(ODIN) run encoding/json   -out:test_json
 	$(ODIN) run encoding/varint -out:test_varint
+	$(ODIN) run encoding/xml    -out:test_xml
 
 math_test:
 	$(ODIN) run math/test_core_math.odin -file -collection:tests=.. -out:test_core_math
