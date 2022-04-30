@@ -297,3 +297,59 @@ once_do :: proc(o: ^Once, fn: proc()) {
 		do_slow(o, fn)
 	}
 }
+
+
+
+// A Parker is an associated token which is initially not present:
+//     * The `park` procedure blocks the current thread unless or until the token
+//       is available, at which point the token is consumed.
+//     * The `park_with_timeout` procedures works the same as `park` but only
+//       blocks for the specified duration.
+//     * The `unpark` procedure automatically makes the token available if it
+//       was not already.
+Parker :: struct {
+	state: Futex,
+}
+
+// Blocks the current thread until the token is made available.
+//
+// Assumes this is only called by the thread that owns the Parker.
+park :: proc(p: ^Parker) {
+	EMPTY    :: 0
+	NOTIFIED :: 1
+	PARKED   :: max(u32)
+	if atomic_sub_explicit(&p.state, 1, .Acquire) == NOTIFIED {
+		return
+	}
+	for {
+		futex_wait(&p.state, PARKED)
+		if _, ok := atomic_compare_exchange_strong_explicit(&p.state, NOTIFIED, EMPTY, .Acquire, .Acquire); ok {
+			return
+		}
+	}
+}
+
+// Blocks the current thread until the token is made available, but only
+// for a limited duration.
+//
+// Assumes this is only called by the thread that owns the Parker
+park_with_timeout :: proc(p: ^Parker, duration: time.Duration) {
+	EMPTY    :: 0
+	NOTIFIED :: 1
+	PARKED   :: max(u32)
+	if atomic_sub_explicit(&p.state, 1, .Acquire) == NOTIFIED {
+		return
+	}
+	futex_wait_with_timeout(&p.state, PARKED, duration)
+	atomic_exchange_explicit(&p.state, EMPTY, .Acquire)
+}
+
+// Automatically makes thee token available if it was not already.
+unpark :: proc(p: ^Parker)  {
+	EMPTY    :: 0
+	NOTIFIED :: 1
+	PARKED   :: max(Futex)
+	if atomic_exchange_explicit(&p.state, NOTIFIED, .Release) == PARKED {
+		futex_signal(&p.state)
+	}
+}
