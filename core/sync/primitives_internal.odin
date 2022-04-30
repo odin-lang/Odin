@@ -1,6 +1,25 @@
 //+private
 package sync
 
+import "core:time"
+
+_Sema :: struct {
+	atomic: Atomic_Sema,
+}
+
+_sema_post :: proc(s: ^Sema, count := 1) {
+	atomic_sema_post(&s.impl.atomic, count)
+}
+
+_sema_wait :: proc(s: ^Sema) {
+	atomic_sema_wait(&s.impl.atomic)
+}
+
+_sema_wait_with_timeout :: proc(s: ^Sema, duration: time.Duration) -> bool {
+	return atomic_sema_wait_with_timeout(&s.impl.atomic, duration)
+}
+
+
 when #config(ODIN_SYNC_RECURSIVE_MUTEX_USE_FUTEX, true) {
 	_Recursive_Mutex :: struct {
 		owner:     Futex,
