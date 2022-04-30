@@ -14,6 +14,7 @@ destroy :: proc(img: ^image.Image) -> bool {
 	header_destroy(&info.header)
 	free(info)
 	img.metadata = nil
+	free(img)
 
 	return true
 }

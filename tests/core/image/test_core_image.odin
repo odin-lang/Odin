@@ -13,6 +13,7 @@ import "core:testing"
 
 import "core:compress"
 import "core:image"
+import pbm "core:image/netpbm"
 import "core:image/png"
 import "core:image/qoi"
 
@@ -1506,26 +1507,53 @@ run_png_suite :: proc(t: ^testing.T, suite: []PNG_Test) -> (subtotal: int) {
 
 				passed &= test.hash == png_hash
 
-				// Roundtrip through QOI to test the QOI encoder and decoder.
-				if passed && img.depth == 8 && (img.channels == 3 || img.channels == 4) {
-					qoi_buffer: bytes.Buffer
-					defer bytes.buffer_destroy(&qoi_buffer)
-					qoi_save_err := qoi.save(&qoi_buffer, img)
+				if passed {
+					// Roundtrip through QOI to test the QOI encoder and decoder.
+					if img.depth == 8 && (img.channels == 3 || img.channels == 4) {
+						qoi_buffer: bytes.Buffer
+						defer bytes.buffer_destroy(&qoi_buffer)
+						qoi_save_err := qoi.save(&qoi_buffer, img)
 
-					error  = fmt.tprintf("%v test %v QOI save failed with %v.", file.file, count, qoi_save_err)
-					expect(t, qoi_save_err == nil, error)
+						error  = fmt.tprintf("%v test %v QOI save failed with %v.", file.file, count, qoi_save_err)
+						expect(t, qoi_save_err == nil, error)
 
-					if qoi_save_err == nil {
-						qoi_img, qoi_load_err := qoi.load(qoi_buffer.buf[:])
-						defer qoi.destroy(qoi_img)
+						if qoi_save_err == nil {
+							qoi_img, qoi_load_err := qoi.load(qoi_buffer.buf[:])
+							defer qoi.destroy(qoi_img)
 
-						error  = fmt.tprintf("%v test %v QOI load failed with %v.", file.file, count, qoi_load_err)
-						expect(t, qoi_load_err == nil, error)
+							error  = fmt.tprintf("%v test %v QOI load failed with %v.", file.file, count, qoi_load_err)
+							expect(t, qoi_load_err == nil, error)
 
-						qoi_hash := hash.crc32(qoi_img.pixels.buf[:])
-						error  = fmt.tprintf("%v test %v QOI load hash is %08x, expected it match PNG's %08x with %v.", file.file, count, qoi_hash, png_hash, test.options)
-						expect(t, qoi_hash == png_hash, error)
+							qoi_hash := hash.crc32(qoi_img.pixels.buf[:])
+							error  = fmt.tprintf("%v test %v QOI load hash is %08x, expected it match PNG's %08x with %v.", file.file, count, qoi_hash, png_hash, test.options)
+							expect(t, qoi_hash == png_hash, error)
+						}
 					}
+
+					// Roundtrip through PBM to test the PBM encoders and decoders - prefer binary
+					pbm_buf, pbm_save_err := pbm.save_to_buffer(img)
+					defer delete(pbm_buf)
+
+					error = fmt.tprintf("%v test %v PBM save failed with %v.", file.file, count, pbm_save_err)
+					expect(t, pbm_save_err == nil, error)
+
+					if pbm_save_err == nil {
+						// Try to load it again.
+						pbm_img, pbm_load_err := pbm.load(pbm_buf)
+						defer pbm.destroy(pbm_img)
+
+						if pbm_load_err == nil {
+							fmt.printf("%v test %v PBM load worked with %v.\n", file.file, count, pbm_load_err)
+						}
+						error  = fmt.tprintf("%v test %v PBM load failed with %v.", file.file, count, pbm_load_err)
+						expect(t, pbm_load_err == nil, error)
+					}
+
+					// Roundtrip through PBM to test the PBM encoders and decoders - prefer ASCII
+					// pbm_info, pbm_format_selected = pbm.autoselect_pbm_format_from_image(img, false)
+					// fmt.printf("Autoselect PBM: %v (%v)\n", pbm_info, pbm_format_selected)
+
+
 				}
 
 				if .return_metadata in test.options {
