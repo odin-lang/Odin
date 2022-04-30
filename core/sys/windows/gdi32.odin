@@ -62,5 +62,10 @@ foreign gdi32 {
 	ChoosePixelFormat :: proc(hdc: HDC, ppfd: ^PIXELFORMATDESCRIPTOR) -> c_int ---
 	SwapBuffers :: proc(HDC) -> BOOL ---
 
+	SetDCBrushColor :: proc(hdc: HDC, color: COLORREF) -> COLORREF ---
 	PatBlt :: proc(hdc: HDC, x, y, w, h: c_int, rop: DWORD) -> BOOL ---
+}
+
+RGB :: proc(r, g, b: u8) -> COLORREF {
+	return COLORREF(COLORREF(r) | COLORREF(g) << 8 | COLORREF(b) << 16)
 }
