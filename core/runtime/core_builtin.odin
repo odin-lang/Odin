@@ -5,6 +5,16 @@ import "core:intrinsics"
 @builtin
 Maybe :: union($T: typeid) #maybe {T}
 
+
+@builtin
+container_of :: #force_inline proc "contextless" (ptr: $P/^$Field_Type, $T: typeid, $field_name: string) -> ^T
+	where intrinsics.type_has_field(T, field_name),
+	      intrinsics.type_field_type(T, field_name) == Field_Type {
+	offset :: offset_of_by_string(T, field_name)
+	return (^T)(uintptr(ptr) - offset) if ptr != nil else nil
+}
+
+
 @thread_local global_default_temp_allocator_data: Default_Temp_Allocator
 
 @builtin

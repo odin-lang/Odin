@@ -62,6 +62,13 @@ foreign kernel32 {
 	GetCurrentProcessId :: proc() -> DWORD ---
 	GetCurrentThread :: proc() -> HANDLE ---
 	GetCurrentThreadId :: proc() -> DWORD ---
+	GetProcessTimes :: proc(
+		hProcess: HANDLE,
+		lpCreationTime: LPFILETIME,
+		lpExitTime: LPFILETIME,
+		lpKernelTime: LPFILETIME,
+		lpUserTime: LPFILETIME,
+	) -> BOOL ---
 	GetStdHandle :: proc(which: DWORD) -> HANDLE ---
 	ExitProcess :: proc(uExitCode: c_uint) -> ! ---
 	DeviceIoControl :: proc(

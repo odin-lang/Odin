@@ -365,6 +365,20 @@ QOI_Info :: struct {
 	header: QOI_Header,
 }
 
+TGA_Header :: struct #packed {
+	id_length:        u8,
+	color_map_type:   u8,
+	data_type_code:   u8,
+	color_map_origin: u16le,
+	color_map_length: u16le,
+	color_map_depth:  u8,
+	origin:           [2]u16le,
+	dimensions:       [2]u16le,
+	bits_per_pixel:   u8,
+	image_descriptor: u8,
+}
+#assert(size_of(TGA_Header) == 18)
+
 // Function to help with image buffer calculations
 compute_buffer_size :: proc(width, height, channels, depth: int, extra_row_bytes := int(0)) -> (size: int) {
 	size = ((((channels * width * depth) + 7) >> 3) + extra_row_bytes) * height
