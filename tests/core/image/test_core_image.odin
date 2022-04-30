@@ -1199,37 +1199,37 @@ Corrupt_PNG_Tests   := []PNG_Test{
 	{
 		"xs1n0g01", // signature byte 1 MSBit reset to zero
 		{
-			{Default, .Invalid_PNG_Signature, {}, 0x_0000_0000},
+			{Default, .Invalid_Signature, {}, 0x_0000_0000},
 		},
 	},
 	{
 		"xs2n0g01", // signature byte 2 is a 'Q'
 		{
-			{Default, .Invalid_PNG_Signature, {}, 0x_0000_0000},
+			{Default, .Invalid_Signature, {}, 0x_0000_0000},
 		},
 	},
 	{
 		"xs4n0g01", // signature byte 4 lowercase
 		{
-			{Default, .Invalid_PNG_Signature, {}, 0x_0000_0000},
+			{Default, .Invalid_Signature, {}, 0x_0000_0000},
 		},
 	},
 	{
 		"xs7n0g01", // 7th byte a space instead of control-Z
 		{
-			{Default, .Invalid_PNG_Signature, {}, 0x_0000_0000},
+			{Default, .Invalid_Signature, {}, 0x_0000_0000},
 		},
 	},
 	{
 		"xcrn0g04", // added cr bytes
 		{
-			{Default, .Invalid_PNG_Signature, {}, 0x_0000_0000},
+			{Default, .Invalid_Signature, {}, 0x_0000_0000},
 		},
 	},
 	{
 		"xlfn0g04", // added lf bytes
 		{
-			{Default, .Invalid_PNG_Signature, {}, 0x_0000_0000},
+			{Default, .Invalid_Signature, {}, 0x_0000_0000},
 		},
 	},
 	{
