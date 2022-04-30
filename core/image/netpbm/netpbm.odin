@@ -9,16 +9,12 @@ import "core:strconv"
 import "core:strings"
 import "core:unicode"
 
-
-
 Image        :: image.Image
 Format       :: image.Netpbm_Format
 Header       :: image.Netpbm_Header
 Info         :: image.Netpbm_Info
 Error        :: image.Error
 Format_Error :: image.Netpbm_Error
-
-
 
 Formats :: bit_set[Format]
 PBM     :: Formats{.P1, .P4}
@@ -30,14 +26,12 @@ PFM     :: Formats{.Pf, .PF}
 ASCII   :: Formats{.P1, .P2, .P3}
 BINARY  :: Formats{.P4, .P5, .P6} + PAM + PFM
 
-
-
-read :: proc {
-	read_from_file,
-	read_from_buffer,
+load :: proc {
+	load_from_file,
+	load_from_buffer,
 }
 
-read_from_file :: proc(filename: string, allocator := context.allocator) -> (img: Image, err: Error) {
+load_from_file :: proc(filename: string, allocator := context.allocator) -> (img: Image, err: Error) {
 	context.allocator = allocator
 
 	data, ok := os.read_entire_file(filename); defer delete(data)
@@ -49,7 +43,7 @@ read_from_file :: proc(filename: string, allocator := context.allocator) -> (img
 	return read_from_buffer(data)
 }
 
-read_from_buffer :: proc(data: []byte, allocator := context.allocator) -> (img: Image, err: Error) {
+load_from_buffer :: proc(data: []byte, allocator := context.allocator) -> (img: Image, err: Error) {
 	context.allocator = allocator
 
 	header: Header; defer header_destroy(&header)
@@ -70,14 +64,12 @@ read_from_buffer :: proc(data: []byte, allocator := context.allocator) -> (img: 
 	return
 }
 
-
-
-write :: proc {
-	write_to_file,
-	write_to_buffer,
+save :: proc {
+	save_to_file,
+	save_to_buffer,
 }
 
-write_to_file :: proc(filename: string, img: Image, allocator := context.allocator) -> (err: Error) {
+save_to_file :: proc(filename: string, img: Image, allocator := context.allocator) -> (err: Error) {
 	context.allocator = allocator
 
 	data: []byte; defer delete(data)
@@ -90,7 +82,7 @@ write_to_file :: proc(filename: string, img: Image, allocator := context.allocat
 	return Format_Error.None
 }
 
-write_to_buffer :: proc(img: Image, allocator := context.allocator) -> (buffer: []byte, err: Error) {
+save_to_buffer :: proc(img: Image, allocator := context.allocator) -> (buffer: []byte, err: Error) {
 	context.allocator = allocator
 
 	info, ok := img.metadata.(^image.Netpbm_Info)
@@ -109,12 +101,12 @@ write_to_buffer :: proc(img: Image, allocator := context.allocator) -> (buffer: 
 	}
 
 	if header.format in (PNM + PAM) {
-		if header.maxval <= int(max(u8)) && img.depth != 1 \
-		|| header.maxval > int(max(u8)) && header.maxval <= int(max(u16)) && img.depth != 2 {
+		if header.maxval <= int(max(u8)) && img.depth != 8 \
+		|| header.maxval > int(max(u8)) && header.maxval <= int(max(u16)) && img.depth != 16 {
 			err = Format_Error.Invalid_Image_Depth
 			return
 		}
-	} else if header.format in PFM && img.depth != 4 {
+	} else if header.format in PFM && img.depth != 32 {
 		err = Format_Error.Invalid_Image_Depth
 		return
 	}
@@ -179,7 +171,7 @@ write_to_buffer :: proc(img: Image, allocator := context.allocator) -> (buffer: 
 		mem.copy(raw_data(data.buf[len(header_buf):]), raw_data(pixels), len(pixels))
 
 		// convert from native endianness
-		if img.depth == 2 {
+		if img.depth == 16 {
 			pixels := mem.slice_data_cast([]u16be, data.buf[len(header_buf):])
 			for p in &pixels {
 				p = u16be(transmute(u16) p)
@@ -212,7 +204,7 @@ write_to_buffer :: proc(img: Image, allocator := context.allocator) -> (buffer: 
 	// Token ASCII
 	case .P2, .P3:
 		switch img.depth {
-		case 1:
+		case 8:
 			pixels := img.pixels.buf[:]
 			for y in 0 ..< img.height {
 				for x in 0 ..< img.width {
@@ -226,7 +218,7 @@ write_to_buffer :: proc(img: Image, allocator := context.allocator) -> (buffer: 
 				fmt.sbprint(&data, "\n")
 			}
 
-		case 2:
+		case 16:
 			pixels := mem.slice_data_cast([]u16, img.pixels.buf[:])
 			for y in 0 ..< img.height {
 				for x in 0 ..< img.width {
@@ -250,8 +242,6 @@ write_to_buffer :: proc(img: Image, allocator := context.allocator) -> (buffer: 
 
 	return data.buf[:], Format_Error.None
 }
-
-
 
 parse_header :: proc(data: []byte, allocator := context.allocator) -> (header: Header, length: int, err: Error) {
 	context.allocator = allocator
@@ -351,7 +341,7 @@ _parse_header_pnm :: proc(data: []byte) -> (header: Header, length: int, err: Er
 
 	// set extra info
 	header.channels = 3 if header.format in PPM else 1
-	header.depth = 2 if header.maxval > int(max(u8)) else 1
+	header.depth    = 16 if header.maxval > int(max(u8)) else 8
 
 	// limit checking
 	if current_field < len(header_fields) {
@@ -448,12 +438,11 @@ _parse_header_pam :: proc(data: []byte, allocator := context.allocator) -> (head
 	}
 
 	// extra info
-	header.depth = 2 if header.maxval > int(max(u8)) else 1
+	header.depth = 16 if header.maxval > int(max(u8)) else 8
 
 	// limit checking
 	if header.width < 1 \
 	|| header.height < 1 \
-	|| header.depth < 1 \
 	|| header.maxval < 1 \
 	|| header.maxval > int(max(u16)) {
 		err = Format_Error.Invalid_Header_Value
@@ -484,7 +473,7 @@ _parse_header_pfm :: proc(data: []byte) -> (header: Header, length: int, err: Er
 	}
 
 	// floating point
-	header.depth = 4
+	header.depth = 32
 
 	// width
 	field, ok = strings.fields_iterator(&field_iterator)
@@ -542,8 +531,6 @@ _parse_header_pfm :: proc(data: []byte) -> (header: Header, length: int, err: Er
 	return
 }
 
-
-
 decode_image :: proc(header: Header, data: []byte, allocator := context.allocator) -> (img: Image, err: Error) {
 	context.allocator = allocator
 
@@ -554,7 +541,7 @@ decode_image :: proc(header: Header, data: []byte, allocator := context.allocato
 		depth    = header.depth,
 	}
 
-	buffer_size := img.width * img.height * img.channels * img.depth
+	buffer_size := image.compute_buffer_size(img.width, img.height, img.channels, img.depth)
 
 	// we can check data size for binary formats
 	if header.format in BINARY {
@@ -615,7 +602,7 @@ decode_image :: proc(header: Header, data: []byte, allocator := context.allocato
 				}
 			}
 		} else {
-			if img.depth == 2 {
+			if img.depth == 16 {
 				pixels := mem.slice_data_cast([]u16, img.pixels.buf[:])
 				for p in &pixels {
 					p = u16(transmute(u16be) p)
@@ -658,9 +645,9 @@ decode_image :: proc(header: Header, data: []byte, allocator := context.allocato
 			}
 
 			switch img.depth {
-			case 1:
+			case 8:
 				bytes.buffer_write_byte(&img.pixels, u8(value))
-			case 2:
+			case 16:
 				vb := transmute([2]u8) u16(value)
 				bytes.buffer_write(&img.pixels, vb[:])
 			}
