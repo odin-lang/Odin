@@ -298,7 +298,7 @@ atomic_cond_wait :: proc(c: ^Atomic_Cond, m: ^Atomic_Mutex) {
 }
 
 atomic_cond_wait_with_timeout :: proc(c: ^Atomic_Cond, m: ^Atomic_Mutex, duration: time.Duration) -> (ok: bool) {
-	state := u32(atomic_load(&c.state))
+	state := u32(atomic_load_explicit(&c.state, .Relaxed))
 	unlock(m)
 	ok = futex_wait_with_timeout(&c.state, state, duration)
 	lock(m)
@@ -307,12 +307,12 @@ atomic_cond_wait_with_timeout :: proc(c: ^Atomic_Cond, m: ^Atomic_Mutex, duratio
 
 
 atomic_cond_signal :: proc(c: ^Atomic_Cond) {
-	atomic_add_explicit(&c.state, 1, .Relaxed)
+	atomic_add_explicit(&c.state, 1, .Release)
 	futex_signal(&c.state)
 }
 
 atomic_cond_broadcast :: proc(c: ^Atomic_Cond) {
-	atomic_add_explicit(&c.state, 1, .Relaxed)
+	atomic_add_explicit(&c.state, 1, .Release)
 	futex_broadcast(&c.state)
 }
 
@@ -351,7 +351,6 @@ atomic_sema_wait_with_timeout :: proc(s: ^Atomic_Sema, duration: time.Duration) 
 		return false
 	}
 	for {
-
 		original_count := atomic_load_explicit(&s.count, .Relaxed)
 		for start := time.tick_now(); original_count == 0; /**/ {
 			remaining := duration - time.tick_since(start)
