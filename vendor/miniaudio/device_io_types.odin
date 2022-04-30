@@ -19,11 +19,11 @@ SUPPORT_CUSTOM     :: true
 SUPPORT_NULL       :: true // ODIN_OS != .Emscripten
 
 device_state :: enum c.int {
-  uninitialized = 0,
-  stopped       = 1,  /* The device's default state after initialization. */
-  started       = 2,  /* The device is started and is requesting and/or delivering audio data. */
-  starting      = 3,  /* Transitioning from a stopped state to started. */
-  stopping      = 4,  /* Transitioning from a started state to stopped. */
+	uninitialized = 0,
+	stopped       = 1,  /* The device's default state after initialization. */
+	started       = 2,  /* The device is started and is requesting and/or delivering audio data. */
+	starting      = 3,  /* Transitioning from a stopped state to started. */
+	stopping      = 4,  /* Transitioning from a started state to stopped. */
 }
 
 
@@ -985,7 +985,7 @@ device :: struct {
 	noPreSilencedOutputBuffer: b8,
 	noClip:                    b8,
 	noDisableDenormals:        b8,
-  noFixedSizedCallback:      b8,
+	noFixedSizedCallback:      b8,
 	masterVolumeFactor:        f32, /*atomic*/        /* Linear 0..1. Can be read and written simultaneously by different threads. Must be used atomically. */
 	duplexRB:                  duplex_rb,             /* Intermediary buffer for duplex device on asynchronous backends. */
 	resampling: struct {
