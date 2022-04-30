@@ -17,7 +17,6 @@ import "core:bytes"
 import "core:os"
 
 Error   :: image.Error
-General :: compress.General_Error
 Image   :: image.Image
 Options :: image.Options
 
@@ -55,7 +54,7 @@ save_to_memory  :: proc(output: ^bytes.Buffer, img: ^Image, options := Options{}
 	necessary := pixels * img.channels + size_of(image.TGA_Header)
 
 	if !resize(&output.buf, necessary) {
-		return General.Resize_Failed
+		return .Unable_To_Allocate_Or_Resize
 	}
 
 	header := image.TGA_Header{
@@ -97,7 +96,7 @@ save_to_file :: proc(output: string, img: ^Image, options := Options{}, allocato
 	save_to_memory(out, img, options) or_return
 	write_ok := os.write_entire_file(output, out.buf[:])
 
-	return nil if write_ok else General.Cannot_Open_File
+	return nil if write_ok else .Unable_To_Write_File
 }
 
 save :: proc{save_to_memory, save_to_file}

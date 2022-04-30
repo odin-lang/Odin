@@ -45,7 +45,7 @@ Image :: struct {
 	width:         int,
 	height:        int,
 	channels:      int,
-	depth:         int,
+	depth:         int, // Channel depth in bits, typically 8 or 16
 	pixels:        bytes.Buffer,
 	/*
 		Some image loaders/writers can return/take an optional background color.
@@ -57,6 +57,7 @@ Image :: struct {
 }
 
 Image_Metadata :: union {
+	^Netpbm_Info,
 	^PNG_Info,
 	^QOI_Info,
 }
@@ -140,18 +141,20 @@ Option :: enum {
 	alpha_drop_if_present,         // Unimplemented for QOI. Returns error.
 	alpha_premultiply,             // Unimplemented for QOI. Returns error.
 	blend_background,              // Ignored for non-PNG formats
+
 	// Unimplemented
 	do_not_expand_grayscale,
 	do_not_expand_indexed,
 	do_not_expand_channels,
 
 	// SAVE OPTIONS
-	qoi_all_channels_linear,       // QOI, informative info. If not set, defaults to sRGB with linear alpha.
+	qoi_all_channels_linear,       // QOI, informative only. If not set, defaults to sRGB with linear alpha.
 }
 Options :: distinct bit_set[Option]
 
 Error :: union #shared_nil {
 	General_Image_Error,
+	Netpbm_Error,
 	PNG_Error,
 	QOI_Error,
 
@@ -164,11 +167,68 @@ Error :: union #shared_nil {
 
 General_Image_Error :: enum {
 	None = 0,
-	Invalid_Image_Dimensions,
-	Image_Dimensions_Too_Large,
-	Image_Does_Not_Adhere_to_Spec,
+	// File I/O
+	Unable_To_Read_File,
+	Unable_To_Write_File,
+
+	// Invalid
+	Invalid_Signature,
 	Invalid_Input_Image,
+	Image_Dimensions_Too_Large,
+	Invalid_Image_Dimensions,
+	Invalid_Number_Of_Channels,
+	Image_Does_Not_Adhere_to_Spec,
+	Invalid_Image_Depth,
+	Invalid_Bit_Depth,
+	Invalid_Color_Space,
+
+	// More data than pixels to decode into, for example.
+	Corrupt,
+
+	// Output buffer is the wrong size
 	Invalid_Output,
+
+	// Allocation
+	Unable_To_Allocate_Or_Resize,
+}
+
+/*
+	Netpbm-specific definitions
+*/
+Netpbm_Format :: enum {
+	P1, P2, P3, P4, P5, P6, P7, Pf, PF,
+}
+
+Netpbm_Header :: struct {
+	format:        Netpbm_Format,
+	width:         int,
+	height:        int,
+	channels:      int,
+	depth:         int,
+	maxval:        int,
+	tupltype:      string,
+	scale:         f32,
+	little_endian: bool,
+}
+
+Netpbm_Info :: struct {
+	header: Netpbm_Header,
+}
+
+Netpbm_Error :: enum {
+	None = 0,
+
+	// reading
+	Invalid_Header_Token_Character,
+	Incomplete_Header,
+	Invalid_Header_Value,
+	Duplicate_Header_Field,
+	Buffer_Too_Small,
+	Invalid_Buffer_ASCII_Token,
+	Invalid_Buffer_Value,
+
+	// writing
+	Invalid_Format,
 }
 
 /*
@@ -176,7 +236,6 @@ General_Image_Error :: enum {
 */
 PNG_Error :: enum {
 	None = 0,
-	Invalid_PNG_Signature,
 	IHDR_Not_First_Chunk,
 	IHDR_Corrupt,
 	IDAT_Missing,
@@ -292,15 +351,10 @@ PNG_Interlace_Method :: enum u8 {
 */
 QOI_Error :: enum {
 	None = 0,
-	Invalid_QOI_Signature,
-	Invalid_Number_Of_Channels, // QOI allows 3 or 4 channel data.
-	Invalid_Bit_Depth,          // QOI supports only 8-bit images, error only returned from writer.
-	Invalid_Color_Space,        // QOI allows 0 = sRGB or 1 = linear.
-	Corrupt,                    // More data than pixels to decode into, for example.
 	Missing_Or_Corrupt_Trailer, // Image seemed to have decoded okay, but trailer is missing or corrupt.
 }
 
-QOI_Magic :: u32be(0x716f6966)      // "qoif"
+QOI_Magic :: u32be(0x716f6966) // "qoif"
 
 QOI_Color_Space :: enum u8 {
 	sRGB   = 0,
@@ -1125,10 +1179,10 @@ write_bytes :: proc(buf: ^bytes.Buffer, data: []u8) -> (err: compress.General_Er
 		return nil
 	} else if len(data) == 1 {
 		if bytes.buffer_write_byte(buf, data[0]) != nil {
-			return compress.General_Error.Resize_Failed
+			return .Resize_Failed
 		}
 	} else if n, _ := bytes.buffer_write(buf, data); n != len(data) {
-		return compress.General_Error.Resize_Failed
+		return .Resize_Failed
 	}
 	return nil
 }
