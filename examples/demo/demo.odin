@@ -1166,7 +1166,8 @@ threading_example :: proc() {
 
 
 		for i in 0..<30 {
-			thread.pool_add_task(pool=&pool, procedure=task_proc, data=nil, user_index=i)
+			// be mindful of the allocator used for tasks. The allocator needs to be thread safe, or be owned by the task for exclusive use 
+			thread.pool_add_task(pool=&pool, procedure=task_proc, data=nil, user_index=i, allocator=context.allocator)
 		}
 
 		thread.pool_start(&pool)
