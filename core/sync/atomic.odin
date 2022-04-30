@@ -6,8 +6,8 @@ cpu_relax :: intrinsics.cpu_relax
 
 /*
 Atomic_Memory_Order :: enum {
-	Relaxed = 0,
-	Consume = 1,
+	Relaxed = 0, // Unordered
+	Consume = 1, // Monotonic
 	Acquire = 2,
 	Release = 3,
 	Acq_Rel = 4,
