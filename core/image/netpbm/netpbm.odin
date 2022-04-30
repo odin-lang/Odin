@@ -46,13 +46,13 @@ load_from_file :: proc(filename: string, allocator := context.allocator) -> (img
 load_from_buffer :: proc(data: []byte, allocator := context.allocator) -> (img: ^Image, err: Error) {
 	context.allocator = allocator
 
+	img = new(Image)
+
 	header: Header; defer header_destroy(&header)
 	header_size: int
 	header, header_size = parse_header(data) or_return
 
 	img_data := data[header_size:]
-
-	img = new(Image)
 	decode_image(img, header, img_data) or_return
 
 	info := new(Info)
@@ -62,8 +62,7 @@ load_from_buffer :: proc(data: []byte, allocator := context.allocator) -> (img: 
 	}
 	img.metadata = info
 
-	err = Format_Error.None
-	return
+	return img, nil
 }
 
 save :: proc {
@@ -140,8 +139,14 @@ save_to_buffer :: proc(img: ^Image, custom_info: Info = {}, allocator := context
 			fmt.sbprintf(&data, "%i\n", header.maxval)
 		}
 	} else if header.format in PAM {
-		fmt.sbprintf(&data, "WIDTH %i\nHEIGHT %i\nMAXVAL %i\nDEPTH %i\nTUPLTYPE %s\nENDHDR\n",
-			img.width, img.height, header.maxval, img.channels, header.tupltype)
+		if len(header.tupltype) > 0 {
+			fmt.sbprintf(&data, "WIDTH %i\nHEIGHT %i\nMAXVAL %i\nDEPTH %i\nTUPLTYPE %s\nENDHDR\n",
+				img.width, img.height, header.maxval, img.channels, header.tupltype)
+		} else {
+			fmt.sbprintf(&data, "WIDTH %i\nHEIGHT %i\nMAXVAL %i\nDEPTH %i\nENDHDR\n",
+				img.width, img.height, header.maxval, img.channels)
+		}
+
 	} else if header.format in PFM {
 		scale := -header.scale if header.little_endian else header.scale
 		fmt.sbprintf(&data, "%i %i\n%f\n", img.width, img.height, scale)
@@ -369,10 +374,12 @@ _parse_header_pnm :: proc(data: []byte) -> (header: Header, length: int, err: Er
 	if header.width < 1 \
 	|| header.height < 1 \
 	|| header.maxval < 1 || header.maxval > int(max(u16)) {
-		err = Format_Error.Invalid_Header_Value
+		fmt.printf("[pnm] Header: {{width = %v, height = %v, maxval: %v}}\n", header.width, header.height, header.maxval)
+		err = .Invalid_Header_Value
 		return
 	}
 
+	length -= 1
 	err = Format_Error.None
 	return
 }
@@ -427,7 +434,7 @@ _parse_header_pam :: proc(data: []byte, allocator := context.allocator) -> (head
 
 		case "TUPLTYPE":
 			if len(value) == 0 {
-				err = Format_Error.Invalid_Header_Value
+				err = .Invalid_Header_Value
 				return
 			}
 
@@ -462,6 +469,7 @@ _parse_header_pam :: proc(data: []byte, allocator := context.allocator) -> (head
 	|| header.height < 1 \
 	|| header.maxval < 1 \
 	|| header.maxval > int(max(u16)) {
+		fmt.printf("[pam] Header: {{width = %v, height = %v, maxval: %v}}\n", header.width, header.height, header.maxval)
 		err = Format_Error.Invalid_Header_Value
 		return
 	}
@@ -540,7 +548,8 @@ _parse_header_pfm :: proc(data: []byte) -> (header: Header, length: int, err: Er
 	if header.width < 1 \
 	|| header.height < 1 \
 	|| header.scale == 0.0 {
-		err = Format_Error.Invalid_Header_Value
+		fmt.printf("[pfm] Header: {{width = %v, height = %v, scale: %v}}\n", header.width, header.height, header.scale)
+		err = .Invalid_Header_Value
 		return
 	}
 
@@ -559,22 +568,12 @@ decode_image :: proc(img: ^Image, header: Header, data: []byte, allocator := con
 
 	buffer_size := image.compute_buffer_size(img.width, img.height, img.channels, img.depth)
 
-	when false {
 	// we can check data size for binary formats
 	if header.format in BINARY {
-		if header.format == .P4 {
-			p4_size := (img.width / 8 + 1) * img.height
-			if len(data) < p4_size {
-				err = Format_Error.Buffer_Too_Small
-				return
-			}
-		} else {
-			if len(data) < buffer_size {
-				err = Format_Error.Buffer_Too_Small
-				return
-			}
+		if len(data) < buffer_size {
+			fmt.printf("len(data): %v, buffer size: %v\n", len(data), buffer_size)
+			return .Buffer_Too_Small
 		}
-	}
 	}
 
 	// for ASCII and P4, we use length for the termination condition, so start at 0
@@ -605,7 +604,7 @@ decode_image :: proc(img: ^Image, header: Header, data: []byte, allocator := con
 
 	// Simple binary
 	case .P5, .P6, .P7, .Pf, .PF:
-		mem.copy(raw_data(img.pixels.buf), raw_data(data), buffer_size)
+		copy(img.pixels.buf[:], data[:])
 
 		// convert to native endianness
 		if header.format in PFM {
