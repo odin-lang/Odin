@@ -63,6 +63,7 @@ foreign gdi32 {
 	SwapBuffers :: proc(HDC) -> BOOL ---
 
 	SetDCBrushColor :: proc(hdc: HDC, color: COLORREF) -> COLORREF ---
+	GetDCBrushColor :: proc(hdc: HDC) -> COLORREF ---
 	PatBlt :: proc(hdc: HDC, x, y, w, h: c_int, rop: DWORD) -> BOOL ---
 }
 
