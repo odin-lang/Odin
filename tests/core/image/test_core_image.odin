@@ -13,6 +13,7 @@ import "core:testing"
 
 import "core:compress"
 import "core:image"
+import pbm "core:image/netpbm"
 import "core:image/png"
 import "core:image/qoi"
 
@@ -1199,37 +1200,37 @@ Corrupt_PNG_Tests   := []PNG_Test{
 	{
 		"xs1n0g01", // signature byte 1 MSBit reset to zero
 		{
-			{Default, .Invalid_PNG_Signature, {}, 0x_0000_0000},
+			{Default, .Invalid_Signature, {}, 0x_0000_0000},
 		},
 	},
 	{
 		"xs2n0g01", // signature byte 2 is a 'Q'
 		{
-			{Default, .Invalid_PNG_Signature, {}, 0x_0000_0000},
+			{Default, .Invalid_Signature, {}, 0x_0000_0000},
 		},
 	},
 	{
 		"xs4n0g01", // signature byte 4 lowercase
 		{
-			{Default, .Invalid_PNG_Signature, {}, 0x_0000_0000},
+			{Default, .Invalid_Signature, {}, 0x_0000_0000},
 		},
 	},
 	{
 		"xs7n0g01", // 7th byte a space instead of control-Z
 		{
-			{Default, .Invalid_PNG_Signature, {}, 0x_0000_0000},
+			{Default, .Invalid_Signature, {}, 0x_0000_0000},
 		},
 	},
 	{
 		"xcrn0g04", // added cr bytes
 		{
-			{Default, .Invalid_PNG_Signature, {}, 0x_0000_0000},
+			{Default, .Invalid_Signature, {}, 0x_0000_0000},
 		},
 	},
 	{
 		"xlfn0g04", // added lf bytes
 		{
-			{Default, .Invalid_PNG_Signature, {}, 0x_0000_0000},
+			{Default, .Invalid_Signature, {}, 0x_0000_0000},
 		},
 	},
 	{
@@ -1506,25 +1507,159 @@ run_png_suite :: proc(t: ^testing.T, suite: []PNG_Test) -> (subtotal: int) {
 
 				passed &= test.hash == png_hash
 
-				// Roundtrip through QOI to test the QOI encoder and decoder.
-				if passed && img.depth == 8 && (img.channels == 3 || img.channels == 4) {
-					qoi_buffer: bytes.Buffer
-					defer bytes.buffer_destroy(&qoi_buffer)
-					qoi_save_err := qoi.save(&qoi_buffer, img)
+				if passed {
+					// Roundtrip through QOI to test the QOI encoder and decoder.
+					if img.depth == 8 && (img.channels == 3 || img.channels == 4) {
+						qoi_buffer: bytes.Buffer
+						defer bytes.buffer_destroy(&qoi_buffer)
+						qoi_save_err := qoi.save(&qoi_buffer, img)
 
-					error  = fmt.tprintf("%v test %v QOI save failed with %v.", file.file, count, qoi_save_err)
-					expect(t, qoi_save_err == nil, error)
+						error  = fmt.tprintf("%v test %v QOI save failed with %v.", file.file, count, qoi_save_err)
+						expect(t, qoi_save_err == nil, error)
 
-					if qoi_save_err == nil {
-						qoi_img, qoi_load_err := qoi.load(qoi_buffer.buf[:])
-						defer qoi.destroy(qoi_img)
+						if qoi_save_err == nil {
+							qoi_img, qoi_load_err := qoi.load(qoi_buffer.buf[:])
+							defer qoi.destroy(qoi_img)
 
-						error  = fmt.tprintf("%v test %v QOI load failed with %v.", file.file, count, qoi_load_err)
-						expect(t, qoi_load_err == nil, error)
+							error  = fmt.tprintf("%v test %v QOI load failed with %v.", file.file, count, qoi_load_err)
+							expect(t, qoi_load_err == nil, error)
 
-						qoi_hash := hash.crc32(qoi_img.pixels.buf[:])
-						error  = fmt.tprintf("%v test %v QOI load hash is %08x, expected it match PNG's %08x with %v.", file.file, count, qoi_hash, png_hash, test.options)
-						expect(t, qoi_hash == png_hash, error)
+							qoi_hash := hash.crc32(qoi_img.pixels.buf[:])
+							error  = fmt.tprintf("%v test %v QOI load hash is %08x, expected it match PNG's %08x with %v.", file.file, count, qoi_hash, png_hash, test.options)
+							expect(t, qoi_hash == png_hash, error)
+						}
+					}
+
+					{
+						// Roundtrip through PBM to test the PBM encoders and decoders - prefer binary
+						pbm_buf, pbm_save_err := pbm.save_to_buffer(img)
+						defer delete(pbm_buf)
+
+						error = fmt.tprintf("%v test %v PBM save failed with %v.", file.file, count, pbm_save_err)
+						expect(t, pbm_save_err == nil, error)
+
+						if pbm_save_err == nil {
+							// Try to load it again.
+							pbm_img, pbm_load_err := pbm.load(pbm_buf)
+							defer pbm.destroy(pbm_img)
+
+							error  = fmt.tprintf("%v test %v PBM load failed with %v.", file.file, count, pbm_load_err)
+							expect(t, pbm_load_err == nil, error)
+
+							if pbm_load_err == nil {
+								pbm_hash := hash.crc32(pbm_img.pixels.buf[:])
+
+								error  = fmt.tprintf("%v test %v PBM load hash is %08x, expected it match PNG's %08x with %v.", file.file, count, pbm_hash, png_hash, test.options)
+								expect(t, pbm_hash == png_hash, error)
+							}
+						}
+					}
+
+					{
+						// Roundtrip through PBM to test the PBM encoders and decoders - prefer ASCII
+						pbm_info, pbm_format_selected := pbm.autoselect_pbm_format_from_image(img, false)
+
+						// We already tested the binary formats above.
+						if pbm_info.header.format in pbm.ASCII {
+							pbm_buf, pbm_save_err := pbm.save_to_buffer(img, pbm_info)
+							defer delete(pbm_buf)
+
+							error = fmt.tprintf("%v test %v PBM save failed with %v.", file.file, count, pbm_save_err)
+							expect(t, pbm_save_err == nil, error)
+
+							if pbm_save_err == nil {
+								// Try to load it again.
+								pbm_img, pbm_load_err := pbm.load(pbm_buf)
+								defer pbm.destroy(pbm_img)
+
+								error  = fmt.tprintf("%v test %v PBM load failed with %v.", file.file, count, pbm_load_err)
+								expect(t, pbm_load_err == nil, error)
+
+								if pbm_load_err == nil {
+									pbm_hash := hash.crc32(pbm_img.pixels.buf[:])
+
+									error  = fmt.tprintf("%v test %v PBM load hash is %08x, expected it match PNG's %08x with %v.", file.file, count, pbm_hash, png_hash, test.options)
+									expect(t, pbm_hash == png_hash, error)
+								}
+							}
+						}
+					}
+
+					{
+						// We still need to test Portable Float Maps
+						if (img.channels == 1 || img.channels == 3) && (img.depth == 8 || img.depth == 16) {
+
+							// Make temporary float image
+							float_img   := new(image.Image)
+							defer png.destroy(float_img)
+
+							float_img.width    = img.width
+							float_img.height   = img.height
+							float_img.channels = img.channels
+							float_img.depth    = 32
+
+							buffer_size := image.compute_buffer_size(img.width, img.height, img.channels, 32)
+							resize(&float_img.pixels.buf, buffer_size)
+
+							pbm_info := pbm.Info {
+								header = {
+									width         = img.width,
+									height        = img.height,
+									channels      = img.channels,
+									depth         = img.depth,
+									maxval        = 255 if img.depth == 8 else 65535,
+									little_endian = true if ODIN_ENDIAN == .Little else false,
+									scale         = 1.0,
+									format        = .Pf if img.channels == 1 else .PF,
+								},
+							}
+
+							// Transform data...
+							orig_float := mem.slice_data_cast([]f32, float_img.pixels.buf[:])
+
+							switch img.depth {
+							case 8:
+								for v, i in img.pixels.buf {
+									orig_float[i] = f32(v) / f32(256)
+								}
+							case 16:
+								wide := mem.slice_data_cast([]u16, img.pixels.buf[:])
+								for v, i in wide {
+									orig_float[i] = f32(v) / f32(65536)
+								}
+							}
+
+							float_pbm_buf, float_pbm_save_err := pbm.save_to_buffer(float_img, pbm_info)
+							defer delete(float_pbm_buf)
+
+							error = fmt.tprintf("%v test %v save as PFM failed with %v", file.file, count, float_pbm_save_err)
+							expect(t, float_pbm_save_err == nil, error)
+
+							if float_pbm_save_err == nil {
+								// Load float image and compare.
+								float_pbm_img, float_pbm_load_err := pbm.load(float_pbm_buf)
+								defer pbm.destroy(float_pbm_img)
+
+								error = fmt.tprintf("%v test %v PFM load failed with %v", file.file, count, float_pbm_load_err)
+								expect(t, float_pbm_load_err == nil, error)
+
+								load_float := mem.slice_data_cast([]f32, float_pbm_img.pixels.buf[:])
+
+								error = fmt.tprintf("%v test %v PFM load returned %v floats, expected %v", file.file, count, len(load_float), len(orig_float))
+								expect(t, len(load_float) == len(orig_float), error)
+
+								// Compare floats
+								equal := true
+								for orig, i in orig_float {
+									if orig != load_float[i] {
+										equal = false
+										break
+									}
+								}
+								error = fmt.tprintf("%v test %v PFM loaded floats to match", file.file, count)
+								expect(t, equal, error)
+							}
+						}
 					}
 				}
 
