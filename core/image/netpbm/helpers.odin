@@ -9,7 +9,6 @@ destroy :: proc(img: ^image.Image) -> bool {
 	defer free(img)
 	bytes.buffer_destroy(&img.pixels)
 
-	//! TEMP CAST
 	info, ok := img.metadata.(^image.Netpbm_Info)
 	if !ok do return false
 
