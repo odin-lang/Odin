@@ -16,8 +16,7 @@ wait_group_add :: proc(wg: ^Wait_Group, delta: int) {
 		return
 	}
 
-	mutex_lock(&wg.mutex)
-	defer mutex_unlock(&wg.mutex)
+	guard(&wg.mutex)
 
 	atomic_add(&wg.counter, delta)
 	if wg.counter < 0 {
@@ -36,8 +35,7 @@ wait_group_done :: proc(wg: ^Wait_Group) {
 }
 
 wait_group_wait :: proc(wg: ^Wait_Group) {
-	mutex_lock(&wg.mutex)
-	defer mutex_unlock(&wg.mutex)
+	guard(&wg.mutex)
 
 	if wg.counter != 0 {
 		cond_wait(&wg.cond, &wg.mutex)
@@ -51,8 +49,7 @@ wait_group_wait_with_timeout :: proc(wg: ^Wait_Group, duration: time.Duration) -
 	if duration <= 0 {
 		return false
 	}
-	mutex_lock(&wg.mutex)
-	defer mutex_unlock(&wg.mutex)
+	guard(&wg.mutex)
 
 	if wg.counter != 0 {
 		if !cond_wait_with_timeout(&wg.cond, &wg.mutex, duration) {
@@ -119,8 +116,7 @@ barrier_init :: proc(b: ^Barrier, thread_count: int) {
 // Block the current thread until all threads have rendezvoused
 // Barrier can be reused after all threads rendezvoused once, and can be used continuously
 barrier_wait :: proc(b: ^Barrier) -> (is_leader: bool) {
-	mutex_lock(&b.mutex)
-	defer mutex_unlock(&b.mutex)
+	guard(&b.mutex)
 	local_gen := b.generation_id
 	b.index += 1
 	if b.index < b.thread_count {
@@ -289,8 +285,7 @@ Once :: struct {
 once_do :: proc(o: ^Once, fn: proc()) {
 	@(cold)
 	do_slow :: proc(o: ^Once, fn: proc()) {
-		mutex_lock(&o.m)
-		defer mutex_unlock(&o.m)
+		guard(&o.m)
 		if !o.done {
 			fn()
 			atomic_store_explicit(&o.done, true, .Release)
