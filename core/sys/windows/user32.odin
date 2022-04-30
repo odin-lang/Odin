@@ -114,9 +114,13 @@ foreign user32 {
 		cy: c_int,
 		uFlags: UINT,
 	) -> BOOL ---
+	MoveWindow :: proc(hWnd: HWND, X, Y, hWidth, hHeight: c_int, bRepaint: BOOL) -> BOOL ---
 	GetSystemMetrics :: proc(nIndex: c_int) -> c_int ---
 	AdjustWindowRect :: proc(lpRect: LPRECT, dwStyle: DWORD, bMenu: BOOL) -> BOOL ---
 	AdjustWindowRectEx :: proc(lpRect: LPRECT, dwStyle: DWORD, bMenu: BOOL, dwExStyle: DWORD) -> BOOL ---
+
+	SystemParametersInfoA :: proc(uiAction, uiParam: UINT, pvParam: PVOID, fWinIni: UINT) -> BOOL ---
+	SystemParametersInfoW :: proc(uiAction, uiParam: UINT, pvParam: PVOID, fWinIni: UINT) -> BOOL ---
 
 	GetWindowDC :: proc(hWnd: HWND) -> HDC ---
 	GetDC :: proc(hWnd: HWND) -> HDC ---
