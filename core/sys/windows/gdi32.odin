@@ -69,6 +69,6 @@ foreign gdi32 {
 
 // Windows colors are packed as ABGR
 RGB :: #force_inline proc "contextless" (r, g, b: u8) -> COLORREF {
-	res: [4]u8 = {0, rgb.b, rgb.g, rgb.r}
+	res: [4]u8 = {0, b, g, r}
 	return transmute(COLORREF)res
 }
