@@ -193,7 +193,6 @@ format :: enum c.int {
 	s24     = 3,     /* Tightly packed. 3 bytes per sample. */
 	s32     = 4,
 	f32     = 5,
-	count,
 }
 
 standard_sample_rate :: enum u32 {
