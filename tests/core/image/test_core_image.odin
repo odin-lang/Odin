@@ -1534,6 +1534,9 @@ run_png_suite :: proc(t: ^testing.T, suite: []PNG_Test) -> (subtotal: int) {
 					pbm_buf, pbm_save_err := pbm.save_to_buffer(img)
 					defer delete(pbm_buf)
 
+					filename := fmt.tprintf("%v-%v.ppm", file.file, count)
+					pbm.save_to_file(filename, img)
+
 					error = fmt.tprintf("%v test %v PBM save failed with %v.", file.file, count, pbm_save_err)
 					expect(t, pbm_save_err == nil, error)
 
@@ -1544,9 +1547,30 @@ run_png_suite :: proc(t: ^testing.T, suite: []PNG_Test) -> (subtotal: int) {
 
 						if pbm_load_err == nil {
 							fmt.printf("%v test %v PBM load worked with %v.\n", file.file, count, pbm_load_err)
+
+							pbm_hash := hash.crc32(pbm_img.pixels.buf[:])
+							if pbm_hash == png_hash {
+								fmt.printf("\t%v test %v PBM load hash %08x matched PNG's\n", file.file, count, png_hash)
+							} else {
+								if img.width != pbm_img.width || img.height != pbm_img.height || img.channels != pbm_img.channels || img.depth != pbm_img.depth {
+									fmt.printf("\tHash failed. IMG: %v, %v, %v, %v PBM: %v, %v, %v, %v\n", img.width, img.height, img.channels, img.depth, pbm_img.width, pbm_img.height, pbm_img.channels, pbm_img.depth)
+								} else if len(img.pixels.buf) != len(pbm_img.pixels.buf) {
+									fmt.printf("\tLengths differ. IMG: %v PBM: %v\n", len(img.pixels.buf), len(pbm_img.pixels.buf))
+								} else if file.file[:3] == "bas" {
+									for v, i in img.pixels.buf {
+										if v != pbm_img.pixels.buf[i] {
+											fmt.printf("\tChannels: %v, Depth: %v, Pixel %v differs. PNG: %v, PBM: %v\n", img.channels, img.depth, i, img.pixels.buf[i:][:4], pbm_img.pixels.buf[i:][:4])
+											break
+										}
+									}
+								}
+								// error  = fmt.tprintf("%v test %v PBM load hash is %08x, expected it match PNG's %08x with %v.", file.file, count, pbm_hash, png_hash, test.options)
+								// expect(t, pbm_hash == png_hash, error)
+							}
+						} else {
+							// error  = fmt.tprintf("%v test %v PBM load failed with %v.", file.file, count, pbm_load_err)
+							// expect(t, pbm_load_err == nil, error)
 						}
-						error  = fmt.tprintf("%v test %v PBM load failed with %v.", file.file, count, pbm_load_err)
-						expect(t, pbm_load_err == nil, error)
 					}
 
 					// Roundtrip through PBM to test the PBM encoders and decoders - prefer ASCII
