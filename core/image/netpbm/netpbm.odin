@@ -31,19 +31,19 @@ load :: proc {
 	load_from_buffer,
 }
 
-load_from_file :: proc(filename: string, allocator := context.allocator) -> (img: Image, err: Error) {
+load_from_file :: proc(filename: string, allocator := context.allocator) -> (img: ^Image, err: Error) {
 	context.allocator = allocator
 
 	data, ok := os.read_entire_file(filename); defer delete(data)
 	if !ok {
-		err = .File_Not_Readable
+		err = .Unable_To_Read_File
 		return
 	}
 
-	return read_from_buffer(data)
+	return load_from_buffer(data)
 }
 
-load_from_buffer :: proc(data: []byte, allocator := context.allocator) -> (img: Image, err: Error) {
+load_from_buffer :: proc(data: []byte, allocator := context.allocator) -> (img: ^Image, err: Error) {
 	context.allocator = allocator
 
 	header: Header; defer header_destroy(&header)
@@ -51,7 +51,9 @@ load_from_buffer :: proc(data: []byte, allocator := context.allocator) -> (img: 
 	header, header_size = parse_header(data) or_return
 
 	img_data := data[header_size:]
-	img = decode_image(header, img_data) or_return
+
+	img = new(Image)
+	decode_image(img, header, img_data) or_return
 
 	info := new(Info)
 	info.header = header
@@ -69,27 +71,42 @@ save :: proc {
 	save_to_buffer,
 }
 
-save_to_file :: proc(filename: string, img: Image, allocator := context.allocator) -> (err: Error) {
+save_to_file :: proc(filename: string, img: ^Image, custom_info: Info = {}, allocator := context.allocator) -> (err: Error) {
 	context.allocator = allocator
 
 	data: []byte; defer delete(data)
-	data = write_to_buffer(img) or_return
+	data = save_to_buffer(img, custom_info) or_return
 
 	if ok := os.write_entire_file(filename, data); !ok {
-		return .File_Not_Writable
+		return .Unable_To_Write_File
 	}
 
 	return Format_Error.None
 }
 
-save_to_buffer :: proc(img: Image, allocator := context.allocator) -> (buffer: []byte, err: Error) {
+save_to_buffer :: proc(img: ^Image, custom_info: Info = {}, allocator := context.allocator) -> (buffer: []byte, err: Error) {
 	context.allocator = allocator
 
-	info, ok := img.metadata.(^image.Netpbm_Info)
-	if !ok {
-		err = image.General_Image_Error.Invalid_Input_Image
-		return
+	info: Info = {}
+	if custom_info.header.width > 0 {
+		// Custom info has been set, use it.
+		info = custom_info
+	} else {
+		img_info, ok := img.metadata.(^image.Netpbm_Info)
+		if !ok {
+			// image doesn't have .Netpbm info, guess it
+			auto_info, auto_info_found := autoselect_pbm_format_from_image(img)
+			if auto_info_found {
+				info = auto_info
+			} else {
+				return {}, .Invalid_Input_Image
+			}
+		} else {
+			// use info as stored on image
+			info = img_info^
+		}
 	}
+
 	// using info so we can just talk about the header
 	using info
 
@@ -103,11 +120,11 @@ save_to_buffer :: proc(img: Image, allocator := context.allocator) -> (buffer: [
 	if header.format in (PNM + PAM) {
 		if header.maxval <= int(max(u8)) && img.depth != 8 \
 		|| header.maxval > int(max(u8)) && header.maxval <= int(max(u16)) && img.depth != 16 {
-			err = Format_Error.Invalid_Image_Depth
+			err = .Invalid_Image_Depth
 			return
 		}
 	} else if header.format in PFM && img.depth != 32 {
-		err = Format_Error.Invalid_Image_Depth
+		err = .Invalid_Image_Depth
 		return
 	}
 
@@ -233,11 +250,11 @@ save_to_buffer :: proc(img: Image, allocator := context.allocator) -> (buffer: [
 			}
 
 		case:
-			return data.buf[:], Format_Error.Invalid_Image_Depth
+			return data.buf[:], .Invalid_Image_Depth
 		}
 
 	case:
-		return data.buf[:], Format_Error.Invalid_Format
+		return data.buf[:], .Invalid_Format
 	}
 
 	return data.buf[:], Format_Error.None
@@ -263,7 +280,7 @@ parse_header :: proc(data: []byte, allocator := context.allocator) -> (header: H
 		}
 	}
 
-	err = Format_Error.Invalid_Signature
+	err = .Invalid_Signature
 	return
 }
 
@@ -366,7 +383,7 @@ _parse_header_pam :: proc(data: []byte, allocator := context.allocator) -> (head
 
 	// the spec needs the newline apparently
 	if string(data[0:3]) != "P7\n" {
-		err = Format_Error.Invalid_Signature
+		err = .Invalid_Signature
 		return
 	}
 	header.format = .P7
@@ -468,7 +485,7 @@ _parse_header_pfm :: proc(data: []byte) -> (header: Header, length: int, err: Er
 		header.format = .PF
 		header.channels = 3
 	case:
-		err = Format_Error.Invalid_Signature
+		err = .Invalid_Signature
 		return
 	}
 
@@ -531,18 +548,18 @@ _parse_header_pfm :: proc(data: []byte) -> (header: Header, length: int, err: Er
 	return
 }
 
-decode_image :: proc(header: Header, data: []byte, allocator := context.allocator) -> (img: Image, err: Error) {
+decode_image :: proc(img: ^Image, header: Header, data: []byte, allocator := context.allocator) -> (err: Error) {
+	assert(img != nil)
 	context.allocator = allocator
 
-	img = Image {
-		width    = header.width,
-		height   = header.height,
-		channels = header.channels,
-		depth    = header.depth,
-	}
+	img.width    = header.width
+	img.height   = header.height
+	img.channels = header.channels
+	img.depth    = header.depth
 
 	buffer_size := image.compute_buffer_size(img.width, img.height, img.channels, img.depth)
 
+	when false {
 	// we can check data size for binary formats
 	if header.format in BINARY {
 		if header.format == .P4 {
@@ -557,6 +574,7 @@ decode_image :: proc(header: Header, data: []byte, allocator := context.allocato
 				return
 			}
 		}
+	}
 	}
 
 	// for ASCII and P4, we use length for the termination condition, so start at 0
@@ -665,4 +683,70 @@ decode_image :: proc(header: Header, data: []byte, allocator := context.allocato
 
 	err = Format_Error.None
 	return
+}
+
+// Automatically try to select an appropriate format to save to based on `img.channel` and `img.depth`
+autoselect_pbm_format_from_image :: proc(img: ^Image, prefer_binary := true, force_black_and_white := false, pfm_scale := f32(1.0)) -> (res: Info, ok: bool) {
+	/*
+		PBM (P1, P4): Portable Bit Map,       stores black and white images   (1 channel)
+		PGM (P2, P5): Portable Gray Map,      stores greyscale images         (1 channel, 1 or 2 bytes per value)
+		PPM (P3, P6): Portable Pixel Map,     stores colour images            (3 channel, 1 or 2 bytes per value)
+		PAM (P7    ): Portable Arbitrary Map, stores arbitrary channel images            (1 or 2 bytes per value)
+		PFM (Pf, PF): Portable Float Map,     stores floating-point images    (Pf: 1 channel, PF: 3 channel)
+
+		ASCII   :: Formats{.P1, .P2, .P3}
+	*/
+	using res.header
+
+	width    = img.width
+	height   = img.height
+	channels = img.channels
+	depth    = img.depth
+	maxval   = 255 if img.depth == 8 else 65535
+	little_endian = true if ODIN_ENDIAN == .Little else false
+
+	// Assume we'll find a suitable format
+	ok = true
+
+	switch img.channels {
+	case 1:
+		// Must be Portable Float Map
+		if img.depth == 32 {
+			format = .Pf
+			return
+		}
+
+		if force_black_and_white {
+			// Portable Bit Map
+			format = .P4 if prefer_binary else .P1
+			maxval = 1
+			return
+		} else {
+			// Portable Gray Map
+			format = .P5 if prefer_binary else .P2
+			return
+		}
+
+	case 3:
+		// Must be Portable Float Map
+		if img.depth == 32 {
+			format = .PF
+			return
+		}
+
+		// Portable Pixel Map
+		format = .P6 if prefer_binary else .P3
+		return
+
+	case:
+		// Portable Arbitrary Map
+		if img.depth == 8 || img.depth == 16 {
+			format = .P7
+			scale  = pfm_scale
+			return
+		}
+	}
+
+	// We couldn't find a suitable format
+	return {}, false
 }
