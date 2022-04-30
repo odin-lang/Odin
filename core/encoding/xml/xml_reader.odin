@@ -493,7 +493,16 @@ parse_from_slice :: proc(data: []u8, options := DEFAULT_Options, path := "", err
 	return doc, .None
 }
 
-parse_from_file :: proc(filename: string, options := DEFAULT_Options, error_handler := default_error_handler, allocator := context.allocator) -> (doc: ^Document, err: Error) {
+parse_from_string :: proc(data: string, options := DEFAULT_Options, path := "", error_handler := default_error_handler, allocator := context.allocator) -> (doc: ^Document, err: Error) {
+	_data := transmute([]u8)data
+
+	return parse_from_slice(_data, options, path, error_handler, allocator)
+}
+
+parse :: proc { parse_from_string, parse_from_slice }
+
+// Load an XML file
+load_from_file :: proc(filename: string, options := DEFAULT_Options, error_handler := default_error_handler, allocator := context.allocator) -> (doc: ^Document, err: Error) {
 	context.allocator = allocator
 	options := options
 
@@ -504,8 +513,6 @@ parse_from_file :: proc(filename: string, options := DEFAULT_Options, error_hand
 
 	return parse_from_slice(data, options, filename, error_handler, allocator)
 }
-
-parse :: proc { parse_from_file, parse_from_slice }
 
 destroy :: proc(doc: ^Document) {
 	if doc == nil { return }
