@@ -6,15 +6,16 @@ import "core:image"
 destroy :: proc(img: ^image.Image) -> bool {
 	if img == nil do return false
 
+	defer free(img)
+	bytes.buffer_destroy(&img.pixels)
+
 	//! TEMP CAST
 	info, ok := img.metadata.(^image.Netpbm_Info)
 	if !ok do return false
 
-	bytes.buffer_destroy(&img.pixels)
 	header_destroy(&info.header)
 	free(info)
 	img.metadata = nil
-	free(img)
 
 	return true
 }
