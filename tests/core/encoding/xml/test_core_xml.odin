@@ -295,7 +295,7 @@ run_tests :: proc(t: ^testing.T) {
 		path := test_file_path(test.filename)
 		log(t, fmt.tprintf("Trying to parse %v", path))
 
-		doc, err := xml.parse(path, test.options, Silent)
+		doc, err := xml.load_from_file(path, test.options, Silent)
 		defer xml.destroy(doc)
 
 		tree_string := doc_to_string(doc)
