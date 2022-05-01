@@ -109,7 +109,7 @@ save_to_buffer :: proc(img: ^Image, custom_info: Info = {}, allocator := context
 	// using info so we can just talk about the header
 	using info
 
-	//? validation
+	// validation
 	if header.format in (PBM + PGM + Formats{.Pf}) && img.channels != 1 \
 	|| header.format in (PPM + Formats{.PF}) && img.channels != 3 {
 		err = .Invalid_Number_Of_Channels
