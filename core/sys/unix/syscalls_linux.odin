@@ -1114,7 +1114,7 @@ when ODIN_ARCH == .amd64 {
 	SYS_landlock_add_rule : uintptr : 445
 	SYS_landlock_restrict_self : uintptr : 446
 	SYS_memfd_secret : uintptr : 447
-} else when false /*ODIN_ARCH == .arm*/ { // TODO
+} else when ODIN_ARCH == .arm32 { // TODO
 	SYS_restart_syscall : uintptr : 0
 	SYS_exit : uintptr : 1
 	SYS_fork : uintptr : 2

@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!DOCTYPE 恥ずべきフクロウ>
+<恥ずべきフクロウ 올빼미_id="Foozle&#32;<![CDATA[<greeting>Hello, world!"</greeting>]]>Barzle">
+<부끄러운:barzle>
+	<name foo:bar="birmese">ရှက်စရာ ဇီးကွက်</name>
+	<nickname>Owl of Shame</nickname>
+	<data>More CDATA <![CDATA[<greeting>Hello, world!</greeting><![CDATA] <$]]> Nonsense.</data>
+</부끄러운:barzle>

@@ -1,0 +1,28 @@
+<html>
+	<head>
+		<title>Entity Reference Test</title>
+		<style>
+			body {
+				background: #000; color: #eee;
+				width: 40%;
+				margin-left:  auto;
+				margin-right: auto;
+				font-size: 14pt;
+			}
+		</style>
+	</head>
+	<body>
+		<h1>Entity Reference Test</h1>
+		<div id="test_cdata_in_comment" foo="">
+			Foozle]!&#32;&copy;&#x20;<!-- <![CDATA[&#32;&reg;&#x20;]]> -->42&;1234&
+		</div>
+		<!-- EXPECTED: Foozle]! © 42&;1234& -->
+		<div id="test_cdata_unwrap_and_passthrough">
+			Foozle]!&#32;&copy;&#x20;<![CDATA[BOX&#32;&reg;&#x20;/BOX]]>42&;1234&
+		</div>
+		<!-- EXPECTED: Foozle]! © BOX ® /BOX42&;1234& -->
+		<div>
+			&verbar; &vert; &VerticalLine; &fjlig; &grave; &bsol; &reg; &rhov; &CounterClockwiseContourIntegral; &bsemi;
+		</div>
+	</body>
+</html>

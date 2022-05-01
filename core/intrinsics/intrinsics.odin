@@ -41,6 +41,10 @@ mem_copy_non_overlapping :: proc(dst, src: rawptr, len: int) ---
 mem_zero                 :: proc(ptr: rawptr, len: int) ---
 mem_zero_volatile        :: proc(ptr: rawptr, len: int) ---
 
+// prefer [^]T operations if possible
+ptr_offset :: proc(ptr: ^$T, offset: int) -> ^T ---
+ptr_sub    :: proc(a, b: ^$T) -> int ---
+
 unaligned_load           :: proc(src: ^$T) -> T ---
 unaligned_store          :: proc(dst: ^$T, val: T) -> T ---
 
@@ -82,6 +86,7 @@ atomic_store_explicit :: proc(dst: ^$T, val: T, order: Atomic_Memory_Order) ---
 atomic_load           :: proc(dst: ^$T) -> T ---
 atomic_load_explicit  :: proc(dst: ^$T, order: Atomic_Memory_Order) -> T ---
 
+// fetch then operator
 atomic_add               :: proc(dst; ^$T, val: T) -> T ---
 atomic_add_explicit      :: proc(dst; ^$T, val: T, order: Atomic_Memory_Order) -> T ---
 atomic_sub               :: proc(dst; ^$T, val: T) -> T ---
@@ -119,22 +124,24 @@ type_is_string     :: proc($T: typeid) -> bool ---
 type_is_typeid     :: proc($T: typeid) -> bool ---
 type_is_any        :: proc($T: typeid) -> bool ---
 
-type_is_endian_platform :: proc($T: typeid) -> bool ---
-type_is_endian_little   :: proc($T: typeid) -> bool ---
-type_is_endian_big      :: proc($T: typeid) -> bool ---
-type_is_unsigned        :: proc($T: typeid) -> bool ---
-type_is_numeric         :: proc($T: typeid) -> bool ---
-type_is_ordered         :: proc($T: typeid) -> bool ---
-type_is_ordered_numeric :: proc($T: typeid) -> bool ---
-type_is_indexable       :: proc($T: typeid) -> bool ---
-type_is_sliceable       :: proc($T: typeid) -> bool ---
-type_is_comparable      :: proc($T: typeid) -> bool ---
-type_is_simple_compare  :: proc($T: typeid) -> bool --- // easily compared using memcmp (== and !=)
-type_is_dereferenceable :: proc($T: typeid) -> bool ---
-type_is_valid_map_key   :: proc($T: typeid) -> bool ---
+type_is_endian_platform       :: proc($T: typeid) -> bool ---
+type_is_endian_little         :: proc($T: typeid) -> bool ---
+type_is_endian_big            :: proc($T: typeid) -> bool ---
+type_is_unsigned              :: proc($T: typeid) -> bool ---
+type_is_numeric               :: proc($T: typeid) -> bool ---
+type_is_ordered               :: proc($T: typeid) -> bool ---
+type_is_ordered_numeric       :: proc($T: typeid) -> bool ---
+type_is_indexable             :: proc($T: typeid) -> bool ---
+type_is_sliceable             :: proc($T: typeid) -> bool ---
+type_is_comparable            :: proc($T: typeid) -> bool ---
+type_is_simple_compare        :: proc($T: typeid) -> bool --- // easily compared using memcmp (== and !=)
+type_is_dereferenceable       :: proc($T: typeid) -> bool ---
+type_is_valid_map_key         :: proc($T: typeid) -> bool ---
+type_is_valid_matrix_elements :: proc($T: typeid) -> bool ---
 
 type_is_named            :: proc($T: typeid) -> bool ---
 type_is_pointer          :: proc($T: typeid) -> bool ---
+type_is_multi_pointer    :: proc($T: typeid) -> bool ---
 type_is_array            :: proc($T: typeid) -> bool ---
 type_is_enumerated_array :: proc($T: typeid) -> bool ---
 type_is_slice            :: proc($T: typeid) -> bool ---
@@ -146,6 +153,7 @@ type_is_enum             :: proc($T: typeid) -> bool ---
 type_is_proc             :: proc($T: typeid) -> bool ---
 type_is_bit_set          :: proc($T: typeid) -> bool ---
 type_is_simd_vector      :: proc($T: typeid) -> bool ---
+type_is_matrix           :: proc($T: typeid) -> bool ---
 
 type_has_nil :: proc($T: typeid) -> bool ---
 
@@ -153,6 +161,7 @@ type_is_specialization_of :: proc($T, $S: typeid) -> bool ---
 type_is_variant_of :: proc($U, $V: typeid) -> bool where type_is_union(U) ---
 
 type_has_field :: proc($T: typeid, $name: string) -> bool ---
+type_field_type :: proc($T: typeid, $name: string) -> typeid ---
 
 type_proc_parameter_count :: proc($T: typeid) -> int where type_is_proc(T) ---
 type_proc_return_count    :: proc($T: typeid) -> int where type_is_proc(T) ---
@@ -160,19 +169,40 @@ type_proc_return_count    :: proc($T: typeid) -> int where type_is_proc(T) ---
 type_proc_parameter_type  :: proc($T: typeid, index: int) -> typeid where type_is_proc(T) ---
 type_proc_return_type     :: proc($T: typeid, index: int) -> typeid where type_is_proc(T) ---
 
+type_struct_field_count :: proc($T: typeid) -> int where type_is_struct(T) ---
+
 type_polymorphic_record_parameter_count :: proc($T: typeid) -> typeid ---
 type_polymorphic_record_parameter_value :: proc($T: typeid, index: int) -> $V ---
 
+type_is_specialized_polymorphic_record   :: proc($T: typeid) -> bool ---
+type_is_unspecialized_polymorphic_record :: proc($T: typeid) -> bool ---
+
+type_is_subtype_of :: proc($T, $U: typeid) -> bool ---
 
 type_field_index_of :: proc($T: typeid, $name: string) -> uintptr ---
 
 type_equal_proc  :: proc($T: typeid) -> (equal:  proc "contextless" (rawptr, rawptr) -> bool)                 where type_is_comparable(T) ---
 type_hasher_proc :: proc($T: typeid) -> (hasher: proc "contextless" (data: rawptr, seed: uintptr) -> uintptr) where type_is_comparable(T) ---
 
+constant_utf16_cstring :: proc($literal: string) -> [^]u16 ---
 
 // WASM targets only
 wasm_memory_grow :: proc(index, delta: uintptr) -> int ---
 wasm_memory_size :: proc(index: uintptr)        -> int ---
+
+
+// Darwin targets only
+objc_object   :: struct{}
+objc_selector :: struct{}
+objc_class    :: struct{}
+objc_id    :: ^objc_object
+objc_SEL   :: ^objc_selector
+objc_Class :: ^objc_class
+
+objc_find_selector     :: proc($name: string) -> objc_SEL   ---
+objc_register_selector :: proc($name: string) -> objc_SEL   ---
+objc_find_class        :: proc($name: string) -> objc_Class ---
+objc_register_class    :: proc($name: string) -> objc_Class ---
 
 // Internal compiler use only
 

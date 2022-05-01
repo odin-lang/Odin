@@ -415,6 +415,7 @@ Odin_OS_Type :: type_of(ODIN_OS)
 		Unknown,
 		amd64,
 		i386,
+		arm32,
 		arm64,
 		wasm32,
 		wasm64,
