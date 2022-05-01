@@ -30,6 +30,7 @@ enum TargetArchKind : u16 {
 
 	TargetArch_amd64,
 	TargetArch_i386,
+	TargetArch_arm32,
 	TargetArch_arm64,
 	TargetArch_wasm32,
 	TargetArch_wasm64,
@@ -75,6 +76,7 @@ String target_arch_names[TargetArch_COUNT] = {
 	str_lit(""),
 	str_lit("amd64"),
 	str_lit("i386"),
+	str_lit("arm32"),
 	str_lit("arm64"),
 	str_lit("wasm32"),
 	str_lit("wasm64"),
@@ -94,6 +96,7 @@ String target_abi_names[TargetABI_COUNT] = {
 
 TargetEndianKind target_endians[TargetArch_COUNT] = {
 	TargetEndian_Invalid,
+	TargetEndian_Little,
 	TargetEndian_Little,
 	TargetEndian_Little,
 	TargetEndian_Little,
@@ -367,7 +370,16 @@ gb_global TargetMetrics target_linux_arm64 = {
 	8,
 	16,
 	str_lit("aarch64-linux-elf"),
-	str_lit("e-m:e-i8:8:32-i16:32-i64:64-i128:128-n32:64-S128"),
+	str_lit("e-m:o-p:32:32-Fi8-i64:64-v128:64:128-a:0:32-n32-S64"),
+};
+
+gb_global TargetMetrics target_linux_arm32 = {
+	TargetOs_linux,
+	TargetArch_arm32,
+	4,
+	8,
+	str_lit("arm-linux-gnu"),
+	str_lit("e-m:o-p:32:32-Fi8-i64:64-v128:64:128-a:0:32-n32-S64"),
 };
 
 gb_global TargetMetrics target_darwin_amd64 = {
@@ -483,6 +495,7 @@ gb_global NamedTargetMetrics named_targets[] = {
 	{ str_lit("linux_i386"),          &target_linux_i386     },
 	{ str_lit("linux_amd64"),         &target_linux_amd64    },
 	{ str_lit("linux_arm64"),         &target_linux_arm64    },
+	{ str_lit("linux_arm32"),         &target_linux_arm32    },
 	{ str_lit("windows_i386"),        &target_windows_i386   },
 	{ str_lit("windows_amd64"),       &target_windows_amd64  },
 	{ str_lit("freebsd_i386"),        &target_freebsd_i386   },
@@ -1114,6 +1127,15 @@ void init_build_context(TargetMetrics *cross_target) {
 			bc->link_flags = str_lit("-arch x86 ");
 			break;
 		}
+	} else if (bc->metrics.arch == TargetArch_arm32) {
+		switch (bc->metrics.os) {
+		case TargetOs_linux:
+			bc->link_flags = str_lit("-arch arm ");
+			break;
+		default:
+			gb_printf_err("Compiler Error: Unsupported architecture\n");
+			gb_exit(1);
+		}
 	} else if (bc->metrics.arch == TargetArch_arm64) {
 		switch (bc->metrics.os) {
 		case TargetOs_darwin:
@@ -1201,27 +1223,28 @@ bool init_build_paths(String init_filename) {
 				return false;
 			}
 
-			GB_ASSERT(find_result.windows_sdk_um_library_path.len > 0);
-			GB_ASSERT(find_result.windows_sdk_ucrt_library_path.len > 0);
-
-			if (find_result.windows_sdk_root.len > 0) {
-				bc->build_paths[BuildPath_Win_SDK_Root]     = path_from_string(ha, find_result.windows_sdk_root);
-			}
-
 			if (find_result.windows_sdk_um_library_path.len > 0) {
-				bc->build_paths[BuildPath_Win_SDK_UM_Lib]   = path_from_string(ha, find_result.windows_sdk_um_library_path);
-			}
+				GB_ASSERT(find_result.windows_sdk_ucrt_library_path.len > 0);
 
-			if (find_result.windows_sdk_ucrt_library_path.len > 0) {
-				bc->build_paths[BuildPath_Win_SDK_UCRT_Lib] = path_from_string(ha, find_result.windows_sdk_ucrt_library_path);
-			}
+				if (find_result.windows_sdk_root.len > 0) {
+					bc->build_paths[BuildPath_Win_SDK_Root]     = path_from_string(ha, find_result.windows_sdk_root);
+				}
 
-			if (find_result.vs_exe_path.len > 0) {
-				bc->build_paths[BuildPath_VS_EXE]           = path_from_string(ha, find_result.vs_exe_path);
-			}
+				if (find_result.windows_sdk_um_library_path.len > 0) {
+					bc->build_paths[BuildPath_Win_SDK_UM_Lib]   = path_from_string(ha, find_result.windows_sdk_um_library_path);
+				}
 
-			if (find_result.vs_library_path.len > 0) {
-				bc->build_paths[BuildPath_VS_LIB]           = path_from_string(ha, find_result.vs_library_path);
+				if (find_result.windows_sdk_ucrt_library_path.len > 0) {
+					bc->build_paths[BuildPath_Win_SDK_UCRT_Lib] = path_from_string(ha, find_result.windows_sdk_ucrt_library_path);
+				}
+
+				if (find_result.vs_exe_path.len > 0) {
+					bc->build_paths[BuildPath_VS_EXE]           = path_from_string(ha, find_result.vs_exe_path);
+				}
+
+				if (find_result.vs_library_path.len > 0) {
+					bc->build_paths[BuildPath_VS_LIB]           = path_from_string(ha, find_result.vs_library_path);
+				}
 			}
 
 			gb_free(ha, find_result.windows_sdk_root.text);

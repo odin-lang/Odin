@@ -55,6 +55,8 @@ UINT_PTR :: uintptr
 ULONG :: c_ulong
 UCHAR :: BYTE
 NTSTATUS :: c.long
+COLORREF :: DWORD // Windows colors are packed as ABGR
+LPCOLORREF :: ^COLORREF
 LPARAM :: LONG_PTR
 WPARAM :: UINT_PTR
 LRESULT :: LONG_PTR

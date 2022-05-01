@@ -1,5 +1,6 @@
 @echo off
-set COMMON=-show-timings -no-bounds-check -vet -strict-style -collection:tests=..
+set COMMON=-no-bounds-check -vet -strict-style
+set COLLECTION=-collection:tests=..
 set PATH_TO_ODIN==..\..\odin
 python3 download_assets.py
 echo ---
@@ -35,9 +36,10 @@ echo ---
 echo ---
 echo Running core:encoding tests
 echo ---
-%PATH_TO_ODIN% run encoding/hxa %COMMON% -out:test_hxa.exe
-%PATH_TO_ODIN% run encoding/json %COMMON% -out:test_json.exe
+%PATH_TO_ODIN% run encoding/hxa    %COMMON% %COLLECTION% -out:test_hxa.exe
+%PATH_TO_ODIN% run encoding/json   %COMMON% -out:test_json.exe
 %PATH_TO_ODIN% run encoding/varint %COMMON% -out:test_varint.exe
+%PATH_TO_ODIN% run encoding/xml    %COMMON% -out:test_xml.exe
 
 echo ---
 echo Running core:math/noise tests
@@ -47,19 +49,24 @@ echo ---
 echo ---
 echo Running core:math tests
 echo ---
-%PATH_TO_ODIN% run math %COMMON% -out:test_core_math.exe
+%PATH_TO_ODIN% run math %COMMON% %COLLECTION% -out:test_core_math.exe
 
 echo ---
 echo Running core:math/linalg/glsl tests
 echo ---
-%PATH_TO_ODIN% run math/linalg/glsl %COMMON% -out:test_linalg_glsl.exe
+%PATH_TO_ODIN% run math/linalg/glsl %COMMON% %COLLECTION% -out:test_linalg_glsl.exe
 
 echo ---
 echo Running core:path/filepath tests
 echo ---
-%PATH_TO_ODIN% run path/filepath %COMMON% -out:test_core_filepath.exe
+%PATH_TO_ODIN% run path/filepath %COMMON% %COLLECTION% -out:test_core_filepath.exe
 
 echo ---
 echo Running core:reflect tests
 echo ---
-%PATH_TO_ODIN% run reflect %COMMON% -out:test_core_reflect.exe
+%PATH_TO_ODIN% run reflect %COMMON% %COLLECTION% -out:test_core_reflect.exe
+
+echo ---
+echo Running core:text/i18n tests
+echo ---
+%PATH_TO_ODIN% run text\i18n %COMMON% -out:test_core_i18n.exe
