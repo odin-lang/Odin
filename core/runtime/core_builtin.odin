@@ -631,13 +631,15 @@ assert :: proc(condition: bool, message := "", loc := #caller_location) {
 		// to improve performance to make the CPU not
 		// execute speculatively, making it about an order of
 		// magnitude faster
-		proc(message: string, loc: Source_Code_Location) {
+		@(cold)
+		internal :: proc(message: string, loc: Source_Code_Location) {
 			p := context.assertion_failure_proc
 			if p == nil {
 				p = default_assertion_failure_proc
 			}
 			p("runtime assertion", message, loc)
-		}(message, loc)
+		}
+		internal(message, loc)
 	}
 }
 
