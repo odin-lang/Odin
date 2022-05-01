@@ -944,6 +944,7 @@ void init_universal(void) {
 			{"Unknown", TargetArch_Invalid},
 			{"amd64",   TargetArch_amd64},
 			{"i386",    TargetArch_i386},
+			{"arm32",   TargetArch_arm32},
 			{"arm64",   TargetArch_arm64},
 			{"wasm32",  TargetArch_wasm32},
 			{"wasm64",  TargetArch_wasm64},
