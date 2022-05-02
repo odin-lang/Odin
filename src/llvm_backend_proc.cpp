@@ -823,12 +823,6 @@ lbValue lb_emit_call(lbProcedure *p, lbValue value, Array<lbValue> const &args, 
 	GB_ASSERT(pt->kind == Type_Proc);
 	Type *results = pt->Proc.results;
 
-	if (p->entity != nullptr) {
-		if (p->entity->flags & EntityFlag_Disabled) {
-			return {};
-		}
-	}
-
 	lbAddr context_ptr = {};
 	if (pt->Proc.calling_convention == ProcCC_Odin) {
 		context_ptr = lb_find_or_generate_context_ptr(p);
@@ -2280,6 +2274,15 @@ lbValue lb_build_call_expr_internal(lbProcedure *p, Ast *expr) {
 	// NOTE(bill): Regular call
 	lbValue value = {};
 	Ast *proc_expr = unparen_expr(ce->proc);
+
+	Entity *proc_entity = entity_of_node(proc_expr);
+	if (proc_entity != nullptr) {
+		if (proc_entity->flags & EntityFlag_Disabled) {
+			GB_ASSERT(tv.type == nullptr);
+			return {};
+		}
+	}
+
 	if (proc_expr->tav.mode == Addressing_Constant) {
 		ExactValue v = proc_expr->tav.value;
 		switch (v.kind) {
@@ -2303,13 +2306,6 @@ lbValue lb_build_call_expr_internal(lbProcedure *p, Ast *expr) {
 				value = lb_emit_conv(p, x, proc_expr->tav.type);
 				break;
 			}
-		}
-	}
-
-	Entity *proc_entity = entity_of_node(proc_expr);
-	if (proc_entity != nullptr) {
-		if (proc_entity->flags & EntityFlag_Disabled) {
-			return {};
 		}
 	}
 
