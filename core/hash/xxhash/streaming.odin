@@ -211,7 +211,9 @@ XXH3_update :: #force_inline proc(
 	length := len(input)
 	secret := state.custom_secret[:] if len(state.external_secret) == 0 else state.external_secret[:]
 
-	assert(len(input) > 0)
+	if len(input) == 0 {
+		return
+	}
 
 	state.total_length += u64(length)
 	assert(state.buffered_size <= XXH3_INTERNAL_BUFFER_SIZE)
