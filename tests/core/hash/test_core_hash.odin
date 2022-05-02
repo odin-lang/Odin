@@ -6,6 +6,8 @@ import "core:time"
 import "core:testing"
 import "core:fmt"
 import "core:os"
+import "core:math/rand"
+import "core:intrinsics"
 
 TEST_count := 0
 TEST_fail  := 0
@@ -202,6 +204,8 @@ test_xxhash_large :: proc(t: ^testing.T) {
 	for i, v in ZERO_VECTORS {
 		b := many_zeroes[:i]
 
+		fmt.printf("[test_xxhash_large] All at once. Size: %v\n", i)
+
 		xxh32    := xxhash.XXH32(b)
 		xxh64    := xxhash.XXH64(b)
 		xxh3_64  := xxhash.XXH3_64(b)
@@ -218,12 +222,25 @@ test_xxhash_large :: proc(t: ^testing.T) {
 		expect(t, xxh3_128  == v.xxh3_128, xxh3_128_error)
 	}
 
+	when #config(RAND_STATE, -1) >= 0 && #config(RAND_INC, -1) >= 0 {
+		random_seed := rand.Rand{
+			state = u64(#config(RAND_STATE, -1)),
+			inc   = u64(#config(RAND_INC,   -1)),
+		}
+		fmt.printf("Using user-selected seed {{%v,%v}} for update size randomness.\n", random_seed.state, random_seed.inc)
+	} else {
+		random_seed := rand.create(u64(intrinsics.read_cycle_counter()))
+		fmt.printf("Randonly selected seed {{%v,%v}} for update size randomness.\n", random_seed.state, random_seed.inc)
+	}
+
 	// Streamed
 	for i, v in ZERO_VECTORS {
 		b := many_zeroes[:i]
 
-		bytes_per_update := []int{1, 42, 13, 7, 16, 5, 23, 74, 1024, 511, 1023, 47}
-		update_size_idx: int
+		fmt.printf("[test_xxhash_large] Streamed. Size: %v\n", i)
+
+		// bytes_per_update := []int{1, 42, 13, 7, 16, 5, 23, 74, 1024, 511, 1023, 47}
+		// update_size_idx: int
 
 		xxh_32_state, xxh_32_err := xxhash.XXH32_create_state()
 		defer xxhash.XXH32_destroy_state(xxh_32_state)
@@ -244,9 +261,10 @@ test_xxhash_large :: proc(t: ^testing.T) {
 		// XXH3_128_update
 
 		for len(b) > 0 {
-			update_size := min(len(b), bytes_per_update[update_size_idx % len(bytes_per_update)])
-			update_size_idx += 1
-
+			update_size := min(len(b), rand.int_max(8192, &random_seed))
+			if update_size > 4096 {
+				update_size %= 73
+			}
 			xxhash.XXH32_update   (xxh_32_state,   b[:update_size])
 			xxhash.XXH64_update   (xxh_64_state,   b[:update_size])
 
