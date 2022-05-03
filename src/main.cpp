@@ -825,11 +825,19 @@ bool parse_build_flags(Array<String> args) {
 
 		String name = substring(flag, 1, flag.len);
 		isize end = 0;
+		bool have_equals = false;
 		for (; end < name.len; end++) {
 			if (name[end] == ':') break;
-			if (name[end] == '=') break; // IMPORTANT TODO(bill): DEPRECATE THIS!!!!
+			if (name[end] == '=') {
+				have_equals = true;
+				break;
+			}
 		}
 		name = substring(name, 0, end);
+		if (have_equals && name != "opt") {
+			gb_printf_err("`flag=value` has been deprecated and will be removed next release. Use `%.*s:` instead.\n", LIT(name), LIT(name));
+		}
+
 		String param = {};
 		if (end < flag.len-1) param = substring(flag, 2+end, flag.len);
 
@@ -903,35 +911,35 @@ bool parse_build_flags(Array<String> args) {
 						switch (bf.param_kind) {
 						case BuildFlagParam_None:
 							if (value.kind != ExactValue_Invalid) {
-								gb_printf_err("%.*s expected no value, got %.*s", LIT(name), LIT(param));
+								gb_printf_err("%.*s expected no value, got %.*s\n", LIT(name), LIT(param));
 								bad_flags = true;
 								ok = false;
 							}
 							break;
 						case BuildFlagParam_Boolean:
 							if (value.kind != ExactValue_Bool) {
-								gb_printf_err("%.*s expected a boolean, got %.*s", LIT(name), LIT(param));
+								gb_printf_err("%.*s expected a boolean, got %.*s\n", LIT(name), LIT(param));
 								bad_flags = true;
 								ok = false;
 							}
 							break;
 						case BuildFlagParam_Integer:
 							if (value.kind != ExactValue_Integer) {
-								gb_printf_err("%.*s expected an integer, got %.*s", LIT(name), LIT(param));
+								gb_printf_err("%.*s expected an integer, got %.*s\n", LIT(name), LIT(param));
 								bad_flags = true;
 								ok = false;
 							}
 							break;
 						case BuildFlagParam_Float:
 							if (value.kind != ExactValue_Float) {
-								gb_printf_err("%.*s expected a floating pointer number, got %.*s", LIT(name), LIT(param));
+								gb_printf_err("%.*s expected a floating pointer number, got %.*s\n", LIT(name), LIT(param));
 								bad_flags = true;
 								ok = false;
 							}
 							break;
 						case BuildFlagParam_String:
 							if (value.kind != ExactValue_String) {
-								gb_printf_err("%.*s expected a string, got %.*s", LIT(name), LIT(param));
+								gb_printf_err("%.*s expected a string, got %.*s\n", LIT(name), LIT(param));
 								bad_flags = true;
 								ok = false;
 							}
@@ -972,6 +980,9 @@ bool parse_build_flags(Array<String> args) {
 								gb_printf_err("\t3\n");
 								bad_flags = true;
 							}
+
+							// Deprecation warning.
+							gb_printf_err("`-opt` has been deprecated and will be removed next release. Use `-o:minimal`, etc.\n");
 							break;
 						}
 						case BuildFlag_OptimizationMode: {
