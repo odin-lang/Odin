@@ -1,12 +1,13 @@
 package vendor_openexr
 
-foreign import lib "exr.lib"
+foreign import lib "OpenEXRCore-3_1.lib"
 
 import "core:c"
 #assert(size_of(c.int) == size_of(i32))
 
 /** Error codes that may be returned by various functions. */
-error_code_t :: enum i32 {
+/** Return type for all functions. */
+result_t :: enum i32 {
 	SUCCESS = 0,
 	OUT_OF_MEMORY,
 	MISSING_CONTEXT_ARG,
@@ -42,8 +43,7 @@ error_code_t :: enum i32 {
 	UNKNOWN,
 }
 
-/** Return type for all functions. */
-result_t :: error_code_t
+error_code_t :: result_t
 
 
 @(link_prefix="exr_", default_calling_convention="c")

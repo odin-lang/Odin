@@ -1,6 +1,6 @@
 package vendor_openexr
 
-foreign import lib "exr.lib"
+foreign import lib "OpenEXRCore-3_1.lib"
 
 import "core:c"
 
