@@ -40,7 +40,7 @@ typedef mp_int BigInt;
 void big_int_from_u64(BigInt *dst, u64 x);
 void big_int_from_i64(BigInt *dst, i64 x);
 void big_int_init    (BigInt *dst, BigInt const *src);
-void big_int_from_string(BigInt *dst, String const &s, bool &success);
+void big_int_from_string(BigInt *dst, String const &s, bool *success);
 
 void big_int_dealloc(BigInt *dst) {
 	mp_clear(dst);
