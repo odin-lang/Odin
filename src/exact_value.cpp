@@ -177,7 +177,11 @@ ExactValue exact_value_typeid(Type *type) {
 
 ExactValue exact_value_integer_from_string(String const &string) {
 	ExactValue result = {ExactValue_Integer};
-	big_int_from_string(&result.value_integer, string);
+	bool success;
+	big_int_from_string(&result.value_integer, string, &success);
+	if (!success) {
+		result = {ExactValue_Invalid};
+	}
 	return result;
 }
 
