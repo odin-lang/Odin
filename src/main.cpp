@@ -961,7 +961,26 @@ bool parse_build_flags(Array<String> args) {
 								bad_flags = true;
 								break;
 							}
-							build_context.optimization_level = cast(i32)big_int_to_i64(&value.value_integer);
+							// NOTE(Jeroen): We can't rely on `value.value_integer` here, because words will be returned as `0`.
+							// Meaning that -opt:speed will coerce to opt:0. That's not what the user intended.
+							// Instead we'll just compare 0..3 directly.
+							if        (param == "0") {
+								build_context.optimization_level = 0;
+							} else if (param == "1") {
+								build_context.optimization_level = 1;
+							} else if (param == "2") {
+								build_context.optimization_level = 2;
+							} else if (param == "3") {
+								build_context.optimization_level = 3;
+							} else {
+								gb_printf_err("Invalid optimization level for -o:<integer>, got %.*s\n", LIT(param));
+								gb_printf_err("Valid optimization levels:\n");
+								gb_printf_err("\t0\n");
+								gb_printf_err("\t1\n");
+								gb_printf_err("\t2\n");
+								gb_printf_err("\t3\n");
+								bad_flags = true;
+							}
 							break;
 						}
 						case BuildFlag_OptimizationMode: {
