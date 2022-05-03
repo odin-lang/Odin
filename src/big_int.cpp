@@ -40,7 +40,7 @@ typedef mp_int BigInt;
 void big_int_from_u64(BigInt *dst, u64 x);
 void big_int_from_i64(BigInt *dst, i64 x);
 void big_int_init    (BigInt *dst, BigInt const *src);
-void big_int_from_string(BigInt *dst, String const &s);
+void big_int_from_string(BigInt *dst, String const &s, bool &success);
 
 void big_int_dealloc(BigInt *dst) {
 	mp_clear(dst);
@@ -84,7 +84,7 @@ void big_int_quo_eq(BigInt *dst, BigInt const *x);
 void big_int_rem_eq(BigInt *dst, BigInt const *x);
 
 bool big_int_is_neg(BigInt const *x);
-
+void big_int_neg(BigInt *dst, BigInt const *x);
 
 void big_int_add_eq(BigInt *dst, BigInt const *x) {
 	BigInt res = {};
@@ -169,7 +169,11 @@ BigInt big_int_make_i64(i64 x) {
 }
 
 
-void big_int_from_string(BigInt *dst, String const &s) {
+void big_int_from_string(BigInt *dst, String const &s, bool *success) {
+	*success = true;
+
+	bool is_negative = false;
+
 	u64 base = 10;
 	bool has_prefix = false;
 	if (s.len > 2 && s[0] == '0') {
@@ -197,11 +201,26 @@ void big_int_from_string(BigInt *dst, String const &s) {
 	isize i = 0;
 	for (; i < len; i++) {
 		Rune r = cast(Rune)text[i];
+
+		if (r == '-') {
+			if (is_negative) {
+				// NOTE(Jeroen): Can't have a doubly negative number.
+				*success = false;
+				return;
+			}
+			is_negative = true;
+			continue;
+		}
+
 		if (r == '_') {
 			continue;
 		}
 		u64 v = u64_digit_value(r);
 		if (v >= base) {
+			// NOTE(Jeroen): Can still be a valid integer if the next character is an `e` or `E`.
+			if (r != 'e' && r != 'E') {
+				*success = false;
+			}
 			break;
 		}
 		BigInt val = big_int_make_u64(v);
@@ -225,6 +244,7 @@ void big_int_from_string(BigInt *dst, String const &s) {
 			if (gb_char_is_digit(r)) {
 				v = u64_digit_value(r);
 			} else {
+				*success = false;
 				break;
 			}
 			exp *= 10;
@@ -233,6 +253,10 @@ void big_int_from_string(BigInt *dst, String const &s) {
 		for (u64 x = 0; x < exp; x++) {
 			big_int_mul_eq(dst, &b);
 		}
+	}
+
+	if (is_negative) {
+		big_int_neg(dst, dst);
 	}
 }
 
