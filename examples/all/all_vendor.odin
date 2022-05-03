@@ -8,6 +8,7 @@ import microui   "vendor:microui"
 import miniaudio "vendor:miniaudio"
 import PM        "vendor:portmidi"
 import rl        "vendor:raylib"
+import exr       "vendor:OpenEXRCore"
 
 import SDL    "vendor:sdl2"
 import SDLNet "vendor:sdl2/net"
@@ -29,6 +30,7 @@ _ :: microui
 _ :: miniaudio
 _ :: PM
 _ :: rl
+_ :: exr
 _ :: SDL
 _ :: SDLNet
 _ :: IMG
