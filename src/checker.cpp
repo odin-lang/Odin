@@ -4414,6 +4414,14 @@ DECL_ATTRIBUTE_PROC(foreign_import_decl_attribute) {
 		}
 		ac->require_declaration = true;
 		return true;
+	} else if (name == "priority_index") {
+		ExactValue ev = check_decl_attribute_value(c, value);
+		if (ev.kind != ExactValue_Integer) {
+			error(elem, "Expected an integer value for '%.*s'", LIT(name));
+		} else {
+			ac->foreign_import_priority_index = exact_value_to_i64(ev);
+		}
+		return true;
 	}
 	return false;
 }
@@ -4469,6 +4477,9 @@ void check_add_foreign_import_decl(CheckerContext *ctx, Ast *decl) {
 	if (ac.require_declaration) {
 		mpmc_enqueue(&ctx->info->required_foreign_imports_through_force_queue, e);
 		add_entity_use(ctx, nullptr, e);
+	}
+	if (ac.foreign_import_priority_index != 0) {
+		e->LibraryName.priority_index = ac.foreign_import_priority_index;
 	}
 
 	if (has_asm_extension(fullpath)) {
