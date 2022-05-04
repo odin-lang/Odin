@@ -3,7 +3,6 @@ package os2
 
 import "core:strings"
 import "core:sys/unix"
-import "core:path/filepath"
 
 _Path_Separator      :: '/'
 _Path_List_Separator :: ':'
@@ -127,23 +126,22 @@ _remove_all :: proc(path: string) -> Error {
 		defer delete(buf)
 
 		loop: for {
-			res := unix.sys_getdents64(int(dfd), &buf[0], n)
-			switch res {
+			getdents_res := unix.sys_getdents64(int(dfd), &buf[0], n)
+			switch getdents_res {
 			case -EINVAL:
 				delete(buf)
 				n *= 2
 				buf = make([]u8, n)
 				continue loop
 			case -4096..<0:
-				return _get_platform_error(res)
+				return _get_platform_error(getdents_res)
 			case 0:
 				break loop
 			}
 
 			d: ^dirent64
 
-			for i := 0; i < res; i += int(d.d_reclen) {
-				description: string
+			for i := 0; i < getdents_res; i += int(d.d_reclen) {
 				d = (^dirent64)(rawptr(&buf[i]))
 				d_name_cstr := cstring(&d.d_name[0])
 
@@ -159,7 +157,7 @@ _remove_all :: proc(path: string) -> Error {
 					continue
 				}
 
-				res: int
+				unlink_res: int
 
 				switch d.d_type {
 				case DT_DIR:
@@ -169,13 +167,13 @@ _remove_all :: proc(path: string) -> Error {
 					}
 					defer unix.sys_close(handle_i)
 					_remove_all_dir(Handle(handle_i)) or_return
-					res = unix.sys_unlinkat(int(dfd), d_name_cstr, int(unix.AT_REMOVEDIR))
+					unlink_res = unix.sys_unlinkat(int(dfd), d_name_cstr, int(unix.AT_REMOVEDIR))
 				case:
-					res = unix.sys_unlinkat(int(dfd), d_name_cstr) 
+					unlink_res = unix.sys_unlinkat(int(dfd), d_name_cstr) 
 				}
 
-				if res < 0 {
-					return _get_platform_error(res)
+				if unlink_res < 0 {
+					return _get_platform_error(unlink_res)
 				}
 			}
 		}
