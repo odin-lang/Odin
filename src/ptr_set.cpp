@@ -13,7 +13,7 @@ struct PtrSet {
 template <typename T> void ptr_set_init   (PtrSet<T> *s, gbAllocator a, isize capacity = 16);
 template <typename T> void ptr_set_destroy(PtrSet<T> *s);
 template <typename T> T    ptr_set_add    (PtrSet<T> *s, T ptr);
-template <typename T> bool ptr_set_update (PtrSet<T> *s, T ptr); // returns true if it previously existsed
+template <typename T> bool ptr_set_update (PtrSet<T> *s, T ptr); // returns true if it previously existed
 template <typename T> bool ptr_set_exists (PtrSet<T> *s, T ptr);
 template <typename T> void ptr_set_remove (PtrSet<T> *s, T ptr);
 template <typename T> void ptr_set_clear  (PtrSet<T> *s);
