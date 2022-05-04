@@ -835,7 +835,7 @@ bool parse_build_flags(Array<String> args) {
 		}
 		name = substring(name, 0, end);
 		if (have_equals && name != "opt") {
-			gb_printf_err("`flag=value` has been deprecated and will be removed next release. Use `%.*s:` instead.\n", LIT(name), LIT(name));
+			gb_printf_err("`flag=value` has been deprecated and will be removed next release. Use `%.*s:` instead.\n", LIT(name));
 		}
 
 		String param = {};
