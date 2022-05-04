@@ -29,29 +29,46 @@ void lb_add_foreign_library_path(lbModule *m, Entity *e) {
 	GB_ASSERT(e->kind == Entity_LibraryName);
 	GB_ASSERT(e->flags & EntityFlag_Used);
 
-	for_array(i, e->LibraryName.paths) {
-		String library_path = e->LibraryName.paths[i];
-		if (library_path.len == 0) {
-			continue;
-		}
+	mutex_lock(&m->gen->foreign_mutex);
+	if (!ptr_set_update(&m->gen->foreign_libraries_set, e)) {
+		array_add(&m->gen->foreign_libraries, e);
+	}
+	mutex_unlock(&m->gen->foreign_mutex);
+}
 
-		bool ok = true;
-		for_array(path_index, m->foreign_library_paths) {
-			String path = m->foreign_library_paths[path_index];
-	#if defined(GB_SYSTEM_WINDOWS)
-			if (str_eq_ignore_case(path, library_path)) {
-	#else
-			if (str_eq(path, library_path)) {
-	#endif
-				ok = false;
-				break;
-			}
-		}
+GB_COMPARE_PROC(foreign_library_cmp) {
+	int cmp = 0;
+	Entity *x = *(Entity **)a;
+	Entity *y = *(Entity **)b;
+	if (x == y) {
+		return 0;
+	}
 
-		if (ok) {
-			array_add(&m->foreign_library_paths, library_path);
+	if (x->pkg != y->pkg) {
+		isize order_x = x->pkg ? x->pkg->order : 0;
+		isize order_y = y->pkg ? y->pkg->order : 0;
+		cmp = isize_cmp(order_x, order_y);
+		if (cmp) {
+			return cmp;
 		}
 	}
+	if (x->file != y->file) {
+		String fullpath_x = x->file ? x->file->fullpath : (String{});
+		String fullpath_y = y->file ? y->file->fullpath : (String{});
+		String file_x = filename_from_path(fullpath_x);
+		String file_y = filename_from_path(fullpath_y);
+
+		cmp = string_compare(file_x, file_y);
+		if (cmp) {
+			return cmp;
+		}
+	}
+
+	cmp = u64_cmp(x->order_in_src, y->order_in_src);
+	if (cmp) {
+		return cmp;
+	}
+	return i32_cmp(x->token.pos.offset, y->token.pos.offset);
 }
 
 void lb_set_entity_from_other_modules_linkage_correctly(lbModule *other_module, Entity *e, String const &name) {
@@ -1922,4 +1939,6 @@ void lb_generate_code(lbGenerator *gen) {
 			}
 		}
 	}
+
+	gb_sort_array(gen->foreign_libraries.data, gen->foreign_libraries.count, foreign_library_cmp);
 }
