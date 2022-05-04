@@ -127,10 +127,6 @@ PSRWLOCK :: ^SRWLOCK
 
 MMRESULT :: UINT
 
-SOCKET :: distinct uintptr // TODO
-socklen_t :: c_int
-ADDRESS_FAMILY :: USHORT
-
 TRUE  :: BOOL(true)
 FALSE :: BOOL(false)
 
@@ -1069,29 +1065,6 @@ BI_BITFIELDS :: 3
 BI_JPEG      :: 4
 BI_PNG       :: 5
 
-WSA_FLAG_OVERLAPPED: DWORD : 0x01
-WSA_FLAG_NO_HANDLE_INHERIT: DWORD : 0x80
-
-WSADESCRIPTION_LEN :: 256
-WSASYS_STATUS_LEN :: 128
-WSAPROTOCOL_LEN: DWORD : 255
-INVALID_SOCKET :: ~SOCKET(0)
-
-WSAEACCES: c_int : 10013
-WSAEINVAL: c_int : 10022
-WSAEWOULDBLOCK: c_int : 10035
-WSAEPROTOTYPE: c_int : 10041
-WSAEADDRINUSE: c_int : 10048
-WSAEADDRNOTAVAIL: c_int : 10049
-WSAECONNABORTED: c_int : 10053
-WSAECONNRESET: c_int : 10054
-WSAENOTCONN: c_int : 10057
-WSAESHUTDOWN: c_int : 10058
-WSAETIMEDOUT: c_int : 10060
-WSAECONNREFUSED: c_int : 10061
-
-MAX_PROTOCOL_CHAIN: DWORD : 7
-
 MAXIMUM_REPARSE_DATA_BUFFER_SIZE :: 16 * 1024
 FSCTL_GET_REPARSE_POINT: DWORD : 0x900a8
 IO_REPARSE_TAG_SYMLINK: DWORD : 0xa000000c
@@ -1161,44 +1134,6 @@ DETACHED_PROCESS: DWORD : 0x00000008
 CREATE_NEW_PROCESS_GROUP: DWORD : 0x00000200
 CREATE_UNICODE_ENVIRONMENT: DWORD : 0x00000400
 STARTF_USESTDHANDLES: DWORD : 0x00000100
-
-AF_INET: c_int : 2
-AF_INET6: c_int : 23
-SD_BOTH: c_int : 2
-SD_RECEIVE: c_int : 0
-SD_SEND: c_int : 1
-SOCK_DGRAM: c_int : 2
-SOCK_STREAM: c_int : 1
-SOL_SOCKET: c_int : 0xffff
-SO_RCVTIMEO: c_int : 0x1006
-SO_SNDTIMEO: c_int : 0x1005
-SO_REUSEADDR: c_int : 0x0004
-IPPROTO_IP: c_int : 0
-IPPROTO_TCP: c_int : 6
-IPPROTO_IPV6: c_int : 41
-TCP_NODELAY: c_int : 0x0001
-IP_TTL: c_int : 4
-IPV6_V6ONLY: c_int : 27
-SO_ERROR: c_int : 0x1007
-SO_BROADCAST: c_int : 0x0020
-IP_MULTICAST_LOOP: c_int : 11
-IPV6_MULTICAST_LOOP: c_int : 11
-IP_MULTICAST_TTL: c_int : 10
-IP_ADD_MEMBERSHIP: c_int : 12
-IP_DROP_MEMBERSHIP: c_int : 13
-IPV6_ADD_MEMBERSHIP: c_int : 12
-IPV6_DROP_MEMBERSHIP: c_int : 13
-MSG_PEEK: c_int : 0x2
-
-ip_mreq :: struct {
-	imr_multiaddr: in_addr,
-	imr_interface: in_addr,
-}
-
-ipv6_mreq :: struct {
-	ipv6mr_multiaddr: in6_addr,
-	ipv6mr_interface: c_uint,
-}
 
 VOLUME_NAME_DOS: DWORD : 0x0
 MOVEFILE_REPLACE_EXISTING: DWORD : 1
@@ -1486,11 +1421,6 @@ STARTUPINFO :: struct {
 	hStdError: HANDLE,
 }
 
-SOCKADDR :: struct {
-	sa_family: ADDRESS_FAMILY,
-	sa_data: [14]CHAR,
-}
-
 FILETIME :: struct {
 	dwLowDateTime: DWORD,
 	dwHighDateTime: DWORD,
@@ -1514,47 +1444,6 @@ ADDRESS_MODE :: enum c_int {
 	AddrMode1632,
 	AddrModeReal,
 	AddrModeFlat,
-}
-
-SOCKADDR_STORAGE_LH :: struct {
-	ss_family: ADDRESS_FAMILY,
-	__ss_pad1: [6]CHAR,
-	__ss_align: i64,
-	__ss_pad2: [112]CHAR,
-}
-
-ADDRINFOA :: struct {
-	ai_flags: c_int,
-	ai_family: c_int,
-	ai_socktype: c_int,
-	ai_protocol: c_int,
-	ai_addrlen: size_t,
-	ai_canonname: ^c_char,
-	ai_addr: ^SOCKADDR,
-	ai_next: ^ADDRINFOA,
-}
-
-sockaddr_in :: struct {
-	sin_family: ADDRESS_FAMILY,
-	sin_port: USHORT,
-	sin_addr: in_addr,
-	sin_zero: [8]CHAR,
-}
-
-sockaddr_in6 :: struct {
-	sin6_family: ADDRESS_FAMILY,
-	sin6_port: USHORT,
-	sin6_flowinfo: c_ulong,
-	sin6_addr: in6_addr,
-	sin6_scope_id: c_ulong,
-}
-
-in_addr :: struct {
-	s_addr: u32,
-}
-
-in6_addr :: struct {
-	s6_addr: [16]u8,
 }
 
 EXCEPTION_DISPOSITION :: enum c_int {
@@ -2139,4 +2028,235 @@ SYSTEMTIME :: struct {
 	minute:       WORD,
 	second:       WORD,
 	milliseconds: WORD,
+}
+
+
+//
+// Networking
+//
+WSA_FLAG_OVERLAPPED             :: 1
+WSA_FLAG_MULTIPOINT_C_ROOT      :: 2
+WSA_FLAG_MULTIPOINT_C_LEAF      :: 4
+WSA_FLAG_MULTIPOINT_D_ROOT      :: 8
+WSA_FLAG_MULTIPOINT_D_LEAF      :: 16
+WSA_FLAG_ACCESS_SYSTEM_SECURITY :: 32
+WSA_FLAG_NO_HANDLE_INHERIT      :: 128
+WSADESCRIPTION_LEN :: 256
+WSASYS_STATUS_LEN  :: 128
+WSAPROTOCOL_LEN    :: 255
+INVALID_SOCKET :: ~SOCKET(0)
+SOMAXCONN    :: 128 // The number of messages that can be queued in memory after being received; use 2-4 for Bluetooth.
+                    // This is for the 'backlog' parameter to listen().
+SOCKET_ERROR :: -1
+
+// Networking errors
+WSAEINTR               :: 10004 // Call interrupted. CancelBlockingCall was called. (This is different on Linux.)
+WSAEACCES              :: 10013 // If you try to bind a Udp socket to the broadcast address without the socket option set.
+WSAEFAULT              :: 10014 // A pointer that was passed to a WSA function is invalid, such as a buffer size is smaller than you said it was
+WSAEINVAL              :: 10022 // Invalid argument supplied
+WSAEMFILE              :: 10024 // SOCKET handles exhausted
+WSAEWOULDBLOCK         :: 10035 // No data is ready yet
+WSAENOTSOCK            :: 10038 // Not a socket.
+WSAEINPROGRESS         :: 10036 // WS1.1 call is in progress or callback function is still being processed
+WSAEALREADY            :: 10037 // Already connecting in parallel.
+WSAEMSGSIZE            :: 10040 // Message was truncated because it exceeded max datagram size.
+WSAEPROTOTYPE          :: 10041 // Wrong protocol for the provided socket
+WSAENOPROTOOPT         :: 10042 // TODO
+WSAEPROTONOSUPPORT     :: 10043 // Protocol not supported
+WSAESOCKTNOSUPPORT     :: 10044 // Socket type not supported in the given address family
+WSAEAFNOSUPPORT        :: 10047 // Address family not supported
+WSAEOPNOTSUPP          :: 10045 // Attempt to accept on non-stream socket, etc.
+WSAEADDRINUSE          :: 10048 // Endpoint being bound is in use by another socket.
+WSAEADDRNOTAVAIL       :: 10049 // Not a valid local IP address on this computer.
+WSAENETDOWN            :: 10050 // Network subsystem failure on the local machine.
+WSAENETUNREACH         :: 10051 // The local machine is not connected to the network.
+WSAENETRESET           :: 10052 // Keepalive failure detected, or TTL exceeded when receiving UDP packets.
+WSAECONNABORTED        :: 10053 // Connection has been aborted by software in the host machine.
+WSAECONNRESET          :: 10054 // The connection was reset while trying to accept, read or write.
+WSAENOBUFS             :: 10055 // No buffer space is available. The outgoing queue may be full in which case you should probably try again after a pause.
+WSAEISCONN             :: 10056 // The socket is already connected.
+WSAENOTCONN            :: 10057 // The socket is not connected yet, or no address was supplied to sendto.
+WSAESHUTDOWN           :: 10058 // The socket has been shutdown in the direction required.
+WSAETIMEDOUT           :: 10060 // The timeout duration was reached before any data was received / before all data was sent.
+WSAECONNREFUSED        :: 10061 // The remote machine is not listening on that endpoint.
+WSAEHOSTDOWN           :: 10064 // Destination host was down.
+WSAEHOSTUNREACH        :: 10065 // The remote machine is not connected to the network.
+WSAENOTINITIALISED     :: 10093 // Needs WSAStartup call
+WSAEINVALIDPROCTABLE   :: 10104 // Invalid or incomplete procedure table was returned
+WSAEINVALIDPROVIDER    :: 10105 // Service provider version is not 2.2
+WSAEPROVIDERFAILEDINIT :: 10106 // Service provider failed to initialize
+
+// Address families
+AF_UNSPEC : c_int : 0  // Unspecified
+AF_INET   : c_int : 2  // IPv4
+AF_INET6  : c_int : 23 // IPv6
+AF_IRDA   : c_int : 26 // Infrared
+AF_BTH    : c_int : 32 // Bluetooth
+
+// Socket types
+SOCK_STREAM    : c_int : 1 // TCP
+SOCK_DGRAM     : c_int : 2 // UDP
+SOCK_RAW       : c_int : 3 // Requires options IP_HDRINCL for v4, IPV6_HDRINCL for v6, on the socket
+SOCK_RDM       : c_int : 4 // Requires "Reliable Multicast Protocol" to be installed - see WSAEnumProtocols
+SOCK_SEQPACKET : c_int : 5 // Provides psuedo-stream packet based on DGRAMs.
+
+// Protocols
+IPPROTO_IP      : c_int : 0
+IPPROTO_ICMP    : c_int : 1   // (AF_UNSPEC, AF_INET, AF_INET6) + SOCK_RAW | not specified
+IPPROTO_IGMP    : c_int : 2   // (AF_UNSPEC, AF_INET, AF_INET6) + SOCK_RAW | not specified
+BTHPROTO_RFCOMM : c_int : 3   // Bluetooth: AF_BTH + SOCK_STREAM
+IPPROTO_TCP     : c_int : 6   // (AF_INET, AF_INET6) + SOCK_STREAM
+IPPROTO_UDP     : c_int : 17  // (AF_INET, AF_INET6) + SOCK_DGRAM
+IPPROTO_ICMPV6  : c_int : 58  // (AF_UNSPEC, AF_INET, AF_INET6) + SOCK_RAW
+IPPROTO_RM      : c_int : 113 // AF_INET + SOCK_RDM [requires "Reliable Multicast Protocol" to be installed - see WSAEnumProtocols]
+
+// Shutdown manners
+SD_RECEIVE : c_int : 0
+SD_SEND    : c_int : 1
+SD_BOTH    : c_int : 2
+
+// Socket 'levels'
+SOL_SOCKET   : c_int : 0xffff // Socket options for any socket.
+IPPROTO_IPV6 : c_int : 41     // Socket options for IPV6.
+
+// Options for any sockets
+SO_ACCEPTCONN         : c_int : 0x0002
+SO_REUSEADDR          : c_int : 0x0004
+SO_KEEPALIVE          : c_int : 0x0008
+SO_SNDTIMEO           : c_int : 0x1005
+SO_RCVTIMEO           : c_int : 0x1006
+SO_EXCLUSIVEADDRUSE   : c_int : ~SO_REUSEADDR
+SO_CONDITIONAL_ACCEPT : c_int : 0x3002
+SO_DONTLINGER         : c_int : ~SO_LINGER
+SO_OOBINLINE          : c_int : 0x0100
+SO_LINGER             : c_int : 0x0080
+SO_RCVBUF             : c_int : 0x1002
+SO_SNDBUF             : c_int : 0x1001
+SO_ERROR              : c_int : 0x1007
+SO_BROADCAST          : c_int : 0x0020
+
+TCP_NODELAY: c_int : 0x0001
+IP_TTL: c_int : 4
+IPV6_V6ONLY: c_int : 27
+IP_MULTICAST_LOOP: c_int : 11
+IPV6_MULTICAST_LOOP: c_int : 11
+IP_MULTICAST_TTL: c_int : 10
+IP_ADD_MEMBERSHIP: c_int : 12
+
+IPV6_ADD_MEMBERSHIP: c_int : 12
+IPV6_DROP_MEMBERSHIP: c_int : 13
+
+MAX_PROTOCOL_CHAIN: DWORD : 7
+
+// Used with the SO_LINGER socket option to setsockopt().
+LINGER :: struct {
+	l_onoff: c.ushort,
+	l_linger: c.ushort,
+}
+// Send/Receive flags.
+MSG_OOB  : c_int : 1 // `send`/`recv` should process out-of-band data.
+MSG_PEEK : c_int : 2 // `recv` should not remove the data from the buffer. Only valid for non-overlapped operations.
+
+
+SOCKET :: distinct uintptr // TODO
+socklen_t :: c_int
+ADDRESS_FAMILY :: USHORT
+
+ip_mreq :: struct {
+	imr_multiaddr: in_addr,
+	imr_interface: in_addr,
+}
+
+ipv6_mreq :: struct {
+	ipv6mr_multiaddr: in6_addr,
+	ipv6mr_interface: c_uint,
+}
+
+SOCKADDR_STORAGE_LH :: struct {
+	ss_family: ADDRESS_FAMILY,
+	__ss_pad1: [6]CHAR,
+	__ss_align: i64,
+	__ss_pad2: [112]CHAR,
+}
+
+ADDRINFOA :: struct {
+	ai_flags: c_int,
+	ai_family: c_int,
+	ai_socktype: c_int,
+	ai_protocol: c_int,
+	ai_addrlen: size_t,
+	ai_canonname: ^c_char,
+	ai_addr: ^SOCKADDR,
+	ai_next: ^ADDRINFOA,
+}
+
+sockaddr_in :: struct {
+	sin_family: ADDRESS_FAMILY,
+	sin_port: u16be,
+	sin_addr: in_addr,
+	sin_zero: [8]CHAR,
+}
+sockaddr_in6 :: struct {
+	sin6_family: ADDRESS_FAMILY,
+	sin6_port: u16be,
+	sin6_flowinfo: c_ulong,
+	sin6_addr: in6_addr,
+	sin6_scope_id: c_ulong,
+}
+
+in_addr :: struct {
+	s_addr: u32,
+}
+
+in6_addr :: struct {
+	s6_addr: [16]u8,
+}
+
+
+DNS_STATUS :: distinct DWORD // zero is success
+DNS_INFO_NO_RECORDS :: 9501
+DNS_QUERY_NO_RECURSION :: 0x00000004
+
+DNS_RECORD :: struct {
+    pNext: ^DNS_RECORD,
+    pName: cstring,
+    wType: WORD,
+    wDataLength: USHORT,
+    Flags: DWORD,
+    dwTtl: DWORD,
+    _: DWORD,
+    Data: struct #raw_union {
+        CNAME: DNS_PTR_DATAA,
+        A: u32be, // Ipv4 Address
+        AAAA: u128be, // Ipv6 Address
+        TXT: DNS_TXT_DATAA,
+        NS: DNS_PTR_DATAA,
+        MX: DNS_MX_DATAA,
+        SRV: DNS_SRV_DATAA,
+    },
+}
+
+DNS_TXT_DATAA :: struct {
+    dwStringCount: DWORD,
+    pStringArray: cstring,
+}
+
+DNS_PTR_DATAA :: cstring
+
+DNS_MX_DATAA :: struct {
+    pNameExchange: cstring, // the hostname
+    wPreference: WORD, // lower values preferred
+    _: WORD, // padding.
+}
+DNS_SRV_DATAA :: struct {
+	pNameTarget: cstring,
+	wPriority: u16,
+	wWeight: u16,
+	wPort: u16,
+	_: WORD, // padding
+}
+
+SOCKADDR :: struct {
+	sa_family: ADDRESS_FAMILY,
+	sa_data: [14]CHAR,
 }
