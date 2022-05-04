@@ -216,12 +216,13 @@ i32 linker_stage(lbGenerator *gen) {
 				GB_ASSERT(e->kind == Entity_LibraryName);
 				for_array(i, e->LibraryName.paths) {
 					String lib = string_trim_whitespace(e->LibraryName.paths[i]);
-					if (lib.len == 0) {
-						continue;
-					}
 					// IMPORTANT NOTE(bill): calling `string_to_lower` here is not an issue because
 					// we will never uses these strings afterwards
 					string_to_lower(&lib);
+					if (lib.len == 0) {
+						continue;
+					}
+
 					if (has_asm_extension(lib)) {
 						if (!string_set_update(&asm_files, lib)) {
 							String asm_file = asm_files.entries[i].value;
@@ -378,7 +379,10 @@ i32 linker_stage(lbGenerator *gen) {
 				Entity *e = gen->foreign_libraries[j];
 				GB_ASSERT(e->kind == Entity_LibraryName);
 				for_array(i, e->LibraryName.paths) {
-					String lib = e->LibraryName.paths[i];
+					String lib = string_trim_whitespace(e->LibraryName.paths[i]);
+					if (lib.len == 0) {
+						continue;
+					}
 					if (string_set_update(&libs, lib)) {
 						continue;
 					}
