@@ -1,6 +1,10 @@
 package vendor_openexr
 
-foreign import lib "OpenEXRCore-3_1.lib"
+when ODIN_OS == .Windows {
+	foreign import lib "OpenEXRCore-3_1.lib"
+} else {
+	foreign import lib "system:OpenEXRCore-3_1"
+}
 
 import "core:c"
 
