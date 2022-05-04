@@ -382,7 +382,6 @@ i32 linker_stage(lbGenerator *gen) {
 					if (string_set_update(&libs, lib)) {
 						continue;
 					}
-					lib_str = gb_string_append_fmt(lib_str, " \"%.*s\"", LIT(lib));
 
 					// NOTE(zangent): Sometimes, you have to use -framework on MacOS.
 					//   This allows you to specify '-f' in a #foreign_system_library,
