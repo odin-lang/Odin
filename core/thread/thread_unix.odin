@@ -30,14 +30,6 @@ _create :: proc(procedure: Thread_Proc, priority := Thread_Priority.Normal) -> ^
 	__linux_thread_entry_proc :: proc "c" (t: rawptr) -> rawptr {
 		t := (^Thread)(t)
 
-		// Set the pthread to be asynchronously cancellable.
-		if unix.pthread_setcanceltype(unix.PTHREAD_CANCEL_TYPE.Asynchronous, nil) != 0 {
-			return nil
-		}
-		if unix.pthread_setcancelstate(unix.PTHREAD_CANCEL_STATE.Enable, nil) != 0 {
-			return nil
-		}
-
 		context = runtime.default_context()
 
 		sync.lock(&t.mutex)
@@ -46,6 +38,14 @@ _create :: proc(procedure: Thread_Proc, priority := Thread_Priority.Normal) -> ^
 
 		for (.Started not_in t.flags) {
 			sync.wait(&t.cond, &t.mutex)
+		}
+
+		// Set the pthread to be asynchronously cancellable.
+		if unix.pthread_setcanceltype(unix.PTHREAD_CANCEL_TYPE.Asynchronous, nil) != 0 {
+			return nil
+		}
+		if unix.pthread_setcancelstate(unix.PTHREAD_CANCEL_STATE.Enable, nil) != 0 {
+			return nil
 		}
 
 		init_context := t.init_context
