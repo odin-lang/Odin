@@ -141,6 +141,86 @@ Region :: struct {
 	memory: [BLOCKS_PER_REGION]Allocation_Header,
 }
 
+_heap_allocator_proc :: proc(allocator_data: rawptr, mode: mem.Allocator_Mode,
+                            size, alignment: int,
+                            old_memory: rawptr, old_size: int, loc := #caller_location) -> ([]byte, mem.Allocator_Error) {
+	//
+	// NOTE(tetra, 2020-01-14): The heap doesn't respect alignment.
+	// Instead, we overallocate by `alignment + size_of(rawptr) - 1`, and insert
+	// padding. We also store the original pointer returned by heap_alloc right before
+	// the pointer we return to the user.
+	//
+
+	aligned_alloc :: proc(size, alignment: int, old_ptr: rawptr = nil) -> ([]byte, mem.Allocator_Error) {
+		a := max(alignment, align_of(rawptr))
+		space := size + a - 1
+
+		allocated_mem: rawptr
+		if old_ptr != nil {
+			original_old_ptr := mem.ptr_offset((^rawptr)(old_ptr), -1)^
+			allocated_mem = heap_resize(original_old_ptr, space+size_of(rawptr))
+		} else {
+			allocated_mem = heap_alloc(space+size_of(rawptr))
+		}
+		aligned_mem := rawptr(mem.ptr_offset((^u8)(allocated_mem), size_of(rawptr)))
+
+		ptr := uintptr(aligned_mem)
+		aligned_ptr := (ptr - 1 + uintptr(a)) & -uintptr(a)
+		diff := int(aligned_ptr - ptr)
+		if (size + diff) > space {
+			return nil, .Out_Of_Memory
+		}
+
+		aligned_mem = rawptr(aligned_ptr)
+		mem.ptr_offset((^rawptr)(aligned_mem), -1)^ = allocated_mem
+
+		return mem.byte_slice(aligned_mem, size), nil
+	}
+
+	aligned_free :: proc(p: rawptr) {
+		if p != nil {
+			heap_free(mem.ptr_offset((^rawptr)(p), -1)^)
+		}
+	}
+
+	aligned_resize :: proc(p: rawptr, old_size: int, new_size: int, new_alignment: int) -> (new_memory: []byte, err: mem.Allocator_Error) {
+		if p == nil {
+			return nil, nil
+		}
+
+		return aligned_alloc(new_size, new_alignment, p)
+	}
+
+	switch mode {
+	case .Alloc:
+		return aligned_alloc(size, alignment)
+
+	case .Free:
+		aligned_free(old_memory)
+
+	case .Free_All:
+		return nil, .Mode_Not_Implemented
+
+	case .Resize:
+		if old_memory == nil {
+			return aligned_alloc(size, alignment)
+		}
+		return aligned_resize(old_memory, old_size, size, alignment)
+
+	case .Query_Features:
+		set := (^mem.Allocator_Mode_Set)(old_memory)
+		if set != nil {
+			set^ = {.Alloc, .Free, .Resize, .Query_Features}
+		}
+		return nil, nil
+
+	case .Query_Info:
+		return nil, .Mode_Not_Implemented
+	}
+
+	return nil, nil
+}
+
 heap_alloc :: proc(size: int) -> rawptr {
 	if size >= DIRECT_MMAP_THRESHOLD {
 		return _direct_mmap_alloc(size)
@@ -476,8 +556,6 @@ _region_get_block :: proc(region: ^Region, idx, blocks_needed: u16) -> (rawptr, 
 	assert(alloc.next > 0)
 
 	block_count := _get_block_count(alloc^)
-	segmented_blocks: u16
-
 	if block_count - blocks_needed > BLOCK_SEGMENT_THRESHOLD {
 		_region_segment(region, alloc, blocks_needed, alloc.free_idx)
 	} else {
@@ -573,7 +651,7 @@ _direct_mmap_resize :: proc(alloc: ^Allocation_Header, new_size: int) -> rawptr 
 	old_mmap_size := _round_up_to_nearest(old_requested + BLOCK_SIZE, PAGE_SIZE)
 	new_mmap_size := _round_up_to_nearest(new_size + BLOCK_SIZE, PAGE_SIZE)
 	if int(new_mmap_size) < MMAP_TO_REGION_SHRINK_THRESHOLD {
-		return _direct_mmap_to_region(alloc, old_mmap_size, new_mmap_size)
+		return _direct_mmap_to_region(alloc, new_size)
 	} else if old_requested == new_size {
 		return mem.ptr_offset(alloc, 1)
 	}
@@ -613,10 +691,10 @@ _direct_mmap_from_region :: proc(alloc: ^Allocation_Header, new_size: int) -> ra
 	return new_memory
 }
 
-_direct_mmap_to_region :: proc(alloc: ^Allocation_Header, old_size, new_size: int) -> rawptr {
+_direct_mmap_to_region :: proc(alloc: ^Allocation_Header, new_size: int) -> rawptr {
 	new_memory := heap_alloc(new_size)
 	if new_memory != nil {
-		mem.copy(new_memory, mem.ptr_offset(alloc, -1), old_size)
+		mem.copy(new_memory, mem.ptr_offset(alloc, -1), new_size)
 		_direct_mmap_free(alloc)
 	}
 	return new_memory
@@ -643,84 +721,3 @@ _get_allocation_header :: #force_inline proc(raw_mem: rawptr) -> ^Allocation_Hea
 _round_up_to_nearest :: #force_inline proc(size, round: int) -> int {
 	return (size-1) + round - (size-1) % round
 }
-
-_heap_allocator_proc :: proc(allocator_data: rawptr, mode: mem.Allocator_Mode,
-                            size, alignment: int,
-                            old_memory: rawptr, old_size: int, loc := #caller_location) -> ([]byte, mem.Allocator_Error) {
-	//
-	// NOTE(tetra, 2020-01-14): The heap doesn't respect alignment.
-	// Instead, we overallocate by `alignment + size_of(rawptr) - 1`, and insert
-	// padding. We also store the original pointer returned by heap_alloc right before
-	// the pointer we return to the user.
-	//
-
-	aligned_alloc :: proc(size, alignment: int, old_ptr: rawptr = nil) -> ([]byte, mem.Allocator_Error) {
-		a := max(alignment, align_of(rawptr))
-		space := size + a - 1
-
-		allocated_mem: rawptr
-		if old_ptr != nil {
-			original_old_ptr := mem.ptr_offset((^rawptr)(old_ptr), -1)^
-			allocated_mem = heap_resize(original_old_ptr, space+size_of(rawptr))
-		} else {
-			allocated_mem = heap_alloc(space+size_of(rawptr))
-		}
-		aligned_mem := rawptr(mem.ptr_offset((^u8)(allocated_mem), size_of(rawptr)))
-
-		ptr := uintptr(aligned_mem)
-		aligned_ptr := (ptr - 1 + uintptr(a)) & -uintptr(a)
-		diff := int(aligned_ptr - ptr)
-		if (size + diff) > space {
-			return nil, .Out_Of_Memory
-		}
-
-		aligned_mem = rawptr(aligned_ptr)
-		mem.ptr_offset((^rawptr)(aligned_mem), -1)^ = allocated_mem
-
-		return mem.byte_slice(aligned_mem, size), nil
-	}
-
-	aligned_free :: proc(p: rawptr) {
-		if p != nil {
-			heap_free(mem.ptr_offset((^rawptr)(p), -1)^)
-		}
-	}
-
-	aligned_resize :: proc(p: rawptr, old_size: int, new_size: int, new_alignment: int) -> (new_memory: []byte, err: mem.Allocator_Error) {
-		if p == nil {
-			return nil, nil
-		}
-
-		return aligned_alloc(new_size, new_alignment, p)
-	}
-
-	switch mode {
-	case .Alloc:
-		return aligned_alloc(size, alignment)
-
-	case .Free:
-		aligned_free(old_memory)
-
-	case .Free_All:
-		return nil, .Mode_Not_Implemented
-
-	case .Resize:
-		if old_memory == nil {
-			return aligned_alloc(size, alignment)
-		}
-		return aligned_resize(old_memory, old_size, size, alignment)
-
-	case .Query_Features:
-		set := (^mem.Allocator_Mode_Set)(old_memory)
-		if set != nil {
-			set^ = {.Alloc, .Free, .Resize, .Query_Features}
-		}
-		return nil, nil
-
-	case .Query_Info:
-		return nil, .Mode_Not_Implemented
-	}
-
-	return nil, nil
-}
-
