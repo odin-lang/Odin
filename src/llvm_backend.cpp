@@ -43,6 +43,13 @@ GB_COMPARE_PROC(foreign_library_cmp) {
 	if (x == y) {
 		return 0;
 	}
+	GB_ASSERT(x->kind == Entity_LibraryName);
+	GB_ASSERT(y->kind == Entity_LibraryName);
+
+	cmp = i64_cmp(x->LibraryName.priority_index, y->LibraryName.priority_index);
+	if (cmp) {
+		return cmp;
+	}
 
 	if (x->pkg != y->pkg) {
 		isize order_x = x->pkg ? x->pkg->order : 0;
