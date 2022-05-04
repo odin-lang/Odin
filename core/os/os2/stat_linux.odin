@@ -2,7 +2,6 @@
 package os2
 
 import "core:time"
-import "core:strings"
 import "core:sys/unix"
 import "core:path/filepath"
 
