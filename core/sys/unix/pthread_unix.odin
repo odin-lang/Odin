@@ -6,16 +6,29 @@ foreign import "system:pthread"
 import "core:c"
 import "core:time"
 
+PTHREAD_CANCEL_STATE :: enum c.int {
+	Enable       = 0,
+	Disable      = 1,
+}
+
+PTHREAD_CANCEL_TYPE :: enum c.int {
+	Deferred     = 0,
+	Asynchronous = 1,
+}
+
 //
 // On success, these functions return 0.
 //
-
 @(default_calling_convention="c")
 foreign pthread {
 	pthread_create :: proc(t: ^pthread_t, attrs: ^pthread_attr_t, routine: proc(data: rawptr) -> rawptr, arg: rawptr) -> c.int ---
 
 	// retval is a pointer to a location to put the return value of the thread proc.
 	pthread_join :: proc(t: pthread_t, retval: ^rawptr) -> c.int ---
+
+	pthread_setcancelstate :: proc(state: PTHREAD_CANCEL_STATE, old_state: ^PTHREAD_CANCEL_STATE) -> c.int ---
+	pthread_setcanceltype  :: proc(state: PTHREAD_CANCEL_TYPE,  old_state: ^PTHREAD_CANCEL_TYPE) -> c.int ---
+	pthread_cancel :: proc(t: pthread_t) -> c.int ---
 
 	pthread_self :: proc() -> pthread_t ---
 

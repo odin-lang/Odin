@@ -61,11 +61,7 @@ main :: proc() {
 
 	address_parsing_test(t)
 
-	when ODIN_OS != .Windows {
-		fmt.printf("IMPORTANT: `core:thread` on {} does not yet have thread.terminate, so we can't run tests relying on them.\n", ODIN_OS)
-	} else {
-		tcp_tests(t)
-	}
+	tcp_tests(t)
 
 	fmt.printf("%v/%v tests successful.\n", TEST_count - TEST_fail, TEST_count)
 
@@ -415,7 +411,6 @@ cleanup_thread :: proc(data: Thread_Data) {
 	net.close(data.skt)
 
 	thread.terminate(data.tid, 1)
-	thread.join(data.tid)
 	thread.destroy(data.tid)
 }
 

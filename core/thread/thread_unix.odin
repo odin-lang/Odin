@@ -21,6 +21,7 @@ Thread_Os_Specific :: struct #align 16 {
 	mutex:       sync.Mutex,
 	flags:       bit_set[Thread_State; u8],
 }
+
 //
 // Creates a thread which will run the given procedure.
 // It then waits for `start` to be called.
@@ -28,6 +29,14 @@ Thread_Os_Specific :: struct #align 16 {
 _create :: proc(procedure: Thread_Proc, priority := Thread_Priority.Normal) -> ^Thread {
 	__linux_thread_entry_proc :: proc "c" (t: rawptr) -> rawptr {
 		t := (^Thread)(t)
+
+		// Set the pthread to be asynchronously cancellable.
+		if unix.pthread_setcanceltype(unix.PTHREAD_CANCEL_TYPE.Asynchronous, nil) != 0 {
+			return nil
+		}
+		if unix.pthread_setcancelstate(unix.PTHREAD_CANCEL_STATE.Enable, nil) != 0 {
+			return nil
+		}
 
 		context = runtime.default_context()
 
@@ -93,7 +102,6 @@ _create :: proc(procedure: Thread_Proc, priority := Thread_Priority.Normal) -> ^
 		free(thread, thread.creation_allocator)
 		return nil
 	}
-
 	return thread
 }
 
@@ -108,7 +116,7 @@ _is_done :: proc(t: ^Thread) -> bool {
 }
 
 _join :: proc(t: ^Thread) {
-	sync.guard(&t.mutex)
+	// sync.guard(&t.mutex) // This makes _join hang indefinitely.
 
 	if .Joined in t.flags || unix.pthread_equal(unix.pthread_self(), t.unix_thread) {
 		return
@@ -132,7 +140,7 @@ _destroy :: proc(t: ^Thread) {
 }
 
 _terminate :: proc(t: ^Thread, exit_code: int) {
-	// TODO(bill)
+	unix.pthread_cancel(t.unix_thread)
 }
 
 _yield :: proc() {
