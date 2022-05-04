@@ -2863,11 +2863,7 @@ int main(int arg_count, char const **arg_ptr) {
 		String exe_name = path_to_string(heap_allocator(), build_context.build_paths[BuildPath_Output]);
 		defer (gb_free(heap_allocator(), exe_name.text));
 
-	#if defined(GB_SYSTEM_WINDOWS)
-		return system_exec_command_line_app("odin run", "%.*s %.*s", LIT(exe_name), LIT(run_args_string));
-	#else
 		return system_exec_command_line_app("odin run", "\"%.*s\" %.*s", LIT(exe_name), LIT(run_args_string));
-	#endif
 	}
 	return 0;
 }
