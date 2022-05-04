@@ -853,3 +853,293 @@ _alloc_command_line_arguments :: proc() -> []string {
 	}
 	return res
 }
+
+// Networking
+ADDRESS_FAMILY :: u16
+SOCKADDR :: struct #packed {
+	sa_family: ADDRESS_FAMILY,
+	sa_data: [14]c.char,
+}
+
+SOCKADDR_STORAGE_LH :: struct #packed {
+	ss_family: ADDRESS_FAMILY,
+	__ss_pad1: [6]c.char,
+	__ss_align: i64,
+	__ss_pad2: [112]c.char,
+}
+
+sockaddr_in :: struct #packed {
+	sin_family: ADDRESS_FAMILY,
+	sin_port: u16be,
+	sin_addr: in_addr,
+	sin_zero: [8]c.char,
+}
+
+sockaddr_in6 :: struct #packed {
+	sin6_family: ADDRESS_FAMILY,
+	sin6_port: u16be,
+	sin6_flowinfo: c.ulong,
+	sin6_addr: in6_addr,
+	sin6_scope_id: c.ulong,
+}
+
+in_addr :: struct #packed {
+	s_addr: u32,
+}
+
+in6_addr :: struct #packed {
+	s6_addr: [16]u8,
+}
+
+rtnl_link_stats :: struct #packed {
+	rx_packets:          u32,
+	tx_packets:          u32,
+	rx_bytes:            u32,
+	tx_bytes:            u32,
+	rx_errors:           u32,
+	tx_errors:           u32,
+	rx_dropped:          u32,
+	tx_dropped:          u32,
+	multicast:           u32,
+	collisions:          u32,
+	rx_length_errors:    u32,
+	rx_over_errors:      u32,
+	rx_crc_errors:       u32,
+	rx_frame_errors:     u32,
+	rx_fifo_errors:      u32,
+	rx_missed_errors:    u32,
+	tx_aborted_errors:   u32,
+	tx_carrier_errors:   u32,
+	tx_fifo_errors:      u32,
+	tx_heartbeat_errors: u32,
+	tx_window_errors:    u32,
+	rx_compressed:       u32,
+	tx_compressed:       u32,
+	rx_nohandler:        u32,
+}
+
+SIOCGIFFLAG :: enum c.int {
+	UP             = 0,  /* Interface is up.  */
+	BROADCAST      = 1,  /* Broadcast address valid.  */
+	DEBUG          = 2,  /* Turn on debugging.  */
+	LOOPBACK       = 3,  /* Is a loopback net.  */
+	POINT_TO_POINT = 4,  /* Interface is point-to-point link.  */
+	NO_TRAILERS    = 5,  /* Avoid use of trailers.  */
+	RUNNING        = 6,  /* Resources allocated.  */
+	NOARP          = 7,  /* No address resolution protocol.  */
+	PROMISC        = 8,  /* Receive all packets.  */
+	ALL_MULTI      = 9,  /* Receive all multicast packets. Unimplemented. */
+	MASTER         = 10, /* Master of a load balancer.  */
+	SLAVE          = 11, /* Slave of a load balancer.  */
+	MULTICAST      = 12, /* Supports multicast.  */
+	PORTSEL        = 13, /* Can set media type.  */
+	AUTOMEDIA      = 14, /* Auto media select active.  */
+	DYNAMIC        = 15, /* Dialup device with changing addresses.  */
+        LOWER_UP       = 16,
+        DORMANT        = 17,
+        ECHO           = 18,
+}
+SIOCGIFFLAGS :: bit_set[SIOCGIFFLAG; c.int]
+
+ifaddrs :: struct {
+	next:              ^ifaddrs,
+	name:              cstring,
+	flags:             SIOCGIFFLAGS,
+	address:           ^SOCKADDR,
+	netmask:           ^SOCKADDR,
+	broadcast_or_dest: ^SOCKADDR,  // Broadcast or Point-to-Point address
+	data:              rawptr,     // Address-specific data.
+
+}
+
+AF_UNSPEC:    int : 0
+AF_UNIX:      int : 1
+AF_LOCAL:     int : AF_UNIX
+AF_INET:      int : 2
+AF_INET6:     int : 10
+AF_PACKET:    int : 17
+AF_BLUETOOTH: int : 31
+
+SOCK_STREAM:    int : 1
+SOCK_DGRAM:     int : 2
+SOCK_RAW:       int : 3
+SOCK_RDM:       int : 4
+SOCK_SEQPACKET: int : 5
+SOCK_PACKET:    int : 10
+
+INADDR_ANY:       c.ulong : 0
+INADDR_BROADCAST: c.ulong : 0xffffffff
+INADDR_NONE:      c.ulong : 0xffffffff
+INADDR_DUMMY:     c.ulong : 0xc0000008
+
+IPPROTO_IP:       int : 0
+IPPROTO_ICMP:     int : 1
+IPPROTO_TCP:      int : 6
+IPPROTO_UDP:      int : 17
+IPPROTO_IPV6:     int : 41
+IPPROTO_ETHERNET: int : 143
+IPPROTO_RAW:      int : 255
+
+SHUT_RD:   int : 0
+SHUT_WR:   int : 1
+SHUT_RDWR: int : 2
+
+
+SOL_SOCKET:   int : 1
+SO_DEBUG:     int : 1
+SO_REUSEADDR: int : 2
+SO_DONTROUTE: int : 5
+SO_BROADCAST: int : 6
+SO_SNDBUF:    int : 7
+SO_RCVBUF:    int : 8
+SO_KEEPALIVE: int : 9
+SO_OOBINLINE: int : 10
+SO_LINGER:    int : 13
+SO_REUSEPORT: int : 15
+SO_RCVTIMEO_NEW: int : 66
+SO_SNDTIMEO_NEW: int : 67
+
+TCP_NODELAY: int : 1
+TCP_CORK:    int : 3
+
+Socket    :: distinct int
+socklen_t :: c.int
+
+Timeval :: struct {
+	seconds: i64,
+	nanoseconds: int,
+}
+
+MSG_TRUNC : int : 0x20
+
+_unix_socket :: proc(domain: int, type: int, protocol: int) -> int {
+	return int(intrinsics.syscall(unix.SYS_socket, uintptr(domain), uintptr(type), uintptr(protocol)))
+}
+
+_unix_connect :: proc(sd: int, addr: rawptr, len: socklen_t) -> int {
+	return int(intrinsics.syscall(unix.SYS_connect, uintptr(sd), uintptr(addr), uintptr(len)))
+}
+
+_unix_accept :: proc(sd: int, addr: rawptr, len: rawptr) -> int {
+	return int(intrinsics.syscall(unix.SYS_accept4, uintptr(sd), uintptr(addr), uintptr(len), uintptr(0)))
+}
+
+_unix_listen :: proc(sd: int, backlog: int) -> int {
+	return int(intrinsics.syscall(unix.SYS_listen, uintptr(sd), uintptr(backlog)))
+}
+
+_unix_bind :: proc(sd: int, addr: rawptr, len: socklen_t) -> int {
+	return int(intrinsics.syscall(unix.SYS_bind, uintptr(sd), uintptr(addr), uintptr(len)))
+}
+
+_unix_setsockopt :: proc(sd: int, level: int, optname: int, optval: rawptr, optlen: socklen_t) -> int {
+	return int(intrinsics.syscall(unix.SYS_setsockopt, uintptr(sd), uintptr(level), uintptr(optname), uintptr(optval), uintptr(optlen)))
+}
+
+_unix_recvfrom :: proc(sd: int, buf: rawptr, len: uint, flags: int, addr: rawptr, alen: uintptr) -> i64 {
+	return i64(intrinsics.syscall(unix.SYS_recvfrom, uintptr(sd), uintptr(buf), uintptr(len), uintptr(flags), uintptr(addr), uintptr(alen)))
+}
+
+_unix_sendto :: proc(sd: int, buf: rawptr, len: uint, flags: int, addr: rawptr, alen: socklen_t) -> i64 {
+	return i64(intrinsics.syscall(unix.SYS_sendto, uintptr(sd), uintptr(buf), uintptr(len), uintptr(flags), uintptr(addr), uintptr(alen)))
+}
+
+_unix_shutdown :: proc(sd: int, how: int) -> int {
+	return int(intrinsics.syscall(unix.SYS_shutdown, uintptr(sd), uintptr(how)))
+}
+
+socket :: proc(domain: int, type: int, protocol: int) -> (Socket, Errno) {
+	result := _unix_socket(domain, type, protocol)
+	if result < 0 {
+		return 0, _get_errno(result)
+	}
+	return Socket(result), ERROR_NONE
+}
+
+bind :: proc(sd: Socket, addr: ^SOCKADDR, len: socklen_t) -> (Errno) {
+	result := _unix_bind(int(sd), addr, len)
+	if result < 0 {
+		return _get_errno(result)
+	}
+	return ERROR_NONE
+}
+
+
+connect :: proc(sd: Socket, addr: ^SOCKADDR, len: socklen_t) -> (Errno) {
+	result := _unix_connect(int(sd), addr, len)
+	if result < 0 {
+		return _get_errno(result)
+	}
+	return ERROR_NONE
+}
+
+accept :: proc(sd: Socket, addr: ^SOCKADDR, len: rawptr) -> (Socket, Errno) {
+	result := _unix_accept(int(sd), rawptr(addr), len)
+	if result < 0 {
+		return 0, _get_errno(result)
+	}
+	return Socket(result), ERROR_NONE
+}
+
+listen :: proc(sd: Socket, backlog: int) -> (Errno) {
+	result := _unix_listen(int(sd), backlog)
+	if result < 0 {
+		return _get_errno(result)
+	}
+	return ERROR_NONE
+}
+
+setsockopt :: proc(sd: Socket, level: int, optname: int, optval: rawptr, optlen: socklen_t) -> (Errno) {
+	result := _unix_setsockopt(int(sd), level, optname, optval, optlen)
+	if result < 0 {
+		return _get_errno(result)
+	}
+	return ERROR_NONE
+}
+
+
+recvfrom :: proc(sd: Socket, data: []byte, flags: int, addr: ^SOCKADDR, addr_size: ^socklen_t) -> (u32, Errno) {
+	result := _unix_recvfrom(int(sd), raw_data(data), len(data), flags, addr, uintptr(addr_size))
+	if result < 0 {
+		return 0, _get_errno(int(result))
+	}
+	return u32(result), ERROR_NONE
+}
+
+recv :: proc(sd: Socket, data: []byte, flags: int) -> (u32, Errno) {
+	result := _unix_recvfrom(int(sd), raw_data(data), len(data), flags, nil, 0)
+	if result < 0 {
+		return 0, _get_errno(int(result))
+	}
+	return u32(result), ERROR_NONE
+}
+
+
+sendto :: proc(sd: Socket, data: []u8, flags: int, addr: ^SOCKADDR, addrlen: socklen_t) -> (u32, Errno) {
+	result := _unix_sendto(int(sd), raw_data(data), len(data), flags, addr, addrlen)
+	if result < 0 {
+		return 0, _get_errno(int(result))
+	}
+	return u32(result), ERROR_NONE
+}
+
+send :: proc(sd: Socket, data: []byte, flags: int) -> (u32, Errno) {
+	result := _unix_sendto(int(sd), raw_data(data), len(data), 0, nil, 0)
+	if result < 0 {
+		return 0, _get_errno(int(result))
+	}
+	return u32(result), ERROR_NONE
+}
+
+shutdown :: proc(sd: Socket, how: int) -> (Errno) {
+	result := _unix_shutdown(int(sd), how)
+	if result < 0 {
+		return _get_errno(result)
+	}
+	return ERROR_NONE
+}
+
+foreign dl {
+	@(link_name="getifaddrs")       _getifaddrs         :: proc(ifap: ^^ifaddrs) -> (c.int) ---
+	@(link_name="freeifaddrs")      _freeifaddrs        :: proc(ifa: ^ifaddrs) ---
+}
