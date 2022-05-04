@@ -40,12 +40,14 @@ _create :: proc(procedure: Thread_Proc, priority := Thread_Priority.Normal) -> ^
 			sync.wait(&t.cond, &t.mutex)
 		}
 
-		// Set the pthread to be asynchronously cancellable.
-		if unix.pthread_setcanceltype(unix.PTHREAD_CANCEL_TYPE.Asynchronous, nil) != 0 {
-			return nil
-		}
-		if unix.pthread_setcancelstate(unix.PTHREAD_CANCEL_STATE.Enable, nil) != 0 {
-			return nil
+		when false {
+			// Set the pthread to be asynchronously cancellable.
+			if unix.pthread_setcanceltype(unix.PTHREAD_CANCEL_TYPE.Asynchronous, nil) != 0 {
+				return nil
+			}
+			if unix.pthread_setcancelstate(unix.PTHREAD_CANCEL_STATE.Enable, nil) != 0 {
+				return nil
+			}
 		}
 
 		init_context := t.init_context
@@ -116,7 +118,7 @@ _is_done :: proc(t: ^Thread) -> bool {
 }
 
 _join :: proc(t: ^Thread) {
-	// sync.guard(&t.mutex) // This makes _join hang indefinitely.
+	sync.guard(&t.mutex)
 
 	if .Joined in t.flags || unix.pthread_equal(unix.pthread_self(), t.unix_thread) {
 		return
@@ -140,7 +142,9 @@ _destroy :: proc(t: ^Thread) {
 }
 
 _terminate :: proc(t: ^Thread, exit_code: int) {
-	unix.pthread_cancel(t.unix_thread)
+	when false {
+		unix.pthread_cancel(t.unix_thread)
+	}
 }
 
 _yield :: proc() {

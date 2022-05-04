@@ -61,7 +61,11 @@ main :: proc() {
 
 	address_parsing_test(t)
 
-	tcp_tests(t)
+	when ODIN_OS != .Windows {
+		fmt.printf("IMPORTANT: `core:thread` seems to still be a bit wonky on Linux and MacOS, so we can't run tests relying on them.\n", ODIN_OS)
+	} else {
+		tcp_tests(t)
+	}
 
 	fmt.printf("%v/%v tests successful.\n", TEST_count - TEST_fail, TEST_count)
 
