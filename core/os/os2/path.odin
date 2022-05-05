@@ -7,15 +7,15 @@ is_path_separator :: proc(c: byte) -> bool {
 	return _is_path_separator(c)
 }
 
-mkdir :: proc(name: string, perm: File_Mode) -> Maybe(Path_Error) {
+mkdir :: proc(name: string, perm: File_Mode) -> Error {
 	return _mkdir(name, perm)
 }
 
-mkdir_all :: proc(path: string, perm: File_Mode) -> Maybe(Path_Error) {
+mkdir_all :: proc(path: string, perm: File_Mode) -> Error {
 	return _mkdir_all(path, perm)
 }
 
-remove_all :: proc(path: string) -> Maybe(Path_Error) {
+remove_all :: proc(path: string) -> Error {
 	return _remove_all(path)
 }
 

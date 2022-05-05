@@ -2,11 +2,12 @@
 package os2
 
 import "core:time"
+import "core:strings"
 import win32 "core:sys/windows"
 
-_fstat :: proc(f: ^File, allocator := context.allocator) -> (File_Info, Maybe(Path_Error)) {
+_fstat :: proc(f: ^File, allocator := context.allocator) -> (File_Info, Error) {
 	if f == nil || f.impl.fd == nil {
-		return {}, Path_Error{err = .Invalid_Argument}
+		return {}, .Invalid_Argument
 	}
 	context.allocator = allocator
 
@@ -27,10 +28,10 @@ _fstat :: proc(f: ^File, allocator := context.allocator) -> (File_Info, Maybe(Pa
 
 	return _file_info_from_get_file_information_by_handle(path, h)
 }
-_stat :: proc(name: string, allocator := context.allocator) -> (File_Info, Maybe(Path_Error)) {
+_stat :: proc(name: string, allocator := context.allocator) -> (File_Info, Error) {
 	return internal_stat(name, win32.FILE_FLAG_BACKUP_SEMANTICS)
 }
-_lstat :: proc(name: string, allocator := context.allocator) -> (File_Info, Maybe(Path_Error)) {
+_lstat :: proc(name: string, allocator := context.allocator) -> (File_Info, Error) {
 	return internal_stat(name, win32.FILE_FLAG_BACKUP_SEMANTICS|win32.FILE_FLAG_OPEN_REPARSE_POINT)
 }
 _same_file :: proc(fi1, fi2: File_Info) -> bool {
@@ -39,12 +40,12 @@ _same_file :: proc(fi1, fi2: File_Info) -> bool {
 
 
 
-_stat_errno :: proc(errno: win32.DWORD) -> Path_Error {
-	return Path_Error{err = Platform_Error{i32(errno)}}
+_stat_errno :: proc(errno: win32.DWORD) -> Error {
+	return Platform_Error{i32(errno)}
 }
 
 
-full_path_from_name :: proc(name: string, allocator := context.allocator) -> (path: string, err: Maybe(Path_Error)) {
+full_path_from_name :: proc(name: string, allocator := context.allocator) -> (path: string, err: Error) {
 	context.allocator = allocator
 	
 	name := name
@@ -69,15 +70,15 @@ full_path_from_name :: proc(name: string, allocator := context.allocator) -> (pa
 }
 
 
-internal_stat :: proc(name: string, create_file_attributes: u32, allocator := context.allocator) -> (fi: File_Info, e: Maybe(Path_Error)) {
+internal_stat :: proc(name: string, create_file_attributes: u32, allocator := context.allocator) -> (fi: File_Info, e: Error) {
 	if len(name) == 0 {
-		return {}, Path_Error{err = .Not_Exist}
+		return {}, .Not_Exist
 	}
 
 	context.allocator = allocator
 
 
-	wname := win32.utf8_to_wstring(_fix_long_path(name), context.temp_allocator)
+	wname := _fix_long_path(name)
 	fa: win32.WIN32_FILE_ATTRIBUTE_DATA
 	ok := win32.GetFileAttributesExW(wname, win32.GetFileExInfoStandard, &fa)
 	if ok && fa.dwFileAttributes & win32.FILE_ATTRIBUTE_REPARSE_POINT == 0 {
@@ -91,7 +92,7 @@ internal_stat :: proc(name: string, create_file_attributes: u32, allocator := co
 		fd: win32.WIN32_FIND_DATAW
 		sh := win32.FindFirstFileW(wname, &fd)
 		if sh == win32.INVALID_HANDLE_VALUE {
-			e = Path_Error{err = Platform_Error{i32(win32.GetLastError())}}
+			e = _get_platform_error()
 			return
 		}
 		win32.FindClose(sh)
@@ -101,7 +102,7 @@ internal_stat :: proc(name: string, create_file_attributes: u32, allocator := co
 
 	h := win32.CreateFileW(wname, 0, 0, nil, win32.OPEN_EXISTING, create_file_attributes, nil)
 	if h == win32.INVALID_HANDLE_VALUE {
-		e = Path_Error{err = Platform_Error{i32(win32.GetLastError())}}
+		e = _get_platform_error()
 		return
 	}
 	defer win32.CloseHandle(h)
@@ -130,9 +131,9 @@ _cleanpath_strip_prefix :: proc(buf: []u16) -> []u16 {
 }
 
 
-_cleanpath_from_handle :: proc(f: ^File) -> (string, Maybe(Path_Error)) {
+_cleanpath_from_handle :: proc(f: ^File) -> (string, Error) {
 	if f == nil || f.impl.fd == nil {
-		return "", Path_Error{err = .Invalid_Argument}
+		return "", .Invalid_Argument
 	}
 	h := win32.HANDLE(f.impl.fd)
 
@@ -153,9 +154,9 @@ _cleanpath_from_handle :: proc(f: ^File) -> (string, Maybe(Path_Error)) {
 	return _cleanpath_from_buf(buf), nil
 }
 
-_cleanpath_from_handle_u16 :: proc(f: ^File) -> ([]u16, Maybe(Path_Error)) {
+_cleanpath_from_handle_u16 :: proc(f: ^File) -> ([]u16, Error) {
 	if f == nil || f.impl.fd == nil {
-		return nil, Path_Error{err = .Invalid_Argument}
+		return nil, .Invalid_Argument
 	}
 	h := win32.HANDLE(f.impl.fd)
 
@@ -251,7 +252,7 @@ _file_mode_from_file_attributes :: proc(FileAttributes: win32.DWORD, h: win32.HA
 }
 
 
-_file_info_from_win32_file_attribute_data :: proc(d: ^win32.WIN32_FILE_ATTRIBUTE_DATA, name: string) -> (fi: File_Info, e: Maybe(Path_Error)) {
+_file_info_from_win32_file_attribute_data :: proc(d: ^win32.WIN32_FILE_ATTRIBUTE_DATA, name: string) -> (fi: File_Info, e: Error) {
 	fi.size = i64(d.nFileSizeHigh)<<32 + i64(d.nFileSizeLow)
 
 	fi.mode |= _file_mode_from_file_attributes(d.dwFileAttributes, nil, 0)
@@ -268,7 +269,7 @@ _file_info_from_win32_file_attribute_data :: proc(d: ^win32.WIN32_FILE_ATTRIBUTE
 }
 
 
-_file_info_from_win32_find_data :: proc(d: ^win32.WIN32_FIND_DATAW, name: string) -> (fi: File_Info, e: Maybe(Path_Error)) {
+_file_info_from_win32_find_data :: proc(d: ^win32.WIN32_FIND_DATAW, name: string) -> (fi: File_Info, e: Error) {
 	fi.size = i64(d.nFileSizeHigh)<<32 + i64(d.nFileSizeLow)
 
 	fi.mode |= _file_mode_from_file_attributes(d.dwFileAttributes, nil, 0)
@@ -285,7 +286,7 @@ _file_info_from_win32_find_data :: proc(d: ^win32.WIN32_FIND_DATAW, name: string
 }
 
 
-_file_info_from_get_file_information_by_handle :: proc(path: string, h: win32.HANDLE) -> (File_Info, Maybe(Path_Error)) {
+_file_info_from_get_file_information_by_handle :: proc(path: string, h: win32.HANDLE) -> (File_Info, Error) {
 	d: win32.BY_HANDLE_FILE_INFORMATION
 	if !win32.GetFileInformationByHandle(h, &d) {
 		return {}, _stat_errno(win32.GetLastError())
@@ -318,58 +319,83 @@ _file_info_from_get_file_information_by_handle :: proc(path: string, h: win32.HA
 	return fi, nil
 }
 
-_is_abs :: proc(path: string) -> bool {
-	if len(path) > 0 && path[0] == '/' {
-		return true
+
+
+reserved_names := [?]string{
+	"CON", "PRN", "AUX", "NUL",
+	"COM1", "COM2", "COM3", "COM4", "COM5", "COM6", "COM7", "COM8", "COM9",
+	"LPT1", "LPT2", "LPT3", "LPT4", "LPT5", "LPT6", "LPT7", "LPT8", "LPT9",
+}
+
+_is_reserved_name :: proc(path: string) -> bool {
+	if len(path) == 0 {
+		return false
 	}
-	if len(path) > 2 {
-		switch path[0] {
-		case 'A'..='Z', 'a'..='z':
-			return path[1] == ':' && is_path_separator(path[2])
+	for reserved in reserved_names {
+		if strings.equal_fold(path, reserved) {
+			return true
 		}
 	}
 	return false
 }
 
-_fix_long_path :: proc(path: string) -> string {
-	if len(path) < 248 {
-		return path
-	}
+_is_UNC :: proc(path: string) -> bool {
+	return _volume_name_len(path) > 2
+}
 
-	if len(path) >= 2 && path[:2] == `\\` {
-		return path
-	}
-	if !_is_abs(path) {
-		return path
-	}
+_volume_name_len :: proc(path: string) -> int {
+	if ODIN_OS == .Windows {
+		if len(path) < 2 {
+			return 0
+		}
+		c := path[0]
+		if path[1] == ':' {
+			switch c {
+			case 'a'..='z', 'A'..='Z':
+				return 2
+			}
+		}
 
-	prefix :: `\\?`
-
-	path_buf := make([]byte, len(prefix)+len(path)+len(`\`), context.temp_allocator)
-	copy(path_buf, prefix)
-	n := len(path)
-	r, w := 0, len(prefix)
-	for r < n {
-		switch {
-		case is_path_separator(path[r]):
-			r += 1
-		case path[r] == '.' && (r+1 == n || is_path_separator(path[r+1])):
-			r += 1
-		case r+1 < n && path[r] == '.' && path[r+1] == '.' && (r+2 == n || is_path_separator(path[r+2])):
-			return path
-		case:
-			path_buf[w] = '\\'
-			w += 1
-			for ; r < n && !is_path_separator(path[r]); r += 1 {
-				path_buf[w] = path[r]
-				w += 1
+		// URL: https://msdn.microsoft.com/en-us/library/windows/desktop/aa365247(v=vs.85).aspx
+		if l := len(path); l >= 5 && _is_path_separator(path[0]) && _is_path_separator(path[1]) &&
+			!_is_path_separator(path[2]) && path[2] != '.' {
+			for n := 3; n < l-1; n += 1 {
+				if _is_path_separator(path[n]) {
+					n += 1
+					if !_is_path_separator(path[n]) {
+						if path[n] == '.' {
+							break
+						}
+					}
+					for ; n < l; n += 1 {
+						if _is_path_separator(path[n]) {
+							break
+						}
+					}
+					return n
+				}
+				break
 			}
 		}
 	}
-
-	if w == len(`\\?\c:`) {
-		path_buf[w] = '\\'
-		w += 1
-	}
-	return string(path_buf[:w])
+	return 0
 }
+
+
+_is_abs :: proc(path: string) -> bool {
+	if _is_reserved_name(path) {
+		return true
+	}
+	l := _volume_name_len(path)
+	if l == 0 {
+		return false
+	}
+
+	path := path
+	path = path[l:]
+	if path == "" {
+		return false
+	}
+	return is_path_separator(path[0])
+}
+

@@ -11,6 +11,8 @@ General_Error :: enum u32 {
 	Closed,
 
 	Timeout,
+
+	Invalid_File,
 }
 
 Platform_Error :: struct {
@@ -23,36 +25,6 @@ Error :: union {
 	Platform_Error,
 }
 #assert(size_of(Error) == size_of(u64))
-
-Path_Error :: struct {
-	op:   string,
-	path: string,
-	err:  Error,
-}
-
-Link_Error :: struct {
-	op:  string,
-	old: string,
-	new: string,
-	err: Error,
-}
-
-path_error_delete :: proc(perr: Maybe(Path_Error)) {
-	if err, ok := perr.?; ok {
-		context.allocator = error_allocator()
-		delete(err.op)
-		delete(err.path)
-	}
-}
-
-link_error_delete :: proc(lerr: Maybe(Link_Error)) {
-	if err, ok := lerr.?; ok {
-		context.allocator = error_allocator()
-		delete(err.op)
-		delete(err.old)
-		delete(err.new)
-	}
-}
 
 
 
