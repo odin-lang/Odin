@@ -9,6 +9,10 @@ OS :: ODIN_OS
 ARCH :: ODIN_ARCH
 ENDIAN :: ODIN_ENDIAN
 
+SEEK_SET :: 0
+SEEK_CUR :: 1
+SEEK_END :: 2
+
 write_string :: proc(fd: Handle, str: string) -> (int, Errno) {
 	return write(fd, transmute([]byte)str)
 }

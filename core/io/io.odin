@@ -4,7 +4,6 @@
 package io
 
 import "core:intrinsics"
-import "core:runtime"
 import "core:unicode/utf8"
 
 // Seek whence values
@@ -254,11 +253,7 @@ read_at :: proc(r: Reader_At, p: []byte, offset: i64, n_read: ^int = nil) -> (n:
 		return 0, .Empty
 	}
 
-	curr_offset: i64
-	curr_offset, err = r->impl_seek(offset, .Current)
-	if err != nil {
-		return 0, err
-	}
+	curr_offset := r->impl_seek(offset, .Current) or_return
 
 	n, err = r->impl_read(p)
 	_, err1 := r->impl_seek(curr_offset, .Start)
@@ -552,7 +547,7 @@ _copy_buffer :: proc(dst: Writer, src: Reader, buf: []byte) -> (written: i64, er
 			}
 		}
 		// NOTE(bill): alloca is fine here
-		buf = transmute([]byte)runtime.Raw_Slice{intrinsics.alloca(size, 2*align_of(rawptr)), size}
+		buf = intrinsics.alloca(size, 2*align_of(rawptr))[:size]
 	}
 	for {
 		nr, er := read(src, buf)
