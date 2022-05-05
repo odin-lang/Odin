@@ -4,18 +4,18 @@ package os2
 import "core:time"
 import win32 "core:sys/windows"
 
-_fstat :: proc(fd: Handle, allocator := context.allocator) -> (File_Info, Maybe(Path_Error)) {
-	if fd == 0 {
+_fstat :: proc(f: ^File, allocator := context.allocator) -> (File_Info, Maybe(Path_Error)) {
+	if f == nil || f.impl.fd == nil {
 		return {}, Path_Error{err = .Invalid_Argument}
 	}
 	context.allocator = allocator
 
-	path, err := _cleanpath_from_handle(fd)
+	path, err := _cleanpath_from_handle(f)
 	if err != nil {
 		return {}, err
 	}
 
-	h := win32.HANDLE(fd)
+	h := win32.HANDLE(f.impl.fd)
 	switch win32.GetFileType(h) {
 	case win32.FILE_TYPE_PIPE, win32.FILE_TYPE_CHAR:
 		fi: File_Info
@@ -130,11 +130,11 @@ _cleanpath_strip_prefix :: proc(buf: []u16) -> []u16 {
 }
 
 
-_cleanpath_from_handle :: proc(fd: Handle) -> (string, Maybe(Path_Error)) {
-	if fd == 0 {
+_cleanpath_from_handle :: proc(f: ^File) -> (string, Maybe(Path_Error)) {
+	if f == nil || f.impl.fd == nil {
 		return "", Path_Error{err = .Invalid_Argument}
 	}
-	h := win32.HANDLE(fd)
+	h := win32.HANDLE(f.impl.fd)
 
 	MAX_PATH := win32.DWORD(260) + 1
 	buf: []u16
@@ -153,11 +153,11 @@ _cleanpath_from_handle :: proc(fd: Handle) -> (string, Maybe(Path_Error)) {
 	return _cleanpath_from_buf(buf), nil
 }
 
-_cleanpath_from_handle_u16 :: proc(fd: Handle) -> ([]u16, Maybe(Path_Error)) {
-	if fd == 0 {
+_cleanpath_from_handle_u16 :: proc(f: ^File) -> ([]u16, Maybe(Path_Error)) {
+	if f == nil || f.impl.fd == nil {
 		return nil, Path_Error{err = .Invalid_Argument}
 	}
-	h := win32.HANDLE(fd)
+	h := win32.HANDLE(f.impl.fd)
 
 	MAX_PATH := win32.DWORD(260) + 1
 	buf: []u16

@@ -4,68 +4,77 @@ package os2
 import "core:io"
 import "core:time"
 
-_create :: proc(name: string) -> (Handle, Error) {
-	return 0, nil
+_File :: struct {
+	fd:   rawptr,
+	name: string,
 }
 
-_open :: proc(name: string) -> (Handle, Error) {
-	return 0, nil
+_create :: proc(name: string) -> (^File, Error) {
+	return nil, nil
 }
 
-_open_file :: proc(name: string, flag: int, perm: File_Mode) -> (Handle, Error) {
-	return 0, nil
+_open :: proc(name: string) -> (^File, Error) {
+	return nil, nil
 }
 
-_close :: proc(fd: Handle) -> Error {
+_open_file :: proc(name: string, flag: int, perm: File_Mode) -> (^File, Error) {
+	return nil, nil
+}
+
+_new_file :: proc(handle: uintptr, name: string) -> ^File {
 	return nil
 }
 
-_name :: proc(fd: Handle, allocator := context.allocator) -> string {
+_close :: proc(f: ^File) -> Error {
+	return nil
+}
+
+_name :: proc(f: ^File, allocator := context.allocator) -> string {
 	return ""
 }
 
-_seek :: proc(fd: Handle, offset: i64, whence: Seek_From) -> (ret: i64, err: Error) {
+_seek :: proc(f: ^File, offset: i64, whence: Seek_From) -> (ret: i64, err: Error) {
 	return
 }
 
-_read :: proc(fd: Handle, p: []byte) -> (n: int, err: Error) {
+_read :: proc(f: ^File, p: []byte) -> (n: int, err: Error) {
 	return
 }
 
-_read_at :: proc(fd: Handle, p: []byte, offset: i64) -> (n: int, err: Error) {
+_read_at :: proc(f: ^File, p: []byte, offset: i64) -> (n: int, err: Error) {
 	return
 }
 
-_read_from :: proc(fd: Handle, r: io.Reader) -> (n: i64, err: Error) {
+_read_from :: proc(f: ^File, r: io.Reader) -> (n: i64, err: Error) {
 	return
 }
 
-_write :: proc(fd: Handle, p: []byte) -> (n: int, err: Error) {
+_write :: proc(f: ^File, p: []byte) -> (n: int, err: Error) {
 	return
 }
 
-_write_at :: proc(fd: Handle, p: []byte, offset: i64) -> (n: int, err: Error) {
+_write_at :: proc(f: ^File, p: []byte, offset: i64) -> (n: int, err: Error) {
 	return
 }
 
-_write_to :: proc(fd: Handle, w: io.Writer) -> (n: i64, err: Error) {
+_write_to :: proc(f: ^File, w: io.Writer) -> (n: i64, err: Error) {
 	return
 }
 
-_file_size :: proc(fd: Handle) -> (n: i64, err: Error) {
+_file_size :: proc(f: ^File) -> (n: i64, err: Error) {
 	return
 }
 
 
-_sync :: proc(fd: Handle) -> Error {
+_sync :: proc(f: ^File) -> Error {
 	return nil
 }
 
-_flush :: proc(fd: Handle) -> Error {
+_flush :: proc(f: ^File) -> Error {
 	return nil
 }
 
-_truncate :: proc(fd: Handle, size: i64) -> Maybe(Path_Error) {
+_truncate :: proc(f: ^File, size: i64) -> Maybe(Path_Error) {
 	return nil
 }
 
@@ -91,15 +100,15 @@ _read_link :: proc(name: string) -> (string, Maybe(Path_Error)) {
 }
 
 
-_chdir :: proc(fd: Handle) -> Error {
+_chdir :: proc(f: ^File) -> Error {
 	return nil
 }
 
-_chmod :: proc(fd: Handle, mode: File_Mode) -> Error {
+_chmod :: proc(f: ^File, mode: File_Mode) -> Error {
 	return nil
 }
 
-_chown :: proc(fd: Handle, uid, gid: int) -> Error {
+_chown :: proc(f: ^File, uid, gid: int) -> Error {
 	return nil
 }
 

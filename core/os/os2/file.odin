@@ -3,7 +3,9 @@ package os2
 import "core:io"
 import "core:time"
 
-Handle :: distinct uintptr
+File :: struct {
+	impl: _File,
+}
 
 Seek_From :: enum {
 	Start   = 0, // seek relative to the origin of the file
@@ -30,74 +32,79 @@ O_TRUNC  :: int(64)
 
 
 
-stdin:  Handle = 0 // OS-Specific
-stdout: Handle = 1 // OS-Specific
-stderr: Handle = 2 // OS-Specific
+stdin:  ^File = nil // OS-Specific
+stdout: ^File = nil // OS-Specific
+stderr: ^File = nil // OS-Specific
 
 
-create :: proc(name: string) -> (Handle, Error) {
+create :: proc(name: string) -> (^File, Error) {
 	return _create(name)
 }
 
-open :: proc(name: string) -> (Handle, Error) {
+open :: proc(name: string) -> (^File, Error) {
 	return _open(name)
 }
 
-open_file :: proc(name: string, flag: int, perm: File_Mode) -> (Handle, Error) {
+open_file :: proc(name: string, flag: int, perm: File_Mode) -> (^File, Error) {
 	return _open_file(name, flag, perm)
 }
 
-close :: proc(fd: Handle) -> Error {
-	return _close(fd)
-}
-
-name :: proc(fd: Handle, allocator := context.allocator) -> string {
-	return _name(fd)
-}
-
-seek :: proc(fd: Handle, offset: i64, whence: Seek_From) -> (ret: i64, err: Error) {
-	return _seek(fd, offset, whence)
-}
-
-read :: proc(fd: Handle, p: []byte) -> (n: int, err: Error) {
-	return _read(fd, p)
-}
-
-read_at :: proc(fd: Handle, p: []byte, offset: i64) -> (n: int, err: Error) {
-	return _read_at(fd, p, offset)
-}
-
-read_from :: proc(fd: Handle, r: io.Reader) -> (n: i64, err: Error) {
-	return _read_from(fd, r)
-}
-
-write :: proc(fd: Handle, p: []byte) -> (n: int, err: Error) {
-	return _write(fd, p)
-}
-
-write_at :: proc(fd: Handle, p: []byte, offset: i64) -> (n: int, err: Error) {
-	return _write_at(fd, p, offset)
-}
-
-write_to :: proc(fd: Handle, w: io.Writer) -> (n: i64, err: Error) {
-	return _write_to(fd, w)
-}
-
-file_size :: proc(fd: Handle) -> (n: i64, err: Error) {
-	return _file_size(fd)
+new_file :: proc(handle: uintptr, name: string) -> ^File {
+	return _new_file(handle, name)
 }
 
 
-sync :: proc(fd: Handle) -> Error {
-	return _sync(fd)
+close :: proc(f: ^File) -> Error {
+	return _close(f)
 }
 
-flush :: proc(fd: Handle) -> Error {
-	return _flush(fd)
+name :: proc(f: ^File, allocator := context.allocator) -> string {
+	return _name(f)
 }
 
-truncate :: proc(fd: Handle, size: i64) -> Maybe(Path_Error) {
-	return _truncate(fd, size)
+seek :: proc(f: ^File, offset: i64, whence: Seek_From) -> (ret: i64, err: Error) {
+	return _seek(f, offset, whence)
+}
+
+read :: proc(f: ^File, p: []byte) -> (n: int, err: Error) {
+	return _read(f, p)
+}
+
+read_at :: proc(f: ^File, p: []byte, offset: i64) -> (n: int, err: Error) {
+	return _read_at(f, p, offset)
+}
+
+read_from :: proc(f: ^File, r: io.Reader) -> (n: i64, err: Error) {
+	return _read_from(f, r)
+}
+
+write :: proc(f: ^File, p: []byte) -> (n: int, err: Error) {
+	return _write(f, p)
+}
+
+write_at :: proc(f: ^File, p: []byte, offset: i64) -> (n: int, err: Error) {
+	return _write_at(f, p, offset)
+}
+
+write_to :: proc(f: ^File, w: io.Writer) -> (n: i64, err: Error) {
+	return _write_to(f, w)
+}
+
+file_size :: proc(f: ^File) -> (n: i64, err: Error) {
+	return _file_size(f)
+}
+
+
+sync :: proc(f: ^File) -> Error {
+	return _sync(f)
+}
+
+flush :: proc(f: ^File) -> Error {
+	return _flush(f)
+}
+
+truncate :: proc(f: ^File, size: i64) -> Maybe(Path_Error) {
+	return _truncate(f, size)
 }
 
 remove :: proc(name: string) -> Maybe(Path_Error) {
@@ -122,16 +129,16 @@ read_link :: proc(name: string) -> (string, Maybe(Path_Error)) {
 }
 
 
-chdir :: proc(fd: Handle) -> Error {
-	return _chdir(fd)
+chdir :: proc(f: ^File) -> Error {
+	return _chdir(f)
 }
 
-chmod :: proc(fd: Handle, mode: File_Mode) -> Error {
-	return _chmod(fd, mode)
+chmod :: proc(f: ^File, mode: File_Mode) -> Error {
+	return _chmod(f, mode)
 }
 
-chown :: proc(fd: Handle, uid, gid: int) -> Error {
-	return _chown(fd, uid, gid)
+chown :: proc(f: ^File, uid, gid: int) -> Error {
+	return _chown(f, uid, gid)
 }
 
 
