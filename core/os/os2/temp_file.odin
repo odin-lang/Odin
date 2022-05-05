@@ -1,7 +1,7 @@
 package os2
 
 
-create_temp :: proc(dir, pattern: string) -> (Handle, Error) {
+create_temp :: proc(dir, pattern: string) -> (^File, Error) {
 	return _create_temp(dir, pattern)
 }
 
