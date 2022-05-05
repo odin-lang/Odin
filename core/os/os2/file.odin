@@ -21,14 +21,27 @@ File_Mode_Char_Device :: File_Mode(1<<19)
 File_Mode_Sym_Link    :: File_Mode(1<<20)
 
 
-O_RDONLY :: int( 0)
-O_WRONLY :: int( 1)
-O_RDWR   :: int( 2)
-O_APPEND :: int( 4)
-O_CREATE :: int( 8)
-O_EXCL   :: int(16)
-O_SYNC   :: int(32)
-O_TRUNC  :: int(64)
+File_Flags :: distinct bit_set[File_Flag; uint]
+File_Flag :: enum {
+	Read,
+	Write,
+	Append,
+	Create,
+	Excl,
+	Sync,
+	Trunc,
+	Sparse,
+}
+
+O_RDONLY :: File_Flags{.Read}
+O_WRONLY :: File_Flags{.Write}
+O_RDWR   :: File_Flags{.Read, .Write}
+O_APPEND :: File_Flags{.Append}
+O_CREATE :: File_Flags{.Create}
+O_EXCL   :: File_Flags{.Excl}
+O_SYNC   :: File_Flags{.Sync}
+O_TRUNC  :: File_Flags{.Trunc}
+O_SPARSE :: File_Flags{.Sparse}
 
 
 
@@ -38,19 +51,19 @@ stderr: ^File = nil // OS-Specific
 
 
 create :: proc(name: string) -> (^File, Error) {
-	return _create(name)
+	return open(name, {.Read, .Write, .Create}, File_Mode(0o777))
 }
 
-open :: proc(name: string) -> (^File, Error) {
-	return _open(name)
-}
-
-open_file :: proc(name: string, flag: int, perm: File_Mode) -> (^File, Error) {
-	return _open_file(name, flag, perm)
+open :: proc(name: string, flags := File_Flags{.Read}, perm := File_Mode(0o777)) -> (^File, Error) {
+	return _open(name, flags, perm)
 }
 
 new_file :: proc(handle: uintptr, name: string) -> ^File {
 	return _new_file(handle, name)
+}
+
+fd :: proc(f: ^File) -> uintptr {
+	return _fd(f)
 }
 
 
@@ -58,7 +71,7 @@ close :: proc(f: ^File) -> Error {
 	return _close(f)
 }
 
-name :: proc(f: ^File, allocator := context.allocator) -> string {
+name :: proc(f: ^File) -> string {
 	return _name(f)
 }
 
@@ -103,28 +116,28 @@ flush :: proc(f: ^File) -> Error {
 	return _flush(f)
 }
 
-truncate :: proc(f: ^File, size: i64) -> Maybe(Path_Error) {
+truncate :: proc(f: ^File, size: i64) -> Error {
 	return _truncate(f, size)
 }
 
-remove :: proc(name: string) -> Maybe(Path_Error) {
+remove :: proc(name: string) -> Error {
 	return _remove(name)
 }
 
-rename :: proc(old_path, new_path: string) -> Maybe(Path_Error) {
+rename :: proc(old_path, new_path: string) -> Error {
 	return _rename(old_path, new_path)
 }
 
 
-link :: proc(old_name, new_name: string) -> Maybe(Link_Error) {
+link :: proc(old_name, new_name: string) -> Error {
 	return _link(old_name, new_name)
 }
 
-symlink :: proc(old_name, new_name: string) -> Maybe(Link_Error) {
+symlink :: proc(old_name, new_name: string) -> Error {
 	return _symlink(old_name, new_name)
 }
 
-read_link :: proc(name: string) -> (string, Maybe(Path_Error)) {
+read_link :: proc(name: string) -> (string, Error) {
 	return _read_link(name)
 }
 
@@ -147,7 +160,7 @@ lchown :: proc(name: string, uid, gid: int) -> Error {
 }
 
 
-chtimes :: proc(name: string, atime, mtime: time.Time) -> Maybe(Path_Error) {
+chtimes :: proc(name: string, atime, mtime: time.Time) -> Error {
 	return _chtimes(name, atime, mtime)
 }
 

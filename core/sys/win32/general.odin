@@ -30,7 +30,7 @@ Monitor_Enum_Proc :: distinct #type proc "std" (Hmonitor, Hdc, ^Rect, Lparam) ->
 
 Bool :: distinct b32
 
-Wstring :: distinct ^u16
+Wstring :: distinct [^]u16
 
 Point :: struct {
 	x, y: i32,
