@@ -746,6 +746,8 @@ dynamic_pool_reset :: proc(using pool: ^Dynamic_Pool) {
 		free(a, block_allocator)
 	}
 	clear(&out_band_allocations)
+
+	bytes_left = 0 // Make new allocations call `cycle_new_block` again.
 }
 
 dynamic_pool_free_all :: proc(using pool: ^Dynamic_Pool) {
