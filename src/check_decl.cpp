@@ -1018,18 +1018,16 @@ void check_proc_decl(CheckerContext *ctx, Entity *e, DeclInfo *d) {
 		}
 		Entity *foreign_library = init_entity_foreign_library(ctx, e);
 		
-		if (is_arch_wasm()) {
+		if (is_arch_wasm() && foreign_library != nullptr) {
 			String module_name = str_lit("env");
-			if (foreign_library != nullptr) {
-				GB_ASSERT (foreign_library->kind == Entity_LibraryName);
-				if (foreign_library->LibraryName.paths.count != 1) {
-					error(foreign_library->token, "'foreign import' for '%.*s' architecture may only have one path, got %td", 
-					      LIT(target_arch_names[build_context.metrics.arch]), foreign_library->LibraryName.paths.count);
-				}
-				
-				if (foreign_library->LibraryName.paths.count >= 1) {
-					module_name = foreign_library->LibraryName.paths[0];
-				}
+			GB_ASSERT (foreign_library->kind == Entity_LibraryName);
+			if (foreign_library->LibraryName.paths.count != 1) {
+				error(foreign_library->token, "'foreign import' for '%.*s' architecture may only have one path, got %td",
+				      LIT(target_arch_names[build_context.metrics.arch]), foreign_library->LibraryName.paths.count);
+			}
+
+			if (foreign_library->LibraryName.paths.count >= 1) {
+				module_name = foreign_library->LibraryName.paths[0];
 			}
 			name = concatenate3_strings(permanent_allocator(), module_name, WASM_MODULE_NAME_SEPARATOR, name);
 		}
