@@ -68,5 +68,5 @@ foreign gdi32 {
 }
 
 RGB :: #force_inline proc "contextless" (r, g, b: u8) -> COLORREF {
-	return COLORREF(r) | COLORREF(WORD(g) << 8) | COLORREF(DWORD(b) << 16)
+	return transmute(COLORREF)[4]u8{r, g, b, 0}
 }
