@@ -758,3 +758,18 @@ foreign kernel32 {
 		UnmapFlags: ULONG,
 	) -> BOOL ---
 }
+
+@(default_calling_convention = "std")
+foreign kernel32 {
+	@(link_name="SetConsoleCtrlHandler") set_console_ctrl_handler :: proc(handler: Handler_Routine, add: BOOL) -> BOOL ---
+}
+
+Handler_Routine :: proc(dwCtrlType: Control_Event) -> BOOL
+
+Control_Event :: enum DWORD {
+	control_c = 0,
+	_break    = 1,
+	close     = 2,
+	logoff    = 5,
+	shutdown  = 6,
+}
