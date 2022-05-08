@@ -238,6 +238,7 @@ foreign kernel32 {
 		bInitialState: BOOL,
 		lpName: LPCWSTR,
 	) -> HANDLE ---
+	ResetEvent :: proc(hEvent: HANDLE) -> BOOL ---
 	WaitForMultipleObjects :: proc(
 		nCount: DWORD,
 		lpHandles: ^HANDLE,
@@ -265,6 +266,17 @@ foreign kernel32 {
 	HeapAlloc :: proc(hHeap: HANDLE, dwFlags: DWORD, dwBytes: SIZE_T) -> LPVOID ---
 	HeapReAlloc :: proc(hHeap: HANDLE, dwFlags: DWORD, lpMem: LPVOID, dwBytes: SIZE_T) -> LPVOID ---
 	HeapFree :: proc(hHeap: HANDLE, dwFlags: DWORD, lpMem: LPVOID) -> BOOL ---
+
+	ReadDirectoryChangesW :: proc(
+		hDirectory: HANDLE,
+		lpBuffer: LPVOID,
+		nBufferLength: DWORD,
+		bWatchSubtree: BOOL,
+		dwNotifyFilter: DWORD,
+		lpBytesReturned: LPDWORD,
+		lpOverlapped: LPOVERLAPPED,
+		lpCompletionRoutine: LPOVERLAPPED_COMPLETION_ROUTINE,
+	) -> BOOL ---
 
 	InitializeSRWLock          :: proc(SRWLock: ^SRWLOCK) ---
 	AcquireSRWLockExclusive    :: proc(SRWLock: ^SRWLOCK) ---
