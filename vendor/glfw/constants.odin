@@ -7,8 +7,8 @@ VERSION_MINOR    :: 3
 VERSION_REVISION :: 4
 
 /* Booleans */
-TRUE  :: true
-FALSE :: false
+TRUE  :: 1
+FALSE :: 0
 
 /* Button/Key states */
 RELEASE :: 0
