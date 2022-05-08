@@ -105,6 +105,7 @@ foreign user32 {
 	GetWindowRect :: proc(hWnd: HWND, lpRect: LPRECT) -> BOOL ---
 	GetClientRect :: proc(hWnd: HWND, lpRect: LPRECT) -> BOOL ---
 	ClientToScreen :: proc(hWnd: HWND, lpPoint: LPPOINT) -> BOOL ---
+	ScreenToClient :: proc(hWnd: HWND, lpPoint: LPPOINT) -> BOOL ---
 	SetWindowPos :: proc(
 		hWnd: HWND,
 		hWndInsertAfter: HWND,
@@ -155,6 +156,11 @@ foreign user32 {
 	MessageBoxW :: proc(hWnd: HWND, lpText: LPCWSTR, lpCaption: LPCWSTR, uType: UINT) -> c_int ---
 	MessageBoxExA :: proc(hWnd: HWND, lpText: LPCSTR, lpCaption: LPCSTR, uType: UINT, wLanguageId: WORD) -> c_int ---
 	MessageBoxExW :: proc(hWnd: HWND, lpText: LPCWSTR, lpCaption: LPCWSTR, uType: UINT, wLanguageId: WORD) -> c_int ---
+
+	ClipCursor :: proc(lpRect: LPRECT) -> BOOL ---
+	GetCursorPos :: proc(lpPoint: LPPOINT) -> BOOL ---
+	SetCursorPos :: proc(X: c_int, Y: c_int) -> BOOL ---
+	SetCursor :: proc(hCursor: HCURSOR) -> HCURSOR ---
 }
 
 CreateWindowA :: #force_inline proc "stdcall" (
