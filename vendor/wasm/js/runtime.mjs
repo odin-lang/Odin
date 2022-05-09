@@ -94,7 +94,7 @@ function odinSetupDefaultImports(wasmMemoryInterface, consoleElement) {
 	const MAX_INFO_CONSOLE_LINES = 512;
 	let infoConsoleLines = new Array();
 	const addConsoleLine = (line) => {
-		if (line === undefined) {
+		if (!line) {
 			return;
 		}
 		if (line.endsWith("\n")) {
@@ -117,7 +117,7 @@ function odinSetupDefaultImports(wasmMemoryInterface, consoleElement) {
 			data = data.concat(infoConsoleLines[i]);
 		}
 
-		if (consoleElement !== undefined) {
+		if (consoleElement) {
 			let info = consoleElement;
 			info.innerHTML = data;
 			info.scrollTop = info.scrollHeight;
@@ -165,7 +165,7 @@ function odinSetupDefaultImports(wasmMemoryInterface, consoleElement) {
 				let offset = ep;
 				let off = (amount, alignment) => {
 					if (alignment === undefined) {
-						alignment = amount;
+						alignment = Math.min(amount, W);
 					}
 					if (offset % alignment != 0) {
 						offset += alignment - (offset%alignment);
@@ -207,7 +207,7 @@ function odinSetupDefaultImports(wasmMemoryInterface, consoleElement) {
 				wmi.storeU8(off(1), !!e.isComposing);
 				wmi.storeU8(off(1), !!e.isTrusted);
 
-				off(0, 8);
+				let base = off(0, 8);
 				if (e instanceof MouseEvent) {
 					wmi.storeI64(off(8), e.screenX);
 					wmi.storeI64(off(8), e.screenY);
@@ -219,8 +219,6 @@ function odinSetupDefaultImports(wasmMemoryInterface, consoleElement) {
 					wmi.storeI64(off(8), e.pageY);
 					wmi.storeI64(off(8), e.movementX);
 					wmi.storeI64(off(8), e.movementY);
-					wmi.storeI64(off(8), e.x);
-					wmi.storeI64(off(8), e.y);
 
 					wmi.storeU8(off(1), !!e.ctrlKey);
 					wmi.storeU8(off(1), !!e.shiftKey);
@@ -339,30 +337,37 @@ function odinSetupDefaultImports(wasmMemoryInterface, consoleElement) {
 			get_element_value_f64: (id_ptr, id_len) => {
 				let id = wasmMemoryInterface.loadString(id_ptr, id_len);
 				let element = document.getElementById(id);
-				return element.value;
+				return element ? element.value : 0;
 			},
 			get_element_value_string: (id_ptr, id_len, buf_ptr, buf_len) => {
 				let id = wasmMemoryInterface.loadString(id_ptr, id_len);
 				let element = document.getElementById(id);
-				let str = element.value;
-				if (buf_len > 0 && buf_ptr) {
-					let n = Math.min(buf_len, str.length);
-					str = str.substring(0, n);
-					this.mem.loadBytes(buf_ptr, buf_len).set(new TextEncoder("utf-8").encode(str))
-					return n;
+				if (element) {
+					let str = element.value;
+					if (buf_len > 0 && buf_ptr) {
+						let n = Math.min(buf_len, str.length);
+						str = str.substring(0, n);
+						this.mem.loadBytes(buf_ptr, buf_len).set(new TextEncoder("utf-8").encode(str))
+						return n;
+					}
 				}
 				return 0;
 			},
 			get_element_min_max: (ptr_array2_f64, id_ptr, id_len) => {
 				let id = wasmMemoryInterface.loadString(id_ptr, id_len);
 				let element = document.getElementById(id);
-				let values = wasmMemoryInterface.loadF64Array(ptr_array2_f64, 2);
-				values[0] = element.min;
-				values[1] = element.max;
+				if (element) {
+					let values = wasmMemoryInterface.loadF64Array(ptr_array2_f64, 2);
+					values[0] = element.min;
+					values[1] = element.max;
+				}
 			},
 			set_element_value: (id_ptr, id_len, value) => {
 				let id = wasmMemoryInterface.loadString(id_ptr, id_len);
-				document.getElementById(id).value = value;
+				let element = document.getElementById(id);
+				if (element) {
+					element.value = value;
+				}
 			},
 		},
 	};
