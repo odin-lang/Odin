@@ -182,7 +182,6 @@ Event_Phase :: enum u8 {
 	Bubbling_Phase  = 3,
 }
 
-
 Event :: struct {
 	kind:                 Event_Kind,
 	target_kind:          Event_Target_Kind,
@@ -231,7 +230,6 @@ Event :: struct {
 			offset:    [2]i64,
 			page:      [2]i64,
 			movement:  [2]i64,
-			using pos: [2]i64,
 
 			ctrl:   bool,
 			shift:  bool,
