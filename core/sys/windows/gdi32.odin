@@ -67,8 +67,6 @@ foreign gdi32 {
 	PatBlt :: proc(hdc: HDC, x, y, w, h: c_int, rop: DWORD) -> BOOL ---
 }
 
-// Windows colors are packed as ABGR
 RGB :: #force_inline proc "contextless" (r, g, b: u8) -> COLORREF {
-	res: [4]u8 = {0, b, g, r}
-	return transmute(COLORREF)res
+	return transmute(COLORREF)[4]u8{r, g, b, 0}
 }

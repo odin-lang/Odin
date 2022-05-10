@@ -6,6 +6,8 @@ import "core:time"
 import "core:testing"
 import "core:fmt"
 import "core:os"
+import "core:math/rand"
+import "core:intrinsics"
 
 TEST_count := 0
 TEST_fail  := 0
@@ -31,8 +33,10 @@ when ODIN_TEST {
 main :: proc() {
 	t := testing.T{}
 	test_benchmark_runner(&t)
-	test_xxhash_vectors(&t)
 	test_crc64_vectors(&t)
+	test_xxhash_vectors(&t)
+	test_xxhash_large(&t)
+
 	fmt.printf("%v/%v tests successful.\n", TEST_count - TEST_fail, TEST_count)
 	if TEST_fail > 0 {
 		os.exit(1)
@@ -189,6 +193,104 @@ test_benchmark_runner :: proc(t: ^testing.T) {
 	expect(t, err == nil, name)
 	expect(t, options.hash == 0xb6ef17a3448492b6918780b90550bf34, name)
 	benchmark_print(name, options)
+}
+
+@test
+test_xxhash_large :: proc(t: ^testing.T) {
+	many_zeroes := make([]u8, 16 * 1024 * 1024)
+	defer delete(many_zeroes)
+
+	// All at once.
+	for i, v in ZERO_VECTORS {
+		b := many_zeroes[:i]
+
+		fmt.printf("[test_xxhash_large] All at once. Size: %v\n", i)
+
+		xxh32    := xxhash.XXH32(b)
+		xxh64    := xxhash.XXH64(b)
+		xxh3_64  := xxhash.XXH3_64(b)
+		xxh3_128 := xxhash.XXH3_128(b)
+
+		xxh32_error     := fmt.tprintf("[   XXH32(%03d) ] Expected: %08x. Got: %08x.", i,   v.xxh_32,   xxh32)
+		xxh64_error     := fmt.tprintf("[   XXH64(%03d) ] Expected: %16x. Got: %16x.", i,   v.xxh_64,   xxh64)
+		xxh3_64_error   := fmt.tprintf("[XXH3_64(%03d)  ] Expected: %16x. Got: %16x.", i,  v.xxh3_64, xxh3_64)
+		xxh3_128_error  := fmt.tprintf("[XXH3_128(%03d) ] Expected: %32x. Got: %32x.", i, v.xxh3_128, xxh3_128)
+
+		expect(t, xxh32     == v.xxh_32,   xxh32_error)
+		expect(t, xxh64     == v.xxh_64,   xxh64_error)
+		expect(t, xxh3_64   == v.xxh3_64,  xxh3_64_error)
+		expect(t, xxh3_128  == v.xxh3_128, xxh3_128_error)
+	}
+
+	when #config(RAND_STATE, -1) >= 0 && #config(RAND_INC, -1) >= 0 {
+		random_seed := rand.Rand{
+			state = u64(#config(RAND_STATE, -1)),
+			inc   = u64(#config(RAND_INC,   -1)),
+		}
+		fmt.printf("Using user-selected seed {{%v,%v}} for update size randomness.\n", random_seed.state, random_seed.inc)
+	} else {
+		random_seed := rand.create(u64(intrinsics.read_cycle_counter()))
+		fmt.printf("Randonly selected seed {{%v,%v}} for update size randomness.\n", random_seed.state, random_seed.inc)
+	}
+
+	// Streamed
+	for i, v in ZERO_VECTORS {
+		b := many_zeroes[:i]
+
+		fmt.printf("[test_xxhash_large] Streamed. Size: %v\n", i)
+
+		// bytes_per_update := []int{1, 42, 13, 7, 16, 5, 23, 74, 1024, 511, 1023, 47}
+		// update_size_idx: int
+
+		xxh_32_state, xxh_32_err := xxhash.XXH32_create_state()
+		defer xxhash.XXH32_destroy_state(xxh_32_state)
+		expect(t, xxh_32_err == nil, "Problem initializing XXH_32 state.")
+
+		xxh_64_state, xxh_64_err := xxhash.XXH64_create_state()
+		defer xxhash.XXH64_destroy_state(xxh_64_state)
+		expect(t, xxh_64_err == nil, "Problem initializing XXH_64 state.")
+
+		xxh3_64_state, xxh3_64_err := xxhash.XXH3_create_state()
+		defer xxhash.XXH3_destroy_state(xxh3_64_state)
+		expect(t, xxh3_64_err == nil, "Problem initializing XXH3_64 state.")
+
+		xxh3_128_state, xxh3_128_err := xxhash.XXH3_create_state()
+		defer xxhash.XXH3_destroy_state(xxh3_128_state)
+		expect(t, xxh3_128_err == nil, "Problem initializing XXH3_128 state.")
+
+		// XXH3_128_update
+
+		for len(b) > 0 {
+			update_size := min(len(b), rand.int_max(8192, &random_seed))
+			if update_size > 4096 {
+				update_size %= 73
+			}
+			xxhash.XXH32_update   (xxh_32_state,   b[:update_size])
+			xxhash.XXH64_update   (xxh_64_state,   b[:update_size])
+
+			xxhash.XXH3_64_update (xxh3_64_state,  b[:update_size])
+			xxhash.XXH3_128_update(xxh3_128_state, b[:update_size])
+
+			b = b[update_size:]
+		}
+
+		// Now finalize
+		xxh32    := xxhash.XXH32_digest(xxh_32_state)
+		xxh64    := xxhash.XXH64_digest(xxh_64_state)
+
+		xxh3_64  := xxhash.XXH3_64_digest(xxh3_64_state)
+		xxh3_128 := xxhash.XXH3_128_digest(xxh3_128_state)
+
+		xxh32_error     := fmt.tprintf("[   XXH32(%03d) ] Expected: %08x. Got: %08x.", i,   v.xxh_32,   xxh32)
+		xxh64_error     := fmt.tprintf("[   XXH64(%03d) ] Expected: %16x. Got: %16x.", i,   v.xxh_64,   xxh64)
+		xxh3_64_error   := fmt.tprintf("[XXH3_64(%03d)  ] Expected: %16x. Got: %16x.", i,  v.xxh3_64, xxh3_64)
+		xxh3_128_error  := fmt.tprintf("[XXH3_128(%03d) ] Expected: %32x. Got: %32x.", i, v.xxh3_128, xxh3_128)
+
+		expect(t, xxh32     == v.xxh_32,   xxh32_error)
+		expect(t, xxh64     == v.xxh_64,   xxh64_error)
+		expect(t, xxh3_64   == v.xxh3_64,  xxh3_64_error)
+		expect(t, xxh3_128  == v.xxh3_128, xxh3_128_error)
+	}
 }
 
 @test

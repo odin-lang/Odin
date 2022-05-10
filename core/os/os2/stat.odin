@@ -24,15 +24,15 @@ file_info_delete :: proc(fi: File_Info, allocator := context.allocator) {
 	delete(fi.fullpath, allocator)
 }
 
-fstat :: proc(fd: Handle, allocator := context.allocator) -> (File_Info, Maybe(Path_Error)) {
-	return _fstat(fd, allocator)
+fstat :: proc(f: ^File, allocator := context.allocator) -> (File_Info, Error) {
+	return _fstat(f, allocator)
 }
 
-stat :: proc(name: string, allocator := context.allocator) -> (File_Info, Maybe(Path_Error)) {
+stat :: proc(name: string, allocator := context.allocator) -> (File_Info, Error) {
 	return _stat(name, allocator)
 }
 
-lstat :: proc(name: string, allocator := context.allocator) -> (File_Info, Maybe(Path_Error)) {
+lstat :: proc(name: string, allocator := context.allocator) -> (File_Info, Error) {
 	return _lstat(name, allocator)
 }
 
