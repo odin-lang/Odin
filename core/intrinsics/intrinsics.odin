@@ -87,20 +87,20 @@ atomic_load           :: proc(dst: ^$T) -> T ---
 atomic_load_explicit  :: proc(dst: ^$T, order: Atomic_Memory_Order) -> T ---
 
 // fetch then operator
-atomic_add               :: proc(dst; ^$T, val: T) -> T ---
-atomic_add_explicit      :: proc(dst; ^$T, val: T, order: Atomic_Memory_Order) -> T ---
-atomic_sub               :: proc(dst; ^$T, val: T) -> T ---
-atomic_sub_explicit      :: proc(dst; ^$T, val: T, order: Atomic_Memory_Order) -> T ---
-atomic_and               :: proc(dst; ^$T, val: T) -> T ---
-atomic_and_explicit      :: proc(dst; ^$T, val: T, order: Atomic_Memory_Order) -> T ---
-atomic_nand              :: proc(dst; ^$T, val: T) -> T ---
-atomic_nand_explicit     :: proc(dst; ^$T, val: T, order: Atomic_Memory_Order) -> T ---
-atomic_or                :: proc(dst; ^$T, val: T) -> T ---
-atomic_or_explicit       :: proc(dst; ^$T, val: T, order: Atomic_Memory_Order) -> T ---
-atomic_xor               :: proc(dst; ^$T, val: T) -> T ---
-atomic_xor_explicit      :: proc(dst; ^$T, val: T, order: Atomic_Memory_Order) -> T ---
-atomic_exchange          :: proc(dst; ^$T, val: T) -> T ---
-atomic_exchange_explicit :: proc(dst; ^$T, val: T, order: Atomic_Memory_Order) -> T ---
+atomic_add               :: proc(dst: ^$T, val: T) -> T ---
+atomic_add_explicit      :: proc(dst: ^$T, val: T, order: Atomic_Memory_Order) -> T ---
+atomic_sub               :: proc(dst: ^$T, val: T) -> T ---
+atomic_sub_explicit      :: proc(dst: ^$T, val: T, order: Atomic_Memory_Order) -> T ---
+atomic_and               :: proc(dst: ^$T, val: T) -> T ---
+atomic_and_explicit      :: proc(dst: ^$T, val: T, order: Atomic_Memory_Order) -> T ---
+atomic_nand              :: proc(dst: ^$T, val: T) -> T ---
+atomic_nand_explicit     :: proc(dst: ^$T, val: T, order: Atomic_Memory_Order) -> T ---
+atomic_or                :: proc(dst: ^$T, val: T) -> T ---
+atomic_or_explicit       :: proc(dst: ^$T, val: T, order: Atomic_Memory_Order) -> T ---
+atomic_xor               :: proc(dst: ^$T, val: T) -> T ---
+atomic_xor_explicit      :: proc(dst: ^$T, val: T, order: Atomic_Memory_Order) -> T ---
+atomic_exchange          :: proc(dst: ^$T, val: T) -> T ---
+atomic_exchange_explicit :: proc(dst: ^$T, val: T, order: Atomic_Memory_Order) -> T ---
 
 atomic_compare_exchange_strong          :: proc(dst: ^$T, old, new: T) -> (T, bool) #optional_ok ---
 atomic_compare_exchange_strong_explicit :: proc(dst: ^$T, old, new: T, success, failure: Atomic_Memory_Order) -> (T, bool) #optional_ok ---
