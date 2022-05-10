@@ -189,7 +189,7 @@ lbProcedure *lb_create_procedure(lbModule *m, Entity *entity, bool ignore_body) 
 				GB_ASSERT(entity->kind == Entity_Procedure);
 				String link_name = entity->Procedure.link_name;
 				if (entity->flags & EntityFlag_CustomLinkName && 
-				    link_name != "") {
+					link_name != "") {
 					if (string_starts_with(link_name, str_lit("__"))) {
 						LLVMSetLinkage(p->value, LLVMExternalLinkage);
 					} else {
@@ -200,12 +200,12 @@ lbProcedure *lb_create_procedure(lbModule *m, Entity *entity, bool ignore_body) 
 		}
 	}
 	lb_set_linkage_from_entity_flags(p->module, p->value, entity->flags);
-	
-	
+
+
 	if (p->is_foreign) {
 		lb_set_wasm_import_attributes(p->value, entity, p->name);
 	}
-	
+
 
 	// NOTE(bill): offset==0 is the return value
 	isize offset = 1;
@@ -280,7 +280,7 @@ lbProcedure *lb_create_procedure(lbModule *m, Entity *entity, bool ignore_body) 
 		if (p->body != nullptr) {
 			// String debug_name = entity->token.string.text;
 			String debug_name = p->name;
-			
+
 			p->debug_info = LLVMDIBuilderCreateFunction(m->debug_builder, scope,
 				cast(char const *)debug_name.text, debug_name.len,
 				cast(char const *)p->name.text, p->name.len,
@@ -823,12 +823,6 @@ lbValue lb_emit_call(lbProcedure *p, lbValue value, Array<lbValue> const &args, 
 	GB_ASSERT(pt->kind == Type_Proc);
 	Type *results = pt->Proc.results;
 
-	if (p->entity != nullptr) {
-		if (p->entity->flags & EntityFlag_Disabled) {
-			return {};
-		}
-	}
-
 	lbAddr context_ptr = {};
 	if (pt->Proc.calling_convention == ProcCC_Odin) {
 		context_ptr = lb_find_or_generate_context_ptr(p);
@@ -1315,22 +1309,22 @@ lbValue lb_build_builtin_proc(lbProcedure *p, Ast *expr, TypeAndValue const &tv,
 
 	case BuiltinProc_clamp:
 		return lb_emit_clamp(p, type_of_expr(expr),
-		                     lb_build_expr(p, ce->args[0]),
-		                     lb_build_expr(p, ce->args[1]),
-		                     lb_build_expr(p, ce->args[2]));
+							 lb_build_expr(p, ce->args[0]),
+							 lb_build_expr(p, ce->args[1]),
+							 lb_build_expr(p, ce->args[2]));
 
 
 	case BuiltinProc_soa_zip:
 		return lb_soa_zip(p, ce, tv);
 	case BuiltinProc_soa_unzip:
 		return lb_soa_unzip(p, ce, tv);
-		
+
 	case BuiltinProc_transpose:
 		{
 			lbValue m = lb_build_expr(p, ce->args[0]);
 			return lb_emit_matrix_tranpose(p, m, tv.type);
 		}
-		
+
 	case BuiltinProc_outer_product:
 		{
 			lbValue a = lb_build_expr(p, ce->args[0]);
@@ -1347,13 +1341,13 @@ lbValue lb_build_builtin_proc(lbProcedure *p, Ast *expr, TypeAndValue const &tv,
 			GB_ASSERT(is_type_matrix(tv.type));
 			return lb_emit_arith_matrix(p, Token_Mul, a, b, tv.type, true);
 		}
-		
+
 	case BuiltinProc_matrix_flatten:
 		{
 			lbValue m = lb_build_expr(p, ce->args[0]);
 			return lb_emit_matrix_flatten(p, m, tv.type);
 		}
-		
+
 	// "Intrinsics"
 
 	case BuiltinProc_alloca:
@@ -1370,7 +1364,7 @@ lbValue lb_build_builtin_proc(lbProcedure *p, Ast *expr, TypeAndValue const &tv,
 
 	case BuiltinProc_cpu_relax:
 		if (build_context.metrics.arch == TargetArch_i386 ||
-		    build_context.metrics.arch == TargetArch_amd64) {
+			build_context.metrics.arch == TargetArch_amd64) {
 			LLVMTypeRef func_type = LLVMFunctionType(LLVMVoidTypeInContext(p->module->ctx), nullptr, 0, false);
 			LLVMValueRef the_asm = llvm_get_inline_asm(func_type, str_lit("pause"), {}, true);
 			GB_ASSERT(the_asm != nullptr);
@@ -1538,7 +1532,7 @@ lbValue lb_build_builtin_proc(lbProcedure *p, Ast *expr, TypeAndValue const &tv,
 			lbValue dst = lb_build_expr(p, ce->args[0]);
 			lbValue src = lb_build_expr(p, ce->args[1]);
 			lbValue len = lb_build_expr(p, ce->args[2]);
-			
+
 			lb_mem_copy_overlapping(p, dst, src, len, false);
 			return {};
 		}
@@ -1547,7 +1541,7 @@ lbValue lb_build_builtin_proc(lbProcedure *p, Ast *expr, TypeAndValue const &tv,
 			lbValue dst = lb_build_expr(p, ce->args[0]);
 			lbValue src = lb_build_expr(p, ce->args[1]);
 			lbValue len = lb_build_expr(p, ce->args[2]);
-			
+
 			lb_mem_copy_non_overlapping(p, dst, src, len, false);
 			return {};
 		}
@@ -1651,7 +1645,7 @@ lbValue lb_build_builtin_proc(lbProcedure *p, Ast *expr, TypeAndValue const &tv,
 		res.type = type_deref(dst.type);
 		return res;
 	}
-	
+
 	case BuiltinProc_unaligned_store:
 		{
 			lbValue dst = lb_build_expr(p, ce->args[0]);
@@ -1661,7 +1655,7 @@ lbValue lb_build_builtin_proc(lbProcedure *p, Ast *expr, TypeAndValue const &tv,
 			lb_mem_copy_non_overlapping(p, dst, src, lb_const_int(p->module, t_int, type_size_of(t)), false);
 			return {};
 		}
-	
+
 	case BuiltinProc_unaligned_load:
 		{
 			lbValue src = lb_build_expr(p, ce->args[0]);
@@ -1843,7 +1837,7 @@ lbValue lb_build_builtin_proc(lbProcedure *p, Ast *expr, TypeAndValue const &tv,
 			res.type = t;
 			return lb_emit_conv(p, res, t);
 		}
-		
+
 	case BuiltinProc_prefetch_read_instruction:
 	case BuiltinProc_prefetch_read_data:
 	case BuiltinProc_prefetch_write_instruction:
@@ -1871,27 +1865,27 @@ lbValue lb_build_builtin_proc(lbProcedure *p, Ast *expr, TypeAndValue const &tv,
 				cache = 1;
 				break;
 			}
-			
+
 			char const *name = "llvm.prefetch";
-			
+
 			LLVMTypeRef types[1] = {lb_type(p->module, t_rawptr)};
 			unsigned id = LLVMLookupIntrinsicID(name, gb_strlen(name));
 			GB_ASSERT_MSG(id != 0, "Unable to find %s.%s", name, LLVMPrintTypeToString(types[0]));
 			LLVMValueRef ip = LLVMGetIntrinsicDeclaration(p->module->mod, id, types, gb_count_of(types));
-			
+
 			LLVMTypeRef llvm_i32 = lb_type(p->module, t_i32);
 			LLVMValueRef args[4] = {};
 			args[0] = ptr.value;
 			args[1] = LLVMConstInt(llvm_i32, rw, false);
 			args[2] = LLVMConstInt(llvm_i32, locality, false);
 			args[3] = LLVMConstInt(llvm_i32, cache, false);
-			
+
 			lbValue res = {};
 			res.value = LLVMBuildCall(p->builder, ip, args, gb_count_of(args), "");
 			res.type = nullptr;
 			return res;
 		}
-		
+
 	case BuiltinProc___entry_point:
 		if (p->module->info->entry_point) {
 			lbValue entry_point = lb_find_procedure_value_from_entity(p->module, p->module->info->entry_point);
@@ -1909,22 +1903,22 @@ lbValue lb_build_builtin_proc(lbProcedure *p, Ast *expr, TypeAndValue const &tv,
 				arg = lb_emit_conv(p, arg, t_uintptr);
 				args[i] = arg.value;
 			}
-			
+
 			LLVMTypeRef llvm_uintptr = lb_type(p->module, t_uintptr);
 			LLVMTypeRef *llvm_arg_types = gb_alloc_array(permanent_allocator(), LLVMTypeRef, arg_count);
 			for (unsigned i = 0; i < arg_count; i++) {
 				llvm_arg_types[i] = llvm_uintptr;
 			}
-			
+
 			LLVMTypeRef func_type = LLVMFunctionType(llvm_uintptr, llvm_arg_types, arg_count, false);
-			
+
 			LLVMValueRef inline_asm = nullptr;
-			
+
 			switch (build_context.metrics.arch) {
 			case TargetArch_amd64:
 				{
 					GB_ASSERT(arg_count <= 7);
-					
+
 					char asm_string[] = "syscall";
 					gbString constraints = gb_string_make(heap_allocator(), "={rax}");
 					for (unsigned i = 0; i < arg_count; i++) {
@@ -1963,11 +1957,11 @@ lbValue lb_build_builtin_proc(lbProcedure *p, Ast *expr, TypeAndValue const &tv,
 			case TargetArch_i386:
 				{
 					GB_ASSERT(arg_count <= 7);
-					
+
 					char asm_string_default[] = "int $0x80";
 					char *asm_string = asm_string_default;
 					gbString constraints = gb_string_make(heap_allocator(), "={eax}");
-					
+
 					for (unsigned i = 0; i < gb_min(arg_count, 6); i++) {
 						constraints = gb_string_appendc(constraints, ",{");
 						static char const *regs[] = {
@@ -1984,56 +1978,81 @@ lbValue lb_build_builtin_proc(lbProcedure *p, Ast *expr, TypeAndValue const &tv,
 					if (arg_count == 7) {
 						char asm_string7[] = "push %[arg6]\npush %%ebp\nmov 4(%%esp), %%ebp\nint $0x80\npop %%ebp\nadd $4, %%esp";
 						asm_string = asm_string7;
-						
+
 						constraints = gb_string_appendc(constraints, ",rm");
 					}
-					
+
 					inline_asm = llvm_get_inline_asm(func_type, make_string_c(asm_string), make_string_c(constraints));
 				}
 				break;
 			case TargetArch_arm64:
 				{
-                    GB_ASSERT(arg_count <= 7);
-                    
-                    if(build_context.metrics.os == TargetOs_darwin) {
-                        char asm_string[] = "svc #0x80";
-                        gbString constraints = gb_string_make(heap_allocator(), "={x0}");
-                        for (unsigned i = 0; i < arg_count; i++) {
-                            constraints = gb_string_appendc(constraints, ",{");
-                            static char const *regs[] = {
-                                "x16",
-                                "x0",
-                                "x1",
-                                "x2",
-                                "x3",
-                                "x4",
-                                "x5",
-                            };
-                            constraints = gb_string_appendc(constraints, regs[i]);
-                            constraints = gb_string_appendc(constraints, "}");
-                        }
+					GB_ASSERT(arg_count <= 7);
 
-                        inline_asm = llvm_get_inline_asm(func_type, make_string_c(asm_string), make_string_c(constraints));
-                    } else {
-                        char asm_string[] = "svc #0";
-                        gbString constraints = gb_string_make(heap_allocator(), "={x0}");
-                        for (unsigned i = 0; i < arg_count; i++) {
-                            constraints = gb_string_appendc(constraints, ",{");
-                            static char const *regs[] = {
-                                "x8",
-                                "x0",
-                                "x1",
-                                "x2",
-                                "x3",
-                                "x4",
-                                "x5",
-                            };
-                            constraints = gb_string_appendc(constraints, regs[i]);
-                            constraints = gb_string_appendc(constraints, "}");
-                        }
+					if(build_context.metrics.os == TargetOs_darwin) {
+						char asm_string[] = "svc #0x80";
+						gbString constraints = gb_string_make(heap_allocator(), "={x0}");
+						for (unsigned i = 0; i < arg_count; i++) {
+							constraints = gb_string_appendc(constraints, ",{");
+							static char const *regs[] = {
+								"x16",
+								"x0",
+								"x1",
+								"x2",
+								"x3",
+								"x4",
+								"x5",
+							};
+							constraints = gb_string_appendc(constraints, regs[i]);
+							constraints = gb_string_appendc(constraints, "}");
+						}
 
-                        inline_asm = llvm_get_inline_asm(func_type, make_string_c(asm_string), make_string_c(constraints));
-                    }
+						inline_asm = llvm_get_inline_asm(func_type, make_string_c(asm_string), make_string_c(constraints));
+					} else {
+						char asm_string[] = "svc #0";
+						gbString constraints = gb_string_make(heap_allocator(), "={x0}");
+						for (unsigned i = 0; i < arg_count; i++) {
+							constraints = gb_string_appendc(constraints, ",{");
+							static char const *regs[] = {
+								"x8",
+								"x0",
+								"x1",
+								"x2",
+								"x3",
+								"x4",
+								"x5",
+							};
+							constraints = gb_string_appendc(constraints, regs[i]);
+							constraints = gb_string_appendc(constraints, "}");
+						}
+
+						inline_asm = llvm_get_inline_asm(func_type, make_string_c(asm_string), make_string_c(constraints));
+					}
+				}
+				break;
+			case TargetArch_arm32:
+				{
+					// TODO(bill): Check this is correct
+					GB_ASSERT(arg_count <= 7);
+
+					char asm_string[] = "svc #0";
+					gbString constraints = gb_string_make(heap_allocator(), "={r0}");
+					for (unsigned i = 0; i < arg_count; i++) {
+						constraints = gb_string_appendc(constraints, ",{");
+						static char const *regs[] = {
+							"r8",
+							"r0",
+							"r1",
+							"r2",
+							"r3",
+							"r4",
+							"r5",
+						};
+						constraints = gb_string_appendc(constraints, regs[i]);
+						constraints = gb_string_appendc(constraints, "}");
+					}
+
+					inline_asm = llvm_get_inline_asm(func_type, make_string_c(asm_string), make_string_c(constraints));
 				}
 				break;
 			default:
@@ -2255,6 +2274,15 @@ lbValue lb_build_call_expr_internal(lbProcedure *p, Ast *expr) {
 	// NOTE(bill): Regular call
 	lbValue value = {};
 	Ast *proc_expr = unparen_expr(ce->proc);
+
+	Entity *proc_entity = entity_of_node(proc_expr);
+	if (proc_entity != nullptr) {
+		if (proc_entity->flags & EntityFlag_Disabled) {
+			GB_ASSERT(tv.type == nullptr);
+			return {};
+		}
+	}
+
 	if (proc_expr->tav.mode == Addressing_Constant) {
 		ExactValue v = proc_expr->tav.value;
 		switch (v.kind) {
@@ -2278,13 +2306,6 @@ lbValue lb_build_call_expr_internal(lbProcedure *p, Ast *expr) {
 				value = lb_emit_conv(p, x, proc_expr->tav.type);
 				break;
 			}
-		}
-	}
-
-	Entity *proc_entity = entity_of_node(proc_expr);
-	if (proc_entity != nullptr) {
-		if (proc_entity->flags & EntityFlag_Disabled) {
-			return {};
 		}
 	}
 

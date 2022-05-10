@@ -281,118 +281,39 @@ atomic_recursive_mutex_guard :: proc(m: ^Atomic_Recursive_Mutex) -> bool {
 
 
 
-
-@(private="file")
-Queue_Item :: struct {
-	next: ^Queue_Item,
-	futex: Futex,
-}
-
-@(private="file")
-queue_item_wait :: proc(item: ^Queue_Item) {
-	for atomic_load_explicit(&item.futex, .Acquire) == 0 {
-		futex_wait(&item.futex, 0)
-		cpu_relax()
-	}
-}
-@(private="file")
-queue_item_wait_with_timeout :: proc(item: ^Queue_Item, duration: time.Duration) -> bool {
-	start := time.tick_now()
-	for atomic_load_explicit(&item.futex, .Acquire) == 0 {
-		remaining := duration - time.tick_since(start)
-		if remaining < 0 {
-			return false
-		}
-		if !futex_wait_with_timeout(&item.futex, 0, remaining) {
-			return false
-		}
-		cpu_relax()
-	}
-	return true
-}
-@(private="file")
-queue_item_signal :: proc(item: ^Queue_Item) {
-	atomic_store_explicit(&item.futex, 1, .Release)
-	futex_signal(&item.futex)
-}
-
-
 // Atomic_Cond implements a condition variable, a rendezvous point for threads
 // waiting for signalling the occurence of an event
 //
 // An Atomic_Cond must not be copied after first use
 Atomic_Cond :: struct {
-	queue_mutex: Atomic_Mutex,
-	queue_head:  ^Queue_Item,
-	pending:     bool,
+	state: Futex,
 }
 
 atomic_cond_wait :: proc(c: ^Atomic_Cond, m: ^Atomic_Mutex) {
-	waiter := &Queue_Item{}
+	state := u32(atomic_load_explicit(&c.state, .Relaxed))
+	unlock(m)
+	futex_wait(&c.state, state)
+	lock(m)
 
-	atomic_mutex_lock(&c.queue_mutex)
-	waiter.next = c.queue_head
-	c.queue_head = waiter
-
-	atomic_store(&c.pending, true)
-	atomic_mutex_unlock(&c.queue_mutex)
-
-	atomic_mutex_unlock(m)
-	queue_item_wait(waiter)
-	atomic_mutex_lock(m)
 }
 
 atomic_cond_wait_with_timeout :: proc(c: ^Atomic_Cond, m: ^Atomic_Mutex, duration: time.Duration) -> (ok: bool) {
-	waiter := &Queue_Item{}
-
-	atomic_mutex_lock(&c.queue_mutex)
-	waiter.next = c.queue_head
-	c.queue_head = waiter
-
-	atomic_store(&c.pending, true)
-	atomic_mutex_unlock(&c.queue_mutex)
-
-	atomic_mutex_unlock(m)
-	ok = queue_item_wait_with_timeout(waiter, duration)
-	atomic_mutex_lock(m)
+	state := u32(atomic_load_explicit(&c.state, .Relaxed))
+	unlock(m)
+	ok = futex_wait_with_timeout(&c.state, state, duration)
+	lock(m)
 	return
 }
 
 
 atomic_cond_signal :: proc(c: ^Atomic_Cond) {
-	if !atomic_load(&c.pending) {
-		return
-	}
-
-	atomic_mutex_lock(&c.queue_mutex)
-	waiter := c.queue_head
-	if c.queue_head != nil {
-		c.queue_head = c.queue_head.next
-	}
-	atomic_store(&c.pending, c.queue_head != nil)
-	atomic_mutex_unlock(&c.queue_mutex)
-
-	if waiter != nil {
-		queue_item_signal(waiter)
-	}
+	atomic_add_explicit(&c.state, 1, .Release)
+	futex_signal(&c.state)
 }
 
 atomic_cond_broadcast :: proc(c: ^Atomic_Cond) {
-	if !atomic_load(&c.pending) {
-		return
-	}
-
-	atomic_store(&c.pending, false)
-
-	atomic_mutex_lock(&c.queue_mutex)
-	waiters := c.queue_head
-	c.queue_head = nil
-	atomic_mutex_unlock(&c.queue_mutex)
-
-	for waiters != nil {
-		queue_item_signal(waiters)
-		waiters = waiters.next
-	}
+	atomic_add_explicit(&c.state, 1, .Release)
+	futex_broadcast(&c.state)
 }
 
 // When waited upon, blocks until the internal count is greater than zero, then subtracts one.
@@ -400,30 +321,28 @@ atomic_cond_broadcast :: proc(c: ^Atomic_Cond) {
 //
 // An Atomic_Sema must not be copied after first use
 Atomic_Sema :: struct {
-	mutex: Atomic_Mutex,
-	cond:  Atomic_Cond,
-	count: int,
+	count: Futex,
 }
 
 atomic_sema_post :: proc(s: ^Atomic_Sema, count := 1) {
-	atomic_mutex_lock(&s.mutex)
-	defer atomic_mutex_unlock(&s.mutex)
-
-	s.count += count
-	atomic_cond_signal(&s.cond)
+	atomic_add_explicit(&s.count, Futex(count), .Release)
+	if count == 1 {
+		futex_signal(&s.count)
+	} else {
+		futex_broadcast(&s.count)
+	}
 }
 
 atomic_sema_wait :: proc(s: ^Atomic_Sema) {
-	atomic_mutex_lock(&s.mutex)
-	defer atomic_mutex_unlock(&s.mutex)
-
-	for s.count == 0 {
-		atomic_cond_wait(&s.cond, &s.mutex)
-	}
-
-	s.count -= 1
-	if s.count > 0 {
-		atomic_cond_signal(&s.cond)
+	for {
+		original_count := atomic_load_explicit(&s.count, .Relaxed)
+		for original_count == 0 {
+			futex_wait(&s.count, u32(original_count))
+			original_count = s.count
+		}
+		if original_count == atomic_compare_exchange_strong_explicit(&s.count, original_count, original_count-1, .Acquire, .Acquire) {
+			return
+		}
 	}
 }
 
@@ -431,25 +350,21 @@ atomic_sema_wait_with_timeout :: proc(s: ^Atomic_Sema, duration: time.Duration) 
 	if duration <= 0 {
 		return false
 	}
-	atomic_mutex_lock(&s.mutex)
-	defer atomic_mutex_unlock(&s.mutex)
-	
-	start := time.tick_now()
+	for {
+		original_count := atomic_load_explicit(&s.count, .Relaxed)
+		for start := time.tick_now(); original_count == 0; /**/ {
+			remaining := duration - time.tick_since(start)
+			if remaining < 0 {
+				return false
+			}
 
-	for s.count == 0 {
-		remaining := duration - time.tick_since(start)
-		if remaining < 0 {
-			return false
+			if !futex_wait_with_timeout(&s.count, u32(original_count), remaining) {
+				return false
+			}
+			original_count = s.count
 		}
-		
-		if !atomic_cond_wait_with_timeout(&s.cond, &s.mutex, remaining) {
-			return false
+		if original_count == atomic_compare_exchange_strong_explicit(&s.count, original_count, original_count-1, .Acquire, .Acquire) {
+			return true
 		}
 	}
-
-	s.count -= 1
-	if s.count > 0 {
-		atomic_cond_signal(&s.cond)
-	}
-	return true
 }

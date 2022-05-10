@@ -19,3 +19,5 @@ _tick_now :: proc "contextless" () -> Tick {
 	return {}
 }
 
+_yield :: proc "contextless" () {
+}

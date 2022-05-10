@@ -32,6 +32,7 @@ const runWasm = async (wasm_path, webglCanvasElement, consoleElement) => {
 	const file = await response.arrayBuffer();
 	const wasm = await WebAssembly.instantiate(file, imports);
 	const exports = wasm.instance.exports;
+	wasmMemoryInterface.setExports(exports);
 	wasmMemoryInterface.setMemory(exports.memory);
 	
 	exports._start();

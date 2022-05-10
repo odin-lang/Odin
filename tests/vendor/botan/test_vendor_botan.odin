@@ -15,6 +15,7 @@ package test_vendor_botan
 import "core:testing"
 import "core:fmt"
 import "core:os"
+import "core:strings"
 
 import "vendor:botan/md4"
 import "vendor:botan/md5"
@@ -172,11 +173,14 @@ test_sha224 :: proc(t: ^testing.T) {
     // Test vectors from 
     // https://csrc.nist.gov/csrc/media/projects/cryptographic-standards-and-guidelines/documents/examples/sha_all.pdf
     // https://www.di-mgt.com.au/sha_testvectors.html
+    // https://datatracker.ietf.org/doc/html/rfc3874#section-3.3
+    data_1_000_000_a := strings.repeat("a", 1_000_000)
     test_vectors := [?]TestHash {
         TestHash{"d14a028c2a3a2bc9476102bb288234c415a2b01f828ea62ac5b3e42f", ""},
         TestHash{"23097d223405d8228642a477bda255b32aadbce4bda0b3f7e36c9da7", "abc"},
         TestHash{"75388b16512776cc5dba5da1fd890150b0c6455cb4f58b1952522525", "abcdbcdecdefdefgefghfghighijhijkijkljklmklmnlmnomnopnopq"},
         TestHash{"c97ca9a559850ce97a04a96def6d99a9e0e0e2ab14e6b8df265fc0b3", "abcdefghbcdefghicdefghijdefghijkefghijklfghijklmghijklmnhijklmnoijklmnopjklmnopqklmnopqrlmnopqrsmnopqrstnopqrstu"},
+        TestHash{"20794655980c91d8bbb4c1ea97618a4bf03f42581948b2ee4ee7ad67", data_1_000_000_a},
     }
     for v, _ in test_vectors {
         computed     := sha2.hash_224(v.str)

@@ -197,6 +197,7 @@ XXH32 :: proc(input: []u8, seed := XXH32_DEFAULT_SEED) -> (digest: XXH32_hash) {
 */
 XXH32_create_state :: proc(allocator := context.allocator) -> (res: ^XXH32_state, err: Error) {
 	state := new(XXH32_state, allocator)
+	XXH32_reset_state(state)
 	return state, .None if state != nil else .Error
 }
 
@@ -258,7 +259,7 @@ XXH32_update :: proc(state: ^XXH32_state, input: []u8) -> (err: Error) {
 		v3 := state.v3
 		v4 := state.v4
 
-		for len(buf) >= 15 {
+		for len(buf) >= 16 {
 			#no_bounds_check v1 = XXH32_round(v1, XXH32_read32(buf, .Unaligned)); buf = buf[4:]
 			#no_bounds_check v2 = XXH32_round(v2, XXH32_read32(buf, .Unaligned)); buf = buf[4:]
 			#no_bounds_check v3 = XXH32_round(v3, XXH32_read32(buf, .Unaligned)); buf = buf[4:]

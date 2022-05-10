@@ -12,14 +12,12 @@
 // The QOI specification is at https://qoiformat.org.
 package qoi
 
-import "core:mem"
 import "core:image"
 import "core:compress"
 import "core:bytes"
 import "core:os"
 
 Error   :: image.Error
-General :: compress.General_Error
 Image   :: image.Image
 Options :: image.Options
 
@@ -57,7 +55,7 @@ save_to_memory  :: proc(output: ^bytes.Buffer, img: ^Image, options := Options{}
 	max_size := pixels * (img.channels + 1) + size_of(image.QOI_Header) + size_of(u64be)
 
 	if !resize(&output.buf, max_size) {
-		return General.Resize_Failed
+		return .Unable_To_Allocate_Or_Resize
 	}
 
 	header := image.QOI_Header{
@@ -177,7 +175,7 @@ save_to_file :: proc(output: string, img: ^Image, options := Options{}, allocato
 	save_to_memory(out, img, options) or_return
 	write_ok := os.write_entire_file(output, out.buf[:])
 
-	return nil if write_ok else General.Cannot_Open_File
+	return nil if write_ok else .Unable_To_Write_File
 }
 
 save :: proc{save_to_memory, save_to_file}
@@ -201,7 +199,7 @@ load_from_file :: proc(filename: string, options := Options{}, allocator := cont
 		return load_from_slice(data, options)
 	} else {
 		img = new(Image)
-		return img, compress.General_Error.File_Not_Found
+		return img, .Unable_To_Read_File
 	}
 }
 
@@ -221,7 +219,7 @@ load_from_context :: proc(ctx: ^$C, options := Options{}, allocator := context.a
 
 	header := image.read_data(ctx, image.QOI_Header) or_return
 	if header.magic != image.QOI_Magic {
-		return img, .Invalid_QOI_Signature
+		return img, .Invalid_Signature
 	}
 
 	if img == nil {
@@ -264,7 +262,7 @@ load_from_context :: proc(ctx: ^$C, options := Options{}, allocator := context.a
 	bytes_needed := image.compute_buffer_size(int(header.width), int(header.height), img.channels, 8)
 
 	if !resize(&img.pixels.buf, bytes_needed) {
-	 	return img, mem.Allocator_Error.Out_Of_Memory
+	 	return img, .Unable_To_Allocate_Or_Resize
 	}
 
 	/*
