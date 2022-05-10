@@ -3,8 +3,8 @@ package os2
 
 import win32 "core:sys/windows"
 
-_create_temp :: proc(dir, pattern: string) -> (Handle, Error) {
-	return 0, nil
+_create_temp :: proc(dir, pattern: string) -> (^File, Error) {
+	return nil, nil
 }
 
 _mkdir_temp :: proc(dir, pattern: string, allocator := context.allocator) -> (string, Error) {

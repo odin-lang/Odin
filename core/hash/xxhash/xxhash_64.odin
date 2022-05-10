@@ -163,6 +163,7 @@ XXH64 :: proc(input: []u8, seed := XXH64_DEFAULT_SEED) -> (digest: XXH64_hash) {
 */
 XXH64_create_state :: proc(allocator := context.allocator) -> (res: ^XXH64_state, err: Error) {
 	state := new(XXH64_state, allocator)
+	XXH64_reset_state(state)
 	return state, .None if state != nil else .Error
 }
 

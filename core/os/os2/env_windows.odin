@@ -1,7 +1,6 @@
 //+private
 package os2
 
-import "core:mem"
 import win32 "core:sys/windows"
 
 _lookup_env :: proc(key: string, allocator := context.allocator) -> (value: string, found: bool) {
@@ -9,24 +8,28 @@ _lookup_env :: proc(key: string, allocator := context.allocator) -> (value: stri
 		return
 	}
 	wkey := win32.utf8_to_wstring(key)
-	b := make([dynamic]u16, 100, context.temp_allocator)
-	for {
-		n := win32.GetEnvironmentVariableW(wkey, raw_data(b), u32(len(b)))
-		if n == 0 {
-			err := win32.GetLastError()
-			if err == win32.ERROR_ENVVAR_NOT_FOUND {
-				return "", false
-			}
-		}
 
-		if n <= u32(len(b)) {
-			value = win32.utf16_to_utf8(b[:n], allocator)
-			found = true
-			return
+	n := win32.GetEnvironmentVariableW(wkey, nil, 0)
+	if n == 0 {
+		err := win32.GetLastError()
+		if err == win32.ERROR_ENVVAR_NOT_FOUND {
+			return "", false
 		}
-
-		resize(&b, len(b)*2)
+		return "", true
 	}
+	b := make([]u16, n+1, context.temp_allocator)
+
+	n = win32.GetEnvironmentVariableW(wkey, raw_data(b), u32(len(b)))
+	if n == 0 {
+		err := win32.GetLastError()
+		if err == win32.ERROR_ENVVAR_NOT_FOUND {
+			return "", false
+		}
+	}
+
+	value = win32.utf16_to_utf8(b[:n], allocator)
+	found = true
+	return
 }
 
 _set_env :: proc(key, value: string) -> bool {
@@ -62,13 +65,12 @@ _environ :: proc(allocator := context.allocator) -> []string {
 
 	r := make([dynamic]string, 0, 50, allocator)
 	for from, i, p := 0, 0, envs; true; i += 1 {
-		c := (^u16)(uintptr(p) + uintptr(i*2))^
+		c := ([^]u16)(p)[i]
 		if c == 0 {
 			if i <= from {
 				break
 			}
-			w := mem.slice_ptr(mem.ptr_offset(p, from), i-from)
-
+			w := ([^]u16)(p)[from:i]
 			append(&r, win32.utf16_to_utf8(w, allocator))
 			from = i + 1
 		}

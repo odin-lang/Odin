@@ -23,11 +23,11 @@ class WebGLInterface {
 		this.transformFeedbacks = [];
 		this.syncs              = [];
 		this.programInfos       = {};
-		
+
 		if (contextSettings === undefined) {
 			contextSettings = {antialias: false};
 		}
-		
+
 		this.ctx = canvasElement.getContext("webgl2", contextSettings) || canvasElement.getContext("webgl", contextSettings);
 		if (!this.ctx) {
 			return;
@@ -38,11 +38,11 @@ class WebGLInterface {
 			this.ctx_version = 1.0;
 		}
 	}
-	
+
 	get mem() {
 		return this.wasmMemoryInterface
 	}
-	
+
 	assertWebGL2() {
 		if (this.ctx_version < 2) {
 			throw new Error("WebGL2 procedure called in a canvas without a WebGL2 context");
@@ -95,19 +95,19 @@ class WebGLInterface {
 		}
 		return source;
 	}
-	
+
 	getWebGL1Interface() {
 		return {
 			DrawingBufferWidth:  () => this.ctx.drawingBufferWidth,
 			DrawingBufferHeight: () => this.ctx.drawingBufferHeight,
-			
+
 			IsExtensionSupported: (name_ptr, name_len) => {
 				let name = this.mem.loadString(name_ptr, name_len);
 				let extensions = this.ctx.getSupportedExtensions();
 				return extensions.indexOf(name) !== -1
 			},
-			
-			
+
+
 			GetError: () => {
 				let err = this.lastError;
 				this.recordError(0);
@@ -116,7 +116,7 @@ class WebGLInterface {
 				}
 				return this.ctx.getError();
 			},
-			
+
 			GetWebGLVersion: (major_ptr, minor_ptr) => {
 				let version = this.ctx.getParameter(0x1F02);
 				if (version.indexOf("WebGL 2.0") !== -1) {
@@ -124,7 +124,7 @@ class WebGLInterface {
 					this.mem.storeI32(minor_ptr, 0);
 					return;
 				}
-				
+
 				this.mem.storeI32(major_ptr, 1);
 				this.mem.storeI32(minor_ptr, 0);
 			},
@@ -135,12 +135,12 @@ class WebGLInterface {
 					this.mem.storeI32(minor_ptr, 0);
 					return;
 				}
-				
+
 				this.mem.storeI32(major_ptr, 2);
 				this.mem.storeI32(minor_ptr, 0);
 			},
-			
-			
+
+
 			ActiveTexture: (x) => {
 				this.ctx.activeTexture(x);
 			},
@@ -180,8 +180,8 @@ class WebGLInterface {
 			BlendFuncSeparate: (srcRGB, dstRGB, srcAlpha, dstAlpha) => {
 				this.ctx.blendFuncSeparate(srcRGB, dstRGB, srcAlpha, dstAlpha);
 			},
-			
-			
+
+
 			BufferData: (target, size, data, usage) => {
 				if (data) {
 					this.ctx.bufferData(target, this.mem.loadBytes(data, size), usage);
@@ -196,8 +196,8 @@ class WebGLInterface {
 					this.ctx.bufferSubData(target, offset, null);
 				}
 			},
-			
-			
+
+
 			Clear: (x) => {
 				this.ctx.clear(x);
 			},
@@ -216,8 +216,8 @@ class WebGLInterface {
 			CompileShader: (shader) => {
 				this.ctx.compileShader(this.shaders[shader]);
 			},
-			
-			
+
+
 			CompressedTexImage2D: (target, level, internalformat, width, height, border, imageSize, data) => {
 				if (data) {
 					this.ctx.compressedTexImage2D(target, level, internalformat, width, height, border, this.mem.loadBytes(data, imageSize));
@@ -232,15 +232,15 @@ class WebGLInterface {
 					this.ctx.compressedTexSubImage2D(target, level, xoffset, yoffset, width, height, format, null);
 				}
 			},
-			
+
 			CopyTexImage2D: (target, level, internalformat, x, y, width, height, border) => {
 				this.ctx.copyTexImage2D(target, level, internalformat, x, y, width, height, border);
 			},
 			CopyTexSubImage2D: (target, level, xoffset, yoffset, x, y, width, height) => {
 				this.ctx.copyTexImage2D(target, level, xoffset, yoffset, x, y, width, height);
 			},
-			
-			
+
+
 			CreateBuffer: () => {
 				let buffer = this.ctx.createBuffer();
 				if (!buffer) {
@@ -291,13 +291,13 @@ class WebGLInterface {
 				this.textures[id] = texture;
 				return id;
 			},
-			
-			
+
+
 			CullFace: (mode) => {
 				this.ctx.cullFace(mode);
 			},
-			
-			
+
+
 			DeleteBuffer: (id) => {
 				let obj = this.buffers[id];
 				if (obj && id != 0) {
@@ -366,8 +366,8 @@ class WebGLInterface {
 			DrawElements: (mode, count, type, indices) => {
 				this.ctx.drawElements(mode, count, type, indices);
 			},
-			
-			
+
+
 			Enable: (cap) => {
 				this.ctx.enable(cap);
 			},
@@ -389,20 +389,20 @@ class WebGLInterface {
 			FrontFace: (mode) => {
 				this.ctx.frontFace(mode);
 			},
-			
-				
+
+
 			GenerateMipmap: (target) => {
 				this.ctx.generateMipmap(target);
 			},
-			
-			
+
+
 			GetAttribLocation: (program, name_ptr, name_len) => {
 				let name = this.mem.loadString(name_ptr, name_len);
 				return this.ctx.getAttribLocation(this.programs[program], name);
 			},
-			
-			
-			
+
+
+
 			GetProgramParameter: (program, pname) => {
 				return this.ctx.getProgramParameter(this.programs[program], pname)
 			},
@@ -415,7 +415,7 @@ class WebGLInterface {
 					let n = Math.min(buf_len, log.length);
 					log = log.substring(0, n);
 					this.mem.loadBytes(buf_ptr, buf_len).set(new TextEncoder("utf-8").encode(log))
-					
+
 					this.mem.storeInt(length_ptr, n);
 				}
 			},
@@ -428,7 +428,7 @@ class WebGLInterface {
 					let n = Math.min(buf_len, log.length);
 					log = log.substring(0, n);
 					this.mem.loadBytes(buf_ptr, buf_len).set(new TextEncoder("utf-8").encode(log))
-					
+
 					this.mem.storeInt(length_ptr, n);
 				}
 			},
@@ -452,8 +452,8 @@ class WebGLInterface {
 					this.recordError(1281);
 				}
 			},
-			
-			
+
+
 			GetUniformLocation: (program, name_ptr, name_len) => {
 				let name = this.mem.loadString(name_ptr, name_len);
 				let arrayOffset = 0;
@@ -472,18 +472,18 @@ class WebGLInterface {
 				var uniformInfo = ptable.uniforms[name];
 				return (uniformInfo && arrayOffset < uniformInfo[0]) ? uniformInfo[1] + arrayOffset : -1
 			},
-			
-			
+
+
 			GetVertexAttribOffset: (index, pname) => {
 				return this.ctx.getVertexAttribOffset(index, pname);
 			},
-			
-			
+
+
 			Hint: (target, mode) => {
 				this.ctx.hint(target, mode);
 			},
-			
-			
+
+
 			IsBuffer:       (buffer)       => this.ctx.isBuffer(this.buffers[buffer]),
 			IsEnabled:      (enabled)      => this.ctx.isEnabled(this.enableds[enabled]),
 			IsFramebuffer:  (framebuffer)  => this.ctx.isFramebuffer(this.framebuffers[framebuffer]),
@@ -491,7 +491,7 @@ class WebGLInterface {
 			IsRenderbuffer: (renderbuffer) => this.ctx.isRenderbuffer(this.renderbuffers[renderbuffer]),
 			IsShader:       (shader)       => this.ctx.isShader(this.shaders[shader]),
 			IsTexture:      (texture)      => this.ctx.isTexture(this.textures[texture]),
-			
+
 			LineWidth: (width) => {
 				this.ctx.lineWidth(width);
 			},
@@ -506,8 +506,8 @@ class WebGLInterface {
 			PolygonOffset: (factor, units) => {
 				this.ctx.polygonOffset(factor, units);
 			},
-			
-			
+
+
 			ReadnPixels: (x, y, width, height, format, type, bufSize, data) => {
 				this.ctx.readPixels(x, y, width, format, type, this.mem.loadBytes(data, bufSize));
 			},
@@ -524,7 +524,7 @@ class WebGLInterface {
 				let source = this.getSource(shader, strings_ptr, strings_length);
 				this.ctx.shaderSource(this.shaders[shader], source);
 			},
-			
+
 			StencilFunc: (func, ref, mask) => {
 				this.ctx.stencilFunc(func, ref, mask);
 			},
@@ -543,8 +543,8 @@ class WebGLInterface {
 			StencilOpSeparate: (face, fail, zfail, zpass) => {
 				this.ctx.stencilOpSeparate(face, fail, zfail, zpass);
 			},
-			
-			
+
+
 			TexImage2D: (target, level, internalformat, width, height, border, format, type, size, data) => {
 				if (data) {
 					this.ctx.texImage2D(target, level, internalformat, width, height, border, format, type, this.mem.loadBytes(data, size));
@@ -561,18 +561,18 @@ class WebGLInterface {
 			TexSubImage2D: (target, level, xoffset, yoffset, width, height, format, type, size, data) => {
 				this.ctx.texSubImage2D(target, level, xoffset, yoffset, width, height, format, type, this.mem.loadBytes(data, size));
 			},
-			
-			
+
+
 			Uniform1f: (location, v0)             => { this.ctx.uniform1f(this.uniforms[location], v0);             },
 			Uniform2f: (location, v0, v1)         => { this.ctx.uniform2f(this.uniforms[location], v0, v1);         },
 			Uniform3f: (location, v0, v1, v2)     => { this.ctx.uniform3f(this.uniforms[location], v0, v1, v2);     },
 			Uniform4f: (location, v0, v1, v2, v3) => { this.ctx.uniform4f(this.uniforms[location], v0, v1, v2, v3); },
-			
+
 			Uniform1i: (location, v0)             => { this.ctx.uniform1i(this.uniforms[location], v0);             },
 			Uniform2i: (location, v0, v1)         => { this.ctx.uniform2i(this.uniforms[location], v0, v1);         },
 			Uniform3i: (location, v0, v1, v2)     => { this.ctx.uniform3i(this.uniforms[location], v0, v1, v2);     },
 			Uniform4i: (location, v0, v1, v2, v3) => { this.ctx.uniform4i(this.uniforms[location], v0, v1, v2, v3); },
-			
+
 			UniformMatrix2fv: (location, addr) => {
 				let array = this.mem.loadF32Array(addr, 2*2);
 				this.ctx.uniformMatrix4fv(this.uniforms[location], false, array);
@@ -585,15 +585,15 @@ class WebGLInterface {
 				let array = this.mem.loadF32Array(addr, 4*4);
 				this.ctx.uniformMatrix4fv(this.uniforms[location], false, array);
 			},
-			
+
 			UseProgram: (program) => {
-				this.ctx.useProgram(this.programs[program]);
+				if (program) this.ctx.useProgram(this.programs[program]);
 			},
 			ValidateProgram: (program) => {
-				this.ctx.validateProgram(this.programs[program]);
+				if (program) this.ctx.validateProgram(this.programs[program]);
 			},
-			
-			
+
+
 			VertexAttrib1f: (index, x) => {
 				this.ctx.vertexAttrib1f(index, x);
 			},
@@ -609,13 +609,13 @@ class WebGLInterface {
 			VertexAttribPointer: (index, size, type, normalized, stride, ptr) => {
 				this.ctx.vertexAttribPointer(index, size, type, !!normalized, stride, ptr);
 			},
-			
+
 			Viewport: (x, y, w, h) => {
 				this.ctx.viewport(x, y, w, h);
 			},
 		};
 	}
-	
+
 	getWebGL2Interface() {
 		return {
 			/* Buffer objects */
@@ -627,7 +627,7 @@ class WebGLInterface {
 				this.assertWebGL2();
 				this.ctx.getBufferSubData(target, srcByteOffset, this.mem.loadBytes(dst_buffer_ptr, dst_buffer_len), dstOffset, length);
 			},
-			
+
 			/* Framebuffer objects */
 			BlitFramebuffer: (srcX0, srcY0, srcX1, srcY1, dstX0, dstY0, dstX1, dstY1, mask, filter) => {
 				this.assertWebGL2();
@@ -642,7 +642,7 @@ class WebGLInterface {
 				let attachments = this.mem.loadU32Array(attachments_ptr, attachments_len);
 				this.ctx.invalidateFramebuffer(target, attachments);
 			},
-			InvalidateSubFramebuffer: (target, attachments_ptr, attachments_len, x, y, width, height) => {	
+			InvalidateSubFramebuffer: (target, attachments_ptr, attachments_len, x, y, width, height) => {
 				this.assertWebGL2();
 				let attachments = this.mem.loadU32Array(attachments_ptr, attachments_len);
 				this.ctx.invalidateSubFramebuffer(target, attachments, x, y, width, height);
@@ -651,15 +651,15 @@ class WebGLInterface {
 				this.assertWebGL2();
 				this.ctx.readBuffer(src);
 			},
-			
+
 			/* Renderbuffer objects */
 			RenderbufferStorageMultisample: (target, samples, internalformat, width, height) => {
 				this.assertWebGL2();
 				this.ctx.renderbufferStorageMultisample(target, samples, internalformat, width, height);
 			},
-			
+
 			/* Texture objects */
-			
+
 			TexStorage3D: (target, levels, internalformat, width, height, depth) => {
 				this.assertWebGL2();
 				this.ctx.texStorage3D(target, level, internalformat, width, heigh, depth);
@@ -692,18 +692,18 @@ class WebGLInterface {
 					this.ctx.compressedTexSubImage3D(target, level, xoffset, yoffset, zoffset, width, height, depth, format, null);
 				}
 			},
-			
+
 			CopyTexSubImage3D: (target, level, xoffset, yoffset, zoffset, x, y, width, height) => {
 				this.assertWebGL2();
 				this.ctx.copyTexImage3D(target, level, xoffset, yoffset, zoffset, x, y, width, height);
 			},
-			
+
 			/* Programs and shaders */
 			GetFragDataLocation: (program, name_ptr, name_len) => {
 				this.assertWebGL2();
 				return this.ctx.getFragDataLocation(this.programs[program], this.mem.loadString(name_ptr, name_len));
 			},
-			
+
 			/* Uniforms */
 			Uniform1ui: (location, v0) => {
 				this.assertWebGL2();
@@ -721,7 +721,7 @@ class WebGLInterface {
 				this.assertWebGL2();
 				this.ctx.uniform4ui(this.uniforms[location], v0, v1, v2, v3);
 			},
-			
+
 			UniformMatrix3x2fv: (location, addr) => {
 				this.assertWebGL2();
 				let array = this.mem.loadF32Array(addr, 3*2);
@@ -752,21 +752,21 @@ class WebGLInterface {
 				let array = this.mem.loadF32Array(addr, 3*4);
 				this.ctx.uniformMatrix3x4fv(this.uniforms[location], false, array);
 			},
-			
+
 			/* Vertex attribs */
 			VertexAttribI4i: (index, x, y, z, w) => {
 				this.assertWebGL2();
 				this.ctx.vertexAttribI4i(index, x, y, z, w);
-			}, 
+			},
 			VertexAttribI4ui: (index, x, y, z, w) => {
 				this.assertWebGL2();
 				this.ctx.vertexAttribI4ui(index, x, y, z, w);
-			}, 
+			},
 			VertexAttribIPointer: (index, size, type, stride, offset) => {
 				this.assertWebGL2();
 				this.ctx.vertexAttribIPointer(index, size, type, stride, offset);
-			}, 
-			
+			},
+
 			/* Writing to the drawing buffer */
 			VertexAttribDivisor: (index, divisor) => {
 				this.assertWebGL2();
@@ -818,7 +818,7 @@ class WebGLInterface {
 				let id = this.getNewId(this.queries);
 				query.name = id;
 				this.queries[id] = query;
-				return id;	
+				return id;
 			},
 			DeleteQuery: (id) => {
 				this.assertWebGL2();
@@ -829,7 +829,7 @@ class WebGLInterface {
 				}
 			},
 			IsQuery: (query) => {
-				this.assertWebGL2();	
+				this.assertWebGL2();
 				return this.ctx.isQuery(this.queries[query]);
 			},
 			BeginQuery: (target, query) => {
@@ -852,9 +852,9 @@ class WebGLInterface {
 				let id = this.getNewId(this.queries);
 				query.name = id;
 				this.queries[id] = query;
-				return id;	
+				return id;
 			},
-			
+
 			/* Sampler Objects */
 			CreateSampler: () => {
 				this.assertWebGL2();
@@ -862,7 +862,7 @@ class WebGLInterface {
 				let id = this.getNewId(this.samplers);
 				sampler.name = id;
 				this.samplers[id] = sampler;
-				return id;	
+				return id;
 			},
 			DeleteSampler: (id) => {
 				this.assertWebGL2();
@@ -873,11 +873,11 @@ class WebGLInterface {
 				}
 			},
 			IsSampler: (sampler) => {
-				this.assertWebGL2();	
+				this.assertWebGL2();
 				return this.ctx.isSampler(this.samplers[sampler]);
 			},
 			BindSampler: (unit, sampler) => {
-				this.assertWebGL2();	
+				this.assertWebGL2();
 				this.ctx.bindSampler(unit, this.samplers[Sampler]);
 			},
 			SamplerParameteri: (sampler, pname, param) => {
@@ -888,7 +888,7 @@ class WebGLInterface {
 				this.assertWebGL2();
 				this.ctx.samplerParameterf(this.samplers[sampler], pname, param);
 			},
-			
+
 			/* Sync objects */
 			FenceSync: (condition, flags) => {
 				this.assertWebGL2();
@@ -896,10 +896,10 @@ class WebGLInterface {
 				let id = this.getNewId(this.syncs);
 				sync.name = id;
 				this.syncs[id] = sync;
-				return id;	
+				return id;
 			},
 			IsSync: (sync) => {
-				this.assertWebGL2();	
+				this.assertWebGL2();
 				return this.ctx.isSync(this.syncs[sync]);
 			},
 			DeleteSync: (id) => {
@@ -908,7 +908,7 @@ class WebGLInterface {
 				if (obj && id != 0) {
 					this.ctx.deleteSampler(obj);
 					this.syncs[id] = null;
-				}	
+				}
 			},
 			ClientWaitSync: (sync, flags, timeout) => {
 				this.assertWebGL2();
@@ -918,8 +918,8 @@ class WebGLInterface {
 				this.assertWebGL2();
 				this.ctx.waitSync(this.syncs[sync], flags, timeout)	;
 			},
-			
-			
+
+
 			/* Transform Feedback */
 			CreateTransformFeedback: () => {
 				this.assertWebGL2();
@@ -927,7 +927,7 @@ class WebGLInterface {
 				let id = this.getNewId(this.transformFeedbacks);
 				transformFeedback.name = id;
 				this.transformFeedbacks[id] = transformFeedback;
-				return id;	
+				return id;
 			},
 			DeleteTransformFeedback: (id)  => {
 				this.assertWebGL2();
@@ -935,7 +935,7 @@ class WebGLInterface {
 				if (obj && id != 0) {
 					this.ctx.deleteTransformFeedback(obj);
 					this.transformFeedbacks[id] = null;
-				}	
+				}
 			},
 			IsTransformFeedback: (tf) => {
 				this.assertWebGL2();
@@ -971,8 +971,8 @@ class WebGLInterface {
 				this.assertWebGL2();
 				this.ctx.resumeTransformFeedback();
 			},
-			
-			
+
+
 			/* Uniform Buffer Objects and Transform Feedback Buffers */
 			BindBufferBase: (target, index, buffer) => {
 				this.assertWebGL2();
@@ -990,7 +990,7 @@ class WebGLInterface {
 			GetActiveUniformBlockName: (program, uniformBlockIndex, buf_ptr, buf_len, length_ptr) => {
 				this.assertWebGL2();
 				let name = this.ctx.getActiveUniformBlockName(this.programs[program], uniformBlockIndex);
-				
+
 				let n = Math.min(buf_len, name.length);
 				name = name.substring(0, n);
 				this.mem.loadBytes(buf_ptr, buf_len).set(new TextEncoder("utf-8").encode(name))
@@ -1000,7 +1000,7 @@ class WebGLInterface {
 				this.assertWebGL2();
 				this.ctx.uniformBlockBinding(this.programs[program], uniformBlockIndex, uniformBlockBinding);
 			},
-			
+
 			/* Vertex Array Objects */
 			CreateVertexArray: () => {
 				this.assertWebGL2();
@@ -1008,7 +1008,7 @@ class WebGLInterface {
 				let id = this.getNewId(this.vaos);
 				vao.name = id;
 				this.vaos[id] = vao;
-				return id;	
+				return id;
 			},
 			DeleteVertexArray: (id) => {
 				this.assertWebGL2();
@@ -1019,11 +1019,11 @@ class WebGLInterface {
 				}
 			},
 			IsVertexArray: (vertexArray) => {
-				this.assertWebGL2();	
+				this.assertWebGL2();
 				return this.ctx.isVertexArray(this.vaos[vertexArray]);
 			},
 			BindVertexArray: (vertexArray) => {
-				this.assertWebGL2();	
+				this.assertWebGL2();
 				this.ctx.bindVertexArray(this.vaos[vertexArray]);
 			},
 		};
