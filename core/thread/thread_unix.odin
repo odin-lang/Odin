@@ -31,6 +31,9 @@ _create :: proc(procedure: Thread_Proc, priority := Thread_Priority.Normal) -> ^
 	__linux_thread_entry_proc :: proc "c" (t: rawptr) -> rawptr {
 		t := (^Thread)(t)
 
+		// We need to give the thread a moment to start up before we enable cancellation.
+		can_set_thread_cancel_state := unix.pthread_setcancelstate(unix.PTHREAD_CANCEL_DISABLE, nil) == 0
+
 		context = runtime.default_context()
 
 		sync.lock(&t.mutex)
@@ -43,6 +46,12 @@ _create :: proc(procedure: Thread_Proc, priority := Thread_Priority.Normal) -> ^
 
 		init_context := t.init_context
 		context =	init_context.? or_else runtime.default_context()
+
+		// Enable thread's cancelability.
+		if can_set_thread_cancel_state {
+			unix.pthread_setcanceltype (unix.PTHREAD_CANCEL_ASYNCHRONOUS, nil)
+			unix.pthread_setcancelstate(unix.PTHREAD_CANCEL_DISABLE,      nil)
+		}
 
 		t.procedure(t)
 
@@ -141,7 +150,7 @@ _destroy :: proc(t: ^Thread) {
 }
 
 _terminate :: proc(t: ^Thread, exit_code: int) {
-	// TODO(bill)
+	unix.pthread_cancel(t.unix_thread)
 }
 
 _yield :: proc() {
