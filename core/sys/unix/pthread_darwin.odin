@@ -81,3 +81,16 @@ PTHREAD_MUTEX_NORMAL :: 0
 PTHREAD_MUTEX_RECURSIVE :: 1
 PTHREAD_MUTEX_ERRORCHECK :: 2
 
+PTHREAD_CANCEL_ENABLE       :: 0
+PTHREAD_CANCEL_DISABLE      :: 1
+PTHREAD_CANCEL_DEFERRED     :: 0
+PTHREAD_CANCEL_ASYNCHRONOUS :: 1
+
+foreign import pthread "System.framework"
+
+@(default_calling_convention="c")
+foreign pthread {
+	pthread_setcancelstate :: proc (state: c.int, old_state: ^c.int) -> c.int ---
+	pthread_setcanceltype  :: proc (type:  c.int, old_type:  ^c.int) -> c.int ---
+	pthread_cancel         :: proc (thread: pthread_t) -> c.int ---
+}
