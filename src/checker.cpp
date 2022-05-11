@@ -544,6 +544,28 @@ GB_COMPARE_PROC(vetted_entity_variable_pos_cmp) {
 	return token_pos_cmp(x->token.pos, y->token.pos);
 }
 
+bool check_vet_shadowing_assignment(Checker *c, Entity *shadowed, Ast *expr) {
+	Ast *init = unparen_expr(expr);
+	if (init == nullptr) {
+		return false;
+	}
+	if (init->kind == Ast_Ident) {
+		// TODO(bill): Which logic is better? Same name or same entity
+		// bool ignore = init->Ident.token.string == name;
+		bool ignore = init->Ident.entity == shadowed;
+		if (ignore) {
+			return true;
+		}
+	} else if (init->kind == Ast_TernaryIfExpr) {
+		bool x = check_vet_shadowing_assignment(c, shadowed, init->TernaryIfExpr.x);
+		bool y = check_vet_shadowing_assignment(c, shadowed, init->TernaryIfExpr.y);
+		if (x || y) {
+			return true;
+		}
+	}
+
+	return false;
+}
 
 
 bool check_vet_shadowing(Checker *c, Entity *e, VettedEntity *ve) {
@@ -594,17 +616,14 @@ bool check_vet_shadowing(Checker *c, Entity *e, VettedEntity *ve) {
 	}
 
 	// NOTE(bill): Ignore intentional redeclaration
-	// x := x;
+	// x := x
 	// Suggested in issue #637 (2020-05-11)
+	// Also allow the following
+	// x := x if cond else y
+	// x := z if cond else x
 	if ((e->flags & EntityFlag_Using) == 0 && e->kind == Entity_Variable) {
-		Ast *init = unparen_expr(e->Variable.init_expr);
-		if (init != nullptr && init->kind == Ast_Ident) {
-			// TODO(bill): Which logic is better? Same name or same entity
-			// bool ignore = init->Ident.token.string == name;
-			bool ignore = init->Ident.entity == shadowed;
-			if (ignore) {
-				return false;
-			}
+		if (check_vet_shadowing_assignment(c, shadowed, e->Variable.init_expr)) {
+			return false;
 		}
 	}
 
