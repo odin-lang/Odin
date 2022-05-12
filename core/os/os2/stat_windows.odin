@@ -57,7 +57,7 @@ full_path_from_name :: proc(name: string, allocator: runtime.Allocator) -> (path
 	if n == 0 {
 		return "", _get_platform_error()
 	}
-	return win32.utf16_to_utf8(buf[:n], allocator), nil
+	return win32.utf16_to_utf8(buf[:n], allocator)
 }
 
 
@@ -131,7 +131,7 @@ _cleanpath_from_handle :: proc(f: ^File, allocator: runtime.Allocator) -> (strin
 	}
 	buf := make([]u16, max(n, 260)+1, _temp_allocator())
 	n = win32.GetFinalPathNameByHandleW(h, raw_data(buf), u32(len(buf)), 0)
-	return _cleanpath_from_buf(buf[:n], allocator), nil
+	return _cleanpath_from_buf(buf[:n], allocator)
 }
 
 _cleanpath_from_handle_u16 :: proc(f: ^File) -> ([]u16, Error) {
@@ -149,7 +149,7 @@ _cleanpath_from_handle_u16 :: proc(f: ^File) -> ([]u16, Error) {
 	return _cleanpath_strip_prefix(buf[:n]), nil
 }
 
-_cleanpath_from_buf :: proc(buf: []u16, allocator: runtime.Allocator) -> string {
+_cleanpath_from_buf :: proc(buf: []u16, allocator: runtime.Allocator) -> (string, runtime.Allocator_Error) {
 	buf := buf
 	buf = _cleanpath_strip_prefix(buf)
 	return win32.utf16_to_utf8(buf, allocator)
@@ -194,15 +194,15 @@ file_type_mode :: proc(h: win32.HANDLE) -> File_Mode {
 
 
 
-_file_mode_from_file_attributes :: proc(FileAttributes: win32.DWORD, h: win32.HANDLE, ReparseTag: win32.DWORD) -> (mode: File_Mode) {
-	if FileAttributes & win32.FILE_ATTRIBUTE_READONLY != 0 {
+_file_mode_from_file_attributes :: proc(file_attributes: win32.DWORD, h: win32.HANDLE, ReparseTag: win32.DWORD) -> (mode: File_Mode) {
+	if file_attributes & win32.FILE_ATTRIBUTE_READONLY != 0 {
 		mode |= 0o444
 	} else {
 		mode |= 0o666
 	}
 
 	is_sym := false
-	if FileAttributes & win32.FILE_ATTRIBUTE_REPARSE_POINT == 0 {
+	if file_attributes & win32.FILE_ATTRIBUTE_REPARSE_POINT == 0 {
 		is_sym = false
 	} else {
 		is_sym = ReparseTag == win32.IO_REPARSE_TAG_SYMLINK || ReparseTag == win32.IO_REPARSE_TAG_MOUNT_POINT
@@ -211,7 +211,7 @@ _file_mode_from_file_attributes :: proc(FileAttributes: win32.DWORD, h: win32.HA
 	if is_sym {
 		mode |= File_Mode_Sym_Link
 	} else {
-		if FileAttributes & win32.FILE_ATTRIBUTE_DIRECTORY != 0 {
+		if file_attributes & win32.FILE_ATTRIBUTE_DIRECTORY != 0 {
 			mode |= 0o111 | File_Mode_Dir
 		}
 

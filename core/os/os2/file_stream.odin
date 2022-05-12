@@ -2,11 +2,19 @@ package os2
 
 import "core:io"
 
-file_to_stream :: proc(f: ^File) -> (s: io.Stream) {
+to_stream :: proc(f: ^File) -> (s: io.Stream) {
 	s.stream_data = f
 	s.stream_vtable = _file_stream_vtable
 	return
 }
+
+to_writer :: proc(f: ^File) -> (s: io.Writer) {
+	return {to_stream(f)}
+}
+to_reader :: proc(f: ^File) -> (s: io.Reader) {
+	return {to_stream(f)}
+}
+
 
 @(private)
 error_to_io_error :: proc(ferr: Error) -> io.Error {

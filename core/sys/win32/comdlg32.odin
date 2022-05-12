@@ -126,7 +126,7 @@ _open_file_dialog :: proc(title: string, dir: string,
 	}
 	
 
-	file_name := utf16_to_utf8(file_buf[:], allocator)
+	file_name, _ := utf16_to_utf8(file_buf[:], allocator)
 	path = strings.trim_right_null(file_name)
 	return
 }

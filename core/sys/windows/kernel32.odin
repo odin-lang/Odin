@@ -272,6 +272,11 @@ foreign kernel32 {
 	HeapReAlloc :: proc(hHeap: HANDLE, dwFlags: DWORD, lpMem: LPVOID, dwBytes: SIZE_T) -> LPVOID ---
 	HeapFree :: proc(hHeap: HANDLE, dwFlags: DWORD, lpMem: LPVOID) -> BOOL ---
 
+	LocalAlloc :: proc(flags: UINT, bytes: SIZE_T) -> LPVOID ---
+	LocalReAlloc :: proc(mem: LPVOID, bytes: SIZE_T, flags: UINT) -> LPVOID ---
+	LocalFree :: proc(mem: LPVOID) -> LPVOID ---
+
+
 	ReadDirectoryChangesW :: proc(
 		hDirectory: HANDLE,
 		lpBuffer: LPVOID,
