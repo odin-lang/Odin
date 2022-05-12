@@ -51,7 +51,7 @@ BLUETOOTH_DEVICE_INFO :: struct {
 	name:          [BLUETOOTH_MAX_NAME_SIZE]u16, //  Name of the device
 }
 
-@(default_calling_convention = "std")
+@(default_calling_convention="stdcall")
 foreign bthprops {
 	/*
 		Version
