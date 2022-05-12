@@ -2,6 +2,8 @@
 package os2
 
 import win32 "core:sys/windows"
+import "core:runtime"
+import "core:strings"
 
 _Path_Separator      :: '\\'
 _Path_List_Separator :: ';'
@@ -11,11 +13,58 @@ _is_path_separator :: proc(c: byte) -> bool {
 }
 
 _mkdir :: proc(name: string, perm: File_Mode) -> Error {
+	if !win32.CreateDirectoryW(_fix_long_path(name), nil) {
+		return _get_platform_error()
+	}
 	return nil
 }
 
 _mkdir_all :: proc(path: string, perm: File_Mode) -> Error {
-	// TODO(bill): _mkdir_all for windows
+	fix_root_directory :: proc(p: string) -> (s: string, allocated: bool, err: runtime.Allocator_Error) {
+		if len(p) == len(`\\?\c:`) {
+			if is_path_separator(p[0]) && is_path_separator(p[1]) && p[2] == '?' && is_path_separator(p[3]) && p[5] == ':' {
+				s = strings.concatenate_safe({p, `\`}, _file_allocator()) or_return
+				allocated = true
+				return
+			}
+		}
+		return p, false, nil
+	}
+
+	dir, err := stat(path, _temp_allocator())
+	if err == nil {
+		if dir.is_dir {
+			return nil
+		}
+		return .Exist
+	}
+
+	i := len(path)
+	for i > 0 && is_path_separator(path[i-1]) {
+		i -= 1
+	}
+
+	j := i
+	for j > 0 && !is_path_separator(path[j-1]) {
+		j -= 1
+	}
+
+	if j > 1 {
+		new_path, allocated := fix_root_directory(path[:j-1]) or_return
+		defer if allocated {
+			delete(new_path, _file_allocator())
+		}
+		mkdir_all(new_path, perm) or_return
+	}
+
+	err = mkdir(path, perm)
+	if err != nil {
+		dir1, err1 := lstat(path, _temp_allocator())
+		if err1 == nil && dir1.is_dir {
+			return nil
+		}
+		return err
+	}
 	return nil
 }
 
@@ -24,11 +73,13 @@ _remove_all :: proc(path: string) -> Error {
 	return nil
 }
 
-_getwd :: proc(allocator := context.allocator) -> (dir: string, err: Error) {
+_getwd :: proc(allocator: runtime.Allocator) -> (dir: string, err: Error) {
+	// TODO(bill)
 	return "", nil
 }
 
 _setwd :: proc(dir: string) -> (err: Error) {
+	// TODO(bill)
 	return nil
 }
 
@@ -75,7 +126,7 @@ _fix_long_path_internal :: proc(path: string) -> string {
 	}
 
 	PREFIX :: `\\?`
-	path_buf := make([]byte, len(PREFIX)+len(path)+1, context.temp_allocator)
+	path_buf := make([]byte, len(PREFIX)+len(path)+1, _temp_allocator())
 	copy(path_buf, PREFIX)
 	n := len(path)
 	r, w := 0, len(PREFIX)

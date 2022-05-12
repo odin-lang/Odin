@@ -74,7 +74,7 @@ read_ptr :: proc(f: ^File, data: rawptr, len: int) -> (n: int, err: Error) {
 
 
 
-read_entire_file :: proc(name: string, allocator := context.allocator) -> ([]byte, Error) {
+read_entire_file :: proc(name: string, allocator := context.allocator) -> (data: []byte, err: Error) {
 	f, ferr := open(name)
 	if ferr != nil {
 		return nil, ferr
@@ -91,15 +91,17 @@ read_entire_file :: proc(name: string, allocator := context.allocator) -> ([]byt
 
 	// TODO(bill): Is this correct logic?
 	total: int
-	data := make([]byte, size, allocator)
+	data = make([]byte, size, allocator) or_return
 	for {
-		n, err := read(f, data[total:])
+		n: int
+		n, err = read(f, data[total:])
 		total += n
 		if err != nil {
 			if err == .EOF {
 				err = nil
 			}
-			return data[:total], err
+			data = data[:total]
+			return
 		}
 	}
 }

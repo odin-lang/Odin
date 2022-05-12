@@ -3,6 +3,7 @@ package os2
 
 import "core:io"
 import "core:mem"
+import "core:sync"
 import "core:runtime"
 import "core:strings"
 import "core:time"
@@ -19,6 +20,12 @@ _file_allocator :: proc() -> runtime.Allocator {
 	return heap_allocator()
 }
 
+_temp_allocator :: proc() -> runtime.Allocator {
+	// TODO(bill): make this not depend on the context allocator
+	return context.temp_allocator
+}
+
+
 _File_Kind :: enum u8 {
 	File,
 	Console,
@@ -30,18 +37,15 @@ _File :: struct {
 	name: string,
 	wname: win32.wstring,
 	kind: _File_Kind,
+
+	allocator: runtime.Allocator,
+
+	rw_mutex: sync.RW_Mutex, // read write calls
+	p_mutex:  sync.Mutex, // pread pwrite calls
 }
 
 _handle :: proc(f: ^File) -> win32.HANDLE {
 	return win32.HANDLE(_fd(f))
-}
-
-_get_platform_error :: proc() -> Error {
-	err := i32(win32.GetLastError())
-	if err != 0 {
-		return Platform_Error{err}
-	}
-	return nil
 }
 
 _open_internal :: proc(name: string, flags: File_Flags, perm: File_Mode) -> (handle: uintptr, err: Error) {
@@ -100,7 +104,7 @@ _open_internal :: proc(name: string, flags: File_Flags, perm: File_Mode) -> (han
 				case 0:
 					return uintptr(h), nil
 				case:
-					return 0, Platform_Error{i32(e)}
+					return 0, Platform_Error(e)
 				}
 			}
 		}
@@ -123,11 +127,12 @@ _new_file :: proc(handle: uintptr, name: string) -> ^File {
 	if handle == INVALID_HANDLE {
 		return nil
 	}
-	context.allocator = _file_allocator()
-	f := new(File)
+	f := new(File, _file_allocator())
+
+	f.impl.allocator = _file_allocator()
 	f.impl.fd = rawptr(fd)
-	f.impl.name = strings.clone(name, context.allocator)
-	f.impl.wname = win32.utf8_to_wstring(name, context.allocator)
+	f.impl.name = strings.clone(name, f.impl.allocator)
+	f.impl.wname = win32.utf8_to_wstring(name, f.impl.allocator)
 
 	handle := _handle(f)
 	kind := _File_Kind.File
@@ -154,10 +159,10 @@ _destroy :: proc(f: ^File) -> Error {
 		return nil
 	}
 
-	context.allocator = _file_allocator()
-	free(f.impl.wname)
-	delete(f.impl.name)
-	free(f)
+	a := f.impl.allocator
+	free(f.impl.wname, a)
+	delete(f.impl.name, a)
+	free(f, a)
 	return nil
 }
 
@@ -185,6 +190,8 @@ _seek :: proc(f: ^File, offset: i64, whence: Seek_From) -> (ret: i64, err: Error
 		return 0, .Invalid_File
 	}
 
+	sync.guard(&f.impl.rw_mutex)
+
 	w: u32
 	switch whence {
 	case .Start:   w = win32.FILE_BEGIN
@@ -207,6 +214,7 @@ _read :: proc(f: ^File, p: []byte) -> (n: int, err: Error) {
 			return 0, nil
 		}
 
+		// TODO(bill): should this be moved to `_File` instead?
 		BUF_SIZE :: 386
 		buf16: [BUF_SIZE]u16
 		buf8: [4*BUF_SIZE]u8
@@ -257,22 +265,27 @@ _read :: proc(f: ^File, p: []byte) -> (n: int, err: Error) {
 	total_read: int
 	length := len(p)
 
-	to_read := min(win32.DWORD(length), MAX_RW)
+	sync.shared_guard(&f.impl.rw_mutex) // multiple readers
 
-	e: win32.BOOL
-	if f.impl.kind == .Console {
-		n, err := read_console(handle, p[total_read:][:to_read])
-		total_read += n
-		if err != nil {
-			return int(total_read), err
+	if sync.guard(&f.impl.p_mutex) {
+		to_read := min(win32.DWORD(length), MAX_RW)
+		ok: win32.BOOL
+		if f.impl.kind == .Console {
+			n, err := read_console(handle, p[total_read:][:to_read])
+			total_read += n
+			if err != nil {
+				return int(total_read), err
+			}
+		} else {
+			ok = win32.ReadFile(handle, &p[total_read], to_read, &single_read_length, nil)
 		}
-	} else {
-		e = win32.ReadFile(handle, &p[total_read], to_read, &single_read_length, nil)
+
+		if single_read_length > 0 && ok {
+			total_read += int(single_read_length)
+		} else {
+			err = _get_platform_error()
+		}
 	}
-	if single_read_length <= 0 || !e {
-		return int(total_read), _get_platform_error()
-	}
-	total_read += int(single_read_length)
 
 	return int(total_read), nil
 }
@@ -303,6 +316,9 @@ _read_at :: proc(f: ^File, p: []byte, offset: i64) -> (n: int, err: Error) {
 		n = int(done)
 		return
 	}
+
+	sync.guard(&f.impl.p_mutex)
+
 	p, offset := p, offset
 	for len(p) > 0 {
 		m := pread(f, p, offset) or_return
@@ -329,6 +345,7 @@ _write :: proc(f: ^File, p: []byte) -> (n: int, err: Error) {
 
 	handle := _handle(f)
 
+	sync.guard(&f.impl.rw_mutex)
 	for total_write < length {
 		remaining := length - total_write
 		to_write := win32.DWORD(min(i32(remaining), MAX_RW))
@@ -369,6 +386,7 @@ _write_at :: proc(f: ^File, p: []byte, offset: i64) -> (n: int, err: Error) {
 		return
 	}
 
+	sync.guard(&f.impl.p_mutex)
 	p, offset := p, offset
 	for len(p) > 0 {
 		m := pwrite(f, p, offset) or_return
@@ -531,7 +549,7 @@ _normalize_link_path :: proc(p: []u16, allocator: runtime.Allocator) -> (str: st
 	if n == 0 {
 		return "", _get_platform_error()
 	}
-	buf := make([]u16, n+1, context.temp_allocator)
+	buf := make([]u16, n+1, _temp_allocator())
 	n = win32.GetFinalPathNameByHandleW(handle, raw_data(buf), u32(len(buf)), win32.VOLUME_NAME_DOS)
 	if n == 0 {
 		return "", _get_platform_error()
