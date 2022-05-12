@@ -29,7 +29,7 @@ _lookup_env :: proc(key: string, allocator: runtime.Allocator) -> (value: string
 		return "", false
 	}
 
-	value = win32.utf16_to_utf8(b[:n], allocator)
+	value = win32.utf16_to_utf8(b[:n], allocator) or_else ""
 	found = true
 	return
 }
@@ -73,7 +73,7 @@ _environ :: proc(allocator: runtime.Allocator) -> []string {
 				break
 			}
 			w := ([^]u16)(p)[from:i]
-			append(&r, win32.utf16_to_utf8(w, allocator))
+			append(&r, win32.utf16_to_utf8(w, allocator) or_else "")
 			from = i + 1
 		}
 	}

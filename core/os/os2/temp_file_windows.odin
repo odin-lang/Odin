@@ -12,10 +12,10 @@ _mkdir_temp :: proc(dir, pattern: string, allocator: runtime.Allocator) -> (stri
 	return "", nil
 }
 
-_temp_dir :: proc(allocator: runtime.Allocator) -> string {
+_temp_dir :: proc(allocator: runtime.Allocator) -> (string, runtime.Allocator_Error) {
 	n := win32.GetTempPathW(0, nil)
 	if n == 0 {
-		return ""
+		return "", nil
 	}
 	b := make([]u16, max(win32.MAX_PATH, n), _temp_allocator())
 	n = win32.GetTempPathW(u32(len(b)), raw_data(b))

@@ -21,6 +21,7 @@ File_Mode_Device      :: File_Mode(1<<18)
 File_Mode_Char_Device :: File_Mode(1<<19)
 File_Mode_Sym_Link    :: File_Mode(1<<20)
 
+File_Mode_Perm :: File_Mode(0o777) // Unix permision bits
 
 File_Flags :: distinct bit_set[File_Flag; uint]
 File_Flag :: enum {
@@ -194,3 +195,20 @@ is_dir :: proc(path: string) -> bool {
 	return _is_dir(path)
 }
 
+
+copy_file :: proc(dst_path, src_path: string) -> Error {
+	src := open(src_path) or_return
+	defer close(src)
+
+	info := fstat(src, _file_allocator()) or_return
+	defer file_info_delete(info, _file_allocator())
+	if info.is_dir {
+		return .Invalid_File
+	}
+
+	dst := open(dst_path, {.Read, .Write, .Create, .Trunc}, info.mode & File_Mode_Perm) or_return
+	defer close(dst)
+
+	_, err := io.copy(to_writer(dst), to_reader(src))
+	return err
+}

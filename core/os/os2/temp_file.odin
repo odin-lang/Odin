@@ -10,6 +10,6 @@ mkdir_temp :: proc(dir, pattern: string, allocator: runtime.Allocator) -> (strin
 	return _mkdir_temp(dir, pattern, allocator)
 }
 
-temp_dir :: proc(allocator: runtime.Allocator) -> string {
+temp_dir :: proc(allocator: runtime.Allocator) -> (string, Error) {
 	return _temp_dir(allocator)
 }

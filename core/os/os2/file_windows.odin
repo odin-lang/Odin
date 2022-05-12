@@ -529,16 +529,16 @@ _normalize_link_path :: proc(p: []u16, allocator: runtime.Allocator) -> (str: st
 	}
 
 	if !has_unc_prefix(p) {
-		return win32.utf16_to_utf8(p, allocator), nil
+		return win32.utf16_to_utf8(p, allocator)
 	}
 
 	ws := p[4:]
 	switch {
 	case len(ws) >= 2 && ws[1] == ':':
-		return win32.utf16_to_utf8(ws, allocator), nil
+		return win32.utf16_to_utf8(ws, allocator)
 	case has_prefix(ws, `UNC\`):
 		ws[3] = '\\' // override data in buffer
-		return win32.utf16_to_utf8(ws[3:], allocator), nil
+		return win32.utf16_to_utf8(ws[3:], allocator)
 	}
 
 
@@ -560,9 +560,9 @@ _normalize_link_path :: proc(p: []u16, allocator: runtime.Allocator) -> (str: st
 		ws = ws[4:]
 		if len(ws) > 3 && has_prefix(ws, `UNC`) {
 			ws[2] = '\\'
-			return win32.utf16_to_utf8(ws[2:], allocator), nil
+			return win32.utf16_to_utf8(ws[2:], allocator)
 		}
-		return win32.utf16_to_utf8(ws, allocator), nil
+		return win32.utf16_to_utf8(ws, allocator)
 	}
 	return "", .Invalid_Path
 }
@@ -593,7 +593,7 @@ _read_link :: proc(name: string, allocator: runtime.Allocator) -> (s: string, er
 		pb[rb.SubstituteNameOffset+rb.SubstituteNameLength] = 0
 		p := pb[rb.SubstituteNameOffset:][:rb.SubstituteNameLength]
 		if rb.Flags & win32.SYMLINK_FLAG_RELATIVE != 0 {
-			return win32.utf16_to_utf8(p, allocator), nil
+			return win32.utf16_to_utf8(p, allocator)
 		}
 		return _normalize_link_path(p, allocator)
 

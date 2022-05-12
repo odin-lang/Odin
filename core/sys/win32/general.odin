@@ -1,6 +1,8 @@
 // +build windows
 package win32
 
+import "core:runtime"
+
 Uint_Ptr :: distinct uintptr
 Int_Ptr :: distinct int
 Long_Ptr :: distinct int
@@ -858,14 +860,14 @@ utf8_to_wstring :: proc(s: string, allocator := context.temp_allocator) -> Wstri
 	return nil
 }
 
-wstring_to_utf8 :: proc(s: Wstring, N: int, allocator := context.temp_allocator) -> string {
+wstring_to_utf8 :: proc(s: Wstring, N: int, allocator := context.temp_allocator) -> (str: string, err: runtime.Allocator_Error) {
 	if N == 0 {
-		return ""
+		return
 	}
 
 	n := wide_char_to_multi_byte(CP_UTF8, WC_ERR_INVALID_CHARS, s, i32(N), nil, 0, nil, nil)
 	if n == 0 {
-		return ""
+		return
 	}
 
 	// If N == -1 the call to wide_char_to_multi_byte assume the wide string is null terminated
@@ -873,11 +875,11 @@ wstring_to_utf8 :: proc(s: Wstring, N: int, allocator := context.temp_allocator)
 	// also null terminated.
 	// If N != -1 it assumes the wide string is not null terminated and the resulting string
 	// will not be null terminated, we therefore have to force it to be null terminated manually.
-	text := make([]byte, n+1 if N != -1 else n, allocator)
+	text := make([]byte, n+1 if N != -1 else n, allocator) or_return
 
 	if n1 := wide_char_to_multi_byte(CP_UTF8, WC_ERR_INVALID_CHARS, s, i32(N), cstring(&text[0]), n, nil, nil); n1 == 0 {
 		delete(text, allocator)
-		return ""
+		return "", nil
 	}
 
 	for i in 0..<n {
@@ -887,12 +889,12 @@ wstring_to_utf8 :: proc(s: Wstring, N: int, allocator := context.temp_allocator)
 		}
 	}
 
-	return string(text[:n])
+	return string(text[:n]), nil
 }
 
-utf16_to_utf8 :: proc(s: []u16, allocator := context.temp_allocator) -> string {
+utf16_to_utf8 :: proc(s: []u16, allocator := context.temp_allocator) -> (string, runtime.Allocator_Error) {
 	if len(s) == 0 {
-		return ""
+		return "", nil
 	}
 	return wstring_to_utf8(cast(Wstring)&s[0], len(s), allocator)
 }
