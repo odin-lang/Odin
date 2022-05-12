@@ -1566,6 +1566,33 @@ ADDRINFOA :: struct {
 	ai_next: ^ADDRINFOA,
 }
 
+PADDRINFOEXW  :: ^ADDRINFOEXW
+LPADDRINFOEXW :: ^ADDRINFOEXW
+ADDRINFOEXW :: struct {
+	ai_flags:     c_int,
+	ai_family:    c_int,
+	ai_socktype:  c_int,
+	ai_protocol:  c_int,
+	ai_addrlen:   size_t,
+	ai_canonname: wstring,
+	ai_addr:      ^sockaddr,
+	ai_blob:      rawptr,
+	ai_bloblen:   size_t,
+	ai_provider:  LPGUID,
+	ai_next:      ^ADDRINFOEXW,
+}
+
+LPLOOKUPSERVICE_COMPLETION_ROUTINE :: #type proc "stdcall" (
+	dwErrorCode: DWORD,
+	dwNumberOfBytesTransfered: DWORD,
+	lpOverlapped: LPOVERLAPPED,
+)
+
+sockaddr  :: struct {
+	sa_family: USHORT,
+	sa_data:   [14]byte,
+}
+
 sockaddr_in :: struct {
 	sin_family: ADDRESS_FAMILY,
 	sin_port: USHORT,
