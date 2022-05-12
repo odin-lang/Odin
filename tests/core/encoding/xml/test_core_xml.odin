@@ -218,7 +218,7 @@ doc_to_string :: proc(doc: ^xml.Document) -> (result: string) {
 
 		written += wprintf(writer, "[XML Prolog]\n")
 
-		for attr in doc.prolog {
+		for attr in doc.prologue {
 			written += wprintf(writer, "\t%v: %v\n", attr.key, attr.val)
 		}
 
