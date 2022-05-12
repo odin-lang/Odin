@@ -29,6 +29,11 @@ foreign kernel32 {
 	SetHandleInformation :: proc(hObject: HANDLE,
 	                             dwMask: DWORD,
 	                             dwFlags: DWORD) -> BOOL ---
+	SetFileInformationByHandle :: proc(hFile:                HANDLE,
+	                                   FileInformationClass: FILE_INFO_BY_HANDLE_CLASS,
+	                                   lpFileInformation:    LPVOID,
+	                                   dwBufferSize:         DWORD) -> BOOL ---
+
 
 	AddVectoredExceptionHandler :: proc(FirstHandler: ULONG, VectoredHandler: PVECTORED_EXCEPTION_HANDLER) -> LPVOID ---
 	AddVectoredContinueHandler  :: proc(FirstHandler: ULONG, VectoredHandler: PVECTORED_EXCEPTION_HANDLER) -> LPVOID ---

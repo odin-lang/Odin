@@ -2,6 +2,7 @@ package os2
 
 import "core:io"
 import "core:time"
+import "core:runtime"
 
 File :: struct {
 	impl: _File,
@@ -31,6 +32,7 @@ File_Flag :: enum {
 	Sync,
 	Trunc,
 	Sparse,
+	Close_On_Exec,
 }
 
 O_RDONLY :: File_Flags{.Read}
@@ -137,22 +139,35 @@ symlink :: proc(old_name, new_name: string) -> Error {
 	return _symlink(old_name, new_name)
 }
 
-read_link :: proc(name: string) -> (string, Error) {
-	return _read_link(name)
+read_link :: proc(name: string, allocator: runtime.Allocator) -> (string, Error) {
+	return _read_link(name,allocator)
 }
 
 
-chdir :: proc(f: ^File) -> Error {
-	return _chdir(f)
+chdir :: proc(name: string) -> Error {
+	return _chdir(name)
 }
 
-chmod :: proc(f: ^File, mode: File_Mode) -> Error {
-	return _chmod(f, mode)
+chmod :: proc(name: string, mode: File_Mode) -> Error {
+	return _chmod(name, mode)
 }
 
-chown :: proc(f: ^File, uid, gid: int) -> Error {
-	return _chown(f, uid, gid)
+chown :: proc(name: string, uid, gid: int) -> Error {
+	return _chown(name, uid, gid)
 }
+
+fchdir :: proc(f: ^File) -> Error {
+	return _fchdir(f)
+}
+
+fchmod :: proc(f: ^File, mode: File_Mode) -> Error {
+	return _fchmod(f, mode)
+}
+
+fchown :: proc(f: ^File, uid, gid: int) -> Error {
+	return _fchown(f, uid, gid)
+}
+
 
 
 lchown :: proc(name: string, uid, gid: int) -> Error {
@@ -162,6 +177,9 @@ lchown :: proc(name: string, uid, gid: int) -> Error {
 
 chtimes :: proc(name: string, atime, mtime: time.Time) -> Error {
 	return _chtimes(name, atime, mtime)
+}
+fchtimes :: proc(f: ^File, atime, mtime: time.Time) -> Error {
+	return _fchtimes(f, atime, mtime)
 }
 
 exists :: proc(path: string) -> bool {
