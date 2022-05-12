@@ -1,13 +1,14 @@
+//+private
 //+build js
 package time
 
-IS_SUPPORTED :: false
+_IS_SUPPORTED :: false
 
-now :: proc() -> Time {
+_now :: proc "contextless" () -> Time {
 	return {}
 }
 
-sleep :: proc(d: Duration) {
+_sleep :: proc "contextless" (d: Duration) {
 }
 
 _tick_now :: proc "contextless" () -> Tick {
