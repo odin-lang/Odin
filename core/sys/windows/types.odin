@@ -3,19 +3,21 @@ package sys_windows
 
 import "core:c"
 
-c_char     :: c.char
-c_uchar    :: c.uchar
-c_int      :: c.int
-c_uint     :: c.uint
-c_long     :: c.long
-c_longlong :: c.longlong
-c_ulong    :: c.ulong
-c_short    :: c.short
-c_ushort   :: c.ushort
-size_t     :: c.size_t
-wchar_t    :: c.wchar_t
+c_char      :: c.char
+c_uchar     :: c.uchar
+c_int       :: c.int
+c_uint      :: c.uint
+c_long      :: c.long
+c_longlong  :: c.longlong
+c_ulong     :: c.ulong
+c_ulonglong :: c.ulonglong
+c_short     :: c.short
+c_ushort    :: c.ushort
+size_t      :: c.size_t
+wchar_t     :: c.wchar_t
 
 DWORD :: c_ulong
+QWORD :: c.ulonglong
 HANDLE :: distinct LPVOID
 HINSTANCE :: HANDLE
 HMODULE :: distinct HINSTANCE
@@ -2169,4 +2171,123 @@ SYSTEMTIME :: struct {
 	minute:       WORD,
 	second:       WORD,
 	milliseconds: WORD,
+}
+
+
+@(private="file")
+IMAGE_DOS_HEADER :: struct {
+	e_magic:    WORD,
+	e_cblp:     WORD,
+	e_cp:       WORD,
+	e_crlc:     WORD,
+	e_cparhdr:  WORD,
+	e_minalloc: WORD,
+	e_maxalloc: WORD,
+	e_ss:       WORD,
+	e_sp:       WORD,
+	e_csum:     WORD,
+	e_ip:       WORD,
+	e_cs:       WORD,
+	e_lfarlc:   WORD,
+	e_ovno:     WORD,
+	e_res_0:    WORD,
+	e_res_1:    WORD,
+	e_res_2:    WORD,
+	e_res_3:    WORD,
+	e_oemid:    WORD,
+	e_oeminfo:  WORD,
+	e_res2_0:   WORD,
+	e_res2_1:   WORD,
+	e_res2_2:   WORD,
+	e_res2_3:   WORD,
+	e_res2_4:   WORD,
+	e_res2_5:   WORD,
+	e_res2_6:   WORD,
+	e_res2_7:   WORD,
+	e_res2_8:   WORD,
+	e_res2_9:   WORD,
+	e_lfanew:   DWORD,
+}
+
+IMAGE_DATA_DIRECTORY :: struct {
+	VirtualAddress: DWORD,
+	Size:           DWORD,
+}
+
+IMAGE_FILE_HEADER :: struct {
+	Machine:              WORD,
+	NumberOfSections:     WORD,
+	TimeDateStamp:        DWORD,
+	PointerToSymbolTable: DWORD,
+	NumberOfSymbols:      DWORD,
+	SizeOfOptionalHeader: WORD,
+	Characteristics:      WORD,
+}
+
+IMAGE_OPTIONAL_HEADER64 :: struct {
+	Magic:                        WORD,
+	MajorLinkerVersion:           BYTE,
+	MinorLinkerVersion:           BYTE,
+	SizeOfCode:                   DWORD,
+	SizeOfInitializedData:        DWORD,
+	SizeOfUninitializedData:      DWORD,
+	AddressOfEntryPoint:          DWORD,
+	BaseOfCode:                   DWORD,
+	ImageBase:                    QWORD,
+	SectionAlignment:             DWORD,
+	FileAlignment:                DWORD,
+	MajorOperatingSystemVersion:  WORD,
+	MinorOperatingSystemVersion:  WORD,
+	MajorImageVersion:            WORD,
+	MinorImageVersion:            WORD,
+	MajorSubsystemVersion:        WORD,
+	MinorSubsystemVersion:        WORD,
+	Win32VersionValue:            DWORD,
+	SizeOfImage:                  DWORD,
+	SizeOfHeaders:                DWORD,
+	CheckSum:                     DWORD,
+	Subsystem:                    WORD,
+	DllCharacteristics:           WORD,
+	SizeOfStackReserve:           QWORD,
+	SizeOfStackCommit:            QWORD,
+	SizeOfHeapReserve:            QWORD,
+	SizeOfHeapCommit:             QWORD,
+	LoaderFlags:                  DWORD,
+	NumberOfRvaAndSizes:          DWORD,
+	ExportTable:                  IMAGE_DATA_DIRECTORY,
+	ImportTable:                  IMAGE_DATA_DIRECTORY,
+	ResourceTable:                IMAGE_DATA_DIRECTORY,
+	ExceptionTable:               IMAGE_DATA_DIRECTORY,
+	CertificateTable:             IMAGE_DATA_DIRECTORY,
+	BaseRelocationTable:          IMAGE_DATA_DIRECTORY,
+	Debug:                        IMAGE_DATA_DIRECTORY,
+	Architecture:                 IMAGE_DATA_DIRECTORY,
+	GlobalPtr:                    IMAGE_DATA_DIRECTORY,
+	TLSTable:                     IMAGE_DATA_DIRECTORY,
+	LoadConfigTable:              IMAGE_DATA_DIRECTORY,
+	BoundImport:                  IMAGE_DATA_DIRECTORY,
+	IAT:                          IMAGE_DATA_DIRECTORY,
+	DelayImportDescriptor:        IMAGE_DATA_DIRECTORY,
+	CLRRuntimeHeader:             IMAGE_DATA_DIRECTORY,
+	Reserved:                     IMAGE_DATA_DIRECTORY,
+}
+
+IMAGE_NT_HEADERS64 :: struct {
+	Signature:      DWORD,
+	FileHeader:     IMAGE_FILE_HEADER,
+	OptionalHeader: IMAGE_OPTIONAL_HEADER64,
+}
+
+IMAGE_EXPORT_DIRECTORY :: struct {
+	Characteristics:       DWORD,
+	TimeDateStamp:         DWORD,
+	MajorVersion:          WORD,
+	MinorVersion:          WORD,
+	Name:                  DWORD,
+	Base:                  DWORD,
+	NumberOfFunctions:     DWORD,
+	NumberOfNames:         DWORD,
+	AddressOfFunctions:    DWORD, // RVA from base of image
+	AddressOfNames:        DWORD, // RVA from base of image
+	AddressOfNameOrdinals: DWORD, // RVA from base of image
 }
