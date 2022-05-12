@@ -13,6 +13,9 @@ General_Error :: enum u32 {
 	Timeout,
 
 	Invalid_File,
+	Invalid_Path,
+
+	Unsupported,
 }
 
 Platform_Error :: struct {
