@@ -451,20 +451,20 @@ run_as_user :: proc(username, password, application, commandline: string, pi: ^P
 		nil,	// lpProcessAttributes,
 		nil,	// lpThreadAttributes,
 		false,	// bInheritHandles,
-    	0,		// creation flags
-    	nil,	// environment,
-    	nil,	// current directory: inherit from parent if nil
-    	&si,
-    	pi,
-    ))
-    if ok {
-    	if wait {
-	    	WaitForSingleObject(pi.hProcess, INFINITE)
-    		CloseHandle(pi.hProcess)
-    		CloseHandle(pi.hThread)
-    	}
-    	return true
-    } else {
-    	return false
-    }
+		0,		// creation flags
+		nil,	// environment,
+		nil,	// current directory: inherit from parent if nil
+		&si,
+		pi,
+	))
+	if ok {
+		if wait {
+			WaitForSingleObject(pi.hProcess, INFINITE)
+			CloseHandle(pi.hProcess)
+			CloseHandle(pi.hThread)
+		}
+		return true
+	} else {
+		return false
+	}
 }

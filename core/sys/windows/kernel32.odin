@@ -5,7 +5,8 @@ foreign import kernel32 "system:Kernel32.lib"
 
 @(default_calling_convention="stdcall")
 foreign kernel32 {
-	OutputDebugStringA :: proc(lpOutputString: LPCSTR) ---
+	OutputDebugStringA :: proc(lpOutputString: LPCSTR) --- // The only A thing that is allowed
+	OutputDebugStringW :: proc(lpOutputString: LPCSTR) ---
 
 	ReadConsoleW :: proc(hConsoleInput: HANDLE,
 	                     lpBuffer: LPVOID,
