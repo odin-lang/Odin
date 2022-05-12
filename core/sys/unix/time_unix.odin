@@ -7,21 +7,13 @@ when ODIN_OS == .Darwin {
 	foreign import libc "system:c"
 }
 
-@(default_calling_convention="c")
-foreign libc {
-	clock_gettime :: proc(clock_id: u64, timespec: ^timespec) -> i32 ---
-	sleep         :: proc(seconds: u32) -> i32 ---
-	nanosleep     :: proc(requested, remaining: ^timespec) -> i32 ---
-}
-
-foreign import "system:pthread"
-
 import "core:c"
 
-@(private="file")
 @(default_calling_convention="c")
-foreign pthread {
-	sched_yield :: proc() -> c.int ---
+foreign libc {
+	clock_gettime :: proc(clock_id: u64, timespec: ^timespec) -> c.int ---
+	sleep         :: proc(seconds: c.uint) -> c.int ---
+	nanosleep     :: proc(requested, remaining: ^timespec) -> c.int ---
 }
 
 timespec :: struct {
