@@ -3,8 +3,6 @@ package sys_windows
 
 foreign import kernel32 "system:Kernel32.lib"
 
-
-
 @(default_calling_convention="stdcall")
 foreign kernel32 {
 	OutputDebugStringA :: proc(lpOutputString: LPCSTR) ---
@@ -781,7 +779,7 @@ foreign kernel32 {
 	) -> BOOL ---
 }
 
-@(default_calling_convention = "std")
+@(default_calling_convention="stdcall")
 foreign kernel32 {
 	@(link_name="SetConsoleCtrlHandler") set_console_ctrl_handler :: proc(handler: Handler_Routine, add: BOOL) -> BOOL ---
 }
