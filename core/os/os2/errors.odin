@@ -14,6 +14,7 @@ General_Error :: enum u32 {
 	Timeout,
 
 	Invalid_File,
+	Invalid_Dir,
 	Invalid_Path,
 
 	Unsupported,
@@ -51,6 +52,7 @@ error_string :: proc(ferr: Error) -> string {
 		case .Closed:            return "file already closed"
 		case .Timeout:           return "i/o timeout"
 		case .Invalid_File:      return "invalid file"
+		case .Invalid_Dir:       return "invalid directory"
 		case .Invalid_Path:      return "invalid path"
 		case .Unsupported:       return "unsupported"
 		}
