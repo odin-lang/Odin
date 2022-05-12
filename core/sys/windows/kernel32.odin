@@ -21,7 +21,8 @@ foreign kernel32 {
 
 	GetConsoleMode :: proc(hConsoleHandle: HANDLE,
 	                       lpMode: LPDWORD) -> BOOL ---
-
+	SetConsoleMode :: proc(hConsoleHandle: HANDLE,
+	                       dwMode: DWORD) -> BOOL ---
 
 	GetFileInformationByHandle :: proc(hFile: HANDLE, lpFileInformation: LPBY_HANDLE_FILE_INFORMATION) -> BOOL ---
 	SetHandleInformation :: proc(hObject: HANDLE,
