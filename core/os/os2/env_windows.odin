@@ -2,8 +2,9 @@
 package os2
 
 import win32 "core:sys/windows"
+import "core:runtime"
 
-_lookup_env :: proc(key: string, allocator := context.allocator) -> (value: string, found: bool) {
+_lookup_env :: proc(key: string, allocator: runtime.Allocator) -> (value: string, found: bool) {
 	if key == "" {
 		return
 	}
@@ -17,7 +18,7 @@ _lookup_env :: proc(key: string, allocator := context.allocator) -> (value: stri
 		}
 		return "", true
 	}
-	b := make([]u16, n+1, context.temp_allocator)
+	b := make([]u16, n+1, _temp_allocator())
 
 	n = win32.GetEnvironmentVariableW(wkey, raw_data(b), u32(len(b)))
 	if n == 0 {
@@ -25,6 +26,7 @@ _lookup_env :: proc(key: string, allocator := context.allocator) -> (value: stri
 		if err == win32.ERROR_ENVVAR_NOT_FOUND {
 			return "", false
 		}
+		return "", false
 	}
 
 	value = win32.utf16_to_utf8(b[:n], allocator)
@@ -45,7 +47,7 @@ _unset_env :: proc(key: string) -> bool {
 }
 
 _clear_env :: proc() {
-	envs := environ(context.temp_allocator)
+	envs := environ(_temp_allocator())
 	for env in envs {
 		for j in 1..<len(env) {
 			if env[j] == '=' {
@@ -56,7 +58,7 @@ _clear_env :: proc() {
 	}
 }
 
-_environ :: proc(allocator := context.allocator) -> []string {
+_environ :: proc(allocator: runtime.Allocator) -> []string {
 	envs := win32.GetEnvironmentStringsW()
 	if envs == nil {
 		return nil
