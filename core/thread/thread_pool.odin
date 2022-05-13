@@ -39,6 +39,7 @@ Pool :: struct {
 
 	threads: []^Thread,
 
+
 	tasks:      [dynamic]Task,
 	tasks_done: [dynamic]Task,
 }
@@ -102,8 +103,15 @@ pool_join :: proc(pool: ^Pool) {
 
 	yield()
 
-	for t in pool.threads {
-		join(t)
+	started_count: int
+	for started_count < len(pool.threads) {
+		started_count = 0
+		for t in pool.threads {
+			if .Started in t.flags {
+				join(t)
+				started_count += 1
+			}
+		}
 	}
 }
 
