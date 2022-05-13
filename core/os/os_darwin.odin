@@ -362,7 +362,7 @@ when  ODIN_OS == .Darwin && ODIN_ARCH == .arm64 {
 }
 
 fchmod :: proc(fd: Handle, mode: u16) -> Errno {
-	return cast(Errno)_unix_fchmod(fildes, mode)
+	return cast(Errno)_unix_fchmod(fd, mode)
 }
 
 close :: proc(fd: Handle) -> bool {
