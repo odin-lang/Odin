@@ -14,7 +14,7 @@ Which_File_Type :: enum {
 	JPEG,
 	JPEG_2000,
 	JPEG_XL,
-	PBM, PGM, PPM, // NetPBM family
+	PBM, PGM, PPM, PAM, PFM, // NetPBM family
 	PIC, // Softimage PIC
 	PNG, // Portable Network Graphics
 	PSD, // Photoshop PSD
@@ -117,6 +117,10 @@ which_bytes :: proc(data: []byte) -> Which_File_Type {
 				return .PGM
 			case '3', '6':
 				return .PPM
+			case '7':
+				return .PAM
+			case 'F', 'f':
+				return .PFM
 			}
 		}
 	case s[:8] == "\x89PNG\r\n\x1a\n":
