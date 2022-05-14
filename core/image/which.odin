@@ -7,18 +7,22 @@ Which_File_Type :: enum {
 
 	BMP,
 	EXR,
+	FLIF,
 	GIF,
 	HDR, // Radiance RGBE HDR
+	ICNS, // Apple Icon Image
 	JPEG,
+	JPEG_2000,
+	JPEG_XL,
 	PBM, PGM, PPM, // NetPBM family
 	PIC, // Softimage PIC
-	PNG,
+	PNG, // Portable Network Graphics
 	PSD, // Photoshop PSD
-	QOI,
+	QOI, // Quite Okay Image
 	SGI_RGB, // Silicon Graphics Image RGB file format
 	Sun_Rast, // Sun Raster Graphic
 	TGA, // Targa Truevision
-	TIFF,
+	TIFF, // Tagged Image File Format
 	WebP,
 	XBM, // X BitMap
 }
@@ -90,8 +94,19 @@ which_bytes :: proc(data: []byte) -> Which_File_Type {
 		return .GIF
 	case s[6:10] == "JFIF", s[6:10] == "Exif":
 		return .JPEG
-	case s[:4] == "\xff\xd8\xff\xdb":
-		return .JPEG
+	case s[:3] == "\xff\xd8\xff":
+		switch s[4] {
+		case 0xdb, 0xee, 0xe1, 0xe0:
+			return .JPEG
+		}
+		switch {
+		case s[:12] == "\xff\xd8\xff\xe0\x00\x10\x4a\x46\x49\x46\x00\x01":
+			return .JPEG
+		}
+	case s[:4] == "\xff\x4f\xff\x51", s[:12] == "\x00\x00\x00\x0c\x6a\x50\x20\x20\x0d\x0a\x87\x0a":
+		return .JPEG_2000
+	case s[:12] == "\x00\x00\x00\x0c\x4a\x58\x4c\x20\x0d\x0a\x87\x0a":
+		return .JPEG_XL
 	case s[0] == 'P':
 		switch s[2] {
 		case '\t', '\n', '\r':
@@ -112,7 +127,7 @@ which_bytes :: proc(data: []byte) -> Which_File_Type {
 		return .SGI_RGB
 	case s[:4] == "\x59\xA6\x6A\x95":
 		return .Sun_Rast
-	case s[:2] == "MM", s[:2] == "II":
+	case s[:4] == "MM\x2a\x00", s[:4] == "II\x00\x2A":
 		return .TIFF
 	case s[:4] == "RIFF" && s[8:12] == "WEBP":
 		return .WebP
@@ -125,6 +140,10 @@ which_bytes :: proc(data: []byte) -> Which_File_Type {
 		return .PSD
 	case s[:4] != "\x53\x80\xF6\x34" && s[88:92] == "PICT":
 		return .PIC
+	case s[:4] == "\x69\x63\x6e\x73":
+		return .ICNS
+	case s[:4] == "\x46\x4c\x49\x46":
+		return .FLIF
 	case:
 		// More complex formats
 		if test_tga(s) {
