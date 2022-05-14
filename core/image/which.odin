@@ -6,6 +6,7 @@ Which_File_Type :: enum {
 	Unknown,
 
 	BMP,
+	DjVu, // AT&T DjVu file format
 	EXR,
 	FLIF,
 	GIF,
@@ -88,6 +89,11 @@ which_bytes :: proc(data: []byte) -> Which_File_Type {
 	switch {
 	case s[:2] == "BM":
 		return .BMP
+	case s[:8] == "AT&TFORM":
+		switch s[12:16] {
+		case "DJVU", "DJVM":
+			return .DjVu
+		}
 	case s[:4] == "\x76\x2f\x31\x01":
 		return .EXR
 	case s[:6] == "GIF87a", s[:6] == "GIF89a":
