@@ -57,7 +57,7 @@ Image :: struct {
 	which:         Which_File_Type,
 }
 
-Image_Metadata :: union {
+Image_Metadata :: union #shared_nil {
 	^Netpbm_Info,
 	^PNG_Info,
 	^QOI_Info,
