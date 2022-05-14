@@ -101,13 +101,14 @@ pool_join :: proc(pool: ^Pool) {
 	intrinsics.atomic_store(&pool.is_running, false)
 	sync.post(&pool.sem_available, len(pool.threads))
 
-	// Because we already stopped the pool, there's no need to take a lock here.
-	done_count: int
-	for done_count < len(pool.threads) {
-		done_count = 0
+	yield()
+
+started_count: int
+	for started_count < len(pool.threads) {
+		started_count = 0
 		for t in pool.threads {
-			if .Done in t.flags {
-				done_count += 1
+			if .Started in t.flags {
+				started_count += 1
 				if .Joined not_in t.flags {
 					join(t)
 				}
