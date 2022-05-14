@@ -172,6 +172,7 @@ General_Image_Error :: enum {
 	Unable_To_Write_File,
 
 	// Invalid
+	Unsupported_Format,
 	Invalid_Signature,
 	Invalid_Input_Image,
 	Image_Dimensions_Too_Large,
