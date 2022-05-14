@@ -4,13 +4,20 @@ import "core:mem"
 import "core:os"
 
 Loader_Proc :: #type proc(data: []byte, options: Options, allocator: mem.Allocator) -> (img: ^Image, err: Error)
+Destroy_Proc :: #type proc(img: ^Image)
 
 @(private)
 _internal_loaders: [Which_File_Type]Loader_Proc
+_internal_destroyers: [Which_File_Type]Destroy_Proc
 
-register_loader :: proc(kind: Which_File_Type, loader: Loader_Proc) {
+register :: proc(kind: Which_File_Type, loader: Loader_Proc, destroyer: Destroy_Proc) {
+	assert(loader != nil)
+	assert(destroyer != nil)
 	assert(_internal_loaders[kind] == nil)
 	_internal_loaders[kind] = loader
+
+	assert(_internal_destroyers[kind] == nil)
+	_internal_destroyers[kind] = destroyer
 }
 
 load :: proc{
@@ -33,7 +40,6 @@ load_from_file :: proc(filename: string, options := Options{}, allocator := cont
 	if ok {
 		return load_from_bytes(data, options, allocator)
 	} else {
-		img = new(Image, allocator)
-		return img, .Unable_To_Read_File
+		return nil, .Unable_To_Read_File
 	}
 }

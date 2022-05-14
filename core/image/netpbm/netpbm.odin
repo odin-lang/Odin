@@ -755,9 +755,12 @@ _register :: proc() {
 	loader :: proc(data: []byte, options: image.Options, allocator: mem.Allocator) -> (img: ^Image, err: Error) {
 		return load_from_bytes(data, allocator)
 	}
-	image.register_loader(.PBM, loader)
-	image.register_loader(.PGM, loader)
-	image.register_loader(.PPM, loader)
-	image.register_loader(.PAM, loader)
-	image.register_loader(.PFM, loader)
+	destroyer :: proc(img: ^Image) {
+		_ = destroy(img)
+	}
+	image.register(.PBM, loader, destroyer)
+	image.register(.PGM, loader, destroyer)
+	image.register(.PPM, loader, destroyer)
+	image.register(.PAM, loader, destroyer)
+	image.register(.PFM, loader, destroyer)
 }

@@ -198,8 +198,7 @@ load_from_file :: proc(filename: string, options := Options{}, allocator := cont
 	if ok {
 		return load_from_bytes(data, options)
 	} else {
-		img = new(Image)
-		return img, .Unable_To_Read_File
+		return nil, .Unable_To_Read_File
 	}
 }
 
@@ -407,5 +406,5 @@ qoi_hash :: #force_inline proc(pixel: RGBA_Pixel) -> (index: u8) {
 
 @(init, private)
 _register :: proc() {
-	image.register_loader(.QOI, load_from_bytes)
+	image.register(.QOI, load_from_bytes, destroy)
 }
