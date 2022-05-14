@@ -2,6 +2,7 @@ package image
 
 import "core:mem"
 import "core:os"
+import "core:bytes"
 
 Loader_Proc :: #type proc(data: []byte, options: Options, allocator: mem.Allocator) -> (img: ^Image, err: Error)
 Destroy_Proc :: #type proc(img: ^Image)
@@ -54,6 +55,7 @@ destroy :: proc(img: ^Image, allocator := context.allocator) -> bool {
 		destroyer(img)
 	} else {
 		assert(img.metadata == nil)
+		bytes.buffer_destroy(&img.pixels)
 		free(img)
 	}
 	return true
