@@ -43,3 +43,16 @@ load_from_file :: proc(filename: string, options := Options{}, allocator := cont
 		return nil, .Unable_To_Read_File
 	}
 }
+
+destroy :: proc(img: ^Image, allocator := context.allocator) -> bool {
+	if img == nil {
+		return true
+	}
+	context.allocator = allocator
+	destroyer := _internal_destroyers[img.which]
+	if destroyer != nil {
+		destroyer(img)
+	}
+	free(img)
+	return true
+}

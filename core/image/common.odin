@@ -54,6 +54,7 @@ Image :: struct {
 	*/
 	background:    Maybe(RGB_Pixel_16),
 	metadata:      Image_Metadata,
+	which:         Which_File_Type,
 }
 
 Image_Metadata :: union {
