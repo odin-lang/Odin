@@ -45,9 +45,9 @@ load_from_file :: proc(filename: string, options := Options{}, allocator := cont
 	}
 }
 
-destroy :: proc(img: ^Image, allocator := context.allocator) -> bool {
+destroy :: proc(img: ^Image, allocator := context.allocator) {
 	if img == nil {
-		return true
+		return
 	}
 	context.allocator = allocator
 	destroyer := _internal_destroyers[img.which]
@@ -58,5 +58,4 @@ destroy :: proc(img: ^Image, allocator := context.allocator) -> bool {
 		bytes.buffer_destroy(&img.pixels)
 		free(img)
 	}
-	return true
 }
