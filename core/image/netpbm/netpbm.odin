@@ -752,7 +752,7 @@ autoselect_pbm_format_from_image :: proc(img: ^Image, prefer_binary := true, for
 
 @(init, private)
 _register :: proc() {
-	loader :: proc(data: []byte, options: Options, allocator: mem.Allocator) -> (img: ^Image, err: Error) {
+	loader :: proc(data: []byte, options: image.Options, allocator: mem.Allocator) -> (img: ^Image, err: Error) {
 		return load_from_buffer(data, allocator)
 	}
 	image.register_loader(.PBM, loader)

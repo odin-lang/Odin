@@ -166,8 +166,10 @@ _ :: xml
 _ :: fmt
 _ :: hash
 _ :: image
+_ :: netpbm
 _ :: png
 _ :: qoi
+_ :: tga
 _ :: io
 _ :: log
 _ :: math
