@@ -344,8 +344,7 @@ load_from_file :: proc(filename: string, options := Options{}, allocator := cont
 	if ok {
 		return load_from_bytes(data, options)
 	} else {
-		img = new(Image)
-		return img, .Unable_To_Read_File
+		return nil, .Unable_To_Read_File
 	}
 }
 
@@ -1642,5 +1641,5 @@ load :: proc{load_from_file, load_from_bytes, load_from_context}
 
 @(init, private)
 _register :: proc() {
-	image.register_loader(.PNG, load_from_bytes)
+	image.register(.PNG, load_from_bytes, destroy)
 }
