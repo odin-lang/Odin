@@ -1640,3 +1640,9 @@ defilter :: proc(img: ^Image, filter_bytes: ^bytes.Buffer, header: ^image.PNG_IH
 }
 
 load :: proc{load_from_file, load_from_slice, load_from_context}
+
+
+@(init, private)
+_register :: proc() {
+	image.register_loader(.PNG, load_from_slice)
+}
