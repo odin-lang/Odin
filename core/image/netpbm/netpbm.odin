@@ -47,6 +47,7 @@ load_from_bytes :: proc(data: []byte, allocator := context.allocator) -> (img: ^
 	context.allocator = allocator
 
 	img = new(Image)
+	img.which = .NetPBM
 
 	header: Header; defer header_destroy(&header)
 	header_size: int
@@ -758,9 +759,5 @@ _register :: proc() {
 	destroyer :: proc(img: ^Image) {
 		_ = destroy(img)
 	}
-	image.register(.PBM, loader, destroyer)
-	image.register(.PGM, loader, destroyer)
-	image.register(.PPM, loader, destroyer)
-	image.register(.PAM, loader, destroyer)
-	image.register(.PFM, loader, destroyer)
+	image.register(.NetPBM, loader, destroyer)
 }

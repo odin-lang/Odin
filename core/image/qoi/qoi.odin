@@ -224,6 +224,7 @@ load_from_context :: proc(ctx: ^$C, options := Options{}, allocator := context.a
 	if img == nil {
 		img = new(Image)
 	}
+	img.which = .QOI
 
 	if .return_metadata in options {
 		info := new(image.QOI_Info)

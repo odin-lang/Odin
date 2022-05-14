@@ -372,6 +372,7 @@ load_from_context :: proc(ctx: ^$C, options := Options{}, allocator := context.a
 	if img == nil {
 		img = new(Image)
 	}
+	img.which = .PNG
 
 	info := new(image.PNG_Info)
 	img.metadata = info
