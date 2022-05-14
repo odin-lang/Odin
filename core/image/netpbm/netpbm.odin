@@ -28,7 +28,7 @@ BINARY  :: Formats{.P4, .P5, .P6} + PAM + PFM
 
 load :: proc {
 	load_from_file,
-	load_from_buffer,
+	load_from_bytes,
 }
 
 load_from_file :: proc(filename: string, allocator := context.allocator) -> (img: ^Image, err: Error) {
@@ -40,10 +40,10 @@ load_from_file :: proc(filename: string, allocator := context.allocator) -> (img
 		return
 	}
 
-	return load_from_buffer(data)
+	return load_from_bytes(data)
 }
 
-load_from_buffer :: proc(data: []byte, allocator := context.allocator) -> (img: ^Image, err: Error) {
+load_from_bytes :: proc(data: []byte, allocator := context.allocator) -> (img: ^Image, err: Error) {
 	context.allocator = allocator
 
 	img = new(Image)
@@ -753,7 +753,7 @@ autoselect_pbm_format_from_image :: proc(img: ^Image, prefer_binary := true, for
 @(init, private)
 _register :: proc() {
 	loader :: proc(data: []byte, options: image.Options, allocator: mem.Allocator) -> (img: ^Image, err: Error) {
-		return load_from_buffer(data, allocator)
+		return load_from_bytes(data, allocator)
 	}
 	image.register_loader(.PBM, loader)
 	image.register_loader(.PGM, loader)
