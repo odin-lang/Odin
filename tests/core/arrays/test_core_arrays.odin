@@ -2,7 +2,7 @@ package test_core_arrays
 
 import "core:testing"
 import "core:fmt"
-import "shared:arrays"
+import "core:arrays"
 
 @(test)
 test_array_sum :: proc(t: ^testing.T) {
