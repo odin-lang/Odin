@@ -52,7 +52,9 @@ destroy :: proc(img: ^Image, allocator := context.allocator) -> bool {
 	destroyer := _internal_destroyers[img.which]
 	if destroyer != nil {
 		destroyer(img)
+	} else {
+		assert(img.metadata == nil)
+		free(img)
 	}
-	free(img)
 	return true
 }
