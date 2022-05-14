@@ -119,7 +119,7 @@ which_bytes :: proc(data: []byte) -> Which_File_Type {
 				return .PPM
 			case '7':
 				return .PAM
-			case 'f', 'F':
+			case 'F', 'f':
 				return .PFM
 			}
 		}
