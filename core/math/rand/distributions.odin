@@ -7,7 +7,7 @@ float32_uniform :: float32_range
 
 // Triangular Distribution
 // See: http://wikipedia.org/wiki/Triangular_distribution
-float64_trianglular :: proc(lo, hi: f64, mode: Maybe(f64), r: ^Rand = nil) -> f64 {
+float64_triangular :: proc(lo, hi: f64, mode: Maybe(f64), r: ^Rand = nil) -> f64 {
 	if hi-lo == 0 {
 		return lo
 	}
@@ -24,7 +24,7 @@ float64_trianglular :: proc(lo, hi: f64, mode: Maybe(f64), r: ^Rand = nil) -> f6
 }
 // Triangular Distribution
 // See: http://wikipedia.org/wiki/Triangular_distribution
-float32_trianglular :: proc(lo, hi: f32, mode: Maybe(f32), r: ^Rand = nil) -> f32 {
+float32_triangular :: proc(lo, hi: f32, mode: Maybe(f32), r: ^Rand = nil) -> f32 {
 
 	if hi-lo == 0 {
 		return lo
