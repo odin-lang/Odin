@@ -585,7 +585,6 @@ AST_KIND(_DeclBegin,      "", bool) \
 		Token    import_name;   \
 		CommentGroup *docs;     \
 		CommentGroup *comment;  \
-		bool     is_using;      \
 	}) \
 	AST_KIND(ForeignImportDecl, "foreign import declaration", struct { \
 		Token    token;           \

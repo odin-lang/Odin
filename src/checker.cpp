@@ -4356,6 +4356,9 @@ void check_add_import_decl(CheckerContext *ctx, Ast *decl) {
 	}
 
 	String import_name = path_to_entity_name(id->import_name.string, id->fullpath, false);
+	if (is_blank_ident(import_name)) {
+		force_use = true;
+	}
 
 	// NOTE(bill, 2019-05-19): If the directory path is not a valid entity name, force the user to assign a custom one
 	// if (import_name.len == 0 || import_name == "_") {
@@ -4363,17 +4366,13 @@ void check_add_import_decl(CheckerContext *ctx, Ast *decl) {
 	// }
 
 	if (import_name.len == 0 || is_blank_ident(import_name)) {
-		if (id->is_using) {
-			// TODO(bill): Should this be a warning?
-		} else {
-			if (id->import_name.string == "") {
-				String invalid_name = id->fullpath;
-				invalid_name = get_invalid_import_name(invalid_name);
+		if (id->import_name.string == "") {
+			String invalid_name = id->fullpath;
+			invalid_name = get_invalid_import_name(invalid_name);
 
-				error(id->token, "Import name %.*s, is not a valid identifier. Perhaps you want to reference the package by a different name like this: import <new_name> \"%.*s\" ", LIT(invalid_name), LIT(invalid_name));
-			} else {
-				error(token, "Import name, %.*s, cannot be use as an import name as it is not a valid identifier", LIT(id->import_name.string));
-			}
+			error(id->token, "Import name %.*s, is not a valid identifier. Perhaps you want to reference the package by a different name like this: import <new_name> \"%.*s\" ", LIT(invalid_name), LIT(invalid_name));
+		} else {
+			error(token, "Import name, %.*s, cannot be use as an import name as it is not a valid identifier", LIT(id->import_name.string));
 		}
 	} else {
 		GB_ASSERT(id->import_name.pos.line != 0);
@@ -4383,35 +4382,8 @@ void check_add_import_decl(CheckerContext *ctx, Ast *decl) {
 		                                     scope);
 
 		add_entity(ctx, parent_scope, nullptr, e);
-		if (force_use || id->is_using) {
+		if (force_use) {
 			add_entity_use(ctx, nullptr, e);
-		}
-	}
-
-	if (id->is_using) {
-		if (parent_scope->flags & ScopeFlag_Global) {
-			error(id->import_name, "built-in package imports cannot use using");
-			return;
-		}
-
-		// NOTE(bill): Add imported entities to this file's scope
-		for_array(elem_index, scope->elements.entries) {
-			String name = scope->elements.entries[elem_index].key.string;
-			Entity *e = scope->elements.entries[elem_index].value;
-			if (e->scope == parent_scope) continue;
-
-			if (is_entity_exported(e, true)) {
-				Entity *found = scope_lookup_current(parent_scope, name);
-				if (found != nullptr) {
-					// NOTE(bill):
-					// Date: 2019-03-17
-					// The order has to be the other way around as `using` adds the entity into the that
-					// file scope otherwise the error would be the wrong way around
-					redeclaration_error(name, found, e);
-				} else {
-					add_entity_with_name(ctx, parent_scope, e->identifier, e, name);
-				}
-			}
 		}
 	}
 
