@@ -249,3 +249,44 @@ float64_von_mises :: proc(mean_angle, kappa: f64, r: ^Rand = nil) -> f64 {
 float32_von_mises :: proc(mean_angle, kappa: f32, r: ^Rand = nil) -> f32 {
 	return f32(float64_von_mises(f64(mean_angle), f64(kappa), r))
 }
+
+
+// Cauchy-Lorentz Distribution
+// `x_0` is the location, `gamma` is the scale where `gamma` > 0
+float64_cauchy_lorentz :: proc(x_0, gamma: f64, r: ^Rand = nil) -> f64 {
+	assert(gamma > 0)
+
+	// Calculated from the inverse CDF
+
+	return math.tan(math.PI * (float64(r) - 0.5))*gamma + x_0
+}
+// Cauchy-Lorentz Distribution
+// `x_0` is the location, `gamma` is the scale where `gamma` > 0
+float32_cauchy_lorentz :: proc(x_0, gamma: f32, r: ^Rand = nil) -> f32 {
+	return f32(float64_cauchy_lorentz(f64(x_0), f64(gamma), r))
+}
+
+
+// Log Cauchy-Lorentz Distribution
+// `x_0` is the location, `gamma` is the scale where `gamma` > 0
+float64_log_cauchy_lorentz :: proc(x_0, gamma: f64, r: ^Rand = nil) -> f64 {
+	assert(gamma > 0)
+	return math.exp(math.tan(math.PI * (float64(r) - 0.5))*gamma + x_0)
+}
+// Log Cauchy-Lorentz Distribution
+// `x_0` is the location, `gamma` is the scale where `gamma` > 0
+float32_log_cauchy_lorentz :: proc(x_0, gamma: f32, r: ^Rand = nil) -> f32 {
+	return f32(float64_log_cauchy_lorentz(f64(x_0), f64(gamma), r))
+}
+
+
+// Laplace Distribution
+// `b` is the scale where `b` > 0
+float64_laplace :: proc(mean, b: f64, r: ^Rand = nil) -> f64 {
+	assert(b > 0)
+	p := float64(r)-0.5
+	return -math.sign(p)*math.ln(1 - 2*abs(p))*b + mean
+}
+float32_laplace :: proc(mean, b: f32, r: ^Rand = nil) -> f32 {
+	return f32(float64_laplace(f64(mean), f64(b), r))
+}
