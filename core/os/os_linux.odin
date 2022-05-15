@@ -415,6 +415,7 @@ foreign libc {
 	@(link_name="realloc")          _unix_realloc       :: proc(ptr: rawptr, size: c.size_t) -> rawptr ---
 
 	@(link_name="getenv")           _unix_getenv        :: proc(cstring) -> cstring ---
+	@(link_name="putenv")           _unix_putenv        :: proc(cstring) -> c.int ---
 	@(link_name="realpath")         _unix_realpath      :: proc(path: cstring, resolved_path: rawptr) -> rawptr ---
 
 	@(link_name="exit")             _unix_exit          :: proc(status: c.int) -> ! ---
@@ -579,6 +580,11 @@ is_dir_path :: proc(path: string, follow_links: bool = true) -> bool {
 is_file :: proc {is_file_path, is_file_handle}
 is_dir :: proc {is_dir_path, is_dir_handle}
 
+exists :: proc(path: string) -> bool {
+	cpath := strings.clone_to_cstring(path, context.temp_allocator)
+	res := _unix_access(cpath, O_RDONLY)
+	return res == 0
+}
 
 // NOTE(bill): Uses startup to initialize it
 
@@ -764,13 +770,28 @@ heap_free :: proc(ptr: rawptr) {
 	_unix_free(ptr)
 }
 
-getenv :: proc(name: string) -> (string, bool) {
-	path_str := strings.clone_to_cstring(name, context.temp_allocator)
+lookup_env :: proc(key: string, allocator := context.allocator) -> (value: string, found: bool) {
+	path_str := strings.clone_to_cstring(key, context.temp_allocator)
+	// NOTE(tetra): Lifetime of 'cstr' is unclear, but _unix_free(cstr) segfaults.
 	cstr := _unix_getenv(path_str)
 	if cstr == nil {
 		return "", false
 	}
-	return string(cstr), true
+	return strings.clone(string(cstr), allocator), true
+}
+
+get_env :: proc(key: string, allocator := context.allocator) -> (value: string) {
+	value, _ = lookup_env(key, allocator)
+	return
+}
+
+set_env :: proc(key, value: string) -> Errno {
+	s := strings.concatenate({key, "=", value, "\x00"}, context.temp_allocator)
+	res := _unix_putenv(strings.unsafe_string_to_cstring(s))
+	if res < 0 {
+		return Errno(get_last_error())
+	}
+	return ERROR_NONE
 }
 
 get_current_directory :: proc() -> string {
