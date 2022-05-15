@@ -25,7 +25,6 @@ float64_triangular :: proc(lo, hi: f64, mode: Maybe(f64), r: ^Rand = nil) -> f64
 // Triangular Distribution
 // See: http://wikipedia.org/wiki/Triangular_distribution
 float32_triangular :: proc(lo, hi: f32, mode: Maybe(f32), r: ^Rand = nil) -> f32 {
-
 	if hi-lo == 0 {
 		return lo
 	}
@@ -287,6 +286,27 @@ float64_laplace :: proc(mean, b: f64, r: ^Rand = nil) -> f64 {
 	p := float64(r)-0.5
 	return -math.sign(p)*math.ln(1 - 2*abs(p))*b + mean
 }
+// Laplace Distribution
+// `b` is the scale where `b` > 0
 float32_laplace :: proc(mean, b: f32, r: ^Rand = nil) -> f32 {
 	return f32(float64_laplace(f64(mean), f64(b), r))
+}
+
+
+// Gompertz Distribution
+// `eta` is the shape, `b` is the scale
+// Both `eta` and `b` must be > 0
+float64_gompertz :: proc(eta, b: f64, r: ^Rand = nil) -> f64 {
+	if eta <= 0 || b <= 0 {
+		panic(#procedure + ": eta and b must be > 0.0")
+	}
+
+	p := float64(r)
+	return math.ln(1 - math.ln(1 - p)/eta)/b
+}
+// Gompertz Distribution
+// `eta` is the shape, `b` is the scale
+// Both `eta` and `b` must be > 0
+float32_gompertz :: proc(eta, b: f32, r: ^Rand = nil) -> f32 {
+	return f32(float64_gompertz(f64(eta), f64(b), r))
 }
