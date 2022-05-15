@@ -5,6 +5,7 @@ import "core:intrinsics"
 Rand :: struct {
 	state: u64,
 	inc:   u64,
+	is_system: bool,
 }
 
 
@@ -29,6 +30,16 @@ init :: proc(r: ^Rand, seed: u64) {
 	_random(r)
 }
 
+init_as_system :: proc(r: ^Rand) {
+	if !#defined(_system_random) {
+		panic(#procedure + " is not supported on this platform yet")
+	}
+	r.state = 0
+	r.inc   = 0
+	r.is_system = true
+}
+
+@(private)
 _random :: proc(r: ^Rand) -> u32 {
 	r := r
 	if r == nil {
@@ -36,6 +47,12 @@ _random :: proc(r: ^Rand) -> u32 {
 		// enforce the global random state if necessary with `nil`
 		r = &global_rand
 	}
+	when #defined(_system_random) {
+		if r.is_system {
+			return _system_random()
+		}
+	}
+
 	old_state := r.state
 	r.state = old_state * 6364136223846793005 + (r.inc|1)
 	xor_shifted := u32(((old_state>>18) ~ old_state) >> 27)
