@@ -12,7 +12,6 @@ package tga
 
 import "core:mem"
 import "core:image"
-import "core:compress"
 import "core:bytes"
 import "core:os"
 

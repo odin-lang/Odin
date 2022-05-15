@@ -62,8 +62,10 @@ import fmt            "core:fmt"
 import hash           "core:hash"
 
 import image          "core:image"
+import netpbm         "core:image/netpbm"
 import png            "core:image/png"
 import qoi            "core:image/qoi"
+import tga            "core:image/tga"
 
 import io             "core:io"
 import log            "core:log"
@@ -164,8 +166,10 @@ _ :: xml
 _ :: fmt
 _ :: hash
 _ :: image
+_ :: netpbm
 _ :: png
 _ :: qoi
+_ :: tga
 _ :: io
 _ :: log
 _ :: math
