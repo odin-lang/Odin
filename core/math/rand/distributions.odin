@@ -53,7 +53,7 @@ float32_normal :: proc(mean, stddev: f32, r: ^Rand = nil) -> f32 {
 
 // Log Normal Distribution
 float64_log_normal :: proc(mean, stddev: f64, r: ^Rand = nil) -> f64 {
-	return math.ln(float64_normal(mean, stddev, r))
+	return math.exp(float64_normal(mean, stddev, r))
 }
 // Log Normal Distribution
 float32_log_normal :: proc(mean, stddev: f32, r: ^Rand = nil) -> f32 {
