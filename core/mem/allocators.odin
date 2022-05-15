@@ -662,6 +662,7 @@ dynamic_pool_destroy :: proc(using pool: ^Dynamic_Pool) {
 	dynamic_pool_free_all(pool)
 	delete(unused_blocks)
 	delete(used_blocks)
+	delete(out_band_allocations)
 
 	zero(pool, size_of(pool^))
 }
