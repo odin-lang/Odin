@@ -858,7 +858,7 @@ tracking_allocator_proc :: proc(allocator_data: rawptr, mode: Allocator_Mode,
 
 	result: []byte
 	err: Allocator_Error
-	if mode == .Free && old_memory not_in data.allocation_map {
+	if mode == .Free && old_memory != nil && old_memory not_in data.allocation_map {
 		append(&data.bad_free_array, Tracking_Allocator_Bad_Free_Entry{
 			memory = old_memory,
 			location = loc,
