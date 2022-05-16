@@ -16,7 +16,8 @@ clone_safe :: proc(s: []byte, allocator := context.allocator, loc := #caller_loc
 	return c[:len(s)], nil
 }
 
-ptr_from_slice :: proc(str: []byte) -> ^byte {
+ptr_from_slice :: ptr_from_bytes
+ptr_from_bytes :: proc(str: []byte) -> ^byte {
 	d := transmute(mem.Raw_String)str
 	return d.data
 }

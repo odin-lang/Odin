@@ -124,11 +124,11 @@ reset_builder :: proc(b: ^Builder) {
 	used in `fmt.bprint*`
 	
 	bytes: [8]byte // <-- gets filled
-	builder := strings.builder_from_slice(bytes[:])
+	builder := strings.builder_from_bytes(bytes[:])
 	strings.write_byte(&builder, 'a') -> "a"
 	strings.write_byte(&builder, 'b') -> "ab"
 */
-builder_from_slice :: proc(backing: []byte) -> Builder {
+builder_from_bytes :: proc(backing: []byte) -> Builder {
 	s := transmute(mem.Raw_Slice)backing
 	d := mem.Raw_Dynamic_Array{
 		data = s.data,
@@ -140,6 +140,7 @@ builder_from_slice :: proc(backing: []byte) -> Builder {
 		buf = transmute([dynamic]byte)d,
 	}
 }
+builder_from_slice :: builder_from_bytes
 
 // cast the builder byte buffer to a string and return it
 to_string :: proc(b: Builder) -> string {

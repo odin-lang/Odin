@@ -119,17 +119,17 @@ tprintf :: proc(fmt: string, args: ..any) -> string {
 
 // bprint procedures return a string using a buffer from an array
 bprint :: proc(buf: []byte, args: ..any, sep := " ") -> string {
-	sb := strings.builder_from_slice(buf[0:len(buf)])
+	sb := strings.builder_from_bytes(buf[0:len(buf)])
 	return sbprint(buf=&sb, args=args, sep=sep)
 }
 // bprintln procedures return a string using a buffer from an array
 bprintln :: proc(buf: []byte, args: ..any, sep := " ") -> string {
-	sb := strings.builder_from_slice(buf[0:len(buf)])
+	sb := strings.builder_from_bytes(buf[0:len(buf)])
 	return sbprintln(buf=&sb, args=args, sep=sep)
 }
 // bprintf procedures return a string using a buffer from an array
 bprintf :: proc(buf: []byte, fmt: string, args: ..any) -> string {
-	sb := strings.builder_from_slice(buf[0:len(buf)])
+	sb := strings.builder_from_bytes(buf[0:len(buf)])
 	return sbprintf(&sb, fmt, ..args)
 }
 

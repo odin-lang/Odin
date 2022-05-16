@@ -1522,6 +1522,6 @@ sys_gettid :: proc "contextless" () -> int {
 	return cast(int)intrinsics.syscall(SYS_gettid)
 }
 
-sys_getrandom :: proc "contextless" (buf: ^byte, buflen: int, flags: uint) -> int {
+sys_getrandom :: proc "contextless" (buf: [^]byte, buflen: int, flags: uint) -> int {
 	return cast(int)intrinsics.syscall(SYS_getrandom, buf, cast(uintptr)(buflen), cast(uintptr)(flags))
 }
