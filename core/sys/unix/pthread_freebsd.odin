@@ -92,6 +92,11 @@ sem_t :: struct {
 	_padding: u32,
 }
 
+PTHREAD_CANCEL_ENABLE       :: 0
+PTHREAD_CANCEL_DISABLE      :: 1
+PTHREAD_CANCEL_DEFERRED     :: 0
+PTHREAD_CANCEL_ASYNCHRONOUS :: 1
+
 foreign import "system:pthread"
 
 @(default_calling_convention="c")
@@ -110,5 +115,8 @@ foreign pthread {
 	// NOTE: unclear whether pthread_yield is well-supported on Linux systems,
 	// see https://linux.die.net/man/3/pthread_yield
 	pthread_yield :: proc() ---
-}
 
+	pthread_setcancelstate :: proc (state: c.int, old_state: ^c.int) -> c.int ---
+	pthread_setcanceltype  :: proc (type:  c.int, old_type:  ^c.int) -> c.int ---
+	pthread_cancel         :: proc (thread: pthread_t) -> c.int ---
+}

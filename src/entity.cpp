@@ -252,6 +252,7 @@ struct Entity {
 		struct {
 			Slice<String> paths;
 			String name;
+			i64 priority_index;
 		} LibraryName;
 		i32 Nil;
 		struct {

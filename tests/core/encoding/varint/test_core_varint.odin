@@ -51,7 +51,7 @@ test_leb128 :: proc(t: ^testing.T) {
 		msg := fmt.tprintf("Expected %02x to decode to %v consuming %v bytes, got %v and %v", vector.encoded, vector.value, vector.size, val, size)
 		expect(t, size == vector.size && val == vector.value, msg)
 
-		msg  = fmt.tprintf("Expected decoder to return error %v, got %v", vector.error, err)
+		msg  = fmt.tprintf("Expected decoder to return error %v, got %v for vector %v", vector.error, err, vector)
 		expect(t, err == vector.error, msg)
 
 		if err == .None { // Try to roundtrip

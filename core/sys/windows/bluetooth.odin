@@ -51,54 +51,27 @@ BLUETOOTH_DEVICE_INFO :: struct {
 	name:          [BLUETOOTH_MAX_NAME_SIZE]u16, //  Name of the device
 }
 
-@(default_calling_convention = "std")
+@(default_calling_convention="stdcall")
 foreign bthprops {
 	/*
 		Version
 	*/
-	@(link_name="BluetoothIsVersionAvailable")      bluetooth_is_version_available :: proc(
-		major: u8, minor: u8,
-	) -> BOOL ---
+	BluetoothIsVersionAvailable :: proc(major: u8, minor: u8) -> BOOL ---
 
 	/*
 		Radio enumeration
 	*/
-	@(link_name="BluetoothFindFirstRadio")          bluetooth_find_first_radio :: proc(
-		find_radio_params: ^BLUETOOTH_FIND_RADIO_PARAMS, radio: ^HANDLE,
-	) -> HBLUETOOTH_RADIO_FIND ---
-
-	@(link_name="BluetoothFindNextRadio")           bluetooth_find_next_radio :: proc(
-		handle: HBLUETOOTH_RADIO_FIND, radio: ^HANDLE,
-	) -> BOOL ---
-
-	@(link_name="BluetoothFindRadioClose")          bluetooth_find_radio_close :: proc(
-		handle: HBLUETOOTH_RADIO_FIND,
-	) -> BOOL ---
-
-	@(link_name="BluetoothGetRadioInfo")            bluetooth_get_radio_info :: proc(
-		radio: HANDLE, radio_info: ^BLUETOOTH_RADIO_INFO,
-	) -> DWORD ---
+	BluetoothFindFirstRadio :: proc(find_radio_params: ^BLUETOOTH_FIND_RADIO_PARAMS, radio: ^HANDLE) -> HBLUETOOTH_RADIO_FIND ---
+	BluetoothFindNextRadio  :: proc(handle: HBLUETOOTH_RADIO_FIND, radio: ^HANDLE) -> BOOL ---
+	BluetoothFindRadioClose :: proc(handle: HBLUETOOTH_RADIO_FIND) -> BOOL ---
+	BluetoothGetRadioInfo   :: proc(radio: HANDLE, radio_info: ^BLUETOOTH_RADIO_INFO) -> DWORD ---
 
 	/*
 		Device enumeration
 	*/
-	@(link_name="BluetoothFindFirstDevice")         bluetooth_find_first_device :: proc(
-		search_params: ^BLUETOOTH_DEVICE_SEARCH_PARAMS, device_info: ^BLUETOOTH_DEVICE_INFO,
-	) -> HBLUETOOTH_DEVICE_FIND ---
-
-	@(link_name="BluetoothFindNextDevice")          bluetooth_find_next_device :: proc(
-		handle: HBLUETOOTH_DEVICE_FIND, device_info: ^BLUETOOTH_DEVICE_INFO,
-	) -> BOOL ---
-
-	@(link_name="BluetoothFindDeviceClose")         bluetooth_find_device_close :: proc(
-		handle: HBLUETOOTH_DEVICE_FIND,
-	) -> BOOL ---
-
-	@(link_name="BluetoothGetDeviceInfo")           bluetooth_get_device_info :: proc(
-		radio: HANDLE, device_info: ^BLUETOOTH_DEVICE_INFO,
-	) -> DWORD ---
-
-	@(link_name="BluetoothDisplayDeviceProperties") bluetooth_display_device_properties :: proc(
-		hwnd_parent: HWND, device_info: ^BLUETOOTH_DEVICE_INFO,
-	) -> BOOL ---
+	BluetoothFindFirstDevice         :: proc(search_params: ^BLUETOOTH_DEVICE_SEARCH_PARAMS, device_info: ^BLUETOOTH_DEVICE_INFO) -> HBLUETOOTH_DEVICE_FIND ---
+	BluetoothFindNextDevice          :: proc(handle: HBLUETOOTH_DEVICE_FIND, device_info: ^BLUETOOTH_DEVICE_INFO) -> BOOL ---
+	BluetoothFindDeviceClose         :: proc(handle: HBLUETOOTH_DEVICE_FIND) -> BOOL ---
+	BluetoothGetDeviceInfo           :: proc(radio: HANDLE, device_info: ^BLUETOOTH_DEVICE_INFO) -> DWORD ---
+	BluetoothDisplayDeviceProperties :: proc(hwnd_parent: HWND, device_info: ^BLUETOOTH_DEVICE_INFO) -> BOOL ---
 }

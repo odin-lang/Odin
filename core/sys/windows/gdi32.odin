@@ -62,5 +62,11 @@ foreign gdi32 {
 	ChoosePixelFormat :: proc(hdc: HDC, ppfd: ^PIXELFORMATDESCRIPTOR) -> c_int ---
 	SwapBuffers :: proc(HDC) -> BOOL ---
 
+	SetDCBrushColor :: proc(hdc: HDC, color: COLORREF) -> COLORREF ---
+	GetDCBrushColor :: proc(hdc: HDC) -> COLORREF ---
 	PatBlt :: proc(hdc: HDC, x, y, w, h: c_int, rop: DWORD) -> BOOL ---
+}
+
+RGB :: #force_inline proc "contextless" (r, g, b: u8) -> COLORREF {
+	return transmute(COLORREF)[4]u8{r, g, b, 0}
 }

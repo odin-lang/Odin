@@ -14,8 +14,15 @@ clone :: proc(s: string, allocator := context.allocator, loc := #caller_location
 	return string(c[:len(s)])
 }
 
+// returns a clone of the string `s` allocated using the `allocator`
+clone_safe :: proc(s: string, allocator := context.allocator, loc := #caller_location) -> (str: string, err: mem.Allocator_Error) {
+	c := make([]byte, len(s), allocator, loc) or_return
+	copy(c, s)
+	return string(c[:len(s)]), nil
+}
+
 // returns a clone of the string `s` allocated using the `allocator` as a cstring
-// a nul byte is appended to the clone, to make the cstring safe 
+// a nul byte is appended to the clone, to make the cstring safe
 clone_to_cstring :: proc(s: string, allocator := context.allocator, loc := #caller_location) -> cstring {
 	c := make([]byte, len(s)+1, allocator, loc)
 	copy(c, s)
@@ -37,7 +44,7 @@ string_from_nul_terminated_ptr :: proc(ptr: ^byte, len: int) -> string {
 	return s
 }
 
-// returns the raw ^byte start of the string `str` 
+// returns the raw ^byte start of the string `str`
 ptr_from_string :: proc(str: string) -> ^byte {
 	d := transmute(mem.Raw_String)str
 	return d.data
@@ -260,6 +267,25 @@ join :: proc(a: []string, sep: string, allocator := context.allocator) -> string
 	return string(b)
 }
 
+join_safe :: proc(a: []string, sep: string, allocator := context.allocator) -> (str: string, err: mem.Allocator_Error) {
+	if len(a) == 0 {
+		return "", nil
+	}
+
+	n := len(sep) * (len(a) - 1)
+	for s in a {
+		n += len(s)
+	}
+
+	b := make([]byte, n, allocator) or_return
+	i := copy(b, a[0])
+	for s in a[1:] {
+		i += copy(b[i:], sep)
+		i += copy(b[i:], s)
+	}
+	return string(b), nil
+}
+
 /*
 	returns a combined string from the slice of strings `a` without a seperator
 	allocates the string using the `allocator`
@@ -283,6 +309,23 @@ concatenate :: proc(a: []string, allocator := context.allocator) -> string {
 		i += copy(b[i:], s)
 	}
 	return string(b)
+}
+
+concatenate_safe :: proc(a: []string, allocator := context.allocator) -> (res: string, err: mem.Allocator_Error) {
+	if len(a) == 0 {
+		return "", nil
+	}
+
+	n := 0
+	for s in a {
+		n += len(s)
+	}
+	b := make([]byte, n, allocator) or_return
+	i := 0
+	for s in a {
+		i += copy(b[i:], s)
+	}
+	return string(b), nil
 }
 
 /*
@@ -969,7 +1012,7 @@ count :: proc(s, substr: string) -> int {
 	repeats the string `s` multiple `count` times and returns the allocated string
 	panics when `count` is below 0
 
-	strings.repeat("abc", 2) -> "abcabc" 
+	strings.repeat("abc", 2) -> "abcabc"
 */
 repeat :: proc(s: string, count: int, allocator := context.allocator) -> string {
 	if count < 0 {
@@ -1378,7 +1421,7 @@ split_multi :: proc(s: string, substrs: []string, allocator := context.allocator
 
 	// skip when no results
 	if substrings_found < 1 {
-		return 
+		return
 	}
 
 	buf = make([]string, substrings_found + 1, allocator)
@@ -1808,4 +1851,66 @@ fields_iterator :: proc(s: ^string) -> (field: string, ok: bool) {
 	ok = true
 	s^ = s[len(s):]
 	return
+}
+
+// `levenshtein_distance` returns the Levenshtein edit distance between 2 strings.
+// This is a single-row-version of the Wagner–Fischer algorithm, based on C code by Martin Ettl.
+// Note: allocator isn't used if the length of string b in runes is smaller than 64.
+levenshtein_distance :: proc(a, b: string, allocator := context.allocator) -> int {
+	LEVENSHTEIN_DEFAULT_COSTS: []int : {
+		0,   1,   2,   3,   4,   5,   6,   7,   8,   9,
+		10,  11,  12,  13,  14,  15,  16,  17,  18,  19,
+		20,  21,  22,  23,  24,  25,  26,  27,  28,  29,
+		30,  31,  32,  33,  34,  35,  36,  37,  38,  39,
+		40,  41,  42,  43,  44,  45,  46,  47,  48,  49,
+		50,  51,  52,  53,  54,  55,  56,  57,  58,  59,
+		60,  61,  62,  63,
+	}
+
+	m, n := utf8.rune_count_in_string(a), utf8.rune_count_in_string(b)
+
+	if m == 0 {
+		return n
+	}
+	if n == 0 {
+		return m
+	}
+
+	costs: []int
+
+	if n + 1 > len(LEVENSHTEIN_DEFAULT_COSTS) {
+		costs = make([]int, n + 1, allocator)
+		for k in 0..=n {
+			costs[k] = k
+		}
+	} else {
+		costs = LEVENSHTEIN_DEFAULT_COSTS
+	}
+
+	defer if n + 1 > len(LEVENSHTEIN_DEFAULT_COSTS) {
+		delete(costs, allocator)
+	}
+
+	i: int
+	for c1 in a {
+		costs[0] = i + 1
+		corner := i
+		j: int
+		for c2 in b {
+			upper := costs[j + 1]
+			if c1 == c2 {
+				costs[j + 1] = corner
+			} else {
+				t := upper if upper < corner else corner
+				costs[j + 1] = (costs[j] if costs[j] < t else t) + 1
+			}
+
+			corner = upper
+			j += 1
+		}
+
+		i += 1
+	}
+
+	return costs[n]
 }

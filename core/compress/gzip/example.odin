@@ -45,7 +45,7 @@ main :: proc() {
 
 	if len(args) < 2 {
 		stderr("No input file specified.\n")
-		err := load(slice=TEST, buf=&buf, known_gzip_size=len(TEST))
+		err := load(data=TEST, buf=&buf, known_gzip_size=len(TEST))
 		if err == nil {
 			stdout("Displaying test vector: ")
 			stdout(bytes.buffer_to_string(&buf))

@@ -10,6 +10,53 @@ _ :: builtin
 _ :: bits
 _ :: mem
 
+/*
+	Turn a pointer and a length into a slice.
+*/
+from_ptr :: proc "contextless" (ptr: ^$T, count: int) -> []T {
+    return ([^]T)(ptr)[:count]
+}
+
+/*
+	Turn a pointer and a length into a byte slice.
+*/
+bytes_from_ptr :: proc "contextless" (ptr: rawptr, byte_count: int) -> []byte {
+    return ([^]byte)(ptr)[:byte_count]
+}
+
+/*
+	Turn a slice into a byte slice.
+
+	See `slice.reinterpret` to go the other way.
+*/
+to_bytes :: proc "contextless" (s: []$T) -> []byte {
+	return ([^]byte)(raw_data(s))[:len(s) * size_of(T)]
+}
+
+/*
+	Turn a slice of one type, into a slice of another type.
+
+	Only converts the type and length of the slice itself.
+	The length is rounded down to the nearest whole number of items.
+
+	```
+	large_items := []i64{1, 2, 3, 4}
+	small_items := slice.reinterpret([]i32, large_items)
+	assert(len(small_items) == 8)
+	```
+	```
+	small_items := []byte{1, 0, 0, 0, 0, 0, 0, 0,
+	                      2, 0, 0, 0}
+	large_items := slice.reinterpret([]i64, small_items)
+	assert(len(large_items) == 1) // only enough bytes to make 1 x i64; two would need at least 8 bytes.
+	```
+*/
+reinterpret :: proc "contextless" ($T: typeid/[]$U, s: []$V) -> []U {
+	bytes := to_bytes(s)
+	n := len(bytes) / size_of(U)
+	return ([^]U)(raw_data(bytes))[:n]
+}
+
 
 swap :: proc(array: $T/[]$E, a, b: int) {
 	when size_of(E) > 8 {

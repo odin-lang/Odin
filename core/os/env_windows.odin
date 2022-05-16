@@ -22,7 +22,7 @@ lookup_env :: proc(key: string, allocator := context.allocator) -> (value: strin
 		}
 
 		if n <= u32(len(b)) {
-			value = win32.utf16_to_utf8(b[:n], allocator)
+			value, _ = win32.utf16_to_utf8(b[:n], allocator)
 			found = true
 			return
 		}
@@ -76,7 +76,7 @@ environ :: proc(allocator := context.allocator) -> []string {
 			if i <= from {
 				break
 			}
-			append(&r, win32.utf16_to_utf8(envs[from:i], allocator))
+			append(&r, win32.utf16_to_utf8(envs[from:i], allocator) or_else "")
 			from = i + 1
 		}
 	}

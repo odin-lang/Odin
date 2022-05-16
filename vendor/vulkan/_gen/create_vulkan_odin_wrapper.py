@@ -7,14 +7,14 @@ import os.path
 import math
 
 file_and_urls = [
-    ("vk_platform.h",  'https://raw.githubusercontent.com/KhronosGroup/Vulkan-Headers/master/include/vulkan/vk_platform.h',  True),
-    ("vulkan_core.h",  'https://raw.githubusercontent.com/KhronosGroup/Vulkan-Headers/master/include/vulkan/vulkan_core.h',  False),
-    ("vk_layer.h",     'https://raw.githubusercontent.com/KhronosGroup/Vulkan-Headers/master/include/vulkan/vk_layer.h',     True),
-    ("vk_icd.h",       'https://raw.githubusercontent.com/KhronosGroup/Vulkan-Headers/master/include/vulkan/vk_icd.h',       True),
-    ("vulkan_win32.h", 'https://raw.githubusercontent.com/KhronosGroup/Vulkan-Headers/master/include/vulkan/vulkan_win32.h', False),
-    ("vulkan_metal.h", 'https://raw.githubusercontent.com/KhronosGroup/Vulkan-Headers/master/include/vulkan/vulkan_metal.h', False),
-    ("vulkan_macos.h", 'https://raw.githubusercontent.com/KhronosGroup/Vulkan-Headers/master/include/vulkan/vulkan_macos.h', False),
-    ("vulkan_ios.h",   'https://raw.githubusercontent.com/KhronosGroup/Vulkan-Headers/master/include/vulkan/vulkan_ios.h',   False),
+    ("vk_platform.h",  'https://raw.githubusercontent.com/KhronosGroup/Vulkan-Headers/main/include/vulkan/vk_platform.h',  True),
+    ("vulkan_core.h",  'https://raw.githubusercontent.com/KhronosGroup/Vulkan-Headers/main/include/vulkan/vulkan_core.h',  False),
+    ("vk_layer.h",     'https://raw.githubusercontent.com/KhronosGroup/Vulkan-Headers/main/include/vulkan/vk_layer.h',     True),
+    ("vk_icd.h",       'https://raw.githubusercontent.com/KhronosGroup/Vulkan-Headers/main/include/vulkan/vk_icd.h',       True),
+    ("vulkan_win32.h", 'https://raw.githubusercontent.com/KhronosGroup/Vulkan-Headers/main/include/vulkan/vulkan_win32.h', False),
+    ("vulkan_metal.h", 'https://raw.githubusercontent.com/KhronosGroup/Vulkan-Headers/main/include/vulkan/vulkan_metal.h', False),
+    ("vulkan_macos.h", 'https://raw.githubusercontent.com/KhronosGroup/Vulkan-Headers/main/include/vulkan/vulkan_macos.h', False),
+    ("vulkan_ios.h",   'https://raw.githubusercontent.com/KhronosGroup/Vulkan-Headers/main/include/vulkan/vulkan_ios.h',   False),
 ]
 
 for file, url, _ in file_and_urls:
@@ -125,7 +125,7 @@ def to_snake_case(name):
     s1 = re.sub('(.)([A-Z][a-z]+)', r'\1_\2', name)
     return re.sub('([a-z0-9])([A-Z])', r'\1_\2', s1).lower()
 
-ext_suffixes = ["KHR", "EXT", "AMD", "NV", "NVX", "GOOGLE"]
+ext_suffixes = ["KHR", "EXT", "AMD", "NV", "NVX", "GOOGLE", "KHX"]
 ext_suffixes_title = [ext.title() for ext in ext_suffixes]
 
 
@@ -254,9 +254,19 @@ def parse_constants(f):
         f.write("{}{} :: {}\n".format(name, "".rjust(max_len-len(name)), value))
 
     f.write("\n// Vendor Constants\n")
-    data = re.findall(r"#define VK_((?:"+'|'.join(ext_suffixes)+r")\w+)\s*(.*?)\n", src, re.S)
+    fixes = '|'.join(ext_suffixes)
+    inner = r"((?:(?:" + fixes + r")\w+)|(?:\w+" + fixes + r"))"
+    pattern = r"#define\s+VK_" + inner + r"\s*(.*?)\n"
+    data = re.findall(pattern, src, re.S)
+
+    number_suffix_re = re.compile(r"(\d+)[UuLlFf]")
+
     max_len = max(len(name) for name, value in data)
     for name, value in data:
+        value = remove_prefix(value, 'VK_')
+        v = number_suffix_re.findall(value)
+        if v:
+            value = v[0]
         f.write("{}{} :: {}\n".format(name, "".rjust(max_len-len(name)), value))
     f.write("\n")
 
@@ -616,6 +626,9 @@ with open("../core.odin", 'w', encoding='utf-8') as f:
     f.write(BASE)
     f.write("""
 API_VERSION_1_0 :: (1<<22) | (0<<12) | (0)
+API_VERSION_1_1 :: (1<<22) | (1<<12) | (0)
+API_VERSION_1_2 :: (1<<22) | (2<<12) | (0)
+API_VERSION_1_3 :: (1<<22) | (3<<12) | (0)
 
 MAKE_VERSION :: proc(major, minor, patch: u32) -> u32 {
     return (major<<22) | (minor<<12) | (patch)
@@ -652,15 +665,12 @@ MAX_MEMORY_TYPES              :: 32
 MAX_MEMORY_HEAPS              :: 16
 MAX_EXTENSION_NAME_SIZE       :: 256
 MAX_DESCRIPTION_SIZE          :: 256
-MAX_DEVICE_GROUP_SIZE_KHX     :: 32
 MAX_DEVICE_GROUP_SIZE         :: 32
 LUID_SIZE_KHX                 :: 8
-LUID_SIZE_KHR                 :: 8
 LUID_SIZE                     :: 8
-MAX_DRIVER_NAME_SIZE_KHR      :: 256
-MAX_DRIVER_INFO_SIZE_KHR      :: 256
-MAX_QUEUE_FAMILY_EXTERNAL     :: ~u32(0)-1
+MAX_QUEUE_FAMILY_EXTERNAL     :: ~u32(1)
 MAX_GLOBAL_PRIORITY_SIZE_EXT  :: 16
+QUEUE_FAMILY_EXTERNAL         :: MAX_QUEUE_FAMILY_EXTERNAL
 
 """[1::])
     parse_constants(f)

@@ -119,6 +119,14 @@ See also LICENSE.txt in the `portmidi` directory itself.
 
 See also LICENSE in the `ENet` directory itself.
 
+## GGPO
+
+[GGPO](https://www.ggpo.net/) GGPO Rollback Networking SDK.
+
+Zero-input latency networking library for peer-to-peer games.
+
+See also LICENSE in the `GGPO` directory itself.
+
 ## Botan
 
 [Botan](https://botan.randombit.net/) Crypto and TLS library.

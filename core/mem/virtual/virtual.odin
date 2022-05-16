@@ -120,7 +120,7 @@ alloc_from_memory_block :: proc(block: ^Memory_Block, min_size, alignment: int) 
 	do_commit_if_necessary :: proc(block: ^Memory_Block, size: uint) -> (err: Allocator_Error) {
 		if block.committed - block.used < size {
 			pmblock := (^Platform_Memory_Block)(block)
-			base_offset := uint(uintptr(block) - uintptr(pmblock))
+			base_offset := uint(uintptr(pmblock.block.base) - uintptr(pmblock))
 			platform_total_commit := base_offset + block.used + size
 
 			assert(pmblock.committed <= pmblock.reserved)

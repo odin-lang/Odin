@@ -402,7 +402,7 @@ syscall_openat :: #force_inline proc(fd: int, path: cstring, oflag: u32, mode: u
 	return cast(c.int)intrinsics.syscall(unix_offset_syscall(.openat), uintptr(fd), transmute(uintptr)path, uintptr(oflag), uintptr(mode))
 } 
 
-syscall_getentropy :: #force_inline proc(buf: ^u8, buflen: u64) -> c.int {
+syscall_getentropy :: #force_inline proc(buf: [^]u8, buflen: u64) -> c.int {
 	return cast(c.int)intrinsics.syscall(unix_offset_syscall(.getentropy), uintptr(buf), uintptr(buflen))
 }
 

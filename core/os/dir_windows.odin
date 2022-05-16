@@ -13,7 +13,7 @@ read_dir :: proc(fd: Handle, n: int, allocator := context.allocator) -> (fi: []F
 		if d.cFileName[0] == '.' && d.cFileName[1] == '.' && d.cFileName[2] == 0 {
 			return
 		}
-		path := strings.concatenate({base_path, `\`, win32.utf16_to_utf8(d.cFileName[:])})
+		path := strings.concatenate({base_path, `\`, win32.utf16_to_utf8(d.cFileName[:]) or_else ""})
 		fi.fullpath = path
 		fi.name = basename(path)
 		fi.size = i64(d.nFileSizeHigh)<<32 + i64(d.nFileSizeLow)

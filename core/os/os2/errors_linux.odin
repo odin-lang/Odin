@@ -130,7 +130,7 @@ EHWPOISON      :: 133  /* Memory page has hardware error */
 
 _get_platform_error :: proc(res: int) -> Error {
 	errno := unix.get_errno(res)
-	return Platform_Error{i32(errno)}
+	return Platform_Error(i32(errno))
 }
 
 _ok_or_error :: proc(res: int) -> Error {

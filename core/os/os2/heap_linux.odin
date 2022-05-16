@@ -102,7 +102,6 @@ MMAP_PROT :: unix.PROT_READ | unix.PROT_WRITE
 
 
 @thread_local _local_region: ^Region
-//_local_region: ^Region
 global_regions: ^Region
 
 

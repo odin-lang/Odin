@@ -2,6 +2,7 @@
 package os2
 
 import "core:time"
+import "core:runtime"
 import "core:sys/unix"
 import "core:path/filepath"
 
@@ -59,7 +60,7 @@ Unix_File_Time :: struct {
 }
 
 @private
-OS_Stat :: struct {
+_Stat :: struct {
 	device_id:     u64, // ID of device containing file
 	serial:        u64, // File serial number
 	nlink:         u64, // Number of hard links
@@ -82,16 +83,20 @@ OS_Stat :: struct {
 }
 
 
-_fstat :: proc(fd: Handle, allocator := context.allocator) -> (File_Info, Error) {
-	s: OS_Stat
-	result := unix.sys_fstat(int(fd), &s)
+_fstat :: proc(f: ^File, allocator := context.allocator) -> (File_Info, Error) {
+	return _fstat_internal(f.impl.fd, allocator)
+}
+
+_fstat_internal :: proc(fd: int, allocator: runtime.Allocator) -> (File_Info, Error) {
+	s: _Stat
+	result := unix.sys_fstat(fd, &s)
 	if result < 0 {
 		return {}, _get_platform_error(result)
 	}
 
 	// TODO: As of Linux 4.11, the new statx syscall can retrieve creation_time
 	fi := File_Info {
-		fullpath = _name(fd, allocator),
+		fullpath = _get_full_path(fd, allocator),
 		name = "",
 		size = s.size,
 		mode = 0,
@@ -117,7 +122,7 @@ _stat :: proc(name: string, allocator := context.allocator) -> (File_Info, Error
 		return {}, _get_platform_error(fd)
 	}
 	defer unix.sys_close(fd)
-	return _fstat(Handle(fd), allocator)
+	return _fstat_internal(fd, allocator)
 }
 
 _lstat :: proc(name: string, allocator := context.allocator) -> (File_Info, Error) {
@@ -130,14 +135,14 @@ _lstat :: proc(name: string, allocator := context.allocator) -> (File_Info, Erro
 		return {}, _get_platform_error(fd)
 	}
 	defer unix.sys_close(fd)
-	return _fstat(Handle(fd), allocator)
+	return _fstat_internal(fd, allocator)
 }
 
 _same_file :: proc(fi1, fi2: File_Info) -> bool {
 	return fi1.fullpath == fi2.fullpath
 }
 
-_stat_internal :: proc(name: string) -> (s: OS_Stat, res: int) {
+_stat_internal :: proc(name: string) -> (s: _Stat, res: int) {
 	name_cstr, allocated := _name_to_cstring(name)
 	defer if allocated {
 		delete(name_cstr)

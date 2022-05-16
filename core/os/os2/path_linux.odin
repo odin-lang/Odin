@@ -2,6 +2,8 @@
 package os2
 
 import "core:strings"
+import "core:strconv"
+import "core:runtime"
 import "core:sys/unix"
 
 _Path_Separator      :: '/'
@@ -37,31 +39,31 @@ _mkdir :: proc(path: string, perm: File_Mode) -> Error {
 }
 
 _mkdir_all :: proc(path: string, perm: File_Mode) -> Error {
-	_mkdirat :: proc(dfd: Handle, path: []u8, perm: int, has_created: ^bool) -> Error {
+	_mkdirat :: proc(dfd: int, path: []u8, perm: int, has_created: ^bool) -> Error {
 		if len(path) == 0 {
-			return _ok_or_error(unix.sys_close(int(dfd)))
+			return _ok_or_error(unix.sys_close(dfd))
 		}
 		i: int
 		for /**/; i < len(path) - 1 && path[i] != '/'; i += 1 {}
 		path[i] = 0
-		new_dfd := unix.sys_openat(int(dfd), cstring(&path[0]), _OPENDIR_FLAGS)
+		new_dfd := unix.sys_openat(dfd, cstring(&path[0]), _OPENDIR_FLAGS)
 		switch new_dfd {
 		case -ENOENT:
-			if res := unix.sys_mkdirat(int(dfd), cstring(&path[0]), perm); res < 0 {
+			if res := unix.sys_mkdirat(dfd, cstring(&path[0]), perm); res < 0 {
 				return _get_platform_error(res)
 			}
 			has_created^ = true
-			if new_dfd = unix.sys_openat(int(dfd), cstring(&path[0]), _OPENDIR_FLAGS); new_dfd < 0 {
+			if new_dfd = unix.sys_openat(dfd, cstring(&path[0]), _OPENDIR_FLAGS); new_dfd < 0 {
 				return _get_platform_error(new_dfd)
 			}
 			fallthrough
 		case 0:
-			if res := unix.sys_close(int(dfd)); res < 0 {
+			if res := unix.sys_close(dfd); res < 0 {
 				return _get_platform_error(res)
 			}
 			// skip consecutive '/'
 			for i += 1; i < len(path) && path[i] == '/'; i += 1 {}
-			return _mkdirat(Handle(new_dfd), path[i:], perm, has_created)
+			return _mkdirat(new_dfd, path[i:], perm, has_created)
 		case:
 			return _get_platform_error(new_dfd)
 		}
@@ -101,7 +103,7 @@ _mkdir_all :: proc(path: string, perm: File_Mode) -> Error {
 	}
 	
 	has_created: bool
-	_mkdirat(Handle(dfd), path_bytes, int(perm & 0o777), &has_created) or_return
+	_mkdirat(dfd, path_bytes, int(perm & 0o777), &has_created) or_return
 	if has_created {
 		return nil
 	}
@@ -120,13 +122,13 @@ dirent64 :: struct {
 _remove_all :: proc(path: string) -> Error {
 	DT_DIR :: 4
 
-	_remove_all_dir :: proc(dfd: Handle) -> Error {
+	_remove_all_dir :: proc(dfd: int) -> Error {
 		n := 64
 		buf := make([]u8, n)
 		defer delete(buf)
 
 		loop: for {
-			getdents_res := unix.sys_getdents64(int(dfd), &buf[0], n)
+			getdents_res := unix.sys_getdents64(dfd, &buf[0], n)
 			switch getdents_res {
 			case -EINVAL:
 				delete(buf)
@@ -161,15 +163,15 @@ _remove_all :: proc(path: string) -> Error {
 
 				switch d.d_type {
 				case DT_DIR:
-					handle_i := unix.sys_openat(int(dfd), d_name_cstr, _OPENDIR_FLAGS)
-					if handle_i < 0 {
-						return _get_platform_error(handle_i)
+					new_dfd := unix.sys_openat(dfd, d_name_cstr, _OPENDIR_FLAGS)
+					if new_dfd < 0 {
+						return _get_platform_error(new_dfd)
 					}
-					defer unix.sys_close(handle_i)
-					_remove_all_dir(Handle(handle_i)) or_return
-					unlink_res = unix.sys_unlinkat(int(dfd), d_name_cstr, int(unix.AT_REMOVEDIR))
+					defer unix.sys_close(new_dfd)
+					_remove_all_dir(new_dfd) or_return
+					unlink_res = unix.sys_unlinkat(dfd, d_name_cstr, int(unix.AT_REMOVEDIR))
 				case:
-					unlink_res = unix.sys_unlinkat(int(dfd), d_name_cstr) 
+					unlink_res = unix.sys_unlinkat(dfd, d_name_cstr) 
 				}
 
 				if unlink_res < 0 {
@@ -185,21 +187,20 @@ _remove_all :: proc(path: string) -> Error {
 		delete(path_cstr)
 	}
 
-	handle_i := unix.sys_open(path_cstr, _OPENDIR_FLAGS)
-	switch handle_i {
+	fd := unix.sys_open(path_cstr, _OPENDIR_FLAGS)
+	switch fd {
 	case -ENOTDIR:
 		return _ok_or_error(unix.sys_unlink(path_cstr))
 	case -4096..<0:
-		return _get_platform_error(handle_i)
+		return _get_platform_error(fd)
 	}
 
-	fd := Handle(handle_i)
-	defer close(fd)
+	defer unix.sys_close(fd)
 	_remove_all_dir(fd) or_return
 	return _ok_or_error(unix.sys_rmdir(path_cstr))
 }
 
-_getwd :: proc(allocator := context.allocator) -> (string, Error) {
+_getwd :: proc(allocator: runtime.Allocator) -> (string, Error) {
 	// NOTE(tetra): I would use PATH_MAX here, but I was not able to find
 	// an authoritative value for it across all systems.
 	// The largest value I could find was 4096, so might as well use the page size.
@@ -227,3 +228,20 @@ _setwd :: proc(dir: string) -> Error {
 	}
 	return _ok_or_error(unix.sys_chdir(dir_cstr))
 }
+
+_get_full_path :: proc(fd: int, allocator := context.allocator) -> string {
+	PROC_FD_PATH :: "/proc/self/fd/"
+
+	buf: [32]u8
+	copy(buf[:], PROC_FD_PATH)
+
+	strconv.itoa(buf[len(PROC_FD_PATH):], fd)
+
+	fullpath: string
+	err: Error
+	if fullpath, err = _read_link_cstr(cstring(&buf[0]), allocator); err != nil || fullpath[0] != '/' {
+		return ""
+	}
+	return fullpath
+}
+

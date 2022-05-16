@@ -135,7 +135,6 @@ struct lbModule {
 	u32 nested_type_name_guid;
 
 	Array<lbProcedure *> procedures_to_generate;
-	Array<String> foreign_library_paths;
 
 	lbProcedure *curr_procedure;
 
@@ -161,6 +160,10 @@ struct lbGenerator {
 	lbModule default_module;
 
 	PtrMap<Ast *, lbProcedure *> anonymous_proc_lits; 
+
+	BlockingMutex foreign_mutex;
+	PtrSet<Entity *> foreign_libraries_set;
+	Array<Entity *>  foreign_libraries;
 
 	std::atomic<u32> global_array_index;
 	std::atomic<u32> global_generated_index;
