@@ -1160,11 +1160,10 @@ Ast *ast_package_decl(AstFile *f, Token token, Token name, CommentGroup *docs, C
 	return result;
 }
 
-Ast *ast_import_decl(AstFile *f, Token token, bool is_using, Token relpath, Token import_name,
+Ast *ast_import_decl(AstFile *f, Token token, Token relpath, Token import_name,
                      CommentGroup *docs, CommentGroup *comment) {
 	Ast *result = alloc_ast_node(f, Ast_ImportDecl);
 	result->ImportDecl.token       = token;
-	result->ImportDecl.is_using    = is_using;
 	result->ImportDecl.relpath     = relpath;
 	result->ImportDecl.import_name = import_name;
 	result->ImportDecl.docs        = docs;
@@ -4382,7 +4381,6 @@ Ast *parse_import_decl(AstFile *f, ImportDeclKind kind) {
 	CommentGroup *docs = f->lead_comment;
 	Token token = expect_token(f, Token_import);
 	Token import_name = {};
-	bool is_using = kind != ImportDecl_Standard;
 
 	switch (f->curr_token.kind) {
 	case Token_Ident:
@@ -4393,22 +4391,18 @@ Ast *parse_import_decl(AstFile *f, ImportDeclKind kind) {
 		break;
 	}
 
-	if (!is_using && is_blank_ident(import_name)) {
-		syntax_error(import_name, "Illegal import name: '_'");
-	}
-
 	Token file_path = expect_token_after(f, Token_String, "import");
 
 	Ast *s = nullptr;
 	if (f->curr_proc != nullptr) {
-		syntax_error(import_name, "You cannot use 'import' within a procedure. This must be done at the file scope");
+		syntax_error(import_name, "Cannot use 'import' within a procedure. This must be done at the file scope");
 		s = ast_bad_decl(f, import_name, file_path);
 	} else {
-		s = ast_import_decl(f, token, is_using, file_path, import_name, docs, f->line_comment);
+		s = ast_import_decl(f, token, file_path, import_name, docs, f->line_comment);
 		array_add(&f->imports, s);
 	}
 
-	if (is_using) {
+	if (kind != ImportDecl_Standard) {
 		syntax_error(import_name, "'using import' is not allowed, please use the import name explicitly");
 	}
 
@@ -5751,7 +5745,7 @@ ParseFileError parse_packages(Parser *p, String init_filename) {
 			}
 		}
 	}
-	
+
 
 	{ // Add these packages serially and then process them parallel
 		mutex_lock(&p->wait_mutex);

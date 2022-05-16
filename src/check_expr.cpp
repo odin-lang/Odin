@@ -7241,7 +7241,11 @@ ExprKind check_ternary_if_expr(CheckerContext *c, Operand *o, Ast *node, Type *t
 	node->viral_state_flags |= te->x->viral_state_flags;
 
 	if (te->y != nullptr) {
-		check_expr_or_type(c, &y, te->y, type_hint);
+		Type *th = type_hint;
+		if (type_hint == nullptr && is_type_typed(x.type)) {
+			th = x.type;
+		}
+		check_expr_or_type(c, &y, te->y, th);
 		node->viral_state_flags |= te->y->viral_state_flags;
 	} else {
 		error(node, "A ternary expression must have an else clause");
@@ -8161,7 +8165,10 @@ ExprKind check_compound_literal(CheckerContext *c, Operand *o, Ast *node, Type *
 	case Type_Basic: {
 		if (!is_type_any(t)) {
 			if (cl->elems.count != 0) {
-				error(node, "Illegal compound literal");
+				gbString s = type_to_string(t);
+				error(node, "Illegal compound literal, %s cannot be used as a compound literal with fields", s);
+				gb_string_free(s);
+				is_constant = false;
 			}
 			break;
 		}

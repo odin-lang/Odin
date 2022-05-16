@@ -7,6 +7,8 @@ import "core:intrinsics"
 import "core:sync"
 import "core:sys/unix"
 
+CAS :: intrinsics.atomic_compare_exchange_strong
+
 Thread_State :: enum u8 {
 	Started,
 	Joined,
@@ -29,6 +31,11 @@ _create :: proc(procedure: Thread_Proc, priority := Thread_Priority.Normal) -> ^
 	__linux_thread_entry_proc :: proc "c" (t: rawptr) -> rawptr {
 		t := (^Thread)(t)
 
+		when ODIN_OS != .Darwin {
+			// We need to give the thread a moment to start up before we enable cancellation.
+			can_set_thread_cancel_state := unix.pthread_setcancelstate(unix.PTHREAD_CANCEL_DISABLE, nil) == 0
+		}
+
 		context = runtime.default_context()
 
 		sync.lock(&t.mutex)
@@ -41,6 +48,14 @@ _create :: proc(procedure: Thread_Proc, priority := Thread_Priority.Normal) -> ^
 
 		init_context := t.init_context
 		context =	init_context.? or_else runtime.default_context()
+
+		when ODIN_OS != .Darwin {
+			// Enable thread's cancelability.
+			if can_set_thread_cancel_state {
+				unix.pthread_setcanceltype (unix.PTHREAD_CANCEL_ASYNCHRONOUS, nil)
+				unix.pthread_setcancelstate(unix.PTHREAD_CANCEL_DISABLE,      nil)
+			}
+		}
 
 		t.procedure(t)
 
@@ -98,7 +113,7 @@ _create :: proc(procedure: Thread_Proc, priority := Thread_Priority.Normal) -> ^
 }
 
 _start :: proc(t: ^Thread) {
-	sync.guard(&t.mutex)
+	// sync.guard(&t.mutex)
 	t.flags += { .Started }
 	sync.signal(&t.cond)
 }
@@ -108,15 +123,22 @@ _is_done :: proc(t: ^Thread) -> bool {
 }
 
 _join :: proc(t: ^Thread) {
-	sync.guard(&t.mutex)
+	// sync.guard(&t.mutex)
 
-	if .Joined in t.flags || unix.pthread_equal(unix.pthread_self(), t.unix_thread) {
+	if unix.pthread_equal(unix.pthread_self(), t.unix_thread) {
 		return
 	}
 
-	unix.pthread_join(t.unix_thread, nil)
+	// Preserve other flags besides `.Joined`, like `.Started`.
+	unjoined := intrinsics.atomic_load(&t.flags) - {.Joined}
+	joined   := unjoined + {.Joined}
 
-	t.flags += { .Joined }
+	// Try to set `t.flags` from unjoined to joined. If it returns joined,
+	// it means the previous value had that flag set and we can return.
+	if res, ok := CAS(&t.flags, unjoined, joined); res == joined && !ok {
+		return
+	}
+	unix.pthread_join(t.unix_thread, nil)
 }
 
 _join_multiple :: proc(threads: ..^Thread) {
@@ -132,7 +154,10 @@ _destroy :: proc(t: ^Thread) {
 }
 
 _terminate :: proc(t: ^Thread, exit_code: int) {
-	// TODO(bill)
+	// `pthread_cancel` is unreliable on Darwin for unknown reasons.
+	when ODIN_OS != .Darwin {
+		unix.pthread_cancel(t.unix_thread)
+	}
 }
 
 _yield :: proc() {

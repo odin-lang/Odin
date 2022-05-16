@@ -48,17 +48,17 @@ Value_getValue :: proc(self: ^Value, value: rawptr, size: UInteger) {
 
 
 @(objc_type=Value, objc_name="objCType")
-Value_objCType :: proc(self: ^Value) -> cstring {
+Value_objCType :: proc "c" (self: ^Value) -> cstring {
 	return msgSend(cstring, self, "objCType")
 }
 
 @(objc_type=Value, objc_name="isEqualToValue")
-Value_isEqualToValue :: proc(self, other: ^Value) -> BOOL {
+Value_isEqualToValue :: proc "c" (self, other: ^Value) -> BOOL {
 	return msgSend(BOOL, self, "isEqualToValue:", other)
 }
 
 @(objc_type=Value, objc_name="pointerValue")
-Value_pointerValue :: proc(self: ^Value) -> rawptr {
+Value_pointerValue :: proc "c" (self: ^Value) -> rawptr {
 	return msgSend(rawptr, self, "pointerValue")
 }
 

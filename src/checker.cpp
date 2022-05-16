@@ -544,6 +544,28 @@ GB_COMPARE_PROC(vetted_entity_variable_pos_cmp) {
 	return token_pos_cmp(x->token.pos, y->token.pos);
 }
 
+bool check_vet_shadowing_assignment(Checker *c, Entity *shadowed, Ast *expr) {
+	Ast *init = unparen_expr(expr);
+	if (init == nullptr) {
+		return false;
+	}
+	if (init->kind == Ast_Ident) {
+		// TODO(bill): Which logic is better? Same name or same entity
+		// bool ignore = init->Ident.token.string == name;
+		bool ignore = init->Ident.entity == shadowed;
+		if (ignore) {
+			return true;
+		}
+	} else if (init->kind == Ast_TernaryIfExpr) {
+		bool x = check_vet_shadowing_assignment(c, shadowed, init->TernaryIfExpr.x);
+		bool y = check_vet_shadowing_assignment(c, shadowed, init->TernaryIfExpr.y);
+		if (x || y) {
+			return true;
+		}
+	}
+
+	return false;
+}
 
 
 bool check_vet_shadowing(Checker *c, Entity *e, VettedEntity *ve) {
@@ -594,17 +616,14 @@ bool check_vet_shadowing(Checker *c, Entity *e, VettedEntity *ve) {
 	}
 
 	// NOTE(bill): Ignore intentional redeclaration
-	// x := x;
+	// x := x
 	// Suggested in issue #637 (2020-05-11)
+	// Also allow the following
+	// x := x if cond else y
+	// x := z if cond else x
 	if ((e->flags & EntityFlag_Using) == 0 && e->kind == Entity_Variable) {
-		Ast *init = unparen_expr(e->Variable.init_expr);
-		if (init != nullptr && init->kind == Ast_Ident) {
-			// TODO(bill): Which logic is better? Same name or same entity
-			// bool ignore = init->Ident.token.string == name;
-			bool ignore = init->Ident.entity == shadowed;
-			if (ignore) {
-				return false;
-			}
+		if (check_vet_shadowing_assignment(c, shadowed, e->Variable.init_expr)) {
+			return false;
 		}
 	}
 
@@ -944,6 +963,7 @@ void init_universal(void) {
 			{"Unknown", TargetArch_Invalid},
 			{"amd64",   TargetArch_amd64},
 			{"i386",    TargetArch_i386},
+			{"arm32",   TargetArch_arm32},
 			{"arm64",   TargetArch_arm64},
 			{"wasm32",  TargetArch_wasm32},
 			{"wasm64",  TargetArch_wasm64},
@@ -4336,25 +4356,21 @@ void check_add_import_decl(CheckerContext *ctx, Ast *decl) {
 	}
 
 	String import_name = path_to_entity_name(id->import_name.string, id->fullpath, false);
+	if (is_blank_ident(import_name)) {
+		force_use = true;
+	}
 
 	// NOTE(bill, 2019-05-19): If the directory path is not a valid entity name, force the user to assign a custom one
 	// if (import_name.len == 0 || import_name == "_") {
 	// 	import_name = scope->pkg->name;
 	// }
 
-	if (import_name.len == 0 || is_blank_ident(import_name)) {
-		if (id->is_using) {
-			// TODO(bill): Should this be a warning?
-		} else {
-			if (id->import_name.string == "") {
-				String invalid_name = id->fullpath;
-				invalid_name = get_invalid_import_name(invalid_name);
+	if (import_name.len == 0) {
+		String invalid_name = id->fullpath;
+		invalid_name = get_invalid_import_name(invalid_name);
 
-				error(id->token, "Import name %.*s, is not a valid identifier. Perhaps you want to reference the package by a different name like this: import <new_name> \"%.*s\" ", LIT(invalid_name), LIT(invalid_name));
-			} else {
-				error(token, "Import name, %.*s, cannot be use as an import name as it is not a valid identifier", LIT(id->import_name.string));
-			}
-		}
+		error(id->token, "Import name %.*s, is not a valid identifier. Perhaps you want to reference the package by a different name like this: import <new_name> \"%.*s\" ", LIT(invalid_name), LIT(invalid_name));
+		error(token, "Import name, %.*s, cannot be use as an import name as it is not a valid identifier", LIT(id->import_name.string));
 	} else {
 		GB_ASSERT(id->import_name.pos.line != 0);
 		id->import_name.string = import_name;
@@ -4363,35 +4379,8 @@ void check_add_import_decl(CheckerContext *ctx, Ast *decl) {
 		                                     scope);
 
 		add_entity(ctx, parent_scope, nullptr, e);
-		if (force_use || id->is_using) {
+		if (force_use) {
 			add_entity_use(ctx, nullptr, e);
-		}
-	}
-
-	if (id->is_using) {
-		if (parent_scope->flags & ScopeFlag_Global) {
-			error(id->import_name, "built-in package imports cannot use using");
-			return;
-		}
-
-		// NOTE(bill): Add imported entities to this file's scope
-		for_array(elem_index, scope->elements.entries) {
-			String name = scope->elements.entries[elem_index].key.string;
-			Entity *e = scope->elements.entries[elem_index].value;
-			if (e->scope == parent_scope) continue;
-
-			if (is_entity_exported(e, true)) {
-				Entity *found = scope_lookup_current(parent_scope, name);
-				if (found != nullptr) {
-					// NOTE(bill):
-					// Date: 2019-03-17
-					// The order has to be the other way around as `using` adds the entity into the that
-					// file scope otherwise the error would be the wrong way around
-					redeclaration_error(name, found, e);
-				} else {
-					add_entity_with_name(ctx, parent_scope, e->identifier, e, name);
-				}
-			}
 		}
 	}
 
@@ -4412,6 +4401,14 @@ DECL_ATTRIBUTE_PROC(foreign_import_decl_attribute) {
 			warning(elem, "'force' is deprecated and is identical to 'require'");
 		}
 		ac->require_declaration = true;
+		return true;
+	} else if (name == "priority_index") {
+		ExactValue ev = check_decl_attribute_value(c, value);
+		if (ev.kind != ExactValue_Integer) {
+			error(elem, "Expected an integer value for '%.*s'", LIT(name));
+		} else {
+			ac->foreign_import_priority_index = exact_value_to_i64(ev);
+		}
 		return true;
 	}
 	return false;
@@ -4468,6 +4465,9 @@ void check_add_foreign_import_decl(CheckerContext *ctx, Ast *decl) {
 	if (ac.require_declaration) {
 		mpmc_enqueue(&ctx->info->required_foreign_imports_through_force_queue, e);
 		add_entity_use(ctx, nullptr, e);
+	}
+	if (ac.foreign_import_priority_index != 0) {
+		e->LibraryName.priority_index = ac.foreign_import_priority_index;
 	}
 
 	if (has_asm_extension(fullpath)) {

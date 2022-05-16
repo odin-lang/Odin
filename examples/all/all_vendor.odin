@@ -2,12 +2,14 @@ package all
 
 import botan     "vendor:botan"
 import ENet      "vendor:ENet"
+import ggpo      "vendor:ggpo"
 import gl        "vendor:OpenGL"
 import glfw      "vendor:glfw"
 import microui   "vendor:microui"
 import miniaudio "vendor:miniaudio"
 import PM        "vendor:portmidi"
 import rl        "vendor:raylib"
+import exr       "vendor:OpenEXRCore"
 
 import SDL    "vendor:sdl2"
 import SDLNet "vendor:sdl2/net"
@@ -23,12 +25,14 @@ import CA  "vendor:darwin/QuartzCore"
 
 _ :: botan
 _ :: ENet
+_ :: ggpo
 _ :: gl
 _ :: glfw
 _ :: microui
 _ :: miniaudio
 _ :: PM
 _ :: rl
+_ :: exr
 _ :: SDL
 _ :: SDLNet
 _ :: IMG

@@ -365,7 +365,7 @@ get_current_directory :: proc(allocator := context.allocator) -> string {
 
 	win32.ReleaseSRWLockExclusive(&cwd_lock)
 
-	return win32.utf16_to_utf8(dir_buf_wstr, allocator)
+	return win32.utf16_to_utf8(dir_buf_wstr, allocator) or_else ""
 }
 
 set_current_directory :: proc(path: string) -> (err: Errno) {

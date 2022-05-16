@@ -184,16 +184,16 @@ Viewport :: struct {
 
 Timestamp :: distinct u64
 
-DeviceNotificationHandler                              :: distinct rawptr
+DeviceNotificationHandler                              :: ^NS.Block
 AutoreleasedComputePipelineReflection                  :: ^ComputePipelineReflection
 AutoreleasedRenderPipelineReflection                   :: ^RenderPipelineReflection
-NewLibraryCompletionHandler                            :: distinct rawptr
-NewRenderPipelineStateCompletionHandler                :: distinct rawptr
-NewRenderPipelineStateWithReflectionCompletionHandler  :: distinct rawptr
-NewComputePipelineStateCompletionHandler               :: distinct rawptr
-NewComputePipelineStateWithReflectionCompletionHandler :: distinct rawptr
-SharedEventNotificationBlock :: distinct rawptr
+NewLibraryCompletionHandler                            :: ^NS.Block
+NewRenderPipelineStateCompletionHandler                :: ^NS.Block
+NewRenderPipelineStateWithReflectionCompletionHandler  :: ^NS.Block
+NewComputePipelineStateCompletionHandler               :: ^NS.Block
+NewComputePipelineStateWithReflectionCompletionHandler :: ^NS.Block
+SharedEventNotificationBlock :: ^NS.Block
 
-DrawablePresentedHandler :: distinct rawptr
+DrawablePresentedHandler :: ^NS.Block
 
 AutoreleasedArgument :: ^Argument

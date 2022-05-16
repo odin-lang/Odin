@@ -2,7 +2,7 @@
 package sys_windows
 
 import "core:strings"
-import "core:sys/win32"
+import "core:runtime"
 import "core:intrinsics"
 
 L :: intrinsics.constant_utf16_cstring
@@ -13,6 +13,14 @@ LOWORD :: #force_inline proc "contextless" (x: DWORD) -> WORD {
 
 HIWORD :: #force_inline proc "contextless" (x: DWORD) -> WORD {
 	return WORD(x >> 16)
+}
+
+GET_X_LPARAM :: #force_inline proc "contextless" (lp: LPARAM) -> c_int {
+	return cast(c_int)cast(c_short)LOWORD(cast(DWORD)lp)
+}
+
+GET_Y_LPARAM :: #force_inline proc "contextless" (lp: LPARAM) -> c_int {
+	return cast(c_int)cast(c_short)HIWORD(cast(DWORD)lp)
 }
 
 utf8_to_utf16 :: proc(s: string, allocator := context.temp_allocator) -> []u16 {
@@ -48,16 +56,16 @@ utf8_to_wstring :: proc(s: string, allocator := context.temp_allocator) -> wstri
 	return nil
 }
 
-wstring_to_utf8 :: proc(s: wstring, N: int, allocator := context.temp_allocator) -> (res: string) {
+wstring_to_utf8 :: proc(s: wstring, N: int, allocator := context.temp_allocator) -> (res: string, err: runtime.Allocator_Error) {
 	context.allocator = allocator
 
 	if N <= 0 {
-		return ""
+		return
 	}
 
 	n := WideCharToMultiByte(CP_UTF8, WC_ERR_INVALID_CHARS, s, i32(N), nil, 0, nil, nil)
 	if n == 0 {
-		return ""
+		return
 	}
 
 	// If N == -1 the call to WideCharToMultiByte assume the wide string is null terminated
@@ -65,12 +73,12 @@ wstring_to_utf8 :: proc(s: wstring, N: int, allocator := context.temp_allocator)
 	// also null terminated.
 	// If N != -1 it assumes the wide string is not null terminated and the resulting string
 	// will not be null terminated, we therefore have to force it to be null terminated manually.
-	text := make([]byte, n+1 if N != -1 else n)
+	text := make([]byte, n+1 if N != -1 else n) or_return
 
 	n1 := WideCharToMultiByte(CP_UTF8, WC_ERR_INVALID_CHARS, s, i32(N), raw_data(text), n, nil, nil)
 	if n1 == 0 {
 		delete(text, allocator)
-		return ""
+		return
 	}
 
 	for i in 0..<n {
@@ -79,12 +87,12 @@ wstring_to_utf8 :: proc(s: wstring, N: int, allocator := context.temp_allocator)
 			break
 		}
 	}
-	return string(text[:n])
+	return string(text[:n]), nil
 }
 
-utf16_to_utf8 :: proc(s: []u16, allocator := context.temp_allocator) -> string {
+utf16_to_utf8 :: proc(s: []u16, allocator := context.temp_allocator) -> (res: string, err: runtime.Allocator_Error) {
 	if len(s) == 0 {
-		return ""
+		return "", nil
 	}
 	return wstring_to_utf8(raw_data(s), len(s), allocator)
 }
@@ -208,7 +216,7 @@ get_computer_name_and_account_sid :: proc(username: string) -> (computer_name: s
 	if !res {
 		return "", {}, false
 	}
-	computer_name = utf16_to_utf8(cname_w, context.temp_allocator)
+	computer_name = utf16_to_utf8(cname_w, context.temp_allocator) or_else ""
 
 	ok = true
 	return
@@ -298,7 +306,7 @@ add_user_profile :: proc(username: string) -> (ok: bool, profile_path: string) {
 	if res == false {
 		return false, ""
 	}
-	defer win32.local_free(sb)
+	defer LocalFree(sb)
 
 	pszProfilePath := make([]u16, 257, context.temp_allocator)
 	res2 := CreateProfile(
@@ -310,7 +318,7 @@ add_user_profile :: proc(username: string) -> (ok: bool, profile_path: string) {
 	if res2 != 0 {
 		return false, ""
 	}
-	profile_path = wstring_to_utf8(&pszProfilePath[0], 257)
+	profile_path = wstring_to_utf8(&pszProfilePath[0], 257) or_else ""
 
 	return true, profile_path
 }
@@ -328,7 +336,7 @@ delete_user_profile :: proc(username: string) -> (ok: bool) {
 	if res == false {
 		return false
 	}
-	defer win32.local_free(sb)
+	defer LocalFree(sb)
 
 	res2 := DeleteProfileW(
 		sb,
@@ -443,20 +451,20 @@ run_as_user :: proc(username, password, application, commandline: string, pi: ^P
 		nil,	// lpProcessAttributes,
 		nil,	// lpThreadAttributes,
 		false,	// bInheritHandles,
-    	0,		// creation flags
-    	nil,	// environment,
-    	nil,	// current directory: inherit from parent if nil
-    	&si,
-    	pi,
-    ))
-    if ok {
-    	if wait {
-	    	WaitForSingleObject(pi.hProcess, INFINITE)
-    		CloseHandle(pi.hProcess)
-    		CloseHandle(pi.hThread)
-    	}
-    	return true
-    } else {
-    	return false
-    }
+		0,		// creation flags
+		nil,	// environment,
+		nil,	// current directory: inherit from parent if nil
+		&si,
+		pi,
+	))
+	if ok {
+		if wait {
+			WaitForSingleObject(pi.hProcess, INFINITE)
+			CloseHandle(pi.hProcess)
+			CloseHandle(pi.hThread)
+		}
+		return true
+	} else {
+		return false
+	}
 }

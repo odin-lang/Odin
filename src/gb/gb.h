@@ -6273,20 +6273,44 @@ char *gb_path_get_full_name(gbAllocator a, char const *path) {
 #else
 	char *p, *result, *fullpath = NULL;
 	isize len;
-	p = realpath(path, NULL);
-	fullpath = p;
-	if (p == NULL) {
-		// NOTE(bill): File does not exist
-		fullpath = cast(char *)path;
+	fullpath = realpath(path, NULL);
+
+	if (fullpath == NULL) {
+		// NOTE(Jeroen): Path doesn't exist.
+		if (gb_strlen(path) > 0 && path[0] == '/') {
+			// But it is an absolute path, so return as-is.
+
+			fullpath = (char *)path;
+			len      = gb_strlen(fullpath) + 1;
+			result   = gb_alloc_array(a, char, len + 1);
+
+			gb_memmove(result, fullpath, len);
+			result[len] = 0;
+
+		} else {
+			// Appears to be a relative path, so construct an absolute one relative to <cwd>.
+			char cwd[4096];
+			getcwd(&cwd[0], 4096);
+
+			isize path_len = gb_strlen(path);
+			isize cwd_len  = gb_strlen(cwd);
+			len            = cwd_len + 1 + path_len + 1;
+			result         = gb_alloc_array(a, char, len);
+
+			gb_memmove(result, (void *)cwd, cwd_len);
+			result[cwd_len] = '/';
+
+			gb_memmove(result + cwd_len + 1, (void *)path, gb_strlen(path));
+			result[len] = 0;
+
+		}
+	} else {
+		len      = gb_strlen(fullpath) + 1;
+		result   = gb_alloc_array(a, char, len + 1);
+		gb_memmove(result, fullpath, len);
+		result[len] = 0;
+		free(fullpath);
 	}
-
-	len = gb_strlen(fullpath);
-
-	result = gb_alloc_array(a, char, len + 1);
-	gb_memmove(result, fullpath, len);
-	result[len] = 0;
-	free(p);
-
 	return result;
 #endif
 }

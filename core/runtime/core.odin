@@ -401,6 +401,7 @@ Raw_Cstring :: struct {
 		Linux,
 		Essence,
 		FreeBSD,
+		OpenBSD,
 		WASI,
 		JS,
 		Freestanding,
@@ -414,6 +415,7 @@ Odin_OS_Type :: type_of(ODIN_OS)
 		Unknown,
 		amd64,
 		i386,
+		arm32,
 		arm64,
 		wasm32,
 		wasm64,
@@ -565,7 +567,7 @@ __init_context :: proc "contextless" (c: ^Context) {
 		return
 	}
 
-	// NOTE(bill): Do not initialize these procedures with a call as they are not defined with the "contexless" calling convention
+	// NOTE(bill): Do not initialize these procedures with a call as they are not defined with the "contextless" calling convention
 	c.allocator.procedure = default_allocator_proc
 	c.allocator.data = nil
 

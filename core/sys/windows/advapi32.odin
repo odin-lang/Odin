@@ -3,6 +3,8 @@ package sys_windows
 
 foreign import advapi32 "system:Advapi32.lib"
 
+HCRYPTPROV :: distinct HANDLE
+
 @(default_calling_convention="stdcall")
 foreign advapi32 {
 	@(link_name = "SystemFunction036")
@@ -10,6 +12,10 @@ foreign advapi32 {
 	OpenProcessToken :: proc(ProcessHandle: HANDLE,
 	                         DesiredAccess: DWORD,
 	                         TokenHandle: ^HANDLE) -> BOOL ---
+
+	CryptAcquireContextW :: proc(hProv: ^HCRYPTPROV, szContainer, szProvider: wstring, dwProvType, dwFlags: DWORD) -> DWORD ---
+	CryptGenRandom       :: proc(hProv: HCRYPTPROV, dwLen: DWORD, buf: LPVOID) -> DWORD ---
+	CryptReleaseContext  :: proc(hProv: HCRYPTPROV, dwFlags: DWORD) -> DWORD ---
 }
 
 // Necessary to create a token to impersonate a user with for CreateProcessAsUser

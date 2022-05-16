@@ -39,7 +39,9 @@ jobs:
           make
         timeout-minutes: 10
       - name: Odin issues tests
-        run: tests/issues/run.sh
+        run: |
+          cd tests/issues
+          ./run.sh
         timeout-minutes: 10
       - name: Odin check examples/all for Linux i386
         run: ./odin check examples/all -vet -strict-style -target:linux_i386
@@ -91,7 +93,9 @@ jobs:
           make
         timeout-minutes: 10
       - name: Odin issues tests
-        run: tests/issues/run.sh
+        run: |
+          cd tests/issues
+          ./run.sh
         timeout-minutes: 10
       - name: Odin check examples/all for Darwin arm64
         run: ./odin check examples/all -vet -strict-style -target:darwin_arm64
@@ -163,7 +167,8 @@ jobs:
         shell: cmd
         run: |
           call "C:\Program Files (x86)\Microsoft Visual Studio\2019\Enterprise\VC\Auxiliary\Build\vcvars64.bat
-          call tests\issues\run.bat
+          cd tests\issues
+          call run.bat
         timeout-minutes: 10
       - name: Odin check examples/all for Windows 32bits
         shell: cmd

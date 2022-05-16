@@ -150,7 +150,7 @@ _quick_sort_general :: proc(data: $T/[]$E, a, b, max_depth: int, call: $P, $KIND
 
 	a, b, max_depth := a, b, max_depth
 
-	if b-a > 12 { // only use shell sort for lengths <= 12
+	for b-a > 12 { // only use shell sort for lengths <= 12
 		if max_depth == 0 {
 			heap_sort(data, a, b, call)
 			return

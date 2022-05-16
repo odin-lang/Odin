@@ -2,52 +2,49 @@ ODIN=../../odin
 PYTHON=$(shell which python3)
 
 all: download_test_assets image_test compress_test strings_test hash_test crypto_test noise_test encoding_test \
-<<<<<<< HEAD
-	 math_test linalg_glsl_math_test os2_test
-=======
-	 math_test linalg_glsl_math_test filepath_test reflect_test os_exit_test
->>>>>>> upstream/master
+	 math_test linalg_glsl_math_test filepath_test reflect_test os_exit_test i18n_test
 
 download_test_assets:
 	$(PYTHON) download_assets.py
 
 image_test:
-	$(ODIN) run image/test_core_image.odin -file
+	$(ODIN) run image/test_core_image.odin -file -out:test_core_image
 
 compress_test:
-	$(ODIN) run compress/test_core_compress.odin -file
+	$(ODIN) run compress/test_core_compress.odin -file -out:test_core_compress
 
 strings_test:
-	$(ODIN) run strings/test_core_strings.odin -file
+	$(ODIN) run strings/test_core_strings.odin -file -out:test_core_strings
 
 hash_test:
-	$(ODIN) run hash -out=test_hash -o:speed -no-bounds-check
+	$(ODIN) run hash -o:speed -no-bounds-check -out:test_hash 
 
 crypto_test:
-	$(ODIN) run crypto -out=test_crypto_hash -o:speed -no-bounds-check
+	$(ODIN) run crypto -o:speed -no-bounds-check -out:test_crypto_hash 
 
 noise_test:
-	$(ODIN) run math/noise -out=test_noise
+	$(ODIN) run math/noise -out:test_noise
 
 encoding_test:
-	$(ODIN) run encoding/hxa -out=test_hxa -collection:tests=..
-	$(ODIN) run encoding/json -out=test_json
-	$(ODIN) run encoding/varint -out=test_varint
+	$(ODIN) run encoding/hxa    -out:test_hxa -collection:tests=..
+	$(ODIN) run encoding/json   -out:test_json
+	$(ODIN) run encoding/varint -out:test_varint
+	$(ODIN) run encoding/xml    -out:test_xml
 
 math_test:
-	$(ODIN) run math/test_core_math.odin -out=test_core_math -file -collection:tests=..
+	$(ODIN) run math/test_core_math.odin -file -collection:tests=.. -out:test_core_math
 
 linalg_glsl_math_test:
-	$(ODIN) run math/linalg/glsl/test_linalg_glsl_math.odin -file -out=test_linalg_glsl_math -collection:tests=..
+	$(ODIN) run math/linalg/glsl/test_linalg_glsl_math.odin -file -collection:tests=.. -out:test_linalg_glsl_math
 
 filepath_test:
-	$(ODIN) run path/filepath/test_core_filepath.odin -file -out=test_core_filepath -collection:tests=..
+	$(ODIN) run path/filepath/test_core_filepath.odin -file -collection:tests=.. -out:test_core_filepath
 
 reflect_test:
-	$(ODIN) run reflect/test_core_reflect.odin -file -out=test_core_reflect -collection:tests=..
+	$(ODIN) run reflect/test_core_reflect.odin -file -collection:tests=.. -out:test_core_reflect
 
 os_exit_test:
-	$(ODIN) run os/test_core_os_exit.odin -file -out=test_core_os_exit && exit 1 || exit 0
+	$(ODIN) run os/test_core_os_exit.odin -file -out:test_core_os_exit && exit 1 || exit 0
 
-os2_test:
-	$(ODIN) run os2/test_os2.odin -out=test_os2
+i18n_test:
+	$(ODIN) run text/i18n -out:test_core_i18n

@@ -1,21 +1,22 @@
 //+private
 package os2
 
+import "core:runtime"
 import "core:time"
+import "core:strings"
 import win32 "core:sys/windows"
 
-_fstat :: proc(fd: Handle, allocator := context.allocator) -> (File_Info, Error) {
-	if fd == 0 {
-		return {}, .Invalid_Argument
+_fstat :: proc(f: ^File, allocator: runtime.Allocator) -> (File_Info, Error) {
+	if f == nil || f.impl.fd == nil {
+		return {}, nil
 	}
-	context.allocator = allocator
 
-	path, err := _cleanpath_from_handle(fd)
+	path, err := _cleanpath_from_handle(f, allocator)
 	if err != nil {
 		return {}, err
 	}
 
-	h := win32.HANDLE(fd)
+	h := _handle(f)
 	switch win32.GetFileType(h) {
 	case win32.FILE_TYPE_PIPE, win32.FILE_TYPE_CHAR:
 		fi: File_Info
@@ -25,58 +26,52 @@ _fstat :: proc(fd: Handle, allocator := context.allocator) -> (File_Info, Error)
 		return fi, nil
 	}
 
-	return _file_info_from_get_file_information_by_handle(path, h)
+	return _file_info_from_get_file_information_by_handle(path, h, allocator)
 }
-_stat :: proc(name: string, allocator := context.allocator) -> (File_Info, Error) {
-	return internal_stat(name, win32.FILE_FLAG_BACKUP_SEMANTICS)
+_stat :: proc(name: string, allocator: runtime.Allocator) -> (File_Info, Error) {
+	return internal_stat(name, win32.FILE_FLAG_BACKUP_SEMANTICS, allocator)
 }
-_lstat :: proc(name: string, allocator := context.allocator) -> (File_Info, Error) {
-	return internal_stat(name, win32.FILE_FLAG_BACKUP_SEMANTICS|win32.FILE_FLAG_OPEN_REPARSE_POINT)
+_lstat :: proc(name: string, allocator: runtime.Allocator) -> (File_Info, Error) {
+	return internal_stat(name, win32.FILE_FLAG_BACKUP_SEMANTICS|win32.FILE_FLAG_OPEN_REPARSE_POINT, allocator)
 }
 _same_file :: proc(fi1, fi2: File_Info) -> bool {
 	return fi1.fullpath == fi2.fullpath
 }
 
 
-full_path_from_name :: proc(name: string, allocator := context.allocator) -> (path: string, err: Error) {
-	context.allocator = allocator
-	
+
+
+full_path_from_name :: proc(name: string, allocator: runtime.Allocator) -> (path: string, err: Error) {
 	name := name
 	if name == "" {
 		name = "."
 	}
-	p := win32.utf8_to_utf16(name, context.temp_allocator)
-	buf := make([dynamic]u16, 100)
-	for {
-		n := win32.GetFullPathNameW(raw_data(p), u32(len(buf)), raw_data(buf), nil)
-		if n == 0 {
-			delete(buf)
-			return "", _get_platform_error()
-		}
-		if n <= u32(len(buf)) {
-			return win32.utf16_to_utf8(buf[:n]), nil
-		}
-		resize(&buf, len(buf)*2)
-	}
+	p := win32.utf8_to_utf16(name, _temp_allocator())
 
-	return
+	n := win32.GetFullPathNameW(raw_data(p), 0, nil, nil)
+	if n == 0 {
+		return "", _get_platform_error()
+	}
+	buf := make([]u16, n+1, _temp_allocator())
+	n = win32.GetFullPathNameW(raw_data(p), u32(len(buf)), raw_data(buf), nil)
+	if n == 0 {
+		return "", _get_platform_error()
+	}
+	return win32.utf16_to_utf8(buf[:n], allocator)
 }
 
 
-internal_stat :: proc(name: string, create_file_attributes: u32, allocator := context.allocator) -> (fi: File_Info, e: Error) {
+internal_stat :: proc(name: string, create_file_attributes: u32, allocator: runtime.Allocator) -> (fi: File_Info, e: Error) {
 	if len(name) == 0 {
 		return {}, .Not_Exist
 	}
 
-	context.allocator = allocator
-
-
-	wname := win32.utf8_to_wstring(_fix_long_path(name), context.temp_allocator)
+	wname := _fix_long_path(name)
 	fa: win32.WIN32_FILE_ATTRIBUTE_DATA
 	ok := win32.GetFileAttributesExW(wname, win32.GetFileExInfoStandard, &fa)
 	if ok && fa.dwFileAttributes & win32.FILE_ATTRIBUTE_REPARSE_POINT == 0 {
 		// Not a symlink
-		return _file_info_from_win32_file_attribute_data(&fa, name)
+		return _file_info_from_win32_file_attribute_data(&fa, name, allocator)
 	}
 
 	err := 0 if ok else win32.GetLastError()
@@ -90,7 +85,7 @@ internal_stat :: proc(name: string, create_file_attributes: u32, allocator := co
 		}
 		win32.FindClose(sh)
 
-		return _file_info_from_win32_find_data(&fd, name)
+		return _file_info_from_win32_find_data(&fd, name, allocator)
 	}
 
 	h := win32.CreateFileW(wname, 0, 0, nil, win32.OPEN_EXISTING, create_file_attributes, nil)
@@ -99,7 +94,7 @@ internal_stat :: proc(name: string, create_file_attributes: u32, allocator := co
 		return
 	}
 	defer win32.CloseHandle(h)
-	return _file_info_from_get_file_information_by_handle(name, h)
+	return _file_info_from_get_file_information_by_handle(name, h, allocator)
 }
 
 
@@ -124,56 +119,40 @@ _cleanpath_strip_prefix :: proc(buf: []u16) -> []u16 {
 }
 
 
-_cleanpath_from_handle :: proc(fd: Handle) -> (string, Error) {
-	if fd == 0 {
-		return "", .Invalid_Argument
+_cleanpath_from_handle :: proc(f: ^File, allocator: runtime.Allocator) -> (string, Error) {
+	if f == nil || f.impl.fd == nil {
+		return "", nil
 	}
-	h := win32.HANDLE(fd)
+	h := _handle(f)
 
-	MAX_PATH := win32.DWORD(260) + 1
-	buf: []u16
-	for {
-		buf = make([]u16, MAX_PATH, context.temp_allocator)
-		err := win32.GetFinalPathNameByHandleW(h, raw_data(buf), MAX_PATH, 0)
-		switch err {
-		case win32.ERROR_PATH_NOT_FOUND, win32.ERROR_INVALID_PARAMETER:
-			return "", Platform_Error{i32(err)}
-		case win32.ERROR_NOT_ENOUGH_MEMORY:
-			MAX_PATH = MAX_PATH*2 + 1
-			continue
-		}
-		break
+	n := win32.GetFinalPathNameByHandleW(h, nil, 0, 0)
+	if n == 0 {
+		return "", _get_platform_error()
 	}
-	return _cleanpath_from_buf(buf), nil
+	buf := make([]u16, max(n, 260)+1, _temp_allocator())
+	n = win32.GetFinalPathNameByHandleW(h, raw_data(buf), u32(len(buf)), 0)
+	return _cleanpath_from_buf(buf[:n], allocator)
 }
 
-_cleanpath_from_handle_u16 :: proc(fd: Handle) -> ([]u16, Error) {
-	if fd == 0 {
-		return nil, .Invalid_Argument
+_cleanpath_from_handle_u16 :: proc(f: ^File) -> ([]u16, Error) {
+	if f == nil || f.impl.fd == nil {
+		return nil, nil
 	}
-	h := win32.HANDLE(fd)
+	h := _handle(f)
 
-	MAX_PATH := win32.DWORD(260) + 1
-	buf: []u16
-	for {
-		buf = make([]u16, MAX_PATH, context.temp_allocator)
-		err := win32.GetFinalPathNameByHandleW(h, raw_data(buf), MAX_PATH, 0)
-		switch err {
-		case win32.ERROR_PATH_NOT_FOUND, win32.ERROR_INVALID_PARAMETER:
-			return nil, Platform_Error{i32(err)}
-		case win32.ERROR_NOT_ENOUGH_MEMORY:
-			MAX_PATH = MAX_PATH*2 + 1
-			continue
-		}
-		break
+	n := win32.GetFinalPathNameByHandleW(h, nil, 0, 0)
+	if n == 0 {
+		return nil, _get_platform_error()
 	}
-	return _cleanpath_strip_prefix(buf), nil
+	buf := make([]u16, max(n, 260)+1, _temp_allocator())
+	n = win32.GetFinalPathNameByHandleW(h, raw_data(buf), u32(len(buf)), 0)
+	return _cleanpath_strip_prefix(buf[:n]), nil
 }
 
-_cleanpath_from_buf :: proc(buf: []u16) -> string {
+_cleanpath_from_buf :: proc(buf: []u16, allocator: runtime.Allocator) -> (string, runtime.Allocator_Error) {
 	buf := buf
 	buf = _cleanpath_strip_prefix(buf)
-	return win32.utf16_to_utf8(buf, context.allocator)
+	return win32.utf16_to_utf8(buf, allocator)
 }
 
 
@@ -215,15 +194,15 @@ file_type_mode :: proc(h: win32.HANDLE) -> File_Mode {
 
 
 
-_file_mode_from_file_attributes :: proc(FileAttributes: win32.DWORD, h: win32.HANDLE, ReparseTag: win32.DWORD) -> (mode: File_Mode) {
-	if FileAttributes & win32.FILE_ATTRIBUTE_READONLY != 0 {
+_file_mode_from_file_attributes :: proc(file_attributes: win32.DWORD, h: win32.HANDLE, ReparseTag: win32.DWORD) -> (mode: File_Mode) {
+	if file_attributes & win32.FILE_ATTRIBUTE_READONLY != 0 {
 		mode |= 0o444
 	} else {
 		mode |= 0o666
 	}
 
 	is_sym := false
-	if FileAttributes & win32.FILE_ATTRIBUTE_REPARSE_POINT == 0 {
+	if file_attributes & win32.FILE_ATTRIBUTE_REPARSE_POINT == 0 {
 		is_sym = false
 	} else {
 		is_sym = ReparseTag == win32.IO_REPARSE_TAG_SYMLINK || ReparseTag == win32.IO_REPARSE_TAG_MOUNT_POINT
@@ -232,7 +211,7 @@ _file_mode_from_file_attributes :: proc(FileAttributes: win32.DWORD, h: win32.HA
 	if is_sym {
 		mode |= File_Mode_Sym_Link
 	} else {
-		if FileAttributes & win32.FILE_ATTRIBUTE_DIRECTORY != 0 {
+		if file_attributes & win32.FILE_ATTRIBUTE_DIRECTORY != 0 {
 			mode |= 0o111 | File_Mode_Dir
 		}
 
@@ -245,7 +224,7 @@ _file_mode_from_file_attributes :: proc(FileAttributes: win32.DWORD, h: win32.HA
 }
 
 
-_file_info_from_win32_file_attribute_data :: proc(d: ^win32.WIN32_FILE_ATTRIBUTE_DATA, name: string) -> (fi: File_Info, e: Error) {
+_file_info_from_win32_file_attribute_data :: proc(d: ^win32.WIN32_FILE_ATTRIBUTE_DATA, name: string, allocator: runtime.Allocator) -> (fi: File_Info, e: Error) {
 	fi.size = i64(d.nFileSizeHigh)<<32 + i64(d.nFileSizeLow)
 
 	fi.mode |= _file_mode_from_file_attributes(d.dwFileAttributes, nil, 0)
@@ -255,14 +234,14 @@ _file_info_from_win32_file_attribute_data :: proc(d: ^win32.WIN32_FILE_ATTRIBUTE
 	fi.modification_time = time.unix(0, win32.FILETIME_as_unix_nanoseconds(d.ftLastWriteTime))
 	fi.access_time       = time.unix(0, win32.FILETIME_as_unix_nanoseconds(d.ftLastAccessTime))
 
-	fi.fullpath, e = full_path_from_name(name)
+	fi.fullpath, e = full_path_from_name(name, allocator)
 	fi.name = basename(fi.fullpath)
 
 	return
 }
 
 
-_file_info_from_win32_find_data :: proc(d: ^win32.WIN32_FIND_DATAW, name: string) -> (fi: File_Info, e: Error) {
+_file_info_from_win32_find_data :: proc(d: ^win32.WIN32_FIND_DATAW, name: string, allocator: runtime.Allocator) -> (fi: File_Info, e: Error) {
 	fi.size = i64(d.nFileSizeHigh)<<32 + i64(d.nFileSizeLow)
 
 	fi.mode |= _file_mode_from_file_attributes(d.dwFileAttributes, nil, 0)
@@ -272,14 +251,14 @@ _file_info_from_win32_find_data :: proc(d: ^win32.WIN32_FIND_DATAW, name: string
 	fi.modification_time = time.unix(0, win32.FILETIME_as_unix_nanoseconds(d.ftLastWriteTime))
 	fi.access_time       = time.unix(0, win32.FILETIME_as_unix_nanoseconds(d.ftLastAccessTime))
 
-	fi.fullpath, e = full_path_from_name(name)
+	fi.fullpath, e = full_path_from_name(name, allocator)
 	fi.name = basename(fi.fullpath)
 
 	return
 }
 
 
-_file_info_from_get_file_information_by_handle :: proc(path: string, h: win32.HANDLE) -> (File_Info, Error) {
+_file_info_from_get_file_information_by_handle :: proc(path: string, h: win32.HANDLE, allocator: runtime.Allocator) -> (File_Info, Error) {
 	d: win32.BY_HANDLE_FILE_INFORMATION
 	if !win32.GetFileInformationByHandle(h, &d) {
 		return {}, _get_platform_error()
@@ -290,7 +269,7 @@ _file_info_from_get_file_information_by_handle :: proc(path: string, h: win32.HA
 	if !win32.GetFileInformationByHandleEx(h, .FileAttributeTagInfo, &ti, size_of(ti)) {
 		err := win32.GetLastError()
 		if err != win32.ERROR_INVALID_PARAMETER {
-			return {}, Platform_Error{i32(err)}
+			return {}, Platform_Error(err)
 		}
 		// Indicate this is a symlink on FAT file systems
 		ti.ReparseTag = 0
@@ -312,58 +291,83 @@ _file_info_from_get_file_information_by_handle :: proc(path: string, h: win32.HA
 	return fi, nil
 }
 
-_is_abs :: proc(path: string) -> bool {
-	if len(path) > 0 && path[0] == '/' {
-		return true
+
+
+reserved_names := [?]string{
+	"CON", "PRN", "AUX", "NUL",
+	"COM1", "COM2", "COM3", "COM4", "COM5", "COM6", "COM7", "COM8", "COM9",
+	"LPT1", "LPT2", "LPT3", "LPT4", "LPT5", "LPT6", "LPT7", "LPT8", "LPT9",
+}
+
+_is_reserved_name :: proc(path: string) -> bool {
+	if len(path) == 0 {
+		return false
 	}
-	if len(path) > 2 {
-		switch path[0] {
-		case 'A'..='Z', 'a'..='z':
-			return path[1] == ':' && is_path_separator(path[2])
+	for reserved in reserved_names {
+		if strings.equal_fold(path, reserved) {
+			return true
 		}
 	}
 	return false
 }
 
-_fix_long_path :: proc(path: string) -> string {
-	if len(path) < 248 {
-		return path
-	}
+_is_UNC :: proc(path: string) -> bool {
+	return _volume_name_len(path) > 2
+}
 
-	if len(path) >= 2 && path[:2] == `\\` {
-		return path
-	}
-	if !_is_abs(path) {
-		return path
-	}
+_volume_name_len :: proc(path: string) -> int {
+	if ODIN_OS == .Windows {
+		if len(path) < 2 {
+			return 0
+		}
+		c := path[0]
+		if path[1] == ':' {
+			switch c {
+			case 'a'..='z', 'A'..='Z':
+				return 2
+			}
+		}
 
-	prefix :: `\\?`
-
-	path_buf := make([]byte, len(prefix)+len(path)+len(`\`), context.temp_allocator)
-	copy(path_buf, prefix)
-	n := len(path)
-	r, w := 0, len(prefix)
-	for r < n {
-		switch {
-		case is_path_separator(path[r]):
-			r += 1
-		case path[r] == '.' && (r+1 == n || is_path_separator(path[r+1])):
-			r += 1
-		case r+1 < n && path[r] == '.' && path[r+1] == '.' && (r+2 == n || is_path_separator(path[r+2])):
-			return path
-		case:
-			path_buf[w] = '\\'
-			w += 1
-			for ; r < n && !is_path_separator(path[r]); r += 1 {
-				path_buf[w] = path[r]
-				w += 1
+		// URL: https://msdn.microsoft.com/en-us/library/windows/desktop/aa365247(v=vs.85).aspx
+		if l := len(path); l >= 5 && _is_path_separator(path[0]) && _is_path_separator(path[1]) &&
+			!_is_path_separator(path[2]) && path[2] != '.' {
+			for n := 3; n < l-1; n += 1 {
+				if _is_path_separator(path[n]) {
+					n += 1
+					if !_is_path_separator(path[n]) {
+						if path[n] == '.' {
+							break
+						}
+					}
+					for ; n < l; n += 1 {
+						if _is_path_separator(path[n]) {
+							break
+						}
+					}
+					return n
+				}
+				break
 			}
 		}
 	}
-
-	if w == len(`\\?\c:`) {
-		path_buf[w] = '\\'
-		w += 1
-	}
-	return string(path_buf[:w])
+	return 0
 }
+
+
+_is_abs :: proc(path: string) -> bool {
+	if _is_reserved_name(path) {
+		return true
+	}
+	l := _volume_name_len(path)
+	if l == 0 {
+		return false
+	}
+
+	path := path
+	path = path[l:]
+	if path == "" {
+		return false
+	}
+	return is_path_separator(path[0])
+}
+

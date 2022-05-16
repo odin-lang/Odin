@@ -10,6 +10,7 @@ import c              "core:c"
 import libc           "core:c/libc"
 
 import compress       "core:compress"
+import shoco          "core:compress/shoco"
 import gzip           "core:compress/gzip"
 import zlib           "core:compress/zlib"
 
@@ -55,12 +56,16 @@ import csv            "core:encoding/csv"
 import hxa            "core:encoding/hxa"
 import json           "core:encoding/json"
 import varint         "core:encoding/varint"
+import xml            "core:encoding/xml"
 
 import fmt            "core:fmt"
 import hash           "core:hash"
 
 import image          "core:image"
+import netpbm         "core:image/netpbm"
 import png            "core:image/png"
+import qoi            "core:image/qoi"
+import tga            "core:image/tga"
 
 import io             "core:io"
 import log            "core:log"
@@ -98,6 +103,7 @@ import strings        "core:strings"
 import sync           "core:sync"
 import testing        "core:testing"
 import scanner        "core:text/scanner"
+import i18n           "core:text/i18n"
 import thread         "core:thread"
 import time           "core:time"
 
@@ -114,6 +120,7 @@ _ :: bytes
 _ :: c
 _ :: libc
 _ :: compress
+_ :: shoco
 _ :: gzip
 _ :: zlib
 _ :: bit_array
@@ -155,10 +162,14 @@ _ :: csv
 _ :: hxa
 _ :: json
 _ :: varint
+_ :: xml
 _ :: fmt
 _ :: hash
 _ :: image
+_ :: netpbm
 _ :: png
+_ :: qoi
+_ :: tga
 _ :: io
 _ :: log
 _ :: math
@@ -188,6 +199,7 @@ _ :: strings
 _ :: sync
 _ :: testing
 _ :: scanner
+_ :: i18n
 _ :: thread
 _ :: time
 _ :: unicode
