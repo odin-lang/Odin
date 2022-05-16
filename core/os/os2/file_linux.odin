@@ -370,6 +370,9 @@ _is_file :: proc(name: string) -> bool {
 	}
 	s: _Stat
 	res := unix.sys_stat(name_cstr, &s)
+	if res < 0 {
+		return false
+	}
 	return S_ISREG(s.mode)
 }
 
@@ -389,6 +392,9 @@ _is_dir :: proc(name: string) -> bool {
 	}
 	s: _Stat
 	res := unix.sys_stat(name_cstr, &s)
+	if res < 0 {
+		return false
+	}
 	return S_ISDIR(s.mode)
 }
 
