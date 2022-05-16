@@ -34,17 +34,20 @@ File_Flag :: enum {
 	Trunc,
 	Sparse,
 	Close_On_Exec,
+
+	Unbuffered_IO,
 }
 
-O_RDONLY :: File_Flags{.Read}
-O_WRONLY :: File_Flags{.Write}
-O_RDWR   :: File_Flags{.Read, .Write}
-O_APPEND :: File_Flags{.Append}
-O_CREATE :: File_Flags{.Create}
-O_EXCL   :: File_Flags{.Excl}
-O_SYNC   :: File_Flags{.Sync}
-O_TRUNC  :: File_Flags{.Trunc}
-O_SPARSE :: File_Flags{.Sparse}
+O_RDONLY  :: File_Flags{.Read}
+O_WRONLY  :: File_Flags{.Write}
+O_RDWR    :: File_Flags{.Read, .Write}
+O_APPEND  :: File_Flags{.Append}
+O_CREATE  :: File_Flags{.Create}
+O_EXCL    :: File_Flags{.Excl}
+O_SYNC    :: File_Flags{.Sync}
+O_TRUNC   :: File_Flags{.Trunc}
+O_SPARSE  :: File_Flags{.Sparse}
+O_CLOEXEC :: File_Flags{.Close_On_Exec}
 
 
 
