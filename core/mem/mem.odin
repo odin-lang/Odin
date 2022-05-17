@@ -25,11 +25,13 @@ zero_explicit :: proc "contextless" (data: rawptr, len: int) -> rawptr {
 	intrinsics.atomic_thread_fence(.Seq_Cst) // Prevent reordering
 	return data
 }
-zero_item :: proc "contextless" (item: $P/^$T) {
+zero_item :: proc "contextless" (item: $P/^$T) -> P {
 	intrinsics.mem_zero(item, size_of(T))
+	return item
 }
-zero_slice :: proc "contextless" (data: $T/[]$E) {
+zero_slice :: proc "contextless" (data: $T/[]$E) -> T {
 	zero(raw_data(data), size_of(E)*len(data))
+	return data
 }
 
 
