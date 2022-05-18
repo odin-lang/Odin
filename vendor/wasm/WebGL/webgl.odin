@@ -29,9 +29,12 @@ DEFAULT_CONTEXT_ATTRIBUTES :: ContextAttributes{}
 
 @(default_calling_convention="c")
 foreign webgl {
-	CreateCurrentContextById :: proc(name: string, attributes := DEFAULT_CONTEXT_ATTRIBUTES) -> bool ---
-	GetCurrentContextAttributes :: proc() -> ContextAttributes ---
+	// CreateCurrentContextById must be called before `GetCurrentContextAttributes` if the user wants to
+	// set specific attributes, otherwise the default attributes will be set for the WebGL context
+	CreateCurrentContextById :: proc(name: string, attributes: ContextAttributes) -> bool ---
+	// Acquire the WebGL context from a canvas element by id
 	SetCurrentContextById :: proc(name: string) -> bool ---
+	GetCurrentContextAttributes :: proc() -> ContextAttributes ---
 
 	DrawingBufferWidth  :: proc() -> i32 ---
 	DrawingBufferHeight :: proc() -> i32 ---
