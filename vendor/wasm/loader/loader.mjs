@@ -1,24 +1,18 @@
-import {WasmMemoryInterface, odinSetupDefaultImports} from "../js/runtime.mjs";
-import {WebGLInterface} from "../WebGL/runtime.mjs";
+import {WasmMemoryInterface, odinSetupDefaultImports, WebGLInterface} from "./runtime.mjs";
 
-export async function runWasmCanvas(wasmPath, webglCanvasElement, consoleElement, extraForeignImports) {
+export async function runWasmCanvas(wasmPath, consoleElement, extraForeignImports) {
 	let wasmMemoryInterface = new WasmMemoryInterface();
 
 	let imports = odinSetupDefaultImports(wasmMemoryInterface, consoleElement);
 	let exports = {};
 
-	if (webglCanvasElement !== undefined) {
-		let gl_context = new WebGLInterface(
-			wasmMemoryInterface,
-			webglCanvasElement,
-			{antialias: false},
-		);
-		if (!gl_context.ctx) {
-			return "WebGL is not available.";
-		}
-		imports["webgl"] = gl_context.getWebGL1Interface();
-		imports["webgl2"] = gl_context.getWebGL2Interface();
-	}
+	let gl_context = new WebGLInterface(
+		wasmMemoryInterface,
+		null,
+		{antialias: false},
+	);
+	imports["webgl"] = gl_context.getWebGL1Interface();
+	imports["webgl2"] = gl_context.getWebGL2Interface();
 
 	if (extraForeignImports !== undefined) {
 		imports = {

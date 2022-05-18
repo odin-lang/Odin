@@ -15,6 +15,7 @@ Texture      :: distinct u32
 
 @(default_calling_convention="c")
 foreign webgl {
+	SetCurrentContextById :: proc(name: string) -> bool ---
 	DrawingBufferWidth  :: proc() -> i32 ---
 	DrawingBufferHeight :: proc() -> i32 ---
 	
