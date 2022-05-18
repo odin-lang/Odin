@@ -794,6 +794,15 @@ set_env :: proc(key, value: string) -> Errno {
 	return ERROR_NONE
 }
 
+unset_env :: proc(key: string) -> Errno {
+	s := strings.clone_to_cstring(key, context.temp_allocator)
+	res := _unix_putenv(s)
+	if res < 0 {
+		return Errno(get_last_error())
+	}
+	return ERROR_NONE
+}
+
 get_current_directory :: proc() -> string {
 	// NOTE(tetra): I would use PATH_MAX here, but I was not able to find
 	// an authoritative value for it across all systems.
