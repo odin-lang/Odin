@@ -13,9 +13,26 @@ Renderbuffer :: distinct u32
 Shader       :: distinct u32
 Texture      :: distinct u32
 
+ContextAttribute :: enum u32 {
+	disableAlpha                 = 0,
+	disableAntialias             = 1,
+	disableDepth                 = 2,
+	failIfMajorPerformanceCaveat = 3,
+	disablePremultipliedAlpha    = 4,
+	preserveDrawingBuffer        = 5,
+	stencil                      = 6,
+	desynchronized               = 7,
+}
+ContextAttributes :: distinct bit_set[ContextAttribute; u32]
+
+DEFAULT_CONTEXT_ATTRIBUTES :: ContextAttributes{}
+
 @(default_calling_convention="c")
 foreign webgl {
+	CreateCurrentContextById :: proc(name: string, attributes := DEFAULT_CONTEXT_ATTRIBUTES) -> bool ---
+	GetCurrentContextAttributes :: proc() -> ContextAttributes ---
 	SetCurrentContextById :: proc(name: string) -> bool ---
+
 	DrawingBufferWidth  :: proc() -> i32 ---
 	DrawingBufferHeight :: proc() -> i32 ---
 	

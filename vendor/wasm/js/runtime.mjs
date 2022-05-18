@@ -400,7 +400,6 @@ class WebGLInterface {
 		this.transformFeedbacks = [];
 		this.syncs              = [];
 		this.programInfos       = {};
-		this.contextSettings    = {antialias: false};
 
 		this.setCurrentContext(canvasElement, contextSettings);
 	}
@@ -417,10 +416,8 @@ class WebGLInterface {
 			return true;
 		}
 
-		if (contextSettings) {
-			this.contextSettings = contextSettings;
-		}
-		this.ctx = element.getContext("webgl2", this.contextSettings) || element.getContext("webgl", this.contextSettings);
+		contextSettings = contextSettings ?? {};
+		this.ctx = element.getContext("webgl2", contextSettings) || element.getContext("webgl", contextSettings);
 		if (!this.ctx) {
 			return false;
 		}
@@ -491,7 +488,40 @@ class WebGLInterface {
 			SetCurrentContextById: (name_ptr, name_len) => {
 				let name = this.mem.loadString(name_ptr, name_len);
 				let element = document.getElementById(name);
-				return this.setCurrentContext(element, this.contextSettings);
+				return this.setCurrentContext(element, {alpha: true, antialias: true, depth: true, premultipliedAlpha: true});
+			},
+			CreateCurrentContextById: (name_ptr, name_len, attributes) => {
+				let name = this.mem.loadString(name_ptr, name_len);
+				let element = document.getElementById(name);
+
+				let contextSettings = {
+					alpha:                        !(attributes & (1<<0)),
+					antialias:                    !(attributes & (1<<1)),
+					depth:                        !(attributes & (1<<2)),
+					failIfMajorPerformanceCaveat: !!(attributes & (1<<3)),
+					premultipliedAlpha:           !(attributes & (1<<4)),
+					preserveDrawingBuffer:        !!(attributes & (1<<5)),
+					stencil:                      !!(attributes & (1<<6)),
+					desynchronized:               !!(attributes & (1<<7)),
+				};
+
+				return this.setCurrentContext(element, contextSettings);
+			},
+			GetCurrentContextAttributes: () => {
+				if (!this.ctx) {
+					return 0;
+				}
+				let attrs = this.ctx.getContextAttributes();
+				let res = 0;
+				if (!attrs.alpha)                        res |= 1<<0;
+				if (!attrs.antialias)                    res |= 1<<1;
+				if (!attrs.depth)                        res |= 1<<2;
+				if (attrs.failIfMajorPerformanceCaveat)  res |= 1<<3;
+				if (!attrs.premultipliedAlpha)           res |= 1<<4;
+				if (attrs.preserveDrawingBuffer)         res |= 1<<5;
+				if (attrs.stencil)                       res |= 1<<6;
+				if (attrs.desynchronized)                res |= 1<<7;
+				return res;
 			},
 
 			DrawingBufferWidth:  () => this.ctx.drawingBufferWidth,
