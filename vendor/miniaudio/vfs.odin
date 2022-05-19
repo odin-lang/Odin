@@ -22,8 +22,10 @@ appropriate for a given situation.
 vfs :: struct {}
 vfs_file :: distinct handle
 
-OPEN_MODE_READ  :: 0x00000001
-OPEN_MODE_WRITE :: 0x00000002
+open_mode_flags :: enum c.int {
+	READ  = 0x00000001,
+	WRITE = 0x00000002,
+}
 
 seek_origin :: enum c.int {
 	start,
@@ -69,10 +71,6 @@ foreign lib {
 	vfs_open_and_read_file :: proc(pVFS: ^vfs, pFilePath: cstring, ppData: ^rawptr, pSize: ^c.size_t, pAllocationCallbacks: ^allocation_callbacks) -> result ---
 
 	default_vfs_init       :: proc(pVFS: ^default_vfs, pAllocationCallbacks: ^allocation_callbacks) -> result ---
-}
-
-resource_format :: enum c.int {
-	wav,
 }
 
 encoding_format :: enum c.int {

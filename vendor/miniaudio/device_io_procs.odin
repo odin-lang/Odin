@@ -12,6 +12,12 @@ import "core:c"
 
 @(default_calling_convention="c", link_prefix="ma_")
 foreign lib {
+	device_job_thread_config_init :: proc() -> device_job_thread_config ---
+
+	device_job_thread_init   :: proc(pConfig: ^device_job_thread_config, pAllocationCallbacks: ^allocation_callbacks, pJobThread: ^device_job_thread) -> result ---
+	device_job_thread_uninit :: proc(pJobThread: ^device_job_thread, pAllocationCallbacks: ^allocation_callbacks) ---
+	device_job_thread_post   :: proc(pJobThread: ^device_job_thread, pJob: ^job) -> result ---
+	device_job_thread_next   :: proc(pJobThread: ^device_job_thread, pJob: ^job) -> result ---
 	
 	/*
 	Initializes a `ma_context_config` object.
@@ -46,16 +52,16 @@ foreign lib {
 	Parameters
 	----------
 	backends (in, optional)
-	    A list of backends to try initializing, in priority order. Can be NULL, in which case it uses default priority order.
+			A list of backends to try initializing, in priority order. Can be NULL, in which case it uses default priority order.
 
 	backendCount (in, optional)
-	    The number of items in `backend`. Ignored if `backend` is NULL.
+			The number of items in `backend`. Ignored if `backend` is NULL.
 
 	pConfig (in, optional)
-	    The context configuration.
+			The context configuration.
 
 	pContext (in)
-	    A pointer to the context object being initialized.
+			A pointer to the context object being initialized.
 
 
 	Return Value
@@ -72,107 +78,116 @@ foreign lib {
 	-------
 	When `backends` is NULL, the default priority order will be used. Below is a list of backends in priority order:
 
-	    |-------------|-----------------------|--------------------------------------------------------|
-	    | Name        | Enum Name             | Supported Operating Systems                            |
-	    |-------------|-----------------------|--------------------------------------------------------|
-	    | WASAPI      | ma_backend_wasapi     | Windows Vista+                                         |
-	    | DirectSound | ma_backend_dsound     | Windows XP+                                            |
-	    | WinMM       | ma_backend_winmm      | Windows XP+ (may work on older versions, but untested) |
-	    | Core Audio  | ma_backend_coreaudio  | macOS, iOS                                             |
-	    | ALSA        | ma_backend_alsa       | Linux                                                  |
-	    | PulseAudio  | ma_backend_pulseaudio | Cross Platform (disabled on Windows, BSD and Android)  |
-	    | JACK        | ma_backend_jack       | Cross Platform (disabled on BSD and Android)           |
-	    | sndio       | ma_backend_sndio      | OpenBSD                                                |
-	    | audio(4)    | ma_backend_audio4     | NetBSD, OpenBSD                                        |
-	    | OSS         | ma_backend_oss        | FreeBSD                                                |
-	    | AAudio      | ma_backend_aaudio     | Android 8+                                             |
-	    | OpenSL|ES   | ma_backend_opensl     | Android (API level 16+)                                |
-	    | Web Audio   | ma_backend_webaudio   | Web (via Emscripten)                                   |
-	    | Null        | ma_backend_null       | Cross Platform (not used on Web)                       |
-	    |-------------|-----------------------|--------------------------------------------------------|
+			|-------------|-----------------------|--------------------------------------------------------|
+			| Name        | Enum Name             | Supported Operating Systems                            |
+			|-------------|-----------------------|--------------------------------------------------------|
+			| WASAPI      | ma_backend_wasapi     | Windows Vista+                                         |
+			| DirectSound | ma_backend_dsound     | Windows XP+                                            |
+			| WinMM       | ma_backend_winmm      | Windows XP+ (may work on older versions, but untested) |
+			| Core Audio  | ma_backend_coreaudio  | macOS, iOS                                             |
+			| ALSA        | ma_backend_alsa       | Linux                                                  |
+			| PulseAudio  | ma_backend_pulseaudio | Cross Platform (disabled on Windows, BSD and Android)  |
+			| JACK        | ma_backend_jack       | Cross Platform (disabled on BSD and Android)           |
+			| sndio       | ma_backend_sndio      | OpenBSD                                                |
+			| audio(4)    | ma_backend_audio4     | NetBSD, OpenBSD                                        |
+			| OSS         | ma_backend_oss        | FreeBSD                                                |
+			| AAudio      | ma_backend_aaudio     | Android 8+                                             |
+			| OpenSL|ES   | ma_backend_opensl     | Android (API level 16+)                                |
+			| Web Audio   | ma_backend_webaudio   | Web (via Emscripten)                                   |
+			| Null        | ma_backend_null       | Cross Platform (not used on Web)                       |
+			|-------------|-----------------------|--------------------------------------------------------|
 
 	The context can be configured via the `pConfig` argument. The config object is initialized with `ma_context_config_init()`. Individual configuration settings
 	can then be set directly on the structure. Below are the members of the `ma_context_config` object.
 
-	    pLog
-	        A pointer to the `ma_log` to post log messages to. Can be NULL if the application does not
-	        require logging. See the `ma_log` API for details on how to use the logging system.
+			pLog
+					A pointer to the `ma_log` to post log messages to. Can be NULL if the application does not
+					require logging. See the `ma_log` API for details on how to use the logging system.
 
-	    threadPriority
-	        The desired priority to use for the audio thread. Allowable values include the following:
+			threadPriority
+					The desired priority to use for the audio thread. Allowable values include the following:
 
-	        |--------------------------------------|
-	        | Thread Priority                      |
-	        |--------------------------------------|
-	        | ma_thread_priority_idle              |
-	        | ma_thread_priority_lowest            |
-	        | ma_thread_priority_low               |
-	        | ma_thread_priority_normal            |
-	        | ma_thread_priority_high              |
-	        | ma_thread_priority_highest (default) |
-	        | ma_thread_priority_realtime          |
-	        | ma_thread_priority_default           |
-	        |--------------------------------------|
+					|--------------------------------------|
+					| Thread Priority                      |
+					|--------------------------------------|
+					| ma_thread_priority_idle              |
+					| ma_thread_priority_lowest            |
+					| ma_thread_priority_low               |
+					| ma_thread_priority_normal            |
+					| ma_thread_priority_high              |
+					| ma_thread_priority_highest (default) |
+					| ma_thread_priority_realtime          |
+					| ma_thread_priority_default           |
+					|--------------------------------------|
 
-	    pUserData
-	        A pointer to application-defined data. This can be accessed from the context object directly such as `context.pUserData`.
+			threadStackSize
+					The desired size of the stack for the audio thread. Defaults to the operating system's default.
 
-	    allocationCallbacks
-	        Structure containing custom allocation callbacks. Leaving this at defaults will cause it to use MA_MALLOC, MA_REALLOC and MA_FREE. These allocation
-	        callbacks will be used for anything tied to the context, including devices.
+			pUserData
+					A pointer to application-defined data. This can be accessed from the context object directly such as `context.pUserData`.
 
-	    alsa.useVerboseDeviceEnumeration
-	        ALSA will typically enumerate many different devices which can be intrusive and not user-friendly. To combat this, miniaudio will enumerate only unique
-	        card/device pairs by default. The problem with this is that you lose a bit of flexibility and control. Setting alsa.useVerboseDeviceEnumeration makes
-	        it so the ALSA backend includes all devices. Defaults to false.
+			allocationCallbacks
+					Structure containing custom allocation callbacks. Leaving this at defaults will cause it to use MA_MALLOC, MA_REALLOC and MA_FREE. These allocation
+					callbacks will be used for anything tied to the context, including devices.
 
-	    pulse.pApplicationName
-	        PulseAudio only. The application name to use when initializing the PulseAudio context with `pa_context_new()`.
+			alsa.useVerboseDeviceEnumeration
+					ALSA will typically enumerate many different devices which can be intrusive and not user-friendly. To combat this, miniaudio will enumerate only unique
+					card/device pairs by default. The problem with this is that you lose a bit of flexibility and control. Setting alsa.useVerboseDeviceEnumeration makes
+					it so the ALSA backend includes all devices. Defaults to false.
 
-	    pulse.pServerName
-	        PulseAudio only. The name of the server to connect to with `pa_context_connect()`.
+			pulse.pApplicationName
+					PulseAudio only. The application name to use when initializing the PulseAudio context with `pa_context_new()`.
 
-	    pulse.tryAutoSpawn
-	        PulseAudio only. Whether or not to try automatically starting the PulseAudio daemon. Defaults to false. If you set this to true, keep in mind that
-	        miniaudio uses a trial and error method to find the most appropriate backend, and this will result in the PulseAudio daemon starting which may be
-	        intrusive for the end user.
+			pulse.pServerName
+					PulseAudio only. The name of the server to connect to with `pa_context_connect()`.
 
-	    coreaudio.sessionCategory
-	        iOS only. The session category to use for the shared AudioSession instance. Below is a list of allowable values and their Core Audio equivalents.
+			pulse.tryAutoSpawn
+					PulseAudio only. Whether or not to try automatically starting the PulseAudio daemon. Defaults to false. If you set this to true, keep in mind that
+					miniaudio uses a trial and error method to find the most appropriate backend, and this will result in the PulseAudio daemon starting which may be
+					intrusive for the end user.
 
-	        |-----------------------------------------|-------------------------------------|
-	        | miniaudio Token                         | Core Audio Token                    |
-	        |-----------------------------------------|-------------------------------------|
-	        | ma_ios_session_category_ambient         | AVAudioSessionCategoryAmbient       |
-	        | ma_ios_session_category_solo_ambient    | AVAudioSessionCategorySoloAmbient   |
-	        | ma_ios_session_category_playback        | AVAudioSessionCategoryPlayback      |
-	        | ma_ios_session_category_record          | AVAudioSessionCategoryRecord        |
-	        | ma_ios_session_category_play_and_record | AVAudioSessionCategoryPlayAndRecord |
-	        | ma_ios_session_category_multi_route     | AVAudioSessionCategoryMultiRoute    |
-	        | ma_ios_session_category_none            | AVAudioSessionCategoryAmbient       |
-	        | ma_ios_session_category_default         | AVAudioSessionCategoryAmbient       |
-	        |-----------------------------------------|-------------------------------------|
+			coreaudio.sessionCategory
+					iOS only. The session category to use for the shared AudioSession instance. Below is a list of allowable values and their Core Audio equivalents.
 
-	    coreaudio.sessionCategoryOptions
-	        iOS only. Session category options to use with the shared AudioSession instance. Below is a list of allowable values and their Core Audio equivalents.
+					|-----------------------------------------|-------------------------------------|
+					| miniaudio Token                         | Core Audio Token                    |
+					|-----------------------------------------|-------------------------------------|
+					| ma_ios_session_category_ambient         | AVAudioSessionCategoryAmbient       |
+					| ma_ios_session_category_solo_ambient    | AVAudioSessionCategorySoloAmbient   |
+					| ma_ios_session_category_playback        | AVAudioSessionCategoryPlayback      |
+					| ma_ios_session_category_record          | AVAudioSessionCategoryRecord        |
+					| ma_ios_session_category_play_and_record | AVAudioSessionCategoryPlayAndRecord |
+					| ma_ios_session_category_multi_route     | AVAudioSessionCategoryMultiRoute    |
+					| ma_ios_session_category_none            | AVAudioSessionCategoryAmbient       |
+					| ma_ios_session_category_default         | AVAudioSessionCategoryAmbient       |
+					|-----------------------------------------|-------------------------------------|
 
-	        |---------------------------------------------------------------------------|------------------------------------------------------------------|
-	        | miniaudio Token                                                           | Core Audio Token                                                 |
-	        |---------------------------------------------------------------------------|------------------------------------------------------------------|
-	        | ma_ios_session_category_option_mix_with_others                            | AVAudioSessionCategoryOptionMixWithOthers                        |
-	        | ma_ios_session_category_option_duck_others                                | AVAudioSessionCategoryOptionDuckOthers                           |
-	        | ma_ios_session_category_option_allow_bluetooth                            | AVAudioSessionCategoryOptionAllowBluetooth                       |
-	        | ma_ios_session_category_option_default_to_speaker                         | AVAudioSessionCategoryOptionDefaultToSpeaker                     |
-	        | ma_ios_session_category_option_interrupt_spoken_audio_and_mix_with_others | AVAudioSessionCategoryOptionInterruptSpokenAudioAndMixWithOthers |
-	        | ma_ios_session_category_option_allow_bluetooth_a2dp                       | AVAudioSessionCategoryOptionAllowBluetoothA2DP                   |
-	        | ma_ios_session_category_option_allow_air_play                             | AVAudioSessionCategoryOptionAllowAirPlay                         |
-	        |---------------------------------------------------------------------------|------------------------------------------------------------------|
+			coreaudio.sessionCategoryOptions
+					iOS only. Session category options to use with the shared AudioSession instance. Below is a list of allowable values and their Core Audio equivalents.
 
-	    jack.pClientName
-	        The name of the client to pass to `jack_client_open()`.
+					|---------------------------------------------------------------------------|------------------------------------------------------------------|
+					| miniaudio Token                                                           | Core Audio Token                                                 |
+					|---------------------------------------------------------------------------|------------------------------------------------------------------|
+					| ma_ios_session_category_option_mix_with_others                            | AVAudioSessionCategoryOptionMixWithOthers                        |
+					| ma_ios_session_category_option_duck_others                                | AVAudioSessionCategoryOptionDuckOthers                           |
+					| ma_ios_session_category_option_allow_bluetooth                            | AVAudioSessionCategoryOptionAllowBluetooth                       |
+					| ma_ios_session_category_option_default_to_speaker                         | AVAudioSessionCategoryOptionDefaultToSpeaker                     |
+					| ma_ios_session_category_option_interrupt_spoken_audio_and_mix_with_others | AVAudioSessionCategoryOptionInterruptSpokenAudioAndMixWithOthers |
+					| ma_ios_session_category_option_allow_bluetooth_a2dp                       | AVAudioSessionCategoryOptionAllowBluetoothA2DP                   |
+					| ma_ios_session_category_option_allow_air_play                             | AVAudioSessionCategoryOptionAllowAirPlay                         |
+					|---------------------------------------------------------------------------|------------------------------------------------------------------|
 
-	    jack.tryStartServer
-	        Whether or not to try auto-starting the JACK server. Defaults to false.
+			coreaudio.noAudioSessionActivate
+					iOS only. When set to true, does not perform an explicit [[AVAudioSession sharedInstace] setActive:true] on initialization.
+
+			coreaudio.noAudioSessionDeactivate
+					iOS only. When set to true, does not perform an explicit [[AVAudioSession sharedInstace] setActive:false] on uninitialization.
+
+			jack.pClientName
+					The name of the client to pass to `jack_client_open()`.
+
+			jack.tryStartServer
+					Whether or not to try auto-starting the JACK server. Defaults to false.
 
 
 	It is recommended that only a single context is active at any given time because it's a bulky data structure which performs run-time linking for the
@@ -190,7 +205,7 @@ foreign lib {
 	ma_context context;
 	ma_result result = ma_context_init(NULL, 0, NULL, &context);
 	if (result != MA_SUCCESS) {
-	    // Error.
+			// Error.
 	}
 	```
 
@@ -205,24 +220,30 @@ foreign lib {
 
 	```c
 	ma_backend backends[] = {
-	    ma_backend_alsa,
-	    ma_backend_pulseaudio,
-	    ma_backend_wasapi,
-	    ma_backend_dsound
+			ma_backend_alsa,
+			ma_backend_pulseaudio,
+			ma_backend_wasapi,
+			ma_backend_dsound
 	};
 
+	ma_log log;
+	ma_log_init(&log);
+	ma_log_register_callback(&log, ma_log_callback_init(my_log_callbac, pMyLogUserData));
+
 	ma_context_config config = ma_context_config_init();
-	config.logCallback = my_log_callback;
-	config.pUserData   = pMyUserData;
+	config.pLog = &log; // Specify a custom log object in the config so any logs that are posted from ma_context_init() are captured.
 
 	ma_context context;
 	ma_result result = ma_context_init(backends, sizeof(backends)/sizeof(backends[0]), &config, &context);
 	if (result != MA_SUCCESS) {
-	    // Error.
-	    if (result == MA_NO_BACKEND) {
-	        // Couldn't find an appropriate backend.
-	    }
+			// Error.
+			if (result == MA_NO_BACKEND) {
+					// Couldn't find an appropriate backend.
+			}
 	}
+
+	// You could also attach a log callback post-initialization:
+	ma_log_register_callback(ma_context_get_log(&context), ma_log_callback_init(my_log_callback, pMyLogUserData));
 	```
 
 
@@ -298,13 +319,13 @@ foreign lib {
 	Parameters
 	----------
 	pContext (in)
-	    A pointer to the context performing the enumeration.
+			A pointer to the context performing the enumeration.
 
 	callback (in)
-	    The callback to fire for each enumerated device.
+			The callback to fire for each enumerated device.
 
 	pUserData (in)
-	    A pointer to application-defined data passed to the callback.
+			A pointer to application-defined data passed to the callback.
 
 
 	Return Value
@@ -331,15 +352,15 @@ foreign lib {
 
 	Example 1 - Simple Enumeration
 	------------------------------
-	ma_bool32 ma_device_enum_callback(pContext: ^context_type, ma_device_type deviceType, const ma_device_info* pInfo, void* pUserData)
+	ma_bool32 ma_device_enum_callback(ma_context* pContext, ma_device_type deviceType, const ma_device_info* pInfo, void* pUserData)
 	{
-	    printf("Device Name: %s\n", pInfo->name);
-	    return MA_TRUE;
+			printf("Device Name: %s\n", pInfo->name);
+			return MA_TRUE;
 	}
 
 	ma_result result = ma_context_enumerate_devices(&context, my_device_enum_callback, pMyUserData);
 	if (result != MA_SUCCESS) {
-	    // Error.
+			// Error.
 	}
 
 
@@ -359,19 +380,19 @@ foreign lib {
 	Parameters
 	----------
 	pContext (in)
-	    A pointer to the context performing the enumeration.
+			A pointer to the context performing the enumeration.
 
 	ppPlaybackDeviceInfos (out)
-	    A pointer to a pointer that will receive the address of a buffer containing the list of `ma_device_info` structures for playback devices.
+			A pointer to a pointer that will receive the address of a buffer containing the list of `ma_device_info` structures for playback devices.
 
 	pPlaybackDeviceCount (out)
-	    A pointer to an unsigned integer that will receive the number of playback devices.
+			A pointer to an unsigned integer that will receive the number of playback devices.
 
 	ppCaptureDeviceInfos (out)
-	    A pointer to a pointer that will receive the address of a buffer containing the list of `ma_device_info` structures for capture devices.
+			A pointer to a pointer that will receive the address of a buffer containing the list of `ma_device_info` structures for capture devices.
 
 	pCaptureDeviceCount (out)
-	    A pointer to an unsigned integer that will receive the number of capture devices.
+			A pointer to an unsigned integer that will receive the number of capture devices.
 
 
 	Return Value
@@ -407,20 +428,16 @@ foreign lib {
 	Parameters
 	----------
 	pContext (in)
-	    A pointer to the context performing the query.
+			A pointer to the context performing the query.
 
 	deviceType (in)
-	    The type of the device being queried. Must be either `ma_device_type_playback` or `ma_device_type_capture`.
+			The type of the device being queried. Must be either `ma_device_type_playback` or `ma_device_type_capture`.
 
 	pDeviceID (in)
-	    The ID of the device being queried.
-
-	shareMode (in)
-	    The share mode to query for device capabilities. This should be set to whatever you're intending on using when initializing the device. If you're unsure,
-	    set this to `ma_share_mode_shared`.
+			The ID of the device being queried.
 
 	pDeviceInfo (out)
-	    A pointer to the `ma_device_info` structure that will receive the device information.
+			A pointer to the `ma_device_info` structure that will receive the device information.
 
 
 	Return Value
@@ -444,7 +461,7 @@ foreign lib {
 
 	This leaves pDeviceInfo unmodified in the result of an error.
 	*/
-	context_get_device_info :: proc(pContext: ^context_type, deviceType: device_type, pDeviceID: ^device_id, shareMode: share_mode, pDeviceInfo: ^device_info) -> result ---
+	context_get_device_info :: proc(pContext: ^context_type, deviceType: device_type, pDeviceID: ^device_id, pDeviceInfo: ^device_info) -> result ---
 
 	/*
 	Determines if the given context supports loopback mode.
@@ -471,16 +488,16 @@ foreign lib {
 	Parameters
 	----------
 	deviceType (in)
-	    The type of the device this config is being initialized for. This must set to one of the following:
+			The type of the device this config is being initialized for. This must set to one of the following:
 
-	    |-------------------------|
-	    | Device Type             |
-	    |-------------------------|
-	    | ma_device_type_playback |
-	    | ma_device_type_capture  |
-	    | ma_device_type_duplex   |
-	    | ma_device_type_loopback |
-	    |-------------------------|
+			|-------------------------|
+			| Device Type             |
+			|-------------------------|
+			| ma_device_type_playback |
+			| ma_device_type_capture  |
+			| ma_device_type_duplex   |
+			| ma_device_type_loopback |
+			|-------------------------|
 
 
 	Return Value
@@ -554,13 +571,13 @@ foreign lib {
 	Parameters
 	----------
 	pContext (in, optional)
-	    A pointer to the context that owns the device. This can be null, in which case it creates a default context internally.
+			A pointer to the context that owns the device. This can be null, in which case it creates a default context internally.
 
 	pConfig (in)
-	    A pointer to the device configuration. Cannot be null. See remarks for details.
+			A pointer to the device configuration. Cannot be null. See remarks for details.
 
 	pDevice (out)
-	    A pointer to the device object being initialized.
+			A pointer to the device object being initialized.
 
 
 	Return Value
@@ -583,9 +600,9 @@ foreign lib {
 	-------
 	Setting `pContext` to NULL will result in miniaudio creating a default context internally and is equivalent to passing in a context initialized like so:
 
-	    ```c
-	    ma_context_init(NULL, 0, NULL, &context);
-	    ```
+			```c
+			ma_context_init(NULL, 0, NULL, &context);
+			```
 
 	Do not set `pContext` to NULL if you are needing to open multiple devices. You can, however, use NULL when initializing the first device, and then use
 	device.pContext for the initialization of other devices.
@@ -593,136 +610,173 @@ foreign lib {
 	The device can be configured via the `pConfig` argument. The config object is initialized with `ma_device_config_init()`. Individual configuration settings can
 	then be set directly on the structure. Below are the members of the `ma_device_config` object.
 
-	    deviceType
-	        Must be `ma_device_type_playback`, `ma_device_type_capture`, `ma_device_type_duplex` of `ma_device_type_loopback`.
+			deviceType
+					Must be `ma_device_type_playback`, `ma_device_type_capture`, `ma_device_type_duplex` of `ma_device_type_loopback`.
 
-	    sampleRate
-	        The sample rate, in hertz. The most common sample rates are 48000 and 44100. Setting this to 0 will use the device's native sample rate.
+			sampleRate
+					The sample rate, in hertz. The most common sample rates are 48000 and 44100. Setting this to 0 will use the device's native sample rate.
 
-	    periodSizeInFrames
-	        The desired size of a period in PCM frames. If this is 0, `periodSizeInMilliseconds` will be used instead. If both are 0 the default buffer size will
-	        be used depending on the selected performance profile. This value affects latency. See below for details.
+			periodSizeInFrames
+					The desired size of a period in PCM frames. If this is 0, `periodSizeInMilliseconds` will be used instead. If both are 0 the default buffer size will
+					be used depending on the selected performance profile. This value affects latency. See below for details.
 
-	    periodSizeInMilliseconds
-	        The desired size of a period in milliseconds. If this is 0, `periodSizeInFrames` will be used instead. If both are 0 the default buffer size will be
-	        used depending on the selected performance profile. The value affects latency. See below for details.
+			periodSizeInMilliseconds
+					The desired size of a period in milliseconds. If this is 0, `periodSizeInFrames` will be used instead. If both are 0 the default buffer size will be
+					used depending on the selected performance profile. The value affects latency. See below for details.
 
-	    periods
-	        The number of periods making up the device's entire buffer. The total buffer size is `periodSizeInFrames` or `periodSizeInMilliseconds` multiplied by
-	        this value. This is just a hint as backends will be the ones who ultimately decide how your periods will be configured.
+			periods
+					The number of periods making up the device's entire buffer. The total buffer size is `periodSizeInFrames` or `periodSizeInMilliseconds` multiplied by
+					this value. This is just a hint as backends will be the ones who ultimately decide how your periods will be configured.
 
-	    performanceProfile
-	        A hint to miniaudio as to the performance requirements of your program. Can be either `ma_performance_profile_low_latency` (default) or
-	        `ma_performance_profile_conservative`. This mainly affects the size of default buffers and can usually be left at it's default value.
+			performanceProfile
+					A hint to miniaudio as to the performance requirements of your program. Can be either `ma_performance_profile_low_latency` (default) or
+					`ma_performance_profile_conservative`. This mainly affects the size of default buffers and can usually be left at it's default value.
 
-	    noPreZeroedOutputBuffer
-	        When set to true, the contents of the output buffer passed into the data callback will be left undefined. When set to false (default), the contents of
-	        the output buffer will be cleared the zero. You can use this to avoid the overhead of zeroing out the buffer if you can guarantee that your data
-	        callback will write to every sample in the output buffer, or if you are doing your own clearing.
+			noPreSilencedOutputBuffer
+					When set to true, the contents of the output buffer passed into the data callback will be left undefined. When set to false (default), the contents of
+					the output buffer will be cleared the zero. You can use this to avoid the overhead of zeroing out the buffer if you can guarantee that your data
+					callback will write to every sample in the output buffer, or if you are doing your own clearing.
 
-	    noClip
-	        When set to true, the contents of the output buffer passed into the data callback will be clipped after returning. When set to false (default), the
-	        contents of the output buffer are left alone after returning and it will be left up to the backend itself to decide whether or not the clip. This only
-	        applies when the playback sample format is f32.
+			noClip
+					When set to true, the contents of the output buffer passed into the data callback will be clipped after returning. When set to false (default), the
+					contents of the output buffer are left alone after returning and it will be left up to the backend itself to decide whether or not the clip. This only
+					applies when the playback sample format is f32.
 
-	    dataCallback
-	        The callback to fire whenever data is ready to be delivered to or from the device.
+			noDisableDenormals
+					By default, miniaudio will disable denormals when the data callback is called. Setting this to true will prevent the disabling of denormals.
 
-	    stopCallback
-	        The callback to fire whenever the device has stopped, either explicitly via `ma_device_stop()`, or implicitly due to things like the device being
-	        disconnected.
+			noFixedSizedCallback
+					Allows miniaudio to fire the data callback with any frame count. When this is set to true, the data callback will be fired with a consistent frame
+					count as specified by `periodSizeInFrames` or `periodSizeInMilliseconds`. When set to false, miniaudio will fire the callback with whatever the
+					backend requests, which could be anything.
 
-	    pUserData
-	        The user data pointer to use with the device. You can access this directly from the device object like `device.pUserData`.
+			dataCallback
+					The callback to fire whenever data is ready to be delivered to or from the device.
 
-	    resampling.algorithm
-	        The resampling algorithm to use when miniaudio needs to perform resampling between the rate specified by `sampleRate` and the device's native rate. The
-	        default value is `ma_resample_algorithm_linear`, and the quality can be configured with `resampling.linear.lpfOrder`.
+			notificationCallback
+					The callback to fire when something has changed with the device, such as whether or not it has been started or stopped.
 
-	    resampling.linear.lpfOrder
-	        The linear resampler applies a low-pass filter as part of it's procesing for anti-aliasing. This setting controls the order of the filter. The higher
-	        the value, the better the quality, in general. Setting this to 0 will disable low-pass filtering altogether. The maximum value is
-	        `MA_MAX_FILTER_ORDER`. The default value is `min(4, MA_MAX_FILTER_ORDER)`.
+			pUserData
+					The user data pointer to use with the device. You can access this directly from the device object like `device.pUserData`.
 
-	    playback.pDeviceID
-	        A pointer to a `ma_device_id` structure containing the ID of the playback device to initialize. Setting this NULL (default) will use the system's
-	        default playback device. Retrieve the device ID from the `ma_device_info` structure, which can be retrieved using device enumeration.
+			resampling.algorithm
+					The resampling algorithm to use when miniaudio needs to perform resampling between the rate specified by `sampleRate` and the device's native rate. The
+					default value is `ma_resample_algorithm_linear`, and the quality can be configured with `resampling.linear.lpfOrder`.
 
-	    playback.format
-	        The sample format to use for playback. When set to `ma_format_unknown` the device's native format will be used. This can be retrieved after
-	        initialization from the device object directly with `device.playback.format`.
+			resampling.pBackendVTable
+					A pointer to an optional vtable that can be used for plugging in a custom resampler.
 
-	    playback.channels
-	        The number of channels to use for playback. When set to 0 the device's native channel count will be used. This can be retrieved after initialization
-	        from the device object directly with `device.playback.channels`.
+			resampling.pBackendUserData
+					A pointer that will passed to callbacks in pBackendVTable.
 
-	    playback.channelMap
-	        The channel map to use for playback. When left empty, the device's native channel map will be used. This can be retrieved after initialization from the
-	        device object direct with `device.playback.channelMap`.
+			resampling.linear.lpfOrder
+					The linear resampler applies a low-pass filter as part of it's procesing for anti-aliasing. This setting controls the order of the filter. The higher
+					the value, the better the quality, in general. Setting this to 0 will disable low-pass filtering altogether. The maximum value is
+					`MA_MAX_FILTER_ORDER`. The default value is `min(4, MA_MAX_FILTER_ORDER)`.
 
-	    playback.shareMode
-	        The preferred share mode to use for playback. Can be either `ma_share_mode_shared` (default) or `ma_share_mode_exclusive`. Note that if you specify
-	        exclusive mode, but it's not supported by the backend, initialization will fail. You can then fall back to shared mode if desired by changing this to
-	        ma_share_mode_shared and reinitializing.
+			playback.pDeviceID
+					A pointer to a `ma_device_id` structure containing the ID of the playback device to initialize. Setting this NULL (default) will use the system's
+					default playback device. Retrieve the device ID from the `ma_device_info` structure, which can be retrieved using device enumeration.
 
-	    capture.pDeviceID
-	        A pointer to a `ma_device_id` structure containing the ID of the capture device to initialize. Setting this NULL (default) will use the system's
-	        default capture device. Retrieve the device ID from the `ma_device_info` structure, which can be retrieved using device enumeration.
+			playback.format
+					The sample format to use for playback. When set to `ma_format_unknown` the device's native format will be used. This can be retrieved after
+					initialization from the device object directly with `device.playback.format`.
 
-	    capture.format
-	        The sample format to use for capture. When set to `ma_format_unknown` the device's native format will be used. This can be retrieved after
-	        initialization from the device object directly with `device.capture.format`.
+			playback.channels
+					The number of channels to use for playback. When set to 0 the device's native channel count will be used. This can be retrieved after initialization
+					from the device object directly with `device.playback.channels`.
 
-	    capture.channels
-	        The number of channels to use for capture. When set to 0 the device's native channel count will be used. This can be retrieved after initialization
-	        from the device object directly with `device.capture.channels`.
+			playback.pChannelMap
+					The channel map to use for playback. When left empty, the device's native channel map will be used. This can be retrieved after initialization from the
+					device object direct with `device.playback.pChannelMap`. When set, the buffer should contain `channels` items.
 
-	    capture.channelMap
-	        The channel map to use for capture. When left empty, the device's native channel map will be used. This can be retrieved after initialization from the
-	        device object direct with `device.capture.channelMap`.
+			playback.shareMode
+					The preferred share mode to use for playback. Can be either `ma_share_mode_shared` (default) or `ma_share_mode_exclusive`. Note that if you specify
+					exclusive mode, but it's not supported by the backend, initialization will fail. You can then fall back to shared mode if desired by changing this to
+					ma_share_mode_shared and reinitializing.
 
-	    capture.shareMode
-	        The preferred share mode to use for capture. Can be either `ma_share_mode_shared` (default) or `ma_share_mode_exclusive`. Note that if you specify
-	        exclusive mode, but it's not supported by the backend, initialization will fail. You can then fall back to shared mode if desired by changing this to
-	        ma_share_mode_shared and reinitializing.
+			capture.pDeviceID
+					A pointer to a `ma_device_id` structure containing the ID of the capture device to initialize. Setting this NULL (default) will use the system's
+					default capture device. Retrieve the device ID from the `ma_device_info` structure, which can be retrieved using device enumeration.
 
-	    wasapi.noAutoConvertSRC
-	        WASAPI only. When set to true, disables WASAPI's automatic resampling and forces the use of miniaudio's resampler. Defaults to false.
+			capture.format
+					The sample format to use for capture. When set to `ma_format_unknown` the device's native format will be used. This can be retrieved after
+					initialization from the device object directly with `device.capture.format`.
 
-	    wasapi.noDefaultQualitySRC
-	        WASAPI only. Only used when `wasapi.noAutoConvertSRC` is set to false. When set to true, disables the use of `AUDCLNT_STREAMFLAGS_SRC_DEFAULT_QUALITY`.
-	        You should usually leave this set to false, which is the default.
+			capture.channels
+					The number of channels to use for capture. When set to 0 the device's native channel count will be used. This can be retrieved after initialization
+					from the device object directly with `device.capture.channels`.
 
-	    wasapi.noAutoStreamRouting
-	        WASAPI only. When set to true, disables automatic stream routing on the WASAPI backend. Defaults to false.
+			capture.pChannelMap
+					The channel map to use for capture. When left empty, the device's native channel map will be used. This can be retrieved after initialization from the
+					device object direct with `device.capture.pChannelMap`. When set, the buffer should contain `channels` items.
 
-	    wasapi.noHardwareOffloading
-	        WASAPI only. When set to true, disables the use of WASAPI's hardware offloading feature. Defaults to false.
+			capture.shareMode
+					The preferred share mode to use for capture. Can be either `ma_share_mode_shared` (default) or `ma_share_mode_exclusive`. Note that if you specify
+					exclusive mode, but it's not supported by the backend, initialization will fail. You can then fall back to shared mode if desired by changing this to
+					ma_share_mode_shared and reinitializing.
 
-	    alsa.noMMap
-	        ALSA only. When set to true, disables MMap mode. Defaults to false.
+			wasapi.noAutoConvertSRC
+					WASAPI only. When set to true, disables WASAPI's automatic resampling and forces the use of miniaudio's resampler. Defaults to false.
 
-	    alsa.noAutoFormat
-	        ALSA only. When set to true, disables ALSA's automatic format conversion by including the SND_PCM_NO_AUTO_FORMAT flag. Defaults to false.
+			wasapi.noDefaultQualitySRC
+					WASAPI only. Only used when `wasapi.noAutoConvertSRC` is set to false. When set to true, disables the use of `AUDCLNT_STREAMFLAGS_SRC_DEFAULT_QUALITY`.
+					You should usually leave this set to false, which is the default.
 
-	    alsa.noAutoChannels
-	        ALSA only. When set to true, disables ALSA's automatic channel conversion by including the SND_PCM_NO_AUTO_CHANNELS flag. Defaults to false.
+			wasapi.noAutoStreamRouting
+					WASAPI only. When set to true, disables automatic stream routing on the WASAPI backend. Defaults to false.
 
-	    alsa.noAutoResample
-	        ALSA only. When set to true, disables ALSA's automatic resampling by including the SND_PCM_NO_AUTO_RESAMPLE flag. Defaults to false.
+			wasapi.noHardwareOffloading
+					WASAPI only. When set to true, disables the use of WASAPI's hardware offloading feature. Defaults to false.
 
-	    pulse.pStreamNamePlayback
-	        PulseAudio only. Sets the stream name for playback.
+			alsa.noMMap
+					ALSA only. When set to true, disables MMap mode. Defaults to false.
 
-	    pulse.pStreamNameCapture
-	        PulseAudio only. Sets the stream name for capture.
+			alsa.noAutoFormat
+					ALSA only. When set to true, disables ALSA's automatic format conversion by including the SND_PCM_NO_AUTO_FORMAT flag. Defaults to false.
 
-	    coreaudio.allowNominalSampleRateChange
-	        Core Audio only. Desktop only. When enabled, allows the sample rate of the device to be changed at the operating system level. This
-	        is disabled by default in order to prevent intrusive changes to the user's system. This is useful if you want to use a sample rate
-	        that is known to be natively supported by the hardware thereby avoiding the cost of resampling. When set to true, miniaudio will
-	        find the closest match between the sample rate requested in the device config and the sample rates natively supported by the
-	        hardware. When set to false, the sample rate currently set by the operating system will always be used.
+			alsa.noAutoChannels
+					ALSA only. When set to true, disables ALSA's automatic channel conversion by including the SND_PCM_NO_AUTO_CHANNELS flag. Defaults to false.
+
+			alsa.noAutoResample
+					ALSA only. When set to true, disables ALSA's automatic resampling by including the SND_PCM_NO_AUTO_RESAMPLE flag. Defaults to false.
+
+			pulse.pStreamNamePlayback
+					PulseAudio only. Sets the stream name for playback.
+
+			pulse.pStreamNameCapture
+					PulseAudio only. Sets the stream name for capture.
+
+			coreaudio.allowNominalSampleRateChange
+					Core Audio only. Desktop only. When enabled, allows the sample rate of the device to be changed at the operating system level. This
+					is disabled by default in order to prevent intrusive changes to the user's system. This is useful if you want to use a sample rate
+					that is known to be natively supported by the hardware thereby avoiding the cost of resampling. When set to true, miniaudio will
+					find the closest match between the sample rate requested in the device config and the sample rates natively supported by the
+					hardware. When set to false, the sample rate currently set by the operating system will always be used.
+
+			opensl.streamType
+					OpenSL only. Explicitly sets the stream type. If left unset (`ma_opensl_stream_type_default`), the
+					stream type will be left unset. Think of this as the type of audio you're playing.
+
+			opensl.recordingPreset
+					OpenSL only. Explicitly sets the type of recording your program will be doing. When left
+					unset, the recording preset will be left unchanged.
+
+			aaudio.usage
+					AAudio only. Explicitly sets the nature of the audio the program will be consuming. When
+					left unset, the usage will be left unchanged.
+
+			aaudio.contentType
+					AAudio only. Sets the content type. When left unset, the content type will be left unchanged.
+
+			aaudio.inputPreset
+					AAudio only. Explicitly sets the type of recording your program will be doing. When left
+					unset, the input preset will be left unchanged.
+
+			aaudio.noAutoStartAfterReroute
+					AAudio only. Controls whether or not the device should be automatically restarted after a
+					stream reroute. When set to false (default) the device will be restarted automatically;
+					otherwise the device will be stopped.
 
 
 	Once initialized, the device's config is immutable. If you need to change the config you will need to initialize a new device.
@@ -767,7 +821,7 @@ foreign lib {
 	ma_device device;
 	ma_result result = ma_device_init(NULL, &config, &device);
 	if (result != MA_SUCCESS) {
-	    // Error
+			// Error
 	}
 	```
 
@@ -782,14 +836,14 @@ foreign lib {
 	ma_context context;
 	ma_result result = ma_context_init(NULL, 0, NULL, &context);
 	if (result != MA_SUCCESS) {
-	    // Error
+			// Error
 	}
 
 	ma_device_info* pPlaybackDeviceInfos;
 	ma_uint32 playbackDeviceCount;
 	result = ma_context_get_devices(&context, &pPlaybackDeviceInfos, &playbackDeviceCount, NULL, NULL);
 	if (result != MA_SUCCESS) {
-	    // Error
+			// Error
 	}
 
 	// ... choose a device from pPlaybackDeviceInfos ...
@@ -807,7 +861,7 @@ foreign lib {
 	ma_device device;
 	result = ma_device_init(&context, &config, &device);
 	if (result != MA_SUCCESS) {
-	    // Error
+			// Error
 	}
 	```
 
@@ -833,19 +887,19 @@ foreign lib {
 	Parameters
 	----------
 	backends (in, optional)
-	    A list of backends to try initializing, in priority order. Can be NULL, in which case it uses default priority order.
+			A list of backends to try initializing, in priority order. Can be NULL, in which case it uses default priority order.
 
 	backendCount (in, optional)
-	    The number of items in `backend`. Ignored if `backend` is NULL.
+			The number of items in `backend`. Ignored if `backend` is NULL.
 
 	pContextConfig (in, optional)
-	    The context configuration.
+			The context configuration.
 
 	pConfig (in)
-	    A pointer to the device configuration. Cannot be null. See remarks for details.
+			A pointer to the device configuration. Cannot be null. See remarks for details.
 
 	pDevice (out)
-	    A pointer to the device object being initialized.
+			A pointer to the device object being initialized.
 
 
 	Return Value
@@ -890,7 +944,7 @@ foreign lib {
 	Parameters
 	----------
 	pDevice (in)
-	    A pointer to the device to stop.
+			A pointer to the device to stop.
 
 
 	Return Value
@@ -928,6 +982,95 @@ foreign lib {
 
 
 	/*
+	Retrieves information about the device.
+
+
+	Parameters
+	----------
+	pDevice (in)
+			A pointer to the device whose information is being retrieved.
+
+	type (in)
+			The device type. This parameter is required for duplex devices. When retrieving device
+			information, you are doing so for an individual playback or capture device.
+
+	pDeviceInfo (out)
+			A pointer to the `ma_device_info` that will receive the device information.
+
+
+	Return Value
+	------------
+	MA_SUCCESS if successful; any other error code otherwise.
+
+
+	Thread Safety
+	-------------
+	Unsafe. This should be considered unsafe because it may be calling into the backend which may or
+	may not be safe.
+
+
+	Callback Safety
+	---------------
+	Unsafe. You should avoid calling this in the data callback because it may call into the backend
+	which may or may not be safe.
+	*/
+	device_get_info :: proc(pDevice: ^device, type: device_type, pDeviceInfo: ^device_info) -> result ---
+
+
+	/*
+	Retrieves the name of the device.
+
+
+	Parameters
+	----------
+	pDevice (in)
+			A pointer to the device whose information is being retrieved.
+
+	type (in)
+			The device type. This parameter is required for duplex devices. When retrieving device
+			information, you are doing so for an individual playback or capture device.
+
+	pName (out)
+			A pointer to the buffer that will receive the name.
+
+	nameCap (in)
+			The capacity of the output buffer, including space for the null terminator.
+
+	pLengthNotIncludingNullTerminator (out, optional)
+			A pointer to the variable that will receive the length of the name, not including the null
+			terminator.
+
+
+	Return Value
+	------------
+	MA_SUCCESS if successful; any other error code otherwise.
+
+
+	Thread Safety
+	-------------
+	Unsafe. This should be considered unsafe because it may be calling into the backend which may or
+	may not be safe.
+
+
+	Callback Safety
+	---------------
+	Unsafe. You should avoid calling this in the data callback because it may call into the backend
+	which may or may not be safe.
+
+
+	Remarks
+	-------
+	If the name does not fully fit into the output buffer, it'll be truncated. You can pass in NULL to
+	`pName` if you want to first get the length of the name for the purpose of memory allocation of the
+	output buffer. Allocating a buffer of size `MA_MAX_DEVICE_NAME_LENGTH + 1` should be enough for
+	most cases and will avoid the need for the inefficiency of calling this function twice.
+
+	This is implemented in terms of `ma_device_get_info()`.
+	*/
+	device_get_name :: proc(pDevice: ^device, type: device_type, pName: [^]c.char, nameCap: c.size_t, pLengthNotIncludingNullTerminator: ^c.size_t) -> result ---
+
+
+	/*
 	Starts the device. For playback devices this begins playback. For capture devices it begins recording.
 
 	Use `ma_device_stop()` to stop the device.
@@ -936,7 +1079,7 @@ foreign lib {
 	Parameters
 	----------
 	pDevice (in)
-	    A pointer to the device to start.
+			A pointer to the device to start.
 
 
 	Return Value
@@ -979,7 +1122,7 @@ foreign lib {
 	Parameters
 	----------
 	pDevice (in)
-	    A pointer to the device to stop.
+			A pointer to the device to stop.
 
 
 	Return Value
@@ -1025,7 +1168,7 @@ foreign lib {
 	Parameters
 	----------
 	pDevice (in)
-	    A pointer to the device whose start state is being retrieved.
+			A pointer to the device whose start state is being retrieved.
 
 
 	Return Value
@@ -1059,24 +1202,24 @@ foreign lib {
 	Parameters
 	----------
 	pDevice (in)
-	    A pointer to the device whose state is being retrieved.
+			A pointer to the device whose state is being retrieved.
 
 
 	Return Value
 	------------
 	The current state of the device. The return value will be one of the following:
 
-	    +------------------------+------------------------------------------------------------------------------+
-	    | MA_STATE_UNINITIALIZED | Will only be returned if the device is in the middle of initialization.      |
-	    +------------------------+------------------------------------------------------------------------------+
-	    | MA_STATE_STOPPED       | The device is stopped. The initial state of the device after initialization. |
-	    +------------------------+------------------------------------------------------------------------------+
-	    | MA_STATE_STARTED       | The device started and requesting and/or delivering audio data.              |
-	    +------------------------+------------------------------------------------------------------------------+
-	    | MA_STATE_STARTING      | The device is in the process of starting.                                    |
-	    +------------------------+------------------------------------------------------------------------------+
-	    | MA_STATE_STOPPING      | The device is in the process of stopping.                                    |
-	    +------------------------+------------------------------------------------------------------------------+
+			+-------------------------------+------------------------------------------------------------------------------+
+			| ma_device_state_uninitialized | Will only be returned if the device is in the middle of initialization.      |
+			+-------------------------------+------------------------------------------------------------------------------+
+			| ma_device_state_stopped       | The device is stopped. The initial state of the device after initialization. |
+			+-------------------------------+------------------------------------------------------------------------------+
+			| ma_device_state_started       | The device started and requesting and/or delivering audio data.              |
+			+-------------------------------+------------------------------------------------------------------------------+
+			| ma_device_state_starting      | The device is in the process of starting.                                    |
+			+-------------------------------+------------------------------------------------------------------------------+
+			| ma_device_state_stopping      | The device is in the process of stopping.                                    |
+			+-------------------------------+------------------------------------------------------------------------------+
 
 
 	Thread Safety
@@ -1094,40 +1237,89 @@ foreign lib {
 	-------
 	The general flow of a devices state goes like this:
 
-	    ```
-	    ma_device_init()  -> MA_STATE_UNINITIALIZED -> MA_STATE_STOPPED
-	    ma_device_start() -> MA_STATE_STARTING      -> MA_STATE_STARTED
-	    ma_device_stop()  -> MA_STATE_STOPPING      -> MA_STATE_STOPPED
-	    ```
+			```
+			ma_device_init()  -> ma_device_state_uninitialized -> ma_device_state_stopped
+			ma_device_start() -> ma_device_state_starting      -> ma_device_state_started
+			ma_device_stop()  -> ma_device_state_stopping      -> ma_device_state_stopped
+			```
 
 	When the state of the device is changed with `ma_device_start()` or `ma_device_stop()` at this same time as this function is called, the
 	value returned by this function could potentially be out of sync. If this is significant to your program you need to implement your own
 	synchronization.
 	*/
-	device_get_state :: proc(pDevice: ^device) -> u32 ---
+	device_get_state :: proc(pDevice: ^device) -> device_state ---
+
+
+	/*
+	Performs post backend initialization routines for setting up internal data conversion.
+
+	This should be called whenever the backend is initialized. The only time this should be called from
+	outside of miniaudio is if you're implementing a custom backend, and you would only do it if you
+	are reinitializing the backend due to rerouting or reinitializing for some reason.
+
+
+	Parameters
+	----------
+	pDevice [in]
+			A pointer to the device.
+
+	deviceType [in]
+			The type of the device that was just reinitialized.
+
+	pPlaybackDescriptor [in]
+			The descriptor of the playback device containing the internal data format and buffer sizes.
+
+	pPlaybackDescriptor [in]
+			The descriptor of the capture device containing the internal data format and buffer sizes.
+
+
+	Return Value
+	------------
+	MA_SUCCESS if successful; any other error otherwise.
+
+
+	Thread Safety
+	-------------
+	Unsafe. This will be reinitializing internal data converters which may be in use by another thread.
+
+
+	Callback Safety
+	---------------
+	Unsafe. This will be reinitializing internal data converters which may be in use by the callback.
+
+
+	Remarks
+	-------
+	For a duplex device, you can call this for only one side of the system. This is why the deviceType
+	is specified as a parameter rather than deriving it from the device.
+
+	You do not need to call this manually unless you are doing a custom backend, in which case you need
+	only do it if you're manually performing rerouting or reinitialization.
+	*/
+	device_post_init :: proc(pDevice: ^device, deviceType: device_type, pPlaybackDescriptor, pCaptureDescriptor: ^device_descriptor) -> result ---
 
 
 	/*
 	Sets the master volume factor for the device.
 
-	The volume factor must be between 0 (silence) and 1 (full volume). Use `ma_device_set_master_gain_db()` to use decibel notation, where 0 is full volume and
+	The volume factor must be between 0 (silence) and 1 (full volume). Use `ma_device_set_master_volume_db()` to use decibel notation, where 0 is full volume and
 	values less than 0 decreases the volume.
 
 
 	Parameters
 	----------
 	pDevice (in)
-	    A pointer to the device whose volume is being set.
+			A pointer to the device whose volume is being set.
 
 	volume (in)
-	    The new volume factor. Must be within the range of [0, 1].
+			The new volume factor. Must be >= 0.
 
 
 	Return Value
 	------------
 	MA_SUCCESS if the volume was set successfully.
 	MA_INVALID_ARGS if pDevice is NULL.
-	MA_INVALID_ARGS if the volume factor is not within the range of [0, 1].
+	MA_INVALID_ARGS if volume is negative.
 
 
 	Thread Safety
@@ -1150,8 +1342,8 @@ foreign lib {
 	See Also
 	--------
 	ma_device_get_master_volume()
-	ma_device_set_master_volume_gain_db()
-	ma_device_get_master_volume_gain_db()
+	ma_device_set_master_volume_db()
+	ma_device_get_master_volume_db()
 	*/
 	device_set_master_volume :: proc(pDevice: ^device, volume: f32) -> result ---
 
@@ -1162,10 +1354,10 @@ foreign lib {
 	Parameters
 	----------
 	pDevice (in)
-	    A pointer to the device whose volume factor is being retrieved.
+			A pointer to the device whose volume factor is being retrieved.
 
 	pVolume (in)
-	    A pointer to the variable that will receive the volume factor. The returned value will be in the range of [0, 1].
+			A pointer to the variable that will receive the volume factor. The returned value will be in the range of [0, 1].
 
 
 	Return Value
@@ -1207,10 +1399,10 @@ foreign lib {
 	Parameters
 	----------
 	pDevice (in)
-	    A pointer to the device whose gain is being set.
+			A pointer to the device whose gain is being set.
 
 	gainDB (in)
-	    The new volume as gain in decibels. Must be less than or equal to 0, where 0 is full volume and anything less than 0 decreases the volume.
+			The new volume as gain in decibels. Must be less than or equal to 0, where 0 is full volume and anything less than 0 decreases the volume.
 
 
 	Return Value
@@ -1243,7 +1435,7 @@ foreign lib {
 	ma_device_set_master_volume()
 	ma_device_get_master_volume()
 	*/
-	device_set_master_gain_db :: proc(pDevice: ^device, gainDB: f32) -> result ---
+	device_set_master_volume_db :: proc(pDevice: ^device, gainDB: f32) -> result ---
 
 	/*
 	Retrieves the master gain in decibels.
@@ -1252,10 +1444,10 @@ foreign lib {
 	Parameters
 	----------
 	pDevice (in)
-	    A pointer to the device whose gain is being retrieved.
+			A pointer to the device whose gain is being retrieved.
 
 	pGainDB (in)
-	    A pointer to the variable that will receive the gain in decibels. The returned value will be <= 0.
+			A pointer to the variable that will receive the gain in decibels. The returned value will be <= 0.
 
 
 	Return Value
@@ -1282,11 +1474,11 @@ foreign lib {
 
 	See Also
 	--------
-	ma_device_set_master_volume_gain_db()
+	ma_device_set_master_volume_db()
 	ma_device_set_master_volume()
 	ma_device_get_master_volume()
 	*/
-	device_get_master_gain_db :: proc(pDevice: ^device, pGainDB: ^f32) -> result ---
+	device_get_master_volume_db :: proc(pDevice: ^device, pGainDB: ^f32) -> result ---
 
 
 	/*
@@ -1296,18 +1488,18 @@ foreign lib {
 	Parameters
 	----------
 	pDevice (in)
-	    A pointer to device whose processing the data callback.
+			A pointer to device whose processing the data callback.
 
 	pOutput (out)
-	    A pointer to the buffer that will receive the output PCM frame data. On a playback device this must not be NULL. On a duplex device
-	    this can be NULL, in which case pInput must not be NULL.
+			A pointer to the buffer that will receive the output PCM frame data. On a playback device this must not be NULL. On a duplex device
+			this can be NULL, in which case pInput must not be NULL.
 
 	pInput (in)
-	    A pointer to the buffer containing input PCM frame data. On a capture device this must not be NULL. On a duplex device this can be
-	    NULL, in which case `pOutput` must not be NULL.
+			A pointer to the buffer containing input PCM frame data. On a capture device this must not be NULL. On a duplex device this can be
+			NULL, in which case `pOutput` must not be NULL.
 
 	frameCount (in)
-	    The number of frames being processed.
+			The number of frames being processed.
 
 
 	Return Value
@@ -1334,7 +1526,7 @@ foreign lib {
 	If you are implementing a custom backend, and that backend uses a callback for data delivery, you'll need to call this from inside that
 	callback.
 	*/
-	device_handle_backend_data_callback :: proc(pDevice: ^device, pOutput: rawptr, pInput: rawptr, frameCount: u32) -> result ---
+	device_handle_backend_data_callback :: proc(pDevice: ^device, pOutput, pInput: rawptr, frameCount: u32) -> result ---
 
 
 	/*
@@ -1351,18 +1543,18 @@ foreign lib {
 	Parameters
 	----------
 	pDescriptor (in)
-	    A pointer to device descriptor whose `periodSizeInFrames` and `periodSizeInMilliseconds` members
-	    will be used for the calculation of the buffer size.
+			A pointer to device descriptor whose `periodSizeInFrames` and `periodSizeInMilliseconds` members
+			will be used for the calculation of the buffer size.
 
 	nativeSampleRate (in)
-	    The device's native sample rate. This is only ever used when the `periodSizeInFrames` member of
-	    `pDescriptor` is zero. In this case, `periodSizeInMilliseconds` will be used instead, in which
-	    case a sample rate is required to convert to a size in frames.
+			The device's native sample rate. This is only ever used when the `periodSizeInFrames` member of
+			`pDescriptor` is zero. In this case, `periodSizeInMilliseconds` will be used instead, in which
+			case a sample rate is required to convert to a size in frames.
 
 	performanceProfile (in)
-	    When both the `periodSizeInFrames` and `periodSizeInMilliseconds` members of `pDescriptor` are
-	    zero, miniaudio will fall back to a buffer size based on the performance profile. The profile
-	    to use for this calculation is determine by this parameter.
+			When both the `periodSizeInFrames` and `periodSizeInMilliseconds` members of `pDescriptor` are
+			zero, miniaudio will fall back to a buffer size based on the performance profile. The profile
+			to use for this calculation is determine by this parameter.
 
 
 	Return Value
@@ -1408,14 +1600,14 @@ foreign lib {
 	Parameters
 	----------
 	pBackends (out, optional)
-	    A pointer to the buffer that will receive the enabled backends. Set to NULL to retrieve the backend count. Setting
-	    the capacity of the buffer to `MA_BUFFER_COUNT` will guarantee it's large enough for all backends.
+			A pointer to the buffer that will receive the enabled backends. Set to NULL to retrieve the backend count. Setting
+			the capacity of the buffer to `MA_BUFFER_COUNT` will guarantee it's large enough for all backends.
 
 	backendCap (in)
-	    The capacity of the `pBackends` buffer.
+			The capacity of the `pBackends` buffer.
 
 	pBackendCount (out)
-	    A pointer to the variable that will receive the enabled backend count.
+			A pointer to the variable that will receive the enabled backend count.
 
 
 	Return Value
@@ -1463,7 +1655,7 @@ foreign lib {
 
 	result = ma_get_enabled_backends(enabledBackends, MA_BACKEND_COUNT, &enabledBackendCount);
 	if (result != MA_SUCCESS) {
-	    // Failed to retrieve enabled backends. Should never happen in this example since all inputs are valid.
+			// Failed to retrieve enabled backends. Should never happen in this example since all inputs are valid.
 	}
 	```
 
