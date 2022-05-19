@@ -22,68 +22,63 @@ you do your own synchronization.
 
 decoding_backend_config :: struct {
 	preferredFormat: format,
+	seekPointCount: u32,   /* Set to > 0 to generate a seektable if the decoding backend supports it. */
 }
 
 @(default_calling_convention="c", link_prefix="ma_")
 foreign lib {
-	decoding_backend_config_init :: proc(preferredFormat: format) -> decoding_backend_config ---
+	decoding_backend_config_init :: proc(preferredFormat: format, seekPointCount: u32) -> decoding_backend_config ---
 }
 
 
 decoding_backend_vtable :: struct {
 	onInit:          proc "c" (pUserData: rawptr, onRead: decoder_read_proc, onSeek: decoder_seek_proc, onTell: decoder_tell_proc, pReadSeekTellUserData: rawptr, pConfig: ^decoding_backend_config, pAllocationCallbacks: ^allocation_callbacks, ppBackend: ^^data_source) -> result,
-	onInitFile:      proc "c" (pUserData: rawptr, pFilePath: cstring, pConfig: ^decoding_backend_config, pAllocationCallbacks: ^allocation_callbacks, ppBackend: ^^data_source) -> result,               /* Optional. */
+	onInitFile:      proc "c" (pUserData: rawptr, pFilePath: cstring, pConfig: ^decoding_backend_config, pAllocationCallbacks: ^allocation_callbacks, ppBackend: ^^data_source) -> result,               	 /* Optional. */
 	onInitFileW:     proc "c" (pUserData: rawptr, pFilePath: [^]c.wchar_t, pConfig: ^decoding_backend_config, pAllocationCallbacks: ^allocation_callbacks, ppBackend: ^^data_source) -> result,            /* Optional. */
 	onInitMemory:    proc "c" (pUserData: rawptr, pData: rawptr, dataSize: c.size_t, pConfig: ^decoding_backend_config, pAllocationCallbacks: ^allocation_callbacks, ppBackend: ^^data_source) -> result,  /* Optional. */
 	onUninit:        proc "c" (pUserData: rawptr, pBackend: ^data_source, pAllocationCallbacks: ^allocation_callbacks),
-	onGetChannelMap: proc "c" (pUserData: rawptr, pBackend: ^data_source, pChannelMap: ^channel, channelMapCap: c.size_t) -> result,
 }
 
 
-/* TODO: Convert read and seek to be consistent with the VFS API (ma_result return value, bytes read moved to an output parameter). */
-decoder_read_proc :: proc "c" (pDecoder: ^decoder, pBufferOut: rawptr, bytesToRead: c.size_t) -> c.size_t         /* Returns the number of bytes read. */
-decoder_seek_proc :: proc "c" (pDecoder: ^decoder, byteOffset: i64, origin: seek_origin) -> b32
+decoder_read_proc :: proc "c" (pDecoder: ^decoder, pBufferOut: rawptr, bytesToRead: c.size_t, pBytesRead: ^c.size_t) -> result         /* Returns the number of bytes read. */
+decoder_seek_proc :: proc "c" (pDecoder: ^decoder, byteOffset: i64, origin: seek_origin) -> result
 decoder_tell_proc :: proc "c" (pDecoder: ^decoder, pCursor: ^i64) -> result
 
 decoder_config :: struct {
-	format:     format, /* Set to 0 or ma_format_unknown to use the stream's internal format. */
-	channels:   u32,    /* Set to 0 to use the stream's internal channels. */
-	sampleRate: u32,    /* Set to 0 to use the stream's internal sample rate. */
-	channelMap: [MAX_CHANNELS]channel,
-	channelMixMode: channel_mix_mode,
-	ditherMode: dither_mode,
-	resampling: struct {
-		algorithm: resample_algorithm,
-		linear: struct {
-			lpfOrder: u32,
-		},
-		speex: struct {
-			quality: c.int,
-		},
-	},
+	format:                 format, /* Set to 0 or ma_format_unknown to use the stream's internal format. */
+	channels:               u32,    /* Set to 0 to use the stream's internal channels. */
+	sampleRate:             u32,    /* Set to 0 to use the stream's internal sample rate. */
+	channelMap:             [^]channel,
+	channelMixMode:         channel_mix_mode,
+	ditherMode:             dither_mode,
+	resampling:             resampler_config,
 	allocationCallbacks:    allocation_callbacks,
 	encodingFormat:         encoding_format,
-	ppCustomBackendVTables: ^^decoding_backend_vtable,
+	seekPointCount:         u32,   /* When set to > 0, specifies the number of seek points to use for the generation of a seek table. Not all decoding backends support this. */
+	ppCustomBackendVTables: ^[^]decoding_backend_vtable,
 	customBackendCount:     u32,
 	pCustomBackendUserData: rawptr,
 }
 
 decoder :: struct  {
-	ds: data_source_base,
-	pBackend: ^data_source,                   /* The decoding backend we'll be pulling data from. */
-	pBackendVTable: ^^decoding_backend_vtable, /* The vtable for the decoding backend. This needs to be stored so we can access the onUninit() callback. */
-	pBackendUserData: rawptr,
-	onRead: decoder_read_proc,
-	onSeek: decoder_seek_proc,
-	onTell: decoder_tell_proc,
-	pUserData: rawptr,
+	ds:                     data_source_base,
+	pBackend:               ^data_source,               /* The decoding backend we'll be pulling data from. */
+	pBackendVTable:         ^decoding_backend_vtable,   /* The vtable for the decoding backend. This needs to be stored so we can access the onUninit() callback. */
+	pBackendUserData:       rawptr,
+	onRead:                 decoder_read_proc,
+	onSeek:                 decoder_seek_proc,
+	onTell:                 decoder_tell_proc,
+	pUserData:              rawptr,
 	readPointerInPCMFrames: u64,      /* In output sample rate. Used for keeping track of how many frames are available for decoding. */
-	outputFormat: format,
-	outputChannels: u32,
-	outputSampleRate: u32,
-	outputChannelMap: [MAX_CHANNELS]channel,
-	converter: data_converter,   /* <-- Data conversion is achieved by running frames through this. */
-	allocationCallbacks: allocation_callbacks,
+	outputFormat:           format,
+	outputChannels:         u32,
+	outputSampleRate:       u32,
+	converter:              data_converter,    /* <-- Data conversion is achieved by running frames through this. */
+	pInputCache:            rawptr,            /* In input format. Can be null if it's not needed. */
+  inputCacheCap:          u64,               /* The capacity of the input cache. */
+  inputCacheConsumed:     u64,               /* The number of frames that have been consumed in the cache. Used for determining the next valid frame. */
+  inputCacheRemaining:    u64,               /* The number of valid frames remaining in the cahce. */
+	allocationCallbacks:    allocation_callbacks,
 	data: struct #raw_union {
 		vfs: struct {
 			pVFS: ^vfs,
@@ -115,6 +110,25 @@ foreign lib {
 	decoder_uninit :: proc(pDecoder: ^decoder) -> result ---
 
 	/*
+	Reads PCM frames from the given decoder.
+
+	This is not thread safe without your own synchronization.
+	*/
+	decoder_read_pcm_frames :: proc(pDecoder: ^decoder, pFramesOut: rawptr, frameCount: u64, pFramesRead: ^u64) -> result ---
+
+	/*
+	Seeks to a PCM frame based on it's absolute index.
+
+	This is not thread safe without your own synchronization.
+	*/
+	decoder_seek_to_pcm_frame :: proc(pDecoder: ^decoder, frameIndex: u64) -> result ---
+
+	/*
+	Retrieves the decoder's output data format.
+	*/
+	decoder_get_data_format :: proc(pDecoder: ^decoder, pFormat: ^format, pChannels, pSampleRate: ^u32, pChannelMap: ^channel, channelMapCap: c.size_t) -> result ---
+
+	/*
 	Retrieves the current position of the read cursor in PCM frames.
 	*/
 	decoder_get_cursor_in_pcm_frames :: proc(pDecoder: ^decoder, pCursor: ^u64) -> result ---
@@ -133,21 +147,7 @@ foreign lib {
 
 	This function is not thread safe without your own synchronization.
 	*/
-	decoder_get_length_in_pcm_frames :: proc(pDecoder: ^decoder) -> u64 ---
-
-	/*
-	Reads PCM frames from the given decoder.
-
-	This is not thread safe without your own synchronization.
-	*/
-	decoder_read_pcm_frames :: proc(pDecoder: ^decoder, pFramesOut: rawptr, frameCount: u64) -> u64 ---
-
-	/*
-	Seeks to a PCM frame based on it's absolute index.
-
-	This is not thread safe without your own synchronization.
-	*/
-	decoder_seek_to_pcm_frame :: proc(pDecoder: ^decoder, frameIndex: u64) -> result ---
+	decoder_get_length_in_pcm_frames :: proc(pDecoder: ^decoder, pLength: ^u64) -> result ---
 
 	/*
 	Retrieves the number of frames that can be read before reaching the end.
