@@ -2187,6 +2187,51 @@ lbValue lb_build_builtin_proc(lbProcedure *p, Ast *expr, TypeAndValue const &tv,
 			return res;
 		}
 
+	case BuiltinProc_wasm_memory_atomic_wait32:
+		{
+			char const *name = "llvm.wasm.memory.atomic.wait32";
+			LLVMTypeRef types[1] = {
+				lb_type(p->module, t_u32),
+			};
+			unsigned id = LLVMLookupIntrinsicID(name, gb_strlen(name));
+			GB_ASSERT_MSG(id != 0, "Unable to find %s", name, LLVMPrintTypeToString(types[0]));
+			LLVMValueRef ip = LLVMGetIntrinsicDeclaration(p->module->mod, id, types, gb_count_of(types));
+
+			Type *t_u32_ptr = alloc_type_pointer(t_u32);
+
+			LLVMValueRef args[3] = {};
+			args[0] = lb_emit_conv(p, lb_build_expr(p, ce->args[0]), t_u32_ptr).value;
+			args[1] = lb_emit_conv(p, lb_build_expr(p, ce->args[1]), t_u32).value;
+			args[2] = lb_emit_conv(p, lb_build_expr(p, ce->args[2]), t_i64).value;
+
+			lbValue res = {};
+			res.type = tv.type;
+			res.value = LLVMBuildCall(p->builder, ip, args, gb_count_of(args), "");
+			return res;
+		}
+
+	case BuiltinProc_wasm_memory_atomic_notify32:
+		{
+			char const *name = "llvm.wasm.memory.atomic.notify";
+			LLVMTypeRef types[1] = {
+				lb_type(p->module, t_u32),
+			};
+			unsigned id = LLVMLookupIntrinsicID(name, gb_strlen(name));
+			GB_ASSERT_MSG(id != 0, "Unable to find %s", name, LLVMPrintTypeToString(types[0]));
+			LLVMValueRef ip = LLVMGetIntrinsicDeclaration(p->module->mod, id, types, gb_count_of(types));
+
+			Type *t_u32_ptr = alloc_type_pointer(t_u32);
+
+			LLVMValueRef args[2] = {};
+			args[0] = lb_emit_conv(p, lb_build_expr(p, ce->args[0]), t_u32_ptr).value;
+			args[1] = lb_emit_conv(p, lb_build_expr(p, ce->args[1]), t_u32).value;
+
+			lbValue res = {};
+			res.type = tv.type;
+			res.value = LLVMBuildCall(p->builder, ip, args, gb_count_of(args), "");
+			return res;
+		}
+
 	}
 
 	GB_PANIC("Unhandled built-in procedure %.*s", LIT(builtin_procs[id].name));

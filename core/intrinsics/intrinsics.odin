@@ -190,6 +190,15 @@ constant_utf16_cstring :: proc($literal: string) -> [^]u16 ---
 wasm_memory_grow :: proc(index, delta: uintptr) -> int ---
 wasm_memory_size :: proc(index: uintptr)        -> int ---
 
+// `timeout_ns` is maximum number of nanoseconds the calling thread will be blocked for
+// A negative value will be blocked forever
+// Return value:
+// 0 - indicates that the thread blocked and then was woken up
+// 1 - the loaded value from `ptr` did not match `expected`, the thread did not block
+// 2 - the thread blocked, but the timeout
+wasm_memory_atomic_wait32   :: proc(ptr: ^u32, expected: u32, timeout_ns: i64) -> u32 ---
+wasm_memory_atomic_notify32 :: proc(ptr: ^u32, waiters: u32) -> (waiters_woken_up: u32) ---
+
 
 // Darwin targets only
 objc_object   :: struct{}
