@@ -1076,7 +1076,7 @@ void init_build_context(TargetMetrics *cross_target) {
 	#endif
 
 	if (bc->disable_red_zone) {
-		if (!!is_arch_wasm() && bc->metrics.os == TargetOs_freestanding) {
+		if (is_arch_wasm() && bc->metrics.os == TargetOs_freestanding) {
 			gb_printf_err("-disable-red-zone is not support for this target");
 			gb_exit(1);
 		}
