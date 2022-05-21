@@ -218,6 +218,8 @@ BuiltinProc__type_end,
 
 	BuiltinProc_wasm_memory_grow,
 	BuiltinProc_wasm_memory_size,
+	BuiltinProc_wasm_memory_atomic_wait32,
+	BuiltinProc_wasm_memory_atomic_notify32,
 
 	BuiltinProc_COUNT,
 };
@@ -438,4 +440,6 @@ gb_global BuiltinProc builtin_procs[BuiltinProc_COUNT] = {
 
 	{STR_LIT("wasm_memory_grow"), 2, false, Expr_Expr, BuiltinProcPkg_intrinsics},
 	{STR_LIT("wasm_memory_size"), 1, false, Expr_Expr, BuiltinProcPkg_intrinsics},
+	{STR_LIT("wasm_memory_atomic_wait32"), 3, false, Expr_Expr, BuiltinProcPkg_intrinsics},
+	{STR_LIT("wasm_memory_atomic_notify32"), 2, false, Expr_Expr, BuiltinProcPkg_intrinsics},
 };

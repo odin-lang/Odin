@@ -1176,10 +1176,31 @@ class WebGLInterface {
 function odinSetupDefaultImports(wasmMemoryInterface, consoleElement) {
 	const MAX_INFO_CONSOLE_LINES = 512;
 	let infoConsoleLines = new Array();
+	let currentLine = "";
+
 	const addConsoleLine = (line) => {
 		if (!line) {
 			return;
 		}
+		if (!line.includes("\n")) {
+			currentLine = currentLine.concat(line);
+		} else {
+			let printLast = line.endsWith("\n");
+			let lines = line.split("\n");
+			for (let i = 0; i < lines.length-1; i++) {
+				let theLine = lines[i].trim("\r");
+				currentLine = currentLine.concat(line);
+				console.log(currentLine);
+				currentLine = "";
+			}
+			console.log(lines);
+			if (printLast) {
+				console.log(lines[lines.length-1]);
+			} else {
+				currentLine = currentLine.concat(lines[lines.length-1]);
+			}
+		}
+
 		if (line.endsWith("\n")) {
 			line = line.substring(0, line.length-1);
 		} else if (infoConsoleLines.length > 0) {
@@ -1191,16 +1212,15 @@ function odinSetupDefaultImports(wasmMemoryInterface, consoleElement) {
 		if (infoConsoleLines.length > MAX_INFO_CONSOLE_LINES) {
 			infoConsoleLines.shift();
 		}
-
-		let data = "";
-		for (let i = 0; i < infoConsoleLines.length; i++) {
-			if (i != 0) {
-				data = data.concat("\n");
-			}
-			data = data.concat(infoConsoleLines[i]);
-		}
-
 		if (consoleElement) {
+			let data = "";
+			for (let i = 0; i < infoConsoleLines.length; i++) {
+				if (i != 0) {
+					data = data.concat("\n");
+				}
+				data = data.concat(infoConsoleLines[i]);
+			}
+
 			let info = consoleElement;
 			info.innerHTML = data;
 			info.scrollTop = info.scrollHeight;
