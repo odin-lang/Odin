@@ -1280,7 +1280,17 @@ function odinSetupDefaultImports(wasmMemoryInterface, consoleElement) {
 			evaluate: (str_ptr, str_len) => { eval.call(null, wasmMemoryInterface.loadString(str_ptr, str_len)); },
 
 			time_now: () => {
+				// convert ms to ns
+				return Date.now() * 1e6;
+			},
+			time_tick_now: () => {
+				// convert ms to ns
 				return performance.now() * 1e6;
+			},
+			time_sleep: (duration_ms) => {
+				if (duration_ms > 0) {
+					// TODO(bill): Does this even make any sense?
+				}
 			},
 
 			sqrt:    (x) => Math.sqrt(x),

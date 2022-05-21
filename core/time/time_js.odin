@@ -2,22 +2,31 @@
 //+build js
 package time
 
-_IS_SUPPORTED :: false
+foreign import "odin_env"
+
+_IS_SUPPORTED :: true
 
 _now :: proc "contextless" () -> Time {
-	return {}
+	foreign odin_env {
+		time_now :: proc "contextless" () -> i64 ---
+	}
+	return Time{time_now()}
 }
 
 _sleep :: proc "contextless" (d: Duration) {
+	foreign odin_env {
+		time_sleep :: proc "contextless" (ms: u32) ---
+	}
+	if d > 0 {
+		time_sleep(u32(d/1e6))
+	}
 }
 
 _tick_now :: proc "contextless" () -> Tick {
-	// mul_div_u64 :: proc "contextless" (val, num, den: i64) -> i64 {
-	// 	q := val / den
-	// 	r := val % den
-	// 	return q * num + r * num / den
-	// }
-	return {}
+	foreign odin_env {
+		tick_now :: proc "contextless" () -> i64 ---
+	}
+	return Tick{tick_now()}
 }
 
 _yield :: proc "contextless" () {
