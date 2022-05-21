@@ -1,3 +1,5 @@
+"use strict";
+
 (function() {
 class WasmMemoryInterface {
 	constructor() {
@@ -1172,32 +1174,33 @@ class WebGLInterface {
 };
 
 
-function newlineCount(str, substr) {
-	return (str.match(/\n/g) || []).length;
-};
-
 function odinSetupDefaultImports(wasmMemoryInterface, consoleElement) {
 	const MAX_INFO_CONSOLE_LINES = 512;
 	let infoConsoleLines = new Array();
 	let currentLine = {};
 	currentLine[false] = "";
 	currentLine[true] = "";
+	let prevIsError = false;
 
 	const writeToConsole = (line, isError) => {
 		if (!line) {
 			return;
 		}
 
-		const println = (text) => {
+		const println = (text, forceIsError) => {
 			let style = [
 				"color: #eee",
 				"background-color: #d20",
 				"padding: 2px 4px",
 				"border-radius: 2px",
-			];
+			].join(";");
+			let doIsError = isError;
+			if (forceIsError !== undefined) {
+				doIsError = forceIsError;
+			}
 
-			if (isError) {
-				console.log("%c"+text, style.join(";"));
+			if (doIsError) {
+				console.log("%c"+text, style);
 			} else {
 				console.log(text);
 			}
@@ -1226,28 +1229,61 @@ function odinSetupDefaultImports(wasmMemoryInterface, consoleElement) {
 			}
 		}
 
+		if (prevIsError != isError) {
+			if (prevIsError) {
+				println(currentLine[prevIsError], prevIsError);
+				currentLine[prevIsError] = "";
+			}
+		}
+		prevIsError = isError;
+
 
 		// HTML based console
 		if (!consoleElement) {
 			return;
 		}
-		if (line.endsWith("\n")) {
-			line = line.substring(0, line.length-1);
-		} else if (infoConsoleLines.length > 0) {
-			let prev_line = infoConsoleLines.pop();
-			line = prev_line.concat(line);
+		const wrap = (x) => {
+			if (isError) {
+				return '<span style="color:#f21">'+x+'</span>';
+			}
+			return x;
+		};
+
+		if (line == "\n") {
+			infoConsoleLines.push(line);
+		} else if (!line.includes("\n")) {
+			let prevLine = "";
+			if (infoConsoleLines.length > 0) {
+				prevLine = infoConsoleLines.pop();
+			}
+			infoConsoleLines.push(prevLine.concat(wrap(line)));
+		} else {
+			let lines = line.split("\n");
+			let lastHasNewline = lines.length > 1 && line.endsWith("\n");
+
+			let prevLine = "";
+			if (infoConsoleLines.length > 0) {
+				prevLine = infoConsoleLines.pop();
+			}
+			infoConsoleLines.push(prevLine.concat(wrap(lines[0]).concat("\n")));
+
+			for (let i = 1; i < lines.length-1; i++) {
+				infoConsoleLines.push(wrap(lines[i]).concat("\n"));
+			}
+			let last = lines[lines.length-1];
+			if (lastHasNewline) {
+				infoConsoleLines.push(last.concat("\n"));
+			} else {
+				infoConsoleLines.push(last);
+			}
 		}
-		infoConsoleLines.push(line);
 
 		if (infoConsoleLines.length > MAX_INFO_CONSOLE_LINES) {
-			infoConsoleLines.shift();
+			infoConsoleLines.shift(MAX_INFO_CONSOLE_LINES);
 		}
 
 		let data = "";
 		for (let i = 0; i < infoConsoleLines.length; i++) {
-			if (i != 0) {
-				data = data.concat("\n");
-			}
 			data = data.concat(infoConsoleLines[i]);
 		}
 
