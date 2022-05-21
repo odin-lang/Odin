@@ -1460,7 +1460,7 @@ function odinSetupDefaultImports(wasmMemoryInterface, consoleElement) {
 	};
 };
 
-async function runWasmCanvas(wasmPath, consoleElement, extraForeignImports) {
+async function runWasm(wasmPath, consoleElement, extraForeignImports) {
 	let wasmMemoryInterface = new WasmMemoryInterface();
 
 	let imports = odinSetupDefaultImports(wasmMemoryInterface, consoleElement);
@@ -1512,6 +1512,6 @@ window.odin = {
 
 	// Functions
 	setupDefaultImports: odinSetupDefaultImports,
-	runWasmCanvas:       runWasmCanvas,
+	runWasm:             runWasm,
 };
 })();
