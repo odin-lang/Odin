@@ -1172,6 +1172,9 @@ class WebGLInterface {
 };
 
 
+function newlineCount(str, substr) {
+	return (str.match(/\n/g) || []).length;
+};
 
 function odinSetupDefaultImports(wasmMemoryInterface, consoleElement) {
 	const MAX_INFO_CONSOLE_LINES = 512;
@@ -1182,25 +1185,34 @@ function odinSetupDefaultImports(wasmMemoryInterface, consoleElement) {
 		if (!line) {
 			return;
 		}
-		if (!line.includes("\n")) {
+
+		// Print to console
+		if (line == "\n") {
+			console.log(currentLine);
+			currentLine = "";
+		} else if (!line.includes("\n")) {
 			currentLine = currentLine.concat(line);
 		} else {
-			let printLast = line.endsWith("\n");
 			let lines = line.split("\n");
-			for (let i = 0; i < lines.length-1; i++) {
-				let theLine = lines[i].trim("\r");
-				currentLine = currentLine.concat(line);
-				console.log(currentLine);
-				currentLine = "";
+			let printLast = lines.length > 1 && line.endsWith("\n");
+			console.log(currentLine.concat(lines[0]));
+			currentLine = "";
+			for (let i = 1; i < lines.length-1; i++) {
+				console.log(lines[i]);
 			}
-			console.log(lines);
+			let last = lines[lines.length-1];
 			if (printLast) {
-				console.log(lines[lines.length-1]);
+				console.log(last);
 			} else {
-				currentLine = currentLine.concat(lines[lines.length-1]);
+				currentLine = last;
 			}
 		}
 
+
+		// HTML based console
+		if (!consoleElement) {
+			return;
+		}
 		if (line.endsWith("\n")) {
 			line = line.substring(0, line.length-1);
 		} else if (infoConsoleLines.length > 0) {
@@ -1212,19 +1224,18 @@ function odinSetupDefaultImports(wasmMemoryInterface, consoleElement) {
 		if (infoConsoleLines.length > MAX_INFO_CONSOLE_LINES) {
 			infoConsoleLines.shift();
 		}
-		if (consoleElement) {
-			let data = "";
-			for (let i = 0; i < infoConsoleLines.length; i++) {
-				if (i != 0) {
-					data = data.concat("\n");
-				}
-				data = data.concat(infoConsoleLines[i]);
-			}
 
-			let info = consoleElement;
-			info.innerHTML = data;
-			info.scrollTop = info.scrollHeight;
+		let data = "";
+		for (let i = 0; i < infoConsoleLines.length; i++) {
+			if (i != 0) {
+				data = data.concat("\n");
+			}
+			data = data.concat(infoConsoleLines[i]);
 		}
+
+		let info = consoleElement;
+		info.innerHTML = data;
+		info.scrollTop = info.scrollHeight;
 	};
 
 	let event_temp_data = {};
@@ -1369,7 +1380,6 @@ function odinSetupDefaultImports(wasmMemoryInterface, consoleElement) {
 					event_temp_data.id_len = id_len;
 					event_temp_data.event = e;
 					event_temp_data.name_code = name_code;
-					// console.log(e);
 					wasmMemoryInterface.exports.odin_dom_do_event_callback(data, callback, odin_ctx);
 				};
 				wasmMemoryInterface.listenerMap[{data: data, callback: callback}] = listener;
@@ -1403,7 +1413,6 @@ function odinSetupDefaultImports(wasmMemoryInterface, consoleElement) {
 					event_temp_data.id_len = 0;
 					event_temp_data.event = e;
 					event_temp_data.name_code = name_code;
-					// console.log(e);
 					wasmMemoryInterface.exports.odin_dom_do_event_callback(data, callback, odin_ctx);
 				};
 				wasmMemoryInterface.listenerMap[{data: data, callback: callback}] = listener;
@@ -1414,10 +1423,13 @@ function odinSetupDefaultImports(wasmMemoryInterface, consoleElement) {
 			remove_window_event_listener: (name_ptr, name_len, data, callback) => {
 				let name = wasmMemoryInterface.loadString(name_ptr, name_len);
 				let element = window;
-				let listener = wasmMemoryInterface.listenerMap[{data: data, callback: callback}];
-				if (listener == undefined) {
+				let key = {data: data, callback: callback};
+				let listener = wasmMemoryInterface.listenerMap[key];
+				if (!listener) {
 					return false;
 				}
+				wasmMemoryInterface.listenerMap[key] = undefined;
+
 				element.removeEventListener(name, listener);
 				return true;
 			},
