@@ -1057,8 +1057,16 @@ namespace lbAbiArm64 {
 }
 
 namespace lbAbiWasm32 {
+	/*
+		NOTE(bill): All of this is custom since there is not an "official"
+		            ABI definition for WASM, especially for Odin.
+		            The approach taken optimizes for passing things in multiple
+		            registers/arguments if possible rather than by pointer.
+	*/
 	Array<lbArgType> compute_arg_types(LLVMContextRef c, LLVMTypeRef *arg_types, unsigned arg_count);
 	lbArgType compute_return_type(LLVMContextRef c, LLVMTypeRef return_type, bool return_is_defined);
+
+	enum {MAX_DIRECT_STRUCT_SIZE = 32};
 
 	LB_ABI_INFO(abi_info) {
 		lbFunctionType *ft = gb_alloc_item(permanent_allocator(), lbFunctionType);
@@ -1087,7 +1095,7 @@ namespace lbAbiWasm32 {
 		return lb_arg_type_direct(type, nullptr, nullptr, attr);
 	}
 	
-	bool is_struct_valid_elem_type(LLVMTypeRef type) {
+	bool is_basic_register_type(LLVMTypeRef type) {
 		switch (LLVMGetTypeKind(type)) {
 		case LLVMHalfTypeKind:
 		case LLVMFloatTypeKind:
@@ -1099,7 +1107,33 @@ namespace lbAbiWasm32 {
 		}	
 		return false;
 	}
-	
+
+	bool type_can_be_direct(LLVMTypeRef type) {
+		LLVMTypeKind kind = LLVMGetTypeKind(type);
+		i64 sz = lb_sizeof(type);
+		if (sz == 0) {
+			return false;
+		}
+		if (sz <= MAX_DIRECT_STRUCT_SIZE) {
+			if (kind == LLVMArrayTypeKind) {
+				if (is_basic_register_type(LLVMGetElementType(type))) {
+					return true;
+				}
+			} else if (kind == LLVMStructTypeKind) {
+				unsigned count = LLVMCountStructElementTypes(type);
+				for (unsigned i = 0; i < count; i++) {
+					LLVMTypeRef elem = LLVMStructGetTypeAtIndex(type, i);
+					if (!is_basic_register_type(elem)) {
+						return false;
+					}
+
+				}
+				return true;
+			}
+		}
+		return false;
+	}
+
 	lbArgType is_struct(LLVMContextRef c, LLVMTypeRef type) {
 		LLVMTypeKind kind = LLVMGetTypeKind(type);
 		GB_ASSERT(kind == LLVMArrayTypeKind || kind == LLVMStructTypeKind);
@@ -1108,29 +1142,9 @@ namespace lbAbiWasm32 {
 		if (sz == 0) {
 			return lb_arg_type_ignore(type);
 		}
-		if (sz <= 16) {
-			if (kind == LLVMArrayTypeKind) {
-				LLVMTypeRef elem = LLVMGetElementType(type);
-				if (is_struct_valid_elem_type(elem)) {
-					return lb_arg_type_direct(type);
-				}
-			} else if (kind == LLVMStructTypeKind) {
-				bool can_be_direct = true;
-				unsigned count = LLVMCountStructElementTypes(type);
-				for (unsigned i = 0; i < count; i++) {
-					LLVMTypeRef elem = LLVMStructGetTypeAtIndex(type, i);
-					if (!is_struct_valid_elem_type(elem)) {
-						can_be_direct = false;
-						break;
-					}
-					
-				}
-				if (can_be_direct) {
-					return lb_arg_type_direct(type);
-				}
-			}
+		if (type_can_be_direct(type)) {
+			return lb_arg_type_direct(type);
 		}
-		
 		return lb_arg_type_indirect(type, nullptr);
 	}
 	
@@ -1154,6 +1168,10 @@ namespace lbAbiWasm32 {
 		if (!return_is_defined) {
 			return lb_arg_type_direct(LLVMVoidTypeInContext(c));
 		} else if (lb_is_type_kind(return_type, LLVMStructTypeKind) || lb_is_type_kind(return_type, LLVMArrayTypeKind)) {
+			if (type_can_be_direct(return_type)) {
+				return lb_arg_type_direct(return_type);
+			}
+
 			i64 sz = lb_sizeof(return_type);
 			switch (sz) {
 			case 1: return lb_arg_type_direct(return_type, LLVMIntTypeInContext(c, 8),  nullptr, nullptr);
