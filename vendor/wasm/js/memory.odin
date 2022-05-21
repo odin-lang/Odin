@@ -1,4 +1,4 @@
-//+build js wasm32
+//+build js wasm32, js wasm64
 package wasm_js_interface
 
 import "core:mem"

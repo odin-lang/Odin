@@ -452,6 +452,15 @@ gb_global TargetMetrics target_js_wasm32 = {
 	str_lit(""),
 };
 
+gb_global TargetMetrics target_js_wasm64 = {
+	TargetOs_js,
+	TargetArch_wasm64,
+	8,
+	16,
+	str_lit("wasm64-js-js"),
+	str_lit(""),
+};
+
 gb_global TargetMetrics target_wasi_wasm32 = {
 	TargetOs_wasi,
 	TargetArch_wasm32,
@@ -504,6 +513,7 @@ gb_global NamedTargetMetrics named_targets[] = {
 	{ str_lit("freestanding_wasm32"), &target_freestanding_wasm32 },
 	{ str_lit("wasi_wasm32"),         &target_wasi_wasm32 },
 	{ str_lit("js_wasm32"),           &target_js_wasm32 },
+	{ str_lit("js_wasm64"),           &target_js_wasm64 },
 
 	{ str_lit("freestanding_amd64_sysv"), &target_freestanding_amd64_sysv },
 };
@@ -1151,7 +1161,7 @@ void init_build_context(TargetMetrics *cross_target) {
 		// link_flags = gb_string_appendc(link_flags, "--export-table ");
 		link_flags = gb_string_appendc(link_flags, "--allow-undefined ");
 		if (bc->metrics.arch == TargetArch_wasm64) {
-			link_flags = gb_string_appendc(link_flags, "-mwas64 ");
+			link_flags = gb_string_appendc(link_flags, "-mwasm64 ");
 		}
 		if (bc->no_entry_point) {
 			link_flags = gb_string_appendc(link_flags, "--no-entry ");
