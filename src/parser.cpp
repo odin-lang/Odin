@@ -4043,7 +4043,7 @@ Ast *parse_if_stmt(AstFile *f) {
 		if (build_context.disallow_do) {
 			syntax_error(body, "'do' has been disallowed");
 		} else if (!ast_on_same_line(cond, body)) {
-			syntax_error(body, "The body of a 'do' be on the same line as if condition");
+			syntax_error(body, "The body of a 'do' must be on the same line as if condition");
 		}
 	} else {
 		body = parse_block_stmt(f, false);
@@ -4065,7 +4065,7 @@ Ast *parse_if_stmt(AstFile *f) {
 			if (build_context.disallow_do) {
 				syntax_error(else_stmt, "'do' has been disallowed");
 			} else if (!ast_on_same_line(else_token, else_stmt)) {
-				syntax_error(else_stmt, "The body of a 'do' be on the same line as 'else'");
+				syntax_error(else_stmt, "The body of a 'do' must be on the same line as 'else'");
 			}
 		} break;
 		default:
@@ -4100,7 +4100,7 @@ Ast *parse_when_stmt(AstFile *f) {
 		if (build_context.disallow_do) {
 			syntax_error(body, "'do' has been disallowed");
 		} else if (!ast_on_same_line(cond, body)) {
-			syntax_error(body, "The body of a 'do' be on the same line as when statement");
+			syntax_error(body, "The body of a 'do' must be on the same line as when statement");
 		}
 	} else {
 		body = parse_block_stmt(f, true);
@@ -4122,7 +4122,7 @@ Ast *parse_when_stmt(AstFile *f) {
 			if (build_context.disallow_do) {
 				syntax_error(else_stmt, "'do' has been disallowed");
 			} else if (!ast_on_same_line(else_token, else_stmt)) {
-				syntax_error(else_stmt, "The body of a 'do' be on the same line as 'else'");
+				syntax_error(else_stmt, "The body of a 'do' must be on the same line as 'else'");
 			}
 		} break;
 		default:
@@ -4197,7 +4197,7 @@ Ast *parse_for_stmt(AstFile *f) {
 				if (build_context.disallow_do) {
 					syntax_error(body, "'do' has been disallowed");
 				} else if (!ast_on_same_line(token, body)) {
-					syntax_error(body, "The body of a 'do' be on the same line as the 'for' token");
+					syntax_error(body, "The body of a 'do' must be on the same line as the 'for' token");
 				}
 			} else {
 				body = parse_block_stmt(f, false);
@@ -4243,7 +4243,7 @@ Ast *parse_for_stmt(AstFile *f) {
 		if (build_context.disallow_do) {
 			syntax_error(body, "'do' has been disallowed");
 		} else if (!ast_on_same_line(token, body)) {
-			syntax_error(body, "The body of a 'do' be on the same line as the 'for' token");
+			syntax_error(body, "The body of a 'do' must be on the same line as the 'for' token");
 		}
 	} else {
 		body = parse_block_stmt(f, false);
@@ -4569,7 +4569,7 @@ Ast *parse_unrolled_for_loop(AstFile *f, Token unroll_token) {
 		if (build_context.disallow_do) {
 			syntax_error(body, "'do' has been disallowed");
 		} else if (!ast_on_same_line(for_token, body)) {
-			syntax_error(body, "The body of a 'do' be on the same line as the 'for' token");
+			syntax_error(body, "The body of a 'do' must be on the same line as the 'for' token");
 		}
 	} else {
 		body = parse_block_stmt(f, false);
