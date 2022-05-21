@@ -1549,6 +1549,27 @@ function odinSetupDefaultImports(wasmMemoryInterface, consoleElement) {
 					element.value = value;
 				}
 			},
+
+			get_bounding_client_rect: (rect_ptr, id_ptr, id_len) => {
+				let id = wasmMemoryInterface.loadString(id_ptr, id_len);
+				let element = document.getElementById(id);
+				if (element) {
+					let values = wasmMemoryInterface.loadF64Array(rect_ptr, 4);
+					let rect = element.getBoundingClientRect();
+					values[0] = rect.left;
+					values[1] = rect.top;
+					values[2] = rect.right  - rect.left;
+					values[3] = rect.bottom - rect.top;
+				}
+			},
+			get_window_rect: (rect_ptr) => {
+				let values = wasmMemoryInterface.loadF64Array(rect_ptr, 4);
+				values[0] = window.screenX;
+				values[1] = window.screenY;
+				values[2] = window.screen.width;
+				values[3] = window.screen.height;
+			},
+
 		},
 
 		"webgl": webglContext.getWebGL1Interface(),
