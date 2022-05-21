@@ -24,15 +24,13 @@ page_allocator :: proc() -> mem.Allocator {
 		case .Alloc:
 			assert(size % PAGE_SIZE == 0)
 			return page_alloc(size/PAGE_SIZE)
-		case .Resize, .Free, .Free_All:
+		case .Resize, .Free, .Free_All, .Query_Info:
 			return nil, .Mode_Not_Implemented
 		case .Query_Features:
 			set := (^mem.Allocator_Mode_Set)(old_memory)
 			if set != nil {
-				set^ = {.Alloc}
+				set^ = {.Alloc, .Query_Features}
 			}
-		case .Query_Info:
-			return nil, .Mode_Not_Implemented
 		}
 
 		return nil, nil
