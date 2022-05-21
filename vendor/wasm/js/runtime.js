@@ -1179,32 +1179,50 @@ function newlineCount(str, substr) {
 function odinSetupDefaultImports(wasmMemoryInterface, consoleElement) {
 	const MAX_INFO_CONSOLE_LINES = 512;
 	let infoConsoleLines = new Array();
-	let currentLine = "";
+	let currentLine = {};
+	currentLine[false] = "";
+	currentLine[true] = "";
 
-	const addConsoleLine = (line) => {
+	const addConsoleLine = (line, isError) => {
 		if (!line) {
 			return;
 		}
 
+		const println = (text) => {
+			let style = [
+				"color: #eee",
+				"background-color: #d20",
+				"padding: 2px 4px",
+				"border-radius: 2px",
+			];
+
+			if (isError) {
+				console.log("%c"+text, style.join(";"));
+			} else {
+				console.log(text);
+			}
+
+		};
+
 		// Print to console
 		if (line == "\n") {
-			console.log(currentLine);
-			currentLine = "";
+			println(currentLine[isError]);
+			currentLine[isError] = "";
 		} else if (!line.includes("\n")) {
-			currentLine = currentLine.concat(line);
+			currentLine[isError] = currentLine[isError].concat(line);
 		} else {
 			let lines = line.split("\n");
 			let printLast = lines.length > 1 && line.endsWith("\n");
-			console.log(currentLine.concat(lines[0]));
-			currentLine = "";
+			println(currentLine[isError].concat(lines[0]));
+			currentLine[isError] = "";
 			for (let i = 1; i < lines.length-1; i++) {
-				console.log(lines[i]);
+				println(lines[i]);
 			}
 			let last = lines[lines.length-1];
 			if (printLast) {
-				console.log(last);
+				println(last);
 			} else {
-				currentLine = last;
+				currentLine[isError] = last;
 			}
 		}
 
@@ -1247,10 +1265,10 @@ function odinSetupDefaultImports(wasmMemoryInterface, consoleElement) {
 			write: (fd, ptr, len) => {
 				const str = wasmMemoryInterface.loadString(ptr, len);
 				if (fd == 1) {
-					addConsoleLine(str);
+					addConsoleLine(str, false);
 					return;
 				} else if (fd == 2) {
-					addConsoleLine(str);
+					addConsoleLine(str, true);
 					return;
 				} else {
 					throw new Error("Invalid fd to 'write'" + stripNewline(str));
