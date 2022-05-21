@@ -88,7 +88,7 @@ abs :: proc(path: string, allocator := context.allocator) -> (string, bool) {
 }
 
 
-join :: proc(elems: ..string, allocator := context.allocator) -> string {
+join :: proc(elems: []string, allocator := context.allocator) -> string {
 	for e, i in elems {
 		if e != "" {
 			return join_non_empty(elems[i:], allocator)
