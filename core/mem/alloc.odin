@@ -55,6 +55,11 @@ Allocator :: struct {
 
 DEFAULT_ALIGNMENT :: 2*align_of(rawptr)
 
+DEFAULT_PAGE_SIZE ::
+	64 * 1024 when ODIN_ARCH == .wasm32 || ODIN_ARCH == .wasm64 else
+	16 * 1024 when ODIN_OS == .darwin && ODIN_ARCH == .arm64 else
+	4 * 1024
+
 alloc :: proc(size: int, alignment: int = DEFAULT_ALIGNMENT, allocator := context.allocator, loc := #caller_location) -> rawptr {
 	if size == 0 {
 		return nil
