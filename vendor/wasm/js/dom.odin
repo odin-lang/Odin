@@ -6,7 +6,14 @@ foreign import dom_lib "odin_dom"
 @(default_calling_convention="contextless")
 foreign dom_lib {
 	get_element_value_f64    :: proc(id: string) -> f64 ---
-	set_element_value        :: proc(id: string, value: f64) ---
+	set_element_value_f64    :: proc(id: string, value: f64) ---
+
+	set_element_value_string :: proc(id: string, value: string) ---
+	get_element_value_string_length :: proc(id: string) -> int ---
+
+	device_pixel_ratio :: proc() -> f64 ---
+
+	window_set_scroll :: proc(x, y: f64) ---
 }
 
 get_element_value_string :: proc "contextless" (id: string, buf: []byte) -> string {
@@ -47,12 +54,23 @@ get_bounding_client_rect :: proc "contextless" (id: string) -> (rect: Rect) {
 	return
 }
 
-get_window_rect :: proc "contextless" () -> (rect: Rect) {
+window_get_rect :: proc "contextless" () -> (rect: Rect) {
 	@(default_calling_convention="contextless")
 	foreign dom_lib {
-		@(link_name="get_window_rect")
-		_get_window_rect :: proc(rect: ^Rect) ---
+		@(link_name="window_get_rect")
+		_window_get_rect :: proc(rect: ^Rect) ---
 	}
-	_get_window_rect(&rect)
+	_window_get_rect(&rect)
+	return
+}
+
+window_get_scroll :: proc "contextless" () -> (x, y: f64) {
+	@(default_calling_convention="contextless")
+	foreign dom_lib {
+		@(link_name="window_get_scroll")
+		_window_get_scroll :: proc(scroll: ^[2]f64) ---
+	}
+	scroll := [2]f64{x, y}
+	_window_get_scroll(&scroll)
 	return
 }
