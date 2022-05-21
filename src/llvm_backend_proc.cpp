@@ -2195,7 +2195,7 @@ lbValue lb_build_builtin_proc(lbProcedure *p, Ast *expr, TypeAndValue const &tv,
 			};
 			unsigned id = LLVMLookupIntrinsicID(name, gb_strlen(name));
 			GB_ASSERT_MSG(id != 0, "Unable to find %s", name, LLVMPrintTypeToString(types[0]));
-			LLVMValueRef ip = LLVMGetIntrinsicDeclaration(p->module->mod, id, types, gb_count_of(types));
+			LLVMValueRef ip = LLVMGetIntrinsicDeclaration(p->module->mod, id, nullptr, 0); // types, gb_count_of(types));
 
 			Type *t_u32_ptr = alloc_type_pointer(t_u32);
 
@@ -2218,7 +2218,7 @@ lbValue lb_build_builtin_proc(lbProcedure *p, Ast *expr, TypeAndValue const &tv,
 			};
 			unsigned id = LLVMLookupIntrinsicID(name, gb_strlen(name));
 			GB_ASSERT_MSG(id != 0, "Unable to find %s", name, LLVMPrintTypeToString(types[0]));
-			LLVMValueRef ip = LLVMGetIntrinsicDeclaration(p->module->mod, id, types, gb_count_of(types));
+			LLVMValueRef ip = LLVMGetIntrinsicDeclaration(p->module->mod, id, nullptr, 0); // types, gb_count_of(types));
 
 			Type *t_u32_ptr = alloc_type_pointer(t_u32);
 
