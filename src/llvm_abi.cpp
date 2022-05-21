@@ -1056,7 +1056,7 @@ namespace lbAbiArm64 {
 	}
 }
 
-namespace lbAbiWasm32 {
+namespace lbAbiWasm {
 	/*
 		NOTE(bill): All of this is custom since there is not an "official"
 		            ABI definition for WASM, especially for Odin.
@@ -1312,13 +1312,8 @@ LB_ABI_INFO(lb_get_abi_info) {
 	case TargetArch_arm64:
 		return lbAbiArm64::abi_info(c, arg_types, arg_count, return_type, return_is_defined, calling_convention);
 	case TargetArch_wasm32:
-		// TODO(bill): implement wasm32's ABI correct 
-		// NOTE(bill): this ABI is only an issue for WASI compatibility
-		return lbAbiWasm32::abi_info(c, arg_types, arg_count, return_type, return_is_defined, calling_convention);
 	case TargetArch_wasm64:
-		// TODO(bill): implement wasm64's ABI correct 
-		// NOTE(bill): this ABI is only an issue for WASI compatibility
-		return lbAbiAmd64SysV::abi_info(c, arg_types, arg_count, return_type, return_is_defined, calling_convention);
+		return lbAbiWasm::abi_info(c, arg_types, arg_count, return_type, return_is_defined, calling_convention);
 	}
 
 	GB_PANIC("Unsupported ABI");
