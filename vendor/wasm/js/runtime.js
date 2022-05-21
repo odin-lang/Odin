@@ -1183,7 +1183,7 @@ function odinSetupDefaultImports(wasmMemoryInterface, consoleElement) {
 	currentLine[false] = "";
 	currentLine[true] = "";
 
-	const addConsoleLine = (line, isError) => {
+	const writeToConsole = (line, isError) => {
 		if (!line) {
 			return;
 		}
@@ -1265,10 +1265,10 @@ function odinSetupDefaultImports(wasmMemoryInterface, consoleElement) {
 			write: (fd, ptr, len) => {
 				const str = wasmMemoryInterface.loadString(ptr, len);
 				if (fd == 1) {
-					addConsoleLine(str, false);
+					writeToConsole(str, false);
 					return;
 				} else if (fd == 2) {
-					addConsoleLine(str, true);
+					writeToConsole(str, true);
 					return;
 				} else {
 					throw new Error("Invalid fd to 'write'" + stripNewline(str));
