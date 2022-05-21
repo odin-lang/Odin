@@ -389,7 +389,8 @@ change_directory :: proc(path: string) -> Errno {
 	return Errno(win32.SetCurrentDirectoryW(wpath))
 }
 
-make_directory :: proc(path: string, mode: u32) -> Errno {
+make_directory :: proc(path: string, mode: u32 = 0) -> Errno {
+	// Mode is unused on Windows, but is needed on *nix
 	wpath := win32.utf8_to_wstring(path, context.temp_allocator)
 	return Errno(win32.CreateDirectoryW(wpath, nil))
 }
