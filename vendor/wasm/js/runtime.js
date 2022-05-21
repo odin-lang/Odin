@@ -1533,6 +1533,14 @@ function odinSetupDefaultImports(wasmMemoryInterface, consoleElement) {
 				}
 				return 0;
 			},
+			get_element_value_string_length: (id_ptr, id_len) => {
+				let id = wasmMemoryInterface.loadString(id_ptr, id_len);
+				let element = document.getElementById(id);
+				if (element) {
+					return element.value.length;
+				}
+				return 0;
+			},
 			get_element_min_max: (ptr_array2_f64, id_ptr, id_len) => {
 				let id = wasmMemoryInterface.loadString(id_ptr, id_len);
 				let element = document.getElementById(id);
@@ -1542,13 +1550,22 @@ function odinSetupDefaultImports(wasmMemoryInterface, consoleElement) {
 					values[1] = element.max;
 				}
 			},
-			set_element_value: (id_ptr, id_len, value) => {
+			set_element_value_f64: (id_ptr, id_len, value) => {
 				let id = wasmMemoryInterface.loadString(id_ptr, id_len);
 				let element = document.getElementById(id);
 				if (element) {
 					element.value = value;
 				}
 			},
+			set_element_value_string: (id_ptr, id_len, value_ptr, value_id) => {
+				let id = wasmMemoryInterface.loadString(id_ptr, id_len);
+				let value = wasmMemoryInterface.loadString(value_ptr, value_len);
+				let element = document.getElementById(id);
+				if (element) {
+					element.value = value;
+				}
+			},
+
 
 			get_bounding_client_rect: (rect_ptr, id_ptr, id_len) => {
 				let id = wasmMemoryInterface.loadString(id_ptr, id_len);
@@ -1562,12 +1579,25 @@ function odinSetupDefaultImports(wasmMemoryInterface, consoleElement) {
 					values[3] = rect.bottom - rect.top;
 				}
 			},
-			get_window_rect: (rect_ptr) => {
+			window_get_rect: (rect_ptr) => {
 				let values = wasmMemoryInterface.loadF64Array(rect_ptr, 4);
 				values[0] = window.screenX;
 				values[1] = window.screenY;
 				values[2] = window.screen.width;
 				values[3] = window.screen.height;
+			},
+
+			window_get_scroll: (pos_ptr) => {
+				let values = wasmMemoryInterface.loadF64Array(pos_ptr, 2);
+				values[0] = window.scrollX;
+				values[1] = window.scrollY;
+			},
+			window_set_scroll: (x, y) => {
+				window.scroll(x, y);
+			},
+
+			device_pixel_ratio: () => {
+				return window.devicePixelRatio;
 			},
 
 		},
