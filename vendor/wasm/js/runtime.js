@@ -1283,7 +1283,7 @@ function odinSetupDefaultImports(wasmMemoryInterface, consoleElement) {
 				// convert ms to ns
 				return Date.now() * 1e6;
 			},
-			time_tick_now: () => {
+			tick_now: () => {
 				// convert ms to ns
 				return performance.now() * 1e6;
 			},
