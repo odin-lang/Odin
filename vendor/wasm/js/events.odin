@@ -243,7 +243,7 @@ Event :: struct {
 
 
 	user_data: rawptr,
-	callback: proc(e: Event),
+	callback:  proc(e: Event),
 }
 
 @(default_calling_convention="contextless")
