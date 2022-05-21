@@ -2,7 +2,7 @@ package webgl
 
 import "core:fmt"
 
-CreateProgramHelper :: proc(vs_sources, fs_sources: []string) -> (program: Program, ok: bool) {
+CreateProgramFromStrings :: proc(vs_sources, fs_sources: []string) -> (program: Program, ok: bool) {
 	ok = true
 	log: [1024]byte
 
