@@ -1510,7 +1510,7 @@ function odinSetupDefaultImports(wasmMemoryInterface, consoleElement) {
 			},
 			event_prevent_default: () => {
 				if (event_temp_data && event_temp_data.event) {
-					event_temp_data.event.eventPreventDefault();
+					event_temp_data.event.preventDefault();
 				}
 			},
 
