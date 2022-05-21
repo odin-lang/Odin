@@ -1,4 +1,4 @@
-//+build js wasm32
+//+build js wasm32, js wasm64
 package wasm_js_interface
 
 foreign import dom_lib "odin_dom"
