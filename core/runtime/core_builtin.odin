@@ -3,7 +3,7 @@ package runtime
 import "core:intrinsics"
 
 @builtin
-Maybe :: union($T: typeid) #maybe {T}
+Maybe :: union($T: typeid) {T}
 
 
 @builtin
