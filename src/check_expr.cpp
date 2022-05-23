@@ -2786,14 +2786,14 @@ bool check_transmute(CheckerContext *c, Ast *node, Operand *o, Type *t) {
 		return false;
 	}
 
-	if (o->mode == Addressing_Constant) {
-		gbString expr_str = expr_to_string(o->expr);
-		error(o->expr, "Cannot transmute a constant expression: '%s'", expr_str);
-		gb_string_free(expr_str);
-		o->mode = Addressing_Invalid;
-		o->expr = node;
-		return false;
-	}
+	// if (o->mode == Addressing_Constant) {
+	// 	gbString expr_str = expr_to_string(o->expr);
+	// 	error(o->expr, "Cannot transmute a constant expression: '%s'", expr_str);
+	// 	gb_string_free(expr_str);
+	// 	o->mode = Addressing_Invalid;
+	// 	o->expr = node;
+	// 	return false;
+	// }
 
 	if (is_type_untyped(o->type)) {
 		gbString expr_str = expr_to_string(o->expr);
