@@ -1977,15 +1977,17 @@ constant_literal_expressions :: proc() {
 }
 
 union_maybe :: proc() {
-	fmt.println("\n#union #maybe")
+	fmt.println("\n#union based maybe")
 
 	// NOTE: This is already built-in, and this is just a reimplementation to explain the behaviour
-	Maybe :: union($T: typeid) #maybe {T}
+	Maybe :: union($T: typeid) {T}
 
 	i: Maybe(u8)
 	p: Maybe(^u8) // No tag is stored for pointers, nil is the sentinel value
 
+	// Tag size will be as small as needed for the number of variants
 	#assert(size_of(i) == size_of(u8) + size_of(u8))
+	// No need to store a tag here, the `nil` state is shared with the variant's `nil`
 	#assert(size_of(p) == size_of(^u8))
 
 	i = 123

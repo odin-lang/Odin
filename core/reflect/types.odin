@@ -256,6 +256,17 @@ is_multi_pointer :: proc(info: ^Type_Info) -> bool {
 	_, ok := type_info_base(info).variant.(Type_Info_Multi_Pointer)
 	return ok
 }
+is_pointer_internally :: proc(info: ^Type_Info) -> bool {
+	if info == nil { return false }
+	#partial switch v in info.variant {
+	case Type_Info_Pointer, Type_Info_Multi_Pointer,
+	     Type_Info_Procedure:
+		return true
+	case Type_Info_String:
+		return v.is_cstring
+	}
+	return false
+}
 is_procedure :: proc(info: ^Type_Info) -> bool {
 	if info == nil { return false }
 	_, ok := type_info_base(info).variant.(Type_Info_Procedure)
@@ -531,9 +542,8 @@ write_type_writer :: proc(w: io.Writer, ti: ^Type_Info, n_written: ^int = nil) -
 
 	case Type_Info_Union:
 		io.write_string(w, "union ", &n) or_return
-		if info.maybe {
-			io.write_string(w, "#maybe ", &n) or_return
-		}
+		if info.no_nil     { io.write_string(w, "#no_nil ", &n)     or_return }
+		if info.shared_nil { io.write_string(w, "#shared_nil ", &n) or_return }
 		if info.custom_align {
 			io.write_string(w, "#align ",      &n) or_return
 			io.write_i64(w, i64(ti.align), 10, &n) or_return

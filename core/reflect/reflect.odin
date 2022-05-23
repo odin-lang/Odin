@@ -654,7 +654,7 @@ union_variant_type_info :: proc(a: any) -> ^Type_Info {
 }
 
 type_info_union_is_pure_maybe :: proc(info: runtime.Type_Info_Union) -> bool {
-	return info.maybe && len(info.variants) == 1 && is_pointer(info.variants[0])
+	return len(info.variants) == 1 && is_pointer(info.variants[0])
 }
 
 union_variant_typeid :: proc(a: any) -> typeid {

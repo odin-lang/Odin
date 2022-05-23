@@ -209,7 +209,7 @@ unmarshal_value :: proc(p: ^Parser, v: any) -> (err: Unmarshal_Error) {
 		variant := u.variants[0]
 		v.id = variant.id
 		ti = reflect.type_info_base(variant)
-		if !(u.maybe && reflect.is_pointer(variant)) {
+		if !reflect.is_pointer_internally(variant) {
 			tag := any{rawptr(uintptr(v.data) + u.tag_offset), u.tag_type.id}
 			assign_int(tag, 1)
 		}
