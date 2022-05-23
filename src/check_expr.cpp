@@ -2844,8 +2844,10 @@ bool check_transmute(CheckerContext *c, Ast *node, Operand *o, Type *t) {
 		}
 	}
 
+	o->expr = node;
 	o->mode = Addressing_Value;
 	o->type = t;
+	o->value = {};
 	return true;
 }
 
