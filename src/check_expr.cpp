@@ -3211,7 +3211,7 @@ void check_binary_expr(CheckerContext *c, Operand *x, Ast *node, Type *type_hint
 		    y->type != t_invalid) {
 			gbString xt = type_to_string(x->type);
 			gbString yt = type_to_string(y->type);
-			gbString expr_str = expr_to_string(x->expr);
+			gbString expr_str = expr_to_string(node);
 			error(op, "Mismatched types in binary expression '%s' : '%s' vs '%s'", expr_str, xt, yt);
 			gb_string_free(expr_str);
 			gb_string_free(yt);
