@@ -2529,6 +2529,7 @@ Ast *parse_operand(AstFile *f, bool lhs) {
 
 		if (maybe) {
 			union_kind = UnionType_maybe;
+			syntax_error(f->curr_token, "#maybe functionality has now been merged with standard 'union' functionality");
 		} else if (no_nil) {
 			union_kind = UnionType_no_nil;
 		} else if (shared_nil) {

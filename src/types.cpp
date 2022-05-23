@@ -1685,11 +1685,9 @@ bool is_type_map(Type *t) {
 
 bool is_type_union_maybe_pointer(Type *t) {
 	t = base_type(t);
-	if (t->kind == Type_Union && t->Union.kind == UnionType_maybe) {
-		if (t->Union.variants.count == 1) {
-			Type *v = t->Union.variants[0];
-			return is_type_pointer(v) || is_type_multi_pointer(v);
-		}
+	if (t->kind == Type_Union && t->Union.variants.count == 1) {
+		Type *v = t->Union.variants[0];
+		return is_type_internally_pointer_like(v);
 	}
 	return false;
 }
@@ -1697,12 +1695,10 @@ bool is_type_union_maybe_pointer(Type *t) {
 
 bool is_type_union_maybe_pointer_original_alignment(Type *t) {
 	t = base_type(t);
-	if (t->kind == Type_Union && t->Union.kind == UnionType_maybe) {
-		if (t->Union.variants.count == 1) {
-			Type *v = t->Union.variants[0];
-			if (is_type_pointer(v) || is_type_multi_pointer(v)) {
-				return type_align_of(v) == type_align_of(t);
-			}
+	if (t->kind == Type_Union && t->Union.variants.count == 1) {
+		Type *v = t->Union.variants[0];
+		if (is_type_internally_pointer_like(v)) {
+			return type_align_of(v) == type_align_of(t);
 		}
 	}
 	return false;
@@ -4054,7 +4050,6 @@ gbString write_type_to_string(gbString str, Type *type, bool shorthand=false) {
 	case Type_Union:
 		str = gb_string_appendc(str, "union");
 		switch (type->Union.kind) {
-		case UnionType_maybe:      str = gb_string_appendc(str, " #maybe");      break;
 		case UnionType_no_nil:     str = gb_string_appendc(str, " #no_nil");     break;
 		case UnionType_shared_nil: str = gb_string_appendc(str, " #shared_nil"); break;
 		}

@@ -10063,7 +10063,6 @@ gbString write_expr_to_string(gbString str, Ast *node, bool shorthand) {
 			str = gb_string_appendc(str, ") ");
 		}
 		switch (st->kind) {
-		case UnionType_maybe:      str = gb_string_appendc(str, "#maybe ");      break;
 		case UnionType_no_nil:     str = gb_string_appendc(str, "#no_nil ");     break;
 		case UnionType_shared_nil: str = gb_string_appendc(str, "#shared_nil "); break;
 		}
