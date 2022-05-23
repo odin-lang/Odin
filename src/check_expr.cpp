@@ -9310,7 +9310,15 @@ ExprKind check_expr_base_internal(CheckerContext *c, Operand *o, Ast *node, Type
  			} else {
  				gbString str = expr_to_string(o->expr);
  				gbString typ = type_to_string(o->type);
+ 				begin_error_block();
+
  				error(o->expr, "Cannot dereference '%s' of type '%s'", str, typ);
+ 				if (o->type && is_type_multi_pointer(o->type)) {
+ 					error_line("\tDid you mean '%s[0]'?\n", str);
+ 				}
+
+ 				end_error_block();
+
  				gb_string_free(typ);
  				gb_string_free(str);
  				o->mode = Addressing_Invalid;
