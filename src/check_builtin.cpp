@@ -3082,13 +3082,13 @@ bool check_builtin_procedure(CheckerContext *c, Operand *operand, Ast *call, i32
 			}
 
 
-			if (!is_type_pointer(dst.type)) {
+			if (!is_type_pointer(dst.type) && !is_type_multi_pointer(dst.type)) {
 				gbString str = type_to_string(dst.type);
 				error(dst.expr, "Expected a pointer value for '%.*s', got %s", LIT(builtin_name), str);
 				gb_string_free(str);
 				return false;
 			}
-			if (!is_type_pointer(src.type)) {
+			if (!is_type_pointer(src.type) && !is_type_multi_pointer(src.type)) {
 				gbString str = type_to_string(src.type);
 				error(src.expr, "Expected a pointer value for '%.*s', got %s", LIT(builtin_name), str);
 				gb_string_free(str);
@@ -3130,7 +3130,7 @@ bool check_builtin_procedure(CheckerContext *c, Operand *operand, Ast *call, i32
 			}
 
 
-			if (!is_type_pointer(ptr.type)) {
+			if (!is_type_pointer(ptr.type) && !is_type_multi_pointer(ptr.type)) {
 				gbString str = type_to_string(ptr.type);
 				error(ptr.expr, "Expected a pointer value for '%.*s', got %s", LIT(builtin_name), str);
 				gb_string_free(str);
@@ -3174,7 +3174,7 @@ bool check_builtin_procedure(CheckerContext *c, Operand *operand, Ast *call, i32
 			operand->mode = Addressing_Value;
 			operand->type = ptr.type;
 
-			if (!is_type_pointer(ptr.type)) {
+			if (!is_type_pointer(ptr.type)  && !is_type_multi_pointer(ptr.type)) {
 				gbString str = type_to_string(ptr.type);
 				error(ptr.expr, "Expected a pointer value for '%.*s', got %s", LIT(builtin_name), str);
 				gb_string_free(str);
@@ -3217,7 +3217,7 @@ bool check_builtin_procedure(CheckerContext *c, Operand *operand, Ast *call, i32
 			operand->mode = Addressing_Value;
 			operand->type = t_int;
 
-			if (!is_type_pointer(ptr0.type)) {
+			if (!is_type_pointer(ptr0.type) && !is_type_multi_pointer(ptr0.type)) {
 				gbString str = type_to_string(ptr0.type);
 				error(ptr0.expr, "Expected a pointer value for '%.*s', got %s", LIT(builtin_name), str);
 				gb_string_free(str);
@@ -3230,7 +3230,7 @@ bool check_builtin_procedure(CheckerContext *c, Operand *operand, Ast *call, i32
 				return false;
 			}
 
-			if (!is_type_pointer(ptr1.type)) {
+			if (!is_type_pointer(ptr1.type) && !is_type_multi_pointer(ptr1.type)) {
 				gbString str = type_to_string(ptr1.type);
 				error(ptr1.expr, "Expected a pointer value for '%.*s', got %s", LIT(builtin_name), str);
 				gb_string_free(str);
