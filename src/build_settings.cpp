@@ -1338,7 +1338,12 @@ bool init_build_paths(String init_filename) {
 		} else {
 			// Init filename was not 'current path'.
 			// Contruct the output name from the path elements as usual.
-			String output_name = remove_directory_from_path(init_filename);
+			String output_name = init_filename;
+			// If it ends with a trailing (back)slash, strip it before continuing.
+			while (output_name.len > 0 && (output_name[output_name.len-1] == '/' || output_name[output_name.len-1] == '\\')) {
+				output_name.len -= 1;
+			}
+			output_name = remove_directory_from_path(output_name);
 			output_name        = remove_extension_from_path(output_name);
 			output_name        = copy_string(ha, string_trim_whitespace(output_name));
 			output_path        = path_from_string(ha, output_name);
