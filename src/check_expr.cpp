@@ -1328,6 +1328,19 @@ bool is_polymorphic_type_assignable(CheckerContext *c, Type *poly, Type *source,
 			}
 		} 
 		return false;
+
+	case Type_SimdVector:
+		if (source->kind == Type_SimdVector) {
+			if (poly->SimdVector.generic_count != nullptr) {
+				if (!polymorphic_assign_index(&poly->SimdVector.generic_count, &poly->SimdVector.count, source->SimdVector.count)) {
+					return false;
+				}
+			}
+			if (poly->SimdVector.count == source->SimdVector.count) {
+				return is_polymorphic_type_assignable(c, poly->SimdVector.elem, source->SimdVector.elem, true, modify_type);
+			}
+		}
+		return false;
 	}
 	return false;
 }
