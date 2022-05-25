@@ -1190,7 +1190,7 @@ void init_build_context(TargetMetrics *cross_target) {
 // NOTE(WalterPlinge): Environment variables can help to find Visual C++ and WinSDK paths for both
 // official and portable installations (like mmozeiko's portable msvc script). This will only use
 // the first paths it finds, and won't overwrite any values that `result` already has.
-bool find_portable_msvc_installation(gbAllocator allocator, Find_Result_Utf8 *result) {
+bool find_msvc_install_from_env_vars(gbAllocator allocator, Find_Result_Utf8 *result) {
 	if (build_context.metrics.arch != TargetArch_amd64 && build_context.metrics.arch != TargetArch_i386) {
 		return false;
 	}
@@ -1380,7 +1380,7 @@ bool find_portable_msvc_installation(gbAllocator allocator, Find_Result_Utf8 *re
 
 	return sdk_found && vs_found;
 }
-#endif defined(GB_SYSTEM_WINDOWS)
+#endif
 
 // NOTE(Jeroen): Set/create the output and other paths and report an error as appropriate.
 // We've previously called `parse_build_flags`, so `out_filepath` should be set.
@@ -1429,20 +1429,11 @@ bool init_build_paths(String init_filename) {
 				find_result.vs_library_path.len               > 0;
 
 			if (find_result.windows_sdk_version == 0 || !all_found) {
-				if (!find_portable_msvc_installation(ha, &find_result)) {
+				if (!find_msvc_install_from_env_vars(ha, &find_result)) {
 					gb_printf_err("Windows SDK not found.\n");
 					return false;
 				}
 			}
-#if 0
-	printf("windows_sdk_root:              %.*s\n", LIT(find_result.windows_sdk_root));
-	printf("windows_sdk_um_library_path:   %.*s\n", LIT(find_result.windows_sdk_um_library_path));
-	printf("windows_sdk_ucrt_library_path: %.*s\n", LIT(find_result.windows_sdk_ucrt_library_path));
-	printf("vs_exe_path:                   %.*s\n", LIT(find_result.vs_exe_path));
-	printf("vs_library_path:               %.*s\n", LIT(find_result.vs_library_path));
-
-	gb_exit(1);
-#endif
 
 			if (find_result.windows_sdk_um_library_path.len > 0) {
 				GB_ASSERT(find_result.windows_sdk_ucrt_library_path.len > 0);
