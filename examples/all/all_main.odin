@@ -96,6 +96,7 @@ import filepath       "core:path/filepath"
 
 import reflect        "core:reflect"
 import runtime        "core:runtime"
+import simd           "core:simd"
 import slice          "core:slice"
 import sort           "core:sort"
 import strconv        "core:strconv"
