@@ -47,6 +47,13 @@ void debugf(char const *fmt, ...);
 #include "range_cache.cpp"
 
 
+bool is_power_of_two(i64 x) {
+	if (x <= 0) {
+		return false;
+	}
+	return !(x & (x-1));
+}
+
 int isize_cmp(isize x, isize y) {
 	if (x < y) {
 		return -1;

@@ -1567,9 +1567,16 @@ bool check_unary_op(CheckerContext *c, Operand *o, Token op) {
 
 bool check_binary_op(CheckerContext *c, Operand *o, Token op) {
 	Type *main_type = o->type;
+
+	if (is_type_simd_vector(main_type)) {
+		error(op, "Operator '%.*s' is not supported on #simd vector types, please use the intrinsics.simd_*", LIT(op.string));
+		return false;
+	}
+
 	// TODO(bill): Handle errors correctly
 	Type *type = base_type(core_array_type(main_type));
 	Type *ct = core_type(type);
+
 	switch (op.kind) {
 	case Token_Sub:
 	case Token_SubEq:
@@ -1638,14 +1645,6 @@ bool check_binary_op(CheckerContext *c, Operand *o, Token op) {
 			error(op, "Operator '%.*s' is only allowed with integers", LIT(op.string));
 			return false;
 		}
-		if (is_type_simd_vector(o->type)) {
-			switch (op.kind) {
-			case Token_ModMod:
-			case Token_ModModEq:
-				error(op, "Operator '%.*s' is only allowed with integers", LIT(op.string));
-				return false;
-			}
-		}
 		break;
 
 	case Token_AndNot:
@@ -1653,14 +1652,6 @@ bool check_binary_op(CheckerContext *c, Operand *o, Token op) {
 		if (!is_type_integer(ct) && !is_type_bit_set(ct)) {
 			error(op, "Operator '%.*s' is only allowed with integers and bit sets", LIT(op.string));
 			return false;
-		}
-		if (is_type_simd_vector(o->type)) {
-			switch (op.kind) {
-			case Token_AndNot:
-			case Token_AndNotEq:
-				error(op, "Operator '%.*s' is only allowed with integers", LIT(op.string));
-				return false;
-			}
 		}
 		break;
 
@@ -7738,6 +7729,7 @@ ExprKind check_compound_literal(CheckerContext *c, Operand *o, Ast *node, Type *
 		}
 
 		if (cl->elems.count > 0 && cl->elems[0]->kind == Ast_FieldValue) {
+			// TODO(bill): Why was this decision made for simd?
 			if (is_type_simd_vector(t)) {
 				error(cl->elems[0], "'field = value' is not allowed for SIMD vector literals");
 			} else {
