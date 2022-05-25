@@ -10,6 +10,6 @@ unload_library :: proc(library: Library) -> bool {
 	return _unload_library(library)
 }
 
-symbol_address :: proc(library: Library, symbol: string) -> (ptr: rawptr, found: bool) {
+symbol_address :: proc(library: Library, symbol: string) -> (ptr: rawptr, found: bool) #optional_ok {
 	return _symbol_address(library, symbol)
 }
