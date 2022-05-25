@@ -824,8 +824,11 @@ bool check_builtin_simd_operation(CheckerContext *c, Operand *operand, Ast *call
 				error(cond.expr, "'%.*s' expected a simd vector boolean type", LIT(builtin_name));
 				return false;
 			}
-			if (!is_type_boolean(base_array_type(cond.type))) {
-				error(cond.expr, "'%.*s' expected a simd vector boolean type", LIT(builtin_name));
+			Type *cond_elem = base_array_type(cond.type);
+			if (!is_type_boolean(cond_elem) && !is_type_integer(cond_elem)) {
+				gbString cond_str = type_to_string(cond.type);
+				error(cond.expr, "'%.*s' expected a simd vector boolean or integer type, got '%s'", LIT(builtin_name), cond_str);
+				gb_string_free(cond_str);
 				return false;
 			}
 
