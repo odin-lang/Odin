@@ -762,7 +762,6 @@ bool check_builtin_simd_operation(CheckerContext *c, Operand *operand, Ast *call
 		{
 			Operand x = {};
 			Operand y = {};
-			Operand z = {};
 			check_expr(c, &x, ce->args[0]); if (x.mode == Addressing_Invalid) { return false; }
 			check_expr_with_type_hint(c, &y, ce->args[1], x.type); if (y.mode == Addressing_Invalid) { return false; }
 			convert_to_typed(c, &y, x.type);
@@ -784,34 +783,53 @@ bool check_builtin_simd_operation(CheckerContext *c, Operand *operand, Ast *call
 			}
 			Type *elem = base_array_type(x.type);
 
-			check_expr(c, &z, ce->args[2]); if (z.mode == Addressing_Invalid) { return false; }
-			Type *z_elem = base_array_type(z.type);
-			if (!is_type_simd_vector(z.type) || !are_types_identical(z_elem, t_u32)) {
-				gbString zstr = type_to_string(z.type);
-				error(z.expr, "'%.*s' expected a simd vector type with an element of type 'u32', got '%s'", LIT(builtin_name), zstr);
-				gb_string_free(zstr);
+			i64 max_count = x.type->SimdVector.count + y.type->SimdVector.count;
+
+			i64 arg_count = 0;
+			for_array(i, ce->args) {
+				if (i < 2) {
+					continue;
+				}
+				Ast *arg = ce->args[i];
+				Operand op = {};
+				check_expr(c, &op, arg);
+				if (op.mode == Addressing_Invalid) {
+					return false;
+				}
+				Type *arg_type = base_type(op.type);
+				if (!is_type_integer(arg_type) || op.mode != Addressing_Constant) {
+					error(op.expr, "Indices to '%.*s' must be constant integers", LIT(builtin_name));
+					return false;
+				}
+
+				if (big_int_is_neg(&op.value.value_integer)) {
+					error(op.expr, "Negative '%.*s' index", LIT(builtin_name));
+					return false;
+				}
+
+				BigInt mc = {};
+				big_int_from_i64(&mc, max_count);
+				if (big_int_cmp(&mc, &op.value.value_integer) <= 0) {
+					error(op.expr, "'%.*s' index exceeds length", LIT(builtin_name));
+					return false;
+				}
+
+				arg_count++;
+			}
+
+			if (arg_count > max_count) {
+				error(call, "Too many '%.*s' indices, %td > %td", LIT(builtin_name), arg_count, max_count);
 				return false;
 			}
 
-			i64 x_count = x.type->SimdVector.count;
-			i64 z_count = z.type->SimdVector.count;
 
-			if (!is_power_of_two(z_count)) {
-				gbString zstr = type_to_string(z.type);
-				error(z.expr, "'%.*s' expected a simd vector type with a power of two length, got '%s'", LIT(builtin_name), zstr);
-				gb_string_free(zstr);
+			if (!is_power_of_two(arg_count)) {
+				error(call, "'%.*s' must have a power of two index arguments, got %lld", LIT(builtin_name), cast(long long)arg_count);
 				return false;
 			}
-			if (z_count > x_count) {
-				gbString zstr = type_to_string(z.type);
-				error(z.expr, "'%.*s' expected a simd vector type excepts the sum of the two input vectors, got '%s'", LIT(builtin_name), zstr);
-				gb_string_free(zstr);
-				return false;
-			}
-
 
 			operand->mode = Addressing_Value;
-			operand->type = alloc_type_simd_vector(z_count, elem);
+			operand->type = alloc_type_simd_vector(arg_count, elem);
 			return true;
 		}
 
@@ -869,36 +887,6 @@ bool check_builtin_simd_operation(CheckerContext *c, Operand *operand, Ast *call
 		}
 
 
-
-	// case BuiltinProc_simd_rotate_left:
-	// 	{
-	// 		Operand x = {};
-	// 		check_expr(c, &x, ce->args[0]); if (x.mode == Addressing_Invalid) { return false; }
-
-	// 		if (!is_type_simd_vector(x.type)) {
-	// 			error(x.expr, "'%.*s' expected a simd vector type", LIT(builtin_name));
-	// 			return false;
-	// 		}
-	// 		Type *elem = base_array_type(x.type);
-	// 		if (!is_type_integer(elem) && !is_type_float(elem)) {
-	// 			gbString xs = type_to_string(x.type);
-	// 			error(x.expr, "'%.*s' expected a #simd type with an integer or floating point element, got '%s'", LIT(builtin_name), xs);
-	// 			gb_string_free(xs);
-	// 			return false;
-	// 		}
-
-	// 		Operand offset = {};
-	// 		check_expr_with_type_hint(c, &offset, ce->args[1]); if (x.mode == Addressing_Invalid) { return false; }
-	// 		convert_to_typed(c, &offset, t_int);
-	// 		if (offset.mode != Addressing_Constant) {
-	// 			error(offset.expr, "'%.*s' expected a constant integer for the offset", LIT(builtin_name));
-	// 			return false;
-	// 		}
-
-	// 		operand->mode = Addressing_Value;
-	// 		operand->type = x.type;
-	// 		return true
-	// 	}
 	default:
 		GB_PANIC("Unhandled simd intrinsic: %.*s", LIT(builtin_name));
 	}
@@ -1540,6 +1528,11 @@ bool check_builtin_procedure(CheckerContext *c, Operand *operand, Ast *call, i32
 			           bt->Struct.soa_kind == StructSoa_Dynamic) {
 				mode = Addressing_Value;
 			}
+		} else if (is_type_simd_vector(op_type)) {
+			Type *bt = base_type(op_type);
+			mode  = Addressing_Constant;
+			value = exact_value_i64(bt->SimdVector.count);
+			type  = t_untyped_integer;
 		}
 		if (operand->mode == Addressing_Type && mode != Addressing_Constant) {
 			mode = Addressing_Invalid;

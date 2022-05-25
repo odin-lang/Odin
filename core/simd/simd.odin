@@ -93,11 +93,11 @@ to_array_ptr :: #force_inline proc "contextless" (v: ^#simd[$LANES]$E) -> ^[LANE
 to_array :: #force_inline proc "contextless" (v: #simd[$LANES]$E) -> [LANES]E {
 	return transmute([LANES]E)(v)
 }
-from_array :: #force_inline proc "contextless" (v: $A/[$LANES]$E) -> #simd[LANES]E where LANES & (LANES-1) == 0 {
+from_array :: #force_inline proc "contextless" (v: $A/[$LANES]$E) -> #simd[LANES]E {
 	return transmute(#simd[LANES]E)v
 }
 
-from_slice :: proc($T: typeid/#simd[$LANES]$E, slice: []E) -> T where LANES & (LANES-1) == 0 {
+from_slice :: proc($T: typeid/#simd[$LANES]$E, slice: []E) -> T {
 	assert(len(slice) >= LANES, "slice length must be a least the number of lanes")
 	array: [LANES]E
 	#no_bounds_check for i in 0..<LANES {
