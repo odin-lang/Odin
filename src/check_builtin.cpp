@@ -246,7 +246,7 @@ bool is_constant_string(CheckerContext *c, String const &builtin_name, Ast *expr
 }
 
 bool check_builtin_objc_procedure(CheckerContext *c, Operand *operand, Ast *call, i32 id, Type *type_hint) {
-	String builtin_name = builtin_procs[id].name;
+	String const &builtin_name = builtin_procs[id].name;
 
 	if (build_context.metrics.os != TargetOs_darwin) {
 		// allow on doc generation (e.g. Metal stuff)
@@ -409,6 +409,194 @@ bool check_atomic_memory_order_argument(CheckerContext *c, Ast *expr, String con
 
 }
 
+
+bool check_builtin_simd_operation(CheckerContext *c, Operand *operand, Ast *call, i32 id, Type *type_hint) {
+	ast_node(ce, CallExpr, call);
+
+	String const &builtin_name = builtin_procs[id].name;
+	switch (id) {
+	// Any numeric
+	case BuiltinProc_simd_add:
+	case BuiltinProc_simd_sub:
+	case BuiltinProc_simd_mul:
+	case BuiltinProc_simd_div:
+	case BuiltinProc_simd_min:
+	case BuiltinProc_simd_max:
+		{
+			Operand x = {};
+			Operand y = {};
+			check_expr(c, &x, ce->args[0]);
+			check_expr(c, &y, ce->args[1]);
+			if (x.mode == Addressing_Invalid) {
+				return false;
+			}
+			if (y.mode == Addressing_Invalid) {
+				return false;
+			}
+			if (!is_type_simd_vector(x.type)) {
+				error(x.expr, "'%.*s' expected a simd vector type", LIT(builtin_name));
+				return false;
+			}
+			if (!is_type_simd_vector(y.type)) {
+				error(y.expr, "'%.*s' expected a simd vector type", LIT(builtin_name));
+				return false;
+			}
+			if (!are_types_identical(x.type, y.type)) {
+				gbString xs = type_to_string(x.type);
+				gbString ys = type_to_string(y.type);
+				error(x.expr, "'%.*s' expected 2 arguments of the same type, got '%s' vs '%s'", LIT(builtin_name), xs, ys);
+				gb_string_free(ys);
+				gb_string_free(xs);
+				return false;
+			}
+			Type *elem = base_array_type(x.type);
+			if (!is_type_integer(elem) && !is_type_float(elem)) {
+				gbString xs = type_to_string(x.type);
+				error(x.expr, "'%.*s' expected a #simd type with an integer or floating-point element, got '%s'", LIT(builtin_name), xs);
+				gb_string_free(xs);
+				return false;
+			}
+
+			operand->mode = Addressing_Value;
+			operand->type = x.type;
+			return true;
+		}
+
+	// Integer only
+	case BuiltinProc_simd_rem:
+	case BuiltinProc_simd_shl:
+	case BuiltinProc_simd_shr:
+	case BuiltinProc_simd_shl_masked:
+	case BuiltinProc_simd_shr_masked:
+	case BuiltinProc_simd_and:
+	case BuiltinProc_simd_or:
+	case BuiltinProc_simd_xor:
+		{
+			Operand x = {};
+			Operand y = {};
+			check_expr(c, &x, ce->args[0]);
+			check_expr(c, &y, ce->args[1]);
+			if (x.mode == Addressing_Invalid) {
+				return false;
+			}
+			if (y.mode == Addressing_Invalid) {
+				return false;
+			}
+			if (!is_type_simd_vector(x.type)) {
+				error(x.expr, "'%.*s' expected a simd vector type", LIT(builtin_name));
+				return false;
+			}
+			if (!is_type_simd_vector(y.type)) {
+				error(y.expr, "'%.*s' expected a simd vector type", LIT(builtin_name));
+				return false;
+			}
+			if (!are_types_identical(x.type, y.type)) {
+				gbString xs = type_to_string(x.type);
+				gbString ys = type_to_string(y.type);
+				error(x.expr, "'%.*s' expected 2 arguments of the same type, got '%s' vs '%s'", LIT(builtin_name), xs, ys);
+				gb_string_free(ys);
+				gb_string_free(xs);
+				return false;
+			}
+			Type *elem = base_array_type(x.type);
+			if (!is_type_integer(elem)) {
+				gbString xs = type_to_string(x.type);
+				error(x.expr, "'%.*s' expected a #simd type with an integer element, got '%s'", LIT(builtin_name), xs);
+				gb_string_free(xs);
+				return false;
+			}
+
+			operand->mode = Addressing_Value;
+			operand->type = x.type;
+			return true;
+		}
+	// Unary
+	case BuiltinProc_simd_neg:
+	case BuiltinProc_simd_abs:
+		{
+			Operand x = {};
+			check_expr(c, &x, ce->args[0]);
+			if (x.mode == Addressing_Invalid) {
+				return false;
+			}
+			if (!is_type_simd_vector(x.type)) {
+				error(x.expr, "'%.*s' expected a simd vector type", LIT(builtin_name));
+				return false;
+			}
+			Type *elem = base_array_type(x.type);
+			if (!is_type_integer(elem) && !is_type_float(elem)) {
+				gbString xs = type_to_string(x.type);
+				error(x.expr, "'%.*s' expected a #simd type with an integer or floating-point element, got '%s'", LIT(builtin_name), xs);
+				gb_string_free(xs);
+				return false;
+			}
+			operand->mode = Addressing_Value;
+			operand->type = x.type;
+			return true;
+		}
+
+	// Return integer masks
+	case BuiltinProc_simd_eq:
+	case BuiltinProc_simd_ne:
+	case BuiltinProc_simd_lt:
+	case BuiltinProc_simd_le:
+	case BuiltinProc_simd_gt:
+	case BuiltinProc_simd_ge:
+		{
+			// op(#simd[N]T, #simd[N]T) -> #simd[N]V
+			// where `V` is an integer, `size_of(T) == size_of(V)`
+			// `V` will all 0s if false and all 1s if true (e.g. 0x00 and 0xff for false and true, respectively)
+
+			Operand x = {};
+			Operand y = {};
+			check_expr(c, &x, ce->args[0]);
+			check_expr(c, &y, ce->args[1]);
+			if (x.mode == Addressing_Invalid) {
+				return false;
+			}
+			if (y.mode == Addressing_Invalid) {
+				return false;
+			}
+			if (!is_type_simd_vector(x.type)) {
+				error(x.expr, "'%.*s' expected a simd vector type", LIT(builtin_name));
+				return false;
+			}
+			Type *elem = base_array_type(x.type);
+			if (!is_type_integer(elem) && !is_type_float(elem)) {
+				gbString xs = type_to_string(x.type);
+				error(x.expr, "'%.*s' expected a #simd type with an integer or floating-point element, got '%s'", LIT(builtin_name), xs);
+				gb_string_free(xs);
+				return false;
+			}
+			Type *vt = base_type(x.type);
+			GB_ASSERT(vt->kind == Type_SimdVector);
+			i64 count = vt->SimdVector.count;
+
+			i64 sz = type_size_of(elem);
+			Type *new_elem = nullptr;
+
+			switch (sz) {
+			case 1: new_elem = t_u8;  break;
+			case 2: new_elem = t_u16; break;
+			case 4: new_elem = t_u32; break;
+			case 8: new_elem = t_u64; break;
+			case 16:
+				error(x.expr, "'%.*s' not supported 128-bit integer backed simd vector types", LIT(builtin_name));
+				return false;
+			}
+
+			operand->mode = Addressing_Value;
+			operand->type = alloc_type_simd_vector(count, new_elem);
+			return true;
+		}
+	default:
+		GB_PANIC("Unhandled simd intrinsic: %.*s", LIT(builtin_name));
+	}
+
+	return false;
+}
+
+
 bool check_builtin_procedure(CheckerContext *c, Operand *operand, Ast *call, i32 id, Type *type_hint) {
 	ast_node(ce, CallExpr, call);
 	if (ce->inlining != ProcInlining_none) {
@@ -479,7 +667,7 @@ bool check_builtin_procedure(CheckerContext *c, Operand *operand, Ast *call, i32
 		break;
 	}
 
-	String builtin_name = builtin_procs[id].name;
+	String const &builtin_name = builtin_procs[id].name;
 
 
 	if (ce->args.count > 0) {
@@ -489,6 +677,16 @@ bool check_builtin_procedure(CheckerContext *c, Operand *operand, Ast *call, i32
 				return false;
 			}
 		}
+	}
+
+	if (BuiltinProc__simd_begin < id && id < BuiltinProc__simd_end) {
+		bool ok = check_builtin_simd_operation(c, operand, call, id, type_hint);
+		if (!ok) {
+			operand->type = t_invalid;
+		}
+		operand->mode = Addressing_Value;
+		operand->value = {};
+		return ok;
 	}
 
 	switch (id) {
@@ -2715,6 +2913,13 @@ bool check_builtin_procedure(CheckerContext *c, Operand *operand, Ast *call, i32
 			gbString str = type_to_string(elem);
 			error(call, "Invalid element type for 'intrinsics.simd_vector', expected an integer or float with no specific endianness, got '%s'", str);
 			gb_string_free(str);
+			operand->mode = Addressing_Type;
+			operand->type = t_invalid;
+			return false;
+		}
+
+		if (count < 1 || !is_power_of_two(count)) {
+			error(call, "Invalid length for 'intrinsics.simd_vector', expected a power of two length, got '%lld'", cast(long long)count);
 			operand->mode = Addressing_Type;
 			operand->type = t_invalid;
 			return false;

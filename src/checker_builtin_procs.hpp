@@ -118,6 +118,35 @@ enum BuiltinProcId {
 	BuiltinProc_fixed_point_div_sat,
 
 	BuiltinProc_expect,
+
+BuiltinProc__simd_begin,
+	BuiltinProc_simd_add,
+	BuiltinProc_simd_sub,
+	BuiltinProc_simd_mul,
+	BuiltinProc_simd_div,
+	BuiltinProc_simd_rem,
+	BuiltinProc_simd_shl,        // Odin logic
+	BuiltinProc_simd_shr,        // Odin logic
+	BuiltinProc_simd_shl_masked, // C logic
+	BuiltinProc_simd_shr_masked, // C logic
+
+	BuiltinProc_simd_and,
+	BuiltinProc_simd_or,
+	BuiltinProc_simd_xor,
+
+	BuiltinProc_simd_neg,
+	BuiltinProc_simd_abs,
+
+	BuiltinProc_simd_min,
+	BuiltinProc_simd_max,
+
+	BuiltinProc_simd_eq,
+	BuiltinProc_simd_ne,
+	BuiltinProc_simd_lt,
+	BuiltinProc_simd_le,
+	BuiltinProc_simd_gt,
+	BuiltinProc_simd_ge,
+BuiltinProc__simd_end,
 	
 	// Platform specific intrinsics
 	BuiltinProc_syscall,
@@ -342,7 +371,33 @@ gb_global BuiltinProc builtin_procs[BuiltinProc_COUNT] = {
 	{STR_LIT("fixed_point_div_sat"), 3, false, Expr_Expr, BuiltinProcPkg_intrinsics},
 
 	{STR_LIT("expect"), 2, false, Expr_Expr, BuiltinProcPkg_intrinsics},
-	
+
+	{STR_LIT(""), 0, false, Expr_Stmt, BuiltinProcPkg_intrinsics},
+	{STR_LIT("simd_add"), 2, false, Expr_Expr, BuiltinProcPkg_intrinsics},
+	{STR_LIT("simd_sub"), 2, false, Expr_Expr, BuiltinProcPkg_intrinsics},
+	{STR_LIT("simd_mul"), 2, false, Expr_Expr, BuiltinProcPkg_intrinsics},
+	{STR_LIT("simd_div"), 2, false, Expr_Expr, BuiltinProcPkg_intrinsics},
+	{STR_LIT("simd_rem"), 2, false, Expr_Expr, BuiltinProcPkg_intrinsics},
+	{STR_LIT("simd_shl"), 2, false, Expr_Expr, BuiltinProcPkg_intrinsics},
+	{STR_LIT("simd_shr"), 2, false, Expr_Expr, BuiltinProcPkg_intrinsics},
+	{STR_LIT("simd_shl_masked"), 2, false, Expr_Expr, BuiltinProcPkg_intrinsics},
+	{STR_LIT("simd_shr_masked"), 2, false, Expr_Expr, BuiltinProcPkg_intrinsics},
+	{STR_LIT("simd_and"), 2, false, Expr_Expr, BuiltinProcPkg_intrinsics},
+	{STR_LIT("simd_or"),  2, false, Expr_Expr, BuiltinProcPkg_intrinsics},
+	{STR_LIT("simd_xor"), 2, false, Expr_Expr, BuiltinProcPkg_intrinsics},
+	{STR_LIT("simd_neg"), 1, false, Expr_Expr, BuiltinProcPkg_intrinsics},
+	{STR_LIT("simd_abs"), 2, false, Expr_Expr, BuiltinProcPkg_intrinsics},
+	{STR_LIT("simd_min"), 2, false, Expr_Expr, BuiltinProcPkg_intrinsics},
+	{STR_LIT("simd_max"), 2, false, Expr_Expr, BuiltinProcPkg_intrinsics},
+	{STR_LIT("simd_eq"),  2, false, Expr_Expr, BuiltinProcPkg_intrinsics},
+	{STR_LIT("simd_ne"),  2, false, Expr_Expr, BuiltinProcPkg_intrinsics},
+	{STR_LIT("simd_lt"),  2, false, Expr_Expr, BuiltinProcPkg_intrinsics},
+	{STR_LIT("simd_le"),  2, false, Expr_Expr, BuiltinProcPkg_intrinsics},
+	{STR_LIT("simd_gt"),  2, false, Expr_Expr, BuiltinProcPkg_intrinsics},
+	{STR_LIT("simd_ge"),  2, false, Expr_Expr, BuiltinProcPkg_intrinsics},
+	{STR_LIT(""), 0, false, Expr_Stmt, BuiltinProcPkg_intrinsics},
+
+
 	{STR_LIT("syscall"), 1, true, Expr_Expr, BuiltinProcPkg_intrinsics},
 
 

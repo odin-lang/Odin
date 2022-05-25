@@ -2803,7 +2803,7 @@ bool check_type_internal(CheckerContext *ctx, Ast *e, Type **type, Type *named_t
 						goto array_end;
 					}
 					if (count < 1 || !is_power_of_two(count)) {
-						error(at->elem, "Invalid length for 'intrinsics.simd_vector', expected a power of two length, got '%lld'", cast(long long)count);
+						error(at->count, "Invalid length for 'intrinsics.simd_vector', expected a power of two length, got '%lld'", cast(long long)count);
 						*type = alloc_type_array(elem, count, generic_type);
 						goto array_end;
 					}
