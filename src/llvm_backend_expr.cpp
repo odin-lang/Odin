@@ -4641,6 +4641,102 @@ lbAddr lb_build_addr(lbProcedure *p, Ast *expr) {
 			break;
 		}
 		
+		case Type_SimdVector: {
+			if (cl->elems.count > 0) {
+				lbValue vector_value = lb_const_value(p->module, type, exact_value_compound(expr));
+				defer (lb_addr_store(p, v, vector_value));
+
+				auto temp_data = array_make<lbCompoundLitElemTempData>(temporary_allocator(), 0, cl->elems.count);
+
+				// NOTE(bill): Separate value, store into their own chunks
+				for_array(i, cl->elems) {
+					Ast *elem = cl->elems[i];
+					if (elem->kind == Ast_FieldValue) {
+						ast_node(fv, FieldValue, elem);
+						if (lb_is_elem_const(fv->value, et)) {
+							continue;
+						}
+						if (is_ast_range(fv->field)) {
+							ast_node(ie, BinaryExpr, fv->field);
+							TypeAndValue lo_tav = ie->left->tav;
+							TypeAndValue hi_tav = ie->right->tav;
+							GB_ASSERT(lo_tav.mode == Addressing_Constant);
+							GB_ASSERT(hi_tav.mode == Addressing_Constant);
+
+							TokenKind op = ie->op.kind;
+							i64 lo = exact_value_to_i64(lo_tav.value);
+							i64 hi = exact_value_to_i64(hi_tav.value);
+							if (op != Token_RangeHalf) {
+								hi += 1;
+							}
+
+							lbValue value = lb_build_expr(p, fv->value);
+
+							for (i64 k = lo; k < hi; k++) {
+								lbCompoundLitElemTempData data = {};
+								data.value = value;
+								data.elem_index = cast(i32)k;
+								array_add(&temp_data, data);
+							}
+
+						} else {
+							auto tav = fv->field->tav;
+							GB_ASSERT(tav.mode == Addressing_Constant);
+							i64 index = exact_value_to_i64(tav.value);
+
+							lbValue value = lb_build_expr(p, fv->value);
+							lbCompoundLitElemTempData data = {};
+							data.value = lb_emit_conv(p, value, et);
+							data.expr = fv->value;
+							data.elem_index = cast(i32)index;
+							array_add(&temp_data, data);
+						}
+
+					} else {
+						if (lb_is_elem_const(elem, et)) {
+							continue;
+						}
+						lbCompoundLitElemTempData data = {};
+						data.expr = elem;
+						data.elem_index = cast(i32)i;
+						array_add(&temp_data, data);
+					}
+				}
+
+
+				for_array(i, temp_data) {
+					lbValue field_expr = temp_data[i].value;
+					Ast *expr = temp_data[i].expr;
+
+					auto prev_hint = lb_set_copy_elision_hint(p, lb_addr(temp_data[i].gep), expr);
+
+					if (field_expr.value == nullptr) {
+						field_expr = lb_build_expr(p, expr);
+					}
+					Type *t = field_expr.type;
+					GB_ASSERT(t->kind != Type_Tuple);
+					lbValue ev = lb_emit_conv(p, field_expr, et);
+
+					if (!p->copy_elision_hint.used) {
+						temp_data[i].value = ev;
+					}
+
+					lb_reset_copy_elision_hint(p, prev_hint);
+				}
+
+
+				// TODO(bill): reduce the need for individual `insertelement` if a `shufflevector`
+				// might be a better option
+
+				for_array(i, temp_data) {
+					if (temp_data[i].value.value != nullptr) {
+						LLVMValueRef index = lb_const_int(p->module, t_u32, temp_data[i].elem_index).value;
+						vector_value.value = LLVMBuildInsertElement(p->builder, vector_value.value, temp_data[i].value.value, index, "");
+					}
+				}
+			}
+			break;
+		}
 		}
 
 		return v;
