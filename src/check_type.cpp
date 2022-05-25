@@ -2795,14 +2795,16 @@ bool check_type_internal(CheckerContext *ctx, Ast *e, Type **type, Type *named_t
 				if (name == "soa") {
 					*type = make_soa_struct_fixed(ctx, e, at->elem, elem, count, generic_type);
 				} else if (name == "simd") {
-					if (!is_type_valid_vector_elem(elem)) {
+					if (!is_type_valid_vector_elem(elem) && !is_type_polymorphic(elem)) {
 						gbString str = type_to_string(elem);
 						error(at->elem, "Invalid element type for 'intrinsics.simd_vector', expected an integer or float with no specific endianness, got '%s'", str);
 						gb_string_free(str);
 						*type = alloc_type_array(elem, count, generic_type);
 						goto array_end;
 					}
-					if (count < 1 || !is_power_of_two(count)) {
+					if (is_type_polymorphic(elem)) {
+						count = 1;
+					} else if (count < 1 || !is_power_of_two(count)) {
 						error(at->count, "Invalid length for 'intrinsics.simd_vector', expected a power of two length, got '%lld'", cast(long long)count);
 						*type = alloc_type_array(elem, count, generic_type);
 						goto array_end;

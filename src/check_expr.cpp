@@ -4119,7 +4119,11 @@ ExactValue get_constant_field(CheckerContext *c, Operand const *operand, Selecti
 
 Type *determine_swizzle_array_type(Type *original_type, Type *type_hint, isize new_count) {
 	Type *array_type = base_type(type_deref(original_type));
-	GB_ASSERT(array_type->kind == Type_Array);
+	GB_ASSERT(array_type->kind == Type_Array || array_type->kind == Type_SimdVector);
+	if (array_type->kind == Type_SimdVector) {
+		Type *elem_type = array_type->SimdVector.elem;
+		return alloc_type_simd_vector(new_count, elem_type);
+	}
 	Type *elem_type = array_type->Array.elem;
 
 	Type *swizzle_array_type = nullptr;

@@ -694,6 +694,36 @@ bool check_builtin_simd_operation(CheckerContext *c, Operand *operand, Ast *call
 			return true;
 		}
 		break;
+
+	// case BuiltinProc_simd_rotate_left:
+	// 	{
+	// 		Operand x = {};
+	// 		check_expr(c, &x, ce->args[0]); if (x.mode == Addressing_Invalid) { return false; }
+
+	// 		if (!is_type_simd_vector(x.type)) {
+	// 			error(x.expr, "'%.*s' expected a simd vector type", LIT(builtin_name));
+	// 			return false;
+	// 		}
+	// 		Type *elem = base_array_type(x.type);
+	// 		if (!is_type_integer(elem) && !is_type_float(elem)) {
+	// 			gbString xs = type_to_string(x.type);
+	// 			error(x.expr, "'%.*s' expected a #simd type with an integer or floating-point element, got '%s'", LIT(builtin_name), xs);
+	// 			gb_string_free(xs);
+	// 			return false;
+	// 		}
+
+	// 		Operand offset = {};
+	// 		check_expr_with_type_hint(c, &offset, ce->args[1]); if (x.mode == Addressing_Invalid) { return false; }
+	// 		convert_to_typed(c, &offset, t_int);
+	// 		if (offset.mode != Addressing_Constant) {
+	// 			error(offset.expr, "'%.*s' expected a constant integer for the offset", LIT(builtin_name));
+	// 			return false;
+	// 		}
+
+	// 		operand->mode = Addressing_Value;
+	// 		operand->type = x.type;
+	// 		return true
+	// 	}
 	default:
 		GB_PANIC("Unhandled simd intrinsic: %.*s", LIT(builtin_name));
 	}
@@ -1747,6 +1777,11 @@ bool check_builtin_procedure(CheckerContext *c, Operand *operand, Ast *call, i32
 			}
 		} else {
 			operand->mode = Addressing_Value;
+		}
+
+		if (is_type_simd_vector(type) && !is_power_of_two(arg_count)) {
+			error(call, "'swizzle' with a #simd vector must have a power of two arguments, got %lld", cast(long long)arg_count);
+			return false;
 		}
 
 		operand->type = determine_swizzle_array_type(original_type, type_hint, arg_count);
