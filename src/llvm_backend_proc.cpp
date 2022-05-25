@@ -981,6 +981,24 @@ lbValue lb_emit_call(lbProcedure *p, lbValue value, Array<lbValue> const &args, 
 	return result;
 }
 
+LLVMValueRef llvm_splat_float(i64 count, LLVMTypeRef type, f64 value) {
+	LLVMValueRef v = LLVMConstReal(type, value);
+	LLVMValueRef *values = gb_alloc_array(temporary_allocator(), LLVMValueRef, count);
+	for (i64 i = 0; i < count; i++) {
+		values[i] = v;
+	}
+	return LLVMConstVector(values, cast(unsigned)count);
+}
+LLVMValueRef llvm_splat_int(i64 count, LLVMTypeRef type, i64 value, bool is_signed=false) {
+	LLVMValueRef v = LLVMConstInt(type, value, is_signed);
+	LLVMValueRef *values = gb_alloc_array(temporary_allocator(), LLVMValueRef, count);
+	for (i64 i = 0; i < count; i++) {
+		values[i] = v;
+	}
+	return LLVMConstVector(values, cast(unsigned)count);
+}
+
+
 lbValue lb_build_builtin_simd_proc(lbProcedure *p, Ast *expr, TypeAndValue const &tv, BuiltinProcId builtin_id) {
 	ast_node(ce, CallExpr, expr);
 
@@ -1060,12 +1078,7 @@ lbValue lb_build_builtin_simd_proc(lbProcedure *p, Ast *expr, TypeAndValue const
 			case BuiltinProc_simd_shr_masked: op_code = is_signed ? LLVMAShr : LLVMLShr; is_masked = true;  break;
 			}
 			if (op_code) {
-				LLVMValueRef bit_value = lb_const_int(m, elem1, sz*8 - 1).value;
-				LLVMValueRef *values = gb_alloc_array(temporary_allocator(), LLVMValueRef, count);
-				for (i64 i = 0; i < count; i++) {
-					values[i] = bit_value;
-				}
-				LLVMValueRef bits = LLVMConstVector(values, cast(unsigned)count);
+				LLVMValueRef bits = llvm_splat_int(count, lb_type(m, elem1), sz*8 - 1);
 				if (is_masked) {
 					// C logic
 					LLVMValueRef shift = LLVMBuildAnd(p->builder, arg1.value, bits, "");
@@ -1077,7 +1090,6 @@ lbValue lb_build_builtin_simd_proc(lbProcedure *p, Ast *expr, TypeAndValue const
 					LLVMValueRef shift = LLVMBuildBinOp(p->builder, op_code, arg0.value, arg1.value, "");
 					res.value = LLVMBuildSelect(p->builder, mask, shift, zero, "");
 				}
-
 				return res;
 			}
 		}
@@ -1264,7 +1276,24 @@ lbValue lb_build_builtin_simd_proc(lbProcedure *p, Ast *expr, TypeAndValue const
 
 			lbValue res = {};
 			res.value = LLVMBuildCall(p->builder, ip, args, gb_count_of(args), "");
-			res.type = tv.type;
+			return res;
+		}
+
+	case BuiltinProc_simd_shuffle:
+		{
+			arg1 = lb_build_expr(p, ce->args[1]);
+			arg2 = lb_build_expr(p, ce->args[2]);
+
+			Type *vt = arg0.type;
+			GB_ASSERT(vt->kind == Type_SimdVector);
+
+			LLVMValueRef mask = arg2.value;
+
+			i64 max_count = vt->SimdVector.count*2;
+			LLVMValueRef max_mask = llvm_splat_int(max_count, lb_type(m, arg2.type->SimdVector.elem), max_count-1);
+			mask = LLVMBuildAnd(p->builder, mask, max_mask, "");
+
+			res.value = LLVMBuildShuffleVector(p->builder, arg0.value, arg1.value, mask, "");
 			return res;
 		}
 	}

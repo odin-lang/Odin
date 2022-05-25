@@ -157,6 +157,8 @@ BuiltinProc__simd_begin,
 	BuiltinProc_simd_reduce_and,
 	BuiltinProc_simd_reduce_or,
 	BuiltinProc_simd_reduce_xor,
+
+	BuiltinProc_simd_shuffle,
 BuiltinProc__simd_end,
 	
 	// Platform specific intrinsics
@@ -417,6 +419,8 @@ gb_global BuiltinProc builtin_procs[BuiltinProc_COUNT] = {
 	{STR_LIT("simd_reduce_and"),         1, false, Expr_Expr, BuiltinProcPkg_intrinsics},
 	{STR_LIT("simd_reduce_or"),          1, false, Expr_Expr, BuiltinProcPkg_intrinsics},
 	{STR_LIT("simd_reduce_xor"),         1, false, Expr_Expr, BuiltinProcPkg_intrinsics},
+
+	{STR_LIT("simd_shuffle"), 3, false, Expr_Expr, BuiltinProcPkg_intrinsics},
 	{STR_LIT(""), 0, false, Expr_Stmt, BuiltinProcPkg_intrinsics},
 
 

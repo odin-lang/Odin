@@ -1,6 +1,27 @@
 package simd
 
+import "core:builtin"
 import "core:intrinsics"
+
+// boolx16 :: #simd[16]bool
+// b8x16   :: #simd[16]b8
+// b16x8   :: #simd[8]b16
+// b32x4   :: #simd[4]b32
+// b64x2   :: #simd[2]b64
+
+// u8x16 :: #simd[16]u8
+// i8x16 :: #simd[16]i8
+// u16x8 :: #simd[8]u16
+// i16x8 :: #simd[8]i16
+// u32x4 :: #simd[4]u32
+// i32x4 :: #simd[4]i32
+// u64x2 :: #simd[2]u64
+// i64x2 :: #simd[2]i64
+
+// f16x8 :: #simd[8]f16
+// f32x4 :: #simd[4]f32
+// f64x2 :: #simd[2]f64
+
 
 add        :: intrinsics.simd_add
 sub        :: intrinsics.simd_sub
@@ -41,6 +62,9 @@ reduce_max         :: intrinsics.simd_reduce_max
 reduce_and         :: intrinsics.simd_reduce_and
 reduce_or          :: intrinsics.simd_reduce_or
 reduce_xor         :: intrinsics.simd_reduce_xor
+
+swizzle :: builtin.swizzle
+shuffle :: intrinsics.simd_shuffle
 
 splat :: #force_inline proc "contextless" ($T: typeid/#simd[$LANES]$E, value: E) -> T {
 	return T{0..<LANES = value}
