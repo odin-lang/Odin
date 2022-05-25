@@ -651,7 +651,7 @@ bool check_builtin_simd_operation(CheckerContext *c, Operand *operand, Ast *call
 			return true;
 		}
 		break;
-	case BuiltinProc_simd_insert:
+	case BuiltinProc_simd_replace:
 		{
 			Operand x = {};
 			check_expr(c, &x, ce->args[0]); if (x.mode == Addressing_Invalid) { return false; }

@@ -1179,7 +1179,7 @@ lbValue lb_build_builtin_simd_proc(lbProcedure *p, Ast *expr, TypeAndValue const
 		arg1 = lb_build_expr(p, ce->args[1]);
 		res.value = LLVMBuildExtractElement(p->builder, arg0.value, arg1.value, "");
 		return res;
-	case BuiltinProc_simd_insert:
+	case BuiltinProc_simd_replace:
 		arg1 = lb_build_expr(p, ce->args[1]);
 		arg2 = lb_build_expr(p, ce->args[2]);
 		res.value = LLVMBuildInsertElement(p->builder, arg0.value, arg2.value, arg1.value, "");
