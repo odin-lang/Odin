@@ -1285,11 +1285,14 @@ bool find_msvc_install_from_env_vars(gbAllocator allocator, Find_Result_Utf8 *re
 			}
 
 			// Get the root from the one we found, and make the other
+			// NOTE(WalterPlinge): we need to copy the string so that we don't risk a double free
 			if (result->windows_sdk_um_library_path.len > 0) {
-				result->windows_sdk_root = substring(result->windows_sdk_um_library_path, 0, result->windows_sdk_um_library_path.len - 1 - um_dir.len);
+				String root = substring(result->windows_sdk_um_library_path, 0, result->windows_sdk_um_library_path.len - 1 - um_dir.len);
+				result->windows_sdk_root = copy_string(allocator, root);
 				result->windows_sdk_ucrt_library_path = concatenate3_strings(allocator, result->windows_sdk_root, ucrt_dir, make_string_c("\\"));
 			} else if (result->windows_sdk_ucrt_library_path.len > 0) {
-				result->windows_sdk_root = substring(result->windows_sdk_ucrt_library_path, 0, result->windows_sdk_ucrt_library_path.len - 1 - ucrt_dir.len);
+				String root = substring(result->windows_sdk_ucrt_library_path, 0, result->windows_sdk_ucrt_library_path.len - 1 - ucrt_dir.len);
+				result->windows_sdk_root = copy_string(allocator, root);
 				result->windows_sdk_um_library_path = concatenate3_strings(allocator, result->windows_sdk_root, um_dir, make_string_c("\\"));
 			}
 
