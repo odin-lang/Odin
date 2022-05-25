@@ -7885,7 +7885,7 @@ ExprKind check_compound_literal(CheckerContext *c, Operand *o, Ast *node, Type *
 
 		if (t->kind == Type_SimdVector) {
 			if (!is_constant) {
-				error(node, "Expected all constant elements for a simd vector");
+				// error(node, "Expected all constant elements for a simd vector");
 			}
 		}
 
