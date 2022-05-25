@@ -815,6 +815,57 @@ bool check_builtin_simd_operation(CheckerContext *c, Operand *operand, Ast *call
 			return true;
 		}
 
+	case BuiltinProc_simd_select:
+		{
+			Operand cond = {};
+			check_expr(c, &cond, ce->args[0]); if (cond.mode == Addressing_Invalid) { return false; }
+
+			if (!is_type_simd_vector(cond.type)) {
+				error(cond.expr, "'%.*s' expected a simd vector boolean type", LIT(builtin_name));
+				return false;
+			}
+			if (!is_type_boolean(base_array_type(cond.type))) {
+				error(cond.expr, "'%.*s' expected a simd vector boolean type", LIT(builtin_name));
+				return false;
+			}
+
+			Operand x = {};
+			Operand y = {};
+			check_expr(c, &x, ce->args[1]); if (x.mode == Addressing_Invalid) { return false; }
+			check_expr_with_type_hint(c, &y, ce->args[2], x.type); if (y.mode == Addressing_Invalid) { return false; }
+			convert_to_typed(c, &y, x.type);
+			if (!is_type_simd_vector(x.type)) {
+				error(x.expr, "'%.*s' expected a simd vector type", LIT(builtin_name));
+				return false;
+			}
+			if (!is_type_simd_vector(y.type)) {
+				error(y.expr, "'%.*s' expected a simd vector type", LIT(builtin_name));
+				return false;
+			}
+			if (!are_types_identical(x.type, y.type)) {
+				gbString xs = type_to_string(x.type);
+				gbString ys = type_to_string(y.type);
+				error(x.expr, "'%.*s' expected 2 results of the same type, got '%s' vs '%s'", LIT(builtin_name), xs, ys);
+				gb_string_free(ys);
+				gb_string_free(xs);
+				return false;
+			}
+
+			if (cond.type->SimdVector.count != x.type->SimdVector.count) {
+				error(x.expr, "'%.*s' expected condition vector to match the length of the result lengths, got '%lld' vs '%lld'",
+				      LIT(builtin_name),
+				      cast(long long)cond.type->SimdVector.count,
+				      cast(long long)x.type->SimdVector.count);
+				return false;
+			}
+
+
+			operand->mode = Addressing_Value;
+			operand->type = x.type;
+			return true;
+		}
+
+
 
 	// case BuiltinProc_simd_rotate_left:
 	// 	{

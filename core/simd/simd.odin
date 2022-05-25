@@ -74,6 +74,7 @@ reduce_xor         :: intrinsics.simd_reduce_xor
 
 swizzle :: builtin.swizzle
 shuffle :: intrinsics.simd_shuffle
+select :: intrinsics.simd_select
 
 splat :: #force_inline proc "contextless" ($T: typeid/#simd[$LANES]$E, value: E) -> T {
 	return T{0..<LANES = value}
