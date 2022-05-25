@@ -201,6 +201,11 @@ lbValue lb_emit_transmute(lbProcedure *p, lbValue value, Type *t) {
 		return res;
 	}
 
+	if (is_type_simd_vector(src) && is_type_simd_vector(dst)) {
+		res.value = LLVMBuildBitCast(p->builder, value.value, lb_type(p->module, t), "");
+		return res;
+	}
+
 	if (lb_is_type_aggregate(src) || lb_is_type_aggregate(dst)) {
 		lbValue s = lb_address_from_load_or_generate_local(p, value);
 		lbValue d = lb_emit_transmute(p, s, alloc_type_pointer(t));
