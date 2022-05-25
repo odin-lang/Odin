@@ -1820,6 +1820,38 @@ lbValue lb_emit_conv(lbProcedure *p, lbValue value, Type *t) {
 		return res;
 	}
 
+	if (is_type_simd_vector(src) && is_type_simd_vector(dst)) {
+		Type *src_elem = core_array_type(src);
+		Type *dst_elem = core_array_type(dst);
+
+		GB_ASSERT(src->SimdVector.count == dst->SimdVector.count);
+
+		lbValue res = {};
+		res.type = t;
+		if (are_types_identical(src_elem, dst_elem)) {
+			res.value = value.value;
+		} else if (is_type_float(src_elem) && is_type_integer(dst_elem)) {
+			if (is_type_unsigned(dst_elem)) {
+				res.value = LLVMBuildFPToUI(p->builder, value.value, lb_type(m, t), "");
+			} else {
+				res.value = LLVMBuildFPToSI(p->builder, value.value, lb_type(m, t), "");
+			}
+		} else if (is_type_integer(src_elem) && is_type_float(dst_elem)) {
+			if (is_type_unsigned(src_elem)) {
+				res.value = LLVMBuildUIToFP(p->builder, value.value, lb_type(m, t), "");
+			} else {
+				res.value = LLVMBuildSIToFP(p->builder, value.value, lb_type(m, t), "");
+			}
+		} else if (is_type_integer(src_elem) && is_type_integer(dst_elem)) {
+			res.value = LLVMBuildIntCast2(p->builder, value.value, lb_type(m, t), !is_type_unsigned(src_elem), "");
+		} else if (is_type_float(src_elem) && is_type_float(dst_elem)) {
+			res.value = LLVMBuildFPCast(p->builder, value.value, lb_type(m, t), "");
+		} else {
+			GB_PANIC("Unhandled simd vector conversion: %s -> %s", type_to_string(src), type_to_string(dst));
+		}
+		return res;
+	}
+
 	// Pointer <-> uintptr
 	if (is_type_pointer(src) && is_type_uintptr(dst)) {
 		lbValue res = {};

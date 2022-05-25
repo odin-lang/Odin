@@ -2688,6 +2688,18 @@ bool check_is_castable_to(CheckerContext *c, Operand *operand, Type *y) {
 		return true;
 	}
 
+	if (is_type_simd_vector(src) && is_type_simd_vector(dst)) {
+		if (src->SimdVector.count != dst->SimdVector.count) {
+			return false;
+		}
+		Type *elem_src = base_array_type(src);
+		Type *elem_dst = base_array_type(dst);
+		Operand x = {};
+		x.type = elem_src;
+		x.mode = Addressing_Value;
+		return check_is_castable_to(c, &x, elem_dst);
+	}
+
 	return false;
 }
 
