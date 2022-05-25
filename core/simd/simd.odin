@@ -61,7 +61,9 @@ le :: intrinsics.simd_le
 gt :: intrinsics.simd_gt
 ge :: intrinsics.simd_ge
 
+// extract :: proc(a: #simd[N]T, idx: uint) -> T
 extract :: intrinsics.simd_extract
+// replace :: proc(a: #simd[N]T, idx: uint, elem: T) -> #simd[N]T
 replace :: intrinsics.simd_replace
 
 reduce_add_ordered :: intrinsics.simd_reduce_add_ordered
@@ -72,8 +74,13 @@ reduce_and         :: intrinsics.simd_reduce_and
 reduce_or          :: intrinsics.simd_reduce_or
 reduce_xor         :: intrinsics.simd_reduce_xor
 
+// swizzle :: proc(a: #simd[N]T, indices: ..int) -> #simd[len(indices)]T
 swizzle :: builtin.swizzle
+
+// shuffle :: proc(a, b: #simd[N]T, indices: #simd[max 2*N]u32) -> #simd[len(indices)]T
 shuffle :: intrinsics.simd_shuffle
+
+// select :: proc(cond: #simd[N]any_boolean, true, false: #simd[N]T) -> #simd[N]T
 select :: intrinsics.simd_select
 
 splat :: #force_inline proc "contextless" ($T: typeid/#simd[$LANES]$E, value: E) -> T {

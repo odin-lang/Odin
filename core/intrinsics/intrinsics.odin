@@ -186,6 +186,60 @@ type_hasher_proc :: proc($T: typeid) -> (hasher: proc "contextless" (data: rawpt
 
 constant_utf16_cstring :: proc($literal: string) -> [^]u16 ---
 
+// SIMD related
+simd_add  :: proc(a, b: #simd[N]T) -> #simd[N]T ---
+simd_sub  :: proc(a, b: #simd[N]T) -> #simd[N]T ---
+simd_mul  :: proc(a, b: #simd[N]T) -> #simd[N]T ---
+simd_div  :: proc(a, b: #simd[N]T) -> #simd[N]T ---
+simd_rem  :: proc(a, b: #simd[N]T) -> #simd[N]T ---
+
+// Keeps Odin's Behaviour
+// (x << y) if y <= mask else 0
+simd_shl :: proc(a: #simd[N]T, b: #simd[N]Unsigned_Integer) -> #simd[N]T ---
+simd_shr :: proc(a: #simd[N]T, b: #simd[N]Unsigned_Integer) -> #simd[N]T ---
+
+// Similar to C's Behaviour
+// x << (y & mask)
+simd_shl_masked :: proc(a: #simd[N]T, b: #simd[N]Unsigned_Integer) -> #simd[N]T ---
+simd_shr_masked :: proc(a: #simd[N]T, b: #simd[N]Unsigned_Integer) -> #simd[N]T ---
+
+simd_and :: proc(a, b: #simd[N]T) -> #simd[N]T ---
+simd_or  :: proc(a, b: #simd[N]T) -> #simd[N]T ---
+simd_xor :: proc(a, b: #simd[N]T) -> #simd[N]T ---
+
+simd_neg  :: proc(a: #simd[N]T) -> #simd[N]T ---
+
+simd_abs :: proc(a: #simd[N]T) -> #simd[N]T ---
+simd_min :: proc(a, b: #simd[N]T) -> #simd[N]T ---
+simd_max :: proc(a, b: #simd[N]T) -> #simd[N]T ---
+
+// Return an unsigned integer of the same size as the input type
+// NOT A BOOLEAN
+// element-wise:
+//     false => 0x00...00
+//     true  => 0xff...ff
+simd_eq :: proc(a, b: #simd[N]T) -> #simd[N]Integer ---
+simd_ne :: proc(a, b: #simd[N]T) -> #simd[N]Integer ---
+simd_lt :: proc(a, b: #simd[N]T) -> #simd[N]Integer ---
+simd_le :: proc(a, b: #simd[N]T) -> #simd[N]Integer ---
+simd_gt :: proc(a, b: #simd[N]T) -> #simd[N]Integer ---
+simd_ge :: proc(a, b: #simd[N]T) -> #simd[N]Integer ---
+
+simd_extract :: proc(a: #simd[N]T, idx: uint) -> T ---
+simd_replace :: proc(a: #simd[N]T, idx: uint, elem: T) -> #simd[N]T ---
+
+simd_reduce_add_ordered :: proc(a: #simd[N]T) -> T ---
+simd_reduce_mul_ordered :: proc(a: #simd[N]T) -> T ---
+simd_reduce_min         :: proc(a: #simd[N]T) -> T ---
+simd_reduce_max         :: proc(a: #simd[N]T) -> T ---
+simd_reduce_and         :: proc(a: #simd[N]T) -> T ---
+simd_reduce_or          :: proc(a: #simd[N]T) -> T ---
+simd_reduce_xor         :: proc(a: #simd[N]T) -> T ---
+
+simd_shuffle :: proc(a, b: #simd[N]T, indices: #simd[max 2*N]u32) -> #simd[len(indices)]T ---
+simd_select  :: proc(cond: #simd[N]any_boolean, true, false: #simd[N]T) -> #simd[N]T ---
+
+
 // WASM targets only
 wasm_memory_grow :: proc(index, delta: uintptr) -> int ---
 wasm_memory_size :: proc(index: uintptr)        -> int ---
