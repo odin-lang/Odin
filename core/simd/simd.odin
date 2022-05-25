@@ -23,31 +23,31 @@ import "core:intrinsics"
 // f64x2 :: #simd[2]f64
 
 
-add        :: intrinsics.simd_add
-sub        :: intrinsics.simd_sub
-mul        :: intrinsics.simd_mul
-div        :: intrinsics.simd_div
-rem        :: intrinsics.simd_rem
+add :: intrinsics.simd_add
+sub :: intrinsics.simd_sub
+mul :: intrinsics.simd_mul
+div :: intrinsics.simd_div
+rem :: intrinsics.simd_rem
 
 // Keeps Odin's Behaviour
 // (x << y) if y <= mask else 0
-shl        :: intrinsics.simd_shl
-shr        :: intrinsics.simd_shr
+shl :: intrinsics.simd_shl
+shr :: intrinsics.simd_shr
 
 // Similar to C's Behaviour
 // x << (y & mask)
 shl_masked :: intrinsics.simd_shl_masked
 shr_masked :: intrinsics.simd_shr_masked
 
-and     :: intrinsics.simd_and
-or      :: intrinsics.simd_or
-xor     :: intrinsics.simd_xor
+and :: intrinsics.simd_and
+or  :: intrinsics.simd_or
+xor :: intrinsics.simd_xor
 
-neg     :: intrinsics.simd_neg
+neg :: intrinsics.simd_neg
 
-abs     :: intrinsics.simd_abs
-min     :: intrinsics.simd_min
-max     :: intrinsics.simd_max
+abs :: intrinsics.simd_abs
+min :: intrinsics.simd_min
+max :: intrinsics.simd_max
 
 // Return an unsigned integer of the same size as the input type
 // NOT A BOOLEAN
