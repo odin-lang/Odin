@@ -42,16 +42,25 @@ shr_masked :: intrinsics.simd_shr_masked
 and     :: intrinsics.simd_and
 or      :: intrinsics.simd_or
 xor     :: intrinsics.simd_xor
+
 neg     :: intrinsics.simd_neg
+
 abs     :: intrinsics.simd_abs
 min     :: intrinsics.simd_min
 max     :: intrinsics.simd_max
-eq      :: intrinsics.simd_eq
-ne      :: intrinsics.simd_ne
-lt      :: intrinsics.simd_lt
-le      :: intrinsics.simd_le
-gt      :: intrinsics.simd_gt
-ge      :: intrinsics.simd_ge
+
+// Return an unsigned integer of the same size as the input type
+// NOT A BOOLEAN
+// element-wise:
+//     false => 0x00...00
+//     true  => 0xff...ff
+eq :: intrinsics.simd_eq
+ne :: intrinsics.simd_ne
+lt :: intrinsics.simd_lt
+le :: intrinsics.simd_le
+gt :: intrinsics.simd_gt
+ge :: intrinsics.simd_ge
+
 extract :: intrinsics.simd_extract
 replace :: intrinsics.simd_replace
 
