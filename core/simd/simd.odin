@@ -34,6 +34,14 @@ ge      :: intrinsics.simd_ge
 extract :: intrinsics.simd_extract
 replace :: intrinsics.simd_replace
 
+reduce_add_ordered :: intrinsics.simd_reduce_add_ordered
+reduce_mul_ordered :: intrinsics.simd_reduce_mul_ordered
+reduce_min         :: intrinsics.simd_reduce_min
+reduce_max         :: intrinsics.simd_reduce_max
+reduce_and         :: intrinsics.simd_reduce_and
+reduce_or          :: intrinsics.simd_reduce_or
+reduce_xor         :: intrinsics.simd_reduce_xor
+
 splat :: #force_inline proc "contextless" ($T: typeid/#simd[$LANES]$E, value: E) -> T {
 	return T{0..<LANES = value}
 }

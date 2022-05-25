@@ -981,7 +981,7 @@ lbValue lb_emit_call(lbProcedure *p, lbValue value, Array<lbValue> const &args, 
 	return result;
 }
 
-lbValue lb_build_builtin_simd_proc(lbProcedure *p, Ast *expr, TypeAndValue const &tv, BuiltinProcId id) {
+lbValue lb_build_builtin_simd_proc(lbProcedure *p, Ast *expr, TypeAndValue const &tv, BuiltinProcId builtin_id) {
 	ast_node(ce, CallExpr, expr);
 
 	lbModule *m = p->module;
@@ -1000,7 +1000,7 @@ lbValue lb_build_builtin_simd_proc(lbProcedure *p, Ast *expr, TypeAndValue const
 
 	LLVMOpcode op_code = cast(LLVMOpcode)0;
 
-	switch (id) {
+	switch (builtin_id) {
 	case BuiltinProc_simd_add:
 	case BuiltinProc_simd_sub:
 	case BuiltinProc_simd_mul:
@@ -1008,14 +1008,14 @@ lbValue lb_build_builtin_simd_proc(lbProcedure *p, Ast *expr, TypeAndValue const
 	case BuiltinProc_simd_rem:
 		arg1 = lb_build_expr(p, ce->args[1]);
 		if (is_float) {
-			switch (id) {
+			switch (builtin_id) {
 			case BuiltinProc_simd_add: op_code = LLVMFAdd; break;
 			case BuiltinProc_simd_sub: op_code = LLVMFSub; break;
 			case BuiltinProc_simd_mul: op_code = LLVMFMul; break;
 			case BuiltinProc_simd_div: op_code = LLVMFDiv; break;
 			}
 		} else {
-			switch (id) {
+			switch (builtin_id) {
 			case BuiltinProc_simd_add: op_code = LLVMAdd; break;
 			case BuiltinProc_simd_sub: op_code = LLVMSub; break;
 			case BuiltinProc_simd_mul: op_code = LLVMMul; break;
@@ -1053,7 +1053,7 @@ lbValue lb_build_builtin_simd_proc(lbProcedure *p, Ast *expr, TypeAndValue const
 			Type *elem1 = base_array_type(arg1.type);
 
 			bool is_masked = false;
-			switch (id) {
+			switch (builtin_id) {
 			case BuiltinProc_simd_shl:        op_code = LLVMShl;                         is_masked = false; break;
 			case BuiltinProc_simd_shr:        op_code = is_signed ? LLVMAShr : LLVMLShr; is_masked = false; break;
 			case BuiltinProc_simd_shl_masked: op_code = LLVMShl;                         is_masked = true;  break;
@@ -1086,7 +1086,7 @@ lbValue lb_build_builtin_simd_proc(lbProcedure *p, Ast *expr, TypeAndValue const
 	case BuiltinProc_simd_or:
 	case BuiltinProc_simd_xor:
 		arg1 = lb_build_expr(p, ce->args[1]);
-		switch (id) {
+		switch (builtin_id) {
 		case BuiltinProc_simd_and: op_code = LLVMAnd; break;
 		case BuiltinProc_simd_or:  op_code = LLVMOr;  break;
 		case BuiltinProc_simd_xor: op_code = LLVMXor; break;
@@ -1144,7 +1144,7 @@ lbValue lb_build_builtin_simd_proc(lbProcedure *p, Ast *expr, TypeAndValue const
 		arg1 = lb_build_expr(p, ce->args[1]);
 		if (is_float) {
 			LLVMRealPredicate pred = cast(LLVMRealPredicate)0;
-			switch (id) {
+			switch (builtin_id) {
 			case BuiltinProc_simd_eq: pred = LLVMRealOEQ; break;
 			case BuiltinProc_simd_ne: pred = LLVMRealONE; break;
 			case BuiltinProc_simd_lt: pred = LLVMRealOLT; break;
@@ -1159,7 +1159,7 @@ lbValue lb_build_builtin_simd_proc(lbProcedure *p, Ast *expr, TypeAndValue const
 			}
 		} else {
 			LLVMIntPredicate pred = cast(LLVMIntPredicate)0;
-			switch (id) {
+			switch (builtin_id) {
 			case BuiltinProc_simd_eq: pred = LLVMIntEQ; break;
 			case BuiltinProc_simd_ne: pred = LLVMIntNE; break;
 			case BuiltinProc_simd_lt: pred = is_signed ? LLVMIntSLT :LLVMIntULT; break;
@@ -1184,8 +1184,92 @@ lbValue lb_build_builtin_simd_proc(lbProcedure *p, Ast *expr, TypeAndValue const
 		arg2 = lb_build_expr(p, ce->args[2]);
 		res.value = LLVMBuildInsertElement(p->builder, arg0.value, arg2.value, arg1.value, "");
 		return res;
+
+	case BuiltinProc_simd_reduce_add_ordered:
+	case BuiltinProc_simd_reduce_mul_ordered:
+		{
+			LLVMTypeRef llvm_elem = lb_type(m, elem);
+			LLVMValueRef args[2] = {};
+			isize args_count = 0;
+
+			char const *name = nullptr;
+			switch (builtin_id) {
+			case BuiltinProc_simd_reduce_add_ordered:
+				if (is_float) {
+					name = "llvm.vector.reduce.fadd";
+					args[args_count++] = LLVMConstReal(llvm_elem, 0.0);
+				} else {
+					name = "llvm.vector.reduce.add";
+				}
+				break;
+			case BuiltinProc_simd_reduce_mul_ordered:
+				if (is_float) {
+					name = "llvm.vector.reduce.fmul";
+					args[args_count++] = LLVMConstReal(llvm_elem, 1.0);
+				} else {
+					name = "llvm.vector.reduce.mul";
+				}
+				break;
+			}
+			args[args_count++] = arg0.value;
+
+
+			LLVMTypeRef types[1] = {lb_type(p->module, arg0.type)};
+			unsigned id = LLVMLookupIntrinsicID(name, gb_strlen(name));
+			GB_ASSERT_MSG(id != 0, "Unable to find %s.%s", name, LLVMPrintTypeToString(types[0]));
+			LLVMValueRef ip = LLVMGetIntrinsicDeclaration(p->module->mod, id, types, gb_count_of(types));
+
+			lbValue res = {};
+			res.value = LLVMBuildCall(p->builder, ip, args, cast(unsigned)args_count, "");
+			res.type = tv.type;
+			return res;
+		}
+	case BuiltinProc_simd_reduce_min:
+	case BuiltinProc_simd_reduce_max:
+	case BuiltinProc_simd_reduce_and:
+	case BuiltinProc_simd_reduce_or:
+	case BuiltinProc_simd_reduce_xor:
+		{
+			char const *name = nullptr;
+			switch (builtin_id) {
+			case BuiltinProc_simd_reduce_min:
+				if (is_float) {
+					name = "llvm.vector.reduce.fmin";
+				} else if (is_signed) {
+					name = "llvm.vector.reduce.smin";
+				} else {
+					name = "llvm.vector.reduce.umin";
+				}
+				break;
+			case BuiltinProc_simd_reduce_max:
+				if (is_float) {
+					name = "llvm.vector.reduce.fmax";
+				} else if (is_signed) {
+					name = "llvm.vector.reduce.smax";
+				} else {
+					name = "llvm.vector.reduce.umax";
+				}
+				break;
+			case BuiltinProc_simd_reduce_and: name = "llvm.vector.reduce.and"; break;
+			case BuiltinProc_simd_reduce_or:  name = "llvm.vector.reduce.or";  break;
+			case BuiltinProc_simd_reduce_xor: name = "llvm.vector.reduce.xor"; break;
+			}
+			LLVMTypeRef types[1] = {lb_type(p->module, arg0.type)};
+			unsigned id = LLVMLookupIntrinsicID(name, gb_strlen(name));
+			GB_ASSERT_MSG(id != 0, "Unable to find %s.%s", name, LLVMPrintTypeToString(types[0]));
+			LLVMValueRef ip = LLVMGetIntrinsicDeclaration(p->module->mod, id, types, gb_count_of(types));
+
+			LLVMValueRef args[1] = {};
+			args[0] = arg0.value;
+
+			lbValue res = {};
+			res.value = LLVMBuildCall(p->builder, ip, args, gb_count_of(args), "");
+			res.type = tv.type;
+			return res;
+		}
 	}
-	GB_PANIC("Unhandled simd intrinsic: '%.*s'", LIT(builtin_procs[id].name));
+	GB_PANIC("Unhandled simd intrinsic: '%.*s'", LIT(builtin_procs[builtin_id].name));
+
 	return {};
 }
 
