@@ -7741,112 +7741,106 @@ ExprKind check_compound_literal(CheckerContext *c, Operand *o, Ast *node, Type *
 		}
 
 		if (cl->elems.count > 0 && cl->elems[0]->kind == Ast_FieldValue) {
-			// TODO(bill): Why was this decision made for simd?
-			if (is_type_simd_vector(t)) {
-				error(cl->elems[0], "'field = value' is not allowed for SIMD vector literals");
-			} else {
-				RangeCache rc = range_cache_make(heap_allocator());
-				defer (range_cache_destroy(&rc));
+			RangeCache rc = range_cache_make(heap_allocator());
+			defer (range_cache_destroy(&rc));
 
-				for_array(i, cl->elems) {
-					Ast *elem = cl->elems[i];
-					if (elem->kind != Ast_FieldValue) {
-						error(elem, "Mixture of 'field = value' and value elements in a literal is not allowed");
+			for_array(i, cl->elems) {
+				Ast *elem = cl->elems[i];
+				if (elem->kind != Ast_FieldValue) {
+					error(elem, "Mixture of 'field = value' and value elements in a literal is not allowed");
+					continue;
+				}
+				ast_node(fv, FieldValue, elem);
+
+				if (is_ast_range(fv->field)) {
+					Token op = fv->field->BinaryExpr.op;
+
+					Operand x = {};
+					Operand y = {};
+					bool ok = check_range(c, fv->field, &x, &y, nullptr);
+					if (!ok) {
 						continue;
 					}
-					ast_node(fv, FieldValue, elem);
-
-					if (is_ast_range(fv->field)) {
-						Token op = fv->field->BinaryExpr.op;
-
-						Operand x = {};
-						Operand y = {};
-						bool ok = check_range(c, fv->field, &x, &y, nullptr);
-						if (!ok) {
-							continue;
-						}
-						if (x.mode != Addressing_Constant || !is_type_integer(core_type(x.type))) {
-							error(x.expr, "Expected a constant integer as an array field");
-							continue;
-						}
-
-						if (y.mode != Addressing_Constant || !is_type_integer(core_type(y.type))) {
-							error(y.expr, "Expected a constant integer as an array field");
-							continue;
-						}
-
-						i64 lo = exact_value_to_i64(x.value);
-						i64 hi = exact_value_to_i64(y.value);
-						i64 max_index = hi;
-						if (op.kind == Token_RangeHalf) { // ..< (exclusive)
-							hi -= 1;
-						} else { // .. (inclusive)
-							max_index += 1;
-						}
-
-						bool new_range = range_cache_add_range(&rc, lo, hi);
-						if (!new_range) {
-							error(elem, "Overlapping field range index %lld %.*s %lld for %.*s", lo, LIT(op.string), hi, LIT(context_name));
-							continue;
-						}
-
-
-						if (max_type_count >= 0 && (lo < 0 || lo >= max_type_count)) {
-							error(elem, "Index %lld is out of bounds (0..<%lld) for %.*s", lo, max_type_count, LIT(context_name));
-							continue;
-						}
-						if (max_type_count >= 0 && (hi < 0 || hi >= max_type_count)) {
-							error(elem, "Index %lld is out of bounds (0..<%lld) for %.*s", hi, max_type_count, LIT(context_name));
-							continue;
-						}
-
-						if (max < hi) {
-							max = max_index;
-						}
-
-						Operand operand = {};
-						check_expr_with_type_hint(c, &operand, fv->value, elem_type);
-						check_assignment(c, &operand, elem_type, context_name);
-
-						is_constant = is_constant && operand.mode == Addressing_Constant;
-					} else {
-						Operand op_index = {};
-						check_expr(c, &op_index, fv->field);
-
-						if (op_index.mode != Addressing_Constant || !is_type_integer(core_type(op_index.type))) {
-							error(elem, "Expected a constant integer as an array field");
-							continue;
-						}
-						// add_type_and_value(c->info, op_index.expr, op_index.mode, op_index.type, op_index.value);
-
-						i64 index = exact_value_to_i64(op_index.value);
-
-						if (max_type_count >= 0 && (index < 0 || index >= max_type_count)) {
-							error(elem, "Index %lld is out of bounds (0..<%lld) for %.*s", index, max_type_count, LIT(context_name));
-							continue;
-						}
-
-						bool new_index = range_cache_add_index(&rc, index);
-						if (!new_index) {
-							error(elem, "Duplicate field index %lld for %.*s", index, LIT(context_name));
-							continue;
-						}
-
-						if (max < index+1) {
-							max = index+1;
-						}
-
-						Operand operand = {};
-						check_expr_with_type_hint(c, &operand, fv->value, elem_type);
-						check_assignment(c, &operand, elem_type, context_name);
-
-						is_constant = is_constant && operand.mode == Addressing_Constant;
+					if (x.mode != Addressing_Constant || !is_type_integer(core_type(x.type))) {
+						error(x.expr, "Expected a constant integer as an array field");
+						continue;
 					}
-				}
 
-				cl->max_count = max;
+					if (y.mode != Addressing_Constant || !is_type_integer(core_type(y.type))) {
+						error(y.expr, "Expected a constant integer as an array field");
+						continue;
+					}
+
+					i64 lo = exact_value_to_i64(x.value);
+					i64 hi = exact_value_to_i64(y.value);
+					i64 max_index = hi;
+					if (op.kind == Token_RangeHalf) { // ..< (exclusive)
+						hi -= 1;
+					} else { // .. (inclusive)
+						max_index += 1;
+					}
+
+					bool new_range = range_cache_add_range(&rc, lo, hi);
+					if (!new_range) {
+						error(elem, "Overlapping field range index %lld %.*s %lld for %.*s", lo, LIT(op.string), hi, LIT(context_name));
+						continue;
+					}
+
+
+					if (max_type_count >= 0 && (lo < 0 || lo >= max_type_count)) {
+						error(elem, "Index %lld is out of bounds (0..<%lld) for %.*s", lo, max_type_count, LIT(context_name));
+						continue;
+					}
+					if (max_type_count >= 0 && (hi < 0 || hi >= max_type_count)) {
+						error(elem, "Index %lld is out of bounds (0..<%lld) for %.*s", hi, max_type_count, LIT(context_name));
+						continue;
+					}
+
+					if (max < hi) {
+						max = max_index;
+					}
+
+					Operand operand = {};
+					check_expr_with_type_hint(c, &operand, fv->value, elem_type);
+					check_assignment(c, &operand, elem_type, context_name);
+
+					is_constant = is_constant && operand.mode == Addressing_Constant;
+				} else {
+					Operand op_index = {};
+					check_expr(c, &op_index, fv->field);
+
+					if (op_index.mode != Addressing_Constant || !is_type_integer(core_type(op_index.type))) {
+						error(elem, "Expected a constant integer as an array field");
+						continue;
+					}
+					// add_type_and_value(c->info, op_index.expr, op_index.mode, op_index.type, op_index.value);
+
+					i64 index = exact_value_to_i64(op_index.value);
+
+					if (max_type_count >= 0 && (index < 0 || index >= max_type_count)) {
+						error(elem, "Index %lld is out of bounds (0..<%lld) for %.*s", index, max_type_count, LIT(context_name));
+						continue;
+					}
+
+					bool new_index = range_cache_add_index(&rc, index);
+					if (!new_index) {
+						error(elem, "Duplicate field index %lld for %.*s", index, LIT(context_name));
+						continue;
+					}
+
+					if (max < index+1) {
+						max = index+1;
+					}
+
+					Operand operand = {};
+					check_expr_with_type_hint(c, &operand, fv->value, elem_type);
+					check_assignment(c, &operand, elem_type, context_name);
+
+					is_constant = is_constant && operand.mode == Addressing_Constant;
+				}
 			}
 
+			cl->max_count = max;
 		} else {
 			isize index = 0;
 			for (; index < cl->elems.count; index++) {
