@@ -1287,21 +1287,18 @@ lbValue lb_build_builtin_simd_proc(lbProcedure *p, Ast *expr, TypeAndValue const
 			GB_ASSERT(vt->kind == Type_SimdVector);
 
 
-			i64 mask_count = ce->args.count-2;
+			i64 indices_count = ce->args.count-2;
 			i64 max_count = vt->SimdVector.count*2;
 
-			LLVMValueRef *values = gb_alloc_array(temporary_allocator(), LLVMValueRef, mask_count);
+			LLVMValueRef *values = gb_alloc_array(temporary_allocator(), LLVMValueRef, indices_count);
 			for (isize i = 0; i < max_count; i++) {
 				lbValue idx = lb_build_expr(p, ce->args[i+2]);
 				GB_ASSERT(LLVMIsConstant(idx.value));
 				values[i] = idx.value;
 			}
-			LLVMValueRef mask = LLVMConstVector(values, cast(unsigned)mask_count);
+			LLVMValueRef indices = LLVMConstVector(values, cast(unsigned)indices_count);
 
-			LLVMValueRef max_mask = llvm_splat_int(mask_count, lb_type(m, t_u32), max_count-1);
-			mask = LLVMBuildAnd(p->builder, mask, max_mask, "");
-
-			res.value = LLVMBuildShuffleVector(p->builder, arg0.value, arg1.value, mask, "");
+			res.value = LLVMBuildShuffleVector(p->builder, arg0.value, arg1.value, indices, "");
 			return res;
 		}
 
