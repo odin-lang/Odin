@@ -3446,7 +3446,7 @@ i64 type_align_of_internal(Type *t, TypePath *path) {
 
 	case Type_SimdVector: {
 		// IMPORTANT TODO(bill): Figure out the alignment of vector types
-		return gb_clamp(next_pow2(type_size_of_internal(t, path)), 1, build_context.max_align);
+		return gb_clamp(next_pow2(type_size_of_internal(t, path)), 1, build_context.max_align*2);
 	}
 	
 	case Type_Matrix: 
