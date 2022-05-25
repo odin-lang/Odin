@@ -464,10 +464,6 @@ bool check_builtin_simd_operation(CheckerContext *c, Operand *operand, Ast *call
 
 	// Integer only
 	case BuiltinProc_simd_rem:
-	case BuiltinProc_simd_shl:
-	case BuiltinProc_simd_shr:
-	case BuiltinProc_simd_shl_masked:
-	case BuiltinProc_simd_shr_masked:
 	case BuiltinProc_simd_and:
 	case BuiltinProc_simd_or:
 	case BuiltinProc_simd_xor:
@@ -510,6 +506,60 @@ bool check_builtin_simd_operation(CheckerContext *c, Operand *operand, Ast *call
 			operand->type = x.type;
 			return true;
 		}
+
+	case BuiltinProc_simd_shl:
+	case BuiltinProc_simd_shr:
+	case BuiltinProc_simd_shl_masked:
+	case BuiltinProc_simd_shr_masked:
+		{
+			Operand x = {};
+			Operand y = {};
+			check_expr(c, &x, ce->args[0]);
+			check_expr(c, &y, ce->args[1]);
+			if (x.mode == Addressing_Invalid) {
+				return false;
+			}
+			if (y.mode == Addressing_Invalid) {
+				return false;
+			}
+			if (!is_type_simd_vector(x.type)) {
+				error(x.expr, "'%.*s' expected a simd vector type", LIT(builtin_name));
+				return false;
+			}
+			if (!is_type_simd_vector(y.type)) {
+				error(y.expr, "'%.*s' expected a simd vector type", LIT(builtin_name));
+				return false;
+			}
+			GB_ASSERT(x.type->kind == Type_SimdVector);
+			GB_ASSERT(y.type->kind == Type_SimdVector);
+			Type *xt = x.type;
+			Type *yt = y.type;
+
+			if (xt->SimdVector.count != yt->SimdVector.count) {
+				error(x.expr, "'%.*s' mismatched simd vector lengths, got '%lld' vs '%lld'",
+				      LIT(builtin_name),
+				      cast(long long)xt->SimdVector.count,
+				      cast(long long)yt->SimdVector.count);
+				return false;
+			}
+			if (!is_type_integer(base_array_type(x.type))) {
+				gbString xs = type_to_string(x.type);
+				error(x.expr, "'%.*s' expected a #simd type with an integer element, got '%s'", LIT(builtin_name), xs);
+				gb_string_free(xs);
+				return false;
+			}
+			if (!is_type_unsigned(base_array_type(y.type))) {
+				gbString ys = type_to_string(y.type);
+				error(y.expr, "'%.*s' expected a #simd type with an unsigned integer element as the shifting operand, got '%s'", LIT(builtin_name), ys);
+				gb_string_free(ys);
+				return false;
+			}
+
+			operand->mode = Addressing_Value;
+			operand->type = x.type;
+			return true;
+		}
+
 	// Unary
 	case BuiltinProc_simd_neg:
 	case BuiltinProc_simd_abs:
