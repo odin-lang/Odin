@@ -13,8 +13,8 @@ _load_library :: proc(path: string, global_symbols := false) -> (Library, bool) 
 	return Library(lib), lib != nil
 }
 
-_unload_library :: proc(library: Library) {
-	os.dlclose(rawptr(library))
+_unload_library :: proc(library: Library) -> bool {
+	return os.dlclose(rawptr(library))
 }
 
 _symbol_address :: proc(library: Library, symbol: string) -> (ptr: rawptr, found: bool) {
