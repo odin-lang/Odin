@@ -1842,10 +1842,13 @@ lbValue lb_emit_conv(lbProcedure *p, lbValue value, Type *t) {
 			} else {
 				res.value = LLVMBuildSIToFP(p->builder, value.value, lb_type(m, t), "");
 			}
-		} else if (is_type_integer(src_elem) && is_type_integer(dst_elem)) {
+		} else if ((is_type_integer(src_elem) || is_type_boolean(src_elem)) && is_type_integer(dst_elem)) {
 			res.value = LLVMBuildIntCast2(p->builder, value.value, lb_type(m, t), !is_type_unsigned(src_elem), "");
 		} else if (is_type_float(src_elem) && is_type_float(dst_elem)) {
 			res.value = LLVMBuildFPCast(p->builder, value.value, lb_type(m, t), "");
+		} else if (is_type_integer(src_elem) && is_type_boolean(dst_elem)) {
+			LLVMValueRef i1vector = LLVMBuildICmp(p->builder, LLVMIntNE, value.value, LLVMConstNull(LLVMTypeOf(value.value)), "");
+			res.value = LLVMBuildIntCast2(p->builder, i1vector, lb_type(m, t), !is_type_unsigned(src_elem), "");
 		} else {
 			GB_PANIC("Unhandled simd vector conversion: %s -> %s", type_to_string(src), type_to_string(dst));
 		}
