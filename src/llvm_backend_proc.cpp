@@ -991,6 +991,7 @@ lbValue lb_build_builtin_simd_proc(lbProcedure *p, Ast *expr, TypeAndValue const
 
 	lbValue arg0 = lb_build_expr(p, ce->args[0]);
 	lbValue arg1 = {};
+	lbValue arg2 = {};
 
 	Type *elem = base_array_type(arg0.type);
 
@@ -1173,6 +1174,16 @@ lbValue lb_build_builtin_simd_proc(lbProcedure *p, Ast *expr, TypeAndValue const
 			}
 		}
 		break;
+
+	case BuiltinProc_simd_extract:
+		arg1 = lb_build_expr(p, ce->args[1]);
+		res.value = LLVMBuildExtractElement(p->builder, arg0.value, arg1.value, "");
+		return res;
+	case BuiltinProc_simd_insert:
+		arg1 = lb_build_expr(p, ce->args[1]);
+		arg2 = lb_build_expr(p, ce->args[2]);
+		res.value = LLVMBuildInsertElement(p->builder, arg0.value, arg2.value, arg1.value, "");
+		return res;
 	}
 	GB_PANIC("Unhandled simd intrinsic: '%.*s'", LIT(builtin_procs[id].name));
 	return {};

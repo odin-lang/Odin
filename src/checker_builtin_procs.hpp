@@ -146,6 +146,9 @@ BuiltinProc__simd_begin,
 	BuiltinProc_simd_le,
 	BuiltinProc_simd_gt,
 	BuiltinProc_simd_ge,
+
+	BuiltinProc_simd_extract,
+	BuiltinProc_simd_insert,
 BuiltinProc__simd_end,
 	
 	// Platform specific intrinsics
@@ -395,6 +398,9 @@ gb_global BuiltinProc builtin_procs[BuiltinProc_COUNT] = {
 	{STR_LIT("simd_le"),  2, false, Expr_Expr, BuiltinProcPkg_intrinsics},
 	{STR_LIT("simd_gt"),  2, false, Expr_Expr, BuiltinProcPkg_intrinsics},
 	{STR_LIT("simd_ge"),  2, false, Expr_Expr, BuiltinProcPkg_intrinsics},
+
+	{STR_LIT("simd_extract"), 2, false, Expr_Expr, BuiltinProcPkg_intrinsics},
+	{STR_LIT("simd_insert"),  3, false, Expr_Expr, BuiltinProcPkg_intrinsics},
 	{STR_LIT(""), 0, false, Expr_Stmt, BuiltinProcPkg_intrinsics},
 
 
