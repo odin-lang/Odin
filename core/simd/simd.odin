@@ -80,7 +80,7 @@ swizzle :: builtin.swizzle
 // shuffle :: proc(a, b: #simd[N]T, indices: #simd[max 2*N]u32) -> #simd[len(indices)]T
 shuffle :: intrinsics.simd_shuffle
 
-// select :: proc(cond: #simd[N]any_boolean, true, false: #simd[N]T) -> #simd[N]T
+// select :: proc(cond: #simd[N]boolean_or_integer, true, false: #simd[N]T) -> #simd[N]T
 select :: intrinsics.simd_select
 
 splat :: #force_inline proc "contextless" ($T: typeid/#simd[$LANES]$E, value: E) -> T {

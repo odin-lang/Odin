@@ -237,7 +237,7 @@ simd_reduce_or          :: proc(a: #simd[N]T) -> T ---
 simd_reduce_xor         :: proc(a: #simd[N]T) -> T ---
 
 simd_shuffle :: proc(a, b: #simd[N]T, indices: #simd[max 2*N]u32) -> #simd[len(indices)]T ---
-simd_select  :: proc(cond: #simd[N]any_boolean, true, false: #simd[N]T) -> #simd[N]T ---
+simd_select  :: proc(cond: #simd[N]boolean_or_integer, true, false: #simd[N]T) -> #simd[N]T ---
 
 
 // WASM targets only
