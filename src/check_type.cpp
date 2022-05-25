@@ -2802,15 +2802,21 @@ bool check_type_internal(CheckerContext *ctx, Ast *e, Type **type, Type *named_t
 						*type = alloc_type_array(elem, count, generic_type);
 						goto array_end;
 					}
+
 					if (is_type_polymorphic(elem)) {
 						// Ignore
 					} else if (count < 1 || !is_power_of_two(count)) {
 						error(at->count, "Invalid length for 'intrinsics.simd_vector', expected a power of two length, got '%lld'", cast(long long)count);
 						*type = alloc_type_array(elem, count, generic_type);
 						goto array_end;
-					}
-
+					} else
 					*type = alloc_type_simd_vector(count, elem, generic_type);
+
+					if (is_arch_wasm()) {
+						if (type_size_of(*type) != 16) {
+							error(at->count, "wasm based targets are limited to 128-bit types");
+						}
+					}
 				} else {
 					error(at->tag, "Invalid tag applied to array, got #%.*s", LIT(name));
 					*type = alloc_type_array(elem, count, generic_type);

@@ -758,6 +758,64 @@ bool check_builtin_simd_operation(CheckerContext *c, Operand *operand, Ast *call
 		}
 
 
+	case BuiltinProc_simd_shuffle:
+		{
+			Operand x = {};
+			Operand y = {};
+			Operand z = {};
+			check_expr(c, &x, ce->args[0]); if (x.mode == Addressing_Invalid) { return false; }
+			check_expr_with_type_hint(c, &y, ce->args[1], x.type); if (y.mode == Addressing_Invalid) { return false; }
+			convert_to_typed(c, &y, x.type);
+			if (!is_type_simd_vector(x.type)) {
+				error(x.expr, "'%.*s' expected a simd vector type", LIT(builtin_name));
+				return false;
+			}
+			if (!is_type_simd_vector(y.type)) {
+				error(y.expr, "'%.*s' expected a simd vector type", LIT(builtin_name));
+				return false;
+			}
+			if (!are_types_identical(x.type, y.type)) {
+				gbString xs = type_to_string(x.type);
+				gbString ys = type_to_string(y.type);
+				error(x.expr, "'%.*s' expected 2 arguments of the same type, got '%s' vs '%s'", LIT(builtin_name), xs, ys);
+				gb_string_free(ys);
+				gb_string_free(xs);
+				return false;
+			}
+			Type *elem = base_array_type(x.type);
+
+			check_expr(c, &z, ce->args[2]); if (z.mode == Addressing_Invalid) { return false; }
+			Type *z_elem = base_array_type(z.type);
+			if (!is_type_simd_vector(z.type) || !are_types_identical(z_elem, t_u32)) {
+				gbString zstr = type_to_string(z.type);
+				error(z.expr, "'%.*s' expected a simd vector type with an element of type 'u32', got '%s'", LIT(builtin_name), zstr);
+				gb_string_free(zstr);
+				return false;
+			}
+
+			i64 x_count = x.type->SimdVector.count;
+			i64 z_count = z.type->SimdVector.count;
+
+			if (!is_power_of_two(z_count)) {
+				gbString zstr = type_to_string(z.type);
+				error(z.expr, "'%.*s' expected a simd vector type with a power of two length, got '%s'", LIT(builtin_name), zstr);
+				gb_string_free(zstr);
+				return false;
+			}
+			if (z_count > x_count) {
+				gbString zstr = type_to_string(z.type);
+				error(z.expr, "'%.*s' expected a simd vector type excepts the sum of the two input vectors, got '%s'", LIT(builtin_name), zstr);
+				gb_string_free(zstr);
+				return false;
+			}
+
+
+			operand->mode = Addressing_Value;
+			operand->type = alloc_type_simd_vector(z_count, elem);
+			return true;
+		}
+
+
 	// case BuiltinProc_simd_rotate_left:
 	// 	{
 	// 		Operand x = {};
@@ -3131,6 +3189,12 @@ bool check_builtin_procedure(CheckerContext *c, Operand *operand, Ast *call, i32
 
 		operand->mode = Addressing_Type;
 		operand->type = alloc_type_simd_vector(count, elem);
+		if (is_arch_wasm()) {
+			if (type_size_of(operand->type) != 16) {
+				error(x.expr, "wasm based targets are limited to 128-bit types");
+			}
+		}
+
 		break;
 	}
 	
