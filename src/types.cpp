@@ -1932,7 +1932,7 @@ bool is_type_valid_vector_elem(Type *t) {
 			return false;
 		}
 		if (is_type_integer(t)) {
-			return true;
+			return !is_type_integer_128bit(t);
 		}
 		if (is_type_float(t)) {
 			return true;
