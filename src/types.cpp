@@ -1939,6 +1939,9 @@ bool is_type_valid_vector_elem(Type *t) {
 		if (is_type_float(t)) {
 			return true;
 		}
+		if (is_type_boolean(t)) {
+			return true;
+		}
 	}
 	return false;
 }
