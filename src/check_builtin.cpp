@@ -458,6 +458,8 @@ bool check_builtin_simd_operation(CheckerContext *c, Operand *operand, Ast *call
 		}
 
 	// Integer only
+	case BuiltinProc_simd_add_sat:
+	case BuiltinProc_simd_sub_sat:
 	case BuiltinProc_simd_rem:
 	case BuiltinProc_simd_and:
 	case BuiltinProc_simd_or:
@@ -486,20 +488,25 @@ bool check_builtin_simd_operation(CheckerContext *c, Operand *operand, Ast *call
 			}
 			Type *elem = base_array_type(x.type);
 
-			if (id == BuiltinProc_simd_rem) {
+			switch (id) {
+			case BuiltinProc_simd_add_sat:
+			case BuiltinProc_simd_sub_sat:
+			case BuiltinProc_simd_rem:
 				if (!is_type_integer(elem)) {
 					gbString xs = type_to_string(x.type);
 					error(x.expr, "'%.*s' expected a #simd type with an integer element, got '%s'", LIT(builtin_name), xs);
 					gb_string_free(xs);
 					return false;
 				}
-			} else {
+				break;
+			default:
 				if (!is_type_integer(elem) && !is_type_boolean(elem)) {
 					gbString xs = type_to_string(x.type);
 					error(x.expr, "'%.*s' expected a #simd type with an integer or boolean element, got '%s'", LIT(builtin_name), xs);
 					gb_string_free(xs);
 					return false;
 				}
+				break;
 			}
 
 			operand->mode = Addressing_Value;

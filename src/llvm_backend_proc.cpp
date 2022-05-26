@@ -1353,6 +1353,30 @@ lbValue lb_build_builtin_simd_proc(lbProcedure *p, Ast *expr, TypeAndValue const
 			return res;
 		}
 
+	case BuiltinProc_simd_add_sat:
+	case BuiltinProc_simd_sub_sat:
+		{
+			arg1 = lb_build_expr(p, ce->args[1]);
+
+			char const *name = nullptr;
+			switch (builtin_id) {
+			case BuiltinProc_simd_add_sat: name = is_signed ? "llvm.sadd.sat" : "llvm.uadd.sat"; break;
+			case BuiltinProc_simd_sub_sat: name = is_signed ? "llvm.ssub.sat" : "llvm.usub.sat"; break;
+			}
+
+			LLVMTypeRef types[1] = {lb_type(p->module, arg0.type)};
+			unsigned id = LLVMLookupIntrinsicID(name, gb_strlen(name));
+			GB_ASSERT_MSG(id != 0, "Unable to find %s.%s", name, LLVMPrintTypeToString(types[0]));
+			LLVMValueRef ip = LLVMGetIntrinsicDeclaration(p->module->mod, id, types, gb_count_of(types));
+
+			LLVMValueRef args[2] = {};
+			args[0] = arg0.value;
+			args[1] = arg1.value;
+
+			res.value = LLVMBuildCall(p->builder, ip, args, gb_count_of(args), "");
+			return res;
+		}
+
 
 	}
 	GB_PANIC("Unhandled simd intrinsic: '%.*s'", LIT(builtin_procs[builtin_id].name));
