@@ -485,8 +485,10 @@ lbValue lb_emit_count_ones(lbProcedure *p, lbValue x, Type *type) {
 }
 
 lbValue lb_emit_count_zeros(lbProcedure *p, lbValue x, Type *type) {
-	i64 sz = 8*type_size_of(type);
-	lbValue size = lb_const_int(p->module, type, cast(u64)sz);
+	Type *elem = base_array_type(type);
+	i64 sz = 8*type_size_of(elem);
+	lbValue size = lb_const_int(p->module, elem, cast(u64)sz);
+	size = lb_emit_conv(p, size, type);
 	lbValue count = lb_emit_count_ones(p, x, type);
 	return lb_emit_arith(p, Token_Sub, size, count, type);
 }
