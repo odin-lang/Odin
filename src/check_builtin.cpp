@@ -425,9 +425,9 @@ bool check_builtin_simd_operation(CheckerContext *c, Operand *operand, Ast *call
 		{
 			Operand x = {};
 			Operand y = {};
-			check_expr(c, &x, ce->args[0]); if (x.mode == Addressing_Invalid) { return false; }
-			check_expr_with_type_hint(c, &y, ce->args[1], x.type); if (y.mode == Addressing_Invalid) { return false; }
-			convert_to_typed(c, &y, x.type);
+			check_expr(c, &x, ce->args[0]);                        if (x.mode == Addressing_Invalid) return false;
+			check_expr_with_type_hint(c, &y, ce->args[1], x.type); if (y.mode == Addressing_Invalid) return false;
+			convert_to_typed(c, &y, x.type);                       if (y.mode == Addressing_Invalid) return false;
 			if (!is_type_simd_vector(x.type)) {
 				error(x.expr, "'%.*s' expected a simd vector type", LIT(builtin_name));
 				return false;
@@ -467,9 +467,9 @@ bool check_builtin_simd_operation(CheckerContext *c, Operand *operand, Ast *call
 		{
 			Operand x = {};
 			Operand y = {};
-			check_expr(c, &x, ce->args[0]); if (x.mode == Addressing_Invalid) { return false; }
-			check_expr_with_type_hint(c, &y, ce->args[1], x.type); if (y.mode == Addressing_Invalid) { return false; }
-			convert_to_typed(c, &y, x.type);
+			check_expr(c, &x, ce->args[0]); if (x.mode == Addressing_Invalid) return false;
+			check_expr_with_type_hint(c, &y, ce->args[1], x.type); if (y.mode == Addressing_Invalid) return false;
+			convert_to_typed(c, &y, x.type); if (y.mode == Addressing_Invalid) return false;
 			if (!is_type_simd_vector(x.type)) {
 				error(x.expr, "'%.*s' expected a simd vector type", LIT(builtin_name));
 				return false;
@@ -521,9 +521,9 @@ bool check_builtin_simd_operation(CheckerContext *c, Operand *operand, Ast *call
 		{
 			Operand x = {};
 			Operand y = {};
-			check_expr(c, &x, ce->args[0]); if (x.mode == Addressing_Invalid) { return false; }
-			check_expr_with_type_hint(c, &y, ce->args[1], x.type); if (y.mode == Addressing_Invalid) { return false; }
-			convert_to_typed(c, &y, x.type);
+			check_expr(c, &x, ce->args[0]); if (x.mode == Addressing_Invalid) return false;
+			check_expr_with_type_hint(c, &y, ce->args[1], x.type); if (y.mode == Addressing_Invalid) return false;
+			convert_to_typed(c, &y, x.type); if (y.mode == Addressing_Invalid) return false;
 			if (!is_type_simd_vector(x.type)) {
 				error(x.expr, "'%.*s' expected a simd vector type", LIT(builtin_name));
 				return false;
@@ -601,9 +601,9 @@ bool check_builtin_simd_operation(CheckerContext *c, Operand *operand, Ast *call
 
 			Operand x = {};
 			Operand y = {};
-			check_expr(c, &x, ce->args[0]); if (x.mode == Addressing_Invalid) { return false; }
-			check_expr_with_type_hint(c, &y, ce->args[1], x.type); if (y.mode == Addressing_Invalid) { return false; }
-			convert_to_typed(c, &y, x.type);
+			check_expr(c, &x, ce->args[0]); if (x.mode == Addressing_Invalid) return false;
+			check_expr_with_type_hint(c, &y, ce->args[1], x.type); if (y.mode == Addressing_Invalid) return false;
+			convert_to_typed(c, &y, x.type); if (y.mode == Addressing_Invalid) return false;
 			if (!is_type_simd_vector(x.type)) {
 				error(x.expr, "'%.*s' expected a simd vector type", LIT(builtin_name));
 				return false;
@@ -655,7 +655,7 @@ bool check_builtin_simd_operation(CheckerContext *c, Operand *operand, Ast *call
 	case BuiltinProc_simd_extract:
 		{
 			Operand x = {};
-			check_expr(c, &x, ce->args[0]); if (x.mode == Addressing_Invalid) { return false; }
+			check_expr(c, &x, ce->args[0]); if (x.mode == Addressing_Invalid) return false;
 
 			if (!is_type_simd_vector(x.type)) {
 				error(x.expr, "'%.*s' expected a simd vector type", LIT(builtin_name));
@@ -680,7 +680,7 @@ bool check_builtin_simd_operation(CheckerContext *c, Operand *operand, Ast *call
 	case BuiltinProc_simd_replace:
 		{
 			Operand x = {};
-			check_expr(c, &x, ce->args[0]); if (x.mode == Addressing_Invalid) { return false; }
+			check_expr(c, &x, ce->args[0]); if (x.mode == Addressing_Invalid) return false;
 
 			if (!is_type_simd_vector(x.type)) {
 				error(x.expr, "'%.*s' expected a simd vector type", LIT(builtin_name));
@@ -698,8 +698,8 @@ bool check_builtin_simd_operation(CheckerContext *c, Operand *operand, Ast *call
 			}
 
 			Operand y = {};
-			check_expr_with_type_hint(c, &y, ce->args[2], elem); if (y.mode == Addressing_Invalid) { return false; }
-			convert_to_typed(c, &y, elem);
+			check_expr_with_type_hint(c, &y, ce->args[2], elem); if (y.mode == Addressing_Invalid) return false;
+			convert_to_typed(c, &y, elem); if (y.mode == Addressing_Invalid) return false;
 			if (!are_types_identical(y.type, elem)) {
 				gbString et = type_to_string(elem);
 				gbString yt = type_to_string(y.type);
@@ -721,7 +721,7 @@ bool check_builtin_simd_operation(CheckerContext *c, Operand *operand, Ast *call
 	case BuiltinProc_simd_reduce_max:
 		{
 			Operand x = {};
-			check_expr(c, &x, ce->args[0]); if (x.mode == Addressing_Invalid) { return false; }
+			check_expr(c, &x, ce->args[0]); if (x.mode == Addressing_Invalid) return false;
 
 			if (!is_type_simd_vector(x.type)) {
 				error(x.expr, "'%.*s' expected a simd vector type", LIT(builtin_name));
@@ -745,7 +745,7 @@ bool check_builtin_simd_operation(CheckerContext *c, Operand *operand, Ast *call
 	case BuiltinProc_simd_reduce_xor:
 		{
 			Operand x = {};
-			check_expr(c, &x, ce->args[0]); if (x.mode == Addressing_Invalid) { return false; }
+			check_expr(c, &x, ce->args[0]); if (x.mode == Addressing_Invalid) return false;
 
 			if (!is_type_simd_vector(x.type)) {
 				error(x.expr, "'%.*s' expected a simd vector type", LIT(builtin_name));
@@ -769,9 +769,9 @@ bool check_builtin_simd_operation(CheckerContext *c, Operand *operand, Ast *call
 		{
 			Operand x = {};
 			Operand y = {};
-			check_expr(c, &x, ce->args[0]); if (x.mode == Addressing_Invalid) { return false; }
-			check_expr_with_type_hint(c, &y, ce->args[1], x.type); if (y.mode == Addressing_Invalid) { return false; }
-			convert_to_typed(c, &y, x.type);
+			check_expr(c, &x, ce->args[0]); if (x.mode == Addressing_Invalid) return false;
+			check_expr_with_type_hint(c, &y, ce->args[1], x.type); if (y.mode == Addressing_Invalid) return false;
+			convert_to_typed(c, &y, x.type); if (y.mode == Addressing_Invalid) return false;
 			if (!is_type_simd_vector(x.type)) {
 				error(x.expr, "'%.*s' expected a simd vector type", LIT(builtin_name));
 				return false;
@@ -843,7 +843,7 @@ bool check_builtin_simd_operation(CheckerContext *c, Operand *operand, Ast *call
 	case BuiltinProc_simd_select:
 		{
 			Operand cond = {};
-			check_expr(c, &cond, ce->args[0]); if (cond.mode == Addressing_Invalid) { return false; }
+			check_expr(c, &cond, ce->args[0]); if (cond.mode == Addressing_Invalid) return false;
 
 			if (!is_type_simd_vector(cond.type)) {
 				error(cond.expr, "'%.*s' expected a simd vector boolean type", LIT(builtin_name));
@@ -859,9 +859,9 @@ bool check_builtin_simd_operation(CheckerContext *c, Operand *operand, Ast *call
 
 			Operand x = {};
 			Operand y = {};
-			check_expr(c, &x, ce->args[1]); if (x.mode == Addressing_Invalid) { return false; }
-			check_expr_with_type_hint(c, &y, ce->args[2], x.type); if (y.mode == Addressing_Invalid) { return false; }
-			convert_to_typed(c, &y, x.type);
+			check_expr(c, &x, ce->args[1]); if (x.mode == Addressing_Invalid) return false;
+			check_expr_with_type_hint(c, &y, ce->args[2], x.type); if (y.mode == Addressing_Invalid) return false;
+			convert_to_typed(c, &y, x.type); if (y.mode == Addressing_Invalid) return false;
 			if (!is_type_simd_vector(x.type)) {
 				error(x.expr, "'%.*s' expected a simd vector type", LIT(builtin_name));
 				return false;
@@ -900,7 +900,7 @@ bool check_builtin_simd_operation(CheckerContext *c, Operand *operand, Ast *call
 	case BuiltinProc_simd_nearest:
 		{
 			Operand x = {};
-			check_expr(c, &x, ce->args[0]); if (x.mode == Addressing_Invalid) { return false; }
+			check_expr(c, &x, ce->args[0]); if (x.mode == Addressing_Invalid) return false;
 
 			if (!is_type_simd_vector(x.type)) {
 				error(x.expr, "'%.*s' expected a simd vector boolean type", LIT(builtin_name));
@@ -922,7 +922,7 @@ bool check_builtin_simd_operation(CheckerContext *c, Operand *operand, Ast *call
 	case BuiltinProc_simd_reverse:
 		{
 			Operand x = {};
-			check_expr(c, &x, ce->args[0]); if (x.mode == Addressing_Invalid) { return false; }
+			check_expr(c, &x, ce->args[0]); if (x.mode == Addressing_Invalid) return false;
 
 			if (!is_type_simd_vector(x.type)) {
 				error(x.expr, "'%.*s' expected a simd vector type", LIT(builtin_name));
@@ -937,13 +937,13 @@ bool check_builtin_simd_operation(CheckerContext *c, Operand *operand, Ast *call
 	case BuiltinProc_simd_rotate_right:
 		{
 			Operand x = {};
-			check_expr(c, &x, ce->args[0]); if (x.mode == Addressing_Invalid) { return false; }
+			check_expr(c, &x, ce->args[0]); if (x.mode == Addressing_Invalid) return false;
 			if (!is_type_simd_vector(x.type)) {
 				error(x.expr, "'%.*s' expected a simd vector type", LIT(builtin_name));
 				return false;
 			}
 			Operand offset = {};
-			check_expr(c, &offset, ce->args[1]); if (offset.mode == Addressing_Invalid) { return false; }
+			check_expr(c, &offset, ce->args[1]); if (offset.mode == Addressing_Invalid) return false;
 			convert_to_typed(c, &offset, t_i64);
 			if (!is_type_integer(offset.type) || offset.mode != Addressing_Constant) {
 				error(offset.expr, "'%.*s' expected a constant integer offset");
@@ -961,10 +961,10 @@ bool check_builtin_simd_operation(CheckerContext *c, Operand *operand, Ast *call
 			Operand x = {};
 			Operand y = {};
 			Operand z = {};
-			check_expr(c, &x, ce->args[0]); if (x.mode == Addressing_Invalid) { return false; }
-			check_expr_with_type_hint(c, &y, ce->args[1], x.type); if (y.mode == Addressing_Invalid) { return false; }
-			check_expr_with_type_hint(c, &z, ce->args[2], x.type); if (z.mode == Addressing_Invalid) { return false; }
-			convert_to_typed(c, &y, x.type);
+			check_expr(c, &x, ce->args[0]); if (x.mode == Addressing_Invalid) return false;
+			check_expr_with_type_hint(c, &y, ce->args[1], x.type); if (y.mode == Addressing_Invalid) return false;
+			check_expr_with_type_hint(c, &z, ce->args[2], x.type); if (z.mode == Addressing_Invalid) return false;
+			convert_to_typed(c, &y, x.type); if (y.mode == Addressing_Invalid) return false;
 			convert_to_typed(c, &z, x.type);
 			if (!is_type_simd_vector(x.type)) {
 				error(x.expr, "'%.*s' expected a simd vector type", LIT(builtin_name));
@@ -1010,7 +1010,7 @@ bool check_builtin_simd_operation(CheckerContext *c, Operand *operand, Ast *call
 	case BuiltinProc_simd_to_bits:
 		{
 			Operand x = {};
-			check_expr(c, &x, ce->args[0]); if (x.mode == Addressing_Invalid) { return false; }
+			check_expr(c, &x, ce->args[0]); if (x.mode == Addressing_Invalid) return false;
 
 			if (!is_type_simd_vector(x.type)) {
 				error(x.expr, "'%.*s' expected a simd vector type", LIT(builtin_name));
@@ -2933,7 +2933,7 @@ bool check_builtin_procedure(CheckerContext *c, Operand *operand, Ast *call, i32
 					if (i == j) continue;
 					Operand *b = ops[j];
 					convert_to_typed(c, a, b->type);
-					if (a->mode == Addressing_Invalid) { return false; }
+					if (a->mode == Addressing_Invalid) return false;
 				}
 			}
 
@@ -3616,7 +3616,7 @@ bool check_builtin_procedure(CheckerContext *c, Operand *operand, Ast *call, i32
 			if (y.mode == Addressing_Invalid) {
 				return false;
 			}
-			convert_to_typed(c, &y, x.type);
+			convert_to_typed(c, &y, x.type); if (y.mode == Addressing_Invalid) return false;
 			convert_to_typed(c, &x, y.type);
 			if (is_type_untyped(x.type)) {
 				gbString xts = type_to_string(x.type);
@@ -4232,7 +4232,7 @@ bool check_builtin_procedure(CheckerContext *c, Operand *operand, Ast *call, i32
 			if (x.mode == Addressing_Invalid) {
 				return false;
 			}
-			convert_to_typed(c, &y, x.type);
+			convert_to_typed(c, &y, x.type); if (y.mode == Addressing_Invalid) return false;
 			if (x.mode == Addressing_Invalid) {
 				return false;
 			}
@@ -4289,7 +4289,7 @@ bool check_builtin_procedure(CheckerContext *c, Operand *operand, Ast *call, i32
 			if (y.mode == Addressing_Invalid) {
 				return false;
 			}
-			convert_to_typed(c, &y, x.type);
+			convert_to_typed(c, &y, x.type); if (y.mode == Addressing_Invalid) return false;
 			convert_to_typed(c, &x, y.type);
 			if (!are_types_identical(x.type, y.type)) {
 				gbString xts = type_to_string(x.type);
