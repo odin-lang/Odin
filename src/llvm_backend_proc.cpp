@@ -1315,7 +1315,6 @@ lbValue lb_build_builtin_simd_proc(lbProcedure *p, Ast *expr, TypeAndValue const
 			return res;
 		}
 
-	case BuiltinProc_simd_sqrt:
 	case BuiltinProc_simd_ceil:
 	case BuiltinProc_simd_floor:
 	case BuiltinProc_simd_trunc:
@@ -1323,7 +1322,6 @@ lbValue lb_build_builtin_simd_proc(lbProcedure *p, Ast *expr, TypeAndValue const
 		{
 			char const *name = nullptr;
 			switch (builtin_id) {
-			case BuiltinProc_simd_sqrt:    name = "llvm.sqrt"; break;
 			case BuiltinProc_simd_ceil:    name = "llvm.ceil"; break;
 			case BuiltinProc_simd_floor:   name = "llvm.floor"; break;
 			case BuiltinProc_simd_trunc:   name = "llvm.trunc"; break;

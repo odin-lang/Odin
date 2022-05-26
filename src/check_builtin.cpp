@@ -894,7 +894,6 @@ bool check_builtin_simd_operation(CheckerContext *c, Operand *operand, Ast *call
 			return true;
 		}
 
-	case BuiltinProc_simd_sqrt:
 	case BuiltinProc_simd_ceil:
 	case BuiltinProc_simd_floor:
 	case BuiltinProc_simd_trunc:
@@ -3661,14 +3660,28 @@ bool check_builtin_procedure(CheckerContext *c, Operand *operand, Ast *call, i32
 			if (x.mode == Addressing_Invalid) {
 				return false;
 			}
+
+			Type *elem = core_array_type(x.type);
+			if (!is_type_float(x.type) && !(is_type_simd_vector(x.type) && is_type_float(elem))) {
+				gbString xts = type_to_string(x.type);
+				error(x.expr, "Expected a floating point or #simd vector value for '%.*s', got %s", LIT(builtin_name), xts);
+				gb_string_free(xts);
+				return false;
+			} else if (is_type_different_to_arch_endianness(elem)) {
+				GB_ASSERT(elem->kind == Type_Basic);
+				if (elem->Basic.flags & (BasicFlag_EndianLittle|BasicFlag_EndianBig)) {
+					gbString xts = type_to_string(x.type);
+					error(x.expr, "Expected a float which does not specify the explicit endianness for '%.*s', got %s", LIT(builtin_name), xts);
+					gb_string_free(xts);
+					return false;
+				}
+			}
 			if (!is_type_float(x.type)) {
 				gbString xts = type_to_string(x.type);
 				error(x.expr, "Expected a floating point value for '%.*s', got %s", LIT(builtin_name), xts);
 				gb_string_free(xts);
 				return false;
-			}
-
-			if (x.mode == Addressing_Constant) {
+			} else if (x.mode == Addressing_Constant) {
 				f64 v = exact_value_to_f64(x.value);
 
 				operand->mode = Addressing_Constant;

@@ -166,7 +166,6 @@ BuiltinProc__simd_begin,
 	BuiltinProc_simd_shuffle,
 	BuiltinProc_simd_select,
 
-	BuiltinProc_simd_sqrt,
 	BuiltinProc_simd_ceil,
 	BuiltinProc_simd_floor,
 	BuiltinProc_simd_trunc,
@@ -451,7 +450,6 @@ gb_global BuiltinProc builtin_procs[BuiltinProc_COUNT] = {
 	{STR_LIT("simd_shuffle"), 2, true,  Expr_Expr, BuiltinProcPkg_intrinsics},
 	{STR_LIT("simd_select"),  3, false, Expr_Expr, BuiltinProcPkg_intrinsics},
 
-	{STR_LIT("simd_sqrt") , 1, false, Expr_Expr, BuiltinProcPkg_intrinsics},
 	{STR_LIT("simd_ceil") , 1, false, Expr_Expr, BuiltinProcPkg_intrinsics},
 	{STR_LIT("simd_floor"), 1, false, Expr_Expr, BuiltinProcPkg_intrinsics},
 	{STR_LIT("simd_trunc"), 1, false, Expr_Expr, BuiltinProcPkg_intrinsics},

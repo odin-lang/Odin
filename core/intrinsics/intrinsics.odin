@@ -33,7 +33,7 @@ overflow_add :: proc(lhs, rhs: $T) -> (T, bool) #optional_ok ---
 overflow_sub :: proc(lhs, rhs: $T) -> (T, bool) #optional_ok ---
 overflow_mul :: proc(lhs, rhs: $T) -> (T, bool) #optional_ok ---
 
-sqrt :: proc(x: $T) -> T where type_is_float(T) ---
+sqrt :: proc(x: $T) -> T where type_is_float(T) || (type_is_simd_vector(T) && type_is_float(type_elem_type(T))) ---
 
 fused_mul_add :: proc(a, b, c: $T) -> T where type_is_float(T) || (type_is_simd_vector(T) && type_is_float(type_elem_type(T))) ---
 
@@ -247,7 +247,6 @@ simd_shuffle :: proc(a, b: #simd[N]T, indices: ..int) -> #simd[len(indices)]T --
 simd_select  :: proc(cond: #simd[N]boolean_or_integer, true, false: #simd[N]T) -> #simd[N]T ---
 
 // Lane-wise operations
-simd_sqrt    :: proc(a: #simd[N]any_float) -> #simd[N]any_float --- // IEEE sqrt
 simd_ceil    :: proc(a: #simd[N]any_float) -> #simd[N]any_float ---
 simd_floor   :: proc(a: #simd[N]any_float) -> #simd[N]any_float ---
 simd_trunc   :: proc(a: #simd[N]any_float) -> #simd[N]any_float ---
