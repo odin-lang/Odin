@@ -464,6 +464,7 @@ bool check_builtin_simd_operation(CheckerContext *c, Operand *operand, Ast *call
 	case BuiltinProc_simd_and:
 	case BuiltinProc_simd_or:
 	case BuiltinProc_simd_xor:
+	case BuiltinProc_simd_and_not:
 		{
 			Operand x = {};
 			Operand y = {};

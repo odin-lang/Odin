@@ -258,7 +258,13 @@ lbValue lb_emit_unary_arith(lbProcedure *p, TokenKind op, lbValue x, Type *type)
 			LLVMBuildStore(p->builder, v2, LLVMBuildStructGEP(p->builder, addr.addr.value, 2, ""));
 			LLVMBuildStore(p->builder, v3, LLVMBuildStructGEP(p->builder, addr.addr.value, 3, ""));
 			return lb_addr_load(p, addr);
-
+		} else if (is_type_simd_vector(x.type)) {
+			Type *elem = base_array_type(x.type);
+			if (is_type_float(elem)) {
+				res.value = LLVMBuildFNeg(p->builder, x.value, "");
+			} else {
+				res.value = LLVMBuildNeg(p->builder, x.value, "");
+			}
 		} else {
 			GB_PANIC("Unhandled type %s", type_to_string(x.type));
 		}
@@ -2559,6 +2565,38 @@ lbValue lb_emit_comp(lbProcedure *p, TokenKind op_kind, lbValue left, lbValue ri
 		case Token_NotEq: pred = LLVMIntNE;  break;
 		}
 		res.value = LLVMBuildICmp(p->builder, pred, left.value, right.value, "");
+	} else if (is_type_simd_vector(a)) {
+		LLVMValueRef mask = nullptr;
+		Type *elem = base_array_type(a);
+		if (is_type_float(elem)) {
+			LLVMRealPredicate pred = {};
+			switch (op_kind) {
+			case Token_CmpEq: pred = LLVMRealOEQ; break;
+			case Token_NotEq: pred = LLVMRealONE; break;
+			}
+			mask = LLVMBuildFCmp(p->builder, pred, left.value, right.value, "");
+		} else {
+			LLVMIntPredicate pred = {};
+			switch (op_kind) {
+			case Token_CmpEq: pred = LLVMIntEQ; break;
+			case Token_NotEq: pred = LLVMIntNE; break;
+			}
+			mask = LLVMBuildICmp(p->builder, pred, left.value, right.value, "");
+		}
+		GB_ASSERT_MSG(mask != nullptr, "Unhandled comparison kind %s (%s) %.*s %s (%s)", type_to_string(left.type), type_to_string(base_type(left.type)), LIT(token_strings[op_kind]), type_to_string(right.type), type_to_string(base_type(right.type)));
+
+		// TODO(bill): is this a good approach to dealing with comparisons of vectors?
+		char const *name = "llvm.vector.reduce.umax";
+		LLVMTypeRef types[1] = {LLVMTypeOf(mask)};
+		unsigned id = LLVMLookupIntrinsicID(name, gb_strlen(name));
+		GB_ASSERT_MSG(id != 0, "Unable to find %s.%s", name, LLVMPrintTypeToString(types[0]));
+		LLVMValueRef ip = LLVMGetIntrinsicDeclaration(p->module->mod, id, types, gb_count_of(types));
+
+		LLVMValueRef args[1] = {};
+		args[0] = mask;
+		res.value = LLVMBuildCall(p->builder, ip, args, gb_count_of(args), "");
+		return res;
+
 	} else {
 		GB_PANIC("Unhandled comparison kind %s (%s) %.*s %s (%s)", type_to_string(left.type), type_to_string(base_type(left.type)), LIT(token_strings[op_kind]), type_to_string(right.type), type_to_string(base_type(right.type)));
 	}

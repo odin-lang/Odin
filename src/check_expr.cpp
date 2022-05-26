@@ -1590,11 +1590,6 @@ bool check_unary_op(CheckerContext *c, Operand *o, Token op) {
 bool check_binary_op(CheckerContext *c, Operand *o, Token op) {
 	Type *main_type = o->type;
 
-	if (is_type_simd_vector(main_type)) {
-		error(op, "Operator '%.*s' is not supported on #simd vector types, please use the intrinsics.simd_*", LIT(op.string));
-		return false;
-	}
-
 	// TODO(bill): Handle errors correctly
 	Type *type = base_type(core_array_type(main_type));
 	Type *ct = core_type(type);
@@ -2499,6 +2494,8 @@ void check_shift(CheckerContext *c, Operand *x, Operand *y, Ast *node, Type *typ
 		error(node, "Shift amount cannot be negative: '%s'", err_str);
 		gb_string_free(err_str);
 	}
+
+	// TODO(bill): Should we support shifts for fixed arrays and #simd vectors?
 
 	if (!is_type_integer(x->type)) {
 		gbString err_str = expr_to_string(y->expr);

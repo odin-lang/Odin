@@ -2306,6 +2306,9 @@ bool is_type_comparable(Type *t) {
 			}
 		}
 		return true;
+
+	case Type_SimdVector:
+		return true;
 	}
 	return false;
 }
