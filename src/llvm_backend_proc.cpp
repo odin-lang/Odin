@@ -1412,6 +1412,28 @@ lbValue lb_build_builtin_simd_proc(lbProcedure *p, Ast *expr, TypeAndValue const
 			return res;
 		}
 
+	case BuiltinProc_simd_clamp:
+		{
+			arg1 = lb_build_expr(p, ce->args[1]);
+			arg2 = lb_build_expr(p, ce->args[2]);
+
+			LLVMValueRef v = arg0.value;
+			LLVMValueRef min = arg1.value;
+			LLVMValueRef max = arg2.value;
+
+			if (is_float) {
+				v = LLVMBuildSelect(p->builder, LLVMBuildFCmp(p->builder, LLVMRealOLT, v, min, ""), min, v, "");
+				res.value = LLVMBuildSelect(p->builder, LLVMBuildFCmp(p->builder, LLVMRealOGT, v, max, ""), max, v, "");
+			} else if (is_signed) {
+				v = LLVMBuildSelect(p->builder, LLVMBuildICmp(p->builder, LLVMIntSLT, v, min, ""), min, v, "");
+				res.value = LLVMBuildSelect(p->builder, LLVMBuildICmp(p->builder, LLVMIntSGT, v, max, ""), max, v, "");
+			} else {
+				v = LLVMBuildSelect(p->builder, LLVMBuildICmp(p->builder, LLVMIntULT, v, min, ""), min, v, "");
+				res.value = LLVMBuildSelect(p->builder, LLVMBuildICmp(p->builder, LLVMIntUGT, v, max, ""), max, v, "");
+			}
+			return res;
+		}
+
 
 	}
 	GB_PANIC("Unhandled simd intrinsic: '%.*s'", LIT(builtin_procs[builtin_id].name));

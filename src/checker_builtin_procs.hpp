@@ -141,6 +141,7 @@ BuiltinProc__simd_begin,
 
 	BuiltinProc_simd_min,
 	BuiltinProc_simd_max,
+	BuiltinProc_simd_clamp,
 
 	BuiltinProc_simd_eq,
 	BuiltinProc_simd_ne,
@@ -415,9 +416,13 @@ gb_global BuiltinProc builtin_procs[BuiltinProc_COUNT] = {
 	{STR_LIT("simd_or"),  2, false, Expr_Expr, BuiltinProcPkg_intrinsics},
 	{STR_LIT("simd_xor"), 2, false, Expr_Expr, BuiltinProcPkg_intrinsics},
 	{STR_LIT("simd_neg"), 1, false, Expr_Expr, BuiltinProcPkg_intrinsics},
+
 	{STR_LIT("simd_abs"), 2, false, Expr_Expr, BuiltinProcPkg_intrinsics},
+
 	{STR_LIT("simd_min"), 2, false, Expr_Expr, BuiltinProcPkg_intrinsics},
 	{STR_LIT("simd_max"), 2, false, Expr_Expr, BuiltinProcPkg_intrinsics},
+	{STR_LIT("simd_clamp"), 3, false, Expr_Expr, BuiltinProcPkg_intrinsics},
+
 	{STR_LIT("simd_eq"),  2, false, Expr_Expr, BuiltinProcPkg_intrinsics},
 	{STR_LIT("simd_ne"),  2, false, Expr_Expr, BuiltinProcPkg_intrinsics},
 	{STR_LIT("simd_lt"),  2, false, Expr_Expr, BuiltinProcPkg_intrinsics},

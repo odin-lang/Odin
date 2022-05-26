@@ -212,8 +212,10 @@ simd_xor :: proc(a, b: #simd[N]T) -> #simd[N]T ---
 simd_neg  :: proc(a: #simd[N]T) -> #simd[N]T ---
 
 simd_abs :: proc(a: #simd[N]T) -> #simd[N]T ---
-simd_min :: proc(a, b: #simd[N]T) -> #simd[N]T ---
-simd_max :: proc(a, b: #simd[N]T) -> #simd[N]T ---
+
+simd_min   :: proc(a, b: #simd[N]T) -> #simd[N]T ---
+simd_max   :: proc(a, b: #simd[N]T) -> #simd[N]T ---
+simd_clamp :: proc(v, min, max: #simd[N]T) -> #simd[N]T ---
 
 // Return an unsigned integer of the same size as the input type
 // NOT A BOOLEAN
