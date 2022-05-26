@@ -1234,7 +1234,7 @@ bool check_type_specialization_to(CheckerContext *ctx, Type *specialization, Typ
 }
 
 
-Type *determine_type_from_polymorphic(CheckerContext *ctx, Type *poly_type, Operand operand) {
+Type *determine_type_from_polymorphic(CheckerContext *ctx, Type *poly_type, Operand const &operand) {
 	bool modify_type = !ctx->no_polymorphic_errors;
 	bool show_error = modify_type && !ctx->hide_polymorphic_errors;
 	if (!is_operand_value(operand)) {
@@ -2803,13 +2803,14 @@ bool check_type_internal(CheckerContext *ctx, Ast *e, Type **type, Type *named_t
 						goto array_end;
 					}
 
-					if (is_type_polymorphic(elem)) {
+					if (generic_type != nullptr) {
 						// Ignore
 					} else if (count < 1 || !is_power_of_two(count)) {
 						error(at->count, "Invalid length for #simd, expected a power of two length, got '%lld'", cast(long long)count);
 						*type = alloc_type_array(elem, count, generic_type);
 						goto array_end;
-					} else
+					}
+
 					*type = alloc_type_simd_vector(count, elem, generic_type);
 
 					if (is_arch_wasm()) {

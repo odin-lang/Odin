@@ -1007,6 +1007,33 @@ bool check_builtin_simd_operation(CheckerContext *c, Operand *operand, Ast *call
 			return true;
 		}
 
+	case BuiltinProc_simd_to_bits:
+		{
+			Operand x = {};
+			check_expr(c, &x, ce->args[0]); if (x.mode == Addressing_Invalid) { return false; }
+
+			if (!is_type_simd_vector(x.type)) {
+				error(x.expr, "'%.*s' expected a simd vector type", LIT(builtin_name));
+				return false;
+			}
+			Type *elem = base_array_type(x.type);
+			i64 count = get_array_type_count(x.type);
+			i64 sz = type_size_of(elem);
+			Type *bit_elem = nullptr;
+			switch (sz) {
+			case 1: bit_elem = t_u8;  break;
+			case 2: bit_elem = t_u16; break;
+			case 4: bit_elem = t_u32; break;
+			case 8: bit_elem = t_u64; break;
+			}
+			GB_ASSERT(bit_elem != nullptr);
+
+			operand->type = alloc_type_simd_vector(count, bit_elem);
+			operand->mode = Addressing_Value;
+			return true;
+		}
+
+
 	default:
 		GB_PANIC("Unhandled simd intrinsic: %.*s", LIT(builtin_name));
 	}
