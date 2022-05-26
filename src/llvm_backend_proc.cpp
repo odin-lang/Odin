@@ -1231,9 +1231,7 @@ lbValue lb_build_builtin_simd_proc(lbProcedure *p, Ast *expr, TypeAndValue const
 			GB_ASSERT_MSG(id != 0, "Unable to find %s.%s", name, LLVMPrintTypeToString(types[0]));
 			LLVMValueRef ip = LLVMGetIntrinsicDeclaration(p->module->mod, id, types, gb_count_of(types));
 
-			lbValue res = {};
 			res.value = LLVMBuildCall(p->builder, ip, args, cast(unsigned)args_count, "");
-			res.type = tv.type;
 			return res;
 		}
 	case BuiltinProc_simd_reduce_min:
@@ -1274,7 +1272,6 @@ lbValue lb_build_builtin_simd_proc(lbProcedure *p, Ast *expr, TypeAndValue const
 			LLVMValueRef args[1] = {};
 			args[0] = arg0.value;
 
-			lbValue res = {};
 			res.value = LLVMBuildCall(p->builder, ip, args, gb_count_of(args), "");
 			return res;
 		}
@@ -1311,6 +1308,33 @@ lbValue lb_build_builtin_simd_proc(lbProcedure *p, Ast *expr, TypeAndValue const
 
 			cond = LLVMBuildICmp(p->builder, LLVMIntNE, cond, LLVMConstNull(LLVMTypeOf(cond)), "");
 			res.value = LLVMBuildSelect(p->builder, cond, x, y, "");
+			return res;
+		}
+
+	case BuiltinProc_simd_sqrt:
+	case BuiltinProc_simd_ceil:
+	case BuiltinProc_simd_floor:
+	case BuiltinProc_simd_trunc:
+	case BuiltinProc_simd_nearest:
+		{
+			char const *name = nullptr;
+			switch (builtin_id) {
+			case BuiltinProc_simd_sqrt:    name = "llvm.sqrt"; break;
+			case BuiltinProc_simd_ceil:    name = "llvm.ceil"; break;
+			case BuiltinProc_simd_floor:   name = "llvm.floor"; break;
+			case BuiltinProc_simd_trunc:   name = "llvm.trunc"; break;
+			case BuiltinProc_simd_nearest: name = "llvm.nearbyint"; break;
+			}
+
+			LLVMTypeRef types[1] = {lb_type(p->module, arg0.type)};
+			unsigned id = LLVMLookupIntrinsicID(name, gb_strlen(name));
+			GB_ASSERT_MSG(id != 0, "Unable to find %s.%s", name, LLVMPrintTypeToString(types[0]));
+			LLVMValueRef ip = LLVMGetIntrinsicDeclaration(p->module->mod, id, types, gb_count_of(types));
+
+			LLVMValueRef args[1] = {};
+			args[0] = arg0.value;
+
+			res.value = LLVMBuildCall(p->builder, ip, args, gb_count_of(args), "");
 			return res;
 		}
 
