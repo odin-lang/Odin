@@ -2713,6 +2713,14 @@ bool check_is_castable_to(CheckerContext *c, Operand *operand, Type *y) {
 		return check_is_castable_to(c, &x, elem_dst);
 	}
 
+	if (is_type_simd_vector(dst)) {
+		Type *elem = base_array_type(dst);
+		if (check_is_castable_to(c, operand, elem)) {
+			return true;
+		}
+	}
+
+
 	return false;
 }
 
