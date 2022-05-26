@@ -3558,7 +3558,7 @@ bool check_builtin_procedure(CheckerContext *c, Operand *operand, Ast *call, i32
 				return false;
 			}
 
-			if (is_type_simd_vector(x.type) && id != BuiltinProc_reverse_bits) {
+			if (is_type_simd_vector(x.type)) {
 				Type *elem = base_array_type(x.type);
 				if (!is_type_integer_like(elem)) {
 					gbString xts = type_to_string(x.type);
