@@ -49,9 +49,11 @@ xor :: intrinsics.simd_xor
 
 neg :: intrinsics.simd_neg
 
-abs :: intrinsics.simd_abs
-min :: intrinsics.simd_min
-max :: intrinsics.simd_max
+abs   :: intrinsics.simd_abs
+
+min   :: intrinsics.simd_min
+max   :: intrinsics.simd_max
+clamp :: intrinsics.simd_clamp
 
 // Return an unsigned integer of the same size as the input type
 // NOT A BOOLEAN
