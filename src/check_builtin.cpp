@@ -3192,59 +3192,6 @@ bool check_builtin_procedure(CheckerContext *c, Operand *operand, Ast *call, i32
 		break;
 	}
 	
-	case BuiltinProc_simd_vector: {
-		Operand x = {};
-		Operand y = {};
-		x = *operand;
-		if (!is_type_integer(x.type) || x.mode != Addressing_Constant) {
-			error(call, "Expected a constant integer for 'intrinsics.simd_vector'");
-			operand->mode = Addressing_Type;
-			operand->type = t_invalid;
-			return false;
-		}
-		if (big_int_is_neg(&x.value.value_integer)) {
-			error(call, "Negative vector element length");
-			operand->mode = Addressing_Type;
-			operand->type = t_invalid;
-			return false;
-		}
-		i64 count = big_int_to_i64(&x.value.value_integer);
-
-		check_expr_or_type(c, &y, ce->args[1]);
-		if (y.mode != Addressing_Type) {
-			error(call, "Expected a type 'intrinsics.simd_vector'");
-			operand->mode = Addressing_Type;
-			operand->type = t_invalid;
-			return false;
-		}
-		Type *elem = y.type;
-		if (!is_type_valid_vector_elem(elem)) {
-			gbString str = type_to_string(elem);
-			error(call, "Invalid element type for 'intrinsics.simd_vector', expected an integer, float, or boolean with no specific endianness, got '%s'", str);
-			gb_string_free(str);
-			operand->mode = Addressing_Type;
-			operand->type = t_invalid;
-			return false;
-		}
-
-		if (count < 1 || !is_power_of_two(count)) {
-			error(call, "Invalid length for 'intrinsics.simd_vector', expected a power of two length, got '%lld'", cast(long long)count);
-			operand->mode = Addressing_Type;
-			operand->type = t_invalid;
-			return false;
-		}
-
-		operand->mode = Addressing_Type;
-		operand->type = alloc_type_simd_vector(count, elem);
-		if (is_arch_wasm()) {
-			if (type_size_of(operand->type) != 16) {
-				error(x.expr, "wasm based targets are limited to 128-bit types");
-			}
-		}
-
-		break;
-	}
-	
 	case BuiltinProc_is_package_imported: {
 		bool value = false;
 

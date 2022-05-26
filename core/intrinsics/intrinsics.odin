@@ -6,7 +6,6 @@ package intrinsics
 is_package_imported :: proc(package_name: string) -> bool ---
 
 // Types
-simd_vector :: proc($N: int, $T: typeid) -> type/#simd[N]T
 soa_struct :: proc($N: int, $T: typeid) -> type/#soa[N]T
 
 // Volatile
