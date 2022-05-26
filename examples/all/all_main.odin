@@ -193,6 +193,7 @@ _ :: slashpath
 _ :: filepath
 _ :: reflect
 _ :: runtime
+_ :: simd
 _ :: slice
 _ :: sort
 _ :: strconv
