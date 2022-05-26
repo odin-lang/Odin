@@ -2797,7 +2797,7 @@ bool check_type_internal(CheckerContext *ctx, Ast *e, Type **type, Type *named_t
 				} else if (name == "simd") {
 					if (!is_type_valid_vector_elem(elem) && !is_type_polymorphic(elem)) {
 						gbString str = type_to_string(elem);
-						error(at->elem, "Invalid element type for 'intrinsics.simd_vector', expected an integer, float, or boolean with no specific endianness, got '%s'", str);
+						error(at->elem, "Invalid element type for #simd, expected an integer, float, or boolean with no specific endianness, got '%s'", str);
 						gb_string_free(str);
 						*type = alloc_type_array(elem, count, generic_type);
 						goto array_end;
@@ -2806,7 +2806,7 @@ bool check_type_internal(CheckerContext *ctx, Ast *e, Type **type, Type *named_t
 					if (is_type_polymorphic(elem)) {
 						// Ignore
 					} else if (count < 1 || !is_power_of_two(count)) {
-						error(at->count, "Invalid length for 'intrinsics.simd_vector', expected a power of two length, got '%lld'", cast(long long)count);
+						error(at->count, "Invalid length for #simd, expected a power of two length, got '%lld'", cast(long long)count);
 						*type = alloc_type_array(elem, count, generic_type);
 						goto array_end;
 					} else
@@ -2816,6 +2816,9 @@ bool check_type_internal(CheckerContext *ctx, Ast *e, Type **type, Type *named_t
 						if (type_size_of(*type) != 16) {
 							error(at->count, "wasm based targets are limited to 128-bit types");
 						}
+					}
+					if (count > SIMD_ELEMENT_COUNT_MAX) {
+						error(at->count, "#simd support a maximum element count of %d, got %lld", SIMD_ELEMENT_COUNT_MAX, cast(long long)count);
 					}
 				} else {
 					error(at->tag, "Invalid tag applied to array, got #%.*s", LIT(name));

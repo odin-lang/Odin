@@ -239,6 +239,12 @@ simd_shuffle :: proc(a, b: #simd[N]T, indices: ..int) -> #simd[len(indices)]T --
 simd_select  :: proc(cond: #simd[N]boolean_or_integer, true, false: #simd[N]T) -> #simd[N]T ---
 
 
+simd_sqrt    :: proc(a: #simd[N]any_float) -> #simd[N]any_float ---
+simd_ceil    :: proc(a: #simd[N]any_float) -> #simd[N]any_float ---
+simd_floor   :: proc(a: #simd[N]any_float) -> #simd[N]any_float ---
+simd_trunc   :: proc(a: #simd[N]any_float) -> #simd[N]any_float ---
+simd_nearest :: proc(a: #simd[N]any_float) -> #simd[N]any_float ---
+
 // WASM targets only
 wasm_memory_grow :: proc(index, delta: uintptr) -> int ---
 wasm_memory_size :: proc(index: uintptr)        -> int ---

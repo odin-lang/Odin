@@ -83,6 +83,13 @@ shuffle :: intrinsics.simd_shuffle
 // select :: proc(cond: #simd[N]boolean_or_integer, true, false: #simd[N]T) -> #simd[N]T
 select :: intrinsics.simd_select
 
+
+sqrt    :: intrinsics.simd_sqrt
+ceil    :: intrinsics.simd_ceil
+floor   :: intrinsics.simd_floor
+trunc   :: intrinsics.simd_trunc
+nearest :: intrinsics.simd_nearest
+
 splat :: #force_inline proc "contextless" ($T: typeid/#simd[$LANES]$E, value: E) -> T {
 	return T{0..<LANES = value}
 }
