@@ -99,7 +99,7 @@ nearest :: intrinsics.simd_nearest
 
 to_bits :: intrinsics.simd_to_bits
 
-reverse :: intrinsics.simd_reverse
+lanes_reverse :: intrinsics.simd_reverse
 
 rotate_left  :: intrinsics.simd_rotate_left
 rotate_right :: intrinsics.simd_rotate_right
@@ -108,6 +108,7 @@ count_ones           :: intrinsics.count_ones
 count_zeros          :: intrinsics.count_zeros
 count_trailing_zeros :: intrinsics.count_trailing_zeros
 count_leading_zeros  :: intrinsics.count_leading_zeros
+reverse_bits         :: intrinsics.reverse_bits
 
 fused_mul_add :: intrinsics.fused_mul_add
 fma           :: intrinsics.fused_mul_add
