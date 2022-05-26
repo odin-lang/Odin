@@ -3681,6 +3681,59 @@ bool check_builtin_procedure(CheckerContext *c, Operand *operand, Ast *call, i32
 		}
 		break;
 
+	case BuiltinProc_fused_mul_add:
+		{
+			Operand x = {};
+			Operand y = {};
+			Operand z = {};
+			check_expr(c, &x, ce->args[0]); if (x.mode == Addressing_Invalid) return false;
+			check_expr(c, &y, ce->args[1]); if (y.mode == Addressing_Invalid) return false;
+			check_expr(c, &z, ce->args[2]); if (z.mode == Addressing_Invalid) return false;
+
+			convert_to_typed(c, &y, x.type); if (y.mode == Addressing_Invalid) return false;
+			convert_to_typed(c, &x, y.type); if (x.mode == Addressing_Invalid) return false;
+			convert_to_typed(c, &z, x.type); if (z.mode == Addressing_Invalid) return false;
+			convert_to_typed(c, &x, z.type); if (x.mode == Addressing_Invalid) return false;
+			if (is_type_untyped(x.type)) {
+				gbString xts = type_to_string(x.type);
+				error(x.expr, "Expected a typed floating point value or #simd vector for '%.*s', got %s", LIT(builtin_name), xts);
+				gb_string_free(xts);
+				return false;
+			}
+
+			Type *elem = core_array_type(x.type);
+			if (!is_type_float(x.type) && !(is_type_simd_vector(x.type) && is_type_float(elem))) {
+				gbString xts = type_to_string(x.type);
+				error(x.expr, "Expected a floating point or #simd vector value for '%.*s', got %s", LIT(builtin_name), xts);
+				gb_string_free(xts);
+				return false;
+			}
+			if (is_type_different_to_arch_endianness(elem)) {
+				GB_ASSERT(elem->kind == Type_Basic);
+				if (elem->Basic.flags & (BasicFlag_EndianLittle|BasicFlag_EndianBig)) {
+					gbString xts = type_to_string(x.type);
+					error(x.expr, "Expected a float which does not specify the explicit endianness for '%.*s', got %s", LIT(builtin_name), xts);
+					gb_string_free(xts);
+					return false;
+				}
+			}
+
+			if (!are_types_identical(x.type, y.type) || !are_types_identical(y.type, z.type)) {
+				gbString xts = type_to_string(x.type);
+				gbString yts = type_to_string(y.type);
+				gbString zts = type_to_string(z.type);
+				error(x.expr, "Mismatched types for '%.*s', got %s vs %s vs %s", LIT(builtin_name), xts, yts, zts);
+				gb_string_free(zts);
+				gb_string_free(yts);
+				gb_string_free(xts);
+				return false;
+			}
+
+			operand->mode = Addressing_Value;
+			operand->type = default_type(x.type);
+		}
+		break;
+
 	case BuiltinProc_mem_copy:
 	case BuiltinProc_mem_copy_non_overlapping:
 		{

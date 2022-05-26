@@ -109,6 +109,9 @@ count_zeros          :: intrinsics.count_zeros
 count_trailing_zeros :: intrinsics.count_trailing_zeros
 count_leading_zeros  :: intrinsics.count_leading_zeros
 
+fused_mul_add :: intrinsics.fused_mul_add
+fma           :: intrinsics.fused_mul_add
+
 to_array_ptr :: #force_inline proc "contextless" (v: ^#simd[$LANES]$E) -> ^[LANES]E {
 	return (^[LANES]E)(v)
 }

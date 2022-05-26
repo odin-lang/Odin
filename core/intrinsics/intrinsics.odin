@@ -35,6 +35,8 @@ overflow_mul :: proc(lhs, rhs: $T) -> (T, bool) #optional_ok ---
 
 sqrt :: proc(x: $T) -> T where type_is_float(T) ---
 
+fused_mul_add :: proc(a, b, c: $T) -> T where type_is_float(T) || (type_is_simd_vector(T) && type_is_float(type_elem_type(T))) ---
+
 mem_copy                 :: proc(dst, src: rawptr, len: int) ---
 mem_copy_non_overlapping :: proc(dst, src: rawptr, len: int) ---
 mem_zero                 :: proc(ptr: rawptr, len: int) ---

@@ -2005,6 +2005,31 @@ lbValue lb_build_builtin_proc(lbProcedure *p, Ast *expr, TypeAndValue const &tv,
 			return res;
 		}
 
+	case BuiltinProc_fused_mul_add:
+		{
+			Type *type = tv.type;
+			lbValue x = lb_emit_conv(p, lb_build_expr(p, ce->args[0]), type);
+			lbValue y = lb_emit_conv(p, lb_build_expr(p, ce->args[1]), type);
+			lbValue z = lb_emit_conv(p, lb_build_expr(p, ce->args[2]), type);
+
+
+			char const *name = "llvm.fma";
+			LLVMTypeRef types[1] = {lb_type(p->module, type)};
+			unsigned id = LLVMLookupIntrinsicID(name, gb_strlen(name));
+			GB_ASSERT_MSG(id != 0, "Unable to find %s.%s", name, LLVMPrintTypeToString(types[0]));
+			LLVMValueRef ip = LLVMGetIntrinsicDeclaration(p->module->mod, id, types, gb_count_of(types));
+
+			LLVMValueRef args[3] = {};
+			args[0] = x.value;
+			args[1] = y.value;
+			args[2] = z.value;
+
+			lbValue res = {};
+			res.value = LLVMBuildCall(p->builder, ip, args, gb_count_of(args), "");
+			res.type = type;
+			return res;
+		}
+
 	case BuiltinProc_mem_copy:
 		{
 			lbValue dst = lb_build_expr(p, ce->args[0]);
