@@ -589,12 +589,12 @@ bool check_builtin_simd_operation(CheckerContext *c, Operand *operand, Ast *call
 		}
 
 	// Return integer masks
-	case BuiltinProc_simd_eq:
-	case BuiltinProc_simd_ne:
-	case BuiltinProc_simd_lt:
-	case BuiltinProc_simd_le:
-	case BuiltinProc_simd_gt:
-	case BuiltinProc_simd_ge:
+	case BuiltinProc_simd_lanes_eq:
+	case BuiltinProc_simd_lanes_ne:
+	case BuiltinProc_simd_lanes_lt:
+	case BuiltinProc_simd_lanes_le:
+	case BuiltinProc_simd_lanes_gt:
+	case BuiltinProc_simd_lanes_ge:
 		{
 			// op(#simd[N]T, #simd[N]T) -> #simd[N]V
 			// where `V` is an integer, `size_of(T) == size_of(V)`
@@ -611,8 +611,8 @@ bool check_builtin_simd_operation(CheckerContext *c, Operand *operand, Ast *call
 			}
 			Type *elem = base_array_type(x.type);
 			switch (id) {
-			case BuiltinProc_simd_eq:
-			case BuiltinProc_simd_ne:
+			case BuiltinProc_simd_lanes_eq:
+			case BuiltinProc_simd_lanes_ne:
 				if (!is_type_integer(elem) && !is_type_float(elem) && !is_type_boolean(elem)) {
 					gbString xs = type_to_string(x.type);
 					error(x.expr, "'%.*s' expected a #simd type with an integer, floating point, or boolean element, got '%s'", LIT(builtin_name), xs);

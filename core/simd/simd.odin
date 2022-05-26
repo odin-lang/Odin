@@ -61,12 +61,12 @@ clamp :: intrinsics.simd_clamp
 // element-wise:
 //     false => 0x00...00
 //     true  => 0xff...ff
-eq :: intrinsics.simd_eq
-ne :: intrinsics.simd_ne
-lt :: intrinsics.simd_lt
-le :: intrinsics.simd_le
-gt :: intrinsics.simd_gt
-ge :: intrinsics.simd_ge
+lanes_eq :: intrinsics.simd_lanes_eq
+lanes_ne :: intrinsics.simd_lanes_ne
+lanes_lt :: intrinsics.simd_lanes_lt
+lanes_le :: intrinsics.simd_lanes_le
+lanes_gt :: intrinsics.simd_lanes_gt
+lanes_ge :: intrinsics.simd_lanes_ge
 
 // extract :: proc(a: #simd[N]T, idx: uint) -> T
 extract :: intrinsics.simd_extract

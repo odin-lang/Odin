@@ -1151,22 +1151,22 @@ lbValue lb_build_builtin_simd_proc(lbProcedure *p, Ast *expr, TypeAndValue const
 			res.value = LLVMBuildSelect(p->builder, cond, arg0.value, arg1.value, "");
 		}
 		return res;
-	case BuiltinProc_simd_eq:
-	case BuiltinProc_simd_ne:
-	case BuiltinProc_simd_lt:
-	case BuiltinProc_simd_le:
-	case BuiltinProc_simd_gt:
-	case BuiltinProc_simd_ge:
+	case BuiltinProc_simd_lanes_eq:
+	case BuiltinProc_simd_lanes_ne:
+	case BuiltinProc_simd_lanes_lt:
+	case BuiltinProc_simd_lanes_le:
+	case BuiltinProc_simd_lanes_gt:
+	case BuiltinProc_simd_lanes_ge:
 		arg1 = lb_build_expr(p, ce->args[1]);
 		if (is_float) {
 			LLVMRealPredicate pred = cast(LLVMRealPredicate)0;
 			switch (builtin_id) {
-			case BuiltinProc_simd_eq: pred = LLVMRealOEQ; break;
-			case BuiltinProc_simd_ne: pred = LLVMRealONE; break;
-			case BuiltinProc_simd_lt: pred = LLVMRealOLT; break;
-			case BuiltinProc_simd_le: pred = LLVMRealOLE; break;
-			case BuiltinProc_simd_gt: pred = LLVMRealOGT; break;
-			case BuiltinProc_simd_ge: pred = LLVMRealOGE; break;
+			case BuiltinProc_simd_lanes_eq: pred = LLVMRealOEQ; break;
+			case BuiltinProc_simd_lanes_ne: pred = LLVMRealONE; break;
+			case BuiltinProc_simd_lanes_lt: pred = LLVMRealOLT; break;
+			case BuiltinProc_simd_lanes_le: pred = LLVMRealOLE; break;
+			case BuiltinProc_simd_lanes_gt: pred = LLVMRealOGT; break;
+			case BuiltinProc_simd_lanes_ge: pred = LLVMRealOGE; break;
 			}
 			if (pred) {
 				res.value = LLVMBuildFCmp(p->builder, pred, arg0.value, arg1.value, "");
@@ -1176,12 +1176,12 @@ lbValue lb_build_builtin_simd_proc(lbProcedure *p, Ast *expr, TypeAndValue const
 		} else {
 			LLVMIntPredicate pred = cast(LLVMIntPredicate)0;
 			switch (builtin_id) {
-			case BuiltinProc_simd_eq: pred = LLVMIntEQ; break;
-			case BuiltinProc_simd_ne: pred = LLVMIntNE; break;
-			case BuiltinProc_simd_lt: pred = is_signed ? LLVMIntSLT :LLVMIntULT; break;
-			case BuiltinProc_simd_le: pred = is_signed ? LLVMIntSLE :LLVMIntULE; break;
-			case BuiltinProc_simd_gt: pred = is_signed ? LLVMIntSGT :LLVMIntUGT; break;
-			case BuiltinProc_simd_ge: pred = is_signed ? LLVMIntSGE :LLVMIntUGE; break;
+			case BuiltinProc_simd_lanes_eq: pred = LLVMIntEQ; break;
+			case BuiltinProc_simd_lanes_ne: pred = LLVMIntNE; break;
+			case BuiltinProc_simd_lanes_lt: pred = is_signed ? LLVMIntSLT :LLVMIntULT; break;
+			case BuiltinProc_simd_lanes_le: pred = is_signed ? LLVMIntSLE :LLVMIntULE; break;
+			case BuiltinProc_simd_lanes_gt: pred = is_signed ? LLVMIntSGT :LLVMIntUGT; break;
+			case BuiltinProc_simd_lanes_ge: pred = is_signed ? LLVMIntSGE :LLVMIntUGE; break;
 			}
 			if (pred) {
 				res.value = LLVMBuildICmp(p->builder, pred, arg0.value, arg1.value, "");
