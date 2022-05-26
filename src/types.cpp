@@ -1598,6 +1598,8 @@ i64 get_array_type_count(Type *t) {
 		return bt->Array.count;
 	} else if (bt->kind == Type_EnumeratedArray) {
 		return bt->EnumeratedArray.count;
+	} else if (bt->kind == Type_SimdVector) {
+		return bt->SimdVector.count;
 	}
 	GB_ASSERT(is_type_array_like(t));
 	return -1;

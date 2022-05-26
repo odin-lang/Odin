@@ -245,6 +245,8 @@ simd_floor   :: proc(a: #simd[N]any_float) -> #simd[N]any_float ---
 simd_trunc   :: proc(a: #simd[N]any_float) -> #simd[N]any_float ---
 simd_nearest :: proc(a: #simd[N]any_float) -> #simd[N]any_float ---
 
+simd_reverse :: proc(a: #simd[N]T) -> #simd[N]T ---
+
 // WASM targets only
 wasm_memory_grow :: proc(index, delta: uintptr) -> int ---
 wasm_memory_size :: proc(index: uintptr)        -> int ---

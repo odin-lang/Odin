@@ -165,6 +165,8 @@ BuiltinProc__simd_begin,
 	BuiltinProc_simd_floor,
 	BuiltinProc_simd_trunc,
 	BuiltinProc_simd_nearest,
+
+	BuiltinProc_simd_reverse,
 BuiltinProc__simd_end,
 	
 	// Platform specific intrinsics
@@ -433,6 +435,8 @@ gb_global BuiltinProc builtin_procs[BuiltinProc_COUNT] = {
 	{STR_LIT("simd_floor"), 1, false, Expr_Expr, BuiltinProcPkg_intrinsics},
 	{STR_LIT("simd_trunc"), 1, false, Expr_Expr, BuiltinProcPkg_intrinsics},
 	{STR_LIT("simd_nearest"), 1, false, Expr_Expr, BuiltinProcPkg_intrinsics},
+
+	{STR_LIT("simd_reverse"), 1, false, Expr_Expr, BuiltinProcPkg_intrinsics},
 	{STR_LIT(""), 0, false, Expr_Stmt, BuiltinProcPkg_intrinsics},
 
 

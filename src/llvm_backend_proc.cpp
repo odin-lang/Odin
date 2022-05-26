@@ -1338,6 +1338,22 @@ lbValue lb_build_builtin_simd_proc(lbProcedure *p, Ast *expr, TypeAndValue const
 			return res;
 		}
 
+	case BuiltinProc_simd_reverse:
+		{
+			i64 count = get_array_type_count(arg0.type);
+			LLVMValueRef *values = gb_alloc_array(temporary_allocator(), LLVMValueRef, count);
+			LLVMTypeRef llvm_u32 = lb_type(m, t_u32);
+			for (i64 i = 0; i < count; i++) {
+				values[i] = LLVMConstInt(llvm_u32, count-1-i, false);
+			}
+			LLVMValueRef mask = LLVMConstVector(values, cast(unsigned)count);
+
+			LLVMValueRef v = arg0.value;
+			res.value = LLVMBuildShuffleVector(p->builder, v, v, mask, "");
+			return res;
+		}
+
+
 	}
 	GB_PANIC("Unhandled simd intrinsic: '%.*s'", LIT(builtin_procs[builtin_id].name));
 
