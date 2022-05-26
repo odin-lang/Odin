@@ -43,9 +43,10 @@ shr_masked :: intrinsics.simd_shr_masked
 add_sat :: intrinsics.simd_add_sat
 sub_sat :: intrinsics.simd_sub_sat
 
-and :: intrinsics.simd_and
-or  :: intrinsics.simd_or
-xor :: intrinsics.simd_xor
+and     :: intrinsics.simd_and
+or      :: intrinsics.simd_or
+xor     :: intrinsics.simd_xor
+and_not :: intrinsics.simd_and_not
 
 neg :: intrinsics.simd_neg
 
@@ -131,4 +132,13 @@ copysign :: #force_inline proc "contextless" (v, sign: $T/#simd[$LANES]$E) -> T 
 	sign_bit := and(to_bits(sign), neg_zero)
 	magnitude := and(to_bits(v), bit_not(neg_zero))
 	return transmute(T)or(sign_bit, magnitude)
+}
+
+signum :: #force_inline proc "contextless" (v: $T/#simd[$LANES]$E) -> T where intrinsics.type_is_float(E) {
+	is_nan := ne(v, v)
+	return select(is_nan, v, copysign(T(1), v))
+}
+
+recip :: #force_inline proc "contextless" (v: $T/#simd[$LANES]$E) -> T where intrinsics.type_is_float(E) {
+	return div(T(1), v)
 }
