@@ -933,6 +933,29 @@ bool check_builtin_simd_operation(CheckerContext *c, Operand *operand, Ast *call
 			return true;
 		}
 
+	case BuiltinProc_simd_rotate_left:
+	case BuiltinProc_simd_rotate_right:
+		{
+			Operand x = {};
+			check_expr(c, &x, ce->args[0]); if (x.mode == Addressing_Invalid) { return false; }
+			if (!is_type_simd_vector(x.type)) {
+				error(x.expr, "'%.*s' expected a simd vector type", LIT(builtin_name));
+				return false;
+			}
+			Operand offset = {};
+			check_expr(c, &offset, ce->args[1]); if (offset.mode == Addressing_Invalid) { return false; }
+			convert_to_typed(c, &offset, t_i64);
+			if (!is_type_integer(offset.type) || offset.mode != Addressing_Constant) {
+				error(offset.expr, "'%.*s' expected a constant integer offset");
+				return false;
+			}
+			check_assignment(c, &offset, t_i64, builtin_name);
+
+			operand->type = x.type;
+			operand->mode = Addressing_Value;
+			return true;
+		}
+
 	default:
 		GB_PANIC("Unhandled simd intrinsic: %.*s", LIT(builtin_name));
 	}

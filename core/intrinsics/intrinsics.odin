@@ -252,6 +252,10 @@ simd_nearest :: proc(a: #simd[N]any_float) -> #simd[N]any_float ---
 // equivalent a swizzle with descending indices, e.g. reserve(a, 3, 2, 1, 0)
 simd_reverse :: proc(a: #simd[N]T) -> #simd[N]T ---
 
+simd_rotate_left  :: proc(a: #simd[N]T, $offset: int) -> #simd[N]T ---
+simd_rotate_right :: proc(a: #simd[N]T, $offset: int) -> #simd[N]T ---
+
+
 // WASM targets only
 wasm_memory_grow :: proc(index, delta: uintptr) -> int ---
 wasm_memory_size :: proc(index: uintptr)        -> int ---
