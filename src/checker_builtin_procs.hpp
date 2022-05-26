@@ -45,7 +45,6 @@ enum BuiltinProcId {
 	// "Intrinsics"
 	BuiltinProc_is_package_imported,
 	
-	BuiltinProc_simd_vector,
 	BuiltinProc_soa_struct,
 
 	BuiltinProc_alloca,
@@ -311,7 +310,6 @@ gb_global BuiltinProc builtin_procs[BuiltinProc_COUNT] = {
 	// "Intrinsics"
 	{STR_LIT("is_package_imported"), 1, false, Expr_Expr, BuiltinProcPkg_intrinsics},
 		
-	{STR_LIT("simd_vector"), 2, false, Expr_Expr, BuiltinProcPkg_intrinsics}, // Type
 	{STR_LIT("soa_struct"),  2, false, Expr_Expr, BuiltinProcPkg_intrinsics}, // Type
 
 	{STR_LIT("alloca"),    2, false, Expr_Expr, BuiltinProcPkg_intrinsics},
