@@ -96,6 +96,9 @@ nearest :: intrinsics.simd_nearest
 
 reverse :: intrinsics.simd_reverse
 
+rotate_left  :: intrinsics.simd_rotate_left
+rotate_right :: intrinsics.simd_rotate_right
+
 splat :: #force_inline proc "contextless" ($T: typeid/#simd[$LANES]$E, value: E) -> T {
 	return T{0..<LANES = value}
 }

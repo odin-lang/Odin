@@ -1353,6 +1353,41 @@ lbValue lb_build_builtin_simd_proc(lbProcedure *p, Ast *expr, TypeAndValue const
 			return res;
 		}
 
+	case BuiltinProc_simd_rotate_left:
+	case BuiltinProc_simd_rotate_right:
+		{
+
+			i64 count = get_array_type_count(arg0.type);
+			GB_ASSERT(is_power_of_two(count));
+			BigInt bi_count = {};
+			big_int_from_i64(&bi_count, count);
+
+			TypeAndValue const &tv = ce->args[1]->tav;
+			ExactValue val = exact_value_to_integer(tv.value);
+			GB_ASSERT(val.kind == ExactValue_Integer);
+			BigInt *bi = &val.value_integer;
+			if (builtin_id == BuiltinProc_simd_rotate_right) {
+				big_int_neg(bi, bi);
+			}
+			big_int_rem(bi, bi, &bi_count);
+			big_int_dealloc(&bi_count);
+
+			i64 left = big_int_to_i64(bi);
+
+			LLVMValueRef *values = gb_alloc_array(temporary_allocator(), LLVMValueRef, count);
+			LLVMTypeRef llvm_u32 = lb_type(m, t_u32);
+			for (i64 i = 0; i < count; i++) {
+				u64 idx = cast(u64)(i+left) & cast(u64)(count-1);
+				values[i] = LLVMConstInt(llvm_u32, idx, false);
+			}
+			LLVMValueRef mask = LLVMConstVector(values, cast(unsigned)count);
+
+			LLVMValueRef v = arg0.value;
+			res.value = LLVMBuildShuffleVector(p->builder, v, v, mask, "");
+			return res;
+		}
+
+
 	case BuiltinProc_simd_add_sat:
 	case BuiltinProc_simd_sub_sat:
 		{
