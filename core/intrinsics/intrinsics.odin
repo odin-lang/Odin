@@ -205,9 +205,10 @@ simd_shr_masked :: proc(a: #simd[N]T, b: #simd[N]Unsigned_Integer) -> #simd[N]T 
 simd_add_sat :: proc(a, b: #simd[N]T) -> #simd[N]T ---
 simd_sub_sat :: proc(a, b: #simd[N]T) -> #simd[N]T ---
 
-simd_and :: proc(a, b: #simd[N]T) -> #simd[N]T ---
-simd_or  :: proc(a, b: #simd[N]T) -> #simd[N]T ---
-simd_xor :: proc(a, b: #simd[N]T) -> #simd[N]T ---
+simd_and     :: proc(a, b: #simd[N]T) -> #simd[N]T ---
+simd_or      :: proc(a, b: #simd[N]T) -> #simd[N]T ---
+simd_xor     :: proc(a, b: #simd[N]T) -> #simd[N]T ---
+simd_and_not :: proc(a, b: #simd[N]T) -> #simd[N]T ---
 
 simd_neg  :: proc(a: #simd[N]T) -> #simd[N]T ---
 
@@ -222,12 +223,12 @@ simd_clamp :: proc(v, min, max: #simd[N]T) -> #simd[N]T ---
 // element-wise:
 //     false => 0x00...00
 //     true  => 0xff...ff
-simd_eq :: proc(a, b: #simd[N]T) -> #simd[N]Integer ---
-simd_ne :: proc(a, b: #simd[N]T) -> #simd[N]Integer ---
-simd_lt :: proc(a, b: #simd[N]T) -> #simd[N]Integer ---
-simd_le :: proc(a, b: #simd[N]T) -> #simd[N]Integer ---
-simd_gt :: proc(a, b: #simd[N]T) -> #simd[N]Integer ---
-simd_ge :: proc(a, b: #simd[N]T) -> #simd[N]Integer ---
+simd_lanes_eq :: proc(a, b: #simd[N]T) -> #simd[N]Integer ---
+simd_lanes_ne :: proc(a, b: #simd[N]T) -> #simd[N]Integer ---
+simd_lanes_lt :: proc(a, b: #simd[N]T) -> #simd[N]Integer ---
+simd_lanes_le :: proc(a, b: #simd[N]T) -> #simd[N]Integer ---
+simd_lanes_gt :: proc(a, b: #simd[N]T) -> #simd[N]Integer ---
+simd_lanes_ge :: proc(a, b: #simd[N]T) -> #simd[N]Integer ---
 
 simd_extract :: proc(a: #simd[N]T, idx: uint) -> T ---
 simd_replace :: proc(a: #simd[N]T, idx: uint, elem: T) -> #simd[N]T ---
