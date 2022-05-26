@@ -91,7 +91,7 @@ shuffle :: intrinsics.simd_shuffle
 select :: intrinsics.simd_select
 
 
-sqrt    :: intrinsics.simd_sqrt
+sqrt    :: intrinsics.sqrt
 ceil    :: intrinsics.simd_ceil
 floor   :: intrinsics.simd_floor
 trunc   :: intrinsics.simd_trunc
