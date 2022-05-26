@@ -103,10 +103,6 @@ reverse :: intrinsics.simd_reverse
 rotate_left  :: intrinsics.simd_rotate_left
 rotate_right :: intrinsics.simd_rotate_right
 
-splat :: #force_inline proc "contextless" ($T: typeid/#simd[$LANES]$E, value: E) -> T {
-	return T{0..<LANES = value}
-}
-
 to_array_ptr :: #force_inline proc "contextless" (v: ^#simd[$LANES]$E) -> ^[LANES]E {
 	return (^[LANES]E)(v)
 }
@@ -127,12 +123,11 @@ from_slice :: proc($T: typeid/#simd[$LANES]$E, slice: []E) -> T {
 }
 
 bit_not :: #force_inline proc "contextless" (v: $T/#simd[$LANES]$E) -> T where intrinsics.type_is_integer(E) {
-	ones := splat(type_of(v), ~E(0))
-	return xor(v, ones)
+	return xor(v, T(~E(0)))
 }
 
 copysign :: #force_inline proc "contextless" (v, sign: $T/#simd[$LANES]$E) -> T where intrinsics.type_is_float(E) {
-	neg_zero := to_bits(splat(T, E(-0.0)))
+	neg_zero := to_bits(T(-0.0))
 	sign_bit := and(to_bits(sign), neg_zero)
 	magnitude := and(to_bits(v), bit_not(neg_zero))
 	return transmute(T)or(sign_bit, magnitude)

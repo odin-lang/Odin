@@ -1820,40 +1820,58 @@ lbValue lb_emit_conv(lbProcedure *p, lbValue value, Type *t) {
 		return res;
 	}
 
-	if (is_type_simd_vector(src) && is_type_simd_vector(dst)) {
-		Type *src_elem = core_array_type(src);
-		Type *dst_elem = core_array_type(dst);
+	if (is_type_simd_vector(dst)) {
+		Type *et = base_array_type(dst);
+		if (is_type_simd_vector(src)) {
+			Type *src_elem = core_array_type(src);
+			Type *dst_elem = core_array_type(dst);
 
-		GB_ASSERT(src->SimdVector.count == dst->SimdVector.count);
+			GB_ASSERT(src->SimdVector.count == dst->SimdVector.count);
 
-		lbValue res = {};
-		res.type = t;
-		if (are_types_identical(src_elem, dst_elem)) {
-			res.value = value.value;
-		} else if (is_type_float(src_elem) && is_type_integer(dst_elem)) {
-			if (is_type_unsigned(dst_elem)) {
-				res.value = LLVMBuildFPToUI(p->builder, value.value, lb_type(m, t), "");
+			lbValue res = {};
+			res.type = t;
+			if (are_types_identical(src_elem, dst_elem)) {
+				res.value = value.value;
+			} else if (is_type_float(src_elem) && is_type_integer(dst_elem)) {
+				if (is_type_unsigned(dst_elem)) {
+					res.value = LLVMBuildFPToUI(p->builder, value.value, lb_type(m, t), "");
+				} else {
+					res.value = LLVMBuildFPToSI(p->builder, value.value, lb_type(m, t), "");
+				}
+			} else if (is_type_integer(src_elem) && is_type_float(dst_elem)) {
+				if (is_type_unsigned(src_elem)) {
+					res.value = LLVMBuildUIToFP(p->builder, value.value, lb_type(m, t), "");
+				} else {
+					res.value = LLVMBuildSIToFP(p->builder, value.value, lb_type(m, t), "");
+				}
+			} else if ((is_type_integer(src_elem) || is_type_boolean(src_elem)) && is_type_integer(dst_elem)) {
+				res.value = LLVMBuildIntCast2(p->builder, value.value, lb_type(m, t), !is_type_unsigned(src_elem), "");
+			} else if (is_type_float(src_elem) && is_type_float(dst_elem)) {
+				res.value = LLVMBuildFPCast(p->builder, value.value, lb_type(m, t), "");
+			} else if (is_type_integer(src_elem) && is_type_boolean(dst_elem)) {
+				LLVMValueRef i1vector = LLVMBuildICmp(p->builder, LLVMIntNE, value.value, LLVMConstNull(LLVMTypeOf(value.value)), "");
+				res.value = LLVMBuildIntCast2(p->builder, i1vector, lb_type(m, t), !is_type_unsigned(src_elem), "");
 			} else {
-				res.value = LLVMBuildFPToSI(p->builder, value.value, lb_type(m, t), "");
+				GB_PANIC("Unhandled simd vector conversion: %s -> %s", type_to_string(src), type_to_string(dst));
 			}
-		} else if (is_type_integer(src_elem) && is_type_float(dst_elem)) {
-			if (is_type_unsigned(src_elem)) {
-				res.value = LLVMBuildUIToFP(p->builder, value.value, lb_type(m, t), "");
-			} else {
-				res.value = LLVMBuildSIToFP(p->builder, value.value, lb_type(m, t), "");
-			}
-		} else if ((is_type_integer(src_elem) || is_type_boolean(src_elem)) && is_type_integer(dst_elem)) {
-			res.value = LLVMBuildIntCast2(p->builder, value.value, lb_type(m, t), !is_type_unsigned(src_elem), "");
-		} else if (is_type_float(src_elem) && is_type_float(dst_elem)) {
-			res.value = LLVMBuildFPCast(p->builder, value.value, lb_type(m, t), "");
-		} else if (is_type_integer(src_elem) && is_type_boolean(dst_elem)) {
-			LLVMValueRef i1vector = LLVMBuildICmp(p->builder, LLVMIntNE, value.value, LLVMConstNull(LLVMTypeOf(value.value)), "");
-			res.value = LLVMBuildIntCast2(p->builder, i1vector, lb_type(m, t), !is_type_unsigned(src_elem), "");
+			return res;
 		} else {
-			GB_PANIC("Unhandled simd vector conversion: %s -> %s", type_to_string(src), type_to_string(dst));
+			i64 count = get_array_type_count(dst);
+			LLVMTypeRef vt = lb_type(m, t);
+			LLVMTypeRef llvm_u32 = lb_type(m, t_u32);
+			LLVMValueRef elem = lb_emit_conv(p, value, et).value;
+			LLVMValueRef vector = LLVMConstNull(vt);
+			for (i64 i = 0; i < count; i++) {
+				LLVMValueRef idx = LLVMConstInt(llvm_u32, i, false);
+				vector = LLVMBuildInsertElement(p->builder, vector, elem, idx, "");
+			}
+			lbValue res = {};
+			res.type = t;
+			res.value = vector;
+			return res;
 		}
-		return res;
 	}
+
 
 	// Pointer <-> uintptr
 	if (is_type_pointer(src) && is_type_uintptr(dst)) {

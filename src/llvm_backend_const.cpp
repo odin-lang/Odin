@@ -495,9 +495,9 @@ lbValue lb_const_value(lbModule *m, Type *type, ExactValue value, bool allow_loc
 		res.value = data;
 		return res;
 	} else if (is_type_array(type) &&
-	    value.kind != ExactValue_Invalid &&
-	    value.kind != ExactValue_String &&
-	    value.kind != ExactValue_Compound) {
+		value.kind != ExactValue_Invalid &&
+		value.kind != ExactValue_String &&
+		value.kind != ExactValue_Compound) {
 
 		i64 count  = type->Array.count;
 		Type *elem = type->Array.elem;
@@ -513,8 +513,8 @@ lbValue lb_const_value(lbModule *m, Type *type, ExactValue value, bool allow_loc
 		res.value = llvm_const_array(lb_type(m, elem), elems, cast(unsigned)count);
 		return res;
 	} else if (is_type_matrix(type) &&
-	    value.kind != ExactValue_Invalid &&
-	    value.kind != ExactValue_Compound) {
+		value.kind != ExactValue_Invalid &&
+		value.kind != ExactValue_Compound) {
 		i64 row = type->Matrix.row_count;
 		i64 column = type->Matrix.column_count;
 		GB_ASSERT(row == column);
@@ -536,6 +536,22 @@ lbValue lb_const_value(lbModule *m, Type *type, ExactValue value, bool allow_loc
 		}
 		
 		res.value = LLVMConstArray(lb_type(m, elem), elems, cast(unsigned)total_elem_count);
+		return res;
+	} else if (is_type_simd_vector(type) &&
+		value.kind != ExactValue_Invalid &&
+		value.kind != ExactValue_Compound) {
+		i64 count = type->SimdVector.count;
+		Type *elem = type->SimdVector.elem;
+
+		lbValue single_elem = lb_const_value(m, elem, value, allow_local);
+		single_elem.value = llvm_const_cast(single_elem.value, lb_type(m, elem));
+
+		LLVMValueRef *elems = gb_alloc_array(permanent_allocator(), LLVMValueRef, count);
+		for (i64 i = 0; i < count; i++) {
+			elems[i] = single_elem.value;
+		}
+
+		res.value = LLVMConstVector(elems, cast(unsigned)count);
 		return res;
 	}
 
