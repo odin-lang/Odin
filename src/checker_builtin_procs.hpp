@@ -65,6 +65,7 @@ enum BuiltinProcId {
 	BuiltinProc_overflow_mul,
 
 	BuiltinProc_sqrt,
+	BuiltinProc_fused_mul_add,
 
 	BuiltinProc_mem_copy,
 	BuiltinProc_mem_copy_non_overlapping,
@@ -348,6 +349,7 @@ gb_global BuiltinProc builtin_procs[BuiltinProc_COUNT] = {
 	{STR_LIT("overflow_mul"), 2, false, Expr_Expr, BuiltinProcPkg_intrinsics},
 
 	{STR_LIT("sqrt"), 1, false, Expr_Expr, BuiltinProcPkg_intrinsics},
+	{STR_LIT("fused_mul_add"), 3, false, Expr_Expr, BuiltinProcPkg_intrinsics},
 
 	{STR_LIT("mem_copy"),                 3, false, Expr_Stmt, BuiltinProcPkg_intrinsics},
 	{STR_LIT("mem_copy_non_overlapping"), 3, false, Expr_Stmt, BuiltinProcPkg_intrinsics},
