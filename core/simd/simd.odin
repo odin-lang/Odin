@@ -104,6 +104,11 @@ reverse :: intrinsics.simd_reverse
 rotate_left  :: intrinsics.simd_rotate_left
 rotate_right :: intrinsics.simd_rotate_right
 
+count_ones           :: intrinsics.count_ones
+count_zeros          :: intrinsics.count_zeros
+count_trailing_zeros :: intrinsics.count_trailing_zeros
+count_leading_zeros  :: intrinsics.count_leading_zeros
+
 to_array_ptr :: #force_inline proc "contextless" (v: ^#simd[$LANES]$E) -> ^[LANES]E {
 	return (^[LANES]E)(v)
 }
@@ -129,16 +134,16 @@ bit_not :: #force_inline proc "contextless" (v: $T/#simd[$LANES]$E) -> T where i
 
 copysign :: #force_inline proc "contextless" (v, sign: $T/#simd[$LANES]$E) -> T where intrinsics.type_is_float(E) {
 	neg_zero := to_bits(T(-0.0))
-	sign_bit := and(to_bits(sign), neg_zero)
-	magnitude := and(to_bits(v), bit_not(neg_zero))
-	return transmute(T)or(sign_bit, magnitude)
+	sign_bit := to_bits(sign) & neg_zero
+	magnitude := to_bits(v) &~ neg_zero
+	return transmute(T)(sign_bit|magnitude)
 }
 
 signum :: #force_inline proc "contextless" (v: $T/#simd[$LANES]$E) -> T where intrinsics.type_is_float(E) {
-	is_nan := ne(v, v)
+	is_nan := lanes_ne(v, v)
 	return select(is_nan, v, copysign(T(1), v))
 }
 
 recip :: #force_inline proc "contextless" (v: $T/#simd[$LANES]$E) -> T where intrinsics.type_is_float(E) {
-	return div(T(1), v)
+	return T(1) / v
 }

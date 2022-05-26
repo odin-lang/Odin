@@ -22,10 +22,10 @@ alloca             :: proc(size, align: int) -> [^]u8 ---
 cpu_relax          :: proc() ---
 read_cycle_counter :: proc() -> i64 ---
 
-count_ones           :: proc(x: $T) -> T where type_is_integer(T) ---
-count_zeros          :: proc(x: $T) -> T where type_is_integer(T) ---
-count_trailing_zeros :: proc(x: $T) -> T where type_is_integer(T) ---
-count_leading_zeros  :: proc(x: $T) -> T where type_is_integer(T) ---
+count_ones           :: proc(x: $T) -> T where type_is_integer(T) || type_is_simd_vector(T) ---
+count_zeros          :: proc(x: $T) -> T where type_is_integer(T) || type_is_simd_vector(T) ---
+count_trailing_zeros :: proc(x: $T) -> T where type_is_integer(T) || type_is_simd_vector(T) ---
+count_leading_zeros  :: proc(x: $T) -> T where type_is_integer(T) || type_is_simd_vector(T) ---
 reverse_bits         :: proc(x: $T) -> T where type_is_integer(T) ---
 byte_swap            :: proc(x: $T) -> T where type_is_integer(T) || type_is_float(T) ---
 
