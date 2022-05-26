@@ -27,7 +27,7 @@ add :: intrinsics.simd_add
 sub :: intrinsics.simd_sub
 mul :: intrinsics.simd_mul
 div :: intrinsics.simd_div
-rem :: intrinsics.simd_rem
+rem :: intrinsics.simd_rem // integers only
 
 // Keeps Odin's Behaviour
 // (x << y) if y <= mask else 0
@@ -96,6 +96,8 @@ floor   :: intrinsics.simd_floor
 trunc   :: intrinsics.simd_trunc
 nearest :: intrinsics.simd_nearest
 
+to_bits :: intrinsics.simd_to_bits
+
 reverse :: intrinsics.simd_reverse
 
 rotate_left  :: intrinsics.simd_rotate_left
@@ -122,4 +124,16 @@ from_slice :: proc($T: typeid/#simd[$LANES]$E, slice: []E) -> T {
 		array[i] = slice[i]
 	}
 	return transmute(T)array
+}
+
+bit_not :: #force_inline proc "contextless" (v: $T/#simd[$LANES]$E) -> T where intrinsics.type_is_integer(E) {
+	ones := splat(type_of(v), ~E(0))
+	return xor(v, ones)
+}
+
+copysign :: #force_inline proc "contextless" (v, sign: $T/#simd[$LANES]$E) -> T where intrinsics.type_is_float(E) {
+	neg_zero := to_bits(splat(T, E(-0.0)))
+	sign_bit := and(to_bits(sign), neg_zero)
+	magnitude := and(to_bits(v), bit_not(neg_zero))
+	return transmute(T)or(sign_bit, magnitude)
 }
