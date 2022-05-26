@@ -202,6 +202,9 @@ simd_shr :: proc(a: #simd[N]T, b: #simd[N]Unsigned_Integer) -> #simd[N]T ---
 simd_shl_masked :: proc(a: #simd[N]T, b: #simd[N]Unsigned_Integer) -> #simd[N]T ---
 simd_shr_masked :: proc(a: #simd[N]T, b: #simd[N]Unsigned_Integer) -> #simd[N]T ---
 
+simd_add_sat :: proc(a, b: #simd[N]T) -> #simd[N]T ---
+simd_sub_sat :: proc(a, b: #simd[N]T) -> #simd[N]T ---
+
 simd_and :: proc(a, b: #simd[N]T) -> #simd[N]T ---
 simd_or  :: proc(a, b: #simd[N]T) -> #simd[N]T ---
 simd_xor :: proc(a, b: #simd[N]T) -> #simd[N]T ---
@@ -238,13 +241,15 @@ simd_reduce_xor         :: proc(a: #simd[N]T) -> T ---
 simd_shuffle :: proc(a, b: #simd[N]T, indices: ..int) -> #simd[len(indices)]T ---
 simd_select  :: proc(cond: #simd[N]boolean_or_integer, true, false: #simd[N]T) -> #simd[N]T ---
 
-
-simd_sqrt    :: proc(a: #simd[N]any_float) -> #simd[N]any_float ---
+// Lane-wise operations
+simd_sqrt    :: proc(a: #simd[N]any_float) -> #simd[N]any_float --- // IEEE sqrt
 simd_ceil    :: proc(a: #simd[N]any_float) -> #simd[N]any_float ---
 simd_floor   :: proc(a: #simd[N]any_float) -> #simd[N]any_float ---
 simd_trunc   :: proc(a: #simd[N]any_float) -> #simd[N]any_float ---
+// rounding to the nearest integral value; if two values are equally near, rounds to the even one
 simd_nearest :: proc(a: #simd[N]any_float) -> #simd[N]any_float ---
 
+// equivalent a swizzle with descending indices, e.g. reserve(a, 3, 2, 1, 0)
 simd_reverse :: proc(a: #simd[N]T) -> #simd[N]T ---
 
 // WASM targets only
