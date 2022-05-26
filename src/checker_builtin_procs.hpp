@@ -170,6 +170,8 @@ BuiltinProc__simd_begin,
 	BuiltinProc_simd_trunc,
 	BuiltinProc_simd_nearest,
 
+	BuiltinProc_simd_to_bits,
+
 	BuiltinProc_simd_reverse,
 	BuiltinProc_simd_rotate_left,
 	BuiltinProc_simd_rotate_right,
@@ -449,6 +451,8 @@ gb_global BuiltinProc builtin_procs[BuiltinProc_COUNT] = {
 	{STR_LIT("simd_floor"), 1, false, Expr_Expr, BuiltinProcPkg_intrinsics},
 	{STR_LIT("simd_trunc"), 1, false, Expr_Expr, BuiltinProcPkg_intrinsics},
 	{STR_LIT("simd_nearest"), 1, false, Expr_Expr, BuiltinProcPkg_intrinsics},
+
+	{STR_LIT("simd_to_bits"), 1, false, Expr_Expr, BuiltinProcPkg_intrinsics},
 
 	{STR_LIT("simd_reverse"), 1, false, Expr_Expr, BuiltinProcPkg_intrinsics},
 	{STR_LIT("simd_rotate_left"), 2, false, Expr_Expr, BuiltinProcPkg_intrinsics},

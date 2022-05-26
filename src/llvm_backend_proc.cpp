@@ -1434,6 +1434,11 @@ lbValue lb_build_builtin_simd_proc(lbProcedure *p, Ast *expr, TypeAndValue const
 			return res;
 		}
 
+	case BuiltinProc_simd_to_bits:
+		{
+			res.value = LLVMBuildBitCast(p->builder, arg0.value, lb_type(m, tv.type), "");
+			return res;
+		}
 
 	}
 	GB_PANIC("Unhandled simd intrinsic: '%.*s'", LIT(builtin_procs[builtin_id].name));

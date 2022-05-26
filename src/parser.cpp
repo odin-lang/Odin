@@ -360,6 +360,7 @@ Ast *clone_ast(Ast *node) {
 	case Ast_ArrayType:
 		n->ArrayType.count = clone_ast(n->ArrayType.count);
 		n->ArrayType.elem  = clone_ast(n->ArrayType.elem);
+		n->ArrayType.tag   = clone_ast(n->ArrayType.tag);
 		break;
 	case Ast_DynamicArrayType:
 		n->DynamicArrayType.elem = clone_ast(n->DynamicArrayType.elem);
@@ -2127,7 +2128,18 @@ Ast *parse_operand(AstFile *f, bool lhs) {
 		Token name = expect_token(f, Token_Ident);
 		if (name.string == "type") {
 			return ast_helper_type(f, token, parse_type(f));
-		} else if (name.string == "soa" || name.string == "simd") {
+		} else if ( name.string == "simd") {
+			Ast *tag = ast_basic_directive(f, token, name);
+			Ast *original_type = parse_type(f);
+			Ast *type = unparen_expr(original_type);
+			switch (type->kind) {
+			case Ast_ArrayType: type->ArrayType.tag = tag; break;
+			default:
+				syntax_error(type, "Expected a fixed array type after #%.*s, got %.*s", LIT(name.string), LIT(ast_strings[type->kind]));
+				break;
+			}
+			return original_type;
+		} else if (name.string == "soa") {
 			Ast *tag = ast_basic_directive(f, token, name);
 			Ast *original_type = parse_type(f);
 			Ast *type = unparen_expr(original_type);
