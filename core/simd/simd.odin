@@ -101,8 +101,8 @@ to_bits :: intrinsics.simd_to_bits
 
 lanes_reverse :: intrinsics.simd_reverse
 
-rotate_left  :: intrinsics.simd_rotate_left
-rotate_right :: intrinsics.simd_rotate_right
+lanes_rotate_left  :: intrinsics.simd_rotate_left
+lanes_rotate_right :: intrinsics.simd_rotate_right
 
 count_ones           :: intrinsics.count_ones
 count_zeros          :: intrinsics.count_zeros
