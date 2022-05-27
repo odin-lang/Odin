@@ -37,9 +37,9 @@ MADV_WIPEONFORK  :: 18
 MADV_KEEPONFORK  :: 19
 MADV_HWPOISON    :: 100
 
-mmap :: proc "contextless" (addr: rawptr, length: uint, prot: c.int, flags: c.int, fd: c.int, offset: uintptr) -> rawptr {
+mmap :: proc "contextless" (addr: rawptr, length: uint, prot: c.int, flags: c.int, fd: c.int, offset: uintptr) -> int {
 	res := intrinsics.syscall(unix.SYS_mmap, uintptr(addr), uintptr(length), uintptr(prot), uintptr(flags), uintptr(fd), offset)
-	return rawptr(res)
+	return int(res)
 }
 
 munmap :: proc "contextless" (addr: rawptr, length: uint) -> c.int {
@@ -59,12 +59,11 @@ madvise :: proc "contextless" (addr: rawptr, length: uint, advice: c.int) -> c.i
 
 
 _reserve :: proc "contextless" (size: uint) -> (data: []byte, err: Allocator_Error) {
-	MAP_FAILED := rawptr(~uintptr(0))
 	result := mmap(nil, size, PROT_NONE, MAP_PRIVATE|MAP_ANONYMOUS, -1, 0)
-	if result == MAP_FAILED {
+	if result < 0 && result > -4096 {
 		return nil, .Out_Of_Memory
 	}
-	return ([^]byte)(result)[:size], nil
+	return ([^]byte)(uintptr(result))[:size], nil
 }
 
 _commit :: proc "contextless" (data: rawptr, size: uint) -> Allocator_Error {
