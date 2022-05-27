@@ -3704,12 +3704,7 @@ bool check_builtin_procedure(CheckerContext *c, Operand *operand, Ast *call, i32
 					return false;
 				}
 			}
-			if (!is_type_float(x.type)) {
-				gbString xts = type_to_string(x.type);
-				error(x.expr, "Expected a floating point value for '%.*s', got %s", LIT(builtin_name), xts);
-				gb_string_free(xts);
-				return false;
-			} else if (x.mode == Addressing_Constant) {
+			if (is_type_float(x.type) && x.mode == Addressing_Constant) {
 				f64 v = exact_value_to_f64(x.value);
 
 				operand->mode = Addressing_Constant;
