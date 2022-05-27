@@ -4025,9 +4025,8 @@ bool check_builtin_procedure(CheckerContext *c, Operand *operand, Ast *call, i32
 		break;
 
 	case BuiltinProc_volatile_store:
-		/*fallthrough*/
 	case BuiltinProc_unaligned_store:
-		/*fallthrough*/
+	case BuiltinProc_nontemporal_store:
 	case BuiltinProc_atomic_store:
 		{
 			Type *elem = nullptr;
@@ -4074,9 +4073,8 @@ bool check_builtin_procedure(CheckerContext *c, Operand *operand, Ast *call, i32
 
 
 	case BuiltinProc_volatile_load:
-		/*fallthrough*/
 	case BuiltinProc_unaligned_load:
-		/*fallthrough*/
+	case BuiltinProc_nontemporal_load:
 	case BuiltinProc_atomic_load:
 		{
 			Type *elem = nullptr;
