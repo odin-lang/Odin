@@ -351,10 +351,10 @@ _mm_storel_epi64 :: #force_inline proc "c" (mem_addr: ^__m128i, a: __m128i) {
 	intrinsics.mem_copy_non_overlapping(mem_addr, &a, 8)
 }
 _mm_stream_si128 :: #force_inline proc "c" (mem_addr: ^__m128i, a: __m128i) {
-	intrinsics.nontemporal_store(mem_addr, a)
+	intrinsics.non_temporal_store(mem_addr, a)
 }
 _mm_stream_si32 :: #force_inline proc "c" (mem_addr: ^i32, a: i32) {
-	intrinsics.nontemporal_store(mem_addr, a)
+	intrinsics.non_temporal_store(mem_addr, a)
 }
 _mm_move_epi64 :: #force_inline proc "c" (a: __m128i) -> __m128i {
 	zero := _mm_setzero_si128()
@@ -694,7 +694,7 @@ _mm_loadl_pd :: #force_inline proc "c" (a: __m128d, mem_addr: ^f64) -> __m128d {
 	return _mm_setr_pd(mem_addr^, simd.extract(a, 1))
 }
 _mm_stream_pd :: #force_inline proc "c" (mem_addr: ^f64, a: __m128d) {
-	intrinsics.nontemporal_store((^__m128d)(mem_addr), a)
+	intrinsics.non_temporal_store((^__m128d)(mem_addr), a)
 }
 _mm_store_sd :: #force_inline proc "c" (mem_addr: ^f64, a: __m128d) {
 	mem_addr^ = simd.extract(a, 0)

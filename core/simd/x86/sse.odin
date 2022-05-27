@@ -414,7 +414,7 @@ _MM_TRANSPOSE4_PS :: #force_inline proc "c" (row0, row1, row2, row3: ^__m128) {
 }
 
 _mm_stream_ps :: #force_inline proc "c" (addr: [^]f32, a: __m128) {
-	intrinsics.nontemporal_store((^__m128)(addr), a)
+	intrinsics.non_temporal_store((^__m128)(addr), a)
 }
 
 
