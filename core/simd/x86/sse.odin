@@ -1,5 +1,5 @@
-//+build amd64
-package simd_amd64
+//+build i386, amd64
+package simd_x86
 
 import "core:intrinsics"
 import "core:simd"
