@@ -1221,12 +1221,13 @@ bool init_build_paths(String init_filename) {
 		}
 
 		if (bc->pdb_filepath.len > 0) {
-			bc->build_paths[BuildPath_PDB]          = path_from_string(ha, bc->pdb_filepath);
+			bc->build_paths[BuildPath_PDB]     = path_from_string(ha, bc->pdb_filepath);
 		}
 
 		if ((bc->command_kind & Command__does_build) && (!bc->ignore_microsoft_magic)) {
 			// NOTE(ic): It would be nice to extend this so that we could specify the Visual Studio version that we want instead of defaulting to the latest.
 			Find_Result_Utf8 find_result = find_visual_studio_and_windows_sdk_utf8();
+			defer (mc_free_all());
 
 			if (find_result.windows_sdk_version == 0) {
 				gb_printf_err("Windows SDK not found.\n");
@@ -1256,13 +1257,6 @@ bool init_build_paths(String init_filename) {
 					bc->build_paths[BuildPath_VS_LIB]           = path_from_string(ha, find_result.vs_library_path);
 				}
 			}
-
-			gb_free(ha, find_result.windows_sdk_root.text);
-			gb_free(ha, find_result.windows_sdk_um_library_path.text);
-			gb_free(ha, find_result.windows_sdk_ucrt_library_path.text);
-			gb_free(ha, find_result.vs_exe_path.text);
-			gb_free(ha, find_result.vs_library_path.text);
-
 		}
 	#endif
 
@@ -1344,9 +1338,9 @@ bool init_build_paths(String init_filename) {
 				output_name.len -= 1;
 			}
 			output_name = remove_directory_from_path(output_name);
-			output_name        = remove_extension_from_path(output_name);
-			output_name        = copy_string(ha, string_trim_whitespace(output_name));
-			output_path        = path_from_string(ha, output_name);
+			output_name = remove_extension_from_path(output_name);
+			output_name = copy_string(ha, string_trim_whitespace(output_name));
+			output_path = path_from_string(ha, output_name);
 
 			// Replace extension.
 			if (output_path.ext.len > 0) {
