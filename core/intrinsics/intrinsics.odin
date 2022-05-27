@@ -12,6 +12,9 @@ soa_struct :: proc($N: int, $T: typeid) -> type/#soa[N]T
 volatile_load  :: proc(dst: ^$T) -> T ---
 volatile_store :: proc(dst: ^$T, val: T) -> T ---
 
+nontemporal_load  :: proc(dst: ^$T) -> T ---
+nontemporal_store :: proc(dst: ^$T, val: T) -> T ---
+
 // Trapping
 debug_trap :: proc() ---
 trap       :: proc() -> ! ---

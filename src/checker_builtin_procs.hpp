@@ -80,6 +80,8 @@ enum BuiltinProcId {
 	
 	BuiltinProc_unaligned_store,
 	BuiltinProc_unaligned_load,
+	BuiltinProc_nontemporal_store,
+	BuiltinProc_nontemporal_load,
 	
 	BuiltinProc_prefetch_read_instruction,
 	BuiltinProc_prefetch_read_data,
@@ -367,6 +369,8 @@ gb_global BuiltinProc builtin_procs[BuiltinProc_COUNT] = {
 	
 	{STR_LIT("unaligned_store"),  2, false, Expr_Stmt, BuiltinProcPkg_intrinsics},
 	{STR_LIT("unaligned_load"),   1, false, Expr_Expr, BuiltinProcPkg_intrinsics},
+	{STR_LIT("nontemporal_store"),  2, false, Expr_Stmt, BuiltinProcPkg_intrinsics},
+	{STR_LIT("nontemporal_load"),   1, false, Expr_Expr, BuiltinProcPkg_intrinsics},
 	
 	{STR_LIT("prefetch_read_instruction"),  2, false, Expr_Stmt, BuiltinProcPkg_intrinsics},
 	{STR_LIT("prefetch_read_data"),         2, false, Expr_Stmt, BuiltinProcPkg_intrinsics},
