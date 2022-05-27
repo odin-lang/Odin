@@ -364,6 +364,101 @@ _mm_move_epi64 :: #force_inline proc "c" (a: __m128i) -> __m128i {
 
 
 
+_mm_packs_epi16 :: #force_inline proc "c" (a, b: __m128i) -> __m128i {
+	return transmute(__m128i)packsswb(transmute(i16x8)a, transmute(i16x8)b)
+}
+_mm_packs_epi32 :: #force_inline proc "c" (a, b: __m128i) -> __m128i {
+	return transmute(__m128i)packssdw(transmute(i32x4)a, transmute(i32x4)b)
+}
+_mm_packus_epi16 :: #force_inline proc "c" (a, b: __m128i) -> __m128i {
+	return transmute(__m128i)packuswb(transmute(i16x8)a, transmute(i16x8)b)
+}
+_mm_extract_epi16 :: #force_inline proc "c" (a: __m128i, $IMM8: u32) -> i32 {
+	return i32(simd.extract(transmute(u16x8)a, IMM8))
+}
+_mm_insert_epi16 :: #force_inline proc "c" (a: __m128i, i: i32, $IMM8: u32) -> __m128i {
+	return i32(simd.replace(transmute(u16x8)a, IMM8, i16(i)))
+}
+_mm_movemask_epi8 :: #force_inline proc "c" (a: __m128i) -> i32 {
+	return pmovmskb(transmute(i8x16)a)
+}
+_mm_shuffle_epi32 :: #force_inline proc "c" (a: __m128i, $IMM8: u32) -> __m128i {
+	v := transmute(i32x4)a
+	return transmute(__m128i)simd.shuffle(
+		v,
+		v,
+		IMM8 & 0b11,
+		(IMM8 >> 2) & 0b11,
+		(IMM8 >> 4) & 0b11,
+		(IMM8 >> 6) & 0b11,
+	)
+}
+_mm_shufflehi_epi16 :: #force_inline proc "c" (a: __m128i, $IMM8: u32) -> __m128i {
+	v := transmute(i16x8)a
+	return transmute(__m128i)simd.shuffle(
+		v,
+		v,
+		0,
+		1,
+		2,
+		3,
+		(IMM8 & 0b11) + 4,
+		((IMM8 >> 2) & 0b11) + 4,
+		((IMM8 >> 4) & 0b11) + 4,
+		((IMM8 >> 6) & 0b11) + 4,
+	)
+}
+_mm_shufflelo_epi16 :: #force_inline proc "c" (a: __m128i, $IMM8: u32) -> __m128i {
+	v := transmute(i16x8)a
+	return transmute(__m128i)simd.shuffle(
+		v,
+		v,
+		IMM8 & 0b11,
+		(IMM8 >> 2) & 0b11,
+		(IMM8 >> 4) & 0b11,
+		(IMM8 >> 6) & 0b11,
+		4,
+		5,
+		6,
+		7,
+	)
+}
+_mm_unpackhi_epi8 :: #force_inline proc "c" (a, b: __m128i) -> __m128i {
+	return transmute(__m128i)simd.shuffle(
+	        transmute(i8x16)a,
+	        transmute(i8x16)b,
+        	8, 24, 9, 25, 10, 26, 11, 27, 12, 28, 13, 29, 14, 30, 15, 31,
+	)
+}
+_mm_unpackhi_epi16 :: #force_inline proc "c" (a, b: __m128i) -> __m128i {
+	return transmute(__m128i)simd.shuffle(transmute(i16x8)a, transmute(i16x8)b, 4, 12, 5, 13, 6, 14, 7, 15)
+}
+_mm_unpackhi_epi32 :: #force_inline proc "c" (a, b: __m128i) -> __m128i {
+	return transmute(__m128i)simd.shuffle(transmute(i32x4)a, transmute(i32x4)b, 2, 6, 3, 7)
+}
+_mm_unpackhi_epi64 :: #force_inline proc "c" (a, b: __m128i) -> __m128i {
+	return transmute(__m128i)simd.shuffle(transmute(i64x2)a, transmute(i64x2)b, 1, 3)
+}
+_mm_unpacklo_epi8 :: #force_inline proc "c" (a, b: __m128i) -> __m128i {
+	return transmute(__m128i)simd.shuffle(
+	        transmute(i8x16)a,
+	        transmute(i8x16)b,
+        	0, 16, 1, 17, 2, 18, 3, 19, 4, 20, 5, 21, 6, 22, 7, 23,
+	)
+}
+_mm_unpacklo_epi16 :: #force_inline proc "c" (a, b: __m128i) -> __m128i {
+	return transmute(__m128i)simd.shuffle(transmute(i16x8)a, transmute(i16x8)b, 0, 8, 1, 9, 2, 10, 3, 11)
+}
+_mm_unpacklo_epi32 :: #force_inline proc "c" (a, b: __m128i) -> __m128i {
+	return transmute(__m128i)simd.shuffle(transmute(i32x4)a, transmute(i32x4)b, 0, 4, 1, 5)
+}
+_mm_unpacklo_epi64 :: #force_inline proc "c" (a, b: __m128i) -> __m128i {
+	return transmute(__m128i)simd.shuffle(transmute(i64x2)a, transmute(i64x2)b, 0, 2)
+}
+
+
+
+
 
 _mm_castpd_ps :: #force_inline proc "c" (a: __m128d) -> __m128 {
 	return transmute(__m128)a
