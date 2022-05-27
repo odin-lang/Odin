@@ -1104,8 +1104,9 @@ lbValue lb_build_builtin_simd_proc(lbProcedure *p, Ast *expr, TypeAndValue const
 		case BuiltinProc_simd_or:  op_code = LLVMOr;  break;
 		case BuiltinProc_simd_xor: op_code = LLVMXor; break;
 		case BuiltinProc_simd_and_not:
-			res.value = LLVMBuildAnd(p->builder, arg0.value, LLVMBuildNot(p->builder, arg1.value, ""), "");
-			return res;
+			op_code = LLVMAnd;
+			arg1.value = LLVMBuildNot(p->builder, arg1.value, "");
+			break;
 		}
 		if (op_code) {
 			res.value = LLVMBuildBinOp(p->builder, op_code, arg0.value, arg1.value, "");
