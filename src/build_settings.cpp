@@ -1234,6 +1234,16 @@ bool init_build_paths(String init_filename) {
 				return false;
 			}
 
+			if (!build_context.use_lld && find_result.vs_exe_path.len == 0) {
+				gb_printf_err("link.exe not found.\n");
+				return false;
+			}
+
+			if (find_result.vs_library_path.len == 0) {
+				gb_printf_err("VS library path not found.\n");
+				return false;
+			}
+
 			if (find_result.windows_sdk_um_library_path.len > 0) {
 				GB_ASSERT(find_result.windows_sdk_ucrt_library_path.len > 0);
 
