@@ -2813,11 +2813,6 @@ bool check_type_internal(CheckerContext *ctx, Ast *e, Type **type, Type *named_t
 
 					*type = alloc_type_simd_vector(count, elem, generic_type);
 
-					if (is_arch_wasm()) {
-						if (type_size_of(*type) != 16) {
-							error(at->count, "wasm based targets are limited to 128-bit types");
-						}
-					}
 					if (count > SIMD_ELEMENT_COUNT_MAX) {
 						error(at->count, "#simd support a maximum element count of %d, got %lld", SIMD_ELEMENT_COUNT_MAX, cast(long long)count);
 					}
