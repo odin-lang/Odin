@@ -107,24 +107,16 @@ _mm_max_ps :: #force_inline proc "c" (a, b: __m128) -> __m128 {
 }
 
 _mm_and_ps :: #force_inline proc "c" (a, b: __m128) -> __m128 {
-	x := transmute(__m128i)a
-	y := transmute(__m128i)b
-	return transmute(__m128)simd.and(x, y)
+	return transmute(__m128)simd.and(transmute(__m128i)a, transmute(__m128i)b)
 }
 _mm_andnot_ps :: #force_inline proc "c" (a, b: __m128) -> __m128 {
-	x := transmute(__m128i)a
-	y := transmute(__m128i)b
-	return transmute(__m128)simd.and_not(x, y)
+	return transmute(__m128)simd.and_not(transmute(__m128i)a, transmute(__m128i)b)
 }
 _mm_or_ps :: #force_inline proc "c" (a, b: __m128) -> __m128 {
-	x := transmute(__m128i)a
-	y := transmute(__m128i)b
-	return transmute(__m128)simd.or(x, y)
+	return transmute(__m128)simd.or(transmute(__m128i)a, transmute(__m128i)b)
 }
 _mm_xor_ps :: #force_inline proc "c" (a, b: __m128) -> __m128 {
-	x := transmute(__m128i)a
-	y := transmute(__m128i)b
-	return transmute(__m128)simd.xor(x, y)
+	return transmute(__m128)simd.xor(transmute(__m128i)a, transmute(__m128i)b)
 }
 
 
@@ -301,7 +293,7 @@ _mm_movelh_ps :: #force_inline proc "c" (a, b: __m128) -> __m128 {
 	return simd.shuffle(a, b, 0, 1, 4, 5)
 }
 
-_mm_movemask_ps :: proc(a: __m128) -> u32 {
+_mm_movemask_ps :: #force_inline proc "c" (a: __m128) -> u32 {
 	return movmskps(a)
 }
 
@@ -421,7 +413,7 @@ _MM_TRANSPOSE4_PS :: #force_inline proc "c" (row0, row1, row2, row3: ^__m128) {
 	row3^ = _mm_movelh_ps(tmp3, tmp1)
 }
 
-_mm_stream_ps :: proc(addr: [^]f32, a: __m128) {
+_mm_stream_ps :: #force_inline proc "c" (addr: [^]f32, a: __m128) {
 	intrinsics.nontemporal_store((^__m128)(addr), a)
 }
 
