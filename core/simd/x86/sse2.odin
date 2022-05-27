@@ -1,6 +1,7 @@
 //+build i386, amd64
 package simd_x86
 
+import "core:intrinsics"
 import "core:simd"
 
 _mm_pause :: #force_inline proc "c" () {
@@ -285,6 +286,80 @@ _mm_cvtsi128_si32 :: #force_inline proc "c" (a: __m128i) -> i32 {
 	return simd.extract(transmute(i32x4)a, 0)
 }
 
+
+
+_mm_set_epi64x :: #force_inline proc "c" (e1, e0: i64) -> __m128i {
+	return transmute(__m128i)i64x2{e0, e1}
+}
+_mm_set_epi32 :: #force_inline proc "c" (e3, e2, e1, e0: i32) -> __m128i {
+	return transmute(__m128i)i32x4{e0, e1, e2, e3}
+}
+_mm_set_epi16 :: #force_inline proc "c" (e7, e6, e5, e4, e3, e2, e1, e0: i16) -> __m128i {
+	return transmute(__m128i)i16x8{e0, e1, e2, e3, e4, e5, e6, e7}
+}
+_mm_set_epi8 :: #force_inline proc "c" (e15, e14, e13, e12, e11, e10, e9, e8, e7, e6, e5, e4, e3, e2, e1, e0: i8) -> __m128i {
+	return transmute(__m128i)i8x16{e0, e1, e2, e3, e4, e5, e6, e7, e8, e9, e10, e11, e12, e13, e14, e15}
+}
+_mm_set1_epi64x :: #force_inline proc "c" (a: i64) -> __m128i {
+	return _mm_set_epi64x(a, a)
+}
+_mm_set1_epi32 :: #force_inline proc "c" (a: i32) -> __m128i {
+	return _mm_set_epi32(a, a, a, a)
+}
+_mm_set1_epi16 :: #force_inline proc "c" (a: i16) -> __m128i {
+	return _mm_set_epi16(a, a, a, a, a, a, a, a)
+}
+_mm_set1_epi8 :: #force_inline proc "c" (a: i8) -> __m128i {
+	return _mm_set_epi8(a, a, a, a, a, a, a, a, a, a, a, a, a, a, a, a)
+}
+_mm_setr_epi32 :: #force_inline proc "c" (e3, e2, e1, e0: i32) -> __m128i {
+	return _mm_set_epi32(e0, e1, e2, e3)
+}
+_mm_setr_epi16 :: #force_inline proc "c" (e7, e6, e5, e4, e3, e2, e1, e0: i16) -> __m128i {
+	return _mm_set_epi16(e0, e1, e2, e3, e4, e5, e6, e7)
+}
+_mm_setr_epi8 :: #force_inline proc "c" (e15, e14, e13, e12, e11, e10, e9, e8, e7, e6, e5, e4, e3, e2, e1, e0: i8) -> __m128i {
+	return _mm_set_epi8(e0, e1, e2, e3, e4, e5, e6, e7, e8, e9, e10, e11, e12, e13, e14, e15)
+}
+_mm_setzero_si128 :: #force_inline proc "c" () -> __m128i {
+	return _mm_set1_epi64x(0)
+}
+
+
+_mm_loadl_epi64 :: #force_inline proc "c" (mem_addr: ^__m128i) -> __m128i {
+	return _mm_set_epi64x(0, intrinsics.unaligned_load((^i64)(mem_addr)))
+}
+_mm_load_si128 :: #force_inline proc "c" (mem_addr: ^__m128i) -> __m128i {
+	return mem_addr^
+}
+_mm_loadu_si128 :: #force_inline proc "c" (mem_addr: ^__m128i) -> __m128i {
+	dst := _mm_undefined_si128()
+	intrinsics.mem_copy_non_overlapping(&dst, mem_addr, size_of(__m128i))
+	return dst
+}
+_mm_maskmoveu_si128 :: #force_inline proc "c" (a, mask: __m128i, mem_addr: rawptr) {
+	maskmovdqu(transmute(i8x16)a, transmute(i8x16)mask, mem_addr)
+}
+_mm_store_si128 :: #force_inline proc "c" (mem_addr: ^__m128i, a: __m128i) {
+	mem_addr^ = a
+}
+_mm_storeu_si128 :: #force_inline proc "c" (mem_addr: ^__m128i, a: __m128i) {
+	storeudq(mem_addr, a)
+}
+_mm_storel_epi64 :: #force_inline proc "c" (mem_addr: ^__m128i, a: __m128i) {
+	a := a
+	intrinsics.mem_copy_non_overlapping(mem_addr, &a, 8)
+}
+_mm_stream_si128 :: #force_inline proc "c" (mem_addr: ^__m128i, a: __m128i) {
+	intrinsics.nontemporal_store(mem_addr, a)
+}
+_mm_stream_si32 :: #force_inline proc "c" (mem_addr: ^i32, a: i32) {
+	intrinsics.nontemporal_store(mem_addr, a)
+}
+_mm_move_epi64 :: #force_inline proc "c" (a: __m128i) -> __m128i {
+	zero := _mm_setzero_si128()
+	return transmute(__m128i)simd.shuffle(transmute(i64x2)a, transmute(i64x2)zero, 0, 2)
+}
 
 
 
