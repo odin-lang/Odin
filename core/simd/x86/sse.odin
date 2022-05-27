@@ -421,6 +421,10 @@ _MM_TRANSPOSE4_PS :: #force_inline proc "c" (row0, row1, row2, row3: ^__m128) {
 	row3^ = _mm_movelh_ps(tmp3, tmp1)
 }
 
+_mm_stream_ps :: proc(addr: [^]f32, a: __m128) {
+	intrinsics.nontemporal_store((^__m128)(addr), a)
+}
+
 
 @(default_calling_convention="c")
 @(private)
