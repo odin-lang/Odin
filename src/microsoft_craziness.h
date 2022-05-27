@@ -612,11 +612,11 @@ bool find_msvc_install_from_env_vars(Find_Result_Utf8 *result) {
 			// to be set without a trailing '\' (apart from manually), so we can just
 			// check paths without it (see use of `String end` in the loop below)
 			String um_dir = build_context.metrics.arch == TargetArch_amd64
-				? make_string_c("um\\x64")
-				: make_string_c("um\\x86");
+				? str_lit("um\\x64")
+				: str_lit("um\\x86");
 			String ucrt_dir = build_context.metrics.arch == TargetArch_amd64
-				? make_string_c("ucrt\\x64")
-				: make_string_c("ucrt\\x86");
+				? str_lit("ucrt\\x64")
+				: str_lit("ucrt\\x86");
 
 			isize lo = {0};
 			isize hi = {0};
