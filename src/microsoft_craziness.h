@@ -181,7 +181,6 @@ void mc_find_close(HANDLE handle) {
 
 
 // COM objects for the ridiculous Microsoft craziness.
-
 typedef WCHAR* BSTR;
 typedef const WCHAR* LPCOLESTR;
 
@@ -215,44 +214,6 @@ struct DECLSPEC_UUID("42843719-DB4C-46C2-8E7C-64F1816EFD5B") DECLSPEC_NOVTABLE I
 
 
 // The beginning of the actual code that does things.
-
-struct Version_Data {
-	i32 best_version[4];  // For Windows 8 versions, only two of these numbers are used.
-	wchar_t const *best_name;
-};
-
-bool os_file_exists(wchar_t const *name) {
-	// @Robustness: What flags do we really want to check here?
-
-	auto attrib = GetFileAttributesW(name);
-	if (attrib == INVALID_FILE_ATTRIBUTES) return false;
-	if (attrib & FILE_ATTRIBUTE_DIRECTORY) return false;
-
-	return true;
-}
-
-wchar_t *concat(wchar_t const *a, wchar_t const *b, wchar_t const *c = nullptr, wchar_t const *d = nullptr) {
-	// Concatenate up to 4 wide strings together. Allocated with malloc.
-	// If you don't like that, use a programming language that actually
-	// helps you with using custom allocators. Or just edit the code.
-
-	isize len_a = string16_len(a);
-	isize len_b = string16_len(b);
-	isize len_c = string16_len(c);
-	isize len_d = string16_len(d);
-
-	wchar_t *result = (wchar_t *)calloc(2, (len_a + len_b + len_c + len_d + 1));
-	gb_memmove(result, a, len_a*2);
-	gb_memmove(result + len_a, b, len_b*2);
-
-	if (c) gb_memmove(result + len_a + len_b, c, len_c * 2);
-	if (d) gb_memmove(result + len_a + len_b + len_c, d, len_d * 2);
-
-	result[len_a + len_b + len_c + len_d] = 0;
-
-	return result;
-}
-
 struct Version_Data_Utf8 {
 	i32 best_version[4];  // For Windows 8 versions, only two of these numbers are used.
 	String best_name;
@@ -426,7 +387,7 @@ void find_windows_kit_root(Find_Result_Utf8 *result) {
 	// If we get here, we failed to find anything.
 }
 
-bool find_visual_studio_by_fighting_through_microsoft_craziness(Find_Result *result) {
+bool find_visual_studio_by_fighting_through_microsoft_craziness(Find_Result_Utf8 *result) {
 	// The name of this procedure is kind of cryptic. Its purpose is
 	// to fight through Microsoft craziness. The things that the fine
 	// Visual Studio team want you to do, JUST TO FIND A SINGLE FOLDER
@@ -470,64 +431,49 @@ bool find_visual_studio_by_fighting_through_microsoft_craziness(Find_Result *res
 
 			defer (instance->Release());
 
-			BSTR bstr_inst_path;
-			hr = instance->GetInstallationPath(&bstr_inst_path);
+			wchar_t* inst_path_wide;
+			hr = instance->GetInstallationPath(&inst_path_wide);
 			if (hr != S_OK)  continue;
-			defer (SysFreeString(bstr_inst_path));
+			defer (SysFreeString(inst_path_wide));
 
-			auto tools_filename = concat(bstr_inst_path, L"\\VC\\Auxiliary\\Build\\Microsoft.VCToolsVersion.default.txt");
-			defer (free(tools_filename));
+			String inst_path = mc_wstring_to_string(inst_path_wide);
+			defer (mc_free(inst_path));
 
-			FILE *f = nullptr;
-			auto open_result = _wfopen_s(&f, tools_filename, L"rt");
-			if (open_result != 0) continue;
-			if (!f) continue;
-			defer (fclose(f));
+			String tools_filename = mc_concat(inst_path, str_lit("\\VC\\Auxiliary\\Build\\Microsoft.VCToolsVersion.default.txt"));
+			defer (mc_free(tools_filename));
 
-			LARGE_INTEGER tools_file_size;
-			auto file_handle = (HANDLE)_get_osfhandle(_fileno(f));
-			BOOL success = GetFileSizeEx(file_handle, &tools_file_size);
-			if (!success) continue;
+			gbFileContents tool_version = gb_file_read_contents(mc_allocator, true, (const char*)tools_filename.text);
+			defer (gb_file_free_contents(&tool_version));
 
-			auto version_bytes = (tools_file_size.QuadPart + 1) * 2;  // Warning: This multiplication by 2 presumes there is no variable-length encoding in the wchars (wacky characters in the file could betray this expectation).
-			if (version_bytes > 0x7FFFFFFF) continue;   // Avoid overflow.
+			String version_string = make_string((const u8*)tool_version.data, tool_version.size);
+			version_string = string_trim_whitespace(version_string);
 
-			wchar_t *version = (wchar_t *)calloc(1, (usize)version_bytes);
-			defer (free(version));
+			String base_path = mc_concat(inst_path, str_lit("\\VC\\Tools\\MSVC\\"), version_string);
+			defer (mc_free(base_path));
 
-			auto read_result = fgetws(version, (int)version_bytes, f);
-			if (!read_result) continue;
-
-			auto version_tail = wcschr(version, '\n');
-			if (version_tail)  *version_tail = 0;  // Stomp the data, because nobody cares about it.
-
-			wchar_t *library_path = nullptr;
+			String library_path = {};
 			if (build_context.metrics.arch == TargetArch_amd64) {
-				library_path = concat(bstr_inst_path, L"\\VC\\Tools\\MSVC\\", version, L"\\lib\\x64\\");
+				library_path = mc_concat(base_path, str_lit("\\lib\\x64\\"));
 			} else if (build_context.metrics.arch == TargetArch_i386) {
-				library_path = concat(bstr_inst_path, L"\\VC\\Tools\\MSVC\\", version, L"\\lib\\x86\\");
+				library_path = mc_concat(base_path, str_lit("\\lib\\x86\\"));
 			} else {
 				continue;
 			}
 
-			auto library_file = concat(library_path, L"vcruntime.lib");  // @Speed: Could have library_path point to this string, with a smaller count, to save on memory flailing!
+			String library_file = mc_concat(library_path, str_lit("vcruntime.lib"));
 
-			if (os_file_exists(library_file)) {
-				wchar_t *link_exe_path = nullptr;
+			if (gb_file_exists((const char*)library_file.text)) {
 				if (build_context.metrics.arch == TargetArch_amd64) {
-					link_exe_path = concat(bstr_inst_path, L"\\VC\\Tools\\MSVC\\", version, L"\\bin\\Hostx64\\x64\\");
+					result->vs_exe_path = mc_concat(base_path, str_lit("\\bin\\Hostx64\\x64\\"));
 				} else if (build_context.metrics.arch == TargetArch_i386) {
-					link_exe_path = concat(bstr_inst_path, L"\\VC\\Tools\\MSVC\\", version, L"\\bin\\Hostx86\\x86\\");
+					result->vs_exe_path = mc_concat(base_path, str_lit("\\bin\\Hostx86\\x86\\"));
 				} else {
 					continue;
 				}
 
-
-				result->vs_exe_path     = link_exe_path;
 				result->vs_library_path = library_path;
 				return true;
 			}
-
 			/*
 			   Ryan Saunderson said:
 			   "Clang uses the 'SetupInstance->GetInstallationVersion' / ISetupHelper->ParseVersion to find the newest version
@@ -542,65 +488,64 @@ bool find_visual_studio_by_fighting_through_microsoft_craziness(Find_Result *res
 	{
 		HKEY vs7_key;
 		rc = RegOpenKeyExA(HKEY_LOCAL_MACHINE, "SOFTWARE\\Microsoft\\VisualStudio\\SxS\\VS7", 0, KEY_QUERY_VALUE | KEY_WOW64_32KEY, &vs7_key);
-		if (rc != S_OK)  return false;
+		if (rc != S_OK) return false;
 		defer (RegCloseKey(vs7_key));
 
 		// Hardcoded search for 4 prior Visual Studio versions. Is there something better to do here?
-		wchar_t const *versions[] = { L"14.0", L"13.0",  L"12.0", L"11.0", L"10.0", L"9.0", };
+		char const *versions[] = { "14.0", "13.0",  "12.0", "11.0", "10.0", "9.0", };
 		const int NUM_VERSIONS = sizeof(versions) / sizeof(versions[0]);
 
 		for (int i = 0; i < NUM_VERSIONS; i++) {
-			wchar_t const *v = versions[i];
+			char const *v = versions[i];
 
 			DWORD dw_type;
-			DWORD cb_data;
+			DWORD required_length;
 
-			auto rc = RegQueryValueExW(vs7_key, v, NULL, &dw_type, NULL, &cb_data);
+			auto rc = RegQueryValueExA(vs7_key, v, NULL, &dw_type, NULL, &required_length);
 			if ((rc == ERROR_FILE_NOT_FOUND) || (dw_type != REG_SZ)) {
 				continue;
 			}
 
-			auto buffer = (wchar_t *)calloc(1, cb_data);
-			if (!buffer)  return false;
-			defer (free(buffer));
+			DWORD length = required_length + 2;  // The +2 is for the maybe optional zero later on. Probably we are over-allocating.
+			char *c_str = gb_alloc_array(mc_allocator, char, length);
 
-			rc = RegQueryValueExW(vs7_key, v, NULL, NULL, (LPBYTE)buffer, &cb_data);
+			rc = RegQueryValueExA(vs7_key, v, NULL, NULL, (LPBYTE)c_str, &length);
 			if (rc != 0)  continue;
 
-			// @Robustness: Do the zero-termination thing suggested in the RegQueryValue docs?
+			if (c_str[required_length]) {
+				c_str[required_length+1] = 0;
+			}
+			String base_path = make_string_c(c_str);
 
-			wchar_t *lib_path = nullptr;
+			String lib_path = {};
 
 			if (build_context.metrics.arch == TargetArch_amd64) {
-				lib_path = concat(buffer, L"VC\\Lib\\amd64\\");
+				lib_path = mc_concat(base_path, str_lit("VC\\Lib\\amd64\\"));
 			} else if (build_context.metrics.arch == TargetArch_i386) {
-				lib_path = concat(buffer, L"VC\\Lib\\");
+				lib_path = mc_concat(base_path, str_lit("VC\\Lib\\"));
 			} else {
 				continue;
 			}
 
 			// Check to see whether a vcruntime.lib actually exists here.
-			auto vcruntime_filename = concat(lib_path, L"vcruntime.lib");
-			defer (free(vcruntime_filename));
+			String vcruntime_filename = mc_concat(lib_path, str_lit("vcruntime.lib"));
+			defer (mc_free(vcruntime_filename));
 
-			if (os_file_exists(vcruntime_filename)) {
+			if (gb_file_exists((const char*)vcruntime_filename.text)) {
 				if (build_context.metrics.arch == TargetArch_amd64) {
-					result->vs_exe_path = concat(buffer, L"VC\\bin\\");
+					result->vs_exe_path = mc_concat(base_path, str_lit("VC\\bin\\"));
 				} else if (build_context.metrics.arch == TargetArch_i386) {
-					result->vs_exe_path = concat(buffer, L"VC\\bin\\x86_amd64\\");
+					result->vs_exe_path = mc_concat(base_path, str_lit("VC\\bin\\x86_amd64\\"));
 				} else {
 					continue;
 				}
-
 				result->vs_library_path = lib_path;
 				return true;
 			}
-
-			free(lib_path);
+			mc_free(lib_path);
 		}
 		// If we get here, we failed to find anything.
 	}
-
 	return false;
 }
 
@@ -618,13 +563,7 @@ Find_Result_Utf8 find_visual_studio_and_windows_sdk_utf8() {
 		}
 	}
 
-	Find_Result result = {};
-	bool ok = find_visual_studio_by_fighting_through_microsoft_craziness(&result);
-
-	if (ok) {
-		r.vs_exe_path     = mc_wstring_to_string(result.vs_exe_path);
-		r.vs_library_path = mc_wstring_to_string(result.vs_library_path);
-	}
+	find_visual_studio_by_fighting_through_microsoft_craziness(&r);
 
 #if 0
 	printf("windows_sdk_root:              %.*s\n", LIT(r.windows_sdk_root));
