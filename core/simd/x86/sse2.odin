@@ -459,6 +459,292 @@ _mm_unpacklo_epi64 :: #force_inline proc "c" (a, b: __m128i) -> __m128i {
 
 
 
+_mm_add_sd :: #force_inline proc "c" (a, b: __m128d) -> __m128d {
+	return simd.replace(a, 0, _mm_cvtsd_f64(a) + _mm_cvtsd_f64(b))
+}
+_mm_add_pd :: #force_inline proc "c" (a, b: __m128d) -> __m128d {
+	return simd.add(a, b)
+}
+_mm_div_sd :: #force_inline proc "c" (a, b: __m128d) -> __m128d {
+	return simd.replace(a, 0, _mm_cvtsd_f64(a) / _mm_cvtsd_f64(b))
+}
+_mm_div_pd :: #force_inline proc "c" (a, b: __m128d) -> __m128d {
+	return simd.div(a, b)
+}
+_mm_max_sd :: #force_inline proc "c" (a, b: __m128d) -> __m128d {
+	return maxsd(a, b)
+}
+_mm_max_pd :: #force_inline proc "c" (a, b: __m128d) -> __m128d {
+	return maxpd(a, b)
+}
+_mm_min_sd :: #force_inline proc "c" (a, b: __m128d) -> __m128d {
+	return minsd(a, b)
+}
+_mm_min_pd :: #force_inline proc "c" (a, b: __m128d) -> __m128d {
+	return minpd(a, b)
+}
+_mm_mul_sd :: #force_inline proc "c" (a, b: __m128d) -> __m128d {
+	return simd.replace(a, 0, _mm_cvtsd_f64(a) * _mm_cvtsd_f64(b))
+}
+_mm_mul_pd :: #force_inline proc "c" (a, b: __m128d) -> __m128d {
+	return simd.mul(a, b)
+}
+_mm_sqrt_sd :: #force_inline proc "c" (a, b: __m128d) -> __m128d {
+	return simd.replace(a, 0, _mm_cvtsd_f64(sqrtsd(b)))
+}
+_mm_sqrt_pd :: #force_inline proc "c" (a: __m128d) -> __m128d {
+	return simd.sqrt(a)
+}
+_mm_sub_sd :: #force_inline proc "c" (a, b: __m128d) -> __m128d {
+	return simd.replace(a, 0, _mm_cvtsd_f64(a) - _mm_cvtsd_f64(b))
+}
+_mm_sub_pd :: #force_inline proc "c" (a, b: __m128d) -> __m128d {
+	return simd.sub(a, b)
+}
+_mm_and_pd :: #force_inline proc "c" (a, b: __m128d) -> __m128d {
+	return transmute(__m128d)_mm_and_si128(transmute(__m128i)a, transmute(__m128i)b)
+}
+_mm_andnot_pd :: #force_inline proc "c" (a, b: __m128d) -> __m128d {
+	return transmute(__m128d)_mm_andnot_si128(transmute(__m128i)a, transmute(__m128i)b)
+}
+_mm_or_pd :: #force_inline proc "c" (a, b: __m128d) -> __m128d {
+	return transmute(__m128d)_mm_or_si128(transmute(__m128i)a, transmute(__m128i)b)
+}
+_mm_xor_pd :: #force_inline proc "c" (a, b: __m128d) -> __m128d {
+	return transmute(__m128d)_mm_xor_si128(transmute(__m128i)a, transmute(__m128i)b)
+}
+
+
+
+
+_mm_cmpeq_sd :: #force_inline proc "c" (a, b: __m128d) -> __m128d {
+	return cmpsd(a, b, 0)
+}
+_mm_cmplt_sd :: #force_inline proc "c" (a, b: __m128d) -> __m128d {
+	return cmpsd(a, b, 1)
+}
+_mm_cmple_sd :: #force_inline proc "c" (a, b: __m128d) -> __m128d {
+	return cmpsd(a, b, 2)
+}
+_mm_cmpgt_sd :: #force_inline proc "c" (a, b: __m128d) -> __m128d {
+	return simd.replace(_mm_cmplt_sd(b, a), 1, simd.extract(a, 1))
+}
+_mm_cmpge_sd :: #force_inline proc "c" (a, b: __m128d) -> __m128d {
+	return simd.replace(_mm_cmple_sd(b, a), 1, simd.extract(a, 1))
+}
+_mm_cmpord_sd :: #force_inline proc "c" (a, b: __m128d) -> __m128d {
+	return cmpsd(a, b, 7)
+}
+_mm_cmpunord_sd :: #force_inline proc "c" (a, b: __m128d) -> __m128d {
+	return cmpsd(a, b, 3)
+}
+_mm_cmpneq_sd :: #force_inline proc "c" (a, b: __m128d) -> __m128d {
+	return cmpsd(a, b, 4)
+}
+_mm_cmpnlt_sd :: #force_inline proc "c" (a, b: __m128d) -> __m128d {
+	return cmpsd(a, b, 5)
+}
+_mm_cmpnle_sd :: #force_inline proc "c" (a, b: __m128d) -> __m128d {
+	return cmpsd(a, b, 6)
+}
+_mm_cmpngt_sd :: #force_inline proc "c" (a, b: __m128d) -> __m128d {
+	return simd.replace(_mm_cmpnlt_sd(b, a), 1, simd.extract(a, 1))
+}
+_mm_cmpnge_sd :: #force_inline proc "c" (a, b: __m128d) -> __m128d {
+	return simd.replace(_mm_cmpnle_sd(b, a), 1, simd.extract(a, 1))
+}
+_mm_cmpeq_pd :: #force_inline proc "c" (a, b: __m128d) -> __m128d {
+	return cmppd(a, b, 0)
+}
+_mm_cmplt_pd :: #force_inline proc "c" (a, b: __m128d) -> __m128d {
+	return cmppd(a, b, 1)
+}
+_mm_cmple_pd :: #force_inline proc "c" (a, b: __m128d) -> __m128d {
+	return cmppd(a, b, 2)
+}
+_mm_cmpgt_pd :: #force_inline proc "c" (a, b: __m128d) -> __m128d {
+	return _mm_cmplt_pd(b, a)
+}
+_mm_cmpge_pd :: #force_inline proc "c" (a, b: __m128d) -> __m128d {
+	return _mm_cmple_pd(b, a)
+}
+_mm_cmpord_pd :: #force_inline proc "c" (a, b: __m128d) -> __m128d {
+	return cmppd(a, b, 7)
+}
+_mm_cmpunord_pd :: #force_inline proc "c" (a, b: __m128d) -> __m128d {
+	return cmppd(a, b, 3)
+}
+_mm_cmpneq_pd :: #force_inline proc "c" (a, b: __m128d) -> __m128d {
+	return cmppd(a, b, 4)
+}
+_mm_cmpnlt_pd :: #force_inline proc "c" (a, b: __m128d) -> __m128d {
+	return cmppd(a, b, 5)
+}
+_mm_cmpnle_pd :: #force_inline proc "c" (a, b: __m128d) -> __m128d {
+	return cmppd(a, b, 6)
+}
+_mm_cmpngt_pd :: #force_inline proc "c" (a, b: __m128d) -> __m128d {
+	return _mm_cmpnlt_pd(b, a)
+}
+_mm_cmpnge_pd :: #force_inline proc "c" (a, b: __m128d) -> __m128d {
+	return _mm_cmpnle_pd(b, a)
+}
+_mm_comieq_sd :: #force_inline proc "c" (a, b: __m128d) -> i32 {
+	return comieqsd(a, b)
+}
+_mm_comilt_sd :: #force_inline proc "c" (a, b: __m128d) -> i32 {
+	return comiltsd(a, b)
+}
+_mm_comile_sd :: #force_inline proc "c" (a, b: __m128d) -> i32 {
+	return comilesd(a, b)
+}
+_mm_comigt_sd :: #force_inline proc "c" (a, b: __m128d) -> i32 {
+	return comigtsd(a, b)
+}
+_mm_comige_sd :: #force_inline proc "c" (a, b: __m128d) -> i32 {
+	return comigesd(a, b)
+}
+_mm_comineq_sd :: #force_inline proc "c" (a, b: __m128d) -> i32 {
+	return comineqsd(a, b)
+}
+_mm_ucomieq_sd :: #force_inline proc "c" (a, b: __m128d) -> i32 {
+	return ucomieqsd(a, b)
+}
+_mm_ucomilt_sd :: #force_inline proc "c" (a, b: __m128d) -> i32 {
+	return ucomiltsd(a, b)
+}
+_mm_ucomile_sd :: #force_inline proc "c" (a, b: __m128d) -> i32 {
+	return ucomilesd(a, b)
+}
+_mm_ucomigt_sd :: #force_inline proc "c" (a, b: __m128d) -> i32 {
+	return ucomigtsd(a, b)
+}
+_mm_ucomige_sd :: #force_inline proc "c" (a, b: __m128d) -> i32 {
+	return ucomigesd(a, b)
+}
+_mm_ucomineq_sd :: #force_inline proc "c" (a, b: __m128d) -> i32 {
+	return ucomineqsd(a, b)
+}
+
+
+
+
+
+_mm_cvtpd_ps :: #force_inline proc "c" (a: __m128d) -> __m128 {
+	return cvtpd2ps(a)
+}
+_mm_cvtps_pd :: #force_inline proc "c" (a: __m128) -> __m128d {
+	return cvtps2pd(a)
+}
+_mm_cvtpd_epi32 :: #force_inline proc "c" (a: __m128d) -> __m128i {
+	return transmute(__m128i)cvtpd2dq(a)
+}
+_mm_cvtsd_si32 :: #force_inline proc "c" (a: __m128d) -> i32 {
+	return cvtsd2si(a)
+}
+_mm_cvtsd_ss :: #force_inline proc "c" (a, b: __m128d) -> __m128 {
+	return cvtsd2ss(a, b)
+}
+_mm_cvtsd_f64 :: #force_inline proc "c" (a: __m128d) -> f64 {
+	return simd.extract(a, 0)
+}
+_mm_cvtss_sd :: #force_inline proc "c" (a, b: __m128) -> __m128d {
+	return cvtss2sd(a, b)
+}
+_mm_cvttpd_epi32 :: #force_inline proc "c" (a: __m128d) -> __m128i {
+	return transmute(__m128i)cvttpd2dq(a)
+}
+_mm_cvttsd_si32 :: #force_inline proc "c" (a: __m128d) -> i32 {
+	return cvttsd2si(a)
+}
+_mm_cvttps_epi32 :: #force_inline proc "c" (a: __m128) -> __m128i {
+	return transmute(__m128i)cvttps2dq(a)
+}
+_mm_set_sd :: #force_inline proc "c" (a: f64) -> __m128d {
+	return _mm_set_pd(0.0, a)
+}
+_mm_set1_pd :: #force_inline proc "c" (a: f64) -> __m128d {
+	return _mm_set_pd(a, a)
+}
+_mm_set_pd1 :: #force_inline proc "c" (a: f64) -> __m128d {
+	return _mm_set_pd(a, a)
+}
+_mm_set_pd :: #force_inline proc "c" (a: f64, b: f64) -> __m128d {
+	return __m128d{b, a}
+}
+_mm_setr_pd :: #force_inline proc "c" (a: f64, b: f64) -> __m128d {
+	return _mm_set_pd(b, a)
+}
+_mm_setzero_pd :: #force_inline proc "c" () -> __m128d {
+	return _mm_set_pd(0.0, 0.0)
+}
+_mm_movemask_pd :: #force_inline proc "c" (a: __m128d) -> i32 {
+	return movmskpd(a)
+}
+_mm_load_pd :: #force_inline proc "c" (mem_addr: ^f64) -> __m128d {
+	return (^__m128d)(mem_addr)^
+}
+_mm_load_sd :: #force_inline proc "c" (mem_addr: ^f64) -> __m128d {
+	return _mm_setr_pd(mem_addr^, 0.)
+}
+_mm_loadh_pd :: #force_inline proc "c" (a: __m128d, mem_addr: ^f64) -> __m128d {
+	return _mm_setr_pd(simd.extract(a, 0), mem_addr^)
+}
+_mm_loadl_pd :: #force_inline proc "c" (a: __m128d, mem_addr: ^f64) -> __m128d {
+	return _mm_setr_pd(mem_addr^, simd.extract(a, 1))
+}
+_mm_stream_pd :: #force_inline proc "c" (mem_addr: ^f64, a: __m128d) {
+	intrinsics.nontemporal_store((^__m128d)(mem_addr), a)
+}
+_mm_store_sd :: #force_inline proc "c" (mem_addr: ^f64, a: __m128d) {
+	mem_addr^ = simd.extract(a, 0)
+}
+_mm_store_pd :: #force_inline proc "c" (mem_addr: ^f64, a: __m128d) {
+	(^__m128d)(mem_addr)^ = a
+}
+_mm_storeu_pd :: #force_inline proc "c" (mem_addr: ^f64, a: __m128d) {
+	storeupd(mem_addr, a)
+}
+_mm_store1_pd :: #force_inline proc "c" (mem_addr: ^f64, a: __m128d) {
+	(^__m128d)(mem_addr)^ = simd.shuffle(a, a, 0, 0)
+}
+_mm_store_pd1 :: #force_inline proc "c" (mem_addr: ^f64, a: __m128d) {
+	(^__m128d)(mem_addr)^ = simd.shuffle(a, a, 0, 0)
+}
+_mm_storer_pd :: #force_inline proc "c" (mem_addr: ^f64, a: __m128d) {
+	(^__m128d)(mem_addr)^ = simd.shuffle(a, a, 1, 0)
+}
+_mm_storeh_pd :: #force_inline proc "c" (mem_addr: ^f64, a: __m128d) {
+	mem_addr^ = simd.extract(a, 1)
+}
+_mm_storel_pd :: #force_inline proc "c" (mem_addr: ^f64, a: __m128d) {
+	mem_addr^ = simd.extract(a, 0)
+}
+_mm_load1_pd :: #force_inline proc "c" (mem_addr: ^f64) -> __m128d {
+	d := mem_addr^
+	return _mm_setr_pd(d, d)
+}
+_mm_load_pd1 :: #force_inline proc "c" (mem_addr: ^f64) -> __m128d {
+	return _mm_load1_pd(mem_addr)
+}
+_mm_loadr_pd :: #force_inline proc "c" (mem_addr: ^f64) -> __m128d {
+	a := _mm_load_pd(mem_addr)
+	return simd.shuffle(a, a, 1, 0)
+}
+_mm_loadu_pd :: #force_inline proc "c" (mem_addr: ^f64) -> __m128d {
+	dst := _mm_undefined_pd()
+	intrinsics.mem_copy_non_overlapping(&dst, mem_addr, size_of(__m128d))
+	return dst
+}
+_mm_shuffle_pd :: #force_inline proc "c" (a, b: __m128d, $MASK: u32) -> __m128d {
+	return simd.shuffle(a, b, MASK&0b1, ((MASK>>1)&0b1) + 2)
+}
+_mm_move_sd :: #force_inline proc "c" (a, b: __m128d) -> __m128d {
+	return _mm_setr_pd(simd.extract(b, 0), simd.extract(a, 1))
+}
+
+
+
 
 _mm_castpd_ps :: #force_inline proc "c" (a: __m128d) -> __m128 {
 	return transmute(__m128)a
@@ -566,53 +852,53 @@ foreign _ {
 	@(link_name="llvm.x86.sse2.maskmov.dqu")
 	maskmovdqu :: proc(a: i8x16, mask: i8x16, mem_addr: rawptr) ---
 	@(link_name="llvm.x86.sse2.packsswb.128")
-	packsswb   :: proc(a: i16x8, b: i16x8) -> i8x16 ---
+	packsswb   :: proc(a, b: i16x8) -> i8x16 ---
 	@(link_name="llvm.x86.sse2.packssdw.128")
-	packssdw   :: proc(a: i32x4, b: i32x4) -> i16x8 ---
+	packssdw   :: proc(a, b: i32x4) -> i16x8 ---
 	@(link_name="llvm.x86.sse2.packuswb.128")
-	packuswb   :: proc(a: i16x8, b: i16x8) -> u8x16 ---
+	packuswb   :: proc(a, b: i16x8) -> u8x16 ---
 	@(link_name="llvm.x86.sse2.pmovmskb.128")
 	pmovmskb   :: proc(a: i8x16) -> i32 ---
 	@(link_name="llvm.x86.sse2.max.sd")
-	maxsd      :: proc(a: __m128d, b: __m128d) -> __m128d ---
+	maxsd      :: proc(a, b: __m128d) -> __m128d ---
 	@(link_name="llvm.x86.sse2.max.pd")
-	maxpd      :: proc(a: __m128d, b: __m128d) -> __m128d ---
+	maxpd      :: proc(a, b: __m128d) -> __m128d ---
 	@(link_name="llvm.x86.sse2.min.sd")
-	minsd      :: proc(a: __m128d, b: __m128d) -> __m128d ---
+	minsd      :: proc(a, b: __m128d) -> __m128d ---
 	@(link_name="llvm.x86.sse2.min.pd")
-	minpd      :: proc(a: __m128d, b: __m128d) -> __m128d ---
+	minpd      :: proc(a, b: __m128d) -> __m128d ---
 	@(link_name="llvm.x86.sse2.sqrt.sd")
 	sqrtsd     :: proc(a: __m128d) -> __m128d ---
 	@(link_name="llvm.x86.sse2.sqrt.pd")
 	sqrtpd     :: proc(a: __m128d) -> __m128d ---
 	@(link_name="llvm.x86.sse2.cmp.sd")
-	cmpsd      :: proc(a: __m128d, b: __m128d, imm8: i8) -> __m128d ---
+	cmpsd      :: proc(a, b: __m128d, imm8: i8) -> __m128d ---
 	@(link_name="llvm.x86.sse2.cmp.pd")
-	cmppd      :: proc(a: __m128d, b: __m128d, imm8: i8) -> __m128d ---
+	cmppd      :: proc(a, b: __m128d, imm8: i8) -> __m128d ---
 	@(link_name="llvm.x86.sse2.comieq.sd")
-	comieqsd   :: proc(a: __m128d, b: __m128d) -> i32 ---
+	comieqsd   :: proc(a, b: __m128d) -> i32 ---
 	@(link_name="llvm.x86.sse2.comilt.sd")
-	comiltsd   :: proc(a: __m128d, b: __m128d) -> i32 ---
+	comiltsd   :: proc(a, b: __m128d) -> i32 ---
 	@(link_name="llvm.x86.sse2.comile.sd")
-	comilesd   :: proc(a: __m128d, b: __m128d) -> i32 ---
+	comilesd   :: proc(a, b: __m128d) -> i32 ---
 	@(link_name="llvm.x86.sse2.comigt.sd")
-	comigtsd   :: proc(a: __m128d, b: __m128d) -> i32 ---
+	comigtsd   :: proc(a, b: __m128d) -> i32 ---
 	@(link_name="llvm.x86.sse2.comige.sd")
-	comigesd   :: proc(a: __m128d, b: __m128d) -> i32 ---
+	comigesd   :: proc(a, b: __m128d) -> i32 ---
 	@(link_name="llvm.x86.sse2.comineq.sd")
-	comineqsd  :: proc(a: __m128d, b: __m128d) -> i32 ---
+	comineqsd  :: proc(a, b: __m128d) -> i32 ---
 	@(link_name="llvm.x86.sse2.ucomieq.sd")
-	ucomieqsd  :: proc(a: __m128d, b: __m128d) -> i32 ---
+	ucomieqsd  :: proc(a, b: __m128d) -> i32 ---
 	@(link_name="llvm.x86.sse2.ucomilt.sd")
-	ucomiltsd  :: proc(a: __m128d, b: __m128d) -> i32 ---
+	ucomiltsd  :: proc(a, b: __m128d) -> i32 ---
 	@(link_name="llvm.x86.sse2.ucomile.sd")
-	ucomilesd  :: proc(a: __m128d, b: __m128d) -> i32 ---
+	ucomilesd  :: proc(a, b: __m128d) -> i32 ---
 	@(link_name="llvm.x86.sse2.ucomigt.sd")
-	ucomigtsd  :: proc(a: __m128d, b: __m128d) -> i32 ---
+	ucomigtsd  :: proc(a, b: __m128d) -> i32 ---
 	@(link_name="llvm.x86.sse2.ucomige.sd")
-	ucomigesd  :: proc(a: __m128d, b: __m128d) -> i32 ---
+	ucomigesd  :: proc(a, b: __m128d) -> i32 ---
 	@(link_name="llvm.x86.sse2.ucomineq.sd")
-	ucomineqsd :: proc(a: __m128d, b: __m128d) -> i32 ---
+	ucomineqsd :: proc(a, b: __m128d) -> i32 ---
 	@(link_name="llvm.x86.sse2.movmsk.pd")
 	movmskpd   :: proc(a: __m128d) -> i32 ---
 	@(link_name="llvm.x86.sse2.cvtpd2ps")
@@ -624,9 +910,9 @@ foreign _ {
 	@(link_name="llvm.x86.sse2.cvtsd2si")
 	cvtsd2si   :: proc(a: __m128d) -> i32 ---
 	@(link_name="llvm.x86.sse2.cvtsd2ss")
-	cvtsd2ss   :: proc(a: __m128, b: __m128d) -> __m128 ---
+	cvtsd2ss   :: proc(a, b: __m128d) -> __m128 ---
 	@(link_name="llvm.x86.sse2.cvtss2sd")
-	cvtss2sd   :: proc(a: __m128d, b: __m128) -> __m128d ---
+	cvtss2sd   :: proc(a, b: __m128) -> __m128d ---
 	@(link_name="llvm.x86.sse2.cvttpd2dq")
 	cvttpd2dq  :: proc(a: __m128d) -> i32x4 ---
 	@(link_name="llvm.x86.sse2.cvttsd2si")
