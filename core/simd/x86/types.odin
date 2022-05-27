@@ -1,6 +1,8 @@
 //+build i386, amd64
 package simd_x86
 
+import "core:simd"
+
 bf16 :: u16
 
 __m128i :: #simd[2]i64
@@ -42,3 +44,14 @@ _MM_MANTISSA_NORM_ENUM :: i32
 _MM_MANTISSA_SIGN_ENUM :: i32
 
 _MM_PERM_ENUM :: i32
+
+@(private) u8x16 :: simd.u8x16
+@(private) i8x16 :: simd.i8x16
+@(private) u16x8 :: simd.u16x8
+@(private) i16x8 :: simd.i16x8
+@(private) u32x4 :: simd.u32x4
+@(private) i32x4 :: simd.i32x4
+@(private) u64x2 :: simd.u64x2
+@(private) i64x2 :: simd.i64x2
+@(private) f32x4 :: simd.f32x4
+@(private) f64x2 :: simd.f64x2

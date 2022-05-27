@@ -17,81 +17,212 @@ _mm_mfence :: #force_inline proc "c" () {
 }
 
 _mm_add_epi8 :: #force_inline proc "c" (a, b: __m128i)  -> __m128i {
-	x := transmute(simd.i8x16)a
-	y := transmute(simd.i8x16)b
-	return transmute(__m128i)simd.add(x, y)
+	return transmute(__m128i)simd.add(transmute(i8x16)a, transmute(i8x16)b)
 }
 _mm_add_epi16 :: #force_inline proc "c" (a, b: __m128i)  -> __m128i {
-	x := transmute(simd.i16x8)a
-	y := transmute(simd.i16x8)b
-	return transmute(__m128i)simd.add(x, y)
+	return transmute(__m128i)simd.add(transmute(i16x8)a, transmute(i16x8)b)
 }
 _mm_add_epi32 :: #force_inline proc "c" (a, b: __m128i)  -> __m128i {
-	x := transmute(simd.i32x4)a
-	y := transmute(simd.i32x4)b
-	return transmute(__m128i)simd.add(x, y)
+	return transmute(__m128i)simd.add(transmute(i32x4)a, transmute(i32x4)b)
 }
 _mm_add_epi64 :: #force_inline proc "c" (a, b: __m128i)  -> __m128i {
-	x := transmute(simd.i64x2)a
-	y := transmute(simd.i64x2)b
-	return transmute(__m128i)simd.add(x, y)
+	return transmute(__m128i)simd.add(transmute(i64x2)a, transmute(i64x2)b)
 }
 _mm_adds_epi8 :: #force_inline proc "c" (a, b: __m128i)  -> __m128i {
-	x := transmute(simd.i8x16)a
-	y := transmute(simd.i8x16)b
-	return transmute(__m128i)simd.add_sat(x, y)
+	return transmute(__m128i)simd.add_sat(transmute(i8x16)a, transmute(i8x16)b)
 }
 _mm_adds_epi16 :: #force_inline proc "c" (a, b: __m128i)  -> __m128i {
-	x := transmute(simd.i16x8)a
-	y := transmute(simd.i16x8)b
-	return transmute(__m128i)simd.add_sat(x, y)
+	return transmute(__m128i)simd.add_sat(transmute(i16x8)a, transmute(i16x8)b)
 }
 _mm_adds_epu8 :: #force_inline proc "c" (a, b: __m128i)  -> __m128i {
-	x := transmute(simd.u8x16)a
-	y := transmute(simd.u8x16)b
-	return transmute(__m128i)simd.add_sat(x, y)
+	return transmute(__m128i)simd.add_sat(transmute(u8x16)a, transmute(u8x16)b)
 }
 _mm_adds_epu16 :: #force_inline proc "c" (a, b: __m128i)  -> __m128i {
-	x := transmute(simd.u16x8)a
-	y := transmute(simd.u16x8)b
-	return transmute(__m128i)simd.add_sat(x, y)
+	return transmute(__m128i)simd.add_sat(transmute(u16x8)a, transmute(u16x8)b)
 }
 _mm_avg_epu8 :: #force_inline proc "c" (a, b: __m128i)  -> __m128i {
-	x := transmute(simd.u8x16)a
-	y := transmute(simd.u8x16)b
-	return transmute(__m128i)pavgb(x, y)
+	return transmute(__m128i)pavgb(transmute(u8x16)a, transmute(u8x16)b)
 }
 _mm_avg_epu16 :: #force_inline proc "c" (a, b: __m128i)  -> __m128i {
-	x := transmute(simd.u16x8)a
-	y := transmute(simd.u16x8)b
-	return transmute(__m128i)pavgw(x, y)
+	return transmute(__m128i)pavgw(transmute(u16x8)a, transmute(u16x8)b)
 }
 
 _mm_madd_epi16 :: #force_inline proc "c" (a, b: __m128i)  -> __m128i {
-	x := transmute(simd.i16x8)a
-	y := transmute(simd.i16x8)b
-	return transmute(__m128i)pmaddwd(x, y)
+	return transmute(__m128i)pmaddwd(transmute(i16x8)a, transmute(i16x8)b)
 }
 _mm_max_epi16 :: #force_inline proc "c" (a, b: __m128i)  -> __m128i {
-	x := transmute(simd.i16x8)a
-	y := transmute(simd.i16x8)b
-	return transmute(__m128i)pmaxsw(x, y)
+	return transmute(__m128i)pmaxsw(transmute(i16x8)a, transmute(i16x8)b)
 }
 _mm_max_epu8 :: #force_inline proc "c" (a, b: __m128i)  -> __m128i {
-	x := transmute(simd.u8x16)a
-	y := transmute(simd.u8x16)b
-	return transmute(__m128i)pmaxub(x, y)
+	return transmute(__m128i)pmaxub(transmute(u8x16)a, transmute(u8x16)b)
 }
 _mm_min_epi16 :: #force_inline proc "c" (a, b: __m128i)  -> __m128i {
-	x := transmute(simd.i16x8)a
-	y := transmute(simd.i16x8)b
-	return transmute(__m128i)pminsw(x, y)
+	return transmute(__m128i)pminsw(transmute(i16x8)a, transmute(i16x8)b)
 }
 _mm_min_epu8 :: #force_inline proc "c" (a, b: __m128i)  -> __m128i {
-	x := transmute(simd.u8x16)a
-	y := transmute(simd.u8x16)b
-	return transmute(__m128i)pminub(x, y)
+	return transmute(__m128i)pminub(transmute(u8x16)a, transmute(u8x16)b)
 }
+
+
+_mm_mulhi_epi16 :: #force_inline proc "c" (a: __m128i, b: __m128i) -> __m128i {
+	return transmute(__m128i)pmulhw(transmute(i16x8)a, transmute(i16x8)b)
+}
+_mm_mulhi_epu16 :: #force_inline proc "c" (a: __m128i, b: __m128i) -> __m128i {
+	return transmute(__m128i)pmulhuw(transmute(u16x8)a, transmute(u16x8)b)
+}
+_mm_mullo_epi16 :: #force_inline proc "c" (a: __m128i, b: __m128i) -> __m128i {
+	return transmute(__m128i)simd.mul(transmute(i16x8)a, transmute(i16x8)b)
+}
+_mm_mul_epu32 :: #force_inline proc "c" (a: __m128i, b: __m128i) -> __m128i {
+	return transmute(__m128i)pmuludq(transmute(u32x4)a, transmute(u32x4)b)
+}
+_mm_sad_epu8 :: #force_inline proc "c" (a: __m128i, b: __m128i) -> __m128i {
+	return transmute(__m128i)psadbw(transmute(u8x16)a, transmute(u8x16)b)
+}
+_mm_sub_epi8 :: #force_inline proc "c" (a: __m128i, b: __m128i) -> __m128i {
+	return transmute(__m128i)simd.sub(transmute(i8x16)a, transmute(i8x16)b)
+}
+_mm_sub_epi16 :: #force_inline proc "c" (a: __m128i, b: __m128i) -> __m128i {
+	return transmute(__m128i)simd.sub(transmute(i16x8)a, transmute(i16x8)b)
+}
+_mm_sub_epi32 :: #force_inline proc "c" (a: __m128i, b: __m128i) -> __m128i {
+	return transmute(__m128i)simd.sub(transmute(i32x4)a, transmute(i32x4)b)
+}
+_mm_sub_epi64 :: #force_inline proc "c" (a: __m128i, b: __m128i) -> __m128i {
+	return transmute(__m128i)simd.sub(transmute(i64x2)a, transmute(i64x2)b)
+}
+_mm_subs_epi8 :: #force_inline proc "c" (a: __m128i, b: __m128i) -> __m128i {
+	return transmute(__m128i)simd.sub_sat(transmute(i8x16)a, transmute(i8x16)b)
+}
+_mm_subs_epi16 :: #force_inline proc "c" (a: __m128i, b: __m128i) -> __m128i {
+	return transmute(__m128i)simd.sub_sat(transmute(i16x8)a, transmute(i16x8)b)
+}
+_mm_subs_epu8 :: #force_inline proc "c" (a: __m128i, b: __m128i) -> __m128i {
+	return transmute(__m128i)simd.sub_sat(transmute(u8x16)a, transmute(u8x16)b)
+}
+_mm_subs_epu16 :: #force_inline proc "c" (a: __m128i, b: __m128i) -> __m128i {
+	return transmute(__m128i)simd.sub_sat(transmute(u16x8)a, transmute(u16x8)b)
+}
+
+
+
+@(private)
+_mm_slli_si128_impl :: #force_inline proc "c" (a: __m128i, $IMM8: u32) -> __m128i {
+	shift :: IMM8 & 0xff
+
+	return transmute(__m128i)simd.shuffle(
+		transmute(i8x16)a,
+		i8x16(0),
+		0  when shift > 15 else (16 - shift + 0),
+		1  when shift > 15 else (16 - shift + 1),
+		2  when shift > 15 else (16 - shift + 2),
+		3  when shift > 15 else (16 - shift + 3),
+		4  when shift > 15 else (16 - shift + 4),
+		5  when shift > 15 else (16 - shift + 5),
+		6  when shift > 15 else (16 - shift + 6),
+		7  when shift > 15 else (16 - shift + 7),
+		8  when shift > 15 else (16 - shift + 8),
+		9  when shift > 15 else (16 - shift + 9),
+		10 when shift > 15 else (16 - shift + 10),
+		11 when shift > 15 else (16 - shift + 11),
+		12 when shift > 15 else (16 - shift + 12),
+		13 when shift > 15 else (16 - shift + 13),
+		14 when shift > 15 else (16 - shift + 14),
+		15 when shift > 15 else (16 - shift + 15),
+	)
+}
+
+@(private)
+_mm_srli_si128_impl :: #force_inline proc "c" (a: __m128i, $IMM8: u32) -> __m128i {
+	shift :: IMM8
+	return transmute(__m128i)simd.shuffle(
+		transmute(i8x16)a,
+		i8x16(0),
+		0  + 16 when shift > 15 else (shift + 0),
+		1  + 16 when shift > 15 else (shift + 1),
+		2  + 16 when shift > 15 else (shift + 2),
+		3  + 16 when shift > 15 else (shift + 3),
+		4  + 16 when shift > 15 else (shift + 4),
+		5  + 16 when shift > 15 else (shift + 5),
+		6  + 16 when shift > 15 else (shift + 6),
+		7  + 16 when shift > 15 else (shift + 7),
+		8  + 16 when shift > 15 else (shift + 8),
+		9  + 16 when shift > 15 else (shift + 9),
+		10 + 16 when shift > 15 else (shift + 10),
+		11 + 16 when shift > 15 else (shift + 11),
+		12 + 16 when shift > 15 else (shift + 12),
+		13 + 16 when shift > 15 else (shift + 13),
+		14 + 16 when shift > 15 else (shift + 14),
+		15 + 16 when shift > 15 else (shift + 15),
+	)
+}
+
+
+_mm_slli_si128 :: #force_inline proc "c" (a: __m128i, $IMM8: u32) -> __m128i {
+	return _mm_slli_si128_impl(a, IMM8)
+}
+_mm_bslli_si128 :: #force_inline proc "c" (a: __m128i, $IMM8: u32) -> __m128i {
+	return _mm_slli_si128_impl(a, IMM8)
+}
+
+
+
+_mm_bsrli_si128 :: #force_inline proc "c" (a: __m128i, $IMM8: u32) -> __m128i {
+	return _mm_srli_si128_impl(a, IMM8)
+}
+_mm_slli_epi16 :: #force_inline proc "c" (a: __m128i, $IMM8: u32) -> __m128i {
+	return transmute(__m128i)pslliw(transmute(i16x8)a, IMM8)
+}
+_mm_sll_epi16 :: #force_inline proc "c" (a: __m128i, count: __m128i) -> __m128i {
+	return transmute(__m128i)psllw(transmute(i16x8)a, transmute(i16x8)count)
+}
+_mm_slli_epi32 :: #force_inline proc "c" (a: __m128i, $IMM8: u32) -> __m128i {
+	return transmute(__m128i)psllid(transmute(i32x4)a, IMM8)
+}
+_mm_sll_epi32 :: #force_inline proc "c" (a: __m128i, count: __m128i) -> __m128i {
+	return transmute(__m128i)pslld(transmute(i32x4)a, transmute(i32x4)count)
+}
+_mm_slli_epi64 :: #force_inline proc "c" (a: __m128i, $IMM8: u32) -> __m128i {
+	return transmute(__m128i)pslliq(transmute(i64x2)a, IMM8)
+}
+_mm_sll_epi64 :: #force_inline proc "c" (a: __m128i, count: __m128i) -> __m128i {
+	return transmute(__m128i)psllq(transmute(i64x2)a, transmute(i64x2)count)
+}
+_mm_srai_epi16 :: #force_inline proc "c" (a: __m128i, $IMM8: u32) -> __m128i {
+	return transmute(__m128i)psraiw(transmute(i16x8)a. IMM8)
+}
+_mm_sra_epi16 :: #force_inline proc "c" (a: __m128i, count: __m128i) -> __m128i {
+	return transmute(__m128i)psraw(transmute(i16x8)a, transmute(i16x8)count)
+}
+_mm_srai_epi32 :: #force_inline proc "c" (a: __m128i, $IMM8: u32) -> __m128i {
+	return transmute(__m128i)psraid(transmute(i32x4)a, IMM8)
+}
+_mm_sra_epi32 :: #force_inline proc "c" (a: __m128i, count: __m128i) -> __m128i {
+	return transmute(__m128i)psrad(transmute(i32x4)a, transmute(i32x4)count)
+}
+
+_mm_srli_si128 :: #force_inline proc "c" (a: __m128i, $IMM8: u32) -> __m128i {
+	return _mm_srli_si128_impl(a, IMM8)
+}
+_mm_srli_epi16 :: #force_inline proc "c" (a: __m128i, $IMM8: u32) -> __m128i {
+	return transmute(__m128i)psrliw(transmute(i16x8)a. IMM8)
+}
+_mm_srl_epi16 :: #force_inline proc "c" (a: __m128i, count: __m128i) -> __m128i {
+	return transmute(__m128i)psrlw(transmute(i16x8)a, transmute(i16x8)count)
+}
+_mm_srli_epi32 :: #force_inline proc "c" (a: __m128i, $IMM8: u32) -> __m128i {
+	return transmute(__m128i)psrlid(transmute(i32x4)a, IMM8)
+}
+_mm_srl_epi32 :: #force_inline proc "c" (a: __m128i, count: __m128i) -> __m128i {
+	return transmute(__m128i)psrld(transmute(i32x4)a, transmute(i32x4)count)
+}
+_mm_srli_epi64 :: #force_inline proc "c" (a: __m128i, $IMM8: u32) -> __m128i {
+	return transmute(__m128i)psrliq(transmute(i64x2)a, IMM8)
+}
+_mm_srl_epi64 :: #force_inline proc "c" (a: __m128i, count: __m128i) -> __m128i {
+	return transmute(__m128i)psrlq(transmute(i64x2)a, transmute(i64x2)count)
+}
+
 
 
 _mm_castpd_ps :: #force_inline proc "c" (a: __m128d) -> __m128 {
@@ -140,73 +271,73 @@ foreign _ {
 	@(link_name="llvm.x86.sse2.mfence")
 	mfence     :: proc() ---
 	@(link_name="llvm.x86.sse2.pavg.b")
-	pavgb      :: proc(a, b: simd.u8x16) -> simd.u8x16 ---
+	pavgb      :: proc(a, b: u8x16) -> u8x16 ---
 	@(link_name="llvm.x86.sse2.pavg.w")
-	pavgw      :: proc(a, b: simd.u16x8) -> simd.u16x8 ---
+	pavgw      :: proc(a, b: u16x8) -> u16x8 ---
 	@(link_name="llvm.x86.sse2.pmadd.wd")
-	pmaddwd    :: proc(a, b: simd.i16x8) -> simd.i32x4 ---
+	pmaddwd    :: proc(a, b: i16x8) -> i32x4 ---
 	@(link_name="llvm.x86.sse2.pmaxs.w")
-	pmaxsw     :: proc(a, b: simd.i16x8) -> simd.i16x8 ---
+	pmaxsw     :: proc(a, b: i16x8) -> i16x8 ---
 	@(link_name="llvm.x86.sse2.pmaxu.b")
-	pmaxub     :: proc(a, b: simd.u8x16) -> simd.u8x16 ---
+	pmaxub     :: proc(a, b: u8x16) -> u8x16 ---
 	@(link_name="llvm.x86.sse2.pmins.w")
-	pminsw     :: proc(a, b: simd.i16x8) -> simd.i16x8 ---
+	pminsw     :: proc(a, b: i16x8) -> i16x8 ---
 	@(link_name="llvm.x86.sse2.pminu.b")
-	pminub     :: proc(a, b: simd.u8x16) -> simd.u8x16 ---
+	pminub     :: proc(a, b: u8x16) -> u8x16 ---
 	@(link_name="llvm.x86.sse2.pmulh.w")
-	pmulhw     :: proc(a, b: simd.i16x8) -> simd.i16x8 ---
+	pmulhw     :: proc(a, b: i16x8) -> i16x8 ---
 	@(link_name="llvm.x86.sse2.pmulhu.w")
-	pmulhuw    :: proc(a, b: simd.u16x8) -> simd.u16x8 ---
+	pmulhuw    :: proc(a, b: u16x8) -> u16x8 ---
 	@(link_name="llvm.x86.sse2.pmulu.dq")
-	pmuludq    :: proc(a, b: simd.u32x4) -> simd.u64x2 ---
+	pmuludq    :: proc(a, b: u32x4) -> u64x2 ---
 	@(link_name="llvm.x86.sse2.psad.bw")
-	psadbw     :: proc(a, b: simd.u8x16) -> simd.u64x2 ---
+	psadbw     :: proc(a, b: u8x16) -> u64x2 ---
 	@(link_name="llvm.x86.sse2.pslli.w")
-	pslliw     :: proc(a: simd.i16x8, #const imm8: u32) -> simd.i16x8 ---
+	pslliw     :: proc(a: i16x8, #const imm8: u32) -> i16x8 ---
 	@(link_name="llvm.x86.sse2.psll.w")
-	psllw      :: proc(a: simd.i16x8, count: simd.i16x8) -> simd.i16x8 ---
+	psllw      :: proc(a: i16x8, count: i16x8) -> i16x8 ---
 	@(link_name="llvm.x86.sse2.pslli.d")
-	psllid     :: proc(a: simd.i32x4, #const imm8: u32) -> simd.i32x4 ---
+	psllid     :: proc(a: i32x4, #const imm8: u32) -> i32x4 ---
 	@(link_name="llvm.x86.sse2.psll.d")
-	pslld      :: proc(a: simd.i32x4, count: simd.i32x4) -> simd.i32x4 ---
+	pslld      :: proc(a: i32x4, count: i32x4) -> i32x4 ---
 	@(link_name="llvm.x86.sse2.pslli.q")
-	pslliq     :: proc(a: simd.i64x2, #const imm8: u32) -> simd.i64x2 ---
+	pslliq     :: proc(a: i64x2, #const imm8: u32) -> i64x2 ---
 	@(link_name="llvm.x86.sse2.psll.q")
-	psllq      :: proc(a: simd.i64x2, count: simd.i64x2) -> simd.i64x2 ---
+	psllq      :: proc(a: i64x2, count: i64x2) -> i64x2 ---
 	@(link_name="llvm.x86.sse2.psrai.w")
-	psraiw     :: proc(a: simd.i16x8, #const imm8: u32) -> simd.i16x8 ---
+	psraiw     :: proc(a: i16x8, #const imm8: u32) -> i16x8 ---
 	@(link_name="llvm.x86.sse2.psra.w")
-	psraw      :: proc(a: simd.i16x8, count: simd.i16x8) -> simd.i16x8 ---
+	psraw      :: proc(a: i16x8, count: i16x8) -> i16x8 ---
 	@(link_name="llvm.x86.sse2.psrai.d")
-	psraid     :: proc(a: simd.i32x4, #const imm8: u32) -> simd.i32x4 ---
+	psraid     :: proc(a: i32x4, #const imm8: u32) -> i32x4 ---
 	@(link_name="llvm.x86.sse2.psra.d")
-	psrad      :: proc(a: simd.i32x4, count: simd.i32x4) -> simd.i32x4 ---
+	psrad      :: proc(a: i32x4, count: i32x4) -> i32x4 ---
 	@(link_name="llvm.x86.sse2.psrli.w")
-	psrliw     :: proc(a: simd.i16x8, #const imm8: u32) -> simd.i16x8 ---
+	psrliw     :: proc(a: i16x8, #const imm8: u32) -> i16x8 ---
 	@(link_name="llvm.x86.sse2.psrl.w")
-	psrlw      :: proc(a: simd.i16x8, count: simd.i16x8) -> simd.i16x8 ---
+	psrlw      :: proc(a: i16x8, count: i16x8) -> i16x8 ---
 	@(link_name="llvm.x86.sse2.psrli.d")
-	psrlid     :: proc(a: simd.i32x4, #const imm8: u32) -> simd.i32x4 ---
+	psrlid     :: proc(a: i32x4, #const imm8: u32) -> i32x4 ---
 	@(link_name="llvm.x86.sse2.psrl.d")
-	psrld      :: proc(a: simd.i32x4, count: simd.i32x4) -> simd.i32x4 ---
+	psrld      :: proc(a: i32x4, count: i32x4) -> i32x4 ---
 	@(link_name="llvm.x86.sse2.psrli.q")
-	psrliq     :: proc(a: simd.i64x2, #const imm8: u32) -> simd.i64x2 ---
+	psrliq     :: proc(a: i64x2, #const imm8: u32) -> i64x2 ---
 	@(link_name="llvm.x86.sse2.psrl.q")
-	psrlq      :: proc(a: simd.i64x2, count: simd.i64x2) -> simd.i64x2 ---
+	psrlq      :: proc(a: i64x2, count: i64x2) -> i64x2 ---
 	@(link_name="llvm.x86.sse2.cvtdq2ps")
-	cvtdq2ps   :: proc(a: simd.i32x4) -> __m128 ---
+	cvtdq2ps   :: proc(a: i32x4) -> __m128 ---
 	@(link_name="llvm.x86.sse2.cvtps2dq")
-	cvtps2dq   :: proc(a: __m128) -> simd.i32x4 ---
+	cvtps2dq   :: proc(a: __m128) -> i32x4 ---
 	@(link_name="llvm.x86.sse2.maskmov.dqu")
-	maskmovdqu :: proc(a: simd.i8x16, mask: simd.i8x16, mem_addr: rawptr) ---
+	maskmovdqu :: proc(a: i8x16, mask: i8x16, mem_addr: rawptr) ---
 	@(link_name="llvm.x86.sse2.packsswb.128")
-	packsswb   :: proc(a: simd.i16x8, b: simd.i16x8) -> simd.i8x16 ---
+	packsswb   :: proc(a: i16x8, b: i16x8) -> i8x16 ---
 	@(link_name="llvm.x86.sse2.packssdw.128")
-	packssdw   :: proc(a: simd.i32x4, b: simd.i32x4) -> simd.i16x8 ---
+	packssdw   :: proc(a: i32x4, b: i32x4) -> i16x8 ---
 	@(link_name="llvm.x86.sse2.packuswb.128")
-	packuswb   :: proc(a: simd.i16x8, b: simd.i16x8) -> simd.u8x16 ---
+	packuswb   :: proc(a: i16x8, b: i16x8) -> u8x16 ---
 	@(link_name="llvm.x86.sse2.pmovmskb.128")
-	pmovmskb   :: proc(a: simd.i8x16) -> i32 ---
+	pmovmskb   :: proc(a: i8x16) -> i32 ---
 	@(link_name="llvm.x86.sse2.max.sd")
 	maxsd      :: proc(a: __m128d, b: __m128d) -> __m128d ---
 	@(link_name="llvm.x86.sse2.max.pd")
@@ -254,7 +385,7 @@ foreign _ {
 	@(link_name="llvm.x86.sse2.cvtps2pd")
 	cvtps2pd   :: proc(a: __m128) -> __m128d ---
 	@(link_name="llvm.x86.sse2.cvtpd2dq")
-	cvtpd2dq   :: proc(a: __m128d) -> simd.i32x4 ---
+	cvtpd2dq   :: proc(a: __m128d) -> i32x4 ---
 	@(link_name="llvm.x86.sse2.cvtsd2si")
 	cvtsd2si   :: proc(a: __m128d) -> i32 ---
 	@(link_name="llvm.x86.sse2.cvtsd2ss")
@@ -262,11 +393,11 @@ foreign _ {
 	@(link_name="llvm.x86.sse2.cvtss2sd")
 	cvtss2sd   :: proc(a: __m128d, b: __m128) -> __m128d ---
 	@(link_name="llvm.x86.sse2.cvttpd2dq")
-	cvttpd2dq  :: proc(a: __m128d) -> simd.i32x4 ---
+	cvttpd2dq  :: proc(a: __m128d) -> i32x4 ---
 	@(link_name="llvm.x86.sse2.cvttsd2si")
 	cvttsd2si  :: proc(a: __m128d) -> i32 ---
 	@(link_name="llvm.x86.sse2.cvttps2dq")
-	cvttps2dq  :: proc(a: __m128) -> simd.i32x4 ---
+	cvttps2dq  :: proc(a: __m128) -> i32x4 ---
 	@(link_name="llvm.x86.sse2.storeu.dq")
 	storeudq   :: proc(mem_addr: rawptr, a: __m128i) ---
 	@(link_name="llvm.x86.sse2.storeu.pd")
