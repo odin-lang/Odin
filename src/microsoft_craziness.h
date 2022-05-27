@@ -87,6 +87,11 @@ String mc_concat(String a, String b, String c) {
 	return concatenate3_strings(mc_allocator, a, b, c);
 }
 
+String mc_get_env(String key) {
+	char const * value = gb_get_env((char const *)key.text, mc_allocator);
+	return make_string_c(value);
+}
+
 void mc_free(String str) {
 	gb_free(mc_allocator, str.text);
 }
@@ -549,6 +554,194 @@ bool find_visual_studio_by_fighting_through_microsoft_craziness(Find_Result_Utf8
 	return false;
 }
 
+// NOTE(WalterPlinge): Environment variables can help to find Visual C++ and WinSDK paths for both
+// official and portable installations (like mmozeiko's portable msvc script). This will only use
+// the first paths it finds, and won't overwrite any values that `result` already has.
+bool find_msvc_install_from_env_vars(Find_Result_Utf8 *result) {
+	if (build_context.metrics.arch != TargetArch_amd64 && build_context.metrics.arch != TargetArch_i386) {
+		return false;
+	}
+
+	// We can find windows sdk using the following combination of env vars:
+	// (UniversalCRTSdkDir or WindowsSdkDir) and (WindowsSDKLibVersion or WindowsSDKVersion)
+	bool sdk_found = false;
+
+	// These appear to be suitable env vars used by Visual Studio
+	String win_sdk_ver_env = mc_get_env(str_lit("WindowsSDKVersion"));
+	String win_sdk_lib_env = mc_get_env(str_lit("WindowsSDKLibVersion"));
+	String win_sdk_dir_env = mc_get_env(str_lit("WindowsSdkDir"));
+	String crt_sdk_dir_env = mc_get_env(str_lit("UniversalCRTSdkDir"));
+
+	defer ({
+		mc_free(win_sdk_ver_env);
+		mc_free(win_sdk_lib_env);
+		mc_free(win_sdk_dir_env);
+		mc_free(crt_sdk_dir_env);
+	});
+
+	// NOTE(WalterPlinge): If any combination is found, let's just assume they are correct
+	if ((win_sdk_ver_env.len || win_sdk_lib_env.len) && (win_sdk_dir_env.len || crt_sdk_dir_env.len)) {
+		//? Maybe we need to handle missing '\' at end of strings, so far it doesn't seem an issue
+		String dir = win_sdk_dir_env.len ? win_sdk_dir_env : crt_sdk_dir_env;
+		String ver = win_sdk_ver_env.len ? win_sdk_ver_env : win_sdk_lib_env;
+
+		// These have trailing '\' as we are just composing the path
+		String um_dir = build_context.metrics.arch == TargetArch_amd64
+			? str_lit("um\\x64\\")
+			: str_lit("um\\x86\\");
+		String ucrt_dir = build_context.metrics.arch == TargetArch_amd64
+			? str_lit("ucrt\\x64\\")
+			: str_lit("ucrt\\x86\\");
+
+		result->windows_sdk_root              = mc_concat(dir, str_lit("Lib\\"), ver);
+		result->windows_sdk_um_library_path   = mc_concat(result->windows_sdk_root, um_dir);
+		result->windows_sdk_ucrt_library_path = mc_concat(result->windows_sdk_root, ucrt_dir);
+
+		sdk_found = true;
+	}
+
+	// If we haven't found it yet, we can loop through LIB for specific folders
+	//? This may not be robust enough using `um\x64` and `ucrt\x64`
+	if (!sdk_found) {
+		char const *lib_env = gb_get_env("LIB", mc_allocator);
+		defer (gb_free(mc_allocator, (void*)lib_env));
+		if (lib_env) {
+			String lib = make_string_c(lib_env);
+
+			// NOTE(WalterPlinge): I don't know if there's a chance for the LIB variable
+			// to be set without a trailing '\' (apart from manually), so we can just
+			// check paths without it (see use of `String end` in the loop below)
+			String um_dir = build_context.metrics.arch == TargetArch_amd64
+				? make_string_c("um\\x64")
+				: make_string_c("um\\x86");
+			String ucrt_dir = build_context.metrics.arch == TargetArch_amd64
+				? make_string_c("ucrt\\x64")
+				: make_string_c("ucrt\\x86");
+
+			isize lo = {0};
+			isize hi = {0};
+			for (isize c = 0; c <= lib.len; c += 1) {
+				if (c != lib.len && lib[c] != ';') {
+					continue;
+				}
+				hi = c;
+				String dir = substring(lib, lo, hi);
+				defer (lo = hi + 1);
+
+				// Remove the last slash so we can match with the strings above
+				String end = dir[dir.len - 1] == '\\'
+					? substring(dir, 0, dir.len - 1)
+					: substring(dir, 0, dir.len);
+
+				// Find one and we can make the other
+				if (string_ends_with(end, um_dir)) {
+					result->windows_sdk_um_library_path   = mc_concat(end, str_lit("\\"));
+					break;
+				} else if (string_ends_with(end, ucrt_dir)) {
+					result->windows_sdk_ucrt_library_path = mc_concat(end, str_lit("\\"));
+					break;
+				}
+			}
+
+			// Get the root from the one we found, and make the other
+			// NOTE(WalterPlinge): we need to copy the string so that we don't risk a double free
+			if (result->windows_sdk_um_library_path.len > 0) {
+				String root = substring(result->windows_sdk_um_library_path, 0, result->windows_sdk_um_library_path.len - 1 - um_dir.len);
+				result->windows_sdk_root              = copy_string(mc_allocator, root);
+				result->windows_sdk_ucrt_library_path = mc_concat(result->windows_sdk_root, ucrt_dir, str_lit("\\"));
+			} else if (result->windows_sdk_ucrt_library_path.len > 0) {
+				String root = substring(result->windows_sdk_ucrt_library_path, 0, result->windows_sdk_ucrt_library_path.len - 1 - ucrt_dir.len);
+				result->windows_sdk_root              = copy_string(mc_allocator, root);
+				result->windows_sdk_um_library_path   = mc_concat(result->windows_sdk_root, um_dir, str_lit("\\"));
+			}
+
+			if (result->windows_sdk_root.len > 0) {
+				sdk_found = true;
+			}
+		}
+	}
+
+	// NOTE(WalterPlinge): So far this function assumes it will only be called if MSVC was
+	// installed using mmozeiko's portable msvc script, which uses the windows 10 sdk.
+	// This may need to be changed later if it ends up causing problems.
+	if (sdk_found && result->windows_sdk_version == 0) {
+		result->windows_sdk_version = 10;
+	}
+
+	bool vs_found = false;
+	if (result->vs_exe_path.len > 0 && result->vs_library_path.len > 0) {
+		vs_found = true;
+	}
+
+	// We can find visual studio using VCToolsInstallDir
+	if (!vs_found) {
+		String vctid = mc_get_env(str_lit("VCToolsInstallDir"));
+		defer (mc_free(vctid));
+
+		if (vctid.len) {
+			String exe = build_context.metrics.arch == TargetArch_amd64
+				? str_lit("bin\\Hostx64\\x64\\")
+				: str_lit("bin\\Hostx86\\x86\\");
+			String lib = build_context.metrics.arch == TargetArch_amd64
+				? str_lit("lib\\x64\\")
+				: str_lit("lib\\x86\\");
+
+			result->vs_exe_path     = mc_concat(vctid, exe);
+			result->vs_library_path = mc_concat(vctid, lib);
+			vs_found = true;
+		}
+	}
+
+	// If we haven't found it yet, we can loop through Path for specific folders
+	if (!vs_found) {
+		String path = mc_get_env(str_lit("Path"));
+		defer (mc_free(path));
+
+		if (path.len) {
+			String exe = build_context.metrics.arch == TargetArch_amd64
+				? str_lit("bin\\Hostx64\\x64")
+				: str_lit("bin\\Hostx86\\x86");
+			String lib = build_context.metrics.arch == TargetArch_amd64
+				? str_lit("lib\\x64")
+				: str_lit("lib\\x86");
+
+			isize lo = {0};
+			isize hi = {0};
+			for (isize c = 0; c <= path.len; c += 1) {
+				if (c != path.len && path[c] != ';') {
+					continue;
+				}
+
+				hi = c;
+				String dir = substring(path, lo, hi);
+				defer (lo = hi + 1);
+
+				String end = dir[dir.len - 1] == '\\'
+					? substring(dir, 0, dir.len - 1)
+					: substring(dir, 0, dir.len);
+
+				// check if cl.exe and link.exe exist in this folder
+				String cl   = mc_concat(end, str_lit("\\cl.exe"));
+				String link = mc_concat(end, str_lit("\\link.exe"));
+				defer (mc_free(cl));
+				defer (mc_free(link));
+
+				if (!string_ends_with(end, exe) || !gb_file_exists((char *)cl.text) || !gb_file_exists((char *)link.text)) {
+					continue;
+				}
+
+				String root = substring(end, 0, end.len - exe.len);
+				result->vs_exe_path     = mc_concat(end,       str_lit("\\"));
+				result->vs_library_path = mc_concat(root, lib, str_lit("\\"));
+
+				vs_found = true;
+			}
+		}
+	}
+
+	return sdk_found && vs_found;
+}
+
 Find_Result_Utf8 find_visual_studio_and_windows_sdk_utf8() {
 	Find_Result_Utf8 r = {};
 	find_windows_kit_root(&r);
@@ -564,6 +757,17 @@ Find_Result_Utf8 find_visual_studio_and_windows_sdk_utf8() {
 	}
 
 	find_visual_studio_by_fighting_through_microsoft_craziness(&r);
+
+	bool all_found =
+		r.windows_sdk_root.len              > 0 &&
+		r.windows_sdk_um_library_path.len   > 0 &&
+		r.windows_sdk_ucrt_library_path.len > 0 &&
+		r.vs_exe_path.len                   > 0 &&
+		r.vs_library_path.len               > 0;
+
+	if (!all_found && !find_msvc_install_from_env_vars(&r)) {
+		return {};
+	}
 
 #if 0
 	printf("windows_sdk_root:              %.*s\n", LIT(r.windows_sdk_root));
