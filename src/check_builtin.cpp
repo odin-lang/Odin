@@ -1033,6 +1033,34 @@ bool check_builtin_simd_operation(CheckerContext *c, Operand *operand, Ast *call
 			return true;
 		}
 
+	case BuiltinProc_simd_x86__MM_SHUFFLE:
+		{
+			Operand x[4] = {};
+			for (unsigned i = 0; i < 4; i++) {
+				check_expr(c, x+i, ce->args[i]); if (x[i].mode == Addressing_Invalid) return false;
+			}
+
+			u32 offsets[4] = {6, 4, 2, 0};
+			u32 result = 0;
+			for (unsigned i = 0; i < 4; i++) {
+				if (!is_type_integer(x[i].type) || x[i].mode != Addressing_Constant) {
+					gbString xs = type_to_string(x[i].type);
+					error(x[i].expr, "'%.*s' expected a constant integer", LIT(builtin_name), xs);
+					gb_string_free(xs);
+					return false;
+				}
+				i64 val = exact_value_to_i64(x[i].value);
+				if (val < 0 || val > 3) {
+					error(x[i].expr, "'%.*s' expected a constant integer in the range 0..<4, got %lld", LIT(builtin_name), cast(long long)val);
+					return false;
+				}
+				result |= cast(u32)(val) << offsets[i];
+			}
+
+			operand->type = t_untyped_integer;
+			operand->mode = Addressing_Constant;
+			operand->value = exact_value_i64(result);
+		}
 
 	default:
 		GB_PANIC("Unhandled simd intrinsic: %.*s", LIT(builtin_name));
