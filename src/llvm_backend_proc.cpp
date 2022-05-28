@@ -1007,9 +1007,9 @@ lbValue lb_build_builtin_simd_proc(lbProcedure *p, Ast *expr, TypeAndValue const
 	lbValue res = {};
 	res.type = tv.type;
 
-	lbValue arg0 = lb_build_expr(p, ce->args[0]);
-	lbValue arg1 = {};
-	lbValue arg2 = {};
+	lbValue arg0 = {}; if (ce->args.count > 0) arg0 = lb_build_expr(p, ce->args[0]);
+	lbValue arg1 = {}; if (ce->args.count > 1) arg0 = lb_build_expr(p, ce->args[1]);
+	lbValue arg2 = {}; if (ce->args.count > 2) arg0 = lb_build_expr(p, ce->args[2]);
 
 	Type *elem = base_array_type(arg0.type);
 
@@ -1024,7 +1024,6 @@ lbValue lb_build_builtin_simd_proc(lbProcedure *p, Ast *expr, TypeAndValue const
 	case BuiltinProc_simd_mul:
 	case BuiltinProc_simd_div:
 	case BuiltinProc_simd_rem:
-		arg1 = lb_build_expr(p, ce->args[1]);
 		if (is_float) {
 			switch (builtin_id) {
 			case BuiltinProc_simd_add: op_code = LLVMFAdd; break;
@@ -1062,7 +1061,6 @@ lbValue lb_build_builtin_simd_proc(lbProcedure *p, Ast *expr, TypeAndValue const
 	case BuiltinProc_simd_shr: // Odin logic
 	case BuiltinProc_simd_shl_masked: // C logic
 	case BuiltinProc_simd_shr_masked: // C logic
-		arg1 = lb_build_expr(p, ce->args[1]);
 		{
 			i64 sz = type_size_of(elem);
 			GB_ASSERT(arg0.type->kind == Type_SimdVector);
@@ -1098,7 +1096,6 @@ lbValue lb_build_builtin_simd_proc(lbProcedure *p, Ast *expr, TypeAndValue const
 	case BuiltinProc_simd_or:
 	case BuiltinProc_simd_xor:
 	case BuiltinProc_simd_and_not:
-		arg1 = lb_build_expr(p, ce->args[1]);
 		switch (builtin_id) {
 		case BuiltinProc_simd_and: op_code = LLVMAnd; break;
 		case BuiltinProc_simd_or:  op_code = LLVMOr;  break;
@@ -1143,7 +1140,6 @@ lbValue lb_build_builtin_simd_proc(lbProcedure *p, Ast *expr, TypeAndValue const
 		}
 		return res;
 	case BuiltinProc_simd_max:
-		arg1 = lb_build_expr(p, ce->args[1]);
 		if (is_float) {
 			LLVMValueRef cond = LLVMBuildFCmp(p->builder, LLVMRealOGT, arg0.value, arg1.value, "");
 			res.value = LLVMBuildSelect(p->builder, cond, arg0.value, arg1.value, "");
@@ -1158,7 +1154,6 @@ lbValue lb_build_builtin_simd_proc(lbProcedure *p, Ast *expr, TypeAndValue const
 	case BuiltinProc_simd_lanes_le:
 	case BuiltinProc_simd_lanes_gt:
 	case BuiltinProc_simd_lanes_ge:
-		arg1 = lb_build_expr(p, ce->args[1]);
 		if (is_float) {
 			LLVMRealPredicate pred = cast(LLVMRealPredicate)0;
 			switch (builtin_id) {
@@ -1193,12 +1188,9 @@ lbValue lb_build_builtin_simd_proc(lbProcedure *p, Ast *expr, TypeAndValue const
 		break;
 
 	case BuiltinProc_simd_extract:
-		arg1 = lb_build_expr(p, ce->args[1]);
 		res.value = LLVMBuildExtractElement(p->builder, arg0.value, arg1.value, "");
 		return res;
 	case BuiltinProc_simd_replace:
-		arg1 = lb_build_expr(p, ce->args[1]);
-		arg2 = lb_build_expr(p, ce->args[2]);
 		res.value = LLVMBuildInsertElement(p->builder, arg0.value, arg2.value, arg1.value, "");
 		return res;
 
@@ -1283,11 +1275,8 @@ lbValue lb_build_builtin_simd_proc(lbProcedure *p, Ast *expr, TypeAndValue const
 
 	case BuiltinProc_simd_shuffle:
 		{
-			arg1 = lb_build_expr(p, ce->args[1]);
-
 			Type *vt = arg0.type;
 			GB_ASSERT(vt->kind == Type_SimdVector);
-
 
 			i64 indices_count = ce->args.count-2;
 			i64 max_count = vt->SimdVector.count*2;
@@ -1394,8 +1383,6 @@ lbValue lb_build_builtin_simd_proc(lbProcedure *p, Ast *expr, TypeAndValue const
 	case BuiltinProc_simd_add_sat:
 	case BuiltinProc_simd_sub_sat:
 		{
-			arg1 = lb_build_expr(p, ce->args[1]);
-
 			char const *name = nullptr;
 			switch (builtin_id) {
 			case BuiltinProc_simd_add_sat: name = is_signed ? "llvm.sadd.sat" : "llvm.uadd.sat"; break;
@@ -1417,9 +1404,6 @@ lbValue lb_build_builtin_simd_proc(lbProcedure *p, Ast *expr, TypeAndValue const
 
 	case BuiltinProc_simd_clamp:
 		{
-			arg1 = lb_build_expr(p, ce->args[1]);
-			arg2 = lb_build_expr(p, ce->args[2]);
-
 			LLVMValueRef v = arg0.value;
 			LLVMValueRef min = arg1.value;
 			LLVMValueRef max = arg2.value;
@@ -2737,6 +2721,47 @@ lbValue lb_build_builtin_proc(lbProcedure *p, Ast *expr, TypeAndValue const &tv,
 			return res;
 		}
 
+
+	case BuiltinProc_x86_cpuid:
+		{
+			Type *param_types[2] = {t_u32, t_u32};
+			Type *type = alloc_type_proc_from_types(param_types, gb_count_of(param_types), tv.type, false, ProcCC_None);
+			LLVMTypeRef func_type = LLVMGetElementType(lb_type(p->module, type));
+			LLVMValueRef the_asm = llvm_get_inline_asm(
+				func_type,
+				str_lit("cpuid"),
+				str_lit("={ax},={bx},={cx},={dx},{ax},{cx}"),
+				true
+			);
+			GB_ASSERT(the_asm != nullptr);
+
+			LLVMValueRef args[2] = {};
+			args[0] = lb_emit_conv(p, lb_build_expr(p, ce->args[0]), t_u32).value;
+			args[1] = lb_emit_conv(p, lb_build_expr(p, ce->args[1]), t_u32).value;
+			lbValue res = {};
+			res.type = tv.type;
+			res.value = LLVMBuildCall2(p->builder, func_type, the_asm, args, gb_count_of(args), "");
+			return res;
+		}
+	case BuiltinProc_x86_xgetbv:
+		{
+			Type *type = alloc_type_proc_from_types(&t_u32, 1, tv.type, false, ProcCC_None);
+			LLVMTypeRef func_type = LLVMGetElementType(lb_type(p->module, type));
+			LLVMValueRef the_asm = llvm_get_inline_asm(
+				func_type,
+				str_lit("xgetbv"),
+				str_lit("={ax},={dx},{cx}"),
+				true
+			);
+			GB_ASSERT(the_asm != nullptr);
+
+			LLVMValueRef args[1] = {};
+			args[0] = lb_emit_conv(p, lb_build_expr(p, ce->args[0]), t_u32).value;
+			lbValue res = {};
+			res.type = tv.type;
+			res.value = LLVMBuildCall2(p->builder, func_type, the_asm, args, gb_count_of(args), "");
+			return res;
+		}
 	}
 
 	GB_PANIC("Unhandled built-in procedure %.*s", LIT(builtin_procs[id].name));

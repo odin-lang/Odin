@@ -278,6 +278,10 @@ wasm_memory_size :: proc(index: uintptr)        -> int ---
 wasm_memory_atomic_wait32   :: proc(ptr: ^u32, expected: u32, timeout_ns: i64) -> u32 ---
 wasm_memory_atomic_notify32 :: proc(ptr: ^u32, waiters: u32) -> (waiters_woken_up: u32) ---
 
+// x86 Targets (i386, amd64)
+cpuid  :: proc(ax, cx: u32) -> (eax, ebc, ecx, edx: u32) ---
+xgetbv :: proc(cx: u32) -> (eax, edx: u32) ---
+
 
 // Darwin targets only
 objc_object   :: struct{}

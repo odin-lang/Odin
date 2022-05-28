@@ -187,6 +187,9 @@ BuiltinProc__simd_end,
 	// Platform specific intrinsics
 	BuiltinProc_syscall,
 
+	BuiltinProc_x86_cpuid,
+	BuiltinProc_x86_xgetbv,
+
 	// Constant type tests
 
 BuiltinProc__type_begin,
@@ -470,10 +473,13 @@ gb_global BuiltinProc builtin_procs[BuiltinProc_COUNT] = {
 	{STR_LIT("simd_rotate_right"), 2, false, Expr_Expr, BuiltinProcPkg_intrinsics},
 
 	{STR_LIT("simd_x86__MM_SHUFFLE"), 4, false, Expr_Expr, BuiltinProcPkg_intrinsics},
+
 	{STR_LIT(""), 0, false, Expr_Stmt, BuiltinProcPkg_intrinsics},
 
 
 	{STR_LIT("syscall"), 1, true, Expr_Expr, BuiltinProcPkg_intrinsics},
+	{STR_LIT("x86_cpuid"),  2, false, Expr_Expr, BuiltinProcPkg_intrinsics},
+	{STR_LIT("x86_xgetbv"), 1, false, Expr_Expr, BuiltinProcPkg_intrinsics},
 
 
 	{STR_LIT(""), 0, false, Expr_Stmt, BuiltinProcPkg_intrinsics},
