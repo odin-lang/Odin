@@ -1060,8 +1060,8 @@ bool check_builtin_simd_operation(CheckerContext *c, Operand *operand, Ast *call
 			operand->type = t_untyped_integer;
 			operand->mode = Addressing_Constant;
 			operand->value = exact_value_i64(result);
+			return true;
 		}
-
 	default:
 		GB_PANIC("Unhandled simd intrinsic: %.*s", LIT(builtin_name));
 	}
@@ -5272,6 +5272,64 @@ bool check_builtin_procedure(CheckerContext *c, Operand *operand, Ast *call, i32
 			operand->type = t_u32;
 			operand->value = {};
 			break;
+		}
+		break;
+
+	case BuiltinProc_x86_cpuid:
+		{
+			if (!is_arch_x86()) {
+				error(call, "'%.*s' is only allowed on x86 targets (i386, amd64)", LIT(builtin_name));
+				return false;
+			}
+
+			Operand ax = {};
+			Operand cx = {};
+
+			check_expr_with_type_hint(c, &ax, ce->args[0], t_u32); if (ax.mode == Addressing_Invalid) return false;
+			check_expr_with_type_hint(c, &cx, ce->args[1], t_u32); if (cx.mode == Addressing_Invalid) return false;
+			convert_to_typed(c, &ax, t_u32); if (ax.mode == Addressing_Invalid) return false;
+			convert_to_typed(c, &cx, t_u32); if (cx.mode == Addressing_Invalid) return false;
+			if (!are_types_identical(ax.type, t_u32)) {
+				gbString str = type_to_string(ax.type);
+				error(ax.expr, "'%.*s' expected a u32, got %s", LIT(builtin_name), str);
+				gb_string_free(str);
+				return false;
+			}
+			if (!are_types_identical(cx.type, t_u32)) {
+				gbString str = type_to_string(cx.type);
+				error(cx.expr, "'%.*s' expected a u32, got %s", LIT(builtin_name), str);
+				gb_string_free(str);
+				return false;
+			}
+			Type *types[4] = {t_u32, t_u32, t_u32, t_u32}; // eax ebc ecx edx
+			operand->type = alloc_type_tuple_from_field_types(types, gb_count_of(types), false, false);
+			operand->mode = Addressing_Value;
+			operand->value = {};
+			return true;
+		}
+		break;
+	case BuiltinProc_x86_xgetbv:
+		{
+			if (!is_arch_x86()) {
+				error(call, "'%.*s' is only allowed on x86 targets (i386, amd64)", LIT(builtin_name));
+				return false;
+			}
+
+			Operand cx = {};
+			check_expr_with_type_hint(c, &cx, ce->args[0], t_u32); if (cx.mode == Addressing_Invalid) return false;
+			convert_to_typed(c, &cx, t_u32); if (cx.mode == Addressing_Invalid) return false;
+			if (!are_types_identical(cx.type, t_u32)) {
+				gbString str = type_to_string(cx.type);
+				error(cx.expr, "'%.*s' expected a u32, got %s", LIT(builtin_name), str);
+				gb_string_free(str);
+				return false;
+			}
+
+			Type *types[2] = {t_u32, t_u32};
+			operand->type = alloc_type_tuple_from_field_types(types, gb_count_of(types), false, false);
+			operand->mode = Addressing_Value;
+			operand->value = {};
+			return true;
 		}
 		break;
 

@@ -121,4 +121,5 @@ foreign _ {
 	@(link_name = "llvm.x86.ssse3.psign.w.128")
 	psignw128    :: proc(a, b: i16x8) -> i16x8 ---
 	@(link_name = "llvm.x86.ssse3.psign.d.128")
-	psignd128    :: proc(a, b: i32x4) -> i32x4 ---}
+	psignd128    :: proc(a, b: i32x4) -> i32x4 ---
+}

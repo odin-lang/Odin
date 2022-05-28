@@ -629,6 +629,15 @@ bool is_arch_wasm(void) {
 	return false;
 }
 
+bool is_arch_x86(void) {
+	switch (build_context.metrics.arch) {
+	case TargetArch_i386:
+	case TargetArch_amd64:
+		return true;
+	}
+	return false;
+}
+
 bool allow_check_foreign_filepath(void) {
 	switch (build_context.metrics.arch) {
 	case TargetArch_wasm32:
