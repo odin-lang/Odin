@@ -574,7 +574,7 @@ void usage(String argv0) {
 	print_usage_line(1, "check             parse, and type check a directory of .odin files");
 	print_usage_line(1, "query             parse, type check, and output a .json file containing information about the program");
 	print_usage_line(1, "strip-semicolon   parse, type check, and remove unneeded semicolons from the entire program");
-	print_usage_line(1, "test              build ands runs procedures with the attribute @(test) in the initial package");
+	print_usage_line(1, "test              build and run procedures with the attribute @(test) in the initial package");
 	print_usage_line(1, "doc               generate documentation on a directory of .odin files");
 	print_usage_line(1, "version           print version");
 	print_usage_line(1, "report            print information useful to reporting a bug");
@@ -1936,7 +1936,7 @@ void print_show_help(String const arg0, String const &command) {
 		print_usage_line(3, "odin check <dir>                # Type check package in <dir>");
 		print_usage_line(3, "odin check filename.odin -file  # Type check single-file package, must contain entry point.");
 	} else if (command == "test") {
-		print_usage_line(1, "test      Build ands runs procedures with the attribute @(test) in the initial package");
+		print_usage_line(1, "test      Build and run procedures with the attribute @(test) in the initial package");
 	} else if (command == "query") {
 		print_usage_line(1, "query     [experimental] Parse, type check, and output a .json file containing information about the program");
 	} else if (command == "doc") {
