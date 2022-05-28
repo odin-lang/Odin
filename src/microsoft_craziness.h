@@ -93,11 +93,11 @@ String mc_get_env(String key) {
 }
 
 void mc_free(String str) {
-	gb_free(mc_allocator, str.text);
+	if (str.len) gb_free(mc_allocator, str.text);
 }
 
 void mc_free(String16 str) {
-	gb_free(mc_allocator, str.text);
+	if (str.len) gb_free(mc_allocator, str.text);
 }
 
 void mc_free_all() {
@@ -603,11 +603,10 @@ bool find_msvc_install_from_env_vars(Find_Result_Utf8 *result) {
 	// If we haven't found it yet, we can loop through LIB for specific folders
 	//? This may not be robust enough using `um\x64` and `ucrt\x64`
 	if (!sdk_found) {
-		char const *lib_env = gb_get_env("LIB", mc_allocator);
-		defer (gb_free(mc_allocator, (void*)lib_env));
-		if (lib_env) {
-			String lib = make_string_c(lib_env);
+		String lib = mc_get_env(str_lit("LIB"));
+		defer (mc_free(lib));
 
+		if (lib.len) {
 			// NOTE(WalterPlinge): I don't know if there's a chance for the LIB variable
 			// to be set without a trailing '\' (apart from manually), so we can just
 			// check paths without it (see use of `String end` in the loop below)
@@ -669,6 +668,7 @@ bool find_msvc_install_from_env_vars(Find_Result_Utf8 *result) {
 	}
 
 	bool vs_found = false;
+
 	if (result->vs_exe_path.len > 0 && result->vs_library_path.len > 0) {
 		vs_found = true;
 	}
@@ -765,8 +765,8 @@ Find_Result_Utf8 find_visual_studio_and_windows_sdk_utf8() {
 		r.vs_exe_path.len                   > 0 &&
 		r.vs_library_path.len               > 0;
 
-	if (!all_found && !find_msvc_install_from_env_vars(&r)) {
-		return {};
+	if (!all_found) {
+		find_msvc_install_from_env_vars(&r);
 	}
 
 #if 0
