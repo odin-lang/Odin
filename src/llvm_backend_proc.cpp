@@ -1330,7 +1330,7 @@ lbValue lb_build_builtin_simd_proc(lbProcedure *p, Ast *expr, TypeAndValue const
 			return res;
 		}
 
-	case BuiltinProc_simd_reverse:
+	case BuiltinProc_simd_lanes_reverse:
 		{
 			i64 count = get_array_type_count(arg0.type);
 			LLVMValueRef *values = gb_alloc_array(temporary_allocator(), LLVMValueRef, count);
@@ -1345,8 +1345,8 @@ lbValue lb_build_builtin_simd_proc(lbProcedure *p, Ast *expr, TypeAndValue const
 			return res;
 		}
 
-	case BuiltinProc_simd_rotate_left:
-	case BuiltinProc_simd_rotate_right:
+	case BuiltinProc_simd_lanes_rotate_left:
+	case BuiltinProc_simd_lanes_rotate_right:
 		{
 
 			i64 count = get_array_type_count(arg0.type);
@@ -1358,7 +1358,7 @@ lbValue lb_build_builtin_simd_proc(lbProcedure *p, Ast *expr, TypeAndValue const
 			ExactValue val = exact_value_to_integer(tv.value);
 			GB_ASSERT(val.kind == ExactValue_Integer);
 			BigInt *bi = &val.value_integer;
-			if (builtin_id == BuiltinProc_simd_rotate_right) {
+			if (builtin_id == BuiltinProc_simd_lanes_rotate_right) {
 				big_int_neg(bi, bi);
 			}
 			big_int_rem(bi, bi, &bi_count);
