@@ -38,8 +38,7 @@ _mm_moveldup_ps :: #force_inline proc "c" (a: __m128) -> __m128 {
 	return simd.shuffle(a, a, 0, 0, 2, 2)
 }
 
-@(default_calling_convention="c")
-@(private)
+@(private, default_calling_convention="c")
 foreign _ {
 	@(link_name = "llvm.x86.sse3.addsub.ps")
 	addsubps :: proc(a, b: __m128) -> __m128 ---

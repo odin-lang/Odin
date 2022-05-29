@@ -89,8 +89,7 @@ _mm_sign_epi32 :: #force_inline proc "c" (a, b: __m128i) -> __m128i {
 
 
 
-@(default_calling_convention="c")
-@(private)
+@(private, default_calling_convention="c")
 foreign _ {
 	@(link_name = "llvm.x86.ssse3.pabs.b.128")
 	pabsb128     :: proc(a: i8x16) -> u8x16 ---

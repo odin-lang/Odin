@@ -17,8 +17,7 @@ when ODIN_ARCH == .amd64 {
 	}
 }
 
-@(default_calling_convention="c")
-@(private)
+@(private, default_calling_convention="c")
 foreign _ {
 	@(link_name="llvm.x86.fxsave")
 	fxsave    :: proc(p: rawptr) ---
