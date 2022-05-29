@@ -919,7 +919,7 @@ bool check_builtin_simd_operation(CheckerContext *c, Operand *operand, Ast *call
 			return true;
 		}
 
-	case BuiltinProc_simd_reverse:
+	case BuiltinProc_simd_lanes_reverse:
 		{
 			Operand x = {};
 			check_expr(c, &x, ce->args[0]); if (x.mode == Addressing_Invalid) return false;
@@ -933,8 +933,8 @@ bool check_builtin_simd_operation(CheckerContext *c, Operand *operand, Ast *call
 			return true;
 		}
 
-	case BuiltinProc_simd_rotate_left:
-	case BuiltinProc_simd_rotate_right:
+	case BuiltinProc_simd_lanes_rotate_left:
+	case BuiltinProc_simd_lanes_rotate_right:
 		{
 			Operand x = {};
 			check_expr(c, &x, ce->args[0]); if (x.mode == Addressing_Invalid) return false;
