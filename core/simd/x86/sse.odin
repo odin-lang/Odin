@@ -417,6 +417,18 @@ _mm_stream_ps :: #force_inline proc "c" (addr: [^]f32, a: __m128) {
 	intrinsics.non_temporal_store((^__m128)(addr), a)
 }
 
+when ODIN_ARCH == .amd64 {
+	_mm_cvtss_si64 :: #force_inline proc "c"(a: __m128) -> i64 {
+		return cvtss2si64(a)
+	}
+	_mm_cvttss_si64 :: #force_inline proc "c"(a: __m128) -> i64 {
+		return cvttss2si64(a)
+	}
+	_mm_cvtsi64_ss :: #force_inline proc "c"(a: __m128, b: i64) -> __m128 {
+		return cvtsi642ss(a, b)
+	}
+}
+
 
 @(default_calling_convention="c")
 @(private)
@@ -493,4 +505,13 @@ foreign _ {
 	prefetch    :: proc(p: rawptr, #const rw, loc, ty: u32) ---
 	@(link_name="llvm.x86.sse.cmp.ss")
 	cmpss       :: proc(a, b: __m128, #const imm8: u8) -> __m128 ---
+
+
+	// amd64 only
+	@(link_name="llvm.x86.sse.cvtss2si64")
+	cvtss2si64  :: proc(a: __m128) -> i64 ---
+	@(link_name="llvm.x86.sse.cvttss2si64")
+	cvttss2si64 :: proc(a: __m128) -> i64 ---
+	@(link_name="llvm.x86.sse.cvtsi642ss")
+	cvtsi642ss  :: proc(a: __m128, b: i64) -> __m128 ---
 }
