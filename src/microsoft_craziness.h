@@ -707,8 +707,8 @@ bool find_msvc_install_from_env_vars(Find_Result_Utf8 *result) {
 
 			isize lo = {0};
 			isize hi = {0};
-			for (isize c = 0; c <= path.len; c += 1) {
-				if (c != path.len && path[c] != ';') {
+			for (isize c = 0; c < path.len; c += 1) {
+				if (path[c] != ';') {
 					continue;
 				}
 
