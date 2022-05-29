@@ -23,8 +23,7 @@ _mm_sha256rnds2_epu32 :: #force_inline proc "c" (a, b, k: __m128i) -> __m128i {
 	return transmute(__m128i)sha256rnds2(transmute(i32x4)a, transmute(i32x4)b, transmute(i32x4)k)
 }
 
-@(default_calling_convention="c")
-@(private)
+@(private, default_calling_convention="c")
 foreign _ {
 	@(link_name="llvm.x86.sha1msg1")
 	sha1msg1    :: proc(a, b: i32x4) -> i32x4 ---
