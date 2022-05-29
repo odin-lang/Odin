@@ -780,6 +780,43 @@ _mm_unpacklo_pd :: #force_inline proc "c" (a, b: __m128d) -> __m128d {
 }
 
 
+when ODIN_ARCH == .amd64 {
+	_mm_cvtsd_si64 :: #force_inline proc "c" (a: __m128d) -> i64 {
+		return cvtsd2si64(a)
+	}
+	_mm_cvtsd_si64x :: #force_inline proc "c" (a: __m128d) -> i64 {
+		return _mm_cvtsd_si64(a)
+	}
+	_mm_cvttsd_si64 :: #force_inline proc "c" (a: __m128d) -> i64 {
+		return cvttsd2si64(a)
+	}
+	_mm_cvttsd_si64x :: #force_inline proc "c" (a: __m128d) -> i64 {
+		return _mm_cvttsd_si64(a)
+	}
+	_mm_stream_si64 :: #force_inline proc "c" (mem_addr: ^i64, a: i64) {
+		intrinsics.non_temporal_store(mem_addr, a)
+	}
+	_mm_cvtsi64_si128 :: #force_inline proc "c" (a: i64) -> __m128i {
+		return _mm_set_epi64x(0, a)
+	}
+	_mm_cvtsi64x_si128 :: #force_inline proc "c" (a: i64) -> __m128i {
+		return _mm_cvtsi64_si128(a)
+	}
+	_mm_cvtsi128_si64 :: #force_inline proc "c" (a: __m128i) -> i64 {
+		return simd.extract(transmute(i64x2)a, 0)
+	}
+	_mm_cvtsi128_si64x :: #force_inline proc "c" (a: __m128i) -> i64 {
+		return _mm_cvtsi128_si64(a)
+	}
+	_mm_cvtsi64_sd :: #force_inline proc "c" (a: __m128d, b: i64) -> __m128d {
+		return simd.replace(a, 0, f64(b))
+	}
+	_mm_cvtsi64x_sd :: #force_inline proc "c" (a: __m128d, b: i64) -> __m128d {
+		return _mm_cvtsi64_sd(a, b)
+	}
+}
+
+
 @(default_calling_convention="c")
 @(private)
 foreign _ {
@@ -923,4 +960,10 @@ foreign _ {
 	storeudq   :: proc(mem_addr: rawptr, a: __m128i) ---
 	@(link_name="llvm.x86.sse2.storeu.pd")
 	storeupd   :: proc(mem_addr: rawptr, a: __m128d) ---
+
+	// amd64 only
+	@(link_name="llvm.x86.sse2.cvtsd2si64")
+	cvtsd2si64  :: proc(a: __m128d) -> i64 ---
+	@(link_name="llvm.x86.sse2.cvttsd2si64")
+	cvttsd2si64 :: proc(a: __m128d) -> i64 ---
 }
