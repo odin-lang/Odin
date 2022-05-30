@@ -899,6 +899,18 @@ void check_proc_decl(CheckerContext *ctx, Entity *e, DeclInfo *d) {
 		}
 	}
 
+	if (ac.require_target_feature.len != 0 && ac.enable_target_feature.len != 0) {
+		error(e->token, "Attributes @(require_target_feature=...) and @(enable_target_feature=...) cannot be used together");
+	} else if (ac.require_target_feature.len != 0) {
+		if (check_target_feature_is_enabled(e->token.pos, ac.require_target_feature)) {
+			e->Procedure.target_feature = ac.require_target_feature;
+		} else {
+			e->Procedure.target_feature_disabled = true;
+		}
+	} else if (ac.enable_target_feature.len != 0) {
+		enable_target_feature(e->token.pos, ac.enable_target_feature);
+		e->Procedure.target_feature = ac.enable_target_feature;
+	}
 
 	switch (e->Procedure.optimization_mode) {
 	case ProcedureOptimizationMode_None:

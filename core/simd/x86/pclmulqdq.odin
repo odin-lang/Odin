@@ -1,6 +1,7 @@
 //+build i386, amd64
 package simd_x86
 
+@(enable_target_feature="pclmulqdq")
 _mm_clmulepi64_si128 :: #force_inline proc "c" (a, b: __m128i, $IMM8: u8) -> __m128i {
 	return pclmulqdq(a, b, u8(IMM8))
 }

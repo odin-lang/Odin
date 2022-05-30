@@ -5,18 +5,23 @@ import "core:intrinsics"
 import "core:simd"
 _ :: simd
 
+@(enable_target_feature="ssse3")
 _mm_abs_epi8 :: #force_inline proc "c" (a: __m128i) -> __m128i {
 	return transmute(__m128i)pabsb128(transmute(i8x16)a)
 }
+@(enable_target_feature="ssse3")
 _mm_abs_epi16 :: #force_inline proc "c" (a: __m128i) -> __m128i {
 	return transmute(__m128i)pabsw128(transmute(i16x8)a)
 }
+@(enable_target_feature="ssse3")
 _mm_abs_epi32 :: #force_inline proc "c" (a: __m128i) -> __m128i {
 	return transmute(__m128i)pabsd128(transmute(i32x4)a)
 }
+@(enable_target_feature="ssse3")
 _mm_shuffle_epi8 :: #force_inline proc "c" (a, b: __m128i) -> __m128i {
 	return transmute(__m128i)pshufb128(transmute(u8x16)a, transmute(u8x16)b)
 }
+@(enable_target_feature="ssse3")
 _mm_alignr_epi8 :: #force_inline proc "c" (a, b: __m128i, $IMM8: u32) -> __m128i {
 	shift :: IMM8
 
@@ -53,36 +58,47 @@ _mm_alignr_epi8 :: #force_inline proc "c" (a, b: __m128i, $IMM8: u32) -> __m128i
 }
 
 
+@(enable_target_feature="ssse3")
 _mm_hadd_epi16 :: #force_inline proc "c" (a, b: __m128i) -> __m128i {
 	return transmute(__m128i)phaddw128(transmute(i16x8)a, transmute(i16x8)b)
 }
+@(enable_target_feature="ssse3")
 _mm_hadds_epi16 :: #force_inline proc "c" (a, b: __m128i) -> __m128i {
 	return transmute(__m128i)phaddsw128(transmute(i16x8)a, transmute(i16x8)b)
 }
+@(enable_target_feature="ssse3")
 _mm_hadd_epi32 :: #force_inline proc "c" (a, b: __m128i) -> __m128i {
 	return transmute(__m128i)phaddd128(transmute(i32x4)a, transmute(i32x4)b)
 }
+@(enable_target_feature="ssse3")
 _mm_hsub_epi16 :: #force_inline proc "c" (a, b: __m128i) -> __m128i {
 	return transmute(__m128i)phsubw128(transmute(i16x8)a, transmute(i16x8)b)
 }
+@(enable_target_feature="ssse3")
 _mm_hsubs_epi16 :: #force_inline proc "c" (a, b: __m128i) -> __m128i {
 	return transmute(__m128i)phsubsw128(transmute(i16x8)a, transmute(i16x8)b)
 }
+@(enable_target_feature="ssse3")
 _mm_hsub_epi32 :: #force_inline proc "c" (a, b: __m128i) -> __m128i {
 	return transmute(__m128i)phsubd128(transmute(i32x4)a, transmute(i32x4)b)
 }
+@(enable_target_feature="ssse3")
 _mm_maddubs_epi16 :: #force_inline proc "c" (a, b: __m128i) -> __m128i {
 	return transmute(__m128i)pmaddubsw128(transmute(u8x16)a, transmute(i8x16)b)
 }
+@(enable_target_feature="ssse3")
 _mm_mulhrs_epi16 :: #force_inline proc "c" (a, b: __m128i) -> __m128i {
 	return transmute(__m128i)pmulhrsw128(transmute(i16x8)a, transmute(i16x8)b)
 }
+@(enable_target_feature="ssse3")
 _mm_sign_epi8 :: #force_inline proc "c" (a, b: __m128i) -> __m128i {
 	return transmute(__m128i)psignb128(transmute(i8x16)a, transmute(i8x16)b)
 }
+@(enable_target_feature="ssse3")
 _mm_sign_epi16 :: #force_inline proc "c" (a, b: __m128i) -> __m128i {
 	return transmute(__m128i)psignw128(transmute(i16x8)a, transmute(i16x8)b)
 }
+@(enable_target_feature="ssse3")
 _mm_sign_epi32 :: #force_inline proc "c" (a, b: __m128i) -> __m128i {
 	return transmute(__m128i)psignd128(transmute(i32x4)a, transmute(i32x4)b)
 }
