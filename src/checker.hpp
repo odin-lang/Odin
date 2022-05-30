@@ -60,6 +60,7 @@ struct BuiltinProc {
 	ExprKind kind;
 	BuiltinProcPkg pkg;
 	bool diverging;
+	bool ignore_results; // ignores require results handling
 };
 
 
