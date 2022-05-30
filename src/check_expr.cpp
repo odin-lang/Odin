@@ -442,6 +442,14 @@ bool find_or_generate_polymorphic_procedure(CheckerContext *old_c, Entity *base_
 	final_proc_type->Proc.is_poly_specialized = true;
 	final_proc_type->Proc.is_polymorphic = true;
 
+	final_proc_type->Proc.variadic            = src->Proc.variadic;
+	final_proc_type->Proc.require_results     = src->Proc.require_results;
+	final_proc_type->Proc.c_vararg            = src->Proc.c_vararg;
+	final_proc_type->Proc.has_named_results   = src->Proc.has_named_results;
+	final_proc_type->Proc.diverging           = src->Proc.diverging;
+	final_proc_type->Proc.return_by_pointer   = src->Proc.return_by_pointer;
+	final_proc_type->Proc.optional_ok         = src->Proc.optional_ok;
+
 
 	for (isize i = 0; i < operands.count; i++) {
 		Operand o = operands[i];

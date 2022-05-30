@@ -1014,10 +1014,12 @@ void check_proc_decl(CheckerContext *ctx, Entity *e, DeclInfo *d) {
 		}
 	}
 
-	if (pt->result_count == 0 && ac.require_results) {
-		error(pl->type, "'require_results' is not needed on a procedure with no results");
-	} else {
-		pt->require_results = ac.require_results;
+	if (ac.require_results) {
+		if (pt->result_count == 0) {
+			error(pl->type, "'require_results' is not needed on a procedure with no results");
+		} else {
+			pt->require_results = true;
+		}
 	}
 
 	if (ac.link_name.len > 0) {
