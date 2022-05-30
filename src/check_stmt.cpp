@@ -1405,12 +1405,12 @@ void check_stmt_internal(CheckerContext *ctx, Ast *node, u32 flags) {
 			if (kind == Expr_Stmt) {
 				return;
 			}
-			Ast *expr = strip_or_return_expr(operand.expr);
 
+			Ast *expr = strip_or_return_expr(operand.expr);
 			if (expr->kind == Ast_CallExpr) {
 				AstCallExpr *ce = &expr->CallExpr;
-				Type *t = type_of_expr(ce->proc);
-				if (is_type_proc(t)) {
+				Type *t = base_type(type_of_expr(ce->proc));
+				if (t->kind == Type_Proc) {
 					if (t->Proc.require_results) {
 						gbString expr_str = expr_to_string(ce->proc);
 						error(node, "'%s' requires that its results must be handled", expr_str);
@@ -1421,8 +1421,8 @@ void check_stmt_internal(CheckerContext *ctx, Ast *node, u32 flags) {
 			} else if (expr->kind == Ast_SelectorCallExpr) {
 				AstSelectorCallExpr *se = &expr->SelectorCallExpr;
 				ast_node(ce, CallExpr, se->call);
-				Type *t = type_of_expr(ce->proc);
-				if (is_type_proc(t)) {
+				Type *t = base_type(type_of_expr(ce->proc));
+				if (t->kind == Type_Proc) {
 					if (t->Proc.require_results) {
 						gbString expr_str = expr_to_string(ce->proc);
 						error(node, "'%s' requires that its results must be handled", expr_str);
