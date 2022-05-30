@@ -1,14 +1,17 @@
 //+build i386, amd64
 package simd_x86
 
+@(require_results)
 _addcarry_u32 :: #force_inline proc "c" (c_in: u8, a: u32, b: u32, out: ^u32) -> u8 {
 	x, y := llvm_addcarry_u32(c_in, a, b)
 	out^ = y
 	return x
 }
+@(require_results)
 _addcarryx_u32 :: #force_inline proc "c" (c_in: u8, a: u32, b: u32, out: ^u32) -> u8 {
 	return llvm_addcarryx_u32(c_in, a, b, out)
 }
+@(require_results)
 _subborrow_u32 :: #force_inline proc "c" (c_in: u8, a: u32, b: u32, out: ^u32) -> u8 {
 	x, y := llvm_subborrow_u32(c_in, a, b)
 	out^ = y
@@ -16,14 +19,17 @@ _subborrow_u32 :: #force_inline proc "c" (c_in: u8, a: u32, b: u32, out: ^u32) -
 }
 
 when ODIN_ARCH == .amd64 {
+	@(require_results)
 	_addcarry_u64 :: #force_inline proc "c" (c_in: u8, a: u64, b: u64, out: ^u64) -> u8 {
 		x, y := llvm_addcarry_u64(c_in, a, b)
 		out^ = y
 		return x
 	}
+	@(require_results)
 	_addcarryx_u64 :: #force_inline proc "c" (c_in: u8, a: u64, b: u64, out: ^u64) -> u8 {
 		return llvm_addcarryx_u64(c_in, a, b, out)
 	}
+	@(require_results)
 	_subborrow_u64 :: #force_inline proc "c" (c_in: u8, a: u64, b: u64, out: ^u64) -> u8 {
 		x, y := llvm_subborrow_u64(c_in, a, b)
 		out^ = y
