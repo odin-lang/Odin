@@ -1021,8 +1021,8 @@ lbValue lb_build_builtin_simd_proc(lbProcedure *p, Ast *expr, TypeAndValue const
 	res.type = tv.type;
 
 	lbValue arg0 = {}; if (ce->args.count > 0) arg0 = lb_build_expr(p, ce->args[0]);
-	lbValue arg1 = {}; if (ce->args.count > 1) arg0 = lb_build_expr(p, ce->args[1]);
-	lbValue arg2 = {}; if (ce->args.count > 2) arg0 = lb_build_expr(p, ce->args[2]);
+	lbValue arg1 = {}; if (ce->args.count > 1) arg1 = lb_build_expr(p, ce->args[1]);
+	lbValue arg2 = {}; if (ce->args.count > 2) arg2 = lb_build_expr(p, ce->args[2]);
 
 	Type *elem = base_array_type(arg0.type);
 
