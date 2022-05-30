@@ -1376,8 +1376,8 @@ bool parse_build_flags(Array<String> args) {
 						}
 						case BuildFlag_TargetFeatures: {
 							GB_ASSERT(value.kind == ExactValue_String);
-							build_context.target_features = value.value_string;
-							string_to_lower(&build_context.target_features);
+							build_context.target_features_string = value.value_string;
+							string_to_lower(&build_context.target_features_string);
 							break;
 						}
 						case BuildFlag_RelocMode: {

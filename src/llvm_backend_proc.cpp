@@ -169,6 +169,19 @@ lbProcedure *lb_create_procedure(lbModule *m, Entity *entity, bool ignore_body) 
 		}
 	}
 
+	if (!entity->Procedure.target_feature_disabled &&
+	    entity->Procedure.target_feature.len != 0) {
+	    	auto features = split_by_comma(entity->Procedure.target_feature);
+		for_array(i, features) {
+			String feature = features[i];
+			LLVMAttributeRef ref = LLVMCreateStringAttribute(
+				m->ctx,
+				cast(char const *)feature.text, cast(unsigned)feature.len,
+				"", 0);
+			LLVMAddAttributeAtIndex(p->value, LLVMAttributeIndex_FunctionIndex, ref);
+		}
+	}
+
 	if (entity->flags & EntityFlag_Cold) {
 		lb_add_attribute_to_proc(m, p->value, "cold");
 	}

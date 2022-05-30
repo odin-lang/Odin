@@ -124,6 +124,9 @@ struct AttributeContext {
 	String  objc_name;
 	bool    objc_is_class_method;
 	Type *  objc_type;
+
+	String require_target_feature; // required by the target micro-architecture
+	String enable_target_feature;  // will be enabled for the procedure only
 };
 
 AttributeContext make_attribute_context(String link_prefix) {
