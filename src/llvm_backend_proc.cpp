@@ -2117,10 +2117,14 @@ lbValue lb_build_builtin_proc(lbProcedure *p, Ast *expr, TypeAndValue const &tv,
 
 		LLVMValueRef instr = LLVMBuildStore(p->builder, val.value, dst.value);
 		switch (id) {
-		case BuiltinProc_volatile_store:        LLVMSetVolatile(instr, true);                                        break;
 		case BuiltinProc_non_temporal_store:
-			// TODO(bill): BuiltinProc_non_temporal_store
+			{
+				unsigned kind_id = LLVMGetMDKindIDInContext(p->module->ctx, "nontemporal", 11);
+				LLVMMetadataRef node = LLVMValueAsMetadata(LLVMConstInt(lb_type(p->module, t_u32), 1, false));
+				LLVMSetMetadata(instr, kind_id, LLVMMetadataAsValue(p->module->ctx, node));
+			}
 			break;
+		case BuiltinProc_volatile_store:        LLVMSetVolatile(instr, true);                                        break;
 		case BuiltinProc_atomic_store:          LLVMSetOrdering(instr, LLVMAtomicOrderingSequentiallyConsistent);    break;
 		case BuiltinProc_atomic_store_explicit: LLVMSetOrdering(instr, llvm_atomic_ordering_from_odin(ce->args[2])); break;
 		}
@@ -2138,10 +2142,15 @@ lbValue lb_build_builtin_proc(lbProcedure *p, Ast *expr, TypeAndValue const &tv,
 
 		LLVMValueRef instr = LLVMBuildLoad(p->builder, dst.value, "");
 		switch (id) {
-		case BuiltinProc_volatile_load:        LLVMSetVolatile(instr, true);                                        break;
 		case BuiltinProc_non_temporal_load:
-			// TODO(bill): BuiltinProc_non_temporal_load
+			{
+				unsigned kind_id = LLVMGetMDKindIDInContext(p->module->ctx, "nontemporal", 11);
+				LLVMMetadataRef node = LLVMValueAsMetadata(LLVMConstInt(lb_type(p->module, t_u32), 1, false));
+				LLVMSetMetadata(instr, kind_id, LLVMMetadataAsValue(p->module->ctx, node));
+			}
 			break;
+			break;
+		case BuiltinProc_volatile_load:        LLVMSetVolatile(instr, true);                                        break;
 		case BuiltinProc_atomic_load:          LLVMSetOrdering(instr, LLVMAtomicOrderingSequentiallyConsistent);    break;
 		case BuiltinProc_atomic_load_explicit: LLVMSetOrdering(instr, llvm_atomic_ordering_from_odin(ce->args[1])); break;
 		}
