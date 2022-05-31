@@ -256,7 +256,6 @@ struct BuildContext {
 	String extra_linker_flags;
 	String extra_assembler_flags;
 	String microarch;
-	String target_features;
 	BuildModeKind build_mode;
 	bool   generate_docs;
 	i32    optimization_level;
@@ -319,6 +318,10 @@ struct BuildContext {
 	isize      thread_count;
 
 	PtrMap<char const *, ExactValue> defined_values;
+
+	BlockingMutex target_features_mutex;
+	StringSet target_features_set;
+	String target_features_string;
 
 };
 
@@ -624,6 +627,15 @@ bool is_arch_wasm(void) {
 	switch (build_context.metrics.arch) {
 	case TargetArch_wasm32:
 	case TargetArch_wasm64:
+		return true;
+	}
+	return false;
+}
+
+bool is_arch_x86(void) {
+	switch (build_context.metrics.arch) {
+	case TargetArch_i386:
+	case TargetArch_amd64:
 		return true;
 	}
 	return false;
@@ -1188,6 +1200,100 @@ void init_build_context(TargetMetrics *cross_target) {
 #include "microsoft_craziness.h"
 #endif
 
+
+Array<String> split_by_comma(String const &list) {
+	isize n = 1;
+	for (isize i = 0; i < list.len; i++) {
+		if (list.text[i] == ',') {
+			n++;
+		}
+	}
+	auto res = array_make<String>(heap_allocator(), n);
+
+	String s = list;
+	for (isize i = 0; i < n; i++) {
+		isize m = string_index_byte(s, ',');
+		if (m < 0) {
+			res[i] = s;
+			break;
+		}
+		res[i] = substring(s, 0, m);
+		s = substring(s, m+1, s.len);
+	}
+	return res;
+}
+
+bool check_target_feature_is_valid(TokenPos pos, String const &feature) {
+	// TODO(bill): check_target_feature_is_valid
+	return true;
+}
+
+bool check_target_feature_is_enabled(TokenPos pos, String const &target_feature_list) {
+	BuildContext *bc = &build_context;
+	mutex_lock(&bc->target_features_mutex);
+	defer (mutex_unlock(&bc->target_features_mutex));
+
+	auto items = split_by_comma(target_feature_list);
+	array_free(&items);
+	for_array(i, items) {
+		String const &item = items.data[i];
+		if (!check_target_feature_is_valid(pos, item)) {
+			error(pos, "Target feature '%.*s' is not valid", LIT(item));
+			return false;
+		}
+		if (!string_set_exists(&bc->target_features_set, item)) {
+			error(pos, "Target feature '%.*s' is not enabled", LIT(item));
+			return false;
+		}
+	}
+
+	return true;
+}
+
+void enable_target_feature(TokenPos pos, String const &target_feature_list) {
+	BuildContext *bc = &build_context;
+	mutex_lock(&bc->target_features_mutex);
+	defer (mutex_unlock(&bc->target_features_mutex));
+
+	auto items = split_by_comma(target_feature_list);
+	array_free(&items);
+	for_array(i, items) {
+		String const &item = items.data[i];
+		if (!check_target_feature_is_valid(pos, item)) {
+			error(pos, "Target feature '%.*s' is not valid", LIT(item));
+		}
+	}
+}
+
+
+char const *target_features_set_to_cstring(gbAllocator allocator, bool with_quotes) {
+	isize len = 0;
+	for_array(i, build_context.target_features_set.entries) {
+		if (i != 0) {
+			len += 1;
+		}
+		String feature = build_context.target_features_set.entries[i].value;
+		len += feature.len;
+		if (with_quotes) len += 2;
+	}
+	char *features = gb_alloc_array(allocator, char, len+1);
+	len = 0;
+	for_array(i, build_context.target_features_set.entries) {
+		if (i != 0) {
+			features[len++] = ',';
+		}
+
+		if (with_quotes) features[len++] = '"';
+		String feature = build_context.target_features_set.entries[i].value;
+		gb_memmove(features, feature.text, feature.len);
+		len += feature.len;
+		if (with_quotes) features[len++] = '"';
+	}
+	features[len++] = 0;
+
+	return features;
+}
+
 // NOTE(Jeroen): Set/create the output and other paths and report an error as appropriate.
 // We've previously called `parse_build_flags`, so `out_filepath` should be set.
 bool init_build_paths(String init_filename) {
@@ -1196,6 +1302,9 @@ bool init_build_paths(String init_filename) {
 
 	// NOTE(Jeroen): We're pre-allocating BuildPathCOUNT slots so that certain paths are always at the same enumerated index.
 	array_init(&bc->build_paths, permanent_allocator(), BuildPathCOUNT);
+
+	string_set_init(&bc->target_features_set, heap_allocator(), 1024);
+	mutex_init(&bc->target_features_mutex);
 
 	// [BuildPathMainPackage] Turn given init path into a `Path`, which includes normalizing it into a full path.
 	bc->build_paths[BuildPath_Main_Package] = path_from_string(ha, init_filename);
@@ -1377,5 +1486,10 @@ bool init_build_paths(String init_filename) {
 		return false;
 	}
 
+	if (bc->target_features_string.len != 0) {
+		enable_target_feature({}, bc->target_features_string);
+	}
+
 	return true;
 }
+

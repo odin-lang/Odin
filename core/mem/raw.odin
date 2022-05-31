@@ -21,6 +21,7 @@ make_any :: proc "contextless" (data: rawptr, id: typeid) -> any {
 }
 
 raw_array_data         :: runtime.raw_array_data
+raw_simd_data          :: runtime.raw_simd_data
 raw_string_data        :: runtime.raw_string_data
 raw_slice_data         :: runtime.raw_slice_data
 raw_dynamic_array_data :: runtime.raw_dynamic_array_data
