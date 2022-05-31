@@ -604,6 +604,10 @@ raw_array_data :: proc "contextless" (a: $P/^($T/[$N]$E)) -> [^]E {
 	return ([^]E)(a)
 }
 @builtin
+raw_simd_data :: proc "contextless" (a: $P/^($T/#simd[$N]$E)) -> [^]E {
+	return ([^]E)(a)
+}
+@builtin
 raw_slice_data :: proc "contextless" (s: $S/[]$E) -> [^]E {
 	ptr := (transmute(Raw_Slice)s).data
 	return ([^]E)(ptr)
@@ -619,7 +623,7 @@ raw_string_data :: proc "contextless" (s: $S/string) -> [^]u8 {
 }
 
 @builtin
-raw_data :: proc{raw_array_data, raw_slice_data, raw_dynamic_array_data, raw_string_data}
+raw_data :: proc{raw_array_data, raw_slice_data, raw_dynamic_array_data, raw_string_data, raw_simd_data}
 
 
 

@@ -157,6 +157,15 @@ int string_compare(String const &x, String const &y) {
 	return 0;
 }
 
+isize string_index_byte(String const &s, u8 x) {
+	for (isize i = 0; i < s.len; i++) {
+		if (s.text[i] == x) {
+			return i;
+		}
+	}
+	return -1;
+}
+
 GB_COMPARE_PROC(string_cmp_proc) {
 	String x = *(String *)a;
 	String y = *(String *)b;

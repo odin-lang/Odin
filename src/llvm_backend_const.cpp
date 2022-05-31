@@ -495,9 +495,9 @@ lbValue lb_const_value(lbModule *m, Type *type, ExactValue value, bool allow_loc
 		res.value = data;
 		return res;
 	} else if (is_type_array(type) &&
-	    value.kind != ExactValue_Invalid &&
-	    value.kind != ExactValue_String &&
-	    value.kind != ExactValue_Compound) {
+		value.kind != ExactValue_Invalid &&
+		value.kind != ExactValue_String &&
+		value.kind != ExactValue_Compound) {
 
 		i64 count  = type->Array.count;
 		Type *elem = type->Array.elem;
@@ -513,8 +513,8 @@ lbValue lb_const_value(lbModule *m, Type *type, ExactValue value, bool allow_loc
 		res.value = llvm_const_array(lb_type(m, elem), elems, cast(unsigned)count);
 		return res;
 	} else if (is_type_matrix(type) &&
-	    value.kind != ExactValue_Invalid &&
-	    value.kind != ExactValue_Compound) {
+		value.kind != ExactValue_Invalid &&
+		value.kind != ExactValue_Compound) {
 		i64 row = type->Matrix.row_count;
 		i64 column = type->Matrix.column_count;
 		GB_ASSERT(row == column);
@@ -536,6 +536,22 @@ lbValue lb_const_value(lbModule *m, Type *type, ExactValue value, bool allow_loc
 		}
 		
 		res.value = LLVMConstArray(lb_type(m, elem), elems, cast(unsigned)total_elem_count);
+		return res;
+	} else if (is_type_simd_vector(type) &&
+		value.kind != ExactValue_Invalid &&
+		value.kind != ExactValue_Compound) {
+		i64 count = type->SimdVector.count;
+		Type *elem = type->SimdVector.elem;
+
+		lbValue single_elem = lb_const_value(m, elem, value, allow_local);
+		single_elem.value = llvm_const_cast(single_elem.value, lb_type(m, elem));
+
+		LLVMValueRef *elems = gb_alloc_array(permanent_allocator(), LLVMValueRef, count);
+		for (i64 i = 0; i < count; i++) {
+			elems[i] = single_elem.value;
+		}
+
+		res.value = LLVMConstVector(elems, cast(unsigned)count);
 		return res;
 	}
 
@@ -819,26 +835,81 @@ lbValue lb_const_value(lbModule *m, Type *type, ExactValue value, bool allow_loc
 				return lb_const_nil(m, original_type);
 			}
 			GB_ASSERT(elem_type_can_be_constant(elem_type));
-
 			isize total_elem_count = cast(isize)type->SimdVector.count;
 			LLVMValueRef *values = gb_alloc_array(temporary_allocator(), LLVMValueRef, total_elem_count);
 
-			for (isize i = 0; i < elem_count; i++) {
-				TypeAndValue tav = cl->elems[i]->tav;
-				GB_ASSERT(tav.mode != Addressing_Invalid);
-				values[i] = lb_const_value(m, elem_type, tav.value, allow_local).value;
-			}
-			LLVMTypeRef et = lb_type(m, elem_type);
+			if (cl->elems[0]->kind == Ast_FieldValue) {
+				// TODO(bill): This is O(N*M) and will be quite slow; it should probably be sorted before hand
+				isize value_index = 0;
+				for (i64 i = 0; i < total_elem_count; i++) {
+					bool found = false;
 
-			for (isize i = elem_count; i < type->SimdVector.count; i++) {
-				values[i] = LLVMConstNull(et);
-			}
-			for (isize i = 0; i < total_elem_count; i++) {
-				values[i] = llvm_const_cast(values[i], et);
-			}
+					for (isize j = 0; j < elem_count; j++) {
+						Ast *elem = cl->elems[j];
+						ast_node(fv, FieldValue, elem);
+						if (is_ast_range(fv->field)) {
+							ast_node(ie, BinaryExpr, fv->field);
+							TypeAndValue lo_tav = ie->left->tav;
+							TypeAndValue hi_tav = ie->right->tav;
+							GB_ASSERT(lo_tav.mode == Addressing_Constant);
+							GB_ASSERT(hi_tav.mode == Addressing_Constant);
 
-			res.value = LLVMConstVector(values, cast(unsigned)total_elem_count);
-			return res;
+							TokenKind op = ie->op.kind;
+							i64 lo = exact_value_to_i64(lo_tav.value);
+							i64 hi = exact_value_to_i64(hi_tav.value);
+							if (op != Token_RangeHalf) {
+								hi += 1;
+							}
+							if (lo == i) {
+								TypeAndValue tav = fv->value->tav;
+								LLVMValueRef val = lb_const_value(m, elem_type, tav.value, allow_local).value;
+								for (i64 k = lo; k < hi; k++) {
+									values[value_index++] = val;
+								}
+
+								found = true;
+								i += (hi-lo-1);
+								break;
+							}
+						} else {
+							TypeAndValue index_tav = fv->field->tav;
+							GB_ASSERT(index_tav.mode == Addressing_Constant);
+							i64 index = exact_value_to_i64(index_tav.value);
+							if (index == i) {
+								TypeAndValue tav = fv->value->tav;
+								LLVMValueRef val = lb_const_value(m, elem_type, tav.value, allow_local).value;
+								values[value_index++] = val;
+								found = true;
+								break;
+							}
+						}
+					}
+
+					if (!found) {
+						values[value_index++] = LLVMConstNull(lb_type(m, elem_type));
+					}
+				}
+
+				res.value = LLVMConstVector(values, cast(unsigned)total_elem_count);
+				return res;
+			} else {
+				for (isize i = 0; i < elem_count; i++) {
+					TypeAndValue tav = cl->elems[i]->tav;
+					GB_ASSERT(tav.mode != Addressing_Invalid);
+					values[i] = lb_const_value(m, elem_type, tav.value, allow_local).value;
+				}
+				LLVMTypeRef et = lb_type(m, elem_type);
+
+				for (isize i = elem_count; i < total_elem_count; i++) {
+					values[i] = LLVMConstNull(et);
+				}
+				for (isize i = 0; i < total_elem_count; i++) {
+					values[i] = llvm_const_cast(values[i], et);
+				}
+
+				res.value = LLVMConstVector(values, cast(unsigned)total_elem_count);
+				return res;
+			}
 		} else if (is_type_struct(type)) {
 			ast_node(cl, CompoundLit, value.value_compound);
 

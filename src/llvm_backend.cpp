@@ -1332,8 +1332,8 @@ void lb_generate_code(lbGenerator *gen) {
 		}
 	}
 
-	if (build_context.target_features.len != 0) {
-		llvm_features = alloc_cstring(permanent_allocator(), build_context.target_features);
+	if (build_context.target_features_set.entries.count != 0) {
+		llvm_features = target_features_set_to_cstring(permanent_allocator(), false);
 	}
 
 	// GB_ASSERT_MSG(LLVMTargetHasAsmBackend(target));

@@ -313,13 +313,19 @@ void check_type_decl(CheckerContext *ctx, Entity *e, Ast *init_expr, Type *def) 
 	}
 	named->Named.base = base;
 
-	if (is_distinct && is_type_typeid(e->type)) {
-		error(init_expr, "'distinct' cannot be applied to 'typeid'");
-		is_distinct = false;
-	}
-	if (is_distinct && is_type_any(e->type)) {
-		error(init_expr, "'distinct' cannot be applied to 'any'");
-		is_distinct = false;
+	if (is_distinct) {
+		if (is_type_typeid(e->type)) {
+			error(init_expr, "'distinct' cannot be applied to 'typeid'");
+			is_distinct = false;
+		} else if (is_type_any(e->type)) {
+			error(init_expr, "'distinct' cannot be applied to 'any'");
+			is_distinct = false;
+		} else if (is_type_simd_vector(e->type)) {
+			gbString str = type_to_string(e->type);
+			error(init_expr, "'distinct' cannot be applied to '%s'", str);
+			gb_string_free(str);
+			is_distinct = false;
+		}
 	}
 	if (!is_distinct) {
 		e->type = bt;
@@ -893,6 +899,18 @@ void check_proc_decl(CheckerContext *ctx, Entity *e, DeclInfo *d) {
 		}
 	}
 
+	if (ac.require_target_feature.len != 0 && ac.enable_target_feature.len != 0) {
+		error(e->token, "Attributes @(require_target_feature=...) and @(enable_target_feature=...) cannot be used together");
+	} else if (ac.require_target_feature.len != 0) {
+		if (check_target_feature_is_enabled(e->token.pos, ac.require_target_feature)) {
+			e->Procedure.target_feature = ac.require_target_feature;
+		} else {
+			e->Procedure.target_feature_disabled = true;
+		}
+	} else if (ac.enable_target_feature.len != 0) {
+		enable_target_feature(e->token.pos, ac.enable_target_feature);
+		e->Procedure.target_feature = ac.enable_target_feature;
+	}
 
 	switch (e->Procedure.optimization_mode) {
 	case ProcedureOptimizationMode_None:
@@ -996,10 +1014,12 @@ void check_proc_decl(CheckerContext *ctx, Entity *e, DeclInfo *d) {
 		}
 	}
 
-	if (pt->result_count == 0 && ac.require_results) {
-		error(pl->type, "'require_results' is not needed on a procedure with no results");
-	} else {
-		pt->require_results = ac.require_results;
+	if (ac.require_results) {
+		if (pt->result_count == 0) {
+			error(pl->type, "'require_results' is not needed on a procedure with no results");
+		} else {
+			pt->require_results = true;
+		}
 	}
 
 	if (ac.link_name.len > 0) {
@@ -1309,20 +1329,20 @@ void check_proc_group_decl(CheckerContext *ctx, Entity *&pg_entity, DeclInfo *d)
 
 			if (!both_have_where_clauses) switch (kind) {
 			case ProcOverload_Identical:
-				error(p->token, "Overloaded procedure '%.*s' as the same type as another procedure in the procedure group '%.*s'", LIT(name), LIT(proc_group_name));
+				error(p->token, "Overloaded procedure '%.*s' has the same type as another procedure in the procedure group '%.*s'", LIT(name), LIT(proc_group_name));
 				is_invalid = true;
 				break;
 			// case ProcOverload_CallingConvention:
-				// error(p->token, "Overloaded procedure '%.*s' as the same type as another procedure in the procedure group '%.*s'", LIT(name), LIT(proc_group_name));
+				// error(p->token, "Overloaded procedure '%.*s' has the same type as another procedure in the procedure group '%.*s'", LIT(name), LIT(proc_group_name));
 				// is_invalid = true;
 				// break;
 			case ProcOverload_ParamVariadic:
-				error(p->token, "Overloaded procedure '%.*s' as the same type as another procedure in the procedure group '%.*s'", LIT(name), LIT(proc_group_name));
+				error(p->token, "Overloaded procedure '%.*s' has the same type as another procedure in the procedure group '%.*s'", LIT(name), LIT(proc_group_name));
 				is_invalid = true;
 				break;
 			case ProcOverload_ResultCount:
 			case ProcOverload_ResultTypes:
-				error(p->token, "Overloaded procedure '%.*s' as the same parameters but different results in the procedure group '%.*s'", LIT(name), LIT(proc_group_name));
+				error(p->token, "Overloaded procedure '%.*s' has the same parameters but different results in the procedure group '%.*s'", LIT(name), LIT(proc_group_name));
 				is_invalid = true;
 				break;
 			case ProcOverload_Polymorphic:
