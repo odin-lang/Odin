@@ -126,7 +126,7 @@ HANDLE mc_find_first(String wildcard, MC_Find_Data *find_data) {
 
 bool mc_find_next(HANDLE handle, MC_Find_Data *find_data) {
  	WIN32_FIND_DATAW _find_data;
- 	bool success = FindNextFileW(handle, &_find_data);
+ 	bool success = !!FindNextFileW(handle, &_find_data);
 
  	find_data->file_attributes = _find_data.dwFileAttributes;
  	find_data->filename        = mc_wstring_to_string(_find_data.cFileName);
