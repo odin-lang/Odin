@@ -231,16 +231,16 @@ xml_decode_entity :: proc(entity: string) -> (decoded: rune, ok: bool) {
 		for len(entity) > 0 {
 			r := entity[0]
 			switch r {
-			case '0'..'9':
+			case '0'..='9':
 				val *= base
 				val += int(r - '0')
 
-			case 'a'..'f':
+			case 'a'..='f':
 				if base == 10 { return -1, false }
 				val *= base
 				val += int(r - 'a' + 10)
 
-			case 'A'..'F':
+			case 'A'..='F':
 				if base == 10 { return -1, false }
 				val *= base
 				val += int(r - 'A' + 10)
