@@ -1618,6 +1618,9 @@ bool check_binary_op(CheckerContext *c, Operand *o, Token op) {
 		if (is_type_matrix(main_type)) {
 			error(op, "Operator '%.*s' is only allowed with matrix types", LIT(op.string));
 			return false;
+		} else if (is_type_simd_vector(main_type) && is_type_integer(type)) {
+			error(op, "Operator '%.*s' is only allowed with #simd types with integer elements", LIT(op.string));
+			return false;
 		}
 		/*fallthrough*/
 	case Token_Mul:
@@ -1668,6 +1671,9 @@ bool check_binary_op(CheckerContext *c, Operand *o, Token op) {
 		}
 		if (!is_type_integer(type)) {
 			error(op, "Operator '%.*s' is only allowed with integers", LIT(op.string));
+			return false;
+		} else if (is_type_simd_vector(main_type)) {
+			error(op, "Operator '%.*s' is only allowed with #simd types with integer elements", LIT(op.string));
 			return false;
 		}
 		break;
