@@ -1,6 +1,6 @@
 package strings
 
-import "core:mem"
+import "core:runtime"
 
 // custom string entry struct
 Intern_Entry :: struct {
@@ -11,7 +11,7 @@ Intern_Entry :: struct {
 // "intern" is a more memory efficient string map
 // `allocator` is used to allocate the actual `Intern_Entry` strings
 Intern :: struct {
-	allocator: mem.Allocator,
+	allocator: runtime.Allocator,
 	entries: map[string]^Intern_Entry,
 }
 
@@ -54,7 +54,8 @@ _intern_get_entry :: proc(m: ^Intern, text: string) -> ^Intern_Entry #no_bounds_
 	}
 
 	entry_size := int(offset_of(Intern_Entry, str)) + len(text) + 1
-	new_entry := (^Intern_Entry)(mem.alloc(entry_size, align_of(Intern_Entry), m.allocator))
+	ptr, _ := runtime.mem_alloc(entry_size, align_of(Intern_Entry), m.allocator)
+	new_entry := (^Intern_Entry)(ptr)
 
 	new_entry.len = len(text)
 	copy(new_entry.str[:new_entry.len], text)
