@@ -194,8 +194,7 @@ constant_utf16_cstring :: proc($literal: string) -> [^]u16 ---
 simd_add  :: proc(a, b: #simd[N]T) -> #simd[N]T ---
 simd_sub  :: proc(a, b: #simd[N]T) -> #simd[N]T ---
 simd_mul  :: proc(a, b: #simd[N]T) -> #simd[N]T ---
-simd_div  :: proc(a, b: #simd[N]T) -> #simd[N]T ---
-simd_rem  :: proc(a, b: #simd[N]T) -> #simd[N]T ---
+simd_div  :: proc(a, b: #simd[N]T) -> #simd[N]T where type_is_float(T) ---
 
 // Keeps Odin's Behaviour
 // (x << y) if y <= mask else 0

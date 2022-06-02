@@ -452,6 +452,13 @@ bool check_builtin_simd_operation(CheckerContext *c, Operand *operand, Ast *call
 				return false;
 			}
 
+			if (id == BuiltinProc_simd_div && is_type_integer(elem)) {
+				gbString xs = type_to_string(x.type);
+				error(x.expr, "'%.*s' is not supported for integer elements, got '%s'", LIT(builtin_name), xs);
+				gb_string_free(xs);
+				// don't return
+			}
+
 			operand->mode = Addressing_Value;
 			operand->type = x.type;
 			return true;
@@ -460,7 +467,6 @@ bool check_builtin_simd_operation(CheckerContext *c, Operand *operand, Ast *call
 	// Integer only
 	case BuiltinProc_simd_add_sat:
 	case BuiltinProc_simd_sub_sat:
-	case BuiltinProc_simd_rem:
 	case BuiltinProc_simd_and:
 	case BuiltinProc_simd_or:
 	case BuiltinProc_simd_xor:
@@ -492,7 +498,6 @@ bool check_builtin_simd_operation(CheckerContext *c, Operand *operand, Ast *call
 			switch (id) {
 			case BuiltinProc_simd_add_sat:
 			case BuiltinProc_simd_sub_sat:
-			case BuiltinProc_simd_rem:
 				if (!is_type_integer(elem)) {
 					gbString xs = type_to_string(x.type);
 					error(x.expr, "'%.*s' expected a #simd type with an integer element, got '%s'", LIT(builtin_name), xs);
