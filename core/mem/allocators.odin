@@ -52,15 +52,16 @@ arena_allocator_proc :: proc(allocator_data: rawptr, mode: Allocator_Mode,
 
 	switch mode {
 	case .Alloc:
-		total_size := size + alignment
+		#no_bounds_check end := &arena.data[arena.offset]
+
+		ptr := align_forward(end, uintptr(alignment))
+
+		total_size := size + ptr_sub((^byte)(ptr), (^byte)(end))
 
 		if arena.offset + total_size > len(arena.data) {
 			return nil, .Out_Of_Memory
 		}
 
-		#no_bounds_check end := &arena.data[arena.offset]
-
-		ptr := align_forward(end, uintptr(alignment))
 		arena.offset += total_size
 		arena.peak_used = max(arena.peak_used, arena.offset)
 		zero(ptr, size)
