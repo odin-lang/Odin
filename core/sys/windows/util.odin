@@ -1,7 +1,6 @@
 // +build windows
 package sys_windows
 
-import "core:strings"
 import "core:runtime"
 import "core:intrinsics"
 
@@ -100,6 +99,20 @@ utf16_to_utf8 :: proc(s: []u16, allocator := context.temp_allocator) -> (res: st
 // AdvAPI32, NetAPI32 and UserENV helpers.
 
 allowed_username :: proc(username: string) -> bool {
+	contains_any :: proc(s, chars: string) -> bool {
+		if chars == "" {
+			return false
+		}
+		for c in transmute([]byte)s {
+			for b in transmute([]byte)chars {
+				if c == b {
+					return true
+				}
+			}
+		}
+		return false
+	}
+
 /*
 	User account names are limited to 20 characters and group names are limited to 256 characters.
 	In addition, account names cannot be terminated by a period and they cannot include commas or any of the following printable characters:
@@ -120,7 +133,7 @@ allowed_username :: proc(username: string) -> bool {
 			return false
 		}
 	}
-	if strings.contains_any(username, _DISALLOWED) {
+	if contains_any(username, _DISALLOWED) {
 		return false
 	}
 
