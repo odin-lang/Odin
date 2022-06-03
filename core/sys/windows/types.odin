@@ -187,18 +187,33 @@ OPEN_ALWAYS: DWORD : 4
 OPEN_EXISTING: DWORD : 3
 TRUNCATE_EXISTING: DWORD : 5
 
+FILE_READ_DATA            : DWORD : 0x00000001
+FILE_LIST_DIRECTORY       : DWORD : 0x00000001
+FILE_WRITE_DATA           : DWORD : 0x00000002
+FILE_ADD_FILE             : DWORD : 0x00000002
+FILE_APPEND_DATA          : DWORD : 0x00000004
+FILE_ADD_SUBDIRECTORY     : DWORD : 0x00000004
+FILE_CREATE_PIPE_INSTANCE : DWORD : 0x00000004
+FILE_READ_EA              : DWORD : 0x00000008
+FILE_WRITE_EA             : DWORD : 0x00000010
+FILE_EXECUTE              : DWORD : 0x00000020
+FILE_TRAVERSE             : DWORD : 0x00000020
+FILE_DELETE_CHILD         : DWORD : 0x00000040
+FILE_READ_ATTRIBUTES      : DWORD : 0x00000080
+FILE_WRITE_ATTRIBUTES     : DWORD : 0x00000100
 
-
-FILE_WRITE_DATA: DWORD : 0x00000002
-FILE_APPEND_DATA: DWORD : 0x00000004
-FILE_WRITE_EA: DWORD : 0x00000010
-FILE_WRITE_ATTRIBUTES: DWORD : 0x00000100
-FILE_READ_ATTRIBUTES: DWORD : 0x000000080
 READ_CONTROL: DWORD : 0x00020000
 SYNCHRONIZE: DWORD : 0x00100000
-GENERIC_READ: DWORD : 0x80000000
-GENERIC_WRITE: DWORD : 0x40000000
-STANDARD_RIGHTS_WRITE: DWORD : READ_CONTROL
+
+GENERIC_READ    : DWORD : 0x80000000
+GENERIC_WRITE   : DWORD : 0x40000000
+GENERIC_EXECUTE : DWORD : 0x20000000
+GENERIC_ALL     : DWORD : 0x10000000
+
+STANDARD_RIGHTS_READ    : DWORD : READ_CONTROL
+STANDARD_RIGHTS_WRITE   : DWORD : READ_CONTROL
+STANDARD_RIGHTS_EXECUTE : DWORD : READ_CONTROL
+
 FILE_GENERIC_WRITE: DWORD : STANDARD_RIGHTS_WRITE |
 	FILE_WRITE_DATA |
 	FILE_WRITE_ATTRIBUTES |
@@ -243,6 +258,9 @@ DIAGNOSTIC_REASON_VERSION :: 0
 DIAGNOSTIC_REASON_SIMPLE_STRING   :: 0x00000001
 DIAGNOSTIC_REASON_DETAILED_STRING :: 0x00000002
 DIAGNOSTIC_REASON_NOT_SPECIFIED   :: 0x80000000
+
+ENUM_CURRENT_SETTINGS  : DWORD : 4294967295 // (DWORD)-1
+ENUM_REGISTRY_SETTINGS : DWORD : 4294967294 // (DWORD)-2
 
 // Defines for power request APIs
 
@@ -412,6 +430,57 @@ CREATESTRUCTW:: struct {
 	lpszName:       LPCWSTR,
 	lpszClass:      LPCWSTR,
 	dwExStyle:      DWORD,
+}
+
+DEVMODEW :: struct {
+    dmDeviceName:   [32]wchar_t,
+    dmSpecVersion:   WORD,
+    dmDriverVersion: WORD,
+    dmSize:          WORD,
+    dmDriverExtra:   WORD,
+    dmFields:        DWORD,
+	using _: struct #raw_union {
+		// Printer only fields.
+		using _: struct {
+			dmOrientation:   c_short,
+			dmPaperSize:     c_short,
+			dmPaperLength:   c_short,
+			dmPaperWidth:    c_short,
+			dmScale:         c_short,
+			dmCopies:        c_short,
+			dmDefaultSource: c_short,
+			dmPrintQuality:  c_short,
+		},
+		// Display only fields.
+		using _: struct {
+			dmPosition:           POINT,
+			dmDisplayOrientation: DWORD,
+			dmDisplayFixedOutput: DWORD,
+		},
+	},
+    dmColor:       c_short,
+    dmDuplex:      c_short,
+    dmYResolution: c_short,
+    dmTTOption:    c_short,
+    dmCollate:     c_short,
+    dmFormName:    [32]wchar_t,
+    dmLogPixels:   WORD,
+    dmBitsPerPel:  DWORD,
+    dmPelsWidth:   DWORD,
+    dmPelsHeight:  DWORD,
+	using _: struct #raw_union {
+		dmDisplayFlags: DWORD,
+		dmNup:          DWORD,
+	},
+    dmDisplayFrequency: DWORD,
+    dmICMMethod:        DWORD,
+    dmICMIntent:        DWORD,
+    dmMediaType:        DWORD,
+    dmDitherType:       DWORD,
+    dmReserved1:        DWORD,
+    dmReserved2:        DWORD,
+    dmPanningWidth:     DWORD,
+    dmPanningHeight:    DWORD,
 }
 
 // MessageBox() Flags
