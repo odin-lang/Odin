@@ -134,6 +134,33 @@ foreign user32 {
 	GetCursorPos :: proc(lpPoint: LPPOINT) -> BOOL ---
 	SetCursorPos :: proc(X: c_int, Y: c_int) -> BOOL ---
 	SetCursor :: proc(hCursor: HCURSOR) -> HCURSOR ---
+
+	BroadcastSystemMessageW :: proc(
+		flags: DWORD,
+		lpInfo: LPDWORD,
+		Msg: UINT,
+		wParam: WPARAM,
+		lParam: LPARAM,
+	) -> c_long ---
+
+	BroadcastSystemMessageExW :: proc(
+		flags: DWORD,
+		lpInfo: LPDWORD,
+		Msg: UINT,
+		wParam: WPARAM,
+		lParam: LPARAM,
+		pbsmInfo: PBSMINFO,
+	) -> c_long ---
+
+	SendMessageTimeoutW :: proc(
+		hWnd: HWND,
+		Msg: UINT,
+		wParam: WPARAM,
+		lParam: LPARAM,
+		fuFlags: UINT,
+		uTimeout: UINT,
+		lpdwResult: PDWORD_PTR,
+	) -> LRESULT ---
 }
 
 CreateWindowW :: #force_inline proc "stdcall" (

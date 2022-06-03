@@ -34,6 +34,7 @@ HBITMAP :: distinct HANDLE
 HGLOBAL :: distinct HANDLE
 HHOOK :: distinct HANDLE
 HKEY :: distinct HANDLE
+HDESK :: distinct HANDLE
 BOOL :: distinct b32
 BYTE :: distinct u8
 BOOLEAN :: distinct b8
@@ -415,6 +416,40 @@ REG_RESOURCE_REQUIREMENTS_LIST :: 10
 REG_QWORD                      :: 11
 REG_QWORD_LITTLE_ENDIAN        :: 11
 
+BSMINFO :: struct {
+	cbSize: UINT,
+	hdesk: HDESK,
+	hwnd: HWND,
+	luid: LUID,
+}
+PBSMINFO :: ^BSMINFO
+
+// Broadcast Special Message Recipient list
+BSM_ALLCOMPONENTS      :: 0x00000000
+BSM_VXDS               :: 0x00000001
+BSM_NETDRIVER          :: 0x00000002
+BSM_INSTALLABLEDRIVERS :: 0x00000004
+BSM_APPLICATIONS       :: 0x00000008
+BSM_ALLDESKTOPS        :: 0x00000010
+
+// Broadcast Special Message Flags
+BSF_QUERY              :: 0x00000001
+BSF_IGNORECURRENTTASK  :: 0x00000002
+BSF_FLUSHDISK          :: 0x00000004
+BSF_NOHANG             :: 0x00000008
+BSF_POSTMESSAGE        :: 0x00000010
+BSF_FORCEIFHUNG        :: 0x00000020
+BSF_NOTIMEOUTIFNOTHUNG :: 0x00000040
+BSF_ALLOWSFW           :: 0x00000080
+BSF_SENDNOTIFYMESSAGE  :: 0x00000100
+BSF_RETURNHDESK        :: 0x00000200
+BSF_LUID               :: 0x00000400
+
+BROADCAST_QUERY_DENY :: 0x424D5144
+
+// Special HWND value for use with PostMessage() and SendMessage()
+HWND_BROADCAST :: HWND(uintptr(0xffff))
+HWND_MESSAGE   :: HWND(~uintptr(0) - 2) // -3
 
 PTIMERAPCROUTINE :: #type proc "stdcall" (lpArgToCompletionRoutine: LPVOID, dwTimerLowValue, dwTimerHighValue: DWORD)
 
