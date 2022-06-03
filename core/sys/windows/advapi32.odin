@@ -110,4 +110,13 @@ foreign advapi32 {
 		pvData: PVOID,
 		pcbData: LPDWORD,
 	) -> LSTATUS ---
+
+	RegSetValueExW :: proc(
+		hKey: HKEY,
+		lpValueName: LPCWSTR,
+		Reserved: DWORD,
+		dwType: DWORD,
+		lpData: ^BYTE,
+		cbData: DWORD,
+	) -> LSTATUS ---
 }
