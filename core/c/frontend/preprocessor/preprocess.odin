@@ -1276,7 +1276,7 @@ preprocess_internal :: proc(cpp: ^Preprocessor, tok: ^Token) -> ^Token {
 				if start.file != nil {
 					dir = filepath.dir(start.file.name)
 				}
-				path := filepath.join(dir, filename)
+				path := filepath.join({dir, filename})
 				if os.exists(path) {
 					tok = include_file(cpp, tok, path, start.next.next)
 					continue

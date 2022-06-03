@@ -276,7 +276,7 @@ foreign libc {
 	@(link_name="__error") __error :: proc() -> ^int ---
 
 	@(link_name="open")             _unix_open          :: proc(path: cstring, flags: i32, mode: u16) -> Handle ---
-	@(link_name="close")            _unix_close         :: proc(handle: Handle) ---
+	@(link_name="close")            _unix_close         :: proc(handle: Handle) -> c.int ---
 	@(link_name="read")             _unix_read          :: proc(handle: Handle, buffer: rawptr, count: int) -> int ---
 	@(link_name="write")            _unix_write         :: proc(handle: Handle, buffer: rawptr, count: int) -> int ---
 	@(link_name="lseek")            _unix_lseek         :: proc(fs: Handle, offset: int, whence: int) -> int ---
@@ -295,13 +295,13 @@ foreign libc {
 
 	@(link_name="closedir")         _unix_closedir      :: proc(dirp: Dir) -> c.int ---
 	@(link_name="rewinddir")        _unix_rewinddir     :: proc(dirp: Dir) ---
-	
-	@(link_name="fcntl")            _unix_fcntl         :: proc(fd: Handle, cmd: c.int, buf: ^byte) -> c.int ---
+
+	@(link_name="__fcntl")          _unix__fcntl        :: proc(fd: Handle, cmd: c.int, buf: ^byte) -> c.int ---
 
 	@(link_name="rename") _unix_rename :: proc(old: cstring, new: cstring) -> c.int ---
 	@(link_name="remove") _unix_remove :: proc(path: cstring) -> c.int ---
 
-	@(link_name="fchmod") _unix_fchmod :: proc(fildes: Handle, mode: u16) -> c.int ---
+	@(link_name="fchmod") _unix_fchmod :: proc(fd: Handle, mode: u16) -> c.int ---
 
 	@(link_name="malloc")   _unix_malloc   :: proc(size: int) -> rawptr ---
 	@(link_name="calloc")   _unix_calloc   :: proc(num, size: int) -> rawptr ---
@@ -361,12 +361,12 @@ when  ODIN_OS == .Darwin && ODIN_ARCH == .arm64 {
 	return handle, 0
 }
 
-fchmod :: proc(fildes: Handle, mode: u16) -> Errno {
-	return cast(Errno)_unix_fchmod(fildes, mode)
+fchmod :: proc(fd: Handle, mode: u16) -> Errno {
+	return cast(Errno)_unix_fchmod(fd, mode)
 }
 
-close :: proc(fd: Handle) {
-	_unix_close(fd)
+close :: proc(fd: Handle) -> bool {
+	return _unix_close(fd) == 0
 }
 
 write :: proc(fd: Handle, data: []u8) -> (int, Errno) {
@@ -473,16 +473,21 @@ is_dir_path :: proc(path: string, follow_links: bool = true) -> bool {
 is_file :: proc {is_file_path, is_file_handle}
 is_dir :: proc {is_dir_path, is_dir_handle}
 
+exists :: proc(path: string) -> bool {
+	cpath := strings.clone_to_cstring(path, context.temp_allocator)
+	res := _unix_access(cpath, O_RDONLY)
+	return res == 0
+}
 
 rename :: proc(old: string, new: string) -> bool {
 	old_cstr := strings.clone_to_cstring(old, context.temp_allocator)
 	new_cstr := strings.clone_to_cstring(new, context.temp_allocator)
-	return _unix_rename(old_cstr, new_cstr) != -1 
+	return _unix_rename(old_cstr, new_cstr) != -1
 }
 
 remove :: proc(path: string) -> bool {
 	path_cstr := strings.clone_to_cstring(path, context.temp_allocator)
-	return _unix_remove(path_cstr) != -1 
+	return _unix_remove(path_cstr) != -1
 }
 
 @private
@@ -546,7 +551,7 @@ _rewinddir :: proc(dirp: Dir) {
 _readdir :: proc(dirp: Dir) -> (entry: Dirent, err: Errno, end_of_stream: bool) {
 	result: ^Dirent
 	rc := _unix_readdir_r(dirp, &entry, &result)
-	
+
 	if rc != 0 {
 		err = Errno(get_last_error())
 		return
@@ -586,7 +591,7 @@ _readlink :: proc(path: string) -> (string, Errno) {
 
 absolute_path_from_handle :: proc(fd: Handle) -> (string, Errno) {
 	buf : [256]byte
-	res  := _unix_fcntl(fd, F_GETPATH, &buf[0])
+	res  := _unix__fcntl(fd, F_GETPATH, &buf[0])
 	if	res != 0 {
 		return "", Errno(get_last_error())
 	}
@@ -633,13 +638,18 @@ heap_free :: proc(ptr: rawptr) {
 	_unix_free(ptr)
 }
 
-getenv :: proc(name: string) -> (string, bool) {
-	path_str := strings.clone_to_cstring(name, context.temp_allocator)
+lookup_env :: proc(key: string, allocator := context.allocator) -> (value: string, found: bool) {
+	path_str := strings.clone_to_cstring(key, context.temp_allocator)
 	cstr := _unix_getenv(path_str)
 	if cstr == nil {
 		return "", false
 	}
-	return string(cstr), true
+	return strings.clone(string(cstr), allocator), true
+}
+
+get_env :: proc(key: string, allocator := context.allocator) -> (value: string) {
+	value, _ = lookup_env(key, allocator)
+	return
 }
 
 get_current_directory :: proc() -> string {

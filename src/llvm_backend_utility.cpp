@@ -201,6 +201,11 @@ lbValue lb_emit_transmute(lbProcedure *p, lbValue value, Type *t) {
 		return res;
 	}
 
+	if (is_type_simd_vector(src) && is_type_simd_vector(dst)) {
+		res.value = LLVMBuildBitCast(p->builder, value.value, lb_type(p->module, t), "");
+		return res;
+	}
+
 	if (lb_is_type_aggregate(src) || lb_is_type_aggregate(dst)) {
 		lbValue s = lb_address_from_load_or_generate_local(p, value);
 		lbValue d = lb_emit_transmute(p, s, alloc_type_pointer(t));
@@ -480,8 +485,10 @@ lbValue lb_emit_count_ones(lbProcedure *p, lbValue x, Type *type) {
 }
 
 lbValue lb_emit_count_zeros(lbProcedure *p, lbValue x, Type *type) {
-	i64 sz = 8*type_size_of(type);
-	lbValue size = lb_const_int(p->module, type, cast(u64)sz);
+	Type *elem = base_array_type(type);
+	i64 sz = 8*type_size_of(elem);
+	lbValue size = lb_const_int(p->module, elem, cast(u64)sz);
+	size = lb_emit_conv(p, size, type);
 	lbValue count = lb_emit_count_ones(p, x, type);
 	return lb_emit_arith(p, Token_Sub, size, count, type);
 }

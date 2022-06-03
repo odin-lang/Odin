@@ -365,7 +365,7 @@ get_current_directory :: proc(allocator := context.allocator) -> string {
 
 	win32.ReleaseSRWLockExclusive(&cwd_lock)
 
-	return win32.utf16_to_utf8(dir_buf_wstr, allocator)
+	return win32.utf16_to_utf8(dir_buf_wstr, allocator) or_else ""
 }
 
 set_current_directory :: proc(path: string) -> (err: Errno) {
@@ -389,7 +389,8 @@ change_directory :: proc(path: string) -> Errno {
 	return Errno(win32.SetCurrentDirectoryW(wpath))
 }
 
-make_directory :: proc(path: string, mode: u32) -> Errno {
+make_directory :: proc(path: string, mode: u32 = 0) -> Errno {
+	// Mode is unused on Windows, but is needed on *nix
 	wpath := win32.utf8_to_wstring(path, context.temp_allocator)
 	return Errno(win32.CreateDirectoryW(wpath, nil))
 }

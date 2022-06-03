@@ -35,7 +35,7 @@ example :: proc() {
 		times[round] = time.tick_diff(start, end)
 	}
 
-	fastest := time.Duration(max(i64))
+	fastest := max(time.Duration)
 	slowest := time.Duration(0)
 	total   := time.Duration(0)
 

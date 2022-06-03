@@ -54,9 +54,10 @@ Image :: struct {
 	*/
 	background:    Maybe(RGB_Pixel_16),
 	metadata:      Image_Metadata,
+	which:         Which_File_Type,
 }
 
-Image_Metadata :: union {
+Image_Metadata :: union #shared_nil {
 	^Netpbm_Info,
 	^PNG_Info,
 	^QOI_Info,
@@ -172,6 +173,7 @@ General_Image_Error :: enum {
 	Unable_To_Write_File,
 
 	// Invalid
+	Unsupported_Format,
 	Invalid_Signature,
 	Invalid_Input_Image,
 	Image_Dimensions_Too_Large,

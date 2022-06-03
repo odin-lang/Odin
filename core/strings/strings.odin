@@ -14,6 +14,13 @@ clone :: proc(s: string, allocator := context.allocator, loc := #caller_location
 	return string(c[:len(s)])
 }
 
+// returns a clone of the string `s` allocated using the `allocator`
+clone_safe :: proc(s: string, allocator := context.allocator, loc := #caller_location) -> (str: string, err: mem.Allocator_Error) {
+	c := make([]byte, len(s), allocator, loc) or_return
+	copy(c, s)
+	return string(c[:len(s)]), nil
+}
+
 // returns a clone of the string `s` allocated using the `allocator` as a cstring
 // a nul byte is appended to the clone, to make the cstring safe
 clone_to_cstring :: proc(s: string, allocator := context.allocator, loc := #caller_location) -> cstring {
@@ -260,6 +267,25 @@ join :: proc(a: []string, sep: string, allocator := context.allocator) -> string
 	return string(b)
 }
 
+join_safe :: proc(a: []string, sep: string, allocator := context.allocator) -> (str: string, err: mem.Allocator_Error) {
+	if len(a) == 0 {
+		return "", nil
+	}
+
+	n := len(sep) * (len(a) - 1)
+	for s in a {
+		n += len(s)
+	}
+
+	b := make([]byte, n, allocator) or_return
+	i := copy(b, a[0])
+	for s in a[1:] {
+		i += copy(b[i:], sep)
+		i += copy(b[i:], s)
+	}
+	return string(b), nil
+}
+
 /*
 	returns a combined string from the slice of strings `a` without a seperator
 	allocates the string using the `allocator`
@@ -283,6 +309,23 @@ concatenate :: proc(a: []string, allocator := context.allocator) -> string {
 		i += copy(b[i:], s)
 	}
 	return string(b)
+}
+
+concatenate_safe :: proc(a: []string, allocator := context.allocator) -> (res: string, err: mem.Allocator_Error) {
+	if len(a) == 0 {
+		return "", nil
+	}
+
+	n := 0
+	for s in a {
+		n += len(s)
+	}
+	b := make([]byte, n, allocator) or_return
+	i := 0
+	for s in a {
+		i += copy(b[i:], s)
+	}
+	return string(b), nil
 }
 
 /*

@@ -15,7 +15,7 @@ adler32 :: proc(data: []byte, seed := u32(1)) -> u32 #no_bounds_check {
 	for len(buf) != 0 && uintptr(buffer) & 7 != 0 {
 		a = (a + u64(buf[0]))
 		b = (b + a)
-		buffer = intrinsics.ptr_offset(buffer, 1)
+		buffer = buffer[1:]
 		buf = buf[1:]
 	}
 
@@ -130,9 +130,9 @@ murmur32 :: proc(data: []byte, seed := u32(0)) -> u32 {
 	h1: u32 = seed
 	nblocks := len(data)/4
 	p := raw_data(data)
-	p1 := mem.ptr_offset(p, 4*nblocks)
+	p1 := p[4*nblocks:]
 
-	for ; p < p1; p = mem.ptr_offset(p, 4) {
+	for ; p < p1; p = p[4:] {
 		k1 := (cast(^u32)p)^
 
 		k1 *= c1_32

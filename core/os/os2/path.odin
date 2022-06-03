@@ -1,5 +1,7 @@
 package os2
 
+import "core:runtime"
+
 Path_Separator      :: _Path_Separator      // OS-Specific
 Path_List_Separator :: _Path_List_Separator // OS-Specific
 
@@ -21,7 +23,7 @@ remove_all :: proc(path: string) -> Error {
 
 
 
-getwd :: proc(allocator := context.allocator) -> (dir: string, err: Error) {
+getwd :: proc(allocator: runtime.Allocator) -> (dir: string, err: Error) {
 	return _getwd(allocator)
 }
 setwd :: proc(dir: string) -> (err: Error) {

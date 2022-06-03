@@ -641,7 +641,7 @@ void lb_setup_type_info_data(lbProcedure *p) { // NOTE(bill): Setup type_info da
 			tag = lb_const_ptr_cast(m, variant_ptr, t_type_info_union_ptr);
 
 			{
-				LLVMValueRef vals[8] = {};
+				LLVMValueRef vals[7] = {};
 
 				isize variant_count = gb_max(0, t->Union.variants.count);
 				lbValue memory_types = lb_type_info_member_types_offset(p, variant_count);
@@ -676,8 +676,7 @@ void lb_setup_type_info_data(lbProcedure *p) { // NOTE(bill): Setup type_info da
 
 				vals[4] = lb_const_bool(m, t_bool, t->Union.custom_align != 0).value;
 				vals[5] = lb_const_bool(m, t_bool, t->Union.kind == UnionType_no_nil).value;
-				vals[6] = lb_const_bool(m, t_bool, t->Union.kind == UnionType_maybe).value;
-				vals[7] = lb_const_bool(m, t_bool, t->Union.kind == UnionType_shared_nil).value;
+				vals[6] = lb_const_bool(m, t_bool, t->Union.kind == UnionType_shared_nil).value;
 
 				for (isize i = 0; i < gb_count_of(vals); i++) {
 					if (vals[i] == nullptr) {

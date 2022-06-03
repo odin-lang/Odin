@@ -135,7 +135,6 @@ Type_Info_Union :: struct {
 
 	custom_align: bool,
 	no_nil:       bool,
-	maybe:        bool,
 	shared_nil:   bool,
 }
 Type_Info_Enum :: struct {

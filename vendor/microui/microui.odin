@@ -309,7 +309,7 @@ init :: proc(ctx: ^Context) {
 	ctx.draw_frame  = default_draw_frame
 	ctx._style      = default_style
 	ctx.style       = &ctx._style
-	ctx.text_input  = strings.builder_from_slice(ctx._text_store[:])
+	ctx.text_input  = strings.builder_from_bytes(ctx._text_store[:])
 }
 
 begin :: proc(ctx: ^Context) {

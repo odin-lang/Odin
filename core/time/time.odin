@@ -14,6 +14,8 @@ Hour        :: 60 * Minute
 MIN_DURATION :: Duration(-1 << 63)
 MAX_DURATION :: Duration(1<<63 - 1)
 
+IS_SUPPORTED :: _IS_SUPPORTED
+
 Time :: struct {
 	_nsec: i64, // zero is 1970-01-01 00:00:00
 }
@@ -49,6 +51,14 @@ Stopwatch :: struct {
 	_accumulation: Duration,
 }
 
+now :: proc "contextless" () -> Time {
+	return _now()
+}
+
+sleep :: proc "contextless" (d: Duration) {
+	_sleep(d)
+}
+
 stopwatch_start :: proc(using stopwatch: ^Stopwatch) {
 	if !running {
 		_start_time = tick_now()
@@ -82,36 +92,36 @@ since :: proc(start: Time) -> Duration {
 	return diff(start, now())
 }
 
-duration_nanoseconds :: proc(d: Duration) -> i64 {
+duration_nanoseconds :: proc "contextless" (d: Duration) -> i64 {
 	return i64(d)
 }
-duration_microseconds :: proc(d: Duration) -> f64 {
+duration_microseconds :: proc "contextless" (d: Duration) -> f64 {
 	return duration_seconds(d) * 1e6
 }
-duration_milliseconds :: proc(d: Duration) -> f64 {
+duration_milliseconds :: proc "contextless" (d: Duration) -> f64 {
 	return duration_seconds(d) * 1e3
 }
-duration_seconds :: proc(d: Duration) -> f64 {
+duration_seconds :: proc "contextless" (d: Duration) -> f64 {
 	sec := d / Second
 	nsec := d % Second
 	return f64(sec) + f64(nsec)/1e9
 }
-duration_minutes :: proc(d: Duration) -> f64 {
+duration_minutes :: proc "contextless" (d: Duration) -> f64 {
 	min := d / Minute
 	nsec := d % Minute
 	return f64(min) + f64(nsec)/(60*1e9)
 }
-duration_hours :: proc(d: Duration) -> f64 {
+duration_hours :: proc "contextless" (d: Duration) -> f64 {
 	hour := d / Hour
 	nsec := d % Hour
 	return f64(hour) + f64(nsec)/(60*60*1e9)
 }
 
-_less_than_half :: #force_inline proc(x, y: Duration) -> bool {
-	return u64(x)+u64(x) < u64(y)
-}
-
 duration_round :: proc(d, m: Duration) -> Duration {
+	_less_than_half :: #force_inline proc(x, y: Duration) -> bool {
+		return u64(x)+u64(x) < u64(y)
+	}
+
 	if m <= 0 {
 		return d
 	}
@@ -201,10 +211,12 @@ unix :: proc(sec: i64, nsec: i64) -> Time {
 	return Time{(sec*1e9 + nsec) + UNIX_TO_INTERNAL}
 }
 
+to_unix_seconds :: time_to_unix
 time_to_unix :: proc(t: Time) -> i64 {
 	return t._nsec/1e9
 }
 
+to_unix_nanoseconds :: time_to_unix_nano
 time_to_unix_nano :: proc(t: Time) -> i64 {
 	return t._nsec
 }
@@ -265,20 +277,24 @@ INTERNAL_TO_WALL :: -WALL_TO_INTERNAL
 UNIX_TO_ABSOLUTE :: UNIX_TO_INTERNAL + INTERNAL_TO_ABSOLUTE
 ABSOLUTE_TO_UNIX :: -UNIX_TO_ABSOLUTE
 
-_is_leap_year :: proc(year: int) -> bool {
-	return year%4 == 0 && (year%100 != 0 || year%400 == 0)
-}
 
+@(private)
 _date :: proc(t: Time, full: bool) -> (year: int, month: Month, day: int, yday: int) {
 	year, month, day, yday = _abs_date(_time_abs(t), full)
 	return
 }
 
+@(private)
 _time_abs :: proc(t: Time) -> u64 {
 	return u64(t._nsec/1e9 + UNIX_TO_ABSOLUTE)
 }
 
+@(private)
 _abs_date :: proc(abs: u64, full: bool) -> (year: int, month: Month, day: int, yday: int) {
+	_is_leap_year :: proc(year: int) -> bool {
+		return year%4 == 0 && (year%100 != 0 || year%400 == 0)
+	}
+
 	d := abs / SECONDS_PER_DAY
 
 	// 400 year cycles

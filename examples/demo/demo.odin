@@ -1110,8 +1110,15 @@ prefix_table := [?]string{
 	"Black",
 }
 
+print_mutex := b64(false)
+
 threading_example :: proc() {
 	fmt.println("\n# threading_example")
+
+	did_acquire :: proc(m: ^b64) -> (acquired: bool) {
+		res, ok := intrinsics.atomic_compare_exchange_strong(m, false, true)
+		return ok && res == false
+	}
 
 	{ // Basic Threads
 		fmt.println("\n## Basic Threads")
@@ -1154,14 +1161,21 @@ threading_example :: proc() {
 		task_proc :: proc(t: thread.Task) {
 			index := t.user_index % len(prefix_table)
 			for iteration in 1..=5 {
+				for !did_acquire(&print_mutex) { thread.yield() } // Allow one thread to print at a time.
+
 				fmt.printf("Worker Task %d is on iteration %d\n", t.user_index, iteration)
 				fmt.printf("`%s`: iteration %d\n", prefix_table[index], iteration)
+
+				print_mutex = false
+
 				time.sleep(1 * time.Millisecond)
 			}
 		}
 
+		N :: 3
+
 		pool: thread.Pool
-		thread.pool_init(pool=&pool, thread_count=3, allocator=context.allocator)
+		thread.pool_init(pool=&pool, thread_count=N, allocator=context.allocator)
 		defer thread.pool_destroy(&pool)
 
 
@@ -1171,6 +1185,19 @@ threading_example :: proc() {
 		}
 
 		thread.pool_start(&pool)
+
+		{
+			// Wait a moment before we cancel a thread
+			time.sleep(5 * time.Millisecond)
+
+			// Allow one thread to print at a time.
+			for !did_acquire(&print_mutex) { thread.yield() }
+
+			thread.terminate(pool.threads[N - 1], 0)
+			fmt.println("Canceled last thread")
+			print_mutex = false
+		}
+
 		thread.pool_finish(&pool)
 	}
 }
@@ -1950,15 +1977,17 @@ constant_literal_expressions :: proc() {
 }
 
 union_maybe :: proc() {
-	fmt.println("\n#union #maybe")
+	fmt.println("\n#union based maybe")
 
 	// NOTE: This is already built-in, and this is just a reimplementation to explain the behaviour
-	Maybe :: union($T: typeid) #maybe {T}
+	Maybe :: union($T: typeid) {T}
 
 	i: Maybe(u8)
 	p: Maybe(^u8) // No tag is stored for pointers, nil is the sentinel value
 
+	// Tag size will be as small as needed for the number of variants
 	#assert(size_of(i) == size_of(u8) + size_of(u8))
+	// No need to store a tag here, the `nil` state is shared with the variant's `nil`
 	#assert(size_of(p) == size_of(^u8))
 
 	i = 123
