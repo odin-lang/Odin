@@ -44,6 +44,8 @@ foreign user32 {
 	SetActiveWindow :: proc(hWnd: HWND) -> HWND ---
 	GetActiveWindow :: proc() -> HWND ---
 
+    SetWindowTextW :: proc "stdcall" (hwnd: HWND, title: LPCWSTR) ---
+
 	GetMessageW :: proc(lpMsg: ^MSG, hWnd: HWND, wMsgFilterMin: UINT, wMsgFilterMax: UINT) -> BOOL ---
 
 	TranslateMessage :: proc(lpMsg: ^MSG) -> BOOL ---
