@@ -620,7 +620,6 @@ OdinDocTypeIndex odin_doc_type(OdinDocWriter *w, Type *type) {
 		doc_type.kind = OdinDocType_Union;
 		if (type->Union.is_polymorphic) { doc_type.flags |= OdinDocTypeFlag_Union_polymorphic; }
 		switch (type->Union.kind) {
-		case UnionType_maybe:      doc_type.flags |= OdinDocTypeFlag_Union_maybe;      break;
 		case UnionType_no_nil:     doc_type.flags |= OdinDocTypeFlag_Union_no_nil;     break;
 		case UnionType_shared_nil: doc_type.flags |= OdinDocTypeFlag_Union_shared_nil; break;
 		}

@@ -4,7 +4,7 @@ when ODIN_NO_CRT && ODIN_OS == .Windows {
 	foreign import lib "system:NtDll.lib"
 	
 	@(private="file")
-	@(default_calling_convention="std")
+	@(default_calling_convention="stdcall")
 	foreign lib {
 		RtlMoveMemory :: proc(dst, src: rawptr, length: int) ---
 		RtlFillMemory :: proc(dst: rawptr, length: int, fill: i32) ---

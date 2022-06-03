@@ -34,6 +34,10 @@ Reader :: struct {
 	// If lazy_quotes is true, a quote may appear in an unquoted field and a non-doubled quote may appear in a quoted field
 	lazy_quotes: bool,
 
+	// multiline_fields, when set to true, will treat a field starting with a " as a multiline string
+	// therefore, instead of reading until the next \n, it'll read until the next "
+	multiline_fields: bool,
+
 	// reuse_record controls whether calls to 'read' may return a slice using the backing buffer
 	// for performance
 	// By default, each call to 'read' returns a newly allocated slice
@@ -194,32 +198,72 @@ is_valid_delim :: proc(r: rune) -> bool {
 @private
 _read_record :: proc(r: ^Reader, dst: ^[dynamic]string, allocator := context.allocator) -> ([]string, Error) {
 	read_line :: proc(r: ^Reader) -> ([]byte, io.Error) {
-		line, err := bufio.reader_read_slice(&r.r, '\n')
-		if err == .Buffer_Full {
-			clear(&r.raw_buffer)
-			append(&r.raw_buffer, ..line)
-			for err == .Buffer_Full {
-				line, err = bufio.reader_read_slice(&r.r, '\n')
+		if !r.multiline_fields {
+			line, err := bufio.reader_read_slice(&r.r, '\n')
+			if err == .Buffer_Full {
+				clear(&r.raw_buffer)
 				append(&r.raw_buffer, ..line)
+				for err == .Buffer_Full {
+					line, err = bufio.reader_read_slice(&r.r, '\n')
+					append(&r.raw_buffer, ..line)
+				}
+				line = r.raw_buffer[:]
 			}
-			line = r.raw_buffer[:]
-		}
-		if len(line) > 0 && err == .EOF {
-			err = nil
-			if line[len(line)-1] == '\r' {
-				line = line[:len(line)-1]
+			if len(line) > 0 && err == .EOF {
+				err = nil
+				if line[len(line)-1] == '\r' {
+					line = line[:len(line)-1]
+				}
 			}
-		}
-		r.line_count += 1
+			r.line_count += 1
 
-		// normalize \r\n to \n
-		n := len(line)
-		for n >= 2 && string(line[n-2:]) == "\r\n" {
-			line[n-2] = '\n'
-			line = line[:n-1]
-		}
+			// normalize \r\n to \n
+			n := len(line)
+			for n >= 2 && string(line[n-2:]) == "\r\n" {
+				line[n-2] = '\n'
+				line = line[:n-1]
+			}
+			return line, err
 
-		return line, err
+		} else {
+			// Reading a "line" that can possibly contain multiline fields.
+			// Unfortunately, this means we need to read a character at a time.
+
+			err:       io.Error
+			cur:       rune
+			is_quoted: bool
+
+			field_length := 0
+
+			clear(&r.raw_buffer)
+
+			read_loop: for err == .None {
+				cur, _, err = bufio.reader_read_rune(&r.r)
+
+				if err != .None { break read_loop }
+
+				switch cur {
+				case '"':
+					is_quoted = field_length == 0
+					field_length += 1
+
+				case '\n', '\r':
+					if !is_quoted { break read_loop }
+
+				case r.comma:
+					field_length = 0
+
+				case:
+					field_length += 1
+				}
+
+				rune_buf, rune_len := utf8.encode_rune(cur)
+				append(&r.raw_buffer, ..rune_buf[:rune_len])
+			}
+
+			return r.raw_buffer[:], err
+		}
+		unreachable()
 	}
 
 	length_newline :: proc(b: []byte) -> int {

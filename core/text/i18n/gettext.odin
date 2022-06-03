@@ -18,7 +18,7 @@ import "core:os"
 import "core:strings"
 import "core:bytes"
 
-parse_mo_from_slice :: proc(data: []u8, options := DEFAULT_PARSE_OPTIONS, pluralizer: proc(int) -> int = nil, allocator := context.allocator) -> (translation: ^Translation, err: Error) {
+parse_mo_from_bytes :: proc(data: []byte, options := DEFAULT_PARSE_OPTIONS, pluralizer: proc(int) -> int = nil, allocator := context.allocator) -> (translation: ^Translation, err: Error) {
 	context.allocator = allocator
 	/*
 		An MO file should have at least a 4-byte magic, 2 x 2 byte version info,
@@ -126,10 +126,10 @@ parse_mo_file :: proc(filename: string, options := DEFAULT_PARSE_OPTIONS, plural
 
 	if !data_ok { return {}, .File_Error }
 
-	return parse_mo_from_slice(data, options, pluralizer, allocator)
+	return parse_mo_from_bytes(data, options, pluralizer, allocator)
 }
 
-parse_mo :: proc { parse_mo_file, parse_mo_from_slice }
+parse_mo :: proc { parse_mo_file, parse_mo_from_bytes }
 
 /*
 	Helpers.

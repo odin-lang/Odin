@@ -3,7 +3,7 @@ package runtime
 import "core:intrinsics"
 
 @builtin
-Maybe :: union($T: typeid) #maybe {T}
+Maybe :: union($T: typeid) {T}
 
 
 @builtin
@@ -600,26 +600,30 @@ card :: proc(s: $S/bit_set[$E; $U]) -> int {
 
 
 @builtin
-raw_array_data :: proc "contextless" (a: $P/^($T/[$N]$E)) -> ^E {
-	return (^E)(a)
+raw_array_data :: proc "contextless" (a: $P/^($T/[$N]$E)) -> [^]E {
+	return ([^]E)(a)
 }
 @builtin
-raw_slice_data :: proc "contextless" (s: $S/[]$E) -> ^E {
+raw_simd_data :: proc "contextless" (a: $P/^($T/#simd[$N]$E)) -> [^]E {
+	return ([^]E)(a)
+}
+@builtin
+raw_slice_data :: proc "contextless" (s: $S/[]$E) -> [^]E {
 	ptr := (transmute(Raw_Slice)s).data
-	return (^E)(ptr)
+	return ([^]E)(ptr)
 }
 @builtin
-raw_dynamic_array_data :: proc "contextless" (s: $S/[dynamic]$E) -> ^E {
+raw_dynamic_array_data :: proc "contextless" (s: $S/[dynamic]$E) -> [^]E {
 	ptr := (transmute(Raw_Dynamic_Array)s).data
-	return (^E)(ptr)
+	return ([^]E)(ptr)
 }
 @builtin
-raw_string_data :: proc "contextless" (s: $S/string) -> ^u8 {
+raw_string_data :: proc "contextless" (s: $S/string) -> [^]u8 {
 	return (transmute(Raw_String)s).data
 }
 
 @builtin
-raw_data :: proc{raw_array_data, raw_slice_data, raw_dynamic_array_data, raw_string_data}
+raw_data :: proc{raw_array_data, raw_slice_data, raw_dynamic_array_data, raw_string_data, raw_simd_data}
 
 
 

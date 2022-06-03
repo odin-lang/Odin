@@ -1,4 +1,4 @@
-//+build js wasm32
+//+build js wasm32, js wasm64
 package wasm_js_interface
 
 foreign import dom_lib "odin_dom"
@@ -77,6 +77,8 @@ Event_Kind :: enum u32 {
 	Transition_Run,
 	Transition_Cancel,
 
+	Context_Menu,
+
 }
 event_kind_string := [Event_Kind]string{
 	.Invalid = "",
@@ -151,6 +153,8 @@ event_kind_string := [Event_Kind]string{
 	.Touch_End    = "touchend",
 	.Touch_Move   = "touchmove",
 	.Touch_Start  = "touchstart",
+
+	.Context_Menu = "contextmenu",
 }
 
 Delta_Mode :: enum u32 {
@@ -243,7 +247,7 @@ Event :: struct {
 
 
 	user_data: rawptr,
-	callback: proc(e: Event),
+	callback:  proc(e: Event),
 }
 
 @(default_calling_convention="contextless")

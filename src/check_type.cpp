@@ -1234,7 +1234,7 @@ bool check_type_specialization_to(CheckerContext *ctx, Type *specialization, Typ
 }
 
 
-Type *determine_type_from_polymorphic(CheckerContext *ctx, Type *poly_type, Operand operand) {
+Type *determine_type_from_polymorphic(CheckerContext *ctx, Type *poly_type, Operand const &operand) {
 	bool modify_type = !ctx->no_polymorphic_errors;
 	bool show_error = modify_type && !ctx->hide_polymorphic_errors;
 	if (!is_operand_value(operand)) {
@@ -2795,15 +2795,27 @@ bool check_type_internal(CheckerContext *ctx, Ast *e, Type **type, Type *named_t
 				if (name == "soa") {
 					*type = make_soa_struct_fixed(ctx, e, at->elem, elem, count, generic_type);
 				} else if (name == "simd") {
-					if (!is_type_valid_vector_elem(elem)) {
+					if (!is_type_valid_vector_elem(elem) && !is_type_polymorphic(elem)) {
 						gbString str = type_to_string(elem);
-						error(at->elem, "Invalid element type for 'intrinsics.simd_vector', expected an integer or float with no specific endianness, got '%s'", str);
+						error(at->elem, "Invalid element type for #simd, expected an integer, float, or boolean with no specific endianness, got '%s'", str);
 						gb_string_free(str);
 						*type = alloc_type_array(elem, count, generic_type);
 						goto array_end;
 					}
 
-					*type = alloc_type_simd_vector(count, elem);
+					if (generic_type != nullptr) {
+						// Ignore
+					} else if (count < 1 || !is_power_of_two(count)) {
+						error(at->count, "Invalid length for #simd, expected a power of two length, got '%lld'", cast(long long)count);
+						*type = alloc_type_array(elem, count, generic_type);
+						goto array_end;
+					}
+
+					*type = alloc_type_simd_vector(count, elem, generic_type);
+
+					if (count > SIMD_ELEMENT_COUNT_MAX) {
+						error(at->count, "#simd support a maximum element count of %d, got %lld", SIMD_ELEMENT_COUNT_MAX, cast(long long)count);
+					}
 				} else {
 					error(at->tag, "Invalid tag applied to array, got #%.*s", LIT(name));
 					*type = alloc_type_array(elem, count, generic_type);

@@ -10,7 +10,14 @@ clone :: proc(s: []byte, allocator := context.allocator, loc := #caller_location
 	return c[:len(s)]
 }
 
-ptr_from_slice :: proc(str: []byte) -> ^byte {
+clone_safe :: proc(s: []byte, allocator := context.allocator, loc := #caller_location) -> (data: []byte, err: mem.Allocator_Error) {
+	c := make([]byte, len(s), allocator, loc) or_return
+	copy(c, s)
+	return c[:len(s)], nil
+}
+
+ptr_from_slice :: ptr_from_bytes
+ptr_from_bytes :: proc(str: []byte) -> ^byte {
 	d := transmute(mem.Raw_String)str
 	return d.data
 }
@@ -134,6 +141,25 @@ join :: proc(a: [][]byte, sep: []byte, allocator := context.allocator) -> []byte
 	return b
 }
 
+join_safe :: proc(a: [][]byte, sep: []byte, allocator := context.allocator) -> (data: []byte, err: mem.Allocator_Error) {
+	if len(a) == 0 {
+		return nil, nil
+	}
+
+	n := len(sep) * (len(a) - 1)
+	for s in a {
+		n += len(s)
+	}
+
+	b := make([]byte, n, allocator) or_return
+	i := copy(b, a[0])
+	for s in a[1:] {
+		i += copy(b[i:], sep)
+		i += copy(b[i:], s)
+	}
+	return b, nil
+}
+
 concatenate :: proc(a: [][]byte, allocator := context.allocator) -> []byte {
 	if len(a) == 0 {
 		return nil
@@ -150,6 +176,24 @@ concatenate :: proc(a: [][]byte, allocator := context.allocator) -> []byte {
 	}
 	return b
 }
+
+concatenate_safe :: proc(a: [][]byte, allocator := context.allocator) -> (data: []byte, err: mem.Allocator_Error) {
+	if len(a) == 0 {
+		return nil, nil
+	}
+
+	n := 0
+	for s in a {
+		n += len(s)
+	}
+	b := make([]byte, n, allocator) or_return
+	i := 0
+	for s in a {
+		i += copy(b[i:], s)
+	}
+	return b, nil
+}
+
 
 @private
 _split :: proc(s, sep: []byte, sep_save, n: int, allocator := context.allocator) -> [][]byte {

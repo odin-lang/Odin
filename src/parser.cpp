@@ -360,6 +360,7 @@ Ast *clone_ast(Ast *node) {
 	case Ast_ArrayType:
 		n->ArrayType.count = clone_ast(n->ArrayType.count);
 		n->ArrayType.elem  = clone_ast(n->ArrayType.elem);
+		n->ArrayType.tag   = clone_ast(n->ArrayType.tag);
 		break;
 	case Ast_DynamicArrayType:
 		n->DynamicArrayType.elem = clone_ast(n->DynamicArrayType.elem);
@@ -1160,11 +1161,10 @@ Ast *ast_package_decl(AstFile *f, Token token, Token name, CommentGroup *docs, C
 	return result;
 }
 
-Ast *ast_import_decl(AstFile *f, Token token, bool is_using, Token relpath, Token import_name,
+Ast *ast_import_decl(AstFile *f, Token token, Token relpath, Token import_name,
                      CommentGroup *docs, CommentGroup *comment) {
 	Ast *result = alloc_ast_node(f, Ast_ImportDecl);
 	result->ImportDecl.token       = token;
-	result->ImportDecl.is_using    = is_using;
 	result->ImportDecl.relpath     = relpath;
 	result->ImportDecl.import_name = import_name;
 	result->ImportDecl.docs        = docs;
@@ -1428,6 +1428,7 @@ Token expect_operator(AstFile *f) {
 		             LIT(p));
 	}
 	if (f->curr_token.kind == Token_Ellipsis) {
+		syntax_warning(f->curr_token, "'..' for ranges has now be deprecated, prefer '..='");
 		f->tokens[f->curr_token_index].flags |= TokenFlag_Replace;
 	}
 	
@@ -2128,7 +2129,18 @@ Ast *parse_operand(AstFile *f, bool lhs) {
 		Token name = expect_token(f, Token_Ident);
 		if (name.string == "type") {
 			return ast_helper_type(f, token, parse_type(f));
-		} else if (name.string == "soa" || name.string == "simd") {
+		} else if ( name.string == "simd") {
+			Ast *tag = ast_basic_directive(f, token, name);
+			Ast *original_type = parse_type(f);
+			Ast *type = unparen_expr(original_type);
+			switch (type->kind) {
+			case Ast_ArrayType: type->ArrayType.tag = tag; break;
+			default:
+				syntax_error(type, "Expected a fixed array type after #%.*s, got %.*s", LIT(name.string), LIT(ast_strings[type->kind]));
+				break;
+			}
+			return original_type;
+		} else if (name.string == "soa") {
 			Ast *tag = ast_basic_directive(f, token, name);
 			Ast *original_type = parse_type(f);
 			Ast *type = unparen_expr(original_type);
@@ -2530,6 +2542,7 @@ Ast *parse_operand(AstFile *f, bool lhs) {
 
 		if (maybe) {
 			union_kind = UnionType_maybe;
+			syntax_error(f->curr_token, "#maybe functionality has now been merged with standard 'union' functionality");
 		} else if (no_nil) {
 			union_kind = UnionType_no_nil;
 		} else if (shared_nil) {
@@ -4044,7 +4057,7 @@ Ast *parse_if_stmt(AstFile *f) {
 		if (build_context.disallow_do) {
 			syntax_error(body, "'do' has been disallowed");
 		} else if (!ast_on_same_line(cond, body)) {
-			syntax_error(body, "The body of a 'do' be on the same line as if condition");
+			syntax_error(body, "The body of a 'do' must be on the same line as if condition");
 		}
 	} else {
 		body = parse_block_stmt(f, false);
@@ -4066,7 +4079,7 @@ Ast *parse_if_stmt(AstFile *f) {
 			if (build_context.disallow_do) {
 				syntax_error(else_stmt, "'do' has been disallowed");
 			} else if (!ast_on_same_line(else_token, else_stmt)) {
-				syntax_error(else_stmt, "The body of a 'do' be on the same line as 'else'");
+				syntax_error(else_stmt, "The body of a 'do' must be on the same line as 'else'");
 			}
 		} break;
 		default:
@@ -4101,7 +4114,7 @@ Ast *parse_when_stmt(AstFile *f) {
 		if (build_context.disallow_do) {
 			syntax_error(body, "'do' has been disallowed");
 		} else if (!ast_on_same_line(cond, body)) {
-			syntax_error(body, "The body of a 'do' be on the same line as when statement");
+			syntax_error(body, "The body of a 'do' must be on the same line as when statement");
 		}
 	} else {
 		body = parse_block_stmt(f, true);
@@ -4123,7 +4136,7 @@ Ast *parse_when_stmt(AstFile *f) {
 			if (build_context.disallow_do) {
 				syntax_error(else_stmt, "'do' has been disallowed");
 			} else if (!ast_on_same_line(else_token, else_stmt)) {
-				syntax_error(else_stmt, "The body of a 'do' be on the same line as 'else'");
+				syntax_error(else_stmt, "The body of a 'do' must be on the same line as 'else'");
 			}
 		} break;
 		default:
@@ -4198,7 +4211,7 @@ Ast *parse_for_stmt(AstFile *f) {
 				if (build_context.disallow_do) {
 					syntax_error(body, "'do' has been disallowed");
 				} else if (!ast_on_same_line(token, body)) {
-					syntax_error(body, "The body of a 'do' be on the same line as the 'for' token");
+					syntax_error(body, "The body of a 'do' must be on the same line as the 'for' token");
 				}
 			} else {
 				body = parse_block_stmt(f, false);
@@ -4244,7 +4257,7 @@ Ast *parse_for_stmt(AstFile *f) {
 		if (build_context.disallow_do) {
 			syntax_error(body, "'do' has been disallowed");
 		} else if (!ast_on_same_line(token, body)) {
-			syntax_error(body, "The body of a 'do' be on the same line as the 'for' token");
+			syntax_error(body, "The body of a 'do' must be on the same line as the 'for' token");
 		}
 	} else {
 		body = parse_block_stmt(f, false);
@@ -4382,7 +4395,6 @@ Ast *parse_import_decl(AstFile *f, ImportDeclKind kind) {
 	CommentGroup *docs = f->lead_comment;
 	Token token = expect_token(f, Token_import);
 	Token import_name = {};
-	bool is_using = kind != ImportDecl_Standard;
 
 	switch (f->curr_token.kind) {
 	case Token_Ident:
@@ -4393,22 +4405,18 @@ Ast *parse_import_decl(AstFile *f, ImportDeclKind kind) {
 		break;
 	}
 
-	if (!is_using && is_blank_ident(import_name)) {
-		syntax_error(import_name, "Illegal import name: '_'");
-	}
-
 	Token file_path = expect_token_after(f, Token_String, "import");
 
 	Ast *s = nullptr;
 	if (f->curr_proc != nullptr) {
-		syntax_error(import_name, "You cannot use 'import' within a procedure. This must be done at the file scope");
+		syntax_error(import_name, "Cannot use 'import' within a procedure. This must be done at the file scope");
 		s = ast_bad_decl(f, import_name, file_path);
 	} else {
-		s = ast_import_decl(f, token, is_using, file_path, import_name, docs, f->line_comment);
+		s = ast_import_decl(f, token, file_path, import_name, docs, f->line_comment);
 		array_add(&f->imports, s);
 	}
 
-	if (is_using) {
+	if (kind != ImportDecl_Standard) {
 		syntax_error(import_name, "'using import' is not allowed, please use the import name explicitly");
 	}
 
@@ -4575,7 +4583,7 @@ Ast *parse_unrolled_for_loop(AstFile *f, Token unroll_token) {
 		if (build_context.disallow_do) {
 			syntax_error(body, "'do' has been disallowed");
 		} else if (!ast_on_same_line(for_token, body)) {
-			syntax_error(body, "The body of a 'do' be on the same line as the 'for' token");
+			syntax_error(body, "The body of a 'do' must be on the same line as the 'for' token");
 		}
 	} else {
 		body = parse_block_stmt(f, false);

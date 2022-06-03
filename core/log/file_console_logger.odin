@@ -67,7 +67,7 @@ file_console_logger_proc :: proc(logger_data: rawptr, level: Level, text: string
 		h = data.file_handle
 	}
 	backing: [1024]byte //NOTE(Hoej): 1024 might be too much for a header backing, unless somebody has really long paths.
-	buf := strings.builder_from_slice(backing[:])
+	buf := strings.builder_from_bytes(backing[:])
 
 	do_level_header(options, level, &buf)
 

@@ -68,7 +68,7 @@ temp_full_path :: proc(name: string) -> (path: string, err: os.Errno) {
 			return "", os.Errno(win32.GetLastError())
 		}
 		if n <= u32(len(buf)) {
-			return win32.utf16_to_utf8(buf[:n], ta), os.ERROR_NONE
+			return win32.utf16_to_utf8(buf[:n], ta) or_else "", os.ERROR_NONE
 		}
 		resize(&buf, len(buf)*2)
 	}
@@ -88,7 +88,7 @@ abs :: proc(path: string, allocator := context.allocator) -> (string, bool) {
 }
 
 
-join :: proc(elems: ..string, allocator := context.allocator) -> string {
+join :: proc(elems: []string, allocator := context.allocator) -> string {
 	for e, i in elems {
 		if e != "" {
 			return join_non_empty(elems[i:], allocator)

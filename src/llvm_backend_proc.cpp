@@ -139,33 +139,51 @@ lbProcedure *lb_create_procedure(lbModule *m, Entity *entity, bool ignore_body) 
 		lb_add_attribute_to_proc(m, p->value, "noredzone");
 	}
 
-	switch (p->inlining) {
-	case ProcInlining_inline:
-		lb_add_attribute_to_proc(m, p->value, "alwaysinline");
-		break;
-	case ProcInlining_no_inline:
+	if (build_context.optimization_level == 0 && build_context.ODIN_DEBUG) {
 		lb_add_attribute_to_proc(m, p->value, "noinline");
-		break;
+		lb_add_attribute_to_proc(m, p->value, "optnone");
+	} else {
+		switch (p->inlining) {
+		case ProcInlining_inline:
+			lb_add_attribute_to_proc(m, p->value, "alwaysinline");
+			break;
+		case ProcInlining_no_inline:
+			lb_add_attribute_to_proc(m, p->value, "noinline");
+			break;
+		}
+
+		switch (entity->Procedure.optimization_mode) {
+		case ProcedureOptimizationMode_None:
+			lb_add_attribute_to_proc(m, p->value, "optnone");
+			break;
+		case ProcedureOptimizationMode_Minimal:
+			lb_add_attribute_to_proc(m, p->value, "optnone");
+			break;
+		case ProcedureOptimizationMode_Size:
+			lb_add_attribute_to_proc(m, p->value, "optsize");
+			break;
+		case ProcedureOptimizationMode_Speed:
+			// TODO(bill): handle this correctly
+			lb_add_attribute_to_proc(m, p->value, "optsize");
+			break;
+		}
+	}
+
+	if (!entity->Procedure.target_feature_disabled &&
+	    entity->Procedure.target_feature.len != 0) {
+	    	auto features = split_by_comma(entity->Procedure.target_feature);
+		for_array(i, features) {
+			String feature = features[i];
+			LLVMAttributeRef ref = LLVMCreateStringAttribute(
+				m->ctx,
+				cast(char const *)feature.text, cast(unsigned)feature.len,
+				"", 0);
+			LLVMAddAttributeAtIndex(p->value, LLVMAttributeIndex_FunctionIndex, ref);
+		}
 	}
 
 	if (entity->flags & EntityFlag_Cold) {
 		lb_add_attribute_to_proc(m, p->value, "cold");
-	}
-
-	switch (entity->Procedure.optimization_mode) {
-	case ProcedureOptimizationMode_None:
-		lb_add_attribute_to_proc(m, p->value, "optnone");
-		break;
-	case ProcedureOptimizationMode_Minimal:
-		lb_add_attribute_to_proc(m, p->value, "optnone");
-		break;
-	case ProcedureOptimizationMode_Size:
-		lb_add_attribute_to_proc(m, p->value, "optsize");
-		break;
-	case ProcedureOptimizationMode_Speed:
-		// TODO(bill): handle this correctly
-		lb_add_attribute_to_proc(m, p->value, "optsize");
-		break;
 	}
 
 	lbValue proc_value = {p->value, p->type};
@@ -976,9 +994,465 @@ lbValue lb_emit_call(lbProcedure *p, lbValue value, Array<lbValue> const &args, 
 	return result;
 }
 
+LLVMValueRef llvm_splat_float(i64 count, LLVMTypeRef type, f64 value) {
+	LLVMValueRef v = LLVMConstReal(type, value);
+	LLVMValueRef *values = gb_alloc_array(temporary_allocator(), LLVMValueRef, count);
+	for (i64 i = 0; i < count; i++) {
+		values[i] = v;
+	}
+	return LLVMConstVector(values, cast(unsigned)count);
+}
+LLVMValueRef llvm_splat_int(i64 count, LLVMTypeRef type, i64 value, bool is_signed=false) {
+	LLVMValueRef v = LLVMConstInt(type, value, is_signed);
+	LLVMValueRef *values = gb_alloc_array(temporary_allocator(), LLVMValueRef, count);
+	for (i64 i = 0; i < count; i++) {
+		values[i] = v;
+	}
+	return LLVMConstVector(values, cast(unsigned)count);
+}
+
+
+lbValue lb_build_builtin_simd_proc(lbProcedure *p, Ast *expr, TypeAndValue const &tv, BuiltinProcId builtin_id) {
+	ast_node(ce, CallExpr, expr);
+
+	lbModule *m = p->module;
+
+	lbValue res = {};
+	res.type = tv.type;
+
+	lbValue arg0 = {}; if (ce->args.count > 0) arg0 = lb_build_expr(p, ce->args[0]);
+	lbValue arg1 = {}; if (ce->args.count > 1) arg1 = lb_build_expr(p, ce->args[1]);
+	lbValue arg2 = {}; if (ce->args.count > 2) arg2 = lb_build_expr(p, ce->args[2]);
+
+	Type *elem = base_array_type(arg0.type);
+
+	bool is_float = is_type_float(elem);
+	bool is_signed = !is_type_unsigned(elem);
+
+	LLVMOpcode op_code = cast(LLVMOpcode)0;
+
+	switch (builtin_id) {
+	case BuiltinProc_simd_add:
+	case BuiltinProc_simd_sub:
+	case BuiltinProc_simd_mul:
+	case BuiltinProc_simd_div:
+	case BuiltinProc_simd_rem:
+		if (is_float) {
+			switch (builtin_id) {
+			case BuiltinProc_simd_add: op_code = LLVMFAdd; break;
+			case BuiltinProc_simd_sub: op_code = LLVMFSub; break;
+			case BuiltinProc_simd_mul: op_code = LLVMFMul; break;
+			case BuiltinProc_simd_div: op_code = LLVMFDiv; break;
+			}
+		} else {
+			switch (builtin_id) {
+			case BuiltinProc_simd_add: op_code = LLVMAdd; break;
+			case BuiltinProc_simd_sub: op_code = LLVMSub; break;
+			case BuiltinProc_simd_mul: op_code = LLVMMul; break;
+			case BuiltinProc_simd_div:
+				if (is_signed) {
+					op_code = LLVMSDiv;
+				} else {
+					op_code = LLVMUDiv;
+				}
+				break;
+			case BuiltinProc_simd_rem:
+				if (is_signed) {
+					op_code = LLVMSRem;
+				} else {
+					op_code = LLVMURem;
+				}
+				break;
+			}
+		}
+		if (op_code) {
+			res.value = LLVMBuildBinOp(p->builder, op_code, arg0.value, arg1.value, "");
+			return res;
+		}
+		break;
+	case BuiltinProc_simd_shl: // Odin logic
+	case BuiltinProc_simd_shr: // Odin logic
+	case BuiltinProc_simd_shl_masked: // C logic
+	case BuiltinProc_simd_shr_masked: // C logic
+		{
+			i64 sz = type_size_of(elem);
+			GB_ASSERT(arg0.type->kind == Type_SimdVector);
+
+			i64 count = arg0.type->SimdVector.count;
+			Type *elem1 = base_array_type(arg1.type);
+
+			bool is_masked = false;
+			switch (builtin_id) {
+			case BuiltinProc_simd_shl:        op_code = LLVMShl;                         is_masked = false; break;
+			case BuiltinProc_simd_shr:        op_code = is_signed ? LLVMAShr : LLVMLShr; is_masked = false; break;
+			case BuiltinProc_simd_shl_masked: op_code = LLVMShl;                         is_masked = true;  break;
+			case BuiltinProc_simd_shr_masked: op_code = is_signed ? LLVMAShr : LLVMLShr; is_masked = true;  break;
+			}
+			if (op_code) {
+				LLVMValueRef bits = llvm_splat_int(count, lb_type(m, elem1), sz*8 - 1);
+				if (is_masked) {
+					// C logic
+					LLVMValueRef shift = LLVMBuildAnd(p->builder, arg1.value, bits, "");
+					res.value = LLVMBuildBinOp(p->builder, op_code, arg0.value, shift, "");
+				} else {
+					// Odin logic
+					LLVMValueRef zero = lb_const_nil(m, arg1.type).value;
+					LLVMValueRef mask = LLVMBuildICmp(p->builder, LLVMIntULE, arg1.value, bits, "");
+					LLVMValueRef shift = LLVMBuildBinOp(p->builder, op_code, arg0.value, arg1.value, "");
+					res.value = LLVMBuildSelect(p->builder, mask, shift, zero, "");
+				}
+				return res;
+			}
+		}
+		break;
+	case BuiltinProc_simd_and:
+	case BuiltinProc_simd_or:
+	case BuiltinProc_simd_xor:
+	case BuiltinProc_simd_and_not:
+		switch (builtin_id) {
+		case BuiltinProc_simd_and: op_code = LLVMAnd; break;
+		case BuiltinProc_simd_or:  op_code = LLVMOr;  break;
+		case BuiltinProc_simd_xor: op_code = LLVMXor; break;
+		case BuiltinProc_simd_and_not:
+			op_code = LLVMAnd;
+			arg1.value = LLVMBuildNot(p->builder, arg1.value, "");
+			break;
+		}
+		if (op_code) {
+			res.value = LLVMBuildBinOp(p->builder, op_code, arg0.value, arg1.value, "");
+			return res;
+		}
+		break;
+	case BuiltinProc_simd_neg:
+		if (is_float) {
+			res.value = LLVMBuildFNeg(p->builder, arg0.value, "");
+		} else {
+			res.value = LLVMBuildNeg(p->builder, arg0.value, "");
+		}
+		return res;
+	case BuiltinProc_simd_abs:
+		if (is_float) {
+			LLVMValueRef pos = arg0.value;
+			LLVMValueRef neg = LLVMBuildFNeg(p->builder, pos, "");
+			LLVMValueRef cond = LLVMBuildFCmp(p->builder, LLVMRealOGT, pos, neg, "");
+			res.value = LLVMBuildSelect(p->builder, cond, pos, neg, "");
+		} else {
+			LLVMValueRef pos = arg0.value;
+			LLVMValueRef neg = LLVMBuildNeg(p->builder, pos, "");
+			LLVMValueRef cond = LLVMBuildICmp(p->builder, is_signed ? LLVMIntSGT : LLVMIntUGT, pos, neg, "");
+			res.value = LLVMBuildSelect(p->builder, cond, pos, neg, "");
+		}
+		return res;
+	case BuiltinProc_simd_min:
+		if (is_float) {
+			LLVMValueRef cond = LLVMBuildFCmp(p->builder, LLVMRealOLT, arg0.value, arg1.value, "");
+			res.value = LLVMBuildSelect(p->builder, cond, arg0.value, arg1.value, "");
+		} else {
+			LLVMValueRef cond = LLVMBuildICmp(p->builder, is_signed ? LLVMIntSLT : LLVMIntULT, arg0.value, arg1.value, "");
+			res.value = LLVMBuildSelect(p->builder, cond, arg0.value, arg1.value, "");
+		}
+		return res;
+	case BuiltinProc_simd_max:
+		if (is_float) {
+			LLVMValueRef cond = LLVMBuildFCmp(p->builder, LLVMRealOGT, arg0.value, arg1.value, "");
+			res.value = LLVMBuildSelect(p->builder, cond, arg0.value, arg1.value, "");
+		} else {
+			LLVMValueRef cond = LLVMBuildICmp(p->builder, is_signed ? LLVMIntSGT : LLVMIntUGT, arg0.value, arg1.value, "");
+			res.value = LLVMBuildSelect(p->builder, cond, arg0.value, arg1.value, "");
+		}
+		return res;
+	case BuiltinProc_simd_lanes_eq:
+	case BuiltinProc_simd_lanes_ne:
+	case BuiltinProc_simd_lanes_lt:
+	case BuiltinProc_simd_lanes_le:
+	case BuiltinProc_simd_lanes_gt:
+	case BuiltinProc_simd_lanes_ge:
+		if (is_float) {
+			LLVMRealPredicate pred = cast(LLVMRealPredicate)0;
+			switch (builtin_id) {
+			case BuiltinProc_simd_lanes_eq: pred = LLVMRealOEQ; break;
+			case BuiltinProc_simd_lanes_ne: pred = LLVMRealONE; break;
+			case BuiltinProc_simd_lanes_lt: pred = LLVMRealOLT; break;
+			case BuiltinProc_simd_lanes_le: pred = LLVMRealOLE; break;
+			case BuiltinProc_simd_lanes_gt: pred = LLVMRealOGT; break;
+			case BuiltinProc_simd_lanes_ge: pred = LLVMRealOGE; break;
+			}
+			if (pred) {
+				res.value = LLVMBuildFCmp(p->builder, pred, arg0.value, arg1.value, "");
+				res.value = LLVMBuildSExtOrBitCast(p->builder, res.value, lb_type(m, tv.type), "");
+				return res;
+			}
+		} else {
+			LLVMIntPredicate pred = cast(LLVMIntPredicate)0;
+			switch (builtin_id) {
+			case BuiltinProc_simd_lanes_eq: pred = LLVMIntEQ; break;
+			case BuiltinProc_simd_lanes_ne: pred = LLVMIntNE; break;
+			case BuiltinProc_simd_lanes_lt: pred = is_signed ? LLVMIntSLT :LLVMIntULT; break;
+			case BuiltinProc_simd_lanes_le: pred = is_signed ? LLVMIntSLE :LLVMIntULE; break;
+			case BuiltinProc_simd_lanes_gt: pred = is_signed ? LLVMIntSGT :LLVMIntUGT; break;
+			case BuiltinProc_simd_lanes_ge: pred = is_signed ? LLVMIntSGE :LLVMIntUGE; break;
+			}
+			if (pred) {
+				res.value = LLVMBuildICmp(p->builder, pred, arg0.value, arg1.value, "");
+				res.value = LLVMBuildSExtOrBitCast(p->builder, res.value, lb_type(m, tv.type), "");
+				return res;
+			}
+		}
+		break;
+
+	case BuiltinProc_simd_extract:
+		res.value = LLVMBuildExtractElement(p->builder, arg0.value, arg1.value, "");
+		return res;
+	case BuiltinProc_simd_replace:
+		res.value = LLVMBuildInsertElement(p->builder, arg0.value, arg2.value, arg1.value, "");
+		return res;
+
+	case BuiltinProc_simd_reduce_add_ordered:
+	case BuiltinProc_simd_reduce_mul_ordered:
+		{
+			LLVMTypeRef llvm_elem = lb_type(m, elem);
+			LLVMValueRef args[2] = {};
+			isize args_count = 0;
+
+			char const *name = nullptr;
+			switch (builtin_id) {
+			case BuiltinProc_simd_reduce_add_ordered:
+				if (is_float) {
+					name = "llvm.vector.reduce.fadd";
+					args[args_count++] = LLVMConstReal(llvm_elem, 0.0);
+				} else {
+					name = "llvm.vector.reduce.add";
+				}
+				break;
+			case BuiltinProc_simd_reduce_mul_ordered:
+				if (is_float) {
+					name = "llvm.vector.reduce.fmul";
+					args[args_count++] = LLVMConstReal(llvm_elem, 1.0);
+				} else {
+					name = "llvm.vector.reduce.mul";
+				}
+				break;
+			}
+			args[args_count++] = arg0.value;
+
+
+			LLVMTypeRef types[1] = {lb_type(p->module, arg0.type)};
+			unsigned id = LLVMLookupIntrinsicID(name, gb_strlen(name));
+			GB_ASSERT_MSG(id != 0, "Unable to find %s.%s", name, LLVMPrintTypeToString(types[0]));
+			LLVMValueRef ip = LLVMGetIntrinsicDeclaration(p->module->mod, id, types, gb_count_of(types));
+
+			res.value = LLVMBuildCall(p->builder, ip, args, cast(unsigned)args_count, "");
+			return res;
+		}
+	case BuiltinProc_simd_reduce_min:
+	case BuiltinProc_simd_reduce_max:
+	case BuiltinProc_simd_reduce_and:
+	case BuiltinProc_simd_reduce_or:
+	case BuiltinProc_simd_reduce_xor:
+		{
+			char const *name = nullptr;
+			switch (builtin_id) {
+			case BuiltinProc_simd_reduce_min:
+				if (is_float) {
+					name = "llvm.vector.reduce.fmin";
+				} else if (is_signed) {
+					name = "llvm.vector.reduce.smin";
+				} else {
+					name = "llvm.vector.reduce.umin";
+				}
+				break;
+			case BuiltinProc_simd_reduce_max:
+				if (is_float) {
+					name = "llvm.vector.reduce.fmax";
+				} else if (is_signed) {
+					name = "llvm.vector.reduce.smax";
+				} else {
+					name = "llvm.vector.reduce.umax";
+				}
+				break;
+			case BuiltinProc_simd_reduce_and: name = "llvm.vector.reduce.and"; break;
+			case BuiltinProc_simd_reduce_or:  name = "llvm.vector.reduce.or";  break;
+			case BuiltinProc_simd_reduce_xor: name = "llvm.vector.reduce.xor"; break;
+			}
+			LLVMTypeRef types[1] = {lb_type(p->module, arg0.type)};
+			unsigned id = LLVMLookupIntrinsicID(name, gb_strlen(name));
+			GB_ASSERT_MSG(id != 0, "Unable to find %s.%s", name, LLVMPrintTypeToString(types[0]));
+			LLVMValueRef ip = LLVMGetIntrinsicDeclaration(p->module->mod, id, types, gb_count_of(types));
+
+			LLVMValueRef args[1] = {};
+			args[0] = arg0.value;
+
+			res.value = LLVMBuildCall(p->builder, ip, args, gb_count_of(args), "");
+			return res;
+		}
+
+	case BuiltinProc_simd_shuffle:
+		{
+			Type *vt = arg0.type;
+			GB_ASSERT(vt->kind == Type_SimdVector);
+
+			i64 indices_count = ce->args.count-2;
+			i64 max_count = vt->SimdVector.count*2;
+			GB_ASSERT(indices_count <= max_count);
+
+			LLVMValueRef *values = gb_alloc_array(temporary_allocator(), LLVMValueRef, indices_count);
+			for (isize i = 0; i < indices_count; i++) {
+				lbValue idx = lb_build_expr(p, ce->args[i+2]);
+				GB_ASSERT(LLVMIsConstant(idx.value));
+				values[i] = idx.value;
+			}
+			LLVMValueRef indices = LLVMConstVector(values, cast(unsigned)indices_count);
+
+			res.value = LLVMBuildShuffleVector(p->builder, arg0.value, arg1.value, indices, "");
+			return res;
+		}
+
+	case BuiltinProc_simd_select:
+		{
+			LLVMValueRef cond = arg0.value;
+			LLVMValueRef x = lb_build_expr(p, ce->args[1]).value;
+			LLVMValueRef y = lb_build_expr(p, ce->args[2]).value;
+
+			cond = LLVMBuildICmp(p->builder, LLVMIntNE, cond, LLVMConstNull(LLVMTypeOf(cond)), "");
+			res.value = LLVMBuildSelect(p->builder, cond, x, y, "");
+			return res;
+		}
+
+	case BuiltinProc_simd_ceil:
+	case BuiltinProc_simd_floor:
+	case BuiltinProc_simd_trunc:
+	case BuiltinProc_simd_nearest:
+		{
+			char const *name = nullptr;
+			switch (builtin_id) {
+			case BuiltinProc_simd_ceil:    name = "llvm.ceil"; break;
+			case BuiltinProc_simd_floor:   name = "llvm.floor"; break;
+			case BuiltinProc_simd_trunc:   name = "llvm.trunc"; break;
+			case BuiltinProc_simd_nearest: name = "llvm.nearbyint"; break;
+			}
+
+			LLVMTypeRef types[1] = {lb_type(p->module, arg0.type)};
+			unsigned id = LLVMLookupIntrinsicID(name, gb_strlen(name));
+			GB_ASSERT_MSG(id != 0, "Unable to find %s.%s", name, LLVMPrintTypeToString(types[0]));
+			LLVMValueRef ip = LLVMGetIntrinsicDeclaration(p->module->mod, id, types, gb_count_of(types));
+
+			LLVMValueRef args[1] = {};
+			args[0] = arg0.value;
+
+			res.value = LLVMBuildCall(p->builder, ip, args, gb_count_of(args), "");
+			return res;
+		}
+
+	case BuiltinProc_simd_lanes_reverse:
+		{
+			i64 count = get_array_type_count(arg0.type);
+			LLVMValueRef *values = gb_alloc_array(temporary_allocator(), LLVMValueRef, count);
+			LLVMTypeRef llvm_u32 = lb_type(m, t_u32);
+			for (i64 i = 0; i < count; i++) {
+				values[i] = LLVMConstInt(llvm_u32, count-1-i, false);
+			}
+			LLVMValueRef mask = LLVMConstVector(values, cast(unsigned)count);
+
+			LLVMValueRef v = arg0.value;
+			res.value = LLVMBuildShuffleVector(p->builder, v, v, mask, "");
+			return res;
+		}
+
+	case BuiltinProc_simd_lanes_rotate_left:
+	case BuiltinProc_simd_lanes_rotate_right:
+		{
+
+			i64 count = get_array_type_count(arg0.type);
+			GB_ASSERT(is_power_of_two(count));
+			BigInt bi_count = {};
+			big_int_from_i64(&bi_count, count);
+
+			TypeAndValue const &tv = ce->args[1]->tav;
+			ExactValue val = exact_value_to_integer(tv.value);
+			GB_ASSERT(val.kind == ExactValue_Integer);
+			BigInt *bi = &val.value_integer;
+			if (builtin_id == BuiltinProc_simd_lanes_rotate_right) {
+				big_int_neg(bi, bi);
+			}
+			big_int_rem(bi, bi, &bi_count);
+			big_int_dealloc(&bi_count);
+
+			i64 left = big_int_to_i64(bi);
+
+			LLVMValueRef *values = gb_alloc_array(temporary_allocator(), LLVMValueRef, count);
+			LLVMTypeRef llvm_u32 = lb_type(m, t_u32);
+			for (i64 i = 0; i < count; i++) {
+				u64 idx = cast(u64)(i+left) & cast(u64)(count-1);
+				values[i] = LLVMConstInt(llvm_u32, idx, false);
+			}
+			LLVMValueRef mask = LLVMConstVector(values, cast(unsigned)count);
+
+			LLVMValueRef v = arg0.value;
+			res.value = LLVMBuildShuffleVector(p->builder, v, v, mask, "");
+			return res;
+		}
+
+
+	case BuiltinProc_simd_add_sat:
+	case BuiltinProc_simd_sub_sat:
+		{
+			char const *name = nullptr;
+			switch (builtin_id) {
+			case BuiltinProc_simd_add_sat: name = is_signed ? "llvm.sadd.sat" : "llvm.uadd.sat"; break;
+			case BuiltinProc_simd_sub_sat: name = is_signed ? "llvm.ssub.sat" : "llvm.usub.sat"; break;
+			}
+
+			LLVMTypeRef types[1] = {lb_type(p->module, arg0.type)};
+			unsigned id = LLVMLookupIntrinsicID(name, gb_strlen(name));
+			GB_ASSERT_MSG(id != 0, "Unable to find %s.%s", name, LLVMPrintTypeToString(types[0]));
+			LLVMValueRef ip = LLVMGetIntrinsicDeclaration(p->module->mod, id, types, gb_count_of(types));
+
+			LLVMValueRef args[2] = {};
+			args[0] = arg0.value;
+			args[1] = arg1.value;
+
+			res.value = LLVMBuildCall(p->builder, ip, args, gb_count_of(args), "");
+			return res;
+		}
+
+	case BuiltinProc_simd_clamp:
+		{
+			LLVMValueRef v = arg0.value;
+			LLVMValueRef min = arg1.value;
+			LLVMValueRef max = arg2.value;
+
+			if (is_float) {
+				v = LLVMBuildSelect(p->builder, LLVMBuildFCmp(p->builder, LLVMRealOLT, v, min, ""), min, v, "");
+				res.value = LLVMBuildSelect(p->builder, LLVMBuildFCmp(p->builder, LLVMRealOGT, v, max, ""), max, v, "");
+			} else if (is_signed) {
+				v = LLVMBuildSelect(p->builder, LLVMBuildICmp(p->builder, LLVMIntSLT, v, min, ""), min, v, "");
+				res.value = LLVMBuildSelect(p->builder, LLVMBuildICmp(p->builder, LLVMIntSGT, v, max, ""), max, v, "");
+			} else {
+				v = LLVMBuildSelect(p->builder, LLVMBuildICmp(p->builder, LLVMIntULT, v, min, ""), min, v, "");
+				res.value = LLVMBuildSelect(p->builder, LLVMBuildICmp(p->builder, LLVMIntUGT, v, max, ""), max, v, "");
+			}
+			return res;
+		}
+
+	case BuiltinProc_simd_to_bits:
+		{
+			res.value = LLVMBuildBitCast(p->builder, arg0.value, lb_type(m, tv.type), "");
+			return res;
+		}
+
+	}
+	GB_PANIC("Unhandled simd intrinsic: '%.*s'", LIT(builtin_procs[builtin_id].name));
+
+	return {};
+}
+
 
 lbValue lb_build_builtin_proc(lbProcedure *p, Ast *expr, TypeAndValue const &tv, BuiltinProcId id) {
 	ast_node(ce, CallExpr, expr);
+
+	if (BuiltinProc__simd_begin < id && id < BuiltinProc__simd_end) {
+		return lb_build_builtin_simd_proc(p, expr, tv, id);
+	}
 
 	switch (id) {
 	case BuiltinProc_DIRECTIVE: {
@@ -1527,6 +2001,31 @@ lbValue lb_build_builtin_proc(lbProcedure *p, Ast *expr, TypeAndValue const &tv,
 			return res;
 		}
 
+	case BuiltinProc_fused_mul_add:
+		{
+			Type *type = tv.type;
+			lbValue x = lb_emit_conv(p, lb_build_expr(p, ce->args[0]), type);
+			lbValue y = lb_emit_conv(p, lb_build_expr(p, ce->args[1]), type);
+			lbValue z = lb_emit_conv(p, lb_build_expr(p, ce->args[2]), type);
+
+
+			char const *name = "llvm.fma";
+			LLVMTypeRef types[1] = {lb_type(p->module, type)};
+			unsigned id = LLVMLookupIntrinsicID(name, gb_strlen(name));
+			GB_ASSERT_MSG(id != 0, "Unable to find %s.%s", name, LLVMPrintTypeToString(types[0]));
+			LLVMValueRef ip = LLVMGetIntrinsicDeclaration(p->module->mod, id, types, gb_count_of(types));
+
+			LLVMValueRef args[3] = {};
+			args[0] = x.value;
+			args[1] = y.value;
+			args[2] = z.value;
+
+			lbValue res = {};
+			res.value = LLVMBuildCall(p->builder, ip, args, gb_count_of(args), "");
+			res.type = type;
+			return res;
+		}
+
 	case BuiltinProc_mem_copy:
 		{
 			lbValue dst = lb_build_expr(p, ce->args[0]);
@@ -1609,6 +2108,7 @@ lbValue lb_build_builtin_proc(lbProcedure *p, Ast *expr, TypeAndValue const &tv,
 		return {};
 
 	case BuiltinProc_volatile_store:
+	case BuiltinProc_non_temporal_store:
 	case BuiltinProc_atomic_store:
 	case BuiltinProc_atomic_store_explicit: {
 		lbValue dst = lb_build_expr(p, ce->args[0]);
@@ -1617,6 +2117,13 @@ lbValue lb_build_builtin_proc(lbProcedure *p, Ast *expr, TypeAndValue const &tv,
 
 		LLVMValueRef instr = LLVMBuildStore(p->builder, val.value, dst.value);
 		switch (id) {
+		case BuiltinProc_non_temporal_store:
+			{
+				unsigned kind_id = LLVMGetMDKindIDInContext(p->module->ctx, "nontemporal", 11);
+				LLVMMetadataRef node = LLVMValueAsMetadata(LLVMConstInt(lb_type(p->module, t_u32), 1, false));
+				LLVMSetMetadata(instr, kind_id, LLVMMetadataAsValue(p->module->ctx, node));
+			}
+			break;
 		case BuiltinProc_volatile_store:        LLVMSetVolatile(instr, true);                                        break;
 		case BuiltinProc_atomic_store:          LLVMSetOrdering(instr, LLVMAtomicOrderingSequentiallyConsistent);    break;
 		case BuiltinProc_atomic_store_explicit: LLVMSetOrdering(instr, llvm_atomic_ordering_from_odin(ce->args[2])); break;
@@ -1628,12 +2135,21 @@ lbValue lb_build_builtin_proc(lbProcedure *p, Ast *expr, TypeAndValue const &tv,
 	}
 
 	case BuiltinProc_volatile_load:
+	case BuiltinProc_non_temporal_load:
 	case BuiltinProc_atomic_load:
 	case BuiltinProc_atomic_load_explicit: {
 		lbValue dst = lb_build_expr(p, ce->args[0]);
 
 		LLVMValueRef instr = LLVMBuildLoad(p->builder, dst.value, "");
 		switch (id) {
+		case BuiltinProc_non_temporal_load:
+			{
+				unsigned kind_id = LLVMGetMDKindIDInContext(p->module->ctx, "nontemporal", 11);
+				LLVMMetadataRef node = LLVMValueAsMetadata(LLVMConstInt(lb_type(p->module, t_u32), 1, false));
+				LLVMSetMetadata(instr, kind_id, LLVMMetadataAsValue(p->module->ctx, node));
+			}
+			break;
+			break;
 		case BuiltinProc_volatile_load:        LLVMSetVolatile(instr, true);                                        break;
 		case BuiltinProc_atomic_load:          LLVMSetOrdering(instr, LLVMAtomicOrderingSequentiallyConsistent);    break;
 		case BuiltinProc_atomic_load_explicit: LLVMSetOrdering(instr, llvm_atomic_ordering_from_odin(ce->args[1])); break;
@@ -2182,6 +2698,92 @@ lbValue lb_build_builtin_proc(lbProcedure *p, Ast *expr, TypeAndValue const &tv,
 			return res;
 		}
 
+	case BuiltinProc_wasm_memory_atomic_wait32:
+		{
+			char const *name = "llvm.wasm.memory.atomic.wait32";
+			LLVMTypeRef types[1] = {
+				lb_type(p->module, t_u32),
+			};
+			unsigned id = LLVMLookupIntrinsicID(name, gb_strlen(name));
+			GB_ASSERT_MSG(id != 0, "Unable to find %s", name, LLVMPrintTypeToString(types[0]));
+			LLVMValueRef ip = LLVMGetIntrinsicDeclaration(p->module->mod, id, nullptr, 0); // types, gb_count_of(types));
+
+			Type *t_u32_ptr = alloc_type_pointer(t_u32);
+
+			LLVMValueRef args[3] = {};
+			args[0] = lb_emit_conv(p, lb_build_expr(p, ce->args[0]), t_u32_ptr).value;
+			args[1] = lb_emit_conv(p, lb_build_expr(p, ce->args[1]), t_u32).value;
+			args[2] = lb_emit_conv(p, lb_build_expr(p, ce->args[2]), t_i64).value;
+
+			lbValue res = {};
+			res.type = tv.type;
+			res.value = LLVMBuildCall(p->builder, ip, args, gb_count_of(args), "");
+			return res;
+		}
+
+	case BuiltinProc_wasm_memory_atomic_notify32:
+		{
+			char const *name = "llvm.wasm.memory.atomic.notify";
+			LLVMTypeRef types[1] = {
+				lb_type(p->module, t_u32),
+			};
+			unsigned id = LLVMLookupIntrinsicID(name, gb_strlen(name));
+			GB_ASSERT_MSG(id != 0, "Unable to find %s", name, LLVMPrintTypeToString(types[0]));
+			LLVMValueRef ip = LLVMGetIntrinsicDeclaration(p->module->mod, id, nullptr, 0); // types, gb_count_of(types));
+
+			Type *t_u32_ptr = alloc_type_pointer(t_u32);
+
+			LLVMValueRef args[2] = {};
+			args[0] = lb_emit_conv(p, lb_build_expr(p, ce->args[0]), t_u32_ptr).value;
+			args[1] = lb_emit_conv(p, lb_build_expr(p, ce->args[1]), t_u32).value;
+
+			lbValue res = {};
+			res.type = tv.type;
+			res.value = LLVMBuildCall(p->builder, ip, args, gb_count_of(args), "");
+			return res;
+		}
+
+
+	case BuiltinProc_x86_cpuid:
+		{
+			Type *param_types[2] = {t_u32, t_u32};
+			Type *type = alloc_type_proc_from_types(param_types, gb_count_of(param_types), tv.type, false, ProcCC_None);
+			LLVMTypeRef func_type = LLVMGetElementType(lb_type(p->module, type));
+			LLVMValueRef the_asm = llvm_get_inline_asm(
+				func_type,
+				str_lit("cpuid"),
+				str_lit("={ax},={bx},={cx},={dx},{ax},{cx}"),
+				true
+			);
+			GB_ASSERT(the_asm != nullptr);
+
+			LLVMValueRef args[2] = {};
+			args[0] = lb_emit_conv(p, lb_build_expr(p, ce->args[0]), t_u32).value;
+			args[1] = lb_emit_conv(p, lb_build_expr(p, ce->args[1]), t_u32).value;
+			lbValue res = {};
+			res.type = tv.type;
+			res.value = LLVMBuildCall2(p->builder, func_type, the_asm, args, gb_count_of(args), "");
+			return res;
+		}
+	case BuiltinProc_x86_xgetbv:
+		{
+			Type *type = alloc_type_proc_from_types(&t_u32, 1, tv.type, false, ProcCC_None);
+			LLVMTypeRef func_type = LLVMGetElementType(lb_type(p->module, type));
+			LLVMValueRef the_asm = llvm_get_inline_asm(
+				func_type,
+				str_lit("xgetbv"),
+				str_lit("={ax},={dx},{cx}"),
+				true
+			);
+			GB_ASSERT(the_asm != nullptr);
+
+			LLVMValueRef args[1] = {};
+			args[0] = lb_emit_conv(p, lb_build_expr(p, ce->args[0]), t_u32).value;
+			lbValue res = {};
+			res.type = tv.type;
+			res.value = LLVMBuildCall2(p->builder, func_type, the_asm, args, gb_count_of(args), "");
+			return res;
+		}
 	}
 
 	GB_PANIC("Unhandled built-in procedure %.*s", LIT(builtin_procs[id].name));

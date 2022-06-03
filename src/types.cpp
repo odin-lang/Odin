@@ -261,6 +261,7 @@ struct TypeProc {
 	TYPE_KIND(SimdVector, struct {                            \
 		i64   count;                                      \
 		Type *elem;                                       \
+		Type *generic_count;                              \
 	})                                                        \
 	TYPE_KIND(RelativePointer, struct {                       \
 		Type *pointer_type;                               \
@@ -362,6 +363,9 @@ enum : int {
 	MATRIX_ELEMENT_COUNT_MIN = 1,
 	MATRIX_ELEMENT_COUNT_MAX = 16,
 	MATRIX_ELEMENT_MAX_SIZE = MATRIX_ELEMENT_COUNT_MAX * (2 * 8), // complex128
+
+	SIMD_ELEMENT_COUNT_MIN = 1,
+	SIMD_ELEMENT_COUNT_MAX = 64,
 };
 
 
@@ -1085,10 +1089,11 @@ Type *alloc_type_bit_set() {
 
 
 
-Type *alloc_type_simd_vector(i64 count, Type *elem) {
+Type *alloc_type_simd_vector(i64 count, Type *elem, Type *generic_count=nullptr) {
 	Type *t = alloc_type(Type_SimdVector);
 	t->SimdVector.count = count;
 	t->SimdVector.elem = elem;
+	t->SimdVector.generic_count = generic_count;
 	return t;
 }
 
@@ -1593,6 +1598,8 @@ i64 get_array_type_count(Type *t) {
 		return bt->Array.count;
 	} else if (bt->kind == Type_EnumeratedArray) {
 		return bt->EnumeratedArray.count;
+	} else if (bt->kind == Type_SimdVector) {
+		return bt->SimdVector.count;
 	}
 	GB_ASSERT(is_type_array_like(t));
 	return -1;
@@ -1685,11 +1692,9 @@ bool is_type_map(Type *t) {
 
 bool is_type_union_maybe_pointer(Type *t) {
 	t = base_type(t);
-	if (t->kind == Type_Union && t->Union.kind == UnionType_maybe) {
-		if (t->Union.variants.count == 1) {
-			Type *v = t->Union.variants[0];
-			return is_type_pointer(v) || is_type_multi_pointer(v);
-		}
+	if (t->kind == Type_Union && t->Union.variants.count == 1) {
+		Type *v = t->Union.variants[0];
+		return is_type_internally_pointer_like(v);
 	}
 	return false;
 }
@@ -1697,12 +1702,10 @@ bool is_type_union_maybe_pointer(Type *t) {
 
 bool is_type_union_maybe_pointer_original_alignment(Type *t) {
 	t = base_type(t);
-	if (t->kind == Type_Union && t->Union.kind == UnionType_maybe) {
-		if (t->Union.variants.count == 1) {
-			Type *v = t->Union.variants[0];
-			if (is_type_pointer(v) || is_type_multi_pointer(v)) {
-				return type_align_of(v) == type_align_of(t);
-			}
+	if (t->kind == Type_Union && t->Union.variants.count == 1) {
+		Type *v = t->Union.variants[0];
+		if (is_type_internally_pointer_like(v)) {
+			return type_align_of(v) == type_align_of(t);
 		}
 	}
 	return false;
@@ -1936,9 +1939,12 @@ bool is_type_valid_vector_elem(Type *t) {
 			return false;
 		}
 		if (is_type_integer(t)) {
-			return true;
+			return !is_type_integer_128bit(t);
 		}
 		if (is_type_float(t)) {
+			return true;
+		}
+		if (is_type_boolean(t)) {
 			return true;
 		}
 	}
@@ -2082,6 +2088,11 @@ bool is_type_polymorphic(Type *t, bool or_specialized=false) {
 			return true;
 		}
 		return is_type_polymorphic(t->Array.elem, or_specialized);
+	case Type_SimdVector:
+		if (t->SimdVector.generic_count != nullptr) {
+			return true;
+		}
+		return is_type_polymorphic(t->SimdVector.elem, or_specialized);
 	case Type_DynamicArray:
 		return is_type_polymorphic(t->DynamicArray.elem, or_specialized);
 	case Type_Slice:
@@ -2294,6 +2305,9 @@ bool is_type_comparable(Type *t) {
 				return false;
 			}
 		}
+		return true;
+
+	case Type_SimdVector:
 		return true;
 	}
 	return false;
@@ -3450,7 +3464,7 @@ i64 type_align_of_internal(Type *t, TypePath *path) {
 
 	case Type_SimdVector: {
 		// IMPORTANT TODO(bill): Figure out the alignment of vector types
-		return gb_clamp(next_pow2(type_size_of_internal(t, path)), 1, build_context.max_align);
+		return gb_clamp(next_pow2(type_size_of_internal(t, path)), 1, build_context.max_align*2);
 	}
 	
 	case Type_Matrix: 
@@ -4054,7 +4068,6 @@ gbString write_type_to_string(gbString str, Type *type, bool shorthand=false) {
 	case Type_Union:
 		str = gb_string_appendc(str, "union");
 		switch (type->Union.kind) {
-		case UnionType_maybe:      str = gb_string_appendc(str, " #maybe");      break;
 		case UnionType_no_nil:     str = gb_string_appendc(str, " #no_nil");     break;
 		case UnionType_shared_nil: str = gb_string_appendc(str, " #shared_nil"); break;
 		}

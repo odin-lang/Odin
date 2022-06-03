@@ -18,7 +18,6 @@ import "core:compress/zlib"
 import "core:image"
 
 import "core:os"
-import "core:strings"
 import "core:hash"
 import "core:bytes"
 import "core:io"
@@ -318,13 +317,12 @@ read_header :: proc(ctx: ^$C) -> (image.PNG_IHDR, Error) {
 }
 
 chunk_type_to_name :: proc(type: ^image.PNG_Chunk_Type) -> string {
-	t := transmute(^u8)type
-	return strings.string_from_ptr(t, 4)
+	return string(([^]u8)(type)[:4])
 }
 
-load_from_slice :: proc(slice: []u8, options := Options{}, allocator := context.allocator) -> (img: ^Image, err: Error) {
+load_from_bytes :: proc(data: []byte, options := Options{}, allocator := context.allocator) -> (img: ^Image, err: Error) {
 	ctx := &compress.Context_Memory_Input{
-		input_data = slice,
+		input_data = data,
 	}
 
 	/*
@@ -344,10 +342,9 @@ load_from_file :: proc(filename: string, options := Options{}, allocator := cont
 	defer delete(data)
 
 	if ok {
-		return load_from_slice(data, options)
+		return load_from_bytes(data, options)
 	} else {
-		img = new(Image)
-		return img, .Unable_To_Read_File
+		return nil, .Unable_To_Read_File
 	}
 }
 
@@ -375,6 +372,7 @@ load_from_context :: proc(ctx: ^$C, options := Options{}, allocator := context.a
 	if img == nil {
 		img = new(Image)
 	}
+	img.which = .PNG
 
 	info := new(image.PNG_Info)
 	img.metadata = info
@@ -1639,4 +1637,10 @@ defilter :: proc(img: ^Image, filter_bytes: ^bytes.Buffer, header: ^image.PNG_IH
 	return nil
 }
 
-load :: proc{load_from_file, load_from_slice, load_from_context}
+load :: proc{load_from_file, load_from_bytes, load_from_context}
+
+
+@(init, private)
+_register :: proc() {
+	image.register(.PNG, load_from_bytes, destroy)
+}

@@ -3,11 +3,10 @@ package sys_windows
 
 foreign import kernel32 "system:Kernel32.lib"
 
-
-
 @(default_calling_convention="stdcall")
 foreign kernel32 {
-	OutputDebugStringA :: proc(lpOutputString: LPCSTR) ---
+	OutputDebugStringA :: proc(lpOutputString: LPCSTR) --- // The only A thing that is allowed
+	OutputDebugStringW :: proc(lpOutputString: LPCSTR) ---
 
 	ReadConsoleW :: proc(hConsoleInput: HANDLE,
 	                     lpBuffer: LPVOID,
@@ -23,12 +22,18 @@ foreign kernel32 {
 
 	GetConsoleMode :: proc(hConsoleHandle: HANDLE,
 	                       lpMode: LPDWORD) -> BOOL ---
-
+	SetConsoleMode :: proc(hConsoleHandle: HANDLE,
+	                       dwMode: DWORD) -> BOOL ---
 
 	GetFileInformationByHandle :: proc(hFile: HANDLE, lpFileInformation: LPBY_HANDLE_FILE_INFORMATION) -> BOOL ---
 	SetHandleInformation :: proc(hObject: HANDLE,
 	                             dwMask: DWORD,
 	                             dwFlags: DWORD) -> BOOL ---
+	SetFileInformationByHandle :: proc(hFile:                HANDLE,
+	                                   FileInformationClass: FILE_INFO_BY_HANDLE_CLASS,
+	                                   lpFileInformation:    LPVOID,
+	                                   dwBufferSize:         DWORD) -> BOOL ---
+
 
 	AddVectoredExceptionHandler :: proc(FirstHandler: ULONG, VectoredHandler: PVECTORED_EXCEPTION_HANDLER) -> LPVOID ---
 	AddVectoredContinueHandler  :: proc(FirstHandler: ULONG, VectoredHandler: PVECTORED_EXCEPTION_HANDLER) -> LPVOID ---
@@ -266,6 +271,11 @@ foreign kernel32 {
 	HeapAlloc :: proc(hHeap: HANDLE, dwFlags: DWORD, dwBytes: SIZE_T) -> LPVOID ---
 	HeapReAlloc :: proc(hHeap: HANDLE, dwFlags: DWORD, lpMem: LPVOID, dwBytes: SIZE_T) -> LPVOID ---
 	HeapFree :: proc(hHeap: HANDLE, dwFlags: DWORD, lpMem: LPVOID) -> BOOL ---
+
+	LocalAlloc :: proc(flags: UINT, bytes: SIZE_T) -> LPVOID ---
+	LocalReAlloc :: proc(mem: LPVOID, bytes: SIZE_T, flags: UINT) -> LPVOID ---
+	LocalFree :: proc(mem: LPVOID) -> LPVOID ---
+
 
 	ReadDirectoryChangesW :: proc(
 		hDirectory: HANDLE,
@@ -771,7 +781,7 @@ foreign kernel32 {
 	) -> BOOL ---
 }
 
-@(default_calling_convention = "std")
+@(default_calling_convention="stdcall")
 foreign kernel32 {
 	@(link_name="SetConsoleCtrlHandler") set_console_ctrl_handler :: proc(handler: Handler_Routine, add: BOOL) -> BOOL ---
 }
