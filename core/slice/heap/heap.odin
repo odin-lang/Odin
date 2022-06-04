@@ -30,8 +30,7 @@ make :: proc(data: []$T, compare: $C) {
 
 	// start from data parent, no need to consider children
 	for start := (length - 2) / 2; start >= 0; start -= 1 {
-		sift_down(data, compare, start);
-		start -= 1;
+		sift_down(data, compare, start)
 	}
 }
 
