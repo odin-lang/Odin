@@ -15,9 +15,9 @@ IUnknown :: struct {
 	using Vtbl: ^IUnknownVtbl,
 }
 IUnknownVtbl :: struct {
-	QueryInterface : proc "std" (This: ^IUnknown, riid: REFIID, ppvObject: ^rawptr) -> HRESULT,
-	AddRef         : proc "std" (This: ^IUnknown) -> ULONG,
-	Release        : proc "std" (This: ^IUnknown) -> ULONG,
+	QueryInterface: proc "stdcall" (This: ^IUnknown, riid: REFIID, ppvObject: ^rawptr) -> HRESULT,
+	AddRef:         proc "stdcall" (This: ^IUnknown) -> ULONG,
+	Release:        proc "stdcall" (This: ^IUnknown) -> ULONG,
 }
 
 LPUNKNOWN :: ^IUnknown
