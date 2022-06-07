@@ -27,8 +27,6 @@ OPENFILENAMEW :: struct {
 	lCustData: 	        LPARAM,
 	lpfnHook: 	        LPOFNHOOKPROC,
 	lpTemplateName: 	wstring,
-	lpEditInfo: 	        rawptr, // LPEDITMENU,
-	lpstrPrompt: 	        wstring,
 	pvReserved:             rawptr,
 	dwReserved:             DWORD,
 	FlagsEx:                DWORD,
