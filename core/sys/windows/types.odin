@@ -58,6 +58,7 @@ DWORD_PTR :: ULONG_PTR
 LONG_PTR :: int
 UINT_PTR :: uintptr
 ULONG :: c_ulong
+ULONGLONG :: c_ulonglong
 UCHAR :: BYTE
 NTSTATUS :: c.long
 COLORREF :: DWORD
