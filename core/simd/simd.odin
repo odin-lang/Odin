@@ -61,8 +61,7 @@ b64x8   :: #simd[8]b64
 add :: intrinsics.simd_add
 sub :: intrinsics.simd_sub
 mul :: intrinsics.simd_mul
-div :: intrinsics.simd_div
-rem :: intrinsics.simd_rem // integers only
+div :: intrinsics.simd_div // floats only
 
 // Keeps Odin's Behaviour
 // (x << y) if y <= mask else 0

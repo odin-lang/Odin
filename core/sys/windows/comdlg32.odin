@@ -2,7 +2,6 @@
 package sys_windows
 
 foreign import "system:Comdlg32.lib"
-import "core:strings"
 
 LPOFNHOOKPROC :: #type proc "stdcall" (hdlg: HWND, msg: u32, wparam: WPARAM, lparam: LPARAM) -> UINT_PTR
 
@@ -46,6 +45,9 @@ OPEN_FLAGS_MULTI :: OPEN_FLAGS | OFN_ALLOWMULTISELECT | OFN_EXPLORER
 SAVE_TITLE :: "Select file to save"
 SAVE_FLAGS :: u32(OFN_OVERWRITEPROMPT | OFN_EXPLORER)
 SAVE_EXT   :: "txt"
+
+/*
+import "core:strings"
 
 Open_Save_Mode :: enum {
 	Open = 0,
@@ -119,6 +121,7 @@ select_file_to_save :: proc(title := SAVE_TITLE, dir := ".",
 	path, ok = _open_file_dialog(title, dir, filters, default_filter, flags, default_ext, Open_Save_Mode.Save, allocator)
 	return
 }
+*/
 
 // TODO: Implement convenience function for select_file_to_open with ALLOW_MULTI_SELECT that takes
 //       it output of the form "path\u0000\file1u\0000file2" and turns it into []string with the path + file pre-concatenated for you.
