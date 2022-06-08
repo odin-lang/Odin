@@ -1,6 +1,6 @@
 package strings
 
-import "core:mem"
+import "core:runtime"
 import "core:unicode/utf8"
 import "core:strconv"
 import "core:io"
@@ -129,12 +129,12 @@ reset_builder :: proc(b: ^Builder) {
 	strings.write_byte(&builder, 'b') -> "ab"
 */
 builder_from_bytes :: proc(backing: []byte) -> Builder {
-	s := transmute(mem.Raw_Slice)backing
-	d := mem.Raw_Dynamic_Array{
+	s := transmute(runtime.Raw_Slice)backing
+	d := runtime.Raw_Dynamic_Array{
 		data = s.data,
 		len  = 0,
 		cap  = s.len,
-		allocator = mem.nil_allocator(),
+		allocator = runtime.nil_allocator(),
 	}
 	return Builder{
 		buf = transmute([dynamic]byte)d,
@@ -276,7 +276,7 @@ pop_byte :: proc(b: ^Builder) -> (r: byte) {
 	}
 
 	r = b.buf[len(b.buf)-1]
-	d := cast(^mem.Raw_Dynamic_Array)&b.buf
+	d := cast(^runtime.Raw_Dynamic_Array)&b.buf
 	d.len = max(d.len-1, 0)
 	return
 }
@@ -289,7 +289,7 @@ pop_rune :: proc(b: ^Builder) -> (r: rune, width: int) {
 	}
 
 	r, width = utf8.decode_last_rune(b.buf[:])
-	d := cast(^mem.Raw_Dynamic_Array)&b.buf
+	d := cast(^runtime.Raw_Dynamic_Array)&b.buf
 	d.len = max(d.len-width, 0)
 	return
 }

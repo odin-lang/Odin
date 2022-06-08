@@ -152,7 +152,7 @@ slice_ptr :: proc "contextless" (ptr: ^$T, len: int) -> []T {
 	return ([^]T)(ptr)[:len]
 }
 
-byte_slice :: #force_inline proc "contextless" (data: rawptr, len: int) -> []byte {
+byte_slice :: #force_inline proc "contextless" (data: rawptr, #any_int len: int) -> []byte {
 	return ([^]u8)(data)[:max(len, 0)]
 }
 
