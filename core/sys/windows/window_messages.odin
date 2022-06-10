@@ -25,6 +25,7 @@ WM_ENDSESSION                 :: 0x0016
 WM_SHOWWINDOW                 :: 0x0018
 WM_CTLCOLOR                   :: 0x0019
 WM_WININICHANGE               :: 0x001a
+WM_SETTINGCHANGE              :: WM_WININICHANGE
 WM_DEVMODECHANGE              :: 0x001b
 WM_ACTIVATEAPP                :: 0x001c
 WM_FONTCHANGE                 :: 0x001d

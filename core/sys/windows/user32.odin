@@ -134,6 +134,45 @@ foreign user32 {
 	GetCursorPos :: proc(lpPoint: LPPOINT) -> BOOL ---
 	SetCursorPos :: proc(X: c_int, Y: c_int) -> BOOL ---
 	SetCursor :: proc(hCursor: HCURSOR) -> HCURSOR ---
+
+	BroadcastSystemMessageW :: proc(
+		flags: DWORD,
+		lpInfo: LPDWORD,
+		Msg: UINT,
+		wParam: WPARAM,
+		lParam: LPARAM,
+	) -> c_long ---
+
+	BroadcastSystemMessageExW :: proc(
+		flags: DWORD,
+		lpInfo: LPDWORD,
+		Msg: UINT,
+		wParam: WPARAM,
+		lParam: LPARAM,
+		pbsmInfo: PBSMINFO,
+	) -> c_long ---
+
+	SendMessageTimeoutW :: proc(
+		hWnd: HWND,
+		Msg: UINT,
+		wParam: WPARAM,
+		lParam: LPARAM,
+		fuFlags: UINT,
+		uTimeout: UINT,
+		lpdwResult: PDWORD_PTR,
+	) -> LRESULT ---
+
+	GetSysColor :: proc(nIndex: c_int) -> DWORD ---
+	GetSysColorBrush :: proc(nIndex: c_int) -> HBRUSH ---
+	SetSysColors :: proc(cElements: c_int, lpaElements: ^INT, lpaRgbValues: ^COLORREF) -> BOOL ---
+	MessageBeep :: proc(uType: UINT) -> BOOL ---
+
+	IsDialogMessageW :: proc(hDlg: HWND, lpMsg: LPMSG) -> BOOL ---
+	GetWindowTextLengthW :: proc(hWnd: HWND) -> c_int ---
+	GetWindowTextW :: proc(hWnd: HWND, lpString: LPWSTR, nMaxCount: c_int) -> c_int ---
+	SetWindowTextW :: proc(hWnd: HWND, lpString: LPCWSTR) -> BOOL ---
+	CallWindowProcW :: proc(lpPrevWndFunc: WNDPROC, hWnd: HWND, Msg: UINT, wParam: WPARAM, lParam: LPARAM) -> LRESULT ---
+	EnableWindow :: proc(hWnd: HWND, bEnable: BOOL) -> BOOL ---
 }
 
 CreateWindowW :: #force_inline proc "stdcall" (

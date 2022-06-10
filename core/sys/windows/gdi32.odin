@@ -7,6 +7,8 @@ foreign import gdi32 "system:Gdi32.lib"
 foreign gdi32 {
 	GetStockObject :: proc(i: c_int) -> HGDIOBJ ---
 	SelectObject :: proc(hdc: HDC, h: HGDIOBJ) -> HGDIOBJ ---
+	DeleteObject :: proc(ho: HGDIOBJ) -> BOOL ---
+	SetBkColor :: proc(hdc: HDC, color: COLORREF) -> COLORREF ---
 
 	CreateDIBPatternBrush :: proc(h: HGLOBAL, iUsage: UINT) -> HBRUSH ---
 
@@ -65,6 +67,15 @@ foreign gdi32 {
 	SetDCBrushColor :: proc(hdc: HDC, color: COLORREF) -> COLORREF ---
 	GetDCBrushColor :: proc(hdc: HDC) -> COLORREF ---
 	PatBlt :: proc(hdc: HDC, x, y, w, h: c_int, rop: DWORD) -> BOOL ---
+	Rectangle :: proc(hdc: HDC, left, top, right, bottom: c_int) -> BOOL ---
+
+	CreateFontW :: proc(
+		cHeight, cWidth, cEscapement, cOrientation, cWeight: c_int,
+		bItalic, bUnderline, bStrikeOut, iCharSet, iOutPrecision: DWORD,
+		iClipPrecision, iQuality, iPitchAndFamily: DWORD,
+		pszFaceName: LPCWSTR,
+	) -> HFONT ---
+	TextOutW :: proc(hdc: HDC, x, y: c_int, lpString: LPCWSTR, c: c_int) -> BOOL ---
 }
 
 RGB :: #force_inline proc "contextless" (r, g, b: u8) -> COLORREF {
