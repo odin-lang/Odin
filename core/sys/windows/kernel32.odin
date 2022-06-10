@@ -329,7 +329,6 @@ foreign kernel32 {
 }
 
 
-STANDARD_RIGHTS_REQUIRED     :: DWORD(0x000F0000)
 SECTION_QUERY                :: DWORD(0x0001)
 SECTION_MAP_WRITE            :: DWORD(0x0002)
 SECTION_MAP_READ             :: DWORD(0x0004)
