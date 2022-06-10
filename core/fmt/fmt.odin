@@ -1247,6 +1247,18 @@ fmt_write_array :: proc(fi: ^Info, array_data: rawptr, count: int, elem_size: in
 	}
 }
 
+
+@(private)
+handle_tag :: proc(info: reflect.Type_Info_Struct, i: int, verb: ^rune) -> (do_continue: bool) {
+	tag := info.tags[i]
+	if value, ok := reflect.struct_tag_lookup(reflect.Struct_Tag(tag), "fmt"); ok {
+		if value == "-" {
+			return true
+		}
+	}
+	return false
+}
+
 fmt_value :: proc(fi: ^Info, v: any, verb: rune) {
 	write_padded_number :: proc(fi: ^Info, i: i64, width: int) {
 		n := width-1
@@ -1465,6 +1477,7 @@ fmt_value :: proc(fi: ^Info, v: any, verb: rune) {
 					defer io.write_byte(fi.writer, '}', &fi.n)
 
 					for name, i in b.names {
+						verb := 'v'
 						field_count += 1
 
 						if !hash && field_count > 0 { io.write_string(fi.writer, ", ", &fi.n) }
@@ -1481,7 +1494,7 @@ fmt_value :: proc(fi: ^Info, v: any, verb: rune) {
 							io.write_string(fi.writer, "any{}", &fi.n)
 						} else {
 							data := rawptr(uintptr(v.data) + b.offsets[i] + index*t_size)
-							fmt_arg(fi, any{data, t.id}, 'v')
+							fmt_arg(fi, any{data, t.id}, verb)
 						}
 
 						if hash { io.write_string(fi.writer, ",\n", &fi.n) }
@@ -1490,6 +1503,10 @@ fmt_value :: proc(fi: ^Info, v: any, verb: rune) {
 			} else {
 				field_count := -1
 				for name, i in b.names {
+					verb := 'v'
+					if handle_tag(b, i, &verb) {
+						continue
+					}
 					field_count += 1
 
 					if !hash && field_count > 0 { io.write_string(fi.writer, ", ") }
@@ -1504,7 +1521,7 @@ fmt_value :: proc(fi: ^Info, v: any, verb: rune) {
 						io.write_string(fi.writer, "any{}", &fi.n)
 					} else {
 						data := rawptr(uintptr(v.data) + b.offsets[i])
-						fmt_arg(fi, any{data, t.id}, 'v')
+						fmt_arg(fi, any{data, t.id}, verb)
 					}
 
 					if hash { io.write_string(fi.writer, ",\n", &fi.n) }
@@ -1793,6 +1810,7 @@ fmt_value :: proc(fi: ^Info, v: any, verb: rune) {
 				defer io.write_byte(fi.writer, '}', &fi.n)
 
 				for i in 0..<actual_field_count {
+					verb := 'v'
 					name := info.names[i]
 					field_count += 1
 
@@ -1811,7 +1829,7 @@ fmt_value :: proc(fi: ^Info, v: any, verb: rune) {
 							io.write_string(fi.writer, "any{}", &fi.n)
 						} else {
 							data := rawptr(uintptr(v.data) + info.offsets[i] + index*t_size)
-							fmt_arg(fi, any{data, t.id}, 'v')
+							fmt_arg(fi, any{data, t.id}, verb)
 						}
 					} else {
 						t := info.types[i].variant.(runtime.Type_Info_Pointer).elem
@@ -1821,7 +1839,7 @@ fmt_value :: proc(fi: ^Info, v: any, verb: rune) {
 						} else {
 							field_ptr := (^^byte)(uintptr(v.data) + info.offsets[i])^
 							data := rawptr(uintptr(field_ptr) + index*t_size)
-							fmt_arg(fi, any{data, t.id}, 'v')
+							fmt_arg(fi, any{data, t.id}, verb)
 						}
 					}
 
@@ -1831,6 +1849,11 @@ fmt_value :: proc(fi: ^Info, v: any, verb: rune) {
 		} else {
 			field_count := -1
 			for name, i in info.names {
+				verb := 'v'
+				if handle_tag(info, i, &verb) {
+					continue
+				}
+
 				field_count += 1
 
 				if !hash && field_count > 0 { io.write_string(fi.writer, ", ", &fi.n) }
@@ -1841,11 +1864,12 @@ fmt_value :: proc(fi: ^Info, v: any, verb: rune) {
 				io.write_string(fi.writer, name, &fi.n)
 				io.write_string(fi.writer, " = ", &fi.n)
 
+
 				if t := info.types[i]; reflect.is_any(t) {
 					io.write_string(fi.writer, "any{}", &fi.n)
 				} else {
 					data := rawptr(uintptr(v.data) + info.offsets[i])
-					fmt_arg(fi, any{data, t.id}, 'v')
+					fmt_arg(fi, any{data, t.id}, verb)
 				}
 
 				if hash {
