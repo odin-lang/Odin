@@ -952,9 +952,9 @@ fmt_string :: proc(fi: ^Info, s: string, verb: rune) {
 	if ol, ok := fi.optional_len.?; ok {
 		s = s[:min(len(s), ol)]
 	}
-	if !fi.in_bad && fi.record_level >= 0 && verb == 'v' {
-		verb = 'q'
-	}
+	// if !fi.in_bad && fi.record_level >= 0 && verb == 'v' {
+	// 	verb = 'q'
+	// }
 
 	switch verb {
 	case 's', 'v':
@@ -1456,6 +1456,25 @@ fmt_struct :: proc(fi: ^Info, v: any, the_verb: rune, info: runtime.Type_Info_St
 	}
 }
 
+fmt_array :: proc(fi: ^Info, data: rawptr, n: int, elem_size: int, elem: ^reflect.Type_Info, verb: rune) {
+	if (verb == 's' || verb == 'q') && reflect.is_byte(elem) {
+		if data == nil && n > 0 {
+			io.write_string(fi.writer, "nil")
+			return
+		}
+		s := strings.string_from_ptr((^byte)(data), n)
+		fmt_string(fi, s, verb)
+	} else if verb == 'p' {
+		fmt_pointer(fi, data, 'p')
+	} else {
+		if data == nil && n > 0 {
+			io.write_string(fi.writer, "nil")
+			return
+		}
+		fmt_write_array(fi, data, n, elem_size, elem.id, verb)
+	}
+}
+
 fmt_value :: proc(fi: ^Info, v: any, verb: rune) {
 	write_padded_number :: proc(fi: ^Info, i: i64, width: int) {
 		n := width-1
@@ -1779,12 +1798,7 @@ fmt_value :: proc(fi: ^Info, v: any, verb: rune) {
 		if ol, ok := fi.optional_len.?; ok {
 			n = min(n, ol)
 		}
-		if (verb == 's' || verb == 'q') && reflect.is_byte(info.elem) {
-			s := strings.string_from_ptr((^byte)(v.data), n)
-			fmt_string(fi, s, verb)
-		} else {
-			fmt_write_array(fi, v.data, n, info.elem_size, info.elem.id, verb)
-		}
+		fmt_array(fi, v.data, n, info.elem_size, info.elem, verb)
 
 	case runtime.Type_Info_Slice:
 		slice := cast(^mem.Raw_Slice)v.data
@@ -1792,14 +1806,7 @@ fmt_value :: proc(fi: ^Info, v: any, verb: rune) {
 		if ol, ok := fi.optional_len.?; ok {
 			n = min(n, ol)
 		}
-		if (verb == 's' || verb == 'q') && reflect.is_byte(info.elem) {
-			s := strings.string_from_ptr((^byte)(slice.data), n)
-			fmt_string(fi, s, verb)
-		} else if verb == 'p' {
-			fmt_pointer(fi, slice.data, 'p')
-		} else {
-			fmt_write_array(fi, slice.data, n, info.elem_size, info.elem.id, verb)
-		}
+		fmt_array(fi, v.data, n, info.elem_size, info.elem, verb)
 
 	case runtime.Type_Info_Dynamic_Array:
 		array := cast(^mem.Raw_Dynamic_Array)v.data
@@ -1807,14 +1814,7 @@ fmt_value :: proc(fi: ^Info, v: any, verb: rune) {
 		if ol, ok := fi.optional_len.?; ok {
 			n = min(n, ol)
 		}
-		if (verb == 's' || verb == 'q') && reflect.is_byte(info.elem) {
-			s := strings.string_from_ptr((^byte)(array.data), n)
-			fmt_string(fi, s, verb)
-		} else if verb == 'p' {
-			fmt_pointer(fi, array.data, 'p')
-		} else {
-			fmt_write_array(fi, array.data, n, info.elem_size, info.elem.id, verb)
-		}
+		fmt_array(fi, v.data, n, info.elem_size, info.elem, verb)
 
 	case runtime.Type_Info_Simd_Vector:
 		io.write_byte(fi.writer, '<', &fi.n)
