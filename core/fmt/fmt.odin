@@ -1811,7 +1811,7 @@ fmt_value :: proc(fi: ^Info, v: any, verb: rune) {
 		if ol, ok := fi.optional_len.?; ok {
 			n = min(n, ol)
 		}
-		fmt_array(fi, v.data, n, info.elem_size, info.elem, verb)
+		fmt_array(fi, slice.data, n, info.elem_size, info.elem, verb)
 
 	case runtime.Type_Info_Dynamic_Array:
 		array := cast(^mem.Raw_Dynamic_Array)v.data
@@ -1819,7 +1819,7 @@ fmt_value :: proc(fi: ^Info, v: any, verb: rune) {
 		if ol, ok := fi.optional_len.?; ok {
 			n = min(n, ol)
 		}
-		fmt_array(fi, v.data, n, info.elem_size, info.elem, verb)
+		fmt_array(fi, array.data, n, info.elem_size, info.elem, verb)
 
 	case runtime.Type_Info_Simd_Vector:
 		io.write_byte(fi.writer, '<', &fi.n)
