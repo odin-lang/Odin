@@ -1322,6 +1322,7 @@ fmt_struct :: proc(fi: ^Info, v: any, the_verb: rune, b: runtime.Type_Info_Struc
 
 	hash   := fi.hash;   defer fi.hash = hash
 	indent := fi.indent; defer fi.indent -= 1
+	do_trailing_comma := hash
 
 	// fi.hash = false;
 	fi.indent += 1
@@ -1346,11 +1347,11 @@ fmt_struct :: proc(fi: ^Info, v: any, the_verb: rune, b: runtime.Type_Info_Struc
 		}
 
 		for index in 0..<uintptr(b.soa_len) {
-			if !hash && index > 0 { io.write_string(fi.writer, ", ", &fi.n) }
+			if !do_trailing_comma && index > 0 { io.write_string(fi.writer, ", ", &fi.n) }
 
 			field_count := -1
 
-			if !hash && field_count > 0 { io.write_string(fi.writer, ", ", &fi.n) }
+			if !do_trailing_comma && field_count > 0 { io.write_string(fi.writer, ", ", &fi.n) }
 
 			io.write_string(fi.writer, base_type_name, &fi.n)
 			io.write_byte(fi.writer, '{', &fi.n)
@@ -1360,7 +1361,7 @@ fmt_struct :: proc(fi: ^Info, v: any, the_verb: rune, b: runtime.Type_Info_Struc
 				verb := 'v'
 				field_count += 1
 
-				if !hash && field_count > 0 { io.write_string(fi.writer, ", ", &fi.n) }
+				if !do_trailing_comma && field_count > 0 { io.write_string(fi.writer, ", ", &fi.n) }
 				if hash {
 					fmt_write_indent(fi)
 				}
@@ -1377,7 +1378,7 @@ fmt_struct :: proc(fi: ^Info, v: any, the_verb: rune, b: runtime.Type_Info_Struc
 					fmt_arg(fi, any{data, t.id}, verb)
 				}
 
-				if hash { io.write_string(fi.writer, ",\n", &fi.n) }
+				if do_trailing_comma { io.write_string(fi.writer, ",\n", &fi.n) }
 			}
 		}
 	} else {
@@ -1397,7 +1398,7 @@ fmt_struct :: proc(fi: ^Info, v: any, the_verb: rune, b: runtime.Type_Info_Struc
 				fi.optional_len = nil
 			}
 
-			if !hash && field_count > 0 { io.write_string(fi.writer, ", ") }
+			if !do_trailing_comma && field_count > 0 { io.write_string(fi.writer, ", ") }
 			if hash {
 				fmt_write_indent(fi)
 			}
@@ -1412,7 +1413,7 @@ fmt_struct :: proc(fi: ^Info, v: any, the_verb: rune, b: runtime.Type_Info_Struc
 				fmt_arg(fi, any{data, t.id}, verb)
 			}
 
-			if hash { io.write_string(fi.writer, ",\n", &fi.n) }
+			if do_trailing_comma { io.write_string(fi.writer, ",\n", &fi.n) }
 		}
 	}
 }
