@@ -952,9 +952,9 @@ fmt_string :: proc(fi: ^Info, s: string, verb: rune) {
 	if ol, ok := fi.optional_len.?; ok {
 		s = s[:min(len(s), ol)]
 	}
-	// if !fi.in_bad && fi.record_level >= 0 && verb == 'v' {
-	// 	verb = 'q'
-	// }
+	if !fi.in_bad && fi.record_level >= 0 && verb == 'v' {
+		verb = 'q'
+	}
 
 	switch verb {
 	case 's', 'v':
