@@ -33,6 +33,8 @@ Info :: struct {
 	arg: any, // Temporary
 	record_level: int,
 
+	optional_len: Maybe(int),
+
 	n: int, // bytes written
 }
 
@@ -941,6 +943,10 @@ fmt_float :: proc(fi: ^Info, v: f64, bit_size: int, verb: rune) {
 
 
 fmt_string :: proc(fi: ^Info, s: string, verb: rune) {
+	s := s
+	if ol, ok := fi.optional_len.?; ok {
+		s = s[:min(len(s), ol)]
+	}
 	switch verb {
 	case 's', 'v':
 		if fi.width_set {
@@ -1249,11 +1255,37 @@ fmt_write_array :: proc(fi: ^Info, array_data: rawptr, count: int, elem_size: in
 
 
 @(private)
-handle_tag :: proc(info: reflect.Type_Info_Struct, i: int, verb: ^rune) -> (do_continue: bool) {
-	tag := info.tags[i]
-	if value, ok := reflect.struct_tag_lookup(reflect.Struct_Tag(tag), "fmt"); ok {
-		if value == "-" {
-			return true
+handle_tag :: proc(data: rawptr, info: reflect.Type_Info_Struct, idx: int, verb: ^rune, optional_len: ^int = nil) -> (do_continue: bool) {
+	tag := info.tags[idx]
+	if vt, ok := reflect.struct_tag_lookup(reflect.Struct_Tag(tag), "fmt"); ok {
+		value := strings.trim_space(string(vt))
+		switch value {
+		case "": return false
+		case "-": return true
+		}
+		r, w := utf8.decode_rune_in_string(value)
+		value = value[w:]
+		if value == "" || value[0] == ',' {
+			verb^ = r
+			if value[0] == ',' {
+				switch r {
+				case 's':
+					if optional_len != nil {
+						field_name := value[1:]
+						for f, i in info.names {
+							if f != field_name {
+								continue
+							}
+							ptr := rawptr(uintptr(data) + info.offsets[i])
+							field := any{ptr, info.types[i].id}
+							if new_len, iok := reflect.as_int(field); iok {
+								optional_len^ = max(new_len, 0)
+							}
+							break
+						}
+					}
+				}
+			}
 		}
 	}
 	return false
@@ -1503,11 +1535,19 @@ fmt_value :: proc(fi: ^Info, v: any, verb: rune) {
 			} else {
 				field_count := -1
 				for name, i in b.names {
+					optional_len: int = -1
 					verb := 'v'
-					if handle_tag(b, i, &verb) {
+					if handle_tag(v.data, b, i, &verb, &optional_len) {
 						continue
 					}
 					field_count += 1
+
+					if optional_len >= 0 {
+						fi.optional_len = optional_len
+					}
+					defer if optional_len >= 0 {
+						fi.optional_len = nil
+					}
 
 					if !hash && field_count > 0 { io.write_string(fi.writer, ", ") }
 					if hash {
@@ -1632,7 +1672,11 @@ fmt_value :: proc(fi: ^Info, v: any, verb: rune) {
 
 	case runtime.Type_Info_Array:
 		if (verb == 's' || verb == 'q') && reflect.is_byte(info.elem) {
-			s := strings.string_from_ptr((^byte)(v.data), info.count)
+			n := info.count
+			if ol, ok := fi.optional_len.?; ok {
+				n = min(n, ol)
+			}
+			s := strings.string_from_ptr((^byte)(v.data), n)
 			fmt_string(fi, s, verb)
 		} else {
 			fmt_write_array(fi, v.data, info.count, info.elem_size, info.elem.id, verb)
@@ -1690,7 +1734,11 @@ fmt_value :: proc(fi: ^Info, v: any, verb: rune) {
 	case runtime.Type_Info_Dynamic_Array:
 		array := cast(^mem.Raw_Dynamic_Array)v.data
 		if (verb == 's' || verb == 'q') && reflect.is_byte(info.elem) {
-			s := strings.string_from_ptr((^byte)(array.data), array.len)
+			n := array.len
+			if ol, ok := fi.optional_len.?; ok {
+				n = min(n, ol)
+			}
+			s := strings.string_from_ptr((^byte)(array.data), n)
 			fmt_string(fi, s, verb)
 		} else if verb == 'p' {
 			fmt_pointer(fi, array.data, 'p')
@@ -1712,7 +1760,11 @@ fmt_value :: proc(fi: ^Info, v: any, verb: rune) {
 	case runtime.Type_Info_Slice:
 		slice := cast(^mem.Raw_Slice)v.data
 		if (verb == 's' || verb == 'q') && reflect.is_byte(info.elem) {
-			s := strings.string_from_ptr((^byte)(slice.data), slice.len)
+			n := slice.len
+			if ol, ok := fi.optional_len.?; ok {
+				n = min(n, ol)
+			}
+			s := strings.string_from_ptr((^byte)(slice.data), n)
 			fmt_string(fi, s, verb)
 		} else if verb == 'p' {
 			fmt_pointer(fi, slice.data, 'p')
@@ -1850,7 +1902,7 @@ fmt_value :: proc(fi: ^Info, v: any, verb: rune) {
 			field_count := -1
 			for name, i in info.names {
 				verb := 'v'
-				if handle_tag(info, i, &verb) {
+				if handle_tag(v.data, info, i, &verb) {
 					continue
 				}
 
