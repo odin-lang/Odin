@@ -943,10 +943,14 @@ fmt_float :: proc(fi: ^Info, v: f64, bit_size: int, verb: rune) {
 
 
 fmt_string :: proc(fi: ^Info, s: string, verb: rune) {
-	s := s
+	s, verb := s, verb
 	if ol, ok := fi.optional_len.?; ok {
 		s = s[:min(len(s), ol)]
 	}
+	if fi.record_level >= 0 && verb == 'v' {
+		verb = 'q'
+	}
+
 	switch verb {
 	case 's', 'v':
 		if fi.width_set {
@@ -1269,7 +1273,7 @@ handle_tag :: proc(data: rawptr, info: reflect.Type_Info_Struct, idx: int, verb:
 			verb^ = r
 			if value[0] == ',' {
 				switch r {
-				case 's':
+				case 's', 'q':
 					if optional_len != nil {
 						field_name := value[1:]
 						for f, i in info.names {
