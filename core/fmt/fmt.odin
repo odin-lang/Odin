@@ -1300,6 +1300,123 @@ handle_tag :: proc(data: rawptr, info: reflect.Type_Info_Struct, idx: int, verb:
 	return false
 }
 
+fmt_struct :: proc(fi: ^Info, v: any, the_verb: rune, b: runtime.Type_Info_Struct, type_name: string) {
+	if the_verb != 'v' {
+		fmt_bad_verb(fi, the_verb)
+		return
+	}
+	if b.is_raw_union {
+		if type_name == "" {
+			io.write_string(fi.writer, "(raw union)", &fi.n)
+		} else {
+			io.write_string(fi.writer, type_name, &fi.n)
+			io.write_string(fi.writer, "{}", &fi.n)
+		}
+		return
+	}
+
+	is_soa := b.soa_kind != .None
+
+	io.write_string(fi.writer, type_name, &fi.n)
+	io.write_byte(fi.writer, '[' if is_soa else '{', &fi.n)
+
+	hash   := fi.hash;   defer fi.hash = hash
+	indent := fi.indent; defer fi.indent -= 1
+
+	// fi.hash = false;
+	fi.indent += 1
+
+	if hash	{
+		io.write_byte(fi.writer, '\n', &fi.n)
+	}
+	defer {
+		if hash {
+			for in 0..<indent { io.write_byte(fi.writer, '\t', &fi.n) }
+		}
+		io.write_byte(fi.writer, ']' if is_soa else '}', &fi.n)
+	}
+
+	if is_soa {
+		fi.indent += 1
+		defer fi.indent -= 1
+
+		base_type_name: string
+		if v, ok := b.soa_base_type.variant.(runtime.Type_Info_Named); ok {
+			base_type_name = v.name
+		}
+
+		for index in 0..<uintptr(b.soa_len) {
+			if !hash && index > 0 { io.write_string(fi.writer, ", ", &fi.n) }
+
+			field_count := -1
+
+			if !hash && field_count > 0 { io.write_string(fi.writer, ", ", &fi.n) }
+
+			io.write_string(fi.writer, base_type_name, &fi.n)
+			io.write_byte(fi.writer, '{', &fi.n)
+			defer io.write_byte(fi.writer, '}', &fi.n)
+
+			for name, i in b.names {
+				verb := 'v'
+				field_count += 1
+
+				if !hash && field_count > 0 { io.write_string(fi.writer, ", ", &fi.n) }
+				if hash {
+					fmt_write_indent(fi)
+				}
+
+				io.write_string(fi.writer, name, &fi.n)
+				io.write_string(fi.writer, " = ", &fi.n)
+
+				t := b.types[i].variant.(runtime.Type_Info_Array).elem
+				t_size := uintptr(t.size)
+				if reflect.is_any(t) {
+					io.write_string(fi.writer, "any{}", &fi.n)
+				} else {
+					data := rawptr(uintptr(v.data) + b.offsets[i] + index*t_size)
+					fmt_arg(fi, any{data, t.id}, verb)
+				}
+
+				if hash { io.write_string(fi.writer, ",\n", &fi.n) }
+			}
+		}
+	} else {
+		field_count := -1
+		for name, i in b.names {
+			optional_len: int = -1
+			verb := 'v'
+			if handle_tag(v.data, b, i, &verb, &optional_len) {
+				continue
+			}
+			field_count += 1
+
+			if optional_len >= 0 {
+				fi.optional_len = optional_len
+			}
+			defer if optional_len >= 0 {
+				fi.optional_len = nil
+			}
+
+			if !hash && field_count > 0 { io.write_string(fi.writer, ", ") }
+			if hash {
+				fmt_write_indent(fi)
+			}
+
+			io.write_string(fi.writer, name, &fi.n)
+			io.write_string(fi.writer, " = ", &fi.n)
+
+			if t := b.types[i]; reflect.is_any(t) {
+				io.write_string(fi.writer, "any{}", &fi.n)
+			} else {
+				data := rawptr(uintptr(v.data) + b.offsets[i])
+				fmt_arg(fi, any{data, t.id}, verb)
+			}
+
+			if hash { io.write_string(fi.writer, ",\n", &fi.n) }
+		}
+	}
+}
+
 fmt_value :: proc(fi: ^Info, v: any, verb: rune) {
 	write_padded_number :: proc(fi: ^Info, i: i64, width: int) {
 		n := width-1
@@ -1466,117 +1583,7 @@ fmt_value :: proc(fi: ^Info, v: any, verb: rune) {
 
 		#partial switch b in info.base.variant {
 		case runtime.Type_Info_Struct:
-			if verb != 'v' {
-				fmt_bad_verb(fi, verb)
-				return
-			}
-			if b.is_raw_union {
-				io.write_string(fi.writer, info.name, &fi.n)
-				io.write_string(fi.writer, "{}", &fi.n)
-				return
-			}
-
-			is_soa := b.soa_kind != .None
-
-			io.write_string(fi.writer, info.name, &fi.n)
-			io.write_byte(fi.writer, '[' if is_soa else '{', &fi.n)
-
-			hash   := fi.hash;   defer fi.hash = hash
-			indent := fi.indent; defer fi.indent -= 1
-
-			// fi.hash = false;
-			fi.indent += 1
-
-			if hash	{
-				io.write_byte(fi.writer, '\n', &fi.n)
-			}
-			defer {
-				if hash {
-					for in 0..<indent { io.write_byte(fi.writer, '\t', &fi.n) }
-				}
-				io.write_byte(fi.writer, ']' if is_soa else '}', &fi.n)
-			}
-
-			if is_soa {
-				fi.indent += 1
-				defer fi.indent -= 1
-
-				base_type_name: string
-				if v, ok := b.soa_base_type.variant.(runtime.Type_Info_Named); ok {
-					base_type_name = v.name
-				}
-
-				for index in 0..<uintptr(b.soa_len) {
-					if !hash && index > 0 { io.write_string(fi.writer, ", ", &fi.n) }
-
-					field_count := -1
-
-					if !hash && field_count > 0 { io.write_string(fi.writer, ", ", &fi.n) }
-
-					io.write_string(fi.writer, base_type_name, &fi.n)
-					io.write_byte(fi.writer, '{', &fi.n)
-					defer io.write_byte(fi.writer, '}', &fi.n)
-
-					for name, i in b.names {
-						verb := 'v'
-						field_count += 1
-
-						if !hash && field_count > 0 { io.write_string(fi.writer, ", ", &fi.n) }
-						if hash {
-							fmt_write_indent(fi)
-						}
-
-						io.write_string(fi.writer, name, &fi.n)
-						io.write_string(fi.writer, " = ", &fi.n)
-
-						t := b.types[i].variant.(runtime.Type_Info_Array).elem
-						t_size := uintptr(t.size)
-						if reflect.is_any(t) {
-							io.write_string(fi.writer, "any{}", &fi.n)
-						} else {
-							data := rawptr(uintptr(v.data) + b.offsets[i] + index*t_size)
-							fmt_arg(fi, any{data, t.id}, verb)
-						}
-
-						if hash { io.write_string(fi.writer, ",\n", &fi.n) }
-					}
-				}
-			} else {
-				field_count := -1
-				for name, i in b.names {
-					optional_len: int = -1
-					verb := 'v'
-					if handle_tag(v.data, b, i, &verb, &optional_len) {
-						continue
-					}
-					field_count += 1
-
-					if optional_len >= 0 {
-						fi.optional_len = optional_len
-					}
-					defer if optional_len >= 0 {
-						fi.optional_len = nil
-					}
-
-					if !hash && field_count > 0 { io.write_string(fi.writer, ", ") }
-					if hash {
-						fmt_write_indent(fi)
-					}
-
-					io.write_string(fi.writer, name, &fi.n)
-					io.write_string(fi.writer, " = ", &fi.n)
-
-					if t := b.types[i]; reflect.is_any(t) {
-						io.write_string(fi.writer, "any{}", &fi.n)
-					} else {
-						data := rawptr(uintptr(v.data) + b.offsets[i])
-						fmt_arg(fi, any{data, t.id}, verb)
-					}
-
-					if hash { io.write_string(fi.writer, ",\n", &fi.n) }
-				}
-			}
-
+			fmt_struct(fi, v, verb, b, info.name)
 		case runtime.Type_Info_Bit_Set:
 			fmt_bit_set(fi, v)
 		case:
@@ -1816,129 +1823,7 @@ fmt_value :: proc(fi: ^Info, v: any, verb: rune) {
 		}
 
 	case runtime.Type_Info_Struct:
-		if info.is_raw_union {
-			io.write_string(fi.writer, "(raw_union)", &fi.n)
-			return
-		}
-
-		is_soa := info.soa_kind != .None
-
-		io.write_byte(fi.writer, '[' if is_soa else '{', &fi.n)
-		defer io.write_byte(fi.writer, ']' if is_soa else '}', &fi.n)
-
-		fi.indent += 1;  defer fi.indent -= 1
-		hash := fi.hash; defer fi.hash = hash
-		// fi.hash = false;
-
-
-		if hash	{ io.write_byte(fi.writer, '\n', &fi.n) }
-
-		if is_soa {
-			fi.indent += 1
-			defer fi.indent -= 1
-
-			base_type_name: string
-			if v, ok := info.soa_base_type.variant.(runtime.Type_Info_Named); ok {
-				base_type_name = v.name
-			}
-
-			actual_field_count := len(info.names)
-
-			n := uintptr(info.soa_len)
-
-			if info.soa_kind == .Slice {
-				actual_field_count = len(info.names)-1 // len
-
-				n = uintptr((^int)(uintptr(v.data) + info.offsets[actual_field_count])^)
-
-			} else if info.soa_kind == .Dynamic {
-				actual_field_count = len(info.names)-3 // len, cap, allocator
-
-				n = uintptr((^int)(uintptr(v.data) + info.offsets[actual_field_count])^)
-			}
-
-
-
-			for index in 0..<n {
-				if !hash && index > 0 { io.write_string(fi.writer, ", ", &fi.n) }
-
-				field_count := -1
-
-				if !hash && field_count > 0 { io.write_string(fi.writer, ", ", &fi.n) }
-
-				io.write_string(fi.writer, base_type_name, &fi.n)
-				io.write_byte(fi.writer, '{', &fi.n)
-				defer io.write_byte(fi.writer, '}', &fi.n)
-
-				for i in 0..<actual_field_count {
-					verb := 'v'
-					name := info.names[i]
-					field_count += 1
-
-					if !hash && field_count > 0 { io.write_string(fi.writer, ", ", &fi.n) }
-					if hash {
-						fmt_write_indent(fi)
-					}
-
-					io.write_string(fi.writer, name, &fi.n)
-					io.write_string(fi.writer, " = ", &fi.n)
-
-					if info.soa_kind == .Fixed {
-						t := info.types[i].variant.(runtime.Type_Info_Array).elem
-						t_size := uintptr(t.size)
-						if reflect.is_any(t) {
-							io.write_string(fi.writer, "any{}", &fi.n)
-						} else {
-							data := rawptr(uintptr(v.data) + info.offsets[i] + index*t_size)
-							fmt_arg(fi, any{data, t.id}, verb)
-						}
-					} else {
-						t := info.types[i].variant.(runtime.Type_Info_Pointer).elem
-						t_size := uintptr(t.size)
-						if reflect.is_any(t) {
-							io.write_string(fi.writer, "any{}", &fi.n)
-						} else {
-							field_ptr := (^^byte)(uintptr(v.data) + info.offsets[i])^
-							data := rawptr(uintptr(field_ptr) + index*t_size)
-							fmt_arg(fi, any{data, t.id}, verb)
-						}
-					}
-
-					if hash { io.write_string(fi.writer, ",\n", &fi.n) }
-				}
-			}
-		} else {
-			field_count := -1
-			for name, i in info.names {
-				verb := 'v'
-				if handle_tag(v.data, info, i, &verb) {
-					continue
-				}
-
-				field_count += 1
-
-				if !hash && field_count > 0 { io.write_string(fi.writer, ", ", &fi.n) }
-				if hash {
-					fmt_write_indent(fi)
-				}
-
-				io.write_string(fi.writer, name, &fi.n)
-				io.write_string(fi.writer, " = ", &fi.n)
-
-
-				if t := info.types[i]; reflect.is_any(t) {
-					io.write_string(fi.writer, "any{}", &fi.n)
-				} else {
-					data := rawptr(uintptr(v.data) + info.offsets[i])
-					fmt_arg(fi, any{data, t.id}, verb)
-				}
-
-				if hash {
-					io.write_string(fi.writer, ",\n", &fi.n)
-				}
-			}
-		}
-
+		fmt_struct(fi, v, verb, info, "")
 
 	case runtime.Type_Info_Union:
 		if type_info.size == 0 {
