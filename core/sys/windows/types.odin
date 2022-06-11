@@ -33,11 +33,15 @@ HGDIOBJ :: distinct HANDLE
 HBITMAP :: distinct HANDLE
 HGLOBAL :: distinct HANDLE
 HHOOK :: distinct HANDLE
+HKEY :: distinct HANDLE
+HDESK :: distinct HANDLE
+HFONT :: distinct HANDLE
 BOOL :: distinct b32
 BYTE :: distinct u8
 BOOLEAN :: distinct b8
 GROUP :: distinct c_uint
 LARGE_INTEGER :: distinct c_longlong
+ULARGE_INTEGER :: distinct c_ulonglong
 LONG :: c_long
 UINT :: c_uint
 INT  :: c_int
@@ -55,6 +59,7 @@ DWORD_PTR :: ULONG_PTR
 LONG_PTR :: int
 UINT_PTR :: uintptr
 ULONG :: c_ulong
+ULONGLONG :: c_ulonglong
 UCHAR :: BYTE
 NTSTATUS :: c.long
 COLORREF :: DWORD
@@ -64,6 +69,8 @@ WPARAM :: UINT_PTR
 LRESULT :: LONG_PTR
 LPRECT :: ^RECT
 LPPOINT :: ^POINT
+LSTATUS :: LONG
+PHKEY :: ^HKEY
 
 UINT8  ::  u8
 UINT16 :: u16
@@ -117,6 +124,8 @@ LPWSADATA :: ^WSADATA
 LPWSAPROTOCOL_INFO :: ^WSAPROTOCOL_INFO
 LPSTR :: ^CHAR
 LPWSTR :: ^WCHAR
+OLECHAR :: WCHAR
+LPOLESTR :: ^OLECHAR
 LPFILETIME :: ^FILETIME
 LPWSABUF :: ^WSABUF
 LPWSAOVERLAPPED :: distinct rawptr
@@ -202,17 +211,10 @@ FILE_DELETE_CHILD         : DWORD : 0x00000040
 FILE_READ_ATTRIBUTES      : DWORD : 0x00000080
 FILE_WRITE_ATTRIBUTES     : DWORD : 0x00000100
 
-READ_CONTROL: DWORD : 0x00020000
-SYNCHRONIZE: DWORD : 0x00100000
-
 GENERIC_READ    : DWORD : 0x80000000
 GENERIC_WRITE   : DWORD : 0x40000000
 GENERIC_EXECUTE : DWORD : 0x20000000
 GENERIC_ALL     : DWORD : 0x10000000
-
-STANDARD_RIGHTS_READ    : DWORD : READ_CONTROL
-STANDARD_RIGHTS_WRITE   : DWORD : READ_CONTROL
-STANDARD_RIGHTS_EXECUTE : DWORD : READ_CONTROL
 
 FILE_GENERIC_WRITE: DWORD : STANDARD_RIGHTS_WRITE |
 	FILE_WRITE_DATA |
@@ -283,6 +285,385 @@ REASON_CONTEXT :: struct {
 	},
 }
 PREASON_CONTEXT :: ^REASON_CONTEXT
+
+// RRF - Registry Routine Flags (for RegGetValue)
+RRF_RT_REG_NONE      :: 0x00000001
+RRF_RT_REG_SZ        :: 0x00000002
+RRF_RT_REG_EXPAND_SZ :: 0x00000004
+RRF_RT_REG_BINARY    :: 0x00000008
+RRF_RT_REG_DWORD     :: 0x00000010
+RRF_RT_REG_MULTI_SZ  :: 0x00000020
+RRF_RT_REG_QWORD     :: 0x00000040
+RRF_RT_DWORD         :: (RRF_RT_REG_BINARY | RRF_RT_REG_DWORD)
+RRF_RT_QWORD         :: (RRF_RT_REG_BINARY | RRF_RT_REG_QWORD)
+RRF_RT_ANY           :: 0x0000ffff
+RRF_NOEXPAND         :: 0x10000000
+RRF_ZEROONFAILURE    :: 0x20000000
+
+ACCESS_MASK :: DWORD
+PACCESS_MASK :: ^ACCESS_MASK
+REGSAM :: ACCESS_MASK
+
+// Reserved Key Handles.
+HKEY_CLASSES_ROOT                :: HKEY(uintptr(0x80000000))
+HKEY_CURRENT_USER                :: HKEY(uintptr(0x80000001))
+HKEY_LOCAL_MACHINE               :: HKEY(uintptr(0x80000002))
+HKEY_USERS                       :: HKEY(uintptr(0x80000003))
+HKEY_PERFORMANCE_DATA            :: HKEY(uintptr(0x80000004))
+HKEY_PERFORMANCE_TEXT            :: HKEY(uintptr(0x80000050))
+HKEY_PERFORMANCE_NLSTEXT         :: HKEY(uintptr(0x80000060))
+HKEY_CURRENT_CONFIG              :: HKEY(uintptr(0x80000005))
+HKEY_DYN_DATA                    :: HKEY(uintptr(0x80000006))
+HKEY_CURRENT_USER_LOCAL_SETTINGS :: HKEY(uintptr(0x80000007))
+
+// The following are masks for the predefined standard access types
+DELETE       : DWORD : 0x00010000
+READ_CONTROL : DWORD : 0x00020000
+WRITE_DAC    : DWORD : 0x00040000
+WRITE_OWNER  : DWORD : 0x00080000
+SYNCHRONIZE  : DWORD : 0x00100000
+
+STANDARD_RIGHTS_REQUIRED : DWORD : 0x000F0000
+STANDARD_RIGHTS_READ     : DWORD : READ_CONTROL
+STANDARD_RIGHTS_WRITE    : DWORD : READ_CONTROL
+STANDARD_RIGHTS_EXECUTE  : DWORD : READ_CONTROL
+STANDARD_RIGHTS_ALL      : DWORD : 0x001F0000
+SPECIFIC_RIGHTS_ALL      : DWORD : 0x0000FFFF
+
+// Registry Specific Access Rights.
+KEY_QUERY_VALUE        :: 0x0001
+KEY_SET_VALUE          :: 0x0002
+KEY_CREATE_SUB_KEY     :: 0x0004
+KEY_ENUMERATE_SUB_KEYS :: 0x0008
+KEY_NOTIFY             :: 0x0010
+KEY_CREATE_LINK        :: 0x0020
+KEY_WOW64_32KEY        :: 0x0200
+KEY_WOW64_64KEY        :: 0x0100
+KEY_WOW64_RES          :: 0x0300
+
+KEY_READ :: (STANDARD_RIGHTS_READ | KEY_QUERY_VALUE | KEY_ENUMERATE_SUB_KEYS | KEY_NOTIFY) & (~SYNCHRONIZE)
+KEY_WRITE :: (STANDARD_RIGHTS_WRITE | KEY_SET_VALUE | KEY_CREATE_SUB_KEY) & (~SYNCHRONIZE)
+KEY_EXECUTE :: (KEY_READ) & (~SYNCHRONIZE)
+KEY_ALL_ACCESS :: (STANDARD_RIGHTS_ALL |
+	KEY_QUERY_VALUE |
+	KEY_SET_VALUE |
+	KEY_CREATE_SUB_KEY |
+	KEY_ENUMERATE_SUB_KEYS |
+	KEY_NOTIFY |
+	KEY_CREATE_LINK) & (~SYNCHRONIZE)
+
+// Open/Create Options
+REG_OPTION_RESERVED        :: 0x00000000
+REG_OPTION_NON_VOLATILE    :: 0x00000000
+REG_OPTION_VOLATILE        :: 0x00000001
+REG_OPTION_CREATE_LINK     :: 0x00000002
+REG_OPTION_BACKUP_RESTORE  :: 0x00000004
+REG_OPTION_OPEN_LINK       :: 0x00000008
+REG_OPTION_DONT_VIRTUALIZE :: 0x00000010
+
+REG_LEGAL_OPTION :: REG_OPTION_RESERVED |
+	REG_OPTION_NON_VOLATILE |
+	REG_OPTION_VOLATILE |
+	REG_OPTION_CREATE_LINK |
+	REG_OPTION_BACKUP_RESTORE |
+	REG_OPTION_OPEN_LINK |
+	REG_OPTION_DONT_VIRTUALIZE
+
+REG_OPEN_LEGAL_OPTION :: REG_OPTION_RESERVED |
+	REG_OPTION_BACKUP_RESTORE |
+	REG_OPTION_OPEN_LINK |
+	REG_OPTION_DONT_VIRTUALIZE
+
+// Key creation/open disposition
+REG_CREATED_NEW_KEY     :: 0x00000001
+REG_OPENED_EXISTING_KEY :: 0x00000002
+
+// hive format to be used by Reg(Nt)SaveKeyEx
+REG_STANDARD_FORMAT :: 1
+REG_LATEST_FORMAT   :: 2
+REG_NO_COMPRESSION  :: 4
+
+// Key restore & hive load flags
+REG_WHOLE_HIVE_VOLATILE       :: 0x00000001
+REG_REFRESH_HIVE              :: 0x00000002
+REG_NO_LAZY_FLUSH             :: 0x00000004
+REG_FORCE_RESTORE             :: 0x00000008
+REG_APP_HIVE                  :: 0x00000010
+REG_PROCESS_PRIVATE           :: 0x00000020
+REG_START_JOURNAL             :: 0x00000040
+REG_HIVE_EXACT_FILE_GROWTH    :: 0x00000080
+REG_HIVE_NO_RM                :: 0x00000100
+REG_HIVE_SINGLE_LOG           :: 0x00000200
+REG_BOOT_HIVE                 :: 0x00000400
+REG_LOAD_HIVE_OPEN_HANDLE     :: 0x00000800
+REG_FLUSH_HIVE_FILE_GROWTH    :: 0x00001000
+REG_OPEN_READ_ONLY            :: 0x00002000
+REG_IMMUTABLE                 :: 0x00004000
+REG_NO_IMPERSONATION_FALLBACK :: 0x00008000
+REG_APP_HIVE_OPEN_READ_ONLY   :: REG_OPEN_READ_ONLY
+
+// Unload Flags
+REG_FORCE_UNLOAD       :: 1
+REG_UNLOAD_LEGAL_FLAGS :: REG_FORCE_UNLOAD
+
+// Notify filter values
+REG_NOTIFY_CHANGE_NAME       :: 0x00000001
+REG_NOTIFY_CHANGE_ATTRIBUTES :: 0x00000002
+REG_NOTIFY_CHANGE_LAST_SET   :: 0x00000004
+REG_NOTIFY_CHANGE_SECURITY   :: 0x00000008
+REG_NOTIFY_THREAD_AGNOSTIC   :: 0x10000000
+
+REG_LEGAL_CHANGE_FILTER :: REG_NOTIFY_CHANGE_NAME |
+	REG_NOTIFY_CHANGE_ATTRIBUTES |
+	REG_NOTIFY_CHANGE_LAST_SET |
+	REG_NOTIFY_CHANGE_SECURITY |
+	REG_NOTIFY_THREAD_AGNOSTIC
+
+// Predefined Value Types.
+REG_NONE                       :: 0
+REG_SZ                         :: 1
+REG_EXPAND_SZ                  :: 2
+REG_BINARY                     :: 3
+REG_DWORD                      :: 4
+REG_DWORD_LITTLE_ENDIAN        :: 4
+REG_DWORD_BIG_ENDIAN           :: 5
+REG_LINK                       :: 6
+REG_MULTI_SZ                   :: 7
+REG_RESOURCE_LIST              :: 8
+REG_FULL_RESOURCE_DESCRIPTOR   :: 9
+REG_RESOURCE_REQUIREMENTS_LIST :: 10
+REG_QWORD                      :: 11
+REG_QWORD_LITTLE_ENDIAN        :: 11
+
+BSMINFO :: struct {
+	cbSize: UINT,
+	hdesk: HDESK,
+	hwnd: HWND,
+	luid: LUID,
+}
+PBSMINFO :: ^BSMINFO
+
+// Broadcast Special Message Recipient list
+BSM_ALLCOMPONENTS      :: 0x00000000
+BSM_VXDS               :: 0x00000001
+BSM_NETDRIVER          :: 0x00000002
+BSM_INSTALLABLEDRIVERS :: 0x00000004
+BSM_APPLICATIONS       :: 0x00000008
+BSM_ALLDESKTOPS        :: 0x00000010
+
+// Broadcast Special Message Flags
+BSF_QUERY              :: 0x00000001
+BSF_IGNORECURRENTTASK  :: 0x00000002
+BSF_FLUSHDISK          :: 0x00000004
+BSF_NOHANG             :: 0x00000008
+BSF_POSTMESSAGE        :: 0x00000010
+BSF_FORCEIFHUNG        :: 0x00000020
+BSF_NOTIMEOUTIFNOTHUNG :: 0x00000040
+BSF_ALLOWSFW           :: 0x00000080
+BSF_SENDNOTIFYMESSAGE  :: 0x00000100
+BSF_RETURNHDESK        :: 0x00000200
+BSF_LUID               :: 0x00000400
+
+BROADCAST_QUERY_DENY :: 0x424D5144
+
+// Special HWND value for use with PostMessage() and SendMessage()
+HWND_BROADCAST :: HWND(uintptr(0xffff))
+HWND_MESSAGE   :: HWND(~uintptr(0) - 2) // -3
+
+// Color Types
+CTLCOLOR_MSGBOX    :: 0
+CTLCOLOR_EDIT      :: 1
+CTLCOLOR_LISTBOX   :: 2
+CTLCOLOR_BTN       :: 3
+CTLCOLOR_DLG       :: 4
+CTLCOLOR_SCROLLBAR :: 5
+CTLCOLOR_STATIC    :: 6
+CTLCOLOR_MAX       :: 7
+
+COLOR_SCROLLBAR           :: 0
+COLOR_BACKGROUND          :: 1
+COLOR_ACTIVECAPTION       :: 2
+COLOR_INACTIVECAPTION     :: 3
+COLOR_MENU                :: 4
+COLOR_WINDOW              :: 5
+COLOR_WINDOWFRAME         :: 6
+COLOR_MENUTEXT            :: 7
+COLOR_WINDOWTEXT          :: 8
+COLOR_CAPTIONTEXT         :: 9
+COLOR_ACTIVEBORDER        :: 10
+COLOR_INACTIVEBORDER      :: 11
+COLOR_APPWORKSPACE        :: 12
+COLOR_HIGHLIGHT           :: 13
+COLOR_HIGHLIGHTTEXT       :: 14
+COLOR_BTNFACE             :: 15
+COLOR_BTNSHADOW           :: 16
+COLOR_GRAYTEXT            :: 17
+COLOR_BTNTEXT             :: 18
+COLOR_INACTIVECAPTIONTEXT :: 19
+COLOR_BTNHIGHLIGHT        :: 20
+
+COLOR_3DDKSHADOW              :: 21
+COLOR_3DLIGHT                 :: 22
+COLOR_INFOTEXT                :: 23
+COLOR_INFOBK                  :: 24
+COLOR_HOTLIGHT                :: 26
+COLOR_GRADIENTACTIVECAPTION   :: 27
+COLOR_GRADIENTINACTIVECAPTION :: 28
+COLOR_MENUHILIGHT             :: 29
+COLOR_MENUBAR                 :: 30
+
+COLOR_DESKTOP     :: COLOR_BACKGROUND
+COLOR_3DFACE      :: COLOR_BTNFACE
+COLOR_3DSHADOW    :: COLOR_BTNSHADOW
+COLOR_3DHIGHLIGHT :: COLOR_BTNHIGHLIGHT
+COLOR_3DHILIGHT   :: COLOR_BTNHIGHLIGHT
+COLOR_BTNHILIGHT  :: COLOR_BTNHIGHLIGHT
+
+// Combo Box Notification Codes
+CBN_ERRSPACE     :: -1
+CBN_SELCHANGE    :: 1
+CBN_DBLCLK       :: 2
+CBN_SETFOCUS     :: 3
+CBN_KILLFOCUS    :: 4
+CBN_EDITCHANGE   :: 5
+CBN_EDITUPDATE   :: 6
+CBN_DROPDOWN     :: 7
+CBN_CLOSEUP      :: 8
+CBN_SELENDOK     :: 9
+CBN_SELENDCANCEL :: 10
+
+// Combo Box styles
+CBS_SIMPLE            :: 0x0001
+CBS_DROPDOWN          :: 0x0002
+CBS_DROPDOWNLIST      :: 0x0003
+CBS_OWNERDRAWFIXED    :: 0x0010
+CBS_OWNERDRAWVARIABLE :: 0x0020
+CBS_AUTOHSCROLL       :: 0x0040
+CBS_OEMCONVERT        :: 0x0080
+CBS_SORT              :: 0x0100
+CBS_HASSTRINGS        :: 0x0200
+CBS_NOINTEGRALHEIGHT  :: 0x0400
+CBS_DISABLENOSCROLL   :: 0x0800
+CBS_UPPERCASE         :: 0x2000
+CBS_LOWERCASE         :: 0x4000
+
+// User Button Notification Codes
+BN_CLICKED       :: 0
+BN_PAINT         :: 1
+BN_HILITE        :: 2
+BN_UNHILITE      :: 3
+BN_DISABLE       :: 4
+BN_DOUBLECLICKED :: 5
+BN_PUSHED        :: BN_HILITE
+BN_UNPUSHED      :: BN_UNHILITE
+BN_DBLCLK        :: BN_DOUBLECLICKED
+BN_SETFOCUS      :: 6
+BN_KILLFOCUS     :: 7
+
+// Button Control Styles
+BS_PUSHBUTTON      :: 0x00000000
+BS_DEFPUSHBUTTON   :: 0x00000001
+BS_CHECKBOX        :: 0x00000002
+BS_AUTOCHECKBOX    :: 0x00000003
+BS_RADIOBUTTON     :: 0x00000004
+BS_3STATE          :: 0x00000005
+BS_AUTO3STATE      :: 0x00000006
+BS_GROUPBOX        :: 0x00000007
+BS_USERBUTTON      :: 0x00000008
+BS_AUTORADIOBUTTON :: 0x00000009
+BS_PUSHBOX         :: 0x0000000A
+BS_OWNERDRAW       :: 0x0000000B
+BS_TYPEMASK        :: 0x0000000F
+BS_LEFTTEXT        :: 0x00000020
+BS_TEXT            :: 0x00000000
+BS_ICON            :: 0x00000040
+BS_BITMAP          :: 0x00000080
+BS_LEFT            :: 0x00000100
+BS_RIGHT           :: 0x00000200
+BS_CENTER          :: 0x00000300
+BS_TOP             :: 0x00000400
+BS_BOTTOM          :: 0x00000800
+BS_VCENTER         :: 0x00000C00
+BS_PUSHLIKE        :: 0x00001000
+BS_MULTILINE       :: 0x00002000
+BS_NOTIFY          :: 0x00004000
+BS_FLAT            :: 0x00008000
+BS_RIGHTBUTTON     :: BS_LEFTTEXT
+
+// Button Control Messages
+BST_UNCHECKED     :: 0x0000
+BST_CHECKED       :: 0x0001
+BST_INDETERMINATE :: 0x0002
+BST_PUSHED        :: 0x0004
+BST_FOCUS         :: 0x0008
+
+// Static Control Constants
+SS_LEFT            :: 0x00000000
+SS_CENTER          :: 0x00000001
+SS_RIGHT           :: 0x00000002
+SS_ICON            :: 0x00000003
+SS_BLACKRECT       :: 0x00000004
+SS_GRAYRECT        :: 0x00000005
+SS_WHITERECT       :: 0x00000006
+SS_BLACKFRAME      :: 0x00000007
+SS_GRAYFRAME       :: 0x00000008
+SS_WHITEFRAME      :: 0x00000009
+SS_USERITEM        :: 0x0000000A
+SS_SIMPLE          :: 0x0000000B
+SS_LEFTNOWORDWRAP  :: 0x0000000C
+SS_OWNERDRAW       :: 0x0000000D
+SS_BITMAP          :: 0x0000000E
+SS_ENHMETAFILE     :: 0x0000000F
+SS_ETCHEDHORZ      :: 0x00000010
+SS_ETCHEDVERT      :: 0x00000011
+SS_ETCHEDFRAME     :: 0x00000012
+SS_TYPEMASK        :: 0x0000001F
+SS_REALSIZECONTROL :: 0x00000040
+SS_NOPREFIX        :: 0x00000080
+SS_NOTIFY          :: 0x00000100
+SS_CENTERIMAGE     :: 0x00000200
+SS_RIGHTJUST       :: 0x00000400
+SS_REALSIZEIMAGE   :: 0x00000800
+SS_SUNKEN          :: 0x00001000
+SS_EDITCONTROL     :: 0x00002000
+SS_ENDELLIPSIS     :: 0x00004000
+SS_PATHELLIPSIS    :: 0x00008000
+SS_WORDELLIPSIS    :: 0x0000C000
+SS_ELLIPSISMASK    :: 0x0000C000
+
+// Edit Control Styles
+ES_LEFT        :: 0x0000
+ES_CENTER      :: 0x0001
+ES_RIGHT       :: 0x0002
+ES_MULTILINE   :: 0x0004
+ES_UPPERCASE   :: 0x0008
+ES_LOWERCASE   :: 0x0010
+ES_PASSWORD    :: 0x0020
+ES_AUTOVSCROLL :: 0x0040
+ES_AUTOHSCROLL :: 0x0080
+ES_NOHIDESEL   :: 0x0100
+ES_OEMCONVERT  :: 0x0400
+ES_READONLY    :: 0x0800
+ES_WANTRETURN  :: 0x1000
+ES_NUMBER      :: 0x2000
+
+// Font Weights
+FW_DONTCARE   :: 0
+FW_THIN       :: 100
+FW_EXTRALIGHT :: 200
+FW_LIGHT      :: 300
+FW_NORMAL     :: 400
+FW_MEDIUM     :: 500
+FW_SEMIBOLD   :: 600
+FW_BOLD       :: 700
+FW_EXTRABOLD  :: 800
+FW_HEAVY      :: 900
+
+FW_ULTRALIGHT :: FW_EXTRALIGHT
+FW_REGULAR    :: FW_NORMAL
+FW_DEMIBOLD   :: FW_SEMIBOLD
+FW_ULTRABOLD  :: FW_EXTRABOLD
+FW_BLACK      :: FW_HEAVY
 
 PTIMERAPCROUTINE :: #type proc "stdcall" (lpArgToCompletionRoutine: LPVOID, dwTimerLowValue, dwTimerHighValue: DWORD)
 
@@ -372,6 +753,8 @@ MSG :: struct {
 	time: DWORD,
 	pt: POINT,
 }
+
+LPMSG :: ^MSG
 
 PAINTSTRUCT :: struct {
 	hdc: HDC,
@@ -1195,34 +1578,6 @@ STD_ERROR_HANDLE:  DWORD : ~DWORD(0) -12 + 1
 
 PROGRESS_CONTINUE: DWORD : 0
 
-ERROR_FILE_NOT_FOUND: DWORD : 2
-ERROR_PATH_NOT_FOUND: DWORD : 3
-ERROR_ACCESS_DENIED: DWORD : 5
-ERROR_NOT_ENOUGH_MEMORY: DWORD : 8
-ERROR_INVALID_HANDLE: DWORD : 6
-ERROR_NO_MORE_FILES: DWORD : 18
-ERROR_SHARING_VIOLATION: DWORD : 32
-ERROR_LOCK_VIOLATION: DWORD : 33
-ERROR_HANDLE_EOF: DWORD : 38
-ERROR_NOT_SUPPORTED: DWORD : 50
-ERROR_FILE_EXISTS: DWORD : 80
-ERROR_INVALID_PARAMETER: DWORD : 87
-ERROR_BROKEN_PIPE: DWORD : 109
-ERROR_CALL_NOT_IMPLEMENTED: DWORD : 120
-ERROR_INSUFFICIENT_BUFFER: DWORD : 122
-ERROR_INVALID_NAME: DWORD : 123
-ERROR_BAD_ARGUMENTS: DWORD: 160
-ERROR_LOCK_FAILED: DWORD : 167
-ERROR_ALREADY_EXISTS: DWORD : 183
-ERROR_NO_DATA: DWORD : 232
-ERROR_ENVVAR_NOT_FOUND: DWORD : 203
-ERROR_OPERATION_ABORTED: DWORD : 995
-ERROR_IO_PENDING: DWORD : 997
-ERROR_TIMEOUT: DWORD : 0x5B4
-ERROR_NO_UNICODE_TRANSLATION: DWORD : 1113
-
-E_NOTIMPL :: HRESULT(-0x7fff_bfff) // 0x8000_4001
-
 INVALID_HANDLE :: HANDLE(~uintptr(0))
 INVALID_HANDLE_VALUE :: INVALID_HANDLE
 
@@ -1551,7 +1906,41 @@ PGUID   :: ^GUID
 PCGUID  :: ^GUID
 LPGUID  :: ^GUID
 LPCGUID :: ^GUID
+REFIID  :: ^GUID
 
+REFGUID :: GUID
+IID :: GUID
+CLSID :: GUID
+REFCLSID :: ^CLSID
+
+CLSCTX_INPROC_SERVER                  :: 0x1
+CLSCTX_INPROC_HANDLER                 :: 0x2
+CLSCTX_LOCAL_SERVER                   :: 0x4
+CLSCTX_INPROC_SERVER16                :: 0x8
+CLSCTX_REMOTE_SERVER                  :: 0x10
+CLSCTX_INPROC_HANDLER16               :: 0x20
+CLSCTX_RESERVED1                      :: 0x40
+CLSCTX_RESERVED2                      :: 0x80
+CLSCTX_RESERVED3                      :: 0x100
+CLSCTX_RESERVED4                      :: 0x200
+CLSCTX_NO_CODE_DOWNLOAD               :: 0x400
+CLSCTX_RESERVED5                      :: 0x800
+CLSCTX_NO_CUSTOM_MARSHAL              :: 0x1000
+CLSCTX_ENABLE_CODE_DOWNLOAD           :: 0x2000
+CLSCTX_NO_FAILURE_LOG                 :: 0x4000
+CLSCTX_DISABLE_AAA                    :: 0x8000
+CLSCTX_ENABLE_AAA                     :: 0x10000
+CLSCTX_FROM_DEFAULT_CONTEXT           :: 0x20000
+CLSCTX_ACTIVATE_X86_SERVER            :: 0x40000
+CLSCTX_ACTIVATE_32_BIT_SERVER         :: CLSCTX_ACTIVATE_X86_SERVER
+CLSCTX_ACTIVATE_64_BIT_SERVER         :: 0x80000
+CLSCTX_ENABLE_CLOAKING                :: 0x100000
+CLSCTX_APPCONTAINER                   :: 0x400000
+CLSCTX_ACTIVATE_AAA_AS_IU             :: 0x800000
+CLSCTX_RESERVED6                      :: 0x1000000
+CLSCTX_ACTIVATE_ARM32_SERVER          :: 0x2000000
+CLSCTX_ALLOW_LOWER_TRUST_REGISTRATION :: 0x4000000
+CLSCTX_PS_DLL                         :: 0x80000000
 
 WSAPROTOCOLCHAIN :: struct {
 	ChainLen: c_int,
@@ -2398,4 +2787,466 @@ IMAGE_EXPORT_DIRECTORY :: struct {
 	AddressOfFunctions:    DWORD, // RVA from base of image
 	AddressOfNames:        DWORD, // RVA from base of image
 	AddressOfNameOrdinals: DWORD, // RVA from base of image
+}
+
+SICHINTF :: DWORD
+SHCONTF :: DWORD
+SFGAOF :: ULONG
+FILEOPENDIALOGOPTIONS :: DWORD
+REFPROPERTYKEY :: ^PROPERTYKEY
+REFPROPVARIANT :: ^PROPVARIANT
+
+SIGDN :: enum c_int {
+	NORMALDISPLAY               = 0,
+	PARENTRELATIVEPARSING       = -2147385343, // 0x80018001
+	DESKTOPABSOLUTEPARSING      = -2147319808, // 0x80028000
+	PARENTRELATIVEEDITING       = -2147282943, // 0x80031001
+	DESKTOPABSOLUTEEDITING      = -2147172352, // 0x8004c000
+	FILESYSPATH                 = -2147123200, // 0x80058000
+	URL                         = -2147057664, // 0x80068000
+	PARENTRELATIVEFORADDRESSBAR = -2146975743, // 0x8007c001
+	PARENTRELATIVE              = -2146959359, // 0x80080001
+	PARENTRELATIVEFORUI         = -2146877439, // 0x80094001
+}
+
+SIATTRIBFLAGS :: enum c_int {
+  AND	= 0x1,
+  OR	= 0x2,
+  APPCOMPAT	= 0x3,
+  MASK	= 0x3,
+  ALLITEMS	= 0x4000,
+}
+
+FDAP :: enum c_int {
+	BOTTOM = 0,
+	TOP = 1,
+}
+
+FDE_SHAREVIOLATION_RESPONSE :: enum c_int {
+	DEFAULT = 0,
+	ACCEPT = 1,
+	REFUSE = 2,
+}
+
+GETPROPERTYSTOREFLAGS :: enum c_int {
+	DEFAULT	= 0,
+	HANDLERPROPERTIESONLY	= 0x1,
+	READWRITE	= 0x2,
+	TEMPORARY	= 0x4,
+	FASTPROPERTIESONLY	= 0x8,
+	OPENSLOWITEM	= 0x10,
+	DELAYCREATION	= 0x20,
+	BESTEFFORT	= 0x40,
+	NO_OPLOCK	= 0x80,
+	PREFERQUERYPROPERTIES	= 0x100,
+	EXTRINSICPROPERTIES	= 0x200,
+	EXTRINSICPROPERTIESONLY	= 0x400,
+	VOLATILEPROPERTIES	= 0x800,
+	VOLATILEPROPERTIESONLY	= 0x1000,
+	MASK_VALID	= 0x1fff,
+}
+
+PROPERTYKEY :: struct {
+	fmtid: GUID,
+	pid: DWORD,
+}
+
+BIND_OPTS :: struct {
+	cbStruct: DWORD,
+	grfFlags: DWORD,
+	grfMode: DWORD,
+	dwTickCountDeadline: DWORD,
+}
+
+STATSTG :: struct {
+	pwcsName: LPOLESTR,
+	type: DWORD,
+	cbSize: ULARGE_INTEGER,
+	mtime: FILETIME,
+	ctime: FILETIME,
+	atime: FILETIME,
+	grfMode: DWORD,
+	grfLocksSupported: DWORD,
+	clsid: CLSID,
+	grfStateBits: DWORD,
+	reserved: DWORD,
+}
+
+COMDLG_FILTERSPEC :: struct {
+	pszName, pszSpec: LPCWSTR,
+}
+
+DECIMAL :: struct {
+	wReserved: USHORT,
+	_: struct #raw_union {
+		_: struct {
+			scale, sign: BYTE,
+		},
+		signscale: USHORT,
+	},
+	Hi32: ULONG,
+	_: struct #raw_union {
+		_: struct {
+			Lo32, Mid32: ULONG,
+		},
+		Lo64: ULONGLONG,
+	},
+}
+
+// NOTE(ftphikari): bigger definition of this struct is ignored
+PROPVARIANT :: struct {
+	decVal: DECIMAL,
+}
+
+SICHINT_DISPLAY                       :: 0
+SICHINT_ALLFIELDS                     :: -2147483648 // 0x80000000
+SICHINT_CANONICAL                     :: 0x10000000
+SICHINT_TEST_FILESYSPATH_IF_NOT_EQUAL :: 0x20000000
+
+FOS_OVERWRITEPROMPT          :: 0x2
+FOS_STRICTFILETYPES          :: 0x4
+FOS_NOCHANGEDIR              :: 0x8
+FOS_PICKFOLDERS              :: 0x20
+FOS_FORCEFILESYSTEM          :: 0x40
+FOS_ALLNONSTORAGEITEMS       :: 0x80
+FOS_NOVALIDATE               :: 0x100
+FOS_ALLOWMULTISELECT         :: 0x200
+FOS_PATHMUSTEXIST            :: 0x800
+FOS_FILEMUSTEXIST            :: 0x1000
+FOS_CREATEPROMPT             :: 0x2000
+FOS_SHAREAWARE               :: 0x4000
+FOS_NOREADONLYRETURN         :: 0x8000
+FOS_NOTESTFILECREATE         :: 0x10000
+FOS_HIDEMRUPLACES            :: 0x20000
+FOS_HIDEPINNEDPLACES         :: 0x40000
+FOS_NODEREFERENCELINKS       :: 0x100000
+FOS_OKBUTTONNEEDSINTERACTION :: 0x200000
+FOS_DONTADDTORECENT          :: 0x2000000
+FOS_FORCESHOWHIDDEN          :: 0x10000000
+FOS_DEFAULTNOMINIMODE        :: 0x20000000
+FOS_FORCEPREVIEWPANEON       :: 0x40000000
+FOS_SUPPORTSTREAMABLEITEMS   :: 0x80000000
+
+SHCONTF_CHECKING_FOR_CHILDREN :: 0x10
+SHCONTF_FOLDERS               :: 0x20
+SHCONTF_NONFOLDERS            :: 0x40
+SHCONTF_INCLUDEHIDDEN         :: 0x80
+SHCONTF_INIT_ON_FIRST_NEXT    :: 0x100
+SHCONTF_NETPRINTERSRCH        :: 0x200
+SHCONTF_SHAREABLE             :: 0x400
+SHCONTF_STORAGE               :: 0x800
+SHCONTF_NAVIGATION_ENUM       :: 0x1000
+SHCONTF_FASTITEMS             :: 0x2000
+SHCONTF_FLATLIST              :: 0x4000
+SHCONTF_ENABLE_ASYNC          :: 0x8000
+SHCONTF_INCLUDESUPERHIDDEN    :: 0x10000
+
+CLSID_FileOpenDialog := &GUID{0xDC1C5A9C, 0xE88A, 0x4DDE, {0xA5, 0xA1, 0x60, 0xF8, 0x2A, 0x20, 0xAE, 0xF7}}
+CLSID_FileSaveDialog := &GUID{0xC0B4E2F3, 0xBA21, 0x4773, {0x8D, 0xBA, 0x33, 0x5E, 0xC9, 0x46, 0xEB, 0x8B}}
+
+IID_IFileDialog := &GUID{0x42F85136, 0xDB7E, 0x439C, {0x85, 0xF1, 0xE4, 0x07, 0x5D, 0x13, 0x5F, 0xC8}}
+IID_IFileSaveDialog := &GUID{0x84BCCD23, 0x5FDE, 0x4CDB, {0xAE, 0xA4, 0xAF, 0x64, 0xB8, 0x3D, 0x78, 0xAB}}
+IID_IFileOpenDialog := &GUID{0xD57C7288, 0xD4AD, 0x4768, {0xBE, 0x02, 0x9D, 0x96, 0x95, 0x32, 0xD9, 0x60}}
+
+IModalWindow :: struct #raw_union {
+	#subtype IUnknown: IUnknown,
+	using Vtbl: ^IModalWindowVtbl,
+}
+IModalWindowVtbl :: struct {
+	using IUnknownVtbl: IUnknownVtbl,
+	Show: proc "stdcall" (this: ^IModalWindow, hwndOwner: HWND) -> HRESULT,
+}
+
+ISequentialStream :: struct #raw_union {
+	#subtype IUnknown: IUnknown,
+	using Vtbl: ^ISequentialStreamVtbl,
+}
+ISequentialStreamVtbl :: struct {
+	using IUnknownVtbl: IUnknownVtbl,
+	Read:  proc "stdcall" (this: ^ISequentialStream, pv: rawptr, cb: ULONG, pcbRead: ^ULONG) -> HRESULT,
+	Write: proc "stdcall" (this: ^ISequentialStream, pv: rawptr, cb: ULONG, pcbWritten: ^ULONG) -> HRESULT,
+}
+
+IStream :: struct #raw_union {
+	#subtype ISequentialStream: ISequentialStream,
+	using Vtbl: ^IStreamVtbl,
+}
+IStreamVtbl :: struct {
+	using ISequentialStreamVtbl: ISequentialStreamVtbl,
+	Seek:         proc "stdcall" (this: ^IStream, dlibMove: LARGE_INTEGER, dwOrigin: DWORD, plibNewPosition: ^ULARGE_INTEGER) -> HRESULT,
+	SetSize:      proc "stdcall" (this: ^IStream, libNewSize: ULARGE_INTEGER) -> HRESULT,
+	CopyTo:       proc "stdcall" (this: ^IStream, pstm: ^IStream, cb: ULARGE_INTEGER, pcbRead: ^ULARGE_INTEGER, pcbWritten: ^ULARGE_INTEGER) -> HRESULT,
+	Commit:       proc "stdcall" (this: ^IStream, grfCommitFlags: DWORD) -> HRESULT,
+	Revert:       proc "stdcall" (this: ^IStream) -> HRESULT,
+	LockRegion:   proc "stdcall" (this: ^IStream, libOffset: ULARGE_INTEGER, cb: ULARGE_INTEGER, dwLockType: DWORD) -> HRESULT,
+	UnlockRegion: proc "stdcall" (this: ^IStream, libOffset: ULARGE_INTEGER, cb: ULARGE_INTEGER, dwLockType: DWORD) -> HRESULT,
+	Stat:         proc "stdcall" (this: ^IStream, pstatstg: ^STATSTG, grfStatFlag: DWORD) -> HRESULT,
+	Clone:        proc "stdcall" (this: ^IStream, ppstm: ^^IStream) -> HRESULT,
+}
+
+IPersist :: struct #raw_union {
+	#subtype IUnknown: IUnknown,
+	using Vtbl: ^IPersistVtbl,
+}
+IPersistVtbl :: struct {
+	using IUnknownVtbl: IUnknownVtbl,
+	GetClassID: proc "stdcall" (this: ^IPersist, pClassID: ^CLSID) -> HRESULT,
+}
+
+IPersistStream :: struct #raw_union {
+	#subtype IPersist: IPersist,
+	using Vtbl: ^IPersistStreamVtbl,
+}
+IPersistStreamVtbl :: struct {
+	using IPersistVtbl: IPersistVtbl,
+	IsDirty:    proc "stdcall" (this: ^IPersistStream) -> HRESULT,
+	Load:       proc "stdcall" (this: ^IPersistStream, pStm: ^IStream) -> HRESULT,
+	Save:       proc "stdcall" (this: ^IPersistStream, pStm: ^IStream, fClearDirty: BOOL) -> HRESULT,
+	GetSizeMax: proc "stdcall" (this: ^IPersistStream, pcbSize: ^ULARGE_INTEGER) -> HRESULT,
+}
+
+IMoniker :: struct #raw_union {
+	#subtype IPersistStream: IPersistStream,
+	using Vtbl: ^IMonikerVtbl,
+}
+IMonikerVtbl :: struct {
+	using IPersistStreamVtbl: IPersistStreamVtbl,
+	BindToObject:        proc "stdcall" (this: ^IMoniker, pbc: ^IBindCtx, pmkToLeft: ^IMoniker, riidResult: REFIID, ppvResult: ^rawptr) -> HRESULT,
+	BindToStorage:       proc "stdcall" (this: ^IMoniker, pbc: ^IBindCtx, pmkToLeft: ^IMoniker, riid: REFIID, ppvObj: ^rawptr) -> HRESULT,
+	Reduce:              proc "stdcall" (this: ^IMoniker, pbc: ^IBindCtx, dwReduceHowFar: DWORD, ppmkToLeft: ^^IMoniker, ppmkReduced: ^^IMoniker) -> HRESULT,
+	ComposeWith:         proc "stdcall" (this: ^IMoniker, pmkRight: ^IMoniker, fOnlyIfNotGeneric: BOOL, ppmkComposite: ^^IMoniker) -> HRESULT,
+	Enum:                proc "stdcall" (this: ^IMoniker, fForward: BOOL, ppenumMoniker: ^^IEnumMoniker) -> HRESULT,
+	IsEqual:             proc "stdcall" (this: ^IMoniker, pmkOtherMoniker: ^IMoniker) -> HRESULT,
+	Hash:                proc "stdcall" (this: ^IMoniker, pdwHash: ^DWORD) -> HRESULT,
+	IsRunning:           proc "stdcall" (this: ^IMoniker, pbc: ^IBindCtx, pmkToLeft: ^IMoniker, pmkNewlyRunning: ^IMoniker) -> HRESULT,
+	GetTimeOfLastChange: proc "stdcall" (this: ^IMoniker, pbc: ^IBindCtx, pmkToLeft: ^IMoniker, pFileTime: ^FILETIME) -> HRESULT,
+	Inverse:             proc "stdcall" (this: ^IMoniker, ppmk: ^^IMoniker) -> HRESULT,
+	CommonPrefixWith:    proc "stdcall" (this: ^IMoniker, pmkOther: ^IMoniker, ppmkPrefix: ^^IMoniker) -> HRESULT,
+	RelativePathTo:      proc "stdcall" (this: ^IMoniker, pmkOther: ^IMoniker, ppmkRelPath: ^^IMoniker) -> HRESULT,
+	GetDisplayName:      proc "stdcall" (this: ^IMoniker, pbc: ^IBindCtx, pmkToLeft: ^IMoniker, ppszDisplayName: ^LPOLESTR) -> HRESULT,
+	ParseDisplayName:    proc "stdcall" (this: ^IMoniker, pbc: ^IBindCtx, pmkToLeft: ^IMoniker, pszDisplayName: LPOLESTR, pchEaten: ^ULONG, ppmkOut: ^^IMoniker) -> HRESULT,
+	IsSystemMoniker:     proc "stdcall" (this: ^IMoniker, pdwMksys: ^DWORD) -> HRESULT,
+}
+
+IEnumMoniker :: struct #raw_union {
+	#subtype IUnknown: IUnknown,
+	using Vtbl: ^IEnumMonikerVtbl,
+}
+IEnumMonikerVtbl :: struct {
+	using IUnknownVtbl: IUnknownVtbl,
+	Next:  proc "stdcall" (this: ^IEnumMoniker, celt: ULONG, rgelt: ^^IMoniker, pceltFetched: ^ULONG) -> HRESULT,
+	Skip:  proc "stdcall" (this: ^IEnumMoniker, celt: ULONG) -> HRESULT,
+	Reset: proc "stdcall" (this: ^IEnumMoniker) -> HRESULT,
+	Clone: proc "stdcall" (this: ^IEnumMoniker, ppenum: ^^IEnumMoniker) -> HRESULT,
+}
+
+IRunningObjectTable :: struct #raw_union {
+	#subtype IUnknown: IUnknown,
+	using Vtbl: ^IRunningObjectTableVtbl,
+}
+IRunningObjectTableVtbl :: struct {
+	using IUnknownVtbl: IUnknownVtbl,
+	Register:            proc "stdcall" (this: ^IRunningObjectTable, grfFlags: DWORD, punkObject: ^IUnknown, pmkObjectName: ^IMoniker, pdwRegister: ^DWORD) -> HRESULT,
+	Revoke:              proc "stdcall" (this: ^IRunningObjectTable, dwRegister: DWORD) -> HRESULT,
+	IsRunning:           proc "stdcall" (this: ^IRunningObjectTable, pmkObjectName: ^IMoniker) -> HRESULT,
+	GetObject:           proc "stdcall" (this: ^IRunningObjectTable, pmkObjectName: ^IMoniker, ppunkObject: ^^IUnknown) -> HRESULT,
+	NoteChangeTime:      proc "stdcall" (this: ^IRunningObjectTable, dwRegister: DWORD, pfiletime: ^FILETIME) -> HRESULT,
+	GetTimeOfLastChange: proc "stdcall" (this: ^IRunningObjectTable, pmkObjectName: ^IMoniker, pfiletime: ^FILETIME) -> HRESULT,
+	EnumRunning:         proc "stdcall" (this: ^IRunningObjectTable, ppenumMoniker: ^^IEnumMoniker) -> HRESULT,
+}
+
+IEnumString :: struct #raw_union {
+	#subtype IUnknown: IUnknown,
+	using Vtbl: ^IEnumStringVtbl,
+}
+IEnumStringVtbl :: struct {
+	using IUnknownVtbl: IUnknownVtbl,
+	Next:  proc "stdcall" (this: ^IEnumString, celt: ULONG, rgelt: ^LPOLESTR, pceltFetched: ^ULONG) -> HRESULT,
+	Skip:  proc "stdcall" (this: ^IEnumString, celt: ULONG) -> HRESULT,
+	Reset: proc "stdcall" (this: ^IEnumString) -> HRESULT,
+	Clone: proc "stdcall" (this: ^IEnumString, ppenum: ^^IEnumString) -> HRESULT,
+}
+
+IBindCtx :: struct #raw_union {
+	#subtype IUnknown: IUnknown,
+	using Vtbl: ^IBindCtxVtbl,
+}
+IBindCtxVtbl :: struct {
+	using IUnknownVtbl: IUnknownVtbl,
+	RegisterObjectBound:   proc "stdcall" (this: ^IBindCtx, punk: ^IUnknown) -> HRESULT,
+	RevokeObjectBound:     proc "stdcall" (this: ^IBindCtx, punk: ^IUnknown) -> HRESULT,
+	ReleaseBoundObjects:   proc "stdcall" (this: ^IBindCtx) -> HRESULT,
+	SetBindOptions:        proc "stdcall" (this: ^IBindCtx, pbindopts: ^BIND_OPTS) -> HRESULT,
+	GetBindOptions:        proc "stdcall" (this: ^IBindCtx, pbindopts: ^BIND_OPTS) -> HRESULT,
+	GetRunningObjectTable: proc "stdcall" (this: ^IBindCtx, pprot: ^^IRunningObjectTable) -> HRESULT,
+	RegisterObjectParam:   proc "stdcall" (this: ^IBindCtx, pszKey: LPOLESTR, punk: ^IUnknown) -> HRESULT,
+	GetObjectParam:        proc "stdcall" (this: ^IBindCtx, pszKey: LPOLESTR, ppunk: ^^IUnknown) -> HRESULT,
+	EnumObjectParam:       proc "stdcall" (this: ^IBindCtx, ppenum: ^^IEnumString) -> HRESULT,
+	RevokeObjectParam:     proc "stdcall" (this: ^IBindCtx, pszKey: LPOLESTR) -> HRESULT,
+}
+
+IEnumShellItems :: struct #raw_union {
+	#subtype IUnknown: IUnknown,
+	using Vtbl: ^IEnumShellItemsVtbl,
+}
+IEnumShellItemsVtbl :: struct {
+	using IUnknownVtbl: IUnknownVtbl,
+	Next:  proc "stdcall" (this: ^IEnumShellItems, celt: ULONG, rgelt: ^^IShellItem, pceltFetched: ^ULONG) -> HRESULT,
+	Skip:  proc "stdcall" (this: ^IEnumShellItems, celt: ULONG) -> HRESULT,
+	Reset: proc "stdcall" (this: ^IEnumShellItems) -> HRESULT,
+	Clone: proc "stdcall" (this: ^IEnumShellItems, ppenum: ^^IEnumShellItems) -> HRESULT,
+}
+
+IShellItem :: struct #raw_union {
+	#subtype IUnknown: IUnknown,
+	using Vtbl: ^IShellItemVtbl,
+}
+IShellItemVtbl :: struct {
+	using IUnknownVtbl: IUnknownVtbl,
+	BindToHandler:  proc "stdcall" (this: ^IShellItem, pbc: ^IBindCtx, bhid: REFGUID, riid: REFIID, ppv: ^rawptr) -> HRESULT,
+	GetParent:      proc "stdcall" (this: ^IShellItem, ppsiFolder: ^^IShellItem) -> HRESULT,
+	GetDisplayName: proc "stdcall" (this: ^IShellItem, sigdnName: SIGDN, ppszName: ^LPWSTR) -> HRESULT,
+	GetAttributes:  proc "stdcall" (this: ^IShellItem, sfgaoMask: SFGAOF, psfgaoAttribs: ^SFGAOF) -> HRESULT,
+	Compare:        proc "stdcall" (this: ^IShellItem, psi: ^IShellItem, hint: SICHINTF, piOrder: ^c_int) -> HRESULT,
+}
+
+IShellItemArray :: struct #raw_union {
+	#subtype IUnknown: IUnknown,
+	using Vtbl: ^IShellItemArrayVtbl,
+}
+IShellItemArrayVtbl :: struct {
+	using IUnknownVtbl: IUnknownVtbl,
+	BindToHandler:              proc "stdcall" (this: ^IShellItemArray, pbc: ^IBindCtx, bhid: REFGUID, riid: REFIID, ppvOut: ^rawptr) -> HRESULT,
+	GetPropertyStore:           proc "stdcall" (this: ^IShellItemArray, flags: GETPROPERTYSTOREFLAGS, riid: REFIID, ppv: ^rawptr) -> HRESULT,
+	GetPropertyDescriptionList: proc "stdcall" (this: ^IShellItemArray, keyType: REFPROPERTYKEY, riid: REFIID, ppv: ^rawptr) -> HRESULT,
+	GetAttributes:              proc "stdcall" (this: ^IShellItemArray, AttribFlags: SIATTRIBFLAGS, sfgaoMask: SFGAOF, psfgaoAttribs: ^SFGAOF) -> HRESULT,
+	GetCount:                   proc "stdcall" (this: ^IShellItemArray, pdwNumItems: ^DWORD) -> HRESULT,
+	GetItemAt:                  proc "stdcall" (this: ^IShellItemArray, dwIndex: DWORD, ppsi: ^^IShellItem) -> HRESULT,
+	EnumItems:                  proc "stdcall" (this: ^IShellItemArray, ppenumShellItems: ^^IEnumShellItems) -> HRESULT,
+}
+
+IFileDialogEvents :: struct #raw_union {
+	#subtype IUnknown: IUnknown,
+	using Vtbl: ^IFileDialogEventsVtbl,
+}
+IFileDialogEventsVtbl :: struct {
+	using IUnknownVtbl: IUnknownVtbl,
+	OnFileOk:          proc "stdcall" (this: ^IFileDialogEvents, pfd: ^IFileDialog) -> HRESULT,
+	OnFolderChanging:  proc "stdcall" (this: ^IFileDialogEvents, pfd: ^IFileDialog, psiFolder: ^IShellItem) -> HRESULT,
+	OnFolderChange:    proc "stdcall" (this: ^IFileDialogEvents, pfd: ^IFileDialog) -> HRESULT,
+	OnSelectionChange: proc "stdcall" (this: ^IFileDialogEvents, pfd: ^IFileDialog) -> HRESULT,
+	OnShareViolation:  proc "stdcall" (this: ^IFileDialogEvents, pfd: ^IFileDialog, psi: ^IShellItem, pResponse: ^FDE_SHAREVIOLATION_RESPONSE) -> HRESULT,
+	OnTypeChange:      proc "stdcall" (this: ^IFileDialogEvents, pfd: ^IFileDialog) -> HRESULT,
+	OnOverwrite:       proc "stdcall" (this: ^IFileDialogEvents, pfd: ^IFileDialog, psi: ^IShellItem, pResponse: ^FDE_SHAREVIOLATION_RESPONSE) -> HRESULT,
+}
+
+IShellItemFilter :: struct #raw_union {
+	#subtype IUnknown: IUnknown,
+	using Vtbl: ^IShellItemFilterVtbl,
+}
+IShellItemFilterVtbl :: struct {
+	using IUnknownVtbl: IUnknownVtbl,
+	IncludeItem:         proc "stdcall" (this: ^IShellItemFilter, psi: ^IShellItem) -> HRESULT,
+	GetEnumFlagsForItem: proc "stdcall" (this: ^IShellItemFilter, psi: ^IShellItem, pgrfFlags: ^SHCONTF) -> HRESULT,
+}
+
+IFileDialog :: struct #raw_union {
+	#subtype IModalWindow: IModalWindow,
+	using Vtbl: ^IFileDialogVtbl,
+}
+IFileDialogVtbl :: struct {
+	using IModalWindowVtbl: IModalWindowVtbl,
+	SetFileTypes:        proc "stdcall" (this: ^IFileDialog, cFileTypes: UINT, rgFilterSpec: ^COMDLG_FILTERSPEC) -> HRESULT,
+	SetFileTypeIndex:    proc "stdcall" (this: ^IFileDialog, iFileType: UINT) -> HRESULT,
+	GetFileTypeIndex:    proc "stdcall" (this: ^IFileDialog, piFileType: ^UINT) -> HRESULT,
+	Advise:              proc "stdcall" (this: ^IFileDialog, pfde: ^IFileDialogEvents, pdwCookie: ^DWORD) -> HRESULT,
+	Unadvise:            proc "stdcall" (this: ^IFileDialog, dwCookie: DWORD) -> HRESULT,
+	SetOptions:          proc "stdcall" (this: ^IFileDialog, fos: FILEOPENDIALOGOPTIONS) -> HRESULT,
+	GetOptions:          proc "stdcall" (this: ^IFileDialog, pfos: ^FILEOPENDIALOGOPTIONS) -> HRESULT,
+	SetDefaultFolder:    proc "stdcall" (this: ^IFileDialog, psi: ^IShellItem) -> HRESULT,
+	SetFolder:           proc "stdcall" (this: ^IFileDialog, psi: ^IShellItem) -> HRESULT,
+	GetFolder:           proc "stdcall" (this: ^IFileDialog, ppsi: ^^IShellItem) -> HRESULT,
+	GetCurrentSelection: proc "stdcall" (this: ^IFileDialog, ppsi: ^^IShellItem) -> HRESULT,
+	SetFileName:         proc "stdcall" (this: ^IFileDialog, pszName: LPCWSTR) -> HRESULT,
+	GetFileName:         proc "stdcall" (this: ^IFileDialog, pszName: ^LPCWSTR) -> HRESULT,
+	SetTitle:            proc "stdcall" (this: ^IFileDialog, pszTitle: LPCWSTR) -> HRESULT,
+	SetOkButtonLabel:    proc "stdcall" (this: ^IFileDialog, pszText: LPCWSTR) -> HRESULT,
+	SetFileNameLabel:    proc "stdcall" (this: ^IFileDialog, pszLabel: LPCWSTR) -> HRESULT,
+	GetResult:           proc "stdcall" (this: ^IFileDialog, ppsi: ^^IShellItem) -> HRESULT,
+	AddPlace:            proc "stdcall" (this: ^IFileDialog, psi: ^IShellItem, fdap: FDAP) -> HRESULT,
+	SetDefaultExtension: proc "stdcall" (this: ^IFileDialog, pszDefaultExtension: LPCWSTR) -> HRESULT,
+	Close:               proc "stdcall" (this: ^IFileDialog, hr: HRESULT) -> HRESULT,
+	SetClientGuid:       proc "stdcall" (this: ^IFileDialog, guid: REFGUID) -> HRESULT,
+	ClearClientData:     proc "stdcall" (this: ^IFileDialog) -> HRESULT,
+	SetFilter:           proc "stdcall" (this: ^IFileDialog, pFilter: ^IShellItemFilter) -> HRESULT,
+}
+
+IFileOpenDialog :: struct #raw_union {
+	#subtype IFileDialog: IFileDialog,
+	using Vtbl: ^IFileOpenDialogVtbl,
+}
+IFileOpenDialogVtbl :: struct {
+	using IFileDialogVtbl: IFileDialogVtbl,
+	GetResults:       proc "stdcall" (this: ^IFileOpenDialog, ppenum: ^^IShellItemArray) -> HRESULT,
+	GetSelectedItems: proc "stdcall" (this: ^IFileOpenDialog, ppsai: ^^IShellItemArray) -> HRESULT,
+}
+
+IPropertyStore :: struct #raw_union {
+	#subtype IUnknown: IUnknown,
+	using Vtbl: ^IPropertyStoreVtbl,
+}
+IPropertyStoreVtbl :: struct {
+	using IUnknownVtbl: IUnknownVtbl,
+	GetCount: proc "stdcall" (this: ^IPropertyStore, cProps: ^DWORD) -> HRESULT,
+	GetAt:    proc "stdcall" (this: ^IPropertyStore, iProp: DWORD, pkey: ^PROPERTYKEY) -> HRESULT,
+	GetValue: proc "stdcall" (this: ^IPropertyStore, key: REFPROPERTYKEY, pv: ^PROPVARIANT) -> HRESULT,
+	SetValue: proc "stdcall" (this: ^IPropertyStore, key: REFPROPERTYKEY, propvar: REFPROPVARIANT) -> HRESULT,
+	Commit:   proc "stdcall" (this: ^IPropertyStore) -> HRESULT,
+}
+
+IPropertyDescriptionList :: struct #raw_union {
+	#subtype IUnknown: IUnknown,
+	using Vtbl: ^IPropertyDescriptionListVtbl,
+}
+IPropertyDescriptionListVtbl :: struct {
+	using IUnknownVtbl: IUnknownVtbl,
+	GetCount: proc "stdcall" (this: ^IPropertyDescriptionList, pcElem: ^UINT) -> HRESULT,
+	GetAt:    proc "stdcall" (this: ^IPropertyDescriptionList, iElem: UINT, riid: REFIID, ppv: ^rawptr) -> HRESULT,
+}
+
+IFileOperationProgressSink :: struct #raw_union {
+	#subtype IUnknown: IUnknown,
+	using Vtbl: ^IFileOperationProgressSinkVtbl,
+}
+IFileOperationProgressSinkVtbl :: struct {
+	using IUnknownVtbl: IUnknownVtbl,
+	StartOperations:  proc "stdcall" (this: ^IFileOperationProgressSink) -> HRESULT,
+	FinishOperations: proc "stdcall" (this: ^IFileOperationProgressSink, hrResult: HRESULT) -> HRESULT,
+	PreRenameItem:    proc "stdcall" (this: ^IFileOperationProgressSink, dwFlags: DWORD, psiItem: ^IShellItem, pszNewName: LPCWSTR) -> HRESULT,
+	PostRenameItem:   proc "stdcall" (this: ^IFileOperationProgressSink, dwFlags: DWORD, psiItem: ^IShellItem, pszNewName: LPCWSTR, hrRename: HRESULT, psiNewlyCreated: ^IShellItem) -> HRESULT,
+	PreMoveItem:      proc "stdcall" (this: ^IFileOperationProgressSink, dwFlags: DWORD, psiItem: ^IShellItem, psiDestinationFolder: ^IShellItem, pszNewName: LPCWSTR) -> HRESULT,
+	PostMoveItem:     proc "stdcall" (this: ^IFileOperationProgressSink, dwFlags: DWORD, psiItem: ^IShellItem, psiDestinationFolder: ^IShellItem, pszNewName: LPCWSTR, hrMove: HRESULT, psiNewlyCreated: ^IShellItem) -> HRESULT,
+	PreCopyItem:      proc "stdcall" (this: ^IFileOperationProgressSink, dwFlags: DWORD, psiItem: ^IShellItem, psiDestinationFolder: ^IShellItem, pszNewName: LPCWSTR) -> HRESULT,
+	PostCopyItem:     proc "stdcall" (this: ^IFileOperationProgressSink, dwFlags: DWORD, psiItem: ^IShellItem, psiDestinationFolder: ^IShellItem, pszNewName: LPCWSTR, hrMove: HRESULT, psiNewlyCreated: ^IShellItem) -> HRESULT,
+	PreDeleteItem:    proc "stdcall" (this: ^IFileOperationProgressSink, dwFlags: DWORD, psiItem: ^IShellItem) -> HRESULT,
+	PostDeleteItem:   proc "stdcall" (this: ^IFileOperationProgressSink, dwFlags: DWORD, psiItem: ^IShellItem, hrDelete: HRESULT, psiNewlyCreated: ^IShellItem) -> HRESULT,
+	PreNewItem:       proc "stdcall" (this: ^IFileOperationProgressSink, dwFlags: DWORD, psiDestinationFolder: ^IShellItem, pszNewName: LPCWSTR) -> HRESULT,
+	PostNewItem:      proc "stdcall" (this: ^IFileOperationProgressSink, dwFlags: DWORD, psiDestinationFolder: ^IShellItem, pszNewName: LPCWSTR, pszTemplateName: LPCWSTR, dwFileAttributes: DWORD, hrNew: HRESULT, psiNewItem: ^IShellItem) -> HRESULT,
+	UpdateProgress:   proc "stdcall" (this: ^IFileOperationProgressSink, iWorkTotal: UINT, iWorkSoFar: UINT) -> HRESULT,
+	ResetTimer:       proc "stdcall" (this: ^IFileOperationProgressSink) -> HRESULT,
+	PauseTimer:       proc "stdcall" (this: ^IFileOperationProgressSink) -> HRESULT,
+	ResumeTimer:      proc "stdcall" (this: ^IFileOperationProgressSink) -> HRESULT,
+}
+
+IFileSaveDialog :: struct #raw_union {
+	#subtype IFileDialog: IFileDialog,
+	using Vtbl: ^IFileSaveDialogVtbl,
+}
+IFileSaveDialogVtbl :: struct {
+	using IFileDialogVtbl: IFileDialogVtbl,
+	SetSaveAsItem:          proc "stdcall" (this: ^IFileSaveDialog, psi: ^IShellItem) -> HRESULT,
+	SetProperties:          proc "stdcall" (this: ^IFileSaveDialog, pStore: ^IPropertyStore) -> HRESULT,
+	SetCollectedProperties: proc "stdcall" (this: ^IFileSaveDialog, pList: ^IPropertyDescriptionList, fAppendDefault: BOOL) -> HRESULT,
+	GetProperties:          proc "stdcall" (this: ^IFileSaveDialog, ppStore: ^^IPropertyStore) -> HRESULT,
+	ApplyProperties:        proc "stdcall" (this: ^IFileSaveDialog, psi: ^IShellItem, pStore: ^IPropertyStore, hwnd: HWND, pSink: ^IFileOperationProgressSink) -> HRESULT,
 }
