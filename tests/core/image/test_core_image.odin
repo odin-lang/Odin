@@ -20,6 +20,7 @@ import "core:image/qoi"
 import "core:bytes"
 import "core:hash"
 import "core:fmt"
+import "core:strings"
 
 import "core:mem"
 import "core:os"
@@ -1463,7 +1464,7 @@ run_png_suite :: proc(t: ^testing.T, suite: []PNG_Test) -> (subtotal: int) {
 	context = runtime.default_context()
 
 	for file in suite {
-		test_file := fmt.tprintf("%v/%v.png", TEST_SUITE_PATH, file.file)
+		test_file := strings.concatenate({TEST_SUITE_PATH, "/", file.file, ".png"}, context.temp_allocator)
 
 		img: ^png.Image
 		err: png.Error
