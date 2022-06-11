@@ -28,6 +28,7 @@ Info :: struct {
 	reordered:      bool,
 	good_arg_index: bool,
 	ignore_user_formatters: bool,
+	in_bad: bool,
 
 	writer: io.Writer,
 	arg: any, // Temporary
@@ -591,6 +592,10 @@ int_from_arg :: proc(args: []any, arg_index: int) -> (int, int, bool) {
 
 
 fmt_bad_verb :: proc(using fi: ^Info, verb: rune) {
+	prev_in_bad := fi.in_bad
+	defer fi.in_bad = prev_in_bad
+	fi.in_bad = true
+
 	io.write_string(writer, "%!", &fi.n)
 	io.write_rune(writer, verb, &fi.n)
 	io.write_byte(writer, '(', &fi.n)
@@ -947,7 +952,7 @@ fmt_string :: proc(fi: ^Info, s: string, verb: rune) {
 	if ol, ok := fi.optional_len.?; ok {
 		s = s[:min(len(s), ol)]
 	}
-	if fi.record_level >= 0 && verb == 'v' {
+	if !fi.in_bad && fi.record_level >= 0 && verb == 'v' {
 		verb = 'q'
 	}
 
@@ -1271,7 +1276,7 @@ handle_tag :: proc(data: rawptr, info: reflect.Type_Info_Struct, idx: int, verb:
 		value = value[w:]
 		if value == "" || value[0] == ',' {
 			verb^ = r
-			if value[0] == ',' {
+			if len(value) > 0 && value[0] == ',' {
 				switch r {
 				case 's', 'q':
 					if optional_len != nil {
