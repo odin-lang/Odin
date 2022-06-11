@@ -1709,6 +1709,11 @@ fmt_value :: proc(fi: ^Info, v: any, verb: rune) {
 
 			elem := runtime.type_info_base(info.elem)
 			if elem != nil {
+				if n, ok := fi.optional_len.?; ok {
+					fmt_array(fi, ptr, n, elem.size, elem, verb)
+					return
+				}
+
 				#partial switch e in elem.variant {
 				case runtime.Type_Info_Array,
 				     runtime.Type_Info_Slice,
