@@ -49,7 +49,7 @@ marshal_to_writer :: proc(w: io.Writer, v: any) -> (err: Marshal_Error) {
 		unreachable()
 
 	case runtime.Type_Info_Integer:
-		buf: [21]byte
+		buf: [40]byte
 		u: u128
 		switch i in a {
 		case i8:      u = u128(i)
