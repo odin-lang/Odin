@@ -32,6 +32,7 @@ Info :: struct {
 
 	writer: io.Writer,
 	arg: any, // Temporary
+	indirection_level: int,
 	record_level: int,
 
 	optional_len: Maybe(int),
@@ -952,9 +953,9 @@ fmt_string :: proc(fi: ^Info, s: string, verb: rune) {
 	if ol, ok := fi.optional_len.?; ok {
 		s = s[:min(len(s), ol)]
 	}
-	// if !fi.in_bad && fi.record_level >= 0 && verb == 'v' {
-	// 	verb = 'q'
-	// }
+	if !fi.in_bad && fi.record_level > 0 && verb == 'v' {
+		verb = 'q'
+	}
 
 	switch verb {
 	case 's', 'v':
@@ -1235,6 +1236,8 @@ fmt_write_array :: proc(fi: ^Info, array_data: rawptr, count: int, elem_size: in
 	if count <= 0 {
 		return
 	}
+	fi.record_level += 1
+	defer fi.record_level -= 1
 	
 	if fi.hash {
 		io.write_byte(fi.writer, '\n', &fi.n)
@@ -1328,6 +1331,8 @@ fmt_struct :: proc(fi: ^Info, v: any, the_verb: rune, info: runtime.Type_Info_St
 
 	io.write_string(fi.writer, type_name, &fi.n)
 	io.write_byte(fi.writer, '[' if is_soa else '{', &fi.n)
+	fi.record_level += 1
+	defer fi.record_level -= 1
 
 	hash   := fi.hash;   defer fi.hash = hash
 	indent := fi.indent; defer fi.indent -= 1
@@ -1381,6 +1386,8 @@ fmt_struct :: proc(fi: ^Info, v: any, the_verb: rune, info: runtime.Type_Info_St
 			io.write_string(fi.writer, base_type_name, &fi.n)
 			io.write_byte(fi.writer, '{', &fi.n)
 			defer io.write_byte(fi.writer, '}', &fi.n)
+			fi.record_level += 1
+			defer fi.record_level -= 1
 
 			for i in 0..<actual_field_count {
 				verb := 'v'
@@ -1767,9 +1774,9 @@ fmt_value :: proc(fi: ^Info, v: any, verb: rune) {
 							io.write_string(fi.writer, "<nil>", &fi.n)
 							return
 						}
-						if fi.record_level < 1 {
-						  	fi.record_level += 1
-							defer fi.record_level -= 1
+						if fi.indirection_level < 1 {
+						  	fi.indirection_level += 1
+							defer fi.indirection_level -= 1
 							io.write_byte(fi.writer, '&')
 							fmt_value(fi, a, verb)
 							return
@@ -1781,9 +1788,9 @@ fmt_value :: proc(fi: ^Info, v: any, verb: rune) {
 							io.write_string(fi.writer, "<nil>", &fi.n)
 							return
 						}
-						if fi.record_level < 1 {
-							fi.record_level += 1
-							defer fi.record_level -= 1
+						if fi.indirection_level < 1 {
+							fi.indirection_level += 1
+							defer fi.indirection_level -= 1
 							io.write_byte(fi.writer, '&', &fi.n)
 							fmt_value(fi, a, verb)
 							return
@@ -1815,9 +1822,9 @@ fmt_value :: proc(fi: ^Info, v: any, verb: rune) {
 						io.write_string(fi.writer, "<nil>", &fi.n)
 						return
 					}
-					if fi.record_level < 1 {
-					  	fi.record_level += 1
-						defer fi.record_level -= 1
+					if fi.indirection_level < 1 {
+					  	fi.indirection_level += 1
+						defer fi.indirection_level -= 1
 						io.write_byte(fi.writer, '&', &fi.n)
 						fmt_value(fi, a, verb)
 						return
@@ -1829,9 +1836,9 @@ fmt_value :: proc(fi: ^Info, v: any, verb: rune) {
 						io.write_string(fi.writer, "<nil>", &fi.n)
 						return
 					}
-					if fi.record_level < 1 {
-						fi.record_level += 1
-						defer fi.record_level -= 1
+					if fi.indirection_level < 1 {
+						fi.indirection_level += 1
+						defer fi.indirection_level -= 1
 						io.write_byte(fi.writer, '&', &fi.n)
 						fmt_value(fi, a, verb)
 						return
@@ -1842,6 +1849,9 @@ fmt_value :: proc(fi: ^Info, v: any, verb: rune) {
 		fmt_pointer(fi, ptr, verb)
 
 	case runtime.Type_Info_Enumerated_Array:
+		fi.record_level += 1
+		defer fi.record_level -= 1
+
 		if fi.hash {
 			io.write_string(fi.writer, "[\n", &fi.n)
 			defer {
@@ -2003,6 +2013,9 @@ fmt_value :: proc(fi: ^Info, v: any, verb: rune) {
 			len_any := any{rawptr(len_ptr), info.base_integer.id}
 			len, _ := reflect.as_int(len_any)
 			slice_type := reflect.type_info_base(info.slice).variant.(runtime.Type_Info_Slice)
+
+			fi.record_level += 1
+			defer fi.record_level -= 1
 
 			io.write_byte(fi.writer, '[', &fi.n)
 			defer io.write_byte(fi.writer, ']', &fi.n)
