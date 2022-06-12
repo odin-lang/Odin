@@ -76,6 +76,7 @@ foreign gdi32 {
 		pszFaceName: LPCWSTR,
 	) -> HFONT ---
 	TextOutW :: proc(hdc: HDC, x, y: c_int, lpString: LPCWSTR, c: c_int) -> BOOL ---
+	GetTextExtentPoint32W :: proc(hdc: HDC, lpString: LPCWSTR, c: c_int, psizl: LPSIZE) -> BOOL ---
 }
 
 RGB :: #force_inline proc "contextless" (r, g, b: u8) -> COLORREF {
