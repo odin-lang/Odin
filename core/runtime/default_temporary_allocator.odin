@@ -185,7 +185,7 @@ when ODIN_OS == .Freestanding || ODIN_OS == .JS || ODIN_DEFAULT_TO_NIL_ALLOCATOR
 			}
 
 		case .Query_Info:
-			// Nothing to give
+			return nil, .Mode_Not_Implemented
 		}
 
 		return

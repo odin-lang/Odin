@@ -99,7 +99,7 @@ _heap_allocator_proc :: proc(allocator_data: rawptr, mode: mem.Allocator_Mode,
 		return nil, nil
 
 	case .Query_Info:
-		return nil, nil
+		return nil, .Mode_Not_Implemented
 	}
 
 	return nil, nil
