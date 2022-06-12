@@ -1494,20 +1494,67 @@ fmt_array_nul_terminated :: proc(fi: ^Info, data: rawptr, max_n: int, elem_size:
 }
 
 fmt_array :: proc(fi: ^Info, data: rawptr, n: int, elem_size: int, elem: ^reflect.Type_Info, verb: rune) {
-	if (verb == 's' || verb == 'q') && reflect.is_byte(elem) {
-		if data == nil && n > 0 {
-			io.write_string(fi.writer, "nil")
+	if data == nil && n > 0 {
+		io.write_string(fi.writer, "nil")
+		return
+	}
+	if verb == 's' || verb == 'q' {
+		REPLACEMENT_CHAR :: '\ufffd'
+		MAX_RUNE         :: '\U0010ffff'
+
+		_surr1           :: 0xd800
+		_surr2           :: 0xdc00
+		_surr3           :: 0xe000
+		_surr_self       :: 0x10000
+
+		decode_surrogate_pair :: proc(r1, r2: rune) -> rune {
+			if _surr1 <= r1 && r1 < _surr2 && _surr2 <= r2 && r2 < _surr3 {
+				return (r1-_surr1)<<10 | (r2 - _surr2) + _surr_self
+			}
+			return REPLACEMENT_CHAR
+		}
+
+		print_utf16 :: proc(fi: ^Info, s: []$T) where size_of(T) == 2, intrinsics.type_is_integer(T) {
+			for i := 0; i < len(s); i += 1 {
+				r := rune(REPLACEMENT_CHAR)
+
+				switch c := s[i]; {
+				case c < _surr1, _surr3 <= c:
+					r = rune(c)
+				case _surr1 <= c && c < _surr2 && i+1 < len(s) &&
+					_surr2 <= s[i+1] && s[i+1] < _surr3:
+					r = decode_surrogate_pair(rune(c), rune(s[i+1]))
+					i += 1
+				}
+				io.write_rune(fi.writer, r, &fi.n)
+			}
+		}
+
+		switch reflect.type_info_base(elem).id {
+		case byte:
+			s := strings.string_from_ptr((^byte)(data), n)
+			fmt_string(fi, s, verb)
+			return
+		case rune:
+			v := ([^]rune)(data)[:n]
+			for r in v {
+				io.write_rune(fi.writer, r, &fi.n)
+			}
+			return
+		case u16:
+			print_utf16(fi, ([^]u16)(data)[:n])
+			return
+		case u16le:
+			print_utf16(fi, ([^]u16le)(data)[:n])
+			return
+		case u16be:
+			print_utf16(fi, ([^]u16be)(data)[:n])
 			return
 		}
-		s := strings.string_from_ptr((^byte)(data), n)
-		fmt_string(fi, s, verb)
-	} else if verb == 'p' {
+	}
+	if verb == 'p' {
 		fmt_pointer(fi, data, 'p')
 	} else {
-		if data == nil && n > 0 {
-			io.write_string(fi.writer, "nil")
-			return
-		}
 		fmt_write_array(fi, data, n, elem_size, elem.id, verb)
 	}
 }
@@ -1833,6 +1880,10 @@ fmt_value :: proc(fi: ^Info, v: any, verb: rune) {
 
 	case runtime.Type_Info_Multi_Pointer:
 		ptr := (^rawptr)(v.data)^
+		if ptr == nil {
+			io.write_string(fi.writer, "<nil>", &fi.n)
+			return
+		}
 		if verb != 'p' && info.elem != nil {
 			a := any{ptr, info.elem.id}
 
@@ -1847,14 +1898,24 @@ fmt_value :: proc(fi: ^Info, v: any, verb: rune) {
 				}
 
 				#partial switch e in elem.variant {
+				case runtime.Type_Info_Integer:
+					switch verb {
+					case 's', 'q':
+						switch elem.id {
+						case u8:
+							fmt_cstring(fi, cstring(ptr), verb)
+							return
+						case u16, u32, rune:
+							n := search_nul_termination(ptr, elem.size, -1)
+							fmt_array(fi, ptr, n, elem.size, elem, verb)
+							return
+						}
+					}
+
 				case runtime.Type_Info_Array,
 				     runtime.Type_Info_Slice,
 				     runtime.Type_Info_Dynamic_Array,
 				     runtime.Type_Info_Map:
-					if ptr == nil {
-						io.write_string(fi.writer, "<nil>", &fi.n)
-						return
-					}
 					if fi.indirection_level < 1 {
 					  	fi.indirection_level += 1
 						defer fi.indirection_level -= 1
@@ -1865,10 +1926,6 @@ fmt_value :: proc(fi: ^Info, v: any, verb: rune) {
 
 				case runtime.Type_Info_Struct,
 				     runtime.Type_Info_Union:
-					if ptr == nil {
-						io.write_string(fi.writer, "<nil>", &fi.n)
-						return
-					}
 					if fi.indirection_level < 1 {
 						fi.indirection_level += 1
 						defer fi.indirection_level -= 1
