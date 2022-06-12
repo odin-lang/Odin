@@ -94,7 +94,7 @@ __dynamic_array_append :: proc(array_: rawptr, elem_size, elem_align: int,
 
 
 	ok := true
-	if array.cap <= array.len+item_count {
+	if array.cap < array.len+item_count {
 		cap := 2 * array.cap + max(8, item_count)
 		ok = __dynamic_array_reserve(array, elem_size, elem_align, cap, loc)
 	}
@@ -115,7 +115,7 @@ __dynamic_array_append_nothing :: proc(array_: rawptr, elem_size, elem_align: in
 	array := (^Raw_Dynamic_Array)(array_)
 
 	ok := true
-	if array.cap <= array.len+1 {
+	if array.cap < array.len+1 {
 		cap := 2 * array.cap + max(8, 1)
 		ok = __dynamic_array_reserve(array, elem_size, elem_align, cap, loc)
 	}
