@@ -1499,22 +1499,13 @@ fmt_array :: proc(fi: ^Info, data: rawptr, n: int, elem_size: int, elem: ^reflec
 		return
 	}
 	if verb == 's' || verb == 'q' {
-		REPLACEMENT_CHAR :: '\ufffd'
-		MAX_RUNE         :: '\U0010ffff'
-
-		_surr1           :: 0xd800
-		_surr2           :: 0xdc00
-		_surr3           :: 0xe000
-		_surr_self       :: 0x10000
-
-		decode_surrogate_pair :: proc(r1, r2: rune) -> rune {
-			if _surr1 <= r1 && r1 < _surr2 && _surr2 <= r2 && r2 < _surr3 {
-				return (r1-_surr1)<<10 | (r2 - _surr2) + _surr_self
-			}
-			return REPLACEMENT_CHAR
-		}
-
 		print_utf16 :: proc(fi: ^Info, s: []$T) where size_of(T) == 2, intrinsics.type_is_integer(T) {
+			REPLACEMENT_CHAR :: '\ufffd'
+			_surr1           :: 0xd800
+			_surr2           :: 0xdc00
+			_surr3           :: 0xe000
+			_surr_self       :: 0x10000
+
 			for i := 0; i < len(s); i += 1 {
 				r := rune(REPLACEMENT_CHAR)
 
@@ -1523,7 +1514,10 @@ fmt_array :: proc(fi: ^Info, data: rawptr, n: int, elem_size: int, elem: ^reflec
 					r = rune(c)
 				case _surr1 <= c && c < _surr2 && i+1 < len(s) &&
 					_surr2 <= s[i+1] && s[i+1] < _surr3:
-					r = decode_surrogate_pair(rune(c), rune(s[i+1]))
+					r1, r2 := rune(c), rune(s[i+1])
+					if _surr1 <= r1 && r1 < _surr2 && _surr2 <= r2 && r2 < _surr3 {
+						r = (r1-_surr1)<<10 | (r2 - _surr2) + _surr_self
+					}
 					i += 1
 				}
 				io.write_rune(fi.writer, r, &fi.n)
