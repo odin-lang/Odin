@@ -221,6 +221,17 @@ LLVMValueRef llvm_one(lbModule *m) {
 	return LLVMConstInt(lb_type(m, t_i32), 1, false);
 }
 
+LLVMValueRef llvm_alloca(lbProcedure *p, LLVMTypeRef llvm_type, isize alignment, char const* name) {
+	LLVMPositionBuilderAtEnd(p->builder, p->decl_block->block);
+
+	LLVMValueRef val = LLVMBuildAlloca(p->builder, llvm_type, name);
+	LLVMSetAlignment(val, cast(unsigned int)alignment);
+
+	LLVMPositionBuilderAtEnd(p->builder, p->curr_block->block);
+
+	return val;
+}
+
 lbValue lb_zero(lbModule *m, Type *t) {
 	lbValue v = {};
 	v.value = LLVMConstInt(lb_type(m, t), 0, false);
@@ -2300,13 +2311,11 @@ general_end:;
 		return loaded_val;
 	} else {
 		GB_ASSERT(p->decl_block != p->curr_block);
-		LLVMPositionBuilderAtEnd(p->builder, p->decl_block->block);
 
-		LLVMValueRef ptr = LLVMBuildAlloca(p->builder, dst_type, "");
-		LLVMPositionBuilderAtEnd(p->builder, p->curr_block->block);
 		i64 max_align = gb_max(lb_alignof(src_type), lb_alignof(dst_type));
 		max_align = gb_max(max_align, 4);
-		LLVMSetAlignment(ptr, cast(unsigned)max_align);
+
+		LLVMValueRef ptr = llvm_alloca(p, dst_type, max_align);
 
 		LLVMValueRef nptr = LLVMBuildPointerCast(p->builder, ptr, LLVMPointerType(src_type, 0), "");
 		LLVMBuildStore(p->builder, val, nptr);
@@ -2689,16 +2698,13 @@ lbAddr lb_add_local(lbProcedure *p, Type *type, Entity *e, bool zero_init, i32 p
 	}
 
 	LLVMTypeRef llvm_type = lb_type(p->module, type);
-	LLVMValueRef ptr = LLVMBuildAlloca(p->builder, llvm_type, name);
 
 	unsigned alignment = cast(unsigned)gb_max(type_align_of(type), lb_alignof(llvm_type));
 	if (is_type_matrix(type)) {
 		alignment *= 2; // NOTE(bill): Just in case
 	}
-	LLVMSetAlignment(ptr, alignment);
 
-	LLVMPositionBuilderAtEnd(p->builder, p->curr_block->block);
-
+	LLVMValueRef ptr = llvm_alloca(p, llvm_type, alignment, name);
 
 	if (!zero_init && !force_no_init) {
 		// If there is any padding of any kind, just zero init regardless of zero_init parameter
