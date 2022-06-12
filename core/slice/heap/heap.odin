@@ -23,14 +23,14 @@ package heap
 	The comparator compares elements of type T and can be used to construct a
 	max heap (less than) or min heap (greater than) for T.
 */
-make :: proc(data: []$T, compare: $C) {
+make :: proc(data: []$T, less: proc(a, b: T) -> bool) {
 	// amoritize length lookup
 	length := len(data)
 	if length <= 1 do return
 
 	// start from data parent, no need to consider children
 	for start := (length - 2) / 2; start >= 0; start -= 1 {
-		sift_down(data, compare, start)
+		sift_down(data, less, start)
 	}
 }
 
@@ -40,8 +40,8 @@ make :: proc(data: []$T, compare: $C) {
 
 	At most log(N) comparisons where N = len(data) will be performed.
 */
-push :: proc(data: []$T, compare: $C) {
-	sift_up(data, compare)
+push :: proc(data: []$T, less: proc(a, b: T) -> bool) {
+	sift_up(data, less)
 }
 
 /*
@@ -51,7 +51,7 @@ push :: proc(data: []$T, compare: $C) {
 
 	At most 2 * log(N) comparisons where N = len(data) will be performed.
 */
-pop :: proc(data: []$T, compare: $C) {
+pop :: proc(data: []$T, less: proc(a, b: T) -> bool) {
 	length := len(data)
 	if length <= 1 do return
 
@@ -59,7 +59,7 @@ pop :: proc(data: []$T, compare: $C) {
 
 	// create a hole at 0
 	top := data[0]
-	hole := floyd_sift_down(data, compare)
+	hole := floyd_sift_down(data, less)
 	last -= 1
 
 	if hole == last {
@@ -68,7 +68,7 @@ pop :: proc(data: []$T, compare: $C) {
 		data[hole] = data[last]
 		hole += 1
 		data[last] = top
-		sift_up(data[:hole], compare)
+		sift_up(data[:hole], less)
 	}
 }
 
@@ -78,9 +78,9 @@ pop :: proc(data: []$T, compare: $C) {
 
 	At most 2 * N * log(N) comparisons where N = len(data) will be performed.
 */
-sort :: proc(data: []$T, compare: $C) {
+sort :: proc(data: []$T, less: proc(a, b: T) -> bool) {
 	for n := len(data); n >= 1; n -= 1 {
-		pop(data[:n], compare)
+		pop(data[:n], less)
 	}
 }
 
@@ -93,16 +93,16 @@ sort :: proc(data: []$T, compare: $C) {
 
 	At most O(n) comparisons where N = len(data) will be performed.
 */
-is_heap_until :: proc(data: []$T, compare: $C) -> int {
+is_heap_until :: proc(data: []$T, less: proc(a, b: T) -> bool) -> int {
 	length := len(data)
 	a := 0
 	b := 1
 	for b < length {
-		if compare(data[a], data[b]) {
+		if less(data[a], data[b]) {
 			return b
 		}
 		b += 1
-		if b == length || compare(data[a], data[b]) {
+		if b == length || less(data[a], data[b]) {
 			return b
 		}
 		a += 1
@@ -116,12 +116,12 @@ is_heap_until :: proc(data: []$T, compare: $C) -> int {
 
 	At most O(n) comparisons where N = len(data) will be performed.
 */
-is_heap :: #force_inline proc(data: []$T, compare: $C) -> bool {
-	return is_heap_until(data, compare) == len(data)
+is_heap :: #force_inline proc(data: []$T, less: proc(a, b: T) -> bool) -> bool {
+	return is_heap_until(data, less) == len(data)
 }
 
 @(private="file")
-floyd_sift_down :: proc(data: []$T, compare: $C) -> int {
+floyd_sift_down :: proc(data: []$T, less: proc(a, b: T) -> bool) -> int {
 	length := len(data)
 	assert(length >= 2)
 
@@ -131,7 +131,7 @@ floyd_sift_down :: proc(data: []$T, compare: $C) -> int {
 	for {
 		index += child + 1
 		child = 2 * child + 1
-		if child + 1 < length && compare(data[index], data[index + 1]) {
+		if child + 1 < length && less(data[index], data[index + 1]) {
 			child += 1
 			index += 1
 		}
@@ -148,7 +148,7 @@ floyd_sift_down :: proc(data: []$T, compare: $C) -> int {
 }
 
 @(private="file")
-sift_down :: proc(data: []$T, compare: $C, start: int) {
+sift_down :: proc(data: []$T, less: proc(a, b: T) -> bool, start: int) {
 	start := start
 	child := start
 
@@ -163,13 +163,13 @@ sift_down :: proc(data: []$T, compare: $C, start: int) {
 
 	child = 2 * child + 1
 
-	if child + 1 < length && compare(data[child], data[child + 1]) {
+	if child + 1 < length && less(data[child], data[child + 1]) {
 		// right child exists and is greater than left child
 		child += 1
 	}
 
 	// check if in heap order
-	if compare(data[child], data[start]) {
+	if less(data[child], data[start]) {
 		// start is larger than its largest child
 		return
 	}
@@ -187,13 +187,13 @@ sift_down :: proc(data: []$T, compare: $C, start: int) {
 		// recompute child based off updated parent
 		child = 2 * child + 1
 
-		if child + 1 < length && compare(data[child], data[child + 1]) {
+		if child + 1 < length && less(data[child], data[child + 1]) {
 			// right child exists and is greater than left child
 			child += 1
 		}
 
 		// check if we are in heap order
-		if compare(data[child], top) {
+		if less(data[child], top) {
 			break
 		}
 	}
@@ -202,7 +202,7 @@ sift_down :: proc(data: []$T, compare: $C, start: int) {
 }
 
 @(private="file")
-sift_up :: proc(data: []$T, compare: $C) {
+sift_up :: proc(data: []$T, less: proc(a, b: T) -> bool) {
 	// amoritize length lookup
 	length := len(data)
 
@@ -212,7 +212,7 @@ sift_up :: proc(data: []$T, compare: $C) {
 	length = (length - 2) / 2
 	index := length
 	last -= 1
-	if compare(data[index], data[last]) {
+	if less(data[index], data[last]) {
 		top := data[last]
 		for {
 			data[last] = data[index]
@@ -222,7 +222,7 @@ sift_up :: proc(data: []$T, compare: $C) {
 			}
 			length = (length - 1) / 2
 			index = length
-			if !compare(data[index], top) {
+			if !less(data[index], top) {
 				break
 			}
 		}
