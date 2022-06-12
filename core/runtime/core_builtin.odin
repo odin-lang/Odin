@@ -296,7 +296,7 @@ reserve_map :: proc(m: ^$T/map[$K]$V, capacity: int, loc := #caller_location) {
 /*
 	Shrinks the capacity of a map down to the current length, or the given capacity.
 
-	If `new_cap` is -1, then `len(m)` is used.
+	If `new_cap` is negative, then `len(m)` is used.
 
 	Returns false if `cap(m) < new_cap`, or the allocator report failure.
 
@@ -305,7 +305,7 @@ reserve_map :: proc(m: ^$T/map[$K]$V, capacity: int, loc := #caller_location) {
 @builtin
 shrink_map :: proc(m: ^$T/map[$K]$V, new_cap := -1, loc := #caller_location) -> (did_shrink: bool) {
 	if m != nil {
-		new_cap := new_cap if new_cap != -1 else len(m)
+		new_cap := new_cap if new_cap >= 0 else len(m)
 		return __dynamic_map_shrink(__get_map_header(m), new_cap, loc)
 	}
 	return
@@ -560,7 +560,7 @@ resize_dynamic_array :: proc(array: ^$T/[dynamic]$E, length: int, loc := #caller
 /*
 	Shrinks the capacity of a dynamic array down to the current length, or the given capacity.
 
-	If `new_cap` is -1, then `len(array)` is used.
+	If `new_cap` is negative, then `len(array)` is used.
 
 	Returns false if `cap(array) < new_cap`, or the allocator report failure.
 
@@ -572,7 +572,7 @@ shrink_dynamic_array :: proc(array: ^$T/[dynamic]$E, new_cap := -1, loc := #call
 	}
 	a := (^Raw_Dynamic_Array)(array)
 
-	new_cap := new_cap if new_cap != -1 else a.len
+	new_cap := new_cap if new_cap >= 0 else a.len
 
 	if new_cap > a.cap {
 		return
