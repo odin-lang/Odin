@@ -36,6 +36,7 @@ Info :: struct {
 	record_level: int,
 
 	optional_len: Maybe(int),
+	use_nul_termination: bool,
 
 	n: int, // bytes written
 }
@@ -951,7 +952,7 @@ fmt_float :: proc(fi: ^Info, v: f64, bit_size: int, verb: rune) {
 fmt_string :: proc(fi: ^Info, s: string, verb: rune) {
 	s, verb := s, verb
 	if ol, ok := fi.optional_len.?; ok {
-		s = s[:min(len(s), ol)]
+		s = s[:clamp(ol, 0, len(s))]
 	}
 	if !fi.in_bad && fi.record_level > 0 && verb == 'v' {
 		verb = 'q'
@@ -1267,7 +1268,7 @@ fmt_write_array :: proc(fi: ^Info, array_data: rawptr, count: int, elem_size: in
 
 
 @(private)
-handle_tag :: proc(data: rawptr, info: reflect.Type_Info_Struct, idx: int, verb: ^rune, optional_len: ^int = nil) -> (do_continue: bool) {
+handle_tag :: proc(data: rawptr, info: reflect.Type_Info_Struct, idx: int, verb: ^rune, optional_len: ^int, use_nul_termination: ^bool) -> (do_continue: bool) {
 	handle_optional_len :: proc(data: rawptr, info: reflect.Type_Info_Struct, field_name: string, optional_len: ^int) {
 		if optional_len == nil {
 			return
@@ -1297,13 +1298,19 @@ handle_tag :: proc(data: rawptr, info: reflect.Type_Info_Struct, idx: int, verb:
 			verb^ = r
 			if len(value) > 0 && value[0] == ',' {
 				field_name := value[1:]
-				switch r {
-				case 's', 'q':
-					handle_optional_len(data, info, field_name, optional_len)
-				case 'v':
-					#partial switch reflect.type_kind(info.types[idx].id) {
-					case .String, .Multi_Pointer, .Array, .Slice, .Dynamic_Array:
+				if field_name == "0" {
+					if use_nul_termination != nil {
+						use_nul_termination^ = true
+					}
+				} else {
+					switch r {
+					case 's', 'q':
 						handle_optional_len(data, info, field_name, optional_len)
+					case 'v':
+						#partial switch reflect.type_kind(info.types[idx].id) {
+						case .String, .Multi_Pointer, .Array, .Slice, .Dynamic_Array:
+							handle_optional_len(data, info, field_name, optional_len)
+						}
 					}
 				}
 			}
@@ -1430,8 +1437,9 @@ fmt_struct :: proc(fi: ^Info, v: any, the_verb: rune, info: runtime.Type_Info_St
 		field_count := -1
 		for name, i in info.names {
 			optional_len: int = -1
+			use_nul_termination: bool = false
 			verb := 'v'
-			if handle_tag(v.data, info, i, &verb, &optional_len) {
+			if handle_tag(v.data, info, i, &verb, &optional_len, &use_nul_termination) {
 				continue
 			}
 			field_count += 1
@@ -1442,6 +1450,8 @@ fmt_struct :: proc(fi: ^Info, v: any, the_verb: rune, info: runtime.Type_Info_St
 			defer if optional_len >= 0 {
 				fi.optional_len = nil
 			}
+			fi.use_nul_termination = use_nul_termination
+			defer fi.use_nul_termination = false
 
 			if !do_trailing_comma && field_count > 0 { io.write_string(fi.writer, ", ") }
 			if hash {
@@ -1461,6 +1471,26 @@ fmt_struct :: proc(fi: ^Info, v: any, the_verb: rune, info: runtime.Type_Info_St
 			if do_trailing_comma { io.write_string(fi.writer, ",\n", &fi.n) }
 		}
 	}
+}
+
+@(private)
+search_nul_termination :: proc(ptr: rawptr, elem_size: int, max_n: int) -> (n: int) {
+	for p := uintptr(ptr); max_n < 0 || n < max_n; p += uintptr(elem_size) {
+		if mem.check_zero_ptr(rawptr(p), elem_size) {
+			break
+		}
+		n += 1
+	}
+	return n
+}
+
+fmt_array_nul_terminated :: proc(fi: ^Info, data: rawptr, max_n: int, elem_size: int, elem: ^reflect.Type_Info, verb: rune) {
+	if data == nil {
+		io.write_string(fi.writer, "<nil>", &fi.n)
+		return
+	}
+	n := search_nul_termination(data, elem_size, max_n)
+	fmt_array(fi, data, n, elem_size, elem, verb)
 }
 
 fmt_array :: proc(fi: ^Info, data: rawptr, n: int, elem_size: int, elem: ^reflect.Type_Info, verb: rune) {
@@ -1811,6 +1841,9 @@ fmt_value :: proc(fi: ^Info, v: any, verb: rune) {
 				if n, ok := fi.optional_len.?; ok {
 					fmt_array(fi, ptr, n, elem.size, elem, verb)
 					return
+				} else if fi.use_nul_termination {
+					fmt_array_nul_terminated(fi, ptr, -1, elem.size, elem, verb)
+					return
 				}
 
 				#partial switch e in elem.variant {
@@ -1902,26 +1935,38 @@ fmt_value :: proc(fi: ^Info, v: any, verb: rune) {
 
 	case runtime.Type_Info_Array:
 		n := info.count
+		ptr := v.data
 		if ol, ok := fi.optional_len.?; ok {
 			n = min(n, ol)
+		} else if fi.use_nul_termination {
+			fmt_array_nul_terminated(fi, ptr, n, info.elem_size, info.elem, verb)
+			return
 		}
-		fmt_array(fi, v.data, n, info.elem_size, info.elem, verb)
+		fmt_array(fi, ptr, n, info.elem_size, info.elem, verb)
 
 	case runtime.Type_Info_Slice:
 		slice := cast(^mem.Raw_Slice)v.data
 		n := slice.len
+		ptr := slice.data
 		if ol, ok := fi.optional_len.?; ok {
 			n = min(n, ol)
+		} else if fi.use_nul_termination {
+			fmt_array_nul_terminated(fi, ptr, n, info.elem_size, info.elem, verb)
+			return
 		}
-		fmt_array(fi, slice.data, n, info.elem_size, info.elem, verb)
+		fmt_array(fi, ptr, n, info.elem_size, info.elem, verb)
 
 	case runtime.Type_Info_Dynamic_Array:
 		array := cast(^mem.Raw_Dynamic_Array)v.data
 		n := array.len
+		ptr := array.data
 		if ol, ok := fi.optional_len.?; ok {
 			n = min(n, ol)
+		} else if fi.use_nul_termination {
+			fmt_array_nul_terminated(fi, ptr, n, info.elem_size, info.elem, verb)
+			return
 		}
-		fmt_array(fi, array.data, n, info.elem_size, info.elem, verb)
+		fmt_array(fi, ptr, n, info.elem_size, info.elem, verb)
 
 	case runtime.Type_Info_Simd_Vector:
 		io.write_byte(fi.writer, '<', &fi.n)
