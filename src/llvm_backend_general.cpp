@@ -221,7 +221,7 @@ LLVMValueRef llvm_one(lbModule *m) {
 	return LLVMConstInt(lb_type(m, t_i32), 1, false);
 }
 
-LLVMValueRef llvm_alloca(lbProcedure *p, LLVMTypeRef llvm_type, isize alignment, char const* name) {
+LLVMValueRef llvm_alloca(lbProcedure *p, LLVMTypeRef llvm_type, isize alignment, char const *name) {
 	LLVMPositionBuilderAtEnd(p->builder, p->decl_block->block);
 
 	LLVMValueRef val = LLVMBuildAlloca(p->builder, llvm_type, name);
