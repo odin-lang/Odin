@@ -1461,7 +1461,11 @@ Token expect_closing_brace_of_field_list(AstFile *f) {
 	if (allow_token(f, Token_CloseBrace)) {
 		return token;
 	}
-	if (allow_token(f, Token_Semicolon)) {
+	bool ok = true;
+	if (!build_context.strict_style) {
+		ok = !skip_possible_newline(f);
+	}
+	if (ok && allow_token(f, Token_Semicolon)) {
 		String p = token_to_string(token);
 		syntax_error(token_end_of_line(f, f->prev_token), "Expected a comma, got a %.*s", LIT(p));
 	}
@@ -2065,6 +2069,20 @@ Ast *parse_check_directive_for_statement(Ast *s, Token const &tag_token, u16 sta
 	return s;
 }
 
+Array<Ast *> parse_union_variant_list(AstFile *f) {
+	auto variants = array_make<Ast *>(heap_allocator());
+	while (f->curr_token.kind != Token_CloseBrace &&
+	       f->curr_token.kind != Token_EOF) {
+		Ast *type = parse_type(f);
+		if (type->kind != Ast_BadExpr) {
+			array_add(&variants, type);
+		}
+		if (!allow_token(f, Token_Comma)) {
+			break;
+		}
+	}
+	return variants;
+}
 
 Ast *parse_operand(AstFile *f, bool lhs) {
 	Ast *operand = nullptr; // Operand
@@ -2418,7 +2436,9 @@ Ast *parse_operand(AstFile *f, bool lhs) {
 			check_polymorphic_params_for_type(f, polymorphic_params, token);
 		}
 
-		isize prev_level = f->expr_level;
+		isize prev_level;
+
+		prev_level = f->expr_level;
 		f->expr_level = -1;
 
 		while (allow_token(f, Token_Hash)) {
@@ -2457,7 +2477,7 @@ Ast *parse_operand(AstFile *f, bool lhs) {
 
 		if (f->curr_token.kind == Token_where) {
 			where_token = expect_token(f, Token_where);
-			isize prev_level = f->expr_level;
+			prev_level = f->expr_level;
 			f->expr_level = -1;
 			where_clauses = parse_rhs_expr_list(f);
 			f->expr_level = prev_level;
@@ -2481,7 +2501,6 @@ Ast *parse_operand(AstFile *f, bool lhs) {
 
 	case Token_union: {
 		Token token = expect_token(f, Token_union);
-		auto variants = array_make<Ast *>(heap_allocator());
 		Ast *polymorphic_params = nullptr;
 		Ast *align = nullptr;
 		bool no_nil = false;
@@ -2565,18 +2584,7 @@ Ast *parse_operand(AstFile *f, bool lhs) {
 
 		skip_possible_newline_for_literal(f);
 		Token open = expect_token_after(f, Token_OpenBrace, "union");
-
-		while (f->curr_token.kind != Token_CloseBrace &&
-		       f->curr_token.kind != Token_EOF) {
-			Ast *type = parse_type(f);
-			if (type->kind != Ast_BadExpr) {
-				array_add(&variants, type);
-			}
-			if (!allow_token(f, Token_Comma)) {
-				break;
-			}
-		}
-
+		auto variants = parse_union_variant_list(f);
 		Token close = expect_closing_brace_of_field_list(f);
 
 		return ast_union_type(f, token, variants, polymorphic_params, align, union_kind, where_token, where_clauses);
@@ -2734,7 +2742,7 @@ Ast *parse_call_expr(AstFile *f, Ast *operand) {
 	isize prev_expr_level = f->expr_level;
 	bool prev_allow_newline = f->allow_newline;
 	f->expr_level = 0;
-	f->allow_newline = true;
+	f->allow_newline = build_context.strict_style;
 
 	open_paren = expect_token(f, Token_OpenParen);
 
@@ -3775,6 +3783,10 @@ bool check_procedure_name_list(Array<Ast *> const &names) {
 }
 
 Ast *parse_field_list(AstFile *f, isize *name_count_, u32 allowed_flags, TokenKind follow, bool allow_default_parameters, bool allow_typeid_token) {
+	bool prev_allow_newline = f->allow_newline;
+	defer (f->allow_newline = prev_allow_newline);
+	f->allow_newline = build_context.strict_style;
+
 	Token start_token = f->curr_token;
 
 	CommentGroup *docs = f->lead_comment;

@@ -41,6 +41,35 @@ __dynamic_array_reserve :: proc(array_: rawptr, elem_size, elem_align: int, cap:
 	return false
 }
 
+__dynamic_array_shrink :: proc(array_: rawptr, elem_size, elem_align: int, new_cap: int, loc := #caller_location) -> (did_shrink: bool) {
+	array := (^Raw_Dynamic_Array)(array_)
+
+	// NOTE(tetra, 2020-01-26): We set the allocator before earlying-out below, because user code is usually written
+	// assuming that appending/reserving will set the allocator, if it is not already set.
+	if array.allocator.procedure == nil {
+		array.allocator = context.allocator
+	}
+	assert(array.allocator.procedure != nil)
+
+	if new_cap > array.cap {
+		return
+	}
+
+	old_size  := array.cap * elem_size
+	new_size  := new_cap * elem_size
+	allocator := array.allocator
+
+	new_data, err := allocator.procedure(allocator.data, .Resize, new_size, elem_align, array.data, old_size, loc)
+	if err != nil {
+		return
+	}
+
+	array.data = raw_data(new_data)
+	array.len = min(new_cap, array.len)
+	array.cap = new_cap
+	return true
+}
+
 __dynamic_array_resize :: proc(array_: rawptr, elem_size, elem_align: int, len: int, loc := #caller_location) -> bool {
 	array := (^Raw_Dynamic_Array)(array_)
 

@@ -203,7 +203,7 @@ run_internal_test :: proc(t: ^T, it: Internal_Test) {
 		thread.it.p(t)
 		
 		sema_post(&global_fail_timeout_semaphore)
-		thread_join_and_destroy(global_fail_timeout_thread)
+		if global_fail_timeout_thread != nil do thread_join_and_destroy(global_fail_timeout_thread)
 		
 		thread.success = true
 		sema_post(&global_threaded_runner_semaphore)
