@@ -461,6 +461,8 @@ void lb_set_entity_from_other_modules_linkage_correctly(lbModule *other_module, 
 lbValue lb_expr_untyped_const_to_typed(lbModule *m, Ast *expr, Type *t);
 bool lb_is_expr_untyped_const(Ast *expr);
 
+LLVMValueRef llvm_alloca(lbProcedure *p, LLVMTypeRef llvm_type, isize alignment, char const *name = "");
+
 void lb_mem_zero_ptr(lbProcedure *p, LLVMValueRef ptr, Type *type, unsigned alignment);
 
 void lb_emit_init_context(lbProcedure *p, lbAddr addr);
