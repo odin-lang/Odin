@@ -1530,26 +1530,21 @@ fmt_array :: proc(fi: ^Info, data: rawptr, n: int, elem_size: int, elem: ^reflec
 			}
 		}
 
-		switch reflect.type_info_base(elem).id {
-		case byte:
-			s := strings.string_from_ptr((^byte)(data), n)
-			fmt_string(fi, s, verb)
-			return
-		case rune:
-			v := ([^]rune)(data)[:n]
-			for r in v {
-				io.write_rune(fi.writer, r, &fi.n)
+		print_utf32 :: proc(fi: ^Info, s: []$T) where size_of(T) == 4 {
+			for r in s {
+				io.write_rune(fi.writer, rune(r), &fi.n)
 			}
-			return
-		case u16:
-			print_utf16(fi, ([^]u16)(data)[:n])
-			return
-		case u16le:
-			print_utf16(fi, ([^]u16le)(data)[:n])
-			return
-		case u16be:
-			print_utf16(fi, ([^]u16be)(data)[:n])
-			return
+		}
+
+		switch reflect.type_info_base(elem).id {
+		case byte:  fmt_string(fi, string(([^]byte)(data)[:n]), verb); return
+		case u16:   print_utf16(fi, ([^]u16)(data)[:n]);               return
+		case u16le: print_utf16(fi, ([^]u16le)(data)[:n]);             return
+		case u16be: print_utf16(fi, ([^]u16be)(data)[:n]);             return
+		case u32:   print_utf32(fi, ([^]u32)(data)[:n]);               return
+		case u32le: print_utf32(fi, ([^]u32le)(data)[:n]);             return
+		case u32be: print_utf32(fi, ([^]u32be)(data)[:n]);             return
+		case rune:  print_utf32(fi, ([^]rune)(data)[:n]);              return
 		}
 	}
 	if verb == 'p' {
