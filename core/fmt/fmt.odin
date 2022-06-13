@@ -1089,9 +1089,9 @@ fmt_enum :: proc(fi: ^Info, v: any, verb: rune) {
 		case: fmt_bad_verb(fi, verb)
 		case 'i', 'd', 'f':
 			fmt_arg(fi, any{v.data, runtime.type_info_base(e.base).id}, verb)
-		case 's', 'v':
+		case 's', 'v', 'q':
 			if str, ok := enum_value_to_string(v); ok {
-				fmt_string(fi, str, 's')
+				fmt_string(fi, str, verb)
 			} else {
 				io.write_string(fi.writer, "%!(BAD ENUM VALUE=", &fi.n)
 				fmt_arg(fi, any{v.data, runtime.type_info_base(e.base).id}, 'i')
