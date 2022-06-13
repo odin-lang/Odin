@@ -2033,6 +2033,8 @@ fmt_value :: proc(fi: ^Info, v: any, verb: rune) {
 
 		io.write_string(fi.writer, "map[", &fi.n)
 		defer io.write_byte(fi.writer, ']', &fi.n)
+		fi.record_level += 1
+		defer fi.record_level -= 1
 
 		m := (^mem.Raw_Map)(v.data)
 		if m != nil {
