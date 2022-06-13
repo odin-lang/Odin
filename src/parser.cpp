@@ -2112,6 +2112,7 @@ Ast *parse_operand(AstFile *f, bool lhs) {
 
 	case Token_OpenParen: {
 		bool allow_newline;
+		isize prev_expr_level;
 		Token open, close;
 		// NOTE(bill): Skip the Paren Expression
 		open = expect_token(f, Token_OpenParen);
@@ -2121,16 +2122,18 @@ Ast *parse_operand(AstFile *f, bool lhs) {
 			return ast_bad_expr(f, open, close);
 		}
 
+		prev_expr_level = f->expr_level;
 		allow_newline = f->allow_newline;
 		if (f->expr_level < 0) {
 			f->allow_newline = false;
 		}
 
-		f->expr_level++;
+		// NOTE(bill): enforce it to >0
+		f->expr_level = gb_max(f->expr_level, 0)+1;
 		operand = parse_expr(f, false);
-		f->expr_level--;
 
 		f->allow_newline = allow_newline;
+		f->expr_level = prev_expr_level;
 
 		close = expect_token(f, Token_CloseParen);
 		return ast_paren_expr(f, operand, open, close);
@@ -4010,7 +4013,7 @@ Ast *parse_body(AstFile *f) {
 
 	// NOTE(bill): The body may be within an expression so reset to zero
 	f->expr_level = 0;
-	f->allow_newline = false;
+	// f->allow_newline = false;
 	open = expect_token(f, Token_OpenBrace);
 	stmts = parse_stmt_list(f);
 	close = expect_token(f, Token_CloseBrace);
@@ -4468,7 +4471,7 @@ Ast *parse_foreign_decl(AstFile *f) {
 					break;
 				}
 			}
-			expect_token(f, Token_CloseBrace);
+			expect_closing_brace_of_field_list(f);
 		} else {
 			filepaths = array_make<Token>(heap_allocator(), 0, 1);
 			Token path = expect_token(f, Token_String);
