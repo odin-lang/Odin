@@ -814,3 +814,4 @@ gbAllocator ast_allocator(AstFile *f) {
 Ast *alloc_ast_node(AstFile *f, AstKind kind);
 
 gbString expr_to_string(Ast *expression);
+bool allow_field_separator(AstFile *f);
