@@ -216,6 +216,29 @@ equal_fold :: proc(u, v: string) -> bool {
 }
 
 /*
+	return the prefix length common between strings `a` and `b`.
+
+	strings.prefix_length("testing", "test") -> 4
+	strings.prefix_length("testing", "te") -> 2
+	strings.prefix_length("telephone", "te") -> 2
+	strings.prefix_length("testing", "est") -> 0
+*/
+prefix_length :: proc(a, b: string) -> (n: int) {
+	_len := min(len(a), len(b))
+	idx  := 0
+
+	#no_bounds_check for idx < _len && a[idx] == b[idx] {
+		idx += 1
+
+		if a[idx] & 128 != 128 {
+			// new codepoint or end of multi-byte codepoint, update match length
+			n = idx
+		}
+	}
+	return
+}
+
+/*
 	return true when the string `prefix` is contained at the start of the string `s`
 
 	strings.has_prefix("testing", "test") -> true
