@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 set -eu
 
 GIT_SHA=$(git rev-parse --short HEAD)
