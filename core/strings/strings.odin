@@ -225,14 +225,23 @@ equal_fold :: proc(u, v: string) -> bool {
 */
 prefix_length :: proc(a, b: string) -> (n: int) {
 	_len := min(len(a), len(b))
-	idx  := 0
 
-	#no_bounds_check for idx < _len && a[idx] == b[idx] {
-		idx += 1
+	// Scan for matches including partial codepoints.
+	#no_bounds_check for n < _len && a[n] == b[n] {
+		n += 1
+	}
 
-		if a[idx] & 128 != 128 {
-			// new codepoint or end of multi-byte codepoint, update match length
-			n = idx
+	// Now scan to ignore partial codepoints.
+	if n > 0 {
+		s := a[:n]
+		n = 0
+		for {
+			r0, w := utf8.decode_rune(s[n:])
+			if r0 != utf8.RUNE_ERROR {
+				n += w
+			} else {
+				break
+			}
 		}
 	}
 	return
