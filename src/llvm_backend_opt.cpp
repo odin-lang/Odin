@@ -380,6 +380,43 @@ void llvm_delete_function(LLVMValueRef func) {
 	LLVMDeleteFunction(func);
 }
 
+void lb_append_to_compiler_used(lbModule *m, LLVMValueRef func) {
+	LLVMValueRef global = LLVMGetNamedGlobal(m->mod, "llvm.compiler.used");
+
+	LLVMValueRef *constants;
+	int operands = 1;
+
+	if (global != NULL) {
+		GB_ASSERT(LLVMIsAGlobalVariable(global));
+		LLVMValueRef initializer = LLVMGetInitializer(global);
+
+		GB_ASSERT(LLVMIsAConstantArray(initializer));
+		operands = LLVMGetNumOperands(initializer) + 1;
+		constants = gb_alloc_array(temporary_allocator(), LLVMValueRef, operands);
+
+		for (int i = 0; i < operands - 1; i++) {
+			LLVMValueRef operand = LLVMGetOperand(initializer, i);
+			GB_ASSERT(LLVMIsAConstant(operand));
+			constants[i] = operand;
+		}
+
+		LLVMDeleteGlobal(global);
+	} else {
+		constants = gb_alloc_array(temporary_allocator(), LLVMValueRef, 1);
+	}
+
+	LLVMTypeRef Int8PtrTy = LLVMPointerType(LLVMInt8TypeInContext(m->ctx), 0);
+	LLVMTypeRef ATy = LLVMArrayType(Int8PtrTy, operands);
+
+	constants[operands - 1] = LLVMConstBitCast(func, Int8PtrTy);
+	LLVMValueRef initializer = LLVMConstArray(Int8PtrTy, constants, operands);
+
+	global = LLVMAddGlobal(m->mod, ATy, "llvm.compiler.used");
+	LLVMSetLinkage(global, LLVMAppendingLinkage);
+	LLVMSetSection(global, "llvm.metadata");
+	LLVMSetInitializer(global, initializer);
+}
+
 void lb_run_remove_unused_function_pass(lbModule *m) {
 	isize removal_count = 0;
 	isize pass_count = 0;
@@ -415,6 +452,7 @@ void lb_run_remove_unused_function_pass(lbModule *m) {
 				Entity *e = *found;
 				bool is_required = (e->flags & EntityFlag_Require) == EntityFlag_Require;
 				if (is_required) {
+					lb_append_to_compiler_used(m, curr_func);
 					continue;
 				}
 			}
