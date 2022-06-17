@@ -633,6 +633,18 @@ ES_READONLY    :: 0x0800
 ES_WANTRETURN  :: 0x1000
 ES_NUMBER      :: 0x2000
 
+// Edit Control Notification Codes
+EN_SETFOCUS     :: 0x0100
+EN_KILLFOCUS    :: 0x0200
+EN_CHANGE       :: 0x0300
+EN_UPDATE       :: 0x0400
+EN_ERRSPACE     :: 0x0500
+EN_MAXTEXT      :: 0x0501
+EN_HSCROLL      :: 0x0601
+EN_VSCROLL      :: 0x0602
+EN_ALIGN_LTR_EC :: 0x0700
+EN_ALIGN_RTL_EC :: 0x0701
+
 // Font Weights
 FW_DONTCARE   :: 0
 FW_THIN       :: 100
