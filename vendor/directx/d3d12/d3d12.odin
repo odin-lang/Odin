@@ -1459,6 +1459,10 @@ TEXTURE_COPY_TYPE :: enum i32 {
 TEXTURE_COPY_LOCATION :: struct {
 	pResource: ^IResource,
 	Type:      TEXTURE_COPY_TYPE,
+	using _: struct #raw_union {
+		PlacedFootprint:  PLACED_SUBRESOURCE_FOOTPRINT,
+		SubresourceIndex: u32,
+	},
 }
 
 RESOLVE_MODE :: enum i32 {
