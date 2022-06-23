@@ -183,6 +183,7 @@ parse_file :: proc(p: ^Parser, file: ^ast.File) -> bool {
 	pd.name    = pkg_name.text
 	pd.comment = p.line_comment
 	p.file.pkg_decl = pd
+	p.file.docs = docs
 
 	expect_semicolon(p, pd)
 
