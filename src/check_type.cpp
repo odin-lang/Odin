@@ -1240,7 +1240,7 @@ Type *determine_type_from_polymorphic(CheckerContext *ctx, Type *poly_type, Oper
 	if (!is_operand_value(operand)) {
 		if (show_error) {
 			gbString pts = type_to_string(poly_type);
-			gbString ots = type_to_string(operand.type);
+			gbString ots = type_to_string(operand.type, true);
 			defer (gb_string_free(pts));
 			defer (gb_string_free(ots));
 			error(operand.expr, "Cannot determine polymorphic type from parameter: '%s' to '%s'", ots, pts);
@@ -1253,7 +1253,7 @@ Type *determine_type_from_polymorphic(CheckerContext *ctx, Type *poly_type, Oper
 	}
 	if (show_error) {
 		gbString pts = type_to_string(poly_type);
-		gbString ots = type_to_string(operand.type);
+		gbString ots = type_to_string(operand.type, true);
 		defer (gb_string_free(pts));
 		defer (gb_string_free(ots));
 		error(operand.expr, "Cannot determine polymorphic type from parameter: '%s' to '%s'", ots, pts);
