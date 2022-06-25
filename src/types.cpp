@@ -731,7 +731,8 @@ gbString type_to_string       (Type *type, bool shorthand=false);
 i64      type_size_of_internal(Type *t, TypePath *path);
 void     init_map_internal_types(Type *type);
 Type *   bit_set_to_int(Type *t);
-bool are_types_identical(Type *x, Type *y, bool treat_booleans_as_equals);
+bool     are_types_identical(Type *x, Type *y);
+bool     are_types_identical(Type *x, Type *y, bool treat_booleans_as_equals);
 
 bool is_type_pointer(Type *t);
 bool is_type_proc(Type *t);
