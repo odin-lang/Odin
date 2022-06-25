@@ -3249,8 +3249,9 @@ void check_binary_expr(CheckerContext *c, Operand *x, Ast *node, Type *type_hint
 		return;
 	}
 
-	
-	if (!are_types_identical(x->type, y->type)) {
+	bool treat_booleans_as_equals = op.kind == Token_CmpAnd || op.kind == Token_CmpOr;
+	if (!are_types_identical(x->type, y->type, treat_booleans_as_equals))
+	{
 		if (x->type != t_invalid &&
 		    y->type != t_invalid) {
 			gbString xt = type_to_string(x->type);
