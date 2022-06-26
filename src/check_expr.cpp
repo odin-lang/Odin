@@ -3249,8 +3249,14 @@ void check_binary_expr(CheckerContext *c, Operand *x, Ast *node, Type *type_hint
 		return;
 	}
 
-	
-	if (!are_types_identical(x->type, y->type)) {
+	if ((op.kind == Token_CmpAnd || op.kind == Token_CmpOr) &&
+	    is_type_boolean(x->type) && is_type_boolean(y->type)) {
+	    	// NOTE(bill, 2022-06-26)
+	    	// Allow any boolean types within `&&` and `||`
+	    	// This is an exception to all other binary expressions since the result
+	    	// of a comparison will always be an untyped boolean, and allowing
+	    	// any boolean between these two simplifies a lot of expressions
+	} else if (!are_types_identical(x->type, y->type)) {
 		if (x->type != t_invalid &&
 		    y->type != t_invalid) {
 			gbString xt = type_to_string(x->type);
