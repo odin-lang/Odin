@@ -488,15 +488,15 @@ foreign lib {
 	HasEvents        :: proc(minType, maxType: EventType) -> bool ---
 	FlushEvent       :: proc(type: EventType) ---
 	FlushEvents      :: proc(minType, maxType: EventType) ---
-	PollEvent        :: proc(event: ^Event) -> c.int ---
-	WaitEvent        :: proc(event: ^Event) -> c.int ---
-	WaitEventTimeout :: proc(event: ^Event, timeout: c.int) -> c.int ---
-	PushEvent        :: proc(event: ^Event) -> c.int ---
+	PollEvent        :: proc(event: ^Event) -> bool ---                 // original return value is c.int
+	WaitEvent        :: proc(event: ^Event) -> bool ---                 // original return value is c.int
+	WaitEventTimeout :: proc(event: ^Event, timeout: c.int) -> bool --- // original return value is c.int
+	PushEvent        :: proc(event: ^Event) -> bool ---                 // original return value is c.int
 	SetEventFilter   :: proc(filter: EventFilter, userdata: rawptr) ---
 	GetEventFilter   :: proc(filter: ^EventFilter, userdata: ^rawptr) -> bool ---
 	AddEventWatch    :: proc(filter: EventFilter, userdata: rawptr) ---
 	DelEventWatch    :: proc(filter: EventFilter, userdata: rawptr) ---
 	FilterEvents     :: proc(filter: EventFilter, userdata: rawptr) ---
-	EventState       :: proc(type: EventType, state: c.int) -> u8 ---
+	EventState       :: proc(type: EventType, state: c.int) -> b8 --- // original return value is u8
 	RegisterEvents   :: proc(numevents: c.int) -> u32 ---
 }
