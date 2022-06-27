@@ -477,7 +477,7 @@ DISABLE ::  0
 ENABLE  ::  1
 
 
-GetEventState :: #force_inline proc "c" (type: EventType) -> u8 { return EventState(type, QUERY) }
+GetEventState :: #force_inline proc "c" (type: EventType) -> b8 { return EventState(type, QUERY) }
 
 
 @(default_calling_convention="c", link_prefix="SDL_")
