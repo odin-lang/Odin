@@ -1266,9 +1266,9 @@ when !ODIN_DEBUG {
 	GetTextureHandleARB              :: proc "c" (target: u32, loc := #caller_location) -> u64
 	{ ret := impl_GetTextureHandleARB(target);   debug_helper(loc, 0, target); return ret }
 	GetTextureSamplerHandleARB     :: proc "c" (texture, sampler: u32, loc := #caller_location) -> u64
-	{        ret := impl_GetTextureSamplerHandleARB(texture, sampler);   debug_helper(loc, 0, texture, sampler); return ret;                                                }
+	{        ret := impl_GetTextureSamplerHandleARB(texture, sampler);   debug_helper(loc, 0, texture, sampler); return ret                                                }
 	GetImageHandleARB              :: proc "c" (texture: u32, level: i32, layered: bool, layer: i32, format: u32, loc := #caller_location) -> u64
-	{        ret := impl_GetImageHandleARB(texture, level, layered, layer, format);   debug_helper(loc, 0, texture, level, layered, layer, format); return ret;                                                }
+	{        ret := impl_GetImageHandleARB(texture, level, layered, layer, format);   debug_helper(loc, 0, texture, level, layered, layer, format); return ret                                                }
 	MakeTextureHandleResidentARB   :: proc "c" (handle: u64, loc := #caller_location)
 	{        impl_MakeTextureHandleResidentARB(handle);   debug_helper(loc, 0, handle)                                                }
 	MakeImageHandleResidentARB     :: proc "c" (handle: u64, access: u32, loc := #caller_location)
