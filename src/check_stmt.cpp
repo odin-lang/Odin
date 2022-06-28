@@ -2142,7 +2142,26 @@ void check_stmt_internal(CheckerContext *ctx, Ast *node, u32 flags) {
 			}
 
 			if (new_name_count == 0) {
-				error(node, "No new declarations on the lhs");
+				begin_error_block();
+				error(node, "No new declarations on the left hand side");
+				bool all_underscore = true;
+				for_array(i, vd->names) {
+					Ast *name = vd->names[i];
+					if (name->kind == Ast_Ident) {
+						if (!is_blank_ident(name)) {
+							all_underscore = false;
+							break;
+						}
+					} else {
+						all_underscore = false;
+						break;
+					}
+				}
+				if (all_underscore) {
+					error_line("\tSuggestion: Try changing the declaration (:=) to an assignment (=)\n");
+				}
+
+				end_error_block();
 			}
 
 			Type *init_type = nullptr;
