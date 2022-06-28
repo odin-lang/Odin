@@ -724,10 +724,11 @@ gb_global RecursiveMutex g_type_mutex;
 
 struct TypePath;
 
-i64      type_size_of         (Type *t);
-i64      type_align_of        (Type *t);
-i64      type_offset_of       (Type *t, i32 index);
-gbString type_to_string       (Type *type, bool shorthand=false);
+i64      type_size_of   (Type *t);
+i64      type_align_of  (Type *t);
+i64      type_offset_of (Type *t, i32 index);
+gbString type_to_string (Type *type, bool shorthand=true);
+gbString type_to_string (Type *type, gbAllocator allocator, bool shorthand=true);
 i64      type_size_of_internal(Type *t, TypePath *path);
 void     init_map_internal_types(Type *type);
 Type *   bit_set_to_int(Type *t);
@@ -4287,7 +4288,7 @@ gbString write_type_to_string(gbString str, Type *type, bool shorthand=false) {
 }
 
 
-gbString type_to_string(Type *type, gbAllocator allocator, bool shorthand=false) {
+gbString type_to_string(Type *type, gbAllocator allocator, bool shorthand) {
 	return write_type_to_string(gb_string_make(allocator, ""), type, shorthand);
 }
 gbString type_to_string(Type *type, bool shorthand) {
