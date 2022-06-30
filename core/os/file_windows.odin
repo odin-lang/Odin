@@ -384,21 +384,33 @@ set_current_directory :: proc(path: string) -> (err: Errno) {
 
 
 
-change_directory :: proc(path: string) -> Errno {
+change_directory :: proc(path: string) -> (err: Errno) {
 	wpath := win32.utf8_to_wstring(path, context.temp_allocator)
-	return Errno(win32.SetCurrentDirectoryW(wpath))
+
+	if !win32.SetCurrentDirectoryW(wpath) {
+		err = Errno(win32.GetLastError())
+	}
+	return
 }
 
-make_directory :: proc(path: string, mode: u32 = 0) -> Errno {
+make_directory :: proc(path: string, mode: u32 = 0) -> (err: Errno) {
 	// Mode is unused on Windows, but is needed on *nix
 	wpath := win32.utf8_to_wstring(path, context.temp_allocator)
-	return Errno(win32.CreateDirectoryW(wpath, nil))
+
+	if !win32.CreateDirectoryW(wpath, nil) {
+		err = Errno(win32.GetLastError())
+	}
+	return
 }
 
 
-remove_directory :: proc(path: string) -> Errno {
+remove_directory :: proc(path: string) -> (err: Errno) {
 	wpath := win32.utf8_to_wstring(path, context.temp_allocator)
-	return Errno(win32.RemoveDirectoryW(wpath))
+
+	if !win32.RemoveDirectoryW(wpath) {
+		err = Errno(win32.GetLastError())
+	}
+	return
 }
 
 
@@ -464,23 +476,31 @@ fix_long_path :: proc(path: string) -> string {
 }
 
 
-link :: proc(old_name, new_name: string) -> Errno {
+link :: proc(old_name, new_name: string) -> (err: Errno) {
 	n := win32.utf8_to_wstring(fix_long_path(new_name))
 	o := win32.utf8_to_wstring(fix_long_path(old_name))
 	return Errno(win32.CreateHardLinkW(n, o, nil))
 }
 
-unlink :: proc(path: string) -> Errno {
+unlink :: proc(path: string) -> (err: Errno) {
 	wpath := win32.utf8_to_wstring(path, context.temp_allocator)
-	return Errno(win32.DeleteFileW(wpath))
+
+	if !win32.DeleteFileW(wpath) {
+		err = Errno(win32.GetLastError())
+	}
+	return
 }
 
 
 
-rename :: proc(old_path, new_path: string) -> Errno {
+rename :: proc(old_path, new_path: string) -> (err: Errno) {
 	from := win32.utf8_to_wstring(old_path, context.temp_allocator)
 	to := win32.utf8_to_wstring(new_path, context.temp_allocator)
-	return Errno(win32.MoveFileExW(from, to, win32.MOVEFILE_REPLACE_EXISTING))
+
+	if !win32.MoveFileExW(from, to, win32.MOVEFILE_REPLACE_EXISTING) {
+		err = Errno(win32.GetLastError())
+	}
+	return
 }
 
 
