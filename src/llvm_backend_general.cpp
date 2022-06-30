@@ -867,9 +867,9 @@ void lb_emit_store(lbProcedure *p, lbValue ptr, lbValue value) {
 		GB_ASSERT_MSG(are_types_identical(ca, core_type(value.type)), "%s != %s", type_to_string(a), type_to_string(value.type));
 	}
 
-	enum {MAX_STORE_SIZE = 32};
+	enum {MAX_STORE_SIZE = 64};
 
-	if (LLVMIsALoadInst(value.value) && lb_sizeof(LLVMTypeOf(value.value)) > 32) {
+	if (LLVMIsALoadInst(value.value) && lb_sizeof(LLVMTypeOf(value.value)) > MAX_STORE_SIZE) {
 		LLVMValueRef dst_ptr = ptr.value;
 		LLVMValueRef src_ptr = LLVMGetOperand(value.value, 0);
 		src_ptr = LLVMBuildPointerCast(p->builder, src_ptr, LLVMTypeOf(dst_ptr), "");
