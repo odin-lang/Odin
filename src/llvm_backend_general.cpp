@@ -852,6 +852,12 @@ bool lb_is_type_proc_recursive(Type *t) {
 void lb_emit_store(lbProcedure *p, lbValue ptr, lbValue value) {
 	GB_ASSERT(value.value != nullptr);
 	Type *a = type_deref(ptr.type);
+
+	if (LLVMIsNull(value.value)) {
+		LLVMTypeRef src_t = LLVMGetElementType(LLVMTypeOf(ptr.value));
+		LLVMBuildStore(p->builder, LLVMConstNull(src_t), ptr.value);
+		return;
+	}
 	if (is_type_boolean(a)) {
 		// NOTE(bill): There are multiple sized booleans, thus force a conversion (if necessarily)
 		value = lb_emit_conv(p, value, a);
@@ -859,6 +865,20 @@ void lb_emit_store(lbProcedure *p, lbValue ptr, lbValue value) {
 	Type *ca = core_type(a);
 	if (ca->kind == Type_Basic) {
 		GB_ASSERT_MSG(are_types_identical(ca, core_type(value.type)), "%s != %s", type_to_string(a), type_to_string(value.type));
+	}
+
+	enum {MAX_STORE_SIZE = 64};
+
+	if (LLVMIsALoadInst(value.value) && lb_sizeof(LLVMTypeOf(value.value)) > MAX_STORE_SIZE) {
+		LLVMValueRef dst_ptr = ptr.value;
+		LLVMValueRef src_ptr = LLVMGetOperand(value.value, 0);
+		src_ptr = LLVMBuildPointerCast(p->builder, src_ptr, LLVMTypeOf(dst_ptr), "");
+
+		LLVMBuildMemMove(p->builder,
+		                 dst_ptr, 1,
+		                 src_ptr, 1,
+		                 LLVMConstInt(LLVMInt64TypeInContext(p->module->ctx), lb_sizeof(LLVMTypeOf(value.value)), false));
+		return;
 	}
 
 	if (lb_is_type_proc_recursive(a)) {

@@ -419,7 +419,18 @@ LLVMMetadataRef lb_debug_type_internal(lbModule *m, Type *type) {
 		break;
 
 	case Type_SimdVector:
-		return LLVMDIBuilderCreateVectorType(m->debug_builder, cast(unsigned)type->SimdVector.count, 8*cast(unsigned)type_align_of(type), lb_debug_type(m, type->SimdVector.elem), nullptr, 0);
+		{
+			LLVMMetadataRef elem = lb_debug_type(m, type->SimdVector.elem);
+			LLVMMetadataRef subscripts[1] = {};
+			subscripts[0] = LLVMDIBuilderGetOrCreateSubrange(m->debug_builder,
+				0ll,
+				type->SimdVector.count
+			);
+			return LLVMDIBuilderCreateVectorType(
+				m->debug_builder,
+				8*cast(unsigned)type_size_of(type), 8*cast(unsigned)type_align_of(type),
+				elem, subscripts, gb_count_of(subscripts));
+		}
 
 	case Type_RelativePointer: {
 		LLVMMetadataRef base_integer = lb_debug_type(m, type->RelativePointer.base_integer);
