@@ -2685,7 +2685,28 @@ bool check_type_internal(CheckerContext *ctx, Ast *e, Type **type, Type *named_t
 	case_end;
 
 	case_ast_node(pt, PointerType, e);
-		*type = alloc_type_pointer(check_type(ctx, pt->type));
+		CheckerContext c = *ctx;
+		c.type_path = new_checker_type_path();
+		defer (destroy_checker_type_path(c.type_path));
+
+		Type *elem = t_invalid;
+		Operand o = {};
+		check_expr_or_type(&c, &o, pt->type);
+		if (o.mode != Addressing_Invalid && o.mode != Addressing_Type) {
+			// NOTE(bill): call check_type_expr again to get a consistent error message
+			begin_error_block();
+			elem = check_type_expr(&c, pt->type, nullptr);
+			if (o.mode == Addressing_Variable) {
+				gbString s = expr_to_string(pt->type);
+				error_line("\tSuggestion: ^ is used for pointer types, did you mean '&%s'?\n", s);
+				gb_string_free(s);
+			}
+			end_error_block();
+		} else {
+			elem = o.type;
+		}
+
+		*type = alloc_type_pointer(elem);
 		set_base_type(named_type, *type);
 		return true;
 	case_end;
