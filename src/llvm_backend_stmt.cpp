@@ -1744,11 +1744,14 @@ void lb_build_for_stmt(lbProcedure *p, Ast *node) {
 		post = lb_create_block(p, "for.post");
 	}
 
-
 	lb_emit_jump(p, loop);
 	lb_start_block(p, loop);
 
 	if (loop != body) {
+		// right now the condition (all expressions) will not set it's debug location, so we will do it here
+		if (p->debug_info != nullptr) {
+			LLVMSetCurrentDebugLocation2(p->builder, lb_debug_location_from_ast(p, fs->cond));
+		}
 		lb_build_cond(p, fs->cond, body, done);
 		lb_start_block(p, body);
 	}
@@ -1756,10 +1759,12 @@ void lb_build_for_stmt(lbProcedure *p, Ast *node) {
 	lb_push_target_list(p, fs->label, done, post, nullptr);
 
 	lb_build_stmt(p, fs->body);
-	lb_close_scope(p, lbDeferExit_Default, nullptr);
 
 	lb_pop_target_list(p);
 
+	if (p->debug_info != nullptr) {
+		LLVMSetCurrentDebugLocation2(p->builder, lb_debug_end_location_from_ast(p, fs->body));
+	}
 	lb_emit_jump(p, post);
 
 	if (fs->post != nullptr) {
@@ -1769,6 +1774,7 @@ void lb_build_for_stmt(lbProcedure *p, Ast *node) {
 	}
 
 	lb_start_block(p, done);
+	lb_close_scope(p, lbDeferExit_Default, nullptr);
 }
 
 void lb_build_assign_stmt_array(lbProcedure *p, TokenKind op, lbAddr const &lhs, lbValue const &value) {
