@@ -1553,7 +1553,7 @@ split_multi_iterate :: proc(using sm: ^Split_Multi) -> (res: string, ok: bool) #
 scrub :: proc(s: string, replacement: string, allocator := context.allocator) -> string {
 	str := s
 	b: Builder
-	init_builder(&b, 0, len(s), allocator)
+	builder_init(&b, 0, len(s), allocator)
 
 	has_error := false
 	cursor := 0
@@ -1622,7 +1622,7 @@ expand_tabs :: proc(s: string, tab_size: int, allocator := context.allocator) ->
 	}
 
 	b: Builder
-	init_builder(&b, allocator)
+	builder_init(&b, allocator)
 	writer := to_writer(&b)
 	str := s
 	column: int
@@ -1690,8 +1690,8 @@ centre_justify :: proc(str: string, length: int, pad: string, allocator := conte
 	pad_len := rune_count(pad)
 
 	b: Builder
-	init_builder(&b, allocator)
-	grow_builder(&b, len(str) + (remains/pad_len + 1)*len(pad))
+	builder_init(&b, allocator)
+	builder_grow(&b, len(str) + (remains/pad_len + 1)*len(pad))
 
 	w := to_writer(&b)
 
@@ -1713,8 +1713,8 @@ left_justify :: proc(str: string, length: int, pad: string, allocator := context
 	pad_len := rune_count(pad)
 
 	b: Builder
-	init_builder(&b, allocator)
-	grow_builder(&b, len(str) + (remains/pad_len + 1)*len(pad))
+	builder_init(&b, allocator)
+	builder_grow(&b, len(str) + (remains/pad_len + 1)*len(pad))
 
 	w := to_writer(&b)
 
@@ -1735,8 +1735,8 @@ right_justify :: proc(str: string, length: int, pad: string, allocator := contex
 	pad_len := rune_count(pad)
 
 	b: Builder
-	init_builder(&b, allocator)
-	grow_builder(&b, len(str) + (remains/pad_len + 1)*len(pad))
+	builder_init(&b, allocator)
+	builder_grow(&b, len(str) + (remains/pad_len + 1)*len(pad))
 
 	w := to_writer(&b)
 
