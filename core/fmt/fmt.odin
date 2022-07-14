@@ -77,7 +77,7 @@ register_user_formatter :: proc(id: typeid, formatter: User_Formatter) -> Regist
 // They must be freed accordingly
 aprint :: proc(args: ..any, sep := " ") -> string {
 	str: strings.Builder
-	strings.init_builder(&str)
+	strings.builder_init(&str)
 	sbprint(buf=&str, args=args, sep=sep)
 	return strings.to_string(str)
 }
@@ -85,7 +85,7 @@ aprint :: proc(args: ..any, sep := " ") -> string {
 // They must be freed accordingly
 aprintln :: proc(args: ..any, sep := " ") -> string {
 	str: strings.Builder
-	strings.init_builder(&str)
+	strings.builder_init(&str)
 	sbprintln(buf=&str, args=args, sep=sep)
 	return strings.to_string(str)
 }
@@ -93,7 +93,7 @@ aprintln :: proc(args: ..any, sep := " ") -> string {
 // They must be freed accordingly
 aprintf :: proc(fmt: string, args: ..any) -> string {
 	str: strings.Builder
-	strings.init_builder(&str)
+	strings.builder_init(&str)
 	sbprintf(&str, fmt, ..args)
 	return strings.to_string(str)
 }
@@ -102,21 +102,21 @@ aprintf :: proc(fmt: string, args: ..any) -> string {
 // tprint procedure return a string that was allocated with the current context's temporary allocator
 tprint :: proc(args: ..any, sep := " ") -> string {
 	str: strings.Builder
-	strings.init_builder(&str, context.temp_allocator)
+	strings.builder_init(&str, context.temp_allocator)
 	sbprint(buf=&str, args=args, sep=sep)
 	return strings.to_string(str)
 }
 // tprintln procedure return a string that was allocated with the current context's temporary allocator
 tprintln :: proc(args: ..any, sep := " ") -> string {
 	str: strings.Builder
-	strings.init_builder(&str, context.temp_allocator)
+	strings.builder_init(&str, context.temp_allocator)
 	sbprintln(buf=&str, args=args, sep=sep)
 	return strings.to_string(str)
 }
 // tprintf procedure return a string that was allocated with the current context's temporary allocator
 tprintf :: proc(fmt: string, args: ..any) -> string {
 	str: strings.Builder
-	strings.init_builder(&str, context.temp_allocator)
+	strings.builder_init(&str, context.temp_allocator)
 	sbprintf(&str, fmt, ..args)
 	return strings.to_string(str)
 }
@@ -776,7 +776,7 @@ fmt_rune :: proc(fi: ^Info, r: rune, verb: rune) {
 	case 'c', 'r', 'v':
 		io.write_rune(fi.writer, r, &fi.n)
 	case 'q':
-		fi.n += strings.write_quoted_rune(fi.writer, r)
+		fi.n += io.write_quoted_rune(fi.writer, r)
 	case:
 		fmt_int(fi, u64(r), false, 32, verb)
 	}
