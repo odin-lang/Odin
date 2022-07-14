@@ -247,6 +247,30 @@ write_quoted_string :: proc(w: Writer, str: string, quote: byte = '"', n_written
 	return
 }
 
+// writer append a quoted rune into the byte buffer, return the written size
+write_quoted_rune :: proc(w: Writer, r: rune) -> (n: int) {
+	_write_byte :: #force_inline proc(w: Writer, c: byte) -> int {
+		err := write_byte(w, c)
+		return 1 if err == nil else 0
+	}
+
+	quote := byte('\'')
+	n += _write_byte(w, quote)
+	buf, width := utf8.encode_rune(r)
+	if width == 1 && r == utf8.RUNE_ERROR {
+		n += _write_byte(w, '\\')
+		n += _write_byte(w, 'x')
+		n += _write_byte(w, DIGITS_LOWER[buf[0]>>4])
+		n += _write_byte(w, DIGITS_LOWER[buf[0]&0xf])
+	} else {
+		i, _ := write_escaped_rune(w, r, quote)
+		n += i
+	}
+	n += _write_byte(w, quote)
+	return
+}
+
+
 
 
 Tee_Reader :: struct {

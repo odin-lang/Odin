@@ -353,7 +353,7 @@ end :: proc(ctx: ^Context) {
 
 	/* reset input state */
 	ctx.key_pressed_bits = {} // clear
-	strings.reset_builder(&ctx.text_input)
+	strings.builder_reset(&ctx.text_input)
 	ctx.mouse_pressed_bits = {} // clear
 	ctx.mouse_released_bits = {} // clear
 	ctx.scroll_delta = Vec2{0, 0}
