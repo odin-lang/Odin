@@ -573,11 +573,11 @@ write_type_writer :: proc(w: io.Writer, ti: ^Type_Info, n_written: ^int = nil) -
 			write_type(w, info.elem, &n) or_return
 		case is_rune(info.elem):
 			io.write_encoded_rune(w, rune(info.lower), true, &n) or_return
-			io.write_string(w, "..",                         &n) or_return
+			io.write_string(w, "..=",                        &n) or_return
 			io.write_encoded_rune(w, rune(info.upper), true, &n) or_return
 		case:
 			io.write_i64(w, info.lower, 10, &n) or_return
-			io.write_string(w, "..",        &n) or_return
+			io.write_string(w, "..=",       &n) or_return
 			io.write_i64(w, info.upper, 10, &n) or_return
 		}
 		if info.underlying != nil {
