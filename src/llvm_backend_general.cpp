@@ -2369,6 +2369,9 @@ LLVMValueRef lb_find_or_add_entity_string_ptr(lbModule *m, String const &str) {
 		LLVMValueRef global_data = LLVMAddGlobal(m->mod, LLVMTypeOf(data), name);
 		LLVMSetInitializer(global_data, data);
 		LLVMSetLinkage(global_data, LLVMPrivateLinkage);
+		LLVMSetUnnamedAddress(global_data, LLVMGlobalUnnamedAddr);
+		LLVMSetAlignment(global_data, 1);
+		LLVMSetGlobalConstant(global_data, true);
 
 		LLVMValueRef ptr = LLVMConstInBoundsGEP(global_data, indices, 2);
 		string_map_set(&m->const_strings, key, ptr);
@@ -2411,6 +2414,9 @@ lbValue lb_find_or_add_entity_string_byte_slice(lbModule *m, String const &str) 
 	LLVMValueRef global_data = LLVMAddGlobal(m->mod, LLVMTypeOf(data), name);
 	LLVMSetInitializer(global_data, data);
 	LLVMSetLinkage(global_data, LLVMPrivateLinkage);
+	LLVMSetUnnamedAddress(global_data, LLVMGlobalUnnamedAddr);
+	LLVMSetAlignment(global_data, 1);
+	LLVMSetGlobalConstant(global_data, true);
 
 	LLVMValueRef ptr = nullptr;
 	if (str.len != 0) {
@@ -2647,6 +2653,7 @@ lbValue lb_generate_global_array(lbModule *m, Type *elem_type, i64 count, String
 	g.type = alloc_type_pointer(t);
 	LLVMSetInitializer(g.value, LLVMConstNull(lb_type(m, t)));
 	LLVMSetLinkage(g.value, LLVMPrivateLinkage);
+	LLVMSetUnnamedAddress(g.value, LLVMGlobalUnnamedAddr);
 	string_map_set(&m->members, s, g);
 	return g;
 }
