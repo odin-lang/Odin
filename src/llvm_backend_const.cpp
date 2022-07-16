@@ -1025,7 +1025,10 @@ lbValue lb_const_value(lbModule *m, Type *type, ExactValue value, bool allow_loc
 				return lb_const_nil(m, original_type);
 			}
 
-			u64 bits = 0;
+			BigInt bits = {};
+			BigInt one = {};
+			big_int_from_u64(&one, 1);
+
 			for_array(i, cl->elems) {
 				Ast *e = cl->elems[i];
 				GB_ASSERT(e->kind != Ast_FieldValue);
@@ -1037,18 +1040,14 @@ lbValue lb_const_value(lbModule *m, Type *type, ExactValue value, bool allow_loc
 				GB_ASSERT(tav.value.kind == ExactValue_Integer);
 				i64 v = big_int_to_i64(&tav.value.value_integer);
 				i64 lower = type->BitSet.lower;
-				bits |= 1ull<<cast(u64)(v-lower);
+				u64 index = cast(u64)(v-lower);
+				gb_printf_err("index: %llu\n", index);
+				BigInt bit = {};
+				big_int_from_u64(&bit, index);
+				big_int_shl(&bit, &one, &bit);
+				big_int_or(&bits, &bits, &bit);
 			}
-			if (is_type_different_to_arch_endianness(type)) {
-				i64 size = type_size_of(type);
-				switch (size) {
-				case 2: bits = cast(u64)gb_endian_swap16(cast(u16)bits); break;
-				case 4: bits = cast(u64)gb_endian_swap32(cast(u32)bits); break;
-				case 8: bits = cast(u64)gb_endian_swap64(cast(u64)bits); break;
-				}
-			}
-
-			res.value = LLVMConstInt(lb_type(m, original_type), bits, false);
+			res.value = lb_big_int_to_llvm(m, original_type, &bits);
 			return res;
 		} else if (is_type_matrix(type)) {
 			ast_node(cl, CompoundLit, value.value_compound);
