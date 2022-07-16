@@ -292,6 +292,8 @@ struct lbProcedure {
 	LLVMMetadataRef debug_info;
 
 	lbCopyElisionHint copy_elision_hint;
+
+	PtrMap<Ast *, lbValue> selector_values;
 };
 
 
