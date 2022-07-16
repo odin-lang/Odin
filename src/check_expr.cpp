@@ -8404,23 +8404,30 @@ ExprKind check_compound_literal(CheckerContext *c, Operand *o, Ast *node, Type *
 		if (is_type_bit_set(type)) {
 			// NOTE(bill): Encode as an integer
 
-			i64 lower = base_type(type)->BitSet.lower;
+			Type *bt = base_type(type);
+			BigInt bits = {};
+			BigInt one = {};
+			big_int_from_u64(&one, 1);
 
-			u64 bits = 0;
-			for_array(index, cl->elems) {
-				Ast *elem = cl->elems[index];
-				GB_ASSERT(elem->kind != Ast_FieldValue);
-				TypeAndValue tav = elem->tav;
-				ExactValue i = exact_value_to_integer(tav.value);
-				if (i.kind != ExactValue_Integer) {
+			for_array(i, cl->elems) {
+				Ast *e = cl->elems[i];
+				GB_ASSERT(e->kind != Ast_FieldValue);
+
+				TypeAndValue tav = e->tav;
+				if (tav.mode != Addressing_Constant) {
 					continue;
 				}
-				i64 val = big_int_to_i64(&i.value_integer);
-				val -= lower;
-				u64 bit = u64(1ll<<val);
-				bits |= bit;
+				GB_ASSERT(tav.value.kind == ExactValue_Integer);
+				i64 v = big_int_to_i64(&tav.value.value_integer);
+				i64 lower = bt->BitSet.lower;
+				u64 index = cast(u64)(v-lower);
+				BigInt bit = {};
+				big_int_from_u64(&bit, index);
+				big_int_shl(&bit, &one, &bit);
+				big_int_or(&bits, &bits, &bit);
 			}
-			o->value = exact_value_u64(bits);
+			o->value.kind = ExactValue_Integer;
+			o->value.value_integer = bits;
 		} else if (is_type_constant_type(type) && cl->elems.count == 0) {
 			ExactValue value = exact_value_compound(node);
 			Type *bt = core_type(type);
