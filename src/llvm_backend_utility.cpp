@@ -1,3 +1,5 @@
+lbValue lb_lookup_runtime_procedure(lbModule *m, String const &name);
+
 bool lb_is_type_aggregate(Type *t) {
 	t = base_type(t);
 	switch (t->kind) {
@@ -60,6 +62,7 @@ void lb_mem_zero_ptr_internal(lbProcedure *p, LLVMValueRef ptr, LLVMValueRef len
 		}
 	}
 
+
 	char const *name = "llvm.memset";
 	if (is_inlinable) {
 		name = "llvm.memset.inline";
@@ -69,17 +72,29 @@ void lb_mem_zero_ptr_internal(lbProcedure *p, LLVMValueRef ptr, LLVMValueRef len
 		lb_type(p->module, t_rawptr),
 		lb_type(p->module, t_int)
 	};
-	unsigned id = LLVMLookupIntrinsicID(name, gb_strlen(name));
-	GB_ASSERT_MSG(id != 0, "Unable to find %s.%s.%s", name, LLVMPrintTypeToString(types[0]), LLVMPrintTypeToString(types[1]));
-	LLVMValueRef ip = LLVMGetIntrinsicDeclaration(p->module->mod, id, types, gb_count_of(types));
+	if (true || is_inlinable) {
+		unsigned id = LLVMLookupIntrinsicID(name, gb_strlen(name));
+		GB_ASSERT_MSG(id != 0, "Unable to find %s.%s.%s", name, LLVMPrintTypeToString(types[0]), LLVMPrintTypeToString(types[1]));
+		LLVMValueRef ip = LLVMGetIntrinsicDeclaration(p->module->mod, id, types, gb_count_of(types));
 
-	LLVMValueRef args[4] = {};
-	args[0] = LLVMBuildPointerCast(p->builder, ptr, types[0], "");
-	args[1] = LLVMConstInt(LLVMInt8TypeInContext(p->module->ctx), 0, false);
-	args[2] = LLVMBuildIntCast2(p->builder, len, types[1], /*signed*/false, "");
-	args[3] = LLVMConstInt(LLVMInt1TypeInContext(p->module->ctx), is_volatile, false);
+		LLVMValueRef args[4] = {};
+		args[0] = LLVMBuildPointerCast(p->builder, ptr, types[0], "");
+		args[1] = LLVMConstInt(LLVMInt8TypeInContext(p->module->ctx), 0, false);
+		args[2] = LLVMBuildIntCast2(p->builder, len, types[1], /*signed*/false, "");
+		args[3] = LLVMConstInt(LLVMInt1TypeInContext(p->module->ctx), is_volatile, false);
 
-	LLVMBuildCall(p->builder, ip, args, gb_count_of(args), "");
+		LLVMBuildCall(p->builder, ip, args, gb_count_of(args), "");
+	} else {
+		LLVMValueRef ip = lb_lookup_runtime_procedure(p->module, str_lit("memset")).value;
+
+		LLVMValueRef args[3] = {};
+		args[0] = LLVMBuildPointerCast(p->builder, ptr, types[0], "");
+		args[1] = LLVMConstInt(LLVMInt32TypeInContext(p->module->ctx), 0, false);
+		args[2] = LLVMBuildIntCast2(p->builder, len, types[1], /*signed*/false, "");
+
+		LLVMBuildCall(p->builder, ip, args, gb_count_of(args), "");
+	}
+
 }
 
 void lb_mem_zero_ptr(lbProcedure *p, LLVMValueRef ptr, Type *type, unsigned alignment) {
@@ -1841,8 +1856,6 @@ void lb_set_wasm_export_attributes(LLVMValueRef value, String export_name) {
 	LLVMAddTargetDependentFunctionAttr(value, "wasm-export-name",   alloc_cstring(permanent_allocator(), export_name));
 }
 
-
-lbValue lb_lookup_runtime_procedure(lbModule *m, String const &name);
 
 
 lbAddr lb_handle_objc_find_or_register_selector(lbProcedure *p, String const &name) {
