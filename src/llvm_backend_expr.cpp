@@ -1425,10 +1425,13 @@ lbValue lb_build_binary_expr(lbProcedure *p, Ast *expr) {
 
 					Type *it = bit_set_to_int(rt);
 					left = lb_emit_conv(p, left, it);
+					if (is_type_different_to_arch_endianness(it)) {
+						left = lb_emit_byte_swap(p, left, integer_endian_type_to_platform_type(it));
+					}
 
-					lbValue lower = lb_const_value(p->module, it, exact_value_i64(rt->BitSet.lower));
-					lbValue key = lb_emit_arith(p, Token_Sub, left, lower, it);
-					lbValue bit = lb_emit_arith(p, Token_Shl, lb_const_int(p->module, it, 1), key, it);
+					lbValue lower = lb_const_value(p->module, left.type, exact_value_i64(rt->BitSet.lower));
+					lbValue key = lb_emit_arith(p, Token_Sub, left, lower, left.type);
+					lbValue bit = lb_emit_arith(p, Token_Shl, lb_const_int(p->module, left.type, 1), key, left.type);
 					bit = lb_emit_conv(p, bit, it);
 
 					lbValue old_value = lb_emit_transmute(p, right, it);
