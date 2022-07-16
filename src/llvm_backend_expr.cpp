@@ -3160,19 +3160,27 @@ lbValue lb_build_expr_internal(lbProcedure *p, Ast *expr) {
 		lb_start_block(p, then);
 
 		Type *type = default_type(type_of_expr(expr));
+		LLVMTypeRef llvm_type = lb_type(p->module, type);
 
 		incoming_values[0] = lb_emit_conv(p, lb_build_expr(p, te->x), type).value;
+		if (is_type_internally_pointer_like(type)) {
+			incoming_values[0] = LLVMBuildBitCast(p->builder, incoming_values[0], llvm_type, "");
+		}
 
 		lb_emit_jump(p, done);
 		lb_start_block(p, else_);
 
 		incoming_values[1] = lb_emit_conv(p, lb_build_expr(p, te->y), type).value;
 
+		if (is_type_internally_pointer_like(type)) {
+			incoming_values[1] = LLVMBuildBitCast(p->builder, incoming_values[1], llvm_type, "");
+		}
+
 		lb_emit_jump(p, done);
 		lb_start_block(p, done);
 
 		lbValue res = {};
-		res.value = LLVMBuildPhi(p->builder, lb_type(p->module, type), "");
+		res.value = LLVMBuildPhi(p->builder, llvm_type, "");
 		res.type = type;
 
 		GB_ASSERT(p->curr_block->preds.count >= 2);
