@@ -8643,6 +8643,8 @@ ExprKind check_selector_call_expr(CheckerContext *c, Operand *o, Ast *node, Type
 	Ast *first_arg = x.expr->SelectorExpr.expr;
 	GB_ASSERT(first_arg != nullptr);
 
+	first_arg->state_flags |= StateFlag_SelectorCallExpr;
+
 	Type *pt = base_type(x.type);
 	GB_ASSERT(pt->kind == Type_Proc);
 	Type *first_type = nullptr;
@@ -8668,6 +8670,7 @@ ExprKind check_selector_call_expr(CheckerContext *c, Operand *o, Ast *node, Type
 	y.mode = first_arg->tav.mode;
 	y.type = first_arg->tav.type;
 	y.value = first_arg->tav.value;
+
 	if (check_is_assignable_to(c, &y, first_type)) {
 		// Do nothing, it's valid
 	} else {
@@ -10034,9 +10037,10 @@ gbString write_expr_to_string(gbString str, Ast *node, bool shorthand) {
 		str = write_expr_to_string(str, ce->proc, shorthand);
 		str = gb_string_appendc(str, "(");
 
-		for_array(i, ce->args) {
+		isize idx0 = cast(isize)ce->was_selector;
+		for (isize i = idx0; i < ce->args.count; i++) {
 			Ast *arg = ce->args[i];
-			if (i > 0) {
+			if (i > idx0) {
 				str = gb_string_appendc(str, ", ");
 			}
 			str = write_expr_to_string(str, arg, shorthand);

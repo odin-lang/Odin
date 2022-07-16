@@ -113,6 +113,7 @@ lbProcedure *lb_create_procedure(lbModule *m, Entity *entity, bool ignore_body) 
 	p->branch_blocks.allocator = a;
 	p->context_stack.allocator = a;
 	p->scope_stack.allocator   = a;
+	map_init(&p->selector_values, a);
 
 	if (p->is_foreign) {
 		lb_add_foreign_library_path(p->module, entity->Procedure.foreign_library);
@@ -2831,10 +2832,6 @@ lbValue lb_build_call_expr_internal(lbProcedure *p, Ast *expr);
 lbValue lb_build_call_expr(lbProcedure *p, Ast *expr) {
 	expr = unparen_expr(expr);
 	ast_node(ce, CallExpr, expr);
-
-	if (ce->sce_temp_data) {
-		return *(lbValue *)ce->sce_temp_data;
-	}
 
 	lbValue res = lb_build_call_expr_internal(p, expr);
 

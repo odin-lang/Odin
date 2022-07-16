@@ -2993,9 +2993,8 @@ lbValue lb_build_unary_and(lbProcedure *p, Ast *expr) {
 	return lb_build_addr_ptr(p, ue->expr);
 }
 
+lbValue lb_build_expr_internal(lbProcedure *p, Ast *expr);
 lbValue lb_build_expr(lbProcedure *p, Ast *expr) {
-	lbModule *m = p->module;
-
 	u16 prev_state_flags = p->state_flags;
 	defer (p->state_flags = prev_state_flags);
 
@@ -3021,6 +3020,32 @@ lbValue lb_build_expr(lbProcedure *p, Ast *expr) {
 
 		p->state_flags = out;
 	}
+
+
+	// IMPORTANT NOTE(bill):
+	// Selector Call Expressions (foo->bar(...))
+	// must only evaluate `foo` once as it gets transformed into
+	// `foo.bar(foo, ...)`
+	// And if `foo` is a procedure call or something more complex, storing the value
+	// once is a very good idea
+	// If a stored value is found, it must be removed from the cache
+	if (expr->state_flags & StateFlag_SelectorCallExpr) {
+		lbValue *pp = map_get(&p->selector_values, expr);
+		if (pp != nullptr) {
+			lbValue res = *pp;
+			map_remove(&p->selector_values, expr);
+			return res;
+		}
+	}
+	lbValue res = lb_build_expr_internal(p, expr);
+	if (expr->state_flags & StateFlag_SelectorCallExpr) {
+		map_set(&p->selector_values, expr, res);
+	}
+	return res;
+}
+
+lbValue lb_build_expr_internal(lbProcedure *p, Ast *expr) {
+	lbModule *m = p->module;
 
 	expr = unparen_expr(expr);
 
@@ -3119,14 +3144,7 @@ lbValue lb_build_expr(lbProcedure *p, Ast *expr) {
 
 	case_ast_node(se, SelectorCallExpr, expr);
 		GB_ASSERT(se->modified_call);
-		TypeAndValue tav = type_and_value_of_expr(expr);
-		GB_ASSERT(tav.mode != Addressing_Invalid);
-		lbValue res = lb_build_call_expr(p, se->call);
-
-		ast_node(ce, CallExpr, se->call);
-		ce->sce_temp_data = gb_alloc_copy(permanent_allocator(), &res, gb_size_of(res));
-
-		return res;
+		return lb_build_call_expr(p, se->call);
 	case_end;
 
 	case_ast_node(te, TernaryIfExpr, expr);

@@ -282,6 +282,8 @@ enum StateFlag : u8 {
 	StateFlag_type_assert     = 1<<2,
 	StateFlag_no_type_assert  = 1<<3,
 
+	StateFlag_SelectorCallExpr = 1<<6,
+
 	StateFlag_BeenHandled = 1<<7,
 };
 
@@ -411,7 +413,7 @@ AST_KIND(_ExprBegin,  "",  bool) \
 		Token        ellipsis; \
 		ProcInlining inlining; \
 		bool         optional_ok_one; \
-		void *sce_temp_data; \
+		bool         was_selector; \
 	}) \
 	AST_KIND(FieldValue,      "field value",              struct { Token eq; Ast *field, *value; }) \
 	AST_KIND(EnumFieldValue,  "enum field value",         struct { \

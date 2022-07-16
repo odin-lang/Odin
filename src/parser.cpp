@@ -164,6 +164,7 @@ Ast *clone_ast(Ast *node) {
 	case Ast_SelectorCallExpr:
 		n->SelectorCallExpr.expr = clone_ast(n->SelectorCallExpr.expr);
 		n->SelectorCallExpr.call = clone_ast(n->SelectorCallExpr.call);
+		GB_ASSERT(n->SelectorCallExpr.modified_call);
 		break;
 	case Ast_IndexExpr:
 		n->IndexExpr.expr  = clone_ast(n->IndexExpr.expr);
