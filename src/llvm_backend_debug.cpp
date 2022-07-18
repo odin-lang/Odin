@@ -969,7 +969,7 @@ void lb_add_debug_local_variable(lbProcedure *p, LLVMValueRef ptr, Type *type, T
 	);
 
 	LLVMValueRef storage = ptr;
-	LLVMBasicBlockRef block = p->decl_block->block;
+	LLVMBasicBlockRef block = p->curr_block->block;
 	LLVMMetadataRef llvm_debug_loc = lb_debug_location_from_token_pos(p, token.pos);
 	LLVMMetadataRef llvm_expr = LLVMDIBuilderCreateExpression(m->debug_builder, nullptr, 0);
 	lb_set_llvm_metadata(m, ptr, llvm_expr);

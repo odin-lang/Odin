@@ -2746,10 +2746,6 @@ lbAddr lb_add_local(lbProcedure *p, Type *type, Entity *e, bool zero_init, i32 p
 		}
 	}
 
-	if (zero_init) {
-		lb_mem_zero_ptr(p, ptr, type, alignment);
-	}
-
 	lbValue val = {};
 	val.value = ptr;
 	val.type = alloc_type_pointer(type);
@@ -2757,6 +2753,10 @@ lbAddr lb_add_local(lbProcedure *p, Type *type, Entity *e, bool zero_init, i32 p
 	if (e != nullptr) {
 		lb_add_entity(p->module, e, val);
 		lb_add_debug_local_variable(p, ptr, type, e->token);
+	}
+
+	if (zero_init) {
+		lb_mem_zero_ptr(p, ptr, type, alignment);
 	}
 
 	return lb_addr(val);
