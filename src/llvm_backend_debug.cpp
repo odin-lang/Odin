@@ -43,6 +43,10 @@ LLVMMetadataRef lb_debug_location_from_ast(lbProcedure *p, Ast *node) {
 	GB_ASSERT(node != nullptr);
 	return lb_debug_location_from_token_pos(p, ast_token(node).pos);
 }
+LLVMMetadataRef lb_debug_end_location_from_ast(lbProcedure *p, Ast *node) {
+	GB_ASSERT(node != nullptr);
+	return lb_debug_location_from_token_pos(p, ast_end_token(node).pos);
+}
 
 LLVMMetadataRef lb_debug_type_internal_proc(lbModule *m, Type *type) {
 	i64 size = type_size_of(type); // Check size
