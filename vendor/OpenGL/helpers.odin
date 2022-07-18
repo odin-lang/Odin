@@ -5,6 +5,7 @@ package odin_gl
 import "core:os"
 import "core:fmt"
 import "core:strings"
+_ :: fmt
 
 Shader_Type :: enum i32 {
 	NONE = 0x0000,
