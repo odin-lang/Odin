@@ -3068,17 +3068,6 @@ lbValue lb_build_expr_internal(lbProcedure *p, Ast *expr) {
 		return lb_const_value(p->module, type, tv.value);
 	}
 
-	#if 0
-	LLVMMetadataRef prev_debug_location = nullptr;
-	if (p->debug_info != nullptr) {
-		prev_debug_location = LLVMGetCurrentDebugLocation2(p->builder);
-		LLVMSetCurrentDebugLocation2(p->builder, lb_debug_location_from_ast(p, expr));
-	}
-	defer (if (prev_debug_location != nullptr) {
-		LLVMSetCurrentDebugLocation2(p->builder, prev_debug_location);
-	});
-	#endif
-
 	switch (expr->kind) {
 	case_ast_node(bl, BasicLit, expr);
 		TokenPos pos = bl->token.pos;

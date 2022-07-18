@@ -1721,6 +1721,9 @@ void lb_build_for_stmt(lbProcedure *p, Ast *node) {
 	ast_node(fs, ForStmt, node);
 
 	lb_open_scope(p, fs->scope); // Open Scope here
+	if (p->debug_info != nullptr) {
+		LLVMSetCurrentDebugLocation2(p->builder, lb_debug_location_from_ast(p, node));
+	}
 
 	if (fs->init != nullptr) {
 	#if 1
@@ -1971,14 +1974,9 @@ void lb_build_stmt(lbProcedure *p, Ast *node) {
 		}
 	}
 
-	LLVMMetadataRef prev_debug_location = nullptr;
 	if (p->debug_info != nullptr) {
-		prev_debug_location = LLVMGetCurrentDebugLocation2(p->builder);
 		LLVMSetCurrentDebugLocation2(p->builder, lb_debug_location_from_ast(p, node));
 	}
-	defer (if (prev_debug_location != nullptr) {
-		LLVMSetCurrentDebugLocation2(p->builder, prev_debug_location);
-	});
 
 	u16 prev_state_flags = p->state_flags;
 	defer (p->state_flags = prev_state_flags);

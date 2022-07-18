@@ -434,6 +434,40 @@ void lb_start_block(lbProcedure *p, lbBlock *b) {
 	p->curr_block = b;
 }
 
+void lb_set_debug_position_to_procedure_begin(lbProcedure *p) {
+	if (p->debug_info == nullptr) {
+		return;
+	}
+	TokenPos pos = {};
+	if (p->body != nullptr) {
+		pos = ast_token(p->body).pos;
+	} else if (p->type_expr != nullptr) {
+		pos = ast_token(p->type_expr).pos;
+	} else if (p->entity != nullptr) {
+		pos = p->entity->token.pos;
+	}
+	if (pos.file_id != 0) {
+		LLVMSetCurrentDebugLocation2(p->builder, lb_debug_location_from_token_pos(p, pos));
+	}
+}
+
+void lb_set_debug_position_to_procedure_end(lbProcedure *p) {
+	if (p->debug_info == nullptr) {
+		return;
+	}
+	TokenPos pos = {};
+	if (p->body != nullptr) {
+		pos = ast_end_token(p->body).pos;
+	} else if (p->type_expr != nullptr) {
+		pos = ast_end_token(p->type_expr).pos;
+	} else if (p->entity != nullptr) {
+		pos = p->entity->token.pos;
+	}
+	if (pos.file_id != 0) {
+		LLVMSetCurrentDebugLocation2(p->builder, lb_debug_location_from_token_pos(p, pos));
+	}
+}
+
 void lb_begin_procedure_body(lbProcedure *p) {
 	DeclInfo *decl = decl_info_of_entity(p->entity);
 	if (decl != nullptr) {
@@ -565,29 +599,21 @@ void lb_begin_procedure_body(lbProcedure *p) {
 		lb_push_context_onto_stack_from_implicit_parameter(p);
 	}
 
-	lb_start_block(p, p->entry_block);
-
+	lb_set_debug_position_to_procedure_begin(p);
 	if (p->debug_info != nullptr) {
-		TokenPos pos = {};
-		if (p->body != nullptr) {
-			pos = ast_token(p->body).pos;
-		} else if (p->type_expr != nullptr) {
-			pos = ast_token(p->type_expr).pos;
-		} else if (p->entity != nullptr) {
-			pos = p->entity->token.pos;
-		}
-		if (pos.file_id != 0) {
-			LLVMSetCurrentDebugLocation2(p->builder, lb_debug_location_from_token_pos(p, pos));
-		}
-
 		if (p->context_stack.count != 0) {
+			p->curr_block = p->decl_block;
 			lb_add_debug_context_variable(p, lb_find_or_generate_context_ptr(p));
 		}
 
 	}
+
+	lb_start_block(p, p->entry_block);
 }
 
 void lb_end_procedure_body(lbProcedure *p) {
+	lb_set_debug_position_to_procedure_begin(p);
+
 	LLVMPositionBuilderAtEnd(p->builder, p->decl_block->block);
 	LLVMBuildBr(p->builder, p->entry_block->block);
 	LLVMPositionBuilderAtEnd(p->builder, p->curr_block->block);
@@ -599,6 +625,7 @@ void lb_end_procedure_body(lbProcedure *p) {
 		instr = LLVMGetLastInstruction(p->curr_block->block);
 		if (!lb_is_instr_terminating(instr)) {
 			lb_emit_defer_stmts(p, lbDeferExit_Return, nullptr);
+			lb_set_debug_position_to_procedure_end(p);
 			LLVMBuildRetVoid(p->builder);
 		}
 	}
