@@ -216,10 +216,7 @@ void lb_open_scope(lbProcedure *p, Scope *s) {
 			if (ast_file != nullptr) {
 				file = lb_get_llvm_metadata(m, ast_file);
 			}
-			LLVMMetadataRef scope = nullptr;
-			if (p->scope_stack.count > 0) {
-				scope = lb_get_llvm_metadata(m, p->scope_stack[p->scope_stack.count-1]);
-			}
+			LLVMMetadataRef scope = lb_get_current_debug_scope(p);
 			if (scope == nullptr) {
 				scope = lb_get_llvm_metadata(m, p);
 			}
@@ -1722,6 +1719,8 @@ void lb_build_if_stmt(lbProcedure *p, Ast *node) {
 	lb_start_block(p, done);
 }
 
+bool contains_deferred_call(Ast *node);
+
 void lb_build_for_stmt(lbProcedure *p, Ast *node) {
 	ast_node(fs, ForStmt, node);
 
@@ -1738,6 +1737,8 @@ void lb_build_for_stmt(lbProcedure *p, Ast *node) {
 	#endif
 		lb_build_stmt(p, fs->init);
 	}
+	lbBlock* outer_block = p->curr_block;
+	lb_open_scope(p, nullptr); // Open "empty" scope to be able to generate deferred statements for cond & post separately from init
 	lbBlock *body = lb_create_block(p, "for.body");
 	lbBlock *done = lb_create_block(p, "for.done"); // NOTE(bill): Append later
 	lbBlock *loop = body;
@@ -1753,11 +1754,19 @@ void lb_build_for_stmt(lbProcedure *p, Ast *node) {
 	lb_start_block(p, loop);
 
 	if (loop != body) {
+		lbBlock* loop_leave = done;
+		if (contains_deferred_call(fs->cond))
+			loop_leave = lb_create_block(p, "for.loop.leave");
 		// right now the condition (all expressions) will not set it's debug location, so we will do it here
 		if (p->debug_info != nullptr) {
 			LLVMSetCurrentDebugLocation2(p->builder, lb_debug_location_from_ast(p, fs->cond));
 		}
-		lb_build_cond(p, fs->cond, body, done);
+		lb_build_cond(p, fs->cond, body, loop_leave);
+		if (loop_leave != done) {
+			lb_start_block(p, loop_leave);
+			lb_emit_defer_stmts(p, lbDeferExit_Branch, outer_block);
+			lb_emit_jump(p, done);
+		}
 		lb_start_block(p, body);
 	}
 
@@ -1770,13 +1779,14 @@ void lb_build_for_stmt(lbProcedure *p, Ast *node) {
 	if (p->debug_info != nullptr) {
 		LLVMSetCurrentDebugLocation2(p->builder, lb_debug_end_location_from_ast(p, fs->body));
 	}
-	lb_emit_jump(p, post);
 
 	if (fs->post != nullptr) {
+		lb_emit_jump(p, post);
 		lb_start_block(p, post);
 		lb_build_stmt(p, fs->post);
-		lb_emit_jump(p, loop);
 	}
+	lb_close_scope(p, lbDeferExit_Default, nullptr);
+	lb_emit_jump(p, loop);
 
 	lb_start_block(p, done);
 	lb_close_scope(p, lbDeferExit_Default, nullptr);
