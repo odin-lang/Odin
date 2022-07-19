@@ -1345,7 +1345,9 @@ ParameterValue handle_parameter_value(CheckerContext *ctx, Type *in_type, Type *
 					param_value.kind = ParameterValue_Constant;
 					param_value.value = o.value;
 				} else {
-					error(expr, "Default parameter must be a constant, %d", o.mode);
+					gbString s = expr_to_string(o.expr);
+					error(expr, "Default parameter must be a constant, got %s", s);
+					gb_string_free(s);
 				}
 			}
 		} else {
