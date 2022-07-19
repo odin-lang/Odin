@@ -58,7 +58,7 @@ set libs= ^
 set linker_flags= -incremental:no -opt:ref -subsystem:console
 
 if %release_mode% EQU 0 ( rem Debug
-	set linker_flags=%linker_flags% -debug
+	set linker_flags=%linker_flags% -debug /NATVIS:src\odin_compiler.natvis
 ) else ( rem Release
 	set linker_flags=%linker_flags% -debug
 )
