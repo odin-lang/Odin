@@ -22,6 +22,10 @@ GET_Y_LPARAM :: #force_inline proc "contextless" (lp: LPARAM) -> c_int {
 	return cast(c_int)cast(c_short)HIWORD(cast(DWORD)lp)
 }
 
+MAKE_WORD :: #force_inline proc "contextless" (x, y: WORD) -> WORD {
+	return x << 8 | y
+}
+
 utf8_to_utf16 :: proc(s: string, allocator := context.temp_allocator) -> []u16 {
 	if len(s) < 1 {
 		return nil
