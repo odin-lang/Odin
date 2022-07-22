@@ -25,11 +25,6 @@
 #include <psapi.h>
 #endif
 
-#if defined(GB_SYSTEM_OPENBSD)
-#include <sys/resource.h>
-#include <sys/wait.h>
-#endif
-
 #include <math.h>
 #include <string.h>
 #include <atomic> // Because I wanted the C++11 memory order semantics, of which gb.h does not offer (because it was a C89 library)
