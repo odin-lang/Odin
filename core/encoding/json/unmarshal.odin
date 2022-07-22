@@ -575,6 +575,20 @@ unmarshal_array :: proc(p: ^Parser, v: any) -> (err: Unmarshal_Error) {
 		
 		return UNSUPPORTED_TYPE
 		
+	case reflect.Type_Info_Quaternion:
+		// NOTE(bill): Allow lengths which are less than the dst array
+		if int(length) > 4 {
+			return UNSUPPORTED_TYPE
+		}
+	
+		switch ti.id {
+		case quaternion64:  return assign_array(p, v.data, type_info_of(f16), 4)
+		case quaternion128:  return assign_array(p, v.data, type_info_of(f32), 4)
+		case quaternion256: return assign_array(p, v.data, type_info_of(f64), 4)
+		}
+		
+		return UNSUPPORTED_TYPE
+		
 	}
 		
 	return UNSUPPORTED_TYPE
