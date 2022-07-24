@@ -1,0 +1,32 @@
+name: "Close Stale Issues & PRs"
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: "0 0 * * *"
+    
+permissions:
+  issues: write
+  pull-requests: write
+
+jobs:
+  stale:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Close Stale Issues
+        uses: actions/stale@v5.1.0
+        with:
+          stale-issue-message: |
+            Hello!
+            
+            I am marking this issue as stale as it has not received any engagement from the community or maintainers 120 days. That does not imply that the issue has no merit! If you feel strongly about this issue
+            - open a PR referencing and resolving the issue;
+            - leave a comment on it and discuss ideas how you could contribute towards resolving it;
+            - leave a comment and describe in detail why this issue is critical for your use case;
+            - open a new issue with updated details and a plan on resolving the issue.
+
+            The motivation for this automation is to help prioritize issues in the backlog and not ignore, reject, or belittle anyone..
+
+          stale-issue-label: "stale"
+          days-before-stale: 120
+          days-before-close: 30
+          exempt-draft-pr: true
