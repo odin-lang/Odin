@@ -26,7 +26,18 @@ jobs:
 
             The motivation for this automation is to help prioritize issues in the backlog and not ignore, reject, or belittle anyone..
 
+          stale-pr-message: |
+            Hello!
+            
+            I am marking this PR as stale as it has not received any engagement from the community or maintainers 120 days. That does not imply that the issue has no merit! If you feel strongly about this issue
+            - leave a comment on it and discuss ideas how you could contribute towards resolving it;
+            - leave a comment and describe in detail why this issue is critical for your use case;
+
+            The motivation for this automation is to help prioritize issues in the backlog and not ignore, reject, or belittle anyone..
+            
           stale-issue-label: "stale"
           days-before-stale: 120
-          days-before-close: 30
+          days-before-close: 100
           exempt-draft-pr: true
+          ascending: true
+          operations-per-run: 250
