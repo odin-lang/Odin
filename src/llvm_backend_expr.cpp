@@ -1,3 +1,4 @@
+lbValue lb_emit_arith_matrix(lbProcedure *p, TokenKind op, lbValue lhs, lbValue rhs, Type *type, bool component_wise=false);
 
 lbValue lb_emit_logical_binary_expr(lbProcedure *p, TokenKind op, Ast *left, Ast *right, Type *type) {
 	lbModule *m = p->module;
@@ -265,6 +266,11 @@ lbValue lb_emit_unary_arith(lbProcedure *p, TokenKind op, lbValue x, Type *type)
 			} else {
 				res.value = LLVMBuildNeg(p->builder, x.value, "");
 			}
+		} else if (is_type_matrix(x.type)) {
+			lbValue zero = {};
+			zero.value = LLVMConstNull(lb_type(p->module, type));
+			zero.type = type;
+			return lb_emit_arith_matrix(p, Token_Sub, zero, x, type, true);
 		} else {
 			GB_PANIC("Unhandled type %s", type_to_string(x.type));
 		}
@@ -976,7 +982,7 @@ lbValue lb_emit_vector_mul_matrix(lbProcedure *p, lbValue lhs, lbValue rhs, Type
 
 
 
-lbValue lb_emit_arith_matrix(lbProcedure *p, TokenKind op, lbValue lhs, lbValue rhs, Type *type, bool component_wise=false) {
+lbValue lb_emit_arith_matrix(lbProcedure *p, TokenKind op, lbValue lhs, lbValue rhs, Type *type, bool component_wise) {
 	GB_ASSERT(is_type_matrix(lhs.type) || is_type_matrix(rhs.type));
 	
 	
