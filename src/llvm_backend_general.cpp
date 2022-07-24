@@ -1958,11 +1958,12 @@ LLVMTypeRef lb_type_internal(lbModule *m, Type *type) {
 					if (e->flags & EntityFlag_CVarArg) {
 						continue;
 					}
-
 					Type *e_type = reduce_tuple_to_single_type(e->type);
 
 					LLVMTypeRef param_type = nullptr;
-					if (is_type_boolean(e_type) &&
+					if (e->flags & EntityFlag_ByPtr) {
+						param_type = lb_type(m, alloc_type_pointer(e_type));
+					} else if (is_type_boolean(e_type) &&
 					    type_size_of(e_type) <= 1) {
 						param_type = LLVMInt1TypeInContext(m->ctx);
 					} else {
