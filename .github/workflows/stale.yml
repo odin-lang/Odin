@@ -2,7 +2,7 @@ name: "Close Stale Issues & PRs"
 on:
   workflow_dispatch:
   schedule:
-    - cron: "0 0 * * *"
+    - cron: "0 21 * * *"
     
 permissions:
   issues: write
@@ -41,3 +41,4 @@ jobs:
           exempt-draft-pr: true
           ascending: true
           operations-per-run: 1000
+          exempt-issue-labels: "ignore"
