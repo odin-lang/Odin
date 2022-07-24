@@ -294,6 +294,7 @@ struct lbProcedure {
 	lbCopyElisionHint copy_elision_hint;
 
 	PtrMap<Ast *, lbValue> selector_values;
+	PtrMap<Ast *, lbAddr>  selector_addr;
 };
 
 

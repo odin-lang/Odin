@@ -3039,6 +3039,12 @@ lbValue lb_build_expr(lbProcedure *p, Ast *expr) {
 			map_remove(&p->selector_values, expr);
 			return res;
 		}
+		lbAddr *pa = map_get(&p->selector_addr, expr);
+		if (pa != nullptr) {
+			lbAddr res = *pa;
+			map_remove(&p->selector_addr, expr);
+			return lb_addr_load(p, res);
+		}
 	}
 	lbValue res = lb_build_expr_internal(p, expr);
 	if (expr->state_flags & StateFlag_SelectorCallExpr) {
@@ -3430,9 +3436,34 @@ lbAddr lb_build_array_swizzle_addr(lbProcedure *p, AstCallExpr *ce, TypeAndValue
 }
 
 
+lbAddr lb_build_addr_internal(lbProcedure *p, Ast *expr);
 lbAddr lb_build_addr(lbProcedure *p, Ast *expr) {
 	expr = unparen_expr(expr);
 
+	// IMPORTANT NOTE(bill):
+	// Selector Call Expressions (foo->bar(...))
+	// must only evaluate `foo` once as it gets transformed into
+	// `foo.bar(foo, ...)`
+	// And if `foo` is a procedure call or something more complex, storing the value
+	// once is a very good idea
+	// If a stored value is found, it must be removed from the cache
+	if (expr->state_flags & StateFlag_SelectorCallExpr) {
+		lbAddr *pp = map_get(&p->selector_addr, expr);
+		if (pp != nullptr) {
+			lbAddr res = *pp;
+			map_remove(&p->selector_addr, expr);
+			return res;
+		}
+	}
+	lbAddr addr = lb_build_addr_internal(p, expr);
+	if (expr->state_flags & StateFlag_SelectorCallExpr) {
+		map_set(&p->selector_addr, expr, addr);
+	}
+	return addr;
+}
+
+
+lbAddr lb_build_addr_internal(lbProcedure *p, Ast *expr) {
 	switch (expr->kind) {
 	case_ast_node(i, Implicit, expr);
 		lbAddr v = {};
@@ -3574,9 +3605,6 @@ lbAddr lb_build_addr(lbProcedure *p, Ast *expr) {
 	case_end;
 
 	case_ast_node(se, SelectorCallExpr, expr);
-		GB_ASSERT(se->modified_call);
-		TypeAndValue tav = type_and_value_of_expr(expr);
-		GB_ASSERT(tav.mode != Addressing_Invalid);
 		lbValue e = lb_build_expr(p, expr);
 		return lb_addr(lb_address_from_load_or_generate_local(p, e));
 	case_end;
