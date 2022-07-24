@@ -9302,7 +9302,7 @@ ExprKind check_expr_base_internal(CheckerContext *c, Operand *o, Ast *node, Type
 			check_unary_expr(c, o, ue->op, node);
 		}
 		o->expr = node;
-		return kind;
+		return Expr_Expr;
 	case_end;
 
 
