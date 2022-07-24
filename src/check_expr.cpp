@@ -2959,7 +2959,14 @@ void check_binary_matrix(CheckerContext *c, Token const &op, Operand *x, Operand
 					goto matrix_error;
 				}
 				x->mode = Addressing_Value;
-				x->type = alloc_type_matrix(xt->Matrix.elem, xt->Matrix.row_count, yt->Matrix.column_count);
+				if (are_types_identical(xt, yt)) {
+					if (!is_type_named(x->type) && is_type_named(y->type)) {
+						// prefer the named type
+						x->type = y->type;
+					}
+				} else {
+					x->type = alloc_type_matrix(xt->Matrix.elem, xt->Matrix.row_count, yt->Matrix.column_count);
+				}
 				goto matrix_success;
 			} else if (yt->kind == Type_Array) {
 				if (!are_types_identical(xt->Matrix.elem, yt->Array.elem)) {
@@ -3021,7 +3028,6 @@ void check_binary_matrix(CheckerContext *c, Token const &op, Operand *x, Operand
 
 matrix_success:
 	x->type = check_matrix_type_hint(x->type, type_hint);
-	
 	return;
 	
 	
