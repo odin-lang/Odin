@@ -40,4 +40,4 @@ jobs:
           days-before-close: 100
           exempt-draft-pr: true
           ascending: true
-          operations-per-run: 250
+          operations-per-run: 1000
