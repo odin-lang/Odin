@@ -2082,7 +2082,8 @@ void lb_build_stmt(lbProcedure *p, Ast *node) {
 			lbAddr lval = {};
 			if (!is_blank_ident(name)) {
 				Entity *e = entity_of_node(name);
-				bool zero_init = true; // Always do it
+				// bool zero_init = true; // Always do it
+				bool zero_init = vd->values.count == 0;
 				lval = lb_add_local(p, e->type, e, zero_init);
 			}
 			array_add(&lvals, lval);

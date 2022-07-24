@@ -50,14 +50,14 @@ lbValue lb_correct_endianness(lbProcedure *p, lbValue value) {
 	return value;
 }
 
-void lb_mem_zero_ptr_internal(lbProcedure *p, LLVMValueRef ptr, LLVMValueRef len, unsigned alignment, bool is_volatile) {
+LLVMValueRef lb_mem_zero_ptr_internal(lbProcedure *p, LLVMValueRef ptr, LLVMValueRef len, unsigned alignment, bool is_volatile) {
 	bool is_inlinable = false;
 
 	i64 const_len = 0;
 	if (LLVMIsConstant(len)) {
 		const_len = cast(i64)LLVMConstIntGetSExtValue(len);
 		// TODO(bill): Determine when it is better to do the `*.inline` versions
-		if (const_len <= 4*build_context.word_size) {
+		if (const_len <= lb_max_zero_init_size()) {
 			is_inlinable = true;
 		}
 	}
@@ -83,7 +83,7 @@ void lb_mem_zero_ptr_internal(lbProcedure *p, LLVMValueRef ptr, LLVMValueRef len
 		args[2] = LLVMBuildIntCast2(p->builder, len, types[1], /*signed*/false, "");
 		args[3] = LLVMConstInt(LLVMInt1TypeInContext(p->module->ctx), is_volatile, false);
 
-		LLVMBuildCall(p->builder, ip, args, gb_count_of(args), "");
+		return LLVMBuildCall(p->builder, ip, args, gb_count_of(args), "");
 	} else {
 		LLVMValueRef ip = lb_lookup_runtime_procedure(p->module, str_lit("memset")).value;
 
@@ -92,7 +92,7 @@ void lb_mem_zero_ptr_internal(lbProcedure *p, LLVMValueRef ptr, LLVMValueRef len
 		args[1] = LLVMConstInt(LLVMInt32TypeInContext(p->module->ctx), 0, false);
 		args[2] = LLVMBuildIntCast2(p->builder, len, types[1], /*signed*/false, "");
 
-		LLVMBuildCall(p->builder, ip, args, gb_count_of(args), "");
+		return LLVMBuildCall(p->builder, ip, args, gb_count_of(args), "");
 	}
 
 }

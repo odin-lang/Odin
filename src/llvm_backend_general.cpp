@@ -855,7 +855,11 @@ void lb_emit_store(lbProcedure *p, lbValue ptr, lbValue value) {
 
 	if (LLVMIsNull(value.value)) {
 		LLVMTypeRef src_t = LLVMGetElementType(LLVMTypeOf(ptr.value));
-		LLVMBuildStore(p->builder, LLVMConstNull(src_t), ptr.value);
+		if (lb_sizeof(src_t) <= lb_max_zero_init_size()) {
+			LLVMBuildStore(p->builder, LLVMConstNull(src_t), ptr.value);
+		} else {
+			lb_mem_zero_ptr(p, ptr.value, a, LLVMGetAlignment(ptr.value));
+		}
 		return;
 	}
 	if (is_type_boolean(a)) {
@@ -2737,13 +2741,15 @@ lbAddr lb_add_local(lbProcedure *p, Type *type, Entity *e, bool zero_init, i32 p
 	if (!zero_init && !force_no_init) {
 		// If there is any padding of any kind, just zero init regardless of zero_init parameter
 		LLVMTypeKind kind = LLVMGetTypeKind(llvm_type);
+		if (kind == LLVMArrayTypeKind) {
+			kind = LLVMGetTypeKind(lb_type(p->module, core_array_type(type)));
+		}
+
 		if (kind == LLVMStructTypeKind) {
 			i64 sz = type_size_of(type);
 			if (type_size_of_struct_pretend_is_packed(type) != sz) {
 				zero_init = true;
 			}
-		} else if (kind == LLVMArrayTypeKind) {
-			zero_init = true;
 		}
 	}
 
