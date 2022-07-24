@@ -28,11 +28,13 @@ struct PtrMap {
 
 u32 ptr_map_hash_key(uintptr key) {
 #if defined(GB_ARCH_64_BIT)
-	u64 x = (u64)key;
-	u8 count = (u8)(x >> 59);
-	x ^= x >> (5 + count);
-	x *= 12605985483714917081ull;
-	return (u32)(x ^ (x >> 43));
+	key = (~key) + (key << 21);
+	key = key ^ (key >> 24);
+	key = (key + (key << 3)) + (key << 8);
+	key = key ^ (key >> 14);
+	key = (key + (key << 2)) + (key << 4);
+	key = key ^ (key << 28);
+	return cast(u32)key;
 #elif defined(GB_ARCH_32_BIT)
 	u32 state = ((u32)key) * 747796405u + 2891336453u;
 	u32 word = ((state >> ((state >> 28u) + 4u)) ^ state) * 277803737u;

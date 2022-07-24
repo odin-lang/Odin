@@ -119,6 +119,115 @@ void check_or_else_split_types(CheckerContext *c, Operand *x, String const &name
 void check_or_else_expr_no_value_error(CheckerContext *c, String const &name, Operand const &x, Type *type_hint);
 void check_or_return_split_types(CheckerContext *c, Operand *x, String const &name, Type **left_type_, Type **right_type_);
 
+
+void check_did_you_mean_print(DidYouMeanAnswers *d, char const *prefix = "") {
+	auto results = did_you_mean_results(d);
+	if (results.count != 0) {
+		error_line("\tSuggestion: Did you mean?\n");
+		for_array(i, results) {
+			String const &target = results[i].target;
+			error_line("\t\t%s%.*s\n", prefix, LIT(target));
+			// error_line("\t\t%.*s %td\n", LIT(target), results[i].distance);
+		}
+	}
+}
+
+void populate_check_did_you_mean_objc_entity(StringSet *set, Entity *e, bool is_type) {
+	if (e->kind != Entity_TypeName) {
+		return;
+	}
+	if (e->TypeName.objc_metadata == nullptr) {
+		return;
+	}
+	TypeNameObjCMetadata *objc_metadata = e->TypeName.objc_metadata;
+	Type *t = base_type(e->type);
+	GB_ASSERT(t->kind == Type_Struct);
+
+	if (is_type) {
+		for_array(i, objc_metadata->type_entries) {
+			String name = objc_metadata->type_entries[i].name;
+			string_set_add(set, name);
+		}
+	} else {
+		for_array(i, objc_metadata->value_entries) {
+			String name = objc_metadata->value_entries[i].name;
+			string_set_add(set, name);
+		}
+	}
+
+	for_array(i, t->Struct.fields) {
+		Entity *f = t->Struct.fields[i];
+		if (f->flags & EntityFlag_Using && f->type != nullptr) {
+			if (f->type->kind == Type_Named && f->type->Named.type_name) {
+				populate_check_did_you_mean_objc_entity(set, f->type->Named.type_name, is_type);
+			}
+		}
+	}
+}
+
+
+void check_did_you_mean_objc_entity(String const &name, Entity *e, bool is_type, char const *prefix = "") {
+	ERROR_BLOCK();
+	GB_ASSERT(e->kind == Entity_TypeName);
+	GB_ASSERT(e->TypeName.objc_metadata != nullptr);
+	auto *objc_metadata = e->TypeName.objc_metadata;
+	mutex_lock(objc_metadata->mutex);
+	defer (mutex_unlock(objc_metadata->mutex));
+
+	StringSet set = {};
+	string_set_init(&set, heap_allocator());
+	defer (string_set_destroy(&set));
+	populate_check_did_you_mean_objc_entity(&set, e, is_type);
+
+
+	DidYouMeanAnswers d = did_you_mean_make(heap_allocator(), set.entries.count, name);
+	defer (did_you_mean_destroy(&d));
+	for_array(i, set.entries) {
+		did_you_mean_append(&d, set.entries[i].value);
+	}
+	check_did_you_mean_print(&d, prefix);
+}
+
+void check_did_you_mean_type(String const &name, Array<Entity *> const &fields, char const *prefix = "") {
+	ERROR_BLOCK();
+
+	DidYouMeanAnswers d = did_you_mean_make(heap_allocator(), fields.count, name);
+	defer (did_you_mean_destroy(&d));
+
+	for_array(i, fields) {
+		did_you_mean_append(&d, fields[i]->token.string);
+	}
+	check_did_you_mean_print(&d, prefix);
+}
+
+
+void check_did_you_mean_type(String const &name, Slice<Entity *> const &fields, char const *prefix = "") {
+	ERROR_BLOCK();
+
+	DidYouMeanAnswers d = did_you_mean_make(heap_allocator(), fields.count, name);
+	defer (did_you_mean_destroy(&d));
+
+	for_array(i, fields) {
+		did_you_mean_append(&d, fields[i]->token.string);
+	}
+	check_did_you_mean_print(&d, prefix);
+}
+
+void check_did_you_mean_scope(String const &name, Scope *scope, char const *prefix = "") {
+	ERROR_BLOCK();
+
+	DidYouMeanAnswers d = did_you_mean_make(heap_allocator(), scope->elements.entries.count, name);
+	defer (did_you_mean_destroy(&d));
+
+	mutex_lock(&scope->mutex);
+	for_array(i, scope->elements.entries) {
+		Entity *e = scope->elements.entries[i].value;
+		did_you_mean_append(&d, e->token.string);
+	}
+	mutex_unlock(&scope->mutex);
+	check_did_you_mean_print(&d, prefix);
+}
+
 Entity *entity_from_expr(Ast *expr) {
 	expr = unparen_expr(expr);
 	switch (expr->kind) {
@@ -174,42 +283,6 @@ void check_scope_decls(CheckerContext *c, Slice<Ast *> const &nodes, isize reser
 			check_entity_decl(c, e, d, nullptr);
 		}
 	}
-}
-
-
-isize check_is_assignable_to_using_subtype(Type *src, Type *dst, isize level = 0, bool src_is_ptr = false) {
-	Type *prev_src = src;
-	src = type_deref(src);
-	if (!src_is_ptr) {
-		src_is_ptr = src != prev_src;
-	}
-	src = base_type(src);
-
-	if (!is_type_struct(src)) {
-		return 0;
-	}
-
-	for_array(i, src->Struct.fields) {
-		Entity *f = src->Struct.fields[i];
-		if (f->kind != Entity_Variable || (f->flags&EntityFlag_Using) == 0) {
-			continue;
-		}
-
-		if (are_types_identical(f->type, dst)) {
-			return level+1;
-		}
-		if (src_is_ptr && is_type_pointer(dst)) {
-			if (are_types_identical(f->type, type_deref(dst))) {
-				return level+1;
-			}
-		}
-		isize nested_level = check_is_assignable_to_using_subtype(f->type, dst, level+1, src_is_ptr);
-		if (nested_level > 0) {
-			return nested_level;
-		}
-	}
-
-	return 0;
 }
 
 bool find_or_generate_polymorphic_procedure(CheckerContext *old_c, Entity *base_entity, Type *type,
@@ -369,6 +442,14 @@ bool find_or_generate_polymorphic_procedure(CheckerContext *old_c, Entity *base_
 	final_proc_type->Proc.is_poly_specialized = true;
 	final_proc_type->Proc.is_polymorphic = true;
 
+	final_proc_type->Proc.variadic            = src->Proc.variadic;
+	final_proc_type->Proc.require_results     = src->Proc.require_results;
+	final_proc_type->Proc.c_vararg            = src->Proc.c_vararg;
+	final_proc_type->Proc.has_named_results   = src->Proc.has_named_results;
+	final_proc_type->Proc.diverging           = src->Proc.diverging;
+	final_proc_type->Proc.return_by_pointer   = src->Proc.return_by_pointer;
+	final_proc_type->Proc.optional_ok         = src->Proc.optional_ok;
+
 
 	for (isize i = 0; i < operands.count; i++) {
 		Operand o = operands[i];
@@ -456,6 +537,10 @@ bool check_cast_internal(CheckerContext *c, Operand *x, Type *type);
 #define MAXIMUM_TYPE_DISTANCE 10
 
 i64 check_distance_between_types(CheckerContext *c, Operand *operand, Type *type) {
+	if (c == nullptr) {
+		GB_ASSERT(operand->mode == Addressing_Value);
+		GB_ASSERT(is_type_typed(operand->type));
+	}
 	if (operand->mode == Addressing_Invalid ||
 	    type == t_invalid) {
 		return -1;
@@ -621,6 +706,42 @@ i64 check_distance_between_types(CheckerContext *c, Operand *operand, Type *type
 				return 1;
 			}
 		}
+
+		// TODO(bill): Determine which rule is a better on in practice
+		#if 1
+			if (dst->Union.variants.count == 1) {
+				Type *vt = dst->Union.variants[0];
+				i64 score = check_distance_between_types(c, operand, vt);
+				if (score >= 0) {
+					return score+2;
+				}
+			}
+		#else
+			// NOTE(bill): check to see you can assign to it with one of the variants?
+			i64 prev_lowest_score = -1;
+			i64 lowest_score = -1;
+			for_array(i, dst->Union.variants) {
+				Type *vt = dst->Union.variants[i];
+				i64 score = check_distance_between_types(c, operand, vt);
+				if (score >= 0) {
+					if (lowest_score < 0) {
+						lowest_score = score;
+					} else {
+						if (prev_lowest_score < 0) {
+							prev_lowest_score = lowest_score;
+						} else {
+							prev_lowest_score = gb_min(prev_lowest_score, lowest_score);
+						}
+						lowest_score = gb_min(lowest_score, score);
+					}
+				}
+			}
+			if (lowest_score >= 0) {
+				if (prev_lowest_score != lowest_score) { // remove possible ambiguities
+					return lowest_score+2;
+				}
+			}
+		#endif
 	}
 
 	if (is_type_relative_pointer(dst)) {
@@ -649,10 +770,25 @@ i64 check_distance_between_types(CheckerContext *c, Operand *operand, Type *type
 			return 4;
 		}
 	}
+	
+	if (is_type_complex_or_quaternion(dst)) {
+		Type *elem = base_complex_elem_type(dst);
+		if (are_types_identical(elem, base_type(src))) {
+			return 5;
+		}
+	}
 
 	if (is_type_array(dst)) {
 		Type *elem = base_array_type(dst);
 		i64 distance = check_distance_between_types(c, operand, elem);
+		if (distance >= 0) {
+			return distance + 6;
+		}
+	}
+
+	if (is_type_simd_vector(dst)) {
+		Type *dst_elem = base_array_type(dst);
+		i64 distance = check_distance_between_types(c, operand, dst_elem);
 		if (distance >= 0) {
 			return distance + 6;
 		}
@@ -665,6 +801,7 @@ i64 check_distance_between_types(CheckerContext *c, Operand *operand, Type *type
 			return distance + 7;
 		}
 	}
+
 
 	if (is_type_any(dst)) {
 		if (!is_type_polymorphic(src)) {
@@ -721,6 +858,13 @@ bool check_is_assignable_to_with_score(CheckerContext *c, Operand *operand, Type
 bool check_is_assignable_to(CheckerContext *c, Operand *operand, Type *type) {
 	i64 score = 0;
 	return check_is_assignable_to_with_score(c, operand, type, &score);
+}
+
+bool internal_check_is_assignable_to(Type *src, Type *dst) {
+	Operand x = {};
+	x.type = src;
+	x.mode = Addressing_Value;
+	return check_is_assignable_to(nullptr, &x, dst);
 }
 
 AstPackage *get_package_of_type(Type *type) {
@@ -1201,6 +1345,19 @@ bool is_polymorphic_type_assignable(CheckerContext *c, Type *poly, Type *source,
 			}
 		} 
 		return false;
+
+	case Type_SimdVector:
+		if (source->kind == Type_SimdVector) {
+			if (poly->SimdVector.generic_count != nullptr) {
+				if (!polymorphic_assign_index(&poly->SimdVector.generic_count, &poly->SimdVector.count, source->SimdVector.count)) {
+					return false;
+				}
+			}
+			if (poly->SimdVector.count == source->SimdVector.count) {
+				return is_polymorphic_type_assignable(c, poly->SimdVector.elem, source->SimdVector.elem, true, modify_type);
+			}
+		}
+		return false;
 	}
 	return false;
 }
@@ -1226,7 +1383,6 @@ bool check_cycle(CheckerContext *c, Entity *curr, bool report) {
 	}
 	return false;
 }
-
 
 Entity *check_ident(CheckerContext *c, Operand *o, Ast *n, Type *named_type, Type *type_hint, bool allow_import_name) {
 	GB_ASSERT(n->kind == Ast_Ident);
@@ -1363,8 +1519,12 @@ Entity *check_ident(CheckerContext *c, Operand *o, Ast *n, Type *named_type, Typ
 	case Entity_TypeName:
 		o->mode = Addressing_Type;
 		if (check_cycle(c, e, true)) {
-			type = t_invalid;
+			o->type = t_invalid;
 		}
+		if (o->type != nullptr && type->kind == Type_Named && o->type->Named.type_name->TypeName.is_type_alias) {
+			o->type = base_type(o->type);
+		}
+
 		break;
 
 	case Entity_ImportName:
@@ -1437,9 +1597,11 @@ bool check_unary_op(CheckerContext *c, Operand *o, Token op) {
 
 bool check_binary_op(CheckerContext *c, Operand *o, Token op) {
 	Type *main_type = o->type;
+
 	// TODO(bill): Handle errors correctly
 	Type *type = base_type(core_array_type(main_type));
 	Type *ct = core_type(type);
+
 	switch (op.kind) {
 	case Token_Sub:
 	case Token_SubEq:
@@ -1455,6 +1617,9 @@ bool check_binary_op(CheckerContext *c, Operand *o, Token op) {
 	case Token_QuoEq:
 		if (is_type_matrix(main_type)) {
 			error(op, "Operator '%.*s' is only allowed with matrix types", LIT(op.string));
+			return false;
+		} else if (is_type_simd_vector(main_type) && is_type_integer(type)) {
+			error(op, "Operator '%.*s' is only allowed with #simd types with integer elements", LIT(op.string));
 			return false;
 		}
 		/*fallthrough*/
@@ -1507,14 +1672,9 @@ bool check_binary_op(CheckerContext *c, Operand *o, Token op) {
 		if (!is_type_integer(type)) {
 			error(op, "Operator '%.*s' is only allowed with integers", LIT(op.string));
 			return false;
-		}
-		if (is_type_simd_vector(o->type)) {
-			switch (op.kind) {
-			case Token_ModMod:
-			case Token_ModModEq:
-				error(op, "Operator '%.*s' is only allowed with integers", LIT(op.string));
-				return false;
-			}
+		} else if (is_type_simd_vector(main_type)) {
+			error(op, "Operator '%.*s' is only allowed with #simd types with integer elements", LIT(op.string));
+			return false;
 		}
 		break;
 
@@ -1523,14 +1683,6 @@ bool check_binary_op(CheckerContext *c, Operand *o, Token op) {
 		if (!is_type_integer(ct) && !is_type_bit_set(ct)) {
 			error(op, "Operator '%.*s' is only allowed with integers and bit sets", LIT(op.string));
 			return false;
-		}
-		if (is_type_simd_vector(o->type)) {
-			switch (op.kind) {
-			case Token_AndNot:
-			case Token_AndNotEq:
-				error(op, "Operator '%.*s' is only allowed with integers", LIT(op.string));
-				return false;
-			}
 		}
 		break;
 
@@ -1837,11 +1989,12 @@ void check_cast_error_suggestion(CheckerContext *c, Operand *o, Type *type) {
 }
 
 
-void check_is_expressible(CheckerContext *ctx, Operand *o, Type *type) {
+bool check_is_expressible(CheckerContext *ctx, Operand *o, Type *type) {
 	GB_ASSERT(o->mode == Addressing_Constant);
 	ExactValue out_value = o->value;
 	if (is_type_constant_type(type) && check_representable_as_constant(ctx, o->value, type, &out_value)) {
 		o->value = out_value;
+		return true;
 	} else {
 		o->value = out_value;
 
@@ -1866,6 +2019,7 @@ void check_is_expressible(CheckerContext *ctx, Operand *o, Type *type) {
 			error(o->expr, "Cannot convert '%s' to '%s' from '%s", a, b, c);
 			check_assignment_error_suggestion(ctx, o, type);
 		}
+		return false;
 	}
 }
 
@@ -2355,6 +2509,8 @@ void check_shift(CheckerContext *c, Operand *x, Operand *y, Ast *node, Type *typ
 		gb_string_free(err_str);
 	}
 
+	// TODO(bill): Should we support shifts for fixed arrays and #simd vectors?
+
 	if (!is_type_integer(x->type)) {
 		gbString err_str = expr_to_string(y->expr);
 		error(node, "Shift operand '%s' must be an integer", err_str);
@@ -2453,6 +2609,9 @@ bool check_is_castable_to(CheckerContext *c, Operand *operand, Type *y) {
 		return true;
 	}
 
+	if (is_type_float(src) && is_type_complex(dst)) {
+		return true;
+	}
 	if (is_type_float(src) && is_type_quaternion(dst)) {
 		return true;
 	}
@@ -2562,6 +2721,26 @@ bool check_is_castable_to(CheckerContext *c, Operand *operand, Type *y) {
 		return true;
 	}
 
+	if (is_type_simd_vector(src) && is_type_simd_vector(dst)) {
+		if (src->SimdVector.count != dst->SimdVector.count) {
+			return false;
+		}
+		Type *elem_src = base_array_type(src);
+		Type *elem_dst = base_array_type(dst);
+		Operand x = {};
+		x.type = elem_src;
+		x.mode = Addressing_Value;
+		return check_is_castable_to(c, &x, elem_dst);
+	}
+
+	if (is_type_simd_vector(dst)) {
+		Type *elem = base_array_type(dst);
+		if (check_is_castable_to(c, operand, elem)) {
+			return true;
+		}
+	}
+
+
 	return false;
 }
 
@@ -2651,14 +2830,14 @@ bool check_transmute(CheckerContext *c, Ast *node, Operand *o, Type *t) {
 		return false;
 	}
 
-	if (o->mode == Addressing_Constant) {
-		gbString expr_str = expr_to_string(o->expr);
-		error(o->expr, "Cannot transmute a constant expression: '%s'", expr_str);
-		gb_string_free(expr_str);
-		o->mode = Addressing_Invalid;
-		o->expr = node;
-		return false;
-	}
+	// if (o->mode == Addressing_Constant) {
+	// 	gbString expr_str = expr_to_string(o->expr);
+	// 	error(o->expr, "Cannot transmute a constant expression: '%s'", expr_str);
+	// 	gb_string_free(expr_str);
+	// 	o->mode = Addressing_Invalid;
+	// 	o->expr = node;
+	// 	return false;
+	// }
 
 	if (is_type_untyped(o->type)) {
 		gbString expr_str = expr_to_string(o->expr);
@@ -2709,8 +2888,10 @@ bool check_transmute(CheckerContext *c, Ast *node, Operand *o, Type *t) {
 		}
 	}
 
+	o->expr = node;
 	o->mode = Addressing_Value;
 	o->type = t;
+	o->value = {};
 	return true;
 }
 
@@ -2778,7 +2959,14 @@ void check_binary_matrix(CheckerContext *c, Token const &op, Operand *x, Operand
 					goto matrix_error;
 				}
 				x->mode = Addressing_Value;
-				x->type = alloc_type_matrix(xt->Matrix.elem, xt->Matrix.row_count, yt->Matrix.column_count);
+				if (are_types_identical(xt, yt)) {
+					if (!is_type_named(x->type) && is_type_named(y->type)) {
+						// prefer the named type
+						x->type = y->type;
+					}
+				} else {
+					x->type = alloc_type_matrix(xt->Matrix.elem, xt->Matrix.row_count, yt->Matrix.column_count);
+				}
 				goto matrix_success;
 			} else if (yt->kind == Type_Array) {
 				if (!are_types_identical(xt->Matrix.elem, yt->Array.elem)) {
@@ -2840,7 +3028,6 @@ void check_binary_matrix(CheckerContext *c, Token const &op, Operand *x, Operand
 
 matrix_success:
 	x->type = check_matrix_type_hint(x->type, type_hint);
-	
 	return;
 	
 	
@@ -3068,13 +3255,19 @@ void check_binary_expr(CheckerContext *c, Operand *x, Ast *node, Type *type_hint
 		return;
 	}
 
-	
-	if (!are_types_identical(x->type, y->type)) {
+	if ((op.kind == Token_CmpAnd || op.kind == Token_CmpOr) &&
+	    is_type_boolean(x->type) && is_type_boolean(y->type)) {
+	    	// NOTE(bill, 2022-06-26)
+	    	// Allow any boolean types within `&&` and `||`
+	    	// This is an exception to all other binary expressions since the result
+	    	// of a comparison will always be an untyped boolean, and allowing
+	    	// any boolean between these two simplifies a lot of expressions
+	} else if (!are_types_identical(x->type, y->type)) {
 		if (x->type != t_invalid &&
 		    y->type != t_invalid) {
 			gbString xt = type_to_string(x->type);
 			gbString yt = type_to_string(y->type);
-			gbString expr_str = expr_to_string(x->expr);
+			gbString expr_str = expr_to_string(node);
 			error(op, "Mismatched types in binary expression '%s' : '%s' vs '%s'", expr_str, xt, yt);
 			gb_string_free(expr_str);
 			gb_string_free(yt);
@@ -3201,6 +3394,16 @@ void check_binary_expr(CheckerContext *c, Operand *x, Ast *node, Type *type_hint
 	x->mode = Addressing_Value;
 }
 
+Operand make_operand_from_node(Ast *node) {
+	GB_ASSERT(node != nullptr);
+	Operand x = {};
+	x.expr  = node;
+	x.mode  = node->tav.mode;
+	x.type  = node->tav.type;
+	x.value = node->tav.value;
+	return x;
+}
+
 
 void update_untyped_expr_type(CheckerContext *c, Ast *e, Type *type, bool final) {
 	GB_ASSERT(e != nullptr);
@@ -3249,9 +3452,18 @@ void update_untyped_expr_type(CheckerContext *c, Ast *e, Type *type, bool final)
 			// See above note in UnaryExpr case
 			break;
 		}
-
-		update_untyped_expr_type(c, te->x, type, final);
-		update_untyped_expr_type(c, te->y, type, final);
+		
+		// NOTE(bill): This is a bit of a hack to get around the edge cases of ternary if expressions
+		// having an untyped value
+		Operand x = make_operand_from_node(te->x);
+		Operand y = make_operand_from_node(te->y);		
+		if (x.mode != Addressing_Constant || check_is_expressible(c, &x, type)) {
+			update_untyped_expr_type(c, te->x, type, final);
+		}
+		if (y.mode != Addressing_Constant || check_is_expressible(c, &y, type)) {
+			update_untyped_expr_type(c, te->y, type, final);
+		}
+		
 	case_end;
 
 	case_ast_node(te, TernaryWhenExpr, e);
@@ -3330,7 +3542,16 @@ void convert_untyped_error(CheckerContext *c, Operand *operand, Type *target_typ
 			}
 		}
 	}
+	ERROR_BLOCK();
+
 	error(operand->expr, "Cannot convert untyped value '%s' to '%s' from '%s'%s", expr_str, type_str, from_type_str, extra_text);
+	if (operand->value.kind == ExactValue_String) {
+		String key = operand->value.value_string;
+		if (is_type_string(operand->type) && is_type_enum(target_type)) {
+			Type *et = base_type(target_type);
+			check_did_you_mean_type(key, et->Enum.fields, ".");
+		}
+	}
 
 	gb_string_free(from_type_str);
 	gb_string_free(type_str);
@@ -3948,58 +4169,14 @@ ExactValue get_constant_field(CheckerContext *c, Operand const *operand, Selecti
 	if (success_) *success_ = true;
 	return empty_exact_value;
 }
-void check_did_you_mean_print(DidYouMeanAnswers *d) {
-	auto results = did_you_mean_results(d);
-	if (results.count != 0) {
-		error_line("\tSuggestion: Did you mean?\n");
-		for_array(i, results) {
-			String const &target = results[i].target;
-			error_line("\t\t%.*s\n", LIT(target));
-			// error_line("\t\t%.*s %td\n", LIT(target), results[i].distance);
-		}
-	}
-}
-
-void check_did_you_mean_type(String const &name, Array<Entity *> const &fields) {
-	ERROR_BLOCK();
-	
-	DidYouMeanAnswers d = did_you_mean_make(heap_allocator(), fields.count, name);
-	defer (did_you_mean_destroy(&d));
-
-	for_array(i, fields) {
-		did_you_mean_append(&d, fields[i]->token.string);
-	}
-	check_did_you_mean_print(&d);
-}
-
-void check_did_you_mean_type(String const &name, Slice<Entity *> const &fields) {
-	ERROR_BLOCK();
-	
-	DidYouMeanAnswers d = did_you_mean_make(heap_allocator(), fields.count, name);
-	defer (did_you_mean_destroy(&d));
-
-	for_array(i, fields) {
-		did_you_mean_append(&d, fields[i]->token.string);
-	}
-	check_did_you_mean_print(&d);
-}
-
-void check_did_you_mean_scope(String const &name, Scope *scope) {
-	ERROR_BLOCK();
-	
-	DidYouMeanAnswers d = did_you_mean_make(heap_allocator(), scope->elements.entries.count, name);
-	defer (did_you_mean_destroy(&d));
-
-	for_array(i, scope->elements.entries) {
-		Entity *e = scope->elements.entries[i].value;
-		did_you_mean_append(&d, e->token.string);
-	}
-	check_did_you_mean_print(&d);
-}
 
 Type *determine_swizzle_array_type(Type *original_type, Type *type_hint, isize new_count) {
 	Type *array_type = base_type(type_deref(original_type));
-	GB_ASSERT(array_type->kind == Type_Array);
+	GB_ASSERT(array_type->kind == Type_Array || array_type->kind == Type_SimdVector);
+	if (array_type->kind == Type_SimdVector) {
+		Type *elem_type = array_type->SimdVector.elem;
+		return alloc_type_simd_vector(new_count, elem_type);
+	}
 	Type *elem_type = array_type->Array.elem;
 
 	Type *swizzle_array_type = nullptr;
@@ -4017,6 +4194,101 @@ Type *determine_swizzle_array_type(Type *original_type, Type *type_hint, isize n
 		}
 	}
 	return swizzle_array_type;
+}
+
+
+bool is_entity_declared_for_selector(Entity *entity, Scope *import_scope, bool *allow_builtin) {
+	bool is_declared = entity != nullptr;
+	if (is_declared) {
+		if (entity->kind == Entity_Builtin) {
+			// NOTE(bill): Builtin's are in the universal scope which is part of every scopes hierarchy
+			// This means that we should just ignore the found result through it
+			*allow_builtin = entity->scope == import_scope || entity->scope != builtin_pkg->scope;
+		} else if ((entity->scope->flags&ScopeFlag_Global) == ScopeFlag_Global && (import_scope->flags&ScopeFlag_Global) == 0) {
+			is_declared = false;
+		}
+	}
+	return is_declared;
+}
+
+// NOTE(bill, 2022-02-03): see `check_const_decl` for why it exists reasoning
+Entity *check_entity_from_ident_or_selector(CheckerContext *c, Ast *node, bool ident_only) {
+	if (node->kind == Ast_Ident) {
+		String name = node->Ident.token.string;
+		return scope_lookup(c->scope, name);
+	} else if (!ident_only) if (node->kind == Ast_SelectorExpr) {
+		ast_node(se, SelectorExpr, node);
+		if (se->token.kind == Token_ArrowRight) {
+			return nullptr;
+		}
+
+		Ast *op_expr  = se->expr;
+		Ast *selector = unparen_expr(se->selector);
+		if (selector == nullptr) {
+			return nullptr;
+		}
+		if (selector->kind != Ast_Ident) {
+			return nullptr;
+		}
+
+		Entity *entity = nullptr;
+		Entity *expr_entity = nullptr;
+		bool check_op_expr = true;
+
+		if (op_expr->kind == Ast_Ident) {
+			String op_name = op_expr->Ident.token.string;
+			Entity *e = scope_lookup(c->scope, op_name);
+			if (e == nullptr) {
+				return nullptr;
+			}
+			add_entity_use(c, op_expr, e);
+			expr_entity = e;
+
+			if (e != nullptr && e->kind == Entity_ImportName && selector->kind == Ast_Ident) {
+				// IMPORTANT NOTE(bill): This is very sloppy code but it's also very fragile
+				// It pretty much needs to be in this order and this way
+				// If you can clean this up, please do but be really careful
+				String import_name = op_name;
+				Scope *import_scope = e->ImportName.scope;
+				String entity_name = selector->Ident.token.string;
+
+				check_op_expr = false;
+				entity = scope_lookup_current(import_scope, entity_name);
+				bool allow_builtin = false;
+				if (!is_entity_declared_for_selector(entity, import_scope, &allow_builtin)) {
+					return nullptr;
+				}
+
+				check_entity_decl(c, entity, nullptr, nullptr);
+				if (entity->kind == Entity_ProcGroup) {
+					return entity;
+				}
+				GB_ASSERT_MSG(entity->type != nullptr, "%.*s (%.*s)", LIT(entity->token.string), LIT(entity_strings[entity->kind]));
+			}
+		}
+
+		Operand operand = {};
+		if (check_op_expr) {
+			check_expr_base(c, &operand, op_expr, nullptr);
+			if (operand.mode == Addressing_Invalid) {
+				return nullptr;
+			}
+		}
+
+		if (entity == nullptr && selector->kind == Ast_Ident) {
+			String field_name = selector->Ident.token.string;
+			if (is_type_dynamic_array(type_deref(operand.type))) {
+				init_mem_allocator(c->checker);
+			}
+			auto sel = lookup_field(operand.type, field_name, operand.mode == Addressing_Type);
+			entity = sel.entity;
+		}
+
+		if (entity != nullptr) {
+			return entity;
+		}
+	}
+	return nullptr;
 }
 
 
@@ -4068,18 +4340,8 @@ Entity *check_selector(CheckerContext *c, Operand *operand, Ast *node, Type *typ
 
 			check_op_expr = false;
 			entity = scope_lookup_current(import_scope, entity_name);
-			bool is_declared = entity != nullptr;
 			bool allow_builtin = false;
-			if (is_declared) {
-				if (entity->kind == Entity_Builtin) {
-					// NOTE(bill): Builtin's are in the universal scope which is part of every scopes hierarchy
-					// This means that we should just ignore the found result through it
-					allow_builtin = entity->scope == import_scope || entity->scope != builtin_pkg->scope;
-				} else if ((entity->scope->flags&ScopeFlag_Global) == ScopeFlag_Global && (import_scope->flags&ScopeFlag_Global) == 0) {
-					is_declared = false;
-				}
-			}
-			if (!is_declared) {
+			if (!is_entity_declared_for_selector(entity, import_scope, &allow_builtin)) {
 				error(op_expr, "'%.*s' is not declared by '%.*s'", LIT(entity_name), LIT(import_name));
 				operand->mode = Addressing_Invalid;
 				operand->expr = node;
@@ -4169,7 +4431,7 @@ Entity *check_selector(CheckerContext *c, Operand *operand, Ast *node, Type *typ
 		}
 	}
 
-	if (entity == nullptr  && selector->kind == Ast_Ident && is_type_array(type_deref(operand->type))) {
+	if (entity == nullptr && selector->kind == Ast_Ident && is_type_array(type_deref(operand->type))) {
 		// TODO(bill): Simd_Vector swizzling
 
 		String field_name = selector->Ident.token.string;
@@ -4270,14 +4532,19 @@ Entity *check_selector(CheckerContext *c, Operand *operand, Ast *node, Type *typ
 
 	if (entity == nullptr) {
 		gbString op_str   = expr_to_string(op_expr);
-		gbString type_str = type_to_string(operand->type);
+		gbString type_str = type_to_string_shorthand(operand->type);
 		gbString sel_str  = expr_to_string(selector);
 		error(op_expr, "'%s' of type '%s' has no field '%s'", op_str, type_str, sel_str);
 
 		if (operand->type != nullptr && selector->kind == Ast_Ident) {
 			String const &name = selector->Ident.token.string;
 			Type *bt = base_type(operand->type);
-			if (bt->kind == Type_Struct) {
+			if (operand->type->kind == Type_Named &&
+			    operand->type->Named.type_name &&
+			    operand->type->Named.type_name->kind == Entity_TypeName &&
+			    operand->type->Named.type_name->TypeName.objc_metadata) {
+				check_did_you_mean_objc_entity(name, operand->type->Named.type_name, operand->mode == Addressing_Type);
+			} else if (bt->kind == Type_Struct) {
 				check_did_you_mean_type(name, bt->Struct.fields);
 			} else if (bt->kind == Type_Enum) {
 				check_did_you_mean_type(name, bt->Enum.fields);
@@ -4306,7 +4573,7 @@ Entity *check_selector(CheckerContext *c, Operand *operand, Ast *node, Type *typ
 		}
 
 		gbString op_str   = expr_to_string(op_expr);
-		gbString type_str = type_to_string(operand->type);
+		gbString type_str = type_to_string_shorthand(operand->type);
 		gbString sel_str  = expr_to_string(selector);
 		error(op_expr, "Cannot access non-constant field '%s' from '%s'", sel_str, op_str);
 		gb_string_free(sel_str);
@@ -4331,7 +4598,7 @@ Entity *check_selector(CheckerContext *c, Operand *operand, Ast *node, Type *typ
 		}
 
 		gbString op_str   = expr_to_string(op_expr);
-		gbString type_str = type_to_string(operand->type);
+		gbString type_str = type_to_string_shorthand(operand->type);
 		gbString sel_str  = expr_to_string(selector);
 		error(op_expr, "Cannot access non-constant field '%s' from '%s'", sel_str, op_str);
 		gb_string_free(sel_str);
@@ -4344,7 +4611,7 @@ Entity *check_selector(CheckerContext *c, Operand *operand, Ast *node, Type *typ
 
 	if (expr_entity != nullptr && is_type_polymorphic(expr_entity->type)) {
 		gbString op_str   = expr_to_string(op_expr);
-		gbString type_str = type_to_string(operand->type);
+		gbString type_str = type_to_string_shorthand(operand->type);
 		gbString sel_str  = expr_to_string(selector);
 		error(op_expr, "Cannot access field '%s' from non-specialized polymorphic type '%s'", sel_str, op_str);
 		gb_string_free(sel_str);
@@ -4667,25 +4934,16 @@ bool is_expr_constant_zero(Ast *expr) {
 	return false;
 }
 
-
-CALL_ARGUMENT_CHECKER(check_call_arguments_internal) {
-	ast_node(ce, CallExpr, call);
-	GB_ASSERT(is_type_proc(proc_type));
-	proc_type = base_type(proc_type);
-	TypeProc *pt = &proc_type->Proc;
-
+isize get_procedure_param_count_excluding_defaults(Type *pt, isize *param_count_) {
+	GB_ASSERT(pt != nullptr);
+	GB_ASSERT(pt->kind == Type_Proc);
 	isize param_count = 0;
 	isize param_count_excluding_defaults = 0;
-	bool variadic = pt->variadic;
-	bool vari_expand = (ce->ellipsis.pos.line != 0);
-	i64 score = 0;
-	bool show_error = show_error_mode == CallArgumentMode_ShowErrors;
-
-
+	bool variadic = pt->Proc.variadic;
 	TypeTuple *param_tuple = nullptr;
 
-	if (pt->params != nullptr) {
-		param_tuple = &pt->params->Tuple;
+	if (pt->Proc.params != nullptr) {
+		param_tuple = &pt->Proc.params->Tuple;
 
 		param_count = param_tuple->variables.count;
 		if (variadic) {
@@ -4724,6 +4982,31 @@ CALL_ARGUMENT_CHECKER(check_call_arguments_internal) {
 			break;
 		}
 	}
+
+	if (param_count_) *param_count_ = param_count;
+	return param_count_excluding_defaults;
+}
+
+
+CALL_ARGUMENT_CHECKER(check_call_arguments_internal) {
+	ast_node(ce, CallExpr, call);
+	GB_ASSERT(is_type_proc(proc_type));
+	proc_type = base_type(proc_type);
+	TypeProc *pt = &proc_type->Proc;
+
+	isize param_count = 0;
+	isize param_count_excluding_defaults = get_procedure_param_count_excluding_defaults(proc_type, &param_count);
+	bool variadic = pt->variadic;
+	bool vari_expand = (ce->ellipsis.pos.line != 0);
+	i64 score = 0;
+	bool show_error = show_error_mode == CallArgumentMode_ShowErrors;
+
+
+	TypeTuple *param_tuple = nullptr;
+	if (pt->params != nullptr) {
+		param_tuple = &pt->params->Tuple;
+	}
+
 
 	CallArgumentError err = CallArgumentError_None;
 	Type *final_proc_type = proc_type;
@@ -5397,7 +5680,37 @@ CallArgumentData check_call_arguments(CheckerContext *c, Operand *operand, Type 
 	if (operand->mode == Addressing_ProcGroup) {
 		check_entity_decl(c, operand->proc_group, nullptr, nullptr);
 
-		Array<Entity *> procs = proc_group_entities(c, *operand);
+		auto procs = proc_group_entities_cloned(c, *operand);
+
+		if (procs.count > 1) {
+			isize max_arg_count = args.count;
+			for_array(i, args) {
+				// NOTE(bill): The only thing that may have multiple values
+				// will be a call expression (assuming `or_return` and `()` will be stripped)
+				Ast *arg = strip_or_return_expr(args[i]);
+				if (arg && arg->kind == Ast_CallExpr) {
+					max_arg_count = ISIZE_MAX;
+					break;
+				}
+			}
+
+			for (isize proc_index = 0; proc_index < procs.count; /**/) {
+				Entity *proc = procs[proc_index];
+				Type *pt = base_type(proc->type);
+				if (!(pt != nullptr && is_type_proc(pt))) {
+					continue;
+				}
+
+				isize param_count = 0;
+				isize param_count_excluding_defaults = get_procedure_param_count_excluding_defaults(pt, &param_count);
+
+				if (param_count_excluding_defaults > max_arg_count) {
+					array_unordered_remove(&procs, proc_index);
+				} else {
+					proc_index++;
+				}
+			}
+		}
 
 		if (procs.count == 1) {
 			Ast *ident = operand->expr;
@@ -5426,6 +5739,7 @@ CallArgumentData check_call_arguments(CheckerContext *c, Operand *operand, Type 
 			}
 			return data;
 		}
+
 
 		Entity **lhs = nullptr;
 		isize lhs_count = -1;
@@ -5711,8 +6025,12 @@ CallArgumentData check_call_arguments(CheckerContext *c, Operand *operand, Type 
 				ctx.curr_proc_sig  = e->type;
 
 				GB_ASSERT(decl->proc_lit->kind == Ast_ProcLit);
-				evaluate_where_clauses(&ctx, call, decl->scope, &decl->proc_lit->ProcLit.where_clauses, true);
+				bool ok = evaluate_where_clauses(&ctx, call, decl->scope, &decl->proc_lit->ProcLit.where_clauses, true);
 				decl->where_clauses_evaluated = true;
+
+				if (ok && (data.gen_entity->flags & EntityFlag_ProcBodyChecked) == 0) {
+					check_procedure_later(c, e->file, e->token, decl, e->type, decl->proc_lit->ProcLit.body, decl->proc_lit->ProcLit.tags);
+				}
 			}
 			return data;
 		}
@@ -5725,6 +6043,7 @@ CallArgumentData check_call_arguments(CheckerContext *c, Operand *operand, Type 
 
 		Entity *e = entity_of_node(ident);
 
+
 		CallArgumentData data = {};
 		CallArgumentError err = call_checker(c, call, proc_type, e, operands, CallArgumentMode_ShowErrors, &data);
 		gb_unused(err);
@@ -5733,7 +6052,6 @@ CallArgumentData check_call_arguments(CheckerContext *c, Operand *operand, Type 
 		if (entity_to_use != nullptr) {
 			update_untyped_expr_type(c, operand->expr, entity_to_use->type, true);
 		}
-
 		if (data.gen_entity != nullptr) {
 			Entity *e = data.gen_entity;
 			DeclInfo *decl = data.gen_entity->decl_info;
@@ -5745,8 +6063,12 @@ CallArgumentData check_call_arguments(CheckerContext *c, Operand *operand, Type 
 			ctx.curr_proc_sig  = e->type;
 
 			GB_ASSERT(decl->proc_lit->kind == Ast_ProcLit);
-			evaluate_where_clauses(&ctx, call, decl->scope, &decl->proc_lit->ProcLit.where_clauses, true);
+			bool ok = evaluate_where_clauses(&ctx, call, decl->scope, &decl->proc_lit->ProcLit.where_clauses, true);
 			decl->where_clauses_evaluated = true;
+
+			if (ok && (data.gen_entity->flags & EntityFlag_ProcBodyChecked) == 0) {
+				check_procedure_later(c, e->file, e->token, decl, e->type, decl->proc_lit->ProcLit.body, decl->proc_lit->ProcLit.tags);
+			}
 		}
 		return data;
 	}
@@ -6040,7 +6362,8 @@ CallArgumentError check_polymorphic_record_type(CheckerContext *c, Operand *oper
 		}
 
 		// NOTE(bill): Add type info the parameters
-		add_type_info_type(c, o->type);
+		// TODO(bill, 2022-01-23): why was this line added in the first place? I'm commenting it out for the time being
+		// add_type_info_type(c, o->type);
 	}
 
 	{
@@ -6244,10 +6567,10 @@ ExprKind check_call_expr(CheckerContext *c, Operand *operand, Ast *call, Ast *pr
 		return builtin_procs[id].kind;
 	}
 
-	Entity *e = entity_of_node(operand->expr);
+	Entity *initial_entity = entity_of_node(operand->expr);
 
-	if (e != nullptr && e->kind == Entity_Procedure) {
-		if (e->Procedure.deferred_procedure.entity != nullptr) {
+	if (initial_entity != nullptr && initial_entity->kind == Entity_Procedure) {
+		if (initial_entity->Procedure.deferred_procedure.entity != nullptr) {
 			call->viral_state_flags |= ViralStateFlag_ContainsDeferredProcedure;
 		}
 	}
@@ -6815,6 +7138,1912 @@ void check_matrix_index_expr(CheckerContext *c, Operand *o, Ast *node, Type *typ
 }
 
 
+struct TypeAndToken {
+	Type *type;
+	Token token;
+};
+
+typedef PtrMap<uintptr, TypeAndToken> SeenMap;
+
+void add_constant_switch_case(CheckerContext *ctx, SeenMap *seen, Operand operand, bool use_expr = true) {
+	if (operand.mode != Addressing_Constant) {
+		return;
+	}
+	if (operand.value.kind == ExactValue_Invalid) {
+		return;
+	}
+
+	uintptr key = hash_exact_value(operand.value);
+	TypeAndToken *found = map_get(seen, key);
+	if (found != nullptr) {
+		isize count = multi_map_count(seen, key);
+		TypeAndToken *taps = gb_alloc_array(temporary_allocator(), TypeAndToken, count);
+
+		multi_map_get_all(seen, key, taps);
+		for (isize i = 0; i < count; i++) {
+			TypeAndToken tap = taps[i];
+			if (!are_types_identical(operand.type, tap.type)) {
+				continue;
+			}
+
+			TokenPos pos = tap.token.pos;
+			if (use_expr) {
+				gbString expr_str = expr_to_string(operand.expr);
+				error(operand.expr,
+				      "Duplicate case '%s'\n"
+				      "\tprevious case at %s",
+				      expr_str,
+				      token_pos_to_string(pos));
+				gb_string_free(expr_str);
+			} else {
+				error(operand.expr, "Duplicate case found with previous case at %s", token_pos_to_string(pos));
+			}
+			return;
+		}
+	}
+
+	TypeAndToken tap = {operand.type, ast_token(operand.expr)};
+	multi_map_insert(seen, key, tap);
+}
+
+
+void add_to_seen_map(CheckerContext *ctx, SeenMap *seen, TokenKind upper_op, Operand const &x, Operand const &lhs, Operand const &rhs) {
+	if (is_type_enum(x.type)) {
+		// TODO(bill): Fix this logic so it's fast!!!
+
+		i64 v0 = exact_value_to_i64(lhs.value);
+		i64 v1 = exact_value_to_i64(rhs.value);
+		Operand v = {};
+		v.mode = Addressing_Constant;
+		v.type = x.type;
+		v.expr = x.expr;
+
+		Type *bt = base_type(x.type);
+		GB_ASSERT(bt->kind == Type_Enum);
+		for (i64 vi = v0; vi <= v1; vi++) {
+			if (upper_op != Token_LtEq && vi == v1) {
+				break;
+			}
+
+			bool found = false;
+			for_array(j, bt->Enum.fields) {
+				Entity *f = bt->Enum.fields[j];
+				GB_ASSERT(f->kind == Entity_Constant);
+
+				i64 fv = exact_value_to_i64(f->Constant.value);
+				if (fv == vi) {
+					found = true;
+					break;
+				}
+			}
+			if (found) {
+				v.value = exact_value_i64(vi);
+				add_constant_switch_case(ctx, seen, v);
+			}
+		}
+	} else {
+		add_constant_switch_case(ctx, seen, lhs);
+		if (upper_op == Token_LtEq) {
+			add_constant_switch_case(ctx, seen, rhs);
+		}
+	}
+}
+void add_to_seen_map(CheckerContext *ctx, SeenMap *seen, Operand const &x) {
+	add_constant_switch_case(ctx, seen, x);
+}
+
+ExprKind check_basic_directive_expr(CheckerContext *c, Operand *o, Ast *node, Type *type_hint) {
+	ast_node(bd, BasicDirective, node);
+
+	ExprKind kind = Expr_Expr;
+
+	o->mode = Addressing_Constant;
+	String name = bd->name.string;
+	if (name == "file") {
+		o->type = t_untyped_string;
+		o->value = exact_value_string(get_file_path_string(bd->token.pos.file_id));
+	} else if (name == "line") {
+		o->type = t_untyped_integer;
+		o->value = exact_value_i64(bd->token.pos.line);
+	} else if (name == "procedure") {
+		if (c->curr_proc_decl == nullptr) {
+			error(node, "#procedure may only be used within procedures");
+			o->type = t_untyped_string;
+			o->value = exact_value_string(str_lit(""));
+		} else {
+			o->type = t_untyped_string;
+			o->value = exact_value_string(c->proc_name);
+		}
+	} else if (name == "caller_location") {
+		init_core_source_code_location(c->checker);
+		error(node, "#caller_location may only be used as a default argument parameter");
+		o->type = t_source_code_location;
+		o->mode = Addressing_Value;
+	} else {
+		if (name == "location") {
+			init_core_source_code_location(c->checker);
+			error(node, "'#%.*s' must be used in a call expression", LIT(name));
+			o->type = t_source_code_location;
+			o->mode = Addressing_Value;
+		} else if (
+		    name == "assert" ||
+		    name == "defined" ||
+		    name == "config" ||
+		    name == "load" ||
+		    name == "load_hash" ||
+		    name == "load_or"
+		) {
+			error(node, "'#%.*s' must be used as a call", LIT(name));
+			o->type = t_invalid;
+			o->mode = Addressing_Invalid;
+		} else {
+			error(node, "Unknown directive: #%.*s", LIT(name));
+			o->type = t_invalid;
+			o->mode = Addressing_Invalid;
+		}
+
+	}
+	return kind;
+}
+
+ExprKind check_ternary_if_expr(CheckerContext *c, Operand *o, Ast *node, Type *type_hint) {
+	ExprKind kind = Expr_Expr;
+	Operand cond = {Addressing_Invalid};
+	ast_node(te, TernaryIfExpr, node);
+	check_expr(c, &cond, te->cond);
+	node->viral_state_flags |= te->cond->viral_state_flags;
+
+	if (cond.mode != Addressing_Invalid && !is_type_boolean(cond.type)) {
+		error(te->cond, "Non-boolean condition in ternary if expression");
+	}
+
+	Operand x = {Addressing_Invalid};
+	Operand y = {Addressing_Invalid};
+	check_expr_or_type(c, &x, te->x, type_hint);
+	node->viral_state_flags |= te->x->viral_state_flags;
+
+	if (te->y != nullptr) {
+		Type *th = type_hint;
+		if (type_hint == nullptr && is_type_typed(x.type)) {
+			th = x.type;
+		}
+		check_expr_or_type(c, &y, te->y, th);
+		node->viral_state_flags |= te->y->viral_state_flags;
+	} else {
+		error(node, "A ternary expression must have an else clause");
+		return kind;
+	}
+
+	if (x.type == nullptr || x.type == t_invalid ||
+	    y.type == nullptr || y.type == t_invalid) {
+		return kind;
+	}
+
+	convert_to_typed(c, &x, y.type);
+	if (x.mode == Addressing_Invalid) {
+		return kind;
+	}
+	convert_to_typed(c, &y, x.type);
+	if (y.mode == Addressing_Invalid) {
+		x.mode = Addressing_Invalid;
+		return kind;
+	}
+
+	if (!ternary_compare_types(x.type, y.type)) {
+		gbString its = type_to_string(x.type);
+		gbString ets = type_to_string(y.type);
+		error(node, "Mismatched types in ternary if expression, %s vs %s", its, ets);
+		gb_string_free(ets);
+		gb_string_free(its);
+		return kind;
+	}
+
+	o->type = x.type;
+	if (is_type_untyped_nil(o->type) || is_type_untyped_undef(o->type)) {
+		o->type = y.type;
+	}
+
+	o->mode = Addressing_Value;
+	o->expr = node;
+	if (type_hint != nullptr && is_type_untyped(o->type)) {
+		if (check_cast_internal(c, &x, type_hint) &&
+		    check_cast_internal(c, &y, type_hint)) {
+			convert_to_typed(c, o, type_hint);
+			update_untyped_expr_type(c, node, type_hint, !is_type_untyped(type_hint));
+		}
+	}
+	return kind;
+}
+
+ExprKind check_ternary_when_expr(CheckerContext *c, Operand *o, Ast *node, Type *type_hint) {
+	ExprKind kind = Expr_Expr;
+	Operand cond = {};
+	ast_node(te, TernaryWhenExpr, node);
+	check_expr(c, &cond, te->cond);
+	node->viral_state_flags |= te->cond->viral_state_flags;
+
+	if (cond.mode != Addressing_Constant || !is_type_boolean(cond.type)) {
+		error(te->cond, "Expected a constant boolean condition in ternary when expression");
+		return kind;
+	}
+
+	if (cond.value.value_bool) {
+		check_expr_or_type(c, o, te->x, type_hint);
+		node->viral_state_flags |= te->x->viral_state_flags;
+	} else {
+		if (te->y != nullptr) {
+			check_expr_or_type(c, o, te->y, type_hint);
+			node->viral_state_flags |= te->y->viral_state_flags;
+		} else {
+			error(node, "A ternary when expression must have an else clause");
+			return kind;
+		}
+	}
+	return kind;
+}
+
+ExprKind check_or_else_expr(CheckerContext *c, Operand *o, Ast *node, Type *type_hint) {
+	ast_node(oe, OrElseExpr, node);
+
+	String name = oe->token.string;
+	Ast *arg = oe->x;
+	Ast *default_value = oe->y;
+
+	Operand x = {};
+	Operand y = {};
+	check_multi_expr_with_type_hint(c, &x, arg, type_hint);
+	if (x.mode == Addressing_Invalid) {
+		o->mode = Addressing_Value;
+		o->type = t_invalid;
+		o->expr = node;
+		return Expr_Expr;
+	}
+
+	check_multi_expr_with_type_hint(c, &y, default_value, x.type);
+	error_operand_no_value(&y);
+	if (y.mode == Addressing_Invalid) {
+		o->mode = Addressing_Value;
+		o->type = t_invalid;
+		o->expr = node;
+		return Expr_Expr;
+	}
+
+	Type *left_type = nullptr;
+	Type *right_type = nullptr;
+	check_or_else_split_types(c, &x, name, &left_type, &right_type);
+	add_type_and_value(&c->checker->info, arg, x.mode, x.type, x.value);
+
+	if (left_type != nullptr) {
+		check_assignment(c, &y, left_type, name);
+	} else {
+		check_or_else_expr_no_value_error(c, name, x, type_hint);
+	}
+
+	if (left_type == nullptr) {
+		left_type = t_invalid;
+	}
+	o->mode = Addressing_Value;
+	o->type = left_type;
+	o->expr = node;
+	return Expr_Expr;
+}
+
+ExprKind check_or_return_expr(CheckerContext *c, Operand *o, Ast *node, Type *type_hint) {
+	ast_node(re, OrReturnExpr, node);
+
+	String name = re->token.string;
+	Operand x = {};
+	check_multi_expr_with_type_hint(c, &x, re->expr, type_hint);
+	if (x.mode == Addressing_Invalid) {
+		o->mode = Addressing_Value;
+		o->type = t_invalid;
+		o->expr = node;
+		return Expr_Expr;
+	}
+
+	Type *left_type = nullptr;
+	Type *right_type = nullptr;
+	check_or_return_split_types(c, &x, name, &left_type, &right_type);
+	add_type_and_value(&c->checker->info, re->expr, x.mode, x.type, x.value);
+
+	if (right_type == nullptr) {
+		check_or_else_expr_no_value_error(c, name, x, type_hint);
+	} else {
+		Type *proc_type = base_type(c->curr_proc_sig);
+		GB_ASSERT(proc_type->kind == Type_Proc);
+		Type *result_type = proc_type->Proc.results;
+		if (result_type == nullptr) {
+			error(node, "'%.*s' requires the current procedure to have at least one return value", LIT(name));
+		} else {
+			GB_ASSERT(result_type->kind == Type_Tuple);
+
+			auto const &vars = result_type->Tuple.variables;
+			Type *end_type = vars[vars.count-1]->type;
+
+			if (vars.count > 1) {
+				if (!proc_type->Proc.has_named_results) {
+					error(node, "'%.*s' within a procedure with more than 1 return value requires that the return values are named, allowing for early return", LIT(name));
+				}
+			}
+
+			Operand rhs = {};
+			rhs.type = right_type;
+			rhs.mode = Addressing_Value;
+
+			// TODO(bill): better error message
+			if (!check_is_assignable_to(c, &rhs, end_type)) {
+				gbString a = type_to_string(right_type);
+				gbString b = type_to_string(end_type);
+				gbString ret_type = type_to_string(result_type);
+				error(node, "Cannot assign end value of type '%s' to '%s' in '%.*s'", a, b, LIT(name));
+				if (vars.count == 1) {
+					error_line("\tProcedure return value type: %s\n", ret_type);
+				} else {
+					error_line("\tProcedure return value types: (%s)\n", ret_type);
+				}
+				gb_string_free(ret_type);
+				gb_string_free(b);
+				gb_string_free(a);
+			}
+		}
+	}
+
+	o->expr = node;
+	o->type = left_type;
+	if (left_type != nullptr) {
+		o->mode = Addressing_Value;
+	} else {
+		o->mode = Addressing_NoValue;
+	}
+
+	if (c->curr_proc_sig == nullptr) {
+		error(node, "'%.*s' can only be used within a procedure", LIT(name));
+	}
+
+	if (c->in_defer) {
+		error(node, "'or_return' cannot be used within a defer statement");
+	}
+
+	return Expr_Expr;
+}
+
+ExprKind check_compound_literal(CheckerContext *c, Operand *o, Ast *node, Type *type_hint) {
+	ExprKind kind = Expr_Expr;
+	ast_node(cl, CompoundLit, node);
+
+	Type *type = type_hint;
+	if (type != nullptr && is_type_untyped(type)) {
+		type = nullptr;
+	}
+	bool is_to_be_determined_array_count = false;
+	bool is_constant = true;
+	if (cl->type != nullptr) {
+		type = nullptr;
+
+		// [?]Type
+		if (cl->type->kind == Ast_ArrayType && cl->type->ArrayType.count != nullptr) {
+			Ast *count = cl->type->ArrayType.count;
+			if (count->kind == Ast_UnaryExpr &&
+			    count->UnaryExpr.op.kind == Token_Question) {
+				type = alloc_type_array(check_type(c, cl->type->ArrayType.elem), -1);
+				is_to_be_determined_array_count = true;
+			}
+			if (cl->elems.count > 0) {
+				if (cl->type->ArrayType.tag != nullptr) {
+					Ast *tag = cl->type->ArrayType.tag;
+					GB_ASSERT(tag->kind == Ast_BasicDirective);
+					String name = tag->BasicDirective.name.string;
+					if (name == "soa") {
+						error(node, "#soa arrays are not supported for compound literals");
+						return kind;
+					}
+				}
+			}
+		}
+		if (cl->type->kind == Ast_DynamicArrayType && cl->type->DynamicArrayType.tag != nullptr) {
+			if (cl->elems.count > 0) {
+				Ast *tag = cl->type->DynamicArrayType.tag;
+				GB_ASSERT(tag->kind == Ast_BasicDirective);
+				String name = tag->BasicDirective.name.string;
+				if (name == "soa") {
+					error(node, "#soa arrays are not supported for compound literals");
+					return kind;
+				}
+			}
+		}
+
+		if (type == nullptr) {
+			type = check_type(c, cl->type);
+		}
+	}
+
+	if (type == nullptr) {
+		error(node, "Missing type in compound literal");
+		return kind;
+	}
+
+
+	Type *t = base_type(type);
+	if (is_type_polymorphic(t)) {
+		gbString str = type_to_string(type);
+		error(node, "Cannot use a polymorphic type for a compound literal, got '%s'", str);
+		o->expr = node;
+		o->type = type;
+		gb_string_free(str);
+		return kind;
+	}
+
+
+	switch (t->kind) {
+	case Type_Struct: {
+		if (cl->elems.count == 0) {
+			break; // NOTE(bill): No need to init
+		}
+		if (t->Struct.is_raw_union) {
+			if (cl->elems.count > 0) {
+				// NOTE: unions cannot be constant
+				is_constant = false;
+
+				if (cl->elems[0]->kind != Ast_FieldValue) {
+					gbString type_str = type_to_string(type);
+					error(node, "%s ('struct #raw_union') compound literals are only allowed to contain 'field = value' elements", type_str);
+					gb_string_free(type_str);
+				} else {
+					if (cl->elems.count != 1) {
+						gbString type_str = type_to_string(type);
+						error(node, "%s ('struct #raw_union') compound literals are only allowed to contain up to 1 'field = value' element, got %td", type_str, cl->elems.count);
+						gb_string_free(type_str);
+					} else {
+						Ast *elem = cl->elems[0];
+						ast_node(fv, FieldValue, elem);
+						if (fv->field->kind != Ast_Ident) {
+							gbString expr_str = expr_to_string(fv->field);
+							error(elem, "Invalid field name '%s' in structure literal", expr_str);
+							gb_string_free(expr_str);
+							break;
+						}
+
+						String name = fv->field->Ident.token.string;
+
+						Selection sel = lookup_field(type, name, o->mode == Addressing_Type);
+						bool is_unknown = sel.entity == nullptr;
+						if (is_unknown) {
+							error(elem, "Unknown field '%.*s' in structure literal", LIT(name));
+							break;
+						}
+
+						if (sel.index.count > 1) {
+							error(elem, "Cannot assign to an anonymous field '%.*s' in a structure literal (at the moment)", LIT(name));
+							break;
+						}
+
+						Entity *field = t->Struct.fields[sel.index[0]];
+						add_entity_use(c, fv->field, field);
+
+						Operand o = {};
+						check_expr_or_type(c, &o, fv->value, field->type);
+
+
+						check_assignment(c, &o, field->type, str_lit("structure literal"));
+					}
+
+				}
+			}
+			break;
+		}
+
+
+		isize field_count = t->Struct.fields.count;
+		isize min_field_count = t->Struct.fields.count;
+		for (isize i = min_field_count-1; i >= 0; i--) {
+			Entity *e = t->Struct.fields[i];
+			GB_ASSERT(e->kind == Entity_Variable);
+			if (e->Variable.param_value.kind != ParameterValue_Invalid) {
+				min_field_count--;
+			} else {
+				break;
+			}
+		}
+
+		if (cl->elems[0]->kind == Ast_FieldValue) {
+			bool *fields_visited = gb_alloc_array(temporary_allocator(), bool, field_count);
+
+			for_array(i, cl->elems) {
+				Ast *elem = cl->elems[i];
+				if (elem->kind != Ast_FieldValue) {
+					error(elem, "Mixture of 'field = value' and value elements in a literal is not allowed");
+					continue;
+				}
+				ast_node(fv, FieldValue, elem);
+				if (fv->field->kind != Ast_Ident) {
+					gbString expr_str = expr_to_string(fv->field);
+					error(elem, "Invalid field name '%s' in structure literal", expr_str);
+					gb_string_free(expr_str);
+					continue;
+				}
+				String name = fv->field->Ident.token.string;
+
+				Selection sel = lookup_field(type, name, o->mode == Addressing_Type);
+				bool is_unknown = sel.entity == nullptr;
+				if (is_unknown) {
+					error(elem, "Unknown field '%.*s' in structure literal", LIT(name));
+					continue;
+				}
+
+				if (sel.index.count > 1) {
+					error(elem, "Cannot assign to an anonymous field '%.*s' in a structure literal (at the moment)", LIT(name));
+					continue;
+				}
+
+				Entity *field = t->Struct.fields[sel.index[0]];
+				add_entity_use(c, fv->field, field);
+
+				if (fields_visited[sel.index[0]]) {
+					error(elem, "Duplicate field '%.*s' in structure literal", LIT(name));
+					continue;
+				}
+
+				fields_visited[sel.index[0]] = true;
+
+				Operand o = {};
+				check_expr_or_type(c, &o, fv->value, field->type);
+
+				if (is_type_any(field->type) || is_type_union(field->type) || is_type_raw_union(field->type) || is_type_typeid(field->type)) {
+					is_constant = false;
+				}
+				if (is_constant) {
+					is_constant = check_is_operand_compound_lit_constant(c, &o);
+				}
+
+				check_assignment(c, &o, field->type, str_lit("structure literal"));
+			}
+		} else {
+			bool seen_field_value = false;
+
+			for_array(index, cl->elems) {
+				Entity *field = nullptr;
+				Ast *elem = cl->elems[index];
+				if (elem->kind == Ast_FieldValue) {
+					seen_field_value = true;
+					error(elem, "Mixture of 'field = value' and value elements in a literal is not allowed");
+					continue;
+				} else if (seen_field_value) {
+					error(elem, "Value elements cannot be used after a 'field = value'");
+					continue;
+				}
+				if (index >= field_count) {
+					error(elem, "Too many values in structure literal, expected %td, got %td", field_count, cl->elems.count);
+					break;
+				}
+
+				if (field == nullptr) {
+					field = t->Struct.fields[index];
+				}
+
+				Operand o = {};
+				check_expr_or_type(c, &o, elem, field->type);
+
+				if (is_type_any(field->type) || is_type_union(field->type) || is_type_raw_union(field->type) || is_type_typeid(field->type)) {
+					is_constant = false;
+				}
+				if (is_constant) {
+					is_constant = check_is_operand_compound_lit_constant(c, &o);
+				}
+
+				check_assignment(c, &o, field->type, str_lit("structure literal"));
+			}
+			if (cl->elems.count < field_count) {
+				if (min_field_count < field_count) {
+				    if (cl->elems.count < min_field_count) {
+						error(cl->close, "Too few values in structure literal, expected at least %td, got %td", min_field_count, cl->elems.count);
+				    }
+				} else {
+					error(cl->close, "Too few values in structure literal, expected %td, got %td", field_count, cl->elems.count);
+				}
+			}
+		}
+
+		break;
+	}
+
+	case Type_Slice:
+	case Type_Array:
+	case Type_DynamicArray:
+	case Type_SimdVector:
+	case Type_Matrix:
+	{
+		Type *elem_type = nullptr;
+		String context_name = {};
+		i64 max_type_count = -1;
+		if (t->kind == Type_Slice) {
+			elem_type = t->Slice.elem;
+			context_name = str_lit("slice literal");
+		} else if (t->kind == Type_Array) {
+			elem_type = t->Array.elem;
+			context_name = str_lit("array literal");
+			if (!is_to_be_determined_array_count) {
+				max_type_count = t->Array.count;
+			}
+		} else if (t->kind == Type_DynamicArray) {
+			elem_type = t->DynamicArray.elem;
+			context_name = str_lit("dynamic array literal");
+			is_constant = false;
+
+			if (!build_context.no_dynamic_literals) {
+				add_package_dependency(c, "runtime", "__dynamic_array_reserve");
+				add_package_dependency(c, "runtime", "__dynamic_array_append");
+			}
+		} else if (t->kind == Type_SimdVector) {
+			elem_type = t->SimdVector.elem;
+			context_name = str_lit("simd vector literal");
+			max_type_count = t->SimdVector.count;
+		} else if (t->kind == Type_Matrix) {
+			elem_type = t->Matrix.elem;
+			context_name = str_lit("matrix literal");
+			max_type_count = t->Matrix.row_count*t->Matrix.column_count;
+		} else {
+			GB_PANIC("unreachable");
+		}
+
+
+		i64 max = 0;
+
+		Type *bet = base_type(elem_type);
+		if (!elem_type_can_be_constant(bet)) {
+			is_constant = false;
+		}
+
+		if (bet == t_invalid) {
+			break;
+		}
+
+		if (cl->elems.count > 0 && cl->elems[0]->kind == Ast_FieldValue) {
+			RangeCache rc = range_cache_make(heap_allocator());
+			defer (range_cache_destroy(&rc));
+
+			for_array(i, cl->elems) {
+				Ast *elem = cl->elems[i];
+				if (elem->kind != Ast_FieldValue) {
+					error(elem, "Mixture of 'field = value' and value elements in a literal is not allowed");
+					continue;
+				}
+				ast_node(fv, FieldValue, elem);
+
+				if (is_ast_range(fv->field)) {
+					Token op = fv->field->BinaryExpr.op;
+
+					Operand x = {};
+					Operand y = {};
+					bool ok = check_range(c, fv->field, &x, &y, nullptr);
+					if (!ok) {
+						continue;
+					}
+					if (x.mode != Addressing_Constant || !is_type_integer(core_type(x.type))) {
+						error(x.expr, "Expected a constant integer as an array field");
+						continue;
+					}
+
+					if (y.mode != Addressing_Constant || !is_type_integer(core_type(y.type))) {
+						error(y.expr, "Expected a constant integer as an array field");
+						continue;
+					}
+
+					i64 lo = exact_value_to_i64(x.value);
+					i64 hi = exact_value_to_i64(y.value);
+					i64 max_index = hi;
+					if (op.kind == Token_RangeHalf) { // ..< (exclusive)
+						hi -= 1;
+					} else { // .. (inclusive)
+						max_index += 1;
+					}
+
+					bool new_range = range_cache_add_range(&rc, lo, hi);
+					if (!new_range) {
+						error(elem, "Overlapping field range index %lld %.*s %lld for %.*s", lo, LIT(op.string), hi, LIT(context_name));
+						continue;
+					}
+
+
+					if (max_type_count >= 0 && (lo < 0 || lo >= max_type_count)) {
+						error(elem, "Index %lld is out of bounds (0..<%lld) for %.*s", lo, max_type_count, LIT(context_name));
+						continue;
+					}
+					if (max_type_count >= 0 && (hi < 0 || hi >= max_type_count)) {
+						error(elem, "Index %lld is out of bounds (0..<%lld) for %.*s", hi, max_type_count, LIT(context_name));
+						continue;
+					}
+
+					if (max < hi) {
+						max = max_index;
+					}
+
+					Operand operand = {};
+					check_expr_with_type_hint(c, &operand, fv->value, elem_type);
+					check_assignment(c, &operand, elem_type, context_name);
+
+					is_constant = is_constant && operand.mode == Addressing_Constant;
+				} else {
+					Operand op_index = {};
+					check_expr(c, &op_index, fv->field);
+
+					if (op_index.mode != Addressing_Constant || !is_type_integer(core_type(op_index.type))) {
+						error(elem, "Expected a constant integer as an array field");
+						continue;
+					}
+					// add_type_and_value(c->info, op_index.expr, op_index.mode, op_index.type, op_index.value);
+
+					i64 index = exact_value_to_i64(op_index.value);
+
+					if (max_type_count >= 0 && (index < 0 || index >= max_type_count)) {
+						error(elem, "Index %lld is out of bounds (0..<%lld) for %.*s", index, max_type_count, LIT(context_name));
+						continue;
+					}
+
+					bool new_index = range_cache_add_index(&rc, index);
+					if (!new_index) {
+						error(elem, "Duplicate field index %lld for %.*s", index, LIT(context_name));
+						continue;
+					}
+
+					if (max < index+1) {
+						max = index+1;
+					}
+
+					Operand operand = {};
+					check_expr_with_type_hint(c, &operand, fv->value, elem_type);
+					check_assignment(c, &operand, elem_type, context_name);
+
+					is_constant = is_constant && operand.mode == Addressing_Constant;
+				}
+			}
+
+			cl->max_count = max;
+		} else {
+			isize index = 0;
+			for (; index < cl->elems.count; index++) {
+				Ast *e = cl->elems[index];
+				if (e == nullptr) {
+					error(node, "Invalid literal element");
+					continue;
+				}
+
+				if (e->kind == Ast_FieldValue) {
+					error(e, "Mixture of 'field = value' and value elements in a literal is not allowed");
+					continue;
+				}
+
+				if (0 <= max_type_count && max_type_count <= index) {
+					error(e, "Index %lld is out of bounds (>= %lld) for %.*s", index, max_type_count, LIT(context_name));
+				}
+
+				Operand operand = {};
+				check_expr_with_type_hint(c, &operand, e, elem_type);
+				check_assignment(c, &operand, elem_type, context_name);
+
+				is_constant = is_constant && operand.mode == Addressing_Constant;
+			}
+
+			if (max < index) {
+				max = index;
+			}
+		}
+
+
+		if (t->kind == Type_Array) {
+			if (is_to_be_determined_array_count) {
+				t->Array.count = max;
+			} else if (cl->elems.count > 0 && cl->elems[0]->kind != Ast_FieldValue) {
+				if (0 < max && max < t->Array.count) {
+					error(node, "Expected %lld values for this array literal, got %lld", cast(long long)t->Array.count, cast(long long)max);
+				}
+			}
+		}
+
+
+		if (t->kind == Type_SimdVector) {
+			if (!is_constant) {
+				// error(node, "Expected all constant elements for a simd vector");
+			}
+		}
+
+
+		if (t->kind == Type_DynamicArray) {
+			if (build_context.no_dynamic_literals && cl->elems.count) {
+				error(node, "Compound literals of dynamic types have been disabled");
+			}
+		}
+
+		if (t->kind == Type_Matrix) {
+			if (cl->elems.count > 0 && cl->elems[0]->kind != Ast_FieldValue) {
+				if (0 < max && max < max_type_count) {
+					error(node, "Expected %lld values for this matrix literal, got %lld", cast(long long)max_type_count, cast(long long)max);
+				}
+			}
+		}
+
+		break;
+	}
+
+	case Type_EnumeratedArray:
+	{
+		Type *elem_type = t->EnumeratedArray.elem;
+		Type *index_type = t->EnumeratedArray.index;
+		String context_name = str_lit("enumerated array literal");
+		i64 max_type_count = t->EnumeratedArray.count;
+
+		gbString index_type_str = type_to_string(index_type);
+		defer (gb_string_free(index_type_str));
+
+		i64 total_lo = exact_value_to_i64(*t->EnumeratedArray.min_value);
+		i64 total_hi = exact_value_to_i64(*t->EnumeratedArray.max_value);
+
+		String total_lo_string = {};
+		String total_hi_string = {};
+		GB_ASSERT(is_type_enum(index_type));
+		{
+			Type *bt = base_type(index_type);
+			GB_ASSERT(bt->kind == Type_Enum);
+			for_array(i, bt->Enum.fields) {
+				Entity *f = bt->Enum.fields[i];
+				if (f->kind != Entity_Constant) {
+					continue;
+				}
+				if (total_lo_string.len == 0 && compare_exact_values(Token_CmpEq, f->Constant.value, *t->EnumeratedArray.min_value)) {
+					total_lo_string = f->token.string;
+				}
+				if (total_hi_string.len == 0 && compare_exact_values(Token_CmpEq, f->Constant.value, *t->EnumeratedArray.max_value)) {
+					total_hi_string = f->token.string;
+				}
+				if (total_lo_string.len != 0 && total_hi_string.len != 0) {
+					break;
+				}
+			}
+		}
+
+		i64 max = 0;
+
+		Type *bet = base_type(elem_type);
+		if (!elem_type_can_be_constant(bet)) {
+			is_constant = false;
+		}
+
+		if (bet == t_invalid) {
+			break;
+		}
+		bool is_partial = cl->tag && (cl->tag->BasicDirective.name.string == "partial");
+
+		SeenMap seen = {}; // NOTE(bill): Multimap, Key: ExactValue
+		map_init(&seen, heap_allocator());
+		defer (map_destroy(&seen));
+
+		if (cl->elems.count > 0 && cl->elems[0]->kind == Ast_FieldValue) {
+			RangeCache rc = range_cache_make(heap_allocator());
+			defer (range_cache_destroy(&rc));
+
+			for_array(i, cl->elems) {
+				Ast *elem = cl->elems[i];
+				if (elem->kind != Ast_FieldValue) {
+					error(elem, "Mixture of 'field = value' and value elements in a literal is not allowed");
+					continue;
+				}
+				ast_node(fv, FieldValue, elem);
+
+				if (is_ast_range(fv->field)) {
+					Token op = fv->field->BinaryExpr.op;
+
+					Operand x = {};
+					Operand y = {};
+					bool ok = check_range(c, fv->field, &x, &y, nullptr, index_type);
+					if (!ok) {
+						continue;
+					}
+					if (x.mode != Addressing_Constant || !are_types_identical(x.type, index_type)) {
+						error(x.expr, "Expected a constant enum of type '%s' as an array field", index_type_str);
+						continue;
+					}
+
+					if (y.mode != Addressing_Constant || !are_types_identical(x.type, index_type)) {
+						error(y.expr, "Expected a constant enum of type '%s' as an array field", index_type_str);
+						continue;
+					}
+
+					i64 lo = exact_value_to_i64(x.value);
+					i64 hi = exact_value_to_i64(y.value);
+					i64 max_index = hi;
+					if (op.kind == Token_RangeHalf) {
+						hi -= 1;
+					}
+
+					bool new_range = range_cache_add_range(&rc, lo, hi);
+					if (!new_range) {
+						gbString lo_str = expr_to_string(x.expr);
+						gbString hi_str = expr_to_string(y.expr);
+						error(elem, "Overlapping field range index %s %.*s %s for %.*s", lo_str, LIT(op.string), hi_str, LIT(context_name));
+						gb_string_free(hi_str);
+						gb_string_free(lo_str);
+						continue;
+					}
+
+
+					// NOTE(bill): These are sanity checks for invalid enum values
+					if (max_type_count >= 0 && (lo < total_lo || lo > total_hi)) {
+						gbString lo_str = expr_to_string(x.expr);
+						error(elem, "Index %s is out of bounds (%.*s .. %.*s) for %.*s", lo_str, LIT(total_lo_string), LIT(total_hi_string), LIT(context_name));
+						gb_string_free(lo_str);
+						continue;
+					}
+					if (max_type_count >= 0 && (hi < 0 || hi > total_hi)) {
+						gbString hi_str = expr_to_string(y.expr);
+						error(elem, "Index %s is out of bounds (%.*s .. %.*s) for %.*s", hi_str, LIT(total_lo_string), LIT(total_hi_string), LIT(context_name));
+						gb_string_free(hi_str);
+						continue;
+					}
+
+					if (max < hi) {
+						max = max_index;
+					}
+
+					Operand operand = {};
+					check_expr_with_type_hint(c, &operand, fv->value, elem_type);
+					check_assignment(c, &operand, elem_type, context_name);
+
+					is_constant = is_constant && operand.mode == Addressing_Constant;
+
+					TokenKind upper_op = Token_LtEq;
+					if (op.kind == Token_RangeHalf) {
+						upper_op = Token_Lt;
+					}
+					add_to_seen_map(c, &seen, upper_op, x, x, y);
+				} else {
+					Operand op_index = {};
+					check_expr_with_type_hint(c, &op_index, fv->field, index_type);
+
+					if (op_index.mode != Addressing_Constant || !are_types_identical(op_index.type, index_type)) {
+						error(op_index.expr, "Expected a constant enum of type '%s' as an array field", index_type_str);
+						continue;
+					}
+
+					i64 index = exact_value_to_i64(op_index.value);
+
+					if (max_type_count >= 0 && (index < total_lo || index > total_hi)) {
+						gbString idx_str = expr_to_string(op_index.expr);
+						error(elem, "Index %s is out of bounds (%.*s .. %.*s) for %.*s", idx_str, LIT(total_lo_string), LIT(total_hi_string), LIT(context_name));
+						gb_string_free(idx_str);
+						continue;
+					}
+
+					bool new_index = range_cache_add_index(&rc, index);
+					if (!new_index) {
+						gbString idx_str = expr_to_string(op_index.expr);
+						error(elem, "Duplicate field index %s for %.*s", idx_str, LIT(context_name));
+						gb_string_free(idx_str);
+						continue;
+					}
+
+					if (max < index+1) {
+						max = index+1;
+					}
+
+					Operand operand = {};
+					check_expr_with_type_hint(c, &operand, fv->value, elem_type);
+					check_assignment(c, &operand, elem_type, context_name);
+
+					is_constant = is_constant && operand.mode == Addressing_Constant;
+
+					add_to_seen_map(c, &seen, op_index);
+				}
+			}
+
+			cl->max_count = max;
+
+		} else {
+			isize index = 0;
+			for (; index < cl->elems.count; index++) {
+				Ast *e = cl->elems[index];
+				if (e == nullptr) {
+					error(node, "Invalid literal element");
+					continue;
+				}
+
+				if (e->kind == Ast_FieldValue) {
+					error(e, "Mixture of 'field = value' and value elements in a literal is not allowed");
+					continue;
+				}
+
+				if (0 <= max_type_count && max_type_count <= index) {
+					error(e, "Index %lld is out of bounds (>= %lld) for %.*s", index, max_type_count, LIT(context_name));
+				}
+
+				Operand operand = {};
+				check_expr_with_type_hint(c, &operand, e, elem_type);
+				check_assignment(c, &operand, elem_type, context_name);
+
+				is_constant = is_constant && operand.mode == Addressing_Constant;
+			}
+
+			if (max < index) {
+				max = index;
+			}
+		}
+
+		bool was_error = false;
+		if (cl->elems.count > 0 && cl->elems[0]->kind != Ast_FieldValue) {
+			if (0 < max && max < t->EnumeratedArray.count) {
+				error(node, "Expected %lld values for this enumerated array literal, got %lld", cast(long long)t->EnumeratedArray.count, cast(long long)max);
+				was_error = true;
+			} else {
+				error(node, "Enumerated array literals must only have 'field = value' elements, bare elements are not allowed");
+				was_error = true;
+			}
+		}
+
+		// NOTE(bill): Check for missing cases when `#partial literal` is not present
+		if (cl->elems.count > 0 && !was_error && !is_partial) {
+			Type *et = base_type(index_type);
+			GB_ASSERT(et->kind == Type_Enum);
+			auto fields = et->Enum.fields;
+
+			auto unhandled = array_make<Entity *>(temporary_allocator(), 0, fields.count);
+
+			for_array(i, fields) {
+				Entity *f = fields[i];
+				if (f->kind != Entity_Constant) {
+					continue;
+				}
+				ExactValue v = f->Constant.value;
+				auto found = map_get(&seen, hash_exact_value(v));
+				if (!found) {
+					array_add(&unhandled, f);
+				}
+			}
+
+			if (unhandled.count > 0) {
+				begin_error_block();
+				defer (end_error_block());
+
+				if (unhandled.count == 1) {
+					error_no_newline(node, "Unhandled enumerated array case: %.*s", LIT(unhandled[0]->token.string));
+				} else {
+					error(node, "Unhandled enumerated array cases:");
+					for_array(i, unhandled) {
+						Entity *f = unhandled[i];
+						error_line("\t%.*s\n", LIT(f->token.string));
+					}
+				}
+				error_line("\n");
+
+				error_line("\tSuggestion: Was '#partial %s{...}' wanted?\n", type_to_string(type));
+			}
+		}
+
+		break;
+	}
+
+	case Type_Basic: {
+		if (!is_type_any(t)) {
+			if (cl->elems.count != 0) {
+				gbString s = type_to_string(t);
+				error(node, "Illegal compound literal, %s cannot be used as a compound literal with fields", s);
+				gb_string_free(s);
+				is_constant = false;
+			}
+			break;
+		}
+		if (cl->elems.count == 0) {
+			break; // NOTE(bill): No need to init
+		}
+		{ // Checker values
+			Type *field_types[2] = {t_rawptr, t_typeid};
+			isize field_count = 2;
+			if (cl->elems[0]->kind == Ast_FieldValue) {
+				bool fields_visited[2] = {};
+
+				for_array(i, cl->elems) {
+					Ast *elem = cl->elems[i];
+					if (elem->kind != Ast_FieldValue) {
+						error(elem, "Mixture of 'field = value' and value elements in a 'any' literal is not allowed");
+						continue;
+					}
+					ast_node(fv, FieldValue, elem);
+					if (fv->field->kind != Ast_Ident) {
+						gbString expr_str = expr_to_string(fv->field);
+						error(elem, "Invalid field name '%s' in 'any' literal", expr_str);
+						gb_string_free(expr_str);
+						continue;
+					}
+					String name = fv->field->Ident.token.string;
+
+					Selection sel = lookup_field(type, name, o->mode == Addressing_Type);
+					if (sel.entity == nullptr) {
+						error(elem, "Unknown field '%.*s' in 'any' literal", LIT(name));
+						continue;
+					}
+
+					isize index = sel.index[0];
+
+					if (fields_visited[index]) {
+						error(elem, "Duplicate field '%.*s' in 'any' literal", LIT(name));
+						continue;
+					}
+
+					fields_visited[index] = true;
+					check_expr(c, o, fv->value);
+
+					// NOTE(bill): 'any' literals can never be constant
+					is_constant = false;
+
+					check_assignment(c, o, field_types[index], str_lit("'any' literal"));
+				}
+			} else {
+				for_array(index, cl->elems) {
+					Ast *elem = cl->elems[index];
+					if (elem->kind == Ast_FieldValue) {
+						error(elem, "Mixture of 'field = value' and value elements in a 'any' literal is not allowed");
+						continue;
+					}
+
+
+					check_expr(c, o, elem);
+					if (index >= field_count) {
+						error(o->expr, "Too many values in 'any' literal, expected %td", field_count);
+						break;
+					}
+
+					// NOTE(bill): 'any' literals can never be constant
+					is_constant = false;
+
+					check_assignment(c, o, field_types[index], str_lit("'any' literal"));
+				}
+				if (cl->elems.count < field_count) {
+					error(cl->close, "Too few values in 'any' literal, expected %td, got %td", field_count, cl->elems.count);
+				}
+			}
+		}
+
+		break;
+	}
+
+	case Type_Map: {
+		if (cl->elems.count == 0) {
+			break;
+		}
+		is_constant = false;
+		{ // Checker values
+			bool key_is_typeid = is_type_typeid(t->Map.key);
+			bool value_is_typeid = is_type_typeid(t->Map.value);
+
+			for_array(i, cl->elems) {
+				Ast *elem = cl->elems[i];
+				if (elem->kind != Ast_FieldValue) {
+					error(elem, "Only 'field = value' elements are allowed in a map literal");
+					continue;
+				}
+				ast_node(fv, FieldValue, elem);
+
+				if (key_is_typeid) {
+					check_expr_or_type(c, o, fv->field, t->Map.key);
+				} else {
+					check_expr_with_type_hint(c, o, fv->field, t->Map.key);
+				}
+				check_assignment(c, o, t->Map.key, str_lit("map literal"));
+				if (o->mode == Addressing_Invalid) {
+					continue;
+				}
+
+				if (value_is_typeid) {
+					check_expr_or_type(c, o, fv->value, t->Map.value);
+				} else {
+					check_expr_with_type_hint(c, o, fv->value, t->Map.value);
+				}
+				check_assignment(c, o, t->Map.value, str_lit("map literal"));
+			}
+		}
+
+		if (build_context.no_dynamic_literals && cl->elems.count) {
+			error(node, "Compound literals of dynamic types have been disabled");
+		} else {
+			add_package_dependency(c, "runtime", "__dynamic_map_reserve");
+			add_package_dependency(c, "runtime", "__dynamic_map_set");
+		}
+		break;
+	}
+
+	case Type_BitSet: {
+		if (cl->elems.count == 0) {
+			break; // NOTE(bill): No need to init
+		}
+		Type *et = base_type(t->BitSet.elem);
+		isize field_count = 0;
+		if (et->kind == Type_Enum) {
+			field_count = et->Enum.fields.count;
+		}
+
+		if (cl->elems[0]->kind == Ast_FieldValue) {
+			error(cl->elems[0], "'field = value' in a bit_set a literal is not allowed");
+			is_constant = false;
+		} else {
+			for_array(index, cl->elems) {
+				Ast *elem = cl->elems[index];
+				if (elem->kind == Ast_FieldValue) {
+					error(elem, "'field = value' in a bit_set a literal is not allowed");
+					continue;
+				}
+
+				check_expr_with_type_hint(c, o, elem, et);
+
+				if (is_constant) {
+					is_constant = o->mode == Addressing_Constant;
+				}
+
+				check_assignment(c, o, t->BitSet.elem, str_lit("bit_set literal"));
+				if (o->mode == Addressing_Constant) {
+					i64 lower = t->BitSet.lower;
+					i64 upper = t->BitSet.upper;
+					i64 v = exact_value_to_i64(o->value);
+					if (lower <= v && v <= upper) {
+						// okay
+					} else {
+						error(elem, "Bit field value out of bounds, %lld not in the range %lld .. %lld", v, lower, upper);
+						continue;
+					}
+				}
+			}
+		}
+		break;
+	}
+
+	default: {
+		if (cl->elems.count == 0) {
+			break; // NOTE(bill): No need to init
+		}
+
+		gbString str = type_to_string(type);
+		error(node, "Invalid compound literal type '%s'", str);
+		gb_string_free(str);
+		return kind;
+	}
+	}
+
+	if (is_constant) {
+		o->mode = Addressing_Constant;
+
+		if (is_type_bit_set(type)) {
+			// NOTE(bill): Encode as an integer
+
+			Type *bt = base_type(type);
+			BigInt bits = {};
+			BigInt one = {};
+			big_int_from_u64(&one, 1);
+
+			for_array(i, cl->elems) {
+				Ast *e = cl->elems[i];
+				GB_ASSERT(e->kind != Ast_FieldValue);
+
+				TypeAndValue tav = e->tav;
+				if (tav.mode != Addressing_Constant) {
+					continue;
+				}
+				GB_ASSERT(tav.value.kind == ExactValue_Integer);
+				i64 v = big_int_to_i64(&tav.value.value_integer);
+				i64 lower = bt->BitSet.lower;
+				u64 index = cast(u64)(v-lower);
+				BigInt bit = {};
+				big_int_from_u64(&bit, index);
+				big_int_shl(&bit, &one, &bit);
+				big_int_or(&bits, &bits, &bit);
+			}
+			o->value.kind = ExactValue_Integer;
+			o->value.value_integer = bits;
+		} else if (is_type_constant_type(type) && cl->elems.count == 0) {
+			ExactValue value = exact_value_compound(node);
+			Type *bt = core_type(type);
+			if (bt->kind == Type_Basic) {
+				if (bt->Basic.flags & BasicFlag_Boolean) {
+					value = exact_value_bool(false);
+				} else if (bt->Basic.flags & BasicFlag_Integer) {
+					value = exact_value_i64(0);
+				} else if (bt->Basic.flags & BasicFlag_Unsigned) {
+					value = exact_value_i64(0);
+				} else if (bt->Basic.flags & BasicFlag_Float) {
+					value = exact_value_float(0);
+				} else if (bt->Basic.flags & BasicFlag_Complex) {
+					value = exact_value_complex(0, 0);
+				} else if (bt->Basic.flags & BasicFlag_Quaternion) {
+					value = exact_value_quaternion(0, 0, 0, 0);
+				} else if (bt->Basic.flags & BasicFlag_Pointer) {
+					value = exact_value_pointer(0);
+				} else if (bt->Basic.flags & BasicFlag_String) {
+					String empty_string = {};
+					value = exact_value_string(empty_string);
+				} else if (bt->Basic.flags & BasicFlag_Rune) {
+					value = exact_value_i64(0);
+				}
+			}
+
+			o->value = value;
+		} else {
+			o->value = exact_value_compound(node);
+		}
+	} else {
+		o->mode = Addressing_Value;
+	}
+	o->type = type;
+	return kind;
+}
+
+ExprKind check_type_assertion(CheckerContext *c, Operand *o, Ast *node, Type *type_hint) {
+	ExprKind kind = Expr_Expr;
+	ast_node(ta, TypeAssertion, node);
+	check_expr(c, o, ta->expr);
+	node->viral_state_flags |= ta->expr->viral_state_flags;
+
+	if (o->mode == Addressing_Invalid) {
+		o->expr = node;
+		return kind;
+	}
+	if (o->mode == Addressing_Constant) {
+		gbString expr_str = expr_to_string(o->expr);
+		error(o->expr, "A type assertion cannot be applied to a constant expression: '%s'", expr_str);
+		gb_string_free(expr_str);
+		o->mode = Addressing_Invalid;
+		o->expr = node;
+		return kind;
+	}
+
+	if (is_type_untyped(o->type)) {
+		gbString expr_str = expr_to_string(o->expr);
+		error(o->expr, "A type assertion cannot be applied to an untyped expression: '%s'", expr_str);
+		gb_string_free(expr_str);
+		o->mode = Addressing_Invalid;
+		o->expr = node;
+		return kind;
+	}
+
+	Type *src = type_deref(o->type);
+	Type *bsrc = base_type(src);
+
+
+	if (ta->type != nullptr && ta->type->kind == Ast_UnaryExpr && ta->type->UnaryExpr.op.kind == Token_Question) {
+		if (!is_type_union(src)) {
+			gbString str = type_to_string(o->type);
+			error(o->expr, "Type assertions with .? can only operate on unions, got %s", str);
+			gb_string_free(str);
+			o->mode = Addressing_Invalid;
+			o->expr = node;
+			return kind;
+		}
+
+		if (bsrc->Union.variants.count != 1 && type_hint != nullptr) {
+			bool allowed = false;
+			for_array(i, bsrc->Union.variants) {
+				Type *vt = bsrc->Union.variants[i];
+				if (are_types_identical(vt, type_hint)) {
+					allowed = true;
+					add_type_info_type(c, vt);
+					break;
+				}
+			}
+			if (allowed) {
+				add_type_info_type(c, o->type);
+				o->type = type_hint;
+				o->mode = Addressing_OptionalOk;
+				return kind;
+			}
+		}
+
+		if (bsrc->Union.variants.count != 1) {
+			error(o->expr, "Type assertions with .? can only operate on unions with 1 variant, got %lld", cast(long long)bsrc->Union.variants.count);
+			o->mode = Addressing_Invalid;
+			o->expr = node;
+			return kind;
+		}
+
+		add_type_info_type(c, o->type);
+		add_type_info_type(c, bsrc->Union.variants[0]);
+
+		o->type = bsrc->Union.variants[0];
+		o->mode = Addressing_OptionalOk;
+	} else {
+		Type *t = check_type(c, ta->type);
+		Type *dst = t;
+
+		if (is_type_union(src)) {
+			bool ok = false;
+			for_array(i, bsrc->Union.variants) {
+				Type *vt = bsrc->Union.variants[i];
+				if (are_types_identical(vt, dst)) {
+					ok = true;
+					break;
+				}
+			}
+
+			if (!ok) {
+				gbString expr_str = expr_to_string(o->expr);
+				gbString dst_type_str = type_to_string(t);
+				defer (gb_string_free(expr_str));
+				defer (gb_string_free(dst_type_str));
+				if (bsrc->Union.variants.count == 0) {
+					error(o->expr, "Cannot type assert '%s' to '%s' as this is an empty union", expr_str, dst_type_str);
+				} else {
+					error(o->expr, "Cannot type assert '%s' to '%s' as it is not a variant of that union", expr_str, dst_type_str);
+				}
+				o->mode = Addressing_Invalid;
+				o->expr = node;
+				return kind;
+			}
+
+			add_type_info_type(c, o->type);
+			add_type_info_type(c, t);
+
+			o->type = t;
+			o->mode = Addressing_OptionalOk;
+		} else if (is_type_any(src)) {
+			o->type = t;
+			o->mode = Addressing_OptionalOk;
+
+			add_type_info_type(c, o->type);
+			add_type_info_type(c, t);
+		} else {
+			gbString str = type_to_string(o->type);
+			error(o->expr, "Type assertions can only operate on unions and 'any', got %s", str);
+			gb_string_free(str);
+			o->mode = Addressing_Invalid;
+			o->expr = node;
+			return kind;
+		}
+	}
+
+	if ((c->state_flags & StateFlag_no_type_assert) == 0) {
+		add_package_dependency(c, "runtime", "type_assertion_check");
+		add_package_dependency(c, "runtime", "type_assertion_check2");
+	}
+	return kind;
+}
+
+ExprKind check_selector_call_expr(CheckerContext *c, Operand *o, Ast *node, Type *type_hint) {
+	ast_node(se, SelectorCallExpr, node);
+	// IMPORTANT NOTE(bill, 2020-05-22): This is a complete hack to get a shorthand which is extremely useful for vtables
+	// COM APIs is a great example of where this kind of thing is extremely useful
+	// General idea:
+	//
+	//     x->y(123)  ==  x.y(x, 123)
+	//
+	// How this has been implemented at the moment is quite hacky but it's done so to reduce need for huge backend changes
+	// Just regenerating a new AST aids things
+	//
+	// TODO(bill): Is this a good hack or not?
+	//
+	// NOTE(bill, 2020-05-22): I'm going to regret this decision, ain't I?
+
+
+	if (se->modified_call) {
+		// Prevent double evaluation
+		o->expr  = node;
+		o->type  = node->tav.type;
+		o->value = node->tav.value;
+		o->mode  = node->tav.mode;
+		return Expr_Expr;
+	}
+
+	bool allow_arrow_right_selector_expr;
+	allow_arrow_right_selector_expr = c->allow_arrow_right_selector_expr;
+	c->allow_arrow_right_selector_expr = true;
+	Operand x = {};
+	ExprKind kind = check_expr_base(c, &x, se->expr, nullptr);
+	c->allow_arrow_right_selector_expr = allow_arrow_right_selector_expr;
+
+	if (x.mode == Addressing_Invalid || x.type == t_invalid) {
+		o->mode = Addressing_Invalid;
+		o->type = t_invalid;
+		o->expr = node;
+		return kind;
+	}
+	if (!is_type_proc(x.type)) {
+		gbString type_str = type_to_string(x.type);
+		error(se->call, "Selector call expressions expect a procedure type for the call, got '%s'", type_str);
+		gb_string_free(type_str);
+
+		o->mode = Addressing_Invalid;
+		o->type = t_invalid;
+		o->expr = node;
+		return Expr_Stmt;
+	}
+
+	ast_node(ce, CallExpr, se->call);
+
+	GB_ASSERT(x.expr->kind == Ast_SelectorExpr);
+
+	Ast *first_arg = x.expr->SelectorExpr.expr;
+	GB_ASSERT(first_arg != nullptr);
+
+	first_arg->state_flags |= StateFlag_SelectorCallExpr;
+
+	Type *pt = base_type(x.type);
+	GB_ASSERT(pt->kind == Type_Proc);
+	Type *first_type = nullptr;
+	String first_arg_name = {};
+	if (pt->Proc.param_count > 0) {
+		Entity *f = pt->Proc.params->Tuple.variables[0];
+		first_type = f->type;
+		first_arg_name = f->token.string;
+	}
+	if (first_arg_name.len == 0) {
+		first_arg_name = str_lit("_");
+	}
+
+	if (first_type == nullptr) {
+		error(se->call, "Selector call expressions expect a procedure type for the call with at least 1 parameter");
+		o->mode = Addressing_Invalid;
+		o->type = t_invalid;
+		o->expr = node;
+		return Expr_Stmt;
+	}
+
+	Operand y = {};
+	y.mode = first_arg->tav.mode;
+	y.type = first_arg->tav.type;
+	y.value = first_arg->tav.value;
+
+	if (check_is_assignable_to(c, &y, first_type)) {
+		// Do nothing, it's valid
+	} else {
+		Operand z = y;
+		z.type = type_deref(y.type);
+		if (check_is_assignable_to(c, &z, first_type)) {
+			// NOTE(bill): AST GENERATION HACK!
+			Token op = {Token_Pointer};
+			first_arg = ast_deref_expr(first_arg->file(), first_arg, op);
+		} else if (y.mode == Addressing_Variable) {
+			Operand w = y;
+			w.type = alloc_type_pointer(y.type);
+			if (check_is_assignable_to(c, &w, first_type)) {
+				// NOTE(bill): AST GENERATION HACK!
+				Token op = {Token_And};
+				first_arg = ast_unary_expr(first_arg->file(), op, first_arg);
+			}
+		}
+	}
+
+	if (ce->args.count > 0) {
+		bool fail = false;
+		bool first_is_field_value = (ce->args[0]->kind == Ast_FieldValue);
+		for_array(i, ce->args) {
+			Ast *arg = ce->args[i];
+			bool mix = false;
+			if (first_is_field_value) {
+				mix = arg->kind != Ast_FieldValue;
+			} else {
+				mix = arg->kind == Ast_FieldValue;
+			}
+			if (mix) {
+				fail = true;
+				break;
+			}
+		}
+		if (!fail && first_is_field_value) {
+			Token op = {Token_Eq};
+			AstFile *f = first_arg->file();
+			first_arg = ast_field_value(f, ast_ident(f, make_token_ident(first_arg_name)), first_arg, op);
+		}
+	}
+
+
+
+	auto modified_args = slice_make<Ast *>(heap_allocator(), ce->args.count+1);
+	modified_args[0] = first_arg;
+	slice_copy(&modified_args, ce->args, 1);
+	ce->args = modified_args;
+	se->modified_call = true;
+
+	allow_arrow_right_selector_expr = c->allow_arrow_right_selector_expr;
+	c->allow_arrow_right_selector_expr = true;
+	check_expr_base(c, o, se->call, type_hint);
+	c->allow_arrow_right_selector_expr = allow_arrow_right_selector_expr;
+
+	o->expr = node;
+	return Expr_Expr;
+}
+
+
+ExprKind check_index_expr(CheckerContext *c, Operand *o, Ast *node, Type *type_hint) {
+	ExprKind kind = Expr_Expr;
+	ast_node(ie, IndexExpr, node);
+	check_expr(c, o, ie->expr);
+	node->viral_state_flags |= ie->expr->viral_state_flags;
+	if (o->mode == Addressing_Invalid) {
+		o->expr = node;
+		return kind;
+	}
+
+	Type *t = base_type(type_deref(o->type));
+	bool is_ptr = is_type_pointer(o->type);
+	bool is_const = o->mode == Addressing_Constant;
+
+	if (is_type_map(t)) {
+		Operand key = {};
+		if (is_type_typeid(t->Map.key)) {
+			check_expr_or_type(c, &key, ie->index, t->Map.key);
+		} else {
+			check_expr_with_type_hint(c, &key, ie->index, t->Map.key);
+		}
+		check_assignment(c, &key, t->Map.key, str_lit("map index"));
+		if (key.mode == Addressing_Invalid) {
+			o->mode = Addressing_Invalid;
+			o->expr = node;
+			return kind;
+		}
+		o->mode = Addressing_MapIndex;
+		o->type = t->Map.value;
+		o->expr = node;
+
+		add_package_dependency(c, "runtime", "__dynamic_map_get");
+		add_package_dependency(c, "runtime", "__dynamic_map_set");
+		return Expr_Expr;
+	}
+
+	i64 max_count = -1;
+	bool valid = check_set_index_data(o, t, is_ptr, &max_count, o->type);
+
+	if (is_const) {
+		if (is_type_array(t)) {
+			// OKay
+		} else if (is_type_slice(t)) {
+			// Okay
+		} else if (is_type_enumerated_array(t)) {
+			// Okay
+		} else if (is_type_string(t)) {
+			// Okay
+		} else if (is_type_relative_slice(t)) {
+			// Okay
+		} else if (is_type_matrix(t)) {
+			// Okay
+		} else {
+			valid = false;
+		}
+	}
+
+	if (!valid) {
+		gbString str = expr_to_string(o->expr);
+		gbString type_str = type_to_string(o->type);
+		defer (gb_string_free(str));
+		defer (gb_string_free(type_str));
+		if (is_const) {
+			error(o->expr, "Cannot index constant '%s' of type '%s'", str, type_str);
+		} else {
+			error(o->expr, "Cannot index '%s' of type '%s'", str, type_str);
+		}
+		o->mode = Addressing_Invalid;
+		o->expr = node;
+		return kind;
+	}
+
+	if (ie->index == nullptr) {
+		gbString str = expr_to_string(o->expr);
+		error(o->expr, "Missing index for '%s'", str);
+		gb_string_free(str);
+		o->mode = Addressing_Invalid;
+		o->expr = node;
+		return kind;
+	}
+
+	Type *index_type_hint = nullptr;
+	if (is_type_enumerated_array(t)) {
+		Type *bt = base_type(t);
+		GB_ASSERT(bt->kind == Type_EnumeratedArray);
+		index_type_hint = bt->EnumeratedArray.index;
+	}
+
+	i64 index = 0;
+	bool ok = check_index_value(c, t, false, ie->index, max_count, &index, index_type_hint);
+	if (is_const) {
+		if (index < 0) {
+			gbString str = expr_to_string(o->expr);
+			error(o->expr, "Cannot index a constant '%s'", str);
+			error_line("\tSuggestion: store the constant into a variable in order to index it with a variable index\n");
+			gb_string_free(str);
+			o->mode = Addressing_Invalid;
+			o->expr = node;
+			return kind;
+		} else if (ok) {
+			ExactValue value = type_and_value_of_expr(ie->expr).value;
+			o->mode = Addressing_Constant;
+			bool success = false;
+			bool finish = false;
+			o->value = get_constant_field_single(c, value, cast(i32)index, &success, &finish);
+			if (!success) {
+				gbString str = expr_to_string(o->expr);
+				error(o->expr, "Cannot index a constant '%s' with index %lld", str, cast(long long)index);
+				error_line("\tSuggestion: store the constant into a variable in order to index it with a variable index\n");
+				gb_string_free(str);
+				o->mode = Addressing_Invalid;
+				o->expr = node;
+				return kind;
+			}
+		}
+	}
+
+	if (type_hint != nullptr && is_type_matrix(t)) {
+		// TODO(bill): allow matrix columns to be assignable to other types which are the same internally
+		// if a type hint exists
+	}
+	return kind;
+}
+
+ExprKind check_slice_expr(CheckerContext *c, Operand *o, Ast *node, Type *type_hint) {
+	ExprKind kind = Expr_Stmt;
+	ast_node(se, SliceExpr, node);
+	check_expr(c, o, se->expr);
+	node->viral_state_flags |= se->expr->viral_state_flags;
+
+	if (o->mode == Addressing_Invalid) {
+		o->mode = Addressing_Invalid;
+		o->expr = node;
+		return kind;
+	}
+
+	bool valid = false;
+	i64 max_count = -1;
+	Type *t = base_type(type_deref(o->type));
+	switch (t->kind) {
+	case Type_Basic:
+		if (t->Basic.kind == Basic_string || t->Basic.kind == Basic_UntypedString) {
+			valid = true;
+			if (o->mode == Addressing_Constant) {
+				max_count = o->value.value_string.len;
+			}
+			o->type = type_deref(o->type);
+		}
+		break;
+
+	case Type_Array:
+		valid = true;
+		max_count = t->Array.count;
+		if (o->mode != Addressing_Variable && !is_type_pointer(o->type)) {
+			gbString str = expr_to_string(node);
+			error(node, "Cannot slice array '%s', value is not addressable", str);
+			gb_string_free(str);
+			o->mode = Addressing_Invalid;
+			o->expr = node;
+			return kind;
+		}
+		o->type = alloc_type_slice(t->Array.elem);
+		break;
+
+	case Type_MultiPointer:
+		valid = true;
+		o->type = type_deref(o->type);
+		break;
+
+	case Type_Slice:
+		valid = true;
+		o->type = type_deref(o->type);
+		break;
+
+	case Type_DynamicArray:
+		valid = true;
+		o->type = alloc_type_slice(t->DynamicArray.elem);
+		break;
+
+	case Type_Struct:
+		if (is_type_soa_struct(t)) {
+			valid = true;
+			o->type = make_soa_struct_slice(c, nullptr, nullptr, t->Struct.soa_elem);
+		}
+		break;
+
+	case Type_RelativeSlice:
+		valid = true;
+		o->type = t->RelativeSlice.slice_type;
+		if (o->mode != Addressing_Variable) {
+			gbString str = expr_to_string(node);
+			error(node, "Cannot relative slice '%s', value is not addressable", str);
+			gb_string_free(str);
+			o->mode = Addressing_Invalid;
+			o->expr = node;
+			return kind;
+		}
+		break;
+	}
+
+	if (!valid) {
+		gbString str = expr_to_string(o->expr);
+		gbString type_str = type_to_string(o->type);
+		error(o->expr, "Cannot slice '%s' of type '%s'", str, type_str);
+		gb_string_free(type_str);
+		gb_string_free(str);
+		o->mode = Addressing_Invalid;
+		o->expr = node;
+		return kind;
+	}
+
+	if (se->low == nullptr && se->high != nullptr) {
+		// It is okay to continue as it will assume the 1st index is zero
+	}
+
+	i64 indices[2] = {};
+	Ast *nodes[2] = {se->low, se->high};
+	for (isize i = 0; i < gb_count_of(nodes); i++) {
+		i64 index = max_count;
+		if (nodes[i] != nullptr) {
+			i64 capacity = -1;
+			if (max_count >= 0) {
+				capacity = max_count;
+			}
+			i64 j = 0;
+			if (check_index_value(c, t, true, nodes[i], capacity, &j)) {
+				index = j;
+			}
+
+			node->viral_state_flags |= nodes[i]->viral_state_flags;
+		} else if (i == 0) {
+			index = 0;
+		}
+		indices[i] = index;
+	}
+
+	for (isize i = 0; i < gb_count_of(indices); i++) {
+		i64 a = indices[i];
+		for (isize j = i+1; j < gb_count_of(indices); j++) {
+			i64 b = indices[j];
+			if (a > b && b >= 0) {
+				error(se->close, "Invalid slice indices: [%td > %td]", a, b);
+			}
+		}
+	}
+
+	if (max_count < 0)  {
+		if (o->mode == Addressing_Constant) {
+			gbString s = expr_to_string(se->expr);
+			error(se->expr, "Cannot slice constant value '%s'", s);
+			gb_string_free(s);
+		}
+	}
+
+	if (t->kind == Type_MultiPointer && se->high != nullptr) {
+		/*
+			x[:]   -> [^]T
+			x[i:]  -> [^]T
+			x[:n]  -> []T
+			x[i:n] -> []T
+		*/
+		o->type = alloc_type_slice(t->MultiPointer.elem);
+	}
+
+	o->mode = Addressing_Value;
+
+	if (is_type_string(t) && max_count >= 0) {
+		bool all_constant = true;
+		for (isize i = 0; i < gb_count_of(nodes); i++) {
+			if (nodes[i] != nullptr) {
+				TypeAndValue tav = type_and_value_of_expr(nodes[i]);
+				if (tav.mode != Addressing_Constant) {
+					all_constant = false;
+					break;
+				}
+			}
+		}
+		if (!all_constant) {
+			gbString str = expr_to_string(o->expr);
+			error(o->expr, "Cannot slice '%s' with non-constant indices", str);
+			error_line("\tSuggestion: store the constant into a variable in order to index it with a variable index\n");
+			gb_string_free(str);
+			o->mode = Addressing_Value; // NOTE(bill): Keep subsequent values going without erring
+			o->expr = node;
+			return kind;
+		}
+
+		String s = {};
+		if (o->value.kind == ExactValue_String) {
+			s = o->value.value_string;
+		}
+
+		o->mode = Addressing_Constant;
+		o->type = t;
+		o->value = exact_value_string(substring(s, cast(isize)indices[0], cast(isize)indices[1]));
+	}
+	return kind;
+}
+
 ExprKind check_expr_base_internal(CheckerContext *c, Operand *o, Ast *node, Type *type_hint) {
 	u32 prev_state_flags = c->state_flags;
 	defer (c->state_flags = prev_state_flags);
@@ -6830,6 +9059,14 @@ ExprKind check_expr_base_internal(CheckerContext *c, Operand *o, Ast *node, Type
 			out &= ~StateFlag_no_bounds_check;
 		}
 
+		if (in & StateFlag_no_type_assert) {
+			out |= StateFlag_no_type_assert;
+			out &= ~StateFlag_type_assert;
+		} else if (in & StateFlag_type_assert) {
+			out |= StateFlag_type_assert;
+			out &= ~StateFlag_no_type_assert;
+		}
+
 		c->state_flags = out;
 	}
 
@@ -6837,6 +9074,7 @@ ExprKind check_expr_base_internal(CheckerContext *c, Operand *o, Ast *node, Type
 
 	o->mode = Addressing_Invalid;
 	o->type = t_invalid;
+	o->value = {ExactValue_Invalid};
 
 	switch (node->kind) {
 	default:
@@ -6909,52 +9147,7 @@ ExprKind check_expr_base_internal(CheckerContext *c, Operand *o, Ast *node, Type
 	case_end;
 
 	case_ast_node(bd, BasicDirective, node);
-		o->mode = Addressing_Constant;
-		String name = bd->name.string;
-		if (name == "file") {
-			o->type = t_untyped_string;
-			o->value = exact_value_string(get_file_path_string(bd->token.pos.file_id));
-		} else if (name == "line") {
-			o->type = t_untyped_integer;
-			o->value = exact_value_i64(bd->token.pos.line);
-		} else if (name == "procedure") {
-			if (c->curr_proc_decl == nullptr) {
-				error(node, "#procedure may only be used within procedures");
-				o->type = t_untyped_string;
-				o->value = exact_value_string(str_lit(""));
-			} else {
-				o->type = t_untyped_string;
-				o->value = exact_value_string(c->proc_name);
-			}
-		} else if (name == "caller_location") {
-			init_core_source_code_location(c->checker);
-			error(node, "#caller_location may only be used as a default argument parameter");
-			o->type = t_source_code_location;
-			o->mode = Addressing_Value;
-		} else {
-			if (name == "location") {
-				init_core_source_code_location(c->checker);
-				error(node, "'#%.*s' must be used in a call expression", LIT(name));
-				o->type = t_source_code_location;
-				o->mode = Addressing_Value;
-			} else if (
-			    name == "assert" ||
-			    name == "defined" ||
-			    name == "config" ||
-			    name == "load" ||
-			    name == "load_hash" ||
-			    name == "load_or"
-			) {
-				error(node, "'#%.*s' must be used as a call", LIT(name));
-				o->type = t_invalid;
-				o->mode = Addressing_Invalid;
-			} else {
-				error(node, "Unknown directive: #%.*s", LIT(name));
-				o->type = t_invalid;
-				o->mode = Addressing_Invalid;
-			}
-			
-		}
+		kind = check_basic_directive_expr(c, o, node, type_hint);
 	case_end;
 
 	case_ast_node(pg, ProcGroup, node);
@@ -7003,1102 +9196,23 @@ ExprKind check_expr_base_internal(CheckerContext *c, Operand *o, Ast *node, Type
 	case_end;
 
 	case_ast_node(te, TernaryIfExpr, node);
-		Operand cond = {Addressing_Invalid};
-		check_expr(c, &cond, te->cond);
-		node->viral_state_flags |= te->cond->viral_state_flags;
-
-		if (cond.mode != Addressing_Invalid && !is_type_boolean(cond.type)) {
-			error(te->cond, "Non-boolean condition in ternary if expression");
-		}
-
-		Operand x = {Addressing_Invalid};
-		Operand y = {Addressing_Invalid};
-		check_expr_or_type(c, &x, te->x, type_hint);
-		node->viral_state_flags |= te->x->viral_state_flags;
-
-		if (te->y != nullptr) {
-			check_expr_or_type(c, &y, te->y, type_hint);
-			node->viral_state_flags |= te->y->viral_state_flags;
-		} else {
-			error(node, "A ternary expression must have an else clause");
-			return kind;
-		}
-
-		if (x.type == nullptr || x.type == t_invalid ||
-		    y.type == nullptr || y.type == t_invalid) {
-			return kind;
-		}
-
-		convert_to_typed(c, &x, y.type);
-		if (x.mode == Addressing_Invalid) {
-			return kind;
-		}
-		convert_to_typed(c, &y, x.type);
-		if (y.mode == Addressing_Invalid) {
-			x.mode = Addressing_Invalid;
-			return kind;
-		}
-
-		if (!ternary_compare_types(x.type, y.type)) {
-			gbString its = type_to_string(x.type);
-			gbString ets = type_to_string(y.type);
-			error(node, "Mismatched types in ternary if expression, %s vs %s", its, ets);
-			gb_string_free(ets);
-			gb_string_free(its);
-			return kind;
-		}
-
-		o->type = x.type;
-		if (is_type_untyped_nil(o->type) || is_type_untyped_undef(o->type)) {
-			o->type = y.type;
-		}
-
-		o->mode = Addressing_Value;
-		o->expr = node;
-		if (type_hint != nullptr && is_type_untyped(o->type)) {
-			if (check_cast_internal(c, &x, type_hint) &&
-			    check_cast_internal(c, &y, type_hint)) {
-				convert_to_typed(c, o, type_hint);
-				update_untyped_expr_type(c, node, type_hint, !is_type_untyped(type_hint));
-			}
-		}
+		kind = check_ternary_if_expr(c, o, node, type_hint);
 	case_end;
 
 	case_ast_node(te, TernaryWhenExpr, node);
-		Operand cond = {};
-		check_expr(c, &cond, te->cond);
-		node->viral_state_flags |= te->cond->viral_state_flags;
-
-		if (cond.mode != Addressing_Constant || !is_type_boolean(cond.type)) {
-			error(te->cond, "Expected a constant boolean condition in ternary when expression");
-			return kind;
-		}
-
-		if (cond.value.value_bool) {
-			check_expr_or_type(c, o, te->x, type_hint);
-			node->viral_state_flags |= te->x->viral_state_flags;
-		} else {
-			if (te->y != nullptr) {
-				check_expr_or_type(c, o, te->y, type_hint);
-				node->viral_state_flags |= te->y->viral_state_flags;
-			} else {
-				error(node, "A ternary when expression must have an else clause");
-				return kind;
-			}
-		}
+		kind = check_ternary_when_expr(c, o, node, type_hint);
 	case_end;
 
 	case_ast_node(oe, OrElseExpr, node);
-		String name = oe->token.string;
-		Ast *arg = oe->x;
-		Ast *default_value = oe->y;
-
-		Operand x = {};
-		Operand y = {};
-		check_multi_expr_with_type_hint(c, &x, arg, type_hint);
-		if (x.mode == Addressing_Invalid) {
-			o->mode = Addressing_Value;
-			o->type = t_invalid;
-			o->expr = node;
-			return Expr_Expr;
-		}
-
-		check_multi_expr_with_type_hint(c, &y, default_value, x.type);
-		error_operand_no_value(&y);
-		if (y.mode == Addressing_Invalid) {
-			o->mode = Addressing_Value;
-			o->type = t_invalid;
-			o->expr = node;
-			return Expr_Expr;
-		}
-
-		Type *left_type = nullptr;
-		Type *right_type = nullptr;
-		check_or_else_split_types(c, &x, name, &left_type, &right_type);
-		add_type_and_value(&c->checker->info, arg, x.mode, x.type, x.value);
-
-		if (left_type != nullptr) {
-			check_assignment(c, &y, left_type, name);
-		} else {
-			check_or_else_expr_no_value_error(c, name, x, type_hint);
-		}
-
-		if (left_type == nullptr) {
-			left_type = t_invalid;
-		}
-		o->mode = Addressing_Value;
-		o->type = left_type;
-		o->expr = node;
-		return Expr_Expr;
+		return check_or_else_expr(c, o, node, type_hint);
 	case_end;
 
 	case_ast_node(re, OrReturnExpr, node);
-		String name = re->token.string;
-		Operand x = {};
-		check_multi_expr_with_type_hint(c, &x, re->expr, type_hint);
-		if (x.mode == Addressing_Invalid) {
-			o->mode = Addressing_Value;
-			o->type = t_invalid;
-			o->expr = node;
-			return Expr_Expr;
-		}
-
-		Type *left_type = nullptr;
-		Type *right_type = nullptr;
-		check_or_return_split_types(c, &x, name, &left_type, &right_type);
-		add_type_and_value(&c->checker->info, re->expr, x.mode, x.type, x.value);
-
-		if (right_type == nullptr) {
-			check_or_else_expr_no_value_error(c, name, x, type_hint);
-		} else {
-			Type *proc_type = base_type(c->curr_proc_sig);
-			GB_ASSERT(proc_type->kind == Type_Proc);
-			Type *result_type = proc_type->Proc.results;
-			if (result_type == nullptr) {
-				error(node, "'%.*s' requires the current procedure to have at least one return value", LIT(name));
-			} else {
-				GB_ASSERT(result_type->kind == Type_Tuple);
-
-				auto const &vars = result_type->Tuple.variables;
-				Type *end_type = vars[vars.count-1]->type;
-
-				if (vars.count > 1) {
-					if (!proc_type->Proc.has_named_results) {
-						error(node, "'%.*s' within a procedure with more than 1 return value requires that the return values are named, allowing for early return", LIT(name));
-					}
-				}
-
-				Operand rhs = {};
-				rhs.type = right_type;
-				rhs.mode = Addressing_Value;
-
-				// TODO(bill): better error message
-				if (!check_is_assignable_to(c, &rhs, end_type)) {
-					gbString a = type_to_string(right_type);
-					gbString b = type_to_string(end_type);
-					gbString ret_type = type_to_string(result_type);
-					error(node, "Cannot assign end value of type '%s' to '%s' in '%.*s'", a, b, LIT(name));
-					if (vars.count == 1) {
-						error_line("\tProcedure return value type: %s\n", ret_type);
-					} else {
-						error_line("\tProcedure return value types: (%s)\n", ret_type);
-					}
-					gb_string_free(ret_type);
-					gb_string_free(b);
-					gb_string_free(a);
-				}
-			}
-		}
-
-		o->expr = node;
-		o->type = left_type;
-		if (left_type != nullptr) {
-			o->mode = Addressing_Value;
-		} else {
-			o->mode = Addressing_NoValue;
-		}
-
-		if (c->curr_proc_sig == nullptr) {
-			error(node, "'%.*s' can only be used within a procedure", LIT(name));
-		}
-		
-		if (c->in_defer) {
-			error(node, "'or_return' cannot be used within a defer statement");
-		}
-
-		return Expr_Expr;
+		return check_or_return_expr(c, o, node, type_hint);
 	case_end;
 
 	case_ast_node(cl, CompoundLit, node);
-		Type *type = type_hint;
-		if (type != nullptr && is_type_untyped(type)) {
-			type = nullptr;
-		}
-		bool is_to_be_determined_array_count = false;
-		bool is_constant = true;
-		if (cl->type != nullptr) {
-			type = nullptr;
-
-			// [?]Type
-			if (cl->type->kind == Ast_ArrayType && cl->type->ArrayType.count != nullptr) {
-				Ast *count = cl->type->ArrayType.count;
-				if (count->kind == Ast_UnaryExpr &&
-				    count->UnaryExpr.op.kind == Token_Question) {
-					type = alloc_type_array(check_type(c, cl->type->ArrayType.elem), -1);
-					is_to_be_determined_array_count = true;
-				}
-				if (cl->elems.count > 0) {
-					if (cl->type->ArrayType.tag != nullptr) {
-						Ast *tag = cl->type->ArrayType.tag;
-						GB_ASSERT(tag->kind == Ast_BasicDirective);
-						String name = tag->BasicDirective.name.string;
-						if (name == "soa") {
-							error(node, "#soa arrays are not supported for compound literals");
-							return kind;
-						}
-					}
-				}
-			}
-			if (cl->type->kind == Ast_DynamicArrayType && cl->type->DynamicArrayType.tag != nullptr) {
-				if (cl->elems.count > 0) {
-					Ast *tag = cl->type->DynamicArrayType.tag;
-					GB_ASSERT(tag->kind == Ast_BasicDirective);
-					String name = tag->BasicDirective.name.string;
-					if (name == "soa") {
-						error(node, "#soa arrays are not supported for compound literals");
-						return kind;
-					}
-				}
-			}
-
-			if (type == nullptr) {
-				type = check_type(c, cl->type);
-			}
-		}
-
-		if (type == nullptr) {
-			error(node, "Missing type in compound literal");
-			return kind;
-		}
-
-
-		Type *t = base_type(type);
-		if (is_type_polymorphic(t)) {
-			gbString str = type_to_string(type);
-			error(node, "Cannot use a polymorphic type for a compound literal, got '%s'", str);
-			o->expr = node;
-			o->type = type;
-			gb_string_free(str);
-			return kind;
-		}
-
-
-		switch (t->kind) {
-		case Type_Struct: {
-			if (cl->elems.count == 0) {
-				break; // NOTE(bill): No need to init
-			}
-			if (t->Struct.is_raw_union) {
-				if (cl->elems.count > 0) {
-					// NOTE: unions cannot be constant
-					is_constant = false;
-
-					if (cl->elems[0]->kind != Ast_FieldValue) {
-						gbString type_str = type_to_string(type);
-						error(node, "%s ('struct #raw_union') compound literals are only allowed to contain 'field = value' elements", type_str);
-						gb_string_free(type_str);
-					} else {
-						if (cl->elems.count != 1) {
-							gbString type_str = type_to_string(type);
-							error(node, "%s ('struct #raw_union') compound literals are only allowed to contain up to 1 'field = value' element, got %td", type_str, cl->elems.count);
-							gb_string_free(type_str);
-						} else {
-							Ast *elem = cl->elems[0];
-							ast_node(fv, FieldValue, elem);
-							if (fv->field->kind != Ast_Ident) {
-								gbString expr_str = expr_to_string(fv->field);
-								error(elem, "Invalid field name '%s' in structure literal", expr_str);
-								gb_string_free(expr_str);
-								break;
-							}
-
-							String name = fv->field->Ident.token.string;
-
-							Selection sel = lookup_field(type, name, o->mode == Addressing_Type);
-							bool is_unknown = sel.entity == nullptr;
-							if (is_unknown) {
-								error(elem, "Unknown field '%.*s' in structure literal", LIT(name));
-								break;
-							}
-
-							if (sel.index.count > 1) {
-								error(elem, "Cannot assign to an anonymous field '%.*s' in a structure literal (at the moment)", LIT(name));
-								break;
-							}
-
-							Entity *field = t->Struct.fields[sel.index[0]];
-							add_entity_use(c, fv->field, field);
-
-							Operand o = {};
-							check_expr_or_type(c, &o, fv->value, field->type);
-
-
-							check_assignment(c, &o, field->type, str_lit("structure literal"));
-						}
-
-					}
-				}
-				break;
-			}
-
-
-			isize field_count = t->Struct.fields.count;
-			isize min_field_count = t->Struct.fields.count;
-			for (isize i = min_field_count-1; i >= 0; i--) {
-				Entity *e = t->Struct.fields[i];
-				GB_ASSERT(e->kind == Entity_Variable);
-				if (e->Variable.param_value.kind != ParameterValue_Invalid) {
-					min_field_count--;
-				} else {
-					break;
-				}
-			}
-
-			if (cl->elems[0]->kind == Ast_FieldValue) {
-				bool *fields_visited = gb_alloc_array(temporary_allocator(), bool, field_count);
-
-				for_array(i, cl->elems) {
-					Ast *elem = cl->elems[i];
-					if (elem->kind != Ast_FieldValue) {
-						error(elem, "Mixture of 'field = value' and value elements in a literal is not allowed");
-						continue;
-					}
-					ast_node(fv, FieldValue, elem);
-					if (fv->field->kind != Ast_Ident) {
-						gbString expr_str = expr_to_string(fv->field);
-						error(elem, "Invalid field name '%s' in structure literal", expr_str);
-						gb_string_free(expr_str);
-						continue;
-					}
-					String name = fv->field->Ident.token.string;
-
-					Selection sel = lookup_field(type, name, o->mode == Addressing_Type);
-					bool is_unknown = sel.entity == nullptr;
-					if (is_unknown) {
-						error(elem, "Unknown field '%.*s' in structure literal", LIT(name));
-						continue;
-					}
-
-					if (sel.index.count > 1) {
-						error(elem, "Cannot assign to an anonymous field '%.*s' in a structure literal (at the moment)", LIT(name));
-						continue;
-					}
-
-					Entity *field = t->Struct.fields[sel.index[0]];
-					add_entity_use(c, fv->field, field);
-
-					if (fields_visited[sel.index[0]]) {
-						error(elem, "Duplicate field '%.*s' in structure literal", LIT(name));
-						continue;
-					}
-
-					fields_visited[sel.index[0]] = true;
-
-					Operand o = {};
-					check_expr_or_type(c, &o, fv->value, field->type);
-
-					if (is_type_any(field->type) || is_type_union(field->type) || is_type_raw_union(field->type) || is_type_typeid(field->type)) {
-						is_constant = false;
-					}
-					if (is_constant) {
-						is_constant = check_is_operand_compound_lit_constant(c, &o);
-					}
-
-					check_assignment(c, &o, field->type, str_lit("structure literal"));
-				}
-			} else {
-				bool seen_field_value = false;
-
-				for_array(index, cl->elems) {
-					Entity *field = nullptr;
-					Ast *elem = cl->elems[index];
-					if (elem->kind == Ast_FieldValue) {
-						seen_field_value = true;
-						error(elem, "Mixture of 'field = value' and value elements in a literal is not allowed");
-						continue;
-					} else if (seen_field_value) {
-						error(elem, "Value elements cannot be used after a 'field = value'");
-						continue;
-					}
-					if (index >= field_count) {
-						error(elem, "Too many values in structure literal, expected %td, got %td", field_count, cl->elems.count);
-						break;
-					}
-
-					if (field == nullptr) {
-						field = t->Struct.fields[index];
-					}
-
-					Operand o = {};
-					check_expr_or_type(c, &o, elem, field->type);
-
-					if (is_type_any(field->type) || is_type_union(field->type) || is_type_raw_union(field->type) || is_type_typeid(field->type)) {
-						is_constant = false;
-					}
-					if (is_constant) {
-						is_constant = check_is_operand_compound_lit_constant(c, &o);
-					}
-
-					check_assignment(c, &o, field->type, str_lit("structure literal"));
-				}
-				if (cl->elems.count < field_count) {
-					if (min_field_count < field_count) {
-					    if (cl->elems.count < min_field_count) {
-							error(cl->close, "Too few values in structure literal, expected at least %td, got %td", min_field_count, cl->elems.count);
-					    }
-					} else {
-						error(cl->close, "Too few values in structure literal, expected %td, got %td", field_count, cl->elems.count);
-					}
-				}
-			}
-
-			break;
-		}
-
-		case Type_Slice:
-		case Type_Array:
-		case Type_DynamicArray:
-		case Type_SimdVector:
-		case Type_Matrix:
-		{
-			Type *elem_type = nullptr;
-			String context_name = {};
-			i64 max_type_count = -1;
-			if (t->kind == Type_Slice) {
-				elem_type = t->Slice.elem;
-				context_name = str_lit("slice literal");
-			} else if (t->kind == Type_Array) {
-				elem_type = t->Array.elem;
-				context_name = str_lit("array literal");
-				if (!is_to_be_determined_array_count) {
-					max_type_count = t->Array.count;
-				}
-			} else if (t->kind == Type_DynamicArray) {
-				elem_type = t->DynamicArray.elem;
-				context_name = str_lit("dynamic array literal");
-				is_constant = false;
-
-				if (!build_context.no_dynamic_literals) {
-					add_package_dependency(c, "runtime", "__dynamic_array_reserve");
-					add_package_dependency(c, "runtime", "__dynamic_array_append");
-				}
-			} else if (t->kind == Type_SimdVector) {
-				elem_type = t->SimdVector.elem;
-				context_name = str_lit("simd vector literal");
-				max_type_count = t->SimdVector.count;
-			} else if (t->kind == Type_Matrix) {
-				elem_type = t->Matrix.elem;
-				context_name = str_lit("matrix literal");
-				max_type_count = t->Matrix.row_count*t->Matrix.column_count;
-			} else {
-				GB_PANIC("unreachable");
-			}
-
-
-			i64 max = 0;
-
-			Type *bet = base_type(elem_type);
-			if (!elem_type_can_be_constant(bet)) {
-				is_constant = false;
-			}
-
-			if (bet == t_invalid) {
-				break;
-			}
-
-			if (cl->elems.count > 0 && cl->elems[0]->kind == Ast_FieldValue) {
-				if (is_type_simd_vector(t)) {
-					error(cl->elems[0], "'field = value' is not allowed for SIMD vector literals");
-				} else {
-					RangeCache rc = range_cache_make(heap_allocator());
-					defer (range_cache_destroy(&rc));
-
-					for_array(i, cl->elems) {
-						Ast *elem = cl->elems[i];
-						if (elem->kind != Ast_FieldValue) {
-							error(elem, "Mixture of 'field = value' and value elements in a literal is not allowed");
-							continue;
-						}
-						ast_node(fv, FieldValue, elem);
-
-						if (is_ast_range(fv->field)) {
-							Token op = fv->field->BinaryExpr.op;
-
-							Operand x = {};
-							Operand y = {};
-							bool ok = check_range(c, fv->field, &x, &y, nullptr);
-							if (!ok) {
-								continue;
-							}
-							if (x.mode != Addressing_Constant || !is_type_integer(core_type(x.type))) {
-								error(x.expr, "Expected a constant integer as an array field");
-								continue;
-							}
-
-							if (y.mode != Addressing_Constant || !is_type_integer(core_type(y.type))) {
-								error(y.expr, "Expected a constant integer as an array field");
-								continue;
-							}
-
-							i64 lo = exact_value_to_i64(x.value);
-							i64 hi = exact_value_to_i64(y.value);
-							i64 max_index = hi;
-							if (op.kind == Token_RangeHalf) { // ..< (exclusive)
-								hi -= 1;
-							} else { // .. (inclusive)
-								max_index += 1;
-							}
-
-							bool new_range = range_cache_add_range(&rc, lo, hi);
-							if (!new_range) {
-								error(elem, "Overlapping field range index %lld %.*s %lld for %.*s", lo, LIT(op.string), hi, LIT(context_name));
-								continue;
-							}
-
-
-							if (max_type_count >= 0 && (lo < 0 || lo >= max_type_count)) {
-								error(elem, "Index %lld is out of bounds (0..<%lld) for %.*s", lo, max_type_count, LIT(context_name));
-								continue;
-							}
-							if (max_type_count >= 0 && (hi < 0 || hi >= max_type_count)) {
-								error(elem, "Index %lld is out of bounds (0..<%lld) for %.*s", hi, max_type_count, LIT(context_name));
-								continue;
-							}
-
-							if (max < hi) {
-								max = max_index;
-							}
-
-							Operand operand = {};
-							check_expr_with_type_hint(c, &operand, fv->value, elem_type);
-							check_assignment(c, &operand, elem_type, context_name);
-
-							is_constant = is_constant && operand.mode == Addressing_Constant;
-						} else {
-							Operand op_index = {};
-							check_expr(c, &op_index, fv->field);
-
-							if (op_index.mode != Addressing_Constant || !is_type_integer(core_type(op_index.type))) {
-								error(elem, "Expected a constant integer as an array field");
-								continue;
-							}
-							// add_type_and_value(c->info, op_index.expr, op_index.mode, op_index.type, op_index.value);
-
-							i64 index = exact_value_to_i64(op_index.value);
-
-							if (max_type_count >= 0 && (index < 0 || index >= max_type_count)) {
-								error(elem, "Index %lld is out of bounds (0..<%lld) for %.*s", index, max_type_count, LIT(context_name));
-								continue;
-							}
-
-							bool new_index = range_cache_add_index(&rc, index);
-							if (!new_index) {
-								error(elem, "Duplicate field index %lld for %.*s", index, LIT(context_name));
-								continue;
-							}
-
-							if (max < index+1) {
-								max = index+1;
-							}
-
-							Operand operand = {};
-							check_expr_with_type_hint(c, &operand, fv->value, elem_type);
-							check_assignment(c, &operand, elem_type, context_name);
-
-							is_constant = is_constant && operand.mode == Addressing_Constant;
-						}
-					}
-
-					cl->max_count = max;
-				}
-
-			} else {
-				isize index = 0;
-				for (; index < cl->elems.count; index++) {
-					Ast *e = cl->elems[index];
-					if (e == nullptr) {
-						error(node, "Invalid literal element");
-						continue;
-					}
-
-					if (e->kind == Ast_FieldValue) {
-						error(e, "Mixture of 'field = value' and value elements in a literal is not allowed");
-						continue;
-					}
-
-					if (0 <= max_type_count && max_type_count <= index) {
-						error(e, "Index %lld is out of bounds (>= %lld) for %.*s", index, max_type_count, LIT(context_name));
-					}
-
-					Operand operand = {};
-					check_expr_with_type_hint(c, &operand, e, elem_type);
-					check_assignment(c, &operand, elem_type, context_name);
-
-					is_constant = is_constant && operand.mode == Addressing_Constant;
-				}
-
-				if (max < index) {
-					max = index;
-				}
-			}
-
-
-			if (t->kind == Type_Array) {
-				if (is_to_be_determined_array_count) {
-					t->Array.count = max;
-				} else if (cl->elems.count > 0 && cl->elems[0]->kind != Ast_FieldValue) {
-					if (0 < max && max < t->Array.count) {
-						error(node, "Expected %lld values for this array literal, got %lld", cast(long long)t->Array.count, cast(long long)max);
-					}
-				}
-			}
-
-
-			if (t->kind == Type_SimdVector) {
-				if (!is_constant) {
-					error(node, "Expected all constant elements for a simd vector");
-				}
-			}
-
-
-			if (t->kind == Type_DynamicArray) {
-				if (build_context.no_dynamic_literals && cl->elems.count) {
-					error(node, "Compound literals of dynamic types have been disabled");
-				}
-			}
-
-			break;
-		}
-
-		case Type_EnumeratedArray:
-		{
-			Type *elem_type = t->EnumeratedArray.elem;
-			Type *index_type = t->EnumeratedArray.index;
-			String context_name = str_lit("enumerated array literal");
-			i64 max_type_count = t->EnumeratedArray.count;
-
-			gbString index_type_str = type_to_string(index_type);
-			defer (gb_string_free(index_type_str));
-
-			i64 total_lo = exact_value_to_i64(*t->EnumeratedArray.min_value);
-			i64 total_hi = exact_value_to_i64(*t->EnumeratedArray.max_value);
-
-			String total_lo_string = {};
-			String total_hi_string = {};
-			GB_ASSERT(is_type_enum(index_type));
-			{
-				Type *bt = base_type(index_type);
-				GB_ASSERT(bt->kind == Type_Enum);
-				for_array(i, bt->Enum.fields) {
-					Entity *f = bt->Enum.fields[i];
-					if (f->kind != Entity_Constant) {
-						continue;
-					}
-					if (total_lo_string.len == 0 && compare_exact_values(Token_CmpEq, f->Constant.value, *t->EnumeratedArray.min_value)) {
-						total_lo_string = f->token.string;
-					}
-					if (total_hi_string.len == 0 && compare_exact_values(Token_CmpEq, f->Constant.value, *t->EnumeratedArray.max_value)) {
-						total_hi_string = f->token.string;
-					}
-					if (total_lo_string.len != 0 && total_hi_string.len != 0) {
-						break;
-					}
-				}
-			}
-
-			i64 max = 0;
-
-			Type *bet = base_type(elem_type);
-			if (!elem_type_can_be_constant(bet)) {
-				is_constant = false;
-			}
-
-			if (bet == t_invalid) {
-				break;
-			}
-
-			if (cl->elems.count > 0 && cl->elems[0]->kind == Ast_FieldValue) {
-				RangeCache rc = range_cache_make(heap_allocator());
-				defer (range_cache_destroy(&rc));
-
-				for_array(i, cl->elems) {
-					Ast *elem = cl->elems[i];
-					if (elem->kind != Ast_FieldValue) {
-						error(elem, "Mixture of 'field = value' and value elements in a literal is not allowed");
-						continue;
-					}
-					ast_node(fv, FieldValue, elem);
-
-					if (is_ast_range(fv->field)) {
-						Token op = fv->field->BinaryExpr.op;
-
-						Operand x = {};
-						Operand y = {};
-						bool ok = check_range(c, fv->field, &x, &y, nullptr, index_type);
-						if (!ok) {
-							continue;
-						}
-						if (x.mode != Addressing_Constant || !are_types_identical(x.type, index_type)) {
-							error(x.expr, "Expected a constant enum of type '%s' as an array field", index_type_str);
-							continue;
-						}
-
-						if (y.mode != Addressing_Constant || !are_types_identical(x.type, index_type)) {
-							error(y.expr, "Expected a constant enum of type '%s' as an array field", index_type_str);
-							continue;
-						}
-
-						i64 lo = exact_value_to_i64(x.value);
-						i64 hi = exact_value_to_i64(y.value);
-						i64 max_index = hi;
-						if (op.kind == Token_RangeHalf) {
-							hi -= 1;
-						}
-
-						bool new_range = range_cache_add_range(&rc, lo, hi);
-						if (!new_range) {
-							gbString lo_str = expr_to_string(x.expr);
-							gbString hi_str = expr_to_string(y.expr);
-							error(elem, "Overlapping field range index %s %.*s %s for %.*s", lo_str, LIT(op.string), hi_str, LIT(context_name));
-							gb_string_free(hi_str);
-							gb_string_free(lo_str);
-							continue;
-						}
-
-
-						// NOTE(bill): These are sanity checks for invalid enum values
-						if (max_type_count >= 0 && (lo < total_lo || lo > total_hi)) {
-							gbString lo_str = expr_to_string(x.expr);
-							error(elem, "Index %s is out of bounds (%.*s .. %.*s) for %.*s", lo_str, LIT(total_lo_string), LIT(total_hi_string), LIT(context_name));
-							gb_string_free(lo_str);
-							continue;
-						}
-						if (max_type_count >= 0 && (hi < 0 || hi > total_hi)) {
-							gbString hi_str = expr_to_string(y.expr);
-							error(elem, "Index %s is out of bounds (%.*s .. %.*s) for %.*s", hi_str, LIT(total_lo_string), LIT(total_hi_string), LIT(context_name));
-							gb_string_free(hi_str);
-							continue;
-						}
-
-						if (max < hi) {
-							max = max_index;
-						}
-
-						Operand operand = {};
-						check_expr_with_type_hint(c, &operand, fv->value, elem_type);
-						check_assignment(c, &operand, elem_type, context_name);
-
-						is_constant = is_constant && operand.mode == Addressing_Constant;
-					} else {
-						Operand op_index = {};
-						check_expr_with_type_hint(c, &op_index, fv->field, index_type);
-
-						if (op_index.mode != Addressing_Constant || !are_types_identical(op_index.type, index_type)) {
-							error(op_index.expr, "Expected a constant enum of type '%s' as an array field", index_type_str);
-							continue;
-						}
-
-						i64 index = exact_value_to_i64(op_index.value);
-
-						if (max_type_count >= 0 && (index < total_lo || index > total_hi)) {
-							gbString idx_str = expr_to_string(op_index.expr);
-							error(elem, "Index %s is out of bounds (%.*s .. %.*s) for %.*s", idx_str, LIT(total_lo_string), LIT(total_hi_string), LIT(context_name));
-							gb_string_free(idx_str);
-							continue;
-						}
-
-						bool new_index = range_cache_add_index(&rc, index);
-						if (!new_index) {
-							gbString idx_str = expr_to_string(op_index.expr);
-							error(elem, "Duplicate field index %s for %.*s", idx_str, LIT(context_name));
-							gb_string_free(idx_str);
-							continue;
-						}
-
-						if (max < index+1) {
-							max = index+1;
-						}
-
-						Operand operand = {};
-						check_expr_with_type_hint(c, &operand, fv->value, elem_type);
-						check_assignment(c, &operand, elem_type, context_name);
-
-						is_constant = is_constant && operand.mode == Addressing_Constant;
-					}
-				}
-
-				cl->max_count = max;
-
-			} else {
-				isize index = 0;
-				for (; index < cl->elems.count; index++) {
-					Ast *e = cl->elems[index];
-					if (e == nullptr) {
-						error(node, "Invalid literal element");
-						continue;
-					}
-
-					if (e->kind == Ast_FieldValue) {
-						error(e, "Mixture of 'field = value' and value elements in a literal is not allowed");
-						continue;
-					}
-
-					if (0 <= max_type_count && max_type_count <= index) {
-						error(e, "Index %lld is out of bounds (>= %lld) for %.*s", index, max_type_count, LIT(context_name));
-					}
-
-					Operand operand = {};
-					check_expr_with_type_hint(c, &operand, e, elem_type);
-					check_assignment(c, &operand, elem_type, context_name);
-
-					is_constant = is_constant && operand.mode == Addressing_Constant;
-				}
-
-				if (max < index) {
-					max = index;
-				}
-			}
-
-			if (cl->elems.count > 0 && cl->elems[0]->kind != Ast_FieldValue) {
-				if (0 < max && max < t->EnumeratedArray.count) {
-					error(node, "Expected %lld values for this enumerated array literal, got %lld", cast(long long)t->EnumeratedArray.count, cast(long long)max);
-				} else {
-					error(node, "Enumerated array literals must only have 'field = value' elements, bare elements are not allowed");
-				}
-			}
-
-			break;
-		}
-
-		case Type_Basic: {
-			if (!is_type_any(t)) {
-				if (cl->elems.count != 0) {
-					error(node, "Illegal compound literal");
-				}
-				break;
-			}
-			if (cl->elems.count == 0) {
-				break; // NOTE(bill): No need to init
-			}
-			{ // Checker values
-				Type *field_types[2] = {t_rawptr, t_typeid};
-				isize field_count = 2;
-				if (cl->elems[0]->kind == Ast_FieldValue) {
-					bool fields_visited[2] = {};
-
-					for_array(i, cl->elems) {
-						Ast *elem = cl->elems[i];
-						if (elem->kind != Ast_FieldValue) {
-							error(elem, "Mixture of 'field = value' and value elements in a 'any' literal is not allowed");
-							continue;
-						}
-						ast_node(fv, FieldValue, elem);
-						if (fv->field->kind != Ast_Ident) {
-							gbString expr_str = expr_to_string(fv->field);
-							error(elem, "Invalid field name '%s' in 'any' literal", expr_str);
-							gb_string_free(expr_str);
-							continue;
-						}
-						String name = fv->field->Ident.token.string;
-
-						Selection sel = lookup_field(type, name, o->mode == Addressing_Type);
-						if (sel.entity == nullptr) {
-							error(elem, "Unknown field '%.*s' in 'any' literal", LIT(name));
-							continue;
-						}
-
-						isize index = sel.index[0];
-
-						if (fields_visited[index]) {
-							error(elem, "Duplicate field '%.*s' in 'any' literal", LIT(name));
-							continue;
-						}
-
-						fields_visited[index] = true;
-						check_expr(c, o, fv->value);
-
-						// NOTE(bill): 'any' literals can never be constant
-						is_constant = false;
-
-						check_assignment(c, o, field_types[index], str_lit("'any' literal"));
-					}
-				} else {
-					for_array(index, cl->elems) {
-						Ast *elem = cl->elems[index];
-						if (elem->kind == Ast_FieldValue) {
-							error(elem, "Mixture of 'field = value' and value elements in a 'any' literal is not allowed");
-							continue;
-						}
-
-
-						check_expr(c, o, elem);
-						if (index >= field_count) {
-							error(o->expr, "Too many values in 'any' literal, expected %td", field_count);
-							break;
-						}
-
-						// NOTE(bill): 'any' literals can never be constant
-						is_constant = false;
-
-						check_assignment(c, o, field_types[index], str_lit("'any' literal"));
-					}
-					if (cl->elems.count < field_count) {
-						error(cl->close, "Too few values in 'any' literal, expected %td, got %td", field_count, cl->elems.count);
-					}
-				}
-			}
-
-			break;
-		}
-
-		case Type_Map: {
-			if (cl->elems.count == 0) {
-				break;
-			}
-			is_constant = false;
-			{ // Checker values
-				bool key_is_typeid = is_type_typeid(t->Map.key);
-				bool value_is_typeid = is_type_typeid(t->Map.value);
-
-				for_array(i, cl->elems) {
-					Ast *elem = cl->elems[i];
-					if (elem->kind != Ast_FieldValue) {
-						error(elem, "Only 'field = value' elements are allowed in a map literal");
-						continue;
-					}
-					ast_node(fv, FieldValue, elem);
-
-					if (key_is_typeid) {
-						check_expr_or_type(c, o, fv->field, t->Map.key);
-					} else {
-						check_expr_with_type_hint(c, o, fv->field, t->Map.key);
-					}
-					check_assignment(c, o, t->Map.key, str_lit("map literal"));
-					if (o->mode == Addressing_Invalid) {
-						continue;
-					}
-
-					if (value_is_typeid) {
-						check_expr_or_type(c, o, fv->value, t->Map.value);
-					} else {
-						check_expr_with_type_hint(c, o, fv->value, t->Map.value);
-					}
-					check_assignment(c, o, t->Map.value, str_lit("map literal"));
-				}
-			}
-
-			if (build_context.no_dynamic_literals && cl->elems.count) {
-				error(node, "Compound literals of dynamic types have been disabled");
-			} else {
-				add_package_dependency(c, "runtime", "__dynamic_map_reserve");
-				add_package_dependency(c, "runtime", "__dynamic_map_set");
-			}
-			break;
-		}
-
-		case Type_BitSet: {
-			if (cl->elems.count == 0) {
-				break; // NOTE(bill): No need to init
-			}
-			Type *et = base_type(t->BitSet.elem);
-			isize field_count = 0;
-			if (et->kind == Type_Enum) {
-				field_count = et->Enum.fields.count;
-			}
-
-			if (cl->elems[0]->kind == Ast_FieldValue) {
-				error(cl->elems[0], "'field = value' in a bit_set a literal is not allowed");
-				is_constant = false;
-			} else {
-				for_array(index, cl->elems) {
-					Ast *elem = cl->elems[index];
-					if (elem->kind == Ast_FieldValue) {
-						error(elem, "'field = value' in a bit_set a literal is not allowed");
-						continue;
-					}
-
-					check_expr_with_type_hint(c, o, elem, et);
-
-					if (is_constant) {
-						is_constant = o->mode == Addressing_Constant;
-					}
-
-					check_assignment(c, o, t->BitSet.elem, str_lit("bit_set literal"));
-					if (o->mode == Addressing_Constant) {
-						i64 lower = t->BitSet.lower;
-						i64 upper = t->BitSet.upper;
-						i64 v = exact_value_to_i64(o->value);
-						if (lower <= v && v <= upper) {
-							// okay
-						} else {
-							error(elem, "Bit field value out of bounds, %lld not in the range %lld .. %lld", v, lower, upper);
-							continue;
-						}
-					}
-				}
-			}
-			break;
-		}
-
-		default: {
-			if (cl->elems.count == 0) {
-				break; // NOTE(bill): No need to init
-			}
-
-			gbString str = type_to_string(type);
-			error(node, "Invalid compound literal type '%s'", str);
-			gb_string_free(str);
-			return kind;
-		}
-		}
-
-		if (is_constant) {
-			o->mode = Addressing_Constant;
-
-			if (is_type_bit_set(type)) {
-				// NOTE(bill): Encode as an integer
-
-				i64 lower = base_type(type)->BitSet.lower;
-
-				u64 bits = 0;
-				for_array(index, cl->elems) {
-					Ast *elem = cl->elems[index];
-					GB_ASSERT(elem->kind != Ast_FieldValue);
-					TypeAndValue tav = elem->tav;
-					ExactValue i = exact_value_to_integer(tav.value);
-					if (i.kind != ExactValue_Integer) {
-						continue;
-					}
-					i64 val = big_int_to_i64(&i.value_integer);
-					val -= lower;
-					u64 bit = u64(1ll<<val);
-					bits |= bit;
-				}
-				o->value = exact_value_u64(bits);
-			} else if (is_type_constant_type(type) && cl->elems.count == 0) {
-				ExactValue value = exact_value_compound(node);
-				Type *bt = core_type(type);
-				if (bt->kind == Type_Basic) {
-					if (bt->Basic.flags & BasicFlag_Boolean) {
-						value = exact_value_bool(false);
-					} else if (bt->Basic.flags & BasicFlag_Integer) {
-						value = exact_value_i64(0);
-					} else if (bt->Basic.flags & BasicFlag_Unsigned) {
-						value = exact_value_i64(0);
-					} else if (bt->Basic.flags & BasicFlag_Float) {
-						value = exact_value_float(0);
-					} else if (bt->Basic.flags & BasicFlag_Complex) {
-						value = exact_value_complex(0, 0);
-					} else if (bt->Basic.flags & BasicFlag_Quaternion) {
-						value = exact_value_quaternion(0, 0, 0, 0);
-					} else if (bt->Basic.flags & BasicFlag_Pointer) {
-						value = exact_value_pointer(0);
-					} else if (bt->Basic.flags & BasicFlag_String) {
-						String empty_string = {};
-						value = exact_value_string(empty_string);
-					} else if (bt->Basic.flags & BasicFlag_Rune) {
-						value = exact_value_i64(0);
-					}
-				}
-
-				o->value = value;
-			} else {
-				o->value = exact_value_compound(node);
-			}
-		} else {
-			o->mode = Addressing_Value;
-		}
-		o->type = type;
+		kind = check_compound_literal(c, o, node, type_hint);
 	case_end;
 
 	case_ast_node(pe, ParenExpr, node);
@@ -8118,127 +9232,7 @@ ExprKind check_expr_base_internal(CheckerContext *c, Operand *o, Ast *node, Type
 	case_end;
 
 	case_ast_node(ta, TypeAssertion, node);
-		check_expr(c, o, ta->expr);
-		node->viral_state_flags |= ta->expr->viral_state_flags;
-
-		if (o->mode == Addressing_Invalid) {
-			o->expr = node;
-			return kind;
-		}
-		if (o->mode == Addressing_Constant) {
-			gbString expr_str = expr_to_string(o->expr);
-			error(o->expr, "A type assertion cannot be applied to a constant expression: '%s'", expr_str);
-			gb_string_free(expr_str);
-			o->mode = Addressing_Invalid;
-			o->expr = node;
-			return kind;
-		}
-
-		if (is_type_untyped(o->type)) {
-			gbString expr_str = expr_to_string(o->expr);
-			error(o->expr, "A type assertion cannot be applied to an untyped expression: '%s'", expr_str);
-			gb_string_free(expr_str);
-			o->mode = Addressing_Invalid;
-			o->expr = node;
-			return kind;
-		}
-
-		Type *src = type_deref(o->type);
-		Type *bsrc = base_type(src);
-
-
-		if (ta->type != nullptr && ta->type->kind == Ast_UnaryExpr && ta->type->UnaryExpr.op.kind == Token_Question) {
-			if (!is_type_union(src)) {
-				gbString str = type_to_string(o->type);
-				error(o->expr, "Type assertions with .? can only operate on unions, got %s", str);
-				gb_string_free(str);
-				o->mode = Addressing_Invalid;
-				o->expr = node;
-				return kind;
-			}
-
-			if (bsrc->Union.variants.count != 1 && type_hint != nullptr) {
-				bool allowed = false;
-				for_array(i, bsrc->Union.variants) {
-					Type *vt = bsrc->Union.variants[i];
-					if (are_types_identical(vt, type_hint)) {
-						allowed = true;
-						add_type_info_type(c, vt);
-						break;
-					}
-				}
-				if (allowed) {
-					add_type_info_type(c, o->type);
-					o->type = type_hint;
-					o->mode = Addressing_OptionalOk;
-					return kind;
-				}
-			}
-
-			if (bsrc->Union.variants.count != 1) {
-				error(o->expr, "Type assertions with .? can only operate on unions with 1 variant, got %lld", cast(long long)bsrc->Union.variants.count);
-				o->mode = Addressing_Invalid;
-				o->expr = node;
-				return kind;
-			}
-
-			add_type_info_type(c, o->type);
-			add_type_info_type(c, bsrc->Union.variants[0]);
-
-			o->type = bsrc->Union.variants[0];
-			o->mode = Addressing_OptionalOk;
-		} else {
-			Type *t = check_type(c, ta->type);
-			Type *dst = t;
-
-			if (is_type_union(src)) {
-				bool ok = false;
-				for_array(i, bsrc->Union.variants) {
-					Type *vt = bsrc->Union.variants[i];
-					if (are_types_identical(vt, dst)) {
-						ok = true;
-						break;
-					}
-				}
-
-				if (!ok) {
-					gbString expr_str = expr_to_string(o->expr);
-					gbString dst_type_str = type_to_string(t);
-					defer (gb_string_free(expr_str));
-					defer (gb_string_free(dst_type_str));
-					if (bsrc->Union.variants.count == 0) {
-						error(o->expr, "Cannot type assert '%s' to '%s' as this is an empty union", expr_str, dst_type_str);
-					} else {
-						error(o->expr, "Cannot type assert '%s' to '%s' as it is not a variant of that union", expr_str, dst_type_str);
-					}
-					o->mode = Addressing_Invalid;
-					o->expr = node;
-					return kind;
-				}
-
-				add_type_info_type(c, o->type);
-				add_type_info_type(c, t);
-
-				o->type = t;
-				o->mode = Addressing_OptionalOk;
-			} else if (is_type_any(src)) {
-				o->type = t;
-				o->mode = Addressing_OptionalOk;
-
-				add_type_info_type(c, o->type);
-				add_type_info_type(c, t);
-			} else {
-				gbString str = type_to_string(o->type);
-				error(o->expr, "Type assertions can only operate on unions and 'any', got %s", str);
-				gb_string_free(str);
-				o->mode = Addressing_Invalid;
-				o->expr = node;
-				return kind;
-			}
-		}
-
-		add_package_dependency(c, "runtime", "type_assertion_check");
-		add_package_dependency(c, "runtime", "type_assertion_check2");
+		kind = check_type_assertion(c, o, node, type_hint);
 	case_end;
 
 	case_ast_node(tc, TypeCast, node);
@@ -8326,443 +9320,19 @@ ExprKind check_expr_base_internal(CheckerContext *c, Operand *o, Ast *node, Type
 	case_end;
 
 	case_ast_node(se, SelectorCallExpr, node);
-		// IMPORTANT NOTE(bill, 2020-05-22): This is a complete hack to get a shorthand which is extremely useful for vtables
-		// COM APIs is a great example of where this kind of thing is extremely useful
-		// General idea:
-		//
-		//     x->y(123)  ==  x.y(x, 123)
-		//
-		// How this has been implemented at the moment is quite hacky but it's done so to reduce need for huge backend changes
-		// Just regenerating a new AST aids things
-		//
-		// TODO(bill): Is this a good hack or not?
-		//
-		// NOTE(bill, 2020-05-22): I'm going to regret this decision, ain't I?
-
-
-		if (se->modified_call) {
-			// Prevent double evaluation
-			o->expr  = node;
-			o->type  = node->tav.type;
-			o->value = node->tav.value;
-			o->mode  = node->tav.mode;
-			return Expr_Expr;
-		}
-
-		bool allow_arrow_right_selector_expr;
-		allow_arrow_right_selector_expr = c->allow_arrow_right_selector_expr;
-		c->allow_arrow_right_selector_expr = true;
-		Operand x = {};
-		ExprKind kind = check_expr_base(c, &x, se->expr, nullptr);
-		c->allow_arrow_right_selector_expr = allow_arrow_right_selector_expr;
-
-		if (x.mode == Addressing_Invalid || x.type == t_invalid) {
-			o->mode = Addressing_Invalid;
-			o->type = t_invalid;
-			o->expr = node;
-			return kind;
-		}
-		if (!is_type_proc(x.type)) {
-			gbString type_str = type_to_string(x.type);
-			error(se->call, "Selector call expressions expect a procedure type for the call, got '%s'", type_str);
-			gb_string_free(type_str);
-
-			o->mode = Addressing_Invalid;
-			o->type = t_invalid;
-			o->expr = node;
-			return Expr_Stmt;
-		}
-
-		ast_node(ce, CallExpr, se->call);
-
-		GB_ASSERT(x.expr->kind == Ast_SelectorExpr);
-
-		Ast *first_arg = x.expr->SelectorExpr.expr;
-		GB_ASSERT(first_arg != nullptr);
-
-		Type *pt = base_type(x.type);
-		GB_ASSERT(pt->kind == Type_Proc);
-		Type *first_type = nullptr;
-		String first_arg_name = {};
-		if (pt->Proc.param_count > 0) {
-			Entity *f = pt->Proc.params->Tuple.variables[0];
-			first_type = f->type;
-			first_arg_name = f->token.string;
-		}
-		if (first_arg_name.len == 0) {
-			first_arg_name = str_lit("_");
-		}
-
-		if (first_type == nullptr) {
-			error(se->call, "Selector call expressions expect a procedure type for the call with at least 1 parameter");
-			o->mode = Addressing_Invalid;
-			o->type = t_invalid;
-			o->expr = node;
-			return Expr_Stmt;
-		}
-
-		Operand y = {};
-		y.mode = first_arg->tav.mode;
-		y.type = first_arg->tav.type;
-		y.value = first_arg->tav.value;
-		if (check_is_assignable_to(c, &y, first_type)) {
-			// Do nothing, it's valid
-		} else {
-			Operand z = y;
-			z.type = type_deref(y.type);
-			if (check_is_assignable_to(c, &z, first_type)) {
-				// NOTE(bill): AST GENERATION HACK!
-				Token op = {Token_Pointer};
-				first_arg = ast_deref_expr(first_arg->file, first_arg, op);
-			} else if (y.mode == Addressing_Variable) {
-				Operand w = y;
-				w.type = alloc_type_pointer(y.type);
-				if (check_is_assignable_to(c, &w, first_type)) {
-					// NOTE(bill): AST GENERATION HACK!
-					Token op = {Token_And};
-					first_arg = ast_unary_expr(first_arg->file, op, first_arg);
-				}
-			}
-		}
-
-		if (ce->args.count > 0) {
-			bool fail = false;
-			bool first_is_field_value = (ce->args[0]->kind == Ast_FieldValue);
-			for_array(i, ce->args) {
-				Ast *arg = ce->args[i];
-				bool mix = false;
-				if (first_is_field_value) {
-					mix = arg->kind != Ast_FieldValue;
-				} else {
-					mix = arg->kind == Ast_FieldValue;
-				}
-				if (mix) {
-					fail = true;
-					break;
-				}
-			}
-			if (!fail && first_is_field_value) {
-				Token op = {Token_Eq};
-				AstFile *f = first_arg->file;
-				first_arg = ast_field_value(f, ast_ident(f, make_token_ident(first_arg_name)), first_arg, op);
-			}
-		}
-
-
-
-		auto modified_args = slice_make<Ast *>(heap_allocator(), ce->args.count+1);
-		modified_args[0] = first_arg;
-		slice_copy(&modified_args, ce->args, 1);
-		ce->args = modified_args;
-		se->modified_call = true;
-
-		allow_arrow_right_selector_expr = c->allow_arrow_right_selector_expr;
-		c->allow_arrow_right_selector_expr = true;
-		check_expr_base(c, o, se->call, type_hint);
-		c->allow_arrow_right_selector_expr = allow_arrow_right_selector_expr;
-
-		o->expr = node;
-		return Expr_Expr;
+		return check_selector_call_expr(c, o, node, type_hint);
 	case_end;
-
 
 	case_ast_node(ise, ImplicitSelectorExpr, node);
 		return check_implicit_selector_expr(c, o, node, type_hint);
 	case_end;
 
 	case_ast_node(ie, IndexExpr, node);
-		check_expr(c, o, ie->expr);
-		node->viral_state_flags |= ie->expr->viral_state_flags;
-		if (o->mode == Addressing_Invalid) {
-			o->expr = node;
-			return kind;
-		}
-
-		Type *t = base_type(type_deref(o->type));
-		bool is_ptr = is_type_pointer(o->type);
-		bool is_const = o->mode == Addressing_Constant;
-
-		if (is_type_map(t)) {
-			Operand key = {};
-			if (is_type_typeid(t->Map.key)) {
-				check_expr_or_type(c, &key, ie->index, t->Map.key);
-			} else {
-				check_expr_with_type_hint(c, &key, ie->index, t->Map.key);
-			}
-			check_assignment(c, &key, t->Map.key, str_lit("map index"));
-			if (key.mode == Addressing_Invalid) {
-				o->mode = Addressing_Invalid;
-				o->expr = node;
-				return kind;
-			}
-			o->mode = Addressing_MapIndex;
-			o->type = t->Map.value;
-			o->expr = node;
-
-			add_package_dependency(c, "runtime", "__dynamic_map_get");
-			add_package_dependency(c, "runtime", "__dynamic_map_set");
-			return Expr_Expr;
-		}
-
-		i64 max_count = -1;
-		bool valid = check_set_index_data(o, t, is_ptr, &max_count, o->type);
-
-		if (is_const) {
-			if (is_type_array(t)) {
-				// OKay
-			} else if (is_type_slice(t)) {
-				// Okay
-			} else if (is_type_enumerated_array(t)) {
-				// Okay
-			} else if (is_type_string(t)) {
-				// Okay
-			} else if (is_type_relative_slice(t)) {
-				// Okay
-			} else if (is_type_matrix(t)) {
-				// Okay
-			} else {
-				valid = false;
-			}
-		}
-
-		if (!valid) {
-			gbString str = expr_to_string(o->expr);
-			gbString type_str = type_to_string(o->type);
-			defer (gb_string_free(str));
-			defer (gb_string_free(type_str));
-			if (is_const) {
-				error(o->expr, "Cannot index constant '%s' of type '%s'", str, type_str);
-			} else {
-				error(o->expr, "Cannot index '%s' of type '%s'", str, type_str);
-			}
-			o->mode = Addressing_Invalid;
-			o->expr = node;
-			return kind;
-		}
-
-		if (ie->index == nullptr) {
-			gbString str = expr_to_string(o->expr);
-			error(o->expr, "Missing index for '%s'", str);
-			gb_string_free(str);
-			o->mode = Addressing_Invalid;
-			o->expr = node;
-			return kind;
-		}
-
-		Type *index_type_hint = nullptr;
-		if (is_type_enumerated_array(t)) {
-			Type *bt = base_type(t);
-			GB_ASSERT(bt->kind == Type_EnumeratedArray);
-			index_type_hint = bt->EnumeratedArray.index;
-		}
-
-		i64 index = 0;
-		bool ok = check_index_value(c, t, false, ie->index, max_count, &index, index_type_hint);
-		if (is_const) {
-			if (index < 0) {
-				gbString str = expr_to_string(o->expr);
-				error(o->expr, "Cannot index a constant '%s'", str);
-				error_line("\tSuggestion: store the constant into a variable in order to index it with a variable index\n");
-				gb_string_free(str);
-				o->mode = Addressing_Invalid;
-				o->expr = node;
-				return kind;
-			} else if (ok) {
-				ExactValue value = type_and_value_of_expr(ie->expr).value;
-				o->mode = Addressing_Constant;
-				bool success = false;
-				bool finish = false;
-				o->value = get_constant_field_single(c, value, cast(i32)index, &success, &finish);
-				if (!success) {
-					gbString str = expr_to_string(o->expr);
-					error(o->expr, "Cannot index a constant '%s' with index %lld", str, cast(long long)index);
-					error_line("\tSuggestion: store the constant into a variable in order to index it with a variable index\n");
-					gb_string_free(str);
-					o->mode = Addressing_Invalid;
-					o->expr = node;
-					return kind;
-				}
-			}
-		}
-		
-		if (type_hint != nullptr && is_type_matrix(t)) {
-			// TODO(bill): allow matrix columns to be assignable to other types which are the same internally
-			// if a type hint exists
-		}
-		
+		kind = check_index_expr(c, o, node, type_hint);
 	case_end;
 
 	case_ast_node(se, SliceExpr, node);
-		check_expr(c, o, se->expr);
-		node->viral_state_flags |= se->expr->viral_state_flags;
-
-		if (o->mode == Addressing_Invalid) {
-			o->mode = Addressing_Invalid;
-			o->expr = node;
-			return kind;
-		}
-
-		bool valid = false;
-		i64 max_count = -1;
-		Type *t = base_type(type_deref(o->type));
-		switch (t->kind) {
-		case Type_Basic:
-			if (t->Basic.kind == Basic_string || t->Basic.kind == Basic_UntypedString) {
-				valid = true;
-				if (o->mode == Addressing_Constant) {
-					max_count = o->value.value_string.len;
-				}
-				o->type = type_deref(o->type);
-			}
-			break;
-
-		case Type_Array:
-			valid = true;
-			max_count = t->Array.count;
-			if (o->mode != Addressing_Variable && !is_type_pointer(o->type)) {
-				gbString str = expr_to_string(node);
-				error(node, "Cannot slice array '%s', value is not addressable", str);
-				gb_string_free(str);
-				o->mode = Addressing_Invalid;
-				o->expr = node;
-				return kind;
-			}
-			o->type = alloc_type_slice(t->Array.elem);
-			break;
-
-		case Type_MultiPointer:
-			valid = true;
-			o->type = type_deref(o->type);
-			break;
-
-		case Type_Slice:
-			valid = true;
-			o->type = type_deref(o->type);
-			break;
-
-		case Type_DynamicArray:
-			valid = true;
-			o->type = alloc_type_slice(t->DynamicArray.elem);
-			break;
-
-		case Type_Struct:
-			if (is_type_soa_struct(t)) {
-				valid = true;
-				o->type = make_soa_struct_slice(c, nullptr, nullptr, t->Struct.soa_elem);
-			}
-			break;
-
-		case Type_RelativeSlice:
-			valid = true;
-			o->type = t->RelativeSlice.slice_type;
-			if (o->mode != Addressing_Variable) {
-				gbString str = expr_to_string(node);
-				error(node, "Cannot relative slice '%s', value is not addressable", str);
-				gb_string_free(str);
-				o->mode = Addressing_Invalid;
-				o->expr = node;
-				return kind;
-			}
-			break;
-		}
-
-		if (!valid) {
-			gbString str = expr_to_string(o->expr);
-			gbString type_str = type_to_string(o->type);
-			error(o->expr, "Cannot slice '%s' of type '%s'", str, type_str);
-			gb_string_free(type_str);
-			gb_string_free(str);
-			o->mode = Addressing_Invalid;
-			o->expr = node;
-			return kind;
-		}
-
-		if (se->low == nullptr && se->high != nullptr) {
-			// It is okay to continue as it will assume the 1st index is zero
-		}
-
-		i64 indices[2] = {};
-		Ast *nodes[2] = {se->low, se->high};
-		for (isize i = 0; i < gb_count_of(nodes); i++) {
-			i64 index = max_count;
-			if (nodes[i] != nullptr) {
-				i64 capacity = -1;
-				if (max_count >= 0) {
-					capacity = max_count;
-				}
-				i64 j = 0;
-				if (check_index_value(c, t, true, nodes[i], capacity, &j)) {
-					index = j;
-				}
-
-				node->viral_state_flags |= nodes[i]->viral_state_flags;
-			} else if (i == 0) {
-				index = 0;
-			}
-			indices[i] = index;
-		}
-
-		for (isize i = 0; i < gb_count_of(indices); i++) {
-			i64 a = indices[i];
-			for (isize j = i+1; j < gb_count_of(indices); j++) {
-				i64 b = indices[j];
-				if (a > b && b >= 0) {
-					error(se->close, "Invalid slice indices: [%td > %td]", a, b);
-				}
-			}
-		}
-
-		if (max_count < 0)  {
-			if (o->mode == Addressing_Constant) {
-				gbString s = expr_to_string(se->expr);
-				error(se->expr, "Cannot slice constant value '%s'", s);
-				gb_string_free(s);
-			}
-		}
-
-		if (t->kind == Type_MultiPointer && se->high != nullptr) {
-			/*
-				x[:]   -> [^]T
-				x[i:]  -> [^]T
-				x[:n]  -> []T
-				x[i:n] -> []T
-			*/
-			o->type = alloc_type_slice(t->MultiPointer.elem);
-		}
-
-		o->mode = Addressing_Value;
-
-		if (is_type_string(t) && max_count >= 0) {
-			bool all_constant = true;
-			for (isize i = 0; i < gb_count_of(nodes); i++) {
-				if (nodes[i] != nullptr) {
-					TypeAndValue tav = type_and_value_of_expr(nodes[i]);
-					if (tav.mode != Addressing_Constant) {
-						all_constant = false;
-						break;
-					}
-				}
-			}
-			if (!all_constant) {
-				gbString str = expr_to_string(o->expr);
-				error(o->expr, "Cannot slice '%s' with non-constant indices", str);
-				error_line("\tSuggestion: store the constant into a variable in order to index it with a variable index\n");
-				gb_string_free(str);
-				o->mode = Addressing_Value; // NOTE(bill): Keep subsequent values going without erring
-				o->expr = node;
-				return kind;
-			}
-
-			String s = {};
-			if (o->value.kind == ExactValue_String) {
-				s = o->value.value_string;
-			}
-
-			o->mode = Addressing_Constant;
-			o->type = t;
-			o->value = exact_value_string(substring(s, cast(isize)indices[0], cast(isize)indices[1]));
-		}
-
+		kind = check_slice_expr(c, o, node, type_hint);
 	case_end;
 	
 	case_ast_node(mie, MatrixIndexExpr, node);
@@ -8807,7 +9377,15 @@ ExprKind check_expr_base_internal(CheckerContext *c, Operand *o, Ast *node, Type
  			} else {
  				gbString str = expr_to_string(o->expr);
  				gbString typ = type_to_string(o->type);
+ 				begin_error_block();
+
  				error(o->expr, "Cannot dereference '%s' of type '%s'", str, typ);
+ 				if (o->type && is_type_multi_pointer(o->type)) {
+ 					error_line("\tDid you mean '%s[0]'?\n", str);
+ 				}
+
+ 				end_error_block();
+
  				gb_string_free(typ);
  				gb_string_free(str);
  				o->mode = Addressing_Invalid;
@@ -8887,6 +9465,8 @@ ExprKind check_expr_base_internal(CheckerContext *c, Operand *o, Ast *node, Type
 	return kind;
 }
 
+
+
 ExprKind check_expr_base(CheckerContext *c, Operand *o, Ast *node, Type *type_hint) {
 	ExprKind kind = check_expr_base_internal(c, o, node, type_hint);
 	if (o->type != nullptr && core_type(o->type) == nullptr) {
@@ -8902,6 +9482,8 @@ ExprKind check_expr_base(CheckerContext *c, Operand *o, Ast *node, Type *type_hi
 	if (o->type != nullptr && is_type_untyped(o->type)) {
 		add_untyped(c, node, o->mode, o->type, o->value);
 	}
+	check_rtti_type_disallowed(node, o->type, "An expression is using a type, %s, which has been disallowed");
+
 	add_type_and_value(c->info, node, o->mode, o->type, o->value);
 	return kind;
 }
@@ -9061,18 +9643,7 @@ gbString string_append_string(gbString str, String string) {
 
 
 gbString string_append_token(gbString str, Token token) {
-	if (token.kind == Token_String) {
-		str = gb_string_append_rune(str, '"');
-	} else if (token.kind == Token_Rune) {
-		str = gb_string_append_rune(str, '\'');
-	}
 	str = string_append_string(str, token.string);
-	if (token.kind == Token_String) {
-		str = gb_string_append_rune(str, '"');
-	} else if (token.kind == Token_Rune) {
-		str = gb_string_append_rune(str, '\'');
-	}
-
 	return str;
 }
 
@@ -9299,6 +9870,13 @@ gbString write_expr_to_string(gbString str, Ast *node, bool shorthand) {
 		str = gb_string_appendc(str, " = ");
 		str = write_expr_to_string(str, fv->value, shorthand);
 	case_end;
+	case_ast_node(fv, EnumFieldValue, node);
+		str = write_expr_to_string(str, fv->name, shorthand);
+		if (fv->value) {
+			str = gb_string_appendc(str, " = ");
+			str = write_expr_to_string(str, fv->value, shorthand);
+		}
+	case_end;
 
 	case_ast_node(ht, HelperType, node);
 		str = gb_string_appendc(str, "#type ");
@@ -9390,6 +9968,9 @@ gbString write_expr_to_string(gbString str, Ast *node, bool shorthand) {
 		if (f->flags&FieldFlag_const) {
 			str = gb_string_appendc(str, "#const ");
 		}
+		if (f->flags&FieldFlag_subtype) {
+			str = gb_string_appendc(str, "#subtype ");
+		}
 
 		for_array(i, f->names) {
 			Ast *name = f->names[i];
@@ -9469,9 +10050,10 @@ gbString write_expr_to_string(gbString str, Ast *node, bool shorthand) {
 		str = write_expr_to_string(str, ce->proc, shorthand);
 		str = gb_string_appendc(str, "(");
 
-		for_array(i, ce->args) {
+		isize idx0 = cast(isize)ce->was_selector;
+		for (isize i = idx0; i < ce->args.count; i++) {
 			Ast *arg = ce->args[i];
-			if (i > 0) {
+			if (i > idx0) {
 				str = gb_string_appendc(str, ", ");
 			}
 			str = write_expr_to_string(str, arg, shorthand);
@@ -9548,8 +10130,10 @@ gbString write_expr_to_string(gbString str, Ast *node, bool shorthand) {
 			str = write_expr_to_string(str, st->polymorphic_params, shorthand);
 			str = gb_string_appendc(str, ") ");
 		}
-		if (st->no_nil) str = gb_string_appendc(str, "#no_nil ");
-		if (st->maybe)  str = gb_string_appendc(str, "#maybe ");
+		switch (st->kind) {
+		case UnionType_no_nil:     str = gb_string_appendc(str, "#no_nil ");     break;
+		case UnionType_shared_nil: str = gb_string_appendc(str, "#shared_nil "); break;
+		}
 		if (st->align) {
 			str = gb_string_appendc(str, "#align ");
 			str = write_expr_to_string(str, st->align, shorthand);

@@ -1,11 +1,10 @@
 isize lb_type_info_index(CheckerInfo *info, Type *type, bool err_on_not_found=true) {
-	isize index = type_info_index(info, type, false);
+	auto *set = &info->minimum_dependency_type_info_set;
+	isize index = type_info_index(info, type, err_on_not_found);
 	if (index >= 0) {
-		auto *set = &info->minimum_dependency_type_info_set;
-		for_array(i, set->entries) {
-			if (set->entries[i].ptr == index) {
-				return i+1;
-			}
+		isize i = ptr_entry_index(set, index);
+		if (i >= 0) {
+			return i+1;
 		}
 	}
 	if (err_on_not_found) {
@@ -15,6 +14,8 @@ isize lb_type_info_index(CheckerInfo *info, Type *type, bool err_on_not_found=tr
 }
 
 lbValue lb_typeid(lbModule *m, Type *type) {
+	GB_ASSERT(!build_context.disallow_rtti);
+
 	type = default_type(type);
 
 	u64 id = cast(u64)lb_type_info_index(m->info, type);
@@ -89,6 +90,8 @@ lbValue lb_typeid(lbModule *m, Type *type) {
 }
 
 lbValue lb_type_info(lbModule *m, Type *type) {
+	GB_ASSERT(!build_context.disallow_rtti);
+
 	type = default_type(type);
 
 	isize index = lb_type_info_index(m->info, type);
@@ -107,6 +110,8 @@ lbValue lb_type_info(lbModule *m, Type *type) {
 }
 
 lbValue lb_get_type_info_ptr(lbModule *m, Type *type) {
+	GB_ASSERT(!build_context.disallow_rtti);
+
 	i32 index = cast(i32)lb_type_info_index(m->info, type);
 	GB_ASSERT(index >= 0);
 	// gb_printf_err("%d %s\n", index, type_to_string(type));
@@ -156,6 +161,10 @@ lbValue lb_type_info_member_tags_offset(lbProcedure *p, isize count) {
 
 
 void lb_setup_type_info_data(lbProcedure *p) { // NOTE(bill): Setup type_info data
+	if (build_context.disallow_rtti) {
+		return;
+	}
+
 	lbModule *m = p->module;
 	CheckerInfo *info = m->info;
 	
@@ -455,7 +464,7 @@ void lb_setup_type_info_data(lbProcedure *p) { // NOTE(bill): Setup type_info da
 		case Type_EnumeratedArray: {
 			tag = lb_const_ptr_cast(m, variant_ptr, t_type_info_enumerated_array_ptr);
 
-			LLVMValueRef vals[6] = {
+			LLVMValueRef vals[7] = {
 				lb_get_type_info_ptr(m, t->EnumeratedArray.elem).value,
 				lb_get_type_info_ptr(m, t->EnumeratedArray.index).value,
 				lb_const_int(m, t_int, type_size_of(t->EnumeratedArray.elem)).value,
@@ -464,6 +473,8 @@ void lb_setup_type_info_data(lbProcedure *p) { // NOTE(bill): Setup type_info da
 				// Unions
 				LLVMConstNull(lb_type(m, t_type_info_enum_value)),
 				LLVMConstNull(lb_type(m, t_type_info_enum_value)),
+
+				lb_const_bool(m, t_bool, t->EnumeratedArray.is_sparse).value,
 			};
 
 			lbValue res = {};
@@ -664,8 +675,8 @@ void lb_setup_type_info_data(lbProcedure *p) { // NOTE(bill): Setup type_info da
 				}
 
 				vals[4] = lb_const_bool(m, t_bool, t->Union.custom_align != 0).value;
-				vals[5] = lb_const_bool(m, t_bool, t->Union.no_nil).value;
-				vals[6] = lb_const_bool(m, t_bool, t->Union.maybe).value;
+				vals[5] = lb_const_bool(m, t_bool, t->Union.kind == UnionType_no_nil).value;
+				vals[6] = lb_const_bool(m, t_bool, t->Union.kind == UnionType_shared_nil).value;
 
 				for (isize i = 0; i < gb_count_of(vals); i++) {
 					if (vals[i] == nullptr) {

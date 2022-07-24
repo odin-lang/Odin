@@ -1,11 +1,6 @@
-//+ignore
 /*
 	Copyright 2021 Jeroen van Rijn <nom@duclavier.com>.
 	Made available under Odin's BSD-3 license.
-
-	A BigInt implementation in Odin.
-	For the theoretical underpinnings, see Knuth's The Art of Computer Programming, Volume 2, section 4.3.
-	The code started out as an idiomatic source port of libTomMath, which is in the public domain, with thanks.
 
 	==========================    Low-level routines    ==========================
 
@@ -29,11 +24,15 @@
 
 	TODO: Handle +/- Infinity and NaN.
 */
+
+
+//+ignore
 package math_big
 
 import "core:mem"
 import "core:intrinsics"
 import rnd "core:math/rand"
+import "core:builtin"
 
 /*
 	Low-level addition, unsigned. Handbook of Applied Cryptography, algorithm 14.7.
@@ -1880,8 +1879,6 @@ internal_int_set_from_integer :: proc(dest: ^Int, src: $T, minimize := false, al
 	where intrinsics.type_is_integer(T) {
 	context.allocator = allocator
 
-	src := src
-
 	internal_error_if_immutable(dest) or_return
 	/*
 		Most internal procs asssume an Int to have already been initialize,
@@ -1892,13 +1889,27 @@ internal_int_set_from_integer :: proc(dest: ^Int, src: $T, minimize := false, al
 	dest.flags = {} // We're not -Inf, Inf, NaN or Immutable.
 
 	dest.used  = 0
-	dest.sign = .Zero_or_Positive if src >= 0 else .Negative
-	src = internal_abs(src)
+	dest.sign = .Negative if src < 0 else .Zero_or_Positive
 
-	#no_bounds_check for src != 0 {
-		dest.digit[dest.used] = DIGIT(src) & _MASK
+	temp := src
+
+	is_maximally_negative := src == min(T)
+	if is_maximally_negative {
+		/*
+			Prevent overflow on abs()
+		*/
+		temp += 1
+	}
+	temp = -temp if temp < 0 else temp
+
+	#no_bounds_check for temp != 0 {
+		dest.digit[dest.used] = DIGIT(temp) & _MASK
 		dest.used += 1
-		src >>= _DIGIT_BITS
+		temp >>= _DIGIT_BITS
+	}
+
+	if is_maximally_negative {
+		return internal_sub(dest, dest, 1)
 	}
 	internal_zero_unused(dest)
 	return nil
@@ -2307,28 +2318,69 @@ internal_int_get_i32 :: proc(a: ^Int) -> (res: i32, err: Error) {
 }
 internal_get_i32 :: proc { internal_int_get_i32, }
 
+internal_get_low_u32 :: proc(a: ^Int) -> u32 #no_bounds_check {
+	if a == nil {
+		return 0
+	}
+	
+	if a.used == 0 {
+		return 0
+	}
+	
+	return u32(a.digit[0])
+}
+internal_get_low_u64 :: proc(a: ^Int) -> u64 #no_bounds_check {
+	if a == nil {
+		return 0
+	}
+	
+	if a.used == 0 {
+		return 0
+	}
+	
+	v := u64(a.digit[0])
+	when size_of(DIGIT) == 4 {
+		if a.used > 1 {
+			return u64(a.digit[1])<<32 | v
+		}
+	}
+	return v
+}
+
 /*
 	TODO: Think about using `count_bits` to check if the value could be returned completely,
 	and maybe return max(T), .Integer_Overflow if not?
 */
 internal_int_get :: proc(a: ^Int, $T: typeid) -> (res: T, err: Error) where intrinsics.type_is_integer(T) {
-	size_in_bits := int(size_of(T) * 8)
-	i := int((size_in_bits + _DIGIT_BITS - 1) / _DIGIT_BITS)
-	i  = min(int(a.used), i)
-
-	#no_bounds_check for ; i >= 0; i -= 1 {
-		res <<= uint(0) if size_in_bits <= _DIGIT_BITS else _DIGIT_BITS
-		res |= T(a.digit[i])
-		if size_in_bits <= _DIGIT_BITS {
-			break
+	/*
+		Calculate target bit size.
+	*/
+	target_bit_size := int(size_of(T) * 8)
+	when !intrinsics.type_is_unsigned(T) {
+		if a.sign == .Zero_or_Positive {
+			target_bit_size -= 1
+		}
+	} else {
+		if a.sign == .Negative {
+			return 0, .Integer_Underflow
 		}
 	}
 
+	bits_used := internal_count_bits(a)
+
+	if bits_used > target_bit_size {
+		if a.sign == .Negative {
+			return min(T), .Integer_Underflow
+		}
+		return max(T), .Integer_Overflow
+	}
+
+	for i := a.used; i > 0; i -= 1 {
+		res <<= _DIGIT_BITS
+		res |=  T(a.digit[i - 1])
+	}
+
 	when !intrinsics.type_is_unsigned(T) {
-		/*
-			Mask off sign bit.
-		*/
-		res ~= 1 << uint(size_in_bits - 1)
 		/*
 			Set the sign.
 		*/
@@ -2594,7 +2646,7 @@ internal_int_shrmod :: proc(quotient, remainder, numerator: ^Int, bits: int, all
 		Shift by as many digits in the bit count.
 	*/
 	if bits >= _DIGIT_BITS {
-		internal_shr_digit(quotient, bits / _DIGIT_BITS) or_return
+		_private_int_shr_leg(quotient, bits / _DIGIT_BITS) or_return
 	}
 
 	/*
@@ -2634,37 +2686,6 @@ internal_int_shr :: proc(dest, source: ^Int, bits: int, allocator := context.all
 internal_shr :: proc { internal_int_shr, }
 
 /*
-	Shift right by `digits` * _DIGIT_BITS bits.
-*/
-internal_int_shr_digit :: proc(quotient: ^Int, digits: int, allocator := context.allocator) -> (err: Error) {
-	context.allocator = allocator
-
-	if digits <= 0 { return nil }
-
-	/*
-		If digits > used simply zero and return.
-	*/
-	if digits > quotient.used { return internal_zero(quotient) }
-
-	/*
-		Much like `int_shl_digit`, this is implemented using a sliding window,
-		except the window goes the other way around.
-
-		b-2 | b-1 | b0 | b1 | b2 | ... | bb |   ---->
-					/\                   |      ---->
-					 \-------------------/      ---->
-	*/
-
-	#no_bounds_check for x := 0; x < (quotient.used - digits); x += 1 {
-		quotient.digit[x] = quotient.digit[x + digits]
-	}
-	quotient.used -= digits
-	internal_zero_unused(quotient)
-	return internal_clamp(quotient)
-}
-internal_shr_digit :: proc { internal_int_shr_digit, }
-
-/*
 	Shift right by a certain bit count with sign extension.
 */
 internal_int_shr_signed :: proc(dest, src: ^Int, bits: int, allocator := context.allocator) -> (err: Error) {
@@ -2702,7 +2723,7 @@ internal_int_shl :: proc(dest, src: ^Int, bits: int, allocator := context.alloca
 		Shift by as many digits in the bit count as we have.
 	*/
 	if bits >= _DIGIT_BITS {
-		internal_shl_digit(dest, bits / _DIGIT_BITS) or_return
+		_private_int_shl_leg(dest, bits / _DIGIT_BITS) or_return
 	}
 
 	/*
@@ -2731,45 +2752,6 @@ internal_int_shl :: proc(dest, src: ^Int, bits: int, allocator := context.alloca
 	return internal_clamp(dest)
 }
 internal_shl :: proc { internal_int_shl, }
-
-
-/*
-	Shift left by `digits` * _DIGIT_BITS bits.
-*/
-internal_int_shl_digit :: proc(quotient: ^Int, digits: int, allocator := context.allocator) -> (err: Error) {
-	context.allocator = allocator
-
-	if digits <= 0 { return nil }
-
-	/*
-		No need to shift a zero.
-	*/
-	if #force_inline internal_is_zero(quotient) {
-		return nil
-	}
-
-	/*
-		Resize `quotient` to accomodate extra digits.
-	*/
-	#force_inline internal_grow(quotient, quotient.used + digits) or_return
-
-	/*
-		Increment the used by the shift amount then copy upwards.
-	*/
-
-	/*
-		Much like `int_shr_digit`, this is implemented using a sliding window,
-		except the window goes the other way around.
-	*/
-	#no_bounds_check for x := quotient.used; x > 0; x -= 1 {
-		quotient.digit[x+digits-1] = quotient.digit[x-1]
-	}
-
-	quotient.used += digits
-	mem.zero_slice(quotient.digit[:digits])
-	return nil
-}
-internal_shl_digit :: proc { internal_int_shl_digit, }
 
 /*
 	Count bits in an `Int`.

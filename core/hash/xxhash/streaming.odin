@@ -52,9 +52,6 @@ XXH3_128_reset_with_seed :: proc(state: ^XXH3_state, seed: XXH64_hash) -> (err: 
 XXH3_64_reset_with_seed :: XXH3_128_reset_with_seed
 
 XXH3_128_update :: proc(state: ^XXH3_state, input: []u8) -> (err: Error) {
-	if len(input) < XXH3_MIDSIZE_MAX {
-		return .Error
-	}
 	return XXH3_update(state, input, XXH3_accumulate_512, XXH3_scramble_accumulator)
 }
 XXH3_64_update :: XXH3_128_update
@@ -96,7 +93,7 @@ XXH3_128_canonical_from_hash :: proc(hash: XXH128_hash_t) -> (canonical: XXH128_
 	#assert(size_of(XXH128_canonical) == size_of(XXH128_hash_t))
 
 	t := hash
-	when ODIN_ENDIAN == "little" {
+	when ODIN_ENDIAN == .Little {
 		t.high = byte_swap(t.high)
 		t.low  = byte_swap(t.low)
 	}
@@ -127,6 +124,7 @@ XXH3_create_state :: proc(allocator := context.allocator) -> (res: ^XXH3_state, 
 	err = nil if mem_error == nil else .Error
 
 	XXH3_init_state(state)
+	XXH3_128_reset(state)
 	return state, nil
 }
 
@@ -213,7 +211,9 @@ XXH3_update :: #force_inline proc(
 	length := len(input)
 	secret := state.custom_secret[:] if len(state.external_secret) == 0 else state.external_secret[:]
 
-	assert(len(input) > 0)
+	if len(input) == 0 {
+		return
+	}
 
 	state.total_length += u64(length)
 	assert(state.buffered_size <= XXH3_INTERNAL_BUFFER_SIZE)
@@ -234,7 +234,9 @@ XXH3_update :: #force_inline proc(
 	*/
 	if state.buffered_size > 0 {
 		load_size := int(XXH3_INTERNAL_BUFFER_SIZE - state.buffered_size)
-		mem_copy(&state.buffer[state.buffered_size], &input[0], load_size)
+
+		state_ptr := rawptr(uintptr(raw_data(state.buffer[:])) + uintptr(state.buffered_size))
+		mem_copy(state_ptr, raw_data(input), load_size)
 		input = input[load_size:]
 
 		XXH3_consume_stripes(

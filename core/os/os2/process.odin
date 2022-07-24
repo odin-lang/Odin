@@ -1,6 +1,6 @@
 package os2
 
-import sync "core:sync/sync2"
+import "core:sync"
 import "core:time"
 import "core:runtime"
 
@@ -46,7 +46,7 @@ Process :: struct {
 Process_Attributes :: struct {
 	dir: string,
 	env: []string,
-	files: []Handle,
+	files: []^File,
 	sys: ^Process_Attributes_OS_Specific,
 }
 

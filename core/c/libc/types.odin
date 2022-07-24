@@ -3,6 +3,8 @@ package libc
 import "core:c"
 
 char           :: c.char // assuming -funsigned-char
+
+schar          :: c.schar
 short          :: c.short
 int            :: c.int
 long           :: c.long

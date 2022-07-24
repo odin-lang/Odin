@@ -5,10 +5,10 @@ package libc
 thrd_start_t :: proc "c" (rawptr) -> int
 tss_dtor_t   :: proc "c" (rawptr)
 
-when ODIN_OS == "windows" {
+when ODIN_OS == .Windows {
 	foreign import libc {
 		"system:libucrt.lib", 
-		"system:msvcprt.lib"
+		"system:msvcprt.lib",
 	}
 
 	thrd_success        :: 0                             // _Thrd_success
@@ -74,10 +74,10 @@ when ODIN_OS == "windows" {
 }
 
 // GLIBC and MUSL compatible constants and types.
-when ODIN_OS == "linux" {
+when ODIN_OS == .Linux {
 	foreign import libc {
 		"system:c",
-		"system:pthread"
+		"system:pthread",
 	}
 
 	thrd_success        :: 0
@@ -135,4 +135,9 @@ when ODIN_OS == "linux" {
 		tss_get       :: proc(key: tss_t) -> rawptr ---
 		tss_set       :: proc(key: tss_t, val: rawptr) -> int ---
 	}
+}
+
+
+when ODIN_OS == .Darwin {
+	// TODO: find out what this is meant to be!
 }

@@ -96,18 +96,6 @@ fmuladd       :: proc{
 	fmuladd_f64, fmuladd_f64le, fmuladd_f64be,
 }
 
-ln_f16le :: proc "contextless" (x: f16le) -> f16le { return #force_inline f16le(ln_f16(f16(x))) }
-ln_f16be :: proc "contextless" (x: f16be) -> f16be { return #force_inline f16be(ln_f16(f16(x))) }
-ln_f32le :: proc "contextless" (x: f32le) -> f32le { return #force_inline f32le(ln_f32(f32(x))) }
-ln_f32be :: proc "contextless" (x: f32be) -> f32be { return #force_inline f32be(ln_f32(f32(x))) }
-ln_f64le :: proc "contextless" (x: f64le) -> f64le { return #force_inline f64le(ln_f64(f64(x))) }
-ln_f64be :: proc "contextless" (x: f64be) -> f64be { return #force_inline f64be(ln_f64(f64(x))) }
-ln       :: proc{
-	ln_f16, ln_f16le, ln_f16be,
-	ln_f32, ln_f32le, ln_f32be,
-	ln_f64, ln_f64le, ln_f64be,
-}
-
 exp_f16le :: proc "contextless" (x: f16le) -> f16le { return #force_inline f16le(exp_f16(f16(x))) }
 exp_f16be :: proc "contextless" (x: f16be) -> f16be { return #force_inline f16be(exp_f16(f16(x))) }
 exp_f32le :: proc "contextless" (x: f32le) -> f32le { return #force_inline f32le(exp_f32(f32(x))) }
@@ -120,13 +108,60 @@ exp       :: proc{
 	exp_f64, exp_f64le, exp_f64be,
 }
 
-ldexp_f16le :: proc "contextless" (val: f16le, exp: i32) -> f16le { return #force_inline f16le(ldexp_f16(f16(val), exp)) }
-ldexp_f16be :: proc "contextless" (val: f16be, exp: i32) -> f16be { return #force_inline f16be(ldexp_f16(f16(val), exp)) }
-ldexp_f32le :: proc "contextless" (val: f32le, exp: i32) -> f32le { return #force_inline f32le(ldexp_f32(f32(val), exp)) }
-ldexp_f32be :: proc "contextless" (val: f32be, exp: i32) -> f32be { return #force_inline f32be(ldexp_f32(f32(val), exp)) }
-ldexp_f64le :: proc "contextless" (val: f64le, exp: i32) -> f64le { return #force_inline f64le(ldexp_f64(f64(val), exp)) }
-ldexp_f64be :: proc "contextless" (val: f64be, exp: i32) -> f64be { return #force_inline f64be(ldexp_f64(f64(val), exp)) }
-ldexp       :: proc{
+
+
+ldexp_f64 :: proc "contextless" (val: f64, exp: int) -> f64 {
+	mask  :: F64_MASK
+	shift :: F64_SHIFT
+	bias  :: F64_BIAS
+	
+	switch {
+	case val == 0:
+		return val
+	case is_inf(val) || is_nan(val):
+		return val
+	}
+	exp := exp
+	frac, e := normalize_f64(val)
+	exp += e
+	x := transmute(u64)frac
+	exp += int(x>>shift)&mask - bias
+	if exp < -1075 { // underflow
+		return copy_sign(0, frac) 
+	} else if exp > 1023 { // overflow
+		if frac < 0 {
+			return inf_f64(-1)
+		}
+		return inf_f64(+1)
+	}
+	
+	m: f64 = 1
+	if exp < -1022 { // denormal
+		exp += 53
+		m = 1.0 / (1<<53)
+	}
+	x &~= mask << shift
+	x |= u64(exp+bias) << shift
+	return m * transmute(f64)x	
+}
+ldexp_f16   :: proc "contextless" (val: f16, exp: int) -> f16 { return f16(ldexp_f64(f64(val), exp)) }
+ldexp_f32   :: proc "contextless" (val: f32, exp: int) -> f32 { return f32(ldexp_f64(f64(val), exp)) }
+ldexp_f16le :: proc "contextless" (val: f16le, exp: int) -> f16le { return #force_inline f16le(ldexp_f16(f16(val), exp)) }
+ldexp_f16be :: proc "contextless" (val: f16be, exp: int) -> f16be { return #force_inline f16be(ldexp_f16(f16(val), exp)) }
+ldexp_f32le :: proc "contextless" (val: f32le, exp: int) -> f32le { return #force_inline f32le(ldexp_f32(f32(val), exp)) }
+ldexp_f32be :: proc "contextless" (val: f32be, exp: int) -> f32be { return #force_inline f32be(ldexp_f32(f32(val), exp)) }
+ldexp_f64le :: proc "contextless" (val: f64le, exp: int) -> f64le { return #force_inline f64le(ldexp_f64(f64(val), exp)) }
+ldexp_f64be :: proc "contextless" (val: f64be, exp: int) -> f64be { return #force_inline f64be(ldexp_f64(f64(val), exp)) }
+// ldexp is the inverse of frexp
+// it returns val * 2**exp.
+// 
+// Special cases:
+// 	ldexp(+0,   exp) = +0
+// 	ldexp(-0,   exp) = -0
+// 	ldexp(+inf, exp) = +inf
+// 	ldexp(-inf, exp) = -inf
+// 	ldexp(NaN,  exp) = NaN
+ldexp :: proc{
 	ldexp_f16, ldexp_f16le, ldexp_f16be,
 	ldexp_f32, ldexp_f32le, ldexp_f32be,
 	ldexp_f64, ldexp_f64le, ldexp_f64be,
@@ -150,22 +185,16 @@ log       :: proc{
 	log_f64, log_f64le, log_f64be,
 }
 
-log2_f16   :: proc "contextless" (x: f16)   -> f16   { return ln(x)/LN2 }
-log2_f16le :: proc "contextless" (x: f16le) -> f16le { return f16le(log2_f16(f16(x))) }
-log2_f16be :: proc "contextless" (x: f16be) -> f16be { return f16be(log2_f16(f16(x))) }
-
-log2_f32   :: proc "contextless" (x: f32)   -> f32   { return ln(x)/LN2 }
-log2_f32le :: proc "contextless" (x: f32le) -> f32le { return f32le(log2_f32(f32(x))) }
-log2_f32be :: proc "contextless" (x: f32be) -> f32be { return f32be(log2_f32(f32(x))) }
-
-log2_f64   :: proc "contextless" (x: f64)   -> f64   { return ln(x)/LN2 }
-log2_f64le :: proc "contextless" (x: f64le) -> f64le { return f64le(log2_f64(f64(x))) }
-log2_f64be :: proc "contextless" (x: f64be) -> f64be { return f64be(log2_f64(f64(x))) }
-log2       :: proc{
-	log2_f16, log2_f16le, log2_f16be,
-	log2_f32, log2_f32le, log2_f32be,
-	log2_f64, log2_f64le, log2_f64be,
-}
+log2_f16   :: logb_f16
+log2_f16le :: logb_f16le
+log2_f16be :: logb_f16be
+log2_f32   :: logb_f32
+log2_f32le :: logb_f32le
+log2_f32be :: logb_f32be
+log2_f64   :: logb_f64
+log2_f64le :: logb_f64le
+log2_f64be :: logb_f64be
+log2       :: logb
 
 log10_f16   :: proc "contextless" (x: f16)   -> f16   { return ln(x)/LN10 }
 log10_f16le :: proc "contextless" (x: f16le) -> f16le { return f16le(log10_f16(f16(x))) }
@@ -351,9 +380,9 @@ to_degrees       :: proc{
 
 trunc_f16   :: proc "contextless" (x: f16) -> f16 {
 	trunc_internal :: proc "contextless" (f: f16) -> f16 {
-		mask :: 0x1f
-		shift :: 16 - 6
-		bias :: 0xf
+		mask  :: F16_MASK
+		shift :: F16_SHIFT
+		bias  :: F16_BIAS
 
 		if f < 1 {
 			switch {
@@ -367,7 +396,7 @@ trunc_f16   :: proc "contextless" (x: f16) -> f16 {
 		e := (x >> shift) & mask - bias
 
 		if e < shift {
-			x &= ~(1 << (shift-e)) - 1
+			x &~= 1 << (shift-e) - 1
 		}
 		return transmute(f16)x
 	}
@@ -383,9 +412,9 @@ trunc_f16be :: proc "contextless" (x: f16be) -> f16be { return #force_inline f16
 
 trunc_f32   :: proc "contextless" (x: f32) -> f32 {
 	trunc_internal :: proc "contextless" (f: f32) -> f32 {
-		mask :: 0xff
-		shift :: 32 - 9
-		bias :: 0x7f
+		mask  :: F32_MASK
+		shift :: F32_SHIFT
+		bias  :: F32_BIAS
 
 		if f < 1 {
 			switch {
@@ -399,7 +428,7 @@ trunc_f32   :: proc "contextless" (x: f32) -> f32 {
 		e := (x >> shift) & mask - bias
 
 		if e < shift {
-			x &= ~(1 << (shift-e)) - 1
+			x &~= 1 << (shift-e) - 1
 		}
 		return transmute(f32)x
 	}
@@ -415,9 +444,9 @@ trunc_f32be :: proc "contextless" (x: f32be) -> f32be { return #force_inline f32
 
 trunc_f64   :: proc "contextless" (x: f64) -> f64 {
 	trunc_internal :: proc "contextless" (f: f64) -> f64 {
-		mask :: 0x7ff
-		shift :: 64 - 12
-		bias :: 0x3ff
+		mask  :: F64_MASK
+		shift :: F64_SHIFT
+		bias  :: F64_BIAS
 
 		if f < 1 {
 			switch {
@@ -431,7 +460,7 @@ trunc_f64   :: proc "contextless" (x: f64) -> f64 {
 		e := (x >> shift) & mask - bias
 
 		if e < shift {
-			x &= ~(1 << (shift-e)) - 1
+			x &~= 1 << (shift-e) - 1
 		}
 		return transmute(f64)x
 	}
@@ -444,6 +473,7 @@ trunc_f64   :: proc "contextless" (x: f64) -> f64 {
 }
 trunc_f64le :: proc "contextless" (x: f64le) -> f64le { return #force_inline f64le(trunc_f64(f64(x))) }
 trunc_f64be :: proc "contextless" (x: f64be) -> f64be { return #force_inline f64be(trunc_f64(f64(x))) }
+// Removes the fractional part of the value, i.e. rounds towards zero.
 trunc       :: proc{
 	trunc_f16, trunc_f16le, trunc_f16be,
 	trunc_f32, trunc_f32le, trunc_f32be, 
@@ -578,9 +608,9 @@ floor_mod :: proc "contextless" (x, y: $T) -> T
 }
 
 modf_f16   :: proc "contextless" (x: f16) -> (int: f16, frac: f16) {
-	shift :: 16 - 5 - 1
-	mask  :: 0x1f
-	bias  :: 15
+	shift :: F16_SHIFT
+	mask  :: F16_MASK
+	bias  :: F16_BIAS
 
 	if x < 1 {
 		switch {
@@ -612,9 +642,9 @@ modf_f16be :: proc "contextless" (x: f16be) -> (int: f16be, frac: f16be) {
 	return f16be(i), f16be(f)
 }
 modf_f32   :: proc "contextless" (x: f32) -> (int: f32, frac: f32) {
-	shift :: 32 - 8 - 1
-	mask  :: 0xff
-	bias  :: 127
+	shift :: F32_SHIFT
+	mask  :: F32_MASK
+	bias  :: F32_BIAS
 
 	if x < 1 {
 		switch {
@@ -645,10 +675,10 @@ modf_f32be :: proc "contextless" (x: f32be) -> (int: f32be, frac: f32be) {
 	i, f := #force_inline modf_f32(f32(x))
 	return f32be(i), f32be(f)
 }
-modf_f64   :: proc "contextless" (x: f64) -> (int: f64, frac: f64) {
-	shift :: 64 - 11 - 1
-	mask  :: 0x7ff
-	bias  :: 1023
+modf_f64 :: proc "contextless" (x: f64) -> (int: f64, frac: f64) {
+	shift :: F64_SHIFT
+	mask  :: F64_MASK
+	bias  :: F64_BIAS
 
 	if x < 1 {
 		switch {
@@ -679,7 +709,7 @@ modf_f64be :: proc "contextless" (x: f64be) -> (int: f64be, frac: f64be) {
 	i, f := #force_inline modf_f64(f64(x))
 	return f64be(i), f64be(f)
 }
-modf       :: proc{
+modf :: proc{
 	modf_f16, modf_f16le, modf_f16be,
 	modf_f32, modf_f32le, modf_f32be,
 	modf_f64, modf_f64le, modf_f64be,
@@ -752,6 +782,44 @@ lcm :: proc "contextless" (x, y: $T) -> T
 	return x / gcd(x, y) * y
 }
 
+normalize_f16 :: proc "contextless" (x: f16) -> (y: f16, exponent: int) {
+	if abs(x) < F16_MIN {
+		return x * (1<<F16_SHIFT), -F16_SHIFT
+	}
+	return x, 0
+}
+normalize_f32 :: proc "contextless" (x: f32) -> (y: f32, exponent: int) {
+	if abs(x) < F32_MIN {
+		return x * (1<<F32_SHIFT), -F32_SHIFT
+	}
+	return x, 0
+}
+normalize_f64 :: proc "contextless" (x: f64) -> (y: f64, exponent: int) {
+	if abs(x) < F64_MIN {
+		return x * (1<<F64_SHIFT), -F64_SHIFT
+	}
+	return x, 0
+}
+
+normalize_f16le :: proc "contextless" (x: f16le) -> (y: f16le, exponent: int) { y0, e := normalize_f16(f16(x)); return f16le(y0), e }
+normalize_f16be :: proc "contextless" (x: f16be) -> (y: f16be, exponent: int) { y0, e := normalize_f16(f16(x)); return f16be(y0), e }
+normalize_f32le :: proc "contextless" (x: f32le) -> (y: f32le, exponent: int) { y0, e := normalize_f32(f32(x)); return f32le(y0), e }
+normalize_f32be :: proc "contextless" (x: f32be) -> (y: f32be, exponent: int) { y0, e := normalize_f32(f32(x)); return f32be(y0), e }
+normalize_f64le :: proc "contextless" (x: f64le) -> (y: f64le, exponent: int) { y0, e := normalize_f64(f64(x)); return f64le(y0), e }
+normalize_f64be :: proc "contextless" (x: f64be) -> (y: f64be, exponent: int) { y0, e := normalize_f64(f64(x)); return f64be(y0), e }
+
+normalize :: proc{
+	normalize_f16,
+	normalize_f32,
+	normalize_f64,
+	normalize_f16le,
+	normalize_f16be,
+	normalize_f32le,
+	normalize_f32be,
+	normalize_f64le,
+	normalize_f64be,
+}
+
 frexp_f16   :: proc "contextless" (x: f16)   -> (significand: f16,   exponent: int) {
 	f, e := frexp_f64(f64(x))
 	return f16(f), e
@@ -776,24 +844,25 @@ frexp_f32be :: proc "contextless" (x: f32be) -> (significand: f32be, exponent: i
 	f, e := frexp_f64(f64(x))
 	return f32be(f), e
 }
-frexp_f64 :: proc "contextless" (x: f64) -> (significand: f64, exponent: int) {
+frexp_f64 :: proc "contextless" (f: f64) -> (significand: f64, exponent: int) {
+	mask  :: F64_MASK
+	shift :: F64_SHIFT
+	bias  :: F64_BIAS
+	
 	switch {
-	case x == 0:
+	case f == 0:
 		return 0, 0
-	case x < 0:
-		significand, exponent = frexp(-x)
-		return -significand, exponent
+	case is_inf(f) || is_nan(f):
+		return f, 0
 	}
-	ex := trunc(log2(x))
-	exponent = int(ex)
-	significand = x / pow(2.0, ex)
-	if abs(significand) >= 1 {
-		exponent += 1
-		significand /= 2
-	}
-	if exponent == 1024 && significand == 0 {
-		significand = 0.99999999999999988898
-	}
+	f := f
+	
+	f, exponent = normalize_f64(f)
+	x := transmute(u64)f
+	exponent += int((x>>shift)&mask) - bias + 1
+	x &~= mask << shift
+	x |= (-1 + bias) << shift
+	significand = transmute(f64)x
 	return
 }
 frexp_f64le :: proc "contextless" (x: f64le) -> (significand: f64le, exponent: int) {
@@ -804,7 +873,18 @@ frexp_f64be :: proc "contextless" (x: f64be) -> (significand: f64be, exponent: i
 	f, e := frexp_f64(f64(x))
 	return f64be(f), e
 }
-frexp       :: proc{
+
+// frexp breaks the value into a normalized fraction, and an integral power of two
+// It returns a significand and exponent satisfying x == significand * 2**exponent
+// with the absolute value of significand in the intervalue of [0.5, 1).
+//
+// Special cases: 
+// 	frexp(+0)   = +0,   0
+// 	frexp(-0)   = -0,   0
+// 	frexp(+inf) = +inf, 0
+// 	frexp(-inf) = -inf, 0
+// 	frexp(NaN)  = NaN,  0
+frexp :: proc{
 	frexp_f16, frexp_f16le, frexp_f16be,
 	frexp_f32, frexp_f32le, frexp_f32be,
 	frexp_f64, frexp_f64le, frexp_f64be, 
@@ -879,7 +959,7 @@ classify_f16   :: proc "contextless" (x: f16)   -> Float_Class {
 			return .Neg_Zero
 		}
 		return .Zero
-	case x*0.5 == x:
+	case x*0.25 == x:
 		if x < 0 {
 			return .Neg_Inf
 		}
@@ -948,6 +1028,8 @@ classify_f64   :: proc "contextless" (x: f64)   -> Float_Class {
 }
 classify_f64le :: proc "contextless" (x: f64le) -> Float_Class { return #force_inline classify_f64(f64(x)) }
 classify_f64be :: proc "contextless" (x: f64be) -> Float_Class { return #force_inline classify_f64(f64(x)) }
+// Returns the `Float_Class` of the value, i.e. whether normal, subnormal, zero, negative zero, NaN, infinity or
+// negative infinity.
 classify       :: proc{
 	classify_f16, classify_f16le, classify_f16be,
 	classify_f32, classify_f32le, classify_f32be,
@@ -1048,13 +1130,11 @@ inf_f32be :: proc "contextless" (sign: int) -> f32be {
 	return f32be(inf_f64(sign))
 }
 inf_f64   :: proc "contextless" (sign: int) -> f64 {
-	v: u64
 	if sign >= 0 {
-		v = 0x7ff00000_00000000
+		return 0h7ff00000_00000000
 	} else {
-		v = 0xfff00000_00000000
+		return 0hfff00000_00000000
 	}
-	return transmute(f64)v
 }
 inf_f64le :: proc "contextless" (sign: int) -> f64le {
 	return f64le(inf_f64(sign))
@@ -1082,8 +1162,7 @@ nan_f32be :: proc "contextless" () -> f32be {
 	return f32be(nan_f64())
 }
 nan_f64   :: proc "contextless" () -> f64 {
-	v: u64 = 0x7ff80000_00000001
-	return transmute(f64)v
+	return 0h7ff80000_00000001
 }
 nan_f64le :: proc "contextless" () -> f64le {
 	return f64le(nan_f64())
@@ -1120,13 +1199,14 @@ sum :: proc "contextless" (x: $T/[]$E) -> (res: E)
 
 prod :: proc "contextless" (x: $T/[]$E) -> (res: E)
 	where intrinsics.type_is_numeric(E) {
+	res = 1
 	for i in x {
 		res *= i
 	}
 	return
 }
 
-cumsum_inplace :: proc "contextless" (x: $T/[]$E) -> T
+cumsum_inplace :: proc "contextless" (x: $T/[]$E)
 	where intrinsics.type_is_numeric(E) {
 	for i in 1..<len(x) {
 		x[i] = x[i-1] + x[i]
@@ -1277,7 +1357,7 @@ atan :: proc "contextless" (x: $T) -> T where intrinsics.type_is_float(T) {
 }
 
 asin :: proc "contextless" (x: $T) -> T where intrinsics.type_is_float(T) {
-	return atan2(x, 1 + sqrt(1 - x*x))
+	return atan2(x, sqrt(1 - x*x))
 }
 
 acos :: proc "contextless" (x: $T) -> T where intrinsics.type_is_float(T) {
@@ -1297,17 +1377,294 @@ tanh :: proc "contextless" (x: $T) -> T where intrinsics.type_is_float(T) {
 	return (t - 1) / (t + 1)
 }
 
-asinh :: proc "contextless" (x: $T) -> T where intrinsics.type_is_float(T) {
-	return ln(x + sqrt(x*x + 1))
+asinh :: proc "contextless" (y: $T) -> T where intrinsics.type_is_float(T) {
+	// The original C code, the long comment, and the constants
+	// below are from FreeBSD's /usr/src/lib/msun/src/s_asinh.c
+	// and came with this notice. 
+	//
+	// ====================================================
+	// Copyright (C) 1993 by Sun Microsystems, Inc. All rights reserved.
+	//
+	// Developed at SunPro, a Sun Microsystems, Inc. business.
+	// Permission to use, copy, modify, and distribute this
+	// software is freely granted, provided that this notice
+	// is preserved.
+	// ====================================================
+	
+	LN2       :: 0h3FE62E42FEFA39EF
+	NEAR_ZERO :: 1.0 / (1 << 28)
+	LARGE     :: 1 << 28
+	
+	x := f64(y)
+	
+	if is_nan(x) || is_inf(x) {
+		return T(x)
+	}
+	sign := false
+	if x < 0 {
+		x = -x
+		sign = true
+	}
+	temp: f64
+	switch {
+	case x > LARGE:
+		temp = ln(x) + LN2
+	case x > 2:
+		temp = ln(2*x + 1/(sqrt(x*x + 1) + x))
+	case x < NEAR_ZERO:
+		temp = x
+	case:
+		temp = log1p(x + x*x/(1 + sqrt(1 + x*x)))
+	}
+	
+	if sign {
+		temp = -temp
+	}
+	return T(temp)
 }
 
-acosh :: proc "contextless" (x: $T) -> T where intrinsics.type_is_float(T) {
-	return ln(x + sqrt(x*x - 1))
+acosh :: proc "contextless" (y: $T) -> T where intrinsics.type_is_float(T) {
+	// The original C code, the long comment, and the constants
+	// below are from FreeBSD's /usr/src/lib/msun/src/e_acosh.c
+	// and came with this notice. 
+	//
+	// ====================================================
+	// Copyright (C) 1993 by Sun Microsystems, Inc. All rights reserved.
+	//
+	// Developed at SunPro, a Sun Microsystems, Inc. business.
+	// Permission to use, copy, modify, and distribute this
+	// software is freely granted, provided that this notice
+	// is preserved.
+	// ====================================================
+	
+	LARGE :: 1<<28
+	LN2 :: 0h3FE62E42FEFA39EF
+	x := f64(y)
+	switch {
+	case x < 1 || is_nan(x):
+		return T(nan_f64())
+	case x == 1:
+		return 0
+	case x >= LARGE:
+		return T(ln(x) + LN2)
+	case x > 2:
+		return T(ln(2*x - 1/(x+sqrt(x*x-1))))
+	}
+	t := x-1
+	return T(log1p(t + sqrt(2*t + t*t)))
 }
 
-atanh :: proc "contextless" (x: $T) -> T where intrinsics.type_is_float(T) {
-	return 0.5*ln((1+x)/(1-x))
+atanh :: proc "contextless" (y: $T) -> T where intrinsics.type_is_float(T) {
+	// The original C code, the long comment, and the constants
+	// below are from FreeBSD's /usr/src/lib/msun/src/e_atanh.c
+	// and came with this notice. 
+	//
+	// ====================================================
+	// Copyright (C) 1993 by Sun Microsystems, Inc. All rights reserved.
+	//
+	// Developed at SunPro, a Sun Microsystems, Inc. business.
+	// Permission to use, copy, modify, and distribute this
+	// software is freely granted, provided that this notice
+	// is preserved.
+	// ====================================================
+	NEAR_ZERO :: 1.0 / (1 << 28)
+	x := f64(y)
+	switch {
+	case x < -1 || x > 1 || is_nan(x):
+		return T(nan_f64())
+	case x == 1:
+		return T(inf_f64(1))
+	case x == -1:
+		return T(inf_f64(-1))
+	}
+	sign := false
+	if x < 0 {
+		x = -x
+		sign = true
+	}
+	temp: f64
+	switch {
+	case x < NEAR_ZERO:
+		temp = x
+	case x < 0.5:
+		temp = x + x
+		temp = 0.5 * log1p(temp + temp*x/(1-x))
+	case:
+		temp = 0.5 * log1p((x+x)/(1-x))
+	}
+	if sign {
+		temp = -temp
+	}
+	return T(temp)
 }
+
+ilogb_f16 :: proc "contextless" (val: f16) -> int {
+	switch {
+	case val == 0:    return int(min(i32))
+	case is_nan(val): return int(max(i32))
+	case is_inf(val): return int(max(i32))
+	}
+	x, exp := normalize_f16(val)
+	return int(((transmute(u16)x)>>F16_SHIFT)&F16_MASK) - F16_BIAS + exp
+}
+ilogb_f32 :: proc "contextless" (val: f32) -> int {
+	switch {
+	case val == 0:    return int(min(i32))
+	case is_nan(val): return int(max(i32))
+	case is_inf(val): return int(max(i32))
+	}
+	x, exp := normalize_f32(val)
+	return int(((transmute(u32)x)>>F32_SHIFT)&F32_MASK) - F32_BIAS + exp
+}
+ilogb_f64 :: proc "contextless" (val: f64) -> int {
+	switch {
+	case val == 0:    return int(min(i32))
+	case is_nan(val): return int(max(i32))
+	case is_inf(val): return int(max(i32))
+	}
+	x, exp := normalize_f64(val)
+	return int(((transmute(u64)x)>>F64_SHIFT)&F64_MASK) - F64_BIAS + exp
+}
+ilogb_f16le :: proc "contextless" (value: f16le) -> int { return ilogb_f16(f16(value)) }
+ilogb_f16be :: proc "contextless" (value: f16be) -> int { return ilogb_f16(f16(value)) }
+ilogb_f32le :: proc "contextless" (value: f32le) -> int { return ilogb_f32(f32(value)) }
+ilogb_f32be :: proc "contextless" (value: f32be) -> int { return ilogb_f32(f32(value)) }
+ilogb_f64le :: proc "contextless" (value: f64le) -> int { return ilogb_f64(f64(value)) }
+ilogb_f64be :: proc "contextless" (value: f64be) -> int { return ilogb_f64(f64(value)) }
+ilogb :: proc {
+	ilogb_f16,
+	ilogb_f32,
+	ilogb_f64,
+	ilogb_f16le,
+	ilogb_f16be,
+	ilogb_f32le,
+	ilogb_f32be,
+	ilogb_f64le,
+	ilogb_f64be,
+}
+
+logb_f16 :: proc "contextless" (val: f16) -> f16 {
+	switch {
+	case val == 0:    return inf_f16(-1)
+	case is_inf(val): return inf_f16(+1)
+	case is_nan(val): return val
+	}
+	return f16(ilogb(val))
+}
+logb_f32 :: proc "contextless" (val: f32) -> f32 {
+	switch {
+	case val == 0:    return inf_f32(-1)
+	case is_inf(val): return inf_f32(+1)
+	case is_nan(val): return val
+	}
+	return f32(ilogb(val))
+}
+logb_f64 :: proc "contextless" (val: f64) -> f64 {
+	switch {
+	case val == 0:    return inf_f64(-1)
+	case is_inf(val): return inf_f64(+1)
+	case is_nan(val): return val
+	}
+	return f64(ilogb(val))
+}
+logb_f16le :: proc "contextless" (value: f16le) -> f16le { return f16le(logb_f16(f16(value))) }
+logb_f16be :: proc "contextless" (value: f16be) -> f16be { return f16be(logb_f16(f16(value))) }
+logb_f32le :: proc "contextless" (value: f32le) -> f32le { return f32le(logb_f32(f32(value))) }
+logb_f32be :: proc "contextless" (value: f32be) -> f32be { return f32be(logb_f32(f32(value))) }
+logb_f64le :: proc "contextless" (value: f64le) -> f64le { return f64le(logb_f64(f64(value))) }
+logb_f64be :: proc "contextless" (value: f64be) -> f64be { return f64be(logb_f64(f64(value))) }
+logb :: proc {
+	logb_f16,
+	logb_f32,
+	logb_f64,
+	logb_f16le,
+	logb_f16be,
+	logb_f32le,
+	logb_f32be,
+	logb_f64le,
+	logb_f64be,
+}
+
+nextafter_f16 :: proc "contextless" (x, y: f16) -> (r: f16) {
+	switch {
+	case is_nan(x) || is_nan(y):
+		r = nan_f16()
+	case x == y:
+		r = x
+	case x == 0:
+		r = copy_sign_f16(1, y)
+	case (y > x) == (x > 0):
+		r = transmute(f16)(transmute(u16)x + 1)
+	case:
+		r = transmute(f16)(transmute(u16)x - 1)
+	}
+	return
+}
+nextafter_f32 :: proc "contextless" (x, y: f32) -> (r: f32) {
+	switch {
+	case is_nan(x) || is_nan(y):
+		r = nan_f32()
+	case x == y:
+		r = x
+	case x == 0:
+		r = copy_sign_f32(1, y)
+	case (y > x) == (x > 0):
+		r = transmute(f32)(transmute(u32)x + 1)
+	case:
+		r = transmute(f32)(transmute(u32)x - 1)
+	}
+	return
+}
+nextafter_f64 :: proc "contextless" (x, y: f64) -> (r: f64) {
+	switch {
+	case is_nan(x) || is_nan(y):
+		r = nan_f64()
+	case x == y:
+		r = x
+	case x == 0:
+		r = copy_sign_f64(1, y)
+	case (y > x) == (x > 0):
+		r = transmute(f64)(transmute(u64)x + 1)
+	case:
+		r = transmute(f64)(transmute(u64)x - 1)
+	}
+	return
+}
+nextafter_f16le :: proc "contextless" (x, y: f16le) -> (r: f16le) { return f16le(nextafter_f16(f16(x), f16(y))) }
+nextafter_f16be :: proc "contextless" (x, y: f16be) -> (r: f16be) { return f16be(nextafter_f16(f16(x), f16(y))) }
+nextafter_f32le :: proc "contextless" (x, y: f32le) -> (r: f32le) { return f32le(nextafter_f32(f32(x), f32(y))) }
+nextafter_f32be :: proc "contextless" (x, y: f32be) -> (r: f32be) { return f32be(nextafter_f32(f32(x), f32(y))) }
+nextafter_f64le :: proc "contextless" (x, y: f64le) -> (r: f64le) { return f64le(nextafter_f64(f64(x), f64(y))) }
+nextafter_f64be :: proc "contextless" (x, y: f64be) -> (r: f64be) { return f64be(nextafter_f64(f64(x), f64(y))) }
+
+nextafter :: proc{
+	nextafter_f16, nextafter_f16le, nextafter_f16be,
+	nextafter_f32, nextafter_f32le, nextafter_f32be,
+	nextafter_f64, nextafter_f64le, nextafter_f64be,
+}
+
+signbit_f16 :: proc "contextless" (x: f16) -> bool {
+	return (transmute(u16)x)&(1<<15) != 0
+}
+signbit_f32 :: proc "contextless" (x: f32) -> bool {
+	return (transmute(u32)x)&(1<<31) != 0
+}
+signbit_f64 :: proc "contextless" (x: f64) -> bool {
+	return (transmute(u64)x)&(1<<63) != 0
+}
+signbit_f16le :: proc "contextless" (x: f16le) -> bool { return signbit_f16(f16(x)) }
+signbit_f32le :: proc "contextless" (x: f32le) -> bool { return signbit_f32(f32(x)) }
+signbit_f64le :: proc "contextless" (x: f64le) -> bool { return signbit_f64(f64(x)) }
+signbit_f16be :: proc "contextless" (x: f16be) -> bool { return signbit_f16(f16(x)) }
+signbit_f32be :: proc "contextless" (x: f32be) -> bool { return signbit_f32(f32(x)) }
+signbit_f64be :: proc "contextless" (x: f64be) -> bool { return signbit_f64(f64(x)) }
+
+signbit :: proc{
+	signbit_f16, signbit_f16le, signbit_f16be,
+	signbit_f32, signbit_f32le, signbit_f32be,
+	signbit_f64, signbit_f64le, signbit_f64be,
+}
+
 
 F16_DIG        :: 3
 F16_EPSILON    :: 0.00097656
@@ -1349,3 +1706,34 @@ F64_MIN_10_EXP :: -307                     // min decimal exponent
 F64_MIN_EXP    :: -1021                    // min binary exponent
 F64_RADIX      :: 2                        // exponent radix
 F64_ROUNDS     :: 1                        // addition rounding: near
+
+
+F16_MASK  :: 0x1f
+F16_SHIFT :: 16 - 6
+F16_BIAS  :: 0xf
+
+F32_MASK  :: 0xff
+F32_SHIFT :: 32 - 9
+F32_BIAS  :: 0x7f
+
+F64_MASK  :: 0x7ff
+F64_SHIFT :: 64 - 12
+F64_BIAS  :: 0x3ff
+
+INF_F16     :f16: 0h7C00
+NEG_INF_F16 :f16: 0hFC00
+
+SNAN_F16    :f16: 0h7C01
+QNAN_F16    :f16: 0h7E01
+
+INF_F32     :f32: 0h7F80_0000
+NEG_INF_F32 :f32: 0hFF80_0000
+
+SNAN_F32    :f32: 0hFF80_0001
+QNAN_F32    :f32: 0hFFC0_0001
+
+INF_F64     :f64: 0h7FF0_0000_0000_0000
+NEG_INF_F64 :f64: 0hFFF0_0000_0000_0000
+
+SNAN_F64    :f64: 0h7FF0_0000_0000_0001
+QNAN_F64    :f64: 0h7FF8_0000_0000_0001

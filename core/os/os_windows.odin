@@ -2,6 +2,7 @@
 package os
 
 import win32 "core:sys/windows"
+import "core:runtime"
 
 Handle    :: distinct uintptr
 File_Time :: distinct u64
@@ -128,6 +129,7 @@ get_page_size :: proc() -> int {
 
 
 exit :: proc "contextless" (code: int) -> ! {
+	runtime._cleanup_runtime_contextless()
 	win32.ExitProcess(win32.DWORD(code))
 }
 

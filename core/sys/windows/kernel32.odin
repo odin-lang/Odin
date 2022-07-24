@@ -3,11 +3,10 @@ package sys_windows
 
 foreign import kernel32 "system:Kernel32.lib"
 
-
-
 @(default_calling_convention="stdcall")
 foreign kernel32 {
-	OutputDebugStringA :: proc(lpOutputString: LPCSTR) ---
+	OutputDebugStringA :: proc(lpOutputString: LPCSTR) --- // The only A thing that is allowed
+	OutputDebugStringW :: proc(lpOutputString: LPCWSTR) ---
 
 	ReadConsoleW :: proc(hConsoleInput: HANDLE,
 	                     lpBuffer: LPVOID,
@@ -23,12 +22,18 @@ foreign kernel32 {
 
 	GetConsoleMode :: proc(hConsoleHandle: HANDLE,
 	                       lpMode: LPDWORD) -> BOOL ---
-
+	SetConsoleMode :: proc(hConsoleHandle: HANDLE,
+	                       dwMode: DWORD) -> BOOL ---
 
 	GetFileInformationByHandle :: proc(hFile: HANDLE, lpFileInformation: LPBY_HANDLE_FILE_INFORMATION) -> BOOL ---
 	SetHandleInformation :: proc(hObject: HANDLE,
 	                             dwMask: DWORD,
 	                             dwFlags: DWORD) -> BOOL ---
+	SetFileInformationByHandle :: proc(hFile:                HANDLE,
+	                                   FileInformationClass: FILE_INFO_BY_HANDLE_CLASS,
+	                                   lpFileInformation:    LPVOID,
+	                                   dwBufferSize:         DWORD) -> BOOL ---
+
 
 	AddVectoredExceptionHandler :: proc(FirstHandler: ULONG, VectoredHandler: PVECTORED_EXCEPTION_HANDLER) -> LPVOID ---
 	AddVectoredContinueHandler  :: proc(FirstHandler: ULONG, VectoredHandler: PVECTORED_EXCEPTION_HANDLER) -> LPVOID ---
@@ -62,6 +67,13 @@ foreign kernel32 {
 	GetCurrentProcessId :: proc() -> DWORD ---
 	GetCurrentThread :: proc() -> HANDLE ---
 	GetCurrentThreadId :: proc() -> DWORD ---
+	GetProcessTimes :: proc(
+		hProcess: HANDLE,
+		lpCreationTime: LPFILETIME,
+		lpExitTime: LPFILETIME,
+		lpKernelTime: LPFILETIME,
+		lpUserTime: LPFILETIME,
+	) -> BOOL ---
 	GetStdHandle :: proc(which: DWORD) -> HANDLE ---
 	ExitProcess :: proc(uExitCode: c_uint) -> ! ---
 	DeviceIoControl :: proc(
@@ -89,9 +101,23 @@ foreign kernel32 {
 	GetExitCodeThread :: proc(thread: HANDLE, exit_code: ^DWORD) -> BOOL ---
 	TerminateThread :: proc(thread: HANDLE, exit_code: DWORD) -> BOOL ---
 
-	CreateSemaphoreW :: proc(attributes: LPSECURITY_ATTRIBUTES, initial_count, maximum_count: LONG, name: LPCSTR) -> HANDLE ---
+	CreateSemaphoreW :: proc(attributes: LPSECURITY_ATTRIBUTES, initial_count, maximum_count: LONG, name: LPCWSTR) -> HANDLE ---
 	ReleaseSemaphore :: proc(semaphore: HANDLE, release_count: LONG, previous_count: ^LONG) -> BOOL ---
 
+	CreateWaitableTimerW :: proc(
+		lpTimerAttributes: LPSECURITY_ATTRIBUTES,
+		bManualReset: BOOL,
+		lpTimerName: LPCWSTR,
+	) -> HANDLE ---
+	SetWaitableTimerEx :: proc(
+		hTimer: HANDLE,
+		lpDueTime: ^LARGE_INTEGER,
+		lPeriod: LONG,
+		pfnCompletionRoutine: PTIMERAPCROUTINE,
+		lpArgToCompletionRoutine: LPVOID,
+		WakeContext: PREASON_CONTEXT,
+		TolerableDelay: ULONG,
+	) -> BOOL ---
 	WaitForSingleObject :: proc(hHandle: HANDLE, dwMilliseconds: DWORD) -> DWORD ---
 	Sleep :: proc(dwMilliseconds: DWORD) ---
 	GetProcessId :: proc(handle: HANDLE) -> DWORD ---
@@ -217,6 +243,7 @@ foreign kernel32 {
 		bInitialState: BOOL,
 		lpName: LPCWSTR,
 	) -> HANDLE ---
+	ResetEvent :: proc(hEvent: HANDLE) -> BOOL ---
 	WaitForMultipleObjects :: proc(
 		nCount: DWORD,
 		lpHandles: ^HANDLE,
@@ -244,6 +271,22 @@ foreign kernel32 {
 	HeapAlloc :: proc(hHeap: HANDLE, dwFlags: DWORD, dwBytes: SIZE_T) -> LPVOID ---
 	HeapReAlloc :: proc(hHeap: HANDLE, dwFlags: DWORD, lpMem: LPVOID, dwBytes: SIZE_T) -> LPVOID ---
 	HeapFree :: proc(hHeap: HANDLE, dwFlags: DWORD, lpMem: LPVOID) -> BOOL ---
+
+	LocalAlloc :: proc(flags: UINT, bytes: SIZE_T) -> LPVOID ---
+	LocalReAlloc :: proc(mem: LPVOID, bytes: SIZE_T, flags: UINT) -> LPVOID ---
+	LocalFree :: proc(mem: LPVOID) -> LPVOID ---
+
+
+	ReadDirectoryChangesW :: proc(
+		hDirectory: HANDLE,
+		lpBuffer: LPVOID,
+		nBufferLength: DWORD,
+		bWatchSubtree: BOOL,
+		dwNotifyFilter: DWORD,
+		lpBytesReturned: LPDWORD,
+		lpOverlapped: LPOVERLAPPED,
+		lpCompletionRoutine: LPOVERLAPPED_COMPLETION_ROUTINE,
+	) -> BOOL ---
 
 	InitializeSRWLock          :: proc(SRWLock: ^SRWLOCK) ---
 	AcquireSRWLockExclusive    :: proc(SRWLock: ^SRWLOCK) ---
@@ -286,7 +329,6 @@ foreign kernel32 {
 }
 
 
-STANDARD_RIGHTS_REQUIRED     :: DWORD(0x000F0000)
 SECTION_QUERY                :: DWORD(0x0001)
 SECTION_MAP_WRITE            :: DWORD(0x0002)
 SECTION_MAP_READ             :: DWORD(0x0004)
@@ -341,6 +383,7 @@ MEM_TOP_DOWN    :: 0x100000
 MEM_LARGE_PAGES :: 0x20000000
 MEM_4MB_PAGES   :: 0x80000000
 
+@(default_calling_convention="stdcall")
 foreign kernel32 {
 	VirtualAlloc :: proc(
 		lpAddress: LPVOID,
@@ -483,6 +526,7 @@ LowMemoryResourceNotification  :: MEMORY_RESOURCE_NOTIFICATION_TYPE.LowMemoryRes
 HighMemoryResourceNotification :: MEMORY_RESOURCE_NOTIFICATION_TYPE.HighMemoryResourceNotification
 
 
+@(default_calling_convention="stdcall")
 foreign kernel32 {
 	CreateMemoryResourceNotification :: proc(
 		NotificationType: MEMORY_RESOURCE_NOTIFICATION_TYPE,
@@ -498,6 +542,7 @@ FILE_CACHE_MAX_HARD_DISABLE :: DWORD(0x00000002)
 FILE_CACHE_MIN_HARD_ENABLE  :: DWORD(0x00000004)
 FILE_CACHE_MIN_HARD_DISABLE :: DWORD(0x00000008)
 
+@(default_calling_convention="stdcall")
 foreign kernel32 {
 	GetSystemFileCacheSize :: proc(
 		lpMinimumFileCacheSize: PSIZE_T,
@@ -527,6 +572,7 @@ WIN32_MEMORY_RANGE_ENTRY :: struct {
 
 PWIN32_MEMORY_RANGE_ENTRY :: ^WIN32_MEMORY_RANGE_ENTRY
 
+@(default_calling_convention="stdcall")
 foreign kernel32 {
 	PrefetchVirtualMemory :: proc(
 		hProcess: HANDLE,
@@ -584,6 +630,7 @@ foreign kernel32 {
 
 MEHC_PATROL_SCRUBBER_PRESENT :: ULONG(0x1)
 
+@(default_calling_convention="stdcall")
 foreign kernel32 {
 	GetMemoryErrorHandlingCapabilities :: proc(
 		Capabilities: PULONG,
@@ -592,6 +639,7 @@ foreign kernel32 {
 
 PBAD_MEMORY_CALLBACK_ROUTINE :: #type proc "stdcall" ()
 
+@(default_calling_convention="stdcall")
 foreign kernel32 {
 	RegisterBadMemoryNotification :: proc(
 		Callback: PBAD_MEMORY_CALLBACK_ROUTINE,
@@ -612,6 +660,7 @@ VmOfferPriorityLow         :: OFFER_PRIORITY.VmOfferPriorityLow
 VmOfferPriorityBelowNormal :: OFFER_PRIORITY.VmOfferPriorityBelowNormal
 VmOfferPriorityNormal      :: OFFER_PRIORITY.VmOfferPriorityNormal
 
+@(default_calling_convention="stdcall")
 foreign kernel32 {
 	OfferVirtualMemory :: proc(
 		VirtualAddress: PVOID,
@@ -676,6 +725,7 @@ WIN32_MEMORY_REGION_INFORMATION_u_s_Bitfield :: distinct ULONG
 	Reserved       : 32-6,
 }*/
 
+@(default_calling_convention="stdcall")
 foreign kernel32 {
 	QueryVirtualMemoryInformation :: proc(
 		Process: HANDLE,
@@ -700,7 +750,7 @@ foreign kernel32 {
 
 NUMA_NO_PREFERRED_NODE :: 0xffffffff
 
-MapViewOfFile2 :: #force_inline proc(
+MapViewOfFile2 :: #force_inline proc "stdcall" (
 	FileMappingHandle: HANDLE,
 	ProcessHandle: HANDLE,
 	Offset: ULONG64,
@@ -721,10 +771,26 @@ MapViewOfFile2 :: #force_inline proc(
 	)
 }
 
+@(default_calling_convention="stdcall")
 foreign kernel32 {
 	UnmapViewOfFile2 :: proc(
 		ProcessHandle: HANDLE,
 		BaseAddress: PVOID,
 		UnmapFlags: ULONG,
 	) -> BOOL ---
+}
+
+@(default_calling_convention="stdcall")
+foreign kernel32 {
+	@(link_name="SetConsoleCtrlHandler") set_console_ctrl_handler :: proc(handler: Handler_Routine, add: BOOL) -> BOOL ---
+}
+
+Handler_Routine :: proc(dwCtrlType: Control_Event) -> BOOL
+
+Control_Event :: enum DWORD {
+	control_c = 0,
+	_break    = 1,
+	close     = 2,
+	logoff    = 5,
+	shutdown  = 6,
 }

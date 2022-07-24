@@ -39,6 +39,7 @@ Token ast_token(Ast *node) {
 	case Ast_SliceExpr:          return node->SliceExpr.open;
 	case Ast_Ellipsis:           return node->Ellipsis.token;
 	case Ast_FieldValue:         return node->FieldValue.eq;
+	case Ast_EnumFieldValue:     return ast_token(node->EnumFieldValue.name);
 	case Ast_DerefExpr:          return node->DerefExpr.op;
 	case Ast_TernaryIfExpr:      return ast_token(node->TernaryIfExpr.x);
 	case Ast_TernaryWhenExpr:    return ast_token(node->TernaryWhenExpr.x);
@@ -178,6 +179,11 @@ Token ast_end_token(Ast *node) {
 		}
 		return node->Ellipsis.token;
 	case Ast_FieldValue:         return ast_end_token(node->FieldValue.value);
+	case Ast_EnumFieldValue:
+		if (node->EnumFieldValue.value) {
+			return ast_end_token(node->EnumFieldValue.value);
+		}
+		return ast_end_token(node->EnumFieldValue.name);
 	case Ast_DerefExpr:          return node->DerefExpr.op;
 	case Ast_TernaryIfExpr:      return ast_end_token(node->TernaryIfExpr.y);
 	case Ast_TernaryWhenExpr:    return ast_end_token(node->TernaryWhenExpr.y);

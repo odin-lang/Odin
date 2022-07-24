@@ -3,8 +3,9 @@ package stb_truetype
 import c "core:c"
 import stbrp "vendor:stb/rect_pack"
 
-when ODIN_OS == "windows" { foreign import stbtt "../lib/stb_truetype.lib" }
-when ODIN_OS == "linux"   { foreign import stbtt "../lib/stb_truetype.a"   }
+when ODIN_OS == .Windows { foreign import stbtt "../lib/stb_truetype.lib" }
+when ODIN_OS == .Linux   { foreign import stbtt "../lib/stb_truetype.a"   }
+when ODIN_OS == .Darwin  { foreign import stbtt "../lib/stb_truetype.a"   }
 
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -98,6 +99,7 @@ pack_range :: struct {
 pack_context :: struct {
 	user_allocator_context, pack_info:       rawptr,
 	width, height, stride_in_bytes, padding: c.int,
+	skip_missing:                            b32,
 	h_oversample, v_oversample:              u32,
 	pixels:                                  [^]byte,
 	nodes:                                   rawptr,
@@ -224,7 +226,7 @@ foreign stbtt {
 	// (.ttf) files only contain one font. The number of fonts can be used for
 	// indexing with the previous function where the index is between zero and one
 	// less than the total fonts. If an error occurs, -1 is returned.
-	GetNumberOfFonts :: proc(data: [^]byte) -> b32 ---
+	GetNumberOfFonts :: proc(data: [^]byte) -> c.int ---
 	
 	// Each .ttf/.ttc file may have more than one font. Each font has a sequential
 	// index number starting from 0. Call this function to get the font offset for

@@ -9,6 +9,10 @@ OS :: ODIN_OS
 ARCH :: ODIN_ARCH
 ENDIAN :: ODIN_ENDIAN
 
+SEEK_SET :: 0
+SEEK_CUR :: 1
+SEEK_END :: 2
+
 write_string :: proc(fd: Handle, str: string) -> (int, Errno) {
 	return write(fd, transmute([]byte)str)
 }
@@ -55,6 +59,25 @@ write_encoded_rune :: proc(fd: Handle, r: rune) {
 	write_byte(fd, '\'')
 }
 
+read_at_least :: proc(fd: Handle, buf: []byte, min: int) -> (n: int, err: Errno) {
+	if len(buf) < min {
+		return 0, -1
+	}
+	for n < min && err == 0 {
+		nn: int
+		nn, err = read(fd, buf[n:])
+		n += nn
+	}
+	if n >= min {
+		err = 0
+	}
+	return
+}
+
+read_full :: proc(fd: Handle, buf: []byte) -> (n: int, err: Errno) {
+	return read_at_least(fd, buf, len(buf))
+}
+
 
 file_size_from_path :: proc(path: string) -> i64 {
 	fd, err := open(path, O_RDONLY, 0)
@@ -85,27 +108,27 @@ read_entire_file_from_filename :: proc(name: string, allocator := context.alloca
 read_entire_file_from_handle :: proc(fd: Handle, allocator := context.allocator) -> (data: []byte, success: bool) {
 	context.allocator = allocator
 
-    length: i64
-    err: Errno
-    if length, err = file_size(fd); err != 0 {
-        return nil, false
-    }
+	length: i64
+	err: Errno
+	if length, err = file_size(fd); err != 0 {
+	    return nil, false
+	}
 
-    if length <= 0 {
-        return nil, true
-    }
+	if length <= 0 {
+		return nil, true
+	}
 
-    data = make([]byte, int(length), allocator)
-    if data == nil {
-        return nil, false
-    }
+	data = make([]byte, int(length), allocator)
+	if data == nil {
+	return nil, false
+	}
 
-    bytes_read, read_err := read(fd, data)
-    if read_err != ERROR_NONE {
-        delete(data)
-        return nil, false
-    }
-    return data[:bytes_read], true
+	bytes_read, read_err := read_full(fd, data)
+	if read_err != ERROR_NONE {
+		delete(data)
+		return nil, false
+	}
+	return data[:bytes_read], true
 }
 
 read_entire_file :: proc {
@@ -120,7 +143,7 @@ write_entire_file :: proc(name: string, data: []byte, truncate := true) -> (succ
 	}
 
 	mode: int = 0
-	when OS == "linux" || OS == "darwin" {
+	when OS == .Linux || OS == .Darwin {
 		// NOTE(justasd): 644 (owner read, write; group read; others read)
 		mode = S_IRUSR | S_IWUSR | S_IRGRP | S_IROTH
 	}
@@ -187,11 +210,19 @@ heap_allocator_proc :: proc(allocator_data: rawptr, mode: mem.Allocator_Mode,
 		}
 	}
 
-	aligned_resize :: proc(p: rawptr, old_size: int, new_size: int, new_alignment: int) -> ([]byte, mem.Allocator_Error) {
+	aligned_resize :: proc(p: rawptr, old_size: int, new_size: int, new_alignment: int) -> (new_memory: []byte, err: mem.Allocator_Error) {
 		if p == nil {
 			return nil, nil
 		}
-		return aligned_alloc(new_size, new_alignment, p)
+
+		new_memory = aligned_alloc(new_size, new_alignment, p) or_return
+		
+		// NOTE: heap_resize does not zero the new memory, so we do it
+		if new_size > old_size {
+			new_region := mem.raw_data(new_memory[old_size:])
+			mem.zero(new_region, new_size - old_size)
+		}
+		return
 	}
 
 	switch mode {

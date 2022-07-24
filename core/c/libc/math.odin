@@ -4,8 +4,10 @@ package libc
 
 import "core:intrinsics"
 
-when ODIN_OS == "windows" {
+when ODIN_OS == .Windows {
 	foreign import libc "system:libucrt.lib"
+} else when ODIN_OS == .Darwin {
+	foreign import libc "system:System.framework"
 } else {
 	foreign import libc "system:c"
 }
@@ -209,19 +211,19 @@ _signbitf :: #force_inline proc(x: float) -> int {
 	return int(transmute(uint32_t)x >> 31)
 }
 
-isfinite :: #force_inline proc(x: $T) where intrinsics.type_is_float(T) {
+isfinite :: #force_inline proc(x: $T) -> bool where intrinsics.type_is_float(T) {
 	return fpclassify(x) == FP_INFINITE
 }
 
-isinf :: #force_inline proc(x: $T) where intrinsics.type_is_float(T) {
+isinf :: #force_inline proc(x: $T) -> bool where intrinsics.type_is_float(T) {
 	return fpclassify(x) > FP_INFINITE
 }
 
-isnan :: #force_inline proc(x: $T) where intrinsics.type_is_float(T) {
+isnan :: #force_inline proc(x: $T) -> bool where intrinsics.type_is_float(T) {
 	return fpclassify(x) == FP_NAN
 }
 
-isnormal :: #force_inline proc(x: $T) where intrinsics.type_is_float(T) {
+isnormal :: #force_inline proc(x: $T) -> bool where intrinsics.type_is_float(T) {
 	return fpclassify(x) == FP_NORMAL
 }
 
@@ -229,27 +231,27 @@ isnormal :: #force_inline proc(x: $T) where intrinsics.type_is_float(T) {
 // implemented as the relational comparisons, as that would produce an invalid
 // "sticky" state that propagates and affects maths results. These need
 // to be implemented natively in Odin assuming isunordered to prevent that.
-isgreater :: #force_inline proc(x, y: $T) where intrinsics.type_is_float(T) {
+isgreater :: #force_inline proc(x, y: $T) -> bool where intrinsics.type_is_float(T) {
 	return !isunordered(x, y) && x > y
 }
 
-isgreaterequal :: #force_inline proc(x, y: $T) where intrinsics.type_is_float(T) {
+isgreaterequal :: #force_inline proc(x, y: $T) -> bool where intrinsics.type_is_float(T) {
 	return !isunordered(x, y) && x >= y
 }
 
-isless :: #force_inline proc(x, y: $T) where intrinsics.type_is_float(T) {
+isless :: #force_inline proc(x, y: $T) -> bool where intrinsics.type_is_float(T) {
 	return !isunordered(x, y) && x < y
 }
 
-islessequal :: #force_inline proc(x, y: $T) where intrinsics.type_is_float(T) {
+islessequal :: #force_inline proc(x, y: $T) -> bool where intrinsics.type_is_float(T) {
 	return !isunordered(x, y) && x <= y
 }
 
-islessgreater :: #force_inline proc(x, y: $T) where intrinsics.type_is_float(T) {
+islessgreater :: #force_inline proc(x, y: $T) -> bool where intrinsics.type_is_float(T) {
 	return !isunordered(x, y) && x <= y
 }
 
-isunordered :: #force_inline proc(x, y: $T) where intrinsics.type_is_float(T) {
+isunordered :: #force_inline proc(x, y: $T) -> bool where intrinsics.type_is_float(T) {
 	if isnan(x) {
 		// Force evaluation of y to propagate exceptions for ordering semantics.
 		// To ensure correct semantics of IEEE 754 this cannot be compiled away.

@@ -52,11 +52,11 @@ unmarshal_any :: proc(data: []byte, v: any, spec := DEFAULT_SPECIFICATION, alloc
 	if p.spec == .MJSON {
 		#partial switch p.curr_token.kind {
 		case .Ident, .String:
-			return unmarsal_object(&p, data, .EOF)
+			return unmarshal_object(&p, data, .EOF)
 		}
 	}
 
-	return unmarsal_value(&p, data)
+	return unmarshal_value(&p, data)
 }
 
 
@@ -148,7 +148,7 @@ assign_float :: proc(val: any, f: $T) -> bool {
 
 
 @(private)
-unmarsal_string :: proc(p: ^Parser, val: any, str: string, ti: ^reflect.Type_Info) -> bool {
+unmarshal_string_token :: proc(p: ^Parser, val: any, str: string, ti: ^reflect.Type_Info) -> bool {
 	val := val
 	switch dst in &val {
 	case string:
@@ -198,7 +198,7 @@ unmarsal_string :: proc(p: ^Parser, val: any, str: string, ti: ^reflect.Type_Inf
 
 
 @(private)
-unmarsal_value :: proc(p: ^Parser, v: any) -> (err: Unmarshal_Error) {
+unmarshal_value :: proc(p: ^Parser, v: any) -> (err: Unmarshal_Error) {
 	UNSUPPORTED_TYPE := Unsupported_Type_Error{v.id, p.curr_token}
 	token := p.curr_token
 	
@@ -209,7 +209,7 @@ unmarsal_value :: proc(p: ^Parser, v: any) -> (err: Unmarshal_Error) {
 		variant := u.variants[0]
 		v.id = variant.id
 		ti = reflect.type_info_base(variant)
-		if !(u.maybe && reflect.is_pointer(variant)) {
+		if !reflect.is_pointer_internally(variant) {
 			tag := any{rawptr(uintptr(v.data) + u.tag_offset), u.tag_type.id}
 			assign_int(tag, 1)
 		}
@@ -222,6 +222,7 @@ unmarsal_value :: proc(p: ^Parser, v: any) -> (err: Unmarshal_Error) {
 		advance_token(p)
 		return
 	case .False, .True:
+		advance_token(p)
 		if assign_bool(v, token.kind == .True) {
 			return
 		}
@@ -256,7 +257,7 @@ unmarsal_value :: proc(p: ^Parser, v: any) -> (err: Unmarshal_Error) {
 	case .Ident:
 		advance_token(p)
 		if p.spec == .MJSON {
-			if unmarsal_string(p, any{v.data, ti.id}, token.text, ti) {
+			if unmarshal_string_token(p, any{v.data, ti.id}, token.text, ti) {
 				return nil
 			}
 		}
@@ -265,7 +266,7 @@ unmarsal_value :: proc(p: ^Parser, v: any) -> (err: Unmarshal_Error) {
 	case .String:
 		advance_token(p)
 		str := unquote_string(token, p.spec, p.allocator) or_return
-		if unmarsal_string(p, any{v.data, ti.id}, str, ti) {
+		if unmarshal_string_token(p, any{v.data, ti.id}, str, ti) {
 			return nil
 		}
 		delete(str, p.allocator)
@@ -273,10 +274,10 @@ unmarsal_value :: proc(p: ^Parser, v: any) -> (err: Unmarshal_Error) {
 
 
 	case .Open_Brace:
-		return unmarsal_object(p, v, .Close_Brace)
+		return unmarshal_object(p, v, .Close_Brace)
 
 	case .Open_Bracket:
-		return unmarsal_array(p, v)
+		return unmarshal_array(p, v)
 
 	case:
 		if p.spec != .JSON {
@@ -311,16 +312,16 @@ unmarsal_value :: proc(p: ^Parser, v: any) -> (err: Unmarshal_Error) {
 
 
 @(private)
-unmarsal_expect_token :: proc(p: ^Parser, kind: Token_Kind, loc := #caller_location) -> Token {
+unmarshal_expect_token :: proc(p: ^Parser, kind: Token_Kind, loc := #caller_location) -> Token {
 	prev := p.curr_token
 	err := expect_token(p, kind)
-	assert(err == nil, "unmarsal_expect_token")
+	assert(err == nil, "unmarshal_expect_token")
 	return prev
 }
 
 
 @(private)
-unmarsal_object :: proc(p: ^Parser, v: any, end_token: Token_Kind) -> (err: Unmarshal_Error) {
+unmarshal_object :: proc(p: ^Parser, v: any, end_token: Token_Kind) -> (err: Unmarshal_Error) {
 	UNSUPPORTED_TYPE := Unsupported_Type_Error{v.id, p.curr_token}
 	
 	if end_token == .Close_Brace {
@@ -341,7 +342,7 @@ unmarsal_object :: proc(p: ^Parser, v: any, end_token: Token_Kind) -> (err: Unma
 			key, _ := parse_object_key(p, p.allocator)
 			defer delete(key, p.allocator)
 			
-			unmarsal_expect_token(p, .Colon)						
+			unmarshal_expect_token(p, .Colon)						
 			
 			fields := reflect.struct_fields_zipped(ti.id)
 			
@@ -377,7 +378,7 @@ unmarsal_object :: proc(p: ^Parser, v: any, end_token: Token_Kind) -> (err: Unma
 				
 				field_ptr := rawptr(uintptr(v.data) + offset)
 				field := any{field_ptr, type.id}
-				unmarsal_value(p, field) or_return
+				unmarshal_value(p, field) or_return
 					
 				if parse_comma(p) {
 					break struct_loop
@@ -406,11 +407,11 @@ unmarsal_object :: proc(p: ^Parser, v: any, end_token: Token_Kind) -> (err: Unma
 		
 		map_loop: for p.curr_token.kind != end_token {
 			key, _ := parse_object_key(p, p.allocator)
-			unmarsal_expect_token(p, .Colon)
+			unmarshal_expect_token(p, .Colon)
 			
 			
 			mem.zero_slice(elem_backing)
-			if err := unmarsal_value(p, map_backing_value); err != nil {
+			if err := unmarshal_value(p, map_backing_value); err != nil {
 				delete(key, p.allocator)
 				return err
 			}
@@ -442,7 +443,7 @@ unmarsal_object :: proc(p: ^Parser, v: any, end_token: Token_Kind) -> (err: Unma
 	
 		enumerated_array_loop: for p.curr_token.kind != end_token {
 			key, _ := parse_object_key(p, p.allocator)
-			unmarsal_expect_token(p, .Colon)
+			unmarshal_expect_token(p, .Colon)
 			defer delete(key, p.allocator)
 
 			index := -1
@@ -459,7 +460,7 @@ unmarsal_object :: proc(p: ^Parser, v: any, end_token: Token_Kind) -> (err: Unma
 			index_ptr := rawptr(uintptr(v.data) + uintptr(index*t.elem_size))
 			index_any := any{index_ptr, t.elem.id}
 			
-			unmarsal_value(p, index_any) or_return
+			unmarshal_value(p, index_any) or_return
 			
 			if parse_comma(p) {
 				break enumerated_array_loop
@@ -479,10 +480,10 @@ unmarsal_object :: proc(p: ^Parser, v: any, end_token: Token_Kind) -> (err: Unma
 
 
 @(private)
-unmarsal_count_array :: proc(p: ^Parser) -> (length: uintptr) {
+unmarshal_count_array :: proc(p: ^Parser) -> (length: uintptr) {
 	p_backup := p^
 	p.allocator = mem.nil_allocator()
-	unmarsal_expect_token(p, .Open_Bracket)
+	unmarshal_expect_token(p, .Open_Bracket)
 	array_length_loop: for p.curr_token.kind != .Close_Bracket {
 		_, _ = parse_value(p)
 		length += 1
@@ -496,9 +497,9 @@ unmarsal_count_array :: proc(p: ^Parser) -> (length: uintptr) {
 }
 
 @(private)
-unmarsal_array :: proc(p: ^Parser, v: any) -> (err: Unmarshal_Error) {
+unmarshal_array :: proc(p: ^Parser, v: any) -> (err: Unmarshal_Error) {
 	assign_array :: proc(p: ^Parser, base: rawptr, elem: ^reflect.Type_Info, length: uintptr) -> Unmarshal_Error {
-		unmarsal_expect_token(p, .Open_Bracket)
+		unmarshal_expect_token(p, .Open_Bracket)
 		
 		for idx: uintptr = 0; p.curr_token.kind != .Close_Bracket; idx += 1 {
 			assert(idx < length)
@@ -506,14 +507,14 @@ unmarsal_array :: proc(p: ^Parser, v: any) -> (err: Unmarshal_Error) {
 			elem_ptr := rawptr(uintptr(base) + idx*uintptr(elem.size))
 			elem := any{elem_ptr, elem.id}
 			
-			unmarsal_value(p, elem) or_return
+			unmarshal_value(p, elem) or_return
 			
 			if parse_comma(p) {
 				break
 			}	
 		}
 		
-		unmarsal_expect_token(p, .Close_Bracket)
+		unmarshal_expect_token(p, .Close_Bracket)
 		
 		
 		return nil
@@ -523,7 +524,7 @@ unmarsal_array :: proc(p: ^Parser, v: any) -> (err: Unmarshal_Error) {
 	
 	ti := reflect.type_info_base(type_info_of(v.id))
 	
-	length := unmarsal_count_array(p)
+	length := unmarshal_count_array(p)
 	
 	#partial switch t in ti.variant {
 	case reflect.Type_Info_Slice:	

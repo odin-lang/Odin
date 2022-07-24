@@ -68,6 +68,40 @@ void yield_thread(void);
 void yield_process(void);
 
 
+struct MutexGuard {
+	MutexGuard() = delete;
+	MutexGuard(MutexGuard const &) = delete;
+
+	MutexGuard(BlockingMutex *bm) : bm{bm} {
+		mutex_lock(this->bm);
+	}
+	MutexGuard(RecursiveMutex *rm) : rm{rm} {
+		mutex_lock(this->rm);
+	}
+	MutexGuard(BlockingMutex &bm) : bm{&bm} {
+		mutex_lock(this->bm);
+	}
+	MutexGuard(RecursiveMutex &rm) : rm{&rm} {
+		mutex_lock(this->rm);
+	}
+	~MutexGuard() {
+		if (this->bm) {
+			mutex_unlock(this->bm);
+		} else if (this->rm) {
+			mutex_unlock(this->rm);
+		}
+	}
+
+	operator bool() const { return true; }
+
+	BlockingMutex *bm;
+	RecursiveMutex *rm;
+};
+
+#define MUTEX_GUARD_BLOCK(m) if (MutexGuard GB_DEFER_3(_mutex_guard_){m})
+#define MUTEX_GUARD(m) MutexGuard GB_DEFER_3(_mutex_guard_){m}
+
+
 #if defined(GB_SYSTEM_WINDOWS)
 	struct BlockingMutex {
 		SRWLOCK srwlock;
@@ -296,6 +330,8 @@ u32 thread_current_id(void) {
 	__asm__("mov %%gs:0x08,%0" : "=r"(thread_id));
 #elif defined(GB_ARCH_64_BIT) && defined(GB_CPU_X86)
 	__asm__("mov %%fs:0x10,%0" : "=r"(thread_id));
+#elif defined(GB_SYSTEM_LINUX)
+	thread_id = gettid();
 #else
 	#error Unsupported architecture for thread_current_id()
 #endif
@@ -315,6 +351,8 @@ gb_inline void yield_thread(void) {
 	#endif
 #elif defined(GB_CPU_X86)
 	_mm_pause();
+#elif defined(GB_CPU_ARM)
+	__asm__ volatile ("yield" : : : "memory");
 #else
 #error Unknown architecture
 #endif
@@ -448,7 +486,7 @@ void thread_set_name(Thread *t, char const *name) {
 #elif defined(GB_SYSTEM_OSX)
 	// TODO(bill): Test if this works
 	pthread_setname_np(name);
-#elif defined(GB_SYSTEM_FREEBSD)
+#elif defined(GB_SYSTEM_FREEBSD) || defined(GB_SYSTEM_OPENBSD)
 	pthread_set_name_np(t->posix_handle, name);
 #else
 	// TODO(bill): Test if this works

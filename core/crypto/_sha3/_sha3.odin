@@ -52,7 +52,7 @@ keccakf :: proc "contextless" (st: ^[25]u64) {
     t: u64       = ---
     bc: [5]u64   = ---
 
-    when ODIN_ENDIAN != "little" {
+    when ODIN_ENDIAN != .Little {
         v: uintptr = ---
         for i = 0; i < 25; i += 1 {
             v := uintptr(&st[i])
@@ -98,7 +98,7 @@ keccakf :: proc "contextless" (st: ^[25]u64) {
         st[0] ~= keccakf_rndc[r]
     }
 
-    when ODIN_ENDIAN != "little" {
+    when ODIN_ENDIAN != .Little {
         for i = 0; i < 25; i += 1 {
             v = uintptr(&st[i])
             t = st[i]

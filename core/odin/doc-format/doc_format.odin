@@ -11,7 +11,7 @@ String :: distinct Array(byte)
 
 Version_Type_Major :: 0
 Version_Type_Minor :: 2
-Version_Type_Patch :: 0
+Version_Type_Patch :: 4
 
 Version_Type :: struct {
 	major, minor, patch: u8,
@@ -77,8 +77,14 @@ Pkg :: struct {
 	flags:    Pkg_Flags,
 	docs:     String,
 	files:    Array(File_Index),
-	entities: Array(Entity_Index),
+	entries:  Array(Scope_Entry),
 }
+
+Scope_Entry :: struct {
+	name:   String,
+	entity: Entity_Index,
+}
+
 
 Entity_Kind :: enum u32le {
 	Invalid      = 0,
@@ -89,6 +95,7 @@ Entity_Kind :: enum u32le {
 	Proc_Group   = 5,
 	Import_Name  = 6,
 	Library_Name = 7,
+	Builtin      = 8,
 }
 
 Entity_Flag :: enum u32le {
@@ -105,8 +112,13 @@ Entity_Flag :: enum u32le {
 
 	Type_Alias = 20,
 
+	Builtin_Pkg_Builtin    = 30,
+	Builtin_Pkg_Intrinsics = 31,
+
 	Var_Thread_Local = 40,
 	Var_Static       = 41,
+
+	Private = 50,
 }
 
 Entity_Flags :: distinct bit_set[Entity_Flag; u64le]
@@ -122,6 +134,10 @@ Entity :: struct {
 	_:                u32le, // reserved for init
 	comment:          String,
 	docs:             String,
+	// May be used by (Struct fields and procedure fields):
+	// .Variable
+	// .Constant
+	field_group_index: i32le,
 
 	// May used by:
 	// .Variable
@@ -242,6 +258,8 @@ Type :: struct {
 	polymorphic_params: Type_Index,
 	// Used By: .Struct, .Union
 	where_clauses: Array(String),
+	// Used By: .Struct
+	tags: Array(String),
 }
 
 Type_Flags_Basic :: distinct bit_set[Type_Flag_Basic; u32le]

@@ -7,6 +7,9 @@
 # User-specific files (MonoDevelop/Xamarin Studio)
 *.userprefs
 
+# For macOS
+.DS_Store
+
 # Build results
 [Dd]ebug/
 [Dd]ebugPublic/
@@ -266,6 +269,8 @@ bin/
 # - Linux/MacOS
 odin
 odin.dSYM
+*.bin
+demo.bin
 
 # shared collection
 shared/
@@ -276,3 +281,5 @@ shared/
 *.ll
 
 *.sublime-workspace
+examples/bug/
+build.sh

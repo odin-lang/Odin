@@ -161,6 +161,10 @@ buffer_write :: proc(b: ^Buffer, p: []byte) -> (n: int, err: io.Error) {
 	return copy(b.buf[m:], p), nil
 }
 
+buffer_write_ptr :: proc(b: ^Buffer, ptr: rawptr, size: int) -> (n: int, err: io.Error) {
+	return buffer_write(b, ([^]byte)(ptr)[:size])
+}
+
 buffer_write_string :: proc(b: ^Buffer, s: string) -> (n: int, err: io.Error) {
 	b.last_read = .Invalid
 	m, ok := _buffer_try_grow(b, len(s))
@@ -227,6 +231,10 @@ buffer_read :: proc(b: ^Buffer, p: []byte) -> (n: int, err: io.Error) {
 		b.last_read = .Read
 	}
 	return
+}
+
+buffer_read_ptr :: proc(b: ^Buffer, ptr: rawptr, size: int) -> (n: int, err: io.Error) {
+	return buffer_read(b, ([^]byte)(ptr)[:size])
 }
 
 buffer_read_at :: proc(b: ^Buffer, p: []byte, offset: int) -> (n: int, err: io.Error) {

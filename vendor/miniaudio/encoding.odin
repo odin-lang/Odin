@@ -2,8 +2,13 @@ package miniaudio
 
 import "core:c"
 
-when ODIN_OS == "windows" { foreign import lib "lib/miniaudio.lib" }
-when ODIN_OS == "linux"   { foreign import lib "lib/miniaudio.a" }
+when ODIN_OS == .Windows {
+	foreign import lib "lib/miniaudio.lib"
+} else when ODIN_OS == .Linux {
+	foreign import lib "lib/miniaudio.a"
+} else {
+	foreign import lib "system:miniaudio"
+}
 
 /************************************************************************************************************************************************************
 
@@ -14,14 +19,14 @@ Encoders do not perform any format conversion for you. If your target format doe
 
 ************************************************************************************************************************************************************/
 
-encoder_write_proc            :: proc "c" (pEncoder: ^encoder, pBufferIn: rawptr, bytesToWrite: c.size_t) -> c.size_t        /* Returns the number of bytes written. */
-encoder_seek_proc             :: proc "c" (pEncoder: ^encoder, byteOffset: c.int, origin: seek_origin) -> b32
+encoder_write_proc            :: proc "c" (pEncoder: ^encoder, pBufferIn: rawptr, bytesToWrite: c.size_t, pBytesWritten: ^c.size_t) -> result
+encoder_seek_proc             :: proc "c" (pEncoder: ^encoder, offset: i64, origin: seek_origin) -> result
 encoder_init_proc             :: proc "c" (pEncoder: ^encoder) -> result
-encoder_uninit_proc           :: proc "c" (pEncoder: ^encoder)      
-encoder_write_pcm_frames_proc :: proc "c" (pEncoder: ^encoder, pFramesIn: rawptr, frameCount: u64) -> u64
+encoder_uninit_proc           :: proc "c" (pEncoder: ^encoder)
+encoder_write_pcm_frames_proc :: proc "c" (pEncoder: ^encoder, pFramesIn: rawptr, frameCount: u64, pFramesWritten: ^u64) -> result
 
 encoder_config :: struct {
-	resourceFormat:      resource_format,
+	encodingFormat:      encoding_format,
 	format:              format,
 	channels:            u32,
 	sampleRate:          u32,
@@ -37,16 +42,23 @@ encoder :: struct {
 	onWritePCMFrames: encoder_write_pcm_frames_proc,
 	pUserData:        rawptr,
 	pInternalEncoder: rawptr, /* <-- The drwav/drflac/stb_vorbis/etc. objects. */
-	pFile:            rawptr,    /* FILE*. Only used when initialized with ma_encoder_init_file(). */
+	data: struct #raw_union {
+		vfs: struct {
+			pVFS: ^vfs,
+			file: vfs_file,
+		},
+	},
 }
 
 @(default_calling_convention="c", link_prefix="ma_")
 foreign lib {
-	encoder_config_init      :: proc(resourceFormat: resource_format, format: format, channels: u32, sampleRate: u32) -> encoder_config ---
+	encoder_config_init      :: proc(encodingFormat: encoding_format, format: format, channels: u32, sampleRate: u32) -> encoder_config ---
 
 	encoder_init             :: proc(onWrite: encoder_write_proc, onSeek: encoder_seek_proc, pUserData: rawptr, pConfig: ^encoder_config, pEncoder: ^encoder) -> result ---
+	encoder_init_vfs         :: proc(pVFS: ^vfs, pFilePath: cstring, pConfig: ^encoder_config, pEncoder: ^encoder) -> result ---
+	encoder_init_vfs_w       :: proc(pVFS: ^vfs, pFilePath: [^]c.wchar_t, pConfig: ^encoder_config, pEncoder: ^encoder) -> result ---
 	encoder_init_file        :: proc(pFilePath: cstring, pConfig: ^encoder_config, pEncoder: ^encoder) -> result ---
 	encoder_init_file_w      :: proc(pFilePath: [^]c.wchar_t, pConfig: ^encoder_config, pEncoder: ^encoder) -> result ---
 	encoder_uninit           :: proc(pEncoder: ^encoder) ---
-	encoder_write_pcm_frames :: proc(pEncoder: ^encoder, FramesIn: rawptr, frameCount: u64) -> u64 ---
+	encoder_write_pcm_frames :: proc(pEncoder: ^encoder, FramesIn: rawptr, frameCount: u64, pFramesWritten: ^u64) -> result ---
 }

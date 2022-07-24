@@ -19,16 +19,21 @@ import "../util"
     High level API
 */
 
+DIGEST_SIZE_128 :: 16
+DIGEST_SIZE_160 :: 20
+DIGEST_SIZE_256 :: 32
+DIGEST_SIZE_320 :: 40
+
 // hash_string_128 will hash the given input and return the
 // computed hash
-hash_string_128 :: proc(data: string) -> [16]byte {
+hash_string_128 :: proc(data: string) -> [DIGEST_SIZE_128]byte {
     return hash_bytes_128(transmute([]byte)(data))
 }
 
 // hash_bytes_128 will hash the given input and return the
 // computed hash
-hash_bytes_128 :: proc(data: []byte) -> [16]byte {
-    hash: [16]byte
+hash_bytes_128 :: proc(data: []byte) -> [DIGEST_SIZE_128]byte {
+    hash: [DIGEST_SIZE_128]byte
     ctx: Ripemd128_Context
     init(&ctx)
     update(&ctx, data)
@@ -36,10 +41,28 @@ hash_bytes_128 :: proc(data: []byte) -> [16]byte {
     return hash
 }
 
+// hash_string_to_buffer_128 will hash the given input and assign the
+// computed hash to the second parameter.
+// It requires that the destination buffer is at least as big as the digest size
+hash_string_to_buffer_128 :: proc(data: string, hash: []byte) {
+    hash_bytes_to_buffer_128(transmute([]byte)(data), hash)
+}
+
+// hash_bytes_to_buffer_128 will hash the given input and write the
+// computed hash into the second parameter.
+// It requires that the destination buffer is at least as big as the digest size
+hash_bytes_to_buffer_128 :: proc(data, hash: []byte) {
+    assert(len(hash) >= DIGEST_SIZE_128, "Size of destination buffer is smaller than the digest size")
+    ctx: Ripemd128_Context
+    init(&ctx)
+    update(&ctx, data)
+    final(&ctx, hash)
+}
+
 // hash_stream_128 will read the stream in chunks and compute a
 // hash from its contents
-hash_stream_128 :: proc(s: io.Stream) -> ([16]byte, bool) {
-    hash: [16]byte
+hash_stream_128 :: proc(s: io.Stream) -> ([DIGEST_SIZE_128]byte, bool) {
+    hash: [DIGEST_SIZE_128]byte
     ctx: Ripemd128_Context
     init(&ctx)
     buf := make([]byte, 512)
@@ -57,7 +80,7 @@ hash_stream_128 :: proc(s: io.Stream) -> ([16]byte, bool) {
 
 // hash_file_128 will read the file provided by the given handle
 // and compute a hash
-hash_file_128 :: proc(hd: os.Handle, load_at_once := false) -> ([16]byte, bool) {
+hash_file_128 :: proc(hd: os.Handle, load_at_once := false) -> ([DIGEST_SIZE_128]byte, bool) {
     if !load_at_once {
         return hash_stream_128(os.stream_from_handle(hd))
     } else {
@@ -65,7 +88,7 @@ hash_file_128 :: proc(hd: os.Handle, load_at_once := false) -> ([16]byte, bool) 
             return hash_bytes_128(buf[:]), ok
         }
     }
-    return [16]byte{}, false
+    return [DIGEST_SIZE_128]byte{}, false
 }
 
 hash_128 :: proc {
@@ -73,18 +96,20 @@ hash_128 :: proc {
     hash_file_128,
     hash_bytes_128,
     hash_string_128,
+    hash_bytes_to_buffer_128,
+    hash_string_to_buffer_128,
 }
 
 // hash_string_160 will hash the given input and return the
 // computed hash
-hash_string_160 :: proc(data: string) -> [20]byte {
+hash_string_160 :: proc(data: string) -> [DIGEST_SIZE_160]byte {
     return hash_bytes_160(transmute([]byte)(data))
 }
 
 // hash_bytes_160 will hash the given input and return the
 // computed hash
-hash_bytes_160 :: proc(data: []byte) -> [20]byte {
-    hash: [20]byte
+hash_bytes_160 :: proc(data: []byte) -> [DIGEST_SIZE_160]byte {
+    hash: [DIGEST_SIZE_160]byte
     ctx: Ripemd160_Context
     init(&ctx)
     update(&ctx, data)
@@ -92,10 +117,28 @@ hash_bytes_160 :: proc(data: []byte) -> [20]byte {
     return hash
 }
 
+// hash_string_to_buffer_160 will hash the given input and assign the
+// computed hash to the second parameter.
+// It requires that the destination buffer is at least as big as the digest size
+hash_string_to_buffer_160 :: proc(data: string, hash: []byte) {
+    hash_bytes_to_buffer_160(transmute([]byte)(data), hash)
+}
+
+// hash_bytes_to_buffer_160 will hash the given input and write the
+// computed hash into the second parameter.
+// It requires that the destination buffer is at least as big as the digest size
+hash_bytes_to_buffer_160 :: proc(data, hash: []byte) {
+    assert(len(hash) >= DIGEST_SIZE_160, "Size of destination buffer is smaller than the digest size")
+    ctx: Ripemd160_Context
+    init(&ctx)
+    update(&ctx, data)
+    final(&ctx, hash)
+}
+
 // hash_stream_160 will read the stream in chunks and compute a
 // hash from its contents
-hash_stream_160 :: proc(s: io.Stream) -> ([20]byte, bool) {
-    hash: [20]byte
+hash_stream_160 :: proc(s: io.Stream) -> ([DIGEST_SIZE_160]byte, bool) {
+    hash: [DIGEST_SIZE_160]byte
     ctx: Ripemd160_Context
     init(&ctx)
     buf := make([]byte, 512)
@@ -113,7 +156,7 @@ hash_stream_160 :: proc(s: io.Stream) -> ([20]byte, bool) {
 
 // hash_file_160 will read the file provided by the given handle
 // and compute a hash
-hash_file_160 :: proc(hd: os.Handle, load_at_once := false) -> ([20]byte, bool) {
+hash_file_160 :: proc(hd: os.Handle, load_at_once := false) -> ([DIGEST_SIZE_160]byte, bool) {
     if !load_at_once {
         return hash_stream_160(os.stream_from_handle(hd))
     } else {
@@ -121,7 +164,7 @@ hash_file_160 :: proc(hd: os.Handle, load_at_once := false) -> ([20]byte, bool) 
             return hash_bytes_160(buf[:]), ok
         }
     }
-    return [20]byte{}, false
+    return [DIGEST_SIZE_160]byte{}, false
 }
 
 hash_160 :: proc {
@@ -129,18 +172,20 @@ hash_160 :: proc {
     hash_file_160,
     hash_bytes_160,
     hash_string_160,
+    hash_bytes_to_buffer_160,
+    hash_string_to_buffer_160,
 }
 
 // hash_string_256 will hash the given input and return the
 // computed hash
-hash_string_256 :: proc(data: string) -> [32]byte {
+hash_string_256 :: proc(data: string) -> [DIGEST_SIZE_256]byte {
     return hash_bytes_256(transmute([]byte)(data))
 }
 
 // hash_bytes_256 will hash the given input and return the
 // computed hash
-hash_bytes_256 :: proc(data: []byte) -> [32]byte {
-    hash: [32]byte
+hash_bytes_256 :: proc(data: []byte) -> [DIGEST_SIZE_256]byte {
+    hash: [DIGEST_SIZE_256]byte
     ctx: Ripemd256_Context
     init(&ctx)
     update(&ctx, data)
@@ -148,10 +193,28 @@ hash_bytes_256 :: proc(data: []byte) -> [32]byte {
     return hash
 }
 
+// hash_string_to_buffer_256 will hash the given input and assign the
+// computed hash to the second parameter.
+// It requires that the destination buffer is at least as big as the digest size
+hash_string_to_buffer_256 :: proc(data: string, hash: []byte) {
+    hash_bytes_to_buffer_256(transmute([]byte)(data), hash)
+}
+
+// hash_bytes_to_buffer_256 will hash the given input and write the
+// computed hash into the second parameter.
+// It requires that the destination buffer is at least as big as the digest size
+hash_bytes_to_buffer_256 :: proc(data, hash: []byte) {
+    assert(len(hash) >= DIGEST_SIZE_256, "Size of destination buffer is smaller than the digest size")
+    ctx: Ripemd256_Context
+    init(&ctx)
+    update(&ctx, data)
+    final(&ctx, hash)
+}
+
 // hash_stream_256 will read the stream in chunks and compute a
 // hash from its contents
-hash_stream_256 :: proc(s: io.Stream) -> ([32]byte, bool) {
-    hash: [32]byte
+hash_stream_256 :: proc(s: io.Stream) -> ([DIGEST_SIZE_256]byte, bool) {
+    hash: [DIGEST_SIZE_256]byte
     ctx: Ripemd256_Context
     init(&ctx)
     buf := make([]byte, 512)
@@ -169,7 +232,7 @@ hash_stream_256 :: proc(s: io.Stream) -> ([32]byte, bool) {
 
 // hash_file_256 will read the file provided by the given handle
 // and compute a hash
-hash_file_256 :: proc(hd: os.Handle, load_at_once := false) -> ([32]byte, bool) {
+hash_file_256 :: proc(hd: os.Handle, load_at_once := false) -> ([DIGEST_SIZE_256]byte, bool) {
     if !load_at_once {
         return hash_stream_256(os.stream_from_handle(hd))
     } else {
@@ -177,7 +240,7 @@ hash_file_256 :: proc(hd: os.Handle, load_at_once := false) -> ([32]byte, bool) 
             return hash_bytes_256(buf[:]), ok
         }
     }
-    return [32]byte{}, false
+    return [DIGEST_SIZE_256]byte{}, false
 }
 
 hash_256 :: proc {
@@ -185,18 +248,20 @@ hash_256 :: proc {
     hash_file_256,
     hash_bytes_256,
     hash_string_256,
+    hash_bytes_to_buffer_256,
+    hash_string_to_buffer_256,
 }
 
 // hash_string_320 will hash the given input and return the
 // computed hash
-hash_string_320 :: proc(data: string) -> [40]byte {
+hash_string_320 :: proc(data: string) -> [DIGEST_SIZE_320]byte {
     return hash_bytes_320(transmute([]byte)(data))
 }
 
 // hash_bytes_320 will hash the given input and return the
 // computed hash
-hash_bytes_320 :: proc(data: []byte) -> [40]byte {
-    hash: [40]byte
+hash_bytes_320 :: proc(data: []byte) -> [DIGEST_SIZE_320]byte {
+    hash: [DIGEST_SIZE_320]byte
     ctx: Ripemd320_Context
     init(&ctx)
     update(&ctx, data)
@@ -204,10 +269,28 @@ hash_bytes_320 :: proc(data: []byte) -> [40]byte {
     return hash
 }
 
+// hash_string_to_buffer_320 will hash the given input and assign the
+// computed hash to the second parameter.
+// It requires that the destination buffer is at least as big as the digest size
+hash_string_to_buffer_320 :: proc(data: string, hash: []byte) {
+    hash_bytes_to_buffer_320(transmute([]byte)(data), hash)
+}
+
+// hash_bytes_to_buffer_320 will hash the given input and write the
+// computed hash into the second parameter.
+// It requires that the destination buffer is at least as big as the digest size
+hash_bytes_to_buffer_320 :: proc(data, hash: []byte) {
+    assert(len(hash) >= DIGEST_SIZE_320, "Size of destination buffer is smaller than the digest size")
+    ctx: Ripemd320_Context
+    init(&ctx)
+    update(&ctx, data)
+    final(&ctx, hash)
+}
+
 // hash_stream_320 will read the stream in chunks and compute a
 // hash from its contents
-hash_stream_320 :: proc(s: io.Stream) -> ([40]byte, bool) {
-    hash: [40]byte
+hash_stream_320 :: proc(s: io.Stream) -> ([DIGEST_SIZE_320]byte, bool) {
+    hash: [DIGEST_SIZE_320]byte
     ctx: Ripemd320_Context
     init(&ctx)
     buf := make([]byte, 512)
@@ -225,7 +308,7 @@ hash_stream_320 :: proc(s: io.Stream) -> ([40]byte, bool) {
 
 // hash_file_320 will read the file provided by the given handle
 // and compute a hash
-hash_file_320 :: proc(hd: os.Handle, load_at_once := false) -> ([40]byte, bool) {
+hash_file_320 :: proc(hd: os.Handle, load_at_once := false) -> ([DIGEST_SIZE_320]byte, bool) {
     if !load_at_once {
         return hash_stream_320(os.stream_from_handle(hd))
     } else {
@@ -233,7 +316,7 @@ hash_file_320 :: proc(hd: os.Handle, load_at_once := false) -> ([40]byte, bool) 
             return hash_bytes_320(buf[:]), ok
         }
     }
-    return [40]byte{}, false
+    return [DIGEST_SIZE_320]byte{}, false
 }
 
 hash_320 :: proc {
@@ -241,6 +324,8 @@ hash_320 :: proc {
     hash_file_320,
     hash_bytes_320,
     hash_string_320,
+    hash_bytes_to_buffer_320,
+    hash_string_to_buffer_320,
 }
 
 /*

@@ -8,18 +8,19 @@ import "core:strings"
 import "core:io"
 
 Marshal_Data_Error :: enum {
+	None,
 	Unsupported_Type,
 }
 
-Marshal_Error :: union {
+Marshal_Error :: union #shared_nil {
 	Marshal_Data_Error,
 	io.Error,
 }
 
 marshal :: proc(v: any, allocator := context.allocator) -> (data: []byte, err: Marshal_Error) {
-	b := strings.make_builder(allocator)
-	defer if err != .None {
-		strings.destroy_builder(&b)
+	b := strings.builder_make(allocator)
+	defer if err != nil {
+		strings.builder_destroy(&b)
 	}
 
 	marshal_to_builder(&b, v) or_return
@@ -27,7 +28,7 @@ marshal :: proc(v: any, allocator := context.allocator) -> (data: []byte, err: M
 	if len(b.buf) != 0 {
 		data = b.buf[:]
 	}
-	return data, .None
+	return data, nil
 }
 
 marshal_to_builder :: proc(b: ^strings.Builder, v: any) -> Marshal_Error {
@@ -48,7 +49,7 @@ marshal_to_writer :: proc(w: io.Writer, v: any) -> (err: Marshal_Error) {
 		unreachable()
 
 	case runtime.Type_Info_Integer:
-		buf: [21]byte
+		buf: [40]byte
 		u: u128
 		switch i in a {
 		case i8:      u = u128(i)
@@ -285,8 +286,8 @@ marshal_to_writer :: proc(w: io.Writer, v: any) -> (err: Marshal_Error) {
 			case runtime.Type_Info_Integer:
 				switch info.endianness {
 				case .Platform: return false
-				case .Little:   return ODIN_ENDIAN != "little"
-				case .Big:      return ODIN_ENDIAN != "big"
+				case .Little:   return ODIN_ENDIAN != .Little
+				case .Big:      return ODIN_ENDIAN != .Big
 				}
 			}
 			return false

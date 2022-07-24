@@ -2,8 +2,10 @@ package libc
 
 // 7.5 Errors
 
-when ODIN_OS == "windows" {
+when ODIN_OS == .Windows {
 	foreign import libc "system:libucrt.lib"
+} else when ODIN_OS == .Darwin {
+	foreign import libc "system:System.framework"
 } else {
 	foreign import libc "system:c"
 }
@@ -12,7 +14,7 @@ when ODIN_OS == "windows" {
 //	EDOM,
 //	EILSEQ
 //	ERANGE
-when ODIN_OS == "linux" || ODIN_OS == "freebsd" {
+when ODIN_OS == .Linux || ODIN_OS == .FreeBSD {
 	@(private="file")
 	@(default_calling_convention="c")
 	foreign libc {
@@ -25,7 +27,20 @@ when ODIN_OS == "linux" || ODIN_OS == "freebsd" {
 	ERANGE :: 34
 }
 
-when ODIN_OS == "windows" {
+when ODIN_OS == .OpenBSD {
+	@(private="file")
+	@(default_calling_convention="c")
+	foreign libc {
+		@(link_name="__errno")
+		_get_errno :: proc() -> ^int ---
+	}
+
+	EDOM   :: 33
+	EILSEQ :: 84
+	ERANGE :: 34
+}
+
+when ODIN_OS == .Windows {
 	@(private="file")
 	@(default_calling_convention="c")
 	foreign libc {
@@ -35,6 +50,20 @@ when ODIN_OS == "windows" {
 
 	EDOM   :: 33
 	EILSEQ :: 42
+	ERANGE :: 34
+}
+
+when ODIN_OS == .Darwin {
+	@(private="file")
+	@(default_calling_convention="c")
+	foreign libc {
+		@(link_name="__error")
+		_get_errno :: proc() -> ^int ---
+	}
+
+	// Unknown
+	EDOM   :: 33
+	EILSEQ :: 92
 	ERANGE :: 34
 }
 

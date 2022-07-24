@@ -4,8 +4,10 @@ import "core:runtime"
 
 // 7.24 String handling
 
-when ODIN_OS == "windows" {
+when ODIN_OS == .Windows {
 	foreign import libc "system:libucrt.lib"
+} else when ODIN_OS == .Darwin {
+	foreign import libc "system:System.framework"
 } else {
 	foreign import libc "system:c"
 }

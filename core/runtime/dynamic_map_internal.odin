@@ -239,6 +239,16 @@ __dynamic_map_reserve :: proc(using header: Map_Header, cap: int, loc := #caller
 	}
 }
 
+__dynamic_map_shrink :: proc(using header: Map_Header, cap: int, loc := #caller_location) -> (did_shrink: bool) {
+	c := context
+	if m.entries.allocator.procedure != nil {
+		c.allocator = m.entries.allocator
+	}
+	context = c
+
+	return __dynamic_array_shrink(&m.entries, entry_size, entry_align, cap, loc)
+}
+
 __dynamic_map_rehash :: proc(using header: Map_Header, new_count: int, loc := #caller_location) {
 	#force_inline __dynamic_map_reserve(header, new_count, loc)
 }

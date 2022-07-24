@@ -32,9 +32,9 @@ print_to_buffer :: proc(val: ^big.Int) -> cstring {
 
 @export test_initialize_constants :: proc "c" () -> (res: u64) {
 	context = runtime.default_context()
-	res = u64(big.initialize_constants())
-	//assert(MUL_KARATSUBA_CUTOFF >= 40);
-	return res
+	_  = big.initialize_constants()
+
+	return u64(big._DIGIT_NAILS)
 }
 
 @export test_error_string :: proc "c" (err: big.Error) -> (res: cstring) {
@@ -208,7 +208,7 @@ print_to_buffer :: proc(val: ^big.Int) -> cstring {
 /*
 	dest = shr_digit(src, digits)
 */
-@export test_shr_digit :: proc "c" (source: cstring, digits: int) -> (res: PyRes) {
+@export test_shr_leg :: proc "c" (source: cstring, digits: int) -> (res: PyRes) {
 	context = runtime.default_context()
 	err: big.Error
 
@@ -216,7 +216,7 @@ print_to_buffer :: proc(val: ^big.Int) -> cstring {
 	defer big.internal_destroy(src)
 
 	if err = big.atoi(src, string(source), 16); err != nil { return PyRes{res=":shr_digit:atoi(src):", err=err} }
-	if err = #force_inline big.internal_shr_digit(src, digits); err != nil { return PyRes{res=":shr_digit:shr_digit(src):", err=err} }
+	if err = #force_inline big._private_int_shr_leg(src, digits); err != nil { return PyRes{res=":shr_digit:shr_digit(src):", err=err} }
 
 	r := print_to_buffer(src)
 	return PyRes{res = r, err = nil}
@@ -225,7 +225,7 @@ print_to_buffer :: proc(val: ^big.Int) -> cstring {
 /*
 	dest = shl_digit(src, digits)
 */
-@export test_shl_digit :: proc "c" (source: cstring, digits: int) -> (res: PyRes) {
+@export test_shl_leg :: proc "c" (source: cstring, digits: int) -> (res: PyRes) {
 	context = runtime.default_context()
 	err: big.Error
 
@@ -233,7 +233,7 @@ print_to_buffer :: proc(val: ^big.Int) -> cstring {
 	defer big.internal_destroy(src)
 
 	if err = big.atoi(src, string(source), 16); err != nil { return PyRes{res=":shl_digit:atoi(src):", err=err} }
-	if err = #force_inline big.internal_shl_digit(src, digits); err != nil { return PyRes{res=":shl_digit:shr_digit(src):", err=err} }
+	if err = #force_inline big._private_int_shl_leg(src, digits); err != nil { return PyRes{res=":shl_digit:shr_digit(src):", err=err} }
 
 	r := print_to_buffer(src)
 	return PyRes{res = r, err = nil}

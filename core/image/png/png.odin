@@ -6,6 +6,11 @@
 		Jeroen van Rijn: Initial implementation.
 		Ginger Bill:     Cosmetic changes.
 */
+
+
+// package png implements a PNG image reader
+//
+// The PNG specification is at https://www.w3.org/TR/PNG/.
 package png
 
 import "core:compress"
@@ -13,23 +18,16 @@ import "core:compress/zlib"
 import "core:image"
 
 import "core:os"
-import "core:strings"
 import "core:hash"
 import "core:bytes"
 import "core:io"
 import "core:mem"
 import "core:intrinsics"
 
-/*
-	67_108_864 pixels max by default.
-	Maximum allowed dimensions are capped at 65535 * 65535.
-*/
-MAX_DIMENSIONS    :: min(#config(PNG_MAX_DIMENSIONS, 8192 * 8192), 65535 * 65535)
+// Limit chunk sizes.
+// By default: IDAT = 8k x 8k x 16-bits + 8k filter bytes.
+// The total number of pixels defaults to 64 Megapixel and can be tuned in image/common.odin.
 
-/*
-	Limit chunk sizes.
-		By default: IDAT = 8k x 8k x 16-bits + 8k filter bytes.
-*/
 _MAX_IDAT_DEFAULT :: ( 8192 /* Width */ *  8192 /* Height */ * 2 /* 16-bit */) +  8192 /* Filter bytes */
 _MAX_IDAT         :: (65535 /* Width */ * 65535 /* Height */ * 2 /* 16-bit */) + 65535 /* Filter bytes */
 
@@ -59,7 +57,7 @@ Row_Filter :: enum u8 {
 	Paeth   = 4,
 }
 
-PLTE_Entry    :: [3]u8
+PLTE_Entry :: image.RGB_Pixel
 
 PLTE :: struct #packed {
 	entries: [256]PLTE_Entry,
@@ -239,7 +237,7 @@ append_chunk :: proc(list: ^[dynamic]image.PNG_Chunk, src: image.PNG_Chunk, allo
 	append(list, c)
 	if len(list) != length + 1 {
 		// Resize during append failed.
-		return mem.Allocator_Error.Out_Of_Memory
+		return .Unable_To_Allocate_Or_Resize
 	}
 
 	return
@@ -254,7 +252,7 @@ read_header :: proc(ctx: ^$C) -> (image.PNG_IHDR, Error) {
 	header := (^image.PNG_IHDR)(raw_data(c.data))^
 	// Validate IHDR
 	using header
-	if width == 0 || height == 0 || u128(width) * u128(height) > MAX_DIMENSIONS {
+	if width == 0 || height == 0 || u128(width) * u128(height) > image.MAX_DIMENSIONS {
 		return {}, .Invalid_Image_Dimensions
 	}
 
@@ -319,13 +317,12 @@ read_header :: proc(ctx: ^$C) -> (image.PNG_IHDR, Error) {
 }
 
 chunk_type_to_name :: proc(type: ^image.PNG_Chunk_Type) -> string {
-	t := transmute(^u8)type
-	return strings.string_from_ptr(t, 4)
+	return string(([^]u8)(type)[:4])
 }
 
-load_from_slice :: proc(slice: []u8, options := Options{}, allocator := context.allocator) -> (img: ^Image, err: Error) {
+load_from_bytes :: proc(data: []byte, options := Options{}, allocator := context.allocator) -> (img: ^Image, err: Error) {
 	ctx := &compress.Context_Memory_Input{
-		input_data = slice,
+		input_data = data,
 	}
 
 	/*
@@ -345,10 +342,9 @@ load_from_file :: proc(filename: string, options := Options{}, allocator := cont
 	defer delete(data)
 
 	if ok {
-		return load_from_slice(data, options)
+		return load_from_bytes(data, options)
 	} else {
-		img = new(Image)
-		return img, compress.General_Error.File_Not_Found
+		return nil, .Unable_To_Read_File
 	}
 }
 
@@ -359,6 +355,10 @@ load_from_context :: proc(ctx: ^$C, options := Options{}, allocator := context.a
 	if .info in options {
 		options |= {.return_metadata, .do_not_decompress_image}
 		options -= {.info}
+	}
+
+	if .return_header in options && .return_metadata in options {
+		options -= {.return_header}
 	}
 
 	if .alpha_drop_if_present in options && .alpha_add_if_missing in options {
@@ -372,13 +372,14 @@ load_from_context :: proc(ctx: ^$C, options := Options{}, allocator := context.a
 	if img == nil {
 		img = new(Image)
 	}
+	img.which = .PNG
 
 	info := new(image.PNG_Info)
 	img.metadata = info
 
 	signature, io_error := compress.read_data(ctx, Signature)
 	if io_error != .None || signature != .PNG {
-		return img, .Invalid_PNG_Signature
+		return img, .Invalid_Signature
 	}
 
 	idat: []u8
@@ -387,7 +388,7 @@ load_from_context :: proc(ctx: ^$C, options := Options{}, allocator := context.a
 
 	idat_length := u64(0)
 
-	c:		image.PNG_Chunk
+	c:	image.PNG_Chunk
 	ch:     image.PNG_Chunk_Header
 	e:      io.Error
 
@@ -468,6 +469,10 @@ load_from_context :: proc(ctx: ^$C, options := Options{}, allocator := context.a
 			}
 			info.header = h
 
+			if .return_header in options && .return_metadata not_in options && .do_not_decompress_image not_in options {
+				return img, nil
+			}
+
 		case .PLTE:
 			seen_plte = true
 			// PLTE must appear before IDAT and can't appear for color types 0, 4.
@@ -535,9 +540,6 @@ load_from_context :: proc(ctx: ^$C, options := Options{}, allocator := context.a
 			seen_iend = true
 
 		case .bKGD:
-
-			// TODO: Make sure that 16-bit bKGD + tRNS chunks return u16 instead of u16be
-
 			c = read_chunk(ctx) or_return
 			seen_bkgd = true
 			if .return_metadata in options {
@@ -589,23 +591,36 @@ load_from_context :: proc(ctx: ^$C, options := Options{}, allocator := context.a
 			*/
 
 			final_image_channels += 1
-
 			seen_trns = true
+
+			if .Paletted in header.color_type {
+				if len(c.data) > 256 {
+					return img, .TNRS_Invalid_Length
+				}
+			} else if .Color in header.color_type {
+				if len(c.data) != 6 {
+					return img, .TNRS_Invalid_Length
+				}
+			} else if len(c.data) != 2 {
+				return img, .TNRS_Invalid_Length
+			}
+
 			if info.header.bit_depth < 8 && .Paletted not_in info.header.color_type {
 				// Rescale tRNS data so key matches intensity
-				dsc := depth_scale_table
+				dsc   := depth_scale_table
 				scale := dsc[info.header.bit_depth]
 				if scale != 1 {
 					key := mem.slice_data_cast([]u16be, c.data)[0] * u16be(scale)
 					c.data = []u8{0, u8(key & 255)}
 				}
 			}
+
 			trns = c
 
-		case .iDOT, .CbGI:
+		case .iDOT, .CgBI:
 			/*
 				iPhone PNG bastardization that doesn't adhere to spec with broken IDAT chunk.
-				We're not going to add support for it. If you have the misfortunte of coming
+				We're not going to add support for it. If you have the misfortune of coming
 				across one of these files, use a utility to defry it.
 			*/
 			return img, .Image_Does_Not_Adhere_to_Spec
@@ -628,6 +643,10 @@ load_from_context :: proc(ctx: ^$C, options := Options{}, allocator := context.a
 
 	if !seen_idat {
 		return img, .IDAT_Missing
+	}
+
+	if .Paletted in header.color_type && !seen_plte {
+		return img, .PLTE_Missing
 	}
 
 	/*
@@ -678,15 +697,6 @@ load_from_context :: proc(ctx: ^$C, options := Options{}, allocator := context.a
 		return {}, defilter_error
 	}
 
-	/*
-		Now we'll handle the relocoring of paletted images, handling of tRNS chunks,
-		and we'll expand grayscale images to RGB(A).
-
-		For the sake of convenience we return only RGB(A) images. In the future we
-		may supply an option to return Gray/Gray+Alpha as-is, in which case RGB(A)
-		will become the default.
-	*/
-
 	if .Paletted in header.color_type && .do_not_expand_indexed in options {
 		return img, nil
 	}
@@ -694,7 +704,10 @@ load_from_context :: proc(ctx: ^$C, options := Options{}, allocator := context.a
 		return img, nil
 	}
 
-
+	/*
+		Now we're going to optionally apply various post-processing stages,
+		to for example expand grayscale, apply a palette, premultiply alpha, etc.
+	*/
 	raw_image_channels := img.channels
 	out_image_channels := 3
 
@@ -732,7 +745,7 @@ load_from_context :: proc(ctx: ^$C, options := Options{}, allocator := context.a
 		dest_raw_size := compute_buffer_size(int(header.width), int(header.height), out_image_channels, 8)
 		t := bytes.Buffer{}
 		if !resize(&t.buf, dest_raw_size) {
-			return {}, mem.Allocator_Error.Out_Of_Memory
+			return {}, .Unable_To_Allocate_Or_Resize
 		}
 
 		i := 0; j := 0
@@ -813,7 +826,7 @@ load_from_context :: proc(ctx: ^$C, options := Options{}, allocator := context.a
 		dest_raw_size := compute_buffer_size(int(header.width), int(header.height), out_image_channels, 16)
 		t := bytes.Buffer{}
 		if !resize(&t.buf, dest_raw_size) {
-			return {}, mem.Allocator_Error.Out_Of_Memory
+			return {}, .Unable_To_Allocate_Or_Resize
 		}
 
 		p16 := mem.slice_data_cast([]u16, temp.buf[:])
@@ -1012,7 +1025,7 @@ load_from_context :: proc(ctx: ^$C, options := Options{}, allocator := context.a
 		dest_raw_size := compute_buffer_size(int(header.width), int(header.height), out_image_channels, 8)
 		t := bytes.Buffer{}
 		if !resize(&t.buf, dest_raw_size) {
-			return {}, mem.Allocator_Error.Out_Of_Memory
+			return {}, .Unable_To_Allocate_Or_Resize
 		}
 
 		p := mem.slice_data_cast([]u8, temp.buf[:])
@@ -1198,7 +1211,6 @@ load_from_context :: proc(ctx: ^$C, options := Options{}, allocator := context.a
 
 	return img, nil
 }
-
 
 filter_paeth :: #force_inline proc(left, up, up_left: u8) -> u8 {
 	aa, bb, cc := i16(left), i16(up), i16(up_left)
@@ -1521,7 +1533,7 @@ defilter :: proc(img: ^Image, filter_bytes: ^bytes.Buffer, header: ^image.PNG_IH
 
 	num_bytes := compute_buffer_size(width, height, channels, depth == 16 ? 16 : 8)
 	if !resize(&img.pixels.buf, num_bytes) {
-		return mem.Allocator_Error.Out_Of_Memory
+		return .Unable_To_Allocate_Or_Resize
 	}
 
 	filter_ok: bool
@@ -1563,7 +1575,7 @@ defilter :: proc(img: ^Image, filter_bytes: ^bytes.Buffer, header: ^image.PNG_IH
 				temp: bytes.Buffer
 				temp_len := compute_buffer_size(x, y, channels, depth == 16 ? 16 : 8)
 				if !resize(&temp.buf, temp_len) {
-					return mem.Allocator_Error.Out_Of_Memory
+					return .Unable_To_Allocate_Or_Resize
 				}
 
 				params := Filter_Params{
@@ -1611,7 +1623,7 @@ defilter :: proc(img: ^Image, filter_bytes: ^bytes.Buffer, header: ^image.PNG_IH
 			}
 		}
 	}
-	when ODIN_ENDIAN == "little" {
+	when ODIN_ENDIAN == .Little {
 		if img.depth == 16 {
 			// The pixel components are in Big Endian. Let's byteswap.
 			input  := mem.slice_data_cast([]u16be, img.pixels.buf[:])
@@ -1625,4 +1637,10 @@ defilter :: proc(img: ^Image, filter_bytes: ^bytes.Buffer, header: ^image.PNG_IH
 	return nil
 }
 
-load :: proc{load_from_file, load_from_slice, load_from_context}
+load :: proc{load_from_file, load_from_bytes, load_from_context}
+
+
+@(init, private)
+_register :: proc() {
+	image.register(.PNG, load_from_bytes, destroy)
+}

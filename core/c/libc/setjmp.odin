@@ -2,13 +2,14 @@ package libc
 
 // 7.13 Nonlocal jumps
 
-when ODIN_OS == "windows" {
+when ODIN_OS == .Windows {
 	foreign import libc "system:libucrt.lib"
+} else when ODIN_OS == .Darwin {
+	foreign import libc "system:System.framework"
 } else {
 	foreign import libc "system:c"
 }
-
-when ODIN_OS == "windows" {
+when ODIN_OS == .Windows {
 	@(default_calling_convention="c")
 	foreign libc {
 		// 7.13.1 Save calling environment

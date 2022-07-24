@@ -1,10 +1,10 @@
 package runtime
 
-when ODIN_NO_CRT && ODIN_OS == "windows" {
+when ODIN_NO_CRT && ODIN_OS == .Windows {
 	foreign import lib "system:NtDll.lib"
 	
 	@(private="file")
-	@(default_calling_convention="std")
+	@(default_calling_convention="stdcall")
 	foreign lib {
 		RtlMoveMemory :: proc(dst, src: rawptr, length: int) ---
 		RtlFillMemory :: proc(dst: rawptr, length: int, fill: i32) ---
@@ -25,7 +25,7 @@ when ODIN_NO_CRT && ODIN_OS == "windows" {
 		RtlMoveMemory(dst, src, len)
 		return dst
 	}
-} else when ODIN_NO_CRT || (ODIN_ARCH == "wasm32" || ODIN_ARCH == "wasm64") {
+} else when ODIN_NO_CRT || (ODIN_ARCH == .wasm32 || ODIN_ARCH == .wasm64) {
 	@(link_name="memset", linkage="strong", require)
 	memset :: proc "c" (ptr: rawptr, val: i32, len: int) -> rawptr {
 		if ptr != nil && len != 0 {
@@ -42,7 +42,6 @@ when ODIN_NO_CRT && ODIN_OS == "windows" {
 	memmove :: proc "c" (dst, src: rawptr, len: int) -> rawptr {
 		if dst != src {
 			d, s := ([^]byte)(dst), ([^]byte)(src)
-			d_end, s_end := d[len:], s[len:]
 			for i := len-1; i >= 0; i -= 1 {
 				d[i] = s[i]
 			}
@@ -54,7 +53,6 @@ when ODIN_NO_CRT && ODIN_OS == "windows" {
 	memcpy :: proc "c" (dst, src: rawptr, len: int) -> rawptr {
 		if dst != src {
 			d, s := ([^]byte)(dst), ([^]byte)(src)
-			d_end, s_end := d[len:], s[len:]
 			for i := len-1; i >= 0; i -= 1 {
 				d[i] = s[i]
 			}

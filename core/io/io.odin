@@ -1,9 +1,12 @@
+// package io provides basic interfaces for generic data stream primitives.
+// The purpose of this package is wrap existing data structures and their
+// operations into an abstracted stream interface.
 package io
 
 import "core:intrinsics"
-import "core:runtime"
 import "core:unicode/utf8"
 
+// Seek whence values
 Seek_From :: enum {
 	Start   = 0, // seek relative to the origin of the file
 	Current = 1, // seek relative to the current offset
@@ -139,6 +142,10 @@ destroy :: proc(s: Stream) -> Error {
 	return .Empty
 }
 
+// read reads up to len(p) bytes into s. It returns the number of bytes read and any error if occurred.
+//
+// When read encounters an .EOF or error after successfully reading n > 0 bytes, it returns the number of
+// bytes read along with the error.
 read :: proc(s: Reader, p: []byte, n_read: ^int = nil) -> (n: int, err: Error) {
 	if s.stream_vtable != nil && s.impl_read != nil {
 		n, err = s->impl_read(p)
@@ -150,6 +157,7 @@ read :: proc(s: Reader, p: []byte, n_read: ^int = nil) -> (n: int, err: Error) {
 	return 0, .Empty
 }
 
+// write writes up to len(p) bytes into s. It returns the number of bytes written and any error if occurred.
 write :: proc(s: Writer, p: []byte, n_written: ^int = nil) -> (n: int, err: Error) {
 	if s.stream_vtable != nil && s.impl_write != nil {
 		n, err = s->impl_write(p)
@@ -161,6 +169,13 @@ write :: proc(s: Writer, p: []byte, n_written: ^int = nil) -> (n: int, err: Erro
 	return 0, .Empty
 }
 
+// seek sets the offset of the next read or write to offset.
+//
+// .Start means seek relative to the origin of the file.
+// .Current means seek relative to the current offset.
+// .End means seek relative to the end.
+//
+// seek returns the new offset to the start of the file/stream, and any error if occurred.
 seek :: proc(s: Seeker, offset: i64, whence: Seek_From) -> (n: i64, err: Error) {
 	if s.stream_vtable != nil && s.impl_seek != nil {
 		return s->impl_seek(offset, whence)
@@ -168,6 +183,8 @@ seek :: proc(s: Seeker, offset: i64, whence: Seek_From) -> (n: i64, err: Error) 
 	return 0, .Empty
 }
 
+// The behaviour of close after the first call is stream implementation defined.
+// Different streams may document their own behaviour.
 close :: proc(s: Closer) -> Error {
 	if s.stream_vtable != nil && s.impl_close != nil {
 		return s->impl_close()
@@ -184,6 +201,7 @@ flush :: proc(s: Flusher) -> Error {
 	return .None
 }
 
+// size returns the size of the stream. If the stream does not support querying its size, 0 will be returned.
 size :: proc(s: Stream) -> i64 {
 	if s.stream_vtable == nil {
 		return 0
@@ -214,7 +232,12 @@ size :: proc(s: Stream) -> i64 {
 
 
 
-
+// read_at reads len(p) bytes into p starting with the provided offset in the underlying Reader_At stream r.
+// It returns the number of bytes read and any error if occurred.
+//
+// When read_at returns n < len(p), it returns a non-nil Error explaining why.
+//
+// If n == len(p), err may be either nil or .EOF
 read_at :: proc(r: Reader_At, p: []byte, offset: i64, n_read: ^int = nil) -> (n: int, err: Error) {
 	defer if n_read != nil {
 		n_read^ += n
@@ -230,11 +253,7 @@ read_at :: proc(r: Reader_At, p: []byte, offset: i64, n_read: ^int = nil) -> (n:
 		return 0, .Empty
 	}
 
-	curr_offset: i64
-	curr_offset, err = r->impl_seek(offset, .Current)
-	if err != nil {
-		return 0, err
-	}
+	curr_offset := r->impl_seek(offset, .Current) or_return
 
 	n, err = r->impl_read(p)
 	_, err1 := r->impl_seek(curr_offset, .Start)
@@ -245,6 +264,11 @@ read_at :: proc(r: Reader_At, p: []byte, offset: i64, n_read: ^int = nil) -> (n:
 
 }
 
+// write_at writes len(p) bytes into p starting with the provided offset in the underlying Writer_At stream w.
+// It returns the number of bytes written and any error if occurred.
+//
+// If write_at is writing to a Writer_At which has a seek offset, then write_at should not affect the underlying
+// seek offset.
 write_at :: proc(w: Writer_At, p: []byte, offset: i64, n_written: ^int = nil) -> (n: int, err: Error) {
 	defer if n_written != nil {
 		n_written^ += n
@@ -294,6 +318,7 @@ read_from :: proc(w: Reader_From, r: Reader) -> (n: i64, err: Error) {
 }
 
 
+// read_byte reads and returns the next byte from r.
 read_byte :: proc(r: Byte_Reader, n_read: ^int = nil) -> (b: byte, err: Error) {
 	defer if err == nil && n_read != nil {
 		n_read^ += 1
@@ -347,6 +372,7 @@ _write_byte :: proc(w: Byte_Writer, c: byte, n_written: ^int = nil) -> (err: Err
 	return err
 }
 
+// read_rune reads a single UTF-8 encoded Unicode codepoint and returns the rune and its size in bytes.
 read_rune :: proc(br: Rune_Reader, n_read: ^int = nil) -> (ch: rune, size: int, err: Error) {
 	defer if err == nil && n_read != nil {
 		n_read^ += size
@@ -405,10 +431,12 @@ unread_rune :: proc(s: Rune_Scanner) -> Error {
 }
 
 
+// write_string writes the contents of the string s to w.
 write_string :: proc(s: Writer, str: string, n_written: ^int = nil) -> (n: int, err: Error) {
 	return write(s, transmute([]byte)str, n_written)
 }
 
+// write_rune writes a UTF-8 encoded rune to w.
 write_rune :: proc(s: Writer, r: rune, n_written: ^int = nil) -> (size: int, err: Error) {
 	defer if err == nil && n_written != nil {
 		n_written^ += size
@@ -430,12 +458,16 @@ write_rune :: proc(s: Writer, r: rune, n_written: ^int = nil) -> (size: int, err
 }
 
 
-
+// read_full expected exactly len(buf) bytes from r into buf.
 read_full :: proc(r: Reader, buf: []byte) -> (n: int, err: Error) {
 	return read_at_least(r, buf, len(buf))
 }
 
 
+// read_at_least reads from r into buf until it has read at least min bytes. It returns the number
+// of bytes copied and an error if fewer bytes were read. `.EOF` is only returned if no bytes were read.
+// `.Unexpected_EOF` is returned when an `.EOF ` is returned by the passed Reader after reading
+// fewer than min bytes. If len(buf) is less than min, `.Short_Buffer` is returned.
 read_at_least :: proc(r: Reader, buf: []byte, min: int) -> (n: int, err: Error) {
 	if len(buf) < min {
 		return 0, .Short_Buffer
@@ -515,7 +547,7 @@ _copy_buffer :: proc(dst: Writer, src: Reader, buf: []byte) -> (written: i64, er
 			}
 		}
 		// NOTE(bill): alloca is fine here
-		buf = transmute([]byte)runtime.Raw_Slice{intrinsics.alloca(size, 2*align_of(rawptr)), size}
+		buf = intrinsics.alloca(size, 2*align_of(rawptr))[:size]
 	}
 	for {
 		nr, er := read(src, buf)

@@ -7,13 +7,14 @@ package test_core_compress
 	List of contributors:
 		Jeroen van Rijn: Initial implementation.
 
-	A test suite for ZLIB, GZIP.
+	A test suite for ZLIB, GZIP and Shoco.
 */
 
 import "core:testing"
 
 import "core:compress/zlib"
 import "core:compress/gzip"
+import "core:compress/shoco"
 
 import "core:bytes"
 import "core:fmt"
@@ -30,14 +31,12 @@ when ODIN_TEST {
 	log     :: testing.log
 } else {
 	expect  :: proc(t: ^testing.T, condition: bool, message: string, loc := #caller_location) {
-		fmt.printf("[%v] ", loc)
 		TEST_count += 1
 		if !condition {
 			TEST_fail += 1
-			fmt.println(message)
+			fmt.printf("[%v] %v\n", loc, message)
 			return
 		}
-		fmt.println(" PASS")
 	}
 	log     :: proc(t: ^testing.T, v: any, loc := #caller_location) {
 		fmt.printf("[%v] ", loc)
@@ -50,8 +49,12 @@ main :: proc() {
 	t := testing.T{w=w}
 	zlib_test(&t)
 	gzip_test(&t)
+	shoco_test(&t)
 
 	fmt.printf("%v/%v tests successful.\n", TEST_count - TEST_fail, TEST_count)
+	if TEST_fail > 0 {
+		os.exit(1)
+	}
 }
 
 @test
@@ -131,5 +134,58 @@ gzip_test :: proc(t: ^testing.T) {
 	for _, v in track.allocation_map {
 		error := fmt.tprintf("GZIP test leaked %v bytes", v.size)
 		expect(t, false, error)
+	}
+}
+
+@test
+shoco_test :: proc(t: ^testing.T) {
+
+	Shoco_Tests :: []struct{
+		compressed:     []u8,
+		raw:            []u8,
+		short_pack:     int,
+		short_sentinel: int,
+	}{
+		{ #load("../assets/Shoco/README.md.shoco"), #load("../assets/Shoco/README.md"), 10, 1006 },
+		{ #load("../assets/Shoco/LICENSE.shoco"),   #load("../assets/Shoco/LICENSE"),   25, 68   },
+	}
+
+	for v in Shoco_Tests {
+		expected_raw        := len(v.raw)
+		expected_compressed := len(v.compressed)
+
+		biggest_unpacked := shoco.decompress_bound(expected_compressed)
+		biggest_packed   := shoco.compress_bound(expected_raw)
+
+		buffer := make([]u8, max(biggest_packed, biggest_unpacked))
+		defer delete(buffer)
+
+		size, err := shoco.decompress(v.compressed, buffer[:])
+		msg := fmt.tprintf("Expected `decompress` to return `nil`, got %v", err)
+		expect(t, err == nil, msg)
+
+		msg  = fmt.tprintf("Decompressed %v bytes into %v. Expected to decompress into %v bytes.", len(v.compressed), size, expected_raw)
+		expect(t, size == expected_raw, msg)
+		expect(t, string(buffer[:size]) == string(v.raw), "Decompressed contents don't match.")
+
+		size, err = shoco.compress(string(v.raw), buffer[:])
+		expect(t, err == nil, "Expected `compress` to return `nil`.")
+
+		msg = fmt.tprintf("Compressed %v bytes into %v. Expected to compress into %v bytes.", expected_raw, size, expected_compressed)
+		expect(t, size == expected_compressed, msg)
+
+		size, err = shoco.decompress(v.compressed, buffer[:expected_raw - 10])
+		msg = fmt.tprintf("Decompressing into too small a buffer returned %v, expected `.Output_Too_Short`", err)
+		expect(t, err == .Output_Too_Short, msg)
+
+		size, err = shoco.compress(string(v.raw), buffer[:expected_compressed - 10])
+		msg = fmt.tprintf("Compressing into too small a buffer returned %v, expected `.Output_Too_Short`", err)
+		expect(t, err == .Output_Too_Short, msg)
+
+		size, err = shoco.decompress(v.compressed[:v.short_pack], buffer[:])
+		expect(t, err == .Stream_Too_Short, "Expected `decompress` to return `Stream_Too_Short` because there was no more data after selecting a pack.")
+
+		size, err = shoco.decompress(v.compressed[:v.short_sentinel], buffer[:])
+		expect(t, err == .Stream_Too_Short, "Expected `decompress` to return `Stream_Too_Short` because there was no more data after non-ASCII sentinel.")
 	}
 }

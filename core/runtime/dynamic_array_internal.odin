@@ -41,6 +41,35 @@ __dynamic_array_reserve :: proc(array_: rawptr, elem_size, elem_align: int, cap:
 	return false
 }
 
+__dynamic_array_shrink :: proc(array_: rawptr, elem_size, elem_align: int, new_cap: int, loc := #caller_location) -> (did_shrink: bool) {
+	array := (^Raw_Dynamic_Array)(array_)
+
+	// NOTE(tetra, 2020-01-26): We set the allocator before earlying-out below, because user code is usually written
+	// assuming that appending/reserving will set the allocator, if it is not already set.
+	if array.allocator.procedure == nil {
+		array.allocator = context.allocator
+	}
+	assert(array.allocator.procedure != nil)
+
+	if new_cap > array.cap {
+		return
+	}
+
+	old_size  := array.cap * elem_size
+	new_size  := new_cap * elem_size
+	allocator := array.allocator
+
+	new_data, err := allocator.procedure(allocator.data, .Resize, new_size, elem_align, array.data, old_size, loc)
+	if err != nil {
+		return
+	}
+
+	array.data = raw_data(new_data)
+	array.len = min(new_cap, array.len)
+	array.cap = new_cap
+	return true
+}
+
 __dynamic_array_resize :: proc(array_: rawptr, elem_size, elem_align: int, len: int, loc := #caller_location) -> bool {
 	array := (^Raw_Dynamic_Array)(array_)
 
@@ -65,7 +94,7 @@ __dynamic_array_append :: proc(array_: rawptr, elem_size, elem_align: int,
 
 
 	ok := true
-	if array.cap <= array.len+item_count {
+	if array.cap < array.len+item_count {
 		cap := 2 * array.cap + max(8, item_count)
 		ok = __dynamic_array_reserve(array, elem_size, elem_align, cap, loc)
 	}
@@ -86,7 +115,7 @@ __dynamic_array_append_nothing :: proc(array_: rawptr, elem_size, elem_align: in
 	array := (^Raw_Dynamic_Array)(array_)
 
 	ok := true
-	if array.cap <= array.len+1 {
+	if array.cap < array.len+1 {
 		cap := 2 * array.cap + max(8, 1)
 		ok = __dynamic_array_reserve(array, elem_size, elem_align, cap, loc)
 	}

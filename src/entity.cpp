@@ -45,9 +45,9 @@ enum EntityFlag : u64 {
 	EntityFlag_NoAlias       = 1ull<<9,
 	EntityFlag_TypeField     = 1ull<<10,
 	EntityFlag_Value         = 1ull<<11,
-	EntityFlag_Sret          = 1ull<<12,
-	EntityFlag_ByVal         = 1ull<<13,
-	EntityFlag_BitFieldValue = 1ull<<14,
+
+
+
 	EntityFlag_PolyConst     = 1ull<<15,
 	EntityFlag_NotExported   = 1ull<<16,
 	EntityFlag_ConstInput    = 1ull<<17,
@@ -74,6 +74,7 @@ enum EntityFlag : u64 {
 
 	EntityFlag_Test          = 1ull<<30,
 	EntityFlag_Init          = 1ull<<31,
+	EntityFlag_Subtype       = 1ull<<32,
 	
 	EntityFlag_CustomLinkName = 1ull<<40,
 	EntityFlag_CustomLinkage_Internal = 1ull<<41,
@@ -82,8 +83,13 @@ enum EntityFlag : u64 {
 	EntityFlag_CustomLinkage_LinkOnce = 1ull<<44,
 	
 	EntityFlag_Require = 1ull<<50,
+	EntityFlag_ByPtr = 1ull<<51, // enforce parameter is passed by pointer
 
 	EntityFlag_Overridden    = 1ull<<63,
+};
+
+enum : u64 {
+	EntityFlags_IsSubtype = EntityFlag_Using|EntityFlag_Subtype,
 };
 
 enum EntityState : u32 {
@@ -110,6 +116,16 @@ struct ParameterValue {
 	};
 };
 
+bool has_parameter_value(ParameterValue const &param_value) {
+	if (param_value.kind != ParameterValue_Invalid) {
+		return true;
+	}
+	if (param_value.original_ast_expr != nullptr) {
+		return true;
+	}
+	return false;
+}
+
 enum EntityConstantFlags : u32 {
 	EntityConstantFlag_ImplicitEnumValue = 1<<0,
 };
@@ -121,6 +137,28 @@ enum ProcedureOptimizationMode : u32 {
 	ProcedureOptimizationMode_Size,
 	ProcedureOptimizationMode_Speed,
 };
+
+
+BlockingMutex global_type_name_objc_metadata_mutex;
+
+struct TypeNameObjCMetadataEntry {
+	String name;
+	Entity *entity;
+};
+struct TypeNameObjCMetadata {
+	BlockingMutex *mutex;
+	Array<TypeNameObjCMetadataEntry> type_entries;
+	Array<TypeNameObjCMetadataEntry> value_entries;
+};
+
+TypeNameObjCMetadata *create_type_name_obj_c_metadata() {
+	TypeNameObjCMetadata *md = gb_alloc_item(permanent_allocator(), TypeNameObjCMetadata);
+	md->mutex = gb_alloc_item(permanent_allocator(), BlockingMutex);
+	mutex_init(md->mutex);
+	array_init(&md->type_entries,  heap_allocator());
+	array_init(&md->value_entries, heap_allocator());
+	return md;
+}
 
 // An Entity is a named "thing" in the language
 struct Entity {
@@ -160,13 +198,16 @@ struct Entity {
 			ExactValue value;
 			ParameterValue param_value;
 			u32 flags;
+			i32 field_group_index;
+			CommentGroup *docs;
+			CommentGroup *comment;
 		} Constant;
 		struct {
 			Ast *init_expr; // only used for some variables within procedure bodies
 			i32  field_index;
+			i32  field_group_index;
 
 			ParameterValue param_value;
-			Ast *          param_expr;
 
 			String     thread_local_model;
 			Entity *   foreign_library;
@@ -174,6 +215,8 @@ struct Entity {
 			String     link_name;
 			String     link_prefix;
 			String     link_section;
+			CommentGroup *docs;
+			CommentGroup *comment;
 			bool       is_foreign;
 			bool       is_export;
 		} Variable;
@@ -181,6 +224,8 @@ struct Entity {
 			Type * type_parameter_specialization;
 			String ir_mangled_name;
 			bool   is_type_alias;
+			String objc_class_name;
+			TypeNameObjCMetadata *objc_metadata;
 		} TypeName;
 		struct {
 			u64     tags;
@@ -189,10 +234,12 @@ struct Entity {
 			String  link_name;
 			String  link_prefix;
 			DeferredProcedure deferred_procedure;
-			bool    is_foreign;
-			bool    is_export;
-			bool    generated_from_polymorphic;
 			ProcedureOptimizationMode optimization_mode;
+			bool    is_foreign                 : 1;
+			bool    is_export                  : 1;
+			bool    generated_from_polymorphic : 1;
+			bool    target_feature_disabled    : 1;
+			String  target_feature;
 		} Procedure;
 		struct {
 			Array<Entity *> entities;
@@ -208,6 +255,7 @@ struct Entity {
 		struct {
 			Slice<String> paths;
 			String name;
+			i64 priority_index;
 		} LibraryName;
 		i32 Nil;
 		struct {
@@ -240,7 +288,7 @@ bool is_entity_exported(Entity *e, bool allow_builtin = false) {
 	if (e->flags & EntityFlag_NotExported) {
 		return false;
 	}
-	if (e->file != nullptr && (e->file->flags & AstFile_IsPrivate) != 0) {
+	if (e->file != nullptr && (e->file->flags & (AstFile_IsPrivatePkg|AstFile_IsPrivateFile)) != 0) {
 		return false;
 	}
 

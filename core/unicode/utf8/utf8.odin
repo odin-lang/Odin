@@ -90,10 +90,15 @@ encode_rune :: proc(c: rune) -> ([4]u8, int) {
 	return buf, 4
 }
 
-decode_rune_in_string :: #force_inline proc(s: string) -> (rune, int) {
-	return decode_rune(transmute([]u8)s)
+
+decode_rune :: proc{
+	decode_rune_in_string,
+	decode_rune_in_bytes,
 }
-decode_rune :: proc(s: []u8) -> (rune, int) {
+decode_rune_in_string :: #force_inline proc(s: string) -> (rune, int) {
+	return decode_rune_in_bytes(transmute([]u8)s)
+}
+decode_rune_in_bytes :: proc(s: []u8) -> (rune, int) {
 	n := len(s)
 	if n < 1 {
 		return RUNE_ERROR, 0
@@ -161,10 +166,15 @@ runes_to_string :: proc(runes: []rune, allocator := context.allocator) -> string
 }
 
 
-decode_last_rune_in_string :: #force_inline proc(s: string) -> (rune, int) {
-	return decode_last_rune(transmute([]u8)s)
+decode_last_rune :: proc{
+	decode_last_rune_in_string,
+	decode_last_rune_in_bytes,
 }
-decode_last_rune :: proc(s: []u8) -> (rune, int) {
+
+decode_last_rune_in_string :: #force_inline proc(s: string) -> (rune, int) {
+	return decode_last_rune_in_bytes(transmute([]u8)s)
+}
+decode_last_rune_in_bytes :: proc(s: []u8) -> (rune, int) {
 	r: rune
 	size: int
 	start, end, limit: int
@@ -297,10 +307,15 @@ rune_start :: #force_inline proc(b: u8) -> bool {
 	return b&0xc0 != 0x80
 }
 
-rune_count_in_string :: #force_inline proc(s: string) -> int {
-	return rune_count(transmute([]u8)s)
+rune_count :: proc{
+	rune_count_in_string,
+	rune_count_in_bytes,
 }
-rune_count :: proc(s: []u8) -> int {
+
+rune_count_in_string :: #force_inline proc(s: string) -> int {
+	return rune_count_in_bytes(transmute([]u8)s)
+}
+rune_count_in_bytes :: proc(s: []u8) -> int {
 	count := 0
 	n := len(s)
 
@@ -353,7 +368,14 @@ rune_size :: proc(r: rune) -> int {
 
 // full_rune reports if the bytes in b begin with a full utf-8 encoding of a rune or not
 // An invalid encoding is considered a full rune since it will convert as an error rune of width 1 (RUNE_ERROR)
-full_rune :: proc(b: []byte) -> bool {
+full_rune :: proc{
+	full_rune_in_bytes,
+	full_rune_in_string,
+}
+
+// full_rune_in_bytes reports if the bytes in b begin with a full utf-8 encoding of a rune or not
+// An invalid encoding is considered a full rune since it will convert as an error rune of width 1 (RUNE_ERROR)
+full_rune_in_bytes :: proc(b: []byte) -> bool {
 	n := len(b)
 	if n == 0 {
 		return false
@@ -374,7 +396,7 @@ full_rune :: proc(b: []byte) -> bool {
 // full_rune_in_string reports if the bytes in s begin with a full utf-8 encoding of a rune or not
 // An invalid encoding is considered a full rune since it will convert as an error rune of width 1 (RUNE_ERROR)
 full_rune_in_string :: proc(s: string) -> bool {
-	return full_rune(transmute([]byte)s)
+	return full_rune_in_bytes(transmute([]byte)s)
 }
 
 

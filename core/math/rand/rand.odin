@@ -1,15 +1,16 @@
 package rand
 
+import "core:intrinsics"
+
 Rand :: struct {
 	state: u64,
 	inc:   u64,
+	is_system: bool,
 }
 
 
 @(private)
-_GLOBAL_SEED_DATA := 1234567890
-@(private)
-global_rand := create(u64(uintptr(&_GLOBAL_SEED_DATA)))
+global_rand := create(u64(intrinsics.read_cycle_counter()))
 
 set_global_seed :: proc(seed: u64) {
 	init(&global_rand, seed)
@@ -29,6 +30,16 @@ init :: proc(r: ^Rand, seed: u64) {
 	_random(r)
 }
 
+init_as_system :: proc(r: ^Rand) {
+	if !#defined(_system_random) {
+		panic(#procedure + " is not supported on this platform yet")
+	}
+	r.state = 0
+	r.inc   = 0
+	r.is_system = true
+}
+
+@(private)
 _random :: proc(r: ^Rand) -> u32 {
 	r := r
 	if r == nil {
@@ -36,6 +47,12 @@ _random :: proc(r: ^Rand) -> u32 {
 		// enforce the global random state if necessary with `nil`
 		r = &global_rand
 	}
+	when #defined(_system_random) {
+		if r.is_system {
+			return _system_random()
+		}
+	}
+
 	old_state := r.state
 	r.state = old_state * 6364136223846793005 + (r.inc|1)
 	xor_shifted := u32(((old_state>>18) ~ old_state) >> 27)
@@ -70,7 +87,7 @@ int31_max :: proc(n: i32, r: ^Rand = nil) -> i32 {
 	if n&(n-1) == 0 {
 		return int31(r) & (n-1)
 	}
-	max := i32((1<<31) - 1 - (1<<31)&u32(n))
+	max := i32((1<<31) - 1 - (1<<31)%u32(n))
 	v := int31(r)
 	for v > max {
 		v = int31(r)
@@ -85,7 +102,7 @@ int63_max :: proc(n: i64, r: ^Rand = nil) -> i64 {
 	if n&(n-1) == 0 {
 		return int63(r) & (n-1)
 	}
-	max := i64((1<<63) - 1 - (1<<63)&u64(n))
+	max := i64((1<<63) - 1 - (1<<63)%u64(n))
 	v := int63(r)
 	for v > max {
 		v = int63(r)
@@ -100,7 +117,7 @@ int127_max :: proc(n: i128, r: ^Rand = nil) -> i128 {
 	if n&(n-1) == 0 {
 		return int127(r) & (n-1)
 	}
-	max := i128((1<<63) - 1 - (1<<63)&u128(n))
+	max := i128((1<<127) - 1 - (1<<127)%u128(n))
 	v := int127(r)
 	for v > max {
 		v = int127(r)
@@ -119,12 +136,13 @@ int_max :: proc(n: int, r: ^Rand = nil) -> int {
 	}
 }
 
+// Uniform random distribution [0, 1)
 float64 :: proc(r: ^Rand = nil) -> f64 { return f64(int63_max(1<<53, r)) / (1 << 53) }
+// Uniform random distribution [0, 1)
 float32 :: proc(r: ^Rand = nil) -> f32 { return f32(float64(r)) }
 
 float64_range :: proc(lo, hi: f64, r: ^Rand = nil) -> f64 { return (hi-lo)*float64(r) + lo }
 float32_range :: proc(lo, hi: f32, r: ^Rand = nil) -> f32 { return (hi-lo)*float32(r) + lo }
-
 
 read :: proc(p: []byte, r: ^Rand = nil) -> (n: int) {
 	pos := i8(0)
@@ -142,8 +160,8 @@ read :: proc(p: []byte, r: ^Rand = nil) -> (n: int) {
 }
 
 // perm returns a slice of n ints in a pseudo-random permutation of integers in the range [0, n)
-perm :: proc(n: int, r: ^Rand = nil) -> []int {
-	m := make([]int, n)
+perm :: proc(n: int, r: ^Rand = nil, allocator := context.allocator) -> []int {
+	m := make([]int, n, allocator)
 	for i := 0; i < n; i += 1 {
 		j := int_max(i+1, r)
 		m[i] = m[j]

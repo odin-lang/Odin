@@ -2,10 +2,11 @@ package sdl2
 
 import "core:c"
 
-when ODIN_OS == "windows" { foreign import lib "SDL2.lib"    }
-when ODIN_OS == "linux"   { foreign import lib "system:SDL2" }
-when ODIN_OS == "darwin"  { foreign import lib "system:SDL2" }
-when ODIN_OS == "freebsd" { foreign import lib "system:SDL2" }
+when ODIN_OS == .Windows {
+	foreign import lib "SDL2.lib"
+} else {
+	foreign import lib "system:SDL2"
+}
 
 /* This is a guess for the cacheline size used for padding.
  * Most x86 processors have a 64 byte cache line.

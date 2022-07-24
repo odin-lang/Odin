@@ -8,6 +8,8 @@
 
 	This file contains logical operations like `and`, `or` and `xor`.
 */
+
+
 package math_big
 
 /*
@@ -87,21 +89,6 @@ int_shr :: proc(dest, source: ^Int, bits: int, allocator := context.allocator) -
 shr :: proc { int_shr, }
 
 /*
-	Shift right by `digits` * _DIGIT_BITS bits.
-*/
-int_shr_digit :: proc(quotient: ^Int, digits: int, allocator := context.allocator) -> (err: Error) {
-	/*
-		Check that `quotient` is usable.
-	*/
-	assert_if_nil(quotient)
-	context.allocator = allocator
-
-	internal_clear_if_uninitialized(quotient) or_return
-	return #force_inline internal_int_shr_digit(quotient, digits)
-}
-shr_digit :: proc { int_shr_digit, }
-
-/*
 	Shift right by a certain bit count with sign extension.
 */
 int_shr_signed :: proc(dest, src: ^Int, bits: int, allocator := context.allocator) -> (err: Error) {
@@ -125,19 +112,3 @@ int_shl :: proc(dest, src: ^Int, bits: int, allocator := context.allocator) -> (
 	return #force_inline internal_int_shl(dest, src, bits)
 }
 shl :: proc { int_shl, }
-
-
-/*
-	Shift left by `digits` * _DIGIT_BITS bits.
-*/
-int_shl_digit :: proc(quotient: ^Int, digits: int, allocator := context.allocator) -> (err: Error) {
-	/*
-		Check that `quotient` is usable.
-	*/
-	assert_if_nil(quotient)
-	context.allocator = allocator
-
-	internal_clear_if_uninitialized(quotient) or_return
-	return #force_inline internal_int_shl_digit(quotient, digits)
-}
-shl_digit :: proc { int_shl_digit, };

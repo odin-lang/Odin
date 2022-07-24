@@ -10,6 +10,53 @@ _ :: builtin
 _ :: bits
 _ :: mem
 
+/*
+	Turn a pointer and a length into a slice.
+*/
+from_ptr :: proc "contextless" (ptr: ^$T, count: int) -> []T {
+    return ([^]T)(ptr)[:count]
+}
+
+/*
+	Turn a pointer and a length into a byte slice.
+*/
+bytes_from_ptr :: proc "contextless" (ptr: rawptr, byte_count: int) -> []byte {
+    return ([^]byte)(ptr)[:byte_count]
+}
+
+/*
+	Turn a slice into a byte slice.
+
+	See `slice.reinterpret` to go the other way.
+*/
+to_bytes :: proc "contextless" (s: []$T) -> []byte {
+	return ([^]byte)(raw_data(s))[:len(s) * size_of(T)]
+}
+
+/*
+	Turn a slice of one type, into a slice of another type.
+
+	Only converts the type and length of the slice itself.
+	The length is rounded down to the nearest whole number of items.
+
+	```
+	large_items := []i64{1, 2, 3, 4}
+	small_items := slice.reinterpret([]i32, large_items)
+	assert(len(small_items) == 8)
+	```
+	```
+	small_items := []byte{1, 0, 0, 0, 0, 0, 0, 0,
+	                      2, 0, 0, 0}
+	large_items := slice.reinterpret([]i64, small_items)
+	assert(len(large_items) == 1) // only enough bytes to make 1 x i64; two would need at least 8 bytes.
+	```
+*/
+reinterpret :: proc "contextless" ($T: typeid/[]$U, s: []$V) -> []U {
+	bytes := to_bytes(s)
+	n := len(bytes) / size_of(U)
+	return ([^]U)(raw_data(bytes))[:n]
+}
+
 
 swap :: proc(array: $T/[]$E, a, b: int) {
 	when size_of(E) > 8 {
@@ -20,7 +67,7 @@ swap :: proc(array: $T/[]$E, a, b: int) {
 }
 
 swap_between :: proc(a, b: $T/[]$E) {
-	n := min(len(a), len(b))
+	n := builtin.min(len(a), len(b))
 	if n >= 0 {
 		ptr_swap_overlapping(&a[0], &b[0], size_of(E)*n)
 	}	
@@ -123,6 +170,21 @@ simple_equal :: proc(a, b: $T/[]$E) -> bool where intrinsics.type_is_simple_comp
 	return mem.compare_ptrs(raw_data(a), raw_data(b), len(a)*size_of(E)) == 0
 }
 
+/*
+	return the prefix length common between slices `a` and `b`.
+
+	slice.prefix_length([]u8{1, 2, 3, 4}, []u8{1}) -> 1
+	slice.prefix_length([]u8{1, 2, 3, 4}, []u8{1, 2, 3}) -> 3
+	slice.prefix_length([]u8{1, 2, 3, 4}, []u8{2, 3, 4}) -> 0
+*/
+prefix_length :: proc(a, b: $T/[]$E) -> (n: int) where intrinsics.type_is_comparable(E) {
+	_len := builtin.min(len(a), len(b))
+
+	#no_bounds_check for n < _len && a[n] == b[n] {
+		n += 1
+	}
+	return
+}
 
 has_prefix :: proc(array: $T/[]$E, needle: E) -> bool where intrinsics.type_is_comparable(E) {
 	n := len(needle)
@@ -185,7 +247,7 @@ concatenate :: proc(a: []$T/[]$E, allocator := context.allocator) -> (res: T) {
 	return
 }
 
-// copies slice into a new dynamic array
+// copies a slice into a new slice
 clone :: proc(a: $T/[]$E, allocator := context.allocator) -> []E {
 	d := make([]E, len(a), allocator)
 	copy(d[:], a)
@@ -194,11 +256,12 @@ clone :: proc(a: $T/[]$E, allocator := context.allocator) -> []E {
 
 
 // copies slice into a new dynamic array
-to_dynamic :: proc(a: $T/[]$E, allocator := context.allocator) -> [dynamic]E {
+clone_to_dynamic :: proc(a: $T/[]$E, allocator := context.allocator) -> [dynamic]E {
 	d := make([dynamic]E, len(a), allocator)
 	copy(d[:], a)
 	return d
 }
+to_dynamic :: clone_to_dynamic
 
 // Converts slice into a dynamic array without cloning or allocating memory
 into_dynamic :: proc(a: $T/[]$E) -> [dynamic]E {
@@ -272,7 +335,7 @@ get_ptr :: proc(array: $T/[]$E, index: int) -> (value: ^E, ok: bool) {
 	return
 }
 
-as_ptr :: proc(array: $T/[]$E) -> ^E {
+as_ptr :: proc(array: $T/[]$E) -> [^]E {
 	return raw_data(array)
 }
 
@@ -303,6 +366,23 @@ filter :: proc(s: $S/[]$U, f: proc(U) -> bool, allocator := context.allocator) -
 	return r[:]
 }
 
+scanner :: proc (s: $S/[]$U, initializer: $V, f: proc(V, U) -> V, allocator := context.allocator) -> []V {
+	if len(s) == 0 { return {} }
+
+	res := make([]V, len(s), allocator)
+	p := as_ptr(s)
+	q := as_ptr(res)
+	r := initializer
+
+	for l := len(s); l > 0; l -= 1 {
+		r = f(r, p[0])
+		q[0] = r
+		p = p[1:]
+		q = q[1:]
+	}
+
+	return res
+}
 
 
 min :: proc(s: $S/[]$T) -> (res: T, ok: bool) where intrinsics.type_is_ordered(T) #optional_ok {
@@ -326,15 +406,106 @@ max :: proc(s: $S/[]$T) -> (res: T, ok: bool) where intrinsics.type_is_ordered(T
 	return
 }
 
+min_max :: proc(s: $S/[]$T) -> (min, max: T, ok: bool) where intrinsics.type_is_ordered(T) {
+	if len(s) != 0 {
+		min, max = s[0], s[0]
+		ok = true
+		for v in s[1:] {
+			min = builtin.min(min, v)
+			max = builtin.max(max, v)
+		}
+	}
+	return
+}
 
-dot_product :: proc(a, b: $S/[]$T) -> T
+any_of :: proc(s: $S/[]$T, value: T) -> bool where intrinsics.type_is_comparable(T) {
+	for v in s {
+		if v == value {
+			return true
+		}
+	}
+	return false
+}
+
+none_of :: proc(s: $S/[]$T, value: T) -> bool where intrinsics.type_is_comparable(T) {
+	for v in s {
+		if v == value {
+			return false
+		}
+	}
+	return true
+}
+
+all_of :: proc(s: $S/[]$T, value: T) -> bool where intrinsics.type_is_comparable(T) {
+	if len(s) == 0 {
+		return false
+	}
+	for v in s {
+		if v != value {
+			return false
+		}
+	}
+	return true
+}
+
+
+any_of_proc :: proc(s: $S/[]$T, f: proc(T) -> bool) -> bool {
+	for v in s {
+		if f(v) {
+			return true
+		}
+	}
+	return false
+}
+
+none_of_proc :: proc(s: $S/[]$T, f: proc(T) -> bool) -> bool {
+	for v in s {
+		if f(v) {
+			return false
+		}
+	}
+	return true
+}
+
+all_of_proc :: proc(s: $S/[]$T, f: proc(T) -> bool) -> bool {
+	if len(s) == 0 {
+		return false
+	}
+	for v in s {
+		if !f(v) {
+			return false
+		}
+	}
+	return true
+}
+
+
+count :: proc(s: $S/[]$T, value: T) -> (n: int) where intrinsics.type_is_comparable(T) {
+	for v in s {
+		if v == value {
+			n += 1
+		}
+	}
+	return
+}
+
+count_proc :: proc(s: $S/[]$T, f: proc(T) -> bool) -> (n: int) {
+	for v in s {
+		if f(v) {
+			n += 1
+		}
+	}
+	return
+}
+
+
+dot_product :: proc(a, b: $S/[]$T) -> (r: T, ok: bool)
 	where intrinsics.type_is_numeric(T) {
 	if len(a) != len(b) {
-		panic("slice.dot_product: slices of unequal length")
+		return
 	}
-	r: T
 	#no_bounds_check for _, i in a {
 		r += a[i] * b[i]
 	}
-	return r
+	return r, true
 }

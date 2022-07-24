@@ -135,7 +135,6 @@ struct lbModule {
 	u32 nested_type_name_guid;
 
 	Array<lbProcedure *> procedures_to_generate;
-	Array<String> foreign_library_paths;
 
 	lbProcedure *curr_procedure;
 
@@ -144,6 +143,9 @@ struct lbModule {
 	PtrMap<void *, LLVMMetadataRef> debug_values; 
 
 	Array<lbIncompleteDebugType> debug_incomplete_types;
+
+	StringMap<lbAddr> objc_classes;
+	StringMap<lbAddr> objc_selectors;
 };
 
 struct lbGenerator {
@@ -158,6 +160,10 @@ struct lbGenerator {
 	lbModule default_module;
 
 	PtrMap<Ast *, lbProcedure *> anonymous_proc_lits; 
+
+	BlockingMutex foreign_mutex;
+	PtrSet<Entity *> foreign_libraries_set;
+	Array<Entity *>  foreign_libraries;
 
 	std::atomic<u32> global_array_index;
 	std::atomic<u32> global_generated_index;
@@ -204,7 +210,6 @@ enum lbDeferExitKind {
 
 enum lbDeferKind {
 	lbDefer_Node,
-	lbDefer_Instr,
 	lbDefer_Proc,
 };
 
@@ -215,8 +220,6 @@ struct lbDefer {
 	lbBlock *   block;
 	union {
 		Ast *stmt;
-		// NOTE(bill): 'instr' will be copied every time to create a new one
-		lbValue instr;
 		struct {
 			lbValue deferred;
 			Array<lbValue> result_as_args;
@@ -235,6 +238,7 @@ struct lbTargetList {
 
 enum lbProcedureFlag : u32 {
 	lbProcedureFlag_WithoutMemcpyPass = 1<<0,
+	lbProcedureFlag_DebugAllocaCopy = 1<<1,
 };
 
 struct lbCopyElisionHint {
@@ -270,7 +274,6 @@ struct lbProcedure {
 	bool            is_done;
 
 	lbAddr           return_ptr;
-	Array<lbValue>   params;
 	Array<lbDefer>   defer_stmts;
 	Array<lbBlock *> blocks;
 	Array<lbBranchBlocks> branch_blocks;
@@ -289,6 +292,9 @@ struct lbProcedure {
 	LLVMMetadataRef debug_info;
 
 	lbCopyElisionHint copy_elision_hint;
+
+	PtrMap<Ast *, lbValue> selector_values;
+	PtrMap<Ast *, lbAddr>  selector_addr;
 };
 
 
@@ -296,7 +302,6 @@ struct lbProcedure {
 
 
 bool lb_init_generator(lbGenerator *gen, Checker *c);
-void lb_generate_module(lbGenerator *gen);
 
 String lb_mangle_name(lbModule *m, Entity *e);
 String lb_get_entity_name(lbModule *m, Entity *e, String name = {});
@@ -369,7 +374,7 @@ lbContextData *lb_push_context_onto_stack(lbProcedure *p, lbAddr ctx);
 lbContextData *lb_push_context_onto_stack_from_implicit_parameter(lbProcedure *p);
 
 
-lbAddr lb_add_global_generated(lbModule *m, Type *type, lbValue value={});
+lbAddr lb_add_global_generated(lbModule *m, Type *type, lbValue value={}, Entity **entity_=nullptr);
 lbAddr lb_add_local(lbProcedure *p, Type *type, Entity *e=nullptr, bool zero_init=true, i32 param_index=0, bool force_no_init=false);
 
 void lb_add_foreign_library_path(lbModule *m, Entity *e);
@@ -459,6 +464,8 @@ void lb_set_entity_from_other_modules_linkage_correctly(lbModule *other_module, 
 lbValue lb_expr_untyped_const_to_typed(lbModule *m, Ast *expr, Type *t);
 bool lb_is_expr_untyped_const(Ast *expr);
 
+LLVMValueRef llvm_alloca(lbProcedure *p, LLVMTypeRef llvm_type, isize alignment, char const *name = "");
+
 void lb_mem_zero_ptr(lbProcedure *p, LLVMValueRef ptr, Type *type, unsigned alignment);
 
 void lb_emit_init_context(lbProcedure *p, lbAddr addr);
@@ -475,7 +482,11 @@ LLVMValueRef llvm_basic_shuffle(lbProcedure *p, LLVMValueRef vector, LLVMValueRe
 
 void lb_mem_copy_overlapping(lbProcedure *p, lbValue dst, lbValue src, lbValue len, bool is_volatile=false);
 void lb_mem_copy_non_overlapping(lbProcedure *p, lbValue dst, lbValue src, lbValue len, bool is_volatile=false);
+LLVMValueRef lb_mem_zero_ptr_internal(lbProcedure *p, LLVMValueRef ptr, LLVMValueRef len, unsigned alignment, bool is_volatile);
 
+i64 lb_max_zero_init_size(void) {
+	return cast(i64)(4*build_context.word_size);
+}
 
 #define LB_STARTUP_RUNTIME_PROC_NAME   "__$startup_runtime"
 #define LB_STARTUP_TYPE_INFO_PROC_NAME "__$startup_type_info"
@@ -549,6 +560,10 @@ lbCallingConventionKind const lb_calling_convention_map[ProcCC_MAX] = {
 	lbCallingConvention_C,            // ProcCC_None,
 	lbCallingConvention_C,            // ProcCC_Naked,
 	lbCallingConvention_C,            // ProcCC_InlineAsm,
+
+	lbCallingConvention_Win64,        // ProcCC_Win64,
+	lbCallingConvention_X86_64_SysV,  // ProcCC_SysV,
+
 };
 
 enum : LLVMDWARFTypeEncoding {
