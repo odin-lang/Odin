@@ -13,7 +13,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Close Stale Issues
-        uses: actions/stale@v5.1.0
+        uses: actions/stale@v4.1.0
         with:
 #          stale-issue-message: |
 #            Hello!
@@ -36,7 +36,7 @@ jobs:
 #           The motivation for this automation is to help prioritize issues in the backlog and not ignore, reject, or belittle anyone..
 
           days-before-stale: 120
-          days-before-close: 100
+          days-before-close: 30
           exempt-draft-pr: true
           ascending: true
           operations-per-run: 1000
