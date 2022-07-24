@@ -113,7 +113,8 @@ lbProcedure *lb_create_procedure(lbModule *m, Entity *entity, bool ignore_body) 
 	p->branch_blocks.allocator = a;
 	p->context_stack.allocator = a;
 	p->scope_stack.allocator   = a;
-	map_init(&p->selector_values, a);
+	map_init(&p->selector_values, a, 0);
+	map_init(&p->selector_addr,   a, 0);
 
 	if (p->is_foreign) {
 		lb_add_foreign_library_path(p->module, entity->Procedure.foreign_library);
