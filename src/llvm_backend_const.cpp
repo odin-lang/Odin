@@ -1041,7 +1041,6 @@ lbValue lb_const_value(lbModule *m, Type *type, ExactValue value, bool allow_loc
 				i64 v = big_int_to_i64(&tav.value.value_integer);
 				i64 lower = type->BitSet.lower;
 				u64 index = cast(u64)(v-lower);
-				gb_printf_err("index: %llu\n", index);
 				BigInt bit = {};
 				big_int_from_u64(&bit, index);
 				big_int_shl(&bit, &one, &bit);
