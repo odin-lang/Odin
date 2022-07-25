@@ -3894,7 +3894,8 @@ Ast *parse_field_list(AstFile *f, isize *name_count_, u32 allowed_flags, TokenKi
 
 
 		while (f->curr_token.kind != follow &&
-		       f->curr_token.kind != Token_EOF) {
+		       f->curr_token.kind != Token_EOF &&
+		       f->curr_token.kind != Token_Semicolon) {
 			CommentGroup *docs = f->lead_comment;
 			u32 set_flags = parse_field_prefixes(f);
 			Token tag = {};
@@ -3922,7 +3923,7 @@ Ast *parse_field_list(AstFile *f, isize *name_count_, u32 allowed_flags, TokenKi
 				default_value = parse_expr(f, false);
 				if (!allow_default_parameters) {
 					syntax_error(f->curr_token, "Default parameters are only allowed for procedures");
-				default_value = nullptr;
+					default_value = nullptr;
 				}
 			}
 
