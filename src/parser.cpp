@@ -2324,11 +2324,7 @@ Ast *parse_operand(AstFile *f, bool lhs) {
 			body = convert_stmt_to_body(f, parse_stmt(f));
 			f->curr_proc = curr_proc;
 
-			if (build_context.disallow_do) {
-				syntax_error(body, "'do' has been disallowed");
-			} else if (!ast_on_same_line(type, body)) {
-				syntax_error(body, "The body of a 'do' must be on the same line as the signature");
-			}
+			syntax_error(body, "'do' for procedure bodies is not allowed, prefer {}");
 
 			return ast_proc_lit(f, type, body, tags, where_token, where_clauses);
 		}
@@ -3565,6 +3561,7 @@ enum FieldPrefixKind : i32 {
 	FieldPrefix_auto_cast,
 	FieldPrefix_any_int,
 	FieldPrefix_subtype, // does not imply `using` semantics
+	FieldPrefix_by_ptr,
 };
 
 struct ParseFieldPrefixMapping {
@@ -3582,6 +3579,7 @@ gb_global ParseFieldPrefixMapping parse_field_prefix_mappings[] = {
 	{str_lit("const"),      Token_Hash,      FieldPrefix_const,     FieldFlag_const},
 	{str_lit("any_int"),    Token_Hash,      FieldPrefix_any_int,   FieldFlag_any_int},
 	{str_lit("subtype"),    Token_Hash,      FieldPrefix_subtype,   FieldFlag_subtype},
+	{str_lit("by_ptr"),     Token_Hash,      FieldPrefix_by_ptr,    FieldFlag_by_ptr},
 };
 
 
@@ -3896,7 +3894,8 @@ Ast *parse_field_list(AstFile *f, isize *name_count_, u32 allowed_flags, TokenKi
 
 
 		while (f->curr_token.kind != follow &&
-		       f->curr_token.kind != Token_EOF) {
+		       f->curr_token.kind != Token_EOF &&
+		       f->curr_token.kind != Token_Semicolon) {
 			CommentGroup *docs = f->lead_comment;
 			u32 set_flags = parse_field_prefixes(f);
 			Token tag = {};
@@ -3924,7 +3923,7 @@ Ast *parse_field_list(AstFile *f, isize *name_count_, u32 allowed_flags, TokenKi
 				default_value = parse_expr(f, false);
 				if (!allow_default_parameters) {
 					syntax_error(f->curr_token, "Default parameters are only allowed for procedures");
-				default_value = nullptr;
+					default_value = nullptr;
 				}
 			}
 

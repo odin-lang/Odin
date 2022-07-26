@@ -196,15 +196,26 @@ OPEN_ALWAYS: DWORD : 4
 OPEN_EXISTING: DWORD : 3
 TRUNCATE_EXISTING: DWORD : 5
 
+FILE_READ_DATA            : DWORD : 0x00000001
+FILE_LIST_DIRECTORY       : DWORD : 0x00000001
+FILE_WRITE_DATA           : DWORD : 0x00000002
+FILE_ADD_FILE             : DWORD : 0x00000002
+FILE_APPEND_DATA          : DWORD : 0x00000004
+FILE_ADD_SUBDIRECTORY     : DWORD : 0x00000004
+FILE_CREATE_PIPE_INSTANCE : DWORD : 0x00000004
+FILE_READ_EA              : DWORD : 0x00000008
+FILE_WRITE_EA             : DWORD : 0x00000010
+FILE_EXECUTE              : DWORD : 0x00000020
+FILE_TRAVERSE             : DWORD : 0x00000020
+FILE_DELETE_CHILD         : DWORD : 0x00000040
+FILE_READ_ATTRIBUTES      : DWORD : 0x00000080
+FILE_WRITE_ATTRIBUTES     : DWORD : 0x00000100
 
+GENERIC_READ    : DWORD : 0x80000000
+GENERIC_WRITE   : DWORD : 0x40000000
+GENERIC_EXECUTE : DWORD : 0x20000000
+GENERIC_ALL     : DWORD : 0x10000000
 
-FILE_WRITE_DATA: DWORD : 0x00000002
-FILE_APPEND_DATA: DWORD : 0x00000004
-FILE_WRITE_EA: DWORD : 0x00000010
-FILE_WRITE_ATTRIBUTES: DWORD : 0x00000100
-FILE_READ_ATTRIBUTES: DWORD : 0x000000080
-GENERIC_READ: DWORD : 0x80000000
-GENERIC_WRITE: DWORD : 0x40000000
 FILE_GENERIC_WRITE: DWORD : STANDARD_RIGHTS_WRITE |
 	FILE_WRITE_DATA |
 	FILE_WRITE_ATTRIBUTES |
@@ -249,6 +260,9 @@ DIAGNOSTIC_REASON_VERSION :: 0
 DIAGNOSTIC_REASON_SIMPLE_STRING   :: 0x00000001
 DIAGNOSTIC_REASON_DETAILED_STRING :: 0x00000002
 DIAGNOSTIC_REASON_NOT_SPECIFIED   :: 0x80000000
+
+ENUM_CURRENT_SETTINGS  : DWORD : 4294967295 // (DWORD)-1
+ENUM_REGISTRY_SETTINGS : DWORD : 4294967294 // (DWORD)-2
 
 // Defines for power request APIs
 
@@ -633,6 +647,18 @@ ES_READONLY    :: 0x0800
 ES_WANTRETURN  :: 0x1000
 ES_NUMBER      :: 0x2000
 
+// Edit Control Notification Codes
+EN_SETFOCUS     :: 0x0100
+EN_KILLFOCUS    :: 0x0200
+EN_CHANGE       :: 0x0300
+EN_UPDATE       :: 0x0400
+EN_ERRSPACE     :: 0x0500
+EN_MAXTEXT      :: 0x0501
+EN_HSCROLL      :: 0x0601
+EN_VSCROLL      :: 0x0602
+EN_ALIGN_LTR_EC :: 0x0700
+EN_ALIGN_RTL_EC :: 0x0701
+
 // Font Weights
 FW_DONTCARE   :: 0
 FW_THIN       :: 100
@@ -799,6 +825,57 @@ CREATESTRUCTW:: struct {
 	lpszName:       LPCWSTR,
 	lpszClass:      LPCWSTR,
 	dwExStyle:      DWORD,
+}
+
+DEVMODEW :: struct {
+	dmDeviceName:   [32]wchar_t,
+	dmSpecVersion:   WORD,
+	dmDriverVersion: WORD,
+	dmSize:          WORD,
+	dmDriverExtra:   WORD,
+	dmFields:        DWORD,
+	using _: struct #raw_union {
+		// Printer only fields.
+		using _: struct {
+			dmOrientation:   c_short,
+			dmPaperSize:     c_short,
+			dmPaperLength:   c_short,
+			dmPaperWidth:    c_short,
+			dmScale:         c_short,
+			dmCopies:        c_short,
+			dmDefaultSource: c_short,
+			dmPrintQuality:  c_short,
+		},
+		// Display only fields.
+		using _: struct {
+			dmPosition:           POINT,
+			dmDisplayOrientation: DWORD,
+			dmDisplayFixedOutput: DWORD,
+		},
+	},
+	dmColor:       c_short,
+	dmDuplex:      c_short,
+	dmYResolution: c_short,
+	dmTTOption:    c_short,
+	dmCollate:     c_short,
+	dmFormName:    [32]wchar_t,
+	dmLogPixels:   WORD,
+	dmBitsPerPel:  DWORD,
+	dmPelsWidth:   DWORD,
+	dmPelsHeight:  DWORD,
+	using _: struct #raw_union {
+		dmDisplayFlags: DWORD,
+		dmNup:          DWORD,
+	},
+	dmDisplayFrequency: DWORD,
+	dmICMMethod:        DWORD,
+	dmICMIntent:        DWORD,
+	dmMediaType:        DWORD,
+	dmDitherType:       DWORD,
+	dmReserved1:        DWORD,
+	dmReserved2:        DWORD,
+	dmPanningWidth:     DWORD,
+	dmPanningHeight:    DWORD,
 }
 
 // MessageBox() Flags

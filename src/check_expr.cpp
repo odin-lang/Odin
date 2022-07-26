@@ -2959,7 +2959,14 @@ void check_binary_matrix(CheckerContext *c, Token const &op, Operand *x, Operand
 					goto matrix_error;
 				}
 				x->mode = Addressing_Value;
-				x->type = alloc_type_matrix(xt->Matrix.elem, xt->Matrix.row_count, yt->Matrix.column_count);
+				if (are_types_identical(xt, yt)) {
+					if (!is_type_named(x->type) && is_type_named(y->type)) {
+						// prefer the named type
+						x->type = y->type;
+					}
+				} else {
+					x->type = alloc_type_matrix(xt->Matrix.elem, xt->Matrix.row_count, yt->Matrix.column_count);
+				}
 				goto matrix_success;
 			} else if (yt->kind == Type_Array) {
 				if (!are_types_identical(xt->Matrix.elem, yt->Array.elem)) {
@@ -3021,7 +3028,6 @@ void check_binary_matrix(CheckerContext *c, Token const &op, Operand *x, Operand
 
 matrix_success:
 	x->type = check_matrix_type_hint(x->type, type_hint);
-	
 	return;
 	
 	
@@ -3249,8 +3255,14 @@ void check_binary_expr(CheckerContext *c, Operand *x, Ast *node, Type *type_hint
 		return;
 	}
 
-	
-	if (!are_types_identical(x->type, y->type)) {
+	if ((op.kind == Token_CmpAnd || op.kind == Token_CmpOr) &&
+	    is_type_boolean(x->type) && is_type_boolean(y->type)) {
+	    	// NOTE(bill, 2022-06-26)
+	    	// Allow any boolean types within `&&` and `||`
+	    	// This is an exception to all other binary expressions since the result
+	    	// of a comparison will always be an untyped boolean, and allowing
+	    	// any boolean between these two simplifies a lot of expressions
+	} else if (!are_types_identical(x->type, y->type)) {
 		if (x->type != t_invalid &&
 		    y->type != t_invalid) {
 			gbString xt = type_to_string(x->type);
@@ -8398,23 +8410,30 @@ ExprKind check_compound_literal(CheckerContext *c, Operand *o, Ast *node, Type *
 		if (is_type_bit_set(type)) {
 			// NOTE(bill): Encode as an integer
 
-			i64 lower = base_type(type)->BitSet.lower;
+			Type *bt = base_type(type);
+			BigInt bits = {};
+			BigInt one = {};
+			big_int_from_u64(&one, 1);
 
-			u64 bits = 0;
-			for_array(index, cl->elems) {
-				Ast *elem = cl->elems[index];
-				GB_ASSERT(elem->kind != Ast_FieldValue);
-				TypeAndValue tav = elem->tav;
-				ExactValue i = exact_value_to_integer(tav.value);
-				if (i.kind != ExactValue_Integer) {
+			for_array(i, cl->elems) {
+				Ast *e = cl->elems[i];
+				GB_ASSERT(e->kind != Ast_FieldValue);
+
+				TypeAndValue tav = e->tav;
+				if (tav.mode != Addressing_Constant) {
 					continue;
 				}
-				i64 val = big_int_to_i64(&i.value_integer);
-				val -= lower;
-				u64 bit = u64(1ll<<val);
-				bits |= bit;
+				GB_ASSERT(tav.value.kind == ExactValue_Integer);
+				i64 v = big_int_to_i64(&tav.value.value_integer);
+				i64 lower = bt->BitSet.lower;
+				u64 index = cast(u64)(v-lower);
+				BigInt bit = {};
+				big_int_from_u64(&bit, index);
+				big_int_shl(&bit, &one, &bit);
+				big_int_or(&bits, &bits, &bit);
 			}
-			o->value = exact_value_u64(bits);
+			o->value.kind = ExactValue_Integer;
+			o->value.value_integer = bits;
 		} else if (is_type_constant_type(type) && cl->elems.count == 0) {
 			ExactValue value = exact_value_compound(node);
 			Type *bt = core_type(type);
@@ -8637,6 +8656,8 @@ ExprKind check_selector_call_expr(CheckerContext *c, Operand *o, Ast *node, Type
 	Ast *first_arg = x.expr->SelectorExpr.expr;
 	GB_ASSERT(first_arg != nullptr);
 
+	first_arg->state_flags |= StateFlag_SelectorCallExpr;
+
 	Type *pt = base_type(x.type);
 	GB_ASSERT(pt->kind == Type_Proc);
 	Type *first_type = nullptr;
@@ -8662,6 +8683,7 @@ ExprKind check_selector_call_expr(CheckerContext *c, Operand *o, Ast *node, Type
 	y.mode = first_arg->tav.mode;
 	y.type = first_arg->tav.type;
 	y.value = first_arg->tav.value;
+
 	if (check_is_assignable_to(c, &y, first_type)) {
 		// Do nothing, it's valid
 	} else {
@@ -9280,7 +9302,7 @@ ExprKind check_expr_base_internal(CheckerContext *c, Operand *o, Ast *node, Type
 			check_unary_expr(c, o, ue->op, node);
 		}
 		o->expr = node;
-		return kind;
+		return Expr_Expr;
 	case_end;
 
 
@@ -10028,9 +10050,10 @@ gbString write_expr_to_string(gbString str, Ast *node, bool shorthand) {
 		str = write_expr_to_string(str, ce->proc, shorthand);
 		str = gb_string_appendc(str, "(");
 
-		for_array(i, ce->args) {
+		isize idx0 = cast(isize)ce->was_selector;
+		for (isize i = idx0; i < ce->args.count; i++) {
 			Ast *arg = ce->args[i];
-			if (i > 0) {
+			if (i > idx0) {
 				str = gb_string_appendc(str, ", ");
 			}
 			str = write_expr_to_string(str, arg, shorthand);

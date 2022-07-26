@@ -413,7 +413,7 @@ append_nothing :: proc(array: ^$T/[dynamic]$E, loc := #caller_location) {
 
 
 @builtin
-insert_at_elem :: proc(array: ^$T/[dynamic]$E, index: int, arg: E, loc := #caller_location) -> (ok: bool) #no_bounds_check {
+inject_at_elem :: proc(array: ^$T/[dynamic]$E, index: int, arg: E, loc := #caller_location) -> (ok: bool) #no_bounds_check {
 	if array == nil {
 		return
 	}
@@ -432,7 +432,7 @@ insert_at_elem :: proc(array: ^$T/[dynamic]$E, index: int, arg: E, loc := #calle
 }
 
 @builtin
-insert_at_elems :: proc(array: ^$T/[dynamic]$E, index: int, args: ..E, loc := #caller_location) -> (ok: bool) #no_bounds_check {
+inject_at_elems :: proc(array: ^$T/[dynamic]$E, index: int, args: ..E, loc := #caller_location) -> (ok: bool) #no_bounds_check {
 	if array == nil {
 		return
 	}
@@ -456,7 +456,7 @@ insert_at_elems :: proc(array: ^$T/[dynamic]$E, index: int, args: ..E, loc := #c
 }
 
 @builtin
-insert_at_elem_string :: proc(array: ^$T/[dynamic]$E/u8, index: int, arg: string, loc := #caller_location) -> (ok: bool) #no_bounds_check {
+inject_at_elem_string :: proc(array: ^$T/[dynamic]$E/u8, index: int, arg: string, loc := #caller_location) -> (ok: bool) #no_bounds_check {
 	if array == nil {
 		return
 	}
@@ -477,7 +477,51 @@ insert_at_elem_string :: proc(array: ^$T/[dynamic]$E/u8, index: int, arg: string
 	return
 }
 
-@builtin insert_at :: proc{insert_at_elem, insert_at_elems, insert_at_elem_string}
+@builtin inject_at :: proc{inject_at_elem, inject_at_elems, inject_at_elem_string}
+
+
+
+@builtin
+assign_at_elem :: proc(array: ^$T/[dynamic]$E, index: int, arg: E, loc := #caller_location) -> (ok: bool) #no_bounds_check {
+	if index < len(array) {
+		array[index] = arg
+		ok = true
+	} else if resize(array, index+1, loc) {
+		array[index] = arg
+		ok = true
+	}
+	return
+}
+
+
+@builtin
+assign_at_elems :: proc(array: ^$T/[dynamic]$E, index: int, args: ..E, loc := #caller_location) -> (ok: bool) #no_bounds_check {
+	if index+len(args) < len(array) {
+		copy(array[index:], args)
+		ok = true
+	} else if resize(array, index+1+len(args), loc) {
+		copy(array[index:], args)
+		ok = true
+	}
+	return
+}
+
+
+@builtin
+assign_at_elem_string :: proc(array: ^$T/[dynamic]$E/u8, index: int, arg: string, loc := #caller_location) -> (ok: bool) #no_bounds_check {
+	if len(args) == 0 {
+		ok = true
+	} else if index+len(args) < len(array) {
+		copy(array[index:], args)
+		ok = true
+	} else if resize(array, index+1+len(args), loc) {
+		copy(array[index:], args)
+		ok = true
+	}
+	return
+}
+
+@builtin assign_at :: proc{assign_at_elem, assign_at_elems, assign_at_elem_string}
 
 
 

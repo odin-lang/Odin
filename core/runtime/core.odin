@@ -267,6 +267,19 @@ type_table: []Type_Info
 
 args__: []cstring
 
+when ODIN_OS == .Windows {
+	// NOTE(Jeroen): If we're a Windows DLL, fwdReason will be populated.
+	// This tells a DLL if it's first loaded, about to be unloaded, or a thread is joining/exiting.
+
+	DLL_Forward_Reason :: enum u32 {
+		Process_Detach = 0, // About to unload DLL
+		Process_Attach = 1, // Entry point
+		Thread_Attach  = 2,
+		Thread_Detach  = 3,
+	}
+	dll_forward_reason: DLL_Forward_Reason
+}
+
 // IMPORTANT NOTE(bill): Must be in this order (as the compiler relies upon it)
 
 

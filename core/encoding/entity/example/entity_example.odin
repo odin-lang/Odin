@@ -8,7 +8,7 @@ import "core:time"
 
 doc_print :: proc(doc: ^xml.Document) {
 	buf: strings.Builder
-	defer strings.destroy_builder(&buf)
+	defer strings.builder_destroy(&buf)
 	w := strings.to_writer(&buf)
 
 	xml.print(w, doc)

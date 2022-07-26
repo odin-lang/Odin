@@ -1,3 +1,4 @@
+lbValue lb_emit_arith_matrix(lbProcedure *p, TokenKind op, lbValue lhs, lbValue rhs, Type *type, bool component_wise=false);
 
 lbValue lb_emit_logical_binary_expr(lbProcedure *p, TokenKind op, Ast *left, Ast *right, Type *type) {
 	lbModule *m = p->module;
@@ -265,6 +266,11 @@ lbValue lb_emit_unary_arith(lbProcedure *p, TokenKind op, lbValue x, Type *type)
 			} else {
 				res.value = LLVMBuildNeg(p->builder, x.value, "");
 			}
+		} else if (is_type_matrix(x.type)) {
+			lbValue zero = {};
+			zero.value = LLVMConstNull(lb_type(p->module, type));
+			zero.type = type;
+			return lb_emit_arith_matrix(p, Token_Sub, zero, x, type, true);
 		} else {
 			GB_PANIC("Unhandled type %s", type_to_string(x.type));
 		}
@@ -976,7 +982,7 @@ lbValue lb_emit_vector_mul_matrix(lbProcedure *p, lbValue lhs, lbValue rhs, Type
 
 
 
-lbValue lb_emit_arith_matrix(lbProcedure *p, TokenKind op, lbValue lhs, lbValue rhs, Type *type, bool component_wise=false) {
+lbValue lb_emit_arith_matrix(lbProcedure *p, TokenKind op, lbValue lhs, lbValue rhs, Type *type, bool component_wise) {
 	GB_ASSERT(is_type_matrix(lhs.type) || is_type_matrix(rhs.type));
 	
 	
@@ -1425,10 +1431,13 @@ lbValue lb_build_binary_expr(lbProcedure *p, Ast *expr) {
 
 					Type *it = bit_set_to_int(rt);
 					left = lb_emit_conv(p, left, it);
+					if (is_type_different_to_arch_endianness(it)) {
+						left = lb_emit_byte_swap(p, left, integer_endian_type_to_platform_type(it));
+					}
 
-					lbValue lower = lb_const_value(p->module, it, exact_value_i64(rt->BitSet.lower));
-					lbValue key = lb_emit_arith(p, Token_Sub, left, lower, it);
-					lbValue bit = lb_emit_arith(p, Token_Shl, lb_const_int(p->module, it, 1), key, it);
+					lbValue lower = lb_const_value(p->module, left.type, exact_value_i64(rt->BitSet.lower));
+					lbValue key = lb_emit_arith(p, Token_Sub, left, lower, left.type);
+					lbValue bit = lb_emit_arith(p, Token_Shl, lb_const_int(p->module, left.type, 1), key, left.type);
 					bit = lb_emit_conv(p, bit, it);
 
 					lbValue old_value = lb_emit_transmute(p, right, it);
@@ -2993,9 +3002,8 @@ lbValue lb_build_unary_and(lbProcedure *p, Ast *expr) {
 	return lb_build_addr_ptr(p, ue->expr);
 }
 
+lbValue lb_build_expr_internal(lbProcedure *p, Ast *expr);
 lbValue lb_build_expr(lbProcedure *p, Ast *expr) {
-	lbModule *m = p->module;
-
 	u16 prev_state_flags = p->state_flags;
 	defer (p->state_flags = prev_state_flags);
 
@@ -3022,6 +3030,38 @@ lbValue lb_build_expr(lbProcedure *p, Ast *expr) {
 		p->state_flags = out;
 	}
 
+
+	// IMPORTANT NOTE(bill):
+	// Selector Call Expressions (foo->bar(...))
+	// must only evaluate `foo` once as it gets transformed into
+	// `foo.bar(foo, ...)`
+	// And if `foo` is a procedure call or something more complex, storing the value
+	// once is a very good idea
+	// If a stored value is found, it must be removed from the cache
+	if (expr->state_flags & StateFlag_SelectorCallExpr) {
+		lbValue *pp = map_get(&p->selector_values, expr);
+		if (pp != nullptr) {
+			lbValue res = *pp;
+			map_remove(&p->selector_values, expr);
+			return res;
+		}
+		lbAddr *pa = map_get(&p->selector_addr, expr);
+		if (pa != nullptr) {
+			lbAddr res = *pa;
+			map_remove(&p->selector_addr, expr);
+			return lb_addr_load(p, res);
+		}
+	}
+	lbValue res = lb_build_expr_internal(p, expr);
+	if (expr->state_flags & StateFlag_SelectorCallExpr) {
+		map_set(&p->selector_values, expr, res);
+	}
+	return res;
+}
+
+lbValue lb_build_expr_internal(lbProcedure *p, Ast *expr) {
+	lbModule *m = p->module;
+
 	expr = unparen_expr(expr);
 
 	TokenPos expr_pos = ast_token(expr).pos;
@@ -3039,17 +3079,6 @@ lbValue lb_build_expr(lbProcedure *p, Ast *expr) {
 		// NOTE(bill): Short on constant values
 		return lb_const_value(p->module, type, tv.value);
 	}
-
-	#if 0
-	LLVMMetadataRef prev_debug_location = nullptr;
-	if (p->debug_info != nullptr) {
-		prev_debug_location = LLVMGetCurrentDebugLocation2(p->builder);
-		LLVMSetCurrentDebugLocation2(p->builder, lb_debug_location_from_ast(p, expr));
-	}
-	defer (if (prev_debug_location != nullptr) {
-		LLVMSetCurrentDebugLocation2(p->builder, prev_debug_location);
-	});
-	#endif
 
 	switch (expr->kind) {
 	case_ast_node(bl, BasicLit, expr);
@@ -3119,14 +3148,7 @@ lbValue lb_build_expr(lbProcedure *p, Ast *expr) {
 
 	case_ast_node(se, SelectorCallExpr, expr);
 		GB_ASSERT(se->modified_call);
-		TypeAndValue tav = type_and_value_of_expr(expr);
-		GB_ASSERT(tav.mode != Addressing_Invalid);
-		lbValue res = lb_build_call_expr(p, se->call);
-
-		ast_node(ce, CallExpr, se->call);
-		ce->sce_temp_data = gb_alloc_copy(permanent_allocator(), &res, gb_size_of(res));
-
-		return res;
+		return lb_build_call_expr(p, se->call);
 	case_end;
 
 	case_ast_node(te, TernaryIfExpr, expr);
@@ -3142,19 +3164,27 @@ lbValue lb_build_expr(lbProcedure *p, Ast *expr) {
 		lb_start_block(p, then);
 
 		Type *type = default_type(type_of_expr(expr));
+		LLVMTypeRef llvm_type = lb_type(p->module, type);
 
 		incoming_values[0] = lb_emit_conv(p, lb_build_expr(p, te->x), type).value;
+		if (is_type_internally_pointer_like(type)) {
+			incoming_values[0] = LLVMBuildBitCast(p->builder, incoming_values[0], llvm_type, "");
+		}
 
 		lb_emit_jump(p, done);
 		lb_start_block(p, else_);
 
 		incoming_values[1] = lb_emit_conv(p, lb_build_expr(p, te->y), type).value;
 
+		if (is_type_internally_pointer_like(type)) {
+			incoming_values[1] = LLVMBuildBitCast(p->builder, incoming_values[1], llvm_type, "");
+		}
+
 		lb_emit_jump(p, done);
 		lb_start_block(p, done);
 
 		lbValue res = {};
-		res.value = LLVMBuildPhi(p->builder, lb_type(p->module, type), "");
+		res.value = LLVMBuildPhi(p->builder, llvm_type, "");
 		res.type = type;
 
 		GB_ASSERT(p->curr_block->preds.count >= 2);
@@ -3412,9 +3442,34 @@ lbAddr lb_build_array_swizzle_addr(lbProcedure *p, AstCallExpr *ce, TypeAndValue
 }
 
 
+lbAddr lb_build_addr_internal(lbProcedure *p, Ast *expr);
 lbAddr lb_build_addr(lbProcedure *p, Ast *expr) {
 	expr = unparen_expr(expr);
 
+	// IMPORTANT NOTE(bill):
+	// Selector Call Expressions (foo->bar(...))
+	// must only evaluate `foo` once as it gets transformed into
+	// `foo.bar(foo, ...)`
+	// And if `foo` is a procedure call or something more complex, storing the value
+	// once is a very good idea
+	// If a stored value is found, it must be removed from the cache
+	if (expr->state_flags & StateFlag_SelectorCallExpr) {
+		lbAddr *pp = map_get(&p->selector_addr, expr);
+		if (pp != nullptr) {
+			lbAddr res = *pp;
+			map_remove(&p->selector_addr, expr);
+			return res;
+		}
+	}
+	lbAddr addr = lb_build_addr_internal(p, expr);
+	if (expr->state_flags & StateFlag_SelectorCallExpr) {
+		map_set(&p->selector_addr, expr, addr);
+	}
+	return addr;
+}
+
+
+lbAddr lb_build_addr_internal(lbProcedure *p, Ast *expr) {
 	switch (expr->kind) {
 	case_ast_node(i, Implicit, expr);
 		lbAddr v = {};
@@ -3556,9 +3611,6 @@ lbAddr lb_build_addr(lbProcedure *p, Ast *expr) {
 	case_end;
 
 	case_ast_node(se, SelectorCallExpr, expr);
-		GB_ASSERT(se->modified_call);
-		TypeAndValue tav = type_and_value_of_expr(expr);
-		GB_ASSERT(tav.mode != Addressing_Invalid);
 		lbValue e = lb_build_expr(p, expr);
 		return lb_addr(lb_address_from_load_or_generate_local(p, e));
 	case_end;

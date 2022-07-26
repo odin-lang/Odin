@@ -241,13 +241,13 @@ S_ISGID :: 0o2000 // Set group id on execution
 S_ISVTX :: 0o1000 // Directory restrcted delete
 
 
-S_ISLNK  :: #force_inline proc(m: mode_t) -> bool do return (m & S_IFMT) == S_IFLNK
-S_ISREG  :: #force_inline proc(m: mode_t) -> bool do return (m & S_IFMT) == S_IFREG
-S_ISDIR  :: #force_inline proc(m: mode_t) -> bool do return (m & S_IFMT) == S_IFDIR
-S_ISCHR  :: #force_inline proc(m: mode_t) -> bool do return (m & S_IFMT) == S_IFCHR
-S_ISBLK  :: #force_inline proc(m: mode_t) -> bool do return (m & S_IFMT) == S_IFBLK
-S_ISFIFO :: #force_inline proc(m: mode_t) -> bool do return (m & S_IFMT) == S_IFIFO
-S_ISSOCK :: #force_inline proc(m: mode_t) -> bool do return (m & S_IFMT) == S_IFSOCK
+S_ISLNK  :: #force_inline proc(m: mode_t) -> bool { return (m & S_IFMT) == S_IFLNK  }
+S_ISREG  :: #force_inline proc(m: mode_t) -> bool { return (m & S_IFMT) == S_IFREG  }
+S_ISDIR  :: #force_inline proc(m: mode_t) -> bool { return (m & S_IFMT) == S_IFDIR  }
+S_ISCHR  :: #force_inline proc(m: mode_t) -> bool { return (m & S_IFMT) == S_IFCHR  }
+S_ISBLK  :: #force_inline proc(m: mode_t) -> bool { return (m & S_IFMT) == S_IFBLK  }
+S_ISFIFO :: #force_inline proc(m: mode_t) -> bool { return (m & S_IFMT) == S_IFIFO  }
+S_ISSOCK :: #force_inline proc(m: mode_t) -> bool { return (m & S_IFMT) == S_IFSOCK }
 
 F_OK :: 0 // Test for file existance
 X_OK :: 1 // Test for execute permission
@@ -257,7 +257,7 @@ R_OK :: 4 // Test for read permission
 foreign libc {
 	@(link_name="__error")		__errno_location :: proc() -> ^int ---
 
-	@(link_name="open")             _unix_open       :: proc(path: cstring, flags: c.int, mode: c.int) -> Handle ---
+	@(link_name="open")             _unix_open          :: proc(path: cstring, flags: c.int, mode: c.int) -> Handle ---
 	@(link_name="close")            _unix_close         :: proc(fd: Handle) -> c.int ---
 	@(link_name="read")             _unix_read          :: proc(fd: Handle, buf: rawptr, size: c.size_t) -> c.ssize_t ---
 	@(link_name="write")            _unix_write         :: proc(fd: Handle, buf: rawptr, size: c.size_t) -> c.ssize_t ---

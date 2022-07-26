@@ -43,6 +43,10 @@ LLVMMetadataRef lb_debug_location_from_ast(lbProcedure *p, Ast *node) {
 	GB_ASSERT(node != nullptr);
 	return lb_debug_location_from_token_pos(p, ast_token(node).pos);
 }
+LLVMMetadataRef lb_debug_end_location_from_ast(lbProcedure *p, Ast *node) {
+	GB_ASSERT(node != nullptr);
+	return lb_debug_location_from_token_pos(p, ast_end_token(node).pos);
+}
 
 LLVMMetadataRef lb_debug_type_internal_proc(lbModule *m, Type *type) {
 	i64 size = type_size_of(type); // Check size
@@ -419,7 +423,18 @@ LLVMMetadataRef lb_debug_type_internal(lbModule *m, Type *type) {
 		break;
 
 	case Type_SimdVector:
-		return LLVMDIBuilderCreateVectorType(m->debug_builder, cast(unsigned)type->SimdVector.count, 8*cast(unsigned)type_align_of(type), lb_debug_type(m, type->SimdVector.elem), nullptr, 0);
+		{
+			LLVMMetadataRef elem = lb_debug_type(m, type->SimdVector.elem);
+			LLVMMetadataRef subscripts[1] = {};
+			subscripts[0] = LLVMDIBuilderGetOrCreateSubrange(m->debug_builder,
+				0ll,
+				type->SimdVector.count
+			);
+			return LLVMDIBuilderCreateVectorType(
+				m->debug_builder,
+				8*cast(unsigned)type_size_of(type), 8*cast(unsigned)type_align_of(type),
+				elem, subscripts, gb_count_of(subscripts));
+		}
 
 	case Type_RelativePointer: {
 		LLVMMetadataRef base_integer = lb_debug_type(m, type->RelativePointer.base_integer);
@@ -958,7 +973,7 @@ void lb_add_debug_local_variable(lbProcedure *p, LLVMValueRef ptr, Type *type, T
 	);
 
 	LLVMValueRef storage = ptr;
-	LLVMBasicBlockRef block = p->decl_block->block;
+	LLVMBasicBlockRef block = p->curr_block->block;
 	LLVMMetadataRef llvm_debug_loc = lb_debug_location_from_token_pos(p, token.pos);
 	LLVMMetadataRef llvm_expr = LLVMDIBuilderCreateExpression(m->debug_builder, nullptr, 0);
 	lb_set_llvm_metadata(m, ptr, llvm_expr);

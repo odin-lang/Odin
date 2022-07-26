@@ -118,7 +118,7 @@ foreign lib {
 	GameControllerGetStringForAxis      :: proc(axis: GameControllerAxis) -> cstring ---
 	GameControllerGetBindForAxis        :: proc(gamecontroller: ^GameController, axis: GameControllerAxis)  -> GameControllerButtonBind---
 	GameControllerHasAxis               :: proc(gamecontroller: ^GameController, axis: GameControllerAxis) -> bool ---
-	GameControllerGetAxis               :: proc(gamecontroller: ^GameController, axis: GameControllerAxis)  -> i16 ---
+	GameControllerGetAxis               :: proc(gamecontroller: ^GameController, axis: GameControllerAxis) -> i16 ---
 
 	GameControllerGetButtonFromString   :: proc(str: cstring) -> GameControllerButton ---
 	GameControllerGetStringForButton    :: proc(button: GameControllerButton) -> cstring ---

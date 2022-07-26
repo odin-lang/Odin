@@ -1322,6 +1322,7 @@ bool init_build_paths(String init_filename) {
 	}
 
 	#if defined(GB_SYSTEM_WINDOWS)
+	if (bc->metrics.os == TargetOs_windows) {
 		if (bc->resource_filepath.len > 0) {
 			bc->build_paths[BuildPath_RC]      = path_from_string(ha, bc->resource_filepath);
 			bc->build_paths[BuildPath_RES]     = path_from_string(ha, bc->resource_filepath);
@@ -1377,6 +1378,7 @@ bool init_build_paths(String init_filename) {
 				}
 			}
 		}
+	}
 	#endif
 
 	// All the build targets and OSes.

@@ -852,6 +852,16 @@ bool lb_is_type_proc_recursive(Type *t) {
 void lb_emit_store(lbProcedure *p, lbValue ptr, lbValue value) {
 	GB_ASSERT(value.value != nullptr);
 	Type *a = type_deref(ptr.type);
+
+	if (LLVMIsNull(value.value)) {
+		LLVMTypeRef src_t = LLVMGetElementType(LLVMTypeOf(ptr.value));
+		if (lb_sizeof(src_t) <= lb_max_zero_init_size()) {
+			LLVMBuildStore(p->builder, LLVMConstNull(src_t), ptr.value);
+		} else {
+			lb_mem_zero_ptr(p, ptr.value, a, 1);
+		}
+		return;
+	}
 	if (is_type_boolean(a)) {
 		// NOTE(bill): There are multiple sized booleans, thus force a conversion (if necessarily)
 		value = lb_emit_conv(p, value, a);
@@ -859,6 +869,20 @@ void lb_emit_store(lbProcedure *p, lbValue ptr, lbValue value) {
 	Type *ca = core_type(a);
 	if (ca->kind == Type_Basic) {
 		GB_ASSERT_MSG(are_types_identical(ca, core_type(value.type)), "%s != %s", type_to_string(a), type_to_string(value.type));
+	}
+
+	enum {MAX_STORE_SIZE = 64};
+
+	if (LLVMIsALoadInst(value.value) && lb_sizeof(LLVMTypeOf(value.value)) > MAX_STORE_SIZE) {
+		LLVMValueRef dst_ptr = ptr.value;
+		LLVMValueRef src_ptr = LLVMGetOperand(value.value, 0);
+		src_ptr = LLVMBuildPointerCast(p->builder, src_ptr, LLVMTypeOf(dst_ptr), "");
+
+		LLVMBuildMemMove(p->builder,
+		                 dst_ptr, 1,
+		                 src_ptr, 1,
+		                 LLVMConstInt(LLVMInt64TypeInContext(p->module->ctx), lb_sizeof(LLVMTypeOf(value.value)), false));
+		return;
 	}
 
 	if (lb_is_type_proc_recursive(a)) {
@@ -1938,11 +1962,12 @@ LLVMTypeRef lb_type_internal(lbModule *m, Type *type) {
 					if (e->flags & EntityFlag_CVarArg) {
 						continue;
 					}
-
 					Type *e_type = reduce_tuple_to_single_type(e->type);
 
 					LLVMTypeRef param_type = nullptr;
-					if (is_type_boolean(e_type) &&
+					if (e->flags & EntityFlag_ByPtr) {
+						param_type = lb_type(m, alloc_type_pointer(e_type));
+					} else if (is_type_boolean(e_type) &&
 					    type_size_of(e_type) <= 1) {
 						param_type = LLVMInt1TypeInContext(m->ctx);
 					} else {
@@ -2349,6 +2374,9 @@ LLVMValueRef lb_find_or_add_entity_string_ptr(lbModule *m, String const &str) {
 		LLVMValueRef global_data = LLVMAddGlobal(m->mod, LLVMTypeOf(data), name);
 		LLVMSetInitializer(global_data, data);
 		LLVMSetLinkage(global_data, LLVMPrivateLinkage);
+		LLVMSetUnnamedAddress(global_data, LLVMGlobalUnnamedAddr);
+		LLVMSetAlignment(global_data, 1);
+		LLVMSetGlobalConstant(global_data, true);
 
 		LLVMValueRef ptr = LLVMConstInBoundsGEP(global_data, indices, 2);
 		string_map_set(&m->const_strings, key, ptr);
@@ -2391,6 +2419,9 @@ lbValue lb_find_or_add_entity_string_byte_slice(lbModule *m, String const &str) 
 	LLVMValueRef global_data = LLVMAddGlobal(m->mod, LLVMTypeOf(data), name);
 	LLVMSetInitializer(global_data, data);
 	LLVMSetLinkage(global_data, LLVMPrivateLinkage);
+	LLVMSetUnnamedAddress(global_data, LLVMGlobalUnnamedAddr);
+	LLVMSetAlignment(global_data, 1);
+	LLVMSetGlobalConstant(global_data, true);
 
 	LLVMValueRef ptr = nullptr;
 	if (str.len != 0) {
@@ -2627,6 +2658,7 @@ lbValue lb_generate_global_array(lbModule *m, Type *elem_type, i64 count, String
 	g.type = alloc_type_pointer(t);
 	LLVMSetInitializer(g.value, LLVMConstNull(lb_type(m, t)));
 	LLVMSetLinkage(g.value, LLVMPrivateLinkage);
+	LLVMSetUnnamedAddress(g.value, LLVMGlobalUnnamedAddr);
 	string_map_set(&m->members, s, g);
 	return g;
 }
@@ -2709,18 +2741,16 @@ lbAddr lb_add_local(lbProcedure *p, Type *type, Entity *e, bool zero_init, i32 p
 	if (!zero_init && !force_no_init) {
 		// If there is any padding of any kind, just zero init regardless of zero_init parameter
 		LLVMTypeKind kind = LLVMGetTypeKind(llvm_type);
+		if (kind == LLVMArrayTypeKind) {
+			kind = LLVMGetTypeKind(lb_type(p->module, core_array_type(type)));
+		}
+
 		if (kind == LLVMStructTypeKind) {
 			i64 sz = type_size_of(type);
 			if (type_size_of_struct_pretend_is_packed(type) != sz) {
 				zero_init = true;
 			}
-		} else if (kind == LLVMArrayTypeKind) {
-			zero_init = true;
 		}
-	}
-
-	if (zero_init) {
-		lb_mem_zero_ptr(p, ptr, type, alignment);
 	}
 
 	lbValue val = {};
@@ -2730,6 +2760,10 @@ lbAddr lb_add_local(lbProcedure *p, Type *type, Entity *e, bool zero_init, i32 p
 	if (e != nullptr) {
 		lb_add_entity(p->module, e, val);
 		lb_add_debug_local_variable(p, ptr, type, e->token);
+	}
+
+	if (zero_init) {
+		lb_mem_zero_ptr(p, ptr, type, alignment);
 	}
 
 	return lb_addr(val);
