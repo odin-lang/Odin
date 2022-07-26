@@ -119,4 +119,13 @@ foreign advapi32 {
 		lpData: ^BYTE,
 		cbData: DWORD,
 	) -> LSTATUS ---
+
+	RegSetKeyValueW :: proc(
+		hKey: HKEY,
+		lpSubKey: LPCWSTR,
+		lpValueName: LPCWSTR,
+		dwType: DWORD,
+		lpData: LPCVOID,
+		cbData: DWORD,
+	) -> LSTATUS ---
 }

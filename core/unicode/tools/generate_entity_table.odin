@@ -45,7 +45,7 @@ generate_encoding_entity_table :: proc() {
 	printf("\"%v\" loaded and parsed.\n", filename)
 
 	generated_buf: strings.Builder
-	defer strings.destroy_builder(&generated_buf)
+	defer strings.builder_destroy(&generated_buf)
 	w := strings.to_writer(&generated_buf)
 
 	charlist, charlist_ok := xml.find_child_by_ident(doc.root, "charlist")

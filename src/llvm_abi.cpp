@@ -233,7 +233,7 @@ i64 lb_sizeof(LLVMTypeRef type) {
 			i64 elem_size = lb_sizeof(elem);
 			i64 count = LLVMGetVectorSize(type);
 			i64 size = count * elem_size;
-			return gb_clamp(next_pow2(size), 1, build_context.max_align);
+			return next_pow2(size);
 		}
 
 	}
@@ -801,16 +801,23 @@ namespace lbAbiAmd64SysV {
 				i64 elem_sz = lb_sizeof(elem);
 				LLVMTypeKind elem_kind = LLVMGetTypeKind(elem);
 				RegClass reg = RegClass_NoClass;
+				unsigned elem_width = LLVMGetIntTypeWidth(elem);
 				switch (elem_kind) {
 				case LLVMIntegerTypeKind:
 				case LLVMHalfTypeKind:
-					switch (LLVMGetIntTypeWidth(elem)) {
-					case 8:  reg = RegClass_SSEInt8;
-					case 16: reg = RegClass_SSEInt16;
-					case 32: reg = RegClass_SSEInt32;
-					case 64: reg = RegClass_SSEInt64;
+					switch (elem_width) {
+					case 8:  reg = RegClass_SSEInt8;  break;
+					case 16: reg = RegClass_SSEInt16; break;
+					case 32: reg = RegClass_SSEInt32; break;
+					case 64: reg = RegClass_SSEInt64; break;
 					default:
-						GB_PANIC("Unhandled integer width for vector type");
+						if (elem_width > 64) {
+							for (i64 i = 0; i < len; i++) {
+								classify_with(elem, cls, ix, off + i*elem_sz);
+							}
+							break;
+						}
+						GB_PANIC("Unhandled integer width for vector type %u", elem_width);
 					}
 					break;
 				case LLVMFloatTypeKind:

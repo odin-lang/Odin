@@ -45,4 +45,4 @@ ERROR_NOT_SAME_OBJECT        : DWORD : 1656
 
 E_NOTIMPL :: HRESULT(-0x7fff_bfff) // 0x8000_4001
 
-SUCCEEDED :: #force_inline proc(#any_int result: int) -> bool do return result >= 0
+SUCCEEDED :: #force_inline proc(#any_int result: int) -> bool { return result >= 0 }

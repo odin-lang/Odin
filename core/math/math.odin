@@ -1357,7 +1357,7 @@ atan :: proc "contextless" (x: $T) -> T where intrinsics.type_is_float(T) {
 }
 
 asin :: proc "contextless" (x: $T) -> T where intrinsics.type_is_float(T) {
-	return atan2(x, 1 + sqrt(1 - x*x))
+	return atan2(x, sqrt(1 - x*x))
 }
 
 acos :: proc "contextless" (x: $T) -> T where intrinsics.type_is_float(T) {

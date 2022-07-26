@@ -282,6 +282,8 @@ enum StateFlag : u8 {
 	StateFlag_type_assert     = 1<<2,
 	StateFlag_no_type_assert  = 1<<3,
 
+	StateFlag_SelectorCallExpr = 1<<6,
+
 	StateFlag_BeenHandled = 1<<7,
 };
 
@@ -300,13 +302,14 @@ enum FieldFlag : u32 {
 	FieldFlag_const     = 1<<5,
 	FieldFlag_any_int   = 1<<6,
 	FieldFlag_subtype   = 1<<7,
+	FieldFlag_by_ptr    = 1<<8,
 
 	// Internal use by the parser only
 	FieldFlag_Tags      = 1<<10,
 	FieldFlag_Results   = 1<<16,
 
 	// Parameter List Restrictions
-	FieldFlag_Signature = FieldFlag_ellipsis|FieldFlag_using|FieldFlag_no_alias|FieldFlag_c_vararg|FieldFlag_auto_cast|FieldFlag_const|FieldFlag_any_int,
+	FieldFlag_Signature = FieldFlag_ellipsis|FieldFlag_using|FieldFlag_no_alias|FieldFlag_c_vararg|FieldFlag_auto_cast|FieldFlag_const|FieldFlag_any_int|FieldFlag_by_ptr,
 	FieldFlag_Struct    = FieldFlag_using|FieldFlag_subtype|FieldFlag_Tags,
 };
 
@@ -411,7 +414,7 @@ AST_KIND(_ExprBegin,  "",  bool) \
 		Token        ellipsis; \
 		ProcInlining inlining; \
 		bool         optional_ok_one; \
-		void *sce_temp_data; \
+		bool         was_selector; \
 	}) \
 	AST_KIND(FieldValue,      "field value",              struct { Token eq; Ast *field, *value; }) \
 	AST_KIND(EnumFieldValue,  "enum field value",         struct { \

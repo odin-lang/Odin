@@ -947,6 +947,13 @@ impl_DrawTransformFeedbackStream:    proc "c" (mode: u32, id: u32, stream: u32)
 impl_BeginQueryIndexed:              proc "c" (target: u32, index: u32, id: u32)
 impl_EndQueryIndexed:                proc "c" (target: u32, index: u32)
 impl_GetQueryIndexediv:              proc "c" (target: u32, index: u32, pname: u32, params: [^]i32)
+impl_GetTextureHandleARB:            proc "c" (texture: u32) -> u64
+impl_GetTextureSamplerHandleARB:     proc "c" (texture, sampler: u32) -> u64
+impl_GetImageHandleARB:              proc "c" (texture: u32, level: i32, layered: bool, layer: i32, format: u32) -> u64
+impl_MakeTextureHandleResidentARB:   proc "c" (handle: u64)
+impl_MakeImageHandleResidentARB:     proc "c" (handle: u64, access: u32)
+impl_MakeTextureHandleNonResidentARB:proc "c" (handle: u64)
+impl_MakeImageHandleNonResidentARB:  proc "c" (handle: u64)
 
 load_4_0 :: proc(set_proc_address: Set_Proc_Address_Type) {
 	set_proc_address(&impl_MinSampleShading,               "glMinSampleShading")
@@ -995,6 +1002,42 @@ load_4_0 :: proc(set_proc_address: Set_Proc_Address_Type) {
 	set_proc_address(&impl_BeginQueryIndexed,              "glBeginQueryIndexed")
 	set_proc_address(&impl_EndQueryIndexed,                "glEndQueryIndexed")
 	set_proc_address(&impl_GetQueryIndexediv,              "glGetQueryIndexediv")
+
+	// Load ARB (architecture review board, vendor specific) extensions that might be available
+	set_proc_address(&impl_GetTextureHandleARB, "glGetTextureHandleARB")
+	if impl_GetTextureHandleARB == nil {
+		set_proc_address(&impl_GetTextureHandleARB, "glGetTextureHandleNV")
+	}
+
+	set_proc_address(&impl_GetTextureSamplerHandleARB, "glGetTextureSamplerHandleARB")
+	if impl_GetTextureSamplerHandleARB == nil {
+		set_proc_address(&impl_GetTextureSamplerHandleARB, "glGetTextureSamplerHandleNV")
+	}
+
+	set_proc_address(&impl_GetImageHandleARB, "glGetImageHandleARB")
+	if impl_GetImageHandleARB == nil {
+		set_proc_address(&impl_GetImageHandleARB, "glGetImageHandleNV")
+	}
+
+	set_proc_address(&impl_MakeTextureHandleResidentARB, "glMakeTextureHandleResidentARB")
+	if impl_MakeTextureHandleResidentARB == nil {
+		set_proc_address(&impl_MakeTextureHandleResidentARB, "glMakeTextureHandleResidentNV")
+	}
+
+	set_proc_address(&impl_MakeImageHandleResidentARB, "glMakeImageHandleResidentARB")
+	if impl_MakeImageHandleResidentARB == nil {
+		set_proc_address(&impl_MakeImageHandleResidentARB, "glMakeImageHandleResidentNV")
+	}
+
+	set_proc_address(&impl_MakeTextureHandleNonResidentARB, "glMakeTextureHandleNonResidentARB")
+	if impl_MakeTextureHandleNonResidentARB == nil {
+		set_proc_address(&impl_MakeTextureHandleNonResidentARB, "glMakeTextureHandleNonResidentNV")
+	}
+
+	set_proc_address(&impl_MakeImageHandleNonResidentARB, "glMakeImageHandleNonResidentARB")
+	if impl_MakeImageHandleNonResidentARB == nil {
+		set_proc_address(&impl_MakeImageHandleNonResidentARB, "glMakeImageHandleNonResidentNV")
+	}
 }
 
 
@@ -1594,3 +1637,4 @@ load_4_6 :: proc(set_proc_address: Set_Proc_Address_Type) {
 	set_proc_address(&impl_MultiDrawElementsIndirectCount, "glMultiDrawElementsIndirectCount")
 	set_proc_address(&impl_PolygonOffsetClamp,             "glPolygonOffsetClamp")
 }
+

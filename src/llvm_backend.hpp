@@ -292,6 +292,9 @@ struct lbProcedure {
 	LLVMMetadataRef debug_info;
 
 	lbCopyElisionHint copy_elision_hint;
+
+	PtrMap<Ast *, lbValue> selector_values;
+	PtrMap<Ast *, lbAddr>  selector_addr;
 };
 
 
@@ -479,7 +482,11 @@ LLVMValueRef llvm_basic_shuffle(lbProcedure *p, LLVMValueRef vector, LLVMValueRe
 
 void lb_mem_copy_overlapping(lbProcedure *p, lbValue dst, lbValue src, lbValue len, bool is_volatile=false);
 void lb_mem_copy_non_overlapping(lbProcedure *p, lbValue dst, lbValue src, lbValue len, bool is_volatile=false);
+LLVMValueRef lb_mem_zero_ptr_internal(lbProcedure *p, LLVMValueRef ptr, LLVMValueRef len, unsigned alignment, bool is_volatile);
 
+i64 lb_max_zero_init_size(void) {
+	return cast(i64)(4*build_context.word_size);
+}
 
 #define LB_STARTUP_RUNTIME_PROC_NAME   "__$startup_runtime"
 #define LB_STARTUP_TYPE_INFO_PROC_NAME "__$startup_type_info"

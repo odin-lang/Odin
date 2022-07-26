@@ -463,8 +463,15 @@ i32 linker_stage(lbGenerator *gen) {
 				// correctly this way since all the other dependencies provided implicitly
 				// by the compiler frontend are still needed and most of the command
 				// line arguments prepared previously are incompatible with ld.
-				link_settings = gb_string_appendc(link_settings, "-Wl,-init,'_odin_entry_point' ");
-				link_settings = gb_string_appendc(link_settings, "-Wl,-fini,'_odin_exit_point' ");
+				if (build_context.metrics.os == TargetOs_darwin) {
+					link_settings = gb_string_appendc(link_settings, "-Wl,-init,'__odin_entry_point' ");
+					// NOTE(weshardee): __odin_exit_point should also be added, but -fini 
+					// does not exist on MacOS
+				} else {
+					link_settings = gb_string_appendc(link_settings, "-Wl,-init,'_odin_entry_point' ");
+					link_settings = gb_string_appendc(link_settings, "-Wl,-fini,'_odin_exit_point' ");
+				}
+				
 			} else if (build_context.metrics.os != TargetOs_openbsd) {
 				// OpenBSD defaults to PIE executable. do not pass -no-pie for it.
 				link_settings = gb_string_appendc(link_settings, "-no-pie ");
