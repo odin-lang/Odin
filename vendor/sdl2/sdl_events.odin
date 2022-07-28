@@ -2,10 +2,11 @@ package sdl2
 
 import "core:c"
 
-when ODIN_OS == "windows" { foreign import lib "SDL2.lib"    }
-when ODIN_OS == "linux"   { foreign import lib "system:SDL2" }
-when ODIN_OS == "darwin"  { foreign import lib "system:SDL2" }
-when ODIN_OS == "freebsd" { foreign import lib "system:SDL2" }
+when ODIN_OS == .Windows {
+	foreign import lib "SDL2.lib"
+} else {
+	foreign import lib "system:SDL2"
+}
 
 RELEASED :: 0
 PRESSED  :: 1
@@ -476,7 +477,7 @@ DISABLE ::  0
 ENABLE  ::  1
 
 
-GetEventState :: #force_inline proc "c" (type: EventType) -> u8 { return EventState(type, QUERY) }
+GetEventState :: #force_inline proc "c" (type: EventType) -> b8 { return EventState(type, QUERY) }
 
 
 @(default_calling_convention="c", link_prefix="SDL_")
@@ -487,15 +488,15 @@ foreign lib {
 	HasEvents        :: proc(minType, maxType: EventType) -> bool ---
 	FlushEvent       :: proc(type: EventType) ---
 	FlushEvents      :: proc(minType, maxType: EventType) ---
-	PollEvent        :: proc(event: ^Event) -> c.int ---
-	WaitEvent        :: proc(event: ^Event) -> c.int ---
-	WaitEventTimeout :: proc(event: ^Event, timeout: c.int) -> c.int ---
-	PushEvent        :: proc(event: ^Event) -> c.int ---
+	PollEvent        :: proc(event: ^Event) -> bool ---                 // original return value is c.int
+	WaitEvent        :: proc(event: ^Event) -> bool ---                 // original return value is c.int
+	WaitEventTimeout :: proc(event: ^Event, timeout: c.int) -> bool --- // original return value is c.int
+	PushEvent        :: proc(event: ^Event) -> bool ---                 // original return value is c.int
 	SetEventFilter   :: proc(filter: EventFilter, userdata: rawptr) ---
 	GetEventFilter   :: proc(filter: ^EventFilter, userdata: ^rawptr) -> bool ---
 	AddEventWatch    :: proc(filter: EventFilter, userdata: rawptr) ---
 	DelEventWatch    :: proc(filter: EventFilter, userdata: rawptr) ---
 	FilterEvents     :: proc(filter: EventFilter, userdata: rawptr) ---
-	EventState       :: proc(type: EventType, state: c.int) -> u8 ---
+	EventState       :: proc(type: EventType, state: c.int) -> b8 --- // original return value is u8
 	RegisterEvents   :: proc(numevents: c.int) -> u32 ---
 }

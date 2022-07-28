@@ -37,9 +37,9 @@ MADV_WIPEONFORK  :: 18
 MADV_KEEPONFORK  :: 19
 MADV_HWPOISON    :: 100
 
-mmap :: proc "contextless" (addr: rawptr, length: uint, prot: c.int, flags: c.int, fd: c.int, offset: uintptr) -> rawptr {
+mmap :: proc "contextless" (addr: rawptr, length: uint, prot: c.int, flags: c.int, fd: c.int, offset: uintptr) -> int {
 	res := intrinsics.syscall(unix.SYS_mmap, uintptr(addr), uintptr(length), uintptr(prot), uintptr(flags), uintptr(fd), offset)
-	return rawptr(res)
+	return int(res)
 }
 
 munmap :: proc "contextless" (addr: rawptr, length: uint) -> c.int {
@@ -58,16 +58,15 @@ madvise :: proc "contextless" (addr: rawptr, length: uint, advice: c.int) -> c.i
 }
 
 
-_reserve :: proc(size: uint) -> (data: []byte, err: Allocator_Error) {
-	MAP_FAILED := rawptr(~uintptr(0))
+_reserve :: proc "contextless" (size: uint) -> (data: []byte, err: Allocator_Error) {
 	result := mmap(nil, size, PROT_NONE, MAP_PRIVATE|MAP_ANONYMOUS, -1, 0)
-	if result == MAP_FAILED {
+	if result < 0 && result > -4096 {
 		return nil, .Out_Of_Memory
 	}
-	return ([^]byte)(result)[:size], nil
+	return ([^]byte)(uintptr(result))[:size], nil
 }
 
-_commit :: proc(data: rawptr, size: uint) -> Allocator_Error {
+_commit :: proc "contextless" (data: rawptr, size: uint) -> Allocator_Error {
 	result := mprotect(data, size, PROT_READ|PROT_WRITE)
 	if result != 0 {
 		// TODO(bill): Handle error value correctly
@@ -75,14 +74,14 @@ _commit :: proc(data: rawptr, size: uint) -> Allocator_Error {
 	}
 	return nil
 }
-_decommit :: proc(data: rawptr, size: uint) {
+_decommit :: proc "contextless" (data: rawptr, size: uint) {
 	mprotect(data, size, PROT_NONE)
 	madvise(data, size, MADV_FREE)
 }
-_release :: proc(data: rawptr, size: uint) {
+_release :: proc "contextless" (data: rawptr, size: uint) {
 	munmap(data, size)
 }
-_protect :: proc(data: rawptr, size: uint, flags: Protect_Flags) -> bool {
+_protect :: proc "contextless" (data: rawptr, size: uint, flags: Protect_Flags) -> bool {
 	pflags: c.int
 	pflags = PROT_NONE
 	if .Read    in flags { pflags |= PROT_READ  }

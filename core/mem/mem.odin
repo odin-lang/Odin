@@ -3,6 +3,12 @@ package mem
 import "core:runtime"
 import "core:intrinsics"
 
+Byte     :: 1
+Kilobyte :: 1024 * Byte
+Megabyte :: 1024 * Kilobyte
+Gigabyte :: 1024 * Megabyte
+Terabyte :: 1024 * Gigabyte
+
 set :: proc "contextless" (data: rawptr, value: byte, len: int) -> rawptr {
 	return runtime.memset(data, i32(value), len)
 }
@@ -16,14 +22,16 @@ zero_explicit :: proc "contextless" (data: rawptr, len: int) -> rawptr {
 	// equivalent semantics to those provided by the C11 Annex K 3.7.4.1
 	// memset_s call.
 	intrinsics.mem_zero_volatile(data, len) // Use the volatile mem_zero
-	intrinsics.atomic_fence() // Prevent reordering
+	intrinsics.atomic_thread_fence(.Seq_Cst) // Prevent reordering
 	return data
 }
-zero_item :: proc "contextless" (item: $P/^$T) {
+zero_item :: proc "contextless" (item: $P/^$T) -> P {
 	intrinsics.mem_zero(item, size_of(T))
+	return item
 }
-zero_slice :: proc "contextless" (data: $T/[]$E) {
+zero_slice :: proc "contextless" (data: $T/[]$E) -> T {
 	zero(raw_data(data), size_of(E)*len(data))
+	return data
 }
 
 
@@ -101,6 +109,12 @@ check_zero_ptr :: proc(ptr: rawptr, len: int) -> bool {
 	case ptr == nil:
 		return true
 	}
+	switch len {
+	case 1: return (^u8)(ptr)^ == 0
+	case 2: return intrinsics.unaligned_load((^u16)(ptr)) == 0
+	case 4: return intrinsics.unaligned_load((^u32)(ptr)) == 0
+	case 8: return intrinsics.unaligned_load((^u64)(ptr)) == 0
+	}
 
 	start := uintptr(ptr)
 	start_aligned := align_forward_uintptr(start, align_of(uintptr))
@@ -144,7 +158,7 @@ slice_ptr :: proc "contextless" (ptr: ^$T, len: int) -> []T {
 	return ([^]T)(ptr)[:len]
 }
 
-byte_slice :: #force_inline proc "contextless" (data: rawptr, len: int) -> []byte {
+byte_slice :: #force_inline proc "contextless" (data: rawptr, #any_int len: int) -> []byte {
 	return ([^]u8)(data)[:max(len, 0)]
 }
 
@@ -166,7 +180,7 @@ slice_data_cast :: proc "contextless" ($T: typeid/[]$A, slice: $S/[]$B) -> T {
 
 slice_to_components :: proc "contextless" (slice: $E/[]$T) -> (data: ^T, len: int) {
 	s := transmute(Raw_Slice)slice
-	return s.data, s.len
+	return (^T)(s.data), s.len
 }
 
 buffer_from_slice :: proc "contextless" (backing: $T/[]$E) -> [dynamic]E {
@@ -191,11 +205,6 @@ any_to_bytes :: proc "contextless" (val: any) -> []byte {
 	return transmute([]byte)Raw_Slice{val.data, size}
 }
 
-
-kilobytes :: proc "contextless" (x: int) -> int { return          (x) * 1024 }
-megabytes :: proc "contextless" (x: int) -> int { return kilobytes(x) * 1024 }
-gigabytes :: proc "contextless" (x: int) -> int { return megabytes(x) * 1024 }
-terabytes :: proc "contextless" (x: int) -> int { return gigabytes(x) * 1024 }
 
 is_power_of_two :: proc "contextless" (x: uintptr) -> bool {
 	if x <= 0 {

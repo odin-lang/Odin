@@ -1,0 +1,30 @@
+# Odin i18n Example
+# Copyright (C) 2021 Jeroen van Rijn
+# This file is distributed under the same license as the PACKAGE package.
+# Jeroen van Rijn <Kelimion@users.noreply.github.com>, 2021.
+#
+#, fuzzy
+msgid   ""
+msgstr  "Project-Id-Version: Example 0.0.1\n"
+        "Report-Msgid-Bugs-To: Jeroen van Rijn <Kelimion@users.noreply.github.com>\n"
+        "POT-Creation-Date: 2021-11-27 19:23+0100\n"
+        "PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
+        "Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
+        "Language: en-GB\n"
+        "MIME-Version: 1.0\n"
+        "Content-Type: text/plain; charset=UTF-8\n"
+        "Content-Transfer-Encoding: 8bit\n"
+
+#: i18n_example.odin:28
+msgid "There are 69,105 leaves here."
+msgstr "Er zijn hier 69.105 bladeren."
+
+#: i18n_example.odin:30
+msgid "Hellope, World!"
+msgstr "Hallo, Wereld!"
+
+#: i18n_example.odin:36
+msgid "There is %d leaf.\n"
+msgid_plural "There are %d leaves.\n"
+msgstr[0] "Er is %d blad.\n"
+msgstr[1] "Er zijn %d bladeren.\n"

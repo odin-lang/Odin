@@ -9,6 +9,10 @@ OS :: ODIN_OS
 ARCH :: ODIN_ARCH
 ENDIAN :: ODIN_ENDIAN
 
+SEEK_SET :: 0
+SEEK_CUR :: 1
+SEEK_END :: 2
+
 write_string :: proc(fd: Handle, str: string) -> (int, Errno) {
 	return write(fd, transmute([]byte)str)
 }
@@ -139,7 +143,7 @@ write_entire_file :: proc(name: string, data: []byte, truncate := true) -> (succ
 	}
 
 	mode: int = 0
-	when OS == "linux" || OS == "darwin" {
+	when OS == .Linux || OS == .Darwin {
 		// NOTE(justasd): 644 (owner read, write; group read; others read)
 		mode = S_IRUSR | S_IWUSR | S_IRGRP | S_IROTH
 	}
@@ -206,11 +210,19 @@ heap_allocator_proc :: proc(allocator_data: rawptr, mode: mem.Allocator_Mode,
 		}
 	}
 
-	aligned_resize :: proc(p: rawptr, old_size: int, new_size: int, new_alignment: int) -> ([]byte, mem.Allocator_Error) {
+	aligned_resize :: proc(p: rawptr, old_size: int, new_size: int, new_alignment: int) -> (new_memory: []byte, err: mem.Allocator_Error) {
 		if p == nil {
 			return nil, nil
 		}
-		return aligned_alloc(new_size, new_alignment, p)
+
+		new_memory = aligned_alloc(new_size, new_alignment, p) or_return
+		
+		// NOTE: heap_resize does not zero the new memory, so we do it
+		if new_size > old_size {
+			new_region := mem.raw_data(new_memory[old_size:])
+			mem.zero(new_region, new_size - old_size)
+		}
+		return
 	}
 
 	switch mode {

@@ -151,7 +151,7 @@ print :: proc(p: ^Printer, file: ^ast.File) -> string {
 
 	fix_lines(p)
 
-	builder := strings.make_builder(0, mem.megabytes(5), p.allocator)
+	builder := strings.builder_make(0, 5 * mem.Megabyte, p.allocator)
 
 	last_line := 0
 

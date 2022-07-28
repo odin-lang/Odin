@@ -17,7 +17,7 @@ when ODIN_DEFAULT_TO_NIL_ALLOCATOR {
 			_windows_default_free(old_memory)
 
 		case .Free_All:
-			// NOTE(tetra): Do nothing.
+			return nil, .Mode_Not_Implemented
 
 		case .Resize:
 			data, err = _windows_default_resize(old_memory, old_size, size, alignment)
@@ -29,7 +29,7 @@ when ODIN_DEFAULT_TO_NIL_ALLOCATOR {
 			}
 
 		case .Query_Info:
-			// Do nothing
+			return nil, .Mode_Not_Implemented
 		}
 
 		return

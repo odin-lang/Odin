@@ -5,6 +5,7 @@ package odin_gl
 import "core:os"
 import "core:fmt"
 import "core:strings"
+_ :: fmt
 
 Shader_Type :: enum i32 {
 	NONE = 0x0000,
@@ -188,7 +189,7 @@ load_shaders_source :: proc(vs_source, fs_source: string, binary_retrievable := 
 load_shaders :: proc{load_shaders_file}
 
 
-when ODIN_OS == "windows" {
+when ODIN_OS == .Windows {
 	update_shader_if_changed :: proc(
 		vertex_name, fragment_name: string, 
 		program: u32, 

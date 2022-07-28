@@ -66,7 +66,8 @@ OS :: enum u8 {
 	_Unknown     = 14,
 	Unknown      = 255,
 }
-OS_Name :: #partial [OS]string{
+OS_Name :: #sparse[OS]string{
+	._Unknown     = "",
 	.FAT          = "FAT",
 	.Amiga        = "Amiga",
 	.VMS          = "VMS/OpenVMS",
@@ -99,9 +100,9 @@ E_GZIP    :: compress.GZIP_Error
 E_ZLIB    :: compress.ZLIB_Error
 E_Deflate :: compress.Deflate_Error
 
-GZIP_MAX_PAYLOAD_SIZE :: int(max(u32le))
+GZIP_MAX_PAYLOAD_SIZE :: i64(max(u32le))
 
-load :: proc{load_from_slice, load_from_file, load_from_context}
+load :: proc{load_from_bytes, load_from_file, load_from_context}
 
 load_from_file :: proc(filename: string, buf: ^bytes.Buffer, expected_output_size := -1, allocator := context.allocator) -> (err: Error) {
 	context.allocator = allocator
@@ -111,16 +112,16 @@ load_from_file :: proc(filename: string, buf: ^bytes.Buffer, expected_output_siz
 
 	err = E_General.File_Not_Found
 	if ok {
-		err = load_from_slice(data, buf, len(data), expected_output_size)
+		err = load_from_bytes(data, buf, len(data), expected_output_size)
 	}
 	return
 }
 
-load_from_slice :: proc(slice: []u8, buf: ^bytes.Buffer, known_gzip_size := -1, expected_output_size := -1, allocator := context.allocator) -> (err: Error) {
+load_from_bytes :: proc(data: []byte, buf: ^bytes.Buffer, known_gzip_size := -1, expected_output_size := -1, allocator := context.allocator) -> (err: Error) {
 	buf := buf
 
 	z := &compress.Context_Memory_Input{
-		input_data = slice,
+		input_data = data,
 		output = buf,
 	}
 	return load_from_context(z, buf, known_gzip_size, expected_output_size, allocator)
@@ -135,7 +136,7 @@ load_from_context :: proc(z: ^$C, buf: ^bytes.Buffer, known_gzip_size := -1, exp
 
 	z.output = buf
 
-	if expected_output_size > GZIP_MAX_PAYLOAD_SIZE {
+	if i64(expected_output_size) > i64(GZIP_MAX_PAYLOAD_SIZE) {
 		return E_GZIP.Payload_Size_Exceeds_Max_Payload
 	}
 

@@ -3,11 +3,11 @@ package sdl2_mixer
 import "core:c"
 import SDL ".."
 
-when ODIN_OS == "windows" { foreign import lib "SDL2_mixer.lib"    }
-when ODIN_OS == "linux"   { foreign import lib "system:SDL2_mixer" }
-when ODIN_OS == "darwin"  { foreign import lib "system:SDL2_mixer" }
-when ODIN_OS == "freebsd" { foreign import lib "system:SDL2_mixer" }
-
+when ODIN_OS == .Windows {
+	foreign import lib "SDL2_mixer.lib"
+} else {
+	foreign import lib "system:SDL2_mixer"
+}
 
 MAJOR_VERSION :: 2
 MINOR_VERSION :: 0

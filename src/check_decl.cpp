@@ -174,6 +174,10 @@ void check_init_constant(CheckerContext *ctx, Entity *e, Operand *operand) {
 		return;
 	}
 
+	if (is_type_proc(e->type)) {
+		error(e->token, "Illegal declaration of a constant procedure value");
+	}
+
 	e->parent_proc_decl = ctx->curr_proc_decl;
 
 	e->Constant.value = operand->value;
@@ -238,6 +242,51 @@ isize total_attribute_count(DeclInfo *decl) {
 	return attribute_count;
 }
 
+Type *clone_enum_type(CheckerContext *ctx, Type *original_enum_type, Type *named_type) {
+	// NOTE(bill, 2022-02-05): Stupid edge case for `distinct` declarations
+	//
+	//         X :: enum {A, B, C}
+	//         Y :: distinct X
+	//
+	// To make Y be just like X, it will need to copy the elements of X and change their type
+	// so that they match Y rather than X.
+	GB_ASSERT(original_enum_type != nullptr);
+	GB_ASSERT(named_type != nullptr);
+	GB_ASSERT(original_enum_type->kind == Type_Enum);
+	GB_ASSERT(named_type->kind == Type_Named);
+
+	Scope *parent = original_enum_type->Enum.scope->parent;
+	Scope *scope = create_scope(nullptr, parent);
+
+
+	Type *et = alloc_type_enum();
+	et->Enum.base_type = original_enum_type->Enum.base_type;
+	et->Enum.min_value = original_enum_type->Enum.min_value;
+	et->Enum.max_value = original_enum_type->Enum.max_value;
+	et->Enum.min_value_index = original_enum_type->Enum.min_value_index;
+	et->Enum.max_value_index = original_enum_type->Enum.max_value_index;
+	et->Enum.scope = scope;
+
+	auto fields = array_make<Entity *>(permanent_allocator(), original_enum_type->Enum.fields.count);
+	for_array(i, fields) {
+		Entity *old = original_enum_type->Enum.fields[i];
+
+		Entity *e = alloc_entity_constant(scope, old->token, named_type, old->Constant.value);
+		e->file = old->file;
+		e->identifier = clone_ast(old->identifier);
+		e->flags |= EntityFlag_Visited;
+		e->state = EntityState_Resolved;
+		e->Constant.flags = old->Constant.flags;
+		e->Constant.docs = old->Constant.docs;
+		e->Constant.comment = old->Constant.comment;
+
+		fields[i] = e;
+		add_entity(ctx, scope, nullptr, e);
+		add_entity_use(ctx, e->identifier, e);
+	}
+	et->Enum.fields = fields;
+	return et;
+}
 
 void check_type_decl(CheckerContext *ctx, Entity *e, Ast *init_expr, Type *def) {
 	GB_ASSERT(e->type == nullptr);
@@ -258,15 +307,25 @@ void check_type_decl(CheckerContext *ctx, Entity *e, Ast *init_expr, Type *def) 
 	Type *bt = check_type_expr(ctx, te, named);
 	check_type_path_pop(ctx);
 
-	named->Named.base = base_type(bt);
-
-	if (is_distinct && is_type_typeid(e->type)) {
-		error(init_expr, "'distinct' cannot be applied to 'typeid'");
-		is_distinct = false;
+	Type *base = base_type(bt);
+	if (is_distinct && bt->kind == Type_Named && base->kind == Type_Enum) {
+		base = clone_enum_type(ctx, base, named);
 	}
-	if (is_distinct && is_type_any(e->type)) {
-		error(init_expr, "'distinct' cannot be applied to 'any'");
-		is_distinct = false;
+	named->Named.base = base;
+
+	if (is_distinct) {
+		if (is_type_typeid(e->type)) {
+			error(init_expr, "'distinct' cannot be applied to 'typeid'");
+			is_distinct = false;
+		} else if (is_type_any(e->type)) {
+			error(init_expr, "'distinct' cannot be applied to 'any'");
+			is_distinct = false;
+		} else if (is_type_simd_vector(e->type)) {
+			gbString str = type_to_string(e->type);
+			error(init_expr, "'distinct' cannot be applied to '%s'", str);
+			gb_string_free(str);
+			is_distinct = false;
+		}
 	}
 	if (!is_distinct) {
 		e->type = bt;
@@ -289,6 +348,13 @@ void check_type_decl(CheckerContext *ctx, Entity *e, Ast *init_expr, Type *def) 
 	if (decl != nullptr) {
 		AttributeContext ac = {};
 		check_decl_attributes(ctx, decl->attributes, type_decl_attribute, &ac);
+		if (e->kind == Entity_TypeName && ac.objc_class != "") {
+			e->TypeName.objc_class_name = ac.objc_class;
+
+			if (type_size_of(e->type) > 0) {
+				error(e->token, "@(objc_class) marked type must be of zero size");
+			}
+		}
 	}
 
 
@@ -380,12 +446,56 @@ void check_const_decl(CheckerContext *ctx, Entity *e, Ast *type_expr, Ast *init,
 
 	if (type_expr) {
 		e->type = check_type(ctx, type_expr);
+		if (are_types_identical(e->type, t_typeid)) {
+			e->type = nullptr;
+			e->kind = Entity_TypeName;
+			check_type_decl(ctx, e, init, named_type);
+			return;
+		}
 	}
 
 	Operand operand = {};
 
 	if (init != nullptr) {
-		Entity *entity = nullptr;
+		Entity *entity = check_entity_from_ident_or_selector(ctx, init, false);
+		if (entity != nullptr && entity->kind == Entity_TypeName) {
+			// @TypeAliasingProblem
+			// NOTE(bill, 2022-02-03): This is used to solve the problem caused by type aliases
+			// being "confused" as constants
+			//
+			//         A :: B
+			//         C :: proc "c" (^A)
+			//         B :: struct {x: C}
+			//
+			//     A gets evaluated first, and then checks B.
+			//     B then checks C.
+			//     C then tries to check A which is unresolved but thought to be a constant.
+			//     Therefore within C's check, A errs as "not a type".
+			//
+			// This is because a const declaration may or may not be a type and this cannot
+			// be determined from a syntactical standpoint.
+			// This check allows the compiler to override the entity to be checked as a type.
+			//
+			// There is no problem if B is prefixed with the `#type` helper enforcing at
+			// both a syntax and semantic level that B must be a type.
+			//
+			//         A :: #type B
+			//
+			// This approach is not fool proof and can fail in case such as:
+			//
+			//         X :: type_of(x)
+			//         X :: Foo(int).Type
+			//
+			// Since even these kind of declarations may cause weird checking cycles.
+			// For the time being, these are going to be treated as an unfortunate error
+			// until there is a proper delaying system to try declaration again if they
+			// have failed.
+
+			e->kind = Entity_TypeName;
+			check_type_decl(ctx, e, init, named_type);
+			return;
+		}
+		entity = nullptr;
 		if (init->kind == Ast_Ident) {
 			entity = check_ident(ctx, &operand, init, nullptr, e->type, true);
 		} else if (init->kind == Ast_SelectorExpr) {
@@ -732,6 +842,75 @@ void check_proc_decl(CheckerContext *ctx, Entity *e, DeclInfo *d) {
 	}
 	e->Procedure.optimization_mode = cast(ProcedureOptimizationMode)ac.optimization_mode;
 
+	if (ac.objc_name.len || ac.objc_is_class_method || ac.objc_type) {
+		if (ac.objc_name.len == 0 && ac.objc_is_class_method) {
+			error(e->token, "@(objc_name) is required with @(objc_is_class_method)");
+		} else if (ac.objc_type == nullptr) {
+			error(e->token, "@(objc_name) requires that @(objc_type) to be set");
+		} else if (ac.objc_name.len == 0 && ac.objc_type) {
+			error(e->token, "@(objc_name) is required with @(objc_type)");
+		} else {
+			Type *t = ac.objc_type;
+			if (t->kind == Type_Named) {
+				Entity *tn = t->Named.type_name;
+
+				GB_ASSERT(tn->kind == Entity_TypeName);
+
+				if (tn->scope != e->scope) {
+					error(e->token, "@(objc_name) attribute may only be applied to procedures and types within the same scope");
+				} else {
+					mutex_lock(&global_type_name_objc_metadata_mutex);
+					defer (mutex_unlock(&global_type_name_objc_metadata_mutex));
+
+					if (!tn->TypeName.objc_metadata) {
+						tn->TypeName.objc_metadata = create_type_name_obj_c_metadata();
+					}
+					auto *md = tn->TypeName.objc_metadata;
+					mutex_lock(md->mutex);
+					defer (mutex_unlock(md->mutex));
+
+					if (!ac.objc_is_class_method) {
+						bool ok = true;
+						for (TypeNameObjCMetadataEntry const &entry : md->value_entries) {
+							if (entry.name == ac.objc_name) {
+								error(e->token, "Previous declaration of @(objc_name=\"%.*s\")", LIT(ac.objc_name));
+								ok = false;
+								break;
+							}
+						}
+						if (ok) {
+							array_add(&md->value_entries, TypeNameObjCMetadataEntry{ac.objc_name, e});
+						}
+					} else {
+						bool ok = true;
+						for (TypeNameObjCMetadataEntry const &entry : md->type_entries) {
+							if (entry.name == ac.objc_name) {
+								error(e->token, "Previous declaration of @(objc_name=\"%.*s\")", LIT(ac.objc_name));
+								ok = false;
+								break;
+							}
+						}
+						if (ok) {
+							array_add(&md->type_entries, TypeNameObjCMetadataEntry{ac.objc_name, e});
+						}
+					}
+				}
+			}
+		}
+	}
+
+	if (ac.require_target_feature.len != 0 && ac.enable_target_feature.len != 0) {
+		error(e->token, "Attributes @(require_target_feature=...) and @(enable_target_feature=...) cannot be used together");
+	} else if (ac.require_target_feature.len != 0) {
+		if (check_target_feature_is_enabled(e->token.pos, ac.require_target_feature)) {
+			e->Procedure.target_feature = ac.require_target_feature;
+		} else {
+			e->Procedure.target_feature_disabled = true;
+		}
+	} else if (ac.enable_target_feature.len != 0) {
+		enable_target_feature(e->token.pos, ac.enable_target_feature);
+		e->Procedure.target_feature = ac.enable_target_feature;
+	}
 
 	switch (e->Procedure.optimization_mode) {
 	case ProcedureOptimizationMode_None:
@@ -835,10 +1014,12 @@ void check_proc_decl(CheckerContext *ctx, Entity *e, DeclInfo *d) {
 		}
 	}
 
-	if (pt->result_count == 0 && ac.require_results) {
-		error(pl->type, "'require_results' is not needed on a procedure with no results");
-	} else {
-		pt->require_results = ac.require_results;
+	if (ac.require_results) {
+		if (pt->result_count == 0) {
+			error(pl->type, "'require_results' is not needed on a procedure with no results");
+		} else {
+			pt->require_results = true;
+		}
 	}
 
 	if (ac.link_name.len > 0) {
@@ -857,18 +1038,16 @@ void check_proc_decl(CheckerContext *ctx, Entity *e, DeclInfo *d) {
 		}
 		Entity *foreign_library = init_entity_foreign_library(ctx, e);
 		
-		if (is_arch_wasm()) {
+		if (is_arch_wasm() && foreign_library != nullptr) {
 			String module_name = str_lit("env");
-			if (foreign_library != nullptr) {
-				GB_ASSERT (foreign_library->kind == Entity_LibraryName);
-				if (foreign_library->LibraryName.paths.count != 1) {
-					error(foreign_library->token, "'foreign import' for '%.*s' architecture may only have one path, got %td", 
-					      LIT(target_arch_names[build_context.metrics.arch]), foreign_library->LibraryName.paths.count);
-				}
-				
-				if (foreign_library->LibraryName.paths.count >= 1) {
-					module_name = foreign_library->LibraryName.paths[0];
-				}
+			GB_ASSERT (foreign_library->kind == Entity_LibraryName);
+			if (foreign_library->LibraryName.paths.count != 1) {
+				error(foreign_library->token, "'foreign import' for '%.*s' architecture may only have one path, got %td",
+				      LIT(target_arch_names[build_context.metrics.arch]), foreign_library->LibraryName.paths.count);
+			}
+
+			if (foreign_library->LibraryName.paths.count >= 1) {
+				module_name = foreign_library->LibraryName.paths[0];
 			}
 			name = concatenate3_strings(permanent_allocator(), module_name, WASM_MODULE_NAME_SEPARATOR, name);
 		}
@@ -975,6 +1154,12 @@ void check_global_variable_decl(CheckerContext *ctx, Entity *&e, Ast *type_expr,
 	}
 	ac.link_name = handle_link_name(ctx, e->token, ac.link_name, ac.link_prefix);
 
+	if (is_arch_wasm() && e->Variable.thread_local_model.len != 0) {
+		e->Variable.thread_local_model.len = 0;
+		// NOTE(bill): ignore this message for the time begin
+		// error(e->token, "@(thread_local) is not supported for this target platform");
+	}
+
 	String context_name = str_lit("variable declaration");
 
 	if (type_expr != nullptr) {
@@ -1050,6 +1235,8 @@ void check_global_variable_decl(CheckerContext *ctx, Entity *&e, Ast *type_expr,
 	Operand o = {};
 	check_expr_with_type_hint(ctx, &o, init_expr, e->type);
 	check_init_variable(ctx, e, &o, str_lit("variable declaration"));
+
+	check_rtti_type_disallowed(e->token, e->type, "A variable declaration is using a type, %s, which has been disallowed");
 }
 
 void check_proc_group_decl(CheckerContext *ctx, Entity *&pg_entity, DeclInfo *d) {
@@ -1142,20 +1329,20 @@ void check_proc_group_decl(CheckerContext *ctx, Entity *&pg_entity, DeclInfo *d)
 
 			if (!both_have_where_clauses) switch (kind) {
 			case ProcOverload_Identical:
-				error(p->token, "Overloaded procedure '%.*s' as the same type as another procedure in the procedure group '%.*s'", LIT(name), LIT(proc_group_name));
+				error(p->token, "Overloaded procedure '%.*s' has the same type as another procedure in the procedure group '%.*s'", LIT(name), LIT(proc_group_name));
 				is_invalid = true;
 				break;
 			// case ProcOverload_CallingConvention:
-				// error(p->token, "Overloaded procedure '%.*s' as the same type as another procedure in the procedure group '%.*s'", LIT(name), LIT(proc_group_name));
+				// error(p->token, "Overloaded procedure '%.*s' has the same type as another procedure in the procedure group '%.*s'", LIT(name), LIT(proc_group_name));
 				// is_invalid = true;
 				// break;
 			case ProcOverload_ParamVariadic:
-				error(p->token, "Overloaded procedure '%.*s' as the same type as another procedure in the procedure group '%.*s'", LIT(name), LIT(proc_group_name));
+				error(p->token, "Overloaded procedure '%.*s' has the same type as another procedure in the procedure group '%.*s'", LIT(name), LIT(proc_group_name));
 				is_invalid = true;
 				break;
 			case ProcOverload_ResultCount:
 			case ProcOverload_ResultTypes:
-				error(p->token, "Overloaded procedure '%.*s' as the same parameters but different results in the procedure group '%.*s'", LIT(name), LIT(proc_group_name));
+				error(p->token, "Overloaded procedure '%.*s' has the same parameters but different results in the procedure group '%.*s'", LIT(name), LIT(proc_group_name));
 				is_invalid = true;
 				break;
 			case ProcOverload_Polymorphic:

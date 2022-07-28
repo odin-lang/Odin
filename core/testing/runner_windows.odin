@@ -21,7 +21,7 @@ sema_wait :: proc "contextless" (s: ^Sema) {
 			win32.WaitOnAddress(&s.count, &original_count, size_of(original_count), win32.INFINITE)
 			original_count = s.count
 		}
-		if original_count == intrinsics.atomic_cxchg(&s.count, original_count-1, original_count) {
+		if original_count == intrinsics.atomic_compare_exchange_strong(&s.count, original_count-1, original_count) {
 			return
 		}
 	}
@@ -46,7 +46,7 @@ sema_wait_with_timeout :: proc "contextless" (s: ^Sema, duration: time.Duration)
 			}
 			original_count = s.count
 		}
-		if original_count == intrinsics.atomic_cxchg(&s.count, original_count-1, original_count) {
+		if original_count == intrinsics.atomic_compare_exchange_strong(&s.count, original_count-1, original_count) {
 			return true
 		}
 	}
@@ -203,7 +203,7 @@ run_internal_test :: proc(t: ^T, it: Internal_Test) {
 		thread.it.p(t)
 		
 		sema_post(&global_fail_timeout_semaphore)
-		thread_join_and_destroy(global_fail_timeout_thread)
+		if global_fail_timeout_thread != nil do thread_join_and_destroy(global_fail_timeout_thread)
 		
 		thread.success = true
 		sema_post(&global_threaded_runner_semaphore)

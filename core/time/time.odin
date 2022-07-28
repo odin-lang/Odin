@@ -14,6 +14,8 @@ Hour        :: 60 * Minute
 MIN_DURATION :: Duration(-1 << 63)
 MAX_DURATION :: Duration(1<<63 - 1)
 
+IS_SUPPORTED :: _IS_SUPPORTED
+
 Time :: struct {
 	_nsec: i64, // zero is 1970-01-01 00:00:00
 }
@@ -49,6 +51,14 @@ Stopwatch :: struct {
 	_accumulation: Duration,
 }
 
+now :: proc "contextless" () -> Time {
+	return _now()
+}
+
+sleep :: proc "contextless" (d: Duration) {
+	_sleep(d)
+}
+
 stopwatch_start :: proc(using stopwatch: ^Stopwatch) {
 	if !running {
 		_start_time = tick_now()
@@ -82,36 +92,36 @@ since :: proc(start: Time) -> Duration {
 	return diff(start, now())
 }
 
-duration_nanoseconds :: proc(d: Duration) -> i64 {
+duration_nanoseconds :: proc "contextless" (d: Duration) -> i64 {
 	return i64(d)
 }
-duration_microseconds :: proc(d: Duration) -> f64 {
+duration_microseconds :: proc "contextless" (d: Duration) -> f64 {
 	return duration_seconds(d) * 1e6
 }
-duration_milliseconds :: proc(d: Duration) -> f64 {
+duration_milliseconds :: proc "contextless" (d: Duration) -> f64 {
 	return duration_seconds(d) * 1e3
 }
-duration_seconds :: proc(d: Duration) -> f64 {
+duration_seconds :: proc "contextless" (d: Duration) -> f64 {
 	sec := d / Second
 	nsec := d % Second
 	return f64(sec) + f64(nsec)/1e9
 }
-duration_minutes :: proc(d: Duration) -> f64 {
+duration_minutes :: proc "contextless" (d: Duration) -> f64 {
 	min := d / Minute
 	nsec := d % Minute
 	return f64(min) + f64(nsec)/(60*1e9)
 }
-duration_hours :: proc(d: Duration) -> f64 {
+duration_hours :: proc "contextless" (d: Duration) -> f64 {
 	hour := d / Hour
 	nsec := d % Hour
 	return f64(hour) + f64(nsec)/(60*60*1e9)
 }
 
-_less_than_half :: #force_inline proc(x, y: Duration) -> bool {
-	return u64(x)+u64(x) < u64(y)
-}
-
 duration_round :: proc(d, m: Duration) -> Duration {
+	_less_than_half :: #force_inline proc(x, y: Duration) -> bool {
+		return u64(x)+u64(x) < u64(y)
+	}
+
 	if m <= 0 {
 		return d
 	}
@@ -201,10 +211,12 @@ unix :: proc(sec: i64, nsec: i64) -> Time {
 	return Time{(sec*1e9 + nsec) + UNIX_TO_INTERNAL}
 }
 
+to_unix_seconds :: time_to_unix
 time_to_unix :: proc(t: Time) -> i64 {
 	return t._nsec/1e9
 }
 
+to_unix_nanoseconds :: time_to_unix_nano
 time_to_unix_nano :: proc(t: Time) -> i64 {
 	return t._nsec
 }
@@ -213,6 +225,44 @@ time_add :: proc(t: Time, d: Duration) -> Time {
 	return Time{t._nsec + i64(d)}
 }
 
+// Accurate sleep borrowed from: https://blat-blatnik.github.io/computerBear/making-accurate-sleep-function/
+//
+// Accuracy seems to be pretty good out of the box on Linux, to within around 4µs worst case.
+// On Windows it depends but is comparable with regular sleep in the worst case.
+// To get the same kind of accuracy as on Linux, have your program call `win32.time_begin_period(1)` to
+// tell Windows to use a more accurate timer for your process.
+accurate_sleep :: proc(d: Duration) {
+	to_sleep, estimate, mean, m2, count: Duration
+
+	to_sleep = d
+	estimate = 5 * Millisecond
+	mean     = 5 * Millisecond
+	count = 1
+
+	for to_sleep > estimate {
+		start := tick_now()
+		sleep(1 * Millisecond)
+
+		observed := tick_since(start)
+		to_sleep -= observed
+
+		count += 1
+
+		delta := observed - mean
+		mean += delta / count
+		m2 += delta * (observed - mean)
+		stddev := intrinsics.sqrt(f64(m2) / f64(count - 1))
+		estimate = mean + Duration(stddev)
+	}
+
+	start := tick_now()
+	for to_sleep > tick_since(start) {
+		// prevent the spinlock from taking the thread hostage, still accurate enough
+		_yield()
+		// NOTE: it might be possible that it yields for too long, in that case it should spinlock freely for a while
+		// TODO: needs actual testing done to check if that's the case
+	}
+}
 
 ABSOLUTE_ZERO_YEAR :: i64(-292277022399) // Day is chosen so that 2001-01-01 is Monday in the calculations
 ABSOLUTE_TO_INTERNAL :: i64(-9223371966579724800) // i64((ABSOLUTE_ZERO_YEAR - 1) * 365.2425 * SECONDS_PER_DAY);
@@ -227,20 +277,24 @@ INTERNAL_TO_WALL :: -WALL_TO_INTERNAL
 UNIX_TO_ABSOLUTE :: UNIX_TO_INTERNAL + INTERNAL_TO_ABSOLUTE
 ABSOLUTE_TO_UNIX :: -UNIX_TO_ABSOLUTE
 
-_is_leap_year :: proc(year: int) -> bool {
-	return year%4 == 0 && (year%100 != 0 || year%400 == 0)
-}
 
+@(private)
 _date :: proc(t: Time, full: bool) -> (year: int, month: Month, day: int, yday: int) {
 	year, month, day, yday = _abs_date(_time_abs(t), full)
 	return
 }
 
+@(private)
 _time_abs :: proc(t: Time) -> u64 {
 	return u64(t._nsec/1e9 + UNIX_TO_ABSOLUTE)
 }
 
+@(private)
 _abs_date :: proc(abs: u64, full: bool) -> (year: int, month: Month, day: int, yday: int) {
+	_is_leap_year :: proc(year: int) -> bool {
+		return year%4 == 0 && (year%100 != 0 || year%400 == 0)
+	}
+
 	d := abs / SECONDS_PER_DAY
 
 	// 400 year cycles

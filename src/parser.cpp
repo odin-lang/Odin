@@ -1,5 +1,8 @@
 #include "parser_pos.cpp"
 
+// #undef at the bottom of this file
+#define ALLOW_NEWLINE build_context.strict_style
+
 Token token_end_of_line(AstFile *f, Token tok) {
 	u8 const *start = f->tokenizer.start + tok.pos.offset;
 	u8 const *s = start;
@@ -57,6 +60,9 @@ isize ast_node_size(AstKind kind) {
 	return align_formula_isize(gb_size_of(AstCommonStuff) + ast_variant_sizes[kind], gb_align_of(void *));
 
 }
+
+gb_global std::atomic<isize> global_total_node_memory_allocated;
+
 // NOTE(bill): And this below is why is I/we need a new language! Discriminated unions are a pain in C/C++
 Ast *alloc_ast_node(AstFile *f, AstKind kind) {
 	gbAllocator a = ast_allocator(f);
@@ -66,6 +72,9 @@ Ast *alloc_ast_node(AstFile *f, AstKind kind) {
 	Ast *node = cast(Ast *)gb_alloc(a, size);
 	node->kind = kind;
 	node->file_id = f ? f->id : 0;
+
+	global_total_node_memory_allocated += size;
+
 	return node;
 }
 
@@ -181,6 +190,11 @@ Ast *clone_ast(Ast *node) {
 	case Ast_FieldValue:
 		n->FieldValue.field = clone_ast(n->FieldValue.field);
 		n->FieldValue.value = clone_ast(n->FieldValue.value);
+		break;
+
+	case Ast_EnumFieldValue:
+		n->EnumFieldValue.name = clone_ast(n->EnumFieldValue.name);
+		n->EnumFieldValue.value = clone_ast(n->EnumFieldValue.value);
 		break;
 
 	case Ast_TernaryIfExpr:
@@ -349,6 +363,7 @@ Ast *clone_ast(Ast *node) {
 	case Ast_ArrayType:
 		n->ArrayType.count = clone_ast(n->ArrayType.count);
 		n->ArrayType.elem  = clone_ast(n->ArrayType.elem);
+		n->ArrayType.tag   = clone_ast(n->ArrayType.tag);
 		break;
 	case Ast_DynamicArrayType:
 		n->DynamicArrayType.elem = clone_ast(n->DynamicArrayType.elem);
@@ -690,6 +705,16 @@ Ast *ast_field_value(AstFile *f, Ast *field, Ast *value, Token eq) {
 	result->FieldValue.field = field;
 	result->FieldValue.value = value;
 	result->FieldValue.eq = eq;
+	return result;
+}
+
+
+Ast *ast_enum_field_value(AstFile *f, Ast *name, Ast *value, CommentGroup *docs, CommentGroup *comment) {
+	Ast *result = alloc_ast_node(f, Ast_EnumFieldValue);
+	result->EnumFieldValue.name = name;
+	result->EnumFieldValue.value = value;
+	result->EnumFieldValue.docs = docs;
+	result->EnumFieldValue.comment = comment;
 	return result;
 }
 
@@ -1050,15 +1075,14 @@ Ast *ast_struct_type(AstFile *f, Token token, Slice<Ast *> fields, isize field_c
 }
 
 
-Ast *ast_union_type(AstFile *f, Token token, Array<Ast *> const &variants, Ast *polymorphic_params, Ast *align, bool no_nil, bool maybe,
+Ast *ast_union_type(AstFile *f, Token token, Array<Ast *> const &variants, Ast *polymorphic_params, Ast *align, UnionTypeKind kind,
                     Token where_token, Array<Ast *> const &where_clauses) {
 	Ast *result = alloc_ast_node(f, Ast_UnionType);
 	result->UnionType.token              = token;
 	result->UnionType.variants           = slice_from_array(variants);
 	result->UnionType.polymorphic_params = polymorphic_params;
 	result->UnionType.align              = align;
-	result->UnionType.no_nil             = no_nil;
-	result->UnionType.maybe              = maybe;
+	result->UnionType.kind               = kind;
 	result->UnionType.where_token        = where_token;
 	result->UnionType.where_clauses      = slice_from_array(where_clauses);
 	return result;
@@ -1140,11 +1164,10 @@ Ast *ast_package_decl(AstFile *f, Token token, Token name, CommentGroup *docs, C
 	return result;
 }
 
-Ast *ast_import_decl(AstFile *f, Token token, bool is_using, Token relpath, Token import_name,
+Ast *ast_import_decl(AstFile *f, Token token, Token relpath, Token import_name,
                      CommentGroup *docs, CommentGroup *comment) {
 	Ast *result = alloc_ast_node(f, Ast_ImportDecl);
 	result->ImportDecl.token       = token;
-	result->ImportDecl.is_using    = is_using;
 	result->ImportDecl.relpath     = relpath;
 	result->ImportDecl.import_name = import_name;
 	result->ImportDecl.docs        = docs;
@@ -1234,7 +1257,7 @@ CommentGroup *consume_comment_group(AstFile *f, isize n, isize *end_line_) {
 	return comments;
 }
 
-void comsume_comment_groups(AstFile *f, Token prev) {
+void consume_comment_groups(AstFile *f, Token prev) {
 	if (f->curr_token.kind == Token_Comment) {
 		CommentGroup *comment = nullptr;
 		isize end_line = 0;
@@ -1258,14 +1281,9 @@ void comsume_comment_groups(AstFile *f, Token prev) {
 	}
 }
 
-bool ignore_newlines(AstFile *f) {
-	if (f->allow_newline) {
-		return f->expr_level > 0;
-	}
-	return f->expr_level >= 0;
+gb_inline bool ignore_newlines(AstFile *f) {
+	return f->expr_level > 0;
 }
-
-
 
 Token advance_token(AstFile *f) {
 	f->lead_comment = nullptr;
@@ -1278,7 +1296,7 @@ Token advance_token(AstFile *f) {
 	if (ok) {
 		switch (f->curr_token.kind) {
 		case Token_Comment:
-			comsume_comment_groups(f, prev);
+			consume_comment_groups(f, prev);
 			break;
 		case Token_Semicolon:
 			if (ignore_newlines(f) && f->curr_token.string == "\n") {
@@ -1408,6 +1426,7 @@ Token expect_operator(AstFile *f) {
 		             LIT(p));
 	}
 	if (f->curr_token.kind == Token_Ellipsis) {
+		syntax_warning(f->curr_token, "'..' for ranges has now be deprecated, prefer '..='");
 		f->tokens[f->curr_token_index].flags |= TokenFlag_Replace;
 	}
 	
@@ -1440,7 +1459,11 @@ Token expect_closing_brace_of_field_list(AstFile *f) {
 	if (allow_token(f, Token_CloseBrace)) {
 		return token;
 	}
-	if (allow_token(f, Token_Semicolon)) {
+	bool ok = true;
+	if (!f->allow_newline) {
+		ok = !skip_possible_newline(f);
+	}
+	if (ok && allow_token(f, Token_Semicolon)) {
 		String p = token_to_string(token);
 		syntax_error(token_end_of_line(f, f->prev_token), "Expected a comma, got a %.*s", LIT(p));
 	}
@@ -1514,13 +1537,15 @@ void fix_advance_to_next_stmt(AstFile *f) {
 	}
 }
 
-Token expect_closing(AstFile *f, TokenKind kind, String context) {
+Token expect_closing(AstFile *f, TokenKind kind, String const &context) {
 	if (f->curr_token.kind != kind &&
 	    f->curr_token.kind == Token_Semicolon &&
-	    f->curr_token.string == "\n") {
-		Token tok = f->prev_token;
-		tok.pos.column += cast(i32)tok.string.len;
-		syntax_error(tok, "Missing ',' before newline in %.*s", LIT(context));
+	    (f->curr_token.string == "\n" || f->curr_token.kind == Token_EOF)) {
+	    	if (f->allow_newline) {
+			Token tok = f->prev_token;
+			tok.pos.column += cast(i32)tok.string.len;
+			syntax_error(tok, "Missing ',' before newline in %.*s", LIT(context));
+		}
 		advance_token(f);
 	}
 	return expect_token(f, kind);
@@ -1539,6 +1564,7 @@ void assign_removal_flag_to_semicolon(AstFile *f) {
 			switch (curr_token->kind) {
 			case Token_CloseBrace:
 			case Token_CloseParen:
+			case Token_EOF:
 				ok = true;
 				break;
 			}
@@ -1555,7 +1581,7 @@ void assign_removal_flag_to_semicolon(AstFile *f) {
 	}
 }
 
-void expect_semicolon(AstFile *f, Ast *s) {
+void expect_semicolon(AstFile *f) {
 	Token prev_token = {};
 
 	if (allow_token(f, Token_Semicolon)) {
@@ -1580,17 +1606,17 @@ void expect_semicolon(AstFile *f, Ast *s) {
 	if (f->curr_token.kind == Token_EOF) {
 		return;
 	}
-
-	if (s != nullptr) {
-		return;
-	} 
 	switch (f->curr_token.kind) {
 	case Token_EOF:
 		return;
 	}
-	String p = token_to_string(f->curr_token);
-	syntax_error(prev_token, "Expected ';', got %.*s", LIT(p));
-	fix_advance_to_next_stmt(f);
+
+	if (f->curr_token.pos.line == f->prev_token.pos.line) {
+		String p = token_to_string(f->curr_token);
+		prev_token.pos = token_pos_end(prev_token);
+		syntax_error(prev_token, "Expected ';', got %.*s", LIT(p));
+		fix_advance_to_next_stmt(f);
+	}
 }
 
 
@@ -1599,6 +1625,7 @@ Ast *        parse_proc_type(AstFile *f, Token proc_token);
 Array<Ast *> parse_stmt_list(AstFile *f);
 Ast *        parse_stmt(AstFile *f);
 Ast *        parse_body(AstFile *f);
+Ast *        parse_do_body(AstFile *f, Token const &token, char const *msg);
 Ast *        parse_block_stmt(AstFile *f, b32 is_when);
 
 
@@ -1682,8 +1709,48 @@ Array<Ast *> parse_element_list(AstFile *f) {
 
 		array_add(&elems, elem);
 
-		if (!allow_token(f, Token_Comma)) {
+		if (!allow_field_separator(f)) {
 			break;
+		}
+	}
+
+	return elems;
+}
+CommentGroup *consume_line_comment(AstFile *f) {
+	CommentGroup *comment = f->line_comment;
+	if (f->line_comment == f->lead_comment) {
+		f->lead_comment = nullptr;
+	}
+	f->line_comment = nullptr;
+	return comment;
+
+}
+
+Array<Ast *> parse_enum_field_list(AstFile *f) {
+	auto elems = array_make<Ast *>(heap_allocator());
+
+	while (f->curr_token.kind != Token_CloseBrace &&
+	       f->curr_token.kind != Token_EOF) {
+		CommentGroup *docs = f->lead_comment;
+		CommentGroup *comment = nullptr;
+		Ast *name = parse_value(f);
+		Ast *value = nullptr;
+		if (f->curr_token.kind == Token_Eq) {
+			Token eq = expect_token(f, Token_Eq);
+			value = parse_value(f);
+		}
+
+		comment = consume_line_comment(f);
+
+		Ast *elem = ast_enum_field_value(f, name, value, docs, comment);
+		array_add(&elems, elem);
+
+		if (!allow_field_separator(f)) {
+			break;
+		}
+
+		if (!elem->EnumFieldValue.comment) {
+			elem->EnumFieldValue.comment = consume_line_comment(f);
 		}
 	}
 
@@ -1719,14 +1786,14 @@ Ast *parse_value(AstFile *f) {
 Ast *parse_type_or_ident(AstFile *f);
 
 
-void check_proc_add_tag(AstFile *f, Ast *tag_expr, u64 *tags, ProcTag tag, String tag_name) {
+void check_proc_add_tag(AstFile *f, Ast *tag_expr, u64 *tags, ProcTag tag, String const &tag_name) {
 	if (*tags & tag) {
 		syntax_error(tag_expr, "Procedure tag already used: %.*s", LIT(tag_name));
 	}
 	*tags |= tag;
 }
 
-bool is_foreign_name_valid(String name) {
+bool is_foreign_name_valid(String const &name) {
 	if (name.len == 0) {
 		return false;
 	}
@@ -1793,6 +1860,8 @@ void parse_proc_tags(AstFile *f, u64 *tags) {
 		ELSE_IF_ADD_TAG(require_results)
 		ELSE_IF_ADD_TAG(bounds_check)
 		ELSE_IF_ADD_TAG(no_bounds_check)
+		ELSE_IF_ADD_TAG(type_assert)
+		ELSE_IF_ADD_TAG(no_type_assert)
 		else {
 			syntax_error(tag_expr, "Unknown procedure type tag #%.*s", LIT(tag_name));
 		}
@@ -1802,6 +1871,10 @@ void parse_proc_tags(AstFile *f, u64 *tags) {
 
 	if ((*tags & ProcTag_bounds_check) && (*tags & ProcTag_no_bounds_check)) {
 		syntax_error(f->curr_token, "You cannot apply both #bounds_check and #no_bounds_check to a procedure");
+	}
+
+	if ((*tags & ProcTag_type_assert) && (*tags & ProcTag_no_type_assert)) {
+		syntax_error(f->curr_token, "You cannot apply both #type_assert and #no_type_assert to a procedure");
 	}
 }
 
@@ -1816,7 +1889,7 @@ Ast *parse_field_list(AstFile *f, isize *name_count_, u32 allowed_flags, TokenKi
 Ast *parse_unary_expr(AstFile *f, bool lhs);
 
 
-Ast *convert_stmt_to_expr(AstFile *f, Ast *statement, String kind) {
+Ast *convert_stmt_to_expr(AstFile *f, Ast *statement, String const &kind) {
 	if (statement == nullptr) {
 		return nullptr;
 	}
@@ -1950,11 +2023,23 @@ Ast *parse_check_directive_for_statement(Ast *s, Token const &tag_token, u16 sta
 			syntax_error(tag_token, "#bounds_check and #no_bounds_check cannot be applied together");
 		}
 		break;
+	case StateFlag_type_assert:
+		if ((s->state_flags & StateFlag_no_type_assert) != 0) {
+			syntax_error(tag_token, "#type_assert and #no_type_assert cannot be applied together");
+		}
+		break;
+	case StateFlag_no_type_assert:
+		if ((s->state_flags & StateFlag_type_assert) != 0) {
+			syntax_error(tag_token, "#type_assert and #no_type_assert cannot be applied together");
+		}
+		break;
 	}
 
 	switch (state_flag) {
 	case StateFlag_bounds_check:
 	case StateFlag_no_bounds_check:
+	case StateFlag_type_assert:
+	case StateFlag_no_type_assert:
 		switch (s->kind) {
 		case Ast_BlockStmt:
 		case Ast_IfStmt:
@@ -1985,6 +2070,20 @@ Ast *parse_check_directive_for_statement(Ast *s, Token const &tag_token, u16 sta
 	return s;
 }
 
+Array<Ast *> parse_union_variant_list(AstFile *f) {
+	auto variants = array_make<Ast *>(heap_allocator());
+	while (f->curr_token.kind != Token_CloseBrace &&
+	       f->curr_token.kind != Token_EOF) {
+		Ast *type = parse_type(f);
+		if (type->kind != Ast_BadExpr) {
+			array_add(&variants, type);
+		}
+		if (!allow_field_separator(f)) {
+			break;
+		}
+	}
+	return variants;
+}
 
 Ast *parse_operand(AstFile *f, bool lhs) {
 	Ast *operand = nullptr; // Operand
@@ -2013,6 +2112,7 @@ Ast *parse_operand(AstFile *f, bool lhs) {
 
 	case Token_OpenParen: {
 		bool allow_newline;
+		isize prev_expr_level;
 		Token open, close;
 		// NOTE(bill): Skip the Paren Expression
 		open = expect_token(f, Token_OpenParen);
@@ -2022,16 +2122,18 @@ Ast *parse_operand(AstFile *f, bool lhs) {
 			return ast_bad_expr(f, open, close);
 		}
 
+		prev_expr_level = f->expr_level;
 		allow_newline = f->allow_newline;
 		if (f->expr_level < 0) {
 			f->allow_newline = false;
 		}
 
-		f->expr_level++;
+		// NOTE(bill): enforce it to >0
+		f->expr_level = gb_max(f->expr_level, 0)+1;
 		operand = parse_expr(f, false);
-		f->expr_level--;
 
 		f->allow_newline = allow_newline;
+		f->expr_level = prev_expr_level;
 
 		close = expect_token(f, Token_CloseParen);
 		return ast_paren_expr(f, operand, open, close);
@@ -2049,7 +2151,18 @@ Ast *parse_operand(AstFile *f, bool lhs) {
 		Token name = expect_token(f, Token_Ident);
 		if (name.string == "type") {
 			return ast_helper_type(f, token, parse_type(f));
-		} else if (name.string == "soa" || name.string == "simd") {
+		} else if ( name.string == "simd") {
+			Ast *tag = ast_basic_directive(f, token, name);
+			Ast *original_type = parse_type(f);
+			Ast *type = unparen_expr(original_type);
+			switch (type->kind) {
+			case Ast_ArrayType: type->ArrayType.tag = tag; break;
+			default:
+				syntax_error(type, "Expected a fixed array type after #%.*s, got %.*s", LIT(name.string), LIT(ast_strings[type->kind]));
+				break;
+			}
+			return original_type;
+		} else if (name.string == "soa") {
 			Ast *tag = ast_basic_directive(f, token, name);
 			Ast *original_type = parse_type(f);
 			Ast *type = unparen_expr(original_type);
@@ -2062,6 +2175,22 @@ Ast *parse_operand(AstFile *f, bool lhs) {
 			}
 			return original_type;
 		} else if (name.string == "partial") {
+			Ast *tag = ast_basic_directive(f, token, name);
+			Ast *original_expr = parse_expr(f, lhs);
+			Ast *expr = unparen_expr(original_expr);
+			switch (expr->kind) {
+			case Ast_ArrayType:
+				syntax_error(expr, "#partial has been replaced with #sparse for non-contiguous enumerated array types");
+				break;
+			case Ast_CompoundLit:
+				expr->CompoundLit.tag = tag;
+				break;
+			default:
+				syntax_error(expr, "Expected a compound literal after #%.*s, got %.*s", LIT(name.string), LIT(ast_strings[expr->kind]));
+				break;
+			}
+			return original_expr;
+		} else if (name.string == "sparse") {
 			Ast *tag = ast_basic_directive(f, token, name);
 			Ast *original_type = parse_type(f);
 			Ast *type = unparen_expr(original_type);
@@ -2078,6 +2207,12 @@ Ast *parse_operand(AstFile *f, bool lhs) {
 		} else if (name.string == "no_bounds_check") {
 			Ast *operand = parse_expr(f, lhs);
 			return parse_check_directive_for_statement(operand, name, StateFlag_no_bounds_check);
+		} else if (name.string == "type_assert") {
+			Ast *operand = parse_expr(f, lhs);
+			return parse_check_directive_for_statement(operand, name, StateFlag_type_assert);
+		} else if (name.string == "no_type_assert") {
+			Ast *operand = parse_expr(f, lhs);
+			return parse_check_directive_for_statement(operand, name, StateFlag_no_type_assert);
 		} else if (name.string == "relative") {
 			Ast *tag = ast_basic_directive(f, token, name);
 			tag = parse_call_expr(f, tag);
@@ -2104,7 +2239,7 @@ Ast *parse_operand(AstFile *f, bool lhs) {
 				Ast *elem = parse_expr(f, false);
 				array_add(&args, elem);
 
-				if (!allow_token(f, Token_Comma)) {
+				if (!allow_field_separator(f)) {
 					break;
 				}
 			}
@@ -2174,6 +2309,12 @@ Ast *parse_operand(AstFile *f, bool lhs) {
 			if (tags & ProcTag_bounds_check) {
 				body->state_flags |= StateFlag_bounds_check;
 			}
+			if (tags & ProcTag_no_type_assert) {
+				body->state_flags |= StateFlag_no_type_assert;
+			}
+			if (tags & ProcTag_type_assert) {
+				body->state_flags |= StateFlag_type_assert;
+			}
 
 			return ast_proc_lit(f, type, body, tags, where_token, where_clauses);
 		} else if (allow_token(f, Token_do)) {
@@ -2183,11 +2324,7 @@ Ast *parse_operand(AstFile *f, bool lhs) {
 			body = convert_stmt_to_body(f, parse_stmt(f));
 			f->curr_proc = curr_proc;
 
-			if (build_context.disallow_do) {
-				syntax_error(body, "'do' has been disallowed");
-			} else if (!ast_on_same_line(type, body)) {
-				syntax_error(body, "The body of a 'do' must be on the same line as the signature");
-			}
+			syntax_error(body, "'do' for procedure bodies is not allowed, prefer {}");
 
 			return ast_proc_lit(f, type, body, tags, where_token, where_clauses);
 		}
@@ -2299,7 +2436,9 @@ Ast *parse_operand(AstFile *f, bool lhs) {
 			check_polymorphic_params_for_type(f, polymorphic_params, token);
 		}
 
-		isize prev_level = f->expr_level;
+		isize prev_level;
+
+		prev_level = f->expr_level;
 		f->expr_level = -1;
 
 		while (allow_token(f, Token_Hash)) {
@@ -2338,7 +2477,7 @@ Ast *parse_operand(AstFile *f, bool lhs) {
 
 		if (f->curr_token.kind == Token_where) {
 			where_token = expect_token(f, Token_where);
-			isize prev_level = f->expr_level;
+			prev_level = f->expr_level;
 			f->expr_level = -1;
 			where_clauses = parse_rhs_expr_list(f);
 			f->expr_level = prev_level;
@@ -2362,11 +2501,13 @@ Ast *parse_operand(AstFile *f, bool lhs) {
 
 	case Token_union: {
 		Token token = expect_token(f, Token_union);
-		auto variants = array_make<Ast *>(heap_allocator());
 		Ast *polymorphic_params = nullptr;
 		Ast *align = nullptr;
 		bool no_nil = false;
 		bool maybe = false;
+		bool shared_nil = false;
+
+		UnionTypeKind union_kind = UnionType_Normal;
 
 		Token start_token = f->curr_token;
 
@@ -2393,6 +2534,11 @@ Ast *parse_operand(AstFile *f, bool lhs) {
 					syntax_error(tag, "Duplicate union tag '#%.*s'", LIT(tag.string));
 				}
 				no_nil = true;
+			} else if (tag.string == "shared_nil") {
+				if (shared_nil) {
+					syntax_error(tag, "Duplicate union tag '#%.*s'", LIT(tag.string));
+				}
+				shared_nil = true;
 			} else if (tag.string == "maybe") {
 				if (maybe) {
 					syntax_error(tag, "Duplicate union tag '#%.*s'", LIT(tag.string));
@@ -2404,6 +2550,22 @@ Ast *parse_operand(AstFile *f, bool lhs) {
 		}
 		if (no_nil && maybe) {
 			syntax_error(f->curr_token, "#maybe and #no_nil cannot be applied together");
+		}
+		if (no_nil && shared_nil) {
+			syntax_error(f->curr_token, "#shared_nil and #no_nil cannot be applied together");
+		}
+		if (shared_nil && maybe) {
+			syntax_error(f->curr_token, "#maybe and #shared_nil cannot be applied together");
+		}
+
+
+		if (maybe) {
+			union_kind = UnionType_maybe;
+			syntax_error(f->curr_token, "#maybe functionality has now been merged with standard 'union' functionality");
+		} else if (no_nil) {
+			union_kind = UnionType_no_nil;
+		} else if (shared_nil) {
+			union_kind = UnionType_shared_nil;
 		}
 
 		skip_possible_newline_for_literal(f);
@@ -2422,21 +2584,10 @@ Ast *parse_operand(AstFile *f, bool lhs) {
 
 		skip_possible_newline_for_literal(f);
 		Token open = expect_token_after(f, Token_OpenBrace, "union");
-
-		while (f->curr_token.kind != Token_CloseBrace &&
-		       f->curr_token.kind != Token_EOF) {
-			Ast *type = parse_type(f);
-			if (type->kind != Ast_BadExpr) {
-				array_add(&variants, type);
-			}
-			if (!allow_token(f, Token_Comma)) {
-				break;
-			}
-		}
-
+		auto variants = parse_union_variant_list(f);
 		Token close = expect_closing_brace_of_field_list(f);
 
-		return ast_union_type(f, token, variants, polymorphic_params, align, no_nil, maybe, where_token, where_clauses);
+		return ast_union_type(f, token, variants, polymorphic_params, align, union_kind, where_token, where_clauses);
 	} break;
 
 	case Token_enum: {
@@ -2449,7 +2600,7 @@ Ast *parse_operand(AstFile *f, bool lhs) {
 		skip_possible_newline_for_literal(f);
 		Token open = expect_token(f, Token_OpenBrace);
 
-		Array<Ast *> values = parse_element_list(f);
+		Array<Ast *> values = parse_enum_field_list(f);
 		Token close = expect_closing_brace_of_field_list(f);
 
 		return ast_enum_type(f, token, base_type, values);
@@ -2591,7 +2742,7 @@ Ast *parse_call_expr(AstFile *f, Ast *operand) {
 	isize prev_expr_level = f->expr_level;
 	bool prev_allow_newline = f->allow_newline;
 	f->expr_level = 0;
-	f->allow_newline = true;
+	f->allow_newline = ALLOW_NEWLINE;
 
 	open_paren = expect_token(f, Token_OpenParen);
 
@@ -2625,7 +2776,7 @@ Ast *parse_call_expr(AstFile *f, Ast *operand) {
 		}
 		array_add(&args, arg);
 
-		if (!allow_token(f, Token_Comma)) {
+		if (!allow_field_separator(f)) {
 			break;
 		}
 	}
@@ -2908,64 +3059,62 @@ i32 token_precedence(AstFile *f, TokenKind t) {
 
 Ast *parse_binary_expr(AstFile *f, bool lhs, i32 prec_in) {
 	Ast *expr = parse_unary_expr(f, lhs);
-	for (i32 prec = token_precedence(f, f->curr_token.kind); prec >= prec_in; prec--) {
-		for (;;) {
-			Token op = f->curr_token;
-			i32 op_prec = token_precedence(f, op.kind);
-			if (op_prec != prec) {
-				// NOTE(bill): This will also catch operators that are not valid "binary" operators
-				break;
+	for (;;) {
+		Token op = f->curr_token;
+		i32 op_prec = token_precedence(f, op.kind);
+		if (op_prec < prec_in) {
+			// NOTE(bill): This will also catch operators that are not valid "binary" operators
+			break;
+		}
+		Token prev = f->prev_token;
+		switch (op.kind) {
+		case Token_if:
+		case Token_when:
+			if (prev.pos.line < op.pos.line) {
+				// NOTE(bill): Check to see if the `if` or `when` is on the same line of the `lhs` condition
+				goto loop_end;
 			}
-			Token prev = f->prev_token;
+			break;
+		}
+		expect_operator(f); // NOTE(bill): error checks too
+
+		if (op.kind == Token_Question) {
+			Ast *cond = expr;
+			// Token_Question
+			Ast *x = parse_expr(f, lhs);
+			Token token_c = expect_token(f, Token_Colon);
+			Ast *y = parse_expr(f, lhs);
+			expr = ast_ternary_if_expr(f, x, cond, y);
+		} else if (op.kind == Token_if || op.kind == Token_when) {
+			Ast *x = expr;
+			Ast *cond = parse_expr(f, lhs);
+			Token tok_else = expect_token(f, Token_else);
+			Ast *y = parse_expr(f, lhs);
+
 			switch (op.kind) {
 			case Token_if:
+				expr = ast_ternary_if_expr(f, x, cond, y);
+				break;
 			case Token_when:
-				if (prev.pos.line < op.pos.line) {
-					// NOTE(bill): Check to see if the `if` or `when` is on the same line of the `lhs` condition
-					goto loop_end;
-				}
+				expr = ast_ternary_when_expr(f, x, cond, y);
 				break;
 			}
-			expect_operator(f); // NOTE(bill): error checks too
-
-			if (op.kind == Token_Question) {
-				Ast *cond = expr;
-				// Token_Question
-				Ast *x = parse_expr(f, lhs);
-				Token token_c = expect_token(f, Token_Colon);
-				Ast *y = parse_expr(f, lhs);
-				expr = ast_ternary_if_expr(f, x, cond, y);
-			} else if (op.kind == Token_if || op.kind == Token_when) {
-				Ast *x = expr;
-				Ast *cond = parse_expr(f, lhs);
-				Token tok_else = expect_token(f, Token_else);
-				Ast *y = parse_expr(f, lhs);
-				
-				switch (op.kind) {
-				case Token_if:
-					expr = ast_ternary_if_expr(f, x, cond, y);
-					break;
-				case Token_when:
-					expr = ast_ternary_when_expr(f, x, cond, y);
-					break;
-				}
-			} else {
-				Ast *right = parse_binary_expr(f, false, prec+1);
-				if (right == nullptr) {
-					syntax_error(op, "Expected expression on the right-hand side of the binary operator '%.*s'", LIT(op.string));
-				}
-				if (op.kind == Token_or_else) {
-					// NOTE(bill): easier to handle its logic different with its own AST kind
-					expr = ast_or_else_expr(f, expr, op, right);	
-				} else {
-					expr = ast_binary_expr(f, op, expr, right);
-				}
+		} else {
+			Ast *right = parse_binary_expr(f, false, op_prec+1);
+			if (right == nullptr) {
+				syntax_error(op, "Expected expression on the right-hand side of the binary operator '%.*s'", LIT(op.string));
 			}
-
-			lhs = false;
+			if (op.kind == Token_or_else) {
+				// NOTE(bill): easier to handle its logic different with its own AST kind
+				expr = ast_or_else_expr(f, expr, op, right);
+			} else {
+				expr = ast_binary_expr(f, op, expr, right);
+			}
 		}
-		loop_end:;
+
+		lhs = false;
 	}
+	loop_end:;
 	return expr;
 }
 
@@ -2976,7 +3125,7 @@ Ast *parse_expr(AstFile *f, bool lhs) {
 
 Array<Ast *> parse_expr_list(AstFile *f, bool lhs) {
 	bool allow_newline = f->allow_newline;
-	f->allow_newline = true;
+	f->allow_newline = ALLOW_NEWLINE;
 
 	auto list = array_make<Ast *>(heap_allocator());
 	for (;;) {
@@ -3075,7 +3224,7 @@ Ast *parse_foreign_block(AstFile *f, Token token) {
 	Ast *body = ast_block_stmt(f, decls, open, close);
 
 	Ast *decl = ast_foreign_block_decl(f, token, foreign_library, body, docs);
-	expect_semicolon(f, decl);
+	expect_semicolon(f);
 	return decl;
 }
 
@@ -3121,15 +3270,11 @@ Ast *parse_value_decl(AstFile *f, Array<Ast *> names, CommentGroup *docs) {
 	}
 
 	if (f->expr_level >= 0) {
-		Ast *end = nullptr;
-		if (!is_mutable && values.count > 0) {
-			end = values[values.count-1];
-		}
 		if (f->curr_token.kind == Token_CloseBrace &&
 		    f->curr_token.pos.line == f->prev_token.pos.line) {
 
 		} else {
-			expect_semicolon(f, end);
+			expect_semicolon(f);
 		}
 	}
 
@@ -3300,7 +3445,7 @@ Ast *parse_results(AstFile *f, bool *diverging) {
 }
 
 
-ProcCallingConvention string_to_calling_convention(String s) {
+ProcCallingConvention string_to_calling_convention(String const &s) {
 	if (s == "odin")        return ProcCC_Odin;
 	if (s == "contextless") return ProcCC_Contextless;
 	if (s == "cdecl")       return ProcCC_CDecl;
@@ -3311,12 +3456,18 @@ ProcCallingConvention string_to_calling_convention(String s) {
 	if (s == "fast")        return ProcCC_FastCall;
 	if (s == "none")        return ProcCC_None;
 	if (s == "naked")       return ProcCC_Naked;
+
+	if (s == "win64")	return ProcCC_Win64;
+	if (s == "sysv")        return ProcCC_SysV;
+
 	if (s == "system") {
 		if (build_context.metrics.os == TargetOs_windows) {
 			return ProcCC_StdCall;
 		}
 		return ProcCC_CDecl;
 	}
+
+
 	return ProcCC_Invalid;
 }
 
@@ -3403,12 +3554,14 @@ enum FieldPrefixKind : i32 {
 	FieldPrefix_Unknown = -1,
 	FieldPrefix_Invalid = 0,
 
-	FieldPrefix_using,
+	FieldPrefix_using, // implies #subtype
 	FieldPrefix_const,
 	FieldPrefix_no_alias,
 	FieldPrefix_c_vararg,
 	FieldPrefix_auto_cast,
 	FieldPrefix_any_int,
+	FieldPrefix_subtype, // does not imply `using` semantics
+	FieldPrefix_by_ptr,
 };
 
 struct ParseFieldPrefixMapping {
@@ -3425,6 +3578,8 @@ gb_global ParseFieldPrefixMapping parse_field_prefix_mappings[] = {
 	{str_lit("c_vararg"),   Token_Hash,      FieldPrefix_c_vararg,  FieldFlag_c_vararg},
 	{str_lit("const"),      Token_Hash,      FieldPrefix_const,     FieldFlag_const},
 	{str_lit("any_int"),    Token_Hash,      FieldPrefix_any_int,   FieldFlag_any_int},
+	{str_lit("subtype"),    Token_Hash,      FieldPrefix_subtype,   FieldFlag_subtype},
+	{str_lit("by_ptr"),     Token_Hash,      FieldPrefix_by_ptr,    FieldFlag_by_ptr},
 };
 
 
@@ -3573,12 +3728,12 @@ Array<Ast *> convert_to_ident_list(AstFile *f, Array<AstAndFlags> list, bool ign
 }
 
 
-bool parse_expect_field_separator(AstFile *f, Ast *param) {
+bool allow_field_separator(AstFile *f) {
 	Token token = f->curr_token;
 	if (allow_token(f, Token_Comma)) {
 		return true;
 	}
-	if (token.kind == Token_Semicolon) {
+	if (ALLOW_NEWLINE && token.kind == Token_Semicolon) {
 		String p = token_to_string(token);
 		syntax_error(token_end_of_line(f, f->prev_token), "Expected a comma, got a %.*s", LIT(p));
 		advance_token(f);
@@ -3630,6 +3785,10 @@ bool check_procedure_name_list(Array<Ast *> const &names) {
 }
 
 Ast *parse_field_list(AstFile *f, isize *name_count_, u32 allowed_flags, TokenKind follow, bool allow_default_parameters, bool allow_typeid_token) {
+	bool prev_allow_newline = f->allow_newline;
+	defer (f->allow_newline = prev_allow_newline);
+	f->allow_newline = ALLOW_NEWLINE;
+
 	Token start_token = f->curr_token;
 
 	CommentGroup *docs = f->lead_comment;
@@ -3659,7 +3818,7 @@ Ast *parse_field_list(AstFile *f, isize *name_count_, u32 allowed_flags, TokenKi
 		}
 		AstAndFlags naf = {param, flags};
 		array_add(&list, naf);
-		if (!allow_token(f, Token_Comma)) {
+		if (!allow_field_separator(f)) {
 			break;
 		}
 	}
@@ -3729,13 +3888,14 @@ Ast *parse_field_list(AstFile *f, isize *name_count_, u32 allowed_flags, TokenKi
 			}
 		}
 
-		parse_expect_field_separator(f, type);
+		allow_field_separator(f);
 		Ast *param = ast_field(f, names, type, default_value, set_flags, tag, docs, f->line_comment);
 		array_add(&params, param);
 
 
 		while (f->curr_token.kind != follow &&
-		       f->curr_token.kind != Token_EOF) {
+		       f->curr_token.kind != Token_EOF &&
+		       f->curr_token.kind != Token_Semicolon) {
 			CommentGroup *docs = f->lead_comment;
 			u32 set_flags = parse_field_prefixes(f);
 			Token tag = {};
@@ -3763,7 +3923,7 @@ Ast *parse_field_list(AstFile *f, isize *name_count_, u32 allowed_flags, TokenKi
 				default_value = parse_expr(f, false);
 				if (!allow_default_parameters) {
 					syntax_error(f->curr_token, "Default parameters are only allowed for procedures");
-				default_value = nullptr;
+					default_value = nullptr;
 				}
 			}
 
@@ -3791,7 +3951,7 @@ Ast *parse_field_list(AstFile *f, isize *name_count_, u32 allowed_flags, TokenKi
 			}
 
 
-			bool ok = parse_expect_field_separator(f, param);
+			bool ok = allow_field_separator(f);
 			Ast *param = ast_field(f, names, type, default_value, set_flags, tag, docs, f->line_comment);
 			array_add(&params, param);
 
@@ -3848,15 +4008,39 @@ Ast *parse_body(AstFile *f) {
 	Array<Ast *> stmts = {};
 	Token open, close;
 	isize prev_expr_level = f->expr_level;
+	bool prev_allow_newline = f->allow_newline;
 
 	// NOTE(bill): The body may be within an expression so reset to zero
 	f->expr_level = 0;
+	// f->allow_newline = false;
 	open = expect_token(f, Token_OpenBrace);
 	stmts = parse_stmt_list(f);
 	close = expect_token(f, Token_CloseBrace);
 	f->expr_level = prev_expr_level;
+	f->allow_newline = prev_allow_newline;
 
 	return ast_block_stmt(f, stmts, open, close);
+}
+
+Ast *parse_do_body(AstFile *f, Token const &token, char const *msg) {
+	Token open, close;
+	isize prev_expr_level = f->expr_level;
+	bool prev_allow_newline = f->allow_newline;
+
+	// NOTE(bill): The body may be within an expression so reset to zero
+	f->expr_level = 0;
+	f->allow_newline = false;
+
+	Ast *body = convert_stmt_to_body(f, parse_stmt(f));
+	if (build_context.disallow_do) {
+		syntax_error(body, "'do' has been disallowed");
+	} else if (token.pos.file_id != 0 && !ast_on_same_line(token, body)) {
+		syntax_error(body, "The body of a 'do' must be on the same line as %s", msg);
+	}
+	f->expr_level = prev_expr_level;
+	f->allow_newline = prev_allow_newline;
+
+	return body;
 }
 
 bool parse_control_statement_semicolon_separator(AstFile *f) {
@@ -3908,12 +4092,7 @@ Ast *parse_if_stmt(AstFile *f) {
 	}
 
 	if (allow_token(f, Token_do)) {
-		body = convert_stmt_to_body(f, parse_stmt(f));
-		if (build_context.disallow_do) {
-			syntax_error(body, "'do' has been disallowed");
-		} else if (!ast_on_same_line(cond, body)) {
-			syntax_error(body, "The body of a 'do' be on the same line as if condition");
-		}
+		body = parse_do_body(f, cond ? ast_token(cond) : token, "the if statement");
 	} else {
 		body = parse_block_stmt(f, false);
 	}
@@ -3928,15 +4107,10 @@ Ast *parse_if_stmt(AstFile *f) {
 		case Token_OpenBrace:
 			else_stmt = parse_block_stmt(f, false);
 			break;
-		case Token_do: {
+		case Token_do:
 			expect_token(f, Token_do);
-			else_stmt = convert_stmt_to_body(f, parse_stmt(f));
-			if (build_context.disallow_do) {
-				syntax_error(else_stmt, "'do' has been disallowed");
-			} else if (!ast_on_same_line(else_token, else_stmt)) {
-				syntax_error(else_stmt, "The body of a 'do' be on the same line as 'else'");
-			}
-		} break;
+			else_stmt = parse_do_body(f, else_token, "'else'");
+			break;
 		default:
 			syntax_error(f->curr_token, "Expected if statement block statement");
 			else_stmt = ast_bad_stmt(f, f->curr_token, f->tokens[f->curr_token_index+1]);
@@ -3965,12 +4139,7 @@ Ast *parse_when_stmt(AstFile *f) {
 	}
 
 	if (allow_token(f, Token_do)) {
-		body = convert_stmt_to_body(f, parse_stmt(f));
-		if (build_context.disallow_do) {
-			syntax_error(body, "'do' has been disallowed");
-		} else if (!ast_on_same_line(cond, body)) {
-			syntax_error(body, "The body of a 'do' be on the same line as when statement");
-		}
+		body = parse_do_body(f, cond ? ast_token(cond) : token, "then when statement");
 	} else {
 		body = parse_block_stmt(f, true);
 	}
@@ -3987,12 +4156,7 @@ Ast *parse_when_stmt(AstFile *f) {
 			break;
 		case Token_do: {
 			expect_token(f, Token_do);
-			else_stmt = convert_stmt_to_body(f, parse_stmt(f));
-			if (build_context.disallow_do) {
-				syntax_error(else_stmt, "'do' has been disallowed");
-			} else if (!ast_on_same_line(else_token, else_stmt)) {
-				syntax_error(else_stmt, "The body of a 'do' be on the same line as 'else'");
-			}
+			else_stmt = parse_do_body(f, else_token, "'else'");
 		} break;
 		default:
 			syntax_error(f->curr_token, "Expected when statement block statement");
@@ -4029,11 +4193,7 @@ Ast *parse_return_stmt(AstFile *f) {
 		advance_token(f);
 	}
 
-	Ast *end = nullptr;
-	if (results.count > 0) {
-		end = results[results.count-1];
-	}
-	expect_semicolon(f, end);
+	expect_semicolon(f);
 	return ast_return_stmt(f, token, results);
 }
 
@@ -4066,12 +4226,7 @@ Ast *parse_for_stmt(AstFile *f) {
 			f->allow_range = prev_allow_range;
 
 			if (allow_token(f, Token_do)) {
-				body = convert_stmt_to_body(f, parse_stmt(f));
-				if (build_context.disallow_do) {
-					syntax_error(body, "'do' has been disallowed");
-				} else if (!ast_on_same_line(token, body)) {
-					syntax_error(body, "The body of a 'do' be on the same line as the 'for' token");
-				}
+				body = parse_do_body(f, token, "the for statement");
 			} else {
 				body = parse_block_stmt(f, false);
 			}
@@ -4112,12 +4267,7 @@ Ast *parse_for_stmt(AstFile *f) {
 
 
 	if (allow_token(f, Token_do)) {
-		body = convert_stmt_to_body(f, parse_stmt(f));
-		if (build_context.disallow_do) {
-			syntax_error(body, "'do' has been disallowed");
-		} else if (!ast_on_same_line(token, body)) {
-			syntax_error(body, "The body of a 'do' be on the same line as the 'for' token");
-		}
+		body = parse_do_body(f, token, "the for statement");
 	} else {
 		body = parse_block_stmt(f, false);
 	}
@@ -4254,7 +4404,6 @@ Ast *parse_import_decl(AstFile *f, ImportDeclKind kind) {
 	CommentGroup *docs = f->lead_comment;
 	Token token = expect_token(f, Token_import);
 	Token import_name = {};
-	bool is_using = kind != ImportDecl_Standard;
 
 	switch (f->curr_token.kind) {
 	case Token_Ident:
@@ -4265,26 +4414,22 @@ Ast *parse_import_decl(AstFile *f, ImportDeclKind kind) {
 		break;
 	}
 
-	if (!is_using && is_blank_ident(import_name)) {
-		syntax_error(import_name, "Illegal import name: '_'");
-	}
-
 	Token file_path = expect_token_after(f, Token_String, "import");
 
 	Ast *s = nullptr;
 	if (f->curr_proc != nullptr) {
-		syntax_error(import_name, "You cannot use 'import' within a procedure. This must be done at the file scope");
+		syntax_error(import_name, "Cannot use 'import' within a procedure. This must be done at the file scope");
 		s = ast_bad_decl(f, import_name, file_path);
 	} else {
-		s = ast_import_decl(f, token, is_using, file_path, import_name, docs, f->line_comment);
+		s = ast_import_decl(f, token, file_path, import_name, docs, f->line_comment);
 		array_add(&f->imports, s);
 	}
 
-	if (is_using) {
+	if (kind != ImportDecl_Standard) {
 		syntax_error(import_name, "'using import' is not allowed, please use the import name explicitly");
 	}
 
-	expect_semicolon(f, s);
+	expect_semicolon(f);
 	return s;
 }
 
@@ -4321,11 +4466,11 @@ Ast *parse_foreign_decl(AstFile *f) {
 				Token path = expect_token(f, Token_String);
 				array_add(&filepaths, path);
 
-				if (!allow_token(f, Token_Comma)) {
+				if (!allow_field_separator(f)) {
 					break;
 				}
 			}
-			expect_token(f, Token_CloseBrace);
+			expect_closing_brace_of_field_list(f);
 		} else {
 			filepaths = array_make<Token>(heap_allocator(), 0, 1);
 			Token path = expect_token(f, Token_String);
@@ -4342,7 +4487,7 @@ Ast *parse_foreign_decl(AstFile *f) {
 		} else {
 			s = ast_foreign_import_decl(f, token, filepaths, lib_name, docs, f->line_comment);
 		}
-		expect_semicolon(f, s);
+		expect_semicolon(f);
 		return s;
 	}
 	}
@@ -4378,7 +4523,7 @@ Ast *parse_attribute(AstFile *f, Token token, TokenKind open_kind, TokenKind clo
 
 				array_add(&elems, elem);
 
-				if (!allow_token(f, Token_Comma)) {
+				if (!allow_field_separator(f)) {
 					break;
 				}
 			}
@@ -4443,12 +4588,7 @@ Ast *parse_unrolled_for_loop(AstFile *f, Token unroll_token) {
 	f->allow_range = prev_allow_range;
 
 	if (allow_token(f, Token_do)) {
-		body = convert_stmt_to_body(f, parse_stmt(f));
-		if (build_context.disallow_do) {
-			syntax_error(body, "'do' has been disallowed");
-		} else if (!ast_on_same_line(for_token, body)) {
-			syntax_error(body, "The body of a 'do' be on the same line as the 'for' token");
-		}
+		body = parse_do_body(f, for_token, "the for statement");
 	} else {
 		body = parse_block_stmt(f, false);
 	}
@@ -4481,7 +4621,7 @@ Ast *parse_stmt(AstFile *f) {
 	case Token_Not:
 	case Token_And:
 		s = parse_simple_stmt(f, StmtAllowFlag_Label);
-		expect_semicolon(f, s);
+		expect_semicolon(f);
 		return s;
 
 
@@ -4509,7 +4649,7 @@ Ast *parse_stmt(AstFile *f) {
 			label = parse_ident(f);
 		}
 		s = ast_branch_stmt(f, token, label);
-		expect_semicolon(f, s);
+		expect_semicolon(f);
 		return s;
 	}
 
@@ -4524,12 +4664,12 @@ Ast *parse_stmt(AstFile *f) {
 		Array<Ast *> list = parse_lhs_expr_list(f);
 		if (list.count == 0) {
 			syntax_error(token, "Illegal use of 'using' statement");
-			expect_semicolon(f, nullptr);
+			expect_semicolon(f);
 			return ast_bad_stmt(f, token, f->curr_token);
 		}
 
 		if (f->curr_token.kind != Token_Colon) {
-			expect_semicolon(f, list[list.count-1]);
+			expect_semicolon(f);
 			return ast_using_stmt(f, token, list);
 		}
 		expect_token_after(f, Token_Colon, "identifier list");
@@ -4561,6 +4701,12 @@ Ast *parse_stmt(AstFile *f) {
 		} else if (tag == "no_bounds_check") {
 			s = parse_stmt(f);
 			return parse_check_directive_for_statement(s, name, StateFlag_no_bounds_check);
+		} else if (tag == "type_assert") {
+			s = parse_stmt(f);
+			return parse_check_directive_for_statement(s, name, StateFlag_type_assert);
+		} else if (tag == "no_type_assert") {
+			s = parse_stmt(f);
+			return parse_check_directive_for_statement(s, name, StateFlag_no_type_assert);
 		} else if (tag == "partial") {
 			s = parse_stmt(f);
 			switch (s->kind) {
@@ -4580,13 +4726,13 @@ Ast *parse_stmt(AstFile *f) {
 		} else if (tag == "assert" || tag == "panic") {
 			Ast *t = ast_basic_directive(f, hash_token, name);
 			Ast *stmt = ast_expr_stmt(f, parse_call_expr(f, t));
-			expect_semicolon(f, stmt);
+			expect_semicolon(f);
 			return stmt;
 		} else if (name.string == "force_inline" ||
 		           name.string == "force_no_inline") {
 			Ast *expr = parse_force_inlining_operand(f, name);
 			Ast *stmt =  ast_expr_stmt(f, expr);
-			expect_semicolon(f, stmt);
+			expect_semicolon(f);
 			return stmt;
 		} else if (tag == "unroll") {
 			return parse_unrolled_for_loop(f, name);
@@ -4608,7 +4754,7 @@ Ast *parse_stmt(AstFile *f) {
 
 	case Token_Semicolon:
 		s = ast_empty_stmt(f, token);
-		expect_semicolon(f, nullptr);
+		expect_semicolon(f);
 		return s;
 	}
 
@@ -4626,7 +4772,7 @@ Ast *parse_stmt(AstFile *f) {
 			return parse_block_stmt(f, true);
 		case Token_do: {
 			expect_token(f, Token_do);
-			Ast *stmt = convert_stmt_to_body(f, parse_stmt(f));
+			Ast *stmt = parse_do_body(f, {}, "the for statement");
 			if (build_context.disallow_do) {
 				syntax_error(stmt, "'do' has been disallowed");
 			}
@@ -4665,7 +4811,7 @@ Array<Ast *> parse_stmt_list(AstFile *f) {
 }
 
 
-ParseFileError init_ast_file(AstFile *f, String fullpath, TokenPos *err_pos) {
+ParseFileError init_ast_file(AstFile *f, String const &fullpath, TokenPos *err_pos) {
 	GB_ASSERT(f != nullptr);
 	f->fullpath = string_trim_whitespace(fullpath); // Just in case
 	set_file_path_string(f->id, fullpath);
@@ -4735,12 +4881,6 @@ ParseFileError init_ast_file(AstFile *f, String fullpath, TokenPos *err_pos) {
 	f->curr_token_index = 0;
 	f->prev_token = f->tokens[f->prev_token_index];
 	f->curr_token = f->tokens[f->curr_token_index];
-
-	isize const page_size = 4*1024;
-	isize block_size = 2*f->tokens.count*gb_size_of(Ast);
-	block_size = ((block_size + page_size-1)/page_size) * page_size;
-	block_size = gb_clamp(block_size, page_size, DEFAULT_MINIMUM_BLOCK_SIZE);
-	f->arena.minimum_block_size = block_size;
 
 	array_init(&f->comments, heap_allocator(), 0, 0);
 	array_init(&f->imports,  heap_allocator(), 0, 0);
@@ -4966,7 +5106,7 @@ gb_global Rune illegal_import_runes[] = {
 	'|', ',',  '<', '>', '?',
 };
 
-bool is_import_path_valid(String path) {
+bool is_import_path_valid(String const &path) {
 	if (path.len > 0) {
 		u8 *start = path.text;
 		u8 *end = path.text + path.len;
@@ -4998,7 +5138,7 @@ bool is_import_path_valid(String path) {
 	return false;
 }
 
-bool is_build_flag_path_valid(String path) {
+bool is_build_flag_path_valid(String const &path) {
 	if (path.len > 0) {
 		u8 *start = path.text;
 		u8 *end = path.text + path.len;
@@ -5050,7 +5190,7 @@ bool is_package_name_reserved(String const &name) {
 }
 
 
-bool determine_path_from_string(BlockingMutex *file_mutex, Ast *node, String base_dir, String original_string, String *path) {
+bool determine_path_from_string(BlockingMutex *file_mutex, Ast *node, String base_dir, String const &original_string, String *path) {
 	GB_ASSERT(path != nullptr);
 
 	// NOTE(bill): if file_mutex == nullptr, this means that the code is used within the semantics stage
@@ -5164,9 +5304,9 @@ bool determine_path_from_string(BlockingMutex *file_mutex, Ast *node, String bas
 
 
 
-void parse_setup_file_decls(Parser *p, AstFile *f, String base_dir, Slice<Ast *> &decls);
+void parse_setup_file_decls(Parser *p, AstFile *f, String const &base_dir, Slice<Ast *> &decls);
 
-void parse_setup_file_when_stmt(Parser *p, AstFile *f, String base_dir, AstWhenStmt *ws) {
+void parse_setup_file_when_stmt(Parser *p, AstFile *f, String const &base_dir, AstWhenStmt *ws) {
 	if (ws->body != nullptr) {
 		auto stmts = ws->body->BlockStmt.stmts;
 		parse_setup_file_decls(p, f, base_dir, stmts);
@@ -5185,7 +5325,7 @@ void parse_setup_file_when_stmt(Parser *p, AstFile *f, String base_dir, AstWhenS
 	}
 }
 
-void parse_setup_file_decls(Parser *p, AstFile *f, String base_dir, Slice<Ast *> &decls) {
+void parse_setup_file_decls(Parser *p, AstFile *f, String const &base_dir, Slice<Ast *> &decls) {
 	for_array(i, decls) {
 		Ast *node = decls[i];
 		if (!is_ast_decl(node) &&
@@ -5398,7 +5538,7 @@ bool parse_file(Parser *p, AstFile *f) {
 	String filepath = f->tokenizer.fullpath;
 	String base_dir = dir_from_path(filepath);
 	if (f->curr_token.kind == Token_Comment) {
-		comsume_comment_groups(f, f->prev_token);
+		consume_comment_groups(f, f->prev_token);
 	}
 
 	CommentGroup *docs = f->lead_comment;
@@ -5444,8 +5584,17 @@ bool parse_file(Parser *p, AstFile *f) {
 						if (!parse_build_tag(tok, lc)) {
 							return false;
 						}
-					} else if (lc == "+private") {
-						f->flags |= AstFile_IsPrivate;
+					} else if (string_starts_with(lc, str_lit("+private"))) {
+						f->flags |= AstFile_IsPrivatePkg;
+						String command = string_trim_starts_with(lc, str_lit("+private "));
+						command = string_trim_whitespace(command);
+						if (lc == "+private") {
+							f->flags |= AstFile_IsPrivatePkg;
+						} else if (command == "package") {
+							f->flags |= AstFile_IsPrivatePkg;
+						} else if (command == "file") {
+							f->flags |= AstFile_IsPrivateFile;
+						}
 					} else if (lc == "+lazy") {
 						if (build_context.ignore_lazy) {
 							// Ignore
@@ -5463,7 +5612,7 @@ bool parse_file(Parser *p, AstFile *f) {
 	}
 
 	Ast *pd = ast_package_decl(f, f->package_token, package_name, docs, f->line_comment);
-	expect_semicolon(f, pd);
+	expect_semicolon(f);
 	f->pkg_decl = pd;
 
 	if (f->error_count == 0) {
@@ -5597,8 +5746,24 @@ ParseFileError parse_packages(Parser *p, String init_filename) {
 			error_line("Expected either a directory or a .odin file, got '%.*s'\n", LIT(init_filename));
 			return ParseFile_WrongExtension;
 		}
+	} else if (init_fullpath.len != 0) {
+		String path = init_fullpath;
+		if (path[path.len-1] == '/') {
+			path.len -= 1;
+		}
+		if ((build_context.command_kind & Command__does_build) &&
+		    build_context.build_mode == BuildMode_Executable) {
+			String short_path = filename_from_path(path);
+			char *cpath = alloc_cstring(heap_allocator(), short_path);
+			defer (gb_free(heap_allocator(), cpath));
+
+			if (gb_file_exists(cpath)) {
+			    	error_line("Please specify the executable name with -out:<string> as a directory exists with the same name in the current working directory");
+			    	return ParseFile_DirectoryAlreadyExists;
+			}
+		}
 	}
-	
+
 
 	{ // Add these packages serially and then process them parallel
 		mutex_lock(&p->wait_mutex);
@@ -5660,3 +5825,5 @@ ParseFileError parse_packages(Parser *p, String init_filename) {
 }
 
 
+
+#undef ALLOW_NEWLINE

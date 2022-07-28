@@ -3,7 +3,17 @@ package runtime
 import "core:intrinsics"
 
 @builtin
-Maybe :: union($T: typeid) #maybe {T}
+Maybe :: union($T: typeid) {T}
+
+
+@builtin
+container_of :: #force_inline proc "contextless" (ptr: $P/^$Field_Type, $T: typeid, $field_name: string) -> ^T
+	where intrinsics.type_has_field(T, field_name),
+	      intrinsics.type_field_type(T, field_name) == Field_Type {
+	offset :: offset_of_by_string(T, field_name)
+	return (^T)(uintptr(ptr) - offset) if ptr != nil else nil
+}
+
 
 @thread_local global_default_temp_allocator_data: Default_Temp_Allocator
 
@@ -119,6 +129,9 @@ reserve :: proc{reserve_dynamic_array, reserve_map}
 @builtin
 resize :: proc{resize_dynamic_array}
 
+// Shrinks the capacity of a dynamic array or map down to the current length, or the given capacity.
+@builtin
+shrink :: proc{shrink_dynamic_array, shrink_map}
 
 @builtin
 free :: proc{mem_free}
@@ -274,10 +287,28 @@ clear_map :: proc "contextless" (m: ^$T/map[$K]$V) {
 }
 
 @builtin
-reserve_map :: proc(m: ^$T/map[$K]$V, capacity: int) {
+reserve_map :: proc(m: ^$T/map[$K]$V, capacity: int, loc := #caller_location) {
 	if m != nil {
-		__dynamic_map_reserve(__get_map_header(m), capacity)
+		__dynamic_map_reserve(__get_map_header(m), capacity, loc)
 	}
+}
+
+/*
+	Shrinks the capacity of a map down to the current length, or the given capacity.
+
+	If `new_cap` is negative, then `len(m)` is used.
+
+	Returns false if `cap(m) < new_cap`, or the allocator report failure.
+
+	If `len(m) < new_cap`, then `len(m)` will be left unchanged.
+*/
+@builtin
+shrink_map :: proc(m: ^$T/map[$K]$V, new_cap := -1, loc := #caller_location) -> (did_shrink: bool) {
+	if m != nil {
+		new_cap := new_cap if new_cap >= 0 else len(m)
+		return __dynamic_map_shrink(__get_map_header(m), new_cap, loc)
+	}
+	return
 }
 
 // The delete_key built-in procedure deletes the element with the specified key (m[key]) from the map.
@@ -382,16 +413,17 @@ append_nothing :: proc(array: ^$T/[dynamic]$E, loc := #caller_location) {
 
 
 @builtin
-insert_at_elem :: proc(array: ^$T/[dynamic]$E, index: int, arg: E, loc := #caller_location) -> (ok: bool) #no_bounds_check {
+inject_at_elem :: proc(array: ^$T/[dynamic]$E, index: int, arg: E, loc := #caller_location) -> (ok: bool) #no_bounds_check {
 	if array == nil {
 		return
 	}
-	n := len(array)
+	n := max(len(array), index)
 	m :: 1
-	resize(array, n+m, loc)
-	if n+m <= len(array) {
+	new_size := n + m
+
+	if resize(array, new_size, loc) {
 		when size_of(E) != 0 {
-			copy(array[index+m:], array[index:])
+			copy(array[index + m:], array[index:])
 			array[index] = arg
 		}
 		ok = true
@@ -400,7 +432,7 @@ insert_at_elem :: proc(array: ^$T/[dynamic]$E, index: int, arg: E, loc := #calle
 }
 
 @builtin
-insert_at_elems :: proc(array: ^$T/[dynamic]$E, index: int, args: ..E, loc := #caller_location) -> (ok: bool) #no_bounds_check {
+inject_at_elems :: proc(array: ^$T/[dynamic]$E, index: int, args: ..E, loc := #caller_location) -> (ok: bool) #no_bounds_check {
 	if array == nil {
 		return
 	}
@@ -409,12 +441,13 @@ insert_at_elems :: proc(array: ^$T/[dynamic]$E, index: int, args: ..E, loc := #c
 		return
 	}
 
-	n := len(array)
+	n := max(len(array), index)
 	m := len(args)
-	resize(array, n+m, loc)
-	if n+m <= len(array) {
+	new_size := n + m
+
+	if resize(array, new_size, loc) {
 		when size_of(E) != 0 {
-			copy(array[index+m:], array[index:])
+			copy(array[index + m:], array[index:])
 			copy(array[index:], args)
 		}
 		ok = true
@@ -423,27 +456,72 @@ insert_at_elems :: proc(array: ^$T/[dynamic]$E, index: int, args: ..E, loc := #c
 }
 
 @builtin
-insert_at_elem_string :: proc(array: ^$T/[dynamic]$E/u8, index: int, arg: string, loc := #caller_location) -> (ok: bool) #no_bounds_check {
+inject_at_elem_string :: proc(array: ^$T/[dynamic]$E/u8, index: int, arg: string, loc := #caller_location) -> (ok: bool) #no_bounds_check {
 	if array == nil {
 		return
 	}
-	if len(args) == 0 {
+	if len(arg) == 0 {
 		ok = true
 		return
 	}
 
-	n := len(array)
-	m := len(args)
-	resize(array, n+m, loc)
-	if n+m <= len(array) {
+	n := max(len(array), index)
+	m := len(arg)
+	new_size := n + m
+
+	if resize(array, new_size, loc) {
 		copy(array[index+m:], array[index:])
+		copy(array[index:], arg)
+		ok = true
+	}
+	return
+}
+
+@builtin inject_at :: proc{inject_at_elem, inject_at_elems, inject_at_elem_string}
+
+
+
+@builtin
+assign_at_elem :: proc(array: ^$T/[dynamic]$E, index: int, arg: E, loc := #caller_location) -> (ok: bool) #no_bounds_check {
+	if index < len(array) {
+		array[index] = arg
+		ok = true
+	} else if resize(array, index+1, loc) {
+		array[index] = arg
+		ok = true
+	}
+	return
+}
+
+
+@builtin
+assign_at_elems :: proc(array: ^$T/[dynamic]$E, index: int, args: ..E, loc := #caller_location) -> (ok: bool) #no_bounds_check {
+	if index+len(args) < len(array) {
+		copy(array[index:], args)
+		ok = true
+	} else if resize(array, index+1+len(args), loc) {
 		copy(array[index:], args)
 		ok = true
 	}
 	return
 }
 
-@builtin insert_at :: proc{insert_at_elem, insert_at_elems, insert_at_elem_string}
+
+@builtin
+assign_at_elem_string :: proc(array: ^$T/[dynamic]$E/u8, index: int, arg: string, loc := #caller_location) -> (ok: bool) #no_bounds_check {
+	if len(args) == 0 {
+		ok = true
+	} else if index+len(args) < len(array) {
+		copy(array[index:], args)
+		ok = true
+	} else if resize(array, index+1+len(args), loc) {
+		copy(array[index:], args)
+		ok = true
+	}
+	return
+}
+
+@builtin assign_at :: proc{assign_at_elem, assign_at_elems, assign_at_elem_string}
 
 
 
@@ -523,6 +601,54 @@ resize_dynamic_array :: proc(array: ^$T/[dynamic]$E, length: int, loc := #caller
 	return true
 }
 
+/*
+	Shrinks the capacity of a dynamic array down to the current length, or the given capacity.
+
+	If `new_cap` is negative, then `len(array)` is used.
+
+	Returns false if `cap(array) < new_cap`, or the allocator report failure.
+
+	If `len(array) < new_cap`, then `len(array)` will be left unchanged.
+*/
+shrink_dynamic_array :: proc(array: ^$T/[dynamic]$E, new_cap := -1, loc := #caller_location) -> (did_shrink: bool) {
+	if array == nil {
+		return
+	}
+	a := (^Raw_Dynamic_Array)(array)
+
+	new_cap := new_cap if new_cap >= 0 else a.len
+
+	if new_cap > a.cap {
+		return
+	}
+
+	if a.allocator.procedure == nil {
+		a.allocator = context.allocator
+	}
+	assert(a.allocator.procedure != nil)
+
+	old_size := a.cap * size_of(E)
+	new_size := new_cap * size_of(E)
+
+	new_data, err := a.allocator.procedure(
+		a.allocator.data,
+		.Resize,
+		new_size,
+		align_of(E),
+		a.data,
+		old_size,
+		loc,
+	)
+	if err != nil {
+		return
+	}
+
+	a.data = raw_data(new_data)
+	a.len = min(new_cap, a.len)
+	a.cap = new_cap
+	return true
+}
+
 @builtin
 map_insert :: proc(m: ^$T/map[$K]$V, key: K, value: V, loc := #caller_location) -> (ptr: ^V) {
 	key, value := key, value
@@ -587,26 +713,30 @@ card :: proc(s: $S/bit_set[$E; $U]) -> int {
 
 
 @builtin
-raw_array_data :: proc "contextless" (a: $P/^($T/[$N]$E)) -> ^E {
-	return (^E)(a)
+raw_array_data :: proc "contextless" (a: $P/^($T/[$N]$E)) -> [^]E {
+	return ([^]E)(a)
 }
 @builtin
-raw_slice_data :: proc "contextless" (s: $S/[]$E) -> ^E {
+raw_simd_data :: proc "contextless" (a: $P/^($T/#simd[$N]$E)) -> [^]E {
+	return ([^]E)(a)
+}
+@builtin
+raw_slice_data :: proc "contextless" (s: $S/[]$E) -> [^]E {
 	ptr := (transmute(Raw_Slice)s).data
-	return (^E)(ptr)
+	return ([^]E)(ptr)
 }
 @builtin
-raw_dynamic_array_data :: proc "contextless" (s: $S/[dynamic]$E) -> ^E {
+raw_dynamic_array_data :: proc "contextless" (s: $S/[dynamic]$E) -> [^]E {
 	ptr := (transmute(Raw_Dynamic_Array)s).data
-	return (^E)(ptr)
+	return ([^]E)(ptr)
 }
 @builtin
-raw_string_data :: proc "contextless" (s: $S/string) -> ^u8 {
+raw_string_data :: proc "contextless" (s: $S/string) -> [^]u8 {
 	return (transmute(Raw_String)s).data
 }
 
 @builtin
-raw_data :: proc{raw_array_data, raw_slice_data, raw_dynamic_array_data, raw_string_data}
+raw_data :: proc{raw_array_data, raw_slice_data, raw_dynamic_array_data, raw_string_data, raw_simd_data}
 
 
 
@@ -618,13 +748,15 @@ assert :: proc(condition: bool, message := "", loc := #caller_location) {
 		// to improve performance to make the CPU not
 		// execute speculatively, making it about an order of
 		// magnitude faster
-		proc(message: string, loc: Source_Code_Location) {
+		@(cold)
+		internal :: proc(message: string, loc: Source_Code_Location) {
 			p := context.assertion_failure_proc
 			if p == nil {
 				p = default_assertion_failure_proc
 			}
 			p("runtime assertion", message, loc)
-		}(message, loc)
+		}
+		internal(message, loc)
 	}
 }
 

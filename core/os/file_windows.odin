@@ -20,12 +20,12 @@ open :: proc(path: string, mode: int = O_RDONLY, perm: int = 0) -> (Handle, Errn
 	case O_RDWR:   access = win32.FILE_GENERIC_READ | win32.FILE_GENERIC_WRITE
 	}
 
+	if mode&O_CREATE != 0 {
+		access |= win32.FILE_GENERIC_WRITE
+	}
 	if mode&O_APPEND != 0 {
 		access &~= win32.FILE_GENERIC_WRITE
 		access |=  win32.FILE_APPEND_DATA
-	}
-	if mode&O_CREATE != 0 {
-		access |= win32.FILE_GENERIC_WRITE
 	}
 
 	share_mode := win32.FILE_SHARE_READ|win32.FILE_SHARE_WRITE
@@ -106,19 +106,23 @@ read_console :: proc(handle: win32.HANDLE, b: []byte) -> (n: int, err: Errno) {
 	BUF_SIZE :: 386
 	buf16: [BUF_SIZE]u16
 	buf8: [4*BUF_SIZE]u8
-	
+
 	for n < len(b) && err == 0 {
-		max_read := u32(min(BUF_SIZE, len(b)/4))
+		min_read := max(len(b)/4, 1 if len(b) > 0 else 0)
+		max_read := u32(min(BUF_SIZE, min_read))
+		if max_read == 0 {
+			break
+		}
 		
 		single_read_length: u32
 		ok := win32.ReadConsoleW(handle, &buf16[0], max_read, &single_read_length, nil)
 		if !ok {
 			err = Errno(win32.GetLastError())
 		}
-		
+
 		buf8_len := utf16.decode_to_utf8(buf8[:], buf16[:single_read_length])
 		src := buf8[:buf8_len]
-		
+
 		ctrl_z := false
 		for i := 0; i < len(src) && n+i < len(b); i += 1 {
 			x := src[i]
@@ -129,9 +133,16 @@ read_console :: proc(handle: win32.HANDLE, b: []byte) -> (n: int, err: Errno) {
 			b[n] = x
 			n += 1
 		}
-		if ctrl_z || single_read_length < len(buf16) {
+		if ctrl_z || single_read_length < max_read {
 			break
 		}
+
+		// NOTE(bill): if the last two values were a newline, then it is expected that
+		// this is the end of the input
+		if n >= 2 && single_read_length == max_read && string(b[n-2:n]) == "\r\n" {
+			break
+		}
+
 	}
 	
 	return
@@ -309,9 +320,6 @@ stderr := get_std_handle(uint(win32.STD_ERROR_HANDLE))
 
 get_std_handle :: proc "contextless" (h: uint) -> Handle {
 	fd := win32.GetStdHandle(win32.DWORD(h))
-	when size_of(uintptr) == 8 {
-		win32.SetHandleInformation(fd, win32.HANDLE_FLAG_INHERIT, 0)
-	}
 	return Handle(fd)
 }
 
@@ -357,7 +365,7 @@ get_current_directory :: proc(allocator := context.allocator) -> string {
 
 	win32.ReleaseSRWLockExclusive(&cwd_lock)
 
-	return win32.utf16_to_utf8(dir_buf_wstr, allocator)
+	return win32.utf16_to_utf8(dir_buf_wstr, allocator) or_else ""
 }
 
 set_current_directory :: proc(path: string) -> (err: Errno) {
@@ -376,20 +384,33 @@ set_current_directory :: proc(path: string) -> (err: Errno) {
 
 
 
-change_directory :: proc(path: string) -> Errno {
+change_directory :: proc(path: string) -> (err: Errno) {
 	wpath := win32.utf8_to_wstring(path, context.temp_allocator)
-	return Errno(win32.SetCurrentDirectoryW(wpath))
+
+	if !win32.SetCurrentDirectoryW(wpath) {
+		err = Errno(win32.GetLastError())
+	}
+	return
 }
 
-make_directory :: proc(path: string, mode: u32) -> Errno {
+make_directory :: proc(path: string, mode: u32 = 0) -> (err: Errno) {
+	// Mode is unused on Windows, but is needed on *nix
 	wpath := win32.utf8_to_wstring(path, context.temp_allocator)
-	return Errno(win32.CreateDirectoryW(wpath, nil))
+
+	if !win32.CreateDirectoryW(wpath, nil) {
+		err = Errno(win32.GetLastError())
+	}
+	return
 }
 
 
-remove_directory :: proc(path: string) -> Errno {
+remove_directory :: proc(path: string) -> (err: Errno) {
 	wpath := win32.utf8_to_wstring(path, context.temp_allocator)
-	return Errno(win32.RemoveDirectoryW(wpath))
+
+	if !win32.RemoveDirectoryW(wpath) {
+		err = Errno(win32.GetLastError())
+	}
+	return
 }
 
 
@@ -399,7 +420,7 @@ is_abs :: proc(path: string) -> bool {
 	if len(path) > 0 && path[0] == '/' {
 		return true
 	}
-	when ODIN_OS == "windows" {
+	when ODIN_OS == .Windows {
 		if len(path) > 2 {
 			switch path[0] {
 			case 'A'..='Z', 'a'..='z':
@@ -455,23 +476,31 @@ fix_long_path :: proc(path: string) -> string {
 }
 
 
-link :: proc(old_name, new_name: string) -> Errno {
+link :: proc(old_name, new_name: string) -> (err: Errno) {
 	n := win32.utf8_to_wstring(fix_long_path(new_name))
 	o := win32.utf8_to_wstring(fix_long_path(old_name))
 	return Errno(win32.CreateHardLinkW(n, o, nil))
 }
 
-unlink :: proc(path: string) -> Errno {
+unlink :: proc(path: string) -> (err: Errno) {
 	wpath := win32.utf8_to_wstring(path, context.temp_allocator)
-	return Errno(win32.DeleteFileW(wpath))
+
+	if !win32.DeleteFileW(wpath) {
+		err = Errno(win32.GetLastError())
+	}
+	return
 }
 
 
 
-rename :: proc(old_path, new_path: string) -> Errno {
+rename :: proc(old_path, new_path: string) -> (err: Errno) {
 	from := win32.utf8_to_wstring(old_path, context.temp_allocator)
 	to := win32.utf8_to_wstring(new_path, context.temp_allocator)
-	return Errno(win32.MoveFileExW(from, to, win32.MOVEFILE_REPLACE_EXISTING))
+
+	if !win32.MoveFileExW(from, to, win32.MOVEFILE_REPLACE_EXISTING) {
+		err = Errno(win32.GetLastError())
+	}
+	return
 }
 
 

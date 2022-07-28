@@ -46,6 +46,7 @@ enum ParseFileError {
 	ParseFile_InvalidToken,
 	ParseFile_GeneralError,
 	ParseFile_FileTooLarge,
+	ParseFile_DirectoryAlreadyExists,
 
 	ParseFile_Count,
 };
@@ -78,9 +79,11 @@ struct ImportedFile {
 };
 
 enum AstFileFlag : u32 {
-	AstFile_IsPrivate = 1<<0,
-	AstFile_IsTest    = 1<<1,
-	AstFile_IsLazy    = 1<<2,
+	AstFile_IsPrivatePkg = 1<<0,
+	AstFile_IsPrivateFile = 1<<1,
+
+	AstFile_IsTest    = 1<<3,
+	AstFile_IsLazy    = 1<<4,
 };
 
 enum AstDelayQueueKind {
@@ -94,8 +97,6 @@ struct AstFile {
 	u32          flags;
 	AstPackage * pkg;
 	Scope *      scope;
-
-	Arena  arena;
 
 	Ast *        pkg_decl;
 	String       fullpath;
@@ -226,6 +227,8 @@ enum ProcInlining {
 enum ProcTag {
 	ProcTag_bounds_check    = 1<<0,
 	ProcTag_no_bounds_check = 1<<1,
+	ProcTag_type_assert     = 1<<2,
+	ProcTag_no_type_assert  = 1<<3,
 
 	ProcTag_require_results = 1<<4,
 	ProcTag_optional_ok     = 1<<5,
@@ -245,10 +248,28 @@ enum ProcCallingConvention : i32 {
 
 	ProcCC_InlineAsm   = 8,
 
+	ProcCC_Win64       = 9,
+	ProcCC_SysV        = 10,
+
+
 	ProcCC_MAX,
 
 
 	ProcCC_ForeignBlockDefault = -1,
+};
+
+char const *proc_calling_convention_strings[ProcCC_MAX] = {
+	"",
+	"odin",
+	"contextless",
+	"cdecl",
+	"stdcall",
+	"fastcall",
+	"none",
+	"naked",
+	"inlineasm",
+	"win64",
+	"sysv",
 };
 
 ProcCallingConvention default_calling_convention(void) {
@@ -258,6 +279,10 @@ ProcCallingConvention default_calling_convention(void) {
 enum StateFlag : u8 {
 	StateFlag_bounds_check    = 1<<0,
 	StateFlag_no_bounds_check = 1<<1,
+	StateFlag_type_assert     = 1<<2,
+	StateFlag_no_type_assert  = 1<<3,
+
+	StateFlag_SelectorCallExpr = 1<<6,
 
 	StateFlag_BeenHandled = 1<<7,
 };
@@ -276,14 +301,16 @@ enum FieldFlag : u32 {
 	FieldFlag_auto_cast = 1<<4,
 	FieldFlag_const     = 1<<5,
 	FieldFlag_any_int   = 1<<6,
+	FieldFlag_subtype   = 1<<7,
+	FieldFlag_by_ptr    = 1<<8,
 
 	// Internal use by the parser only
 	FieldFlag_Tags      = 1<<10,
 	FieldFlag_Results   = 1<<16,
 
 	// Parameter List Restrictions
-	FieldFlag_Signature = FieldFlag_ellipsis|FieldFlag_using|FieldFlag_no_alias|FieldFlag_c_vararg|FieldFlag_auto_cast|FieldFlag_const|FieldFlag_any_int,
-	FieldFlag_Struct    = FieldFlag_using|FieldFlag_Tags,
+	FieldFlag_Signature = FieldFlag_ellipsis|FieldFlag_using|FieldFlag_no_alias|FieldFlag_c_vararg|FieldFlag_auto_cast|FieldFlag_const|FieldFlag_any_int|FieldFlag_by_ptr,
+	FieldFlag_Struct    = FieldFlag_using|FieldFlag_subtype|FieldFlag_Tags,
 };
 
 enum StmtAllowFlag {
@@ -304,6 +331,13 @@ char const *inline_asm_dialect_strings[InlineAsmDialect_COUNT] = {
 	"",
 	"att",
 	"intel",
+};
+
+enum UnionTypeKind : u8 {
+	UnionType_Normal     = 0,
+	UnionType_maybe      = 1, // removed
+	UnionType_no_nil     = 2,
+	UnionType_shared_nil = 3,
 };
 
 #define AST_KINDS \
@@ -344,6 +378,7 @@ char const *inline_asm_dialect_strings[InlineAsmDialect_COUNT] = {
 		Slice<Ast *> elems; \
 		Token open, close; \
 		i64 max_count; \
+		Ast *tag; \
 	}) \
 AST_KIND(_ExprBegin,  "",  bool) \
 	AST_KIND(BadExpr,      "bad expression",         struct { Token begin, end; }) \
@@ -379,10 +414,15 @@ AST_KIND(_ExprBegin,  "",  bool) \
 		Token        ellipsis; \
 		ProcInlining inlining; \
 		bool         optional_ok_one; \
-		i32          builtin_id; \
-		void *sce_temp_data; \
+		bool         was_selector; \
 	}) \
 	AST_KIND(FieldValue,      "field value",              struct { Token eq; Ast *field, *value; }) \
+	AST_KIND(EnumFieldValue,  "enum field value",         struct { \
+		Ast *name;          \
+		Ast *value;         \
+		CommentGroup *docs; \
+		CommentGroup *comment; \
+	}) \
 	AST_KIND(TernaryIfExpr,   "ternary if expression",    struct { Ast *x, *cond, *y; }) \
 	AST_KIND(TernaryWhenExpr, "ternary when expression",  struct { Ast *x, *cond, *y; }) \
 	AST_KIND(OrElseExpr,      "or_else expression",       struct { Ast *x; Token token; Ast *y; }) \
@@ -547,7 +587,6 @@ AST_KIND(_DeclBegin,      "", bool) \
 		Token    import_name;   \
 		CommentGroup *docs;     \
 		CommentGroup *comment;  \
-		bool     is_using;      \
 	}) \
 	AST_KIND(ForeignImportDecl, "foreign import declaration", struct { \
 		Token    token;           \
@@ -647,8 +686,7 @@ AST_KIND(_TypeBegin, "", bool) \
 		Slice<Ast *> variants;      \
 		Ast *polymorphic_params;    \
 		Ast *        align;         \
-		bool         maybe;         \
-		bool         no_nil;        \
+		UnionTypeKind kind;       \
 		Token where_token;          \
 		Slice<Ast *> where_clauses; \
 	}) \
@@ -769,13 +807,14 @@ gb_inline bool is_ast_when_stmt(Ast *node) {
 	return node->kind == Ast_WhenStmt;
 }
 
-gb_global gb_thread_local Arena global_ast_arena = {};
+gb_global gb_thread_local Arena global_thread_local_ast_arena = {};
 
 gbAllocator ast_allocator(AstFile *f) {
-	Arena *arena = f ? &f->arena : &global_ast_arena;
+	Arena *arena = &global_thread_local_ast_arena;
 	return arena_allocator(arena);
 }
 
 Ast *alloc_ast_node(AstFile *f, AstKind kind);
 
 gbString expr_to_string(Ast *expression);
+bool allow_field_separator(AstFile *f);

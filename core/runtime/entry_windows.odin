@@ -8,21 +8,25 @@ when ODIN_BUILD_MODE == .Dynamic {
 	@(link_name="DllMain", linkage="strong", require)
 	DllMain :: proc "stdcall" (hinstDLL: rawptr, fdwReason: u32, lpReserved: rawptr) -> b32 {
 		context = default_context()
-		switch fdwReason {
-		case 1: // DLL_PROCESS_ATTACH
+
+		// Populate Windows DLL-specific global
+		dll_forward_reason = DLL_Forward_Reason(fdwReason)
+
+		switch dll_forward_reason {
+		case .Process_Attach:
 			#force_no_inline _startup_runtime()
 			intrinsics.__entry_point()
-		case 0: // DLL_PROCESS_DETACH
+		case .Process_Detach:
 			#force_no_inline _cleanup_runtime()
-		case 2: // DLL_THREAD_ATTACH
+		case .Thread_Attach:
 			break
-		case 3: // DLL_THREAD_DETACH
+		case .Thread_Detach:
 			break
 		}
 		return true
 	}
 } else when !ODIN_TEST && !ODIN_NO_ENTRY_POINT {
-	when ODIN_ARCH == "i386" || ODIN_NO_CRT {
+	when ODIN_ARCH == .i386 || ODIN_NO_CRT {
 		@(link_name="mainCRTStartup", linkage="strong", require)
 		mainCRTStartup :: proc "stdcall" () -> i32 {
 			context = default_context()

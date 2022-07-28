@@ -1,32 +1,37 @@
 //+private
 package os2
 
-import "core:mem"
 import win32 "core:sys/windows"
+import "core:runtime"
 
-_lookup_env :: proc(key: string, allocator := context.allocator) -> (value: string, found: bool) {
+_lookup_env :: proc(key: string, allocator: runtime.Allocator) -> (value: string, found: bool) {
 	if key == "" {
 		return
 	}
 	wkey := win32.utf8_to_wstring(key)
-	b := make([dynamic]u16, 100, context.temp_allocator)
-	for {
-		n := win32.GetEnvironmentVariableW(wkey, raw_data(b), u32(len(b)))
-		if n == 0 {
-			err := win32.GetLastError()
-			if err == win32.ERROR_ENVVAR_NOT_FOUND {
-				return "", false
-			}
-		}
 
-		if n <= u32(len(b)) {
-			value = win32.utf16_to_utf8(b[:n], allocator)
-			found = true
-			return
+	n := win32.GetEnvironmentVariableW(wkey, nil, 0)
+	if n == 0 {
+		err := win32.GetLastError()
+		if err == win32.ERROR_ENVVAR_NOT_FOUND {
+			return "", false
 		}
-
-		resize(&b, len(b)*2)
+		return "", true
 	}
+	b := make([]u16, n+1, _temp_allocator())
+
+	n = win32.GetEnvironmentVariableW(wkey, raw_data(b), u32(len(b)))
+	if n == 0 {
+		err := win32.GetLastError()
+		if err == win32.ERROR_ENVVAR_NOT_FOUND {
+			return "", false
+		}
+		return "", false
+	}
+
+	value = win32.utf16_to_utf8(b[:n], allocator) or_else ""
+	found = true
+	return
 }
 
 _set_env :: proc(key, value: string) -> bool {
@@ -42,7 +47,7 @@ _unset_env :: proc(key: string) -> bool {
 }
 
 _clear_env :: proc() {
-	envs := environ(context.temp_allocator)
+	envs := environ(_temp_allocator())
 	for env in envs {
 		for j in 1..<len(env) {
 			if env[j] == '=' {
@@ -53,7 +58,7 @@ _clear_env :: proc() {
 	}
 }
 
-_environ :: proc(allocator := context.allocator) -> []string {
+_environ :: proc(allocator: runtime.Allocator) -> []string {
 	envs := win32.GetEnvironmentStringsW()
 	if envs == nil {
 		return nil
@@ -62,14 +67,13 @@ _environ :: proc(allocator := context.allocator) -> []string {
 
 	r := make([dynamic]string, 0, 50, allocator)
 	for from, i, p := 0, 0, envs; true; i += 1 {
-		c := (^u16)(uintptr(p) + uintptr(i*2))^
+		c := ([^]u16)(p)[i]
 		if c == 0 {
 			if i <= from {
 				break
 			}
-			w := mem.slice_ptr(mem.ptr_offset(p, from), i-from)
-
-			append(&r, win32.utf16_to_utf8(w, allocator))
+			w := ([^]u16)(p)[from:i]
+			append(&r, win32.utf16_to_utf8(w, allocator) or_else "")
 			from = i + 1
 		}
 	}
