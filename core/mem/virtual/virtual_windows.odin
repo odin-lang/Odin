@@ -62,7 +62,7 @@ foreign Kernel32 {
 }
 
 
-_reserve :: proc(size: uint) -> (data: []byte, err: Allocator_Error) {
+_reserve :: proc "contextless" (size: uint) -> (data: []byte, err: Allocator_Error) {
 	result := VirtualAlloc(nil, size, MEM_RESERVE, PAGE_READWRITE)
 	if result == nil {
 		err = .Out_Of_Memory
@@ -72,7 +72,7 @@ _reserve :: proc(size: uint) -> (data: []byte, err: Allocator_Error) {
 	return
 }
 
-_commit :: proc(data: rawptr, size: uint) -> Allocator_Error {
+_commit :: proc "contextless" (data: rawptr, size: uint) -> Allocator_Error {
 	result := VirtualAlloc(data, size, MEM_COMMIT, PAGE_READWRITE)
 	if result == nil {
 		switch err := GetLastError(); err {
@@ -85,13 +85,13 @@ _commit :: proc(data: rawptr, size: uint) -> Allocator_Error {
 	}
 	return nil
 }
-_decommit :: proc(data: rawptr, size: uint) {
+_decommit :: proc "contextless" (data: rawptr, size: uint) {
 	VirtualFree(data, size, MEM_DECOMMIT)
 }
-_release :: proc(data: rawptr, size: uint) {
+_release :: proc "contextless" (data: rawptr, size: uint) {
 	VirtualFree(data, 0, MEM_RELEASE)
 }
-_protect :: proc(data: rawptr, size: uint, flags: Protect_Flags) -> bool {
+_protect :: proc "contextless" (data: rawptr, size: uint, flags: Protect_Flags) -> bool {
 	pflags: u32
 	pflags = PAGE_NOACCESS
 	switch flags {

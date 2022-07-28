@@ -3,7 +3,7 @@
 */
 package test_core_hash
 
-XXHASH_Test_Vectors_With_Seed :: struct #packed {
+XXHASH_Test_Vectors :: struct #packed {
 	/*
 		Old hashes
 	*/
@@ -17,7 +17,75 @@ XXHASH_Test_Vectors_With_Seed :: struct #packed {
 	xxh3_128: u128,
 }
 
-XXHASH_TEST_VECTOR_SEEDED := map[u64][257]XXHASH_Test_Vectors_With_Seed{
+ZERO_VECTORS := map[int]XXHASH_Test_Vectors{
+	1024 * 1024 = {
+		/*
+			Old hashes
+		*/
+		xxh_32   = 0x9430f97f,         // xxhsum -H0
+		xxh_64   = 0x87d2a1b6e1163ef1, // xxhsum -H1
+
+		/*
+			XXH3 hashes
+		*/
+		xxh3_128 = 0xb6ef17a3448492b6918780b90550bf34, // xxhsum -H2
+		xxh3_64  = 0x918780b90550bf34,                 // xxhsum -H3
+	},
+	1024 * 2048 = {
+		/*
+			Old hashes
+		*/
+		xxh_32   = 0xeeb74ca1,         // xxhsum -H0
+		xxh_64   = 0xeb8a7322f88e23db, // xxhsum -H1
+
+		/*
+			XXH3 hashes
+		*/
+		xxh3_128 = 0x7b3e6abe1456fd0094e26d8e04364852, // xxhsum -H2
+		xxh3_64  = 0x94e26d8e04364852,                 // xxhsum -H3
+	},
+	1024 * 4096 = {
+		/*
+			Old hashes
+		*/
+		xxh_32   = 0xa59010b8,         // xxhsum -H0
+		xxh_64   = 0x639f9e1a7cbc9d28, // xxhsum -H1
+
+		/*
+			XXH3 hashes
+		*/
+		xxh3_128 = 0x34001ae2f947e773165f453a5f35c459, // xxhsum -H2
+		xxh3_64  = 0x165f453a5f35c459,                 // xxhsum -H3
+	},
+	1024 * 8192 = {
+		/*
+			Old hashes
+		*/
+		xxh_32   = 0xfed1d084,         // xxhsum -H0
+		xxh_64   = 0x86823cbc61f6df0f, // xxhsum -H1
+
+		/*
+			XXH3 hashes
+		*/
+		xxh3_128 = 0x9d6bf1a4e92df02ce881a25e37e37b19, // xxhsum -H2
+		xxh3_64  = 0xe881a25e37e37b19,                 // xxhsum -H3
+	},
+	1024 * 16384 = {
+		/*
+			Old hashes
+		*/
+		xxh_32   = 0x0ee4ebf9,         // xxhsum -H0
+		xxh_64   = 0x412f1e415ee2d80b, // xxhsum -H1
+
+		/*
+			XXH3 hashes
+		*/
+		xxh3_128 = 0x14d914cac1f4c1b1c4979470a1b529a1, // xxhsum -H2
+		xxh3_64  = 0xc4979470a1b529a1,                 // xxhsum -H3
+	},
+}
+
+XXHASH_TEST_VECTOR_SEEDED := map[u64][257]XXHASH_Test_Vectors{
 	0 = {
 		{ // Length: 000
 			/*  XXH32 with seed   */ 0x02cc5d05,

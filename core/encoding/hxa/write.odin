@@ -84,7 +84,7 @@ write_internal :: proc(w: ^Writer, file: File) {
 
 	write_metadata :: proc(w: ^Writer, meta_data: []Meta) {
 		for m in meta_data {
-			name_len := max(len(m.name), 255)
+			name_len := min(len(m.name), 255)
 			write_value(w, u8(name_len))
 			write_string(w, m.name[:name_len])
 
@@ -127,7 +127,7 @@ write_internal :: proc(w: ^Writer, file: File) {
 	write_layer_stack :: proc(w: ^Writer, layers: Layer_Stack) {
 		write_value(w, u32(len(layers)))
 		for layer in layers {
-			name_len := max(len(layer.name), 255)
+			name_len := min(len(layer.name), 255)
 			write_value(w, u8(name_len))
 			write_string(w, layer .name[:name_len])
 
@@ -152,7 +152,7 @@ write_internal :: proc(w: ^Writer, file: File) {
 		return
 	}
 
-	write_value(w, &Header{
+	write_value(w, Header{
 		magic_number = MAGIC_NUMBER,
 		version = LATEST_VERSION,
 		internal_node_count = u32le(len(file.nodes)),

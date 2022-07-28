@@ -242,17 +242,16 @@ srgb :: proc(c: image.PNG_Chunk) -> (res: sRGB, ok: bool) {
 }
 
 plte :: proc(c: image.PNG_Chunk) -> (res: PLTE, ok: bool) {
-	if c.header.type != .PLTE {
+	if c.header.type != .PLTE || c.header.length % 3 != 0 || c.header.length > 768 {
 		return {}, false
 	}
 
-	i := 0; j := 0; ok = true
-	for j < int(c.header.length) {
-		res.entries[i] = {c.data[j], c.data[j+1], c.data[j+2]}
-		i += 1; j += 3
+	plte := mem.slice_data_cast([]image.RGB_Pixel, c.data[:])
+	for color, i in plte {
+		res.entries[i] = color
 	}
-	res.used = u16(i)
-	return
+	res.used = u16(len(plte))
+	return res, true
 }
 
 splt :: proc(c: image.PNG_Chunk) -> (res: sPLT, ok: bool) {
@@ -439,18 +438,18 @@ when false {
 		flags: int = O_WRONLY|O_CREATE|O_TRUNC
 
 		if len(image.pixels) == 0 || len(image.pixels) < image.width * image.height * int(image.channels) {
-			return E_PNG.Invalid_Image_Dimensions
+			return .Invalid_Image_Dimensions
 		}
 
 		mode: int = 0
-		when ODIN_OS == "linux" || ODIN_OS == "darwin" {
+		when ODIN_OS == .Linux || ODIN_OS == .Darwin {
 			// NOTE(justasd): 644 (owner read, write; group read; others read)
 			mode = S_IRUSR | S_IWUSR | S_IRGRP | S_IROTH
 		}
 
 		fd, fderr := open(filename, flags, mode)
 		if fderr != 0 {
-			return E_General.Cannot_Open_File
+			return .Cannot_Open_File
 		}
 		defer close(fd)
 
@@ -473,7 +472,7 @@ when false {
 		case 3: ihdr.color_type = Color_Type{.Color}
 		case 4: ihdr.color_type = Color_Type{.Color, .Alpha}
 		case:// Unhandled
-			return E_PNG.Unknown_Color_Type
+			return .Unknown_Color_Type
 		}
 		h := make_chunk(ihdr, .IHDR)
 		write_chunk(fd, h)

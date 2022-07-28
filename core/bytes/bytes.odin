@@ -10,7 +10,14 @@ clone :: proc(s: []byte, allocator := context.allocator, loc := #caller_location
 	return c[:len(s)]
 }
 
-ptr_from_slice :: proc(str: []byte) -> ^byte {
+clone_safe :: proc(s: []byte, allocator := context.allocator, loc := #caller_location) -> (data: []byte, err: mem.Allocator_Error) {
+	c := make([]byte, len(s), allocator, loc) or_return
+	copy(c, s)
+	return c[:len(s)], nil
+}
+
+ptr_from_slice :: ptr_from_bytes
+ptr_from_bytes :: proc(str: []byte) -> ^byte {
 	d := transmute(mem.Raw_String)str
 	return d.data
 }
@@ -134,6 +141,25 @@ join :: proc(a: [][]byte, sep: []byte, allocator := context.allocator) -> []byte
 	return b
 }
 
+join_safe :: proc(a: [][]byte, sep: []byte, allocator := context.allocator) -> (data: []byte, err: mem.Allocator_Error) {
+	if len(a) == 0 {
+		return nil, nil
+	}
+
+	n := len(sep) * (len(a) - 1)
+	for s in a {
+		n += len(s)
+	}
+
+	b := make([]byte, n, allocator) or_return
+	i := copy(b, a[0])
+	for s in a[1:] {
+		i += copy(b[i:], sep)
+		i += copy(b[i:], s)
+	}
+	return b, nil
+}
+
 concatenate :: proc(a: [][]byte, allocator := context.allocator) -> []byte {
 	if len(a) == 0 {
 		return nil
@@ -150,6 +176,24 @@ concatenate :: proc(a: [][]byte, allocator := context.allocator) -> []byte {
 	}
 	return b
 }
+
+concatenate_safe :: proc(a: [][]byte, allocator := context.allocator) -> (data: []byte, err: mem.Allocator_Error) {
+	if len(a) == 0 {
+		return nil, nil
+	}
+
+	n := 0
+	for s in a {
+		n += len(s)
+	}
+	b := make([]byte, n, allocator) or_return
+	i := 0
+	for s in a {
+		i += copy(b[i:], s)
+	}
+	return b, nil
+}
+
 
 @private
 _split :: proc(s, sep: []byte, sep_save, n: int, allocator := context.allocator) -> [][]byte {
@@ -218,60 +262,36 @@ split_after_n :: proc(s, sep: []byte, n: int, allocator := context.allocator) ->
 
 
 @private
-_split_iterator :: proc(s: ^[]byte, sep: []byte, sep_save, n: int) -> (res: []byte, ok: bool) {
-	s, n := s, n
-
-	if n == 0 {
-		return
-	}
-
-	if sep == nil {
+_split_iterator :: proc(s: ^[]byte, sep: []byte, sep_save: int) -> (res: []byte, ok: bool) {
+	if len(sep) == 0 {
 		res = s[:]
 		ok = true
 		s^ = s[len(s):]
 		return
 	}
 
-	if n < 0 {
-		n = count(s^, sep) + 1
-	}
-
-	n -= 1
-
-	i := 0
-	for ; i < n; i += 1 {
-		m := index(s^, sep)
-		if m < 0 {
-			break
-		}
+	m := index(s^, sep)
+	if m < 0 {
+		// not found
+		res = s[:]
+		ok = len(res) != 0
+		s^ = s[len(s):]
+	} else {
 		res = s[:m+sep_save]
 		ok = true
 		s^ = s[m+len(sep):]
-		return
 	}
-	res = s[:]
-	ok = res != nil
-	s^ = s[len(s):]
 	return
 }
 
 
 split_iterator :: proc(s: ^[]byte, sep: []byte) -> ([]byte, bool) {
-	return _split_iterator(s, sep, 0, -1)
-}
-
-split_n_iterator :: proc(s: ^[]byte, sep: []byte, n: int) -> ([]byte, bool) {
-	return _split_iterator(s, sep, 0, n)
+	return _split_iterator(s, sep, 0)
 }
 
 split_after_iterator :: proc(s: ^[]byte, sep: []byte) -> ([]byte, bool) {
-	return _split_iterator(s, sep, len(sep), -1)
+	return _split_iterator(s, sep, len(sep))
 }
-
-split_after_n_iterator :: proc(s: ^[]byte, sep: []byte, n: int) -> ([]byte, bool) {
-	return _split_iterator(s, sep, len(sep), n)
-}
-
 
 
 index_byte :: proc(s: []byte, c: byte) -> int {

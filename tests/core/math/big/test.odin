@@ -32,9 +32,9 @@ print_to_buffer :: proc(val: ^big.Int) -> cstring {
 
 @export test_initialize_constants :: proc "c" () -> (res: u64) {
 	context = runtime.default_context()
-	res = u64(big.initialize_constants())
-	//assert(MUL_KARATSUBA_CUTOFF >= 40);
-	return res
+	_  = big.initialize_constants()
+
+	return u64(big._DIGIT_NAILS)
 }
 
 @export test_error_string :: proc "c" (err: big.Error) -> (res: cstring) {

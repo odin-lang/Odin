@@ -1,31 +1,104 @@
 package stb_easy_font
 
-// Source port of stb_easy_font.h
+/*
+	Source port of stb_easy_font.h
+
+	Original port: gingerBill
+	Bugfixes:      Florian Behr & Jeroen van Rijn
+	Additions:     Jeroen van Rijn
+
+	Changelog:
+	2022-04-03
+		Bug fixes
+		Add `print(x, y, text, color, quad_buffer)` version that takes `[]quad`.
+			(Same internal memory layout as []u8 API, but more convenient for the caller.)
+		Add optional `scale := f32(1.0)` param to `print` to embiggen the glyph quads.
+
+	2021-09-14
+		Original Odin version
+*/
+
+/*
+	// Example for use with vendor:raylib
+
+	quads: [999]easy_font.Quad = ---
+
+	color := rl.GREEN
+	c     := transmute(easy_font.Color)color
+	num_quads := easy_font.print(10, 60, TEXT, c, quads[:])
+
+	for q in quads[:num_quads] {
+		tl    := q.tl.v
+		br    := q.br.v
+		color  = transmute(rl.Color)q.tl.c
+
+		r := rl.Rectangle{x = tl.x, y = tl.y, width = br.x - tl.x, height = br.y - tl.y}
+
+		// Yes, we could just use the `color` from above, but this shows how to get it back from the vertex.
+		// And in practice this code will likely not live as close to the `easy_font` call.
+		rl.DrawRectangleRec(r, color)
+	}
+*/
 
 import "core:math"
+import "core:mem"
 
-color :: struct {
-	c: [4]u8,
+Color  :: [4]u8
+
+Vertex :: struct {
+	v: [3]f32,
+	c: Color,
 }
+#assert(size_of(Vertex) == 16)
 
-draw_segs :: proc(x, y: f32, segs: []u8, vertical: bool, c: color, vbuf: []byte, offset: int) -> int {
-	x, y, offset := x, y, offset
-	for i in 0..<len(segs) {
-		n := segs[i] & 7
-		x += f32((segs[i]>>31) & 1)
-		if n != 0 && offset+64 <= len(vbuf) {
-			y0 := y + f32(segs[i]>>4)
-			for j in 0..<4 {
-				(^f32)(&vbuf[offset+0])^    = x  + ((vertical ? 1 : len) if j==1 || j==2 else 0)
-				(^f32)(&vbuf[offset+4])^    = y0 + ((vertical ? len : 1) if     j >= 2   else 0)
-				(^f32)(&vbuf[offset+8])^    = 0
-				(^color)(&vbuf[offset+12])^ = c
-				offset += 16
-			}
+Quad :: struct #packed {
+	tl: Vertex,
+	tr: Vertex,
+	br: Vertex,
+	bl: Vertex,
+}
+#assert(size_of(Quad) == 64)
+
+// Same memory layout, but takes a []quad instead of []byte
+draw_segs_quad_buffer :: proc(x, y: f32, segs: []u8, vertical: bool, c: Color, buf: []Quad, start_offset: int, scale := f32(1.0)) -> (quads: int) {
+	x, y := x, y
+	quads = start_offset
+
+	for seg in segs {
+		stroke_length := f32(seg & 7) * scale
+		x += f32((seg >> 3) & 1) * scale
+		if stroke_length != 0 && quads + 1 <= len(buf) {
+			y0 := y + (f32(seg >> 4) * scale)
+
+			horz := scale if vertical else stroke_length
+			vert := stroke_length if vertical else scale
+
+			buf[quads].tl.c = c
+			buf[quads].tl.v = { x,        y0,        0 }
+
+			buf[quads].tr.c = c
+			buf[quads].tr.v = { x + horz, y0,        0 }
+
+			buf[quads].br.c = c
+			buf[quads].br.v = { x + horz, y0 + vert, 0 }
+
+			buf[quads].bl.c = c
+			buf[quads].bl.v = { x,        y0 + vert, 0 }
+
+			quads += 1
 		}
 	}
+	return quads
+}
+
+// Compatible with original C API
+draw_segs_vertex_buffer :: proc(x, y: f32, segs: []u8, vertical: bool, c: Color, vbuf: []byte, start_offset: int, scale := f32(1.0)) -> (offset: int) {
+	buf := mem.slice_data_cast([]Quad, vbuf)
+	offset = draw_segs_quad_buffer(x, y, segs, vertical, c, buf, start_offset / size_of(Quad), scale) * size_of(Quad)
 	return offset
 }
+
+draw_segs :: proc{ draw_segs_quad_buffer, draw_segs_vertex_buffer }
 
 @(private)
 _spacing_val := f32(0)
@@ -34,13 +107,17 @@ font_spacing :: proc(spacing: f32) {
 	_spacing_val = spacing
 }
 
-print :: proc(x, y: f32, text: string, color: color, vertex_buffer: []byte) -> int {
-	x, y := x, y
+// Same memory layout, but takes a []quad instead of []byte
+print_quad_buffer :: proc(x, y: f32, text: string, color: Color, quad_buffer: []Quad, scale := f32(1.0)) -> (quads: int) {
+	x, y, color := x, y, color
 	text := text
 	start_x := x
-	offset := 0
-	
-	for len(text) != 0 && offset < len(vertex_buffer) {
+
+	if color == {} {
+		color = {255, 255, 255, 255}
+	}
+
+	for len(text) != 0 && quads < len(quad_buffer) {
 		c := text[0]
 		if c == '\n' {
 			y += 12
@@ -52,16 +129,26 @@ print :: proc(x, y: f32, text: string, color: color, vertex_buffer: []byte) -> i
 			v_seg := charinfo[c-32].v_seg
 			num_h := charinfo[c-32 + 1].h_seg - h_seg
 			num_v := charinfo[c-32 + 1].v_seg - v_seg
-			offset = draw_segs(x, y_ch, hseg[h_seg:][:num_h], false, color, vertex_buffer, offset)
-			offset = draw_segs(x, y_ch, hseg[v_seg:][:num_v], true, color, vertex_buffer, offset)
-			x += f32(advance & 15)
-			x += _spacing_val
+
+			quads = draw_segs(x, y_ch, hseg[h_seg:][:num_h], false, color, quad_buffer, quads, scale)
+			quads = draw_segs(x, y_ch, vseg[v_seg:][:num_v], true,  color, quad_buffer, quads, scale)
+
+			x += f32(advance & 15) * scale
+			x += _spacing_val * scale
 		}
 		text = text[1:]
 	}
 
-	return offset/64
+	return
 }
+
+// Compatible with original C API
+print_vertex_buffer :: proc(x, y: f32, text: string, color: Color, vertex_buffer: []byte, scale := f32(1.0)) -> int {
+	buf := mem.slice_data_cast([]Quad, vertex_buffer)
+	return print_quad_buffer(x, y, text, color, buf, scale)
+}
+
+print :: proc{ print_quad_buffer, print_vertex_buffer }
 
 width :: proc(text: string) -> int {
 	length := f32(0)

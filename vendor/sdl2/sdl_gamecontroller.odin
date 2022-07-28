@@ -2,10 +2,11 @@ package sdl2
 
 import "core:c"
 
-when ODIN_OS == "windows" { foreign import lib "SDL2.lib"    }
-when ODIN_OS == "linux"   { foreign import lib "system:SDL2" }
-when ODIN_OS == "darwin"  { foreign import lib "system:SDL2" }
-when ODIN_OS == "freebsd" { foreign import lib "system:SDL2" }
+when ODIN_OS == .Windows {
+	foreign import lib "SDL2.lib"
+} else {
+	foreign import lib "system:SDL2"
+}
 
 GameController :: struct {}
 
@@ -117,7 +118,7 @@ foreign lib {
 	GameControllerGetStringForAxis      :: proc(axis: GameControllerAxis) -> cstring ---
 	GameControllerGetBindForAxis        :: proc(gamecontroller: ^GameController, axis: GameControllerAxis)  -> GameControllerButtonBind---
 	GameControllerHasAxis               :: proc(gamecontroller: ^GameController, axis: GameControllerAxis) -> bool ---
-	GameControllerGetAxis               :: proc(gamecontroller: ^GameController, axis: GameControllerAxis)  -> i16 ---
+	GameControllerGetAxis               :: proc(gamecontroller: ^GameController, axis: GameControllerAxis) -> i16 ---
 
 	GameControllerGetButtonFromString   :: proc(str: cstring) -> GameControllerButton ---
 	GameControllerGetStringForButton    :: proc(button: GameControllerButton) -> cstring ---

@@ -1,10 +1,9 @@
-//+build linux, darwin, freebsd
+//+build linux, darwin, freebsd, openbsd
 package unix
 
 foreign import "system:pthread"
 
 import "core:c"
-import "core:time"
 
 //
 // On success, these functions return 0.
@@ -72,7 +71,7 @@ foreign pthread {
 
 	// assumes the mutex is pre-locked
 	pthread_cond_wait :: proc(cond: ^pthread_cond_t, mutex: ^pthread_mutex_t) -> c.int ---
-	pthread_cond_timedwait :: proc(cond: ^pthread_cond_t, mutex: ^pthread_mutex_t, timeout: ^time.TimeSpec) -> c.int ---
+	pthread_cond_timedwait :: proc(cond: ^pthread_cond_t, mutex: ^pthread_mutex_t, timeout: ^timespec) -> c.int ---
 
 	pthread_condattr_init :: proc(attrs: ^pthread_condattr_t) -> c.int ---
 	pthread_condattr_destroy :: proc(attrs: ^pthread_condattr_t) -> c.int ---
@@ -95,7 +94,7 @@ foreign pthread {
 
 	pthread_mutex_lock :: proc(mutex: ^pthread_mutex_t) -> c.int ---
 
-	pthread_mutex_timedlock :: proc(mutex: ^pthread_mutex_t, timeout: ^time.TimeSpec) -> c.int ---
+	pthread_mutex_timedlock :: proc(mutex: ^pthread_mutex_t, timeout: ^timespec) -> c.int ---
 
 	pthread_mutex_unlock :: proc(mutex: ^pthread_mutex_t) -> c.int ---
 

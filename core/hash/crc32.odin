@@ -9,8 +9,8 @@ crc32 :: proc(data: []byte, seed := u32(0)) -> u32 #no_bounds_check {
 	length := len(data)
 
 	for length != 0 && uintptr(buffer) & 7 != 0 {
-		crc = crc32_table[0][byte(crc) ~ buffer^] ~ (crc >> 8)
-		buffer = intrinsics.ptr_offset(buffer, 1)
+		crc = crc32_table[0][byte(crc) ~ buffer[0]] ~ (crc >> 8)
+		buffer = buffer[1:]
 		length -= 1
 	}
 
@@ -28,14 +28,14 @@ crc32 :: proc(data: []byte, seed := u32(0)) -> u32 #no_bounds_check {
 		      crc32_table[1][buf[6]] ~
 		      crc32_table[0][buf[7]]
 
-		buffer = intrinsics.ptr_offset(buffer, 8)
+		buffer = buffer[8:]
 		length -= 8
 	}
 
 
 	for length != 0 {
-		crc = crc32_table[0][byte(crc) ~ buffer^] ~ (crc >> 8)
-		buffer = intrinsics.ptr_offset(buffer, 1)
+		crc = crc32_table[0][byte(crc) ~ buffer[0]] ~ (crc >> 8)
+		buffer = buffer[1:]
 		length -= 1
 	}
 

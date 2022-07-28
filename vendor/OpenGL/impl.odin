@@ -199,7 +199,7 @@ load_1_1 :: proc(set_proc_address: Set_Proc_Address_Type) {
 
 // VERSION_1_2
 impl_DrawRangeElements: proc "c" (mode: u32, start: u32, end: u32, count: i32, type: u32, indices: rawptr)
-impl_TexImage3D:        proc "c" (target: u32, level: i32, internalformat: i32, width: i32, height: i32, depth: i32, border: i32, format: u32, type: u32, pixels: rawptr)
+impl_TexImage3D:        proc "c" (target: u32, level: i32, internalformat: i32, width: i32, height: i32, depth: i32, border: i32, format: u32, type: u32, data: rawptr)
 impl_TexSubImage3D:     proc "c" (target: u32, level: i32, xoffset: i32, yoffset: i32, zoffset: i32, width: i32, height: i32, depth: i32, format: u32, type: u32, pixels: rawptr)
 impl_CopyTexSubImage3D: proc "c" (target: u32, level: i32, xoffset: i32, yoffset: i32, zoffset: i32, x: i32, y: i32, width: i32, height: i32)
 
@@ -947,6 +947,13 @@ impl_DrawTransformFeedbackStream:    proc "c" (mode: u32, id: u32, stream: u32)
 impl_BeginQueryIndexed:              proc "c" (target: u32, index: u32, id: u32)
 impl_EndQueryIndexed:                proc "c" (target: u32, index: u32)
 impl_GetQueryIndexediv:              proc "c" (target: u32, index: u32, pname: u32, params: [^]i32)
+impl_GetTextureHandleARB:            proc "c" (texture: u32) -> u64
+impl_GetTextureSamplerHandleARB:     proc "c" (texture, sampler: u32) -> u64
+impl_GetImageHandleARB:              proc "c" (texture: u32, level: i32, layered: bool, layer: i32, format: u32) -> u64
+impl_MakeTextureHandleResidentARB:   proc "c" (handle: u64)
+impl_MakeImageHandleResidentARB:     proc "c" (handle: u64, access: u32)
+impl_MakeTextureHandleNonResidentARB:proc "c" (handle: u64)
+impl_MakeImageHandleNonResidentARB:  proc "c" (handle: u64)
 
 load_4_0 :: proc(set_proc_address: Set_Proc_Address_Type) {
 	set_proc_address(&impl_MinSampleShading,               "glMinSampleShading")
@@ -995,6 +1002,42 @@ load_4_0 :: proc(set_proc_address: Set_Proc_Address_Type) {
 	set_proc_address(&impl_BeginQueryIndexed,              "glBeginQueryIndexed")
 	set_proc_address(&impl_EndQueryIndexed,                "glEndQueryIndexed")
 	set_proc_address(&impl_GetQueryIndexediv,              "glGetQueryIndexediv")
+
+	// Load ARB (architecture review board, vendor specific) extensions that might be available
+	set_proc_address(&impl_GetTextureHandleARB, "glGetTextureHandleARB")
+	if impl_GetTextureHandleARB == nil {
+		set_proc_address(&impl_GetTextureHandleARB, "glGetTextureHandleNV")
+	}
+
+	set_proc_address(&impl_GetTextureSamplerHandleARB, "glGetTextureSamplerHandleARB")
+	if impl_GetTextureSamplerHandleARB == nil {
+		set_proc_address(&impl_GetTextureSamplerHandleARB, "glGetTextureSamplerHandleNV")
+	}
+
+	set_proc_address(&impl_GetImageHandleARB, "glGetImageHandleARB")
+	if impl_GetImageHandleARB == nil {
+		set_proc_address(&impl_GetImageHandleARB, "glGetImageHandleNV")
+	}
+
+	set_proc_address(&impl_MakeTextureHandleResidentARB, "glMakeTextureHandleResidentARB")
+	if impl_MakeTextureHandleResidentARB == nil {
+		set_proc_address(&impl_MakeTextureHandleResidentARB, "glMakeTextureHandleResidentNV")
+	}
+
+	set_proc_address(&impl_MakeImageHandleResidentARB, "glMakeImageHandleResidentARB")
+	if impl_MakeImageHandleResidentARB == nil {
+		set_proc_address(&impl_MakeImageHandleResidentARB, "glMakeImageHandleResidentNV")
+	}
+
+	set_proc_address(&impl_MakeTextureHandleNonResidentARB, "glMakeTextureHandleNonResidentARB")
+	if impl_MakeTextureHandleNonResidentARB == nil {
+		set_proc_address(&impl_MakeTextureHandleNonResidentARB, "glMakeTextureHandleNonResidentNV")
+	}
+
+	set_proc_address(&impl_MakeImageHandleNonResidentARB, "glMakeImageHandleNonResidentARB")
+	if impl_MakeImageHandleNonResidentARB == nil {
+		set_proc_address(&impl_MakeImageHandleNonResidentARB, "glMakeImageHandleNonResidentNV")
+	}
 }
 
 
@@ -1250,14 +1293,14 @@ impl_VertexAttribLFormat:             proc "c" (attribindex: u32, size: i32, typ
 impl_VertexAttribBinding:             proc "c" (attribindex: u32, bindingindex: u32)
 impl_VertexBindingDivisor:            proc "c" (bindingindex: u32, divisor: u32)
 impl_DebugMessageControl:             proc "c" (source: u32, type: u32, severity: u32, count: i32, ids: [^]u32, enabled: bool)
-impl_DebugMessageInsert:              proc "c" (source: u32, type: u32, id: u32, severity: u32, length: i32, buf: [^]u8)
+impl_DebugMessageInsert:              proc "c" (source: u32, type: u32, id: u32, severity: u32, length: i32, message: cstring)
 impl_DebugMessageCallback:            proc "c" (callback: debug_proc_t, userParam: rawptr)
 impl_GetDebugMessageLog:              proc "c" (count: u32, bufSize: i32, sources: [^]u32, types: [^]u32, ids: [^]u32, severities: [^]u32, lengths: [^]i32, messageLog: [^]u8) -> u32
 impl_PushDebugGroup:                  proc "c" (source: u32, id: u32, length: i32, message: cstring)
 impl_PopDebugGroup:                   proc "c" ()
-impl_ObjectLabel:                     proc "c" (identifier: u32, name: u32, length: i32, label: [^]u8)
+impl_ObjectLabel:                     proc "c" (identifier: u32, name: u32, length: i32, label: cstring)
 impl_GetObjectLabel:                  proc "c" (identifier: u32, name: u32, bufSize: i32, length: ^i32, label: [^]u8)
-impl_ObjectPtrLabel:                  proc "c" (ptr: rawptr, length: i32, label: [^]u8)
+impl_ObjectPtrLabel:                  proc "c" (ptr: rawptr, length: i32, label: cstring)
 impl_GetObjectPtrLabel:               proc "c" (ptr: rawptr, bufSize: i32, length: ^i32, label: [^]u8)
 
 load_4_3 :: proc(set_proc_address: Set_Proc_Address_Type) {
@@ -1594,3 +1637,4 @@ load_4_6 :: proc(set_proc_address: Set_Proc_Address_Type) {
 	set_proc_address(&impl_MultiDrawElementsIndirectCount, "glMultiDrawElementsIndirectCount")
 	set_proc_address(&impl_PolygonOffsetClamp,             "glPolygonOffsetClamp")
 }
+

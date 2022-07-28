@@ -2,11 +2,46 @@ package miniaudio
 
 import c "core:c/libc"
 
-when ODIN_OS == "windows" { foreign import lib "lib/miniaudio.lib" }
-when ODIN_OS == "linux"   { foreign import lib "lib/miniaudio.a" }
+when ODIN_OS == .Windows {
+	foreign import lib "lib/miniaudio.lib"
+} else when ODIN_OS == .Linux {
+	foreign import lib "lib/miniaudio.a"
+} else {
+	foreign import lib "system:miniaudio"
+}
 
 MAX_LOG_CALLBACKS :: 4
 
+
+/*
+The callback for handling log messages.
+
+
+Parameters
+----------
+pUserData (in)
+    The user data pointer that was passed into ma_log_register_callback().
+
+logLevel (in)
+    The log level. This can be one of the following:
+
+    +----------------------+
+    | Log Level            |
+    +----------------------+
+    | MA_LOG_LEVEL_DEBUG   |
+    | MA_LOG_LEVEL_INFO    |
+    | MA_LOG_LEVEL_WARNING |
+    | MA_LOG_LEVEL_ERROR   |
+    +----------------------+
+
+pMessage (in)
+    The log message.
+
+
+Remarks
+-------
+Do not modify the state of the device from inside the callback.
+*/
 log_callback_proc :: proc "c" (pUserData: rawptr, level: u32, pMessage: cstring)
 
 log_callback :: struct {

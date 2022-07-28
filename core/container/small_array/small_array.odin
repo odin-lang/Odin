@@ -25,14 +25,14 @@ slice :: proc(a: ^$A/Small_Array($N, $T)) -> []T {
 }
 
 
-get :: proc(a: $A/Small_Array($N, $T), index: int, loc := #caller_location) -> T {
+get :: proc(a: $A/Small_Array($N, $T), index: int) -> T {
 	return a.data[index]
 }
-get_ptr :: proc(a: $A/Small_Array($N, $T), index: int, loc := #caller_location) -> ^T {
+get_ptr :: proc(a: ^$A/Small_Array($N, $T), index: int) -> ^T {
 	return &a.data[index]
 }
 
-set :: proc(a: ^$A/Small_Array($N, $T), index: int, item: T, loc := #caller_location) {
+set :: proc(a: ^$A/Small_Array($N, $T), index: int, item: T) {
 	a.data[index] = item
 }
 
@@ -86,7 +86,7 @@ pop_back_safe :: proc(a: ^$A/Small_Array($N, $T)) -> (item: T, ok: bool) {
 	return
 }
 
-pop_front_safe :: proc(a: ^$A/Small_Array($N, $T)) -> (T, bool) {
+pop_front_safe :: proc(a: ^$A/Small_Array($N, $T)) -> (item: T, ok: bool) {
 	if N > 0 && a.len > 0 {
 		item = a.data[0]
 		s := slice(a)

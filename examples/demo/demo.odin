@@ -11,22 +11,32 @@ import "core:intrinsics"
 import "core:math/big"
 
 /*
-	The Odin programming language is fast, concise, readable, pragmatic and open sourced.
-	It is designed with the intent of replacing C with the following goals:
-	 * simplicity
-	 * high performance
-	 * built for modern systems
-	 * joy of programming
+	Odin is a general-purpose programming language with distinct typing built
+	for high performance, modern systems and data-oriented programming.
+
+	Odin is the C alternative for the Joy of Programming.
 
 	# Installing Odin
 	Getting Started - https://odin-lang.org/docs/install/
 		Instructions for downloading and install the Odin compiler and libraries.
 
 	# Learning Odin
+	Getting Started - https://odin-lang.org/docs/install/
+		Getting Started with Odin. Downloading, installing, and getting your
+		first program to compile and run.
 	Overview of Odin - https://odin-lang.org/docs/overview/
-		An overview of the Odin programming language.
+		An overview of the Odin programming language and its features.
 	Frequently Asked Questions (FAQ) - https://odin-lang.org/docs/faq/
 		Answers to common questions about Odin.
+	Packages - https://pkg.odin-lang.org/
+		Documentation for all the official packages part of the
+		core and vendor library collections.
+	Nightly Builds - https://odin-lang.org/docs/nightly/
+		Get the latest nightly builds of Odin.
+	More Odin Examples - https://github.com/odin-lang/examples
+		This repository contains examples of how certain things can be accomplished 
+		in idiomatic Odin, allowing you learn its semantics, as well as how to use 
+		parts of the core and vendor package collections.
 */
 
 the_basics :: proc() {
@@ -88,6 +98,7 @@ the_basics :: proc() {
 		z: f64 // `z` is typed of type `f64` (64-bit floating point number)
 		z = 1  // `1` is an untyped integer literal which can be implicitly converted to `f64`
 				// No need for any suffixes or decimal places like in other languages
+				// (with the exception of negative zero, which must be given as `-0.0`)
 				// CONSTANTS JUST WORK!!!
 
 
@@ -244,10 +255,10 @@ control_flow :: proc() {
 		// A switch statement is another way to write a sequence of if-else statements.
 		// In Odin, the default case is denoted as a case without any expression.
 
-		switch arch := ODIN_ARCH; arch {
-		case "386":
+		#partial switch arch := ODIN_ARCH; arch {
+		case .i386:
 			fmt.println("32-bit")
-		case "amd64":
+		case .amd64:
 			fmt.println("64-bit")
 		case: // default
 			fmt.println("Unsupported architecture")
@@ -363,12 +374,12 @@ control_flow :: proc() {
 		*/
 
 		// Example
-		when ODIN_ARCH == "386" {
+		when ODIN_ARCH == .i386 {
 			fmt.println("32 bit")
-		} else when ODIN_ARCH == "amd64" {
+		} else when ODIN_ARCH == .amd64 {
 			fmt.println("64 bit")
 		} else {
-			fmt.println("Unsupported architecture")
+			fmt.println("Unknown architecture")
 		}
 		// The when statement is very useful for writing platform specific code.
 		// This is akin to the #if construct in C’s preprocessor however, in Odin,
@@ -1099,13 +1110,15 @@ prefix_table := [?]string{
 	"Black",
 }
 
-threading_example :: proc() {
-	if ODIN_OS == "darwin" {
-		// TODO: Fix threads on darwin/macOS
-		return
-	}
+print_mutex := b64(false)
 
+threading_example :: proc() {
 	fmt.println("\n# threading_example")
+
+	did_acquire :: proc(m: ^b64) -> (acquired: bool) {
+		res, ok := intrinsics.atomic_compare_exchange_strong(m, false, true)
+		return ok && res == false
+	}
 
 	{ // Basic Threads
 		fmt.println("\n## Basic Threads")
@@ -1145,26 +1158,47 @@ threading_example :: proc() {
 
 	{ // Thread Pool
 		fmt.println("\n## Thread Pool")
-		task_proc :: proc(t: ^thread.Task) {
+		task_proc :: proc(t: thread.Task) {
 			index := t.user_index % len(prefix_table)
 			for iteration in 1..=5 {
+				for !did_acquire(&print_mutex) { thread.yield() } // Allow one thread to print at a time.
+
 				fmt.printf("Worker Task %d is on iteration %d\n", t.user_index, iteration)
 				fmt.printf("`%s`: iteration %d\n", prefix_table[index], iteration)
+
+				print_mutex = false
+
 				time.sleep(1 * time.Millisecond)
 			}
 		}
 
+		N :: 3
+
 		pool: thread.Pool
-		thread.pool_init(pool=&pool, thread_count=3)
+		thread.pool_init(pool=&pool, thread_count=N, allocator=context.allocator)
 		defer thread.pool_destroy(&pool)
 
 
 		for i in 0..<30 {
-			thread.pool_add_task(pool=&pool, procedure=task_proc, data=nil, user_index=i)
+			// be mindful of the allocator used for tasks. The allocator needs to be thread safe, or be owned by the task for exclusive use 
+			thread.pool_add_task(pool=&pool, procedure=task_proc, data=nil, user_index=i, allocator=context.allocator)
 		}
 
 		thread.pool_start(&pool)
-		thread.pool_wait_and_process(&pool)
+
+		{
+			// Wait a moment before we cancel a thread
+			time.sleep(5 * time.Millisecond)
+
+			// Allow one thread to print at a time.
+			for !did_acquire(&print_mutex) { thread.yield() }
+
+			thread.terminate(pool.threads[N - 1], 0)
+			fmt.println("Canceled last thread")
+			print_mutex = false
+		}
+
+		thread.pool_finish(&pool)
 	}
 }
 
@@ -1606,13 +1640,13 @@ where_clauses :: proc() {
 }
 
 
-when ODIN_OS == "windows" {
+when ODIN_OS == .Windows {
 	foreign import kernel32 "system:kernel32.lib"
 }
 
 foreign_system :: proc() {
 	fmt.println("\n#foreign system")
-	when ODIN_OS == "windows" {
+	when ODIN_OS == .Windows {
 		// It is sometimes necessarily to interface with foreign code,
 		// such as a C library. In Odin, this is achieved through the
 		// foreign system. You can “import” a library into the code
@@ -1708,7 +1742,6 @@ deprecated_attribute :: proc() {
 }
 
 range_statements_with_multiple_return_values :: proc() {
-	// IMPORTANT NOTE(bill, 2019-11-02): This feature is subject to be changed/removed
 	fmt.println("\n#range statements with multiple return values")
 	My_Iterator :: struct {
 		index: int,
@@ -1921,14 +1954,14 @@ constant_literal_expressions :: proc() {
 
 	fmt.println("-------")
 
-	Partial_Baz :: enum{A=5, B, C, D=16}
-	#assert(len(Partial_Baz) < len(#partial [Partial_Baz]int))
-	PARTIAL_ENUM_ARRAY_CONST :: #partial [Partial_Baz]int{.A ..= .C = 1, .D = 16}
+	Sparse_Baz :: enum{A=5, B, C, D=16}
+	#assert(len(Sparse_Baz) < len(#sparse[Sparse_Baz]int))
+	SPARSE_ENUM_ARRAY_CONST :: #sparse[Sparse_Baz]int{.A ..= .C = 1, .D = 16}
 
-	fmt.println(PARTIAL_ENUM_ARRAY_CONST[.A])
-	fmt.println(PARTIAL_ENUM_ARRAY_CONST[.B])
-	fmt.println(PARTIAL_ENUM_ARRAY_CONST[.C])
-	fmt.println(PARTIAL_ENUM_ARRAY_CONST[.D])
+	fmt.println(SPARSE_ENUM_ARRAY_CONST[.A])
+	fmt.println(SPARSE_ENUM_ARRAY_CONST[.B])
+	fmt.println(SPARSE_ENUM_ARRAY_CONST[.C])
+	fmt.println(SPARSE_ENUM_ARRAY_CONST[.D])
 
 	fmt.println("-------")
 
@@ -1944,15 +1977,17 @@ constant_literal_expressions :: proc() {
 }
 
 union_maybe :: proc() {
-	fmt.println("\n#union #maybe")
+	fmt.println("\n#union based maybe")
 
 	// NOTE: This is already built-in, and this is just a reimplementation to explain the behaviour
-	Maybe :: union($T: typeid) #maybe {T}
+	Maybe :: union($T: typeid) {T}
 
 	i: Maybe(u8)
 	p: Maybe(^u8) // No tag is stored for pointers, nil is the sentinel value
 
+	// Tag size will be as small as needed for the number of variants
 	#assert(size_of(i) == size_of(u8) + size_of(u8))
+	// No need to store a tag here, the `nil` state is shared with the variant's `nil`
 	#assert(size_of(p) == size_of(^u8))
 
 	i = 123
@@ -1998,7 +2033,6 @@ relative_data_types :: proc() {
 
 or_else_operator :: proc() {
 	fmt.println("\n#'or_else'")
-	// IMPORTANT NOTE: 'or_else' is an experimental feature and subject to change/removal
 	{
 		m: map[string]int
 		i: int
@@ -2029,8 +2063,6 @@ or_else_operator :: proc() {
 
 or_return_operator :: proc() {
 	fmt.println("\n#'or_return'")
-	// IMPORTANT NOTE: 'or_return' is an experimental feature and subject to change/removal
-	//
 	// The concept of 'or_return' will work by popping off the end value in a multiple
 	// valued expression and checking whether it was not 'nil' or 'false', and if so,
 	// set the end return value to value if possible. If the procedure only has one
@@ -2421,6 +2453,13 @@ matrix_type :: proc() {
 }
 
 main :: proc() {
+	/*
+		For More Odin Examples - https://github.com/odin-lang/examples
+			This repository contains examples of how certain things can be accomplished 
+			in idiomatic Odin, allowing you learn its semantics, as well as how to use 
+			parts of the core and vendor package collections.
+	*/
+
 	when true {
 		the_basics()
 		control_flow()

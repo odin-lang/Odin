@@ -209,7 +209,7 @@ unmarshal_value :: proc(p: ^Parser, v: any) -> (err: Unmarshal_Error) {
 		variant := u.variants[0]
 		v.id = variant.id
 		ti = reflect.type_info_base(variant)
-		if !(u.maybe && reflect.is_pointer(variant)) {
+		if !reflect.is_pointer_internally(variant) {
 			tag := any{rawptr(uintptr(v.data) + u.tag_offset), u.tag_type.id}
 			assign_int(tag, 1)
 		}
@@ -325,7 +325,7 @@ unmarshal_object :: proc(p: ^Parser, v: any, end_token: Token_Kind) -> (err: Unm
 	UNSUPPORTED_TYPE := Unsupported_Type_Error{v.id, p.curr_token}
 	
 	if end_token == .Close_Brace {
-		assert(expect_token(p, .Open_Brace) == nil)
+		unmarshal_expect_token(p, .Open_Brace)
 	}
 
 	v := v
@@ -473,7 +473,7 @@ unmarshal_object :: proc(p: ^Parser, v: any, end_token: Token_Kind) -> (err: Unm
 	}
 	
 	if end_token == .Close_Brace {
-		assert(expect_token(p, .Close_Brace) == nil)
+		unmarshal_expect_token(p, .Close_Brace)
 	}
 	return
 }

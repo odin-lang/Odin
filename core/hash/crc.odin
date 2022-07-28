@@ -1,8 +1,8 @@
 package hash
 
 @(optimization_mode="speed")
-crc64_ecma_182 :: proc(data: []byte, seed := u32(0)) -> u64 #no_bounds_check {
-	result := u64(seed)
+crc64_ecma_182 :: proc(data: []byte, seed := u64(0)) -> (result: u64) #no_bounds_check {
+	result = seed
 	#no_bounds_check for b in data {
 		result = result<<8 ~ _crc64_table_ecma_182[((result>>56) ~ u64(b)) & 0xff]
 	}

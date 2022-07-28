@@ -43,6 +43,10 @@ LLVMMetadataRef lb_debug_location_from_ast(lbProcedure *p, Ast *node) {
 	GB_ASSERT(node != nullptr);
 	return lb_debug_location_from_token_pos(p, ast_token(node).pos);
 }
+LLVMMetadataRef lb_debug_end_location_from_ast(lbProcedure *p, Ast *node) {
+	GB_ASSERT(node != nullptr);
+	return lb_debug_location_from_token_pos(p, ast_end_token(node).pos);
+}
 
 LLVMMetadataRef lb_debug_type_internal_proc(lbModule *m, Type *type) {
 	i64 size = type_size_of(type); // Check size
@@ -419,7 +423,18 @@ LLVMMetadataRef lb_debug_type_internal(lbModule *m, Type *type) {
 		break;
 
 	case Type_SimdVector:
-		return LLVMDIBuilderCreateVectorType(m->debug_builder, cast(unsigned)type->SimdVector.count, 8*cast(unsigned)type_align_of(type), lb_debug_type(m, type->SimdVector.elem), nullptr, 0);
+		{
+			LLVMMetadataRef elem = lb_debug_type(m, type->SimdVector.elem);
+			LLVMMetadataRef subscripts[1] = {};
+			subscripts[0] = LLVMDIBuilderGetOrCreateSubrange(m->debug_builder,
+				0ll,
+				type->SimdVector.count
+			);
+			return LLVMDIBuilderCreateVectorType(
+				m->debug_builder,
+				8*cast(unsigned)type_size_of(type), 8*cast(unsigned)type_align_of(type),
+				elem, subscripts, gb_count_of(subscripts));
+		}
 
 	case Type_RelativePointer: {
 		LLVMMetadataRef base_integer = lb_debug_type(m, type->RelativePointer.base_integer);
@@ -958,12 +973,78 @@ void lb_add_debug_local_variable(lbProcedure *p, LLVMValueRef ptr, Type *type, T
 	);
 
 	LLVMValueRef storage = ptr;
-	LLVMValueRef instr = ptr;
+	LLVMBasicBlockRef block = p->curr_block->block;
 	LLVMMetadataRef llvm_debug_loc = lb_debug_location_from_token_pos(p, token.pos);
 	LLVMMetadataRef llvm_expr = LLVMDIBuilderCreateExpression(m->debug_builder, nullptr, 0);
 	lb_set_llvm_metadata(m, ptr, llvm_expr);
-	LLVMDIBuilderInsertDeclareBefore(m->debug_builder, storage, var_info, llvm_expr, llvm_debug_loc, instr);
+	LLVMDIBuilderInsertDeclareAtEnd(m->debug_builder, storage, var_info, llvm_expr, llvm_debug_loc, block);
 }
+
+
+void lb_add_debug_param_variable(lbProcedure *p, LLVMValueRef ptr, Type *type, Token const &token, unsigned arg_number, lbBlock *block) {
+	if (p->debug_info == nullptr) {
+		return;
+	}
+	if (type == nullptr) {
+		return;
+	}
+	if (type == t_invalid) {
+		return;
+	}
+	if (p->body == nullptr) {
+		return;
+	}
+
+	lbModule *m = p->module;
+	String const &name = token.string;
+	if (name == "" || name == "_") {
+		return;
+	}
+
+	if (lb_get_llvm_metadata(m, ptr) != nullptr) {
+		// Already been set
+		return;
+	}
+
+
+	AstFile *file = p->body->file();
+
+	LLVMMetadataRef llvm_scope = lb_get_current_debug_scope(p);
+	LLVMMetadataRef llvm_file = lb_get_llvm_metadata(m, file);
+	GB_ASSERT(llvm_scope != nullptr);
+	if (llvm_file == nullptr) {
+		llvm_file = LLVMDIScopeGetFile(llvm_scope);
+	}
+
+	if (llvm_file == nullptr) {
+		return;
+	}
+
+	LLVMDIFlags flags = LLVMDIFlagZero;
+	LLVMBool always_preserve = build_context.optimization_level == 0;
+
+	LLVMMetadataRef debug_type = lb_debug_type(m, type);
+
+	LLVMMetadataRef var_info = LLVMDIBuilderCreateParameterVariable(
+		m->debug_builder, llvm_scope,
+		cast(char const *)name.text, cast(size_t)name.len,
+		arg_number,
+		llvm_file, token.pos.line,
+		debug_type,
+		always_preserve, flags
+	);
+
+	LLVMValueRef storage = ptr;
+	LLVMMetadataRef llvm_debug_loc = lb_debug_location_from_token_pos(p, token.pos);
+	LLVMMetadataRef llvm_expr = LLVMDIBuilderCreateExpression(m->debug_builder, nullptr, 0);
+	lb_set_llvm_metadata(m, ptr, llvm_expr);
+
+	// NOTE(bill, 2022-02-01): For parameter values, you must insert them at the end of the decl block
+	// The reason is that if the parameter is at index 0 and a pointer, there is not such things as an
+	// instruction "before" it.
+	LLVMDIBuilderInsertDbgValueAtEnd(m->debug_builder, storage, var_info, llvm_expr, llvm_debug_loc, block->block);
+}
+
 
 void lb_add_debug_context_variable(lbProcedure *p, lbAddr const &ctx) {
 	if (!p->debug_info || !p->body) {
@@ -984,5 +1065,10 @@ void lb_add_debug_context_variable(lbProcedure *p, lbAddr const &ctx) {
 	token.string = str_lit("context");
 	token.pos = pos;
 
-	lb_add_debug_local_variable(p, ctx.addr.value, t_context, token);
+	LLVMValueRef ptr = ctx.addr.value;
+	while (LLVMIsABitCastInst(ptr)) {
+		ptr = LLVMGetOperand(ptr, 0);
+	}
+
+	lb_add_debug_local_variable(p, ptr, t_context, token);
 }

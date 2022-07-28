@@ -183,6 +183,7 @@ parse_file :: proc(p: ^Parser, file: ^ast.File) -> bool {
 	pd.name    = pkg_name.text
 	pd.comment = p.line_comment
 	p.file.pkg_decl = pd
+	p.file.docs = docs
 
 	expect_semicolon(p, pd)
 
@@ -195,10 +196,10 @@ parse_file :: proc(p: ^Parser, file: ^ast.File) -> bool {
 	for p.curr_tok.kind != .EOF {
 		stmt := parse_stmt(p)
 		if stmt != nil {
-			if _, ok := stmt.derived.(ast.Empty_Stmt); !ok {
+			if _, ok := stmt.derived.(^ast.Empty_Stmt); !ok {
 				append(&p.file.decls, stmt)
-				if es, es_ok := stmt.derived.(ast.Expr_Stmt); es_ok && es.expr != nil {
-					if _, pl_ok := es.expr.derived.(ast.Proc_Lit); pl_ok {
+				if es, es_ok := stmt.derived.(^ast.Expr_Stmt); es_ok && es.expr != nil {
+					if _, pl_ok := es.expr.derived.(^ast.Proc_Lit); pl_ok {
 						error(p, stmt.pos, "procedure literal evaluated but not used")
 					}
 				}
@@ -428,9 +429,21 @@ expect_closing_brace_of_field_list :: proc(p: ^Parser) -> tokenizer.Token {
 		str := tokenizer.token_to_string(token)
 		error(p, end_of_line_pos(p, p.prev_tok), "expected a comma, got %s", str)
 	}
-	return expect_token(p, .Close_Brace)
+	expect_brace := expect_token(p, .Close_Brace)
+
+	if expect_brace.kind != .Close_Brace {
+		for p.curr_tok.kind != .Close_Brace && p.curr_tok.kind != .EOF && !is_non_inserted_semicolon(p.curr_tok) {
+			advance_token(p)
+		}
+		return p.curr_tok
+	} 
+
+	return expect_brace
 }
 
+is_non_inserted_semicolon :: proc(tok: tokenizer.Token) -> bool {
+	return tok.kind == .Semicolon && tok.text != "\n"
+}
 
 is_blank_ident :: proc{
 	is_blank_ident_string,
@@ -447,7 +460,7 @@ is_blank_ident_token :: proc(tok: tokenizer.Token) -> bool {
 	return false
 }
 is_blank_ident_node :: proc(node: ^ast.Node) -> bool {
-	if ident, ok := node.derived.(ast.Ident); ok {
+	if ident, ok := node.derived.(^ast.Ident); ok {
 		return is_blank_ident(ident.name)
 	}
 	return true
@@ -490,34 +503,34 @@ is_semicolon_optional_for_node :: proc(p: ^Parser, node: ^ast.Node) -> bool {
 		return true
 	}
 
-	switch n in node.derived {
-	case ast.Empty_Stmt, ast.Block_Stmt:
+	#partial switch n in node.derived {
+	case ^ast.Empty_Stmt, ^ast.Block_Stmt:
 		return true
 
-	case ast.If_Stmt, ast.When_Stmt,
-	     ast.For_Stmt, ast.Range_Stmt, ast.Inline_Range_Stmt,
-	     ast.Switch_Stmt, ast.Type_Switch_Stmt:
+	case ^ast.If_Stmt, ^ast.When_Stmt,
+	     ^ast.For_Stmt, ^ast.Range_Stmt, ^ast.Inline_Range_Stmt,
+	     ^ast.Switch_Stmt, ^ast.Type_Switch_Stmt:
 		return true
 
-	case ast.Helper_Type:
+	case ^ast.Helper_Type:
 		return is_semicolon_optional_for_node(p, n.type)
-	case ast.Distinct_Type:
+	case ^ast.Distinct_Type:
 		return is_semicolon_optional_for_node(p, n.type)
-	case ast.Pointer_Type:
+	case ^ast.Pointer_Type:
 		return is_semicolon_optional_for_node(p, n.elem)
-	case ast.Struct_Type, ast.Union_Type, ast.Enum_Type:
+	case ^ast.Struct_Type, ^ast.Union_Type, ^ast.Enum_Type:
 		// Require semicolon within a procedure body
 		return p.curr_proc == nil
-	case ast.Proc_Lit:
+	case ^ast.Proc_Lit:
 		return true
 
-	case ast.Package_Decl, ast.Import_Decl, ast.Foreign_Import_Decl:
+	case ^ast.Package_Decl, ^ast.Import_Decl, ^ast.Foreign_Import_Decl:
 		return true
 
-	case ast.Foreign_Block_Decl:
+	case ^ast.Foreign_Block_Decl:
 		return is_semicolon_optional_for_node(p, n.body)
 
-	case ast.Value_Decl:
+	case ^ast.Value_Decl:
 		if n.is_mutable {
 			return false
 		}
@@ -629,10 +642,10 @@ parse_stmt_list :: proc(p: ^Parser) -> []^ast.Stmt {
 	    p.curr_tok.kind != .EOF  {
 		stmt := parse_stmt(p)
 		if stmt != nil {
-			if _, ok := stmt.derived.(ast.Empty_Stmt); !ok {
+			if _, ok := stmt.derived.(^ast.Empty_Stmt); !ok {
 				append(&list, stmt)
-				if es, es_ok := stmt.derived.(ast.Expr_Stmt); es_ok && es.expr != nil {
-					if _, pl_ok := es.expr.derived.(ast.Proc_Lit); pl_ok {
+				if es, es_ok := stmt.derived.(^ast.Expr_Stmt); es_ok && es.expr != nil {
+					if _, pl_ok := es.expr.derived.(^ast.Proc_Lit); pl_ok {
 						error(p, stmt.pos, "procedure literal evaluated but not used")
 					}
 				}
@@ -710,7 +723,7 @@ convert_stmt_to_expr :: proc(p: ^Parser, stmt: ^ast.Stmt, kind: string) -> ^ast.
 	if stmt == nil {
 		return nil
 	}
-	if es, ok := stmt.derived.(ast.Expr_Stmt); ok {
+	if es, ok := stmt.derived.(^ast.Expr_Stmt); ok {
 		return es.expr
 	}
 	error(p, stmt.pos, "expected %s, found a simple statement", kind)
@@ -852,7 +865,7 @@ parse_for_stmt :: proc(p: ^Parser) -> ^ast.Stmt {
 
 		if p.curr_tok.kind != .Semicolon {
 			cond = parse_simple_stmt(p, {Stmt_Allow_Flag.In})
-			if as, ok := cond.derived.(ast.Assign_Stmt); ok && as.op.kind == .In {
+			if as, ok := cond.derived.(^ast.Assign_Stmt); ok && as.op.kind == .In {
 				is_range = true
 			}
 		}
@@ -894,7 +907,7 @@ parse_for_stmt :: proc(p: ^Parser) -> ^ast.Stmt {
 
 
 	if is_range {
-		assign_stmt := cond.derived.(ast.Assign_Stmt)
+		assign_stmt := cond.derived.(^ast.Assign_Stmt)
 		vals := assign_stmt.lhs[:]
 
 		rhs: ^ast.Expr
@@ -975,7 +988,7 @@ parse_switch_stmt :: proc(p: ^Parser) -> ^ast.Stmt {
 			tag = as
 		} else {
 			tag = parse_simple_stmt(p, {Stmt_Allow_Flag.In})
-			if as, ok := tag.derived.(ast.Assign_Stmt); ok && as.op.kind == .In {
+			if as, ok := tag.derived.(^ast.Assign_Stmt); ok && as.op.kind == .In {
 				is_type_switch = true
 			} else if parse_control_statement_semicolon_separator(p) {
 				init = tag
@@ -1062,14 +1075,14 @@ parse_attribute :: proc(p: ^Parser, tok: tokenizer.Token, open_kind, close_kind:
 	skip_possible_newline(p)
 
 	decl := parse_stmt(p)
-	switch d in &decl.derived {
-	case ast.Value_Decl:
+	#partial switch d in decl.derived_stmt {
+	case ^ast.Value_Decl:
 		if d.docs == nil { d.docs = docs }
 		append(&d.attributes, attribute)
-	case ast.Foreign_Block_Decl:
+	case ^ast.Foreign_Block_Decl:
 		if d.docs == nil { d.docs = docs }
 		append(&d.attributes, attribute)
-	case ast.Foreign_Import_Decl:
+	case ^ast.Foreign_Import_Decl:
 		if d.docs == nil { d.docs = docs }
 		append(&d.attributes, attribute)
 	case:
@@ -1083,11 +1096,11 @@ parse_attribute :: proc(p: ^Parser, tok: tokenizer.Token, open_kind, close_kind:
 
 parse_foreign_block_decl :: proc(p: ^Parser) -> ^ast.Stmt {
 	decl := parse_stmt(p)
-	switch in decl.derived {
-	case ast.Empty_Stmt, ast.Bad_Stmt, ast.Bad_Decl:
+	#partial switch in decl.derived_stmt {
+	case ^ast.Empty_Stmt, ^ast.Bad_Stmt, ^ast.Bad_Decl:
 		// Ignore
 		return nil
-	case ast.When_Stmt, ast.Value_Decl:
+	case ^ast.When_Stmt, ^ast.Value_Decl:
 		return decl
 	}
 
@@ -1291,13 +1304,13 @@ parse_stmt :: proc(p: ^Parser) -> ^ast.Stmt {
 	case .Defer:
 		tok := advance_token(p)
 		stmt := parse_stmt(p)
-		switch s in stmt.derived {
-		case ast.Empty_Stmt:
+		#partial switch s in stmt.derived_stmt {
+		case ^ast.Empty_Stmt:
 			error(p, s.pos, "empty statement after defer (e.g. ';')")
-		case ast.Defer_Stmt:
+		case ^ast.Defer_Stmt:
 			error(p, s.pos, "you cannot defer a defer statement")
 			stmt = s.stmt
-		case ast.Return_Stmt:
+		case ^ast.Return_Stmt:
 			error(p, s.pos, "you cannot defer a return statement")
 		}
 		ds := ast.new(ast.Defer_Stmt, tok.pos, stmt.end)
@@ -1312,7 +1325,7 @@ parse_stmt :: proc(p: ^Parser) -> ^ast.Stmt {
 		}
 
 		results: [dynamic]^ast.Expr
-		for p.curr_tok.kind != .Semicolon {
+		for p.curr_tok.kind != .Semicolon && p.curr_tok.kind != .Close_Brace {
 			result := parse_expr(p, false)
 			append(&results, result)
 			if p.curr_tok.kind != .Comma ||
@@ -1369,8 +1382,8 @@ parse_stmt :: proc(p: ^Parser) -> ^ast.Stmt {
 		expect_token_after(p, .Colon, "identifier list")
 		decl := parse_value_decl(p, list, docs)
 		if decl != nil {
-			switch d in &decl.derived {
-			case ast.Value_Decl:
+			#partial switch d in decl.derived_stmt {
+			case ^ast.Value_Decl:
 				d.is_using = true
 				return decl
 			}
@@ -1401,9 +1414,9 @@ parse_stmt :: proc(p: ^Parser) -> ^ast.Stmt {
 			return stmt
 		case "partial":
 			stmt := parse_stmt(p)
-			switch s in &stmt.derived {
-			case ast.Switch_Stmt:      s.partial = true
-			case ast.Type_Switch_Stmt: s.partial = true
+			#partial switch s in stmt.derived_stmt {
+			case ^ast.Switch_Stmt:      s.partial = true
+			case ^ast.Type_Switch_Stmt: s.partial = true
 			case: error(p, stmt.pos, "#partial can only be applied to a switch statement")
 			}
 			return stmt
@@ -1548,11 +1561,11 @@ parse_body :: proc(p: ^Parser) -> ^ast.Block_Stmt {
 }
 
 convert_stmt_to_body :: proc(p: ^Parser, stmt: ^ast.Stmt) -> ^ast.Stmt {
-	switch s in stmt.derived {
-	case ast.Block_Stmt:
+	#partial switch s in stmt.derived_stmt {
+	case ^ast.Block_Stmt:
 		error(p, stmt.pos, "expected a normal statement rather than a block statement")
 		return stmt
-	case ast.Empty_Stmt:
+	case ^ast.Empty_Stmt:
 		error(p, stmt.pos, "expected a non-empty statement")
 	}
 
@@ -1629,10 +1642,10 @@ convert_to_ident_list :: proc(p: ^Parser, list: []Expr_And_Flags, ignore_flags, 
 
 		id: ^ast.Expr = ident.expr
 
-		switch n in ident.expr.derived {
-		case ast.Ident:
-		case ast.Bad_Expr:
-		case ast.Poly_Type:
+		#partial switch n in ident.expr.derived_expr {
+		case ^ast.Ident:
+		case ^ast.Bad_Expr:
+		case ^ast.Poly_Type:
 			if allow_poly_names {
 				if n.specialization == nil {
 					break
@@ -1794,21 +1807,21 @@ check_procedure_name_list :: proc(p: ^Parser, names: []^ast.Expr) -> bool {
 		return false
 	}
 
-	_, first_is_polymorphic := names[0].derived.(ast.Poly_Type)
+	_, first_is_polymorphic := names[0].derived.(^ast.Poly_Type)
 	any_polymorphic_names := first_is_polymorphic
 
 	for i := 1; i < len(names); i += 1 {
 		name := names[i]
 
 		if first_is_polymorphic {
-			if _, ok := name.derived.(ast.Poly_Type); ok {
+			if _, ok := name.derived.(^ast.Poly_Type); ok {
 				any_polymorphic_names = true
 			} else {
 				error(p, name.pos, "mixture of polymorphic and non-polymorphic identifiers")
 				return any_polymorphic_names
 			}
 		} else {
-			if _, ok := name.derived.(ast.Poly_Type); ok {
+			if _, ok := name.derived.(^ast.Poly_Type); ok {
 				any_polymorphic_names = true
 				error(p, name.pos, "mixture of polymorphic and non-polymorphic identifiers")
 				return any_polymorphic_names
@@ -1873,7 +1886,7 @@ parse_field_list :: proc(p: ^Parser, follow: tokenizer.Token_Kind, allowed_flags
 			if type == nil {
 				return false
 			}
-			_, ok := type.derived.(ast.Ellipsis)
+			_, ok := type.derived.(^ast.Ellipsis)
 			return ok
 		}
 
@@ -1891,7 +1904,7 @@ parse_field_list :: proc(p: ^Parser, follow: tokenizer.Token_Kind, allowed_flags
 			type = parse_var_type(p, allowed_flags)
 			tt := ast.unparen_expr(type)
 			if is_signature && !any_polymorphic_names {
-				if ti, ok := tt.derived.(ast.Typeid_Type); ok && ti.specialization != nil {
+				if ti, ok := tt.derived.(^ast.Typeid_Type); ok && ti.specialization != nil {
 					error(p, tt.pos, "specialization of typeid is not allowed without polymorphic names")
 				}
 			}
@@ -1967,7 +1980,7 @@ parse_field_list :: proc(p: ^Parser, follow: tokenizer.Token_Kind, allowed_flags
 	    p.curr_tok.kind != .EOF {
 		prefix_flags := parse_field_prefixes(p)
 		param := parse_var_type(p, allowed_flags & {.Typeid_Token, .Ellipsis})
-		if _, ok := param.derived.(ast.Ellipsis); ok {
+		if _, ok := param.derived.(^ast.Ellipsis); ok {
 			if seen_ellipsis {
 				error(p, param.pos, "extra variadic parameter after ellipsis")
 			}
@@ -1994,8 +2007,8 @@ parse_field_list :: proc(p: ^Parser, follow: tokenizer.Token_Kind, allowed_flags
 
 			names := make([]^ast.Expr, 1)
 			names[0] = ast.new(ast.Ident, tok.pos, end_pos(tok))
-			switch ident in &names[0].derived {
-			case ast.Ident:
+			#partial switch ident in names[0].derived_expr {
+			case ^ast.Ident:
 				ident.name = tok.text
 			case:
 				unreachable()
@@ -2125,12 +2138,12 @@ parse_proc_type :: proc(p: ^Parser, tok: tokenizer.Token) -> ^ast.Proc_Type {
 
 	loop: for param in params.list {
 		if param.type != nil {
-			if _, ok := param.type.derived.(ast.Poly_Type); ok {
+			if _, ok := param.type.derived.(^ast.Poly_Type); ok {
 				is_generic = true
 				break loop
 			}
 			for name in param.names {
-				if _, ok := name.derived.(ast.Poly_Type); ok {
+				if _, ok := name.derived.(^ast.Poly_Type); ok {
 					is_generic = true
 					break loop
 				}
@@ -2167,13 +2180,13 @@ parse_inlining_operand :: proc(p: ^Parser, lhs: bool, tok: tokenizer.Token) -> ^
 		}
 	}
 
-	switch e in &ast.unparen_expr(expr).derived {
-	case ast.Proc_Lit:
+	#partial switch e in ast.unparen_expr(expr).derived_expr {
+	case ^ast.Proc_Lit:
 		if e.inlining != .None && e.inlining != pi {
 			error(p, expr.pos, "both 'inline' and 'no_inline' cannot be applied to a procedure literal")
 		}
 		e.inlining = pi
-	case ast.Call_Expr:
+	case ^ast.Call_Expr:
 		if e.inlining != .None && e.inlining != pi {
 			error(p, expr.pos, "both 'inline' and 'no_inline' cannot be applied to a procedure call")
 		}
@@ -2264,9 +2277,9 @@ parse_operand :: proc(p: ^Parser, lhs: bool) -> ^ast.Expr {
 			bd.name = name.text
 			original_type := parse_type(p)
 			type := ast.unparen_expr(original_type)
-			switch t in &type.derived {
-			case ast.Array_Type:         t.tag = bd
-			case ast.Dynamic_Array_Type: t.tag = bd
+			#partial switch t in type.derived_expr {
+			case ^ast.Array_Type:         t.tag = bd
+			case ^ast.Dynamic_Array_Type: t.tag = bd
 			case:
 				error(p, original_type.pos, "expected an array type after #%s", name.text)
 			}
@@ -2276,10 +2289,28 @@ parse_operand :: proc(p: ^Parser, lhs: bool) -> ^ast.Expr {
 			tag := ast.new(ast.Basic_Directive, tok.pos, end_pos(name))
 			tag.tok = tok
 			tag.name = name.text
+			original_expr := parse_expr(p, lhs)
+			expr := ast.unparen_expr(original_expr)
+			#partial switch t in expr.derived_expr {
+			case ^ast.Comp_Lit:
+				t.tag = tag
+			case ^ast.Array_Type:
+				t.tag = tag
+				error(p, tok.pos, "#%s has been replaced with #sparse for non-contiguous enumerated array types", name.text)
+			case:
+				error(p, tok.pos, "expected a compound literal after #%s", name.text)
+
+			}
+			return original_expr
+
+		case "sparse":
+			tag := ast.new(ast.Basic_Directive, tok.pos, end_pos(name))
+			tag.tok = tok
+			tag.name = name.text
 			original_type := parse_type(p)
 			type := ast.unparen_expr(original_type)
-			switch t in &type.derived {
-			case ast.Array_Type:
+			#partial switch t in type.derived_expr {
+			case ^ast.Array_Type:
 				t.tag = tag
 			case:
 				error(p, tok.pos, "expected an enumerated array type after #%s", name.text)
@@ -2319,7 +2350,7 @@ parse_operand :: proc(p: ^Parser, lhs: bool) -> ^ast.Expr {
 			return rt
 
 		case "force_inline", "force_no_inline":
-			return parse_inlining_operand(p, lhs, tok)
+			return parse_inlining_operand(p, lhs, name)
 		case:
 			expr := parse_expr(p, lhs)
 			te := ast.new(ast.Tag_Expr, tok.pos, expr.pos)
@@ -2600,8 +2631,9 @@ parse_operand :: proc(p: ^Parser, lhs: bool) -> ^ast.Expr {
 		tok := expect_token(p, .Union)
 		poly_params: ^ast.Field_List
 		align:       ^ast.Expr
-		is_maybe:    bool
-		is_no_nil:   bool
+		is_maybe:      bool
+		is_no_nil:     bool
+		is_shared_nil: bool
 
 		if allow_token(p, .Open_Paren) {
 			param_count: int
@@ -2633,11 +2665,33 @@ parse_operand :: proc(p: ^Parser, lhs: bool) -> ^ast.Expr {
 					error(p, tag.pos, "duplicate union tag '#%s'", tag.text)
 				}
 				is_no_nil = true
+			case "shared_nil":
+				if is_shared_nil {
+					error(p, tag.pos, "duplicate union tag '#%s'", tag.text)
+				}
+				is_shared_nil = true
 			case:
 				error(p, tag.pos, "invalid union tag '#%s", tag.text)
 			}
 		}
 		p.expr_level = prev_level
+
+		if is_no_nil && is_maybe {
+			error(p, p.curr_tok.pos, "#maybe and #no_nil cannot be applied together")
+		}
+		if is_no_nil && is_shared_nil {
+			error(p, p.curr_tok.pos, "#shared_nil and #no_nil cannot be applied together")
+		}
+		if is_shared_nil && is_maybe {
+			error(p, p.curr_tok.pos, "#maybe and #shared_nil cannot be applied together")
+		}
+
+		union_kind := ast.Union_Type_Kind.Normal
+		switch {
+		case is_maybe:      union_kind = .maybe
+		case is_no_nil:     union_kind = .no_nil
+		case is_shared_nil: union_kind = .shared_nil
+		}
 
 		where_token: tokenizer.Token
 		where_clauses: []^ast.Expr
@@ -2659,7 +2713,7 @@ parse_operand :: proc(p: ^Parser, lhs: bool) -> ^ast.Expr {
 		variants: [dynamic]^ast.Expr
 		for p.curr_tok.kind != .Close_Brace && p.curr_tok.kind != .EOF {
 			type := parse_type(p)
-			if _, ok := type.derived.(ast.Bad_Expr); !ok {
+			if _, ok := type.derived.(^ast.Bad_Expr); !ok {
 				append(&variants, type)
 			}
 			if !allow_token(p, .Comma) {
@@ -2669,14 +2723,15 @@ parse_operand :: proc(p: ^Parser, lhs: bool) -> ^ast.Expr {
 
 		close := expect_closing_brace_of_field_list(p)
 
+
+
 		ut := ast.new(ast.Union_Type, tok.pos, end_pos(close))
 		ut.poly_params   = poly_params
 		ut.variants      = variants[:]
 		ut.align         = align
 		ut.where_token   = where_token
 		ut.where_clauses = where_clauses
-		ut.is_maybe      = is_maybe
-		ut.is_no_nil     = is_no_nil
+		ut.kind          = union_kind
 
 		return ut
 
@@ -2834,19 +2889,19 @@ is_literal_type :: proc(expr: ^ast.Expr) -> bool {
 	if val == nil {
 		return false
 	}
-	switch _ in val.derived {
-	case ast.Bad_Expr,
-		ast.Ident,
-		ast.Selector_Expr,
-		ast.Array_Type,
-		ast.Struct_Type,
-		ast.Union_Type,
-		ast.Enum_Type,
-		ast.Dynamic_Array_Type,
-		ast.Map_Type,
-		ast.Bit_Set_Type,
-		ast.Matrix_Type,
-		ast.Call_Expr:
+	#partial switch _ in val.derived_expr {
+	case ^ast.Bad_Expr,
+		^ast.Ident,
+		^ast.Selector_Expr,
+		^ast.Array_Type,
+		^ast.Struct_Type,
+		^ast.Union_Type,
+		^ast.Enum_Type,
+		^ast.Dynamic_Array_Type,
+		^ast.Map_Type,
+		^ast.Bit_Set_Type,
+		^ast.Matrix_Type,
+		^ast.Call_Expr:
 		return true
 	}
 	return false
@@ -2968,7 +3023,7 @@ parse_call_expr :: proc(p: ^Parser, operand: ^ast.Expr) -> ^ast.Expr {
 	ce.close    = close.pos
 
 	o := ast.unparen_expr(operand)
-	if se, ok := o.derived.(ast.Selector_Expr); ok && se.op.kind == .Arrow_Right {
+	if se, ok := o.derived.(^ast.Selector_Expr); ok && se.op.kind == .Arrow_Right {
 		sce := ast.new(ast.Selector_Call_Expr, ce.pos, ce.end)
 		sce.expr = o
 		sce.call = ce
@@ -3398,13 +3453,13 @@ parse_simple_stmt :: proc(p: ^Parser, flags: Stmt_Allow_Flags) -> ^ast.Stmt {
 				stmt := parse_stmt(p)
 
 				if stmt != nil {
-					switch n in &stmt.derived {
-					case ast.Block_Stmt:       n.label = label
-					case ast.If_Stmt:          n.label = label
-					case ast.For_Stmt:         n.label = label
-					case ast.Switch_Stmt:      n.label = label
-					case ast.Type_Switch_Stmt: n.label = label
-					case ast.Range_Stmt:	   n.label = label
+					#partial switch n in stmt.derived_stmt {
+					case ^ast.Block_Stmt:       n.label = label
+					case ^ast.If_Stmt:          n.label = label
+					case ^ast.For_Stmt:         n.label = label
+					case ^ast.Switch_Stmt:      n.label = label
+					case ^ast.Type_Switch_Stmt: n.label = label
+					case ^ast.Range_Stmt:	    n.label = label
 					}
 				}
 

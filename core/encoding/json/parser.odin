@@ -40,7 +40,7 @@ parse_string :: proc(data: string, spec := DEFAULT_SPECIFICATION, parse_integers
 		return parse_object(&p)
 	case .JSON5:
 		return parse_value(&p)
-	case .MJSON:
+	case .SJSON:
 		#partial switch p.curr_token.kind {
 		case .Ident, .String:
 			return parse_object_body(&p, .EOF)
@@ -354,6 +354,12 @@ unquote_string :: proc(token: Token, spec: Specification, allocator := context.a
 
 	b := bytes_make(len(s) + 2*utf8.UTF_MAX, 1, allocator) or_return
 	w := copy(b, s[0:i])
+
+	if len(b) == 0 && allocator.data == nil {
+		// `unmarshal_count_array` calls us with a nil allocator
+		return string(b[:w]), nil
+	}
+
 	loop: for i < len(s) {
 		c := s[i]
 		switch {

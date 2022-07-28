@@ -10,10 +10,6 @@ struct String {
 	u8 *  text;
 	isize len;
 
-	// u8 &operator[](isize i) {
-	// 	GB_ASSERT_MSG(0 <= i && i < len, "[%td]", i);
-	// 	return text[i];
-	// }
 	u8 const &operator[](isize i) const {
 		GB_ASSERT_MSG(0 <= i && i < len, "[%td]", i);
 		return text[i];
@@ -33,10 +29,6 @@ struct String {
 struct String16 {
 	wchar_t *text;
 	isize    len;
-	wchar_t &operator[](isize i) {
-		GB_ASSERT_MSG(0 <= i && i < len, "[%td]", i);
-		return text[i];
-	}
 	wchar_t const &operator[](isize i) const {
 		GB_ASSERT_MSG(0 <= i && i < len, "[%td]", i);
 		return text[i];
@@ -165,6 +157,15 @@ int string_compare(String const &x, String const &y) {
 	return 0;
 }
 
+isize string_index_byte(String const &s, u8 x) {
+	for (isize i = 0; i < s.len; i++) {
+		if (s.text[i] == x) {
+			return i;
+		}
+	}
+	return -1;
+}
+
 GB_COMPARE_PROC(string_cmp_proc) {
 	String x = *(String *)a;
 	String y = *(String *)b;
@@ -194,8 +195,6 @@ template <isize N> bool operator <  (String const &a, char const (&b)[N]) { retu
 template <isize N> bool operator >  (String const &a, char const (&b)[N]) { return str_gt(a, make_string(cast(u8 *)b, N-1)); }
 template <isize N> bool operator <= (String const &a, char const (&b)[N]) { return str_le(a, make_string(cast(u8 *)b, N-1)); }
 template <isize N> bool operator >= (String const &a, char const (&b)[N]) { return str_ge(a, make_string(cast(u8 *)b, N-1)); }
-
-
 
 gb_inline bool string_starts_with(String const &s, String const &prefix) {
 	if (prefix.len > s.len) {
@@ -230,6 +229,16 @@ gb_inline bool string_ends_with(String const &s, u8 suffix) {
 	return s[s.len-1] == suffix;
 }
 
+
+
+gb_inline String string_trim_starts_with(String const &s, String const &prefix) {
+	if (string_starts_with(s, prefix)) {
+		return substring(s, prefix.len, s.len);
+	}
+	return s;
+}
+
+
 gb_inline isize string_extension_position(String const &str) {
 	isize dot_pos = -1;
 	isize i = str.len;
@@ -245,14 +254,13 @@ gb_inline isize string_extension_position(String const &str) {
 	return dot_pos;
 }
 
-String path_extension(String const &str) {
+String path_extension(String const &str, bool include_dot = true) {
 	isize pos = string_extension_position(str);
 	if (pos < 0) {
 		return make_string(nullptr, 0);
 	}
-	return substring(str, pos, str.len);
+	return substring(str, include_dot ? pos : pos + 1, str.len);
 }
-
 
 String string_trim_whitespace(String str) {
 	while (str.len > 0 && rune_is_whitespace(str[str.len-1])) {
@@ -297,38 +305,6 @@ String filename_from_path(String s) {
 		return substring(s, j+1, s.len);
 	}
 	return make_string(nullptr, 0);
-}
-
-String remove_extension_from_path(String const &s) {
-	for (isize i = s.len-1; i >= 0; i--) {
-		if (s[i] == '.') {
-			return substring(s, 0, i);
-		}
-	}
-	return s;
-}
-
-String remove_directory_from_path(String const &s) {
-	isize len = 0;
-	for (isize i = s.len-1; i >= 0; i--) {
-		if (s[i] == '/' ||
-		    s[i] == '\\') {
-			break;
-		}
-		len += 1;
-	}
-	return substring(s, s.len-len, s.len);
-}
-
-String directory_from_path(String const &s) {
-	isize i = s.len-1;
-	for (; i >= 0; i--) {
-		if (s[i] == '/' ||
-		    s[i] == '\\') {
-			break;
-		}
-	}
-	return substring(s, 0, i);
 }
 
 String concatenate_strings(gbAllocator a, String const &x, String const &y) {
@@ -773,3 +749,34 @@ i32 unquote_string(gbAllocator a, String *s_, u8 quote=0, bool has_carriage_retu
 	return 2;
 }
 
+
+
+bool string_is_valid_identifier(String str) {
+	if (str.len <= 0) return false;
+
+	isize rune_count = 0;
+
+	isize w = 0;
+	isize offset = 0;
+	while (offset < str.len) {
+		Rune r = 0;
+		w = utf8_decode(str.text, str.len, &r);
+		if (r == GB_RUNE_INVALID) {
+			return false;
+		}
+
+		if (rune_count == 0) {
+			if (!rune_is_letter(r)) {
+				return false;
+			}
+		} else {
+			if (!rune_is_letter(r) && !rune_is_digit(r)) {
+				return false;
+			}
+		}
+		rune_count += 1;
+		offset += w;
+	}
+
+	return true;
+}

@@ -11,24 +11,24 @@ lookup_env :: proc(key: string, allocator := context.allocator) -> (value: strin
 		return
 	}
 	wkey := win32.utf8_to_wstring(key)
-	b := make([dynamic]u16, 100, context.temp_allocator)
-	for {
-		n := win32.GetEnvironmentVariableW(wkey, raw_data(b), u32(len(b)))
-		if n == 0 {
-			err := win32.GetLastError()
-			if err == u32(ERROR_ENVVAR_NOT_FOUND) {
-				return "", false
-			}
+	n := win32.GetEnvironmentVariableW(wkey, nil, 0)
+	if n == 0 {
+		err := win32.GetLastError()
+		if err == u32(ERROR_ENVVAR_NOT_FOUND) {
+			return "", false
 		}
-
-		if n <= u32(len(b)) {
-			value = win32.utf16_to_utf8(b[:n], allocator)
-			found = true
-			return
-		}
-
-		resize(&b, len(b)*2)
 	}
+	b := make([dynamic]u16, n, context.temp_allocator)
+	n = win32.GetEnvironmentVariableW(wkey, raw_data(b), u32(len(b)))
+	if n == 0 {
+		err := win32.GetLastError()
+		if err == u32(ERROR_ENVVAR_NOT_FOUND) {
+			return "", false
+		}
+	}
+	value, _ = win32.utf16_to_utf8(b[:n], allocator)
+	found = true
+	return
 }
 
 
@@ -76,7 +76,7 @@ environ :: proc(allocator := context.allocator) -> []string {
 			if i <= from {
 				break
 			}
-			append(&r, win32.utf16_to_utf8(envs[from:i], allocator))
+			append(&r, win32.utf16_to_utf8(envs[from:i], allocator) or_else "")
 			from = i + 1
 		}
 	}

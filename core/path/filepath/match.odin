@@ -89,7 +89,7 @@ scan_chunk :: proc(pattern: string) -> (star: bool, chunk, rest: string) {
 	scan_loop: for i = 0; i < len(pattern); i += 1 {
 		switch pattern[i] {
 		case '\\':
-			when ODIN_OS != "windows" {
+			when ODIN_OS != .Windows {
 				if i+1 < len(pattern) {
 					i += 1
 				}
@@ -161,7 +161,7 @@ match_chunk :: proc(chunk, s: string) -> (rest: string, ok: bool, err: Match_Err
 			chunk = chunk[1:]
 
 		case '\\':
-			when ODIN_OS != "windows" {
+			when ODIN_OS != .Windows {
 				chunk = chunk[1:]
 				if len(chunk) == 0 {
 					err = .Syntax_Error
@@ -188,7 +188,7 @@ get_escape :: proc(chunk: string) -> (r: rune, next_chunk: string, err: Match_Er
 		return
 	}
 	chunk := chunk
-	if chunk[0] == '\\' && ODIN_OS != "windows" {
+	if chunk[0] == '\\' && ODIN_OS != .Windows {
 		chunk = chunk[1:]
 		if len(chunk) == 0 {
 			err = .Syntax_Error
@@ -220,19 +220,21 @@ get_escape :: proc(chunk: string) -> (r: rune, next_chunk: string, err: Match_Er
 //
 
 glob :: proc(pattern: string, allocator := context.allocator) -> (matches: []string, err: Match_Error) {
+	context.allocator = allocator
+
 	if !has_meta(pattern) {
 		// TODO(bill): os.lstat on here to check for error
-		m := make([]string, 1, allocator)
+		m := make([]string, 1)
 		m[0] = pattern
 		return m[:], .None
 	}
 
-	temp_buf: [8]byte
-
 	dir, file := split(pattern)
 	volume_len := 0
-	when ODIN_OS == "windows" {
+	when ODIN_OS == .Windows {
+		temp_buf: [8]byte
 		volume_len, dir = clean_glob_path_windows(dir, temp_buf[:])
+
 	} else {
 		dir = clean_glob_path(dir)
 	}
@@ -247,7 +249,7 @@ glob :: proc(pattern: string, allocator := context.allocator) -> (matches: []str
 	if err != .None {
 		return
 	}
-	dmatches := make([dynamic]string, 0, 0, allocator)
+	dmatches := make([dynamic]string, 0, 0)
 	for d in m {
 		dmatches, err = _glob(d, file, &dmatches)
 		if err != .None {
@@ -259,15 +261,17 @@ glob :: proc(pattern: string, allocator := context.allocator) -> (matches: []str
 	}
 	return
 }
-_glob :: proc(dir, pattern: string, matches: ^[dynamic]string) -> (m: [dynamic]string, e: Match_Error) {
+_glob :: proc(dir, pattern: string, matches: ^[dynamic]string, allocator := context.allocator) -> (m: [dynamic]string, e: Match_Error) {
+	context.allocator = allocator
+
 	if matches != nil {
 		m = matches^
 	} else {
-		m = make([dynamic]string, 0, 0, context.allocator)
+		m = make([dynamic]string, 0, 0)
 	}
 
 
-	d, derr := os.open(dir)
+	d, derr := os.open(dir, os.O_RDONLY)
 	if derr != 0 {
 		return
 	}
@@ -276,6 +280,7 @@ _glob :: proc(dir, pattern: string, matches: ^[dynamic]string) -> (m: [dynamic]s
 	{
 		file_info, ferr := os.fstat(d)
 		defer os.file_info_delete(file_info)
+
 		if ferr != 0 {
 			return
 		}
@@ -300,7 +305,7 @@ _glob :: proc(dir, pattern: string, matches: ^[dynamic]string) -> (m: [dynamic]s
 		n := fi.name
 		matched := match(pattern, n) or_return
 		if matched {
-			append(&m, join(dir, n))
+			append(&m, join({dir, n}))
 		}
 	}
 	return
@@ -308,7 +313,7 @@ _glob :: proc(dir, pattern: string, matches: ^[dynamic]string) -> (m: [dynamic]s
 
 @(private)
 has_meta :: proc(path: string) -> bool {
-	when ODIN_OS == "windows" {
+	when ODIN_OS == .Windows {
 		CHARS :: `*?[`
 	} else {
 		CHARS :: `*?[\`

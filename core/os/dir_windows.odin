@@ -13,7 +13,7 @@ read_dir :: proc(fd: Handle, n: int, allocator := context.allocator) -> (fi: []F
 		if d.cFileName[0] == '.' && d.cFileName[1] == '.' && d.cFileName[2] == 0 {
 			return
 		}
-		path := strings.concatenate({base_path, `\`, win32.utf16_to_utf8(d.cFileName[:])})
+		path := strings.concatenate({base_path, `\`, win32.utf16_to_utf8(d.cFileName[:]) or_else ""})
 		fi.fullpath = path
 		fi.name = basename(path)
 		fi.size = i64(d.nFileSizeHigh)<<32 + i64(d.nFileSizeLow)
@@ -82,6 +82,7 @@ read_dir :: proc(fd: Handle, n: int, allocator := context.allocator) -> (fi: []F
 	wpath_search[len(wpath)+2] = 0
 
 	path := cleanpath_from_buf(wpath)
+	defer delete(path)
 
 	find_data := &win32.WIN32_FIND_DATAW{}
 	find_handle := win32.FindFirstFileW(raw_data(wpath_search), find_data)

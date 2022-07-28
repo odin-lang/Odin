@@ -14,6 +14,8 @@ package test_vendor_botan
 
 import "core:testing"
 import "core:fmt"
+import "core:os"
+import "core:strings"
 
 import "vendor:botan/md4"
 import "vendor:botan/md5"
@@ -30,6 +32,7 @@ import "vendor:botan/gost"
 import "vendor:botan/streebog"
 import "vendor:botan/sm3"
 import "vendor:botan/skein512"
+import "vendor:botan/siphash"
 
 TEST_count := 0
 TEST_fail  := 0
@@ -82,8 +85,12 @@ main :: proc() {
     test_sm3(&t)
     test_skein512_256(&t)
     test_skein512_512(&t)
+    test_siphash_2_4(&t)
 
     fmt.printf("%v/%v tests successful.\n", TEST_count - TEST_fail, TEST_count)
+    if TEST_fail > 0 {
+        os.exit(1)
+    }
 }
 
 TestHash :: struct {
@@ -166,11 +173,14 @@ test_sha224 :: proc(t: ^testing.T) {
     // Test vectors from 
     // https://csrc.nist.gov/csrc/media/projects/cryptographic-standards-and-guidelines/documents/examples/sha_all.pdf
     // https://www.di-mgt.com.au/sha_testvectors.html
+    // https://datatracker.ietf.org/doc/html/rfc3874#section-3.3
+    data_1_000_000_a := strings.repeat("a", 1_000_000)
     test_vectors := [?]TestHash {
         TestHash{"d14a028c2a3a2bc9476102bb288234c415a2b01f828ea62ac5b3e42f", ""},
         TestHash{"23097d223405d8228642a477bda255b32aadbce4bda0b3f7e36c9da7", "abc"},
         TestHash{"75388b16512776cc5dba5da1fd890150b0c6455cb4f58b1952522525", "abcdbcdecdefdefgefghfghighijhijkijkljklmklmnlmnomnopnopq"},
         TestHash{"c97ca9a559850ce97a04a96def6d99a9e0e0e2ab14e6b8df265fc0b3", "abcdefghbcdefghicdefghijdefghijkefghijklfghijklmghijklmnhijklmnoijklmnopjklmnopqklmnopqrlmnopqrsmnopqrstnopqrstu"},
+        TestHash{"20794655980c91d8bbb4c1ea97618a4bf03f42581948b2ee4ee7ad67", data_1_000_000_a},
     }
     for v, _ in test_vectors {
         computed     := sha2.hash_224(v.str)
@@ -574,4 +584,45 @@ test_skein512_512 :: proc(t: ^testing.T) {
         computed_str := hex_string(computed[:])
         expect(t, computed_str == v.hash, fmt.tprintf("Expected: %s for input of %s, but got %s instead", v.hash, v.str, computed_str))
     }
+}
+
+@(test)
+test_siphash_2_4 :: proc(t: ^testing.T) {
+    // Test vectors from 
+    // https://github.com/veorq/SipHash/blob/master/vectors.h
+    test_vectors := [?]u64 {
+        0x726fdb47dd0e0e31, 0x74f839c593dc67fd, 0x0d6c8009d9a94f5a, 0x85676696d7fb7e2d,
+        0xcf2794e0277187b7, 0x18765564cd99a68d, 0xcbc9466e58fee3ce, 0xab0200f58b01d137,
+        0x93f5f5799a932462, 0x9e0082df0ba9e4b0, 0x7a5dbbc594ddb9f3, 0xf4b32f46226bada7,
+        0x751e8fbc860ee5fb, 0x14ea5627c0843d90, 0xf723ca908e7af2ee, 0xa129ca6149be45e5,
+        0x3f2acc7f57c29bdb, 0x699ae9f52cbe4794, 0x4bc1b3f0968dd39c, 0xbb6dc91da77961bd,
+        0xbed65cf21aa2ee98, 0xd0f2cbb02e3b67c7, 0x93536795e3a33e88, 0xa80c038ccd5ccec8,
+        0xb8ad50c6f649af94, 0xbce192de8a85b8ea, 0x17d835b85bbb15f3, 0x2f2e6163076bcfad,
+        0xde4daaaca71dc9a5, 0xa6a2506687956571, 0xad87a3535c49ef28, 0x32d892fad841c342,
+        0x7127512f72f27cce, 0xa7f32346f95978e3, 0x12e0b01abb051238, 0x15e034d40fa197ae,
+        0x314dffbe0815a3b4, 0x027990f029623981, 0xcadcd4e59ef40c4d, 0x9abfd8766a33735c,
+        0x0e3ea96b5304a7d0, 0xad0c42d6fc585992, 0x187306c89bc215a9, 0xd4a60abcf3792b95,
+        0xf935451de4f21df2, 0xa9538f0419755787, 0xdb9acddff56ca510, 0xd06c98cd5c0975eb,
+        0xe612a3cb9ecba951, 0xc766e62cfcadaf96, 0xee64435a9752fe72, 0xa192d576b245165a,
+        0x0a8787bf8ecb74b2, 0x81b3e73d20b49b6f, 0x7fa8220ba3b2ecea, 0x245731c13ca42499,
+        0xb78dbfaf3a8d83bd, 0xea1ad565322a1a0b, 0x60e61c23a3795013, 0x6606d7e446282b93,
+        0x6ca4ecb15c5f91e1, 0x9f626da15c9625f3, 0xe51b38608ef25f57, 0x958a324ceb064572,
+    }
+
+    key: [16]byte
+    for i in 0..<16 {
+        key[i] = byte(i)
+    }
+
+    for i in 0..<len(test_vectors) {
+        data := make([]byte, i)
+        for j in 0..<i {
+            data[j] = byte(j)
+        }
+
+        vector   := test_vectors[i]
+        computed := siphash.sum_2_4(data[:], key[:])
+
+        expect(t, computed == vector, fmt.tprintf("Expected: 0x%x for input of %v, but got 0x%x instead", vector, data, computed))
+    }  
 }

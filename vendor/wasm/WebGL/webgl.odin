@@ -13,8 +13,29 @@ Renderbuffer :: distinct u32
 Shader       :: distinct u32
 Texture      :: distinct u32
 
+ContextAttribute :: enum u32 {
+	disableAlpha                 = 0,
+	disableAntialias             = 1,
+	disableDepth                 = 2,
+	failIfMajorPerformanceCaveat = 3,
+	disablePremultipliedAlpha    = 4,
+	preserveDrawingBuffer        = 5,
+	stencil                      = 6,
+	desynchronized               = 7,
+}
+ContextAttributes :: distinct bit_set[ContextAttribute; u32]
+
+DEFAULT_CONTEXT_ATTRIBUTES :: ContextAttributes{}
+
 @(default_calling_convention="c")
 foreign webgl {
+	// CreateCurrentContextById must be called before `GetCurrentContextAttributes` if the user wants to
+	// set specific attributes, otherwise the default attributes will be set for the WebGL context
+	CreateCurrentContextById :: proc(name: string, attributes: ContextAttributes) -> bool ---
+	// Acquire the WebGL context from a canvas element by id
+	SetCurrentContextById :: proc(name: string) -> bool ---
+	GetCurrentContextAttributes :: proc() -> ContextAttributes ---
+
 	DrawingBufferWidth  :: proc() -> i32 ---
 	DrawingBufferHeight :: proc() -> i32 ---
 	
