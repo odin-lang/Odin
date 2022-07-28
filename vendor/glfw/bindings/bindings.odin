@@ -15,11 +15,11 @@ when ODIN_OS == .Windows {
 	foreign import glfw "system:glfw"
 } else when ODIN_OS == .Darwin {
 	 foreign import glfw { 
-        "../lib/darwin/libglfw3.a",
-        "system:Cocoa.framework",
-        "system:IOKit.framework",
-        "system:OpenGL.framework",
-    }
+        	"../lib/darwin/libglfw3.a",
+        	"system:Cocoa.framework",
+        	"system:IOKit.framework",
+        	"system:OpenGL.framework",
+    	}
 } else {
 	foreign import glfw "system:glfw"
 }
