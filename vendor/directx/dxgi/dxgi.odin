@@ -38,10 +38,10 @@ IUnknown_VTable :: struct {
 
 @(default_calling_convention="stdcall")
 foreign dxgi {
-	CreateDXGIFactory      :: proc(riid: ^IID, ppFactory: rawptr) -> HRESULT ---
-	CreateDXGIFactory1     :: proc(riid: ^IID, ppFactory: rawptr) -> HRESULT ---
-	CreateDXGIFactory2     :: proc(Flags: u32, riid: ^IID, ppFactory: rawptr) -> HRESULT ---
-	DXGIGetDebugInterface1 :: proc(Flags: u32, riid: ^IID, pDebug: rawptr) -> HRESULT ---
+	CreateDXGIFactory      :: proc(riid: ^IID, ppFactory: ^rawptr) -> HRESULT ---
+	CreateDXGIFactory1     :: proc(riid: ^IID, ppFactory: ^rawptr) -> HRESULT ---
+	CreateDXGIFactory2     :: proc(Flags: u32, riid: ^IID, ppFactory: ^rawptr) -> HRESULT ---
+	DXGIGetDebugInterface1 :: proc(Flags: u32, riid: ^IID, pDebug: ^rawptr) -> HRESULT ---
 }
 
 STANDARD_MULTISAMPLE_QUALITY_PATTERN :: 0xffffffff
