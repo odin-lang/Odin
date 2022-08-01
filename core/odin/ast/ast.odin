@@ -553,12 +553,16 @@ unparen_expr :: proc(expr: ^Expr) -> (val: ^Expr) {
 }
 
 Field_Flag :: enum {
+	Unknown,
+
 	Ellipsis,
 	Using,
 	No_Alias,
 	C_Vararg,
 	Auto_Cast,
 	Any_Int,
+	Subtype,
+	By_Ptr,
 
 	Results,
 	Tags,
@@ -566,11 +570,31 @@ Field_Flag :: enum {
 	Typeid_Token,
 }
 
+field_flag_strings := [Field_Flag]string{
+	.Unknown            = "",
+
+	.Ellipsis           = "..",
+	.Using              = "using",
+	.No_Alias           = "#no_alias",
+	.C_Vararg           = "#c_vararg",
+	.Auto_Cast          = "auto_cast",
+	.Any_Int            = "#any_int",
+	.Subtype            = "#subtype",
+	.By_Ptr             = "#by_ptr",
+
+	.Results            = "results",
+	.Tags               = "field tag",
+	.Default_Parameters = "default parameters",
+	.Typeid_Token       = "typeid",
+}
+
+
 Field_Flags :: distinct bit_set[Field_Flag]
 
 Field_Flags_Struct :: Field_Flags{
 	.Using,
 	.Tags,
+	.Subtype,
 }
 Field_Flags_Record_Poly_Params :: Field_Flags{
 	.Typeid_Token,
@@ -583,6 +607,7 @@ Field_Flags_Signature :: Field_Flags{
 	.C_Vararg,
 	.Auto_Cast,
 	.Any_Int,
+	.By_Ptr,
 	.Default_Parameters,
 }
 
