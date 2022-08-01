@@ -1663,19 +1663,20 @@ is_token_field_prefix :: proc(p: ^Parser) -> ast.Field_Flag {
 		advance_token(p)
 		return .Auto_Cast
 	case .Hash:
+		tok: tokenizer.Token
 		advance_token(p)
-		defer advance_token(p)
-		#partial switch p.curr_tok.kind {
-		case .Ident:
+		tok = p.curr_tok
+		advance_token(p)
+		if tok.kind == .Ident {
 			for kf in ast.field_hash_flag_strings {
-				if p.curr_tok.text == kf.key {
+				if kf.key == tok.text {
 					return kf.flag
 				}
 			}
 		}
 		return .Unknown
 	}
-	return .Unknown
+	return .Invalid
 }
 
 parse_field_prefixes :: proc(p: ^Parser) -> (flags: ast.Field_Flags) {
