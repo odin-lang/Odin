@@ -552,7 +552,10 @@ unparen_expr :: proc(expr: ^Expr) -> (val: ^Expr) {
 	return
 }
 
+Field_Flags :: distinct bit_set[Field_Flag]
+
 Field_Flag :: enum {
+	Invalid,
 	Unknown,
 
 	Ellipsis,
@@ -571,6 +574,7 @@ Field_Flag :: enum {
 }
 
 field_flag_strings := [Field_Flag]string{
+	.Invalid            = "",
 	.Unknown            = "",
 
 	.Ellipsis           = "..",
@@ -588,8 +592,14 @@ field_flag_strings := [Field_Flag]string{
 	.Typeid_Token       = "typeid",
 }
 
+field_hash_flag_strings := []struct{key: string, flag: Field_Flag}{
+	{"no_alias", .No_Alias},
+	{"c_vararg", .C_Vararg},
+	{"any_int",  .Any_Int},
+	{"subtype",  .Subtype},
+	{"by_ptr",   .By_Ptr},
+}
 
-Field_Flags :: distinct bit_set[Field_Flag]
 
 Field_Flags_Struct :: Field_Flags{
 	.Using,

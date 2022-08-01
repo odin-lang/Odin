@@ -1611,48 +1611,6 @@ new_ast_field :: proc(names: []^ast.Expr, type: ^ast.Expr, default_value: ^ast.E
 	return field
 }
 
-
-Field_Prefix :: enum {
-	Invalid,
-	Unknown,
-
-	Using,
-	No_Alias,
-	C_Vararg,
-	Auto_Cast,
-	Any_Int,
-	Subtype,
-	By_Ptr,
-}
-
-field_prefix_strings := [Field_Prefix]string{
-	.Invalid   = "invalid",
-	.Unknown   = "unknown",
-
-	.Using     = "using",
-	.Auto_Cast = "auto_cast",
-	.No_Alias  = "#no_alias",
-	.C_Vararg  = "#c_vararg",
-	.Any_Int   = "#any_int",
-	.Subtype   = "#subtype",
-	.By_Ptr    = "#by_ptr",
-}
-
-field_prefix_to_flag := [Field_Prefix]ast.Field_Flag{
-	.Invalid   = .Unknown,
-	.Unknown   = .Unknown,
-
-	.Using     = .Using,
-	.No_Alias  = .No_Alias,
-	.C_Vararg  = .C_Vararg,
-	.Auto_Cast = .Auto_Cast,
-	.Any_Int   = .Any_Int,
-	.Subtype   = .Subtype,
-	.By_Ptr    = .By_Ptr,
-}
-
-Field_Prefixes :: distinct bit_set[Field_Prefix]
-
 Expr_And_Flags :: struct {
 	expr:  ^ast.Expr,
 	flags: ast.Field_Flags,
@@ -1694,7 +1652,7 @@ convert_to_ident_list :: proc(p: ^Parser, list: []Expr_And_Flags, ignore_flags, 
 	return idents[:]
 }
 
-is_token_field_prefix :: proc(p: ^Parser) -> Field_Prefix {
+is_token_field_prefix :: proc(p: ^Parser) -> ast.Field_Flag {
 	#partial switch p.curr_tok.kind {
 	case .EOF:
 		return .Invalid
@@ -1709,26 +1667,19 @@ is_token_field_prefix :: proc(p: ^Parser) -> Field_Prefix {
 		defer advance_token(p)
 		#partial switch p.curr_tok.kind {
 		case .Ident:
-			switch p.curr_tok.text {
-			case "no_alias":
-				return .No_Alias
-			case "c_vararg":
-				return .C_Vararg
-			case "any_int":
-				return .Any_Int
-			case "subtype":
-				return .Subtype
-			case "by_ptr":
-				return .By_Ptr
+			for kf in ast.field_hash_flag_strings {
+				if p.curr_tok.text == kf.key {
+					return kf.flag
+				}
 			}
 		}
 		return .Unknown
 	}
-	return .Invalid
+	return .Unknown
 }
 
-parse_field_prefixes :: proc(p: ^Parser) -> ast.Field_Flags {
-	counts: [len(Field_Prefix)]int
+parse_field_prefixes :: proc(p: ^Parser) -> (flags: ast.Field_Flags) {
+	counts: [len(ast.Field_Flag)]int
 
 	for {
 		kind := is_token_field_prefix(p)
@@ -1744,19 +1695,17 @@ parse_field_prefixes :: proc(p: ^Parser) -> ast.Field_Flags {
 		counts[kind] += 1
 	}
 
-	flags: ast.Field_Flags
-
-	for kind in Field_Prefix {
+	for kind in ast.Field_Flag {
 		count := counts[kind]
 		if kind == .Invalid || kind == .Unknown {
 			// Ignore
 		} else {
-			if count > 1 { error(p, p.curr_tok.pos, "multiple '%s' in this field list", field_prefix_strings[kind]) }
-			if count > 0 { flags += {field_prefix_to_flag[kind]} }
+			if count > 1 { error(p, p.curr_tok.pos, "multiple '%s' in this field list", ast.field_flag_strings[kind]) }
+			if count > 0 { flags += {kind} }
 		}
 	}
 
-	return flags
+	return
 }
 
 check_field_flag_prefixes :: proc(p: ^Parser, name_count: int, allowed_flags, set_flags: ast.Field_Flags) -> (flags: ast.Field_Flags) {
@@ -1769,6 +1718,8 @@ check_field_flag_prefixes :: proc(p: ^Parser, name_count: int, allowed_flags, se
 	for flag in ast.Field_Flag {
 		if flag not_in allowed_flags && flag in flags {
 			#partial switch flag {
+			case .Unknown, .Invalid:
+				// ignore
 			case .Tags, .Ellipsis, .Results, .Default_Parameters, .Typeid_Token:
 				panic("Impossible prefixes")
 			case:
