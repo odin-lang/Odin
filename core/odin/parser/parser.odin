@@ -1621,6 +1621,34 @@ Field_Prefix :: enum {
 	C_Vararg,
 	Auto_Cast,
 	Any_Int,
+	Subtype,
+	By_Ptr,
+}
+
+field_prefix_strings := [Field_Prefix]string{
+	.Invalid   = "invalid",
+	.Unknown   = "unknown",
+
+	.Using     = "using",
+	.Auto_Cast = "auto_cast",
+	.No_Alias  = "#no_alias",
+	.C_Vararg  = "#c_vararg",
+	.Any_Int   = "#any_int",
+	.Subtype   = "#subtype",
+	.By_Ptr    = "#by_ptr",
+}
+
+field_prefix_to_flag := [Field_Prefix]ast.Field_Flag{
+	.Invalid   = .Unknown,
+	.Unknown   = .Unknown,
+
+	.Using     = .Using,
+	.No_Alias  = .No_Alias,
+	.C_Vararg  = .C_Vararg,
+	.Auto_Cast = .Auto_Cast,
+	.Any_Int   = .Any_Int,
+	.Subtype   = .Subtype,
+	.By_Ptr    = .By_Ptr,
 }
 
 Field_Prefixes :: distinct bit_set[Field_Prefix]
@@ -1688,6 +1716,10 @@ is_token_field_prefix :: proc(p: ^Parser) -> Field_Prefix {
 				return .C_Vararg
 			case "any_int":
 				return .Any_Int
+			case "subtype":
+				return .Subtype
+			case "by_ptr":
+				return .By_Ptr
 			}
 		}
 		return .Unknown
@@ -1716,23 +1748,11 @@ parse_field_prefixes :: proc(p: ^Parser) -> ast.Field_Flags {
 
 	for kind in Field_Prefix {
 		count := counts[kind]
-		switch kind {
-		case .Invalid, .Unknown: // Ignore
-		case .Using:
-			if count > 1 { error(p, p.curr_tok.pos, "multiple 'using' in this field list") }
-			if count > 0 { flags += {.Using} }
-		case .No_Alias:
-			if count > 1 { error(p, p.curr_tok.pos, "multiple '#no_alias' in this field list") }
-			if count > 0 { flags += {.No_Alias} }
-		case .C_Vararg:
-			if count > 1 { error(p, p.curr_tok.pos, "multiple '#c_vararg' in this field list") }
-			if count > 0 { flags += {.C_Vararg} }
-		case .Auto_Cast:
-			if count > 1 { error(p, p.curr_tok.pos, "multiple 'auto_cast' in this field list") }
-			if count > 0 { flags += {.Auto_Cast} }
-		case .Any_Int:
-			if count > 1 { error(p, p.curr_tok.pos, "multiple '#any_int' in this field list") }
-			if count > 0 { flags += {.Any_Int} }
+		if kind == .Invalid || kind == .Unknown {
+			// Ignore
+		} else {
+			if count > 1 { error(p, p.curr_tok.pos, "multiple '%s' in this field list", field_prefix_strings[kind]) }
+			if count > 0 { flags += {field_prefix_to_flag[kind]} }
 		}
 	}
 
@@ -1748,19 +1768,11 @@ check_field_flag_prefixes :: proc(p: ^Parser, name_count: int, allowed_flags, se
 
 	for flag in ast.Field_Flag {
 		if flag not_in allowed_flags && flag in flags {
-			switch flag {
-			case .Using:
-				error(p, p.curr_tok.pos, "'using' is not allowed within this field list")
-			case .No_Alias:
-				error(p, p.curr_tok.pos, "'#no_alias' is not allowed within this field list")
-			case .C_Vararg:
-				error(p, p.curr_tok.pos, "'#c_vararg' is not allowed within this field list")
-			case .Auto_Cast:
-				error(p, p.curr_tok.pos, "'auto_cast' is not allowed within this field list")
-			case .Any_Int:
-				error(p, p.curr_tok.pos, "'#any_int' is not allowed within this field list")
+			#partial switch flag {
 			case .Tags, .Ellipsis, .Results, .Default_Parameters, .Typeid_Token:
 				panic("Impossible prefixes")
+			case:
+				error(p, p.curr_tok.pos, "'%s' is not allowed within this field list", ast.field_flag_strings[flag])
 			}
 			flags -= {flag}
 		}
