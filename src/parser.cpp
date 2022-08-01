@@ -2548,21 +2548,15 @@ Ast *parse_operand(AstFile *f, bool lhs) {
 				syntax_error(tag, "Invalid union tag '#%.*s'", LIT(tag.string));
 			}
 		}
-		if (no_nil && maybe) {
-			syntax_error(f->curr_token, "#maybe and #no_nil cannot be applied together");
-		}
+
 		if (no_nil && shared_nil) {
 			syntax_error(f->curr_token, "#shared_nil and #no_nil cannot be applied together");
 		}
-		if (shared_nil && maybe) {
-			syntax_error(f->curr_token, "#maybe and #shared_nil cannot be applied together");
-		}
-
 
 		if (maybe) {
-			union_kind = UnionType_maybe;
 			syntax_error(f->curr_token, "#maybe functionality has now been merged with standard 'union' functionality");
-		} else if (no_nil) {
+		}
+		if (no_nil) {
 			union_kind = UnionType_no_nil;
 		} else if (shared_nil) {
 			union_kind = UnionType_shared_nil;
