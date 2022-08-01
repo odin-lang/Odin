@@ -695,11 +695,6 @@ void check_union_type(CheckerContext *ctx, Type *union_type, Ast *node, Array<Op
 			error(ut->align, "A union with #no_nil must have at least 2 variants");
 		}
 		break;
-	case UnionType_maybe:
-		if (variants.count != 1) {
-			error(ut->align, "A union with #maybe must have at 1 variant, got %lld", cast(long long)variants.count);
-		}
-		break;
 	}
 
 	if (ut->align != nullptr) {

@@ -98,7 +98,6 @@ enum OdinDocTypeFlag_Struct : u32 {
 enum OdinDocTypeFlag_Union : u32 {
 	OdinDocTypeFlag_Union_polymorphic = 1<<0,
 	OdinDocTypeFlag_Union_no_nil      = 1<<1,
-	OdinDocTypeFlag_Union_maybe       = 1<<2,
 	OdinDocTypeFlag_Union_shared_nil  = 1<<3,
 };
 

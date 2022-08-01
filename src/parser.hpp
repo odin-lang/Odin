@@ -339,7 +339,6 @@ char const *inline_asm_dialect_strings[InlineAsmDialect_COUNT] = {
 
 enum UnionTypeKind : u8 {
 	UnionType_Normal     = 0,
-	UnionType_maybe      = 1, // removed
 	UnionType_no_nil     = 2,
 	UnionType_shared_nil = 3,
 };
