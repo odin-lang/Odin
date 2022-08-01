@@ -308,6 +308,10 @@ enum FieldFlag : u32 {
 	FieldFlag_Tags      = 1<<10,
 	FieldFlag_Results   = 1<<16,
 
+
+	FieldFlag_Unknown   = 1u<<30,
+	FieldFlag_Invalid   = 1u<<31,
+
 	// Parameter List Restrictions
 	FieldFlag_Signature = FieldFlag_ellipsis|FieldFlag_using|FieldFlag_no_alias|FieldFlag_c_vararg|FieldFlag_auto_cast|FieldFlag_const|FieldFlag_any_int|FieldFlag_by_ptr,
 	FieldFlag_Struct    = FieldFlag_using|FieldFlag_subtype|FieldFlag_Tags,
