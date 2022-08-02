@@ -339,19 +339,22 @@ append_elem :: proc(array: ^$T/[dynamic]$E, arg: E, loc := #caller_location)  {
 	if array == nil {
 		return
 	}
-
-	if cap(array) < len(array)+1 {
-		cap := 2 * cap(array) + max(8, 1)
-		_ = reserve(array, cap, loc)
-	}
-	if cap(array)-len(array) > 0 {
-		a := (^Raw_Dynamic_Array)(array)
-		when size_of(E) != 0 {
-			data := ([^]E)(a.data)
-			assert(condition=data != nil, loc=loc)
-			data[a.len] = arg
-		}
+	when size_of(E) == 0 {
 		a.len += 1
+	} else {
+		if cap(array) < len(array)+1 {
+			cap := 2 * cap(array) + max(8, 1)
+			_ = reserve(array, cap, loc)
+		}
+		if cap(array)-len(array) > 0 {
+			a := (^Raw_Dynamic_Array)(array)
+			when size_of(E) != 0 {
+				data := ([^]E)(a.data)
+				assert(condition=data != nil, loc=loc)
+				data[a.len] = arg
+			}
+			a.len += 1
+		}
 	}
 }
 
@@ -366,20 +369,23 @@ append_elems :: proc(array: ^$T/[dynamic]$E, args: ..E, loc := #caller_location)
 		return
 	}
 
-
-	if cap(array) < len(array)+arg_len {
-		cap := 2 * cap(array) + max(8, arg_len)
-		_ = reserve(array, cap, loc)
-	}
-	arg_len = min(cap(array)-len(array), arg_len)
-	if arg_len > 0 {
-		a := (^Raw_Dynamic_Array)(array)
-		when size_of(E) != 0 {
-			data := ([^]E)(a.data)
-			assert(condition=data != nil, loc=loc)
-			intrinsics.mem_copy(&data[a.len], raw_data(args), size_of(E) * arg_len)
-		}
+	when size_of(E) == 0 {
 		a.len += arg_len
+	} else {
+		if cap(array) < len(array)+arg_len {
+			cap := 2 * cap(array) + max(8, arg_len)
+			_ = reserve(array, cap, loc)
+		}
+		arg_len = min(cap(array)-len(array), arg_len)
+		if arg_len > 0 {
+			a := (^Raw_Dynamic_Array)(array)
+			when size_of(E) != 0 {
+				data := ([^]E)(a.data)
+				assert(condition=data != nil, loc=loc)
+				intrinsics.mem_copy(&data[a.len], raw_data(args), size_of(E) * arg_len)
+			}
+			a.len += arg_len
+		}
 	}
 }
 
