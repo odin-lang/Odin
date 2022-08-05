@@ -1,14 +1,15 @@
 package main
 
 import "core:fmt"
-import "core:mem"
-import "core:os"
-import "core:thread"
-import "core:time"
-import "core:reflect"
-import "core:runtime"
 import "core:intrinsics"
 import "core:math/big"
+import "core:mem"
+import "core:os"
+import "core:reflect"
+import "core:runtime"
+import "core:sync"
+import "core:thread"
+import "core:time"
 
 /*
 	Odin is a general-purpose programming language with distinct typing built
@@ -1100,19 +1101,18 @@ parametric_polymorphism :: proc() {
 	}
 }
 
-
-prefix_table := [?]string{
-	"White",
-	"Red",
-	"Green",
-	"Blue",
-	"Octarine",
-	"Black",
-}
-
-print_mutex := b64(false)
-
 threading_example :: proc() {
+	@static prefix_table := [?]string{
+		"White",
+		"Red",
+		"Green",
+		"Blue",
+		"Octarine",
+		"Black",
+	}
+
+	@static print_mutex: sync.Mutex
+
 	fmt.println("\n# threading_example")
 
 	did_acquire :: proc(m: ^b64) -> (acquired: bool) {
@@ -1161,12 +1161,10 @@ threading_example :: proc() {
 		task_proc :: proc(t: thread.Task) {
 			index := t.user_index % len(prefix_table)
 			for iteration in 1..=5 {
-				for !did_acquire(&print_mutex) { thread.yield() } // Allow one thread to print at a time.
-
-				fmt.printf("Worker Task %d is on iteration %d\n", t.user_index, iteration)
-				fmt.printf("`%s`: iteration %d\n", prefix_table[index], iteration)
-
-				print_mutex = false
+				if sync.guard(&print_mutex) {
+					fmt.printf("Worker Task %d is on iteration %d\n", t.user_index, iteration)
+					fmt.printf("`%s`: iteration %d\n", prefix_table[index], iteration)
+				}
 
 				time.sleep(1 * time.Millisecond)
 			}
@@ -1191,11 +1189,10 @@ threading_example :: proc() {
 			time.sleep(5 * time.Millisecond)
 
 			// Allow one thread to print at a time.
-			for !did_acquire(&print_mutex) { thread.yield() }
+			sync.guard(&print_mutex)
 
 			thread.terminate(pool.threads[N - 1], 0)
 			fmt.println("Canceled last thread")
-			print_mutex = false
 		}
 
 		thread.pool_finish(&pool)
