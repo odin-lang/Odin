@@ -18,6 +18,7 @@ foreign user32 {
 
 	RegisterClassW :: proc(lpWndClass: ^WNDCLASSW) -> ATOM ---
 	RegisterClassExW :: proc(^WNDCLASSEXW) -> ATOM ---
+	UnregisterClassW :: proc(lpClassName: LPCWSTR, hInstance: HINSTANCE) -> BOOL ---
 
 	CreateWindowExW :: proc(
 		dwExStyle: DWORD,
