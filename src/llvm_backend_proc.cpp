@@ -1851,6 +1851,11 @@ lbValue lb_build_builtin_proc(lbProcedure *p, Ast *expr, TypeAndValue const &tv,
 			return lb_emit_matrix_flatten(p, m, tv.type);
 		}
 
+	case BuiltinProc_unreachable:
+		LLVMBuildUnreachable(p->builder);
+		return {};
+
+
 	// "Intrinsics"
 
 	case BuiltinProc_alloca:
