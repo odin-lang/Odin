@@ -1,17 +1,26 @@
-package src
+package json
 
-import "core:math/bits"
 import "core:mem"
+import "core:math/bits"
 import "core:runtime"
 import "core:strconv"
-import "core:io"
 import "core:strings"
-import "core:encoding/json"
+import "core:io"
+
+Marshal_Data_Error :: enum {
+	None,
+	Unsupported_Type,
+}
+
+Marshal_Error :: union #shared_nil {
+	Marshal_Data_Error,
+	io.Error,
+}
 
 // supports json specs
 Marshal_Options :: struct {
 	// output based on spec
-	spec: json.Specification,
+	spec: Specification,
 
 	// use line breaks & tab|spaces
 	pretty: bool, 
@@ -33,7 +42,7 @@ Marshal_Options :: struct {
 	mjson_skipped_first_braces_end: bool,
 }
 
-marshal :: proc(v: any, opt: Marshal_Options = {}, allocator := context.allocator) -> (data: []byte, err: json.Marshal_Error) {
+marshal :: proc(v: any, opt: Marshal_Options = {}, allocator := context.allocator) -> (data: []byte, err: Marshal_Error) {
 	b := strings.builder_make(allocator)
 	defer if err != nil {
 		strings.builder_destroy(&b)
@@ -49,11 +58,11 @@ marshal :: proc(v: any, opt: Marshal_Options = {}, allocator := context.allocato
 	return data, nil
 }
 
-marshal_to_builder :: proc(b: ^strings.Builder, v: any, opt: ^Marshal_Options) -> json.Marshal_Error {
+marshal_to_builder :: proc(b: ^strings.Builder, v: any, opt: ^Marshal_Options) -> Marshal_Error {
 	return marshal_to_writer(strings.to_writer(b), v, opt)
 }
 
-marshal_to_writer :: proc(w: io.Writer, v: any, opt: ^Marshal_Options) -> (err: json.Marshal_Error) {
+marshal_to_writer :: proc(w: io.Writer, v: any, opt: ^Marshal_Options) -> (err: Marshal_Error) {
 	if v == nil {
 		io.write_string(w, "null") or_return
 		return
