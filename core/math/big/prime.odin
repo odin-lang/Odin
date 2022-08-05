@@ -449,7 +449,7 @@ internal_int_is_prime :: proc(a: ^Int, miller_rabin_trials := int(-1), miller_ra
 			in the loop is non-zero, although very low.
 			-- NOTE(Jeroen): This is not yet true in Odin, but I have some ideas.
 
-			If the BPSW test and/or the addtional Frobenious test have been
+			If the BPSW test and/or the additional Frobenious test have been
 			performed instead of just the Miller-Rabin test with the bases 2 and 3,
 			a single extra test should suffice, so such a very unlikely event will not do much harm.
 

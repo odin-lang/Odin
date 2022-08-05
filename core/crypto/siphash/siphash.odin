@@ -233,7 +233,7 @@ init :: proc(ctx: ^Context, key: []byte, c_rounds, d_rounds: int) {
 }
 
 update :: proc(ctx: ^Context, data: []byte) {
-    assert(ctx.is_initialized, "crypto/siphash: Context is not initalized")
+    assert(ctx.is_initialized, "crypto/siphash: Context is not initialized")
     ctx.last_block = len(data) / 8 * 8
     ctx.buf = data
     i := 0
