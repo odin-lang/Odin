@@ -2270,6 +2270,9 @@ lbValue lb_emit_comp(lbProcedure *p, TokenKind op_kind, lbValue left, lbValue ri
 		}
 	}
 
+	a = core_type(left.type);
+	b = core_type(right.type);
+
 	if (is_type_matrix(a) && (op_kind == Token_CmpEq || op_kind == Token_NotEq)) {
 		Type *tl = base_type(a);
 		lbValue lhs = lb_address_from_load_or_generate_local(p, left);
