@@ -341,7 +341,12 @@ string_eq :: proc "contextless" (lhs, rhs: string) -> bool {
 string_cmp :: proc "contextless" (a, b: string) -> int {
 	x := transmute(Raw_String)a
 	y := transmute(Raw_String)b
-	return memory_compare(x.data, y.data, min(x.len, y.len))
+
+	ret := memory_compare(x.data, y.data, min(x.len, y.len))
+	if ret == 0 && x.len != y.len {
+		return -1 if x.len < y.len else +1
+	}
+	return ret
 }
 
 string_ne :: #force_inline proc "contextless" (a, b: string) -> bool { return !string_eq(a, b) }
