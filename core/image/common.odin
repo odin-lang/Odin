@@ -469,7 +469,7 @@ return_single_channel :: proc(img: ^Image, channel: Channel) -> (res: ^Image, ok
 }
 
 // Does the image have 1 or 2 channels, a valid bit depth (8 or 16),
-// Is the pointer valid, are the dimenions valid?
+// Is the pointer valid, are the dimensions valid?
 is_valid_grayscale_image :: proc(img: ^Image) -> (ok: bool) {
 	// Were we actually given a valid image?
 	if img == nil {
@@ -489,7 +489,7 @@ is_valid_grayscale_image :: proc(img: ^Image) -> (ok: bool) {
 	// This returns 0 if any of the inputs is zero.
 	bytes_expected := compute_buffer_size(img.width, img.height, img.channels, img.depth)
 
-	// If the dimenions are invalid or the buffer size doesn't match the image characteristics, bail.
+	// If the dimensions are invalid or the buffer size doesn't match the image characteristics, bail.
 	if bytes_expected == 0 || bytes_expected != len(img.pixels.buf) || img.width * img.height > MAX_DIMENSIONS {
 		return false
 	}
@@ -498,7 +498,7 @@ is_valid_grayscale_image :: proc(img: ^Image) -> (ok: bool) {
 }
 
 // Does the image have 3 or 4 channels, a valid bit depth (8 or 16),
-// Is the pointer valid, are the dimenions valid?
+// Is the pointer valid, are the dimensions valid?
 is_valid_color_image :: proc(img: ^Image) -> (ok: bool) {
 	// Were we actually given a valid image?
 	if img == nil {
@@ -518,7 +518,7 @@ is_valid_color_image :: proc(img: ^Image) -> (ok: bool) {
 	// This returns 0 if any of the inputs is zero.
 	bytes_expected := compute_buffer_size(img.width, img.height, img.channels, img.depth)
 
-	// If the dimenions are invalid or the buffer size doesn't match the image characteristics, bail.
+	// If the dimensions are invalid or the buffer size doesn't match the image characteristics, bail.
 	if bytes_expected == 0 || bytes_expected != len(img.pixels.buf) || img.width * img.height > MAX_DIMENSIONS {
 		return false
 	}
@@ -527,7 +527,7 @@ is_valid_color_image :: proc(img: ^Image) -> (ok: bool) {
 }
 
 // Does the image have 1..4 channels, a valid bit depth (8 or 16),
-// Is the pointer valid, are the dimenions valid?
+// Is the pointer valid, are the dimensions valid?
 is_valid_image :: proc(img: ^Image) -> (ok: bool) {
 	// Were we actually given a valid image?
 	if img == nil {
