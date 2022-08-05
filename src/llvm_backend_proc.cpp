@@ -1852,7 +1852,7 @@ lbValue lb_build_builtin_proc(lbProcedure *p, Ast *expr, TypeAndValue const &tv,
 		}
 
 	case BuiltinProc_unreachable:
-		LLVMBuildUnreachable(p->builder);
+		lb_emit_unreachable(p);
 		return {};
 
 

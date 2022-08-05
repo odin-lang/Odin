@@ -39,6 +39,12 @@ bool lb_is_type_aggregate(Type *t) {
 	return false;
 }
 
+void lb_emit_unreachable(lbProcedure *p) {
+	LLVMValueRef instr = LLVMGetLastInstruction(p->curr_block->block);
+	if (instr == nullptr || !lb_is_instr_terminating(instr)) {
+		LLVMBuildUnreachable(p->builder);
+	}
+}
 
 lbValue lb_correct_endianness(lbProcedure *p, lbValue value) {
 	Type *src = core_type(value.type);
@@ -350,40 +356,57 @@ lbValue lb_emit_or_else(lbProcedure *p, Ast *arg, Ast *else_expr, TypeAndValue c
 	lbValue rhs = {};
 	lb_emit_try_lhs_rhs(p, arg, tv, &lhs, &rhs);
 
-	LLVMValueRef incoming_values[2] = {};
-	LLVMBasicBlockRef incoming_blocks[2] = {};
-
 	GB_ASSERT(else_expr != nullptr);
-	lbBlock *then  = lb_create_block(p, "or_else.then");
-	lbBlock *done  = lb_create_block(p, "or_else.done"); // NOTE(bill): Append later
-	lbBlock *else_ = lb_create_block(p, "or_else.else");
-
-	lb_emit_if(p, lb_emit_try_has_value(p, rhs), then, else_);
-	lb_start_block(p, then);
 
 	Type *type = default_type(tv.type);
 
-	incoming_values[0] = lb_emit_conv(p, lhs, type).value;
+	if (is_diverging_expr(else_expr)) {
+		lbBlock *then  = lb_create_block(p, "or_else.then");
+		lbBlock *else_ = lb_create_block(p, "or_else.else");
 
-	lb_emit_jump(p, done);
-	lb_start_block(p, else_);
+		lb_emit_if(p, lb_emit_try_has_value(p, rhs), then, else_);
+		// NOTE(bill): else block needs to be straight afterwards to make sure that the actual value is used
+		// from the then block
+		lb_start_block(p, else_);
 
-	incoming_values[1] = lb_emit_conv(p, lb_build_expr(p, else_expr), type).value;
+		lb_build_expr(p, else_expr);
+		lb_emit_unreachable(p); // add just in case
 
-	lb_emit_jump(p, done);
-	lb_start_block(p, done);
+		lb_start_block(p, then);
+		return lb_emit_conv(p, lhs, type);
+	} else {
+		LLVMValueRef incoming_values[2] = {};
+		LLVMBasicBlockRef incoming_blocks[2] = {};
 
-	lbValue res = {};
-	res.value = LLVMBuildPhi(p->builder, lb_type(p->module, type), "");
-	res.type = type;
+		lbBlock *then  = lb_create_block(p, "or_else.then");
+		lbBlock *done  = lb_create_block(p, "or_else.done"); // NOTE(bill): Append later
+		lbBlock *else_ = lb_create_block(p, "or_else.else");
 
-	GB_ASSERT(p->curr_block->preds.count >= 2);
-	incoming_blocks[0] = p->curr_block->preds[0]->block;
-	incoming_blocks[1] = p->curr_block->preds[1]->block;
+		lb_emit_if(p, lb_emit_try_has_value(p, rhs), then, else_);
+		lb_start_block(p, then);
 
-	LLVMAddIncoming(res.value, incoming_values, incoming_blocks, 2);
+		incoming_values[0] = lb_emit_conv(p, lhs, type).value;
 
-	return res;
+		lb_emit_jump(p, done);
+		lb_start_block(p, else_);
+
+		incoming_values[1] = lb_emit_conv(p, lb_build_expr(p, else_expr), type).value;
+
+		lb_emit_jump(p, done);
+		lb_start_block(p, done);
+
+		lbValue res = {};
+		res.value = LLVMBuildPhi(p->builder, lb_type(p->module, type), "");
+		res.type = type;
+
+		GB_ASSERT(p->curr_block->preds.count >= 2);
+		incoming_blocks[0] = p->curr_block->preds[0]->block;
+		incoming_blocks[1] = p->curr_block->preds[1]->block;
+
+		LLVMAddIncoming(res.value, incoming_values, incoming_blocks, 2);
+
+		return res;
+	}
 }
 
 void lb_build_return_stmt(lbProcedure *p, Slice<Ast *> const &return_results);
