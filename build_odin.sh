@@ -32,7 +32,7 @@ config_darwin() {
 	if [ ARCH == arm64 ]; then
 		MIN_LLVM_VERSION=("13.0.0")
 	else
-		# allow for x86 / amd64 all llvm versions begining from 11
+		# allow for x86 / amd64 all llvm versions beginning from 11
 		MIN_LLVM_VERSION=("11.1.0")
 	fi
 

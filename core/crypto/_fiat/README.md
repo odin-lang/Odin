@@ -30,6 +30,6 @@ equivalence.
 
 For the most part, alterations to the base fiat-crypto generated code was
 kept to a minimum, to aid auditability.  This results in a somewhat
-ideosyncratic style, and in some cases minor performance penalties.
+idiosyncratic style, and in some cases minor performance penalties.
 
 [1]: https://github.com/mit-plv/fiat-crypto
