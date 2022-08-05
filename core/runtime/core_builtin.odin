@@ -785,17 +785,3 @@ unimplemented :: proc(message := "", loc := #caller_location) -> ! {
 	}
 	p("not yet implemented", message, loc)
 }
-
-@builtin
-@(disabled=ODIN_DISABLE_ASSERT)
-unreachable :: proc(message := "", loc := #caller_location) -> ! {
-	p := context.assertion_failure_proc
-	if p == nil {
-		p = default_assertion_failure_proc
-	}
-	if message != "" {
-		p("internal error", message, loc)
-	} else {
-		p("internal error", "entered unreachable code", loc)
-	}
-}

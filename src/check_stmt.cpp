@@ -1,8 +1,5 @@
-bool is_diverging_stmt(Ast *stmt) {
-	if (stmt->kind != Ast_ExprStmt) {
-		return false;
-	}
-	Ast *expr = unparen_expr(stmt->ExprStmt.expr);
+bool is_diverging_expr(Ast *expr) {
+	expr = unparen_expr(expr);
 	if (expr->kind != Ast_CallExpr) {
 		return false;
 	}
@@ -25,6 +22,12 @@ bool is_diverging_stmt(Ast *stmt) {
 	Type *t = tv.type;
 	t = base_type(t);
 	return t != nullptr && t->kind == Type_Proc && t->Proc.diverging;
+}
+bool is_diverging_stmt(Ast *stmt) {
+	if (stmt->kind != Ast_ExprStmt) {
+		return false;
+	}
+	return is_diverging_expr(stmt->ExprStmt.expr);
 }
 
 bool contains_deferred_call(Ast *node) {
