@@ -739,11 +739,11 @@ lbProcedure *lb_create_startup_runtime(lbModule *main_module, lbProcedure *start
 	lb_begin_procedure_body(p);
 
 	if (startup_type_info) {
-		LLVMBuildCall2(p->builder, LLVMGetElementType(lb_type(main_module, startup_type_info->type)), startup_type_info->value, nullptr, 0, "");
+		LLVMBuildCall2(p->builder, lb_llvm_get_pointer_type(lb_type(main_module, startup_type_info->type)), startup_type_info->value, nullptr, 0, "");
 	}
 
 	if (objc_names) {
-		LLVMBuildCall2(p->builder, LLVMGetElementType(lb_type(main_module, objc_names->type)), objc_names->value, nullptr, 0, "");
+		LLVMBuildCall2(p->builder, lb_llvm_get_pointer_type(lb_type(main_module, objc_names->type)), objc_names->value, nullptr, 0, "");
 	}
 
 	for_array(i, global_variables) {
@@ -762,7 +762,7 @@ lbProcedure *lb_create_startup_runtime(lbModule *main_module, lbProcedure *start
 		if (init_expr != nullptr)  {
 			lbValue init = lb_build_expr(p, init_expr);
 			if (init.value == nullptr) {
-				LLVMTypeRef global_type = LLVMGetElementType(LLVMTypeOf(var->var.value));
+				LLVMTypeRef global_type = llvm_addr_type(p->module, var->var);
 				if (is_type_untyped_undef(init.type)) {
 					// LLVMSetInitializer(var->var.value, LLVMGetUndef(global_type));
 					LLVMSetInitializer(var->var.value, LLVMConstNull(global_type));
@@ -805,8 +805,7 @@ lbProcedure *lb_create_startup_runtime(lbModule *main_module, lbProcedure *start
 				lb_emit_store(p, data, lb_emit_conv(p, gp, t_rawptr));
 				lb_emit_store(p, ti,   lb_type_info(main_module, var_type));
 			} else {
-				LLVMTypeRef pvt = LLVMTypeOf(var->var.value);
-				LLVMTypeRef vt = LLVMGetElementType(pvt);
+				LLVMTypeRef vt = llvm_addr_type(p->module, var->var);
 				lbValue src0 = lb_emit_conv(p, var->init, t);
 				LLVMValueRef src = OdinLLVMBuildTransmute(p, src0.value, vt);
 				LLVMValueRef dst = var->var.value;
@@ -933,7 +932,7 @@ lbProcedure *lb_create_main_procedure(lbModule *m, lbProcedure *startup_runtime)
 			GB_ASSERT(LLVMIsConstant(vals[1]));
 			GB_ASSERT(LLVMIsConstant(vals[2]));
 
-			LLVMValueRef dst = LLVMConstInBoundsGEP(all_tests_array.value, indices, gb_count_of(indices));
+			LLVMValueRef dst = LLVMConstInBoundsGEP2(llvm_addr_type(m, all_tests_array), all_tests_array.value, indices, gb_count_of(indices));
 			LLVMValueRef src = llvm_const_named_struct(m, t_Internal_Test, vals, gb_count_of(vals));
 
 			LLVMBuildStore(p->builder, src, dst);
