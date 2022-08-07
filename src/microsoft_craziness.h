@@ -220,7 +220,7 @@ struct DECLSPEC_UUID("42843719-DB4C-46C2-8E7C-64F1816EFD5B") DECLSPEC_NOVTABLE I
 
 // The beginning of the actual code that does things.
 struct Version_Data_Utf8 {
-	i32 best_version[4];  // For Windows 8 versions, only two of these numbers are used.
+	i32 best_version[4];
 	String best_name;
 };
 
@@ -316,35 +316,7 @@ void win10_best(String short_name, String full_name, Version_Data_Utf8 *data) {
 	}
 }
 
-void win8_best(String short_name, String full_name, Version_Data_Utf8 *data) {
-	// Find the Windows 8 subdirectory with the highest version number.
-
-	int i0, i1;
-	auto success = sscanf_s((const char *const)short_name.text, "winv%d.%d", &i0, &i1);
-	if (success < 2) return;
-
-	if (i0 < data->best_version[0]) return;
-	else if (i0 == data->best_version[0]) {
-		if (i1 < data->best_version[1]) return;
-	}
-
-	// we have to copy_string and free here because visit_files free's the full_name string
-	// after we execute this function, so Win*_Data would contain an invalid pointer.
-	if (data->best_name.len > 0) mc_free(data->best_name);
-	data->best_name = copy_string(mc_allocator, full_name);
-
-	if (data->best_name.len > 0) {
-		data->best_version[0] = i0;
-		data->best_version[1] = i1;
-	}
-}
-
 void find_windows_kit_root(Find_Result_Utf8 *result) {
-	// Information about the Windows 10 and Windows 8 development kits
-	// is stored in the same place in the registry. We open a key
-	// to that place, first checking preferntially for a Windows 10 kit,
-	// then, if that's not found, a Windows 8 kit.
-
 	HKEY main_key;
 
 	auto rc = RegOpenKeyExA(HKEY_LOCAL_MACHINE, "SOFTWARE\\Microsoft\\Windows Kits\\Installed Roots",
@@ -371,24 +343,6 @@ void find_windows_kit_root(Find_Result_Utf8 *result) {
 		mc_free(data.best_name);
 	}
 
-	// Look for a Windows 8 entry.
-	String windows8_root = find_windows_kit_root(main_key, str_lit("KitsRoot81"));
-
-	if (windows8_root.len > 0) {
-		defer (mc_free(windows8_root));
-
-		String windows8_lib = mc_concat(windows8_root, str_lit("Lib"));
-		defer (mc_free(windows8_lib));
-
-		Version_Data_Utf8 data = {0};
-		mc_visit_files(windows8_lib, &data, win8_best);
-		if (data.best_name.len > 0) {
-			result->windows_sdk_version = 8;
-			result->windows_sdk_root    = mc_concat(data.best_name, str_lit("\\"));
-			return;
-		}
-		mc_free(data.best_name);
-	}
 	// If we get here, we failed to find anything.
 }
 
