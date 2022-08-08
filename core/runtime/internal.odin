@@ -171,21 +171,34 @@ mem_free_all :: #force_inline proc(allocator := context.allocator, loc := #calle
 	return
 }
 
-mem_resize :: #force_inline proc(ptr: rawptr, old_size, new_size: int, alignment: int = DEFAULT_ALIGNMENT, allocator := context.allocator, loc := #caller_location) -> (new_ptr: rawptr, err: Allocator_Error) {
-	new_data: []byte
-	switch {
-	case allocator.procedure == nil:
-		return
-	case new_size == 0:
-		new_data, err = allocator.procedure(allocator.data, .Free, 0, 0, ptr, 0, loc)
-	case ptr == nil:
-		new_data, err = allocator.procedure(allocator.data, .Alloc, new_size, alignment, nil, 0, loc)
-	case:
-		new_data, err = allocator.procedure(allocator.data, .Resize, new_size, alignment, ptr, old_size, loc)
+mem_resize :: proc(ptr: rawptr, old_size, new_size: int, alignment: int = DEFAULT_ALIGNMENT, allocator := context.allocator, loc := #caller_location) -> ([]byte, Allocator_Error) {
+	if allocator.procedure == nil {
+		return nil, nil
 	}
-	new_ptr = raw_data(new_data)
-	return
+	if new_size == 0 {
+		if ptr != nil {
+			_, err := allocator.procedure(allocator.data, .Free, 0, 0, ptr, old_size, loc)
+			return nil, err
+		}
+		return nil, nil
+	} else if ptr == nil {
+		return allocator.procedure(allocator.data, .Alloc, new_size, alignment, nil, 0, loc)
+	} else if old_size == new_size && uintptr(ptr) % uintptr(alignment) == 0 {
+		return ([^]byte)(ptr)[:old_size], nil
+	}
+
+	data, err := allocator.procedure(allocator.data, .Resize, new_size, alignment, ptr, old_size, loc)
+	if err == .Mode_Not_Implemented {
+		data, err = allocator.procedure(allocator.data, .Alloc, new_size, alignment, nil, 0, loc)
+		if err != nil {
+			return data, err
+		}
+		copy(data, ([^]byte)(ptr)[:old_size])
+		_, err = allocator.procedure(allocator.data, .Free, 0, 0, ptr, old_size, loc)
+	}
+	return data, err
 }
+
 memory_equal :: proc "contextless" (x, y: rawptr, n: int) -> bool {
 	switch {
 	case n == 0: return true
