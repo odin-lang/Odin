@@ -143,7 +143,7 @@ free_all :: proc{mem_free_all}
 
 @builtin
 delete_string :: proc(str: string, allocator := context.allocator, loc := #caller_location) -> Allocator_Error {
-	return mem_free(raw_data(str), allocator, loc)
+	return mem_free_with_size(raw_data(str), len(str), allocator, loc)
 }
 @builtin
 delete_cstring :: proc(str: cstring, allocator := context.allocator, loc := #caller_location) -> Allocator_Error {
@@ -151,17 +151,24 @@ delete_cstring :: proc(str: cstring, allocator := context.allocator, loc := #cal
 }
 @builtin
 delete_dynamic_array :: proc(array: $T/[dynamic]$E, loc := #caller_location) -> Allocator_Error {
-	return mem_free(raw_data(array), array.allocator, loc)
+	return mem_free_with_size(raw_data(array), cap(array)*size_of(E), array.allocator, loc)
 }
 @builtin
 delete_slice :: proc(array: $T/[]$E, allocator := context.allocator, loc := #caller_location) -> Allocator_Error {
-	return mem_free(raw_data(array), allocator, loc)
+	return mem_free_with_size(raw_data(array), len(array)*size_of(E), allocator, loc)
 }
 @builtin
 delete_map :: proc(m: $T/map[$K]$V, loc := #caller_location) -> Allocator_Error {
+	Entry :: struct {
+		hash:  uintptr,
+		next:  int,
+		key:   K,
+		value: V,
+	}
+
 	raw := transmute(Raw_Map)m
 	err := delete_slice(raw.hashes, raw.entries.allocator, loc)
-	err1 := mem_free(raw.entries.data, raw.entries.allocator, loc)
+	err1 := mem_free_with_size(raw.entries.data, raw.entries.cap*size_of(Entry), raw.entries.allocator, loc)
 	if err == nil {
 		err = err1
 	}

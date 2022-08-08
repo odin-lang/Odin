@@ -36,12 +36,21 @@ log_allocator_proc :: proc(allocator_data: rawptr, mode: runtime.Allocator_Mode,
 			location = location,
 		)
 	case .Free:
-		logf(
-			level=la.level,
-			fmt_str = "%s%s<<< ALLOCATOR(mode=.Free, ptr=%p, size=%d)",
-			args = {la.prefix, " " if la.prefix != "" else "", old_memory, old_size},
-			location = location,
-		)
+		if old_size != 0 {
+			logf(
+				level=la.level,
+				fmt_str = "%s%s<<< ALLOCATOR(mode=.Free, ptr=%p, size=%d)",
+				args = {la.prefix, " " if la.prefix != "" else "", old_memory, old_size},
+				location = location,
+			)
+		} else {
+			logf(
+				level=la.level,
+				fmt_str = "%s%s<<< ALLOCATOR(mode=.Free, ptr=%p)",
+				args = {la.prefix, " " if la.prefix != "" else "", old_memory},
+				location = location,
+			)
+		}
 	case .Free_All:
 		logf(
 			level=la.level,
