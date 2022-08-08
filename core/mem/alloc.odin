@@ -61,55 +61,24 @@ DEFAULT_PAGE_SIZE ::
 	4 * 1024
 
 alloc :: proc(size: int, alignment: int = DEFAULT_ALIGNMENT, allocator := context.allocator, loc := #caller_location) -> rawptr {
-	if size == 0 {
-		return nil
-	}
-	if allocator.procedure == nil {
-		return nil
-	}
-	data, err := allocator.procedure(allocator.data, .Alloc, size, alignment, nil, 0, loc)
-	_ = err
+	data, _ := runtime.mem_alloc(size, alignment, allocator, loc)
 	return raw_data(data)
 }
 
 alloc_bytes :: proc(size: int, alignment: int = DEFAULT_ALIGNMENT, allocator := context.allocator, loc := #caller_location) -> ([]byte, Allocator_Error) {
-	if size == 0 {
-		return nil, nil
-	}
-	if allocator.procedure == nil {
-		return nil, nil
-	}
-	return allocator.procedure(allocator.data, .Alloc, size, alignment, nil, 0, loc)
+	return runtime.mem_alloc(size, alignment, allocator, loc)
 }
 
 free :: proc(ptr: rawptr, allocator := context.allocator, loc := #caller_location) -> Allocator_Error {
-	if ptr == nil {
-		return nil
-	}
-	if allocator.procedure == nil {
-		return nil
-	}
-	_, err := allocator.procedure(allocator.data, .Free, 0, 0, ptr, 0, loc)
-	return err
+	return runtime.mem_free(ptr, allocator, loc)
 }
 
 free_bytes :: proc(bytes: []byte, allocator := context.allocator, loc := #caller_location) -> Allocator_Error {
-	if bytes == nil {
-		return nil
-	}
-	if allocator.procedure == nil {
-		return nil
-	}
-	_, err := allocator.procedure(allocator.data, .Free, 0, 0, raw_data(bytes), len(bytes), loc)
-	return err
+	return runtime.mem_free_bytes(bytes, allocator, loc)
 }
 
 free_all :: proc(allocator := context.allocator, loc := #caller_location) -> Allocator_Error {
-	if allocator.procedure != nil {
-		_, err := allocator.procedure(allocator.data, .Free_All, 0, 0, nil, 0, loc)
-		return err
-	}
-	return nil
+	return runtime.mem_free_all(allocator, loc)
 }
 
 resize :: proc(ptr: rawptr, old_size, new_size: int, alignment: int = DEFAULT_ALIGNMENT, allocator := context.allocator, loc := #caller_location) -> rawptr {

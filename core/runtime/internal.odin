@@ -103,7 +103,7 @@ mem_zero :: proc "contextless" (data: rawptr, len: int) -> rawptr {
 	if data == nil {
 		return nil
 	}
-	if len < 0 {
+	if len <= 0 {
 		return data
 	}
 	intrinsics.mem_zero(data, len)
@@ -111,22 +111,18 @@ mem_zero :: proc "contextless" (data: rawptr, len: int) -> rawptr {
 }
 
 mem_copy :: proc "contextless" (dst, src: rawptr, len: int) -> rawptr {
-	if src == nil {
-		return dst
+	if src != nil && dst != src && len > 0 {
+		// NOTE(bill): This _must_ be implemented like C's memmove
+		intrinsics.mem_copy(dst, src, len)
 	}
-
-	// NOTE(bill): This _must_ be implemented like C's memmove
-	intrinsics.mem_copy(dst, src, len)
 	return dst
 }
 
 mem_copy_non_overlapping :: proc "contextless" (dst, src: rawptr, len: int) -> rawptr {
-	if src == nil {
-		return dst
+	if src != nil && dst != src && len > 0 {
+		// NOTE(bill): This _must_ be implemented like C's memcpy
+		intrinsics.mem_copy_non_overlapping(dst, src, len)
 	}
-
-	// NOTE(bill): This _must_ be implemented like C's memcpy
-	intrinsics.mem_copy_non_overlapping(dst, src, len)
 	return dst
 }
 
@@ -142,27 +138,29 @@ mem_alloc_bytes :: #force_inline proc(size: int, alignment: int = DEFAULT_ALIGNM
 	return allocator.procedure(allocator.data, .Alloc, size, alignment, nil, 0, loc)
 }
 
-mem_alloc :: #force_inline proc(size: int, alignment: int = DEFAULT_ALIGNMENT, allocator := context.allocator, loc := #caller_location) -> (rawptr, Allocator_Error) {
-	if size == 0 {
+mem_alloc :: #force_inline proc(size: int, alignment: int = DEFAULT_ALIGNMENT, allocator := context.allocator, loc := #caller_location) -> ([]byte, Allocator_Error) {
+	if size == 0 || allocator.procedure == nil {
 		return nil, nil
 	}
-	if allocator.procedure == nil {
-		return nil, nil
-	}
-	data, err := allocator.procedure(allocator.data, .Alloc, size, alignment, nil, 0, loc)
-	return raw_data(data), err
+	return allocator.procedure(allocator.data, .Alloc, size, alignment, nil, 0, loc)
 }
 
 mem_free :: #force_inline proc(ptr: rawptr, allocator := context.allocator, loc := #caller_location) -> Allocator_Error {
-	if ptr == nil {
-		return .None
-	}
-	if allocator.procedure == nil {
-		return .None
+	if ptr == nil || allocator.procedure == nil {
+		return nil
 	}
 	_, err := allocator.procedure(allocator.data, .Free, 0, 0, ptr, 0, loc)
 	return err
 }
+
+mem_free_bytes :: #force_inline proc(bytes: []byte, allocator := context.allocator, loc := #caller_location) -> Allocator_Error {
+	if bytes == nil || allocator.procedure == nil {
+		return nil
+	}
+	_, err := allocator.procedure(allocator.data, .Free, 0, 0, raw_data(bytes), len(bytes), loc)
+	return err
+}
+
 
 mem_free_all :: #force_inline proc(allocator := context.allocator, loc := #caller_location) -> (err: Allocator_Error) {
 	if allocator.procedure != nil {

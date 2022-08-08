@@ -197,7 +197,7 @@ __slice_resize :: proc(array_: ^$T/[]$E, new_count: int, allocator: Allocator, l
 	if err != nil {
 		return false
 	}
-	if new_data != nil || elem_size == 0 {
+	if new_data != nil || size_of(E) == 0 {
 		array.data = raw_data(new_data)
 		array.len = new_count
 		return true
