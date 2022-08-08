@@ -153,6 +153,14 @@ mem_free :: #force_inline proc(ptr: rawptr, allocator := context.allocator, loc 
 	return err
 }
 
+mem_free_with_size :: #force_inline proc(ptr: rawptr, byte_count: int, allocator := context.allocator, loc := #caller_location) -> Allocator_Error {
+	if ptr == nil || allocator.procedure == nil {
+		return nil
+	}
+	_, err := allocator.procedure(allocator.data, .Free, 0, 0, ptr, byte_count, loc)
+	return err
+}
+
 mem_free_bytes :: #force_inline proc(bytes: []byte, allocator := context.allocator, loc := #caller_location) -> Allocator_Error {
 	if bytes == nil || allocator.procedure == nil {
 		return nil
