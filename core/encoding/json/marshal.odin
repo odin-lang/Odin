@@ -17,7 +17,7 @@ Marshal_Error :: union #shared_nil {
 	io.Error,
 }
 
-// supports json specs
+// NOTE careful with MJSON maps & non quotes usage as keys without whitespace will lead to bad results
 Marshal_Options :: struct {
 	// output based on spec
 	spec: Specification,
@@ -28,10 +28,12 @@ Marshal_Options :: struct {
 	// spacing
 	use_spaces: bool,
 	spaces: int,
-	tabs: int,
 
 	// state
 	indentation: int,
+
+	// option to output uint in JSON5 & MJSON
+	write_uint_as_hex: bool, 
 
 	// mjson output options
 	mjson_keys_use_quotes: bool,
@@ -109,7 +111,23 @@ marshal_to_writer :: proc(w: io.Writer, v: any, opt: ^Marshal_Options) -> (err: 
 		case u128be: u = u128(i)
 		}
 
-		s := strconv.append_bits_128(buf[:], u, 10, info.signed, 8*ti.size, "0123456789", nil)
+		s: string
+
+		// allow uints to be printed as hex
+		if opt.write_uint_as_hex && (opt.spec == .JSON5 || opt.spec == .MJSON) {
+			switch i in a {
+				case u8, u16, u32, u64, u128: {
+					s = strconv.append_bits_128(buf[:], u, 16, info.signed, 8*ti.size, "0123456789abcdef", { .Prefix })
+				}
+
+				case: {
+					s = strconv.append_bits_128(buf[:], u, 10, info.signed, 8*ti.size, "0123456789", nil)
+				}
+			}
+		} else {
+			s = strconv.append_bits_128(buf[:], u, 10, info.signed, 8*ti.size, "0123456789", nil)
+		}
+
 		io.write_string(w, s) or_return
 
 
@@ -261,16 +279,9 @@ marshal_to_writer :: proc(w: io.Writer, v: any, opt: ^Marshal_Options) -> (err: 
 
 					#partial switch info in ti.variant {
 						case runtime.Type_Info_String: {
-							// fmt.eprintln("WAS STRING")
-
 							switch s in a {
 								case string: name = s
 								case cstring: name = string(s)
-							}
-
-							// NOTE need to ensure that map keys are valid for mjson and contain no whitespace
-							if opt.spec == .MJSON && !opt.mjson_keys_use_quotes {
-								name, _ = strings.replace_all(name, " ", "_", context.temp_allocator)
 							}
 
 							opt_write_key(w, opt, name) or_return
