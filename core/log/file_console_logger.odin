@@ -56,7 +56,7 @@ create_console_logger :: proc(lowest := Level.Debug, opt := Default_Console_Logg
 	return Logger{file_console_logger_proc, data, lowest, opt}
 }
 
-destroy_console_logger :: proc(log: ^Logger) {
+destroy_console_logger :: proc(log: Logger) {
 	free(log.data)
 }
 
