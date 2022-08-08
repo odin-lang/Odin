@@ -1007,6 +1007,11 @@ lbValue lb_emit_struct_ep(lbProcedure *p, lbValue s, i32 index) {
 		case 0: result_type = t->RelativeSlice.base_integer; break;
 		case 1: result_type = t->RelativeSlice.base_integer; break;
 		}
+	} else if (is_type_soa_pointer(t)) {
+		switch (index) {
+		case 0: result_type = alloc_type_pointer(t->SoaPointer.elem); break;
+		case 1: result_type = t_int; break;
+		}
 	} else {
 		GB_PANIC("TODO(bill): struct_gep type: %s, %d", type_to_string(s.type), index);
 	}
@@ -1137,6 +1142,13 @@ lbValue lb_emit_struct_ev(lbProcedure *p, lbValue s, i32 index) {
 		result_type = t->Array.elem;
 		break;
 
+	case Type_SoaPointer:
+		switch (index) {
+		case 0: result_type = alloc_type_pointer(t->SoaPointer.elem); break;
+		case 1: result_type = t_int; break;
+		}
+		break;
+
 	default:
 		GB_PANIC("TODO(bill): struct_ev type: %s, %d", type_to_string(s.type), index);
 		break;
@@ -1164,7 +1176,28 @@ lbValue lb_emit_deep_field_gep(lbProcedure *p, lbValue e, Selection sel) {
 		}
 		type = core_type(type);
 
-		if (is_type_quaternion(type)) {
+		if (type->kind == Type_SoaPointer) {
+			lbValue addr = lb_emit_struct_ep(p, e, 0);
+			lbValue index = lb_emit_struct_ep(p, e, 1);
+			addr = lb_emit_load(p, addr);
+			index = lb_emit_load(p, index);
+
+			i32 first_index = sel.index[0];
+			Selection sub_sel = sel;
+			sub_sel.index.data += 1;
+			sub_sel.index.count -= 1;
+
+			lbValue arr = lb_emit_struct_ep(p, addr, first_index);
+
+			Type *t = base_type(type_deref(addr.type));
+			GB_ASSERT(is_type_soa_struct(t));
+
+			if (t->Struct.soa_kind == StructSoa_Fixed) {
+				e = lb_emit_array_ep(p, arr, index);
+			} else {
+				e = lb_emit_ptr_offset(p, lb_emit_load(p, arr), index);
+			}
+		} else if (is_type_quaternion(type)) {
 			e = lb_emit_struct_ep(p, e, index);
 		} else if (is_type_raw_union(type)) {
 			type = get_struct_field_type(type, index);

@@ -700,6 +700,7 @@ Proc_Type :: struct {
 
 Pointer_Type :: struct {
 	using node: Expr,
+	tag:     ^Expr,
 	pointer: tokenizer.Pos,
 	elem:    ^Expr,
 }

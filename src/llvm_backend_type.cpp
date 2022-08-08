@@ -57,6 +57,7 @@ lbValue lb_typeid(lbModule *m, Type *type) {
 	case Type_SimdVector:      kind = Typeid_Simd_Vector;      break;
 	case Type_RelativePointer: kind = Typeid_Relative_Pointer; break;
 	case Type_RelativeSlice:   kind = Typeid_Relative_Slice;   break;
+	case Type_SoaPointer:      kind = Typeid_SoaPointer;       break;
 	}
 
 	if (is_type_cstring(type)) {
@@ -434,6 +435,20 @@ void lb_setup_type_info_data(lbProcedure *p) { // NOTE(bill): Setup type_info da
 		case Type_MultiPointer: {
 			tag = lb_const_ptr_cast(m, variant_ptr, t_type_info_multi_pointer_ptr);
 			lbValue gep = lb_get_type_info_ptr(m, t->MultiPointer.elem);
+
+			LLVMValueRef vals[1] = {
+				gep.value,
+			};
+
+			lbValue res = {};
+			res.type = type_deref(tag.type);
+			res.value = llvm_const_named_struct(m, res.type, vals, gb_count_of(vals));
+			lb_emit_store(p, tag, res);
+			break;
+		}
+		case Type_SoaPointer: {
+			tag = lb_const_ptr_cast(m, variant_ptr, t_type_info_soa_pointer_ptr);
+			lbValue gep = lb_get_type_info_ptr(m, t->SoaPointer.elem);
 
 			LLVMValueRef vals[1] = {
 				gep.value,

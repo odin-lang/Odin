@@ -2235,7 +2235,7 @@ parse_operand :: proc(p: ^Parser, lhs: bool) -> ^ast.Expr {
 			return parse_call_expr(p, bd)
 
 
-		case "soa", "simd":
+		case "soa":
 			bd := ast.new(ast.Basic_Directive, tok.pos, end_pos(name))
 			bd.tok  = tok
 			bd.name = name.text
@@ -2244,6 +2244,20 @@ parse_operand :: proc(p: ^Parser, lhs: bool) -> ^ast.Expr {
 			#partial switch t in type.derived_expr {
 			case ^ast.Array_Type:         t.tag = bd
 			case ^ast.Dynamic_Array_Type: t.tag = bd
+			case ^ast.Pointer_Type:       t.tag = bd
+			case:
+				error(p, original_type.pos, "expected an array or pointer type after #%s", name.text)
+			}
+			return original_type
+
+		case "simd":
+			bd := ast.new(ast.Basic_Directive, tok.pos, end_pos(name))
+			bd.tok  = tok
+			bd.name = name.text
+			original_type := parse_type(p)
+			type := ast.unparen_expr(original_type)
+			#partial switch t in type.derived_expr {
+			case ^ast.Array_Type:         t.tag = bd
 			case:
 				error(p, original_type.pos, "expected an array type after #%s", name.text)
 			}

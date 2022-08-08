@@ -83,6 +83,7 @@ enum OdinDocTypeKind : u32 {
 	OdinDocType_RelativeSlice    = 21,
 	OdinDocType_MultiPointer     = 22,
 	OdinDocType_Matrix           = 23,
+	OdinDocType_SoaPointer       = 24,
 };
 
 enum OdinDocTypeFlag_Basic : u32 {
