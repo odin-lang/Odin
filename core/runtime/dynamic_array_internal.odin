@@ -29,11 +29,15 @@ __dynamic_array_reserve :: proc(array_: rawptr, elem_size, elem_align: int, cap:
 	new_size  := cap * elem_size
 	allocator := array.allocator
 
-	new_data, err := allocator.procedure(allocator.data, .Resize, new_size, elem_align, array.data, old_size, loc)
+	new_data, err := mem_resize(array.data, old_size, new_size, elem_align, allocator, loc)
 	if err != nil {
 		return false
 	}
-	if new_data != nil || elem_size == 0 {
+	if elem_size == 0 {
+		array.data = raw_data(new_data)
+		array.cap = cap
+		return true
+	} else if new_data != nil {
 		array.data = raw_data(new_data)
 		array.cap = min(cap, len(new_data)/elem_size)
 		return true
@@ -59,7 +63,7 @@ __dynamic_array_shrink :: proc(array_: rawptr, elem_size, elem_align: int, new_c
 	new_size  := new_cap * elem_size
 	allocator := array.allocator
 
-	new_data, err := allocator.procedure(allocator.data, .Resize, new_size, elem_align, array.data, old_size, loc)
+	new_data, err := mem_resize(array.data, old_size, new_size, elem_align, allocator, loc)
 	if err != nil {
 		return
 	}
