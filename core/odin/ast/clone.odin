@@ -286,6 +286,7 @@ clone_node :: proc(node: ^Node) -> ^Node {
 		r.results = auto_cast clone(r.results)
 	case ^Pointer_Type:
 		r.elem = clone(r.elem)
+		r.tag  = clone(r.tag)
 	case ^Multi_Pointer_Type:
 		r.elem = clone(r.elem)
 	case ^Array_Type:

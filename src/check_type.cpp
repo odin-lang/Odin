@@ -2693,9 +2693,12 @@ bool check_type_internal(CheckerContext *ctx, Ast *e, Type **type, Type *named_t
 	case_ast_node(ue, UnaryExpr, e);
 		switch (ue->op.kind) {
 		case Token_Pointer:
-			*type = alloc_type_pointer(check_type(ctx, ue->expr));
-			set_base_type(named_type, *type);
-			return true;
+			{
+				Type *elem = check_type(ctx, ue->expr);
+				*type = alloc_type_pointer(elem);
+				set_base_type(named_type, *type);
+				return true;
+			}
 		}
 	case_end;
 
@@ -2721,7 +2724,24 @@ bool check_type_internal(CheckerContext *ctx, Ast *e, Type **type, Type *named_t
 			elem = o.type;
 		}
 
-		*type = alloc_type_pointer(elem);
+		if (pt->tag != nullptr) {
+			GB_ASSERT(pt->tag->kind == Ast_BasicDirective);
+			String name = pt->tag->BasicDirective.name.string;
+			if (name == "soa") {
+				// TODO(bill): generic #soa pointers
+				if (is_type_soa_struct(elem)) {
+					*type = alloc_type_soa_pointer(elem);
+				} else {
+					error(pt->tag, "#soa pointers require an #soa record type as the element");
+					*type = alloc_type_pointer(elem);
+				}
+			} else {
+				error(pt->tag, "Invalid tag applied to pointer, got #%.*s", LIT(name));
+				*type = alloc_type_pointer(elem);
+			}
+		} else {
+			*type = alloc_type_pointer(elem);
+		}
 		set_base_type(named_type, *type);
 		return true;
 	case_end;

@@ -34,6 +34,7 @@ Type_Info_Simd_Vector      :: runtime.Type_Info_Simd_Vector
 Type_Info_Relative_Pointer :: runtime.Type_Info_Relative_Pointer
 Type_Info_Relative_Slice   :: runtime.Type_Info_Relative_Slice
 Type_Info_Matrix           :: runtime.Type_Info_Matrix
+Type_Info_Soa_Pointer      :: runtime.Type_Info_Soa_Pointer
 
 Type_Info_Enum_Value :: runtime.Type_Info_Enum_Value
 
@@ -68,6 +69,7 @@ Type_Kind :: enum {
 	Relative_Pointer,
 	Relative_Slice,
 	Matrix,
+	Soa_Pointer,
 }
 
 
@@ -102,6 +104,7 @@ type_kind :: proc(T: typeid) -> Type_Kind {
 		case Type_Info_Relative_Pointer: return .Relative_Pointer
 		case Type_Info_Relative_Slice:   return .Relative_Slice
 		case Type_Info_Matrix:           return .Matrix
+		case Type_Info_Soa_Pointer:      return .Soa_Pointer
 		}
 
 	}
@@ -194,6 +197,7 @@ typeid_elem :: proc(id: typeid) -> typeid {
 		}
 	case Type_Info_Pointer:          return v.elem.id
 	case Type_Info_Multi_Pointer:    return v.elem.id
+	case Type_Info_Soa_Pointer:      return v.elem.id
 	case Type_Info_Array:            return v.elem.id
 	case Type_Info_Enumerated_Array: return v.elem.id
 	case Type_Info_Slice:            return v.elem.id
@@ -1419,6 +1423,7 @@ equal :: proc(a, b: any, including_indirect_array_recursion := false, recursion_
 		Type_Info_Enum,
 		Type_Info_Simd_Vector,
 		Type_Info_Relative_Pointer,
+		Type_Info_Soa_Pointer,
 		Type_Info_Matrix:
 		return mem.compare_byte_ptrs((^byte)(a.data), (^byte)(b.data), t.size) == 0
 		

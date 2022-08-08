@@ -8,6 +8,7 @@ Raw_Cstring       :: runtime.Raw_Cstring
 Raw_Slice         :: runtime.Raw_Slice
 Raw_Dynamic_Array :: runtime.Raw_Dynamic_Array
 Raw_Map           :: runtime.Raw_Map
+Raw_Soa_Pointer   :: runtime.Raw_Soa_Pointer
 
 Raw_Complex64     :: struct {real, imag: f32}
 Raw_Complex128    :: struct {real, imag: f64}

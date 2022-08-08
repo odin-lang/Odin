@@ -916,7 +916,13 @@ lbValue lb_emit_load(lbProcedure *p, lbValue value) {
 		Type *t = vt->MultiPointer.elem;
 		LLVMValueRef v = LLVMBuildLoad2(p->builder, llvm_addr_type(value), value.value, "");
 		return lbValue{v, t};
+	} else if (is_type_soa_pointer(value.type)) {
+		lbValue ptr = lb_emit_struct_ev(p, value, 0);
+		lbValue idx = lb_emit_struct_ev(p, value, 1);
+		lbAddr addr = lb_addr_soa_variable(ptr, idx, nullptr);
+		return lb_addr_load(p, addr);
 	}
+
 	GB_ASSERT(is_type_pointer(value.type));
 	Type *t = type_deref(value.type);
 	LLVMValueRef v = LLVMBuildLoad2(p->builder, llvm_addr_type(value), value.value, "");
@@ -2054,6 +2060,15 @@ LLVMTypeRef lb_type_internal(lbModule *m, Type *type) {
 			
 			m->internal_type_level += 1;
 			return t;
+		}
+
+	case Type_SoaPointer:
+		{
+			unsigned field_count = 2;
+			LLVMTypeRef *fields = gb_alloc_array(permanent_allocator(), LLVMTypeRef, field_count);
+			fields[0] = LLVMPointerType(lb_type(m, type->Pointer.elem), 0);
+			fields[1] = LLVMIntTypeInContext(ctx, 8*cast(unsigned)build_context.word_size);
+			return LLVMStructTypeInContext(ctx, fields, field_count, false);
 		}
 	
 	}

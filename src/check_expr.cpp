@@ -2052,7 +2052,7 @@ bool check_is_not_addressable(CheckerContext *c, Operand *o) {
 		return false;
 	}
 
-	return o->mode != Addressing_Variable;
+	return o->mode != Addressing_Variable && o->mode != Addressing_SoaVariable;
 }
 
 void check_unary_expr(CheckerContext *c, Operand *o, Token op, Ast *node) {
@@ -2069,9 +2069,6 @@ void check_unary_expr(CheckerContext *c, Operand *o, Token op, Ast *node) {
 					error(op, "Cannot take the pointer address of '%s' which is a procedure parameter", str);
 				} else {
 					switch (o->mode) {
-					case Addressing_SoaVariable:
-						error(op, "Cannot take the pointer address of '%s' as it is an indirect index of an SOA struct", str);
-						break;
 					case Addressing_Constant:
 						error(op, "Cannot take the pointer address of '%s' which is a constant", str);
 						break;
@@ -2099,7 +2096,19 @@ void check_unary_expr(CheckerContext *c, Operand *o, Token op, Ast *node) {
 			return;
 		}
 
-		o->type = alloc_type_pointer(o->type);
+		if (o->mode == Addressing_SoaVariable) {
+			ast_node(ue, UnaryExpr, node);
+			if (ast_node_expect(ue->expr, Ast_IndexExpr)) {
+				ast_node(ie, IndexExpr, ue->expr);
+				Type *soa_type = type_of_expr(ie->expr);
+				GB_ASSERT(is_type_soa_struct(soa_type));
+				o->type = alloc_type_soa_pointer(soa_type);
+			} else {
+				o->type = alloc_type_pointer(o->type);
+			}
+		} else {
+			o->type = alloc_type_pointer(o->type);
+		}
 
 		switch (o->mode) {
 		case Addressing_OptionalOk:
@@ -9378,6 +9387,9 @@ ExprKind check_expr_base_internal(CheckerContext *c, Operand *o, Ast *node, Type
 			if (t->kind == Type_Pointer && !is_type_empty_union(t->Pointer.elem)) {
 				o->mode = Addressing_Variable;
 				o->type = t->Pointer.elem;
+ 			} else if (t->kind == Type_SoaPointer) {
+				o->mode = Addressing_SoaVariable;
+				o->type = type_deref(t);
  			} else if (t->kind == Type_RelativePointer) {
  				if (o->mode != Addressing_Variable) {
  					gbString str = expr_to_string(o->expr);

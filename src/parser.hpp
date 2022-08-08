@@ -650,7 +650,8 @@ AST_KIND(_TypeBegin, "", bool) \
 	}) \
 	AST_KIND(PointerType, "pointer type", struct { \
 		Token token; \
-		Ast *type; \
+		Ast *type;   \
+		Ast *tag;    \
 	}) \
 	AST_KIND(RelativeType, "relative type", struct { \
 		Ast *tag; \

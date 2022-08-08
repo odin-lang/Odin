@@ -2803,7 +2803,15 @@ lbValue lb_emit_comp_against_nil(lbProcedure *p, TokenKind op_kind, lbValue x) {
 	return {};
 }
 
+lbValue lb_make_soa_pointer(lbProcedure *p, Type *type, lbValue const &addr, lbValue const &index) {
+	lbAddr v = lb_add_local_generated(p, type, false);
+	lbValue ptr = lb_emit_struct_ep(p, v.addr, 0);
+	lbValue idx = lb_emit_struct_ep(p, v.addr, 1);
+	lb_emit_store(p, ptr, addr);
+	lb_emit_store(p, idx, index);
 
+	return lb_addr_load(p, v);
+}
 
 lbValue lb_build_unary_and(lbProcedure *p, Ast *expr) {
 	ast_node(ue, UnaryExpr, expr);
@@ -2842,7 +2850,17 @@ lbValue lb_build_unary_and(lbProcedure *p, Ast *expr) {
 		lb_emit_store(p, gep1, ok);
 		return lb_addr_load(p, res);
 
-	} if (ue_expr->kind == Ast_CompoundLit) {
+	} else if (is_type_soa_pointer(tv.type)) {
+		ast_node(ie, IndexExpr, ue_expr);
+		lbValue addr = lb_build_addr_ptr(p, ie->expr);
+		lbValue index = lb_build_expr(p, ie->index);
+
+		if (!build_context.no_bounds_check) {
+			// TODO(bill): soa bounds checking
+		}
+
+		return lb_make_soa_pointer(p, tv.type, addr, index);
+	} else if (ue_expr->kind == Ast_CompoundLit) {
 		lbValue v = lb_build_expr(p, ue->expr);
 
 		Type *type = v.type;
@@ -3604,6 +3622,7 @@ lbAddr lb_build_addr_internal(lbProcedure *p, Ast *expr) {
 					// NOTE(bill): just patch the index in place
 					sel.index[0] = addr.swizzle.indices[sel.index[0]];
 				}
+
 				lbValue a = lb_addr_get_ptr(p, addr);
 				a = lb_emit_deep_field_gep(p, a, sel);
 				return lb_addr(a);
@@ -4093,10 +4112,16 @@ lbAddr lb_build_addr_internal(lbProcedure *p, Ast *expr) {
 	case_end;
 
 	case_ast_node(de, DerefExpr, expr);
-		if (is_type_relative_pointer(type_of_expr(de->expr))) {
+		Type *t = type_of_expr(de->expr);
+		if (is_type_relative_pointer(t)) {
 			lbAddr addr = lb_build_addr(p, de->expr);
 			addr.relative.deref = true;
-			return addr;\
+			return addr;
+		} else if (is_type_soa_pointer(t)) {
+			lbValue value = lb_build_expr(p, de->expr);
+			lbValue ptr = lb_emit_struct_ev(p, value, 0);
+			lbValue idx = lb_emit_struct_ev(p, value, 1);
+			return lb_addr_soa_variable(ptr, idx, nullptr);
 		}
 		lbValue addr = lb_build_expr(p, de->expr);
 		return lb_addr(addr);

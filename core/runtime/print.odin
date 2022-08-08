@@ -228,6 +228,9 @@ print_type :: proc "contextless" (ti: ^Type_Info) {
 	case Type_Info_Multi_Pointer:
 		print_string("[^]")
 		print_type(info.elem)
+	case Type_Info_Soa_Pointer:
+		print_string("#soa ^")
+		print_type(info.elem)
 	case Type_Info_Procedure:
 		print_string("proc")
 		if info.params == nil {

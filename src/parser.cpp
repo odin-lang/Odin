@@ -356,6 +356,7 @@ Ast *clone_ast(Ast *node) {
 		break;
 	case Ast_PointerType:
 		n->PointerType.type = clone_ast(n->PointerType.type);
+		n->PointerType.tag  = clone_ast(n->PointerType.tag);
 		break;
 	case Ast_MultiPointerType:
 		n->MultiPointerType.type = clone_ast(n->MultiPointerType.type);
@@ -2167,10 +2168,11 @@ Ast *parse_operand(AstFile *f, bool lhs) {
 			Ast *original_type = parse_type(f);
 			Ast *type = unparen_expr(original_type);
 			switch (type->kind) {
-			case Ast_ArrayType:        type->ArrayType.tag = tag;        break;
+			case Ast_ArrayType:        type->ArrayType.tag        = tag; break;
 			case Ast_DynamicArrayType: type->DynamicArrayType.tag = tag; break;
+			case Ast_PointerType:      type->PointerType.tag      = tag; break;
 			default:
-				syntax_error(type, "Expected an array type after #%.*s, got %.*s", LIT(name.string), LIT(ast_strings[type->kind]));
+				syntax_error(type, "Expected an array or pointer type after #%.*s, got %.*s", LIT(name.string), LIT(ast_strings[type->kind]));
 				break;
 			}
 			return original_type;
