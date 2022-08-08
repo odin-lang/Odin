@@ -1032,9 +1032,9 @@ fmt_pointer :: proc(fi: ^Info, p: rawptr, verb: rune) {
 }
 
 fmt_soa_pointer :: proc(fi: ^Info, p: runtime.Raw_Soa_Pointer, verb: rune) {
-	io.write_string(fi.writer, "#soa{0x", &fi.n)
+	io.write_string(fi.writer, "#soa{data=0x", &fi.n)
 	_fmt_int(fi, u64(uintptr(p.data)), 16, false, 8*size_of(rawptr), __DIGITS_UPPER)
-	io.write_string(fi.writer, ", ", &fi.n)
+	io.write_string(fi.writer, ", index=", &fi.n)
 	_fmt_int(fi, u64(p.index), 10, false, 8*size_of(rawptr), __DIGITS_UPPER)
 	io.write_string(fi.writer, "}", &fi.n)
 }
