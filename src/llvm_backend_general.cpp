@@ -853,7 +853,9 @@ void lb_emit_store(lbProcedure *p, lbValue ptr, lbValue value) {
 
 	if (LLVMIsNull(value.value)) {
 		LLVMTypeRef src_t = llvm_addr_type(p->module, ptr);
-		if (lb_sizeof(src_t) <= lb_max_zero_init_size()) {
+		if (is_type_proc(a)) {
+			LLVMBuildStore(p->builder, LLVMConstNull(llvm_get_element_type(LLVMTypeOf(ptr.value))), ptr.value);
+		} else if (lb_sizeof(src_t) <= lb_max_zero_init_size()) {
 			LLVMBuildStore(p->builder, LLVMConstNull(src_t), ptr.value);
 		} else {
 			lb_mem_zero_ptr(p, ptr.value, a, 1);
