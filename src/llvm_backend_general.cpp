@@ -56,6 +56,7 @@ void lb_init_module(lbModule *m, Checker *c) {
 
 	gbAllocator a = heap_allocator();
 	map_init(&m->types, a);
+	map_init(&m->func_raw_types, a);
 	map_init(&m->struct_field_remapping, a);
 	map_init(&m->values, a);
 	map_init(&m->soa_values, a);
@@ -1416,6 +1417,116 @@ String lb_get_entity_name(lbModule *m, Entity *e, String default_name) {
 }
 
 
+LLVMTypeRef lb_type_internal_for_procedures_raw(lbModule *m, Type *type) {
+	Type *original_type = type;
+	type = base_type(original_type);
+	GB_ASSERT(type->kind == Type_Proc);
+
+	LLVMTypeRef *found = map_get(&m->func_raw_types, type);
+	if (found) {
+		return *found;
+	}
+
+	unsigned param_count = 0;
+	if (type->Proc.calling_convention == ProcCC_Odin) {
+		param_count += 1;
+	}
+
+	if (type->Proc.param_count != 0) {
+		GB_ASSERT(type->Proc.params->kind == Type_Tuple);
+		for_array(i, type->Proc.params->Tuple.variables) {
+			Entity *e = type->Proc.params->Tuple.variables[i];
+			if (e->kind != Entity_Variable) {
+				continue;
+			}
+			if (e->flags & EntityFlag_CVarArg) {
+				continue;
+			}
+			param_count += 1;
+		}
+	}
+	m->internal_type_level += 1;
+	defer (m->internal_type_level -= 1);
+
+	LLVMTypeRef ret = nullptr;
+	LLVMTypeRef *params = gb_alloc_array(permanent_allocator(), LLVMTypeRef, param_count);
+	if (type->Proc.result_count != 0) {
+		Type *single_ret = reduce_tuple_to_single_type(type->Proc.results);
+		ret = lb_type(m, single_ret);
+		if (ret != nullptr) {
+			if (is_type_boolean(single_ret) &&
+			    is_calling_convention_none(type->Proc.calling_convention) &&
+			    type_size_of(single_ret) <= 1) {
+				ret = LLVMInt1TypeInContext(m->ctx);
+			}
+		}
+	}
+
+	unsigned param_index = 0;
+	if (type->Proc.param_count != 0) {
+		GB_ASSERT(type->Proc.params->kind == Type_Tuple);
+		for_array(i, type->Proc.params->Tuple.variables) {
+			Entity *e = type->Proc.params->Tuple.variables[i];
+			if (e->kind != Entity_Variable) {
+				continue;
+			}
+			if (e->flags & EntityFlag_CVarArg) {
+				continue;
+			}
+			Type *e_type = reduce_tuple_to_single_type(e->type);
+
+			LLVMTypeRef param_type = nullptr;
+			if (e->flags & EntityFlag_ByPtr) {
+				param_type = lb_type(m, alloc_type_pointer(e_type));
+			} else if (is_type_boolean(e_type) &&
+			    type_size_of(e_type) <= 1) {
+				param_type = LLVMInt1TypeInContext(m->ctx);
+			} else {
+				if (is_type_proc(e_type)) {
+					param_type = lb_type(m, t_rawptr);
+				} else {
+					param_type = lb_type(m, e_type);
+				}
+			}
+
+			params[param_index++] = param_type;
+		}
+	}
+	if (param_index < param_count) {
+		params[param_index++] = lb_type(m, t_rawptr);
+	}
+	GB_ASSERT(param_index == param_count);
+
+	lbFunctionType *ft = lb_get_abi_info(m->ctx, params, param_count, ret, ret != nullptr, type->Proc.calling_convention);
+	{
+		for_array(j, ft->args) {
+			auto arg = ft->args[j];
+			GB_ASSERT_MSG(LLVMGetTypeContext(arg.type) == ft->ctx,
+			              "\n\t%s %td/%td"
+			              "\n\tArgTypeCtx: %p\n\tCurrentCtx: %p\n\tGlobalCtx:  %p",
+			              LLVMPrintTypeToString(arg.type),
+			              j, ft->args.count,
+			              LLVMGetTypeContext(arg.type), ft->ctx, LLVMGetGlobalContext());
+		}
+		GB_ASSERT_MSG(LLVMGetTypeContext(ft->ret.type) == ft->ctx,
+		              "\n\t%s"
+		              "\n\tRetTypeCtx: %p\n\tCurrentCtx: %p\n\tGlobalCtx:  %p",
+		              LLVMPrintTypeToString(ft->ret.type),
+		              LLVMGetTypeContext(ft->ret.type), ft->ctx, LLVMGetGlobalContext());
+	}
+
+	map_set(&m->function_type_map, type, ft);
+	LLVMTypeRef new_abi_fn_type = lb_function_type_to_llvm_raw(ft, type->Proc.c_vararg);
+
+	GB_ASSERT_MSG(LLVMGetTypeContext(new_abi_fn_type) == m->ctx,
+	              "\n\tFuncTypeCtx: %p\n\tCurrentCtx:  %p\n\tGlobalCtx:   %p",
+	              LLVMGetTypeContext(new_abi_fn_type), m->ctx, LLVMGetGlobalContext());
+
+	map_set(&m->func_raw_types, type, new_abi_fn_type);
+
+	return new_abi_fn_type;
+
+}
 LLVMTypeRef lb_type_internal(lbModule *m, Type *type) {
 	LLVMContextRef ctx = m->ctx;
 	i64 size = type_size_of(type); // Check size
@@ -1919,103 +2030,8 @@ LLVMTypeRef lb_type_internal(lbModule *m, Type *type) {
 		if (m->internal_type_level > 1) { // TODO HACK(bill): is this really enough?
 			return LLVMPointerType(LLVMIntTypeInContext(m->ctx, 8), 0);
 		} else {
-			unsigned param_count = 0;
-			if (type->Proc.calling_convention == ProcCC_Odin) {
-				param_count += 1;
-			}
-
-			if (type->Proc.param_count != 0) {
-				GB_ASSERT(type->Proc.params->kind == Type_Tuple);
-				for_array(i, type->Proc.params->Tuple.variables) {
-					Entity *e = type->Proc.params->Tuple.variables[i];
-					if (e->kind != Entity_Variable) {
-						continue;
-					}
-					if (e->flags & EntityFlag_CVarArg) {
-						continue;
-					}
-					param_count += 1;
-				}
-			}
-			m->internal_type_level += 1;
-			defer (m->internal_type_level -= 1);
-
-			LLVMTypeRef ret = nullptr;
-			LLVMTypeRef *params = gb_alloc_array(permanent_allocator(), LLVMTypeRef, param_count);
-			if (type->Proc.result_count != 0) {
-				Type *single_ret = reduce_tuple_to_single_type(type->Proc.results);
-				ret = lb_type(m, single_ret);
-				if (ret != nullptr) {
-					if (is_type_boolean(single_ret) &&
-					    is_calling_convention_none(type->Proc.calling_convention) &&
-					    type_size_of(single_ret) <= 1) {
-						ret = LLVMInt1TypeInContext(m->ctx);
-					}
-				}
-			}
-
-			unsigned param_index = 0;
-			if (type->Proc.param_count != 0) {
-				GB_ASSERT(type->Proc.params->kind == Type_Tuple);
-				for_array(i, type->Proc.params->Tuple.variables) {
-					Entity *e = type->Proc.params->Tuple.variables[i];
-					if (e->kind != Entity_Variable) {
-						continue;
-					}
-					if (e->flags & EntityFlag_CVarArg) {
-						continue;
-					}
-					Type *e_type = reduce_tuple_to_single_type(e->type);
-
-					LLVMTypeRef param_type = nullptr;
-					if (e->flags & EntityFlag_ByPtr) {
-						param_type = lb_type(m, alloc_type_pointer(e_type));
-					} else if (is_type_boolean(e_type) &&
-					    type_size_of(e_type) <= 1) {
-						param_type = LLVMInt1TypeInContext(m->ctx);
-					} else {
-						if (is_type_proc(e_type)) {
-							param_type = lb_type(m, t_rawptr);
-						} else {
-							param_type = lb_type(m, e_type);
-						}
-					}
-
-					params[param_index++] = param_type;
-				}
-			}
-			if (param_index < param_count) {
-				params[param_index++] = lb_type(m, t_rawptr);
-			}
-			GB_ASSERT(param_index == param_count);
-
-			lbFunctionType *ft = lb_get_abi_info(m->ctx, params, param_count, ret, ret != nullptr, type->Proc.calling_convention);
-			{
-				for_array(j, ft->args) {
-					auto arg = ft->args[j];
-					GB_ASSERT_MSG(LLVMGetTypeContext(arg.type) == ft->ctx,
-					              "\n\t%s %td/%td"
-					              "\n\tArgTypeCtx: %p\n\tCurrentCtx: %p\n\tGlobalCtx:  %p",
-					              LLVMPrintTypeToString(arg.type),
-					              j, ft->args.count,
-					              LLVMGetTypeContext(arg.type), ft->ctx, LLVMGetGlobalContext());
-				}
-				GB_ASSERT_MSG(LLVMGetTypeContext(ft->ret.type) == ft->ctx,
-				              "\n\t%s"
-				              "\n\tRetTypeCtx: %p\n\tCurrentCtx: %p\n\tGlobalCtx:  %p",
-				              LLVMPrintTypeToString(ft->ret.type),
-				              LLVMGetTypeContext(ft->ret.type), ft->ctx, LLVMGetGlobalContext());
-			}
-
-			map_set(&m->function_type_map, type, ft);
-			LLVMTypeRef new_abi_fn_ptr_type = lb_function_type_to_llvm_ptr(ft, type->Proc.c_vararg);
-			LLVMTypeRef new_abi_fn_type = lb_llvm_get_pointer_type(new_abi_fn_ptr_type);
-
-			GB_ASSERT_MSG(LLVMGetTypeContext(new_abi_fn_type) == m->ctx,
-			              "\n\tFuncTypeCtx: %p\n\tCurrentCtx:  %p\n\tGlobalCtx:   %p",
-			              LLVMGetTypeContext(new_abi_fn_type), m->ctx, LLVMGetGlobalContext());
-
-			return new_abi_fn_ptr_type;
+			LLVMTypeRef proc_raw_type = lb_type_internal_for_procedures_raw(m, type);
+			return LLVMPointerType(proc_raw_type, 0);
 		}
 
 		break;

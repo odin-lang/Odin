@@ -96,9 +96,7 @@ LLVMValueRef lb_mem_zero_ptr_internal(lbProcedure *p, LLVMValueRef ptr, LLVMValu
 		args[2] = LLVMBuildIntCast2(p->builder, len, types[1], /*signed*/false, "");
 
 		// We always get the function pointer type rather than the function and there is apparently no way around that?
-		LLVMTypeRef type = lb_type(p->module, pr.type);
-
-		type = lb_llvm_get_pointer_type(type);
+		LLVMTypeRef type = lb_type_internal_for_procedures_raw(p->module, pr.type);
 		return LLVMBuildCall2(p->builder, type, pr.value, args, gb_count_of(args), "");
 	}
 
