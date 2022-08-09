@@ -129,8 +129,7 @@ lbProcedure *lb_create_procedure(lbModule *m, Entity *entity, bool ignore_body) 
 	}
 
 	char *c_link_name = alloc_cstring(permanent_allocator(), p->name);
-	LLVMTypeRef func_ptr_type = lb_type(m, p->type);
-	LLVMTypeRef func_type = lb_llvm_get_pointer_type(func_ptr_type);
+	LLVMTypeRef func_type = lb_get_procedure_raw_type(m, p->type);
 
 	p->value = LLVMAddFunction(m->mod, c_link_name, func_type);
 
@@ -354,8 +353,7 @@ lbProcedure *lb_create_dummy_procedure(lbModule *m, String link_name, Type *type
 
 
 	char *c_link_name = alloc_cstring(permanent_allocator(), p->name);
-	LLVMTypeRef func_ptr_type = lb_type(m, p->type);
-	LLVMTypeRef func_type = lb_llvm_get_pointer_type(func_ptr_type);
+	LLVMTypeRef func_type = lb_get_procedure_raw_type(m, p->type);
 
 	p->value = LLVMAddFunction(m->mod, c_link_name, func_type);
 
@@ -753,12 +751,12 @@ lbValue lb_emit_call_internal(lbProcedure *p, lbValue value, lbValue return_ptr,
 	GB_ASSERT(curr_block != p->decl_block->block);
 
 	{
-		LLVMTypeRef ftp = lb_type(p->module, value.type);
+		LLVMTypeRef fnp = lb_type_internal_for_procedures_raw(p->module, value.type);
+		LLVMTypeRef ftp = LLVMPointerType(fnp, 0);
 		LLVMValueRef fn = value.value;
 		if (!lb_is_type_kind(LLVMTypeOf(value.value), LLVMFunctionTypeKind)) {
 			fn = LLVMBuildPointerCast(p->builder, fn, ftp, "");
 		}
-		LLVMTypeRef fnp = lb_llvm_get_pointer_type(LLVMTypeOf(fn));
 		GB_ASSERT_MSG(lb_is_type_kind(fnp, LLVMFunctionTypeKind), "%s", LLVMPrintTypeToString(fnp));
 
 		{
@@ -2723,7 +2721,7 @@ lbValue lb_build_builtin_proc(lbProcedure *p, Ast *expr, TypeAndValue const &tv,
 		{
 			Type *param_types[2] = {t_u32, t_u32};
 			Type *type = alloc_type_proc_from_types(param_types, gb_count_of(param_types), tv.type, false, ProcCC_None);
-			LLVMTypeRef func_type = lb_llvm_get_pointer_type(lb_type(p->module, type));
+			LLVMTypeRef func_type = lb_get_procedure_raw_type(p->module, type);
 			LLVMValueRef the_asm = llvm_get_inline_asm(
 				func_type,
 				str_lit("cpuid"),
@@ -2743,7 +2741,7 @@ lbValue lb_build_builtin_proc(lbProcedure *p, Ast *expr, TypeAndValue const &tv,
 	case BuiltinProc_x86_xgetbv:
 		{
 			Type *type = alloc_type_proc_from_types(&t_u32, 1, tv.type, false, ProcCC_None);
-			LLVMTypeRef func_type = lb_llvm_get_pointer_type(lb_type(p->module, type));
+			LLVMTypeRef func_type = lb_get_procedure_raw_type(p->module, type);
 			LLVMValueRef the_asm = llvm_get_inline_asm(
 				func_type,
 				str_lit("xgetbv"),

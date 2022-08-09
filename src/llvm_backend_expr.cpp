@@ -3345,7 +3345,7 @@ lbValue lb_build_expr_internal(lbProcedure *p, Ast *expr) {
 		default: GB_PANIC("Unhandled inline asm dialect"); break;
 		}
 
-		LLVMTypeRef func_type = lb_llvm_get_pointer_type(lb_type(p->module, t));
+		LLVMTypeRef func_type = lb_type_internal_for_procedures_raw(p->module, t);
 		LLVMValueRef the_asm = llvm_get_inline_asm(func_type, asm_string, constraints_string, ia->has_side_effects, ia->has_side_effects, dialect);
 		GB_ASSERT(the_asm != nullptr);
 		return {the_asm, t};

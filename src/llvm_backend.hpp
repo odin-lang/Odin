@@ -127,6 +127,7 @@ struct lbModule {
 	AstPackage *pkg; // associated
 
 	PtrMap<Type *, LLVMTypeRef> types;
+	PtrMap<Type *, LLVMTypeRef> func_raw_types;
 	PtrMap<void *, lbStructFieldRemapping> struct_field_remapping; // Key: LLVMTypeRef or Type *
 	i32 internal_type_level;
 
@@ -330,7 +331,8 @@ lbProcedure *lb_create_procedure(lbModule *module, Entity *entity, bool ignore_b
 void lb_end_procedure(lbProcedure *p);
 
 
-LLVMTypeRef  lb_type(lbModule *m, Type *type);
+LLVMTypeRef lb_type(lbModule *m, Type *type);
+LLVMTypeRef llvm_get_element_type(LLVMTypeRef type);
 
 lbBlock *lb_create_block(lbProcedure *p, char const *name, bool append=false);
 
@@ -343,7 +345,6 @@ lbValue lb_const_int(lbModule *m, Type *type, u64 value);
 
 lbAddr lb_addr(lbValue addr);
 Type *lb_addr_type(lbAddr const &addr);
-LLVMTypeRef lb_llvm_get_pointer_type(LLVMTypeRef type);
 LLVMTypeRef llvm_addr_type(lbModule *module, lbValue addr_val);
 void lb_addr_store(lbProcedure *p, lbAddr addr, lbValue value);
 lbValue lb_addr_load(lbProcedure *p, lbAddr const &addr);
