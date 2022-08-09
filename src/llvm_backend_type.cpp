@@ -105,7 +105,8 @@ lbValue lb_type_info(lbModule *m, Type *type) {
 	};
 
 	lbValue value = {};
-	value.value = LLVMConstGEP(lb_global_type_info_data_ptr(m).value, indices, gb_count_of(indices));
+	lbValue data = lb_global_type_info_data_ptr(m);
+	value.value = LLVMConstGEP2(lb_type(m, type_deref(data.type)), data.value, indices, gb_count_of(indices));
 	value.type = t_type_info_ptr;
 	return value;
 }
@@ -124,10 +125,16 @@ lbValue lb_get_type_info_ptr(lbModule *m, Type *type) {
 
 	lbValue res = {};
 	res.type = t_type_info_ptr;
-	res.value = LLVMConstGEP(lb_global_type_info_data_ptr(m).value, indices, cast(unsigned)gb_count_of(indices));
+	lbValue data = lb_global_type_info_data_ptr(m);
+	res.value = LLVMConstGEP2(lb_type(m, type_deref(data.type)), data.value, indices, cast(unsigned)gb_count_of(indices));
 	return res;
 }
 
+// The use of this method needs to be eliminated.
+LLVMTypeRef lb_llvm_get_pointer_type(LLVMTypeRef type)
+{
+	return LLVMGetElementType(type);
+}
 
 lbValue lb_type_info_member_types_offset(lbProcedure *p, isize count) {
 	GB_ASSERT(p->module == &p->module->gen->default_module);
@@ -179,10 +186,10 @@ void lb_setup_type_info_data(lbProcedure *p) { // NOTE(bill): Setup type_info da
 
 		LLVMValueRef indices[2] = {llvm_zero(m), llvm_zero(m)};
 		LLVMValueRef values[2] = {
-			LLVMConstInBoundsGEP(lb_global_type_info_data_ptr(m).value, indices, gb_count_of(indices)),
+			LLVMConstInBoundsGEP2(lb_type(m, lb_global_type_info_data_entity->type), lb_global_type_info_data_ptr(m).value, indices, gb_count_of(indices)),
 			LLVMConstInt(lb_type(m, t_int), type->Array.count, true),
 		};
-		LLVMValueRef slice = llvm_const_named_struct_internal(llvm_addr_type(global_type_table), values, gb_count_of(values));
+		LLVMValueRef slice = llvm_const_named_struct_internal(lb_type(m, type_deref(global_type_table.type)), values, gb_count_of(values));
 
 		LLVMSetInitializer(global_type_table.value, slice);
 	}
