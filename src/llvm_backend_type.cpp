@@ -130,11 +130,6 @@ lbValue lb_get_type_info_ptr(lbModule *m, Type *type) {
 	return res;
 }
 
-// NOTE: The use of this method needs to be eliminated for pointers.
-LLVMTypeRef llvm_get_element_type(LLVMTypeRef type) {
-	return LLVMGetElementType(type);
-}
-
 LLVMTypeRef lb_get_procedure_raw_type(lbModule *m, Type *type) {
 	return lb_type_internal_for_procedures_raw(m, type);
 }

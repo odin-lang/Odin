@@ -507,6 +507,9 @@ i64 lb_max_zero_init_size(void) {
 	return cast(i64)(4*build_context.word_size);
 }
 
+LLVMTypeRef OdinLLVMGetArrayElementType(LLVMTypeRef type);
+LLVMTypeRef OdinLLVMGetVectorElementType(LLVMTypeRef type);
+
 #define LB_STARTUP_RUNTIME_PROC_NAME   "__$startup_runtime"
 #define LB_STARTUP_TYPE_INFO_PROC_NAME "__$startup_type_info"
 #define LB_TYPE_INFO_DATA_NAME       "__$type_info_data"
