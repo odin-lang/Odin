@@ -204,7 +204,7 @@ enum BuildPath : u8 {
 	BuildPath_Main_Package,     // Input  Path to the package directory (or file) we're building.
 	BuildPath_RC,               // Input  Path for .rc  file, can be set with `-resource:`.
 	BuildPath_RES,              // Output Path for .res file, generated from previous.
-	BuildPath_Win_SDK_Root,     // windows_sdk_root
+	BuildPath_Win_SDK_Bin_Path, // windows_sdk_bin_path
 	BuildPath_Win_SDK_UM_Lib,   // windows_sdk_um_library_path
 	BuildPath_Win_SDK_UCRT_Lib, // windows_sdk_ucrt_library_path
 	BuildPath_VS_EXE,           // vs_exe_path
@@ -1336,7 +1336,7 @@ bool init_build_paths(String init_filename) {
 
 		if ((bc->command_kind & Command__does_build) && (!bc->ignore_microsoft_magic)) {
 			// NOTE(ic): It would be nice to extend this so that we could specify the Visual Studio version that we want instead of defaulting to the latest.
-			Find_Result_Utf8 find_result = find_visual_studio_and_windows_sdk_utf8();
+			Find_Result find_result = find_visual_studio_and_windows_sdk();
 			defer (mc_free_all());
 
 			if (find_result.windows_sdk_version == 0) {
@@ -1357,8 +1357,8 @@ bool init_build_paths(String init_filename) {
 			if (find_result.windows_sdk_um_library_path.len > 0) {
 				GB_ASSERT(find_result.windows_sdk_ucrt_library_path.len > 0);
 
-				if (find_result.windows_sdk_root.len > 0) {
-					bc->build_paths[BuildPath_Win_SDK_Root]     = path_from_string(ha, find_result.windows_sdk_root);
+				if (find_result.windows_sdk_bin_path.len > 0) {
+					bc->build_paths[BuildPath_Win_SDK_Bin_Path]  = path_from_string(ha, find_result.windows_sdk_bin_path);
 				}
 
 				if (find_result.windows_sdk_um_library_path.len > 0) {
