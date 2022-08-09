@@ -1651,7 +1651,7 @@ LLVMValueRef llvm_vector_expand_to_power_of_two(lbProcedure *p, LLVMValueRef val
 LLVMValueRef llvm_vector_reduce_add(lbProcedure *p, LLVMValueRef value) {
 	LLVMTypeRef type = LLVMTypeOf(value);
 	GB_ASSERT(LLVMGetTypeKind(type) == LLVMVectorTypeKind);
-	LLVMTypeRef elem = LLVMGetElementType(type);
+	LLVMTypeRef elem = OdinLLVMGetVectorElementType(type);
 	unsigned len = LLVMGetVectorSize(type);
 	if (len == 0) {
 		return LLVMConstNull(type);
@@ -1727,7 +1727,7 @@ LLVMValueRef llvm_vector_reduce_add(lbProcedure *p, LLVMValueRef value) {
 LLVMValueRef llvm_vector_add(lbProcedure *p, LLVMValueRef a, LLVMValueRef b) {
 	GB_ASSERT(LLVMTypeOf(a) == LLVMTypeOf(b));
 	
-	LLVMTypeRef elem = LLVMGetElementType(LLVMTypeOf(a));
+	LLVMTypeRef elem = OdinLLVMGetVectorElementType(LLVMTypeOf(a));
 	
 	if (LLVMGetTypeKind(elem) == LLVMIntegerTypeKind) {
 		return LLVMBuildAdd(p->builder, a, b, "");
@@ -1738,7 +1738,7 @@ LLVMValueRef llvm_vector_add(lbProcedure *p, LLVMValueRef a, LLVMValueRef b) {
 LLVMValueRef llvm_vector_mul(lbProcedure *p, LLVMValueRef a, LLVMValueRef b) {
 	GB_ASSERT(LLVMTypeOf(a) == LLVMTypeOf(b));
 	
-	LLVMTypeRef elem = LLVMGetElementType(LLVMTypeOf(a));
+	LLVMTypeRef elem = OdinLLVMGetVectorElementType(LLVMTypeOf(a));
 	
 	if (LLVMGetTypeKind(elem) == LLVMIntegerTypeKind) {
 		return LLVMBuildMul(p->builder, a, b, "");
@@ -1758,7 +1758,7 @@ LLVMValueRef llvm_vector_mul_add(lbProcedure *p, LLVMValueRef a, LLVMValueRef b,
 	GB_ASSERT(t == LLVMTypeOf(c));
 	GB_ASSERT(LLVMGetTypeKind(t) == LLVMVectorTypeKind);
 	
-	LLVMTypeRef elem = LLVMGetElementType(t);
+	LLVMTypeRef elem = OdinLLVMGetVectorElementType(t);
 	
 	bool is_possible = false;
 	

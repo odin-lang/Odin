@@ -2293,6 +2293,17 @@ void lb_emit_if(lbProcedure *p, lbValue cond, lbBlock *true_block, lbBlock *fals
 }
 
 
+gb_inline LLVMTypeRef OdinLLVMGetInternalElementType(LLVMTypeRef type) {
+	return LLVMGetElementType(type);
+}
+LLVMTypeRef OdinLLVMGetArrayElementType(LLVMTypeRef type) {
+	GB_ASSERT(lb_is_type_kind(type, LLVMArrayTypeKind));
+	return OdinLLVMGetInternalElementType(type);
+}
+LLVMTypeRef OdinLLVMGetVectorElementType(LLVMTypeRef type) {
+	GB_ASSERT(lb_is_type_kind(type, LLVMVectorTypeKind));
+	return OdinLLVMGetInternalElementType(type);
+}
 
 
 LLVMValueRef OdinLLVMBuildTransmute(lbProcedure *p, LLVMValueRef val, LLVMTypeRef dst_type) {
