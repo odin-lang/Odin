@@ -278,7 +278,8 @@ struct TypeProc {
 		Type *generic_row_count;                          \
 		Type *generic_column_count;                       \
 		i64   stride_in_bytes;                            \
-	})
+	})                                                        \
+	TYPE_KIND(SoaPointer, struct { Type *elem; })
 
 
 enum TypeKind {
@@ -350,6 +351,7 @@ enum Typeid_Kind : u8 {
 	Typeid_Relative_Pointer,
 	Typeid_Relative_Slice,
 	Typeid_Matrix,
+	Typeid_SoaPointer,
 };
 
 // IMPORTANT NOTE(bill): This must match the same as the in core.odin
@@ -644,6 +646,7 @@ gb_global Type *t_type_info_simd_vector          = nullptr;
 gb_global Type *t_type_info_relative_pointer     = nullptr;
 gb_global Type *t_type_info_relative_slice       = nullptr;
 gb_global Type *t_type_info_matrix               = nullptr;
+gb_global Type *t_type_info_soa_pointer          = nullptr;
 
 gb_global Type *t_type_info_named_ptr            = nullptr;
 gb_global Type *t_type_info_integer_ptr          = nullptr;
@@ -672,6 +675,7 @@ gb_global Type *t_type_info_simd_vector_ptr      = nullptr;
 gb_global Type *t_type_info_relative_pointer_ptr = nullptr;
 gb_global Type *t_type_info_relative_slice_ptr   = nullptr;
 gb_global Type *t_type_info_matrix_ptr           = nullptr;
+gb_global Type *t_type_info_soa_pointer_ptr      = nullptr;
 
 gb_global Type *t_allocator                      = nullptr;
 gb_global Type *t_allocator_ptr                  = nullptr;
@@ -735,6 +739,7 @@ Type *   bit_set_to_int(Type *t);
 bool are_types_identical(Type *x, Type *y);
 
 bool is_type_pointer(Type *t);
+bool is_type_soa_pointer(Type *t);
 bool is_type_proc(Type *t);
 bool is_type_slice(Type *t);
 bool is_type_integer(Type *t);
@@ -916,6 +921,13 @@ Type *alloc_type_multi_pointer(Type *elem) {
 	t->MultiPointer.elem = elem;
 	return t;
 }
+
+Type *alloc_type_soa_pointer(Type *elem) {
+	Type *t = alloc_type(Type_SoaPointer);
+	t->SoaPointer.elem = elem;
+	return t;
+}
+
 
 Type *alloc_type_array(Type *elem, i64 count, Type *generic_count = nullptr) {
 	if (generic_count != nullptr) {
@@ -1109,11 +1121,17 @@ Type *type_deref(Type *t) {
 		if (bt == nullptr) {
 			return nullptr;
 		}
-		if (bt->kind == Type_Pointer) {
+		switch (bt->kind) {
+		case Type_Pointer:
 			return bt->Pointer.elem;
-		}
-		if (bt->kind == Type_RelativePointer) {
+		case Type_RelativePointer:
 			return type_deref(bt->RelativePointer.pointer_type);
+		case Type_SoaPointer:
+			{
+				Type *elem = base_type(bt->SoaPointer.elem);
+				GB_ASSERT(elem->kind == Type_Struct && elem->Struct.soa_kind != StructSoa_None);
+				return elem->Struct.soa_elem;
+			}
 		}
 	}
 	return t;
@@ -1326,6 +1344,10 @@ bool is_type_pointer(Type *t) {
 		return (t->Basic.flags & BasicFlag_Pointer) != 0;
 	}
 	return t->kind == Type_Pointer;
+}
+bool is_type_soa_pointer(Type *t) {
+	t = base_type(t);
+	return t->kind == Type_SoaPointer;
 }
 bool is_type_multi_pointer(Type *t) {
 	t = base_type(t);
@@ -1804,7 +1826,7 @@ bool is_type_dereferenceable(Type *t) {
 	if (is_type_rawptr(t)) {
 		return false;
 	}
-	return is_type_pointer(t);
+	return is_type_pointer(t) || is_type_soa_pointer(t);
 }
 
 
@@ -2079,6 +2101,9 @@ bool is_type_polymorphic(Type *t, bool or_specialized=false) {
 	case Type_Pointer:
 		return is_type_polymorphic(t->Pointer.elem, or_specialized);
 
+	case Type_SoaPointer:
+		return is_type_polymorphic(t->SoaPointer.elem, or_specialized);
+
 	case Type_EnumeratedArray:
 		if (is_type_polymorphic(t->EnumeratedArray.index, or_specialized)) {
 			return true;
@@ -2196,6 +2221,7 @@ bool type_has_nil(Type *t) {
 	case Type_Slice:
 	case Type_Proc:
 	case Type_Pointer:
+	case Type_SoaPointer:
 	case Type_MultiPointer:
 	case Type_DynamicArray:
 	case Type_Map:
@@ -2261,6 +2287,8 @@ bool is_type_comparable(Type *t) {
 		}
 		return true;
 	case Type_Pointer:
+		return true;
+	case Type_SoaPointer:
 		return true;
 	case Type_MultiPointer:
 		return true;
@@ -2335,6 +2363,7 @@ bool is_type_simple_compare(Type *t) {
 
 	case Type_Pointer:
 	case Type_MultiPointer:
+	case Type_SoaPointer:
 	case Type_Proc:
 	case Type_BitSet:
 		return true;
@@ -2555,6 +2584,12 @@ bool are_types_identical_internal(Type *x, Type *y, bool check_tuple_names) {
 	case Type_MultiPointer:
 		if (y->kind == Type_MultiPointer) {
 			return are_types_identical(x->MultiPointer.elem, y->MultiPointer.elem);
+		}
+		break;
+
+	case Type_SoaPointer:
+		if (y->kind == Type_SoaPointer) {
+			return are_types_identical(x->SoaPointer.elem, y->SoaPointer.elem);
 		}
 		break;
 
@@ -3475,6 +3510,9 @@ i64 type_align_of_internal(Type *t, TypePath *path) {
 		return type_align_of_internal(t->RelativePointer.base_integer, path);
 	case Type_RelativeSlice:
 		return type_align_of_internal(t->RelativeSlice.base_integer, path);
+
+	case Type_SoaPointer:
+		return build_context.word_size;
 	}
 
 	// return gb_clamp(next_pow2(type_size_of(t)), 1, build_context.max_align);
@@ -3579,6 +3617,9 @@ i64 type_size_of_internal(Type *t, TypePath *path) {
 
 	case Type_MultiPointer:
 		return build_context.word_size;
+
+	case Type_SoaPointer:
+		return build_context.word_size*2;
 
 	case Type_Array: {
 		i64 count, align, size, alignment;
@@ -4015,6 +4056,11 @@ gbString write_type_to_string(gbString str, Type *type, bool shorthand=false) {
 	case Type_Pointer:
 		str = gb_string_append_rune(str, '^');
 		str = write_type_to_string(str, type->Pointer.elem);
+		break;
+
+	case Type_SoaPointer:
+		str = gb_string_appendc(str, "#soa ^");
+		str = write_type_to_string(str, type->SoaPointer.elem);
 		break;
 
 	case Type_MultiPointer:

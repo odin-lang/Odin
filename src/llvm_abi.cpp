@@ -62,7 +62,7 @@ bool lb_is_type_kind(LLVMTypeRef type, LLVMTypeKind kind) {
 	return LLVMGetTypeKind(type) == kind;
 }
 
-LLVMTypeRef lb_function_type_to_llvm_ptr(lbFunctionType *ft, bool is_var_arg) {
+LLVMTypeRef lb_function_type_to_llvm_raw(lbFunctionType *ft, bool is_var_arg) {
 	unsigned arg_count = cast(unsigned)ft->args.count;
 	unsigned offset = 0;
 
@@ -108,8 +108,14 @@ LLVMTypeRef lb_function_type_to_llvm_ptr(lbFunctionType *ft, bool is_var_arg) {
 	}
 	unsigned total_arg_count = arg_index;
 	LLVMTypeRef func_type = LLVMFunctionType(ret, args, total_arg_count, is_var_arg);
-	return LLVMPointerType(func_type, 0);
+	return func_type;
 }
+
+
+// LLVMTypeRef lb_function_type_to_llvm_ptr(lbFunctionType *ft, bool is_var_arg) {
+// 	LLVMTypeRef func_type = lb_function_type_to_llvm_raw(ft, is_var_arg);
+// 	return LLVMPointerType(func_type, 0);
+// }
 
 
 void lb_add_function_type_attributes(LLVMValueRef fn, lbFunctionType *ft, ProcCallingConvention calling_convention) {

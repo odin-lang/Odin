@@ -57,6 +57,7 @@ lbValue lb_typeid(lbModule *m, Type *type) {
 	case Type_SimdVector:      kind = Typeid_Simd_Vector;      break;
 	case Type_RelativePointer: kind = Typeid_Relative_Pointer; break;
 	case Type_RelativeSlice:   kind = Typeid_Relative_Slice;   break;
+	case Type_SoaPointer:      kind = Typeid_SoaPointer;       break;
 	}
 
 	if (is_type_cstring(type)) {
@@ -104,7 +105,8 @@ lbValue lb_type_info(lbModule *m, Type *type) {
 	};
 
 	lbValue value = {};
-	value.value = LLVMConstGEP(lb_global_type_info_data_ptr(m).value, indices, gb_count_of(indices));
+	lbValue data = lb_global_type_info_data_ptr(m);
+	value.value = LLVMConstGEP2(lb_type(m, type_deref(data.type)), data.value, indices, gb_count_of(indices));
 	value.type = t_type_info_ptr;
 	return value;
 }
@@ -123,8 +125,18 @@ lbValue lb_get_type_info_ptr(lbModule *m, Type *type) {
 
 	lbValue res = {};
 	res.type = t_type_info_ptr;
-	res.value = LLVMConstGEP(lb_global_type_info_data_ptr(m).value, indices, cast(unsigned)gb_count_of(indices));
+	lbValue data = lb_global_type_info_data_ptr(m);
+	res.value = LLVMConstGEP2(lb_type(m, type_deref(data.type)), data.value, indices, cast(unsigned)gb_count_of(indices));
 	return res;
+}
+
+// NOTE: The use of this method needs to be eliminated for pointers.
+LLVMTypeRef llvm_get_element_type(LLVMTypeRef type) {
+	return LLVMGetElementType(type);
+}
+
+LLVMTypeRef lb_get_procedure_raw_type(lbModule *m, Type *type) {
+	return lb_type_internal_for_procedures_raw(m, type);
 }
 
 
@@ -178,10 +190,10 @@ void lb_setup_type_info_data(lbProcedure *p) { // NOTE(bill): Setup type_info da
 
 		LLVMValueRef indices[2] = {llvm_zero(m), llvm_zero(m)};
 		LLVMValueRef values[2] = {
-			LLVMConstInBoundsGEP(lb_global_type_info_data_ptr(m).value, indices, gb_count_of(indices)),
+			LLVMConstInBoundsGEP2(lb_type(m, lb_global_type_info_data_entity->type), lb_global_type_info_data_ptr(m).value, indices, gb_count_of(indices)),
 			LLVMConstInt(lb_type(m, t_int), type->Array.count, true),
 		};
-		LLVMValueRef slice = llvm_const_named_struct_internal(llvm_addr_type(global_type_table), values, gb_count_of(values));
+		LLVMValueRef slice = llvm_const_named_struct_internal(lb_type(m, type_deref(global_type_table.type)), values, gb_count_of(values));
 
 		LLVMSetInitializer(global_type_table.value, slice);
 	}
@@ -434,6 +446,20 @@ void lb_setup_type_info_data(lbProcedure *p) { // NOTE(bill): Setup type_info da
 		case Type_MultiPointer: {
 			tag = lb_const_ptr_cast(m, variant_ptr, t_type_info_multi_pointer_ptr);
 			lbValue gep = lb_get_type_info_ptr(m, t->MultiPointer.elem);
+
+			LLVMValueRef vals[1] = {
+				gep.value,
+			};
+
+			lbValue res = {};
+			res.type = type_deref(tag.type);
+			res.value = llvm_const_named_struct(m, res.type, vals, gb_count_of(vals));
+			lb_emit_store(p, tag, res);
+			break;
+		}
+		case Type_SoaPointer: {
+			tag = lb_const_ptr_cast(m, variant_ptr, t_type_info_soa_pointer_ptr);
+			lbValue gep = lb_get_type_info_ptr(m, t->SoaPointer.elem);
 
 			LLVMValueRef vals[1] = {
 				gep.value,

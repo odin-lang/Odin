@@ -1,3 +1,13 @@
+
+LLVMValueRef lb_call_intrinsic(lbProcedure *p, const char *name, LLVMValueRef* args, unsigned arg_count, LLVMTypeRef* types, unsigned type_count)
+{
+	unsigned id = LLVMLookupIntrinsicID(name, gb_strlen(name));
+	GB_ASSERT_MSG(id != 0, "Unable to find %s", name);
+	LLVMValueRef ip = LLVMGetIntrinsicDeclaration(p->module->mod, id, types, type_count);
+	LLVMTypeRef call_type = LLVMIntrinsicGetType(p->module->ctx, id, types, type_count);
+	return LLVMBuildCall2(p->builder, call_type, ip, args, arg_count, "");
+}
+
 void lb_mem_copy_overlapping(lbProcedure *p, lbValue dst, lbValue src, lbValue len, bool is_volatile) {
 	dst = lb_emit_conv(p, dst, t_rawptr);
 	src = lb_emit_conv(p, src, t_rawptr);
@@ -10,23 +20,23 @@ void lb_mem_copy_overlapping(lbProcedure *p, lbValue dst, lbValue src, lbValue l
 			name = "llvm.memmove.inline";
 		}
 	}
-
 	LLVMTypeRef types[3] = {
 		lb_type(p->module, t_rawptr),
 		lb_type(p->module, t_rawptr),
 		lb_type(p->module, t_int)
 	};
-	unsigned id = LLVMLookupIntrinsicID(name, gb_strlen(name));
-	GB_ASSERT_MSG(id != 0, "Unable to find %s.%s.%s.%s", name, LLVMPrintTypeToString(types[0]), LLVMPrintTypeToString(types[1]), LLVMPrintTypeToString(types[2]));
-	LLVMValueRef ip = LLVMGetIntrinsicDeclaration(p->module->mod, id, types, gb_count_of(types));
+	LLVMValueRef args[4] = {
+		dst.value,
+		src.value,
+		len.value,
+		LLVMConstInt(LLVMInt1TypeInContext(p->module->ctx), 0, is_volatile)
+	};
 
-	LLVMValueRef args[4] = {};
-	args[0] = dst.value;
-	args[1] = src.value;
-	args[2] = len.value;
-	args[3] = LLVMConstInt(LLVMInt1TypeInContext(p->module->ctx), 0, is_volatile);
-	LLVMBuildCall(p->builder, ip, args, gb_count_of(args), "");
+	lb_call_intrinsic(p, name, args, gb_count_of(args), types, gb_count_of(types));
 }
+
+
+
 void lb_mem_copy_non_overlapping(lbProcedure *p, lbValue dst, lbValue src, lbValue len, bool is_volatile) {
 	dst = lb_emit_conv(p, dst, t_rawptr);
 	src = lb_emit_conv(p, src, t_rawptr);
@@ -45,16 +55,14 @@ void lb_mem_copy_non_overlapping(lbProcedure *p, lbValue dst, lbValue src, lbVal
 		lb_type(p->module, t_rawptr),
 		lb_type(p->module, t_int)
 	};
-	unsigned id = LLVMLookupIntrinsicID(name, gb_strlen(name));
-	GB_ASSERT_MSG(id != 0, "Unable to find %s.%s.%s.%s", name, LLVMPrintTypeToString(types[0]), LLVMPrintTypeToString(types[1]), LLVMPrintTypeToString(types[2]));
-	LLVMValueRef ip = LLVMGetIntrinsicDeclaration(p->module->mod, id, types, gb_count_of(types));
 
-	LLVMValueRef args[4] = {};
-	args[0] = dst.value;
-	args[1] = src.value;
-	args[2] = len.value;
-	args[3] = LLVMConstInt(LLVMInt1TypeInContext(p->module->ctx), 0, is_volatile);
-	LLVMBuildCall(p->builder, ip, args, gb_count_of(args), "");
+	LLVMValueRef args[4] = {
+			dst.value,
+			src.value,
+			len.value,
+			LLVMConstInt(LLVMInt1TypeInContext(p->module->ctx), 0, is_volatile) };
+
+	lb_call_intrinsic(p, name, args, gb_count_of(args), types, gb_count_of(types));
 }
 
 
@@ -121,8 +129,7 @@ lbProcedure *lb_create_procedure(lbModule *m, Entity *entity, bool ignore_body) 
 	}
 
 	char *c_link_name = alloc_cstring(permanent_allocator(), p->name);
-	LLVMTypeRef func_ptr_type = lb_type(m, p->type);
-	LLVMTypeRef func_type = LLVMGetElementType(func_ptr_type);
+	LLVMTypeRef func_type = lb_get_procedure_raw_type(m, p->type);
 
 	p->value = LLVMAddFunction(m->mod, c_link_name, func_type);
 
@@ -346,8 +353,7 @@ lbProcedure *lb_create_dummy_procedure(lbModule *m, String link_name, Type *type
 
 
 	char *c_link_name = alloc_cstring(permanent_allocator(), p->name);
-	LLVMTypeRef func_ptr_type = lb_type(m, p->type);
-	LLVMTypeRef func_type = LLVMGetElementType(func_ptr_type);
+	LLVMTypeRef func_type = lb_get_procedure_raw_type(m, p->type);
 
 	p->value = LLVMAddFunction(m->mod, c_link_name, func_type);
 
@@ -745,12 +751,12 @@ lbValue lb_emit_call_internal(lbProcedure *p, lbValue value, lbValue return_ptr,
 	GB_ASSERT(curr_block != p->decl_block->block);
 
 	{
-		LLVMTypeRef ftp = lb_type(p->module, value.type);
+		LLVMTypeRef fnp = lb_type_internal_for_procedures_raw(p->module, value.type);
+		LLVMTypeRef ftp = LLVMPointerType(fnp, 0);
 		LLVMValueRef fn = value.value;
 		if (!lb_is_type_kind(LLVMTypeOf(value.value), LLVMFunctionTypeKind)) {
 			fn = LLVMBuildPointerCast(p->builder, fn, ftp, "");
 		}
-		LLVMTypeRef fnp = LLVMGetElementType(LLVMTypeOf(fn));
 		GB_ASSERT_MSG(lb_is_type_kind(fnp, LLVMFunctionTypeKind), "%s", LLVMPrintTypeToString(fnp));
 
 		{
@@ -1264,13 +1270,8 @@ lbValue lb_build_builtin_simd_proc(lbProcedure *p, Ast *expr, TypeAndValue const
 			}
 			args[args_count++] = arg0.value;
 
-
 			LLVMTypeRef types[1] = {lb_type(p->module, arg0.type)};
-			unsigned id = LLVMLookupIntrinsicID(name, gb_strlen(name));
-			GB_ASSERT_MSG(id != 0, "Unable to find %s.%s", name, LLVMPrintTypeToString(types[0]));
-			LLVMValueRef ip = LLVMGetIntrinsicDeclaration(p->module->mod, id, types, gb_count_of(types));
-
-			res.value = LLVMBuildCall(p->builder, ip, args, cast(unsigned)args_count, "");
+			res.value = lb_call_intrinsic(p, name, args, cast(unsigned)args_count, types, gb_count_of(types));
 			return res;
 		}
 	case BuiltinProc_simd_reduce_min:
@@ -1303,15 +1304,11 @@ lbValue lb_build_builtin_simd_proc(lbProcedure *p, Ast *expr, TypeAndValue const
 			case BuiltinProc_simd_reduce_or:  name = "llvm.vector.reduce.or";  break;
 			case BuiltinProc_simd_reduce_xor: name = "llvm.vector.reduce.xor"; break;
 			}
-			LLVMTypeRef types[1] = {lb_type(p->module, arg0.type)};
-			unsigned id = LLVMLookupIntrinsicID(name, gb_strlen(name));
-			GB_ASSERT_MSG(id != 0, "Unable to find %s.%s", name, LLVMPrintTypeToString(types[0]));
-			LLVMValueRef ip = LLVMGetIntrinsicDeclaration(p->module->mod, id, types, gb_count_of(types));
 
-			LLVMValueRef args[1] = {};
-			args[0] = arg0.value;
+			LLVMTypeRef types[1] = { lb_type(p->module, arg0.type) };
+			LLVMValueRef args[1] = { arg0.value };
 
-			res.value = LLVMBuildCall(p->builder, ip, args, gb_count_of(args), "");
+			res.value = lb_call_intrinsic(p, name, args, gb_count_of(args), types, gb_count_of(types));
 			return res;
 		}
 
@@ -1360,15 +1357,10 @@ lbValue lb_build_builtin_simd_proc(lbProcedure *p, Ast *expr, TypeAndValue const
 			case BuiltinProc_simd_nearest: name = "llvm.nearbyint"; break;
 			}
 
-			LLVMTypeRef types[1] = {lb_type(p->module, arg0.type)};
-			unsigned id = LLVMLookupIntrinsicID(name, gb_strlen(name));
-			GB_ASSERT_MSG(id != 0, "Unable to find %s.%s", name, LLVMPrintTypeToString(types[0]));
-			LLVMValueRef ip = LLVMGetIntrinsicDeclaration(p->module->mod, id, types, gb_count_of(types));
+			LLVMTypeRef types[1] = { lb_type(p->module, arg0.type) };
+			LLVMValueRef args[1] = { arg0.value };
 
-			LLVMValueRef args[1] = {};
-			args[0] = arg0.value;
-
-			res.value = LLVMBuildCall(p->builder, ip, args, gb_count_of(args), "");
+			res.value = lb_call_intrinsic(p, name, args, gb_count_of(args), types, gb_count_of(types));
 			return res;
 		}
 
@@ -1432,15 +1424,10 @@ lbValue lb_build_builtin_simd_proc(lbProcedure *p, Ast *expr, TypeAndValue const
 			}
 
 			LLVMTypeRef types[1] = {lb_type(p->module, arg0.type)};
-			unsigned id = LLVMLookupIntrinsicID(name, gb_strlen(name));
-			GB_ASSERT_MSG(id != 0, "Unable to find %s.%s", name, LLVMPrintTypeToString(types[0]));
-			LLVMValueRef ip = LLVMGetIntrinsicDeclaration(p->module->mod, id, types, gb_count_of(types));
 
-			LLVMValueRef args[2] = {};
-			args[0] = arg0.value;
-			args[1] = arg1.value;
+			LLVMValueRef args[2] = { arg0.value, arg1.value };
 
-			res.value = LLVMBuildCall(p->builder, ip, args, gb_count_of(args), "");
+			res.value = lb_call_intrinsic(p, name, args, gb_count_of(args), types, gb_count_of(types));
 			return res;
 		}
 
@@ -1851,6 +1838,11 @@ lbValue lb_build_builtin_proc(lbProcedure *p, Ast *expr, TypeAndValue const &tv,
 			return lb_emit_matrix_flatten(p, m, tv.type);
 		}
 
+	case BuiltinProc_unreachable:
+		lb_emit_unreachable(p);
+		return {};
+
+
 	// "Intrinsics"
 
 	case BuiltinProc_alloca:
@@ -1898,11 +1890,7 @@ lbValue lb_build_builtin_proc(lbProcedure *p, Ast *expr, TypeAndValue const &tv,
 			case BuiltinProc_trap:       name = "llvm.trap";      break;
 			}
 
-			unsigned id = LLVMLookupIntrinsicID(name, gb_strlen(name));
-			GB_ASSERT_MSG(id != 0, "Unable to find %s", name);
-			LLVMValueRef ip = LLVMGetIntrinsicDeclaration(p->module->mod, id, nullptr, 0);
-
-			LLVMBuildCall(p->builder, ip, nullptr, 0, "");
+			lb_call_intrinsic(p, name, nullptr, 0, nullptr, 0);
 			if (id == BuiltinProc_trap) {
 				LLVMBuildUnreachable(p->builder);
 			}
@@ -1922,11 +1910,7 @@ lbValue lb_build_builtin_proc(lbProcedure *p, Ast *expr, TypeAndValue const &tv,
 				res.value = LLVMBuildCall2(p->builder, func_type, the_asm, nullptr, 0, "");
 			} else {
 				char const *name = "llvm.readcyclecounter";
-				unsigned id = LLVMLookupIntrinsicID(name, gb_strlen(name));
-				GB_ASSERT_MSG(id != 0, "Unable to find %s", name);
-				LLVMValueRef ip = LLVMGetIntrinsicDeclaration(p->module->mod, id, nullptr, 0);
-
-				res.value = LLVMBuildCall(p->builder, ip, nullptr, 0, "");
+				res.value = lb_call_intrinsic(p, name, nullptr, 0, nullptr, 0);
 			}
 			return res;
 		}
@@ -1981,16 +1965,11 @@ lbValue lb_build_builtin_proc(lbProcedure *p, Ast *expr, TypeAndValue const &tv,
 				}
 			}
 			LLVMTypeRef types[1] = {lb_type(p->module, type)};
-			unsigned id = LLVMLookupIntrinsicID(name, gb_strlen(name));
-			GB_ASSERT_MSG(id != 0, "Unable to find %s.%s", name, LLVMPrintTypeToString(types[0]));
-			LLVMValueRef ip = LLVMGetIntrinsicDeclaration(p->module->mod, id, types, gb_count_of(types));
 
-			LLVMValueRef args[2] = {};
-			args[0] = x.value;
-			args[1] = y.value;
+			LLVMValueRef args[2] = { x.value, y.value };
 
 			lbValue res = {};
-			res.value = LLVMBuildCall(p->builder, ip, args, gb_count_of(args), "");
+			res.value = lb_call_intrinsic(p, name, args, gb_count_of(args), types, gb_count_of(types));
 
 			if (is_type_tuple(main_type)) {
 				Type *res_type = nullptr;
@@ -2017,15 +1996,11 @@ lbValue lb_build_builtin_proc(lbProcedure *p, Ast *expr, TypeAndValue const &tv,
 
 			char const *name = "llvm.sqrt";
 			LLVMTypeRef types[1] = {lb_type(p->module, type)};
-			unsigned id = LLVMLookupIntrinsicID(name, gb_strlen(name));
-			GB_ASSERT_MSG(id != 0, "Unable to find %s.%s", name, LLVMPrintTypeToString(types[0]));
-			LLVMValueRef ip = LLVMGetIntrinsicDeclaration(p->module->mod, id, types, gb_count_of(types));
 
-			LLVMValueRef args[1] = {};
-			args[0] = x.value;
+			LLVMValueRef args[1] = { x.value };
 
 			lbValue res = {};
-			res.value = LLVMBuildCall(p->builder, ip, args, gb_count_of(args), "");
+			res.value = lb_call_intrinsic(p, name, args, gb_count_of(args), types, gb_count_of(types));
 			res.type = type;
 			return res;
 		}
@@ -2040,17 +2015,11 @@ lbValue lb_build_builtin_proc(lbProcedure *p, Ast *expr, TypeAndValue const &tv,
 
 			char const *name = "llvm.fma";
 			LLVMTypeRef types[1] = {lb_type(p->module, type)};
-			unsigned id = LLVMLookupIntrinsicID(name, gb_strlen(name));
-			GB_ASSERT_MSG(id != 0, "Unable to find %s.%s", name, LLVMPrintTypeToString(types[0]));
-			LLVMValueRef ip = LLVMGetIntrinsicDeclaration(p->module->mod, id, types, gb_count_of(types));
 
-			LLVMValueRef args[3] = {};
-			args[0] = x.value;
-			args[1] = y.value;
-			args[2] = z.value;
+			LLVMValueRef args[3] = { x.value, y.value, z.value };
 
 			lbValue res = {};
-			res.value = LLVMBuildCall(p->builder, ip, args, gb_count_of(args), "");
+			res.value = lb_call_intrinsic(p, name, args, gb_count_of(args), types, gb_count_of(types));
 			res.type = type;
 			return res;
 		}
@@ -2109,7 +2078,7 @@ lbValue lb_build_builtin_proc(lbProcedure *p, Ast *expr, TypeAndValue const &tv,
 
 			lbValue res = {};
 			res.type = tv.type;
-			res.value = LLVMBuildGEP(p->builder, ptr.value, indices, gb_count_of(indices), "");
+			res.value = LLVMBuildGEP2(p->builder, lb_type(p->module, type_deref(tv.type)), ptr.value, indices, gb_count_of(indices), "");
 			return res;
 		}
 	case BuiltinProc_ptr_sub:
@@ -2118,7 +2087,7 @@ lbValue lb_build_builtin_proc(lbProcedure *p, Ast *expr, TypeAndValue const &tv,
 			lbValue ptr1 = lb_build_expr(p, ce->args[1]);
 
 			LLVMTypeRef type_int = lb_type(p->module, t_int);
-			LLVMValueRef diff = LLVMBuildPtrDiff(p->builder, ptr0.value, ptr1.value, "");
+			LLVMValueRef diff = LLVMBuildPtrDiff2(p->builder, lb_type(p->module, ptr0.type), ptr0.value, ptr1.value, "");
 			diff = LLVMBuildIntCast2(p->builder, diff, type_int, /*signed*/true, "");
 
 			lbValue res = {};
@@ -2169,7 +2138,7 @@ lbValue lb_build_builtin_proc(lbProcedure *p, Ast *expr, TypeAndValue const &tv,
 	case BuiltinProc_atomic_load_explicit: {
 		lbValue dst = lb_build_expr(p, ce->args[0]);
 
-		LLVMValueRef instr = LLVMBuildLoad(p->builder, dst.value, "");
+		LLVMValueRef instr = LLVMBuildLoad2(p->builder,  lb_type(p->module, type_deref(dst.type)), dst.value, "");
 		switch (id) {
 		case BuiltinProc_non_temporal_load:
 			{
@@ -2343,18 +2312,14 @@ lbValue lb_build_builtin_proc(lbProcedure *p, Ast *expr, TypeAndValue const &tv,
 			GB_ASSERT(name != nullptr);
 
 			LLVMTypeRef types[1] = {lb_type(p->module, platform_type)};
-			unsigned id = LLVMLookupIntrinsicID(name, gb_strlen(name));
-			GB_ASSERT_MSG(id != 0, "Unable to find %s.%s", name, LLVMPrintTypeToString(types[0]));
-			LLVMValueRef ip = LLVMGetIntrinsicDeclaration(p->module->mod, id, types, gb_count_of(types));
-
 			lbValue res = {};
 
-			LLVMValueRef args[3] = {};
-			args[0] = x.value;
-			args[1] = y.value;
-			args[2] = scale.value;
+			LLVMValueRef args[3] = {
+					x.value,
+					y.value,
+					scale.value };
 
-			res.value = LLVMBuildCall(p->builder, ip, args, gb_count_of(args), "");
+			res.value = lb_call_intrinsic(p, name, args, gb_count_of(args), types, gb_count_of(types));
 			res.type = platform_type;
 			return lb_emit_conv(p, res, tv.type);
 		}
@@ -2368,17 +2333,10 @@ lbValue lb_build_builtin_proc(lbProcedure *p, Ast *expr, TypeAndValue const &tv,
 			char const *name = "llvm.expect";
 
 			LLVMTypeRef types[1] = {lb_type(p->module, t)};
-			unsigned id = LLVMLookupIntrinsicID(name, gb_strlen(name));
-			GB_ASSERT_MSG(id != 0, "Unable to find %s.%s", name, LLVMPrintTypeToString(types[0]));
-			LLVMValueRef ip = LLVMGetIntrinsicDeclaration(p->module->mod, id, types, gb_count_of(types));
-
 			lbValue res = {};
+			LLVMValueRef args[2] = { x.value, y.value };
 
-			LLVMValueRef args[2] = {};
-			args[0] = x.value;
-			args[1] = y.value;
-
-			res.value = LLVMBuildCall(p->builder, ip, args, gb_count_of(args), "");
+			res.value = lb_call_intrinsic(p, name, args, gb_count_of(args), types, gb_count_of(types));
 			res.type = t;
 			return lb_emit_conv(p, res, t);
 		}
@@ -2414,9 +2372,6 @@ lbValue lb_build_builtin_proc(lbProcedure *p, Ast *expr, TypeAndValue const &tv,
 			char const *name = "llvm.prefetch";
 
 			LLVMTypeRef types[1] = {lb_type(p->module, t_rawptr)};
-			unsigned id = LLVMLookupIntrinsicID(name, gb_strlen(name));
-			GB_ASSERT_MSG(id != 0, "Unable to find %s.%s", name, LLVMPrintTypeToString(types[0]));
-			LLVMValueRef ip = LLVMGetIntrinsicDeclaration(p->module->mod, id, types, gb_count_of(types));
 
 			LLVMTypeRef llvm_i32 = lb_type(p->module, t_i32);
 			LLVMValueRef args[4] = {};
@@ -2426,7 +2381,7 @@ lbValue lb_build_builtin_proc(lbProcedure *p, Ast *expr, TypeAndValue const &tv,
 			args[3] = LLVMConstInt(llvm_i32, cache, false);
 
 			lbValue res = {};
-			res.value = LLVMBuildCall(p->builder, ip, args, gb_count_of(args), "");
+			res.value = lb_call_intrinsic(p, name, args, gb_count_of(args), types, gb_count_of(types));
 			res.type = nullptr;
 			return res;
 		}
@@ -2672,7 +2627,8 @@ lbValue lb_build_builtin_proc(lbProcedure *p, Ast *expr, TypeAndValue const &tv,
 				isize len = gb_snprintf(name, max_len, "csbs$%x", id);
 				len -= 1;
 			}
-			LLVMValueRef global_data = LLVMAddGlobal(m->mod, LLVMTypeOf(array), name);
+			LLVMTypeRef type = LLVMTypeOf(array);
+			LLVMValueRef global_data = LLVMAddGlobal(m->mod, type, name);
 			LLVMSetInitializer(global_data, array);
 			LLVMSetLinkage(global_data, LLVMInternalLinkage);
 
@@ -2684,7 +2640,7 @@ lbValue lb_build_builtin_proc(lbProcedure *p, Ast *expr, TypeAndValue const &tv,
 			};
 			lbValue res = {};
 			res.type = tv.type;
-			res.value = LLVMBuildInBoundsGEP(p->builder, global_data, indices, gb_count_of(indices), "");
+			res.value = LLVMBuildInBoundsGEP2(p->builder, type, global_data, indices, gb_count_of(indices), "");
 			return res;
 
 		}
@@ -2695,9 +2651,6 @@ lbValue lb_build_builtin_proc(lbProcedure *p, Ast *expr, TypeAndValue const &tv,
 			LLVMTypeRef types[1] = {
 				lb_type(p->module, t_uintptr),
 			};
-			unsigned id = LLVMLookupIntrinsicID(name, gb_strlen(name));
-			GB_ASSERT_MSG(id != 0, "Unable to find %s", name, LLVMPrintTypeToString(types[0]));
-			LLVMValueRef ip = LLVMGetIntrinsicDeclaration(p->module->mod, id, types, gb_count_of(types));
 
 			LLVMValueRef args[2] = {};
 			args[0] = lb_emit_conv(p, lb_build_expr(p, ce->args[0]), t_uintptr).value;
@@ -2705,7 +2658,7 @@ lbValue lb_build_builtin_proc(lbProcedure *p, Ast *expr, TypeAndValue const &tv,
 
 			lbValue res = {};
 			res.type = tv.type;
-			res.value = LLVMBuildCall(p->builder, ip, args, gb_count_of(args), "");
+			res.value = lb_call_intrinsic(p, name, args, gb_count_of(args), types, gb_count_of(types));
 			return res;
 		}
 	case BuiltinProc_wasm_memory_size:
@@ -2714,16 +2667,13 @@ lbValue lb_build_builtin_proc(lbProcedure *p, Ast *expr, TypeAndValue const &tv,
 			LLVMTypeRef types[1] = {
 				lb_type(p->module, t_uintptr),
 			};
-			unsigned id = LLVMLookupIntrinsicID(name, gb_strlen(name));
-			GB_ASSERT_MSG(id != 0, "Unable to find %s", name, LLVMPrintTypeToString(types[0]));
-			LLVMValueRef ip = LLVMGetIntrinsicDeclaration(p->module->mod, id, types, gb_count_of(types));
 
 			LLVMValueRef args[1] = {};
 			args[0] = lb_emit_conv(p, lb_build_expr(p, ce->args[0]), t_uintptr).value;
 
 			lbValue res = {};
 			res.type = tv.type;
-			res.value = LLVMBuildCall(p->builder, ip, args, gb_count_of(args), "");
+			res.value = lb_call_intrinsic(p, name, args, gb_count_of(args), types, gb_count_of(types));
 			return res;
 		}
 
@@ -2733,9 +2683,6 @@ lbValue lb_build_builtin_proc(lbProcedure *p, Ast *expr, TypeAndValue const &tv,
 			LLVMTypeRef types[1] = {
 				lb_type(p->module, t_u32),
 			};
-			unsigned id = LLVMLookupIntrinsicID(name, gb_strlen(name));
-			GB_ASSERT_MSG(id != 0, "Unable to find %s", name, LLVMPrintTypeToString(types[0]));
-			LLVMValueRef ip = LLVMGetIntrinsicDeclaration(p->module->mod, id, nullptr, 0); // types, gb_count_of(types));
 
 			Type *t_u32_ptr = alloc_type_pointer(t_u32);
 
@@ -2746,7 +2693,7 @@ lbValue lb_build_builtin_proc(lbProcedure *p, Ast *expr, TypeAndValue const &tv,
 
 			lbValue res = {};
 			res.type = tv.type;
-			res.value = LLVMBuildCall(p->builder, ip, args, gb_count_of(args), "");
+			res.value = lb_call_intrinsic(p, name, args, gb_count_of(args), types, gb_count_of(types));
 			return res;
 		}
 
@@ -2756,19 +2703,16 @@ lbValue lb_build_builtin_proc(lbProcedure *p, Ast *expr, TypeAndValue const &tv,
 			LLVMTypeRef types[1] = {
 				lb_type(p->module, t_u32),
 			};
-			unsigned id = LLVMLookupIntrinsicID(name, gb_strlen(name));
-			GB_ASSERT_MSG(id != 0, "Unable to find %s", name, LLVMPrintTypeToString(types[0]));
-			LLVMValueRef ip = LLVMGetIntrinsicDeclaration(p->module->mod, id, nullptr, 0); // types, gb_count_of(types));
 
 			Type *t_u32_ptr = alloc_type_pointer(t_u32);
 
-			LLVMValueRef args[2] = {};
-			args[0] = lb_emit_conv(p, lb_build_expr(p, ce->args[0]), t_u32_ptr).value;
-			args[1] = lb_emit_conv(p, lb_build_expr(p, ce->args[1]), t_u32).value;
+			LLVMValueRef args[2] = {
+					lb_emit_conv(p, lb_build_expr(p, ce->args[0]), t_u32_ptr).value,
+					lb_emit_conv(p, lb_build_expr(p, ce->args[1]), t_u32).value };
 
 			lbValue res = {};
 			res.type = tv.type;
-			res.value = LLVMBuildCall(p->builder, ip, args, gb_count_of(args), "");
+			res.value = lb_call_intrinsic(p, name, args, gb_count_of(args), types, gb_count_of(types));
 			return res;
 		}
 
@@ -2777,7 +2721,7 @@ lbValue lb_build_builtin_proc(lbProcedure *p, Ast *expr, TypeAndValue const &tv,
 		{
 			Type *param_types[2] = {t_u32, t_u32};
 			Type *type = alloc_type_proc_from_types(param_types, gb_count_of(param_types), tv.type, false, ProcCC_None);
-			LLVMTypeRef func_type = LLVMGetElementType(lb_type(p->module, type));
+			LLVMTypeRef func_type = lb_get_procedure_raw_type(p->module, type);
 			LLVMValueRef the_asm = llvm_get_inline_asm(
 				func_type,
 				str_lit("cpuid"),
@@ -2797,7 +2741,7 @@ lbValue lb_build_builtin_proc(lbProcedure *p, Ast *expr, TypeAndValue const &tv,
 	case BuiltinProc_x86_xgetbv:
 		{
 			Type *type = alloc_type_proc_from_types(&t_u32, 1, tv.type, false, ProcCC_None);
-			LLVMTypeRef func_type = LLVMGetElementType(lb_type(p->module, type));
+			LLVMTypeRef func_type = lb_get_procedure_raw_type(p->module, type);
 			LLVMValueRef the_asm = llvm_get_inline_asm(
 				func_type,
 				str_lit("xgetbv"),
