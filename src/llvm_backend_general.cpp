@@ -854,7 +854,9 @@ void lb_emit_store(lbProcedure *p, lbValue ptr, lbValue value) {
 	if (LLVMIsNull(value.value)) {
 		LLVMTypeRef src_t = llvm_addr_type(p->module, ptr);
 		if (is_type_proc(a)) {
-			LLVMBuildStore(p->builder, LLVMConstNull(llvm_get_element_type(LLVMTypeOf(ptr.value))), ptr.value);
+			LLVMTypeRef rawptr_type = lb_type(p->module, t_rawptr);
+			LLVMTypeRef rawptr_ptr_type = LLVMPointerType(rawptr_type, 0);
+			LLVMBuildStore(p->builder, LLVMConstNull(rawptr_type), LLVMBuildBitCast(p->builder, ptr.value, rawptr_ptr_type, ""));
 		} else if (lb_sizeof(src_t) <= lb_max_zero_init_size()) {
 			LLVMBuildStore(p->builder, LLVMConstNull(src_t), ptr.value);
 		} else {
@@ -889,9 +891,11 @@ void lb_emit_store(lbProcedure *p, lbValue ptr, lbValue value) {
 		// NOTE(bill, 2020-11-11): Because of certain LLVM rules, a procedure value may be
 		// stored as regular pointer with no procedure information
 
-		LLVMTypeRef src_t = LLVMGetElementType(LLVMTypeOf(ptr.value));
-		LLVMValueRef v = LLVMBuildPointerCast(p->builder, value.value, src_t, "");
-		LLVMBuildStore(p->builder, v, ptr.value);
+ 		LLVMTypeRef rawptr_type = lb_type(p->module, t_rawptr);
+ 		LLVMTypeRef rawptr_ptr_type = LLVMPointerType(rawptr_type, 0);
+		LLVMBuildStore(p->builder,
+		               LLVMBuildPointerCast(p->builder, value.value, rawptr_type, ""),
+		               LLVMBuildPointerCast(p->builder, ptr.value, rawptr_ptr_type, ""));
 	} else {
 		Type *ca = core_type(a);
 		if (ca->kind == Type_Basic || ca->kind == Type_Proc) {
