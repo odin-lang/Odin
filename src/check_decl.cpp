@@ -320,7 +320,7 @@ void check_type_decl(CheckerContext *ctx, Entity *e, Ast *init_expr, Type *def) 
 		} else if (is_type_any(e->type)) {
 			error(init_expr, "'distinct' cannot be applied to 'any'");
 			is_distinct = false;
-		} else if (is_type_simd_vector(e->type)) {
+		} else if (is_type_simd_vector(e->type) || is_type_soa_pointer(e->type)) {
 			gbString str = type_to_string(e->type);
 			error(init_expr, "'distinct' cannot be applied to '%s'", str);
 			gb_string_free(str);

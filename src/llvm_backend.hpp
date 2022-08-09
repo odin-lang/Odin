@@ -42,6 +42,18 @@
 #define ODIN_LLVM_MINIMUM_VERSION_12 0
 #endif
 
+#if LLVM_VERSION_MAJOR > 13 || (LLVM_VERSION_MAJOR == 13 && LLVM_VERSION_MINOR >= 0 && LLVM_VERSION_PATCH > 0)
+#define ODIN_LLVM_MINIMUM_VERSION_13 1
+#else
+#define ODIN_LLVM_MINIMUM_VERSION_13 0
+#endif
+
+#if LLVM_VERSION_MAJOR > 14 || (LLVM_VERSION_MAJOR == 14 && LLVM_VERSION_MINOR >= 0 && LLVM_VERSION_PATCH > 0)
+#define ODIN_LLVM_MINIMUM_VERSION_14 1
+#else
+#define ODIN_LLVM_MINIMUM_VERSION_14 0
+#endif
+
 struct lbProcedure;
 
 struct lbValue {
@@ -115,6 +127,7 @@ struct lbModule {
 	AstPackage *pkg; // associated
 
 	PtrMap<Type *, LLVMTypeRef> types;
+	PtrMap<Type *, LLVMTypeRef> func_raw_types;
 	PtrMap<void *, lbStructFieldRemapping> struct_field_remapping; // Key: LLVMTypeRef or Type *
 	i32 internal_type_level;
 
@@ -299,7 +312,11 @@ struct lbProcedure {
 
 
 
-
+#if !ODIN_LLVM_MINIMUM_VERSION_14
+#define LLVMConstGEP2(Ty__, ConstantVal__, ConstantIndices__, NumIndices__) LLVMConstGEP(ConstantVal__, ConstantIndices__, NumIndices__)
+#define LLVMConstInBoundsGEP2(Ty__, ConstantVal__, ConstantIndices__, NumIndices__) LLVMConstInBoundsGEP(ConstantVal__, ConstantIndices__, NumIndices__)
+#define LLVMBuildPtrDiff2(Builder__, Ty__, LHS__, RHS__, Name__) LLVMBuildPtrDiff(Builder__, LHS__, RHS__, Name__)
+#endif
 
 bool lb_init_generator(lbGenerator *gen, Checker *c);
 
@@ -314,7 +331,8 @@ lbProcedure *lb_create_procedure(lbModule *module, Entity *entity, bool ignore_b
 void lb_end_procedure(lbProcedure *p);
 
 
-LLVMTypeRef  lb_type(lbModule *m, Type *type);
+LLVMTypeRef lb_type(lbModule *m, Type *type);
+LLVMTypeRef llvm_get_element_type(LLVMTypeRef type);
 
 lbBlock *lb_create_block(lbProcedure *p, char const *name, bool append=false);
 
@@ -327,7 +345,7 @@ lbValue lb_const_int(lbModule *m, Type *type, u64 value);
 
 lbAddr lb_addr(lbValue addr);
 Type *lb_addr_type(lbAddr const &addr);
-LLVMTypeRef lb_addr_lb_type(lbAddr const &addr);
+LLVMTypeRef llvm_addr_type(lbModule *module, lbValue addr_val);
 void lb_addr_store(lbProcedure *p, lbAddr addr, lbValue value);
 lbValue lb_addr_load(lbProcedure *p, lbAddr const &addr);
 lbValue lb_emit_load(lbProcedure *p, lbValue v);
@@ -480,6 +498,7 @@ LLVMTypeRef lb_type_padding_filler(lbModule *m, i64 padding, i64 padding_align);
 
 LLVMValueRef llvm_basic_shuffle(lbProcedure *p, LLVMValueRef vector, LLVMValueRef mask);
 
+LLVMValueRef lb_call_intrinsic(lbProcedure *p, const char *name, LLVMValueRef* args, unsigned arg_count, LLVMTypeRef* types, unsigned type_count);
 void lb_mem_copy_overlapping(lbProcedure *p, lbValue dst, lbValue src, lbValue len, bool is_volatile=false);
 void lb_mem_copy_non_overlapping(lbProcedure *p, lbValue dst, lbValue src, lbValue len, bool is_volatile=false);
 LLVMValueRef lb_mem_zero_ptr_internal(lbProcedure *p, LLVMValueRef ptr, LLVMValueRef len, unsigned alignment, bool is_volatile);

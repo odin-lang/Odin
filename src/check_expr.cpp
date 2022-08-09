@@ -119,6 +119,7 @@ void check_or_else_split_types(CheckerContext *c, Operand *x, String const &name
 void check_or_else_expr_no_value_error(CheckerContext *c, String const &name, Operand const &x, Type *type_hint);
 void check_or_return_split_types(CheckerContext *c, Operand *x, String const &name, Type **left_type_, Type **right_type_);
 
+bool is_diverging_expr(Ast *expr);
 
 void check_did_you_mean_print(DidYouMeanAnswers *d, char const *prefix = "") {
 	auto results = did_you_mean_results(d);
@@ -2051,7 +2052,7 @@ bool check_is_not_addressable(CheckerContext *c, Operand *o) {
 		return false;
 	}
 
-	return o->mode != Addressing_Variable;
+	return o->mode != Addressing_Variable && o->mode != Addressing_SoaVariable;
 }
 
 void check_unary_expr(CheckerContext *c, Operand *o, Token op, Ast *node) {
@@ -2068,9 +2069,6 @@ void check_unary_expr(CheckerContext *c, Operand *o, Token op, Ast *node) {
 					error(op, "Cannot take the pointer address of '%s' which is a procedure parameter", str);
 				} else {
 					switch (o->mode) {
-					case Addressing_SoaVariable:
-						error(op, "Cannot take the pointer address of '%s' as it is an indirect index of an SOA struct", str);
-						break;
 					case Addressing_Constant:
 						error(op, "Cannot take the pointer address of '%s' which is a constant", str);
 						break;
@@ -2098,7 +2096,19 @@ void check_unary_expr(CheckerContext *c, Operand *o, Token op, Ast *node) {
 			return;
 		}
 
-		o->type = alloc_type_pointer(o->type);
+		if (o->mode == Addressing_SoaVariable) {
+			ast_node(ue, UnaryExpr, node);
+			if (ast_node_expect(ue->expr, Ast_IndexExpr)) {
+				ast_node(ie, IndexExpr, ue->expr);
+				Type *soa_type = type_of_expr(ie->expr);
+				GB_ASSERT(is_type_soa_struct(soa_type));
+				o->type = alloc_type_soa_pointer(soa_type);
+			} else {
+				o->type = alloc_type_pointer(o->type);
+			}
+		} else {
+			o->type = alloc_type_pointer(o->type);
+		}
 
 		switch (o->mode) {
 		case Addressing_OptionalOk:
@@ -7399,8 +7409,25 @@ ExprKind check_or_else_expr(CheckerContext *c, Operand *o, Ast *node, Type *type
 		return Expr_Expr;
 	}
 
-	check_multi_expr_with_type_hint(c, &y, default_value, x.type);
-	error_operand_no_value(&y);
+	bool y_is_diverging = false;
+	check_expr_base(c, &y, default_value, x.type);
+	switch (y.mode) {
+	case Addressing_NoValue:
+		if (is_diverging_expr(y.expr)) {
+			// Allow
+			y.mode = Addressing_Value;
+			y_is_diverging = true;
+		} else {
+			error_operand_no_value(&y);
+			y.mode = Addressing_Invalid;
+		}
+		break;
+	case Addressing_Type:
+		error_operand_not_expression(&y);
+		y.mode = Addressing_Invalid;
+		break;
+	}
+
 	if (y.mode == Addressing_Invalid) {
 		o->mode = Addressing_Value;
 		o->type = t_invalid;
@@ -7414,7 +7441,9 @@ ExprKind check_or_else_expr(CheckerContext *c, Operand *o, Ast *node, Type *type
 	add_type_and_value(&c->checker->info, arg, x.mode, x.type, x.value);
 
 	if (left_type != nullptr) {
-		check_assignment(c, &y, left_type, name);
+		if (!y_is_diverging) {
+			check_assignment(c, &y, left_type, name);
+		}
 	} else {
 		check_or_else_expr_no_value_error(c, name, x, type_hint);
 	}
@@ -9358,6 +9387,9 @@ ExprKind check_expr_base_internal(CheckerContext *c, Operand *o, Ast *node, Type
 			if (t->kind == Type_Pointer && !is_type_empty_union(t->Pointer.elem)) {
 				o->mode = Addressing_Variable;
 				o->type = t->Pointer.elem;
+ 			} else if (t->kind == Type_SoaPointer) {
+				o->mode = Addressing_SoaVariable;
+				o->type = type_deref(t);
  			} else if (t->kind == Type_RelativePointer) {
  				if (o->mode != Addressing_Variable) {
  					gbString str = expr_to_string(o->expr);

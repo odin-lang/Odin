@@ -1031,6 +1031,15 @@ fmt_pointer :: proc(fi: ^Info, p: rawptr, verb: rune) {
 	}
 }
 
+fmt_soa_pointer :: proc(fi: ^Info, p: runtime.Raw_Soa_Pointer, verb: rune) {
+	io.write_string(fi.writer, "#soa{data=0x", &fi.n)
+	_fmt_int(fi, u64(uintptr(p.data)), 16, false, 8*size_of(rawptr), __DIGITS_UPPER)
+	io.write_string(fi.writer, ", index=", &fi.n)
+	_fmt_int(fi, u64(p.index), 10, false, 8*size_of(rawptr), __DIGITS_UPPER)
+	io.write_string(fi.writer, "}", &fi.n)
+}
+
+
 enum_value_to_string :: proc(val: any) -> (string, bool) {
 	v := val
 	v.id = runtime.typeid_base(v.id)
@@ -1866,6 +1875,10 @@ fmt_value :: proc(fi: ^Info, v: any, verb: rune) {
 			}
 			fmt_pointer(fi, ptr, verb)
 		}
+
+	case runtime.Type_Info_Soa_Pointer:
+		ptr := (^runtime.Raw_Soa_Pointer)(v.data)^
+		fmt_soa_pointer(fi, ptr, verb)
 
 	case runtime.Type_Info_Multi_Pointer:
 		ptr := (^rawptr)(v.data)^

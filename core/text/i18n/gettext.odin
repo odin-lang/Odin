@@ -99,14 +99,14 @@ parse_mo_from_bytes :: proc(data: []byte, options := DEFAULT_PARSE_OPTIONS, plur
 		}
 
 		for k in keys {
-			interned_key := strings.intern_get(&translation.intern, string(k))
+			interned_key, _ := strings.intern_get(&translation.intern, string(k))
 
 			interned_vals := make([]string, len(keys))
 			last_val: string
 
 			i := 0
 			for v in vals {
-				interned_vals[i] = strings.intern_get(&translation.intern, string(v))
+				interned_vals[i], _ = strings.intern_get(&translation.intern, string(v))
 				last_val = interned_vals[i]
 				i += 1
 			}

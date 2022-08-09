@@ -61,114 +61,38 @@ DEFAULT_PAGE_SIZE ::
 	4 * 1024
 
 alloc :: proc(size: int, alignment: int = DEFAULT_ALIGNMENT, allocator := context.allocator, loc := #caller_location) -> rawptr {
-	if size == 0 {
-		return nil
-	}
-	if allocator.procedure == nil {
-		return nil
-	}
-	data, err := allocator.procedure(allocator.data, Allocator_Mode.Alloc, size, alignment, nil, 0, loc)
-	_ = err
+	data, _ := runtime.mem_alloc(size, alignment, allocator, loc)
 	return raw_data(data)
 }
 
 alloc_bytes :: proc(size: int, alignment: int = DEFAULT_ALIGNMENT, allocator := context.allocator, loc := #caller_location) -> ([]byte, Allocator_Error) {
-	if size == 0 {
-		return nil, nil
-	}
-	if allocator.procedure == nil {
-		return nil, nil
-	}
-	return allocator.procedure(allocator.data, Allocator_Mode.Alloc, size, alignment, nil, 0, loc)
+	return runtime.mem_alloc(size, alignment, allocator, loc)
 }
 
 free :: proc(ptr: rawptr, allocator := context.allocator, loc := #caller_location) -> Allocator_Error {
-	if ptr == nil {
-		return nil
-	}
-	if allocator.procedure == nil {
-		return nil
-	}
-	_, err := allocator.procedure(allocator.data, Allocator_Mode.Free, 0, 0, ptr, 0, loc)
-	return err
+	return runtime.mem_free(ptr, allocator, loc)
 }
 
 free_bytes :: proc(bytes: []byte, allocator := context.allocator, loc := #caller_location) -> Allocator_Error {
-	if bytes == nil {
-		return nil
-	}
-	if allocator.procedure == nil {
-		return nil
-	}
-	_, err := allocator.procedure(allocator.data, Allocator_Mode.Free, 0, 0, raw_data(bytes), len(bytes), loc)
-	return err
+	return runtime.mem_free_bytes(bytes, allocator, loc)
 }
 
 free_all :: proc(allocator := context.allocator, loc := #caller_location) -> Allocator_Error {
-	if allocator.procedure != nil {
-		_, err := allocator.procedure(allocator.data, Allocator_Mode.Free_All, 0, 0, nil, 0, loc)
-		return err
-	}
-	return nil
+	return runtime.mem_free_all(allocator, loc)
 }
 
 resize :: proc(ptr: rawptr, old_size, new_size: int, alignment: int = DEFAULT_ALIGNMENT, allocator := context.allocator, loc := #caller_location) -> rawptr {
-	if allocator.procedure == nil {
-		return nil
-	}
-	if new_size == 0 {
-		if ptr != nil {
-			allocator.procedure(allocator.data, Allocator_Mode.Free, 0, 0, ptr, old_size, loc)
-		}
-		return nil
-	} else if ptr == nil {
-		_, err := allocator.procedure(allocator.data, Allocator_Mode.Alloc, new_size, alignment, nil, 0, loc)
-		_ = err
-		return nil
-	}
-	data, err := allocator.procedure(allocator.data, Allocator_Mode.Resize, new_size, alignment, ptr, old_size, loc)
-	if err == .Mode_Not_Implemented {
-		data, err = allocator.procedure(allocator.data, Allocator_Mode.Alloc, new_size, alignment, nil, 0, loc)
-		if err != nil {
-			return nil
-		}
-		runtime.copy(data, byte_slice(ptr, old_size))
-		_, err = allocator.procedure(allocator.data, Allocator_Mode.Free, 0, 0, ptr, old_size, loc)
-		return raw_data(data)
-	}
+	data, _ := runtime.mem_resize(ptr, old_size, new_size, alignment, allocator, loc)
 	return raw_data(data)
 }
 
 resize_bytes :: proc(old_data: []byte, new_size: int, alignment: int = DEFAULT_ALIGNMENT, allocator := context.allocator, loc := #caller_location) -> ([]byte, Allocator_Error) {
-	if allocator.procedure == nil {
-		return nil, nil
-	}
-	ptr := raw_data(old_data)
-	old_size := len(old_data)
-	if new_size == 0 {
-		if ptr != nil {
-			_, err := allocator.procedure(allocator.data, Allocator_Mode.Free, 0, 0, ptr, old_size, loc)
-			return nil, err
-		}
-		return nil, nil
-	} else if ptr == nil {
-		return allocator.procedure(allocator.data, Allocator_Mode.Alloc, new_size, alignment, nil, 0, loc)
-	}
-	data, err := allocator.procedure(allocator.data, Allocator_Mode.Resize, new_size, alignment, ptr, old_size, loc)
-	if err == .Mode_Not_Implemented {
-		data, err = allocator.procedure(allocator.data, Allocator_Mode.Alloc, new_size, alignment, nil, 0, loc)
-		if err != nil {
-			return data, err
-		}
-		runtime.copy(data, old_data)
-		_, err = allocator.procedure(allocator.data, Allocator_Mode.Free, 0, 0, ptr, old_size, loc)
-	}
-	return data, err
+	return runtime.mem_resize(raw_data(old_data), len(old_data), new_size, alignment, allocator, loc)
 }
 
 query_features :: proc(allocator: Allocator, loc := #caller_location) -> (set: Allocator_Mode_Set) {
 	if allocator.procedure != nil {
-		allocator.procedure(allocator.data, Allocator_Mode.Query_Features, 0, 0, &set, 0, loc)
+		allocator.procedure(allocator.data, .Query_Features, 0, 0, &set, 0, loc)
 		return set
 	}
 	return nil
@@ -177,7 +101,7 @@ query_features :: proc(allocator: Allocator, loc := #caller_location) -> (set: A
 query_info :: proc(pointer: rawptr, allocator: Allocator, loc := #caller_location) -> (props: Allocator_Query_Info) {
 	props.pointer = pointer
 	if allocator.procedure != nil {
-		allocator.procedure(allocator.data, Allocator_Mode.Query_Info, 0, 0, &props, 0, loc)
+		allocator.procedure(allocator.data, .Query_Info, 0, 0, &props, 0, loc)
 	}
 	return
 }
