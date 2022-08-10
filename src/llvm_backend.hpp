@@ -357,8 +357,9 @@ lbValue lb_build_expr(lbProcedure *p, Ast *expr);
 lbAddr  lb_build_addr(lbProcedure *p, Ast *expr);
 void lb_build_stmt_list(lbProcedure *p, Array<Ast *> const &stmts);
 
-lbValue lb_build_gep(lbProcedure *p, lbValue const &value, i32 index) ;
-
+lbValue lb_emit_epi(lbProcedure *p, lbValue const &value, isize index);
+lbValue lb_emit_epi(lbModule *m, lbValue const &value, isize index);
+lbValue lb_emit_array_epi(lbModule *m, lbValue s, isize index);
 lbValue lb_emit_struct_ep(lbProcedure *p, lbValue s, i32 index);
 lbValue lb_emit_struct_ev(lbProcedure *p, lbValue s, i32 index);
 lbValue lb_emit_array_epi(lbProcedure *p, lbValue value, isize index);
