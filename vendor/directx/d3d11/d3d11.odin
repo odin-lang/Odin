@@ -3625,3 +3625,36 @@ IFunctionLinkingGraph_VTable :: struct {
 	GetLastError:         proc "stdcall" (this: ^IFunctionLinkingGraph, ppErrorBuffer: ^^IBlob) -> HRESULT,
 	GenerateHlsl:         proc "stdcall" (this: ^IFunctionLinkingGraph, uFlags: u32, ppBuffer: ^^IBlob) -> HRESULT,
 }
+
+IDebug_UUID_STRING :: "79CF2233-7536-4948-9D36-1E4692DC5760"
+IDebug_UUID := &IID{0x79CF2233, 0x7536, 0x4948, {0x9D, 0x36, 0x1E, 0x46, 0x92, 0xDC, 0x57, 0x60}}
+
+IDebug :: struct #raw_union {
+	#subtype iunknown: IUnknown,
+	using id3d11debug_vtable: ^IDebug_VTable,
+}
+
+RLDO_FLAGS :: enum u32 { // TODO: make bit_set
+	SUMMARY = 0x1,
+	DETAIL = 0x2,
+	IGNORE_INTERNAL = 0x4,
+}
+
+DEBUG_FEATURE :: enum u32 { // TODO: make bit_set
+	FLUSH_PER_RENDER_OP = 0x1,
+	FINISH_PER_RENDER_OP = 0x2,
+	FEATURE_PRESENT_PER_RENDER_OP = 0x4,
+}
+
+IDebug_VTable :: struct {
+	using iunkown_vtable: IUnknown_VTable,
+	SetFeatureMask:             proc "stdcall" (this: ^IDebug, mask: DEBUG_FEATURE) -> HRESULT,
+	GetFeatureMask:             proc "stdcall" (this: ^IDebug) -> DEBUG_FEATURE,
+	SetPresentPerRenderOpDelay: proc "stdcall" (this: ^IDebug, Milliseconds: u32) -> HRESULT,
+	GetPresentPerRenderOpDelay: proc "stdcall" (this: ^IDebug) -> u32,
+	SetSwapChain:               proc "stdcall" (this: ^IDebug, pSwapChain: ^dxgi.ISwapChain) -> HRESULT,
+	GetSwapChain:               proc "stdcall" (this: ^IDebug, ppSwapChain: ^^dxgi.ISwapChain) -> HRESULT,
+	ValidateContext:            proc "stdcall" (this: ^IDebug, pContext: ^IDeviceContext) -> HRESULT,
+	ReportLiveDeviceObjects:    proc "stdcall" (this: ^IDebug, Flags: RLDO_FLAGS) -> HRESULT,
+	ValidateContextForDispatch: proc "stdcall" (this: ^IDebug, pContext: ^IDeviceContext) -> HRESULT,
+}
