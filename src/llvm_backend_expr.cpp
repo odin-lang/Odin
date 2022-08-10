@@ -1345,7 +1345,13 @@ lbValue lb_build_binary_expr(lbProcedure *p, Ast *expr) {
 	case Token_Shr: {
 		lbValue left, right;
 		Type *type = default_type(tv.type);
-		left = lb_build_expr(p, be->left);
+
+		if (lb_is_expr_untyped_const(be->left) && !is_type_integer(type)) {
+			type = t_int;
+			left = lb_expr_untyped_const_to_typed(p->module, be->left, t_int);
+		} else {
+			left = lb_build_expr(p, be->left);
+		}
 
 		if (lb_is_expr_untyped_const(be->right)) {
 			// NOTE(bill): RHS shift operands can still be untyped
