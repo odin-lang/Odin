@@ -212,6 +212,45 @@ void lb_loop_end(lbProcedure *p, lbLoopData const &data) {
 }
 
 
+// This emits a GEP at 0, index
+lbValue lb_emit_epi(lbProcedure *p, lbValue const &value, isize index) {
+	GB_ASSERT(is_type_pointer(value.type));
+	Type *type = type_deref(value.type);
+
+	LLVMValueRef indices[2] = {
+		LLVMConstInt(lb_type(p->module, t_int), 0, false),
+		LLVMConstInt(lb_type(p->module, t_int), cast(unsigned long long)index, false),
+	};
+	LLVMTypeRef llvm_type = lb_type(p->module, type);
+	lbValue res = {};
+	Type *ptr = base_array_type(type);
+	res.type = alloc_type_pointer(ptr);
+	if (LLVMIsConstant(value.value)) {
+		res.value = LLVMConstGEP2(llvm_type, value.value, indices, gb_count_of(indices));
+	} else {
+		res.value = LLVMBuildGEP2(p->builder, llvm_type, value.value, indices, gb_count_of(indices), "");
+	}
+	return res;
+}
+// This emits a GEP at 0, index
+lbValue lb_emit_epi(lbModule *m, lbValue const &value, isize index) {
+	GB_ASSERT(is_type_pointer(value.type));
+	GB_ASSERT(LLVMIsConstant(value.value));
+	Type *type = type_deref(value.type);
+
+	LLVMValueRef indices[2] = {
+		LLVMConstInt(lb_type(m, t_int), 0, false),
+		LLVMConstInt(lb_type(m, t_int), cast(unsigned long long)index, false),
+	};
+	lbValue res = {};
+	Type *ptr = base_array_type(type);
+	res.type = alloc_type_pointer(ptr);
+	res.value = LLVMConstGEP2(lb_type(m, type), value.value, indices, gb_count_of(indices));
+	return res;
+}
+
+
+
 LLVMValueRef llvm_zero(lbModule *m) {
 	return LLVMConstInt(lb_type(m, t_int), 0, false);
 }
