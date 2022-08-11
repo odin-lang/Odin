@@ -1169,11 +1169,11 @@ LoadDirectiveResult check_load_directive(CheckerContext *c, Operand *operand, As
 	String name = bd->name.string;
 	GB_ASSERT(name == "load");
 
-	if (ce->args.count != 1) {
+	if (ce->args.count != 1 && ce->args.count != 2) {
 		if (ce->args.count == 0) {
-			error(ce->close, "'#load' expects 1 argument, got 0");
+			error(ce->close, "'#%.*s' expects 1 or 2 arguments, got 0", LIT(name));
 		} else {
-			error(ce->args[0], "'#load' expects 1 argument, got %td", ce->args.count);
+			error(ce->args[0], "'#%.*s' expects 1 or 2 arguments, got %td", LIT(name), ce->args.count);
 		}
 
 		return LoadDirective_Error;
@@ -1183,13 +1183,13 @@ LoadDirectiveResult check_load_directive(CheckerContext *c, Operand *operand, As
 	Operand o = {};
 	check_expr(c, &o, arg);
 	if (o.mode != Addressing_Constant) {
-		error(arg, "'#load' expected a constant string argument");
+		error(arg, "'#%.*s' expected a constant string argument", LIT(name));
 		return LoadDirective_Error;
 	}
 
 	if (!is_type_string(o.type)) {
 		gbString str = type_to_string(o.type);
-		error(arg, "'#load' expected a constant string, got %s", str);
+		error(arg, "'#%.*s' expected a constant string, got %s", LIT(name), str);
 		gb_string_free(str);
 		return LoadDirective_Error;
 	}
@@ -1197,8 +1197,43 @@ LoadDirectiveResult check_load_directive(CheckerContext *c, Operand *operand, As
 	GB_ASSERT(o.value.kind == ExactValue_String);
 
 	operand->type = t_u8_slice;
-	if (type_hint && is_type_string(type_hint)) {
-		operand->type = type_hint;
+	if (ce->args.count == 1) {
+		if (type_hint && is_type_string(type_hint)) {
+			operand->type = type_hint;
+		}
+	} else if (ce->args.count == 2) {
+		bool failed = false;
+		Ast *arg_type = ce->args[1];
+		Type *type = check_type(c, arg_type);
+		if (type != nullptr && type != t_invalid) {
+			if (is_type_string(type)) {
+				operand->type = type;
+			} else if (is_type_slice(type) /*|| is_type_array(type) || is_type_enumerated_array(type)*/) {
+				Type *elem = nullptr;
+				Type *bt = base_type(type);
+				if (bt->kind == Type_Slice) {
+					elem = bt->Slice.elem;
+				} else if (bt->kind == Type_Array) {
+					elem = bt->Array.elem;
+				} else if (bt->kind == Type_EnumeratedArray) {
+					elem = bt->EnumeratedArray.elem;
+				}
+				GB_ASSERT(elem != nullptr);
+				if (is_type_load_safe(elem)) {
+					operand->type = type;
+				} else {
+					failed = true;
+				}
+			} else {
+				failed = true;
+			}
+		}
+
+		if (failed) {
+			gbString type_str = type_to_string(type);
+			error(arg_type, "'#%.*s' invalid type, expected a string, or slice of simple types, got %s", LIT(name), type_str);
+			gb_string_free(type_str);
+		}
 	}
 	operand->mode = Addressing_Constant;
 
