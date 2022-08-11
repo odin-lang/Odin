@@ -1074,6 +1074,95 @@ bool check_builtin_simd_operation(CheckerContext *c, Operand *operand, Ast *call
 	return false;
 }
 
+bool cache_load_file_directive(CheckerContext *c, Ast *call, String const &original_string, bool err_on_not_found, LoadFileCache **cache_) {
+	ast_node(ce, CallExpr, call);
+	ast_node(bd, BasicDirective, ce->proc);
+	String builtin_name = bd->name.string;
+
+	String base_dir = dir_from_path(get_file_path_string(call->file_id));
+
+	BlockingMutex *ignore_mutex = nullptr;
+	String path = {};
+	bool ok = determine_path_from_string(ignore_mutex, call, base_dir, original_string, &path);
+	gb_unused(ok);
+
+
+	MUTEX_GUARD(&c->info->load_file_mutex);
+
+	gbFileError file_error = gbFileError_None;
+	String data = {};
+
+	LoadFileCache **cache_ptr = string_map_get(&c->info->load_file_cache, path);
+	LoadFileCache *cache = cache_ptr ? *cache_ptr : nullptr;
+	if (cache) {
+		file_error = cache->file_error;
+		data = cache->data;
+	}
+	defer ({
+		if (cache == nullptr) {
+			LoadFileCache *new_cache = gb_alloc_item(permanent_allocator(), LoadFileCache);
+			new_cache->path = path;
+			new_cache->data = data;
+			new_cache->file_error = file_error;
+			string_map_init(&new_cache->hashes, heap_allocator(), 32);
+			string_map_set(&c->info->load_file_cache, path, new_cache);
+			if (cache_) *cache_ = new_cache;
+		} else {
+			cache->data = data;
+			cache->file_error = file_error;
+			if (cache_) *cache_ = cache;
+		}
+	});
+
+	char *c_str = alloc_cstring(heap_allocator(), path);
+	defer (gb_free(heap_allocator(), c_str));
+
+	gbFile f = {};
+	if (cache == nullptr) {
+		file_error = gb_file_open(&f, c_str);
+	}
+	defer (gb_file_close(&f));
+
+	switch (file_error) {
+	default:
+	case gbFileError_Invalid:
+		if (err_on_not_found) {
+			error(ce->proc, "Failed to `#%.*s` file: %s; invalid file or cannot be found", LIT(builtin_name), c_str);
+		}
+		call->state_flags |= StateFlag_DirectiveWasFalse;
+		return false;
+	case gbFileError_NotExists:
+		if (err_on_not_found) {
+			error(ce->proc, "Failed to `#%.*s` file: %s; file cannot be found", LIT(builtin_name), c_str);
+		}
+		call->state_flags |= StateFlag_DirectiveWasFalse;
+		return false;
+	case gbFileError_Permission:
+		if (err_on_not_found) {
+			error(ce->proc, "Failed to `#%.*s` file: %s; file permissions problem", LIT(builtin_name), c_str);
+		}
+		call->state_flags |= StateFlag_DirectiveWasFalse;
+		return false;
+	case gbFileError_None:
+		// Okay
+		break;
+	}
+
+	if (cache == nullptr) {
+		isize file_size = cast(isize)gb_file_size(&f);
+		if (file_size > 0) {
+			u8 *ptr = cast(u8 *)gb_alloc(permanent_allocator(), file_size+1);
+			gb_file_read_at(&f, ptr, file_size, 0);
+			ptr[file_size] = '\0';
+			data.text = ptr;
+			data.len = file_size;
+		}
+	}
+
+	return true;
+}
+
+
 LoadDirectiveResult check_load_directive(CheckerContext *c, Operand *operand, Ast *call, Type *type_hint, bool err_on_not_found) {
 	ast_node(ce, CallExpr, call);
 	ast_node(bd, BasicDirective, ce->proc);
@@ -1105,65 +1194,17 @@ LoadDirectiveResult check_load_directive(CheckerContext *c, Operand *operand, As
 		return LoadDirective_Error;
 	}
 
-	gbAllocator a = heap_allocator();
-
 	GB_ASSERT(o.value.kind == ExactValue_String);
-	String base_dir = dir_from_path(get_file_path_string(bd->token.pos.file_id));
-	String original_string = o.value.value_string;
 
-
-	BlockingMutex *ignore_mutex = nullptr;
-	String path = {};
-	bool ok = determine_path_from_string(ignore_mutex, call, base_dir, original_string, &path);
-	gb_unused(ok);
-
-	char *c_str = alloc_cstring(a, path);
-	defer (gb_free(a, c_str));
-
-
-	gbFile f = {};
-	gbFileError file_err = gb_file_open(&f, c_str);
-	defer (gb_file_close(&f));
-
-	switch (file_err) {
-	default:
-	case gbFileError_Invalid:
-		if (err_on_not_found) {
-			error(ce->proc, "Failed to `#load` file: %s; invalid file or cannot be found", c_str);
-		}
-		call->state_flags |= StateFlag_DirectiveWasFalse;
-		return LoadDirective_NotFound;
-	case gbFileError_NotExists:
-		if (err_on_not_found) {
-			error(ce->proc, "Failed to `#load` file: %s; file cannot be found", c_str);
-		}
-		call->state_flags |= StateFlag_DirectiveWasFalse;
-		return LoadDirective_NotFound;
-	case gbFileError_Permission:
-		if (err_on_not_found) {
-			error(ce->proc, "Failed to `#load` file: %s; file permissions problem", c_str);
-		}
-		call->state_flags |= StateFlag_DirectiveWasFalse;
-		return LoadDirective_NotFound;
-	case gbFileError_None:
-		// Okay
-		break;
+	LoadFileCache *cache = nullptr;
+	if (cache_load_file_directive(c, call, o.value.value_string, err_on_not_found, &cache)) {
+		operand->type = t_u8_slice;
+		operand->mode = Addressing_Constant;
+		operand->value = exact_value_string(cache->data);
+		return LoadDirective_Success;
 	}
+	return LoadDirective_NotFound;
 
-	String result = {};
-	isize file_size = cast(isize)gb_file_size(&f);
-	if (file_size > 0) {
-		u8 *data = cast(u8 *)gb_alloc(a, file_size+1);
-		gb_file_read_at(&f, data, file_size, 0);
-		data[file_size] = '\0';
-		result.text = data;
-		result.len = file_size;
-	}
-
-	operand->type = t_u8_slice;
-	operand->mode = Addressing_Constant;
-	operand->value = exact_value_string(result);
-	return LoadDirective_Success;
 }
 
 
@@ -1232,14 +1273,11 @@ bool check_builtin_procedure_directive(CheckerContext *c, Operand *operand, Ast 
 			gb_string_free(str);
 			return false;
 		}
-
-
 		gbAllocator a = heap_allocator();
 
 		GB_ASSERT(o.value.kind == ExactValue_String);
 		GB_ASSERT(o_hash.value.kind == ExactValue_String);
 
-		String base_dir = dir_from_path(get_file_path_string(bd->token.pos.file_id));
 		String original_string = o.value.value_string;
 		String hash_kind = o_hash.value.value_string;
 
@@ -1272,71 +1310,47 @@ bool check_builtin_procedure_directive(CheckerContext *c, Operand *operand, Ast 
 			return false;
 		}
 
-
-		BlockingMutex *ignore_mutex = nullptr;
-		String path = {};
-		bool ok = determine_path_from_string(ignore_mutex, call, base_dir, original_string, &path);
-		gb_unused(ok);
-
-		char *c_str = alloc_cstring(a, path);
-		defer (gb_free(a, c_str));
-
-		gbFile f = {};
-		gbFileError file_err = gb_file_open(&f, c_str);
-		defer (gb_file_close(&f));
-
-		switch (file_err) {
-		default:
-		case gbFileError_Invalid:
-			error(ce->proc, "Failed to `#load_hash` file: %s; invalid file or cannot be found", c_str);
-			return false;
-		case gbFileError_NotExists:
-			error(ce->proc, "Failed to `#load_hash` file: %s; file cannot be found", c_str);
-			return false;
-		case gbFileError_Permission:
-			error(ce->proc, "Failed to `#load_hash` file: %s; file permissions problem", c_str);
-			return false;
-		case gbFileError_None:
-			// Okay
-			break;
-		}
-
-		// TODO(bill): make these procedures fast :P
-
-		u64 hash_value = 0;
-		String result = {};
-		isize file_size = cast(isize)gb_file_size(&f);
-		if (file_size > 0) {
-			u8 *data = cast(u8 *)gb_alloc(a, file_size);
-			gb_file_read_at(&f, data, file_size, 0);
-			if (hash_kind == "adler32") {
-				hash_value = gb_adler32(data, file_size);
-			} else if (hash_kind == "crc32") {
-				hash_value = gb_crc32(data, file_size);
-			} else if (hash_kind == "crc64") {
-				hash_value = gb_crc64(data, file_size);
-			} else if (hash_kind == "fnv32") {
-				hash_value = gb_fnv32(data, file_size);
-			} else if (hash_kind == "fnv64") {
-				hash_value = gb_fnv64(data, file_size);
-			} else if (hash_kind == "fnv32a") {
-				hash_value = fnv32a(data, file_size);
-			} else if (hash_kind == "fnv64a") {
-				hash_value = fnv64a(data, file_size);
-			} else if (hash_kind == "murmur32") {
-				hash_value = gb_murmur32(data, file_size);
-			} else if (hash_kind == "murmur64") {
-				hash_value = gb_murmur64(data, file_size);
+		LoadFileCache *cache = nullptr;
+		if (cache_load_file_directive(c, call, original_string, true, &cache)) {
+			MUTEX_GUARD(&c->info->load_file_mutex);
+			// TODO(bill): make these procedures fast :P
+			u64 hash_value = 0;
+			u64 *hash_value_ptr = string_map_get(&cache->hashes, hash_kind);
+			if (hash_value_ptr) {
+				hash_value = *hash_value_ptr;
 			} else {
-				compiler_error("unhandled hash kind: %.*s", LIT(hash_kind));
+				u8 *data = cache->data.text;
+				isize file_size = cache->data.len;
+				if (hash_kind == "adler32") {
+					hash_value = gb_adler32(data, file_size);
+				} else if (hash_kind == "crc32") {
+					hash_value = gb_crc32(data, file_size);
+				} else if (hash_kind == "crc64") {
+					hash_value = gb_crc64(data, file_size);
+				} else if (hash_kind == "fnv32") {
+					hash_value = gb_fnv32(data, file_size);
+				} else if (hash_kind == "fnv64") {
+					hash_value = gb_fnv64(data, file_size);
+				} else if (hash_kind == "fnv32a") {
+					hash_value = fnv32a(data, file_size);
+				} else if (hash_kind == "fnv64a") {
+					hash_value = fnv64a(data, file_size);
+				} else if (hash_kind == "murmur32") {
+					hash_value = gb_murmur32(data, file_size);
+				} else if (hash_kind == "murmur64") {
+					hash_value = gb_murmur64(data, file_size);
+				} else {
+					compiler_error("unhandled hash kind: %.*s", LIT(hash_kind));
+				}
+				string_map_set(&cache->hashes, hash_kind, hash_value);
 			}
-			gb_free(a, data);
+
+			operand->type = t_untyped_integer;
+			operand->mode = Addressing_Constant;
+			operand->value = exact_value_u64(hash_value);
+			return true;
 		}
-
-		operand->type = t_untyped_integer;
-		operand->mode = Addressing_Constant;
-		operand->value = exact_value_u64(hash_value);
-
+		return false;
 	} else if (name == "load_or") {
 		warning(call, "'#load_or' is deprecated in favour of '#load(path) or_else default'");
 
