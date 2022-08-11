@@ -44,7 +44,7 @@ Marshal_Options :: struct {
 	mjson_skipped_first_braces_end: bool,
 }
 
-marshal :: proc(v: any, opt: Marshal_Options = {}, allocator := context.allocator) -> (data: []byte, err: Marshal_Error) {
+marshal :: proc(v: any, opt := Marshal_Options{}, allocator := context.allocator) -> (data: []byte, err: Marshal_Error) {
 	b := strings.builder_make(allocator)
 	defer if err != nil {
 		strings.builder_destroy(&b)
@@ -190,6 +190,9 @@ marshal_to_writer :: proc(w: io.Writer, v: any, opt: ^Marshal_Options) -> (err: 
 		return .Unsupported_Type
 
 	case runtime.Type_Info_Multi_Pointer:
+		return .Unsupported_Type
+
+	case runtime.Type_Info_Soa_Pointer:
 		return .Unsupported_Type
 
 	case runtime.Type_Info_Procedure:

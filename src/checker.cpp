@@ -1947,6 +1947,11 @@ void add_type_info_type_internal(CheckerContext *c, Type *t) {
 		add_type_info_type_internal(c, bt->Matrix.elem);
 		break;
 
+	case Type_SoaPointer:
+		add_type_info_type_internal(c, bt->SoaPointer.elem);
+		break;
+
+
 	default:
 		GB_PANIC("Unhandled type: %*.s %d", LIT(type_strings[bt->kind]), bt->kind);
 		break;
@@ -2162,6 +2167,10 @@ void add_min_dep_type_info(Checker *c, Type *t) {
 
 	case Type_Matrix:
 		add_min_dep_type_info(c, bt->Matrix.elem);
+		break;
+
+	case Type_SoaPointer:
+		add_min_dep_type_info(c, bt->SoaPointer.elem);
 		break;
 
 	default:
@@ -2756,6 +2765,7 @@ void init_core_type_info(Checker *c) {
 	t_type_info_relative_pointer = find_core_type(c, str_lit("Type_Info_Relative_Pointer"));
 	t_type_info_relative_slice   = find_core_type(c, str_lit("Type_Info_Relative_Slice"));
 	t_type_info_matrix           = find_core_type(c, str_lit("Type_Info_Matrix"));
+	t_type_info_soa_pointer      = find_core_type(c, str_lit("Type_Info_Soa_Pointer"));
 
 	t_type_info_named_ptr            = alloc_type_pointer(t_type_info_named);
 	t_type_info_integer_ptr          = alloc_type_pointer(t_type_info_integer);
@@ -2784,6 +2794,7 @@ void init_core_type_info(Checker *c) {
 	t_type_info_relative_pointer_ptr = alloc_type_pointer(t_type_info_relative_pointer);
 	t_type_info_relative_slice_ptr   = alloc_type_pointer(t_type_info_relative_slice);
 	t_type_info_matrix_ptr           = alloc_type_pointer(t_type_info_matrix);
+	t_type_info_soa_pointer_ptr      = alloc_type_pointer(t_type_info_soa_pointer);
 }
 
 void init_mem_allocator(Checker *c) {

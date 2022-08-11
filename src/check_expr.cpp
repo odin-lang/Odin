@@ -119,6 +119,7 @@ void check_or_else_split_types(CheckerContext *c, Operand *x, String const &name
 void check_or_else_expr_no_value_error(CheckerContext *c, String const &name, Operand const &x, Type *type_hint);
 void check_or_return_split_types(CheckerContext *c, Operand *x, String const &name, Type **left_type_, Type **right_type_);
 
+bool is_diverging_expr(Ast *expr);
 
 void check_did_you_mean_print(DidYouMeanAnswers *d, char const *prefix = "") {
 	auto results = did_you_mean_results(d);
@@ -2051,7 +2052,7 @@ bool check_is_not_addressable(CheckerContext *c, Operand *o) {
 		return false;
 	}
 
-	return o->mode != Addressing_Variable;
+	return o->mode != Addressing_Variable && o->mode != Addressing_SoaVariable;
 }
 
 void check_unary_expr(CheckerContext *c, Operand *o, Token op, Ast *node) {
@@ -2068,9 +2069,6 @@ void check_unary_expr(CheckerContext *c, Operand *o, Token op, Ast *node) {
 					error(op, "Cannot take the pointer address of '%s' which is a procedure parameter", str);
 				} else {
 					switch (o->mode) {
-					case Addressing_SoaVariable:
-						error(op, "Cannot take the pointer address of '%s' as it is an indirect index of an SOA struct", str);
-						break;
 					case Addressing_Constant:
 						error(op, "Cannot take the pointer address of '%s' which is a constant", str);
 						break;
@@ -2098,7 +2096,19 @@ void check_unary_expr(CheckerContext *c, Operand *o, Token op, Ast *node) {
 			return;
 		}
 
-		o->type = alloc_type_pointer(o->type);
+		if (o->mode == Addressing_SoaVariable) {
+			ast_node(ue, UnaryExpr, node);
+			if (ast_node_expect(ue->expr, Ast_IndexExpr)) {
+				ast_node(ie, IndexExpr, ue->expr);
+				Type *soa_type = type_of_expr(ie->expr);
+				GB_ASSERT(is_type_soa_struct(soa_type));
+				o->type = alloc_type_soa_pointer(soa_type);
+			} else {
+				o->type = alloc_type_pointer(o->type);
+			}
+		} else {
+			o->type = alloc_type_pointer(o->type);
+		}
 
 		switch (o->mode) {
 		case Addressing_OptionalOk:
@@ -2495,8 +2505,17 @@ void check_shift(CheckerContext *c, Operand *x, Operand *y, Ast *node, Type *typ
 				x->expr->tav.is_lhs = true;
 			}
 			x->mode = Addressing_Value;
-			if (type_hint && is_type_integer(type_hint)) {
-				x->type = type_hint;
+			if (type_hint) {
+				if (is_type_integer(type_hint)) {
+					x->type = type_hint;
+				} else {
+					gbString x_str = expr_to_string(x->expr);
+					gbString to_type = type_to_string(type_hint);
+					error(node, "Conversion of shifted operand '%s' to '%s' is not allowed", x_str, to_type);
+					gb_string_free(x_str);
+					gb_string_free(to_type);
+					x->mode = Addressing_Invalid;
+				}
 			}
 			// x->value = x_val;
 			return;
@@ -2512,7 +2531,7 @@ void check_shift(CheckerContext *c, Operand *x, Operand *y, Ast *node, Type *typ
 	// TODO(bill): Should we support shifts for fixed arrays and #simd vectors?
 
 	if (!is_type_integer(x->type)) {
-		gbString err_str = expr_to_string(y->expr);
+		gbString err_str = expr_to_string(x->expr);
 		error(node, "Shift operand '%s' must be an integer", err_str);
 		gb_string_free(err_str);
 		x->mode = Addressing_Invalid;
@@ -2959,7 +2978,14 @@ void check_binary_matrix(CheckerContext *c, Token const &op, Operand *x, Operand
 					goto matrix_error;
 				}
 				x->mode = Addressing_Value;
-				x->type = alloc_type_matrix(xt->Matrix.elem, xt->Matrix.row_count, yt->Matrix.column_count);
+				if (are_types_identical(xt, yt)) {
+					if (!is_type_named(x->type) && is_type_named(y->type)) {
+						// prefer the named type
+						x->type = y->type;
+					}
+				} else {
+					x->type = alloc_type_matrix(xt->Matrix.elem, xt->Matrix.row_count, yt->Matrix.column_count);
+				}
 				goto matrix_success;
 			} else if (yt->kind == Type_Array) {
 				if (!are_types_identical(xt->Matrix.elem, yt->Array.elem)) {
@@ -3021,7 +3047,6 @@ void check_binary_matrix(CheckerContext *c, Token const &op, Operand *x, Operand
 
 matrix_success:
 	x->type = check_matrix_type_hint(x->type, type_hint);
-	
 	return;
 	
 	
@@ -7393,8 +7418,25 @@ ExprKind check_or_else_expr(CheckerContext *c, Operand *o, Ast *node, Type *type
 		return Expr_Expr;
 	}
 
-	check_multi_expr_with_type_hint(c, &y, default_value, x.type);
-	error_operand_no_value(&y);
+	bool y_is_diverging = false;
+	check_expr_base(c, &y, default_value, x.type);
+	switch (y.mode) {
+	case Addressing_NoValue:
+		if (is_diverging_expr(y.expr)) {
+			// Allow
+			y.mode = Addressing_Value;
+			y_is_diverging = true;
+		} else {
+			error_operand_no_value(&y);
+			y.mode = Addressing_Invalid;
+		}
+		break;
+	case Addressing_Type:
+		error_operand_not_expression(&y);
+		y.mode = Addressing_Invalid;
+		break;
+	}
+
 	if (y.mode == Addressing_Invalid) {
 		o->mode = Addressing_Value;
 		o->type = t_invalid;
@@ -7408,7 +7450,9 @@ ExprKind check_or_else_expr(CheckerContext *c, Operand *o, Ast *node, Type *type
 	add_type_and_value(&c->checker->info, arg, x.mode, x.type, x.value);
 
 	if (left_type != nullptr) {
-		check_assignment(c, &y, left_type, name);
+		if (!y_is_diverging) {
+			check_assignment(c, &y, left_type, name);
+		}
 	} else {
 		check_or_else_expr_no_value_error(c, name, x, type_hint);
 	}
@@ -8404,23 +8448,30 @@ ExprKind check_compound_literal(CheckerContext *c, Operand *o, Ast *node, Type *
 		if (is_type_bit_set(type)) {
 			// NOTE(bill): Encode as an integer
 
-			i64 lower = base_type(type)->BitSet.lower;
+			Type *bt = base_type(type);
+			BigInt bits = {};
+			BigInt one = {};
+			big_int_from_u64(&one, 1);
 
-			u64 bits = 0;
-			for_array(index, cl->elems) {
-				Ast *elem = cl->elems[index];
-				GB_ASSERT(elem->kind != Ast_FieldValue);
-				TypeAndValue tav = elem->tav;
-				ExactValue i = exact_value_to_integer(tav.value);
-				if (i.kind != ExactValue_Integer) {
+			for_array(i, cl->elems) {
+				Ast *e = cl->elems[i];
+				GB_ASSERT(e->kind != Ast_FieldValue);
+
+				TypeAndValue tav = e->tav;
+				if (tav.mode != Addressing_Constant) {
 					continue;
 				}
-				i64 val = big_int_to_i64(&i.value_integer);
-				val -= lower;
-				u64 bit = u64(1ll<<val);
-				bits |= bit;
+				GB_ASSERT(tav.value.kind == ExactValue_Integer);
+				i64 v = big_int_to_i64(&tav.value.value_integer);
+				i64 lower = bt->BitSet.lower;
+				u64 index = cast(u64)(v-lower);
+				BigInt bit = {};
+				big_int_from_u64(&bit, index);
+				big_int_shl(&bit, &one, &bit);
+				big_int_or(&bits, &bits, &bit);
 			}
-			o->value = exact_value_u64(bits);
+			o->value.kind = ExactValue_Integer;
+			o->value.value_integer = bits;
 		} else if (is_type_constant_type(type) && cl->elems.count == 0) {
 			ExactValue value = exact_value_compound(node);
 			Type *bt = core_type(type);
@@ -8643,6 +8694,8 @@ ExprKind check_selector_call_expr(CheckerContext *c, Operand *o, Ast *node, Type
 	Ast *first_arg = x.expr->SelectorExpr.expr;
 	GB_ASSERT(first_arg != nullptr);
 
+	first_arg->state_flags |= StateFlag_SelectorCallExpr;
+
 	Type *pt = base_type(x.type);
 	GB_ASSERT(pt->kind == Type_Proc);
 	Type *first_type = nullptr;
@@ -8668,6 +8721,7 @@ ExprKind check_selector_call_expr(CheckerContext *c, Operand *o, Ast *node, Type
 	y.mode = first_arg->tav.mode;
 	y.type = first_arg->tav.type;
 	y.value = first_arg->tav.value;
+
 	if (check_is_assignable_to(c, &y, first_type)) {
 		// Do nothing, it's valid
 	} else {
@@ -9286,7 +9340,7 @@ ExprKind check_expr_base_internal(CheckerContext *c, Operand *o, Ast *node, Type
 			check_unary_expr(c, o, ue->op, node);
 		}
 		o->expr = node;
-		return kind;
+		return Expr_Expr;
 	case_end;
 
 
@@ -9342,6 +9396,9 @@ ExprKind check_expr_base_internal(CheckerContext *c, Operand *o, Ast *node, Type
 			if (t->kind == Type_Pointer && !is_type_empty_union(t->Pointer.elem)) {
 				o->mode = Addressing_Variable;
 				o->type = t->Pointer.elem;
+ 			} else if (t->kind == Type_SoaPointer) {
+				o->mode = Addressing_SoaVariable;
+				o->type = type_deref(t);
  			} else if (t->kind == Type_RelativePointer) {
  				if (o->mode != Addressing_Variable) {
  					gbString str = expr_to_string(o->expr);
@@ -10034,9 +10091,10 @@ gbString write_expr_to_string(gbString str, Ast *node, bool shorthand) {
 		str = write_expr_to_string(str, ce->proc, shorthand);
 		str = gb_string_appendc(str, "(");
 
-		for_array(i, ce->args) {
+		isize idx0 = cast(isize)ce->was_selector;
+		for (isize i = idx0; i < ce->args.count; i++) {
 			Ast *arg = ce->args[i];
-			if (i > 0) {
+			if (i > idx0) {
 				str = gb_string_appendc(str, ", ");
 			}
 			str = write_expr_to_string(str, arg, shorthand);

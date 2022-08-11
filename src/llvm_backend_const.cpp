@@ -10,11 +10,12 @@ bool lb_is_const(lbValue value) {
 	return false;
 }
 
-
 bool lb_is_const_or_global(lbValue value) {
 	if (lb_is_const(value)) {
 		return true;
 	}
+	// TODO remove use of LLVMGetElementType
+	#if 0
 	if (LLVMGetValueKind(value.value) == LLVMGlobalVariableValueKind) {
 		LLVMTypeRef t = LLVMGetElementType(LLVMTypeOf(value.value));
 		if (!lb_is_type_kind(t, LLVMPointerTypeKind)) {
@@ -23,6 +24,7 @@ bool lb_is_const_or_global(lbValue value) {
 		LLVMTypeRef elem = LLVMGetElementType(t);
 		return lb_is_type_kind(elem, LLVMFunctionTypeKind);
 	}
+	#endif
 	return false;
 }
 
@@ -418,7 +420,7 @@ lbValue lb_const_value(lbModule *m, Type *type, ExactValue value, bool allow_loc
 
 				{
 					LLVMValueRef indices[2] = {llvm_zero(m), llvm_zero(m)};
-					LLVMValueRef ptr = LLVMBuildInBoundsGEP(p->builder, array_data, indices, 2, "");
+					LLVMValueRef ptr = LLVMBuildInBoundsGEP2(p->builder, llvm_type, array_data, indices, 2, "");
 					LLVMValueRef len = LLVMConstInt(lb_type(m, t_int), count, true);
 					lbAddr slice = lb_add_local_generated(p, type, false);
 					lb_fill_slice(p, slice, {ptr, alloc_type_pointer(elem)}, {len, t_int});
@@ -445,7 +447,7 @@ lbValue lb_const_value(lbModule *m, Type *type, ExactValue value, bool allow_loc
 
 				{
 					LLVMValueRef indices[2] = {llvm_zero(m), llvm_zero(m)};
-					LLVMValueRef ptr = LLVMConstInBoundsGEP(array_data, indices, 2);
+					LLVMValueRef ptr = LLVMConstInBoundsGEP2(lb_type(m, t), array_data, indices, 2);
 					LLVMValueRef len = LLVMConstInt(lb_type(m, t_int), count, true);
 					LLVMValueRef values[2] = {ptr, len};
 
@@ -1007,7 +1009,7 @@ lbValue lb_const_value(lbModule *m, Type *type, ExactValue value, bool allow_loc
 				for (isize i = 0; i < value_count; i++) {
 					LLVMValueRef val = old_values[i];
 					if (!LLVMIsConstant(val)) {
-						LLVMValueRef dst = LLVMBuildStructGEP(p->builder, v.addr.value, cast(unsigned)i, "");
+						LLVMValueRef dst = LLVMBuildStructGEP2(p->builder, llvm_addr_type(p->module, v.addr), v.addr.value, cast(unsigned)i, "");
 						LLVMBuildStore(p->builder, val, dst);
 					}
 				}
@@ -1025,7 +1027,10 @@ lbValue lb_const_value(lbModule *m, Type *type, ExactValue value, bool allow_loc
 				return lb_const_nil(m, original_type);
 			}
 
-			u64 bits = 0;
+			BigInt bits = {};
+			BigInt one = {};
+			big_int_from_u64(&one, 1);
+
 			for_array(i, cl->elems) {
 				Ast *e = cl->elems[i];
 				GB_ASSERT(e->kind != Ast_FieldValue);
@@ -1037,18 +1042,13 @@ lbValue lb_const_value(lbModule *m, Type *type, ExactValue value, bool allow_loc
 				GB_ASSERT(tav.value.kind == ExactValue_Integer);
 				i64 v = big_int_to_i64(&tav.value.value_integer);
 				i64 lower = type->BitSet.lower;
-				bits |= 1ull<<cast(u64)(v-lower);
+				u64 index = cast(u64)(v-lower);
+				BigInt bit = {};
+				big_int_from_u64(&bit, index);
+				big_int_shl(&bit, &one, &bit);
+				big_int_or(&bits, &bits, &bit);
 			}
-			if (is_type_different_to_arch_endianness(type)) {
-				i64 size = type_size_of(type);
-				switch (size) {
-				case 2: bits = cast(u64)gb_endian_swap16(cast(u16)bits); break;
-				case 4: bits = cast(u64)gb_endian_swap32(cast(u32)bits); break;
-				case 8: bits = cast(u64)gb_endian_swap64(cast(u64)bits); break;
-				}
-			}
-
-			res.value = LLVMConstInt(lb_type(m, original_type), bits, false);
+			res.value = lb_big_int_to_llvm(m, original_type, &bits);
 			return res;
 		} else if (is_type_matrix(type)) {
 			ast_node(cl, CompoundLit, value.value_compound);

@@ -519,7 +519,7 @@ join_adjacent_string_literals :: proc(cpp: ^Preprocessor, initial_tok: ^Token) {
 
 
 quote_string :: proc(s: string) -> []byte {
-	b := strings.make_builder(0, len(s)+2)
+	b := strings.builder_make(0, len(s)+2)
 	io.write_quoted_string(strings.to_writer(&b), s, '"')
 	return b.buf[:]
 }

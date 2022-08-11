@@ -10,6 +10,6 @@ The `js_wasm32` target assumes that the WASM output will be ran within a web bro
 <!-- Copy `vendor:wasm/js/runtime.js` into your web server -->
 <script type="text/javascript" src="runtime.js"></script>
 <script type="text/javascript">
-	odin.runWasm(pathToWasm, webglCanvasElement, consolePreElement);
+	odin.runWasm(pathToWasm, consolePreElement);
 </script>
 ```

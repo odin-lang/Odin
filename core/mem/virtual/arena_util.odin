@@ -1,5 +1,10 @@
 package mem_virtual
 
+arena_init :: proc{
+	static_arena_init,
+	growing_arena_init,
+}
+
 arena_temp_begin :: proc{
 	static_arena_temp_begin,
 	growing_arena_temp_begin,

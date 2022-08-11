@@ -106,11 +106,20 @@ when ODIN_OS == .Windows {
 		"system:pthread",
 	}
 } else when ODIN_OS == .Darwin {
-	foreign import lib {
-		"macos/libraylib.a",
-		"system:Cocoa.framework",
-		"system:OpenGL.framework",
-		"system:IOKit.framework",
+	when ODIN_ARCH == .arm64 {
+		foreign import lib {
+			"macos-arm64/libraylib.a",
+			"system:Cocoa.framework",
+			"system:OpenGL.framework",
+			"system:IOKit.framework",
+		}
+	} else {
+		foreign import lib {
+			"macos/libraylib.a",
+			"system:Cocoa.framework",
+			"system:OpenGL.framework",
+			"system:IOKit.framework",
+		}
 	}
 } else {
 	foreign import lib "system:raylib"

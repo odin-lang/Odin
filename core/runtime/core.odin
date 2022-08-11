@@ -176,6 +176,9 @@ Type_Info_Matrix :: struct {
 	column_count: int,
 	// Total element count = column_count * elem_stride
 }
+Type_Info_Soa_Pointer :: struct {
+	elem: ^Type_Info,
+}
 
 Type_Info_Flag :: enum u8 {
 	Comparable     = 0,
@@ -217,6 +220,7 @@ Type_Info :: struct {
 		Type_Info_Relative_Pointer,
 		Type_Info_Relative_Slice,
 		Type_Info_Matrix,
+		Type_Info_Soa_Pointer,
 	},
 }
 
@@ -402,6 +406,12 @@ Raw_Any :: struct {
 Raw_Cstring :: struct {
 	data: [^]byte,
 }
+
+Raw_Soa_Pointer :: struct {
+	data:  rawptr,
+	index: int,
+}
+
 
 
 /*

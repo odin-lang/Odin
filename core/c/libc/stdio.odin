@@ -196,7 +196,7 @@ foreign libc {
 	getc      :: proc(stream: ^FILE) -> int ---
 	getchar   :: proc() -> int ---
 	putc      :: proc(c: int, stream: ^FILE) -> int ---
-	putchar   :: proc() -> int ---
+	putchar   :: proc(c: int) -> int ---
 	puts      :: proc(s: cstring) -> int ---
 	ungetc    :: proc(c: int, stream: ^FILE) -> int ---
 	fread     :: proc(ptr: rawptr, size: size_t, nmemb: size_t, stream: ^FILE) -> size_t ---
