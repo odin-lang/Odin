@@ -1392,45 +1392,17 @@ bool check_builtin_procedure_directive(CheckerContext *c, Operand *operand, Ast 
 			gb_string_free(str);
 			return false;
 		}
-
-		gbAllocator a = heap_allocator();
-
 		GB_ASSERT(o.value.kind == ExactValue_String);
-		String base_dir = dir_from_path(get_file_path_string(bd->token.pos.file_id));
 		String original_string = o.value.value_string;
-
-
-		BlockingMutex *ignore_mutex = nullptr;
-		String path = {};
-		bool ok = determine_path_from_string(ignore_mutex, call, base_dir, original_string, &path);
-		gb_unused(ok);
-
-		char *c_str = alloc_cstring(a, path);
-		defer (gb_free(a, c_str));
-
-
-		gbFile f = {};
-		gbFileError file_err = gb_file_open(&f, c_str);
-		defer (gb_file_close(&f));
 
 		operand->type = t_u8_slice;
 		operand->mode = Addressing_Constant;
-		if (file_err == gbFileError_None) {
-			String result = {};
-			isize file_size = cast(isize)gb_file_size(&f);
-			if (file_size > 0) {
-				u8 *data = cast(u8 *)gb_alloc(a, file_size+1);
-				gb_file_read_at(&f, data, file_size, 0);
-				data[file_size] = '\0';
-				result.text = data;
-				result.len = file_size;
-			}
-
-			operand->value = exact_value_string(result);
+		LoadFileCache *cache = nullptr;
+		if (cache_load_file_directive(c, call, original_string, false, &cache)) {
+			operand->value = exact_value_string(cache->data);
 		} else {
 			operand->value = default_op.value;
 		}
-
 	} else if (name == "assert") {
 		if (ce->args.count != 1 && ce->args.count != 2) {
 			error(call, "'#assert' expects either 1 or 2 arguments, got %td", ce->args.count);
