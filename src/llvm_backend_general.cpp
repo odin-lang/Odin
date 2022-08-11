@@ -2523,7 +2523,55 @@ lbValue lb_find_or_add_entity_string_byte_slice(lbModule *m, String const &str) 
 	res.type = t_u8_slice;
 	return res;
 }
+lbValue lb_find_or_add_entity_string_byte_slice_with_type(lbModule *m, String const &str, Type *slice_type) {
+	GB_ASSERT(is_type_slice(slice_type));
+	LLVMValueRef indices[2] = {llvm_zero(m), llvm_zero(m)};
+	LLVMValueRef data = LLVMConstStringInContext(m->ctx,
+		cast(char const *)str.text,
+		cast(unsigned)str.len,
+		false);
 
+
+	char *name = nullptr;
+	{
+		isize max_len = 7+8+1;
+		name = gb_alloc_array(permanent_allocator(), char, max_len);
+		u32 id = m->gen->global_array_index.fetch_add(1);
+		isize len = gb_snprintf(name, max_len, "csbs$%x", id);
+		len -= 1;
+	}
+	LLVMTypeRef type = LLVMTypeOf(data);
+	LLVMValueRef global_data = LLVMAddGlobal(m->mod, type, name);
+	LLVMSetInitializer(global_data, data);
+	LLVMSetLinkage(global_data, LLVMPrivateLinkage);
+	LLVMSetUnnamedAddress(global_data, LLVMGlobalUnnamedAddr);
+	LLVMSetAlignment(global_data, 1);
+	LLVMSetGlobalConstant(global_data, true);
+
+	i64 data_len = str.len;
+	LLVMValueRef ptr = nullptr;
+	if (data_len != 0) {
+		ptr = LLVMConstInBoundsGEP2(type, global_data, indices, 2);
+	} else {
+		ptr = LLVMConstNull(lb_type(m, t_u8_ptr));
+	}
+	if (!is_type_u8_slice(slice_type)) {
+		Type *bt = base_type(slice_type);
+		Type *elem = bt->Slice.elem;
+		i64 sz = type_size_of(elem);
+		GB_ASSERT(sz > 0);
+		ptr = LLVMConstPointerCast(ptr, lb_type(m, alloc_type_pointer(elem)));
+		data_len /= sz;
+	}
+
+	LLVMValueRef len = LLVMConstInt(lb_type(m, t_int), data_len, true);
+	LLVMValueRef values[2] = {ptr, len};
+
+	lbValue res = {};
+	res.value = llvm_const_named_struct(m, slice_type, values, 2);
+	res.type = slice_type;
+	return res;
+}
 
 
 
