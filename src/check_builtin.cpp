@@ -1074,8 +1074,100 @@ bool check_builtin_simd_operation(CheckerContext *c, Operand *operand, Ast *call
 	return false;
 }
 
+LoadDirectiveResult check_load_directive(CheckerContext *c, Operand *operand, Ast *call, Type *type_hint, bool err_on_not_found) {
+	ast_node(ce, CallExpr, call);
+	ast_node(bd, BasicDirective, ce->proc);
+	String name = bd->name.string;
+	GB_ASSERT(name == "load");
 
-bool check_builtin_procedure_directive(CheckerContext *c, Operand *operand, Ast *call, i32 id, Type *type_hint) {
+	if (ce->args.count != 1) {
+		if (ce->args.count == 0) {
+			error(ce->close, "'#load' expects 1 argument, got 0");
+		} else {
+			error(ce->args[0], "'#load' expects 1 argument, got %td", ce->args.count);
+		}
+
+		return LoadDirective_Error;
+	}
+
+	Ast *arg = ce->args[0];
+	Operand o = {};
+	check_expr(c, &o, arg);
+	if (o.mode != Addressing_Constant) {
+		error(arg, "'#load' expected a constant string argument");
+		return LoadDirective_Error;
+	}
+
+	if (!is_type_string(o.type)) {
+		gbString str = type_to_string(o.type);
+		error(arg, "'#load' expected a constant string, got %s", str);
+		gb_string_free(str);
+		return LoadDirective_Error;
+	}
+
+	gbAllocator a = heap_allocator();
+
+	GB_ASSERT(o.value.kind == ExactValue_String);
+	String base_dir = dir_from_path(get_file_path_string(bd->token.pos.file_id));
+	String original_string = o.value.value_string;
+
+
+	BlockingMutex *ignore_mutex = nullptr;
+	String path = {};
+	bool ok = determine_path_from_string(ignore_mutex, call, base_dir, original_string, &path);
+	gb_unused(ok);
+
+	char *c_str = alloc_cstring(a, path);
+	defer (gb_free(a, c_str));
+
+
+	gbFile f = {};
+	gbFileError file_err = gb_file_open(&f, c_str);
+	defer (gb_file_close(&f));
+
+	switch (file_err) {
+	default:
+	case gbFileError_Invalid:
+		if (err_on_not_found) {
+			error(ce->proc, "Failed to `#load` file: %s; invalid file or cannot be found", c_str);
+		}
+		call->state_flags |= StateFlag_DirectiveWasFalse;
+		return LoadDirective_NotFound;
+	case gbFileError_NotExists:
+		if (err_on_not_found) {
+			error(ce->proc, "Failed to `#load` file: %s; file cannot be found", c_str);
+		}
+		call->state_flags |= StateFlag_DirectiveWasFalse;
+		return LoadDirective_NotFound;
+	case gbFileError_Permission:
+		if (err_on_not_found) {
+			error(ce->proc, "Failed to `#load` file: %s; file permissions problem", c_str);
+		}
+		call->state_flags |= StateFlag_DirectiveWasFalse;
+		return LoadDirective_NotFound;
+	case gbFileError_None:
+		// Okay
+		break;
+	}
+
+	String result = {};
+	isize file_size = cast(isize)gb_file_size(&f);
+	if (file_size > 0) {
+		u8 *data = cast(u8 *)gb_alloc(a, file_size+1);
+		gb_file_read_at(&f, data, file_size, 0);
+		data[file_size] = '\0';
+		result.text = data;
+		result.len = file_size;
+	}
+
+	operand->type = t_u8_slice;
+	operand->mode = Addressing_Constant;
+	operand->value = exact_value_string(result);
+	return LoadDirective_Success;
+}
+
+
+bool check_builtin_procedure_directive(CheckerContext *c, Operand *operand, Ast *call, Type *type_hint) {
 	ast_node(ce, CallExpr, call);
 	ast_node(bd, BasicDirective, ce->proc);
 	String name = bd->name.string;
@@ -1100,81 +1192,7 @@ bool check_builtin_procedure_directive(CheckerContext *c, Operand *operand, Ast 
 		operand->type = t_source_code_location;
 		operand->mode = Addressing_Value;
 	} else if (name == "load") {
-		if (ce->args.count != 1) {
-			if (ce->args.count == 0) {
-				error(ce->close, "'#load' expects 1 argument, got 0");
-			} else {
-				error(ce->args[0], "'#load' expects 1 argument, got %td", ce->args.count);
-			}
-
-			return false;
-		}
-
-		Ast *arg = ce->args[0];
-		Operand o = {};
-		check_expr(c, &o, arg);
-		if (o.mode != Addressing_Constant) {
-			error(arg, "'#load' expected a constant string argument");
-			return false;
-		}
-
-		if (!is_type_string(o.type)) {
-			gbString str = type_to_string(o.type);
-			error(arg, "'#load' expected a constant string, got %s", str);
-			gb_string_free(str);
-			return false;
-		}
-
-		gbAllocator a = heap_allocator();
-
-		GB_ASSERT(o.value.kind == ExactValue_String);
-		String base_dir = dir_from_path(get_file_path_string(bd->token.pos.file_id));
-		String original_string = o.value.value_string;
-
-
-		BlockingMutex *ignore_mutex = nullptr;
-		String path = {};
-		bool ok = determine_path_from_string(ignore_mutex, call, base_dir, original_string, &path);
-		gb_unused(ok);
-
-		char *c_str = alloc_cstring(a, path);
-		defer (gb_free(a, c_str));
-
-
-		gbFile f = {};
-		gbFileError file_err = gb_file_open(&f, c_str);
-		defer (gb_file_close(&f));
-
-		switch (file_err) {
-		default:
-		case gbFileError_Invalid:
-			error(ce->proc, "Failed to `#load` file: %s; invalid file or cannot be found", c_str);
-			return false;
-		case gbFileError_NotExists:
-			error(ce->proc, "Failed to `#load` file: %s; file cannot be found", c_str);
-			return false;
-		case gbFileError_Permission:
-			error(ce->proc, "Failed to `#load` file: %s; file permissions problem", c_str);
-			return false;
-		case gbFileError_None:
-			// Okay
-			break;
-		}
-
-		String result = {};
-		isize file_size = cast(isize)gb_file_size(&f);
-		if (file_size > 0) {
-			u8 *data = cast(u8 *)gb_alloc(a, file_size+1);
-			gb_file_read_at(&f, data, file_size, 0);
-			data[file_size] = '\0';
-			result.text = data;
-			result.len = file_size;
-		}
-
-		operand->type = t_u8_slice;
-		operand->mode = Addressing_Constant;
-		operand->value = exact_value_string(result);
-
+		return check_load_directive(c, operand, call, type_hint, true) == LoadDirective_Success;
 	} else if (name == "load_hash") {
 		if (ce->args.count != 2) {
 			if (ce->args.count == 0) {
@@ -1263,7 +1281,6 @@ bool check_builtin_procedure_directive(CheckerContext *c, Operand *operand, Ast 
 		char *c_str = alloc_cstring(a, path);
 		defer (gb_free(a, c_str));
 
-
 		gbFile f = {};
 		gbFileError file_err = gb_file_open(&f, c_str);
 		defer (gb_file_close(&f));
@@ -1321,6 +1338,8 @@ bool check_builtin_procedure_directive(CheckerContext *c, Operand *operand, Ast 
 		operand->value = exact_value_u64(hash_value);
 
 	} else if (name == "load_or") {
+		warning(call, "'#load_or' is deprecated in favour of '#load(path) or_else default'");
+
 		if (ce->args.count != 2) {
 			if (ce->args.count == 0) {
 				error(ce->close, "'#load_or' expects 2 arguments, got 0");
@@ -1640,7 +1659,7 @@ bool check_builtin_procedure(CheckerContext *c, Operand *operand, Ast *call, i32
 		break;
 
 	case BuiltinProc_DIRECTIVE:
-		return check_builtin_procedure_directive(c, operand, call, id, type_hint);
+		return check_builtin_procedure_directive(c, operand, call, type_hint);
 
 	case BuiltinProc_len:
 		check_expr_or_type(c, operand, ce->args[0]);

@@ -282,7 +282,8 @@ enum StateFlag : u8 {
 	StateFlag_type_assert     = 1<<2,
 	StateFlag_no_type_assert  = 1<<3,
 
-	StateFlag_SelectorCallExpr = 1<<6,
+	StateFlag_SelectorCallExpr = 1<<5,
+	StateFlag_DirectiveWasFalse = 1<<6,
 
 	StateFlag_BeenHandled = 1<<7,
 };
