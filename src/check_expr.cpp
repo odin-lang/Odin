@@ -2515,10 +2515,10 @@ void check_shift(CheckerContext *c, Operand *x, Operand *y, Ast *node, Type *typ
 					gb_string_free(x_str);
 					gb_string_free(to_type);
 					x->mode = Addressing_Invalid;
-					return;
 				}
 			}
 			// x->value = x_val;
+			return;
 		}
 	}
 
