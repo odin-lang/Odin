@@ -7436,36 +7436,39 @@ ExprKind check_or_else_expr(CheckerContext *c, Operand *o, Ast *node, Type *type
 	if (is_load_directive_call(arg)) {
 		LoadDirectiveResult res = check_load_directive(c, &x, arg, type_hint, false);
 
-		bool y_is_diverging = false;
-		check_expr_base(c, &y, default_value, x.type);
-		switch (y.mode) {
-		case Addressing_NoValue:
-			if (is_diverging_expr(y.expr)) {
-				// Allow
-				y.mode = Addressing_Value;
-				y_is_diverging = true;
-			} else {
-				error_operand_no_value(&y);
+		// Allow for chaining of '#load(path) or_else #load(path)'
+		if (!(is_load_directive_call(default_value) && res == LoadDirective_Success)) {
+			bool y_is_diverging = false;
+			check_expr_base(c, &y, default_value, x.type);
+			switch (y.mode) {
+			case Addressing_NoValue:
+				if (is_diverging_expr(y.expr)) {
+					// Allow
+					y.mode = Addressing_Value;
+					y_is_diverging = true;
+				} else {
+					error_operand_no_value(&y);
+					y.mode = Addressing_Invalid;
+				}
+				break;
+			case Addressing_Type:
+				error_operand_not_expression(&y);
 				y.mode = Addressing_Invalid;
+				break;
 			}
-			break;
-		case Addressing_Type:
-			error_operand_not_expression(&y);
-			y.mode = Addressing_Invalid;
-			break;
-		}
 
-		if (y.mode == Addressing_Invalid) {
-			o->mode = Addressing_Value;
-			o->type = t_invalid;
-			o->expr = node;
-			return Expr_Expr;
-		}
+			if (y.mode == Addressing_Invalid) {
+				o->mode = Addressing_Value;
+				o->type = t_invalid;
+				o->expr = node;
+				return Expr_Expr;
+			}
 
-		if (!y_is_diverging) {
-			check_assignment(c, &y, x.type, name);
-			if (y.mode != Addressing_Constant) {
-				error(y.expr, "expected a constant expression on the right-hand side of 'or_else' in conjuction with '#load'");
+			if (!y_is_diverging) {
+				check_assignment(c, &y, x.type, name);
+				if (y.mode != Addressing_Constant) {
+					error(y.expr, "expected a constant expression on the right-hand side of 'or_else' in conjuction with '#load'");
+				}
 			}
 		}
 

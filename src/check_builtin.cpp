@@ -1163,6 +1163,27 @@ bool cache_load_file_directive(CheckerContext *c, Ast *call, String const &origi
 }
 
 
+bool is_valid_type_for_load(Type *type) {
+	if (type == t_invalid) {
+		return false;
+	} else if (is_type_string(type)) {
+		return true;
+	} else if (is_type_slice(type) /*|| is_type_array(type) || is_type_enumerated_array(type)*/) {
+		Type *elem = nullptr;
+		Type *bt = base_type(type);
+		if (bt->kind == Type_Slice) {
+			elem = bt->Slice.elem;
+		} else if (bt->kind == Type_Array) {
+			elem = bt->Array.elem;
+		} else if (bt->kind == Type_EnumeratedArray) {
+			elem = bt->EnumeratedArray.elem;
+		}
+		GB_ASSERT(elem != nullptr);
+		return is_type_load_safe(elem);
+	}
+	return false;
+}
+
 LoadDirectiveResult check_load_directive(CheckerContext *c, Operand *operand, Ast *call, Type *type_hint, bool err_on_not_found) {
 	ast_node(ce, CallExpr, call);
 	ast_node(bd, BasicDirective, ce->proc);
@@ -1198,42 +1219,23 @@ LoadDirectiveResult check_load_directive(CheckerContext *c, Operand *operand, As
 
 	operand->type = t_u8_slice;
 	if (ce->args.count == 1) {
-		if (type_hint && is_type_string(type_hint)) {
+		if (type_hint && is_valid_type_for_load(type_hint)) {
 			operand->type = type_hint;
 		}
 	} else if (ce->args.count == 2) {
-		bool failed = false;
 		Ast *arg_type = ce->args[1];
 		Type *type = check_type(c, arg_type);
-		if (type != nullptr && type != t_invalid) {
-			if (is_type_string(type)) {
+		if (type != nullptr) {
+			if (is_valid_type_for_load(type)) {
 				operand->type = type;
-			} else if (is_type_slice(type) /*|| is_type_array(type) || is_type_enumerated_array(type)*/) {
-				Type *elem = nullptr;
-				Type *bt = base_type(type);
-				if (bt->kind == Type_Slice) {
-					elem = bt->Slice.elem;
-				} else if (bt->kind == Type_Array) {
-					elem = bt->Array.elem;
-				} else if (bt->kind == Type_EnumeratedArray) {
-					elem = bt->EnumeratedArray.elem;
-				}
-				GB_ASSERT(elem != nullptr);
-				if (is_type_load_safe(elem)) {
-					operand->type = type;
-				} else {
-					failed = true;
-				}
 			} else {
-				failed = true;
+				gbString type_str = type_to_string(type);
+				error(arg_type, "'#%.*s' invalid type, expected a string, or slice of simple types, got %s", LIT(name), type_str);
+				gb_string_free(type_str);
 			}
 		}
-
-		if (failed) {
-			gbString type_str = type_to_string(type);
-			error(arg_type, "'#%.*s' invalid type, expected a string, or slice of simple types, got %s", LIT(name), type_str);
-			gb_string_free(type_str);
-		}
+	} else {
+		GB_PANIC("unreachable");
 	}
 	operand->mode = Addressing_Constant;
 
