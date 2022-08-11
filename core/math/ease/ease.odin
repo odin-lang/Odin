@@ -325,9 +325,9 @@ ease :: proc "contextless" (type: Ease, p: $T) -> T
 	// in case type was invalid
 	return 0
 }
-
 Flux_Map :: struct($T: typeid) {
 	values: map[^T]Flux_Tween(T),
+	keys_to_be_deleted: [dynamic]^T,
 }
 
 Flux_Tween :: struct($T: typeid) {
@@ -353,15 +353,17 @@ Flux_Tween :: struct($T: typeid) {
 }
 
 // init flux map to a float type and a wanted cap
-flux_init :: proc($T: typeid, cap := 8) -> Flux_Map(T) where intrinsics.type_is_float(T) {
+flux_init :: proc($T: typeid, value_capacity := 8) -> Flux_Map(T) where intrinsics.type_is_float(T) {
 	return {
-		make(map[^T]Flux_Tween(T), cap),
+		values = make(map[^T]Flux_Tween(T), value_capacity),
+		keys_to_be_deleted = make([dynamic]^T, 0, value_capacity)
 	}
 }
 
 // delete map content
 flux_destroy :: proc(flux: Flux_Map($T)) where intrinsics.type_is_float(T) {
 	delete(flux.values)
+	delete(flux.keys_to_be_deleted)
 }
 
 // clear map content, stops all animations
@@ -374,8 +376,8 @@ flux_clear :: proc(flux: ^Flux_Map($T)) where intrinsics.type_is_float(T) {
 // return value can be used to set callbacks
 flux_to :: proc(
 	flux: ^Flux_Map($T),
-	value: ^f32, 
-	goal: f32, 
+	value: ^T, 
+	goal: T, 
 	type: Ease = .Quadratic_Out,
 	duration: time.Duration = time.Second, 
 	delay: f64 = 0,
@@ -413,6 +415,8 @@ flux_tween_init :: proc(tween: ^Flux_Tween($T), duration: time.Duration) where i
 // calls callbacks in all stages, when they're filled
 // deletes tween from the map after completion
 flux_update :: proc(flux: ^Flux_Map($T), dt: f64) where intrinsics.type_is_float(T) {
+	clear(&flux.keys_to_be_deleted)
+
 	for key, tween in &flux.values {
 		delay_remainder := f64(0)
 
@@ -451,7 +455,8 @@ flux_update :: proc(flux: ^Flux_Map($T), dt: f64) where intrinsics.type_is_float
 			}
 
 			if tween.progress >= 1 {
-				delete_key(&flux.values, key)
+				// append keys to array that will be deleted after the loop
+				append(&flux.keys_to_be_deleted, key)
 
 				if tween.on_complete != nil {
 					tween.on_complete(flux, tween.data)
@@ -459,17 +464,24 @@ flux_update :: proc(flux: ^Flux_Map($T), dt: f64) where intrinsics.type_is_float
 			}
 		}
 	}
+	
+	// loop through keys that should be deleted from the map
+	if len(flux.keys_to_be_deleted) != 0 {
+		for key in flux.keys_to_be_deleted {
+			delete_key(&flux.values, key)
+		}
+	}
 }
 
 // stop a specific key inside the map
 // returns true when it successfully removed the key
 flux_stop :: proc(flux: ^Flux_Map($T), key: ^T) -> bool where intrinsics.type_is_float(T) {
-    if key in flux.values {
-        delete_key(&flux.values, key)
-        return true
-    }
+	if key in flux.values {
+		delete_key(&flux.values, key)
+		return true
+	}
 
-    return false
+	return false
 }
 
 // returns the amount of time left for the tween animation, if the key exists in the map

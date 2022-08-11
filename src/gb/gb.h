@@ -90,6 +90,10 @@ extern "C" {
 	#error This operating system is not supported
 #endif
 
+#if defined(GB_SYSTEM_OPENBSD)
+#include <sys/wait.h>
+#endif
+
 #if defined(_MSC_VER)
 	#define GB_COMPILER_MSVC 1
 #elif defined(__GNUC__)

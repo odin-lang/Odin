@@ -1,6 +1,14 @@
 "use strict";
 
 (function() {
+
+function getElement(name) {
+	if (name) {
+		return document.getElementById(name);
+	}
+	return undefined;
+}
+
 class WasmMemoryInterface {
 	constructor() {
 		this.memory = null;
@@ -204,12 +212,12 @@ class WebGLInterface {
 		return {
 			SetCurrentContextById: (name_ptr, name_len) => {
 				let name = this.mem.loadString(name_ptr, name_len);
-				let element = document.getElementById(name);
+				let element = getElement(name);
 				return this.setCurrentContext(element, {alpha: true, antialias: true, depth: true, premultipliedAlpha: true});
 			},
 			CreateCurrentContextById: (name_ptr, name_len, attributes) => {
 				let name = this.mem.loadString(name_ptr, name_len);
-				let element = document.getElementById(name);
+				let element = getElement(name);
 
 				let contextSettings = {
 					alpha:                        !(attributes & (1<<0)),
@@ -1380,9 +1388,11 @@ function odinSetupDefaultImports(wasmMemoryInterface, consoleElement) {
 				wmi.storeF64(off(8), e.timeStamp*1e-3);
 
 				wmi.storeU8(off(1), e.eventPhase);
-				wmi.storeU8(off(1), !!e.bubbles);
-				wmi.storeU8(off(1), !!e.cancelable);
-				wmi.storeU8(off(1), !!e.composed);
+				let options = 0;
+				if (!!e.bubbles)    { options |= 1<<0; }
+				if (!!e.cancelable) { options |= 1<<1; }
+				if (!!e.composed)   { options |= 1<<2; }
+				wmi.storeU8(off(1), options);
 				wmi.storeU8(off(1), !!e.isComposing);
 				wmi.storeU8(off(1), !!e.isTrusted);
 
@@ -1433,7 +1443,7 @@ function odinSetupDefaultImports(wasmMemoryInterface, consoleElement) {
 			add_event_listener: (id_ptr, id_len, name_ptr, name_len, name_code, data, callback, use_capture) => {
 				let id = wasmMemoryInterface.loadString(id_ptr, id_len);
 				let name = wasmMemoryInterface.loadString(name_ptr, name_len);
-				let element = document.getElementById(id);
+				let element = getElement(id);
 				if (element == undefined) {
 					return false;
 				}
@@ -1454,7 +1464,7 @@ function odinSetupDefaultImports(wasmMemoryInterface, consoleElement) {
 			remove_event_listener: (id_ptr, id_len, name_ptr, name_len, data, callback) => {
 				let id = wasmMemoryInterface.loadString(id_ptr, id_len);
 				let name = wasmMemoryInterface.loadString(name_ptr, name_len);
-				let element = document.getElementById(id);
+				let element = getElement(id);
 				if (element == undefined) {
 					return false;
 				}
@@ -1514,14 +1524,31 @@ function odinSetupDefaultImports(wasmMemoryInterface, consoleElement) {
 				}
 			},
 
+			dispatch_custom_event: (id_ptr, id_len, name_ptr, name_len, options_bits) => {
+				let id = wasmMemoryInterface.loadString(id_ptr, id_len);
+				let name = wasmMemoryInterface.loadString(name_ptr, name_len);
+				let options = {
+					bubbles:   (options_bits & (1<<0)) !== 0,
+					cancelabe: (options_bits & (1<<1)) !== 0,
+					composed:  (options_bits & (1<<2)) !== 0,
+				};
+
+				let element = getElement(id);
+				if (element) {
+					element.dispatchEvent(new Event(name, options));
+					return true;
+				}
+				return false;
+			},
+
 			get_element_value_f64: (id_ptr, id_len) => {
 				let id = wasmMemoryInterface.loadString(id_ptr, id_len);
-				let element = document.getElementById(id);
+				let element = getElement(id);
 				return element ? element.value : 0;
 			},
 			get_element_value_string: (id_ptr, id_len, buf_ptr, buf_len) => {
 				let id = wasmMemoryInterface.loadString(id_ptr, id_len);
-				let element = document.getElementById(id);
+				let element = getElement(id);
 				if (element) {
 					let str = element.value;
 					if (buf_len > 0 && buf_ptr) {
@@ -1535,7 +1562,7 @@ function odinSetupDefaultImports(wasmMemoryInterface, consoleElement) {
 			},
 			get_element_value_string_length: (id_ptr, id_len) => {
 				let id = wasmMemoryInterface.loadString(id_ptr, id_len);
-				let element = document.getElementById(id);
+				let element = getElement(id);
 				if (element) {
 					return element.value.length;
 				}
@@ -1543,7 +1570,7 @@ function odinSetupDefaultImports(wasmMemoryInterface, consoleElement) {
 			},
 			get_element_min_max: (ptr_array2_f64, id_ptr, id_len) => {
 				let id = wasmMemoryInterface.loadString(id_ptr, id_len);
-				let element = document.getElementById(id);
+				let element = getElement(id);
 				if (element) {
 					let values = wasmMemoryInterface.loadF64Array(ptr_array2_f64, 2);
 					values[0] = element.min;
@@ -1552,7 +1579,7 @@ function odinSetupDefaultImports(wasmMemoryInterface, consoleElement) {
 			},
 			set_element_value_f64: (id_ptr, id_len, value) => {
 				let id = wasmMemoryInterface.loadString(id_ptr, id_len);
-				let element = document.getElementById(id);
+				let element = getElement(id);
 				if (element) {
 					element.value = value;
 				}
@@ -1560,7 +1587,7 @@ function odinSetupDefaultImports(wasmMemoryInterface, consoleElement) {
 			set_element_value_string: (id_ptr, id_len, value_ptr, value_id) => {
 				let id = wasmMemoryInterface.loadString(id_ptr, id_len);
 				let value = wasmMemoryInterface.loadString(value_ptr, value_len);
-				let element = document.getElementById(id);
+				let element = getElement(id);
 				if (element) {
 					element.value = value;
 				}
@@ -1569,7 +1596,7 @@ function odinSetupDefaultImports(wasmMemoryInterface, consoleElement) {
 
 			get_bounding_client_rect: (rect_ptr, id_ptr, id_len) => {
 				let id = wasmMemoryInterface.loadString(id_ptr, id_len);
-				let element = document.getElementById(id);
+				let element = getElement(id);
 				if (element) {
 					let values = wasmMemoryInterface.loadF64Array(rect_ptr, 4);
 					let rect = element.getBoundingClientRect();

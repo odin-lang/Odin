@@ -143,7 +143,7 @@ free_all :: proc{mem_free_all}
 
 @builtin
 delete_string :: proc(str: string, allocator := context.allocator, loc := #caller_location) -> Allocator_Error {
-	return mem_free(raw_data(str), allocator, loc)
+	return mem_free_with_size(raw_data(str), len(str), allocator, loc)
 }
 @builtin
 delete_cstring :: proc(str: cstring, allocator := context.allocator, loc := #caller_location) -> Allocator_Error {
@@ -151,17 +151,24 @@ delete_cstring :: proc(str: cstring, allocator := context.allocator, loc := #cal
 }
 @builtin
 delete_dynamic_array :: proc(array: $T/[dynamic]$E, loc := #caller_location) -> Allocator_Error {
-	return mem_free(raw_data(array), array.allocator, loc)
+	return mem_free_with_size(raw_data(array), cap(array)*size_of(E), array.allocator, loc)
 }
 @builtin
 delete_slice :: proc(array: $T/[]$E, allocator := context.allocator, loc := #caller_location) -> Allocator_Error {
-	return mem_free(raw_data(array), allocator, loc)
+	return mem_free_with_size(raw_data(array), len(array)*size_of(E), allocator, loc)
 }
 @builtin
 delete_map :: proc(m: $T/map[$K]$V, loc := #caller_location) -> Allocator_Error {
+	Entry :: struct {
+		hash:  uintptr,
+		next:  int,
+		key:   K,
+		value: V,
+	}
+
 	raw := transmute(Raw_Map)m
 	err := delete_slice(raw.hashes, raw.entries.allocator, loc)
-	err1 := mem_free(raw.entries.data, raw.entries.allocator, loc)
+	err1 := mem_free_with_size(raw.entries.data, raw.entries.cap*size_of(Entry), raw.entries.allocator, loc)
 	if err == nil {
 		err = err1
 	}
@@ -339,19 +346,22 @@ append_elem :: proc(array: ^$T/[dynamic]$E, arg: E, loc := #caller_location)  {
 	if array == nil {
 		return
 	}
-
-	if cap(array) < len(array)+1 {
-		cap := 2 * cap(array) + max(8, 1)
-		_ = reserve(array, cap, loc)
-	}
-	if cap(array)-len(array) > 0 {
-		a := (^Raw_Dynamic_Array)(array)
-		when size_of(E) != 0 {
-			data := ([^]E)(a.data)
-			assert(condition=data != nil, loc=loc)
-			data[a.len] = arg
-		}
+	when size_of(E) == 0 {
 		a.len += 1
+	} else {
+		if cap(array) < len(array)+1 {
+			cap := 2 * cap(array) + max(8, 1)
+			_ = reserve(array, cap, loc)
+		}
+		if cap(array)-len(array) > 0 {
+			a := (^Raw_Dynamic_Array)(array)
+			when size_of(E) != 0 {
+				data := ([^]E)(a.data)
+				assert(condition=data != nil, loc=loc)
+				data[a.len] = arg
+			}
+			a.len += 1
+		}
 	}
 }
 
@@ -366,20 +376,23 @@ append_elems :: proc(array: ^$T/[dynamic]$E, args: ..E, loc := #caller_location)
 		return
 	}
 
-
-	if cap(array) < len(array)+arg_len {
-		cap := 2 * cap(array) + max(8, arg_len)
-		_ = reserve(array, cap, loc)
-	}
-	arg_len = min(cap(array)-len(array), arg_len)
-	if arg_len > 0 {
-		a := (^Raw_Dynamic_Array)(array)
-		when size_of(E) != 0 {
-			data := ([^]E)(a.data)
-			assert(condition=data != nil, loc=loc)
-			intrinsics.mem_copy(&data[a.len], raw_data(args), size_of(E) * arg_len)
-		}
+	when size_of(E) == 0 {
 		a.len += arg_len
+	} else {
+		if cap(array) < len(array)+arg_len {
+			cap := 2 * cap(array) + max(8, arg_len)
+			_ = reserve(array, cap, loc)
+		}
+		arg_len = min(cap(array)-len(array), arg_len)
+		if arg_len > 0 {
+			a := (^Raw_Dynamic_Array)(array)
+			when size_of(E) != 0 {
+				data := ([^]E)(a.data)
+				assert(condition=data != nil, loc=loc)
+				intrinsics.mem_copy(&data[a.len], raw_data(args), size_of(E) * arg_len)
+			}
+			a.len += arg_len
+		}
 	}
 }
 
@@ -413,7 +426,7 @@ append_nothing :: proc(array: ^$T/[dynamic]$E, loc := #caller_location) {
 
 
 @builtin
-insert_at_elem :: proc(array: ^$T/[dynamic]$E, index: int, arg: E, loc := #caller_location) -> (ok: bool) #no_bounds_check {
+inject_at_elem :: proc(array: ^$T/[dynamic]$E, index: int, arg: E, loc := #caller_location) -> (ok: bool) #no_bounds_check {
 	if array == nil {
 		return
 	}
@@ -432,7 +445,7 @@ insert_at_elem :: proc(array: ^$T/[dynamic]$E, index: int, arg: E, loc := #calle
 }
 
 @builtin
-insert_at_elems :: proc(array: ^$T/[dynamic]$E, index: int, args: ..E, loc := #caller_location) -> (ok: bool) #no_bounds_check {
+inject_at_elems :: proc(array: ^$T/[dynamic]$E, index: int, args: ..E, loc := #caller_location) -> (ok: bool) #no_bounds_check {
 	if array == nil {
 		return
 	}
@@ -456,7 +469,7 @@ insert_at_elems :: proc(array: ^$T/[dynamic]$E, index: int, args: ..E, loc := #c
 }
 
 @builtin
-insert_at_elem_string :: proc(array: ^$T/[dynamic]$E/u8, index: int, arg: string, loc := #caller_location) -> (ok: bool) #no_bounds_check {
+inject_at_elem_string :: proc(array: ^$T/[dynamic]$E/u8, index: int, arg: string, loc := #caller_location) -> (ok: bool) #no_bounds_check {
 	if array == nil {
 		return
 	}
@@ -477,7 +490,51 @@ insert_at_elem_string :: proc(array: ^$T/[dynamic]$E/u8, index: int, arg: string
 	return
 }
 
-@builtin insert_at :: proc{insert_at_elem, insert_at_elems, insert_at_elem_string}
+@builtin inject_at :: proc{inject_at_elem, inject_at_elems, inject_at_elem_string}
+
+
+
+@builtin
+assign_at_elem :: proc(array: ^$T/[dynamic]$E, index: int, arg: E, loc := #caller_location) -> (ok: bool) #no_bounds_check {
+	if index < len(array) {
+		array[index] = arg
+		ok = true
+	} else if resize(array, index+1, loc) {
+		array[index] = arg
+		ok = true
+	}
+	return
+}
+
+
+@builtin
+assign_at_elems :: proc(array: ^$T/[dynamic]$E, index: int, args: ..E, loc := #caller_location) -> (ok: bool) #no_bounds_check {
+	if index+len(args) < len(array) {
+		copy(array[index:], args)
+		ok = true
+	} else if resize(array, index+1+len(args), loc) {
+		copy(array[index:], args)
+		ok = true
+	}
+	return
+}
+
+
+@builtin
+assign_at_elem_string :: proc(array: ^$T/[dynamic]$E/u8, index: int, arg: string, loc := #caller_location) -> (ok: bool) #no_bounds_check {
+	if len(args) == 0 {
+		ok = true
+	} else if index+len(args) < len(array) {
+		copy(array[index:], args)
+		ok = true
+	} else if resize(array, index+1+len(args), loc) {
+		copy(array[index:], args)
+		ok = true
+	}
+	return
+}
+
+@builtin assign_at :: proc{assign_at_elem, assign_at_elems, assign_at_elem_string}
 
 
 
@@ -734,18 +791,4 @@ unimplemented :: proc(message := "", loc := #caller_location) -> ! {
 		p = default_assertion_failure_proc
 	}
 	p("not yet implemented", message, loc)
-}
-
-@builtin
-@(disabled=ODIN_DISABLE_ASSERT)
-unreachable :: proc(message := "", loc := #caller_location) -> ! {
-	p := context.assertion_failure_proc
-	if p == nil {
-		p = default_assertion_failure_proc
-	}
-	if message != "" {
-		p("internal error", message, loc)
-	} else {
-		p("internal error", "entered unreachable code", loc)
-	}
 }

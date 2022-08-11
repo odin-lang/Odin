@@ -79,6 +79,8 @@ Event_Kind :: enum u32 {
 
 	Context_Menu,
 
+	Custom,
+
 }
 event_kind_string := [Event_Kind]string{
 	.Invalid = "",
@@ -155,6 +157,8 @@ event_kind_string := [Event_Kind]string{
 	.Touch_Start  = "touchstart",
 
 	.Context_Menu = "contextmenu",
+
+	.Custom = "?custom?",
 }
 
 Delta_Mode :: enum u32 {
@@ -186,6 +190,13 @@ Event_Phase :: enum u8 {
 	Bubbling_Phase  = 3,
 }
 
+Event_Option :: enum u8 {
+	Bubbles    = 0,
+	Cancelable = 1,
+	Composed   = 2,
+}
+Event_Options :: distinct bit_set[Event_Option; u8]
+
 Event :: struct {
 	kind:                 Event_Kind,
 	target_kind:          Event_Target_Kind,
@@ -194,9 +205,7 @@ Event :: struct {
 	timestamp:    f64,
 
 	phase:        Event_Phase,
-	bubbles:      bool,
-	cancelable:   bool,
-	composed:     bool,
+	options:      Event_Options,
 	is_composing: bool,
 	is_trusted:   bool,
 
@@ -255,6 +264,7 @@ foreign dom_lib {
 	event_stop_propagation           :: proc() ---
 	event_stop_immediate_propagation :: proc() ---
 	event_prevent_default            :: proc() ---
+	dispatch_custom_event            :: proc(id: string, name: string, options := Event_Options{}) -> bool ---
 }
 
 add_event_listener :: proc(id: string, kind: Event_Kind, user_data: rawptr, callback: proc(e: Event), use_capture := false) -> bool {
@@ -299,6 +309,23 @@ remove_event_listener_from_event :: proc(e: Event) -> bool {
 		return remove_window_event_listener(e.kind, e.user_data, e.callback)
 	}
 	return remove_event_listener(e.id, e.kind, e.user_data, e.callback)
+}
+
+add_custom_event_listener :: proc(id: string, name: string, user_data: rawptr, callback: proc(e: Event), use_capture := false) -> bool {
+	@(default_calling_convention="contextless")
+	foreign dom_lib {
+		@(link_name="add_event_listener")
+		_add_event_listener :: proc(id: string, name: string, name_code: Event_Kind, user_data: rawptr, callback: proc "odin" (Event), use_capture: bool) -> bool ---
+	}
+	return _add_event_listener(id, name, .Custom, user_data, callback, use_capture)
+}
+remove_custom_event_listener :: proc(id: string, name: string, user_data: rawptr, callback: proc(e: Event)) -> bool {
+	@(default_calling_convention="contextless")
+	foreign dom_lib {
+		@(link_name="remove_event_listener")
+		_remove_event_listener :: proc(id: string, name: string, user_data: rawptr, callback: proc "odin" (Event)) -> bool ---
+	}
+	return _remove_event_listener(id, name, user_data, callback)
 }
 
 

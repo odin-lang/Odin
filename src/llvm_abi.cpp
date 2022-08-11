@@ -62,7 +62,7 @@ bool lb_is_type_kind(LLVMTypeRef type, LLVMTypeKind kind) {
 	return LLVMGetTypeKind(type) == kind;
 }
 
-LLVMTypeRef lb_function_type_to_llvm_ptr(lbFunctionType *ft, bool is_var_arg) {
+LLVMTypeRef lb_function_type_to_llvm_raw(lbFunctionType *ft, bool is_var_arg) {
 	unsigned arg_count = cast(unsigned)ft->args.count;
 	unsigned offset = 0;
 
@@ -108,8 +108,14 @@ LLVMTypeRef lb_function_type_to_llvm_ptr(lbFunctionType *ft, bool is_var_arg) {
 	}
 	unsigned total_arg_count = arg_index;
 	LLVMTypeRef func_type = LLVMFunctionType(ret, args, total_arg_count, is_var_arg);
-	return LLVMPointerType(func_type, 0);
+	return func_type;
 }
+
+
+// LLVMTypeRef lb_function_type_to_llvm_ptr(lbFunctionType *ft, bool is_var_arg) {
+// 	LLVMTypeRef func_type = lb_function_type_to_llvm_raw(ft, is_var_arg);
+// 	return LLVMPointerType(func_type, 0);
+// }
 
 
 void lb_add_function_type_attributes(LLVMValueRef fn, lbFunctionType *ft, ProcCallingConvention calling_convention) {
@@ -217,7 +223,7 @@ i64 lb_sizeof(LLVMTypeRef type) {
 		break;
 	case LLVMArrayTypeKind:
 		{
-			LLVMTypeRef elem = LLVMGetElementType(type);
+			LLVMTypeRef elem = OdinLLVMGetArrayElementType(type);
 			i64 elem_size = lb_sizeof(elem);
 			i64 count = LLVMGetArrayLength(type);
 			i64 size = count * elem_size;
@@ -229,11 +235,11 @@ i64 lb_sizeof(LLVMTypeRef type) {
 		return 8;
 	case LLVMVectorTypeKind:
 		{
-			LLVMTypeRef elem = LLVMGetElementType(type);
+			LLVMTypeRef elem = OdinLLVMGetVectorElementType(type);
 			i64 elem_size = lb_sizeof(elem);
 			i64 count = LLVMGetVectorSize(type);
 			i64 size = count * elem_size;
-			return gb_clamp(next_pow2(size), 1, build_context.max_align);
+			return next_pow2(size);
 		}
 
 	}
@@ -277,14 +283,14 @@ i64 lb_alignof(LLVMTypeRef type) {
 		}
 		break;
 	case LLVMArrayTypeKind:
-		return lb_alignof(LLVMGetElementType(type));
+		return lb_alignof(OdinLLVMGetArrayElementType(type));
 
 	case LLVMX86_MMXTypeKind:
 		return 8;
 	case LLVMVectorTypeKind:
 		{
 			// TODO(bill): This appears to be correct but LLVM isn't necessarily "great" with regards to documentation
-			LLVMTypeRef elem = LLVMGetElementType(type);
+			LLVMTypeRef elem = OdinLLVMGetVectorElementType(type);
 			i64 elem_size = lb_sizeof(elem);
 			i64 count = LLVMGetVectorSize(type);
 			i64 size = count * elem_size;
@@ -787,7 +793,7 @@ namespace lbAbiAmd64SysV {
 		case LLVMArrayTypeKind:
 			{
 				i64 len = LLVMGetArrayLength(t);
-				LLVMTypeRef elem = LLVMGetElementType(t);
+				LLVMTypeRef elem = OdinLLVMGetArrayElementType(t);
 				i64 elem_sz = lb_sizeof(elem);
 				for (i64 i = 0; i < len; i++) {
 					classify_with(elem, cls, ix, off + i*elem_sz);
@@ -797,20 +803,27 @@ namespace lbAbiAmd64SysV {
 		case LLVMVectorTypeKind:
 			{
 				i64 len = LLVMGetVectorSize(t);
-				LLVMTypeRef elem = LLVMGetElementType(t);
+				LLVMTypeRef elem = OdinLLVMGetVectorElementType(t);
 				i64 elem_sz = lb_sizeof(elem);
 				LLVMTypeKind elem_kind = LLVMGetTypeKind(elem);
 				RegClass reg = RegClass_NoClass;
+				unsigned elem_width = LLVMGetIntTypeWidth(elem);
 				switch (elem_kind) {
 				case LLVMIntegerTypeKind:
 				case LLVMHalfTypeKind:
-					switch (LLVMGetIntTypeWidth(elem)) {
-					case 8:  reg = RegClass_SSEInt8;
-					case 16: reg = RegClass_SSEInt16;
-					case 32: reg = RegClass_SSEInt32;
-					case 64: reg = RegClass_SSEInt64;
+					switch (elem_width) {
+					case 8:  reg = RegClass_SSEInt8;  break;
+					case 16: reg = RegClass_SSEInt16; break;
+					case 32: reg = RegClass_SSEInt32; break;
+					case 64: reg = RegClass_SSEInt64; break;
 					default:
-						GB_PANIC("Unhandled integer width for vector type");
+						if (elem_width > 64) {
+							for (i64 i = 0; i < len; i++) {
+								classify_with(elem, cls, ix, off + i*elem_sz);
+							}
+							break;
+						}
+						GB_PANIC("Unhandled integer width for vector type %u", elem_width);
 					}
 					break;
 				case LLVMFloatTypeKind:
@@ -900,7 +913,7 @@ namespace lbAbiArm64 {
 		if (len == 0) {
 			return false;
 		}
-		LLVMTypeRef elem = LLVMGetElementType(type);
+		LLVMTypeRef elem = OdinLLVMGetArrayElementType(type);
 		LLVMTypeRef base_type = nullptr;
 		unsigned member_count = 0;
 		if (is_homogenous_aggregate(c, elem, &base_type, &member_count)) {
@@ -1116,7 +1129,7 @@ namespace lbAbiWasm {
 		}
 		if (sz <= MAX_DIRECT_STRUCT_SIZE) {
 			if (kind == LLVMArrayTypeKind) {
-				if (is_basic_register_type(LLVMGetElementType(type))) {
+				if (is_basic_register_type(OdinLLVMGetArrayElementType(type))) {
 					return true;
 				}
 			} else if (kind == LLVMStructTypeKind) {

@@ -283,6 +283,9 @@ i32 linker_stage(lbGenerator *gen) {
 			String vs_exe_path = path_to_string(heap_allocator(), build_context.build_paths[BuildPath_VS_EXE]);
 			defer (gb_free(heap_allocator(), vs_exe_path.text));
 
+			String windows_sdk_bin_path = path_to_string(heap_allocator(), build_context.build_paths[BuildPath_Win_SDK_Bin_Path]);
+			defer (gb_free(heap_allocator(), windows_sdk_bin_path.text));
+
 			char const *subsystem_str = build_context.use_subsystem_windows ? "WINDOWS" : "CONSOLE";
 			if (!build_context.use_lld) { // msvc
 				if (build_context.has_resource) {
@@ -292,7 +295,8 @@ i32 linker_stage(lbGenerator *gen) {
 					defer (gb_free(heap_allocator(), res_path.text));
 
 					result = system_exec_command_line_app("msvc-link",
-						"\"rc.exe\" /nologo /fo \"%.*s\" \"%.*s\"",
+						"\"%.*src.exe\" /nologo /fo \"%.*s\" \"%.*s\"",
+						LIT(windows_sdk_bin_path),
 						LIT(res_path),
 						LIT(rc_path)
 					);
@@ -463,8 +467,15 @@ i32 linker_stage(lbGenerator *gen) {
 				// correctly this way since all the other dependencies provided implicitly
 				// by the compiler frontend are still needed and most of the command
 				// line arguments prepared previously are incompatible with ld.
-				link_settings = gb_string_appendc(link_settings, "-Wl,-init,'_odin_entry_point' ");
-				link_settings = gb_string_appendc(link_settings, "-Wl,-fini,'_odin_exit_point' ");
+				if (build_context.metrics.os == TargetOs_darwin) {
+					link_settings = gb_string_appendc(link_settings, "-Wl,-init,'__odin_entry_point' ");
+					// NOTE(weshardee): __odin_exit_point should also be added, but -fini 
+					// does not exist on MacOS
+				} else {
+					link_settings = gb_string_appendc(link_settings, "-Wl,-init,'_odin_entry_point' ");
+					link_settings = gb_string_appendc(link_settings, "-Wl,-fini,'_odin_exit_point' ");
+				}
+				
 			} else if (build_context.metrics.os != TargetOs_openbsd) {
 				// OpenBSD defaults to PIE executable. do not pass -no-pie for it.
 				link_settings = gb_string_appendc(link_settings, "-no-pie ");
@@ -1551,7 +1562,7 @@ bool parse_build_flags(Array<String> args) {
 									bad_flags = true;
 									break;
 								}
-								build_context.resource_filepath = substring(path, 0, string_extension_position(path));
+								build_context.resource_filepath = path;
 								build_context.has_resource = true;
 							} else {
 								gb_printf_err("Invalid -resource path, got %.*s\n", LIT(path));

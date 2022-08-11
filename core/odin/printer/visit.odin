@@ -71,7 +71,7 @@ push_comment :: proc(p: ^Printer, comment: tokenizer.Token) -> int {
 
 		return 0
 	} else {
-		builder := strings.make_builder(context.temp_allocator)
+		builder := strings.builder_make(context.temp_allocator)
 
 		c_len      := len(comment.text)
 		trim_space := true
@@ -90,12 +90,12 @@ push_comment :: proc(p: ^Printer, comment: tokenizer.Token) -> int {
 				continue
 			case c == '\r' && comment.text[min(c_len - 1, i + 1)] == '\n':
 				append(&multilines, strings.to_string(builder))
-				builder = strings.make_builder(context.temp_allocator)
+				builder = strings.builder_make(context.temp_allocator)
 				trim_space = true
 				i += 1
 			case c == '\n':
 				append(&multilines, strings.to_string(builder))
-				builder = strings.make_builder(context.temp_allocator)
+				builder = strings.builder_make(context.temp_allocator)
 				trim_space = true
 			case c == '/' && comment.text[min(c_len - 1, i + 1)] == '*':
 				strings.write_string(&builder, "/*")

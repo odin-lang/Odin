@@ -6,7 +6,6 @@ import "core:fmt"
 
 // NOTE(bill, 2019-12-31): These are defined in `package runtime` as they are used in the `context`. This is to prevent an import definition cycle.
 
-Level :: runtime.Logger_Level
 /*
 Logger_Level :: enum {
 	Debug   = 0,
@@ -16,8 +15,8 @@ Logger_Level :: enum {
 	Fatal   = 40,
 }
 */
+Level :: runtime.Logger_Level
 
-Option :: runtime.Logger_Option
 /*
 Option :: enum {
 	Level,
@@ -30,11 +29,12 @@ Option :: enum {
 	Terminal_Color
 }
 */
+Option :: runtime.Logger_Option
 
-Options :: runtime.Logger_Options
 /*
 Options :: bit_set[Option];
 */
+Options :: runtime.Logger_Options
 
 Full_Timestamp_Opts :: Options{
 	.Date,
@@ -52,12 +52,11 @@ Location_File_Opts :: Options{
 }
 
 
-Logger_Proc :: runtime.Logger_Proc
 /*
 Logger_Proc :: #type proc(data: rawptr, level: Level, text: string, options: Options, location := #caller_location);
 */
+Logger_Proc :: runtime.Logger_Proc
 
-Logger :: runtime.Logger
 /*
 Logger :: struct {
 	procedure:    Logger_Proc,
@@ -66,6 +65,7 @@ Logger :: struct {
 	options:   	  Logger_Options,
 }
 */
+Logger :: runtime.Logger
 
 nil_logger_proc :: proc(data: rawptr, level: Level, text: string, options: Options, location := #caller_location) {
 	// Do nothing
@@ -75,7 +75,6 @@ nil_logger :: proc() -> Logger {
 	return Logger{nil_logger_proc, nil, Level.Debug, nil}
 }
 
-// TODO(bill): Should these be redesigned so that they are do not rely upon `package fmt`?
 debugf :: proc(fmt_str: string, args: ..any, location := #caller_location) {
 	logf(level=.Debug,   fmt_str=fmt_str, args=args, location=location)
 }
