@@ -3532,20 +3532,30 @@ void lb_build_addr_compound_lit_populate(lbProcedure *p, Slice<Ast *> const &ele
 
 				GB_ASSERT((hi-lo) > 0);
 
-				enum {MAX_ELEMENT_AMOUNT = 32};
-				if ((hi-lo) <= MAX_ELEMENT_AMOUNT) {
+				if (bt->kind == Type_Matrix) {
 					for (i64 k = lo; k < hi; k++) {
 						lbCompoundLitElemTempData data = {};
 						data.value = value;
-						data.elem_index = k;
+
+						data.elem_index = matrix_row_major_index_to_offset(bt, k);
 						array_add(temp_data, data);
 					}
 				} else {
-					lbCompoundLitElemTempData data = {};
-					data.value = value;
-					data.elem_index = lo;
-					data.elem_length = hi-lo;
-					array_add(temp_data, data);
+					enum {MAX_ELEMENT_AMOUNT = 32};
+					if ((hi-lo) <= MAX_ELEMENT_AMOUNT) {
+						for (i64 k = lo; k < hi; k++) {
+							lbCompoundLitElemTempData data = {};
+							data.value = value;
+							data.elem_index = k;
+							array_add(temp_data, data);
+						}
+					} else {
+						lbCompoundLitElemTempData data = {};
+						data.value = value;
+						data.elem_index = lo;
+						data.elem_length = hi-lo;
+						array_add(temp_data, data);
+					}
 				}
 			} else {
 				auto tav = fv->field->tav;
@@ -3558,7 +3568,11 @@ void lb_build_addr_compound_lit_populate(lbProcedure *p, Slice<Ast *> const &ele
 				lbCompoundLitElemTempData data = {};
 				data.value = value;
 				data.expr = fv->value;
-				data.elem_index = cast(i32)index;
+				if (bt->kind == Type_Matrix) {
+					data.elem_index = matrix_row_major_index_to_offset(bt, index);
+				} else {
+					data.elem_index = index;
+				}
 				array_add(temp_data, data);
 			}
 
@@ -3574,25 +3588,29 @@ void lb_build_addr_compound_lit_populate(lbProcedure *p, Slice<Ast *> const &ele
 
 			lbCompoundLitElemTempData data = {};
 			data.value = ev;
-			data.elem_index = cast(i32)i;
+			if (bt->kind == Type_Matrix) {
+				data.elem_index = matrix_row_major_index_to_offset(bt, i);
+			} else {
+				data.elem_index = i;
+			}
 			array_add(temp_data, data);
 		}
 	}
 }
-void lb_build_addr_compound_lit_assign_array(lbProcedure *p, Array<lbCompoundLitElemTempData> &temp_data) {
+void lb_build_addr_compound_lit_assign_array(lbProcedure *p, Array<lbCompoundLitElemTempData> const &temp_data) {
 	for_array(i, temp_data) {
 		auto td = temp_data[i];
 		if (td.value.value != nullptr) {
 			if (td.elem_length > 0) {
 				auto loop_data = lb_loop_start(p, cast(isize)td.elem_length, t_i32);
 				{
-					lbValue dst = temp_data[i].gep;
+					lbValue dst = td.gep;
 					dst = lb_emit_ptr_offset(p, dst, loop_data.idx);
-					lb_emit_store(p, dst, temp_data[i].value);
+					lb_emit_store(p, dst, td.value);
 				}
 				lb_loop_end(p, loop_data);
 			} else {
-				lb_emit_store(p, temp_data[i].gep, temp_data[i].value);
+				lb_emit_store(p, td.gep, td.value);
 			}
 		}
 	}
@@ -3907,93 +3925,14 @@ lbAddr lb_build_addr_compound_lit(lbProcedure *p, Ast *expr) {
 
 			auto temp_data = array_make<lbCompoundLitElemTempData>(temporary_allocator(), 0, cl->elems.count);
 
-			// NOTE(bill): Separate value, gep, store into their own chunks
-			for_array(i, cl->elems) {
-				Ast *elem = cl->elems[i];
+			lb_build_addr_compound_lit_populate(p, cl->elems, &temp_data, type);
 
-				if (elem->kind == Ast_FieldValue) {
-					ast_node(fv, FieldValue, elem);
-					if (lb_is_elem_const(fv->value, et)) {
-						continue;
-					}
-					if (is_ast_range(fv->field)) {
-						ast_node(ie, BinaryExpr, fv->field);
-						TypeAndValue lo_tav = ie->left->tav;
-						TypeAndValue hi_tav = ie->right->tav;
-						GB_ASSERT(lo_tav.mode == Addressing_Constant);
-						GB_ASSERT(hi_tav.mode == Addressing_Constant);
-
-						TokenKind op = ie->op.kind;
-						i64 lo = exact_value_to_i64(lo_tav.value);
-						i64 hi = exact_value_to_i64(hi_tav.value);
-						if (op != Token_RangeHalf) {
-							hi += 1;
-						}
-
-						lbValue value = lb_build_expr(p, fv->value);
-
-						for (i64 k = lo; k < hi; k++) {
-							lbCompoundLitElemTempData data = {};
-							data.value = value;
-
-							data.elem_index = cast(i32)matrix_row_major_index_to_offset(bt, k);
-							array_add(&temp_data, data);
-						}
-
-					} else {
-						auto tav = fv->field->tav;
-						GB_ASSERT(tav.mode == Addressing_Constant);
-						i64 index = exact_value_to_i64(tav.value);
-
-						lbValue value = lb_build_expr(p, fv->value);
-						lbCompoundLitElemTempData data = {};
-						data.value = lb_emit_conv(p, value, et);
-						data.expr = fv->value;
-
-						data.elem_index = cast(i32)matrix_row_major_index_to_offset(bt, index);
-						array_add(&temp_data, data);
-					}
-
-				} else {
-					if (lb_is_elem_const(elem, et)) {
-						continue;
-					}
-					lbCompoundLitElemTempData data = {};
-					data.expr = elem;
-					data.elem_index = cast(i32)matrix_row_major_index_to_offset(bt, i);
-					array_add(&temp_data, data);
-				}
-			}
-
+			lbValue dst_ptr = lb_addr_get_ptr(p, v);
 			for_array(i, temp_data) {
-				temp_data[i].gep = lb_emit_array_epi(p, lb_addr_get_ptr(p, v), temp_data[i].elem_index);
+				temp_data[i].gep = lb_emit_array_epi(p, dst_ptr, temp_data[i].elem_index);
 			}
 
-			for_array(i, temp_data) {
-				lbValue field_expr = temp_data[i].value;
-				Ast *expr = temp_data[i].expr;
-
-				auto prev_hint = lb_set_copy_elision_hint(p, lb_addr(temp_data[i].gep), expr);
-
-				if (field_expr.value == nullptr) {
-					field_expr = lb_build_expr(p, expr);
-				}
-				Type *t = field_expr.type;
-				GB_ASSERT(t->kind != Type_Tuple);
-				lbValue ev = lb_emit_conv(p, field_expr, et);
-
-				if (!p->copy_elision_hint.used) {
-					temp_data[i].value = ev;
-				}
-
-				lb_reset_copy_elision_hint(p, prev_hint);
-			}
-
-			for_array(i, temp_data) {
-				if (temp_data[i].value.value != nullptr) {
-					lb_emit_store(p, temp_data[i].gep, temp_data[i].value);
-				}
-			}
+			lb_build_addr_compound_lit_assign_array(p, temp_data);
 		}
 		break;
 	}
@@ -4005,90 +3944,23 @@ lbAddr lb_build_addr_compound_lit(lbProcedure *p, Ast *expr) {
 
 			auto temp_data = array_make<lbCompoundLitElemTempData>(temporary_allocator(), 0, cl->elems.count);
 
-			// NOTE(bill): Separate value, store into their own chunks
-			for_array(i, cl->elems) {
-				Ast *elem = cl->elems[i];
-				if (elem->kind == Ast_FieldValue) {
-					ast_node(fv, FieldValue, elem);
-					if (lb_is_elem_const(fv->value, et)) {
-						continue;
-					}
-					if (is_ast_range(fv->field)) {
-						ast_node(ie, BinaryExpr, fv->field);
-						TypeAndValue lo_tav = ie->left->tav;
-						TypeAndValue hi_tav = ie->right->tav;
-						GB_ASSERT(lo_tav.mode == Addressing_Constant);
-						GB_ASSERT(hi_tav.mode == Addressing_Constant);
-
-						TokenKind op = ie->op.kind;
-						i64 lo = exact_value_to_i64(lo_tav.value);
-						i64 hi = exact_value_to_i64(hi_tav.value);
-						if (op != Token_RangeHalf) {
-							hi += 1;
-						}
-
-						lbValue value = lb_build_expr(p, fv->value);
-
-						for (i64 k = lo; k < hi; k++) {
-							lbCompoundLitElemTempData data = {};
-							data.value = value;
-							data.elem_index = cast(i32)k;
-							array_add(&temp_data, data);
-						}
-
-					} else {
-						auto tav = fv->field->tav;
-						GB_ASSERT(tav.mode == Addressing_Constant);
-						i64 index = exact_value_to_i64(tav.value);
-
-						lbValue value = lb_build_expr(p, fv->value);
-						lbCompoundLitElemTempData data = {};
-						data.value = lb_emit_conv(p, value, et);
-						data.expr = fv->value;
-						data.elem_index = cast(i32)index;
-						array_add(&temp_data, data);
-					}
-
-				} else {
-					if (lb_is_elem_const(elem, et)) {
-						continue;
-					}
-					lbCompoundLitElemTempData data = {};
-					data.expr = elem;
-					data.elem_index = cast(i32)i;
-					array_add(&temp_data, data);
-				}
-			}
-
-
-			for_array(i, temp_data) {
-				lbValue field_expr = temp_data[i].value;
-				Ast *expr = temp_data[i].expr;
-
-				auto prev_hint = lb_set_copy_elision_hint(p, lb_addr(temp_data[i].gep), expr);
-
-				if (field_expr.value == nullptr) {
-					field_expr = lb_build_expr(p, expr);
-				}
-				Type *t = field_expr.type;
-				GB_ASSERT(t->kind != Type_Tuple);
-				lbValue ev = lb_emit_conv(p, field_expr, et);
-
-				if (!p->copy_elision_hint.used) {
-					temp_data[i].value = ev;
-				}
-
-				lb_reset_copy_elision_hint(p, prev_hint);
-			}
-
+			lb_build_addr_compound_lit_populate(p, cl->elems, &temp_data, type);
 
 			// TODO(bill): reduce the need for individual `insertelement` if a `shufflevector`
 			// might be a better option
-
 			for_array(i, temp_data) {
-				if (temp_data[i].value.value != nullptr) {
-					LLVMValueRef index = lb_const_int(p->module, t_u32, temp_data[i].elem_index).value;
-					vector_value.value = LLVMBuildInsertElement(p->builder, vector_value.value, temp_data[i].value.value, index, "");
+				auto td = temp_data[i];
+				if (td.value.value != nullptr) {
+					if (td.elem_length > 0) {
+						for (i64 k = 0; k < td.elem_length; k++) {
+							LLVMValueRef index = lb_const_int(p->module, t_u32, td.elem_index + k).value;
+							vector_value.value = LLVMBuildInsertElement(p->builder, vector_value.value, td.value.value, index, "");
+						}
+					} else {
+						LLVMValueRef index = lb_const_int(p->module, t_u32, td.elem_index).value;
+						vector_value.value = LLVMBuildInsertElement(p->builder, vector_value.value, td.value.value, index, "");
+
+					}
 				}
 			}
 		}
