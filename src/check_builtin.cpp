@@ -1196,10 +1196,14 @@ LoadDirectiveResult check_load_directive(CheckerContext *c, Operand *operand, As
 
 	GB_ASSERT(o.value.kind == ExactValue_String);
 
+	operand->type = t_u8_slice;
+	if (type_hint && is_type_string(type_hint)) {
+		operand->type = type_hint;
+	}
+	operand->mode = Addressing_Constant;
+
 	LoadFileCache *cache = nullptr;
 	if (cache_load_file_directive(c, call, o.value.value_string, err_on_not_found, &cache)) {
-		operand->type = t_u8_slice;
-		operand->mode = Addressing_Constant;
 		operand->value = exact_value_string(cache->data);
 		return LoadDirective_Success;
 	}
