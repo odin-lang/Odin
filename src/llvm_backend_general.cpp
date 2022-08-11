@@ -175,7 +175,8 @@ struct lbLoopData {
 struct lbCompoundLitElemTempData {
 	Ast *   expr;
 	lbValue value;
-	i32     elem_index;
+	i64     elem_index;
+	i64     elem_length;
 	lbValue gep;
 };
 
