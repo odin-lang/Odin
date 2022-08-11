@@ -121,6 +121,28 @@ void check_or_return_split_types(CheckerContext *c, Operand *x, String const &na
 
 bool is_diverging_expr(Ast *expr);
 
+
+enum LoadDirectiveResult {
+	LoadDirective_Success  = 0,
+	LoadDirective_Error    = 1,
+	LoadDirective_NotFound = 2,
+};
+
+bool is_load_directive_call(Ast *call) {
+	call = unparen_expr(call);
+	if (call->kind != Ast_CallExpr) {
+		return false;
+	}
+	ast_node(ce, CallExpr, call);
+	if (ce->proc->kind != Ast_BasicDirective) {
+		return false;
+	}
+	ast_node(bd, BasicDirective, ce->proc);
+	String name = bd->name.string;
+	return name == "load";
+}
+LoadDirectiveResult check_load_directive(CheckerContext *c, Operand *operand, Ast *call, Type *type_hint, bool err_on_not_found);
+
 void check_did_you_mean_print(DidYouMeanAnswers *d, char const *prefix = "") {
 	auto results = did_you_mean_results(d);
 	if (results.count != 0) {
@@ -7407,9 +7429,54 @@ ExprKind check_or_else_expr(CheckerContext *c, Operand *o, Ast *node, Type *type
 	String name = oe->token.string;
 	Ast *arg = oe->x;
 	Ast *default_value = oe->y;
-
 	Operand x = {};
 	Operand y = {};
+
+	// NOTE(bill, 2022-08-11): edge case to handle #load(path) or_else default
+	if (is_load_directive_call(arg)) {
+		LoadDirectiveResult res = check_load_directive(c, &x, arg, type_hint, false);
+		if (res == LoadDirective_Success) {
+			*o = x;
+			return Expr_Expr;
+		}
+
+		bool y_is_diverging = false;
+		check_expr_base(c, &y, default_value, x.type);
+		switch (y.mode) {
+		case Addressing_NoValue:
+			if (is_diverging_expr(y.expr)) {
+				// Allow
+				y.mode = Addressing_Value;
+				y_is_diverging = true;
+			} else {
+				error_operand_no_value(&y);
+				y.mode = Addressing_Invalid;
+			}
+			break;
+		case Addressing_Type:
+			error_operand_not_expression(&y);
+			y.mode = Addressing_Invalid;
+			break;
+		}
+
+		if (y.mode == Addressing_Invalid) {
+			o->mode = Addressing_Value;
+			o->type = t_invalid;
+			o->expr = node;
+			return Expr_Expr;
+		}
+
+		if (!y_is_diverging) {
+			check_assignment(c, &y, x.type, name);
+		}
+
+		o->mode = y.mode;
+		o->type  = y.type;
+		o->expr = node;
+
+		return Expr_Expr;
+	}
+
 	check_multi_expr_with_type_hint(c, &x, arg, type_hint);
 	if (x.mode == Addressing_Invalid) {
 		o->mode = Addressing_Value;
@@ -7417,7 +7484,6 @@ ExprKind check_or_else_expr(CheckerContext *c, Operand *o, Ast *node, Type *type
 		o->expr = node;
 		return Expr_Expr;
 	}
-
 	bool y_is_diverging = false;
 	check_expr_base(c, &y, default_value, x.type);
 	switch (y.mode) {
