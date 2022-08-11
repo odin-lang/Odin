@@ -1075,6 +1075,459 @@ bool check_builtin_simd_operation(CheckerContext *c, Operand *operand, Ast *call
 }
 
 
+bool check_builtin_procedure_directive(CheckerContext *c, Operand *operand, Ast *call, i32 id, Type *type_hint) {
+	ast_node(ce, CallExpr, call);
+	ast_node(bd, BasicDirective, ce->proc);
+	String name = bd->name.string;
+	if (name == "location") {
+		if (ce->args.count > 1) {
+			error(ce->args[0], "'#location' expects either 0 or 1 arguments, got %td", ce->args.count);
+		}
+		if (ce->args.count > 0) {
+			Ast *arg = ce->args[0];
+			Entity *e = nullptr;
+			Operand o = {};
+			if (arg->kind == Ast_Ident) {
+				e = check_ident(c, &o, arg, nullptr, nullptr, true);
+			} else if (arg->kind == Ast_SelectorExpr) {
+				e = check_selector(c, &o, arg, nullptr);
+			}
+			if (e == nullptr) {
+				error(ce->args[0], "'#location' expected a valid entity name");
+			}
+		}
+
+		operand->type = t_source_code_location;
+		operand->mode = Addressing_Value;
+	} else if (name == "load") {
+		if (ce->args.count != 1) {
+			if (ce->args.count == 0) {
+				error(ce->close, "'#load' expects 1 argument, got 0");
+			} else {
+				error(ce->args[0], "'#load' expects 1 argument, got %td", ce->args.count);
+			}
+
+			return false;
+		}
+
+		Ast *arg = ce->args[0];
+		Operand o = {};
+		check_expr(c, &o, arg);
+		if (o.mode != Addressing_Constant) {
+			error(arg, "'#load' expected a constant string argument");
+			return false;
+		}
+
+		if (!is_type_string(o.type)) {
+			gbString str = type_to_string(o.type);
+			error(arg, "'#load' expected a constant string, got %s", str);
+			gb_string_free(str);
+			return false;
+		}
+
+		gbAllocator a = heap_allocator();
+
+		GB_ASSERT(o.value.kind == ExactValue_String);
+		String base_dir = dir_from_path(get_file_path_string(bd->token.pos.file_id));
+		String original_string = o.value.value_string;
+
+
+		BlockingMutex *ignore_mutex = nullptr;
+		String path = {};
+		bool ok = determine_path_from_string(ignore_mutex, call, base_dir, original_string, &path);
+		gb_unused(ok);
+
+		char *c_str = alloc_cstring(a, path);
+		defer (gb_free(a, c_str));
+
+
+		gbFile f = {};
+		gbFileError file_err = gb_file_open(&f, c_str);
+		defer (gb_file_close(&f));
+
+		switch (file_err) {
+		default:
+		case gbFileError_Invalid:
+			error(ce->proc, "Failed to `#load` file: %s; invalid file or cannot be found", c_str);
+			return false;
+		case gbFileError_NotExists:
+			error(ce->proc, "Failed to `#load` file: %s; file cannot be found", c_str);
+			return false;
+		case gbFileError_Permission:
+			error(ce->proc, "Failed to `#load` file: %s; file permissions problem", c_str);
+			return false;
+		case gbFileError_None:
+			// Okay
+			break;
+		}
+
+		String result = {};
+		isize file_size = cast(isize)gb_file_size(&f);
+		if (file_size > 0) {
+			u8 *data = cast(u8 *)gb_alloc(a, file_size+1);
+			gb_file_read_at(&f, data, file_size, 0);
+			data[file_size] = '\0';
+			result.text = data;
+			result.len = file_size;
+		}
+
+		operand->type = t_u8_slice;
+		operand->mode = Addressing_Constant;
+		operand->value = exact_value_string(result);
+
+	} else if (name == "load_hash") {
+		if (ce->args.count != 2) {
+			if (ce->args.count == 0) {
+				error(ce->close, "'#load_hash' expects 2 argument, got 0");
+			} else {
+				error(ce->args[0], "'#load_hash' expects 2 argument, got %td", ce->args.count);
+			}
+			return false;
+		}
+
+		Ast *arg0 = ce->args[0];
+		Ast *arg1 = ce->args[1];
+		Operand o = {};
+		check_expr(c, &o, arg0);
+		if (o.mode != Addressing_Constant) {
+			error(arg0, "'#load_hash' expected a constant string argument");
+			return false;
+		}
+
+		if (!is_type_string(o.type)) {
+			gbString str = type_to_string(o.type);
+			error(arg0, "'#load_hash' expected a constant string, got %s", str);
+			gb_string_free(str);
+			return false;
+		}
+
+		Operand o_hash = {};
+		check_expr(c, &o_hash, arg1);
+		if (o_hash.mode != Addressing_Constant) {
+			error(arg1, "'#load_hash' expected a constant string argument");
+			return false;
+		}
+
+		if (!is_type_string(o_hash.type)) {
+			gbString str = type_to_string(o.type);
+			error(arg1, "'#load_hash' expected a constant string, got %s", str);
+			gb_string_free(str);
+			return false;
+		}
+
+
+		gbAllocator a = heap_allocator();
+
+		GB_ASSERT(o.value.kind == ExactValue_String);
+		GB_ASSERT(o_hash.value.kind == ExactValue_String);
+
+		String base_dir = dir_from_path(get_file_path_string(bd->token.pos.file_id));
+		String original_string = o.value.value_string;
+		String hash_kind = o_hash.value.value_string;
+
+		String supported_hashes[] = {
+			str_lit("adler32"),
+			str_lit("crc32"),
+			str_lit("crc64"),
+			str_lit("fnv32"),
+			str_lit("fnv64"),
+			str_lit("fnv32a"),
+			str_lit("fnv64a"),
+			str_lit("murmur32"),
+			str_lit("murmur64"),
+		};
+
+		bool hash_found = false;
+		for (isize i = 0; i < gb_count_of(supported_hashes); i++) {
+			if (supported_hashes[i] == hash_kind) {
+				hash_found = true;
+				break;
+			}
+		}
+		if (!hash_found) {
+			ERROR_BLOCK();
+			error(ce->proc, "Invalid hash kind passed to `#load_hash`, got: %.*s", LIT(hash_kind));
+			error_line("\tAvailable hash kinds:\n");
+			for (isize i = 0; i < gb_count_of(supported_hashes); i++) {
+				error_line("\t%.*s\n", LIT(supported_hashes[i]));
+			}
+			return false;
+		}
+
+
+		BlockingMutex *ignore_mutex = nullptr;
+		String path = {};
+		bool ok = determine_path_from_string(ignore_mutex, call, base_dir, original_string, &path);
+		gb_unused(ok);
+
+		char *c_str = alloc_cstring(a, path);
+		defer (gb_free(a, c_str));
+
+
+		gbFile f = {};
+		gbFileError file_err = gb_file_open(&f, c_str);
+		defer (gb_file_close(&f));
+
+		switch (file_err) {
+		default:
+		case gbFileError_Invalid:
+			error(ce->proc, "Failed to `#load_hash` file: %s; invalid file or cannot be found", c_str);
+			return false;
+		case gbFileError_NotExists:
+			error(ce->proc, "Failed to `#load_hash` file: %s; file cannot be found", c_str);
+			return false;
+		case gbFileError_Permission:
+			error(ce->proc, "Failed to `#load_hash` file: %s; file permissions problem", c_str);
+			return false;
+		case gbFileError_None:
+			// Okay
+			break;
+		}
+
+		// TODO(bill): make these procedures fast :P
+
+		u64 hash_value = 0;
+		String result = {};
+		isize file_size = cast(isize)gb_file_size(&f);
+		if (file_size > 0) {
+			u8 *data = cast(u8 *)gb_alloc(a, file_size);
+			gb_file_read_at(&f, data, file_size, 0);
+			if (hash_kind == "adler32") {
+				hash_value = gb_adler32(data, file_size);
+			} else if (hash_kind == "crc32") {
+				hash_value = gb_crc32(data, file_size);
+			} else if (hash_kind == "crc64") {
+				hash_value = gb_crc64(data, file_size);
+			} else if (hash_kind == "fnv32") {
+				hash_value = gb_fnv32(data, file_size);
+			} else if (hash_kind == "fnv64") {
+				hash_value = gb_fnv64(data, file_size);
+			} else if (hash_kind == "fnv32a") {
+				hash_value = fnv32a(data, file_size);
+			} else if (hash_kind == "fnv64a") {
+				hash_value = fnv64a(data, file_size);
+			} else if (hash_kind == "murmur32") {
+				hash_value = gb_murmur32(data, file_size);
+			} else if (hash_kind == "murmur64") {
+				hash_value = gb_murmur64(data, file_size);
+			} else {
+				compiler_error("unhandled hash kind: %.*s", LIT(hash_kind));
+			}
+			gb_free(a, data);
+		}
+
+		operand->type = t_untyped_integer;
+		operand->mode = Addressing_Constant;
+		operand->value = exact_value_u64(hash_value);
+
+	} else if (name == "load_or") {
+		if (ce->args.count != 2) {
+			if (ce->args.count == 0) {
+				error(ce->close, "'#load_or' expects 2 arguments, got 0");
+			} else {
+				error(ce->args[0], "'#load_or' expects 2 arguments, got %td", ce->args.count);
+			}
+			return false;
+		}
+
+		Ast *arg = ce->args[0];
+		Operand o = {};
+		check_expr(c, &o, arg);
+		if (o.mode != Addressing_Constant) {
+			error(arg, "'#load_or' expected a constant string argument");
+			return false;
+		}
+
+		if (!is_type_string(o.type)) {
+			gbString str = type_to_string(o.type);
+			error(arg, "'#load_or' expected a constant string, got %s", str);
+			gb_string_free(str);
+			return false;
+		}
+
+		Ast *default_arg = ce->args[1];
+		Operand default_op = {};
+		check_expr_with_type_hint(c, &default_op, default_arg, t_u8_slice);
+		if (default_op.mode != Addressing_Constant) {
+			error(arg, "'#load_or' expected a constant '[]byte' argument");
+			return false;
+		}
+
+		if (!are_types_identical(base_type(default_op.type), t_u8_slice)) {
+			gbString str = type_to_string(default_op.type);
+			error(arg, "'#load_or' expected a constant '[]byte', got %s", str);
+			gb_string_free(str);
+			return false;
+		}
+
+		gbAllocator a = heap_allocator();
+
+		GB_ASSERT(o.value.kind == ExactValue_String);
+		String base_dir = dir_from_path(get_file_path_string(bd->token.pos.file_id));
+		String original_string = o.value.value_string;
+
+
+		BlockingMutex *ignore_mutex = nullptr;
+		String path = {};
+		bool ok = determine_path_from_string(ignore_mutex, call, base_dir, original_string, &path);
+		gb_unused(ok);
+
+		char *c_str = alloc_cstring(a, path);
+		defer (gb_free(a, c_str));
+
+
+		gbFile f = {};
+		gbFileError file_err = gb_file_open(&f, c_str);
+		defer (gb_file_close(&f));
+
+		operand->type = t_u8_slice;
+		operand->mode = Addressing_Constant;
+		if (file_err == gbFileError_None) {
+			String result = {};
+			isize file_size = cast(isize)gb_file_size(&f);
+			if (file_size > 0) {
+				u8 *data = cast(u8 *)gb_alloc(a, file_size+1);
+				gb_file_read_at(&f, data, file_size, 0);
+				data[file_size] = '\0';
+				result.text = data;
+				result.len = file_size;
+			}
+
+			operand->value = exact_value_string(result);
+		} else {
+			operand->value = default_op.value;
+		}
+
+	} else if (name == "assert") {
+		if (ce->args.count != 1 && ce->args.count != 2) {
+			error(call, "'#assert' expects either 1 or 2 arguments, got %td", ce->args.count);
+			return false;
+		}
+		if (!is_type_boolean(operand->type) || operand->mode != Addressing_Constant) {
+			gbString str = expr_to_string(ce->args[0]);
+			error(call, "'%s' is not a constant boolean", str);
+			gb_string_free(str);
+			return false;
+		}
+		if (ce->args.count == 2) {
+			Ast *arg = unparen_expr(ce->args[1]);
+			if (arg == nullptr || arg->kind != Ast_BasicLit || arg->BasicLit.token.kind != Token_String) {
+				gbString str = expr_to_string(arg);
+				error(call, "'%s' is not a constant string", str);
+				gb_string_free(str);
+				return false;
+			}
+		}
+
+		if (!operand->value.value_bool) {
+			gbString arg1 = expr_to_string(ce->args[0]);
+			gbString arg2 = {};
+
+			if (ce->args.count == 1) {
+				error(call, "Compile time assertion: %s", arg1);
+			} else {
+				arg2 = expr_to_string(ce->args[1]);
+				error(call, "Compile time assertion: %s (%s)", arg1, arg2);
+			}
+
+			if (c->proc_name != "") {
+				gbString str = type_to_string(c->curr_proc_sig);
+				error_line("\tCalled within '%.*s' :: %s\n", LIT(c->proc_name), str);
+				gb_string_free(str);
+			}
+
+			gb_string_free(arg1);
+			if (ce->args.count == 2) {
+				gb_string_free(arg2);
+			}
+		}
+
+		operand->type = t_untyped_bool;
+		operand->mode = Addressing_Constant;
+	} else if (name == "panic") {
+		if (ce->args.count != 1) {
+			error(call, "'#panic' expects 1 argument, got %td", ce->args.count);
+			return false;
+		}
+		if (!is_type_string(operand->type) && operand->mode != Addressing_Constant) {
+			gbString str = expr_to_string(ce->args[0]);
+			error(call, "'%s' is not a constant string", str);
+			gb_string_free(str);
+			return false;
+		}
+		error(call, "Compile time panic: %.*s", LIT(operand->value.value_string));
+		if (c->proc_name != "") {
+			gbString str = type_to_string(c->curr_proc_sig);
+			error_line("\tCalled within '%.*s' :: %s\n", LIT(c->proc_name), str);
+			gb_string_free(str);
+		}
+		operand->type = t_invalid;
+		operand->mode = Addressing_NoValue;
+	} else if (name == "defined") {
+		if (ce->args.count != 1) {
+			error(call, "'#defined' expects 1 argument, got %td", ce->args.count);
+			return false;
+		}
+		Ast *arg = unparen_expr(ce->args[0]);
+		if (arg == nullptr || (arg->kind != Ast_Ident && arg->kind != Ast_SelectorExpr)) {
+			error(call, "'#defined' expects an identifier or selector expression, got %.*s", LIT(ast_strings[arg->kind]));
+			return false;
+		}
+
+		if (c->curr_proc_decl == nullptr) {
+			error(call, "'#defined' is only allowed within a procedure, prefer the replacement '#config(NAME, default_value)'");
+			return false;
+		}
+
+		bool is_defined = check_identifier_exists(c->scope, arg);
+		gb_unused(is_defined);
+		operand->type = t_untyped_bool;
+		operand->mode = Addressing_Constant;
+		operand->value = exact_value_bool(false);
+
+	} else if (name == "config") {
+		if (ce->args.count != 2) {
+			error(call, "'#config' expects 2 argument, got %td", ce->args.count);
+			return false;
+		}
+		Ast *arg = unparen_expr(ce->args[0]);
+		if (arg == nullptr || arg->kind != Ast_Ident) {
+			error(call, "'#config' expects an identifier, got %.*s", LIT(ast_strings[arg->kind]));
+			return false;
+		}
+
+		Ast *def_arg = unparen_expr(ce->args[1]);
+
+		Operand def = {};
+		check_expr(c, &def, def_arg);
+		if (def.mode != Addressing_Constant) {
+			error(def_arg, "'#config' default value must be a constant");
+			return false;
+		}
+
+		String name = arg->Ident.token.string;
+
+
+		operand->type = def.type;
+		operand->mode = def.mode;
+		operand->value = def.value;
+
+		Entity *found = scope_lookup_current(config_pkg->scope, name);
+		if (found != nullptr) {
+			if (found->kind != Entity_Constant) {
+				error(arg, "'#config' entity '%.*s' found but expected a constant", LIT(name));
+			} else {
+				operand->type = found->type;
+				operand->mode = Addressing_Constant;
+				operand->value = found->Constant.value;
+			}
+		}
+	} else {
+		error(call, "Unknown directive call: #%.*s", LIT(name));
+	}
+	return true;
+}
+
 bool check_builtin_procedure(CheckerContext *c, Operand *operand, Ast *call, i32 id, Type *type_hint) {
 	ast_node(ce, CallExpr, call);
 	if (ce->inlining != ProcInlining_none) {
@@ -1186,458 +1639,8 @@ bool check_builtin_procedure(CheckerContext *c, Operand *operand, Ast *call, i32
 		mpmc_enqueue(&c->info->intrinsics_entry_point_usage, call);
 		break;
 
-	case BuiltinProc_DIRECTIVE: {
-		ast_node(bd, BasicDirective, ce->proc);
-		String name = bd->name.string;
-		if (name == "location") {
-			if (ce->args.count > 1) {
-				error(ce->args[0], "'#location' expects either 0 or 1 arguments, got %td", ce->args.count);
-			}
-			if (ce->args.count > 0) {
-				Ast *arg = ce->args[0];
-				Entity *e = nullptr;
-				Operand o = {};
-				if (arg->kind == Ast_Ident) {
-					e = check_ident(c, &o, arg, nullptr, nullptr, true);
-				} else if (arg->kind == Ast_SelectorExpr) {
-					e = check_selector(c, &o, arg, nullptr);
-				}
-				if (e == nullptr) {
-					error(ce->args[0], "'#location' expected a valid entity name");
-				}
-			}
-
-			operand->type = t_source_code_location;
-			operand->mode = Addressing_Value;
-		} else if (name == "load") {
-			if (ce->args.count != 1) {
-				if (ce->args.count == 0) {
-					error(ce->close, "'#load' expects 1 argument, got 0");
-				} else {
-					error(ce->args[0], "'#load' expects 1 argument, got %td", ce->args.count);					
-				}
-
-				return false;
-			}
-
-			Ast *arg = ce->args[0];
-			Operand o = {};
-			check_expr(c, &o, arg);
-			if (o.mode != Addressing_Constant) {
-				error(arg, "'#load' expected a constant string argument");
-				return false;
-			}
-
-			if (!is_type_string(o.type)) {
-				gbString str = type_to_string(o.type);
-				error(arg, "'#load' expected a constant string, got %s", str);
-				gb_string_free(str);
-				return false;
-			}
-
-			gbAllocator a = heap_allocator();
-
-			GB_ASSERT(o.value.kind == ExactValue_String);
-			String base_dir = dir_from_path(get_file_path_string(bd->token.pos.file_id));
-			String original_string = o.value.value_string;
-
-
-			BlockingMutex *ignore_mutex = nullptr;
-			String path = {};
-			bool ok = determine_path_from_string(ignore_mutex, call, base_dir, original_string, &path);
-			gb_unused(ok);
-
-			char *c_str = alloc_cstring(a, path);
-			defer (gb_free(a, c_str));
-
-
-			gbFile f = {};
-			gbFileError file_err = gb_file_open(&f, c_str);
-			defer (gb_file_close(&f));
-
-			switch (file_err) {
-			default:
-			case gbFileError_Invalid:
-				error(ce->proc, "Failed to `#load` file: %s; invalid file or cannot be found", c_str);
-				return false;
-			case gbFileError_NotExists:
-				error(ce->proc, "Failed to `#load` file: %s; file cannot be found", c_str);
-				return false;
-			case gbFileError_Permission:
-				error(ce->proc, "Failed to `#load` file: %s; file permissions problem", c_str);
-				return false;
-			case gbFileError_None:
-				// Okay
-				break;
-			}
-
-			String result = {};
-			isize file_size = cast(isize)gb_file_size(&f);
-			if (file_size > 0) {
-				u8 *data = cast(u8 *)gb_alloc(a, file_size+1);
-				gb_file_read_at(&f, data, file_size, 0);
-				data[file_size] = '\0';
-				result.text = data;
-				result.len = file_size;
-			}
-
-			operand->type = t_u8_slice;
-			operand->mode = Addressing_Constant;
-			operand->value = exact_value_string(result);
-
-		} else if (name == "load_hash") {
-			if (ce->args.count != 2) {
-				if (ce->args.count == 0) {
-					error(ce->close, "'#load_hash' expects 2 argument, got 0");
-				} else {
-					error(ce->args[0], "'#load_hash' expects 2 argument, got %td", ce->args.count);
-				}
-				return false;
-			}
-
-			Ast *arg0 = ce->args[0];
-			Ast *arg1 = ce->args[1];
-			Operand o = {};
-			check_expr(c, &o, arg0);
-			if (o.mode != Addressing_Constant) {
-				error(arg0, "'#load_hash' expected a constant string argument");
-				return false;
-			}
-
-			if (!is_type_string(o.type)) {
-				gbString str = type_to_string(o.type);
-				error(arg0, "'#load_hash' expected a constant string, got %s", str);
-				gb_string_free(str);
-				return false;
-			}
-			
-			Operand o_hash = {};
-			check_expr(c, &o_hash, arg1);
-			if (o_hash.mode != Addressing_Constant) {
-				error(arg1, "'#load_hash' expected a constant string argument");
-				return false;
-			}
-
-			if (!is_type_string(o_hash.type)) {
-				gbString str = type_to_string(o.type);
-				error(arg1, "'#load_hash' expected a constant string, got %s", str);
-				gb_string_free(str);
-				return false;
-			}
-			
-
-			gbAllocator a = heap_allocator();
-
-			GB_ASSERT(o.value.kind == ExactValue_String);
-			GB_ASSERT(o_hash.value.kind == ExactValue_String);
-			
-			String base_dir = dir_from_path(get_file_path_string(bd->token.pos.file_id));
-			String original_string = o.value.value_string;
-			String hash_kind = o_hash.value.value_string;
-			
-			String supported_hashes[] = {
-				str_lit("adler32"),
-				str_lit("crc32"),
-				str_lit("crc64"),
-				str_lit("fnv32"),
-				str_lit("fnv64"),
-				str_lit("fnv32a"),
-				str_lit("fnv64a"),
-				str_lit("murmur32"),
-				str_lit("murmur64"),
-			};
-			
-			bool hash_found = false;
-			for (isize i = 0; i < gb_count_of(supported_hashes); i++) {
-				if (supported_hashes[i] == hash_kind) {
-					hash_found = true;
-					break;
-				}
-			}
-			if (!hash_found) {
-				ERROR_BLOCK();
-				error(ce->proc, "Invalid hash kind passed to `#load_hash`, got: %.*s", LIT(hash_kind));
-				error_line("\tAvailable hash kinds:\n");
-				for (isize i = 0; i < gb_count_of(supported_hashes); i++) {
-					error_line("\t%.*s\n", LIT(supported_hashes[i]));
-				}
-				return false;
-			}
-			
-
-			BlockingMutex *ignore_mutex = nullptr;
-			String path = {};
-			bool ok = determine_path_from_string(ignore_mutex, call, base_dir, original_string, &path);
-			gb_unused(ok);
-
-			char *c_str = alloc_cstring(a, path);
-			defer (gb_free(a, c_str));
-
-
-			gbFile f = {};
-			gbFileError file_err = gb_file_open(&f, c_str);
-			defer (gb_file_close(&f));
-
-			switch (file_err) {
-			default:
-			case gbFileError_Invalid:
-				error(ce->proc, "Failed to `#load_hash` file: %s; invalid file or cannot be found", c_str);
-				return false;
-			case gbFileError_NotExists:
-				error(ce->proc, "Failed to `#load_hash` file: %s; file cannot be found", c_str);
-				return false;
-			case gbFileError_Permission:
-				error(ce->proc, "Failed to `#load_hash` file: %s; file permissions problem", c_str);
-				return false;
-			case gbFileError_None:
-				// Okay
-				break;
-			}
-			
-			// TODO(bill): make these procedures fast :P
-			
-			u64 hash_value = 0;
-			String result = {};
-			isize file_size = cast(isize)gb_file_size(&f);
-			if (file_size > 0) {
-				u8 *data = cast(u8 *)gb_alloc(a, file_size);
-				gb_file_read_at(&f, data, file_size, 0);
-				if (hash_kind == "adler32") {
-					hash_value = gb_adler32(data, file_size);
-				} else if (hash_kind == "crc32") {
-					hash_value = gb_crc32(data, file_size);
-				} else if (hash_kind == "crc64") {
-					hash_value = gb_crc64(data, file_size);
-				} else if (hash_kind == "fnv32") {
-					hash_value = gb_fnv32(data, file_size);
-				} else if (hash_kind == "fnv64") {
-					hash_value = gb_fnv64(data, file_size);
-				} else if (hash_kind == "fnv32a") {
-					hash_value = fnv32a(data, file_size);
-				} else if (hash_kind == "fnv64a") {
-					hash_value = fnv64a(data, file_size);
-				} else if (hash_kind == "murmur32") {
-					hash_value = gb_murmur32(data, file_size);
-				} else if (hash_kind == "murmur64") {
-					hash_value = gb_murmur64(data, file_size);
-				} else {
-					compiler_error("unhandled hash kind: %.*s", LIT(hash_kind));	
-				}
-				gb_free(a, data);
-			}
-
-			operand->type = t_untyped_integer;
-			operand->mode = Addressing_Constant;
-			operand->value = exact_value_u64(hash_value);
-
-		} else if (name == "load_or") {
-			if (ce->args.count != 2) {
-				if (ce->args.count == 0) {
-					error(ce->close, "'#load_or' expects 2 arguments, got 0");
-				} else {
-					error(ce->args[0], "'#load_or' expects 2 arguments, got %td", ce->args.count);
-				}
-				return false;
-			}
-
-			Ast *arg = ce->args[0];
-			Operand o = {};
-			check_expr(c, &o, arg);
-			if (o.mode != Addressing_Constant) {
-				error(arg, "'#load_or' expected a constant string argument");
-				return false;
-			}
-
-			if (!is_type_string(o.type)) {
-				gbString str = type_to_string(o.type);
-				error(arg, "'#load_or' expected a constant string, got %s", str);
-				gb_string_free(str);
-				return false;
-			}
-			
-			Ast *default_arg = ce->args[1];
-			Operand default_op = {};
-			check_expr_with_type_hint(c, &default_op, default_arg, t_u8_slice);
-			if (default_op.mode != Addressing_Constant) {
-				error(arg, "'#load_or' expected a constant '[]byte' argument");
-				return false;
-			}
-
-			if (!are_types_identical(base_type(default_op.type), t_u8_slice)) {
-				gbString str = type_to_string(default_op.type);
-				error(arg, "'#load_or' expected a constant '[]byte', got %s", str);
-				gb_string_free(str);
-				return false;
-			}
-
-			gbAllocator a = heap_allocator();
-
-			GB_ASSERT(o.value.kind == ExactValue_String);
-			String base_dir = dir_from_path(get_file_path_string(bd->token.pos.file_id));
-			String original_string = o.value.value_string;
-
-
-			BlockingMutex *ignore_mutex = nullptr;
-			String path = {};
-			bool ok = determine_path_from_string(ignore_mutex, call, base_dir, original_string, &path);
-			gb_unused(ok);
-
-			char *c_str = alloc_cstring(a, path);
-			defer (gb_free(a, c_str));
-
-
-			gbFile f = {};
-			gbFileError file_err = gb_file_open(&f, c_str);
-			defer (gb_file_close(&f));
-			
-			operand->type = t_u8_slice;
-			operand->mode = Addressing_Constant;
-			if (file_err == gbFileError_None) {
-				String result = {};
-				isize file_size = cast(isize)gb_file_size(&f);
-				if (file_size > 0) {
-					u8 *data = cast(u8 *)gb_alloc(a, file_size+1);
-					gb_file_read_at(&f, data, file_size, 0);
-					data[file_size] = '\0';
-					result.text = data;
-					result.len = file_size;
-				}
-
-				operand->value = exact_value_string(result);
-			} else {
-				operand->value = default_op.value;
-			}
-
-		} else if (name == "assert") {
-			if (ce->args.count != 1 && ce->args.count != 2) {
-				error(call, "'#assert' expects either 1 or 2 arguments, got %td", ce->args.count);
-				return false;
-			}
-			if (!is_type_boolean(operand->type) || operand->mode != Addressing_Constant) {
-				gbString str = expr_to_string(ce->args[0]);
-				error(call, "'%s' is not a constant boolean", str);
-				gb_string_free(str);
-				return false;
-			}
-			if (ce->args.count == 2) {
-				Ast *arg = unparen_expr(ce->args[1]);
-				if (arg == nullptr || arg->kind != Ast_BasicLit || arg->BasicLit.token.kind != Token_String) {
-					gbString str = expr_to_string(arg);
-					error(call, "'%s' is not a constant string", str);
-					gb_string_free(str);
-					return false;
-				}
-			}
-
-			if (!operand->value.value_bool) {
-				gbString arg1 = expr_to_string(ce->args[0]);
-				gbString arg2 = {};
-
-				if (ce->args.count == 1) {
-					error(call, "Compile time assertion: %s", arg1);
-				} else {
-					arg2 = expr_to_string(ce->args[1]);
-					error(call, "Compile time assertion: %s (%s)", arg1, arg2);
-				}			
-				
-				if (c->proc_name != "") {
-					gbString str = type_to_string(c->curr_proc_sig);
-					error_line("\tCalled within '%.*s' :: %s\n", LIT(c->proc_name), str);
-					gb_string_free(str);
-				}
-
-				gb_string_free(arg1);
-				if (ce->args.count == 2) {
-					gb_string_free(arg2);
-				}
-			}
-
-			operand->type = t_untyped_bool;
-			operand->mode = Addressing_Constant;
-		} else if (name == "panic") {
-			if (ce->args.count != 1) {
-				error(call, "'#panic' expects 1 argument, got %td", ce->args.count);
-				return false;
-			}
-			if (!is_type_string(operand->type) && operand->mode != Addressing_Constant) {
-				gbString str = expr_to_string(ce->args[0]);
-				error(call, "'%s' is not a constant string", str);
-				gb_string_free(str);
-				return false;
-			}
-			error(call, "Compile time panic: %.*s", LIT(operand->value.value_string));
-			if (c->proc_name != "") {
-				gbString str = type_to_string(c->curr_proc_sig);
-				error_line("\tCalled within '%.*s' :: %s\n", LIT(c->proc_name), str);
-				gb_string_free(str);
-			}
-			operand->type = t_invalid;
-			operand->mode = Addressing_NoValue;
-		} else if (name == "defined") {
-			if (ce->args.count != 1) {
-				error(call, "'#defined' expects 1 argument, got %td", ce->args.count);
-				return false;
-			}
-			Ast *arg = unparen_expr(ce->args[0]);
-			if (arg == nullptr || (arg->kind != Ast_Ident && arg->kind != Ast_SelectorExpr)) {
-				error(call, "'#defined' expects an identifier or selector expression, got %.*s", LIT(ast_strings[arg->kind]));
-				return false;
-			}
-
-			if (c->curr_proc_decl == nullptr) {
-				error(call, "'#defined' is only allowed within a procedure, prefer the replacement '#config(NAME, default_value)'");
-				return false;
-			}
-
-			bool is_defined = check_identifier_exists(c->scope, arg);
-			gb_unused(is_defined);
-			operand->type = t_untyped_bool;
-			operand->mode = Addressing_Constant;
-			operand->value = exact_value_bool(false);
-
-		} else if (name == "config") {
-			if (ce->args.count != 2) {
-				error(call, "'#config' expects 2 argument, got %td", ce->args.count);
-				return false;
-			}
-			Ast *arg = unparen_expr(ce->args[0]);
-			if (arg == nullptr || arg->kind != Ast_Ident) {
-				error(call, "'#config' expects an identifier, got %.*s", LIT(ast_strings[arg->kind]));
-				return false;
-			}
-
-			Ast *def_arg = unparen_expr(ce->args[1]);
-
-			Operand def = {};
-			check_expr(c, &def, def_arg);
-			if (def.mode != Addressing_Constant) {
-				error(def_arg, "'#config' default value must be a constant");
-				return false;
-			}
-
-			String name = arg->Ident.token.string;
-
-
-			operand->type = def.type;
-			operand->mode = def.mode;
-			operand->value = def.value;
-
-			Entity *found = scope_lookup_current(config_pkg->scope, name);
-			if (found != nullptr) {
-				if (found->kind != Entity_Constant) {
-					error(arg, "'#config' entity '%.*s' found but expected a constant", LIT(name));
-				} else {
-					operand->type = found->type;
-					operand->mode = Addressing_Constant;
-					operand->value = found->Constant.value;
-				}
-			}
-		} else {
-			error(call, "Unknown directive call: #%.*s", LIT(name));
-		}
-
-		break;
-	}
+	case BuiltinProc_DIRECTIVE:
+		return check_builtin_procedure_directive(c, operand, call, id, type_hint);
 
 	case BuiltinProc_len:
 		check_expr_or_type(c, operand, ce->args[0]);
