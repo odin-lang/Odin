@@ -2505,11 +2505,20 @@ void check_shift(CheckerContext *c, Operand *x, Operand *y, Ast *node, Type *typ
 				x->expr->tav.is_lhs = true;
 			}
 			x->mode = Addressing_Value;
-			if (type_hint && is_type_integer(type_hint)) {
-				x->type = type_hint;
+			if (type_hint) {
+				if (is_type_integer(type_hint)) {
+					x->type = type_hint;
+				} else {
+					gbString expr_str = expr_to_string(node);
+					gbString to_type = type_to_string(type_hint);
+					error(node, "Cannot convert untyped expression '%s' to '%s'", expr_str, to_type);
+					gb_string_free(expr_str);
+					gb_string_free(to_type);
+					x->mode = Addressing_Invalid;
+					return;
+				}
 			}
 			// x->value = x_val;
-			return;
 		}
 	}
 
@@ -2522,7 +2531,7 @@ void check_shift(CheckerContext *c, Operand *x, Operand *y, Ast *node, Type *typ
 	// TODO(bill): Should we support shifts for fixed arrays and #simd vectors?
 
 	if (!is_type_integer(x->type)) {
-		gbString err_str = expr_to_string(y->expr);
+		gbString err_str = expr_to_string(x->expr);
 		error(node, "Shift operand '%s' must be an integer", err_str);
 		gb_string_free(err_str);
 		x->mode = Addressing_Invalid;
