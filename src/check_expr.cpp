@@ -2509,10 +2509,10 @@ void check_shift(CheckerContext *c, Operand *x, Operand *y, Ast *node, Type *typ
 				if (is_type_integer(type_hint)) {
 					x->type = type_hint;
 				} else {
-					gbString expr_str = expr_to_string(node);
+					gbString x_str = expr_to_string(x->expr);
 					gbString to_type = type_to_string(type_hint);
-					error(node, "Cannot convert untyped expression '%s' to '%s'", expr_str, to_type);
-					gb_string_free(expr_str);
+					error(node, "Conversion of shifted operand '%s' to '%s' is not allowed", x_str, to_type);
+					gb_string_free(x_str);
 					gb_string_free(to_type);
 					x->mode = Addressing_Invalid;
 					return;
