@@ -7435,10 +7435,6 @@ ExprKind check_or_else_expr(CheckerContext *c, Operand *o, Ast *node, Type *type
 	// NOTE(bill, 2022-08-11): edge case to handle #load(path) or_else default
 	if (is_load_directive_call(arg)) {
 		LoadDirectiveResult res = check_load_directive(c, &x, arg, type_hint, false);
-		if (res == LoadDirective_Success) {
-			*o = x;
-			return Expr_Expr;
-		}
 
 		bool y_is_diverging = false;
 		check_expr_base(c, &y, default_value, x.type);
@@ -7468,10 +7464,16 @@ ExprKind check_or_else_expr(CheckerContext *c, Operand *o, Ast *node, Type *type
 
 		if (!y_is_diverging) {
 			check_assignment(c, &y, x.type, name);
+			if (y.mode != Addressing_Constant) {
+				error(y.expr, "expected a constant expression on the right-hand side of 'or_else' in conjuction with '#load'");
+			}
 		}
 
-		o->mode = y.mode;
-		o->type  = y.type;
+		if (res == LoadDirective_Success) {
+			*o = x;
+		} else {
+			*o = y;
+		}
 		o->expr = node;
 
 		return Expr_Expr;
