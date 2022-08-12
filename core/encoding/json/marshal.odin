@@ -190,6 +190,9 @@ marshal_to_writer :: proc(w: io.Writer, v: any, opt: ^Marshal_Options) -> (err: 
 	case runtime.Type_Info_Multi_Pointer:
 		return .Unsupported_Type
 
+	case Type_Info_Soa_Pointer:
+		return .Unsupported_Type
+
 	case runtime.Type_Info_Procedure:
 		return .Unsupported_Type
 
