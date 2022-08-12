@@ -1285,7 +1285,7 @@ lbValue lb_emit_ptr_offset(lbProcedure *p, lbValue ptr, lbValue index) {
 	LLVMValueRef indices[1] = {index.value};
 	lbValue res = {};
 	res.type = ptr.type;
-	LLVMTypeRef type = lb_type(p->module, type_deref(ptr.type));
+	LLVMTypeRef type = lb_type(p->module, type_deref(res.type, true));
 
 	if (lb_is_const(ptr) && lb_is_const(index)) {
 		res.value = LLVMConstGEP2(type, ptr.value, indices, 1);
