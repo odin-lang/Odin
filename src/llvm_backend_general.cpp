@@ -854,13 +854,6 @@ void lb_addr_store(lbProcedure *p, lbAddr addr, lbValue value) {
 	lb_emit_store(p, addr.addr, value);
 }
 
-void lb_const_store(lbValue ptr, lbValue value) {
-	GB_ASSERT(lb_is_const(ptr));
-	GB_ASSERT(lb_is_const(value));
-	GB_ASSERT(is_type_pointer(ptr.type));
-	LLVMSetInitializer(ptr.value, value.value);
-}
-
 void lb_emit_store(lbProcedure *p, lbValue ptr, lbValue value) {
 	GB_ASSERT(value.value != nullptr);
 	Type *a = type_deref(ptr.type);

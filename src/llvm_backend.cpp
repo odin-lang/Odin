@@ -758,6 +758,10 @@ lbProcedure *lb_create_startup_runtime(lbModule *main_module, lbProcedure *start
 		GB_ASSERT(e->kind == Entity_Variable);
 		e->code_gen_module = entity_module;
 
+		if (e->token.string == "XXH3_init_custom_secret") {
+			gb_printf_err("HERE1\n");
+		}
+
 		Ast *init_expr = var->decl->init_expr;
 		if (init_expr != nullptr)  {
 			lbValue init = lb_build_expr(p, init_expr);
@@ -780,6 +784,10 @@ lbProcedure *lb_create_startup_runtime(lbModule *main_module, lbProcedure *start
 				var->init = init;
 			} else if (lb_is_const_or_global(init)) {
 				if (!var->is_initialized) {
+					if (is_type_proc(init.type)) {
+						LLVMTypeRef global_type = llvm_addr_type(p->module, var->var);
+						init.value = LLVMConstPointerCast(init.value, global_type);
+					}
 					LLVMSetInitializer(var->var.value, init.value);
 					var->is_initialized = true;
 					continue;
@@ -1649,6 +1657,10 @@ void lb_generate_code(lbGenerator *gen) {
 					if (tav.value.kind != ExactValue_Invalid) {
 						ExactValue v = tav.value;
 						lbValue init = lb_const_value(m, tav.type, v);
+						if (is_type_proc(init.type)) {
+							LLVMTypeRef global_type = llvm_addr_type(m, var.var);
+							init.value = LLVMConstPointerCast(init.value, global_type);
+						}
 						LLVMSetInitializer(g.value, init.value);
 						var.is_initialized = true;
 					}
