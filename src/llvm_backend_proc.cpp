@@ -2077,15 +2077,7 @@ lbValue lb_build_builtin_proc(lbProcedure *p, Ast *expr, TypeAndValue const &tv,
 			lbValue ptr = lb_build_expr(p, ce->args[0]);
 			lbValue len = lb_build_expr(p, ce->args[1]);
 			len = lb_emit_conv(p, len, t_int);
-
-			LLVMValueRef indices[1] = {
-				len.value,
-			};
-
-			lbValue res = {};
-			res.type = tv.type;
-			res.value = LLVMBuildGEP2(p->builder, lb_type(p->module, type_deref(tv.type)), ptr.value, indices, gb_count_of(indices), "");
-			return res;
+			return lb_emit_ptr_offset(p, ptr, len);
 		}
 	case BuiltinProc_ptr_sub:
 		{

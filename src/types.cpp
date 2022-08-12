@@ -1115,7 +1115,7 @@ Type *alloc_type_simd_vector(i64 count, Type *elem, Type *generic_count=nullptr)
 ////////////////////////////////////////////////////////////////
 
 
-Type *type_deref(Type *t) {
+Type *type_deref(Type *t, bool allow_multi_pointer=false) {
 	if (t != nullptr) {
 		Type *bt = base_type(t);
 		if (bt == nullptr) {
@@ -1132,6 +1132,11 @@ Type *type_deref(Type *t) {
 				GB_ASSERT(elem->kind == Type_Struct && elem->Struct.soa_kind != StructSoa_None);
 				return elem->Struct.soa_elem;
 			}
+		case Type_MultiPointer:
+			if (allow_multi_pointer) {
+				return bt->MultiPointer.elem;
+			}
+			break;
 		}
 	}
 	return t;
