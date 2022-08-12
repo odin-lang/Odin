@@ -17,7 +17,7 @@ Marshal_Error :: union #shared_nil {
 	io.Error,
 }
 
-// NOTE careful with MJSON maps & non quotes usage as keys without whitespace will lead to bad results
+// careful with MJSON maps & non quotes usage as keys without whitespace will lead to bad results
 Marshal_Options :: struct {
 	// output based on spec
 	spec: Specification,
@@ -44,7 +44,7 @@ Marshal_Options :: struct {
 	mjson_skipped_first_braces_end: bool,
 }
 
-marshal :: proc(v: any, opt := Marshal_Options{}, allocator := context.allocator) -> (data: []byte, err: Marshal_Error) {
+marshal :: proc(v: any, opt: Marshal_Options = {}, allocator := context.allocator) -> (data: []byte, err: Marshal_Error) {
 	b := strings.builder_make(allocator)
 	defer if err != nil {
 		strings.builder_destroy(&b)
@@ -116,13 +116,11 @@ marshal_to_writer :: proc(w: io.Writer, v: any, opt: ^Marshal_Options) -> (err: 
 		// allow uints to be printed as hex
 		if opt.write_uint_as_hex && (opt.spec == .JSON5 || opt.spec == .MJSON) {
 			switch i in a {
-				case u8, u16, u32, u64, u128: {
-					s = strconv.append_bits_128(buf[:], u, 16, info.signed, 8*ti.size, "0123456789abcdef", { .Prefix })
-				}
+			case u8, u16, u32, u64, u128: 
+				s = strconv.append_bits_128(buf[:], u, 16, info.signed, 8*ti.size, "0123456789abcdef", { .Prefix })
 
-				case: {
-					s = strconv.append_bits_128(buf[:], u, 10, info.signed, 8*ti.size, "0123456789", nil)
-				}
+			case:
+				s = strconv.append_bits_128(buf[:], u, 10, info.signed, 8*ti.size, "0123456789", nil)
 			}
 		} else {
 			s = strconv.append_bits_128(buf[:], u, 10, info.signed, 8*ti.size, "0123456789", nil)
@@ -190,9 +188,6 @@ marshal_to_writer :: proc(w: io.Writer, v: any, opt: ^Marshal_Options) -> (err: 
 		return .Unsupported_Type
 
 	case runtime.Type_Info_Multi_Pointer:
-		return .Unsupported_Type
-
-	case runtime.Type_Info_Soa_Pointer:
 		return .Unsupported_Type
 
 	case runtime.Type_Info_Procedure:
@@ -281,19 +276,14 @@ marshal_to_writer :: proc(w: io.Writer, v: any, opt: ^Marshal_Options) -> (err: 
 					name: string
 
 					#partial switch info in ti.variant {
-						case runtime.Type_Info_String: {
-							switch s in a {
-								case string: name = s
-								case cstring: name = string(s)
-							}
-
-							opt_write_key(w, opt, name) or_return
+					case runtime.Type_Info_String: 
+						switch s in a {
+							case string: name = s
+							case cstring: name = string(s)
 						}
+						opt_write_key(w, opt, name) or_return
 	
-						case: {
-							// TODO better error output?
-							return .Unsupported_Type
-						}
+					case: return .Unsupported_Type
 					}
 				}
 
@@ -402,23 +392,21 @@ marshal_to_writer :: proc(w: io.Writer, v: any, opt: ^Marshal_Options) -> (err: 
 // write key as quoted string or with optional quotes in mjson
 opt_write_key :: proc(w: io.Writer, opt: ^Marshal_Options, name: string) -> (err: io.Error)  {
 	switch opt.spec {
-		case .JSON, .JSON5: {
-			io.write_quoted_string(w, name) or_return
-			io.write_string(w, ": ") or_return
-		}
+	case .JSON, .JSON5:
+		io.write_quoted_string(w, name) or_return
+		io.write_string(w, ": ") or_return
 
-		case .MJSON: {
-			if opt.mjson_keys_use_quotes {
-				io.write_quoted_string(w, name) or_return
-			} else {
-				io.write_string(w, name) or_return
-			}
-			
-			if opt.mjson_keys_use_equal_sign {
-				io.write_string(w, " = ") or_return
-			} else {
-				io.write_string(w, ": ") or_return
-			}
+	case .MJSON:
+		if opt.mjson_keys_use_quotes {
+			io.write_quoted_string(w, name) or_return
+		} else {
+			io.write_string(w, name) or_return
+		}
+		
+		if opt.mjson_keys_use_equal_sign {
+			io.write_string(w, " = ") or_return
+		} else {
+			io.write_string(w, ": ") or_return
 		}
 	}	
 
@@ -446,31 +434,29 @@ opt_write_start :: proc(w: io.Writer, opt: ^Marshal_Options, c: byte) -> (err: i
 // insert comma seperation and write indentations
 opt_write_iteration :: proc(w: io.Writer, opt: ^Marshal_Options, iteration: int) -> (err: io.Error) {
 	switch opt.spec {
-		case .JSON, .JSON5: {
-			if iteration > 0 {
+	case .JSON, .JSON5: 
+		if iteration > 0 {
+			io.write_string(w, ", ") or_return
+
+			if opt.pretty {
+				io.write_byte(w, '\n') or_return
+			}
+		}
+
+		opt_write_indentation(w, opt) or_return
+
+	case .MJSON: 
+		if iteration > 0 {
+			// on pretty no commas necessary
+			if opt.pretty {
+				io.write_byte(w, '\n') or_return
+			} else {
+				// comma seperation necessary for non pretty output!
 				io.write_string(w, ", ") or_return
-
-				if opt.pretty {
-					io.write_byte(w, '\n') or_return
-				}
 			}
-
-			opt_write_indentation(w, opt) or_return
 		}
 
-		case .MJSON: {
-			if iteration > 0 {
-				// on pretty no commas necessary
-				if opt.pretty {
-					io.write_byte(w, '\n') or_return
-				} else {
-					// NOTE comma seperation necessary for non pretty output!
-					io.write_string(w, ", ") or_return
-				}
-			}
-
-			opt_write_indentation(w, opt) or_return
-		}
+		opt_write_indentation(w, opt) or_return
 	}
 
 	return
@@ -502,10 +488,9 @@ opt_write_indentation :: proc(w: io.Writer, opt: ^Marshal_Options) -> (err: io.E
 		return
 	}
 
-	// TODO optimize?
 	if opt.use_spaces {
-		// NOTE maybe max(1, opt.spaces)
-		for _ in 0..<opt.indentation * opt.spaces {
+		spaces := opt.spaces == 0 ? 4 : opt.spaces
+		for _ in 0..<opt.indentation * spaces {
 			io.write_byte(w, ' ') or_return
 		}
 	} else {
