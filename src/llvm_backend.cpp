@@ -758,10 +758,6 @@ lbProcedure *lb_create_startup_runtime(lbModule *main_module, lbProcedure *start
 		GB_ASSERT(e->kind == Entity_Variable);
 		e->code_gen_module = entity_module;
 
-		if (e->token.string == "XXH3_init_custom_secret") {
-			gb_printf_err("HERE1\n");
-		}
-
 		Ast *init_expr = var->decl->init_expr;
 		if (init_expr != nullptr)  {
 			lbValue init = lb_build_expr(p, init_expr);
