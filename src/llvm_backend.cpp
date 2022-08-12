@@ -739,11 +739,11 @@ lbProcedure *lb_create_startup_runtime(lbModule *main_module, lbProcedure *start
 	lb_begin_procedure_body(p);
 
 	if (startup_type_info) {
-		LLVMBuildCall2(p->builder, lb_type_internal_for_procedures_raw(main_module, startup_type_info->type), startup_type_info->value, nullptr, 0, "");
+		OdinLLVMBuildCall(p, {startup_type_info->value, startup_type_info->type}, nullptr, 0);
 	}
 
 	if (objc_names) {
-		LLVMBuildCall2(p->builder, lb_type_internal_for_procedures_raw(main_module, objc_names->type), objc_names->value, nullptr, 0, "");
+		OdinLLVMBuildCall(p, {objc_names->value, objc_names->type}, nullptr, 0);
 	}
 
 	for_array(i, global_variables) {
