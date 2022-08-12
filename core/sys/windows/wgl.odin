@@ -62,7 +62,7 @@ GetExtensionsStringARBType  :: #type proc "c" (HDC) -> cstring
 // Procedures
 	wglCreateContextAttribsARB: CreateContextAttribsARBType
 	wglChoosePixelFormatARB:    ChoosePixelFormatARBType
-	wglSwapIntervalExt:         SwapIntervalEXTType
+	wglSwapIntervalEXT:         SwapIntervalEXTType
 	wglGetExtensionsStringARB:  GetExtensionsStringARBType
 
 
