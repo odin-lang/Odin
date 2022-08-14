@@ -235,7 +235,7 @@ when ODIN_ARCH == .amd64 {
 	SetClassLongPtrW :: SetClassLongW
 
 	GetWindowLongPtrW :: GetWindowLongW
-	SetWindowLongPtrW :: GetWindowLongW
+	SetWindowLongPtrW :: SetWindowLongW
 }
 
 GET_SC_WPARAM :: #force_inline proc "contextless" (wParam: WPARAM) -> c_int {
