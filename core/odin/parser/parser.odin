@@ -4,6 +4,7 @@ import "core:odin/ast"
 import "core:odin/tokenizer"
 
 import "core:fmt"
+import "core:reflect"
 
 Warning_Handler :: #type proc(pos: tokenizer.Pos, fmt: string, args: ..any)
 Error_Handler   :: #type proc(pos: tokenizer.Pos, fmt: string, args: ..any)
@@ -245,12 +246,7 @@ peek_token :: proc(p: ^Parser, lookahead := 0) -> (tok: tokenizer.Token) {
 	return
 }
 skip_possible_newline :: proc(p: ^Parser) -> bool {
-	if .Optional_Semicolons not_in p.flags {
-		return false
-	}
-
-	prev := p.curr_tok
-	if tokenizer.is_newline(prev) {
+	if tokenizer.is_newline(p.curr_tok) {
 		advance_token(p)
 		return true
 	}
