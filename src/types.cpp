@@ -1115,7 +1115,7 @@ Type *alloc_type_simd_vector(i64 count, Type *elem, Type *generic_count=nullptr)
 ////////////////////////////////////////////////////////////////
 
 
-Type *type_deref(Type *t) {
+Type *type_deref(Type *t, bool allow_multi_pointer=false) {
 	if (t != nullptr) {
 		Type *bt = base_type(t);
 		if (bt == nullptr) {
@@ -1132,6 +1132,11 @@ Type *type_deref(Type *t) {
 				GB_ASSERT(elem->kind == Type_Struct && elem->Struct.soa_kind != StructSoa_None);
 				return elem->Struct.soa_elem;
 			}
+		case Type_MultiPointer:
+			if (allow_multi_pointer) {
+				return bt->MultiPointer.elem;
+			}
+			break;
 		}
 	}
 	return t;
@@ -2395,6 +2400,57 @@ bool is_type_simple_compare(Type *t) {
 
 	}
 
+	return false;
+}
+
+bool is_type_load_safe(Type *type) {
+	GB_ASSERT(type != nullptr);
+	type = core_type(core_array_type(type));
+	switch (type->kind) {
+	case Type_Basic:
+		return (type->Basic.flags & (BasicFlag_Boolean|BasicFlag_Numeric|BasicFlag_Rune)) != 0;
+
+	case Type_BitSet:
+		if (type->BitSet.underlying) {
+			return is_type_load_safe(type->BitSet.underlying);
+		}
+		return true;
+
+	case Type_RelativePointer:
+	case Type_RelativeSlice:
+		return true;
+
+	case Type_Pointer:
+	case Type_MultiPointer:
+	case Type_Slice:
+	case Type_DynamicArray:
+	case Type_Proc:
+	case Type_SoaPointer:
+		return false;
+
+	case Type_Enum:
+	case Type_EnumeratedArray:
+	case Type_Array:
+	case Type_SimdVector:
+	case Type_Matrix:
+		GB_PANIC("should never be hit");
+		return false;
+
+	case Type_Struct:
+		for_array(i, type->Struct.fields) {
+			if (!is_type_load_safe(type->Struct.fields[i]->type)) {
+				return false;
+			}
+		}
+		return type_size_of(type) > 0;
+	case Type_Union:
+		for_array(i, type->Union.variants) {
+			if (!is_type_load_safe(type->Union.variants[i])) {
+				return false;
+			}
+		}
+		return type_size_of(type) > 0;
+	}
 	return false;
 }
 

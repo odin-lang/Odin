@@ -175,7 +175,8 @@ struct lbLoopData {
 struct lbCompoundLitElemTempData {
 	Ast *   expr;
 	lbValue value;
-	i32     elem_index;
+	i64     elem_index;
+	i64     elem_length;
 	lbValue gep;
 };
 
@@ -210,6 +211,45 @@ void lb_loop_end(lbProcedure *p, lbLoopData const &data) {
 		lb_start_block(p, data.done);
 	}
 }
+
+
+// This emits a GEP at 0, index
+lbValue lb_emit_epi(lbProcedure *p, lbValue const &value, isize index) {
+	GB_ASSERT(is_type_pointer(value.type));
+	Type *type = type_deref(value.type);
+
+	LLVMValueRef indices[2] = {
+		LLVMConstInt(lb_type(p->module, t_int), 0, false),
+		LLVMConstInt(lb_type(p->module, t_int), cast(unsigned long long)index, false),
+	};
+	LLVMTypeRef llvm_type = lb_type(p->module, type);
+	lbValue res = {};
+	Type *ptr = base_array_type(type);
+	res.type = alloc_type_pointer(ptr);
+	if (LLVMIsConstant(value.value)) {
+		res.value = LLVMConstGEP2(llvm_type, value.value, indices, gb_count_of(indices));
+	} else {
+		res.value = LLVMBuildGEP2(p->builder, llvm_type, value.value, indices, gb_count_of(indices), "");
+	}
+	return res;
+}
+// This emits a GEP at 0, index
+lbValue lb_emit_epi(lbModule *m, lbValue const &value, isize index) {
+	GB_ASSERT(is_type_pointer(value.type));
+	GB_ASSERT(LLVMIsConstant(value.value));
+	Type *type = type_deref(value.type);
+
+	LLVMValueRef indices[2] = {
+		LLVMConstInt(lb_type(m, t_int), 0, false),
+		LLVMConstInt(lb_type(m, t_int), cast(unsigned long long)index, false),
+	};
+	lbValue res = {};
+	Type *ptr = base_array_type(type);
+	res.type = alloc_type_pointer(ptr);
+	res.value = LLVMConstGEP2(lb_type(m, type), value.value, indices, gb_count_of(indices));
+	return res;
+}
+
 
 
 LLVMValueRef llvm_zero(lbModule *m) {
@@ -528,6 +568,13 @@ void lb_emit_slice_bounds_check(lbProcedure *p, Token token, lbValue low, lbValu
 	}
 }
 
+unsigned lb_try_get_alignment(LLVMValueRef addr_ptr, unsigned default_alignment) {
+	if (LLVMIsAGlobalValue(addr_ptr) || LLVMIsAAllocaInst(addr_ptr) || LLVMIsALoadInst(addr_ptr)) {
+		return LLVMGetAlignment(addr_ptr);
+	}
+	return default_alignment;
+}
+
 bool lb_try_update_alignment(LLVMValueRef addr_ptr, unsigned alignment) {
 	if (LLVMIsAGlobalValue(addr_ptr) || LLVMIsAAllocaInst(addr_ptr) || LLVMIsALoadInst(addr_ptr)) {
 		if (LLVMGetAlignment(addr_ptr) < alignment) {
@@ -807,46 +854,6 @@ void lb_addr_store(lbProcedure *p, lbAddr addr, lbValue value) {
 	lb_emit_store(p, addr.addr, value);
 }
 
-void lb_const_store(lbValue ptr, lbValue value) {
-	GB_ASSERT(lb_is_const(ptr));
-	GB_ASSERT(lb_is_const(value));
-	GB_ASSERT(is_type_pointer(ptr.type));
-	LLVMSetInitializer(ptr.value, value.value);
-}
-
-
-bool lb_is_type_proc_recursive(Type *t) {
-	for (;;) {
-		if (t == nullptr) {
-			return false;
-		}
-		switch (t->kind) {
-		case Type_Named:
-			t = t->Named.base;
-			break;
-		case Type_Pointer:
-			t = t->Pointer.elem;
-			break;
-		case Type_Array:
-			t = t->Array.elem;
-			break;
-		case Type_EnumeratedArray:
-			t = t->EnumeratedArray.elem;
-			break;
-		case Type_Slice:
-			t = t->Slice.elem;
-			break;
-		case Type_DynamicArray:
-			t = t->DynamicArray.elem;
-			break;
-		case Type_Proc:
-			return true;
-		default:
-			return false;
-		}
-	}
-}
-
 void lb_emit_store(lbProcedure *p, lbValue ptr, lbValue value) {
 	GB_ASSERT(value.value != nullptr);
 	Type *a = type_deref(ptr.type);
@@ -854,7 +861,9 @@ void lb_emit_store(lbProcedure *p, lbValue ptr, lbValue value) {
 	if (LLVMIsNull(value.value)) {
 		LLVMTypeRef src_t = llvm_addr_type(p->module, ptr);
 		if (is_type_proc(a)) {
-			LLVMBuildStore(p->builder, LLVMConstNull(llvm_get_element_type(LLVMTypeOf(ptr.value))), ptr.value);
+			LLVMTypeRef rawptr_type = lb_type(p->module, t_rawptr);
+			LLVMTypeRef rawptr_ptr_type = LLVMPointerType(rawptr_type, 0);
+			LLVMBuildStore(p->builder, LLVMConstNull(rawptr_type), LLVMBuildBitCast(p->builder, ptr.value, rawptr_ptr_type, ""));
 		} else if (lb_sizeof(src_t) <= lb_max_zero_init_size()) {
 			LLVMBuildStore(p->builder, LLVMConstNull(src_t), ptr.value);
 		} else {
@@ -873,25 +882,46 @@ void lb_emit_store(lbProcedure *p, lbValue ptr, lbValue value) {
 
 	enum {MAX_STORE_SIZE = 64};
 
-	if (LLVMIsALoadInst(value.value) && lb_sizeof(LLVMTypeOf(value.value)) > MAX_STORE_SIZE) {
-		LLVMValueRef dst_ptr = ptr.value;
-		LLVMValueRef src_ptr = LLVMGetOperand(value.value, 0);
-		src_ptr = LLVMBuildPointerCast(p->builder, src_ptr, LLVMTypeOf(dst_ptr), "");
+	if (lb_sizeof(LLVMTypeOf(value.value)) > MAX_STORE_SIZE) {
+		if (LLVMIsALoadInst(value.value)) {
+			LLVMValueRef dst_ptr = ptr.value;
+			LLVMValueRef src_ptr_original = LLVMGetOperand(value.value, 0);
+			LLVMValueRef src_ptr = LLVMBuildPointerCast(p->builder, src_ptr_original, LLVMTypeOf(dst_ptr), "");
 
-		LLVMBuildMemMove(p->builder,
-		                 dst_ptr, 1,
-		                 src_ptr, 1,
-		                 LLVMConstInt(LLVMInt64TypeInContext(p->module->ctx), lb_sizeof(LLVMTypeOf(value.value)), false));
-		return;
+			LLVMBuildMemMove(p->builder,
+			                 dst_ptr, lb_try_get_alignment(dst_ptr, 1),
+			                 src_ptr, lb_try_get_alignment(src_ptr_original, 1),
+			                 LLVMConstInt(LLVMInt64TypeInContext(p->module->ctx), lb_sizeof(LLVMTypeOf(value.value)), false));
+			return;
+		} else if (LLVMIsConstant(value.value)) {
+			lbAddr addr = lb_add_global_generated(p->module, value.type, value, nullptr);
+			LLVMValueRef global_data = addr.addr.value;
+			// make it truly private data
+			LLVMSetLinkage(global_data, LLVMPrivateLinkage);
+			LLVMSetUnnamedAddress(global_data, LLVMGlobalUnnamedAddr);
+			LLVMSetGlobalConstant(global_data, true);
+
+			LLVMValueRef dst_ptr = ptr.value;
+			LLVMValueRef src_ptr = global_data;
+			src_ptr = LLVMBuildPointerCast(p->builder, src_ptr, LLVMTypeOf(dst_ptr), "");
+
+			LLVMBuildMemMove(p->builder,
+			                 dst_ptr, lb_try_get_alignment(dst_ptr, 1),
+			                 src_ptr, lb_try_get_alignment(global_data, 1),
+			                 LLVMConstInt(LLVMInt64TypeInContext(p->module->ctx), lb_sizeof(LLVMTypeOf(value.value)), false));
+			return;
+		}
 	}
 
-	if (lb_is_type_proc_recursive(a)) {
+	if (is_type_proc(a)) {
 		// NOTE(bill, 2020-11-11): Because of certain LLVM rules, a procedure value may be
 		// stored as regular pointer with no procedure information
 
-		LLVMTypeRef src_t = LLVMGetElementType(LLVMTypeOf(ptr.value));
-		LLVMValueRef v = LLVMBuildPointerCast(p->builder, value.value, src_t, "");
-		LLVMBuildStore(p->builder, v, ptr.value);
+ 		LLVMTypeRef rawptr_type = lb_type(p->module, t_rawptr);
+ 		LLVMTypeRef rawptr_ptr_type = LLVMPointerType(rawptr_type, 0);
+		LLVMBuildStore(p->builder,
+		               LLVMBuildPointerCast(p->builder, value.value, rawptr_type, ""),
+		               LLVMBuildPointerCast(p->builder, ptr.value, rawptr_ptr_type, ""));
 	} else {
 		Type *ca = core_type(a);
 		if (ca->kind == Type_Basic || ca->kind == Type_Proc) {
@@ -1481,7 +1511,7 @@ LLVMTypeRef lb_type_internal_for_procedures_raw(lbModule *m, Type *type) {
 			if (e->flags & EntityFlag_ByPtr) {
 				param_type = lb_type(m, alloc_type_pointer(e_type));
 			} else if (is_type_boolean(e_type) &&
-			    type_size_of(e_type) <= 1) {
+			           type_size_of(e_type) <= 1) {
 				param_type = LLVMInt1TypeInContext(m->ctx);
 			} else {
 				if (is_type_proc(e_type)) {
@@ -2028,15 +2058,13 @@ LLVMTypeRef lb_type_internal(lbModule *m, Type *type) {
 		}
 
 	case Type_Proc:
-		// if (m->internal_type_level > 256) { // TODO HACK(bill): is this really enough?
-		if (m->internal_type_level > 1) { // TODO HACK(bill): is this really enough?
-			return LLVMPointerType(LLVMIntTypeInContext(m->ctx, 8), 0);
-		} else {
+		{
+			// NOTE(bill): we do an explicit cast to the correct procedure type when calling the procedure
 			LLVMTypeRef proc_raw_type = lb_type_internal_for_procedures_raw(m, type);
-			return LLVMPointerType(proc_raw_type, 0);
+			gb_unused(proc_raw_type);
+			return lb_type(m, t_rawptr);
 		}
 
-		break;
 	case Type_BitSet:
 		{
 			Type *ut = bit_set_to_int(type);
@@ -2289,6 +2317,17 @@ void lb_emit_if(lbProcedure *p, lbValue cond, lbBlock *true_block, lbBlock *fals
 }
 
 
+gb_inline LLVMTypeRef OdinLLVMGetInternalElementType(LLVMTypeRef type) {
+	return LLVMGetElementType(type);
+}
+LLVMTypeRef OdinLLVMGetArrayElementType(LLVMTypeRef type) {
+	GB_ASSERT(lb_is_type_kind(type, LLVMArrayTypeKind));
+	return OdinLLVMGetInternalElementType(type);
+}
+LLVMTypeRef OdinLLVMGetVectorElementType(LLVMTypeRef type) {
+	GB_ASSERT(lb_is_type_kind(type, LLVMVectorTypeKind));
+	return OdinLLVMGetInternalElementType(type);
+}
 
 
 LLVMValueRef OdinLLVMBuildTransmute(lbProcedure *p, LLVMValueRef val, LLVMTypeRef dst_type) {
@@ -2469,7 +2508,55 @@ lbValue lb_find_or_add_entity_string_byte_slice(lbModule *m, String const &str) 
 	res.type = t_u8_slice;
 	return res;
 }
+lbValue lb_find_or_add_entity_string_byte_slice_with_type(lbModule *m, String const &str, Type *slice_type) {
+	GB_ASSERT(is_type_slice(slice_type));
+	LLVMValueRef indices[2] = {llvm_zero(m), llvm_zero(m)};
+	LLVMValueRef data = LLVMConstStringInContext(m->ctx,
+		cast(char const *)str.text,
+		cast(unsigned)str.len,
+		false);
 
+
+	char *name = nullptr;
+	{
+		isize max_len = 7+8+1;
+		name = gb_alloc_array(permanent_allocator(), char, max_len);
+		u32 id = m->gen->global_array_index.fetch_add(1);
+		isize len = gb_snprintf(name, max_len, "csbs$%x", id);
+		len -= 1;
+	}
+	LLVMTypeRef type = LLVMTypeOf(data);
+	LLVMValueRef global_data = LLVMAddGlobal(m->mod, type, name);
+	LLVMSetInitializer(global_data, data);
+	LLVMSetLinkage(global_data, LLVMPrivateLinkage);
+	LLVMSetUnnamedAddress(global_data, LLVMGlobalUnnamedAddr);
+	LLVMSetAlignment(global_data, 1);
+	LLVMSetGlobalConstant(global_data, true);
+
+	i64 data_len = str.len;
+	LLVMValueRef ptr = nullptr;
+	if (data_len != 0) {
+		ptr = LLVMConstInBoundsGEP2(type, global_data, indices, 2);
+	} else {
+		ptr = LLVMConstNull(lb_type(m, t_u8_ptr));
+	}
+	if (!is_type_u8_slice(slice_type)) {
+		Type *bt = base_type(slice_type);
+		Type *elem = bt->Slice.elem;
+		i64 sz = type_size_of(elem);
+		GB_ASSERT(sz > 0);
+		ptr = LLVMConstPointerCast(ptr, lb_type(m, alloc_type_pointer(elem)));
+		data_len /= sz;
+	}
+
+	LLVMValueRef len = LLVMConstInt(lb_type(m, t_int), data_len, true);
+	LLVMValueRef values[2] = {ptr, len};
+
+	lbValue res = {};
+	res.value = llvm_const_named_struct(m, slice_type, values, 2);
+	res.type = slice_type;
+	return res;
+}
 
 
 

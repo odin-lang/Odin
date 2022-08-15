@@ -3,7 +3,7 @@ package glfw
 when ODIN_OS == .Windows {
 	import win32 "core:sys/windows"
 	
-	foreign import glfw { "lib/glfw3.lib", "system:user32.lib", "system:gdi32.lib", "system:shell32.lib" }
+	foreign import glfw { "lib/glfw3_mt.lib", "system:user32.lib", "system:gdi32.lib", "system:shell32.lib" }
 	
 	@(default_calling_convention="c", link_prefix="glfw")
 	foreign glfw {

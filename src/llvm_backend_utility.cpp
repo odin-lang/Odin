@@ -351,6 +351,10 @@ lbValue lb_emit_try_has_value(lbProcedure *p, lbValue rhs) {
 
 
 lbValue lb_emit_or_else(lbProcedure *p, Ast *arg, Ast *else_expr, TypeAndValue const &tv) {
+	if (arg->state_flags & StateFlag_DirectiveWasFalse) {
+		return lb_build_expr(p, else_expr);
+	}
+
 	lbValue lhs = {};
 	lbValue rhs = {};
 	lb_emit_try_lhs_rhs(p, arg, tv, &lhs, &rhs);
@@ -1002,6 +1006,7 @@ lbValue lb_emit_struct_ep(lbProcedure *p, lbValue s, i32 index) {
 	index = lb_convert_struct_index(p->module, t, index);
 	
 	if (lb_is_const(s)) {
+		// NOTE(bill): this cannot be replaced with lb_emit_epi
 		lbModule *m = p->module;
 		lbValue res = {};
 		LLVMValueRef indices[2] = {llvm_zero(m), LLVMConstInt(lb_type(m, t_i32), index, false)};
@@ -1252,27 +1257,13 @@ lbValue lb_emit_array_ep(lbProcedure *p, lbValue s, lbValue index) {
 
 	Type *ptr = base_array_type(st);
 	lbValue res = {};
-	res.value = LLVMBuildGEP2(p->builder, lb_type(p->module, st), s.value, indices, 2, "");
-	res.type = alloc_type_pointer(ptr);
-	return res;
-}
 
-// This emits a GEP at 0, index
-static inline lbValue lb_emit_gep(lbProcedure *p, Type *type, LLVMValueRef value, isize index)
-{
-	LLVMValueRef indices[2] = {
-		LLVMConstInt(lb_type(p->module, t_int), 0, false),
-		LLVMConstInt(lb_type(p->module, t_int), cast(unsigned)index, false),
-	};
-	LLVMTypeRef llvm_type = lb_type(p->module, type);
-	lbValue res = {};
-	Type *ptr = base_array_type(type);
-	res.type = alloc_type_pointer(ptr);
-	if (LLVMIsConstant(value)) {
-		res.value = LLVMConstGEP2(llvm_type, value, indices, gb_count_of(indices));
+	if (LLVMIsConstant(s.value) && LLVMIsConstant(index.value)) {
+		res.value = LLVMConstGEP2(lb_type(p->module, st), s.value, indices, gb_count_of(indices));
 	} else {
-		res.value = LLVMBuildGEP2(p->builder, llvm_type, value, indices, gb_count_of(indices), "");
+		res.value = LLVMBuildGEP2(p->builder, lb_type(p->module, st), s.value, indices, gb_count_of(indices), "");
 	}
+	res.type = alloc_type_pointer(ptr);
 	return res;
 }
 
@@ -1282,7 +1273,15 @@ lbValue lb_emit_array_epi(lbProcedure *p, lbValue s, isize index) {
 	Type *st = base_type(type_deref(t));
 	GB_ASSERT_MSG(is_type_array(st) || is_type_enumerated_array(st) || is_type_matrix(st), "%s", type_to_string(st));
 	GB_ASSERT(0 <= index);
-	return lb_emit_gep(p, st, s.value, index);
+	return lb_emit_epi(p, s, index);
+}
+lbValue lb_emit_array_epi(lbModule *m, lbValue s, isize index) {
+	Type *t = s.type;
+	GB_ASSERT(is_type_pointer(t));
+	Type *st = base_type(type_deref(t));
+	GB_ASSERT_MSG(is_type_array(st) || is_type_enumerated_array(st) || is_type_matrix(st), "%s", type_to_string(st));
+	GB_ASSERT(0 <= index);
+	return lb_emit_epi(m, s, index);
 }
 
 lbValue lb_emit_ptr_offset(lbProcedure *p, lbValue ptr, lbValue index) {
@@ -1290,7 +1289,7 @@ lbValue lb_emit_ptr_offset(lbProcedure *p, lbValue ptr, lbValue index) {
 	LLVMValueRef indices[1] = {index.value};
 	lbValue res = {};
 	res.type = ptr.type;
-	LLVMTypeRef type = lb_type(p->module, type_deref(ptr.type));
+	LLVMTypeRef type = lb_type(p->module, type_deref(res.type, true));
 
 	if (lb_is_const(ptr) && lb_is_const(index)) {
 		res.value = LLVMConstGEP2(type, ptr.value, indices, 1);
@@ -1306,16 +1305,16 @@ lbValue lb_emit_matrix_epi(lbProcedure *p, lbValue s, isize row, isize column) {
 	Type *mt = base_type(type_deref(t));
 	if (column == 0) {
 		GB_ASSERT_MSG(is_type_matrix(mt) || is_type_array_like(mt), "%s", type_to_string(mt));
-		return lb_emit_gep(p, mt, s.value, row);
+		return lb_emit_epi(p, s, row);
 	} else if (row == 0 && is_type_array_like(mt)) {
-		return lb_emit_gep(p, mt, s.value, column);
+		return lb_emit_epi(p, s, column);
 	}
 	
 	
 	GB_ASSERT_MSG(is_type_matrix(mt), "%s", type_to_string(mt));
 	
 	isize offset = matrix_indices_to_offset(mt, row, column);
-	return lb_emit_gep(p, mt, s.value, offset);
+	return lb_emit_epi(p, s, offset);
 }
 
 lbValue lb_emit_matrix_ep(lbProcedure *p, lbValue s, lbValue row, lbValue column) {
@@ -1651,7 +1650,7 @@ LLVMValueRef llvm_vector_expand_to_power_of_two(lbProcedure *p, LLVMValueRef val
 LLVMValueRef llvm_vector_reduce_add(lbProcedure *p, LLVMValueRef value) {
 	LLVMTypeRef type = LLVMTypeOf(value);
 	GB_ASSERT(LLVMGetTypeKind(type) == LLVMVectorTypeKind);
-	LLVMTypeRef elem = LLVMGetElementType(type);
+	LLVMTypeRef elem = OdinLLVMGetVectorElementType(type);
 	unsigned len = LLVMGetVectorSize(type);
 	if (len == 0) {
 		return LLVMConstNull(type);
@@ -1727,7 +1726,7 @@ LLVMValueRef llvm_vector_reduce_add(lbProcedure *p, LLVMValueRef value) {
 LLVMValueRef llvm_vector_add(lbProcedure *p, LLVMValueRef a, LLVMValueRef b) {
 	GB_ASSERT(LLVMTypeOf(a) == LLVMTypeOf(b));
 	
-	LLVMTypeRef elem = LLVMGetElementType(LLVMTypeOf(a));
+	LLVMTypeRef elem = OdinLLVMGetVectorElementType(LLVMTypeOf(a));
 	
 	if (LLVMGetTypeKind(elem) == LLVMIntegerTypeKind) {
 		return LLVMBuildAdd(p->builder, a, b, "");
@@ -1738,7 +1737,7 @@ LLVMValueRef llvm_vector_add(lbProcedure *p, LLVMValueRef a, LLVMValueRef b) {
 LLVMValueRef llvm_vector_mul(lbProcedure *p, LLVMValueRef a, LLVMValueRef b) {
 	GB_ASSERT(LLVMTypeOf(a) == LLVMTypeOf(b));
 	
-	LLVMTypeRef elem = LLVMGetElementType(LLVMTypeOf(a));
+	LLVMTypeRef elem = OdinLLVMGetVectorElementType(LLVMTypeOf(a));
 	
 	if (LLVMGetTypeKind(elem) == LLVMIntegerTypeKind) {
 		return LLVMBuildMul(p->builder, a, b, "");
@@ -1758,7 +1757,7 @@ LLVMValueRef llvm_vector_mul_add(lbProcedure *p, LLVMValueRef a, LLVMValueRef b,
 	GB_ASSERT(t == LLVMTypeOf(c));
 	GB_ASSERT(LLVMGetTypeKind(t) == LLVMVectorTypeKind);
 	
-	LLVMTypeRef elem = LLVMGetElementType(t);
+	LLVMTypeRef elem = OdinLLVMGetVectorElementType(t);
 	
 	bool is_possible = false;
 	

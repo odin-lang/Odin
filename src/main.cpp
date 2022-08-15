@@ -1562,7 +1562,7 @@ bool parse_build_flags(Array<String> args) {
 									bad_flags = true;
 									break;
 								}
-								build_context.resource_filepath = substring(path, 0, string_extension_position(path));
+								build_context.resource_filepath = path;
 								build_context.has_resource = true;
 							} else {
 								gb_printf_err("Invalid -resource path, got %.*s\n", LIT(path));
