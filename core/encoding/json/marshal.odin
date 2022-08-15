@@ -17,25 +17,54 @@ Marshal_Error :: union #shared_nil {
 	io.Error,
 }
 
-marshal :: proc(v: any, allocator := context.allocator) -> (data: []byte, err: Marshal_Error) {
+// careful with MJSON maps & non quotes usage as keys without whitespace will lead to bad results
+Marshal_Options :: struct {
+	// output based on spec
+	spec: Specification,
+
+	// use line breaks & tab|spaces
+	pretty: bool, 
+
+	// spacing
+	use_spaces: bool,
+	spaces: int,
+
+	// state
+	indentation: int,
+
+	// option to output uint in JSON5 & MJSON
+	write_uint_as_hex: bool, 
+
+	// mjson output options
+	mjson_keys_use_quotes: bool,
+	mjson_keys_use_equal_sign: bool,
+
+	// mjson state
+	mjson_skipped_first_braces_start: bool,
+	mjson_skipped_first_braces_end: bool,
+}
+
+marshal :: proc(v: any, opt: Marshal_Options = {}, allocator := context.allocator) -> (data: []byte, err: Marshal_Error) {
 	b := strings.builder_make(allocator)
 	defer if err != nil {
 		strings.builder_destroy(&b)
 	}
 
-	marshal_to_builder(&b, v) or_return
+	opt := opt
+	marshal_to_builder(&b, v, &opt) or_return
 	
 	if len(b.buf) != 0 {
 		data = b.buf[:]
 	}
+
 	return data, nil
 }
 
-marshal_to_builder :: proc(b: ^strings.Builder, v: any) -> Marshal_Error {
-	return marshal_to_writer(strings.to_writer(b), v)
+marshal_to_builder :: proc(b: ^strings.Builder, v: any, opt: ^Marshal_Options) -> Marshal_Error {
+	return marshal_to_writer(strings.to_writer(b), v, opt)
 }
 
-marshal_to_writer :: proc(w: io.Writer, v: any) -> (err: Marshal_Error) {
+marshal_to_writer :: proc(w: io.Writer, v: any, opt: ^Marshal_Options) -> (err: Marshal_Error) {
 	if v == nil {
 		io.write_string(w, "null") or_return
 		return
@@ -82,7 +111,21 @@ marshal_to_writer :: proc(w: io.Writer, v: any) -> (err: Marshal_Error) {
 		case u128be: u = u128(i)
 		}
 
-		s := strconv.append_bits_128(buf[:], u, 10, info.signed, 8*ti.size, "0123456789", nil)
+		s: string
+
+		// allow uints to be printed as hex
+		if opt.write_uint_as_hex && (opt.spec == .JSON5 || opt.spec == .MJSON) {
+			switch i in a {
+			case u8, u16, u32, u64, u128: 
+				s = strconv.append_bits_128(buf[:], u, 16, info.signed, 8*ti.size, "0123456789abcdef", { .Prefix })
+
+			case:
+				s = strconv.append_bits_128(buf[:], u, 10, info.signed, 8*ti.size, "0123456789", nil)
+			}
+		} else {
+			s = strconv.append_bits_128(buf[:], u, 10, info.signed, 8*ti.size, "0123456789", nil)
+		}
+
 		io.write_string(w, s) or_return
 
 
@@ -169,52 +212,48 @@ marshal_to_writer :: proc(w: io.Writer, v: any) -> (err: Marshal_Error) {
 		return .Unsupported_Type
 
 	case runtime.Type_Info_Array:
-		io.write_byte(w, '[') or_return
+		opt_write_start(w, opt, '[') or_return
 		for i in 0..<info.count {
-			if i > 0 { io.write_string(w, ", ") or_return }
-
+			opt_write_iteration(w, opt, i) or_return
 			data := uintptr(v.data) + uintptr(i*info.elem_size)
-			marshal_to_writer(w, any{rawptr(data), info.elem.id}) or_return
+			marshal_to_writer(w, any{rawptr(data), info.elem.id}, opt) or_return
 		}
-		io.write_byte(w, ']') or_return
+		opt_write_end(w, opt, ']') or_return
 		
 	case runtime.Type_Info_Enumerated_Array:
 		index := runtime.type_info_base(info.index).variant.(runtime.Type_Info_Enum)
-		io.write_byte(w, '[') or_return
+		opt_write_start(w, opt, '[') or_return
 		for i in 0..<info.count {
-			if i > 0 { io.write_string(w, ", ") or_return }
-
+			opt_write_iteration(w, opt, i) or_return
 			data := uintptr(v.data) + uintptr(i*info.elem_size)
-			marshal_to_writer(w, any{rawptr(data), info.elem.id}) or_return
+			marshal_to_writer(w, any{rawptr(data), info.elem.id}, opt) or_return
 		}
-		io.write_byte(w, ']') or_return
+		opt_write_end(w, opt, ']') or_return
 		
 	case runtime.Type_Info_Dynamic_Array:
-		io.write_byte(w, '[') or_return
+		opt_write_start(w, opt, '[') or_return
 		array := cast(^mem.Raw_Dynamic_Array)v.data
 		for i in 0..<array.len {
-			if i > 0 { io.write_string(w, ", ") or_return }
-
+			opt_write_iteration(w, opt, i) or_return
 			data := uintptr(array.data) + uintptr(i*info.elem_size)
-			marshal_to_writer(w, any{rawptr(data), info.elem.id}) or_return
+			marshal_to_writer(w, any{rawptr(data), info.elem.id}, opt) or_return
 		}
-		io.write_byte(w, ']') or_return
+		opt_write_end(w, opt, ']') or_return
 
 	case runtime.Type_Info_Slice:
-		io.write_byte(w, '[') or_return
+		opt_write_start(w, opt, '[') or_return
 		slice := cast(^mem.Raw_Slice)v.data
 		for i in 0..<slice.len {
-			if i > 0 { io.write_string(w, ", ") or_return }
-
+			opt_write_iteration(w, opt, i) or_return
 			data := uintptr(slice.data) + uintptr(i*info.elem_size)
-			marshal_to_writer(w, any{rawptr(data), info.elem.id}) or_return
+			marshal_to_writer(w, any{rawptr(data), info.elem.id}, opt) or_return
 		}
-		io.write_byte(w, ']') or_return
+		opt_write_end(w, opt, ']') or_return
 
 	case runtime.Type_Info_Map:
 		m := (^mem.Raw_Map)(v.data)
+		opt_write_start(w, opt, '{') or_return
 
-		io.write_byte(w, '{') or_return
 		if m != nil {
 			if info.generated_struct == nil {
 				return .Unsupported_Type
@@ -226,31 +265,50 @@ marshal_to_writer :: proc(w: io.Writer, v: any) -> (err: Marshal_Error) {
 			entry_size := ed.elem_size
 
 			for i in 0..<entries.len {
-				if i > 0 { io.write_string(w, ", ") or_return }
+				opt_write_iteration(w, opt, i) or_return
 
 				data := uintptr(entries.data) + uintptr(i*entry_size)
 				key   := rawptr(data + entry_type.offsets[2])
 				value := rawptr(data + entry_type.offsets[3])
 
-				marshal_to_writer(w, any{key, info.key.id})     or_return
-				io.write_string(w, ": ")                        or_return
-				marshal_to_writer(w, any{value, info.value.id}) or_return
+				// check for string type
+				{
+					v := any{key, info.key.id}
+					ti := runtime.type_info_base(type_info_of(v.id))
+					a := any{v.data, ti.id}
+					name: string
+
+					#partial switch info in ti.variant {
+					case runtime.Type_Info_String: 
+						switch s in a {
+							case string: name = s
+							case cstring: name = string(s)
+						}
+						opt_write_key(w, opt, name) or_return
+	
+					case: return .Unsupported_Type
+					}
+				}
+
+				marshal_to_writer(w, any{value, info.value.id}, opt) or_return
 			}
 		}
-		io.write_byte(w, '}') or_return
+
+		opt_write_end(w, opt, '}') or_return
 
 	case runtime.Type_Info_Struct:
-		io.write_byte(w, '{') or_return
+		opt_write_start(w, opt, '{') or_return
+		
 		for name, i in info.names {
-			if i > 0 { io.write_string(w, ", ") or_return }
-			io.write_quoted_string(w, name) or_return
-			io.write_string(w, ": ") or_return
+			opt_write_iteration(w, opt, i) or_return
+			opt_write_key(w, opt, name) or_return
 
 			id := info.types[i].id
 			data := rawptr(uintptr(v.data) + info.offsets[i])
-			marshal_to_writer(w, any{data, id}) or_return
+			marshal_to_writer(w, any{data, id}, opt) or_return
 		}
-		io.write_byte(w, '}') or_return
+
+		opt_write_end(w, opt, '}') or_return
 
 	case runtime.Type_Info_Union:
 		tag_ptr := uintptr(v.data) + info.tag_offset
@@ -273,11 +331,11 @@ marshal_to_writer :: proc(w: io.Writer, v: any) -> (err: Marshal_Error) {
 			io.write_string(w, "null") or_return
 		} else {
 			id := info.variants[tag-1].id
-			return marshal_to_writer(w, any{v.data, id})
+			return marshal_to_writer(w, any{v.data, id}, opt)
 		}
 
 	case runtime.Type_Info_Enum:
-		return marshal_to_writer(w, any{v.data, info.base.id})
+		return marshal_to_writer(w, any{v.data, info.base.id}, opt)
 
 	case runtime.Type_Info_Bit_Set:
 		is_bit_set_different_endian_to_platform :: proc(ti: ^runtime.Type_Info) -> bool {
@@ -329,6 +387,119 @@ marshal_to_writer :: proc(w: io.Writer, v: any) -> (err: Marshal_Error) {
 		io.write_u64(w, bit_data) or_return
 
 		return .Unsupported_Type
+	}
+
+	return
+}
+
+// write key as quoted string or with optional quotes in mjson
+opt_write_key :: proc(w: io.Writer, opt: ^Marshal_Options, name: string) -> (err: io.Error)  {
+	switch opt.spec {
+	case .JSON, .JSON5:
+		io.write_quoted_string(w, name) or_return
+		io.write_string(w, ": ") or_return
+
+	case .MJSON:
+		if opt.mjson_keys_use_quotes {
+			io.write_quoted_string(w, name) or_return
+		} else {
+			io.write_string(w, name) or_return
+		}
+		
+		if opt.mjson_keys_use_equal_sign {
+			io.write_string(w, " = ") or_return
+		} else {
+			io.write_string(w, ": ") or_return
+		}
+	}	
+
+	return
+}
+
+// insert start byte and increase indentation on pretty
+opt_write_start :: proc(w: io.Writer, opt: ^Marshal_Options, c: byte) -> (err: io.Error)  {
+	// skip mjson starting braces
+	if opt.spec == .MJSON && !opt.mjson_skipped_first_braces_start {
+		opt.mjson_skipped_first_braces_start = true
+		return
+	}
+
+	io.write_byte(w, c) or_return
+	opt.indentation += 1
+
+	if opt.pretty {
+		io.write_byte(w, '\n') or_return
+	}
+
+	return
+}
+
+// insert comma seperation and write indentations
+opt_write_iteration :: proc(w: io.Writer, opt: ^Marshal_Options, iteration: int) -> (err: io.Error) {
+	switch opt.spec {
+	case .JSON, .JSON5: 
+		if iteration > 0 {
+			io.write_string(w, ", ") or_return
+
+			if opt.pretty {
+				io.write_byte(w, '\n') or_return
+			}
+		}
+
+		opt_write_indentation(w, opt) or_return
+
+	case .MJSON: 
+		if iteration > 0 {
+			// on pretty no commas necessary
+			if opt.pretty {
+				io.write_byte(w, '\n') or_return
+			} else {
+				// comma seperation necessary for non pretty output!
+				io.write_string(w, ", ") or_return
+			}
+		}
+
+		opt_write_indentation(w, opt) or_return
+	}
+
+	return
+}
+
+// decrease indent, write spacing and insert end byte
+opt_write_end :: proc(w: io.Writer, opt: ^Marshal_Options, c: byte) -> (err: io.Error)  {
+	if opt.spec == .MJSON && opt.mjson_skipped_first_braces_start && !opt.mjson_skipped_first_braces_end {
+		if opt.indentation == 0 {
+			opt.mjson_skipped_first_braces_end = true
+			return
+		}
+	}
+
+	opt.indentation -= 1
+
+	if opt.pretty {
+		io.write_byte(w, '\n') or_return
+		opt_write_indentation(w, opt) or_return
+	}
+
+	io.write_byte(w, c) or_return
+	return
+}
+
+// writes current indentation level based on options
+opt_write_indentation :: proc(w: io.Writer, opt: ^Marshal_Options) -> (err: io.Error) {
+	if !opt.pretty {
+		return
+	}
+
+	if opt.use_spaces {
+		spaces := opt.spaces == 0 ? 4 : opt.spaces
+		for _ in 0..<opt.indentation * spaces {
+			io.write_byte(w, ' ') or_return
+		}
+	} else {
+		for _ in 0..<opt.indentation {
+			io.write_byte(w, '\t') or_return
+		}
 	}
 
 	return
