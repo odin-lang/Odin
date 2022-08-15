@@ -102,9 +102,9 @@ growing_arena_allocator :: proc(arena: ^Growing_Arena) -> mem.Allocator {
 }
 
 growing_arena_allocator_proc :: proc(allocator_data: rawptr, mode: mem.Allocator_Mode,
-                             size, alignment: int,
-                             old_memory: rawptr, old_size: int,
-                             location := #caller_location) -> (data: []byte, err: Allocator_Error) {
+                                     size, alignment: int,
+                                     old_memory: rawptr, old_size: int,
+                                     location := #caller_location) -> (data: []byte, err: Allocator_Error) {
 	arena := (^Growing_Arena)(allocator_data)
 		
 	switch mode {
