@@ -481,7 +481,7 @@ void lb_build_range_interval(lbProcedure *p, AstBinaryExpr *node,
 	lbAddr index;
 	if (val1_type != nullptr) {
 		Entity *e = entity_of_node(rs->vals[1]);
-		index = lb_add_local(p, t_int, e, false);
+		index = lb_add_local(p, val1_type, e, false);
 	} else {
 		index = lb_add_local_generated(p, t_int, false);
 	}
