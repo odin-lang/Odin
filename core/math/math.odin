@@ -623,8 +623,8 @@ divmod :: #force_inline proc "contextless" (x, y: $T) -> (div, mod: T)
 
 floor_divmod :: #force_inline proc "contextless" (x, y: $T) -> (div, mod: T)
 	where intrinsics.type_is_integer(T) {
-	div := x / y
-	mod := x % y
+	div = x / y
+	mod = x % y
 	if (div > 0 && y < 0) || (mod < 0 && y > 0) {
 		div -= 1
 		mod += y
