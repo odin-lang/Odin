@@ -1170,6 +1170,8 @@ void init_checker_info(CheckerInfo *i) {
 
 	mutex_init(&i->objc_types_mutex);
 	map_init(&i->objc_msgSend_types, a);
+	mutex_init(&i->load_file_mutex);
+	string_map_init(&i->load_file_cache, a);
 }
 
 void destroy_checker_info(CheckerInfo *i) {
@@ -1205,6 +1207,8 @@ void destroy_checker_info(CheckerInfo *i) {
 
 	mutex_destroy(&i->objc_types_mutex);
 	map_destroy(&i->objc_msgSend_types);
+	mutex_init(&i->load_file_mutex);
+	string_map_destroy(&i->load_file_cache);
 }
 
 CheckerContext make_checker_context(Checker *c) {
