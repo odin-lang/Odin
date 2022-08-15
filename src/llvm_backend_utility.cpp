@@ -351,6 +351,10 @@ lbValue lb_emit_try_has_value(lbProcedure *p, lbValue rhs) {
 
 
 lbValue lb_emit_or_else(lbProcedure *p, Ast *arg, Ast *else_expr, TypeAndValue const &tv) {
+	if (arg->state_flags & StateFlag_DirectiveWasFalse) {
+		return lb_build_expr(p, else_expr);
+	}
+
 	lbValue lhs = {};
 	lbValue rhs = {};
 	lb_emit_try_lhs_rhs(p, arg, tv, &lhs, &rhs);

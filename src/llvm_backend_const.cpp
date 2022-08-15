@@ -391,8 +391,8 @@ lbValue lb_const_value(lbModule *m, Type *type, ExactValue value, bool allow_loc
 
 	if (is_type_slice(type)) {
 		if (value.kind == ExactValue_String) {
-			GB_ASSERT(is_type_u8_slice(type));
-			res.value = lb_find_or_add_entity_string_byte_slice(m, value.value_string).value;
+			GB_ASSERT(is_type_slice(type));
+			res.value = lb_find_or_add_entity_string_byte_slice_with_type(m, value.value_string, original_type).value;
 			return res;
 		} else {
 			ast_node(cl, CompoundLit, value.value_compound);
