@@ -121,6 +121,28 @@ void check_or_return_split_types(CheckerContext *c, Operand *x, String const &na
 
 bool is_diverging_expr(Ast *expr);
 
+
+enum LoadDirectiveResult {
+	LoadDirective_Success  = 0,
+	LoadDirective_Error    = 1,
+	LoadDirective_NotFound = 2,
+};
+
+bool is_load_directive_call(Ast *call) {
+	call = unparen_expr(call);
+	if (call->kind != Ast_CallExpr) {
+		return false;
+	}
+	ast_node(ce, CallExpr, call);
+	if (ce->proc->kind != Ast_BasicDirective) {
+		return false;
+	}
+	ast_node(bd, BasicDirective, ce->proc);
+	String name = bd->name.string;
+	return name == "load";
+}
+LoadDirectiveResult check_load_directive(CheckerContext *c, Operand *operand, Ast *call, Type *type_hint, bool err_on_not_found);
+
 void check_did_you_mean_print(DidYouMeanAnswers *d, char const *prefix = "") {
 	auto results = did_you_mean_results(d);
 	if (results.count != 0) {
@@ -2505,8 +2527,17 @@ void check_shift(CheckerContext *c, Operand *x, Operand *y, Ast *node, Type *typ
 				x->expr->tav.is_lhs = true;
 			}
 			x->mode = Addressing_Value;
-			if (type_hint && is_type_integer(type_hint)) {
-				x->type = type_hint;
+			if (type_hint) {
+				if (is_type_integer(type_hint)) {
+					x->type = type_hint;
+				} else {
+					gbString x_str = expr_to_string(x->expr);
+					gbString to_type = type_to_string(type_hint);
+					error(node, "Conversion of shifted operand '%s' to '%s' is not allowed", x_str, to_type);
+					gb_string_free(x_str);
+					gb_string_free(to_type);
+					x->mode = Addressing_Invalid;
+				}
 			}
 			// x->value = x_val;
 			return;
@@ -2522,7 +2553,7 @@ void check_shift(CheckerContext *c, Operand *x, Operand *y, Ast *node, Type *typ
 	// TODO(bill): Should we support shifts for fixed arrays and #simd vectors?
 
 	if (!is_type_integer(x->type)) {
-		gbString err_str = expr_to_string(y->expr);
+		gbString err_str = expr_to_string(x->expr);
 		error(node, "Shift operand '%s' must be an integer", err_str);
 		gb_string_free(err_str);
 		x->mode = Addressing_Invalid;
@@ -7398,9 +7429,59 @@ ExprKind check_or_else_expr(CheckerContext *c, Operand *o, Ast *node, Type *type
 	String name = oe->token.string;
 	Ast *arg = oe->x;
 	Ast *default_value = oe->y;
-
 	Operand x = {};
 	Operand y = {};
+
+	// NOTE(bill, 2022-08-11): edge case to handle #load(path) or_else default
+	if (is_load_directive_call(arg)) {
+		LoadDirectiveResult res = check_load_directive(c, &x, arg, type_hint, false);
+
+		// Allow for chaining of '#load(path) or_else #load(path)'
+		if (!(is_load_directive_call(default_value) && res == LoadDirective_Success)) {
+			bool y_is_diverging = false;
+			check_expr_base(c, &y, default_value, x.type);
+			switch (y.mode) {
+			case Addressing_NoValue:
+				if (is_diverging_expr(y.expr)) {
+					// Allow
+					y.mode = Addressing_Value;
+					y_is_diverging = true;
+				} else {
+					error_operand_no_value(&y);
+					y.mode = Addressing_Invalid;
+				}
+				break;
+			case Addressing_Type:
+				error_operand_not_expression(&y);
+				y.mode = Addressing_Invalid;
+				break;
+			}
+
+			if (y.mode == Addressing_Invalid) {
+				o->mode = Addressing_Value;
+				o->type = t_invalid;
+				o->expr = node;
+				return Expr_Expr;
+			}
+
+			if (!y_is_diverging) {
+				check_assignment(c, &y, x.type, name);
+				if (y.mode != Addressing_Constant) {
+					error(y.expr, "expected a constant expression on the right-hand side of 'or_else' in conjuction with '#load'");
+				}
+			}
+		}
+
+		if (res == LoadDirective_Success) {
+			*o = x;
+		} else {
+			*o = y;
+		}
+		o->expr = node;
+
+		return Expr_Expr;
+	}
+
 	check_multi_expr_with_type_hint(c, &x, arg, type_hint);
 	if (x.mode == Addressing_Invalid) {
 		o->mode = Addressing_Value;
@@ -7408,7 +7489,6 @@ ExprKind check_or_else_expr(CheckerContext *c, Operand *o, Ast *node, Type *type
 		o->expr = node;
 		return Expr_Expr;
 	}
-
 	bool y_is_diverging = false;
 	check_expr_base(c, &y, default_value, x.type);
 	switch (y.mode) {

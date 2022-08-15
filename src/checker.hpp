@@ -287,6 +287,12 @@ struct ObjcMsgData {
 	ObjcMsgKind kind;
 	Type *proc_type;
 };
+struct LoadFileCache {
+	String         path;
+	gbFileError    file_error;
+	String         data;
+	StringMap<u64> hashes;
+};
 
 // CheckerInfo stores all the symbol information for a type-checked program
 struct CheckerInfo {
@@ -363,6 +369,9 @@ struct CheckerInfo {
 
 	BlockingMutex objc_types_mutex;
 	PtrMap<Ast *, ObjcMsgData> objc_msgSend_types;
+
+	BlockingMutex load_file_mutex;
+	StringMap<LoadFileCache *> load_file_cache;
 };
 
 struct CheckerContext {
