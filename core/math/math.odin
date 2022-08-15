@@ -614,6 +614,25 @@ floor_mod :: proc "contextless" (x, y: $T) -> T
 	return r
 }
 
+divmod :: #force_inline proc "contextless" (x, y: $T) -> (div, mod: T)
+	where intrinsics.type_is_integer(T) {
+	div = x / y
+	mod = x % y
+	return
+}
+
+floor_divmod :: #force_inline proc "contextless" (x, y: $T) -> (div, mod: T)
+	where intrinsics.type_is_integer(T) {
+	div = x / y
+	mod = x % y
+	if (div > 0 && y < 0) || (mod < 0 && y > 0) {
+		div -= 1
+		mod += y
+	}
+	return
+}
+
+
 modf_f16   :: proc "contextless" (x: f16) -> (int: f16, frac: f16) {
 	shift :: F16_SHIFT
 	mask  :: F16_MASK
