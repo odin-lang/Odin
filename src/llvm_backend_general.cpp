@@ -854,6 +854,46 @@ void lb_addr_store(lbProcedure *p, lbAddr addr, lbValue value) {
 	lb_emit_store(p, addr.addr, value);
 }
 
+void lb_const_store(lbValue ptr, lbValue value) {
+	GB_ASSERT(lb_is_const(ptr));
+	GB_ASSERT(lb_is_const(value));
+	GB_ASSERT(is_type_pointer(ptr.type));
+	LLVMSetInitializer(ptr.value, value.value);
+}
+
+
+bool lb_is_type_proc_recursive(Type *t) {
+	for (;;) {
+		if (t == nullptr) {
+			return false;
+		}
+		switch (t->kind) {
+		case Type_Named:
+			t = t->Named.base;
+			break;
+		case Type_Pointer:
+			t = t->Pointer.elem;
+			break;
+		case Type_Array:
+			t = t->Array.elem;
+			break;
+		case Type_EnumeratedArray:
+			t = t->EnumeratedArray.elem;
+			break;
+		case Type_Slice:
+			t = t->Slice.elem;
+			break;
+		case Type_DynamicArray:
+			t = t->DynamicArray.elem;
+			break;
+		case Type_Proc:
+			return true;
+		default:
+			return false;
+		}
+	}
+}
+
 void lb_emit_store(lbProcedure *p, lbValue ptr, lbValue value) {
 	GB_ASSERT(value.value != nullptr);
 	Type *a = type_deref(ptr.type);
@@ -913,7 +953,7 @@ void lb_emit_store(lbProcedure *p, lbValue ptr, lbValue value) {
 		}
 	}
 
-	if (is_type_proc(a)) {
+	if (lb_is_type_proc_recursive(a)) {
 		// NOTE(bill, 2020-11-11): Because of certain LLVM rules, a procedure value may be
 		// stored as regular pointer with no procedure information
 
@@ -1511,7 +1551,7 @@ LLVMTypeRef lb_type_internal_for_procedures_raw(lbModule *m, Type *type) {
 			if (e->flags & EntityFlag_ByPtr) {
 				param_type = lb_type(m, alloc_type_pointer(e_type));
 			} else if (is_type_boolean(e_type) &&
-			           type_size_of(e_type) <= 1) {
+			    type_size_of(e_type) <= 1) {
 				param_type = LLVMInt1TypeInContext(m->ctx);
 			} else {
 				if (is_type_proc(e_type)) {
@@ -2058,13 +2098,15 @@ LLVMTypeRef lb_type_internal(lbModule *m, Type *type) {
 		}
 
 	case Type_Proc:
-		{
-			// NOTE(bill): we do an explicit cast to the correct procedure type when calling the procedure
+		// if (m->internal_type_level > 256) { // TODO HACK(bill): is this really enough?
+		if (m->internal_type_level > 1) { // TODO HACK(bill): is this really enough?
+			return LLVMPointerType(LLVMIntTypeInContext(m->ctx, 8), 0);
+		} else {
 			LLVMTypeRef proc_raw_type = lb_type_internal_for_procedures_raw(m, type);
-			gb_unused(proc_raw_type);
-			return lb_type(m, t_rawptr);
+			return LLVMPointerType(proc_raw_type, 0);
 		}
 
+		break;
 	case Type_BitSet:
 		{
 			Type *ut = bit_set_to_int(type);
