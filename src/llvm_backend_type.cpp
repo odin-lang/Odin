@@ -554,6 +554,7 @@ void lb_setup_type_info_data(lbProcedure *p) { // NOTE(bill): Setup type_info da
 				lbValue index     = lb_const_int(m, t_int, i);
 				lbValue type_info = lb_emit_ptr_offset(p, memory_types, index);
 
+				// TODO(bill): Make this constant if possible, 'lb_const_store' does not work
 				lb_emit_store(p, type_info, lb_type_info(m, f->type));
 				if (f->token.string.len > 0) {
 					lbValue name = lb_emit_ptr_offset(p, memory_names, index);
