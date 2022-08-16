@@ -94,7 +94,7 @@ quaternion_cross :: proc(q1, q2: $Q) -> (q3: Q) where IS_QUATERNION(Q) {
 vector_cross :: proc{scalar_cross, vector_cross2, vector_cross3}
 cross :: proc{scalar_cross, vector_cross2, vector_cross3, quaternion_cross}
 
-vector_normalize :: proc(v: $T/[$N]$E) -> T where IS_NUMERIC(E) {
+vector_normalize :: proc(v: $T/[$N]$E) -> T where IS_FLOAT(E) {
 	return v / length(v)
 }
 quaternion_normalize :: proc(q: $Q) -> Q where IS_QUATERNION(Q) {
@@ -102,7 +102,7 @@ quaternion_normalize :: proc(q: $Q) -> Q where IS_QUATERNION(Q) {
 }
 normalize :: proc{vector_normalize, quaternion_normalize}
 
-vector_normalize0 :: proc(v: $T/[$N]$E) -> T where IS_NUMERIC(E) {
+vector_normalize0 :: proc(v: $T/[$N]$E) -> T where IS_FLOAT(E) {
 	m := length(v)
 	return 0 if m == 0 else v/m
 }
@@ -113,7 +113,7 @@ quaternion_normalize0 :: proc(q: $Q) -> Q  where IS_QUATERNION(Q) {
 normalize0 :: proc{vector_normalize0, quaternion_normalize0}
 
 
-vector_length :: proc(v: $T/[$N]$E) -> E where IS_NUMERIC(E) {
+vector_length :: proc(v: $T/[$N]$E) -> E where IS_FLOAT(E) {
 	return math.sqrt(dot(v, v))
 }
 
