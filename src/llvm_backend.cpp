@@ -739,11 +739,11 @@ lbProcedure *lb_create_startup_runtime(lbModule *main_module, lbProcedure *start
 	lb_begin_procedure_body(p);
 
 	if (startup_type_info) {
-		OdinLLVMBuildCall(p, {startup_type_info->value, startup_type_info->type}, nullptr, 0);
+		LLVMBuildCall2(p->builder, lb_type_internal_for_procedures_raw(main_module, startup_type_info->type), startup_type_info->value, nullptr, 0, "");
 	}
 
 	if (objc_names) {
-		OdinLLVMBuildCall(p, {objc_names->value, objc_names->type}, nullptr, 0);
+		LLVMBuildCall2(p->builder, lb_type_internal_for_procedures_raw(main_module, objc_names->type), objc_names->value, nullptr, 0, "");
 	}
 
 	for_array(i, global_variables) {
@@ -780,10 +780,6 @@ lbProcedure *lb_create_startup_runtime(lbModule *main_module, lbProcedure *start
 				var->init = init;
 			} else if (lb_is_const_or_global(init)) {
 				if (!var->is_initialized) {
-					if (is_type_proc(init.type)) {
-						LLVMTypeRef global_type = llvm_addr_type(p->module, var->var);
-						init.value = LLVMConstPointerCast(init.value, global_type);
-					}
 					LLVMSetInitializer(var->var.value, init.value);
 					var->is_initialized = true;
 					continue;
@@ -1653,10 +1649,6 @@ void lb_generate_code(lbGenerator *gen) {
 					if (tav.value.kind != ExactValue_Invalid) {
 						ExactValue v = tav.value;
 						lbValue init = lb_const_value(m, tav.type, v);
-						if (is_type_proc(init.type)) {
-							LLVMTypeRef global_type = llvm_addr_type(m, var.var);
-							init.value = LLVMConstPointerCast(init.value, global_type);
-						}
 						LLVMSetInitializer(g.value, init.value);
 						var.is_initialized = true;
 					}

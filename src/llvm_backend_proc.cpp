@@ -1,11 +1,6 @@
-LLVMValueRef OdinLLVMBuildCall(lbProcedure *p, lbValue const &value, LLVMValueRef *args, unsigned arg_count) {
-	GB_ASSERT(is_type_proc(value.type));
-	LLVMTypeRef type = lb_type_internal_for_procedures_raw(p->module, value.type);
-	LLVMValueRef func = LLVMBuildPointerCast(p->builder, value.value, LLVMPointerType(type, 0), "");
-	return LLVMBuildCall2(p->builder, type, func, args, arg_count, "");
-}
 
-LLVMValueRef lb_call_intrinsic(lbProcedure *p, const char *name, LLVMValueRef* args, unsigned arg_count, LLVMTypeRef* types, unsigned type_count) {
+LLVMValueRef lb_call_intrinsic(lbProcedure *p, const char *name, LLVMValueRef* args, unsigned arg_count, LLVMTypeRef* types, unsigned type_count)
+{
 	unsigned id = LLVMLookupIntrinsicID(name, gb_strlen(name));
 	GB_ASSERT_MSG(id != 0, "Unable to find %s", name);
 	LLVMValueRef ip = LLVMGetIntrinsicDeclaration(p->module->mod, id, types, type_count);
@@ -745,11 +740,6 @@ lbValue lb_emit_call_internal(lbProcedure *p, lbValue value, lbValue return_ptr,
 	}
 	for_array(i, processed_args) {
 		lbValue arg = processed_args[i];
-		if (is_type_proc(arg.type)) {
-			// NOTE(bill): all procedure types (function pointers) are typed as if they are `rawptr`
-			// and then the correct type is set at the call site
-			arg.value = LLVMBuildPointerCast(p->builder, arg.value, lb_type(p->module, arg.type), "");
-		}
 		args[arg_index++] = arg.value;
 	}
 	if (context_ptr.addr.value != nullptr) {
@@ -762,7 +752,11 @@ lbValue lb_emit_call_internal(lbProcedure *p, lbValue value, lbValue return_ptr,
 
 	{
 		LLVMTypeRef fnp = lb_type_internal_for_procedures_raw(p->module, value.type);
-
+		LLVMTypeRef ftp = LLVMPointerType(fnp, 0);
+		LLVMValueRef fn = value.value;
+		if (!lb_is_type_kind(LLVMTypeOf(value.value), LLVMFunctionTypeKind)) {
+			fn = LLVMBuildPointerCast(p->builder, fn, ftp, "");
+		}
 		GB_ASSERT_MSG(lb_is_type_kind(fnp, LLVMFunctionTypeKind), "%s", LLVMPrintTypeToString(fnp));
 
 		{
@@ -786,7 +780,7 @@ lbValue lb_emit_call_internal(lbProcedure *p, lbValue value, lbValue return_ptr,
 			}
 		}
 
-		LLVMValueRef ret = OdinLLVMBuildCall(p, value, args, arg_count);
+		LLVMValueRef ret = LLVMBuildCall2(p->builder, fnp, fn, args, arg_count, "");
 
 		if (return_ptr.value != nullptr) {
 			LLVMAddCallSiteAttribute(ret, 1, lb_create_enum_attribute_with_type(p->module->ctx, "sret", LLVMTypeOf(args[0])));
