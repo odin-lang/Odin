@@ -148,34 +148,30 @@ lbProcedure *lb_create_procedure(lbModule *m, Entity *entity, bool ignore_body) 
 		lb_add_attribute_to_proc(m, p->value, "noredzone");
 	}
 
-	if (build_context.optimization_level == 0 && build_context.ODIN_DEBUG) {
-		lb_add_attribute_to_proc(m, p->value, "noinline");
-		lb_add_attribute_to_proc(m, p->value, "optnone");
-	} else {
-		switch (p->inlining) {
-		case ProcInlining_inline:
-			lb_add_attribute_to_proc(m, p->value, "alwaysinline");
-			break;
-		case ProcInlining_no_inline:
-			lb_add_attribute_to_proc(m, p->value, "noinline");
-			break;
-		}
 
-		switch (entity->Procedure.optimization_mode) {
-		case ProcedureOptimizationMode_None:
-			lb_add_attribute_to_proc(m, p->value, "optnone");
-			break;
-		case ProcedureOptimizationMode_Minimal:
-			lb_add_attribute_to_proc(m, p->value, "optnone");
-			break;
-		case ProcedureOptimizationMode_Size:
-			lb_add_attribute_to_proc(m, p->value, "optsize");
-			break;
-		case ProcedureOptimizationMode_Speed:
-			// TODO(bill): handle this correctly
-			lb_add_attribute_to_proc(m, p->value, "optsize");
-			break;
-		}
+	switch (p->inlining) {
+	case ProcInlining_inline:
+		lb_add_attribute_to_proc(m, p->value, "alwaysinline");
+		break;
+	case ProcInlining_no_inline:
+		lb_add_attribute_to_proc(m, p->value, "noinline");
+		break;
+	}
+
+	switch (entity->Procedure.optimization_mode) {
+	case ProcedureOptimizationMode_None:
+		lb_add_attribute_to_proc(m, p->value, "optnone");
+		break;
+	case ProcedureOptimizationMode_Minimal:
+		lb_add_attribute_to_proc(m, p->value, "optnone");
+		break;
+	case ProcedureOptimizationMode_Size:
+		lb_add_attribute_to_proc(m, p->value, "optsize");
+		break;
+	case ProcedureOptimizationMode_Speed:
+		// TODO(bill): handle this correctly
+		lb_add_attribute_to_proc(m, p->value, "optsize");
+		break;
 	}
 
 	if (!entity->Procedure.target_feature_disabled &&
