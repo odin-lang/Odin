@@ -42,6 +42,7 @@ bool lb_is_type_aggregate(Type *t) {
 void lb_emit_unreachable(lbProcedure *p) {
 	LLVMValueRef instr = LLVMGetLastInstruction(p->curr_block->block);
 	if (instr == nullptr || !lb_is_instr_terminating(instr)) {
+		lb_call_intrinsic(p, "trap", nullptr, 0, nullptr, 0);
 		LLVMBuildUnreachable(p->builder);
 	}
 }
