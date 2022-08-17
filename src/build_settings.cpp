@@ -228,6 +228,7 @@ struct BuildContext {
 	bool   ODIN_DISABLE_ASSERT; // Whether the default 'assert' et al is disabled in code or not
 	bool   ODIN_DEFAULT_TO_NIL_ALLOCATOR; // Whether the default allocator is a "nil" allocator or not (i.e. it does nothing)
 	bool   ODIN_FOREIGN_ERROR_PROCEDURES;
+	bool   ODIN_VALGRIND_SUPPORT;
 
 	ErrorPosStyle ODIN_ERROR_POS_STYLE;
 
@@ -1189,6 +1190,8 @@ void init_build_context(TargetMetrics *cross_target) {
 	}
 
 	bc->optimization_level = gb_clamp(bc->optimization_level, 0, 3);
+
+	bc->ODIN_VALGRIND_SUPPORT = is_arch_x86() && build_context.metrics.os != TargetOs_windows;
 
 	#undef LINK_FLAG_X64
 	#undef LINK_FLAG_386

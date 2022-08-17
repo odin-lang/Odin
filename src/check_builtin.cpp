@@ -5388,6 +5388,41 @@ bool check_builtin_procedure(CheckerContext *c, Operand *operand, Ast *call, i32
 		}
 		break;
 
+	case BuiltinProc_valgrind_client_request:
+		{
+			if (!is_arch_x86()) {
+				error(call, "'%.*s' is only allowed on x86 targets (i386, amd64)", LIT(builtin_name));
+				return false;
+			}
+
+			enum {ARG_COUNT = 7};
+			GB_ASSERT(builtin_procs[BuiltinProc_valgrind_client_request].arg_count == ARG_COUNT);
+
+			Operand operands[ARG_COUNT] = {};
+			for (isize i = 0; i < ARG_COUNT; i++) {
+				Operand *op = &operands[i];
+				check_expr_with_type_hint(c, op, ce->args[i], t_uintptr);
+				if (op->mode == Addressing_Invalid) {
+					return false;
+				}
+				convert_to_typed(c, op, t_uintptr);
+				if (op->mode == Addressing_Invalid) {
+					return false;
+				}
+				if (!are_types_identical(op->type, t_uintptr)) {
+					gbString str = type_to_string(op->type);
+					error(op->expr, "'%.*s' expected a uintptr, got %s", LIT(builtin_name), str);
+					gb_string_free(str);
+					return false;
+				}
+			}
+
+			operand->type = t_uintptr;
+			operand->mode = Addressing_Value;
+			operand->value = {};
+			return true;
+		}
+
 	}
 
 	return true;
