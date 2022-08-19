@@ -1037,6 +1037,9 @@ void init_universal(void) {
 	add_global_bool_constant("ODIN_FOREIGN_ERROR_PROCEDURES", bc->ODIN_FOREIGN_ERROR_PROCEDURES);
 	add_global_bool_constant("ODIN_DISALLOW_RTTI",            bc->disallow_rtti);
 
+	add_global_bool_constant("ODIN_VALGRIND_SUPPORT",         bc->ODIN_VALGRIND_SUPPORT);
+
+
 
 // Builtin Procedures
 	for (isize i = 0; i < gb_count_of(builtin_procs); i++) {

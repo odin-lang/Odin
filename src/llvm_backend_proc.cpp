@@ -2745,6 +2745,55 @@ lbValue lb_build_builtin_proc(lbProcedure *p, Ast *expr, TypeAndValue const &tv,
 			res.value = LLVMBuildCall2(p->builder, func_type, the_asm, args, gb_count_of(args), "");
 			return res;
 		}
+
+	case BuiltinProc_valgrind_client_request:
+		{
+			lbValue args[7] = {};
+			for (isize i = 0; i < 7; i++) {
+				args[i] = lb_emit_conv(p, lb_build_expr(p, ce->args[i]), t_uintptr);
+			}
+			if (!build_context.ODIN_VALGRIND_SUPPORT) {
+				return args[0];
+			}
+			lbValue array = lb_generate_local_array(p, t_uintptr, 6, false);
+			for (isize i = 0; i < 6; i++) {
+				lbValue gep = lb_emit_array_epi(p, array, i);
+				lb_emit_store(p, gep, args[i+1]);
+			}
+
+			switch (build_context.metrics.arch) {
+			case TargetArch_amd64:
+				{
+					Type *param_types[2] = {};
+					param_types[0] = t_uintptr;
+					param_types[1] = array.type;
+
+					Type *type = alloc_type_proc_from_types(param_types, gb_count_of(param_types), t_uintptr, false, ProcCC_None);
+					LLVMTypeRef func_type = lb_get_procedure_raw_type(p->module, type);
+					LLVMValueRef the_asm = llvm_get_inline_asm(
+						func_type,
+						str_lit("rolq $3, %rdi; rolq $13, %rdi\n rolq $61, %rdi; rolq $51, %rdi\n xchgq %rbx, %rbx"),
+						str_lit("={rdx},{rdx},{rax},cc,memory"),
+						true
+					);
+
+					LLVMValueRef asm_args[2] = {};
+					asm_args[0] = args[0].value;
+					asm_args[1] = array.value;
+
+					lbValue res = {};
+					res.type = t_uintptr;
+					res.value = LLVMBuildCall2(p->builder, func_type, the_asm, asm_args, gb_count_of(asm_args), "");
+					return res;
+				}
+				break;
+			default:
+				GB_PANIC("Unsupported architecture: %.*s", LIT(target_arch_names[build_context.metrics.arch]));
+				break;
+			}
+
+		}
+
 	}
 
 	GB_PANIC("Unhandled built-in procedure %.*s", LIT(builtin_procs[id].name));
