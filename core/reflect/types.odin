@@ -302,6 +302,11 @@ is_dynamic_map :: proc(info: ^Type_Info) -> bool {
 	_, ok := type_info_base(info).variant.(Type_Info_Map)
 	return ok
 }
+is_bit_set :: proc(info: ^Type_Info) -> bool {
+	if info == nil { return false }
+	_, ok := type_info_base(info).variant.(Type_Info_Bit_Set)
+	return ok
+}
 is_slice :: proc(info: ^Type_Info) -> bool {
 	if info == nil { return false }
 	_, ok := type_info_base(info).variant.(Type_Info_Slice)

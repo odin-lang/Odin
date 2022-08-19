@@ -3577,7 +3577,7 @@ void lb_build_addr_compound_lit_populate(lbProcedure *p, Slice<Ast *> const &ele
 			}
 
 		} else {
-			if (lb_is_elem_const(elem, et)) {
+			if (bt->kind != Type_DynamicArray && lb_is_elem_const(elem, et)) {
 				continue;
 			}
 
