@@ -85,7 +85,6 @@ _shift_down :: proc(pq: ^$Q/Priority_Queue($T), i0, n: int) -> bool {
 _shift_up :: proc(pq: ^$Q/Priority_Queue($T), j: int) {
 	j := j
 	queue := pq.queue[:]
-	n := builtin.len(queue)
 	for 0 <= j {
 		i := (j-1)/2
 		if i == j || !pq.less(queue[j], queue[i]) {
