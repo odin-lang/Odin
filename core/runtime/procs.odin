@@ -6,7 +6,7 @@ when ODIN_NO_CRT && ODIN_OS == .Windows {
 	@(private="file")
 	@(default_calling_convention="stdcall")
 	foreign lib {
-		RtlMoveMemory :: proc(dst, src: rawptr, length: int) ---
+		RtlMoveMemory :: proc(dst, s: rawptr, length: int) ---
 		RtlFillMemory :: proc(dst: rawptr, length: int, fill: i32) ---
 	}
 	
@@ -40,24 +40,34 @@ when ODIN_NO_CRT && ODIN_OS == .Windows {
 	
 	@(link_name="memmove", linkage="strong", require)
 	memmove :: proc "c" (dst, src: rawptr, len: int) -> rawptr {
-		if dst != src {
-			d, s := ([^]byte)(dst), ([^]byte)(src)
+		d, s := ([^]byte)(dst), ([^]byte)(src)
+		if d == s || len == 0 {
+			return dst
+		}
+		if d > s && uintptr(d)-uintptr(s) < uintptr(len) {
 			for i := len-1; i >= 0; i -= 1 {
 				d[i] = s[i]
 			}
+			return dst
 		}
-		return dst
-		
+
+		if s > d && uintptr(s)-uintptr(d) < uintptr(len) {
+			for i := 0; i < len; i += 1 {
+				d[i] = s[i]
+			}
+			return dst
+		}
+		return memcpy(dst, src, len)
 	}
 	@(link_name="memcpy", linkage="strong", require)
 	memcpy :: proc "c" (dst, src: rawptr, len: int) -> rawptr {
-		if dst != src {
-			d, s := ([^]byte)(dst), ([^]byte)(src)
-			for i := len-1; i >= 0; i -= 1 {
+		d, s := ([^]byte)(dst), ([^]byte)(src)
+		if d != s {
+			for i := 0; i < len; i += 1 {
 				d[i] = s[i]
 			}
 		}
-		return dst
+		return d
 		
 	}
 } else {
