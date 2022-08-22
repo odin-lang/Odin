@@ -290,10 +290,10 @@ foreign kernel32 {
 
 	InitializeSRWLock          :: proc(SRWLock: ^SRWLOCK) ---
 	AcquireSRWLockExclusive    :: proc(SRWLock: ^SRWLOCK) ---
-	TryAcquireSRWLockExclusive :: proc(SRWLock: ^SRWLOCK) -> BOOL ---
+	TryAcquireSRWLockExclusive :: proc(SRWLock: ^SRWLOCK) -> BOOLEAN ---
 	ReleaseSRWLockExclusive    :: proc(SRWLock: ^SRWLOCK) ---
 	AcquireSRWLockShared    :: proc(SRWLock: ^SRWLOCK) ---
-	TryAcquireSRWLockShared :: proc(SRWLock: ^SRWLOCK) -> BOOL ---
+	TryAcquireSRWLockShared :: proc(SRWLock: ^SRWLOCK) -> BOOLEAN ---
 	ReleaseSRWLockShared    :: proc(SRWLock: ^SRWLOCK) ---
 
 	InitializeConditionVariable :: proc(ConditionVariable: ^CONDITION_VARIABLE) ---
