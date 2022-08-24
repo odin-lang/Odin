@@ -1568,7 +1568,7 @@ sys_gettid :: proc "contextless" () -> int {
 }
 
 sys_getrandom :: proc "contextless" (buf: [^]byte, buflen: int, flags: uint) -> int {
-	return cast(int)intrinsics.syscall(SYS_getrandom, buf, cast(uintptr)(buflen), cast(uintptr)(flags))
+	return cast(int)intrinsics.syscall(SYS_getrandom, uintptr(buf), uintptr(buflen), uintptr(flags))
 }
 
 sys_open :: proc "contextless" (path: cstring, flags: int, mode: int = 0o000) -> int {
@@ -1748,7 +1748,7 @@ sys_unlink :: proc "contextless" (path: cstring) -> int {
 }
 
 sys_unlinkat :: proc "contextless" (dfd: int, path: cstring, flag: int = 0) -> int {
-	return int(intrinsics.syscall(SYS_unlinkat, uintptr(dfd), uintptr(rawptr(path)), flag))
+	return int(intrinsics.syscall(SYS_unlinkat, uintptr(dfd), uintptr(rawptr(path)), uintptr(flag)))
 }
 
 sys_rmdir :: proc "contextless" (path: cstring) -> int {
