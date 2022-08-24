@@ -294,7 +294,7 @@ i64 lb_alignof(LLVMTypeRef type) {
 			i64 elem_size = lb_sizeof(elem);
 			i64 count = LLVMGetVectorSize(type);
 			i64 size = count * elem_size;
-			return gb_clamp(next_pow2(size), 1, build_context.max_align);
+			return gb_clamp(next_pow2(size), 1, build_context.max_simd_align);
 		}
 
 	}

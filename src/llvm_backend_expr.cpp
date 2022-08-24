@@ -137,7 +137,7 @@ lbValue lb_emit_unary_arith(lbProcedure *p, TokenKind op, lbValue x, Type *type)
 		lbAddr res_addr = lb_add_local(p, type, nullptr, false, 0, true);
 		lbValue res = lb_addr_get_ptr(p, res_addr);
 
-		bool inline_array_arith = type_size_of(type) <= build_context.max_align;
+		bool inline_array_arith = lb_can_try_to_inline_array_arith(type);
 
 		i32 count = cast(i32)get_array_type_count(tl);
 
@@ -436,7 +436,7 @@ lbValue lb_emit_arith_array(lbProcedure *p, TokenKind op, lbValue lhs, lbValue r
 		return direct_vector_res;
 	}
 
-	bool inline_array_arith = type_size_of(type) <= build_context.max_align;
+	bool inline_array_arith = lb_can_try_to_inline_array_arith(type);
 	if (inline_array_arith) {
 
 		auto dst_ptrs = slice_make<lbValue>(temporary_allocator(), n);
@@ -2303,7 +2303,7 @@ lbValue lb_emit_comp(lbProcedure *p, TokenKind op_kind, lbValue left, lbValue ri
 			cmp_op = Token_And;
 		}
 
-		bool inline_array_arith = type_size_of(tl) <= build_context.max_align;
+		bool inline_array_arith = lb_can_try_to_inline_array_arith(tl);
 		i32 count = 0;
 		switch (tl->kind) {
 		case Type_Array:           count = cast(i32)tl->Array.count;           break;
