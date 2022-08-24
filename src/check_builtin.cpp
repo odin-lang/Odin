@@ -4523,7 +4523,8 @@ bool check_builtin_procedure(CheckerContext *c, Operand *operand, Ast *call, i32
 				if (x.mode != Addressing_Invalid) {
 					convert_to_typed(c, &x, t_uintptr);	
 				}
-				if (!is_type_uintptr(operand->type)) {
+				convert_to_typed(c, &x, t_uintptr);
+				if (!is_type_uintptr(x.type)) {
 					gbString t = type_to_string(x.type);
 					error(x.expr, "Argument %td must be of type 'uintptr', got %s", i, t);
 					gb_string_free(t);
