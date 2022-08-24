@@ -110,7 +110,7 @@ when ODIN_OS == .Linux {
 		cnd_signal    :: proc(cond: ^cnd_t) -> int ---
 		cnd_timedwait :: proc(cond: ^cnd_t, ts: ^timespec) -> int ---
 		cnd_wait      :: proc(cond: ^cnd_t, mtx: ^mtx_t) -> int ---
-		
+		sleep :: proc(ms : uint) -> int---
 		// 7.26.4 Mutex functions
 		mtx_destroy   :: proc(mtx: ^mtx_t) ---
 		mtx_init      :: proc(mtx: ^mtx_t, type: int) -> int ---

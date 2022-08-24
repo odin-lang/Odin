@@ -18,7 +18,7 @@ version() { echo "$@" | awk -F. '{ printf("%d%03d%03d%03d\n", $1,$2,$3,$4); }'; 
 
 config_darwin() {
 	ARCH=$(uname -m)
-	LLVM_CONFIG=llvm-config
+	LLVM_CONFIG=/usr/local/opt/llvm/bin/llvm-config
 
 	# allow for arm only llvm's with version 13
 	if [ ARCH == arm64 ]; then
@@ -36,8 +36,8 @@ config_darwin() {
 		fi
 	fi
 
-	LDFLAGS="$LDFLAGS -liconv -ldl"
-	CFLAGS="$CFLAGS $($LLVM_CONFIG --cxxflags --ldflags)"
+	LDFLAGS="$LDFLAGS -liconv -ldl -L/usr/local/opt/llvm/lib -Wl,-rpath,/usr/local/opt/llvm/lib"
+	CFLAGS="$CFLAGS $($LLVM_CONFIG --cxxflags --ldflags) -I/usr/local/opt/llvm/include"
 	LDFLAGS="$LDFLAGS -lLLVM-C"
 }
 

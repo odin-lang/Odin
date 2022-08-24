@@ -165,7 +165,9 @@ foreign libc {
 	rename    :: proc(old, new: cstring) -> int ---
 	tmpfile   :: proc() -> ^FILE ---
 	tmpnam    :: proc(s: [^]char) -> [^]char ---
-
+	//popen :: proc(command: cstring, mode: cstring) -> ^FILE --- 
+	popen     :: proc(command : [^]char,mode : [^]char) -> ^FILE --- 
+	pclose    :: proc(stream : ^FILE) ---
 	// 7.21.5 File access functions
 	fclose    :: proc(stream: ^FILE) -> int ---
 	fflush    :: proc(stream: ^FILE) -> int ---
