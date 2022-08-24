@@ -96,7 +96,9 @@ import filepath       "core:path/filepath"
 
 import reflect        "core:reflect"
 import runtime        "core:runtime"
+import simd           "core:simd"
 import slice          "core:slice"
+import slice_heap     "core:slice/heap"
 import sort           "core:sort"
 import strconv        "core:strconv"
 import strings        "core:strings"
@@ -192,7 +194,9 @@ _ :: slashpath
 _ :: filepath
 _ :: reflect
 _ :: runtime
+_ :: simd
 _ :: slice
+_ :: slice_heap
 _ :: sort
 _ :: strconv
 _ :: strings

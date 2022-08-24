@@ -194,12 +194,15 @@ __slice_resize :: proc(array_: ^$T/[]$E, new_count: int, allocator: Allocator, l
 	new_size := new_count*size_of(T)
 
 	new_data, err := mem_resize(array.data, old_size, new_size, align_of(T), allocator, loc)
-	if new_data == nil || err != nil {
+	if err != nil {
 		return false
 	}
-	array.data = new_data
-	array.len = new_count
-	return true
+	if new_data != nil || size_of(E) == 0 {
+		array.data = raw_data(new_data)
+		array.len = new_count
+		return true
+	}
+	return false
 }
 
 __dynamic_map_reset_entries :: proc(using header: Map_Header, loc := #caller_location) {
@@ -207,7 +210,7 @@ __dynamic_map_reset_entries :: proc(using header: Map_Header, loc := #caller_loc
 		m.hashes[i] = -1
 	}
 
-	for i in 0 ..< m.entries.len {
+	for i in 0..<m.entries.len {
 		entry_header := __dynamic_map_get_entry(header, i)
 		entry_hash := __get_map_hash_from_entry(header, entry_header)
 		entry_header.next = -1
@@ -237,6 +240,16 @@ __dynamic_map_reserve :: proc(using header: Map_Header, cap: int, loc := #caller
 	if __slice_resize(&m.hashes, cap*2, m.entries.allocator, loc) {
 		__dynamic_map_reset_entries(header, loc)
 	}
+}
+
+__dynamic_map_shrink :: proc(using header: Map_Header, cap: int, loc := #caller_location) -> (did_shrink: bool) {
+	c := context
+	if m.entries.allocator.procedure != nil {
+		c.allocator = m.entries.allocator
+	}
+	context = c
+
+	return __dynamic_array_shrink(&m.entries, entry_size, entry_align, cap, loc)
 }
 
 __dynamic_map_rehash :: proc(using header: Map_Header, new_count: int, loc := #caller_location) {

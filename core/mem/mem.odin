@@ -109,6 +109,12 @@ check_zero_ptr :: proc(ptr: rawptr, len: int) -> bool {
 	case ptr == nil:
 		return true
 	}
+	switch len {
+	case 1: return (^u8)(ptr)^ == 0
+	case 2: return intrinsics.unaligned_load((^u16)(ptr)) == 0
+	case 4: return intrinsics.unaligned_load((^u32)(ptr)) == 0
+	case 8: return intrinsics.unaligned_load((^u64)(ptr)) == 0
+	}
 
 	start := uintptr(ptr)
 	start_aligned := align_forward_uintptr(start, align_of(uintptr))
@@ -152,7 +158,7 @@ slice_ptr :: proc "contextless" (ptr: ^$T, len: int) -> []T {
 	return ([^]T)(ptr)[:len]
 }
 
-byte_slice :: #force_inline proc "contextless" (data: rawptr, len: int) -> []byte {
+byte_slice :: #force_inline proc "contextless" (data: rawptr, #any_int len: int) -> []byte {
 	return ([^]u8)(data)[:max(len, 0)]
 }
 

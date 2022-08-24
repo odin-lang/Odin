@@ -40,12 +40,13 @@ enum BuiltinProcId {
 	BuiltinProc_hadamard_product,
 	BuiltinProc_matrix_flatten,
 
+	BuiltinProc_unreachable,
+
 	BuiltinProc_DIRECTIVE, // NOTE(bill): This is used for specialized hash-prefixed procedures
 
 	// "Intrinsics"
 	BuiltinProc_is_package_imported,
 	
-	BuiltinProc_simd_vector,
 	BuiltinProc_soa_struct,
 
 	BuiltinProc_alloca,
@@ -66,6 +67,7 @@ enum BuiltinProcId {
 	BuiltinProc_overflow_mul,
 
 	BuiltinProc_sqrt,
+	BuiltinProc_fused_mul_add,
 
 	BuiltinProc_mem_copy,
 	BuiltinProc_mem_copy_non_overlapping,
@@ -80,6 +82,8 @@ enum BuiltinProcId {
 	
 	BuiltinProc_unaligned_store,
 	BuiltinProc_unaligned_load,
+	BuiltinProc_non_temporal_store,
+	BuiltinProc_non_temporal_load,
 	
 	BuiltinProc_prefetch_read_instruction,
 	BuiltinProc_prefetch_read_data,
@@ -118,9 +122,75 @@ enum BuiltinProcId {
 	BuiltinProc_fixed_point_div_sat,
 
 	BuiltinProc_expect,
+
+BuiltinProc__simd_begin,
+	BuiltinProc_simd_add,
+	BuiltinProc_simd_sub,
+	BuiltinProc_simd_mul,
+	BuiltinProc_simd_div,
+	BuiltinProc_simd_rem,
+	BuiltinProc_simd_shl,        // Odin logic
+	BuiltinProc_simd_shr,        // Odin logic
+	BuiltinProc_simd_shl_masked, // C logic
+	BuiltinProc_simd_shr_masked, // C logic
+
+	BuiltinProc_simd_add_sat, // saturation arithmetic
+	BuiltinProc_simd_sub_sat, // saturation arithmetic
+
+	BuiltinProc_simd_and,
+	BuiltinProc_simd_or,
+	BuiltinProc_simd_xor,
+	BuiltinProc_simd_and_not,
+
+	BuiltinProc_simd_neg,
+	BuiltinProc_simd_abs,
+
+	BuiltinProc_simd_min,
+	BuiltinProc_simd_max,
+	BuiltinProc_simd_clamp,
+
+	BuiltinProc_simd_lanes_eq,
+	BuiltinProc_simd_lanes_ne,
+	BuiltinProc_simd_lanes_lt,
+	BuiltinProc_simd_lanes_le,
+	BuiltinProc_simd_lanes_gt,
+	BuiltinProc_simd_lanes_ge,
+
+	BuiltinProc_simd_extract,
+	BuiltinProc_simd_replace,
+
+	BuiltinProc_simd_reduce_add_ordered,
+	BuiltinProc_simd_reduce_mul_ordered,
+	BuiltinProc_simd_reduce_min,
+	BuiltinProc_simd_reduce_max,
+	BuiltinProc_simd_reduce_and,
+	BuiltinProc_simd_reduce_or,
+	BuiltinProc_simd_reduce_xor,
+
+	BuiltinProc_simd_shuffle,
+	BuiltinProc_simd_select,
+
+	BuiltinProc_simd_ceil,
+	BuiltinProc_simd_floor,
+	BuiltinProc_simd_trunc,
+	BuiltinProc_simd_nearest,
+
+	BuiltinProc_simd_to_bits,
+
+	BuiltinProc_simd_lanes_reverse,
+	BuiltinProc_simd_lanes_rotate_left,
+	BuiltinProc_simd_lanes_rotate_right,
+
+
+	// Platform specific SIMD intrinsics
+	BuiltinProc_simd_x86__MM_SHUFFLE,
+BuiltinProc__simd_end,
 	
 	// Platform specific intrinsics
 	BuiltinProc_syscall,
+
+	BuiltinProc_x86_cpuid,
+	BuiltinProc_x86_xgetbv,
 
 	// Constant type tests
 
@@ -221,6 +291,8 @@ BuiltinProc__type_end,
 	BuiltinProc_wasm_memory_atomic_wait32,
 	BuiltinProc_wasm_memory_atomic_notify32,
 
+	BuiltinProc_valgrind_client_request,
+
 	BuiltinProc_COUNT,
 };
 gb_global BuiltinProc builtin_procs[BuiltinProc_COUNT] = {
@@ -262,19 +334,20 @@ gb_global BuiltinProc builtin_procs[BuiltinProc_COUNT] = {
 	{STR_LIT("hadamard_product"), 2, false, Expr_Expr, BuiltinProcPkg_builtin},
 	{STR_LIT("matrix_flatten"),   1, false, Expr_Expr, BuiltinProcPkg_builtin},
 
+	{STR_LIT("unreachable"),      0, false, Expr_Expr, BuiltinProcPkg_builtin, /*diverging*/true},
+
 	{STR_LIT(""),                 0, true,  Expr_Expr, BuiltinProcPkg_builtin}, // DIRECTIVE
 
 
 	// "Intrinsics"
 	{STR_LIT("is_package_imported"), 1, false, Expr_Expr, BuiltinProcPkg_intrinsics},
 		
-	{STR_LIT("simd_vector"), 2, false, Expr_Expr, BuiltinProcPkg_intrinsics}, // Type
 	{STR_LIT("soa_struct"),  2, false, Expr_Expr, BuiltinProcPkg_intrinsics}, // Type
 
 	{STR_LIT("alloca"),    2, false, Expr_Expr, BuiltinProcPkg_intrinsics},
 	{STR_LIT("cpu_relax"), 0, false, Expr_Stmt, BuiltinProcPkg_intrinsics},
 
-	{STR_LIT("trap"),               0, false, Expr_Stmt, BuiltinProcPkg_intrinsics, /*diverging*/true},
+	{STR_LIT("trap"),               0, false, Expr_Expr, BuiltinProcPkg_intrinsics, /*diverging*/true},
 	{STR_LIT("debug_trap"),         0, false, Expr_Stmt, BuiltinProcPkg_intrinsics, /*diverging*/false},
 	{STR_LIT("read_cycle_counter"), 0, false, Expr_Expr, BuiltinProcPkg_intrinsics},
 
@@ -290,6 +363,7 @@ gb_global BuiltinProc builtin_procs[BuiltinProc_COUNT] = {
 	{STR_LIT("overflow_mul"), 2, false, Expr_Expr, BuiltinProcPkg_intrinsics},
 
 	{STR_LIT("sqrt"), 1, false, Expr_Expr, BuiltinProcPkg_intrinsics},
+	{STR_LIT("fused_mul_add"), 3, false, Expr_Expr, BuiltinProcPkg_intrinsics},
 
 	{STR_LIT("mem_copy"),                 3, false, Expr_Stmt, BuiltinProcPkg_intrinsics},
 	{STR_LIT("mem_copy_non_overlapping"), 3, false, Expr_Stmt, BuiltinProcPkg_intrinsics},
@@ -304,6 +378,8 @@ gb_global BuiltinProc builtin_procs[BuiltinProc_COUNT] = {
 	
 	{STR_LIT("unaligned_store"),  2, false, Expr_Stmt, BuiltinProcPkg_intrinsics},
 	{STR_LIT("unaligned_load"),   1, false, Expr_Expr, BuiltinProcPkg_intrinsics},
+	{STR_LIT("non_temporal_store"),  2, false, Expr_Stmt, BuiltinProcPkg_intrinsics},
+	{STR_LIT("non_temporal_load"),   1, false, Expr_Expr, BuiltinProcPkg_intrinsics},
 	
 	{STR_LIT("prefetch_read_instruction"),  2, false, Expr_Stmt, BuiltinProcPkg_intrinsics},
 	{STR_LIT("prefetch_read_data"),         2, false, Expr_Stmt, BuiltinProcPkg_intrinsics},
@@ -315,26 +391,26 @@ gb_global BuiltinProc builtin_procs[BuiltinProc_COUNT] = {
 	{STR_LIT("atomic_signal_fence"),                     1, false, Expr_Stmt, BuiltinProcPkg_intrinsics},
 	{STR_LIT("atomic_store"),                            2, false, Expr_Stmt, BuiltinProcPkg_intrinsics},
 	{STR_LIT("atomic_store_explicit"),                   3, false, Expr_Stmt, BuiltinProcPkg_intrinsics},
-	{STR_LIT("atomic_load"),                             1, false, Expr_Expr, BuiltinProcPkg_intrinsics},
-	{STR_LIT("atomic_load_explicit"),                    2, false, Expr_Expr, BuiltinProcPkg_intrinsics},
-	{STR_LIT("atomic_add"),                              2, false, Expr_Expr, BuiltinProcPkg_intrinsics},
-	{STR_LIT("atomic_add_explicit"),                     3, false, Expr_Expr, BuiltinProcPkg_intrinsics},
-	{STR_LIT("atomic_sub"),                              2, false, Expr_Expr, BuiltinProcPkg_intrinsics},
-	{STR_LIT("atomic_sub_explicit"),                     3, false, Expr_Expr, BuiltinProcPkg_intrinsics},
-	{STR_LIT("atomic_and"),                              2, false, Expr_Expr, BuiltinProcPkg_intrinsics},
-	{STR_LIT("atomic_and_explicit"),                     3, false, Expr_Expr, BuiltinProcPkg_intrinsics},
-	{STR_LIT("atomic_nand"),                             2, false, Expr_Expr, BuiltinProcPkg_intrinsics},
-	{STR_LIT("atomic_nand_explicit"),                    3, false, Expr_Expr, BuiltinProcPkg_intrinsics},
-	{STR_LIT("atomic_or"),                               2, false, Expr_Expr, BuiltinProcPkg_intrinsics},
-	{STR_LIT("atomic_or_explicit"),                      3, false, Expr_Expr, BuiltinProcPkg_intrinsics},
-	{STR_LIT("atomic_xor"),                              2, false, Expr_Expr, BuiltinProcPkg_intrinsics},
-	{STR_LIT("atomic_xor_explicit"),                     3, false, Expr_Expr, BuiltinProcPkg_intrinsics},
-	{STR_LIT("atomic_exchange"),                         2, false, Expr_Expr, BuiltinProcPkg_intrinsics},
-	{STR_LIT("atomic_exchange_explicit"),                3, false, Expr_Expr, BuiltinProcPkg_intrinsics},
-	{STR_LIT("atomic_compare_exchange_strong"),          3, false, Expr_Expr, BuiltinProcPkg_intrinsics},
-	{STR_LIT("atomic_compare_exchange_strong_explicit"), 5, false, Expr_Expr, BuiltinProcPkg_intrinsics},
-	{STR_LIT("atomic_compare_exchange_weak"),            3, false, Expr_Expr, BuiltinProcPkg_intrinsics},
-	{STR_LIT("atomic_compare_exchange_weak_explicit"),   5, false, Expr_Expr, BuiltinProcPkg_intrinsics},
+	{STR_LIT("atomic_load"),                             1, false, Expr_Expr, BuiltinProcPkg_intrinsics, false, true},
+	{STR_LIT("atomic_load_explicit"),                    2, false, Expr_Expr, BuiltinProcPkg_intrinsics, false, true},
+	{STR_LIT("atomic_add"),                              2, false, Expr_Expr, BuiltinProcPkg_intrinsics, false, true},
+	{STR_LIT("atomic_add_explicit"),                     3, false, Expr_Expr, BuiltinProcPkg_intrinsics, false, true},
+	{STR_LIT("atomic_sub"),                              2, false, Expr_Expr, BuiltinProcPkg_intrinsics, false, true},
+	{STR_LIT("atomic_sub_explicit"),                     3, false, Expr_Expr, BuiltinProcPkg_intrinsics, false, true},
+	{STR_LIT("atomic_and"),                              2, false, Expr_Expr, BuiltinProcPkg_intrinsics, false, true},
+	{STR_LIT("atomic_and_explicit"),                     3, false, Expr_Expr, BuiltinProcPkg_intrinsics, false, true},
+	{STR_LIT("atomic_nand"),                             2, false, Expr_Expr, BuiltinProcPkg_intrinsics, false, true},
+	{STR_LIT("atomic_nand_explicit"),                    3, false, Expr_Expr, BuiltinProcPkg_intrinsics, false, true},
+	{STR_LIT("atomic_or"),                               2, false, Expr_Expr, BuiltinProcPkg_intrinsics, false, true},
+	{STR_LIT("atomic_or_explicit"),                      3, false, Expr_Expr, BuiltinProcPkg_intrinsics, false, true},
+	{STR_LIT("atomic_xor"),                              2, false, Expr_Expr, BuiltinProcPkg_intrinsics, false, true},
+	{STR_LIT("atomic_xor_explicit"),                     3, false, Expr_Expr, BuiltinProcPkg_intrinsics, false, true},
+	{STR_LIT("atomic_exchange"),                         2, false, Expr_Expr, BuiltinProcPkg_intrinsics, false, true},
+	{STR_LIT("atomic_exchange_explicit"),                3, false, Expr_Expr, BuiltinProcPkg_intrinsics, false, true},
+	{STR_LIT("atomic_compare_exchange_strong"),          3, false, Expr_Expr, BuiltinProcPkg_intrinsics, false, true},
+	{STR_LIT("atomic_compare_exchange_strong_explicit"), 5, false, Expr_Expr, BuiltinProcPkg_intrinsics, false, true},
+	{STR_LIT("atomic_compare_exchange_weak"),            3, false, Expr_Expr, BuiltinProcPkg_intrinsics, false, true},
+	{STR_LIT("atomic_compare_exchange_weak_explicit"),   5, false, Expr_Expr, BuiltinProcPkg_intrinsics, false, true},
 
 	{STR_LIT("fixed_point_mul"), 3, false, Expr_Expr, BuiltinProcPkg_intrinsics},
 	{STR_LIT("fixed_point_div"), 3, false, Expr_Expr, BuiltinProcPkg_intrinsics},
@@ -342,8 +418,74 @@ gb_global BuiltinProc builtin_procs[BuiltinProc_COUNT] = {
 	{STR_LIT("fixed_point_div_sat"), 3, false, Expr_Expr, BuiltinProcPkg_intrinsics},
 
 	{STR_LIT("expect"), 2, false, Expr_Expr, BuiltinProcPkg_intrinsics},
-	
-	{STR_LIT("syscall"), 1, true, Expr_Expr, BuiltinProcPkg_intrinsics},
+
+	{STR_LIT(""), 0, false, Expr_Stmt, BuiltinProcPkg_intrinsics},
+	{STR_LIT("simd_add"), 2, false, Expr_Expr, BuiltinProcPkg_intrinsics},
+	{STR_LIT("simd_sub"), 2, false, Expr_Expr, BuiltinProcPkg_intrinsics},
+	{STR_LIT("simd_mul"), 2, false, Expr_Expr, BuiltinProcPkg_intrinsics},
+	{STR_LIT("simd_div"), 2, false, Expr_Expr, BuiltinProcPkg_intrinsics},
+	{STR_LIT("simd_rem"), 2, false, Expr_Expr, BuiltinProcPkg_intrinsics},
+	{STR_LIT("simd_shl"), 2, false, Expr_Expr, BuiltinProcPkg_intrinsics},
+	{STR_LIT("simd_shr"), 2, false, Expr_Expr, BuiltinProcPkg_intrinsics},
+	{STR_LIT("simd_shl_masked"), 2, false, Expr_Expr, BuiltinProcPkg_intrinsics},
+	{STR_LIT("simd_shr_masked"), 2, false, Expr_Expr, BuiltinProcPkg_intrinsics},
+
+	{STR_LIT("simd_add_sat"), 2, false, Expr_Expr, BuiltinProcPkg_intrinsics},
+	{STR_LIT("simd_sub_sat"), 2, false, Expr_Expr, BuiltinProcPkg_intrinsics},
+
+	{STR_LIT("simd_and"), 2, false, Expr_Expr, BuiltinProcPkg_intrinsics},
+	{STR_LIT("simd_or"),  2, false, Expr_Expr, BuiltinProcPkg_intrinsics},
+	{STR_LIT("simd_xor"), 2, false, Expr_Expr, BuiltinProcPkg_intrinsics},
+	{STR_LIT("simd_and_not"), 2, false, Expr_Expr, BuiltinProcPkg_intrinsics},
+
+	{STR_LIT("simd_neg"), 1, false, Expr_Expr, BuiltinProcPkg_intrinsics},
+
+	{STR_LIT("simd_abs"), 1, false, Expr_Expr, BuiltinProcPkg_intrinsics},
+
+	{STR_LIT("simd_min"), 2, false, Expr_Expr, BuiltinProcPkg_intrinsics},
+	{STR_LIT("simd_max"), 2, false, Expr_Expr, BuiltinProcPkg_intrinsics},
+	{STR_LIT("simd_clamp"), 3, false, Expr_Expr, BuiltinProcPkg_intrinsics},
+
+	{STR_LIT("simd_lanes_eq"),  2, false, Expr_Expr, BuiltinProcPkg_intrinsics},
+	{STR_LIT("simd_lanes_ne"),  2, false, Expr_Expr, BuiltinProcPkg_intrinsics},
+	{STR_LIT("simd_lanes_lt"),  2, false, Expr_Expr, BuiltinProcPkg_intrinsics},
+	{STR_LIT("simd_lanes_le"),  2, false, Expr_Expr, BuiltinProcPkg_intrinsics},
+	{STR_LIT("simd_lanes_gt"),  2, false, Expr_Expr, BuiltinProcPkg_intrinsics},
+	{STR_LIT("simd_lanes_ge"),  2, false, Expr_Expr, BuiltinProcPkg_intrinsics},
+
+	{STR_LIT("simd_extract"), 2, false, Expr_Expr, BuiltinProcPkg_intrinsics},
+	{STR_LIT("simd_replace"), 3, false, Expr_Expr, BuiltinProcPkg_intrinsics},
+
+	{STR_LIT("simd_reduce_add_ordered"), 1, false, Expr_Expr, BuiltinProcPkg_intrinsics},
+	{STR_LIT("simd_reduce_mul_ordered"), 1, false, Expr_Expr, BuiltinProcPkg_intrinsics},
+	{STR_LIT("simd_reduce_min"),         1, false, Expr_Expr, BuiltinProcPkg_intrinsics},
+	{STR_LIT("simd_reduce_max"),         1, false, Expr_Expr, BuiltinProcPkg_intrinsics},
+	{STR_LIT("simd_reduce_and"),         1, false, Expr_Expr, BuiltinProcPkg_intrinsics},
+	{STR_LIT("simd_reduce_or"),          1, false, Expr_Expr, BuiltinProcPkg_intrinsics},
+	{STR_LIT("simd_reduce_xor"),         1, false, Expr_Expr, BuiltinProcPkg_intrinsics},
+
+	{STR_LIT("simd_shuffle"), 2, true,  Expr_Expr, BuiltinProcPkg_intrinsics},
+	{STR_LIT("simd_select"),  3, false, Expr_Expr, BuiltinProcPkg_intrinsics},
+
+	{STR_LIT("simd_ceil") , 1, false, Expr_Expr, BuiltinProcPkg_intrinsics},
+	{STR_LIT("simd_floor"), 1, false, Expr_Expr, BuiltinProcPkg_intrinsics},
+	{STR_LIT("simd_trunc"), 1, false, Expr_Expr, BuiltinProcPkg_intrinsics},
+	{STR_LIT("simd_nearest"), 1, false, Expr_Expr, BuiltinProcPkg_intrinsics},
+
+	{STR_LIT("simd_to_bits"), 1, false, Expr_Expr, BuiltinProcPkg_intrinsics},
+
+	{STR_LIT("simd_lanes_reverse"), 1, false, Expr_Expr, BuiltinProcPkg_intrinsics},
+	{STR_LIT("simd_lanes_rotate_left"), 2, false, Expr_Expr, BuiltinProcPkg_intrinsics},
+	{STR_LIT("simd_lanes_rotate_right"), 2, false, Expr_Expr, BuiltinProcPkg_intrinsics},
+
+	{STR_LIT("simd_x86__MM_SHUFFLE"), 4, false, Expr_Expr, BuiltinProcPkg_intrinsics},
+
+	{STR_LIT(""), 0, false, Expr_Stmt, BuiltinProcPkg_intrinsics},
+
+
+	{STR_LIT("syscall"), 1, true, Expr_Expr, BuiltinProcPkg_intrinsics, false, true},
+	{STR_LIT("x86_cpuid"),  2, false, Expr_Expr, BuiltinProcPkg_intrinsics},
+	{STR_LIT("x86_xgetbv"), 1, false, Expr_Expr, BuiltinProcPkg_intrinsics},
 
 
 	{STR_LIT(""), 0, false, Expr_Stmt, BuiltinProcPkg_intrinsics},
@@ -429,12 +571,12 @@ gb_global BuiltinProc builtin_procs[BuiltinProc_COUNT] = {
 
 	{STR_LIT("__entry_point"), 0, false, Expr_Stmt, BuiltinProcPkg_intrinsics},
 
-	{STR_LIT("objc_send"),   3, true,  Expr_Expr, BuiltinProcPkg_intrinsics},
+	{STR_LIT("objc_send"),   3, true,  Expr_Expr, BuiltinProcPkg_intrinsics, false, true},
 
 	{STR_LIT("objc_find_selector"),     1, false, Expr_Expr, BuiltinProcPkg_intrinsics},
 	{STR_LIT("objc_find_class"),        1, false, Expr_Expr, BuiltinProcPkg_intrinsics},
-	{STR_LIT("objc_register_selector"), 1, false, Expr_Expr, BuiltinProcPkg_intrinsics},
-	{STR_LIT("objc_register_class"),    1, false, Expr_Expr, BuiltinProcPkg_intrinsics},
+	{STR_LIT("objc_register_selector"), 1, false, Expr_Expr, BuiltinProcPkg_intrinsics, false, true},
+	{STR_LIT("objc_register_class"),    1, false, Expr_Expr, BuiltinProcPkg_intrinsics, false, true},
 
 	{STR_LIT("constant_utf16_cstring"), 1, false, Expr_Expr, BuiltinProcPkg_intrinsics},
 
@@ -442,4 +584,6 @@ gb_global BuiltinProc builtin_procs[BuiltinProc_COUNT] = {
 	{STR_LIT("wasm_memory_size"), 1, false, Expr_Expr, BuiltinProcPkg_intrinsics},
 	{STR_LIT("wasm_memory_atomic_wait32"), 3, false, Expr_Expr, BuiltinProcPkg_intrinsics},
 	{STR_LIT("wasm_memory_atomic_notify32"), 2, false, Expr_Expr, BuiltinProcPkg_intrinsics},
+
+	{STR_LIT("valgrind_client_request"), 7, false, Expr_Expr, BuiltinProcPkg_intrinsics},
 };

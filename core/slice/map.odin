@@ -2,11 +2,9 @@ package slice
 
 import "core:intrinsics"
 import "core:runtime"
-import "core:mem"
 
 _ :: intrinsics
 _ :: runtime
-_ :: mem
 
 map_keys :: proc(m: $M/map[$K]$V, allocator := context.allocator) -> (keys: []K) {
 	keys = make(type_of(keys), len(m), allocator)
@@ -52,7 +50,7 @@ map_entries :: proc(m: $M/map[$K]$V, allocator := context.allocator) -> (entries
 
 map_entry_infos :: proc(m: $M/map[$K]$V, allocator := context.allocator) -> (entries: []Map_Entry_Info(K, V)) #no_bounds_check {
 	m := m
-	rm := (^mem.Raw_Map)(&m)
+	rm := (^runtime.Raw_Map)(&m)
 
 	info := runtime.type_info_base(type_info_of(M)).variant.(runtime.Type_Info_Map)
 	gs := runtime.type_info_base(info.generated_struct).variant.(runtime.Type_Info_Struct)

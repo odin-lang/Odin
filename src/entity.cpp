@@ -83,6 +83,7 @@ enum EntityFlag : u64 {
 	EntityFlag_CustomLinkage_LinkOnce = 1ull<<44,
 	
 	EntityFlag_Require = 1ull<<50,
+	EntityFlag_ByPtr = 1ull<<51, // enforce parameter is passed by pointer
 
 	EntityFlag_Overridden    = 1ull<<63,
 };
@@ -233,10 +234,12 @@ struct Entity {
 			String  link_name;
 			String  link_prefix;
 			DeferredProcedure deferred_procedure;
-			bool    is_foreign;
-			bool    is_export;
-			bool    generated_from_polymorphic;
 			ProcedureOptimizationMode optimization_mode;
+			bool    is_foreign                 : 1;
+			bool    is_export                  : 1;
+			bool    generated_from_polymorphic : 1;
+			bool    target_feature_disabled    : 1;
+			String  target_feature;
 		} Procedure;
 		struct {
 			Array<Entity *> entities;

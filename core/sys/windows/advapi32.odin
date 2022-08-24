@@ -70,4 +70,62 @@ foreign advapi32 {
 		lpStartupInfo: LPSTARTUPINFO,
 		lpProcessInformation: LPPROCESS_INFORMATION,
 	) -> BOOL ---
+
+	RegCreateKeyExW :: proc(
+		hKey: HKEY,
+		lpSubKey: LPCWSTR,
+		Reserved: DWORD,
+		lpClass: LPWSTR,
+		dwOptions: DWORD,
+		samDesired: REGSAM,
+		lpSecurityAttributes: LPSECURITY_ATTRIBUTES,
+		phkResult: PHKEY,
+		lpdwDisposition: LPDWORD,
+	) -> LSTATUS ---
+
+	RegOpenKeyW :: proc(
+		hKey: HKEY,
+		lpSubKey: LPCWSTR,
+		phkResult: PHKEY,
+	) -> LSTATUS ---
+
+	RegOpenKeyExW :: proc(
+		hKey: HKEY,
+		lpSubKey: LPCWSTR,
+		ulOptions: DWORD,
+		samDesired: REGSAM,
+		phkResult: PHKEY,
+	) -> LSTATUS ---
+
+	RegCloseKey :: proc(
+		hKey: HKEY,
+	) -> LSTATUS ---
+
+	RegGetValueW :: proc(
+		hkey: HKEY,
+		lpSubKey: LPCWSTR,
+		lpValue: LPCWSTR,
+		dwFlags: DWORD,
+		pdwType: LPDWORD,
+		pvData: PVOID,
+		pcbData: LPDWORD,
+	) -> LSTATUS ---
+
+	RegSetValueExW :: proc(
+		hKey: HKEY,
+		lpValueName: LPCWSTR,
+		Reserved: DWORD,
+		dwType: DWORD,
+		lpData: ^BYTE,
+		cbData: DWORD,
+	) -> LSTATUS ---
+
+	RegSetKeyValueW :: proc(
+		hKey: HKEY,
+		lpSubKey: LPCWSTR,
+		lpValueName: LPCWSTR,
+		dwType: DWORD,
+		lpData: LPCVOID,
+		cbData: DWORD,
+	) -> LSTATUS ---
 }

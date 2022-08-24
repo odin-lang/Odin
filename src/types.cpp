@@ -261,6 +261,7 @@ struct TypeProc {
 	TYPE_KIND(SimdVector, struct {                            \
 		i64   count;                                      \
 		Type *elem;                                       \
+		Type *generic_count;                              \
 	})                                                        \
 	TYPE_KIND(RelativePointer, struct {                       \
 		Type *pointer_type;                               \
@@ -277,7 +278,8 @@ struct TypeProc {
 		Type *generic_row_count;                          \
 		Type *generic_column_count;                       \
 		i64   stride_in_bytes;                            \
-	})
+	})                                                        \
+	TYPE_KIND(SoaPointer, struct { Type *elem; })
 
 
 enum TypeKind {
@@ -349,6 +351,7 @@ enum Typeid_Kind : u8 {
 	Typeid_Relative_Pointer,
 	Typeid_Relative_Slice,
 	Typeid_Matrix,
+	Typeid_SoaPointer,
 };
 
 // IMPORTANT NOTE(bill): This must match the same as the in core.odin
@@ -362,6 +365,9 @@ enum : int {
 	MATRIX_ELEMENT_COUNT_MIN = 1,
 	MATRIX_ELEMENT_COUNT_MAX = 16,
 	MATRIX_ELEMENT_MAX_SIZE = MATRIX_ELEMENT_COUNT_MAX * (2 * 8), // complex128
+
+	SIMD_ELEMENT_COUNT_MIN = 1,
+	SIMD_ELEMENT_COUNT_MAX = 64,
 };
 
 
@@ -640,6 +646,7 @@ gb_global Type *t_type_info_simd_vector          = nullptr;
 gb_global Type *t_type_info_relative_pointer     = nullptr;
 gb_global Type *t_type_info_relative_slice       = nullptr;
 gb_global Type *t_type_info_matrix               = nullptr;
+gb_global Type *t_type_info_soa_pointer          = nullptr;
 
 gb_global Type *t_type_info_named_ptr            = nullptr;
 gb_global Type *t_type_info_integer_ptr          = nullptr;
@@ -668,6 +675,7 @@ gb_global Type *t_type_info_simd_vector_ptr      = nullptr;
 gb_global Type *t_type_info_relative_pointer_ptr = nullptr;
 gb_global Type *t_type_info_relative_slice_ptr   = nullptr;
 gb_global Type *t_type_info_matrix_ptr           = nullptr;
+gb_global Type *t_type_info_soa_pointer_ptr      = nullptr;
 
 gb_global Type *t_allocator                      = nullptr;
 gb_global Type *t_allocator_ptr                  = nullptr;
@@ -720,16 +728,18 @@ gb_global RecursiveMutex g_type_mutex;
 
 struct TypePath;
 
-i64      type_size_of         (Type *t);
-i64      type_align_of        (Type *t);
-i64      type_offset_of       (Type *t, i32 index);
-gbString type_to_string       (Type *type, bool shorthand=false);
+i64      type_size_of   (Type *t);
+i64      type_align_of  (Type *t);
+i64      type_offset_of (Type *t, i32 index);
+gbString type_to_string (Type *type, bool shorthand=true);
+gbString type_to_string (Type *type, gbAllocator allocator, bool shorthand=true);
 i64      type_size_of_internal(Type *t, TypePath *path);
 void     init_map_internal_types(Type *type);
 Type *   bit_set_to_int(Type *t);
 bool are_types_identical(Type *x, Type *y);
 
 bool is_type_pointer(Type *t);
+bool is_type_soa_pointer(Type *t);
 bool is_type_proc(Type *t);
 bool is_type_slice(Type *t);
 bool is_type_integer(Type *t);
@@ -912,6 +922,13 @@ Type *alloc_type_multi_pointer(Type *elem) {
 	return t;
 }
 
+Type *alloc_type_soa_pointer(Type *elem) {
+	Type *t = alloc_type(Type_SoaPointer);
+	t->SoaPointer.elem = elem;
+	return t;
+}
+
+
 Type *alloc_type_array(Type *elem, i64 count, Type *generic_count = nullptr) {
 	if (generic_count != nullptr) {
 		Type *t = alloc_type(Type_Array);
@@ -1085,10 +1102,11 @@ Type *alloc_type_bit_set() {
 
 
 
-Type *alloc_type_simd_vector(i64 count, Type *elem) {
+Type *alloc_type_simd_vector(i64 count, Type *elem, Type *generic_count=nullptr) {
 	Type *t = alloc_type(Type_SimdVector);
 	t->SimdVector.count = count;
 	t->SimdVector.elem = elem;
+	t->SimdVector.generic_count = generic_count;
 	return t;
 }
 
@@ -1097,17 +1115,28 @@ Type *alloc_type_simd_vector(i64 count, Type *elem) {
 ////////////////////////////////////////////////////////////////
 
 
-Type *type_deref(Type *t) {
+Type *type_deref(Type *t, bool allow_multi_pointer=false) {
 	if (t != nullptr) {
 		Type *bt = base_type(t);
 		if (bt == nullptr) {
 			return nullptr;
 		}
-		if (bt->kind == Type_Pointer) {
+		switch (bt->kind) {
+		case Type_Pointer:
 			return bt->Pointer.elem;
-		}
-		if (bt->kind == Type_RelativePointer) {
+		case Type_RelativePointer:
 			return type_deref(bt->RelativePointer.pointer_type);
+		case Type_SoaPointer:
+			{
+				Type *elem = base_type(bt->SoaPointer.elem);
+				GB_ASSERT(elem->kind == Type_Struct && elem->Struct.soa_kind != StructSoa_None);
+				return elem->Struct.soa_elem;
+			}
+		case Type_MultiPointer:
+			if (allow_multi_pointer) {
+				return bt->MultiPointer.elem;
+			}
+			break;
 		}
 	}
 	return t;
@@ -1320,6 +1349,10 @@ bool is_type_pointer(Type *t) {
 		return (t->Basic.flags & BasicFlag_Pointer) != 0;
 	}
 	return t->kind == Type_Pointer;
+}
+bool is_type_soa_pointer(Type *t) {
+	t = base_type(t);
+	return t->kind == Type_SoaPointer;
 }
 bool is_type_multi_pointer(Type *t) {
 	t = base_type(t);
@@ -1593,6 +1626,8 @@ i64 get_array_type_count(Type *t) {
 		return bt->Array.count;
 	} else if (bt->kind == Type_EnumeratedArray) {
 		return bt->EnumeratedArray.count;
+	} else if (bt->kind == Type_SimdVector) {
+		return bt->SimdVector.count;
 	}
 	GB_ASSERT(is_type_array_like(t));
 	return -1;
@@ -1796,7 +1831,7 @@ bool is_type_dereferenceable(Type *t) {
 	if (is_type_rawptr(t)) {
 		return false;
 	}
-	return is_type_pointer(t);
+	return is_type_pointer(t) || is_type_soa_pointer(t);
 }
 
 
@@ -1932,9 +1967,12 @@ bool is_type_valid_vector_elem(Type *t) {
 			return false;
 		}
 		if (is_type_integer(t)) {
-			return true;
+			return !is_type_integer_128bit(t);
 		}
 		if (is_type_float(t)) {
+			return true;
+		}
+		if (is_type_boolean(t)) {
 			return true;
 		}
 	}
@@ -2068,6 +2106,9 @@ bool is_type_polymorphic(Type *t, bool or_specialized=false) {
 	case Type_Pointer:
 		return is_type_polymorphic(t->Pointer.elem, or_specialized);
 
+	case Type_SoaPointer:
+		return is_type_polymorphic(t->SoaPointer.elem, or_specialized);
+
 	case Type_EnumeratedArray:
 		if (is_type_polymorphic(t->EnumeratedArray.index, or_specialized)) {
 			return true;
@@ -2078,6 +2119,11 @@ bool is_type_polymorphic(Type *t, bool or_specialized=false) {
 			return true;
 		}
 		return is_type_polymorphic(t->Array.elem, or_specialized);
+	case Type_SimdVector:
+		if (t->SimdVector.generic_count != nullptr) {
+			return true;
+		}
+		return is_type_polymorphic(t->SimdVector.elem, or_specialized);
 	case Type_DynamicArray:
 		return is_type_polymorphic(t->DynamicArray.elem, or_specialized);
 	case Type_Slice:
@@ -2180,6 +2226,7 @@ bool type_has_nil(Type *t) {
 	case Type_Slice:
 	case Type_Proc:
 	case Type_Pointer:
+	case Type_SoaPointer:
 	case Type_MultiPointer:
 	case Type_DynamicArray:
 	case Type_Map:
@@ -2246,6 +2293,8 @@ bool is_type_comparable(Type *t) {
 		return true;
 	case Type_Pointer:
 		return true;
+	case Type_SoaPointer:
+		return true;
 	case Type_MultiPointer:
 		return true;
 	case Type_Enum:
@@ -2291,6 +2340,9 @@ bool is_type_comparable(Type *t) {
 			}
 		}
 		return true;
+
+	case Type_SimdVector:
+		return true;
 	}
 	return false;
 }
@@ -2316,6 +2368,7 @@ bool is_type_simple_compare(Type *t) {
 
 	case Type_Pointer:
 	case Type_MultiPointer:
+	case Type_SoaPointer:
 	case Type_Proc:
 	case Type_BitSet:
 		return true;
@@ -2347,6 +2400,57 @@ bool is_type_simple_compare(Type *t) {
 
 	}
 
+	return false;
+}
+
+bool is_type_load_safe(Type *type) {
+	GB_ASSERT(type != nullptr);
+	type = core_type(core_array_type(type));
+	switch (type->kind) {
+	case Type_Basic:
+		return (type->Basic.flags & (BasicFlag_Boolean|BasicFlag_Numeric|BasicFlag_Rune)) != 0;
+
+	case Type_BitSet:
+		if (type->BitSet.underlying) {
+			return is_type_load_safe(type->BitSet.underlying);
+		}
+		return true;
+
+	case Type_RelativePointer:
+	case Type_RelativeSlice:
+		return true;
+
+	case Type_Pointer:
+	case Type_MultiPointer:
+	case Type_Slice:
+	case Type_DynamicArray:
+	case Type_Proc:
+	case Type_SoaPointer:
+		return false;
+
+	case Type_Enum:
+	case Type_EnumeratedArray:
+	case Type_Array:
+	case Type_SimdVector:
+	case Type_Matrix:
+		GB_PANIC("should never be hit");
+		return false;
+
+	case Type_Struct:
+		for_array(i, type->Struct.fields) {
+			if (!is_type_load_safe(type->Struct.fields[i]->type)) {
+				return false;
+			}
+		}
+		return type_size_of(type) > 0;
+	case Type_Union:
+		for_array(i, type->Union.variants) {
+			if (!is_type_load_safe(type->Union.variants[i])) {
+				return false;
+			}
+		}
+		return type_size_of(type) > 0;
+	}
 	return false;
 }
 
@@ -2536,6 +2640,12 @@ bool are_types_identical_internal(Type *x, Type *y, bool check_tuple_names) {
 	case Type_MultiPointer:
 		if (y->kind == Type_MultiPointer) {
 			return are_types_identical(x->MultiPointer.elem, y->MultiPointer.elem);
+		}
+		break;
+
+	case Type_SoaPointer:
+		if (y->kind == Type_SoaPointer) {
+			return are_types_identical(x->SoaPointer.elem, y->SoaPointer.elem);
 		}
 		break;
 
@@ -3446,7 +3556,7 @@ i64 type_align_of_internal(Type *t, TypePath *path) {
 
 	case Type_SimdVector: {
 		// IMPORTANT TODO(bill): Figure out the alignment of vector types
-		return gb_clamp(next_pow2(type_size_of_internal(t, path)), 1, build_context.max_align);
+		return gb_clamp(next_pow2(type_size_of_internal(t, path)), 1, build_context.max_align*2);
 	}
 	
 	case Type_Matrix: 
@@ -3456,6 +3566,9 @@ i64 type_align_of_internal(Type *t, TypePath *path) {
 		return type_align_of_internal(t->RelativePointer.base_integer, path);
 	case Type_RelativeSlice:
 		return type_align_of_internal(t->RelativeSlice.base_integer, path);
+
+	case Type_SoaPointer:
+		return build_context.word_size;
 	}
 
 	// return gb_clamp(next_pow2(type_size_of(t)), 1, build_context.max_align);
@@ -3560,6 +3673,9 @@ i64 type_size_of_internal(Type *t, TypePath *path) {
 
 	case Type_MultiPointer:
 		return build_context.word_size;
+
+	case Type_SoaPointer:
+		return build_context.word_size*2;
 
 	case Type_Array: {
 		i64 count, align, size, alignment;
@@ -3998,6 +4114,11 @@ gbString write_type_to_string(gbString str, Type *type, bool shorthand=false) {
 		str = write_type_to_string(str, type->Pointer.elem);
 		break;
 
+	case Type_SoaPointer:
+		str = gb_string_appendc(str, "#soa ^");
+		str = write_type_to_string(str, type->SoaPointer.elem);
+		break;
+
 	case Type_MultiPointer:
 		str = gb_string_appendc(str, "[^]");
 		str = write_type_to_string(str, type->Pointer.elem);
@@ -4269,7 +4390,7 @@ gbString write_type_to_string(gbString str, Type *type, bool shorthand=false) {
 }
 
 
-gbString type_to_string(Type *type, gbAllocator allocator, bool shorthand=false) {
+gbString type_to_string(Type *type, gbAllocator allocator, bool shorthand) {
 	return write_type_to_string(gb_string_make(allocator, ""), type, shorthand);
 }
 gbString type_to_string(Type *type, bool shorthand) {

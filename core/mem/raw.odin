@@ -8,6 +8,7 @@ Raw_Cstring       :: runtime.Raw_Cstring
 Raw_Slice         :: runtime.Raw_Slice
 Raw_Dynamic_Array :: runtime.Raw_Dynamic_Array
 Raw_Map           :: runtime.Raw_Map
+Raw_Soa_Pointer   :: runtime.Raw_Soa_Pointer
 
 Raw_Complex64     :: struct {real, imag: f32}
 Raw_Complex128    :: struct {real, imag: f64}
@@ -21,6 +22,7 @@ make_any :: proc "contextless" (data: rawptr, id: typeid) -> any {
 }
 
 raw_array_data         :: runtime.raw_array_data
+raw_simd_data          :: runtime.raw_simd_data
 raw_string_data        :: runtime.raw_string_data
 raw_slice_data         :: runtime.raw_slice_data
 raw_dynamic_array_data :: runtime.raw_dynamic_array_data

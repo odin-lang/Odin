@@ -176,6 +176,9 @@ Type_Info_Matrix :: struct {
 	column_count: int,
 	// Total element count = column_count * elem_stride
 }
+Type_Info_Soa_Pointer :: struct {
+	elem: ^Type_Info,
+}
 
 Type_Info_Flag :: enum u8 {
 	Comparable     = 0,
@@ -217,6 +220,7 @@ Type_Info :: struct {
 		Type_Info_Relative_Pointer,
 		Type_Info_Relative_Slice,
 		Type_Info_Matrix,
+		Type_Info_Soa_Pointer,
 	},
 }
 
@@ -266,6 +270,19 @@ Typeid_Kind :: enum u8 {
 type_table: []Type_Info
 
 args__: []cstring
+
+when ODIN_OS == .Windows {
+	// NOTE(Jeroen): If we're a Windows DLL, fwdReason will be populated.
+	// This tells a DLL if it's first loaded, about to be unloaded, or a thread is joining/exiting.
+
+	DLL_Forward_Reason :: enum u32 {
+		Process_Detach = 0, // About to unload DLL
+		Process_Attach = 1, // Entry point
+		Thread_Attach  = 2,
+		Thread_Detach  = 3,
+	}
+	dll_forward_reason: DLL_Forward_Reason
+}
 
 // IMPORTANT NOTE(bill): Must be in this order (as the compiler relies upon it)
 
@@ -389,6 +406,12 @@ Raw_Any :: struct {
 Raw_Cstring :: struct {
 	data: [^]byte,
 }
+
+Raw_Soa_Pointer :: struct {
+	data:  rawptr,
+	index: int,
+}
+
 
 
 /*

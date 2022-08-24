@@ -458,15 +458,6 @@ void lb_build_range_interval(lbProcedure *p, AstBinaryExpr *node,
 		val1_type = type_of_expr(rs->vals[1]);
 	}
 
-	if (val0_type != nullptr) {
-		Entity *e = entity_of_node(rs->vals[0]);
-		lb_add_local(p, e->type, e, true);
-	}
-	if (val1_type != nullptr) {
-		Entity *e = entity_of_node(rs->vals[1]);
-		lb_add_local(p, e->type, e, true);
-	}
-
 	TokenKind op = Token_Lt;
 	switch (node->op.kind) {
 	case Token_Ellipsis:  op = Token_LtEq; break;
@@ -478,10 +469,22 @@ void lb_build_range_interval(lbProcedure *p, AstBinaryExpr *node,
 	lbValue lower = lb_build_expr(p, node->left);
 	lbValue upper = {}; // initialized each time in the loop
 
-	lbAddr value = lb_add_local_generated(p, val0_type ? val0_type : lower.type, false);
+	lbAddr value;
+	if (val0_type != nullptr) {
+		Entity *e = entity_of_node(rs->vals[0]);
+		value = lb_add_local(p, val0_type, e, false);
+	} else {
+		value = lb_add_local_generated(p, lower.type, false);
+	}
 	lb_addr_store(p, value, lower);
 
-	lbAddr index = lb_add_local_generated(p, t_int, false);
+	lbAddr index;
+	if (val1_type != nullptr) {
+		Entity *e = entity_of_node(rs->vals[1]);
+		index = lb_add_local(p, val1_type, e, false);
+	} else {
+		index = lb_add_local_generated(p, t_int, false);
+	}
 	lb_addr_store(p, index, lb_const_int(m, t_int, 0));
 
 	lbBlock *loop = lb_create_block(p, "for.interval.loop");
@@ -1210,8 +1213,8 @@ void lb_build_switch_stmt(lbProcedure *p, AstSwitchStmt *ss, Scope *scope) {
 	}
 
 	lb_emit_jump(p, done);
-	lb_close_scope(p, lbDeferExit_Default, done);
 	lb_start_block(p, done);
+	lb_close_scope(p, lbDeferExit_Default, done);
 }
 
 void lb_store_type_case_implicit(lbProcedure *p, Ast *clause, lbValue value) {
@@ -1253,7 +1256,6 @@ void lb_type_case_body(lbProcedure *p, Ast *label, Ast *clause, lbBlock *body, l
 	ast_node(cc, CaseClause, clause);
 
 	lb_push_target_list(p, label, done, nullptr, nullptr);
-	lb_open_scope(p, body->scope);
 	lb_build_stmt_list(p, cc->stmts);
 	lb_close_scope(p, lbDeferExit_Default, body);
 	lb_pop_target_list(p);
@@ -1263,6 +1265,7 @@ void lb_type_case_body(lbProcedure *p, Ast *label, Ast *clause, lbBlock *body, l
 
 void lb_build_type_switch_stmt(lbProcedure *p, AstTypeSwitchStmt *ss) {
 	lbModule *m = p->module;
+	lb_open_scope(p, ss->scope);
 
 	ast_node(as, AssignStmt, ss->tag);
 	GB_ASSERT(as->lhs.count == 1);
@@ -1321,6 +1324,7 @@ void lb_build_type_switch_stmt(lbProcedure *p, AstTypeSwitchStmt *ss) {
 	for_array(i, body->stmts) {
 		Ast *clause = body->stmts[i];
 		ast_node(cc, CaseClause, clause);
+		lb_open_scope(p, cc->scope);
 		if (cc->list.count == 0) {
 			lb_start_block(p, default_block);
 			lb_store_type_case_implicit(p, clause, parent_value);
@@ -1329,6 +1333,9 @@ void lb_build_type_switch_stmt(lbProcedure *p, AstTypeSwitchStmt *ss) {
 		}
 
 		lbBlock *body = lb_create_block(p, "typeswitch.body");
+		if (p->debug_info != nullptr) {
+			LLVMSetCurrentDebugLocation2(p->builder, lb_debug_location_from_ast(p, clause));
+		}
 		Type *case_type = nullptr;
 		for_array(type_index, cc->list) {
 			case_type = type_of_expr(cc->list[type_index]);
@@ -1375,6 +1382,7 @@ void lb_build_type_switch_stmt(lbProcedure *p, AstTypeSwitchStmt *ss) {
 
 	lb_emit_jump(p, done);
 	lb_start_block(p, done);
+	lb_close_scope(p, lbDeferExit_Default, done);
 }
 
 
@@ -1721,6 +1729,9 @@ void lb_build_for_stmt(lbProcedure *p, Ast *node) {
 	ast_node(fs, ForStmt, node);
 
 	lb_open_scope(p, fs->scope); // Open Scope here
+	if (p->debug_info != nullptr) {
+		LLVMSetCurrentDebugLocation2(p->builder, lb_debug_location_from_ast(p, node));
+	}
 
 	if (fs->init != nullptr) {
 	#if 1
@@ -1741,11 +1752,14 @@ void lb_build_for_stmt(lbProcedure *p, Ast *node) {
 		post = lb_create_block(p, "for.post");
 	}
 
-
 	lb_emit_jump(p, loop);
 	lb_start_block(p, loop);
 
 	if (loop != body) {
+		// right now the condition (all expressions) will not set it's debug location, so we will do it here
+		if (p->debug_info != nullptr) {
+			LLVMSetCurrentDebugLocation2(p->builder, lb_debug_location_from_ast(p, fs->cond));
+		}
 		lb_build_cond(p, fs->cond, body, done);
 		lb_start_block(p, body);
 	}
@@ -1753,10 +1767,12 @@ void lb_build_for_stmt(lbProcedure *p, Ast *node) {
 	lb_push_target_list(p, fs->label, done, post, nullptr);
 
 	lb_build_stmt(p, fs->body);
-	lb_close_scope(p, lbDeferExit_Default, nullptr);
 
 	lb_pop_target_list(p);
 
+	if (p->debug_info != nullptr) {
+		LLVMSetCurrentDebugLocation2(p->builder, lb_debug_end_location_from_ast(p, fs->body));
+	}
 	lb_emit_jump(p, post);
 
 	if (fs->post != nullptr) {
@@ -1766,6 +1782,7 @@ void lb_build_for_stmt(lbProcedure *p, Ast *node) {
 	}
 
 	lb_start_block(p, done);
+	lb_close_scope(p, lbDeferExit_Default, nullptr);
 }
 
 void lb_build_assign_stmt_array(lbProcedure *p, TokenKind op, lbAddr const &lhs, lbValue const &value) {
@@ -1971,14 +1988,9 @@ void lb_build_stmt(lbProcedure *p, Ast *node) {
 		}
 	}
 
-	LLVMMetadataRef prev_debug_location = nullptr;
 	if (p->debug_info != nullptr) {
-		prev_debug_location = LLVMGetCurrentDebugLocation2(p->builder);
 		LLVMSetCurrentDebugLocation2(p->builder, lb_debug_location_from_ast(p, node));
 	}
-	defer (if (prev_debug_location != nullptr) {
-		LLVMSetCurrentDebugLocation2(p->builder, prev_debug_location);
-	});
 
 	u16 prev_state_flags = p->state_flags;
 	defer (p->state_flags = prev_state_flags);
@@ -2073,7 +2085,8 @@ void lb_build_stmt(lbProcedure *p, Ast *node) {
 			lbAddr lval = {};
 			if (!is_blank_ident(name)) {
 				Entity *e = entity_of_node(name);
-				bool zero_init = true; // Always do it
+				// bool zero_init = true; // Always do it
+				bool zero_init = vd->values.count == 0;
 				lval = lb_add_local(p, e->type, e, zero_init);
 			}
 			array_add(&lvals, lval);

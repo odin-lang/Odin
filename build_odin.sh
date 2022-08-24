@@ -1,12 +1,20 @@
-#!/bin/bash
+#!/usr/bin/env bash
 set -eu
 
-GIT_SHA=$(git rev-parse --short HEAD)
+: ${CXX=clang++}
+: ${CPPFLAGS=}
+: ${CXXFLAGS=}
+: ${LDFLAGS=}
+: ${ODIN_VERSION=dev-$(date +"%Y-%m")}
+
+CPPFLAGS="$CPPFLAGS -DODIN_VERSION_RAW=\"$ODIN_VERSION\""
+CXXFLAGS="$CXXFLAGS -std=c++14"
+LDFLAGS="$LDFLAGS -pthread -lm -lstdc++"
+
+GIT_SHA=$(git rev-parse --short HEAD || :)
+if [ "$GIT_SHA" ]; then CPPFLAGS="$CPPFLAGS -DGIT_SHA=\"$GIT_SHA\""; fi
+
 DISABLED_WARNINGS="-Wno-switch -Wno-macro-redefined -Wno-unused-value"
-LDFLAGS="-pthread -lm -lstdc++"
-CFLAGS="-std=c++14 -DGIT_SHA=\"$GIT_SHA\""
-CFLAGS="$CFLAGS -DODIN_VERSION_RAW=\"dev-$(date +"%Y-%m")\""
-CC=clang
 OS=$(uname)
 
 panic() {
@@ -18,13 +26,13 @@ version() { echo "$@" | awk -F. '{ printf("%d%03d%03d%03d\n", $1,$2,$3,$4); }'; 
 
 config_darwin() {
 	ARCH=$(uname -m)
-	LLVM_CONFIG=/usr/local/opt/llvm/bin/llvm-config
+	: ${LLVM_CONFIG=llvm-config}
 
 	# allow for arm only llvm's with version 13
 	if [ ARCH == arm64 ]; then
 		MIN_LLVM_VERSION=("13.0.0")
 	else
-		# allow for x86 / amd64 all llvm versions begining from 11
+		# allow for x86 / amd64 all llvm versions beginning from 11
 		MIN_LLVM_VERSION=("11.1.0")
 	fi
 
@@ -36,35 +44,39 @@ config_darwin() {
 		fi
 	fi
 
-	LDFLAGS="$LDFLAGS -liconv -ldl -L/usr/local/opt/llvm/lib -Wl,-rpath,/usr/local/opt/llvm/lib"
-	CFLAGS="$CFLAGS $($LLVM_CONFIG --cxxflags --ldflags) -I/usr/local/opt/llvm/include"
+	LDFLAGS="$LDFLAGS -liconv -ldl"
+	CXXFLAGS="$CXXFLAGS $($LLVM_CONFIG --cxxflags --ldflags)"
 	LDFLAGS="$LDFLAGS -lLLVM-C"
 }
 
 config_freebsd() {
-	LLVM_CONFIG=/usr/local/bin/llvm-config11
+	: ${LLVM_CONFIG=/usr/local/bin/llvm-config11}
 
-	CFLAGS="$CFLAGS $($LLVM_CONFIG --cxxflags --ldflags)"
+	CXXFLAGS="$CXXFLAGS $($LLVM_CONFIG --cxxflags --ldflags)"
 	LDFLAGS="$LDFLAGS $($LLVM_CONFIG --libs core native --system-libs)"
 }
 
 config_openbsd() {
-	LLVM_CONFIG=/usr/local/bin/llvm-config
+	: ${LLVM_CONFIG=/usr/local/bin/llvm-config}
 
 	LDFLAGS="$LDFLAGS -liconv"
-	CFLAGS="$CFLAGS $($LLVM_CONFIG --cxxflags --ldflags)"
+	CXXFLAGS="$CXXFLAGS $($LLVM_CONFIG --cxxflags --ldflags)"
 	LDFLAGS="$LDFLAGS $($LLVM_CONFIG --libs core native --system-libs)"
 }
 
 config_linux() {
-	if which llvm-config > /dev/null 2>&1; then
-		LLVM_CONFIG=llvm-config
-	elif which llvm-config-11 > /dev/null 2>&1; then
-		LLVM_CONFIG=llvm-config-11
-	elif which llvm-config-11-64 > /dev/null 2>&1; then
-		LLVM_CONFIG=llvm-config-11-64
-	else
-		panic "Unable to find LLVM-config"
+	: ${LLVM_CONFIG=}
+
+	if [ ! "$LLVM_CONFIG" ]; then
+		if which llvm-config > /dev/null 2>&1; then
+			LLVM_CONFIG=llvm-config
+		elif which llvm-config-11 > /dev/null 2>&1; then
+			LLVM_CONFIG=llvm-config-11
+		elif which llvm-config-11-64 > /dev/null 2>&1; then
+			LLVM_CONFIG=llvm-config-11-64
+		else
+			panic "Unable to find LLVM-config"
+		fi
 	fi
 
 	MIN_LLVM_VERSION=("11.0.0")
@@ -74,7 +86,7 @@ config_linux() {
 	fi
 
 	LDFLAGS="$LDFLAGS -ldl"
-	CFLAGS="$CFLAGS $($LLVM_CONFIG --cxxflags --ldflags)"
+	CXXFLAGS="$CXXFLAGS $($LLVM_CONFIG --cxxflags --ldflags)"
 	LDFLAGS="$LDFLAGS $($LLVM_CONFIG --libs core native --system-libs)"
 }
 
@@ -97,7 +109,7 @@ build_odin() {
 	esac
 
 	set -x
-	$CC src/main.cpp src/libtommath.cpp $DISABLED_WARNINGS $CFLAGS $EXTRAFLAGS $LDFLAGS -o odin
+	$CXX src/main.cpp src/libtommath.cpp $DISABLED_WARNINGS $CPPFLAGS $CXXFLAGS $EXTRAFLAGS $LDFLAGS -o odin
 	set +x
 }
 

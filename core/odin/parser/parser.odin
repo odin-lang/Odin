@@ -183,6 +183,7 @@ parse_file :: proc(p: ^Parser, file: ^ast.File) -> bool {
 	pd.name    = pkg_name.text
 	pd.comment = p.line_comment
 	p.file.pkg_decl = pd
+	p.file.docs = docs
 
 	expect_semicolon(p, pd)
 
@@ -244,12 +245,7 @@ peek_token :: proc(p: ^Parser, lookahead := 0) -> (tok: tokenizer.Token) {
 	return
 }
 skip_possible_newline :: proc(p: ^Parser) -> bool {
-	if .Optional_Semicolons not_in p.flags {
-		return false
-	}
-
-	prev := p.curr_tok
-	if tokenizer.is_newline(prev) {
+	if tokenizer.is_newline(p.curr_tok) {
 		advance_token(p)
 		return true
 	}
@@ -1610,20 +1606,6 @@ new_ast_field :: proc(names: []^ast.Expr, type: ^ast.Expr, default_value: ^ast.E
 	return field
 }
 
-
-Field_Prefix :: enum {
-	Invalid,
-	Unknown,
-
-	Using,
-	No_Alias,
-	C_Vararg,
-	Auto_Cast,
-	Any_Int,
-}
-
-Field_Prefixes :: distinct bit_set[Field_Prefix]
-
 Expr_And_Flags :: struct {
 	expr:  ^ast.Expr,
 	flags: ast.Field_Flags,
@@ -1665,7 +1647,7 @@ convert_to_ident_list :: proc(p: ^Parser, list: []Expr_And_Flags, ignore_flags, 
 	return idents[:]
 }
 
-is_token_field_prefix :: proc(p: ^Parser) -> Field_Prefix {
+is_token_field_prefix :: proc(p: ^Parser) -> ast.Field_Flag {
 	#partial switch p.curr_tok.kind {
 	case .EOF:
 		return .Invalid
@@ -1676,17 +1658,15 @@ is_token_field_prefix :: proc(p: ^Parser) -> Field_Prefix {
 		advance_token(p)
 		return .Auto_Cast
 	case .Hash:
+		tok: tokenizer.Token
 		advance_token(p)
-		defer advance_token(p)
-		#partial switch p.curr_tok.kind {
-		case .Ident:
-			switch p.curr_tok.text {
-			case "no_alias":
-				return .No_Alias
-			case "c_vararg":
-				return .C_Vararg
-			case "any_int":
-				return .Any_Int
+		tok = p.curr_tok
+		advance_token(p)
+		if tok.kind == .Ident {
+			for kf in ast.field_hash_flag_strings {
+				if kf.key == tok.text {
+					return kf.flag
+				}
 			}
 		}
 		return .Unknown
@@ -1694,8 +1674,8 @@ is_token_field_prefix :: proc(p: ^Parser) -> Field_Prefix {
 	return .Invalid
 }
 
-parse_field_prefixes :: proc(p: ^Parser) -> ast.Field_Flags {
-	counts: [len(Field_Prefix)]int
+parse_field_prefixes :: proc(p: ^Parser) -> (flags: ast.Field_Flags) {
+	counts: [len(ast.Field_Flag)]int
 
 	for {
 		kind := is_token_field_prefix(p)
@@ -1711,31 +1691,17 @@ parse_field_prefixes :: proc(p: ^Parser) -> ast.Field_Flags {
 		counts[kind] += 1
 	}
 
-	flags: ast.Field_Flags
-
-	for kind in Field_Prefix {
+	for kind in ast.Field_Flag {
 		count := counts[kind]
-		switch kind {
-		case .Invalid, .Unknown: // Ignore
-		case .Using:
-			if count > 1 { error(p, p.curr_tok.pos, "multiple 'using' in this field list") }
-			if count > 0 { flags += {.Using} }
-		case .No_Alias:
-			if count > 1 { error(p, p.curr_tok.pos, "multiple '#no_alias' in this field list") }
-			if count > 0 { flags += {.No_Alias} }
-		case .C_Vararg:
-			if count > 1 { error(p, p.curr_tok.pos, "multiple '#c_vararg' in this field list") }
-			if count > 0 { flags += {.C_Vararg} }
-		case .Auto_Cast:
-			if count > 1 { error(p, p.curr_tok.pos, "multiple 'auto_cast' in this field list") }
-			if count > 0 { flags += {.Auto_Cast} }
-		case .Any_Int:
-			if count > 1 { error(p, p.curr_tok.pos, "multiple '#any_int' in this field list") }
-			if count > 0 { flags += {.Any_Int} }
+		if kind == .Invalid || kind == .Unknown {
+			// Ignore
+		} else {
+			if count > 1 { error(p, p.curr_tok.pos, "multiple '%s' in this field list", ast.field_flag_strings[kind]) }
+			if count > 0 { flags += {kind} }
 		}
 	}
 
-	return flags
+	return
 }
 
 check_field_flag_prefixes :: proc(p: ^Parser, name_count: int, allowed_flags, set_flags: ast.Field_Flags) -> (flags: ast.Field_Flags) {
@@ -1747,19 +1713,13 @@ check_field_flag_prefixes :: proc(p: ^Parser, name_count: int, allowed_flags, se
 
 	for flag in ast.Field_Flag {
 		if flag not_in allowed_flags && flag in flags {
-			switch flag {
-			case .Using:
-				error(p, p.curr_tok.pos, "'using' is not allowed within this field list")
-			case .No_Alias:
-				error(p, p.curr_tok.pos, "'#no_alias' is not allowed within this field list")
-			case .C_Vararg:
-				error(p, p.curr_tok.pos, "'#c_vararg' is not allowed within this field list")
-			case .Auto_Cast:
-				error(p, p.curr_tok.pos, "'auto_cast' is not allowed within this field list")
-			case .Any_Int:
-				error(p, p.curr_tok.pos, "'#any_int' is not allowed within this field list")
+			#partial switch flag {
+			case .Unknown, .Invalid:
+				// ignore
 			case .Tags, .Ellipsis, .Results, .Default_Parameters, .Typeid_Token:
 				panic("Impossible prefixes")
+			case:
+				error(p, p.curr_tok.pos, "'%s' is not allowed within this field list", ast.field_flag_strings[flag])
 			}
 			flags -= {flag}
 		}
@@ -2270,7 +2230,7 @@ parse_operand :: proc(p: ^Parser, lhs: bool) -> ^ast.Expr {
 			return parse_call_expr(p, bd)
 
 
-		case "soa", "simd":
+		case "soa":
 			bd := ast.new(ast.Basic_Directive, tok.pos, end_pos(name))
 			bd.tok  = tok
 			bd.name = name.text
@@ -2279,6 +2239,20 @@ parse_operand :: proc(p: ^Parser, lhs: bool) -> ^ast.Expr {
 			#partial switch t in type.derived_expr {
 			case ^ast.Array_Type:         t.tag = bd
 			case ^ast.Dynamic_Array_Type: t.tag = bd
+			case ^ast.Pointer_Type:       t.tag = bd
+			case:
+				error(p, original_type.pos, "expected an array or pointer type after #%s", name.text)
+			}
+			return original_type
+
+		case "simd":
+			bd := ast.new(ast.Basic_Directive, tok.pos, end_pos(name))
+			bd.tok  = tok
+			bd.name = name.text
+			original_type := parse_type(p)
+			type := ast.unparen_expr(original_type)
+			#partial switch t in type.derived_expr {
+			case ^ast.Array_Type:         t.tag = bd
 			case:
 				error(p, original_type.pos, "expected an array type after #%s", name.text)
 			}
@@ -2630,7 +2604,6 @@ parse_operand :: proc(p: ^Parser, lhs: bool) -> ^ast.Expr {
 		tok := expect_token(p, .Union)
 		poly_params: ^ast.Field_List
 		align:       ^ast.Expr
-		is_maybe:      bool
 		is_no_nil:     bool
 		is_shared_nil: bool
 
@@ -2655,10 +2628,7 @@ parse_operand :: proc(p: ^Parser, lhs: bool) -> ^ast.Expr {
 				}
 				align = parse_expr(p, true)
 			case "maybe":
-				if is_maybe {
-					error(p, tag.pos, "duplicate union tag '#%s'", tag.text)
-				}
-				is_maybe = true
+				error(p, tag.pos, "#%s functionality has now been merged with standard 'union' functionality", tag.text)
 			case "no_nil":
 				if is_no_nil {
 					error(p, tag.pos, "duplicate union tag '#%s'", tag.text)
@@ -2675,19 +2645,12 @@ parse_operand :: proc(p: ^Parser, lhs: bool) -> ^ast.Expr {
 		}
 		p.expr_level = prev_level
 
-		if is_no_nil && is_maybe {
-			error(p, p.curr_tok.pos, "#maybe and #no_nil cannot be applied together")
-		}
 		if is_no_nil && is_shared_nil {
 			error(p, p.curr_tok.pos, "#shared_nil and #no_nil cannot be applied together")
-		}
-		if is_shared_nil && is_maybe {
-			error(p, p.curr_tok.pos, "#maybe and #shared_nil cannot be applied together")
 		}
 
 		union_kind := ast.Union_Type_Kind.Normal
 		switch {
-		case is_maybe:      union_kind = .maybe
 		case is_no_nil:     union_kind = .no_nil
 		case is_shared_nil: union_kind = .shared_nil
 		}

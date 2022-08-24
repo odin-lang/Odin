@@ -119,6 +119,29 @@ void check_or_else_split_types(CheckerContext *c, Operand *x, String const &name
 void check_or_else_expr_no_value_error(CheckerContext *c, String const &name, Operand const &x, Type *type_hint);
 void check_or_return_split_types(CheckerContext *c, Operand *x, String const &name, Type **left_type_, Type **right_type_);
 
+bool is_diverging_expr(Ast *expr);
+
+
+enum LoadDirectiveResult {
+	LoadDirective_Success  = 0,
+	LoadDirective_Error    = 1,
+	LoadDirective_NotFound = 2,
+};
+
+bool is_load_directive_call(Ast *call) {
+	call = unparen_expr(call);
+	if (call->kind != Ast_CallExpr) {
+		return false;
+	}
+	ast_node(ce, CallExpr, call);
+	if (ce->proc->kind != Ast_BasicDirective) {
+		return false;
+	}
+	ast_node(bd, BasicDirective, ce->proc);
+	String name = bd->name.string;
+	return name == "load";
+}
+LoadDirectiveResult check_load_directive(CheckerContext *c, Operand *operand, Ast *call, Type *type_hint, bool err_on_not_found);
 
 void check_did_you_mean_print(DidYouMeanAnswers *d, char const *prefix = "") {
 	auto results = did_you_mean_results(d);
@@ -441,6 +464,14 @@ bool find_or_generate_polymorphic_procedure(CheckerContext *old_c, Entity *base_
 	add_scope(&nctx, pl->type, final_proc_type->Proc.scope);
 	final_proc_type->Proc.is_poly_specialized = true;
 	final_proc_type->Proc.is_polymorphic = true;
+
+	final_proc_type->Proc.variadic            = src->Proc.variadic;
+	final_proc_type->Proc.require_results     = src->Proc.require_results;
+	final_proc_type->Proc.c_vararg            = src->Proc.c_vararg;
+	final_proc_type->Proc.has_named_results   = src->Proc.has_named_results;
+	final_proc_type->Proc.diverging           = src->Proc.diverging;
+	final_proc_type->Proc.return_by_pointer   = src->Proc.return_by_pointer;
+	final_proc_type->Proc.optional_ok         = src->Proc.optional_ok;
 
 
 	for (isize i = 0; i < operands.count; i++) {
@@ -777,14 +808,27 @@ i64 check_distance_between_types(CheckerContext *c, Operand *operand, Type *type
 			return distance + 6;
 		}
 	}
+
+	if (is_type_simd_vector(dst)) {
+		Type *dst_elem = base_array_type(dst);
+		i64 distance = check_distance_between_types(c, operand, dst_elem);
+		if (distance >= 0) {
+			return distance + 6;
+		}
+	}
 	
 	if (is_type_matrix(dst)) {
+		if (are_types_identical(src, dst)) {
+			return 5;
+		}
+
 		Type *dst_elem = base_array_type(dst);
 		i64 distance = check_distance_between_types(c, operand, dst_elem);
 		if (distance >= 0) {
 			return distance + 7;
 		}
 	}
+
 
 	if (is_type_any(dst)) {
 		if (!is_type_polymorphic(src)) {
@@ -1328,6 +1372,19 @@ bool is_polymorphic_type_assignable(CheckerContext *c, Type *poly, Type *source,
 			}
 		} 
 		return false;
+
+	case Type_SimdVector:
+		if (source->kind == Type_SimdVector) {
+			if (poly->SimdVector.generic_count != nullptr) {
+				if (!polymorphic_assign_index(&poly->SimdVector.generic_count, &poly->SimdVector.count, source->SimdVector.count)) {
+					return false;
+				}
+			}
+			if (poly->SimdVector.count == source->SimdVector.count) {
+				return is_polymorphic_type_assignable(c, poly->SimdVector.elem, source->SimdVector.elem, true, modify_type);
+			}
+		}
+		return false;
 	}
 	return false;
 }
@@ -1567,9 +1624,11 @@ bool check_unary_op(CheckerContext *c, Operand *o, Token op) {
 
 bool check_binary_op(CheckerContext *c, Operand *o, Token op) {
 	Type *main_type = o->type;
+
 	// TODO(bill): Handle errors correctly
 	Type *type = base_type(core_array_type(main_type));
 	Type *ct = core_type(type);
+
 	switch (op.kind) {
 	case Token_Sub:
 	case Token_SubEq:
@@ -1585,6 +1644,9 @@ bool check_binary_op(CheckerContext *c, Operand *o, Token op) {
 	case Token_QuoEq:
 		if (is_type_matrix(main_type)) {
 			error(op, "Operator '%.*s' is only allowed with matrix types", LIT(op.string));
+			return false;
+		} else if (is_type_simd_vector(main_type) && is_type_integer(type)) {
+			error(op, "Operator '%.*s' is only allowed with #simd types with integer elements", LIT(op.string));
 			return false;
 		}
 		/*fallthrough*/
@@ -1637,14 +1699,9 @@ bool check_binary_op(CheckerContext *c, Operand *o, Token op) {
 		if (!is_type_integer(type)) {
 			error(op, "Operator '%.*s' is only allowed with integers", LIT(op.string));
 			return false;
-		}
-		if (is_type_simd_vector(o->type)) {
-			switch (op.kind) {
-			case Token_ModMod:
-			case Token_ModModEq:
-				error(op, "Operator '%.*s' is only allowed with integers", LIT(op.string));
-				return false;
-			}
+		} else if (is_type_simd_vector(main_type)) {
+			error(op, "Operator '%.*s' is only allowed with #simd types with integer elements", LIT(op.string));
+			return false;
 		}
 		break;
 
@@ -1653,14 +1710,6 @@ bool check_binary_op(CheckerContext *c, Operand *o, Token op) {
 		if (!is_type_integer(ct) && !is_type_bit_set(ct)) {
 			error(op, "Operator '%.*s' is only allowed with integers and bit sets", LIT(op.string));
 			return false;
-		}
-		if (is_type_simd_vector(o->type)) {
-			switch (op.kind) {
-			case Token_AndNot:
-			case Token_AndNotEq:
-				error(op, "Operator '%.*s' is only allowed with integers", LIT(op.string));
-				return false;
-			}
 		}
 		break;
 
@@ -2029,7 +2078,7 @@ bool check_is_not_addressable(CheckerContext *c, Operand *o) {
 		return false;
 	}
 
-	return o->mode != Addressing_Variable;
+	return o->mode != Addressing_Variable && o->mode != Addressing_SoaVariable;
 }
 
 void check_unary_expr(CheckerContext *c, Operand *o, Token op, Ast *node) {
@@ -2046,9 +2095,6 @@ void check_unary_expr(CheckerContext *c, Operand *o, Token op, Ast *node) {
 					error(op, "Cannot take the pointer address of '%s' which is a procedure parameter", str);
 				} else {
 					switch (o->mode) {
-					case Addressing_SoaVariable:
-						error(op, "Cannot take the pointer address of '%s' as it is an indirect index of an SOA struct", str);
-						break;
 					case Addressing_Constant:
 						error(op, "Cannot take the pointer address of '%s' which is a constant", str);
 						break;
@@ -2076,7 +2122,19 @@ void check_unary_expr(CheckerContext *c, Operand *o, Token op, Ast *node) {
 			return;
 		}
 
-		o->type = alloc_type_pointer(o->type);
+		if (o->mode == Addressing_SoaVariable) {
+			ast_node(ue, UnaryExpr, node);
+			if (ast_node_expect(ue->expr, Ast_IndexExpr)) {
+				ast_node(ie, IndexExpr, ue->expr);
+				Type *soa_type = type_of_expr(ie->expr);
+				GB_ASSERT(is_type_soa_struct(soa_type));
+				o->type = alloc_type_soa_pointer(soa_type);
+			} else {
+				o->type = alloc_type_pointer(o->type);
+			}
+		} else {
+			o->type = alloc_type_pointer(o->type);
+		}
 
 		switch (o->mode) {
 		case Addressing_OptionalOk:
@@ -2473,8 +2531,17 @@ void check_shift(CheckerContext *c, Operand *x, Operand *y, Ast *node, Type *typ
 				x->expr->tav.is_lhs = true;
 			}
 			x->mode = Addressing_Value;
-			if (type_hint && is_type_integer(type_hint)) {
-				x->type = type_hint;
+			if (type_hint) {
+				if (is_type_integer(type_hint)) {
+					x->type = type_hint;
+				} else {
+					gbString x_str = expr_to_string(x->expr);
+					gbString to_type = type_to_string(type_hint);
+					error(node, "Conversion of shifted operand '%s' to '%s' is not allowed", x_str, to_type);
+					gb_string_free(x_str);
+					gb_string_free(to_type);
+					x->mode = Addressing_Invalid;
+				}
 			}
 			// x->value = x_val;
 			return;
@@ -2487,8 +2554,10 @@ void check_shift(CheckerContext *c, Operand *x, Operand *y, Ast *node, Type *typ
 		gb_string_free(err_str);
 	}
 
+	// TODO(bill): Should we support shifts for fixed arrays and #simd vectors?
+
 	if (!is_type_integer(x->type)) {
-		gbString err_str = expr_to_string(y->expr);
+		gbString err_str = expr_to_string(x->expr);
 		error(node, "Shift operand '%s' must be an integer", err_str);
 		gb_string_free(err_str);
 		x->mode = Addressing_Invalid;
@@ -2696,6 +2765,26 @@ bool check_is_castable_to(CheckerContext *c, Operand *operand, Type *y) {
 	if (is_type_rawptr(src) && is_type_proc(dst)) {
 		return true;
 	}
+
+	if (is_type_simd_vector(src) && is_type_simd_vector(dst)) {
+		if (src->SimdVector.count != dst->SimdVector.count) {
+			return false;
+		}
+		Type *elem_src = base_array_type(src);
+		Type *elem_dst = base_array_type(dst);
+		Operand x = {};
+		x.type = elem_src;
+		x.mode = Addressing_Value;
+		return check_is_castable_to(c, &x, elem_dst);
+	}
+
+	if (is_type_simd_vector(dst)) {
+		Type *elem = base_array_type(dst);
+		if (check_is_castable_to(c, operand, elem)) {
+			return true;
+		}
+	}
+
 
 	return false;
 }
@@ -2915,7 +3004,14 @@ void check_binary_matrix(CheckerContext *c, Token const &op, Operand *x, Operand
 					goto matrix_error;
 				}
 				x->mode = Addressing_Value;
-				x->type = alloc_type_matrix(xt->Matrix.elem, xt->Matrix.row_count, yt->Matrix.column_count);
+				if (are_types_identical(xt, yt)) {
+					if (!is_type_named(x->type) && is_type_named(y->type)) {
+						// prefer the named type
+						x->type = y->type;
+					}
+				} else {
+					x->type = alloc_type_matrix(xt->Matrix.elem, xt->Matrix.row_count, yt->Matrix.column_count);
+				}
 				goto matrix_success;
 			} else if (yt->kind == Type_Array) {
 				if (!are_types_identical(xt->Matrix.elem, yt->Array.elem)) {
@@ -2977,7 +3073,6 @@ void check_binary_matrix(CheckerContext *c, Token const &op, Operand *x, Operand
 
 matrix_success:
 	x->type = check_matrix_type_hint(x->type, type_hint);
-	
 	return;
 	
 	
@@ -3205,8 +3300,14 @@ void check_binary_expr(CheckerContext *c, Operand *x, Ast *node, Type *type_hint
 		return;
 	}
 
-	
-	if (!are_types_identical(x->type, y->type)) {
+	if ((op.kind == Token_CmpAnd || op.kind == Token_CmpOr) &&
+	    is_type_boolean(x->type) && is_type_boolean(y->type)) {
+	    	// NOTE(bill, 2022-06-26)
+	    	// Allow any boolean types within `&&` and `||`
+	    	// This is an exception to all other binary expressions since the result
+	    	// of a comparison will always be an untyped boolean, and allowing
+	    	// any boolean between these two simplifies a lot of expressions
+	} else if (!are_types_identical(x->type, y->type)) {
 		if (x->type != t_invalid &&
 		    y->type != t_invalid) {
 			gbString xt = type_to_string(x->type);
@@ -4116,7 +4217,11 @@ ExactValue get_constant_field(CheckerContext *c, Operand const *operand, Selecti
 
 Type *determine_swizzle_array_type(Type *original_type, Type *type_hint, isize new_count) {
 	Type *array_type = base_type(type_deref(original_type));
-	GB_ASSERT(array_type->kind == Type_Array);
+	GB_ASSERT(array_type->kind == Type_Array || array_type->kind == Type_SimdVector);
+	if (array_type->kind == Type_SimdVector) {
+		Type *elem_type = array_type->SimdVector.elem;
+		return alloc_type_simd_vector(new_count, elem_type);
+	}
 	Type *elem_type = array_type->Array.elem;
 
 	Type *swizzle_array_type = nullptr;
@@ -7328,9 +7433,59 @@ ExprKind check_or_else_expr(CheckerContext *c, Operand *o, Ast *node, Type *type
 	String name = oe->token.string;
 	Ast *arg = oe->x;
 	Ast *default_value = oe->y;
-
 	Operand x = {};
 	Operand y = {};
+
+	// NOTE(bill, 2022-08-11): edge case to handle #load(path) or_else default
+	if (is_load_directive_call(arg)) {
+		LoadDirectiveResult res = check_load_directive(c, &x, arg, type_hint, false);
+
+		// Allow for chaining of '#load(path) or_else #load(path)'
+		if (!(is_load_directive_call(default_value) && res == LoadDirective_Success)) {
+			bool y_is_diverging = false;
+			check_expr_base(c, &y, default_value, x.type);
+			switch (y.mode) {
+			case Addressing_NoValue:
+				if (is_diverging_expr(y.expr)) {
+					// Allow
+					y.mode = Addressing_Value;
+					y_is_diverging = true;
+				} else {
+					error_operand_no_value(&y);
+					y.mode = Addressing_Invalid;
+				}
+				break;
+			case Addressing_Type:
+				error_operand_not_expression(&y);
+				y.mode = Addressing_Invalid;
+				break;
+			}
+
+			if (y.mode == Addressing_Invalid) {
+				o->mode = Addressing_Value;
+				o->type = t_invalid;
+				o->expr = node;
+				return Expr_Expr;
+			}
+
+			if (!y_is_diverging) {
+				check_assignment(c, &y, x.type, name);
+				if (y.mode != Addressing_Constant) {
+					error(y.expr, "expected a constant expression on the right-hand side of 'or_else' in conjuction with '#load'");
+				}
+			}
+		}
+
+		if (res == LoadDirective_Success) {
+			*o = x;
+		} else {
+			*o = y;
+		}
+		o->expr = node;
+
+		return Expr_Expr;
+	}
+
 	check_multi_expr_with_type_hint(c, &x, arg, type_hint);
 	if (x.mode == Addressing_Invalid) {
 		o->mode = Addressing_Value;
@@ -7338,9 +7493,25 @@ ExprKind check_or_else_expr(CheckerContext *c, Operand *o, Ast *node, Type *type
 		o->expr = node;
 		return Expr_Expr;
 	}
+	bool y_is_diverging = false;
+	check_expr_base(c, &y, default_value, x.type);
+	switch (y.mode) {
+	case Addressing_NoValue:
+		if (is_diverging_expr(y.expr)) {
+			// Allow
+			y.mode = Addressing_Value;
+			y_is_diverging = true;
+		} else {
+			error_operand_no_value(&y);
+			y.mode = Addressing_Invalid;
+		}
+		break;
+	case Addressing_Type:
+		error_operand_not_expression(&y);
+		y.mode = Addressing_Invalid;
+		break;
+	}
 
-	check_multi_expr_with_type_hint(c, &y, default_value, x.type);
-	error_operand_no_value(&y);
 	if (y.mode == Addressing_Invalid) {
 		o->mode = Addressing_Value;
 		o->type = t_invalid;
@@ -7354,7 +7525,9 @@ ExprKind check_or_else_expr(CheckerContext *c, Operand *o, Ast *node, Type *type
 	add_type_and_value(&c->checker->info, arg, x.mode, x.type, x.value);
 
 	if (left_type != nullptr) {
-		check_assignment(c, &y, left_type, name);
+		if (!y_is_diverging) {
+			check_assignment(c, &y, left_type, name);
+		}
 	} else {
 		check_or_else_expr_no_value_error(c, name, x, type_hint);
 	}
@@ -7738,111 +7911,106 @@ ExprKind check_compound_literal(CheckerContext *c, Operand *o, Ast *node, Type *
 		}
 
 		if (cl->elems.count > 0 && cl->elems[0]->kind == Ast_FieldValue) {
-			if (is_type_simd_vector(t)) {
-				error(cl->elems[0], "'field = value' is not allowed for SIMD vector literals");
-			} else {
-				RangeCache rc = range_cache_make(heap_allocator());
-				defer (range_cache_destroy(&rc));
+			RangeCache rc = range_cache_make(heap_allocator());
+			defer (range_cache_destroy(&rc));
 
-				for_array(i, cl->elems) {
-					Ast *elem = cl->elems[i];
-					if (elem->kind != Ast_FieldValue) {
-						error(elem, "Mixture of 'field = value' and value elements in a literal is not allowed");
+			for_array(i, cl->elems) {
+				Ast *elem = cl->elems[i];
+				if (elem->kind != Ast_FieldValue) {
+					error(elem, "Mixture of 'field = value' and value elements in a literal is not allowed");
+					continue;
+				}
+				ast_node(fv, FieldValue, elem);
+
+				if (is_ast_range(fv->field)) {
+					Token op = fv->field->BinaryExpr.op;
+
+					Operand x = {};
+					Operand y = {};
+					bool ok = check_range(c, fv->field, &x, &y, nullptr);
+					if (!ok) {
 						continue;
 					}
-					ast_node(fv, FieldValue, elem);
-
-					if (is_ast_range(fv->field)) {
-						Token op = fv->field->BinaryExpr.op;
-
-						Operand x = {};
-						Operand y = {};
-						bool ok = check_range(c, fv->field, &x, &y, nullptr);
-						if (!ok) {
-							continue;
-						}
-						if (x.mode != Addressing_Constant || !is_type_integer(core_type(x.type))) {
-							error(x.expr, "Expected a constant integer as an array field");
-							continue;
-						}
-
-						if (y.mode != Addressing_Constant || !is_type_integer(core_type(y.type))) {
-							error(y.expr, "Expected a constant integer as an array field");
-							continue;
-						}
-
-						i64 lo = exact_value_to_i64(x.value);
-						i64 hi = exact_value_to_i64(y.value);
-						i64 max_index = hi;
-						if (op.kind == Token_RangeHalf) { // ..< (exclusive)
-							hi -= 1;
-						} else { // .. (inclusive)
-							max_index += 1;
-						}
-
-						bool new_range = range_cache_add_range(&rc, lo, hi);
-						if (!new_range) {
-							error(elem, "Overlapping field range index %lld %.*s %lld for %.*s", lo, LIT(op.string), hi, LIT(context_name));
-							continue;
-						}
-
-
-						if (max_type_count >= 0 && (lo < 0 || lo >= max_type_count)) {
-							error(elem, "Index %lld is out of bounds (0..<%lld) for %.*s", lo, max_type_count, LIT(context_name));
-							continue;
-						}
-						if (max_type_count >= 0 && (hi < 0 || hi >= max_type_count)) {
-							error(elem, "Index %lld is out of bounds (0..<%lld) for %.*s", hi, max_type_count, LIT(context_name));
-							continue;
-						}
-
-						if (max < hi) {
-							max = max_index;
-						}
-
-						Operand operand = {};
-						check_expr_with_type_hint(c, &operand, fv->value, elem_type);
-						check_assignment(c, &operand, elem_type, context_name);
-
-						is_constant = is_constant && operand.mode == Addressing_Constant;
-					} else {
-						Operand op_index = {};
-						check_expr(c, &op_index, fv->field);
-
-						if (op_index.mode != Addressing_Constant || !is_type_integer(core_type(op_index.type))) {
-							error(elem, "Expected a constant integer as an array field");
-							continue;
-						}
-						// add_type_and_value(c->info, op_index.expr, op_index.mode, op_index.type, op_index.value);
-
-						i64 index = exact_value_to_i64(op_index.value);
-
-						if (max_type_count >= 0 && (index < 0 || index >= max_type_count)) {
-							error(elem, "Index %lld is out of bounds (0..<%lld) for %.*s", index, max_type_count, LIT(context_name));
-							continue;
-						}
-
-						bool new_index = range_cache_add_index(&rc, index);
-						if (!new_index) {
-							error(elem, "Duplicate field index %lld for %.*s", index, LIT(context_name));
-							continue;
-						}
-
-						if (max < index+1) {
-							max = index+1;
-						}
-
-						Operand operand = {};
-						check_expr_with_type_hint(c, &operand, fv->value, elem_type);
-						check_assignment(c, &operand, elem_type, context_name);
-
-						is_constant = is_constant && operand.mode == Addressing_Constant;
+					if (x.mode != Addressing_Constant || !is_type_integer(core_type(x.type))) {
+						error(x.expr, "Expected a constant integer as an array field");
+						continue;
 					}
-				}
 
-				cl->max_count = max;
+					if (y.mode != Addressing_Constant || !is_type_integer(core_type(y.type))) {
+						error(y.expr, "Expected a constant integer as an array field");
+						continue;
+					}
+
+					i64 lo = exact_value_to_i64(x.value);
+					i64 hi = exact_value_to_i64(y.value);
+					i64 max_index = hi;
+					if (op.kind == Token_RangeHalf) { // ..< (exclusive)
+						hi -= 1;
+					} else { // .. (inclusive)
+						max_index += 1;
+					}
+
+					bool new_range = range_cache_add_range(&rc, lo, hi);
+					if (!new_range) {
+						error(elem, "Overlapping field range index %lld %.*s %lld for %.*s", lo, LIT(op.string), hi, LIT(context_name));
+						continue;
+					}
+
+
+					if (max_type_count >= 0 && (lo < 0 || lo >= max_type_count)) {
+						error(elem, "Index %lld is out of bounds (0..<%lld) for %.*s", lo, max_type_count, LIT(context_name));
+						continue;
+					}
+					if (max_type_count >= 0 && (hi < 0 || hi >= max_type_count)) {
+						error(elem, "Index %lld is out of bounds (0..<%lld) for %.*s", hi, max_type_count, LIT(context_name));
+						continue;
+					}
+
+					if (max < hi) {
+						max = max_index;
+					}
+
+					Operand operand = {};
+					check_expr_with_type_hint(c, &operand, fv->value, elem_type);
+					check_assignment(c, &operand, elem_type, context_name);
+
+					is_constant = is_constant && operand.mode == Addressing_Constant;
+				} else {
+					Operand op_index = {};
+					check_expr(c, &op_index, fv->field);
+
+					if (op_index.mode != Addressing_Constant || !is_type_integer(core_type(op_index.type))) {
+						error(elem, "Expected a constant integer as an array field");
+						continue;
+					}
+					// add_type_and_value(c->info, op_index.expr, op_index.mode, op_index.type, op_index.value);
+
+					i64 index = exact_value_to_i64(op_index.value);
+
+					if (max_type_count >= 0 && (index < 0 || index >= max_type_count)) {
+						error(elem, "Index %lld is out of bounds (0..<%lld) for %.*s", index, max_type_count, LIT(context_name));
+						continue;
+					}
+
+					bool new_index = range_cache_add_index(&rc, index);
+					if (!new_index) {
+						error(elem, "Duplicate field index %lld for %.*s", index, LIT(context_name));
+						continue;
+					}
+
+					if (max < index+1) {
+						max = index+1;
+					}
+
+					Operand operand = {};
+					check_expr_with_type_hint(c, &operand, fv->value, elem_type);
+					check_assignment(c, &operand, elem_type, context_name);
+
+					is_constant = is_constant && operand.mode == Addressing_Constant;
+				}
 			}
 
+			cl->max_count = max;
 		} else {
 			isize index = 0;
 			for (; index < cl->elems.count; index++) {
@@ -7887,7 +8055,7 @@ ExprKind check_compound_literal(CheckerContext *c, Operand *o, Ast *node, Type *
 
 		if (t->kind == Type_SimdVector) {
 			if (!is_constant) {
-				error(node, "Expected all constant elements for a simd vector");
+				// error(node, "Expected all constant elements for a simd vector");
 			}
 		}
 
@@ -8355,23 +8523,30 @@ ExprKind check_compound_literal(CheckerContext *c, Operand *o, Ast *node, Type *
 		if (is_type_bit_set(type)) {
 			// NOTE(bill): Encode as an integer
 
-			i64 lower = base_type(type)->BitSet.lower;
+			Type *bt = base_type(type);
+			BigInt bits = {};
+			BigInt one = {};
+			big_int_from_u64(&one, 1);
 
-			u64 bits = 0;
-			for_array(index, cl->elems) {
-				Ast *elem = cl->elems[index];
-				GB_ASSERT(elem->kind != Ast_FieldValue);
-				TypeAndValue tav = elem->tav;
-				ExactValue i = exact_value_to_integer(tav.value);
-				if (i.kind != ExactValue_Integer) {
+			for_array(i, cl->elems) {
+				Ast *e = cl->elems[i];
+				GB_ASSERT(e->kind != Ast_FieldValue);
+
+				TypeAndValue tav = e->tav;
+				if (tav.mode != Addressing_Constant) {
 					continue;
 				}
-				i64 val = big_int_to_i64(&i.value_integer);
-				val -= lower;
-				u64 bit = u64(1ll<<val);
-				bits |= bit;
+				GB_ASSERT(tav.value.kind == ExactValue_Integer);
+				i64 v = big_int_to_i64(&tav.value.value_integer);
+				i64 lower = bt->BitSet.lower;
+				u64 index = cast(u64)(v-lower);
+				BigInt bit = {};
+				big_int_from_u64(&bit, index);
+				big_int_shl(&bit, &one, &bit);
+				big_int_or(&bits, &bits, &bit);
 			}
-			o->value = exact_value_u64(bits);
+			o->value.kind = ExactValue_Integer;
+			o->value.value_integer = bits;
 		} else if (is_type_constant_type(type) && cl->elems.count == 0) {
 			ExactValue value = exact_value_compound(node);
 			Type *bt = core_type(type);
@@ -8594,6 +8769,8 @@ ExprKind check_selector_call_expr(CheckerContext *c, Operand *o, Ast *node, Type
 	Ast *first_arg = x.expr->SelectorExpr.expr;
 	GB_ASSERT(first_arg != nullptr);
 
+	first_arg->state_flags |= StateFlag_SelectorCallExpr;
+
 	Type *pt = base_type(x.type);
 	GB_ASSERT(pt->kind == Type_Proc);
 	Type *first_type = nullptr;
@@ -8619,6 +8796,7 @@ ExprKind check_selector_call_expr(CheckerContext *c, Operand *o, Ast *node, Type
 	y.mode = first_arg->tav.mode;
 	y.type = first_arg->tav.type;
 	y.value = first_arg->tav.value;
+
 	if (check_is_assignable_to(c, &y, first_type)) {
 		// Do nothing, it's valid
 	} else {
@@ -9237,7 +9415,7 @@ ExprKind check_expr_base_internal(CheckerContext *c, Operand *o, Ast *node, Type
 			check_unary_expr(c, o, ue->op, node);
 		}
 		o->expr = node;
-		return kind;
+		return Expr_Expr;
 	case_end;
 
 
@@ -9293,6 +9471,9 @@ ExprKind check_expr_base_internal(CheckerContext *c, Operand *o, Ast *node, Type
 			if (t->kind == Type_Pointer && !is_type_empty_union(t->Pointer.elem)) {
 				o->mode = Addressing_Variable;
 				o->type = t->Pointer.elem;
+ 			} else if (t->kind == Type_SoaPointer) {
+				o->mode = Addressing_SoaVariable;
+				o->type = type_deref(t);
  			} else if (t->kind == Type_RelativePointer) {
  				if (o->mode != Addressing_Variable) {
  					gbString str = expr_to_string(o->expr);
@@ -9985,9 +10166,10 @@ gbString write_expr_to_string(gbString str, Ast *node, bool shorthand) {
 		str = write_expr_to_string(str, ce->proc, shorthand);
 		str = gb_string_appendc(str, "(");
 
-		for_array(i, ce->args) {
+		isize idx0 = cast(isize)ce->was_selector;
+		for (isize i = idx0; i < ce->args.count; i++) {
 			Ast *arg = ce->args[i];
-			if (i > 0) {
+			if (i > idx0) {
 				str = gb_string_appendc(str, ", ");
 			}
 			str = write_expr_to_string(str, arg, shorthand);

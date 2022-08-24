@@ -1037,6 +1037,9 @@ void init_universal(void) {
 	add_global_bool_constant("ODIN_FOREIGN_ERROR_PROCEDURES", bc->ODIN_FOREIGN_ERROR_PROCEDURES);
 	add_global_bool_constant("ODIN_DISALLOW_RTTI",            bc->disallow_rtti);
 
+	add_global_bool_constant("ODIN_VALGRIND_SUPPORT",         bc->ODIN_VALGRIND_SUPPORT);
+
+
 
 // Builtin Procedures
 	for (isize i = 0; i < gb_count_of(builtin_procs); i++) {
@@ -1170,6 +1173,8 @@ void init_checker_info(CheckerInfo *i) {
 
 	mutex_init(&i->objc_types_mutex);
 	map_init(&i->objc_msgSend_types, a);
+	mutex_init(&i->load_file_mutex);
+	string_map_init(&i->load_file_cache, a);
 }
 
 void destroy_checker_info(CheckerInfo *i) {
@@ -1205,6 +1210,8 @@ void destroy_checker_info(CheckerInfo *i) {
 
 	mutex_destroy(&i->objc_types_mutex);
 	map_destroy(&i->objc_msgSend_types);
+	mutex_init(&i->load_file_mutex);
+	string_map_destroy(&i->load_file_cache);
 }
 
 CheckerContext make_checker_context(Checker *c) {
@@ -1947,6 +1954,11 @@ void add_type_info_type_internal(CheckerContext *c, Type *t) {
 		add_type_info_type_internal(c, bt->Matrix.elem);
 		break;
 
+	case Type_SoaPointer:
+		add_type_info_type_internal(c, bt->SoaPointer.elem);
+		break;
+
+
 	default:
 		GB_PANIC("Unhandled type: %*.s %d", LIT(type_strings[bt->kind]), bt->kind);
 		break;
@@ -2162,6 +2174,10 @@ void add_min_dep_type_info(Checker *c, Type *t) {
 
 	case Type_Matrix:
 		add_min_dep_type_info(c, bt->Matrix.elem);
+		break;
+
+	case Type_SoaPointer:
+		add_min_dep_type_info(c, bt->SoaPointer.elem);
 		break;
 
 	default:
@@ -2756,6 +2772,7 @@ void init_core_type_info(Checker *c) {
 	t_type_info_relative_pointer = find_core_type(c, str_lit("Type_Info_Relative_Pointer"));
 	t_type_info_relative_slice   = find_core_type(c, str_lit("Type_Info_Relative_Slice"));
 	t_type_info_matrix           = find_core_type(c, str_lit("Type_Info_Matrix"));
+	t_type_info_soa_pointer      = find_core_type(c, str_lit("Type_Info_Soa_Pointer"));
 
 	t_type_info_named_ptr            = alloc_type_pointer(t_type_info_named);
 	t_type_info_integer_ptr          = alloc_type_pointer(t_type_info_integer);
@@ -2784,6 +2801,7 @@ void init_core_type_info(Checker *c) {
 	t_type_info_relative_pointer_ptr = alloc_type_pointer(t_type_info_relative_pointer);
 	t_type_info_relative_slice_ptr   = alloc_type_pointer(t_type_info_relative_slice);
 	t_type_info_matrix_ptr           = alloc_type_pointer(t_type_info_matrix);
+	t_type_info_soa_pointer_ptr      = alloc_type_pointer(t_type_info_soa_pointer);
 }
 
 void init_mem_allocator(Checker *c) {
@@ -3205,6 +3223,22 @@ DECL_ATTRIBUTE_PROC(proc_decl_attribute) {
 					ac->objc_type = objc_type;
 				}
 			}
+		}
+		return true;
+	} else if (name == "require_target_feature") {
+		ExactValue ev = check_decl_attribute_value(c, value);
+		if (ev.kind == ExactValue_String) {
+			ac->require_target_feature = ev.value_string;
+		} else {
+			error(elem, "Expected a string value for '%.*s'", LIT(name));
+		}
+		return true;
+	} else if (name == "enable_target_feature") {
+		ExactValue ev = check_decl_attribute_value(c, value);
+		if (ev.kind == ExactValue_String) {
+			ac->enable_target_feature = ev.value_string;
+		} else {
+			error(elem, "Expected a string value for '%.*s'", LIT(name));
 		}
 		return true;
 	}

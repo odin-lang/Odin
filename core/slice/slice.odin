@@ -170,6 +170,21 @@ simple_equal :: proc(a, b: $T/[]$E) -> bool where intrinsics.type_is_simple_comp
 	return mem.compare_ptrs(raw_data(a), raw_data(b), len(a)*size_of(E)) == 0
 }
 
+/*
+	return the prefix length common between slices `a` and `b`.
+
+	slice.prefix_length([]u8{1, 2, 3, 4}, []u8{1}) -> 1
+	slice.prefix_length([]u8{1, 2, 3, 4}, []u8{1, 2, 3}) -> 3
+	slice.prefix_length([]u8{1, 2, 3, 4}, []u8{2, 3, 4}) -> 0
+*/
+prefix_length :: proc(a, b: $T/[]$E) -> (n: int) where intrinsics.type_is_comparable(E) {
+	_len := builtin.min(len(a), len(b))
+
+	#no_bounds_check for n < _len && a[n] == b[n] {
+		n += 1
+	}
+	return
+}
 
 has_prefix :: proc(array: $T/[]$E, needle: E) -> bool where intrinsics.type_is_comparable(E) {
 	n := len(needle)

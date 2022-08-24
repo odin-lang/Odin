@@ -157,6 +157,15 @@ int string_compare(String const &x, String const &y) {
 	return 0;
 }
 
+isize string_index_byte(String const &s, u8 x) {
+	for (isize i = 0; i < s.len; i++) {
+		if (s.text[i] == x) {
+			return i;
+		}
+	}
+	return -1;
+}
+
 GB_COMPARE_PROC(string_cmp_proc) {
 	String x = *(String *)a;
 	String y = *(String *)b;
@@ -312,6 +321,16 @@ String concatenate3_strings(gbAllocator a, String const &x, String const &y, Str
 	gb_memmove(data,             x.text, x.len);
 	gb_memmove(data+x.len,       y.text, y.len);
 	gb_memmove(data+x.len+y.len, z.text, z.len);
+	data[len] = 0;
+	return make_string(data, len);
+}
+String concatenate4_strings(gbAllocator a, String const &x, String const &y, String const &z, String const &w) {
+	isize len = x.len+y.len+z.len+w.len;
+	u8 *data = gb_alloc_array(a, u8, len+1);
+	gb_memmove(data,                   x.text, x.len);
+	gb_memmove(data+x.len,             y.text, y.len);
+	gb_memmove(data+x.len+y.len,       z.text, z.len);
+	gb_memmove(data+x.len+y.len+z.len, w.text, w.len);
 	data[len] = 0;
 	return make_string(data, len);
 }

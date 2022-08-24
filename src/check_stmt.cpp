@@ -1,8 +1,5 @@
-bool is_diverging_stmt(Ast *stmt) {
-	if (stmt->kind != Ast_ExprStmt) {
-		return false;
-	}
-	Ast *expr = unparen_expr(stmt->ExprStmt.expr);
+bool is_diverging_expr(Ast *expr) {
+	expr = unparen_expr(expr);
 	if (expr->kind != Ast_CallExpr) {
 		return false;
 	}
@@ -25,6 +22,12 @@ bool is_diverging_stmt(Ast *stmt) {
 	Type *t = tv.type;
 	t = base_type(t);
 	return t != nullptr && t->kind == Type_Proc && t->Proc.diverging;
+}
+bool is_diverging_stmt(Ast *stmt) {
+	if (stmt->kind != Ast_ExprStmt) {
+		return false;
+	}
+	return is_diverging_expr(stmt->ExprStmt.expr);
 }
 
 bool contains_deferred_call(Ast *node) {
@@ -1381,6 +1384,18 @@ bool all_operands_valid(Array<Operand> const &operands) {
 	return true;
 }
 
+bool check_stmt_internal_builtin_proc_id(Ast *expr, BuiltinProcId *id_) {
+	BuiltinProcId id = BuiltinProc_Invalid;
+	Entity *e = entity_of_node(expr);
+	if (e != nullptr && e->kind == Entity_Builtin) {
+		if (e->Builtin.id && e->Builtin.id != BuiltinProc_DIRECTIVE) {
+			id = cast(BuiltinProcId)e->Builtin.id;
+		}
+	}
+	if (id_) *id_ = id;
+	return id != BuiltinProc_Invalid;
+}
+
 void check_stmt_internal(CheckerContext *ctx, Ast *node, u32 flags) {
 	u32 mod_flags = flags & (~Stmt_FallthroughAllowed);
 	switch (node->kind) {
@@ -1405,29 +1420,43 @@ void check_stmt_internal(CheckerContext *ctx, Ast *node, u32 flags) {
 			if (kind == Expr_Stmt) {
 				return;
 			}
-			Ast *expr = strip_or_return_expr(operand.expr);
 
+			Ast *expr = strip_or_return_expr(operand.expr);
 			if (expr->kind == Ast_CallExpr) {
+				BuiltinProcId builtin_id = BuiltinProc_Invalid;
+				bool do_require = false;
+
 				AstCallExpr *ce = &expr->CallExpr;
-				Type *t = type_of_expr(ce->proc);
-				if (is_type_proc(t)) {
-					if (t->Proc.require_results) {
-						gbString expr_str = expr_to_string(ce->proc);
-						error(node, "'%s' requires that its results must be handled", expr_str);
-						gb_string_free(expr_str);
-					}
+				Type *t = base_type(type_of_expr(ce->proc));
+				if (t->kind == Type_Proc) {
+					do_require = t->Proc.require_results;
+				} else if (check_stmt_internal_builtin_proc_id(ce->proc, &builtin_id)) {
+					auto const &bp = builtin_procs[builtin_id];
+					do_require = bp.kind == Expr_Expr && !bp.ignore_results;
+				}
+				if (do_require) {
+					gbString expr_str = expr_to_string(ce->proc);
+					error(node, "'%s' requires that its results must be handled", expr_str);
+					gb_string_free(expr_str);
 				}
 				return;
 			} else if (expr->kind == Ast_SelectorCallExpr) {
+				BuiltinProcId builtin_id = BuiltinProc_Invalid;
+				bool do_require = false;
+
 				AstSelectorCallExpr *se = &expr->SelectorCallExpr;
 				ast_node(ce, CallExpr, se->call);
-				Type *t = type_of_expr(ce->proc);
-				if (is_type_proc(t)) {
-					if (t->Proc.require_results) {
-						gbString expr_str = expr_to_string(ce->proc);
-						error(node, "'%s' requires that its results must be handled", expr_str);
-						gb_string_free(expr_str);
-					}
+				Type *t = base_type(type_of_expr(ce->proc));
+				if (t->kind == Type_Proc) {
+					do_require = t->Proc.require_results;
+				} else if (check_stmt_internal_builtin_proc_id(ce->proc, &builtin_id)) {
+					auto const &bp = builtin_procs[builtin_id];
+					do_require = bp.kind == Expr_Expr && !bp.ignore_results;
+				}
+				if (do_require) {
+					gbString expr_str = expr_to_string(ce->proc);
+					error(node, "'%s' requires that its results must be handled", expr_str);
+					gb_string_free(expr_str);
 				}
 				return;
 			}
@@ -2116,7 +2145,26 @@ void check_stmt_internal(CheckerContext *ctx, Ast *node, u32 flags) {
 			}
 
 			if (new_name_count == 0) {
-				error(node, "No new declarations on the lhs");
+				begin_error_block();
+				error(node, "No new declarations on the left hand side");
+				bool all_underscore = true;
+				for_array(i, vd->names) {
+					Ast *name = vd->names[i];
+					if (name->kind == Ast_Ident) {
+						if (!is_blank_ident(name)) {
+							all_underscore = false;
+							break;
+						}
+					} else {
+						all_underscore = false;
+						break;
+					}
+				}
+				if (all_underscore) {
+					error_line("\tSuggestion: Try changing the declaration (:=) to an assignment (=)\n");
+				}
+
+				end_error_block();
 			}
 
 			Type *init_type = nullptr;

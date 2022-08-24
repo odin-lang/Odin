@@ -106,7 +106,21 @@ when ODIN_OS == .Windows {
 		"system:pthread",
 	}
 } else when ODIN_OS == .Darwin {
-	foreign import lib "macos/libraylib.a"
+	when ODIN_ARCH == .arm64 {
+		foreign import lib {
+			"macos-arm64/libraylib.a",
+			"system:Cocoa.framework",
+			"system:OpenGL.framework",
+			"system:IOKit.framework",
+		}
+	} else {
+		foreign import lib {
+			"macos/libraylib.a",
+			"system:Cocoa.framework",
+			"system:OpenGL.framework",
+			"system:IOKit.framework",
+		}
+	}
 } else {
 	foreign import lib "system:raylib"
 }
@@ -611,9 +625,13 @@ KeyboardKey :: enum c.int {
 
 // Mouse buttons
 MouseButton :: enum c.int {
-	LEFT   = 0,
-	RIGHT  = 1,
-	MIDDLE = 2,
+	LEFT    = 0, // Mouse button left
+	RIGHT   = 1, // Mouse button right
+	MIDDLE  = 2, // Mouse button middle (pressed wheel)
+	SIDE    = 3, // Mouse button side (advanced mouse device)
+	EXTRA   = 4, // Mouse button extra (advanced mouse device)
+	FORWARD = 5, // Mouse button fordward (advanced mouse device)
+	BACK    = 6, // Mouse button back (advanced mouse device)
 }
 
 // Mouse cursor

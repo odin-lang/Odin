@@ -130,7 +130,7 @@ save_to_buffer :: proc(img: ^Image, custom_info: Info = {}, allocator := context
 
 	// we will write to a string builder
 	data: strings.Builder
-	strings.init_builder(&data)
+	strings.builder_init(&data)
 
 	// all PNM headers start with the format
 	fmt.sbprintf(&data, "%s\n", header.format)
@@ -409,7 +409,7 @@ _parse_header_pam :: proc(data: []byte, allocator := context.allocator) -> (head
 
 	// string buffer for the tupltype
 	tupltype: strings.Builder
-	strings.init_builder(&tupltype, context.temp_allocator); defer strings.destroy_builder(&tupltype)
+	strings.builder_init(&tupltype, context.temp_allocator); defer strings.builder_destroy(&tupltype)
 	fmt.sbprint(&tupltype, "")
 
 	// PAM uses actual lines, so we can iterate easily

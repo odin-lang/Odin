@@ -695,11 +695,6 @@ void check_union_type(CheckerContext *ctx, Type *union_type, Ast *node, Array<Op
 			error(ut->align, "A union with #no_nil must have at least 2 variants");
 		}
 		break;
-	case UnionType_maybe:
-		if (variants.count != 1) {
-			error(ut->align, "A union with #maybe must have at 1 variant, got %lld", cast(long long)variants.count);
-		}
-		break;
 	}
 
 	if (ut->align != nullptr) {
@@ -1234,13 +1229,13 @@ bool check_type_specialization_to(CheckerContext *ctx, Type *specialization, Typ
 }
 
 
-Type *determine_type_from_polymorphic(CheckerContext *ctx, Type *poly_type, Operand operand) {
+Type *determine_type_from_polymorphic(CheckerContext *ctx, Type *poly_type, Operand const &operand) {
 	bool modify_type = !ctx->no_polymorphic_errors;
 	bool show_error = modify_type && !ctx->hide_polymorphic_errors;
 	if (!is_operand_value(operand)) {
 		if (show_error) {
 			gbString pts = type_to_string(poly_type);
-			gbString ots = type_to_string(operand.type);
+			gbString ots = type_to_string(operand.type, true);
 			defer (gb_string_free(pts));
 			defer (gb_string_free(ots));
 			error(operand.expr, "Cannot determine polymorphic type from parameter: '%s' to '%s'", ots, pts);
@@ -1253,7 +1248,7 @@ Type *determine_type_from_polymorphic(CheckerContext *ctx, Type *poly_type, Oper
 	}
 	if (show_error) {
 		gbString pts = type_to_string(poly_type);
-		gbString ots = type_to_string(operand.type);
+		gbString ots = type_to_string(operand.type, true);
 		defer (gb_string_free(pts));
 		defer (gb_string_free(ots));
 		error(operand.expr, "Cannot determine polymorphic type from parameter: '%s' to '%s'", ots, pts);
@@ -1345,7 +1340,9 @@ ParameterValue handle_parameter_value(CheckerContext *ctx, Type *in_type, Type *
 					param_value.kind = ParameterValue_Constant;
 					param_value.value = o.value;
 				} else {
-					error(expr, "Default parameter must be a constant, %d", o.mode);
+					gbString s = expr_to_string(o.expr);
+					error(expr, "Default parameter must be a constant, got %s", s);
+					gb_string_free(s);
 				}
 			}
 		} else {
@@ -1614,6 +1611,10 @@ Type *check_get_params(CheckerContext *ctx, Scope *scope, Ast *_params, bool *is
 					error(name, "'#any_int' can only be applied to variable fields");
 					p->flags &= ~FieldFlag_any_int;
 				}
+				if (p->flags&FieldFlag_by_ptr) {
+					error(name, "'#by_ptr' can only be applied to variable fields");
+					p->flags &= ~FieldFlag_by_ptr;
+				}
 
 				param = alloc_entity_type_name(scope, name->Ident.token, type, EntityState_Resolved);
 				param->TypeName.is_type_alias = true;
@@ -1690,10 +1691,17 @@ Type *check_get_params(CheckerContext *ctx, Scope *scope, Ast *_params, bool *is
 
 				if (p->flags&FieldFlag_no_alias) {
 					if (!is_type_pointer(type)) {
-						error(name, "'#no_alias' can only be applied to fields of pointer type");
+						error(name, "'#no_alias' can only be applied pointer typed parameters");
 						p->flags &= ~FieldFlag_no_alias; // Remove the flag
 					}
 				}
+				if (p->flags&FieldFlag_by_ptr) {
+					if (is_type_internally_pointer_like(type)) {
+						error(name, "'#by_ptr' can only be applied to non-pointer-like parameters");
+						p->flags &= ~FieldFlag_by_ptr; // Remove the flag
+					}
+				}
+
 				if (is_poly_name) {
 					if (p->flags&FieldFlag_no_alias) {
 						error(name, "'#no_alias' can only be applied to non constant values");
@@ -1710,6 +1718,10 @@ Type *check_get_params(CheckerContext *ctx, Scope *scope, Ast *_params, bool *is
 					if (p->flags&FieldFlag_const) {
 						error(name, "'#const' can only be applied to variable fields");
 						p->flags &= ~FieldFlag_const;
+					}
+					if (p->flags&FieldFlag_by_ptr) {
+						error(name, "'#by_ptr' can only be applied to variable fields");
+						p->flags &= ~FieldFlag_by_ptr;
 					}
 
 					if (!is_type_constant_type(type) && !is_type_polymorphic(type)) {
@@ -1742,6 +1754,9 @@ Type *check_get_params(CheckerContext *ctx, Scope *scope, Ast *_params, bool *is
 			}
 			if (p->flags&FieldFlag_const) {
 				param->flags |= EntityFlag_ConstInput;
+			}
+			if (p->flags&FieldFlag_by_ptr) {
+				param->flags |= EntityFlag_ByPtr;
 			}
 
 			param->state = EntityState_Resolved; // NOTE(bill): This should have be resolved whilst determining it
@@ -2678,14 +2693,55 @@ bool check_type_internal(CheckerContext *ctx, Ast *e, Type **type, Type *named_t
 	case_ast_node(ue, UnaryExpr, e);
 		switch (ue->op.kind) {
 		case Token_Pointer:
-			*type = alloc_type_pointer(check_type(ctx, ue->expr));
-			set_base_type(named_type, *type);
-			return true;
+			{
+				Type *elem = check_type(ctx, ue->expr);
+				*type = alloc_type_pointer(elem);
+				set_base_type(named_type, *type);
+				return true;
+			}
 		}
 	case_end;
 
 	case_ast_node(pt, PointerType, e);
-		*type = alloc_type_pointer(check_type(ctx, pt->type));
+		CheckerContext c = *ctx;
+		c.type_path = new_checker_type_path();
+		defer (destroy_checker_type_path(c.type_path));
+
+		Type *elem = t_invalid;
+		Operand o = {};
+		check_expr_or_type(&c, &o, pt->type);
+		if (o.mode != Addressing_Invalid && o.mode != Addressing_Type) {
+			// NOTE(bill): call check_type_expr again to get a consistent error message
+			begin_error_block();
+			elem = check_type_expr(&c, pt->type, nullptr);
+			if (o.mode == Addressing_Variable) {
+				gbString s = expr_to_string(pt->type);
+				error_line("\tSuggestion: ^ is used for pointer types, did you mean '&%s'?\n", s);
+				gb_string_free(s);
+			}
+			end_error_block();
+		} else {
+			elem = o.type;
+		}
+
+		if (pt->tag != nullptr) {
+			GB_ASSERT(pt->tag->kind == Ast_BasicDirective);
+			String name = pt->tag->BasicDirective.name.string;
+			if (name == "soa") {
+				// TODO(bill): generic #soa pointers
+				if (is_type_soa_struct(elem)) {
+					*type = alloc_type_soa_pointer(elem);
+				} else {
+					error(pt->tag, "#soa pointers require an #soa record type as the element");
+					*type = alloc_type_pointer(elem);
+				}
+			} else {
+				error(pt->tag, "Invalid tag applied to pointer, got #%.*s", LIT(name));
+				*type = alloc_type_pointer(elem);
+			}
+		} else {
+			*type = alloc_type_pointer(elem);
+		}
 		set_base_type(named_type, *type);
 		return true;
 	case_end;
@@ -2795,15 +2851,27 @@ bool check_type_internal(CheckerContext *ctx, Ast *e, Type **type, Type *named_t
 				if (name == "soa") {
 					*type = make_soa_struct_fixed(ctx, e, at->elem, elem, count, generic_type);
 				} else if (name == "simd") {
-					if (!is_type_valid_vector_elem(elem)) {
+					if (!is_type_valid_vector_elem(elem) && !is_type_polymorphic(elem)) {
 						gbString str = type_to_string(elem);
-						error(at->elem, "Invalid element type for 'intrinsics.simd_vector', expected an integer or float with no specific endianness, got '%s'", str);
+						error(at->elem, "Invalid element type for #simd, expected an integer, float, or boolean with no specific endianness, got '%s'", str);
 						gb_string_free(str);
 						*type = alloc_type_array(elem, count, generic_type);
 						goto array_end;
 					}
 
-					*type = alloc_type_simd_vector(count, elem);
+					if (generic_type != nullptr) {
+						// Ignore
+					} else if (count < 1 || !is_power_of_two(count)) {
+						error(at->count, "Invalid length for #simd, expected a power of two length, got '%lld'", cast(long long)count);
+						*type = alloc_type_array(elem, count, generic_type);
+						goto array_end;
+					}
+
+					*type = alloc_type_simd_vector(count, elem, generic_type);
+
+					if (count > SIMD_ELEMENT_COUNT_MAX) {
+						error(at->count, "#simd support a maximum element count of %d, got %lld", SIMD_ELEMENT_COUNT_MAX, cast(long long)count);
+					}
 				} else {
 					error(at->tag, "Invalid tag applied to array, got #%.*s", LIT(name));
 					*type = alloc_type_array(elem, count, generic_type);

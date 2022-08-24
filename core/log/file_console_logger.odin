@@ -56,7 +56,7 @@ create_console_logger :: proc(lowest := Level.Debug, opt := Default_Console_Logg
 	return Logger{file_console_logger_proc, data, lowest, opt}
 }
 
-destroy_console_logger :: proc(log: ^Logger) {
+destroy_console_logger :: proc(log: Logger) {
 	free(log.data)
 }
 
@@ -95,7 +95,7 @@ file_console_logger_proc :: proc(logger_data: rawptr, level: Level, text: string
 		fmt.sbprintf(&buf, "[%s] ", data.ident)
 	}
 	//TODO(Hoej): When we have better atomics and such, make this thread-safe
-	fmt.fprintf(h, "%s %s\n", strings.to_string(buf), text)
+	fmt.fprintf(h, "%s%s\n", strings.to_string(buf), text)
 }
 
 do_level_header :: proc(opts: Options, level: Level, str: ^strings.Builder) {

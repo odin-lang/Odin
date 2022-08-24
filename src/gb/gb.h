@@ -90,6 +90,10 @@ extern "C" {
 	#error This operating system is not supported
 #endif
 
+#if defined(GB_SYSTEM_UNIX)
+#include <sys/wait.h>
+#endif
+
 #if defined(_MSC_VER)
 	#define GB_COMPILER_MSVC 1
 #elif defined(__GNUC__)
@@ -1680,7 +1684,7 @@ GB_DEF gbFileContents gb_file_read_contents(gbAllocator a, b32 zero_terminate, c
 GB_DEF void           gb_file_free_contents(gbFileContents *fc);
 
 
-// TODO(bill): Should these have different na,es as they do not take in a gbFile * ???
+// TODO(bill): Should these have different names as they do not take in a gbFile * ???
 GB_DEF b32        gb_file_exists         (char const *filepath);
 GB_DEF gbFileTime gb_file_last_write_time(char const *filepath);
 GB_DEF b32        gb_file_copy           (char const *existing_filename, char const *new_filename, b32 fail_if_exists);
