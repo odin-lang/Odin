@@ -1777,9 +1777,6 @@ lbValue lb_emit_conv(lbProcedure *p, lbValue value, Type *t) {
 			lbValue res = {};
 			res = lb_emit_conv(p, value, platform_src_type);
 			res = lb_emit_conv(p, res, platform_dst_type);
-			if (is_type_different_to_arch_endianness(dst)) {
-				res = lb_emit_byte_swap(p, res, platform_dst_type);
-			}
 			return lb_emit_conv(p, res, t);
 		}
 
