@@ -1622,7 +1622,7 @@ sys_lseek :: proc "contextless" (fd: int, offset: i64, whence: int) -> i64 {
 		low := uintptr(offset & 0xFFFFFFFF)
 		high := uintptr(offset >> 32)
 		result: i64
-		res := i64(intrinsics.syscall(SYS__llseek, uintptr(fd), high, low, &result, uintptr(whence)))
+		res := i64(intrinsics.syscall(SYS__llseek, uintptr(fd), high, low, uintptr(&result), uintptr(whence)))
 		return res if res < 0 else result
 	}
 }
