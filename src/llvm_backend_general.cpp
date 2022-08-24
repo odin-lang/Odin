@@ -591,6 +591,9 @@ bool lb_try_update_alignment(lbValue ptr, unsigned alignment) {
 	return lb_try_update_alignment(ptr.value, alignment);
 }
 
+bool lb_can_try_to_inline_array_arith(Type *t) {
+	return type_size_of(t) <= build_context.max_simd_align;
+}
 
 bool lb_try_vector_cast(lbModule *m, lbValue ptr, LLVMTypeRef *vector_type_) {
 	Type *array_type = base_type(type_deref(ptr.type));
@@ -599,7 +602,7 @@ bool lb_try_vector_cast(lbModule *m, lbValue ptr, LLVMTypeRef *vector_type_) {
 	Type *elem_type = base_array_type(array_type);
 
 	// TODO(bill): Determine what is the correct limit for doing vector arithmetic
-	if (type_size_of(array_type) <= build_context.max_align &&
+	if (lb_can_try_to_inline_array_arith(array_type) &&
 	    is_type_valid_vector_elem(elem_type)) {
 		// Try to treat it like a vector if possible
 		bool possible = false;

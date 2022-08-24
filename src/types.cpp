@@ -1428,7 +1428,7 @@ i64 matrix_align_of(Type *t, struct TypePath *tp) {
 	}
 	GB_ASSERT(min_alignment >= elem_align);
 	
-	i64 align = gb_min(min_alignment, build_context.max_align);
+	i64 align = gb_min(min_alignment, build_context.max_simd_align);
 	return align;
 }
 

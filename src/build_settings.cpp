@@ -428,12 +428,13 @@ gb_global TargetMetrics target_essence_amd64 = {
 	str_lit("x86_64-pc-none-elf"),
 };
 
+
 gb_global TargetMetrics target_freestanding_wasm32 = {
 	TargetOs_freestanding,
 	TargetArch_wasm32,
 	4, 8, 16,
 	str_lit("wasm32-freestanding-js"),
-	str_lit(""),
+	str_lit("e-m:e-p:32:32-i64:64-n32:64-S128"),
 };
 
 gb_global TargetMetrics target_js_wasm32 = {
@@ -441,15 +442,7 @@ gb_global TargetMetrics target_js_wasm32 = {
 	TargetArch_wasm32,
 	4, 8, 16,
 	str_lit("wasm32-js-js"),
-	str_lit(""),
-};
-
-gb_global TargetMetrics target_js_wasm64 = {
-	TargetOs_js,
-	TargetArch_wasm64,
-	8, 8, 16,
-	str_lit("wasm64-js-js"),
-	str_lit(""),
+	str_lit("e-m:e-p:32:32-i64:64-n32:64-S128"),
 };
 
 gb_global TargetMetrics target_wasi_wasm32 = {
@@ -457,6 +450,15 @@ gb_global TargetMetrics target_wasi_wasm32 = {
 	TargetArch_wasm32,
 	4, 8, 16,
 	str_lit("wasm32-wasi-js"),
+	str_lit("e-m:e-p:32:32-i64:64-n32:64-S128"),
+};
+
+
+gb_global TargetMetrics target_js_wasm64 = {
+	TargetOs_js,
+	TargetArch_wasm64,
+	8, 8, 16,
+	str_lit("wasm64-js-js"),
 	str_lit(""),
 };
 

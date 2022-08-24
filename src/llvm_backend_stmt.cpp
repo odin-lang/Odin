@@ -1796,7 +1796,7 @@ void lb_build_assign_stmt_array(lbProcedure *p, TokenKind op, lbAddr const &lhs,
 
 	lbValue rhs = lb_emit_conv(p, value, lhs_type);
 
-	bool inline_array_arith = type_size_of(array_type) <= build_context.max_align;
+	bool inline_array_arith = lb_can_try_to_inline_array_arith(array_type);
 
 
 	if (lhs.kind == lbAddr_Swizzle) {
