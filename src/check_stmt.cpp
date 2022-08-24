@@ -1396,6 +1396,22 @@ bool check_stmt_internal_builtin_proc_id(Ast *expr, BuiltinProcId *id_) {
 	return id != BuiltinProc_Invalid;
 }
 
+bool check_expr_is_stack_variable(Ast *expr) {
+	Entity *e = entity_of_node(expr);
+	if (e && e->kind == Entity_Variable) {
+		if (e->flags & EntityFlag_Static) {
+			// okay
+		} else if (e->Variable.thread_local_model.len != 0) {
+			// okay
+		} else if (e->scope) {
+			if ((e->scope->flags & (ScopeFlag_Global|ScopeFlag_File)) == 0) {
+				return true;
+			}
+		}
+	}
+	return false;
+}
+
 void check_stmt_internal(CheckerContext *ctx, Ast *node, u32 flags) {
 	u32 mod_flags = flags & (~Stmt_FallthroughAllowed);
 	switch (node->kind) {
@@ -1677,6 +1693,29 @@ void check_stmt_internal(CheckerContext *ctx, Ast *node, u32 flags) {
 				check_assignment(ctx, o, e->type, str_lit("return statement"));
 				if (is_type_untyped(o->type)) {
 					update_untyped_expr_type(ctx, o->expr, e->type, true);
+				}
+
+
+				// NOTE(bill): This is very basic escape analysis
+				// This needs to be improved tremendously, and a lot of it done during the
+				// middle-end (or LLVM side) to improve checks and error messages
+				Ast *expr = unparen_expr(o->expr);
+				if (expr->kind == Ast_UnaryExpr && expr->UnaryExpr.op.kind == Token_And) {
+					Ast *x = unparen_expr(expr->UnaryExpr.expr);
+					if (x->kind == Ast_CompoundLit) {
+						error(expr, "Cannot return the address to a stack value from a procedure");
+					} else if (x->kind == Ast_IndexExpr) {
+						Ast *array = x->IndexExpr.expr;
+						if (is_type_array_like(type_of_expr(array)) && check_expr_is_stack_variable(array)) {
+							gbString t = type_to_string(type_of_expr(array));
+							error(expr, "Cannot return the address to an element of stack variable from a procedure, of type %s", t);
+							gb_string_free(t);
+						}
+					} else {
+						if (check_expr_is_stack_variable(x)) {
+							error(expr, "Cannot return the address to a stack variable from a procedure");
+						}
+					}
 				}
 			}
 		}
