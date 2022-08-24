@@ -3571,10 +3571,22 @@ i64 type_align_of_internal(Type *t, TypePath *path) {
 		return build_context.word_size;
 	}
 
-	// return gb_clamp(next_pow2(type_size_of(t)), 1, build_context.max_align);
+	i64 max_alignment = build_context.word_size;
+	if (is_arch_wasm()) {
+		// NOTE(bill): wasm32 with LLVM defines its default datalayout as:
+		//
+		//          e-m:e-p:32:32-i64:64-n32:64-S128
+		//
+		// This means that the alignment of a 64-bit type is 64-bits and not 32-bits like
+		// on other 32-bit architectures
+		//
+		// See: https://github.com/WebAssembly/tool-conventions/blob/main/BasicCABI.md
+		max_alignment = 8;
+	}
+
 	// NOTE(bill): Things that are bigger than build_context.word_size, are actually comprised of smaller types
 	// TODO(bill): Is this correct for 128-bit types (integers)?
-	return gb_clamp(next_pow2(type_size_of_internal(t, path)), 1, build_context.word_size);
+	return gb_clamp(next_pow2(type_size_of_internal(t, path)), 1, max_alignment);
 }
 
 i64 *type_set_offsets_of(Slice<Entity *> const &fields, bool is_packed, bool is_raw_union) {
