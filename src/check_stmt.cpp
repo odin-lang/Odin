@@ -1397,6 +1397,7 @@ bool check_stmt_internal_builtin_proc_id(Ast *expr, BuiltinProcId *id_) {
 }
 
 bool check_expr_is_stack_variable(Ast *expr) {
+	expr = unparen_expr(expr);
 	Entity *e = entity_of_node(expr);
 	if (e && e->kind == Entity_Variable) {
 		if (e->flags & EntityFlag_Static) {
@@ -1404,7 +1405,7 @@ bool check_expr_is_stack_variable(Ast *expr) {
 		} else if (e->Variable.thread_local_model.len != 0) {
 			// okay
 		} else if (e->scope) {
-			if ((e->scope->flags & (ScopeFlag_Global|ScopeFlag_File)) == 0) {
+			if ((e->scope->flags & (ScopeFlag_Global|ScopeFlag_File|ScopeFlag_Type)) == 0) {
 				return true;
 			}
 		}
