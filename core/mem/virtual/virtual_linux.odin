@@ -48,7 +48,7 @@ munmap :: proc "contextless" (addr: rawptr, length: uint) -> c.int {
 }
 
 mprotect :: proc "contextless" (addr: rawptr, length: uint, prot: c.int) -> c.int {
-	res := intrinsics.syscall(unix.SYS_mprotect, uintptr(addr), uintptr(length), uint(prot))
+	res := intrinsics.syscall(unix.SYS_mprotect, uintptr(addr), uintptr(length), uintptr(prot))
 	return c.int(res)
 }
 
