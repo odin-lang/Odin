@@ -1464,6 +1464,12 @@ void check_stmt_internal(CheckerContext *ctx, Ast *node, u32 flags) {
 				AstSelectorCallExpr *se = &expr->SelectorCallExpr;
 				ast_node(ce, CallExpr, se->call);
 				Type *t = base_type(type_of_expr(ce->proc));
+				if (t == nullptr) {
+					gbString expr_str = expr_to_string(ce->proc);
+					error(node, "'%s' is not a value field nor procedure", expr_str);
+					gb_string_free(expr_str);
+					return;
+				}
 				if (t->kind == Type_Proc) {
 					do_require = t->Proc.require_results;
 				} else if (check_stmt_internal_builtin_proc_id(ce->proc, &builtin_id)) {
