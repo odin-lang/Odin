@@ -1,7 +1,6 @@
 package reflect
 
 import "core:runtime"
-import "core:mem"
 import "core:intrinsics"
 _ :: intrinsics
 
@@ -224,7 +223,7 @@ align_of_typeid :: proc(T: typeid) -> int {
 as_bytes :: proc(v: any) -> []byte {
 	if v != nil {
 		sz := size_of_typeid(v.id)
-		return mem.slice_ptr((^byte)(v.data), sz)
+		return ([^]byte)(v.data)[:sz]
 	}
 	return nil
 }
@@ -266,19 +265,19 @@ length :: proc(val: any) -> int {
 		return a.count
 
 	case Type_Info_Slice:
-		return (^mem.Raw_Slice)(val.data).len
+		return (^runtime.Raw_Slice)(val.data).len
 
 	case Type_Info_Dynamic_Array:
-		return (^mem.Raw_Dynamic_Array)(val.data).len
+		return (^runtime.Raw_Dynamic_Array)(val.data).len
 
 	case Type_Info_Map:
-		return (^mem.Raw_Map)(val.data).entries.len
+		return (^runtime.Raw_Map)(val.data).entries.len
 
 	case Type_Info_String:
 		if a.is_cstring {
 			return len((^cstring)(val.data)^)
 		} else {
-			return (^mem.Raw_String)(val.data).len
+			return (^runtime.Raw_String)(val.data).len
 		}
 	}
 	return 0
@@ -301,10 +300,10 @@ capacity :: proc(val: any) -> int {
 		return a.count
 
 	case Type_Info_Dynamic_Array:
-		return (^mem.Raw_Dynamic_Array)(val.data).cap
+		return (^runtime.Raw_Dynamic_Array)(val.data).cap
 
 	case Type_Info_Map:
-		return (^mem.Raw_Map)(val.data).entries.cap
+		return (^runtime.Raw_Map)(val.data).entries.cap
 	}
 	return 0
 }
@@ -344,14 +343,14 @@ index :: proc(val: any, i: int, loc := #caller_location) -> any {
 		return any{data, a.elem.id}
 
 	case Type_Info_Slice:
-		raw := (^mem.Raw_Slice)(val.data)
+		raw := (^runtime.Raw_Slice)(val.data)
 		runtime.bounds_check_error_loc(loc, i, raw.len)
 		offset := uintptr(a.elem.size * i)
 		data := rawptr(uintptr(raw.data) + offset)
 		return any{data, a.elem.id}
 
 	case Type_Info_Dynamic_Array:
-		raw := (^mem.Raw_Dynamic_Array)(val.data)
+		raw := (^runtime.Raw_Dynamic_Array)(val.data)
 		runtime.bounds_check_error_loc(loc, i, raw.len)
 		offset := uintptr(a.elem.size * i)
 		data := rawptr(uintptr(raw.data) + offset)
@@ -360,7 +359,7 @@ index :: proc(val: any, i: int, loc := #caller_location) -> any {
 	case Type_Info_String:
 		if a.is_cstring { return nil }
 
-		raw := (^mem.Raw_String)(val.data)
+		raw := (^runtime.Raw_String)(val.data)
 		runtime.bounds_check_error_loc(loc, i, raw.len)
 		offset := uintptr(size_of(u8) * i)
 		data := rawptr(uintptr(raw.data) + offset)
@@ -837,17 +836,17 @@ set_union_value :: proc(dst: any, value: any) -> bool {
 	ti := runtime.type_info_base(type_info_of(dst.id))
 	if info, ok := ti.variant.(runtime.Type_Info_Union); ok {
 		if value.id == nil {
-			mem.zero(dst.data, ti.size)
+			intrinsics.mem_zero(dst.data, ti.size)
 			return true
 		}
 		if ti.id == runtime.typeid_base(value.id) {
-			mem.copy(dst.data, value.data, ti.size)
+			intrinsics.mem_copy(dst.data, value.data, ti.size)
 			return true
 		}
 		
 		if type_info_union_is_pure_maybe(info) {
 			if variant := info.variants[0]; variant.id == value.id {
-				mem.copy(dst.data, value.data, variant.size)
+				intrinsics.mem_copy(dst.data, value.data, variant.size)
 				return true
 			}
 			return false
@@ -859,7 +858,7 @@ set_union_value :: proc(dst: any, value: any) -> bool {
 				if !info.no_nil {
 					tag += 1
 				}
-				mem.copy(dst.data, value.data, variant.size)
+				intrinsics.mem_copy(dst.data, value.data, variant.size)
 				set_union_variant_raw_tag(dst, tag)
 				return true
 			}
@@ -1352,11 +1351,11 @@ as_raw_data :: proc(a: any) -> (value: rawptr, valid: bool) {
 
 	case Type_Info_Slice:
 		valid = true
-		value = (^mem.Raw_Slice)(a.data).data
+		value = (^runtime.Raw_Slice)(a.data).data
 
 	case Type_Info_Dynamic_Array:
 		valid = true
-		value = (^mem.Raw_Dynamic_Array)(a.data).data
+		value = (^runtime.Raw_Dynamic_Array)(a.data).data
 	}
 
 	return
@@ -1398,7 +1397,7 @@ equal :: proc(a, b: any, including_indirect_array_recursion := false, recursion_
 	}
 
 	if .Simple_Compare in t.flags {
-		return mem.compare_byte_ptrs((^byte)(a.data), (^byte)(b.data), t.size) == 0
+		return runtime.memory_compare(a.data, b.data, t.size) == 0
 	}
 	
 	t = runtime.type_info_core(t)
@@ -1436,7 +1435,7 @@ equal :: proc(a, b: any, including_indirect_array_recursion := false, recursion_
 		Type_Info_Relative_Pointer,
 		Type_Info_Soa_Pointer,
 		Type_Info_Matrix:
-		return mem.compare_byte_ptrs((^byte)(a.data), (^byte)(b.data), t.size) == 0
+		return runtime.memory_compare(a.data, b.data, t.size) == 0
 		
 	case Type_Info_String:
 		if v.is_cstring {
@@ -1490,8 +1489,8 @@ equal :: proc(a, b: any, including_indirect_array_recursion := false, recursion_
 		if !including_indirect_array_recursion {
 			return false
 		}
-		array_a := (^mem.Raw_Slice)(a.data)
-		array_b := (^mem.Raw_Slice)(b.data)
+		array_a := (^runtime.Raw_Slice)(a.data)
+		array_b := (^runtime.Raw_Slice)(b.data)
 		if array_a.len != array_b.len {
 			return false
 		}
@@ -1510,8 +1509,8 @@ equal :: proc(a, b: any, including_indirect_array_recursion := false, recursion_
 		if !including_indirect_array_recursion {
 			return false
 		}
-		array_a := (^mem.Raw_Dynamic_Array)(a.data)
-		array_b := (^mem.Raw_Dynamic_Array)(b.data)
+		array_a := (^runtime.Raw_Dynamic_Array)(a.data)
+		array_b := (^runtime.Raw_Dynamic_Array)(b.data)
 		if array_a.len != array_b.len {
 			return false
 		}
@@ -1519,7 +1518,7 @@ equal :: proc(a, b: any, including_indirect_array_recursion := false, recursion_
 			return true
 		}
 		if .Simple_Compare in v.elem.flags {
-			return mem.compare_byte_ptrs((^byte)(array_a.data), (^byte)(array_b.data), array_a.len * v.elem.size) == 0
+			return runtime.memory_compare((^byte)(array_a.data), (^byte)(array_b.data), array_a.len * v.elem.size) == 0
 		}
 		
 		for i in 0..<array_a.len {
