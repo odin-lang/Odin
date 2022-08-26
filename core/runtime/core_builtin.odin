@@ -425,7 +425,7 @@ append_string :: proc(array: ^$T/[dynamic]$E/u8, args: ..string, loc := #caller_
 @builtin
 append_nothing :: proc(array: ^$T/[dynamic]$E, loc := #caller_location) -> int {
 	if array == nil {
-		return
+		return 0
 	}
 	prev_len := len(array)
 	resize(array, len(array)+1)
