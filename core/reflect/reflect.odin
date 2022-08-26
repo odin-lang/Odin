@@ -729,6 +729,17 @@ get_union_variant_raw_tag :: proc(a: any) -> i64 {
 	panic("expected a union to reflect.get_union_variant_raw_tag")
 }
 
+get_union_variant :: proc(a: any) -> any {
+	if a == nil {
+		return nil
+	}
+	id := union_variant_typeid(a)
+	if id == nil {
+		return nil
+	}
+	return any{a.data, id}
+}
+
 
 set_union_variant_raw_tag :: proc(a: any, tag: i64) {
 	if a == nil { return }
