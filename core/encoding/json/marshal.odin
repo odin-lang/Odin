@@ -85,6 +85,7 @@ marshal_to_writer :: proc(w: io.Writer, v: any, opt: ^Marshal_Options) -> (err: 
 		case i16:     u = u128(i)
 		case i32:     u = u128(i)
 		case i64:     u = u128(i)
+		case i128:    u = u128(i)
 		case int:     u = u128(i)
 		case u8:      u = u128(i)
 		case u16:     u = u128(i)
