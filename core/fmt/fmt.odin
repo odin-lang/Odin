@@ -2059,18 +2059,33 @@ fmt_value :: proc(fi: ^Info, v: any, verb: rune) {
 			ed         := runtime.type_info_base(gs.types[1]).variant.(runtime.Type_Info_Dynamic_Array)
 			entry_type := ed.elem.variant.(runtime.Type_Info_Struct)
 			entry_size := ed.elem_size
+			/*
+				NOTE: The layout of a `map` is as follows:
 
+					map[Key]Value
+
+				## Internal Layout
+				struct {
+					hashes: []int,
+					entries: [dynamic]struct{
+						hash:  uintptr,
+						next:  int,
+						key:   Key,
+						value: Value,
+					},
+				}
+			*/
 			for i in 0..<entries.len {
 				if i > 0 { io.write_string(fi.writer, ", ", &fi.n) }
 
 				data := uintptr(entries.data) + uintptr(i*entry_size)
 
-				key := data + entry_type.offsets[2]
+				key := data + entry_type.offsets[2] // key: Key
 				fmt_arg(&Info{writer = fi.writer}, any{rawptr(key), info.key.id}, 'v')
 
 				io.write_string(fi.writer, "=", &fi.n)
 
-				value := data + entry_type.offsets[3]
+				value := data + entry_type.offsets[3] // value: Value
 				fmt_arg(fi, any{rawptr(value), info.value.id}, 'v')
 			}
 		}
