@@ -1400,7 +1400,7 @@ bool check_expr_is_stack_variable(Ast *expr) {
 	expr = unparen_expr(expr);
 	Entity *e = entity_of_node(expr);
 	if (e && e->kind == Entity_Variable) {
-		if (e->flags & EntityFlag_Static) {
+		if (e->flags & (EntityFlag_Static|EntityFlag_Using)) {
 			// okay
 		} else if (e->Variable.thread_local_model.len != 0) {
 			// okay
