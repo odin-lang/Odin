@@ -61,6 +61,7 @@ Image_Metadata :: union #shared_nil {
 	^Netpbm_Info,
 	^PNG_Info,
 	^QOI_Info,
+	^TGA_Info,
 }
 
 
@@ -168,6 +169,7 @@ Error :: union #shared_nil {
 
 General_Image_Error :: enum {
 	None = 0,
+	Unsupported_Option,
 	// File I/O
 	Unable_To_Read_File,
 	Unable_To_Write_File,
@@ -389,6 +391,10 @@ TGA_Header :: struct #packed {
 	image_descriptor: u8,
 }
 #assert(size_of(TGA_Header) == 18)
+
+TGA_Info :: struct {
+	header: TGA_Header,
+}
 
 // Function to help with image buffer calculations
 compute_buffer_size :: proc(width, height, channels, depth: int, extra_row_bytes := int(0)) -> (size: int) {
