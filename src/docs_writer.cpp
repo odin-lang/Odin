@@ -532,6 +532,10 @@ OdinDocTypeIndex odin_doc_type(OdinDocWriter *w, Type *type) {
 		doc_type.kind = OdinDocType_MultiPointer;
 		doc_type.types = odin_doc_type_as_slice(w, type->MultiPointer.elem);
 		break;
+	case Type_SoaPointer:
+		doc_type.kind = OdinDocType_SoaPointer;
+		doc_type.types = odin_doc_type_as_slice(w, type->SoaPointer.elem);
+		break;
 	case Type_Array:
 		doc_type.kind = OdinDocType_Array;
 		doc_type.elem_count_len = 1;

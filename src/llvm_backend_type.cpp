@@ -57,6 +57,7 @@ lbValue lb_typeid(lbModule *m, Type *type) {
 	case Type_SimdVector:      kind = Typeid_Simd_Vector;      break;
 	case Type_RelativePointer: kind = Typeid_Relative_Pointer; break;
 	case Type_RelativeSlice:   kind = Typeid_Relative_Slice;   break;
+	case Type_SoaPointer:      kind = Typeid_SoaPointer;       break;
 	}
 
 	if (is_type_cstring(type)) {
@@ -97,34 +98,12 @@ lbValue lb_type_info(lbModule *m, Type *type) {
 	isize index = lb_type_info_index(m->info, type);
 	GB_ASSERT(index >= 0);
 
-	LLVMTypeRef it = lb_type(m, t_int);
-	LLVMValueRef indices[2] = {
-		LLVMConstInt(it, 0, false),
-		LLVMConstInt(it, index, true),
-	};
-
-	lbValue value = {};
-	value.value = LLVMConstGEP(lb_global_type_info_data_ptr(m).value, indices, gb_count_of(indices));
-	value.type = t_type_info_ptr;
-	return value;
+	lbValue data = lb_global_type_info_data_ptr(m);
+	return lb_emit_array_epi(m, data, index);
 }
 
-lbValue lb_get_type_info_ptr(lbModule *m, Type *type) {
-	GB_ASSERT(!build_context.disallow_rtti);
-
-	i32 index = cast(i32)lb_type_info_index(m->info, type);
-	GB_ASSERT(index >= 0);
-	// gb_printf_err("%d %s\n", index, type_to_string(type));
-
-	LLVMValueRef indices[2] = {
-		LLVMConstInt(lb_type(m, t_int), 0, false),
-		LLVMConstInt(lb_type(m, t_int), index, false),
-	};
-
-	lbValue res = {};
-	res.type = t_type_info_ptr;
-	res.value = LLVMConstGEP(lb_global_type_info_data_ptr(m).value, indices, cast(unsigned)gb_count_of(indices));
-	return res;
+LLVMTypeRef lb_get_procedure_raw_type(lbModule *m, Type *type) {
+	return lb_type_internal_for_procedures_raw(m, type);
 }
 
 
@@ -178,10 +157,10 @@ void lb_setup_type_info_data(lbProcedure *p) { // NOTE(bill): Setup type_info da
 
 		LLVMValueRef indices[2] = {llvm_zero(m), llvm_zero(m)};
 		LLVMValueRef values[2] = {
-			LLVMConstInBoundsGEP(lb_global_type_info_data_ptr(m).value, indices, gb_count_of(indices)),
+			LLVMConstInBoundsGEP2(lb_type(m, lb_global_type_info_data_entity->type), lb_global_type_info_data_ptr(m).value, indices, gb_count_of(indices)),
 			LLVMConstInt(lb_type(m, t_int), type->Array.count, true),
 		};
-		LLVMValueRef slice = llvm_const_named_struct_internal(llvm_addr_type(global_type_table), values, gb_count_of(values));
+		LLVMValueRef slice = llvm_const_named_struct_internal(lb_type(m, type_deref(global_type_table.type)), values, gb_count_of(values));
 
 		LLVMSetInitializer(global_type_table.value, slice);
 	}
@@ -260,7 +239,7 @@ void lb_setup_type_info_data(lbProcedure *p) { // NOTE(bill): Setup type_info da
 
 			LLVMValueRef vals[4] = {
 				lb_const_string(p->module, t->Named.type_name->token.string).value,
-				lb_get_type_info_ptr(m, t->Named.base).value,
+				lb_type_info(m, t->Named.base).value,
 				pkg_name,
 				loc.value
 			};
@@ -419,7 +398,7 @@ void lb_setup_type_info_data(lbProcedure *p) { // NOTE(bill): Setup type_info da
 
 		case Type_Pointer: {
 			tag = lb_const_ptr_cast(m, variant_ptr, t_type_info_pointer_ptr);
-			lbValue gep = lb_get_type_info_ptr(m, t->Pointer.elem);
+			lbValue gep = lb_type_info(m, t->Pointer.elem);
 
 			LLVMValueRef vals[1] = {
 				gep.value,
@@ -433,7 +412,21 @@ void lb_setup_type_info_data(lbProcedure *p) { // NOTE(bill): Setup type_info da
 		}
 		case Type_MultiPointer: {
 			tag = lb_const_ptr_cast(m, variant_ptr, t_type_info_multi_pointer_ptr);
-			lbValue gep = lb_get_type_info_ptr(m, t->MultiPointer.elem);
+			lbValue gep = lb_type_info(m, t->MultiPointer.elem);
+
+			LLVMValueRef vals[1] = {
+				gep.value,
+			};
+
+			lbValue res = {};
+			res.type = type_deref(tag.type);
+			res.value = llvm_const_named_struct(m, res.type, vals, gb_count_of(vals));
+			lb_emit_store(p, tag, res);
+			break;
+		}
+		case Type_SoaPointer: {
+			tag = lb_const_ptr_cast(m, variant_ptr, t_type_info_soa_pointer_ptr);
+			lbValue gep = lb_type_info(m, t->SoaPointer.elem);
 
 			LLVMValueRef vals[1] = {
 				gep.value,
@@ -450,7 +443,7 @@ void lb_setup_type_info_data(lbProcedure *p) { // NOTE(bill): Setup type_info da
 			i64 ez = type_size_of(t->Array.elem);
 
 			LLVMValueRef vals[3] = {
-				lb_get_type_info_ptr(m, t->Array.elem).value,
+				lb_type_info(m, t->Array.elem).value,
 				lb_const_int(m, t_int, ez).value,
 				lb_const_int(m, t_int, t->Array.count).value,
 			};
@@ -465,8 +458,8 @@ void lb_setup_type_info_data(lbProcedure *p) { // NOTE(bill): Setup type_info da
 			tag = lb_const_ptr_cast(m, variant_ptr, t_type_info_enumerated_array_ptr);
 
 			LLVMValueRef vals[7] = {
-				lb_get_type_info_ptr(m, t->EnumeratedArray.elem).value,
-				lb_get_type_info_ptr(m, t->EnumeratedArray.index).value,
+				lb_type_info(m, t->EnumeratedArray.elem).value,
+				lb_type_info(m, t->EnumeratedArray.index).value,
 				lb_const_int(m, t_int, type_size_of(t->EnumeratedArray.elem)).value,
 				lb_const_int(m, t_int, t->EnumeratedArray.count).value,
 
@@ -497,7 +490,7 @@ void lb_setup_type_info_data(lbProcedure *p) { // NOTE(bill): Setup type_info da
 			tag = lb_const_ptr_cast(m, variant_ptr, t_type_info_dynamic_array_ptr);
 
 			LLVMValueRef vals[2] = {
-				lb_get_type_info_ptr(m, t->DynamicArray.elem).value,
+				lb_type_info(m, t->DynamicArray.elem).value,
 				lb_const_int(m, t_int, type_size_of(t->DynamicArray.elem)).value,
 			};
 
@@ -511,7 +504,7 @@ void lb_setup_type_info_data(lbProcedure *p) { // NOTE(bill): Setup type_info da
 			tag = lb_const_ptr_cast(m, variant_ptr, t_type_info_slice_ptr);
 
 			LLVMValueRef vals[2] = {
-				lb_get_type_info_ptr(m, t->Slice.elem).value,
+				lb_type_info(m, t->Slice.elem).value,
 				lb_const_int(m, t_int, type_size_of(t->Slice.elem)).value,
 			};
 
@@ -527,10 +520,10 @@ void lb_setup_type_info_data(lbProcedure *p) { // NOTE(bill): Setup type_info da
 			LLVMValueRef params = LLVMConstNull(lb_type(m, t_type_info_ptr));
 			LLVMValueRef results = LLVMConstNull(lb_type(m, t_type_info_ptr));
 			if (t->Proc.params != nullptr) {
-				params = lb_get_type_info_ptr(m, t->Proc.params).value;
+				params = lb_type_info(m, t->Proc.params).value;
 			}
 			if (t->Proc.results != nullptr) {
-				results = lb_get_type_info_ptr(m, t->Proc.results).value;
+				results = lb_type_info(m, t->Proc.results).value;
 			}
 
 			LLVMValueRef vals[4] = {
@@ -649,7 +642,7 @@ void lb_setup_type_info_data(lbProcedure *p) { // NOTE(bill): Setup type_info da
 				// NOTE(bill): Zeroth is nil so ignore it
 				for (isize variant_index = 0; variant_index < variant_count; variant_index++) {
 					Type *vt = t->Union.variants[variant_index];
-					lbValue tip = lb_get_type_info_ptr(m, vt);
+					lbValue tip = lb_type_info(m, vt);
 
 					lbValue index     = lb_const_int(m, t_int, variant_index);
 					lbValue type_info = lb_emit_ptr_offset(p, memory_types, index);
@@ -737,7 +730,7 @@ void lb_setup_type_info_data(lbProcedure *p) { // NOTE(bill): Setup type_info da
 				for (isize source_index = 0; source_index < count; source_index++) {
 					// TODO(bill): Order fields in source order not layout order
 					Entity *f = t->Struct.fields[source_index];
-					lbValue tip = lb_get_type_info_ptr(m, f->type);
+					lbValue tip = lb_type_info(m, f->type);
 					i64 foffset = 0;
 					if (!t->Struct.is_raw_union) {
 						GB_ASSERT(t->Struct.offsets != nullptr);
@@ -794,11 +787,11 @@ void lb_setup_type_info_data(lbProcedure *p) { // NOTE(bill): Setup type_info da
 			tag = lb_const_ptr_cast(m, variant_ptr, t_type_info_map_ptr);
 			init_map_internal_types(t);
 			
-			lbValue gst = lb_get_type_info_ptr(m, t->Map.generated_struct_type);
+			lbValue gst = lb_type_info(m, t->Map.generated_struct_type);
 
 			LLVMValueRef vals[5] = {
-				lb_get_type_info_ptr(m, t->Map.key).value,
-				lb_get_type_info_ptr(m, t->Map.value).value,
+				lb_type_info(m, t->Map.key).value,
+				lb_type_info(m, t->Map.value).value,
 				gst.value,
 				lb_get_equal_proc_for_type(m, t->Map.key).value,
 				lb_get_hasher_proc_for_type(m, t->Map.key).value
@@ -819,13 +812,13 @@ void lb_setup_type_info_data(lbProcedure *p) { // NOTE(bill): Setup type_info da
 
 
 				LLVMValueRef vals[4] = {
-					lb_get_type_info_ptr(m, t->BitSet.elem).value,
+					lb_type_info(m, t->BitSet.elem).value,
 					LLVMConstNull(lb_type(m, t_type_info_ptr)),
 					lb_const_int(m, t_i64, t->BitSet.lower).value,
 					lb_const_int(m, t_i64, t->BitSet.upper).value,
 				};
 				if (t->BitSet.underlying != nullptr) {
-					vals[1] =lb_get_type_info_ptr(m, t->BitSet.underlying).value;
+					vals[1] =lb_type_info(m, t->BitSet.underlying).value;
 				}
 
 				lbValue res = {};
@@ -841,7 +834,7 @@ void lb_setup_type_info_data(lbProcedure *p) { // NOTE(bill): Setup type_info da
 
 				LLVMValueRef vals[3] = {};
 
-				vals[0] = lb_get_type_info_ptr(m, t->SimdVector.elem).value;
+				vals[0] = lb_type_info(m, t->SimdVector.elem).value;
 				vals[1] = lb_const_int(m, t_int, type_size_of(t->SimdVector.elem)).value;
 				vals[2] = lb_const_int(m, t_int, t->SimdVector.count).value;
 
@@ -856,8 +849,8 @@ void lb_setup_type_info_data(lbProcedure *p) { // NOTE(bill): Setup type_info da
 			{
 				tag = lb_const_ptr_cast(m, variant_ptr, t_type_info_relative_pointer_ptr);
 				LLVMValueRef vals[2] = {
-					lb_get_type_info_ptr(m, t->RelativePointer.pointer_type).value,
-					lb_get_type_info_ptr(m, t->RelativePointer.base_integer).value,
+					lb_type_info(m, t->RelativePointer.pointer_type).value,
+					lb_type_info(m, t->RelativePointer.base_integer).value,
 				};
 
 				lbValue res = {};
@@ -870,8 +863,8 @@ void lb_setup_type_info_data(lbProcedure *p) { // NOTE(bill): Setup type_info da
 			{
 				tag = lb_const_ptr_cast(m, variant_ptr, t_type_info_relative_slice_ptr);
 				LLVMValueRef vals[2] = {
-					lb_get_type_info_ptr(m, t->RelativeSlice.slice_type).value,
-					lb_get_type_info_ptr(m, t->RelativeSlice.base_integer).value,
+					lb_type_info(m, t->RelativeSlice.slice_type).value,
+					lb_type_info(m, t->RelativeSlice.base_integer).value,
 				};
 
 				lbValue res = {};
@@ -886,7 +879,7 @@ void lb_setup_type_info_data(lbProcedure *p) { // NOTE(bill): Setup type_info da
 				i64 ez = type_size_of(t->Matrix.elem);
 
 				LLVMValueRef vals[5] = {
-					lb_get_type_info_ptr(m, t->Matrix.elem).value,
+					lb_type_info(m, t->Matrix.elem).value,
 					lb_const_int(m, t_int, ez).value,
 					lb_const_int(m, t_int, matrix_type_stride_in_elems(t)).value,
 					lb_const_int(m, t_int, t->Matrix.row_count).value,

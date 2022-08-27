@@ -1031,6 +1031,15 @@ fmt_pointer :: proc(fi: ^Info, p: rawptr, verb: rune) {
 	}
 }
 
+fmt_soa_pointer :: proc(fi: ^Info, p: runtime.Raw_Soa_Pointer, verb: rune) {
+	io.write_string(fi.writer, "#soa{data=0x", &fi.n)
+	_fmt_int(fi, u64(uintptr(p.data)), 16, false, 8*size_of(rawptr), __DIGITS_UPPER)
+	io.write_string(fi.writer, ", index=", &fi.n)
+	_fmt_int(fi, u64(p.index), 10, false, 8*size_of(rawptr), __DIGITS_UPPER)
+	io.write_string(fi.writer, "}", &fi.n)
+}
+
+
 enum_value_to_string :: proc(val: any) -> (string, bool) {
 	v := val
 	v.id = runtime.typeid_base(v.id)
@@ -1867,6 +1876,10 @@ fmt_value :: proc(fi: ^Info, v: any, verb: rune) {
 			fmt_pointer(fi, ptr, verb)
 		}
 
+	case runtime.Type_Info_Soa_Pointer:
+		ptr := (^runtime.Raw_Soa_Pointer)(v.data)^
+		fmt_soa_pointer(fi, ptr, verb)
+
 	case runtime.Type_Info_Multi_Pointer:
 		ptr := (^rawptr)(v.data)^
 		if ptr == nil {
@@ -2046,18 +2059,33 @@ fmt_value :: proc(fi: ^Info, v: any, verb: rune) {
 			ed         := runtime.type_info_base(gs.types[1]).variant.(runtime.Type_Info_Dynamic_Array)
 			entry_type := ed.elem.variant.(runtime.Type_Info_Struct)
 			entry_size := ed.elem_size
+			/*
+				NOTE: The layout of a `map` is as follows:
 
+					map[Key]Value
+
+				## Internal Layout
+				struct {
+					hashes: []int,
+					entries: [dynamic]struct{
+						hash:  uintptr,
+						next:  int,
+						key:   Key,
+						value: Value,
+					},
+				}
+			*/
 			for i in 0..<entries.len {
 				if i > 0 { io.write_string(fi.writer, ", ", &fi.n) }
 
 				data := uintptr(entries.data) + uintptr(i*entry_size)
 
-				key := data + entry_type.offsets[2]
+				key := data + entry_type.offsets[2] // key: Key
 				fmt_arg(&Info{writer = fi.writer}, any{rawptr(key), info.key.id}, 'v')
 
 				io.write_string(fi.writer, "=", &fi.n)
 
-				value := data + entry_type.offsets[3]
+				value := data + entry_type.offsets[3] // value: Value
 				fmt_arg(fi, any{rawptr(value), info.value.id}, 'v')
 			}
 		}

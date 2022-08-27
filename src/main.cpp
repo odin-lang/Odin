@@ -283,6 +283,9 @@ i32 linker_stage(lbGenerator *gen) {
 			String vs_exe_path = path_to_string(heap_allocator(), build_context.build_paths[BuildPath_VS_EXE]);
 			defer (gb_free(heap_allocator(), vs_exe_path.text));
 
+			String windows_sdk_bin_path = path_to_string(heap_allocator(), build_context.build_paths[BuildPath_Win_SDK_Bin_Path]);
+			defer (gb_free(heap_allocator(), windows_sdk_bin_path.text));
+
 			char const *subsystem_str = build_context.use_subsystem_windows ? "WINDOWS" : "CONSOLE";
 			if (!build_context.use_lld) { // msvc
 				if (build_context.has_resource) {
@@ -292,7 +295,8 @@ i32 linker_stage(lbGenerator *gen) {
 					defer (gb_free(heap_allocator(), res_path.text));
 
 					result = system_exec_command_line_app("msvc-link",
-						"\"rc.exe\" /nologo /fo \"%.*s\" \"%.*s\"",
+						"\"%.*src.exe\" /nologo /fo \"%.*s\" \"%.*s\"",
+						LIT(windows_sdk_bin_path),
 						LIT(res_path),
 						LIT(rc_path)
 					);
@@ -1558,7 +1562,7 @@ bool parse_build_flags(Array<String> args) {
 									bad_flags = true;
 									break;
 								}
-								build_context.resource_filepath = substring(path, 0, string_extension_position(path));
+								build_context.resource_filepath = path;
 								build_context.has_resource = true;
 							} else {
 								gb_printf_err("Invalid -resource path, got %.*s\n", LIT(path));

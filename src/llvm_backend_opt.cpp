@@ -62,7 +62,9 @@ void lb_basic_populate_function_pass_manager(LLVMPassManagerRef fpm, i32 optimiz
 		LLVMAddPromoteMemoryToRegisterPass(fpm);
 		LLVMAddMergedLoadStoreMotionPass(fpm);
 		LLVM_ADD_CONSTANT_VALUE_PASS(fpm);
-		LLVMAddEarlyCSEPass(fpm);
+		if (!build_context.ODIN_DEBUG) {
+			LLVMAddEarlyCSEPass(fpm);
+		}
 	}
 }
 

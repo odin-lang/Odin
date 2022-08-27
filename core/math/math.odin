@@ -185,16 +185,23 @@ log       :: proc{
 	log_f64, log_f64le, log_f64be,
 }
 
-log2_f16   :: logb_f16
-log2_f16le :: logb_f16le
-log2_f16be :: logb_f16be
-log2_f32   :: logb_f32
-log2_f32le :: logb_f32le
-log2_f32be :: logb_f32be
-log2_f64   :: logb_f64
-log2_f64le :: logb_f64le
-log2_f64be :: logb_f64be
-log2       :: logb
+log2_f16   :: proc "contextless" (x: f16)   -> f16   { return log(f16(x), f16(2.0)) }
+log2_f16le :: proc "contextless" (x: f16le) -> f16le { return f16le(log_f16(f16(x), f16(2.0))) }
+log2_f16be :: proc "contextless" (x: f16be) -> f16be { return f16be(log_f16(f16(x), f16(2.0))) }
+
+log2_f32   :: proc "contextless" (x: f32)   -> f32   { return log(f32(x), f32(2.0)) }
+log2_f32le :: proc "contextless" (x: f32le) -> f32le { return f32le(log_f32(f32(x), f32(2.0))) }
+log2_f32be :: proc "contextless" (x: f32be) -> f32be { return f32be(log_f32(f32(x), f32(2.0))) }
+
+log2_f64   :: proc "contextless" (x: f64)   -> f64   { return log(f64(x), f64(2.0)) }
+log2_f64le :: proc "contextless" (x: f64le) -> f64le { return f64le(log_f64(f64(x), f64(2.0))) }
+log2_f64be :: proc "contextless" (x: f64be) -> f64be { return f64be(log_f64(f64(x), f64(2.0))) }
+
+log2       :: proc{
+	log2_f16, log2_f16le, log2_f16be,
+	log2_f32, log2_f32le, log2_f32be,
+	log2_f64, log2_f64le, log2_f64be,
+}
 
 log10_f16   :: proc "contextless" (x: f16)   -> f16   { return ln(x)/LN10 }
 log10_f16le :: proc "contextless" (x: f16le) -> f16le { return f16le(log10_f16(f16(x))) }
@@ -606,6 +613,25 @@ floor_mod :: proc "contextless" (x, y: $T) -> T
 	}
 	return r
 }
+
+divmod :: #force_inline proc "contextless" (x, y: $T) -> (div, mod: T)
+	where intrinsics.type_is_integer(T) {
+	div = x / y
+	mod = x % y
+	return
+}
+
+floor_divmod :: #force_inline proc "contextless" (x, y: $T) -> (div, mod: T)
+	where intrinsics.type_is_integer(T) {
+	div = x / y
+	mod = x % y
+	if (div > 0 && y < 0) || (mod < 0 && y > 0) {
+		div -= 1
+		mod += y
+	}
+	return
+}
+
 
 modf_f16   :: proc "contextless" (x: f16) -> (int: f16, frac: f16) {
 	shift :: F16_SHIFT

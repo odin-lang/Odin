@@ -14,14 +14,14 @@ _ :: mem
 	Turn a pointer and a length into a slice.
 */
 from_ptr :: proc "contextless" (ptr: ^$T, count: int) -> []T {
-    return ([^]T)(ptr)[:count]
+	return ([^]T)(ptr)[:count]
 }
 
 /*
 	Turn a pointer and a length into a byte slice.
 */
 bytes_from_ptr :: proc "contextless" (ptr: rawptr, byte_count: int) -> []byte {
-    return ([^]byte)(ptr)[:byte_count]
+	return ([^]byte)(ptr)[:byte_count]
 }
 
 /*

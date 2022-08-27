@@ -50,26 +50,13 @@ gb_global gbAllocator mc_allocator = heap_allocator();
 struct Find_Result {
 	int windows_sdk_version;   // Zero if no Windows SDK found.
 
-	wchar_t const *windows_sdk_root;
-	wchar_t const *windows_sdk_um_library_path;
-	wchar_t const *windows_sdk_ucrt_library_path;
-
-	wchar_t const *vs_exe_path;
-	wchar_t const *vs_library_path;
-};
-
-struct Find_Result_Utf8 {
-	int windows_sdk_version;   // Zero if no Windows SDK found.
-
-	String windows_sdk_root;
+	String windows_sdk_bin_path;
 	String windows_sdk_um_library_path;
 	String windows_sdk_ucrt_library_path;
 
 	String vs_exe_path;
 	String vs_library_path;
 };
-
-Find_Result_Utf8 find_visual_studio_and_windows_sdk_utf8();
 
 String mc_wstring_to_string(wchar_t const *str) {
 	return string16_to_string(mc_allocator, make_string16_c(str));
@@ -85,6 +72,10 @@ String mc_concat(String a, String b) {
 
 String mc_concat(String a, String b, String c) {
 	return concatenate3_strings(mc_allocator, a, b, c);
+}
+
+String mc_concat(String a, String b, String c, String d) {
+	return concatenate4_strings(mc_allocator, a, b, c, d);
 }
 
 String mc_get_env(String key) {
@@ -219,19 +210,19 @@ struct DECLSPEC_UUID("42843719-DB4C-46C2-8E7C-64F1816EFD5B") DECLSPEC_NOVTABLE I
 
 
 // The beginning of the actual code that does things.
-struct Version_Data_Utf8 {
-	i32 best_version[4];  // For Windows 8 versions, only two of these numbers are used.
+struct Version_Data {
+	i32 best_version[4];
 	String best_name;
 };
 
-typedef void (*MC_Visit_Proc)(String short_name, String full_name, Version_Data_Utf8 *data);
-bool mc_visit_files(String dir_name, Version_Data_Utf8 *data, MC_Visit_Proc proc) {
+typedef void (*MC_Visit_Proc)(String short_name, String full_name, Version_Data *data);
+bool mc_visit_files(String dir_name, Version_Data *data, MC_Visit_Proc proc) {
 
 	// Visit everything in one folder (non-recursively). If it's a directory
 	// that doesn't start with ".", call the visit proc on it. The visit proc
 	// will see if the filename conforms to the expected versioning pattern.
 
-	String wildcard_name = mc_concat(dir_name, str_lit("\\*"));
+	String wildcard_name = mc_concat(dir_name, str_lit("*"));
 	defer (mc_free(wildcard_name));
 
 	MC_Find_Data find_data;
@@ -242,7 +233,7 @@ bool mc_visit_files(String dir_name, Version_Data_Utf8 *data, MC_Visit_Proc proc
 	bool success = true;
 	while (success) {
 		if ((find_data.file_attributes & FILE_ATTRIBUTE_DIRECTORY) && (find_data.filename[0] != '.')) {
-			String full_name = mc_concat(dir_name, str_lit("\\"), find_data.filename);
+			String full_name = mc_concat(dir_name, find_data.filename);
 			defer (mc_free(full_name));
 
 			proc(find_data.filename, full_name, data);
@@ -284,7 +275,7 @@ String find_windows_kit_root(HKEY key, String const version) {
 	return value;
 }
 
-void win10_best(String short_name, String full_name, Version_Data_Utf8 *data) {
+void win10_best(String short_name, String full_name, Version_Data *data) {
 	// Find the Windows 10 subdirectory with the highest version number.
 
 	int i0, i1, i2, i3;
@@ -304,11 +295,11 @@ void win10_best(String short_name, String full_name, Version_Data_Utf8 *data) {
 
 	// we have to copy_string and free here because visit_files free's the full_name string
 	// after we execute this function, so Win*_Data would contain an invalid pointer.
-	if (data->best_name.len > 0) mc_free(data->best_name);
+	if (data->best_name.len) mc_free(data->best_name);
 
 	data->best_name = copy_string(mc_allocator, full_name);
 
-	if (data->best_name.len > 0) {
+	if (data->best_name.len) {
 		data->best_version[0] = i0;
 		data->best_version[1] = i1;
 		data->best_version[2] = i2;
@@ -316,34 +307,8 @@ void win10_best(String short_name, String full_name, Version_Data_Utf8 *data) {
 	}
 }
 
-void win8_best(String short_name, String full_name, Version_Data_Utf8 *data) {
-	// Find the Windows 8 subdirectory with the highest version number.
-
-	int i0, i1;
-	auto success = sscanf_s((const char *const)short_name.text, "winv%d.%d", &i0, &i1);
-	if (success < 2) return;
-
-	if (i0 < data->best_version[0]) return;
-	else if (i0 == data->best_version[0]) {
-		if (i1 < data->best_version[1]) return;
-	}
-
-	// we have to copy_string and free here because visit_files free's the full_name string
-	// after we execute this function, so Win*_Data would contain an invalid pointer.
-	if (data->best_name.len > 0) mc_free(data->best_name);
-	data->best_name = copy_string(mc_allocator, full_name);
-
-	if (data->best_name.len > 0) {
-		data->best_version[0] = i0;
-		data->best_version[1] = i1;
-	}
-}
-
-void find_windows_kit_root(Find_Result_Utf8 *result) {
-	// Information about the Windows 10 and Windows 8 development kits
-	// is stored in the same place in the registry. We open a key
-	// to that place, first checking preferntially for a Windows 10 kit,
-	// then, if that's not found, a Windows 8 kit.
+void find_windows_kit_paths(Find_Result *result) {
+	bool sdk_found = false;
 
 	HKEY main_key;
 
@@ -355,44 +320,42 @@ void find_windows_kit_root(Find_Result_Utf8 *result) {
 	// Look for a Windows 10 entry.
 	String windows10_root = find_windows_kit_root(main_key, str_lit("KitsRoot10"));
 
-	if (windows10_root.len > 0) {
+	if (windows10_root.len) {
 		defer (mc_free(windows10_root));
 
-		String windows10_lib = mc_concat(windows10_root, str_lit("Lib"));
+		String windows10_lib = mc_concat(windows10_root, str_lit("Lib\\"));
+		Version_Data data_lib = {0};
+		mc_visit_files(windows10_lib, &data_lib, win10_best);
 		defer (mc_free(windows10_lib));
+		defer (mc_free(data_lib.best_name));
 
-		Version_Data_Utf8 data = {0};
-		mc_visit_files(windows10_lib, &data, win10_best);
-		if (data.best_name.len > 0) {
-			result->windows_sdk_version = 10;
-			result->windows_sdk_root    = mc_concat(data.best_name, str_lit("\\"));
-			return;
+		String windows10_bin = mc_concat(windows10_root, str_lit("bin\\"));
+		Version_Data data_bin = {0};
+		mc_visit_files(windows10_bin, &data_bin, win10_best);
+		defer (mc_free(windows10_bin));
+		defer (mc_free(data_bin.best_name));
+
+		if (data_lib.best_name.len && data_bin.best_name.len) {
+			if (build_context.metrics.arch == TargetArch_amd64) {
+				result->windows_sdk_um_library_path   = mc_concat(data_lib.best_name, str_lit("\\um\\x64\\"));
+				result->windows_sdk_ucrt_library_path = mc_concat(data_lib.best_name, str_lit("\\ucrt\\x64\\"));
+				result->windows_sdk_bin_path          = mc_concat(data_bin.best_name, str_lit("\\x64\\"));
+				sdk_found = true;
+			} else if (build_context.metrics.arch == TargetArch_i386) {
+				result->windows_sdk_um_library_path   = mc_concat(data_lib.best_name, str_lit("\\um\\x86\\"));
+				result->windows_sdk_ucrt_library_path = mc_concat(data_lib.best_name, str_lit("\\ucrt\\x86\\"));
+				result->windows_sdk_bin_path          = mc_concat(data_bin.best_name, str_lit("\\x86\\"));
+				sdk_found = true;
+			}
 		}
-		mc_free(data.best_name);
 	}
 
-	// Look for a Windows 8 entry.
-	String windows8_root = find_windows_kit_root(main_key, str_lit("KitsRoot81"));
-
-	if (windows8_root.len > 0) {
-		defer (mc_free(windows8_root));
-
-		String windows8_lib = mc_concat(windows8_root, str_lit("Lib"));
-		defer (mc_free(windows8_lib));
-
-		Version_Data_Utf8 data = {0};
-		mc_visit_files(windows8_lib, &data, win8_best);
-		if (data.best_name.len > 0) {
-			result->windows_sdk_version = 8;
-			result->windows_sdk_root    = mc_concat(data.best_name, str_lit("\\"));
-			return;
-		}
-		mc_free(data.best_name);
+	if (sdk_found) {
+		result->windows_sdk_version = 10;
 	}
-	// If we get here, we failed to find anything.
 }
 
-bool find_visual_studio_by_fighting_through_microsoft_craziness(Find_Result_Utf8 *result) {
+bool find_visual_studio_by_fighting_through_microsoft_craziness(Find_Result *result) {
 	// The name of this procedure is kind of cryptic. Its purpose is
 	// to fight through Microsoft craziness. The things that the fine
 	// Visual Studio team want you to do, JUST TO FIND A SINGLE FOLDER
@@ -555,54 +518,97 @@ bool find_visual_studio_by_fighting_through_microsoft_craziness(Find_Result_Utf8
 }
 
 // NOTE(WalterPlinge): Environment variables can help to find Visual C++ and WinSDK paths for both
-// official and portable installations (like mmozeiko's portable msvc script). This will only use
-// the first paths it finds, and won't overwrite any values that `result` already has.
-bool find_msvc_install_from_env_vars(Find_Result_Utf8 *result) {
+// official and portable installations (like mmozeiko's portable msvc script).
+void find_windows_kit_paths_from_env_vars(Find_Result *result) {
 	if (build_context.metrics.arch != TargetArch_amd64 && build_context.metrics.arch != TargetArch_i386) {
-		return false;
+		return;
 	}
 
-	// We can find windows sdk using the following combination of env vars:
-	// (UniversalCRTSdkDir or WindowsSdkDir) and (WindowsSDKLibVersion or WindowsSDKVersion)
-	bool sdk_found = false;
+	// We can find windows sdk lib dir using the following combination of env vars:
+	// (WindowsSdkDir or UniversalCRTSdkDir) and (WindowsSDKVersion or WindowsSDKLibVersion)
+	bool sdk_lib_found = false;
+
+	// We can find windows sdk bin dir using the following combination of env vars:
+	// (WindowsSdkVerBinPath) or ((WindowsSdkBinPath or WindowsSdkDir or UniversalCRTSdkDir) and (WindowsSDKVersion || WindowsSDKLibVersion))
+	bool sdk_bin_found = false;
 
 	// These appear to be suitable env vars used by Visual Studio
 	String win_sdk_ver_env = mc_get_env(str_lit("WindowsSDKVersion"));
-	String win_sdk_lib_env = mc_get_env(str_lit("WindowsSDKLibVersion"));
+	String win_sdk_lib_ver_env = mc_get_env(str_lit("WindowsSDKLibVersion"));
 	String win_sdk_dir_env = mc_get_env(str_lit("WindowsSdkDir"));
 	String crt_sdk_dir_env = mc_get_env(str_lit("UniversalCRTSdkDir"));
+	String win_sdk_bin_path_env = mc_get_env(str_lit("WindowsSdkBinPath"));
+	String win_sdk_ver_bin_path_env = mc_get_env(str_lit("WindowsSdkVerBinPath"));
 
 	defer ({
 		mc_free(win_sdk_ver_env);
-		mc_free(win_sdk_lib_env);
+		mc_free(win_sdk_lib_ver_env);
 		mc_free(win_sdk_dir_env);
 		mc_free(crt_sdk_dir_env);
+		mc_free(win_sdk_bin_path_env);
+		mc_free(win_sdk_ver_bin_path_env);
 	});
 
+	if (win_sdk_ver_bin_path_env.len || ((win_sdk_bin_path_env.len || win_sdk_dir_env.len || crt_sdk_dir_env.len) && (win_sdk_ver_env.len || win_sdk_lib_ver_env.len))) {
+		String bin;
+		defer (mc_free(bin));
+
+		if (win_sdk_ver_bin_path_env.len) {
+			String dir = win_sdk_ver_bin_path_env;
+
+			// Add trailing '\' in case it was missing
+			bin = mc_concat(dir, dir[dir.len - 1] != '\\' ? str_lit("\\") : str_lit(""));
+		} else {
+			String dir = win_sdk_bin_path_env.len ? win_sdk_bin_path_env : win_sdk_dir_env.len ? win_sdk_dir_env : crt_sdk_dir_env;
+			String ver = win_sdk_ver_env.len ? win_sdk_ver_env : win_sdk_lib_ver_env;
+
+			// Add trailing '\' in case it was missing
+			dir = mc_concat(dir, dir[dir.len - 1] != '\\' ? str_lit("\\") : str_lit(""));
+			ver = mc_concat(ver, ver[ver.len - 1] != '\\' ? str_lit("\\") : str_lit(""));
+			defer (mc_free(dir));
+			defer (mc_free(ver));
+
+			// Append "bin" for win_sdk_dir_env and crt_sdk_dir_env
+			String dir_bin = mc_concat(dir, win_sdk_bin_path_env.len ? str_lit("") : str_lit("bin\\"));
+			defer (mc_free(dir_bin));
+
+			bin = mc_concat(dir_bin, ver);
+		}
+
+		if (build_context.metrics.arch == TargetArch_amd64) {
+			result->windows_sdk_bin_path = mc_concat(bin, str_lit("x64\\"));
+			sdk_bin_found = true;
+		} else if (build_context.metrics.arch == TargetArch_i386) {
+			result->windows_sdk_bin_path = mc_concat(bin, str_lit("x86\\"));
+			sdk_bin_found = true;
+		} 
+	}
+
 	// NOTE(WalterPlinge): If any combination is found, let's just assume they are correct
-	if ((win_sdk_ver_env.len || win_sdk_lib_env.len) && (win_sdk_dir_env.len || crt_sdk_dir_env.len)) {
-		//? Maybe we need to handle missing '\' at end of strings, so far it doesn't seem an issue
+	if ((win_sdk_ver_env.len || win_sdk_lib_ver_env.len) && (win_sdk_dir_env.len || crt_sdk_dir_env.len)) {
 		String dir = win_sdk_dir_env.len ? win_sdk_dir_env : crt_sdk_dir_env;
-		String ver = win_sdk_ver_env.len ? win_sdk_ver_env : win_sdk_lib_env;
+		String ver = win_sdk_ver_env.len ? win_sdk_ver_env : win_sdk_lib_ver_env;
 
-		// These have trailing '\' as we are just composing the path
-		String um_dir = build_context.metrics.arch == TargetArch_amd64
-			? str_lit("um\\x64\\")
-			: str_lit("um\\x86\\");
-		String ucrt_dir = build_context.metrics.arch == TargetArch_amd64
-			? str_lit("ucrt\\x64\\")
-			: str_lit("ucrt\\x86\\");
+		// Add trailing '\' in case it was missing
+		dir = mc_concat(dir, dir[dir.len - 1] != '\\' ? str_lit("\\") : str_lit(""));
+		ver = mc_concat(ver, ver[ver.len - 1] != '\\' ? str_lit("\\") : str_lit(""));
+		defer (mc_free(dir));
+		defer (mc_free(ver));
 
-		result->windows_sdk_root              = mc_concat(dir, str_lit("Lib\\"), ver);
-		result->windows_sdk_um_library_path   = mc_concat(result->windows_sdk_root, um_dir);
-		result->windows_sdk_ucrt_library_path = mc_concat(result->windows_sdk_root, ucrt_dir);
-
-		sdk_found = true;
+		if (build_context.metrics.arch == TargetArch_amd64) {
+			result->windows_sdk_um_library_path   = mc_concat(dir, str_lit("Lib\\"), ver, str_lit("um\\x64\\"));
+			result->windows_sdk_ucrt_library_path = mc_concat(dir, str_lit("Lib\\"), ver, str_lit("ucrt\\x64\\"));
+			sdk_lib_found = true;
+		} else if (build_context.metrics.arch == TargetArch_i386) {
+			result->windows_sdk_um_library_path   = mc_concat(dir, str_lit("Lib\\"), ver, str_lit("um\\x86\\"));
+			result->windows_sdk_ucrt_library_path = mc_concat(dir, str_lit("Lib\\"), ver, str_lit("ucrt\\x86\\"));
+			sdk_lib_found = true;
+		}
 	}
 
 	// If we haven't found it yet, we can loop through LIB for specific folders
 	//? This may not be robust enough using `um\x64` and `ucrt\x64`
-	if (!sdk_found) {
+	if (!sdk_lib_found) {
 		String lib = mc_get_env(str_lit("LIB"));
 		defer (mc_free(lib));
 
@@ -624,38 +630,30 @@ bool find_msvc_install_from_env_vars(Find_Result_Utf8 *result) {
 					continue;
 				}
 				hi = c;
-				String dir = substring(lib, lo, hi);
 				defer (lo = hi + 1);
+
+				// Skip when there are two ;; in a row
+				if (lo == hi) {
+					continue;
+				}
+
+				String dir = substring(lib, lo, hi);
 
 				// Remove the last slash so we can match with the strings above
 				String end = dir[dir.len - 1] == '\\'
 					? substring(dir, 0, dir.len - 1)
 					: substring(dir, 0, dir.len);
 
-				// Find one and we can make the other
 				if (string_ends_with(end, um_dir)) {
-					result->windows_sdk_um_library_path   = mc_concat(end, str_lit("\\"));
-					break;
+					result->windows_sdk_um_library_path = mc_concat(end, str_lit("\\"));
 				} else if (string_ends_with(end, ucrt_dir)) {
 					result->windows_sdk_ucrt_library_path = mc_concat(end, str_lit("\\"));
+				}
+
+				if (result->windows_sdk_um_library_path.len && result->windows_sdk_ucrt_library_path.len) {
+					sdk_lib_found = true;
 					break;
 				}
-			}
-
-			// Get the root from the one we found, and make the other
-			// NOTE(WalterPlinge): we need to copy the string so that we don't risk a double free
-			if (result->windows_sdk_um_library_path.len > 0) {
-				String root = substring(result->windows_sdk_um_library_path, 0, result->windows_sdk_um_library_path.len - 1 - um_dir.len);
-				result->windows_sdk_root              = copy_string(mc_allocator, root);
-				result->windows_sdk_ucrt_library_path = mc_concat(result->windows_sdk_root, ucrt_dir, str_lit("\\"));
-			} else if (result->windows_sdk_ucrt_library_path.len > 0) {
-				String root = substring(result->windows_sdk_ucrt_library_path, 0, result->windows_sdk_ucrt_library_path.len - 1 - ucrt_dir.len);
-				result->windows_sdk_root              = copy_string(mc_allocator, root);
-				result->windows_sdk_um_library_path   = mc_concat(result->windows_sdk_root, um_dir, str_lit("\\"));
-			}
-
-			if (result->windows_sdk_root.len > 0) {
-				sdk_found = true;
 			}
 		}
 	}
@@ -663,33 +661,36 @@ bool find_msvc_install_from_env_vars(Find_Result_Utf8 *result) {
 	// NOTE(WalterPlinge): So far this function assumes it will only be called if MSVC was
 	// installed using mmozeiko's portable msvc script, which uses the windows 10 sdk.
 	// This may need to be changed later if it ends up causing problems.
-	if (sdk_found && result->windows_sdk_version == 0) {
+	if (sdk_bin_found && sdk_lib_found) {
 		result->windows_sdk_version = 10;
+	}
+}
+
+// NOTE(WalterPlinge): Environment variables can help to find Visual C++ and WinSDK paths for both
+// official and portable installations (like mmozeiko's portable msvc script). This will only use
+// the first paths it finds, and won't overwrite any values that `result` already has.
+void find_visual_studio_paths_from_env_vars(Find_Result *result) {
+	if (build_context.metrics.arch != TargetArch_amd64 && build_context.metrics.arch != TargetArch_i386) {
+		return;
 	}
 
 	bool vs_found = false;
 
-	if (result->vs_exe_path.len > 0 && result->vs_library_path.len > 0) {
-		vs_found = true;
-	}
-
 	// We can find visual studio using VCToolsInstallDir
-	if (!vs_found) {
-		String vctid = mc_get_env(str_lit("VCToolsInstallDir"));
-		defer (mc_free(vctid));
+	String vctid = mc_get_env(str_lit("VCToolsInstallDir"));
+	defer (mc_free(vctid));
 
-		if (vctid.len) {
-			String exe = build_context.metrics.arch == TargetArch_amd64
-				? str_lit("bin\\Hostx64\\x64\\")
-				: str_lit("bin\\Hostx86\\x86\\");
-			String lib = build_context.metrics.arch == TargetArch_amd64
-				? str_lit("lib\\x64\\")
-				: str_lit("lib\\x86\\");
+	if (vctid.len) {
+		String exe = build_context.metrics.arch == TargetArch_amd64
+			? str_lit("bin\\Hostx64\\x64\\")
+			: str_lit("bin\\Hostx86\\x86\\");
+		String lib = build_context.metrics.arch == TargetArch_amd64
+			? str_lit("lib\\x64\\")
+			: str_lit("lib\\x86\\");
 
-			result->vs_exe_path     = mc_concat(vctid, exe);
-			result->vs_library_path = mc_concat(vctid, lib);
-			vs_found = true;
-		}
+		result->vs_exe_path     = mc_concat(vctid, exe);
+		result->vs_library_path = mc_concat(vctid, lib);
+		vs_found = true;
 	}
 
 	// If we haven't found it yet, we can loop through Path for specific folders
@@ -701,21 +702,32 @@ bool find_msvc_install_from_env_vars(Find_Result_Utf8 *result) {
 			String exe = build_context.metrics.arch == TargetArch_amd64
 				? str_lit("bin\\Hostx64\\x64")
 				: str_lit("bin\\Hostx86\\x86");
+			// The environment variable may have an uppercase X even though the folder is lowercase
+			String exe2 = build_context.metrics.arch == TargetArch_amd64
+				? str_lit("bin\\HostX64\\x64")
+				: str_lit("bin\\HostX86\\x86");
 			String lib = build_context.metrics.arch == TargetArch_amd64
 				? str_lit("lib\\x64")
 				: str_lit("lib\\x86");
 
 			isize lo = {0};
 			isize hi = {0};
-			for (isize c = 0; c < path.len; c += 1) {
-				if (path[c] != ';') {
+			for (isize c = 0; c <= path.len; c += 1) {
+				if (c != path.len && path[c] != ';') {
 					continue;
 				}
 
 				hi = c;
-				String dir = substring(path, lo, hi);
 				defer (lo = hi + 1);
 
+				// Skip when there are two ;; in a row
+				if (lo == hi) {
+					continue;
+				}
+
+				String dir = substring(path, lo, hi);
+
+				// Remove the last slash so we can match with the strings above
 				String end = dir[dir.len - 1] == '\\'
 					? substring(dir, 0, dir.len - 1)
 					: substring(dir, 0, dir.len);
@@ -726,7 +738,10 @@ bool find_msvc_install_from_env_vars(Find_Result_Utf8 *result) {
 				defer (mc_free(cl));
 				defer (mc_free(link));
 
-				if (!string_ends_with(end, exe) || !gb_file_exists((char *)cl.text) || !gb_file_exists((char *)link.text)) {
+				if (!string_ends_with(end, exe) && !string_ends_with(end, exe2)) {
+					continue;
+				}
+				if (!gb_file_exists((char *)cl.text) || !gb_file_exists((char *)link.text)) {
 					continue;
 				}
 
@@ -735,42 +750,36 @@ bool find_msvc_install_from_env_vars(Find_Result_Utf8 *result) {
 				result->vs_library_path = mc_concat(root, lib, str_lit("\\"));
 
 				vs_found = true;
+				break;
 			}
 		}
 	}
-
-	return sdk_found && vs_found;
 }
 
-Find_Result_Utf8 find_visual_studio_and_windows_sdk_utf8() {
-	Find_Result_Utf8 r = {};
-	find_windows_kit_root(&r);
-
-	if (r.windows_sdk_root.len > 0) {
-		if (build_context.metrics.arch == TargetArch_amd64) {
-			r.windows_sdk_um_library_path   = mc_concat(r.windows_sdk_root, str_lit("um\\x64\\"));
-			r.windows_sdk_ucrt_library_path = mc_concat(r.windows_sdk_root, str_lit("ucrt\\x64\\"));
-		} else if (build_context.metrics.arch == TargetArch_i386) {
-			r.windows_sdk_um_library_path   = mc_concat(r.windows_sdk_root, str_lit("um\\x86\\"));
-			r.windows_sdk_ucrt_library_path = mc_concat(r.windows_sdk_root, str_lit("ucrt\\x86\\"));
-		}
-	}
-
+Find_Result find_visual_studio_and_windows_sdk() {
+	Find_Result r = {};
+	find_windows_kit_paths(&r);
 	find_visual_studio_by_fighting_through_microsoft_craziness(&r);
 
-	bool all_found =
-		r.windows_sdk_root.len              > 0 &&
-		r.windows_sdk_um_library_path.len   > 0 &&
-		r.windows_sdk_ucrt_library_path.len > 0 &&
-		r.vs_exe_path.len                   > 0 &&
-		r.vs_library_path.len               > 0;
+	bool sdk_found =
+		r.windows_sdk_bin_path.len          &&
+		r.windows_sdk_um_library_path.len   &&
+		r.windows_sdk_ucrt_library_path.len ;
 
-	if (!all_found) {
-		find_msvc_install_from_env_vars(&r);
+	bool vs_found = 
+		r.vs_exe_path.len                   &&
+		r.vs_library_path.len               ;
+
+	if (!sdk_found) {
+		find_windows_kit_paths_from_env_vars(&r);
+	}
+
+	if (!vs_found) {
+		find_visual_studio_paths_from_env_vars(&r);
 	}
 
 #if 0
-	printf("windows_sdk_root:              %.*s\n", LIT(r.windows_sdk_root));
+	printf("windows_sdk_bin_path:          %.*s\n", LIT(r.windows_sdk_bin_path));
 	printf("windows_sdk_um_library_path:   %.*s\n", LIT(r.windows_sdk_um_library_path));
 	printf("windows_sdk_ucrt_library_path: %.*s\n", LIT(r.windows_sdk_ucrt_library_path));
 	printf("vs_exe_path:                   %.*s\n", LIT(r.vs_exe_path));

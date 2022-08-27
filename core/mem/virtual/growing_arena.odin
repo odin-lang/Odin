@@ -13,6 +13,13 @@ Growing_Arena :: struct {
 
 DEFAULT_MINIMUM_BLOCK_SIZE :: 1<<20 // 1 MiB should be enough
 
+growing_arena_init :: proc(arena: ^Static_Arena, reserved: uint = DEFAULT_MINIMUM_BLOCK_SIZE) -> (err: Allocator_Error) {
+	arena.block = memory_block_alloc(0, reserved, {}) or_return
+	arena.total_used = 0
+	arena.total_reserved = arena.block.reserved
+	return
+}
+
 growing_arena_alloc :: proc(arena: ^Growing_Arena, min_size: int, alignment: int) -> (data: []byte, err: Allocator_Error) {
 	align_forward_offset :: proc "contextless" (arena: ^Growing_Arena, alignment: int) -> uint #no_bounds_check {
 		alignment_offset := uint(0)
@@ -37,7 +44,7 @@ growing_arena_alloc :: proc(arena: ^Growing_Arena, min_size: int, alignment: int
 		
 		block_size := max(size, arena.minimum_block_size)
 		
-		new_block := memory_block_alloc(block_size, block_size, {}) or_return
+		new_block := memory_block_alloc(size, block_size, {}) or_return
 		new_block.prev = arena.curr_block
 		arena.curr_block = new_block
 		arena.total_reserved += new_block.reserved	
@@ -95,9 +102,9 @@ growing_arena_allocator :: proc(arena: ^Growing_Arena) -> mem.Allocator {
 }
 
 growing_arena_allocator_proc :: proc(allocator_data: rawptr, mode: mem.Allocator_Mode,
-                             size, alignment: int,
-                             old_memory: rawptr, old_size: int,
-                             location := #caller_location) -> (data: []byte, err: Allocator_Error) {
+                                     size, alignment: int,
+                                     old_memory: rawptr, old_size: int,
+                                     location := #caller_location) -> (data: []byte, err: Allocator_Error) {
 	arena := (^Growing_Arena)(allocator_data)
 		
 	switch mode {

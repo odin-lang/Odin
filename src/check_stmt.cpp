@@ -1,8 +1,5 @@
-bool is_diverging_stmt(Ast *stmt) {
-	if (stmt->kind != Ast_ExprStmt) {
-		return false;
-	}
-	Ast *expr = unparen_expr(stmt->ExprStmt.expr);
+bool is_diverging_expr(Ast *expr) {
+	expr = unparen_expr(expr);
 	if (expr->kind != Ast_CallExpr) {
 		return false;
 	}
@@ -25,6 +22,12 @@ bool is_diverging_stmt(Ast *stmt) {
 	Type *t = tv.type;
 	t = base_type(t);
 	return t != nullptr && t->kind == Type_Proc && t->Proc.diverging;
+}
+bool is_diverging_stmt(Ast *stmt) {
+	if (stmt->kind != Ast_ExprStmt) {
+		return false;
+	}
+	return is_diverging_expr(stmt->ExprStmt.expr);
 }
 
 bool contains_deferred_call(Ast *node) {
@@ -1393,6 +1396,23 @@ bool check_stmt_internal_builtin_proc_id(Ast *expr, BuiltinProcId *id_) {
 	return id != BuiltinProc_Invalid;
 }
 
+bool check_expr_is_stack_variable(Ast *expr) {
+	expr = unparen_expr(expr);
+	Entity *e = entity_of_node(expr);
+	if (e && e->kind == Entity_Variable) {
+		if (e->flags & (EntityFlag_Static|EntityFlag_Using)) {
+			// okay
+		} else if (e->Variable.thread_local_model.len != 0) {
+			// okay
+		} else if (e->scope) {
+			if ((e->scope->flags & (ScopeFlag_Global|ScopeFlag_File|ScopeFlag_Type)) == 0) {
+				return true;
+			}
+		}
+	}
+	return false;
+}
+
 void check_stmt_internal(CheckerContext *ctx, Ast *node, u32 flags) {
 	u32 mod_flags = flags & (~Stmt_FallthroughAllowed);
 	switch (node->kind) {
@@ -1444,6 +1464,12 @@ void check_stmt_internal(CheckerContext *ctx, Ast *node, u32 flags) {
 				AstSelectorCallExpr *se = &expr->SelectorCallExpr;
 				ast_node(ce, CallExpr, se->call);
 				Type *t = base_type(type_of_expr(ce->proc));
+				if (t == nullptr) {
+					gbString expr_str = expr_to_string(ce->proc);
+					error(node, "'%s' is not a value field nor procedure", expr_str);
+					gb_string_free(expr_str);
+					return;
+				}
 				if (t->kind == Type_Proc) {
 					do_require = t->Proc.require_results;
 				} else if (check_stmt_internal_builtin_proc_id(ce->proc, &builtin_id)) {
@@ -1674,6 +1700,29 @@ void check_stmt_internal(CheckerContext *ctx, Ast *node, u32 flags) {
 				check_assignment(ctx, o, e->type, str_lit("return statement"));
 				if (is_type_untyped(o->type)) {
 					update_untyped_expr_type(ctx, o->expr, e->type, true);
+				}
+
+
+				// NOTE(bill): This is very basic escape analysis
+				// This needs to be improved tremendously, and a lot of it done during the
+				// middle-end (or LLVM side) to improve checks and error messages
+				Ast *expr = unparen_expr(o->expr);
+				if (expr->kind == Ast_UnaryExpr && expr->UnaryExpr.op.kind == Token_And) {
+					Ast *x = unparen_expr(expr->UnaryExpr.expr);
+					if (x->kind == Ast_CompoundLit) {
+						error(expr, "Cannot return the address to a stack value from a procedure");
+					} else if (x->kind == Ast_IndexExpr) {
+						Ast *array = x->IndexExpr.expr;
+						if (is_type_array_like(type_of_expr(array)) && check_expr_is_stack_variable(array)) {
+							gbString t = type_to_string(type_of_expr(array));
+							error(expr, "Cannot return the address to an element of stack variable from a procedure, of type %s", t);
+							gb_string_free(t);
+						}
+					} else {
+						if (check_expr_is_stack_variable(x)) {
+							error(expr, "Cannot return the address to a stack variable from a procedure");
+						}
+					}
 				}
 			}
 		}
