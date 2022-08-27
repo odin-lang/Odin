@@ -356,6 +356,7 @@ Ast *clone_ast(Ast *node) {
 		break;
 	case Ast_PointerType:
 		n->PointerType.type = clone_ast(n->PointerType.type);
+		n->PointerType.tag  = clone_ast(n->PointerType.tag);
 		break;
 	case Ast_MultiPointerType:
 		n->MultiPointerType.type = clone_ast(n->MultiPointerType.type);
@@ -2167,10 +2168,11 @@ Ast *parse_operand(AstFile *f, bool lhs) {
 			Ast *original_type = parse_type(f);
 			Ast *type = unparen_expr(original_type);
 			switch (type->kind) {
-			case Ast_ArrayType:        type->ArrayType.tag = tag;        break;
+			case Ast_ArrayType:        type->ArrayType.tag        = tag; break;
 			case Ast_DynamicArrayType: type->DynamicArrayType.tag = tag; break;
+			case Ast_PointerType:      type->PointerType.tag      = tag; break;
 			default:
-				syntax_error(type, "Expected an array type after #%.*s, got %.*s", LIT(name.string), LIT(ast_strings[type->kind]));
+				syntax_error(type, "Expected an array or pointer type after #%.*s, got %.*s", LIT(name.string), LIT(ast_strings[type->kind]));
 				break;
 			}
 			return original_type;
@@ -2548,21 +2550,15 @@ Ast *parse_operand(AstFile *f, bool lhs) {
 				syntax_error(tag, "Invalid union tag '#%.*s'", LIT(tag.string));
 			}
 		}
-		if (no_nil && maybe) {
-			syntax_error(f->curr_token, "#maybe and #no_nil cannot be applied together");
-		}
+
 		if (no_nil && shared_nil) {
 			syntax_error(f->curr_token, "#shared_nil and #no_nil cannot be applied together");
 		}
-		if (shared_nil && maybe) {
-			syntax_error(f->curr_token, "#maybe and #shared_nil cannot be applied together");
-		}
-
 
 		if (maybe) {
-			union_kind = UnionType_maybe;
 			syntax_error(f->curr_token, "#maybe functionality has now been merged with standard 'union' functionality");
-		} else if (no_nil) {
+		}
+		if (no_nil) {
 			union_kind = UnionType_no_nil;
 		} else if (shared_nil) {
 			union_kind = UnionType_shared_nil;
@@ -3550,49 +3546,34 @@ Ast *parse_var_type(AstFile *f, bool allow_ellipsis, bool allow_typeid_token) {
 }
 
 
-enum FieldPrefixKind : i32 {
-	FieldPrefix_Unknown = -1,
-	FieldPrefix_Invalid = 0,
-
-	FieldPrefix_using, // implies #subtype
-	FieldPrefix_const,
-	FieldPrefix_no_alias,
-	FieldPrefix_c_vararg,
-	FieldPrefix_auto_cast,
-	FieldPrefix_any_int,
-	FieldPrefix_subtype, // does not imply `using` semantics
-	FieldPrefix_by_ptr,
-};
-
 struct ParseFieldPrefixMapping {
 	String          name;
 	TokenKind       token_kind;
-	FieldPrefixKind prefix;
 	FieldFlag       flag;
 };
 
 gb_global ParseFieldPrefixMapping parse_field_prefix_mappings[] = {
-	{str_lit("using"),      Token_using,     FieldPrefix_using,     FieldFlag_using},
-	{str_lit("auto_cast"),  Token_auto_cast, FieldPrefix_auto_cast, FieldFlag_auto_cast},
-	{str_lit("no_alias"),   Token_Hash,      FieldPrefix_no_alias,  FieldFlag_no_alias},
-	{str_lit("c_vararg"),   Token_Hash,      FieldPrefix_c_vararg,  FieldFlag_c_vararg},
-	{str_lit("const"),      Token_Hash,      FieldPrefix_const,     FieldFlag_const},
-	{str_lit("any_int"),    Token_Hash,      FieldPrefix_any_int,   FieldFlag_any_int},
-	{str_lit("subtype"),    Token_Hash,      FieldPrefix_subtype,   FieldFlag_subtype},
-	{str_lit("by_ptr"),     Token_Hash,      FieldPrefix_by_ptr,    FieldFlag_by_ptr},
+	{str_lit("using"),      Token_using,     FieldFlag_using},
+	{str_lit("auto_cast"),  Token_auto_cast, FieldFlag_auto_cast},
+	{str_lit("no_alias"),   Token_Hash,      FieldFlag_no_alias},
+	{str_lit("c_vararg"),   Token_Hash,      FieldFlag_c_vararg},
+	{str_lit("const"),      Token_Hash,      FieldFlag_const},
+	{str_lit("any_int"),    Token_Hash,      FieldFlag_any_int},
+	{str_lit("subtype"),    Token_Hash,      FieldFlag_subtype},
+	{str_lit("by_ptr"),     Token_Hash,      FieldFlag_by_ptr},
 };
 
 
-FieldPrefixKind is_token_field_prefix(AstFile *f) {
+FieldFlag is_token_field_prefix(AstFile *f) {
 	switch (f->curr_token.kind) {
 	case Token_EOF:
-		return FieldPrefix_Invalid;
+		return FieldFlag_Invalid;
 
 	case Token_using:
-		return FieldPrefix_using;
+		return FieldFlag_using;
 
 	case Token_auto_cast:
-		return FieldPrefix_auto_cast;
+		return FieldFlag_auto_cast;
 
 	case Token_Hash:
 		advance_token(f);
@@ -3602,33 +3583,33 @@ FieldPrefixKind is_token_field_prefix(AstFile *f) {
 				auto const &mapping = parse_field_prefix_mappings[i];
 				if (mapping.token_kind == Token_Hash) {
 					if (f->curr_token.string == mapping.name) {
-						return mapping.prefix;
+						return mapping.flag;
 					}
 				}
 			}
 			break;
 		}
-		return FieldPrefix_Unknown;
+		return FieldFlag_Unknown;
 	}
-	return FieldPrefix_Invalid;
+	return FieldFlag_Invalid;
 }
 
 u32 parse_field_prefixes(AstFile *f) {
 	i32 counts[gb_count_of(parse_field_prefix_mappings)] = {};
 
 	for (;;) {
-		FieldPrefixKind kind = is_token_field_prefix(f);
-		if (kind == FieldPrefix_Invalid) {
+		FieldFlag flag = is_token_field_prefix(f);
+		if (flag & FieldFlag_Invalid) {
 			break;
 		}
-		if (kind == FieldPrefix_Unknown) {
+		if (flag & FieldFlag_Unknown) {
 			syntax_error(f->curr_token, "Unknown prefix kind '#%.*s'", LIT(f->curr_token.string));
 			advance_token(f);
 			continue;
 		}
 
 		for (i32 i = 0; i < gb_count_of(parse_field_prefix_mappings); i++) {
-			if (parse_field_prefix_mappings[i].prefix == kind) {
+			if (parse_field_prefix_mappings[i].flag == flag) {
 				counts[i] += 1;
 				advance_token(f);
 				break;
@@ -3894,7 +3875,8 @@ Ast *parse_field_list(AstFile *f, isize *name_count_, u32 allowed_flags, TokenKi
 
 
 		while (f->curr_token.kind != follow &&
-		       f->curr_token.kind != Token_EOF) {
+		       f->curr_token.kind != Token_EOF &&
+		       f->curr_token.kind != Token_Semicolon) {
 			CommentGroup *docs = f->lead_comment;
 			u32 set_flags = parse_field_prefixes(f);
 			Token tag = {};
@@ -3922,7 +3904,7 @@ Ast *parse_field_list(AstFile *f, isize *name_count_, u32 allowed_flags, TokenKi
 				default_value = parse_expr(f, false);
 				if (!allow_default_parameters) {
 					syntax_error(f->curr_token, "Default parameters are only allowed for procedures");
-				default_value = nullptr;
+					default_value = nullptr;
 				}
 			}
 

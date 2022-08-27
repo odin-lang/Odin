@@ -143,7 +143,7 @@ free_all :: proc{mem_free_all}
 
 @builtin
 delete_string :: proc(str: string, allocator := context.allocator, loc := #caller_location) -> Allocator_Error {
-	return mem_free(raw_data(str), allocator, loc)
+	return mem_free_with_size(raw_data(str), len(str), allocator, loc)
 }
 @builtin
 delete_cstring :: proc(str: cstring, allocator := context.allocator, loc := #caller_location) -> Allocator_Error {
@@ -151,17 +151,24 @@ delete_cstring :: proc(str: cstring, allocator := context.allocator, loc := #cal
 }
 @builtin
 delete_dynamic_array :: proc(array: $T/[dynamic]$E, loc := #caller_location) -> Allocator_Error {
-	return mem_free(raw_data(array), array.allocator, loc)
+	return mem_free_with_size(raw_data(array), cap(array)*size_of(E), array.allocator, loc)
 }
 @builtin
 delete_slice :: proc(array: $T/[]$E, allocator := context.allocator, loc := #caller_location) -> Allocator_Error {
-	return mem_free(raw_data(array), allocator, loc)
+	return mem_free_with_size(raw_data(array), len(array)*size_of(E), allocator, loc)
 }
 @builtin
 delete_map :: proc(m: $T/map[$K]$V, loc := #caller_location) -> Allocator_Error {
+	Entry :: struct {
+		hash:  uintptr,
+		next:  int,
+		key:   K,
+		value: V,
+	}
+
 	raw := transmute(Raw_Map)m
 	err := delete_slice(raw.hashes, raw.entries.allocator, loc)
-	err1 := mem_free(raw.entries.data, raw.entries.allocator, loc)
+	err1 := mem_free_with_size(raw.entries.data, raw.entries.cap*size_of(Entry), raw.entries.allocator, loc)
 	if err == nil {
 		err = err1
 	}
@@ -335,68 +342,80 @@ delete_key :: proc(m: ^$T/map[$K]$V, key: K) -> (deleted_key: K, deleted_value: 
 
 
 @builtin
-append_elem :: proc(array: ^$T/[dynamic]$E, arg: E, loc := #caller_location)  {
+append_elem :: proc(array: ^$T/[dynamic]$E, arg: E, loc := #caller_location) -> int {
 	if array == nil {
-		return
+		return 0
 	}
-
-	if cap(array) < len(array)+1 {
-		cap := 2 * cap(array) + max(8, 1)
-		_ = reserve(array, cap, loc)
-	}
-	if cap(array)-len(array) > 0 {
-		a := (^Raw_Dynamic_Array)(array)
-		when size_of(E) != 0 {
-			data := ([^]E)(a.data)
-			assert(condition=data != nil, loc=loc)
-			data[a.len] = arg
+	when size_of(E) == 0 {
+		array.len += 1
+		return 1
+	} else {
+		if cap(array) < len(array)+1 {
+			cap := 2 * cap(array) + max(8, 1)
+			_ = reserve(array, cap, loc)
 		}
-		a.len += 1
+		if cap(array)-len(array) > 0 {
+			a := (^Raw_Dynamic_Array)(array)
+			when size_of(E) != 0 {
+				data := ([^]E)(a.data)
+				assert(condition=data != nil, loc=loc)
+				data[a.len] = arg
+			}
+			a.len += 1
+			return 1
+		}
+		return 0
 	}
 }
 
 @builtin
-append_elems :: proc(array: ^$T/[dynamic]$E, args: ..E, loc := #caller_location)  {
+append_elems :: proc(array: ^$T/[dynamic]$E, args: ..E, loc := #caller_location) -> int {
 	if array == nil {
-		return
+		return 0
 	}
 
 	arg_len := len(args)
 	if arg_len <= 0 {
-		return
+		return 0
 	}
 
-
-	if cap(array) < len(array)+arg_len {
-		cap := 2 * cap(array) + max(8, arg_len)
-		_ = reserve(array, cap, loc)
-	}
-	arg_len = min(cap(array)-len(array), arg_len)
-	if arg_len > 0 {
-		a := (^Raw_Dynamic_Array)(array)
-		when size_of(E) != 0 {
-			data := ([^]E)(a.data)
-			assert(condition=data != nil, loc=loc)
-			intrinsics.mem_copy(&data[a.len], raw_data(args), size_of(E) * arg_len)
+	when size_of(E) == 0 {
+		array.len += arg_len
+		return arg_len
+	} else {
+		if cap(array) < len(array)+arg_len {
+			cap := 2 * cap(array) + max(8, arg_len)
+			_ = reserve(array, cap, loc)
 		}
-		a.len += arg_len
+		arg_len = min(cap(array)-len(array), arg_len)
+		if arg_len > 0 {
+			a := (^Raw_Dynamic_Array)(array)
+			when size_of(E) != 0 {
+				data := ([^]E)(a.data)
+				assert(condition=data != nil, loc=loc)
+				intrinsics.mem_copy(&data[a.len], raw_data(args), size_of(E) * arg_len)
+			}
+			a.len += arg_len
+		}
+		return arg_len
 	}
 }
 
 // The append_string built-in procedure appends a string to the end of a [dynamic]u8 like type
 @builtin
-append_elem_string :: proc(array: ^$T/[dynamic]$E/u8, arg: $A/string, loc := #caller_location) {
+append_elem_string :: proc(array: ^$T/[dynamic]$E/u8, arg: $A/string, loc := #caller_location) -> int {
 	args := transmute([]E)arg
-	append_elems(array=array, args=args, loc=loc)
+	return append_elems(array=array, args=args, loc=loc)
 }
 
 
 // The append_string built-in procedure appends multiple strings to the end of a [dynamic]u8 like type
 @builtin
-append_string :: proc(array: ^$T/[dynamic]$E/u8, args: ..string, loc := #caller_location) {
+append_string :: proc(array: ^$T/[dynamic]$E/u8, args: ..string, loc := #caller_location) -> (n: int) {
 	for arg in args {
-		append(array = array, args = transmute([]E)(arg), loc = loc)
+		n += append(array = array, args = transmute([]E)(arg), loc = loc)
 	}
+	return
 }
 
 // The append built-in procedure appends elements to the end of a dynamic array
@@ -404,11 +423,13 @@ append_string :: proc(array: ^$T/[dynamic]$E/u8, args: ..string, loc := #caller_
 
 
 @builtin
-append_nothing :: proc(array: ^$T/[dynamic]$E, loc := #caller_location) {
+append_nothing :: proc(array: ^$T/[dynamic]$E, loc := #caller_location) -> int {
 	if array == nil {
-		return
+		return 0
 	}
+	prev_len := len(array)
 	resize(array, len(array)+1)
+	return len(array)-prev_len
 }
 
 
@@ -778,18 +799,4 @@ unimplemented :: proc(message := "", loc := #caller_location) -> ! {
 		p = default_assertion_failure_proc
 	}
 	p("not yet implemented", message, loc)
-}
-
-@builtin
-@(disabled=ODIN_DISABLE_ASSERT)
-unreachable :: proc(message := "", loc := #caller_location) -> ! {
-	p := context.assertion_failure_proc
-	if p == nil {
-		p = default_assertion_failure_proc
-	}
-	if message != "" {
-		p("internal error", message, loc)
-	} else {
-		p("internal error", "entered unreachable code", loc)
-	}
 }

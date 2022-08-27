@@ -458,15 +458,6 @@ void lb_build_range_interval(lbProcedure *p, AstBinaryExpr *node,
 		val1_type = type_of_expr(rs->vals[1]);
 	}
 
-	if (val0_type != nullptr) {
-		Entity *e = entity_of_node(rs->vals[0]);
-		lb_add_local(p, e->type, e, true);
-	}
-	if (val1_type != nullptr) {
-		Entity *e = entity_of_node(rs->vals[1]);
-		lb_add_local(p, e->type, e, true);
-	}
-
 	TokenKind op = Token_Lt;
 	switch (node->op.kind) {
 	case Token_Ellipsis:  op = Token_LtEq; break;
@@ -478,10 +469,22 @@ void lb_build_range_interval(lbProcedure *p, AstBinaryExpr *node,
 	lbValue lower = lb_build_expr(p, node->left);
 	lbValue upper = {}; // initialized each time in the loop
 
-	lbAddr value = lb_add_local_generated(p, val0_type ? val0_type : lower.type, false);
+	lbAddr value;
+	if (val0_type != nullptr) {
+		Entity *e = entity_of_node(rs->vals[0]);
+		value = lb_add_local(p, val0_type, e, false);
+	} else {
+		value = lb_add_local_generated(p, lower.type, false);
+	}
 	lb_addr_store(p, value, lower);
 
-	lbAddr index = lb_add_local_generated(p, t_int, false);
+	lbAddr index;
+	if (val1_type != nullptr) {
+		Entity *e = entity_of_node(rs->vals[1]);
+		index = lb_add_local(p, val1_type, e, false);
+	} else {
+		index = lb_add_local_generated(p, t_int, false);
+	}
 	lb_addr_store(p, index, lb_const_int(m, t_int, 0));
 
 	lbBlock *loop = lb_create_block(p, "for.interval.loop");
@@ -1793,7 +1796,7 @@ void lb_build_assign_stmt_array(lbProcedure *p, TokenKind op, lbAddr const &lhs,
 
 	lbValue rhs = lb_emit_conv(p, value, lhs_type);
 
-	bool inline_array_arith = type_size_of(array_type) <= build_context.max_align;
+	bool inline_array_arith = lb_can_try_to_inline_array_arith(array_type);
 
 
 	if (lhs.kind == lbAddr_Swizzle) {

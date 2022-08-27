@@ -31,6 +31,14 @@ Arena_Temp_Memory :: struct {
 }
 
 
+arena_init :: proc(a: ^Arena, data: []byte) {
+	a.data       = data
+	a.offset     = 0
+	a.peak_used  = 0
+	a.temp_count = 0
+}
+
+@(deprecated="prefer 'mem.arena_init'")
 init_arena :: proc(a: ^Arena, data: []byte) {
 	a.data       = data
 	a.offset     = 0
@@ -293,6 +301,14 @@ Stack :: struct {
 	peak_used: int,
 }
 
+stack_init :: proc(s: ^Stack, data: []byte) {
+	s.data = data
+	s.prev_offset = 0
+	s.curr_offset = 0
+	s.peak_used = 0
+}
+
+@(deprecated="prefer 'mem.stack_init'")
 init_stack :: proc(s: ^Stack, data: []byte) {
 	s.data = data
 	s.prev_offset = 0
@@ -445,27 +461,34 @@ Small_Stack_Allocation_Header :: struct {
 
 // Small_Stack is a stack-like allocator which uses the smallest possible header but at the cost of non-strict memory freeing order
 Small_Stack :: struct {
-	data: []byte,
-	offset: int,
+	data:      []byte,
+	offset:    int,
 	peak_used: int,
 }
 
+small_stack_init :: proc(s: ^Small_Stack, data: []byte) {
+	s.data      = data
+	s.offset    = 0
+	s.peak_used = 0
+}
+
+@(deprecated="prefer 'small_stack_init'")
 init_small_stack :: proc(s: ^Small_Stack, data: []byte) {
-	s.data = data
-	s.offset = 0
+	s.data      = data
+	s.offset    = 0
 	s.peak_used = 0
 }
 
 small_stack_allocator :: proc(stack: ^Small_Stack) -> Allocator {
 	return Allocator{
 		procedure = small_stack_allocator_proc,
-		data = stack,
+		data      = stack,
 	}
 }
 
 small_stack_allocator_proc :: proc(allocator_data: rawptr, mode: Allocator_Mode,
                                    size, alignment: int,
-                                   old_memory: rawptr, old_size: int, ocation := #caller_location) -> ([]byte, Allocator_Error) {
+                                   old_memory: rawptr, old_size: int, location := #caller_location) -> ([]byte, Allocator_Error) {
 	s := cast(^Small_Stack)allocator_data
 
 	if s.data == nil {

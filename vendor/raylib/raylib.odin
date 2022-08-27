@@ -625,9 +625,13 @@ KeyboardKey :: enum c.int {
 
 // Mouse buttons
 MouseButton :: enum c.int {
-	LEFT   = 0,
-	RIGHT  = 1,
-	MIDDLE = 2,
+	LEFT    = 0, // Mouse button left
+	RIGHT   = 1, // Mouse button right
+	MIDDLE  = 2, // Mouse button middle (pressed wheel)
+	SIDE    = 3, // Mouse button side (advanced mouse device)
+	EXTRA   = 4, // Mouse button extra (advanced mouse device)
+	FORWARD = 5, // Mouse button fordward (advanced mouse device)
+	BACK    = 6, // Mouse button back (advanced mouse device)
 }
 
 // Mouse cursor

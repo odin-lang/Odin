@@ -90,7 +90,7 @@ extern "C" {
 	#error This operating system is not supported
 #endif
 
-#if defined(GB_SYSTEM_OPENBSD)
+#if defined(GB_SYSTEM_UNIX)
 #include <sys/wait.h>
 #endif
 

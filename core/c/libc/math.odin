@@ -331,7 +331,7 @@ fmin       :: proc{libc_fmin, libc_fminf}
 fma        :: proc{libc_fma, libc_fmaf}
 
 // But retain the 'f' suffix-variant functions as well so they can be used,
-// a trick is used here where we use explicit procedrual overloading of one
+// a trick is used here where we use explicit procedural overloading of one
 // procedure. This is done because the foreign block is marked @(private) and
 // aliasing functions does not remove privateness from the entity.
 acosf      :: proc{libc_acosf}

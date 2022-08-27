@@ -116,6 +116,7 @@ struct TargetMetrics {
 	TargetArchKind arch;
 	isize          word_size;
 	isize          max_align;
+	isize          max_simd_align;
 	String         target_triplet;
 	String         target_data_layout;
 	TargetABIKind  abi;
@@ -204,7 +205,7 @@ enum BuildPath : u8 {
 	BuildPath_Main_Package,     // Input  Path to the package directory (or file) we're building.
 	BuildPath_RC,               // Input  Path for .rc  file, can be set with `-resource:`.
 	BuildPath_RES,              // Output Path for .res file, generated from previous.
-	BuildPath_Win_SDK_Root,     // windows_sdk_root
+	BuildPath_Win_SDK_Bin_Path, // windows_sdk_bin_path
 	BuildPath_Win_SDK_UM_Lib,   // windows_sdk_um_library_path
 	BuildPath_Win_SDK_UCRT_Lib, // windows_sdk_ucrt_library_path
 	BuildPath_VS_EXE,           // vs_exe_path
@@ -228,14 +229,16 @@ struct BuildContext {
 	bool   ODIN_DISABLE_ASSERT; // Whether the default 'assert' et al is disabled in code or not
 	bool   ODIN_DEFAULT_TO_NIL_ALLOCATOR; // Whether the default allocator is a "nil" allocator or not (i.e. it does nothing)
 	bool   ODIN_FOREIGN_ERROR_PROCEDURES;
+	bool   ODIN_VALGRIND_SUPPORT;
 
 	ErrorPosStyle ODIN_ERROR_POS_STYLE;
 
 	TargetEndianKind endian_kind;
 
 	// In bytes
-	i64    word_size; // Size of a pointer, must be >= 4
-	i64    max_align; // max alignment, must be >= 1 (and typically >= word_size)
+	i64    word_size;      // Size of a pointer, must be >= 4
+	i64    max_align;      // max alignment, must be >= 1 (and typically >= word_size)
+	i64    max_simd_align; // max alignment, must be >= 1 (and typically >= word_size)
 
 	CommandKind command_kind;
 	String command;
@@ -338,15 +341,13 @@ bool global_ignore_warnings(void) {
 gb_global TargetMetrics target_windows_i386 = {
 	TargetOs_windows,
 	TargetArch_i386,
-	4,
-	8,
+	4, 4, 8,
 	str_lit("i386-pc-windows-msvc"),
 };
 gb_global TargetMetrics target_windows_amd64 = {
 	TargetOs_windows,
 	TargetArch_amd64,
-	8,
-	16,
+	8, 8, 16,
 	str_lit("x86_64-pc-windows-msvc"),
 	str_lit("e-m:w-i64:64-f80:128-n8:16:32:64-S128"),
 };
@@ -354,24 +355,21 @@ gb_global TargetMetrics target_windows_amd64 = {
 gb_global TargetMetrics target_linux_i386 = {
 	TargetOs_linux,
 	TargetArch_i386,
-	4,
-	8,
+	4, 4, 8,
 	str_lit("i386-pc-linux-gnu"),
 
 };
 gb_global TargetMetrics target_linux_amd64 = {
 	TargetOs_linux,
 	TargetArch_amd64,
-	8,
-	16,
+	8, 8, 16,
 	str_lit("x86_64-pc-linux-gnu"),
 	str_lit("e-m:w-i64:64-f80:128-n8:16:32:64-S128"),
 };
 gb_global TargetMetrics target_linux_arm64 = {
 	TargetOs_linux,
 	TargetArch_arm64,
-	8,
-	16,
+	8, 8, 16,
 	str_lit("aarch64-linux-elf"),
 	str_lit("e-m:o-p:32:32-Fi8-i64:64-v128:64:128-a:0:32-n32-S64"),
 };
@@ -379,8 +377,7 @@ gb_global TargetMetrics target_linux_arm64 = {
 gb_global TargetMetrics target_linux_arm32 = {
 	TargetOs_linux,
 	TargetArch_arm32,
-	4,
-	8,
+	4, 4, 8,
 	str_lit("arm-linux-gnu"),
 	str_lit("e-m:o-p:32:32-Fi8-i64:64-v128:64:128-a:0:32-n32-S64"),
 };
@@ -388,8 +385,7 @@ gb_global TargetMetrics target_linux_arm32 = {
 gb_global TargetMetrics target_darwin_amd64 = {
 	TargetOs_darwin,
 	TargetArch_amd64,
-	8,
-	16,
+	8, 8, 16,
 	str_lit("x86_64-apple-darwin"),
 	str_lit("e-m:o-i64:64-f80:128-n8:16:32:64-S128"),
 };
@@ -397,8 +393,7 @@ gb_global TargetMetrics target_darwin_amd64 = {
 gb_global TargetMetrics target_darwin_arm64 = {
 	TargetOs_darwin,
 	TargetArch_arm64,
-	8,
-	16,
+	8, 8, 16,
 	str_lit("arm64-apple-macosx11.0.0"),
 	str_lit("e-m:o-i64:64-i128:128-n32:64-S128"), // TODO(bill): Is this correct?
 };
@@ -406,16 +401,14 @@ gb_global TargetMetrics target_darwin_arm64 = {
 gb_global TargetMetrics target_freebsd_i386 = {
 	TargetOs_freebsd,
 	TargetArch_i386,
-	4,
-	8,
+	4, 4, 8,
 	str_lit("i386-unknown-freebsd-elf"),
 };
 
 gb_global TargetMetrics target_freebsd_amd64 = {
 	TargetOs_freebsd,
 	TargetArch_amd64,
-	8,
-	16,
+	8, 8, 16,
 	str_lit("x86_64-unknown-freebsd-elf"),
 	str_lit("e-m:w-i64:64-f80:128-n8:16:32:64-S128"),
 };
@@ -423,8 +416,7 @@ gb_global TargetMetrics target_freebsd_amd64 = {
 gb_global TargetMetrics target_openbsd_amd64 = {
 	TargetOs_openbsd,
 	TargetArch_amd64,
-	8,
-	16,
+	8, 8, 16,
 	str_lit("x86_64-unknown-openbsd-elf"),
 	str_lit("e-m:e-p270:32:32-p271:32:32-p272:64:64-i64:64-f80:128-n8:16:32:64-S128"),
 };
@@ -432,62 +424,48 @@ gb_global TargetMetrics target_openbsd_amd64 = {
 gb_global TargetMetrics target_essence_amd64 = {
 	TargetOs_essence,
 	TargetArch_amd64,
-	8,
-	16,
+	8, 8, 16,
 	str_lit("x86_64-pc-none-elf"),
 };
+
 
 gb_global TargetMetrics target_freestanding_wasm32 = {
 	TargetOs_freestanding,
 	TargetArch_wasm32,
-	4,
-	8,
+	4, 8, 16,
 	str_lit("wasm32-freestanding-js"),
-	str_lit(""),
+	str_lit("e-m:e-p:32:32-i64:64-n32:64-S128"),
 };
 
 gb_global TargetMetrics target_js_wasm32 = {
 	TargetOs_js,
 	TargetArch_wasm32,
-	4,
-	8,
+	4, 8, 16,
 	str_lit("wasm32-js-js"),
-	str_lit(""),
-};
-
-gb_global TargetMetrics target_js_wasm64 = {
-	TargetOs_js,
-	TargetArch_wasm64,
-	8,
-	16,
-	str_lit("wasm64-js-js"),
-	str_lit(""),
+	str_lit("e-m:e-p:32:32-i64:64-n32:64-S128"),
 };
 
 gb_global TargetMetrics target_wasi_wasm32 = {
 	TargetOs_wasi,
 	TargetArch_wasm32,
-	4,
-	8,
+	4, 8, 16,
 	str_lit("wasm32-wasi-js"),
-	str_lit(""),
+	str_lit("e-m:e-p:32:32-i64:64-n32:64-S128"),
 };
 
 
-// gb_global TargetMetrics target_freestanding_wasm64 = {
-// 	TargetOs_freestanding,
-// 	TargetArch_wasm64,
-// 	8,
-// 	16,
-// 	str_lit("wasm64-freestanding-js"),
-// 	str_lit(""),
-// };
+gb_global TargetMetrics target_js_wasm64 = {
+	TargetOs_js,
+	TargetArch_wasm64,
+	8, 8, 16,
+	str_lit("wasm64-js-js"),
+	str_lit(""),
+};
 
 gb_global TargetMetrics target_freestanding_amd64_sysv = {
 	TargetOs_freestanding,
 	TargetArch_amd64,
-	8,
-	16,
+	8, 8, 16,
 	str_lit("x86_64-pc-none-gnu"),
 	str_lit("e-m:w-i64:64-f80:128-n8:16:32:64-S128"),
 	TargetABI_SysV,
@@ -516,7 +494,7 @@ gb_global NamedTargetMetrics named_targets[] = {
 	{ str_lit("freestanding_wasm32"), &target_freestanding_wasm32 },
 	{ str_lit("wasi_wasm32"),         &target_wasi_wasm32 },
 	{ str_lit("js_wasm32"),           &target_js_wasm32 },
-	{ str_lit("js_wasm64"),           &target_js_wasm64 },
+	// { str_lit("js_wasm64"),           &target_js_wasm64 },
 
 	{ str_lit("freestanding_amd64_sysv"), &target_freestanding_amd64_sysv },
 };
@@ -1083,14 +1061,16 @@ void init_build_context(TargetMetrics *cross_target) {
 	GB_ASSERT(metrics->arch != TargetArch_Invalid);
 	GB_ASSERT(metrics->word_size > 1);
 	GB_ASSERT(metrics->max_align > 1);
+	GB_ASSERT(metrics->max_simd_align > 1);
 
 
 	bc->metrics = *metrics;
-	bc->ODIN_OS     = target_os_names[metrics->os];
-	bc->ODIN_ARCH   = target_arch_names[metrics->arch];
-	bc->endian_kind = target_endians[metrics->arch];
-	bc->word_size   = metrics->word_size;
-	bc->max_align   = metrics->max_align;
+	bc->ODIN_OS        = target_os_names[metrics->os];
+	bc->ODIN_ARCH      = target_arch_names[metrics->arch];
+	bc->endian_kind    = target_endians[metrics->arch];
+	bc->word_size      = metrics->word_size;
+	bc->max_align      = metrics->max_align;
+	bc->max_simd_align = metrics->max_simd_align;
 	bc->link_flags  = str_lit(" ");
 
 	#if defined(DEFAULT_TO_THREADED_CHECKER)
@@ -1189,6 +1169,8 @@ void init_build_context(TargetMetrics *cross_target) {
 	}
 
 	bc->optimization_level = gb_clamp(bc->optimization_level, 0, 3);
+
+	bc->ODIN_VALGRIND_SUPPORT = is_arch_x86() && build_context.metrics.os != TargetOs_windows;
 
 	#undef LINK_FLAG_X64
 	#undef LINK_FLAG_386
@@ -1336,7 +1318,7 @@ bool init_build_paths(String init_filename) {
 
 		if ((bc->command_kind & Command__does_build) && (!bc->ignore_microsoft_magic)) {
 			// NOTE(ic): It would be nice to extend this so that we could specify the Visual Studio version that we want instead of defaulting to the latest.
-			Find_Result_Utf8 find_result = find_visual_studio_and_windows_sdk_utf8();
+			Find_Result find_result = find_visual_studio_and_windows_sdk();
 			defer (mc_free_all());
 
 			if (find_result.windows_sdk_version == 0) {
@@ -1357,8 +1339,8 @@ bool init_build_paths(String init_filename) {
 			if (find_result.windows_sdk_um_library_path.len > 0) {
 				GB_ASSERT(find_result.windows_sdk_ucrt_library_path.len > 0);
 
-				if (find_result.windows_sdk_root.len > 0) {
-					bc->build_paths[BuildPath_Win_SDK_Root]     = path_from_string(ha, find_result.windows_sdk_root);
+				if (find_result.windows_sdk_bin_path.len > 0) {
+					bc->build_paths[BuildPath_Win_SDK_Bin_Path]  = path_from_string(ha, find_result.windows_sdk_bin_path);
 				}
 
 				if (find_result.windows_sdk_um_library_path.len > 0) {
