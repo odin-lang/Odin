@@ -4,6 +4,7 @@
 
 	List of contributors:
 		Jeroen van Rijn: Initial implementation.
+		Benoit Jacquier: tga loader
 */
 
 
@@ -17,7 +18,6 @@ import "core:os"
 import "core:compress"
 
 // TODO: alpha_premultiply support
-// TODO: RLE decompression
 
 
 Error   :: image.Error
@@ -62,7 +62,7 @@ save_to_memory  :: proc(output: ^bytes.Buffer, img: ^Image, options := Options{}
 	}
 
 	header := image.TGA_Header{
-		data_type_code   = 0x02, // Color, uncompressed.
+		data_type_code   = .Uncompressed_RGB,
 		dimensions       = {u16le(img.width), u16le(img.height)},
 		bits_per_pixel   = u8(img.depth * img.channels),
 		image_descriptor = 1 << 5, // Origin is top left.
@@ -125,8 +125,12 @@ load_from_context :: proc(ctx: ^$C, options := Options{}, allocator := context.a
 	header := image.read_data(ctx, image.TGA_Header) or_return
 	
 	// Header checks
-	if header.data_type_code != DATATYPE_UNCOMPRESSED_RGB {
-		return nil, .Unsupported_Format
+	rle_encoding := false 
+
+	switch header.data_type_code {
+		case .Compressed_RBB: rle_encoding = true
+		case .Uncompressed_RGB:
+		case: return nil, .Unsupported_Format 	
 	}
 	if header.bits_per_pixel!=24 && header.bits_per_pixel!=32 {
 		return nil, .Unsupported_Format
@@ -173,26 +177,57 @@ load_from_context :: proc(ctx: ^$C, options := Options{}, allocator := context.a
 	}
 
 	origin_is_topleft := (header.image_descriptor & IMAGE_DESCRIPTOR_TOPLEFT_MASK ) != 0
+	rle_repetition_count := 0
+	read_pixel := true
+	is_packet_rle := false
+	pixel: [4]u8
 	for y in 0..<img.height {
 		line := origin_is_topleft ? y : img.height-y-1
 		dst := mem.ptr_offset(mem.raw_data(img.pixels.buf), line*img.width*img.channels)
 		for x in 0..<img.width {
-			src, err := compress.read_slice(ctx, src_channels)
-			if err!=.None {
-				destroy(img)
-				return nil, .Corrupt
-			}
-			dst[2] = src[0]
-			dst[1] = src[1]
-			dst[0] = src[2]
-			if img.channels==4 {
-				if src_channels==4 {
-					dst[3] = src[3]
+
+			// handle RLE decoding
+			if rle_encoding {
+				
+				if rle_repetition_count == 0 {
+					rle_cmd, err := compress.read_u8(ctx)
+					if err!=.None {
+						destroy(img)
+						return nil, .Corrupt
+					}
+					is_packet_rle = (rle_cmd>>7) != 0 
+					rle_repetition_count = 1 + int(rle_cmd & 0x7F)
+					read_pixel = true
+				} else if is_packet_rle==false {
+					read_pixel = rle_repetition_count>0
 				} else {
-					dst[3] = 255
+					read_pixel = false
 				}
 			}
+			// Read pixel
+			if read_pixel {
+				src, err := compress.read_slice(ctx, src_channels)
+				if err!=.None {
+					destroy(img)
+					return nil, .Corrupt
+				}
+				pixel[2] = src[0]
+				pixel[1] = src[1]
+				pixel[0] = src[2]
+				pixel[3] = src_channels==4 ? src[3] : 255
+				if img.channels==4 {
+					if src_channels==4 {
+						dst[3] = src[3]
+					} else {
+						dst[3] = 255
+					}
+				}
+			}
+
+			// Write pixel
+			mem.copy(dst, mem.raw_data(&pixel), img.channels)
 			dst = mem.ptr_offset(dst, img.channels)
+			rle_repetition_count -= 1
 		}
 	}
 	return img, nil
@@ -235,7 +270,6 @@ destroy :: proc(img: ^Image) {
 	free(img)
 }
 
-DATATYPE_UNCOMPRESSED_RGB :: 0x2
 IMAGE_DESCRIPTOR_INTERLEAVING_MASK :: (1<<6) | (1<<7)
 IMAGE_DESCRIPTOR_TOPLEFT_MASK :: 1<<5
 
