@@ -380,7 +380,7 @@ QOI_Info :: struct {
 
 TGA_Data_Type :: enum u8  {
 	Uncompressed_RGB = 2,
-	Compressed_RBB = 10
+	Compressed_RBB = 10,
 }
 
 TGA_Header :: struct #packed {
