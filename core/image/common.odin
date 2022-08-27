@@ -378,10 +378,15 @@ QOI_Info :: struct {
 	header: QOI_Header,
 }
 
+TGA_Data_Type :: enum u8  {
+	Uncompressed_RGB = 2,
+	Compressed_RBB = 10
+}
+
 TGA_Header :: struct #packed {
 	id_length:        u8,
 	color_map_type:   u8,
-	data_type_code:   u8,
+	data_type_code:   TGA_Data_Type,
 	color_map_origin: u16le,
 	color_map_length: u16le,
 	color_map_depth:  u8,
