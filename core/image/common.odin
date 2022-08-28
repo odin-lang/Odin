@@ -379,8 +379,13 @@ QOI_Info :: struct {
 }
 
 TGA_Data_Type :: enum u8  {
-	Uncompressed_RGB = 2,
-	Compressed_RBB   = 10,
+	No_Image_Data             = 0,
+	Uncompressed_Color_Mapped = 1,
+	Uncompressed_RGB          = 2,
+	Uncompressed_Black_White  = 3,
+	Compressed_Color_Mapped   = 9,
+	Compressed_RGB            = 10,
+	Compressed_Black_White    = 11,
 }
 
 TGA_Header :: struct #packed {
