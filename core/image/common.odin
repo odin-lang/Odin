@@ -46,7 +46,7 @@ Image :: struct {
 	height:        int,
 	channels:      int,
 	depth:         int, // Channel depth in bits, typically 8 or 16
-	pixels:        bytes.Buffer,
+	pixels:        bytes.Buffer `fmt:"-"`,
 	/*
 		Some image loaders/writers can return/take an optional background color.
 		For convenience, we return them as u16 so we don't need to switch on the type
@@ -61,6 +61,7 @@ Image_Metadata :: union #shared_nil {
 	^Netpbm_Info,
 	^PNG_Info,
 	^QOI_Info,
+	^TGA_Info,
 }
 
 
@@ -168,6 +169,7 @@ Error :: union #shared_nil {
 
 General_Image_Error :: enum {
 	None = 0,
+	Unsupported_Option,
 	// File I/O
 	Unable_To_Read_File,
 	Unable_To_Write_File,
@@ -376,10 +378,15 @@ QOI_Info :: struct {
 	header: QOI_Header,
 }
 
+TGA_Data_Type :: enum u8  {
+	Uncompressed_RGB = 2,
+	Compressed_RBB   = 10,
+}
+
 TGA_Header :: struct #packed {
 	id_length:        u8,
 	color_map_type:   u8,
-	data_type_code:   u8,
+	data_type_code:   TGA_Data_Type,
 	color_map_origin: u16le,
 	color_map_length: u16le,
 	color_map_depth:  u8,
@@ -389,6 +396,21 @@ TGA_Header :: struct #packed {
 	image_descriptor: u8,
 }
 #assert(size_of(TGA_Header) == 18)
+
+New_TGA_Signature :: "TRUEVISION-XFILE.\x00"
+
+TGA_Footer :: struct #packed {
+	extension_area_offset:      u32le,
+	developer_directory_offset: u32le,
+	signature:                  [18]u8 `fmt:"s"`, // Should match signature if New TGA.
+}
+#assert(size_of(TGA_Footer) == 26)
+
+TGA_Info :: struct {
+	header:   TGA_Header,
+	image_id: string,
+	footer:   Maybe(TGA_Footer),
+}
 
 // Function to help with image buffer calculations
 compute_buffer_size :: proc(width, height, channels, depth: int, extra_row_bytes := int(0)) -> (size: int) {
