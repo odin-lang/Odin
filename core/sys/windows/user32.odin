@@ -190,6 +190,14 @@ foreign user32 {
 	SetWindowTextW :: proc(hWnd: HWND, lpString: LPCWSTR) -> BOOL ---
 	CallWindowProcW :: proc(lpPrevWndFunc: WNDPROC, hWnd: HWND, Msg: UINT, wParam: WPARAM, lParam: LPARAM) -> LRESULT ---
 	EnableWindow :: proc(hWnd: HWND, bEnable: BOOL) -> BOOL ---
+
+	DefRawInputProc :: proc(paRawInput: ^PRAWINPUT, nInput: INT, cbSizeHeader: UINT) -> LRESULT ---
+	GetRawInputBuffer :: proc(pRawInput: PRAWINPUT, pcbSize: PUINT, cbSizeHeader: UINT) -> UINT ---
+	GetRawInputData :: proc(hRawInput: HRAWINPUT, uiCommand: UINT, pData: LPVOID, pcbSize: PUINT, cbSizeHeader: UINT) -> UINT ---
+	GetRawInputDeviceInfoW :: proc(hDevice: HANDLE, uiCommand: UINT, pData: LPVOID, pcbSize: PUINT) -> UINT ---
+	GetRawInputDeviceList :: proc(pRawInputDeviceList: PRAWINPUTDEVICELIST, puiNumDevices: PUINT, cbSize: UINT) -> UINT ---
+	GetRegisteredRawInputDevices :: proc(pRawInputDevices: PRAWINPUTDEVICE, puiNumDevices: PUINT, cbSize: UINT) -> UINT ---
+	RegisterRawInputDevices :: proc(pRawInputDevices: PCRAWINPUTDEVICE, uiNumDevices: UINT, cbSize: UINT) -> BOOL ---
 }
 
 CreateWindowW :: #force_inline proc "stdcall" (
@@ -277,3 +285,146 @@ DPI_AWARENESS_CONTEXT_SYSTEM_AWARE         :: DPI_AWARENESS_CONTEXT(~uintptr(1))
 DPI_AWARENESS_CONTEXT_PER_MONITOR_AWARE    :: DPI_AWARENESS_CONTEXT(~uintptr(2)) // -3
 DPI_AWARENESS_CONTEXT_PER_MONITOR_AWARE_V2 :: DPI_AWARENESS_CONTEXT(~uintptr(3)) // -4
 DPI_AWARENESS_CONTEXT_UNAWARE_GDISCALED    :: DPI_AWARENESS_CONTEXT(~uintptr(4)) // -5
+
+RAWINPUTHEADER :: struct {
+	dwType: DWORD,
+	dwSize: DWORD,
+	hDevice: HANDLE,
+	wParam: WPARAM,
+}
+
+RAWHID :: struct {
+	dwSizeHid: DWORD,
+	dwCount: DWORD,
+	bRawData: [1]BYTE,
+}
+
+RAWMOUSE :: struct {
+	usFlags: USHORT,
+	DUMMYUNIONNAME: struct #raw_union {
+		ulButtons: ULONG,
+		DUMMYSTRUCTNAME: struct {
+			usButtonFlags: USHORT,
+			usButtonData: USHORT,
+		},
+	},
+	ulRawButtons: ULONG,
+	lLastX: LONG,
+	lLastY: LONG,
+	ulExtraInformation: ULONG,
+}
+
+RAWKEYBOARD :: struct {
+	MakeCode: USHORT,
+	Flags: USHORT,
+	Rserved: USHORT,
+	VKey: USHORT,
+	Message: UINT,
+	ExtraInformation: ULONG,
+}
+
+RAWINPUT :: struct {
+	header: RAWINPUTHEADER,
+	data: struct #raw_union {
+		mouse: RAWMOUSE,
+		keyboard: RAWKEYBOARD,
+		hid: RAWHID,
+	},
+}
+
+PRAWINPUT :: ^RAWINPUT
+HRAWINPUT :: distinct LPARAM
+
+RAWINPUTDEVICE :: struct {
+	usUsagePage: USHORT,
+	usUsage: USHORT,
+	dwFlags: DWORD,
+	hwndTarget: HWND,
+}
+
+PRAWINPUTDEVICE :: ^RAWINPUTDEVICE
+PCRAWINPUTDEVICE :: PRAWINPUTDEVICE
+
+RAWINPUTDEVICELIST :: struct {
+	hDevice: HANDLE,
+	dwType: DWORD,
+}
+
+PRAWINPUTDEVICELIST :: ^RAWINPUTDEVICELIST
+
+RID_DEVICE_INFO_HID :: struct {
+	dwVendorId: DWORD,
+	dwProductId: DWORD,
+	dwVersionNumber: DWORD,
+	usUsagePage: USHORT,
+	usUsage: USHORT,
+}
+
+RID_DEVICE_INFO_KEYBOARD :: struct {
+	dwType: DWORD,
+	dwSubType: DWORD,
+	dwKeyboardMode: DWORD,
+	dwNumberOfFunctionKeys: DWORD,
+	dwNumberOfIndicators: DWORD,
+	dwNumberOfKeysTotal: DWORD,
+}
+
+RID_DEVICE_INFO_MOUSE :: struct {
+	dwId: DWORD,
+	dwNumberOfButtons: DWORD,
+	dwSampleRate: DWORD,
+	fHasHorizontalWheel: BOOL,
+}
+
+RID_DEVICE_INFO :: struct {
+	cbSize: DWORD,
+	dwType: DWORD,
+	DUMMYUNIONNAME: struct #raw_union {
+		mouse: RID_DEVICE_INFO_MOUSE,
+		keyboard: RID_DEVICE_INFO_KEYBOARD,
+		hid: RID_DEVICE_INFO_HID,
+	},
+}
+
+RIDEV_REMOVE :: 0x00000001
+RIDEV_EXCLUDE :: 0x00000010
+RIDEV_PAGEONLY :: 0x00000020
+RIDEV_NOLEGACY :: 0x00000030
+RIDEV_INPUTSINK :: 0x00000100
+RIDEV_CAPTUREMOUSE :: 0x00000200
+RIDEV_NOHOTKEYS :: 0x00000200
+RIDEV_APPKEYS :: 0x00000400
+RIDEV_EXINPUTSINK :: 0x00001000
+RIDEV_DEVNOTIFY :: 0x00002000
+
+RID_HEADER :: 0x10000005
+RID_INPUT :: 0x10000003
+
+RIM_TYPEMOUSE :: 0
+RIM_TYPEKEYBOARD :: 1
+RIM_TYPEHID :: 2
+
+MOUSE_MOVE_RELATIVE :: 0x00
+MOUSE_MOVE_ABSOLUTE :: 0x01
+MOUSE_VIRTUAL_DESKTOP :: 0x02
+MOUSE_ATTRIUBTTES_CHANGED :: 0x04
+MOUSE_MOVE_NOCOALESCE :: 0x08
+
+RI_MOUSE_BUTTON_1_DOWN :: 0x0001
+RI_MOUSE_LEFT_BUTTON_DOWNS :: RI_MOUSE_BUTTON_1_DOWN
+RI_MOUSE_BUTTON_1_UP :: 0x0002
+RI_MOUSE_LEFT_BUTTON_UP :: RI_MOUSE_BUTTON_1_UP
+RI_MOUSE_BUTTON_2_DOWN :: 0x0004
+RI_MOUSE_RIGHT_BUTTON_DOWN :: RI_MOUSE_BUTTON_2_DOWN
+RI_MOUSE_BUTTON_2_UP :: 0x0008
+RI_MOUSE_RIGHT_BUTTON_UP :: RI_MOUSE_BUTTON_2_UP
+RI_MOUSE_BUTTON_3_DOWN :: 0x0010
+RI_MOUSE_MIDDLE_BUTTON_DOWN :: RI_MOUSE_BUTTON_3_DOWN
+RI_MOUSE_BUTTON_3_UP :: 0x0020
+RI_MOUSE_MIDDLE_BUTTON_UP :: RI_MOUSE_BUTTON_3_UP
+RI_MOUSE_BUTTON_4_DOWN :: 0x0040
+RI_MOUSE_BUTTON_4_UP :: 0x0080
+RI_MOUSE_BUTTON_5_DOWN :: 0x0100
+RI_MOUSE_BUTTON_5_UP :: 0x0200
+RI_MOUSE_WHEEL :: 0x0400
+RI_MOUSE_HWHEEL :: 0x0800
