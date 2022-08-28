@@ -46,7 +46,7 @@ Image :: struct {
 	height:        int,
 	channels:      int,
 	depth:         int, // Channel depth in bits, typically 8 or 16
-	pixels:        bytes.Buffer,
+	pixels:        bytes.Buffer `fmt:"-"`,
 	/*
 		Some image loaders/writers can return/take an optional background color.
 		For convenience, we return them as u16 so we don't need to switch on the type
@@ -380,7 +380,7 @@ QOI_Info :: struct {
 
 TGA_Data_Type :: enum u8  {
 	Uncompressed_RGB = 2,
-	Compressed_RBB = 10,
+	Compressed_RBB   = 10,
 }
 
 TGA_Header :: struct #packed {
@@ -397,8 +397,19 @@ TGA_Header :: struct #packed {
 }
 #assert(size_of(TGA_Header) == 18)
 
+New_TGA_Signature :: "TRUEVISION-XFILE.\x00"
+
+TGA_Footer :: struct #packed {
+	extension_area_offset:      u32le,
+	developer_directory_offset: u32le,
+	signature:                  [18]u8 `fmt:"s"`, // Should match signature if New TGA.
+}
+#assert(size_of(TGA_Footer) == 26)
+
 TGA_Info :: struct {
-	header: TGA_Header,
+	header:   TGA_Header,
+	image_id: string,
+	footer:   Maybe(TGA_Footer),
 }
 
 // Function to help with image buffer calculations
