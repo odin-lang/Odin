@@ -17,8 +17,6 @@ import "core:bytes"
 import "core:os"
 import "core:compress"
 import "core:strings"
-import "core:fmt"
-_ :: fmt
 
 // TODO: alpha_premultiply support
 
@@ -142,29 +140,58 @@ load_from_context :: proc(ctx: ^$C, options := Options{}, allocator := context.a
 	header := image.read_data(ctx, image.TGA_Header) or_return
 	
 	// Header checks
-	rle_encoding := false 
+	rle_encoding  := false
+	color_mapped  := false
+	src_channels  := 0
+	dest_depth    := header.bits_per_pixel
+	dest_channels := 0
 
-	switch header.data_type_code {
-		// Supported formats: RGB(A), RGB(A) RLE
-		case .Compressed_RGB:
-			rle_encoding = true
-		case .Uncompressed_RGB:
+	#partial switch header.data_type_code {
+	// Supported formats: RGB(A), RGB(A) RLE
+	case .Compressed_RGB:
+		rle_encoding = true
+	case .Uncompressed_RGB:
+		// Intentionally blank
+	case .Uncompressed_Color_Mapped:
+		color_mapped = true
 
-		case .No_Image_Data:
-			return nil, .Unsupported_Format
-		case .Uncompressed_Color_Mapped:
-			return nil, .Unsupported_Format
-		case .Uncompressed_Black_White:
-			return nil, .Unsupported_Format
-		case .Compressed_Color_Mapped:
-			return nil, .Unsupported_Format
-		case .Compressed_Black_White:
-			return nil, .Unsupported_Format
-		case:
-			return nil, .Unsupported_Format
+	case:
+		return nil, .Unsupported_Format
 	}
 
-	if header.bits_per_pixel != 24 && header.bits_per_pixel != 32 {
+	if color_mapped {
+		if header.color_map_type != 1 {
+			return nil, .Unsupported_Format
+		}
+		dest_depth = header.color_map_depth
+
+		// Expect LUT entry index to be 8 bits
+		if header.bits_per_pixel != 8 || header.color_map_origin != 0 || header.color_map_length > 256 {
+			return nil, .Unsupported_Format
+		}
+	}
+
+	switch dest_depth {
+	case 15: // B5G5R5
+		src_channels  = 2
+		dest_channels = 3
+		if color_mapped {
+			return nil, .Unsupported_Format
+		}
+	case 16: // B5G5R5A1
+		src_channels  = 2
+		dest_channels = 3 // Alpha bit is dodgy in TGA, so we ignore it.
+		if color_mapped {
+			return nil, .Unsupported_Format
+		}
+	case 24: // RGB8
+		src_channels  = 3 if !color_mapped else 1
+		dest_channels = 3
+	case 32: // RGBA8
+		src_channels  = 4 if !color_mapped else 1
+		dest_channels = 4
+
+	case:
 		return nil, .Unsupported_Format
 	}
 
@@ -184,9 +211,8 @@ load_from_context :: proc(ctx: ^$C, options := Options{}, allocator := context.a
 		destroy(img)
 	}
 
-	src_channels := int(header.bits_per_pixel) / 8
 	img.which = .TGA
-	img.channels = 4 if .alpha_add_if_missing  in options else src_channels
+	img.channels = 4 if .alpha_add_if_missing  in options else dest_channels
 	img.channels = 3 if .alpha_drop_if_present in options else img.channels
 
 	img.depth  = 8
@@ -196,11 +222,37 @@ load_from_context :: proc(ctx: ^$C, options := Options{}, allocator := context.a
 	// Read Image ID if present
 	image_id := ""
 	if _id, e := compress.read_slice(ctx, int(header.id_length)); e != .None {
-		return nil, .Corrupt
+		return img, .Corrupt
 	} else {
 		if .return_metadata in options {
 			id := strings.trim_right_null(string(_id))
 			image_id = strings.clone(id)
+		}
+	}
+
+	color_map := make([]RGBA_Pixel, header.color_map_length)
+	defer delete(color_map)
+
+	if color_mapped {
+		switch header.color_map_depth {
+		case 24:
+			for i in 0..<header.color_map_length {
+				if lut, lut_err := compress.read_data(ctx, RGB_Pixel); lut_err != .None {
+					return img, .Corrupt
+				} else {
+					color_map[i].rgb = lut
+					color_map[i].a   = 255
+				}
+			}
+
+		case 32:
+			for i in 0..<header.color_map_length {
+				if lut, lut_err := compress.read_data(ctx, RGBA_Pixel); lut_err != .None {
+					return img, .Corrupt
+				} else {
+					color_map[i] = lut
+				}
+			}
 		}
 	}
 
@@ -218,7 +270,7 @@ load_from_context :: proc(ctx: ^$C, options := Options{}, allocator := context.a
 		return img, nil
 	}
 
-	if !resize(&img.pixels.buf, img.channels * img.width * img.height) {
+	if !resize(&img.pixels.buf, dest_channels * img.width * img.height) {
 		return img, .Unable_To_Allocate_Or_Resize
 	}
 
@@ -228,13 +280,13 @@ load_from_context :: proc(ctx: ^$C, options := Options{}, allocator := context.a
 	read_pixel           := true
 	is_packet_rle        := false
 
-	pixel: [4]u8
+	pixel: RGBA_Pixel
 
-	stride := img.width * img.channels
+	stride := img.width * dest_channels
 	line   := 0 if origin_is_top else img.height - 1
 
 	for _ in 0..<img.height {
-		offset := line * stride + (0 if origin_is_left else (stride - img.channels))
+		offset := line * stride + (0 if origin_is_left else (stride - dest_channels))
 		for _ in 0..<img.width {
 			// handle RLE decoding
 			if rle_encoding {
@@ -258,24 +310,29 @@ load_from_context :: proc(ctx: ^$C, options := Options{}, allocator := context.a
 				if src_err != .None {
 					return img, .Corrupt
 				}
-
-				pixel[2] = src[0]
-				pixel[1] = src[1]
-				pixel[0] = src[2]
-
-				pixel[3] = src_channels == 4 ? src[3] : 255
-				if img.channels == 4 {
-					if src_channels == 4 {
-						img.pixels.buf[offset:][3] = src[3]
-					} else {
-						img.pixels.buf[offset:][3] = 255
-					}
+				switch src_channels {
+				case 1:
+					// Color mapped
+					pixel = color_map[src[0]].bgra
+				case 2:
+					assert(dest_depth == 16)
+					v := int(src[0]) | int(src[1]) << 8
+					b := u8( v        & 31) << 3
+					g := u8((v >>  5) & 31) << 3
+					r := u8((v >> 10) & 31) << 3
+					pixel = {r, g, b, 255}
+				case 3:
+					pixel = {src[2], src[1], src[0], 255}
+				case 4:
+					pixel = {src[2], src[1], src[0], src[3]}
+				case:
+					return img, .Corrupt
 				}
 			}
 
 			// Write pixel
-			copy(img.pixels.buf[offset:], pixel[:img.channels])
-			offset += img.channels if origin_is_left else -img.channels
+			copy(img.pixels.buf[offset:], pixel[:dest_channels])
+			offset += dest_channels if origin_is_left else -dest_channels
 			rle_repetition_count -= 1
 		}
 		line += 1 if origin_is_top else -1
