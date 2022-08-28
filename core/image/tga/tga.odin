@@ -16,9 +16,11 @@ import "core:image"
 import "core:bytes"
 import "core:os"
 import "core:compress"
+import "core:strings"
+import "core:fmt"
+_ :: fmt
 
 // TODO: alpha_premultiply support
-
 
 Error   :: image.Error
 Image   :: image.Image
@@ -122,6 +124,21 @@ load_from_context :: proc(ctx: ^$C, options := Options{}, allocator := context.a
 		options -= {.return_header}
 	}
 
+	// First check for a footer.
+	filesize := compress.input_size(ctx) or_return
+
+	footer: image.TGA_Footer
+	have_valid_footer := false
+
+	if filesize >= size_of(image.TGA_Header) + size_of(image.TGA_Footer) {
+		if f, f_err := compress.peek_data(ctx, image.TGA_Footer, filesize - i64(size_of(image.TGA_Footer))); f_err == .None {
+			if string(f.signature[:]) == image.New_TGA_Signature {
+				have_valid_footer = true
+				footer = f
+			}
+		}
+	}
+
 	header := image.read_data(ctx, image.TGA_Header) or_return
 	
 	// Header checks
@@ -132,14 +149,16 @@ load_from_context :: proc(ctx: ^$C, options := Options{}, allocator := context.a
 		case .Uncompressed_RGB:
 		case: return nil, .Unsupported_Format 	
 	}
-	if header.bits_per_pixel!=24 && header.bits_per_pixel!=32 {
-		return nil, .Unsupported_Format
-	}
-	if ( header.image_descriptor & IMAGE_DESCRIPTOR_INTERLEAVING_MASK ) != 0 {
+
+	if header.bits_per_pixel != 24 && header.bits_per_pixel != 32 {
 		return nil, .Unsupported_Format
 	}
 
-	if (int(header.dimensions[0])*int(header.dimensions[1])) > image.MAX_DIMENSIONS {
+	if header.image_descriptor & IMAGE_DESCRIPTOR_INTERLEAVING_MASK != 0 {
+		return nil, .Unsupported_Format
+	}
+
+	if int(header.dimensions[0]) * int(header.dimensions[1]) > image.MAX_DIMENSIONS {
 		return nil, .Image_Dimensions_Too_Large
 	}
 
@@ -147,88 +166,104 @@ load_from_context :: proc(ctx: ^$C, options := Options{}, allocator := context.a
 		img = new(Image)
 	}
 
+	defer if err != nil {
+		destroy(img)
+	}
+
+	src_channels := int(header.bits_per_pixel) / 8
+	img.which = .TGA
+	img.channels = 4 if .alpha_add_if_missing  in options else src_channels
+	img.channels = 3 if .alpha_drop_if_present in options else img.channels
+
+	img.depth  = 8
+	img.width  = int(header.dimensions[0])
+	img.height = int(header.dimensions[1])
+
+	// Read Image ID if present
+	image_id := ""
+	if _id, e := compress.read_slice(ctx, int(header.id_length)); e != .None {
+		return nil, .Corrupt
+	} else {
+		if .return_metadata in options {
+			id := strings.trim_right_null(string(_id))
+			image_id = strings.clone(id)
+		}
+	}
+
 	if .return_metadata in options {
 		info := new(image.TGA_Info)
-		info.header = header
+		info.header   = header
+		info.image_id = image_id
+		if have_valid_footer {
+			info.footer = footer
+		}
 		img.metadata = info
 	}
-	src_channels := int(header.bits_per_pixel)/8
-	img.which = .TGA
-	img.channels = .alpha_add_if_missing in options ? 4: src_channels
-	img.channels = .alpha_drop_if_present in options ? 3: img.channels
-	
-	img.depth = 8
-	img.width = int(header.dimensions[0])
-	img.height = int(header.dimensions[1])
 
 	if .do_not_decompress_image in options {
 		return img, nil
 	}
 
-	// skip id
-	if _, e := compress.read_slice(ctx, int(header.id_length)); e!= .None {
-		destroy(img)
-		return nil, .Corrupt
-	}
-
 	if !resize(&img.pixels.buf, img.channels * img.width * img.height) {
-		destroy(img)
-		return nil, .Unable_To_Allocate_Or_Resize
+		return img, .Unable_To_Allocate_Or_Resize
 	}
 
-	origin_is_topleft := (header.image_descriptor & IMAGE_DESCRIPTOR_TOPLEFT_MASK ) != 0
+	origin_is_topleft    := header.image_descriptor & IMAGE_DESCRIPTOR_TOPLEFT_MASK != 0
 	rle_repetition_count := 0
-	read_pixel := true
-	is_packet_rle := false
-	pixel: [4]u8
-	for y in 0..<img.height {
-		line := origin_is_topleft ? y : img.height-y-1
-		dst := mem.ptr_offset(mem.raw_data(img.pixels.buf), line*img.width*img.channels)
-		for x in 0..<img.width {
+	read_pixel           := true
+	is_packet_rle        := false
 
+	pixel: [4]u8
+
+	stride := img.width * img.channels
+	line   := 0 if origin_is_topleft else img.height - 1
+
+	for _ in 0..<img.height {
+		offset := line * stride
+		for _ in 0..<img.width {
 			// handle RLE decoding
 			if rle_encoding {
-				
 				if rle_repetition_count == 0 {
 					rle_cmd, err := compress.read_u8(ctx)
-					if err!=.None {
-						destroy(img)
-						return nil, .Corrupt
+					if err != .None {
+						return img, .Corrupt
 					}
-					is_packet_rle = (rle_cmd>>7) != 0 
+					is_packet_rle = (rle_cmd >> 7) != 0
 					rle_repetition_count = 1 + int(rle_cmd & 0x7F)
 					read_pixel = true
-				} else if is_packet_rle==false {
-					read_pixel = rle_repetition_count>0
+				} else if !is_packet_rle {
+					read_pixel = rle_repetition_count > 0
 				} else {
 					read_pixel = false
 				}
 			}
 			// Read pixel
 			if read_pixel {
-				src, err := compress.read_slice(ctx, src_channels)
-				if err!=.None {
-					destroy(img)
-					return nil, .Corrupt
+				src, src_err := compress.read_slice(ctx, src_channels)
+				if src_err != .None {
+					return img, .Corrupt
 				}
+
 				pixel[2] = src[0]
 				pixel[1] = src[1]
 				pixel[0] = src[2]
-				pixel[3] = src_channels==4 ? src[3] : 255
-				if img.channels==4 {
-					if src_channels==4 {
-						dst[3] = src[3]
+
+				pixel[3] = src_channels == 4 ? src[3] : 255
+				if img.channels == 4 {
+					if src_channels == 4 {
+						img.pixels.buf[offset:][3] = src[3]
 					} else {
-						dst[3] = 255
+						img.pixels.buf[offset:][3] = 255
 					}
 				}
 			}
 
 			// Write pixel
-			mem.copy(dst, mem.raw_data(&pixel), img.channels)
-			dst = mem.ptr_offset(dst, img.channels)
+			copy(img.pixels.buf[offset:], pixel[:img.channels])
+			offset += img.channels
 			rle_repetition_count -= 1
 		}
+		line += 1 if origin_is_topleft else -1
 	}
 	return img, nil
 }
@@ -258,15 +293,19 @@ load_from_file :: proc(filename: string, options := Options{}, allocator := cont
 load :: proc{load_from_file, load_from_bytes, load_from_context}
 
 destroy :: proc(img: ^Image) {
-	if img == nil {
+	if img == nil || img.width == 0 || img.height == 0 {
 		return
 	}
 
 	bytes.buffer_destroy(&img.pixels)
 	if v, ok := img.metadata.(^image.TGA_Info); ok {
+		delete(v.image_id)
 		free(v)
 	}
 
+	// Make destroy idempotent
+	img.width  = 0
+	img.height = 0
 	free(img)
 }
 
