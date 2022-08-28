@@ -24,6 +24,7 @@ Error   :: image.Error
 Image   :: image.Image
 Options :: image.Options
 
+GA_Pixel   :: image.GA_Pixel
 RGB_Pixel  :: image.RGB_Pixel
 RGBA_Pixel :: image.RGBA_Pixel
 
@@ -128,20 +129,33 @@ load_from_context :: proc(ctx: ^$C, options := Options{}, allocator := context.a
 	footer: image.TGA_Footer
 	have_valid_footer := false
 
+	extension: image.TGA_Extension
+	have_valid_extension := false
+
 	if filesize >= size_of(image.TGA_Header) + size_of(image.TGA_Footer) {
 		if f, f_err := compress.peek_data(ctx, image.TGA_Footer, filesize - i64(size_of(image.TGA_Footer))); f_err == .None {
 			if string(f.signature[:]) == image.New_TGA_Signature {
 				have_valid_footer = true
 				footer = f
+
+				if i64(footer.extension_area_offset) + i64(size_of(image.TGA_Extension)) < filesize {
+					if e, e_err := compress.peek_data(ctx, image.TGA_Extension, footer.extension_area_offset); e_err == .None {
+						if e.extension_size == size_of(image.TGA_Extension) {
+							have_valid_extension = true
+							extension = e
+						}
+					}
+				}
 			}
 		}
 	}
 
 	header := image.read_data(ctx, image.TGA_Header) or_return
-	
+
 	// Header checks
 	rle_encoding  := false
 	color_mapped  := false
+	black_white   := false
 	src_channels  := 0
 	dest_depth    := header.bits_per_pixel
 	dest_channels := 0
@@ -152,8 +166,18 @@ load_from_context :: proc(ctx: ^$C, options := Options{}, allocator := context.a
 		rle_encoding = true
 	case .Uncompressed_RGB:
 		// Intentionally blank
+	case .Uncompressed_Black_White:
+		black_white  = true
+		dest_depth   = 24
 	case .Uncompressed_Color_Mapped:
 		color_mapped = true
+	case .Compressed_Color_Mapped:
+		color_mapped = true
+		rle_encoding = true
+	case .Compressed_Black_White:
+		black_white  = true
+		rle_encoding = true
+		dest_depth   = 24
 
 	case:
 		return nil, .Unsupported_Format
@@ -176,16 +200,16 @@ load_from_context :: proc(ctx: ^$C, options := Options{}, allocator := context.a
 		src_channels  = 2
 		dest_channels = 3
 		if color_mapped {
-			return nil, .Unsupported_Format
+			src_channels = 1
 		}
 	case 16: // B5G5R5A1
 		src_channels  = 2
 		dest_channels = 3 // Alpha bit is dodgy in TGA, so we ignore it.
 		if color_mapped {
-			return nil, .Unsupported_Format
+			src_channels = 1
 		}
 	case 24: // RGB8
-		src_channels  = 3 if !color_mapped else 1
+		src_channels  = 1 if (color_mapped || black_white) else 3
 		dest_channels = 3
 	case 32: // RGBA8
 		src_channels  = 4 if !color_mapped else 1
@@ -235,6 +259,16 @@ load_from_context :: proc(ctx: ^$C, options := Options{}, allocator := context.a
 
 	if color_mapped {
 		switch header.color_map_depth {
+		case 16:
+			for i in 0..<header.color_map_length {
+				if lut, lut_err := compress.read_data(ctx, GA_Pixel); lut_err != .None {
+					return img, .Corrupt
+				} else {
+					color_map[i].rg = lut
+					color_map[i].ba = 255
+				}
+			}
+
 		case 24:
 			for i in 0..<header.color_map_length {
 				if lut, lut_err := compress.read_data(ctx, RGB_Pixel); lut_err != .None {
@@ -262,6 +296,9 @@ load_from_context :: proc(ctx: ^$C, options := Options{}, allocator := context.a
 		info.image_id = image_id
 		if have_valid_footer {
 			info.footer = footer
+		}
+		if have_valid_extension {
+			info.extension = extension
 		}
 		img.metadata = info
 	}
@@ -312,15 +349,27 @@ load_from_context :: proc(ctx: ^$C, options := Options{}, allocator := context.a
 				}
 				switch src_channels {
 				case 1:
-					// Color mapped
-					pixel = color_map[src[0]].bgra
+					// Color-mapped or Black & White
+					if black_white {
+						pixel = {src[0], src[0], src[0], 255}
+					} else if header.color_map_depth == 24 {
+						pixel = color_map[src[0]].bgra
+					} else if header.color_map_depth == 16 {
+						lut := color_map[src[0]]
+						v := u16(lut.r) | u16(lut.g) << 8
+						b := u8( v        & 31) << 3
+						g := u8((v >>  5) & 31) << 3
+						r := u8((v >> 10) & 31) << 3
+						pixel = {r, g, b, 255}
+					}
+
 				case 2:
-					assert(dest_depth == 16)
-					v := int(src[0]) | int(src[1]) << 8
+					v := u16(src[0]) | u16(src[1]) << 8
 					b := u8( v        & 31) << 3
 					g := u8((v >>  5) & 31) << 3
 					r := u8((v >> 10) & 31) << 3
 					pixel = {r, g, b, 255}
+
 				case 3:
 					pixel = {src[2], src[1], src[0], 255}
 				case 4:
