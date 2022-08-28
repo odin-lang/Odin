@@ -145,9 +145,23 @@ load_from_context :: proc(ctx: ^$C, options := Options{}, allocator := context.a
 	rle_encoding := false 
 
 	switch header.data_type_code {
-		case .Compressed_RBB: rle_encoding = true
+		// Supported formats: RGB(A), RGB(A) RLE
+		case .Compressed_RGB:
+			rle_encoding = true
 		case .Uncompressed_RGB:
-		case: return nil, .Unsupported_Format 	
+
+		case .No_Image_Data:
+			return nil, .Unsupported_Format
+		case .Uncompressed_Color_Mapped:
+			return nil, .Unsupported_Format
+		case .Uncompressed_Black_White:
+			return nil, .Unsupported_Format
+		case .Compressed_Color_Mapped:
+			return nil, .Unsupported_Format
+		case .Compressed_Black_White:
+			return nil, .Unsupported_Format
+		case:
+			return nil, .Unsupported_Format
 	}
 
 	if header.bits_per_pixel != 24 && header.bits_per_pixel != 32 {
@@ -208,7 +222,8 @@ load_from_context :: proc(ctx: ^$C, options := Options{}, allocator := context.a
 		return img, .Unable_To_Allocate_Or_Resize
 	}
 
-	origin_is_topleft    := header.image_descriptor & IMAGE_DESCRIPTOR_TOPLEFT_MASK != 0
+	origin_is_top        := header.image_descriptor & IMAGE_DESCRIPTOR_TOP_MASK   != 0
+	origin_is_left       := header.image_descriptor & IMAGE_DESCRIPTOR_RIGHT_MASK == 0
 	rle_repetition_count := 0
 	read_pixel           := true
 	is_packet_rle        := false
@@ -216,10 +231,10 @@ load_from_context :: proc(ctx: ^$C, options := Options{}, allocator := context.a
 	pixel: [4]u8
 
 	stride := img.width * img.channels
-	line   := 0 if origin_is_topleft else img.height - 1
+	line   := 0 if origin_is_top else img.height - 1
 
 	for _ in 0..<img.height {
-		offset := line * stride
+		offset := line * stride + (0 if origin_is_left else (stride - img.channels))
 		for _ in 0..<img.width {
 			// handle RLE decoding
 			if rle_encoding {
@@ -260,10 +275,10 @@ load_from_context :: proc(ctx: ^$C, options := Options{}, allocator := context.a
 
 			// Write pixel
 			copy(img.pixels.buf[offset:], pixel[:img.channels])
-			offset += img.channels
+			offset += img.channels if origin_is_left else -img.channels
 			rle_repetition_count -= 1
 		}
-		line += 1 if origin_is_topleft else -1
+		line += 1 if origin_is_top else -1
 	}
 	return img, nil
 }
@@ -310,7 +325,8 @@ destroy :: proc(img: ^Image) {
 }
 
 IMAGE_DESCRIPTOR_INTERLEAVING_MASK :: (1<<6) | (1<<7)
-IMAGE_DESCRIPTOR_TOPLEFT_MASK :: 1<<5
+IMAGE_DESCRIPTOR_RIGHT_MASK :: 1<<4
+IMAGE_DESCRIPTOR_TOP_MASK   :: 1<<5
 
 @(init, private)
 _register :: proc() {
