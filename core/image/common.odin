@@ -407,14 +407,45 @@ New_TGA_Signature :: "TRUEVISION-XFILE.\x00"
 TGA_Footer :: struct #packed {
 	extension_area_offset:      u32le,
 	developer_directory_offset: u32le,
-	signature:                  [18]u8 `fmt:"s"`, // Should match signature if New TGA.
+	signature:                  [18]u8 `fmt:"s,0"`, // Should match signature if New TGA.
 }
 #assert(size_of(TGA_Footer) == 26)
 
+TGA_Extension :: struct #packed {
+	extension_size:          u16le,               // Size of this struct. If not 495 bytes it means it's an unsupported version.
+	author_name:             [41]u8  `fmt:"s,0"`, // Author name, ASCII. Zero-terminated
+	author_comments:         [324]u8 `fmt:"s,0"`, // Author comments, formatted as 4 lines of 80 character lines, each zero terminated.
+	datetime:                struct {month, day, year, hour, minute, second: u16le},
+	job_name:                [41]u8  `fmt:"s,0"`, // Author name, ASCII. Zero-terminated
+	job_time:                struct {hour, minute, second: u16le},
+	software_id:             [41]u8  `fmt:"s,0"`, // Software ID name, ASCII. Zero-terminated
+	software_version: struct #packed {
+		number: u16le, // Version number * 100
+		letter: u8 `fmt:"r"`,   // " " if not used
+	},
+	key_color:               [4]u8,    // ARGB key color used at time of production
+	aspect_ratio:            [2]u16le, // Numerator / Denominator
+	gamma:                   [2]u16le, // Numerator / Denominator, range should be 0.0..10.0
+	color_correction_offset: u32le,    // 0 if no color correction information
+	postage_stamp_offset:    u32le,    // 0 if no thumbnail
+	scanline_offset:         u32le,    // 0 if no scanline table
+	attributes:              TGA_Alpha_Kind,
+}
+#assert(size_of(TGA_Extension) == 495)
+
+TGA_Alpha_Kind :: enum u8 {
+	None,
+	Undefined_Ignore,
+	Undefined_Retain,
+	Useful,
+	Premultiplied,
+}
+
 TGA_Info :: struct {
-	header:   TGA_Header,
-	image_id: string,
-	footer:   Maybe(TGA_Footer),
+	header:    TGA_Header,
+	image_id:  string,
+	footer:    Maybe(TGA_Footer),
+	extension: Maybe(TGA_Extension),
 }
 
 // Function to help with image buffer calculations
