@@ -1017,8 +1017,11 @@ String lb_filepath_obj_for_module(lbModule *m) {
 	}
 
 	String ext = {};
-
-	if (build_context.build_mode == BuildMode_Assembly) {
+	if (build_context.out_filepath.len > 0) {
+		if (build_context.build_paths[BuildPath_Output].ext.len > 0) {
+			ext = concatenate_strings(permanent_allocator(), STR_LIT("."), build_context.build_paths[BuildPath_Output].ext);
+		}
+	} else if (build_context.build_mode == BuildMode_Assembly) {
 		ext = STR_LIT(".S");
 	} else {
 		if (is_arch_wasm()) {
@@ -1050,7 +1053,6 @@ String lb_filepath_obj_for_module(lbModule *m) {
 			}
 		}
 	}
-
 	return concatenate_strings(permanent_allocator(), path, ext);
 }
 
