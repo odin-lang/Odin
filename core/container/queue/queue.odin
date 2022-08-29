@@ -99,12 +99,14 @@ get_ptr :: proc(q: ^$Q/Queue($T), #any_int i: int, loc := #caller_location) -> ^
 	return &q.data[idx]
 }
 
-peek_front :: proc(q: ^$Q/Queue($T)) -> ^T {
+peek_front :: proc(q: ^$Q/Queue($T), loc := #caller_location) -> ^T {
+	runtime.bounds_check_error_loc(loc, 0, builtin.len(q.data))
 	idx := q.offset%builtin.len(q.data)
 	return &q.data[idx]
 }
 
-peek_back :: proc(q: ^$Q/Queue($T)) -> ^T {
+peek_back :: proc(q: ^$Q/Queue($T), loc := #caller_location) -> ^T {
+	runtime.bounds_check_error_loc(loc, int(q.len - 1), builtin.len(q.data))
 	idx := (uint(q.len - 1)+q.offset)%builtin.len(q.data)
 	return &q.data[idx]
 }
