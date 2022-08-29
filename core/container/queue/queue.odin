@@ -73,10 +73,17 @@ get :: proc(q: ^$Q/Queue($T), #any_int i: int, loc := #caller_location) -> T {
 front :: proc(q: ^$Q/Queue($T)) -> T {
 	return q.data[q.offset]
 }
+front_ptr :: proc(q: ^$Q/Queue($T)) -> ^T {
+	return &q.data[q.offset]
+}
 
 back :: proc(q: ^$Q/Queue($T)) -> T {
 	idx := (q.offset+uint(q.len))%builtin.len(q.data)
 	return q.data[idx]
+}
+back_ptr :: proc(q: ^$Q/Queue($T)) -> ^T {
+	idx := (q.offset+uint(q.len))%builtin.len(q.data)
+	return &q.data[idx]
 }
 
 set :: proc(q: ^$Q/Queue($T), #any_int i: int, val: T, loc := #caller_location) {
