@@ -99,6 +99,16 @@ get_ptr :: proc(q: ^$Q/Queue($T), #any_int i: int, loc := #caller_location) -> ^
 	return &q.data[idx]
 }
 
+peek_front :: proc(q: ^$Q/Queue($T)) -> ^T {
+	idx := q.offset%builtin.len(q.data)
+	return &q.data[idx]
+}
+
+peek_back :: proc(q: ^$Q/Queue($T)) -> ^T {
+	idx := (uint(q.len - 1)+q.offset)%builtin.len(q.data)
+	return &q.data[idx]
+}
+
 // Push an element to the back of the queue
 push_back :: proc(q: ^$Q/Queue($T), elem: T) -> bool {
 	if space(q^) == 0 {
