@@ -135,3 +135,10 @@ See also LICENSE in the `GGPO` directory itself.
 
 See also LICENSE in the `botan` directory itself.
 Includes full bindings as well as wrappers to match the `core:crypto` API.
+
+## CMark
+
+[CMark](https://github.com/commonmark/cmark) CommonMark parsing library.
+
+See also LICENSE in the `cmark` directory itself.
+Includes full bindings and Windows `.lib` and `.dll`.
