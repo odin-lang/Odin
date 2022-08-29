@@ -1020,6 +1020,9 @@ String lb_filepath_obj_for_module(lbModule *m) {
 
 	if (build_context.build_mode == BuildMode_Assembly) {
 		ext = STR_LIT(".S");
+	} else if (build_context.build_mode == BuildMode_Object && bc->build_paths[BuildPath_Output].ext.len > 0) {
+		// If explicitly building an object file, use the extension we were given
+		ext = concatenate_strings(permanent_allocator(), STR_LIT("."), build_context.build_paths[BuildPath_Output].ext);
 	} else {
 		if (is_arch_wasm()) {
 			ext = STR_LIT(".wasm.o");
