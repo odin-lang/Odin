@@ -114,16 +114,4 @@ package cmark
 
 	Nodes must only be modified after an `.Exit` event, or an `.Enter` event for
 	leaf nodes.
-
-	Wrapping the context.allocator for CMark's use:
-
-	```odin
-	using cm
-
-	alloc := cm.get_default_mem_allocator()
-	alloc^ = cm.make_allocator()
-
-	... proceed as usual, but keep in mind that `context.allocator` can't change
-	for any of the calls to this package.
-	```
 */
