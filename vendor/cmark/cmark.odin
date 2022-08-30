@@ -8,6 +8,7 @@ package cmark
 
 import "core:c"
 import "core:c/libc"
+import "core:runtime"
 
 BINDING_VERSION :: Version_Info{major = 0, minor = 30, patch = 2}
 
@@ -479,3 +480,47 @@ free_string :: proc "c" (s: string) {
     free_rawptr(raw_data(s))
 }
 free :: proc{free_rawptr, free_cstring}
+
+// Wrap CMark allocator as Odin allocator
+@(private)
+cmark_allocator_proc :: proc(allocator_data: rawptr, mode: runtime.Allocator_Mode,
+                           size, alignment: int,
+                           old_memory: rawptr, old_size: int, loc := #caller_location) -> (res: []byte, err: runtime.Allocator_Error) {
+
+	cmark_alloc := cast(^Allocator)allocator_data
+	switch mode {
+	case .Alloc:
+		ptr := cmark_alloc.calloc(1, c.size_t(size))
+		res  = transmute([]byte)runtime.Raw_Slice{ptr, size}
+		return res, nil
+
+	case .Free:
+		cmark_alloc.free(old_memory)
+		return nil, nil
+
+	case .Free_All:
+		return nil, .Mode_Not_Implemented
+
+	case .Resize:
+		new_ptr := cmark_alloc.realloc(old_memory, c.size_t(size))
+		res = transmute([]byte)runtime.Raw_Slice{new_ptr, size}
+		if size > old_size {
+			runtime.mem_zero(raw_data(res[old_size:]), size - old_size)
+		}
+		return res, nil
+
+	case .Query_Features:
+		return nil, nil
+
+	case .Query_Info:
+		return nil, .Mode_Not_Implemented
+	}
+	return nil, nil
+}
+
+get_default_mem_allocator_as_odin :: proc() -> runtime.Allocator {
+	return runtime.Allocator{
+		procedure = cmark_allocator_proc,
+		data = rawptr(get_default_mem_allocator()),
+	}
+}
