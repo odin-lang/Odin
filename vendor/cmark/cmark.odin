@@ -12,9 +12,8 @@ import "core:c/libc"
 BINDING_VERSION :: Version_Info{major = 0, minor = 30, patch = 2}
 
 when ODIN_OS == .Windows {
-	// To use `import "vendor:cmark"` and copy the `.dll` next to your program.
 	foreign import lib {
-		"cmark.lib",
+		"cmark_static.lib",
 	}
 }
 
