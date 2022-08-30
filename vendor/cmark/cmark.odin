@@ -8,13 +8,16 @@ package cmark
 
 import "core:c"
 import "core:c/libc"
-import "core:runtime"
 
 BINDING_VERSION :: Version_Info{major = 0, minor = 30, patch = 2}
 
 when ODIN_OS == .Windows {
 	foreign import lib {
 		"cmark_static.lib",
+	}
+} else when ODIN_OS == .Linux {
+	foreign import lib {
+		"libcmark.a",
 	}
 }
 
@@ -123,20 +126,6 @@ Allocator :: struct {
 foreign lib {
 	// Returns a pointer to the default memory allocator.
 	get_default_mem_allocator :: proc() -> (mem: ^Allocator) ---
-}
-
-// You can use the current context.allocator to make a custom allocator for CMark.
-// WARNING: It needs to remain the context.allocator for any subsequent calls into this package.
-//
-// To use:
-// alloc := get_default_allocator()
-// alloc^ = make_allocator()
-make_allocator :: proc() -> (res: Allocator) {
-	return Allocator{
-		calloc  = _calloc,
-		realloc = _realloc,
-		free    = _free,
-	}
 }
 
 bufsize_t :: distinct i32
@@ -490,23 +479,3 @@ free_string :: proc "c" (s: string) {
     free_rawptr(raw_data(s))
 }
 free :: proc{free_rawptr, free_cstring}
-
-@(private)
-_calloc :: proc "c" (num: c.size_t, size: c.size_t) -> (alloc: rawptr) {
-	context = runtime.default_context()
-	data, _ := runtime.mem_alloc(int(num * size), 2 * align_of(rawptr), context.allocator, {})
-	return raw_data(data)
-}
-
-@(private)
-_realloc :: proc "c" (ptr: rawptr, new_size: c.size_t) -> (alloc: rawptr) {
-	context = runtime.default_context()
-	data, _ := runtime.mem_resize(ptr, {}, int(new_size), 2 * align_of(rawptr), context.allocator, {})
-	return raw_data(data)
-}
-
-@(private)
-_free :: proc "c" (ptr: rawptr) {
-	context = runtime.default_context()
-	runtime.mem_free(ptr, context.allocator, {})
-}
