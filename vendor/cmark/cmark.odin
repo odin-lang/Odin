@@ -8,6 +8,7 @@ package cmark
 
 import "core:c"
 import "core:c/libc"
+import "core:runtime"
 
 BINDING_VERSION :: Version_Info{major = 0, minor = 30, patch = 2}
 
@@ -113,9 +114,9 @@ markdown_to_html_from_string :: proc(text: string, options: Options) -> (html: s
 // Custom allocator - Defines the memory allocation functions to be used by CMark
 // when parsing and allocating a document tree
 Allocator :: struct {
-	calloc:  proc "c" (c.size_t, c.size_t) -> rawptr,
-	realloc: proc "c" (rawptr, c.size_t)   -> rawptr,
-	free:    proc "c" (rawptr),
+	calloc:  proc "c" (num: c.size_t, size: c.size_t)  -> rawptr,
+	realloc: proc "c" (ptr: rawptr, new_size: c.size_t) -> rawptr,
+	free:    proc "c" (ptr: rawptr),
 }
 
 @(default_calling_convention="c", link_prefix="cmark_")
@@ -475,3 +476,33 @@ free_string :: proc "c" (s: string) {
     free_rawptr(raw_data(s))
 }
 free :: proc{free_rawptr, free_cstring}
+
+// You can use the current context.allocator to make a custom allocator for CMark.
+// WARNING: It needs to remain the context.allocator for any subsequent calls into this package.
+make_allocator :: proc() -> (res: Allocator) {
+	return Allocator{
+		calloc  = _calloc,
+		realloc = _realloc,
+		free    = _free,
+	}
+}
+
+@(private)
+_calloc :: proc "c" (num: c.size_t, size: c.size_t) -> (alloc: rawptr) {
+	context = runtime.default_context()
+	data, _ := runtime.mem_alloc(int(num * size), 2 * align_of(rawptr), context.allocator, {})
+	return raw_data(data)
+}
+
+@(private)
+_realloc :: proc "c" (ptr: rawptr, new_size: c.size_t) -> (alloc: rawptr) {
+	context = runtime.default_context()
+	data, _ := runtime.mem_resize(ptr, {}, int(new_size), 2 * align_of(rawptr), context.allocator, {})
+	return raw_data(data)
+}
+
+@(private)
+_free :: proc "c" (ptr: rawptr) {
+	context = runtime.default_context()
+	runtime.mem_free(ptr, context.allocator, {})
+}
