@@ -22,14 +22,14 @@ Option :: enum c.int {
 	Hard_Breaks     =  2, // Render `softbreak` as hard line breaks.
 	Safe            =  3, // Defined for API compatibility, now enabled by default.
 	Unsafe          = 17, // Render raw HTML and unsafe links (`javascript:`, `vbscript:`,
-	                      // `file:`, and `data:`, except for `image/png`, `image/gif`,
-	                      // `image/jpeg`, or `image/webp` mime types).  By default,
-	                      // raw HTML is replaced by a placeholder HTML comment. Unsafe
-	                      // links are replaced by empty strings.
+						  // `file:`, and `data:`, except for `image/png`, `image/gif`,
+						  // `image/jpeg`, or `image/webp` mime types).  By default,
+						  // raw HTML is replaced by a placeholder HTML comment. Unsafe
+						  // links are replaced by empty strings.
 	No_Breaks       =  4, // Render `softbreak` elements as spaces.
 	Normalize       =  8, // Legacy option, no effect.
 	Validate_UTF8   =  9, // Validate UTF-8 input before parsing, replacing illegal
-	                      // sequences with the replacement character U+FFFD.
+						  // sequences with the replacement character U+FFFD.
 	Smart           = 10, // Convert straight quotes to curly, --- to em dashes, -- to en dashes.
 }
 Options :: bit_set[Option; c.int]
@@ -106,12 +106,16 @@ foreign lib {
 	markdown_to_html :: proc(text: cstring, length: c.size_t, options: Options) -> (html: cstring) ---
 }
 
+markdown_to_html_from_string :: proc(text: string, options: Options) -> (html: string) {
+	return string(markdown_to_html(cstring(raw_data(text)), len(text), options))
+}
+
 // Custom allocator - Defines the memory allocation functions to be used by CMark
 // when parsing and allocating a document tree
 Allocator :: struct {
-	calloc:  proc(c.size_t, c.size_t) -> rawptr,
-	realloc: proc(rawptr, c.size_t)   -> rawptr,
-	free:    proc(rawptr),
+	calloc:  proc "c" (c.size_t, c.size_t) -> rawptr,
+	realloc: proc "c" (rawptr, c.size_t)   -> rawptr,
+	free:    proc "c" (rawptr),
 }
 
 @(default_calling_convention="c", link_prefix="cmark_")
@@ -214,7 +218,7 @@ foreign lib {
 		Tree Traversal
 	*/
 	// Returns the next node in the sequence after `node`, or nil if there is none.
- 	node_next :: proc(node: ^Node) -> (next: ^Node) ---
+	node_next :: proc(node: ^Node) -> (next: ^Node) ---
 
 	// Returns the previous node in the sequence after `node`, or nil if there is none.
 	node_previous :: proc(node: ^Node) -> (prev: ^Node) ---
@@ -347,7 +351,7 @@ foreign lib {
 
 	// Sets the literal text to render "on enter" for a custom `node`.
 	// Any children of the node will be rendered after this text.
-    // Returns `true` on success, `false`on failure.
+	// Returns `true` on success, `false`on failure.
 	node_set_on_enter :: proc(node: ^Node, on_enter: cstring) -> (success: b32) ---
 
 	// Returns the line on which `node` begins.
@@ -386,8 +390,8 @@ foreign lib {
 	node_prepend_child :: proc(node: ^Node, child: ^Node) -> (success: b32) ---
 
 	// Adds 'child' to the end of the children of `node`.
- 	// Returns `true` on success, `false` on failure.
- 	node_append_child :: proc(node: ^Node, child: ^Node) -> (success: b32) ---
+	// Returns `true` on success, `false` on failure.
+	node_append_child :: proc(node: ^Node, child: ^Node) -> (success: b32) ---
 
 	// Consolidates adjacent text nodes.
 	consolidate_text_nodes :: proc(root: ^Node) ---
@@ -427,6 +431,13 @@ foreign lib {
 	parse_from_libc_file :: proc(file: ^libc.FILE, options: Options) -> (root: ^Node) ---
 }
 
+parser_feed_from_string :: proc "c" (parser: ^Parser, s: string) {
+	parser_feed(parser, raw_data(s), len(s))
+}
+parse_document_from_string :: proc "c" (s: string, options: Options) -> (root: ^Node) {
+	return parse_document(raw_data(s), len(s), options)
+}
+
 // Rendering
 @(default_calling_convention="c", link_prefix="cmark_")
 foreign lib {
@@ -440,24 +451,27 @@ foreign lib {
 	render_html :: proc(root: ^Node, options: Options) -> (html: cstring) ---
 
 	// Render a `node` tree as a groff man page, without the header.
- 	// It is the caller's responsibility to free the returned buffer.
- 	render_man :: proc(root: ^Node, options: Options, width: c.int) -> (groff: cstring) ---
+	// It is the caller's responsibility to free the returned buffer.
+	render_man :: proc(root: ^Node, options: Options, width: c.int) -> (groff: cstring) ---
 
 	// Render a `node` tree as a commonmark document.
- 	// It is the caller's responsibility to free the returned buffer.
- 	render_commonmark :: proc(root: ^Node, options: Options, width: c.int) -> (commonmark: cstring) ---
+	// It is the caller's responsibility to free the returned buffer.
+	render_commonmark :: proc(root: ^Node, options: Options, width: c.int) -> (commonmark: cstring) ---
 
 	// Render a `node` tree as a LaTeX document.
- 	// It is the caller's responsibility to free the returned buffer.
- 	render_latex :: proc(root: ^Node, options: Options, width: c.int) -> (latex: cstring) ---
+	// It is the caller's responsibility to free the returned buffer.
+	render_latex :: proc(root: ^Node, options: Options, width: c.int) -> (latex: cstring) ---
 }
 
 // Helpers to free results from `render_*`.
-free_rawptr :: proc (ptr: rawptr) {
+free_rawptr :: proc "c" (ptr: rawptr) {
 	cmm := get_default_mem_allocator()
 	cmm.free(ptr)
 }
-free_cstring :: proc (str: cstring) {
+free_cstring :: proc "c" (str: cstring) {
 	free_rawptr(rawptr(str))
+}
+free_string :: proc "c" (s: string) {
+    free_rawptr(raw_data(s))
 }
 free :: proc{free_rawptr, free_cstring}
