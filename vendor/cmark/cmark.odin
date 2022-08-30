@@ -125,6 +125,20 @@ foreign lib {
 	get_default_mem_allocator :: proc() -> (mem: ^Allocator) ---
 }
 
+// You can use the current context.allocator to make a custom allocator for CMark.
+// WARNING: It needs to remain the context.allocator for any subsequent calls into this package.
+//
+// To use:
+// alloc := get_default_allocator()
+// alloc^ = make_allocator()
+make_allocator :: proc() -> (res: Allocator) {
+	return Allocator{
+		calloc  = _calloc,
+		realloc = _realloc,
+		free    = _free,
+	}
+}
+
 bufsize_t :: distinct i32
 
 // Node creation, destruction, and tree traversal
@@ -476,16 +490,6 @@ free_string :: proc "c" (s: string) {
     free_rawptr(raw_data(s))
 }
 free :: proc{free_rawptr, free_cstring}
-
-// You can use the current context.allocator to make a custom allocator for CMark.
-// WARNING: It needs to remain the context.allocator for any subsequent calls into this package.
-make_allocator :: proc() -> (res: Allocator) {
-	return Allocator{
-		calloc  = _calloc,
-		realloc = _realloc,
-		free    = _free,
-	}
-}
 
 @(private)
 _calloc :: proc "c" (num: c.size_t, size: c.size_t) -> (alloc: rawptr) {
