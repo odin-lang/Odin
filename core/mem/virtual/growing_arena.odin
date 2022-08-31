@@ -14,9 +14,9 @@ Growing_Arena :: struct {
 DEFAULT_MINIMUM_BLOCK_SIZE :: 1<<20 // 1 MiB should be enough
 
 growing_arena_init :: proc(arena: ^Growing_Arena, reserved: uint = DEFAULT_MINIMUM_BLOCK_SIZE) -> (err: Allocator_Error) {
-	arena.block = memory_block_alloc(0, reserved, {}) or_return
+	arena.curr_block = memory_block_alloc(0, reserved, {}) or_return
 	arena.total_used = 0
-	arena.total_reserved = arena.block.reserved
+	arena.total_reserved = arena.curr_block.reserved
 	return
 }
 
