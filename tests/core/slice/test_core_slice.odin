@@ -127,11 +127,13 @@ test_sort_by_indices :: proc(t: ^testing.T) {
 
 		{
 			indices := make([]int, test_size)
+			defer delete(indices)
 			for _, i in indices {
 				indices[i] = i
 			}
 
 			sorted_indices := slice.sort_by_indices(indices, f_idx)
+			defer delete(sorted_indices)
 			for v, i in sorted_indices {
 				idx_pass := v == f_idx[i]
 				expect(t, idx_pass, "Expected the sorted index to be the same as the result from sort_with_indices")
@@ -142,6 +144,7 @@ test_sort_by_indices :: proc(t: ^testing.T) {
 		}
 		{
 			indices := make([]int, test_size)
+			defer delete(indices)
 			for _, i in indices {
 				indices[i] = i
 			}
@@ -158,6 +161,10 @@ test_sort_by_indices :: proc(t: ^testing.T) {
 		{
 			indices := make([]int, test_size)
 			swap := make([]int, test_size)
+			defer {
+				delete(indices)
+				delete(swap)
+			}
 			for _, i in indices {
 				indices[i] = i
 			}
