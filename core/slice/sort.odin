@@ -38,6 +38,52 @@ sort :: proc(data: $T/[]$E) where ORD(E) {
 	}
 }
 
+
+sort_by_indices :: proc{ sort_by_indices_allocate, _sort_by_indices}
+
+sort_by_indices_allocate :: proc(data: $T/[]$E, indices: []int, allocator := context.allocator) -> (sorted: T) {
+	assert(len(data) == len(indices))
+	sorted = make([]int, len(data), allocator)
+	for v, i in indices {
+		sorted[i] = data[v]
+	}
+	return
+}
+
+_sort_by_indices :: proc(data, sorted: $T/[]$E, indices: []int) {
+	assert(len(data) == len(indices))
+	assert(len(data) == len(sorted))
+	for v, i in indices {
+		sorted[i] = data[v]
+	}
+}
+
+sort_by_indices_overwrite :: proc(data: $T/[]$E, indices: []int) {
+	assert(len(data) == len(indices))
+	temp := make([]int, len(data), context.allocator)
+	defer delete(temp)
+	for v, i in indices {
+		temp[i] = data[v]
+	}
+	swap_with_slice(data, temp)
+}
+
+// sort sorts a slice and returns a slice of the original indices
+// This sort is not guaranteed to be stable
+sort_with_indices :: proc(data: $T/[]$E, allocator := context.allocator) -> (indices: []int) where ORD(E) {
+	indices = make([]int, len(data), allocator)
+	when size_of(E) != 0 {
+		if n := len(data); n > 1 {
+			for _, idx in indices {
+				indices[idx] = idx
+			}
+			_quick_sort_general_with_indices(data, indices, 0, n, _max_depth(n), struct{}{}, .Ordered)
+		}
+		return indices
+	}
+	return indices
+}
+
 // sort_by sorts a slice with a given procedure to test whether two values are ordered "i < j"
 // This sort is not guaranteed to be stable
 sort_by :: proc(data: $T/[]$E, less: proc(i, j: E) -> bool) {
@@ -46,6 +92,22 @@ sort_by :: proc(data: $T/[]$E, less: proc(i, j: E) -> bool) {
 			_quick_sort_general(data, 0, n, _max_depth(n), less, .Less)
 		}
 	}
+}
+
+// sort_by sorts a slice with a given procedure to test whether two values are ordered "i < j"
+// This sort is not guaranteed to be stable
+sort_by_with_indices :: proc(data: $T/[]$E, less: proc(i, j: E) -> bool, allocator := context.allocator) -> (indices : []int) {
+	indices = make([]int, len(data), allocator)
+	when size_of(E) != 0 {
+		if n := len(data); n > 1 {
+			for _, idx in indices {
+				indices[idx] = idx
+			}
+			_quick_sort_general_with_indices(data, indices, 0, n, _max_depth(n), less, .Less)
+			return indices
+		}
+	}
+	return indices
 }
 
 sort_by_cmp :: proc(data: $T/[]$E, cmp: proc(i, j: E) -> Ordering) {

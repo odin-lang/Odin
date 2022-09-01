@@ -341,6 +341,13 @@ bool check_builtin_objc_procedure(CheckerContext *c, Operand *operand, Ast *call
 		for (isize i = 2+arg_offset; i < ce->args.count; i++) {
 			Operand x = {};
 			check_expr(c, &x, ce->args[i]);
+			if (is_type_untyped(x.type)) {
+				gbString e = expr_to_string(x.expr);
+				gbString t = type_to_string(x.type);
+				error(x.expr, "'%.*s' expects typed parameters, got %s of type %s", LIT(builtin_name), e, t);
+				gb_string_free(t);
+				gb_string_free(e);
+			}
 			param_types[i-arg_offset] = x.type;
 		}
 
