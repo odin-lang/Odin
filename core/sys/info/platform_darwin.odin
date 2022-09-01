@@ -3,6 +3,7 @@ package sysinfo
 
 import sys "core:sys/darwin"
 import "core:intrinsics"
+import "core:fmt"
 
 @(init, private)
 init_os_version :: proc "c" () {
@@ -16,17 +17,20 @@ init_ram :: proc() {
 	CTL_HW     :: 6
 	HW_MEMSIZE :: 24
 
-	sysctls := []int{CTL_HW, HW_MEMSIZE}
+	sysctls := []i32{CTL_HW, HW_MEMSIZE}
 
-	mem_size: i64
+	result: i64
+	result_size := i64(size_of(result))
 
-	if intrinsics.syscall(
-		uintptr(sys.System_Call_Number.sysctl),
-		uintptr(raw_data(sysctls)), uintptr(len(sysctls)),
-		uintptr(&mem_size), uintptr(size_of(mem_size))) == 0 {
-		return
-	}
-	ram.total_ram = int(mem_size)
+	res := intrinsics.syscall(
+		sys.unix_offset_syscall(.sysctl),
+		uintptr(&sysctls[0]), uintptr(2),
+		uintptr(&result), uintptr(&result_size),
+		uintptr(0), uintptr(0),
+	)
+	fmt.println(res, result)
+	
+	ram.total_ram = int(result)
 }
 
 @(private)
