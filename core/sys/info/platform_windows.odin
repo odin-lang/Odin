@@ -4,7 +4,9 @@ package sysinfo
 import sys "core:sys/windows"
 import "core:intrinsics"
 import "core:strings"
+import "core:unicode/utf16"
 
+import "core:fmt"
 
 @(private)
 version_string_buf: [1024]u8
@@ -220,67 +222,40 @@ init_os_version :: proc () {
 
 	// Grab Windows DisplayVersion (like 20H02)
 	format_display_version :: proc (b: ^strings.Builder) -> (version: string) {
-		value_type: ^sys.DWORD
-		display_version: [256]u16le
-		value_size := sys.DWORD(size_of(display_version))
-
-		status := sys.RegGetValueW(
+		dv, ok := read_reg(
 			sys.HKEY_LOCAL_MACHINE,
-			sys.L("SOFTWARE\\Microsoft\\Windows NT\\CurrentVersion"),
-			sys.L("DisplayVersion"),
-			sys.RRF_RT_REG_SZ,
-			value_type,
-			raw_data(display_version[:]),
-			&value_size,
+			"SOFTWARE\\Microsoft\\Windows NT\\CurrentVersion",
+			"DisplayVersion",
+			string,
 		)
-		if status != 0 {
-			// Couldn't retrieve DisplayVersion
-			return
-		}
+		defer delete(dv) // It'll be interned into `version_string_buf`
 
-		strings.write_string(b, " (version: ")
-		l := strings.builder_len(b^)
-
-		for r, i in display_version {
-			if r == 0 {
-				s := strings.to_string(b^)
-				version = string(s[l:][:i])
-				break
-			}
-			if r < 256 {
-				strings.write_rune(b, rune(r))
-			}
+		if ok {
+			strings.write_string(b, " (version: ")
+			l := strings.builder_len(b^)
+			strings.write_string(b, dv)
+			version = strings.to_string(b^)[l:][:len(dv)]
+			strings.write_rune(b, ')')
 		}
-		strings.write_rune(b, ')')
 		return
 	}
 
 	// Grab build number and UBR
 	format_build_number :: proc (b: ^strings.Builder, major_build: int) -> (ubr: int) {
-		value_type: ^sys.DWORD
-		_ubr: sys.DWORD
-		value_size := sys.DWORD(size_of(ubr))
-
-		status := sys.RegGetValueW(
+		res, ok := read_reg(
 			sys.HKEY_LOCAL_MACHINE,
-			sys.L("SOFTWARE\\Microsoft\\Windows NT\\CurrentVersion"),
-			sys.L("UBR"),
-			sys.RRF_RT_REG_DWORD,
-			value_type,
-			&_ubr,
-			&value_size,
+			"SOFTWARE\\Microsoft\\Windows NT\\CurrentVersion",
+			"UBR",
+			i32,
 		)
 
-		if status != 0 {
-			// Couldn't retrieve DisplayVersion
-			return
+		if ok {
+			ubr = int(res)
+			strings.write_string(b, ", build: ")
+			strings.write_int(b, major_build)
+			strings.write_rune(b, '.')
+			strings.write_int(b, ubr)
 		}
-
-		ubr  = int(_ubr)
-		strings.write_string(b, ", build: ")
-		strings.write_int(b, major_build)
-		strings.write_rune(b, '.')
-		strings.write_int(b, ubr)
 		return
 	}
 }
@@ -300,4 +275,101 @@ init_ram :: proc() {
 		total_swap = int(state.ullTotalPageFil),
 		free_swap  = int(state.ullAvailPageFil),
 	}
+}
+
+@(init, private)
+init_gpu_info :: proc() {
+
+	GPU_INFO_BASE :: "SYSTEM\\ControlSet001\\Control\\Class\\{4d36e968-e325-11ce-bfc1-08002be10318}\\"
+
+	gpu_list: [dynamic]GPU
+	gpu_index: int
+
+	for {
+		key := fmt.tprintf("%v\\%04d", GPU_INFO_BASE, gpu_index)
+
+		if vendor, ok := read_reg(sys.HKEY_LOCAL_MACHINE, key, "ProviderName", string); ok {
+			append(&gpu_list, GPU{vendor_name = vendor})
+		} else {
+			break
+		}
+
+		if desc, ok := read_reg(sys.HKEY_LOCAL_MACHINE, key, "DriverDesc", string); ok {
+			gpu_list[gpu_index].model_name = desc
+		}
+
+		if vram, ok := read_reg(sys.HKEY_LOCAL_MACHINE, key, "HardwareInformation.qwMemorySize", i64); ok {
+			gpu_list[gpu_index].total_ram = int(vram)
+		}
+		gpu_index += 1
+	}
+	gpus = gpu_list[:]
+}
+
+@(private)
+read_reg :: proc(hkey: sys.HKEY, subkey, val: string, $T: typeid) -> (res: T, ok: bool) {
+	BUF_SIZE :: 1024
+
+	if len(subkey) == 0 || len(val) == 0 {
+		return {}, false
+	}
+
+	key_name_wide := make([]u16, BUF_SIZE, context.temp_allocator)
+	val_name_wide := make([]u16, BUF_SIZE, context.temp_allocator)
+
+	utf16.encode_string(key_name_wide, subkey)
+	utf16.encode_string(val_name_wide, val)
+
+	when T == string {
+		result_wide := make([]u16, BUF_SIZE, context.temp_allocator)
+		result_size := sys.DWORD(BUF_SIZE * size_of(u16))
+
+		status := sys.RegGetValueW(
+			hkey,
+			&key_name_wide[0],
+			&val_name_wide[0],
+			sys.RRF_RT_REG_SZ,
+			nil,
+			raw_data(result_wide[:]),
+			&result_size,
+		)
+		if status != 0 {
+			// Couldn't retrieve string
+			return
+		}
+
+		// Result string will be allocated for the caller.
+		result_utf8 := make([]u8, BUF_SIZE * 4, context.temp_allocator)
+		utf16.decode_to_utf8(result_utf8, result_wide[:result_size])
+		return strings.clone_from_cstring(cstring(raw_data(result_utf8))), true
+
+	} else when T == i32 {
+		result_size := sys.DWORD(size_of(i32))
+		status := sys.RegGetValueW(
+			hkey,
+			&key_name_wide[0],
+			&val_name_wide[0],
+			sys.RRF_RT_REG_DWORD,
+			nil,
+			&res,
+			&result_size,
+		)
+		return res, status == 0
+
+	} else when T == i64 {
+		result_size := sys.DWORD(size_of(i64))
+		status := sys.RegGetValueW(
+			hkey,
+			&key_name_wide[0],
+			&val_name_wide[0],
+			sys.RRF_RT_REG_QWORD,
+			nil,
+			&res,
+			&result_size,
+		)
+		return res, status == 0
+	} else {
+		#assert(false, "Unhandled type for read_reg")
+	}
+	return
 }
