@@ -6,6 +6,7 @@ when !(ODIN_ARCH == .amd64 || ODIN_ARCH == .i386 || ODIN_ARCH == .arm32 || ODIN_
 
 os_version: OS_Version
 ram:        RAM
+gpus:       []GPU
 
 OS_Version_Platform :: enum {
 	Unknown,
@@ -35,4 +36,10 @@ RAM :: struct {
 	free_ram:   int,
 	total_swap: int,
 	free_swap:  int,
+}
+
+GPU :: struct {
+	vendor_name: string,
+	model_name:  string,
+	total_ram:   int,
 }
