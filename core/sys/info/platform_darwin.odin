@@ -3,11 +3,10 @@ package sysinfo
 
 import sys "core:sys/darwin"
 import "core:intrinsics"
-import "core:fmt"
 
 @(init, private)
 init_os_version :: proc "c" () {
-	os_version = {}
+	os_version.platform = .MacOS
 }
 
 @(init)
@@ -17,21 +16,22 @@ init_ram :: proc() {
 	CTL_HW     :: 6
 	HW_MEMSIZE :: 24
 
-	sysctls := []i32{CTL_HW, HW_MEMSIZE}
-
-	result: i64
-	result_size := i64(size_of(result))
-
-	res := intrinsics.syscall(
-		sys.unix_offset_syscall(.sysctl),
-		uintptr(&sysctls[0]), uintptr(2),
-		uintptr(&result), uintptr(&result_size),
-		uintptr(0), uintptr(0),
-	)
-	fmt.println(res, result)
-	
-	ram.total_ram = int(result)
+	mib := []i32{CTL_HW, HW_MEMSIZE}
+	mem_size: i64
+	ok := sysctl(mib, &mem_size)
+	ram.total_ram = int(mem_size)
 }
 
 @(private)
-sysctl :: proc(leaf: int)
+sysctl :: proc(mib: []i32, val: ^$T) -> (ok: bool) {
+	mib := mib
+	result_size := i64(size_of(T))
+
+	res := intrinsics.syscall(
+		sys.unix_offset_syscall(.sysctl),
+		uintptr(raw_data(mib)), uintptr(len(mib)),
+		uintptr(val), uintptr(&result_size),
+		uintptr(0), uintptr(0),
+	)
+	return res == 0
+}
