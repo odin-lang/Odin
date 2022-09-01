@@ -92,3 +92,68 @@ test_sort_with_indices :: proc(t: ^testing.T) {
 		}
 	}
 }
+
+@test
+test_sort_by_indices :: proc(t: ^testing.T) {
+	seed := rand.uint64()
+	fmt.printf("Random seed: %v\n", seed)
+
+	// Test sizes are all prime.
+	test_sizes :: []int{7, 13, 347, 1031, 10111, 100003}
+
+	for test_size in test_sizes {
+		fmt.printf("Sorting %v random u64 values along with index.\n", test_size)
+
+		r := rand.create(seed)
+
+		vals  := make([]u64, test_size)
+		r_idx := make([]int, test_size) // Reverse index
+		defer {
+			delete(vals)
+			delete(r_idx)
+		}
+
+		// Set up test values
+		for _, i in vals {
+			vals[i]     = rand.uint64(&r)
+		}
+
+		// Sort
+		f_idx := slice.sort_with_indices(vals)
+		defer delete(f_idx)
+
+		// Verify sorted test values
+		rand.init(&r, seed)
+
+		{
+			indices := make([]int, test_size)
+			for _, i in indices {
+				indices[i] = i
+			}
+
+			sorted_indices := slice.sort_by_indices(indices, f_idx)
+			for v, i in sorted_indices {
+				idx_pass := v == f_idx[i]
+				expect(t, idx_pass, "Expected the sorted index to be the same as the result from sort_with_indices")
+				if !idx_pass {
+					break
+				}
+			}
+		}
+		{
+			indices := make([]int, test_size)
+			for _, i in indices {
+				indices[i] = i
+			}
+
+			slice.sort_by_indices_overwrite(indices, f_idx)
+			for v, i in indices {
+				idx_pass := v == f_idx[i]
+				expect(t, idx_pass, "Expected the sorted index to be the same as the result from sort_with_indices")
+				if !idx_pass {
+					break
+				}
+			}
+		}
+	}
+}

@@ -45,11 +45,12 @@ sort_by_indices :: proc(data: $T/[]$E, indices: []int, allocator := context.allo
 	for v, i in indices {
 		sorted[i] = data[v]
 	}
+	return
 }
 
 sort_by_indices_overwrite :: proc(data: $T/[]$E, indices: []int) {
 	assert(len(data) == len(indices))
-	temp := make([]int, len(data), context.temp_allocator)
+	temp := make([]int, len(data), context.allocator)
 	defer delete(temp)
 	for v, i in indices {
 		temp[i] = data[v]
