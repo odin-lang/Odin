@@ -97,9 +97,9 @@ sort_by :: proc(data: $T/[]$E, less: proc(i, j: E) -> bool) {
 // sort_by sorts a slice with a given procedure to test whether two values are ordered "i < j"
 // This sort is not guaranteed to be stable
 sort_by_with_indices :: proc(data: $T/[]$E, less: proc(i, j: E) -> bool, allocator := context.allocator) -> (indices : []int) {
+	indices = make([]int, len(data), allocator)
 	when size_of(E) != 0 {
 		if n := len(data); n > 1 {
-			indices = make([]int, len(data), allocator)
 			for _, idx in indices {
 				indices[idx] = idx
 			}
@@ -107,7 +107,7 @@ sort_by_with_indices :: proc(data: $T/[]$E, less: proc(i, j: E) -> bool, allocat
 			return indices
 		}
 	}
-	return nil
+	return indices
 }
 
 sort_by_cmp :: proc(data: $T/[]$E, cmp: proc(i, j: E) -> Ordering) {
