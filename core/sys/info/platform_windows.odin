@@ -20,6 +20,8 @@ init_os_version :: proc () {
 			`HKEY_LOCAL_MACHINE\SOFTWARE\Microsoft\Windows NT\CurrentVersion` is for the minor build version (Update Build Release)
 
 	*/
+	os_version.platform = .Windows
+
 	osvi: sys.OSVERSIONINFOEXW
 	osvi.dwOSVersionInfoSize = size_of(osvi)
 	status := sys.RtlGetVersion(&osvi)
@@ -35,15 +37,11 @@ init_os_version :: proc () {
 		&product_type,
 	)
 
-	os_version = {
-		platform = .Windows,
-		major    = int(osvi.dwMajorVersion),
-		minor    = int(osvi.dwMinorVersion),
-	}
+	os_version.major    = int(osvi.dwMajorVersion)
+	os_version.minor    = int(osvi.dwMinorVersion)
 	os_version.build[0] = int(osvi.dwBuildNumber)
 
 	b := strings.builder_from_bytes(version_string_buf[:])
-
 	strings.write_string(&b, "Windows ")
 
 	switch osvi.dwMajorVersion {
