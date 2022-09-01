@@ -155,5 +155,21 @@ test_sort_by_indices :: proc(t: ^testing.T) {
 				}
 			}
 		}
+		{
+			indices := make([]int, test_size)
+			swap := make([]int, test_size)
+			for _, i in indices {
+				indices[i] = i
+			}
+
+			slice.sort_by_indices(indices, swap, f_idx)
+			for v, i in swap {
+				idx_pass := v == f_idx[i]
+				expect(t, idx_pass, "Expected the sorted index to be the same as the result from sort_with_indices")
+				if !idx_pass {
+					break
+				}
+			}
+		}
 	}
 }

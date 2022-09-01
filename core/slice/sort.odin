@@ -39,13 +39,23 @@ sort :: proc(data: $T/[]$E) where ORD(E) {
 }
 
 
-sort_by_indices :: proc(data: $T/[]$E, indices: []int, allocator := context.allocator) -> (sorted: T) {
+sort_by_indices :: proc{ sort_by_indices_allocate, _sort_by_indices}
+
+sort_by_indices_allocate :: proc(data: $T/[]$E, indices: []int, allocator := context.allocator) -> (sorted: T) {
 	assert(len(data) == len(indices))
 	sorted = make([]int, len(data), allocator)
 	for v, i in indices {
 		sorted[i] = data[v]
 	}
 	return
+}
+
+_sort_by_indices :: proc(data, sorted: $T/[]$E, indices: []int) {
+	assert(len(data) == len(indices))
+	assert(len(data) == len(sorted))
+	for v, i in indices {
+		sorted[i] = data[v]
+	}
 }
 
 sort_by_indices_overwrite :: proc(data: $T/[]$E, indices: []int) {
