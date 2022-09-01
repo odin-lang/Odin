@@ -60,17 +60,17 @@ sort_by_indices_overwrite :: proc(data: $T/[]$E, indices: []int) {
 // sort sorts a slice and returns a slice of the original indices
 // This sort is not guaranteed to be stable
 sort_with_indices :: proc(data: $T/[]$E, allocator := context.allocator) -> (indices: []int) where ORD(E) {
+	indices = make([]int, len(data), allocator)
 	when size_of(E) != 0 {
 		if n := len(data); n > 1 {
-			indices = make([]int, len(data), allocator)
 			for _, idx in indices {
 				indices[idx] = idx
 			}
 			_quick_sort_general_with_indices(data, indices, 0, n, _max_depth(n), struct{}{}, .Ordered)
-			return indices
 		}
+		return indices
 	}
-	return nil
+	return indices
 }
 
 // sort_by sorts a slice with a given procedure to test whether two values are ordered "i < j"

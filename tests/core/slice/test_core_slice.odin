@@ -51,8 +51,11 @@ test_sort_with_indices :: proc(t: ^testing.T) {
 		r := rand.create(seed)
 
 		vals  := make([]u64, test_size)
-		defer delete(vals)
 		r_idx := make([]int, test_size) // Reverse index
+		defer {
+			delete(vals)
+			delete(r_idx)
+		}
 
 		// Set up test values
 		for _, i in vals {
