@@ -8769,7 +8769,10 @@ ExprKind check_selector_call_expr(CheckerContext *c, Operand *o, Ast *node, Type
 	Ast *first_arg = x.expr->SelectorExpr.expr;
 	GB_ASSERT(first_arg != nullptr);
 
-	first_arg->state_flags |= StateFlag_SelectorCallExpr;
+	Entity *e = entity_of_node(se->expr);
+	if (!(e != nullptr && (e->kind == Entity_Procedure || e->kind == Entity_ProcGroup))) {
+		first_arg->state_flags |= StateFlag_SelectorCallExpr;
+	}
 
 	Type *pt = base_type(x.type);
 	GB_ASSERT(pt->kind == Type_Proc);
