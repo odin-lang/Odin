@@ -646,7 +646,7 @@ void lb_build_range_stmt_struct_soa(lbProcedure *p, AstRangeStmt *rs, Scope *sco
 
 
 	lbAddr array = lb_build_addr(p, expr);
-	if (is_type_pointer(type_deref(lb_addr_type(array)))) {
+	if (is_type_pointer(lb_addr_type(array))) {
 		array = lb_addr(lb_addr_load(p, array));
 	}
 	lbValue count = lb_soa_struct_len(p, lb_addr_load(p, array));
