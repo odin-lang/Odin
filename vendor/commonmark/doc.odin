@@ -5,13 +5,13 @@
 	Original authors: John MacFarlane, Vicent Marti, Kārlis Gaņģis, Nick Wellnhofer.
 	See LICENSE for license details.
 */
-package cmark
+package commonmark
 
 /*
 	Parsing - Simple interface:
 
 	```odin
-	import cm "vendor:cmark"
+	import cm "vendor:commonmark"
 
 	hellope_world :: proc() {
 		fmt.printf("CMark version: %v\n", cm.version_string())
@@ -30,7 +30,7 @@ package cmark
 	Parsing - Streaming interface:
 
 	```odin
-	import cm "vendor:cm"
+	import cm "vendor:commonmark"
 
 	streaming :: proc() {
 		using cm
