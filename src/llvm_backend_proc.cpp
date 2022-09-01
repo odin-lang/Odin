@@ -2867,9 +2867,9 @@ lbValue lb_build_call_expr_internal(lbProcedure *p, Ast *expr) {
 		return y;
 	}
 
-	Ast *pexpr = unparen_expr(ce->proc);
+	Ast *proc_expr = unparen_expr(ce->proc);
 	if (proc_mode == Addressing_Builtin) {
-		Entity *e = entity_of_node(pexpr);
+		Entity *e = entity_of_node(proc_expr);
 		BuiltinProcId id = BuiltinProc_Invalid;
 		if (e != nullptr) {
 			id = cast(BuiltinProcId)e->Builtin.id;
@@ -2881,7 +2881,6 @@ lbValue lb_build_call_expr_internal(lbProcedure *p, Ast *expr) {
 
 	// NOTE(bill): Regular call
 	lbValue value = {};
-	Ast *proc_expr = unparen_expr(ce->proc);
 
 	Entity *proc_entity = entity_of_node(proc_expr);
 	if (proc_entity != nullptr) {

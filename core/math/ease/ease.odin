@@ -356,7 +356,7 @@ Flux_Tween :: struct($T: typeid) {
 flux_init :: proc($T: typeid, value_capacity := 8) -> Flux_Map(T) where intrinsics.type_is_float(T) {
 	return {
 		values = make(map[^T]Flux_Tween(T), value_capacity),
-		keys_to_be_deleted = make([dynamic]^T, 0, value_capacity)
+		keys_to_be_deleted = make([dynamic]^T, 0, value_capacity),
 	}
 }
 
