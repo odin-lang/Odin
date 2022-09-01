@@ -646,7 +646,7 @@ void lb_build_range_stmt_struct_soa(lbProcedure *p, AstRangeStmt *rs, Scope *sco
 
 
 	lbAddr array = lb_build_addr(p, expr);
-	if (is_type_pointer(type_deref(lb_addr_type(array)))) {
+	if (is_type_pointer(lb_addr_type(array))) {
 		array = lb_addr(lb_addr_load(p, array));
 	}
 	lbValue count = lb_soa_struct_len(p, lb_addr_load(p, array));
@@ -1959,8 +1959,18 @@ void lb_build_assign_stmt(lbProcedure *p, AstAssignStmt *as) {
 	} else {
 		lbAddr lhs = lb_build_addr(p, as->lhs[0]);
 		lbValue value = lb_build_expr(p, as->rhs[0]);
-
 		Type *lhs_type = lb_addr_type(lhs);
+
+		// NOTE(bill): Allow for the weird edge case of:
+		// array *= matrix
+		if (op == Token_Mul && is_type_matrix(value.type) && is_type_array(lhs_type)) {
+			lbValue old_value = lb_addr_load(p, lhs);
+			Type *type = old_value.type;
+			lbValue new_value = lb_emit_vector_mul_matrix(p, old_value, value, type);
+			lb_addr_store(p, lhs, new_value);
+			return;
+		}
+
 		if (is_type_array(lhs_type)) {
 			lb_build_assign_stmt_array(p, op, lhs, value);
 			return;

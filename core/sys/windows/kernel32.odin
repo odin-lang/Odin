@@ -24,6 +24,8 @@ foreign kernel32 {
 	                       lpMode: LPDWORD) -> BOOL ---
 	SetConsoleMode :: proc(hConsoleHandle: HANDLE,
 	                       dwMode: DWORD) -> BOOL ---
+	SetConsoleCursorPosition :: proc(hConsoleHandle: HANDLE,
+						   dwCursorPosition: COORD) -> BOOL ---
 
 	GetFileInformationByHandle :: proc(hFile: HANDLE, lpFileInformation: LPBY_HANDLE_FILE_INFORMATION) -> BOOL ---
 	SetHandleInformation :: proc(hObject: HANDLE,
@@ -87,6 +89,15 @@ foreign kernel32 {
 		lpOverlapped: LPOVERLAPPED,
 	) -> BOOL ---
 	CreateThread :: proc(
+		lpThreadAttributes: LPSECURITY_ATTRIBUTES,
+		dwStackSize: SIZE_T,
+		lpStartAddress: proc "stdcall" (rawptr) -> DWORD,
+		lpParameter: LPVOID,
+		dwCreationFlags: DWORD,
+		lpThreadId: LPDWORD,
+	) -> HANDLE ---
+	CreateRemoteThread :: proc(
+		hProcess: HANDLE,
 		lpThreadAttributes: LPSECURITY_ATTRIBUTES,
 		dwStackSize: SIZE_T,
 		lpStartAddress: proc "stdcall" (rawptr) -> DWORD,
@@ -326,6 +337,15 @@ foreign kernel32 {
 	SetEndOfFile :: proc(hFile: HANDLE) -> BOOL ---
 
 	CreatePipe :: proc(hReadPipe, hWritePipe: ^HANDLE, lpPipeAttributes: LPSECURITY_ATTRIBUTES, nSize: DWORD) -> BOOL ---
+
+	ConnectNamedPipe :: proc(hNamedPipe: HANDLE, lpOverlapped: LPOVERLAPPED,) -> BOOL ---
+	DisconnectNamedPipe :: proc(hNamedPipe: HANDLE,) -> BOOL ---
+	WaitNamedPipeW :: proc(lpNamedPipeName: LPCWSTR, nTimeOut: DWORD,) -> BOOL ---
+
+	SetConsoleCtrlHandler :: proc(HandlerRoutine: PHANDLER_ROUTINE, Add: BOOL) -> BOOL ---
+	GenerateConsoleCtrlEvent :: proc(dwCtrlEvent: DWORD, dwProcessGroupId: DWORD) -> BOOL ---
+	FreeConsole :: proc() -> BOOL ---
+	GetConsoleWindow :: proc() -> HWND ---
 }
 
 
@@ -789,21 +809,6 @@ foreign kernel32 {
 
 @(default_calling_convention="stdcall")
 foreign kernel32 {
-	@(link_name="SetConsoleCtrlHandler") set_console_ctrl_handler :: proc(handler: Handler_Routine, add: BOOL) -> BOOL ---
-}
-
-Handler_Routine :: proc(dwCtrlType: Control_Event) -> BOOL
-
-Control_Event :: enum DWORD {
-	control_c = 0,
-	_break    = 1,
-	close     = 2,
-	logoff    = 5,
-	shutdown  = 6,
-}
-
-@(default_calling_convention="stdcall")
-foreign kernel32 {
 	GetProductInfo :: proc(
 		OSMajorVersion: DWORD,
 		OSMinorVersion: DWORD,
@@ -812,3 +817,6 @@ foreign kernel32 {
 		product_type: ^Windows_Product_Type,
 	) -> BOOL ---
 }
+
+HandlerRoutine :: proc "stdcall" (dwCtrlType: DWORD) -> BOOL
+PHANDLER_ROUTINE :: HandlerRoutine
