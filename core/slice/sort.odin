@@ -38,12 +38,40 @@ sort :: proc(data: $T/[]$E) where ORD(E) {
 	}
 }
 
+// sort sorts a slice
+// This sort is not guaranteed to be stable
+sort_with_indices :: proc(data: $T/[]$E, indices: []int) where ORD(E) {
+	when size_of(E) != 0 {
+		if n := len(data); n > 1 {
+			assert(len(data) == len(indices))
+			for _, idx in indices {
+				indices[idx] = idx
+			}
+			_quick_sort_general_with_indices(data, indices, 0, n, _max_depth(n), struct{}{}, .Ordered)
+		}
+	}
+}
+
 // sort_by sorts a slice with a given procedure to test whether two values are ordered "i < j"
 // This sort is not guaranteed to be stable
 sort_by :: proc(data: $T/[]$E, less: proc(i, j: E) -> bool) {
 	when size_of(E) != 0 {
 		if n := len(data); n > 1 {
 			_quick_sort_general(data, 0, n, _max_depth(n), less, .Less)
+		}
+	}
+}
+
+// sort_by sorts a slice with a given procedure to test whether two values are ordered "i < j"
+// This sort is not guaranteed to be stable
+sort_by_with_indices :: proc(data: $T/[]$E, indices: []int, less: proc(i, j: E) -> bool) {
+	when size_of(E) != 0 {
+		if n := len(data); n > 1 {
+			assert(len(data) == len(indices))
+			for _, idx in indices {
+				indices[idx] = idx
+			}
+			_quick_sort_general_with_indices(data, indices, 0, n, _max_depth(n), less, .Less)
 		}
 	}
 }
