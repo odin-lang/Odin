@@ -596,7 +596,7 @@ absolute_path_from_handle :: proc(fd: Handle) -> (string, Errno) {
 		return "", Errno(get_last_error())
 	}
 
-	path := strings.clone_from_cstring(cstring(&buf[0]), context.temp_allocator)
+	path := strings.clone_from_cstring(cstring(&buf[0]))
 	return path, ERROR_NONE
 }
 
