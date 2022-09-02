@@ -46,7 +46,7 @@ get_last_error_message :: proc() -> (compile_message: string, compile_type: Shad
 // Shader checking and linking checking are identical
 // except for calling differently named GL functions
 // it's a bit ugly looking, but meh
-when ODIN_DEBUG {
+when GL_DEBUG {
 	import "core:runtime"
 	
 	@private
