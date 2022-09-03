@@ -1615,6 +1615,7 @@ void lb_generate_code(lbGenerator *gen) {
 		}
 		if (is_foreign) {
 			LLVMSetLinkage(g.value, LLVMExternalLinkage);
+			LLVMSetDLLStorageClass(g.value, LLVMDLLImportStorageClass);
 			LLVMSetExternallyInitialized(g.value, true);
 			lb_add_foreign_library_path(m, e->Variable.foreign_library);
 			
