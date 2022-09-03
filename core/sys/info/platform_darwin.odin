@@ -112,12 +112,13 @@ init_os_version :: proc () {
 
 @(init)
 init_ram :: proc() {
-	// Retrieve RAM info using `sysinfo`
+	// Retrieve RAM info using `sysctl`
 
 	mib := []i32{CTL_HW, HW_MEMSIZE}
 	mem_size: u64
-	ok := sysctl(mib, &mem_size)
-	ram.total_ram = int(mem_size)
+	if sysctl(mib, &mem_size) {
+		ram.total_ram = int(mem_size)
+	}
 }
 
 @(private)
@@ -134,10 +135,10 @@ sysctl :: proc(mib: []i32, val: ^$T) -> (ok: bool) {
 	return res == 0
 }
 
-// See sysctl.h for darwin/dwrwin for details
+// See sysctl.h for darwin for details
 CTL_KERN    :: 1
 	KERN_OSTYPE    :: 1  // Darwin
-	KERN_OSRELEASE :: 2  // 21.5.0 for 12.4 Monterey 
+	KERN_OSRELEASE :: 2  // 21.5.0 for 12.4 Monterey
 	KERN_OSREV     :: 3  // i32: system revision
 	KERN_VERSION   :: 4  // Darwin Kernel Version 21.5.0: Tue Apr 26 21:08:22 PDT 2022; root:darwin-8020.121.3~4/RELEASE_X86_64
 	KERN_OSRELDATE :: 26 // i32: OS release date

@@ -67,8 +67,15 @@ init_cpu_features :: proc "c" () {
 	try_set(&set, .os_xsave,  27, ecx1)
 	try_set(&set, .rdrand,    30, ecx1)
 
+	when ODIN_OS == .FreeBSD {
+		// xgetbv is an illegal instruction under FreeBSD 13
+		// return before probing further
+		cpu_features = set
+		return
+	}
+
 	os_supports_avx := false
-	if .os_xsave in set {
+		if .os_xsave in set {
 		eax, _ := xgetbv(0)
 		os_supports_avx = is_set(1, eax) && is_set(2, eax)
 	}
