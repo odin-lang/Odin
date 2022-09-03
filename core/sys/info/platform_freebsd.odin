@@ -3,7 +3,6 @@ package sysinfo
 
 import sys "core:sys/unix"
 import "core:intrinsics"
-import "core:os"
 import "core:strings"
 import "core:strconv"
 
@@ -14,72 +13,46 @@ version_string_buf: [1024]u8
 init_os_version :: proc () {
 	os_version.platform = .FreeBSD
 
-	// TODO(Jeroen): No need to parse /etc/os-release. Use sysctl                                                                                                                                               
-	// kern.ostype: FreeBSD                                                                                                                                                                          
-	// kern.osrelease: 13.1-RELEASE-p2                                                                
-	// kern.osrevision: 199506                                                                        
-	// kern.version: FreeBSD 13.1-RELEASE-p2 GENERIC
-
-	// Try to parse `/etc/os-release` for `PRETTY_NAME="Ubuntu 20.04.3 LTS`
-	fd, err := os.open("/etc/os-release", os.O_RDONLY, 0)
-	if err != 0 {
-		return
-	}
-	defer os.close(fd)
-
-	os_release_buf: [2048]u8
-	n, read_err := os.read(fd, os_release_buf[:])
-	if read_err != 0 {
-		return
-	}
-	release := string(os_release_buf[:n])
-
-	NEEDLE :: "PRETTY_NAME=\""
-	pretty_start := strings.index(release, NEEDLE)
+	kernel_version_buf: [129]u8
 
 	b := strings.builder_from_bytes(version_string_buf[:])
-
-	if pretty_start > 0 {
-		for r, i in release[pretty_start + len(NEEDLE):] {
-			if r == '"' {
-				strings.write_string(&b, release[pretty_start + len(NEEDLE):][:i])
-				break
-			} else if r == '\r' || r == '\n' {
-				strings.write_string(&b, "Unknown FreeBSD Distro")
-				break
-			}
-		}
-	}
-
-	// Finish the string
-	os_version.as_string = strings.to_string(b)
-
-	NEW_UTS_LEN :: 63
-	UTS_Name :: struct {
-		sys_name:    [NEW_UTS_LEN + 1]u8 `fmt:"s,0"`,
-		node_name:   [NEW_UTS_LEN + 1]u8 `fmt:"s,0"`,
-		release:     [NEW_UTS_LEN + 1]u8 `fmt:"s,0"`,
-		version:     [NEW_UTS_LEN + 1]u8 `fmt:"s,0"`,
-		machine:     [NEW_UTS_LEN + 1]u8 `fmt:"s,0"`,
-		domain_name: [NEW_UTS_LEN + 1]u8 `fmt:"s,0"`,
-	}
-	uts: UTS_Name
-
-	// Grab kernel info using `uname()` syscall, https://www.freebsd.org/cgi/man.cgi?query=uname&sektion=3&n=1
-	if intrinsics.syscall(sys.SYS_uname, uintptr(&uts)) != 0 {
+	// Retrieve kernel info using `sysctl`, e.g. FreeBSD 13.1-RELEASE-p2 GENERIC
+	mib := []i32{CTL_KERN, KERN_VERSION}
+	if !sysctl(mib, &kernel_version_buf) {
 		return
 	}
 
-	// Parse kernel version, as substrings of the version info in `version_string_buf`
-	version_bits := strings.split_n(string(cstring(&uts.node_name[0])), "-", 2, context.temp_allocator)
-	if len(version_bits) > 1 {
-		// We finished the display string, but are also using the buffer to intern the version alone.
-		strings.write_rune(&b, ' ')
-		l := strings.builder_len(b)
-		strings.write_string(&b, version_bits[0])
-		os_version.version = strings.to_string(b)[l:]
+	pretty_name := string(cstring(raw_data(kernel_version_buf[:])))
+	pretty_name  = strings.trim(pretty_name, "\n")
+	strings.write_string(&b, pretty_name)
 
-		// Parse major, minor from node_name
+	// l := strings.builder_len(b)
+
+	// Retrieve kernel revision using `sysctl`, e.g. 199506
+	mib = []i32{CTL_KERN, KERN_OSREV}
+	revision: int
+	if !sysctl(mib, &revision) {
+		return
+	}
+	os_version.patch = revision
+
+	strings.write_string(&b, ", revision ")
+	strings.write_int(&b, revision)
+
+	// Finalize pretty name.
+	os_version.as_string = strings.to_string(b)
+
+	// Retrieve kernel release using `sysctl`, e.g. 13.1-RELEASE-p2
+	mib = []i32{CTL_KERN, KERN_OSRELEASE}
+	if !sysctl(mib, &kernel_version_buf) {
+		return
+	}
+
+	// Parse kernel version
+	release := string(cstring(raw_data(kernel_version_buf[:])))
+	version_bits := strings.split_n(release, "-", 2, context.temp_allocator)
+	if len(version_bits) > 1 {
+		// Parse major, minor from KERN_OSRELEASE
 		triplet := strings.split(version_bits[0], ".", context.temp_allocator)
 		if len(triplet) == 2 {
 			major, major_ok := strconv.parse_int(triplet[0])
