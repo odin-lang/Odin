@@ -2,7 +2,6 @@
 package sysinfo
 
 import sys "core:sys/unix"
-import "core:intrinsics"
 import "core:strings"
 import "core:strconv"
 
@@ -17,8 +16,8 @@ init_os_version :: proc () {
 
 	b := strings.builder_from_bytes(version_string_buf[:])
 	// Retrieve kernel info using `sysctl`, e.g. FreeBSD 13.1-RELEASE-p2 GENERIC
-	mib := []i32{CTL_KERN, KERN_VERSION}
-	if !sysctl(mib, &kernel_version_buf) {
+	mib := []i32{sys.CTL_KERN, sys.KERN_VERSION}
+	if !sys.sysctl(mib, &kernel_version_buf) {
 		return
 	}
 
@@ -29,9 +28,9 @@ init_os_version :: proc () {
 	// l := strings.builder_len(b)
 
 	// Retrieve kernel revision using `sysctl`, e.g. 199506
-	mib = []i32{CTL_KERN, KERN_OSREV}
+	mib = []i32{sys.CTL_KERN, sys.KERN_OSREV}
 	revision: int
-	if !sysctl(mib, &revision) {
+	if !sys.sysctl(mib, &revision) {
 		return
 	}
 	os_version.patch = revision
@@ -43,8 +42,8 @@ init_os_version :: proc () {
 	os_version.as_string = strings.to_string(b)
 
 	// Retrieve kernel release using `sysctl`, e.g. 13.1-RELEASE-p2
-	mib = []i32{CTL_KERN, KERN_OSRELEASE}
-	if !sysctl(mib, &kernel_version_buf) {
+	mib = []i32{sys.CTL_KERN, sys.KERN_OSRELEASE}
+	if !sys.sysctl(mib, &kernel_version_buf) {
 		return
 	}
 
@@ -69,50 +68,9 @@ init_os_version :: proc () {
 @(init)
 init_ram :: proc() {
 	// Retrieve RAM info using `sysctl`
-	mib := []i32{CTL_HW, HW_PHYSMEM}
+	mib := []i32{sys.CTL_HW, sys.HW_PHYSMEM}
 	mem_size: u64
-	if sysctl(mib, &mem_size) {
+	if sys.sysctl(mib, &mem_size) {
 		ram.total_ram = int(mem_size)
 	}
 }
-
-@(private)
-sysctl :: proc(mib: []i32, val: ^$T) -> (ok: bool) {
-	mib := mib
-	result_size := i64(size_of(T))
-
-	res := intrinsics.syscall(sys.SYS_sysctl,
-		uintptr(raw_data(mib)), uintptr(len(mib)),
-		uintptr(val), uintptr(&result_size),
-		uintptr(0), uintptr(0),
-	)
-	return res == 0
-}
-
-// See /usr/include/sys/sysctl.h for details
-CTL_SYSCTL :: 0
-CTL_KERN   :: 1
-	KERN_OSTYPE    :: 1
-	KERN_OSRELEASE :: 2
-	KERN_OSREV     :: 3
-	KERN_VERSION   :: 4
-CTL_VM     :: 2
-CTL_VFS    :: 3
-CTL_NET    :: 4
-CTL_DEBUG  :: 5
-CTL_HW     :: 6
-	HW_MACHINE      ::  1
-	HW_MODEL        ::  2
-	HW_NCPU         ::  3
-	HW_BYTEORDER    ::  4
-	HW_PHYSMEM      ::  5
-	HW_USERMEM      ::  6
-	HW_PAGESIZE     ::  7
-	HW_DISKNAMES    ::  8
-	HW_DISKSTATS    ::  9
-	HW_FLOATINGPT   :: 10
-	HW_MACHINE_ARCH :: 11
-	HW_REALMEM      :: 12
-CTL_MACHDEP  :: 7
-CTL_USER     :: 8
-CTL_P1003_1B :: 9
