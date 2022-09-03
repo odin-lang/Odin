@@ -50,7 +50,19 @@ config_darwin() {
 }
 
 config_freebsd() {
-	: ${LLVM_CONFIG=/usr/local/bin/llvm-config11}
+	: ${LLVM_CONFIG=}
+
+	if [ ! "$LLVM_CONFIG" ]; then
+		if which llvm-config11 > /dev/null 2>&1; then
+			LLVM_CONFIG=llvm-config11
+		elif which llvm-config12 > /dev/null 2>&1; then
+			LLVM_CONFIG=llvm-config12
+		elif which llvm-config13 > /dev/null 2>&1; then
+			LLVM_CONFIG=llvm-config13
+		else
+			panic "Unable to find LLVM-config"
+		fi
+	fi
 
 	CXXFLAGS="$CXXFLAGS $($LLVM_CONFIG --cxxflags --ldflags)"
 	LDFLAGS="$LDFLAGS $($LLVM_CONFIG --libs core native --system-libs)"
