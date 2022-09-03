@@ -146,7 +146,7 @@ reflect_args_structure :: proc(ctx: ^Flag_Context, v: any) -> Flag_Error {
 		type := types[i];
 
 		if named_type, ok := type.variant.(Type_Info_Named); ok {
-			if union_type, ok := named_type.base.variant.(Type_Info_Union); ok && union_type.maybe && len(union_type.variants) == 1 {
+			if union_type, ok := named_type.base.variant.(Type_Info_Union); ok && len(union_type.variants) == 1 {
 				flag.optional = true;
 				flag.tag_ptr = rawptr(uintptr(union_type.tag_offset) + uintptr(v.data) + uintptr(offsets[i]));
 				type = union_type.variants[0];
