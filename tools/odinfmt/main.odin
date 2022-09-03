@@ -70,7 +70,7 @@ walk_files :: proc(info: os.File_Info, in_err: os.Errno) -> (err: os.Errno, skip
 }
 
 main :: proc() {
-	init_global_temporary_allocator(mem.megabytes(100));
+	init_global_temporary_allocator(mem.Megabyte * 100)
 
 	args: Args;
 
