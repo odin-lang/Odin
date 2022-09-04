@@ -7347,7 +7347,7 @@ ExprKind check_ternary_if_expr(CheckerContext *c, Operand *o, Ast *node, Type *t
 	check_expr_or_type(c, &x, te->x, type_hint);
 	node->viral_state_flags |= te->x->viral_state_flags;
 
-    if (x.mode == Addressing_Type || x.mode == Addressing_Type) {
+    if (x.mode == Addressing_Type) {
         gbString type_string = expr_to_string(x.expr);
         error(node, "Type %s is invalid operand for ternary if expression", type_string);
         gb_string_free(type_string);
@@ -7366,7 +7366,7 @@ ExprKind check_ternary_if_expr(CheckerContext *c, Operand *o, Ast *node, Type *t
 		return kind;
 	}
 
-    if (y.mode == Addressing_Type || y.mode == Addressing_Type) {
+    if (y.mode == Addressing_Type) {
         gbString type_string = expr_to_string(y.expr);
         error(node, "Type %s is invalid operand for ternary if expression", type_string);
         gb_string_free(type_string);
