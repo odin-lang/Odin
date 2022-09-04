@@ -8,8 +8,9 @@ import "core:time"
 foreign import System "System.framework"
 
 foreign System {
+	// __ulock_wait is not available on 10.15
+	// See https://github.com/odin-lang/Odin/issues/1959
 	__ulock_wait  :: proc "c" (operation: u32, addr: rawptr, value: u64, timeout_us: u32) -> c.int ---
-	__ulock_wait2 :: proc "c" (operation: u32, addr: rawptr, value: u64, timeout_ns: u64, value2: u64) -> c.int ---
 	__ulock_wake  :: proc "c" (operation: u32, addr: rawptr, wake_value: u64) -> c.int ---
 }
 
@@ -28,9 +29,9 @@ _futex_wait :: proc(f: ^Futex, expected: u32) -> bool {
 }
 
 _futex_wait_with_timeout :: proc(f: ^Futex, expected: u32, duration: time.Duration) -> bool {
-	timeout_ns := u64(duration)
+	timeout_ns := u32(duration) * 1000
 	
-	s := __ulock_wait2(UL_COMPARE_AND_WAIT | ULF_NO_ERRNO, f, u64(expected), timeout_ns, 0)
+	s := __ulock_wait(UL_COMPARE_AND_WAIT | ULF_NO_ERRNO, f, u64(expected), timeout_ns)
 	if s >= 0 {
 		return true
 	}
