@@ -830,10 +830,73 @@ String internal_odin_root_dir(void) {
 			gb_mfree(argv);
 			return make_string(nullptr, 0);
 		}
-		// copy argv[0] to path_buf
+
+		// NOTE(Jeroen):
+		// On OpenBSD, if `odin` is on the path, `argv[0]` will contain just `odin`,
+		// even though that isn't then the relative path.
+		// When run from Odin's directory, it returns `./odin`.
+		// Check argv[0] for lack of / to see if it's a reference to PATH.
+		// If so, walk PATH to find the executable.
+
 		len = gb_strlen(argv[0]);
-		if(len < path_buf.count) {
-			gb_memmove(&path_buf[0], argv[0], len);
+
+		bool slash_found = false;
+		bool odin_found  = false;
+
+		for (int i = 0; i < len; i += 1) {
+			if (argv[0][i] == '/') {
+				slash_found = true;
+				break;
+			}
+		}
+
+		if (slash_found) {
+			// copy argv[0] to path_buf
+			if(len < path_buf.count) {
+				gb_memmove(&path_buf[0], argv[0], len);
+				odin_found = true;
+			}
+		} else {
+			gbAllocator a = heap_allocator();
+			char const *path_env = gb_get_env("PATH", a);
+			defer (gb_free(a, cast(void *)path_env));
+
+			if (path_env) {
+				int path_len = gb_strlen(path_env);
+				int path_start = 0;
+				int path_end   = 0;
+
+				for (; path_start < path_len; ) {
+					for (; path_end <= path_len; path_end++) {
+						if (path_env[path_end] == ':' || path_end == path_len) {
+							break;
+						}
+					}
+					String path_needle    = (const String)make_string((const u8 *)(path_env + path_start), path_end - path_start);
+					String argv0          = (const String)make_string((const u8 *)argv[0], len);
+					String odin_candidate = concatenate3_strings(a, path_needle, STR_LIT("/"), argv0);
+					defer (gb_free(a, odin_candidate.text));
+
+					if (gb_file_exists((const char *)odin_candidate.text)) {
+						len = odin_candidate.len;
+						if(len < path_buf.count) {
+							gb_memmove(&path_buf[0], odin_candidate.text, len);
+						}
+						odin_found = true;
+						break;
+					}
+
+					path_start = path_end + 1;
+					path_end   = path_start;
+					if (path_start > path_len) {
+						break;
+					}
+				}
+			}
+
+			if (!odin_found) {
+				gb_printf_err("Odin could not locate itself in PATH, and ODIN_ROOT wasn't set either.\n");
+			}
 		}
 		gb_mfree(argv);
 #endif
