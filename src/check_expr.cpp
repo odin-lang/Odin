@@ -9586,6 +9586,7 @@ ExprKind check_expr_base_internal(CheckerContext *c, Operand *o, Ast *node, Type
 	case Ast_MapType:
 	case Ast_BitSetType:
 	case Ast_MatrixType:
+	case Ast_RelativeType:
 		o->mode = Addressing_Type;
 		o->type = check_type(c, node);
 		break;
