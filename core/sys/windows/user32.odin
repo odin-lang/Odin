@@ -137,6 +137,7 @@ foreign user32 {
 	GetCursorPos :: proc(lpPoint: LPPOINT) -> BOOL ---
 	SetCursorPos :: proc(X: c_int, Y: c_int) -> BOOL ---
 	SetCursor :: proc(hCursor: HCURSOR) -> HCURSOR ---
+	ShowCursor :: proc(bShow: BOOL) -> c_int ---
 
 	EnumDisplaySettingsW :: proc(lpszDeviceName: LPCWSTR, iModeNum: DWORD, lpDevMode: ^DEVMODEW) -> BOOL ---
 
