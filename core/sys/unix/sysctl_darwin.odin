@@ -4,6 +4,8 @@ package unix
 import "core:sys/darwin"
 import "core:intrinsics"
 
+_ :: darwin
+
 sysctl :: proc(mib: []i32, val: ^$T) -> (ok: bool) {
 	mib := mib
 	result_size := i64(size_of(T))
