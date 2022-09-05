@@ -22,6 +22,10 @@
 	#include <sys/utsname.h>
 #endif
 
+#if defined(GB_SYSTEM_FREEBSD)
+	#include <sys/sysctl.h>
+#endif
+
 /*
 	NOTE(Jeroen): This prints the Windows product edition only, to be called from `print_platform_details`.
 */
@@ -217,7 +221,6 @@ void report_cpu_info() {
 	Report the amount of installed RAM.
 */
 void report_ram_info() {
-
 	gb_printf("\tRAM:  ");
 
 	#if defined(GB_SYSTEM_WINDOWS)
@@ -255,235 +258,213 @@ void report_ram_info() {
 		if (sysctl(sysctls, 2, &ram_amount, &val_size, NULL, 0) != -1) {
 			gb_printf("%lld MiB\n", ram_amount / gb_megabytes(1));
 		}
+	#elif defined(GB_SYSTEM_FREEBSD)
+		uint64_t ram_amount;
+		size_t   val_size = sizeof(ram_amount);
+
+		int sysctls[] = { CTL_HW, HW_PHYSMEM };
+		if (sysctl(sysctls, 2, &ram_amount, &val_size, NULL, 0) != -1) {
+			gb_printf("%lu MiB\n", ram_amount / gb_megabytes(1));
+		}
 	#else
 		gb_printf("Unknown.\n");
 	#endif
 }
 
-/*
-	NOTE(Jeroen): `odin report` prints some system information for easier bug reporting.
-*/
-void print_bug_report_help() {
-	gb_printf("Where to find more information and get into contact when you encounter a bug:\n\n");
-	gb_printf("\tWebsite: https://odin-lang.org\n");
-	gb_printf("\tGitHub:  https://github.com/odin-lang/Odin/issues\n");
-	/*
-		Uncomment and update URL once we have a Discord vanity URL. For now people can get here from the site.
-		gb_printf("\tDiscord: https://discord.com/invite/sVBPHEv\n");
-	*/
-	gb_printf("\n\n");
-
-	gb_printf("Useful information to add to a bug report:\n\n");
-
-	gb_printf("\tOdin: %.*s", LIT(ODIN_VERSION));
-
-	#ifdef NIGHTLY
-	gb_printf("-nightly");
-	#endif
-
-	#ifdef GIT_SHA
-	gb_printf(":%s", GIT_SHA);
-	#endif
-
-	gb_printf("\n");
-
-	/*
-		Print OS information.
-	*/
+void report_os_info() {
 	gb_printf("\tOS:   ");
 
 	#if defined(GB_SYSTEM_WINDOWS)
-		/*
-			NOTE(Jeroen): 
-				`GetVersionEx`  will return 6.2 for Windows 10 unless the program is manifested for Windows 10.
-				`RtlGetVersion` will return the true version.
+	/*
+		NOTE(Jeroen): 
+			`GetVersionEx`  will return 6.2 for Windows 10 unless the program is manifested for Windows 10.
+			`RtlGetVersion` will return the true version.
 
-				Rather than include the WinDDK, we ask the kernel directly.
+			Rather than include the WinDDK, we ask the kernel directly.
 
-				`HKEY_LOCAL_MACHINE\SOFTWARE\Microsoft\Windows NT\CurrentVersion` is for the minor build version (Update Build Release)
+			`HKEY_LOCAL_MACHINE\SOFTWARE\Microsoft\Windows NT\CurrentVersion` is for the minor build version (Update Build Release)
 
-		*/
-		OSVERSIONINFOEXW osvi;
-		ZeroMemory(&osvi, sizeof(OSVERSIONINFOEXW));
-		osvi.dwOSVersionInfoSize = sizeof(OSVERSIONINFOEXW);
+	*/
+	OSVERSIONINFOEXW osvi;
+	ZeroMemory(&osvi, sizeof(OSVERSIONINFOEXW));
+	osvi.dwOSVersionInfoSize = sizeof(OSVERSIONINFOEXW);
 
-		typedef NTSTATUS (WINAPI* RtlGetVersionPtr)(OSVERSIONINFOW*);
-		typedef BOOL (WINAPI* GetProductInfoPtr)(DWORD dwOSMajorVersion, DWORD dwOSMinorVersion, DWORD dwSpMajorVersion, DWORD dwSpMinorVersion, PDWORD pdwReturnedProductType);
+	typedef NTSTATUS (WINAPI* RtlGetVersionPtr)(OSVERSIONINFOW*);
+	typedef BOOL (WINAPI* GetProductInfoPtr)(DWORD dwOSMajorVersion, DWORD dwOSMinorVersion, DWORD dwSpMajorVersion, DWORD dwSpMinorVersion, PDWORD pdwReturnedProductType);
 
-		// https://docs.microsoft.com/en-us/windows-hardware/drivers/ddi/wdm/nf-wdm-rtlgetversion
-		RtlGetVersionPtr  RtlGetVersion  =  (RtlGetVersionPtr)GetProcAddress(GetModuleHandle(TEXT("ntdll.dll")), "RtlGetVersion");
-		// https://docs.microsoft.com/en-us/windows/win32/api/sysinfoapi/nf-sysinfoapi-getproductinfo
-		GetProductInfoPtr GetProductInfo = (GetProductInfoPtr)GetProcAddress(GetModuleHandle(TEXT("kernel32.dll")), "GetProductInfo");
+	// https://docs.microsoft.com/en-us/windows-hardware/drivers/ddi/wdm/nf-wdm-rtlgetversion
+	RtlGetVersionPtr  RtlGetVersion  =  (RtlGetVersionPtr)GetProcAddress(GetModuleHandle(TEXT("ntdll.dll")), "RtlGetVersion");
+	// https://docs.microsoft.com/en-us/windows/win32/api/sysinfoapi/nf-sysinfoapi-getproductinfo
+	GetProductInfoPtr GetProductInfo = (GetProductInfoPtr)GetProcAddress(GetModuleHandle(TEXT("kernel32.dll")), "GetProductInfo");
 
-		NTSTATUS status  = {};
-		DWORD ProductType = {};
-		if (RtlGetVersion != nullptr) {
-			status = RtlGetVersion((OSVERSIONINFOW*)&osvi);
+	NTSTATUS status  = {};
+	DWORD ProductType = {};
+	if (RtlGetVersion != nullptr) {
+		status = RtlGetVersion((OSVERSIONINFOW*)&osvi);
+	}
+
+	if (RtlGetVersion == nullptr || status != 0x0) {
+		gb_printf("Windows (Unknown Version)");
+	} else {
+		if (GetProductInfo != nullptr) {
+			GetProductInfo(osvi.dwMajorVersion, osvi.dwMinorVersion, osvi.wServicePackMajor, osvi.wServicePackMinor, &ProductType);
 		}
 
-		if (RtlGetVersion == nullptr || status != 0x0) {
-			gb_printf("Windows (Unknown Version)");
-		} else {
-			if (GetProductInfo != nullptr) {
-				GetProductInfo(osvi.dwMajorVersion, osvi.dwMinorVersion, osvi.wServicePackMajor, osvi.wServicePackMinor, &ProductType);
-			}
+		if (false) {
+			gb_printf("dwMajorVersion:    %u\n", cast(unsigned)osvi.dwMajorVersion);
+			gb_printf("dwMinorVersion:    %u\n", cast(unsigned)osvi.dwMinorVersion);
+			gb_printf("dwBuildNumber:     %u\n", cast(unsigned)osvi.dwBuildNumber);
+			gb_printf("dwPlatformId:      %u\n", cast(unsigned)osvi.dwPlatformId);
+			gb_printf("wServicePackMajor: %u\n", cast(unsigned)osvi.wServicePackMajor);
+			gb_printf("wServicePackMinor: %u\n", cast(unsigned)osvi.wServicePackMinor);
+			gb_printf("wSuiteMask:        %u\n", cast(unsigned)osvi.wSuiteMask);
+			gb_printf("wProductType:      %u\n", cast(unsigned)osvi.wProductType);
+		}
 
-			if (false) {
-				gb_printf("dwMajorVersion:    %u\n", cast(unsigned)osvi.dwMajorVersion);
-				gb_printf("dwMinorVersion:    %u\n", cast(unsigned)osvi.dwMinorVersion);
-				gb_printf("dwBuildNumber:     %u\n", cast(unsigned)osvi.dwBuildNumber);
-				gb_printf("dwPlatformId:      %u\n", cast(unsigned)osvi.dwPlatformId);
-				gb_printf("wServicePackMajor: %u\n", cast(unsigned)osvi.wServicePackMajor);
-				gb_printf("wServicePackMinor: %u\n", cast(unsigned)osvi.wServicePackMinor);
-				gb_printf("wSuiteMask:        %u\n", cast(unsigned)osvi.wSuiteMask);
-				gb_printf("wProductType:      %u\n", cast(unsigned)osvi.wProductType);
-			}
+		gb_printf("Windows ");
 
-			gb_printf("Windows ");
+		switch (osvi.dwMajorVersion) {
+		case 10:
+			/*
+				Windows 10 (Pro), Windows 2016 Server, Windows 2019 Server, Windows 2022 Server
+			*/
+			switch (osvi.wProductType) {
+			case VER_NT_WORKSTATION: // Workstation
+				if (osvi.dwBuildNumber < 22000) {
+					gb_printf("10 ");
+				} else {
+					gb_printf("11 ");
+				}
+				
+				report_windows_product_type(ProductType);
 
-			switch (osvi.dwMajorVersion) {
-			case 10:
-				/*
-					Windows 10 (Pro), Windows 2016 Server, Windows 2019 Server, Windows 2022 Server
-				*/
-				switch (osvi.wProductType) {
-				case VER_NT_WORKSTATION: // Workstation
-					if (osvi.dwBuildNumber < 22000) {
-						gb_printf("10 ");
-					} else {
-						gb_printf("11 ");
-					}
-					
-					report_windows_product_type(ProductType);
-
+				break;
+			default: // Server or Domain Controller
+				switch(osvi.dwBuildNumber) {
+				case 14393:
+					gb_printf("2016 Server");
 					break;
-				default: // Server or Domain Controller
-					switch(osvi.dwBuildNumber) {
-					case 14393:
-						gb_printf("2016 Server");
-						break;
-					case 17763:
-						gb_printf("2019 Server");
-						break;
-					case 20348:
-						gb_printf("2022 Server");
-						break;
-					default:
-						gb_printf("Unknown Server");
-						break;
+				case 17763:
+					gb_printf("2019 Server");
+					break;
+				case 20348:
+					gb_printf("2022 Server");
+					break;
+				default:
+					gb_printf("Unknown Server");
+					break;
+				}
+			}
+			break;
+		case 6:
+			switch (osvi.dwMinorVersion) {
+				case 0:
+					switch (osvi.wProductType) {
+						case VER_NT_WORKSTATION:
+							gb_printf("Windows Vista ");
+							report_windows_product_type(ProductType);
+							break;
+						case 3:
+							gb_printf("Windows Server 2008");
+							break;
 					}
-				}
-				break;
-			case 6:
-				switch (osvi.dwMinorVersion) {
-					case 0:
-						switch (osvi.wProductType) {
-							case VER_NT_WORKSTATION:
-								gb_printf("Windows Vista ");
-								report_windows_product_type(ProductType);
-								break;
-							case 3:
-								gb_printf("Windows Server 2008");
-								break;
-						}
-						break;
+					break;
 
-					case 1:
-						switch (osvi.wProductType) {
-							case VER_NT_WORKSTATION:
-								gb_printf("Windows 7 ");
-								report_windows_product_type(ProductType);
-								break;
-							case 3:
-								gb_printf("Windows Server 2008 R2");
-								break;
-						}
-						break;
-					case 2:
-						switch (osvi.wProductType) {
-							case VER_NT_WORKSTATION:
-								gb_printf("Windows 8 ");
-								report_windows_product_type(ProductType);
-								break;
-							case 3:
-								gb_printf("Windows Server 2012");
-								break;
-						}
-						break;
-					case 3:
-						switch (osvi.wProductType) {
-							case VER_NT_WORKSTATION:
-								gb_printf("Windows 8.1 ");
-								report_windows_product_type(ProductType);
-								break;
-							case 3:
-								gb_printf("Windows Server 2012 R2");
-								break;
-						}
-						break;
-				}
-				break;
-			case 5:
-				switch (osvi.dwMinorVersion) {
-					case 0:
-						gb_printf("Windows 2000");
-						break;
-					case 1:
-						gb_printf("Windows XP");
-						break;
-					case 2:
-						gb_printf("Windows Server 2003");
-						break;
-				}
-				break;
-			default:
-				break;
+				case 1:
+					switch (osvi.wProductType) {
+						case VER_NT_WORKSTATION:
+							gb_printf("Windows 7 ");
+							report_windows_product_type(ProductType);
+							break;
+						case 3:
+							gb_printf("Windows Server 2008 R2");
+							break;
+					}
+					break;
+				case 2:
+					switch (osvi.wProductType) {
+						case VER_NT_WORKSTATION:
+							gb_printf("Windows 8 ");
+							report_windows_product_type(ProductType);
+							break;
+						case 3:
+							gb_printf("Windows Server 2012");
+							break;
+					}
+					break;
+				case 3:
+					switch (osvi.wProductType) {
+						case VER_NT_WORKSTATION:
+							gb_printf("Windows 8.1 ");
+							report_windows_product_type(ProductType);
+							break;
+						case 3:
+							gb_printf("Windows Server 2012 R2");
+							break;
+					}
+					break;
 			}
-
-			/*
-				Grab Windows DisplayVersion (like 20H02)
-			*/
-			LPDWORD ValueType = {};
-			DWORD   UBR;
-			char    DisplayVersion[256];
-			DWORD   ValueSize = 256;
-
-			status = RegGetValue(
-				HKEY_LOCAL_MACHINE,
-				TEXT("SOFTWARE\\Microsoft\\Windows NT\\CurrentVersion"),
-				TEXT("DisplayVersion"),
-				RRF_RT_REG_SZ,
-				ValueType,
-				DisplayVersion,
-				&ValueSize
-			);
-
-			if (status == 0x0) {
-				gb_printf(" (version: %s)", DisplayVersion);
+			break;
+		case 5:
+			switch (osvi.dwMinorVersion) {
+				case 0:
+					gb_printf("Windows 2000");
+					break;
+				case 1:
+					gb_printf("Windows XP");
+					break;
+				case 2:
+					gb_printf("Windows Server 2003");
+					break;
 			}
-
-			/*
-				Now print build number.
-			*/
-			gb_printf(", build %u", cast(unsigned)osvi.dwBuildNumber);
-
-			ValueSize = sizeof(UBR);
-			status = RegGetValue(
-				HKEY_LOCAL_MACHINE,
-				TEXT("SOFTWARE\\Microsoft\\Windows NT\\CurrentVersion"),
-				TEXT("UBR"),
-				RRF_RT_REG_DWORD,
-				ValueType,
-				&UBR,
-				&ValueSize
-			);
-
-			if (status == 0x0) {
-				gb_printf(".%u", cast(unsigned)UBR);
-			}
-			gb_printf("\n");
+			break;
+		default:
+			break;
 		}
 
+		/*
+			Grab Windows DisplayVersion (like 20H02)
+		*/
+		LPDWORD ValueType = {};
+		DWORD   UBR;
+		char    DisplayVersion[256];
+		DWORD   ValueSize = 256;
+
+		status = RegGetValue(
+			HKEY_LOCAL_MACHINE,
+			TEXT("SOFTWARE\\Microsoft\\Windows NT\\CurrentVersion"),
+			TEXT("DisplayVersion"),
+			RRF_RT_REG_SZ,
+			ValueType,
+			DisplayVersion,
+			&ValueSize
+		);
+
+		if (status == 0x0) {
+			gb_printf(" (version: %s)", DisplayVersion);
+		}
+
+		/*
+			Now print build number.
+		*/
+		gb_printf(", build %u", cast(unsigned)osvi.dwBuildNumber);
+
+		ValueSize = sizeof(UBR);
+		status = RegGetValue(
+			HKEY_LOCAL_MACHINE,
+			TEXT("SOFTWARE\\Microsoft\\Windows NT\\CurrentVersion"),
+			TEXT("UBR"),
+			RRF_RT_REG_DWORD,
+			ValueType,
+			&UBR,
+			&ValueSize
+		);
+
+		if (status == 0x0) {
+			gb_printf(".%u", cast(unsigned)UBR);
+		}
+		gb_printf("\n");
+	}
 	#elif defined(GB_SYSTEM_LINUX)
 		/*
 			Try to parse `/etc/os-release` for `PRETTY_NAME="Ubuntu 20.04.3 LTS`
@@ -542,10 +523,10 @@ void print_bug_report_help() {
 		b32 found = 1;
 		uint32_t major, minor;
 
-		#define osx_version_buffer 100
-		char buffer[osx_version_buffer];
-		size_t buffer_size = osx_version_buffer - 1;
-		#undef osx_version_buffer
+		#define freebsd_version_buffer 100
+		char buffer[freebsd_version_buffer];
+		size_t buffer_size = freebsd_version_buffer - 1;
+		#undef freebsd_version_buffer
 
 		int sysctls[] = { CTL_KERN, KERN_OSRELEASE };
 		if (sysctl(sysctls, 2, buffer, &buffer_size, NULL, 0) == -1) {
@@ -664,10 +645,82 @@ void print_bug_report_help() {
 		} else {
 			gb_printf("OpenBSD: Unknown\n");    
 		}
-	#else
-		gb_printf("Unknown\n");
+	#elif defined(GB_SYSTEM_FREEBSD)
+		#define freebsd_version_buffer 129
+		char buffer[freebsd_version_buffer];
+		size_t buffer_size = freebsd_version_buffer - 1;
+		#undef freebsd_version_buffer
 
+		int sysctls[] = { CTL_KERN, KERN_VERSION };
+		if (sysctl(sysctls, 2, buffer, &buffer_size, NULL, 0) == -1) {
+			gb_printf("FreeBSD: Unknown\n");
+		} else {
+			// KERN_VERSION can end in a \n, replace it with a \0
+			for (int i = 0; i < buffer_size; i += 1) {
+				if (buffer[i] == '\n') buffer[i] = 0;
+			}
+			gb_printf("%s", &buffer[0]);
+
+			// Retrieve kernel revision using `sysctl`, e.g. 199506
+			sysctls[1] = KERN_OSREV;
+			uint64_t revision;
+			size_t revision_size = sizeof(revision);
+
+			if (sysctl(sysctls, 2, &revision, &revision_size, NULL, 0) == -1) {
+				gb_printf("\n");
+			} else {
+				gb_printf(", revision %ld\n", revision);
+			}
+		}
+
+		// if (found) {
+		// 	gb_printf("FreeBSD ")
+		// }
+
+		// // Retrieve kernel revision using `sysctl`, e.g. 199506
+		// mib = []i32{sys.CTL_KERN, sys.KERN_OSREV}
+		// revision: int
+		// if !sys.sysctl(mib, &revision) {
+		// 	return
+		// }
+		// os_version.patch = revision
+
+		// strings.write_string(&b, ", revision ")
+		// strings.write_int(&b, revision)
+	#else
+		gb_printf("Unknown");
 	#endif
+}
+
+// NOTE(Jeroen): `odin report` prints some system information for easier bug reporting.
+void print_bug_report_help() {
+	gb_printf("Where to find more information and get into contact when you encounter a bug:\n\n");
+	gb_printf("\tWebsite: https://odin-lang.org\n");
+	gb_printf("\tGitHub:  https://github.com/odin-lang/Odin/issues\n");
+	/*
+		Uncomment and update URL once we have a Discord vanity URL. For now people can get here from the site.
+		gb_printf("\tDiscord: https://discord.com/invite/sVBPHEv\n");
+	*/
+	gb_printf("\n\n");
+
+	gb_printf("Useful information to add to a bug report:\n\n");
+
+	gb_printf("\tOdin: %.*s", LIT(ODIN_VERSION));
+
+	#ifdef NIGHTLY
+	gb_printf("-nightly");
+	#endif
+
+	#ifdef GIT_SHA
+	gb_printf(":%s", GIT_SHA);
+	#endif
+
+	gb_printf("\n");
+
+	/*
+		Print OS information.
+	*/
+	report_os_info();
 
 	/*
 		Now print CPU info.
