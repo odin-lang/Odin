@@ -2727,7 +2727,12 @@ int main(int arg_count, char const **arg_ptr) {
 
 			if (!single_file_package) {
 				gb_printf_err("ERROR: `%.*s %.*s` takes a package as its first argument.\n", LIT(args[0]), LIT(command));
-				gb_printf_err("Did you mean `%.*s %.*s %.*s -file`?\n", LIT(args[0]), LIT(command), LIT(init_filename));
+				if (init_filename == "-file") {
+					gb_printf_err("Did you mean `%.*s %.*s <filename.odin> -file`?\n", LIT(args[0]), LIT(command));
+				} else {
+					gb_printf_err("Did you mean `%.*s %.*s %.*s -file`?\n", LIT(args[0]), LIT(command), LIT(init_filename));
+				}
+
 				gb_printf_err("The `-file` flag tells it to treat a file as a self-contained package.\n");
 				return 1;
 			} else {
