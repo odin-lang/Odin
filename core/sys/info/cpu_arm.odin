@@ -17,10 +17,10 @@ _cpu_name_buf: [72]u8
 @(init, private)
 init_cpu_name :: proc "c" () {
 	when ODIN_ARCH == .arm32 {
-		copy(_cpu_name_buf, "ARM")
+		copy(_cpu_name_buf[:], "ARM")
 		cpu_name = string(_cpu_name_buf[:3])
 	} else {
-		copy(_cpu_name_buf, "ARM64")
+		copy(_cpu_name_buf[:], "ARM64")
 		cpu_name = string(_cpu_name_buf[:5])
 	}
 }
