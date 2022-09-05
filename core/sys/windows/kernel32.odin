@@ -657,6 +657,13 @@ foreign kernel32 {
 	) -> BOOL ---
 }
 
+@(default_calling_convention="stdcall")
+foreign kernel32 {
+	GlobalMemoryStatusEx :: proc(
+		lpBuffer: ^MEMORYSTATUSEX,
+	) -> BOOL ---
+}
+
 PBAD_MEMORY_CALLBACK_ROUTINE :: #type proc "stdcall" ()
 
 @(default_calling_convention="stdcall")
@@ -797,6 +804,17 @@ foreign kernel32 {
 		ProcessHandle: HANDLE,
 		BaseAddress: PVOID,
 		UnmapFlags: ULONG,
+	) -> BOOL ---
+}
+
+@(default_calling_convention="stdcall")
+foreign kernel32 {
+	GetProductInfo :: proc(
+		OSMajorVersion: DWORD,
+		OSMinorVersion: DWORD,
+		SpMajorVersion: DWORD,
+		SpMinorVersion: DWORD,
+		product_type: ^Windows_Product_Type,
 	) -> BOOL ---
 }
 
