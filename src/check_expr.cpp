@@ -7359,6 +7359,14 @@ ExprKind check_ternary_if_expr(CheckerContext *c, Operand *o, Ast *node, Type *t
 		return kind;
 	}
 
+    if (x.mode == Addressing_Type || y.mode == Addressing_Type) {
+        Ast *type_expr = (x.mode == Addressing_Type) ? x.expr : y.expr;
+        gbString type_string = expr_to_string(type_expr);
+        error(node, "Type %s is invalid operand for ternary if expression", type_string);
+        gb_string_free(type_string);
+        return kind;
+    }
+
 	if (x.type == nullptr || x.type == t_invalid ||
 	    y.type == nullptr || y.type == t_invalid) {
 		return kind;
