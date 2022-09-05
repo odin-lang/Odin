@@ -3039,8 +3039,8 @@ void check_binary_matrix(CheckerContext *c, Token const &op, Operand *x, Operand
 		x->type = xt;
 		goto matrix_success;
 	} else {
-		GB_ASSERT(is_type_matrix(yt));
 		GB_ASSERT(!is_type_matrix(xt));
+		GB_ASSERT(is_type_matrix(yt));
 		
 		if (op.kind == Token_Mul) {
 			// NOTE(bill): no need to handle the matrix case here since it should be handled above
@@ -3061,6 +3061,9 @@ void check_binary_matrix(CheckerContext *c, Token const &op, Operand *x, Operand
 					x->type = alloc_type_matrix(yt->Matrix.elem, 1, yt->Matrix.column_count);
 				}
 				goto matrix_success;
+			} else if (are_types_identical(yt->Matrix.elem, xt)) {
+				x->type = check_matrix_type_hint(y->type, type_hint);
+				return;
 			}
 		}
 		if (!are_types_identical(xt, yt)) {
