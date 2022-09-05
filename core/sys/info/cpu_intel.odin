@@ -75,7 +75,7 @@ init_cpu_features :: proc "c" () {
 	}
 
 	os_supports_avx := false
-		if .os_xsave in set {
+	if .os_xsave in set {
 		eax, _ := xgetbv(0)
 		os_supports_avx = is_set(1, eax) && is_set(2, eax)
 	}
