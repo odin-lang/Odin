@@ -109,6 +109,8 @@ import i18n           "core:text/i18n"
 import thread         "core:thread"
 import time           "core:time"
 
+import sysinfo        "core:sys/info"
+
 import unicode        "core:unicode"
 import utf8           "core:unicode/utf8"
 import utf8string     "core:unicode/utf8/utf8string"
@@ -206,6 +208,7 @@ _ :: scanner
 _ :: i18n
 _ :: thread
 _ :: time
+_ :: sysinfo
 _ :: unicode
 _ :: utf8
 _ :: utf8string
