@@ -7359,13 +7359,13 @@ ExprKind check_ternary_if_expr(CheckerContext *c, Operand *o, Ast *node, Type *t
 		return kind;
 	}
 
-    if (x.mode == Addressing_Type || y.mode == Addressing_Type) {
-        Ast *type_expr = (x.mode == Addressing_Type) ? x.expr : y.expr;
-        gbString type_string = expr_to_string(type_expr);
-        error(node, "Type %s is invalid operand for ternary if expression", type_string);
-        gb_string_free(type_string);
-        return kind;
-    }
+	if (x.mode == Addressing_Type || y.mode == Addressing_Type) {
+		Ast *type_expr = (x.mode == Addressing_Type) ? x.expr : y.expr;
+		gbString type_string = expr_to_string(type_expr);
+		error(node, "Type %s is invalid operand for ternary if expression", type_string);
+		gb_string_free(type_string);
+		return kind;
+	}
 
 	if (x.type == nullptr || x.type == t_invalid ||
 	    y.type == nullptr || y.type == t_invalid) {
@@ -7403,6 +7403,7 @@ ExprKind check_ternary_if_expr(CheckerContext *c, Operand *o, Ast *node, Type *t
 		    check_cast_internal(c, &y, type_hint)) {
 			convert_to_typed(c, o, type_hint);
 			update_untyped_expr_type(c, node, type_hint, !is_type_untyped(type_hint));
+			o->type = type_hint;
 		}
 	}
 	return kind;
