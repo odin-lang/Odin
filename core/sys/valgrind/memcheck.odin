@@ -22,10 +22,10 @@ Mem_Check_Client_Request :: enum uintptr {
 }
 
 @(require_results)
-mem_check_client_request_expr :: proc "c" (default: uintptr, request: Mem_Check_Client_Request, a0, a1, a2, a3, a4: uintptr) -> uintptr {
+mem_check_client_request_expr :: #force_inline proc "c" (default: uintptr, request: Mem_Check_Client_Request, a0, a1, a2, a3, a4: uintptr) -> uintptr {
 	return intrinsics.valgrind_client_request(default, uintptr(request), a0, a1, a2, a3, a4)
 }
-mem_check_client_request_stmt :: proc "c" (request: Mem_Check_Client_Request, a0, a1, a2, a3, a4: uintptr) {
+mem_check_client_request_stmt :: #force_inline proc "c" (request: Mem_Check_Client_Request, a0, a1, a2, a3, a4: uintptr) {
 	_ = intrinsics.valgrind_client_request(0, uintptr(request), a0, a1, a2, a3, a4)
 }
 
