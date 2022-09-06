@@ -590,8 +590,8 @@ void usage(String argv0) {
 	print_usage_line(1, "version           print version");
 	print_usage_line(1, "report            print information useful to reporting a bug");
 	print_usage_line(0, "");
-	print_usage_line(0, "For further details on a command, use -help after the command name");
-	print_usage_line(1, "e.g. odin build -help");
+	print_usage_line(0, "For further details on a command, invoke command help:");
+	print_usage_line(1, "e.g. `odin build -help` or `odin help build`");
 }
 
 enum BuildFlagKind {
@@ -1963,13 +1963,13 @@ void print_show_help(String const arg0, String const &command) {
 		print_usage_line(2, "Parse and type check .odin file(s) and then remove unneeded semicolons from the entire project");
 	}
 
-	bool doc = command == "doc";
-	bool build = command == "build";
-	bool run_or_build = command == "run" || command == "build" || command == "test";
-	bool test_only = command == "test";
+	bool doc             = command == "doc";
+	bool build           = command == "build";
+	bool run_or_build    = command == "run" || command == "build" || command == "test";
+	bool test_only       = command == "test";
 	bool strip_semicolon = command == "strip-semicolon";
-	bool check_only = command == "check" || strip_semicolon;
-	bool check = run_or_build || check_only;
+	bool check_only      = command == "check" || strip_semicolon;
+	bool check           = run_or_build || check_only;
 
 	print_usage_line(0, "");
 	print_usage_line(1, "Flags");
@@ -2085,7 +2085,7 @@ void print_show_help(String const arg0, String const &command) {
 		print_usage_line(3, "-build-mode:shared    Build as a dynamically linked library");
 		print_usage_line(3, "-build-mode:obj       Build as an object file");
 		print_usage_line(3, "-build-mode:object    Build as an object file");
-		print_usage_line(3, "-build-mode:assembly  Build as an object file");
+		print_usage_line(3, "-build-mode:assembly  Build as an assembly file");
 		print_usage_line(3, "-build-mode:assembler Build as an assembly file");
 		print_usage_line(3, "-build-mode:asm       Build as an assembly file");
 		print_usage_line(3, "-build-mode:llvm-ir   Build as an LLVM IR file");
@@ -2701,6 +2701,14 @@ int main(int arg_count, char const **arg_ptr) {
 		build_context.command_kind = Command_bug_report;
 		print_bug_report_help();
 		return 0;
+	} else if (command == "help") {
+		if (args.count <= 2) {
+			usage(args[0]);
+			return 1;
+		} else {
+			print_show_help(args[0], args[2]);
+			return 0;
+		}
 	} else {
 		usage(args[0]);
 		return 1;
@@ -2727,7 +2735,12 @@ int main(int arg_count, char const **arg_ptr) {
 
 			if (!single_file_package) {
 				gb_printf_err("ERROR: `%.*s %.*s` takes a package as its first argument.\n", LIT(args[0]), LIT(command));
-				gb_printf_err("Did you mean `%.*s %.*s %.*s -file`?\n", LIT(args[0]), LIT(command), LIT(init_filename));
+				if (init_filename == "-file") {
+					gb_printf_err("Did you mean `%.*s %.*s <filename.odin> -file`?\n", LIT(args[0]), LIT(command));
+				} else {
+					gb_printf_err("Did you mean `%.*s %.*s %.*s -file`?\n", LIT(args[0]), LIT(command), LIT(init_filename));
+				}
+
 				gb_printf_err("The `-file` flag tells it to treat a file as a self-contained package.\n");
 				return 1;
 			} else {

@@ -1,5 +1,5 @@
 //+build i386, amd64
-package simd_x86
+package sysinfo
 
 import "core:intrinsics"
 
@@ -8,7 +8,6 @@ cpuid :: intrinsics.x86_cpuid
 
 // xgetbv :: proc(cx: u32) -> (eax, edx: u32) ---
 xgetbv :: intrinsics.x86_xgetbv
-
 
 CPU_Feature :: enum u64 {
 	aes,       // AES hardware implementation (AES NI)
@@ -34,6 +33,7 @@ CPU_Feature :: enum u64 {
 CPU_Features :: distinct bit_set[CPU_Feature; u64]
 
 cpu_features: Maybe(CPU_Features)
+cpu_name:     Maybe(string)
 
 @(init, private)
 init_cpu_features :: proc "c" () {
@@ -67,6 +67,13 @@ init_cpu_features :: proc "c" () {
 	try_set(&set, .os_xsave,  27, ecx1)
 	try_set(&set, .rdrand,    30, ecx1)
 
+	when ODIN_OS == .FreeBSD || ODIN_OS == .OpenBSD {
+		// xgetbv is an illegal instruction under FreeBSD 13 & OpenBSD 7.1
+		// return before probing further
+		cpu_features = set
+		return
+	}
+
 	os_supports_avx := false
 	if .os_xsave in set {
 		eax, _ := xgetbv(0)
@@ -91,4 +98,32 @@ init_cpu_features :: proc "c" () {
 	try_set(&set, .adx,    19, ebx7)
 
 	cpu_features = set
+}
+
+@(private)
+_cpu_name_buf: [72]u8
+
+@(init, private)
+init_cpu_name :: proc "c" () {
+	number_of_extended_ids, _, _, _ := cpuid(0x8000_0000, 0)
+	if number_of_extended_ids < 0x8000_0004 {
+		return
+	}
+
+	_buf := transmute(^[0x12]u32)&_cpu_name_buf
+	_buf[ 0], _buf[ 1], _buf[ 2], _buf[ 3] = cpuid(0x8000_0002, 0)
+	_buf[ 4], _buf[ 5], _buf[ 6], _buf[ 7] = cpuid(0x8000_0003, 0)
+	_buf[ 8], _buf[ 9], _buf[10], _buf[11] = cpuid(0x8000_0004, 0)
+
+	// Some CPUs like may include leading or trailing spaces. Trim them.
+	// e.g. `      Intel(R) Xeon(R) CPU E5-1650 v2 @ 3.50GHz`
+
+	brand := string(_cpu_name_buf[:])
+	for len(brand) > 0 && brand[0] == 0 || brand[0] == ' ' {
+		brand = brand[1:]
+	}
+	for len(brand) > 0 && brand[len(brand) - 1] == 0 || brand[len(brand) - 1] == ' ' {
+		brand = brand[:len(brand) - 1]
+	}
+	cpu_name = brand
 }
