@@ -1643,8 +1643,10 @@ Type *check_get_params(CheckerContext *ctx, Scope *scope, Ast *_params, bool *is
 						bool valid = false;
 						if (is_type_proc(op.type)) {
 							Entity *proc_entity = entity_from_expr(op.expr);
-							valid = proc_entity != nullptr;
-							poly_const = exact_value_procedure(proc_entity->identifier.load() ? proc_entity->identifier.load() : op.expr);
+							valid = (proc_entity != nullptr) && (op.value.kind == ExactValue_Procedure);
+							if (valid) {
+								poly_const = exact_value_procedure(proc_entity->identifier.load() ? proc_entity->identifier.load() : op.expr);
+							}
 						}
 						if (!valid) {
 							if (op.mode == Addressing_Constant) {
