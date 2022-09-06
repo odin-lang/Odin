@@ -5398,10 +5398,7 @@ bool check_builtin_procedure(CheckerContext *c, Operand *operand, Ast *call, i32
 
 	case BuiltinProc_valgrind_client_request:
 		{
-			if (!is_arch_x86()) {
-				error(call, "'%.*s' is only allowed on x86 targets (i386, amd64)", LIT(builtin_name));
-				return false;
-			}
+			// NOTE(bill): Check it but make it a no-op for non x86 (i386, amd64) targets
 
 			enum {ARG_COUNT = 7};
 			GB_ASSERT(builtin_procs[BuiltinProc_valgrind_client_request].arg_count == ARG_COUNT);
