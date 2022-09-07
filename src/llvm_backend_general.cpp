@@ -877,18 +877,6 @@ bool lb_is_type_proc_recursive(Type *t) {
 		case Type_Pointer:
 			t = t->Pointer.elem;
 			break;
-		case Type_Array:
-			t = t->Array.elem;
-			break;
-		case Type_EnumeratedArray:
-			t = t->EnumeratedArray.elem;
-			break;
-		case Type_Slice:
-			t = t->Slice.elem;
-			break;
-		case Type_DynamicArray:
-			t = t->DynamicArray.elem;
-			break;
 		case Type_Proc:
 			return true;
 		default:
@@ -1890,16 +1878,16 @@ LLVMTypeRef lb_type_internal(lbModule *m, Type *type) {
 		return LLVMPointerType(lb_type(m, type->Pointer.elem), 0);
 
 	case Type_Array: {
-		m->internal_type_level -= 1;
-		LLVMTypeRef t = LLVMArrayType(lb_type(m, type->Array.elem), cast(unsigned)type->Array.count);
 		m->internal_type_level += 1;
+		LLVMTypeRef t = LLVMArrayType(lb_type(m, type->Array.elem), cast(unsigned)type->Array.count);
+		m->internal_type_level -= 1;
 		return t;
 	}
 
 	case Type_EnumeratedArray: {
-		m->internal_type_level -= 1;
-		LLVMTypeRef t = LLVMArrayType(lb_type(m, type->EnumeratedArray.elem), cast(unsigned)type->EnumeratedArray.count);
 		m->internal_type_level += 1;
+		LLVMTypeRef t = LLVMArrayType(lb_type(m, type->EnumeratedArray.elem), cast(unsigned)type->EnumeratedArray.count);
+		m->internal_type_level -= 1;
 		return t;
 	}
 
@@ -2101,14 +2089,11 @@ LLVMTypeRef lb_type_internal(lbModule *m, Type *type) {
 		}
 
 	case Type_Proc:
-		// if (m->internal_type_level > 256) { // TODO HACK(bill): is this really enough?
-		if (m->internal_type_level > 1) { // TODO HACK(bill): is this really enough?
-			return LLVMPointerType(LLVMIntTypeInContext(m->ctx, 8), 0);
-		} else {
+		{
 			LLVMTypeRef proc_raw_type = lb_type_internal_for_procedures_raw(m, type);
-			return LLVMPointerType(proc_raw_type, 0);
+			gb_unused(proc_raw_type);
+			return LLVMPointerType(LLVMIntTypeInContext(m->ctx, 8), 0);
 		}
-
 		break;
 	case Type_BitSet:
 		{
