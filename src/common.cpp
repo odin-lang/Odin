@@ -38,6 +38,10 @@ i64 next_pow2(i64 n);
 isize next_pow2_isize(isize n);
 void debugf(char const *fmt, ...);
 
+#if defined(GB_SYSTEM_WINDOWS) && defined(GB_ARCH_32_BIT)
+#error Odin on Windows requires a 64-bit build-system. The 'Developer Command Prompt' for VS still defaults to 32-bit shell. The 64-bit shell can be found under the name 'x64 Native Tools Command Prompt' for VS. For more information, please see https://odin-lang.org/docs/install/#for-windows
+#endif
+
 #include "threading.cpp"
 #include "unicode.cpp"
 #include "array.cpp"
