@@ -43,7 +43,7 @@ sort_by_indices :: proc{ sort_by_indices_allocate, _sort_by_indices}
 
 sort_by_indices_allocate :: proc(data: $T/[]$E, indices: []int, allocator := context.allocator) -> (sorted: T) {
 	assert(len(data) == len(indices))
-	sorted = make([]int, len(data), allocator)
+	sorted = make(T, len(data), allocator)
 	for v, i in indices {
 		sorted[i] = data[v]
 	}
