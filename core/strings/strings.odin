@@ -1686,7 +1686,7 @@ centre_justify :: proc(str: string, length: int, pad: string, allocator := conte
 		return clone(str, allocator)
 	}
 
-	remains := length-1
+	remains := length-n
 	pad_len := rune_count(pad)
 
 	b: Builder
@@ -1702,14 +1702,14 @@ centre_justify :: proc(str: string, length: int, pad: string, allocator := conte
 	return to_string(b)
 }
 
-// left_justify returns a string with a pad string at left side if the str's rune length is smaller than length
+// left_justify returns a string with a pad string at right side if the str's rune length is smaller than length
 left_justify :: proc(str: string, length: int, pad: string, allocator := context.allocator) -> string {
 	n := rune_count(str)
 	if n >= length || pad == "" {
 		return clone(str, allocator)
 	}
 
-	remains := length-1
+	remains := length-n
 	pad_len := rune_count(pad)
 
 	b: Builder
@@ -1724,14 +1724,14 @@ left_justify :: proc(str: string, length: int, pad: string, allocator := context
 	return to_string(b)
 }
 
-// right_justify returns a string with a pad string at right side if the str's rune length is smaller than length
+// right_justify returns a string with a pad string at left side if the str's rune length is smaller than length
 right_justify :: proc(str: string, length: int, pad: string, allocator := context.allocator) -> string {
 	n := rune_count(str)
 	if n >= length || pad == "" {
 		return clone(str, allocator)
 	}
 
-	remains := length-1
+	remains := length-n
 	pad_len := rune_count(pad)
 
 	b: Builder
