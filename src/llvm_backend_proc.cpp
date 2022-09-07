@@ -736,6 +736,9 @@ lbValue lb_emit_call_internal(lbProcedure *p, lbValue value, lbValue return_ptr,
 	}
 	for_array(i, processed_args) {
 		lbValue arg = processed_args[i];
+		if (is_type_proc(arg.type)) {
+			arg.value = LLVMBuildPointerCast(p->builder, arg.value, lb_type(p->module, arg.type), "");
+		}
 		args[arg_index++] = arg.value;
 	}
 	if (context_ptr.addr.value != nullptr) {
