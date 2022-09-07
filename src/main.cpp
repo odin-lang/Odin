@@ -288,11 +288,15 @@ i32 linker_stage(lbGenerator *gen) {
 
 			char const *subsystem_str = build_context.use_subsystem_windows ? "WINDOWS" : "CONSOLE";
 			if (!build_context.use_lld) { // msvc
+				String res_path = {};
+				defer (gb_free(heap_allocator(), res_path.text));
 				if (build_context.has_resource) {
+					String temp_res_path = path_to_string(heap_allocator(), build_context.build_paths[BuildPath_RES]);
+					res_path = concatenate3_strings(heap_allocator(), str_lit("\""), temp_res_path, str_lit("\""));
+					gb_free(heap_allocator(), temp_res_path.text);
+
 					String rc_path  = path_to_string(heap_allocator(), build_context.build_paths[BuildPath_RC]);
-					String res_path = path_to_string(heap_allocator(), build_context.build_paths[BuildPath_RES]);
 					defer (gb_free(heap_allocator(), rc_path.text));
-					defer (gb_free(heap_allocator(), res_path.text));
 
 					result = system_exec_command_line_app("msvc-link",
 						"\"%.*src.exe\" /nologo /fo \"%.*s\" \"%.*s\"",
@@ -304,42 +308,25 @@ i32 linker_stage(lbGenerator *gen) {
 					if (result) {
 						return result;
 					}
-
-					result = system_exec_command_line_app("msvc-link",
-						"\"%.*slink.exe\" %s \"%.*s\" -OUT:\"%.*s\" %s "
-						"/nologo /incremental:no /opt:ref /subsystem:%s "
-						" %.*s "
-						" %.*s "
-						" %s "
-						"",
-						LIT(vs_exe_path), object_files, LIT(res_path), LIT(output_filename),
-						link_settings,
-						subsystem_str,
-						LIT(build_context.link_flags),
-						LIT(build_context.extra_linker_flags),
-						lib_str
-					  );
-				} else {
-					result = system_exec_command_line_app("msvc-link",
-						"\"%.*slink.exe\" %s -OUT:\"%.*s\" %s "
-						"/nologo /incremental:no /opt:ref /subsystem:%s "
-						" %.*s "
-						" %.*s "
-						" %s "
-						"",
-						LIT(vs_exe_path), object_files, LIT(output_filename),
-						link_settings,
-						subsystem_str,
-						LIT(build_context.link_flags),
-						LIT(build_context.extra_linker_flags),
-						lib_str
-					);
 				}
 
+				result = system_exec_command_line_app("msvc-link",
+					"\"%.*slink.exe\" %s %.*s -OUT:\"%.*s\" %s "
+					"/nologo /incremental:no /opt:ref /subsystem:%s "
+					" %.*s "
+					" %.*s "
+					" %s "
+					"",
+					LIT(vs_exe_path), object_files, LIT(res_path), LIT(output_filename),
+					link_settings,
+					subsystem_str,
+					LIT(build_context.link_flags),
+					LIT(build_context.extra_linker_flags),
+					lib_str
+				);
 				if (result) {
 					return result;
 				}
-
 			} else { // lld
 				result = system_exec_command_line_app("msvc-lld-link",
 					"\"%.*s\\bin\\lld-link\" %s -OUT:\"%.*s\" %s "
