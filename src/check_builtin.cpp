@@ -4613,6 +4613,46 @@ bool check_builtin_procedure(CheckerContext *c, Operand *operand, Ast *call, i32
 		operand->mode = Addressing_Type;
 		break;
 
+	case BuiltinProc_type_convert_variants_to_pointers:
+		if (operand->mode != Addressing_Type) {
+			error(operand->expr, "Expected a type for '%.*s'", LIT(builtin_name));
+		} else {
+			Type *bt = base_type(operand->type);
+			if (is_type_polymorphic(bt)) {
+				// IGNORE polymorphic types
+				return true;
+			} else if (bt->kind != Type_Union) {
+				gbString t = type_to_string(operand->type);
+				error(operand->expr, "Expected a union type for '%.*s', got %s", LIT(builtin_name), t);
+				gb_string_free(t);
+
+				operand->mode = Addressing_Invalid;
+				operand->type = t_invalid;
+				return false;
+			} else if (bt->Union.is_polymorphic) {
+				gbString t = type_to_string(operand->type);
+				error(operand->expr, "Expected a non-polymorphic union type for '%.*s', got %s", LIT(builtin_name), t);
+				gb_string_free(t);
+
+				operand->mode = Addressing_Invalid;
+				operand->type = t_invalid;
+				return false;
+			}
+
+			Type *new_type = alloc_type_union();
+			auto variants = slice_make<Type *>(permanent_allocator(), bt->Union.variants.count);
+			for_array(i, bt->Union.variants) {
+				variants[i] = alloc_type_pointer(bt->Union.variants[i]);
+			}
+			new_type->Union.variants = variants;
+
+			// NOTE(bill): Is this even correct?
+			new_type->Union.scope = bt->Union.scope;
+
+			operand->type = new_type;
+		}
+		operand->mode = Addressing_Type;
+		break;
 
 	case BuiltinProc_type_is_boolean:
 	case BuiltinProc_type_is_integer:
