@@ -225,6 +225,7 @@ struct BuildContext {
 	String ODIN_VENDOR;  // compiler vendor
 	String ODIN_VERSION; // compiler version
 	String ODIN_ROOT;    // Odin ROOT
+	String ODIN_BUILD_PROJECT_NAME; // Odin main/initial package's directory name
 	bool   ODIN_DEBUG;   // Odin in debug mode
 	bool   ODIN_DISABLE_ASSERT; // Whether the default 'assert' et al is disabled in code or not
 	bool   ODIN_DEFAULT_TO_NIL_ALLOCATOR; // Whether the default allocator is a "nil" allocator or not (i.e. it does nothing)
@@ -1535,6 +1536,12 @@ bool init_build_paths(String init_filename) {
 
 	if (bc->target_features_string.len != 0) {
 		enable_target_feature({}, bc->target_features_string);
+	}
+
+	{
+		String build_project_name  = last_path_element(bc->build_paths[BuildPath_Main_Package].basename);
+		GB_ASSERT(build_project_name.len > 0);
+		bc->ODIN_BUILD_PROJECT_NAME = build_project_name;
 	}
 
 	return true;
