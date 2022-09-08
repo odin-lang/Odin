@@ -188,6 +188,8 @@ type_field_index_of :: proc($T: typeid, $name: string) -> uintptr ---
 type_equal_proc  :: proc($T: typeid) -> (equal:  proc "contextless" (rawptr, rawptr) -> bool)                 where type_is_comparable(T) ---
 type_hasher_proc :: proc($T: typeid) -> (hasher: proc "contextless" (data: rawptr, seed: uintptr) -> uintptr) where type_is_comparable(T) ---
 
+type_convert_variants_to_pointers :: proc($T: typeid) -> typeid where type_is_union(T) ---
+
 constant_utf16_cstring :: proc($literal: string) -> [^]u16 ---
 
 // SIMD related
