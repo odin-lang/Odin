@@ -2,7 +2,7 @@ package odin_gl
 
 #assert(size_of(bool) == size_of(u8))
 
-when !ODIN_DEBUG {
+when !GL_DEBUG {
 	// VERSION_1_0
 	CullFace               :: proc "c" (mode: u32)                                                                                         {        impl_CullFace(mode)                                                                         }
 	FrontFace              :: proc "c" (mode: u32)                                                                                         {        impl_FrontFace(mode)                                                                        }

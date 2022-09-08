@@ -288,11 +288,15 @@ i32 linker_stage(lbGenerator *gen) {
 
 			char const *subsystem_str = build_context.use_subsystem_windows ? "WINDOWS" : "CONSOLE";
 			if (!build_context.use_lld) { // msvc
+				String res_path = {};
+				defer (gb_free(heap_allocator(), res_path.text));
 				if (build_context.has_resource) {
+					String temp_res_path = path_to_string(heap_allocator(), build_context.build_paths[BuildPath_RES]);
+					res_path = concatenate3_strings(heap_allocator(), str_lit("\""), temp_res_path, str_lit("\""));
+					gb_free(heap_allocator(), temp_res_path.text);
+
 					String rc_path  = path_to_string(heap_allocator(), build_context.build_paths[BuildPath_RC]);
-					String res_path = path_to_string(heap_allocator(), build_context.build_paths[BuildPath_RES]);
 					defer (gb_free(heap_allocator(), rc_path.text));
-					defer (gb_free(heap_allocator(), res_path.text));
 
 					result = system_exec_command_line_app("msvc-link",
 						"\"%.*src.exe\" /nologo /fo \"%.*s\" \"%.*s\"",
@@ -304,42 +308,25 @@ i32 linker_stage(lbGenerator *gen) {
 					if (result) {
 						return result;
 					}
-
-					result = system_exec_command_line_app("msvc-link",
-						"\"%.*slink.exe\" %s \"%.*s\" -OUT:\"%.*s\" %s "
-						"/nologo /incremental:no /opt:ref /subsystem:%s "
-						" %.*s "
-						" %.*s "
-						" %s "
-						"",
-						LIT(vs_exe_path), object_files, LIT(res_path), LIT(output_filename),
-						link_settings,
-						subsystem_str,
-						LIT(build_context.link_flags),
-						LIT(build_context.extra_linker_flags),
-						lib_str
-					  );
-				} else {
-					result = system_exec_command_line_app("msvc-link",
-						"\"%.*slink.exe\" %s -OUT:\"%.*s\" %s "
-						"/nologo /incremental:no /opt:ref /subsystem:%s "
-						" %.*s "
-						" %.*s "
-						" %s "
-						"",
-						LIT(vs_exe_path), object_files, LIT(output_filename),
-						link_settings,
-						subsystem_str,
-						LIT(build_context.link_flags),
-						LIT(build_context.extra_linker_flags),
-						lib_str
-					);
 				}
 
+				result = system_exec_command_line_app("msvc-link",
+					"\"%.*slink.exe\" %s %.*s -OUT:\"%.*s\" %s "
+					"/nologo /incremental:no /opt:ref /subsystem:%s "
+					" %.*s "
+					" %.*s "
+					" %s "
+					"",
+					LIT(vs_exe_path), object_files, LIT(res_path), LIT(output_filename),
+					link_settings,
+					subsystem_str,
+					LIT(build_context.link_flags),
+					LIT(build_context.extra_linker_flags),
+					lib_str
+				);
 				if (result) {
 					return result;
 				}
-
 			} else { // lld
 				result = system_exec_command_line_app("msvc-lld-link",
 					"\"%.*s\\bin\\lld-link\" %s -OUT:\"%.*s\" %s "
@@ -590,8 +577,8 @@ void usage(String argv0) {
 	print_usage_line(1, "version           print version");
 	print_usage_line(1, "report            print information useful to reporting a bug");
 	print_usage_line(0, "");
-	print_usage_line(0, "For further details on a command, use -help after the command name");
-	print_usage_line(1, "e.g. odin build -help");
+	print_usage_line(0, "For further details on a command, invoke command help:");
+	print_usage_line(1, "e.g. `odin build -help` or `odin help build`");
 }
 
 enum BuildFlagKind {
@@ -1963,13 +1950,13 @@ void print_show_help(String const arg0, String const &command) {
 		print_usage_line(2, "Parse and type check .odin file(s) and then remove unneeded semicolons from the entire project");
 	}
 
-	bool doc = command == "doc";
-	bool build = command == "build";
-	bool run_or_build = command == "run" || command == "build" || command == "test";
-	bool test_only = command == "test";
+	bool doc             = command == "doc";
+	bool build           = command == "build";
+	bool run_or_build    = command == "run" || command == "build" || command == "test";
+	bool test_only       = command == "test";
 	bool strip_semicolon = command == "strip-semicolon";
-	bool check_only = command == "check" || strip_semicolon;
-	bool check = run_or_build || check_only;
+	bool check_only      = command == "check" || strip_semicolon;
+	bool check           = run_or_build || check_only;
 
 	print_usage_line(0, "");
 	print_usage_line(1, "Flags");
@@ -2085,7 +2072,7 @@ void print_show_help(String const arg0, String const &command) {
 		print_usage_line(3, "-build-mode:shared    Build as a dynamically linked library");
 		print_usage_line(3, "-build-mode:obj       Build as an object file");
 		print_usage_line(3, "-build-mode:object    Build as an object file");
-		print_usage_line(3, "-build-mode:assembly  Build as an object file");
+		print_usage_line(3, "-build-mode:assembly  Build as an assembly file");
 		print_usage_line(3, "-build-mode:assembler Build as an assembly file");
 		print_usage_line(3, "-build-mode:asm       Build as an assembly file");
 		print_usage_line(3, "-build-mode:llvm-ir   Build as an LLVM IR file");
@@ -2701,6 +2688,14 @@ int main(int arg_count, char const **arg_ptr) {
 		build_context.command_kind = Command_bug_report;
 		print_bug_report_help();
 		return 0;
+	} else if (command == "help") {
+		if (args.count <= 2) {
+			usage(args[0]);
+			return 1;
+		} else {
+			print_show_help(args[0], args[2]);
+			return 0;
+		}
 	} else {
 		usage(args[0]);
 		return 1;
@@ -2727,7 +2722,12 @@ int main(int arg_count, char const **arg_ptr) {
 
 			if (!single_file_package) {
 				gb_printf_err("ERROR: `%.*s %.*s` takes a package as its first argument.\n", LIT(args[0]), LIT(command));
-				gb_printf_err("Did you mean `%.*s %.*s %.*s -file`?\n", LIT(args[0]), LIT(command), LIT(init_filename));
+				if (init_filename == "-file") {
+					gb_printf_err("Did you mean `%.*s %.*s <filename.odin> -file`?\n", LIT(args[0]), LIT(command));
+				} else {
+					gb_printf_err("Did you mean `%.*s %.*s %.*s -file`?\n", LIT(args[0]), LIT(command), LIT(init_filename));
+				}
+
 				gb_printf_err("The `-file` flag tells it to treat a file as a self-contained package.\n");
 				return 1;
 			} else {

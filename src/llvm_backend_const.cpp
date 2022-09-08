@@ -297,12 +297,16 @@ LLVMValueRef lb_build_constant_array_values(lbModule *m, Type *type, Type *elem_
 	}
 
 	if (!is_const) {
+		LLVMTypeRef llvm_elem_type = lb_type(m, elem_type);
 		lbProcedure *p = m->curr_procedure;
 		GB_ASSERT(p != nullptr);
 		lbAddr v = lb_add_local_generated(p, type, false);
 		lbValue ptr = lb_addr_get_ptr(p, v);
 		for (isize i = 0; i < count; i++) {
 			lbValue elem = lb_emit_array_epi(p, ptr, i);
+			if (is_type_proc(elem_type)) {
+				values[i] = LLVMConstPointerCast(values[i], llvm_elem_type);
+			}
 			LLVMBuildStore(p->builder, values[i], elem.value);
 		}
 		return lb_addr_load(p, v).value;

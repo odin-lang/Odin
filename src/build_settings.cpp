@@ -116,6 +116,7 @@ struct TargetMetrics {
 	TargetArchKind arch;
 	isize          word_size;
 	isize          max_align;
+	isize          max_simd_align;
 	String         target_triplet;
 	String         target_data_layout;
 	TargetABIKind  abi;
@@ -224,6 +225,7 @@ struct BuildContext {
 	String ODIN_VENDOR;  // compiler vendor
 	String ODIN_VERSION; // compiler version
 	String ODIN_ROOT;    // Odin ROOT
+	String ODIN_BUILD_PROJECT_NAME; // Odin main/initial package's directory name
 	bool   ODIN_DEBUG;   // Odin in debug mode
 	bool   ODIN_DISABLE_ASSERT; // Whether the default 'assert' et al is disabled in code or not
 	bool   ODIN_DEFAULT_TO_NIL_ALLOCATOR; // Whether the default allocator is a "nil" allocator or not (i.e. it does nothing)
@@ -235,8 +237,9 @@ struct BuildContext {
 	TargetEndianKind endian_kind;
 
 	// In bytes
-	i64    word_size; // Size of a pointer, must be >= 4
-	i64    max_align; // max alignment, must be >= 1 (and typically >= word_size)
+	i64    word_size;      // Size of a pointer, must be >= 4
+	i64    max_align;      // max alignment, must be >= 1 (and typically >= word_size)
+	i64    max_simd_align; // max alignment, must be >= 1 (and typically >= word_size)
 
 	CommandKind command_kind;
 	String command;
@@ -339,15 +342,13 @@ bool global_ignore_warnings(void) {
 gb_global TargetMetrics target_windows_i386 = {
 	TargetOs_windows,
 	TargetArch_i386,
-	4,
-	8,
+	4, 4, 8,
 	str_lit("i386-pc-windows-msvc"),
 };
 gb_global TargetMetrics target_windows_amd64 = {
 	TargetOs_windows,
 	TargetArch_amd64,
-	8,
-	16,
+	8, 8, 16,
 	str_lit("x86_64-pc-windows-msvc"),
 	str_lit("e-m:w-i64:64-f80:128-n8:16:32:64-S128"),
 };
@@ -355,24 +356,21 @@ gb_global TargetMetrics target_windows_amd64 = {
 gb_global TargetMetrics target_linux_i386 = {
 	TargetOs_linux,
 	TargetArch_i386,
-	4,
-	8,
+	4, 4, 8,
 	str_lit("i386-pc-linux-gnu"),
 
 };
 gb_global TargetMetrics target_linux_amd64 = {
 	TargetOs_linux,
 	TargetArch_amd64,
-	8,
-	16,
+	8, 8, 16,
 	str_lit("x86_64-pc-linux-gnu"),
 	str_lit("e-m:w-i64:64-f80:128-n8:16:32:64-S128"),
 };
 gb_global TargetMetrics target_linux_arm64 = {
 	TargetOs_linux,
 	TargetArch_arm64,
-	8,
-	16,
+	8, 8, 16,
 	str_lit("aarch64-linux-elf"),
 	str_lit("e-m:o-p:32:32-Fi8-i64:64-v128:64:128-a:0:32-n32-S64"),
 };
@@ -380,8 +378,7 @@ gb_global TargetMetrics target_linux_arm64 = {
 gb_global TargetMetrics target_linux_arm32 = {
 	TargetOs_linux,
 	TargetArch_arm32,
-	4,
-	8,
+	4, 4, 8,
 	str_lit("arm-linux-gnu"),
 	str_lit("e-m:o-p:32:32-Fi8-i64:64-v128:64:128-a:0:32-n32-S64"),
 };
@@ -389,8 +386,7 @@ gb_global TargetMetrics target_linux_arm32 = {
 gb_global TargetMetrics target_darwin_amd64 = {
 	TargetOs_darwin,
 	TargetArch_amd64,
-	8,
-	16,
+	8, 8, 16,
 	str_lit("x86_64-apple-darwin"),
 	str_lit("e-m:o-i64:64-f80:128-n8:16:32:64-S128"),
 };
@@ -398,8 +394,7 @@ gb_global TargetMetrics target_darwin_amd64 = {
 gb_global TargetMetrics target_darwin_arm64 = {
 	TargetOs_darwin,
 	TargetArch_arm64,
-	8,
-	16,
+	8, 8, 16,
 	str_lit("arm64-apple-macosx11.0.0"),
 	str_lit("e-m:o-i64:64-i128:128-n32:64-S128"), // TODO(bill): Is this correct?
 };
@@ -407,16 +402,14 @@ gb_global TargetMetrics target_darwin_arm64 = {
 gb_global TargetMetrics target_freebsd_i386 = {
 	TargetOs_freebsd,
 	TargetArch_i386,
-	4,
-	8,
+	4, 4, 8,
 	str_lit("i386-unknown-freebsd-elf"),
 };
 
 gb_global TargetMetrics target_freebsd_amd64 = {
 	TargetOs_freebsd,
 	TargetArch_amd64,
-	8,
-	16,
+	8, 8, 16,
 	str_lit("x86_64-unknown-freebsd-elf"),
 	str_lit("e-m:w-i64:64-f80:128-n8:16:32:64-S128"),
 };
@@ -424,8 +417,7 @@ gb_global TargetMetrics target_freebsd_amd64 = {
 gb_global TargetMetrics target_openbsd_amd64 = {
 	TargetOs_openbsd,
 	TargetArch_amd64,
-	8,
-	16,
+	8, 8, 16,
 	str_lit("x86_64-unknown-openbsd-elf"),
 	str_lit("e-m:e-p270:32:32-p271:32:32-p272:64:64-i64:64-f80:128-n8:16:32:64-S128"),
 };
@@ -433,62 +425,48 @@ gb_global TargetMetrics target_openbsd_amd64 = {
 gb_global TargetMetrics target_essence_amd64 = {
 	TargetOs_essence,
 	TargetArch_amd64,
-	8,
-	16,
+	8, 8, 16,
 	str_lit("x86_64-pc-none-elf"),
 };
+
 
 gb_global TargetMetrics target_freestanding_wasm32 = {
 	TargetOs_freestanding,
 	TargetArch_wasm32,
-	4,
-	8,
+	4, 8, 16,
 	str_lit("wasm32-freestanding-js"),
-	str_lit(""),
+	str_lit("e-m:e-p:32:32-i64:64-n32:64-S128"),
 };
 
 gb_global TargetMetrics target_js_wasm32 = {
 	TargetOs_js,
 	TargetArch_wasm32,
-	4,
-	8,
+	4, 8, 16,
 	str_lit("wasm32-js-js"),
-	str_lit(""),
-};
-
-gb_global TargetMetrics target_js_wasm64 = {
-	TargetOs_js,
-	TargetArch_wasm64,
-	8,
-	16,
-	str_lit("wasm64-js-js"),
-	str_lit(""),
+	str_lit("e-m:e-p:32:32-i64:64-n32:64-S128"),
 };
 
 gb_global TargetMetrics target_wasi_wasm32 = {
 	TargetOs_wasi,
 	TargetArch_wasm32,
-	4,
-	8,
+	4, 8, 16,
 	str_lit("wasm32-wasi-js"),
-	str_lit(""),
+	str_lit("e-m:e-p:32:32-i64:64-n32:64-S128"),
 };
 
 
-// gb_global TargetMetrics target_freestanding_wasm64 = {
-// 	TargetOs_freestanding,
-// 	TargetArch_wasm64,
-// 	8,
-// 	16,
-// 	str_lit("wasm64-freestanding-js"),
-// 	str_lit(""),
-// };
+gb_global TargetMetrics target_js_wasm64 = {
+	TargetOs_js,
+	TargetArch_wasm64,
+	8, 8, 16,
+	str_lit("wasm64-js-js"),
+	str_lit(""),
+};
 
 gb_global TargetMetrics target_freestanding_amd64_sysv = {
 	TargetOs_freestanding,
 	TargetArch_amd64,
-	8,
-	16,
+	8, 8, 16,
 	str_lit("x86_64-pc-none-gnu"),
 	str_lit("e-m:w-i64:64-f80:128-n8:16:32:64-S128"),
 	TargetABI_SysV,
@@ -517,7 +495,7 @@ gb_global NamedTargetMetrics named_targets[] = {
 	{ str_lit("freestanding_wasm32"), &target_freestanding_wasm32 },
 	{ str_lit("wasi_wasm32"),         &target_wasi_wasm32 },
 	{ str_lit("js_wasm32"),           &target_js_wasm32 },
-	{ str_lit("js_wasm64"),           &target_js_wasm64 },
+	// { str_lit("js_wasm64"),           &target_js_wasm64 },
 
 	{ str_lit("freestanding_amd64_sysv"), &target_freestanding_amd64_sysv },
 };
@@ -853,10 +831,73 @@ String internal_odin_root_dir(void) {
 			gb_mfree(argv);
 			return make_string(nullptr, 0);
 		}
-		// copy argv[0] to path_buf
+
+		// NOTE(Jeroen):
+		// On OpenBSD, if `odin` is on the path, `argv[0]` will contain just `odin`,
+		// even though that isn't then the relative path.
+		// When run from Odin's directory, it returns `./odin`.
+		// Check argv[0] for lack of / to see if it's a reference to PATH.
+		// If so, walk PATH to find the executable.
+
 		len = gb_strlen(argv[0]);
-		if(len < path_buf.count) {
-			gb_memmove(&path_buf[0], argv[0], len);
+
+		bool slash_found = false;
+		bool odin_found  = false;
+
+		for (int i = 0; i < len; i += 1) {
+			if (argv[0][i] == '/') {
+				slash_found = true;
+				break;
+			}
+		}
+
+		if (slash_found) {
+			// copy argv[0] to path_buf
+			if(len < path_buf.count) {
+				gb_memmove(&path_buf[0], argv[0], len);
+				odin_found = true;
+			}
+		} else {
+			gbAllocator a = heap_allocator();
+			char const *path_env = gb_get_env("PATH", a);
+			defer (gb_free(a, cast(void *)path_env));
+
+			if (path_env) {
+				int path_len = gb_strlen(path_env);
+				int path_start = 0;
+				int path_end   = 0;
+
+				for (; path_start < path_len; ) {
+					for (; path_end <= path_len; path_end++) {
+						if (path_env[path_end] == ':' || path_end == path_len) {
+							break;
+						}
+					}
+					String path_needle    = (const String)make_string((const u8 *)(path_env + path_start), path_end - path_start);
+					String argv0          = (const String)make_string((const u8 *)argv[0], len);
+					String odin_candidate = concatenate3_strings(a, path_needle, STR_LIT("/"), argv0);
+					defer (gb_free(a, odin_candidate.text));
+
+					if (gb_file_exists((const char *)odin_candidate.text)) {
+						len = odin_candidate.len;
+						if(len < path_buf.count) {
+							gb_memmove(&path_buf[0], odin_candidate.text, len);
+						}
+						odin_found = true;
+						break;
+					}
+
+					path_start = path_end + 1;
+					path_end   = path_start;
+					if (path_start > path_len) {
+						break;
+					}
+				}
+			}
+
+			if (!odin_found) {
+				gb_printf_err("Odin could not locate itself in PATH, and ODIN_ROOT wasn't set either.\n");
+			}
 		}
 		gb_mfree(argv);
 #endif
@@ -1084,14 +1125,16 @@ void init_build_context(TargetMetrics *cross_target) {
 	GB_ASSERT(metrics->arch != TargetArch_Invalid);
 	GB_ASSERT(metrics->word_size > 1);
 	GB_ASSERT(metrics->max_align > 1);
+	GB_ASSERT(metrics->max_simd_align > 1);
 
 
 	bc->metrics = *metrics;
-	bc->ODIN_OS     = target_os_names[metrics->os];
-	bc->ODIN_ARCH   = target_arch_names[metrics->arch];
-	bc->endian_kind = target_endians[metrics->arch];
-	bc->word_size   = metrics->word_size;
-	bc->max_align   = metrics->max_align;
+	bc->ODIN_OS        = target_os_names[metrics->os];
+	bc->ODIN_ARCH      = target_arch_names[metrics->arch];
+	bc->endian_kind    = target_endians[metrics->arch];
+	bc->word_size      = metrics->word_size;
+	bc->max_align      = metrics->max_align;
+	bc->max_simd_align = metrics->max_simd_align;
 	bc->link_flags  = str_lit(" ");
 
 	#if defined(DEFAULT_TO_THREADED_CHECKER)
@@ -1493,6 +1536,12 @@ bool init_build_paths(String init_filename) {
 
 	if (bc->target_features_string.len != 0) {
 		enable_target_feature({}, bc->target_features_string);
+	}
+
+	{
+		String build_project_name  = last_path_element(bc->build_paths[BuildPath_Main_Package].basename);
+		GB_ASSERT(build_project_name.len > 0);
+		bc->ODIN_BUILD_PROJECT_NAME = build_project_name;
 	}
 
 	return true;

@@ -295,6 +295,24 @@ peek_data_from_memory :: #force_inline proc(z: ^Context_Memory_Input, $T: typeid
 }
 
 @(optimization_mode="speed")
+peek_data_at_offset_from_memory :: #force_inline proc(z: ^Context_Memory_Input, $T: typeid, #any_int offset: int) -> (res: T, err: io.Error) {
+	size :: size_of(T)
+
+	#no_bounds_check {
+		if len(z.input_data) >= size + offset {
+			buf := z.input_data[offset:][:size]
+			return (^T)(&buf[0])^, .None
+		}
+	}
+
+	if len(z.input_data) == 0 {
+		return T{}, .EOF
+	} else {
+		return T{}, .Short_Buffer
+	}
+}
+
+@(optimization_mode="speed")
 peek_data_from_stream :: #force_inline proc(z: ^Context_Stream_Input, $T: typeid) -> (res: T, err: io.Error) {
 	size :: size_of(T)
 
@@ -321,7 +339,44 @@ peek_data_from_stream :: #force_inline proc(z: ^Context_Stream_Input, $T: typeid
 	return res, .None
 }
 
-peek_data :: proc{peek_data_from_memory, peek_data_from_stream}
+@(optimization_mode="speed")
+peek_data_at_offset_from_stream :: #force_inline proc(z: ^Context_Stream_Input, $T: typeid, #any_int offset: int) -> (res: T, err: io.Error) {
+	size :: size_of(T)
+
+	// Get current position to return to.
+	cur_pos, e1 := z.input->impl_seek(0, .Current)
+	if e1 != .None {
+		return T{}, e1
+	}
+
+	// Seek to offset.
+	pos, e2 := z.input->impl_seek(offset, .Start)
+	if e2 != .None {
+		return T{}, e2
+	}
+
+	r, e3 := io.to_reader_at(z.input)
+	if !e3 {
+		return T{}, .Empty
+	}
+	when size <= 128 {
+		b: [size]u8
+	} else {
+		b := make([]u8, size, context.temp_allocator)
+	}
+	_, e4 := io.read_at(r, b[:], pos)
+	if e4 != .None {
+		return T{}, .Empty
+	}
+
+	// Return read head to original position.
+	z.input->impl_seek(cur_pos, .Start)
+
+	res = (^T)(&b[0])^
+	return res, .None
+}
+
+peek_data :: proc{peek_data_from_memory, peek_data_from_stream, peek_data_at_offset_from_memory, peek_data_at_offset_from_stream}
 
 
 

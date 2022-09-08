@@ -13,10 +13,10 @@ Callgrind_Client_Request :: enum uintptr {
 }
 
 @(require_results)
-callgrind_client_request_expr :: proc "c" (default: uintptr, request: Callgrind_Client_Request, a0, a1, a2, a3, a4: uintptr) -> uintptr {
+callgrind_client_request_expr :: #force_inline proc "c" (default: uintptr, request: Callgrind_Client_Request, a0, a1, a2, a3, a4: uintptr) -> uintptr {
 	return intrinsics.valgrind_client_request(default, uintptr(request), a0, a1, a2, a3, a4)
 }
-callgrind_client_request_stmt :: proc "c" (request: Callgrind_Client_Request, a0, a1, a2, a3, a4: uintptr) {
+callgrind_client_request_stmt :: #force_inline proc "c" (request: Callgrind_Client_Request, a0, a1, a2, a3, a4: uintptr) {
 	_ = intrinsics.valgrind_client_request(0, uintptr(request), a0, a1, a2, a3, a4)
 }
 

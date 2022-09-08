@@ -2,11 +2,13 @@ package strconv
 
 import "core:unicode/utf8"
 
-parse_bool :: proc(s: string) -> (result: bool = false, ok: bool) {
+parse_bool :: proc(s: string, n: ^int = nil) -> (result: bool = false, ok: bool) {
 	switch s {
 	case "1", "t", "T", "true", "TRUE", "True":
+		if n != nil { n^ = len(s) }
 		return true, true
 	case "0", "f", "F", "false", "FALSE", "False":
+		if n != nil { n^ = len(s) }
 		return false, true
 	}
 	return
@@ -32,10 +34,13 @@ _digit_value :: proc(r: rune) -> int {
 // n, ok := strconv.parse_i64_of_base("-1234eeee", 10);
 // assert(n == -1234 && ok);
 // ```
-parse_i64_of_base :: proc(str: string, base: int) -> (value: i64, ok: bool) {
+parse_i64_of_base :: proc(str: string, base: int, n: ^int = nil) -> (value: i64, ok: bool) {
 	assert(base <= 16, "base must be 1-16")
 
 	s := str
+
+	defer if n != nil { n^ = len(str)-len(s) }
+
 	if s == "" {
 		return
 	}
@@ -87,8 +92,9 @@ parse_i64_of_base :: proc(str: string, base: int) -> (value: i64, ok: bool) {
 // n, ok = strconv.parse_i64_maybe_prefixed("0xeeee");
 // assert(n == 0xeeee && ok);
 // ```
-parse_i64_maybe_prefixed :: proc(str: string) -> (value: i64, ok: bool) {
+parse_i64_maybe_prefixed :: proc(str: string, n: ^int = nil) -> (value: i64, ok: bool) {
 	s := str
+	defer if n != nil { n^ = len(str)-len(s) }
 	if s == "" {
 		return
 	}
@@ -155,9 +161,10 @@ parse_i64 :: proc{parse_i64_maybe_prefixed, parse_i64_of_base}
 // n, ok = strconv.parse_u64_of_base("5678eeee", 16);
 // assert(n == 0x5678eeee && ok);
 // ```
-parse_u64_of_base :: proc(str: string, base: int) -> (value: u64, ok: bool) {
+parse_u64_of_base :: proc(str: string, base: int, n: ^int = nil) -> (value: u64, ok: bool) {
 	assert(base <= 16, "base must be 1-16")
 	s := str
+	defer if n != nil { n^ = len(str)-len(s) }
 	if s == "" {
 		return
 	}
@@ -198,8 +205,9 @@ parse_u64_of_base :: proc(str: string, base: int) -> (value: u64, ok: bool) {
 // n, ok = strconv.parse_u64_maybe_prefixed("0xeeee");
 // assert(n == 0xeeee && ok);
 // ```
-parse_u64_maybe_prefixed :: proc(str: string) -> (value: u64, ok: bool) {
+parse_u64_maybe_prefixed :: proc(str: string, n: ^int = nil) -> (value: u64, ok: bool) {
 	s := str
+	defer if n != nil { n^ = len(str)-len(s) }
 	if s == "" {
 		return
 	}
@@ -259,11 +267,11 @@ parse_u64 :: proc{parse_u64_maybe_prefixed, parse_u64_of_base}
 // n, ok = strconv.parse_int("0xffff"); // with prefix and inferred base
 // assert(n == 0xffff && ok);
 // ```
-parse_int :: proc(s: string, base := 0) -> (value: int, ok: bool) {
+parse_int :: proc(s: string, base := 0, n: ^int = nil) -> (value: int, ok: bool) {
 	v: i64 = ---
 	switch base {
-	case 0:  v, ok = parse_i64_maybe_prefixed(s)
-	case:    v, ok = parse_i64_of_base(s, base)
+	case 0:  v, ok = parse_i64_maybe_prefixed(s, n)
+	case:    v, ok = parse_i64_of_base(s, base, n)
 	}
 	value = int(v)
 	return
@@ -289,11 +297,11 @@ parse_int :: proc(s: string, base := 0) -> (value: int, ok: bool) {
 // n, ok = strconv.parse_uint("0xffff"); // with prefix and inferred base
 // assert(n == 0xffff && ok);
 // ```
-parse_uint :: proc(s: string, base := 0) -> (value: uint, ok: bool) {
+parse_uint :: proc(s: string, base := 0, n: ^int = nil) -> (value: uint, ok: bool) {
 	v: u64 = ---
 	switch base {
-	case 0:  v, ok = parse_u64_maybe_prefixed(s)
-	case:    v, ok = parse_u64_of_base(s, base)
+	case 0:  v, ok = parse_u64_maybe_prefixed(s, n)
+	case:    v, ok = parse_u64_of_base(s, base, n)
 	}
 	value = uint(v)
 	return
@@ -309,10 +317,11 @@ parse_uint :: proc(s: string, base := 0) -> (value: uint, ok: bool) {
 // n, ok := strconv.parse_i128_of_base("-1234eeee", 10);
 // assert(n == -1234 && ok);
 // ```
-parse_i128_of_base :: proc(str: string, base: int) -> (value: i128, ok: bool) {
+parse_i128_of_base :: proc(str: string, base: int, n: ^int = nil) -> (value: i128, ok: bool) {
 	assert(base <= 16, "base must be 1-16")
 
 	s := str
+	defer if n != nil { n^ = len(str)-len(s) }
 	if s == "" {
 		return
 	}
@@ -364,8 +373,9 @@ parse_i128_of_base :: proc(str: string, base: int) -> (value: i128, ok: bool) {
 // n, ok = strconv.parse_i128_maybe_prefixed("0xeeee");
 // assert(n == 0xeeee && ok);
 // ```
-parse_i128_maybe_prefixed :: proc(str: string) -> (value: i128, ok: bool) {
+parse_i128_maybe_prefixed :: proc(str: string, n: ^int = nil) -> (value: i128, ok: bool) {
 	s := str
+	defer if n != nil { n^ = len(str)-len(s) }
 	if s == "" {
 		return
 	}
@@ -432,9 +442,10 @@ parse_i128 :: proc{parse_i128_maybe_prefixed, parse_i128_of_base}
 // n, ok = strconv.parse_u128_of_base("5678eeee", 16);
 // assert(n == 0x5678eeee && ok);
 // ```
-parse_u128_of_base :: proc(str: string, base: int) -> (value: u128, ok: bool) {
+parse_u128_of_base :: proc(str: string, base: int, n: ^int = nil) -> (value: u128, ok: bool) {
 	assert(base <= 16, "base must be 1-16")
 	s := str
+	defer if n != nil { n^ = len(str)-len(s) }
 	if s == "" {
 		return
 	}
@@ -475,8 +486,9 @@ parse_u128_of_base :: proc(str: string, base: int) -> (value: u128, ok: bool) {
 // n, ok = strconv.parse_u128_maybe_prefixed("0xeeee");
 // assert(n == 0xeeee && ok);
 // ```
-parse_u128_maybe_prefixed :: proc(str: string) -> (value: u128, ok: bool) {
+parse_u128_maybe_prefixed :: proc(str: string, n: ^int = nil) -> (value: u128, ok: bool) {
 	s := str
+	defer if n != nil { n^ = len(str)-len(s) }
 	if s == "" {
 		return
 	}
@@ -535,9 +547,9 @@ parse_u128 :: proc{parse_u128_maybe_prefixed, parse_u128_of_base}
 // n, ok = strconv.parse_f32("12.34");
 // assert(n == 12.34 && ok);
 // ```
-parse_f32 :: proc(s: string) -> (value: f32, ok: bool) {
+parse_f32 :: proc(s: string, n: ^int = nil) -> (value: f32, ok: bool) {
 	v: f64 = ---
-	v, ok = parse_f64(s)
+	v, ok = parse_f64(s, n)
 	return f32(v), ok
 }
 
@@ -553,8 +565,9 @@ parse_f32 :: proc(s: string) -> (value: f32, ok: bool) {
 // n, ok = strconv.parse_f32("12.34");
 // assert(n == 12.34 && ok);
 // ```
-parse_f64 :: proc(str: string) -> (value: f64, ok: bool) {
+parse_f64 :: proc(str: string, n: ^int = nil) -> (value: f64, ok: bool) {
 	s := str
+	defer if n != nil { n^ = len(str)-len(s) }
 	if s == "" {
 		return
 	}

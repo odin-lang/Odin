@@ -3039,8 +3039,8 @@ void check_binary_matrix(CheckerContext *c, Token const &op, Operand *x, Operand
 		x->type = xt;
 		goto matrix_success;
 	} else {
-		GB_ASSERT(is_type_matrix(yt));
 		GB_ASSERT(!is_type_matrix(xt));
+		GB_ASSERT(is_type_matrix(yt));
 		
 		if (op.kind == Token_Mul) {
 			// NOTE(bill): no need to handle the matrix case here since it should be handled above
@@ -3061,6 +3061,9 @@ void check_binary_matrix(CheckerContext *c, Token const &op, Operand *x, Operand
 					x->type = alloc_type_matrix(yt->Matrix.elem, 1, yt->Matrix.column_count);
 				}
 				goto matrix_success;
+			} else if (are_types_identical(yt->Matrix.elem, xt)) {
+				x->type = check_matrix_type_hint(y->type, type_hint);
+				return;
 			}
 		}
 		if (!are_types_identical(xt, yt)) {
@@ -7359,6 +7362,14 @@ ExprKind check_ternary_if_expr(CheckerContext *c, Operand *o, Ast *node, Type *t
 		return kind;
 	}
 
+	if (x.mode == Addressing_Type || y.mode == Addressing_Type) {
+		Ast *type_expr = (x.mode == Addressing_Type) ? x.expr : y.expr;
+		gbString type_string = expr_to_string(type_expr);
+		error(node, "Type %s is invalid operand for ternary if expression", type_string);
+		gb_string_free(type_string);
+		return kind;
+	}
+
 	if (x.type == nullptr || x.type == t_invalid ||
 	    y.type == nullptr || y.type == t_invalid) {
 		return kind;
@@ -7395,6 +7406,7 @@ ExprKind check_ternary_if_expr(CheckerContext *c, Operand *o, Ast *node, Type *t
 		    check_cast_internal(c, &y, type_hint)) {
 			convert_to_typed(c, o, type_hint);
 			update_untyped_expr_type(c, node, type_hint, !is_type_untyped(type_hint));
+			o->type = type_hint;
 		}
 	}
 	return kind;
@@ -8769,7 +8781,10 @@ ExprKind check_selector_call_expr(CheckerContext *c, Operand *o, Ast *node, Type
 	Ast *first_arg = x.expr->SelectorExpr.expr;
 	GB_ASSERT(first_arg != nullptr);
 
-	first_arg->state_flags |= StateFlag_SelectorCallExpr;
+	Entity *e = entity_of_node(se->expr);
+	if (!(e != nullptr && (e->kind == Entity_Procedure || e->kind == Entity_ProcGroup))) {
+		first_arg->state_flags |= StateFlag_SelectorCallExpr;
+	}
 
 	Type *pt = base_type(x.type);
 	GB_ASSERT(pt->kind == Type_Proc);
@@ -9571,6 +9586,7 @@ ExprKind check_expr_base_internal(CheckerContext *c, Operand *o, Ast *node, Type
 	case Ast_MapType:
 	case Ast_BitSetType:
 	case Ast_MatrixType:
+	case Ast_RelativeType:
 		o->mode = Addressing_Type;
 		o->type = check_type(c, node);
 		break;

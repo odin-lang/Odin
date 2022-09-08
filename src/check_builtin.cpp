@@ -341,6 +341,13 @@ bool check_builtin_objc_procedure(CheckerContext *c, Operand *operand, Ast *call
 		for (isize i = 2+arg_offset; i < ce->args.count; i++) {
 			Operand x = {};
 			check_expr(c, &x, ce->args[i]);
+			if (is_type_untyped(x.type)) {
+				gbString e = expr_to_string(x.expr);
+				gbString t = type_to_string(x.type);
+				error(x.expr, "'%.*s' expects typed parameters, got %s of type %s", LIT(builtin_name), e, t);
+				gb_string_free(t);
+				gb_string_free(e);
+			}
 			param_types[i-arg_offset] = x.type;
 		}
 
@@ -4523,7 +4530,8 @@ bool check_builtin_procedure(CheckerContext *c, Operand *operand, Ast *call, i32
 				if (x.mode != Addressing_Invalid) {
 					convert_to_typed(c, &x, t_uintptr);	
 				}
-				if (!is_type_uintptr(operand->type)) {
+				convert_to_typed(c, &x, t_uintptr);
+				if (!is_type_uintptr(x.type)) {
 					gbString t = type_to_string(x.type);
 					error(x.expr, "Argument %td must be of type 'uintptr', got %s", i, t);
 					gb_string_free(t);
@@ -4605,6 +4613,46 @@ bool check_builtin_procedure(CheckerContext *c, Operand *operand, Ast *call, i32
 		operand->mode = Addressing_Type;
 		break;
 
+	case BuiltinProc_type_convert_variants_to_pointers:
+		if (operand->mode != Addressing_Type) {
+			error(operand->expr, "Expected a type for '%.*s'", LIT(builtin_name));
+		} else {
+			Type *bt = base_type(operand->type);
+			if (is_type_polymorphic(bt)) {
+				// IGNORE polymorphic types
+				return true;
+			} else if (bt->kind != Type_Union) {
+				gbString t = type_to_string(operand->type);
+				error(operand->expr, "Expected a union type for '%.*s', got %s", LIT(builtin_name), t);
+				gb_string_free(t);
+
+				operand->mode = Addressing_Invalid;
+				operand->type = t_invalid;
+				return false;
+			} else if (bt->Union.is_polymorphic) {
+				gbString t = type_to_string(operand->type);
+				error(operand->expr, "Expected a non-polymorphic union type for '%.*s', got %s", LIT(builtin_name), t);
+				gb_string_free(t);
+
+				operand->mode = Addressing_Invalid;
+				operand->type = t_invalid;
+				return false;
+			}
+
+			Type *new_type = alloc_type_union();
+			auto variants = slice_make<Type *>(permanent_allocator(), bt->Union.variants.count);
+			for_array(i, bt->Union.variants) {
+				variants[i] = alloc_type_pointer(bt->Union.variants[i]);
+			}
+			new_type->Union.variants = variants;
+
+			// NOTE(bill): Is this even correct?
+			new_type->Union.scope = bt->Union.scope;
+
+			operand->type = new_type;
+		}
+		operand->mode = Addressing_Type;
+		break;
 
 	case BuiltinProc_type_is_boolean:
 	case BuiltinProc_type_is_integer:
@@ -5390,10 +5438,7 @@ bool check_builtin_procedure(CheckerContext *c, Operand *operand, Ast *call, i32
 
 	case BuiltinProc_valgrind_client_request:
 		{
-			if (!is_arch_x86()) {
-				error(call, "'%.*s' is only allowed on x86 targets (i386, amd64)", LIT(builtin_name));
-				return false;
-			}
+			// NOTE(bill): Check it but make it a no-op for non x86 (i386, amd64) targets
 
 			enum {ARG_COUNT = 7};
 			GB_ASSERT(builtin_procs[BuiltinProc_valgrind_client_request].arg_count == ARG_COUNT);

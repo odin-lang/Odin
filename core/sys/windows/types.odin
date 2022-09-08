@@ -17,6 +17,7 @@ size_t      :: c.size_t
 wchar_t     :: c.wchar_t
 
 DWORD :: c_ulong
+DWORDLONG :: c.ulonglong
 QWORD :: c.ulonglong
 HANDLE :: distinct LPVOID
 HINSTANCE :: HANDLE
@@ -978,6 +979,35 @@ WS_TILEDWINDOW      : UINT : WS_OVERLAPPED | WS_CAPTION | WS_SYSMENU | WS_THICKF
 WS_VISIBLE          : UINT : 0x1000_0000
 WS_VSCROLL          : UINT : 0x0020_0000
 
+WS_EX_ACCEPTFILES           : UINT : 0x0000_0010
+WS_EX_APPWINDOW             : UINT : 0x0004_0000
+WS_EX_CLIENTEDGE            : UINT : 0x0000_0200
+WS_EX_COMPOSITED            : UINT : 0x0200_0000
+WS_EX_CONTEXTHELP           : UINT : 0x0000_0400
+WS_EX_CONTROLPARENT         : UINT : 0x0001_0000
+WS_EX_DLGMODALFRAME         : UINT : 0x0000_0001
+WS_EX_DRAGDETECT            : UINT : 0x0000_0002 // undocumented
+WS_EX_LAYERED               : UINT : 0x0008_0000
+WS_EX_LAYOUTRTL             : UINT : 0x0040_0000
+WS_EX_LEFT                  : UINT : 0x0000_0000
+WS_EX_LEFTSCROLLBAR         : UINT : 0x0000_4000
+WS_EX_LTRREADING            : UINT : 0x0000_0000
+WS_EX_MDICHILD              : UINT : 0x0000_0040
+WS_EX_NOACTIVATE            : UINT : 0x0800_0000
+WS_EX_NOINHERITLAYOUT       : UINT : 0x0010_0000
+WS_EX_NOPARENTNOTIFY        : UINT : 0x0000_0004
+WS_EX_NOREDIRECTIONBITMAP   : UINT : 0x0020_0000
+WS_EX_OVERLAPPEDWINDOW      : UINT : WS_EX_WINDOWEDGE | WS_EX_CLIENTEDGE
+WS_EX_PALETTEWINDOW         : UINT : WS_EX_WINDOWEDGE | WS_EX_TOOLWINDOW | WS_EX_TOPMOST
+WS_EX_RIGHT                 : UINT : 0x0000_1000
+WS_EX_RIGHTSCROLLBAR        : UINT : 0x0000_0000
+WS_EX_RTLREADING            : UINT : 0x0000_2000
+WS_EX_STATICEDGE            : UINT : 0x0002_0000
+WS_EX_TOOLWINDOW            : UINT : 0x0000_0080
+WS_EX_TOPMOST               : UINT : 0x0000_0008
+WS_EX_TRANSPARENT           : UINT : 0x0000_0020
+WS_EX_WINDOWEDGE            : UINT : 0x0000_0100
+
 PBS_SMOOTH   :: 0x01
 PBS_VERTICAL :: 0x04
 
@@ -1628,6 +1658,8 @@ CONDITION_VARIABLE_INIT :: CONDITION_VARIABLE{}
 SRWLOCK_INIT :: SRWLOCK{}
 
 DETACHED_PROCESS: DWORD : 0x00000008
+CREATE_NEW_CONSOLE: DWORD : 0x00000010
+CREATE_NO_WINDOW: DWORD : 0x08000000
 CREATE_NEW_PROCESS_GROUP: DWORD : 0x00000200
 CREATE_UNICODE_ENVIRONMENT: DWORD : 0x00000400
 STARTF_USESTDHANDLES: DWORD : 0x00000100
@@ -1689,6 +1721,7 @@ PIPE_WAIT: DWORD : 0x00000000
 PIPE_TYPE_BYTE: DWORD : 0x00000000
 PIPE_REJECT_REMOTE_CLIENTS: DWORD : 0x00000008
 PIPE_READMODE_BYTE: DWORD : 0x00000000
+PIPE_ACCEPT_REMOTE_CLIENTS: DWORD : 0x00000000
 
 FD_SETSIZE :: 64
 
@@ -3264,4 +3297,142 @@ IFileSaveDialogVtbl :: struct {
 	SetCollectedProperties: proc "stdcall" (this: ^IFileSaveDialog, pList: ^IPropertyDescriptionList, fAppendDefault: BOOL) -> HRESULT,
 	GetProperties:          proc "stdcall" (this: ^IFileSaveDialog, ppStore: ^^IPropertyStore) -> HRESULT,
 	ApplyProperties:        proc "stdcall" (this: ^IFileSaveDialog, psi: ^IShellItem, pStore: ^IPropertyStore, hwnd: HWND, pSink: ^IFileOperationProgressSink) -> HRESULT,
+}
+
+MEMORYSTATUSEX :: struct {
+	dwLength:                DWORD,
+	dwMemoryLoad:            DWORD,
+	ullTotalPhys:            DWORDLONG,
+	ullAvailPhys:            DWORDLONG,
+	ullTotalPageFil:         DWORDLONG,
+	ullAvailPageFil:         DWORDLONG,
+	ullTotalVirtual:         DWORDLONG,
+	ullAvailVirtual:         DWORDLONG,
+	ullAvailExtendedVirtual: DWORDLONG,
+}
+
+Windows_Product_Type :: enum DWORD {
+	BUSINESS                            = 0x00000006, // Business
+	BUSINESS_N                          = 0x00000010, // Business N
+	CLUSTER_SERVER                      = 0x00000012, // HPC Edition
+	CLUSTER_SERVER_V                    = 0x00000040, // Server Hyper Core V
+	CORE                                = 0x00000065, // Windows 10 Home
+	CORE_COUNTRYSPECIFIC                = 0x00000063, // Windows 10 Home China
+	CORE_N                              = 0x00000062, // Windows 10 Home N
+	CORE_SINGLELANGUAGE                 = 0x00000064, // Windows 10 Home Single Language
+	DATACENTER_EVALUATION_SERVER        = 0x00000050, // Server Datacenter (evaluation installation)
+	DATACENTER_A_SERVER_CORE            = 0x00000091, // Server Datacenter, Semi-Annual Channel (core installation)
+	STANDARD_A_SERVER_CORE              = 0x00000092, // Server Standard, Semi-Annual Channel (core installation)
+	DATACENTER_SERVER                   = 0x00000008, // Server Datacenter (full installation. For Server Core installations of Windows Server 2012 and later, use the method, Determining whether Server Core is running.)
+	DATACENTER_SERVER_CORE              = 0x0000000C, // Server Datacenter (core installation, Windows Server 2008 R2 and earlier)
+	DATACENTER_SERVER_CORE_V            = 0x00000027, // Server Datacenter without Hyper-V (core installation)
+	DATACENTER_SERVER_V                 = 0x00000025, // Server Datacenter without Hyper-V (full installation)
+	EDUCATION                           = 0x00000079, // Windows 10 Education
+	EDUCATION_N                         = 0x0000007A, // Windows 10 Education N
+	ENTERPRISE                          = 0x00000004, // Windows 10 Enterprise
+	ENTERPRISE_E                        = 0x00000046, // Windows 10 Enterprise E
+	ENTERPRISE_EVALUATION               = 0x00000048, // Windows 10 Enterprise Evaluation
+	ENTERPRISE_N                        = 0x0000001B, // Windows 10 Enterprise N
+	ENTERPRISE_N_EVALUATION             = 0x00000054, // Windows 10 Enterprise N Evaluation
+	ENTERPRISE_S                        = 0x0000007D, // Windows 10 Enterprise 2015 LTSB
+	ENTERPRISE_S_EVALUATION             = 0x00000081, // Windows 10 Enterprise 2015 LTSB Evaluation
+	ENTERPRISE_S_N                      = 0x0000007E, // Windows 10 Enterprise 2015 LTSB N
+	ENTERPRISE_S_N_EVALUATION           = 0x00000082, // Windows 10 Enterprise 2015 LTSB N Evaluation
+	ENTERPRISE_SERVER                   = 0x0000000A, // Server Enterprise (full installation)
+	ENTERPRISE_SERVER_CORE              = 0x0000000E, // Server Enterprise (core installation)
+	ENTERPRISE_SERVER_CORE_V            = 0x00000029, // Server Enterprise without Hyper-V (core installation)
+	ENTERPRISE_SERVER_IA64              = 0x0000000F, // Server Enterprise for Itanium-based Systems
+	ENTERPRISE_SERVER_V                 = 0x00000026, // Server Enterprise without Hyper-V (full installation)
+	ESSENTIALBUSINESS_SERVER_ADDL       = 0x0000003C, // Windows Essential Server Solution Additional
+	ESSENTIALBUSINESS_SERVER_ADDLSVC    = 0x0000003E, // Windows Essential Server Solution Additional SVC
+	ESSENTIALBUSINESS_SERVER_MGMT       = 0x0000003B, // Windows Essential Server Solution Management
+	ESSENTIALBUSINESS_SERVER_MGMTSVC    = 0x0000003D, // Windows Essential Server Solution Management SVC
+	HOME_BASIC                          = 0x00000002, // Home Basic
+	HOME_BASIC_E                        = 0x00000043, // Not supported
+	HOME_BASIC_N                        = 0x00000005, // Home Basic N
+	HOME_PREMIUM                        = 0x00000003, // Home Premium
+	HOME_PREMIUM_E                      = 0x00000044, // Not supported
+	HOME_PREMIUM_N                      = 0x0000001A, // Home Premium N
+	HOME_PREMIUM_SERVER                 = 0x00000022, // Windows Home Server 2011
+	HOME_SERVER                         = 0x00000013, // Windows Storage Server 2008 R2 Essentials
+	HYPERV                              = 0x0000002A, // Microsoft Hyper-V Server
+	IOTENTERPRISE                       = 0x000000BC, // Windows IoT Enterprise
+	IOTENTERPRISE_S                     = 0x000000BF, // Windows IoT Enterprise LTSC
+	IOTUAP                              = 0x0000007B, // Windows 10 IoT Core
+	IOTUAPCOMMERCIAL                    = 0x00000083, // Windows 10 IoT Core Commercial
+	MEDIUMBUSINESS_SERVER_MANAGEMENT    = 0x0000001E, // Windows Essential Business Server Management Server
+	MEDIUMBUSINESS_SERVER_MESSAGING     = 0x00000020, // Windows Essential Business Server Messaging Server
+	MEDIUMBUSINESS_SERVER_SECURITY      = 0x0000001F, // Windows Essential Business Server Security Server
+	MOBILE_CORE                         = 0x00000068, // Windows 10 Mobile
+	MOBILE_ENTERPRISE                   = 0x00000085, // Windows 10 Mobile Enterprise
+	MULTIPOINT_PREMIUM_SERVER           = 0x0000004D, // Windows MultiPoint Server Premium (full installation)
+	MULTIPOINT_STANDARD_SERVER          = 0x0000004C, // Windows MultiPoint Server Standard (full installation)
+	PRO_WORKSTATION                     = 0x000000A1, // Windows 10 Pro for Workstations
+	PRO_WORKSTATION_N                   = 0x000000A2, // Windows 10 Pro for Workstations N
+	PROFESSIONAL                        = 0x00000030, // Windows 10 Pro
+	PROFESSIONAL_E                      = 0x00000045, // Not supported
+	PROFESSIONAL_N                      = 0x00000031, // Windows 10 Pro N
+	PROFESSIONAL_WMC                    = 0x00000067, // Professional with Media Center
+	SB_SOLUTION_SERVER                  = 0x00000032, // Windows Small Business Server 2011 Essentials
+	SB_SOLUTION_SERVER_EM               = 0x00000036, // Server For SB Solutions EM
+	SERVER_FOR_SB_SOLUTIONS             = 0x00000033, // Server For SB Solutions
+	SERVER_FOR_SB_SOLUTIONS_EM          = 0x00000037, // Server For SB Solutions EM
+	SERVER_FOR_SMALLBUSINESS            = 0x00000018, // Windows Server 2008 for Windows Essential Server Solutions
+	SERVER_FOR_SMALLBUSINESS_V          = 0x00000023, // Windows Server 2008 without Hyper-V for Windows Essential Server Solutions
+	SERVER_FOUNDATION                   = 0x00000021, // Server Foundation
+	SMALLBUSINESS_SERVER                = 0x00000009, // Windows Small Business Server
+	SMALLBUSINESS_SERVER_PREMIUM        = 0x00000019, // Small Business Server Premium
+	SMALLBUSINESS_SERVER_PREMIUM_CORE   = 0x0000003F, // Small Business Server Premium (core installation)
+	SOLUTION_EMBEDDEDSERVER             = 0x00000038, // Windows MultiPoint Server
+	STANDARD_EVALUATION_SERVER          = 0x0000004F, // Server Standard (evaluation installation)
+	STANDARD_SERVER                     = 0x00000007, // Server Standard (full installation. For Server Core installations of Windows Server 2012 and later, use the method, Determining whether Server Core is running.)
+	STANDARD_SERVER_CORE                = 0x0000000D, // Server Standard (core installation, Windows Server 2008 R2 and earlier)
+	STANDARD_SERVER_CORE_V              = 0x00000028, // Server Standard without Hyper-V (core installation)
+	STANDARD_SERVER_V                   = 0x00000024, // Server Standard without Hyper-V
+	STANDARD_SERVER_SOLUTIONS           = 0x00000034, // Server Solutions Premium
+	STANDARD_SERVER_SOLUTIONS_CORE      = 0x00000035, // Server Solutions Premium (core installation)
+	STARTER                             = 0x0000000B, // Starter
+	STARTER_E                           = 0x00000042, // Not supported
+	STARTER_N                           = 0x0000002F, // Starter N
+	STORAGE_ENTERPRISE_SERVER           = 0x00000017, // Storage Server Enterprise
+	STORAGE_ENTERPRISE_SERVER_CORE      = 0x0000002E, // Storage Server Enterprise (core installation)
+	STORAGE_EXPRESS_SERVER              = 0x00000014, // Storage Server Express
+	STORAGE_EXPRESS_SERVER_CORE         = 0x0000002B, // Storage Server Express (core installation)
+	STORAGE_STANDARD_EVALUATION_SERVER  = 0x00000060, // Storage Server Standard (evaluation installation)
+	STORAGE_STANDARD_SERVER             = 0x00000015, // Storage Server Standard
+	STORAGE_STANDARD_SERVER_CORE        = 0x0000002C, // Storage Server Standard (core installation)
+	STORAGE_WORKGROUP_EVALUATION_SERVER = 0x0000005F, // Storage Server Workgroup (evaluation installation)
+	STORAGE_WORKGROUP_SERVER            = 0x00000016, // Storage Server Workgroup
+	STORAGE_WORKGROUP_SERVER_CORE       = 0x0000002D, // Storage Server Workgroup (core installation)
+	ULTIMATE                            = 0x00000001, // Ultimate
+	ULTIMATE_E                          = 0x00000047, // Not supported
+	ULTIMATE_N                          = 0x0000001C, // Ultimate N
+	UNDEFINED                           = 0x00000000, // An unknown product
+	WEB_SERVER                          = 0x00000011, // Web Server (full installation)
+	WEB_SERVER_CORE                     = 0x0000001D, // Web Server (core installation)
+}
+
+ENABLE_ECHO_INPUT : DWORD : 0x0004
+ENABLE_INSERT_MODE : DWORD : 0x0020
+ENABLE_LINE_INPUT : DWORD : 0x0002
+ENABLE_MOUSE_INPUT : DWORD : 0x0010
+ENABLE_PROCESSED_INPUT : DWORD : 0x0001
+ENABLE_QUICK_EDIT_MODE : DWORD : 0x0040
+ENABLE_WINDOW_INPUT : DWORD : 0x0008
+ENABLE_VIRTUAL_TERMINAL_INPUT : DWORD : 0x0200
+ENABLE_PROCESSED_OUTPUT : DWORD : 0x0001
+ENABLE_WRAP_AT_EOL_OUTPUT : DWORD : 0x0002
+ENABLE_VIRTUAL_TERMINAL_PROCESSING : DWORD : 0x0004
+DISABLE_NEWLINE_AUTO_RETURN : DWORD : 0x0008
+ENABLE_LVB_GRID_WORLDWIDE : DWORD : 0x0010
+
+CTRL_C_EVENT : DWORD : 0
+CTRL_BREAK_EVENT : DWORD : 1
+CTRL_CLOSE_EVENT : DWORD : 2
+CTRL_LOGOFF_EVENT : DWORD : 5
+CTRL_SHUTDOWN_EVENT : DWORD : 6
+
+COORD :: struct {
+	X: SHORT,
+	Y: SHORT,
 }
