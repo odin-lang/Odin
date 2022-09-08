@@ -1,4 +1,4 @@
-lbValue lb_emit_arith_matrix(lbProcedure *p, TokenKind op, lbValue lhs, lbValue rhs, Type *type, bool component_wise=false);
+lbValue lb_emit_arith_matrix(lbProcedure *p, TokenKind op, lbValue lhs, lbValue rhs, Type *type, bool component_wise);
 
 lbValue lb_emit_logical_binary_expr(lbProcedure *p, TokenKind op, Ast *left, Ast *right, Type *type) {
 	lbModule *m = p->module;
@@ -137,7 +137,7 @@ lbValue lb_emit_unary_arith(lbProcedure *p, TokenKind op, lbValue x, Type *type)
 		lbAddr res_addr = lb_add_local(p, type, nullptr, false, 0, true);
 		lbValue res = lb_addr_get_ptr(p, res_addr);
 
-		bool inline_array_arith = type_size_of(type) <= build_context.max_align;
+		bool inline_array_arith = lb_can_try_to_inline_array_arith(type);
 
 		i32 count = cast(i32)get_array_type_count(tl);
 
@@ -436,7 +436,7 @@ lbValue lb_emit_arith_array(lbProcedure *p, TokenKind op, lbValue lhs, lbValue r
 		return direct_vector_res;
 	}
 
-	bool inline_array_arith = type_size_of(type) <= build_context.max_align;
+	bool inline_array_arith = lb_can_try_to_inline_array_arith(type);
 	if (inline_array_arith) {
 
 		auto dst_ptrs = slice_make<lbValue>(temporary_allocator(), n);
@@ -987,7 +987,6 @@ lbValue lb_emit_vector_mul_matrix(lbProcedure *p, lbValue lhs, lbValue rhs, Type
 lbValue lb_emit_arith_matrix(lbProcedure *p, TokenKind op, lbValue lhs, lbValue rhs, Type *type, bool component_wise) {
 	GB_ASSERT(is_type_matrix(lhs.type) || is_type_matrix(rhs.type));
 
-
 	if (op == Token_Mul && !component_wise) {
 		Type *xt = base_type(lhs.type);
 		Type *yt = base_type(rhs.type);
@@ -1001,8 +1000,22 @@ lbValue lb_emit_arith_matrix(lbProcedure *p, TokenKind op, lbValue lhs, lbValue 
 		} else if (is_type_array_like(xt)) {
 			GB_ASSERT(yt->kind == Type_Matrix);
 			return lb_emit_vector_mul_matrix(p, lhs, rhs, type);
-		}
+		} else {
+			GB_ASSERT(xt->kind == Type_Basic);
+			GB_ASSERT(yt->kind == Type_Matrix);
+			GB_ASSERT(is_type_matrix(type));
 
+			Type *array_type = alloc_type_array(yt->Matrix.elem, matrix_type_total_internal_elems(yt));
+			GB_ASSERT(type_size_of(array_type) == type_size_of(yt));
+
+			lbValue array_lhs = lb_emit_conv(p, lhs, array_type);
+			lbValue array_rhs = rhs;
+			array_rhs.type = array_type;
+
+			lbValue array = lb_emit_arith(p, op, array_lhs, array_rhs, array_type);
+			array.type = type;
+			return array;
+		}
 	} else {
 		if (is_type_matrix(lhs.type)) {
 			rhs = lb_emit_conv(p, rhs, lhs.type);
@@ -1047,7 +1060,7 @@ lbValue lb_emit_arith(lbProcedure *p, TokenKind op, lbValue lhs, lbValue rhs, Ty
 	if (is_type_array_like(lhs.type) || is_type_array_like(rhs.type)) {
 		return lb_emit_arith_array(p, op, lhs, rhs, type);
 	} else if (is_type_matrix(lhs.type) || is_type_matrix(rhs.type)) {
-		return lb_emit_arith_matrix(p, op, lhs, rhs, type);
+		return lb_emit_arith_matrix(p, op, lhs, rhs, type, false);
 	} else if (is_type_complex(type)) {
 		lhs = lb_emit_conv(p, lhs, type);
 		rhs = lb_emit_conv(p, rhs, type);
@@ -1320,7 +1333,7 @@ lbValue lb_build_binary_expr(lbProcedure *p, Ast *expr) {
 	if (is_type_matrix(be->left->tav.type) || is_type_matrix(be->right->tav.type)) {
 		lbValue left = lb_build_expr(p, be->left);
 		lbValue right = lb_build_expr(p, be->right);
-		return lb_emit_arith_matrix(p, be->op.kind, left, right, default_type(tv.type));
+		return lb_emit_arith_matrix(p, be->op.kind, left, right, default_type(tv.type), false);
 	}
 
 
@@ -1777,9 +1790,6 @@ lbValue lb_emit_conv(lbProcedure *p, lbValue value, Type *t) {
 			lbValue res = {};
 			res = lb_emit_conv(p, value, platform_src_type);
 			res = lb_emit_conv(p, res, platform_dst_type);
-			if (is_type_different_to_arch_endianness(dst)) {
-				res = lb_emit_byte_swap(p, res, platform_dst_type);
-			}
 			return lb_emit_conv(p, res, t);
 		}
 
@@ -1927,7 +1937,7 @@ lbValue lb_emit_conv(lbProcedure *p, lbValue value, Type *t) {
 		}
 		if (dst->Union.variants.count == 1) {
 			Type *vt = dst->Union.variants[0];
-			if (internal_check_is_assignable_to(src, vt)) {
+			if (internal_check_is_assignable_to(src_type, vt)) {
 				value = lb_emit_conv(p, value, vt);
 				lbAddr parent = lb_add_local_generated(p, t, true);
 				lb_emit_store_union_variant(p, parent.addr, value, vt);
@@ -2306,7 +2316,7 @@ lbValue lb_emit_comp(lbProcedure *p, TokenKind op_kind, lbValue left, lbValue ri
 			cmp_op = Token_And;
 		}
 
-		bool inline_array_arith = type_size_of(tl) <= build_context.max_align;
+		bool inline_array_arith = lb_can_try_to_inline_array_arith(tl);
 		i32 count = 0;
 		switch (tl->kind) {
 		case Type_Array:           count = cast(i32)tl->Array.count;           break;

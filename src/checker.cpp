@@ -938,6 +938,7 @@ void init_universal(void) {
 	add_global_string_constant("ODIN_VENDOR",  bc->ODIN_VENDOR);
 	add_global_string_constant("ODIN_VERSION", bc->ODIN_VERSION);
 	add_global_string_constant("ODIN_ROOT",    bc->ODIN_ROOT);
+	add_global_string_constant("ODIN_BUILD_PROJECT_NAME", bc->ODIN_BUILD_PROJECT_NAME);
 
 	{
 		GlobalEnumValue values[TargetOs_COUNT] = {

@@ -1,6 +1,7 @@
 package math
 
 import "core:intrinsics"
+import "core:builtin"
 _ :: intrinsics
 
 Float_Class :: enum {
@@ -35,6 +36,11 @@ MAX_F16_PRECISION ::  4 // Maximum number of meaningful digits after the decimal
 
 RAD_PER_DEG :: TAU/360.0
 DEG_PER_RAD :: 360.0/TAU
+
+abs :: builtin.abs
+min :: builtin.min
+max :: builtin.max
+clamp :: builtin.clamp
 
 sqrt_f16le :: proc "contextless" (x: f16le) -> f16le { return #force_inline f16le(sqrt_f16(f16(x))) }
 sqrt_f16be :: proc "contextless" (x: f16be) -> f16be { return #force_inline f16be(sqrt_f16(f16(x))) }

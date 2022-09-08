@@ -103,18 +103,7 @@ Window_alloc :: proc() -> ^Window {
 
 @(objc_type=Window, objc_name="initWithContentRect")
 Window_initWithContentRect :: proc (self: ^Window, contentRect: Rect, styleMask: WindowStyleMask, backing: BackingStoreType, doDefer: bool) -> ^Window {
-	self := self
-	// HACK: due to a compiler bug, the generated calling code does not
-	// currently work for this message. Has to do with passing a struct along
-	// with other parameters, so we don't send the rect here.
-	// Omiting the rect argument here actually works, because of how the C
-	// calling conventions are defined.
-	self = msgSend(^Window, self, "initWithContentRect:styleMask:backing:defer:", styleMask, backing, doDefer)
-
-	// apply the contentRect now, since we did not pass it to the init call
-	msgSend(nil, self, "setContentSize:", contentRect.size)
-	msgSend(nil, self, "setFrameOrigin:", contentRect.origin)
-	return self
+	return msgSend(^Window, self, "initWithContentRect:styleMask:backing:defer:", contentRect, styleMask, backing, doDefer)
 }
 @(objc_type=Window, objc_name="contentView")
 Window_contentView :: proc(self: ^Window) -> ^View {

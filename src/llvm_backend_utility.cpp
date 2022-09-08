@@ -225,6 +225,20 @@ lbValue lb_emit_transmute(lbProcedure *p, lbValue value, Type *t) {
 	if (is_type_simd_vector(src) && is_type_simd_vector(dst)) {
 		res.value = LLVMBuildBitCast(p->builder, value.value, lb_type(p->module, t), "");
 		return res;
+	} else if (is_type_array_like(src) && is_type_simd_vector(dst)) {
+		unsigned align = cast(unsigned)gb_max(type_align_of(src), type_align_of(dst));
+		lbValue ptr = lb_address_from_load_or_generate_local(p, value);
+		if (lb_try_update_alignment(ptr, align)) {
+			LLVMTypeRef result_type = lb_type(p->module, t);
+			res.value = LLVMBuildPointerCast(p->builder, ptr.value, LLVMPointerType(result_type, 0), "");
+			res.value = LLVMBuildLoad2(p->builder, result_type, res.value, "");
+			return res;
+		}
+		lbAddr addr = lb_add_local_generated(p, t, false);
+		lbValue ap = lb_addr_get_ptr(p, addr);
+		ap = lb_emit_conv(p, ap, alloc_type_pointer(value.type));
+		lb_emit_store(p, ap, value);
+		return lb_addr_load(p, addr);
 	}
 
 	if (lb_is_type_aggregate(src) || lb_is_type_aggregate(dst)) {

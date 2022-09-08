@@ -1428,7 +1428,7 @@ i64 matrix_align_of(Type *t, struct TypePath *tp) {
 	}
 	GB_ASSERT(min_alignment >= elem_align);
 	
-	i64 align = gb_min(min_alignment, build_context.max_align);
+	i64 align = gb_min(min_alignment, build_context.max_simd_align);
 	return align;
 }
 
@@ -3556,7 +3556,7 @@ i64 type_align_of_internal(Type *t, TypePath *path) {
 
 	case Type_SimdVector: {
 		// IMPORTANT TODO(bill): Figure out the alignment of vector types
-		return gb_clamp(next_pow2(type_size_of_internal(t, path)), 1, build_context.max_align*2);
+		return gb_clamp(next_pow2(type_size_of_internal(t, path)), 1, build_context.max_simd_align*2);
 	}
 	
 	case Type_Matrix: 
@@ -3571,10 +3571,9 @@ i64 type_align_of_internal(Type *t, TypePath *path) {
 		return build_context.word_size;
 	}
 
-	// return gb_clamp(next_pow2(type_size_of(t)), 1, build_context.max_align);
 	// NOTE(bill): Things that are bigger than build_context.word_size, are actually comprised of smaller types
 	// TODO(bill): Is this correct for 128-bit types (integers)?
-	return gb_clamp(next_pow2(type_size_of_internal(t, path)), 1, build_context.word_size);
+	return gb_clamp(next_pow2(type_size_of_internal(t, path)), 1, build_context.max_align);
 }
 
 i64 *type_set_offsets_of(Slice<Entity *> const &fields, bool is_packed, bool is_raw_union) {

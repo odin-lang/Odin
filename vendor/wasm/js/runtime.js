@@ -1340,7 +1340,7 @@ function odinSetupDefaultImports(wasmMemoryInterface, consoleElement) {
 			sqrt:    (x) => Math.sqrt(x),
 			sin:     (x) => Math.sin(x),
 			cos:     (x) => Math.cos(x),
-			pow:     (x) => Math.pow(x),
+			pow:     (x, power) => Math.pow(x, power),
 			fmuladd: (x, y, z) => x*y + z,
 			ln:      (x) => Math.log(x),
 			exp:     (x) => Math.exp(x),

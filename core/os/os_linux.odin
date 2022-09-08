@@ -311,7 +311,7 @@ _unix_seek :: proc(fd: Handle, offset: i64, whence: int) -> i64 {
 		low := uintptr(offset & 0xFFFFFFFF)
 		high := uintptr(offset >> 32)
 		result: i64
-		res := i64(intrinsics.syscall(unix.SYS__llseek, uintptr(fd), high, low, &result, uintptr(whence)))
+		res := i64(intrinsics.syscall(unix.SYS__llseek, uintptr(fd), high, low, uintptr(&result), uintptr(whence)))
 		return -1 if res < 0 else result
 	}
 }

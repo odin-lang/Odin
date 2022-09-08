@@ -38,10 +38,10 @@ Client_Request :: enum uintptr {
 }
 
 @(require_results)
-client_request_expr :: proc "c" (default: uintptr, request: Client_Request, a0, a1, a2, a3, a4: uintptr) -> uintptr {
+client_request_expr :: #force_inline proc "c" (default: uintptr, request: Client_Request, a0, a1, a2, a3, a4: uintptr) -> uintptr {
 	return intrinsics.valgrind_client_request(default, uintptr(request), a0, a1, a2, a3, a4)
 }
-client_request_stmt :: proc "c" (request: Client_Request, a0, a1, a2, a3, a4: uintptr) {
+client_request_stmt :: #force_inline proc "c" (request: Client_Request, a0, a1, a2, a3, a4: uintptr) {
 	_ = intrinsics.valgrind_client_request(0, uintptr(request), a0, a1, a2, a3, a4)
 }
 
@@ -49,8 +49,8 @@ client_request_stmt :: proc "c" (request: Client_Request, a0, a1, a2, a3, a4: ui
 //     0 - running natively
 //     1 - running under Valgrind
 //     2 - running under Valgrind which is running under another Valgrind
-running_on_valgrind :: proc "c" () -> uintptr {
-	return client_request_expr(0, .Running_On_Valgrind, 0, 0, 0, 0, 0)
+running_on_valgrind :: proc "c" () -> uint {
+	return uint(client_request_expr(0, .Running_On_Valgrind, 0, 0, 0, 0, 0))
 }
 
 // Discard translation of code in the slice qzz. Useful if you are debugging a JIT-er or some such,

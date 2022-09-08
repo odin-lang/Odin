@@ -73,10 +73,10 @@ wstring_to_utf8 :: proc(s: wstring, N: int, allocator := context.temp_allocator)
 
 	// If N == -1 the call to WideCharToMultiByte assume the wide string is null terminated
 	// and will scan it to find the first null terminated character. The resulting string will
-	// also null terminated.
+	// also be null terminated.
 	// If N != -1 it assumes the wide string is not null terminated and the resulting string
-	// will not be null terminated, we therefore have to force it to be null terminated manually.
-	text := make([]byte, n+1 if N != -1 else n) or_return
+	// will not be null terminated.
+	text := make([]byte, n) or_return
 
 	n1 := WideCharToMultiByte(CP_UTF8, WC_ERR_INVALID_CHARS, s, i32(N), raw_data(text), n, nil, nil)
 	if n1 == 0 {

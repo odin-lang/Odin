@@ -200,7 +200,7 @@ Locale :: struct {
 
 @(default_calling_convention="c", link_prefix="SDL_")
 foreign lib {
-	GetPreferredLocales :: proc() -> ^Locale ---
+	GetPreferredLocales :: proc() -> [^]Locale ---
 }
 
 // misc

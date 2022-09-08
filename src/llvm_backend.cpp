@@ -1420,7 +1420,7 @@ void lb_generate_code(lbGenerator *gen) {
 				}
 			}
 
-			LLVMBool split_debug_inlining = false;
+			LLVMBool split_debug_inlining = build_context.build_mode == BuildMode_Assembly;
 			LLVMBool debug_info_for_profiling = false;
 
 			m->debug_compile_unit = LLVMDIBuilderCreateCompileUnit(m->debug_builder, LLVMDWARFSourceLanguageC99,
@@ -1615,6 +1615,7 @@ void lb_generate_code(lbGenerator *gen) {
 		}
 		if (is_foreign) {
 			LLVMSetLinkage(g.value, LLVMExternalLinkage);
+			LLVMSetDLLStorageClass(g.value, LLVMDLLImportStorageClass);
 			LLVMSetExternallyInitialized(g.value, true);
 			lb_add_foreign_library_path(m, e->Variable.foreign_library);
 			
