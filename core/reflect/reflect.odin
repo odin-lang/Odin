@@ -3,6 +3,7 @@ package reflect
 import "core:runtime"
 import "core:intrinsics"
 import "core:mem"
+_ :: mem
 _ :: intrinsics
 
 Type_Info :: runtime.Type_Info
