@@ -1397,6 +1397,7 @@ bool check_stmt_internal_builtin_proc_id(Ast *expr, BuiltinProcId *id_) {
 }
 
 bool check_expr_is_stack_variable(Ast *expr) {
+	/*
 	expr = unparen_expr(expr);
 	Entity *e = entity_of_node(expr);
 	if (e && e->kind == Entity_Variable) {
@@ -1410,6 +1411,7 @@ bool check_expr_is_stack_variable(Ast *expr) {
 			}
 		}
 	}
+	*/
 	return false;
 }
 
