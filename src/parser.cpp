@@ -5506,6 +5506,51 @@ isize calc_decl_count(Ast *decl) {
 	return count;
 }
 
+bool parse_build_project_directory_tag(Token token_for_pos, String s) {
+	String const prefix = str_lit("+build-project-name");
+	GB_ASSERT(string_starts_with(s, prefix));
+	s = string_trim_whitespace(substring(s, prefix.len, s.len));
+	if (s.len == 0) {
+		return true;
+	}
+
+	bool any_correct = false;
+
+	while (s.len > 0) {
+		bool this_kind_correct = true;
+
+		do {
+			String p = string_trim_whitespace(build_tag_get_token(s, &s));
+			if (p.len == 0) break;
+			if (p == ",") break;
+
+			bool is_notted = false;
+			if (p[0] == '!') {
+				is_notted = true;
+				p = substring(p, 1, p.len);
+				if (p.len == 0) {
+					syntax_error(token_for_pos, "Expected a build-project-name after '!'");
+					break;
+				}
+			}
+
+			if (p.len == 0) {
+				continue;
+			}
+
+			if (is_notted) {
+				this_kind_correct = this_kind_correct && (p != build_context.ODIN_BUILD_PROJECT_NAME);
+			} else {
+				this_kind_correct = this_kind_correct && (p == build_context.ODIN_BUILD_PROJECT_NAME);
+			}
+		} while (s.len > 0);
+
+		any_correct = any_correct || this_kind_correct;
+	}
+
+	return any_correct;
+}
+
 bool parse_file(Parser *p, AstFile *f) {
 	if (f->tokens.count == 0) {
 		return true;
@@ -5561,7 +5606,11 @@ bool parse_file(Parser *p, AstFile *f) {
 			if (string_starts_with(str, str_lit("//"))) {
 				String lc = string_trim_whitespace(substring(str, 2, str.len));
 				if (lc.len > 0 && lc[0] == '+') {
-					if (string_starts_with(lc, str_lit("+build"))) {
+					 if (string_starts_with(lc, str_lit("+build-project-name"))) {
+						if (!parse_build_project_directory_tag(tok, lc)) {
+							return false;
+						}
+					} else if (string_starts_with(lc, str_lit("+build"))) {
 						if (!parse_build_tag(tok, lc)) {
 							return false;
 						}
