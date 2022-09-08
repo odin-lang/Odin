@@ -381,12 +381,17 @@ lbValue lb_const_value(lbModule *m, Type *type, ExactValue value, bool allow_loc
 	}
 
 	if (value.kind == ExactValue_Procedure) {
+		lbValue res = {};
 		Ast *expr = unparen_expr(value.value_procedure);
 		if (expr->kind == Ast_ProcLit) {
-			return lb_generate_anonymous_proc_lit(m, str_lit("_proclit"), expr);
+			res = lb_generate_anonymous_proc_lit(m, str_lit("_proclit"), expr);
+
+		} else {
+			Entity *e = entity_from_expr(expr);
+			res = lb_find_procedure_value_from_entity(m, e);
 		}
-		Entity *e = entity_from_expr(expr);
-		return lb_find_procedure_value_from_entity(m, e);
+		res.value = LLVMConstPointerCast(res.value, lb_type(m, res.type));
+		return res;
 	}
 
 	bool is_local = allow_local && m->curr_procedure != nullptr;
@@ -1141,13 +1146,7 @@ lbValue lb_const_value(lbModule *m, Type *type, ExactValue value, bool allow_loc
 		}
 		break;
 	case ExactValue_Procedure:
-		{
-			Ast *expr = value.value_procedure;
-			GB_ASSERT(expr != nullptr);
-			if (expr->kind == Ast_ProcLit) {
-				return lb_generate_anonymous_proc_lit(m, str_lit("_proclit"), expr);
-			}
-		}
+		GB_PANIC("handled earlier");
 		break;
 	case ExactValue_Typeid:
 		return lb_typeid(m, value.value_typeid);
