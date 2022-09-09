@@ -563,16 +563,19 @@ void lb_begin_procedure_body(lbProcedure *p) {
 						lb_add_debug_param_variable(p, ptr.value, e->type, e->token, param_index+1, p->decl_block);
 					}
 				}
-			}
+			} 
 		}
 
 		if (p->type->Proc.has_named_results) {
 			GB_ASSERT(p->type->Proc.result_count > 0);
 			TypeTuple *results = &p->type->Proc.results->Tuple;
 
+			unsigned result_index = p->type->Proc.param_count;
 			for_array(i, results->variables) {
 				Entity *e = results->variables[i];
 				GB_ASSERT(e->kind == Entity_Variable);
+
+				defer (result_index += 1);
 
 				if (e->token.string != "") {
 					GB_ASSERT(!is_blank_ident(e->token));
@@ -594,6 +597,8 @@ void lb_begin_procedure_body(lbProcedure *p) {
 						lbValue c = lb_handle_param_value(p, e->type, e->Variable.param_value, e->token.pos);
 						lb_addr_store(p, res, c);
 					}
+
+					lb_add_debug_param_variable(p, return_ptr_value.value, e->type, e->token, result_index+1, p->decl_block);
 				}
 			}
 		}
