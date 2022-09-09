@@ -981,7 +981,72 @@ void lb_add_debug_local_variable(lbProcedure *p, LLVMValueRef ptr, Type *type, T
 }
 
 
-void lb_add_debug_param_variable(lbProcedure *p, LLVMValueRef ptr, Type *type, Token const &token, unsigned arg_number, lbBlock *block) {
+void lb_add_debug_param_variable_direct(lbProcedure *p, LLVMValueRef ptr, Type *type, Token const &token, unsigned arg_number, lbBlock *block) {
+	if (p->debug_info == nullptr) {
+		return;
+	}
+	if (type == nullptr) {
+		return;
+	}
+	if (type == t_invalid) {
+		return;
+	}
+	if (p->body == nullptr) {
+		return;
+	}
+
+	lbModule *m = p->module;
+	String const &name = token.string;
+	if (name == "" || name == "_") {
+		return;
+	}
+
+	if (lb_get_llvm_metadata(m, ptr) != nullptr) {
+		// Already been set
+		return;
+	}
+
+
+	AstFile *file = p->body->file();
+
+	LLVMMetadataRef llvm_scope = lb_get_current_debug_scope(p);
+	LLVMMetadataRef llvm_file = lb_get_llvm_metadata(m, file);
+	GB_ASSERT(llvm_scope != nullptr);
+	if (llvm_file == nullptr) {
+		llvm_file = LLVMDIScopeGetFile(llvm_scope);
+	}
+
+	if (llvm_file == nullptr) {
+		return;
+	}
+
+	LLVMDIFlags flags = LLVMDIFlagZero;
+	LLVMBool always_preserve = build_context.optimization_level == 0;
+
+	LLVMMetadataRef debug_type = lb_debug_type(m, type);
+
+	LLVMMetadataRef var_info = LLVMDIBuilderCreateParameterVariable(
+		m->debug_builder, llvm_scope,
+		cast(char const *)name.text, cast(size_t)name.len,
+		arg_number,
+		llvm_file, token.pos.line,
+		debug_type,
+		always_preserve, flags
+	);
+
+	LLVMValueRef storage = ptr;
+	LLVMMetadataRef llvm_debug_loc = lb_debug_location_from_token_pos(p, token.pos);
+	LLVMMetadataRef llvm_expr = LLVMDIBuilderCreateExpression(m->debug_builder, nullptr, 0);
+	lb_set_llvm_metadata(m, ptr, llvm_expr);
+
+	// NOTE(bill, 2022-02-01): For parameter values, you must insert them at the end of the decl block
+	// The reason is that if the parameter is at index 0 and a pointer, there is not such things as an
+	// instruction "before" it.
+	LLVMDIBuilderInsertDbgValueAtEnd(m->debug_builder, storage, var_info, llvm_expr, llvm_debug_loc, block->block);
+}
+
+
+void lb_add_debug_param_variable_indirect(lbProcedure *p, LLVMValueRef ptr, Type *type, Token const &token, unsigned arg_number, lbBlock *block) {
 	if (p->debug_info == nullptr) {
 		return;
 	}
