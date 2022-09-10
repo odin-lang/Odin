@@ -7,4 +7,5 @@ foreign import winmm "system:Winmm.lib"
 foreign winmm {
 	timeBeginPeriod :: proc(uPeriod: UINT) -> MMRESULT ---
 	timeEndPeriod   :: proc(uPeriod: UINT) -> MMRESULT ---
+	timeGetTime     :: proc() -> DWORD ---
 }
