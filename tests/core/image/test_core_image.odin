@@ -16,6 +16,7 @@ import "core:image"
 import pbm "core:image/netpbm"
 import "core:image/png"
 import "core:image/qoi"
+import "core:image/tga"
 
 import "core:bytes"
 import "core:hash"
@@ -1527,6 +1528,28 @@ run_png_suite :: proc(t: ^testing.T, suite: []PNG_Test) -> (subtotal: int) {
 							qoi_hash := hash.crc32(qoi_img.pixels.buf[:])
 							error  = fmt.tprintf("%v test %v QOI load hash is %08x, expected it match PNG's %08x with %v.", file.file, count, qoi_hash, png_hash, test.options)
 							expect(t, qoi_hash == png_hash, error)
+						}
+					}
+
+					// Roundtrip through TGA to test the TGA encoder and decoder.
+					if img.depth == 8 && (img.channels == 3 || img.channels == 4) {
+						tga_buffer: bytes.Buffer
+						defer bytes.buffer_destroy(&tga_buffer)
+						tga_save_err := tga.save(&tga_buffer, img)
+
+						error  = fmt.tprintf("%v test %v TGA save failed with %v.", file.file, count, tga_save_err)
+						expect(t, tga_save_err == nil, error)
+
+						if tga_save_err == nil {
+							tga_img, tga_load_err := tga.load(tga_buffer.buf[:])
+							defer tga.destroy(tga_img)
+
+							error  = fmt.tprintf("%v test %v TGA load failed with %v.", file.file, count, tga_load_err)
+							expect(t, tga_load_err == nil, error)
+
+							tga_hash := hash.crc32(tga_img.pixels.buf[:])
+							error  = fmt.tprintf("%v test %v TGA load hash is %08x, expected it match PNG's %08x with %v.", file.file, count, tga_hash, png_hash, test.options)
+							expect(t, tga_hash == png_hash, error)
 						}
 					}
 
