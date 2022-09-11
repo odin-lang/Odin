@@ -937,14 +937,14 @@ index_any :: proc(s, chars: string) -> int {
 }
 
 /*
-	returns the index of any first char of `chars` found in `s`, -1 if not found
+	returns the last matching index in `s` of any char in `chars` found in `s`, -1 if not found
 	iterates the string in reverse
 
-	strings.index_any("test", "s") -> 2
-	strings.index_any("test", "se") -> 2
-	strings.index_any("test", "et") -> 1
-	strings.index_any("test", "set") -> 3
-	strings.index_any("test", "x") -> -1
+	strings.last_index_any("test", "s") -> 2
+	strings.last_index_any("test", "se") -> 2
+	strings.last_index_any("test", "et") -> 3
+	strings.last_index_any("test", "set") -> 3
+	strings.last_index_any("test", "x") -> -1
 */
 last_index_any :: proc(s, chars: string) -> int {
 	if chars == "" {
