@@ -42,20 +42,6 @@ to_reader_at :: proc(r: ^Reader, s: string) -> io.Reader_At {
 	return rr
 }
 
-// init a reader to the string `s` and return an io.Byte_Reader
-to_byte_reader :: proc(r: ^Reader, s: string) -> io.Byte_Reader {
-	reader_init(r, s)
-	rr, _ := io.to_byte_reader(reader_to_stream(r))
-	return rr
-}
-
-// init a reader to the string `s` and return an io.Rune_Reader
-to_rune_reader :: proc(r: ^Reader, s: string) -> io.Rune_Reader {
-	reader_init(r, s)
-	rr, _ := io.to_rune_reader(reader_to_stream(r))
-	return rr
-}
-
 // remaining length of the reader 
 reader_length :: proc(r: ^Reader) -> int {
 	if r.i >= i64(len(r.s)) {

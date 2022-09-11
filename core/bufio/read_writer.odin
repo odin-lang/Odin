@@ -25,10 +25,6 @@ _read_writer_vtable := &io.Stream_VTable{
 		b := (^Read_Writer)(s.stream_data).r
 		return reader_read(b, p)
 	},
-	impl_read_byte = proc(s: io.Stream) -> (c: byte, err: io.Error) {
-		b := (^Read_Writer)(s.stream_data).r
-		return reader_read_byte(b)
-	},
 	impl_unread_byte = proc(s: io.Stream) -> io.Error {
 		b := (^Read_Writer)(s.stream_data).r
 		return reader_unread_byte(b)
