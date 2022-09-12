@@ -123,13 +123,6 @@ Writer_At          :: struct {using stream: Stream}
 Reader_From        :: struct {using stream: Stream}
 Writer_To          :: struct {using stream: Stream}
 
-Byte_Reader        :: struct {using stream: Stream}
-Byte_Scanner       :: struct {using stream: Stream}
-Byte_Writer        :: struct {using stream: Stream}
-
-Rune_Reader        :: struct {using stream: Stream}
-Rune_Scanner       :: struct {using stream: Stream}
-
 
 destroy :: proc(s: Stream) -> Error {
 	close_err := close({s})
@@ -147,24 +140,48 @@ destroy :: proc(s: Stream) -> Error {
 // When read encounters an .EOF or error after successfully reading n > 0 bytes, it returns the number of
 // bytes read along with the error.
 read :: proc(s: Reader, p: []byte, n_read: ^int = nil) -> (n: int, err: Error) {
-	if s.stream_vtable != nil && s.impl_read != nil {
-		n, err = s->impl_read(p)
-		if n_read != nil {
-			n_read^ += n
+	if s.stream_vtable != nil {
+		if s.impl_read != nil {
+			n, err = s->impl_read(p)
+			if n_read != nil {
+				n_read^ += n
+			}
+			return
+		} else if s.impl_read_byte != nil {
+			bytes_read := 0
+			defer if n_read != nil {
+				n_read^ += bytes_read
+			}
+			for _, i in p {
+				p[i] = s->impl_read_byte() or_return
+				bytes_read += 1
+			}
+			return
 		}
-		return
 	}
 	return 0, .Empty
 }
 
 // write writes up to len(p) bytes into s. It returns the number of bytes written and any error if occurred.
 write :: proc(s: Writer, p: []byte, n_written: ^int = nil) -> (n: int, err: Error) {
-	if s.stream_vtable != nil && s.impl_write != nil {
-		n, err = s->impl_write(p)
-		if n_written != nil {
-			n_written^ += n
+	if s.stream_vtable != nil {
+		if s.impl_write != nil {
+			n, err = s->impl_write(p)
+			if n_written != nil {
+				n_written^ += n
+			}
+			return
+		} else if s.impl_write_byte != nil {
+			bytes_written := 0
+			defer if n_written != nil {
+				n_written^ += bytes_written
+			}
+			for c in p {
+				s->impl_write_byte(c) or_return
+				bytes_written += 1
+			}
+			return
 		}
-		return
 	}
 	return 0, .Empty
 }
@@ -319,7 +336,7 @@ read_from :: proc(w: Reader_From, r: Reader) -> (n: i64, err: Error) {
 
 
 // read_byte reads and returns the next byte from r.
-read_byte :: proc(r: Byte_Reader, n_read: ^int = nil) -> (b: byte, err: Error) {
+read_byte :: proc(r: Reader, n_read: ^int = nil) -> (b: byte, err: Error) {
 	defer if err == nil && n_read != nil {
 		n_read^ += 1
 	}
@@ -339,21 +356,12 @@ read_byte :: proc(r: Byte_Reader, n_read: ^int = nil) -> (b: byte, err: Error) {
 	return buf[0], err
 }
 
-write_byte :: proc{
-	write_byte_to_byte_writer,
-	write_byte_to_writer,
-}
-
-write_byte_to_byte_writer :: proc(w: Byte_Writer, c: byte, n_written: ^int = nil) -> Error {
-	return _write_byte(w, c, n_written)
-}
-
-write_byte_to_writer :: proc(w: Writer, c: byte, n_written: ^int = nil) -> Error {
+write_byte :: proc(w: Writer, c: byte, n_written: ^int = nil) -> Error {
 	return _write_byte(auto_cast w, c, n_written)
 }
 
 @(private)
-_write_byte :: proc(w: Byte_Writer, c: byte, n_written: ^int = nil) -> (err: Error) {
+_write_byte :: proc(w: Writer, c: byte, n_written: ^int = nil) -> (err: Error) {
 	defer if err == nil && n_written != nil {
 		n_written^ += 1
 	}
@@ -373,7 +381,7 @@ _write_byte :: proc(w: Byte_Writer, c: byte, n_written: ^int = nil) -> (err: Err
 }
 
 // read_rune reads a single UTF-8 encoded Unicode codepoint and returns the rune and its size in bytes.
-read_rune :: proc(br: Rune_Reader, n_read: ^int = nil) -> (ch: rune, size: int, err: Error) {
+read_rune :: proc(br: Reader, n_read: ^int = nil) -> (ch: rune, size: int, err: Error) {
 	defer if err == nil && n_read != nil {
 		n_read^ += size
 	}
@@ -417,13 +425,21 @@ read_rune :: proc(br: Rune_Reader, n_read: ^int = nil) -> (ch: rune, size: int, 
 	return
 }
 
-unread_byte :: proc(s: Byte_Scanner) -> Error {
-	if s.stream_vtable != nil && s.impl_unread_byte != nil {
+unread_byte :: proc(s: Stream) -> Error {
+	if s.stream_vtable == nil {
+		return .Empty
+	}
+	if s.impl_unread_byte != nil {
 		return s->impl_unread_byte()
 	}
+	if s.impl_seek != nil {
+		_, err := s->impl_seek(-1, .Current)
+		return err
+	}
+
 	return .Empty
 }
-unread_rune :: proc(s: Rune_Scanner) -> Error {
+unread_rune :: proc(s: Writer) -> Error {
 	if s.stream_vtable != nil && s.impl_unread_rune != nil {
 		return s->impl_unread_rune()
 	}
@@ -442,7 +458,10 @@ write_rune :: proc(s: Writer, r: rune, n_written: ^int = nil) -> (size: int, err
 		n_written^ += size
 	}
 	
-	if s.stream_vtable != nil && s.impl_write_rune != nil {
+	if s.stream_vtable == nil {
+		return 0, .Empty
+	}
+	if s.impl_write_rune != nil {
 		return s->impl_write_rune(r)
 	}
 

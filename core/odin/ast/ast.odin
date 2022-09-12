@@ -6,7 +6,7 @@ Proc_Tag :: enum {
 	Bounds_Check,
 	No_Bounds_Check,
 	Optional_Ok,
-	Optional_Second,
+	Optional_Allocator_Error,
 }
 Proc_Tags :: distinct bit_set[Proc_Tag; u32]
 

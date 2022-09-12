@@ -1857,7 +1857,7 @@ void parse_proc_tags(AstFile *f, u64 *tags) {
 
 		if (false) {}
 		ELSE_IF_ADD_TAG(optional_ok)
-		ELSE_IF_ADD_TAG(optional_second)
+		ELSE_IF_ADD_TAG(optional_allocator_error)
 		ELSE_IF_ADD_TAG(require_results)
 		ELSE_IF_ADD_TAG(bounds_check)
 		ELSE_IF_ADD_TAG(no_bounds_check)

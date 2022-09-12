@@ -1355,6 +1355,12 @@ bool init_build_paths(String init_filename) {
 	// [BuildPathMainPackage] Turn given init path into a `Path`, which includes normalizing it into a full path.
 	bc->build_paths[BuildPath_Main_Package] = path_from_string(ha, init_filename);
 
+	{
+		String build_project_name  = last_path_element(bc->build_paths[BuildPath_Main_Package].basename);
+		GB_ASSERT(build_project_name.len > 0);
+		bc->ODIN_BUILD_PROJECT_NAME = build_project_name;
+	}
+
 	bool produces_output_file = false;
 	if (bc->command_kind == Command_doc && bc->cmd_doc_flags & CmdDocFlag_DocFormat) {
 		produces_output_file = true;
@@ -1536,12 +1542,6 @@ bool init_build_paths(String init_filename) {
 
 	if (bc->target_features_string.len != 0) {
 		enable_target_feature({}, bc->target_features_string);
-	}
-
-	{
-		String build_project_name  = last_path_element(bc->build_paths[BuildPath_Main_Package].basename);
-		GB_ASSERT(build_project_name.len > 0);
-		bc->ODIN_BUILD_PROJECT_NAME = build_project_name;
 	}
 
 	return true;
