@@ -232,7 +232,7 @@ enum ProcTag {
 
 	ProcTag_require_results = 1<<4,
 	ProcTag_optional_ok     = 1<<5,
-	ProcTag_optional_second = 1<<6,
+	ProcTag_optional_allocator_error = 1<<6,
 };
 
 enum ProcCallingConvention : i32 {
