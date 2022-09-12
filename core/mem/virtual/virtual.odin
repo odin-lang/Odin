@@ -63,6 +63,7 @@ memory_block_alloc :: proc(committed, reserved: uint, flags: Memory_Block_Flags)
 	}
 	
 	page_size := DEFAULT_PAGE_SIZE
+	assert(mem.is_power_of_two(uintptr(page_size)))
 	committed := committed
 	committed = clamp(committed, 0, reserved)
 	
@@ -82,8 +83,7 @@ memory_block_alloc :: proc(committed, reserved: uint, flags: Memory_Block_Flags)
 	pmblock := platform_memory_alloc(0, total_size) or_return
 	
 	pmblock.block.base = ([^]byte)(uintptr(pmblock) + base_offset)
-	commit_err := platform_memory_commit(pmblock, uint(base_offset) + committed)
-	assert(commit_err == nil)
+	platform_memory_commit(pmblock, uint(base_offset) + committed) or_return
 
 	// Should be zeroed
 	assert(pmblock.block.used == 0)
