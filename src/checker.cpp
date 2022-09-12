@@ -2809,17 +2809,9 @@ void init_mem_allocator(Checker *c) {
 	if (t_allocator != nullptr) {
 		return;
 	}
-	AstPackage *pkg = get_core_package(&c->info, str_lit("runtime"));
-
-	String name = str_lit("Allocator");
-	Entity *e = scope_lookup_current(pkg->scope, name);
-	if (e == nullptr) {
-		compiler_error("Could not find type declaration for '%.*s'\n", LIT(name));
-		// NOTE(bill): This will exit the program as it's cannot continue without it!
-	}
-
-	t_allocator = e->type;
+	t_allocator = find_core_type(c, str_lit("Allocator"));
 	t_allocator_ptr = alloc_type_pointer(t_allocator);
+	t_allocator_error = find_core_type(c, str_lit("Allocator_Error"));
 }
 
 void init_core_context(Checker *c) {
@@ -2827,7 +2819,6 @@ void init_core_context(Checker *c) {
 		return;
 	}
 	t_context = find_core_type(c, str_lit("Context"));
-	GB_ASSERT(t_context != nullptr);
 	t_context_ptr = alloc_type_pointer(t_context);
 }
 

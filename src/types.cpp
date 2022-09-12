@@ -681,6 +681,7 @@ gb_global Type *t_allocator                      = nullptr;
 gb_global Type *t_allocator_ptr                  = nullptr;
 gb_global Type *t_context                        = nullptr;
 gb_global Type *t_context_ptr                    = nullptr;
+gb_global Type *t_allocator_error                = nullptr;
 
 gb_global Type *t_source_code_location           = nullptr;
 gb_global Type *t_source_code_location_ptr       = nullptr;
