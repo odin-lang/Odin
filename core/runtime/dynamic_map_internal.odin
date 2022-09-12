@@ -231,6 +231,9 @@ __dynamic_map_reserve :: proc(using header: Map_Header, cap: int, loc := #caller
 		c.allocator = m.entries.allocator
 	}
 	context = c
+
+	cap := cap
+	cap = next_pow2(cap)
 		
 	__dynamic_array_reserve(&m.entries, entry_size, entry_align, cap, loc)
 
@@ -267,7 +270,6 @@ __dynamic_map_get :: proc(h: Map_Header, hash: Map_Hash) -> rawptr {
 
 __dynamic_map_set :: proc(h: Map_Header, hash: Map_Hash, value: rawptr, loc := #caller_location) -> ^Map_Entry_Header #no_bounds_check {
 	index: int
-	// assert(value != nil)
 
 	if len(h.m.hashes) == 0 {
 		__dynamic_map_reserve(h, INITIAL_MAP_CAP, loc)
@@ -300,17 +302,36 @@ __dynamic_map_set :: proc(h: Map_Header, hash: Map_Hash, value: rawptr, loc := #
 
 	if __dynamic_map_full(h) {
 		__dynamic_map_grow(h, loc)
-		// index = __dynamic_map_find(h, hash).entry_index
-		// assert(index >= 0)
 	}
 	
 	return __dynamic_map_get_entry(h, index)
 }
 
 
+@(private="file")
+next_pow2 :: proc "contextless" (n: int) -> int {
+	n := n
+	if n <= 0 {
+		return 0
+	} else if n <= 2 {
+		return n
+	}
+	n -= 1
+	n |= n >> 1
+	n |= n >> 2
+	n |= n >> 4
+	n |= n >> 8
+	n |= n >> 16
+	when size_of(int) == 8 {
+		n |= n >> 32
+	}
+	n += 1
+	return n
+}
+
 __dynamic_map_grow :: proc(using h: Map_Header, loc := #caller_location) {
 	// TODO(bill): Determine an efficient growing rate
-	new_count := max(4*m.entries.cap + 7, INITIAL_MAP_CAP)
+	new_count := max(m.entries.cap * 2, INITIAL_MAP_CAP)
 	__dynamic_map_rehash(h, new_count, loc)
 }
 
@@ -325,8 +346,8 @@ __dynamic_map_hash_equal :: proc "contextless" (h: Map_Header, a, b: Map_Hash) -
 
 __dynamic_map_find :: proc(using h: Map_Header, hash: Map_Hash) -> Map_Find_Result #no_bounds_check {
 	fr := Map_Find_Result{-1, -1, -1}
-	if n := uintptr(len(m.hashes)); n > 0 {
-		fr.hash_index = int(hash.hash % n)
+	if n := uintptr(len(m.hashes)); n != 0 {
+		fr.hash_index = int(hash.hash & (n-1))
 		fr.entry_index = m.hashes[fr.hash_index]
 		for fr.entry_index >= 0 {
 			entry := __dynamic_map_get_entry(h, fr.entry_index)
