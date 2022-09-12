@@ -586,6 +586,7 @@ void lb_begin_procedure_body(lbProcedure *p) {
 
 						res = lb_addr(ptr);
 						lb_add_entity(p->module, e, ptr);
+						lb_add_debug_local_variable(p, ptr.value, e->type, e->token);
 					} else {
 						res = lb_add_local(p, e->type, e);
 					}
@@ -595,7 +596,6 @@ void lb_begin_procedure_body(lbProcedure *p) {
 						lb_addr_store(p, res, c);
 					}
 
-					lb_add_debug_param_variable(p, lb_addr_get_ptr(p, res).value, e->type, e->token, cast(unsigned)(ft->args.count+i), p->curr_block, lbArg_Indirect);
 				}
 			}
 
