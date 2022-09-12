@@ -578,7 +578,7 @@ void lb_begin_procedure_body(lbProcedure *p) {
 					GB_ASSERT(!is_blank_ident(e->token));
 
 					lbAddr res = {};
-					if (return_ptr_value.value) {
+					if (return_ptr_value.value != nullptr) {
 						lbValue ptr = return_ptr_value;
 						if (results->variables.count != 1) {
 							ptr = lb_emit_struct_ep(p, ptr, cast(i32)i);
@@ -594,8 +594,11 @@ void lb_begin_procedure_body(lbProcedure *p) {
 						lbValue c = lb_handle_param_value(p, e->type, e->Variable.param_value, e->token.pos);
 						lb_addr_store(p, res, c);
 					}
+
+					lb_add_debug_param_variable(p, lb_addr_get_ptr(p, res).value, e->type, e->token, cast(unsigned)(ft->args.count+i), p->curr_block, lbArg_Indirect);
 				}
 			}
+
 		}
 	}
 	if (p->type->Proc.calling_convention == ProcCC_Odin) {
