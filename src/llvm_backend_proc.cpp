@@ -578,7 +578,7 @@ void lb_begin_procedure_body(lbProcedure *p) {
 					GB_ASSERT(!is_blank_ident(e->token));
 
 					lbAddr res = {};
-					if (return_ptr_value.value) {
+					if (return_ptr_value.value != nullptr) {
 						lbValue ptr = return_ptr_value;
 						if (results->variables.count != 1) {
 							ptr = lb_emit_struct_ep(p, ptr, cast(i32)i);
@@ -586,6 +586,7 @@ void lb_begin_procedure_body(lbProcedure *p) {
 
 						res = lb_addr(ptr);
 						lb_add_entity(p->module, e, ptr);
+						lb_add_debug_local_variable(p, ptr.value, e->type, e->token);
 					} else {
 						res = lb_add_local(p, e->type, e);
 					}
@@ -594,8 +595,10 @@ void lb_begin_procedure_body(lbProcedure *p) {
 						lbValue c = lb_handle_param_value(p, e->type, e->Variable.param_value, e->token.pos);
 						lb_addr_store(p, res, c);
 					}
+
 				}
 			}
+
 		}
 	}
 	if (p->type->Proc.calling_convention == ProcCC_Odin) {
