@@ -590,6 +590,10 @@ BS_MULTILINE       :: 0x00002000
 BS_NOTIFY          :: 0x00004000
 BS_FLAT            :: 0x00008000
 BS_RIGHTBUTTON     :: BS_LEFTTEXT
+BS_SPLITBUTTON     :: 0x0000000C
+BS_DEFSPLITBUTTON  :: 0x0000000D
+BS_COMMANDLINK     :: 0x0000000E
+BS_DEFCOMMANDLINK  :: 0x0000000F
 
 // Button Control Messages
 BST_UNCHECKED     :: 0x0000
@@ -828,6 +832,53 @@ CREATESTRUCTW:: struct {
 	dwExStyle:      DWORD,
 }
 
+MAX_LINKID_TEXT :: 48
+L_MAX_URL_LENGTH :: 2048 + 32 + len("://")
+
+LITEM :: struct {
+	mask: UINT,
+	iLink: c_int,
+	state: UINT,
+	stateMask: UINT,
+	szID: [MAX_LINKID_TEXT]WCHAR,
+	szUrl: [L_MAX_URL_LENGTH]WCHAR,
+}
+
+NMLINK :: struct {
+	hdr: NMHDR,
+	item: LITEM,
+}
+
+NMHDR :: struct {
+	hwndFrom: HWND,
+	idFrom:   UINT_PTR,
+	code:     UINT,      // NM_ code
+}
+
+// Generic WM_NOTIFY notification codes
+NM_OUTOFMEMORY          :: ~uintptr(0) // -1
+NM_CLICK                :: NM_OUTOFMEMORY-1  // uses NMCLICK struct
+NM_DBLCLK               :: NM_OUTOFMEMORY-2
+NM_RETURN               :: NM_OUTOFMEMORY-3
+NM_RCLICK               :: NM_OUTOFMEMORY-4  // uses NMCLICK struct
+NM_RDBLCLK              :: NM_OUTOFMEMORY-5
+NM_SETFOCUS             :: NM_OUTOFMEMORY-6
+NM_KILLFOCUS            :: NM_OUTOFMEMORY-7
+NM_CUSTOMDRAW           :: NM_OUTOFMEMORY-11
+NM_HOVER                :: NM_OUTOFMEMORY-12
+NM_NCHITTEST            :: NM_OUTOFMEMORY-13 // uses NMMOUSE struct
+NM_KEYDOWN              :: NM_OUTOFMEMORY-14 // uses NMKEY struct
+NM_RELEASEDCAPTURE      :: NM_OUTOFMEMORY-15
+NM_SETCURSOR            :: NM_OUTOFMEMORY-16 // uses NMMOUSE struct
+NM_CHAR                 :: NM_OUTOFMEMORY-17 // uses NMCHAR struct
+NM_TOOLTIPSCREATED      :: NM_OUTOFMEMORY-18 // notify of when the tooltips window is create
+NM_LDOWN                :: NM_OUTOFMEMORY-19
+NM_RDOWN                :: NM_OUTOFMEMORY-20
+NM_THEMECHANGED         :: NM_OUTOFMEMORY-21
+NM_FONTCHANGED          :: NM_OUTOFMEMORY-22
+NM_CUSTOMTEXT           :: NM_OUTOFMEMORY-23 // uses NMCUSTOMTEXT struct
+NM_TVSTATEIMAGECHANGING :: NM_OUTOFMEMORY-23 // uses NMTVSTATEIMAGECHANGING struct, defined after HTREEITEM
+
 DEVMODEW :: struct {
 	dmDeviceName:   [32]wchar_t,
 	dmSpecVersion:   WORD,
@@ -950,6 +1001,13 @@ CS_BYTEALIGNCLIENT : UINT : 0x1000
 CS_BYTEALIGNWINDOW : UINT : 0x2000
 CS_GLOBALCLASS     : UINT : 0x4000
 CS_DROPSHADOW      : UINT : 0x0002_0000
+
+AURL_ENABLEURL          :: 1
+AURL_ENABLEEMAILADDR    :: 2
+AURL_ENABLETELNO        :: 4
+AURL_ENABLEEAURLS       :: 8
+AURL_ENABLEDRIVELETTERS :: 16
+AURL_DISABLEMIXEDLGC    :: 32 // Disable mixed Latin Greek Cyrillic IDNs
 
 WS_BORDER           : UINT : 0x0080_0000
 WS_CAPTION          : UINT : 0x00C0_0000
