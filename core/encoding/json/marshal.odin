@@ -302,7 +302,11 @@ marshal_to_writer :: proc(w: io.Writer, v: any, opt: ^Marshal_Options) -> (err: 
 		
 		for name, i in info.names {
 			opt_write_iteration(w, opt, i) or_return
-			opt_write_key(w, opt, name) or_return
+			if json_name := string(reflect.struct_tag_get(info.tags[i], "json")); json_name != "" {
+				opt_write_key(w, opt, json_name) or_return
+			} else {
+				opt_write_key(w, opt, name) or_return
+			}
 
 			id := info.types[i].id
 			data := rawptr(uintptr(v.data) + info.offsets[i])
