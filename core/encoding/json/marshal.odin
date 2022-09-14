@@ -5,6 +5,7 @@ import "core:math/bits"
 import "core:runtime"
 import "core:strconv"
 import "core:strings"
+import "core:reflect"
 import "core:io"
 
 Marshal_Data_Error :: enum {
@@ -302,7 +303,7 @@ marshal_to_writer :: proc(w: io.Writer, v: any, opt: ^Marshal_Options) -> (err: 
 		
 		for name, i in info.names {
 			opt_write_iteration(w, opt, i) or_return
-			if json_name := string(reflect.struct_tag_get(info.tags[i], "json")); json_name != "" {
+			if json_name := string(reflect.struct_tag_get(auto_cast info.tags[i], "json")); json_name != "" {
 				opt_write_key(w, opt, json_name) or_return
 			} else {
 				opt_write_key(w, opt, name) or_return
