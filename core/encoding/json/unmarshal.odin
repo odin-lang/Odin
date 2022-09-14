@@ -386,7 +386,14 @@ unmarshal_object :: proc(p: ^Parser, v: any, end_token: Token_Kind) -> (err: Unm
 				continue struct_loop
 			}
 			
-			return Unsupported_Type_Error{v.id, p.curr_token}
+			// NOTE(bill, 2022-09-14): Previously this would not be allowed
+			//         {"foo": 123, "bar": 456}
+			//         T :: struct{foo: int}
+			// `T` is missing the `bar` field
+			// The line below is commented out to ignore fields in an object which
+			// do not have a corresponding target field
+			//
+			// return Unsupported_Type_Error{v.id, p.curr_token}
 		}
 		
 	case reflect.Type_Info_Map:
