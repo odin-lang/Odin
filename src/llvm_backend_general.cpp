@@ -926,11 +926,7 @@ void lb_emit_store(lbProcedure *p, lbValue ptr, lbValue value) {
 			return;
 		} else if (LLVMIsConstant(value.value)) {
 			lbAddr addr = lb_add_global_generated(p->module, value.type, value, nullptr);
-			LLVMValueRef global_data = addr.addr.value;
-			// make it truly private data
-			LLVMSetLinkage(global_data, LLVMPrivateLinkage);
-			LLVMSetUnnamedAddress(global_data, LLVMGlobalUnnamedAddr);
-			LLVMSetGlobalConstant(global_data, true);
+			LLVMValueRef global_data = lb_make_global_truly_private(addr);
 
 			LLVMValueRef dst_ptr = ptr.value;
 			LLVMValueRef src_ptr = global_data;
@@ -2667,6 +2663,15 @@ lbValue lb_find_procedure_value_from_entity(lbModule *m, Entity *e) {
 
 	GB_PANIC("Error in: %s, missing procedure %.*s\n", token_pos_to_string(e->token.pos), LIT(e->token.string));
 	return {};
+}
+
+LLVMValueRef lb_make_global_truly_private(lbAddr const &addr) {
+	LLVMValueRef global_data = addr.addr.value;
+	// make it truly private data
+	LLVMSetLinkage(global_data, LLVMPrivateLinkage);
+	LLVMSetUnnamedAddress(global_data, LLVMGlobalUnnamedAddr);
+	LLVMSetGlobalConstant(global_data, true);
+	return global_data;
 }
 
 lbAddr lb_add_global_generated(lbModule *m, Type *type, lbValue value, Entity **entity_) {

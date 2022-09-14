@@ -758,9 +758,29 @@ lbProcedure *lb_create_startup_runtime(lbModule *main_module, lbProcedure *start
 		GB_ASSERT(e->kind == Entity_Variable);
 		e->code_gen_module = entity_module;
 
-		Ast *init_expr = var->decl->init_expr;
+		Ast *init_expr = unparen_expr(var->decl->init_expr);
 		if (init_expr != nullptr)  {
-			lbValue init = lb_build_expr(p, init_expr);
+			lbValue init = {};
+
+			if (!(is_type_any(e->type) || is_type_union(e->type))) {
+				if (init_expr->kind == Ast_UnaryExpr && init_expr->UnaryExpr.op.kind == Token_And) {
+					// NOTE(bill): Just get the value directly and store it in another global variable
+					Ast *expr = unparen_expr(init_expr->UnaryExpr.expr);
+					if (expr->tav.value.kind != ExactValue_Invalid) {
+						init = lb_build_expr(p, expr);
+						GB_ASSERT(init.value != nullptr);
+						GB_ASSERT(LLVMIsConstant(init.value));
+
+						lbAddr addr = lb_add_global_generated(p->module, init.type, init, nullptr);
+						LLVMValueRef global_val = lb_make_global_truly_private(addr);
+						LLVMSetInitializer(var->var.value, global_val);
+						var->is_initialized = true;
+						continue;
+					}
+				}
+			}
+
+			init = lb_build_expr(p, init_expr);
 			if (init.value == nullptr) {
 				LLVMTypeRef global_type = llvm_addr_type(p->module, var->var);
 				if (is_type_untyped_undef(init.type)) {
@@ -1587,7 +1607,6 @@ void lb_generate_code(lbGenerator *gen) {
 
 		bool is_foreign = e->Variable.is_foreign;
 		bool is_export  = e->Variable.is_export;
-
 
 		lbModule *m = &gen->default_module;
 		String name = lb_get_entity_name(m, e);
