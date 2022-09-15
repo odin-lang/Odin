@@ -41,7 +41,6 @@ gbString get_file_line_as_string(TokenPos const &pos, i32 *offset_) {
 
 	while (line_end < end) {
 		if (*line_end == '\n') {
-			line_end -= 1;
 			break;
 		}
 		line_end += 1;
