@@ -67,7 +67,7 @@ builder_init :: proc{
 }
 
 @(private)
-_builder_stream_vtable := &io.Stream_VTable{
+_builder_stream_vtable := io.Stream_VTable{
 	impl_write = proc(s: io.Stream, p: []byte) -> (n: int, err: io.Error) {
 		b := (^Builder)(s.stream_data)
 		n = write_bytes(b, p)
@@ -97,7 +97,7 @@ _builder_stream_vtable := &io.Stream_VTable{
 
 // return an `io.Stream` from a builder
 to_stream :: proc(b: ^Builder) -> io.Stream {
-	return io.Stream{stream_vtable=_builder_stream_vtable, stream_data=b}
+	return io.Stream{stream_vtable=&_builder_stream_vtable, stream_data=b}
 }
 
 // return an `io.Writer` from a builder
