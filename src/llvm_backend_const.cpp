@@ -390,6 +390,9 @@ lbValue lb_const_value(lbModule *m, Type *type, ExactValue value, bool allow_loc
 			Entity *e = entity_from_expr(expr);
 			res = lb_find_procedure_value_from_entity(m, e);
 		}
+		GB_ASSERT(res.value != nullptr);
+		GB_ASSERT(LLVMGetValueKind(res.value) == LLVMFunctionValueKind);
+
 		res.value = LLVMConstPointerCast(res.value, lb_type(m, res.type));
 		return res;
 	}

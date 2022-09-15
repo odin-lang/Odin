@@ -5,13 +5,13 @@ import "core:io"
 stream_from_handle :: proc(fd: Handle) -> io.Stream {
 	s: io.Stream
 	s.stream_data = rawptr(uintptr(fd))
-	s.stream_vtable = _file_stream_vtable
+	s.stream_vtable = &_file_stream_vtable
 	return s
 }
 
 
 @(private)
-_file_stream_vtable := &io.Stream_VTable{
+_file_stream_vtable := io.Stream_VTable{
 	impl_read = proc(s: io.Stream, p: []byte) -> (n: int, err: io.Error) {
 		fd := Handle(uintptr(s.stream_data))
 		os_err: Errno
