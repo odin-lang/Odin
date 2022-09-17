@@ -139,7 +139,7 @@ __get_map_header :: proc "contextless" (m: ^$T/map[$K]$V) -> Map_Header {
 	header := Map_Header{m = (^Raw_Map)(m)}
 	Entry :: struct {
 		hash:  uintptr,
-		next:  int,
+		next:  Map_Index,
 		key:   K,
 		value: V,
 	}
