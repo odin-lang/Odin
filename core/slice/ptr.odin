@@ -4,10 +4,10 @@ import "core:builtin"
 import "core:mem"
 
 ptr_add :: proc(p: $P/^$T, x: int) -> ^T {
-	return (^T)(uintptr(p) + size_of(T)*x)
+	return ([^]T)(p)[x:]
 }
 ptr_sub :: proc(p: $P/^$T, x: int) -> ^T {
-	return #force_inline ptr_add(p, -x)
+	return ([^]T)(p)[-x:]
 }
 
 ptr_swap_non_overlapping :: proc(x, y: rawptr, len: int) {
@@ -84,12 +84,14 @@ ptr_rotate :: proc(left: int, mid: ^$T, right: int) {
 				}
 			}
 		} else {
-			ptr_swap_non_overlapping(ptr_sub(mid, left), mid, left)
-			mid = ptr_add(mid, left)
+			for {
+				ptr_swap_non_overlapping(ptr_sub(mid, left), mid, left)
+				mid = ptr_add(mid, left)
 
-			right -= left
-			if right < left {
-				break
+				right -= left
+				if right < left {
+					break
+				}
 			}
 		}
 	}
