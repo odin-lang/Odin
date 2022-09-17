@@ -595,13 +595,11 @@ lbValue lb_const_hash(lbModule *m, lbValue key, Type *key_type) {
 	return hashed_key;
 }
 
-lbValue lb_gen_map_hash(lbProcedure *p, lbValue key, Type *key_type) {
-	lbAddr v = lb_add_local_generated(p, t_map_hash, true);
-	lbValue vp = lb_addr_get_ptr(p, v);
-	key = lb_emit_conv(p, key, key_type);
-
+lbValue lb_gen_map_key_hash(lbProcedure *p, lbValue key, Type *key_type, lbValue *key_ptr_) {
 	lbValue key_ptr = lb_address_from_load_or_generate_local(p, key);
 	key_ptr = lb_emit_conv(p, key_ptr, t_rawptr);
+
+	if (key_ptr_) *key_ptr_ = key_ptr;
 
 	lbValue hashed_key = lb_const_hash(p->module, key, key_type);
 	if (hashed_key.value == nullptr) {
@@ -613,10 +611,7 @@ lbValue lb_gen_map_hash(lbProcedure *p, lbValue key, Type *key_type) {
 		hashed_key = lb_emit_call(p, hasher, args);
 	}
 
-	lb_emit_store(p, lb_emit_struct_ep(p, vp, 0), hashed_key);
-	lb_emit_store(p, lb_emit_struct_ep(p, vp, 1), key_ptr);
-
-	return lb_addr_load(p, v);
+	return hashed_key;
 }
 
 void lb_insert_dynamic_map_key_and_value(lbProcedure *p, lbAddr addr, Type *map_type,
@@ -625,17 +620,19 @@ void lb_insert_dynamic_map_key_and_value(lbProcedure *p, lbAddr addr, Type *map_
 	GB_ASSERT(map_type->kind == Type_Map);
 
 	lbValue h = lb_gen_map_header(p, addr.addr, map_type);
-	lbValue key = lb_gen_map_hash(p, map_key, map_type->Map.key);
+	lbValue key_ptr = {};
+	lbValue key_hash = lb_gen_map_key_hash(p, map_key, map_type->Map.key, &key_ptr);
 	lbValue v = lb_emit_conv(p, map_value, map_type->Map.value);
 
 	lbAddr value_addr = lb_add_local_generated(p, v.type, false);
 	lb_addr_store(p, value_addr, v);
 
-	auto args = array_make<lbValue>(permanent_allocator(), 4);
+	auto args = array_make<lbValue>(permanent_allocator(), 5);
 	args[0] = h;
-	args[1] = key;
-	args[2] = lb_emit_conv(p, value_addr.addr, t_rawptr);
-	args[3] = lb_emit_source_code_location(p, node);
+	args[1] = key_hash;
+	args[2] = key_ptr;
+	args[3] = lb_emit_conv(p, value_addr.addr, t_rawptr);
+	args[4] = lb_emit_source_code_location(p, node);
 	lb_emit_runtime_call(p, "__dynamic_map_set", args);
 }
 
