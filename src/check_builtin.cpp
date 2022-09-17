@@ -1899,6 +1899,21 @@ bool check_builtin_procedure(CheckerContext *c, Operand *operand, Ast *call, i32
 			gb_string_free(t);
 			return false;
 		}
+
+		Type *bt = base_type(type);
+		if (bt->kind == Type_Struct && bt->Struct.scope != nullptr) {
+			if (is_type_polymorphic(bt)) {
+				gbString t = type_to_string(type);
+				error(field_arg, "Cannot use '%.*s' on an unspecialized polymorphic struct type, got '%s'", LIT(builtin_name), t);
+				gb_string_free(t);
+				return false;
+			} else if (bt->Struct.fields.count == 0 && bt->Struct.node == nullptr) {
+				gbString t = type_to_string(type);
+				error(field_arg, "Cannot use '%.*s' on incomplete struct declaration, got '%s'", LIT(builtin_name), t);
+				gb_string_free(t);
+				return false;
+			}
+		}
 		
 		Selection sel = lookup_field(type, field_name, false);
 		if (sel.entity == nullptr) {
