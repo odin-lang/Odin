@@ -11,11 +11,9 @@ Map_Hash :: struct {
 	key_ptr: rawptr, // address of Map_Entry_Header.key
 }
 
-__get_map_hash :: proc "contextless" (k: ^$K) -> (map_hash: Map_Hash) {
+__get_map_key_hash :: proc "contextless" (k: ^$K) -> uintptr {
 	hasher := intrinsics.type_hasher_proc(K)
-	map_hash.key_ptr = k
-	map_hash.hash = hasher(k, 0)
-	return
+	return hasher(k, 0)
 }
 
 __get_map_hash_from_entry :: proc "contextless" (h: Map_Header, entry: ^Map_Entry_Header, hash: ^Map_Hash) {
@@ -346,6 +344,13 @@ __dynamic_map_full :: #force_inline proc "contextless" (using h: Map_Header) -> 
 __dynamic_map_hash_equal :: #force_inline proc "contextless" (h: Map_Header, a, b: Map_Hash) -> bool {
 	return a.hash == b.hash && h.equal(a.key_ptr, b.key_ptr)
 }
+
+
+__map_find :: proc "contextless" (h: Map_Header, key_ptr: ^$K) -> Map_Find_Result #no_bounds_check {
+	hash := __get_map_key_hash(key_ptr)
+	return __dynamic_map_find(h, {hash, key_ptr})
+}
+
 
 __dynamic_map_find :: proc "contextless" (using h: Map_Header, hash: Map_Hash) -> Map_Find_Result #no_bounds_check {
 	fr := Map_Find_Result{MAP_SENTINEL, MAP_SENTINEL, MAP_SENTINEL}

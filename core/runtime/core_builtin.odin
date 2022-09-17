@@ -325,8 +325,7 @@ delete_key :: proc(m: ^$T/map[$K]$V, key: K) -> (deleted_key: K, deleted_value: 
 	if m != nil {
 		key := key
 		h := __get_map_header(m)
-		hash := __get_map_hash(&key)
-		fr := __dynamic_map_find(h, hash)
+		fr := __map_find(h, &key)
 		if fr.entry_index >= 0 {
 			entry := __dynamic_map_get_entry(h, fr.entry_index)
 			deleted_key   = (^K)(uintptr(entry)+h.key_offset)^
@@ -674,9 +673,8 @@ shrink_dynamic_array :: proc(array: ^$T/[dynamic]$E, new_cap := -1, loc := #call
 map_insert :: proc(m: ^$T/map[$K]$V, key: K, value: V, loc := #caller_location) -> (ptr: ^V) {
 	key, value := key, value
 	h := __get_map_header(m)
-	hash := __get_map_hash(&key)
-	
-	data := uintptr(__dynamic_map_set(h, hash, &value, loc))
+
+	data := uintptr(__dynamic_map_set(h, __get_map_key_hash(&key), &key, &value, loc))
 	return (^V)(data + h.value_offset)
 }
 
