@@ -283,3 +283,4 @@ shared/
 *.sublime-workspace
 examples/bug/
 build.sh
+!core/debug/
