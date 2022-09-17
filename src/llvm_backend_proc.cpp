@@ -121,8 +121,9 @@ lbProcedure *lb_create_procedure(lbModule *m, Entity *entity, bool ignore_body) 
 	p->branch_blocks.allocator = a;
 	p->context_stack.allocator = a;
 	p->scope_stack.allocator   = a;
-	map_init(&p->selector_values, a, 0);
-	map_init(&p->selector_addr,   a, 0);
+	map_init(&p->selector_values,  a, 0);
+	map_init(&p->selector_addr,    a, 0);
+	map_init(&p->map_header_cache, a, 0);
 
 	if (p->is_foreign) {
 		lb_add_foreign_library_path(p->module, entity->Procedure.foreign_library);
@@ -379,6 +380,8 @@ lbProcedure *lb_create_dummy_procedure(lbModule *m, String link_name, Type *type
 		lb_add_proc_attribute_at_index(p, offset+parameter_index, "nonnull");
 		lb_add_proc_attribute_at_index(p, offset+parameter_index, "nocapture");
 	}
+
+	map_init(&p->map_header_cache, heap_allocator(), 0);
 
 	return p;
 }
