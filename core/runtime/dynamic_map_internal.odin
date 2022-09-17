@@ -233,7 +233,7 @@ __dynamic_map_reserve :: proc(using header: Map_Header, cap: int, loc := #caller
 	context = c
 
 	cap := cap
-	cap = next_pow2(cap)
+	cap = ceil_to_pow2(cap)
 		
 	__dynamic_array_reserve(&m.entries, entry_size, entry_align, cap, loc)
 
@@ -309,7 +309,7 @@ __dynamic_map_set :: proc(h: Map_Header, hash: Map_Hash, value: rawptr, loc := #
 
 
 @(private="file")
-next_pow2 :: proc "contextless" (n: int) -> int {
+ceil_to_pow2 :: proc "contextless" (n: int) -> int {
 	n := n
 	if n <= 0 {
 		return 0
