@@ -289,7 +289,7 @@ clear_map :: proc "contextless" (m: ^$T/map[$K]$V) {
 	entries := (^Raw_Dynamic_Array)(&raw_map.entries)
 	entries.len = 0
 	for _, i in raw_map.hashes {
-		raw_map.hashes[i] = -1
+		raw_map.hashes[i] = MAP_SENTINEL
 	}
 }
 

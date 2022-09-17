@@ -24,17 +24,18 @@ __get_map_hash_from_entry :: proc "contextless" (h: Map_Header, entry: ^Map_Entr
 	return
 }
 
-
+Map_Index :: distinct uint
+MAP_SENTINEL :: ~Map_Index(0)
 
 Map_Find_Result :: struct {
-	hash_index:  int,
-	entry_prev:  int,
-	entry_index: int,
+	hash_index:  Map_Index,
+	entry_prev:  Map_Index,
+	entry_index: Map_Index,
 }
 
 Map_Entry_Header :: struct {
 	hash: uintptr,
-	next: int,
+	next: Map_Index,
 /*
 	key:   Key_Value,
 	value: Value_Type,
@@ -207,16 +208,16 @@ __slice_resize :: proc(array_: ^$T/[]$E, new_count: int, allocator: Allocator, l
 
 __dynamic_map_reset_entries :: proc(using header: Map_Header, loc := #caller_location) {
 	for i in 0..<len(m.hashes) {
-		m.hashes[i] = -1
+		m.hashes[i] = MAP_SENTINEL
 	}
 
-	for i in 0..<m.entries.len {
+	for i in 0..<Map_Index(m.entries.len) {
 		entry_header := __dynamic_map_get_entry(header, i)
 		entry_hash := __get_map_hash_from_entry(header, entry_header)
-		entry_header.next = -1
+		entry_header.next = MAP_SENTINEL
 		
 		fr := __dynamic_map_find(header, entry_hash)
-		if fr.entry_prev < 0 {
+		if fr.entry_prev == MAP_SENTINEL {
 			m.hashes[fr.hash_index] = i
 		} else {
 			e := __dynamic_map_get_entry(header, fr.entry_prev)
@@ -269,7 +270,7 @@ __dynamic_map_get :: proc(h: Map_Header, hash: Map_Hash) -> rawptr {
 }
 
 __dynamic_map_set :: proc(h: Map_Header, hash: Map_Hash, value: rawptr, loc := #caller_location) -> ^Map_Entry_Header #no_bounds_check {
-	index: int
+	index: Map_Index
 
 	if len(h.m.hashes) == 0 {
 		__dynamic_map_reserve(h, INITIAL_MAP_CAP, loc)
@@ -345,11 +346,11 @@ __dynamic_map_hash_equal :: proc "contextless" (h: Map_Header, a, b: Map_Hash) -
 }
 
 __dynamic_map_find :: proc(using h: Map_Header, hash: Map_Hash) -> Map_Find_Result #no_bounds_check {
-	fr := Map_Find_Result{-1, -1, -1}
+	fr := Map_Find_Result{MAP_SENTINEL, MAP_SENTINEL, MAP_SENTINEL}
 	if n := uintptr(len(m.hashes)); n != 0 {
-		fr.hash_index = int(hash.hash & (n-1))
+		fr.hash_index = Map_Index(hash.hash & (n-1))
 		fr.entry_index = m.hashes[fr.hash_index]
-		for fr.entry_index >= 0 {
+		for fr.entry_index != MAP_SENTINEL {
 			entry := __dynamic_map_get_entry(h, fr.entry_index)
 			entry_hash := __get_map_hash_from_entry(h, entry)
 			if __dynamic_map_hash_equal(h, entry_hash, hash) {
@@ -364,28 +365,28 @@ __dynamic_map_find :: proc(using h: Map_Header, hash: Map_Hash) -> Map_Find_Resu
 	return fr
 }
 
-__dynamic_map_add_entry :: proc(using h: Map_Header, hash: Map_Hash, loc := #caller_location) -> int {
-	prev := m.entries.len
-	c := __dynamic_array_append_nothing(&m.entries, entry_size, entry_align, loc)
+__dynamic_map_add_entry :: proc(using h: Map_Header, hash: Map_Hash, loc := #caller_location) -> Map_Index {
+	prev := Map_Index(m.entries.len)
+	c := Map_Index(__dynamic_array_append_nothing(&m.entries, entry_size, entry_align, loc))
 	if c != prev {
 		end := __dynamic_map_get_entry(h, c-1)
 		end.hash = hash.hash
 		mem_copy(rawptr(uintptr(end) + key_offset), hash.key_ptr, key_size)
-		end.next = -1
+		end.next = MAP_SENTINEL
 	}
 	return prev
 }
 
 __dynamic_map_delete_key :: proc(using h: Map_Header, hash: Map_Hash) {
 	fr := __dynamic_map_find(h, hash)
-	if fr.entry_index >= 0 {
+	if fr.entry_index != MAP_SENTINEL {
 		__dynamic_map_erase(h, fr)
 	}
 }
 
-__dynamic_map_get_entry :: proc(using h: Map_Header, index: int) -> ^Map_Entry_Header {
+__dynamic_map_get_entry :: proc(using h: Map_Header, index: Map_Index) -> ^Map_Entry_Header {
 	// assert(0 <= index && index < m.entries.len)
-	return (^Map_Entry_Header)(uintptr(m.entries.data) + uintptr(index*entry_size))
+	return (^Map_Entry_Header)(uintptr(m.entries.data) + uintptr(index*Map_Index(entry_size)))
 }
 
 __dynamic_map_copy_entry :: proc(h: Map_Header, new, old: ^Map_Entry_Header) {
@@ -393,23 +394,24 @@ __dynamic_map_copy_entry :: proc(h: Map_Header, new, old: ^Map_Entry_Header) {
 }
 
 __dynamic_map_erase :: proc(using h: Map_Header, fr: Map_Find_Result) #no_bounds_check {	
-	if fr.entry_prev < 0 {
+	if fr.entry_prev == MAP_SENTINEL {
 		m.hashes[fr.hash_index] = __dynamic_map_get_entry(h, fr.entry_index).next
 	} else {
 		prev := __dynamic_map_get_entry(h, fr.entry_prev)
 		curr := __dynamic_map_get_entry(h, fr.entry_index)
 		prev.next = curr.next
 	}
-	if fr.entry_index == m.entries.len-1 {
+	last_index := Map_Index(m.entries.len-1)
+	if fr.entry_index == last_index {
 		// NOTE(bill): No need to do anything else, just pop
 	} else {
 		old := __dynamic_map_get_entry(h, fr.entry_index)
-		end := __dynamic_map_get_entry(h, m.entries.len-1)
+		end := __dynamic_map_get_entry(h, last_index)
 		__dynamic_map_copy_entry(h, old, end)
 
 		old_hash := __get_map_hash_from_entry(h, old)
 
-		if last := __dynamic_map_find(h, old_hash); last.entry_prev >= 0 {
+		if last := __dynamic_map_find(h, old_hash); last.entry_prev != MAP_SENTINEL {
 			last_entry := __dynamic_map_get_entry(h, last.entry_prev)
 			last_entry.next = fr.entry_index
 		} else {
