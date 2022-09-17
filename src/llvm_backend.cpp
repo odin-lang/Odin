@@ -780,6 +780,9 @@ lbProcedure *lb_create_startup_runtime(lbModule *main_module, lbProcedure *start
 				var->init = init;
 			} else if (lb_is_const_or_global(init)) {
 				if (!var->is_initialized) {
+					if (is_type_proc(init.type)) {
+						init.value = LLVMConstPointerCast(init.value, lb_type(p->module, init.type));
+					}
 					LLVMSetInitializer(var->var.value, init.value);
 					var->is_initialized = true;
 					continue;
