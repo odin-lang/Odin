@@ -381,6 +381,8 @@ lbProcedure *lb_create_dummy_procedure(lbModule *m, String link_name, Type *type
 		lb_add_proc_attribute_at_index(p, offset+parameter_index, "nocapture");
 	}
 
+	map_init(&p->map_header_cache, heap_allocator(), 0);
+
 	return p;
 }
 
