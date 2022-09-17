@@ -326,7 +326,7 @@ delete_key :: proc(m: ^$T/map[$K]$V, key: K) -> (deleted_key: K, deleted_value: 
 		key := key
 		h := __get_map_header(m)
 		fr := __map_find(h, &key)
-		if fr.entry_index >= 0 {
+		if fr.entry_index != MAP_SENTINEL {
 			entry := __dynamic_map_get_entry(h, fr.entry_index)
 			deleted_key   = (^K)(uintptr(entry)+h.key_offset)^
 			deleted_value = (^V)(uintptr(entry)+h.value_offset)^
