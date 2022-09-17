@@ -1273,6 +1273,7 @@ void lb_build_type_switch_stmt(lbProcedure *p, AstTypeSwitchStmt *ss) {
 
 	lbValue parent = lb_build_expr(p, as->rhs[0]);
 	bool is_parent_ptr = is_type_pointer(parent.type);
+	Type *parent_base_type = type_deref(parent.type);
 
 	TypeSwitchKind switch_kind = check_valid_type_switch_type(parent.type);
 	GB_ASSERT(switch_kind != TypeSwitch_Invalid);
@@ -1288,8 +1289,11 @@ void lb_build_type_switch_stmt(lbProcedure *p, AstTypeSwitchStmt *ss) {
 	lbValue union_data = {};
 	if (switch_kind == TypeSwitch_Union) {
 		union_data = lb_emit_conv(p, parent_ptr, t_rawptr);
-		if (is_type_union_maybe_pointer(type_deref(parent_ptr.type))) {
+		Type *union_type = type_deref(parent_ptr.type);
+		if (is_type_union_maybe_pointer(union_type)) {
 			tag = lb_emit_conv(p, lb_emit_comp_against_nil(p, Token_NotEq, union_data), t_int);
+		} else if (union_tag_size(union_type) == 0) {
+			tag = {}; // there is no tag for a zero sized union
 		} else {
 			lbValue tag_ptr = lb_emit_union_tag_ptr(p, parent_ptr);
 			tag = lb_emit_load(p, tag_ptr);
@@ -1318,8 +1322,15 @@ void lb_build_type_switch_stmt(lbProcedure *p, AstTypeSwitchStmt *ss) {
 		}
 	}
 
-	GB_ASSERT(tag.value != nullptr);
-	LLVMValueRef switch_instr = LLVMBuildSwitch(p->builder, tag.value, else_block->block, cast(unsigned)num_cases);
+
+	LLVMValueRef switch_instr = nullptr;
+	if (type_size_of(parent_base_type) == 0) {
+		GB_ASSERT(tag.value == nullptr);
+		switch_instr = LLVMBuildSwitch(p->builder, lb_const_bool(p->module, t_llvm_bool, false).value, else_block->block, cast(unsigned)num_cases);
+	} else {
+		GB_ASSERT(tag.value != nullptr);
+		switch_instr = LLVMBuildSwitch(p->builder, tag.value, else_block->block, cast(unsigned)num_cases);
+	}
 
 	for_array(i, body->stmts) {
 		Ast *clause = body->stmts[i];
