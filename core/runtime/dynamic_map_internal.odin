@@ -181,7 +181,7 @@ __get_map_header_runtime :: proc "contextless" (m: ^Raw_Map, ti: Type_Info_Map) 
 }
 
 
-__slice_resize :: proc(array_: ^$T/[]$E, new_count: int, allocator: Allocator, loc := #caller_location) -> bool {
+__slice_resize :: proc "odin" (array_: ^$T/[]$E, new_count: int, allocator: Allocator, loc := #caller_location) -> bool {
 	array := (^Raw_Slice)(array_)
 
 	if new_count < array.len {
@@ -203,59 +203,55 @@ __slice_resize :: proc(array_: ^$T/[]$E, new_count: int, allocator: Allocator, l
 	return false
 }
 
-__dynamic_map_reset_entries :: proc "contextless" (using header: Map_Header, loc := #caller_location) {
-	for i in 0..<len(m.hashes) {
-		m.hashes[i] = MAP_SENTINEL
+__dynamic_map_reset_entries :: proc "contextless" (h: Map_Header, loc := #caller_location) {
+	for i in 0..<len(h.m.hashes) {
+		h.m.hashes[i] = MAP_SENTINEL
 	}
 
-	for i in 0..<Map_Index(m.entries.len) {
-		entry_header := __dynamic_map_get_entry(header, i)
+	for i in 0..<Map_Index(h.m.entries.len) {
+		entry_header := __dynamic_map_get_entry(h, i)
 		entry_hash: Map_Hash
-		__get_map_hash_from_entry(header, entry_header, &entry_hash)
+		__get_map_hash_from_entry(h, entry_header, &entry_hash)
 		entry_header.next = MAP_SENTINEL
 		
-		fr := __dynamic_map_find(header, entry_hash)
+		fr := __dynamic_map_find(h, entry_hash)
 		if fr.entry_prev == MAP_SENTINEL {
-			m.hashes[fr.hash_index] = i
+			h.m.hashes[fr.hash_index] = i
 		} else {
-			e := __dynamic_map_get_entry(header, fr.entry_prev)
+			e := __dynamic_map_get_entry(h, fr.entry_prev)
 			e.next = i
 		}
 	}
 }
 
-__dynamic_map_reserve :: proc(using header: Map_Header, cap: int, loc := #caller_location) {
+__dynamic_map_reserve :: proc "odin" (h: Map_Header, cap: int, loc := #caller_location) {
 	c := context
-	if m.entries.allocator.procedure != nil {
-		c.allocator = m.entries.allocator
+	if h.m.entries.allocator.procedure != nil {
+		c.allocator = h.m.entries.allocator
 	}
 	context = c
 
 	cap := cap
 	cap = ceil_to_pow2(cap)
 		
-	__dynamic_array_reserve(&m.entries, entry_size, entry_align, cap, loc)
+	__dynamic_array_reserve(&h.m.entries, h.entry_size, h.entry_align, cap, loc)
 
-	if m.entries.len*2 < len(m.hashes) {
+	if h.m.entries.len*2 < len(h.m.hashes) {
 		return
 	}
-	if __slice_resize(&m.hashes, cap*2, m.entries.allocator, loc) {
-		__dynamic_map_reset_entries(header, loc)
+	if __slice_resize(&h.m.hashes, cap*2, h.m.entries.allocator, loc) {
+		__dynamic_map_reset_entries(h, loc)
 	}
 }
 
-__dynamic_map_shrink :: proc(using header: Map_Header, cap: int, loc := #caller_location) -> (did_shrink: bool) {
+__dynamic_map_shrink :: proc "odin" (h: Map_Header, cap: int, loc := #caller_location) -> (did_shrink: bool) {
 	c := context
-	if m.entries.allocator.procedure != nil {
-		c.allocator = m.entries.allocator
+	if h.m.entries.allocator.procedure != nil {
+		c.allocator = h.m.entries.allocator
 	}
 	context = c
 
-	return __dynamic_array_shrink(&m.entries, entry_size, entry_align, cap, loc)
-}
-
-__dynamic_map_rehash :: proc(using header: Map_Header, new_count: int, loc := #caller_location) {
-	#force_inline __dynamic_map_reserve(header, new_count, loc)
+	return __dynamic_array_shrink(&h.m.entries, h.entry_size, h.entry_align, cap, loc)
 }
 
 // USED INTERNALLY BY THE COMPILER
@@ -269,8 +265,19 @@ __dynamic_map_get :: proc "contextless" (h: Map_Header, key_hash: uintptr, key_p
 }
 
 // USED INTERNALLY BY THE COMPILER
-__dynamic_map_set :: proc(h: Map_Header, key_hash: uintptr, key_ptr: rawptr, value: rawptr, loc := #caller_location) -> ^Map_Entry_Header #no_bounds_check {
-	hash := Map_Hash{key_hash, key_ptr}
+__dynamic_map_set :: proc "odin" (h: Map_Header, key_hash: uintptr, key_ptr: rawptr, value: rawptr, loc := #caller_location) -> ^Map_Entry_Header #no_bounds_check {
+	add_entry :: proc "odin" (h: Map_Header, key_hash: uintptr, key_ptr: rawptr, loc := #caller_location) -> Map_Index {
+		prev := Map_Index(h.m.entries.len)
+		c := Map_Index(__dynamic_array_append_nothing(&h.m.entries, h.entry_size, h.entry_align, loc))
+		if c != prev {
+			end := __dynamic_map_get_entry(h, c-1)
+			end.hash = key_hash
+			mem_copy(rawptr(uintptr(end) + h.key_offset), key_ptr, h.key_size)
+			end.next = MAP_SENTINEL
+		}
+		return prev
+	}
+
 	index := MAP_SENTINEL
 
 	if len(h.m.hashes) == 0 {
@@ -278,11 +285,11 @@ __dynamic_map_set :: proc(h: Map_Header, key_hash: uintptr, key_ptr: rawptr, val
 		__dynamic_map_grow(h, loc)
 	}
 
-	fr := __dynamic_map_find(h, hash)
+	fr := __dynamic_map_find(h, {key_hash, key_ptr})
 	if fr.entry_index != MAP_SENTINEL {
 		index = fr.entry_index
 	} else {
-		index = __dynamic_map_add_entry(h, hash, loc)
+		index = add_entry(h, key_hash, key_ptr, loc)
 		if fr.entry_prev != MAP_SENTINEL {
 			entry := __dynamic_map_get_entry(h, fr.entry_prev)
 			entry.next = index
@@ -294,10 +301,10 @@ __dynamic_map_set :: proc(h: Map_Header, key_hash: uintptr, key_ptr: rawptr, val
 	}
 
 	e := __dynamic_map_get_entry(h, index)
-	e.hash = hash.hash
+	e.hash = key_hash
 	
 	key := rawptr(uintptr(e) + h.key_offset)
-	mem_copy(key, hash.key_ptr, h.key_size)
+	mem_copy(key, key_ptr, h.key_size)
 
 	val := rawptr(uintptr(e) + h.value_offset)
 	mem_copy(val, value, h.value_size)
@@ -331,18 +338,14 @@ ceil_to_pow2 :: proc "contextless" (n: int) -> int {
 	return n
 }
 
-__dynamic_map_grow :: proc(using h: Map_Header, loc := #caller_location) {
-	new_count := max(m.entries.cap * 2, INITIAL_MAP_CAP)
-	__dynamic_map_rehash(h, new_count, loc)
+__dynamic_map_grow :: proc "odin" (h: Map_Header, loc := #caller_location) {
+	new_count := max(h.m.entries.cap * 2, INITIAL_MAP_CAP)
+	// Rehash through Reserve
+	__dynamic_map_reserve(h, new_count, loc)
 }
 
-__dynamic_map_full :: #force_inline proc "contextless" (using h: Map_Header) -> bool {
-	return int(0.75 * f64(len(m.hashes))) <= m.entries.len
-}
-
-
-__dynamic_map_hash_equal :: #force_inline proc "contextless" (h: Map_Header, a, b: Map_Hash) -> bool {
-	return a.hash == b.hash && h.equal(a.key_ptr, b.key_ptr)
+__dynamic_map_full :: #force_inline proc "contextless" (h: Map_Header) -> bool {
+	return int(0.75 * f64(len(h.m.hashes))) <= h.m.entries.len
 }
 
 
@@ -352,16 +355,17 @@ __map_find :: proc "contextless" (h: Map_Header, key_ptr: ^$K) -> Map_Find_Resul
 }
 
 
-__dynamic_map_find :: proc "contextless" (using h: Map_Header, hash: Map_Hash) -> Map_Find_Result #no_bounds_check {
+__dynamic_map_find :: proc "contextless" (h: Map_Header, hash: Map_Hash) -> Map_Find_Result #no_bounds_check {
 	fr := Map_Find_Result{MAP_SENTINEL, MAP_SENTINEL, MAP_SENTINEL}
-	if n := uintptr(len(m.hashes)); n != 0 {
+	if n := uintptr(len(h.m.hashes)); n != 0 {
 		fr.hash_index = Map_Index(hash.hash & (n-1))
-		fr.entry_index = m.hashes[fr.hash_index]
+		fr.entry_index = h.m.hashes[fr.hash_index]
 		for fr.entry_index != MAP_SENTINEL {
 			entry := __dynamic_map_get_entry(h, fr.entry_index)
 			entry_hash: Map_Hash
 			__get_map_hash_from_entry(h, entry, &entry_hash)
-			if __dynamic_map_hash_equal(h, entry_hash, hash) {
+
+			if entry_hash.hash == hash.hash && h.equal(entry_hash.key_ptr, hash.key_ptr) {
 				return fr
 			}
 			// assert(entry.next < m.entries.len)
@@ -373,48 +377,36 @@ __dynamic_map_find :: proc "contextless" (using h: Map_Header, hash: Map_Hash) -
 	return fr
 }
 
-__dynamic_map_add_entry :: proc(using h: Map_Header, hash: Map_Hash, loc := #caller_location) -> Map_Index {
-	prev := Map_Index(m.entries.len)
-	c := Map_Index(__dynamic_array_append_nothing(&m.entries, entry_size, entry_align, loc))
-	if c != prev {
-		end := __dynamic_map_get_entry(h, c-1)
-		end.hash = hash.hash
-		mem_copy(rawptr(uintptr(end) + key_offset), hash.key_ptr, key_size)
-		end.next = MAP_SENTINEL
-	}
-	return prev
-}
-
-__dynamic_map_delete_key :: proc "contextless" (using h: Map_Header, hash: Map_Hash) {
+__dynamic_map_delete_key :: proc "contextless" (h: Map_Header, hash: Map_Hash) {
 	fr := __dynamic_map_find(h, hash)
 	if fr.entry_index != MAP_SENTINEL {
 		__dynamic_map_erase(h, fr)
 	}
 }
 
-__dynamic_map_get_entry :: #force_inline proc "contextless" (using h: Map_Header, index: Map_Index) -> ^Map_Entry_Header {
-	return (^Map_Entry_Header)(uintptr(m.entries.data) + uintptr(index*Map_Index(entry_size)))
+__dynamic_map_get_entry :: #force_inline proc "contextless" (h: Map_Header, index: Map_Index) -> ^Map_Entry_Header {
+	return (^Map_Entry_Header)(uintptr(h.m.entries.data) + uintptr(index*Map_Index(h.entry_size)))
 }
 
 __dynamic_map_copy_entry :: proc "contextless" (h: Map_Header, new, old: ^Map_Entry_Header) {
 	mem_copy(new, old, h.entry_size)
 }
 
-__dynamic_map_erase :: proc "contextless" (using h: Map_Header, fr: Map_Find_Result) #no_bounds_check {
+__dynamic_map_erase :: proc "contextless" (h: Map_Header, fr: Map_Find_Result) #no_bounds_check {
 	if fr.entry_prev == MAP_SENTINEL {
-		m.hashes[fr.hash_index] = __dynamic_map_get_entry(h, fr.entry_index).next
+		h.m.hashes[fr.hash_index] = __dynamic_map_get_entry(h, fr.entry_index).next
 	} else {
 		prev := __dynamic_map_get_entry(h, fr.entry_prev)
 		curr := __dynamic_map_get_entry(h, fr.entry_index)
 		prev.next = curr.next
 	}
-	last_index := Map_Index(m.entries.len-1)
+	last_index := Map_Index(h.m.entries.len-1)
 	if fr.entry_index == last_index {
 		// NOTE(bill): No need to do anything else, just pop
 	} else {
 		old := __dynamic_map_get_entry(h, fr.entry_index)
 		end := __dynamic_map_get_entry(h, last_index)
-		__dynamic_map_copy_entry(h, old, end)
+		mem_copy(old, end, h.entry_size)
 
 		old_hash: Map_Hash
 		__get_map_hash_from_entry(h, old, &old_hash)
@@ -423,9 +415,9 @@ __dynamic_map_erase :: proc "contextless" (using h: Map_Header, fr: Map_Find_Res
 			last_entry := __dynamic_map_get_entry(h, last.entry_prev)
 			last_entry.next = fr.entry_index
 		} else {
-			m.hashes[last.hash_index] = fr.entry_index
+			h.m.hashes[last.hash_index] = fr.entry_index
 		}
 	}
 
-	m.entries.len -= 1
+	h.m.entries.len -= 1
 }
