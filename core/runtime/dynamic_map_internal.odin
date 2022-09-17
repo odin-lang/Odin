@@ -262,7 +262,7 @@ __dynamic_map_rehash :: proc(using header: Map_Header, new_count: int, loc := #c
 
 __dynamic_map_get :: proc(h: Map_Header, hash: Map_Hash) -> rawptr {
 	index := __dynamic_map_find(h, hash).entry_index
-	if index >= 0 {
+	if index != MAP_SENTINEL {
 		data := uintptr(__dynamic_map_get_entry(h, index))
 		return rawptr(data + h.value_offset)
 	}
@@ -270,7 +270,7 @@ __dynamic_map_get :: proc(h: Map_Header, hash: Map_Hash) -> rawptr {
 }
 
 __dynamic_map_set :: proc(h: Map_Header, hash: Map_Hash, value: rawptr, loc := #caller_location) -> ^Map_Entry_Header #no_bounds_check {
-	index: Map_Index
+	index := MAP_SENTINEL
 
 	if len(h.m.hashes) == 0 {
 		__dynamic_map_reserve(h, INITIAL_MAP_CAP, loc)
@@ -278,14 +278,14 @@ __dynamic_map_set :: proc(h: Map_Header, hash: Map_Hash, value: rawptr, loc := #
 	}
 
 	fr := __dynamic_map_find(h, hash)
-	if fr.entry_index >= 0 {
+	if fr.entry_index != MAP_SENTINEL {
 		index = fr.entry_index
 	} else {
 		index = __dynamic_map_add_entry(h, hash, loc)
-		if fr.entry_prev >= 0 {
+		if fr.entry_prev != MAP_SENTINEL {
 			entry := __dynamic_map_get_entry(h, fr.entry_prev)
 			entry.next = index
-		} else if fr.hash_index >= 0 {
+		} else if fr.hash_index != MAP_SENTINEL {
 			h.m.hashes[fr.hash_index] = index
 		} else {
 			return nil
