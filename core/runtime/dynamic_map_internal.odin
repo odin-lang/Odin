@@ -334,7 +334,6 @@ ceil_to_pow2 :: proc "contextless" (n: int) -> int {
 }
 
 __dynamic_map_grow :: proc(using h: Map_Header, loc := #caller_location) {
-	// TODO(bill): Determine an efficient growing rate
 	new_count := max(m.entries.cap * 2, INITIAL_MAP_CAP)
 	__dynamic_map_rehash(h, new_count, loc)
 }
@@ -344,7 +343,7 @@ __dynamic_map_full :: #force_inline proc "contextless" (using h: Map_Header) -> 
 }
 
 
-__dynamic_map_hash_equal :: proc "contextless" (h: Map_Header, a, b: Map_Hash) -> bool {
+__dynamic_map_hash_equal :: #force_inline proc "contextless" (h: Map_Header, a, b: Map_Hash) -> bool {
 	return a.hash == b.hash && h.equal(a.key_ptr, b.key_ptr)
 }
 
@@ -388,7 +387,7 @@ __dynamic_map_delete_key :: proc "contextless" (using h: Map_Header, hash: Map_H
 	}
 }
 
-__dynamic_map_get_entry :: proc "contextless" (using h: Map_Header, index: Map_Index) -> ^Map_Entry_Header {
+__dynamic_map_get_entry :: #force_inline proc "contextless" (using h: Map_Header, index: Map_Index) -> ^Map_Entry_Header {
 	return (^Map_Entry_Header)(uintptr(m.entries.data) + uintptr(index*Map_Index(entry_size)))
 }
 
