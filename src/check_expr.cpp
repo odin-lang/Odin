@@ -4022,6 +4022,7 @@ ExactValue get_constant_field_single(CheckerContext *c, ExactValue value, i32 in
 
 		if (cl->elems[0]->kind == Ast_FieldValue) {
 			if (is_type_struct(node->tav.type)) {
+				bool found = false;
 				for_array(i, cl->elems) {
 					Ast *elem = cl->elems[i];
 					if (elem->kind != Ast_FieldValue) {
@@ -4033,8 +4034,13 @@ ExactValue get_constant_field_single(CheckerContext *c, ExactValue value, i32 in
 					defer (array_free(&sub_sel.index));
 					if (sub_sel.index[0] == index) {
 						value = fv->value->tav.value;
+						found = true;
 						break;
 					}
+				}
+				if (!found) {
+					// Use the zero value if it is not found
+					value = {};
 				}
 			} else if (is_type_array(node->tav.type) || is_type_enumerated_array(node->tav.type)) {
 				for_array(i, cl->elems) {
@@ -4677,7 +4683,7 @@ Entity *check_selector(CheckerContext *c, Operand *operand, Ast *node, Type *typ
 
 	switch (entity->kind) {
 	case Entity_Constant:
-		operand->value = entity->Constant.value;
+	operand->value = entity->Constant.value;
 		operand->mode = Addressing_Constant;
 		if (operand->value.kind == ExactValue_Procedure) {
 			Entity *proc = strip_entity_wrapping(operand->value.value_procedure);
