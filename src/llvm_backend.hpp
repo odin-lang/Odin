@@ -308,6 +308,7 @@ struct lbProcedure {
 
 	PtrMap<Ast *, lbValue> selector_values;
 	PtrMap<Ast *, lbAddr>  selector_addr;
+	PtrMap<LLVMValueRef, lbAddr> map_header_cache;
 };
 
 
