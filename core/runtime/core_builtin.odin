@@ -296,7 +296,7 @@ clear_map :: proc "contextless" (m: ^$T/map[$K]$V) {
 @builtin
 reserve_map :: proc(m: ^$T/map[$K]$V, capacity: int, loc := #caller_location) {
 	if m != nil {
-		__dynamic_map_reserve(__get_map_header(m), capacity, loc)
+		__dynamic_map_reserve(__get_map_header(m), uint(capacity), loc)
 	}
 }
 
@@ -334,7 +334,6 @@ delete_key :: proc(m: ^$T/map[$K]$V, key: K) -> (deleted_key: K, deleted_value: 
 			__dynamic_map_erase(h, fr)
 		}
 	}
-
 	return
 }
 
