@@ -1423,15 +1423,9 @@ lbValue lb_build_binary_expr(lbProcedure *p, Ast *expr) {
 			switch (rt->kind) {
 			case Type_Map:
 				{
-					lbValue addr = lb_address_from_load_or_generate_local(p, right);
-					lbValue h = lb_gen_map_header(p, addr, rt);
-					lbValue key = lb_gen_map_hash(p, left, rt->Map.key);
-
-					auto args = array_make<lbValue>(permanent_allocator(), 2);
-					args[0] = h;
-					args[1] = key;
-
-					lbValue ptr = lb_emit_runtime_call(p, "__dynamic_map_get", args);
+					lbValue map_ptr = lb_address_from_load_or_generate_local(p, right);
+					lbValue key = left;
+					lbValue ptr = lb_internal_dynamic_map_get_ptr(p, map_ptr, key);
 					if (be->op.kind == Token_in) {
 						return lb_emit_conv(p, lb_emit_comp_against_nil(p, Token_NotEq, ptr), t_bool);
 					} else {

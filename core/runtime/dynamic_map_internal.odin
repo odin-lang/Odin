@@ -18,10 +18,9 @@ __get_map_hash :: proc "contextless" (k: ^$K) -> (map_hash: Map_Hash) {
 	return
 }
 
-__get_map_hash_from_entry :: proc "contextless" (h: Map_Header, entry: ^Map_Entry_Header) -> (hash: Map_Hash) {
+__get_map_hash_from_entry :: proc "contextless" (h: Map_Header, entry: ^Map_Entry_Header, hash: ^Map_Hash) {
 	hash.hash = entry.hash
 	hash.key_ptr = rawptr(uintptr(entry) + h.key_offset)
-	return
 }
 
 Map_Index :: distinct uint
@@ -213,7 +212,8 @@ __dynamic_map_reset_entries :: proc(using header: Map_Header, loc := #caller_loc
 
 	for i in 0..<Map_Index(m.entries.len) {
 		entry_header := __dynamic_map_get_entry(header, i)
-		entry_hash := __get_map_hash_from_entry(header, entry_header)
+		entry_hash: Map_Hash
+		__get_map_hash_from_entry(header, entry_header, &entry_hash)
 		entry_header.next = MAP_SENTINEL
 		
 		fr := __dynamic_map_find(header, entry_hash)
@@ -260,8 +260,9 @@ __dynamic_map_rehash :: proc(using header: Map_Header, new_count: int, loc := #c
 	#force_inline __dynamic_map_reserve(header, new_count, loc)
 }
 
-__dynamic_map_get :: proc(h: Map_Header, hash: Map_Hash) -> rawptr {
-	index := __dynamic_map_find(h, hash).entry_index
+// USED INTERNALLY BY THE COMPILER
+__dynamic_map_get :: proc(h: Map_Header, key_hash: uintptr, key_ptr: rawptr) -> rawptr {
+	index := __dynamic_map_find(h, {key_hash, key_ptr}).entry_index
 	if index != MAP_SENTINEL {
 		data := uintptr(__dynamic_map_get_entry(h, index))
 		return rawptr(data + h.value_offset)
@@ -269,7 +270,9 @@ __dynamic_map_get :: proc(h: Map_Header, hash: Map_Hash) -> rawptr {
 	return nil
 }
 
-__dynamic_map_set :: proc(h: Map_Header, hash: Map_Hash, value: rawptr, loc := #caller_location) -> ^Map_Entry_Header #no_bounds_check {
+// USED INTERNALLY BY THE COMPILER
+__dynamic_map_set :: proc(h: Map_Header, key_hash: uintptr, key_ptr: rawptr, value: rawptr, loc := #caller_location) -> ^Map_Entry_Header #no_bounds_check {
+	hash := Map_Hash{key_hash, key_ptr}
 	index := MAP_SENTINEL
 
 	if len(h.m.hashes) == 0 {
@@ -352,7 +355,8 @@ __dynamic_map_find :: proc(using h: Map_Header, hash: Map_Hash) -> Map_Find_Resu
 		fr.entry_index = m.hashes[fr.hash_index]
 		for fr.entry_index != MAP_SENTINEL {
 			entry := __dynamic_map_get_entry(h, fr.entry_index)
-			entry_hash := __get_map_hash_from_entry(h, entry)
+			entry_hash: Map_Hash
+			__get_map_hash_from_entry(h, entry, &entry_hash)
 			if __dynamic_map_hash_equal(h, entry_hash, hash) {
 				return fr
 			}
@@ -409,7 +413,8 @@ __dynamic_map_erase :: proc(using h: Map_Header, fr: Map_Find_Result) #no_bounds
 		end := __dynamic_map_get_entry(h, last_index)
 		__dynamic_map_copy_entry(h, old, end)
 
-		old_hash := __get_map_hash_from_entry(h, old)
+		old_hash: Map_Hash
+		__get_map_hash_from_entry(h, old, &old_hash)
 
 		if last := __dynamic_map_find(h, old_hash); last.entry_prev != MAP_SENTINEL {
 			last_entry := __dynamic_map_get_entry(h, last.entry_prev)
