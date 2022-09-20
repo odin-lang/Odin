@@ -2107,6 +2107,9 @@ bool is_type_polymorphic(Type *t, bool or_specialized=false) {
 	case Type_Pointer:
 		return is_type_polymorphic(t->Pointer.elem, or_specialized);
 
+	case Type_MultiPointer:
+		return is_type_polymorphic(t->MultiPointer.elem, or_specialized);
+
 	case Type_SoaPointer:
 		return is_type_polymorphic(t->SoaPointer.elem, or_specialized);
 
@@ -2129,6 +2132,15 @@ bool is_type_polymorphic(Type *t, bool or_specialized=false) {
 		return is_type_polymorphic(t->DynamicArray.elem, or_specialized);
 	case Type_Slice:
 		return is_type_polymorphic(t->Slice.elem, or_specialized);
+
+	case Type_Matrix:
+		if (t->Matrix.generic_row_count != nullptr) {
+			return true;
+		}
+		if (t->Matrix.generic_column_count != nullptr) {
+			return true;
+		}
+		return is_type_polymorphic(t->Matrix.elem, or_specialized);
 
 	case Type_Tuple:
 		for_array(i, t->Tuple.variables) {
@@ -2196,6 +2208,34 @@ bool is_type_polymorphic(Type *t, bool or_specialized=false) {
 		}
 		break;
 
+	case Type_BitSet:
+		if (is_type_polymorphic(t->BitSet.elem, or_specialized)) {
+			return true;
+		}
+		if (t->BitSet.underlying != nullptr &&
+		    is_type_polymorphic(t->BitSet.underlying, or_specialized)) {
+			return true;
+		}
+		break;
+
+	case Type_RelativeSlice:
+		if (is_type_polymorphic(t->RelativeSlice.slice_type, or_specialized)) {
+			return true;
+		}
+		if (t->RelativeSlice.base_integer != nullptr &&
+		    is_type_polymorphic(t->RelativeSlice.base_integer, or_specialized)) {
+			return true;
+		}
+		break;
+	case Type_RelativePointer:
+		if (is_type_polymorphic(t->RelativePointer.pointer_type, or_specialized)) {
+			return true;
+		}
+		if (t->RelativePointer.base_integer != nullptr &&
+		    is_type_polymorphic(t->RelativePointer.base_integer, or_specialized)) {
+			return true;
+		}
+		break;
 	}
 
 	return false;
