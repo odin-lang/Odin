@@ -271,6 +271,7 @@ odin
 odin.dSYM
 *.bin
 demo.bin
+libLLVM*.so
 
 # shared collection
 shared/
