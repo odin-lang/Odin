@@ -1143,6 +1143,12 @@ bool is_polymorphic_type_assignable(CheckerContext *c, Type *poly, Type *source,
 				return true;
 			}
 			return is_polymorphic_type_assignable(c, poly->Pointer.elem, source->Pointer.elem, true, modify_type);
+		} else if (source->kind == Type_MultiPointer) {
+			isize level = check_is_assignable_to_using_subtype(source->MultiPointer.elem, poly->Pointer.elem);
+			if (level > 0) {
+				return true;
+			}
+			return is_polymorphic_type_assignable(c, poly->Pointer.elem, source->MultiPointer.elem, true, modify_type);
 		}
 		return false;
 
@@ -1153,6 +1159,12 @@ bool is_polymorphic_type_assignable(CheckerContext *c, Type *poly, Type *source,
 				return true;
 			}
 			return is_polymorphic_type_assignable(c, poly->MultiPointer.elem, source->MultiPointer.elem, true, modify_type);
+		} else if (source->kind == Type_Pointer) {
+			isize level = check_is_assignable_to_using_subtype(source->Pointer.elem, poly->MultiPointer.elem);
+			if (level > 0) {
+				return true;
+			}
+			return is_polymorphic_type_assignable(c, poly->MultiPointer.elem, source->Pointer.elem, true, modify_type);
 		}
 		return false;
 	case Type_Array:
