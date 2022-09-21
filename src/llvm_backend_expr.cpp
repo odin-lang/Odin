@@ -3717,8 +3717,11 @@ lbAddr lb_build_addr_index_expr(lbProcedure *p, Ast *expr) {
 				ExactValue idx = exact_value_sub(index_tv.value, *t->EnumeratedArray.min_value);
 				index = lb_const_value(p->module, index_type, idx);
 			} else {
-				index = lb_emit_conv(p, lb_build_expr(p, ie->index), t_int);
-				index = lb_emit_arith(p, Token_Sub, index, lb_const_value(p->module, index_type, *t->EnumeratedArray.min_value), index_type);
+				index = lb_emit_arith(p, Token_Sub,
+				                      lb_build_expr(p, ie->index),
+				                      lb_const_value(p->module, index_type, *t->EnumeratedArray.min_value),
+				                      index_type);
+				index = lb_emit_conv(p, index, t_int);
 			}
 		} else {
 			index = lb_emit_conv(p, lb_build_expr(p, ie->index), t_int);
