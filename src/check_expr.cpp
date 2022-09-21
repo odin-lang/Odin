@@ -9106,7 +9106,20 @@ ExprKind check_slice_expr(CheckerContext *c, Operand *o, Ast *node, Type *type_h
 		o->type = t->RelativeSlice.slice_type;
 		if (o->mode != Addressing_Variable) {
 			gbString str = expr_to_string(node);
-			error(node, "Cannot relative slice '%s', value is not addressable", str);
+			error(node, "Cannot relative slice '%s', as value is not addressable", str);
+			gb_string_free(str);
+			o->mode = Addressing_Invalid;
+			o->expr = node;
+			return kind;
+		}
+		break;
+
+	case Type_EnumeratedArray:
+		{
+			gbString str = expr_to_string(o->expr);
+			gbString type_str = type_to_string(o->type);
+			error(o->expr, "Cannot slice '%s' of type '%s', as enumerated arrays cannot be sliced", str, type_str);
+			gb_string_free(type_str);
 			gb_string_free(str);
 			o->mode = Addressing_Invalid;
 			o->expr = node;
