@@ -74,6 +74,9 @@ void lb_init_module(lbModule *m, Checker *c) {
 
 	string_map_init(&m->objc_classes, a);
 	string_map_init(&m->objc_selectors, a);
+
+	map_init(&m->map_header_table_map, a, 0);
+
 }
 
 bool lb_init_generator(lbGenerator *gen, Checker *c) {
@@ -381,21 +384,6 @@ Type *lb_addr_type(lbAddr const &addr) {
 		return addr.swizzle_large.type;
 	}
 	return type_deref(addr.addr.type);
-}
-
-lbValue lb_internal_dynamic_map_get_ptr(lbProcedure *p, lbValue const &map_ptr, lbValue const &key) {
-	Type *map_type = base_type(type_deref(map_ptr.type));
-	lbValue h = lb_gen_map_header(p, map_ptr, map_type);
-
-	lbValue key_ptr = {};
-	auto args = array_make<lbValue>(permanent_allocator(), 3);
-	args[0] = h;
-	args[1] = lb_gen_map_key_hash(p, key, map_type->Map.key, &key_ptr);
-	args[2] = key_ptr;
-
-	lbValue ptr = lb_emit_runtime_call(p, "__dynamic_map_get", args);
-
-	return lb_emit_conv(p, ptr, alloc_type_pointer(map_type->Map.value));
 }
 
 lbValue lb_addr_get_ptr(lbProcedure *p, lbAddr const &addr) {
@@ -715,7 +703,7 @@ void lb_addr_store(lbProcedure *p, lbAddr addr, lbValue value) {
 
 		return;
 	} else if (addr.kind == lbAddr_Map) {
-		lb_insert_dynamic_map_key_and_value(p, addr, addr.map.type, addr.map.key, value, p->curr_stmt);
+		lb_insert_dynamic_map_key_and_value(p, addr.addr, addr.map.type, addr.map.key, value, p->curr_stmt);
 		return;
 	} else if (addr.kind == lbAddr_Context) {
 		lbAddr old_addr = lb_find_or_generate_context_ptr(p);

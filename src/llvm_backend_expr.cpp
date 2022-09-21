@@ -3670,16 +3670,14 @@ lbAddr lb_build_addr_index_expr(lbProcedure *p, Ast *expr) {
 
 	if (is_type_map(t)) {
 		lbAddr map_addr = lb_build_addr(p, ie->expr);
-		lbValue map_val = lb_addr_load(p, map_addr);
-		if (deref) {
-			map_val = lb_emit_load(p, map_val);
-		}
-
 		lbValue key = lb_build_expr(p, ie->index);
 		key = lb_emit_conv(p, key, t->Map.key);
 
 		Type *result_type = type_of_expr(expr);
-		lbValue map_ptr = lb_address_from_load_or_generate_local(p, map_val);
+		lbValue map_ptr = lb_addr_get_ptr(p, map_addr);
+		if (is_type_pointer(type_deref(map_ptr.type))) {
+			map_ptr = lb_emit_load(p, map_ptr);
+		}
 		return lb_addr_map(map_ptr, key, t, result_type);
 	}
 
@@ -4130,20 +4128,16 @@ lbAddr lb_build_addr_compound_lit(lbProcedure *p, Ast *expr) {
 			break;
 		}
 		GB_ASSERT(!build_context.no_dynamic_literals);
-		{
-			auto args = array_make<lbValue>(permanent_allocator(), 3);
-			args[0] = lb_gen_map_header(p, v.addr, type);
-			args[1] = lb_const_int(p->module, t_int, 2*cl->elems.count);
-			args[2] = lb_emit_source_code_location(p, proc_name, pos);
-			lb_emit_runtime_call(p, "__dynamic_map_reserve", args);
-		}
+
+		lb_dynamic_map_reserve(p, v.addr, 2*cl->elems.count, pos);
+
 		for_array(field_index, cl->elems) {
 			Ast *elem = cl->elems[field_index];
 			ast_node(fv, FieldValue, elem);
 
 			lbValue key   = lb_build_expr(p, fv->field);
 			lbValue value = lb_build_expr(p, fv->value);
-			lb_insert_dynamic_map_key_and_value(p, v, type, key, value, elem);
+			lb_insert_dynamic_map_key_and_value(p, v.addr, type, key, value, elem);
 		}
 		break;
 	}

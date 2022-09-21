@@ -57,17 +57,20 @@ Map_Header :: struct {
 }
 
 // USED INTERNALLY BY THE COMPILER
-__dynamic_map_get :: proc "contextless" (h: Map_Header, key_hash: uintptr, key_ptr: rawptr) -> rawptr {
-	index := __dynamic_map_find(h, key_hash, key_ptr).entry_index
-	if index != MAP_SENTINEL {
-		data := uintptr(__dynamic_map_get_entry(h, index))
-		return rawptr(data + h.value_offset)
+__dynamic_map_get :: proc "contextless" (m: rawptr, table: Map_Header_Table, key_hash: uintptr, key_ptr: rawptr) -> rawptr {
+	if m != nil {
+		h := Map_Header{(^Raw_Map)(m), table}
+		index := __dynamic_map_find(h, key_hash, key_ptr).entry_index
+		if index != MAP_SENTINEL {
+			data := uintptr(__dynamic_map_get_entry(h, index))
+			return rawptr(data + h.value_offset)
+		}
 	}
 	return nil
 }
 
 // USED INTERNALLY BY THE COMPILER
-__dynamic_map_set :: proc "odin" (h: Map_Header, key_hash: uintptr, key_ptr: rawptr, value: rawptr, loc := #caller_location) -> ^Map_Entry_Header #no_bounds_check {
+__dynamic_map_set :: proc "odin" (m: rawptr, table: Map_Header_Table, key_hash: uintptr, key_ptr: rawptr, value: rawptr, loc := #caller_location) -> ^Map_Entry_Header #no_bounds_check {
 	add_entry :: proc "odin" (h: Map_Header, key_hash: uintptr, key_ptr: rawptr, loc := #caller_location) -> Map_Index {
 		prev := Map_Index(h.m.entries.len)
 		c := Map_Index(__dynamic_array_append_nothing(&h.m.entries, h.entry_size, h.entry_align, loc))
@@ -79,11 +82,14 @@ __dynamic_map_set :: proc "odin" (h: Map_Header, key_hash: uintptr, key_ptr: raw
 		}
 		return prev
 	}
+	assert(condition = m != nil)
+
+	h := Map_Header{(^Raw_Map)(m), table}
 
 	index := MAP_SENTINEL
 
 	if len(h.m.hashes) == 0 {
-		__dynamic_map_reserve(h, INITIAL_MAP_CAP, loc)
+		__dynamic_map_reserve(m, table, INITIAL_MAP_CAP, loc)
 		__dynamic_map_grow(h, loc)
 	}
 
@@ -119,7 +125,11 @@ __dynamic_map_set :: proc "odin" (h: Map_Header, key_hash: uintptr, key_ptr: raw
 }
 
 // USED INTERNALLY BY THE COMPILER
-__dynamic_map_reserve :: proc "odin" (h: Map_Header, cap: uint, loc := #caller_location) {
+__dynamic_map_reserve :: proc "odin" (m: rawptr, table: Map_Header_Table, cap: uint, loc := #caller_location) {
+	assert(condition = m != nil)
+
+	h := Map_Header{(^Raw_Map)(m), table}
+
 	c := context
 	if h.m.entries.allocator.procedure != nil {
 		c.allocator = h.m.entries.allocator
@@ -352,7 +362,7 @@ ceil_to_pow2 :: proc "contextless" (n: uint) -> uint {
 __dynamic_map_grow :: proc "odin" (h: Map_Header, loc := #caller_location) {
 	new_count := max(uint(h.m.entries.cap) * 2, INITIAL_MAP_CAP)
 	// Rehash through Reserve
-	__dynamic_map_reserve(h, new_count, loc)
+	__dynamic_map_reserve(h.m, h.table, new_count, loc)
 }
 
 __dynamic_map_full :: #force_inline proc "contextless" (h: Map_Header) -> bool {
