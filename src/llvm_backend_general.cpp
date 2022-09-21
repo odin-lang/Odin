@@ -216,6 +216,17 @@ void lb_loop_end(lbProcedure *p, lbLoopData const &data) {
 }
 
 
+void lb_make_global_private_const(LLVMValueRef global_data) {
+	LLVMSetLinkage(global_data, LLVMPrivateLinkage);
+	LLVMSetUnnamedAddress(global_data, LLVMGlobalUnnamedAddr);
+	LLVMSetGlobalConstant(global_data, true);
+}
+void lb_make_global_private_const(lbAddr const &addr) {
+	lb_make_global_private_const(addr.addr.value);
+}
+
+
+
 // This emits a GEP at 0, index
 lbValue lb_emit_epi(lbProcedure *p, lbValue const &value, isize index) {
 	GB_ASSERT(is_type_pointer(value.type));
@@ -918,19 +929,15 @@ void lb_emit_store(lbProcedure *p, lbValue ptr, lbValue value) {
 			return;
 		} else if (LLVMIsConstant(value.value)) {
 			lbAddr addr = lb_add_global_generated(p->module, value.type, value, nullptr);
-			LLVMValueRef global_data = addr.addr.value;
-			// make it truly private data
-			LLVMSetLinkage(global_data, LLVMPrivateLinkage);
-			LLVMSetUnnamedAddress(global_data, LLVMGlobalUnnamedAddr);
-			LLVMSetGlobalConstant(global_data, true);
+			lb_make_global_private_const(addr);
 
 			LLVMValueRef dst_ptr = ptr.value;
-			LLVMValueRef src_ptr = global_data;
+			LLVMValueRef src_ptr = addr.addr.value;
 			src_ptr = LLVMBuildPointerCast(p->builder, src_ptr, LLVMTypeOf(dst_ptr), "");
 
 			LLVMBuildMemMove(p->builder,
 			                 dst_ptr, lb_try_get_alignment(dst_ptr, 1),
-			                 src_ptr, lb_try_get_alignment(global_data, 1),
+			                 src_ptr, lb_try_get_alignment(src_ptr, 1),
 			                 LLVMConstInt(LLVMInt64TypeInContext(p->module->ctx), lb_sizeof(LLVMTypeOf(value.value)), false));
 			return;
 		}
@@ -2460,10 +2467,8 @@ LLVMValueRef lb_find_or_add_entity_string_ptr(lbModule *m, String const &str) {
 		LLVMTypeRef type = LLVMTypeOf(data);
 		LLVMValueRef global_data = LLVMAddGlobal(m->mod, type, name);
 		LLVMSetInitializer(global_data, data);
-		LLVMSetLinkage(global_data, LLVMPrivateLinkage);
-		LLVMSetUnnamedAddress(global_data, LLVMGlobalUnnamedAddr);
+		lb_make_global_private_const(global_data);
 		LLVMSetAlignment(global_data, 1);
-		LLVMSetGlobalConstant(global_data, true);
 
 		LLVMValueRef ptr = LLVMConstInBoundsGEP2(type, global_data, indices, 2);
 		string_map_set(&m->const_strings, key, ptr);
@@ -2506,10 +2511,8 @@ lbValue lb_find_or_add_entity_string_byte_slice(lbModule *m, String const &str) 
 	LLVMTypeRef type = LLVMTypeOf(data);
 	LLVMValueRef global_data = LLVMAddGlobal(m->mod, type, name);
 	LLVMSetInitializer(global_data, data);
-	LLVMSetLinkage(global_data, LLVMPrivateLinkage);
-	LLVMSetUnnamedAddress(global_data, LLVMGlobalUnnamedAddr);
+	lb_make_global_private_const(global_data);
 	LLVMSetAlignment(global_data, 1);
-	LLVMSetGlobalConstant(global_data, true);
 
 	LLVMValueRef ptr = nullptr;
 	if (str.len != 0) {
@@ -2545,10 +2548,8 @@ lbValue lb_find_or_add_entity_string_byte_slice_with_type(lbModule *m, String co
 	LLVMTypeRef type = LLVMTypeOf(data);
 	LLVMValueRef global_data = LLVMAddGlobal(m->mod, type, name);
 	LLVMSetInitializer(global_data, data);
-	LLVMSetLinkage(global_data, LLVMPrivateLinkage);
-	LLVMSetUnnamedAddress(global_data, LLVMGlobalUnnamedAddr);
+	lb_make_global_private_const(global_data);
 	LLVMSetAlignment(global_data, 1);
-	LLVMSetGlobalConstant(global_data, true);
 
 	i64 data_len = str.len;
 	LLVMValueRef ptr = nullptr;
@@ -2655,6 +2656,7 @@ lbValue lb_find_procedure_value_from_entity(lbModule *m, Entity *e) {
 	GB_PANIC("Error in: %s, missing procedure %.*s\n", token_pos_to_string(e->token.pos), LIT(e->token.string));
 	return {};
 }
+
 
 lbAddr lb_add_global_generated(lbModule *m, Type *type, lbValue value, Entity **entity_) {
 	GB_ASSERT(type != nullptr);

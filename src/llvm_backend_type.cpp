@@ -612,6 +612,8 @@ void lb_setup_type_info_data(lbProcedure *p) { // NOTE(bill): Setup type_info da
 					LLVMValueRef value_init = llvm_const_array(lb_type(m, t_type_info_enum_value), value_values, cast(unsigned)fields.count);
 					LLVMSetInitializer(name_array.value,  name_init);
 					LLVMSetInitializer(value_array.value, value_init);
+					LLVMSetGlobalConstant(name_array.value, true);
+					LLVMSetGlobalConstant(value_array.value, true);
 
 					lbValue v_count = lb_const_int(m, t_int, fields.count);
 
