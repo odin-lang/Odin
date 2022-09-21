@@ -310,7 +310,6 @@ struct lbProcedure {
 
 	PtrMap<Ast *, lbValue> selector_values;
 	PtrMap<Ast *, lbAddr>  selector_addr;
-	PtrMap<LLVMValueRef, lbAddr> map_header_cache;
 };
 
 
@@ -446,7 +445,6 @@ String lb_get_const_string(lbModule *m, lbValue value);
 
 lbValue lb_generate_local_array(lbProcedure *p, Type *elem_type, i64 count, bool zero_init=true);
 lbValue lb_generate_global_array(lbModule *m, Type *elem_type, i64 count, String prefix, i64 id);
-lbValue lb_gen_map_header(lbProcedure *p, lbValue map_val_ptr, Type *map_type);
 lbValue lb_gen_map_key_hash(lbProcedure *p, lbValue key, Type *key_type, lbValue *key_ptr_);
 
 lbValue lb_internal_dynamic_map_get_ptr(lbProcedure *p, lbValue const &map_ptr, lbValue const &key);

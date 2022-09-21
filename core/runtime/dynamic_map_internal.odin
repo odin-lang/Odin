@@ -82,7 +82,6 @@ __dynamic_map_set :: proc "odin" (m: rawptr, table: Map_Header_Table, key_hash: 
 		}
 		return prev
 	}
-	assert(condition = m != nil)
 
 	h := Map_Header{(^Raw_Map)(m), table}
 
@@ -126,8 +125,6 @@ __dynamic_map_set :: proc "odin" (m: rawptr, table: Map_Header_Table, key_hash: 
 
 // USED INTERNALLY BY THE COMPILER
 __dynamic_map_reserve :: proc "odin" (m: rawptr, table: Map_Header_Table, cap: uint, loc := #caller_location) {
-	assert(condition = m != nil)
-
 	h := Map_Header{(^Raw_Map)(m), table}
 
 	c := context

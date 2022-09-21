@@ -578,31 +578,6 @@ lbAddr lb_gen_map_header_internal(lbProcedure *p, lbValue map_val_ptr, Type *map
 	return h;
 }
 
-
-lbValue lb_gen_map_header(lbProcedure *p, lbValue map_val_ptr, Type *map_type) {
-	GB_ASSERT_MSG(is_type_pointer(map_val_ptr.type), "%s", type_to_string(map_val_ptr.type));
-	GB_ASSERT(is_type_map(map_type));
-
-
-	// TODO(bill): this is a temporary fix since this caching is not working other platforms
-	bool allow_caching = build_context.metrics.os == TargetOs_windows || is_arch_wasm();
-
-	lbAddr h = {};
-	if (!allow_caching) {
-		h = lb_gen_map_header_internal(p, map_val_ptr, map_type);
-	} else {
-		lbAddr *found = map_get(&p->map_header_cache, map_val_ptr.value);
-		if (found != nullptr) {
-			h = *found;
-		} else {
-			h = lb_gen_map_header_internal(p, map_val_ptr, map_type);
-			map_set(&p->map_header_cache, map_val_ptr.value, h);
-		}
-	}
-
-	return lb_addr_load(p, h);
-}
-
 lbValue lb_const_hash(lbModule *m, lbValue key, Type *key_type) {
 	if (true) {
 		return {};
