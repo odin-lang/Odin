@@ -1,4 +1,4 @@
-package ggpo
+package vendor_ggpo
 
 foreign import lib "GGPO.lib"
 

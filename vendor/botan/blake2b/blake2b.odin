@@ -1,4 +1,4 @@
-package botan_blake2b
+package vendor_botan_blake2b
 
 /*
     Copyright 2021 zhibog

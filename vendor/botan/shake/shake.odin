@@ -1,4 +1,4 @@
-package shake
+package vendor_shake
 
 /*
     Copyright 2021 zhibog

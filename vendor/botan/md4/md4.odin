@@ -1,4 +1,4 @@
-package md4
+package vendor_md4
 
 /*
     Copyright 2021 zhibog
