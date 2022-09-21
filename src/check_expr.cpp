@@ -3922,7 +3922,9 @@ bool check_index_value(CheckerContext *c, Type *main_type, bool open_range, Ast 
 		}
 	} else if (!is_type_integer(operand.type) && !is_type_enum(operand.type)) {
 		gbString expr_str = expr_to_string(operand.expr);
-		error(operand.expr, "Index '%s' must be an integer", expr_str);
+		gbString type_str = type_to_string(operand.type);
+		error(operand.expr, "Index '%s' must be an integer, got %s", expr_str, type_str);
+		gb_string_free(type_str);
 		gb_string_free(expr_str);
 		if (value) *value = 0;
 		return false;
@@ -3932,8 +3934,9 @@ bool check_index_value(CheckerContext *c, Type *main_type, bool open_range, Ast 
 	    (c->state_flags & StateFlag_no_bounds_check) == 0) {
 		BigInt i = exact_value_to_integer(operand.value).value_integer;
 		if (i.sign && !is_type_enum(index_type) && !is_type_multi_pointer(main_type)) {
+			String idx_str = big_int_to_string(temporary_allocator(), &i);
 			gbString expr_str = expr_to_string(operand.expr);
-			error(operand.expr, "Index '%s' cannot be a negative value", expr_str);
+			error(operand.expr, "Index '%s' cannot be a negative value, got %.*s", expr_str, LIT(idx_str));
 			gb_string_free(expr_str);
 			if (value) *value = 0;
 			return false;
@@ -3964,7 +3967,7 @@ bool check_index_value(CheckerContext *c, Type *main_type, bool open_range, Ast 
 				if (out_of_bounds) {
 					gbString expr_str = expr_to_string(operand.expr);
 					if (lo_str.len > 0) {
-						error(operand.expr, "Index '%s' is out of bounds range %.*s .. %.*s", expr_str, LIT(lo_str), LIT(hi_str));
+						error(operand.expr, "Index '%s' is out of bounds range %.*s ..= %.*s", expr_str, LIT(lo_str), LIT(hi_str));
 					} else {
 						gbString index_type_str = type_to_string(index_type);
 						error(operand.expr, "Index '%s' is out of bounds range of enum type %s", expr_str, index_type_str);
@@ -3994,8 +3997,9 @@ bool check_index_value(CheckerContext *c, Type *main_type, bool open_range, Ast 
 				}
 
 				if (out_of_bounds) {
+					String idx_str = big_int_to_string(temporary_allocator(), &i);
 					gbString expr_str = expr_to_string(operand.expr);
-					error(operand.expr, "Index '%s' is out of bounds range 0..<%lld", expr_str, max_count);
+					error(operand.expr, "Index '%s' is out of bounds range 0..<%lld, got %.*s", expr_str, max_count, LIT(idx_str));
 					gb_string_free(expr_str);
 					return false;
 				}
