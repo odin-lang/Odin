@@ -16,7 +16,7 @@ __get_map_key_hash :: #force_inline proc "contextless" (k: ^$K) -> uintptr {
 	return hasher(k, 0)
 }
 
-__get_map_entry_key_ptr :: #force_inline proc "contextless" (h: Map_Header, entry: ^Map_Entry_Header) -> rawptr {
+__get_map_entry_key_ptr :: #force_inline proc "contextless" (h: Map_Header_Table, entry: ^Map_Entry_Header) -> rawptr {
 	return rawptr(uintptr(entry) + h.key_offset)
 }
 
@@ -53,7 +53,7 @@ Map_Header_Table :: struct {
 
 Map_Header :: struct {
 	m: ^Raw_Map,
-	using header_table: Map_Header_Table,
+	using table: Map_Header_Table,
 }
 
 // USED INTERNALLY BY THE COMPILER
@@ -223,8 +223,19 @@ default_hasher_cstring :: proc "contextless" (data: rawptr, seed: uintptr) -> ui
 }
 
 
-__get_map_header :: proc "contextless" (m: ^$T/map[$K]$V) -> Map_Header {
-	header := Map_Header{m = (^Raw_Map)(m)}
+__get_map_header :: proc "contextless" (m: ^$T/map[$K]$V) -> (header: Map_Header) {
+	header.m = (^Raw_Map)(m)
+	header.table = #force_inline __get_map_header_table(T)
+	return
+}
+
+__get_map_header_runtime :: proc "contextless" (m: ^Raw_Map, ti: Type_Info_Map) -> (header: Map_Header) {
+	header.m = m
+	header.table = #force_inline __get_map_header_table_runtime(ti)
+	return
+}
+
+__get_map_header_table :: proc "contextless" ($T: typeid/map[$K]$V) -> (header: Map_Header_Table) {
 	Entry :: struct {
 		hash:  uintptr,
 		next:  Map_Index,
@@ -243,18 +254,16 @@ __get_map_header :: proc "contextless" (m: ^$T/map[$K]$V) -> Map_Header {
 	header.value_offset  = offset_of(Entry, value)
 	header.value_size    = size_of(V)
 
-	return header
+	return
 }
 
-__get_map_header_runtime :: proc "contextless" (m: ^Raw_Map, ti: Type_Info_Map) -> Map_Header {
-	header := Map_Header{m = m}
-	
+__get_map_header_table_runtime :: proc "contextless" (ti: Type_Info_Map) -> (header: Map_Header) {
 	header.equal = ti.key_equal
-	
+
 	entries := ti.generated_struct.variant.(Type_Info_Struct).types[1]
 	entry := entries.variant.(Type_Info_Dynamic_Array).elem
 	e := entry.variant.(Type_Info_Struct)
-	
+
 	header.entry_size    = entry.size
 	header.entry_align   = entry.align
 
@@ -264,8 +273,9 @@ __get_map_header_runtime :: proc "contextless" (m: ^Raw_Map, ti: Type_Info_Map) 
 	header.value_offset  = e.offsets[3]
 	header.value_size    = e.types[3].size
 
-	return header
+	return
 }
+
 
 
 __slice_resize :: proc "odin" (array_: ^$T/[]$E, new_count: int, allocator: Allocator, loc := #caller_location) -> bool {
