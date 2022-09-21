@@ -889,7 +889,7 @@ lbValue lb_emit_call(lbProcedure *p, lbValue value, Array<lbValue> const &args, 
 		GB_ASSERT(param_count-1 <= args.count);
 		param_count -= 1;
 	} else {
-		GB_ASSERT_MSG(param_count == args.count, "%td == %td", param_count, args.count);
+		GB_ASSERT_MSG(param_count == args.count, "%td == %td (%s)", param_count, args.count, LLVMPrintValueToString(value.value));
 	}
 
 	lbValue result = {};
