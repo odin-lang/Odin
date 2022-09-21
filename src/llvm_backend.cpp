@@ -670,10 +670,6 @@ lbValue lb_gen_map_key_hash(lbProcedure *p, lbValue key, Type *key_type, lbValue
 }
 
 lbValue lb_internal_dynamic_map_get_ptr(lbProcedure *p, lbValue const &map_ptr, lbValue const &key) {
-	if (p->name == "main.map_type") {
-		gb_printf_err("HERE!\n");
-	}
-
 	Type *map_type = base_type(type_deref(map_ptr.type));
 
 	lbValue key_ptr = {};
