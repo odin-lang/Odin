@@ -986,6 +986,15 @@ String get_fullpath_relative(gbAllocator a, String base_dir, String path) {
 	gb_memmove(str+i, path.text,     path.len);     i += path.len;
 	str[i] = 0;
 
+	// IMPORTANT NOTE(bill): Remove trailing path separators
+	// this is required to make sure there is a conventional
+	// notation for the path
+	for (/**/; i > 0; i--) {
+		u8 c = str[i-1];
+		if (c != '/' && c != '\\') {
+			break;
+		}
+	}
 
 	String res = make_string(str, i);
 	res = string_trim_whitespace(res);
