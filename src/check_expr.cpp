@@ -2046,15 +2046,14 @@ bool check_is_expressible(CheckerContext *ctx, Operand *o, Type *type) {
 		gbString a = expr_to_string(o->expr);
 		gbString b = type_to_string(type);
 		gbString c = type_to_string(o->type);
+		gbString s = exact_value_to_string(o->value);
 		defer(
+			gb_string_free(s);
 			gb_string_free(c);
 			gb_string_free(b);
 			gb_string_free(a);
 			o->mode = Addressing_Invalid;
 		);
-
-		gbString s = exact_value_to_string(o->value);
-		defer (gb_string_free(s));
 
 		if (is_type_numeric(o->type) && is_type_numeric(type)) {
 			if (!is_type_integer(o->type) && is_type_integer(type)) {
