@@ -1,7 +1,6 @@
 package all
 
 import botan      "vendor:botan"
-import cm         "vendor:commonmark"
 import ENet       "vendor:ENet"
 import ggpo       "vendor:ggpo"
 import gl         "vendor:OpenGL"
@@ -11,7 +10,6 @@ import miniaudio  "vendor:miniaudio"
 import PM         "vendor:portmidi"
 import rl         "vendor:raylib"
 import exr        "vendor:OpenEXRCore"
-import zlib       "vendor:zlib"
 
 import SDL        "vendor:sdl2"
 import SDLNet     "vendor:sdl2/net"
@@ -26,7 +24,6 @@ import MTL        "vendor:darwin/Metal"
 import CA         "vendor:darwin/QuartzCore"
 
 _ :: botan
-_ :: cm
 _ :: ENet
 _ :: ggpo
 _ :: gl
@@ -36,7 +33,6 @@ _ :: miniaudio
 _ :: PM
 _ :: rl
 _ :: exr
-_ :: zlib
 
 _ :: SDL
 _ :: SDLNet
