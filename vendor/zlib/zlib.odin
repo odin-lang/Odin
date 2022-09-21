@@ -2,8 +2,8 @@ package zlib
 
 import "core:c"
 
-when ODIN_OS == .Windows do foreign import zlib "libz.lib"
-when ODIN_OS == .Linux   do foreign import zlib "system:z"
+when ODIN_OS == .Windows { foreign import zlib "libz.lib" }
+when ODIN_OS == .Linux   { foreign import zlib "system:z" }
 
 VERSION         :: "1.2.12"
 VERNUM          :: 0x12c0
