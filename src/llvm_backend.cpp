@@ -500,20 +500,11 @@ lbValue lb_generate_anonymous_proc_lit(lbModule *m, String const &prefix_name, A
 	return value;
 }
 
-lbAddr lb_gen_map_header_internal(lbProcedure *p, lbValue map_val_ptr, Type *map_type) {
+LLVMValueRef lb_gen_map_header_table_internal(lbModule *m, Type *map_type) {
 	map_type = base_type(map_type);
 	GB_ASSERT(map_type->kind == Type_Map);
 
-	lbAddr h = lb_add_local_generated(p, t_map_header, true); // all the values will be initialzed later
-
-	Type *key_type = map_type->Map.key;
-	Type *val_type = map_type->Map.value;
-	gb_unused(val_type);
-
 	GB_ASSERT(map_type->Map.entry_type->kind == Type_Struct);
-	map_type->Map.entry_type->cached_size = -1;
-	map_type->Map.entry_type->Struct.are_offsets_set = false;
-
 	i64 entry_size   = type_size_of  (map_type->Map.entry_type);
 	i64 entry_align  = type_align_of (map_type->Map.entry_type);
 
@@ -524,18 +515,42 @@ lbAddr lb_gen_map_header_internal(lbProcedure *p, lbValue map_val_ptr, Type *map
 	i64 value_size   = type_size_of  (map_type->Map.value);
 
 
+	Type *key_type = map_type->Map.key;
+	Type *val_type = map_type->Map.value;
+	gb_unused(val_type);
+
+	Type *st = base_type(t_map_header_table);
+	GB_ASSERT(st->Struct.fields.count == 7);
+
+	LLVMValueRef const_values[7] = {};
+	const_values[0] = lb_get_equal_proc_for_type(m, key_type)    .value;
+	const_values[1] = lb_const_int(m, t_int,        entry_size)  .value;
+	const_values[2] = lb_const_int(m, t_int,        entry_align) .value;
+	const_values[3] = lb_const_int(m, t_uintptr,    key_offset)  .value;
+	const_values[4] = lb_const_int(m, t_int,        key_size)    .value;
+	const_values[5] = lb_const_int(m, t_uintptr,    value_offset).value;
+	const_values[6] = lb_const_int(m, t_int,        value_size)  .value;
+
+	return llvm_const_named_struct(m, t_map_header_table, const_values, gb_count_of(const_values));
+}
+
+
+lbAddr lb_gen_map_header_internal(lbProcedure *p, lbValue map_val_ptr, Type *map_type) {
+	map_type = base_type(map_type);
+	GB_ASSERT(map_type->kind == Type_Map);
+
+	lbAddr h = lb_add_local_generated(p, t_map_header, true); // all the values will be initialzed later
+
+	GB_ASSERT(map_type->Map.entry_type->kind == Type_Struct);
+	map_type->Map.entry_type->cached_size = -1;
+	map_type->Map.entry_type->Struct.are_offsets_set = false;
+
 	Type *map_header_base = base_type(t_map_header);
-	GB_ASSERT(map_header_base->Struct.fields.count == 8);
+	GB_ASSERT(map_header_base->Struct.fields.count == 2);
 	Type *raw_map_ptr_type = map_header_base->Struct.fields[0]->type;
-	LLVMValueRef const_values[8] = {};
+	LLVMValueRef const_values[2] = {};
 	const_values[0] = LLVMConstNull(lb_type(p->module, raw_map_ptr_type));
-	const_values[1] = lb_get_equal_proc_for_type(p->module, key_type)    .value;
-	const_values[2] = lb_const_int(p->module, t_int,        entry_size)  .value;
-	const_values[3] = lb_const_int(p->module, t_int,        entry_align) .value;
-	const_values[4] = lb_const_int(p->module, t_uintptr,    key_offset)  .value;
-	const_values[5] = lb_const_int(p->module, t_int,        key_size)    .value;
-	const_values[6] = lb_const_int(p->module, t_uintptr,    value_offset).value;
-	const_values[7] = lb_const_int(p->module, t_int,        value_size)  .value;
+	const_values[1] = lb_gen_map_header_table_internal(p->module, map_type);
 
 	LLVMValueRef const_value = llvm_const_named_struct(p->module, t_map_header, const_values, gb_count_of(const_values));
 	LLVMBuildStore(p->builder, const_value, h.addr.value);

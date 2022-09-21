@@ -688,6 +688,7 @@ gb_global Type *t_source_code_location_ptr       = nullptr;
 
 gb_global Type *t_map_hash                       = nullptr;
 gb_global Type *t_map_header                     = nullptr;
+gb_global Type *t_map_header_table               = nullptr;
 
 
 gb_global Type *t_equal_proc  = nullptr;
