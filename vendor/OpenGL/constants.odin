@@ -1,4 +1,4 @@
-package odin_gl
+package vendor_gl
 
 GL_DEBUG :: #config(GL_DEBUG, ODIN_DEBUG)
 

@@ -1,4 +1,4 @@
-package ripemd
+package vendor_ripemd
 
 /*
     Copyright 2021 zhibog
