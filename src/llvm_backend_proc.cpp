@@ -123,7 +123,6 @@ lbProcedure *lb_create_procedure(lbModule *m, Entity *entity, bool ignore_body) 
 	p->scope_stack.allocator   = a;
 	map_init(&p->selector_values,  a, 0);
 	map_init(&p->selector_addr,    a, 0);
-	map_init(&p->map_header_cache, a, 0);
 
 	if (p->is_foreign) {
 		lb_add_foreign_library_path(p->module, entity->Procedure.foreign_library);
@@ -380,9 +379,6 @@ lbProcedure *lb_create_dummy_procedure(lbModule *m, String link_name, Type *type
 		lb_add_proc_attribute_at_index(p, offset+parameter_index, "nonnull");
 		lb_add_proc_attribute_at_index(p, offset+parameter_index, "nocapture");
 	}
-
-	map_init(&p->map_header_cache, heap_allocator(), 0);
-
 	return p;
 }
 
@@ -889,7 +885,7 @@ lbValue lb_emit_call(lbProcedure *p, lbValue value, Array<lbValue> const &args, 
 		GB_ASSERT(param_count-1 <= args.count);
 		param_count -= 1;
 	} else {
-		GB_ASSERT_MSG(param_count == args.count, "%td == %td", param_count, args.count);
+		GB_ASSERT_MSG(param_count == args.count, "%td == %td (%s)", param_count, args.count, LLVMPrintValueToString(value.value));
 	}
 
 	lbValue result = {};

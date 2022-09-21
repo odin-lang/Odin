@@ -405,7 +405,7 @@ unmarshal_object :: proc(p: ^Parser, v: any, end_token: Token_Kind) -> (err: Unm
 			raw_map.entries.allocator = p.allocator
 		}
 		
-		header := runtime.__get_map_header_runtime(raw_map, t)
+		header := runtime.__get_map_header_table_runtime(t)
 		
 		elem_backing := bytes_make(t.value.size, t.value.align, p.allocator) or_return
 		defer delete(elem_backing, p.allocator)
@@ -432,7 +432,7 @@ unmarshal_object :: proc(p: ^Parser, v: any, end_token: Token_Kind) -> (err: Unm
 				key_ptr = &key_cstr
 			}
 			
-			set_ptr := runtime.__dynamic_map_set(header, key_hash, key_ptr, map_backing_value.data)
+			set_ptr := runtime.__dynamic_map_set(raw_map, header, key_hash, key_ptr, map_backing_value.data)
 			if set_ptr == nil {
 				delete(key, p.allocator)
 			} 
