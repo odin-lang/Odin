@@ -2211,7 +2211,6 @@ void init_map_internal_types(Type *type) {
 	GB_ASSERT(type->kind == Type_Map);
 	init_map_entry_type(type);
 	if (type->Map.internal_type != nullptr) return;
-	if (type->Map.generated_struct_type != nullptr) return;
 
 	Type *key   = type->Map.key;
 	Type *value = type->Map.value;
@@ -2239,7 +2238,6 @@ void init_map_internal_types(Type *type) {
 	generated_struct_type->Struct.fields = fields;
 	type_set_offsets(generated_struct_type);
 	
-	type->Map.generated_struct_type = generated_struct_type;
 	type->Map.internal_type         = generated_struct_type;
 	type->Map.lookup_result_type    = make_optional_ok_type(value);
 }
