@@ -541,11 +541,7 @@ lbValue lb_gen_map_header_table_internal(lbProcedure *p, Type *map_type) {
 	lbValue res = {llvm_res, t_map_header_table};
 
 	lbAddr addr = lb_add_global_generated(m, t_map_header_table, res, nullptr);
-	LLVMValueRef global_data = addr.addr.value;
-
-	LLVMSetLinkage(global_data, LLVMPrivateLinkage);
-	LLVMSetUnnamedAddress(global_data, LLVMGlobalUnnamedAddr);
-	LLVMSetGlobalConstant(global_data, true);
+	lb_make_global_private_const(addr);
 
 	map_set(&m->map_header_table_map, map_type, addr);
 	return lb_addr_load(p, addr);
