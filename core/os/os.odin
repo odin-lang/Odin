@@ -120,7 +120,7 @@ read_entire_file_from_handle :: proc(fd: Handle, allocator := context.allocator)
 
 	data = make([]byte, int(length), allocator)
 	if data == nil {
-	return nil, false
+	    return nil, false
 	}
 
 	bytes_read, read_err := read_full(fd, data)
