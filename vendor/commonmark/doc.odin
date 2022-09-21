@@ -5,7 +5,7 @@
 	Original authors: John MacFarlane, Vicent Marti, Kārlis Gaņģis, Nick Wellnhofer.
 	See LICENSE for license details.
 */
-package commonmark
+package vendor_commonmark
 
 /*
 	Parsing - Simple interface:

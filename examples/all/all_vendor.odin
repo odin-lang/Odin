@@ -1,29 +1,32 @@
 package all
 
-import botan     "vendor:botan"
-import ENet      "vendor:ENet"
-import ggpo      "vendor:ggpo"
-import gl        "vendor:OpenGL"
-import glfw      "vendor:glfw"
-import microui   "vendor:microui"
-import miniaudio "vendor:miniaudio"
-import PM        "vendor:portmidi"
-import rl        "vendor:raylib"
-import exr       "vendor:OpenEXRCore"
+import botan      "vendor:botan"
+import cm         "vendor:commonmark"
+import ENet       "vendor:ENet"
+import ggpo       "vendor:ggpo"
+import gl         "vendor:OpenGL"
+import glfw       "vendor:glfw"
+import microui    "vendor:microui"
+import miniaudio  "vendor:miniaudio"
+import PM         "vendor:portmidi"
+import rl         "vendor:raylib"
+import exr        "vendor:OpenEXRCore"
+import zlib       "vendor:zlib"
 
-import SDL    "vendor:sdl2"
-import SDLNet "vendor:sdl2/net"
-import IMG    "vendor:sdl2/image"
-import MIX    "vendor:sdl2/mixer"
-import TTF    "vendor:sdl2/ttf"
+import SDL        "vendor:sdl2"
+import SDLNet     "vendor:sdl2/net"
+import IMG        "vendor:sdl2/image"
+import MIX        "vendor:sdl2/mixer"
+import TTF        "vendor:sdl2/ttf"
 
-import vk "vendor:vulkan"
+import vk         "vendor:vulkan"
 
-import NS  "vendor:darwin/Foundation"
-import MTL "vendor:darwin/Metal"
-import CA  "vendor:darwin/QuartzCore"
+import NS         "vendor:darwin/Foundation"
+import MTL        "vendor:darwin/Metal"
+import CA         "vendor:darwin/QuartzCore"
 
 _ :: botan
+_ :: cm
 _ :: ENet
 _ :: ggpo
 _ :: gl
@@ -33,12 +36,16 @@ _ :: miniaudio
 _ :: PM
 _ :: rl
 _ :: exr
+_ :: zlib
+
 _ :: SDL
 _ :: SDLNet
 _ :: IMG
 _ :: MIX
 _ :: TTF
+
 _ :: vk
+
 _ :: NS
 _ :: MTL
 _ :: CA

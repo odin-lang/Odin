@@ -1,4 +1,4 @@
-package zlib
+package vendor_zlib
 
 import "core:c"
 

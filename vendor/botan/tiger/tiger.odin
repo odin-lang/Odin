@@ -1,4 +1,4 @@
-package tiger
+package vendor_tiger
 
 /*
     Copyright 2021 zhibog

@@ -1,4 +1,4 @@
-package gost
+package vendor_gost
 
 /*
     Copyright 2021 zhibog
