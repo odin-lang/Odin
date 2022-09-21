@@ -787,7 +787,7 @@ void lb_setup_type_info_data(lbProcedure *p) { // NOTE(bill): Setup type_info da
 			tag = lb_const_ptr_cast(m, variant_ptr, t_type_info_map_ptr);
 			init_map_internal_types(t);
 			
-			lbValue gst = lb_type_info(m, t->Map.generated_struct_type);
+			lbValue gst = lb_type_info(m, t->Map.internal_type);
 
 			LLVMValueRef vals[5] = {
 				lb_type_info(m, t->Map.key).value,

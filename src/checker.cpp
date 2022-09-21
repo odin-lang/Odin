@@ -1922,7 +1922,7 @@ void add_type_info_type_internal(CheckerContext *c, Type *t) {
 		init_map_internal_types(bt);
 		add_type_info_type_internal(c, bt->Map.key);
 		add_type_info_type_internal(c, bt->Map.value);
-		add_type_info_type_internal(c, bt->Map.generated_struct_type);
+		add_type_info_type_internal(c, bt->Map.internal_type);
 		break;
 
 	case Type_Tuple:
@@ -2144,7 +2144,7 @@ void add_min_dep_type_info(Checker *c, Type *t) {
 		init_map_internal_types(bt);
 		add_min_dep_type_info(c, bt->Map.key);
 		add_min_dep_type_info(c, bt->Map.value);
-		add_min_dep_type_info(c, bt->Map.generated_struct_type);
+		add_min_dep_type_info(c, bt->Map.internal_type);
 		break;
 
 	case Type_Tuple:

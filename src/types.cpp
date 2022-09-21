@@ -227,7 +227,6 @@ struct TypeProc {
 		Type *key;                                        \
 		Type *value;                                      \
 		Type *entry_type;                                 \
-		Type *generated_struct_type;                      \
 		Type *internal_type;                              \
 		Type *lookup_result_type;                         \
 	})                                                        \

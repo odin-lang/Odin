@@ -521,7 +521,6 @@ lbValue lb_gen_map_header_table_internal(lbProcedure *p, Type *map_type) {
 	i64 value_offset = type_offset_of(map_type->Map.entry_type, 3);
 	i64 value_size   = type_size_of  (map_type->Map.value);
 
-
 	Type *key_type = map_type->Map.key;
 	Type *val_type = map_type->Map.value;
 	gb_unused(val_type);
