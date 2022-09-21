@@ -2053,15 +2053,18 @@ bool check_is_expressible(CheckerContext *ctx, Operand *o, Type *type) {
 			o->mode = Addressing_Invalid;
 		);
 
+		gbString s = exact_value_to_string(o->value);
+		defer (gb_string_free(s));
+
 		if (is_type_numeric(o->type) && is_type_numeric(type)) {
 			if (!is_type_integer(o->type) && is_type_integer(type)) {
-				error(o->expr, "'%s' truncated to '%s'", a, b);
+				error(o->expr, "'%s' truncated to '%s', got %s", a, b, s);
 			} else {
-				error(o->expr, "Cannot convert numeric value '%s' to '%s' from '%s", a, b, c);
+				error(o->expr, "Cannot convert numeric value '%s' to '%s' from '%s', got %s", a, b, c, s);
 				check_assignment_error_suggestion(ctx, o, type);
 			}
 		} else {
-			error(o->expr, "Cannot convert '%s' to '%s' from '%s", a, b, c);
+			error(o->expr, "Cannot convert '%s' to '%s' from '%s', got %s", a, b, c, s);
 			check_assignment_error_suggestion(ctx, o, type);
 		}
 		return false;
