@@ -1614,6 +1614,7 @@ bool check_builtin_procedure(CheckerContext *c, Operand *operand, Ast *call, i32
 	case BuiltinProc_type_info_of:
 	case BuiltinProc_typeid_of:
 	case BuiltinProc_len:
+	case BuiltinProc_cap:
 	case BuiltinProc_min:
 	case BuiltinProc_max:
 	case BuiltinProc_type_is_subtype_of:
@@ -1696,16 +1697,14 @@ bool check_builtin_procedure(CheckerContext *c, Operand *operand, Ast *call, i32
 		return check_builtin_procedure_directive(c, operand, call, type_hint);
 
 	case BuiltinProc_len:
-		check_expr_or_type(c, operand, ce->args[0]);
-		if (operand->mode == Addressing_Invalid) {
-			return false;
-		}
-		/* fallthrough */
-
 	case BuiltinProc_cap:
 	{
 		// len :: proc(Type) -> int
 		// cap :: proc(Type) -> int
+		check_expr_or_type(c, operand, ce->args[0]);
+		if (operand->mode == Addressing_Invalid) {
+			return false;
+		}
 
 		Type *op_type = type_deref(operand->type);
 		Type *type = t_int;
@@ -1749,11 +1748,17 @@ bool check_builtin_procedure(CheckerContext *c, Operand *operand, Ast *call, i32
 			mode = Addressing_Value;
 		} else if (is_type_map(op_type)) {
 			mode = Addressing_Value;
-		} else if (operand->mode == Addressing_Type && is_type_enum(op_type) && id == BuiltinProc_len) {
+		} else if (operand->mode == Addressing_Type && is_type_enum(op_type)) {
 			Type *bt = base_type(op_type);
-			mode  = Addressing_Constant;
-			value = exact_value_i64(bt->Enum.fields.count);
-			type  = t_untyped_integer;
+			mode = Addressing_Constant;
+			type = t_untyped_integer;
+			if (id == BuiltinProc_len) {
+				value = exact_value_i64(bt->Enum.fields.count);
+			} else {
+				GB_ASSERT(id == BuiltinProc_cap);
+				value = exact_value_sub(*bt->Enum.max_value, *bt->Enum.min_value);
+				value = exact_value_increment_one(value);
+			}
 		} else if (is_type_struct(op_type)) {
 			Type *bt = base_type(op_type);
 			if (bt->Struct.soa_kind == StructSoa_Fixed) {
