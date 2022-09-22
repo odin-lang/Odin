@@ -18,8 +18,8 @@ current_thread_id :: proc "contextless" () -> int {
 	return (int) (es.ThreadGetID(es.CURRENT_THREAD));
 }
 
-heap_alloc :: proc(size: int) -> rawptr {
-	return es.HeapAllocate(size, false);
+heap_alloc :: proc(size: int, zero_memory := true) -> rawptr {
+	return es.HeapAllocate(size, zero_memory);
 }
 
 heap_free :: proc(ptr: rawptr) {
