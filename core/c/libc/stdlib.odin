@@ -88,6 +88,7 @@ foreign libc {
 	srand         :: proc(seed: uint) ---
 
 	// 7.22.3 Memory management functions
+	@(link_name="_aligned_malloc" when ODIN_OS == .Windows else "aligned_alloc")
 	aligned_alloc :: proc(aligment, size: size_t) -> rawptr ---
 	calloc        :: proc(nmemb, size: size_t) -> rawptr ---
 	free          :: proc(ptr: rawptr) ---
@@ -124,4 +125,16 @@ foreign libc {
 	// 7.22.8 Multibyte/wide string conversion functions
 	mbstowcs      :: proc(pwcs: ^wchar_t, s: cstring, n: size_t) -> size_t ---
 	wcstombs      :: proc(s: [^]char, pwcs: ^wchar_t, n: size_t) -> size_t ---
+}
+
+
+aligned_free :: proc "c" (ptr: rawptr) {
+	when ODIN_OS == .Windows {
+		foreign libc {
+			_aligned_free :: proc(ptr: rawptr) ---
+		}
+		_aligned_free(ptr)
+	} else {
+		free(ptr)
+	}
 }
