@@ -1311,13 +1311,16 @@ void enable_target_feature(TokenPos pos, String const &target_feature_list) {
 	defer (mutex_unlock(&bc->target_features_mutex));
 
 	auto items = split_by_comma(target_feature_list);
-	array_free(&items);
 	for_array(i, items) {
 		String const &item = items.data[i];
 		if (!check_target_feature_is_valid(pos, item)) {
 			error(pos, "Target feature '%.*s' is not valid", LIT(item));
+			continue;
 		}
+
+		string_set_add(&bc->target_features_set, item);
 	}
+	array_free(&items);
 }
 
 
@@ -1340,7 +1343,7 @@ char const *target_features_set_to_cstring(gbAllocator allocator, bool with_quot
 
 		if (with_quotes) features[len++] = '"';
 		String feature = build_context.target_features_set.entries[i].value;
-		gb_memmove(features, feature.text, feature.len);
+		gb_memmove(features + len, feature.text, feature.len);
 		len += feature.len;
 		if (with_quotes) features[len++] = '"';
 	}
