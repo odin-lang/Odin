@@ -604,7 +604,7 @@ access :: proc(path: string, mask: int) -> (bool, Errno) {
 }
 
 heap_alloc :: proc(size: int, zero_memory := true) -> rawptr {
-	if zero <= 0 {
+	if size <= 0 {
 		return nil
 	}
 	if zero_memory {
