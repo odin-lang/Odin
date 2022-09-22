@@ -99,7 +99,7 @@ static_arena_allocator_proc :: proc(allocator_data: rawptr, mode: mem.Allocator_
 	arena := (^Static_Arena)(allocator_data)
 	
 	switch mode {
-	case .Alloc:
+	case .Alloc, .Alloc_Non_Zeroed:
 		return static_arena_alloc(arena, size, alignment)
 	case .Free:
 		err = .Mode_Not_Implemented

@@ -625,9 +625,15 @@ access :: proc(path: string, mask: int) -> bool {
 	return _unix_access(cstr, mask) == 0
 }
 
-heap_alloc :: proc(size: int) -> rawptr {
-	assert(size > 0)
-	return _unix_calloc(1, size)
+heap_alloc :: proc(size: int, zero_memory := true) -> rawptr {
+	if size <= 0 {
+		return nil
+	}
+	if zero_memory {
+		return _unix_calloc(1, size)
+	} else {
+		return _unix_malloc(size)
+	}
 }
 heap_resize :: proc(ptr: rawptr, new_size: int) -> rawptr {
 	// NOTE: _unix_realloc doesn't guarantee new memory will be zeroed on

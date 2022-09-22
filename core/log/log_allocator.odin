@@ -43,6 +43,13 @@ log_allocator_proc :: proc(allocator_data: rawptr, mode: runtime.Allocator_Mode,
 				args = {la.prefix, padding, size, alignment},
 				location = location,
 			)
+		case .Alloc_Non_Zeroed:
+			logf(
+				level=la.level,
+				fmt_str = "%s%s>>> ALLOCATOR(mode=.Alloc_Non_Zeroed, size=%d, alignment=%d)",
+				args = {la.prefix, padding, size, alignment},
+				location = location,
+			)
 		case .Free:
 			if old_size != 0 {
 				logf(
