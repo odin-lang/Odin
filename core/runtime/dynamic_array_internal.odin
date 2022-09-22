@@ -59,6 +59,8 @@ __dynamic_array_shrink :: proc(array_: rawptr, elem_size, elem_align: int, new_c
 		return
 	}
 
+	new_cap := new_cap
+	new_cap = max(new_cap, 0)
 	old_size  := array.cap * elem_size
 	new_size  := new_cap * elem_size
 	allocator := array.allocator

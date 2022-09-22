@@ -121,8 +121,8 @@ lbProcedure *lb_create_procedure(lbModule *m, Entity *entity, bool ignore_body) 
 	p->branch_blocks.allocator = a;
 	p->context_stack.allocator = a;
 	p->scope_stack.allocator   = a;
-	map_init(&p->selector_values, a, 0);
-	map_init(&p->selector_addr,   a, 0);
+	map_init(&p->selector_values,  a, 0);
+	map_init(&p->selector_addr,    a, 0);
 
 	if (p->is_foreign) {
 		lb_add_foreign_library_path(p->module, entity->Procedure.foreign_library);
@@ -379,7 +379,6 @@ lbProcedure *lb_create_dummy_procedure(lbModule *m, String link_name, Type *type
 		lb_add_proc_attribute_at_index(p, offset+parameter_index, "nonnull");
 		lb_add_proc_attribute_at_index(p, offset+parameter_index, "nocapture");
 	}
-
 	return p;
 }
 
@@ -577,20 +576,13 @@ void lb_begin_procedure_body(lbProcedure *p) {
 				if (e->token.string != "") {
 					GB_ASSERT(!is_blank_ident(e->token));
 
-					lbAddr res = {};
-					if (return_ptr_value.value != nullptr) {
-						lbValue ptr = return_ptr_value;
-						if (results->variables.count != 1) {
-							ptr = lb_emit_struct_ep(p, ptr, cast(i32)i);
-						}
-
-						res = lb_addr(ptr);
-						lb_add_entity(p->module, e, ptr);
-						lb_add_debug_local_variable(p, ptr.value, e->type, e->token);
-					} else {
-						res = lb_add_local(p, e->type, e);
-					}
-
+					// NOTE(bill): Don't even bother trying to optimize this with the return ptr value
+					// This will violate the defer rules if you do:
+					//         foo :: proc() -> (x, y: T) {
+					//                 defer x = ... // defer is executed after the `defer`
+					//                 return // the values returned should be zeroed
+					//         }
+					lbAddr res = lb_add_local(p, e->type, e);
 					if (e->Variable.param_value.kind != ParameterValue_Invalid) {
 						lbValue c = lb_handle_param_value(p, e->type, e->Variable.param_value, e->token.pos);
 						lb_addr_store(p, res, c);
@@ -893,7 +885,7 @@ lbValue lb_emit_call(lbProcedure *p, lbValue value, Array<lbValue> const &args, 
 		GB_ASSERT(param_count-1 <= args.count);
 		param_count -= 1;
 	} else {
-		GB_ASSERT_MSG(param_count == args.count, "%td == %td", param_count, args.count);
+		GB_ASSERT_MSG(param_count == args.count, "%td == %td (%s)", param_count, args.count, LLVMPrintValueToString(value.value));
 	}
 
 	lbValue result = {};

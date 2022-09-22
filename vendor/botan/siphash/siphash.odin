@@ -1,4 +1,4 @@
-package siphash
+package vendor_siphash
 
 /*
     Copyright 2022 zhibog

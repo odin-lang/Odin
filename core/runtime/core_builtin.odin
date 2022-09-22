@@ -289,14 +289,15 @@ clear_map :: proc "contextless" (m: ^$T/map[$K]$V) {
 	entries := (^Raw_Dynamic_Array)(&raw_map.entries)
 	entries.len = 0
 	for _, i in raw_map.hashes {
-		raw_map.hashes[i] = -1
+		raw_map.hashes[i] = MAP_SENTINEL
 	}
 }
 
 @builtin
 reserve_map :: proc(m: ^$T/map[$K]$V, capacity: int, loc := #caller_location) {
 	if m != nil {
-		__dynamic_map_reserve(__get_map_header(m), capacity, loc)
+		h := __get_map_header_table(T)
+		__dynamic_map_reserve(m, h, uint(capacity), loc)
 	}
 }
 
@@ -325,9 +326,8 @@ delete_key :: proc(m: ^$T/map[$K]$V, key: K) -> (deleted_key: K, deleted_value: 
 	if m != nil {
 		key := key
 		h := __get_map_header(m)
-		hash := __get_map_hash(&key)
-		fr := __dynamic_map_find(h, hash)
-		if fr.entry_index >= 0 {
+		fr := __map_find(h, &key)
+		if fr.entry_index != MAP_SENTINEL {
 			entry := __dynamic_map_get_entry(h, fr.entry_index)
 			deleted_key   = (^K)(uintptr(entry)+h.key_offset)^
 			deleted_value = (^V)(uintptr(entry)+h.value_offset)^
@@ -335,7 +335,6 @@ delete_key :: proc(m: ^$T/map[$K]$V, key: K) -> (deleted_key: K, deleted_value: 
 			__dynamic_map_erase(h, fr)
 		}
 	}
-
 	return
 }
 
@@ -673,11 +672,10 @@ shrink_dynamic_array :: proc(array: ^$T/[dynamic]$E, new_cap := -1, loc := #call
 @builtin
 map_insert :: proc(m: ^$T/map[$K]$V, key: K, value: V, loc := #caller_location) -> (ptr: ^V) {
 	key, value := key, value
-	h := __get_map_header(m)
-	hash := __get_map_hash(&key)
-	
-	data := uintptr(__dynamic_map_set(h, hash, &value, loc))
-	return (^V)(data + h.value_offset)
+	h := __get_map_header(T)
+
+	e := __dynamic_map_set(m, h, __get_map_key_hash(&key), &key, &value, loc)
+	return (^V)(uintptr(e) + h.value_offset)
 }
 
 

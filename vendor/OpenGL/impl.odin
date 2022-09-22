@@ -1,4 +1,4 @@
-package odin_gl
+package vendor_gl
 
 loaded_up_to: [2]int
 loaded_up_to_major := 0

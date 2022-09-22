@@ -15,12 +15,12 @@ read_writer_init :: proc(rw: ^Read_Writer, r: ^Reader, w: ^Writer) {
 
 read_writer_to_stream :: proc(rw: ^Read_Writer) -> (s: io.Stream) {
 	s.stream_data = rw
-	s.stream_vtable = _read_writer_vtable
+	s.stream_vtable = &_read_writer_vtable
 	return
 }
 
 @(private)
-_read_writer_vtable := &io.Stream_VTable{
+_read_writer_vtable := io.Stream_VTable{
 	impl_read = proc(s: io.Stream, p: []byte) -> (n: int, err: io.Error) {
 		b := (^Read_Writer)(s.stream_data).r
 		return reader_read(b, p)
