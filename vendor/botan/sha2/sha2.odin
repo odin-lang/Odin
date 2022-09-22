@@ -1,4 +1,4 @@
-package sha2
+package vendor_sha2
 
 /*
     Copyright 2021 zhibog

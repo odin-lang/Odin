@@ -1130,7 +1130,7 @@ lbValue lb_emit_struct_ev(lbProcedure *p, lbValue s, i32 index) {
 	case Type_Map:
 		{
 			init_map_internal_types(t);
-			Type *gst = t->Map.generated_struct_type;
+			Type *gst = t->Map.internal_type;
 			switch (index) {
 			case 0: result_type = get_struct_field_type(gst, 0); break;
 			case 1: result_type = get_struct_field_type(gst, 1); break;

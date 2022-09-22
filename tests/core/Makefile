@@ -2,7 +2,7 @@ ODIN=../../odin
 PYTHON=$(shell which python3)
 
 all: download_test_assets image_test compress_test strings_test hash_test crypto_test noise_test encoding_test \
-	 math_test linalg_glsl_math_test filepath_test reflect_test os_exit_test i18n_test
+	 math_test linalg_glsl_math_test filepath_test reflect_test os_exit_test i18n_test c_libc_test
 
 download_test_assets:
 	$(PYTHON) download_assets.py
@@ -48,3 +48,6 @@ os_exit_test:
 
 i18n_test:
 	$(ODIN) run text/i18n -out:test_core_i18n
+
+c_libc_test:
+	$(ODIN) run c/libc -out:test_core_libc

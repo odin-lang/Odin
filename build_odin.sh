@@ -99,7 +99,8 @@ config_linux() {
 
 	LDFLAGS="$LDFLAGS -ldl"
 	CXXFLAGS="$CXXFLAGS $($LLVM_CONFIG --cxxflags --ldflags)"
-	LDFLAGS="$LDFLAGS $($LLVM_CONFIG --libs core native --system-libs)"
+	LDFLAGS="$LDFLAGS $($LLVM_CONFIG  --libs core native --system-libs --libfiles) -Wl,-rpath=\$ORIGIN"
+	cp $($LLVM_CONFIG --libfiles) ./
 }
 
 build_odin() {

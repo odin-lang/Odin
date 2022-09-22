@@ -74,6 +74,9 @@ void lb_init_module(lbModule *m, Checker *c) {
 
 	string_map_init(&m->objc_classes, a);
 	string_map_init(&m->objc_selectors, a);
+
+	map_init(&m->map_header_table_map, a, 0);
+
 }
 
 bool lb_init_generator(lbGenerator *gen, Checker *c) {
@@ -211,6 +214,17 @@ void lb_loop_end(lbProcedure *p, lbLoopData const &data) {
 		lb_start_block(p, data.done);
 	}
 }
+
+
+void lb_make_global_private_const(LLVMValueRef global_data) {
+	LLVMSetLinkage(global_data, LLVMPrivateLinkage);
+	LLVMSetUnnamedAddress(global_data, LLVMGlobalUnnamedAddr);
+	LLVMSetGlobalConstant(global_data, true);
+}
+void lb_make_global_private_const(lbAddr const &addr) {
+	lb_make_global_private_const(addr.addr.value);
+}
+
 
 
 // This emits a GEP at 0, index
@@ -390,19 +404,8 @@ lbValue lb_addr_get_ptr(lbProcedure *p, lbAddr const &addr) {
 	}
 
 	switch (addr.kind) {
-	case lbAddr_Map: {
-		Type *map_type = base_type(addr.map.type);
-		lbValue h = lb_gen_map_header(p, addr.addr, map_type);
-		lbValue key = lb_gen_map_hash(p, addr.map.key, map_type->Map.key);
-
-		auto args = array_make<lbValue>(permanent_allocator(), 2);
-		args[0] = h;
-		args[1] = key;
-
-		lbValue ptr = lb_emit_runtime_call(p, "__dynamic_map_get", args);
-
-		return lb_emit_conv(p, ptr, alloc_type_pointer(map_type->Map.value));
-	}
+	case lbAddr_Map:
+		return lb_internal_dynamic_map_get_ptr(p, addr.addr, addr.map.key);
 
 	case lbAddr_RelativePointer: {
 		Type *rel_ptr = base_type(lb_addr_type(addr));
@@ -711,7 +714,7 @@ void lb_addr_store(lbProcedure *p, lbAddr addr, lbValue value) {
 
 		return;
 	} else if (addr.kind == lbAddr_Map) {
-		lb_insert_dynamic_map_key_and_value(p, addr, addr.map.type, addr.map.key, value, p->curr_stmt);
+		lb_insert_dynamic_map_key_and_value(p, addr.addr, addr.map.type, addr.map.key, value, p->curr_stmt);
 		return;
 	} else if (addr.kind == lbAddr_Context) {
 		lbAddr old_addr = lb_find_or_generate_context_ptr(p);
@@ -926,19 +929,15 @@ void lb_emit_store(lbProcedure *p, lbValue ptr, lbValue value) {
 			return;
 		} else if (LLVMIsConstant(value.value)) {
 			lbAddr addr = lb_add_global_generated(p->module, value.type, value, nullptr);
-			LLVMValueRef global_data = addr.addr.value;
-			// make it truly private data
-			LLVMSetLinkage(global_data, LLVMPrivateLinkage);
-			LLVMSetUnnamedAddress(global_data, LLVMGlobalUnnamedAddr);
-			LLVMSetGlobalConstant(global_data, true);
+			lb_make_global_private_const(addr);
 
 			LLVMValueRef dst_ptr = ptr.value;
-			LLVMValueRef src_ptr = global_data;
+			LLVMValueRef src_ptr = addr.addr.value;
 			src_ptr = LLVMBuildPointerCast(p->builder, src_ptr, LLVMTypeOf(dst_ptr), "");
 
 			LLVMBuildMemMove(p->builder,
 			                 dst_ptr, lb_try_get_alignment(dst_ptr, 1),
-			                 src_ptr, lb_try_get_alignment(global_data, 1),
+			                 src_ptr, lb_try_get_alignment(src_ptr, 1),
 			                 LLVMConstInt(LLVMInt64TypeInContext(p->module->ctx), lb_sizeof(LLVMTypeOf(value.value)), false));
 			return;
 		}
@@ -1059,16 +1058,11 @@ lbValue lb_addr_load(lbProcedure *p, lbAddr const &addr) {
 
 
 	} else if (addr.kind == lbAddr_Map) {
-		Type *map_type = base_type(addr.map.type);
+		Type *map_type = base_type(type_deref(addr.addr.type));
+		GB_ASSERT(map_type->kind == Type_Map);
 		lbAddr v = lb_add_local_generated(p, map_type->Map.lookup_result_type, true);
-		lbValue h = lb_gen_map_header(p, addr.addr, map_type);
-		lbValue key = lb_gen_map_hash(p, addr.map.key, map_type->Map.key);
 
-		auto args = array_make<lbValue>(permanent_allocator(), 2);
-		args[0] = h;
-		args[1] = key;
-
-		lbValue ptr = lb_emit_runtime_call(p, "__dynamic_map_get", args);
+		lbValue ptr = lb_internal_dynamic_map_get_ptr(p, addr.addr, addr.map.key);
 		lbValue ok = lb_emit_conv(p, lb_emit_comp_against_nil(p, Token_NotEq, ptr), t_bool);
 		lb_emit_store(p, lb_emit_struct_ep(p, v.addr, 1), ok);
 
@@ -2473,10 +2467,8 @@ LLVMValueRef lb_find_or_add_entity_string_ptr(lbModule *m, String const &str) {
 		LLVMTypeRef type = LLVMTypeOf(data);
 		LLVMValueRef global_data = LLVMAddGlobal(m->mod, type, name);
 		LLVMSetInitializer(global_data, data);
-		LLVMSetLinkage(global_data, LLVMPrivateLinkage);
-		LLVMSetUnnamedAddress(global_data, LLVMGlobalUnnamedAddr);
+		lb_make_global_private_const(global_data);
 		LLVMSetAlignment(global_data, 1);
-		LLVMSetGlobalConstant(global_data, true);
 
 		LLVMValueRef ptr = LLVMConstInBoundsGEP2(type, global_data, indices, 2);
 		string_map_set(&m->const_strings, key, ptr);
@@ -2519,10 +2511,8 @@ lbValue lb_find_or_add_entity_string_byte_slice(lbModule *m, String const &str) 
 	LLVMTypeRef type = LLVMTypeOf(data);
 	LLVMValueRef global_data = LLVMAddGlobal(m->mod, type, name);
 	LLVMSetInitializer(global_data, data);
-	LLVMSetLinkage(global_data, LLVMPrivateLinkage);
-	LLVMSetUnnamedAddress(global_data, LLVMGlobalUnnamedAddr);
+	lb_make_global_private_const(global_data);
 	LLVMSetAlignment(global_data, 1);
-	LLVMSetGlobalConstant(global_data, true);
 
 	LLVMValueRef ptr = nullptr;
 	if (str.len != 0) {
@@ -2558,10 +2548,8 @@ lbValue lb_find_or_add_entity_string_byte_slice_with_type(lbModule *m, String co
 	LLVMTypeRef type = LLVMTypeOf(data);
 	LLVMValueRef global_data = LLVMAddGlobal(m->mod, type, name);
 	LLVMSetInitializer(global_data, data);
-	LLVMSetLinkage(global_data, LLVMPrivateLinkage);
-	LLVMSetUnnamedAddress(global_data, LLVMGlobalUnnamedAddr);
+	lb_make_global_private_const(global_data);
 	LLVMSetAlignment(global_data, 1);
-	LLVMSetGlobalConstant(global_data, true);
 
 	i64 data_len = str.len;
 	LLVMValueRef ptr = nullptr;
@@ -2668,6 +2656,7 @@ lbValue lb_find_procedure_value_from_entity(lbModule *m, Entity *e) {
 	GB_PANIC("Error in: %s, missing procedure %.*s\n", token_pos_to_string(e->token.pos), LIT(e->token.string));
 	return {};
 }
+
 
 lbAddr lb_add_global_generated(lbModule *m, Type *type, lbValue value, Entity **entity_) {
 	GB_ASSERT(type != nullptr);

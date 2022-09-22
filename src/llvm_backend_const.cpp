@@ -352,7 +352,7 @@ LLVMValueRef lb_big_int_to_llvm(lbModule *m, Type *original_type, BigInt const *
 		}
 	}
 
-	LLVMValueRef value = LLVMConstIntOfArbitraryPrecision(lb_type(m, original_type), cast(unsigned)(sz+7/8), cast(u64 *)rop);
+	LLVMValueRef value = LLVMConstIntOfArbitraryPrecision(lb_type(m, original_type), cast(unsigned)((sz+7)/8), cast(u64 *)rop);
 	if (big_int_is_neg(a)) {
 		value = LLVMConstNeg(value);
 	}
@@ -390,6 +390,9 @@ lbValue lb_const_value(lbModule *m, Type *type, ExactValue value, bool allow_loc
 			Entity *e = entity_from_expr(expr);
 			res = lb_find_procedure_value_from_entity(m, e);
 		}
+		GB_ASSERT(res.value != nullptr);
+		GB_ASSERT(LLVMGetValueKind(res.value) == LLVMFunctionValueKind);
+
 		res.value = LLVMConstPointerCast(res.value, lb_type(m, res.type));
 		return res;
 	}
