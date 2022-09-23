@@ -16,8 +16,6 @@ main :: proc() {
 
 	test_fract_f32(&t)
 	test_fract_f64(&t)
-
-	tc.report(&t)
 }
 
 @test

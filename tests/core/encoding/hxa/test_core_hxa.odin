@@ -15,8 +15,6 @@ main :: proc() {
 
 	test_read(&t)
 	test_write(&t)
-
-	tc.report(&t)
 }
 
 @test

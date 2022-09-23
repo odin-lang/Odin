@@ -13,8 +13,6 @@ main :: proc() {
 
 	test_as_u64(&t)
 	test_as_f64(&t)
-
-	tc.report(&t)
 }
 
 @test

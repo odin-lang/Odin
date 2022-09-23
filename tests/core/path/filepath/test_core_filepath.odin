@@ -16,8 +16,6 @@ main :: proc() {
 	} else {
 		test_split_list_unix(&t)
 	}
-
-	tc.report(&t)
 }
 
 @test

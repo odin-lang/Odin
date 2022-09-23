@@ -18,8 +18,6 @@ main :: proc() {
 	test_trunc_f16(&t)
 	test_trunc_f32(&t)
 	test_trunc_f64(&t)
-
-	tc.report(&t)
 }
 
 @test
