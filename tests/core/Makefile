@@ -11,43 +11,43 @@ image_test:
 	$(ODIN) test image/test_core_image.odin -file
 
 compress_test:
-	$(ODIN) test compress/test_core_compress.odin -file -out:test_core_compress
+	$(ODIN) test compress/test_core_compress.odin -file
 
 strings_test:
-	$(ODIN) test strings/test_core_strings.odin -file -out:test_core_strings
+	$(ODIN) test strings/test_core_strings.odin -file
 
 hash_test:
-	$(ODIN) test hash -o:speed -no-bounds-check -out:test_hash 
+	$(ODIN) test hash -o:speed -no-bounds-check 
 
 crypto_test:
-	$(ODIN) test crypto -o:speed -no-bounds-check -out:test_crypto_hash 
+	$(ODIN) test crypto -o:speed -no-bounds-check 
 
 noise_test:
-	$(ODIN) test math/noise -out:test_noise
+	$(ODIN) test math/noise
 
 encoding_test:
-	$(ODIN) test encoding/hxa    -out:test_hxa -collection:tests=..
-	$(ODIN) test encoding/json   -out:test_json
-	$(ODIN) test encoding/varint -out:test_varint
-	$(ODIN) test encoding/xml    -out:test_xml
+	$(ODIN) test encoding/hxa -collection:tests=..
+	$(ODIN) test encoding/json
+	$(ODIN) test encoding/varint
+	$(ODIN) test encoding/xml
 
 math_test:
-	$(ODIN) test math/test_core_math.odin -file -collection:tests=.. -out:test_core_math
+	$(ODIN) test math/test_core_math.odin -file -collection:tests=..
 
 linalg_glsl_math_test:
-	$(ODIN) test math/linalg/glsl/test_linalg_glsl_math.odin -file -collection:tests=.. -out:test_linalg_glsl_math
+	$(ODIN) test math/linalg/glsl/test_linalg_glsl_math.odin -file -collection:tests=..
 
 filepath_test:
-	$(ODIN) test path/filepath/test_core_filepath.odin -file -collection:tests=.. -out:test_core_filepath
+	$(ODIN) test path/filepath/test_core_filepath.odin -file -collection:tests=..
 
 reflect_test:
-	$(ODIN) test reflect/test_core_reflect.odin -file -collection:tests=.. -out:test_core_reflect
+	$(ODIN) test reflect/test_core_reflect.odin -file -collection:tests=..
 
 os_exit_test:
-	$(ODIN) test os/test_core_os_exit.odin -file -out:test_core_os_exit && exit 1 || exit 0
+	$(ODIN) test os/test_core_os_exit.odin -file && exit 1 || exit 0
 
 i18n_test:
-	$(ODIN) test text/i18n -out:test_core_i18n
+	$(ODIN) test text/i18n
 
 c_libc_test:
-	$(ODIN) test c/libc -out:test_core_libc
+	$(ODIN) test c/libc
