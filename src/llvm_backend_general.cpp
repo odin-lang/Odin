@@ -1536,7 +1536,8 @@ LLVMTypeRef lb_type_internal_for_procedures_raw(lbModule *m, Type *type) {
 			bool param_is_by_ptr = false;
 			LLVMTypeRef param_type = nullptr;
 			if (e->flags & EntityFlag_ByPtr) {
-				param_type = lb_type(m, alloc_type_pointer(e_type));
+				// it will become a pointer afterwards by making it indirect
+				param_type = lb_type(m, e_type);
 				param_is_by_ptr = true;
 			} else if (is_type_boolean(e_type) &&
 			    type_size_of(e_type) <= 1) {
@@ -1578,7 +1579,6 @@ LLVMTypeRef lb_type_internal_for_procedures_raw(lbModule *m, Type *type) {
 	for_array(j, ft->args) {
 		if (params_by_ptr[j]) {
 			// NOTE(bill): The parameter needs to be passed "indirectly", override it
-			GB_ASSERT(ft->args[j].kind == lbArg_Direct);
 			ft->args[j].kind = lbArg_Indirect;
 		}
 	}
