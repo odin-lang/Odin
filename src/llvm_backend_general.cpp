@@ -1507,6 +1507,7 @@ LLVMTypeRef lb_type_internal_for_procedures_raw(lbModule *m, Type *type) {
 
 	LLVMTypeRef ret = nullptr;
 	LLVMTypeRef *params = gb_alloc_array(permanent_allocator(), LLVMTypeRef, param_count);
+	bool *params_by_ptr = gb_alloc_array(permanent_allocator(), bool, param_count);
 	if (type->Proc.result_count != 0) {
 		Type *single_ret = reduce_tuple_to_single_type(type->Proc.results);
 		ret = lb_type(m, single_ret);
@@ -1532,9 +1533,11 @@ LLVMTypeRef lb_type_internal_for_procedures_raw(lbModule *m, Type *type) {
 			}
 			Type *e_type = reduce_tuple_to_single_type(e->type);
 
+			bool param_is_by_ptr = false;
 			LLVMTypeRef param_type = nullptr;
 			if (e->flags & EntityFlag_ByPtr) {
 				param_type = lb_type(m, alloc_type_pointer(e_type));
+				param_is_by_ptr = true;
 			} else if (is_type_boolean(e_type) &&
 			    type_size_of(e_type) <= 1) {
 				param_type = LLVMInt1TypeInContext(m->ctx);
@@ -1546,6 +1549,7 @@ LLVMTypeRef lb_type_internal_for_procedures_raw(lbModule *m, Type *type) {
 				}
 			}
 
+			params_by_ptr[param_index] = param_is_by_ptr;
 			params[param_index++] = param_type;
 		}
 	}
@@ -1570,6 +1574,13 @@ LLVMTypeRef lb_type_internal_for_procedures_raw(lbModule *m, Type *type) {
 		              "\n\tRetTypeCtx: %p\n\tCurrentCtx: %p\n\tGlobalCtx:  %p",
 		              LLVMPrintTypeToString(ft->ret.type),
 		              LLVMGetTypeContext(ft->ret.type), ft->ctx, LLVMGetGlobalContext());
+	}
+	for_array(j, ft->args) {
+		if (params_by_ptr[j]) {
+			// NOTE(bill): The parameter needs to be passed "indirectly", override it
+			GB_ASSERT(ft->args[j].kind == lbArg_Direct);
+			ft->args[j].kind = lbArg_Indirect;
+		}
 	}
 
 	map_set(&m->function_type_map, type, ft);
