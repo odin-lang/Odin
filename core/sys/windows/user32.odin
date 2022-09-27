@@ -104,6 +104,9 @@ foreign user32 {
 	GetDC :: proc(hWnd: HWND) -> HDC ---
 	ReleaseDC :: proc(hWnd: HWND, hDC: HDC) -> c_int ---
 
+	GetDlgCtrlID :: proc(hWnd: HWND) -> c_int ---
+	GetDlgItem :: proc(hDlg: HWND, nIDDlgItem: c_int) -> HWND ---
+
 	GetUpdateRect :: proc(hWnd: HWND, lpRect: LPRECT, bErase: BOOL) -> BOOL ---
 	ValidateRect :: proc(hWnd: HWND, lpRect: ^RECT) -> BOOL ---
 	InvalidateRect :: proc(hWnd: HWND, lpRect: ^RECT, bErase: BOOL) -> BOOL ---
