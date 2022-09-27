@@ -374,12 +374,12 @@ buffer_read_from :: proc(b: ^Buffer, r: io.Reader) -> (n: i64, err: io.Error) #n
 
 buffer_to_stream :: proc(b: ^Buffer) -> (s: io.Stream) {
 	s.stream_data = b
-	s.stream_vtable = _buffer_vtable
+	s.stream_vtable = &_buffer_vtable
 	return
 }
 
 @(private)
-_buffer_vtable := &io.Stream_VTable{
+_buffer_vtable := io.Stream_VTable{
 	impl_size = proc(s: io.Stream) -> i64 {
 		b := (^Buffer)(s.stream_data)
 		return i64(buffer_capacity(b))
