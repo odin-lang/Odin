@@ -1,8 +1,5 @@
 #include <math.h>
 
-// TODO(bill): Big numbers
-// IMPORTANT TODO(bill): This needs to be completely fixed!!!!!!!!
-
 gb_global BlockingMutex hash_exact_value_mutex;
 
 struct Ast;

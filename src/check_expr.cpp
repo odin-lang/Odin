@@ -1060,6 +1060,8 @@ void check_assignment(CheckerContext *c, Operand *operand, Type *type, String co
 						type_extra = gb_string_append_fmt(type_extra, " (package %.*s)", LIT(type_pkg->name));
 					}
 				}
+
+				ERROR_BLOCK();
 				error(operand->expr,
 				      "Cannot assign value '%s' of type '%s%s' to '%s%s' in %.*s",
 				      expr_str,
@@ -1143,6 +1145,12 @@ bool is_polymorphic_type_assignable(CheckerContext *c, Type *poly, Type *source,
 				return true;
 			}
 			return is_polymorphic_type_assignable(c, poly->Pointer.elem, source->Pointer.elem, true, modify_type);
+		} else if (source->kind == Type_MultiPointer) {
+			isize level = check_is_assignable_to_using_subtype(source->MultiPointer.elem, poly->Pointer.elem);
+			if (level > 0) {
+				return true;
+			}
+			return is_polymorphic_type_assignable(c, poly->Pointer.elem, source->MultiPointer.elem, true, modify_type);
 		}
 		return false;
 
@@ -1153,6 +1161,12 @@ bool is_polymorphic_type_assignable(CheckerContext *c, Type *poly, Type *source,
 				return true;
 			}
 			return is_polymorphic_type_assignable(c, poly->MultiPointer.elem, source->MultiPointer.elem, true, modify_type);
+		} else if (source->kind == Type_Pointer) {
+			isize level = check_is_assignable_to_using_subtype(source->Pointer.elem, poly->MultiPointer.elem);
+			if (level > 0) {
+				return true;
+			}
+			return is_polymorphic_type_assignable(c, poly->MultiPointer.elem, source->Pointer.elem, true, modify_type);
 		}
 		return false;
 	case Type_Array:
@@ -1348,7 +1362,13 @@ bool is_polymorphic_type_assignable(CheckerContext *c, Type *poly, Type *source,
 		if (source->kind == Type_Map) {
 			bool key   = is_polymorphic_type_assignable(c, poly->Map.key, source->Map.key, true, modify_type);
 			bool value = is_polymorphic_type_assignable(c, poly->Map.value, source->Map.value, true, modify_type);
-			return key || value;
+			if (key || value) {
+				poly->Map.entry_type = nullptr;
+				poly->Map.internal_type = nullptr;
+				poly->Map.lookup_result_type = nullptr;
+				init_map_internal_types(poly);
+				return true;
+			}
 		}
 		return false;
 		
@@ -1965,10 +1985,18 @@ void check_assignment_error_suggestion(CheckerContext *c, Operand *o, Type *type
 		if (are_types_identical(s, d)) {
 			error_line("\tSuggestion: the array expression may be sliced with %s[:]\n", a);
 		}
-	} else if (are_types_identical(src, dst)) {
+	} else if (is_type_dynamic_array(src) && is_type_slice(dst)) {
+		Type *s = src->DynamicArray.elem;
+		Type *d = dst->Slice.elem;
+		if (are_types_identical(s, d)) {
+			error_line("\tSuggestion: the dynamic array expression may be sliced with %s[:]\n", a);
+		}
+	}else if (are_types_identical(src, dst) && !are_types_identical(o->type, type)) {
 		error_line("\tSuggestion: the expression may be directly casted to type %s\n", b);
 	} else if (are_types_identical(src, t_string) && is_type_u8_slice(dst)) {
 		error_line("\tSuggestion: a string may be transmuted to %s\n", b);
+		error_line("\t            This is an UNSAFE operation as string data is assumed to be immutable, \n");
+		error_line("\t            whereas slices in general are assumed to be mutable.\n");
 	} else if (is_type_u8_slice(src) && are_types_identical(dst, t_string)) {
 		error_line("\tSuggestion: the expression may be casted to %s\n", b);
 	}
@@ -2028,7 +2056,9 @@ bool check_is_expressible(CheckerContext *ctx, Operand *o, Type *type) {
 		gbString a = expr_to_string(o->expr);
 		gbString b = type_to_string(type);
 		gbString c = type_to_string(o->type);
+		gbString s = exact_value_to_string(o->value);
 		defer(
+			gb_string_free(s);
 			gb_string_free(c);
 			gb_string_free(b);
 			gb_string_free(a);
@@ -2037,13 +2067,15 @@ bool check_is_expressible(CheckerContext *ctx, Operand *o, Type *type) {
 
 		if (is_type_numeric(o->type) && is_type_numeric(type)) {
 			if (!is_type_integer(o->type) && is_type_integer(type)) {
-				error(o->expr, "'%s' truncated to '%s'", a, b);
+				error(o->expr, "'%s' truncated to '%s', got %s", a, b, s);
 			} else {
-				error(o->expr, "Cannot convert numeric value '%s' to '%s' from '%s", a, b, c);
+				ERROR_BLOCK();
+				error(o->expr, "Cannot convert numeric value '%s' to '%s' from '%s', got %s", a, b, c, s);
 				check_assignment_error_suggestion(ctx, o, type);
 			}
 		} else {
-			error(o->expr, "Cannot convert '%s' to '%s' from '%s", a, b, c);
+			ERROR_BLOCK();
+			error(o->expr, "Cannot convert '%s' to '%s' from '%s', got %s", a, b, c, s);
 			check_assignment_error_suggestion(ctx, o, type);
 		}
 		return false;
@@ -3904,7 +3936,9 @@ bool check_index_value(CheckerContext *c, Type *main_type, bool open_range, Ast 
 		}
 	} else if (!is_type_integer(operand.type) && !is_type_enum(operand.type)) {
 		gbString expr_str = expr_to_string(operand.expr);
-		error(operand.expr, "Index '%s' must be an integer", expr_str);
+		gbString type_str = type_to_string(operand.type);
+		error(operand.expr, "Index '%s' must be an integer, got %s", expr_str, type_str);
+		gb_string_free(type_str);
 		gb_string_free(expr_str);
 		if (value) *value = 0;
 		return false;
@@ -3914,8 +3948,9 @@ bool check_index_value(CheckerContext *c, Type *main_type, bool open_range, Ast 
 	    (c->state_flags & StateFlag_no_bounds_check) == 0) {
 		BigInt i = exact_value_to_integer(operand.value).value_integer;
 		if (i.sign && !is_type_enum(index_type) && !is_type_multi_pointer(main_type)) {
+			String idx_str = big_int_to_string(temporary_allocator(), &i);
 			gbString expr_str = expr_to_string(operand.expr);
-			error(operand.expr, "Index '%s' cannot be a negative value", expr_str);
+			error(operand.expr, "Index '%s' cannot be a negative value, got %.*s", expr_str, LIT(idx_str));
 			gb_string_free(expr_str);
 			if (value) *value = 0;
 			return false;
@@ -3946,7 +3981,7 @@ bool check_index_value(CheckerContext *c, Type *main_type, bool open_range, Ast 
 				if (out_of_bounds) {
 					gbString expr_str = expr_to_string(operand.expr);
 					if (lo_str.len > 0) {
-						error(operand.expr, "Index '%s' is out of bounds range %.*s .. %.*s", expr_str, LIT(lo_str), LIT(hi_str));
+						error(operand.expr, "Index '%s' is out of bounds range %.*s ..= %.*s", expr_str, LIT(lo_str), LIT(hi_str));
 					} else {
 						gbString index_type_str = type_to_string(index_type);
 						error(operand.expr, "Index '%s' is out of bounds range of enum type %s", expr_str, index_type_str);
@@ -3976,8 +4011,9 @@ bool check_index_value(CheckerContext *c, Type *main_type, bool open_range, Ast 
 				}
 
 				if (out_of_bounds) {
+					String idx_str = big_int_to_string(temporary_allocator(), &i);
 					gbString expr_str = expr_to_string(operand.expr);
-					error(operand.expr, "Index '%s' is out of bounds range 0..<%lld", expr_str, max_count);
+					error(operand.expr, "Index '%s' is out of bounds range 0..<%lld, got %.*s", expr_str, max_count, LIT(idx_str));
 					gb_string_free(expr_str);
 					return false;
 				}
@@ -4022,6 +4058,7 @@ ExactValue get_constant_field_single(CheckerContext *c, ExactValue value, i32 in
 
 		if (cl->elems[0]->kind == Ast_FieldValue) {
 			if (is_type_struct(node->tav.type)) {
+				bool found = false;
 				for_array(i, cl->elems) {
 					Ast *elem = cl->elems[i];
 					if (elem->kind != Ast_FieldValue) {
@@ -4033,8 +4070,13 @@ ExactValue get_constant_field_single(CheckerContext *c, ExactValue value, i32 in
 					defer (array_free(&sub_sel.index));
 					if (sub_sel.index[0] == index) {
 						value = fv->value->tav.value;
+						found = true;
 						break;
 					}
+				}
+				if (!found) {
+					// Use the zero value if it is not found
+					value = {};
 				}
 			} else if (is_type_array(node->tav.type) || is_type_enumerated_array(node->tav.type)) {
 				for_array(i, cl->elems) {
@@ -4677,7 +4719,7 @@ Entity *check_selector(CheckerContext *c, Operand *operand, Ast *node, Type *typ
 
 	switch (entity->kind) {
 	case Entity_Constant:
-		operand->value = entity->Constant.value;
+	operand->value = entity->Constant.value;
 		operand->mode = Addressing_Constant;
 		if (operand->value.kind == ExactValue_Procedure) {
 			Entity *proc = strip_entity_wrapping(operand->value.value_procedure);
@@ -9064,7 +9106,20 @@ ExprKind check_slice_expr(CheckerContext *c, Operand *o, Ast *node, Type *type_h
 		o->type = t->RelativeSlice.slice_type;
 		if (o->mode != Addressing_Variable) {
 			gbString str = expr_to_string(node);
-			error(node, "Cannot relative slice '%s', value is not addressable", str);
+			error(node, "Cannot relative slice '%s', as value is not addressable", str);
+			gb_string_free(str);
+			o->mode = Addressing_Invalid;
+			o->expr = node;
+			return kind;
+		}
+		break;
+
+	case Type_EnumeratedArray:
+		{
+			gbString str = expr_to_string(o->expr);
+			gbString type_str = type_to_string(o->type);
+			error(o->expr, "Cannot slice '%s' of type '%s', as enumerated arrays cannot be sliced", str, type_str);
+			gb_string_free(type_str);
 			gb_string_free(str);
 			o->mode = Addressing_Invalid;
 			o->expr = node;

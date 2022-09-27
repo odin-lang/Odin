@@ -1,4 +1,4 @@
-package odin_gl
+package vendor_gl
 
 // Helper for loading shaders into a program
 

@@ -1,4 +1,4 @@
-package botan_bindings
+package vendor_botan
 
 /*
     Copyright 2021 zhibog

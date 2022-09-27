@@ -509,3 +509,10 @@ dot_product :: proc(a, b: $S/[]$T) -> (r: T, ok: bool)
 	}
 	return r, true
 }
+
+
+// Convert a pointer to an enumerated array to a slice of the element type
+enumerated_array :: proc(ptr: ^$T) -> []intrinsics.type_elem_type(T)
+	where intrinsics.type_is_enumerated_array(T) {
+	return ([^]intrinsics.type_elem_type(T))(ptr)[:len(T)]
+}

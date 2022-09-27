@@ -1614,6 +1614,7 @@ bool check_builtin_procedure(CheckerContext *c, Operand *operand, Ast *call, i32
 	case BuiltinProc_type_info_of:
 	case BuiltinProc_typeid_of:
 	case BuiltinProc_len:
+	case BuiltinProc_cap:
 	case BuiltinProc_min:
 	case BuiltinProc_max:
 	case BuiltinProc_type_is_subtype_of:
@@ -1696,16 +1697,14 @@ bool check_builtin_procedure(CheckerContext *c, Operand *operand, Ast *call, i32
 		return check_builtin_procedure_directive(c, operand, call, type_hint);
 
 	case BuiltinProc_len:
-		check_expr_or_type(c, operand, ce->args[0]);
-		if (operand->mode == Addressing_Invalid) {
-			return false;
-		}
-		/* fallthrough */
-
 	case BuiltinProc_cap:
 	{
 		// len :: proc(Type) -> int
 		// cap :: proc(Type) -> int
+		check_expr_or_type(c, operand, ce->args[0]);
+		if (operand->mode == Addressing_Invalid) {
+			return false;
+		}
 
 		Type *op_type = type_deref(operand->type);
 		Type *type = t_int;
@@ -1749,11 +1748,17 @@ bool check_builtin_procedure(CheckerContext *c, Operand *operand, Ast *call, i32
 			mode = Addressing_Value;
 		} else if (is_type_map(op_type)) {
 			mode = Addressing_Value;
-		} else if (operand->mode == Addressing_Type && is_type_enum(op_type) && id == BuiltinProc_len) {
+		} else if (operand->mode == Addressing_Type && is_type_enum(op_type)) {
 			Type *bt = base_type(op_type);
-			mode  = Addressing_Constant;
-			value = exact_value_i64(bt->Enum.fields.count);
-			type  = t_untyped_integer;
+			mode = Addressing_Constant;
+			type = t_untyped_integer;
+			if (id == BuiltinProc_len) {
+				value = exact_value_i64(bt->Enum.fields.count);
+			} else {
+				GB_ASSERT(id == BuiltinProc_cap);
+				value = exact_value_sub(*bt->Enum.max_value, *bt->Enum.min_value);
+				value = exact_value_increment_one(value);
+			}
 		} else if (is_type_struct(op_type)) {
 			Type *bt = base_type(op_type);
 			if (bt->Struct.soa_kind == StructSoa_Fixed) {
@@ -1898,6 +1903,21 @@ bool check_builtin_procedure(CheckerContext *c, Operand *operand, Ast *call, i32
 			error(field_arg, "Invalid a struct type for '%.*s', got '%s'", LIT(builtin_name), t);
 			gb_string_free(t);
 			return false;
+		}
+
+		Type *bt = base_type(type);
+		if (bt->kind == Type_Struct && bt->Struct.scope != nullptr) {
+			if (is_type_polymorphic(bt)) {
+				gbString t = type_to_string(type);
+				error(field_arg, "Cannot use '%.*s' on an unspecialized polymorphic struct type, got '%s'", LIT(builtin_name), t);
+				gb_string_free(t);
+				return false;
+			} else if (bt->Struct.fields.count == 0 && bt->Struct.node == nullptr) {
+				gbString t = type_to_string(type);
+				error(field_arg, "Cannot use '%.*s' on incomplete struct declaration, got '%s'", LIT(builtin_name), t);
+				gb_string_free(t);
+				return false;
+			}
 		}
 		
 		Selection sel = lookup_field(type, field_name, false);
@@ -3665,8 +3685,92 @@ bool check_builtin_procedure(CheckerContext *c, Operand *operand, Ast *call, i32
 				gb_string_free(xts);
 			}
 
+			Type *type = default_type(x.type);
 			operand->mode = Addressing_Value;
-			operand->type = default_type(x.type);
+			operand->type = type;
+
+			if (id == BuiltinProc_reverse_bits) {
+				// make runtime only for the time being
+			} else if (x.mode == Addressing_Constant && x.value.kind == ExactValue_Integer) {
+				convert_to_typed(c, &x, type);
+				if (x.mode == Addressing_Invalid) {
+					return false;
+				}
+
+				ExactValue res = {};
+
+				i64 sz = type_size_of(x.type);
+				u64 bit_size = sz*8;
+				u64 rop64[4] = {}; // 2 u64 is the maximum we will ever need, so doubling it will ne fine
+				u8 *rop = cast(u8 *)rop64;
+
+				size_t max_count = 0;
+				size_t written = 0;
+				size_t size = 1;
+				size_t nails = 0;
+				mp_endian endian = MP_LITTLE_ENDIAN;
+
+				max_count = mp_pack_count(&x.value.value_integer, nails, size);
+				GB_ASSERT(sz >= cast(i64)max_count);
+
+				mp_err err = mp_pack(rop, max_count, &written, MP_LSB_FIRST, size, endian, nails, &x.value.value_integer);
+				GB_ASSERT(err == MP_OKAY);
+
+				if (id == BuiltinProc_reverse_bits) {
+					// TODO(bill): Should this even be allowed at compile time?
+				} else {
+					u64 v = 0;
+					switch (id) {
+					case BuiltinProc_count_ones:
+					case BuiltinProc_count_zeros:
+						switch (sz) {
+						case 1: v = bit_set_count(cast(u32)rop[0]);  break;
+						case 2: v = bit_set_count(cast(u32)*(u16 *)rop); break;
+						case 4: v = bit_set_count(*(u32 *)rop); break;
+						case 8: v = bit_set_count(rop64[0]); break;
+						case 16:
+							v += bit_set_count(rop64[0]);
+							v += bit_set_count(rop64[1]);
+							break;
+						default: GB_PANIC("Unhandled sized");
+						}
+						if (id == BuiltinProc_count_zeros) {
+							// flip the result
+							v = bit_size - v;
+						}
+						break;
+					case BuiltinProc_count_trailing_zeros:
+						for (u64 i = 0; i < bit_size; i++) {
+							u8 b = cast(u8)(i & 7);
+							u8 j = cast(u8)(i >> 3);
+							if (rop[j] & (1 << b)) {
+								break;
+							}
+							v += 1;
+						}
+						break;
+					case BuiltinProc_count_leading_zeros:
+						for (u64 i = bit_size-1; i < bit_size; i--) {
+							u8 b = cast(u8)(i & 7);
+							u8 j = cast(u8)(i >> 3);
+							if (rop[j] & (1 << b)) {
+								break;
+							}
+							v += 1;
+						}
+						break;
+					}
+
+
+					res = exact_value_u64(v);
+				}
+
+				if (res.kind != ExactValue_Invalid) {
+					operand->mode = Addressing_Constant;
+					operand->value = res;
+				}
+			}
+
 		}
 		break;
 

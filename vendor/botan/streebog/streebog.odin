@@ -1,4 +1,4 @@
-package streebog
+package vendor_streebog
 
 /*
     Copyright 2021 zhibog

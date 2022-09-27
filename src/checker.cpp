@@ -1922,7 +1922,7 @@ void add_type_info_type_internal(CheckerContext *c, Type *t) {
 		init_map_internal_types(bt);
 		add_type_info_type_internal(c, bt->Map.key);
 		add_type_info_type_internal(c, bt->Map.value);
-		add_type_info_type_internal(c, bt->Map.generated_struct_type);
+		add_type_info_type_internal(c, bt->Map.internal_type);
 		break;
 
 	case Type_Tuple:
@@ -2144,7 +2144,7 @@ void add_min_dep_type_info(Checker *c, Type *t) {
 		init_map_internal_types(bt);
 		add_min_dep_type_info(c, bt->Map.key);
 		add_min_dep_type_info(c, bt->Map.value);
-		add_min_dep_type_info(c, bt->Map.generated_struct_type);
+		add_min_dep_type_info(c, bt->Map.internal_type);
 		break;
 
 	case Type_Tuple:
@@ -2831,23 +2831,12 @@ void init_core_source_code_location(Checker *c) {
 }
 
 void init_core_map_type(Checker *c) {
-	if (t_map_hash == nullptr) {
-		Entity *e = find_core_entity(c, str_lit("Map_Hash"));
-		if (e->state == EntityState_Unresolved) {
-			check_entity_decl(&c->builtin_ctx, e, nullptr, nullptr);
-		}
-		t_map_hash = e->type;
-		GB_ASSERT(t_map_hash != nullptr);
+	if (t_map_hash != nullptr) {
+		return;
 	}
-
-	if (t_map_header == nullptr) {
-		Entity *e = find_core_entity(c, str_lit("Map_Header"));
-		if (e->state == EntityState_Unresolved) {
-			check_entity_decl(&c->builtin_ctx, e, nullptr, nullptr);
-		}
-		t_map_header = e->type;
-		GB_ASSERT(t_map_header != nullptr);
-	}
+	t_map_hash = find_core_type(c, str_lit("Map_Hash"));
+	t_map_header = find_core_type(c, str_lit("Map_Header"));
+	t_map_header_table = find_core_type(c, str_lit("Map_Header_Table"));
 }
 
 void init_preload(Checker *c) {
