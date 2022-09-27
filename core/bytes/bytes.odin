@@ -638,7 +638,7 @@ trim_left_proc :: proc(s: []byte, p: proc(rune) -> bool) -> []byte {
 
 index_rune :: proc(s: []byte, r: rune) -> int {
 	switch {
-	case 0 <= r && r < utf8.RUNE_SELF:
+	case u32(r) < utf8.RUNE_SELF:
 		return index_byte(s, byte(r))
 
 	case r == utf8.RUNE_ERROR:
