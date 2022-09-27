@@ -4,7 +4,7 @@ import "core:io"
 
 to_stream :: proc(f: ^File) -> (s: io.Stream) {
 	s.stream_data = f
-	s.stream_vtable = _file_stream_vtable
+	s.stream_vtable = &_file_stream_vtable
 	return
 }
 
@@ -26,7 +26,7 @@ error_to_io_error :: proc(ferr: Error) -> io.Error {
 
 
 @(private)
-_file_stream_vtable := &io.Stream_VTable{
+_file_stream_vtable := io.Stream_VTable{
 	impl_read = proc(s: io.Stream, p: []byte) -> (n: int, err: io.Error) {
 		f := (^File)(s.stream_data)
 		ferr: Error

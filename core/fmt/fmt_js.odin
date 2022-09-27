@@ -11,7 +11,7 @@ foreign odin_env {
 }
 
 @(private="file")
-write_vtable := &io.Stream_VTable{
+write_vtable := io.Stream_VTable{
 	impl_write = proc(s: io.Stream, p: []byte) -> (n: int, err: io.Error) {
 		fd := u32(uintptr(s.stream_data))
 		write(fd, p)
@@ -22,14 +22,14 @@ write_vtable := &io.Stream_VTable{
 @(private="file")
 stdout := io.Writer{
 	stream = {
-		stream_vtable = write_vtable,
+		stream_vtable = &write_vtable,
 		stream_data = rawptr(uintptr(1)),
 	},
 }
 @(private="file")
 stderr := io.Writer{
 	stream = {
-		stream_vtable = write_vtable,
+		stream_vtable = &write_vtable,
 		stream_data = rawptr(uintptr(2)),
 	},
 }

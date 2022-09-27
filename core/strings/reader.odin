@@ -24,7 +24,7 @@ reader_init :: proc(r: ^Reader, s: string) {
 // returns a stream from the reader data
 reader_to_stream :: proc(r: ^Reader) -> (s: io.Stream) {
 	s.stream_data = r
-	s.stream_vtable = _reader_vtable
+	s.stream_vtable = &_reader_vtable
 	return
 }
 
@@ -177,7 +177,7 @@ reader_write_to :: proc(r: ^Reader, w: io.Writer) -> (n: i64, err: io.Error) {
 }
 
 @(private)
-_reader_vtable := &io.Stream_VTable{
+_reader_vtable := io.Stream_VTable{
 	impl_size = proc(s: io.Stream) -> i64 {
 		r := (^Reader)(s.stream_data)
 		return reader_size(r)
