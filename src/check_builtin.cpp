@@ -4751,6 +4751,7 @@ bool check_builtin_procedure(CheckerContext *c, Operand *operand, Ast *call, i32
 			new_type->Union.variants = variants;
 
 			// NOTE(bill): Is this even correct?
+			new_type->Union.node = operand->expr;
 			new_type->Union.scope = bt->Union.scope;
 
 			operand->type = new_type;
