@@ -18,7 +18,7 @@ type_assertion_trap :: proc "contextless" () -> ! {
 
 
 bounds_check_error :: proc "contextless" (file: string, line, column: i32, index, count: int) {
-	if 0 <= index && index < count {
+	if uint(index) < uint(count) {
 		return
 	}
 	@(cold)
@@ -99,8 +99,8 @@ dynamic_array_expr_error :: proc "contextless" (file: string, line, column: i32,
 
 
 matrix_bounds_check_error :: proc "contextless" (file: string, line, column: i32, row_index, column_index, row_count, column_count: int) {
-	if 0 <= row_index && row_index < row_count &&
-	   0 <= column_index && column_index < column_count {
+	if uint(row_index) < uint(row_count) &&
+	   uint(column_index) < uint(column_count) {
 		return
 	}
 	@(cold)

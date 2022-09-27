@@ -321,14 +321,14 @@ last_ptr :: proc(array: $T/[]$E) -> ^E {
 }
 
 get :: proc(array: $T/[]$E, index: int) -> (value: E, ok: bool) {
-	if 0 <= index && index < len(array) {
+	if uint(index) < len(array) {
 		value = array[index]
 		ok = true
 	}
 	return
 }
 get_ptr :: proc(array: $T/[]$E, index: int) -> (value: ^E, ok: bool) {
-	if 0 <= index && index < len(array) {
+	if uint(index) < len(array) {
 		value = &array[index]
 		ok = true
 	}
