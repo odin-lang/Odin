@@ -1,4 +1,4 @@
-package keccak
+package vendor_keccak
 
 /*
     Copyright 2021 zhibog

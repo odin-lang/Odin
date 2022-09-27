@@ -1,4 +1,4 @@
-package odin_gl
+package vendor_gl
 
 GL_Enum :: enum u64 {
 	FALSE = 0, 

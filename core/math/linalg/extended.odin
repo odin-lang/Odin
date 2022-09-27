@@ -81,7 +81,7 @@ max_single :: proc(a: $T) -> (out: ELEM_TYPE(T)) where IS_NUMERIC(ELEM_TYPE(T)) 
 		} else when N == 2 {
 			out = builtin.max(a[0], a[1])
 		} else when N == 3 {
-			out = builtin.max(a[0], a[1], a[3])
+			out = builtin.max(a[0], a[1], a[2])
 		}else {
 			out = builtin.max(a[0], a[1])
 			for i in 2..<N {
