@@ -639,7 +639,7 @@ OdinDocTypeIndex odin_doc_type(OdinDocWriter *w, Type *type) {
 			doc_type.polmorphic_params = odin_doc_type(w, type->Union.polymorphic_params);
 		}
 
-		if (type->Union.node) {
+		if (type->Union.node && type->Union.node->kind == Ast_UnionType) {
 			ast_node(ut, UnionType, type->Union.node);
 			if (ut->align) {
 				doc_type.custom_align = odin_doc_expr_string(w, ut->align);
