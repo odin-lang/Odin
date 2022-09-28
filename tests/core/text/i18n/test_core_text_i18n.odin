@@ -5,7 +5,7 @@ import "core:fmt"
 import "core:os"
 import "core:testing"
 import "core:text/i18n"
-
+import "core:path/filepath"
 
 expect  :: testing.expect
 log     :: testing.log
@@ -105,10 +105,13 @@ tests :: proc(t: ^testing.T) {
 	using fmt
 
 	for suite in TESTS {
-		cat, err := suite.loader(suite.file, suite.options, nil, context.allocator)
+		file := filepath.join({ODIN_ROOT, "tests\\core", suite.file})
+		defer delete(file)
+
+		cat, err := suite.loader(file, suite.options, nil, context.allocator)
 		defer i18n.destroy(cat)
 
-		msg := fmt.tprintf("Expected loading %v to return %v, got %v", suite.file, suite.err, err)
+		msg := fmt.tprintf("Expected loading %v to return %v, got %v", file, suite.err, err)
 		expect(t, err == suite.err, msg)
 
 		if err == .None {
