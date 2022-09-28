@@ -149,14 +149,14 @@ jobs:
           cd tests\core
           python3 download_assets.py
           ..\..\odin test image -no-bounds-check -vet -strict-style
-        timeout-minutes: 10
-      - name: Vendor library tests
+        timeout-minutes: 1
+      - name: core:compress tests
         shell: cmd
         run: |
           call "C:\Program Files (x86)\Microsoft Visual Studio\2019\Enterprise\VC\Auxiliary\Build\vcvars64.bat
-          cd tests\vendor
-          call build.bat
-        timeout-minutes: 10
+          cd tests\core
+          ..\..\odin test compress -no-bounds-check -vet -strict-style
+        timeout-minutes: 1
       - name: core:math/big tests
         shell: cmd
         run: |
@@ -164,12 +164,33 @@ jobs:
           cd tests\core\math\big
           call build.bat
         timeout-minutes: 10
-      - name: Odin issues tests
+      - name: issue 829 tests
         shell: cmd
         run: |
           call "C:\Program Files (x86)\Microsoft Visual Studio\2019\Enterprise\VC\Auxiliary\Build\vcvars64.bat
           cd tests\issues
-          call run.bat
+          ..\..\odin test test_issue_829.odin -file -no-bounds-check -vet -strict-style
+        timeout-minutes: 1
+      - name: issue 1592 tests
+        shell: cmd
+        run: |
+          call "C:\Program Files (x86)\Microsoft Visual Studio\2019\Enterprise\VC\Auxiliary\Build\vcvars64.bat
+          cd tests\issues
+          ..\..\odin test test_issue_1592.odin -file -no-bounds-check -vet -strict-style
+        timeout-minutes: 1
+      - name: issue 2087 tests
+        shell: cmd
+        run: |
+          call "C:\Program Files (x86)\Microsoft Visual Studio\2019\Enterprise\VC\Auxiliary\Build\vcvars64.bat
+          cd tests\issues
+          ..\..\odin test test_issue_2087.odin -file -no-bounds-check -vet -strict-style
+        timeout-minutes: 1
+      - name: Vendor library tests
+        shell: cmd
+        run: |
+          call "C:\Program Files (x86)\Microsoft Visual Studio\2019\Enterprise\VC\Auxiliary\Build\vcvars64.bat
+          cd tests\vendor
+          call build.bat
         timeout-minutes: 10
       - name: Odin check examples/all for Windows 32bits
         shell: cmd
