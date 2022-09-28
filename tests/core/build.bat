@@ -30,7 +30,7 @@ echo ---
 echo ---
 echo Running core:crypto hash tests
 echo ---
-%PATH_TO_ODIN% test crypto %COMMON%
+%PATH_TO_ODIN% test crypto %COMMON% -o:speed
 
 echo ---
 echo Running core:encoding tests
