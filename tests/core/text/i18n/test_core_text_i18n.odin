@@ -105,11 +105,11 @@ tests :: proc(t: ^testing.T) {
 	using fmt
 
 	for suite in TESTS {
-		file := filepath.join({ODIN_ROOT, "tests\\core", suite.file})
-		defer delete(file)
+		file := filepath.join({ODIN_ROOT, "tests", "core", suite.file})
+		// defer delete(file)
 
 		cat, err := suite.loader(file, suite.options, nil, context.allocator)
-		defer i18n.destroy(cat)
+		// defer i18n.destroy(cat)
 
 		msg := fmt.tprintf("Expected loading %v to return %v, got %v", file, suite.err, err)
 		expect(t, err == suite.err, msg)

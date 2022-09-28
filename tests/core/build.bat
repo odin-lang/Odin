@@ -61,11 +61,6 @@ echo ---
 %PATH_TO_ODIN% test reflect %COMMON%
 
 echo ---
-echo Running core:text/i18n tests
-echo ---
-%PATH_TO_ODIN% test text/i18n %COMMON%
-
-echo ---
 echo Running core:slice tests
 echo ---
 %PATH_TO_ODIN% test slice %COMMON%

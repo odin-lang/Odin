@@ -241,13 +241,6 @@ jobs:
           cd tests\core
           ..\..\odin test reflect -no-bounds-check -vet -strict-style
         timeout-minutes: 1
-      - name: core:text/i18n tests
-        shell: cmd
-        run: |
-          call "C:\Program Files (x86)\Microsoft Visual Studio\2019\Enterprise\VC\Auxiliary\Build\vcvars64.bat
-          cd tests\core
-          ..\..\odin test text/i18n -no-bounds-check -vet -strict-style
-        timeout-minutes: 1
       - name: core:slice tests
         shell: cmd
         run: |
