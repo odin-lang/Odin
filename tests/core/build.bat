@@ -28,11 +28,6 @@ echo ---
 %PATH_TO_ODIN% test odin %COMMON% -o:size
 
 echo ---
-echo Running core:crypto hash tests
-echo ---
-%PATH_TO_ODIN% test crypto %COMMON% -o:speed
-
-echo ---
 echo Running core:encoding tests
 echo ---
 %PATH_TO_ODIN% test encoding/hxa    %COMMON%
@@ -74,3 +69,9 @@ echo ---
 echo Running core:slice tests
 echo ---
 %PATH_TO_ODIN% test slice %COMMON%
+
+rem Run as the last tests in case the CI gets stuck on them
+echo ---
+echo Running core:crypto hash tests
+echo ---
+%PATH_TO_ODIN% run crypto %COMMON% -o:speed
