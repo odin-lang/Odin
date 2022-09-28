@@ -1,6 +1,5 @@
 @echo off
 set COMMON=-no-bounds-check -vet -strict-style
-set COLLECTION=-collection:tests=..
 set PATH_TO_ODIN==..\..\odin
 python3 download_assets.py
 echo ---
