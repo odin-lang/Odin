@@ -104,11 +104,9 @@ TESTS := []Test_Suite{
 tests :: proc(t: ^testing.T) {
 	using fmt
 
-	cat: ^i18n.Translation
-	err: i18n.Error
-
 	for suite in TESTS {
-		cat, err = suite.loader(suite.file, suite.options, nil, context.allocator)
+		cat, err := suite.loader(suite.file, suite.options, nil, context.allocator)
+		defer i18n.destroy(cat)
 
 		msg := fmt.tprintf("Expected loading %v to return %v, got %v", suite.file, suite.err, err)
 		expect(t, err == suite.err, msg)
@@ -121,7 +119,6 @@ tests :: proc(t: ^testing.T) {
 				expect(t, val == test.val, msg)
 			}
 		}
-		i18n.destroy(cat)
 	}
 }
 

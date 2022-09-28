@@ -3,10 +3,6 @@ package test_core_math_noise
 import "core:testing"
 import "core:math/noise"
 import "core:fmt"
-import "core:os"
-
-TEST_count := 0
-TEST_fail  := 0
 
 V2 :: noise.Vec2
 V3 :: noise.Vec3
@@ -14,15 +10,6 @@ V4 :: noise.Vec4
 
 expect  :: testing.expect
 log     :: testing.log
-
-main :: proc() {
-	t := testing.T{}
-	noise_test(&t)
-
-	if t.error_count > 0 {
-		os.exit(1)
-	}
-}
 
 Test_Vector :: struct {
 	seed:      i64,
@@ -112,11 +99,12 @@ Noise_Tests := []Test_Vector{
 		`noise_4d_fallback` tests.
 	*/
 	{SEED_1, COORD_1,     -0.14233987,  noise.noise_4d_fallback},
-	{SEED_2, COORD_2,      0.1354035,  noise.noise_4d_fallback},
+	{SEED_2, COORD_2,      0.1354035,   noise.noise_4d_fallback},
 	{SEED_3, COORD_3,      0.14565045,  noise.noise_4d_fallback},
 
 }
 
+@(test)
 noise_test :: proc(t: ^testing.T) {
 	for test in Noise_Tests {
 		output: f32

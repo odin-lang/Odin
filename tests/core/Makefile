@@ -2,7 +2,7 @@ ODIN=../../odin
 PYTHON=$(shell which python3)
 
 all: download_test_assets image_test compress_test strings_test hash_test crypto_test noise_test encoding_test \
-	 math_test linalg_glsl_math_test filepath_test reflect_test os_exit_test i18n_test c_libc_test
+	 math_test linalg_glsl_math_test filepath_test reflect_test i18n_test c_libc_test os_exit_test
 
 download_test_assets:
 	$(PYTHON) download_assets.py
@@ -26,28 +26,28 @@ noise_test:
 	$(ODIN) test math/noise
 
 encoding_test:
-	$(ODIN) test encoding/hxa -collection:tests=..
+	$(ODIN) test encoding/hxa
 	$(ODIN) test encoding/json
 	$(ODIN) test encoding/varint
 	$(ODIN) test encoding/xml
 
 math_test:
-	$(ODIN) test math/test_core_math.odin -file -collection:tests=..
+	$(ODIN) test math/test_core_math.odin -file
 
 linalg_glsl_math_test:
-	$(ODIN) test math/linalg/glsl/test_linalg_glsl_math.odin -file -collection:tests=..
+	$(ODIN) test math/linalg/glsl/test_linalg_glsl_math.odin -file
 
 filepath_test:
-	$(ODIN) test path/filepath/test_core_filepath.odin -file -collection:tests=..
+	$(ODIN) test path/filepath
 
 reflect_test:
-	$(ODIN) test reflect/test_core_reflect.odin -file -collection:tests=..
-
-os_exit_test:
-	$(ODIN) test os/test_core_os_exit.odin -file && exit 1 || exit 0
+	$(ODIN) test reflect/test_core_reflect.odin -file
 
 i18n_test:
-	$(ODIN) test text/i18n
+	$(ODIN) run text/i18n
 
 c_libc_test:
 	$(ODIN) test c/libc
+
+os_exit_test:
+	$(ODIN) run os/test_core_os_exit.odin -file && exit 1 || exit 0

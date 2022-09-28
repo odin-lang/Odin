@@ -44,7 +44,6 @@ test_libc_complex :: proc(t: ^testing.T) {
 	test_libc_pow_binding(t, libc.complex_float, f32, libc_powf, 1e-12, 1e-5)
 }
 
-@test
 test_libc_pow_binding :: proc(t: ^testing.T, $LIBC_COMPLEX:typeid, $F:typeid, pow: proc(LIBC_COMPLEX, LIBC_COMPLEX) -> LIBC_COMPLEX, 
                               rtol: f64, atol: f64) {
 	// Tests that c/libc/pow(f) functions have two arguments and that the function works as expected for simple inputs
@@ -56,8 +55,8 @@ test_libc_pow_binding :: proc(t: ^testing.T, $LIBC_COMPLEX:typeid, $F:typeid, po
 		for n in -4..=4 {
 			complex_power := LIBC_COMPLEX(complex(F(n), F(0.)))
 			result := pow(complex_base, complex_power) 
-			expect(t, isclose(expected_real, F(real(result)), rtol, atol), fmt.tprintf("ftype:%T, n:%v reldiff(%v, re(%v)) is greater than specified rtol:%e", F{}, n, expected_real, result, rtol))
-			expect(t, isclose(expected_imag, F(imag(result)), rtol, atol), fmt.tprintf("ftype:%T, n:%v reldiff(%v, im(%v)) is greater than specified rtol:%e", F{}, n, expected_imag, result, rtol))
+			testing.expect(t, isclose(expected_real, F(real(result)), rtol, atol), fmt.tprintf("ftype:%T, n:%v reldiff(%v, re(%v)) is greater than specified rtol:%e", F{}, n, expected_real, result, rtol))
+			testing.expect(t, isclose(expected_imag, F(imag(result)), rtol, atol), fmt.tprintf("ftype:%T, n:%v reldiff(%v, im(%v)) is greater than specified rtol:%e", F{}, n, expected_imag, result, rtol))
 			expected_real *= 2
 		}
 	}
@@ -83,8 +82,8 @@ test_libc_pow_binding :: proc(t: ^testing.T, $LIBC_COMPLEX:typeid, $F:typeid, po
 					expected_real = 0.
 					expected_imag = -value
 			}
-			expect(t, isclose(expected_real, F(real(result)), rtol, atol), fmt.tprintf("ftype:%T, n:%v reldiff(%v, re(%v)) is greater than specified rtol:%e", F{}, n, expected_real, result, rtol))
-			expect(t, isclose(expected_imag, F(imag(result)), rtol, atol), fmt.tprintf("ftype:%T, n:%v reldiff(%v, im(%v)) is greater than specified rtol:%e", F{}, n, expected_imag, result, rtol))
+			testing.expect(t, isclose(expected_real, F(real(result)), rtol, atol), fmt.tprintf("ftype:%T, n:%v reldiff(%v, re(%v)) is greater than specified rtol:%e", F{}, n, expected_real, result, rtol))
+			testing.expect(t, isclose(expected_imag, F(imag(result)), rtol, atol), fmt.tprintf("ftype:%T, n:%v reldiff(%v, im(%v)) is greater than specified rtol:%e", F{}, n, expected_imag, result, rtol))
 			value *= 2
 		}
 	}

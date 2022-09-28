@@ -1,24 +1,9 @@
 // Tests "math.odin" in "core:math".
-// Must be run with `-collection:tests=` flag, e.g.
-// ./odin run tests/core/math/test_core_math.odin -collection:tests=./tests
 package test_core_math
 
 import "core:fmt"
 import "core:math"
 import "core:testing"
-import tc "tests:common"
-
-main :: proc() {
-    t := testing.T{}
-
-	test_classify_f16(&t)
-	test_classify_f32(&t)
-	test_classify_f64(&t)
-
-	test_trunc_f16(&t)
-	test_trunc_f32(&t)
-	test_trunc_f64(&t)
-}
 
 @test
 test_classify_f16 :: proc(t: ^testing.T) {
@@ -47,7 +32,7 @@ test_classify_f16 :: proc(t: ^testing.T) {
 	for d, i in data {
 		assert(i == d.i)
 		r = classify_f16(d.v)
-		tc.expect(t, r == d.e, fmt.tprintf("i:%d %s(%h) -> %v != %v", i, #procedure, d.v, r, d.e))
+		testing.expect(t, r == d.e, fmt.tprintf("i:%d %s(%h) -> %v != %v", i, #procedure, d.v, r, d.e))
 	}
 
 	/* Check all subnormals (exponent 0, 10-bit significand non-zero) */
@@ -55,7 +40,7 @@ test_classify_f16 :: proc(t: ^testing.T) {
 		v :f16 = transmute(f16)i
 		r = classify_f16(v)
 		e :Float_Class: Subnormal
-		tc.expect(t, r == e, fmt.tprintf("i:%d %s(%h) -> %v != %v", i, #procedure, v, r, e))
+		testing.expect(t, r == e, fmt.tprintf("i:%d %s(%h) -> %v != %v", i, #procedure, v, r, e))
 	}
 }
 
@@ -86,7 +71,7 @@ test_classify_f32 :: proc(t: ^testing.T) {
 	for d, i in data {
 		assert(i == d.i)
 		r = classify_f32(d.v)
-		tc.expect(t, r == d.e, fmt.tprintf("i:%d %s(%h) -> %v != %v", i, #procedure, d.v, r, d.e))
+		testing.expect(t, r == d.e, fmt.tprintf("i:%d %s(%h) -> %v != %v", i, #procedure, d.v, r, d.e))
 	}
 }
 
@@ -117,7 +102,7 @@ test_classify_f64 :: proc(t: ^testing.T) {
 	for d, i in data {
 		assert(i == d.i)
 		r = classify_f64(d.v)
-		tc.expect(t, r == d.e, fmt.tprintf("i:%d %s(%h) -> %v != %v", i, #procedure, d.v, r, d.e))
+		testing.expect(t, r == d.e, fmt.tprintf("i:%d %s(%h) -> %v != %v", i, #procedure, d.v, r, d.e))
 	}
 }
 
@@ -165,16 +150,16 @@ test_trunc_f16 :: proc(t: ^testing.T) {
 	for d, i in data {
 		assert(i == d.i)
 		r = trunc_f16(d.v)
-		tc.expect(t, r == d.e, fmt.tprintf("i:%d %s(%h) -> %h != %h", i, #procedure, d.v, r, d.e))
+		testing.expect(t, r == d.e, fmt.tprintf("i:%d %s(%h) -> %h != %h", i, #procedure, d.v, r, d.e))
 	}
 
 	v = SNAN_F16
 	r = trunc_f16(v)
-	tc.expect(t, is_nan_f16(r), fmt.tprintf("%s(%f) -> %f != NaN", #procedure, v, r))
+	testing.expect(t, is_nan_f16(r), fmt.tprintf("%s(%f) -> %f != NaN", #procedure, v, r))
 
 	v = QNAN_F16
 	r = trunc_f16(v)
-	tc.expect(t, is_nan_f16(r), fmt.tprintf("%s(%f) -> %f != NaN", #procedure, v, r))
+	testing.expect(t, is_nan_f16(r), fmt.tprintf("%s(%f) -> %f != NaN", #procedure, v, r))
 }
 
 @test
@@ -230,16 +215,16 @@ test_trunc_f32 :: proc(t: ^testing.T) {
 	for d, i in data {
 		assert(i == d.i)
 		r = trunc_f32(d.v)
-		tc.expect(t, r == d.e, fmt.tprintf("i:%d %s(%h) -> %h != %h", i, #procedure, d.v, r, d.e))
+		testing.expect(t, r == d.e, fmt.tprintf("i:%d %s(%h) -> %h != %h", i, #procedure, d.v, r, d.e))
 	}
 
 	v = SNAN_F32
 	r = trunc_f32(v)
-	tc.expect(t, is_nan_f32(r), fmt.tprintf("%s(%f) -> %f != NaN", #procedure, v, r))
+	testing.expect(t, is_nan_f32(r), fmt.tprintf("%s(%f) -> %f != NaN", #procedure, v, r))
 
 	v = QNAN_F32
 	r = trunc_f32(v)
-	tc.expect(t, is_nan_f32(r), fmt.tprintf("%s(%f) -> %f != NaN", #procedure, v, r))
+	testing.expect(t, is_nan_f32(r), fmt.tprintf("%s(%f) -> %f != NaN", #procedure, v, r))
 }
 
 @test
@@ -295,14 +280,14 @@ test_trunc_f64 :: proc(t: ^testing.T) {
 	for d, i in data {
 		assert(i == d.i)
 		r = trunc_f64(d.v)
-		tc.expect(t, r == d.e, fmt.tprintf("i:%d %s(%h) -> %h != %h", i, #procedure, d.v, r, d.e))
+		testing.expect(t, r == d.e, fmt.tprintf("i:%d %s(%h) -> %h != %h", i, #procedure, d.v, r, d.e))
 	}
 
 	v = SNAN_F64
 	r = trunc_f64(v)
-	tc.expect(t, is_nan_f64(r), fmt.tprintf("%s(%f) -> %f != NaN", #procedure, v, r))
+	testing.expect(t, is_nan_f64(r), fmt.tprintf("%s(%f) -> %f != NaN", #procedure, v, r))
 
 	v = QNAN_F64
 	r = trunc_f64(v)
-	tc.expect(t, is_nan_f64(r), fmt.tprintf("%s(%f) -> %f != NaN", #procedure, v, r))
+	testing.expect(t, is_nan_f64(r), fmt.tprintf("%s(%f) -> %f != NaN", #procedure, v, r))
 }
