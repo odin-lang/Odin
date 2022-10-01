@@ -50,7 +50,7 @@ jobs:
         run: |
           mkdir dist
           cp odin dist
-          cp libLLVM*.so dist
+          cp libLLVM* dist
           cp -r shared dist
           cp -r core dist
           cp -r vendor dist
