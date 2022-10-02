@@ -375,18 +375,18 @@ MAX_RW :: 0x7fffffff // The limit on Darwin is max(i32), trying to read/write mo
 write :: proc(fd: Handle, data: []u8) -> (int, Errno) {
 	assert(fd != -1)
 
-    bytes_total := len(data)
-    bytes_written_total := 0
+	bytes_total := len(data)
+	bytes_written_total := 0
 
-    for bytes_written_total < bytes_total {
+	for bytes_written_total < bytes_total {
 		bytes_to_write := min(bytes_total - bytes_written_total, MAX_RW)
-        slice := data[bytes_written_total:bytes_written_total + bytes_to_write]
-        bytes_written := _unix_write(fd, raw_data(slice), bytes_to_write)
-        if bytes_written == -1 {
-            return bytes_written_total, 1
-        }
-        bytes_written_total += bytes_written
-    }
+		slice := data[bytes_written_total:bytes_written_total + bytes_to_write]
+		bytes_written := _unix_write(fd, raw_data(slice), bytes_to_write)
+		if bytes_written == -1 {
+			return bytes_written_total, 1
+		}
+		bytes_written_total += bytes_written
+	}
 
 	return bytes_written_total, 0
 }
