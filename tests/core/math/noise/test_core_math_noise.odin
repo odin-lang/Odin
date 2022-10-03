@@ -3,41 +3,13 @@ package test_core_math_noise
 import "core:testing"
 import "core:math/noise"
 import "core:fmt"
-import "core:os"
-
-TEST_count := 0
-TEST_fail  := 0
 
 V2 :: noise.Vec2
 V3 :: noise.Vec3
 V4 :: noise.Vec4
 
-when ODIN_TEST {
-	expect  :: testing.expect
-	log     :: testing.log
-} else {
-	expect  :: proc(t: ^testing.T, condition: bool, message: string, loc := #caller_location) {
-		TEST_count += 1
-		if !condition {
-			TEST_fail += 1
-			fmt.printf("[%v] %v\n", loc, message)
-			return
-		}
-	}
-	log     :: proc(t: ^testing.T, v: any, loc := #caller_location) {
-		fmt.printf("[%v] ", loc)
-		fmt.printf("log: %v\n", v)
-	}
-}
-
-main :: proc() {
-	t := testing.T{}
-	noise_test(&t)
-	fmt.printf("%v/%v tests successful.\n", TEST_count - TEST_fail, TEST_count)
-	if TEST_fail > 0 {
-		os.exit(1)
-	}
-}
+expect  :: testing.expect
+log     :: testing.log
 
 Test_Vector :: struct {
 	seed:      i64,
@@ -127,11 +99,12 @@ Noise_Tests := []Test_Vector{
 		`noise_4d_fallback` tests.
 	*/
 	{SEED_1, COORD_1,     -0.14233987,  noise.noise_4d_fallback},
-	{SEED_2, COORD_2,      0.1354035,  noise.noise_4d_fallback},
+	{SEED_2, COORD_2,      0.1354035,   noise.noise_4d_fallback},
 	{SEED_3, COORD_3,      0.14565045,  noise.noise_4d_fallback},
 
 }
 
+@(test)
 noise_test :: proc(t: ^testing.T) {
 	for test in Noise_Tests {
 		output: f32

@@ -5,27 +5,11 @@ import "core:fmt"
 import "core:os"
 import "core:testing"
 import "core:text/i18n"
+import "core:path/filepath"
 
-TEST_count := 0
-TEST_fail  := 0
+expect  :: testing.expect
+log     :: testing.log
 
-when ODIN_TEST {
-	expect  :: testing.expect
-	log     :: testing.log
-} else {
-	expect  :: proc(t: ^testing.T, condition: bool, message: string, loc := #caller_location) {
-		TEST_count += 1
-		if !condition {
-			TEST_fail += 1
-			fmt.printf("[%v] %v\n", loc, message)
-			return
-		}
-	}
-	log     :: proc(t: ^testing.T, v: any, loc := #caller_location) {
-		fmt.printf("[%v] ", loc)
-		fmt.printf("log: %v\n", v)
-	}
-}
 T :: i18n.get
 
 Test :: struct {
@@ -120,13 +104,14 @@ TESTS := []Test_Suite{
 tests :: proc(t: ^testing.T) {
 	using fmt
 
-	cat: ^i18n.Translation
-	err: i18n.Error
-
 	for suite in TESTS {
-		cat, err = suite.loader(suite.file, suite.options, nil, context.allocator)
+		file := filepath.join({ODIN_ROOT, "tests", "core", suite.file})
+		// defer delete(file)
 
-		msg := fmt.tprintf("Expected loading %v to return %v, got %v", suite.file, suite.err, err)
+		cat, err := suite.loader(file, suite.options, nil, context.allocator)
+		// defer i18n.destroy(cat)
+
+		msg := fmt.tprintf("Expected loading %v to return %v, got %v", file, suite.err, err)
 		expect(t, err == suite.err, msg)
 
 		if err == .None {
@@ -137,7 +122,6 @@ tests :: proc(t: ^testing.T) {
 				expect(t, val == test.val, msg)
 			}
 		}
-		i18n.destroy(cat)
 	}
 }
 
@@ -151,8 +135,7 @@ main :: proc() {
 	t := testing.T{}
 	tests(&t)
 
-	fmt.printf("%v/%v tests successful.\n", TEST_count - TEST_fail, TEST_count)
-	if TEST_fail > 0 {
+	if t.error_count > 0 {
 		os.exit(1)
 	}
 

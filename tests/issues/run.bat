@@ -2,8 +2,6 @@
 
 if not exist "build\" mkdir build
 
-set COMMON=-collection:tests=..
-
 @echo on
 
 ..\..\odin test test_issue_829.odin %COMMON% -file

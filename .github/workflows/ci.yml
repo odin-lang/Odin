@@ -137,20 +137,119 @@ jobs:
           call "C:\Program Files (x86)\Microsoft Visual Studio\2019\Enterprise\VC\Auxiliary\Build\vcvars64.bat
           odin check examples/all -strict-style
         timeout-minutes: 10
-      - name: Core library tests
+      - name: core:image tests
         shell: cmd
         run: |
           call "C:\Program Files (x86)\Microsoft Visual Studio\2019\Enterprise\VC\Auxiliary\Build\vcvars64.bat
           cd tests\core
-          call build.bat
-        timeout-minutes: 10
-      - name: Vendor library tests
+          python3 download_assets.py
+          ..\..\odin test image -no-bounds-check -vet -strict-style
+        timeout-minutes: 1
+      - name: core:compress tests
         shell: cmd
         run: |
           call "C:\Program Files (x86)\Microsoft Visual Studio\2019\Enterprise\VC\Auxiliary\Build\vcvars64.bat
-          cd tests\vendor
-          call build.bat
-        timeout-minutes: 10
+          cd tests\core
+          ..\..\odin test compress -no-bounds-check -vet -strict-style
+        timeout-minutes: 1
+      - name: core:strings tests
+        shell: cmd
+        run: |
+          call "C:\Program Files (x86)\Microsoft Visual Studio\2019\Enterprise\VC\Auxiliary\Build\vcvars64.bat
+          cd tests\core
+          ..\..\odin test strings -no-bounds-check -vet -strict-style
+        timeout-minutes: 1
+      - name: core:hash tests
+        shell: cmd
+        run: |
+          call "C:\Program Files (x86)\Microsoft Visual Studio\2019\Enterprise\VC\Auxiliary\Build\vcvars64.bat
+          cd tests\core
+          ..\..\odin test hash -no-bounds-check -vet -strict-style -o:size
+        timeout-minutes: 1
+      - name: core:odin tests
+        shell: cmd
+        run: |
+          call "C:\Program Files (x86)\Microsoft Visual Studio\2019\Enterprise\VC\Auxiliary\Build\vcvars64.bat
+          cd tests\core
+          ..\..\odin test odin -no-bounds-check -vet -strict-style -o:size
+        timeout-minutes: 1
+      - name: core:encoding/hxa tests
+        shell: cmd
+        run: |
+          call "C:\Program Files (x86)\Microsoft Visual Studio\2019\Enterprise\VC\Auxiliary\Build\vcvars64.bat
+          cd tests\core
+          ..\..\odin test encoding/hxa -no-bounds-check -vet -strict-style
+        timeout-minutes: 1
+      - name: core:encoding/json tests
+        shell: cmd
+        run: |
+          call "C:\Program Files (x86)\Microsoft Visual Studio\2019\Enterprise\VC\Auxiliary\Build\vcvars64.bat
+          cd tests\core
+          ..\..\odin test encoding/json -no-bounds-check -vet -strict-style
+        timeout-minutes: 1
+      - name: core:encoding/varint tests
+        shell: cmd
+        run: |
+          call "C:\Program Files (x86)\Microsoft Visual Studio\2019\Enterprise\VC\Auxiliary\Build\vcvars64.bat
+          cd tests\core
+          ..\..\odin test encoding/varint -no-bounds-check -vet -strict-style
+        timeout-minutes: 1
+      - name: core:encoding/xml tests
+        shell: cmd
+        run: |
+          call "C:\Program Files (x86)\Microsoft Visual Studio\2019\Enterprise\VC\Auxiliary\Build\vcvars64.bat
+          cd tests\core
+          ..\..\odin test encoding/xml -no-bounds-check -vet -strict-style
+        timeout-minutes: 1
+      - name: core:math/noise tests
+        shell: cmd
+        run: |
+          call "C:\Program Files (x86)\Microsoft Visual Studio\2019\Enterprise\VC\Auxiliary\Build\vcvars64.bat
+          cd tests\core
+          ..\..\odin test math/noise -no-bounds-check -vet -strict-style
+        timeout-minutes: 1
+      - name: core:math tests
+        shell: cmd
+        run: |
+          call "C:\Program Files (x86)\Microsoft Visual Studio\2019\Enterprise\VC\Auxiliary\Build\vcvars64.bat
+          cd tests\core
+          ..\..\odin test math -no-bounds-check -vet -strict-style
+        timeout-minutes: 1
+      - name: core:math/linalg/glsl tests
+        shell: cmd
+        run: |
+          call "C:\Program Files (x86)\Microsoft Visual Studio\2019\Enterprise\VC\Auxiliary\Build\vcvars64.bat
+          cd tests\core
+          ..\..\odin test math/linalg/glsl -no-bounds-check -vet -strict-style
+        timeout-minutes: 1
+      - name: core:path/filepath tests
+        shell: cmd
+        run: |
+          call "C:\Program Files (x86)\Microsoft Visual Studio\2019\Enterprise\VC\Auxiliary\Build\vcvars64.bat
+          cd tests\core
+          ..\..\odin test path/filepath -no-bounds-check -vet -strict-style
+        timeout-minutes: 1
+      - name: core:reflect tests
+        shell: cmd
+        run: |
+          call "C:\Program Files (x86)\Microsoft Visual Studio\2019\Enterprise\VC\Auxiliary\Build\vcvars64.bat
+          cd tests\core
+          ..\..\odin test reflect -no-bounds-check -vet -strict-style
+        timeout-minutes: 1
+      - name: core:slice tests
+        shell: cmd
+        run: |
+          call "C:\Program Files (x86)\Microsoft Visual Studio\2019\Enterprise\VC\Auxiliary\Build\vcvars64.bat
+          cd tests\core
+          ..\..\odin test slice -no-bounds-check -vet -strict-style
+        timeout-minutes: 1
+      - name: core:crypto tests
+        shell: cmd
+        run: |
+          call "C:\Program Files (x86)\Microsoft Visual Studio\2019\Enterprise\VC\Auxiliary\Build\vcvars64.bat
+          cd tests\core
+          ..\..\odin test crypto -no-bounds-check -vet -strict-style
+        timeout-minutes: 1
       - name: core:math/big tests
         shell: cmd
         run: |
@@ -158,12 +257,33 @@ jobs:
           cd tests\core\math\big
           call build.bat
         timeout-minutes: 10
-      - name: Odin issues tests
+      - name: issue 829 tests
         shell: cmd
         run: |
           call "C:\Program Files (x86)\Microsoft Visual Studio\2019\Enterprise\VC\Auxiliary\Build\vcvars64.bat
           cd tests\issues
-          call run.bat
+          ..\..\odin test test_issue_829.odin -file -no-bounds-check -vet -strict-style
+        timeout-minutes: 1
+      - name: issue 1592 tests
+        shell: cmd
+        run: |
+          call "C:\Program Files (x86)\Microsoft Visual Studio\2019\Enterprise\VC\Auxiliary\Build\vcvars64.bat
+          cd tests\issues
+          ..\..\odin test test_issue_1592.odin -file -no-bounds-check -vet -strict-style
+        timeout-minutes: 1
+      - name: issue 2087 tests
+        shell: cmd
+        run: |
+          call "C:\Program Files (x86)\Microsoft Visual Studio\2019\Enterprise\VC\Auxiliary\Build\vcvars64.bat
+          cd tests\issues
+          ..\..\odin test test_issue_2087.odin -file -no-bounds-check -vet -strict-style
+        timeout-minutes: 1
+      - name: Vendor library tests
+        shell: cmd
+        run: |
+          call "C:\Program Files (x86)\Microsoft Visual Studio\2019\Enterprise\VC\Auxiliary\Build\vcvars64.bat
+          cd tests\vendor
+          call build.bat
         timeout-minutes: 10
       - name: Odin check examples/all for Windows 32bits
         shell: cmd

@@ -2,52 +2,49 @@ ODIN=../../odin
 PYTHON=$(shell which python3)
 
 all: download_test_assets image_test compress_test strings_test hash_test crypto_test noise_test encoding_test \
-	 math_test linalg_glsl_math_test filepath_test reflect_test os_exit_test i18n_test c_libc_test
+	 math_test linalg_glsl_math_test filepath_test reflect_test c_libc_test os_exit_test
 
 download_test_assets:
 	$(PYTHON) download_assets.py
 
 image_test:
-	$(ODIN) run image/test_core_image.odin -file -out:test_core_image
+	$(ODIN) test image/test_core_image.odin -file
 
 compress_test:
-	$(ODIN) run compress/test_core_compress.odin -file -out:test_core_compress
+	$(ODIN) test compress/test_core_compress.odin -file
 
 strings_test:
-	$(ODIN) run strings/test_core_strings.odin -file -out:test_core_strings
+	$(ODIN) test strings/test_core_strings.odin -file
 
 hash_test:
-	$(ODIN) run hash -o:speed -no-bounds-check -out:test_hash 
+	$(ODIN) test hash -o:speed -no-bounds-check 
 
 crypto_test:
-	$(ODIN) run crypto -o:speed -no-bounds-check -out:test_crypto_hash 
+	$(ODIN) test crypto -o:speed -no-bounds-check 
 
 noise_test:
-	$(ODIN) run math/noise -out:test_noise
+	$(ODIN) test math/noise
 
 encoding_test:
-	$(ODIN) run encoding/hxa    -out:test_hxa -collection:tests=..
-	$(ODIN) run encoding/json   -out:test_json
-	$(ODIN) run encoding/varint -out:test_varint
-	$(ODIN) run encoding/xml    -out:test_xml
+	$(ODIN) test encoding/hxa
+	$(ODIN) test encoding/json
+	$(ODIN) test encoding/varint
+	$(ODIN) test encoding/xml
 
 math_test:
-	$(ODIN) run math/test_core_math.odin -file -collection:tests=.. -out:test_core_math
+	$(ODIN) test math/test_core_math.odin -file
 
 linalg_glsl_math_test:
-	$(ODIN) run math/linalg/glsl/test_linalg_glsl_math.odin -file -collection:tests=.. -out:test_linalg_glsl_math
+	$(ODIN) test math/linalg/glsl/test_linalg_glsl_math.odin -file
 
 filepath_test:
-	$(ODIN) run path/filepath/test_core_filepath.odin -file -collection:tests=.. -out:test_core_filepath
+	$(ODIN) test path/filepath
 
 reflect_test:
-	$(ODIN) run reflect/test_core_reflect.odin -file -collection:tests=.. -out:test_core_reflect
-
-os_exit_test:
-	$(ODIN) run os/test_core_os_exit.odin -file -out:test_core_os_exit && exit 1 || exit 0
-
-i18n_test:
-	$(ODIN) run text/i18n -out:test_core_i18n
+	$(ODIN) test reflect/test_core_reflect.odin -file
 
 c_libc_test:
-	$(ODIN) run c/libc -out:test_core_libc
+	$(ODIN) test c/libc
+
+os_exit_test:
+	$(ODIN) run os/test_core_os_exit.odin -file && exit 1 || exit 0
