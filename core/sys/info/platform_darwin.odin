@@ -464,6 +464,7 @@ macos_release_map: map[string]Darwin_To_Release = {
 	"21F2092"  = {{21, 5, 0}, "macOS", {"Monterey",      {12, 4, 0}}},
 	"21G72"    = {{21, 6, 0}, "macOS", {"Monterey",      {12, 5, 0}}},
 	"21G83"    = {{21, 6, 0}, "macOS", {"Monterey",      {12, 5, 1}}},
+	"21G115"   = {{21, 6, 0}, "macOS", {"Monterey",      {12, 6, 0}}},
 }
 
 @(private)
