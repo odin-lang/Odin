@@ -240,14 +240,11 @@ buffer_read_ptr :: proc(b: ^Buffer, ptr: rawptr, size: int) -> (n: int, err: io.
 buffer_read_at :: proc(b: ^Buffer, p: []byte, offset: int) -> (n: int, err: io.Error) {
 	b.last_read = .Invalid
 
-	if offset < 0 || offset >= len(b.buf) {
+	if uint(offset) >= len(b.buf) {
 		err = .Invalid_Offset
 		return
 	}
-
-	if 0 <= offset && offset < len(b.buf) {
-		n = copy(p, b.buf[offset:])
-	}
+	n = copy(p, b.buf[offset:])
 	if n > 0 {
 		b.last_read = .Read
 	}

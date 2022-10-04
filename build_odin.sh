@@ -100,7 +100,11 @@ config_linux() {
 	LDFLAGS="$LDFLAGS -ldl"
 	CXXFLAGS="$CXXFLAGS $($LLVM_CONFIG --cxxflags --ldflags)"
 	LDFLAGS="$LDFLAGS $($LLVM_CONFIG  --libs core native --system-libs --libfiles) -Wl,-rpath=\$ORIGIN"
-	cp $($LLVM_CONFIG --libfiles) ./
+
+	# Creates a copy of the llvm library in the build dir, this is meant to support compiler explorer.
+	# The annoyance is that this copy can be cluttering the development folder. TODO: split staging folders
+	# for development and compiler explorer builds
+	cp $(readlink -f $($LLVM_CONFIG --libfiles)) ./
 }
 
 build_odin() {

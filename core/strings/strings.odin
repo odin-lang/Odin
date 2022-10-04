@@ -760,7 +760,7 @@ last_index_byte :: proc(s: string, c: byte) -> int {
 */
 index_rune :: proc(s: string, r: rune) -> int {
 	switch {
-	case 0 <= r && r < utf8.RUNE_SELF:
+	case u32(r) < utf8.RUNE_SELF:
 		return index_byte(s, byte(r))
 
 	case r == utf8.RUNE_ERROR:
