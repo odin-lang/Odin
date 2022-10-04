@@ -964,3 +964,14 @@ foreign kernel32 {
 	GetCommState :: proc(handle: HANDLE, dcb: ^DCB) -> BOOL ---
 	SetCommState :: proc(handle: HANDLE, dcb: ^DCB) -> BOOL ---
 }
+
+
+LPFIBER_START_ROUTINE :: #type proc "stdcall" (lpFiberParameter: LPVOID)
+
+@(default_calling_convention = "stdcall")
+foreign kernel32 {
+	CreateFiber :: proc(dwStackSize: SIZE_T, lpStartAddress: LPFIBER_START_ROUTINE, lpParameter: LPVOID) -> LPVOID ---
+	DeleteFiber :: proc(lpFiber: LPVOID) ---
+	ConvertThreadToFiber :: proc(lpParameter: LPVOID) -> LPVOID ---
+	SwitchToFiber :: proc(lpFiber: LPVOID) ---
+}
