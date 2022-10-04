@@ -158,13 +158,6 @@ jobs:
           cd tests\core\math\big
           call build.bat
         timeout-minutes: 10
-      - name: Odin issues tests
-        shell: cmd
-        run: |
-          call "C:\Program Files (x86)\Microsoft Visual Studio\2019\Enterprise\VC\Auxiliary\Build\vcvars64.bat
-          cd tests\issues
-          call run.bat
-        timeout-minutes: 10
       - name: Odin check examples/all for Windows 32bits
         shell: cmd
         run: |
