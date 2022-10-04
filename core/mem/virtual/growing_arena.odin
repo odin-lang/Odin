@@ -76,8 +76,7 @@ growing_arena_destroy :: proc(arena: ^Growing_Arena) {
 	growing_arena_free_all(arena)
 }
 
-growing_arena_bootstrap_new_by_offset :: proc($T: typeid, offset_to_arena: uintptr, minimum_block_size := DEFAULT_MINIMUM_BLOCK_SIZE) -> (ptr: ^T, err: Allocator_Error) {
-	bootstrap: Growing_Arena
+growing_arena_bootstrap_new_by_offset :: proc($T: typeid, offset_to_arena: uintptr, minimum_block_size: uint = DEFAULT_MINIMUM_BLOCK_SIZE) -> (ptr: ^T, err: Allocator_Error) {	bootstrap: Growing_Arena
 	bootstrap.minimum_block_size = minimum_block_size
 	
 	data := growing_arena_alloc(&bootstrap, size_of(T), align_of(T)) or_return
@@ -89,7 +88,7 @@ growing_arena_bootstrap_new_by_offset :: proc($T: typeid, offset_to_arena: uintp
 	return
 }
 
-growing_arena_bootstrap_new_by_name :: proc($T: typeid, $field_name: string, minimum_block_size := DEFAULT_MINIMUM_BLOCK_SIZE) -> (ptr: ^T, err: Allocator_Error) { 
+growing_arena_bootstrap_new_by_name :: proc($T: typeid, $field_name: string, minimum_block_size: uint = DEFAULT_MINIMUM_BLOCK_SIZE) -> (ptr: ^T, err: Allocator_Error) {
 	return growing_arena_bootstrap_new_by_offset(T, offset_of_by_string(T, field_name), minimum_block_size)
 }
 growing_arena_bootstrap_new :: proc{
