@@ -384,16 +384,14 @@ unmarshal_object :: proc(p: ^Parser, v: any, end_token: Token_Kind) -> (err: Unm
 					break struct_loop
 				}
 				continue struct_loop
+			} else {
+				// allows skipping unused struct fields
+				parse_value(p) or_return
+				if parse_comma(p) {
+					break struct_loop
+				}
+				continue struct_loop
 			}
-			
-			// NOTE(bill, 2022-09-14): Previously this would not be allowed
-			//         {"foo": 123, "bar": 456}
-			//         T :: struct{foo: int}
-			// `T` is missing the `bar` field
-			// The line below is commented out to ignore fields in an object which
-			// do not have a corresponding target field
-			//
-			// return Unsupported_Type_Error{v.id, p.curr_token}
 		}
 		
 	case reflect.Type_Info_Map:
