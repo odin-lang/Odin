@@ -1,7 +1,10 @@
 package libc
 
 when ODIN_OS == .Windows {
-	foreign import libc "system:libucrt.lib"
+	foreign import libc {
+		"system:libucrt.lib",
+		"system:legacy_stdio_definitions.lib",
+	}
 } else when ODIN_OS == .Darwin {
 	foreign import libc "system:System.framework"
 } else {
