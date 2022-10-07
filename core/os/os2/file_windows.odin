@@ -130,7 +130,7 @@ _new_file :: proc(handle: uintptr, name: string) -> ^File {
 	f := new(File, _file_allocator())
 
 	f.impl.allocator = _file_allocator()
-	f.impl.fd = rawptr(fd)
+	f.impl.fd = rawptr(handle)
 	f.impl.name = strings.clone(name, f.impl.allocator)
 	f.impl.wname = win32.utf8_to_wstring(name, f.impl.allocator)
 
