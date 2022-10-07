@@ -454,6 +454,7 @@ TB_ISBUTTONENABLED                :: 0x0409
 TBM_CLEARTICS                     :: 0x0409
 TTM_SETTOOLINFOA                  :: 0x0409
 CBEM_HASEDITCHANGED               :: 0x040a
+PBM_SETMARQUEE                    :: 0x040a
 RB_INSERTBANDW                    :: 0x040a
 SB_GETRECT                        :: 0x040a
 TB_ISBUTTONCHECKED                :: 0x040a
@@ -488,10 +489,12 @@ TTM_ENUMTOOLSA                    :: 0x040e
 SB_SETICON                        :: 0x040f
 TBM_GETTICPOS                     :: 0x040f
 TTM_GETCURRENTTOOLA               :: 0x040f
+PBM_SETSTATE                      :: 0x0410
 RB_IDTOINDEX                      :: 0x0410
 SB_SETTIPTEXTA                    :: 0x0410
 TBM_GETNUMTICS                    :: 0x0410
 TTM_WINDOWFROMPOINT               :: 0x0410
+PBM_GETSTATE                      :: 0x0411
 RB_GETTOOLTIPS                    :: 0x0411
 SB_SETTIPTEXTW                    :: 0x0411
 TBM_GETSELSTART                   :: 0x0411
