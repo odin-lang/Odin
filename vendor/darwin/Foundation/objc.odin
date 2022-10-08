@@ -13,6 +13,9 @@ foreign Foundation {
 	objc_allocateClassPair :: proc "c" (superclass: Class, name: cstring, extraBytes: uint) ---
 
 	class_addMethod :: proc "c" (cls: Class, name: SEL, imp: IMP, types: cstring) -> BOOL ---
+	class_getInstanceMethod :: proc "c" (cls: Class, name: SEL) -> Method ---
+
+	method_setImplementation :: proc "c" (method: Method, imp: IMP) ---
 }
 
 
