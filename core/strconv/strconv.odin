@@ -575,9 +575,11 @@ parse_f64 :: proc(str: string, n: ^int = nil) -> (value: f64, ok: bool) {
 	i := 0
 
 	sign: f64 = 1
+	seen_sign := true
 	switch s[i] {
 	case '-': i += 1; sign = -1
 	case '+': i += 1
+	case: seen_sign = false
 	}
 
 	for ; i < len(s); i += 1 {
@@ -677,8 +679,13 @@ parse_f64 :: proc(str: string, n: ^int = nil) -> (value: f64, ok: bool) {
 			for exp >   0 { scale *=   10; exp -=  1 }
 		}
 	}
-	s = s[i:]
 
+	// If we only consumed a sign, return false
+	if i == 1 && seen_sign {
+		return 0, false
+	}
+
+	s = s[i:]
 	if frac {
 		value = sign * (value/scale)
 	} else {
