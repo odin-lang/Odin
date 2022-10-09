@@ -11,7 +11,7 @@ ActivationPolicy :: enum UInteger {
 ApplicationDelegate :: struct {
 	willFinishLaunching:                  proc "c" (self: ^ApplicationDelegate, notification: ^Notification),
 	didFinishLaunching:                   proc "c" (self: ^ApplicationDelegate, notification: ^Notification),
-	shouldTerminateAfterLastWindowClosed: proc "c" (self: ^ApplicationDelegate, sender: ^Application),
+	shouldTerminateAfterLastWindowClosed: proc "c" (self: ^ApplicationDelegate, sender: ^Application) -> bool,
 
 	user_data: rawptr,
 }
@@ -34,9 +34,9 @@ Application_setDelegate :: proc(self: ^Application, delegate: ^ApplicationDelega
 		del := (^ApplicationDelegate)(self->pointerValue())
 		del->didFinishLaunching(notification)
 	}
-	shouldTerminateAfterLastWindowClosed :: proc "c" (self: ^Value, _: SEL, application: ^Application) {
+	shouldTerminateAfterLastWindowClosed :: proc "c" (self: ^Value, _: SEL, application: ^Application) -> bool {
 		del := (^ApplicationDelegate)(self->pointerValue())
-		del->shouldTerminateAfterLastWindowClosed(application)
+		return del->shouldTerminateAfterLastWindowClosed(application)
 	}
 
 	wrapper := Value.valueWithPointer(delegate)
