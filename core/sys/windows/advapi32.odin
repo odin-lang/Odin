@@ -129,8 +129,8 @@ foreign advapi32 {
 		cbData: DWORD,
 	) -> LSTATUS ---
 
-	GetFileSecurityA :: proc(
-		lpFileName: LPCSTR,
+	GetFileSecurityW :: proc(
+		lpFileName: LPCWSTR,
 		RequestedInformation: SECURITY_INFORMATION,
 		pSecurityDescriptor: PSECURITY_DESCRIPTOR,
 		nLength: DWORD,
