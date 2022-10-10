@@ -293,6 +293,7 @@ LLVMMetadataRef lb_debug_type_internal(lbModule *m, Type *type) {
 	case Type_Named:
 		GB_PANIC("Type_Named should be handled in lb_debug_type separately");
 
+	case Type_SoaPointer:
 	case Type_Pointer:
 		return LLVMDIBuilderCreatePointerType(m->debug_builder, lb_debug_type(m, type->Pointer.elem), word_bits, word_bits, 0, nullptr, 0);
 	case Type_MultiPointer:
