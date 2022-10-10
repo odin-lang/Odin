@@ -38,6 +38,10 @@ jobs:
           cd tests/vendor
           make
         timeout-minutes: 10
+      - name: Odin issues tests
+        run: |
+          cd tests/issues
+          ./run.sh
       - name: Odin check examples/all for Linux i386
         run: ./odin check examples/all -vet -strict-style -target:linux_i386
         timeout-minutes: 10
@@ -151,6 +155,10 @@ jobs:
           cd tests\vendor
           call build.bat
         timeout-minutes: 10
+      - name: Odin issues tests
+        run: |
+          cd tests/issues
+          ./run.bat
       - name: core:math/big tests
         shell: cmd
         run: |
