@@ -346,6 +346,13 @@ foreign kernel32 {
 	GenerateConsoleCtrlEvent :: proc(dwCtrlEvent: DWORD, dwProcessGroupId: DWORD) -> BOOL ---
 	FreeConsole :: proc() -> BOOL ---
 	GetConsoleWindow :: proc() -> HWND ---
+
+	GetDiskFreeSpaceExW :: proc(
+		lpDirectoryName: LPCWSTR,
+		lpFreeBytesAvailableToCaller: PULARGE_INTEGER,
+		lpTotalNumberOfBytes: PULARGE_INTEGER,
+		lpTotalNumberOfFreeBytes: PULARGE_INTEGER,
+	) -> BOOL ---
 }
 
 
