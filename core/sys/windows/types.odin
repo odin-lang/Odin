@@ -44,6 +44,7 @@ BOOLEAN :: distinct b8
 GROUP :: distinct c_uint
 LARGE_INTEGER :: distinct c_longlong
 ULARGE_INTEGER :: distinct c_ulonglong
+PULARGE_INTEGER :: ^ULARGE_INTEGER
 LONG :: c_long
 UINT :: c_uint
 INT  :: c_int
