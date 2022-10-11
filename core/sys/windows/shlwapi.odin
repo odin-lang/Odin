@@ -8,4 +8,5 @@ foreign shlwapi {
 	PathFileExistsW    :: proc(pszPath: wstring) -> BOOL ---
 	PathFindExtensionW :: proc(pszPath: wstring) -> wstring ---
 	PathFindFileNameW  :: proc(pszPath: wstring) -> wstring ---
+	SHAutoComplete     :: proc(hwndEdit: HWND, dwFlags: DWORD) -> LWSTDAPI ---
 }

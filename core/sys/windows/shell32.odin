@@ -14,4 +14,9 @@ foreign shell32 {
 		lpDirectory: LPCWSTR,
 		nShowCmd: INT,
 	) -> HINSTANCE ---
+	SHCreateDirectoryExW :: proc(
+		hwnd: HWND,
+		pszPath: LPCWSTR,
+		psa: ^SECURITY_ATTRIBUTES,
+	) -> c_int ---
 }
