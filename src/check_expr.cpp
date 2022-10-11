@@ -6413,7 +6413,9 @@ CallArgumentError check_polymorphic_record_type(CheckerContext *c, Operand *oper
 		if (e->kind == Entity_TypeName) {
 			if (o->mode != Addressing_Type) {
 				if (show_error) {
-					error(o->expr, "Expected a type for the argument '%.*s'", LIT(e->token.string));
+					gbString expr = expr_to_string(o->expr);
+					error(o->expr, "Expected a type for the argument '%.*s', got %s", LIT(e->token.string), expr);
+					gb_string_free(expr);
 				}
 				err = CallArgumentError_WrongTypes;
 			}
@@ -6454,6 +6456,10 @@ CallArgumentError check_polymorphic_record_type(CheckerContext *c, Operand *oper
 		// NOTE(bill): Add type info the parameters
 		// TODO(bill, 2022-01-23): why was this line added in the first place? I'm commenting it out for the time being
 		// add_type_info_type(c, o->type);
+	}
+
+	if (show_error && err) {
+		return err;
 	}
 
 	{
