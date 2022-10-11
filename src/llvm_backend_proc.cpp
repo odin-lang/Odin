@@ -753,12 +753,16 @@ lbValue lb_emit_call_internal(lbProcedure *p, lbValue value, lbValue return_ptr,
 		}
 		GB_ASSERT_MSG(lb_is_type_kind(fnp, LLVMFunctionTypeKind), "%s", LLVMPrintTypeToString(fnp));
 
+		lbFunctionType *ft = map_must_get(&p->module->function_type_map, base_type(value.type));
+
 		{
 			unsigned param_count = LLVMCountParamTypes(fnp);
 			GB_ASSERT(arg_count >= param_count);
 
 			LLVMTypeRef *param_types = gb_alloc_array(temporary_allocator(), LLVMTypeRef, param_count);
 			LLVMGetParamTypes(fnp, param_types);
+
+
 			for (unsigned i = 0; i < param_count; i++) {
 				LLVMTypeRef param_type = param_types[i];
 				LLVMTypeRef arg_type = LLVMTypeOf(args[i]);
@@ -776,8 +780,18 @@ lbValue lb_emit_call_internal(lbProcedure *p, lbValue value, lbValue return_ptr,
 
 		LLVMValueRef ret = LLVMBuildCall2(p->builder, fnp, fn, args, arg_count, "");
 
+		LLVMAttributeIndex param_offset = LLVMAttributeIndex_FirstArgIndex;
 		if (return_ptr.value != nullptr) {
+			param_offset += 1;
+
 			LLVMAddCallSiteAttribute(ret, 1, lb_create_enum_attribute_with_type(p->module->ctx, "sret", LLVMTypeOf(args[0])));
+		}
+
+		for_array(i, ft->args) {
+			LLVMAttributeRef attribute = ft->args[i].attribute;
+			if (attribute != nullptr) {
+				LLVMAddCallSiteAttribute(ret, param_offset + cast(LLVMAttributeIndex)i, attribute);
+			}
 		}
 
 		switch (inlining) {
