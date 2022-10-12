@@ -925,6 +925,48 @@ NM_FONTCHANGED          :: NM_OUTOFMEMORY-22
 NM_CUSTOMTEXT           :: NM_OUTOFMEMORY-23 // uses NMCUSTOMTEXT struct
 NM_TVSTATEIMAGECHANGING :: NM_OUTOFMEMORY-23 // uses NMTVSTATEIMAGECHANGING struct, defined after HTREEITEM
 
+PCZZWSTR :: ^WCHAR
+
+SHFILEOPSTRUCTW :: struct {
+	hwnd: HWND,
+	wFunc: UINT,
+	pFrom: PCZZWSTR,
+	pTo: PCZZWSTR,
+	fFlags: FILEOP_FLAGS,
+	fAnyOperationsAborted: BOOL,
+	hNameMappings: LPVOID,
+	lpszProgressTitle: PCWSTR, // only used if FOF_SIMPLEPROGRESS
+}
+LPSHFILEOPSTRUCTW :: ^SHFILEOPSTRUCTW
+
+// Shell File Operations
+FO_MOVE   :: 0x0001
+FO_COPY   :: 0x0002
+FO_DELETE :: 0x0003
+FO_RENAME :: 0x0004
+
+// SHFILEOPSTRUCT.fFlags and IFileOperation::SetOperationFlags() flag values
+FOF_MULTIDESTFILES        :: 0x0001
+FOF_CONFIRMMOUSE          :: 0x0002
+FOF_SILENT                :: 0x0004  // don't display progress UI (confirm prompts may be displayed still)
+FOF_RENAMEONCOLLISION     :: 0x0008  // automatically rename the source files to avoid the collisions
+FOF_NOCONFIRMATION        :: 0x0010  // don't display confirmation UI, assume "yes" for cases that can be bypassed, "no" for those that can not
+FOF_WANTMAPPINGHANDLE     :: 0x0020  // Fill in SHFILEOPSTRUCT.hNameMappings
+                                     // Must be freed using SHFreeNameMappings
+FOF_ALLOWUNDO             :: 0x0040  // enable undo including Recycle behavior for IFileOperation::Delete()
+FOF_FILESONLY             :: 0x0080  // only operate on the files (non folders), both files and folders are assumed without this
+FOF_SIMPLEPROGRESS        :: 0x0100  // means don't show names of files
+FOF_NOCONFIRMMKDIR        :: 0x0200  // don't dispplay confirmatino UI before making any needed directories, assume "Yes" in these cases
+FOF_NOERRORUI             :: 0x0400  // don't put up error UI, other UI may be displayed, progress, confirmations
+FOF_NOCOPYSECURITYATTRIBS :: 0x0800  // dont copy file security attributes (ACLs)
+FOF_NORECURSION           :: 0x1000  // don't recurse into directories for operations that would recurse
+FOF_NO_CONNECTED_ELEMENTS :: 0x2000  // don't operate on connected elements ("xxx_files" folders that go with .htm files)
+FOF_WANTNUKEWARNING       :: 0x4000  // during delete operation, warn if object is being permanently destroyed instead of recycling (partially overrides FOF_NOCONFIRMATION)
+FOF_NORECURSEREPARSE      :: 0x8000  // deprecated; the operations engine always does the right thing on FolderLink objects (symlinks, reparse points, folder shortcuts)
+FOF_NO_UI                 :: (FOF_SILENT | FOF_NOCONFIRMATION | FOF_NOERRORUI | FOF_NOCONFIRMMKDIR) // don't display any UI at all
+
+FILEOP_FLAGS :: WORD
+
 DEVMODEW :: struct {
 	dmDeviceName:   [32]wchar_t,
 	dmSpecVersion:   WORD,
