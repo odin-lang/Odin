@@ -44,7 +44,7 @@ arena_init_static :: proc(arena: ^Arena, reserved: uint, commit_size: uint = DEF
 }
 
 arena_alloc :: proc(arena: ^Arena, size: uint, alignment: uint, loc := #caller_location) -> (data: []byte, err: Allocator_Error) {
-	assert(mem.is_power_of_two(uintptr(alignment)), "non-power of two alignment", loc)
+	assert(alignment & (alignment-1) == 0, "non-power of two alignment", loc)
 
 	size := size
 	if size == 0 {
