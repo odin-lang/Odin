@@ -2,32 +2,31 @@ package mem_virtual
 
 import "core:mem"
 
-Arena_Kind :: enum u8 {
-	Growing = 0, // chained memory block
-	Static  = 1, // fixed reservation
+Arena_Kind :: enum uint {
+	Growing = 0, // chained memory blocks (singly linked list)
+	Static  = 1, // fixed reservation sized
 }
 
 Arena :: struct {
-	curr_block: ^Memory_Block,
-	total_used:     uint,
-	total_reserved: uint,
-
 	kind:               Arena_Kind,
+	curr_block:         ^Memory_Block,
+	total_used:         uint,
+	total_reserved:     uint,
 	minimum_block_size: uint,
-	temp_count:         int,
+	temp_count:         uint,
 }
 
 
 // 1 MiB should be enough to start with
-STATIC_ARENA_DEFAULT_COMMIT_SIZE         :: 1<<20
-GROWING_ARENA_DEFAULT_MINIMUM_BLOCK_SIZE :: STATIC_ARENA_DEFAULT_COMMIT_SIZE
+DEFAULT_ARENA_STATIC_COMMIT_SIZE         :: 1<<20
+DEFAULT_ARENA_GROWING_MINIMUM_BLOCK_SIZE :: DEFAULT_ARENA_STATIC_COMMIT_SIZE
 
 // 1 GiB on 64-bit systems, 128 MiB on 32-bit systems by default
-STATIC_ARENA_DEFAULT_RESERVE_SIZE :: 1<<30 when size_of(uintptr) == 8 else 1<<27
+DEFAULT_ARENA_STATIC_RESERVE_SIZE :: 1<<30 when size_of(uintptr) == 8 else 1<<27
 
 
 
-arena_init_growing :: proc(arena: ^Arena, reserved: uint = GROWING_ARENA_DEFAULT_MINIMUM_BLOCK_SIZE) -> (err: Allocator_Error) {
+arena_init_growing :: proc(arena: ^Arena, reserved: uint = DEFAULT_ARENA_GROWING_MINIMUM_BLOCK_SIZE) -> (err: Allocator_Error) {
 	arena.kind = .Growing
 	arena.curr_block = memory_block_alloc(0, reserved, {}) or_return
 	arena.total_used = 0
@@ -36,7 +35,7 @@ arena_init_growing :: proc(arena: ^Arena, reserved: uint = GROWING_ARENA_DEFAULT
 }
 
 
-arena_init_static :: proc(arena: ^Arena, reserved: uint, commit_size: uint = STATIC_ARENA_DEFAULT_COMMIT_SIZE) -> (err: Allocator_Error) {
+arena_init_static :: proc(arena: ^Arena, reserved: uint, commit_size: uint = DEFAULT_ARENA_STATIC_COMMIT_SIZE) -> (err: Allocator_Error) {
 	arena.kind = .Static
 	arena.curr_block = memory_block_alloc(commit_size, reserved, {}) or_return
 	arena.total_used = 0
@@ -57,7 +56,7 @@ arena_alloc :: proc(arena: ^Arena, size: uint, alignment: uint, loc := #caller_l
 		if arena.curr_block == nil || arena.curr_block.used + size > arena.curr_block.reserved {
 			size = mem.align_forward_uint(size, alignment)
 			if arena.minimum_block_size == 0 {
-				arena.minimum_block_size = GROWING_ARENA_DEFAULT_MINIMUM_BLOCK_SIZE
+				arena.minimum_block_size = DEFAULT_ARENA_GROWING_MINIMUM_BLOCK_SIZE
 			}
 
 			block_size := max(size, arena.minimum_block_size)
@@ -74,9 +73,9 @@ arena_alloc :: proc(arena: ^Arena, size: uint, alignment: uint, loc := #caller_l
 	case .Static:
 		if arena.curr_block == nil {
 			if arena.minimum_block_size == 0 {
-				arena.minimum_block_size = STATIC_ARENA_DEFAULT_RESERVE_SIZE
+				arena.minimum_block_size = DEFAULT_ARENA_STATIC_RESERVE_SIZE
 			}
-			arena_init_static(arena=arena, reserved=arena.minimum_block_size, commit_size=STATIC_ARENA_DEFAULT_COMMIT_SIZE) or_return
+			arena_init_static(arena=arena, reserved=arena.minimum_block_size, commit_size=DEFAULT_ARENA_STATIC_COMMIT_SIZE) or_return
 		}
 		data, err = alloc_from_memory_block(arena.curr_block, size, alignment)
 		arena.total_used = arena.curr_block.used
@@ -143,7 +142,7 @@ arena_static_bootstrap_new :: proc{
 	arena_static_bootstrap_new_by_name,
 }
 
-arena_growing_bootstrap_new_by_offset :: proc($T: typeid, offset_to_arena: uintptr, minimum_block_size: uint = GROWING_ARENA_DEFAULT_MINIMUM_BLOCK_SIZE) -> (ptr: ^T, err: Allocator_Error) {
+arena_growing_bootstrap_new_by_offset :: proc($T: typeid, offset_to_arena: uintptr, minimum_block_size: uint = DEFAULT_ARENA_GROWING_MINIMUM_BLOCK_SIZE) -> (ptr: ^T, err: Allocator_Error) {
 	bootstrap: Arena
 	bootstrap.kind = .Growing
 	bootstrap.minimum_block_size = minimum_block_size
@@ -157,7 +156,7 @@ arena_growing_bootstrap_new_by_offset :: proc($T: typeid, offset_to_arena: uintp
 	return
 }
 
-arena_growing_bootstrap_new_by_name :: proc($T: typeid, $field_name: string, minimum_block_size: uint = GROWING_ARENA_DEFAULT_MINIMUM_BLOCK_SIZE) -> (ptr: ^T, err: Allocator_Error) {
+arena_growing_bootstrap_new_by_name :: proc($T: typeid, $field_name: string, minimum_block_size: uint = DEFAULT_ARENA_GROWING_MINIMUM_BLOCK_SIZE) -> (ptr: ^T, err: Allocator_Error) {
 	return arena_growing_bootstrap_new_by_offset(T, offset_of_by_string(T, field_name), minimum_block_size)
 }
 
