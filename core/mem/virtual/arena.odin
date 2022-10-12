@@ -44,23 +44,18 @@ arena_init_static :: proc(arena: ^Arena, reserved: uint, commit_size: uint = STA
 }
 
 arena_alloc :: proc(arena: ^Arena, min_size: int, alignment: int, loc := #caller_location) -> (data: []byte, err: Allocator_Error) {
-	align_forward_offset :: proc "contextless" (arena: ^Arena, alignment: int) -> uint #no_bounds_check {
-		alignment_offset := uint(0)
-		ptr := uintptr(arena.curr_block.base[arena.curr_block.used:])
-		mask := uintptr(alignment-1)
-		if ptr & mask != 0 {
-			alignment_offset = uint(alignment) - uint(ptr & mask)
-		}
-		return alignment_offset
-	}
-
 	assert(mem.is_power_of_two(uintptr(alignment)), "non-power of two alignment", loc)
 
 	switch arena.kind {
 	case .Growing:
-		size := uint(0)
+		size := uint(min_size)
 		if arena.curr_block != nil {
-			size = uint(min_size) + align_forward_offset(arena, alignment)
+			// align forward offset
+			ptr := uintptr(arena.curr_block.base[arena.curr_block.used:])
+			mask := uintptr(alignment-1)
+			if ptr & mask != 0 {
+				size += uint(alignment) - uint(ptr & mask)
+			}
 		}
 
 		if arena.curr_block == nil || arena.curr_block.used + size > arena.curr_block.reserved {
