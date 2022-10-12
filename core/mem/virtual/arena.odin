@@ -56,7 +56,9 @@ arena_alloc :: proc(arena: ^Arena, size: uint, alignment: uint, loc := #caller_l
 	case .Growing:
 		if arena.curr_block == nil || arena.curr_block.used + size > arena.curr_block.reserved {
 			size = mem.align_forward_uint(size, alignment)
-			arena.minimum_block_size = max(GROWING_ARENA_DEFAULT_MINIMUM_BLOCK_SIZE, arena.minimum_block_size)
+			if arena.minimum_block_size == 0 {
+				arena.minimum_block_size = GROWING_ARENA_DEFAULT_MINIMUM_BLOCK_SIZE
+			}
 
 			block_size := max(size, arena.minimum_block_size)
 
@@ -71,8 +73,10 @@ arena_alloc :: proc(arena: ^Arena, size: uint, alignment: uint, loc := #caller_l
 		arena.total_used += arena.curr_block.used - prev_used
 	case .Static:
 		if arena.curr_block == nil {
-			reserve_size := max(arena.minimum_block_size, STATIC_ARENA_DEFAULT_RESERVE_SIZE)
-			arena_init_static(arena, reserve_size, STATIC_ARENA_DEFAULT_COMMIT_SIZE) or_return
+			if arena.minimum_block_size == 0 {
+				arena.minimum_block_size = STATIC_ARENA_DEFAULT_RESERVE_SIZE
+			}
+			arena_init_static(arena=arena, reserved=arena.minimum_block_size, commit_size=STATIC_ARENA_DEFAULT_COMMIT_SIZE) or_return
 		}
 		data, err = alloc_from_memory_block(arena.curr_block, size, alignment)
 		arena.total_used = arena.curr_block.used
