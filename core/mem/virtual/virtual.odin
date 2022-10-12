@@ -106,7 +106,7 @@ memory_block_alloc :: proc(committed, reserved: uint, flags: Memory_Block_Flags)
 	return &pmblock.block, nil
 }
 
-alloc_from_memory_block :: proc(block: ^Memory_Block, min_size, alignment: int) -> (data: []byte, err: Allocator_Error) {
+alloc_from_memory_block :: proc(block: ^Memory_Block, min_size, alignment: uint) -> (data: []byte, err: Allocator_Error) {
 	calc_alignment_offset :: proc "contextless" (block: ^Memory_Block, alignment: uintptr) -> uint {
 		alignment_offset := uint(0)
 		ptr := uintptr(block.base[block.used:])
