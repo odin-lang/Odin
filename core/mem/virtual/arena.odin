@@ -18,7 +18,8 @@ Arena :: struct {
 }
 
 
-STATIC_ARENA_DEFAULT_COMMIT_SIZE  :: 1<<20 // 1 MiB should be enough to start with
+// 1 MiB should be enough to start with
+STATIC_ARENA_DEFAULT_COMMIT_SIZE         :: 1<<20
 GROWING_ARENA_DEFAULT_MINIMUM_BLOCK_SIZE :: STATIC_ARENA_DEFAULT_COMMIT_SIZE
 
 // 1 GiB on 64-bit systems, 128 MiB on 32-bit systems by default
@@ -43,27 +44,18 @@ arena_init_static :: proc(arena: ^Arena, reserved: uint, commit_size: uint = STA
 	return
 }
 
-arena_alloc :: proc(arena: ^Arena, min_size: int, alignment: int, loc := #caller_location) -> (data: []byte, err: Allocator_Error) {
+arena_alloc :: proc(arena: ^Arena, size: uint, alignment: uint, loc := #caller_location) -> (data: []byte, err: Allocator_Error) {
 	assert(mem.is_power_of_two(uintptr(alignment)), "non-power of two alignment", loc)
 
-	if min_size == 0 {
+	size := size
+	if size == 0 {
 		return nil, nil
 	}
 
 	switch arena.kind {
 	case .Growing:
-		size := uint(min_size)
-		if arena.curr_block != nil {
-			// align forward offset
-			ptr := uintptr(arena.curr_block.base[arena.curr_block.used:])
-			mask := uintptr(alignment-1)
-			if ptr & mask != 0 {
-				size += uint(alignment) - uint(ptr & mask)
-			}
-		}
-
 		if arena.curr_block == nil || arena.curr_block.used + size > arena.curr_block.reserved {
-			size = uint(mem.align_forward_int(min_size, alignment))
+			size = mem.align_forward_uint(size, alignment)
 			arena.minimum_block_size = max(GROWING_ARENA_DEFAULT_MINIMUM_BLOCK_SIZE, arena.minimum_block_size)
 
 			block_size := max(size, arena.minimum_block_size)
@@ -74,17 +66,15 @@ arena_alloc :: proc(arena: ^Arena, min_size: int, alignment: int, loc := #caller
 			arena.total_reserved += new_block.reserved
 		}
 
-
-		data, err = alloc_from_memory_block(arena.curr_block, int(size), alignment)
-		if err == nil {
-			arena.total_used += size
-		}
+		prev_used := arena.curr_block.used
+		data, err = alloc_from_memory_block(arena.curr_block, size, alignment)
+		arena.total_used += arena.curr_block.used - prev_used
 	case .Static:
 		if arena.curr_block == nil {
 			reserve_size := max(arena.minimum_block_size, STATIC_ARENA_DEFAULT_RESERVE_SIZE)
 			arena_init_static(arena, reserve_size, STATIC_ARENA_DEFAULT_COMMIT_SIZE) or_return
 		}
-		data, err = alloc_from_memory_block(arena.curr_block, min_size, alignment)
+		data, err = alloc_from_memory_block(arena.curr_block, size, alignment)
 		arena.total_used = arena.curr_block.used
 	}
 	return
@@ -123,11 +113,11 @@ arena_free_all :: proc(arena: ^Arena) {
 		for arena.curr_block != nil {
 			arena_growing_free_last_memory_block(arena)
 		}
+		arena.total_reserved = 0
 	case .Static:
 		arena_static_reset_to(arena, 0)
 	}
 	arena.total_used = 0
-	arena.total_reserved = 0
 }
 
 arena_destroy :: proc(arena: ^Arena) {
@@ -137,6 +127,16 @@ arena_destroy :: proc(arena: ^Arena) {
 	arena.total_used     = 0
 	arena.total_reserved = 0
 	arena.temp_count     = 0
+}
+
+arena_growing_bootstrap_new :: proc{
+	arena_growing_bootstrap_new_by_offset,
+	arena_growing_bootstrap_new_by_name,
+}
+
+arena_static_bootstrap_new :: proc{
+	arena_static_bootstrap_new_by_offset,
+	arena_static_bootstrap_new_by_name,
 }
 
 arena_growing_bootstrap_new_by_offset :: proc($T: typeid, offset_to_arena: uintptr, minimum_block_size: uint = GROWING_ARENA_DEFAULT_MINIMUM_BLOCK_SIZE) -> (ptr: ^T, err: Allocator_Error) {
@@ -157,11 +157,6 @@ arena_growing_bootstrap_new_by_name :: proc($T: typeid, $field_name: string, min
 	return arena_growing_bootstrap_new_by_offset(T, offset_of_by_string(T, field_name), minimum_block_size)
 }
 
-arena_growing_bootstrap_new :: proc{
-	arena_growing_bootstrap_new_by_offset,
-	arena_growing_bootstrap_new_by_name,
-}
-
 arena_static_bootstrap_new_by_offset :: proc($T: typeid, offset_to_arena: uintptr, reserved: uint) -> (ptr: ^T, err: Allocator_Error) {
 	bootstrap: Arena
 	bootstrap.kind = .Static
@@ -179,10 +174,6 @@ arena_static_bootstrap_new_by_offset :: proc($T: typeid, offset_to_arena: uintpt
 arena_static_bootstrap_new_by_name :: proc($T: typeid, $field_name: string, reserved: uint) -> (ptr: ^T, err: Allocator_Error) {
 	return arena_static_bootstrap_new_by_offset(T, offset_of_by_string(T, field_name), reserved)
 }
-arena_static_bootstrap_new :: proc{
-	arena_static_bootstrap_new_by_offset,
-	arena_static_bootstrap_new_by_name,
-}
 
 
 arena_allocator :: proc(arena: ^Arena) -> mem.Allocator {
@@ -194,6 +185,9 @@ arena_allocator_proc :: proc(allocator_data: rawptr, mode: mem.Allocator_Mode,
                              old_memory: rawptr, old_size: int,
                              location := #caller_location) -> (data: []byte, err: Allocator_Error) {
 	arena := (^Arena)(allocator_data)
+
+	size, alignment := uint(size), uint(alignment)
+	old_size := uint(old_size)
 
 	switch mode {
 	case .Alloc:
@@ -238,6 +232,9 @@ arena_allocator_proc :: proc(allocator_data: rawptr, mode: mem.Allocator_Mode,
 
 	return
 }
+
+
+
 
 Arena_Temp :: struct {
 	arena: ^Arena,
