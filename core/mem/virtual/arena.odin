@@ -46,6 +46,10 @@ arena_init_static :: proc(arena: ^Arena, reserved: uint, commit_size: uint = STA
 arena_alloc :: proc(arena: ^Arena, min_size: int, alignment: int, loc := #caller_location) -> (data: []byte, err: Allocator_Error) {
 	assert(mem.is_power_of_two(uintptr(alignment)), "non-power of two alignment", loc)
 
+	if min_size == 0 {
+		return nil, nil
+	}
+
 	switch arena.kind {
 	case .Growing:
 		size := uint(min_size)
@@ -186,9 +190,9 @@ arena_allocator :: proc(arena: ^Arena) -> mem.Allocator {
 }
 
 arena_allocator_proc :: proc(allocator_data: rawptr, mode: mem.Allocator_Mode,
-                                     size, alignment: int,
-                                     old_memory: rawptr, old_size: int,
-                                     location := #caller_location) -> (data: []byte, err: Allocator_Error) {
+                             size, alignment: int,
+                             old_memory: rawptr, old_size: int,
+                             location := #caller_location) -> (data: []byte, err: Allocator_Error) {
 	arena := (^Arena)(allocator_data)
 
 	switch mode {
@@ -196,19 +200,42 @@ arena_allocator_proc :: proc(allocator_data: rawptr, mode: mem.Allocator_Mode,
 		return arena_alloc(arena, size, alignment)
 	case .Free:
 		err = .Mode_Not_Implemented
-		return
 	case .Free_All:
 		arena_free_all(arena)
-		return
 	case .Resize:
-		return mem.default_resize_bytes_align(mem.byte_slice(old_memory, old_size), size, alignment, arena_allocator(arena), location)
+		old_data := ([^]byte)(old_memory)
 
-	case .Query_Features, .Query_Info:
+		switch {
+		case old_data == nil:
+			return arena_alloc(arena, size, alignment)
+		case size == old_size:
+			// return old memory
+			data = old_data[:size]
+			return
+		case size == 0:
+			err = .Mode_Not_Implemented
+			return
+		case (uintptr(old_data) & uintptr(alignment-1) == 0) && size < old_size:
+			// shrink data in-place
+			data = old_data[:size]
+			return
+		}
+
+		new_memory := arena_alloc(arena, size, alignment) or_return
+		if new_memory == nil {
+			return
+		}
+		copy(new_memory, old_data[:old_size])
+		return new_memory, nil
+	case .Query_Features:
+		set := (^mem.Allocator_Mode_Set)(old_memory)
+		if set != nil {
+			set^ = {.Alloc, .Free_All, .Resize, .Query_Features}
+		}
+	case .Query_Info:
 		err = .Mode_Not_Implemented
-		return
 	}
 
-	err = .Mode_Not_Implemented
 	return
 }
 
