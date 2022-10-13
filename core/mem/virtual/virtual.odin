@@ -1,6 +1,7 @@
 package mem_virtual
 
 import "core:mem"
+import "core:intrinsics"
 
 DEFAULT_PAGE_SIZE := uint(4096)
 
@@ -134,11 +135,14 @@ alloc_from_memory_block :: proc(block: ^Memory_Block, min_size, alignment: uint)
 		return nil
 	}
 
-
 	alignment_offset := calc_alignment_offset(block, uintptr(alignment))
-	size := uint(min_size) + alignment_offset
+	size, size_ok := intrinsics.overflow_add(min_size, alignment_offset)
+	if !size_ok {
+		err = .Out_Of_Memory
+		return
+	}
 
-	if block.used + size > block.reserved {
+	if to_be_used, ok := intrinsics.overflow_add(block.used, size); !ok || to_be_used > block.reserved {
 		err = .Out_Of_Memory
 		return
 	}
