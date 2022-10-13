@@ -26,6 +26,7 @@ DEFAULT_ARENA_STATIC_RESERVE_SIZE :: 1<<30 when size_of(uintptr) == 8 else 1<<27
 
 
 
+@(require_results)
 arena_init_growing :: proc(arena: ^Arena, reserved: uint = DEFAULT_ARENA_GROWING_MINIMUM_BLOCK_SIZE) -> (err: Allocator_Error) {
 	arena.kind = .Growing
 	arena.curr_block = memory_block_alloc(0, reserved, {}) or_return
@@ -35,6 +36,7 @@ arena_init_growing :: proc(arena: ^Arena, reserved: uint = DEFAULT_ARENA_GROWING
 }
 
 
+@(require_results)
 arena_init_static :: proc(arena: ^Arena, reserved: uint, commit_size: uint = DEFAULT_ARENA_STATIC_COMMIT_SIZE) -> (err: Allocator_Error) {
 	arena.kind = .Static
 	arena.curr_block = memory_block_alloc(commit_size, reserved, {}) or_return
@@ -43,6 +45,7 @@ arena_init_static :: proc(arena: ^Arena, reserved: uint, commit_size: uint = DEF
 	return
 }
 
+@(require_results)
 arena_alloc :: proc(arena: ^Arena, size: uint, alignment: uint, loc := #caller_location) -> (data: []byte, err: Allocator_Error) {
 	assert(alignment & (alignment-1) == 0, "non-power of two alignment", loc)
 
@@ -142,6 +145,7 @@ arena_static_bootstrap_new :: proc{
 	arena_static_bootstrap_new_by_name,
 }
 
+@(require_results)
 arena_growing_bootstrap_new_by_offset :: proc($T: typeid, offset_to_arena: uintptr, minimum_block_size: uint = DEFAULT_ARENA_GROWING_MINIMUM_BLOCK_SIZE) -> (ptr: ^T, err: Allocator_Error) {
 	bootstrap: Arena
 	bootstrap.kind = .Growing
@@ -156,10 +160,12 @@ arena_growing_bootstrap_new_by_offset :: proc($T: typeid, offset_to_arena: uintp
 	return
 }
 
+@(require_results)
 arena_growing_bootstrap_new_by_name :: proc($T: typeid, $field_name: string, minimum_block_size: uint = DEFAULT_ARENA_GROWING_MINIMUM_BLOCK_SIZE) -> (ptr: ^T, err: Allocator_Error) {
 	return arena_growing_bootstrap_new_by_offset(T, offset_of_by_string(T, field_name), minimum_block_size)
 }
 
+@(require_results)
 arena_static_bootstrap_new_by_offset :: proc($T: typeid, offset_to_arena: uintptr, reserved: uint) -> (ptr: ^T, err: Allocator_Error) {
 	bootstrap: Arena
 	bootstrap.kind = .Static
@@ -174,11 +180,13 @@ arena_static_bootstrap_new_by_offset :: proc($T: typeid, offset_to_arena: uintpt
 	return
 }
 
+@(require_results)
 arena_static_bootstrap_new_by_name :: proc($T: typeid, $field_name: string, reserved: uint) -> (ptr: ^T, err: Allocator_Error) {
 	return arena_static_bootstrap_new_by_offset(T, offset_of_by_string(T, field_name), reserved)
 }
 
 
+@(require_results)
 arena_allocator :: proc(arena: ^Arena) -> mem.Allocator {
 	return mem.Allocator{arena_allocator_proc, arena}
 }
@@ -245,6 +253,7 @@ Arena_Temp :: struct {
 	used:  uint,
 }
 
+@(require_results)
 arena_temp_begin :: proc(arena: ^Arena, loc := #caller_location) -> (temp: Arena_Temp) {
 	assert(arena != nil, "nil arena", loc)
 	temp.arena = arena
