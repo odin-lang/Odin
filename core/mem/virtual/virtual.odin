@@ -136,13 +136,13 @@ alloc_from_memory_block :: proc(block: ^Memory_Block, min_size, alignment: uint)
 	}
 
 	alignment_offset := calc_alignment_offset(block, uintptr(alignment))
-	size, size_ok := intrinsics.overflow_add(min_size, alignment_offset)
+	size, size_ok := safe_add(min_size, alignment_offset)
 	if !size_ok {
 		err = .Out_Of_Memory
 		return
 	}
 
-	if to_be_used, ok := intrinsics.overflow_add(block.used, size); !ok || to_be_used > block.reserved {
+	if to_be_used, ok := safe_add(block.used, size); !ok || to_be_used > block.reserved {
 		err = .Out_Of_Memory
 		return
 	}
@@ -166,3 +166,10 @@ memory_block_dealloc :: proc(block_to_free: ^Memory_Block) {
 	}
 }
 
+
+
+@(private)
+safe_add :: #force_inline proc "contextless" (x, y: uint) -> (uint, bool) {
+	z, did_overflow := intrinsics.overflow_add(x, y)
+	return z, !did_overflow
+}

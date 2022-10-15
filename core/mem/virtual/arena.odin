@@ -1,7 +1,6 @@
 package mem_virtual
 
 import "core:mem"
-import "core:intrinsics"
 
 Arena_Kind :: enum uint {
 	Growing = 0, // chained memory blocks (singly linked list)
@@ -57,7 +56,7 @@ arena_alloc :: proc(arena: ^Arena, size: uint, alignment: uint, loc := #caller_l
 
 	switch arena.kind {
 	case .Growing:
-		if arena.curr_block == nil || (intrinsics.overflow_add(arena.curr_block.used, size) or_else 0) > arena.curr_block.reserved {
+		if arena.curr_block == nil || (safe_add(arena.curr_block.used, size) or_else 0) > arena.curr_block.reserved {
 			size = mem.align_forward_uint(size, alignment)
 			if arena.minimum_block_size == 0 {
 				arena.minimum_block_size = DEFAULT_ARENA_GROWING_MINIMUM_BLOCK_SIZE
@@ -299,6 +298,3 @@ arena_temp_end :: proc(temp: Arena_Temp, loc := #caller_location) {
 arena_check_temp :: proc(arena: ^Arena, loc := #caller_location) {
 	assert(arena.temp_count == 0, "Arena_Temp not been ended", loc)
 }
-
-
-
