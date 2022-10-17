@@ -1488,6 +1488,11 @@ void check_proc_body(CheckerContext *ctx_, Token token, DeclInfo *decl, Type *ty
 				if (!(e->flags & EntityFlag_Using)) {
 					continue;
 				}
+				if (is_blank_ident(e->token)) {
+                    error(e->token, "'using' a procedure parameter requires a non blank identifier");
+					break;
+				}
+
 				bool is_value = (e->flags & EntityFlag_Value) != 0 && !is_type_pointer(e->type);
 				String name = e->token.string;
 				Type *t = base_type(type_deref(e->type));
