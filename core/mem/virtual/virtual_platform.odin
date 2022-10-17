@@ -63,7 +63,6 @@ platform_memory_commit :: proc "contextless" (block: ^Platform_Memory_Block, to_
 		return .Out_Of_Memory
 	}
 
-
 	commit(block, to_commit) or_return
 	block.committed = to_commit
 	return nil

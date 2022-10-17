@@ -243,13 +243,11 @@ default_resize_bytes_align :: proc(old_data: []byte, new_size, alignment: int, a
 		return alloc_bytes(new_size, alignment, allocator, loc)
 	}
 
-	if new_size == 0 {
-		err := free_bytes(old_data, allocator, loc)
-		return nil, err
-	}
-
 	if new_size == old_size {
-		return old_data, .None
+		return old_data, nil
+	}
+	if new_size == 0 {
+		return nil, free_bytes(old_data, allocator, loc)
 	}
 
 	new_memory, err := alloc_bytes(new_size, alignment, allocator, loc)
@@ -258,6 +256,9 @@ default_resize_bytes_align :: proc(old_data: []byte, new_size, alignment: int, a
 	}
 
 	runtime.copy(new_memory, old_data)
-	free_bytes(old_data, allocator, loc)
+	err1 := free_bytes(old_data, allocator, loc)
+	if err == nil {
+		err = err1
+	}
 	return new_memory, err
 }
