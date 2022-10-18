@@ -925,6 +925,48 @@ NM_FONTCHANGED          :: NM_OUTOFMEMORY-22
 NM_CUSTOMTEXT           :: NM_OUTOFMEMORY-23 // uses NMCUSTOMTEXT struct
 NM_TVSTATEIMAGECHANGING :: NM_OUTOFMEMORY-23 // uses NMTVSTATEIMAGECHANGING struct, defined after HTREEITEM
 
+PCZZWSTR :: ^WCHAR
+
+SHFILEOPSTRUCTW :: struct {
+	hwnd: HWND,
+	wFunc: UINT,
+	pFrom: PCZZWSTR,
+	pTo: PCZZWSTR,
+	fFlags: FILEOP_FLAGS,
+	fAnyOperationsAborted: BOOL,
+	hNameMappings: LPVOID,
+	lpszProgressTitle: PCWSTR, // only used if FOF_SIMPLEPROGRESS
+}
+LPSHFILEOPSTRUCTW :: ^SHFILEOPSTRUCTW
+
+// Shell File Operations
+FO_MOVE   :: 0x0001
+FO_COPY   :: 0x0002
+FO_DELETE :: 0x0003
+FO_RENAME :: 0x0004
+
+// SHFILEOPSTRUCT.fFlags and IFileOperation::SetOperationFlags() flag values
+FOF_MULTIDESTFILES        :: 0x0001
+FOF_CONFIRMMOUSE          :: 0x0002
+FOF_SILENT                :: 0x0004  // don't display progress UI (confirm prompts may be displayed still)
+FOF_RENAMEONCOLLISION     :: 0x0008  // automatically rename the source files to avoid the collisions
+FOF_NOCONFIRMATION        :: 0x0010  // don't display confirmation UI, assume "yes" for cases that can be bypassed, "no" for those that can not
+FOF_WANTMAPPINGHANDLE     :: 0x0020  // Fill in SHFILEOPSTRUCT.hNameMappings
+                                     // Must be freed using SHFreeNameMappings
+FOF_ALLOWUNDO             :: 0x0040  // enable undo including Recycle behavior for IFileOperation::Delete()
+FOF_FILESONLY             :: 0x0080  // only operate on the files (non folders), both files and folders are assumed without this
+FOF_SIMPLEPROGRESS        :: 0x0100  // means don't show names of files
+FOF_NOCONFIRMMKDIR        :: 0x0200  // don't dispplay confirmatino UI before making any needed directories, assume "Yes" in these cases
+FOF_NOERRORUI             :: 0x0400  // don't put up error UI, other UI may be displayed, progress, confirmations
+FOF_NOCOPYSECURITYATTRIBS :: 0x0800  // dont copy file security attributes (ACLs)
+FOF_NORECURSION           :: 0x1000  // don't recurse into directories for operations that would recurse
+FOF_NO_CONNECTED_ELEMENTS :: 0x2000  // don't operate on connected elements ("xxx_files" folders that go with .htm files)
+FOF_WANTNUKEWARNING       :: 0x4000  // during delete operation, warn if object is being permanently destroyed instead of recycling (partially overrides FOF_NOCONFIRMATION)
+FOF_NORECURSEREPARSE      :: 0x8000  // deprecated; the operations engine always does the right thing on FolderLink objects (symlinks, reparse points, folder shortcuts)
+FOF_NO_UI                 :: (FOF_SILENT | FOF_NOCONFIRMATION | FOF_NOERRORUI | FOF_NOCONFIRMMKDIR) // don't display any UI at all
+
+FILEOP_FLAGS :: WORD
+
 DEVMODEW :: struct {
 	dmDeviceName:   [32]wchar_t,
 	dmSpecVersion:   WORD,
@@ -3190,10 +3232,14 @@ LWSTDAPI :: HRESULT
 
 CLSID_FileOpenDialog := &GUID{0xDC1C5A9C, 0xE88A, 0x4DDE, {0xA5, 0xA1, 0x60, 0xF8, 0x2A, 0x20, 0xAE, 0xF7}}
 CLSID_FileSaveDialog := &GUID{0xC0B4E2F3, 0xBA21, 0x4773, {0x8D, 0xBA, 0x33, 0x5E, 0xC9, 0x46, 0xEB, 0x8B}}
+CLSID_TaskbarList := &GUID{0x56FDF344, 0xFD6D, 0x11d0, {0x95, 0x8A, 0x00, 0x60, 0x97, 0xC9, 0xA0, 0x90}}
 
 IID_IFileDialog := &GUID{0x42F85136, 0xDB7E, 0x439C, {0x85, 0xF1, 0xE4, 0x07, 0x5D, 0x13, 0x5F, 0xC8}}
 IID_IFileSaveDialog := &GUID{0x84BCCD23, 0x5FDE, 0x4CDB, {0xAE, 0xA4, 0xAF, 0x64, 0xB8, 0x3D, 0x78, 0xAB}}
 IID_IFileOpenDialog := &GUID{0xD57C7288, 0xD4AD, 0x4768, {0xBE, 0x02, 0x9D, 0x96, 0x95, 0x32, 0xD9, 0x60}}
+IID_ITaskbarList := &GUID{0x56FDF342, 0xFD6D, 0x11d0, {0x95, 0x8A, 0x00, 0x60, 0x97, 0xC9, 0xA0, 0x90}}
+IID_ITaskbarList2 := &GUID{0x602D4995, 0xB13A, 0x429b, {0xA6, 0x6E, 0x19, 0x35, 0xE4, 0x4F, 0x43, 0x17}}
+IID_ITaskbarList3 := &GUID{0xea1afb91, 0x9e28, 0x4b86, {0x90, 0xe9, 0x9e, 0x9f, 0x8a, 0x5e, 0xef, 0xaf}}
 
 IModalWindow :: struct #raw_union {
 	#subtype IUnknown: IUnknown,
@@ -3496,6 +3542,84 @@ IFileSaveDialogVtbl :: struct {
 	SetCollectedProperties: proc "stdcall" (this: ^IFileSaveDialog, pList: ^IPropertyDescriptionList, fAppendDefault: BOOL) -> HRESULT,
 	GetProperties:          proc "stdcall" (this: ^IFileSaveDialog, ppStore: ^^IPropertyStore) -> HRESULT,
 	ApplyProperties:        proc "stdcall" (this: ^IFileSaveDialog, psi: ^IShellItem, pStore: ^IPropertyStore, hwnd: HWND, pSink: ^IFileOperationProgressSink) -> HRESULT,
+}
+
+ITaskbarList :: struct #raw_union {
+	#subtype IUnknown: IUnknown,
+	using Vtbl: ^ITaskbarListVtbl,
+}
+ITaskbarListVtbl :: struct {
+	using IUnknownVtbl: IUnknownVtbl,
+	HrInit: proc "stdcall" (this: ^ITaskbarList) -> HRESULT,
+	AddTab: proc "stdcall" (this: ^ITaskbarList, hwnd: HWND) -> HRESULT,
+	DeleteTab: proc "stdcall" (this: ^ITaskbarList, hwnd: HWND) -> HRESULT,
+	ActivateTab: proc "stdcall" (this: ^ITaskbarList, hwnd: HWND) -> HRESULT,
+	SetActiveAlt: proc "stdcall" (this: ^ITaskbarList, hwnd: HWND) -> HRESULT,
+}
+
+ITaskbarList2 :: struct #raw_union {
+	#subtype ITaskbarList: ITaskbarList,
+	using Vtbl: ^ITaskbarList2Vtbl,
+}
+ITaskbarList2Vtbl :: struct {
+	using ITaskbarListVtbl: ITaskbarListVtbl,
+	MarkFullscreenWindow: proc "stdcall" (this: ^ITaskbarList2, hwnd: HWND, fFullscreen: BOOL) -> HRESULT,
+}
+
+TBPFLAG :: enum c_int {
+	NOPROGRESS    = 0,
+	INDETERMINATE = 0x1,
+	NORMAL        = 0x2,
+	ERROR         = 0x4,
+	PAUSED        = 0x8,
+}
+
+THUMBBUTTONFLAGS :: enum c_int {
+	ENABLED        = 0,
+	DISABLED       = 0x1,
+	DISMISSONCLICK = 0x2,
+	NOBACKGROUND   = 0x4,
+	HIDDEN         = 0x8,
+	NONINTERACTIVE = 0x10,
+}
+
+THUMBBUTTONMASK :: enum c_int {
+	BITMAP  = 0x1,
+	ICON    = 0x2,
+	TOOLTIP = 0x4,
+	FLAGS   = 0x8,
+}
+
+THUMBBUTTON :: struct {
+	dwMask: THUMBBUTTONMASK,
+	iId: UINT,
+	iBitmap: UINT,
+	hIcon: HICON,
+	szTip: [260]WCHAR,
+	dwFlags: THUMBBUTTONFLAGS,
+}
+LPTHUMBBUTTON :: ^THUMBBUTTON
+
+HIMAGELIST :: ^IUnknown
+
+ITaskbarList3 :: struct #raw_union {
+	#subtype ITaskbarList2: ITaskbarList2,
+	using Vtbl: ^ITaskbarList3Vtbl,
+}
+ITaskbarList3Vtbl :: struct {
+	using ITaskbarList2Vtbl: ITaskbarList2Vtbl,
+	SetProgressValue: proc "stdcall" (this: ^ITaskbarList3, hwnd: HWND, ullCompleted: ULONGLONG, ullTotal: ULONGLONG) -> HRESULT,
+	SetProgressState: proc "stdcall" (this: ^ITaskbarList3, hwnd: HWND, tbpFlags: TBPFLAG) -> HRESULT,
+	RegisterTab: proc "stdcall" (this: ^ITaskbarList3, hwndTab: HWND, hwndMDI: HWND) -> HRESULT,
+	UnregisterTab: proc "stdcall" (this: ^ITaskbarList3, hwndTab: HWND) -> HRESULT,
+	SetTabOrder: proc "stdcall" (this: ^ITaskbarList3, hwndTab: HWND, hwndInsertBefore: HWND) -> HRESULT,
+	SetTabActive: proc "stdcall" (this: ^ITaskbarList3, hwndTab: HWND, hwndMDI: HWND, dwReserved: DWORD) -> HRESULT,
+	ThumbBarAddButtons: proc "stdcall" (this: ^ITaskbarList3, hwnd: HWND, cButtons: UINT, pButton: LPTHUMBBUTTON) -> HRESULT,
+	ThumbBarUpdateButtons: proc "stdcall" (this: ^ITaskbarList3, hwnd: HWND, cButtons: UINT, pButton: LPTHUMBBUTTON) -> HRESULT,
+	ThumbBarSetImageList: proc "stdcall" (this: ^ITaskbarList3, hwnd: HWND, himl: HIMAGELIST) -> HRESULT,
+	SetOverlayIcon: proc "stdcall" (this: ^ITaskbarList3, hwnd: HWND, hIcon: HICON, pszDescription: LPCWSTR) -> HRESULT,
+	SetThumbnailTooltip: proc "stdcall" (this: ^ITaskbarList3, hwnd: HWND, pszTip: LPCWSTR) -> HRESULT,
+	SetThumbnailClip: proc "stdcall" (this: ^ITaskbarList3, hwnd: HWND, prcClip: ^RECT) -> HRESULT,
 }
 
 MEMORYSTATUSEX :: struct {
