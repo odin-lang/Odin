@@ -19,4 +19,5 @@ foreign shell32 {
 		pszPath: LPCWSTR,
 		psa: ^SECURITY_ATTRIBUTES,
 	) -> c_int ---
+	SHFileOperationW :: proc(lpFileOp: LPSHFILEOPSTRUCTW) -> c_int ---
 }

@@ -1,6 +1,7 @@
 package mem_virtual
 
 import "core:mem"
+import "core:intrinsics"
 
 DEFAULT_PAGE_SIZE := uint(4096)
 
@@ -106,7 +107,7 @@ memory_block_alloc :: proc(committed, reserved: uint, flags: Memory_Block_Flags)
 	return &pmblock.block, nil
 }
 
-alloc_from_memory_block :: proc(block: ^Memory_Block, min_size, alignment: int) -> (data: []byte, err: Allocator_Error) {
+alloc_from_memory_block :: proc(block: ^Memory_Block, min_size, alignment: uint) -> (data: []byte, err: Allocator_Error) {
 	calc_alignment_offset :: proc "contextless" (block: ^Memory_Block, alignment: uintptr) -> uint {
 		alignment_offset := uint(0)
 		ptr := uintptr(block.base[block.used:])
@@ -134,11 +135,14 @@ alloc_from_memory_block :: proc(block: ^Memory_Block, min_size, alignment: int) 
 		return nil
 	}
 
-
 	alignment_offset := calc_alignment_offset(block, uintptr(alignment))
-	size := uint(min_size) + alignment_offset
+	size, size_ok := safe_add(min_size, alignment_offset)
+	if !size_ok {
+		err = .Out_Of_Memory
+		return
+	}
 
-	if block.used + size > block.reserved {
+	if to_be_used, ok := safe_add(block.used, size); !ok || to_be_used > block.reserved {
 		err = .Out_Of_Memory
 		return
 	}
@@ -162,3 +166,10 @@ memory_block_dealloc :: proc(block_to_free: ^Memory_Block) {
 	}
 }
 
+
+
+@(private)
+safe_add :: #force_inline proc "contextless" (x, y: uint) -> (uint, bool) {
+	z, did_overflow := intrinsics.overflow_add(x, y)
+	return z, !did_overflow
+}
