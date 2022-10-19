@@ -96,13 +96,6 @@ memory_block_alloc :: proc(committed, reserved: uint, flags: Memory_Block_Flags)
 	pmblock.block.committed = committed
 	pmblock.block.reserved  = reserved
 
-	sentinel := &global_platform_memory_block_sentinel
-	platform_mutex_lock()
-	pmblock.next = sentinel
-	pmblock.prev = sentinel.prev
-	pmblock.prev.next = pmblock
-	pmblock.next.prev = pmblock
-	platform_mutex_unlock()
 	
 	return &pmblock.block, nil
 }
@@ -157,11 +150,6 @@ alloc_from_memory_block :: proc(block: ^Memory_Block, min_size, alignment: uint)
 
 memory_block_dealloc :: proc(block_to_free: ^Memory_Block) {
 	if block := (^Platform_Memory_Block)(block_to_free); block != nil {
-		platform_mutex_lock()
-		block.prev.next = block.next
-		block.next.prev = block.prev
-		platform_mutex_unlock()
-		
 		platform_memory_free(block)
 	}
 }
