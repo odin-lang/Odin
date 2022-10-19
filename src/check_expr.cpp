@@ -2916,7 +2916,12 @@ bool check_transmute(CheckerContext *c, Ast *node, Operand *o, Type *t) {
 	// 	return false;
 	// }
 
-	if (is_type_untyped(o->type)) {
+	Type *src_t = o->type;
+	Type *dst_t = t;
+	Type *src_bt = base_type(src_t);
+	Type *dst_bt = base_type(dst_t);
+
+	if (is_type_untyped(src_t)) {
 		gbString expr_str = expr_to_string(o->expr);
 		error(o->expr, "Cannot transmute untyped expression: '%s'", expr_str);
 		gb_string_free(expr_str);
@@ -2925,7 +2930,6 @@ bool check_transmute(CheckerContext *c, Ast *node, Operand *o, Type *t) {
 		return false;
 	}
 
-	Type *dst_bt = base_type(t);
 	if (dst_bt == nullptr || dst_bt == t_invalid) {
 		GB_ASSERT(global_error_collector.count != 0);
 
@@ -2934,21 +2938,21 @@ bool check_transmute(CheckerContext *c, Ast *node, Operand *o, Type *t) {
 		return false;
 	}
 
-	Type *src_bt = base_type(o->type);
 	if (src_bt == nullptr || src_bt == t_invalid) {
 		// NOTE(bill): this should be an error
 		GB_ASSERT(global_error_collector.count != 0);
 		o->mode = Addressing_Value;
 		o->expr = node;
-		o->type = t;
+		o->type = dst_t;
 		return true;
 	}
 
-	i64 srcz = type_size_of(o->type);
-	i64 dstz = type_size_of(t);
+
+	i64 srcz = type_size_of(src_t);
+	i64 dstz = type_size_of(dst_t);
 	if (srcz != dstz) {
 		gbString expr_str = expr_to_string(o->expr);
-		gbString type_str = type_to_string(t);
+		gbString type_str = type_to_string(dst_t);
 		error(o->expr, "Cannot transmute '%s' to '%s', %lld vs %lld bytes", expr_str, type_str, srcz, dstz);
 		gb_string_free(type_str);
 		gb_string_free(expr_str);
@@ -2958,16 +2962,53 @@ bool check_transmute(CheckerContext *c, Ast *node, Operand *o, Type *t) {
 	}
 
 	if (build_context.vet_extra) {
-		if (are_types_identical(o->type, t)) {
-			gbString str = type_to_string(t);
+		if (are_types_identical(o->type, dst_t)) {
+			gbString str = type_to_string(dst_t);
 			warning(o->expr, "Unneeded transmute to the same type '%s'", str);
 			gb_string_free(str);
 		}
 	}
 
 	o->expr = node;
+	o->type = dst_t;
+	if (o->mode == Addressing_Constant) {
+		if (are_types_identical(src_bt, dst_bt)) {
+			return true;
+		}
+		if (is_type_integer(src_t) && is_type_integer(dst_t)) {
+			if (types_have_same_internal_endian(src_t, dst_t)) {
+				ExactValue src_v = exact_value_to_integer(o->value);
+				GB_ASSERT(src_v.kind == ExactValue_Integer);
+				BigInt v = src_v.value_integer;
+
+				BigInt smax = {};
+				BigInt umax = {};
+
+				big_int_from_u64(&smax, 0);
+				big_int_not(&smax, &smax, cast(i32)(srcz*8 - 1), false);
+
+				big_int_from_u64(&umax, 1);
+				BigInt sz_in_bits = big_int_make_i64(srcz*8);
+				big_int_shl_eq(&umax, &sz_in_bits);
+
+				if (is_type_unsigned(src_t) && !is_type_unsigned(dst_t)) {
+					if (big_int_cmp(&v, &smax) >= 0) {
+						big_int_sub_eq(&v, &umax);
+					}
+				} else if (!is_type_unsigned(src_t) && is_type_unsigned(dst_t)) {
+					if (big_int_is_neg(&v)) {
+						big_int_add_eq(&v, &umax);
+					}
+				}
+
+				o->value.kind = ExactValue_Integer;
+				o->value.value_integer = v;
+				return true;
+			}
+		}
+	}
+
 	o->mode = Addressing_Value;
-	o->type = t;
 	o->value = {};
 	return true;
 }
