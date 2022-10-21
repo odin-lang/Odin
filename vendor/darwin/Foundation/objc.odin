@@ -10,7 +10,7 @@ IMP :: proc "c" (object: id, sel: SEL, #c_vararg args: ..any) -> id
 foreign Foundation {
 	objc_lookUpClass       :: proc "c" (name: cstring) -> Class ---
 	sel_registerName       :: proc "c" (name: cstring) -> SEL ---
-	objc_allocateClassPair :: proc "c" (superclass: Class, name: cstring, extraBytes: uint) -> Class ---
+    objc_allocateClassPair :: proc "c" (superclass : Class, name : cstring, extraBytes : c.size_t) -> Class ---
 
 	class_addMethod :: proc "c" (cls: Class, name: SEL, imp: IMP, types: cstring) -> BOOL ---
 	class_getInstanceMethod :: proc "c" (cls: Class, name: SEL) -> Method ---
