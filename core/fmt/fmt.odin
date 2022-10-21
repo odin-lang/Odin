@@ -166,7 +166,7 @@ panicf :: proc(fmt: string, args: ..any, loc := #caller_location) -> ! {
 caprintf :: proc(format: string, args: ..any) -> cstring {
 	str: strings.Builder
 	strings.builder_init(&str)
-	fmt.sbprintf(&str, format, ..args)
+	sbprintf(&str, format, ..args)
 	strings.write_byte(&str, 0)
 	s := strings.to_string(str)
 	return cstring(raw_data(s))
@@ -176,7 +176,7 @@ caprintf :: proc(format: string, args: ..any) -> cstring {
 ctprintf :: proc(format: string, args: ..any) -> cstring {
 	str: strings.Builder
 	strings.builder_init(&str, context.temp_allocator)
-	fmt.sbprintf(&str, format, ..args)
+	sbprintf(&str, format, ..args)
 	strings.write_byte(&str, 0)
 	s := strings.to_string(str)
 	return cstring(raw_data(s))
