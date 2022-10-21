@@ -110,6 +110,7 @@ foreign glfw {
 	WaitEventsTimeout :: proc(timeout: f64) ---
 	PostEmptyEvent    :: proc() ---
 
+	RawMouseMotionSupported :: proc() -> b32 ---
 	GetInputMode :: proc(window: WindowHandle, mode: c.int) -> c.int ---
 	SetInputMode :: proc(window: WindowHandle, mode, value: c.int) ---
 
