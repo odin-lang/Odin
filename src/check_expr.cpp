@@ -821,11 +821,12 @@ i64 check_distance_between_types(CheckerContext *c, Operand *operand, Type *type
 		if (are_types_identical(src, dst)) {
 			return 5;
 		}
-
-		Type *dst_elem = base_array_type(dst);
-		i64 distance = check_distance_between_types(c, operand, dst_elem);
-		if (distance >= 0) {
-			return distance + 7;
+		if (dst->Matrix.row_count == dst->Matrix.column_count) {
+			Type *dst_elem = base_array_type(dst);
+			i64 distance = check_distance_between_types(c, operand, dst_elem);
+			if (distance >= 0) {
+				return distance + 7;
+			}
 		}
 	}
 
