@@ -30,7 +30,7 @@ foreign d3d11 {
 		DriverType:         DRIVER_TYPE,
 		Software:           HMODULE,
 		Flags:              CREATE_DEVICE_FLAGS,
-		pFeatureLevels:     ^FEATURE_LEVEL,
+		pFeatureLevels:     [^]FEATURE_LEVEL,
 		FeatureLevels:      u32,
 		SDKVersion:         u32,
 		ppDevice:           ^^IDevice,
@@ -41,8 +41,8 @@ foreign d3d11 {
 		pAdapter:           ^dxgi.IAdapter,
 		DriverType:         DRIVER_TYPE,
 		Software:           HMODULE,
-		Flags:              u32,
-		pFeatureLevels:     ^FEATURE_LEVEL,
+		Flags:              CREATE_DEVICE_FLAGS,
+		pFeatureLevels:     [^]FEATURE_LEVEL,
 		FeatureLevels:      u32,
 		SDKVersion:         u32,
 		pSwapChainDesc:     ^dxgi.SWAP_CHAIN_DESC,
@@ -539,24 +539,36 @@ ANISOTROPIC_FILTERING_BIT :: 0x40
 SDK_VERSION :: 7
 RETURN_PARAMETER_INDEX :: -1
 
-COMPONENT_MASK :: enum u32 { // TODO: make bit_set
+COMPONENT_MASK :: distinct bit_set[COMPONENT_MASK_ELEMENT; u32]
+COMPONENT_MASK_ELEMENT :: enum u32 {
 	X = 1,
 	Y = 2,
 	Z = 4,
 	W = 8,
 }
 
-SHADER_REQUIRES :: enum u32 { // TODO: make bit_set
-	DOUBLES                      = 0x00000001,
-	EARLY_DEPTH_STENCIL          = 0x00000002,
-	UAVS_AT_EVERY_STAGE          = 0x00000004,
-	_64_UAVS                     = 0x00000008,
-	MINIMUM_PRECISION            = 0x00000010,
-	_11_1_DOUBLE_EXTENSIONS      = 0x00000020,
-	_11_1_SHADER_EXTENSIONS      = 0x00000040,
-	LEVEL_9_COMPARISON_FILTERING = 0x00000080,
-	TILED_RESOURCES              = 0x00000100,
+SHADER_REQUIRES_FLAGS :: distinct bit_set[SHADER_REQUIRES_FLAG; u64]
+SHADER_REQUIRES_FLAG :: enum u64 {
+	DOUBLES                      = 0,
+	EARLY_DEPTH_STENCIL          = 1,
+	UAVS_AT_EVERY_STAGE          = 2,
+	_64_UAVS                     = 3,
+	MINIMUM_PRECISION            = 4,
+	_11_1_DOUBLE_EXTENSIONS      = 5,
+	_11_1_SHADER_EXTENSIONS      = 6,
+	LEVEL_9_COMPARISON_FILTERING = 7,
+	TILED_RESOURCES              = 8,
 }
+
+SHADER_REQUIRES_DOUBLES                      :: SHADER_REQUIRES_FLAGS{.DOUBLES}
+SHADER_REQUIRES_EARLY_DEPTH_STENCIL          :: SHADER_REQUIRES_FLAGS{.EARLY_DEPTH_STENCIL}
+SHADER_REQUIRES_UAVS_AT_EVERY_STAGE          :: SHADER_REQUIRES_FLAGS{.UAVS_AT_EVERY_STAGE}
+SHADER_REQUIRES_64_UAVS                      :: SHADER_REQUIRES_FLAGS{._64_UAVS}
+SHADER_REQUIRES_MINIMUM_PRECISION            :: SHADER_REQUIRES_FLAGS{.MINIMUM_PRECISION}
+SHADER_REQUIRES_11_1_DOUBLE_EXTENSIONS       :: SHADER_REQUIRES_FLAGS{._11_1_DOUBLE_EXTENSIONS}
+SHADER_REQUIRES_11_1_SHADER_EXTENSIONS       :: SHADER_REQUIRES_FLAGS{._11_1_SHADER_EXTENSIONS}
+SHADER_REQUIRES_LEVEL_9_COMPARISON_FILTERING :: SHADER_REQUIRES_FLAGS{.LEVEL_9_COMPARISON_FILTERING}
+SHADER_REQUIRES_TILED_RESOURCES              :: SHADER_REQUIRES_FLAGS{.TILED_RESOURCES}
 
 DRIVER_TYPE :: enum i32 {
 	UNKNOWN   = 0,
@@ -708,11 +720,12 @@ SHADER_VARIABLE_CLASS :: enum i32 {
 	INTERFACE_POINTER     = 7,
 }
 
-SHADER_VARIABLE_FLAGS :: enum u32 { // TODO: make bit_set
-	USERPACKED              = 0x1,
-	USED                    = 0x2,
-	INTERFACE_POINTER       = 0x4,
-	INTERFACE_PARAMETER     = 0x8,
+SHADER_VARIABLE_FLAGS :: distinct bit_set[SHADER_VARIABLE_FLAG; u32]
+SHADER_VARIABLE_FLAG :: enum u32 {
+	USERPACKED              = 0,
+	USED                    = 1,
+	INTERFACE_POINTER       = 2,
+	INTERFACE_PARAMETER     = 3,
 }
 
 SHADER_VARIABLE_TYPE :: enum i32 {
@@ -776,14 +789,21 @@ SHADER_VARIABLE_TYPE :: enum i32 {
 	MIN16UINT                     = 57,
 }
 
-SHADER_INPUT_FLAGS :: enum u32 { // TODO: make bit_set
-	USERPACKED          = 0x1,
-	COMPARISON_SAMPLER  = 0x2,
-	TEXTURE_COMPONENT_0 = 0x4,
-	TEXTURE_COMPONENT_1 = 0x8,
+SHADER_INPUT_FLAGS :: distinct bit_set[SHADER_INPUT_FLAG; u32]
+SHADER_INPUT_FLAG :: enum u32 {
+	USERPACKED          = 0,
+	COMPARISON_SAMPLER  = 1,
+	TEXTURE_COMPONENT_0 = 2,
+	TEXTURE_COMPONENT_1 = 3,
 	TEXTURE_COMPONENTS  = 0xc,
-	UNUSED              = 0x10,
+	UNUSED              = 4,
 }
+SHADER_INPUT_FLAG_USERPACKED          :: SHADER_INPUT_FLAGS{.USERPACKED}
+SHADER_INPUT_FLAG_COMPARISON_SAMPLER  :: SHADER_INPUT_FLAGS{.COMPARISON_SAMPLER}
+SHADER_INPUT_FLAG_TEXTURE_COMPONENT_0 :: SHADER_INPUT_FLAGS{.TEXTURE_COMPONENT_0}
+SHADER_INPUT_FLAG_TEXTURE_COMPONENT_1 :: SHADER_INPUT_FLAGS{.TEXTURE_COMPONENT_1}
+SHADER_INPUT_FLAG_TEXTURE_COMPONENTS  :: SHADER_INPUT_FLAGS{.TEXTURE_COMPONENT_0, .TEXTURE_COMPONENT_1}
+SHADER_INPUT_FLAG_UNUSED              :: SHADER_INPUT_FLAGS{.UNUSED}
 
 SHADER_INPUT_TYPE :: enum i32 {
 	CBUFFER                       = 0,
@@ -802,8 +822,9 @@ SHADER_INPUT_TYPE :: enum i32 {
 	UAV_FEEDBACKTEXTURE           = 13,
 }
 
-SHADER_CBUFFER_FLAGS :: enum u32 { // TODO: make bit_set
-	USERPACKED = 0x1,
+SHADER_CBUFFER_FLAGS :: distinct bit_set[SHADER_CBUFFER_FLAG; u32]
+SHADER_CBUFFER_FLAG :: enum u32 {
+	USERPACKED = 0,
 }
 
 CBUFFER_TYPE :: enum i32 {
@@ -906,10 +927,10 @@ INTERPOLATION_MODE :: enum i32 {
 	LINEAR_NOPERSPECTIVE_SAMPLE   = 7,
 }
 
-PARAMETER_FLAGS :: enum u32 { // TODO: make bit_set
-	NONE = 0x0,
-	IN   = 0x1,
-	OUT  = 0x2,
+PARAMETER_FLAGS :: distinct bit_set[PARAMETER_FLAG; u32]
+PARAMETER_FLAG :: enum u32 {
+	IN   = 0,
+	OUT  = 1,
 }
 
 CDEFAULT :: struct {
@@ -1022,43 +1043,46 @@ USAGE :: enum i32 {
 	STAGING   = 3,
 }
 
-BIND_FLAG :: enum u32 { // TODO: make bit_set
-	VERTEX_BUFFER    = 0x1,
-	INDEX_BUFFER     = 0x2,
-	CONSTANT_BUFFER  = 0x4,
-	SHADER_RESOURCE  = 0x8,
-	STREAM_OUTPUT    = 0x10,
-	RENDER_TARGET    = 0x20,
-	DEPTH_STENCIL    = 0x40,
-	UNORDERED_ACCESS = 0x80,
-	DECODER          = 0x200,
-	VIDEO_ENCODER    = 0x400,
+BIND_FLAGS :: distinct bit_set[BIND_FLAG; u32]
+BIND_FLAG :: enum u32 {
+	VERTEX_BUFFER    = 0,
+	INDEX_BUFFER     = 1,
+	CONSTANT_BUFFER  = 2,
+	SHADER_RESOURCE  = 3,
+	STREAM_OUTPUT    = 4,
+	RENDER_TARGET    = 5,
+	DEPTH_STENCIL    = 6,
+	UNORDERED_ACCESS = 7,
+	DECODER          = 9,
+	VIDEO_ENCODER    = 10,
 }
 
-CPU_ACCESS_FLAG :: enum u32 { // TODO: make bit_set
-	WRITE = 0x10000,
-	READ  = 0x20000,
+CPU_ACCESS_FLAGS :: distinct bit_set[CPU_ACCESS_FLAG; u32]
+CPU_ACCESS_FLAG :: enum u32 {
+	WRITE = 16,
+	READ  = 17,
 
 }
 
-RESOURCE_MISC_FLAG :: enum u32 { // TODO: make bit_set
-	GENERATE_MIPS                   = 0x1,
-	SHARED                          = 0x2,
-	TEXTURECUBE                     = 0x4,
-	DRAWINDIRECT_ARGS               = 0x10,
-	BUFFER_ALLOW_RAW_VIEWS          = 0x20,
-	BUFFER_STRUCTURED               = 0x40,
-	RESOURCE_CLAMP                  = 0x80,
-	SHARED_KEYEDMUTEX               = 0x100,
-	GDI_COMPATIBLE                  = 0x200,
-	SHARED_NTHANDLE                 = 0x800,
-	RESTRICTED_CONTENT              = 0x1000,
-	RESTRICT_SHARED_RESOURCE        = 0x2000,
-	RESTRICT_SHARED_RESOURCE_DRIVER = 0x4000,
-	GUARDED                         = 0x8000,
-	TILE_POOL                       = 0x20000,
-	TILED                           = 0x40000,
-	HW_PROTECTED                    = 0x80000,
+RESOURCE_MISC_FLAGS :: distinct bit_set[RESOURCE_MISC_FLAG; u32]
+RESOURCE_MISC_FLAG :: enum u32 {
+	GENERATE_MIPS                   = 0,
+	SHARED                          = 1,
+	TEXTURECUBE                     = 2,
+	DRAWINDIRECT_ARGS               = 4,
+	BUFFER_ALLOW_RAW_VIEWS          = 5,
+	BUFFER_STRUCTURED               = 6,
+	RESOURCE_CLAMP                  = 7,
+	SHARED_KEYEDMUTEX               = 8,
+	GDI_COMPATIBLE                  = 9,
+	SHARED_NTHANDLE                 = 11,
+	RESTRICTED_CONTENT              = 12,
+	RESTRICT_SHARED_RESOURCE        = 13,
+	RESTRICT_SHARED_RESOURCE_DRIVER = 14,
+	GUARDED                         = 15,
+	TILE_POOL                       = 17,
+	TILED                           = 18,
+	HW_PROTECTED                    = 19,
 }
 
 MAP :: enum i32 {
@@ -1069,17 +1093,20 @@ MAP :: enum i32 {
 	WRITE_NO_OVERWRITE = 5,
 }
 
-MAP_FLAG :: enum u32 { // TODO: make bit_set
-	DO_NOT_WAIT = 0x100000,
+MAP_FLAGS :: distinct bit_set[MAP_FLAG; u32]
+MAP_FLAG :: enum u32 {
+	DO_NOT_WAIT = 20,
 }
 
-RAISE_FLAG :: enum u32 { // TODO: make bit_set
-	DRIVER_INTERNAL_ERROR = 0x1,
+RAISE_FLAGS :: distinct bit_set[RAISE_FLAG; u32]
+RAISE_FLAG :: enum u32 {
+	DRIVER_INTERNAL_ERROR = 0,
 }
 
-CLEAR_FLAG :: enum u32 { // TODO: make bit_set
-	DEPTH   = 0x1,
-	STENCIL = 0x2,
+CLEAR_FLAGS :: distinct bit_set[CLEAR_FLAG; u32]
+CLEAR_FLAG :: enum u32 {
+	DEPTH   = 0,
+	STENCIL = 1,
 }
 
 
@@ -1206,7 +1233,15 @@ BLEND_OP :: enum i32 {
 	MAX          = 5,
 }
 
-COLOR_WRITE_ENABLE :: enum i32 { // TODO: make bit_set
+COLOR_WRITE_ENABLE_MASK   :: distinct bit_set[COLOR_WRITE_ENABLE; u32]
+
+COLOR_WRITE_ENABLE_RED   :: COLOR_WRITE_ENABLE_MASK{.RED}
+COLOR_WRITE_ENABLE_GREEN :: COLOR_WRITE_ENABLE_MASK{.GREEN}
+COLOR_WRITE_ENABLE_BLUE  :: COLOR_WRITE_ENABLE_MASK{.BLUE}
+COLOR_WRITE_ENABLE_ALPHA :: COLOR_WRITE_ENABLE_MASK{.ALPHA}
+COLOR_WRITE_ENABLE_ALL   :: COLOR_WRITE_ENABLE_MASK{.RED, .GREEN, .BLUE, .ALPHA}
+
+COLOR_WRITE_ENABLE :: enum i32 {
 	RED   = 1,
 	GREEN = 2,
 	BLUE  = 4,
@@ -1308,9 +1343,9 @@ IResource_VTable :: struct {
 BUFFER_DESC :: struct {
 	ByteWidth:           u32,
 	Usage:               USAGE,
-	BindFlags:           BIND_FLAG,
-	CPUAccessFlags:      CPU_ACCESS_FLAG,
-	MiscFlags:           RESOURCE_MISC_FLAG,
+	BindFlags:           BIND_FLAGS,
+	CPUAccessFlags:      CPU_ACCESS_FLAGS,
+	MiscFlags:           RESOURCE_MISC_FLAGS,
 	StructureByteStride: u32,
 }
 
@@ -1337,9 +1372,9 @@ TEXTURE1D_DESC :: struct {
 	ArraySize:      u32,
 	Format:         dxgi.FORMAT,
 	Usage:          USAGE,
-	BindFlags:      BIND_FLAG,
-	CPUAccessFlags: CPU_ACCESS_FLAG,
-	MiscFlags:      RESOURCE_MISC_FLAG,
+	BindFlags:      BIND_FLAGS,
+	CPUAccessFlags: CPU_ACCESS_FLAGS,
+	MiscFlags:      RESOURCE_MISC_FLAGS,
 }
 
 CTEXTURE1D_DESC :: struct {
@@ -1367,9 +1402,9 @@ TEXTURE2D_DESC :: struct {
 	Format:         dxgi.FORMAT,
 	SampleDesc:     dxgi.SAMPLE_DESC,
 	Usage:          USAGE,
-	BindFlags:      BIND_FLAG,
-	CPUAccessFlags: CPU_ACCESS_FLAG,
-	MiscFlags:      RESOURCE_MISC_FLAG,
+	BindFlags:      BIND_FLAGS,
+	CPUAccessFlags: CPU_ACCESS_FLAGS,
+	MiscFlags:      RESOURCE_MISC_FLAGS,
 }
 
 CTEXTURE2D_DESC :: struct {
@@ -1396,9 +1431,9 @@ TEXTURE3D_DESC :: struct {
 	MipLevels:      u32,
 	Format:         dxgi.FORMAT,
 	Usage:          USAGE,
-	BindFlags:      BIND_FLAG,
-	CPUAccessFlags: CPU_ACCESS_FLAG,
-	MiscFlags:      RESOURCE_MISC_FLAG,
+	BindFlags:      BIND_FLAGS,
+	CPUAccessFlags: CPU_ACCESS_FLAGS,
+	MiscFlags:      RESOURCE_MISC_FLAGS,
 }
 
 CTEXTURE3D_DESC :: struct {
@@ -1451,14 +1486,15 @@ BUFFER_SRV :: struct {
 	},
 }
 
-BUFFEREX_SRV_FLAG :: enum u32 { // TODO: make bit_set
-	RAW = 0x1,
+BUFFEREX_SRV_FLAGS :: distinct bit_set[BUFFEREX_SRV_FLAG; u32]
+BUFFEREX_SRV_FLAG :: enum u32 {
+	RAW = 0,
 }
 
 BUFFEREX_SRV :: struct {
 	FirstElement: u32,
 	NumElements:  u32,
-	Flags:        u32,
+	Flags:        BUFFEREX_SRV_FLAGS,
 }
 
 TEX1D_SRV :: struct {
@@ -1657,15 +1693,16 @@ TEX2DMS_ARRAY_DSV :: struct {
 	ArraySize:       u32,
 }
 
-DSV_FLAG :: enum u32 { // TODO: make bit_set
-	DEPTH   = 0x1,
-	STENCIL = 0x2,
+DSV_FLAGS :: distinct bit_set[DSV_FLAG; u32]
+DSV_FLAG :: enum u32 {
+	DEPTH   = 0,
+	STENCIL = 1,
 }
 
 DEPTH_STENCIL_VIEW_DESC :: struct {
 	Format:        dxgi.FORMAT,
 	ViewDimension: DSV_DIMENSION,
-	Flags:         u32,
+	Flags:         DSV_FLAGS,
 	using _: struct #raw_union {
 		Texture1D:        TEX1D_DSV,
 		Texture1DArray:   TEX1D_ARRAY_DSV,
@@ -1693,16 +1730,17 @@ IDepthStencilView_VTable :: struct {
 }
 
 
-BUFFER_UAV_FLAG :: enum u32 { // TODO: make bit_set
-	RAW     = 0x1,
-	APPEND  = 0x2,
-	COUNTER = 0x4,
+BUFFER_UAV_FLAGS :: distinct bit_set[BUFFER_UAV_FLAG; u32]
+BUFFER_UAV_FLAG :: enum u32 {
+	RAW     = 0,
+	APPEND  = 1,
+	COUNTER = 2,
 }
 
 BUFFER_UAV :: struct {
 	FirstElement: u32,
 	NumElements:  u32,
-	Flags:        u32,
+	Flags:        BUFFER_UAV_FLAGS,
 }
 
 TEX1D_UAV :: struct {
@@ -1961,8 +1999,9 @@ IAsynchronous_VTable :: struct {
 }
 
 
-ASYNC_GETDATA_FLAG :: enum u32 { // TODO: make bit_set
-	DONOTFLUSH = 0x1,
+ASYNC_GETDATA_FLAGS :: distinct bit_set[ASYNC_GETDATA_FLAG; u32]
+ASYNC_GETDATA_FLAG :: enum u32 {
+	DONOTFLUSH = 0,
 }
 
 QUERY :: enum i32 {
@@ -1984,13 +2023,14 @@ QUERY :: enum i32 {
 	SO_OVERFLOW_PREDICATE_STREAM3 = 15,
 }
 
-QUERY_MISC_FLAG :: enum u32 { // TODO: make bit_set
-	QUERY_MISC_PREDICATEHINT = 0x1,
+QUERY_MISC_FLAGS :: distinct bit_set[QUERY_MISC_FLAG; u32]
+QUERY_MISC_FLAG :: enum u32 {
+	PREDICATEHINT = 0,
 }
 
 QUERY_DESC :: struct {
 	Query:     QUERY,
-	MiscFlags: RESOURCE_MISC_FLAG,
+	MiscFlags: QUERY_MISC_FLAGS,
 }
 
 CQUERY_DESC :: struct {
@@ -2054,7 +2094,7 @@ COUNTER_TYPE :: enum i32 {
 
 COUNTER_DESC :: struct {
 	Counter:   COUNTER,
-	MiscFlags: RESOURCE_MISC_FLAG,
+	MiscFlags: RESOURCE_MISC_FLAGS,
 }
 
 CCOUNTER_DESC :: struct {
@@ -2150,21 +2190,21 @@ FEATURE :: enum i32 {
 	FORMAT_SUPPORT                 = 2,
 	FORMAT_SUPPORT2                = 3,
 	D3D10_X_HARDWARE_OPTIONS       = 4,
-	OPTIONS                  = 5,
+	OPTIONS                        = 5,
 	ARCHITECTURE_INFO              = 6,
 	D3D9_OPTIONS                   = 7,
 	SHADER_MIN_PRECISION_SUPPORT   = 8,
 	D3D9_SHADOW_SUPPORT            = 9,
-	OPTIONS1                 = 10,
+	OPTIONS1                       = 10,
 	D3D9_SIMPLE_INSTANCING_SUPPORT = 11,
 	MARKER_SUPPORT                 = 12,
 	D3D9_OPTIONS1                  = 13,
-	OPTIONS2                 = 14,
-	OPTIONS3                 = 15,
+	OPTIONS2                       = 14,
+	OPTIONS3                       = 15,
 	GPU_VIRTUAL_ADDRESS_SUPPORT    = 16,
-	OPTIONS4                 = 17,
+	OPTIONS4                       = 17,
 	SHADER_CACHE                   = 18,
-	OPTIONS5                 = 19,
+	OPTIONS5                       = 19,
 }
 
 FEATURE_DATA_THREADING :: struct {
@@ -2285,14 +2325,14 @@ FEATURE_DATA_GPU_VIRTUAL_ADDRESS_SUPPORT :: struct {
 	MaxGPUVirtualAddressBitsPerProcess:  u32,
 }
 
-SHADER_CACHE_SUPPORT_FLAGS :: enum u32 { // TODO: make bit_set
-	NONE                   = 0x0,
-	AUTOMATIC_INPROC_CACHE = 0x1,
-	AUTOMATIC_DISK_CACHE   = 0x2,
+SHADER_CACHE_SUPPORT_FLAGS :: distinct bit_set[SHADER_CACHE_SUPPORT_FLAG; u32]
+SHADER_CACHE_SUPPORT_FLAG :: enum u32 {
+	AUTOMATIC_INPROC_CACHE = 0,
+	AUTOMATIC_DISK_CACHE   = 1,
 }
 
 FEATURE_DATA_SHADER_CACHE :: struct {
-	SupportFlags: u32,
+	SupportFlags: SHADER_CACHE_SUPPORT_FLAGS,
 }
 
 SHARED_RESOURCE_TIER :: enum i32 {
@@ -2322,7 +2362,7 @@ IDeviceContext_VTable :: struct {
 	VSSetShader:                               proc "stdcall" (this: ^IDeviceContext, pVertexShader: ^IVertexShader, ppClassInstances: ^^IClassInstance, NumClassInstances: u32),
 	DrawIndexed:                               proc "stdcall" (this: ^IDeviceContext, IndexCount: u32, StartIndexLocation: u32, BaseVertexLocation: i32),
 	Draw:                                      proc "stdcall" (this: ^IDeviceContext, VertexCount: u32, StartVertexLocation: u32),
-	Map:                                       proc "stdcall" (this: ^IDeviceContext, pResource: ^IResource, Subresource: u32, MapType: MAP, MapFlags: u32, pMappedResource: ^MAPPED_SUBRESOURCE) -> HRESULT,
+	Map:                                       proc "stdcall" (this: ^IDeviceContext, pResource: ^IResource, Subresource: u32, MapType: MAP, MapFlags: MAP_FLAGS, pMappedResource: ^MAPPED_SUBRESOURCE) -> HRESULT,
 	Unmap:                                     proc "stdcall" (this: ^IDeviceContext, pResource: ^IResource, Subresource: u32),
 	PSSetConstantBuffers:                      proc "stdcall" (this: ^IDeviceContext, StartSlot: u32, NumBuffers: u32, ppConstantBuffers: ^^IBuffer),
 	IASetInputLayout:                          proc "stdcall" (this: ^IDeviceContext, pInputLayout: ^IInputLayout),
@@ -2343,7 +2383,7 @@ IDeviceContext_VTable :: struct {
 	GSSetSamplers:                             proc "stdcall" (this: ^IDeviceContext, StartSlot: u32, NumSamplers: u32, ppSamplers: ^^ISamplerState),
 	OMSetRenderTargets:                        proc "stdcall" (this: ^IDeviceContext, NumViews: u32, ppRenderTargetViews: ^^IRenderTargetView, pDepthStencilView: ^IDepthStencilView),
 	OMSetRenderTargetsAndUnorderedAccessViews: proc "stdcall" (this: ^IDeviceContext, NumRTVs: u32, ppRenderTargetViews: ^^IRenderTargetView, pDepthStencilView: ^IDepthStencilView, UAVStartSlot: u32, NumUAVs: u32, ppUnorderedAccessViews: ^^IUnorderedAccessView, pUAVInitialCounts: ^u32),
-	OMSetBlendState:                           proc "stdcall" (this: ^IDeviceContext, pBlendState: ^IBlendState, BlendFactor: ^[4]f32, SampleMask: u32),
+	OMSetBlendState:                           proc "stdcall" (this: ^IDeviceContext, pBlendState: ^IBlendState, BlendFactor: ^[4]f32, SampleMask: COLOR_WRITE_ENABLE_MASK),
 	OMSetDepthStencilState:                    proc "stdcall" (this: ^IDeviceContext, pDepthStencilState: ^IDepthStencilState, StencilRef: u32),
 	SOSetTargets:                              proc "stdcall" (this: ^IDeviceContext, NumBuffers: u32, ppSOTargets: ^^IBuffer, pOffsets: ^u32),
 	DrawAuto:                                  proc "stdcall" (this: ^IDeviceContext),
@@ -2399,7 +2439,7 @@ IDeviceContext_VTable :: struct {
 	GSGetSamplers:                             proc "stdcall" (this: ^IDeviceContext, StartSlot: u32, NumSamplers: u32, ppSamplers: ^^ISamplerState),
 	OMGetRenderTargets:                        proc "stdcall" (this: ^IDeviceContext, NumViews: u32, ppRenderTargetViews: ^^IRenderTargetView, ppDepthStencilView: ^^IDepthStencilView),
 	OMGetRenderTargetsAndUnorderedAccessViews: proc "stdcall" (this: ^IDeviceContext, NumRTVs: u32, ppRenderTargetViews: ^^IRenderTargetView, ppDepthStencilView: ^^IDepthStencilView, UAVStartSlot: u32, NumUAVs: u32, ppUnorderedAccessViews: ^^IUnorderedAccessView),
-	OMGetBlendState:                           proc "stdcall" (this: ^IDeviceContext, ppBlendState: ^^IBlendState, BlendFactor: ^[4]f32, pSampleMask: ^u32),
+	OMGetBlendState:                           proc "stdcall" (this: ^IDeviceContext, ppBlendState: ^^IBlendState, BlendFactor: ^[4]f32, pSampleMask: ^COLOR_WRITE_ENABLE_MASK),
 	OMGetDepthStencilState:                    proc "stdcall" (this: ^IDeviceContext, ppDepthStencilState: ^^IDepthStencilState, pStencilRef: ^u32),
 	SOGetTargets:                              proc "stdcall" (this: ^IDeviceContext, NumBuffers: u32, ppSOTargets: ^^IBuffer),
 	RSGetState:                                proc "stdcall" (this: ^IDeviceContext, ppRasterizerState: ^^IRasterizerState),
@@ -3315,13 +3355,13 @@ IDevice_VTable :: struct {
 	GetCreationFlags:                     proc "stdcall" (this: ^IDevice) -> u32,
 	GetDeviceRemovedReason:               proc "stdcall" (this: ^IDevice) -> HRESULT,
 	GetImmediateContext:                  proc "stdcall" (this: ^IDevice, ppImmediateContext: ^^IDeviceContext),
-	SetExceptionMode:                     proc "stdcall" (this: ^IDevice, RaiseFlags: u32) -> HRESULT,
+	SetExceptionMode:                     proc "stdcall" (this: ^IDevice, RaiseFlags: RAISE_FLAGS) -> HRESULT,
 	GetExceptionMode:                     proc "stdcall" (this: ^IDevice) -> u32,
 }
 
 
 CREATE_DEVICE_FLAGS :: distinct bit_set[CREATE_DEVICE_FLAG; u32]
-CREATE_DEVICE_FLAG :: enum u32 { // TODO: make bit_set
+CREATE_DEVICE_FLAG :: enum u32 {
 	SINGLETHREADED                                = 0,
 	DEBUG                                         = 1,
 	SWITCH_TO_REF                                 = 2,
@@ -3367,14 +3407,14 @@ SHADER_BUFFER_DESC :: struct {
 	Type:      CBUFFER_TYPE,
 	Variables: u32,
 	Size:      u32,
-	uFlags:    u32,
+	uFlags:    SHADER_CBUFFER_FLAGS,
 }
 
 SHADER_VARIABLE_DESC :: struct {
 	Name:         cstring,
 	StartOffset:  u32,
 	Size:         u32,
-	uFlags:       u32,
+	uFlags:       SHADER_VARIABLE_FLAGS,
 	DefaultValue: rawptr,
 	StartTexture: u32,
 	TextureSize:  u32,
@@ -3443,7 +3483,7 @@ SHADER_INPUT_BIND_DESC :: struct {
 	BindPoint:  u32,
 	BindCount:  u32,
 
-	uFlags:     u32,
+	uFlags:     SHADER_INPUT_FLAGS,
 	ReturnType: RESOURCE_RETURN_TYPE,
 	Dimension:  SRV_DIMENSION,
 	NumSamples: u32,
@@ -3485,7 +3525,7 @@ FUNCTION_DESC :: struct {
 	ConversionInstructionCount:  u32,
 	BitwiseInstructionCount:     u32,
 	MinFeatureLevel:             FEATURE_LEVEL,
-	RequiredFeatureFlags:        u64,
+	RequiredFeatureFlags:        SHADER_REQUIRES_FLAGS,
 
 	Name:                        cstring,
 	FunctionParameterCount:      i32,
@@ -3571,7 +3611,7 @@ IShaderReflection_VTable :: struct {
 	GetNumInterfaceSlots:          proc "stdcall" (this: ^IShaderReflection) -> u32,
 	GetMinFeatureLevel:            proc "stdcall" (this: ^IShaderReflection, pLevel: ^FEATURE_LEVEL) -> HRESULT,
 	GetThreadGroupSize:            proc "stdcall" (this: ^IShaderReflection, pSizeX: ^u32, pSizeY: ^u32, pSizeZ: ^u32) -> u32,
-	GetRequiresFlags:              proc "stdcall" (this: ^IShaderReflection) -> u64,
+	GetRequiresFlags:              proc "stdcall" (this: ^IShaderReflection) -> SHADER_REQUIRES_FLAGS,
 }
 
 
@@ -3634,22 +3674,24 @@ IDebug :: struct #raw_union {
 	using id3d11debug_vtable: ^IDebug_VTable,
 }
 
-RLDO_FLAGS :: enum u32 { // TODO: make bit_set
-	SUMMARY = 0x1,
-	DETAIL = 0x2,
-	IGNORE_INTERNAL = 0x4,
+RLDO_FLAGS :: distinct bit_set[RLDO_FLAG; u32]
+RLDO_FLAG :: enum u32 {
+	SUMMARY = 0,
+	DETAIL = 1,
+	IGNORE_INTERNAL = 2,
 }
 
-DEBUG_FEATURE :: enum u32 { // TODO: make bit_set
-	FLUSH_PER_RENDER_OP = 0x1,
-	FINISH_PER_RENDER_OP = 0x2,
-	FEATURE_PRESENT_PER_RENDER_OP = 0x4,
+DEBUG_FEATURES :: distinct bit_set[DEBUG_FEATURE; u32]
+DEBUG_FEATURE :: enum u32 {
+	FLUSH_PER_RENDER_OP = 0,
+	FINISH_PER_RENDER_OP = 1,
+	FEATURE_PRESENT_PER_RENDER_OP = 2,
 }
 
 IDebug_VTable :: struct {
 	using iunkown_vtable: IUnknown_VTable,
-	SetFeatureMask:             proc "stdcall" (this: ^IDebug, mask: DEBUG_FEATURE) -> HRESULT,
-	GetFeatureMask:             proc "stdcall" (this: ^IDebug) -> DEBUG_FEATURE,
+	SetFeatureMask:             proc "stdcall" (this: ^IDebug, mask: DEBUG_FEATURES) -> HRESULT,
+	GetFeatureMask:             proc "stdcall" (this: ^IDebug) -> DEBUG_FEATURES,
 	SetPresentPerRenderOpDelay: proc "stdcall" (this: ^IDebug, Milliseconds: u32) -> HRESULT,
 	GetPresentPerRenderOpDelay: proc "stdcall" (this: ^IDebug) -> u32,
 	SetSwapChain:               proc "stdcall" (this: ^IDebug, pSwapChain: ^dxgi.ISwapChain) -> HRESULT,
@@ -3667,7 +3709,7 @@ IInfoQueue :: struct #raw_union {
 	using id3d11infoqueue_vtable: ^IInfoQueue_VTable,
 }
 
-MESSAGE_SEVERITY :: enum u32 { // TODO: make bit_set
+MESSAGE_SEVERITY :: enum u32 {
 	CORRUPTION = 0,
 	ERROR,
 	WARNING,
@@ -3675,7 +3717,7 @@ MESSAGE_SEVERITY :: enum u32 { // TODO: make bit_set
 	MESSAGE, // Not supported until D3D 11.1
 }
 
-MESSAGE_CATEGORY :: enum u32 { // TODO: make bit_set
+MESSAGE_CATEGORY :: enum u32 {
 	APPLICATION_DEFINED = 0,
 	MISCELLANEOUS,
 	INITIALIZATION,
@@ -3750,7 +3792,7 @@ IInfoQueue_VTable :: struct {
 	SetMuteDebugOutput:                           proc "stdcall" (this: ^IInfoQueue, bMute: BOOL),
 }
 
-MESSAGE_ID :: enum u32 { // TODO: make bit_set
+MESSAGE_ID :: enum u32 {
 	UNKNOWN = 0,
 	DEVICE_IASETVERTEXBUFFERS_HAZARD,
 	DEVICE_IASETINDEXBUFFER_HAZARD,
