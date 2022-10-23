@@ -1533,10 +1533,10 @@ bool check_builtin_procedure_directive(CheckerContext *c, Operand *operand, Ast 
 		}
 
 		bool is_defined = check_identifier_exists(c->scope, arg);
-		gb_unused(is_defined);
+		// gb_unused(is_defined);
 		operand->type = t_untyped_bool;
 		operand->mode = Addressing_Constant;
-		operand->value = exact_value_bool(false);
+		operand->value = exact_value_bool(is_defined);
 
 	} else if (name == "config") {
 		if (ce->args.count != 2) {
