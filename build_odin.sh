@@ -134,6 +134,14 @@ run_demo() {
 	./odin run examples/demo/demo.odin -file
 }
 
+have_which() {
+	if ! which which > /dev/null 2>&1; then
+		panic "Could not find \`which\`"
+	fi
+}
+
+have_which
+
 case $OS in
 Linux)
 	config_linux
