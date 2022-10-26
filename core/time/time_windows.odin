@@ -7,9 +7,16 @@ _IS_SUPPORTED :: true
 
 _now :: proc "contextless" () -> Time {
 	file_time: win32.FILETIME
-	win32.GetSystemTimeAsFileTime(&file_time)
-	ns := win32.FILETIME_as_unix_nanoseconds(file_time)
-	return Time{_nsec=ns}
+
+	ns: i64
+
+	// monotonic
+	win32.GetSystemTimePreciseAsFileTime(&file_time)
+
+	dt := u64(transmute(u64le)file_time) // in 100ns units
+	ns = i64((dt - 116444736000000000) * 100) // convert to ns
+
+	return unix(0, ns)
 }
 
 _sleep :: proc "contextless" (d: Duration) {

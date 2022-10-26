@@ -10,9 +10,13 @@ test_parse_float :: proc(t: ^testing.T) {
 	{
 		f, ok := strconv.parse_f64("1.2")
 		testing.expect(t, ok && f == 1.2, "expected f64(1.2), fully consumed")
-
 		f, ok = strconv.parse_f64("1.2a")
 		testing.expect(t, !ok && f == 1.2, "expected f64(1.2), partially consumed")
+		f, ok = strconv.parse_f64("+")
+		testing.expect(t, !ok && f == 0.0, "expected f64(0.0), with ok=false")
+		f, ok = strconv.parse_f64("-")
+		testing.expect(t, !ok && f == 0.0, "expected f64(0.0), with ok=false")
+
 
 		f, ok = strconv.parse_f64("inf")
 		testing.expect(t, ok && math.classify(f) == math.Float_Class.Inf, "expected f64(+inf), fully consumed")

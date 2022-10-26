@@ -182,3 +182,12 @@ shuffle :: proc(array: $T/[]$E, r: ^Rand = nil) {
 		array[i], array[j] = array[j], array[i]
 	}
 }
+
+// Returns a random element from the given slice
+choice :: proc(array: $T/[]$E, r: ^Rand = nil) -> (res: E) {
+	n := i64(len(array))
+	if n < 1 {
+		return E{}
+	}
+	return array[int63_max(n, r)]
+}
