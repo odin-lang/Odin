@@ -975,7 +975,7 @@ fmt_string :: proc(fi: ^Info, s: string, verb: rune) {
 				}
 			}
 			else {
-				io.write_string(fi.writer, s[:fi.width], &fi.n)
+				io.write_string(fi.writer, s, &fi.n)
 			}
 		}
 		else
