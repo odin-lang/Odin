@@ -2267,8 +2267,9 @@ FILETIME :: struct {
 
 FILETIME_as_unix_nanoseconds :: proc "contextless" (ft: FILETIME) -> i64 {
 	t := i64(u64(ft.dwLowDateTime) | u64(ft.dwHighDateTime) << 32)
-	return (t - 0x019db1ded53e8000) * 100
+	return (t - 116444736000000000) * 100
 }
+
 
 OVERLAPPED :: struct {
 	Internal: ^c_ulong,
@@ -2941,6 +2942,16 @@ SYSTEMTIME :: struct {
 	minute:       WORD,
 	second:       WORD,
 	milliseconds: WORD,
+}
+
+TIME_ZONE_INFORMATION :: struct {
+	Bias:         LONG,
+	StandardName: [32]WCHAR,
+	StandardDate: SYSTEMTIME,
+	StandardBias: LONG,
+	DaylightName: [32]WCHAR,
+	DaylightDate: SYSTEMTIME,
+	DaylightBias: LONG,
 }
 
 

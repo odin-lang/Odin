@@ -41,9 +41,7 @@ read_dir :: proc(fd: Handle, n: int, allocator := context.allocator) -> (fi: []F
 			// fi.mode |= file_type_mode(h);
 		}
 
-		fi.creation_time     = time.unix(0, win32.FILETIME_as_unix_nanoseconds(d.ftCreationTime))
-		fi.modification_time = time.unix(0, win32.FILETIME_as_unix_nanoseconds(d.ftLastWriteTime))
-		fi.access_time       = time.unix(0, win32.FILETIME_as_unix_nanoseconds(d.ftLastAccessTime))
+		window_set_file_info_times(&fi, d)
 
 		fi.is_dir = fi.mode & File_Mode_Dir != 0
 		return
