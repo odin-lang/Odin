@@ -533,6 +533,7 @@ DeviceMemoryReportCallbackEXT:        ProcDeviceMemoryReportCallbackEXT
 EnumerateInstanceExtensionProperties: ProcEnumerateInstanceExtensionProperties
 EnumerateInstanceLayerProperties:     ProcEnumerateInstanceLayerProperties
 EnumerateInstanceVersion:             ProcEnumerateInstanceVersion
+GetInstanceProcAddr:                  ProcGetInstanceProcAddr
 
 // Instance Procedures
 AcquireDrmDisplayEXT:                                            ProcAcquireDrmDisplayEXT
@@ -564,7 +565,6 @@ GetDisplayPlaneCapabilities2KHR:                                 ProcGetDisplayP
 GetDisplayPlaneCapabilitiesKHR:                                  ProcGetDisplayPlaneCapabilitiesKHR
 GetDisplayPlaneSupportedDisplaysKHR:                             ProcGetDisplayPlaneSupportedDisplaysKHR
 GetDrmDisplayEXT:                                                ProcGetDrmDisplayEXT
-GetInstanceProcAddr:                                             ProcGetInstanceProcAddr
 GetPhysicalDeviceCalibrateableTimeDomainsEXT:                    ProcGetPhysicalDeviceCalibrateableTimeDomainsEXT
 GetPhysicalDeviceCooperativeMatrixPropertiesNV:                  ProcGetPhysicalDeviceCooperativeMatrixPropertiesNV
 GetPhysicalDeviceDisplayPlaneProperties2KHR:                     ProcGetPhysicalDeviceDisplayPlaneProperties2KHR
@@ -1045,6 +1045,7 @@ load_proc_addresses_custom :: proc(set_proc_address: SetProcAddressType) {
 	set_proc_address(&EnumerateInstanceExtensionProperties, "vkEnumerateInstanceExtensionProperties")
 	set_proc_address(&EnumerateInstanceLayerProperties,     "vkEnumerateInstanceLayerProperties")
 	set_proc_address(&EnumerateInstanceVersion,             "vkEnumerateInstanceVersion")
+	set_proc_address(&GetInstanceProcAddr,                  "vkGetInstanceProcAddr")
 
 	// Instance Procedures
 	set_proc_address(&AcquireDrmDisplayEXT,                                            "vkAcquireDrmDisplayEXT")
@@ -1076,7 +1077,6 @@ load_proc_addresses_custom :: proc(set_proc_address: SetProcAddressType) {
 	set_proc_address(&GetDisplayPlaneCapabilitiesKHR,                                  "vkGetDisplayPlaneCapabilitiesKHR")
 	set_proc_address(&GetDisplayPlaneSupportedDisplaysKHR,                             "vkGetDisplayPlaneSupportedDisplaysKHR")
 	set_proc_address(&GetDrmDisplayEXT,                                                "vkGetDrmDisplayEXT")
-	set_proc_address(&GetInstanceProcAddr,                                             "vkGetInstanceProcAddr")
 	set_proc_address(&GetPhysicalDeviceCalibrateableTimeDomainsEXT,                    "vkGetPhysicalDeviceCalibrateableTimeDomainsEXT")
 	set_proc_address(&GetPhysicalDeviceCooperativeMatrixPropertiesNV,                  "vkGetPhysicalDeviceCooperativeMatrixPropertiesNV")
 	set_proc_address(&GetPhysicalDeviceDisplayPlaneProperties2KHR,                     "vkGetPhysicalDeviceDisplayPlaneProperties2KHR")
@@ -2839,7 +2839,6 @@ load_proc_addresses_instance :: proc(instance: Instance) {
 	GetDisplayPlaneCapabilitiesKHR                                  = auto_cast GetInstanceProcAddr(instance, "vkGetDisplayPlaneCapabilitiesKHR")
 	GetDisplayPlaneSupportedDisplaysKHR                             = auto_cast GetInstanceProcAddr(instance, "vkGetDisplayPlaneSupportedDisplaysKHR")
 	GetDrmDisplayEXT                                                = auto_cast GetInstanceProcAddr(instance, "vkGetDrmDisplayEXT")
-	GetInstanceProcAddr                                             = auto_cast GetInstanceProcAddr(instance, "vkGetInstanceProcAddr")
 	GetPhysicalDeviceCalibrateableTimeDomainsEXT                    = auto_cast GetInstanceProcAddr(instance, "vkGetPhysicalDeviceCalibrateableTimeDomainsEXT")
 	GetPhysicalDeviceCooperativeMatrixPropertiesNV                  = auto_cast GetInstanceProcAddr(instance, "vkGetPhysicalDeviceCooperativeMatrixPropertiesNV")
 	GetPhysicalDeviceDisplayPlaneProperties2KHR                     = auto_cast GetInstanceProcAddr(instance, "vkGetPhysicalDeviceDisplayPlaneProperties2KHR")
@@ -3322,6 +3321,7 @@ load_proc_addresses_global :: proc(vk_get_instance_proc_addr: rawptr) {
 	EnumerateInstanceExtensionProperties = auto_cast GetInstanceProcAddr(nil, "vkEnumerateInstanceExtensionProperties")
 	EnumerateInstanceLayerProperties     = auto_cast GetInstanceProcAddr(nil, "vkEnumerateInstanceLayerProperties")
 	EnumerateInstanceVersion             = auto_cast GetInstanceProcAddr(nil, "vkEnumerateInstanceVersion")
+	GetInstanceProcAddr                  = auto_cast GetInstanceProcAddr(nil, "vkGetInstanceProcAddr")
 }
 
 load_proc_addresses :: proc{

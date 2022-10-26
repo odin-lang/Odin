@@ -16,7 +16,7 @@ fprintln :: proc(fd: os.Handle, args: ..any, sep := " ") -> int {
 	w := io.to_writer(os.stream_from_handle(fd))
 	return wprintln(w=w, args=args, sep=sep)
 }
-// fprintf formats according to the specififed format string and writes to fd
+// fprintf formats according to the specified format string and writes to fd
 fprintf :: proc(fd: os.Handle, fmt: string, args: ..any) -> int {
 	w := io.to_writer(os.stream_from_handle(fd))
 	return wprintf(w, fmt, ..args)
@@ -34,12 +34,12 @@ fprint_typeid :: proc(fd: os.Handle, id: typeid) -> (n: int, err: io.Error) {
 print   :: proc(args: ..any, sep := " ") -> int { return fprint(fd=os.stdout, args=args, sep=sep) }
 // println formats using the default print settings and writes to os.stdout
 println :: proc(args: ..any, sep := " ") -> int { return fprintln(fd=os.stdout, args=args, sep=sep) }
-// printf formats according to the specififed format string and writes to os.stdout
+// printf formats according to the specified format string and writes to os.stdout
 printf  :: proc(fmt: string, args: ..any) -> int { return fprintf(os.stdout, fmt, ..args) }
 
 // eprint formats using the default print settings and writes to os.stderr
 eprint   :: proc(args: ..any, sep := " ") -> int { return fprint(fd=os.stderr, args=args, sep=sep) }
 // eprintln formats using the default print settings and writes to os.stderr
 eprintln :: proc(args: ..any, sep := " ") -> int { return fprintln(fd=os.stderr, args=args, sep=sep) }
-// eprintf formats according to the specififed format string and writes to os.stderr
+// eprintf formats according to the specified format string and writes to os.stderr
 eprintf  :: proc(fmt: string, args: ..any) -> int { return fprintf(os.stderr, fmt, ..args) }

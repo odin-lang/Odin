@@ -78,6 +78,7 @@ foreign user32 {
 	LoadIconW :: proc(hInstance: HINSTANCE, lpIconName: LPCWSTR) -> HICON ---
 	LoadCursorA :: proc(hInstance: HINSTANCE, lpCursorName: LPCSTR) -> HCURSOR ---
 	LoadCursorW :: proc(hInstance: HINSTANCE, lpCursorName: LPCWSTR) -> HCURSOR ---
+	LoadImageW :: proc(hInst: HINSTANCE, name: LPCWSTR, type: UINT, cx: c_int, cy: c_int, fuLoad: UINT) -> HANDLE ---
 
 	GetWindowRect :: proc(hWnd: HWND, lpRect: LPRECT) -> BOOL ---
 	GetClientRect :: proc(hWnd: HWND, lpRect: LPRECT) -> BOOL ---

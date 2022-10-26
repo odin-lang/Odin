@@ -128,4 +128,34 @@ foreign advapi32 {
 		lpData: LPCVOID,
 		cbData: DWORD,
 	) -> LSTATUS ---
+
+	GetFileSecurityW :: proc(
+		lpFileName: LPCWSTR,
+		RequestedInformation: SECURITY_INFORMATION,
+		pSecurityDescriptor: PSECURITY_DESCRIPTOR,
+		nLength: DWORD,
+		lpnLengthNeeded: LPDWORD,
+	) -> BOOL ---
+
+	DuplicateToken :: proc(
+		ExistingTokenHandle: HANDLE,
+		ImpersonationLevel: SECURITY_IMPERSONATION_LEVEL,
+		DuplicateTokenHandle: PHANDLE,
+	) -> BOOL ---
+
+	MapGenericMask :: proc(
+		AccessMask: PDWORD,
+		GenericMapping: PGENERIC_MAPPING,
+	) ---
+
+	AccessCheck :: proc(
+		pSecurityDescriptor: PSECURITY_DESCRIPTOR,
+		ClientToken: HANDLE,
+		DesiredAccess: DWORD,
+		GenericMapping: PGENERIC_MAPPING,
+		PrivilegeSet: PPRIVILEGE_SET,
+		PrivilegeSetLength: LPDWORD,
+		GrantedAccess: LPDWORD,
+		AccessStatus: LPBOOL,
+	) -> BOOL ---
 }
