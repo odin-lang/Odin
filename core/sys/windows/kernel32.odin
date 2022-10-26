@@ -248,7 +248,7 @@ foreign kernel32 {
 	GetModuleHandleW :: proc(lpModuleName: LPCWSTR) -> HMODULE ---
 	GetModuleHandleA :: proc(lpModuleName: LPCSTR) -> HMODULE ---
 	GetSystemTimeAsFileTime :: proc(lpSystemTimeAsFileTime: LPFILETIME) ---
-	GetSystemTimePreciseAsFileTime :: proc(lpSystemTimeAsFileTimeL LPFILETIME) ---
+	GetSystemTimePreciseAsFileTime :: proc(lpSystemTimeAsFileTime: LPFILETIME) ---
 	CreateEventW :: proc(
 		lpEventAttributes: LPSECURITY_ATTRIBUTES,
 		bManualReset: BOOL,
