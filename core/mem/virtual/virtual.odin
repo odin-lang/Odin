@@ -128,6 +128,10 @@ alloc_from_memory_block :: proc(block: ^Memory_Block, min_size, alignment: uint)
 		return nil
 	}
 
+	if block == nil {
+		return nil, .Out_Of_Memory
+	}
+
 	alignment_offset := calc_alignment_offset(block, uintptr(alignment))
 	size, size_ok := safe_add(min_size, alignment_offset)
 	if !size_ok {
