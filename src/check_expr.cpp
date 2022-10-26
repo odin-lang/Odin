@@ -1998,7 +1998,7 @@ void check_assignment_error_suggestion(CheckerContext *c, Operand *o, Type *type
 		error_line("\tSuggestion: a string may be transmuted to %s\n", b);
 		error_line("\t            This is an UNSAFE operation as string data is assumed to be immutable, \n");
 		error_line("\t            whereas slices in general are assumed to be mutable.\n");
-	} else if (is_type_u8_slice(src) && are_types_identical(dst, t_string) && o->expr->kind != Ast_CompoundLit) {
+	} else if (is_type_u8_slice(src) && are_types_identical(dst, t_string) && o->mode != Addressing_Constant) {
 		error_line("\tSuggestion: the expression may be casted to %s\n", b);
 	}
 }
@@ -2039,7 +2039,7 @@ void check_cast_error_suggestion(CheckerContext *c, Operand *o, Type *type) {
 		}
 	} else if (are_types_identical(src, t_string) && is_type_u8_slice(dst)) {
 		error_line("\tSuggestion: a string may be transmuted to %s\n", b);
-	} else if (is_type_u8_slice(src) && are_types_identical(dst, t_string) && o->expr->kind != Ast_CompoundLit) {
+	} else if (is_type_u8_slice(src) && are_types_identical(dst, t_string) && o->mode != Addressing_Constant) {
 		error_line("\tSuggestion: the expression may be casted to %s\n", b);
 	}
 }
