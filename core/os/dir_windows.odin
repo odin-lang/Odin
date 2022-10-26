@@ -2,7 +2,6 @@ package os
 
 import win32 "core:sys/windows"
 import "core:strings"
-import "core:time"
 
 read_dir :: proc(fd: Handle, n: int, allocator := context.allocator) -> (fi: []File_Info, err: Errno) {
 	find_data_to_file_info :: proc(base_path: string, d: ^win32.WIN32_FIND_DATAW) -> (fi: File_Info) {
@@ -41,7 +40,7 @@ read_dir :: proc(fd: Handle, n: int, allocator := context.allocator) -> (fi: []F
 			// fi.mode |= file_type_mode(h);
 		}
 
-		window_set_file_info_times(&fi, d)
+		windows_set_file_info_times(&fi, d)
 
 		fi.is_dir = fi.mode & File_Mode_Dir != 0
 		return
