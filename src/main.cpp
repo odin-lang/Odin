@@ -53,6 +53,9 @@ gb_global Timings global_timings = {0};
 	#if LLVM_VERSION_MAJOR < 11
 	#error LLVM Version 11+ is required => "brew install llvm@11"
 	#endif
+	#if LLVM_VERSION_MAJOR > 14
+	#error LLVM Version 11..=14 is required => "brew install llvm@14"
+	#endif
 #endif
 
 #include "query_data.cpp"
