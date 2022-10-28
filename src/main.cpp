@@ -591,7 +591,6 @@ enum BuildFlagKind {
 	BuildFlag_SingleFile,
 
 	BuildFlag_OutFile,
-	BuildFlag_OptimizationLevel,
 	BuildFlag_OptimizationMode,
 	BuildFlag_ShowTimings,
 	BuildFlag_ShowUnused,
@@ -745,13 +744,25 @@ ExactValue build_param_to_exact_value(String name, String param) {
 	return value;
 }
 
+// Writes a did-you-mean message for formerly deprecated flags.
+void did_you_mean_flag(String flag) {
+	gbAllocator a = heap_allocator();
+	String name = copy_string(a, flag);
+	defer (gb_free(a, name.text));
+	string_to_lower(&name);
+
+	if (name == "opt") {
+		gb_printf_err("`-opt` is an unrecognized option. Did you mean `-o`?");
+		return;
+	}
+	gb_printf_err("Unknown flag: '%.*s'\n", LIT(flag));
+}
 
 bool parse_build_flags(Array<String> args) {
 	auto build_flags = array_make<BuildFlag>(heap_allocator(), 0, BuildFlag_COUNT);
 	add_flag(&build_flags, BuildFlag_Help,                    str_lit("help"),                      BuildFlagParam_None,    Command_all);
 	add_flag(&build_flags, BuildFlag_SingleFile,              str_lit("file"),                      BuildFlagParam_None,    Command__does_build | Command__does_check);
 	add_flag(&build_flags, BuildFlag_OutFile,                 str_lit("out"),                       BuildFlagParam_String,  Command__does_build &~ Command_test);
-	add_flag(&build_flags, BuildFlag_OptimizationLevel,       str_lit("opt"),                       BuildFlagParam_Integer, Command__does_build);
 	add_flag(&build_flags, BuildFlag_OptimizationMode,        str_lit("o"),                         BuildFlagParam_String,  Command__does_build);
 	add_flag(&build_flags, BuildFlag_OptimizationMode,        str_lit("O"),                         BuildFlagParam_String,  Command__does_build);
 	add_flag(&build_flags, BuildFlag_ShowTimings,             str_lit("show-timings"),              BuildFlagParam_None,    Command__does_check);
@@ -853,16 +864,14 @@ bool parse_build_flags(Array<String> args) {
 				break;
 			}
 		}
-		name = substring(name, 0, end);
-		if (have_equals && name != "opt") {
-			gb_printf_err("`flag=value` has been deprecated and will be removed next release. Use `%.*s:` instead.\n", LIT(name));
-		}
 
+		name = substring(name, 0, end);
 		String param = {};
 		if (end < flag.len-1) param = substring(flag, 2+end, flag.len);
 
 		bool is_supported = true;
 		bool found = false;
+
 		BuildFlag found_bf = {};
 		for_array(build_flag_index, build_flags) {
 			BuildFlag bf = build_flags[build_flag_index];
@@ -982,37 +991,8 @@ bool parse_build_flags(Array<String> args) {
 							}
 							break;
 						}
-						case BuildFlag_OptimizationLevel: {
-							GB_ASSERT(value.kind == ExactValue_Integer);
-							if (set_flags[BuildFlag_OptimizationMode]) {
-								gb_printf_err("Mixture of -opt and -o is not allowed\n");
-								bad_flags = true;
-								break;
-							}
-
-							build_context.optimization_level = cast(i32)big_int_to_i64(&value.value_integer);
-							if (build_context.optimization_level < 0 || build_context.optimization_level > 3) {
-								gb_printf_err("Invalid optimization level for -o:<integer>, got %d\n", build_context.optimization_level);
-								gb_printf_err("Valid optimization levels:\n");
-								gb_printf_err("\t0\n");
-								gb_printf_err("\t1\n");
-								gb_printf_err("\t2\n");
-								gb_printf_err("\t3\n");
-								bad_flags = true;
-							}
-
-							// Deprecation warning.
-							gb_printf_err("`-opt` has been deprecated and will be removed next release. Use `-o:minimal`, etc.\n");
-							break;
-						}
 						case BuildFlag_OptimizationMode: {
 							GB_ASSERT(value.kind == ExactValue_String);
-							if (set_flags[BuildFlag_OptimizationLevel]) {
-								gb_printf_err("Mixture of -opt and -o is not allowed\n");
-								bad_flags = true;
-								break;
-							}
-
 							if (value.value_string == "minimal") {
 								build_context.optimization_level = 0;
 							} else if (value.value_string == "size") {
@@ -1628,7 +1608,7 @@ bool parse_build_flags(Array<String> args) {
 			gb_printf_err("\n");
 			bad_flags = true;
 		} else if (!found) {
-			gb_printf_err("Unknown flag: '%.*s'\n", LIT(name));
+			did_you_mean_flag(name);
 			bad_flags = true;
 		}
 	}
