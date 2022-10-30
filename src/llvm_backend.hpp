@@ -298,6 +298,7 @@ struct lbProcedure {
 	lbBlock *        entry_block;
 	lbBlock *        curr_block;
 	lbTargetList *   target_list;
+	PtrMap<Entity *, lbValue> direct_parameters;
 
 	Ast *curr_stmt;
 

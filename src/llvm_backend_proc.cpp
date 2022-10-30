@@ -486,6 +486,8 @@ void lb_begin_procedure_body(lbProcedure *p) {
 	p->entry_block = lb_create_block(p, "entry", true);
 	lb_start_block(p, p->entry_block);
 
+	map_init(&p->direct_parameters, heap_allocator());
+
 	GB_ASSERT(p->type != nullptr);
 
 	lb_ensure_abi_function_type(p->module, p);
@@ -538,6 +540,8 @@ void lb_begin_procedure_body(lbProcedure *p) {
 						lbValue param = {};
 						param.value = value;
 						param.type = e->type;
+
+						map_set(&p->direct_parameters, e, param);
 
 						lbValue ptr = lb_address_from_load_or_generate_local(p, param);
 						GB_ASSERT(LLVMIsAAllocaInst(ptr.value));
