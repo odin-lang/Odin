@@ -2590,6 +2590,15 @@ lbValue lb_find_or_add_entity_string_byte_slice_with_type(lbModule *m, String co
 
 
 lbValue lb_find_ident(lbProcedure *p, lbModule *m, Entity *e, Ast *expr) {
+	if (e->flags & EntityFlag_Param) {
+		// NOTE(bill): Bypass the stack copied variable for
+		// direct parameters as there is no need for the direct load
+		auto *found = map_get(&p->direct_parameters, e);
+		if (found) {
+			return *found;
+		}
+	}
+
 	auto *found = map_get(&m->values, e);
 	if (found) {
 		auto v = *found;
