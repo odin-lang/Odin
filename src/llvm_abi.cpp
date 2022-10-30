@@ -537,6 +537,22 @@ namespace lbAbiAmd64SysV {
 		return false;
 	}
 
+	bool is_llvm_type_slice_like(LLVMTypeRef type) {
+		if (!lb_is_type_kind(type, LLVMStructTypeKind)) {
+			return false;
+		}
+		if (LLVMCountStructElementTypes(type) != 2) {
+			return false;
+		}
+		LLVMTypeRef fields[2] = {};
+		LLVMGetStructElementTypes(type, fields);
+		if (!lb_is_type_kind(fields[0], LLVMPointerTypeKind)) {
+			return false;
+		}
+		return lb_is_type_kind(fields[1], LLVMIntegerTypeKind) && lb_sizeof(fields[1]) == 8;
+
+	}
+
 	lbArgType amd64_type(LLVMContextRef c, LLVMTypeRef type, Amd64TypeAttributeKind attribute_kind, ProcCallingConvention calling_convention) {
 		if (is_register(type)) {
 			LLVMAttributeRef attribute = nullptr;
@@ -559,7 +575,16 @@ namespace lbAbiAmd64SysV {
 			}
 			return lb_arg_type_indirect(type, attribute);
 		} else {
-			return lb_arg_type_direct(type, llreg(c, cls), nullptr, nullptr);
+			LLVMTypeRef reg_type = nullptr;
+			if (is_llvm_type_slice_like(type)) {
+				// NOTE(bill): This is to make the ABI look closer to what the
+				// original code is just for slices/strings whilst still adhering
+				// the ABI rules for SysV
+				reg_type = type;
+			} else {
+				reg_type = llreg(c, cls);
+			}
+			return lb_arg_type_direct(type, reg_type, nullptr, nullptr);
 		}
 	}
 
