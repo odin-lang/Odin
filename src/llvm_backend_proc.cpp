@@ -1850,6 +1850,37 @@ lbValue lb_build_builtin_proc(lbProcedure *p, Ast *expr, TypeAndValue const &tv,
 		lb_emit_unreachable(p);
 		return {};
 
+	case BuiltinProc_raw_data:
+		{
+			lbValue x = lb_build_expr(p, ce->args[0]);
+			Type *t = base_type(x.type);
+			lbValue res = {};
+			switch (t->kind) {
+			case Type_Slice:
+				res = lb_slice_elem(p, x);
+				res = lb_emit_conv(p, res, tv.type);
+				break;
+			case Type_DynamicArray:
+				res = lb_dynamic_array_elem(p, x);
+				res = lb_emit_conv(p, res, tv.type);
+				break;
+			case Type_Basic:
+				if (t->Basic.kind == Basic_string) {
+					res = lb_string_elem(p, x);
+					res = lb_emit_conv(p, res, tv.type);
+				} else if (t->Basic.kind == Basic_cstring) {
+					res = lb_emit_conv(p, x, tv.type);
+				}
+				break;
+			case Type_Pointer:
+			case Type_MultiPointer:
+				res = lb_emit_conv(p, x, tv.type);
+				break;
+			}
+			GB_ASSERT(res.value != nullptr);
+			return res;
+		}
+
 
 	// "Intrinsics"
 
