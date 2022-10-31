@@ -24,7 +24,7 @@ O_CLOEXEC  :: 0x80000
 stdin:  Handle = 0
 stdout: Handle = 1
 stderr: Handle = 2
-default_dir: Handle = 3
+current_dir: Handle = 3
 
 write :: proc(fd: Handle, data: []byte) -> (int, Errno) {
 	iovs := wasi.ciovec_t(data)
@@ -75,7 +75,7 @@ open :: proc(path: string, mode: int = O_RDONLY, perm: int = 0) -> (Handle, Errn
 	if mode & O_SYNC == O_SYNC {
 		fdflags += {.SYNC}
 	}
-	fd, err := wasi.path_open(wasi.fd_t(default_dir),{.SYMLINK_FOLLOW},path,oflags,rights,{},fdflags)
+	fd, err := wasi.path_open(wasi.fd_t(current_dir),{.SYMLINK_FOLLOW},path,oflags,rights,{},fdflags)
 	return Handle(fd), Errno(err)
 }
 close :: proc(fd: Handle) -> Errno {
