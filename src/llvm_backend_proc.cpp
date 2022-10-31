@@ -1503,7 +1503,7 @@ lbValue lb_build_builtin_proc(lbProcedure *p, Ast *expr, TypeAndValue const &tv,
 			pos = e->token.pos;
 
 		}
-		return lb_emit_source_code_location(p, procedure, pos);
+		return lb_emit_source_code_location_as_global(p, procedure, pos);
 	}
 
 	case BuiltinProc_type_info_of: {
@@ -2874,7 +2874,7 @@ lbValue lb_handle_param_value(lbProcedure *p, Type *parameter_type, ParameterVal
 			if (p->entity != nullptr) {
 				proc_name = p->entity->token.string;
 			}
-			return lb_emit_source_code_location(p, proc_name, pos);
+			return lb_emit_source_code_location_as_global(p, proc_name, pos);
 		}
 	case ParameterValue_Value:
 		return lb_build_expr(p, param_value.ast_value);

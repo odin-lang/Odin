@@ -646,7 +646,7 @@ void lb_insert_dynamic_map_key_and_value(lbProcedure *p, lbValue const &map_ptr,
 	args[2] = key_hash;
 	args[3] = key_ptr;
 	args[4] = lb_emit_conv(p, value_addr.addr, t_rawptr);
-	args[5] = lb_emit_source_code_location(p, node);
+	args[5] = lb_emit_source_code_location_as_global(p, node);
 	lb_emit_runtime_call(p, "__dynamic_map_set", args);
 }
 
@@ -662,7 +662,7 @@ void lb_dynamic_map_reserve(lbProcedure *p, lbValue const &map_ptr, isize const 
 	args[0] = lb_emit_conv(p, map_ptr, t_rawptr);
 	args[1] = lb_gen_map_header_table_internal(p, type_deref(map_ptr.type));
 	args[2] = lb_const_int(p->module, t_int, capacity);
-	args[3] = lb_emit_source_code_location(p, proc_name, pos);
+	args[3] = lb_emit_source_code_location_as_global(p, proc_name, pos);
 	lb_emit_runtime_call(p, "__dynamic_map_reserve", args);
 }
 
