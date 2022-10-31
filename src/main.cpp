@@ -752,7 +752,7 @@ void did_you_mean_flag(String flag) {
 	string_to_lower(&name);
 
 	if (name == "opt") {
-		gb_printf_err("`-opt` is an unrecognized option. Did you mean `-o`?");
+		gb_printf_err("`-opt` is an unrecognized option. Did you mean `-o`?\n");
 		return;
 	}
 	gb_printf_err("Unknown flag: '%.*s'\n", LIT(flag));
