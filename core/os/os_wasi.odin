@@ -24,7 +24,7 @@ O_CLOEXEC  :: 0x80000
 stdin:  Handle = 0
 stdout: Handle = 1
 stderr: Handle = 2
-
+default_dir: Handle = 3
 
 write :: proc(fd: Handle, data: []byte) -> (int, Errno) {
 	iovs := wasi.ciovec_t(data)
@@ -47,7 +47,36 @@ read_at :: proc(fd: Handle, data: []byte, offset: i64) -> (int, Errno) {
 	return int(n), Errno(err)
 }
 open :: proc(path: string, mode: int = O_RDONLY, perm: int = 0) -> (Handle, Errno) {
-	return 0, -1
+	oflags: wasi.oflags_t
+	if mode & O_CREATE == O_CREATE {
+		oflags += {.CREATE}
+	}
+	if mode & O_EXCL == O_EXCL {
+		oflags += {.EXCL}
+	}
+	if mode & O_TRUNC == O_TRUNC {
+		oflags += {.TRUNC}
+	}
+
+	rights: wasi.rights_t = {.FD_SEEK}
+	switch mode & (O_RDONLY|O_WRONLY|O_RDWR) {
+	case O_RDONLY: rights += {.FD_READ}
+	case O_WRONLY: rights += {.FD_WRITE}
+	case O_RDWR:   rights += {.FD_READ, .FD_WRITE}
+	}
+
+	fdflags: wasi.fdflags_t
+	if mode & O_APPEND == O_APPEND {
+		fdflags += {.APPEND}
+	}
+	if mode & O_NONBLOCK == O_NONBLOCK {
+		fdflags += {.NONBLOCK}
+	}
+	if mode & O_SYNC == O_SYNC {
+		fdflags += {.SYNC}
+	}
+	fd, err := wasi.path_open(wasi.fd_t(default_dir),{.SYMLINK_FOLLOW},path,oflags,rights,{},fdflags)
+	return Handle(fd), Errno(err)
 }
 close :: proc(fd: Handle) -> Errno {
 	err := wasi.fd_close(wasi.fd_t(fd))
