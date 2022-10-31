@@ -235,7 +235,7 @@ void lb_setup_type_info_data(lbProcedure *p) { // NOTE(bill): Setup type_info da
 			}
 			TokenPos pos = t->Named.type_name->token.pos;
 
-			lbValue loc = lb_emit_source_code_location(p, proc_name, pos);
+			lbValue loc = lb_emit_source_code_location_const(p, proc_name, pos);
 
 			LLVMValueRef vals[4] = {
 				lb_const_string(p->module, t->Named.type_name->token.string).value,
