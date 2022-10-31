@@ -404,6 +404,9 @@ read :: proc(fd: Handle, data: []u8) -> (int, Errno) {
 		if bytes_read == -1 {
 			return bytes_read_total, 1
 		}
+		if bytes_read == 0 {
+			break
+		}
 		bytes_read_total += bytes_read
 	}
 
