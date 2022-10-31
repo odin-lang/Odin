@@ -4232,7 +4232,7 @@ lbAddr lb_build_addr_compound_lit(lbProcedure *p, Ast *expr) {
 			args[1] = size;
 			args[2] = align;
 			args[3] = lb_const_int(p->module, t_int, item_count);
-			args[4] = lb_emit_source_code_location(p, proc_name, pos);
+			args[4] = lb_emit_source_code_location_as_global(p, proc_name, pos);
 			lb_emit_runtime_call(p, "__dynamic_array_reserve", args);
 		}
 
@@ -4253,7 +4253,7 @@ lbAddr lb_build_addr_compound_lit(lbProcedure *p, Ast *expr) {
 			args[2] = align;
 			args[3] = lb_emit_conv(p, items, t_rawptr);
 			args[4] = lb_const_int(p->module, t_int, item_count);
-			args[5] = lb_emit_source_code_location(p, proc_name, pos);
+			args[5] = lb_emit_source_code_location_as_global(p, proc_name, pos);
 			lb_emit_runtime_call(p, "__dynamic_array_append", args);
 		}
 		break;

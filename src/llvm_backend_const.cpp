@@ -283,6 +283,23 @@ lbValue lb_emit_source_code_location(lbProcedure *p, Ast *node) {
 	return lb_emit_source_code_location(p, proc_name, pos);
 }
 
+lbValue lb_emit_source_code_location_as_global(lbProcedure *p, String const &procedure, TokenPos const &pos) {
+	lbValue loc = lb_emit_source_code_location(p, procedure, pos);
+	lbAddr addr = lb_add_global_generated(p->module, loc.type, loc, nullptr);
+	lb_make_global_private_const(addr);
+	return lb_addr_load(p, addr);
+}
+
+
+lbValue lb_emit_source_code_location_as_global(lbProcedure *p, Ast *node) {
+	lbValue loc = lb_emit_source_code_location(p, node);
+	lbAddr addr = lb_add_global_generated(p->module, loc.type, loc, nullptr);
+	lb_make_global_private_const(addr);
+	return lb_addr_load(p, addr);
+}
+
+
+
 LLVMValueRef lb_build_constant_array_values(lbModule *m, Type *type, Type *elem_type, isize count, LLVMValueRef *values, bool allow_local) {
 	bool is_local = allow_local && m->curr_procedure != nullptr;
 	bool is_const = true;
