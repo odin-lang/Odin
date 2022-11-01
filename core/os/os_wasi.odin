@@ -58,7 +58,7 @@ open :: proc(path: string, mode: int = O_RDONLY, perm: int = 0) -> (Handle, Errn
 		oflags += {.TRUNC}
 	}
 
-	rights: wasi.rights_t = {.FD_SEEK}
+	rights: wasi.rights_t = {.FD_SEEK, .FD_FILESTAT_GET}
 	switch mode & (O_RDONLY|O_WRONLY|O_RDWR) {
 	case O_RDONLY: rights += {.FD_READ}
 	case O_WRONLY: rights += {.FD_WRITE}
