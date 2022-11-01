@@ -1673,7 +1673,11 @@ bool could_entity_be_lazy(Entity *e, DeclInfo *d) {
 }
 
 void add_entity_and_decl_info(CheckerContext *c, Ast *identifier, Entity *e, DeclInfo *d, bool is_exported) {
-	GB_ASSERT(identifier != nullptr);
+	if (identifier == nullptr) {
+		// NOTE(bill): Should only happen on errors
+		error(e->token, "Invalid variable declaration");
+		return;
+	}
 	if (identifier->kind != Ast_Ident) {
 		// NOTE(bill): This is a safety check
 		gbString s = expr_to_string(identifier);
