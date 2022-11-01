@@ -1673,7 +1673,14 @@ bool could_entity_be_lazy(Entity *e, DeclInfo *d) {
 }
 
 void add_entity_and_decl_info(CheckerContext *c, Ast *identifier, Entity *e, DeclInfo *d, bool is_exported) {
-	GB_ASSERT(identifier->kind == Ast_Ident);
+	GB_ASSERT(identifier != nullptr);
+	if (identifier->kind != Ast_Ident) {
+		// NOTE(bill): This is a safety check
+		gbString s = expr_to_string(identifier);
+		error(identifier, "A variable declaration must be an identifer, got %s", s);
+		gb_string_free(s);
+		return;
+	}
 	GB_ASSERT(e != nullptr && d != nullptr);
 	GB_ASSERT(identifier->Ident.token.string == e->token.string);
 
