@@ -911,6 +911,9 @@ lbValue lb_emit_call(lbProcedure *p, lbValue value, Array<lbValue> const &args, 
 	auto processed_args = array_make<lbValue>(permanent_allocator(), 0, args.count);
 
 	{
+
+		bool is_odin_cc = is_calling_convention_odin(pt->Proc.calling_convention);
+
 		lbFunctionType *ft = lb_get_function_type(m, p, pt);
 		bool return_by_pointer = ft->ret.kind == lbArg_Indirect;
 
@@ -946,8 +949,12 @@ lbValue lb_emit_call(lbProcedure *p, lbValue value, Array<lbValue> const &args, 
 			} else if (arg->kind == lbArg_Indirect) {
 				lbValue ptr = {};
 				if (arg->is_byval) {
-					ptr = lb_copy_value_to_ptr(p, x, original_type, arg->byval_alignment);
-				} else if (is_calling_convention_odin(pt->Proc.calling_convention)) {
+					if (is_odin_cc && are_types_identical(original_type, t_source_code_location)) {
+						ptr = lb_address_from_load_or_generate_local(p, x);
+					} else {
+						ptr = lb_copy_value_to_ptr(p, x, original_type, arg->byval_alignment);
+					}
+				} else if (is_odin_cc) {
 					// NOTE(bill): Odin parameters are immutable so the original value can be passed if possible
 					// i.e. `T const &` in C++
 					ptr = lb_address_from_load_or_generate_local(p, x);

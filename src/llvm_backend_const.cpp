@@ -256,7 +256,7 @@ lbValue lb_expr_untyped_const_to_typed(lbModule *m, Ast *expr, Type *t) {
 	return lb_const_value(m, t, tv.value);
 }
 
-lbValue lb_emit_source_code_location(lbProcedure *p, String const &procedure, TokenPos const &pos) {
+lbValue lb_emit_source_code_location_const(lbProcedure *p, String const &procedure, TokenPos const &pos) {
 	lbModule *m = p->module;
 
 	LLVMValueRef fields[4] = {};
@@ -271,7 +271,7 @@ lbValue lb_emit_source_code_location(lbProcedure *p, String const &procedure, To
 	return res;
 }
 
-lbValue lb_emit_source_code_location(lbProcedure *p, Ast *node) {
+lbValue lb_emit_source_code_location_const(lbProcedure *p, Ast *node) {
 	String proc_name = {};
 	if (p->entity) {
 		proc_name = p->entity->token.string;
@@ -280,11 +280,11 @@ lbValue lb_emit_source_code_location(lbProcedure *p, Ast *node) {
 	if (node) {
 		pos = ast_token(node).pos;
 	}
-	return lb_emit_source_code_location(p, proc_name, pos);
+	return lb_emit_source_code_location_const(p, proc_name, pos);
 }
 
 lbValue lb_emit_source_code_location_as_global(lbProcedure *p, String const &procedure, TokenPos const &pos) {
-	lbValue loc = lb_emit_source_code_location(p, procedure, pos);
+	lbValue loc = lb_emit_source_code_location_const(p, procedure, pos);
 	lbAddr addr = lb_add_global_generated(p->module, loc.type, loc, nullptr);
 	lb_make_global_private_const(addr);
 	return lb_addr_load(p, addr);
@@ -292,7 +292,7 @@ lbValue lb_emit_source_code_location_as_global(lbProcedure *p, String const &pro
 
 
 lbValue lb_emit_source_code_location_as_global(lbProcedure *p, Ast *node) {
-	lbValue loc = lb_emit_source_code_location(p, node);
+	lbValue loc = lb_emit_source_code_location_const(p, node);
 	lbAddr addr = lb_add_global_generated(p->module, loc.type, loc, nullptr);
 	lb_make_global_private_const(addr);
 	return lb_addr_load(p, addr);
