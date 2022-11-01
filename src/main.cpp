@@ -481,9 +481,9 @@ i32 linker_stage(lbGenerator *gen) {
 
 			if (build_context.metrics.os == TargetOs_darwin) {
 				// This sets a requirement of Mountain Lion and up, but the compiler doesn't work without this limit.
-				// NOTE: If you change this (although this minimum is as low as you can go with Odin working)
-				//       make sure to also change the 'mtriple' param passed to 'opt'
-				if (build_context.metrics.arch == TargetArch_arm64) {
+				if (build_context.minimum_os_version_string.len) {
+					link_settings = gb_string_append_fmt(link_settings, " -mmacosx-version-min=%.*s ", LIT(build_context.minimum_os_version_string));
+				} else if (build_context.metrics.arch == TargetArch_arm64) {
 					link_settings = gb_string_appendc(link_settings, " -mmacosx-version-min=12.0.0  ");
 				} else {
 					link_settings = gb_string_appendc(link_settings, " -mmacosx-version-min=10.12.0 ");
@@ -624,6 +624,7 @@ enum BuildFlagKind {
 	BuildFlag_ExtraAssemblerFlags,
 	BuildFlag_Microarch,
 	BuildFlag_TargetFeatures,
+	BuildFlag_MinimumOSVersion,
 
 	BuildFlag_RelocMode,
 	BuildFlag_DisableRedZone,
@@ -797,6 +798,7 @@ bool parse_build_flags(Array<String> args) {
 	add_flag(&build_flags, BuildFlag_ExtraAssemblerFlags,     str_lit("extra-assembler-flags"),     BuildFlagParam_String,  Command__does_build);
 	add_flag(&build_flags, BuildFlag_Microarch,               str_lit("microarch"),                 BuildFlagParam_String,  Command__does_build);
 	add_flag(&build_flags, BuildFlag_TargetFeatures,          str_lit("target-features"),           BuildFlagParam_String,  Command__does_build);
+	add_flag(&build_flags, BuildFlag_MinimumOSVersion,        str_lit("minimum-os-version"),        BuildFlagParam_String,  Command__does_build);
 
 	add_flag(&build_flags, BuildFlag_RelocMode,               str_lit("reloc-mode"),                BuildFlagParam_String,  Command__does_build);
 	add_flag(&build_flags, BuildFlag_DisableRedZone,          str_lit("disable-red-zone"),          BuildFlagParam_None,    Command__does_build);
@@ -1359,6 +1361,11 @@ bool parse_build_flags(Array<String> args) {
 							GB_ASSERT(value.kind == ExactValue_String);
 							build_context.target_features_string = value.value_string;
 							string_to_lower(&build_context.target_features_string);
+							break;
+						}
+						case BuildFlag_MinimumOSVersion: {
+							GB_ASSERT(value.kind == ExactValue_String);
+							build_context.minimum_os_version_string = value.value_string;
 							break;
 						}
 						case BuildFlag_RelocMode: {
@@ -1972,12 +1979,6 @@ void print_show_help(String const arg0, String const &command) {
 		print_usage_line(2, "Example: -out:foo.exe");
 		print_usage_line(0, "");
 
-		print_usage_line(1, "-opt:<integer>");
-		print_usage_line(2, "Set the optimization level for compilation");
-		print_usage_line(2, "Accepted values: 0, 1, 2, 3");
-		print_usage_line(2, "Example: -opt:2");
-		print_usage_line(0, "");
-
 		print_usage_line(1, "-o:<string>");
 		print_usage_line(2, "Set the optimization mode for compilation");
 		print_usage_line(2, "Accepted values: minimal, size, speed");
@@ -2141,6 +2142,12 @@ void print_show_help(String const arg0, String const &command) {
 	}
 
 	if (run_or_build) {
+		print_usage_line(1, "-minimum-os-version:<string>");
+		print_usage_line(2, "Sets the minimum OS version targeted by the application");
+		print_usage_line(2, "e.g. -minimum-os-version:12.0.0");
+		print_usage_line(2, "(Only used when target is Darwin)");
+		print_usage_line(0, "");
+
 		print_usage_line(1, "-extra-linker-flags:<string>");
 		print_usage_line(2, "Adds extra linker specific flags in a string");
 		print_usage_line(0, "");
@@ -2148,7 +2155,6 @@ void print_show_help(String const arg0, String const &command) {
 		print_usage_line(1, "-extra-assembler-flags:<string>");
 		print_usage_line(2, "Adds extra assembler specific flags in a string");
 		print_usage_line(0, "");
-
 
 		print_usage_line(1, "-microarch:<string>");
 		print_usage_line(2, "Specifies the specific micro-architecture for the build in a string");
