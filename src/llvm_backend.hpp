@@ -457,7 +457,7 @@ lbValue lb_find_value_from_entity(lbModule *m, Entity *e);
 
 void lb_store_type_case_implicit(lbProcedure *p, Ast *clause, lbValue value);
 lbAddr lb_store_range_stmt_val(lbProcedure *p, Ast *stmt_val, lbValue value);
-lbValue lb_emit_source_code_location(lbProcedure *p, String const &procedure, TokenPos const &pos);
+lbValue lb_emit_source_code_location_const(lbProcedure *p, String const &procedure, TokenPos const &pos);
 
 lbValue lb_handle_param_value(lbProcedure *p, Type *parameter_type, ParameterValue const &param_value, TokenPos const &pos);
 
