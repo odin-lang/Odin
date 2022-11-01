@@ -383,16 +383,27 @@ Type *lb_addr_type(lbAddr const &addr) {
 	if (addr.addr.value == nullptr) {
 		return nullptr;
 	}
-	if (addr.kind == lbAddr_Map) {
-		Type *t = base_type(addr.map.type);
-		GB_ASSERT(is_type_map(t));
-		return t->Map.value;
-	}
-	if (addr.kind == lbAddr_Swizzle) {
+	switch (addr.kind) {
+	case lbAddr_Map:
+		{
+			Type *t = base_type(addr.map.type);
+			GB_ASSERT(is_type_map(t));
+			return t->Map.value;
+		}
+	case lbAddr_Swizzle:
 		return addr.swizzle.type;
-	}
-	if (addr.kind == lbAddr_SwizzleLarge) {
+	case lbAddr_SwizzleLarge:
 		return addr.swizzle_large.type;
+	case lbAddr_Context:
+		if (addr.ctx.sel.index.count > 0) {
+			Type *t = t_context;
+			for_array(i, addr.ctx.sel.index) {
+				GB_ASSERT(is_type_struct(t));
+				t = base_type(t)->Struct.fields[addr.ctx.sel.index[i]]->type;
+			}
+			return t;
+		}
+		break;
 	}
 	return type_deref(addr.addr.type);
 }
