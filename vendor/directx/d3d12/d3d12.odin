@@ -1379,39 +1379,45 @@ TILE_MAPPING_FLAG :: enum u32 {
 
 TILE_COPY_FLAGS :: distinct bit_set[TILE_COPY_FLAG; u32]
 TILE_COPY_FLAG :: enum u32 {
-	NONE                                     = 0x0,
-	NO_HAZARD                                = 0x1,
-	LINEAR_BUFFER_TO_SWIZZLED_TILED_RESOURCE = 0x2,
-	SWIZZLED_TILED_RESOURCE_TO_LINEAR_BUFFER = 0x4,
+	NO_HAZARD                                = 0,
+	LINEAR_BUFFER_TO_SWIZZLED_TILED_RESOURCE = 1,
+	SWIZZLED_TILED_RESOURCE_TO_LINEAR_BUFFER = 2,
 }
 
-RESOURCE_STATES :: enum i32 { // TODO: make bit_set
-	COMMON                            = 0,
-	VERTEX_AND_CONSTANT_BUFFER        = 1,
-	INDEX_BUFFER                      = 2,
-	RENDER_TARGET                     = 4,
-	UNORDERED_ACCESS                  = 8,
-	DEPTH_WRITE                       = 16,
-	DEPTH_READ                        = 32,
-	NON_PIXEL_SHADER_RESOURCE         = 64,
-	PIXEL_SHADER_RESOURCE             = 128,
-	STREAM_OUT                        = 256,
-	INDIRECT_ARGUMENT                 = 512,
-	COPY_DEST                         = 1024,
-	COPY_SOURCE                       = 2048,
-	RESOLVE_DEST                      = 4096,
-	RESOLVE_SOURCE                    = 8192,
-	RAYTRACING_ACCELERATION_STRUCTURE = 4194304,
-	SHADING_RATE_SOURCE               = 16777216,
-	GENERIC_READ                      = 2755,
-	PRESENT                           = 0,
-	PREDICATION                       = 512,
-	VIDEO_DECODE_READ                 = 65536,
-	VIDEO_DECODE_WRITE                = 131072,
-	VIDEO_PROCESS_READ                = 262144,
-	VIDEO_PROCESS_WRITE               = 524288,
-	VIDEO_ENCODE_READ                 = 2097152,
-	VIDEO_ENCODE_WRITE                = 8388608,
+RESOURCE_STATES :: distinct bit_set[RESOURCE_STATE; u32]
+RESOURCE_STATE :: enum i32 {
+	VERTEX_AND_CONSTANT_BUFFER        = 0,
+	INDEX_BUFFER                      = 1,
+	RENDER_TARGET                     = 2,
+	UNORDERED_ACCESS                  = 3,
+	DEPTH_WRITE                       = 4,
+	DEPTH_READ                        = 5,
+	NON_PIXEL_SHADER_RESOURCE         = 6,
+	PIXEL_SHADER_RESOURCE             = 7,
+	STREAM_OUT                        = 8,
+	INDIRECT_ARGUMENT                 = 9,
+	COPY_DEST                         = 10,
+	COPY_SOURCE                       = 11,
+	RESOLVE_DEST                      = 12,
+	RESOLVE_SOURCE                    = 13,
+	RAYTRACING_ACCELERATION_STRUCTURE = 22,
+	SHADING_RATE_SOURCE               = 24,
+	PREDICATION                       = 9,
+	VIDEO_DECODE_READ                 = 16,
+	VIDEO_DECODE_WRITE                = 17,
+	VIDEO_PROCESS_READ                = 18,
+	VIDEO_PROCESS_WRITE               = 19,
+	VIDEO_ENCODE_READ                 = 21,
+	VIDEO_ENCODE_WRITE                = 23,
+}
+
+RESOURCE_STATE_COMMON :: RESOURCE_STATES{}
+RESOURCE_STATE_PRESENT :: RESOURCE_STATES{}
+RESOURCE_STATE_GENERIC_READ :: RESOURCE_STATES{
+	.SHADING_RATE_SOURCE, .VERTEX_AND_CONSTANT_BUFFER,
+}
+RESOURCE_STATE_ALL_SHADER_RESOURCE :: RESOURCE_STATES{
+	.SHADING_RATE_SOURCE, .INDEX_BUFFER,
 }
 
 RESOURCE_BARRIER_TYPE :: enum i32 {
