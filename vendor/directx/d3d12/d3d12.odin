@@ -212,11 +212,12 @@ SHADER_VARIABLE_CLASS :: enum i32 {
 	INTERFACE_POINTER     = 7,
 }
 
-SHADER_VARIABLE_FLAGS :: enum u32 { // TODO: make bit_set
-	USERPACKED              = 0x1,
-	USED                    = 0x2,
-	INTERFACE_POINTER       = 0x4,
-	INTERFACE_PARAMETER     = 0x8,
+SHADER_VARIABLE_FLAGS :: distinct bit_set[SHADER_VARIABLE_FLAG; u32]
+SHADER_VARIABLE_FLAG :: enum u32 {
+	USERPACKED              = 0,
+	USED                    = 1,
+	INTERFACE_POINTER       = 2,
+	INTERFACE_PARAMETER     = 3,
 }
 
 SHADER_VARIABLE_TYPE :: enum i32 {
@@ -280,14 +281,15 @@ SHADER_VARIABLE_TYPE :: enum i32 {
 	MIN16UINT                     = 57,
 }
 
-SHADER_INPUT_FLAGS :: enum u32 { // TODO: make bit_set
-	USERPACKED              = 0x1,
-	COMPARISON_SAMPLER      = 0x2,
-	TEXTURE_COMPONENT_0     = 0x4,
-	TEXTURE_COMPONENT_1     = 0x8,
-	TEXTURE_COMPONENTS      = 0xc,
-	UNUSED                  = 0x10,
+SHADER_INPUT_FLAGS :: distinct bit_set[SHADER_INPUT_FLAG; u32]
+SHADER_INPUT_FLAG :: enum u32 {
+	USERPACKED              = 0,
+	COMPARISON_SAMPLER      = 1,
+	TEXTURE_COMPONENT_0     = 2,
+	TEXTURE_COMPONENT_1     = 3,
+	UNUSED                  = 4,
 }
+
 
 SHADER_INPUT_TYPE :: enum i32 {
 	CBUFFER                        = 0,
@@ -306,8 +308,9 @@ SHADER_INPUT_TYPE :: enum i32 {
 	UAV_FEEDBACKTEXTURE            = 13,
 }
 
-SHADER_CBUFFER_FLAGS :: enum u32 { // TODO: make bit_set
-	USERPACKED = 0x1,
+SHADER_CBUFFER_FLAGS :: distinct bit_set[SHADER_CBUFFER_FLAG; u32]
+SHADER_CBUFFER_FLAG :: enum u32 {
+	USERPACKED = 0,
 }
 
 CBUFFER_TYPE :: enum i32 {
@@ -410,12 +413,11 @@ INTERPOLATION_MODE :: enum i32 {
 	LINEAR_NOPERSPECTIVE_SAMPLE   = 7,
 }
 
-PARAMETER_FLAGS :: enum u32 { // TODO: make bit_set
-	NONE = 0x0,
-	IN   = 0x1,
-	OUT  = 0x2,
+PARAMETER_FLAGS :: distinct bit_set[PARAMETER_FLAG; u32]
+PARAMETER_FLAG :: enum u32 {
+	IN   = 0,
+	OUT  = 1,
 }
-
 
 GPU_VIRTUAL_ADDRESS :: u64
 
@@ -429,9 +431,9 @@ COMMAND_LIST_TYPE :: enum i32 {
 	VIDEO_ENCODE  = 6,
 }
 
-COMMAND_QUEUE_FLAGS :: enum u32 { // TODO: make bit_set
-	NONE                = 0x0,
-	DISABLE_GPU_TIMEOUT = 0x1,
+COMMAND_QUEUE_FLAGS :: distinct bit_set[COMMAND_QUEUE_FLAG; u32]
+COMMAND_QUEUE_FLAG :: enum u32 {
+	DISABLE_GPU_TIMEOUT = 0,
 }
 
 COMMAND_QUEUE_PRIORITY :: enum i32 {
@@ -593,12 +595,19 @@ BLEND_OP :: enum i32 {
 	MAX          = 5,
 }
 
-COLOR_WRITE_ENABLE :: enum i32 { // TODO: make bit_set
-	RED   = 1,
-	GREEN = 2,
-	BLUE  = 4,
-	ALPHA = 8,
-	ALL   = 15,
+COLOR_WRITE_ENABLE_MASK   :: distinct bit_set[COLOR_WRITE_ENABLE; u32]
+
+COLOR_WRITE_ENABLE_RED   :: COLOR_WRITE_ENABLE_MASK{.RED}
+COLOR_WRITE_ENABLE_GREEN :: COLOR_WRITE_ENABLE_MASK{.GREEN}
+COLOR_WRITE_ENABLE_BLUE  :: COLOR_WRITE_ENABLE_MASK{.BLUE}
+COLOR_WRITE_ENABLE_ALPHA :: COLOR_WRITE_ENABLE_MASK{.ALPHA}
+COLOR_WRITE_ENABLE_ALL   :: COLOR_WRITE_ENABLE_MASK{.RED, .GREEN, .BLUE, .ALPHA}
+
+COLOR_WRITE_ENABLE :: enum i32 {
+	RED   = 0,
+	GREEN = 1,
+	BLUE  = 2,
+	ALPHA = 3,
 }
 
 LOGIC_OP :: enum i32 {
@@ -721,9 +730,9 @@ CACHED_PIPELINE_STATE :: struct {
 	CachedBlobSizeInBytes: SIZE_T,
 }
 
-PIPELINE_STATE_FLAGS :: enum u32 { // TODO: make bit_set
-	NONE       = 0x0,
-	TOOL_DEBUG = 0x1,
+PIPELINE_STATE_FLAGS :: distinct bit_set[PIPELINE_STATE_FLAG; u32]
+PIPELINE_STATE_FLAG :: enum u32 {
+	TOOL_DEBUG = 0,
 }
 
 GRAPHICS_PIPELINE_STATE_DESC :: struct {
@@ -853,58 +862,61 @@ CONSERVATIVE_RASTERIZATION_TIER :: enum i32 {
 	_3            = 3,
 }
 
-FORMAT_SUPPORT1 :: enum i32 { // TODO: make bit_set
-	NONE                        = 0,
-	BUFFER                      = 1,
-	IA_VERTEX_BUFFER            = 2,
-	IA_INDEX_BUFFER             = 4,
-	SO_BUFFER                   = 8,
-	TEXTURE1D                   = 16,
-	TEXTURE2D                   = 32,
-	TEXTURE3D                   = 64,
-	TEXTURECUBE                 = 128,
-	SHADER_LOAD                 = 256,
-	SHADER_SAMPLE               = 512,
-	SHADER_SAMPLE_COMPARISON    = 1024,
-	SHADER_SAMPLE_MONO_TEXT     = 2048,
-	MIP                         = 4096,
-	RENDER_TARGET               = 16384,
-	BLENDABLE                   = 32768,
-	DEPTH_STENCIL               = 65536,
-	MULTISAMPLE_RESOLVE         = 262144,
-	DISPLAY                     = 524288,
-	CAST_WITHIN_BIT_LAYOUT      = 1048576,
-	MULTISAMPLE_RENDERTARGET    = 2097152,
-	MULTISAMPLE_LOAD            = 4194304,
-	SHADER_GATHER               = 8388608,
-	BACK_BUFFER_CAST            = 16777216,
-	TYPED_UNORDERED_ACCESS_VIEW = 33554432,
-	SHADER_GATHER_COMPARISON    = 67108864,
-	DECODER_OUTPUT              = 134217728,
-	VIDEO_PROCESSOR_OUTPUT      = 268435456,
-	VIDEO_PROCESSOR_INPUT       = 536870912,
-	VIDEO_ENCODER               = 1073741824,
+FORMAT_SUPPORT1 :: distinct bit_set[FORMAT_SUPPORT1_FLAG; u32]
+FORMAT_SUPPORT1_FLAG :: enum i32 {
+	BUFFER                      = 0,
+	IA_VERTEX_BUFFER            = 1,
+	IA_INDEX_BUFFER             = 2,
+	SO_BUFFER                   = 3,
+	TEXTURE1D                   = 4,
+	TEXTURE2D                   = 5,
+	TEXTURE3D                   = 6,
+	TEXTURECUBE                 = 7,
+	SHADER_LOAD                 = 8,
+	SHADER_SAMPLE               = 9,
+	SHADER_SAMPLE_COMPARISON    = 10,
+	SHADER_SAMPLE_MONO_TEXT     = 11,
+	MIP                         = 12,
+
+	RENDER_TARGET               = 14,
+	BLENDABLE                   = 15,
+	DEPTH_STENCIL               = 16,
+
+	MULTISAMPLE_RESOLVE         = 18,
+	DISPLAY                     = 19,
+	CAST_WITHIN_BIT_LAYOUT      = 20,
+	MULTISAMPLE_RENDERTARGET    = 21,
+	MULTISAMPLE_LOAD            = 22,
+	SHADER_GATHER               = 23,
+	BACK_BUFFER_CAST            = 24,
+	TYPED_UNORDERED_ACCESS_VIEW = 25,
+	SHADER_GATHER_COMPARISON    = 26,
+	DECODER_OUTPUT              = 27,
+	VIDEO_PROCESSOR_OUTPUT      = 28,
+	VIDEO_PROCESSOR_INPUT       = 29,
+	VIDEO_ENCODER               = 30,
 }
 
-FORMAT_SUPPORT2 :: enum i32 { // TODO: make bit_set
-	NONE                                         = 0,
-	UAV_ATOMIC_ADD                               = 1,
-	UAV_ATOMIC_BITWISE_OPS                       = 2,
-	UAV_ATOMIC_COMPARE_STORE_OR_COMPARE_EXCHANGE = 4,
-	UAV_ATOMIC_EXCHANGE                          = 8,
-	UAV_ATOMIC_SIGNED_MIN_OR_MAX                 = 16,
-	UAV_ATOMIC_UNSIGNED_MIN_OR_MAX               = 32,
-	UAV_TYPED_LOAD                               = 64,
-	UAV_TYPED_STORE                              = 128,
-	OUTPUT_MERGER_LOGIC_OP                       = 256,
-	TILED                                        = 512,
-	MULTIPLANE_OVERLAY                           = 16384,
-	SAMPLER_FEEDBACK                             = 32768,
+FORMAT_SUPPORT2 :: distinct bit_set[FORMAT_SUPPORT2_FLAG; u32]
+FORMAT_SUPPORT2_FLAG :: enum i32 {
+	UAV_ATOMIC_ADD                               = 0,
+	UAV_ATOMIC_BITWISE_OPS                       = 1,
+	UAV_ATOMIC_COMPARE_STORE_OR_COMPARE_EXCHANGE = 2,
+	UAV_ATOMIC_EXCHANGE                          = 3,
+	UAV_ATOMIC_SIGNED_MIN_OR_MAX                 = 4,
+	UAV_ATOMIC_UNSIGNED_MIN_OR_MAX               = 5,
+	UAV_TYPED_LOAD                               = 6,
+	UAV_TYPED_STORE                              = 7,
+	OUTPUT_MERGER_LOGIC_OP                       = 8,
+	TILED                                        = 9,
+
+	MULTIPLANE_OVERLAY                           = 14,
+	SAMPLER_FEEDBACK                             = 15,
 }
 
-MULTISAMPLE_QUALITY_LEVEL_FLAGS :: enum u32 { // TODO: make bit_set
-	NONE           = 0x0,
-	TILED_RESOURCE = 0x1,
+MULTISAMPLE_QUALITY_LEVEL_FLAGS :: distinct bit_set[MULTISAMPLE_QUALITY_LEVEL_FLAG; u32]
+MULTISAMPLE_QUALITY_LEVEL_FLAG :: enum u32 {
+	TILED_RESOURCE = 0,
 }
 
 CROSS_NODE_SHARING_TIER :: enum i32 {
@@ -1034,12 +1046,12 @@ FEATURE_DATA_GPU_VIRTUAL_ADDRESS_SUPPORT :: struct {
 	MaxGPUVirtualAddressBitsPerProcess:  u32,
 }
 
-SHADER_CACHE_SUPPORT_FLAGS :: enum u32 { // TODO: make bit_set
-	NONE                   = 0x0,
-	SINGLE_PSO             = 0x1,
-	LIBRARY                = 0x2,
-	AUTOMATIC_INPROC_CACHE = 0x4,
-	AUTOMATIC_DISK_CACHE   = 0x8,
+SHADER_CACHE_SUPPORT_FLAGS :: distinct bit_set[SHADER_CACHE_SUPPORT_FLAG; u32]
+SHADER_CACHE_SUPPORT_FLAG :: enum u32 {
+	SINGLE_PSO             = 0,
+	LIBRARY                = 1,
+	AUTOMATIC_INPROC_CACHE = 2,
+	AUTOMATIC_DISK_CACHE   = 3,
 }
 
 FEATURE_DATA_SHADER_CACHE :: struct {
@@ -1052,15 +1064,15 @@ FEATURE_DATA_COMMAND_QUEUE_PRIORITY :: struct {
 	PriorityForTypeIsSupported: BOOL,
 }
 
-COMMAND_LIST_SUPPORT_FLAGS :: enum u32 { // TODO: make bit_set
-	NONE          = 0x0,
-	DIRECT        = 0x1,
-	BUNDLE        = 0x2,
-	COMPUTE       = 0x4,
-	COPY          = 0x8,
-	VIDEO_DECODE  = 0x10,
-	VIDEO_PROCESS = 0x20,
-	VIDEO_ENCODE  = 0x40,
+COMMAND_LIST_SUPPORT_FLAGS :: distinct bit_set[COMMAND_LIST_SUPPORT_FLAG; u32]
+COMMAND_LIST_SUPPORT_FLAG :: enum u32 {
+	DIRECT        = 0,
+	BUNDLE        = 1,
+	COMPUTE       = 2,
+	COPY          = 3,
+	VIDEO_DECODE  = 4,
+	VIDEO_PROCESS = 5,
+	VIDEO_ENCODE  = 6,
 }
 
 FEATURE_DATA_OPTIONS3 :: struct {
@@ -1198,24 +1210,25 @@ HEAP_PROPERTIES :: struct {
 	VisibleNodeMask:      u32,
 }
 
-HEAP_FLAGS :: enum u32 { // TODO: make bit_set ???
-	NONE                           = 0x0,
-	SHARED                         = 0x1,
-	DENY_BUFFERS                   = 0x4,
-	ALLOW_DISPLAY                  = 0x8,
-	SHARED_CROSS_ADAPTER           = 0x20,
-	DENY_RT_DS_TEXTURES            = 0x40,
-	DENY_NON_RT_DS_TEXTURES        = 0x80,
-	HARDWARE_PROTECTED             = 0x100,
-	ALLOW_WRITE_WATCH              = 0x200,
-	ALLOW_SHADER_ATOMICS           = 0x400,
-	CREATE_NOT_RESIDENT            = 0x800,
-	CREATE_NOT_ZEROED              = 0x1000,
-	ALLOW_ALL_BUFFERS_AND_TEXTURES = 0x0,
-	ALLOW_ONLY_BUFFERS             = 0xc0,
-	ALLOW_ONLY_NON_RT_DS_TEXTURES  = 0x44,
-	ALLOW_ONLY_RT_DS_TEXTURES      = 0x84,
+HEAP_FLAGS :: distinct bit_set[HEAP_FLAG; u32]
+HEAP_FLAG :: enum u32 {
+	SHARED                         = 0,
+	DENY_BUFFERS                   = 2,
+	ALLOW_DISPLAY                  = 3,
+	SHARED_CROSS_ADAPTER           = 5,
+	DENY_RT_DS_TEXTURES            = 6,
+	DENY_NON_RT_DS_TEXTURES        = 7,
+	HARDWARE_PROTECTED             = 8,
+	ALLOW_WRITE_WATCH              = 9,
+	ALLOW_SHADER_ATOMICS           = 10,
+	CREATE_NOT_RESIDENT            = 11,
+	CREATE_NOT_ZEROED              = 12,
 }
+
+HEAP_FLAG_ALLOW_ALL_BUFFERS_AND_TEXTURES :: HEAP_FLAGS{}
+HEAP_FLAG_ALLOW_ONLY_BUFFERS             :: HEAP_FLAGS{.DENY_BUFFERS, .ALLOW_DISPLAY}
+HEAP_FLAG_ALLOW_ONLY_NON_RT_DS_TEXTURES  :: HEAP_FLAGS{.DENY_BUFFERS, .DENY_RT_DS_TEXTURES}
+HEAP_FLAG_ALLOW_ONLY_RT_DS_TEXTURES      :: HEAP_FLAGS{.DENY_BUFFERS, .DENY_NON_RT_DS_TEXTURES}
 
 HEAP_DESC :: struct {
 	SizeInBytes: u64,
@@ -1239,15 +1252,15 @@ TEXTURE_LAYOUT :: enum i32 {
 	_64KB_STANDARD_SWIZZLE  = 3,
 }
 
-RESOURCE_FLAGS :: enum u32 { // TODO: make bit_set
-	NONE                        = 0x0,
-	ALLOW_RENDER_TARGET         = 0x1,
-	ALLOW_DEPTH_STENCIL         = 0x2,
-	ALLOW_UNORDERED_ACCESS      = 0x4,
-	DENY_SHADER_RESOURCE        = 0x8,
-	ALLOW_CROSS_ADAPTER         = 0x10,
-	ALLOW_SIMULTANEOUS_ACCESS   = 0x20,
-	VIDEO_DECODE_REFERENCE_ONLY = 0x40,
+RESOURCE_FLAGS :: distinct bit_set[RESOURCE_FLAG; u32]
+RESOURCE_FLAG :: enum u32 {
+	ALLOW_RENDER_TARGET         = 0,
+	ALLOW_DEPTH_STENCIL         = 1,
+	ALLOW_UNORDERED_ACCESS      = 2,
+	DENY_SHADER_RESOURCE        = 3,
+	ALLOW_CROSS_ADAPTER         = 4,
+	ALLOW_SIMULTANEOUS_ACCESS   = 5,
+	VIDEO_DECODE_REFERENCE_ONLY = 6,
 }
 
 MIP_REGION :: struct {
@@ -1332,11 +1345,11 @@ TILE_REGION_SIZE :: struct {
 	Depth:    u16,
 }
 
-TILE_RANGE_FLAGS :: enum u32 { // TODO: make bit_set
-	NONE              = 0x0,
-	NULL              = 0x1,
-	SKIP              = 0x2,
-	REUSE_SINGLE_TILE = 0x4,
+TILE_RANGE_FLAGS :: distinct bit_set[TILE_RANGE_FLAG; u32]
+TILE_RANGE_FLAG :: enum u32 {
+	NULL              = 0,
+	SKIP              = 1,
+	REUSE_SINGLE_TILE = 2,
 }
 
 SUBRESOURCE_TILING :: struct {
@@ -1359,12 +1372,13 @@ PACKED_MIP_INFO :: struct {
 	StartTileIndexInOverallResource: u32,
 }
 
-TILE_MAPPING_FLAGS :: enum u32 { // TODO: make bit_set
-	NONE      = 0x0,
-	NO_HAZARD = 0x1,
+TILE_MAPPING_FLAGS :: distinct bit_set[TILE_MAPPING_FLAG; u32]
+TILE_MAPPING_FLAG :: enum u32 {
+	NO_HAZARD = 0,
 }
 
-TILE_COPY_FLAGS :: enum u32 { // TODO: make bit_set
+TILE_COPY_FLAGS :: distinct bit_set[TILE_COPY_FLAG; u32]
+TILE_COPY_FLAG :: enum u32 {
 	NONE                                     = 0x0,
 	NO_HAZARD                                = 0x1,
 	LINEAR_BUFFER_TO_SWIZZLED_TILED_RESOURCE = 0x2,
@@ -1422,10 +1436,10 @@ RESOURCE_UAV_BARRIER :: struct {
 	pResource: ^IResource,
 }
 
-RESOURCE_BARRIER_FLAGS :: enum u32 { // TODO: make bit_set
-	NONE       = 0x0,
-	BEGIN_ONLY = 0x1,
-	END_ONLY   = 0x2,
+RESOURCE_BARRIER_FLAGS :: distinct bit_set[RESOURCE_BARRIER_FLAG; u32]
+RESOURCE_BARRIER_FLAG :: enum u32 {
+	BEGIN_ONLY = 0,
+	END_ONLY   = 1,
 }
 
 RESOURCE_BARRIER :: struct {
@@ -1484,9 +1498,9 @@ VIEW_INSTANCE_LOCATION :: struct {
 	RenderTargetArrayIndex: u32,
 }
 
-VIEW_INSTANCING_FLAGS :: enum u32 { // TODO: make bit_set
-	NONE                         = 0x0,
-	ENABLE_VIEW_INSTANCE_MASKING = 0x1,
+VIEW_INSTANCING_FLAGS :: distinct bit_set[VIEW_INSTANCING_FLAG; u32]
+VIEW_INSTANCING_FLAG :: enum u32 {
+	ENABLE_VIEW_INSTANCE_MASKING = 0,
 }
 
 VIEW_INSTANCING_DESC :: struct {
@@ -1504,9 +1518,9 @@ SHADER_COMPONENT_MAPPING :: enum i32 {
 	FORCE_VALUE_1           = 5,
 }
 
-BUFFER_SRV_FLAGS :: enum u32 { // TODO: make bit_set
-	NONE = 0x0,
-	RAW  = 0x1,
+BUFFER_SRV_FLAGS :: distinct bit_set[BUFFER_SRV_FLAG; u32]
+BUFFER_SRV_FLAG :: enum u32 {
+	RAW = 0,
 }
 
 BUFFER_SRV :: struct {
@@ -1675,9 +1689,9 @@ SAMPLER_DESC :: struct {
 	MaxLOD:         f32,
 }
 
-BUFFER_UAV_FLAGS :: enum u32 { // TODO: make bit_set
-	NONE = 0x0,
-	RAW  = 0x1,
+BUFFER_UAV_FLAGS :: distinct bit_set[BUFFER_UAV_FLAG; u32]
+BUFFER_UAV_FLAG :: enum u32 {
+	RAW = 0,
 }
 
 BUFFER_UAV :: struct {
@@ -1837,10 +1851,10 @@ TEX2DMS_ARRAY_DSV :: struct {
 	ArraySize:       u32,
 }
 
-DSV_FLAGS :: enum u32 { // TODO: make bit_set
-	NONE              = 0x0,
-	READ_ONLY_DEPTH   = 0x1,
-	READ_ONLY_STENCIL = 0x2,
+DSV_FLAGS :: distinct bit_set[DSV_FLAG; u32]
+DSV_FLAG :: enum u32 {
+	READ_ONLY_DEPTH   = 0,
+	READ_ONLY_STENCIL = 1,
 }
 
 DSV_DIMENSION :: enum i32 {
@@ -1867,16 +1881,17 @@ DEPTH_STENCIL_VIEW_DESC :: struct {
 	},
 }
 
-CLEAR_FLAGS :: enum u32 { // TODO: make bit_set
-	DEPTH   = 0x1,
-	STENCIL = 0x2,
+CLEAR_FLAGS :: distinct bit_set[CLEAR_FLAG; u32]
+CLEAR_FLAG :: enum u32 {
+	DEPTH   = 0,
+	STENCIL = 1,
 }
 
-FENCE_FLAGS :: enum u32 { // TODO: make bit_set
-	NONE                 = 0x0,
-	SHARED               = 0x1,
-	SHARED_CROSS_ADAPTER = 0x2,
-	NON_MONITORED        = 0x4,
+FENCE_FLAGS :: distinct bit_set[FENCE_FLAG; u32]
+FENCE_FLAG :: enum u32 {
+	SHARED               = 0,
+	SHARED_CROSS_ADAPTER = 1,
+	NON_MONITORED        = 2,
 }
 
 DESCRIPTOR_HEAP_TYPE :: enum i32 {
@@ -1887,9 +1902,9 @@ DESCRIPTOR_HEAP_TYPE :: enum i32 {
 	NUM_TYPES   = 4,
 }
 
-DESCRIPTOR_HEAP_FLAGS :: enum u32 { // TODO: make bit_set
-	NONE           = 0x0,
-	SHADER_VISIBLE = 0x1,
+DESCRIPTOR_HEAP_FLAGS :: distinct bit_set[DESCRIPTOR_HEAP_FLAG; u32]
+DESCRIPTOR_HEAP_FLAG :: enum u32 {
+	SHADER_VISIBLE = 0,
 }
 
 DESCRIPTOR_HEAP_DESC :: struct {
@@ -1959,18 +1974,18 @@ ROOT_PARAMETER :: struct {
 	ShaderVisibility: SHADER_VISIBILITY,
 }
 
-ROOT_SIGNATURE_FLAGS :: enum u32 { // TODO: make bit_set
-	NONE                                  = 0x0,
-	ALLOW_INPUT_ASSEMBLER_INPUT_LAYOUT    = 0x1,
-	DENY_VERTEX_SHADER_ROOT_ACCESS        = 0x2,
-	DENY_HULL_SHADER_ROOT_ACCESS          = 0x4,
-	DENY_DOMAIN_SHADER_ROOT_ACCESS        = 0x8,
-	DENY_GEOMETRY_SHADER_ROOT_ACCESS      = 0x10,
-	DENY_PIXEL_SHADER_ROOT_ACCESS         = 0x20,
-	ALLOW_STREAM_OUTPUT                   = 0x40,
-	LOCAL_ROOT_SIGNATURE                  = 0x80,
-	DENY_AMPLIFICATION_SHADER_ROOT_ACCESS = 0x100,
-	DENY_MESH_SHADER_ROOT_ACCESS          = 0x200,
+ROOT_SIGNATURE_FLAGS :: distinct bit_set[ROOT_SIGNATURE_FLAG; u32]
+ROOT_SIGNATURE_FLAG :: enum u32 {
+	ALLOW_INPUT_ASSEMBLER_INPUT_LAYOUT    = 0,
+	DENY_VERTEX_SHADER_ROOT_ACCESS        = 1,
+	DENY_HULL_SHADER_ROOT_ACCESS          = 2,
+	DENY_DOMAIN_SHADER_ROOT_ACCESS        = 3,
+	DENY_GEOMETRY_SHADER_ROOT_ACCESS      = 4,
+	DENY_PIXEL_SHADER_ROOT_ACCESS         = 5,
+	ALLOW_STREAM_OUTPUT                   = 6,
+	LOCAL_ROOT_SIGNATURE                  = 7,
+	DENY_AMPLIFICATION_SHADER_ROOT_ACCESS = 8,
+	DENY_MESH_SHADER_ROOT_ACCESS          = 9,
 }
 
 STATIC_BORDER_COLOR :: enum i32 {
@@ -2003,13 +2018,13 @@ ROOT_SIGNATURE_DESC :: struct {
 	Flags:             ROOT_SIGNATURE_FLAGS,
 }
 
-DESCRIPTOR_RANGE_FLAGS :: enum u32 { // TODO: make bit_set
-	NONE                                            = 0x0,
-	DESCRIPTORS_VOLATILE                            = 0x1,
-	DATA_VOLATILE                                   = 0x2,
-	DATA_STATIC_WHILE_SET_AT_EXECUTE                = 0x4,
-	DATA_STATIC                                     = 0x8,
-	DESCRIPTORS_STATIC_KEEPING_BUFFER_BOUNDS_CHECKS = 0x10000,
+DESCRIPTOR_RANGE_FLAGS :: distinct bit_set[DESCRIPTOR_RANGE_FLAG; u32]
+DESCRIPTOR_RANGE_FLAG :: enum u32 {
+	DESCRIPTORS_VOLATILE                            = 0,
+	DATA_VOLATILE                                   = 1,
+	DATA_STATIC_WHILE_SET_AT_EXECUTE                = 2,
+	DATA_STATIC                                     = 3,
+	DESCRIPTORS_STATIC_KEEPING_BUFFER_BOUNDS_CHECKS = 16,
 }
 
 DESCRIPTOR_RANGE1 :: struct {
@@ -2026,11 +2041,11 @@ ROOT_DESCRIPTOR_TABLE1 :: struct {
 	pDescriptorRanges:   ^DESCRIPTOR_RANGE1,
 }
 
-ROOT_DESCRIPTOR_FLAGS :: enum u32 { // TODO: make bit_set
-	NONE                             = 0x0,
-	DATA_VOLATILE                    = 0x2,
-	DATA_STATIC_WHILE_SET_AT_EXECUTE = 0x4,
-	DATA_STATIC                      = 0x8,
+ROOT_DESCRIPTOR_FLAGS :: distinct bit_set[ROOT_DESCRIPTOR_FLAG; u32]
+ROOT_DESCRIPTOR_FLAG :: enum u32 {
+	DATA_VOLATILE                    = 2,
+	DATA_STATIC_WHILE_SET_AT_EXECUTE = 3,
+	DATA_STATIC                      = 4,
 }
 
 ROOT_DESCRIPTOR1 :: struct {
@@ -2571,11 +2586,13 @@ IPipelineLibrary1_VTable :: struct {
 	LoadPipeline: proc "stdcall" (this: ^IPipelineLibrary1, pName: [^]u16, pDesc: ^PIPELINE_STATE_STREAM_DESC, riid: ^IID, ppPipelineState: ^rawptr) -> HRESULT,
 }
 
-MULTIPLE_FENCE_WAIT_FLAGS :: enum u32 { // TODO: make bit_set
-	NONE = 0x0,
-	ANY  = 0x1,
-	ALL  = 0x0,
+MULTIPLE_FENCE_WAIT_FLAGS :: distinct bit_set[MULTIPLE_FENCE_WAIT_FLAG; u32]
+MULTIPLE_FENCE_WAIT_FLAG :: enum u32 {
+	ANY = 0,
 }
+MULTIPLE_FENCE_WAIT_FLAG_NONE :: MULTIPLE_FENCE_WAIT_FLAGS{}
+MULTIPLE_FENCE_WAIT_FLAG_ANY  :: MULTIPLE_FENCE_WAIT_FLAGS{.ANY}
+MULTIPLE_FENCE_WAIT_FLAG_ALL  :: MULTIPLE_FENCE_WAIT_FLAGS{}
 
 RESIDENCY_PRIORITY :: enum i32 {
 	MINIMUM = 671088640,
@@ -2611,9 +2628,9 @@ IDevice2_VTable :: struct {
 	CreatePipelineState: proc "stdcall" (this: ^IDevice2, pDesc: ^PIPELINE_STATE_STREAM_DESC, riid: ^IID, ppPipelineState: ^rawptr) -> HRESULT,
 }
 
-RESIDENCY_FLAGS :: enum u32 { // TODO: make bit_set
-	NONE            = 0x0,
-	DENY_OVERBUDGET = 0x1,
+RESIDENCY_FLAGS :: distinct bit_set[RESIDENCY_FLAG; u32]
+RESIDENCY_FLAG :: enum u32 {
+	DENY_OVERBUDGET = 0,
 }
 
 
@@ -2630,16 +2647,16 @@ IDevice3_VTable :: struct {
 	EnqueueMakeResident:             proc "stdcall" (this: ^IDevice3, Flags: RESIDENCY_FLAGS, NumObjects: u32, ppObjects: ^^IPageable, pFenceToSignal: ^IFence, FenceValueToSignal: u64) -> HRESULT,
 }
 
-COMMAND_LIST_FLAGS :: enum u32 { // TODO: make bit_set
-	COMMAND_LIST_FLAG_NONE = 0x0,
+COMMAND_LIST_FLAGS :: distinct bit_set[COMMAND_LIST_FLAG; u32]
+COMMAND_LIST_FLAG :: enum u32 {
 }
 
-COMMAND_POOL_FLAGS :: enum u32 { // TODO: make bit_set
-	COMMAND_POOL_FLAG_NONE = 0x0,
+COMMAND_POOL_FLAGS :: distinct bit_set[COMMAND_POOL_FLAG; u32]
+COMMAND_POOL_FLAG :: enum u32 {
 }
 
-COMMAND_RECORDER_FLAGS :: enum u32 { // TODO: make bit_set
-	COMMAND_RECORDER_FLAG_NONE = 0x0,
+COMMAND_RECORDER_FLAGS :: distinct bit_set[COMMAND_RECORDER_FLAG; u32]
+COMMAND_RECORDER_FLAG :: enum u32 {
 }
 
 PROTECTED_SESSION_STATUS :: enum i32 {
@@ -2660,9 +2677,9 @@ IProtectedSession_VTable :: struct {
 	GetSessionStatus: proc "stdcall" (this: ^IProtectedSession) -> PROTECTED_SESSION_STATUS,
 }
 
-PROTECTED_RESOURCE_SESSION_SUPPORT_FLAGS :: enum u32 { // TODO: make bit_set
-	NONE      = 0x0,
-	SUPPORTED = 0x1,
+PROTECTED_RESOURCE_SESSION_SUPPORT_FLAGS :: distinct bit_set[PROTECTED_RESOURCE_SESSION_SUPPORT_FLAG; u32]
+PROTECTED_RESOURCE_SESSION_SUPPORT_FLAG :: enum u32 {
+	SUPPORTED = 0,
 }
 
 FEATURE_DATA_PROTECTED_RESOURCE_SESSION_SUPPORT :: struct {
@@ -2670,8 +2687,8 @@ FEATURE_DATA_PROTECTED_RESOURCE_SESSION_SUPPORT :: struct {
 	Support:   PROTECTED_RESOURCE_SESSION_SUPPORT_FLAGS,
 }
 
-PROTECTED_RESOURCE_SESSION_FLAGS :: enum u32 { // TODO: make bit_set
-	PROTECTED_RESOURCE_SESSION_FLAG_NONE = 0x0,
+PROTECTED_RESOURCE_SESSION_FLAGS :: distinct bit_set[PROTECTED_RESOURCE_SESSION_FLAG; u32]
+PROTECTED_RESOURCE_SESSION_FLAG :: enum u32 {
 }
 
 PROTECTED_RESOURCE_SESSION_DESC :: struct {
@@ -2760,9 +2777,10 @@ META_COMMAND_PARAMETER_TYPE :: enum i32 {
 	GPU_DESCRIPTOR_HANDLE_HEAP_TYPE_CBV_SRV_UAV = 4,
 }
 
-META_COMMAND_PARAMETER_FLAGS :: enum u32 { // TODO: make bit_set
-	INPUT  = 0x1,
-	OUTPUT = 0x2,
+META_COMMAND_PARAMETER_FLAGS :: distinct bit_set[META_COMMAND_PARAMETER_FLAG; u32]
+META_COMMAND_PARAMETER_FLAG :: enum u32 {
+	INPUT  = 0,
+	OUTPUT = 1,
 }
 
 META_COMMAND_PARAMETER_STAGE :: enum i32 {
@@ -2850,11 +2868,11 @@ STATE_SUBOBJECT :: struct {
 	pDesc: rawptr,
 }
 
-STATE_OBJECT_FLAGS :: enum u32 { // TODO: make bit_set
-	NONE                                             = 0x0,
-	ALLOW_LOCAL_DEPENDENCIES_ON_EXTERNAL_DEFINITIONS = 0x1,
-	ALLOW_EXTERNAL_DEPENDENCIES_ON_LOCAL_DEFINITIONS = 0x2,
-	ALLOW_STATE_OBJECT_ADDITIONS                     = 0x4,
+STATE_OBJECT_FLAGS :: distinct bit_set[STATE_OBJECT_FLAG; u32]
+STATE_OBJECT_FLAG :: enum u32 {
+	ALLOW_LOCAL_DEPENDENCIES_ON_EXTERNAL_DEFINITIONS = 0,
+	ALLOW_EXTERNAL_DEPENDENCIES_ON_LOCAL_DEFINITIONS = 1,
+	ALLOW_STATE_OBJECT_ADDITIONS                     = 2,
 }
 
 STATE_OBJECT_CONFIG :: struct {
@@ -2873,8 +2891,8 @@ NODE_MASK :: struct {
 	NodeMask: u32,
 }
 
-EXPORT_FLAGS :: enum u32 { // TODO: make bit_set
-	EXPORT_FLAG_NONE = 0x0,
+EXPORT_FLAGS :: distinct bit_set[EXPORT_FLAG; u32]
+EXPORT_FLAG :: enum u32 {
 }
 
 EXPORT_DESC :: struct {
@@ -2929,10 +2947,10 @@ RAYTRACING_PIPELINE_CONFIG :: struct {
 	MaxTraceRecursionDepth: u32,
 }
 
-RAYTRACING_PIPELINE_FLAGS :: enum u32 { // TODO: make bit_set
-	NONE                       = 0x0,
-	SKIP_TRIANGLES             = 0x100,
-	SKIP_PROCEDURAL_PRIMITIVES = 0x200,
+RAYTRACING_PIPELINE_FLAGS :: distinct bit_set[RAYTRACING_PIPELINE_FLAG; u32]
+RAYTRACING_PIPELINE_FLAG :: enum u32 {
+	SKIP_TRIANGLES             = 8,
+	SKIP_PROCEDURAL_PRIMITIVES = 9,
 }
 
 RAYTRACING_PIPELINE_CONFIG1 :: struct {
@@ -2951,10 +2969,10 @@ STATE_OBJECT_DESC :: struct {
 	pSubobjects:   ^STATE_SUBOBJECT,
 }
 
-RAYTRACING_GEOMETRY_FLAGS :: enum u32 { // TODO: make bit_set
-	NONE                           = 0x0,
-	OPAQUE                         = 0x1,
-	NO_DUPLICATE_ANYHIT_INVOCATION = 0x2,
+RAYTRACING_GEOMETRY_FLAGS :: distinct bit_set[RAYTRACING_GEOMETRY_FLAG; u32]
+RAYTRACING_GEOMETRY_FLAG :: enum u32 {
+	OPAQUE                         = 0,
+	NO_DUPLICATE_ANYHIT_INVOCATION = 1,
 }
 
 RAYTRACING_GEOMETRY_TYPE :: enum i32 {
@@ -2962,12 +2980,12 @@ RAYTRACING_GEOMETRY_TYPE :: enum i32 {
 	PROCEDURAL_PRIMITIVE_AABBS = 1,
 }
 
-RAYTRACING_INSTANCE_FLAGS :: enum u32 { // TODO: make bit_set
-	NONE                            = 0x0,
-	TRIANGLE_CULL_DISABLE           = 0x1,
-	TRIANGLE_FRONT_COUNTERCLOCKWISE = 0x2,
-	FORCE_OPAQUE                    = 0x4,
-	FORCE_NON_OPAQUE                = 0x8,
+RAYTRACING_INSTANCE_FLAGS :: distinct bit_set[RAYTRACING_INSTANCE_FLAG; u32]
+RAYTRACING_INSTANCE_FLAG :: enum u32 {
+	TRIANGLE_CULL_DISABLE           = 0,
+	TRIANGLE_FRONT_COUNTERCLOCKWISE = 1,
+	FORCE_OPAQUE                    = 2,
+	FORCE_NON_OPAQUE                = 3,
 }
 
 GPU_VIRTUAL_ADDRESS_AND_STRIDE :: struct {
@@ -3010,14 +3028,14 @@ RAYTRACING_GEOMETRY_AABBS_DESC :: struct {
 	AABBs:     GPU_VIRTUAL_ADDRESS_AND_STRIDE,
 }
 
-RAYTRACING_ACCELERATION_STRUCTURE_BUILD_FLAGS :: enum u32 { // TODO: make bit_set
-	NONE              = 0x0,
-	ALLOW_UPDATE      = 0x1,
-	ALLOW_COMPACTION  = 0x2,
-	PREFER_FAST_TRACE = 0x4,
-	PREFER_FAST_BUILD = 0x8,
-	MINIMIZE_MEMORY   = 0x10,
-	PERFORM_UPDATE    = 0x20,
+RAYTRACING_ACCELERATION_STRUCTURE_BUILD_FLAGS :: distinct bit_set[RAYTRACING_ACCELERATION_STRUCTURE_BUILD_FLAG; u32]
+RAYTRACING_ACCELERATION_STRUCTURE_BUILD_FLAG :: enum u32 {
+	ALLOW_UPDATE      = 0,
+	ALLOW_COMPACTION  = 1,
+	PREFER_FAST_TRACE = 2,
+	PREFER_FAST_BUILD = 3,
+	MINIMIZE_MEMORY   = 4,
+	PERFORM_UPDATE    = 5,
 }
 
 RAYTRACING_ACCELERATION_STRUCTURE_COPY_MODE :: enum i32 {
@@ -3137,18 +3155,18 @@ RAYTRACING_ACCELERATION_STRUCTURE_PREBUILD_INFO :: struct {
 	UpdateScratchDataSizeInBytes: u64,
 }
 
-RAY_FLAGS :: enum u32 { // TODO: make bit_set
-	NONE                            = 0x0,
-	FORCE_OPAQUE                    = 0x1,
-	FORCE_NON_OPAQUE                = 0x2,
-	ACCEPT_FIRST_HIT_AND_END_SEARCH = 0x4,
-	SKIP_CLOSEST_HIT_SHADER         = 0x8,
-	CULL_BACK_FACING_TRIANGLES      = 0x10,
-	CULL_FRONT_FACING_TRIANGLES     = 0x20,
-	CULL_OPAQUE                     = 0x40,
-	CULL_NON_OPAQUE                 = 0x80,
-	SKIP_TRIANGLES                  = 0x100,
-	SKIP_PROCEDURAL_PRIMITIVES      = 0x200,
+RAY_FLAGS :: distinct bit_set[RAY_FLAG; u32]
+RAY_FLAG :: enum u32 {
+	FORCE_OPAQUE                    = 0,
+	FORCE_NON_OPAQUE                = 1,
+	ACCEPT_FIRST_HIT_AND_END_SEARCH = 2,
+	SKIP_CLOSEST_HIT_SHADER         = 3,
+	CULL_BACK_FACING_TRIANGLES      = 4,
+	CULL_FRONT_FACING_TRIANGLES     = 5,
+	CULL_OPAQUE                     = 6,
+	CULL_NON_OPAQUE                 = 7,
+	SKIP_TRIANGLES                  = 8,
+	SKIP_PROCEDURAL_PRIMITIVES      = 9,
 }
 
 HIT_KIND :: enum i32 {
@@ -3260,10 +3278,10 @@ DRED_VERSION :: enum i32 {
 	_1_2 = 3,
 }
 
-DRED_FLAGS :: enum u32 { // TODO: make bit_set
-	NONE                    = 0x0,
-	FORCE_ENABLE            = 0x1,
-	DISABLE_AUTOBREADCRUMBS = 0x2,
+DRED_FLAGS :: distinct bit_set[DRED_FLAG; u32]
+DRED_FLAG :: enum u32 {
+	FORCE_ENABLE            = 0,
+	DISABLE_AUTOBREADCRUMBS = 1,
 }
 
 DRED_ENABLEMENT :: enum i32 {
@@ -3611,11 +3629,11 @@ RENDER_PASS_DEPTH_STENCIL_DESC :: struct {
 	StencilEndingAccess:    RENDER_PASS_ENDING_ACCESS,
 }
 
-RENDER_PASS_FLAGS :: enum u32 { // TODO: make bit_set
-	NONE             = 0x0,
-	ALLOW_UAV_WRITES = 0x1,
-	SUSPENDING_PASS  = 0x2,
-	RESUMING_PASS    = 0x4,
+RENDER_PASS_FLAGS :: distinct bit_set[RENDER_PASS_FLAG; u32]
+RENDER_PASS_FLAG :: enum u32 {
+	ALLOW_UAV_WRITES = 0,
+	SUSPENDING_PASS  = 1,
+	RESUMING_PASS    = 2,
 }
 
 
@@ -3697,9 +3715,9 @@ IDebug_VTable :: struct {
 	EnableDebugLayer: proc "stdcall" (this: ^IDebug),
 }
 
-GPU_BASED_VALIDATION_FLAGS :: enum u32 { // TODO: make bit_set
-	NONE                   = 0x0,
-	DISABLE_STATE_TRACKING = 0x1,
+GPU_BASED_VALIDATION_FLAGS :: distinct bit_set[GPU_BASED_VALIDATION_FLAG; u32]
+GPU_BASED_VALIDATION_FLAG :: enum u32 {
+	DISABLE_STATE_TRACKING = 0,
 }
 
 
@@ -3741,11 +3759,11 @@ IDebug3_VTable :: struct {
 	SetGPUBasedValidationFlags:                  proc "stdcall" (this: ^IDebug3, Flags: GPU_BASED_VALIDATION_FLAGS),
 }
 
-RLDO_FLAGS :: enum u32 { // TODO: make bit_set
-	NONE            = 0x0,
-	SUMMARY         = 0x1,
-	DETAIL          = 0x2,
-	IGNORE_INTERNAL = 0x4,
+RLDO_FLAGS :: distinct bit_set[RLDO_FLAG; u32]
+RLDO_FLAG :: enum u32 {
+	SUMMARY         = 0,
+	DETAIL          = 1,
+	IGNORE_INTERNAL = 2,
 }
 
 DEBUG_DEVICE_PARAMETER_TYPE :: enum i32 {
@@ -3754,12 +3772,12 @@ DEBUG_DEVICE_PARAMETER_TYPE :: enum i32 {
 	GPU_SLOWDOWN_PERFORMANCE_FACTOR = 2,
 }
 
-DEBUG_FEATURE :: enum i32 { // TODO: make bit_set
-	NONE                                   = 0,
-	ALLOW_BEHAVIOR_CHANGING_DEBUG_AIDS     = 1,
-	CONSERVATIVE_RESOURCE_STATE_TRACKING   = 2,
-	DISABLE_VIRTUALIZED_BUNDLES_VALIDATION = 4,
-	EMULATE_WINDOWS7                       = 8,
+DEBUG_FEATURE :: distinct bit_set[DEBUG_FEATURE_FLAG; u32]
+DEBUG_FEATURE_FLAG :: enum i32 {
+	ALLOW_BEHAVIOR_CHANGING_DEBUG_AIDS     = 0,
+	CONSERVATIVE_RESOURCE_STATE_TRACKING   = 1,
+	DISABLE_VIRTUALIZED_BUNDLES_VALIDATION = 2,
+	EMULATE_WINDOWS7                       = 3,
 }
 
 GPU_BASED_VALIDATION_SHADER_PATCH_MODE :: enum i32 {
@@ -3770,12 +3788,16 @@ GPU_BASED_VALIDATION_SHADER_PATCH_MODE :: enum i32 {
 	NUM_GPU_BASED_VALIDATION_SHADER_PATCH_MODES = 4,
 }
 
-GPU_BASED_VALIDATION_PIPELINE_STATE_CREATE_FLAGS :: enum u32 { // TODO: make bit_set
-	GPU_BASED_VALIDATION_PIPELINE_STATE_CREATE_FLAG_NONE                                           = 0x0,
-	GPU_BASED_VALIDATION_PIPELINE_STATE_CREATE_FLAG_FRONT_LOAD_CREATE_TRACKING_ONLY_SHADERS        = 0x1,
-	GPU_BASED_VALIDATION_PIPELINE_STATE_CREATE_FLAG_FRONT_LOAD_CREATE_UNGUARDED_VALIDATION_SHADERS = 0x2,
-	GPU_BASED_VALIDATION_PIPELINE_STATE_CREATE_FLAG_FRONT_LOAD_CREATE_GUARDED_VALIDATION_SHADERS   = 0x4,
-	VALID_MASK                                                                                           = 0x7,
+GPU_BASED_VALIDATION_PIPELINE_STATE_CREATE_FLAGS :: distinct bit_set[GPU_BASED_VALIDATION_PIPELINE_STATE_CREATE_FLAG; u32]
+GPU_BASED_VALIDATION_PIPELINE_STATE_CREATE_FLAG :: enum u32 {
+	FRONT_LOAD_CREATE_TRACKING_ONLY_SHADERS        = 0,
+	FRONT_LOAD_CREATE_UNGUARDED_VALIDATION_SHADERS = 1,
+	FRONT_LOAD_CREATE_GUARDED_VALIDATION_SHADERS   = 2,
+}
+GPU_BASED_VALIDATION_PIPELINE_STATE_CREATE_FLAG_VALID_MASK :: GPU_BASED_VALIDATION_PIPELINE_STATE_CREATE_FLAGS{
+	.FRONT_LOAD_CREATE_TRACKING_ONLY_SHADERS,
+	.FRONT_LOAD_CREATE_UNGUARDED_VALIDATION_SHADERS,
+	.FRONT_LOAD_CREATE_GUARDED_VALIDATION_SHADERS,
 }
 
 DEBUG_DEVICE_GPU_BASED_VALIDATION_SETTINGS :: struct {
