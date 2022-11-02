@@ -82,7 +82,7 @@ A wiki maintained by the Odin community.
 
 #### [Odin Discord](https://discord.gg/sVBPHEv)
 
-Get live support and talk with other odiners on the Odin Discord.
+Get live support and talk with other Odin programmers on the Odin Discord.
 
 ### Articles
 
