@@ -84,7 +84,7 @@ def convert_type(t, prev_name, curr_name):
         else:
             ttype = t[:len(t)-1]
             elem = convert_type(ttype, prev_name, curr_name)
-            
+
         if curr_name.endswith("s") or curr_name.endswith("Table"):
             if prev_name.endswith("Count") or prev_name.endswith("Counts"):
                 pointer = "[^]"
@@ -95,10 +95,10 @@ def convert_type(t, prev_name, curr_name):
                     pointer = "[^]"
             elif curr_name.startswith("p"):
                 pointer = "[^]"
-                
+
         if curr_name and elem.endswith("Flags"):
             pointer = "[^]"
-                    
+
         return "{}{}".format(pointer, elem)
     elif t[0].isupper():
         return t
@@ -276,7 +276,7 @@ def parse_enums(f):
     f.write("// Enums\n")
 
     data = re.findall(r"typedef enum Vk(\w+) {(.+?)} \w+;", src, re.S)
-    
+
     data.sort(key=lambda x: x[0])
 
     generated_flags = set()
@@ -458,14 +458,14 @@ def parse_procedures(f):
 
     for rt, name, fields in data:
         proc_name = no_vk(name)
-        
+
         pf = []
         prev_name = ""
         for type_, fname in re.findall(r"(?:\s*|)(.+?)\s*(\w+)(?:,|$)", fields):
             curr_name = fix_arg(fname)
             pf.append((do_type(type_, prev_name, curr_name), curr_name))
             prev_name = curr_name
-            
+
         data_fields = ', '.join(["{}: {}".format(n, t) for t, n in pf if t != ""])
 
         ts = "proc \"c\" ({})".format(data_fields)
@@ -510,7 +510,7 @@ def group_functions(f):
 
         if table_name in ('Device', 'Queue', 'CommandBuffer') and name != 'GetDeviceProcAddr':
             group_map["Device"].append(nn)
-        elif table_name in ('Instance', 'PhysicalDevice') or name == 'GetDeviceProcAddr':
+        elif table_name in ('Instance', 'PhysicalDevice') and name != 'ProcGetInstanceProcAddr' or name == 'GetDeviceProcAddr':
             group_map["Instance"].append(nn)
         elif table_name in ('rawptr', '', 'DebugReportFlagsEXT') or name == 'GetInstanceProcAddr':
             # Skip the allocation function and the dll entry point

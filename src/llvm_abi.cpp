@@ -537,6 +537,22 @@ namespace lbAbiAmd64SysV {
 		return false;
 	}
 
+	bool is_llvm_type_slice_like(LLVMTypeRef type) {
+		if (!lb_is_type_kind(type, LLVMStructTypeKind)) {
+			return false;
+		}
+		if (LLVMCountStructElementTypes(type) != 2) {
+			return false;
+		}
+		LLVMTypeRef fields[2] = {};
+		LLVMGetStructElementTypes(type, fields);
+		if (!lb_is_type_kind(fields[0], LLVMPointerTypeKind)) {
+			return false;
+		}
+		return lb_is_type_kind(fields[1], LLVMIntegerTypeKind) && lb_sizeof(fields[1]) == 8;
+
+	}
+
 	lbArgType amd64_type(LLVMContextRef c, LLVMTypeRef type, Amd64TypeAttributeKind attribute_kind, ProcCallingConvention calling_convention) {
 		if (is_register(type)) {
 			LLVMAttributeRef attribute = nullptr;
@@ -550,16 +566,25 @@ namespace lbAbiAmd64SysV {
 		if (is_mem_cls(cls, attribute_kind)) {
 			LLVMAttributeRef attribute = nullptr;
 			if (attribute_kind == Amd64TypeAttribute_ByVal) {
-				if (!is_calling_convention_odin(calling_convention)) {
+				// if (!is_calling_convention_odin(calling_convention)) {
 					return lb_arg_type_indirect_byval(c, type);
-				}
-				attribute = nullptr;
+				// }
+				// attribute = nullptr;
 			} else if (attribute_kind == Amd64TypeAttribute_StructRect) {
 				attribute = lb_create_enum_attribute_with_type(c, "sret", type);
 			}
 			return lb_arg_type_indirect(type, attribute);
 		} else {
-			return lb_arg_type_direct(type, llreg(c, cls), nullptr, nullptr);
+			LLVMTypeRef reg_type = nullptr;
+			if (is_llvm_type_slice_like(type)) {
+				// NOTE(bill): This is to make the ABI look closer to what the
+				// original code is just for slices/strings whilst still adhering
+				// the ABI rules for SysV
+				reg_type = type;
+			} else {
+				reg_type = llreg(c, cls);
+			}
+			return lb_arg_type_direct(type, reg_type, nullptr, nullptr);
 		}
 	}
 
@@ -982,13 +1007,13 @@ namespace lbAbiArm64 {
 		}
 		return false;
 	}
-    
-    unsigned is_homogenous_aggregate_small_enough(LLVMTypeRef *base_type_, unsigned member_count_) {
-        return (member_count_ <= 4);
-    }
+
+	unsigned is_homogenous_aggregate_small_enough(LLVMTypeRef base_type, unsigned member_count) {
+		return (member_count <= 4);
+	}
 
 	lbArgType compute_return_type(LLVMContextRef c, LLVMTypeRef type, bool return_is_defined) {
-		LLVMTypeRef homo_base_type = {};
+		LLVMTypeRef homo_base_type = nullptr;
 		unsigned homo_member_count = 0;
 
 		if (!return_is_defined) {
@@ -996,16 +1021,16 @@ namespace lbAbiArm64 {
 		} else if (is_register(type)) {
 			return non_struct(c, type);
 		} else if (is_homogenous_aggregate(c, type, &homo_base_type, &homo_member_count)) {
-            if(is_homogenous_aggregate_small_enough(&homo_base_type, homo_member_count)) {
-                return lb_arg_type_direct(type, LLVMArrayType(homo_base_type, homo_member_count), nullptr, nullptr);
-            } else {
-                //TODO(Platin): do i need to create stuff that can handle the diffrent return type?
-                //              else this needs a fix in llvm_backend_proc as we would need to cast it to the correct array type
-                
-                //LLVMTypeRef array_type = LLVMArrayType(homo_base_type, homo_member_count);
-                LLVMAttributeRef attr = lb_create_enum_attribute_with_type(c, "sret", type);
-                return lb_arg_type_indirect(type, attr);
-            }
+			if (is_homogenous_aggregate_small_enough(homo_base_type, homo_member_count)) {
+				return lb_arg_type_direct(type, LLVMArrayType(homo_base_type, homo_member_count), nullptr, nullptr);
+			} else {
+				//TODO(Platin): do i need to create stuff that can handle the diffrent return type?
+				//              else this needs a fix in llvm_backend_proc as we would need to cast it to the correct array type
+
+				//LLVMTypeRef array_type = LLVMArrayType(homo_base_type, homo_member_count);
+				LLVMAttributeRef attr = lb_create_enum_attribute_with_type(c, "sret", type);
+				return lb_arg_type_indirect(type, attr);
+			}
 		} else {
 			i64 size = lb_sizeof(type);
 			if (size <= 16) {

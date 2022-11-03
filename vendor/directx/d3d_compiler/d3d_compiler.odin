@@ -45,50 +45,57 @@ foreign d3dcompiler {
 
 
 
-D3DCOMPILE :: enum u32 { // TODO: make bit_field
-	DEBUG                              = 1 << 0,
-	SKIP_VALIDATION                    = 1 << 1,
-	SKIP_OPTIMIZATION                  = 1 << 2,
-	PACK_MATRIX_ROW_MAJOR              = 1 << 3,
-	PACK_MATRIX_COLUMN_MAJOR           = 1 << 4,
-	PARTIAL_PRECISION                  = 1 << 5,
-	FORCE_VS_SOFTWARE_NO_OPT           = 1 << 6,
-	FORCE_PS_SOFTWARE_NO_OPT           = 1 << 7,
-	NO_PRESHADER                       = 1 << 8,
-	AVOID_FLOW_CONTROL                 = 1 << 9,
-	PREFER_FLOW_CONTROL                = 1 << 10,
-	ENABLE_STRICTNESS                  = 1 << 11,
-	ENABLE_BACKWARDS_COMPATIBILITY     = 1 << 12,
-	IEEE_STRICTNESS                    = 1 << 13,
-	OPTIMIZATION_LEVEL0                = 1 << 14,
-	OPTIMIZATION_LEVEL1                = 0,
-	OPTIMIZATION_LEVEL2                = (1 << 14)|(1 << 15), // Added manually
-	OPTIMIZATION_LEVEL3                = 1 << 15,
-	RESERVED16                         = 1 << 16,
-	RESERVED17                         = 1 << 17,
-	WARNINGS_ARE_ERRORS                = 1 << 18,
-	RESOURCES_MAY_ALIAS                = 1 << 19,
-	ENABLE_UNBOUNDED_DESCRIPTOR_TABLES = 1 << 20,
-	ALL_RESOURCES_BOUND                = 1 << 21,
-	DEBUG_NAME_FOR_SOURCE              = 1 << 22,
-	DEBUG_NAME_FOR_BINARY              = 1 << 23,
+D3DCOMPILE :: distinct bit_set[D3DCOMPILE_FLAG; u32]
+D3DCOMPILE_FLAG :: enum u32 {
+	DEBUG                              = 0,
+	SKIP_VALIDATION                    = 1,
+	SKIP_OPTIMIZATION                  = 2,
+	PACK_MATRIX_ROW_MAJOR              = 3,
+	PACK_MATRIX_COLUMN_MAJOR           = 4,
+	PARTIAL_PRECISION                  = 5,
+	FORCE_VS_SOFTWARE_NO_OPT           = 6,
+	FORCE_PS_SOFTWARE_NO_OPT           = 7,
+	NO_PRESHADER                       = 8,
+	AVOID_FLOW_CONTROL                 = 9,
+	PREFER_FLOW_CONTROL                = 10,
+	ENABLE_STRICTNESS                  = 11,
+	ENABLE_BACKWARDS_COMPATIBILITY     = 12,
+	IEEE_STRICTNESS                    = 13,
+	OPTIMIZATION_LEVEL0                = 14,
+	OPTIMIZATION_LEVEL3                = 15,
+	RESERVED16                         = 16,
+	RESERVED17                         = 17,
+	WARNINGS_ARE_ERRORS                = 18,
+	RESOURCES_MAY_ALIAS                = 19,
+	ENABLE_UNBOUNDED_DESCRIPTOR_TABLES = 20,
+	ALL_RESOURCES_BOUND                = 21,
+	DEBUG_NAME_FOR_SOURCE              = 22,
+	DEBUG_NAME_FOR_BINARY              = 23,
 }
 
-EFFECT :: enum u32 { // TODO: make bit_field
-	CHILD_EFFECT   = 1 << 0,
-	ALLOW_SLOW_OPS = 1 << 1,
+D3DCOMPILE_OPTIMIZATION_LEVEL0 :: D3DCOMPILE{.OPTIMIZATION_LEVEL0}
+D3DCOMPILE_OPTIMIZATION_LEVEL1 :: D3DCOMPILE{}
+D3DCOMPILE_OPTIMIZATION_LEVEL2 :: D3DCOMPILE{.IEEE_STRICTNESS, .OPTIMIZATION_LEVEL3}
+D3DCOMPILE_OPTIMIZATION_LEVEL3 :: D3DCOMPILE{.OPTIMIZATION_LEVEL3}
+
+
+EFFECT :: distinct bit_set[EFFECT_FLAG; u32]
+EFFECT_FLAG :: enum u32 {
+	CHILD_EFFECT   = 0,
+	ALLOW_SLOW_OPS = 1,
 }
 
-FLAGS2 :: enum u32 { // TODO: make bit_field
+FLAGS2 :: enum u32 {
 	FORCE_ROOT_SIGNATURE_LATEST = 0,
 	FORCE_ROOT_SIGNATURE_1_0    = 1 << 4,
 	FORCE_ROOT_SIGNATURE_1_1    = 1 << 5,
 }
 
-SECDATA :: enum u32 { // TODO: make bit_field
-	MERGE_UAV_SLOTS         = 0x00000001,
-	PRESERVE_TEMPLATE_SLOTS = 0x00000002,
-	REQUIRE_TEMPLATE_MATCH  = 0x00000004,
+SECDATA :: distinct bit_set[SECDATA_FLAG; u32]
+SECDATA_FLAG :: enum u32 {
+	MERGE_UAV_SLOTS         = 0,
+	PRESERVE_TEMPLATE_SLOTS = 1,
+	REQUIRE_TEMPLATE_MATCH  = 2,
 }
 
 DISASM_ENABLE_COLOR_CODE            :: 0x00000001
@@ -188,13 +195,13 @@ pD3DCompile     :: #type proc "c" (a0: rawptr, a1: SIZE_T, a2: cstring, a3: ^SHA
 pD3DPreprocess  :: #type proc "c" (a0: rawptr, a1: SIZE_T, a2: cstring, a3: ^SHADER_MACRO, a4: ^ID3DInclude, a5: ^^ID3DBlob, a6: ^^ID3DBlob) -> HRESULT
 pD3DDisassemble :: #type proc "c" (a0: rawptr, a1: SIZE_T, a2: u32, a3: cstring, a4: ^^ID3DBlob) -> HRESULT
 
-D3DCOMPILER_STRIP_FLAGS :: enum u32 { // TODO: make bit_field
-	REFLECTION_DATA = 0x1,
-	DEBUG_INFO      = 0x2,
-	TEST_BLOBS      = 0x4,
-	PRIVATE_DATA    = 0x8,
-	ROOT_SIGNATURE  = 0x10,
-	FORCE_DWORD     = 0x7fffffff,
+D3DCOMPILER_STRIP_FLAGS :: distinct bit_set[D3DCOMPILER_STRIP_FLAG; u32]
+D3DCOMPILER_STRIP_FLAG :: enum u32 {
+	REFLECTION_DATA = 0,
+	DEBUG_INFO      = 1,
+	TEST_BLOBS      = 2,
+	PRIVATE_DATA    = 3,
+	ROOT_SIGNATURE  = 4,
 }
 
 BLOB_PART :: enum i32 {

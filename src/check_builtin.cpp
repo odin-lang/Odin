@@ -1533,10 +1533,10 @@ bool check_builtin_procedure_directive(CheckerContext *c, Operand *operand, Ast 
 		}
 
 		bool is_defined = check_identifier_exists(c->scope, arg);
-		gb_unused(is_defined);
+		// gb_unused(is_defined);
 		operand->type = t_untyped_bool;
 		operand->mode = Addressing_Constant;
-		operand->value = exact_value_bool(false);
+		operand->value = exact_value_bool(is_defined);
 
 	} else if (name == "config") {
 		if (ce->args.count != 2) {
@@ -3651,6 +3651,59 @@ bool check_builtin_procedure(CheckerContext *c, Operand *operand, Ast *call, i32
 		operand->mode = Addressing_NoValue;
 		break;
 
+	case BuiltinProc_raw_data:
+		{
+			Operand x = {};
+			check_expr(c, &x, ce->args[0]);
+			if (x.mode == Addressing_Invalid) {
+				return false;
+			}
+			if (!is_operand_value(x)) {
+				gbString s = expr_to_string(x.expr);
+				error(call, "'%.*s' expects a string, slice, dynamic array, or pointer to array type, got %s", LIT(builtin_name), s);
+				gb_string_free(s);
+				return false;
+			}
+			Type *t = base_type(x.type);
+
+			operand->mode = Addressing_Value;
+			operand->type = nullptr;
+			switch (t->kind) {
+			case Type_Slice:
+				operand->type = alloc_type_multi_pointer(t->MultiPointer.elem);
+				break;
+			case Type_DynamicArray:
+				operand->type = alloc_type_multi_pointer(t->DynamicArray.elem);
+				break;
+			case Type_Basic:
+				if (t->Basic.kind == Basic_string) {
+					operand->type = alloc_type_multi_pointer(t_u8);
+				}
+				break;
+			case Type_Pointer:
+			case Type_MultiPointer:
+				{
+					Type *base = base_type(type_deref(t, true));
+					switch (base->kind) {
+					case Type_Array:
+					case Type_EnumeratedArray:
+					case Type_SimdVector:
+						operand->type = alloc_type_multi_pointer(base_array_type(base));
+						break;
+					}
+				}
+				break;
+			}
+
+			if (operand->type == nullptr) {
+				gbString s = type_to_string(x.type);
+				error(call, "'%.*s' expects a string, slice, dynamic array, or pointer to array type, got %s", LIT(builtin_name), s);
+				gb_string_free(s);
+				return false;
+			}
+		}
+		break;
+
 	case BuiltinProc_read_cycle_counter:
 		operand->mode = Addressing_Value;
 		operand->type = t_i64;
@@ -3685,8 +3738,92 @@ bool check_builtin_procedure(CheckerContext *c, Operand *operand, Ast *call, i32
 				gb_string_free(xts);
 			}
 
+			Type *type = default_type(x.type);
 			operand->mode = Addressing_Value;
-			operand->type = default_type(x.type);
+			operand->type = type;
+
+			if (id == BuiltinProc_reverse_bits) {
+				// make runtime only for the time being
+			} else if (x.mode == Addressing_Constant && x.value.kind == ExactValue_Integer) {
+				convert_to_typed(c, &x, type);
+				if (x.mode == Addressing_Invalid) {
+					return false;
+				}
+
+				ExactValue res = {};
+
+				i64 sz = type_size_of(x.type);
+				u64 bit_size = sz*8;
+				u64 rop64[4] = {}; // 2 u64 is the maximum we will ever need, so doubling it will ne fine
+				u8 *rop = cast(u8 *)rop64;
+
+				size_t max_count = 0;
+				size_t written = 0;
+				size_t size = 1;
+				size_t nails = 0;
+				mp_endian endian = MP_LITTLE_ENDIAN;
+
+				max_count = mp_pack_count(&x.value.value_integer, nails, size);
+				GB_ASSERT(sz >= cast(i64)max_count);
+
+				mp_err err = mp_pack(rop, max_count, &written, MP_LSB_FIRST, size, endian, nails, &x.value.value_integer);
+				GB_ASSERT(err == MP_OKAY);
+
+				if (id == BuiltinProc_reverse_bits) {
+					// TODO(bill): Should this even be allowed at compile time?
+				} else {
+					u64 v = 0;
+					switch (id) {
+					case BuiltinProc_count_ones:
+					case BuiltinProc_count_zeros:
+						switch (sz) {
+						case 1: v = bit_set_count(cast(u32)rop[0]);  break;
+						case 2: v = bit_set_count(cast(u32)*(u16 *)rop); break;
+						case 4: v = bit_set_count(*(u32 *)rop); break;
+						case 8: v = bit_set_count(rop64[0]); break;
+						case 16:
+							v += bit_set_count(rop64[0]);
+							v += bit_set_count(rop64[1]);
+							break;
+						default: GB_PANIC("Unhandled sized");
+						}
+						if (id == BuiltinProc_count_zeros) {
+							// flip the result
+							v = bit_size - v;
+						}
+						break;
+					case BuiltinProc_count_trailing_zeros:
+						for (u64 i = 0; i < bit_size; i++) {
+							u8 b = cast(u8)(i & 7);
+							u8 j = cast(u8)(i >> 3);
+							if (rop[j] & (1 << b)) {
+								break;
+							}
+							v += 1;
+						}
+						break;
+					case BuiltinProc_count_leading_zeros:
+						for (u64 i = bit_size-1; i < bit_size; i--) {
+							u8 b = cast(u8)(i & 7);
+							u8 j = cast(u8)(i >> 3);
+							if (rop[j] & (1 << b)) {
+								break;
+							}
+							v += 1;
+						}
+						break;
+					}
+
+
+					res = exact_value_u64(v);
+				}
+
+				if (res.kind != ExactValue_Invalid) {
+					operand->mode = Addressing_Constant;
+					operand->value = res;
+				}
+			}
+
 		}
 		break;
 
@@ -4667,6 +4804,7 @@ bool check_builtin_procedure(CheckerContext *c, Operand *operand, Ast *call, i32
 			new_type->Union.variants = variants;
 
 			// NOTE(bill): Is this even correct?
+			new_type->Union.node = operand->expr;
 			new_type->Union.scope = bt->Union.scope;
 
 			operand->type = new_type;

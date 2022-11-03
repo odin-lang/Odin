@@ -248,6 +248,17 @@ foreign kernel32 {
 	GetModuleHandleW :: proc(lpModuleName: LPCWSTR) -> HMODULE ---
 	GetModuleHandleA :: proc(lpModuleName: LPCSTR) -> HMODULE ---
 	GetSystemTimeAsFileTime :: proc(lpSystemTimeAsFileTime: LPFILETIME) ---
+	GetSystemTimePreciseAsFileTime :: proc(lpSystemTimeAsFileTime: LPFILETIME) ---
+	FileTimeToSystemTime :: proc(lpFileTime: ^FILETIME, lpSystemTime: ^SYSTEMTIME) -> BOOL ---
+	SystemTimeToTzSpecificLocalTime :: proc(
+		lpTimeZoneInformation: ^TIME_ZONE_INFORMATION,
+		lpUniversalTime: ^SYSTEMTIME,
+		lpLocalTime: ^SYSTEMTIME,
+	) -> BOOL ---
+	SystemTimeToFileTime :: proc(
+		lpSystemTime: ^SYSTEMTIME,
+		lpFileTime: LPFILETIME,
+	) -> BOOL ---
 	CreateEventW :: proc(
 		lpEventAttributes: LPSECURITY_ATTRIBUTES,
 		bManualReset: BOOL,
@@ -346,6 +357,13 @@ foreign kernel32 {
 	GenerateConsoleCtrlEvent :: proc(dwCtrlEvent: DWORD, dwProcessGroupId: DWORD) -> BOOL ---
 	FreeConsole :: proc() -> BOOL ---
 	GetConsoleWindow :: proc() -> HWND ---
+
+	GetDiskFreeSpaceExW :: proc(
+		lpDirectoryName: LPCWSTR,
+		lpFreeBytesAvailableToCaller: PULARGE_INTEGER,
+		lpTotalNumberOfBytes: PULARGE_INTEGER,
+		lpTotalNumberOfFreeBytes: PULARGE_INTEGER,
+	) -> BOOL ---
 }
 
 
@@ -820,3 +838,158 @@ foreign kernel32 {
 
 HandlerRoutine :: proc "stdcall" (dwCtrlType: DWORD) -> BOOL
 PHANDLER_ROUTINE :: HandlerRoutine
+
+
+
+
+DCB_Config :: struct {
+	fParity: bool,
+	fOutxCtsFlow: bool,
+	fOutxDsrFlow: bool,
+	fDtrControl: DTR_Control,
+	fDsrSensitivity: bool,
+	fTXContinueOnXoff: bool,
+	fOutX: bool,
+	fInX: bool,
+	fErrorChar: bool,
+	fNull: bool,
+	fRtsControl: RTS_Control,
+	fAbortOnError: bool,
+	BaudRate: DWORD,
+	ByteSize: BYTE,
+	Parity: Parity,
+	StopBits: Stop_Bits,
+	XonChar: byte,
+	XoffChar: byte,
+	ErrorChar: byte,
+	EvtChar: byte,
+}
+DTR_Control :: enum byte {
+	Disable = 0,
+	Enable = 1,
+	Handshake = 2,
+}
+RTS_Control :: enum byte {
+	Disable   = 0,
+	Enable    = 1,
+	Handshake = 2,
+	Toggle    = 3,
+}
+Parity :: enum byte {
+	None  = 0,
+	Odd   = 1,
+	Even  = 2,
+	Mark  = 3,
+	Space = 4,
+}
+Stop_Bits :: enum byte {
+	One = 0,
+	One_And_A_Half = 1,
+	Two = 2,
+}
+
+// A helper procedure to set the values of a DCB structure.
+init_dcb_with_config :: proc "contextless" (dcb: ^DCB, config: DCB_Config) {
+	out: u32
+
+	// NOTE(tetra, 2022-09-21): On both Clang 14 on Windows, and MSVC, the bits in the bitfield
+	// appear to be defined from LSB to MSB order.
+	// i.e: `fBinary` (the first bitfield in the C source) is the LSB in the `settings` u32.
+
+	out |= u32(1) << 0 // fBinary must always be true on Windows.
+
+	out |= u32(config.fParity) << 1
+	out |= u32(config.fOutxCtsFlow) << 2
+	out |= u32(config.fOutxDsrFlow) << 3
+
+	out |= u32(config.fDtrControl) << 4
+
+	out |= u32(config.fDsrSensitivity) << 6
+	out |= u32(config.fTXContinueOnXoff) << 7
+	out |= u32(config.fOutX) << 8
+	out |= u32(config.fInX) << 9
+	out |= u32(config.fErrorChar) << 10
+	out |= u32(config.fNull) << 11
+
+	out |= u32(config.fRtsControl) << 12
+
+	out |= u32(config.fAbortOnError) << 14
+
+	dcb.settings = out
+
+	dcb.BaudRate = config.BaudRate
+	dcb.ByteSize = config.ByteSize
+	dcb.Parity = config.Parity
+	dcb.StopBits = config.StopBits
+	dcb.XonChar = config.XonChar
+	dcb.XoffChar = config.XoffChar
+	dcb.ErrorChar = config.ErrorChar
+	dcb.EvtChar = config.EvtChar
+
+	dcb.DCBlength = size_of(DCB)
+}
+get_dcb_config :: proc "contextless" (dcb: DCB) -> (config: DCB_Config) {
+	config.fParity = bool((dcb.settings >> 1) & 0x01)
+	config.fOutxCtsFlow = bool((dcb.settings >> 2) & 0x01)
+	config.fOutxDsrFlow = bool((dcb.settings >> 3) & 0x01)
+
+	config.fDtrControl = DTR_Control((dcb.settings >> 4) & 0x02)
+
+	config.fDsrSensitivity = bool((dcb.settings >> 6) & 0x01)
+	config.fTXContinueOnXoff = bool((dcb.settings >> 7) & 0x01)
+	config.fOutX = bool((dcb.settings >> 8) & 0x01)
+	config.fInX = bool((dcb.settings >> 9) & 0x01)
+	config.fErrorChar = bool((dcb.settings >> 10) & 0x01)
+	config.fNull = bool((dcb.settings >> 11) & 0x01)
+
+	config.fRtsControl = RTS_Control((dcb.settings >> 12) & 0x02)
+
+	config.fAbortOnError = bool((dcb.settings >> 14) & 0x01)
+
+	config.BaudRate = dcb.BaudRate
+	config.ByteSize = dcb.ByteSize
+	config.Parity = dcb.Parity
+	config.StopBits = dcb.StopBits
+	config.XonChar = dcb.XonChar
+	config.XoffChar = dcb.XoffChar
+	config.ErrorChar = dcb.ErrorChar
+	config.EvtChar = dcb.EvtChar
+
+	return
+}
+
+// NOTE(tetra): See get_dcb_config() and init_dcb_with_config() for help with initializing this.
+DCB :: struct {
+	DCBlength: DWORD, // NOTE(tetra): Must be set to size_of(DCB).
+	BaudRate: DWORD,
+	settings: u32, // NOTE(tetra): These are bitfields in the C struct.
+	wReserved: WORD,
+	XOnLim: WORD,
+	XOffLim: WORD,
+	ByteSize: BYTE,
+	Parity: Parity,
+	StopBits: Stop_Bits,
+	XonChar: byte,
+	XoffChar: byte,
+	ErrorChar: byte,
+	EofChar: byte,
+	EvtChar: byte,
+	wReserved1: WORD,
+}
+
+@(default_calling_convention="stdcall")
+foreign kernel32 {
+	GetCommState :: proc(handle: HANDLE, dcb: ^DCB) -> BOOL ---
+	SetCommState :: proc(handle: HANDLE, dcb: ^DCB) -> BOOL ---
+}
+
+
+LPFIBER_START_ROUTINE :: #type proc "stdcall" (lpFiberParameter: LPVOID)
+
+@(default_calling_convention = "stdcall")
+foreign kernel32 {
+	CreateFiber :: proc(dwStackSize: SIZE_T, lpStartAddress: LPFIBER_START_ROUTINE, lpParameter: LPVOID) -> LPVOID ---
+	DeleteFiber :: proc(lpFiber: LPVOID) ---
+	ConvertThreadToFiber :: proc(lpParameter: LPVOID) -> LPVOID ---
+	SwitchToFiber :: proc(lpFiber: LPVOID) ---
+}

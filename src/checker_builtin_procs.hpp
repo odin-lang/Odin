@@ -42,6 +42,8 @@ enum BuiltinProcId {
 
 	BuiltinProc_unreachable,
 
+	BuiltinProc_raw_data,
+
 	BuiltinProc_DIRECTIVE, // NOTE(bill): This is used for specialized hash-prefixed procedures
 
 	// "Intrinsics"
@@ -337,6 +339,8 @@ gb_global BuiltinProc builtin_procs[BuiltinProc_COUNT] = {
 	{STR_LIT("matrix_flatten"),   1, false, Expr_Expr, BuiltinProcPkg_builtin},
 
 	{STR_LIT("unreachable"),      0, false, Expr_Expr, BuiltinProcPkg_builtin, /*diverging*/true},
+
+	{STR_LIT("raw_data"),         1, false, Expr_Expr, BuiltinProcPkg_builtin},
 
 	{STR_LIT(""),                 0, true,  Expr_Expr, BuiltinProcPkg_builtin}, // DIRECTIVE
 
