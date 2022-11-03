@@ -162,7 +162,25 @@ panicf :: proc(fmt: string, args: ..any, loc := #caller_location) -> ! {
 	p("Panic", message, loc)
 }
 
+// formatted printing for cstrings
+caprintf :: proc(format: string, args: ..any) -> cstring {
+	str: strings.Builder
+	strings.builder_init(&str)
+	sbprintf(&str, format, ..args)
+	strings.write_byte(&str, 0)
+	s := strings.to_string(str)
+	return cstring(raw_data(s))
+}
 
+// c string with temp allocator
+ctprintf :: proc(format: string, args: ..any) -> cstring {
+	str: strings.Builder
+	strings.builder_init(&str, context.temp_allocator)
+	sbprintf(&str, format, ..args)
+	strings.write_byte(&str, 0)
+	s := strings.to_string(str)
+	return cstring(raw_data(s))
+}
 
 // sbprint formats using the default print settings and writes to buf
 sbprint :: proc(buf: ^strings.Builder, args: ..any, sep := " ") -> string {
