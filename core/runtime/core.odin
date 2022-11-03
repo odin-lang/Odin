@@ -303,6 +303,7 @@ Allocator_Mode :: enum byte {
 	Resize,
 	Query_Features,
 	Query_Info,
+	Alloc_Non_Zeroed,
 }
 
 Allocator_Mode_Set :: distinct bit_set[Allocator_Mode]

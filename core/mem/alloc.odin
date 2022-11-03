@@ -69,6 +69,10 @@ alloc_bytes :: proc(size: int, alignment: int = DEFAULT_ALIGNMENT, allocator := 
 	return runtime.mem_alloc(size, alignment, allocator, loc)
 }
 
+alloc_bytes_non_zeroed :: proc(size: int, alignment: int = DEFAULT_ALIGNMENT, allocator := context.allocator, loc := #caller_location) -> ([]byte, Allocator_Error) {
+	return runtime.mem_alloc_non_zeroed(size, alignment, allocator, loc)
+}
+
 free :: proc(ptr: rawptr, allocator := context.allocator, loc := #caller_location) -> Allocator_Error {
 	return runtime.mem_free(ptr, allocator, loc)
 }

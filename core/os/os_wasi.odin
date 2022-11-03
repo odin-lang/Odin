@@ -101,7 +101,7 @@ file_size :: proc(fd: Handle) -> (i64, Errno) {
 
 
 
-heap_alloc :: proc(size: int) -> rawptr {
+heap_alloc :: proc(size: int, zero_memory := true) -> rawptr {
 	return nil
 }
 heap_resize :: proc(ptr: rawptr, new_size: int) -> rawptr {
