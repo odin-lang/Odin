@@ -1,5 +1,5 @@
 // This is purely for documentation
-//+ignore
+//+build ignore
 package intrinsics
 
 // Package-Related

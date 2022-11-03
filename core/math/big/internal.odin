@@ -25,8 +25,6 @@
 	TODO: Handle +/- Infinity and NaN.
 */
 
-
-//+ignore
 package math_big
 
 import "core:mem"
