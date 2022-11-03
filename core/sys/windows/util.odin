@@ -62,19 +62,19 @@ utf8_to_wstring :: proc(s: string, allocator := context.temp_allocator) -> wstri
 wstring_to_utf8 :: proc(s: wstring, N: int, allocator := context.temp_allocator) -> (res: string, err: runtime.Allocator_Error) {
 	context.allocator = allocator
 
-	if N <= 0 {
+	if N == 0 {
 		return
 	}
 
-	n := WideCharToMultiByte(CP_UTF8, WC_ERR_INVALID_CHARS, s, i32(N), nil, 0, nil, nil)
+	n := WideCharToMultiByte(CP_UTF8, WC_ERR_INVALID_CHARS, s, i32(N) if N > 0 else -1, nil, 0, nil, nil)
 	if n == 0 {
 		return
 	}
 
-	// If N == -1 the call to WideCharToMultiByte assume the wide string is null terminated
+	// If N < 0 the call to WideCharToMultiByte assume the wide string is null terminated
 	// and will scan it to find the first null terminated character. The resulting string will
 	// also be null terminated.
-	// If N != -1 it assumes the wide string is not null terminated and the resulting string
+	// If N > 0 it assumes the wide string is not null terminated and the resulting string
 	// will not be null terminated.
 	text := make([]byte, n) or_return
 

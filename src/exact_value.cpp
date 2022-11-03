@@ -499,6 +499,13 @@ i64 exact_value_to_i64(ExactValue v) {
 	}
 	return 0;
 }
+u64 exact_value_to_u64(ExactValue v) {
+	v = exact_value_to_integer(v);
+	if (v.kind == ExactValue_Integer) {
+		return big_int_to_u64(&v.value_integer);
+	}
+	return 0;
+}
 f64 exact_value_to_f64(ExactValue v) {
 	v = exact_value_to_float(v);
 	if (v.kind == ExactValue_Float) {

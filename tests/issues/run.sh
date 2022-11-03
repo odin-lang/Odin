@@ -2,17 +2,18 @@
 set -eu
 
 mkdir -p build
-ODIN=../../odin
-COMMON="-collection:tests=.. -out:build/test_issue"
+pushd build
+ODIN=../../../odin
+COMMON="-collection:tests=../.."
 
 set -x
 
-$ODIN build test_issue_829.odin $COMMON -file
-./build/test_issue
-
-$ODIN build test_issue_1592.odin $COMMON -file
-./build/test_issue
+$ODIN test ../test_issue_829.odin  $COMMON -file
+$ODIN test ../test_issue_1592.odin $COMMON -file
+$ODIN test ../test_issue_2087.odin $COMMON -file
+$ODIN build ../test_issue_2113.odin $COMMON -file -debug
 
 set +x
 
+popd
 rm -rf build

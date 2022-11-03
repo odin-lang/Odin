@@ -383,16 +383,27 @@ Type *lb_addr_type(lbAddr const &addr) {
 	if (addr.addr.value == nullptr) {
 		return nullptr;
 	}
-	if (addr.kind == lbAddr_Map) {
-		Type *t = base_type(addr.map.type);
-		GB_ASSERT(is_type_map(t));
-		return t->Map.value;
-	}
-	if (addr.kind == lbAddr_Swizzle) {
+	switch (addr.kind) {
+	case lbAddr_Map:
+		{
+			Type *t = base_type(addr.map.type);
+			GB_ASSERT(is_type_map(t));
+			return t->Map.value;
+		}
+	case lbAddr_Swizzle:
 		return addr.swizzle.type;
-	}
-	if (addr.kind == lbAddr_SwizzleLarge) {
+	case lbAddr_SwizzleLarge:
 		return addr.swizzle_large.type;
+	case lbAddr_Context:
+		if (addr.ctx.sel.index.count > 0) {
+			Type *t = t_context;
+			for_array(i, addr.ctx.sel.index) {
+				GB_ASSERT(is_type_struct(t));
+				t = base_type(t)->Struct.fields[addr.ctx.sel.index[i]]->type;
+			}
+			return t;
+		}
+		break;
 	}
 	return type_deref(addr.addr.type);
 }
@@ -1507,6 +1518,7 @@ LLVMTypeRef lb_type_internal_for_procedures_raw(lbModule *m, Type *type) {
 
 	LLVMTypeRef ret = nullptr;
 	LLVMTypeRef *params = gb_alloc_array(permanent_allocator(), LLVMTypeRef, param_count);
+	bool *params_by_ptr = gb_alloc_array(permanent_allocator(), bool, param_count);
 	if (type->Proc.result_count != 0) {
 		Type *single_ret = reduce_tuple_to_single_type(type->Proc.results);
 		ret = lb_type(m, single_ret);
@@ -1532,9 +1544,12 @@ LLVMTypeRef lb_type_internal_for_procedures_raw(lbModule *m, Type *type) {
 			}
 			Type *e_type = reduce_tuple_to_single_type(e->type);
 
+			bool param_is_by_ptr = false;
 			LLVMTypeRef param_type = nullptr;
 			if (e->flags & EntityFlag_ByPtr) {
-				param_type = lb_type(m, alloc_type_pointer(e_type));
+				// it will become a pointer afterwards by making it indirect
+				param_type = lb_type(m, e_type);
+				param_is_by_ptr = true;
 			} else if (is_type_boolean(e_type) &&
 			    type_size_of(e_type) <= 1) {
 				param_type = LLVMInt1TypeInContext(m->ctx);
@@ -1546,6 +1561,7 @@ LLVMTypeRef lb_type_internal_for_procedures_raw(lbModule *m, Type *type) {
 				}
 			}
 
+			params_by_ptr[param_index] = param_is_by_ptr;
 			params[param_index++] = param_type;
 		}
 	}
@@ -1570,6 +1586,12 @@ LLVMTypeRef lb_type_internal_for_procedures_raw(lbModule *m, Type *type) {
 		              "\n\tRetTypeCtx: %p\n\tCurrentCtx: %p\n\tGlobalCtx:  %p",
 		              LLVMPrintTypeToString(ft->ret.type),
 		              LLVMGetTypeContext(ft->ret.type), ft->ctx, LLVMGetGlobalContext());
+	}
+	for_array(j, ft->args) {
+		if (params_by_ptr[j]) {
+			// NOTE(bill): The parameter needs to be passed "indirectly", override it
+			ft->args[j].kind = lbArg_Indirect;
+		}
 	}
 
 	map_set(&m->function_type_map, type, ft);
@@ -2579,6 +2601,15 @@ lbValue lb_find_or_add_entity_string_byte_slice_with_type(lbModule *m, String co
 
 
 lbValue lb_find_ident(lbProcedure *p, lbModule *m, Entity *e, Ast *expr) {
+	if (e->flags & EntityFlag_Param) {
+		// NOTE(bill): Bypass the stack copied variable for
+		// direct parameters as there is no need for the direct load
+		auto *found = map_get(&p->direct_parameters, e);
+		if (found) {
+			return *found;
+		}
+	}
+
 	auto *found = map_get(&m->values, e);
 	if (found) {
 		auto v = *found;

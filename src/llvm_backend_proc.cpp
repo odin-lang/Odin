@@ -486,6 +486,8 @@ void lb_begin_procedure_body(lbProcedure *p) {
 	p->entry_block = lb_create_block(p, "entry", true);
 	lb_start_block(p, p->entry_block);
 
+	map_init(&p->direct_parameters, heap_allocator());
+
 	GB_ASSERT(p->type != nullptr);
 
 	lb_ensure_abi_function_type(p->module, p);
@@ -538,6 +540,8 @@ void lb_begin_procedure_body(lbProcedure *p) {
 						lbValue param = {};
 						param.value = value;
 						param.type = e->type;
+
+						map_set(&p->direct_parameters, e, param);
 
 						lbValue ptr = lb_address_from_load_or_generate_local(p, param);
 						GB_ASSERT(LLVMIsAAllocaInst(ptr.value));
@@ -753,12 +757,16 @@ lbValue lb_emit_call_internal(lbProcedure *p, lbValue value, lbValue return_ptr,
 		}
 		GB_ASSERT_MSG(lb_is_type_kind(fnp, LLVMFunctionTypeKind), "%s", LLVMPrintTypeToString(fnp));
 
+		lbFunctionType *ft = map_must_get(&p->module->function_type_map, base_type(value.type));
+
 		{
 			unsigned param_count = LLVMCountParamTypes(fnp);
 			GB_ASSERT(arg_count >= param_count);
 
 			LLVMTypeRef *param_types = gb_alloc_array(temporary_allocator(), LLVMTypeRef, param_count);
 			LLVMGetParamTypes(fnp, param_types);
+
+
 			for (unsigned i = 0; i < param_count; i++) {
 				LLVMTypeRef param_type = param_types[i];
 				LLVMTypeRef arg_type = LLVMTypeOf(args[i]);
@@ -776,8 +784,18 @@ lbValue lb_emit_call_internal(lbProcedure *p, lbValue value, lbValue return_ptr,
 
 		LLVMValueRef ret = LLVMBuildCall2(p->builder, fnp, fn, args, arg_count, "");
 
+		LLVMAttributeIndex param_offset = LLVMAttributeIndex_FirstArgIndex;
 		if (return_ptr.value != nullptr) {
+			param_offset += 1;
+
 			LLVMAddCallSiteAttribute(ret, 1, lb_create_enum_attribute_with_type(p->module->ctx, "sret", LLVMTypeOf(args[0])));
+		}
+
+		for_array(i, ft->args) {
+			LLVMAttributeRef attribute = ft->args[i].attribute;
+			if (attribute != nullptr) {
+				LLVMAddCallSiteAttribute(ret, param_offset + cast(LLVMAttributeIndex)i, attribute);
+			}
 		}
 
 		switch (inlining) {
@@ -893,6 +911,9 @@ lbValue lb_emit_call(lbProcedure *p, lbValue value, Array<lbValue> const &args, 
 	auto processed_args = array_make<lbValue>(permanent_allocator(), 0, args.count);
 
 	{
+
+		bool is_odin_cc = is_calling_convention_odin(pt->Proc.calling_convention);
+
 		lbFunctionType *ft = lb_get_function_type(m, p, pt);
 		bool return_by_pointer = ft->ret.kind == lbArg_Indirect;
 
@@ -928,8 +949,12 @@ lbValue lb_emit_call(lbProcedure *p, lbValue value, Array<lbValue> const &args, 
 			} else if (arg->kind == lbArg_Indirect) {
 				lbValue ptr = {};
 				if (arg->is_byval) {
-					ptr = lb_copy_value_to_ptr(p, x, original_type, arg->byval_alignment);
-				} else if (is_calling_convention_odin(pt->Proc.calling_convention)) {
+					if (is_odin_cc && are_types_identical(original_type, t_source_code_location)) {
+						ptr = lb_address_from_load_or_generate_local(p, x);
+					} else {
+						ptr = lb_copy_value_to_ptr(p, x, original_type, arg->byval_alignment);
+					}
+				} else if (is_odin_cc) {
 					// NOTE(bill): Odin parameters are immutable so the original value can be passed if possible
 					// i.e. `T const &` in C++
 					ptr = lb_address_from_load_or_generate_local(p, x);
@@ -1485,7 +1510,7 @@ lbValue lb_build_builtin_proc(lbProcedure *p, Ast *expr, TypeAndValue const &tv,
 			pos = e->token.pos;
 
 		}
-		return lb_emit_source_code_location(p, procedure, pos);
+		return lb_emit_source_code_location_as_global(p, procedure, pos);
 	}
 
 	case BuiltinProc_type_info_of: {
@@ -1835,6 +1860,37 @@ lbValue lb_build_builtin_proc(lbProcedure *p, Ast *expr, TypeAndValue const &tv,
 	case BuiltinProc_unreachable:
 		lb_emit_unreachable(p);
 		return {};
+
+	case BuiltinProc_raw_data:
+		{
+			lbValue x = lb_build_expr(p, ce->args[0]);
+			Type *t = base_type(x.type);
+			lbValue res = {};
+			switch (t->kind) {
+			case Type_Slice:
+				res = lb_slice_elem(p, x);
+				res = lb_emit_conv(p, res, tv.type);
+				break;
+			case Type_DynamicArray:
+				res = lb_dynamic_array_elem(p, x);
+				res = lb_emit_conv(p, res, tv.type);
+				break;
+			case Type_Basic:
+				if (t->Basic.kind == Basic_string) {
+					res = lb_string_elem(p, x);
+					res = lb_emit_conv(p, res, tv.type);
+				} else if (t->Basic.kind == Basic_cstring) {
+					res = lb_emit_conv(p, x, tv.type);
+				}
+				break;
+			case Type_Pointer:
+			case Type_MultiPointer:
+				res = lb_emit_conv(p, x, tv.type);
+				break;
+			}
+			GB_ASSERT(res.value != nullptr);
+			return res;
+		}
 
 
 	// "Intrinsics"
@@ -2825,7 +2881,7 @@ lbValue lb_handle_param_value(lbProcedure *p, Type *parameter_type, ParameterVal
 			if (p->entity != nullptr) {
 				proc_name = p->entity->token.string;
 			}
-			return lb_emit_source_code_location(p, proc_name, pos);
+			return lb_emit_source_code_location_as_global(p, proc_name, pos);
 		}
 	case ParameterValue_Value:
 		return lb_build_expr(p, param_value.ast_value);

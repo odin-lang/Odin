@@ -298,17 +298,17 @@ struct BuildContext {
 	bool   ignore_microsoft_magic;
 	bool   linker_map_file;
 
-	bool use_separate_modules;
-	bool threaded_checker;
+	bool   use_separate_modules;
+	bool   threaded_checker;
 
-	bool show_debug_messages;
+	bool   show_debug_messages;
 	
-	bool copy_file_contents;
+	bool   copy_file_contents;
 
-	bool disallow_rtti;
+	bool   disallow_rtti;
 
 	RelocMode reloc_mode;
-	bool disable_red_zone;
+	bool   disable_red_zone;
 
 
 	u32 cmd_doc_flags;
@@ -326,7 +326,7 @@ struct BuildContext {
 	BlockingMutex target_features_mutex;
 	StringSet target_features_set;
 	String target_features_string;
-
+	String minimum_os_version_string;
 };
 
 gb_global BuildContext build_context = {0};
@@ -1311,13 +1311,16 @@ void enable_target_feature(TokenPos pos, String const &target_feature_list) {
 	defer (mutex_unlock(&bc->target_features_mutex));
 
 	auto items = split_by_comma(target_feature_list);
-	array_free(&items);
 	for_array(i, items) {
 		String const &item = items.data[i];
 		if (!check_target_feature_is_valid(pos, item)) {
 			error(pos, "Target feature '%.*s' is not valid", LIT(item));
+			continue;
 		}
+
+		string_set_add(&bc->target_features_set, item);
 	}
+	array_free(&items);
 }
 
 
@@ -1340,7 +1343,7 @@ char const *target_features_set_to_cstring(gbAllocator allocator, bool with_quot
 
 		if (with_quotes) features[len++] = '"';
 		String feature = build_context.target_features_set.entries[i].value;
-		gb_memmove(features, feature.text, feature.len);
+		gb_memmove(features + len, feature.text, feature.len);
 		len += feature.len;
 		if (with_quotes) features[len++] = '"';
 	}

@@ -646,7 +646,7 @@ void lb_insert_dynamic_map_key_and_value(lbProcedure *p, lbValue const &map_ptr,
 	args[2] = key_hash;
 	args[3] = key_ptr;
 	args[4] = lb_emit_conv(p, value_addr.addr, t_rawptr);
-	args[5] = lb_emit_source_code_location(p, node);
+	args[5] = lb_emit_source_code_location_as_global(p, node);
 	lb_emit_runtime_call(p, "__dynamic_map_set", args);
 }
 
@@ -662,7 +662,7 @@ void lb_dynamic_map_reserve(lbProcedure *p, lbValue const &map_ptr, isize const 
 	args[0] = lb_emit_conv(p, map_ptr, t_rawptr);
 	args[1] = lb_gen_map_header_table_internal(p, type_deref(map_ptr.type));
 	args[2] = lb_const_int(p->module, t_int, capacity);
-	args[3] = lb_emit_source_code_location(p, proc_name, pos);
+	args[3] = lb_emit_source_code_location_as_global(p, proc_name, pos);
 	lb_emit_runtime_call(p, "__dynamic_map_reserve", args);
 }
 
@@ -1736,6 +1736,13 @@ void lb_generate_code(lbGenerator *gen) {
 	lbProcedure *startup_runtime = lb_create_startup_runtime(default_module, startup_type_info, objc_names, global_variables);
 	gb_unused(startup_runtime);
 
+	if (build_context.ODIN_DEBUG) {
+		for_array(i, builtin_pkg->scope->elements.entries) {
+			Entity *e = builtin_pkg->scope->elements.entries[i].value;
+			add_debug_info_for_global_constant_from_entity(gen, e);
+		}
+	}
+
 	TIME_SECTION("LLVM Global Procedures and Types");
 	for_array(i, info->entities) {
 		Entity *e = info->entities[i];
@@ -1758,6 +1765,11 @@ void lb_generate_code(lbGenerator *gen) {
 
 		case Entity_TypeName:
 		case Entity_Procedure:
+			break;
+		case Entity_Constant:
+			if (build_context.ODIN_DEBUG) {
+				add_debug_info_for_global_constant_from_entity(gen, e);
+			}
 			break;
 		}
 
@@ -1820,6 +1832,21 @@ void lb_generate_code(lbGenerator *gen) {
 	lb_finalize_objc_names(objc_names);
 
 	if (build_context.ODIN_DEBUG) {
+		TIME_SECTION("LLVM Debug Info for global constant value declarations");
+		{
+			// lbModule *m = default_module;
+
+
+		}
+		// if (gen->modules.entries.count == 1) {
+		// } else {
+		// 	for_array(j, gen->modules.entries) {
+		// 		lbModule *m = gen->modules.entries[j].value;
+		// 		if (m->debug_builder != nullptr) {
+		// 		}
+		// 	}
+		// }
+
 		TIME_SECTION("LLVM Debug Info Complete Types and Finalize");
 		for_array(j, gen->modules.entries) {
 			lbModule *m = gen->modules.entries[j].value;

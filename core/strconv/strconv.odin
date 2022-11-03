@@ -567,7 +567,7 @@ parse_f32 :: proc(s: string, n: ^int = nil) -> (value: f32, ok: bool) {
 // ```
 parse_f64 :: proc(str: string, n: ^int = nil) -> (value: f64, ok: bool) {
 	s := str
-	defer if n != nil { n^ = len(str)-len(s) }
+	defer if n != nil { n^ = len(str) - len(s) }
 	if s == "" {
 		return
 	}
@@ -575,9 +575,11 @@ parse_f64 :: proc(str: string, n: ^int = nil) -> (value: f64, ok: bool) {
 	i := 0
 
 	sign: f64 = 1
+	seen_sign := true
 	switch s[i] {
 	case '-': i += 1; sign = -1
 	case '+': i += 1
+	case: seen_sign = false
 	}
 
 	for ; i < len(s); i += 1 {
@@ -588,6 +590,38 @@ parse_f64 :: proc(str: string, n: ^int = nil) -> (value: f64, ok: bool) {
 
 		v := _digit_value(r)
 		if v >= 10 {
+			if r == '.' || r == 'e' || r == 'E' { // Skip parsing NaN and Inf if it's probably a regular float
+				break
+			}
+			if len(s) >= 3 + i {
+				buf: [4]u8
+				copy(buf[:], s[i:][:3])
+
+				v2 := transmute(u32)buf
+				v2 &= 0xDFDFDFDF // Knock out lower-case bits
+
+				buf = transmute([4]u8)v2
+
+				when ODIN_ENDIAN == .Little {
+					if v2 == 0x464e49 { // "INF"
+						s = s[3+i:]
+						value = 0h7ff00000_00000000 if sign == 1 else 0hfff00000_00000000
+						return value, len(s) == 0
+					} else if v2 == 0x4e414e { // "NAN"
+						s = s[3+i:]
+						return 0h7ff80000_00000001, len(s) == 0
+					}
+				} else {
+					if v2 == 0x494e4600 { // "\0FNI"
+						s = s[3+i:]
+						value = 0h7ff00000_00000000 if sign == 1 else 0hfff00000_00000000
+						return value, len(s) == 0
+					} else if v2 == 0x4e414e00 { // "\0NAN"
+						s = s[3+i:]
+						return 0h7ff80000_00000001, len(s) == 0
+					}
+				}
+			}
 			break
 		}
 		value *= 10
@@ -645,8 +679,13 @@ parse_f64 :: proc(str: string, n: ^int = nil) -> (value: f64, ok: bool) {
 			for exp >   0 { scale *=   10; exp -=  1 }
 		}
 	}
-	s = s[i:]
 
+	// If we only consumed a sign, return false
+	if i == 1 && seen_sign {
+		return 0, false
+	}
+
+	s = s[i:]
 	if frac {
 		value = sign * (value/scale)
 	} else {

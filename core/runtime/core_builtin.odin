@@ -672,7 +672,7 @@ shrink_dynamic_array :: proc(array: ^$T/[dynamic]$E, new_cap := -1, loc := #call
 @builtin
 map_insert :: proc(m: ^$T/map[$K]$V, key: K, value: V, loc := #caller_location) -> (ptr: ^V) {
 	key, value := key, value
-	h := __get_map_header(T)
+	h := __get_map_header_table(T)
 
 	e := __dynamic_map_set(m, h, __get_map_key_hash(&key), &key, &value, loc)
 	return (^V)(uintptr(e) + h.value_offset)
@@ -728,34 +728,6 @@ card :: proc(s: $S/bit_set[$E; $U]) -> int {
 		#panic("Unhandled card bit_set size")
 	}
 }
-
-
-
-@builtin
-raw_array_data :: proc "contextless" (a: $P/^($T/[$N]$E)) -> [^]E {
-	return ([^]E)(a)
-}
-@builtin
-raw_simd_data :: proc "contextless" (a: $P/^($T/#simd[$N]$E)) -> [^]E {
-	return ([^]E)(a)
-}
-@builtin
-raw_slice_data :: proc "contextless" (s: $S/[]$E) -> [^]E {
-	ptr := (transmute(Raw_Slice)s).data
-	return ([^]E)(ptr)
-}
-@builtin
-raw_dynamic_array_data :: proc "contextless" (s: $S/[dynamic]$E) -> [^]E {
-	ptr := (transmute(Raw_Dynamic_Array)s).data
-	return ([^]E)(ptr)
-}
-@builtin
-raw_string_data :: proc "contextless" (s: $S/string) -> [^]u8 {
-	return (transmute(Raw_String)s).data
-}
-
-@builtin
-raw_data :: proc{raw_array_data, raw_slice_data, raw_dynamic_array_data, raw_string_data, raw_simd_data}
 
 
 
