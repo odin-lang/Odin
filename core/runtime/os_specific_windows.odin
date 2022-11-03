@@ -58,9 +58,9 @@ _os_write :: proc "contextless" (data: []byte) -> (n: int, err: _OS_Errno) #no_b
 	return
 }
 
-heap_alloc :: proc "contextless" (size: int) -> rawptr {
+heap_alloc :: proc "contextless" (size: int, zero_memory := true) -> rawptr {
 	HEAP_ZERO_MEMORY :: 0x00000008
-	return HeapAlloc(GetProcessHeap(), HEAP_ZERO_MEMORY, uint(size))
+	return HeapAlloc(GetProcessHeap(), HEAP_ZERO_MEMORY if zero_memory else 0, uint(size))
 }
 heap_resize :: proc "contextless" (ptr: rawptr, new_size: int) -> rawptr {
 	if new_size == 0 {
@@ -91,7 +91,7 @@ heap_free :: proc "contextless" (ptr: rawptr) {
 
 
 
-_windows_default_alloc_or_resize :: proc "contextless" (size, alignment: int, old_ptr: rawptr = nil) -> ([]byte, Allocator_Error) {
+_windows_default_alloc_or_resize :: proc "contextless" (size, alignment: int, old_ptr: rawptr = nil, zero_memory := true) -> ([]byte, Allocator_Error) {
 	if size == 0 {
 		_windows_default_free(old_ptr)
 		return nil, nil
@@ -105,7 +105,7 @@ _windows_default_alloc_or_resize :: proc "contextless" (size, alignment: int, ol
 		original_old_ptr := intrinsics.ptr_offset((^rawptr)(old_ptr), -1)^
 		allocated_mem = heap_resize(original_old_ptr, space+size_of(rawptr))
 	} else {
-		allocated_mem = heap_alloc(space+size_of(rawptr))
+		allocated_mem = heap_alloc(space+size_of(rawptr), zero_memory)
 	}
 	aligned_mem := rawptr(intrinsics.ptr_offset((^u8)(allocated_mem), size_of(rawptr)))
 
@@ -122,8 +122,8 @@ _windows_default_alloc_or_resize :: proc "contextless" (size, alignment: int, ol
 	return byte_slice(aligned_mem, size), nil
 }
 
-_windows_default_alloc :: proc "contextless" (size, alignment: int) -> ([]byte, Allocator_Error) {
-	return _windows_default_alloc_or_resize(size, alignment, nil)
+_windows_default_alloc :: proc "contextless" (size, alignment: int, zero_memory := true) -> ([]byte, Allocator_Error) {
+	return _windows_default_alloc_or_resize(size, alignment, nil, zero_memory)
 }
 
 

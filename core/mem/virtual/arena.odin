@@ -232,7 +232,7 @@ arena_allocator_proc :: proc(allocator_data: rawptr, mode: mem.Allocator_Mode,
 	old_size := uint(old_size)
 
 	switch mode {
-	case .Alloc:
+	case .Alloc, .Alloc_Non_Zeroed:
 		return arena_alloc(arena, size, alignment)
 	case .Free:
 		err = .Mode_Not_Implemented
@@ -266,7 +266,7 @@ arena_allocator_proc :: proc(allocator_data: rawptr, mode: mem.Allocator_Mode,
 	case .Query_Features:
 		set := (^mem.Allocator_Mode_Set)(old_memory)
 		if set != nil {
-			set^ = {.Alloc, .Free_All, .Resize, .Query_Features}
+			set^ = {.Alloc, .Alloc_Non_Zeroed, .Free_All, .Resize, .Query_Features}
 		}
 	case .Query_Info:
 		err = .Mode_Not_Implemented
