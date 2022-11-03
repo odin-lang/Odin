@@ -72,8 +72,9 @@ djbx33a :: proc(data: []byte, seed := u32(5381)) -> (result: [16]byte) #no_bound
 	return
 }
 
+// If you have a choice, prefer fnv32a
 @(optimization_mode="speed")
-fnv32 :: proc(data: []byte, seed := u32(0x811c9dc5)) -> u32 {
+fnv32_no_a :: proc(data: []byte, seed := u32(0x811c9dc5)) -> u32 {
 	h: u32 = seed
 	for b in data {
 		h = (h * 0x01000193) ~ u32(b)
@@ -81,8 +82,9 @@ fnv32 :: proc(data: []byte, seed := u32(0x811c9dc5)) -> u32 {
 	return h
 }
 
+// If you have a choice, prefer fnv64a
 @(optimization_mode="speed")
-fnv64 :: proc(data: []byte, seed := u64(0xcbf29ce484222325)) -> u64 {
+fnv64_no_a :: proc(data: []byte, seed := u64(0xcbf29ce484222325)) -> u64 {
 	h: u64 = seed
 	for b in data {
 		h = (h * 0x100000001b3) ~ u64(b)
