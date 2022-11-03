@@ -1,4 +1,4 @@
-//+ignore
+//+build ignore
 package zlib
 
 /*
