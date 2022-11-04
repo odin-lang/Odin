@@ -149,3 +149,13 @@ Includes full bindings and Windows `.lib` and `.dll`.
 
 See also LICENSE in the `zlib` directory itself.
 Includes full bindings.
+
+
+## cgltf
+
+
+[cgltf](https://github.com/jkuhlmann/cgltf) is a [glTF2.0](https://registry.khronos.org/glTF/specs/2.0/glTF-2.0.html) loader and writer.
+
+Used in: [bgfx](https://github.com/bkaradzic/bgfx), [Filament](https://github.com/google/filament), [gltfpack](https://github.com/zeux/meshoptimizer/tree/master/gltf), [raylib](https://github.com/raysan5/raylib), [Unigine](https://developer.unigine.com/en/docs/2.14.1/third_party?rlang=cpp#cgltf), and more!
+
+Se also LICENCE in `cgltf` directory itself.
