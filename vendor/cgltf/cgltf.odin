@@ -1,3 +1,4 @@
+//+build windows
 package cgltf
 
 when ODIN_OS == .Windows {
