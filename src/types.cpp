@@ -1257,6 +1257,9 @@ bool is_type_typed(Type *t) {
 }
 bool is_type_untyped(Type *t) {
 	t = base_type(t);
+	if (t == nullptr) {
+		return false;
+	}
 	if (t->kind == Type_Basic) {
 		return (t->Basic.flags & BasicFlag_Untyped) != 0;
 	}
