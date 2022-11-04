@@ -608,27 +608,44 @@ data :: struct {
 	file:   file_options,
 }
 
+parse :: proc "c" (options: ^/*const*/options, data_ptr: rawptr, size: uint) -> (out_data: ^data, res: result) {
+	foreign lib {
+		cgltf_parse :: proc "c" (
+			options: ^/*const*/options,
+			data_ptr: rawptr,
+			size: uint,
+			out_data: ^^data) -> result ---
+	}
+	res = cgltf_parse(options, data_ptr, size, &out_data)
+	return
+}
+
+parse_file :: proc "c" (options: ^/*const*/options, path: cstring) -> (out_data: ^data, res: result) {
+	foreign lib {
+		cgltf_parse_file :: proc "c" (
+			options: ^/*const*/options,
+			path: cstring,
+			out_data: ^^data) -> result ---
+	}
+	res = cgltf_parse_file(options, path, &out_data)
+	return
+}
+
+load_buffer_base64 :: proc "c" (options: ^/*const*/options, size: uint, base64: cstring) -> (out_data: rawptr, res: result) {
+	foreign lib {
+		cgltf_load_buffer_base64 :: proc "c" (options: ^/*const*/options, size: uint, base64: cstring, out_data: ^rawptr) -> result ---
+	}
+	res = cgltf_load_buffer_base64(options, size, base64, &out_data)
+	return
+}
 
 @(default_calling_convention="c")
 @(link_prefix="cgltf_")
 foreign lib {
-	cgltf_parse :: proc(
-		options: ^/*const*/options,
-		data_ptr: rawptr,
-		size: uint,
-		out_data: ^^data) -> result ---
-
-	parse_file :: proc(
-		options: ^/*const*/options,
-		path: cstring,
-		out_data: ^^data) -> result ---
-
 	load_buffers :: proc(
 		options: ^/*const*/options,
 		data: ^data,
 		gltf_path: cstring) -> result ---
-
-	load_buffer_base64 :: proc(options: ^/*const*/options, size: uint, base64: cstring, out_data: ^rawptr) -> result ---
 
 	decode_string :: proc(string: [^]byte) -> uint ---
 	decode_uri    :: proc(uri: [^]byte) -> uint ---
