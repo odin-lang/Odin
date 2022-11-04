@@ -608,10 +608,11 @@ data :: struct {
 	file:   file_options,
 }
 
-parse :: proc "c" (options: ^/*const*/options, data_ptr: rawptr, size: uint) -> (out_data: ^data, res: result) {
+@(require_results)
+parse :: proc "c" (#by_ptr options: options, data_ptr: rawptr, size: uint) -> (out_data: ^data, res: result) {
 	foreign lib {
 		cgltf_parse :: proc "c" (
-			options: ^/*const*/options,
+			#by_ptr options: options,
 			data_ptr: rawptr,
 			size: uint,
 			out_data: ^^data) -> result ---
@@ -620,10 +621,11 @@ parse :: proc "c" (options: ^/*const*/options, data_ptr: rawptr, size: uint) -> 
 	return
 }
 
-parse_file :: proc "c" (options: ^/*const*/options, path: cstring) -> (out_data: ^data, res: result) {
+@(require_results)
+parse_file :: proc "c" (#by_ptr options: options, path: cstring) -> (out_data: ^data, res: result) {
 	foreign lib {
 		cgltf_parse_file :: proc "c" (
-			options: ^/*const*/options,
+			#by_ptr options: options,
 			path: cstring,
 			out_data: ^^data) -> result ---
 	}
@@ -631,9 +633,10 @@ parse_file :: proc "c" (options: ^/*const*/options, path: cstring) -> (out_data:
 	return
 }
 
-load_buffer_base64 :: proc "c" (options: ^/*const*/options, size: uint, base64: cstring) -> (out_data: rawptr, res: result) {
+@(require_results)
+load_buffer_base64 :: proc "c" (#by_ptr options: options, size: uint, base64: cstring) -> (out_data: rawptr, res: result) {
 	foreign lib {
-		cgltf_load_buffer_base64 :: proc "c" (options: ^/*const*/options, size: uint, base64: cstring, out_data: ^rawptr) -> result ---
+		cgltf_load_buffer_base64 :: proc "c" (#by_ptr options: options, size: uint, base64: cstring, out_data: ^rawptr) -> result ---
 	}
 	res = cgltf_load_buffer_base64(options, size, base64, &out_data)
 	return
@@ -642,14 +645,18 @@ load_buffer_base64 :: proc "c" (options: ^/*const*/options, size: uint, base64: 
 @(default_calling_convention="c")
 @(link_prefix="cgltf_")
 foreign lib {
+@(require_results)
 	load_buffers :: proc(
-		options: ^/*const*/options,
+		#by_ptr options: options,
 		data: ^data,
 		gltf_path: cstring) -> result ---
 
+	@(require_results)
 	decode_string :: proc(string: [^]byte) -> uint ---
+	@(require_results)
 	decode_uri    :: proc(uri: [^]byte) -> uint ---
 
+	@(require_results)
 	validate :: proc(data: ^data) -> result ---
 
 	free :: proc(data: ^data) ---
@@ -657,19 +664,26 @@ foreign lib {
 	node_transform_local :: proc(node: ^node, out_matrix: [^]f32) ---
 	node_transform_world :: proc(node: ^node, out_matrix: [^]f32) ---
 
+	@(require_results)
 	accessor_read_float :: proc(accessor: ^/*const*/accessor, index: uint, out: [^]f32,    element_size: uint) -> b32 ---
+	@(require_results)
 	accessor_read_uint  :: proc(accessor: ^/*const*/accessor, index: uint, out: [^]c.uint, element_size: uint) -> b32 ---
+	@(require_results)
 	accessor_read_index :: proc(accessor: ^/*const*/accessor, index: uint) -> uint ---
 
+	@(require_results)
 	num_components :: proc(type: type) -> uint ---
 
+	@(require_results)
 	accessor_unpack_floats :: proc(accessor: ^/*const*/accessor, out: [^]f32, float_count: uint) -> uint ---
 
 	/* this function is deprecated and will be removed in the future; use cgltf_extras::data instead */
+	@(require_results)
 	copy_extras_json :: proc(data: ^data, extras: ^extras_t, dest: [^]byte, dest_size: ^uint) -> result ---
 
-
-	write_file :: proc(options: ^/*const*/options, path:   cstring,             data: ^data) -> result ---
-	write      :: proc(options: ^/*const*/options, buffer: [^]byte, size: uint, data: ^data) -> uint ---
+	@(require_results)
+	write_file :: proc(#by_ptr options: options, path:   cstring,             data: ^data) -> result ---
+	@(require_results)
+	write      :: proc(#by_ptr options: options, buffer: [^]byte, size: uint, data: ^data) -> uint ---
 }
 
