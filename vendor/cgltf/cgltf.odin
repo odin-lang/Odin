@@ -397,53 +397,44 @@ material :: struct {
 }
 
 material_mapping :: struct {
-	variant: uint,
+	variant:  uint,
 	material: ^material,
-	extras: extras_t,
+	extras:   extras_t,
 }
 
 morph_target :: struct {
-	attributes:       [^]attribute,
-	attributes_count: uint,
+	attributes: []attribute,
 }
 
 draco_mesh_compression :: struct {
-	buffer_view:      ^buffer_view,
-	attributes:       [^]attribute,
-	attributes_count: uint,
+	buffer_view: ^buffer_view,
+	attributes:  []attribute,
 }
 
 mesh_gpu_instancing :: struct {
-	buffer_view:      ^buffer_view,
-	attributes:       [^]attribute,
-	attributes_count: uint,
+	buffer_view: ^buffer_view,
+	attributes:  []attribute,
 }
 
 primitive :: struct {
 	type:                       primitive_type,
 	indices:                    ^accessor,
 	material:                   ^material,
-	attributes:                 [^]attribute,
-	attributes_count:           uint,
-	targets:                    [^]morph_target,
-	targets_count:              uint,
+	attributes:                 []attribute,
+	targets:                    []morph_target,
 	extras:                     extras_t,
 	has_draco_mesh_compression: b32,
 	draco_mesh_compression:     draco_mesh_compression,
-	mappings:                   [^]material_mapping,
-	mappings_count:             uint,
+	mappings:                   []material_mapping,
 	extensions_count:           uint,
 	extensions:                 [^]extension,
 }
 
 mesh :: struct {
 	name:               cstring,
-	primitives:         [^]primitive,
-	primitives_count:   uint,
-	weights:            [^]f32,
-	weights_count:      uint,
-	target_names:       [^]cstring,
-	target_names_count: uint,
+	primitives:         []primitive,
+	weights:            []f32,
+	target_names:       []cstring,
 	extras:             extras_t,
 	extensions_count:   uint,
 	extensions:         [^]extension,
@@ -451,8 +442,7 @@ mesh :: struct {
 
 skin :: struct {
 	name:                  cstring,
-	joints:                [^]^node,
-	joints_count:          uint,
+	joints:                []^node,
 	skeleton:              ^node,
 	inverse_bind_matrices: ^accessor,
 	extras:                extras_t,
@@ -504,14 +494,12 @@ light :: struct {
 node :: struct {
 	name:                    cstring,
 	parent:                  ^node,
-	children:                [^]^node,
-	children_count:          uint,
+	children:                []^node,
 	skin:                    ^skin,
 	mesh:                    ^mesh,
 	camera:                  ^camera,
 	light:                   ^light,
-	weights:                 [^]f32,
-	weights_count:           uint,
+	weights:                 []f32,
 	has_translation:         b32,
 	has_rotation:            b32,
 	has_scale:               b32,
@@ -529,8 +517,7 @@ node :: struct {
 
 scene :: struct {
 	name:             cstring,
-	nodes:            [^]^node,
-	nodes_count:      uint,
+	nodes:            []^node,
 	extras:           extras_t,
 	extensions_count: uint,
 	extensions:       [^]extension,
@@ -556,10 +543,8 @@ animation_channel :: struct {
 
 animation :: struct {
 	name:             cstring,
-	samplers:         [^]animation_sampler,
-	samplers_count:   uint,
-	channels:         [^]animation_channel,
-	channels_count:   uint,
+	samplers:         []animation_sampler,
+	channels:         []animation_channel,
 	extras:           extras_t,
 	extensions_count: uint,
 	extensions:       [^]extension,
@@ -586,79 +571,46 @@ data :: struct {
 
 	asset: asset,
 
-	meshes: [^]mesh,
-	meshes_count: uint,
-
-	materials: [^]material,
-	materials_count: uint,
-
-	accessors: [^]accessor,
-	accessors_count: uint,
-
-	buffer_views: [^]buffer_view,
-	buffer_views_count: uint,
-
-	buffers: [^]buffer,
-	buffers_count: uint,
-
-	images: [^]image,
-	images_count: uint,
-
-	textures: [^]texture,
-	textures_count: uint,
-
-	samplers: [^]sampler,
-	samplers_count: uint,
-
-	skins: [^]skin,
-	skins_count: uint,
-
-	cameras: [^]camera,
-	cameras_count: uint,
-
-	lights: [^]light,
-	lights_count: uint,
-
-	nodes: [^]node,
-	nodes_count: uint,
-
-	scenes: [^]scene,
-	scenes_count: uint,
+	meshes:       []mesh,
+	materials:    []material,
+	accessors:    []accessor,
+	buffer_views: []buffer_view,
+	buffers:      []buffer,
+	images:       []image,
+	textures:     []texture,
+	samplers:     []sampler,
+	skins:        []skin,
+	cameras:      []camera,
+	lights:       []light,
+	nodes:        []node,
+	scenes:       []scene,
 
 	scene: ^scene,
 
-	animations: [^]animation,
-	animations_count: uint,
+	animations: []animation,
 
-	variants: [^]material_variant,
-	variants_count: uint,
+	variants: []material_variant,
 
 	extras: extras_t,
 
 	data_extensions_count: uint,
-	data_extensions: [^]extension,
+	data_extensions:       [^]extension,
 
-	extensions_used: [^]cstring,
-	extensions_used_count: uint,
+	extensions_used:     []cstring,
+	extensions_required: []cstring,
 
-	extensions_required: [^]cstring,
-	extensions_required_count: uint,
+	json: string,
 
-	json: cstring,
-	json_size: uint,
-
-	bin: rawptr,
-	bin_size: uint,
+	bin: []byte,
 
 	memory: memory_options,
-	file: file_options,
+	file:   file_options,
 }
 
 
 @(default_calling_convention="c")
 @(link_prefix="cgltf_")
 foreign lib {
-
 	cgltf_parse :: proc(
 		options: ^/*const*/options,
 		data_ptr: rawptr,
@@ -678,7 +630,7 @@ foreign lib {
 	load_buffer_base64 :: proc(options: ^/*const*/options, size: uint, base64: cstring, out_data: ^rawptr) -> result ---
 
 	decode_string :: proc(string: [^]byte) -> uint ---
-	decode_uri :: proc(uri: [^]byte) -> uint ---
+	decode_uri    :: proc(uri: [^]byte) -> uint ---
 
 	validate :: proc(data: ^data) -> result ---
 
@@ -687,8 +639,8 @@ foreign lib {
 	node_transform_local :: proc(node: ^node, out_matrix: [^]f32) ---
 	node_transform_world :: proc(node: ^node, out_matrix: [^]f32) ---
 
-	accessor_read_float :: proc(accessor: ^/*const*/accessor, index: uint, out: ^f32, element_size: uint) -> b32 ---
-	accessor_read_uint :: proc(accessor: ^/*const*/accessor, index: uint, out: ^c.uint, element_size: uint) -> b32 ---
+	accessor_read_float :: proc(accessor: ^/*const*/accessor, index: uint, out: [^]f32,    element_size: uint) -> b32 ---
+	accessor_read_uint  :: proc(accessor: ^/*const*/accessor, index: uint, out: [^]c.uint, element_size: uint) -> b32 ---
 	accessor_read_index :: proc(accessor: ^/*const*/accessor, index: uint) -> uint ---
 
 	num_components :: proc(type: type) -> uint ---
@@ -699,7 +651,7 @@ foreign lib {
 	copy_extras_json :: proc(data: ^data, extras: ^extras_t, dest: [^]byte, dest_size: ^uint) -> result ---
 
 
-	write_file :: proc(options: ^/*const*/options, path: cstring, data: ^data) -> result ---
-	write :: proc(options: ^/*const*/options, buffer: [^]byte, size: uint, data: ^data) -> uint ---
+	write_file :: proc(options: ^/*const*/options, path:   cstring,             data: ^data) -> result ---
+	write      :: proc(options: ^/*const*/options, buffer: [^]byte, size: uint, data: ^data) -> uint ---
 }
 
