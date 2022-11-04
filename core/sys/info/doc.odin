@@ -13,7 +13,7 @@
 	CPU feature flags can be tested against `cpu_features`, where applicable, e.g.
 	`if .aes in si.aes { ... }`
 */
-// +ignore
+//+build ignore
 package sysinfo
 
 import "core:fmt"
