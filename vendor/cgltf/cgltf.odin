@@ -646,6 +646,7 @@ load_buffer_base64 :: proc "c" (#by_ptr options: options, size: uint, base64: cs
 @(link_prefix="cgltf_")
 foreign lib {
 @(require_results)
+	@(require_results)
 	load_buffers :: proc(
 		#by_ptr options: options,
 		data: ^data,
