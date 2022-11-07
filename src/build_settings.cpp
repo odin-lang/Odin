@@ -1380,6 +1380,11 @@ bool init_build_paths(String init_filename) {
 		produces_output_file = true;
 	}
 
+
+	if (build_context.ODIN_DEFAULT_TO_NIL_ALLOCATOR) {
+		bc->no_dynamic_literals = true;
+	}
+
 	if (!produces_output_file) {
 		// Command doesn't produce output files. We're done.
 		return true;
