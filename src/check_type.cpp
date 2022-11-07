@@ -2176,40 +2176,9 @@ Type *make_optional_ok_type(Type *value, bool typed) {
 	return t;
 }
 
-void init_map_entry_type(Type *type) {
-	GB_ASSERT(type->kind == Type_Map);
-	if (type->Map.entry_type != nullptr) return;
-
-	// NOTE(bill): The preload types may have not been set yet
-	GB_ASSERT(t_map_hash != nullptr);
-
-	/*
-	struct {
-		hash:  uintptr,
-		next:  int,
-		key:   Key,
-		value: Value,
-	}
-	*/
-	Scope *s = create_scope(nullptr, builtin_pkg->scope);
-
-	auto fields = slice_make<Entity *>(permanent_allocator(), 4);
-	fields[0] = alloc_entity_field(s, make_token_ident(str_lit("hash")),  t_uintptr,       false, 0, EntityState_Resolved);
-	fields[1] = alloc_entity_field(s, make_token_ident(str_lit("next")),  t_int,           false, 1, EntityState_Resolved);
-	fields[2] = alloc_entity_field(s, make_token_ident(str_lit("key")),   type->Map.key,   false, 2, EntityState_Resolved);
-	fields[3] = alloc_entity_field(s, make_token_ident(str_lit("value")), type->Map.value, false, 3, EntityState_Resolved);
-
-	Type *entry_type = alloc_type_struct();
-	entry_type->Struct.fields  = fields;
-	entry_type->Struct.tags    = gb_alloc_array(permanent_allocator(), String, fields.count);
-	
-	type_set_offsets(entry_type);
-	type->Map.entry_type = entry_type;
-}
-
 void init_map_internal_types(Type *type) {
 	GB_ASSERT(type->kind == Type_Map);
-	init_map_entry_type(type);
+	GB_ASSERT(t_allocator != nullptr);
 	if (type->Map.internal_type != nullptr) return;
 
 	Type *key   = type->Map.key;
@@ -2221,19 +2190,17 @@ void init_map_internal_types(Type *type) {
 
 	/*
 	struct {
-		hashes:  []int;
-		entries: [dynamic]EntryType;
+		data:      uintptr,
+		size:      uintptr,
+		allocator: runtime.Allocator,
 	}
 	*/
 	Scope *s = create_scope(nullptr, builtin_pkg->scope);
 
-	Type *hashes_type  = alloc_type_slice(t_int);
-	Type *entries_type = alloc_type_dynamic_array(type->Map.entry_type);
-
-
-	auto fields = slice_make<Entity *>(permanent_allocator(), 2);
-	fields[0] = alloc_entity_field(s, make_token_ident(str_lit("hashes")),  hashes_type,  false, 0, EntityState_Resolved);
-	fields[1] = alloc_entity_field(s, make_token_ident(str_lit("entries")), entries_type, false, 1, EntityState_Resolved);
+	auto fields = slice_make<Entity *>(permanent_allocator(), 3);
+	fields[0] = alloc_entity_field(s, make_token_ident(str_lit("data")),      t_uintptr,  false,  0, EntityState_Resolved);
+	fields[1] = alloc_entity_field(s, make_token_ident(str_lit("size")),      t_uintptr,   false, 1, EntityState_Resolved);
+	fields[2] = alloc_entity_field(s, make_token_ident(str_lit("allocator")), t_allocator, false, 2, EntityState_Resolved);
 
 	generated_struct_type->Struct.fields = fields;
 	type_set_offsets(generated_struct_type);

@@ -159,20 +159,7 @@ delete_slice :: proc(array: $T/[]$E, allocator := context.allocator, loc := #cal
 }
 @builtin
 delete_map :: proc(m: $T/map[$K]$V, loc := #caller_location) -> Allocator_Error {
-	Entry :: struct {
-		hash:  uintptr,
-		next:  int,
-		key:   K,
-		value: V,
-	}
-
-	raw := transmute(Raw_Map)m
-	err := delete_slice(raw.hashes, raw.entries.allocator, loc)
-	err1 := mem_free_with_size(raw.entries.data, raw.entries.cap*size_of(Entry), raw.entries.allocator, loc)
-	if err == nil {
-		err = err1
-	}
-	return err
+	return map_free(transmute(Raw_Map)m, loc)
 }
 
 
@@ -285,19 +272,13 @@ clear_map :: proc "contextless" (m: ^$T/map[$K]$V) {
 	if m == nil {
 		return
 	}
-	raw_map := (^Raw_Map)(m)
-	entries := (^Raw_Dynamic_Array)(&raw_map.entries)
-	entries.len = 0
-	for _, i in raw_map.hashes {
-		raw_map.hashes[i] = MAP_SENTINEL
-	}
+	map_clear_dynamic((^Raw_Map)(m), map_info(K, V))
 }
 
 @builtin
 reserve_map :: proc(m: ^$T/map[$K]$V, capacity: int, loc := #caller_location) {
 	if m != nil {
-		h := __get_map_header_table(T)
-		__dynamic_map_reserve(m, h, uint(capacity), loc)
+		__dynamic_map_reserve((^Raw_Map)(m), map_info(K, V), uint(capacity), loc)
 	}
 }
 
@@ -325,15 +306,9 @@ shrink_map :: proc(m: ^$T/map[$K]$V, new_cap := -1, loc := #caller_location) -> 
 delete_key :: proc(m: ^$T/map[$K]$V, key: K) -> (deleted_key: K, deleted_value: V) {
 	if m != nil {
 		key := key
-		h := __get_map_header(m)
-		fr := __map_find(h, &key)
-		if fr.entry_index != MAP_SENTINEL {
-			entry := __dynamic_map_get_entry(h, fr.entry_index)
-			deleted_key   = (^K)(uintptr(entry)+h.key_offset)^
-			deleted_value = (^V)(uintptr(entry)+h.value_offset)^
-
-			__dynamic_map_erase(h, fr)
-		}
+		info := map_info(K, V)
+		_ =  map_erase_dynamic((^Raw_Map)(m), info, uintptr(&key))
+		// TODO(bill) old key and value
 	}
 	return
 }
