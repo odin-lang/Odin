@@ -290,6 +290,12 @@ map_kvh_data_dynamic :: proc "contextless" (m: Raw_Map, #no_alias info: ^Map_Inf
 	return
 }
 
+map_kvh_data_values_dynamic :: proc "contextless" (m: Raw_Map, #no_alias info: ^Map_Info) -> (vs: uintptr) {
+	capacity := uintptr(1) << map_log2_cap(m)
+	return map_cell_index_dynamic(map_data(m), &info.ks, capacity) // Skip past ks to get start of vs
+}
+
+
 
 // The only procedure which needs access to the context is the one which allocates the map.
 map_alloc_dynamic :: proc(info: ^Map_Info, log2_capacity: uintptr, allocator := context.allocator) -> (result: Raw_Map, err: Allocator_Error) {
@@ -490,12 +496,14 @@ map_add_hash_dynamic :: proc(m: Raw_Map, #no_alias info: ^Map_Info, h: Map_Hash,
 @(optimization_mode="size")
 map_grow_dynamic :: proc(#no_alias m: ^Raw_Map, #no_alias info: ^Map_Info) -> Allocator_Error {
 	allocator := m.allocator
+	if allocator.procedure == nil {
+		allocator = context.allocator
+	}
 
 	log2_capacity := map_log2_cap(m^)
 
 	if m.data == 0 {
-		n := map_alloc_dynamic(info, MAP_MIN_LOG2_CAPACITY, allocator) or_return
-		m.data = n.data
+		m^ = map_alloc_dynamic(info, MAP_MIN_LOG2_CAPACITY, allocator) or_return
 		return nil
 	}
 
@@ -512,15 +520,21 @@ map_grow_dynamic :: proc(#no_alias m: ^Raw_Map, #no_alias info: ^Map_Info) -> Al
 	n := map_len(m^)
 	for i := uintptr(0); i < capacity; i += 1 {
 		hash := hs[i]
-		if map_hash_is_empty(hash) do continue
-		if map_hash_is_deleted(hash) do continue
+		if map_hash_is_empty(hash) {
+			continue
+		}
+		if map_hash_is_deleted(hash) {
+			continue
+		}
 		k := map_cell_index_dynamic(ks, info_ks, i)
 		v := map_cell_index_dynamic(vs, info_vs, i)
 		map_insert_hash_dynamic(resized, info, hash, k, v)
 		// Only need to do this comparison on each actually added pair, so do not
 		// fold it into the for loop comparator as a micro-optimization.
 		n -= 1
-		if n == 0 do break
+		if n == 0 {
+			break
+		}
 	}
 
 	mem_free(rawptr(ks), allocator)
@@ -534,6 +548,9 @@ map_grow_dynamic :: proc(#no_alias m: ^Raw_Map, #no_alias info: ^Map_Info) -> Al
 @(optimization_mode="size")
 map_reserve_dynamic :: proc(#no_alias m: ^Raw_Map, #no_alias info: ^Map_Info, new_capacity: uintptr) -> Allocator_Error {
 	allocator := m.allocator
+	if allocator.procedure == nil {
+		allocator = context.allocator
+	}
 
 	log2_capacity := map_log2_cap(m^)
 	capacity := uintptr(1) << log2_capacity
@@ -545,8 +562,7 @@ map_reserve_dynamic :: proc(#no_alias m: ^Raw_Map, #no_alias info: ^Map_Info, ne
 	log2_new_capacity := size_of(uintptr) - intrinsics.count_leading_zeros(new_capacity-1)
 
 	if m.data == 0 {
-		n := map_alloc_dynamic(info, MAP_MIN_LOG2_CAPACITY, allocator) or_return
-		m.data = n.data
+		m^ = map_alloc_dynamic(info, MAP_MIN_LOG2_CAPACITY, allocator) or_return
 		return nil
 	}
 
@@ -562,15 +578,21 @@ map_reserve_dynamic :: proc(#no_alias m: ^Raw_Map, #no_alias info: ^Map_Info, ne
 	n := map_len(m^)
 	for i := uintptr(0); i < capacity; i += 1 {
 		hash := hs[i]
-		if map_hash_is_empty(hash) do continue
-		if map_hash_is_deleted(hash) do continue
+		if map_hash_is_empty(hash) {
+			continue
+		}
+		if map_hash_is_deleted(hash) {
+			continue
+		}
 		k := map_cell_index_dynamic(ks, info_ks, i)
 		v := map_cell_index_dynamic(vs, info_vs, i)
 		map_insert_hash_dynamic(resized, info, hash, k, v)
 		// Only need to do this comparison on each actually added pair, so do not
 		// fold it into the for loop comparator as a micro-optimization.
 		n -= 1
-		if n == 0 do break
+		if n == 0 {
+			break
+		}
 	}
 
 	mem_free(rawptr(ks), allocator)
@@ -584,12 +606,18 @@ map_reserve_dynamic :: proc(#no_alias m: ^Raw_Map, #no_alias info: ^Map_Info, ne
 @(optimization_mode="size")
 map_shrink_dynamic :: proc(#no_alias m: ^Raw_Map, #no_alias info: ^Map_Info) -> Allocator_Error {
 	allocator := m.allocator
+	if allocator.procedure == nil {
+		// TODO(bill): is this correct behaviour?
+		allocator = context.allocator
+	}
 
 	// Cannot shrink the capacity if the number of items in the map would exceed
 	// one minus the current log2 capacity's resize threshold. That is the shrunk
 	// map needs to be within the max load factor.
 	log2_capacity := map_log2_cap(m^)
-	if m.len >= map_load_factor(log2_capacity - 1) do return nil
+	if m.len >= map_load_factor(log2_capacity - 1) {
+		return nil
+	}
 
 	shrinked := map_alloc_dynamic(info, log2_capacity - 1, allocator) or_return
 
@@ -603,8 +631,12 @@ map_shrink_dynamic :: proc(#no_alias m: ^Raw_Map, #no_alias info: ^Map_Info) -> 
 	n := map_len(m^)
 	for i := uintptr(0); i < capacity; i += 1 {
 		hash := hs[i]
-		if map_hash_is_empty(hash) do continue
-		if map_hash_is_deleted(hash) do continue
+		if map_hash_is_empty(hash) {
+			continue
+		}
+		if map_hash_is_deleted(hash) {
+			continue
+		}
 
 		k := map_cell_index_dynamic(ks, info_ks, i)
 		v := map_cell_index_dynamic(vs, info_vs, i)
@@ -614,7 +646,9 @@ map_shrink_dynamic :: proc(#no_alias m: ^Raw_Map, #no_alias info: ^Map_Info) -> 
 		// Only need to do this comparison on each actually added pair, so do not
 		// fold it into the for loop comparator as a micro-optimization.
 		n -= 1
-		if n == 0 do break
+		if n == 0 {
+			break
+		}
 	}
 
 	free(rawptr(ks), allocator)
@@ -632,7 +666,9 @@ map_free :: proc(m: Raw_Map, loc := #caller_location) -> Allocator_Error {
 
 @(optimization_mode="speed")
 map_lookup_dynamic :: proc "contextless" (m: Raw_Map, #no_alias info: ^Map_Info, k: uintptr) -> (index: uintptr, ok: bool) {
-	if map_len(m) == 0 do return 0, false
+	if map_len(m) == 0 {
+		return 0, false
+	}
 	h := info.hash(rawptr(k), 0)
 	p := map_desired_position(m, h)
 	d := uintptr(0)
@@ -663,9 +699,9 @@ map_insert_dynamic :: proc(#no_alias m: ^Raw_Map, #no_alias info: ^Map_Info, k, 
 		map_grow_dynamic(m, info) or_return
 	}
 	hashed := info.hash(rawptr(k), 0)
-	result := map_insert_hash_dynamic(m^, info, hashed, k, v)
+	value = map_insert_hash_dynamic(m^, info, hashed, k, v)
 	m.len += 1
-	return result, nil
+	return
 }
 
 // Same as map_insert_dynamic but does not return address to the inserted element.
@@ -680,9 +716,8 @@ map_add_dynamic :: proc(#no_alias m: ^Raw_Map, #no_alias info: ^Map_Info, k, v: 
 }
 
 map_erase_dynamic :: #force_inline proc "contextless" (#no_alias m: ^Raw_Map, #no_alias info: ^Map_Info, k: uintptr) -> bool {
-	when size_of(Map_Hash) == 4  do MASK :: Map_Hash(0x8000_0000)
-	when size_of(Map_Hash) == 8  do MASK :: Map_Hash(0x8000_0000_0000_0000)
-	when size_of(Map_Hash) == 16 do MASK :: Map_Hash(0x8000_0000_0000_0000_0000_0000_0000_0000)
+	MASK :: 1 << (size_of(Map_Hash)*8 - 1)
+
 	index := map_lookup_dynamic(m^, info, k) or_return
 	_, _, hs, _, _ := map_kvh_data_dynamic(m^, info)
 	hs[index] |= MASK
@@ -691,7 +726,9 @@ map_erase_dynamic :: #force_inline proc "contextless" (#no_alias m: ^Raw_Map, #n
 }
 
 map_clear_dynamic :: #force_inline proc "contextless" (#no_alias m: ^Raw_Map, #no_alias info: ^Map_Info) {
-	if m.data == 0 do return
+	if m.data == 0 {
+		return
+	}
 	_, _, hs, _, _ := map_kvh_data_dynamic(m^, info)
 	intrinsics.mem_zero(rawptr(hs), map_cap(m^) * size_of(Map_Hash))
 	m.len = 0
@@ -705,16 +742,13 @@ __dynamic_map_get :: proc "contextless" (m: rawptr, #no_alias info: ^Map_Info, k
 	if !ok {
 		return nil
 	}
-	_ = index
-	// TODO(bill)
-	return nil
+	vs := map_kvh_data_values_dynamic(rm, info)
+	return rawptr(map_cell_index_dynamic(vs, &info.vs, index))
 }
 
 __dynamic_map_set :: proc "odin" (#no_alias m: ^Raw_Map, #no_alias info: ^Map_Info, key, value: rawptr, loc := #caller_location) -> rawptr {
-	// value, _ := map_insert_dynamic(m, info, uintptr(key), uintptr(value))
-	// return rawptr(value)
-	// TODO(bill)
-	return nil
+	value, _ := map_insert_dynamic(m, info, uintptr(key), uintptr(value))
+	return rawptr(value)
 }
 
 __dynamic_map_reserve :: proc "odin" (#no_alias m: ^Raw_Map, #no_alias info: ^Map_Info, new_capacity: uint, loc := #caller_location) {
