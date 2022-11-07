@@ -2842,12 +2842,12 @@ void init_core_source_code_location(Checker *c) {
 }
 
 void init_core_map_type(Checker *c) {
-	if (t_map_hash != nullptr) {
+	if (t_map_info != nullptr) {
 		return;
 	}
-	t_map_hash = find_core_type(c, str_lit("Map_Hash"));
-	t_map_header = find_core_type(c, str_lit("Map_Header"));
-	t_map_header_table = find_core_type(c, str_lit("Map_Header_Table"));
+	t_map_info = find_core_type(c, str_lit("Map_Info"));
+	t_map_cell_info = find_core_type(c, str_lit("Map_Cell_Info"));
+	init_mem_allocator(c);
 }
 
 void init_preload(Checker *c) {

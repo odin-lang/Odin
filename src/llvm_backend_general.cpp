@@ -75,7 +75,7 @@ void lb_init_module(lbModule *m, Checker *c) {
 	string_map_init(&m->objc_classes, a);
 	string_map_init(&m->objc_selectors, a);
 
-	map_init(&m->map_header_table_map, a, 0);
+	map_init(&m->map_info_map, a, 0);
 
 }
 
@@ -1939,27 +1939,13 @@ LLVMTypeRef lb_type_internal(lbModule *m, Type *type) {
 			defer (m->internal_type_level += 1);
 
 			unsigned field_count = cast(unsigned)(internal_type->Struct.fields.count);
-			GB_ASSERT(field_count == 2);
-			LLVMTypeRef *fields = gb_alloc_array(temporary_allocator(), LLVMTypeRef, field_count);
+			GB_ASSERT(field_count == 3);
 
-			LLVMTypeRef entries_fields[] = {
-				lb_type(m, t_rawptr), // data
-				lb_type(m, t_int), // len
-				lb_type(m, t_int), // cap
+			LLVMTypeRef fields[3] = {
+				lb_type(m, t_uintptr),   // data
+				lb_type(m, t_uintptr),   // len
 				lb_type(m, t_allocator), // allocator
 			};
-
-			fields[0] = lb_type(m, internal_type->Struct.fields[0]->type);
-			fields[1] = LLVMStructTypeInContext(ctx, entries_fields, gb_count_of(entries_fields), false);
-			
-			{ // Add this to simplify things
-				lbStructFieldRemapping entries_field_remapping = {};
-				slice_init(&entries_field_remapping, permanent_allocator(), gb_count_of(entries_fields));
-				for_array(i, entries_field_remapping) {
-					entries_field_remapping[i] = cast(i32)i;
-				}
-				map_set(&m->struct_field_remapping, cast(void *)fields[1], entries_field_remapping);
-			}
 			
 			return LLVMStructTypeInContext(ctx, fields, field_count, false);
 		}

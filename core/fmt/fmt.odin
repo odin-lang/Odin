@@ -2072,6 +2072,7 @@ fmt_value :: proc(fi: ^Info, v: any, verb: rune) {
 			if info.generated_struct == nil {
 				return
 			}
+			/*
 			entries    := &m.entries
 			gs         := runtime.type_info_base(info.generated_struct).variant.(runtime.Type_Info_Struct)
 			ed         := runtime.type_info_base(gs.types[1]).variant.(runtime.Type_Info_Dynamic_Array)
@@ -2106,6 +2107,7 @@ fmt_value :: proc(fi: ^Info, v: any, verb: rune) {
 				value := data + entry_type.offsets[3] // value: Value
 				fmt_arg(fi, any{rawptr(value), info.value.id}, 'v')
 			}
+			*/
 		}
 
 	case runtime.Type_Info_Struct:
