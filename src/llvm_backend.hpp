@@ -447,6 +447,7 @@ String lb_get_const_string(lbModule *m, lbValue value);
 lbValue lb_generate_local_array(lbProcedure *p, Type *elem_type, i64 count, bool zero_init=true);
 lbValue lb_generate_global_array(lbModule *m, Type *elem_type, i64 count, String prefix, i64 id);
 lbValue lb_gen_map_key_hash(lbProcedure *p, lbValue key, Type *key_type, lbValue *key_ptr_);
+lbValue lb_gen_map_info_ptr(lbModule *m, Type *map_type);
 
 lbValue lb_internal_dynamic_map_get_ptr(lbProcedure *p, lbValue const &map_ptr, lbValue const &key);
 void    lb_insert_dynamic_map_key_and_value(lbProcedure *p, lbValue const &map_ptr, Type *map_type, lbValue const &map_key, lbValue const &map_value, Ast *node);
