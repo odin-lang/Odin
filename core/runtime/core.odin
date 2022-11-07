@@ -143,11 +143,9 @@ Type_Info_Enum :: struct {
 	values:    []Type_Info_Enum_Value,
 }
 Type_Info_Map :: struct {
-	key:              ^Type_Info,
-	value:            ^Type_Info,
-	generated_struct: ^Type_Info,
-	key_equal:        Equal_Proc,
-	key_hasher:       Hasher_Proc,
+	key:      ^Type_Info,
+	value:    ^Type_Info,
+	map_info: ^Map_Info,
 }
 Type_Info_Bit_Set :: struct {
 	elem:       ^Type_Info,

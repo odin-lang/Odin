@@ -242,8 +242,8 @@ map_probe_distance :: #force_inline proc "contextless" (m: Raw_Map, hash: Map_Ha
 Map_Info :: struct {
 	ks:   Map_Cell_Info,                                                 // 32-bytes on 64-bit, 16-bytes on 32-bit
 	vs:   Map_Cell_Info,                                                 // 32-bytes on 64-bit, 16-bytes on 32-bit
-	hash: proc "contextless" (key: rawptr, seed: Map_Hash) -> Map_Hash,  // 8-bytes on 64-bit, 4-bytes on 32-bit
-	cmp:  proc "contextless" (lhs, rhs: rawptr) -> bool,                 // 8-bytes on 64-bit, 4-bytes on 32-bit
+	key_hasher: proc "contextless" (key: rawptr, seed: Map_Hash) -> Map_Hash,  // 8-bytes on 64-bit, 4-bytes on 32-bit
+	key_equal:  proc "contextless" (lhs, rhs: rawptr) -> bool,                 // 8-bytes on 64-bit, 4-bytes on 32-bit
 }
 
 
@@ -669,7 +669,7 @@ map_lookup_dynamic :: proc "contextless" (m: Raw_Map, #no_alias info: ^Map_Info,
 	if map_len(m) == 0 {
 		return 0, false
 	}
-	h := info.hash(rawptr(k), 0)
+	h := info.key_hasher(rawptr(k), 0)
 	p := map_desired_position(m, h)
 	d := uintptr(0)
 	c := (uintptr(1) << map_log2_cap(m)) - 1
@@ -681,7 +681,7 @@ map_lookup_dynamic :: proc "contextless" (m: Raw_Map, #no_alias info: ^Map_Info,
 			return 0, false
 		} else if d > map_probe_distance(m, element_hash, p) {
 			return 0, false
-		} else if element_hash == h && info.cmp(rawptr(k), rawptr(map_cell_index_dynamic(ks, info_ks, p))) {
+		} else if element_hash == h && info.key_equal(rawptr(k), rawptr(map_cell_index_dynamic(ks, info_ks, p))) {
 			return p, true
 		}
 		p = (p + 1) & c
@@ -698,7 +698,7 @@ map_insert_dynamic :: proc(#no_alias m: ^Raw_Map, #no_alias info: ^Map_Info, k, 
 	if map_len(m^) + 1 >= map_resize_threshold(m^) {
 		map_grow_dynamic(m, info) or_return
 	}
-	hashed := info.hash(rawptr(k), 0)
+	hashed := info.key_hasher(rawptr(k), 0)
 	value = map_insert_hash_dynamic(m^, info, hashed, k, v)
 	m.len += 1
 	return
@@ -710,7 +710,7 @@ map_add_dynamic :: proc(#no_alias m: ^Raw_Map, #no_alias info: ^Map_Info, k, v: 
 	if map_len(m^) + 1 >= map_resize_threshold(m^) {
 		map_grow_dynamic(m, info) or_return
 	}
-	map_add_hash_dynamic(m^, info, info.hash(rawptr(k), 0), k, v)
+	map_add_hash_dynamic(m^, info, info.key_hasher(rawptr(k), 0), k, v)
 	m.len += 1
 	return nil
 }
@@ -735,7 +735,6 @@ map_clear_dynamic :: #force_inline proc "contextless" (#no_alias m: ^Raw_Map, #n
 }
 
 
-// TODO(bill): Change signature to not be a `rawptr`
 __dynamic_map_get :: proc "contextless" (m: rawptr, #no_alias info: ^Map_Info, key: rawptr) -> rawptr {
 	rm := (^Raw_Map)(m)^
 	index, ok := map_lookup_dynamic(rm, info, uintptr(key))

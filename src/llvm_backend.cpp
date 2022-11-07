@@ -530,15 +530,13 @@ LLVMValueRef lb_gen_map_cell_info(lbModule *m, Type *type) {
 	return llvm_const_named_struct(m, t_map_cell_info, const_values, gb_count_of(const_values));
 
 }
-lbValue lb_gen_map_info_ptr(lbProcedure *p, Type *map_type) {
-	lbModule *m = p->module;
-
+lbValue lb_gen_map_info_ptr(lbModule *m, Type *map_type) {
 	map_type = base_type(map_type);
 	GB_ASSERT(map_type->kind == Type_Map);
 
 	lbAddr *found = map_get(&m->map_info_map, map_type);
 	if (found) {
-		return lb_addr_get_ptr(p, *found);
+		return found->addr;
 	}
 
 	GB_ASSERT(t_map_info != nullptr);
@@ -560,7 +558,7 @@ lbValue lb_gen_map_info_ptr(lbProcedure *p, Type *map_type) {
 	lb_make_global_private_const(addr);
 
 	map_set(&m->map_info_map, map_type, addr);
-	return lb_addr_get_ptr(p, addr);
+	return addr.addr;
 }
 
 lbValue lb_const_hash(lbModule *m, lbValue key, Type *key_type) {
@@ -637,7 +635,7 @@ lbValue lb_internal_dynamic_map_get_ptr(lbProcedure *p, lbValue const &map_ptr, 
 
 	auto args = array_make<lbValue>(permanent_allocator(), 3);
 	args[0] = lb_emit_conv(p, map_ptr, t_rawptr);
-	args[1] = lb_gen_map_info_ptr(p, map_type);
+	args[1] = lb_gen_map_info_ptr(p->module, map_type);
 	args[2] = key_ptr;
 
 	lbValue ptr = lb_emit_runtime_call(p, "__dynamic_map_get", args);
@@ -659,7 +657,7 @@ void lb_insert_dynamic_map_key_and_value(lbProcedure *p, lbValue const &map_ptr,
 
 	auto args = array_make<lbValue>(permanent_allocator(), 5);
 	args[0] = lb_emit_conv(p, map_ptr, t_rawptr);
-	args[1] = lb_gen_map_info_ptr(p, map_type);
+	args[1] = lb_gen_map_info_ptr(p->module, map_type);
 	args[2] = key_ptr;
 	args[3] = lb_emit_conv(p, value_addr.addr, t_rawptr);
 	args[4] = lb_emit_source_code_location_as_global(p, node);
@@ -676,7 +674,7 @@ void lb_dynamic_map_reserve(lbProcedure *p, lbValue const &map_ptr, isize const 
 
 	auto args = array_make<lbValue>(permanent_allocator(), 4);
 	args[0] = lb_emit_conv(p, map_ptr, t_rawptr);
-	args[1] = lb_gen_map_info_ptr(p, type_deref(map_ptr.type));
+	args[1] = lb_gen_map_info_ptr(p->module, type_deref(map_ptr.type));
 	args[2] = lb_const_int(p->module, t_uint, capacity);
 	args[3] = lb_emit_source_code_location_as_global(p, proc_name, pos);
 	lb_emit_runtime_call(p, "__dynamic_map_reserve", args);
