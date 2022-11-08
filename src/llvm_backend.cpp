@@ -501,10 +501,10 @@ lbValue lb_generate_anonymous_proc_lit(lbModule *m, String const &prefix_name, A
 }
 
 
-LLVMValueRef lb_gen_map_cell_info(lbModule *m, Type *type) {
+lbValue lb_gen_map_cell_info_ptr(lbModule *m, Type *type) {
 	lbAddr *found = map_get(&m->map_cell_info_map, type);
 	if (found) {
-		return found->addr.value;
+		return found->addr;
 	}
 
 	i64 size = 0, len = 0;
@@ -523,7 +523,7 @@ LLVMValueRef lb_gen_map_cell_info(lbModule *m, Type *type) {
 
 	map_set(&m->map_cell_info_map, type, addr);
 
-	return addr.addr.value;
+	return addr.addr;
 }
 lbValue lb_gen_map_info_ptr(lbModule *m, Type *map_type) {
 	map_type = base_type(map_type);
@@ -537,8 +537,8 @@ lbValue lb_gen_map_info_ptr(lbModule *m, Type *map_type) {
 	GB_ASSERT(t_map_info != nullptr);
 	GB_ASSERT(t_map_cell_info != nullptr);
 
-	LLVMValueRef key_cell_info   = lb_gen_map_cell_info(m, map_type->Map.key);
-	LLVMValueRef value_cell_info = lb_gen_map_cell_info(m, map_type->Map.value);
+	LLVMValueRef key_cell_info   = lb_gen_map_cell_info_ptr(m, map_type->Map.key).value;
+	LLVMValueRef value_cell_info = lb_gen_map_cell_info_ptr(m, map_type->Map.value).value;
 
 	LLVMValueRef const_values[4] = {};
 	const_values[0] = key_cell_info;
