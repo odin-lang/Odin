@@ -105,41 +105,22 @@ Map_Cell_Info :: struct {
 
 // Same as the above procedure but at runtime with the cell Map_Cell_Info value.
 map_cell_index_dynamic :: #force_inline proc "contextless" (base: uintptr, info: ^Map_Cell_Info, index: uintptr) -> uintptr {
-	// Micro-optimize the case when the number of elements per cell is one or two
-	// to save on expensive integer division.
-
-	cell_index, data_index: uintptr
-	switch elements_per_cell := info.elements_per_cell; elements_per_cell {
+	// Micro-optimize the common cases to save on integer division.
+	elements_per_cell := uintptr(info.elements_per_cell)
+	size_of_cell      := uintptr(info.size_of_cell)
+	switch elements_per_cell {
 	case 1:
-		return base + (index * info.size_of_cell)
+		return base + (index * size_of_cell)
 	case 2:
-		cell_index = index >> 1
-		data_index = index & 1
-		return base + (cell_index * info.size_of_cell) + (data_index * info.size_of_type)
-	case 4:
-		cell_index = index >> 2
-		data_index = index & 3
-		return base + (cell_index * info.size_of_cell) + (data_index * info.size_of_type)
-	case 8:
-		cell_index = index >> 3
-		data_index = index & 7
-		return base + (cell_index * info.size_of_cell) + (data_index * info.size_of_type)
-	case 16:
-		cell_index = index >> 4
-		data_index = index & 15
-		return base + (cell_index * info.size_of_cell) + (data_index * info.size_of_type)
-	case 32:
-		cell_index = index >> 5
-		data_index = index & 31
-		return base + (cell_index * info.size_of_cell) + (data_index * info.size_of_type)
-	case 64:
-		cell_index = index >> 6
-		data_index = index & 63
-		return base + (cell_index * info.size_of_cell) + (data_index * info.size_of_type)
+		cell_index   := index >> 1
+		data_index   := index & 1
+		size_of_type := uintptr(info.size_of_type)
+		return base + (cell_index * size_of_cell) + (data_index * size_of_type)
 	case:
-		cell_index = index / elements_per_cell
-		data_index = index % elements_per_cell
-		return base + (cell_index * info.size_of_cell) + (data_index * info.size_of_type)
+		cell_index   := index / elements_per_cell
+		data_index   := index % elements_per_cell
+		size_of_type := uintptr(info.size_of_type)
+		return base + (cell_index * size_of_cell) + (data_index * size_of_type)
 	}
 }
 
@@ -190,22 +171,11 @@ map_log2_cap :: #force_inline proc "contextless" (m: Raw_Map) -> uintptr {
 // Canonicalize the data by removing the tagged capacity stored in the lower six
 // bits of the data uintptr.
 map_data :: #force_inline proc "contextless" (m: Raw_Map) -> uintptr {
-	return m.data & ~uintptr(64 - 1)
+	return m.data &~ uintptr(64 - 1)
 }
 
 
-
 Map_Hash :: uintptr
-
-// __get_map_key_hash :: #force_inline proc "contextless" (k: ^$K) -> uintptr {
-// 	hasher := intrinsics.type_hasher_proc(K)
-// 	return hasher(k, 0)
-// }
-
-// __get_map_entry_key_ptr :: #force_inline proc "contextless" (h: Map_Header_Table, entry: ^Map_Entry_Header) -> rawptr {
-// 	return rawptr(uintptr(entry) + h.key_offset)
-// }
-
 
 // Procedure to check if a slot is empty for a given hash. This is represented
 // by the zero value to make the zero value useful. This is a procedure just
@@ -218,6 +188,11 @@ map_hash_is_deleted :: #force_inline proc "contextless" (hash: Map_Hash) -> bool
 	// The MSB indicates a tombstone
 	return (hash >> ((size_of(Map_Hash) * 8) - 1)) != 0
 }
+map_hash_is_valid :: #force_inline proc "contextless" (hash: Map_Hash) -> bool {
+	// The MSB indicates a tombstone
+	return hash != 0 && (hash >> ((size_of(Map_Hash) * 8) - 1)) == 0
+}
+
 
 // Computes the desired position in the array. This is just index % capacity,
 // but a procedure as there's some math involved here to recover the capacity.
@@ -242,10 +217,10 @@ map_probe_distance :: #force_inline proc "contextless" (m: Raw_Map, hash: Map_Ha
 // 80-bytes on 64-bit
 // 40-bytes on 32-bit
 Map_Info :: struct {
-	ks:   Map_Cell_Info,                                                 // 32-bytes on 64-bit, 16-bytes on 32-bit
-	vs:   Map_Cell_Info,                                                 // 32-bytes on 64-bit, 16-bytes on 32-bit
-	key_hasher: proc "contextless" (key: rawptr, seed: Map_Hash) -> Map_Hash,  // 8-bytes on 64-bit, 4-bytes on 32-bit
-	key_equal:  proc "contextless" (lhs, rhs: rawptr) -> bool,                 // 8-bytes on 64-bit, 4-bytes on 32-bit
+	ks: Map_Cell_Info, // 32-bytes on 64-bit, 16-bytes on 32-bit
+	vs: Map_Cell_Info, // 32-bytes on 64-bit, 16-bytes on 32-bit
+	key_hasher: proc "contextless" (key: rawptr, seed: Map_Hash) -> Map_Hash, // 8-bytes on 64-bit, 4-bytes on 32-bit
+	key_equal:  proc "contextless" (lhs, rhs: rawptr) -> bool,                // 8-bytes on 64-bit, 4-bytes on 32-bit
 }
 
 
@@ -264,8 +239,12 @@ map_info :: #force_inline proc "contextless" ($K: typeid, $V: typeid) -> ^Map_In
 			size_of(Map_Cell(V)),
 			len(Map_Cell(V){}.data),
 		},
-		proc "contextless" (ptr: rawptr, seed: uintptr) -> Map_Hash { return intrinsics.type_hasher_proc(K)(ptr, seed) } ,
-		proc "contextless" (a, b: rawptr) -> bool { return intrinsics.type_equal_proc(K)(a, b) },
+		proc "contextless" (ptr: rawptr, seed: uintptr) -> Map_Hash {
+			return intrinsics.type_hasher_proc(K)(ptr, seed)
+		} ,
+		proc "contextless" (a, b: rawptr) -> bool {
+			return intrinsics.type_equal_proc(K)(a, b)
+		},
 	}
 	return &INFO
 }
@@ -280,10 +259,10 @@ map_kvh_data_dynamic :: proc "contextless" (m: Raw_Map, #no_alias info: ^Map_Inf
 	}
 
 	capacity := uintptr(1) << map_log2_cap(m)
-	ks = map_data(m)
-	vs = map_cell_index_dynamic(ks, &info.ks, capacity) // Skip past ks to get start of vs
-	hs_ := map_cell_index_dynamic(vs, &info.vs, capacity) // Skip past vs to get start of hs
-	sk = map_cell_index_dynamic(hs_, &INFO_HS, capacity) // Skip past hs to get start of sk
+	ks   = map_data(m)
+	vs   = map_cell_index_dynamic(ks,  &info.ks, capacity) // Skip past ks to get start of vs
+	hs_ := map_cell_index_dynamic(vs,  &info.vs, capacity) // Skip past vs to get start of hs
+	sk   = map_cell_index_dynamic(hs_, &INFO_HS, capacity) // Skip past hs to get start of sk
 	// Need to skip past two elements in the scratch key space to get to the start
 	// of the scratch value space, of which there's only two elements as well.
 	sv = map_cell_index_dynamic_const(sk, &info.ks, 2)
@@ -321,16 +300,19 @@ map_alloc_dynamic :: proc(info: ^Map_Info, log2_capacity: uintptr, allocator := 
 	}
 
 	round :: #force_inline proc "contextless" (value: uintptr) -> uintptr {
-		return (value + MAP_CACHE_LINE_SIZE - 1) & ~uintptr(MAP_CACHE_LINE_SIZE - 1)
+		return (value + MAP_CACHE_LINE_SIZE - 1) &~ uintptr(MAP_CACHE_LINE_SIZE - 1)
 	}
 
 	size := uintptr(0)
 	size = round(map_cell_index_dynamic(size, &info.ks, capacity))
 	size = round(map_cell_index_dynamic(size, &info.vs, capacity))
 	size = round(map_cell_index_dynamic(size, &INFO_HS, capacity))
+	size = round(map_cell_index_dynamic(size, &info.ks, 2)) // Two additional ks for scratch storage
+	size = round(map_cell_index_dynamic(size, &info.vs, 2)) // Two additional vs for scratch storage
 
 	data := mem_alloc(int(size), MAP_CACHE_LINE_SIZE, allocator) or_return
 	data_ptr := uintptr(raw_data(data))
+	assert(data_ptr & 63 == 0)
 
 	result = {
 		// Tagged pointer representation for capacity.
@@ -351,23 +333,36 @@ map_alloc_dynamic :: proc(info: ^Map_Info, log2_capacity: uintptr, allocator := 
 // memcpy since there is no type information.
 //
 // This procedure returns the address of the just inserted value.
-@(optimization_mode="size")
-map_insert_hash_dynamic :: proc(m: Raw_Map, info: ^Map_Info, h: Map_Hash, k, v: uintptr) -> (result: uintptr) {
+@(optimization_mode="speed")
+map_insert_hash_dynamic :: proc(m: Raw_Map, #no_alias info: ^Map_Info, h: Map_Hash, ik: uintptr, iv: uintptr) -> (result: uintptr) {
 	info_ks := &info.ks
 	info_vs := &info.vs
-
-	// Storage to exchange when reducing variance.
-	k_storage := intrinsics.alloca(info_ks.size_of_type, MAP_CACHE_LINE_SIZE)
-	v_storage := intrinsics.alloca(info_vs.size_of_type, MAP_CACHE_LINE_SIZE)
-	intrinsics.mem_copy_non_overlapping(rawptr(k_storage), rawptr(k), info_ks.size_of_type)
-	intrinsics.mem_copy_non_overlapping(rawptr(v_storage), rawptr(v), info_vs.size_of_type)
-	h := h
 
 	p := map_desired_position(m, h)
 	d := uintptr(0)
 	c := (uintptr(1) << map_log2_cap(m)) - 1 // Saturating arithmetic mask
 
-	ks, vs, hs, _, _ := map_kvh_data_dynamic(m, info)
+	ks, vs, hs, sk, sv := map_kvh_data_dynamic(m, info)
+
+	// Avoid redundant loads of these values
+	size_of_k := info_ks.size_of_type
+	size_of_v := info_vs.size_of_type
+
+	// Use sk and sv scratch storage space for dynamic k and v storage here.
+	//
+	// Simulate the following at runtime
+	// 	k = ik
+	// 	v = iv
+	// 	h = h
+	k := map_cell_index_dynamic_const(sk, info_ks, 0)
+	v := map_cell_index_dynamic_const(sv, info_vs, 0)
+	intrinsics.mem_copy_non_overlapping(rawptr(k), rawptr(ik), size_of_k)
+	intrinsics.mem_copy_non_overlapping(rawptr(v), rawptr(iv), size_of_v)
+	h := h
+
+	// Temporary k and v dynamic storage for swap below
+	tk := map_cell_index_dynamic_const(sk, info_ks, 1)
+	tv := map_cell_index_dynamic_const(sv, info_vs, 1)
 
 	for {
 		hp := &hs[p]
@@ -376,8 +371,8 @@ map_insert_hash_dynamic :: proc(m: Raw_Map, info: ^Map_Info, h: Map_Hash, k, v: 
 		if map_hash_is_empty(element_hash) {
 			k_dst := map_cell_index_dynamic(ks, info_ks, p)
 			v_dst := map_cell_index_dynamic(vs, info_vs, p)
-			intrinsics.mem_copy_non_overlapping(rawptr(k_dst), k_storage, info_ks.size_of_type)
-			intrinsics.mem_copy_non_overlapping(rawptr(v_dst), v_storage, info_vs.size_of_type)
+			intrinsics.mem_copy_non_overlapping(rawptr(k_dst), rawptr(k), size_of_k)
+			intrinsics.mem_copy_non_overlapping(rawptr(v_dst), rawptr(v), size_of_v)
 			hp^ = h
 			return result if result != 0 else v_dst
 		}
@@ -386,8 +381,8 @@ map_insert_hash_dynamic :: proc(m: Raw_Map, info: ^Map_Info, h: Map_Hash, k, v: 
 			if map_hash_is_deleted(element_hash) {
 				k_dst := map_cell_index_dynamic(ks, info_ks, p)
 				v_dst := map_cell_index_dynamic(vs, info_vs, p)
-				intrinsics.mem_copy_non_overlapping(rawptr(k_dst), k_storage, info_ks.size_of_type)
-				intrinsics.mem_copy_non_overlapping(rawptr(v_dst), v_storage, info_vs.size_of_type)
+				intrinsics.mem_copy_non_overlapping(rawptr(k_dst), rawptr(k), size_of_k)
+				intrinsics.mem_copy_non_overlapping(rawptr(v_dst), rawptr(v), size_of_v)
 				hp^ = h
 				return result if result != 0 else v_dst
 			}
@@ -396,16 +391,20 @@ map_insert_hash_dynamic :: proc(m: Raw_Map, info: ^Map_Info, h: Map_Hash, k, v: 
 				result = map_cell_index_dynamic(vs, info_vs, p)
 			}
 
-			swap :: #force_inline proc "contextless" (lhs, rhs, size: uintptr) {
-				tmp := intrinsics.alloca(size, MAP_CACHE_LINE_SIZE)
-				intrinsics.mem_copy_non_overlapping(&tmp[0],     rawptr(lhs), size)
-				intrinsics.mem_copy_non_overlapping(rawptr(lhs), rawptr(rhs), size)
-				intrinsics.mem_copy_non_overlapping(rawptr(rhs), &tmp[0],     size)
-			}
+			kp := map_cell_index_dynamic(ks, info_vs, p)
+			vp := map_cell_index_dynamic(vs, info_ks, p)
 
-			// Exchange to reduce variance.
-			swap(uintptr(k_storage), map_cell_index_dynamic(ks, info_ks, p), info_ks.size_of_type)
-			swap(uintptr(v_storage), map_cell_index_dynamic(vs, info_vs, p), info_vs.size_of_type)
+			// Simulate the following at runtime with dynamic storage
+			//
+			// 	kp^, k = k, kp^
+			// 	vp^, v = v, vp^
+			// 	hp^, h = h, hp^
+			intrinsics.mem_copy_non_overlapping(rawptr(tk), rawptr(kp), size_of_k)
+			intrinsics.mem_copy_non_overlapping(rawptr(tv), rawptr(vp), size_of_v)
+			intrinsics.mem_copy_non_overlapping(rawptr(kp), rawptr(k),  size_of_k)
+			intrinsics.mem_copy_non_overlapping(rawptr(vp), rawptr(v),  size_of_v)
+			intrinsics.mem_copy_non_overlapping(rawptr(k),  rawptr(tk), size_of_k)
+			intrinsics.mem_copy_non_overlapping(rawptr(v),  rawptr(tv), size_of_v)
 			hp^, h = h, hp^
 
 			d = pd
@@ -505,13 +504,14 @@ map_grow_dynamic :: proc(#no_alias m: ^Raw_Map, #no_alias info: ^Map_Info) -> Al
 	log2_capacity := map_log2_cap(m^)
 
 	if m.data == 0 {
-		m^ = map_alloc_dynamic(info, MAP_MIN_LOG2_CAPACITY, allocator) or_return
+		n := map_alloc_dynamic(info, MAP_MIN_LOG2_CAPACITY, allocator) or_return
+		m.data = n.data
 		return nil
 	}
 
 	resized := map_alloc_dynamic(info, log2_capacity + 1, allocator) or_return
 
-	capacity := uintptr(1) << log2_capacity
+	old_capacity := uintptr(1) << log2_capacity
 
 	ks, vs, hs, _, _ := map_kvh_data_dynamic(m^, info)
 
@@ -520,7 +520,7 @@ map_grow_dynamic :: proc(#no_alias m: ^Raw_Map, #no_alias info: ^Map_Info) -> Al
 	info_vs := &info.vs
 
 	n := map_len(m^)
-	for i := uintptr(0); i < capacity; i += 1 {
+	for i := uintptr(0); i < old_capacity; i += 1 {
 		hash := hs[i]
 		if map_hash_is_empty(hash) {
 			continue
@@ -535,7 +535,7 @@ map_grow_dynamic :: proc(#no_alias m: ^Raw_Map, #no_alias info: ^Map_Info) -> Al
 		// fold it into the for loop comparator as a micro-optimization.
 		n -= 1
 		if n == 0 {
-			break
+			// break
 		}
 	}
 
@@ -602,7 +602,7 @@ map_reserve_dynamic :: proc(#no_alias m: ^Raw_Map, #no_alias info: ^Map_Info, ne
 
 	mem_free(rawptr(ks), allocator)
 
-	m.data = resized.data // Should copy the capacity too
+	m^ = resized // Should copy the capacity too
 
 	return nil
 }
@@ -656,7 +656,7 @@ map_shrink_dynamic :: proc(#no_alias m: ^Raw_Map, #no_alias info: ^Map_Info) -> 
 		}
 	}
 
-	free(rawptr(ks), allocator)
+	mem_free(rawptr(ks), allocator)
 
 	m.data = shrinked.data // Should copy the capacity too
 
@@ -750,8 +750,8 @@ __dynamic_map_get :: proc "contextless" (m: rawptr, #no_alias info: ^Map_Info, k
 }
 
 __dynamic_map_set :: proc "odin" (#no_alias m: ^Raw_Map, #no_alias info: ^Map_Info, key, value: rawptr, loc := #caller_location) -> rawptr {
-	value, _ := map_insert_dynamic(m, info, uintptr(key), uintptr(value))
-	return rawptr(value)
+	value, err := map_insert_dynamic(m, info, uintptr(key), uintptr(value))
+	return rawptr(value) if err == nil else nil
 }
 
 __dynamic_map_reserve :: proc "odin" (#no_alias m: ^Raw_Map, #no_alias info: ^Map_Info, new_capacity: uint, loc := #caller_location) {
@@ -763,11 +763,14 @@ __dynamic_map_reserve :: proc "odin" (#no_alias m: ^Raw_Map, #no_alias info: ^Ma
 
 INITIAL_HASH_SEED :: 0xcbf29ce484222325
 
+HASH_MASK :: 1 << (8*size_of(uintptr) - 1) -1
+
 _fnv64a :: proc "contextless" (data: []byte, seed: u64 = INITIAL_HASH_SEED) -> u64 {
 	h: u64 = seed
 	for b in data {
 		h = (h ~ u64(b)) * 0x100000001b3
 	}
+	h &= HASH_MASK
 	return h | u64(h == 0)
 }
 
@@ -791,6 +794,7 @@ _default_hasher_const :: #force_inline proc "contextless" (data: rawptr, seed: u
 		h = (h ~ b) * 0x100000001b3
 		p += 1
 	}
+	h &= HASH_MASK
 	return uintptr(h) | uintptr(h == 0)
 }
 
@@ -802,6 +806,7 @@ default_hasher_n :: #force_inline proc "contextless" (data: rawptr, seed: uintpt
 		h = (h ~ b) * 0x100000001b3
 		p += 1
 	}
+	h &= HASH_MASK
 	return uintptr(h) | uintptr(h == 0)
 }
 
@@ -830,6 +835,7 @@ default_hasher_string :: proc "contextless" (data: rawptr, seed: uintptr) -> uin
 	for b in str {
 		h = (h ~ u64(b)) * 0x100000001b3
 	}
+	h &= HASH_MASK
 	return uintptr(h) | uintptr(h == 0)
 }
 default_hasher_cstring :: proc "contextless" (data: rawptr, seed: uintptr) -> uintptr {
@@ -840,5 +846,6 @@ default_hasher_cstring :: proc "contextless" (data: rawptr, seed: uintptr) -> ui
 		h = (h ~ u64(b)) * 0x100000001b3
 		ptr += 1
 	}
+	h &= HASH_MASK
 	return uintptr(h) | uintptr(h == 0)
 }
