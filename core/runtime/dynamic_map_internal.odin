@@ -393,7 +393,7 @@ map_insert_hash_dynamic :: proc "odin" (m: Raw_Map, #no_alias info: ^Map_Info, h
 			return result if result != 0 else v_dst
 		}
 
-		if pd := map_probe_distance(m, element_hash, p); pd < d {
+		if pd := map_probe_distance(m, element_hash, p); pd <= d {
 			if map_hash_is_deleted(element_hash) {
 				k_dst := map_cell_index_dynamic(ks, info.ks, p)
 				v_dst := map_cell_index_dynamic(vs, info.vs, p)
@@ -401,86 +401,14 @@ map_insert_hash_dynamic :: proc "odin" (m: Raw_Map, #no_alias info: ^Map_Info, h
 				intrinsics.mem_copy_non_overlapping(rawptr(v_dst), rawptr(v), size_of_v)
 				hp^ = h
 				return result if result != 0 else v_dst
+			} else if element_hash == h && info.key_equal(rawptr(k), rawptr(map_cell_index_dynamic(ks, info.ks, p))) {
+				v_dst := map_cell_index_dynamic(vs, info.vs, p)
+				intrinsics.mem_copy_non_overlapping(rawptr(v_dst), rawptr(iv), info.vs.size_of_type)
+				return v_dst
 			}
 
 			if result == 0 {
 				result = map_cell_index_dynamic(vs, info.vs, p)
-			}
-
-			kp := map_cell_index_dynamic(ks, info.vs, p)
-			vp := map_cell_index_dynamic(vs, info.ks, p)
-
-			// Simulate the following at runtime with dynamic storage
-			//
-			// 	kp^, k = k, kp^
-			// 	vp^, v = v, vp^
-			// 	hp^, h = h, hp^
-			intrinsics.mem_copy_non_overlapping(rawptr(tk), rawptr(kp), size_of_k)
-			intrinsics.mem_copy_non_overlapping(rawptr(tv), rawptr(vp), size_of_v)
-			intrinsics.mem_copy_non_overlapping(rawptr(kp), rawptr(k),  size_of_k)
-			intrinsics.mem_copy_non_overlapping(rawptr(vp), rawptr(v),  size_of_v)
-			intrinsics.mem_copy_non_overlapping(rawptr(k),  rawptr(tk), size_of_k)
-			intrinsics.mem_copy_non_overlapping(rawptr(v),  rawptr(tv), size_of_v)
-			hp^, h = h, hp^
-
-			d = pd
-		}
-
-		p = (p + 1) & c
-		d += 1
-	}
-}
-
-@(optimization_mode="speed")
-map_add_hash_dynamic :: proc "odin" (m: Raw_Map, #no_alias info: ^Map_Info, h: Map_Hash, ik: uintptr, iv: uintptr) {
-	capacity := uintptr(1) << map_log2_cap(m)
-	p := map_desired_position(m, h)
-	d := uintptr(0)
-	c := capacity - 1 // Saturating arithmetic mask
-
-	ks, vs, hs, sk, sv := map_kvh_data_dynamic(m, info)
-
-	// Avoid redundant loads of these values
-	size_of_k := info.ks.size_of_type
-	size_of_v := info.vs.size_of_type
-
-	// Use sk and sv scratch storage space for dynamic k and v storage here.
-	//
-	// Simulate the following at runtime
-	// 	k = ik
-	// 	v = iv
-	// 	h = h
-	k := map_cell_index_dynamic_const(sk, info.ks, 0)
-	v := map_cell_index_dynamic_const(sv, info.vs, 0)
-	intrinsics.mem_copy_non_overlapping(rawptr(k), rawptr(ik), size_of_k)
-	intrinsics.mem_copy_non_overlapping(rawptr(v), rawptr(iv), size_of_v)
-	h := h
-
-	// Temporary k and v dynamic storage for swap below
-	tk := map_cell_index_dynamic_const(sk, info.ks, 1)
-	tv := map_cell_index_dynamic_const(sv, info.vs, 1)
-
-	for {
-		hp := &hs[p]
-		element_hash := hp^
-
-		if map_hash_is_empty(element_hash) {
-			k_dst := map_cell_index_dynamic(ks, info.ks, p)
-			v_dst := map_cell_index_dynamic(vs, info.vs, p)
-			intrinsics.mem_copy_non_overlapping(rawptr(k_dst), rawptr(k), size_of_k)
-			intrinsics.mem_copy_non_overlapping(rawptr(v_dst), rawptr(v), size_of_v)
-			hp^ = h
-			return
-		}
-
-		if pd := map_probe_distance(m, element_hash, p); pd < d {
-			if map_hash_is_deleted(element_hash) {
-				k_dst := map_cell_index_dynamic(ks, info.ks, p)
-				v_dst := map_cell_index_dynamic(vs, info.vs, p)
-				intrinsics.mem_copy_non_overlapping(rawptr(k_dst), rawptr(k), size_of_k)
-				intrinsics.mem_copy_non_overlapping(rawptr(v_dst), rawptr(v), size_of_v)
-				hp^ = h
-				return
 			}
 
 			kp := map_cell_index_dynamic(ks, info.vs, p)
@@ -727,17 +655,6 @@ map_insert_dynamic :: proc "odin" (#no_alias m: ^Raw_Map, #no_alias info: ^Map_I
 	value = map_insert_hash_dynamic(m^, info, hashed, k, v)
 	m.len += 1
 	return
-}
-
-// Same as map_insert_dynamic but does not return address to the inserted element.
-@(optimization_mode="speed")
-map_add_dynamic :: proc "odin" (#no_alias m: ^Raw_Map, #no_alias info: ^Map_Info, k, v: uintptr, loc := #caller_location) -> Allocator_Error {
-	if map_len(m^) + 1 >= map_resize_threshold(m^) {
-		map_grow_dynamic(m, info, loc) or_return
-	}
-	map_add_hash_dynamic(m^, info, info.key_hasher(rawptr(k), 0), k, v)
-	m.len += 1
-	return nil
 }
 
 map_erase_dynamic :: #force_inline proc "contextless" (#no_alias m: ^Raw_Map, #no_alias info: ^Map_Info, k: uintptr) -> bool {
