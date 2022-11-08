@@ -1,9 +1,7 @@
 package reflect
 
 import "core:runtime"
-import "core:mem"
 _ :: runtime
-_ :: mem
 
 Map_Entry_Info :: struct($Key, $Value: typeid) {
 	hash:  uintptr,
@@ -11,32 +9,28 @@ Map_Entry_Info :: struct($Key, $Value: typeid) {
 	value: Value,
 }
 
-map_entry_info_slice :: proc(m: $M/map[$K]$V, allocator := context.allocator) -> (entries: []Map_Entry_Info(K, V)) #no_bounds_check {
+map_entry_info_slice :: proc(m: $M/map[$K]$V, allocator := context.allocator) -> (entries: []Map_Entry_Info(K, V), err: runtime.Allocator_Error) #no_bounds_check {
 	m := m
-	rm := (^mem.Raw_Map)(&m)
+	rm := (^runtime.Raw_Map)(&m)
 
 	info := type_info_base(type_info_of(M)).variant.(Type_Info_Map)
-	gs := type_info_base(info.generated_struct).variant.(Type_Info_Struct)
-	ed := type_info_base(gs.types[1]).variant.(Type_Info_Dynamic_Array)
-	entry_type := ed.elem.variant.(Type_Info_Struct)
-	key_offset :=  entry_type.offsets[2]
-	value_offset :=  entry_type.offsets[3]
-	entry_size := uintptr(ed.elem_size)
+	if info.map_info != nil {
+		entries = make(type_of(entries), len(m), allocator) or_return
 
-	entries = make(type_of(entries), rm.entries.len)
+		map_cap := uintptr(cap(m))
+		ks, vs, hs, _, _ := runtime.map_kvh_data_dynamic(rm^, info.map_info)
+		entry_index := 0
+		for bucket_index in 0..<map_cap {
+			if hash := hs[bucket_index]; runtime.map_hash_is_valid(hash) {
+				key   := runtime.map_cell_index_dynamic(ks, &info.map_info.ks, bucket_index)
+				value := runtime.map_cell_index_dynamic(vs, &info.map_info.vs, bucket_index)
+				entries[entry_index].hash  = hash
+				entries[entry_index].key   = (^K)(key)^
+				entries[entry_index].value = (^V)(value)^
 
-	data := uintptr(rm.entries.data)
-	for i in 0..<rm.entries.len {
-		header := (^runtime.Map_Entry_Header)(data)
-
-		hash  := header.hash
-		key   := (^K)(data + key_offset)^
-		value := (^V)(data + value_offset)^
-
-		entries[i] = {hash, key, value}
-
-		data += entry_size
+				entry_index += 1
+			}
+		}
 	}
-
-	return entries
+	return
 }
