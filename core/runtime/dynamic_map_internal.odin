@@ -148,13 +148,13 @@ map_cell_index_static :: #force_inline proc "contextless" (cells: [^]Map_Cell($T
 
 	#assert(N <= MAP_CACHE_LINE_SIZE)
 
-	// No padding case, can treat as a regular array of []T.
 	when size_of(Map_Cell(T)) == size_of([N]T) {
-		return &([^]T)(cells)[index]
-	}
+		// No padding case, can treat as a regular array of []T.
 
-	// Likely case, N is a power of two because T is a power of two.
-	when (N & (N - 1)) == 0 {
+		return &([^]T)(cells)[index]
+	} else when (N & (N - 1)) == 0 && N <= 8*size_of(uintptr) {
+		// Likely case, N is a power of two because T is a power of two.
+
 		// Compute the integer log 2 of N, this is the shift amount to index the
 		// correct cell. Odin's intrinsics.count_leading_zeros does not produce a
 		// constant, hence this approach. We only need to check up to N = 64.
@@ -170,12 +170,12 @@ map_cell_index_static :: #force_inline proc "contextless" (cells: [^]Map_Cell($T
 		} else {
 			return &cells[index >> SHIFT].data[index & (N - 1)]
 		}
+	} else {
+		// Least likely (and worst case), we pay for a division operation but we
+		// assume the compiler does not actually generate a division. N will be in the
+		// range [1, CACHE_LINE_SIZE) and not a power of two.
+		return &cells[index / N].data[index % N]
 	}
-
-	// Least likely (and worst case), we pay for a division operation but we
-	// assume the compiler does not actually generate a division. N will be in the
-	// range [1, CACHE_LINE_SIZE) and not a power of two.
-	return &cells[index / N].data[index % N]
 }
 
 // len() for map
