@@ -297,6 +297,22 @@ map_kvh_data_values_dynamic :: proc "contextless" (m: Raw_Map, #no_alias info: ^
 }
 
 
+@(private)
+map_total_allocation_size :: #force_inline proc "contextless" (capacity: uintptr, info: ^Map_Info) -> uintptr {
+	round :: #force_inline proc "contextless" (value: uintptr) -> uintptr {
+		CACHE_MASK :: MAP_CACHE_LINE_SIZE - 1
+		return (value + CACHE_MASK) &~ CACHE_MASK
+	}
+	INFO_HS := intrinsics.type_map_cell_info(Map_Hash)
+
+	size := uintptr(0)
+	size = round(map_cell_index_dynamic(size, info.ks, capacity))
+	size = round(map_cell_index_dynamic(size, info.vs, capacity))
+	size = round(map_cell_index_dynamic(size, INFO_HS, capacity))
+	size = round(map_cell_index_dynamic(size, info.ks, 2)) // Two additional ks for scratch storage
+	size = round(map_cell_index_dynamic(size, info.vs, 2)) // Two additional vs for scratch storage
+	return size
+}
 
 // The only procedure which needs access to the context is the one which allocates the map.
 map_alloc_dynamic :: proc "odin" (info: ^Map_Info, log2_capacity: uintptr, allocator := context.allocator, loc := #caller_location) -> (result: Raw_Map, err: Allocator_Error) {
@@ -313,18 +329,8 @@ map_alloc_dynamic :: proc "odin" (info: ^Map_Info, log2_capacity: uintptr, alloc
 	capacity := uintptr(1) << max(log2_capacity, MAP_MIN_LOG2_CAPACITY)
 
 	CACHE_MASK :: MAP_CACHE_LINE_SIZE - 1
-	round :: #force_inline proc "contextless" (value: uintptr) -> uintptr {
-		return (value + CACHE_MASK) &~ CACHE_MASK
-	}
 
-	INFO_HS := intrinsics.type_map_cell_info(Map_Hash)
-
-	size := uintptr(0)
-	size = round(map_cell_index_dynamic(size, info.ks, capacity))
-	size = round(map_cell_index_dynamic(size, info.vs, capacity))
-	size = round(map_cell_index_dynamic(size, INFO_HS, capacity))
-	size = round(map_cell_index_dynamic(size, info.ks, 2)) // Two additional ks for scratch storage
-	size = round(map_cell_index_dynamic(size, info.vs, 2)) // Two additional vs for scratch storage
+	size := map_total_allocation_size(capacity, info)
 
 	data := mem_alloc_non_zeroed(int(size), MAP_CACHE_LINE_SIZE, allocator, loc) or_return
 	data_ptr := uintptr(raw_data(data))
@@ -543,11 +549,10 @@ map_grow_dynamic :: proc "odin" (#no_alias m: ^Raw_Map, #no_alias info: ^Map_Inf
 		// fold it into the for loop comparator as a micro-optimization.
 		n -= 1
 		if n == 0 {
-			// break
+			break
 		}
 	}
-
-	mem_free(rawptr(ks), allocator, loc)
+	map_free_dynamic(m^, info, loc) or_return
 
 	m.data = resized.data // Should copy the capacity too
 
@@ -556,7 +561,7 @@ map_grow_dynamic :: proc "odin" (#no_alias m: ^Raw_Map, #no_alias info: ^Map_Inf
 
 
 @(optimization_mode="size")
-map_reserve_dynamic :: proc "odin" (#no_alias m: ^Raw_Map, #no_alias info: ^Map_Info, new_capacity: uintptr) -> Allocator_Error {
+map_reserve_dynamic :: proc "odin" (#no_alias m: ^Raw_Map, #no_alias info: ^Map_Info, new_capacity: uintptr, loc := #caller_location) -> Allocator_Error {
 	allocator := m.allocator
 	if allocator.procedure == nil {
 		allocator = context.allocator
@@ -575,11 +580,11 @@ map_reserve_dynamic :: proc "odin" (#no_alias m: ^Raw_Map, #no_alias info: ^Map_
 	log2_new_capacity := size_of(uintptr) - intrinsics.count_leading_zeros(new_capacity-1)
 
 	if m.data == 0 {
-		m^ = map_alloc_dynamic(info, MAP_MIN_LOG2_CAPACITY, allocator) or_return
+		m^ = map_alloc_dynamic(info, MAP_MIN_LOG2_CAPACITY, allocator, loc) or_return
 		return nil
 	}
 
-	resized := map_alloc_dynamic(info, log2_new_capacity, allocator) or_return
+	resized := map_alloc_dynamic(info, log2_new_capacity, allocator, loc) or_return
 
 	ks, vs, hs, _, _ := map_kvh_data_dynamic(m^, info)
 
@@ -664,10 +669,12 @@ map_shrink_dynamic :: proc "odin" (#no_alias m: ^Raw_Map, #no_alias info: ^Map_I
 	return nil
 }
 
-// Single procedure for static and dynamic paths.
 @(require_results)
-map_free :: proc "odin" (m: Raw_Map, loc := #caller_location) -> Allocator_Error {
-	return mem_free(rawptr(map_data(m)), m.allocator, loc)
+map_free_dynamic :: proc "odin" (m: Raw_Map, info: ^Map_Info, loc := #caller_location) -> Allocator_Error {
+	ptr := rawptr(map_data(m))
+	size := map_total_allocation_size(uintptr(map_cap(m)), info)
+
+	return mem_free_with_size(ptr, int(size), m.allocator, loc)
 }
 
 @(optimization_mode="speed")
@@ -832,13 +839,13 @@ __dynamic_map_get :: proc "contextless" (m: Raw_Map, #no_alias info: ^Map_Info, 
 }
 
 __dynamic_map_set :: proc "odin" (#no_alias m: ^Raw_Map, #no_alias info: ^Map_Info, key, value: rawptr, loc := #caller_location) -> rawptr {
-	value, err := map_insert_dynamic(m, info, uintptr(key), uintptr(value))
+	value, err := map_insert_dynamic(m, info, uintptr(key), uintptr(value), loc)
 	return rawptr(value) if err == nil else nil
 }
 
 @(private)
 __dynamic_map_reserve :: proc "odin" (#no_alias m: ^Raw_Map, #no_alias info: ^Map_Info, new_capacity: uint, loc := #caller_location) {
-	map_reserve_dynamic(m, info, uintptr(new_capacity))
+	map_reserve_dynamic(m, info, uintptr(new_capacity), loc)
 }
 
 
