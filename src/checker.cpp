@@ -926,6 +926,10 @@ void init_universal(void) {
 
 		Type *hasher_args[2] = {t_rawptr, t_uintptr};
 		t_hasher_proc = alloc_type_proc_from_types(hasher_args, 2, t_uintptr, false, ProcCC_Contextless);
+
+		Type *map_get_args[2] = {/*map*/t_rawptr, /*key*/t_rawptr};
+		t_map_get_proc = alloc_type_proc_from_types(map_get_args, 2, t_rawptr, false, ProcCC_Contextless);
+
 	}
 
 // Constants

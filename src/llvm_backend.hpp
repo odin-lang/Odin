@@ -144,6 +144,7 @@ struct lbModule {
 
 	PtrMap<Type *, lbProcedure *> equal_procs;
 	PtrMap<Type *, lbProcedure *> hasher_procs;
+	PtrMap<Type *, lbProcedure *> map_get_procs;
 
 	u32 nested_type_name_guid;
 

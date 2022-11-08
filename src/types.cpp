@@ -693,6 +693,7 @@ gb_global Type *t_raw_map_ptr                    = nullptr;
 
 gb_global Type *t_equal_proc  = nullptr;
 gb_global Type *t_hasher_proc = nullptr;
+gb_global Type *t_map_get_proc = nullptr;
 
 gb_global Type *t_objc_object   = nullptr;
 gb_global Type *t_objc_selector = nullptr;

@@ -371,24 +371,30 @@ void lb_build_range_indexed(lbProcedure *p, lbValue expr, Type *val_type, lbValu
 }
 
 lbValue lb_map_cell_index_static(lbProcedure *p, Type *type, lbValue cells_ptr, lbValue index) {
-	i64 size, N;
-	i64 sz = type_size_of(type);
-	map_cell_size_and_len(type, &size, &N);
+	i64 size, len;
+	i64 elem_sz = type_size_of(type);
+	map_cell_size_and_len(type, &size, &len);
 
-	index = lb_emit_conv(p, index, t_uint);
+	index = lb_emit_conv(p, index, t_uintptr);
 
-	if (size == N*sz) {
+	if (size == len*elem_sz) {
 		lbValue elems_ptr = lb_emit_conv(p, cells_ptr, alloc_type_pointer(type));
 		return lb_emit_ptr_offset(p, elems_ptr, index);
 	}
 
 	// TOOD(bill): N power of two optimization to use >> and &
 
-	lbValue N_const = lb_const_int(p->module, index.type, N);
-	lbValue cell_index = lb_emit_arith(p, Token_Quo, index, N_const, index.type);
-	lbValue data_index = lb_emit_arith(p, Token_Mod, index, N_const, index.type);
-	lbValue cell = lb_emit_ptr_offset(p, cells_ptr, cell_index);
-	lbValue elems_ptr = lb_emit_conv(p, cell, alloc_type_pointer(type));
+	lbValue size_const = lb_const_int(p->module, t_uintptr, size);
+	lbValue len_const = lb_const_int(p->module, t_uintptr, len);
+	lbValue cell_index = lb_emit_arith(p, Token_Quo, index, len_const, t_uintptr);
+	lbValue data_index = lb_emit_arith(p, Token_Mod, index, len_const, t_uintptr);
+
+	lbValue elems_ptr = lb_emit_conv(p, cells_ptr, t_uintptr);
+	lbValue cell_offset = lb_emit_arith(p, Token_Mul, size_const, cell_index, t_uintptr);
+	elems_ptr = lb_emit_arith(p, Token_Add, elems_ptr, cell_offset, t_uintptr);
+
+	elems_ptr = lb_emit_conv(p, elems_ptr, alloc_type_pointer(type));
+
 	return lb_emit_ptr_offset(p, elems_ptr, data_index);
 }
 

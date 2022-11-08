@@ -3244,7 +3244,12 @@ void check_binary_expr(CheckerContext *c, Operand *x, Ast *node, Type *type_hint
 				check_assignment(c, x, yt->Map.key, str_lit("map 'not_in'"));
 			}
 
-			add_package_dependency(c, "runtime", "__dynamic_map_get");
+			if (build_context.use_static_map_calls) {
+				add_package_dependency(c, "runtime", "map_desired_position");
+				add_package_dependency(c, "runtime", "map_probe_distance");
+			} else {
+				add_package_dependency(c, "runtime", "__dynamic_map_get");
+			}
 		} else if (is_type_bit_set(rhs_type)) {
 			Type *yt = base_type(rhs_type);
 
@@ -8992,8 +8997,14 @@ ExprKind check_index_expr(CheckerContext *c, Operand *o, Ast *node, Type *type_h
 		o->type = t->Map.value;
 		o->expr = node;
 
-		add_package_dependency(c, "runtime", "__dynamic_map_get");
+
 		add_package_dependency(c, "runtime", "__dynamic_map_set");
+		if (build_context.use_static_map_calls) {
+			add_package_dependency(c, "runtime", "map_desired_position");
+			add_package_dependency(c, "runtime", "map_probe_distance");
+		} else {
+			add_package_dependency(c, "runtime", "__dynamic_map_get");
+		}
 		return Expr_Expr;
 	}
 
