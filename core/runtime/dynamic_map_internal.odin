@@ -139,7 +139,7 @@ map_cell_index_dynamic_const :: proc "contextless" (base: uintptr, #no_alias inf
 
 // len() for map
 map_len :: #force_inline proc "contextless" (m: Raw_Map) -> int {
-	return int(m.len)
+	return m.len
 }
 
 // cap() for map
@@ -591,7 +591,7 @@ map_shrink_dynamic :: proc(#no_alias m: ^Raw_Map, #no_alias info: ^Map_Info) -> 
 	// one minus the current log2 capacity's resize threshold. That is the shrunk
 	// map needs to be within the max load factor.
 	log2_capacity := map_log2_cap(m^)
-	if m.len >= map_load_factor(log2_capacity - 1) {
+	if uintptr(m.len) >= map_load_factor(log2_capacity - 1) {
 		return nil
 	}
 
