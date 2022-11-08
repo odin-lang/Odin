@@ -990,15 +990,13 @@ lbValue lb_emit_struct_ep(lbProcedure *p, lbValue s, i32 index) {
 		}
 	} else if (is_type_map(t)) {
 		init_map_internal_types(t);
-		Type *itp = alloc_type_pointer(t->Map.internal_type);
+		Type *itp = alloc_type_pointer(t_raw_map);
 		s = lb_emit_transmute(p, s, itp);
 
-		Type *gst = t->Map.internal_type;
-		GB_ASSERT(gst->kind == Type_Struct);
 		switch (index) {
-		case 0: result_type = get_struct_field_type(gst, 0); break;
-		case 1: result_type = get_struct_field_type(gst, 1); break;
-		case 2: result_type = get_struct_field_type(gst, 2); break;
+		case 0: result_type = get_struct_field_type(t_raw_map, 0); break;
+		case 1: result_type = get_struct_field_type(t_raw_map, 1); break;
+		case 2: result_type = get_struct_field_type(t_raw_map, 2); break;
 		}
 	} else if (is_type_array(t)) {
 		return lb_emit_array_epi(p, s, index);
@@ -1131,11 +1129,10 @@ lbValue lb_emit_struct_ev(lbProcedure *p, lbValue s, i32 index) {
 	case Type_Map:
 		{
 			init_map_internal_types(t);
-			Type *gst = t->Map.internal_type;
 			switch (index) {
-			case 0: result_type = get_struct_field_type(gst, 0); break;
-			case 1: result_type = get_struct_field_type(gst, 1); break;
-			case 2: result_type = get_struct_field_type(gst, 2); break;
+			case 0: result_type = get_struct_field_type(t_raw_map, 0); break;
+			case 1: result_type = get_struct_field_type(t_raw_map, 1); break;
+			case 2: result_type = get_struct_field_type(t_raw_map, 2); break;
 			}
 		}
 		break;

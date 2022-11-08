@@ -2198,34 +2198,14 @@ void map_cell_size_and_len(Type *type, i64 *size_, i64 *len_) {
 void init_map_internal_types(Type *type) {
 	GB_ASSERT(type->kind == Type_Map);
 	GB_ASSERT(t_allocator != nullptr);
-	if (type->Map.internal_type != nullptr) return;
+	if (type->Map.lookup_result_type != nullptr) return;
 
 	Type *key   = type->Map.key;
 	Type *value = type->Map.value;
 	GB_ASSERT(key != nullptr);
 	GB_ASSERT(value != nullptr);
 
-	Type *generated_struct_type = alloc_type_struct();
-
-	/*
-	struct {
-		data:      uintptr,
-		size:      uintptr,
-		allocator: runtime.Allocator,
-	}
-	*/
-	Scope *s = create_scope(nullptr, builtin_pkg->scope);
-
-	auto fields = slice_make<Entity *>(permanent_allocator(), 3);
-	fields[0] = alloc_entity_field(s, make_token_ident(str_lit("data")),      t_uintptr,  false,  0, EntityState_Resolved);
-	fields[1] = alloc_entity_field(s, make_token_ident(str_lit("size")),      t_uintptr,   false, 1, EntityState_Resolved);
-	fields[2] = alloc_entity_field(s, make_token_ident(str_lit("allocator")), t_allocator, false, 2, EntityState_Resolved);
-
-	generated_struct_type->Struct.fields = fields;
-	type_set_offsets(generated_struct_type);
-	
-	type->Map.internal_type         = generated_struct_type;
-	type->Map.lookup_result_type    = make_optional_ok_type(value);
+	type->Map.lookup_result_type = make_optional_ok_type(value);
 }
 
 void add_map_key_type_dependencies(CheckerContext *ctx, Type *key) {
