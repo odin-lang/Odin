@@ -203,26 +203,19 @@ lbValue lb_emit_transmute(lbProcedure *p, lbValue value, Type *t) {
 	if (is_type_uintptr(src) && is_type_internally_pointer_like(dst)) {
 		res.value = LLVMBuildIntToPtr(p->builder, value.value, lb_type(m, t), "");
 		return res;
-	}
-	if (is_type_internally_pointer_like(src) && is_type_uintptr(dst)) {
+	} else if (is_type_internally_pointer_like(src) && is_type_uintptr(dst)) {
 		res.value = LLVMBuildPtrToInt(p->builder, value.value, lb_type(m, t), "");
 		return res;
-	}
-
-	if (is_type_integer(src) && is_type_internally_pointer_like(dst)) {
+	} else if (is_type_integer(src) && is_type_internally_pointer_like(dst)) {
 		res.value = LLVMBuildIntToPtr(p->builder, value.value, lb_type(m, t), "");
 		return res;
 	} else if (is_type_internally_pointer_like(src) && is_type_integer(dst)) {
 		res.value = LLVMBuildPtrToInt(p->builder, value.value, lb_type(m, t), "");
 		return res;
-	}
-
-	if (is_type_internally_pointer_like(src) && is_type_internally_pointer_like(dst)) {
+	} else if (is_type_internally_pointer_like(src) && is_type_internally_pointer_like(dst)) {
 		res.value = LLVMBuildPointerCast(p->builder, value.value, lb_type(p->module, t), "");
 		return res;
-	}
-
-	if (is_type_simd_vector(src) && is_type_simd_vector(dst)) {
+	} else if (is_type_simd_vector(src) && is_type_simd_vector(dst)) {
 		res.value = LLVMBuildBitCast(p->builder, value.value, lb_type(p->module, t), "");
 		return res;
 	} else if (is_type_array_like(src) && is_type_simd_vector(dst)) {
@@ -239,9 +232,11 @@ lbValue lb_emit_transmute(lbProcedure *p, lbValue value, Type *t) {
 		ap = lb_emit_conv(p, ap, alloc_type_pointer(value.type));
 		lb_emit_store(p, ap, value);
 		return lb_addr_load(p, addr);
-	}
-
-	if (lb_is_type_aggregate(src) || lb_is_type_aggregate(dst)) {
+	} else if (is_type_map(src) && are_types_identical(t_raw_map, t)) {
+		res.value = value.value;
+		res.type = t;
+		return res;
+	} else if (lb_is_type_aggregate(src) || lb_is_type_aggregate(dst)) {
 		lbValue s = lb_address_from_load_or_generate_local(p, value);
 		lbValue d = lb_emit_transmute(p, s, alloc_type_pointer(t));
 		return lb_emit_load(p, d);

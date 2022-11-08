@@ -622,14 +622,15 @@ lbValue lb_gen_map_key_hash(lbProcedure *p, lbValue key, Type *key_type, lbValue
 	return hashed_key;
 }
 
-lbValue lb_internal_dynamic_map_get_ptr(lbProcedure *p, lbValue const &map_ptr, lbValue const &key) {
-	Type *map_type = base_type(type_deref(map_ptr.type));
+lbValue lb_internal_dynamic_map_get_ptr(lbProcedure *p, lbValue const &map, lbValue const &key) {
+	Type *map_type = base_type(map.type);
+	GB_ASSERT(map_type->kind == Type_Map);
 
 	lbValue key_ptr = lb_address_from_load_or_generate_local(p, key);
 	key_ptr = lb_emit_conv(p, key_ptr, t_rawptr);
 
 	auto args = array_make<lbValue>(permanent_allocator(), 3);
-	args[0] = lb_emit_conv(p, map_ptr, t_rawptr);
+	args[0] = lb_emit_transmute(p, map, t_raw_map);
 	args[1] = lb_gen_map_info_ptr(p->module, map_type);
 	args[2] = key_ptr;
 
@@ -644,17 +645,15 @@ void lb_insert_dynamic_map_key_and_value(lbProcedure *p, lbValue const &map_ptr,
 	GB_ASSERT(map_type->kind == Type_Map);
 
 	lbValue key_ptr = lb_address_from_load_or_generate_local(p, map_key);
-	key_ptr = lb_emit_conv(p, key_ptr, t_rawptr);
-	lbValue v = lb_emit_conv(p, map_value, map_type->Map.value);
 
-	lbAddr value_addr = lb_add_local_generated(p, v.type, false);
-	lb_addr_store(p, value_addr, v);
+	lbValue v = lb_emit_conv(p, map_value, map_type->Map.value);
+	lbValue value_ptr = lb_address_from_load_or_generate_local(p, v);
 
 	auto args = array_make<lbValue>(permanent_allocator(), 5);
-	args[0] = lb_emit_conv(p, map_ptr, t_rawptr);
+	args[0] = lb_emit_conv(p, map_ptr, t_raw_map_ptr);
 	args[1] = lb_gen_map_info_ptr(p->module, map_type);
-	args[2] = key_ptr;
-	args[3] = lb_emit_conv(p, value_addr.addr, t_rawptr);
+	args[2] = lb_emit_conv(p, key_ptr, t_rawptr);
+	args[3] = lb_emit_conv(p, value_ptr, t_rawptr);
 	args[4] = lb_emit_source_code_location_as_global(p, node);
 	lb_emit_runtime_call(p, "__dynamic_map_set", args);
 }
