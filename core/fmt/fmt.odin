@@ -2075,10 +2075,9 @@ fmt_value :: proc(fi: ^Info, v: any, verb: rune) {
 			map_cap := uintptr(runtime.map_cap(m^))
 			ks, vs, hs, _, _ := runtime.map_kvh_data_dynamic(m^, info.map_info)
 			j := 0
-			fmt_arg(fi, map_cap, 'v')
 			for bucket_index in 0..<map_cap {
-				if hs[bucket_index] == 0 {
-					// continue
+				if !runtime.map_hash_is_valid(hs[bucket_index]) {
+					continue
 				}
 
 				if j > 0 {
