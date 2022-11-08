@@ -257,21 +257,18 @@ marshal_to_writer :: proc(w: io.Writer, v: any, opt: ^Marshal_Options) -> (err: 
 		opt_write_start(w, opt, '{') or_return
 
 		if m != nil {
-			if info.generated_struct == nil {
+			if info.map_info == nil {
 				return .Unsupported_Type
 			}
-			entries    := &m.entries
-			gs         := runtime.type_info_base(info.generated_struct).variant.(runtime.Type_Info_Struct)
-			ed         := runtime.type_info_base(gs.types[1]).variant.(runtime.Type_Info_Dynamic_Array)
-			entry_type := ed.elem.variant.(runtime.Type_Info_Struct)
-			entry_size := ed.elem_size
+			map_cap := uintptr(runtime.map_cap(m^))
+			ks, vs, hs, _, _ := runtime.map_kvh_data_dynamic(m^, info.map_info)
+			for bucket_index in 0..<map_cap {
+				if !runtime.map_hash_is_valid(hs[bucket_index]) {
+					continue
+				}
 
-			for i in 0..<entries.len {
-				opt_write_iteration(w, opt, i) or_return
-
-				data := uintptr(entries.data) + uintptr(i*entry_size)
-				key   := rawptr(data + entry_type.offsets[2])
-				value := rawptr(data + entry_type.offsets[3])
+				key   := rawptr(runtime.map_cell_index_dynamic(ks, &info.map_info.ks, bucket_index))
+				value := rawptr(runtime.map_cell_index_dynamic(vs, &info.map_info.vs, bucket_index))
 
 				// check for string type
 				{
@@ -281,13 +278,13 @@ marshal_to_writer :: proc(w: io.Writer, v: any, opt: ^Marshal_Options) -> (err: 
 					name: string
 
 					#partial switch info in ti.variant {
-					case runtime.Type_Info_String: 
+					case runtime.Type_Info_String:
 						switch s in a {
 							case string: name = s
 							case cstring: name = string(s)
 						}
 						opt_write_key(w, opt, name) or_return
-	
+
 					case: return .Unsupported_Type
 					}
 				}
