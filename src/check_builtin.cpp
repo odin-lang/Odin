@@ -5385,6 +5385,20 @@ bool check_builtin_procedure(CheckerContext *c, Operand *operand, Ast *call, i32
 			operand->type = t_map_info_ptr;
 			break;
 		}
+	case BuiltinProc_type_map_cell_info:
+		{
+			Operand op = {};
+			Type *bt = check_type(c, ce->args[0]);
+			Type *type = base_type(bt);
+			if (type == nullptr || type == t_invalid) {
+				error(ce->args[0], "Expected a type for '%.*s'", LIT(builtin_name));
+				return false;
+			}
+
+			operand->mode = Addressing_Value;
+			operand->type = t_map_cell_info_ptr;
+			break;
+		}
 
 	case BuiltinProc_constant_utf16_cstring:
 		{

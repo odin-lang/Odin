@@ -103,6 +103,9 @@ Map_Cell_Info :: struct {
 	elements_per_cell: uintptr, // 8-bytes on 64-bit, 4-bytes on 32-bits
 }
 
+// map_cell_info :: proc "contextless" ($T: typeid) -> ^Map_Cell_Info {...}
+map_cell_info :: intrinsics.type_map_cell_info
+
 // Same as the above procedure but at runtime with the cell Map_Cell_Info value.
 map_cell_index_dynamic :: #force_inline proc "contextless" (base: uintptr, info: ^Map_Cell_Info, index: uintptr) -> uintptr {
 	// Micro-optimize the common cases to save on integer division.
@@ -229,18 +232,13 @@ Map_Info :: struct {
 map_info :: intrinsics.type_map_info
 
 map_kvh_data_dynamic :: proc "contextless" (m: Raw_Map, #no_alias info: ^Map_Info) -> (ks: uintptr, vs: uintptr, hs: [^]Map_Hash, sk: uintptr, sv: uintptr) {
-	@static INFO_HS := Map_Cell_Info {
-		size_of(Map_Hash),
-		align_of(Map_Hash),
-		size_of(Map_Cell(Map_Hash)),
-		len(Map_Cell(Map_Hash){}.data),
-	}
+	INFO_HS := intrinsics.type_map_cell_info(Map_Hash)
 
 	capacity := uintptr(1) << map_log2_cap(m)
 	ks   = map_data(m)
 	vs   = map_cell_index_dynamic(ks,  info.ks, capacity) // Skip past ks to get start of vs
 	hs_ := map_cell_index_dynamic(vs,  info.vs, capacity) // Skip past vs to get start of hs
-	sk   = map_cell_index_dynamic(hs_, &INFO_HS, capacity) // Skip past hs to get start of sk
+	sk   = map_cell_index_dynamic(hs_, INFO_HS, capacity) // Skip past hs to get start of sk
 	// Need to skip past two elements in the scratch key space to get to the start
 	// of the scratch value space, of which there's only two elements as well.
 	sv = map_cell_index_dynamic_const(sk, info.ks, 2)
@@ -270,21 +268,16 @@ map_alloc_dynamic :: proc(info: ^Map_Info, log2_capacity: uintptr, allocator := 
 
 	capacity := uintptr(1) << max(log2_capacity, MAP_MIN_LOG2_CAPACITY)
 
-	@static INFO_HS := Map_Cell_Info {
-		size_of(Map_Hash),
-		align_of(Map_Hash),
-		size_of(Map_Cell(Map_Hash)),
-		len(Map_Cell(Map_Hash){}.data),
-	}
-
 	round :: #force_inline proc "contextless" (value: uintptr) -> uintptr {
 		return (value + MAP_CACHE_LINE_SIZE - 1) &~ uintptr(MAP_CACHE_LINE_SIZE - 1)
 	}
 
+	INFO_HS := intrinsics.type_map_cell_info(Map_Hash)
+
 	size := uintptr(0)
 	size = round(map_cell_index_dynamic(size, info.ks, capacity))
 	size = round(map_cell_index_dynamic(size, info.vs, capacity))
-	size = round(map_cell_index_dynamic(size, &INFO_HS, capacity))
+	size = round(map_cell_index_dynamic(size, INFO_HS, capacity))
 	size = round(map_cell_index_dynamic(size, info.ks, 2)) // Two additional ks for scratch storage
 	size = round(map_cell_index_dynamic(size, info.vs, 2)) // Two additional vs for scratch storage
 
