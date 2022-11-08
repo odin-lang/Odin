@@ -190,7 +190,7 @@ map_hash_is_deleted :: #force_inline proc "contextless" (hash: Map_Hash) -> bool
 }
 map_hash_is_valid :: #force_inline proc "contextless" (hash: Map_Hash) -> bool {
 	// The MSB indicates a tombstone
-	return hash != 0 && (hash >> ((size_of(Map_Hash) * 8) - 1)) == 0
+	return (hash != 0) & ((hash >> ((size_of(Map_Hash) * 8) - 1)) == 0)
 }
 
 
@@ -248,7 +248,6 @@ map_info :: #force_inline proc "contextless" ($K: typeid, $V: typeid) -> ^Map_In
 	}
 	return &INFO
 }
-
 
 map_kvh_data_dynamic :: proc "contextless" (m: Raw_Map, #no_alias info: ^Map_Info) -> (ks: uintptr, vs: uintptr, hs: [^]Map_Hash, sk: uintptr, sv: uintptr) {
 	@static INFO_HS := Map_Cell_Info {
