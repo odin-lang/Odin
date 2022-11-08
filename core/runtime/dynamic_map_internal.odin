@@ -692,7 +692,30 @@ map_lookup_dynamic :: proc "contextless" (m: Raw_Map, #no_alias info: ^Map_Info,
 		d += 1
 	}
 }
-
+@(optimization_mode="speed")
+map_exists_dynamic :: proc "contextless" (m: Raw_Map, #no_alias info: ^Map_Info, k: uintptr) -> (ok: bool) {
+	if map_len(m) == 0 {
+		return false
+	}
+	h := info.key_hasher(rawptr(k), 0)
+	p := map_desired_position(m, h)
+	d := uintptr(0)
+	c := (uintptr(1) << map_log2_cap(m)) - 1
+	ks, _, hs, _, _ := map_kvh_data_dynamic(m, info)
+	info_ks := &info.ks
+	for {
+		element_hash := hs[p]
+		if map_hash_is_empty(element_hash) {
+			return false
+		} else if d > map_probe_distance(m, element_hash, p) {
+			return false
+		} else if element_hash == h && info.key_equal(rawptr(k), rawptr(map_cell_index_dynamic(ks, info_ks, p))) {
+			return true
+		}
+		p = (p + 1) & c
+		d += 1
+	}
+}
 
 
 
