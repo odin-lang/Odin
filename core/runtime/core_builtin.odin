@@ -159,7 +159,7 @@ delete_slice :: proc(array: $T/[]$E, allocator := context.allocator, loc := #cal
 }
 @builtin
 delete_map :: proc(m: $T/map[$K]$V, loc := #caller_location) -> Allocator_Error {
-	return map_free(transmute(Raw_Map)m, loc)
+	return map_free_dynamic(transmute(Raw_Map)m, map_info(T), loc)
 }
 
 
