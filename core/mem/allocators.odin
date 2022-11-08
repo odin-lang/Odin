@@ -880,7 +880,7 @@ tracking_allocator :: proc(data: ^Tracking_Allocator) -> Allocator {
 
 tracking_allocator_proc :: proc(allocator_data: rawptr, mode: Allocator_Mode,
                                 size, alignment: int,
-                                old_memory: rawptr, old_size: int, loc := #caller_location) -> ([]byte, Allocator_Error) {
+                                old_memory: rawptr, old_size: int, loc := #caller_location) -> (result: []byte, err: Allocator_Error) {
 	data := (^Tracking_Allocator)(allocator_data)
 	if mode == .Query_Info {
 		info := (^Allocator_Query_Info)(old_memory)
@@ -892,21 +892,16 @@ tracking_allocator_proc :: proc(allocator_data: rawptr, mode: Allocator_Mode,
 			info.pointer = nil
 		}
 
-		return nil, nil
+		return
 	}
 
-	result: []byte
-	err: Allocator_Error
 	if mode == .Free && old_memory != nil && old_memory not_in data.allocation_map {
 		append(&data.bad_free_array, Tracking_Allocator_Bad_Free_Entry{
 			memory = old_memory,
 			location = loc,
 		})
 	} else {
-		result, err = data.backing.procedure(data.backing.data, mode, size, alignment, old_memory, old_size, loc)
-		if err != nil {
-			return result, err
-		}
+		result = data.backing.procedure(data.backing.data, mode, size, alignment, old_memory, old_size, loc) or_return
 	}
 	result_ptr := raw_data(result)
 
@@ -954,6 +949,6 @@ tracking_allocator_proc :: proc(allocator_data: rawptr, mode: Allocator_Mode,
 		unreachable()
 	}
 
-	return result, err
+	return
 }
 
