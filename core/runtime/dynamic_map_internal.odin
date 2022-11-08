@@ -137,6 +137,47 @@ map_cell_index_dynamic_const :: proc "contextless" (base: uintptr, #no_alias inf
 	return base + (cell_index * size_of_cell) + (data_index * size_of_type)
 }
 
+// We always round the capacity to a power of two so this becomes [16]Foo, which
+// works out to [4]Cell(Foo).
+//
+// The following compile-time procedure indexes such a [N]Cell(T) structure as
+// if it were a flat array accounting for the internal padding introduced by the
+// Cell structure.
+map_cell_index_static :: #force_inline proc "contextless" (cells: [^]Map_Cell($T), index: uintptr) -> ^T #no_bounds_check {
+	N :: size_of(Map_Cell(T){}.data) / size_of(T) when size_of(T) > 0 else 1
+
+	#assert(N <= MAP_CACHE_LINE_SIZE)
+
+	// No padding case, can treat as a regular array of []T.
+	when size_of(Map_Cell(T)) == size_of([N]T) {
+		return &([^]T)(cells)[index]
+	}
+
+	// Likely case, N is a power of two because T is a power of two.
+	when (N & (N - 1)) == 0 {
+		// Compute the integer log 2 of N, this is the shift amount to index the
+		// correct cell. Odin's intrinsics.count_leading_zeros does not produce a
+		// constant, hence this approach. We only need to check up to N = 64.
+		SHIFT :: 1 when N < 2  else
+		         2 when N < 4  else
+		         3 when N < 8  else
+		         4 when N < 16 else
+		         5 when N < 32 else 6
+		#assert(SHIFT <= MAP_CACHE_LINE_LOG2)
+		// Unique case, no need to index data here since only one element.
+		when N == 1 {
+			return &cells[index >> SHIFT].data[0]
+		} else {
+			return &cells[index >> SHIFT].data[index & (N - 1)]
+		}
+	}
+
+	// Least likely (and worst case), we pay for a division operation but we
+	// assume the compiler does not actually generate a division. N will be in the
+	// range [1, CACHE_LINE_SIZE) and not a power of two.
+	return &cells[index / N].data[index % N]
+}
+
 // len() for map
 map_len :: #force_inline proc "contextless" (m: Raw_Map) -> int {
 	return m.len
@@ -721,27 +762,72 @@ map_clear_dynamic :: #force_inline proc "contextless" (#no_alias m: ^Raw_Map, #n
 }
 
 
+map_kvh_data_static :: #force_inline proc "contextless" (m: $T/map[$K]$V) -> ([^]Map_Cell(K), [^]Map_Cell(V), [^]Map_Hash) {
+	H :: Map_Hash
+	capacity := uintptr(cap(m))
+	ks := ([^]Map_Cell(K))(map_data(transmute(Raw_Map)m))
+	vs := ([^]Map_Cell(V))(map_cell_index_static(ks, capacity))
+	hs := ([^]Map_Cell(H))(map_cell_index_static(vs, capacity))
+	return ks, vs, ([^]Map_Hash)(hs)
+}
+
+
+map_get :: proc "contextless" (m: $T/map[$K]$V, key: K) -> (stored_key: K, stored_value: V, ok: bool) {
+	rm := transmute(Raw_Map)m
+	if rm.len == 0 {
+		return
+	}
+	info := intrinsics.type_map_info(T)
+	key := key
+
+	h := info.key_hasher(&key, 0)
+	pos := map_desired_position(rm, h)
+	distance := uintptr(0)
+	mask := (uintptr(1) << map_log2_cap(rm)) - 1
+	ks, vs, hs := map_kvh_data_static(m)
+	for {
+		element_hash := hs[pos]
+		if map_hash_is_empty(element_hash) {
+			return
+		} else if distance > map_probe_distance(rm, element_hash, pos) {
+			return
+		} else if element_hash == h {
+			element_key := map_cell_index_static(ks, pos)
+			if info.key_equal(&key, rawptr(element_key)) {
+				element_value := map_cell_index_static(vs, pos)
+				stored_key   = (^K)(element_key)^
+				stored_value = (^V)(element_value)^
+				ok = true
+				return
+			}
+
+		}
+		pos = (pos + 1) & mask
+		distance += 1
+	}
+}
+
 __dynamic_map_get :: proc "contextless" (m: Raw_Map, #no_alias info: ^Map_Info, key: rawptr) -> (ptr: rawptr) {
 	if m.len == 0 {
 		return nil
 	}
 
 	h := info.key_hasher(key, 0)
-	p := map_desired_position(m, h)
-	d := uintptr(0)
-	c := (uintptr(1) << map_log2_cap(m)) - 1
+	pos := map_desired_position(m, h)
+	distance := uintptr(0)
+	mask := (uintptr(1) << map_log2_cap(m)) - 1
 	ks, vs, hs, _, _ := map_kvh_data_dynamic(m, info)
 	for {
-		element_hash := hs[p]
+		element_hash := hs[pos]
 		if map_hash_is_empty(element_hash) {
 			return nil
-		} else if d > map_probe_distance(m, element_hash, p) {
+		} else if distance > map_probe_distance(m, element_hash, pos) {
 			return nil
-		} else if element_hash == h && info.key_equal(key, rawptr(map_cell_index_dynamic(ks, info.ks, p))) {
-			return rawptr(map_cell_index_dynamic(vs, info.vs, p))
+		} else if element_hash == h && info.key_equal(key, rawptr(map_cell_index_dynamic(ks, info.ks, pos))) {
+			return rawptr(map_cell_index_dynamic(vs, info.vs, pos))
 		}
-		p = (p + 1) & c
-		d += 1
+		pos = (pos + 1) & mask
+		distance += 1
 	}
 }
 

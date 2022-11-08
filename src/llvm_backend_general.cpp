@@ -67,6 +67,7 @@ void lb_init_module(lbModule *m, Checker *c) {
 	map_init(&m->function_type_map, a);
 	map_init(&m->equal_procs, a);
 	map_init(&m->hasher_procs, a);
+	map_init(&m->map_get_procs, a);
 	array_init(&m->procedures_to_generate, a, 0, 1024);
 	array_init(&m->missing_procedures_to_check, a, 0, 16);
 	map_init(&m->debug_values, a);

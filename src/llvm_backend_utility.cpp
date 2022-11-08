@@ -1440,7 +1440,7 @@ lbValue lb_map_len(lbProcedure *p, lbValue value) {
 }
 
 lbValue lb_map_cap(lbProcedure *p, lbValue value) {
-	GB_ASSERT(is_type_map(value.type));
+	GB_ASSERT_MSG(is_type_map(value.type) || are_types_identical(value.type, t_raw_map), "%s", type_to_string(value.type));
 	lbValue zero = lb_const_int(p->module, t_uintptr, 0);
 	lbValue one = lb_const_int(p->module, t_uintptr, 1);
 
@@ -1454,7 +1454,7 @@ lbValue lb_map_cap(lbProcedure *p, lbValue value) {
 }
 
 lbValue lb_map_data_uintptr(lbProcedure *p, lbValue value) {
-	GB_ASSERT(is_type_map(value.type));
+	GB_ASSERT(is_type_map(value.type) || are_types_identical(value.type, t_raw_map));
 	lbValue data = lb_emit_struct_ev(p, value, 0);
 	u64 mask_value = 0;
 	if (build_context.word_size == 4) {
