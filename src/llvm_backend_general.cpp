@@ -1931,24 +1931,8 @@ LLVMTypeRef lb_type_internal(lbModule *m, Type *type) {
 
 	case Type_Map:
 		init_map_internal_types(type);
-		{
-			Type *internal_type = type->Map.internal_type;
-			GB_ASSERT(internal_type->kind == Type_Struct);
-
-			m->internal_type_level -= 1;
-			defer (m->internal_type_level += 1);
-
-			unsigned field_count = cast(unsigned)(internal_type->Struct.fields.count);
-			GB_ASSERT(field_count == 3);
-
-			LLVMTypeRef fields[3] = {
-				lb_type(m, t_uintptr),   // data
-				lb_type(m, t_uintptr),   // len
-				lb_type(m, t_allocator), // allocator
-			};
-			
-			return LLVMStructTypeInContext(ctx, fields, field_count, false);
-		}
+		GB_ASSERT(t_raw_map != nullptr);
+		return lb_type_internal(m, t_raw_map);
 
 	case Type_Struct:
 		{

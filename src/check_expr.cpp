@@ -1364,7 +1364,6 @@ bool is_polymorphic_type_assignable(CheckerContext *c, Type *poly, Type *source,
 			bool key   = is_polymorphic_type_assignable(c, poly->Map.key, source->Map.key, true, modify_type);
 			bool value = is_polymorphic_type_assignable(c, poly->Map.value, source->Map.value, true, modify_type);
 			if (key || value) {
-				poly->Map.internal_type = nullptr;
 				poly->Map.lookup_result_type = nullptr;
 				init_map_internal_types(poly);
 				return true;

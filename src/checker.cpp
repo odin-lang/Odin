@@ -1933,7 +1933,8 @@ void add_type_info_type_internal(CheckerContext *c, Type *t) {
 		init_map_internal_types(bt);
 		add_type_info_type_internal(c, bt->Map.key);
 		add_type_info_type_internal(c, bt->Map.value);
-		add_type_info_type_internal(c, bt->Map.internal_type);
+		add_type_info_type_internal(c, t_uintptr); // hash value
+		add_type_info_type_internal(c, t_allocator);
 		break;
 
 	case Type_Tuple:
@@ -2155,7 +2156,8 @@ void add_min_dep_type_info(Checker *c, Type *t) {
 		init_map_internal_types(bt);
 		add_min_dep_type_info(c, bt->Map.key);
 		add_min_dep_type_info(c, bt->Map.value);
-		add_min_dep_type_info(c, bt->Map.internal_type);
+		add_min_dep_type_info(c, t_uintptr); // hash value
+		add_min_dep_type_info(c, t_allocator);
 		break;
 
 	case Type_Tuple:
@@ -2845,9 +2847,10 @@ void init_core_map_type(Checker *c) {
 	if (t_map_info != nullptr) {
 		return;
 	}
-	t_map_info = find_core_type(c, str_lit("Map_Info"));
-	t_map_cell_info = find_core_type(c, str_lit("Map_Cell_Info"));
 	init_mem_allocator(c);
+	t_map_info      = find_core_type(c, str_lit("Map_Info"));
+	t_map_cell_info = find_core_type(c, str_lit("Map_Cell_Info"));
+	t_raw_map       = find_core_type(c, str_lit("Raw_Map"));
 }
 
 void init_preload(Checker *c) {

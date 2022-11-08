@@ -226,7 +226,6 @@ struct TypeProc {
 	TYPE_KIND(Map, struct {                                   \
 		Type *key;                                        \
 		Type *value;                                      \
-		Type *internal_type;                              \
 		Type *lookup_result_type;                         \
 	})                                                        \
 	TYPE_KIND(Struct,  TypeStruct)                            \
@@ -686,6 +685,7 @@ gb_global Type *t_source_code_location_ptr       = nullptr;
 
 gb_global Type *t_map_info                       = nullptr;
 gb_global Type *t_map_cell_info                  = nullptr;
+gb_global Type *t_raw_map                        = nullptr;
 
 
 gb_global Type *t_equal_proc  = nullptr;
