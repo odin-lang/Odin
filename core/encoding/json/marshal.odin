@@ -267,8 +267,8 @@ marshal_to_writer :: proc(w: io.Writer, v: any, opt: ^Marshal_Options) -> (err: 
 					continue
 				}
 
-				key   := rawptr(runtime.map_cell_index_dynamic(ks, &info.map_info.ks, bucket_index))
-				value := rawptr(runtime.map_cell_index_dynamic(vs, &info.map_info.vs, bucket_index))
+				key   := rawptr(runtime.map_cell_index_dynamic(ks, info.map_info.ks, bucket_index))
+				value := rawptr(runtime.map_cell_index_dynamic(vs, info.map_info.vs, bucket_index))
 
 				// check for string type
 				{
