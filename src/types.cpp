@@ -1921,7 +1921,7 @@ bool is_type_valid_for_keys(Type *t) {
 	if (is_type_untyped(t)) {
 		return false;
 	}
-	return is_type_comparable(t);
+	return type_size_of(t) > 0 && is_type_comparable(t);
 }
 
 bool is_type_valid_bit_set_elem(Type *t) {
