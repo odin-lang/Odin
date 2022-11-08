@@ -1464,7 +1464,13 @@ lbValue lb_map_cap(lbProcedure *p, lbValue value) {
 lbValue lb_map_data_uintptr(lbProcedure *p, lbValue value) {
 	GB_ASSERT(is_type_map(value.type));
 	lbValue data = lb_emit_struct_ev(p, value, 0);
-	lbValue mask = lb_const_int(p->module, t_uintptr, MAP_CACHE_LINE_SIZE-1);
+	u64 mask_value = 0;
+	if (build_context.word_size == 4) {
+		mask_value = 0xfffffffful & ~(MAP_CACHE_LINE_SIZE-1);
+	} else {
+		mask_value = 0xffffffffffffffffull & ~(MAP_CACHE_LINE_SIZE-1);
+	}
+	lbValue mask = lb_const_int(p->module, t_uintptr, mask_value);
 	return lb_emit_arith(p, Token_And, data, mask, t_uintptr);
 }
 

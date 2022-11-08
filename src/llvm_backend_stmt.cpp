@@ -402,6 +402,22 @@ void lb_map_kvh_data_static(lbProcedure *p, lbValue map_value, lbValue *ks_, lbV
 	if (hs_) *hs_ = hs;
 }
 
+lbValue lb_map_hash_is_valid(lbProcedure *p, lbValue hash) {
+	// N :: size_of(uintptr)*8 - 1
+	// (hash != 0) & (hash>>N == 0)
+
+	u64 top_bit_index = cast(u64)(type_size_of(t_uintptr)*8 - 1);
+	lbValue shift_amount = lb_const_int(p->module, t_uintptr, top_bit_index);
+	lbValue zero = lb_const_int(p->module, t_uintptr, 0);
+
+	lbValue not_empty = lb_emit_comp(p, Token_NotEq, hash, zero);
+
+	lbValue not_deleted = lb_emit_arith(p, Token_Shr, hash, shift_amount, t_uintptr);
+	not_deleted = lb_emit_comp(p, Token_CmpEq, not_deleted, zero);
+
+	return lb_emit_arith(p, Token_And, not_deleted, not_empty, t_uintptr);
+}
+
 void lb_build_range_map(lbProcedure *p, lbValue expr, Type *val_type,
                         lbValue *val_, lbValue *key_, lbBlock **loop_, lbBlock **done_) {
 	lbModule *m = p->module;
@@ -442,19 +458,19 @@ void lb_build_range_map(lbProcedure *p, lbValue expr, Type *val_type,
 	lbValue vs = lb_map_cell_index_static(p, type->Map.key, ks, capacity);
 	lbValue hs = lb_map_cell_index_static(p, type->Map.value, vs, capacity);
 
+	// NOTE(bill): no need to use lb_map_cell_index_static for that hashes
+	// since it will always be packed without padding into the cells
 	lbValue hash = lb_emit_load(p, lb_emit_ptr_offset(p, hs, idx));
 
-	lbValue hash_cond = lb_emit_comp(p, Token_CmpEq, hash, lb_const_int(m, t_uintptr, 0));
+	lbValue hash_cond = lb_map_hash_is_valid(p, hash);
 	lb_emit_if(p, hash_cond, body, loop);
 	lb_start_block(p, body);
 
-	// lbValue entries = lb_map_entries_ptr(p, expr);
-	// lbValue elem = lb_emit_struct_ep(p, entries, 0);
-	// elem = lb_emit_load(p, elem);
-	// lbValue entry = lb_emit_ptr_offset(p, elem, idx);
-	lbValue key = lb_const_nil(m, type->Map.key);
-	lbValue val = lb_const_nil(m, type->Map.value);
 
+	lbValue key_ptr = lb_map_cell_index_static(p, type->Map.key, ks, idx);
+	lbValue val_ptr = lb_map_cell_index_static(p, type->Map.value, vs, idx);
+	lbValue key = lb_emit_load(p, key_ptr);
+	lbValue val = lb_emit_load(p, val_ptr);
 
 	if (val_)  *val_  = val;
 	if (key_)  *key_  = key;
