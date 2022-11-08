@@ -998,6 +998,7 @@ lbValue lb_emit_struct_ep(lbProcedure *p, lbValue s, i32 index) {
 		switch (index) {
 		case 0: result_type = get_struct_field_type(gst, 0); break;
 		case 1: result_type = get_struct_field_type(gst, 1); break;
+		case 2: result_type = get_struct_field_type(gst, 2); break;
 		}
 	} else if (is_type_array(t)) {
 		return lb_emit_array_epi(p, s, index);
@@ -1134,6 +1135,7 @@ lbValue lb_emit_struct_ev(lbProcedure *p, lbValue s, i32 index) {
 			switch (index) {
 			case 0: result_type = get_struct_field_type(gst, 0); break;
 			case 1: result_type = get_struct_field_type(gst, 1); break;
+			case 2: result_type = get_struct_field_type(gst, 2); break;
 			}
 		}
 		break;
@@ -1439,33 +1441,33 @@ lbValue lb_dynamic_array_allocator(lbProcedure *p, lbValue da) {
 	return lb_emit_struct_ev(p, da, 3);
 }
 
-lbValue lb_map_entries(lbProcedure *p, lbValue value) {
-	Type *t = base_type(value.type);
-	GB_ASSERT_MSG(t->kind == Type_Map, "%s", type_to_string(t));
-	init_map_internal_types(t);
-	i32 index = 1;
-	lbValue entries = lb_emit_struct_ev(p, value, index);
-	return entries;
-}
-
-lbValue lb_map_entries_ptr(lbProcedure *p, lbValue value) {
-	Type *t = base_type(type_deref(value.type));
-	GB_ASSERT_MSG(t->kind == Type_Map, "%s", type_to_string(t));
-	init_map_internal_types(t);
-	i32 index = 1;
-	lbValue entries = lb_emit_struct_ep(p, value, index);	
-	return entries;
-}
-
 lbValue lb_map_len(lbProcedure *p, lbValue value) {
-	lbValue entries = lb_map_entries(p, value);
-	return lb_dynamic_array_len(p, entries);
+	GB_ASSERT(is_type_map(value.type));
+	lbValue len = lb_emit_struct_ev(p, value, 1);
+	return lb_emit_conv(p, len, t_int);
 }
 
 lbValue lb_map_cap(lbProcedure *p, lbValue value) {
-	lbValue entries = lb_map_entries(p, value);
-	return lb_dynamic_array_cap(p, entries);
+	GB_ASSERT(is_type_map(value.type));
+	lbValue zero = lb_const_int(p->module, t_uintptr, 0);
+	lbValue one = lb_const_int(p->module, t_uintptr, 1);
+
+	lbValue mask = lb_const_int(p->module, t_uintptr, MAP_CACHE_LINE_SIZE-1);
+
+	lbValue data = lb_emit_struct_ev(p, value, 0);
+	lbValue log2_cap = lb_emit_arith(p, Token_And, data, mask, t_uintptr);
+	lbValue cap = lb_emit_arith(p, Token_Shl, one, log2_cap, t_uintptr);
+	lbValue cmp = lb_emit_comp(p, Token_CmpEq, data, zero);
+	return lb_emit_conv(p, lb_emit_select(p, cmp, zero, cap), t_int);
 }
+
+lbValue lb_map_data_uintptr(lbProcedure *p, lbValue value) {
+	GB_ASSERT(is_type_map(value.type));
+	lbValue data = lb_emit_struct_ev(p, value, 0);
+	lbValue mask = lb_const_int(p->module, t_uintptr, MAP_CACHE_LINE_SIZE-1);
+	return lb_emit_arith(p, Token_And, data, mask, t_uintptr);
+}
+
 
 lbValue lb_soa_struct_len(lbProcedure *p, lbValue value) {
 	Type *t = base_type(value.type);

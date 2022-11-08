@@ -88,7 +88,7 @@ MAP_CACHE_LINE_SIZE :: 1 << MAP_CACHE_LINE_LOG2
 // In the optimal case, len(Map_Cell(T){}.data) = 1 so the cell array can be treated
 // as a regular array of T, which is the case for hashes.
 Map_Cell :: struct($T: typeid) #align MAP_CACHE_LINE_SIZE {
-	data: [MAP_CACHE_LINE_SIZE / size_of(T) when size_of(T) < MAP_CACHE_LINE_SIZE else 1]T,
+	data: [MAP_CACHE_LINE_SIZE / size_of(T) when 0 < size_of(T) && size_of(T) < MAP_CACHE_LINE_SIZE else 1]T,
 }
 
 // So we can operate on a cell data structure at runtime without any type
@@ -107,36 +107,38 @@ Map_Cell_Info :: struct {
 map_cell_index_dynamic :: #force_inline proc "contextless" (base: uintptr, info: ^Map_Cell_Info, index: uintptr) -> uintptr {
 	// Micro-optimize the case when the number of elements per cell is one or two
 	// to save on expensive integer division.
+
+	cell_index, data_index: uintptr
 	switch elements_per_cell := info.elements_per_cell; elements_per_cell {
 	case 1:
 		return base + (index * info.size_of_cell)
 	case 2:
-		cell_index := index >> 1
-		data_index := index & 1
+		cell_index = index >> 1
+		data_index = index & 1
 		return base + (cell_index * info.size_of_cell) + (data_index * info.size_of_type)
 	case 4:
-		cell_index := index >> 2
-		data_index := index & 3
+		cell_index = index >> 2
+		data_index = index & 3
 		return base + (cell_index * info.size_of_cell) + (data_index * info.size_of_type)
 	case 8:
-		cell_index := index >> 3
-		data_index := index & 7
+		cell_index = index >> 3
+		data_index = index & 7
 		return base + (cell_index * info.size_of_cell) + (data_index * info.size_of_type)
 	case 16:
-		cell_index := index >> 4
-		data_index := index & 15
+		cell_index = index >> 4
+		data_index = index & 15
 		return base + (cell_index * info.size_of_cell) + (data_index * info.size_of_type)
 	case 32:
-		cell_index := index >> 5
-		data_index := index & 31
+		cell_index = index >> 5
+		data_index = index & 31
 		return base + (cell_index * info.size_of_cell) + (data_index * info.size_of_type)
 	case 64:
-		cell_index := index >> 6
-		data_index := index & 63
+		cell_index = index >> 6
+		data_index = index & 63
 		return base + (cell_index * info.size_of_cell) + (data_index * info.size_of_type)
 	case:
-		cell_index := index / elements_per_cell
-		data_index := index % elements_per_cell
+		cell_index = index / elements_per_cell
+		data_index = index % elements_per_cell
 		return base + (cell_index * info.size_of_cell) + (data_index * info.size_of_type)
 	}
 }
@@ -309,7 +311,7 @@ map_alloc_dynamic :: proc(info: ^Map_Info, log2_capacity: uintptr, allocator := 
 		return {}, .Out_Of_Memory
 	}
 
-	capacity := uintptr(1) << log2_capacity
+	capacity := uintptr(1) << max(log2_capacity, MAP_MIN_LOG2_CAPACITY)
 
 	@static INFO_HS := Map_Cell_Info {
 		size_of(Map_Hash),
@@ -552,6 +554,9 @@ map_reserve_dynamic :: proc(#no_alias m: ^Raw_Map, #no_alias info: ^Map_Info, ne
 		allocator = context.allocator
 	}
 
+	new_capacity := new_capacity
+	new_capacity = max(new_capacity, uintptr(1)<<MAP_MIN_LOG2_CAPACITY)
+
 	log2_capacity := map_log2_cap(m^)
 	capacity := uintptr(1) << log2_capacity
 
@@ -735,14 +740,13 @@ map_clear_dynamic :: #force_inline proc "contextless" (#no_alias m: ^Raw_Map, #n
 }
 
 
-__dynamic_map_get :: proc "contextless" (m: rawptr, #no_alias info: ^Map_Info, key: rawptr) -> rawptr {
+__dynamic_map_get :: proc "contextless" (m: rawptr, #no_alias info: ^Map_Info, key: rawptr) -> (ptr: rawptr) {
 	rm := (^Raw_Map)(m)^
-	index, ok := map_lookup_dynamic(rm, info, uintptr(key))
-	if !ok {
-		return nil
+	if index, ok := map_lookup_dynamic(rm, info, uintptr(key)); ok {
+		vs := map_kvh_data_values_dynamic(rm, info)
+		ptr = rawptr(map_cell_index_dynamic(vs, &info.vs, index))
 	}
-	vs := map_kvh_data_values_dynamic(rm, info)
-	return rawptr(map_cell_index_dynamic(vs, &info.vs, index))
+	return
 }
 
 __dynamic_map_set :: proc "odin" (#no_alias m: ^Raw_Map, #no_alias info: ^Map_Info, key, value: rawptr, loc := #caller_location) -> rawptr {
