@@ -360,21 +360,6 @@ map_insert_hash_dynamic :: proc "odin" (m: Raw_Map, #no_alias info: ^Map_Info, h
 
 	ks, vs, hs, sk, sv := map_kvh_data_dynamic(m, info)
 
-	get_loop: for {
-		element_hash := hs[pos]
-		if map_hash_is_empty(element_hash) {
-			break get_loop
-		} else if distance > map_probe_distance(m, element_hash, pos) {
-			break get_loop
-		} else if element_hash == h && info.key_equal(rawptr(ik), rawptr(map_cell_index_dynamic(ks, info.ks, pos))) {
-			result = map_cell_index_dynamic(vs, info.vs, pos)
-			intrinsics.mem_copy_non_overlapping(rawptr(result), rawptr(iv), info.ks.size_of_type)
-			return
-		}
-		pos = (pos + 1) & mask
-		distance += 1
-	}
-
 	// Avoid redundant loads of these values
 	size_of_k := info.ks.size_of_type
 	size_of_v := info.vs.size_of_type
@@ -416,10 +401,6 @@ map_insert_hash_dynamic :: proc "odin" (m: Raw_Map, #no_alias info: ^Map_Info, h
 				intrinsics.mem_copy_non_overlapping(rawptr(v_dst), rawptr(v), size_of_v)
 				hp^ = h
 				return result if result != 0 else v_dst
-			} else if element_hash == h && info.key_equal(rawptr(k), rawptr(map_cell_index_dynamic(ks, info.ks, pos))) {
-				v_dst := map_cell_index_dynamic(vs, info.vs, pos)
-				intrinsics.mem_copy_non_overlapping(rawptr(v_dst), rawptr(iv), info.vs.size_of_type)
-				return v_dst
 			}
 
 			if result == 0 {
@@ -662,7 +643,13 @@ map_exists_dynamic :: proc "contextless" (m: Raw_Map, #no_alias info: ^Map_Info,
 
 
 @(optimization_mode="speed")
-map_insert_dynamic :: proc "odin" (#no_alias m: ^Raw_Map, #no_alias info: ^Map_Info, k, v: uintptr, loc := #caller_location) -> (value: uintptr, err: Allocator_Error) {
+map_set_dynamic :: proc "odin" (#no_alias m: ^Raw_Map, #no_alias info: ^Map_Info, k, v: uintptr, loc := #caller_location) -> (value: uintptr, err: Allocator_Error) {
+	if found := __dynamic_map_get(m^, info, rawptr(k)); found != nil {
+		intrinsics.mem_copy_non_overlapping(found, rawptr(v), info.vs.size_of_type)
+		value = uintptr(found)
+		return
+	}
+
 	if map_len(m^) + 1 >= map_resize_threshold(m^) {
 		map_grow_dynamic(m, info, loc) or_return
 	}
@@ -762,7 +749,7 @@ __dynamic_map_get :: proc "contextless" (m: Raw_Map, #no_alias info: ^Map_Info, 
 }
 
 __dynamic_map_set :: proc "odin" (#no_alias m: ^Raw_Map, #no_alias info: ^Map_Info, key, value: rawptr, loc := #caller_location) -> rawptr {
-	value, err := map_insert_dynamic(m, info, uintptr(key), uintptr(value), loc)
+	value, err := map_set_dynamic(m, info, uintptr(key), uintptr(value), loc)
 	return rawptr(value) if err == nil else nil
 }
 
