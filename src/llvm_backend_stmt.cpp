@@ -461,8 +461,8 @@ void lb_build_range_map(lbProcedure *p, lbValue expr, Type *val_type,
 	idx = lb_addr_load(p, index);
 
 	lbValue ks = lb_map_data_uintptr(p, map_value);
-	lbValue vs = lb_map_cell_index_static(p, type->Map.key, ks, capacity);
-	lbValue hs = lb_map_cell_index_static(p, type->Map.value, vs, capacity);
+	lbValue vs = lb_emit_conv(p, lb_map_cell_index_static(p, type->Map.key, ks, capacity), alloc_type_pointer(type->Map.value));
+	lbValue hs = lb_emit_conv(p, lb_map_cell_index_static(p, type->Map.value, vs, capacity), alloc_type_pointer(t_uintptr));
 
 	// NOTE(bill): no need to use lb_map_cell_index_static for that hashes
 	// since it will always be packed without padding into the cells
