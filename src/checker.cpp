@@ -2854,6 +2854,7 @@ void init_core_map_type(Checker *c) {
 
 	t_map_info_ptr      = alloc_type_pointer(t_map_info);
 	t_map_cell_info_ptr = alloc_type_pointer(t_map_cell_info);
+	t_raw_map_ptr       = alloc_type_pointer(t_raw_map);
 }
 
 void init_preload(Checker *c) {

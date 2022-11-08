@@ -1423,9 +1423,9 @@ lbValue lb_build_binary_expr(lbProcedure *p, Ast *expr) {
 			switch (rt->kind) {
 			case Type_Map:
 				{
-					lbValue map_ptr = lb_address_from_load_or_generate_local(p, right);
+					lbValue map = right;
 					lbValue key = left;
-					lbValue ptr = lb_internal_dynamic_map_get_ptr(p, map_ptr, key);
+					lbValue ptr = lb_internal_dynamic_map_get_ptr(p, map, key);
 					if (be->op.kind == Token_in) {
 						return lb_emit_conv(p, lb_emit_comp_against_nil(p, Token_NotEq, ptr), t_bool);
 					} else {

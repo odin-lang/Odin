@@ -217,6 +217,9 @@ map_probe_distance :: #force_inline proc "contextless" (m: Raw_Map, hash: Map_Ha
 // about the map to make working with it possible. This info structure stores
 // that.
 //
+// `Map_Info` and `Map_Cell_Info` are read only data structures and cannot be
+// modified after creation
+//
 // 32-bytes on 64-bit
 // 16-bytes on 32-bit
 Map_Info :: struct {
@@ -255,7 +258,7 @@ map_kvh_data_values_dynamic :: proc "contextless" (m: Raw_Map, #no_alias info: ^
 
 
 // The only procedure which needs access to the context is the one which allocates the map.
-map_alloc_dynamic :: proc(info: ^Map_Info, log2_capacity: uintptr, allocator := context.allocator) -> (result: Raw_Map, err: Allocator_Error) {
+map_alloc_dynamic :: proc "odin" (info: ^Map_Info, log2_capacity: uintptr, allocator := context.allocator, loc := #caller_location) -> (result: Raw_Map, err: Allocator_Error) {
 	if log2_capacity == 0 {
 		// Empty map, but set the allocator.
 		return { 0, 0, allocator }, nil
@@ -268,8 +271,9 @@ map_alloc_dynamic :: proc(info: ^Map_Info, log2_capacity: uintptr, allocator := 
 
 	capacity := uintptr(1) << max(log2_capacity, MAP_MIN_LOG2_CAPACITY)
 
+	CACHE_MASK :: MAP_CACHE_LINE_SIZE - 1
 	round :: #force_inline proc "contextless" (value: uintptr) -> uintptr {
-		return (value + MAP_CACHE_LINE_SIZE - 1) &~ uintptr(MAP_CACHE_LINE_SIZE - 1)
+		return (value + CACHE_MASK) &~ CACHE_MASK
 	}
 
 	INFO_HS := intrinsics.type_map_cell_info(Map_Hash)
@@ -281,19 +285,20 @@ map_alloc_dynamic :: proc(info: ^Map_Info, log2_capacity: uintptr, allocator := 
 	size = round(map_cell_index_dynamic(size, info.ks, 2)) // Two additional ks for scratch storage
 	size = round(map_cell_index_dynamic(size, info.vs, 2)) // Two additional vs for scratch storage
 
-	data := mem_alloc(int(size), MAP_CACHE_LINE_SIZE, allocator) or_return
+	data := mem_alloc_non_zeroed(int(size), MAP_CACHE_LINE_SIZE, allocator, loc) or_return
 	data_ptr := uintptr(raw_data(data))
-	assert(data_ptr & 63 == 0)
+	if intrinsics.expect(data_ptr & CACHE_MASK != 0, false) {
+		panic("allocation not aligned to a cache line", loc)
+	} else {
+		result = {
+			// Tagged pointer representation for capacity.
+			data_ptr | log2_capacity,
+			0,
+			allocator,
+		}
 
-	result = {
-		// Tagged pointer representation for capacity.
-		data_ptr | log2_capacity,
-		0,
-		allocator,
+		map_clear_dynamic(&result, info)
 	}
-
-	map_clear_dynamic(&result, info)
-
 	return
 }
 
@@ -305,10 +310,7 @@ map_alloc_dynamic :: proc(info: ^Map_Info, log2_capacity: uintptr, allocator := 
 //
 // This procedure returns the address of the just inserted value.
 @(optimization_mode="speed")
-map_insert_hash_dynamic :: proc(m: Raw_Map, #no_alias info: ^Map_Info, h: Map_Hash, ik: uintptr, iv: uintptr) -> (result: uintptr) {
-	info_ks := info.ks
-	info_vs := info.vs
-
+map_insert_hash_dynamic :: proc "odin" (m: Raw_Map, #no_alias info: ^Map_Info, h: Map_Hash, ik: uintptr, iv: uintptr) -> (result: uintptr) {
 	p := map_desired_position(m, h)
 	d := uintptr(0)
 	c := (uintptr(1) << map_log2_cap(m)) - 1 // Saturating arithmetic mask
@@ -316,8 +318,8 @@ map_insert_hash_dynamic :: proc(m: Raw_Map, #no_alias info: ^Map_Info, h: Map_Ha
 	ks, vs, hs, sk, sv := map_kvh_data_dynamic(m, info)
 
 	// Avoid redundant loads of these values
-	size_of_k := info_ks.size_of_type
-	size_of_v := info_vs.size_of_type
+	size_of_k := info.ks.size_of_type
+	size_of_v := info.vs.size_of_type
 
 	// Use sk and sv scratch storage space for dynamic k and v storage here.
 	//
@@ -325,23 +327,23 @@ map_insert_hash_dynamic :: proc(m: Raw_Map, #no_alias info: ^Map_Info, h: Map_Ha
 	// 	k = ik
 	// 	v = iv
 	// 	h = h
-	k := map_cell_index_dynamic_const(sk, info_ks, 0)
-	v := map_cell_index_dynamic_const(sv, info_vs, 0)
+	k := map_cell_index_dynamic_const(sk, info.ks, 0)
+	v := map_cell_index_dynamic_const(sv, info.vs, 0)
 	intrinsics.mem_copy_non_overlapping(rawptr(k), rawptr(ik), size_of_k)
 	intrinsics.mem_copy_non_overlapping(rawptr(v), rawptr(iv), size_of_v)
 	h := h
 
 	// Temporary k and v dynamic storage for swap below
-	tk := map_cell_index_dynamic_const(sk, info_ks, 1)
-	tv := map_cell_index_dynamic_const(sv, info_vs, 1)
+	tk := map_cell_index_dynamic_const(sk, info.ks, 1)
+	tv := map_cell_index_dynamic_const(sv, info.vs, 1)
 
 	for {
 		hp := &hs[p]
 		element_hash := hp^
 
 		if map_hash_is_empty(element_hash) {
-			k_dst := map_cell_index_dynamic(ks, info_ks, p)
-			v_dst := map_cell_index_dynamic(vs, info_vs, p)
+			k_dst := map_cell_index_dynamic(ks, info.ks, p)
+			v_dst := map_cell_index_dynamic(vs, info.vs, p)
 			intrinsics.mem_copy_non_overlapping(rawptr(k_dst), rawptr(k), size_of_k)
 			intrinsics.mem_copy_non_overlapping(rawptr(v_dst), rawptr(v), size_of_v)
 			hp^ = h
@@ -350,8 +352,8 @@ map_insert_hash_dynamic :: proc(m: Raw_Map, #no_alias info: ^Map_Info, h: Map_Ha
 
 		if pd := map_probe_distance(m, element_hash, p); pd < d {
 			if map_hash_is_deleted(element_hash) {
-				k_dst := map_cell_index_dynamic(ks, info_ks, p)
-				v_dst := map_cell_index_dynamic(vs, info_vs, p)
+				k_dst := map_cell_index_dynamic(ks, info.ks, p)
+				v_dst := map_cell_index_dynamic(vs, info.vs, p)
 				intrinsics.mem_copy_non_overlapping(rawptr(k_dst), rawptr(k), size_of_k)
 				intrinsics.mem_copy_non_overlapping(rawptr(v_dst), rawptr(v), size_of_v)
 				hp^ = h
@@ -359,11 +361,11 @@ map_insert_hash_dynamic :: proc(m: Raw_Map, #no_alias info: ^Map_Info, h: Map_Ha
 			}
 
 			if result == 0 {
-				result = map_cell_index_dynamic(vs, info_vs, p)
+				result = map_cell_index_dynamic(vs, info.vs, p)
 			}
 
-			kp := map_cell_index_dynamic(ks, info_vs, p)
-			vp := map_cell_index_dynamic(vs, info_ks, p)
+			kp := map_cell_index_dynamic(ks, info.vs, p)
+			vp := map_cell_index_dynamic(vs, info.ks, p)
 
 			// Simulate the following at runtime with dynamic storage
 			//
@@ -387,10 +389,7 @@ map_insert_hash_dynamic :: proc(m: Raw_Map, #no_alias info: ^Map_Info, h: Map_Ha
 }
 
 @(optimization_mode="speed")
-map_add_hash_dynamic :: proc(m: Raw_Map, #no_alias info: ^Map_Info, h: Map_Hash, ik: uintptr, iv: uintptr) {
-	info_ks := info.ks
-	info_vs := info.vs
-
+map_add_hash_dynamic :: proc "odin" (m: Raw_Map, #no_alias info: ^Map_Info, h: Map_Hash, ik: uintptr, iv: uintptr) {
 	capacity := uintptr(1) << map_log2_cap(m)
 	p := map_desired_position(m, h)
 	d := uintptr(0)
@@ -399,8 +398,8 @@ map_add_hash_dynamic :: proc(m: Raw_Map, #no_alias info: ^Map_Info, h: Map_Hash,
 	ks, vs, hs, sk, sv := map_kvh_data_dynamic(m, info)
 
 	// Avoid redundant loads of these values
-	size_of_k := info_ks.size_of_type
-	size_of_v := info_vs.size_of_type
+	size_of_k := info.ks.size_of_type
+	size_of_v := info.vs.size_of_type
 
 	// Use sk and sv scratch storage space for dynamic k and v storage here.
 	//
@@ -408,23 +407,23 @@ map_add_hash_dynamic :: proc(m: Raw_Map, #no_alias info: ^Map_Info, h: Map_Hash,
 	// 	k = ik
 	// 	v = iv
 	// 	h = h
-	k := map_cell_index_dynamic_const(sk, info_ks, 0)
-	v := map_cell_index_dynamic_const(sv, info_vs, 0)
+	k := map_cell_index_dynamic_const(sk, info.ks, 0)
+	v := map_cell_index_dynamic_const(sv, info.vs, 0)
 	intrinsics.mem_copy_non_overlapping(rawptr(k), rawptr(ik), size_of_k)
 	intrinsics.mem_copy_non_overlapping(rawptr(v), rawptr(iv), size_of_v)
 	h := h
 
 	// Temporary k and v dynamic storage for swap below
-	tk := map_cell_index_dynamic_const(sk, info_ks, 1)
-	tv := map_cell_index_dynamic_const(sv, info_vs, 1)
+	tk := map_cell_index_dynamic_const(sk, info.ks, 1)
+	tv := map_cell_index_dynamic_const(sv, info.vs, 1)
 
 	for {
 		hp := &hs[p]
 		element_hash := hp^
 
 		if map_hash_is_empty(element_hash) {
-			k_dst := map_cell_index_dynamic(ks, info_ks, p)
-			v_dst := map_cell_index_dynamic(vs, info_vs, p)
+			k_dst := map_cell_index_dynamic(ks, info.ks, p)
+			v_dst := map_cell_index_dynamic(vs, info.vs, p)
 			intrinsics.mem_copy_non_overlapping(rawptr(k_dst), rawptr(k), size_of_k)
 			intrinsics.mem_copy_non_overlapping(rawptr(v_dst), rawptr(v), size_of_v)
 			hp^ = h
@@ -433,16 +432,16 @@ map_add_hash_dynamic :: proc(m: Raw_Map, #no_alias info: ^Map_Info, h: Map_Hash,
 
 		if pd := map_probe_distance(m, element_hash, p); pd < d {
 			if map_hash_is_deleted(element_hash) {
-				k_dst := map_cell_index_dynamic(ks, info_ks, p)
-				v_dst := map_cell_index_dynamic(vs, info_vs, p)
+				k_dst := map_cell_index_dynamic(ks, info.ks, p)
+				v_dst := map_cell_index_dynamic(vs, info.vs, p)
 				intrinsics.mem_copy_non_overlapping(rawptr(k_dst), rawptr(k), size_of_k)
 				intrinsics.mem_copy_non_overlapping(rawptr(v_dst), rawptr(v), size_of_v)
 				hp^ = h
 				return
 			}
 
-			kp := map_cell_index_dynamic(ks, info_vs, p)
-			vp := map_cell_index_dynamic(vs, info_ks, p)
+			kp := map_cell_index_dynamic(ks, info.vs, p)
+			vp := map_cell_index_dynamic(vs, info.ks, p)
 
 			// Simulate the following at runtime with dynamic storage
 			//
@@ -466,7 +465,7 @@ map_add_hash_dynamic :: proc(m: Raw_Map, #no_alias info: ^Map_Info, h: Map_Hash,
 }
 
 @(optimization_mode="size")
-map_grow_dynamic :: proc(#no_alias m: ^Raw_Map, #no_alias info: ^Map_Info) -> Allocator_Error {
+map_grow_dynamic :: proc "odin" (#no_alias m: ^Raw_Map, #no_alias info: ^Map_Info, loc := #caller_location) -> Allocator_Error {
 	allocator := m.allocator
 	if allocator.procedure == nil {
 		allocator = context.allocator
@@ -475,23 +474,20 @@ map_grow_dynamic :: proc(#no_alias m: ^Raw_Map, #no_alias info: ^Map_Info) -> Al
 	log2_capacity := map_log2_cap(m^)
 
 	if m.data == 0 {
-		n := map_alloc_dynamic(info, MAP_MIN_LOG2_CAPACITY, allocator) or_return
+		n := map_alloc_dynamic(info, MAP_MIN_LOG2_CAPACITY, allocator, loc) or_return
 		m.data = n.data
 		return nil
 	}
 
-	resized := map_alloc_dynamic(info, log2_capacity + 1, allocator) or_return
+	resized := map_alloc_dynamic(info, log2_capacity + 1, allocator, loc) or_return
 
 	old_capacity := uintptr(1) << log2_capacity
 
 	ks, vs, hs, _, _ := map_kvh_data_dynamic(m^, info)
 
 	// Cache these loads to avoid hitting them in the for loop.
-	info_ks := info.ks
-	info_vs := info.vs
-
 	n := map_len(m^)
-	for i := uintptr(0); i < old_capacity; i += 1 {
+	for i in 0..<old_capacity {
 		hash := hs[i]
 		if map_hash_is_empty(hash) {
 			continue
@@ -499,8 +495,8 @@ map_grow_dynamic :: proc(#no_alias m: ^Raw_Map, #no_alias info: ^Map_Info) -> Al
 		if map_hash_is_deleted(hash) {
 			continue
 		}
-		k := map_cell_index_dynamic(ks, info_ks, i)
-		v := map_cell_index_dynamic(vs, info_vs, i)
+		k := map_cell_index_dynamic(ks, info.ks, i)
+		v := map_cell_index_dynamic(vs, info.vs, i)
 		map_insert_hash_dynamic(resized, info, hash, k, v)
 		// Only need to do this comparison on each actually added pair, so do not
 		// fold it into the for loop comparator as a micro-optimization.
@@ -510,7 +506,7 @@ map_grow_dynamic :: proc(#no_alias m: ^Raw_Map, #no_alias info: ^Map_Info) -> Al
 		}
 	}
 
-	mem_free(rawptr(ks), allocator)
+	mem_free(rawptr(ks), allocator, loc)
 
 	m.data = resized.data // Should copy the capacity too
 
@@ -519,7 +515,7 @@ map_grow_dynamic :: proc(#no_alias m: ^Raw_Map, #no_alias info: ^Map_Info) -> Al
 
 
 @(optimization_mode="size")
-map_reserve_dynamic :: proc(#no_alias m: ^Raw_Map, #no_alias info: ^Map_Info, new_capacity: uintptr) -> Allocator_Error {
+map_reserve_dynamic :: proc "odin" (#no_alias m: ^Raw_Map, #no_alias info: ^Map_Info, new_capacity: uintptr) -> Allocator_Error {
 	allocator := m.allocator
 	if allocator.procedure == nil {
 		allocator = context.allocator
@@ -544,15 +540,11 @@ map_reserve_dynamic :: proc(#no_alias m: ^Raw_Map, #no_alias info: ^Map_Info, ne
 
 	resized := map_alloc_dynamic(info, log2_new_capacity, allocator) or_return
 
-
 	ks, vs, hs, _, _ := map_kvh_data_dynamic(m^, info)
 
 	// Cache these loads to avoid hitting them in the for loop.
-	info_ks := info.ks
-	info_vs := info.vs
-
 	n := map_len(m^)
-	for i := uintptr(0); i < capacity; i += 1 {
+	for i in 0..<capacity {
 		hash := hs[i]
 		if map_hash_is_empty(hash) {
 			continue
@@ -560,8 +552,8 @@ map_reserve_dynamic :: proc(#no_alias m: ^Raw_Map, #no_alias info: ^Map_Info, ne
 		if map_hash_is_deleted(hash) {
 			continue
 		}
-		k := map_cell_index_dynamic(ks, info_ks, i)
-		v := map_cell_index_dynamic(vs, info_vs, i)
+		k := map_cell_index_dynamic(ks, info.ks, i)
+		v := map_cell_index_dynamic(vs, info.vs, i)
 		map_insert_hash_dynamic(resized, info, hash, k, v)
 		// Only need to do this comparison on each actually added pair, so do not
 		// fold it into the for loop comparator as a micro-optimization.
@@ -580,7 +572,7 @@ map_reserve_dynamic :: proc(#no_alias m: ^Raw_Map, #no_alias info: ^Map_Info, ne
 
 
 @(optimization_mode="size")
-map_shrink_dynamic :: proc(#no_alias m: ^Raw_Map, #no_alias info: ^Map_Info) -> Allocator_Error {
+map_shrink_dynamic :: proc "odin" (#no_alias m: ^Raw_Map, #no_alias info: ^Map_Info) -> Allocator_Error {
 	allocator := m.allocator
 	if allocator.procedure == nil {
 		// TODO(bill): is this correct behaviour?
@@ -601,11 +593,8 @@ map_shrink_dynamic :: proc(#no_alias m: ^Raw_Map, #no_alias info: ^Map_Info) -> 
 
 	ks, vs, hs, _, _ := map_kvh_data_dynamic(m^, info)
 
-	info_ks := info.ks
-	info_vs := info.vs
-
 	n := map_len(m^)
-	for i := uintptr(0); i < capacity; i += 1 {
+	for i in 0..<capacity {
 		hash := hs[i]
 		if map_hash_is_empty(hash) {
 			continue
@@ -614,8 +603,8 @@ map_shrink_dynamic :: proc(#no_alias m: ^Raw_Map, #no_alias info: ^Map_Info) -> 
 			continue
 		}
 
-		k := map_cell_index_dynamic(ks, info_ks, i)
-		v := map_cell_index_dynamic(vs, info_vs, i)
+		k := map_cell_index_dynamic(ks, info.ks, i)
+		v := map_cell_index_dynamic(vs, info.vs, i)
 
 		map_insert_hash_dynamic(shrinked, info, hash, k, v)
 
@@ -636,7 +625,7 @@ map_shrink_dynamic :: proc(#no_alias m: ^Raw_Map, #no_alias info: ^Map_Info) -> 
 
 // Single procedure for static and dynamic paths.
 @(require_results)
-map_free :: proc(m: Raw_Map, loc := #caller_location) -> Allocator_Error {
+map_free :: proc "odin" (m: Raw_Map, loc := #caller_location) -> Allocator_Error {
 	return mem_free(rawptr(map_data(m)), m.allocator, loc)
 }
 
@@ -650,14 +639,13 @@ map_lookup_dynamic :: proc "contextless" (m: Raw_Map, #no_alias info: ^Map_Info,
 	d := uintptr(0)
 	c := (uintptr(1) << map_log2_cap(m)) - 1
 	ks, _, hs, _, _ := map_kvh_data_dynamic(m, info)
-	info_ks := info.ks
 	for {
 		element_hash := hs[p]
 		if map_hash_is_empty(element_hash) {
 			return 0, false
 		} else if d > map_probe_distance(m, element_hash, p) {
 			return 0, false
-		} else if element_hash == h && info.key_equal(rawptr(k), rawptr(map_cell_index_dynamic(ks, info_ks, p))) {
+		} else if element_hash == h && info.key_equal(rawptr(k), rawptr(map_cell_index_dynamic(ks, info.ks, p))) {
 			return p, true
 		}
 		p = (p + 1) & c
@@ -674,14 +662,13 @@ map_exists_dynamic :: proc "contextless" (m: Raw_Map, #no_alias info: ^Map_Info,
 	d := uintptr(0)
 	c := (uintptr(1) << map_log2_cap(m)) - 1
 	ks, _, hs, _, _ := map_kvh_data_dynamic(m, info)
-	info_ks := info.ks
 	for {
 		element_hash := hs[p]
 		if map_hash_is_empty(element_hash) {
 			return false
 		} else if d > map_probe_distance(m, element_hash, p) {
 			return false
-		} else if element_hash == h && info.key_equal(rawptr(k), rawptr(map_cell_index_dynamic(ks, info_ks, p))) {
+		} else if element_hash == h && info.key_equal(rawptr(k), rawptr(map_cell_index_dynamic(ks, info.ks, p))) {
 			return true
 		}
 		p = (p + 1) & c
@@ -693,9 +680,9 @@ map_exists_dynamic :: proc "contextless" (m: Raw_Map, #no_alias info: ^Map_Info,
 
 
 @(optimization_mode="speed")
-map_insert_dynamic :: proc(#no_alias m: ^Raw_Map, #no_alias info: ^Map_Info, k, v: uintptr) -> (value: uintptr, err: Allocator_Error) {
+map_insert_dynamic :: proc "odin" (#no_alias m: ^Raw_Map, #no_alias info: ^Map_Info, k, v: uintptr, loc := #caller_location) -> (value: uintptr, err: Allocator_Error) {
 	if map_len(m^) + 1 >= map_resize_threshold(m^) {
-		map_grow_dynamic(m, info) or_return
+		map_grow_dynamic(m, info, loc) or_return
 	}
 	hashed := info.key_hasher(rawptr(k), 0)
 	value = map_insert_hash_dynamic(m^, info, hashed, k, v)
@@ -705,9 +692,9 @@ map_insert_dynamic :: proc(#no_alias m: ^Raw_Map, #no_alias info: ^Map_Info, k, 
 
 // Same as map_insert_dynamic but does not return address to the inserted element.
 @(optimization_mode="speed")
-map_add_dynamic :: proc(#no_alias m: ^Raw_Map, #no_alias info: ^Map_Info, k, v: uintptr) -> Allocator_Error {
+map_add_dynamic :: proc "odin" (#no_alias m: ^Raw_Map, #no_alias info: ^Map_Info, k, v: uintptr, loc := #caller_location) -> Allocator_Error {
 	if map_len(m^) + 1 >= map_resize_threshold(m^) {
-		map_grow_dynamic(m, info) or_return
+		map_grow_dynamic(m, info, loc) or_return
 	}
 	map_add_hash_dynamic(m^, info, info.key_hasher(rawptr(k), 0), k, v)
 	m.len += 1
@@ -734,13 +721,28 @@ map_clear_dynamic :: #force_inline proc "contextless" (#no_alias m: ^Raw_Map, #n
 }
 
 
-__dynamic_map_get :: proc "contextless" (m: rawptr, #no_alias info: ^Map_Info, key: rawptr) -> (ptr: rawptr) {
-	rm := (^Raw_Map)(m)^
-	if index, ok := map_lookup_dynamic(rm, info, uintptr(key)); ok {
-		vs := map_kvh_data_values_dynamic(rm, info)
-		ptr = rawptr(map_cell_index_dynamic(vs, info.vs, index))
+__dynamic_map_get :: proc "contextless" (m: Raw_Map, #no_alias info: ^Map_Info, key: rawptr) -> (ptr: rawptr) {
+	if m.len == 0 {
+		return nil
 	}
-	return
+
+	h := info.key_hasher(key, 0)
+	p := map_desired_position(m, h)
+	d := uintptr(0)
+	c := (uintptr(1) << map_log2_cap(m)) - 1
+	ks, vs, hs, _, _ := map_kvh_data_dynamic(m, info)
+	for {
+		element_hash := hs[p]
+		if map_hash_is_empty(element_hash) {
+			return nil
+		} else if d > map_probe_distance(m, element_hash, p) {
+			return nil
+		} else if element_hash == h && info.key_equal(key, rawptr(map_cell_index_dynamic(ks, info.ks, p))) {
+			return rawptr(map_cell_index_dynamic(vs, info.vs, p))
+		}
+		p = (p + 1) & c
+		d += 1
+	}
 }
 
 __dynamic_map_set :: proc "odin" (#no_alias m: ^Raw_Map, #no_alias info: ^Map_Info, key, value: rawptr, loc := #caller_location) -> rawptr {
@@ -748,6 +750,7 @@ __dynamic_map_set :: proc "odin" (#no_alias m: ^Raw_Map, #no_alias info: ^Map_In
 	return rawptr(value) if err == nil else nil
 }
 
+@(private)
 __dynamic_map_reserve :: proc "odin" (#no_alias m: ^Raw_Map, #no_alias info: ^Map_Info, new_capacity: uint, loc := #caller_location) {
 	map_reserve_dynamic(m, info, uintptr(new_capacity))
 }
