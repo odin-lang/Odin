@@ -685,6 +685,8 @@ gb_global Type *t_source_code_location_ptr       = nullptr;
 
 gb_global Type *t_map_info                       = nullptr;
 gb_global Type *t_map_cell_info                  = nullptr;
+gb_global Type *t_map_info_ptr                   = nullptr;
+gb_global Type *t_map_cell_info_ptr              = nullptr;
 gb_global Type *t_raw_map                        = nullptr;
 
 

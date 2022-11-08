@@ -2851,6 +2851,9 @@ void init_core_map_type(Checker *c) {
 	t_map_info      = find_core_type(c, str_lit("Map_Info"));
 	t_map_cell_info = find_core_type(c, str_lit("Map_Cell_Info"));
 	t_raw_map       = find_core_type(c, str_lit("Raw_Map"));
+
+	t_map_info_ptr      = alloc_type_pointer(t_map_info);
+	t_map_cell_info_ptr = alloc_type_pointer(t_map_cell_info);
 }
 
 void init_preload(Checker *c) {

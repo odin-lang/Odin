@@ -2085,8 +2085,8 @@ fmt_value :: proc(fi: ^Info, v: any, verb: rune) {
 				}
 				j += 1
 
-				key   := runtime.map_cell_index_dynamic(ks, &info.map_info.ks, bucket_index)
-				value := runtime.map_cell_index_dynamic(vs, &info.map_info.vs, bucket_index)
+				key   := runtime.map_cell_index_dynamic(ks, info.map_info.ks, bucket_index)
+				value := runtime.map_cell_index_dynamic(vs, info.map_info.vs, bucket_index)
 
 				fmt_arg(&Info{writer = fi.writer}, any{rawptr(key), info.key.id}, 'v')
 				io.write_string(fi.writer, "=", &fi.n)

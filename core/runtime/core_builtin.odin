@@ -272,13 +272,13 @@ clear_map :: proc "contextless" (m: ^$T/map[$K]$V) {
 	if m == nil {
 		return
 	}
-	map_clear_dynamic((^Raw_Map)(m), map_info(K, V))
+	map_clear_dynamic((^Raw_Map)(m), map_info(T))
 }
 
 @builtin
 reserve_map :: proc(m: ^$T/map[$K]$V, capacity: int, loc := #caller_location) {
 	if m != nil {
-		__dynamic_map_reserve((^Raw_Map)(m), map_info(K, V), uint(capacity), loc)
+		__dynamic_map_reserve((^Raw_Map)(m), map_info(T), uint(capacity), loc)
 	}
 }
 
@@ -306,8 +306,7 @@ shrink_map :: proc(m: ^$T/map[$K]$V, new_cap := -1, loc := #caller_location) -> 
 delete_key :: proc(m: ^$T/map[$K]$V, key: K) -> (deleted_key: K, deleted_value: V) {
 	if m != nil {
 		key := key
-		info := map_info(K, V)
-		_ =  map_erase_dynamic((^Raw_Map)(m), info, uintptr(&key))
+		_ =  map_erase_dynamic((^Raw_Map)(m), map_info(T), uintptr(&key))
 		// TODO(bill) old key and value
 	}
 	return

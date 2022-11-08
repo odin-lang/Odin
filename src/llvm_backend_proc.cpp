@@ -2324,6 +2324,9 @@ lbValue lb_build_builtin_proc(lbProcedure *p, Ast *expr, TypeAndValue const &tv,
 	case BuiltinProc_type_hasher_proc:
 		return lb_get_hasher_proc_for_type(p->module, ce->args[0]->tav.type);
 
+	case BuiltinProc_type_map_info:
+		return lb_gen_map_info_ptr(p->module, ce->args[0]->tav.type);
+
 	case BuiltinProc_fixed_point_mul:
 	case BuiltinProc_fixed_point_div:
 	case BuiltinProc_fixed_point_mul_sat:

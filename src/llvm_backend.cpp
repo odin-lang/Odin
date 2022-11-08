@@ -502,6 +502,11 @@ lbValue lb_generate_anonymous_proc_lit(lbModule *m, String const &prefix_name, A
 
 
 LLVMValueRef lb_gen_map_cell_info(lbModule *m, Type *type) {
+	lbAddr *found = map_get(&m->map_cell_info_map, type);
+	if (found) {
+		return found->addr.value;
+	}
+
 	i64 size = 0, len = 0;
 	map_cell_size_and_len(type, &size, &len);
 
@@ -510,8 +515,15 @@ LLVMValueRef lb_gen_map_cell_info(lbModule *m, Type *type) {
 	const_values[1] = lb_const_int(m, t_uintptr, type_align_of(type)).value;
 	const_values[2] = lb_const_int(m, t_uintptr, size).value;
 	const_values[3] = lb_const_int(m, t_uintptr, len).value;
-	return llvm_const_named_struct(m, t_map_cell_info, const_values, gb_count_of(const_values));
+	LLVMValueRef llvm_res =  llvm_const_named_struct(m, t_map_cell_info, const_values, gb_count_of(const_values));
+	lbValue res = {llvm_res, t_map_cell_info};
 
+	lbAddr addr = lb_add_global_generated(m, t_map_cell_info, res, nullptr);
+	lb_make_global_private_const(addr);
+
+	map_set(&m->map_cell_info_map, type, addr);
+
+	return addr.addr.value;
 }
 lbValue lb_gen_map_info_ptr(lbModule *m, Type *map_type) {
 	map_type = base_type(map_type);
