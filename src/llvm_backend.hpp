@@ -422,8 +422,6 @@ lbValue lb_dynamic_array_elem(lbProcedure *p, lbValue da);
 lbValue lb_dynamic_array_len(lbProcedure *p, lbValue da);
 lbValue lb_dynamic_array_cap(lbProcedure *p, lbValue da);
 lbValue lb_dynamic_array_allocator(lbProcedure *p, lbValue da);
-lbValue lb_map_entries(lbProcedure *p, lbValue value);
-lbValue lb_map_entries_ptr(lbProcedure *p, lbValue value);
 lbValue lb_map_len(lbProcedure *p, lbValue value);
 lbValue lb_map_cap(lbProcedure *p, lbValue value);
 lbValue lb_soa_struct_len(lbProcedure *p, lbValue value);

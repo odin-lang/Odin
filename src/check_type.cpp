@@ -2176,6 +2176,25 @@ Type *make_optional_ok_type(Type *value, bool typed) {
 	return t;
 }
 
+
+// IMPORTANT NOTE(bill): This must match the definition in dynamic_map_internal.odin
+enum : i64 {
+	MAP_CACHE_LINE_LOG2 = 6,
+	MAP_CACHE_LINE_SIZE = 1 << MAP_CACHE_LINE_LOG2
+};
+GB_STATIC_ASSERT(MAP_CACHE_LINE_SIZE >= 64);
+void map_cell_size_and_len(Type *type, i64 *size_, i64 *len_) {
+	i64 elem_sz = type_size_of(type);
+
+	i64 len = 1;
+	if (0 < elem_sz && elem_sz < MAP_CACHE_LINE_SIZE) {
+		len = MAP_CACHE_LINE_SIZE / elem_sz;
+	}
+	i64 size = align_formula(elem_sz * len, MAP_CACHE_LINE_SIZE);
+	if (size_) *size_ = size;
+	if (len_)  *len_ = len;
+}
+
 void init_map_internal_types(Type *type) {
 	GB_ASSERT(type->kind == Type_Map);
 	GB_ASSERT(t_allocator != nullptr);
