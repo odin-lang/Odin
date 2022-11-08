@@ -452,7 +452,7 @@ map_grow_dynamic :: proc "odin" (#no_alias m: ^Raw_Map, #no_alias info: ^Map_Inf
 	ks, vs, hs, _, _ := map_kvh_data_dynamic(m^, info)
 
 	// Cache these loads to avoid hitting them in the for loop.
-	n := map_len(m^)
+	n := m.len
 	for i in 0..<old_capacity {
 		hash := hs[i]
 		if map_hash_is_empty(hash) {
@@ -507,7 +507,7 @@ map_reserve_dynamic :: proc "odin" (#no_alias m: ^Raw_Map, #no_alias info: ^Map_
 	ks, vs, hs, _, _ := map_kvh_data_dynamic(m^, info)
 
 	// Cache these loads to avoid hitting them in the for loop.
-	n := map_len(m^)
+	n := m.len
 	for i in 0..<capacity {
 		hash := hs[i]
 		if map_hash_is_empty(hash) {
@@ -555,7 +555,7 @@ map_shrink_dynamic :: proc "odin" (#no_alias m: ^Raw_Map, #no_alias info: ^Map_I
 
 	ks, vs, hs, _, _ := map_kvh_data_dynamic(m^, info)
 
-	n := map_len(m^)
+	n := m.len
 	for i in 0..<capacity {
 		hash := hs[i]
 		if map_hash_is_empty(hash) {
@@ -640,24 +640,6 @@ map_exists_dynamic :: proc "contextless" (m: Raw_Map, #no_alias info: ^Map_Info,
 }
 
 
-
-
-@(optimization_mode="speed")
-map_set_dynamic :: proc "odin" (#no_alias m: ^Raw_Map, #no_alias info: ^Map_Info, k, v: uintptr, loc := #caller_location) -> (value: uintptr, err: Allocator_Error) {
-	if found := __dynamic_map_get(m^, info, rawptr(k)); found != nil {
-		intrinsics.mem_copy_non_overlapping(found, rawptr(v), info.vs.size_of_type)
-		value = uintptr(found)
-		return
-	}
-
-	if map_len(m^) + 1 >= map_resize_threshold(m^) {
-		map_grow_dynamic(m, info, loc) or_return
-	}
-	hashed := info.key_hasher(rawptr(k), 0)
-	value = map_insert_hash_dynamic(m^, info, hashed, k, v)
-	m.len += 1
-	return
-}
 
 map_erase_dynamic :: #force_inline proc "contextless" (#no_alias m: ^Raw_Map, #no_alias info: ^Map_Info, k: uintptr) -> bool {
 	MASK :: 1 << (size_of(Map_Hash)*8 - 1)
@@ -749,8 +731,20 @@ __dynamic_map_get :: proc "contextless" (m: Raw_Map, #no_alias info: ^Map_Info, 
 }
 
 __dynamic_map_set :: proc "odin" (#no_alias m: ^Raw_Map, #no_alias info: ^Map_Info, key, value: rawptr, loc := #caller_location) -> rawptr {
-	value, err := map_set_dynamic(m, info, uintptr(key), uintptr(value), loc)
-	return rawptr(value) if err == nil else nil
+	if found := __dynamic_map_get(m^, info, key); found != nil {
+		intrinsics.mem_copy_non_overlapping(found, value, info.vs.size_of_type)
+		return found
+	}
+
+	if m.len + 1 >= map_resize_threshold(m^) {
+		if map_grow_dynamic(m, info, loc) != nil {
+			return nil
+		}
+	}
+	hashed := info.key_hasher(key, 0)
+	result := map_insert_hash_dynamic(m^, info, hashed, uintptr(key), uintptr(value))
+	m.len += 1
+	return rawptr(result)
 }
 
 @(private)
