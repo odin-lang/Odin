@@ -354,11 +354,26 @@ map_alloc_dynamic :: proc "odin" (info: ^Map_Info, log2_capacity: uintptr, alloc
 // This procedure returns the address of the just inserted value.
 @(optimization_mode="speed")
 map_insert_hash_dynamic :: proc "odin" (m: Raw_Map, #no_alias info: ^Map_Info, h: Map_Hash, ik: uintptr, iv: uintptr) -> (result: uintptr) {
-	p := map_desired_position(m, h)
-	d := uintptr(0)
-	c := (uintptr(1) << map_log2_cap(m)) - 1 // Saturating arithmetic mask
+	pos := map_desired_position(m, h)
+	distance := uintptr(0)
+	mask := (uintptr(1) << map_log2_cap(m)) - 1 // Saturating arithmetic mask
 
 	ks, vs, hs, sk, sv := map_kvh_data_dynamic(m, info)
+
+	get_loop: for {
+		element_hash := hs[pos]
+		if map_hash_is_empty(element_hash) {
+			break get_loop
+		} else if distance > map_probe_distance(m, element_hash, pos) {
+			break get_loop
+		} else if element_hash == h && info.key_equal(rawptr(ik), rawptr(map_cell_index_dynamic(ks, info.ks, pos))) {
+			result = map_cell_index_dynamic(vs, info.vs, pos)
+			intrinsics.mem_copy_non_overlapping(rawptr(result), rawptr(iv), info.ks.size_of_type)
+			return
+		}
+		pos = (pos + 1) & mask
+		distance += 1
+	}
 
 	// Avoid redundant loads of these values
 	size_of_k := info.ks.size_of_type
@@ -381,38 +396,38 @@ map_insert_hash_dynamic :: proc "odin" (m: Raw_Map, #no_alias info: ^Map_Info, h
 	tv := map_cell_index_dynamic_const(sv, info.vs, 1)
 
 	for {
-		hp := &hs[p]
+		hp := &hs[pos]
 		element_hash := hp^
 
 		if map_hash_is_empty(element_hash) {
-			k_dst := map_cell_index_dynamic(ks, info.ks, p)
-			v_dst := map_cell_index_dynamic(vs, info.vs, p)
+			k_dst := map_cell_index_dynamic(ks, info.ks, pos)
+			v_dst := map_cell_index_dynamic(vs, info.vs, pos)
 			intrinsics.mem_copy_non_overlapping(rawptr(k_dst), rawptr(k), size_of_k)
 			intrinsics.mem_copy_non_overlapping(rawptr(v_dst), rawptr(v), size_of_v)
 			hp^ = h
 			return result if result != 0 else v_dst
 		}
 
-		if pd := map_probe_distance(m, element_hash, p); pd <= d {
+		if pd := map_probe_distance(m, element_hash, pos); pd <= distance {
 			if map_hash_is_deleted(element_hash) {
-				k_dst := map_cell_index_dynamic(ks, info.ks, p)
-				v_dst := map_cell_index_dynamic(vs, info.vs, p)
+				k_dst := map_cell_index_dynamic(ks, info.ks, pos)
+				v_dst := map_cell_index_dynamic(vs, info.vs, pos)
 				intrinsics.mem_copy_non_overlapping(rawptr(k_dst), rawptr(k), size_of_k)
 				intrinsics.mem_copy_non_overlapping(rawptr(v_dst), rawptr(v), size_of_v)
 				hp^ = h
 				return result if result != 0 else v_dst
-			} else if element_hash == h && info.key_equal(rawptr(k), rawptr(map_cell_index_dynamic(ks, info.ks, p))) {
-				v_dst := map_cell_index_dynamic(vs, info.vs, p)
+			} else if element_hash == h && info.key_equal(rawptr(k), rawptr(map_cell_index_dynamic(ks, info.ks, pos))) {
+				v_dst := map_cell_index_dynamic(vs, info.vs, pos)
 				intrinsics.mem_copy_non_overlapping(rawptr(v_dst), rawptr(iv), info.vs.size_of_type)
 				return v_dst
 			}
 
 			if result == 0 {
-				result = map_cell_index_dynamic(vs, info.vs, p)
+				result = map_cell_index_dynamic(vs, info.vs, pos)
 			}
 
-			kp := map_cell_index_dynamic(ks, info.vs, p)
-			vp := map_cell_index_dynamic(vs, info.ks, p)
+			kp := map_cell_index_dynamic(ks, info.vs, pos)
+			vp := map_cell_index_dynamic(vs, info.ks, pos)
 
 			// Simulate the following at runtime with dynamic storage
 			//
@@ -427,11 +442,11 @@ map_insert_hash_dynamic :: proc "odin" (m: Raw_Map, #no_alias info: ^Map_Info, h
 			intrinsics.mem_copy_non_overlapping(rawptr(v),  rawptr(tv), size_of_v)
 			hp^, h = h, hp^
 
-			d = pd
+			distance = pd
 		}
 
-		p = (p + 1) & c
-		d += 1
+		pos = (pos + 1) & mask
+		distance += 1
 	}
 }
 
