@@ -231,7 +231,7 @@ make_dynamic_array_len_cap :: proc($T: typeid/[dynamic]$E, #any_int len: int, #a
 	return
 }
 @(builtin)
-make_map :: proc($T: typeid/map[$K]$E, #any_int cap: int = DEFAULT_RESERVE_CAPACITY, allocator := context.allocator, loc := #caller_location) -> T {
+make_map :: proc($T: typeid/map[$K]$E, #any_int cap: int = 1<<MAP_MIN_LOG2_CAPACITY, allocator := context.allocator, loc := #caller_location) -> T {
 	make_map_expr_error_loc(loc, cap)
 	context.allocator = allocator
 
@@ -283,19 +283,13 @@ reserve_map :: proc(m: ^$T/map[$K]$V, capacity: int, loc := #caller_location) {
 }
 
 /*
-	Shrinks the capacity of a map down to the current length, or the given capacity.
-
-	If `new_cap` is negative, then `len(m)` is used.
-
-	Returns false if `cap(m) < new_cap`, or the allocator report failure.
-
-	If `len(m) < new_cap`, then `len(m)` will be left unchanged.
+	Shrinks the capacity of a map down to the current length.
 */
 @builtin
-shrink_map :: proc(m: ^$T/map[$K]$V, new_cap := -1, loc := #caller_location) -> (did_shrink: bool) {
+shrink_map :: proc(m: ^$T/map[$K]$V, loc := #caller_location) -> (did_shrink: bool) {
 	if m != nil {
-		new_cap := new_cap if new_cap >= 0 else len(m)
-		return __dynamic_map_shrink(__get_map_header(m), new_cap, loc)
+		err := map_shrink_dynamic((^Raw_Map)(m), map_info(T), loc)
+		did_shrink = err == nil
 	}
 	return
 }

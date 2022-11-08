@@ -316,9 +316,9 @@ map_total_allocation_size :: #force_inline proc "contextless" (capacity: uintptr
 
 // The only procedure which needs access to the context is the one which allocates the map.
 map_alloc_dynamic :: proc "odin" (info: ^Map_Info, log2_capacity: uintptr, allocator := context.allocator, loc := #caller_location) -> (result: Raw_Map, err: Allocator_Error) {
+	result.allocator = allocator // set the allocator always
 	if log2_capacity == 0 {
-		// Empty map, but set the allocator.
-		return { 0, 0, allocator }, nil
+		return
 	}
 
 	if log2_capacity >= 64 {
@@ -337,12 +337,8 @@ map_alloc_dynamic :: proc "odin" (info: ^Map_Info, log2_capacity: uintptr, alloc
 	if intrinsics.expect(data_ptr & CACHE_MASK != 0, false) {
 		panic("allocation not aligned to a cache line", loc)
 	} else {
-		result = {
-			// Tagged pointer representation for capacity.
-			data_ptr | log2_capacity,
-			0,
-			allocator,
-		}
+		result.data = data_ptr | log2_capacity // Tagged pointer representation for capacity.
+		result.len = 0
 
 		map_clear_dynamic(&result, info)
 	}
@@ -513,20 +509,19 @@ map_add_hash_dynamic :: proc "odin" (m: Raw_Map, #no_alias info: ^Map_Info, h: M
 
 @(optimization_mode="size")
 map_grow_dynamic :: proc "odin" (#no_alias m: ^Raw_Map, #no_alias info: ^Map_Info, loc := #caller_location) -> Allocator_Error {
-	allocator := m.allocator
-	if allocator.procedure == nil {
-		allocator = context.allocator
+	if m.allocator.procedure == nil {
+		m.allocator = context.allocator
 	}
 
 	log2_capacity := map_log2_cap(m^)
 
 	if m.data == 0 {
-		n := map_alloc_dynamic(info, MAP_MIN_LOG2_CAPACITY, allocator, loc) or_return
+		n := map_alloc_dynamic(info, MAP_MIN_LOG2_CAPACITY, m.allocator, loc) or_return
 		m.data = n.data
 		return nil
 	}
 
-	resized := map_alloc_dynamic(info, log2_capacity + 1, allocator, loc) or_return
+	resized := map_alloc_dynamic(info, log2_capacity + 1, m.allocator, loc) or_return
 
 	old_capacity := uintptr(1) << log2_capacity
 
@@ -554,7 +549,7 @@ map_grow_dynamic :: proc "odin" (#no_alias m: ^Raw_Map, #no_alias info: ^Map_Inf
 	}
 	map_free_dynamic(m^, info, loc) or_return
 
-	m.data = resized.data // Should copy the capacity too
+	m^ = resized
 
 	return nil
 }
@@ -562,9 +557,8 @@ map_grow_dynamic :: proc "odin" (#no_alias m: ^Raw_Map, #no_alias info: ^Map_Inf
 
 @(optimization_mode="size")
 map_reserve_dynamic :: proc "odin" (#no_alias m: ^Raw_Map, #no_alias info: ^Map_Info, new_capacity: uintptr, loc := #caller_location) -> Allocator_Error {
-	allocator := m.allocator
-	if allocator.procedure == nil {
-		allocator = context.allocator
+	if m.allocator.procedure == nil {
+		m.allocator = context.allocator
 	}
 
 	new_capacity := new_capacity
@@ -580,11 +574,11 @@ map_reserve_dynamic :: proc "odin" (#no_alias m: ^Raw_Map, #no_alias info: ^Map_
 	log2_new_capacity := size_of(uintptr) - intrinsics.count_leading_zeros(new_capacity-1)
 
 	if m.data == 0 {
-		m^ = map_alloc_dynamic(info, MAP_MIN_LOG2_CAPACITY, allocator, loc) or_return
+		m^ = map_alloc_dynamic(info, MAP_MIN_LOG2_CAPACITY, m.allocator, loc) or_return
 		return nil
 	}
 
-	resized := map_alloc_dynamic(info, log2_new_capacity, allocator, loc) or_return
+	resized := map_alloc_dynamic(info, log2_new_capacity, m.allocator, loc) or_return
 
 	ks, vs, hs, _, _ := map_kvh_data_dynamic(m^, info)
 
@@ -609,7 +603,7 @@ map_reserve_dynamic :: proc "odin" (#no_alias m: ^Raw_Map, #no_alias info: ^Map_
 		}
 	}
 
-	mem_free(rawptr(ks), allocator)
+	map_free_dynamic(m^, info, loc) or_return
 
 	m^ = resized // Should copy the capacity too
 
@@ -618,11 +612,9 @@ map_reserve_dynamic :: proc "odin" (#no_alias m: ^Raw_Map, #no_alias info: ^Map_
 
 
 @(optimization_mode="size")
-map_shrink_dynamic :: proc "odin" (#no_alias m: ^Raw_Map, #no_alias info: ^Map_Info) -> Allocator_Error {
-	allocator := m.allocator
-	if allocator.procedure == nil {
-		// TODO(bill): is this correct behaviour?
-		allocator = context.allocator
+map_shrink_dynamic :: proc "odin" (#no_alias m: ^Raw_Map, #no_alias info: ^Map_Info, loc := #caller_location) -> Allocator_Error {
+	if m.allocator.procedure == nil {
+		m.allocator = context.allocator
 	}
 
 	// Cannot shrink the capacity if the number of items in the map would exceed
@@ -633,7 +625,7 @@ map_shrink_dynamic :: proc "odin" (#no_alias m: ^Raw_Map, #no_alias info: ^Map_I
 		return nil
 	}
 
-	shrinked := map_alloc_dynamic(info, log2_capacity - 1, allocator) or_return
+	shrinked := map_alloc_dynamic(info, log2_capacity - 1, m.allocator) or_return
 
 	capacity := uintptr(1) << log2_capacity
 
@@ -662,9 +654,9 @@ map_shrink_dynamic :: proc "odin" (#no_alias m: ^Raw_Map, #no_alias info: ^Map_I
 		}
 	}
 
-	mem_free(rawptr(ks), allocator)
+	map_free_dynamic(m^, info, loc) or_return
 
-	m.data = shrinked.data // Should copy the capacity too
+	m^ = shrinked
 
 	return nil
 }
@@ -672,9 +664,8 @@ map_shrink_dynamic :: proc "odin" (#no_alias m: ^Raw_Map, #no_alias info: ^Map_I
 @(require_results)
 map_free_dynamic :: proc "odin" (m: Raw_Map, info: ^Map_Info, loc := #caller_location) -> Allocator_Error {
 	ptr := rawptr(map_data(m))
-	size := map_total_allocation_size(uintptr(map_cap(m)), info)
-
-	return mem_free_with_size(ptr, int(size), m.allocator, loc)
+	size := int(map_total_allocation_size(uintptr(map_cap(m)), info))
+	return mem_free_with_size(ptr, size, m.allocator, loc)
 }
 
 @(optimization_mode="speed")
