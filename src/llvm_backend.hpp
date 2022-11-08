@@ -160,7 +160,8 @@ struct lbModule {
 	StringMap<lbAddr> objc_classes;
 	StringMap<lbAddr> objc_selectors;
 
-	PtrMap<Type *, lbAddr> map_info_map;
+	PtrMap<Type *, lbAddr> map_cell_info_map; // address of runtime.Map_Info
+	PtrMap<Type *, lbAddr> map_info_map;      // address of runtime.Map_Cell_Info
 };
 
 struct lbGenerator {

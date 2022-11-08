@@ -76,6 +76,7 @@ void lb_init_module(lbModule *m, Checker *c) {
 	string_map_init(&m->objc_selectors, a);
 
 	map_init(&m->map_info_map, a, 0);
+	map_init(&m->map_cell_info_map, a, 0);
 
 }
 

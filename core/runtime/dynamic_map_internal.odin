@@ -184,13 +184,15 @@ map_hash_is_empty :: #force_inline proc "contextless" (hash: Map_Hash) -> bool {
 	return hash == 0
 }
 
-map_hash_is_deleted :: #force_inline proc "contextless" (hash: Map_Hash) -> bool {
+map_hash_is_deleted :: #force_no_inline proc "contextless" (hash: Map_Hash) -> bool {
 	// The MSB indicates a tombstone
-	return (hash >> ((size_of(Map_Hash) * 8) - 1)) != 0
+	N :: size_of(Map_Hash)*8 - 1
+	return hash >> N != 0
 }
 map_hash_is_valid :: #force_inline proc "contextless" (hash: Map_Hash) -> bool {
 	// The MSB indicates a tombstone
-	return (hash != 0) & ((hash >> ((size_of(Map_Hash) * 8) - 1)) == 0)
+	N :: size_of(Map_Hash)*8 - 1
+	return (hash != 0) & (hash >> N == 0)
 }
 
 
@@ -212,42 +214,19 @@ map_probe_distance :: #force_inline proc "contextless" (m: Raw_Map, hash: Map_Ha
 // about the map to make working with it possible. This info structure stores
 // that.
 //
-// The Odin compiler should generate this for __get_map_header.
-//
-// 80-bytes on 64-bit
-// 40-bytes on 32-bit
+// 32-bytes on 64-bit
+// 16-bytes on 32-bit
 Map_Info :: struct {
-	ks: Map_Cell_Info, // 32-bytes on 64-bit, 16-bytes on 32-bit
-	vs: Map_Cell_Info, // 32-bytes on 64-bit, 16-bytes on 32-bit
+	ks: ^Map_Cell_Info, // 8-bytes on 64-bit, 4-bytes on 32-bit
+	vs: ^Map_Cell_Info, // 8-bytes on 64-bit, 4-bytes on 32-bit
 	key_hasher: proc "contextless" (key: rawptr, seed: Map_Hash) -> Map_Hash, // 8-bytes on 64-bit, 4-bytes on 32-bit
 	key_equal:  proc "contextless" (lhs, rhs: rawptr) -> bool,                // 8-bytes on 64-bit, 4-bytes on 32-bit
 }
 
 
 // The Map_Info structure is basically a pseudo-table of information for a given K and V pair.
-map_info :: #force_inline proc "contextless" ($K: typeid, $V: typeid) -> ^Map_Info where intrinsics.type_is_comparable(K) {
-	@static INFO := Map_Info {
-		Map_Cell_Info {
-			size_of(K),
-			align_of(K),
-			size_of(Map_Cell(K)),
-			len(Map_Cell(K){}.data),
-		},
-		Map_Cell_Info {
-			size_of(V),
-			align_of(V),
-			size_of(Map_Cell(V)),
-			len(Map_Cell(V){}.data),
-		},
-		proc "contextless" (ptr: rawptr, seed: uintptr) -> Map_Hash {
-			return intrinsics.type_hasher_proc(K)(ptr, seed)
-		} ,
-		proc "contextless" (a, b: rawptr) -> bool {
-			return intrinsics.type_equal_proc(K)(a, b)
-		},
-	}
-	return &INFO
-}
+// map_info :: proc "contextless" ($T: typeid/map[$K]$V) -> ^Map_Info {...}
+map_info :: intrinsics.type_map_info
 
 map_kvh_data_dynamic :: proc "contextless" (m: Raw_Map, #no_alias info: ^Map_Info) -> (ks: uintptr, vs: uintptr, hs: [^]Map_Hash, sk: uintptr, sv: uintptr) {
 	@static INFO_HS := Map_Cell_Info {
@@ -259,12 +238,12 @@ map_kvh_data_dynamic :: proc "contextless" (m: Raw_Map, #no_alias info: ^Map_Inf
 
 	capacity := uintptr(1) << map_log2_cap(m)
 	ks   = map_data(m)
-	vs   = map_cell_index_dynamic(ks,  &info.ks, capacity) // Skip past ks to get start of vs
-	hs_ := map_cell_index_dynamic(vs,  &info.vs, capacity) // Skip past vs to get start of hs
+	vs   = map_cell_index_dynamic(ks,  info.ks, capacity) // Skip past ks to get start of vs
+	hs_ := map_cell_index_dynamic(vs,  info.vs, capacity) // Skip past vs to get start of hs
 	sk   = map_cell_index_dynamic(hs_, &INFO_HS, capacity) // Skip past hs to get start of sk
 	// Need to skip past two elements in the scratch key space to get to the start
 	// of the scratch value space, of which there's only two elements as well.
-	sv = map_cell_index_dynamic_const(sk, &info.ks, 2)
+	sv = map_cell_index_dynamic_const(sk, info.ks, 2)
 
 	hs = ([^]Map_Hash)(hs_)
 	return
@@ -272,7 +251,7 @@ map_kvh_data_dynamic :: proc "contextless" (m: Raw_Map, #no_alias info: ^Map_Inf
 
 map_kvh_data_values_dynamic :: proc "contextless" (m: Raw_Map, #no_alias info: ^Map_Info) -> (vs: uintptr) {
 	capacity := uintptr(1) << map_log2_cap(m)
-	return map_cell_index_dynamic(map_data(m), &info.ks, capacity) // Skip past ks to get start of vs
+	return map_cell_index_dynamic(map_data(m), info.ks, capacity) // Skip past ks to get start of vs
 }
 
 
@@ -303,11 +282,11 @@ map_alloc_dynamic :: proc(info: ^Map_Info, log2_capacity: uintptr, allocator := 
 	}
 
 	size := uintptr(0)
-	size = round(map_cell_index_dynamic(size, &info.ks, capacity))
-	size = round(map_cell_index_dynamic(size, &info.vs, capacity))
+	size = round(map_cell_index_dynamic(size, info.ks, capacity))
+	size = round(map_cell_index_dynamic(size, info.vs, capacity))
 	size = round(map_cell_index_dynamic(size, &INFO_HS, capacity))
-	size = round(map_cell_index_dynamic(size, &info.ks, 2)) // Two additional ks for scratch storage
-	size = round(map_cell_index_dynamic(size, &info.vs, 2)) // Two additional vs for scratch storage
+	size = round(map_cell_index_dynamic(size, info.ks, 2)) // Two additional ks for scratch storage
+	size = round(map_cell_index_dynamic(size, info.vs, 2)) // Two additional vs for scratch storage
 
 	data := mem_alloc(int(size), MAP_CACHE_LINE_SIZE, allocator) or_return
 	data_ptr := uintptr(raw_data(data))
@@ -334,8 +313,8 @@ map_alloc_dynamic :: proc(info: ^Map_Info, log2_capacity: uintptr, allocator := 
 // This procedure returns the address of the just inserted value.
 @(optimization_mode="speed")
 map_insert_hash_dynamic :: proc(m: Raw_Map, #no_alias info: ^Map_Info, h: Map_Hash, ik: uintptr, iv: uintptr) -> (result: uintptr) {
-	info_ks := &info.ks
-	info_vs := &info.vs
+	info_ks := info.ks
+	info_vs := info.vs
 
 	p := map_desired_position(m, h)
 	d := uintptr(0)
@@ -416,8 +395,8 @@ map_insert_hash_dynamic :: proc(m: Raw_Map, #no_alias info: ^Map_Info, h: Map_Ha
 
 @(optimization_mode="speed")
 map_add_hash_dynamic :: proc(m: Raw_Map, #no_alias info: ^Map_Info, h: Map_Hash, ik: uintptr, iv: uintptr) {
-	info_ks := &info.ks
-	info_vs := &info.vs
+	info_ks := info.ks
+	info_vs := info.vs
 
 	capacity := uintptr(1) << map_log2_cap(m)
 	p := map_desired_position(m, h)
@@ -515,8 +494,8 @@ map_grow_dynamic :: proc(#no_alias m: ^Raw_Map, #no_alias info: ^Map_Info) -> Al
 	ks, vs, hs, _, _ := map_kvh_data_dynamic(m^, info)
 
 	// Cache these loads to avoid hitting them in the for loop.
-	info_ks := &info.ks
-	info_vs := &info.vs
+	info_ks := info.ks
+	info_vs := info.vs
 
 	n := map_len(m^)
 	for i := uintptr(0); i < old_capacity; i += 1 {
@@ -576,8 +555,8 @@ map_reserve_dynamic :: proc(#no_alias m: ^Raw_Map, #no_alias info: ^Map_Info, ne
 	ks, vs, hs, _, _ := map_kvh_data_dynamic(m^, info)
 
 	// Cache these loads to avoid hitting them in the for loop.
-	info_ks := &info.ks
-	info_vs := &info.vs
+	info_ks := info.ks
+	info_vs := info.vs
 
 	n := map_len(m^)
 	for i := uintptr(0); i < capacity; i += 1 {
@@ -629,8 +608,8 @@ map_shrink_dynamic :: proc(#no_alias m: ^Raw_Map, #no_alias info: ^Map_Info) -> 
 
 	ks, vs, hs, _, _ := map_kvh_data_dynamic(m^, info)
 
-	info_ks := &info.ks
-	info_vs := &info.vs
+	info_ks := info.ks
+	info_vs := info.vs
 
 	n := map_len(m^)
 	for i := uintptr(0); i < capacity; i += 1 {
@@ -678,7 +657,7 @@ map_lookup_dynamic :: proc "contextless" (m: Raw_Map, #no_alias info: ^Map_Info,
 	d := uintptr(0)
 	c := (uintptr(1) << map_log2_cap(m)) - 1
 	ks, _, hs, _, _ := map_kvh_data_dynamic(m, info)
-	info_ks := &info.ks
+	info_ks := info.ks
 	for {
 		element_hash := hs[p]
 		if map_hash_is_empty(element_hash) {
@@ -702,7 +681,7 @@ map_exists_dynamic :: proc "contextless" (m: Raw_Map, #no_alias info: ^Map_Info,
 	d := uintptr(0)
 	c := (uintptr(1) << map_log2_cap(m)) - 1
 	ks, _, hs, _, _ := map_kvh_data_dynamic(m, info)
-	info_ks := &info.ks
+	info_ks := info.ks
 	for {
 		element_hash := hs[p]
 		if map_hash_is_empty(element_hash) {
@@ -766,7 +745,7 @@ __dynamic_map_get :: proc "contextless" (m: rawptr, #no_alias info: ^Map_Info, k
 	rm := (^Raw_Map)(m)^
 	if index, ok := map_lookup_dynamic(rm, info, uintptr(key)); ok {
 		vs := map_kvh_data_values_dynamic(rm, info)
-		ptr = rawptr(map_cell_index_dynamic(vs, &info.vs, index))
+		ptr = rawptr(map_cell_index_dynamic(vs, info.vs, index))
 	}
 	return
 }
