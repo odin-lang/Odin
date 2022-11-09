@@ -541,10 +541,7 @@ reserve_dynamic_array :: proc(array: ^$T/[dynamic]$E, capacity: int, loc := #cal
 	new_size  := capacity * size_of(E)
 	allocator := a.allocator
 
-	new_data, err := allocator.procedure(
-		allocator.data, .Resize, new_size, align_of(E),
-		a.data, old_size, loc,
-	)
+	new_data, err := mem_resize(a.data, old_size, new_size, align_of(E), allocator, loc)
 	if new_data == nil || err != nil {
 		return false
 	}
@@ -575,10 +572,7 @@ resize_dynamic_array :: proc(array: ^$T/[dynamic]$E, length: int, loc := #caller
 	new_size  := length * size_of(E)
 	allocator := a.allocator
 
-	new_data, err := allocator.procedure(
-		allocator.data, .Resize, new_size, align_of(E),
-		a.data, old_size, loc,
-	)
+	new_data, err := mem_resize(a.data, old_size, new_size, align_of(E), allocator, loc)
 	if new_data == nil || err != nil {
 		return false
 	}
@@ -618,15 +612,7 @@ shrink_dynamic_array :: proc(array: ^$T/[dynamic]$E, new_cap := -1, loc := #call
 	old_size := a.cap * size_of(E)
 	new_size := new_cap * size_of(E)
 
-	new_data, err := a.allocator.procedure(
-		a.allocator.data,
-		.Resize,
-		new_size,
-		align_of(E),
-		a.data,
-		old_size,
-		loc,
-	)
+	new_data, err := mem_resize(a.data, old_size, new_size, align_of(E), allocator, loc)
 	if err != nil {
 		return
 	}
