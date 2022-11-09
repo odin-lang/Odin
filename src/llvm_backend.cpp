@@ -757,8 +757,8 @@ lbValue lb_gen_map_key_hash(lbProcedure *p, lbValue key, Type *key_type, lbValue
 	return hashed_key;
 }
 
-lbValue lb_internal_dynamic_map_get_ptr(lbProcedure *p, lbValue const &map, lbValue const &key) {
-	Type *map_type = base_type(map.type);
+lbValue lb_internal_dynamic_map_get_ptr(lbProcedure *p, lbValue const &map_ptr, lbValue const &key) {
+	Type *map_type = base_type(type_deref(map_ptr.type));
 	GB_ASSERT(map_type->kind == Type_Map);
 
 	lbValue ptr = {};
@@ -770,13 +770,13 @@ lbValue lb_internal_dynamic_map_get_ptr(lbProcedure *p, lbValue const &map, lbVa
 		lbValue map_get_proc = lb_get_map_get_proc_for_type(p->module, map_type);
 
 		auto args = array_make<lbValue>(permanent_allocator(), 2);
-		args[0] = lb_address_from_load_or_generate_local(p, map);
+		args[0] = map_ptr;
 		args[1] = key_ptr;
 
 		ptr = lb_emit_call(p, map_get_proc, args);
 	} else {
 		auto args = array_make<lbValue>(permanent_allocator(), 3);
-		args[0] = lb_emit_transmute(p, map, t_raw_map);
+		args[0] = lb_emit_transmute(p, lb_emit_load(p, map_ptr), t_raw_map);
 		args[1] = lb_gen_map_info_ptr(p->module, map_type);
 		args[2] = key_ptr;
 

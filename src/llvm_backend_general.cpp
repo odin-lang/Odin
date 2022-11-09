@@ -418,7 +418,7 @@ lbValue lb_addr_get_ptr(lbProcedure *p, lbAddr const &addr) {
 
 	switch (addr.kind) {
 	case lbAddr_Map:
-		return lb_internal_dynamic_map_get_ptr(p, lb_emit_load(p, addr.addr), addr.map.key);
+		return lb_internal_dynamic_map_get_ptr(p, addr.addr, addr.map.key);
 
 	case lbAddr_RelativePointer: {
 		Type *rel_ptr = base_type(lb_addr_type(addr));
@@ -1075,7 +1075,7 @@ lbValue lb_addr_load(lbProcedure *p, lbAddr const &addr) {
 		GB_ASSERT(map_type->kind == Type_Map);
 		lbAddr v = lb_add_local_generated(p, map_type->Map.lookup_result_type, true);
 
-		lbValue ptr = lb_internal_dynamic_map_get_ptr(p, lb_emit_load(p, addr.addr), addr.map.key);
+		lbValue ptr = lb_internal_dynamic_map_get_ptr(p, addr.addr, addr.map.key);
 		lbValue ok = lb_emit_conv(p, lb_emit_comp_against_nil(p, Token_NotEq, ptr), t_bool);
 		lb_emit_store(p, lb_emit_struct_ep(p, v.addr, 1), ok);
 
