@@ -351,7 +351,6 @@ map_alloc_dynamic :: proc "odin" (info: ^Map_Info, log2_capacity: uintptr, alloc
 // there is no type information.
 //
 // This procedure returns the address of the just inserted value.
-@(optimization_mode="speed")
 map_insert_hash_dynamic :: proc "odin" (m: Raw_Map, #no_alias info: ^Map_Info, h: Map_Hash, ik: uintptr, iv: uintptr) -> (result: uintptr) {
 	pos      := map_desired_position(m, h)
 	distance := uintptr(0)
@@ -413,6 +412,10 @@ map_insert_hash_dynamic :: proc "odin" (m: Raw_Map, #no_alias info: ^Map_Info, h
 			intrinsics.mem_copy_non_overlapping(rawptr(v),  rawptr(vp), size_of_v)
 			intrinsics.mem_copy_non_overlapping(rawptr(vp), rawptr(tv), size_of_v)
 
+			th := h
+			h = hp^
+			hp^ = h
+
 			distance = probe_distance
 		}
 
@@ -421,7 +424,6 @@ map_insert_hash_dynamic :: proc "odin" (m: Raw_Map, #no_alias info: ^Map_Info, h
 	}
 }
 
-@(optimization_mode="size")
 map_grow_dynamic :: proc "odin" (#no_alias m: ^Raw_Map, #no_alias info: ^Map_Info, loc := #caller_location) -> Allocator_Error {
 	if m.allocator.procedure == nil {
 		m.allocator = context.allocator
@@ -469,7 +471,6 @@ map_grow_dynamic :: proc "odin" (#no_alias m: ^Raw_Map, #no_alias info: ^Map_Inf
 }
 
 
-@(optimization_mode="size")
 map_reserve_dynamic :: proc "odin" (#no_alias m: ^Raw_Map, #no_alias info: ^Map_Info, new_capacity: uintptr, loc := #caller_location) -> Allocator_Error {
 	if m.allocator.procedure == nil {
 		m.allocator = context.allocator
@@ -525,7 +526,6 @@ map_reserve_dynamic :: proc "odin" (#no_alias m: ^Raw_Map, #no_alias info: ^Map_
 }
 
 
-@(optimization_mode="size")
 map_shrink_dynamic :: proc "odin" (#no_alias m: ^Raw_Map, #no_alias info: ^Map_Info, loc := #caller_location) -> Allocator_Error {
 	if m.allocator.procedure == nil {
 		m.allocator = context.allocator
@@ -582,7 +582,6 @@ map_free_dynamic :: proc "odin" (m: Raw_Map, info: ^Map_Info, loc := #caller_loc
 	return mem_free_with_size(ptr, size, m.allocator, loc)
 }
 
-@(optimization_mode="speed")
 map_lookup_dynamic :: proc "contextless" (m: Raw_Map, #no_alias info: ^Map_Info, k: uintptr) -> (index: uintptr, ok: bool) {
 	if map_len(m) == 0 {
 		return 0, false
@@ -605,7 +604,6 @@ map_lookup_dynamic :: proc "contextless" (m: Raw_Map, #no_alias info: ^Map_Info,
 		d += 1
 	}
 }
-@(optimization_mode="speed")
 map_exists_dynamic :: proc "contextless" (m: Raw_Map, #no_alias info: ^Map_Info, k: uintptr) -> (ok: bool) {
 	if map_len(m) == 0 {
 		return false
