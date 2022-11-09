@@ -351,12 +351,12 @@ map_alloc_dynamic :: proc "odin" (info: ^Map_Info, log2_capacity: uintptr, alloc
 // there is no type information.
 //
 // This procedure returns the address of the just inserted value.
-map_insert_hash_dynamic :: proc "odin" (m: Raw_Map, #no_alias info: ^Map_Info, h: Map_Hash, ik: uintptr, iv: uintptr) -> (result: uintptr) {
-	pos      := map_desired_position(m, h)
+map_insert_hash_dynamic :: proc "odin" (m: ^Raw_Map, #no_alias info: ^Map_Info, h: Map_Hash, ik: uintptr, iv: uintptr) -> (result: uintptr) {
+	pos      := map_desired_position(m^, h)
 	distance := uintptr(0)
-	mask     := (uintptr(1) << map_log2_cap(m)) - 1
+	mask     := (uintptr(1) << map_log2_cap(m^)) - 1
 
-	ks, vs, hs, sk, sv := map_kvh_data_dynamic(m, info)
+	ks, vs, hs, sk, sv := map_kvh_data_dynamic(m^, info)
 	_, _ = sk, sv
 
 	// Avoid redundant loads of these values
@@ -384,16 +384,18 @@ map_insert_hash_dynamic :: proc "odin" (m: Raw_Map, #no_alias info: ^Map_Info, h
 			intrinsics.mem_copy_non_overlapping(rawptr(k_dst), rawptr(k), size_of_k)
 			intrinsics.mem_copy_non_overlapping(rawptr(v_dst), rawptr(v), size_of_v)
 			hp^ = h
+
 			return result if result != 0 else v_dst
 		}
 
-		if probe_distance := map_probe_distance(m, element_hash, pos); probe_distance < distance {
+		if probe_distance := map_probe_distance(m^, element_hash, pos); distance > probe_distance {
 			if map_hash_is_deleted(element_hash) {
 				k_dst := map_cell_index_dynamic(ks, info.ks, pos)
 				v_dst := map_cell_index_dynamic(vs, info.vs, pos)
 				intrinsics.mem_copy_non_overlapping(rawptr(k_dst), rawptr(k), size_of_k)
 				intrinsics.mem_copy_non_overlapping(rawptr(v_dst), rawptr(v), size_of_v)
 				hp^ = h
+
 				return result if result != 0 else v_dst
 			}
 
@@ -414,7 +416,7 @@ map_insert_hash_dynamic :: proc "odin" (m: Raw_Map, #no_alias info: ^Map_Info, h
 
 			th := h
 			h = hp^
-			hp^ = h
+			hp^ = th
 
 			distance = probe_distance
 		}
@@ -455,7 +457,7 @@ map_grow_dynamic :: proc "odin" (#no_alias m: ^Raw_Map, #no_alias info: ^Map_Inf
 		}
 		k := map_cell_index_dynamic(ks, info.ks, i)
 		v := map_cell_index_dynamic(vs, info.vs, i)
-		map_insert_hash_dynamic(resized, info, hash, k, v)
+		map_insert_hash_dynamic(&resized, info, hash, k, v)
 		// Only need to do this comparison on each actually added pair, so do not
 		// fold it into the for loop comparator as a micro-optimization.
 		n -= 1
@@ -465,7 +467,7 @@ map_grow_dynamic :: proc "odin" (#no_alias m: ^Raw_Map, #no_alias info: ^Map_Inf
 	}
 	map_free_dynamic(m^, info, loc) or_return
 
-	m^ = resized
+	m.data = resized.data
 
 	return nil
 }
@@ -509,7 +511,7 @@ map_reserve_dynamic :: proc "odin" (#no_alias m: ^Raw_Map, #no_alias info: ^Map_
 		}
 		k := map_cell_index_dynamic(ks, info.ks, i)
 		v := map_cell_index_dynamic(vs, info.vs, i)
-		map_insert_hash_dynamic(resized, info, hash, k, v)
+		map_insert_hash_dynamic(&resized, info, hash, k, v)
 		// Only need to do this comparison on each actually added pair, so do not
 		// fold it into the for loop comparator as a micro-optimization.
 		n -= 1
@@ -520,7 +522,7 @@ map_reserve_dynamic :: proc "odin" (#no_alias m: ^Raw_Map, #no_alias info: ^Map_
 
 	map_free_dynamic(m^, info, loc) or_return
 
-	m^ = resized // Should copy the capacity too
+	m.data = resized.data
 
 	return nil
 }
@@ -539,7 +541,7 @@ map_shrink_dynamic :: proc "odin" (#no_alias m: ^Raw_Map, #no_alias info: ^Map_I
 		return nil
 	}
 
-	shrinked := map_alloc_dynamic(info, log2_capacity - 1, m.allocator) or_return
+	shrunk := map_alloc_dynamic(info, log2_capacity - 1, m.allocator) or_return
 
 	capacity := uintptr(1) << log2_capacity
 
@@ -558,7 +560,7 @@ map_shrink_dynamic :: proc "odin" (#no_alias m: ^Raw_Map, #no_alias info: ^Map_I
 		k := map_cell_index_dynamic(ks, info.ks, i)
 		v := map_cell_index_dynamic(vs, info.vs, i)
 
-		map_insert_hash_dynamic(shrinked, info, hash, k, v)
+		map_insert_hash_dynamic(&shrunk, info, hash, k, v)
 
 		// Only need to do this comparison on each actually added pair, so do not
 		// fold it into the for loop comparator as a micro-optimization.
@@ -570,7 +572,7 @@ map_shrink_dynamic :: proc "odin" (#no_alias m: ^Raw_Map, #no_alias info: ^Map_I
 
 	map_free_dynamic(m^, info, loc) or_return
 
-	m^ = shrinked
+	m.data = shrunk.data
 
 	return nil
 }
@@ -694,12 +696,10 @@ map_get :: proc "contextless" (m: $T/map[$K]$V, key: K) -> (stored_key: K, store
 	}
 }
 
-__dynamic_map_get :: proc "contextless" (m: Raw_Map, #no_alias info: ^Map_Info, key: rawptr) -> (ptr: rawptr) {
+__dynamic_map_get_with_hash :: proc "contextless" (m: Raw_Map, #no_alias info: ^Map_Info, h: Map_Hash, key: rawptr) -> (ptr: rawptr) {
 	if m.len == 0 {
 		return nil
 	}
-
-	h := info.key_hasher(key, 0)
 	pos := map_desired_position(m, h)
 	distance := uintptr(0)
 	mask := (uintptr(1) << map_log2_cap(m)) - 1
@@ -718,19 +718,31 @@ __dynamic_map_get :: proc "contextless" (m: Raw_Map, #no_alias info: ^Map_Info, 
 	}
 }
 
+__dynamic_map_get :: proc "contextless" (m: Raw_Map, #no_alias info: ^Map_Info, key: rawptr) -> (ptr: rawptr) {
+	if m.len == 0 {
+		return nil
+	}
+	h := info.key_hasher(key, 0)
+	return __dynamic_map_get_with_hash(m, info, h, key)
+}
+
 __dynamic_map_set :: proc "odin" (#no_alias m: ^Raw_Map, #no_alias info: ^Map_Info, key, value: rawptr, loc := #caller_location) -> rawptr {
-	if found := __dynamic_map_get(m^, info, key); found != nil {
+	hash := info.key_hasher(key, 0)
+
+	if found := __dynamic_map_get_with_hash(m^, info, hash, key); found != nil {
 		intrinsics.mem_copy_non_overlapping(found, value, info.vs.size_of_type)
 		return found
 	}
 
 	if m.len + 1 >= map_resize_threshold(m^) {
-		if map_grow_dynamic(m, info, loc) != nil {
+		err := map_grow_dynamic(m, info, loc)
+		if err != nil {
 			return nil
 		}
 	}
-	hash := info.key_hasher(key, 0)
-	result := map_insert_hash_dynamic(m^, info, hash, uintptr(key), uintptr(value))
+
+	result := map_insert_hash_dynamic(m, info, hash, uintptr(key), uintptr(value))
+	assert(result != 0)
 	m.len += 1
 	return rawptr(result)
 }
