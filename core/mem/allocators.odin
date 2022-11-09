@@ -864,12 +864,23 @@ tracking_allocator_init :: proc(t: ^Tracking_Allocator, backing_allocator: Alloc
 	t.backing = backing_allocator
 	t.allocation_map.allocator = internals_allocator
 	t.bad_free_array.allocator = internals_allocator
+
+	if .Free_All in query_features(t.backing) {
+		t.clear_on_free_all = true
+	}
 }
 
 tracking_allocator_destroy :: proc(t: ^Tracking_Allocator) {
 	delete(t.allocation_map)
 	delete(t.bad_free_array)
 }
+
+
+tracking_allocator_clear :: proc(t: ^Tracking_Allocator) {
+	clear(&t.allocation_map)
+	clear(&t.bad_free_array)
+}
+
 
 tracking_allocator :: proc(data: ^Tracking_Allocator) -> Allocator {
 	return Allocator{
