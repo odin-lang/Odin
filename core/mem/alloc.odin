@@ -77,6 +77,14 @@ free :: proc(ptr: rawptr, allocator := context.allocator, loc := #caller_locatio
 	return runtime.mem_free(ptr, allocator, loc)
 }
 
+free_with_size :: proc(ptr: rawptr, byte_count: int, allocator := context.allocator, loc := #caller_location) -> Allocator_Error {
+	if ptr == nil || allocator.procedure == nil {
+		return nil
+	}
+	_, err := allocator.procedure(allocator.data, .Free, 0, 0, ptr, byte_count, loc)
+	return err
+}
+
 free_bytes :: proc(bytes: []byte, allocator := context.allocator, loc := #caller_location) -> Allocator_Error {
 	return runtime.mem_free_bytes(bytes, allocator, loc)
 }
@@ -113,16 +121,16 @@ query_info :: proc(pointer: rawptr, allocator: Allocator, loc := #caller_locatio
 
 
 delete_string :: proc(str: string, allocator := context.allocator, loc := #caller_location) -> Allocator_Error {
-	return free(raw_data(str), allocator, loc)
+	return free_with_size(raw_data(str), len(str), allocator, loc)
 }
 delete_cstring :: proc(str: cstring, allocator := context.allocator, loc := #caller_location) -> Allocator_Error {
 	return free((^byte)(str), allocator, loc)
 }
 delete_dynamic_array :: proc(array: $T/[dynamic]$E, loc := #caller_location) -> Allocator_Error {
-	return free(raw_data(array), array.allocator, loc)
+	return free_with_size(raw_data(array), cap(array)*size_of(E), array.allocator, loc)
 }
 delete_slice :: proc(array: $T/[]$E, allocator := context.allocator, loc := #caller_location) -> Allocator_Error {
-	return free(raw_data(array), allocator, loc)
+	return free_with_size(raw_data(array), len(array)*size_of(E), allocator, loc)
 }
 delete_map :: proc(m: $T/map[$K]$V, loc := #caller_location) -> Allocator_Error {
 	return runtime.map_free_dynamic(transmute(Raw_Map)m, runtime.map_info(T), loc)
