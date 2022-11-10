@@ -431,49 +431,9 @@ map_insert_hash_dynamic :: proc "odin" (m: ^Raw_Map, #no_alias info: ^Map_Info, 
 }
 
 map_grow_dynamic :: proc "odin" (#no_alias m: ^Raw_Map, #no_alias info: ^Map_Info, loc := #caller_location) -> Allocator_Error {
-	if m.allocator.procedure == nil {
-		m.allocator = context.allocator
-	}
-
 	log2_capacity := map_log2_cap(m^)
-
-	if m.data == 0 {
-		n := map_alloc_dynamic(info, MAP_MIN_LOG2_CAPACITY, m.allocator, loc) or_return
-		m.data = n.data
-		return nil
-	}
-
-	resized := map_alloc_dynamic(info, log2_capacity + 1, m.allocator, loc) or_return
-
-	old_capacity := uintptr(1) << log2_capacity
-
-	ks, vs, hs, _, _ := map_kvh_data_dynamic(m^, info)
-
-	// Cache these loads to avoid hitting them in the for loop.
-	n := m.len
-	for i in 0..<old_capacity {
-		hash := hs[i]
-		if map_hash_is_empty(hash) {
-			continue
-		}
-		if map_hash_is_deleted(hash) {
-			continue
-		}
-		k := map_cell_index_dynamic(ks, info.ks, i)
-		v := map_cell_index_dynamic(vs, info.vs, i)
-		map_insert_hash_dynamic(&resized, info, hash, k, v)
-		// Only need to do this comparison on each actually added pair, so do not
-		// fold it into the for loop comparator as a micro-optimization.
-		n -= 1
-		if n == 0 {
-			break
-		}
-	}
-	map_free_dynamic(m^, info, loc) or_return
-
-	m.data = resized.data
-
-	return nil
+	new_capacity := uintptr(1) << max(log2_capacity + 1, MAP_MIN_LOG2_CAPACITY)
+	return map_reserve_dynamic(m, info, new_capacity, loc)
 }
 
 
@@ -739,8 +699,7 @@ __dynamic_map_set :: proc "odin" (#no_alias m: ^Raw_Map, #no_alias info: ^Map_In
 	}
 
 	if m.len + 1 >= map_resize_threshold(m^) {
-		err := map_grow_dynamic(m, info, loc)
-		if err != nil {
+		if err := map_grow_dynamic(m, info, loc); err != nil {
 			return nil
 		}
 	}
