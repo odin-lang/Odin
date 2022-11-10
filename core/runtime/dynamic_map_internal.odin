@@ -334,6 +334,10 @@ map_alloc_dynamic :: proc "odin" (info: ^Map_Info, log2_capacity: uintptr, alloc
 
 	data := mem_alloc_non_zeroed(int(size), MAP_CACHE_LINE_SIZE, allocator, loc) or_return
 	data_ptr := uintptr(raw_data(data))
+	if data_ptr == 0 {
+		err = .Out_Of_Memory
+		return
+	}
 	if intrinsics.expect(data_ptr & CACHE_MASK != 0, false) {
 		panic("allocation not aligned to a cache line", loc)
 	} else {
