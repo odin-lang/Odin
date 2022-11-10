@@ -463,8 +463,8 @@ lbValue lb_emit_source_code_location_const(lbProcedure *p, String const &procedu
 
 lbValue lb_handle_param_value(lbProcedure *p, Type *parameter_type, ParameterValue const &param_value, TokenPos const &pos);
 
-lbValue lb_get_equal_proc_for_type(lbModule *m, Type *type);
-lbValue lb_get_hasher_proc_for_type(lbModule *m, Type *type);
+lbValue lb_equal_proc_for_type(lbModule *m, Type *type);
+lbValue lb_hasher_proc_for_type(lbModule *m, Type *type);
 lbValue lb_emit_conv(lbProcedure *p, lbValue value, Type *t);
 
 LLVMMetadataRef lb_debug_type(lbModule *m, Type *type);

@@ -666,7 +666,7 @@ void lb_setup_type_info_data(lbProcedure *p) { // NOTE(bill): Setup type_info da
 				}
 
 				if (is_type_comparable(t) && !is_type_simple_compare(t)) {
-					vals[3] = lb_get_equal_proc_for_type(m, t).value;
+					vals[3] = lb_equal_proc_for_type(m, t).value;
 				}
 
 				vals[4] = lb_const_bool(m, t_bool, t->Union.custom_align != 0).value;
@@ -702,7 +702,7 @@ void lb_setup_type_info_data(lbProcedure *p) { // NOTE(bill): Setup type_info da
 				vals[6] = is_raw_union.value;
 				vals[7] = is_custom_align.value;
 				if (is_type_comparable(t) && !is_type_simple_compare(t)) {
-					vals[8] = lb_get_equal_proc_for_type(m, t).value;
+					vals[8] = lb_equal_proc_for_type(m, t).value;
 				}
 
 

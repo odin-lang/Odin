@@ -2215,7 +2215,7 @@ lbValue lb_compare_records(lbProcedure *p, TokenKind op_kind, lbValue left, lbVa
 		args[2] = lb_const_int(p->module, t_int, type_size_of(type));
 		res = lb_emit_runtime_call(p, "memory_equal", args);
 	} else {
-		lbValue value = lb_get_equal_proc_for_type(p->module, type);
+		lbValue value = lb_equal_proc_for_type(p->module, type);
 		auto args = array_make<lbValue>(permanent_allocator(), 2);
 		args[0] = lb_emit_conv(p, left_ptr, t_rawptr);
 		args[1] = lb_emit_conv(p, right_ptr, t_rawptr);

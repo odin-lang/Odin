@@ -1434,7 +1434,7 @@ lbValue lb_dynamic_array_allocator(lbProcedure *p, lbValue da) {
 }
 
 lbValue lb_map_len(lbProcedure *p, lbValue value) {
-	GB_ASSERT(is_type_map(value.type));
+	GB_ASSERT_MSG(is_type_map(value.type) || are_types_identical(value.type, t_raw_map), "%s", type_to_string(value.type));
 	lbValue len = lb_emit_struct_ev(p, value, 1);
 	return lb_emit_conv(p, len, t_int);
 }
