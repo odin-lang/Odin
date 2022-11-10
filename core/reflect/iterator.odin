@@ -67,7 +67,7 @@ iterate_map :: proc(val: any, it: ^int) -> (key, value: any, ok: bool) {
 				key.id     = info.key.id
 				value.id   = info.value.id
 				ok = true
-				return
+				break
 			}
 
 		}
