@@ -107,7 +107,7 @@ Map_Cell_Info :: struct {
 map_cell_info :: intrinsics.type_map_cell_info
 
 // Same as the above procedure but at runtime with the cell Map_Cell_Info value.
-map_cell_index_dynamic :: #force_inline proc "contextless" (base: uintptr, info: ^Map_Cell_Info, index: uintptr) -> uintptr {
+map_cell_index_dynamic :: #force_inline proc "contextless" (base: uintptr, #no_alias info: ^Map_Cell_Info, index: uintptr) -> uintptr {
 	// Micro-optimize the common cases to save on integer division.
 	elements_per_cell := uintptr(info.elements_per_cell)
 	size_of_cell      := uintptr(info.size_of_cell)
@@ -355,13 +355,13 @@ map_alloc_dynamic :: proc "odin" (info: ^Map_Info, log2_capacity: uintptr, alloc
 // there is no type information.
 //
 // This procedure returns the address of the just inserted value.
-map_insert_hash_dynamic :: proc "odin" (m: ^Raw_Map, #no_alias info: ^Map_Info, h: Map_Hash, ik: uintptr, iv: uintptr) -> (result: uintptr) {
+map_insert_hash_dynamic :: proc "odin" (#no_alias m: ^Raw_Map, #no_alias info: ^Map_Info, h: Map_Hash, ik: uintptr, iv: uintptr) -> (result: uintptr) {
+	h        := h
 	pos      := map_desired_position(m^, h)
 	distance := uintptr(0)
 	mask     := (uintptr(1) << map_log2_cap(m^)) - 1
 
 	ks, vs, hs, sk, sv := map_kvh_data_dynamic(m^, info)
-	_, _ = sk, sv
 
 	// Avoid redundant loads of these values
 	size_of_k := info.ks.size_of_type
@@ -376,7 +376,6 @@ map_insert_hash_dynamic :: proc "odin" (m: ^Raw_Map, #no_alias info: ^Map_Info, 
 	tk := map_cell_index_dynamic(sk, info.ks, 1)
 	tv := map_cell_index_dynamic(sv, info.vs, 1)
 
-	h := h
 
 	for {
 		hp := &hs[pos]
@@ -660,19 +659,19 @@ map_get :: proc "contextless" (m: $T/map[$K]$V, key: K) -> (stored_key: K, store
 	}
 }
 
-__dynamic_map_get_with_hash :: proc "contextless" (m: Raw_Map, #no_alias info: ^Map_Info, h: Map_Hash, key: rawptr) -> (ptr: rawptr) {
+__dynamic_map_get_with_hash :: proc "contextless" (#no_alias m: ^Raw_Map, #no_alias info: ^Map_Info, h: Map_Hash, key: rawptr) -> (ptr: rawptr) {
 	if m.len == 0 {
 		return nil
 	}
-	pos := map_desired_position(m, h)
+	pos := map_desired_position(m^, h)
 	distance := uintptr(0)
-	mask := (uintptr(1) << map_log2_cap(m)) - 1
-	ks, vs, hs, _, _ := map_kvh_data_dynamic(m, info)
+	mask := (uintptr(1) << map_log2_cap(m^)) - 1
+	ks, vs, hs, _, _ := map_kvh_data_dynamic(m^, info)
 	for {
 		element_hash := hs[pos]
 		if map_hash_is_empty(element_hash) {
 			return nil
-		} else if distance > map_probe_distance(m, element_hash, pos) {
+		} else if distance > map_probe_distance(m^, element_hash, pos) {
 			return nil
 		} else if element_hash == h && info.key_equal(key, rawptr(map_cell_index_dynamic(ks, info.ks, pos))) {
 			return rawptr(map_cell_index_dynamic(vs, info.vs, pos))
@@ -682,7 +681,7 @@ __dynamic_map_get_with_hash :: proc "contextless" (m: Raw_Map, #no_alias info: ^
 	}
 }
 
-__dynamic_map_get :: proc "contextless" (m: Raw_Map, #no_alias info: ^Map_Info, key: rawptr) -> (ptr: rawptr) {
+__dynamic_map_get :: proc "contextless" (#no_alias m: ^Raw_Map, #no_alias info: ^Map_Info, key: rawptr) -> (ptr: rawptr) {
 	if m.len == 0 {
 		return nil
 	}
@@ -693,7 +692,7 @@ __dynamic_map_get :: proc "contextless" (m: Raw_Map, #no_alias info: ^Map_Info, 
 __dynamic_map_set :: proc "odin" (#no_alias m: ^Raw_Map, #no_alias info: ^Map_Info, key, value: rawptr, loc := #caller_location) -> rawptr {
 	hash := info.key_hasher(key, 0)
 
-	if found := __dynamic_map_get_with_hash(m^, info, hash, key); found != nil {
+	if found := __dynamic_map_get_with_hash(m, info, hash, key); found != nil {
 		intrinsics.mem_copy_non_overlapping(found, value, info.vs.size_of_type)
 		return found
 	}
