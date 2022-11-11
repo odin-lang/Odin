@@ -552,9 +552,6 @@ lbValue lb_map_get_proc_for_type(lbModule *m, Type *type) {
 	vs = lb_emit_conv(p, vs, alloc_type_pointer(type->Map.value));
 	hs = lb_emit_conv(p, hs, alloc_type_pointer(t_uintptr));
 
-	// lbValue res =
-	// LLVMBuildRet(p->builder, res.value);
-
 	lb_emit_jump(p, loop_block);
 	lb_start_block(p, loop_block);
 
