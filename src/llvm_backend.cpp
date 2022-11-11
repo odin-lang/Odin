@@ -498,16 +498,18 @@ lbValue lb_map_get_proc_for_type(lbModule *m, Type *type) {
 
 	LLVMValueRef x = LLVMGetParam(p->value, 0);
 	LLVMValueRef y = LLVMGetParam(p->value, 1);
+	LLVMValueRef z = LLVMGetParam(p->value, 2);
 	lbValue map_ptr = {x, t_rawptr};
-	lbValue key_ptr = {y, t_rawptr};
+	lbValue h       = {y, t_uintptr};
+	lbValue key_ptr = {z, t_rawptr};
 
 	lb_add_proc_attribute_at_index(p, 1+0, "nonnull");
 	lb_add_proc_attribute_at_index(p, 1+0, "noalias");
 	lb_add_proc_attribute_at_index(p, 1+0, "readonly");
 
-	lb_add_proc_attribute_at_index(p, 1+1, "nonnull");
-	lb_add_proc_attribute_at_index(p, 1+1, "noalias");
-	lb_add_proc_attribute_at_index(p, 1+1, "readonly");
+	lb_add_proc_attribute_at_index(p, 1+2, "nonnull");
+	lb_add_proc_attribute_at_index(p, 1+2, "noalias");
+	lb_add_proc_attribute_at_index(p, 1+2, "readonly");
 
 	lbBlock *loop_block = lb_create_block(p, "loop");
 	lbBlock *hash_block = lb_create_block(p, "hash");
@@ -529,7 +531,6 @@ lbValue lb_map_get_proc_for_type(lbModule *m, Type *type) {
 	key_ptr = lb_emit_conv(p, key_ptr, alloc_type_pointer(type->Map.key));
 	lbValue key = lb_emit_load(p, key_ptr);
 
-	lbValue h = lb_gen_map_key_hash(p, key, type->Map.key, nullptr);
 	lbAddr pos = lb_add_local_generated(p, t_uintptr, false);
 	lbAddr distance = lb_add_local_generated(p, t_uintptr, true);
 	lbValue capacity = lb_map_cap(p, map);
@@ -785,23 +786,24 @@ lbValue lb_internal_dynamic_map_get_ptr(lbProcedure *p, lbValue const &map_ptr, 
 	GB_ASSERT(map_type->kind == Type_Map);
 
 	lbValue ptr = {};
-
-	lbValue key_ptr = lb_address_from_load_or_generate_local(p, key);
-	key_ptr = lb_emit_conv(p, key_ptr, t_rawptr);
+	lbValue key_ptr = {};
+	lbValue hash = lb_gen_map_key_hash(p, key, map_type->Map.key, &key_ptr);
 
 	if (build_context.use_static_map_calls) {
 		lbValue map_get_proc = lb_map_get_proc_for_type(p->module, map_type);
 
-		auto args = array_make<lbValue>(permanent_allocator(), 2);
+		auto args = array_make<lbValue>(permanent_allocator(), 3);
 		args[0] = lb_emit_conv(p, map_ptr, t_rawptr);
-		args[1] = key_ptr;
+		args[1] = hash;
+		args[2] = key_ptr;
 
 		ptr = lb_emit_call(p, map_get_proc, args);
 	} else {
-		auto args = array_make<lbValue>(permanent_allocator(), 3);
+		auto args = array_make<lbValue>(permanent_allocator(), 4);
 		args[0] = lb_emit_transmute(p, map_ptr, t_raw_map_ptr);
 		args[1] = lb_gen_map_info_ptr(p->module, map_type);
-		args[2] = key_ptr;
+		args[2] = hash;
+		args[3] = key_ptr;
 
 		ptr = lb_emit_runtime_call(p, "__dynamic_map_get", args);
 	}

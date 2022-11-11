@@ -665,7 +665,8 @@ map_get :: proc "contextless" (m: $T/map[$K]$V, key: K) -> (stored_key: K, store
 	}
 }
 
-__dynamic_map_get_with_hash :: proc "contextless" (#no_alias m: ^Raw_Map, #no_alias info: ^Map_Info, h: Map_Hash, key: rawptr) -> (ptr: rawptr) {
+// IMPORTANT: USED WITHIN THE COMPILER
+__dynamic_map_get :: proc "contextless" (#no_alias m: ^Raw_Map, #no_alias info: ^Map_Info, h: Map_Hash, key: rawptr) -> (ptr: rawptr) {
 	if m.len == 0 {
 		return nil
 	}
@@ -687,28 +688,24 @@ __dynamic_map_get_with_hash :: proc "contextless" (#no_alias m: ^Raw_Map, #no_al
 	}
 }
 
-// IMPORTANT: USED WITHIN THE COMPILER
-__dynamic_map_get :: proc "contextless" (#no_alias m: ^Raw_Map, #no_alias info: ^Map_Info, key: rawptr) -> (ptr: rawptr) {
-	if m.len == 0 {
-		return nil
+__dynamic_map_check_grow :: proc "odin" (#no_alias m: ^Raw_Map, #no_alias info: ^Map_Info, loc := #caller_location) -> Allocator_Error {
+	if m.len + 1 >= map_resize_threshold(m^) {
+		return map_grow_dynamic(m, info, loc)
 	}
-	h := info.key_hasher(key, 0)
-	return __dynamic_map_get_with_hash(m, info, h, key)
+	return nil
 }
 
 // IMPORTANT: USED WITHIN THE COMPILER
 __dynamic_map_set :: proc "odin" (#no_alias m: ^Raw_Map, #no_alias info: ^Map_Info, key, value: rawptr, loc := #caller_location) -> rawptr {
 	hash := info.key_hasher(key, 0)
 
-	if found := __dynamic_map_get_with_hash(m, info, hash, key); found != nil {
+	if found := __dynamic_map_get(m, info, hash, key); found != nil {
 		intrinsics.mem_copy_non_overlapping(found, value, info.vs.size_of_type)
 		return found
 	}
 
-	if m.len + 1 >= map_resize_threshold(m^) {
-		if err := map_grow_dynamic(m, info, loc); err != nil {
-			return nil
-		}
+	if __dynamic_map_check_grow(m, info, loc) != nil {
+		return nil
 	}
 
 	result := map_insert_hash_dynamic(m, info, hash, uintptr(key), uintptr(value))
