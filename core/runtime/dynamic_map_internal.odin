@@ -688,12 +688,18 @@ __dynamic_map_get :: proc "contextless" (#no_alias m: ^Raw_Map, #no_alias info: 
 	}
 }
 
+// IMPORTANT: USED WITHIN THE COMPILER
 __dynamic_map_check_grow :: proc "odin" (#no_alias m: ^Raw_Map, #no_alias info: ^Map_Info, loc := #caller_location) -> Allocator_Error {
 	if m.len + 1 >= map_resize_threshold(m^) {
 		return map_grow_dynamic(m, info, loc)
 	}
 	return nil
 }
+
+__dynamic_map_set_without_hash :: proc "odin" (#no_alias m: ^Raw_Map, #no_alias info: ^Map_Info, key, value: rawptr, loc := #caller_location) -> rawptr {
+	return __dynamic_map_set(m, info, info.key_hasher(key, 0), key, value, loc)
+}
+
 
 // IMPORTANT: USED WITHIN THE COMPILER
 __dynamic_map_set :: proc "odin" (#no_alias m: ^Raw_Map, #no_alias info: ^Map_Info, hash: Map_Hash, key, value: rawptr, loc := #caller_location) -> rawptr {

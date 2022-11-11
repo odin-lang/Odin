@@ -427,7 +427,7 @@ unmarshal_object :: proc(p: ^Parser, v: any, end_token: Token_Kind) -> (err: Unm
 				key_ptr = &key_cstr
 			}
 			
-			set_ptr := runtime.__dynamic_map_set(raw_map, t.map_info, key_ptr, map_backing_value.data)
+			set_ptr := runtime.__dynamic_map_set_without_hash(raw_map, t.map_info, key_ptr, map_backing_value.data)
 			if set_ptr == nil {
 				delete(key, p.allocator)
 			} 
