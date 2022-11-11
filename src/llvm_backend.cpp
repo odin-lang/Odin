@@ -166,6 +166,9 @@ lbValue lb_equal_proc_for_type(lbModule *m, Type *type) {
 	map_set(&m->equal_procs, type, p);
 	lb_begin_procedure_body(p);
 
+	lb_add_attribute_to_proc(m, p->value, "readonly");
+	lb_add_attribute_to_proc(m, p->value, "nounwind");
+
 	LLVMValueRef x = LLVMGetParam(p->value, 0);
 	LLVMValueRef y = LLVMGetParam(p->value, 1);
 	x = LLVMBuildPointerCast(p->builder, x, ptr_type, "");
@@ -173,6 +176,8 @@ lbValue lb_equal_proc_for_type(lbModule *m, Type *type) {
 	lbValue lhs = {x, pt};
 	lbValue rhs = {y, pt};
 
+	lb_add_proc_attribute_at_index(p, 1+0, "nonnull");
+	lb_add_proc_attribute_at_index(p, 1+1, "nonnull");
 
 	lbBlock *block_same_ptr = lb_create_block(p, "same_ptr");
 	lbBlock *block_diff_ptr = lb_create_block(p, "diff_ptr");
@@ -296,6 +301,10 @@ lbValue lb_simple_compare_hash(lbProcedure *p, Type *type, lbValue data, lbValue
 	return lb_emit_runtime_call(p, "default_hasher_n", args);
 }
 
+void lb_add_callsite_force_inline(lbProcedure *p, lbValue ret_value) {
+	LLVMAddCallSiteAttribute(ret_value.value, LLVMAttributeIndex_FunctionIndex, lb_create_enum_attribute(p->module->ctx, "alwaysinline"));
+}
+
 lbValue lb_hasher_proc_for_type(lbModule *m, Type *type) {
 	type = core_type(type);
 	GB_ASSERT_MSG(is_type_valid_for_keys(type), "%s", type_to_string(type));
@@ -320,16 +329,20 @@ lbValue lb_hasher_proc_for_type(lbModule *m, Type *type) {
 	lb_begin_procedure_body(p);
 	defer (lb_end_procedure_body(p));
 
+	lb_add_attribute_to_proc(m, p->value, "readonly");
+	lb_add_attribute_to_proc(m, p->value, "nounwind");
+
 	LLVMValueRef x = LLVMGetParam(p->value, 0);
 	LLVMValueRef y = LLVMGetParam(p->value, 1);
 	lbValue data = {x, t_rawptr};
 	lbValue seed = {y, t_uintptr};
 
-	LLVMAttributeRef nonnull_attr = lb_create_enum_attribute(m->ctx, "nonnull");
-	LLVMAddAttributeAtIndex(p->value, 1+0, nonnull_attr);
+	lb_add_proc_attribute_at_index(p, 1+0, "nonnull");
+	lb_add_proc_attribute_at_index(p, 1+0, "readonly");
 
 	if (is_type_simple_compare(type)) {
 		lbValue res = lb_simple_compare_hash(p, type, data, seed);
+		lb_add_callsite_force_inline(p, res);
 		LLVMBuildRet(p->builder, res.value);
 		return {p->value, p->type};
 	}
@@ -361,6 +374,7 @@ lbValue lb_hasher_proc_for_type(lbModule *m, Type *type) {
 			args[0] = data;
 			args[1] = seed;
 			lbValue res = lb_emit_call(p, variant_hasher, args);
+			lb_add_callsite_force_inline(p, res);
 			LLVMBuildRet(p->builder, res.value);
 		}
 
@@ -439,12 +453,14 @@ lbValue lb_hasher_proc_for_type(lbModule *m, Type *type) {
 		args[0] = data;
 		args[1] = seed;
 		lbValue res = lb_emit_runtime_call(p, "default_hasher_cstring", args);
+		lb_add_callsite_force_inline(p, res);
 		LLVMBuildRet(p->builder, res.value);
 	} else if (is_type_string(type)) {
 		auto args = array_make<lbValue>(permanent_allocator(), 2);
 		args[0] = data;
 		args[1] = seed;
 		lbValue res = lb_emit_runtime_call(p, "default_hasher_string", args);
+		lb_add_callsite_force_inline(p, res);
 		LLVMBuildRet(p->builder, res.value);
 	} else {
 		GB_PANIC("Unhandled type for hasher: %s", type_to_string(type));
@@ -477,17 +493,21 @@ lbValue lb_map_get_proc_for_type(lbModule *m, Type *type) {
 	lb_begin_procedure_body(p);
 	defer (lb_end_procedure_body(p));
 
+	lb_add_attribute_to_proc(m, p->value, "readonly");
+	lb_add_attribute_to_proc(m, p->value, "nounwind");
+
 	LLVMValueRef x = LLVMGetParam(p->value, 0);
 	LLVMValueRef y = LLVMGetParam(p->value, 1);
 	lbValue map_ptr = {x, t_rawptr};
 	lbValue key_ptr = {y, t_rawptr};
 
-	LLVMAttributeRef nonnull_attr = lb_create_enum_attribute(m->ctx, "nonnull");
-	LLVMAttributeRef noalias_attr = lb_create_enum_attribute(m->ctx, "noalias");
-	LLVMAddAttributeAtIndex(p->value, 1+0, nonnull_attr);
-	LLVMAddAttributeAtIndex(p->value, 1+0, noalias_attr);
-	LLVMAddAttributeAtIndex(p->value, 1+1, nonnull_attr);
-	LLVMAddAttributeAtIndex(p->value, 1+1, noalias_attr);
+	lb_add_proc_attribute_at_index(p, 1+0, "nonnull");
+	lb_add_proc_attribute_at_index(p, 1+0, "noalias");
+	lb_add_proc_attribute_at_index(p, 1+0, "readonly");
+
+	lb_add_proc_attribute_at_index(p, 1+1, "nonnull");
+	lb_add_proc_attribute_at_index(p, 1+1, "noalias");
+	lb_add_proc_attribute_at_index(p, 1+1, "readonly");
 
 	lbBlock *loop_block = lb_create_block(p, "loop");
 	lbBlock *hash_block = lb_create_block(p, "hash");
@@ -848,6 +868,8 @@ lbProcedure *lb_create_startup_type_info(lbModule *m) {
 	p->is_startup = true;
 	LLVMSetLinkage(p->value, LLVMInternalLinkage);
 
+	lb_add_attribute_to_proc(m, p->value, "nounwind");
+
 	lb_begin_procedure_body(p);
 
 	lb_setup_type_info_data(p);
@@ -872,6 +894,7 @@ lbProcedure *lb_create_objc_names(lbModule *main_module) {
 	}
 	Type *proc_type = alloc_type_proc(nullptr, nullptr, 0, nullptr, 0, false, ProcCC_CDecl);
 	lbProcedure *p = lb_create_dummy_procedure(main_module, str_lit("__$init_objc_names"), proc_type);
+	lb_add_attribute_to_proc(p->module, p->value, "nounwind");
 	p->is_startup = true;
 	return p;
 }
