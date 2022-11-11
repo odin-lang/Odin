@@ -300,8 +300,11 @@ shrink_map :: proc(m: ^$T/map[$K]$V, loc := #caller_location) -> (did_shrink: bo
 delete_key :: proc(m: ^$T/map[$K]$V, key: K) -> (deleted_key: K, deleted_value: V) {
 	if m != nil {
 		key := key
-		_ =  map_erase_dynamic((^Raw_Map)(m), map_info(T), uintptr(&key))
-		// TODO(bill) old key and value
+		old_k, old_v, ok :=  map_erase_dynamic((^Raw_Map)(m), map_info(T), uintptr(&key))
+		if ok {
+			deleted_key   = (^K)(old_k)^
+			deleted_value = (^V)(old_v)^
+		}
 	}
 	return
 }

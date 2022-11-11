@@ -594,14 +594,18 @@ map_exists_dynamic :: proc "contextless" (m: Raw_Map, #no_alias info: ^Map_Info,
 
 
 
-map_erase_dynamic :: #force_inline proc "contextless" (#no_alias m: ^Raw_Map, #no_alias info: ^Map_Info, k: uintptr) -> bool {
+@(require_results)
+map_erase_dynamic :: #force_inline proc "contextless" (#no_alias m: ^Raw_Map, #no_alias info: ^Map_Info, k: uintptr) -> (old_k, old_v: uintptr, ok: bool) {
 	MASK :: 1 << (size_of(Map_Hash)*8 - 1)
 
 	index := map_lookup_dynamic(m^, info, k) or_return
-	_, _, hs, _, _ := map_kvh_data_dynamic(m^, info)
+	ks, vs, hs, _, _ := map_kvh_data_dynamic(m^, info)
 	hs[index] |= MASK
+	old_k = map_cell_index_dynamic(ks, info.ks, index)
+	old_v = map_cell_index_dynamic(vs, info.vs, index)
 	m.len -= 1
-	return true
+	ok = true
+	return
 }
 
 map_clear_dynamic :: #force_inline proc "contextless" (#no_alias m: ^Raw_Map, #no_alias info: ^Map_Info) {
@@ -681,6 +685,7 @@ __dynamic_map_get_with_hash :: proc "contextless" (#no_alias m: ^Raw_Map, #no_al
 	}
 }
 
+// IMPORTANT: USED WITHIN THE COMPILER
 __dynamic_map_get :: proc "contextless" (#no_alias m: ^Raw_Map, #no_alias info: ^Map_Info, key: rawptr) -> (ptr: rawptr) {
 	if m.len == 0 {
 		return nil
@@ -689,6 +694,7 @@ __dynamic_map_get :: proc "contextless" (#no_alias m: ^Raw_Map, #no_alias info: 
 	return __dynamic_map_get_with_hash(m, info, h, key)
 }
 
+// IMPORTANT: USED WITHIN THE COMPILER
 __dynamic_map_set :: proc "odin" (#no_alias m: ^Raw_Map, #no_alias info: ^Map_Info, key, value: rawptr, loc := #caller_location) -> rawptr {
 	hash := info.key_hasher(key, 0)
 
@@ -709,6 +715,7 @@ __dynamic_map_set :: proc "odin" (#no_alias m: ^Raw_Map, #no_alias info: ^Map_In
 	return rawptr(result)
 }
 
+// IMPORTANT: USED WITHIN THE COMPILER
 @(private)
 __dynamic_map_reserve :: proc "odin" (#no_alias m: ^Raw_Map, #no_alias info: ^Map_Info, new_capacity: uint, loc := #caller_location) {
 	map_reserve_dynamic(m, info, uintptr(new_capacity), loc)
