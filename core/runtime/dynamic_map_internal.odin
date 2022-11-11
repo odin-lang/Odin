@@ -442,7 +442,6 @@ map_reserve_dynamic :: proc "odin" (#no_alias m: ^Raw_Map, #no_alias info: ^Map_
 	}
 
 	new_capacity := new_capacity
-	new_capacity = max(new_capacity, uintptr(1)<<MAP_MIN_LOG2_CAPACITY)
 
 	log2_capacity := map_log2_cap(m^)
 	capacity := uintptr(1) << log2_capacity
@@ -450,6 +449,9 @@ map_reserve_dynamic :: proc "odin" (#no_alias m: ^Raw_Map, #no_alias info: ^Map_
 	if capacity >= new_capacity {
 		return nil
 	}
+
+	new_capacity = max(new_capacity, uintptr(1)<<MAP_MIN_LOG2_CAPACITY)
+
 	// ceiling nearest power of two
 	log2_new_capacity := size_of(uintptr) - intrinsics.count_leading_zeros(new_capacity-1)
 
