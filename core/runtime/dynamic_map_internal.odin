@@ -696,9 +696,7 @@ __dynamic_map_check_grow :: proc "odin" (#no_alias m: ^Raw_Map, #no_alias info: 
 }
 
 // IMPORTANT: USED WITHIN THE COMPILER
-__dynamic_map_set :: proc "odin" (#no_alias m: ^Raw_Map, #no_alias info: ^Map_Info, key, value: rawptr, loc := #caller_location) -> rawptr {
-	hash := info.key_hasher(key, 0)
-
+__dynamic_map_set :: proc "odin" (#no_alias m: ^Raw_Map, #no_alias info: ^Map_Info, hash: Map_Hash, key, value: rawptr, loc := #caller_location) -> rawptr {
 	if found := __dynamic_map_get(m, info, hash, key); found != nil {
 		intrinsics.mem_copy_non_overlapping(found, value, info.vs.size_of_type)
 		return found

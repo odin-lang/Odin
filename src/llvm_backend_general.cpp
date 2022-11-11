@@ -68,6 +68,7 @@ void lb_init_module(lbModule *m, Checker *c) {
 	map_init(&m->equal_procs, a);
 	map_init(&m->hasher_procs, a);
 	map_init(&m->map_get_procs, a);
+	map_init(&m->map_set_procs, a);
 	array_init(&m->procedures_to_generate, a, 0, 1024);
 	array_init(&m->missing_procedures_to_check, a, 0, 16);
 	map_init(&m->debug_values, a);
@@ -727,7 +728,7 @@ void lb_addr_store(lbProcedure *p, lbAddr addr, lbValue value) {
 
 		return;
 	} else if (addr.kind == lbAddr_Map) {
-		lb_insert_dynamic_map_key_and_value(p, addr.addr, addr.map.type, addr.map.key, value, p->curr_stmt);
+		lb_internal_dynamic_map_set(p, addr.addr, addr.map.type, addr.map.key, value, p->curr_stmt);
 		return;
 	} else if (addr.kind == lbAddr_Context) {
 		lbAddr old_addr = lb_find_or_generate_context_ptr(p);

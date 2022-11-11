@@ -145,6 +145,7 @@ struct lbModule {
 	PtrMap<Type *, lbProcedure *> equal_procs;
 	PtrMap<Type *, lbProcedure *> hasher_procs;
 	PtrMap<Type *, lbProcedure *> map_get_procs;
+	PtrMap<Type *, lbProcedure *> map_set_procs;
 
 	u32 nested_type_name_guid;
 
@@ -451,7 +452,7 @@ lbValue lb_gen_map_cell_info_ptr(lbModule *m, Type *type);
 lbValue lb_gen_map_info_ptr(lbModule *m, Type *map_type);
 
 lbValue lb_internal_dynamic_map_get_ptr(lbProcedure *p, lbValue const &map_ptr, lbValue const &key);
-void    lb_insert_dynamic_map_key_and_value(lbProcedure *p, lbValue const &map_ptr, Type *map_type, lbValue const &map_key, lbValue const &map_value, Ast *node);
+void    lb_internal_dynamic_map_set(lbProcedure *p, lbValue const &map_ptr, Type *map_type, lbValue const &map_key, lbValue const &map_value, Ast *node);
 void    lb_dynamic_map_reserve(lbProcedure *p, lbValue const &map_ptr, isize const capacity, TokenPos const &pos);
 
 lbValue lb_find_procedure_value_from_entity(lbModule *m, Entity *e);
