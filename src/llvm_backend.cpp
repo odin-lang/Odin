@@ -496,6 +496,9 @@ lbValue lb_map_get_proc_for_type(lbModule *m, Type *type) {
 	LLVMSetLinkage(p->value, LLVMInternalLinkage);
 	lb_add_attribute_to_proc(m, p->value, "readonly");
 	lb_add_attribute_to_proc(m, p->value, "nounwind");
+	if (build_context.ODIN_DEBUG) {
+		lb_add_attribute_to_proc(m, p->value, "noinline");
+	}
 
 	LLVMValueRef x = LLVMGetParam(p->value, 0);
 	LLVMValueRef y = LLVMGetParam(p->value, 1);
@@ -645,6 +648,9 @@ lbValue lb_map_set_proc_for_type(lbModule *m, Type *type) {
 
 	LLVMSetLinkage(p->value, LLVMInternalLinkage);
 	lb_add_attribute_to_proc(m, p->value, "nounwind");
+	if (build_context.ODIN_DEBUG) {
+		lb_add_attribute_to_proc(m, p->value, "noinline");
+	}
 
 	lbValue map_ptr      = {LLVMGetParam(p->value, 0), t_rawptr};
 	lbValue hash         = {LLVMGetParam(p->value, 1), t_uintptr};
