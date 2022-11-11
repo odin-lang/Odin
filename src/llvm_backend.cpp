@@ -493,6 +493,7 @@ lbValue lb_map_get_proc_for_type(lbModule *m, Type *type) {
 	lb_begin_procedure_body(p);
 	defer (lb_end_procedure_body(p));
 
+	LLVMSetLinkage(p->value, LLVMInternalLinkage);
 	lb_add_attribute_to_proc(m, p->value, "readonly");
 	lb_add_attribute_to_proc(m, p->value, "nounwind");
 
@@ -642,8 +643,8 @@ lbValue lb_map_set_proc_for_type(lbModule *m, Type *type) {
 	lb_begin_procedure_body(p);
 	defer (lb_end_procedure_body(p));
 
+	LLVMSetLinkage(p->value, LLVMInternalLinkage);
 	lb_add_attribute_to_proc(m, p->value, "nounwind");
-	lb_add_attribute_to_proc(m, p->value, "noinline");
 
 	lbValue map_ptr      = {LLVMGetParam(p->value, 0), t_rawptr};
 	lbValue hash         = {LLVMGetParam(p->value, 1), t_uintptr};
