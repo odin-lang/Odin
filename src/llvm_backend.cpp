@@ -815,17 +815,19 @@ void lb_insert_dynamic_map_key_and_value(lbProcedure *p, lbValue const &map_ptr,
 	map_type = base_type(map_type);
 	GB_ASSERT(map_type->kind == Type_Map);
 
-	lbValue key_ptr = lb_address_from_load_or_generate_local(p, map_key);
+	lbValue key_ptr = {};
+	lbValue hash = lb_gen_map_key_hash(p, map_key, map_type->Map.key, &key_ptr);
 
 	lbValue v = lb_emit_conv(p, map_value, map_type->Map.value);
 	lbValue value_ptr = lb_address_from_load_or_generate_local(p, v);
 
-	auto args = array_make<lbValue>(permanent_allocator(), 5);
+	auto args = array_make<lbValue>(permanent_allocator(), 6);
 	args[0] = lb_emit_conv(p, map_ptr, t_raw_map_ptr);
 	args[1] = lb_gen_map_info_ptr(p->module, map_type);
-	args[2] = lb_emit_conv(p, key_ptr, t_rawptr);
-	args[3] = lb_emit_conv(p, value_ptr, t_rawptr);
-	args[4] = lb_emit_source_code_location_as_global(p, node);
+	args[2] = hash;
+	args[3] = lb_emit_conv(p, key_ptr, t_rawptr);
+	args[4] = lb_emit_conv(p, value_ptr, t_rawptr);
+	args[5] = lb_emit_source_code_location_as_global(p, node);
 	lb_emit_runtime_call(p, "__dynamic_map_set", args);
 }
 
