@@ -1438,6 +1438,13 @@ lbValue lb_map_len(lbProcedure *p, lbValue value) {
 	lbValue len = lb_emit_struct_ev(p, value, 1);
 	return lb_emit_conv(p, len, t_int);
 }
+lbValue lb_map_len_ptr(lbProcedure *p, lbValue map_ptr) {
+	Type *type = map_ptr.type;
+	GB_ASSERT(is_type_pointer(type));
+	type = type_deref(type);
+	GB_ASSERT_MSG(is_type_map(type) || are_types_identical(type, t_raw_map), "%s", type_to_string(type));
+	return lb_emit_struct_ep(p, map_ptr, 1);
+}
 
 lbValue lb_map_cap(lbProcedure *p, lbValue value) {
 	GB_ASSERT_MSG(is_type_map(value.type) || are_types_identical(value.type, t_raw_map), "%s", type_to_string(value.type));

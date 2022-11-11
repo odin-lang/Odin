@@ -922,14 +922,13 @@ void init_universal(void) {
 
 	{
 		Type *equal_args[2] = {t_rawptr, t_rawptr};
-		t_equal_proc = alloc_type_proc_from_types(equal_args, 2, t_bool, false, ProcCC_Contextless);
+		t_equal_proc = alloc_type_proc_from_types(equal_args, gb_count_of(equal_args), t_bool, false, ProcCC_Contextless);
 
 		Type *hasher_args[2] = {t_rawptr, t_uintptr};
-		t_hasher_proc = alloc_type_proc_from_types(hasher_args, 2, t_uintptr, false, ProcCC_Contextless);
+		t_hasher_proc = alloc_type_proc_from_types(hasher_args, gb_count_of(hasher_args), t_uintptr, false, ProcCC_Contextless);
 
 		Type *map_get_args[3] = {/*map*/t_rawptr, /*hash*/t_uintptr, /*key*/t_rawptr};
-		t_map_get_proc = alloc_type_proc_from_types(map_get_args, 3, t_rawptr, false, ProcCC_Contextless);
-
+		t_map_get_proc = alloc_type_proc_from_types(map_get_args, gb_count_of(map_get_args), t_rawptr, false, ProcCC_Contextless);
 	}
 
 // Constants
@@ -2844,7 +2843,7 @@ void init_core_source_code_location(Checker *c) {
 		return;
 	}
 	t_source_code_location = find_core_type(c, str_lit("Source_Code_Location"));
-	t_source_code_location_ptr = alloc_type_pointer(t_allocator);
+	t_source_code_location_ptr = alloc_type_pointer(t_source_code_location);
 }
 
 void init_core_map_type(Checker *c) {

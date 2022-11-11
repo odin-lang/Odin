@@ -4139,7 +4139,7 @@ lbAddr lb_build_addr_compound_lit(lbProcedure *p, Ast *expr) {
 
 			lbValue key   = lb_build_expr(p, fv->field);
 			lbValue value = lb_build_expr(p, fv->value);
-			lb_insert_dynamic_map_key_and_value(p, v.addr, type, key, value, elem);
+			lb_internal_dynamic_map_set(p, v.addr, type, key, value, elem);
 		}
 		break;
 	}
