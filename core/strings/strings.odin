@@ -138,7 +138,7 @@ contains_rune :: proc(s: string, r: rune) -> int {
 	strings.contains("testing", "text") -> false
 */
 contains :: proc(s, substr: string) -> bool {
-	return index(s, substr) >= 0
+	return get_index_string(s, substr) >= 0
 }
 
 /*
@@ -456,7 +456,7 @@ _split :: proc(s_, sep: string, sep_save, n_: int, allocator := context.allocato
 
 	i := 0
 	for ; i < n; i += 1 {
-		m := index(s, sep)
+		m := get_index_string(s, sep)
 		if m < 0 {
 			break
 		}
@@ -533,7 +533,7 @@ _split_iterator :: proc(s: ^string, sep: string, sep_save: int) -> (res: string,
 		return
 	}
 
-	m := index(s^, sep)
+	m := get_index_string(s^, sep)
 	if m < 0 {
 		// not found
 		res = s[:]
@@ -776,7 +776,7 @@ index_rune :: proc(s: string, r: rune) -> int {
 	}
 
 	b, w := utf8.encode_rune(r)
-	return index(s, string(b[:w]))
+	return get_index_string(s, string(b[:w]))
 }
 
 @private PRIME_RABIN_KARP :: 16777619
@@ -784,12 +784,12 @@ index_rune :: proc(s: string, r: rune) -> int {
 /*
 	returns the byte offset of the string `substr` in the string `s`, -1 when not found
 	
-	strings.index("test", "t") -> 0
-	strings.index("test", "te") -> 0
-	strings.index("test", "st") -> 2
-	strings.index("test", "tt") -> -1
+	strings.get_index_string("test", "t") -> 0
+	strings.get_index_string("test", "te") -> 0
+	strings.get_index_string("test", "st") -> 2
+	strings.get_index_string("test", "tt") -> -1
 */
-index :: proc(s, substr: string) -> int {
+get_index_string :: proc(s, substr: string) -> int {
 	hash_str_rabin_karp :: proc(s: string) -> (hash: u32 = 0, pow: u32 = 1) {
 		for i := 0; i < len(s); i += 1 {
 			hash = hash*PRIME_RABIN_KARP + u32(s[i])
@@ -842,10 +842,10 @@ index :: proc(s, substr: string) -> int {
 /*
 	returns the last byte offset of the string `substr` in the string `s`, -1 when not found
 	
-	strings.index("test", "t") -> 3
-	strings.index("test", "te") -> 0
-	strings.index("test", "st") -> 2
-	strings.index("test", "tt") -> -1
+	strings.get_index_string("test", "t") -> 3
+	strings.get_index_string("test", "te") -> 0
+	strings.get_index_string("test", "st") -> 2
+	strings.get_index_string("test", "tt") -> -1
 */
 last_index :: proc(s, substr: string) -> int {
 	hash_str_rabin_karp_reverse :: proc(s: string) -> (hash: u32 = 0, pow: u32 = 1) {
@@ -1030,7 +1030,7 @@ count :: proc(s, substr: string) -> int {
 	n := 0
 	str := s
 	for {
-		i := index(str, substr)
+		i := get_index_string(str, substr)
 		if i == -1 {
 			return n
 		}
@@ -1113,7 +1113,7 @@ replace :: proc(s, old, new: string, n: int, allocator := context.allocator) -> 
 				j += width
 			}
 		} else {
-			j += index(s[start:], old)
+			j += get_index_string(s[start:], old)
 		}
 		w += copy(t[w:], s[start:j])
 		w += copy(t[w:], new)
@@ -1665,7 +1665,7 @@ expand_tabs :: proc(s: string, tab_size: int, allocator := context.allocator) ->
 	strings.partition(text, "xyz") -> head: "testing this out", match: "", tail: ""
 */
 partition :: proc(str, sep: string) -> (head, match, tail: string) {
-	i := index(str, sep)
+	i := get_index_string(str, sep)
 	if i == -1 {
 		head = str
 		return
