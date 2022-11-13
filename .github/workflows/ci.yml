@@ -38,6 +38,11 @@ jobs:
           cd tests/vendor
           make
         timeout-minutes: 10
+      - name: Odin internals tests
+        run: |
+          cd tests/internal
+          make
+        timeout-minutes: 10
       - name: Odin check examples/all for Linux i386
         run: ./odin check examples/all -vet -strict-style -target:linux_i386
         timeout-minutes: 10
@@ -85,6 +90,11 @@ jobs:
       - name: Vendor library tests
         run: |
           cd tests/vendor
+          make
+        timeout-minutes: 10
+      - name: Odin internals tests
+        run: |
+          cd tests/internals
           make
         timeout-minutes: 10
       - name: Odin check examples/all for Darwin arm64
