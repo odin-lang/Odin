@@ -437,36 +437,42 @@ map_grow_dynamic :: proc "odin" (#no_alias m: ^Raw_Map, #no_alias info: ^Map_Inf
 
 
 map_reserve_dynamic :: proc "odin" (#no_alias m: ^Raw_Map, #no_alias info: ^Map_Info, new_capacity: uintptr, loc := #caller_location) -> Allocator_Error {
+	ceil_log2 :: #force_inline proc "contextless" (x: uintptr) -> uintptr {
+		z := intrinsics.count_leading_zeros(x)
+		if z > 0 && x & (x-1) != 0 {
+			z -= 1
+		}
+		return size_of(uintptr)*8 - 1 - z
+	}
+
 	if m.allocator.procedure == nil {
 		m.allocator = context.allocator
 	}
 
 	new_capacity := new_capacity
+	old_capacity := uintptr(map_cap(m^))
 
-	log2_capacity := map_log2_cap(m^)
-	capacity := uintptr(1) << log2_capacity
-
-	if capacity >= new_capacity {
+	if old_capacity >= new_capacity {
 		return nil
 	}
-
-	new_capacity = max(new_capacity, uintptr(1)<<MAP_MIN_LOG2_CAPACITY)
 
 	// ceiling nearest power of two
-	log2_new_capacity := size_of(uintptr) - intrinsics.count_leading_zeros(new_capacity-1)
+	log2_new_capacity := ceil_log2(new_capacity)
+
+	log2_min_cap := max(MAP_MIN_LOG2_CAPACITY, log2_new_capacity)
 
 	if m.data == 0 {
-		m^ = map_alloc_dynamic(info, MAP_MIN_LOG2_CAPACITY, m.allocator, loc) or_return
+		m^ = map_alloc_dynamic(info, log2_min_cap, m.allocator, loc) or_return
 		return nil
 	}
 
-	resized := map_alloc_dynamic(info, log2_new_capacity, m.allocator, loc) or_return
+	resized := map_alloc_dynamic(info, log2_min_cap, m.allocator, loc) or_return
 
 	ks, vs, hs, _, _ := map_kvh_data_dynamic(m^, info)
 
 	// Cache these loads to avoid hitting them in the for loop.
 	n := m.len
-	for i in 0..<capacity {
+	for i in 0..<old_capacity {
 		hash := hs[i]
 		if map_hash_is_empty(hash) {
 			continue
@@ -690,7 +696,7 @@ __dynamic_map_get :: proc "contextless" (#no_alias m: ^Raw_Map, #no_alias info: 
 
 // IMPORTANT: USED WITHIN THE COMPILER
 __dynamic_map_check_grow :: proc "odin" (#no_alias m: ^Raw_Map, #no_alias info: ^Map_Info, loc := #caller_location) -> Allocator_Error {
-	if m.len + 1 >= map_resize_threshold(m^) {
+	if m.len  >= map_resize_threshold(m^) {
 		return map_grow_dynamic(m, info, loc)
 	}
 	return nil
