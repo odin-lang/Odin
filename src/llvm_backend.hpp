@@ -453,7 +453,7 @@ lbValue lb_gen_map_info_ptr(lbModule *m, Type *map_type);
 
 lbValue lb_internal_dynamic_map_get_ptr(lbProcedure *p, lbValue const &map_ptr, lbValue const &key);
 void    lb_internal_dynamic_map_set(lbProcedure *p, lbValue const &map_ptr, Type *map_type, lbValue const &map_key, lbValue const &map_value, Ast *node);
-void    lb_dynamic_map_reserve(lbProcedure *p, lbValue const &map_ptr, isize const capacity, TokenPos const &pos);
+lbValue lb_dynamic_map_reserve(lbProcedure *p, lbValue const &map_ptr, isize const capacity, TokenPos const &pos);
 
 lbValue lb_find_procedure_value_from_entity(lbModule *m, Entity *e);
 lbValue lb_find_value_from_entity(lbModule *m, Entity *e);
