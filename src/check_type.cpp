@@ -2221,35 +2221,27 @@ void add_map_key_type_dependencies(CheckerContext *ctx, Type *key) {
 		}
 
 		if (is_type_simple_compare(key)) {
-			i64 sz = type_size_of(key);
-			if (1 <= sz && sz <= 16) {
-				char buf[20] = {};
-				gb_snprintf(buf, 20, "default_hasher%d", cast(i32)sz);
-				add_package_dependency(ctx, "runtime", buf);
-				return;
-			} else {
-				add_package_dependency(ctx, "runtime", "default_hasher_n");
-				return;
-			}
+			add_package_dependency(ctx, "runtime", "default_hasher");
+			return;
 		}
 
 		if (key->kind == Type_Struct) {
-			add_package_dependency(ctx, "runtime", "default_hasher_n");
+			add_package_dependency(ctx, "runtime", "default_hasher");
 			for_array(i, key->Struct.fields) {
 				Entity *field = key->Struct.fields[i];
 				add_map_key_type_dependencies(ctx, field->type);
 			}
 		} else if (key->kind == Type_Union) {
-			add_package_dependency(ctx, "runtime", "default_hasher_n");
+			add_package_dependency(ctx, "runtime", "default_hasher");
 			for_array(i, key->Union.variants) {
 				Type *v = key->Union.variants[i];
 				add_map_key_type_dependencies(ctx, v);
 			}
 		} else if (key->kind == Type_EnumeratedArray) {
-			add_package_dependency(ctx, "runtime", "default_hasher_n");
+			add_package_dependency(ctx, "runtime", "default_hasher");
 			add_map_key_type_dependencies(ctx, key->EnumeratedArray.elem);
 		} else if (key->kind == Type_Array) {
-			add_package_dependency(ctx, "runtime", "default_hasher_n");
+			add_package_dependency(ctx, "runtime", "default_hasher");
 			add_map_key_type_dependencies(ctx, key->Array.elem);
 		}
 	}

@@ -282,23 +282,11 @@ lbValue lb_equal_proc_for_type(lbModule *m, Type *type) {
 lbValue lb_simple_compare_hash(lbProcedure *p, Type *type, lbValue data, lbValue seed) {
 	GB_ASSERT_MSG(is_type_simple_compare(type), "%s", type_to_string(type));
 
-	i64 sz = type_size_of(type);
-
-	if (1 <= sz && sz <= 16) {
-		char name[32] = {};
-		gb_snprintf(name, 32, "default_hasher%d", cast(i32)sz);
-
-		auto args = array_make<lbValue>(permanent_allocator(), 2);
-		args[0] = data;
-		args[1] = seed;
-		return lb_emit_runtime_call(p, name, args);
-	}
-
 	auto args = array_make<lbValue>(permanent_allocator(), 3);
 	args[0] = data;
 	args[1] = seed;
 	args[2] = lb_const_int(p->module, t_int, type_size_of(type));
-	return lb_emit_runtime_call(p, "default_hasher_n", args);
+	return lb_emit_runtime_call(p, "default_hasher", args);
 }
 
 void lb_add_callsite_force_inline(lbProcedure *p, lbValue ret_value) {

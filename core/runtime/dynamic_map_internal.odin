@@ -732,92 +732,42 @@ __dynamic_map_reserve :: proc "odin" (#no_alias m: ^Raw_Map, #no_alias info: ^Ma
 
 
 
+// NOTE: the default hashing algorithm derives from fnv64a, with some minor modifications to work for `map` type:
+//
+//     * Convert a `0` result to `1`
+//         * "empty entry"
+//     * Prevent the top bit from being set
+//         * "deleted entry"
+//
+// Both of these modification are necessary for the implementation of the `map`
 
 INITIAL_HASH_SEED :: 0xcbf29ce484222325
 
 HASH_MASK :: 1 << (8*size_of(uintptr) - 1) -1
 
-_fnv64a :: proc "contextless" (data: []byte, seed: u64 = INITIAL_HASH_SEED) -> u64 {
-	h: u64 = seed
-	for b in data {
-		h = (h ~ u64(b)) * 0x100000001b3
-	}
-	h &= HASH_MASK
-	return h | u64(h == 0)
-}
-
-default_hash :: #force_inline proc "contextless" (data: []byte) -> uintptr {
-	return uintptr(_fnv64a(data))
-}
-default_hash_string :: #force_inline proc "contextless" (s: string) -> uintptr {
-	return default_hash(transmute([]byte)(s))
-}
-default_hash_ptr :: #force_inline proc "contextless" (data: rawptr, size: int) -> uintptr {
-	s := Raw_Slice{data, size}
-	return default_hash(transmute([]byte)(s))
-}
-
-@(private)
-_default_hasher_const :: #force_inline proc "contextless" (data: rawptr, seed: uintptr, $N: uint) -> uintptr where N <= 16 {
-	h := u64(seed) + 0xcbf29ce484222325
-	p := uintptr(data)
-	#unroll for _ in 0..<N {
-		b := u64((^byte)(p)^)
-		h = (h ~ b) * 0x100000001b3
-		p += 1
-	}
-	h &= HASH_MASK
-	return uintptr(h) | uintptr(h == 0)
-}
-
-default_hasher_n :: #force_inline proc "contextless" (data: rawptr, seed: uintptr, N: int) -> uintptr {
-	h := u64(seed) + 0xcbf29ce484222325
-	p := uintptr(data)
+default_hasher :: #force_inline proc "contextless" (data: rawptr, seed: uintptr, N: int) -> uintptr {
+	h := u64(seed) + INITIAL_HASH_SEED
+	p := ([^]byte)(data)
 	for _ in 0..<N {
-		b := u64((^byte)(p)^)
-		h = (h ~ b) * 0x100000001b3
-		p += 1
+		h = (h ~ u64(p[0])) * 0x100000001b3
+		p = p[1:]
 	}
 	h &= HASH_MASK
-	return uintptr(h) | uintptr(h == 0)
+	return uintptr(h) | uintptr(uintptr(h) == 0)
 }
-
-// NOTE(bill): There are loads of predefined ones to improve optimizations for small types
-
-default_hasher1  :: proc "contextless" (data: rawptr, seed: uintptr) -> uintptr { return #force_inline _default_hasher_const(data, seed,  1) }
-default_hasher2  :: proc "contextless" (data: rawptr, seed: uintptr) -> uintptr { return #force_inline _default_hasher_const(data, seed,  2) }
-default_hasher3  :: proc "contextless" (data: rawptr, seed: uintptr) -> uintptr { return #force_inline _default_hasher_const(data, seed,  3) }
-default_hasher4  :: proc "contextless" (data: rawptr, seed: uintptr) -> uintptr { return #force_inline _default_hasher_const(data, seed,  4) }
-default_hasher5  :: proc "contextless" (data: rawptr, seed: uintptr) -> uintptr { return #force_inline _default_hasher_const(data, seed,  5) }
-default_hasher6  :: proc "contextless" (data: rawptr, seed: uintptr) -> uintptr { return #force_inline _default_hasher_const(data, seed,  6) }
-default_hasher7  :: proc "contextless" (data: rawptr, seed: uintptr) -> uintptr { return #force_inline _default_hasher_const(data, seed,  7) }
-default_hasher8  :: proc "contextless" (data: rawptr, seed: uintptr) -> uintptr { return #force_inline _default_hasher_const(data, seed,  8) }
-default_hasher9  :: proc "contextless" (data: rawptr, seed: uintptr) -> uintptr { return #force_inline _default_hasher_const(data, seed,  9) }
-default_hasher10 :: proc "contextless" (data: rawptr, seed: uintptr) -> uintptr { return #force_inline _default_hasher_const(data, seed, 10) }
-default_hasher11 :: proc "contextless" (data: rawptr, seed: uintptr) -> uintptr { return #force_inline _default_hasher_const(data, seed, 11) }
-default_hasher12 :: proc "contextless" (data: rawptr, seed: uintptr) -> uintptr { return #force_inline _default_hasher_const(data, seed, 12) }
-default_hasher13 :: proc "contextless" (data: rawptr, seed: uintptr) -> uintptr { return #force_inline _default_hasher_const(data, seed, 13) }
-default_hasher14 :: proc "contextless" (data: rawptr, seed: uintptr) -> uintptr { return #force_inline _default_hasher_const(data, seed, 14) }
-default_hasher15 :: proc "contextless" (data: rawptr, seed: uintptr) -> uintptr { return #force_inline _default_hasher_const(data, seed, 15) }
-default_hasher16 :: proc "contextless" (data: rawptr, seed: uintptr) -> uintptr { return #force_inline _default_hasher_const(data, seed, 16) }
 
 default_hasher_string :: proc "contextless" (data: rawptr, seed: uintptr) -> uintptr {
-	h := u64(seed) + 0xcbf29ce484222325
-	str := (^[]byte)(data)^
-	for b in str {
-		h = (h ~ u64(b)) * 0x100000001b3
-	}
-	h &= HASH_MASK
-	return uintptr(h) | uintptr(h == 0)
+	str := (^[]byte)(data)
+	return default_hasher(raw_data(str^), seed, len(str))
 }
 default_hasher_cstring :: proc "contextless" (data: rawptr, seed: uintptr) -> uintptr {
-	h := u64(seed) + 0xcbf29ce484222325
-	ptr := (^uintptr)(data)^
-	for (^byte)(ptr)^ != 0 {
-		b := (^byte)(ptr)^
-		h = (h ~ u64(b)) * 0x100000001b3
-		ptr += 1
+	h := u64(seed) + INITIAL_HASH_SEED
+	if ptr := (^[^]byte)(data)^; ptr != nil {
+		for ptr[0] != 0 {
+			h = (h ~ u64(ptr[0])) * 0x100000001b3
+			ptr = ptr[1:]
+		}
 	}
 	h &= HASH_MASK
-	return uintptr(h) | uintptr(h == 0)
+	return uintptr(h) | uintptr(uintptr(h) == 0)
 }
