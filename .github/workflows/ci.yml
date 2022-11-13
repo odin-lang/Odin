@@ -94,7 +94,7 @@ jobs:
         timeout-minutes: 10
       - name: Odin internals tests
         run: |
-          cd tests/internals
+          cd tests/internal
           make
         timeout-minutes: 10
       - name: Odin check examples/all for Darwin arm64
