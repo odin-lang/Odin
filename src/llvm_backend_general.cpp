@@ -936,27 +936,23 @@ void lb_emit_store(lbProcedure *p, lbValue ptr, lbValue value) {
 			LLVMValueRef src_ptr_original = LLVMGetOperand(value.value, 0);
 			LLVMValueRef src_ptr = LLVMBuildPointerCast(p->builder, src_ptr_original, LLVMTypeOf(dst_ptr), "");
 
-			if (dst_ptr != src_ptr && dst_ptr != src_ptr_original) {
-				LLVMBuildMemMove(p->builder,
-				                 dst_ptr, lb_try_get_alignment(dst_ptr, 1),
-				                 src_ptr, lb_try_get_alignment(src_ptr_original, 1),
-				                 LLVMConstInt(LLVMInt64TypeInContext(p->module->ctx), lb_sizeof(LLVMTypeOf(value.value)), false));
-			}
+			LLVMBuildMemMove(p->builder,
+			                 dst_ptr, lb_try_get_alignment(dst_ptr, 1),
+			                 src_ptr, lb_try_get_alignment(src_ptr_original, 1),
+			                 LLVMConstInt(LLVMInt64TypeInContext(p->module->ctx), lb_sizeof(LLVMTypeOf(value.value)), false));
 			return;
 		} else if (LLVMIsConstant(value.value)) {
 			lbAddr addr = lb_add_global_generated(p->module, value.type, value, nullptr);
 			lb_make_global_private_const(addr);
 
 			LLVMValueRef dst_ptr = ptr.value;
-			LLVMValueRef src_ptr_original = addr.addr.value;
-			LLVMValueRef src_ptr = LLVMBuildPointerCast(p->builder, src_ptr_original, LLVMTypeOf(dst_ptr), "");
+			LLVMValueRef src_ptr = addr.addr.value;
+			src_ptr = LLVMBuildPointerCast(p->builder, src_ptr, LLVMTypeOf(dst_ptr), "");
 
-			if (dst_ptr != src_ptr && dst_ptr != src_ptr_original) {
-				LLVMBuildMemMove(p->builder,
-				                 dst_ptr, lb_try_get_alignment(dst_ptr, 1),
-				                 src_ptr, lb_try_get_alignment(src_ptr, 1),
-				                 LLVMConstInt(LLVMInt64TypeInContext(p->module->ctx), lb_sizeof(LLVMTypeOf(value.value)), false));
-			}
+			LLVMBuildMemMove(p->builder,
+			                 dst_ptr, lb_try_get_alignment(dst_ptr, 1),
+			                 src_ptr, lb_try_get_alignment(src_ptr, 1),
+			                 LLVMConstInt(LLVMInt64TypeInContext(p->module->ctx), lb_sizeof(LLVMTypeOf(value.value)), false));
 			return;
 		}
 	}
