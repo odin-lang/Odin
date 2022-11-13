@@ -267,6 +267,8 @@ void lb_populate_module_pass_manager(LLVMTargetMachineRef target_machine, LLVMPa
 **************************************************************************/
 
 void lb_run_remove_dead_instruction_pass(lbProcedure *p) {
+	LLVMTypeRef llvm_void = LLVMVoidTypeInContext(p->module->ctx);
+
 	isize removal_count = 0;
 	isize pass_count = 0;
 	isize const max_pass_count = 10;
@@ -322,7 +324,7 @@ void lb_run_remove_dead_instruction_pass(lbProcedure *p) {
 				case LLVMOr:
 				case LLVMXor:
 				case LLVMAlloca:
-				case LLVMLoad:
+				case LLVMLoad: // TODO: should LLVMLoad be removed?
 				case LLVMGetElementPtr:
 				case LLVMTrunc:
 				case LLVMZExt:
@@ -346,6 +348,37 @@ void lb_run_remove_dead_instruction_pass(lbProcedure *p) {
 					removal_count += 1;
 					LLVMInstructionEraseFromParent(curr_instr);
 					was_dead_instructions = true;
+					break;
+
+				case LLVMCall:
+					if (LLVMTypeOf(curr_instr) == llvm_void) {
+						LLVMValueRef the_proc = LLVMGetCalledValue(curr_instr);
+						unsigned id = LLVMGetIntrinsicID(the_proc);
+						if (id != 0) {
+							size_t text_len = 0;
+							char const *text = LLVMIntrinsicGetName(id, &text_len);
+							String name = make_string(cast(u8 const *)text, cast(isize)text_len);
+							if (name == "llvm.memmove" || name == "llvm.memcpy") {
+								LLVMValueRef dst = LLVMGetOperand(curr_instr, 0);
+								LLVMValueRef src = LLVMGetOperand(curr_instr, 1);
+								LLVMValueRef sz = LLVMGetOperand(curr_instr, 2);
+								if ((dst == src) || (LLVMIsConstant(sz) && LLVMConstIntGetZExtValue(sz) == 0)) {
+									removal_count += 1;
+									LLVMInstructionEraseFromParent(curr_instr);
+									was_dead_instructions = true;
+									break;
+								}
+							} else if (name == "llvm.memset") {
+								LLVMValueRef sz = LLVMGetOperand(curr_instr, 2);
+								if (LLVMIsConstant(sz) && LLVMConstIntGetZExtValue(sz) == 0) {
+									removal_count += 1;
+									LLVMInstructionEraseFromParent(curr_instr);
+									was_dead_instructions = true;
+									break;
+								}
+							}
+						}
+					}
 					break;
 				}
 			}
