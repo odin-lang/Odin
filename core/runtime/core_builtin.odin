@@ -231,12 +231,12 @@ make_dynamic_array_len_cap :: proc($T: typeid/[dynamic]$E, #any_int len: int, #a
 	return
 }
 @(builtin)
-make_map :: proc($T: typeid/map[$K]$E, #any_int cap: int = 1<<MAP_MIN_LOG2_CAPACITY, allocator := context.allocator, loc := #caller_location) -> T {
-	make_map_expr_error_loc(loc, cap)
+make_map :: proc($T: typeid/map[$K]$E, #any_int capacity: int = 1<<MAP_MIN_LOG2_CAPACITY, allocator := context.allocator, loc := #caller_location) -> T {
+	make_map_expr_error_loc(loc, capacity)
 	context.allocator = allocator
 
 	m: T
-	reserve_map(&m, cap)
+	reserve_map(&m, capacity, loc)
 	return m
 }
 @(builtin)
