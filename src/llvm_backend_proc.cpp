@@ -9,9 +9,15 @@ LLVMValueRef lb_call_intrinsic(lbProcedure *p, const char *name, LLVMValueRef* a
 }
 
 void lb_mem_copy_overlapping(lbProcedure *p, lbValue dst, lbValue src, lbValue len, bool is_volatile) {
+	if (dst.value == src.value) {
+		return;
+	}
 	dst = lb_emit_conv(p, dst, t_rawptr);
 	src = lb_emit_conv(p, src, t_rawptr);
 	len = lb_emit_conv(p, len, t_int);
+	if (dst.value == src.value) {
+		return;
+	}
 	
 	char const *name = "llvm.memmove";
 	if (LLVMIsConstant(len.value)) {
@@ -38,9 +44,16 @@ void lb_mem_copy_overlapping(lbProcedure *p, lbValue dst, lbValue src, lbValue l
 
 
 void lb_mem_copy_non_overlapping(lbProcedure *p, lbValue dst, lbValue src, lbValue len, bool is_volatile) {
+	if (dst.value == src.value) {
+		return;
+	}
 	dst = lb_emit_conv(p, dst, t_rawptr);
 	src = lb_emit_conv(p, src, t_rawptr);
 	len = lb_emit_conv(p, len, t_int);
+	if (dst.value == src.value) {
+		return;
+	}
+
 	
 	char const *name = "llvm.memcpy";
 	if (LLVMIsConstant(len.value)) {
@@ -580,18 +593,31 @@ void lb_begin_procedure_body(lbProcedure *p) {
 				if (e->token.string != "") {
 					GB_ASSERT(!is_blank_ident(e->token));
 
-					// NOTE(bill): Don't even bother trying to optimize this with the return ptr value
-					// This will violate the defer rules if you do:
-					//         foo :: proc() -> (x, y: T) {
-					//                 defer x = ... // defer is executed after the `defer`
-					//                 return // the values returned should be zeroed
-					//         }
-					lbAddr res = lb_add_local(p, e->type, e);
+					lbAddr res = {};
+					if (p->return_ptr.addr.value != nullptr &&
+					    p->entity                != nullptr &&
+					    p->entity->decl_info     != nullptr &&
+					    p->entity->decl_info->defer_use_count == 0) {
+						lbValue val = lb_emit_struct_ep(p, p->return_ptr.addr, cast(i32)i);
+
+						lb_add_entity(p->module, e, val);
+						lb_add_debug_local_variable(p, val.value, e->type, e->token);
+
+						// NOTE(bill): no need to zero initialize due to caller will zero return value
+						res = lb_addr(val);
+					} else {
+						// NOTE(bill): Don't even bother trying to optimize this with the return ptr value
+						// This will violate the defer rules if you do:
+						//         foo :: proc() -> (x, y: T) {
+						//                 defer x = ... // defer is executed after the `defer`
+						//                 return // the values returned should be zeroed
+						//         }
+						res = lb_add_local(p, e->type, e);
+					}
 					if (e->Variable.param_value.kind != ParameterValue_Invalid) {
 						lbValue c = lb_handle_param_value(p, e->type, e->Variable.param_value, e->token.pos);
 						lb_addr_store(p, res, c);
 					}
-
 				}
 			}
 
