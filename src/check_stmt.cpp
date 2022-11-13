@@ -2014,10 +2014,6 @@ void check_stmt_internal(CheckerContext *ctx, Ast *node, u32 flags) {
 		if (is_ast_decl(ds->stmt)) {
 			error(ds->token, "You cannot defer a declaration");
 		} else {
-			if (ctx->decl != nullptr) {
-				ctx->decl->defer_use_count += 1;
-			}
-
 			bool out_in_defer = ctx->in_defer;
 			ctx->in_defer = true;
 			check_stmt(ctx, ds->stmt, 0);

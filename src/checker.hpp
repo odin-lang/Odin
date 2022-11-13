@@ -158,7 +158,6 @@ struct DeclInfo {
 	bool          is_using;
 	bool          where_clauses_evaluated;
 	bool          proc_checked;
-	isize         defer_use_count;
 
 	CommentGroup *comment;
 	CommentGroup *docs;
