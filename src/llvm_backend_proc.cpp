@@ -599,6 +599,7 @@ void lb_begin_procedure_body(lbProcedure *p) {
 					    p->entity->decl_info     != nullptr &&
 					    p->entity->decl_info->defer_use_count == 0) {
 						lbValue val = lb_emit_struct_ep(p, p->return_ptr.addr, cast(i32)i);
+						val = lb_emit_conv(p, val, alloc_type_pointer(e->type));
 
 						lb_add_entity(p->module, e, val);
 						lb_add_debug_local_variable(p, val.value, e->type, e->token);
