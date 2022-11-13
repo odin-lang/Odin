@@ -4131,7 +4131,8 @@ lbAddr lb_build_addr_compound_lit(lbProcedure *p, Ast *expr) {
 		}
 		GB_ASSERT(!build_context.no_dynamic_literals);
 
-		lb_dynamic_map_reserve(p, v.addr, 2*cl->elems.count, pos);
+		lbValue err = lb_dynamic_map_reserve(p, v.addr, 2*cl->elems.count, pos);
+		gb_unused(err);
 
 		for_array(field_index, cl->elems) {
 			Ast *elem = cl->elems[field_index];

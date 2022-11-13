@@ -962,7 +962,7 @@ void lb_internal_dynamic_map_set(lbProcedure *p, lbValue const &map_ptr, Type *m
 	}
 }
 
-void lb_dynamic_map_reserve(lbProcedure *p, lbValue const &map_ptr, isize const capacity, TokenPos const &pos) {
+lbValue lb_dynamic_map_reserve(lbProcedure *p, lbValue const &map_ptr, isize const capacity, TokenPos const &pos) {
 	GB_ASSERT(!build_context.no_dynamic_literals);
 
 	String proc_name = {};
@@ -975,7 +975,7 @@ void lb_dynamic_map_reserve(lbProcedure *p, lbValue const &map_ptr, isize const 
 	args[1] = lb_gen_map_info_ptr(p->module, type_deref(map_ptr.type));
 	args[2] = lb_const_int(p->module, t_uint, capacity);
 	args[3] = lb_emit_source_code_location_as_global(p, proc_name, pos);
-	lb_emit_runtime_call(p, "__dynamic_map_reserve", args);
+	return lb_emit_runtime_call(p, "__dynamic_map_reserve", args);
 }
 
 
