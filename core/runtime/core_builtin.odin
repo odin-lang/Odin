@@ -629,10 +629,7 @@ shrink_dynamic_array :: proc(array: ^$T/[dynamic]$E, new_cap := -1, loc := #call
 @builtin
 map_insert :: proc(m: ^$T/map[$K]$V, key: K, value: V, loc := #caller_location) -> (ptr: ^V) {
 	key, value := key, value
-	h := __get_map_header_table(T)
-
-	e := __dynamic_map_set(m, h, __get_map_key_hash(&key), &key, &value, loc)
-	return (^V)(uintptr(e) + h.value_offset)
+	return (^V)(__dynamic_map_set_without_hash((^Raw_Map)(m), map_info(T), rawptr(&key), rawptr(&value), loc))
 }
 
 
