@@ -217,6 +217,9 @@ scratch_allocator_proc :: proc(allocator_data: rawptr, mode: Allocator_Mode,
 		return ptr, err
 
 	case .Free:
+		if old_memory == nil {
+			return nil, nil
+		}
 		start := uintptr(raw_data(s.data))
 		end := start + uintptr(len(s.data))
 		old_ptr := uintptr(old_memory)
