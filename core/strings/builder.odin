@@ -306,6 +306,29 @@ write_float :: proc(b: ^Builder, f: f64, fmt: byte, prec, bit_size: int) -> (n: 
 	return write_string(b, s)
 }
 
+// writes a f16 value into the builder, returns the written amount of characters
+write_f16 :: proc(b: ^Builder, f: f16, fmt: byte) -> (n: int) {
+	buf: [384]byte
+	s := strconv.append_float(buf[:], f64(f), fmt, 2*size_of(f), 8*size_of(f))
+	return write_string(b, s)
+}
+
+// writes a f32 value into the builder, returns the written amount of characters
+write_f32 :: proc(b: ^Builder, f: f32, fmt: byte) -> (n: int) {
+	buf: [384]byte
+	s := strconv.append_float(buf[:], f64(f), fmt, 2*size_of(f), 8*size_of(f))
+	return write_string(b, s)
+}
+
+// writes a f64 value into the builder, returns the written amount of characters
+write_f64 :: proc(b: ^Builder, f: f64, fmt: byte) -> (n: int) {
+	buf: [384]byte
+	s := strconv.append_float(buf[:], f64(f), fmt, 2*size_of(f), 8*size_of(f))
+	return write_string(b, s)
+}
+
+
+
 // writes a u64 value `i` in `base` = 10 into the builder, returns the written amount of characters
 write_u64 :: proc(b: ^Builder, i: u64, base: int = 10) -> (n: int) {
 	buf: [32]byte
