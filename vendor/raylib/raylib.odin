@@ -125,7 +125,7 @@ when ODIN_OS == .Windows {
 	foreign import lib "system:raylib"
 }
 
-VERSION :: "4.0"
+VERSION :: "4.2"
 
 PI :: 3.14159265358979323846 
 DEG2RAD :: PI/180.0
@@ -414,7 +414,7 @@ Wave :: struct {
 // NOTE: Useful to create custom audio streams not bound to a specific file
 AudioStream :: struct {
 	buffer: rawptr,               // Pointer to internal data used by the audio system
-
+	processor: rawptr,			  // Pointer to internal data processor, useful for audio effects
 	sampleRate: c.uint,           // Frequency (samples per second)
 	sampleSize: c.uint,           // Bit depth (bits per sample): 8, 16, 32 (24 not supported)
 	channels:   c.uint,           // Number of channels (1-mono, 2-stereo)
@@ -483,6 +483,7 @@ ConfigFlag :: enum c.int {
 	WINDOW_ALWAYS_RUN  =  8,   // Set to allow windows running while minimized
 	WINDOW_TRANSPARENT =  4,   // Set to allow transparent framebuffer
 	WINDOW_HIGHDPI     = 13,   // Set to support HighDPI
+	MOUSE_PASSTHROUGH  = 15, // Set to support mouse passthrough, only supported when FLAG_WINDOW_UNDECORATED
 	MSAA_4X_HINT       =  5,   // Set to try enabling MSAA 4X
 	INTERLACED_HINT    = 16,   // Set to try enabling interlaced video format (for V3D)
 }
@@ -831,12 +832,13 @@ FontType :: enum c.int {
 
 // Color blending modes (pre-defined)
 BlendMode :: enum c.int {
-	ALPHA = 0,        // Blend textures considering alpha (default)
-	ADDITIVE,         // Blend textures adding colors
-	MULTIPLIED,       // Blend textures multiplying colors
-	ADD_COLORS,       // Blend textures adding colors (alternative)
-	SUBTRACT_COLORS,  // Blend textures subtracting colors (alternative)
-	CUSTOM,           // Belnd textures using custom src/dst factors (use rlSetBlendMode())
+	ALPHA = 0,         // Blend textures considering alpha (default)
+	ADDITIVE,          // Blend textures adding colors
+	MULTIPLIED,        // Blend textures multiplying colors
+	ADD_COLORS,        // Blend textures adding colors (alternative)
+	SUBTRACT_COLORS,   // Blend textures subtracting colors (alternative)
+	ALPHA_PREMULTIPLY, // Blend premultiplied textures considering alpha
+	CUSTOM,            // Belnd textures using custom src/dst factors (use rlSetBlendMode())
 }
 
 // Gestures
@@ -886,6 +888,7 @@ LoadFileDataCallback :: #type proc "c"(fileName: cstring, bytesRead: ^c.uint) ->
 SaveFileDataCallback :: #type proc "c" (fileName: cstring, data: rawptr, bytesToWrite: c.uint) -> bool  // FileIO: Save binary data
 LoadFileTextCallback :: #type proc "c" (fileName: cstring) -> [^]u8                                     // FileIO: Load text data
 SaveFileTextCallback :: #type proc "c" (fileName: cstring, text: cstring) -> bool                       // FileIO: Save text data
+AudioCallback		 :: #type proc "c" (bufferData: rawptr, frames: u32)
 
 
 @(default_calling_convention="c")
@@ -923,9 +926,12 @@ foreign lib {
 	SetWindowMonitor         :: proc(monitor: c.int) ---                        // Set monitor for the current window (fullscreen mode)
 	SetWindowMinSize         :: proc(width, height: c.int) ---                  // Set window minimum dimensions (for FLAG_WINDOW_RESIZABLE)
 	SetWindowSize            :: proc(width, height: c.int) ---                  // Set window dimensions
+	SetWindowOpacity 		 :: proc(opacity: f32) ---							// Set window opacity [0.0f..1.0f] (only PLATFORM_DESKTOP)
 	GetWindowHandle          :: proc() -> rawptr ---                            // Get native window handle
 	GetScreenWidth           :: proc() -> c.int ---                             // Get current screen width
 	GetScreenHeight          :: proc() -> c.int ---                             // Get current screen height
+	GetRenderWidth			 :: proc() -> c.int ---								// Get current render width (it considers HiDPI)
+	GetRenderHeight			 :: proc() -> c.int ---								// Get current render height (it considers HiDPI)
 	GetMonitorCount          :: proc() -> c.int ---                             // Get number of connected monitors
 	GetCurrentMonitor        :: proc() -> c.int ---                             // Get current connected monitor
 	GetMonitorPosition       :: proc(monitor: c.int) -> Vector2 ---             // Get specified monitor position
@@ -939,6 +945,8 @@ foreign lib {
 	GetMonitorName           :: proc(monitor: c.int) -> cstring ---             // Get the human-readable, UTF-8 encoded name of the primary monitor
 	SetClipboardText         :: proc(text: cstring) ---                         // Set clipboard text content
 	GetClipboardText         :: proc() -> cstring ---                           // Get clipboard text content
+	EnableEventWaiting		 :: proc() ---										// Enable waiting for events on EndDrawing(), no automatic event polling
+	DisableEventWaiting		 :: proc()	---										// Disable waiting for events on EndDrawing(), automatic events polling
 
 	
 	// Custom frame control functions
@@ -947,7 +955,7 @@ foreign lib {
 	// To avoid that behaviour and control frame processes manually, enable in config.h: SUPPORT_CUSTOM_FRAME_CONTROL
 	SwapScreenBuffer :: proc() ---        // Swap back buffer with front buffer (screen drawing)
 	PollInputEvents  :: proc() ---        // Register all input events
-	WaitTime         :: proc(ms: f32) --- // Wait for some milliseconds (halt program execution)
+	WaitTime         :: proc(seconds: f64) --- // Wait for some time (halt program execution)
 
 
 	// Cursor-related functions
@@ -1032,34 +1040,33 @@ foreign lib {
 	LoadFileData          :: proc(fileName: cstring, bytesRead: ^c.uint) -> [^]u8 ---                // Load file data as byte array (read)
 	UnloadFileData        :: proc(data: [^]u8) ---                                                   // Unload file data allocated by LoadFileData()
 	SaveFileData          :: proc(fileName: cstring, data: rawptr, bytesToWrite: c.uint) -> bool --- // Save data to file from byte array (write), returns true on success
+	ExportDataAsCode      :: proc(data: cstring, size: u32, fileName: cstring) -> bool --- // Export data to code (.h), returns true on success
 	LoadFileText          :: proc(fileName: cstring) -> [^]u8 ---                                    // Load text data from file (read), returns a '\0' terminated string
 	UnloadFileText        :: proc(text: cstring) ---                                                 // Unload file text data allocated by LoadFileText()
 	SaveFileText          :: proc(fileName: cstring, text: cstring) -> bool ---                      // Save text data to file (write), string must be '\0' terminated, returns true on success
 	FileExists            :: proc(fileName: cstring) -> bool ---                                     // Check if file exists
 	DirectoryExists       :: proc(dirPath: cstring) -> bool ---                                      // Check if a directory path exists
 	IsFileExtension       :: proc(fileName: cstring, ext: cstring) -> bool ---                       // Check file extension (including point: .png, .wav)
+	GetFileLength		  :: proc(fileName: cstring) -> c.int --- 																  // Get file length in bytes (NOTE: GetFileSize() conflicts with windows.h)
 	GetFileExtension      :: proc(fileName: cstring) -> cstring ---                                  // Get pointer to extension for a filename string (includes dot: ".png")
 	GetFileName           :: proc(filePath: cstring) -> cstring ---                                  // Get pointer to filename for a path string
 	GetFileNameWithoutExt :: proc(filePath: cstring) -> cstring ---                                  // Get filename string without extension (uses static string)
 	GetDirectoryPath      :: proc(filePath: cstring) -> cstring ---                                  // Get full path for a given fileName with path (uses static string)
 	GetPrevDirectoryPath  :: proc(dirPath: cstring) -> cstring ---                                   // Get previous directory path for a given path (uses static string)
 	GetWorkingDirectory   :: proc() -> cstring ---                                                   // Get current working directory (uses static string)
-	GetDirectoryFiles     :: proc(dirPath: cstring, count: ^c.int) -> [^]cstring ---                 // Get filenames in a directory path (memory should be freed)
-	ClearDirectoryFiles   :: proc() ---                                                              // Clear directory files paths buffers (free memory)
+	GetApplicationDirectory :: proc() -> cstring ---	   // Get the directory if the running application (uses static string)
+	LoadDirectoryFiles     :: proc(dirPath: cstring, count: ^c.int) -> [^]cstring ---                 // Get filenames in a directory path (memory should be freed)
+	UnloadDirectoryFiles   :: proc() ---                                                              // Clear directory files paths buffers (free memory)
 	ChangeDirectory       :: proc(dir: cstring) -> bool ---                                          // Change working directory, return true on success
 	IsFileDropped         :: proc() -> bool ---                                                      // Check if a file has been dropped into window
-	GetDroppedFiles       :: proc(count: ^c.int) -> [^]cstring ---                                   // Get dropped files names (memory should be freed)
-	ClearDroppedFiles     :: proc() ---                                                              // Clear dropped files paths buffer (free memory)
+	LoadDroppedFiles       :: proc(count: ^c.int) -> [^]cstring ---                                   // Get dropped files names (memory should be freed)
+	UnloadDroppedFiles     :: proc() ---                                                              // Clear dropped files paths buffer (free memory)
 	GetFileModTime        :: proc(fileName: cstring) -> c.long ---                                   // Get file modification time (last write time)
 
 	CompressData     :: proc(data: [^]u8, dataLength: c.int, compDataLength: ^c.int) -> [^]u8 ---     // Compress data (DEFLATE algorithm)
 	DecompressData   :: proc(compData: [^]u8, compDataLength: c.int, dataLength: ^c.int) -> [^]u8 --- // Decompress data (DEFLATE algorithm)
 	EncodeDataBase64 :: proc(data: [^]u8, dataLength: c.int, outputLength: ^c.int) -> [^]u8 ---       // Encode data to Base64 string
 	DecodeDataBase64 :: proc(data: [^]u8, outputLength: ^c.int) -> [^]u8 ---                          // Decode Base64 string data
-
-	// Persistent storage management
-	SaveStorageValue :: proc(position: c.uint, value: c.int) -> bool ---   // Save integer value to storage file (to defined position), returns true on success
-	LoadStorageValue :: proc(position: c.uint) -> c.int ---                // Load integer value from storage file (from defined position)
 
 	OpenURL :: proc(url: cstring) ---                                      // Open URL with default system browser (if available)
 
@@ -1102,6 +1109,7 @@ foreign lib {
 	SetMouseOffset        :: proc(offsetX, offsetY: c.int) ---        // Set mouse offset
 	SetMouseScale         :: proc(scaleX, scaleY: f32) ---            // Set mouse scaling
 	GetMouseWheelMove     :: proc() -> f32 ---                        // Returns mouse wheel movement Y
+	GetMouseWheelMoveV    :: proc() -> Vector2 ---					  // Get mouse wheel movement for both X and Y
 	SetMouseCursor        :: proc(cursor: MouseCursor) ---            // Set mouse cursor
 
 	// Input-related functions: touch
@@ -1322,6 +1330,7 @@ foreign lib {
 	GenImageFontAtlas  :: proc(chars: [^]GlyphInfo, recs: ^[^]Rectangle, charsCount: c.int, fontSize: c.int, padding: c.int, packMethod: c.int) -> Image ---  // Generate image font atlas using chars info
 	UnloadFontData     :: proc(chars: [^]GlyphInfo, charsCount: c.int) ---                                                                                    // Unload font chars info data (RAM)
 	UnloadFont         :: proc(font: Font) ---                                                                                                               // Unload Font from GPU memory (VRAM)
+	ExportFontAsCode   :: proc(font: Font, fileName: cstring) -> bool ---					// Export font as code file, returns true on success
 
 	// Text drawing functions
 	DrawFPS           :: proc(posX, posY: c.int) ---                                                                              // Draw current FPS
@@ -1330,7 +1339,7 @@ foreign lib {
 	DrawTextPro       :: proc(font: Font, text: cstring, position, origin: Vector2, 
 	                          rotation: f32, fontSize: f32, spacing: f32, tint: Color) ---                                        // Draw text using Font and pro parameters (rotation)
 	DrawTextCodepoint :: proc(font: Font, codepoint: rune, position: Vector2, fontSize: f32, tint: Color) ---                     // Draw one character (codepoint)
-
+	DrawTextCodepoints :: proc(font: Font, codepoints: [^]c.int, count: c.int, position: Vector2, fontSize, spacing: f32, tint: Color) ---									// Draw multiple character (codepoint)
 	// Text misc. functions
 	MeasureText      :: proc(text: cstring, fontSize: c.int) -> c.int ---                       // Measure string width for default font
 	MeasureTextEx    :: proc(font: Font, text: cstring, fontSize, spacing: f32) -> Vector2 ---  // Measure string size for Font
@@ -1422,8 +1431,6 @@ foreign lib {
 	ExportMesh         :: proc(mesh: Mesh, fileName: cstring) -> bool ---                                   // Export mesh data to file, returns true on success
 	GetMeshBoundingBox :: proc(mesh: Mesh) -> BoundingBox ---                                               // Compute mesh bounding box limits
 	GenMeshTangents    :: proc(mesh: ^Mesh) ---                                                             // Compute mesh tangents
-	GenMeshBinormals   :: proc(mesh: ^Mesh) ---          
-	
 	// Mesh generation functions
 	GenMeshPoly       :: proc(sides: c.int, radius: f32) -> Mesh ---                           // Generate polygonal mesh
 	GenMeshPlane      :: proc(width, length: f32, resX, resZ: c.int) -> Mesh ---               // Generate plane mesh (with subdivisions)
@@ -1457,7 +1464,6 @@ foreign lib {
 	CheckCollisionBoxSphere :: proc(box: BoundingBox, center: Vector3, radius: f32) -> bool ---                 // Check collision between box and sphere
 	GetRayCollisionSphere   :: proc(ray: Ray, center: Vector3, radius: f32) -> RayCollision ---                  // Get collision info between ray and sphere
 	GetRayCollisionBox      :: proc(ray: Ray, box: BoundingBox) -> RayCollision ---                              // Get collision info between ray and box
-	GetRayCollisionModel    :: proc(ray: Ray, model: Model) -> RayCollision ---                                  // Get collision info between ray and model
 	GetRayCollisionMesh     :: proc(ray: Ray, mesh: Mesh, transform: Matrix) -> RayCollision ---                 // Get collision info between ray and mesh
 	GetRayCollisionTriangle :: proc(ray: Ray, p1, p2, p3: Vector3) -> RayCollision ---                           // Get collision info between ray and triangle
 	GetRayCollisionQuad     :: proc(ray: Ray, p1, p2, p3, p4: Vector3) -> RayCollision ---                       // Get collision info between ray and quad
@@ -1494,6 +1500,7 @@ foreign lib {
 	IsSoundPlaying    :: proc(sound: Sound) -> bool ---                                        // Check if a sound is currently playing
 	SetSoundVolume    :: proc(sound: Sound, volume: f32) ---                                   // Set volume for a sound (1.0 is max level)
 	SetSoundPitch     :: proc(sound: Sound, pitch: f32) ---                                    // Set pitch for a sound (1.0 is base level)
+	SetSoundPan       :: proc(sound: Sound, pan: f32) ---									   // Set pan for a sound (0.5 is center)
 	WaveFormat        :: proc(wave: ^Wave, sampleRate, sampleSize: c.int, channels: c.int) --- // Convert wave data to desired format
 	WaveCopy          :: proc(wave: Wave) -> Wave ---                                          // Copy a wave to a new wave
 	WaveCrop          :: proc(wave: ^Wave, initSample, finalSample: c.int) ---                 // Crop a wave to defined samples range
@@ -1513,6 +1520,7 @@ foreign lib {
 	SeekMusicStream           :: proc(music: Music, position: f32) ---                               // Seek music to a position (in seconds)
 	SetMusicVolume            :: proc(music: Music, volume: f32) ---                                 // Set volume for music (1.0 is max level)
 	SetMusicPitch             :: proc(music: Music, pitch: f32) ---                                  // Set pitch for a music (1.0 is base level)
+	SetMusicPan               :: proc(music: Music, pan: f32) ---																	// Set pan for a music (0.5 is center)
 	GetMusicTimeLength        :: proc(music: Music) -> f32 ---                                       // Get music time length (in seconds)
 	GetMusicTimePlayed        :: proc(music: Music) -> f32 ---                                       // Get current music time played (in seconds)
 
@@ -1528,7 +1536,11 @@ foreign lib {
 	StopAudioStream                  :: proc(stream: AudioStream) ---                                     // Stop audio stream
 	SetAudioStreamVolume             :: proc(stream: AudioStream, volume: f32) ---                        // Set volume for audio stream (1.0 is max level)
 	SetAudioStreamPitch              :: proc(stream: AudioStream, pitch: f32) ---                         // Set pitch for audio stream (1.0 is base level)
+	SetAudioStreamPan				 :: proc(stream: AudioStream, pan: f32) ---												// Set pan for audio stream (0.5 is centered)
 	SetAudioStreamBufferSizeDefault  :: proc(size: c.int) ---                                             // Default size for new audio streams
+	SetAudioStreamCallback			 :: proc(stream: AudioStream, callback: AudioCallback) ---									// Audio thread callback to request new data
+	AttachAudioStreamProcessor       :: proc(stream: AudioStream, processor: AudioCallback) ---									// Attach audio stream processor to stream
+	DetachAudioStreamProcessor		 :: proc(stream: AudioStream, processor: AudioCallback)	---									// Detach audio stream processor from stream
 }
 
 
