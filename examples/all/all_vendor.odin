@@ -10,6 +10,7 @@ import miniaudio  "vendor:miniaudio"
 import PM         "vendor:portmidi"
 import rl         "vendor:raylib"
 import exr        "vendor:OpenEXRCore"
+import cgltf      "vendor:cgltf"
 
 import SDL        "vendor:sdl2"
 import SDLNet     "vendor:sdl2/net"
@@ -33,6 +34,7 @@ _ :: miniaudio
 _ :: PM
 _ :: rl
 _ :: exr
+_ :: cgltf
 
 _ :: SDL
 _ :: SDLNet

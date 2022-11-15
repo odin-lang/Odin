@@ -1242,11 +1242,10 @@ COLOR_WRITE_ENABLE_ALPHA :: COLOR_WRITE_ENABLE_MASK{.ALPHA}
 COLOR_WRITE_ENABLE_ALL   :: COLOR_WRITE_ENABLE_MASK{.RED, .GREEN, .BLUE, .ALPHA}
 
 COLOR_WRITE_ENABLE :: enum i32 {
-	RED   = 1,
-	GREEN = 2,
-	BLUE  = 4,
-	ALPHA = 8,
-	ALL   = 15,
+	RED   = 0,
+	GREEN = 1,
+	BLUE  = 2,
+	ALPHA = 3,
 }
 
 RENDER_TARGET_BLEND_DESC :: struct {
@@ -2401,7 +2400,7 @@ IDeviceContext_VTable :: struct {
 	ClearRenderTargetView:                     proc "stdcall" (this: ^IDeviceContext, pRenderTargetView: ^IRenderTargetView, ColorRGBA: ^[4]f32),
 	ClearUnorderedAccessViewUint:              proc "stdcall" (this: ^IDeviceContext, pUnorderedAccessView: ^IUnorderedAccessView, Values: ^[4]u32),
 	ClearUnorderedAccessViewFloat:             proc "stdcall" (this: ^IDeviceContext, pUnorderedAccessView: ^IUnorderedAccessView, Values: ^[4]f32),
-	ClearDepthStencilView:                     proc "stdcall" (this: ^IDeviceContext, pDepthStencilView: ^IDepthStencilView, ClearFlags: CLEAR_FLAG, Depth: f32, Stencil: u8),
+	ClearDepthStencilView:                     proc "stdcall" (this: ^IDeviceContext, pDepthStencilView: ^IDepthStencilView, ClearFlags: CLEAR_FLAGS, Depth: f32, Stencil: u8),
 	GenerateMips:                              proc "stdcall" (this: ^IDeviceContext, pShaderResourceView: ^IShaderResourceView),
 	SetResourceMinLOD:                         proc "stdcall" (this: ^IDeviceContext, pResource: ^IResource, MinLOD: f32),
 	GetResourceMinLOD:                         proc "stdcall" (this: ^IDeviceContext, pResource: ^IResource) -> f32,
@@ -3734,10 +3733,10 @@ MESSAGE_CATEGORY :: enum u32 {
 INFO_QUEUE_FILTER_DESC :: struct {
 	NumCategories:    u32,
 	pCategoryList:    ^MESSAGE_CATEGORY,
-	
+
 	NumSeverities:    u32,
 	pSeverityList:    ^MESSAGE_SEVERITY,
-	
+
 	NumIDs:           u32,
 	pIDList:          ^MESSAGE_ID,
 }

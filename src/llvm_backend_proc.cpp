@@ -2125,17 +2125,17 @@ lbValue lb_build_builtin_proc(lbProcedure *p, Ast *expr, TypeAndValue const &tv,
 		}
 	case BuiltinProc_ptr_sub:
 		{
-			lbValue ptr0 = lb_build_expr(p, ce->args[0]);
-			lbValue ptr1 = lb_build_expr(p, ce->args[1]);
+			Type *elem0 = type_deref(type_of_expr(ce->args[0]));
+			Type *elem1 = type_deref(type_of_expr(ce->args[1]));
+			GB_ASSERT(are_types_identical(elem0, elem1));
+			Type *elem = elem0;
 
-			LLVMTypeRef type_int = lb_type(p->module, t_int);
-			LLVMValueRef diff = LLVMBuildPtrDiff2(p->builder, lb_type(p->module, ptr0.type), ptr0.value, ptr1.value, "");
-			diff = LLVMBuildIntCast2(p->builder, diff, type_int, /*signed*/true, "");
+			lbValue ptr0 = lb_emit_conv(p, lb_build_expr(p, ce->args[0]), t_uintptr);
+			lbValue ptr1 = lb_emit_conv(p, lb_build_expr(p, ce->args[1]), t_uintptr);
 
-			lbValue res = {};
-			res.type = t_int;
-			res.value = diff;
-			return res;
+			lbValue diff = lb_emit_arith(p, Token_Sub, ptr0, ptr1, t_uintptr);
+			diff = lb_emit_conv(p, diff, t_int);
+			return lb_emit_arith(p, Token_Quo, diff, lb_const_int(p->module, t_int, type_size_of(elem)), t_int);
 		}
 
 

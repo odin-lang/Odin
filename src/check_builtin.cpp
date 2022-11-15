@@ -4182,6 +4182,13 @@ bool check_builtin_procedure(CheckerContext *c, Operand *operand, Ast *call, i32
 				return false;
 			}
 
+			Type *elem = type_deref(ptr0.type);
+			if (type_size_of(elem) == 0) {
+				gbString str = type_to_string(ptr0.type);
+				error(ptr0.expr, "Expected a pointer to a non-zero sized element for '%.*s', got %s", LIT(builtin_name), str);
+				gb_string_free(str);
+				return false;
+			}
 		}
 		break;
 

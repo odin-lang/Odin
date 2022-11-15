@@ -299,6 +299,50 @@ write_escaped_rune :: proc(b: ^Builder, r: rune, quote: byte, html_safe := false
 	return
 }
 
+// writes a f64 value into the builder, returns the written amount of characters
+write_float :: proc(b: ^Builder, f: f64, fmt: byte, prec, bit_size: int, always_signed := false) -> (n: int) {
+	buf: [384]byte
+	s := strconv.append_float(buf[:], f, fmt, prec, bit_size)
+	// If the result starts with a `+` then unless we always want signed results,
+	// we skip it unless it's followed by an `I` (because of +Inf).
+	if !always_signed && (buf[0] == '+' && buf[1] != 'I') {
+		s = s[1:]
+	}
+	return write_string(b, s)
+}
+
+// writes a f16 value into the builder, returns the written amount of characters
+write_f16 :: proc(b: ^Builder, f: f16, fmt: byte, always_signed := false) -> (n: int) {
+	buf: [384]byte
+	s := strconv.append_float(buf[:], f64(f), fmt, 2*size_of(f), 8*size_of(f))
+	if !always_signed && (buf[0] == '+' && buf[1] != 'I') {
+		s = s[1:]
+	}
+	return write_string(b, s)
+}
+
+// writes a f32 value into the builder, returns the written amount of characters
+write_f32 :: proc(b: ^Builder, f: f32, fmt: byte, always_signed := false) -> (n: int) {
+	buf: [384]byte
+	s := strconv.append_float(buf[:], f64(f), fmt, 2*size_of(f), 8*size_of(f))
+	if !always_signed && (buf[0] == '+' && buf[1] != 'I') {
+		s = s[1:]
+	}
+	return write_string(b, s)
+}
+
+// writes a f64 value into the builder, returns the written amount of characters
+write_f64 :: proc(b: ^Builder, f: f64, fmt: byte, always_signed := false) -> (n: int) {
+	buf: [384]byte
+	s := strconv.append_float(buf[:], f64(f), fmt, 2*size_of(f), 8*size_of(f))
+	if !always_signed && (buf[0] == '+' && buf[1] != 'I') {
+		s = s[1:]
+	}
+	return write_string(b, s)
+}
+
+
+
 // writes a u64 value `i` in `base` = 10 into the builder, returns the written amount of characters
 write_u64 :: proc(b: ^Builder, i: u64, base: int = 10) -> (n: int) {
 	buf: [32]byte
