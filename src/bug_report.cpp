@@ -836,6 +836,10 @@ void report_os_info() {
 			{"21F2092",  {21,  5,  0}, "macOS", {"Monterey",      {12,  4,  0}}},
 			{"21G72",    {21,  6,  0}, "macOS", {"Monterey",      {12,  5,  0}}},
 			{"21G83",    {21,  6,  0}, "macOS", {"Monterey",      {12,  5,  1}}},
+			{"21G115",   {21,  6,  0}, "macOS", {"Monterey",      {12,  6,  0}}},
+			{"21G309",   {21,  6,  0}, "macOS", {"Monterey",      {12,  6,  2}}}, // Release candidate
+			{"22A380",   {22,  1,  0}, "macOS", {"Ventura",       {13,  0,  0}}},
+			{"22A400",   {22,  1,  0}, "macOS", {"Ventura",       {13,  0,  1}}},
 		};
 
 

@@ -132,7 +132,7 @@ Darwin_To_Release :: struct {
 // Important: Order from lowest to highest kernel version
 @(private)
 macos_release_map: map[string]Darwin_To_Release = {
-	// MacOS Tiger
+	// macOS Tiger
 	"8A428"   = {{8, 0, 0},   "macOS", {"Tiger",         {10,  4, 0}}},
 	"8A432"   = {{8, 0, 0},   "macOS", {"Tiger",         {10,  4, 0}}},
 	"8B15"    = {{8, 1, 0},   "macOS", {"Tiger",         {10,  4, 1}}},
@@ -163,7 +163,7 @@ macos_release_map: map[string]Darwin_To_Release = {
 	"8S165"   = {{8, 11, 0},  "macOS", {"Tiger",         {10,  4, 11}}},
 	"8S2167"  = {{8, 11, 0},  "macOS", {"Tiger",         {10,  4, 11}}},
 
-	// MacOS Leopard
+	// macOS Leopard
 	"9A581"   = {{9, 0, 0},   "macOS", {"Leopard",       {10,  5, 0}}},
 	"9B18"    = {{9, 1, 0},   "macOS", {"Leopard",       {10,  5, 1}}},
 	"9B2117"  = {{9, 1, 1},   "macOS", {"Leopard",       {10,  5, 1}}},
@@ -179,7 +179,7 @@ macos_release_map: map[string]Darwin_To_Release = {
 	"9L30"    = {{9, 8, 0},   "macOS", {"Leopard",       {10,  5, 8}}},
 	"9L34"    = {{9, 8, 0},   "macOS", {"Leopard",       {10,  5, 8}}},
 
-	// MacOS Snow Leopard
+	// macOS Snow Leopard
 	"10A432"  = {{10, 0, 0},  "macOS", {"Snow Leopard",  {10,  6, 0}}},
 	"10A433"  = {{10, 0, 0},  "macOS", {"Snow Leopard",  {10,  6, 0}}},
 	"10B504"  = {{10, 1, 0},  "macOS", {"Snow Leopard",  {10,  6, 1}}},
@@ -196,7 +196,7 @@ macos_release_map: map[string]Darwin_To_Release = {
 	"10K540"  = {{10, 8, 0},  "macOS", {"Snow Leopard",  {10,  6, 8}}},
 	"10K549"  = {{10, 8, 0},  "macOS", {"Snow Leopard",  {10,  6, 8}}},
 
-	// MacOS Lion
+	// macOS Lion
 	"11A511"  = {{11, 0, 0},  "macOS", {"Lion",          {10,  7, 0}}},
 	"11A511s" = {{11, 0, 0},  "macOS", {"Lion",          {10,  7, 0}}},
 	"11A2061" = {{11, 0, 2},  "macOS", {"Lion",          {10,  7, 0}}},
@@ -209,7 +209,7 @@ macos_release_map: map[string]Darwin_To_Release = {
 	"11G56"   = {{11, 4, 2},  "macOS", {"Lion",          {10,  7, 5}}},
 	"11G63"   = {{11, 4, 2},  "macOS", {"Lion",          {10,  7, 5}}},
 
-	// MacOS Mountain Lion
+	// macOS Mountain Lion
 	"12A269"  = {{12, 0, 0},  "macOS", {"Mountain Lion", {10,  8, 0}}},
 	"12B19"   = {{12, 1, 0},  "macOS", {"Mountain Lion", {10,  8, 1}}},
 	"12C54"   = {{12, 2, 0},  "macOS", {"Mountain Lion", {10,  8, 2}}},
@@ -227,7 +227,7 @@ macos_release_map: map[string]Darwin_To_Release = {
 	"12F2542" = {{12, 5, 0},  "macOS", {"Mountain Lion", {10,  8, 5}}},
 	"12F2560" = {{12, 5, 0},  "macOS", {"Mountain Lion", {10,  8, 5}}},
 
-	// MacOS Mavericks
+	// macOS Mavericks
 	"13A603"  = {{13, 0, 0},  "macOS", {"Mavericks",     {10,  9, 0}}},
 	"13B42"   = {{13, 0, 0},  "macOS", {"Mavericks",     {10,  9, 1}}},
 	"13C64"   = {{13, 1, 0},  "macOS", {"Mavericks",     {10,  9, 2}}},
@@ -246,7 +246,7 @@ macos_release_map: map[string]Darwin_To_Release = {
 	"13F1808" = {{13, 4, 0},  "macOS", {"Mavericks",     {10,  9, 5}}},
 	"13F1911" = {{13, 4, 0},  "macOS", {"Mavericks",     {10,  9, 5}}},
 
-	// MacOS Yosemite
+	// macOS Yosemite
 	"14A389"  = {{14, 0, 0},  "macOS", {"Yosemite",      {10, 10, 0}}},
 	"14B25"   = {{14, 0, 0},  "macOS", {"Yosemite",      {10, 10, 1}}},
 	"14C109"  = {{14, 1, 0},  "macOS", {"Yosemite",      {10, 10, 2}}},
@@ -272,7 +272,7 @@ macos_release_map: map[string]Darwin_To_Release = {
 	"14F2411" = {{14, 5, 0},  "macOS", {"Yosemite",      {10, 10, 5}}},
 	"14F2511" = {{14, 5, 0},  "macOS", {"Yosemite",      {10, 10, 5}}},
 
-	// MacOS El Capitan
+	// macOS El Capitan
 	"15A284"   = {{15, 0, 0}, "macOS", {"El Capitan",    {10, 11, 0}}},
 	"15B42"    = {{15, 0, 0}, "macOS", {"El Capitan",    {10, 11, 1}}},
 	"15C50"    = {{15, 2, 0}, "macOS", {"El Capitan",    {10, 11, 2}}},
@@ -295,7 +295,7 @@ macos_release_map: map[string]Darwin_To_Release = {
 	"15G21013" = {{15, 6, 0}, "macOS", {"El Capitan",    {10, 11, 6}}},
 	"15G22010" = {{15, 6, 0}, "macOS", {"El Capitan",    {10, 11, 6}}},
 
-	// MacOS Sierra
+	// macOS Sierra
 	"16A323"   = {{16, 0, 0}, "macOS", {"Sierra",        {10, 12, 0}}},
 	"16B2555"  = {{16, 1, 0}, "macOS", {"Sierra",        {10, 12, 1}}},
 	"16B2657"  = {{16, 1, 0}, "macOS", {"Sierra",        {10, 12, 1}}},
@@ -322,7 +322,7 @@ macos_release_map: map[string]Darwin_To_Release = {
 	"16G2128"  = {{16, 7, 0}, "macOS", {"Sierra",        {10, 12, 6}}},
 	"16G2136"  = {{16, 7, 0}, "macOS", {"Sierra",        {10, 12, 6}}},
 
-	// MacOS High Sierra
+	// macOS High Sierra
 	"17A365"   = {{17, 0, 0}, "macOS", {"High Sierra",   {10, 13, 0}}},
 	"17A405"   = {{17, 0, 0}, "macOS", {"High Sierra",   {10, 13, 0}}},
 	"17B48"    = {{17, 2, 0}, "macOS", {"High Sierra",   {10, 13, 1}}},
@@ -361,7 +361,7 @@ macos_release_map: map[string]Darwin_To_Release = {
 	"17G14033" = {{17, 7, 0}, "macOS", {"High Sierra",   {10, 13, 6}}},
 	"17G14042" = {{17, 7, 0}, "macOS", {"High Sierra",   {10, 13, 6}}},
 
-	// MacOS Mojave
+	// macOS Mojave
 	"18A391"   = {{18, 0, 0}, "macOS", {"Mojave",        {10, 14, 0}}},
 	"18B75"    = {{18, 2, 0}, "macOS", {"Mojave",        {10, 14, 1}}},
 	"18B2107"  = {{18, 2, 0}, "macOS", {"Mojave",        {10, 14, 1}}},
@@ -392,7 +392,7 @@ macos_release_map: map[string]Darwin_To_Release = {
 	"18G9216"  = {{18, 7, 0}, "macOS", {"Mojave",        {10, 14, 6}}},
 	"18G9323"  = {{18, 7, 0}, "macOS", {"Mojave",        {10, 14, 6}}},
 
-	// MacOS Catalina
+	// macOS Catalina
 	"19A583"   = {{19, 0, 0}, "macOS", {"Catalina",      {10, 15, 0}}},
 	"19A602"   = {{19, 0, 0}, "macOS", {"Catalina",      {10, 15, 0}}},
 	"19A603"   = {{19, 0, 0}, "macOS", {"Catalina",      {10, 15, 0}}},
@@ -425,7 +425,7 @@ macos_release_map: map[string]Darwin_To_Release = {
 	"19H1922"  = {{19, 6, 0}, "macOS", {"Catalina",      {10, 15, 7}}},
 	"19H2026"  = {{19, 6, 0}, "macOS", {"Catalina",      {10, 15, 7}}},
 
-	// MacOS Big Sur
+	// macOS Big Sur
 	"20A2411"  = {{20, 1, 0}, "macOS", {"Big Sur",       {11, 0, 0}}},
 	"20B29"    = {{20, 1, 0}, "macOS", {"Big Sur",       {11, 0, 1}}},
 	"20B50"    = {{20, 1, 0}, "macOS", {"Big Sur",       {11, 0, 1}}},
@@ -451,7 +451,7 @@ macos_release_map: map[string]Darwin_To_Release = {
 	"20G630"   = {{20, 6, 0}, "macOS", {"Big Sur",       {11, 6, 7}}},
 	"20G730"   = {{20, 6, 0}, "macOS", {"Big Sur",       {11, 6, 8}}},
 
-	// MacOS Monterey
+	// macOS Monterey
 	"21A344"   = {{21, 0, 1}, "macOS", {"Monterey",      {12, 0, 0}}},
 	"21A559"   = {{21, 1, 0}, "macOS", {"Monterey",      {12, 0, 1}}},
 	"21C52"    = {{21, 2, 0}, "macOS", {"Monterey",      {12, 1, 0}}},
@@ -465,6 +465,12 @@ macos_release_map: map[string]Darwin_To_Release = {
 	"21G72"    = {{21, 6, 0}, "macOS", {"Monterey",      {12, 5, 0}}},
 	"21G83"    = {{21, 6, 0}, "macOS", {"Monterey",      {12, 5, 1}}},
 	"21G115"   = {{21, 6, 0}, "macOS", {"Monterey",      {12, 6, 0}}},
+	"21G115"   = {{21, 6, 0}, "macOS", {"Monterey",      {12, 6, 0}}},
+	"21G309"   = {{21, 6, 0}, "macOS", {"Monterey",      {12, 6, 2}}}, // Release candidate
+
+	// macOS Ventura
+	"22A380"   = {{22, 1, 0}, "macOS", {"Ventura",       {13, 0, 0}}},
+	"22A400"   = {{22, 1, 0}, "macOS", {"Ventura",       {13, 0, 1}}},
 }
 
 @(private)
