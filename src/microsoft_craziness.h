@@ -108,7 +108,7 @@ HANDLE mc_find_first(String wildcard, MC_Find_Data *find_data) {
  	defer (mc_free(wildcard_wide));
 
  	HANDLE handle = FindFirstFileW(wildcard_wide.text, &_find_data);
- 	if (handle == INVALID_HANDLE_VALUE) return false;
+ 	if (handle == INVALID_HANDLE_VALUE) return INVALID_HANDLE_VALUE;
 
  	find_data->file_attributes = _find_data.dwFileAttributes;
  	find_data->filename        = mc_wstring_to_string(_find_data.cFileName);
