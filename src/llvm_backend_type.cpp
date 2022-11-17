@@ -666,7 +666,7 @@ void lb_setup_type_info_data(lbProcedure *p) { // NOTE(bill): Setup type_info da
 				}
 
 				if (is_type_comparable(t) && !is_type_simple_compare(t)) {
-					vals[3] = lb_get_equal_proc_for_type(m, t).value;
+					vals[3] = lb_equal_proc_for_type(m, t).value;
 				}
 
 				vals[4] = lb_const_bool(m, t_bool, t->Union.custom_align != 0).value;
@@ -702,7 +702,7 @@ void lb_setup_type_info_data(lbProcedure *p) { // NOTE(bill): Setup type_info da
 				vals[6] = is_raw_union.value;
 				vals[7] = is_custom_align.value;
 				if (is_type_comparable(t) && !is_type_simple_compare(t)) {
-					vals[8] = lb_get_equal_proc_for_type(m, t).value;
+					vals[8] = lb_equal_proc_for_type(m, t).value;
 				}
 
 
@@ -788,15 +788,11 @@ void lb_setup_type_info_data(lbProcedure *p) { // NOTE(bill): Setup type_info da
 		case Type_Map: {
 			tag = lb_const_ptr_cast(m, variant_ptr, t_type_info_map_ptr);
 			init_map_internal_types(t);
-			
-			lbValue gst = lb_type_info(m, t->Map.internal_type);
 
-			LLVMValueRef vals[5] = {
+			LLVMValueRef vals[3] = {
 				lb_type_info(m, t->Map.key).value,
 				lb_type_info(m, t->Map.value).value,
-				gst.value,
-				lb_get_equal_proc_for_type(m, t->Map.key).value,
-				lb_get_hasher_proc_for_type(m, t->Map.key).value
+				lb_gen_map_info_ptr(p->module, t).value
 			};
 
 			lbValue res = {};

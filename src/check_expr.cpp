@@ -285,6 +285,37 @@ void error_operand_no_value(Operand *o) {
 	}
 }
 
+void add_map_get_dependencies(CheckerContext *c) {
+	if (build_context.use_static_map_calls) {
+		add_package_dependency(c, "runtime", "map_desired_position");
+		add_package_dependency(c, "runtime", "map_probe_distance");
+	} else {
+		add_package_dependency(c, "runtime", "__dynamic_map_get");
+	}
+}
+
+void add_map_set_dependencies(CheckerContext *c) {
+	init_core_source_code_location(c->checker);
+
+	if (t_map_set_proc == nullptr) {
+		Type *map_set_args[5] = {/*map*/t_rawptr, /*hash*/t_uintptr, /*key*/t_rawptr, /*value*/t_rawptr, /*#caller_location*/t_source_code_location};
+		t_map_set_proc = alloc_type_proc_from_types(map_set_args, gb_count_of(map_set_args), t_rawptr, false, ProcCC_Odin);
+	}
+
+	if (build_context.use_static_map_calls) {
+		add_package_dependency(c, "runtime", "__dynamic_map_check_grow");
+		add_package_dependency(c, "runtime", "map_insert_hash_dynamic");
+	} else {
+		add_package_dependency(c, "runtime", "__dynamic_map_set");
+	}
+}
+
+void add_map_reserve_dependencies(CheckerContext *c) {
+	init_core_source_code_location(c->checker);
+	add_package_dependency(c, "runtime", "__dynamic_map_reserve");
+}
+
+
 
 void check_scope_decls(CheckerContext *c, Slice<Ast *> const &nodes, isize reserve_size) {
 	Scope *s = c->scope;
@@ -1364,8 +1395,6 @@ bool is_polymorphic_type_assignable(CheckerContext *c, Type *poly, Type *source,
 			bool key   = is_polymorphic_type_assignable(c, poly->Map.key, source->Map.key, true, modify_type);
 			bool value = is_polymorphic_type_assignable(c, poly->Map.value, source->Map.value, true, modify_type);
 			if (key || value) {
-				poly->Map.entry_type = nullptr;
-				poly->Map.internal_type = nullptr;
 				poly->Map.lookup_result_type = nullptr;
 				init_map_internal_types(poly);
 				return true;
@@ -3246,7 +3275,7 @@ void check_binary_expr(CheckerContext *c, Operand *x, Ast *node, Type *type_hint
 				check_assignment(c, x, yt->Map.key, str_lit("map 'not_in'"));
 			}
 
-			add_package_dependency(c, "runtime", "__dynamic_map_get");
+			add_map_get_dependencies(c);
 		} else if (is_type_bit_set(rhs_type)) {
 			Type *yt = base_type(rhs_type);
 
@@ -8557,8 +8586,8 @@ ExprKind check_compound_literal(CheckerContext *c, Operand *o, Ast *node, Type *
 		if (build_context.no_dynamic_literals && cl->elems.count) {
 			error(node, "Compound literals of dynamic types have been disabled");
 		} else {
-			add_package_dependency(c, "runtime", "__dynamic_map_reserve");
-			add_package_dependency(c, "runtime", "__dynamic_map_set");
+			add_map_reserve_dependencies(c);
+			add_map_set_dependencies(c);
 		}
 		break;
 	}
@@ -8994,8 +9023,8 @@ ExprKind check_index_expr(CheckerContext *c, Operand *o, Ast *node, Type *type_h
 		o->type = t->Map.value;
 		o->expr = node;
 
-		add_package_dependency(c, "runtime", "__dynamic_map_get");
-		add_package_dependency(c, "runtime", "__dynamic_map_set");
+		add_map_get_dependencies(c);
+		add_map_set_dependencies(c);
 		return Expr_Expr;
 	}
 

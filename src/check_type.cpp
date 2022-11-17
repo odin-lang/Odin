@@ -2176,70 +2176,36 @@ Type *make_optional_ok_type(Type *value, bool typed) {
 	return t;
 }
 
-void init_map_entry_type(Type *type) {
-	GB_ASSERT(type->kind == Type_Map);
-	if (type->Map.entry_type != nullptr) return;
 
-	// NOTE(bill): The preload types may have not been set yet
-	GB_ASSERT(t_map_hash != nullptr);
+// IMPORTANT NOTE(bill): This must match the definition in dynamic_map_internal.odin
+enum : i64 {
+	MAP_CACHE_LINE_LOG2 = 6,
+	MAP_CACHE_LINE_SIZE = 1 << MAP_CACHE_LINE_LOG2
+};
+GB_STATIC_ASSERT(MAP_CACHE_LINE_SIZE >= 64);
+void map_cell_size_and_len(Type *type, i64 *size_, i64 *len_) {
+	i64 elem_sz = type_size_of(type);
 
-	/*
-	struct {
-		hash:  uintptr,
-		next:  int,
-		key:   Key,
-		value: Value,
+	i64 len = 1;
+	if (0 < elem_sz && elem_sz < MAP_CACHE_LINE_SIZE) {
+		len = MAP_CACHE_LINE_SIZE / elem_sz;
 	}
-	*/
-	Scope *s = create_scope(nullptr, builtin_pkg->scope);
-
-	auto fields = slice_make<Entity *>(permanent_allocator(), 4);
-	fields[0] = alloc_entity_field(s, make_token_ident(str_lit("hash")),  t_uintptr,       false, 0, EntityState_Resolved);
-	fields[1] = alloc_entity_field(s, make_token_ident(str_lit("next")),  t_int,           false, 1, EntityState_Resolved);
-	fields[2] = alloc_entity_field(s, make_token_ident(str_lit("key")),   type->Map.key,   false, 2, EntityState_Resolved);
-	fields[3] = alloc_entity_field(s, make_token_ident(str_lit("value")), type->Map.value, false, 3, EntityState_Resolved);
-
-	Type *entry_type = alloc_type_struct();
-	entry_type->Struct.fields  = fields;
-	entry_type->Struct.tags    = gb_alloc_array(permanent_allocator(), String, fields.count);
-	
-	type_set_offsets(entry_type);
-	type->Map.entry_type = entry_type;
+	i64 size = align_formula(elem_sz * len, MAP_CACHE_LINE_SIZE);
+	if (size_) *size_ = size;
+	if (len_)  *len_ = len;
 }
 
 void init_map_internal_types(Type *type) {
 	GB_ASSERT(type->kind == Type_Map);
-	init_map_entry_type(type);
-	if (type->Map.internal_type != nullptr) return;
+	GB_ASSERT(t_allocator != nullptr);
+	if (type->Map.lookup_result_type != nullptr) return;
 
 	Type *key   = type->Map.key;
 	Type *value = type->Map.value;
 	GB_ASSERT(key != nullptr);
 	GB_ASSERT(value != nullptr);
 
-	Type *generated_struct_type = alloc_type_struct();
-
-	/*
-	struct {
-		hashes:  []int;
-		entries: [dynamic]EntryType;
-	}
-	*/
-	Scope *s = create_scope(nullptr, builtin_pkg->scope);
-
-	Type *hashes_type  = alloc_type_slice(t_int);
-	Type *entries_type = alloc_type_dynamic_array(type->Map.entry_type);
-
-
-	auto fields = slice_make<Entity *>(permanent_allocator(), 2);
-	fields[0] = alloc_entity_field(s, make_token_ident(str_lit("hashes")),  hashes_type,  false, 0, EntityState_Resolved);
-	fields[1] = alloc_entity_field(s, make_token_ident(str_lit("entries")), entries_type, false, 1, EntityState_Resolved);
-
-	generated_struct_type->Struct.fields = fields;
-	type_set_offsets(generated_struct_type);
-	
-	type->Map.internal_type         = generated_struct_type;
-	type->Map.lookup_result_type    = make_optional_ok_type(value);
+	type->Map.lookup_result_type = make_optional_ok_type(value);
 }
 
 void add_map_key_type_dependencies(CheckerContext *ctx, Type *key) {
@@ -2255,35 +2221,27 @@ void add_map_key_type_dependencies(CheckerContext *ctx, Type *key) {
 		}
 
 		if (is_type_simple_compare(key)) {
-			i64 sz = type_size_of(key);
-			if (1 <= sz && sz <= 16) {
-				char buf[20] = {};
-				gb_snprintf(buf, 20, "default_hasher%d", cast(i32)sz);
-				add_package_dependency(ctx, "runtime", buf);
-				return;
-			} else {
-				add_package_dependency(ctx, "runtime", "default_hasher_n");
-				return;
-			}
+			add_package_dependency(ctx, "runtime", "default_hasher");
+			return;
 		}
 
 		if (key->kind == Type_Struct) {
-			add_package_dependency(ctx, "runtime", "default_hasher_n");
+			add_package_dependency(ctx, "runtime", "default_hasher");
 			for_array(i, key->Struct.fields) {
 				Entity *field = key->Struct.fields[i];
 				add_map_key_type_dependencies(ctx, field->type);
 			}
 		} else if (key->kind == Type_Union) {
-			add_package_dependency(ctx, "runtime", "default_hasher_n");
+			add_package_dependency(ctx, "runtime", "default_hasher");
 			for_array(i, key->Union.variants) {
 				Type *v = key->Union.variants[i];
 				add_map_key_type_dependencies(ctx, v);
 			}
 		} else if (key->kind == Type_EnumeratedArray) {
-			add_package_dependency(ctx, "runtime", "default_hasher_n");
+			add_package_dependency(ctx, "runtime", "default_hasher");
 			add_map_key_type_dependencies(ctx, key->EnumeratedArray.elem);
 		} else if (key->kind == Type_Array) {
-			add_package_dependency(ctx, "runtime", "default_hasher_n");
+			add_package_dependency(ctx, "runtime", "default_hasher");
 			add_map_key_type_dependencies(ctx, key->Array.elem);
 		}
 	}

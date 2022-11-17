@@ -144,6 +144,8 @@ struct lbModule {
 
 	PtrMap<Type *, lbProcedure *> equal_procs;
 	PtrMap<Type *, lbProcedure *> hasher_procs;
+	PtrMap<Type *, lbProcedure *> map_get_procs;
+	PtrMap<Type *, lbProcedure *> map_set_procs;
 
 	u32 nested_type_name_guid;
 
@@ -160,7 +162,8 @@ struct lbModule {
 	StringMap<lbAddr> objc_classes;
 	StringMap<lbAddr> objc_selectors;
 
-	PtrMap<Type *, lbAddr> map_header_table_map;
+	PtrMap<Type *, lbAddr> map_cell_info_map; // address of runtime.Map_Info
+	PtrMap<Type *, lbAddr> map_info_map;      // address of runtime.Map_Cell_Info
 };
 
 struct lbGenerator {
@@ -422,8 +425,6 @@ lbValue lb_dynamic_array_elem(lbProcedure *p, lbValue da);
 lbValue lb_dynamic_array_len(lbProcedure *p, lbValue da);
 lbValue lb_dynamic_array_cap(lbProcedure *p, lbValue da);
 lbValue lb_dynamic_array_allocator(lbProcedure *p, lbValue da);
-lbValue lb_map_entries(lbProcedure *p, lbValue value);
-lbValue lb_map_entries_ptr(lbProcedure *p, lbValue value);
 lbValue lb_map_len(lbProcedure *p, lbValue value);
 lbValue lb_map_cap(lbProcedure *p, lbValue value);
 lbValue lb_soa_struct_len(lbProcedure *p, lbValue value);
@@ -447,10 +448,12 @@ String lb_get_const_string(lbModule *m, lbValue value);
 lbValue lb_generate_local_array(lbProcedure *p, Type *elem_type, i64 count, bool zero_init=true);
 lbValue lb_generate_global_array(lbModule *m, Type *elem_type, i64 count, String prefix, i64 id);
 lbValue lb_gen_map_key_hash(lbProcedure *p, lbValue key, Type *key_type, lbValue *key_ptr_);
+lbValue lb_gen_map_cell_info_ptr(lbModule *m, Type *type);
+lbValue lb_gen_map_info_ptr(lbModule *m, Type *map_type);
 
 lbValue lb_internal_dynamic_map_get_ptr(lbProcedure *p, lbValue const &map_ptr, lbValue const &key);
-void    lb_insert_dynamic_map_key_and_value(lbProcedure *p, lbValue const &map_ptr, Type *map_type, lbValue const &map_key, lbValue const &map_value, Ast *node);
-void    lb_dynamic_map_reserve(lbProcedure *p, lbValue const &map_ptr, isize const capacity, TokenPos const &pos);
+void    lb_internal_dynamic_map_set(lbProcedure *p, lbValue const &map_ptr, Type *map_type, lbValue const &map_key, lbValue const &map_value, Ast *node);
+lbValue lb_dynamic_map_reserve(lbProcedure *p, lbValue const &map_ptr, isize const capacity, TokenPos const &pos);
 
 lbValue lb_find_procedure_value_from_entity(lbModule *m, Entity *e);
 lbValue lb_find_value_from_entity(lbModule *m, Entity *e);
@@ -461,8 +464,8 @@ lbValue lb_emit_source_code_location_const(lbProcedure *p, String const &procedu
 
 lbValue lb_handle_param_value(lbProcedure *p, Type *parameter_type, ParameterValue const &param_value, TokenPos const &pos);
 
-lbValue lb_get_equal_proc_for_type(lbModule *m, Type *type);
-lbValue lb_get_hasher_proc_for_type(lbModule *m, Type *type);
+lbValue lb_equal_proc_for_type(lbModule *m, Type *type);
+lbValue lb_hasher_proc_for_type(lbModule *m, Type *type);
 lbValue lb_emit_conv(lbProcedure *p, lbValue value, Type *t);
 
 LLVMMetadataRef lb_debug_type(lbModule *m, Type *type);

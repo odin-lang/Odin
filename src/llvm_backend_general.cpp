@@ -67,6 +67,8 @@ void lb_init_module(lbModule *m, Checker *c) {
 	map_init(&m->function_type_map, a);
 	map_init(&m->equal_procs, a);
 	map_init(&m->hasher_procs, a);
+	map_init(&m->map_get_procs, a);
+	map_init(&m->map_set_procs, a);
 	array_init(&m->procedures_to_generate, a, 0, 1024);
 	array_init(&m->missing_procedures_to_check, a, 0, 16);
 	map_init(&m->debug_values, a);
@@ -75,7 +77,8 @@ void lb_init_module(lbModule *m, Checker *c) {
 	string_map_init(&m->objc_classes, a);
 	string_map_init(&m->objc_selectors, a);
 
-	map_init(&m->map_header_table_map, a, 0);
+	map_init(&m->map_info_map, a, 0);
+	map_init(&m->map_cell_info_map, a, 0);
 
 }
 
@@ -725,7 +728,7 @@ void lb_addr_store(lbProcedure *p, lbAddr addr, lbValue value) {
 
 		return;
 	} else if (addr.kind == lbAddr_Map) {
-		lb_insert_dynamic_map_key_and_value(p, addr.addr, addr.map.type, addr.map.key, value, p->curr_stmt);
+		lb_internal_dynamic_map_set(p, addr.addr, addr.map.type, addr.map.key, value, p->curr_stmt);
 		return;
 	} else if (addr.kind == lbAddr_Context) {
 		lbAddr old_addr = lb_find_or_generate_context_ptr(p);
@@ -1931,38 +1934,8 @@ LLVMTypeRef lb_type_internal(lbModule *m, Type *type) {
 
 	case Type_Map:
 		init_map_internal_types(type);
-		{
-			Type *internal_type = type->Map.internal_type;
-			GB_ASSERT(internal_type->kind == Type_Struct);
-
-			m->internal_type_level -= 1;
-			defer (m->internal_type_level += 1);
-
-			unsigned field_count = cast(unsigned)(internal_type->Struct.fields.count);
-			GB_ASSERT(field_count == 2);
-			LLVMTypeRef *fields = gb_alloc_array(temporary_allocator(), LLVMTypeRef, field_count);
-
-			LLVMTypeRef entries_fields[] = {
-				lb_type(m, t_rawptr), // data
-				lb_type(m, t_int), // len
-				lb_type(m, t_int), // cap
-				lb_type(m, t_allocator), // allocator
-			};
-
-			fields[0] = lb_type(m, internal_type->Struct.fields[0]->type);
-			fields[1] = LLVMStructTypeInContext(ctx, entries_fields, gb_count_of(entries_fields), false);
-			
-			{ // Add this to simplify things
-				lbStructFieldRemapping entries_field_remapping = {};
-				slice_init(&entries_field_remapping, permanent_allocator(), gb_count_of(entries_fields));
-				for_array(i, entries_field_remapping) {
-					entries_field_remapping[i] = cast(i32)i;
-				}
-				map_set(&m->struct_field_remapping, cast(void *)fields[1], entries_field_remapping);
-			}
-			
-			return LLVMStructTypeInContext(ctx, fields, field_count, false);
-		}
+		GB_ASSERT(t_raw_map != nullptr);
+		return lb_type_internal(m, t_raw_map);
 
 	case Type_Struct:
 		{

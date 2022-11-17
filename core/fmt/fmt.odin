@@ -2069,41 +2069,27 @@ fmt_value :: proc(fi: ^Info, v: any, verb: rune) {
 
 		m := (^mem.Raw_Map)(v.data)
 		if m != nil {
-			if info.generated_struct == nil {
+			if info.map_info == nil {
 				return
 			}
-			entries    := &m.entries
-			gs         := runtime.type_info_base(info.generated_struct).variant.(runtime.Type_Info_Struct)
-			ed         := runtime.type_info_base(gs.types[1]).variant.(runtime.Type_Info_Dynamic_Array)
-			entry_type := ed.elem.variant.(runtime.Type_Info_Struct)
-			entry_size := ed.elem_size
-			/*
-				NOTE: The layout of a `map` is as follows:
-
-					map[Key]Value
-
-				## Internal Layout
-				struct {
-					hashes: []int,
-					entries: [dynamic]struct{
-						hash:  uintptr,
-						next:  int,
-						key:   Key,
-						value: Value,
-					},
+			map_cap := uintptr(runtime.map_cap(m^))
+			ks, vs, hs, _, _ := runtime.map_kvh_data_dynamic(m^, info.map_info)
+			j := 0
+			for bucket_index in 0..<map_cap {
+				if !runtime.map_hash_is_valid(hs[bucket_index]) {
+					continue
 				}
-			*/
-			for i in 0..<entries.len {
-				if i > 0 { io.write_string(fi.writer, ", ", &fi.n) }
 
-				data := uintptr(entries.data) + uintptr(i*entry_size)
+				if j > 0 {
+					io.write_string(fi.writer, ", ", &fi.n)
+				}
+				j += 1
 
-				key := data + entry_type.offsets[2] // key: Key
+				key   := runtime.map_cell_index_dynamic(ks, info.map_info.ks, bucket_index)
+				value := runtime.map_cell_index_dynamic(vs, info.map_info.vs, bucket_index)
+
 				fmt_arg(&Info{writer = fi.writer}, any{rawptr(key), info.key.id}, 'v')
-
 				io.write_string(fi.writer, "=", &fi.n)
-
-				value := data + entry_type.offsets[3] // value: Value
 				fmt_arg(fi, any{rawptr(value), info.value.id}, 'v')
 			}
 		}
