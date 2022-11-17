@@ -671,7 +671,8 @@ void lb_debug_complete_types(lbModule *m) {
 				break;
 
 			case Type_Map:
-				bt = bt->Map.internal_type;
+				GB_ASSERT(t_raw_map != nullptr);
+				bt = base_type(t_raw_map);
 				/*fallthrough*/
 			case Type_Struct:
 				if (file == nullptr) {

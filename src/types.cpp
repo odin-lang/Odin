@@ -226,8 +226,6 @@ struct TypeProc {
 	TYPE_KIND(Map, struct {                                   \
 		Type *key;                                        \
 		Type *value;                                      \
-		Type *entry_type;                                 \
-		Type *internal_type;                              \
 		Type *lookup_result_type;                         \
 	})                                                        \
 	TYPE_KIND(Struct,  TypeStruct)                            \
@@ -685,13 +683,18 @@ gb_global Type *t_allocator_error                = nullptr;
 gb_global Type *t_source_code_location           = nullptr;
 gb_global Type *t_source_code_location_ptr       = nullptr;
 
-gb_global Type *t_map_hash                       = nullptr;
-gb_global Type *t_map_header                     = nullptr;
-gb_global Type *t_map_header_table               = nullptr;
+gb_global Type *t_map_info                       = nullptr;
+gb_global Type *t_map_cell_info                  = nullptr;
+gb_global Type *t_raw_map                        = nullptr;
+gb_global Type *t_map_info_ptr                   = nullptr;
+gb_global Type *t_map_cell_info_ptr              = nullptr;
+gb_global Type *t_raw_map_ptr                    = nullptr;
 
 
 gb_global Type *t_equal_proc  = nullptr;
 gb_global Type *t_hasher_proc = nullptr;
+gb_global Type *t_map_get_proc = nullptr;
+gb_global Type *t_map_set_proc = nullptr;
 
 gb_global Type *t_objc_object   = nullptr;
 gb_global Type *t_objc_selector = nullptr;
@@ -1926,7 +1929,7 @@ bool is_type_valid_for_keys(Type *t) {
 	if (is_type_untyped(t)) {
 		return false;
 	}
-	return is_type_comparable(t);
+	return type_size_of(t) > 0 && is_type_comparable(t);
 }
 
 bool is_type_valid_bit_set_elem(Type *t) {
@@ -3333,8 +3336,6 @@ Selection lookup_field_with_selection(Type *type_, String field_name, bool is_ty
 			}
 		}
 	} else if (type->kind == Type_DynamicArray) {
-		// IMPORTANT TODO(bill): Should these members be available to should I only allow them with
-		// `Raw_Dynamic_Array` type?
 		GB_ASSERT(t_allocator != nullptr);
 		String allocator_str = str_lit("allocator");
 		gb_local_persist Entity *entity__allocator = alloc_entity_field(nullptr, make_token_ident(allocator_str), t_allocator, false, 3);
@@ -3345,15 +3346,12 @@ Selection lookup_field_with_selection(Type *type_, String field_name, bool is_ty
 			return sel;
 		}
 	} else if (type->kind == Type_Map) {
-		// IMPORTANT TODO(bill): Should these members be available to should I only allow them with
-		// `Raw_Map` type?
 		GB_ASSERT(t_allocator != nullptr);
 		String allocator_str = str_lit("allocator");
-		gb_local_persist Entity *entity__allocator = alloc_entity_field(nullptr, make_token_ident(allocator_str), t_allocator, false, 3);
+		gb_local_persist Entity *entity__allocator = alloc_entity_field(nullptr, make_token_ident(allocator_str), t_allocator, false, 2);
 
 		if (field_name == allocator_str) {
-			selection_add_index(&sel, 1);
-			selection_add_index(&sel, 3);
+			selection_add_index(&sel, 2);
 			sel.entity = entity__allocator;
 			return sel;
 		}
@@ -3798,11 +3796,12 @@ i64 type_size_of_internal(Type *t, TypePath *path) {
 	case Type_Map:
 		/*
 			struct {
-				hashes:  []int,               // 2 words
-				entries: [dynamic]Entry_Type, // 5 words
+				data:      uintptr,           // 1 word
+				size:      uintptr,           // 1 word
+				allocator: runtime.Allocator, // 2 words
 			}
 		*/
-		return (2 + (3 + 2))*build_context.word_size;
+		return (1 + 1 + 2)*build_context.word_size;
 
 	case Type_Tuple: {
 		i64 count, align, size;

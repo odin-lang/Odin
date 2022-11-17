@@ -638,6 +638,7 @@ enum BuildFlagKind {
 	BuildFlag_StrictStyleInitOnly,
 	BuildFlag_ForeignErrorProcedures,
 	BuildFlag_DisallowRTTI,
+	BuildFlag_UseStaticMapCalls,
 
 	BuildFlag_Compact,
 	BuildFlag_GlobalDefinitions,
@@ -813,6 +814,8 @@ bool parse_build_flags(Array<String> args) {
 	add_flag(&build_flags, BuildFlag_ForeignErrorProcedures,  str_lit("foreign-error-procedures"),  BuildFlagParam_None,    Command__does_check);
 
 	add_flag(&build_flags, BuildFlag_DisallowRTTI,            str_lit("disallow-rtti"),             BuildFlagParam_None,    Command__does_check);
+
+	add_flag(&build_flags, BuildFlag_UseStaticMapCalls,       str_lit("use-static-map-calls"),      BuildFlagParam_None,    Command__does_check);
 
 
 	add_flag(&build_flags, BuildFlag_Compact,                 str_lit("compact"),                   BuildFlagParam_None,    Command_query);
@@ -1413,6 +1416,9 @@ bool parse_build_flags(Array<String> args) {
 							break;
 						case BuildFlag_DisallowRTTI:
 							build_context.disallow_rtti = true;
+							break;
+						case BuildFlag_UseStaticMapCalls:
+							build_context.use_static_map_calls = true;
 							break;
 						case BuildFlag_DefaultToNilAllocator:
 							build_context.ODIN_DEFAULT_TO_NIL_ALLOCATOR = true;

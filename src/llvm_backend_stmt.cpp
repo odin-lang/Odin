@@ -354,16 +354,6 @@ void lb_build_range_indexed(lbProcedure *p, lbValue expr, Type *val_type, lbValu
 		}
 		break;
 	}
-	case Type_Map: {
-		lbValue entries = lb_map_entries_ptr(p, expr);
-		lbValue elem = lb_emit_struct_ep(p, entries, 0);
-		elem = lb_emit_load(p, elem);
-		lbValue entry = lb_emit_ptr_offset(p, elem, idx);		
-		idx = lb_emit_load(p, lb_emit_struct_ep(p, entry, 2));
-		val = lb_emit_load(p, lb_emit_struct_ep(p, entry, 3));
-
-		break;
-	}
 	case Type_Struct: {
 		GB_ASSERT(is_type_soa_struct(expr_type));
 		break;
@@ -379,6 +369,129 @@ void lb_build_range_indexed(lbProcedure *p, lbValue expr, Type *val_type, lbValu
 	if (loop_) *loop_ = loop;
 	if (done_) *done_ = done;
 }
+
+lbValue lb_map_cell_index_static(lbProcedure *p, Type *type, lbValue cells_ptr, lbValue index) {
+	i64 size, len;
+	i64 elem_sz = type_size_of(type);
+	map_cell_size_and_len(type, &size, &len);
+
+	index = lb_emit_conv(p, index, t_uintptr);
+
+	if (size == len*elem_sz) {
+		lbValue elems_ptr = lb_emit_conv(p, cells_ptr, alloc_type_pointer(type));
+		return lb_emit_ptr_offset(p, elems_ptr, index);
+	}
+
+	lbValue cell_index = {};
+	lbValue data_index = {};
+
+	lbValue size_const = lb_const_int(p->module, t_uintptr, size);
+	lbValue len_const = lb_const_int(p->module, t_uintptr, len);
+
+	if (is_power_of_two(len)) {
+		u64 log2_len = floor_log2(cast(u64)len);
+		cell_index = log2_len == 0 ? index : lb_emit_arith(p, Token_Shr, index, lb_const_int(p->module, t_uintptr, log2_len), t_uintptr);
+		data_index = lb_emit_arith(p, Token_And, index, lb_const_int(p->module, t_uintptr, len-1), t_uintptr);
+	} else {
+		cell_index = lb_emit_arith(p, Token_Quo, index, len_const, t_uintptr);
+		data_index = lb_emit_arith(p, Token_Mod, index, len_const, t_uintptr);
+	}
+
+	lbValue elems_ptr = lb_emit_conv(p, cells_ptr, t_uintptr);
+	lbValue cell_offset = lb_emit_arith(p, Token_Mul, size_const, cell_index, t_uintptr);
+	elems_ptr = lb_emit_arith(p, Token_Add, elems_ptr, cell_offset, t_uintptr);
+
+	elems_ptr = lb_emit_conv(p, elems_ptr, alloc_type_pointer(type));
+
+	return lb_emit_ptr_offset(p, elems_ptr, data_index);
+}
+
+void lb_map_kvh_data_static(lbProcedure *p, lbValue map_value, lbValue *ks_, lbValue *vs_, lbValue *hs_) {
+	lbValue capacity = lb_map_cap(p, map_value);
+	lbValue ks = lb_map_data_uintptr(p, map_value);
+	lbValue vs = {};
+	lbValue hs = {};
+	if (ks_) *ks_ = ks;
+	if (vs_) *vs_ = vs;
+	if (hs_) *hs_ = hs;
+}
+
+lbValue lb_map_hash_is_valid(lbProcedure *p, lbValue hash) {
+	// N :: size_of(uintptr)*8 - 1
+	// (hash != 0) & (hash>>N == 0)
+
+	u64 top_bit_index = cast(u64)(type_size_of(t_uintptr)*8 - 1);
+	lbValue shift_amount = lb_const_int(p->module, t_uintptr, top_bit_index);
+	lbValue zero = lb_const_int(p->module, t_uintptr, 0);
+
+	lbValue not_empty = lb_emit_comp(p, Token_NotEq, hash, zero);
+
+	lbValue not_deleted = lb_emit_arith(p, Token_Shr, hash, shift_amount, t_uintptr);
+	not_deleted = lb_emit_comp(p, Token_CmpEq, not_deleted, zero);
+
+	return lb_emit_arith(p, Token_And, not_deleted, not_empty, t_uintptr);
+}
+
+void lb_build_range_map(lbProcedure *p, lbValue expr, Type *val_type,
+                        lbValue *val_, lbValue *key_, lbBlock **loop_, lbBlock **done_) {
+	lbModule *m = p->module;
+
+	Type *type = base_type(type_deref(expr.type));
+	GB_ASSERT(type->kind == Type_Map);
+
+	lbValue idx = {};
+	lbBlock *loop = nullptr;
+	lbBlock *done = nullptr;
+	lbBlock *body = nullptr;
+	lbBlock *hash_check = nullptr;
+
+
+	lbAddr index = lb_add_local_generated(p, t_int, false);
+	lb_addr_store(p, index, lb_const_int(m, t_int, cast(u64)-1));
+
+	loop = lb_create_block(p, "for.index.loop");
+	lb_emit_jump(p, loop);
+	lb_start_block(p, loop);
+
+	lbValue incr = lb_emit_arith(p, Token_Add, lb_addr_load(p, index), lb_const_int(m, t_int, 1), t_int);
+	lb_addr_store(p, index, incr);
+
+	hash_check = lb_create_block(p, "for.index.hash_check");
+	body = lb_create_block(p, "for.index.body");
+	done = lb_create_block(p, "for.index.done");
+
+	lbValue map_value = lb_emit_load(p, expr);
+	lbValue capacity = lb_map_cap(p, map_value);
+	lbValue cond = lb_emit_comp(p, Token_Lt, incr, capacity);
+	lb_emit_if(p, cond, hash_check, done);
+	lb_start_block(p, hash_check);
+
+	idx = lb_addr_load(p, index);
+
+	lbValue ks = lb_map_data_uintptr(p, map_value);
+	lbValue vs = lb_emit_conv(p, lb_map_cell_index_static(p, type->Map.key, ks, capacity), alloc_type_pointer(type->Map.value));
+	lbValue hs = lb_emit_conv(p, lb_map_cell_index_static(p, type->Map.value, vs, capacity), alloc_type_pointer(t_uintptr));
+
+	// NOTE(bill): no need to use lb_map_cell_index_static for that hashes
+	// since it will always be packed without padding into the cells
+	lbValue hash = lb_emit_load(p, lb_emit_ptr_offset(p, hs, idx));
+
+	lbValue hash_cond = lb_map_hash_is_valid(p, hash);
+	lb_emit_if(p, hash_cond, body, loop);
+	lb_start_block(p, body);
+
+
+	lbValue key_ptr = lb_map_cell_index_static(p, type->Map.key, ks, idx);
+	lbValue val_ptr = lb_map_cell_index_static(p, type->Map.value, vs, idx);
+	lbValue key = lb_emit_load(p, key_ptr);
+	lbValue val = lb_emit_load(p, val_ptr);
+
+	if (val_)  *val_  = val;
+	if (key_)  *key_  = key;
+	if (loop_) *loop_ = loop;
+	if (done_) *done_ = done;
+}
+
 
 
 void lb_build_range_string(lbProcedure *p, lbValue expr, Type *val_type,
@@ -749,9 +862,7 @@ void lb_build_range_stmt(lbProcedure *p, AstRangeStmt *rs, Scope *scope) {
 			if (is_type_pointer(type_deref(map.type))) {
 				map = lb_emit_load(p, map);
 			}
-			lbValue entries_ptr = lb_map_entries_ptr(p, map);
-			lbValue count_ptr = lb_emit_struct_ep(p, entries_ptr, 1);
-			lb_build_range_indexed(p, map, val1_type, count_ptr, &val, &key, &loop, &done);
+			lb_build_range_map(p, map, val1_type, &val, &key, &loop, &done);
 			break;
 		}
 		case Type_Array: {
