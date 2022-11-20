@@ -2724,18 +2724,13 @@ lbValue lb_emit_comp_against_nil(lbProcedure *p, TokenKind op_kind, lbValue x) {
 
 	case Type_Map:
 		{
-			lbValue map_ptr = lb_address_from_load_or_generate_local(p, x);
-
-			unsigned indices[2] = {0, 0};
-			lbValue hashes_data = lb_emit_struct_ep(p, map_ptr, 0);
-			lbValue hashes_data_ptr_ptr = lb_emit_struct_ep(p, hashes_data, 0);
-			LLVMValueRef hashes_data_ptr = LLVMBuildLoad2(p->builder, llvm_addr_type(p->module, hashes_data_ptr_ptr), hashes_data_ptr_ptr.value, "");
+			lbValue data_ptr = lb_emit_struct_ev(p, x, 0);
 
 			if (op_kind == Token_CmpEq) {
-				res.value = LLVMBuildIsNull(p->builder, hashes_data_ptr, "");
+				res.value = LLVMBuildIsNull(p->builder, data_ptr.value, "");
 				return res;
 			} else {
-				res.value = LLVMBuildIsNotNull(p->builder, hashes_data_ptr, "");
+				res.value = LLVMBuildIsNotNull(p->builder, data_ptr.value, "");
 				return res;
 			}
 		}
