@@ -611,6 +611,9 @@ i64 check_distance_between_types(CheckerContext *c, Operand *operand, Type *type
 		}
 		return -1;
 	}
+	if (operand->mode == Addressing_ProcGroup && !is_type_proc(type)) {
+		return -1;
+	}
 
 	Type *s = operand->type;
 
@@ -1003,22 +1006,24 @@ void check_assignment(CheckerContext *c, Operand *operand, Type *type, String co
 	}
 
 	if (operand->mode == Addressing_ProcGroup) {
-		Array<Entity *> procs = proc_group_entities(c, *operand);
 		bool good = false;
-		// NOTE(bill): These should be done
-		for_array(i, procs) {
-			Type *t = base_type(procs[i]->type);
-			if (t == t_invalid) {
-				continue;
-			}
-			Operand x = {};
-			x.mode = Addressing_Value;
-			x.type = t;
-			if (check_is_assignable_to(c, &x, type)) {
-				Entity *e = procs[i];
-				add_entity_use(c, operand->expr, e);
-				good = true;
-				break;
+		if (type != nullptr && is_type_proc(type)) {
+			Array<Entity *> procs = proc_group_entities(c, *operand);
+			// NOTE(bill): These should be done
+			for_array(i, procs) {
+				Type *t = base_type(procs[i]->type);
+				if (t == t_invalid) {
+					continue;
+				}
+				Operand x = {};
+				x.mode = Addressing_Value;
+				x.type = t;
+				if (check_is_assignable_to(c, &x, type)) {
+					Entity *e = procs[i];
+					add_entity_use(c, operand->expr, e);
+					good = true;
+					break;
+				}
 			}
 		}
 
@@ -1507,7 +1512,7 @@ Entity *check_ident(CheckerContext *c, Operand *o, Ast *n, Type *named_type, Typ
 		Array<Entity *> procs = pge->entities;
 		bool skip = false;
 
-		if (type_hint != nullptr) {
+		if (type_hint != nullptr && is_type_proc(type_hint)) {
 			// NOTE(bill): These should be done
 			for_array(i, procs) {
 				Type *t = base_type(procs[i]->type);
