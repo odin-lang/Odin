@@ -9,6 +9,89 @@ Decimal :: struct {
 	neg, trunc:    bool,
 }
 
+set :: proc(d: ^Decimal, s: string) -> (ok: bool) {
+	d^ = {}
+
+	if len(s) == 0 {
+		return
+	}
+
+	i := 0
+	switch s[i] {
+	case '+': i += 1
+	case '-': i += 1; d.neg = true
+	}
+
+	// digits
+	saw_dot := false
+	saw_digits := false
+	for ; i < len(s); i += 1 {
+		switch {
+		case s[i] == '_':
+			// ignore underscores
+			continue
+		case s[i] == '.':
+			if saw_dot {
+				return
+			}
+			saw_dot = true
+			d.decimal_point = d.count
+			continue
+
+		case '0' <= s[i] && s[i] <= '9':
+			saw_digits = true
+			if s[i] == '0' && d.count == 0 {
+				d.decimal_point -= 1
+				continue
+			}
+			if d.count < len(d.digits) {
+				d.digits[d.count] = s[i]
+				d.count += 1
+			} else if s[i] != '0' {
+				d.trunc = true
+			}
+			continue
+		}
+		break
+	}
+	if !saw_digits {
+		return
+	}
+	if !saw_dot {
+		d.decimal_point = d.count
+	}
+
+	lower :: #force_inline proc "contextless" (ch: byte) -> byte { return ('a' - 'A') | ch }
+
+	if i < len(s) && lower(s[i]) == 'e' {
+		i += 1
+		if i >= len(s) {
+			return
+		}
+		exp_sign := 1
+		switch s[i] {
+		case '+': i += 1
+		case '-': i += 1; exp_sign = -1
+		}
+		if i >= len(s) || s[i] < '0' || s[i] > '9' {
+			return
+		}
+		e := 0
+		for ; i < len(s) && ('0' <= s[i] && s[i] <= '9' || s[i] == '_'); i += 1 {
+			if s[i] == '_' {
+				// ignore underscores
+				continue
+			}
+			if e < 1e4 {
+				e = e*10 + int(s[i]) - '0'
+			}
+		}
+		d.decimal_point += e * exp_sign
+	}
+
+	return i == len(s)
+}
+
 decimal_to_string :: proc(buf: []byte, a: ^Decimal) -> string {
 	digit_zero :: proc(buf: []byte) -> int {
 		for _, i in buf {
