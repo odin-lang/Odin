@@ -1524,6 +1524,9 @@ LLVMTypeRef lb_type_internal_for_procedures_raw(lbModule *m, Type *type) {
 	bool *params_by_ptr = gb_alloc_array(permanent_allocator(), bool, param_count);
 	if (type->Proc.result_count != 0) {
 		Type *single_ret = reduce_tuple_to_single_type(type->Proc.results);
+		 if (is_type_proc(single_ret)) {
+			single_ret = t_rawptr;
+		}
 		ret = lb_type(m, single_ret);
 		if (ret != nullptr) {
 			if (is_type_boolean(single_ret) &&
