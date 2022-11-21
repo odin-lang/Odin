@@ -3372,6 +3372,24 @@ void check_binary_expr(CheckerContext *c, Operand *x, Ast *node, Type *type_hint
 		error(y->expr, "built-in expression in binary expression");
 		return;
 	}
+	if (x->mode == Addressing_ProcGroup) {
+		x->mode = Addressing_Invalid;
+		if (x->proc_group != nullptr) {
+			error(x->expr, "procedure group '%.*s' used in binary expression", LIT(x->proc_group->token.string));
+		} else {
+			error(x->expr, "procedure group used in binary expression");
+		}
+		return;
+	}
+	if (y->mode == Addressing_ProcGroup) {
+		x->mode = Addressing_Invalid;
+		if (x->proc_group != nullptr) {
+			error(y->expr, "procedure group '%.*s' used in binary expression", LIT(y->proc_group->token.string));
+		} else {
+			error(y->expr, "procedure group used in binary expression");
+		}
+		return;
+	}
 
 	if (token_is_shift(op.kind)) {
 		check_shift(c, x, y, node, type_hint);
