@@ -5881,6 +5881,7 @@ CallArgumentData check_call_arguments(CheckerContext *c, Operand *operand, Type 
 				Entity *proc = procs[proc_index];
 				Type *pt = base_type(proc->type);
 				if (!(pt != nullptr && is_type_proc(pt))) {
+					proc_index++;
 					continue;
 				}
 
