@@ -1725,7 +1725,7 @@ lbValue lb_build_builtin_proc(lbProcedure *p, Ast *expr, TypeAndValue const &tv,
 				return lb_emit_struct_ev(p, val, 0);
 			} else if (t->kind == Type_Array) {
 				GB_ASSERT(t->Array.count == 1);
-				return lb_emit_array_epi(p, val, 0);
+				return lb_emit_struct_ev(p, val, 0);
 			} else {
 				GB_PANIC("Unknown type of expand_to_tuple");
 			}
