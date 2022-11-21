@@ -200,22 +200,35 @@ lbValue lb_emit_transmute(lbProcedure *p, lbValue value, Type *t) {
 	GB_ASSERT_MSG(sz == dz, "Invalid transmute conversion: '%s' to '%s'", type_to_string(src_type), type_to_string(t));
 
 	// NOTE(bill): Casting between an integer and a pointer cannot be done through a bitcast
-	if (is_type_uintptr(src) && is_type_internally_pointer_like(dst)) {
-		res.value = LLVMBuildIntToPtr(p->builder, value.value, lb_type(m, t), "");
-		return res;
-	} else if (is_type_internally_pointer_like(src) && is_type_uintptr(dst)) {
-		res.value = LLVMBuildPtrToInt(p->builder, value.value, lb_type(m, t), "");
-		return res;
-	} else if (is_type_integer(src) && is_type_internally_pointer_like(dst)) {
-		res.value = LLVMBuildIntToPtr(p->builder, value.value, lb_type(m, t), "");
-		return res;
-	} else if (is_type_internally_pointer_like(src) && is_type_integer(dst)) {
-		res.value = LLVMBuildPtrToInt(p->builder, value.value, lb_type(m, t), "");
-		return res;
-	} else if (is_type_internally_pointer_like(src) && is_type_internally_pointer_like(dst)) {
-		res.value = LLVMBuildPointerCast(p->builder, value.value, lb_type(p->module, t), "");
-		return res;
-	} else if (is_type_simd_vector(src) && is_type_simd_vector(dst)) {
+	if (is_type_internally_pointer_like(src)) {
+		if (is_type_integer(dst)) {
+			res.value = LLVMBuildPtrToInt(p->builder, value.value, lb_type(m, t), "");
+			return res;
+		} else if (is_type_internally_pointer_like(dst)) {
+			res.value = LLVMBuildPointerCast(p->builder, value.value, lb_type(p->module, t), "");
+			return res;
+		} else if (is_type_float(dst)) {
+			LLVMValueRef the_int = LLVMBuildPtrToInt(p->builder, value.value, lb_type(m, t_uintptr), "");
+			res.value = LLVMBuildBitCast(p->builder, the_int, lb_type(m, t), "");
+			return res;
+		}
+	}
+
+	if (is_type_internally_pointer_like(dst)) {
+		if (is_type_uintptr(src) && is_type_internally_pointer_like(dst)) {
+			res.value = LLVMBuildIntToPtr(p->builder, value.value, lb_type(m, t), "");
+			return res;
+		} else if (is_type_integer(src) && is_type_internally_pointer_like(dst)) {
+			res.value = LLVMBuildIntToPtr(p->builder, value.value, lb_type(m, t), "");
+			return res;
+		} else if (is_type_float(src)) {
+			LLVMValueRef the_int = LLVMBuildBitCast(p->builder, value.value, lb_type(m, t_uintptr), "");
+			res.value = LLVMBuildIntToPtr(p->builder, the_int, lb_type(m, t), "");
+			return res;
+		}
+	}
+
+	if (is_type_simd_vector(src) && is_type_simd_vector(dst)) {
 		res.value = LLVMBuildBitCast(p->builder, value.value, lb_type(p->module, t), "");
 		return res;
 	} else if (is_type_array_like(src) && is_type_simd_vector(dst)) {
@@ -242,7 +255,7 @@ lbValue lb_emit_transmute(lbProcedure *p, lbValue value, Type *t) {
 		return lb_emit_load(p, d);
 	}
 
-	res.value = LLVMBuildBitCast(p->builder, value.value, lb_type(p->module, t), "");
+	res.value = OdinLLVMBuildTransmute(p, value.value, lb_type(m, res.type));
 	return res;
 }
 
