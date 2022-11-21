@@ -3916,13 +3916,7 @@ i64 type_size_of_internal(Type *t, TypePath *path) {
 	}
 	
 	case Type_Matrix: {
-		bool pop = type_path_push(path, t->Matrix.elem);
-		if (path->failure) {
-			return FAILURE_SIZE;
-		}
 		i64 stride_in_bytes = matrix_type_stride_in_bytes(t, path);
-		if (pop) type_path_pop(path);
-
 		return stride_in_bytes * t->Matrix.column_count;
 	}
 
