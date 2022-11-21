@@ -1,7 +1,7 @@
 #include "parser_pos.cpp"
 
 // #undef at the bottom of this file
-#define ALLOW_NEWLINE build_context.strict_style
+#define ALLOW_NEWLINE (!build_context.strict_style)
 
 Token token_end_of_line(AstFile *f, Token tok) {
 	u8 const *start = f->tokenizer.start + tok.pos.offset;
@@ -1384,7 +1384,13 @@ Token expect_token_after(AstFile *f, TokenKind kind, char const *msg) {
 	Token prev = f->curr_token;
 	if (prev.kind != kind) {
 		String p = token_to_string(prev);
-		syntax_error(f->curr_token, "Expected '%.*s' after %s, got '%.*s'",
+		Token token = f->curr_token;
+		if (token_is_newline(prev)) {
+			token = prev;
+			token.pos.column -= 1;
+			skip_possible_newline(f);
+		}
+		syntax_error(token, "Expected '%.*s' after %s, got '%.*s'",
 		             LIT(token_strings[kind]),
 		             msg,
 		             LIT(p));
@@ -3420,7 +3426,6 @@ Ast *parse_results(AstFile *f, bool *diverging) {
 
 	isize prev_level = f->expr_level;
 	defer (f->expr_level = prev_level);
-	// f->expr_level = -1;
 
 	if (f->curr_token.kind != Token_OpenParen) {
 		Token begin_token = f->curr_token;
@@ -3435,6 +3440,9 @@ Ast *parse_results(AstFile *f, bool *diverging) {
 	Ast *list = nullptr;
 	expect_token(f, Token_OpenParen);
 	list = parse_field_list(f, nullptr, FieldFlag_Results, Token_CloseParen, true, false);
+	if (ALLOW_NEWLINE) {
+		skip_possible_newline(f);
+	}
 	expect_token_after(f, Token_CloseParen, "parameter list");
 	return list;
 }
@@ -3492,6 +3500,9 @@ Ast *parse_proc_type(AstFile *f, Token proc_token) {
 
 	expect_token(f, Token_OpenParen);
 	params = parse_field_list(f, nullptr, FieldFlag_Signature, Token_CloseParen, true, true);
+	if (ALLOW_NEWLINE) {
+		skip_possible_newline(f);
+	}
 	expect_token_after(f, Token_CloseParen, "parameter list");
 	results = parse_results(f, &diverging);
 
@@ -3713,7 +3724,7 @@ bool allow_field_separator(AstFile *f) {
 	if (allow_token(f, Token_Comma)) {
 		return true;
 	}
-	if (ALLOW_NEWLINE && token.kind == Token_Semicolon) {
+	if (ALLOW_NEWLINE && token.kind == Token_Semicolon && !token_is_newline(token)) {
 		String p = token_to_string(token);
 		syntax_error(token_end_of_line(f, f->prev_token), "Expected a comma, got a %.*s", LIT(p));
 		advance_token(f);
