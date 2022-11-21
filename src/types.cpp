@@ -2705,6 +2705,9 @@ bool are_types_identical_internal(Type *x, Type *y, bool check_tuple_names) {
 					if (xf->token.string != yf->token.string) {
 						return false;
 					}
+					if (x->Struct.tags[i] != y->Struct.tags[i]) {
+						return false;
+					}
 					u64 xf_flags = (xf->flags&EntityFlags_IsSubtype);
 					u64 yf_flags = (yf->flags&EntityFlags_IsSubtype);
 					if (xf_flags != yf_flags) {
