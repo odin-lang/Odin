@@ -5525,6 +5525,8 @@ CALL_ARGUMENT_CHECKER(check_named_call_arguments) {
 			GB_ASSERT(is_type_proc(gept));
 			proc_type = gept;
 			pt = &gept->Proc;
+		} else {
+			err = CallArgumentError_WrongTypes;
 		}
 	}
 
@@ -6156,6 +6158,7 @@ CallArgumentData check_call_arguments(CheckerContext *c, Operand *operand, Type 
 			}
 			result_type = t_invalid;
 		} else {
+			GB_ASSERT(valids.count == 1);
 			Ast *ident = operand->expr;
 			while (ident->kind == Ast_SelectorExpr) {
 				Ast *s = ident->SelectorExpr.selector;

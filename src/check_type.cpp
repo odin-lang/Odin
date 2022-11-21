@@ -1629,6 +1629,8 @@ Type *check_get_params(CheckerContext *ctx, Scope *scope, Ast *_params, bool *is
 						// This is just to add the error message to determine_type_from_polymorphic which
 						// depends on valid position information
 						op.expr = _params;
+						op.mode = Addressing_Invalid;
+						op.type = t_invalid;
 					}
 					if (is_type_polymorphic_type) {
 						type = determine_type_from_polymorphic(ctx, type, op);
