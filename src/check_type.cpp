@@ -2290,9 +2290,7 @@ void check_matrix_type(CheckerContext *ctx, Type **type, Ast *node) {
 	
 	i64 row_count = check_array_count(ctx, &row, mt->row_count);
 	i64 column_count = check_array_count(ctx, &column, mt->column_count);
-	
-	Type *elem = check_type_expr(ctx, mt->elem, nullptr);
-	
+
 	Type *generic_row = nullptr;
 	Type *generic_column = nullptr;
 	
@@ -2304,22 +2302,25 @@ void check_matrix_type(CheckerContext *ctx, Type **type, Ast *node) {
 		generic_column = column.type;
 	}
 	
-	if (row_count < MATRIX_ELEMENT_COUNT_MIN && generic_row == nullptr) {
+	if (generic_row == nullptr && row_count < MATRIX_ELEMENT_COUNT_MIN) {
 		gbString s = expr_to_string(row.expr);
 		error(row.expr, "Invalid matrix row count, expected %d+ rows, got %s", MATRIX_ELEMENT_COUNT_MIN, s);
 		gb_string_free(s);
 	}
 	
-	if (column_count < MATRIX_ELEMENT_COUNT_MIN && generic_column == nullptr) {
+	if (generic_column == nullptr && column_count < MATRIX_ELEMENT_COUNT_MIN) {
 		gbString s = expr_to_string(column.expr);
 		error(column.expr, "Invalid matrix column count, expected %d+ rows, got %s", MATRIX_ELEMENT_COUNT_MIN, s);
 		gb_string_free(s);
 	}
 	
-	if (row_count*column_count > MATRIX_ELEMENT_COUNT_MAX) {
+	if ((generic_row == nullptr && generic_column == nullptr) && row_count*column_count > MATRIX_ELEMENT_COUNT_MAX) {
 		i64 element_count = row_count*column_count;
 		error(column.expr, "Matrix types are limited to a maximum of %d elements, got %lld", MATRIX_ELEMENT_COUNT_MAX, cast(long long)element_count);
 	}
+
+
+	Type *elem = check_type_expr(ctx, mt->elem, nullptr);
 	
 	if (!is_type_valid_for_matrix_elems(elem)) {
 		if (elem == t_typeid) {
