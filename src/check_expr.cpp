@@ -765,16 +765,13 @@ i64 check_distance_between_types(CheckerContext *c, Operand *operand, Type *type
 		}
 
 		// TODO(bill): Determine which rule is a better on in practice
-		#if 1
-			if (dst->Union.variants.count == 1) {
-				Type *vt = dst->Union.variants[0];
-				i64 score = check_distance_between_types(c, operand, vt);
-				if (score >= 0) {
-					return score+2;
-				}
+		if (dst->Union.variants.count == 1) {
+			Type *vt = dst->Union.variants[0];
+			i64 score = check_distance_between_types(c, operand, vt);
+			if (score >= 0) {
+				return score+2;
 			}
-		#else
-			// NOTE(bill): check to see you can assign to it with one of the variants?
+		} else if (is_type_untyped(src)) {
 			i64 prev_lowest_score = -1;
 			i64 lowest_score = -1;
 			for_array(i, dst->Union.variants) {
@@ -798,7 +795,7 @@ i64 check_distance_between_types(CheckerContext *c, Operand *operand, Type *type
 					return lowest_score+2;
 				}
 			}
-		#endif
+		}
 	}
 
 	if (is_type_relative_pointer(dst)) {
