@@ -1,31 +1,3 @@
-lbCopyElisionHint lb_set_copy_elision_hint(lbProcedure *p, lbAddr const &addr, Ast *ast) {
-	lbCopyElisionHint prev = p->copy_elision_hint;
-	p->copy_elision_hint.used = false;
-	p->copy_elision_hint.ptr = {};
-	p->copy_elision_hint.ast = nullptr;
-	#if 0
-	if (addr.kind == lbAddr_Default && addr.addr.value != nullptr) {
-		p->copy_elision_hint.ptr = lb_addr_get_ptr(p, addr);
-		p->copy_elision_hint.ast = unparen_expr(ast);
-	}
-	#endif
-	return prev;
-}
-
-void lb_reset_copy_elision_hint(lbProcedure *p, lbCopyElisionHint prev_hint) {
-	p->copy_elision_hint = prev_hint;
-}
-
-
-lbValue lb_consume_copy_elision_hint(lbProcedure *p) {
-	lbValue return_ptr = p->copy_elision_hint.ptr;
-	p->copy_elision_hint.used = true;
-	p->copy_elision_hint.ptr = {};
-	p->copy_elision_hint.ast = nullptr;
-	return return_ptr;
-}
-
-
 void lb_build_constant_value_decl(lbProcedure *p, AstValueDecl *vd) {
 	if (vd == nullptr || vd->is_mutable) {
 		return;
@@ -1591,12 +1563,7 @@ void lb_build_assignment(lbProcedure *p, Array<lbAddr> &lvals, Slice<Ast *> cons
 				array_add(&inits, v);
 			}
 		} else {
-			auto prev_hint = lb_set_copy_elision_hint(p, lvals[inits.count], rhs);
 			lbValue init = lb_build_expr(p, rhs);
-			if (p->copy_elision_hint.used) {
-				lvals[inits.count] = {}; // zero lval
-			}
-			lb_reset_copy_elision_hint(p, prev_hint);
 			array_add(&inits, init);
 		}
 	}

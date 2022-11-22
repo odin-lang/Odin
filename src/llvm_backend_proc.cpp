@@ -882,7 +882,7 @@ lbValue lb_emit_conjugate(lbProcedure *p, lbValue val, Type *type) {
 	return lb_emit_load(p, res);
 }
 
-lbValue lb_emit_call(lbProcedure *p, lbValue value, Array<lbValue> const &args, ProcInlining inlining, bool use_copy_elision_hint) {
+lbValue lb_emit_call(lbProcedure *p, lbValue value, Array<lbValue> const &args, ProcInlining inlining) {
 	lbModule *m = p->module;
 
 	Type *pt = base_type(value.type);
@@ -981,11 +981,6 @@ lbValue lb_emit_call(lbProcedure *p, lbValue value, Array<lbValue> const &args, 
 		Type *rt = reduce_tuple_to_single_type(results);
 		if (return_by_pointer) {
 			lbValue return_ptr = {};
-			if (use_copy_elision_hint && p->copy_elision_hint.ptr.value != nullptr) {
-				if (are_types_identical(type_deref(p->copy_elision_hint.ptr.type), rt)) {
-					return_ptr = lb_consume_copy_elision_hint(p);
-				}
-			}
 			if (return_ptr.value == nullptr) {
 				lbAddr r = lb_add_local_generated(p, rt, true);
 				return_ptr = r.addr;
@@ -3032,7 +3027,7 @@ lbValue lb_build_call_expr_internal(lbProcedure *p, Ast *expr) {
 			}
 		}
 
-		return lb_emit_call(p, value, args, ce->inlining, p->copy_elision_hint.ast == expr);
+		return lb_emit_call(p, value, args, ce->inlining);
 	}
 
 	isize arg_index = 0;
@@ -3213,6 +3208,6 @@ lbValue lb_build_call_expr_internal(lbProcedure *p, Ast *expr) {
 	}
 
 	auto call_args = array_slice(args, 0, final_count);
-	return lb_emit_call(p, value, call_args, ce->inlining, p->copy_elision_hint.ast == expr);
+	return lb_emit_call(p, value, call_args, ce->inlining);
 }
 
