@@ -1,4 +1,4 @@
-// +ignore
+//+build ignore
 /*
 	Bindings against CMark (https://github.com/commonmark/cmark)
 

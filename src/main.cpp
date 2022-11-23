@@ -53,6 +53,9 @@ gb_global Timings global_timings = {0};
 	#if LLVM_VERSION_MAJOR < 11
 	#error LLVM Version 11+ is required => "brew install llvm@11"
 	#endif
+	#if LLVM_VERSION_MAJOR > 14
+	#error LLVM Version 11..=14 is required => "brew install llvm@14"
+	#endif
 #endif
 
 #include "query_data.cpp"
@@ -478,9 +481,9 @@ i32 linker_stage(lbGenerator *gen) {
 
 			if (build_context.metrics.os == TargetOs_darwin) {
 				// This sets a requirement of Mountain Lion and up, but the compiler doesn't work without this limit.
-				// NOTE: If you change this (although this minimum is as low as you can go with Odin working)
-				//       make sure to also change the 'mtriple' param passed to 'opt'
-				if (build_context.metrics.arch == TargetArch_arm64) {
+				if (build_context.minimum_os_version_string.len) {
+					link_settings = gb_string_append_fmt(link_settings, " -mmacosx-version-min=%.*s ", LIT(build_context.minimum_os_version_string));
+				} else if (build_context.metrics.arch == TargetArch_arm64) {
 					link_settings = gb_string_appendc(link_settings, " -mmacosx-version-min=12.0.0  ");
 				} else {
 					link_settings = gb_string_appendc(link_settings, " -mmacosx-version-min=10.12.0 ");
@@ -588,7 +591,6 @@ enum BuildFlagKind {
 	BuildFlag_SingleFile,
 
 	BuildFlag_OutFile,
-	BuildFlag_OptimizationLevel,
 	BuildFlag_OptimizationMode,
 	BuildFlag_ShowTimings,
 	BuildFlag_ShowUnused,
@@ -622,6 +624,7 @@ enum BuildFlagKind {
 	BuildFlag_ExtraAssemblerFlags,
 	BuildFlag_Microarch,
 	BuildFlag_TargetFeatures,
+	BuildFlag_MinimumOSVersion,
 
 	BuildFlag_RelocMode,
 	BuildFlag_DisableRedZone,
@@ -635,6 +638,7 @@ enum BuildFlagKind {
 	BuildFlag_StrictStyleInitOnly,
 	BuildFlag_ForeignErrorProcedures,
 	BuildFlag_DisallowRTTI,
+	BuildFlag_UseStaticMapCalls,
 
 	BuildFlag_Compact,
 	BuildFlag_GlobalDefinitions,
@@ -742,13 +746,25 @@ ExactValue build_param_to_exact_value(String name, String param) {
 	return value;
 }
 
+// Writes a did-you-mean message for formerly deprecated flags.
+void did_you_mean_flag(String flag) {
+	gbAllocator a = heap_allocator();
+	String name = copy_string(a, flag);
+	defer (gb_free(a, name.text));
+	string_to_lower(&name);
+
+	if (name == "opt") {
+		gb_printf_err("`-opt` is an unrecognized option. Did you mean `-o`?\n");
+		return;
+	}
+	gb_printf_err("Unknown flag: '%.*s'\n", LIT(flag));
+}
 
 bool parse_build_flags(Array<String> args) {
 	auto build_flags = array_make<BuildFlag>(heap_allocator(), 0, BuildFlag_COUNT);
 	add_flag(&build_flags, BuildFlag_Help,                    str_lit("help"),                      BuildFlagParam_None,    Command_all);
 	add_flag(&build_flags, BuildFlag_SingleFile,              str_lit("file"),                      BuildFlagParam_None,    Command__does_build | Command__does_check);
 	add_flag(&build_flags, BuildFlag_OutFile,                 str_lit("out"),                       BuildFlagParam_String,  Command__does_build &~ Command_test);
-	add_flag(&build_flags, BuildFlag_OptimizationLevel,       str_lit("opt"),                       BuildFlagParam_Integer, Command__does_build);
 	add_flag(&build_flags, BuildFlag_OptimizationMode,        str_lit("o"),                         BuildFlagParam_String,  Command__does_build);
 	add_flag(&build_flags, BuildFlag_OptimizationMode,        str_lit("O"),                         BuildFlagParam_String,  Command__does_build);
 	add_flag(&build_flags, BuildFlag_ShowTimings,             str_lit("show-timings"),              BuildFlagParam_None,    Command__does_check);
@@ -783,6 +799,7 @@ bool parse_build_flags(Array<String> args) {
 	add_flag(&build_flags, BuildFlag_ExtraAssemblerFlags,     str_lit("extra-assembler-flags"),     BuildFlagParam_String,  Command__does_build);
 	add_flag(&build_flags, BuildFlag_Microarch,               str_lit("microarch"),                 BuildFlagParam_String,  Command__does_build);
 	add_flag(&build_flags, BuildFlag_TargetFeatures,          str_lit("target-features"),           BuildFlagParam_String,  Command__does_build);
+	add_flag(&build_flags, BuildFlag_MinimumOSVersion,        str_lit("minimum-os-version"),        BuildFlagParam_String,  Command__does_build);
 
 	add_flag(&build_flags, BuildFlag_RelocMode,               str_lit("reloc-mode"),                BuildFlagParam_String,  Command__does_build);
 	add_flag(&build_flags, BuildFlag_DisableRedZone,          str_lit("disable-red-zone"),          BuildFlagParam_None,    Command__does_build);
@@ -797,6 +814,8 @@ bool parse_build_flags(Array<String> args) {
 	add_flag(&build_flags, BuildFlag_ForeignErrorProcedures,  str_lit("foreign-error-procedures"),  BuildFlagParam_None,    Command__does_check);
 
 	add_flag(&build_flags, BuildFlag_DisallowRTTI,            str_lit("disallow-rtti"),             BuildFlagParam_None,    Command__does_check);
+
+	add_flag(&build_flags, BuildFlag_UseStaticMapCalls,       str_lit("use-static-map-calls"),      BuildFlagParam_None,    Command__does_check);
 
 
 	add_flag(&build_flags, BuildFlag_Compact,                 str_lit("compact"),                   BuildFlagParam_None,    Command_query);
@@ -850,16 +869,14 @@ bool parse_build_flags(Array<String> args) {
 				break;
 			}
 		}
-		name = substring(name, 0, end);
-		if (have_equals && name != "opt") {
-			gb_printf_err("`flag=value` has been deprecated and will be removed next release. Use `%.*s:` instead.\n", LIT(name));
-		}
 
+		name = substring(name, 0, end);
 		String param = {};
 		if (end < flag.len-1) param = substring(flag, 2+end, flag.len);
 
 		bool is_supported = true;
 		bool found = false;
+
 		BuildFlag found_bf = {};
 		for_array(build_flag_index, build_flags) {
 			BuildFlag bf = build_flags[build_flag_index];
@@ -979,37 +996,8 @@ bool parse_build_flags(Array<String> args) {
 							}
 							break;
 						}
-						case BuildFlag_OptimizationLevel: {
-							GB_ASSERT(value.kind == ExactValue_Integer);
-							if (set_flags[BuildFlag_OptimizationMode]) {
-								gb_printf_err("Mixture of -opt and -o is not allowed\n");
-								bad_flags = true;
-								break;
-							}
-
-							build_context.optimization_level = cast(i32)big_int_to_i64(&value.value_integer);
-							if (build_context.optimization_level < 0 || build_context.optimization_level > 3) {
-								gb_printf_err("Invalid optimization level for -o:<integer>, got %d\n", build_context.optimization_level);
-								gb_printf_err("Valid optimization levels:\n");
-								gb_printf_err("\t0\n");
-								gb_printf_err("\t1\n");
-								gb_printf_err("\t2\n");
-								gb_printf_err("\t3\n");
-								bad_flags = true;
-							}
-
-							// Deprecation warning.
-							gb_printf_err("`-opt` has been deprecated and will be removed next release. Use `-o:minimal`, etc.\n");
-							break;
-						}
 						case BuildFlag_OptimizationMode: {
 							GB_ASSERT(value.kind == ExactValue_String);
-							if (set_flags[BuildFlag_OptimizationLevel]) {
-								gb_printf_err("Mixture of -opt and -o is not allowed\n");
-								bad_flags = true;
-								break;
-							}
-
 							if (value.value_string == "minimal") {
 								build_context.optimization_level = 0;
 							} else if (value.value_string == "size") {
@@ -1378,6 +1366,11 @@ bool parse_build_flags(Array<String> args) {
 							string_to_lower(&build_context.target_features_string);
 							break;
 						}
+						case BuildFlag_MinimumOSVersion: {
+							GB_ASSERT(value.kind == ExactValue_String);
+							build_context.minimum_os_version_string = value.value_string;
+							break;
+						}
 						case BuildFlag_RelocMode: {
 							GB_ASSERT(value.kind == ExactValue_String);
 							String v = value.value_string;
@@ -1423,6 +1416,9 @@ bool parse_build_flags(Array<String> args) {
 							break;
 						case BuildFlag_DisallowRTTI:
 							build_context.disallow_rtti = true;
+							break;
+						case BuildFlag_UseStaticMapCalls:
+							build_context.use_static_map_calls = true;
 							break;
 						case BuildFlag_DefaultToNilAllocator:
 							build_context.ODIN_DEFAULT_TO_NIL_ALLOCATOR = true;
@@ -1625,7 +1621,7 @@ bool parse_build_flags(Array<String> args) {
 			gb_printf_err("\n");
 			bad_flags = true;
 		} else if (!found) {
-			gb_printf_err("Unknown flag: '%.*s'\n", LIT(name));
+			did_you_mean_flag(name);
 			bad_flags = true;
 		}
 	}
@@ -1989,12 +1985,6 @@ void print_show_help(String const arg0, String const &command) {
 		print_usage_line(2, "Example: -out:foo.exe");
 		print_usage_line(0, "");
 
-		print_usage_line(1, "-opt:<integer>");
-		print_usage_line(2, "Set the optimization level for compilation");
-		print_usage_line(2, "Accepted values: 0, 1, 2, 3");
-		print_usage_line(2, "Example: -opt:2");
-		print_usage_line(0, "");
-
 		print_usage_line(1, "-o:<string>");
 		print_usage_line(2, "Set the optimization mode for compilation");
 		print_usage_line(2, "Accepted values: minimal, size, speed");
@@ -2056,8 +2046,8 @@ void print_show_help(String const arg0, String const &command) {
 		print_usage_line(3, "import \"shared:foo\"");
 		print_usage_line(0, "");
 
-		print_usage_line(1, "-define:<name>=<expression>");
-		print_usage_line(2, "Defines a global constant with a value");
+		print_usage_line(1, "-define:<name>=<value>");
+		print_usage_line(2, "Defines a scalar boolean, integer or string as global constant");
 		print_usage_line(2, "Example: -define:SPAM=123");
 		print_usage_line(2, "To use:  #config(SPAM, default_value)");
 		print_usage_line(0, "");
@@ -2158,6 +2148,12 @@ void print_show_help(String const arg0, String const &command) {
 	}
 
 	if (run_or_build) {
+		print_usage_line(1, "-minimum-os-version:<string>");
+		print_usage_line(2, "Sets the minimum OS version targeted by the application");
+		print_usage_line(2, "e.g. -minimum-os-version:12.0.0");
+		print_usage_line(2, "(Only used when target is Darwin)");
+		print_usage_line(0, "");
+
 		print_usage_line(1, "-extra-linker-flags:<string>");
 		print_usage_line(2, "Adds extra linker specific flags in a string");
 		print_usage_line(0, "");
@@ -2165,7 +2161,6 @@ void print_show_help(String const arg0, String const &command) {
 		print_usage_line(1, "-extra-assembler-flags:<string>");
 		print_usage_line(2, "Adds extra assembler specific flags in a string");
 		print_usage_line(0, "");
-
 
 		print_usage_line(1, "-microarch:<string>");
 		print_usage_line(2, "Specifies the specific micro-architecture for the build in a string");

@@ -15,3 +15,10 @@ if not exist "vendor\miniaudio\lib\*.lib" (
 		call build.bat
 	popd
 )
+
+
+if not exist "vendor\cgltf\lib\*.lib" (
+	pushd vendor\cgltf\src
+		call build.bat
+	popd
+)

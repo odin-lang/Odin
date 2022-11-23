@@ -162,7 +162,8 @@ read :: proc(fd: Handle, data: []byte) -> (int, Errno) {
 	total_read: int
 	length := len(data)
 
-	to_read := min(win32.DWORD(length), MAX_RW)
+	// NOTE(Jeroen): `length` can't be casted to win32.DWORD here because it'll overflow if > 4 GiB and return 0 if exactly that.
+	to_read := min(i64(length), MAX_RW)
 
 	e: win32.BOOL
 	if is_console {
@@ -172,7 +173,8 @@ read :: proc(fd: Handle, data: []byte) -> (int, Errno) {
 			return int(total_read), err
 		}
 	} else {
-		e = win32.ReadFile(handle, &data[total_read], to_read, &single_read_length, nil)
+		// NOTE(Jeroen): So we cast it here *after* we've ensured that `to_read` is at most MAX_RW (1 GiB)
+		e = win32.ReadFile(handle, &data[total_read], win32.DWORD(to_read), &single_read_length, nil)
 	}
 	if single_read_length <= 0 || !e {
 		err := Errno(win32.GetLastError())

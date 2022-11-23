@@ -1419,6 +1419,58 @@ WMSZ_BOTTOM      :: 6
 WMSZ_BOTTOMLEFT  :: 7
 WMSZ_BOTTOMRIGHT :: 8
 
+// Note CLASSKEY overrides CLASSNAME
+SEE_MASK_DEFAULT   :: 0x00000000
+SEE_MASK_CLASSNAME :: 0x00000001   // SHELLEXECUTEINFO.lpClass is valid
+SEE_MASK_CLASSKEY  :: 0x00000003   // SHELLEXECUTEINFO.hkeyClass is valid
+// Note SEE_MASK_INVOKEIDLIST(0xC) implies SEE_MASK_IDLIST(0x04)
+SEE_MASK_IDLIST            :: 0x00000004   // SHELLEXECUTEINFO.lpIDList is valid
+SEE_MASK_INVOKEIDLIST      :: 0x0000000c   // enable IContextMenu based verbs
+SEE_MASK_ICON              :: 0x00000010   // not used
+SEE_MASK_HOTKEY            :: 0x00000020   // SHELLEXECUTEINFO.dwHotKey is valid
+SEE_MASK_NOCLOSEPROCESS    :: 0x00000040   // SHELLEXECUTEINFO.hProcess
+SEE_MASK_CONNECTNETDRV     :: 0x00000080   // enables re-connecting disconnected network drives
+SEE_MASK_NOASYNC           :: 0x00000100   // block on the call until the invoke has completed, use for callers that exit after calling ShellExecuteEx()
+SEE_MASK_FLAG_DDEWAIT      :: SEE_MASK_NOASYNC // Use SEE_MASK_NOASYNC instead of SEE_MASK_FLAG_DDEWAIT as it more accuratly describes the behavior
+SEE_MASK_DOENVSUBST        :: 0x00000200   // indicates that SHELLEXECUTEINFO.lpFile contains env vars that should be expanded
+SEE_MASK_FLAG_NO_UI        :: 0x00000400   // disable UI including error messages
+SEE_MASK_UNICODE           :: 0x00004000
+SEE_MASK_NO_CONSOLE        :: 0x00008000
+SEE_MASK_ASYNCOK           :: 0x00100000
+SEE_MASK_HMONITOR          :: 0x00200000   // SHELLEXECUTEINFO.hMonitor
+SEE_MASK_NOZONECHECKS      :: 0x00800000
+SEE_MASK_NOQUERYCLASSSTORE :: 0x01000000
+SEE_MASK_WAITFORINPUTIDLE  :: 0x02000000
+SEE_MASK_FLAG_LOG_USAGE    :: 0x04000000
+
+// When SEE_MASK_FLAG_HINST_IS_SITE is specified SHELLEXECUTEINFO.hInstApp is used as an
+// _In_ parameter and specifies a IUnknown* to be used as a site pointer. The site pointer
+// is used to provide services to shell execute, the handler binding process and the verb handlers
+// once they are invoked.
+SEE_MASK_FLAG_HINST_IS_SITE :: 0x08000000
+
+SHELLEXECUTEINFOW :: struct {
+	cbSize: DWORD,               // in, required, sizeof of this structure
+	fMask: ULONG,                // in, SEE_MASK_XXX values
+	hwnd: HWND,                  // in, optional
+	lpVerb: LPCWSTR,            // in, optional when unspecified the default verb is choosen
+	lpFile: LPCWSTR,            // in, either this value or lpIDList must be specified
+	lpParameters: LPCWSTR,      // in, optional
+	lpDirectory: LPCWSTR,       // in, optional
+	nShow: c.int,                  // in, required
+	hInstApp: HINSTANCE,         // out when SEE_MASK_NOCLOSEPROCESS is specified
+	lpIDList: rawptr,             // in, valid when SEE_MASK_IDLIST is specified, PCIDLIST_ABSOLUTE, for use with SEE_MASK_IDLIST & SEE_MASK_INVOKEIDLIST
+	lpClass: LPCWSTR,           // in, valid when SEE_MASK_CLASSNAME is specified
+	hkeyClass: HKEY,             // in, valid when SEE_MASK_CLASSKEY is specified
+	dwHotKey: DWORD,             // in, valid when SEE_MASK_HOTKEY is specified
+	DUMMYUNIONNAME: struct #raw_union {
+		hIcon: HANDLE,           // not used
+		hMonitor: HANDLE,        // in, valid when SEE_MASK_HMONITOR specified
+	},
+	hProcess: HANDLE,            // out, valid when SEE_MASK_NOCLOSEPROCESS specified
+}
+LPSHELLEXECUTEINFOW :: ^SHELLEXECUTEINFOW
+
 // Key State Masks for Mouse Messages
 MK_LBUTTON  :: 0x0001
 MK_RBUTTON  :: 0x0002

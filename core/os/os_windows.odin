@@ -91,8 +91,8 @@ last_write_time_by_name :: proc(name: string) -> (File_Time, Errno) {
 
 
 
-heap_alloc :: proc(size: int) -> rawptr {
-	return win32.HeapAlloc(win32.GetProcessHeap(), win32.HEAP_ZERO_MEMORY, uint(size))
+heap_alloc :: proc(size: int, zero_memory := true) -> rawptr {
+	return win32.HeapAlloc(win32.GetProcessHeap(), win32.HEAP_ZERO_MEMORY if zero_memory else 0, uint(size))
 }
 heap_resize :: proc(ptr: rawptr, new_size: int) -> rawptr {
 	if new_size == 0 {
