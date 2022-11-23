@@ -582,10 +582,12 @@ LLVMMetadataRef lb_debug_type(lbModule *m, Type *type) {
 				switch (bt->kind) {
 				case Type_Slice:
 					dummy = lb_debug_type(m, bt->Slice.elem);
+					dummy = lb_debug_type(m, alloc_type_pointer(bt->Slice.elem));
 					dummy = lb_debug_type(m, t_int);
 					break;
 				case Type_DynamicArray:
 					dummy = lb_debug_type(m, bt->DynamicArray.elem);
+					dummy = lb_debug_type(m, alloc_type_pointer(bt->DynamicArray.elem));
 					dummy = lb_debug_type(m, t_int);
 					dummy = lb_debug_type(m, t_allocator);
 					break;
