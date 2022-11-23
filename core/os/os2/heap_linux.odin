@@ -191,7 +191,7 @@ _heap_allocator_proc :: proc(allocator_data: rawptr, mode: mem.Allocator_Mode,
 	}
 
 	switch mode {
-	case .Alloc:
+	case .Alloc, .Alloc_Non_Zeroed:
 		return aligned_alloc(size, alignment)
 
 	case .Free:
