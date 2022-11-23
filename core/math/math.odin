@@ -1379,21 +1379,223 @@ atan2_f64be :: proc "contextless" (y, x: f64be) -> f64be {
 }
 
 atan2 :: proc{
-	atan2_f16, atan2_f16le, atan2_f16be,
-	atan2_f32, atan2_f32le, atan2_f32be,
-	atan2_f64, atan2_f64le, atan2_f64be,
+	atan2_f64, atan2_f32, atan2_f16,
+	atan2_f64le, atan2_f64be,
+	atan2_f32le, atan2_f32be,
+	atan2_f16le, atan2_f16be,
 }
 
 atan :: proc "contextless" (x: $T) -> T where intrinsics.type_is_float(T) {
-	return atan2(x, 1)
+	return atan2(1, x)
 }
 
-asin :: proc "contextless" (x: $T) -> T where intrinsics.type_is_float(T) {
-	return atan2(x, sqrt(1 - x*x))
+
+
+asin_f64 :: proc "contextless" (x: f64) -> f64 {
+	/* origin: FreeBSD /usr/src/lib/msun/src/e_asin.c */
+	/*
+	 * ====================================================
+	 * Copyright (C) 1993 by Sun Microsystems, Inc. All rights reserved.
+	 *
+	 * Developed at SunSoft, a Sun Microsystems, Inc. business.
+	 * Permission to use, copy, modify, and distribute this
+	 * software is freely granted, provided that this notice
+	 * is preserved.
+	 * ====================================================
+	 */
+
+	pio2_hi :: 0h3FF921FB54442D18
+	pio2_lo :: 0h3C91A62633145C07
+	pS0     :: 0h3FC5555555555555
+	pS1     :: 0hBFD4D61203EB6F7D
+	pS2     :: 0h3FC9C1550E884455
+	pS3     :: 0hBFA48228B5688F3B
+	pS4     :: 0h3F49EFE07501B288
+	pS5     :: 0h3F023DE10DFDF709
+	qS1     :: 0hC0033A271C8A2D4B
+	qS2     :: 0h40002AE59C598AC8
+	qS3     :: 0hBFE6066C1B8D0159
+	qS4     :: 0h3FB3B8C5B12E9282
+
+	R :: #force_inline proc "contextless" (z: f64) -> f64 {
+		p, q: f64
+		p = z*(pS0+z*(pS1+z*(pS2+z*(pS3+z*(pS4+z*pS5)))))
+		q = 1.0+z*(qS1+z*(qS2+z*(qS3+z*qS4)))
+		return p/q
+	}
+
+	x := x
+	z, r, s: f64
+	dwords := transmute([2]u32)x
+	hx := dwords[1]
+	ix := hx & 0x7fffffff
+	/* |x| >= 1 or nan */
+	if ix >= 0x3ff00000 {
+		lx := dwords[0]
+		if (ix-0x3ff00000 | lx) == 0 {
+			/* asin(1) = +-pi/2 with inexact */
+			return x*pio2_hi + 1e-120
+		}
+		return 0/(x-x)
+	}
+	/* |x| < 0.5 */
+	if ix < 0x3fe00000 {
+		/* if 0x1p-1022 <= |x| < 0x1p-26, avoid raising underflow */
+		if ix < 0x3e500000 && ix >= 0x00100000 {
+			return x
+		}
+		return x + x*R(x*x)
+	}
+	/* 1 > |x| >= 0.5 */
+	z = (1 - abs(x))*0.5
+	s = sqrt(z)
+	r = R(z)
+	if ix >= 0x3fef3333 {  /* if |x| > 0.975 */
+		x = pio2_hi-(2*(s+s*r)-pio2_lo)
+	} else {
+		f, c: f64
+		/* f+c = sqrt(z) */
+		f = s
+		(^u64)(&f)^ &= 0xffffffff_00000000
+		c = (z-f*f)/(s+f)
+		x = 0.5*pio2_hi - (2*s*r - (pio2_lo-2*c) - (0.5*pio2_hi-2*f))
+	}
+	return -x if hx >> 31 != 0 else x
+}
+asin_f64le :: proc "contextless" (x: f64le) -> f64le {
+	return f64le(asin_f64(f64(x)))
+}
+asin_f64be :: proc "contextless" (x: f64be) -> f64be {
+	return f64be(asin_f64(f64(x)))
+}
+asin_f32 :: proc "contextless" (x: f32) -> f32 {
+	return f32(asin_f64(f64(x)))
+}
+asin_f32le :: proc "contextless" (x: f32le) -> f32le {
+	return f32le(asin_f64(f64(x)))
+}
+asin_f32be :: proc "contextless" (x: f32be) -> f32be {
+	return f32be(asin_f64(f64(x)))
+}
+asin_f16 :: proc "contextless" (x: f16) -> f16 {
+	return f16(asin_f64(f64(x)))
+}
+asin_f16le :: proc "contextless" (x: f16le) -> f16le {
+	return f16le(asin_f64(f64(x)))
+}
+asin_f16be :: proc "contextless" (x: f16be) -> f16be {
+	return f16be(asin_f64(f64(x)))
+}
+asin :: proc{
+	asin_f64, asin_f32, asin_f16,
+	asin_f64le, asin_f64be,
+	asin_f32le, asin_f32be,
+	asin_f16le, asin_f16be,
 }
 
-acos :: proc "contextless" (x: $T) -> T where intrinsics.type_is_float(T) {
-	return 2 * atan2(sqrt(1 - x), sqrt(1 + x))
+
+acos_f64 :: proc "contextless" (x: f64) -> f64 {
+	/* origin: FreeBSD /usr/src/lib/msun/src/e_acos.c */
+	/*
+	 * ====================================================
+	 * Copyright (C) 1993 by Sun Microsystems, Inc. All rights reserved.
+	 *
+	 * Developed at SunSoft, a Sun Microsystems, Inc. business.
+	 * Permission to use, copy, modify, and distribute this
+	 * software is freely granted, provided that this notice
+	 * is preserved.
+	 * ====================================================
+	 */
+
+	pio2_hi :: 0h3FF921FB54442D18
+	pio2_lo :: 0h3C91A62633145C07
+	pS0     :: 0h3FC5555555555555
+	pS1     :: 0hBFD4D61203EB6F7D
+	pS2     :: 0h3FC9C1550E884455
+	pS3     :: 0hBFA48228B5688F3B
+	pS4     :: 0h3F49EFE07501B288
+	pS5     :: 0h3F023DE10DFDF709
+	qS1     :: 0hC0033A271C8A2D4B
+	qS2     :: 0h40002AE59C598AC8
+	qS3     :: 0hBFE6066C1B8D0159
+	qS4     :: 0h3FB3B8C5B12E9282
+
+	R :: #force_inline proc "contextless" (z: f64) -> f64 {
+		p, q: f64
+		p = z*(pS0+z*(pS1+z*(pS2+z*(pS3+z*(pS4+z*pS5)))))
+		q = 1.0+z*(qS1+z*(qS2+z*(qS3+z*qS4)))
+		return p/q
+	}
+
+	z, w, s, c, df: f64
+	dwords := transmute([2]u32)x
+	hx := dwords[1]
+	ix := hx & 0x7fffffff
+	/* |x| >= 1 or nan */
+	if ix >= 0x3ff00000 {
+		lx := dwords[0]
+
+		if (ix-0x3ff00000 | lx) == 0 {
+			/* acos(1)=0, acos(-1)=pi */
+			if hx >> 31 != 0 {
+				return 2*pio2_hi + 1e-120
+			}
+			return 0
+		}
+		return 0/(x-x)
+	}
+	/* |x| < 0.5 */
+	if ix < 0x3fe00000 {
+		if ix <= 0x3c600000 { /* |x| < 2**-57 */
+			return pio2_hi + 1e-120
+		}
+		return pio2_hi - (x - (pio2_lo-x*R(x*x)))
+	}
+	/* x < -0.5 */
+	if hx >> 31 != 0 {
+		z = (1.0+x)*0.5
+		s = sqrt(z)
+		w = R(z)*s-pio2_lo
+		return 2*(pio2_hi - (s+w))
+	}
+	/* x > 0.5 */
+	z = (1.0-x)*0.5
+	s = sqrt(z)
+	df = s
+	(^u64)(&df)^ &= 0xffffffff_00000000
+	c = (z-df*df)/(s+df)
+	w = R(z)*s+c
+	return 2*(df+w)
+}
+acos_f64le :: proc "contextless" (x: f64le) -> f64le {
+	return f64le(acos_f64(f64(x)))
+}
+acos_f64be :: proc "contextless" (x: f64be) -> f64be {
+	return f64be(acos_f64(f64(x)))
+}
+acos_f32 :: proc "contextless" (x: f32) -> f32 {
+	return f32(acos_f64(f64(x)))
+}
+acos_f32le :: proc "contextless" (x: f32le) -> f32le {
+	return f32le(acos_f64(f64(x)))
+}
+acos_f32be :: proc "contextless" (x: f32be) -> f32be {
+	return f32be(acos_f64(f64(x)))
+}
+acos_f16 :: proc "contextless" (x: f16) -> f16 {
+	return f16(acos_f64(f64(x)))
+}
+acos_f16le :: proc "contextless" (x: f16le) -> f16le {
+	return f16le(acos_f64(f64(x)))
+}
+acos_f16be :: proc "contextless" (x: f16be) -> f16be {
+	return f16be(acos_f64(f64(x)))
+}
+acos :: proc{
+	acos_f64, acos_f32, acos_f16,
+	acos_f64le, acos_f64be,
+	acos_f32le, acos_f32be,
+	acos_f16le, acos_f16be,
 }
 
 sinh :: proc "contextless" (x: $T) -> T where intrinsics.type_is_float(T) {

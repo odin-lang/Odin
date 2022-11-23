@@ -57,14 +57,15 @@ CPU_ACCESS :: enum u32 {
 	FIELD      = 15,
 }
 
-USAGE :: enum u32 { // TODO: convert to bit_set
-	SHADER_INPUT         = 0x00000010,
-	RENDER_TARGET_OUTPUT = 0x00000020,
-	BACK_BUFFER          = 0x00000040,
-	SHARED               = 0x00000080,
-	READ_ONLY            = 0x00000100,
-	DISCARD_ON_PRESENT   = 0x00000200,
-	UNORDERED_ACCESS     = 0x00000400,
+USAGE :: distinct bit_set[USAGE_FLAG; u32]
+USAGE_FLAG :: enum u32 {
+	SHADER_INPUT         =  4,
+	RENDER_TARGET_OUTPUT =  5,
+	BACK_BUFFER          =  6,
+	SHARED               =  7,
+	READ_ONLY            =  8,
+	DISCARD_ON_PRESENT   =  9,
+	UNORDERED_ACCESS     = 10,
 }
 
 RESOURCE_PRIORITY :: enum u32 {
@@ -75,37 +76,45 @@ RESOURCE_PRIORITY :: enum u32 {
 	MAXIMUM = 0xc8000000,
 }
 
-MAP :: enum u32 { // TODO: convert to bit_set
+MAP :: enum u32 {
 	READ    = 1,
 	WRITE   = 2,
 	DISCARD = 4,
 }
 
-ENUM_MODES :: enum u32 { // TODO: convert to bit_set
-	INTERLACED      = 1,
-	SCALING         = 2,
-	STEREO          = 4,
-	DISABLED_STEREO = 8,
+ENUM_MODES :: distinct bit_set[ENUM_MODE; u32]
+ENUM_MODE :: enum u32 {
+	INTERLACED      = 0,
+	SCALING         = 1,
+	STEREO          = 2,
+	DISABLED_STEREO = 3,
 }
 
 MAX_SWAP_CHAIN_BUFFERS :: 16
-PRESENT :: enum u32 { // TODO: convert to bit_set
-	TEST                  = 0x00000001,
-	DO_NOT_SEQUENCE       = 0x00000002,
-	RESTART               = 0x00000004,
-	DO_NOT_WAIT           = 0x00000008,
-	STEREO_PREFER_RIGHT   = 0x00000010,
-	STEREO_TEMPORARY_MONO = 0x00000020,
-	RESTRICT_TO_OUTPUT    = 0x00000040,
-	USE_DURATION          = 0x00000100,
-	ALLOW_TEARING         = 0x00000200,
+PRESENT :: distinct bit_set[PRESENT_FLAG; u32]
+PRESENT_FLAG :: enum u32 {
+	TEST                  = 0,
+	DO_NOT_SEQUENCE       = 1,
+	RESTART               = 2,
+	DO_NOT_WAIT           = 3,
+	STEREO_PREFER_RIGHT   = 4,
+	STEREO_TEMPORARY_MONO = 5,
+	RESTRICT_TO_OUTPUT    = 6,
+
+	USE_DURATION          = 8,
+	ALLOW_TEARING         = 9,
 }
 
-MWA :: enum u32 { // TODO: convert to bit_set
-	NO_WINDOW_CHANGES = 1 << 0,
-	NO_ALT_ENTER      = 1 << 1,
-	NO_PRINT_SCREEN   = 1 << 2,
-	VALID             = 0x7,
+MWA :: distinct bit_set[MWA_FLAG; u32]
+MWA_FLAG :: enum u32 {
+	NO_WINDOW_CHANGES = 0,
+	NO_ALT_ENTER      = 1,
+	NO_PRINT_SCREEN   = 2,
+}
+MWA_VALID :: MWA{
+	.NO_WINDOW_CHANGES,
+	.NO_ALT_ENTER,
+	.NO_PRINT_SCREEN,
 }
 
 SHARED_RESOURCE_READ  :: 0x80000000

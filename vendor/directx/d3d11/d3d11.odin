@@ -53,11 +53,13 @@ foreign d3d11 {
 	) -> HRESULT ---
 }
 
-foreign d3d11 {
-	WKPDID_D3DDebugObjectNameW: GUID
-	WKPDID_CommentStringW:      GUID
-}
+WKPDID_D3DDebugObjectNameW_UUID_STRING :: "4CCA5FD8-921F-42C8-8566-70CAF2A9B741"
+WKPDID_D3DDebugObjectNameW_UUID        := &IID{0x4cca5fd8, 0x921f, 0x42c8, {0x85, 0x66, 0x70, 0xca, 0xf2, 0xa9, 0xb7, 0x41}}
 
+// TODO(bill): Convert these to actual internal UUID
+foreign d3d11 {
+	WKPDID_CommentStringW: GUID
+}
 @(link_prefix="D3D_")
 foreign d3d11 {
 	TEXTURE_LAYOUT_ROW_MAJOR:             GUID
@@ -1242,11 +1244,10 @@ COLOR_WRITE_ENABLE_ALPHA :: COLOR_WRITE_ENABLE_MASK{.ALPHA}
 COLOR_WRITE_ENABLE_ALL   :: COLOR_WRITE_ENABLE_MASK{.RED, .GREEN, .BLUE, .ALPHA}
 
 COLOR_WRITE_ENABLE :: enum i32 {
-	RED   = 1,
-	GREEN = 2,
-	BLUE  = 4,
-	ALPHA = 8,
-	ALL   = 15,
+	RED   = 0,
+	GREEN = 1,
+	BLUE  = 2,
+	ALPHA = 3,
 }
 
 RENDER_TARGET_BLEND_DESC :: struct {
@@ -2401,7 +2402,7 @@ IDeviceContext_VTable :: struct {
 	ClearRenderTargetView:                     proc "stdcall" (this: ^IDeviceContext, pRenderTargetView: ^IRenderTargetView, ColorRGBA: ^[4]f32),
 	ClearUnorderedAccessViewUint:              proc "stdcall" (this: ^IDeviceContext, pUnorderedAccessView: ^IUnorderedAccessView, Values: ^[4]u32),
 	ClearUnorderedAccessViewFloat:             proc "stdcall" (this: ^IDeviceContext, pUnorderedAccessView: ^IUnorderedAccessView, Values: ^[4]f32),
-	ClearDepthStencilView:                     proc "stdcall" (this: ^IDeviceContext, pDepthStencilView: ^IDepthStencilView, ClearFlags: CLEAR_FLAG, Depth: f32, Stencil: u8),
+	ClearDepthStencilView:                     proc "stdcall" (this: ^IDeviceContext, pDepthStencilView: ^IDepthStencilView, ClearFlags: CLEAR_FLAGS, Depth: f32, Stencil: u8),
 	GenerateMips:                              proc "stdcall" (this: ^IDeviceContext, pShaderResourceView: ^IShaderResourceView),
 	SetResourceMinLOD:                         proc "stdcall" (this: ^IDeviceContext, pResource: ^IResource, MinLOD: f32),
 	GetResourceMinLOD:                         proc "stdcall" (this: ^IDeviceContext, pResource: ^IResource) -> f32,
@@ -3734,10 +3735,10 @@ MESSAGE_CATEGORY :: enum u32 {
 INFO_QUEUE_FILTER_DESC :: struct {
 	NumCategories:    u32,
 	pCategoryList:    ^MESSAGE_CATEGORY,
-	
+
 	NumSeverities:    u32,
 	pSeverityList:    ^MESSAGE_SEVERITY,
-	
+
 	NumIDs:           u32,
 	pIDList:          ^MESSAGE_ID,
 }

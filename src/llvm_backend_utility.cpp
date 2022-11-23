@@ -200,26 +200,32 @@ lbValue lb_emit_transmute(lbProcedure *p, lbValue value, Type *t) {
 	GB_ASSERT_MSG(sz == dz, "Invalid transmute conversion: '%s' to '%s'", type_to_string(src_type), type_to_string(t));
 
 	// NOTE(bill): Casting between an integer and a pointer cannot be done through a bitcast
-	if (is_type_uintptr(src) && is_type_internally_pointer_like(dst)) {
-		res.value = LLVMBuildIntToPtr(p->builder, value.value, lb_type(m, t), "");
-		return res;
-	}
-	if (is_type_internally_pointer_like(src) && is_type_uintptr(dst)) {
-		res.value = LLVMBuildPtrToInt(p->builder, value.value, lb_type(m, t), "");
-		return res;
-	}
-
-	if (is_type_integer(src) && is_type_internally_pointer_like(dst)) {
-		res.value = LLVMBuildIntToPtr(p->builder, value.value, lb_type(m, t), "");
-		return res;
-	} else if (is_type_internally_pointer_like(src) && is_type_integer(dst)) {
-		res.value = LLVMBuildPtrToInt(p->builder, value.value, lb_type(m, t), "");
-		return res;
+	if (is_type_internally_pointer_like(src)) {
+		if (is_type_integer(dst)) {
+			res.value = LLVMBuildPtrToInt(p->builder, value.value, lb_type(m, t), "");
+			return res;
+		} else if (is_type_internally_pointer_like(dst)) {
+			res.value = LLVMBuildPointerCast(p->builder, value.value, lb_type(p->module, t), "");
+			return res;
+		} else if (is_type_float(dst)) {
+			LLVMValueRef the_int = LLVMBuildPtrToInt(p->builder, value.value, lb_type(m, t_uintptr), "");
+			res.value = LLVMBuildBitCast(p->builder, the_int, lb_type(m, t), "");
+			return res;
+		}
 	}
 
-	if (is_type_internally_pointer_like(src) && is_type_internally_pointer_like(dst)) {
-		res.value = LLVMBuildPointerCast(p->builder, value.value, lb_type(p->module, t), "");
-		return res;
+	if (is_type_internally_pointer_like(dst)) {
+		if (is_type_uintptr(src) && is_type_internally_pointer_like(dst)) {
+			res.value = LLVMBuildIntToPtr(p->builder, value.value, lb_type(m, t), "");
+			return res;
+		} else if (is_type_integer(src) && is_type_internally_pointer_like(dst)) {
+			res.value = LLVMBuildIntToPtr(p->builder, value.value, lb_type(m, t), "");
+			return res;
+		} else if (is_type_float(src)) {
+			LLVMValueRef the_int = LLVMBuildBitCast(p->builder, value.value, lb_type(m, t_uintptr), "");
+			res.value = LLVMBuildIntToPtr(p->builder, the_int, lb_type(m, t), "");
+			return res;
+		}
 	}
 
 	if (is_type_simd_vector(src) && is_type_simd_vector(dst)) {
@@ -239,15 +245,17 @@ lbValue lb_emit_transmute(lbProcedure *p, lbValue value, Type *t) {
 		ap = lb_emit_conv(p, ap, alloc_type_pointer(value.type));
 		lb_emit_store(p, ap, value);
 		return lb_addr_load(p, addr);
-	}
-
-	if (lb_is_type_aggregate(src) || lb_is_type_aggregate(dst)) {
+	} else if (is_type_map(src) && are_types_identical(t_raw_map, t)) {
+		res.value = value.value;
+		res.type = t;
+		return res;
+	} else if (lb_is_type_aggregate(src) || lb_is_type_aggregate(dst)) {
 		lbValue s = lb_address_from_load_or_generate_local(p, value);
 		lbValue d = lb_emit_transmute(p, s, alloc_type_pointer(t));
 		return lb_emit_load(p, d);
 	}
 
-	res.value = LLVMBuildBitCast(p->builder, value.value, lb_type(p->module, t), "");
+	res.value = OdinLLVMBuildTransmute(p, value.value, lb_type(m, res.type));
 	return res;
 }
 
@@ -990,14 +998,13 @@ lbValue lb_emit_struct_ep(lbProcedure *p, lbValue s, i32 index) {
 		}
 	} else if (is_type_map(t)) {
 		init_map_internal_types(t);
-		Type *itp = alloc_type_pointer(t->Map.internal_type);
+		Type *itp = alloc_type_pointer(t_raw_map);
 		s = lb_emit_transmute(p, s, itp);
 
-		Type *gst = t->Map.internal_type;
-		GB_ASSERT(gst->kind == Type_Struct);
 		switch (index) {
-		case 0: result_type = get_struct_field_type(gst, 0); break;
-		case 1: result_type = get_struct_field_type(gst, 1); break;
+		case 0: result_type = get_struct_field_type(t_raw_map, 0); break;
+		case 1: result_type = get_struct_field_type(t_raw_map, 1); break;
+		case 2: result_type = get_struct_field_type(t_raw_map, 2); break;
 		}
 	} else if (is_type_array(t)) {
 		return lb_emit_array_epi(p, s, index);
@@ -1130,10 +1137,10 @@ lbValue lb_emit_struct_ev(lbProcedure *p, lbValue s, i32 index) {
 	case Type_Map:
 		{
 			init_map_internal_types(t);
-			Type *gst = t->Map.internal_type;
 			switch (index) {
-			case 0: result_type = get_struct_field_type(gst, 0); break;
-			case 1: result_type = get_struct_field_type(gst, 1); break;
+			case 0: result_type = get_struct_field_type(t_raw_map, 0); break;
+			case 1: result_type = get_struct_field_type(t_raw_map, 1); break;
+			case 2: result_type = get_struct_field_type(t_raw_map, 2); break;
 			}
 		}
 		break;
@@ -1439,33 +1446,46 @@ lbValue lb_dynamic_array_allocator(lbProcedure *p, lbValue da) {
 	return lb_emit_struct_ev(p, da, 3);
 }
 
-lbValue lb_map_entries(lbProcedure *p, lbValue value) {
-	Type *t = base_type(value.type);
-	GB_ASSERT_MSG(t->kind == Type_Map, "%s", type_to_string(t));
-	init_map_internal_types(t);
-	i32 index = 1;
-	lbValue entries = lb_emit_struct_ev(p, value, index);
-	return entries;
-}
-
-lbValue lb_map_entries_ptr(lbProcedure *p, lbValue value) {
-	Type *t = base_type(type_deref(value.type));
-	GB_ASSERT_MSG(t->kind == Type_Map, "%s", type_to_string(t));
-	init_map_internal_types(t);
-	i32 index = 1;
-	lbValue entries = lb_emit_struct_ep(p, value, index);	
-	return entries;
-}
-
 lbValue lb_map_len(lbProcedure *p, lbValue value) {
-	lbValue entries = lb_map_entries(p, value);
-	return lb_dynamic_array_len(p, entries);
+	GB_ASSERT_MSG(is_type_map(value.type) || are_types_identical(value.type, t_raw_map), "%s", type_to_string(value.type));
+	lbValue len = lb_emit_struct_ev(p, value, 1);
+	return lb_emit_conv(p, len, t_int);
+}
+lbValue lb_map_len_ptr(lbProcedure *p, lbValue map_ptr) {
+	Type *type = map_ptr.type;
+	GB_ASSERT(is_type_pointer(type));
+	type = type_deref(type);
+	GB_ASSERT_MSG(is_type_map(type) || are_types_identical(type, t_raw_map), "%s", type_to_string(type));
+	return lb_emit_struct_ep(p, map_ptr, 1);
 }
 
 lbValue lb_map_cap(lbProcedure *p, lbValue value) {
-	lbValue entries = lb_map_entries(p, value);
-	return lb_dynamic_array_cap(p, entries);
+	GB_ASSERT_MSG(is_type_map(value.type) || are_types_identical(value.type, t_raw_map), "%s", type_to_string(value.type));
+	lbValue zero = lb_const_int(p->module, t_uintptr, 0);
+	lbValue one = lb_const_int(p->module, t_uintptr, 1);
+
+	lbValue mask = lb_const_int(p->module, t_uintptr, MAP_CACHE_LINE_SIZE-1);
+
+	lbValue data = lb_emit_struct_ev(p, value, 0);
+	lbValue log2_cap = lb_emit_arith(p, Token_And, data, mask, t_uintptr);
+	lbValue cap = lb_emit_arith(p, Token_Shl, one, log2_cap, t_uintptr);
+	lbValue cmp = lb_emit_comp(p, Token_CmpEq, data, zero);
+	return lb_emit_conv(p, lb_emit_select(p, cmp, zero, cap), t_int);
 }
+
+lbValue lb_map_data_uintptr(lbProcedure *p, lbValue value) {
+	GB_ASSERT(is_type_map(value.type) || are_types_identical(value.type, t_raw_map));
+	lbValue data = lb_emit_struct_ev(p, value, 0);
+	u64 mask_value = 0;
+	if (build_context.word_size == 4) {
+		mask_value = 0xfffffffful & ~(MAP_CACHE_LINE_SIZE-1);
+	} else {
+		mask_value = 0xffffffffffffffffull & ~(MAP_CACHE_LINE_SIZE-1);
+	}
+	lbValue mask = lb_const_int(p->module, t_uintptr, mask_value);
+	return lb_emit_arith(p, Token_And, data, mask, t_uintptr);
+}
+
 
 lbValue lb_soa_struct_len(lbProcedure *p, lbValue value) {
 	Type *t = base_type(value.type);

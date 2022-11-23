@@ -1952,34 +1952,33 @@ lbValue lb_emit_conv(lbProcedure *p, lbValue value, Type *t) {
 		Type *dt = t;
 
 		GB_ASSERT(is_type_struct(st) || is_type_raw_union(st));
-		String field_name = lookup_subtype_polymorphic_field(t, src_type);
-		if (field_name.len > 0) {
-			// NOTE(bill): It can be casted
-			Selection sel = lookup_field(st, field_name, false, true);
-			if (sel.entity != nullptr) {
-				if (st_is_ptr) {
-					lbValue res = lb_emit_deep_field_gep(p, value, sel);
-					Type *rt = res.type;
-					if (!are_types_identical(rt, dt) && are_types_identical(type_deref(rt), dt)) {
-						res = lb_emit_load(p, res);
-					}
-					return res;
-				} else {
-					if (is_type_pointer(value.type)) {
-						Type *rt = value.type;
-						if (!are_types_identical(rt, dt) && are_types_identical(type_deref(rt), dt)) {
-							value = lb_emit_load(p, value);
-						} else {
-							value = lb_emit_deep_field_gep(p, value, sel);
-							return lb_emit_load(p, value);
-						}
-					}
-
-					return lb_emit_deep_field_ev(p, value, sel);
-
+		Selection sel = {};
+		sel.index.allocator = heap_allocator();
+		defer (array_free(&sel.index));
+		if (lookup_subtype_polymorphic_selection(t, src_type, &sel)) {
+			if (sel.entity == nullptr) {
+				GB_PANIC("invalid subtype cast  %s -> ", type_to_string(src_type), type_to_string(t));
+			}
+			if (st_is_ptr) {
+				lbValue res = lb_emit_deep_field_gep(p, value, sel);
+				Type *rt = res.type;
+				if (!are_types_identical(rt, dt) && are_types_identical(type_deref(rt), dt)) {
+					res = lb_emit_load(p, res);
 				}
+				return res;
 			} else {
-				GB_PANIC("invalid subtype cast  %s.%.*s", type_to_string(src_type), LIT(field_name));
+				if (is_type_pointer(value.type)) {
+					Type *rt = value.type;
+					if (!are_types_identical(rt, dt) && are_types_identical(type_deref(rt), dt)) {
+						value = lb_emit_load(p, value);
+					} else {
+						value = lb_emit_deep_field_gep(p, value, sel);
+						return lb_emit_load(p, value);
+					}
+				}
+
+				return lb_emit_deep_field_ev(p, value, sel);
+
 			}
 		}
 	}
@@ -2216,7 +2215,7 @@ lbValue lb_compare_records(lbProcedure *p, TokenKind op_kind, lbValue left, lbVa
 		args[2] = lb_const_int(p->module, t_int, type_size_of(type));
 		res = lb_emit_runtime_call(p, "memory_equal", args);
 	} else {
-		lbValue value = lb_get_equal_proc_for_type(p->module, type);
+		lbValue value = lb_equal_proc_for_type(p->module, type);
 		auto args = array_make<lbValue>(permanent_allocator(), 2);
 		args[0] = lb_emit_conv(p, left_ptr, t_rawptr);
 		args[1] = lb_emit_conv(p, right_ptr, t_rawptr);
@@ -2725,18 +2724,13 @@ lbValue lb_emit_comp_against_nil(lbProcedure *p, TokenKind op_kind, lbValue x) {
 
 	case Type_Map:
 		{
-			lbValue map_ptr = lb_address_from_load_or_generate_local(p, x);
-
-			unsigned indices[2] = {0, 0};
-			lbValue hashes_data = lb_emit_struct_ep(p, map_ptr, 0);
-			lbValue hashes_data_ptr_ptr = lb_emit_struct_ep(p, hashes_data, 0);
-			LLVMValueRef hashes_data_ptr = LLVMBuildLoad2(p->builder, llvm_addr_type(p->module, hashes_data_ptr_ptr), hashes_data_ptr_ptr.value, "");
+			lbValue data_ptr = lb_emit_struct_ev(p, x, 0);
 
 			if (op_kind == Token_CmpEq) {
-				res.value = LLVMBuildIsNull(p->builder, hashes_data_ptr, "");
+				res.value = LLVMBuildIsNull(p->builder, data_ptr.value, "");
 				return res;
 			} else {
-				res.value = LLVMBuildIsNotNull(p->builder, hashes_data_ptr, "");
+				res.value = LLVMBuildIsNotNull(p->builder, data_ptr.value, "");
 				return res;
 			}
 		}
@@ -4132,7 +4126,8 @@ lbAddr lb_build_addr_compound_lit(lbProcedure *p, Ast *expr) {
 		}
 		GB_ASSERT(!build_context.no_dynamic_literals);
 
-		lb_dynamic_map_reserve(p, v.addr, 2*cl->elems.count, pos);
+		lbValue err = lb_dynamic_map_reserve(p, v.addr, 2*cl->elems.count, pos);
+		gb_unused(err);
 
 		for_array(field_index, cl->elems) {
 			Ast *elem = cl->elems[field_index];
@@ -4140,7 +4135,7 @@ lbAddr lb_build_addr_compound_lit(lbProcedure *p, Ast *expr) {
 
 			lbValue key   = lb_build_expr(p, fv->field);
 			lbValue value = lb_build_expr(p, fv->value);
-			lb_insert_dynamic_map_key_and_value(p, v.addr, type, key, value, elem);
+			lb_internal_dynamic_map_set(p, v.addr, type, key, value, elem);
 		}
 		break;
 	}
@@ -4232,7 +4227,7 @@ lbAddr lb_build_addr_compound_lit(lbProcedure *p, Ast *expr) {
 			args[1] = size;
 			args[2] = align;
 			args[3] = lb_const_int(p->module, t_int, item_count);
-			args[4] = lb_emit_source_code_location(p, proc_name, pos);
+			args[4] = lb_emit_source_code_location_as_global(p, proc_name, pos);
 			lb_emit_runtime_call(p, "__dynamic_array_reserve", args);
 		}
 
@@ -4253,7 +4248,7 @@ lbAddr lb_build_addr_compound_lit(lbProcedure *p, Ast *expr) {
 			args[2] = align;
 			args[3] = lb_emit_conv(p, items, t_rawptr);
 			args[4] = lb_const_int(p->module, t_int, item_count);
-			args[5] = lb_emit_source_code_location(p, proc_name, pos);
+			args[5] = lb_emit_source_code_location_as_global(p, proc_name, pos);
 			lb_emit_runtime_call(p, "__dynamic_array_append", args);
 		}
 		break;

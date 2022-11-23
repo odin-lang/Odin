@@ -489,10 +489,13 @@ cmark_allocator_proc :: proc(allocator_data: rawptr, mode: runtime.Allocator_Mod
 
 	cmark_alloc := cast(^Allocator)allocator_data
 	switch mode {
-	case .Alloc:
+	case .Alloc, .Alloc_Non_Zeroed:
 		ptr := cmark_alloc.calloc(1, c.size_t(size))
-		res  = transmute([]byte)runtime.Raw_Slice{ptr, size}
-		return res, nil
+		res = ([^]byte)(ptr)[:size]
+		if ptr == nil {
+			err = .Out_Of_Memory
+		}
+		return
 
 	case .Free:
 		cmark_alloc.free(old_memory)

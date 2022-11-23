@@ -42,6 +42,8 @@ enum BuiltinProcId {
 
 	BuiltinProc_unreachable,
 
+	BuiltinProc_raw_data,
+
 	BuiltinProc_DIRECTIVE, // NOTE(bill): This is used for specialized hash-prefixed procedures
 
 	// "Intrinsics"
@@ -275,6 +277,8 @@ BuiltinProc__type_simple_boolean_end,
 
 	BuiltinProc_type_equal_proc,
 	BuiltinProc_type_hasher_proc,
+	BuiltinProc_type_map_info,
+	BuiltinProc_type_map_cell_info,
 
 BuiltinProc__type_end,
 
@@ -337,6 +341,8 @@ gb_global BuiltinProc builtin_procs[BuiltinProc_COUNT] = {
 	{STR_LIT("matrix_flatten"),   1, false, Expr_Expr, BuiltinProcPkg_builtin},
 
 	{STR_LIT("unreachable"),      0, false, Expr_Expr, BuiltinProcPkg_builtin, /*diverging*/true},
+
+	{STR_LIT("raw_data"),         1, false, Expr_Expr, BuiltinProcPkg_builtin},
 
 	{STR_LIT(""),                 0, true,  Expr_Expr, BuiltinProcPkg_builtin}, // DIRECTIVE
 
@@ -566,8 +572,10 @@ gb_global BuiltinProc builtin_procs[BuiltinProc_COUNT] = {
 
 	{STR_LIT("type_field_index_of"), 2, false, Expr_Expr, BuiltinProcPkg_intrinsics},
 
-	{STR_LIT("type_equal_proc"),  1, false, Expr_Expr, BuiltinProcPkg_intrinsics},
-	{STR_LIT("type_hasher_proc"), 1, false, Expr_Expr, BuiltinProcPkg_intrinsics},
+	{STR_LIT("type_equal_proc"),    1, false, Expr_Expr, BuiltinProcPkg_intrinsics},
+	{STR_LIT("type_hasher_proc"),   1, false, Expr_Expr, BuiltinProcPkg_intrinsics},
+	{STR_LIT("type_map_info"),      1, false, Expr_Expr, BuiltinProcPkg_intrinsics},
+	{STR_LIT("type_map_cell_info"), 1, false, Expr_Expr, BuiltinProcPkg_intrinsics},
 
 
 	{STR_LIT(""), 0, false, Expr_Stmt, BuiltinProcPkg_intrinsics},

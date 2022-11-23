@@ -298,17 +298,19 @@ struct BuildContext {
 	bool   ignore_microsoft_magic;
 	bool   linker_map_file;
 
-	bool use_separate_modules;
-	bool threaded_checker;
+	bool   use_separate_modules;
+	bool   threaded_checker;
 
-	bool show_debug_messages;
+	bool   show_debug_messages;
 	
-	bool copy_file_contents;
+	bool   copy_file_contents;
 
-	bool disallow_rtti;
+	bool   disallow_rtti;
+
+	bool   use_static_map_calls;
 
 	RelocMode reloc_mode;
-	bool disable_red_zone;
+	bool   disable_red_zone;
 
 
 	u32 cmd_doc_flags;
@@ -326,7 +328,7 @@ struct BuildContext {
 	BlockingMutex target_features_mutex;
 	StringSet target_features_set;
 	String target_features_string;
-
+	String minimum_os_version_string;
 };
 
 gb_global BuildContext build_context = {0};
@@ -1378,6 +1380,11 @@ bool init_build_paths(String init_filename) {
 		produces_output_file = true;
 	} else if (bc->command_kind & Command__does_build) {
 		produces_output_file = true;
+	}
+
+
+	if (build_context.ODIN_DEFAULT_TO_NIL_ALLOCATOR) {
+		bc->no_dynamic_literals = true;
 	}
 
 	if (!produces_output_file) {
