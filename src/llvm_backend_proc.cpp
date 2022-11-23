@@ -588,30 +588,16 @@ void lb_begin_procedure_body(lbProcedure *p) {
 				if (e->token.string != "") {
 					GB_ASSERT(!is_blank_ident(e->token));
 
-					lbAddr res = {};
-
-					lbFunctionType *ft = p->abi_function_type;
-					if (ft->multiple_return_original_type &&
-					    i < results->variables.count-1) {
-						isize ret_offset = param_offset + ft->original_arg_count + i;
-						lbValue ptr = {};
-						ptr.value = LLVMGetParam(p->value, cast(unsigned)ret_offset);
-						ptr.type = alloc_type_pointer(e->type);
-						res = lb_addr(ptr);
-
-						lb_add_entity(p->module, e, ptr);
-						lb_add_debug_local_variable(p, ptr.value, e->type, e->token);
-					} else {
-
-						// NOTE(bill): Don't even bother trying to optimize this with the return ptr value
-						// This will violate the defer rules if you do:
-						//         foo :: proc() -> (x, y: T) {
-						//                 defer x = ... // defer is executed after the `defer`
-						//                 return // the values returned should be zeroed
-						//         }
-						// NOTE(bill): REALLY, don't even bother.
-						res = lb_add_local(p, e->type, e);
-					}
+					// NOTE(bill): Don't even bother trying to optimize this with the return ptr value
+					// This will violate the defer rules if you do:
+					//         foo :: proc() -> (x, y: T) {
+					//                 defer x = ... // defer is executed after the `defer`
+					//                 return // the values returned should be zeroed
+					//         }
+					// NOTE(bill): REALLY, don't even bother.
+					//
+					// IMPORTANT NOTE(bill): REALLY, don't even bother!!!!!!
+					lbAddr res = lb_add_local(p, e->type, e);
 
 					if (e->Variable.param_value.kind != ParameterValue_Invalid) {
 						lbValue c = lb_handle_param_value(p, e->type, e->Variable.param_value, e->token.pos);
