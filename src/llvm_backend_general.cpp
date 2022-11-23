@@ -1982,7 +1982,15 @@ LLVMTypeRef lb_type_internal(lbModule *m, Type *type) {
 				}
 				
 				field_remapping[field_index] = cast(i32)fields.count;
-				array_add(&fields, lb_type(m, field->type));
+
+				Type *field_type = field->type;
+				if (is_type_proc(field_type)) {
+					// NOTE(bill, 2022-11-23): Prevent type cycle declaration (e.g. vtable) of procedures
+					// because LLVM is dumb with procedure types
+					field_type = t_rawptr;
+				}
+
+				array_add(&fields, lb_type(m, field_type));
 				
 				if (!type->Struct.is_packed) {
 					padding_offset = align_formula(padding_offset, type_align_of(field->type));
