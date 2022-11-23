@@ -688,13 +688,25 @@ void lb_debug_complete_types(lbModule *m) {
 			case Type_Slice:
 				element_count = 2;
 				elements = gb_alloc_array(temporary_allocator(), LLVMMetadataRef, element_count);
-				elements[0] = lb_debug_struct_field(m, str_lit("data"), alloc_type_pointer(bt->Slice.elem), 0*word_bits);
+				#if defined(GB_SYSTEM_WINDOWS)
+					elements[0] = lb_debug_struct_field(m, str_lit("data"), alloc_type_pointer(bt->Slice.elem), 0*word_bits);
+				#else
+					// FIX HACK TODO(bill): For some reason this causes a crash in *nix systems due to the reference counting
+					// of the debug type information
+					elements[0] = lb_debug_struct_field(m, str_lit("data"), t_rawptr, 0*word_bits);
+				#endif
 				elements[1] = lb_debug_struct_field(m, str_lit("len"),  t_int,                              1*word_bits);
 				break;
 			case Type_DynamicArray:
 				element_count = 4;
 				elements = gb_alloc_array(temporary_allocator(), LLVMMetadataRef, element_count);
-				elements[0] = lb_debug_struct_field(m, str_lit("data"),      alloc_type_pointer(bt->DynamicArray.elem), 0*word_bits);
+				#if defined(GB_SYSTEM_WINDOWS)
+					elements[0] = lb_debug_struct_field(m, str_lit("data"), alloc_type_pointer(bt->DynamicArray.elem), 0*word_bits);
+				#else
+					// FIX HACK TODO(bill): For some reason this causes a crash in *nix systems due to the reference counting
+					// of the debug type information
+					elements[0] = lb_debug_struct_field(m, str_lit("data"), t_rawptr, 0*word_bits);
+				#endif
 				elements[1] = lb_debug_struct_field(m, str_lit("len"),       t_int,                                     1*word_bits);
 				elements[2] = lb_debug_struct_field(m, str_lit("cap"),       t_int,                                     2*word_bits);
 				elements[3] = lb_debug_struct_field(m, str_lit("allocator"), t_allocator,                               3*word_bits);
