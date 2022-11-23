@@ -569,14 +569,41 @@ LLVMMetadataRef lb_debug_type(lbModule *m, Type *type) {
 		case Type_Struct:
 		case Type_Union:
 		case Type_BitSet:
-			LLVMMetadataRef temp_forward_decl = LLVMDIBuilderCreateReplaceableCompositeType(
-				m->debug_builder, tag, name_text, name_len, nullptr, nullptr, 0, 0, size_in_bits, align_in_bits, flags, "", 0
-			);
-			idt.metadata = temp_forward_decl;
+			{
+				LLVMMetadataRef temp_forward_decl = LLVMDIBuilderCreateReplaceableCompositeType(
+					m->debug_builder, tag, name_text, name_len, nullptr, nullptr, 0, 0, size_in_bits, align_in_bits, flags, "", 0
+				);
+				idt.metadata = temp_forward_decl;
 
-			array_add(&m->debug_incomplete_types, idt);
-			lb_set_llvm_metadata(m, type, temp_forward_decl);
-			return temp_forward_decl;
+				array_add(&m->debug_incomplete_types, idt);
+				lb_set_llvm_metadata(m, type, temp_forward_decl);
+
+				LLVMMetadataRef dummy = nullptr;
+				switch (bt->kind) {
+				case Type_Slice:
+					dummy = lb_debug_type(m, bt->Slice.elem);
+					dummy = lb_debug_type(m, t_int);
+					break;
+				case Type_DynamicArray:
+					dummy = lb_debug_type(m, bt->DynamicArray.elem);
+					dummy = lb_debug_type(m, t_int);
+					dummy = lb_debug_type(m, t_allocator);
+					break;
+				case Type_Map:
+					dummy = lb_debug_type(m, bt->Map.key);
+					dummy = lb_debug_type(m, bt->Map.value);
+					dummy = lb_debug_type(m, t_int);
+					dummy = lb_debug_type(m, t_allocator);
+					dummy = lb_debug_type(m, t_uintptr);
+					break;
+				case Type_BitSet:
+					if (bt->BitSet.elem)       dummy = lb_debug_type(m, bt->BitSet.elem);
+					if (bt->BitSet.underlying) dummy = lb_debug_type(m, bt->BitSet.underlying);
+					break;
+				}
+
+				return temp_forward_decl;
+			}
 		}
 	}
 
