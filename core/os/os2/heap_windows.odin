@@ -4,17 +4,17 @@ package os2
 import "core:mem"
 import win32 "core:sys/windows"
 
-heap_alloc :: proc(size: int) -> rawptr {
-	return win32.HeapAlloc(win32.GetProcessHeap(), win32.HEAP_ZERO_MEMORY, uint(size))
+heap_alloc :: proc(size: int, zero_memory: bool) -> rawptr {
+	return win32.HeapAlloc(win32.GetProcessHeap(), win32.HEAP_ZERO_MEMORY if zero_memory else 0, uint(size))
 }
 
-heap_resize :: proc(ptr: rawptr, new_size: int) -> rawptr {
+heap_resize :: proc(ptr: rawptr, new_size: int, zero_memory: bool) -> rawptr {
 	if new_size == 0 {
 		heap_free(ptr)
 		return nil
 	}
 	if ptr == nil {
-		return heap_alloc(new_size)
+		return heap_alloc(new_size, zero_memory)
 	}
 
 	return win32.HeapReAlloc(win32.GetProcessHeap(), win32.HEAP_ZERO_MEMORY, ptr, uint(new_size))
@@ -36,16 +36,16 @@ _heap_allocator_proc :: proc(allocator_data: rawptr, mode: mem.Allocator_Mode,
 	// the pointer we return to the user.
 	//
 
-	aligned_alloc :: proc(size, alignment: int, old_ptr: rawptr = nil) -> ([]byte, mem.Allocator_Error) {
+	aligned_alloc :: proc(size, alignment: int, zero_memory: bool, old_ptr: rawptr = nil) -> ([]byte, mem.Allocator_Error) {
 		a := max(alignment, align_of(rawptr))
 		space := size + a - 1
 
 		allocated_mem: rawptr
 		if old_ptr != nil {
 			original_old_ptr := mem.ptr_offset((^rawptr)(old_ptr), -1)^
-			allocated_mem = heap_resize(original_old_ptr, space+size_of(rawptr))
+			allocated_mem = heap_resize(original_old_ptr, space+size_of(rawptr), zero_memory)
 		} else {
-			allocated_mem = heap_alloc(space+size_of(rawptr))
+			allocated_mem = heap_alloc(space+size_of(rawptr), zero_memory)
 		}
 		aligned_mem := rawptr(mem.ptr_offset((^u8)(allocated_mem), size_of(rawptr)))
 
@@ -72,12 +72,12 @@ _heap_allocator_proc :: proc(allocator_data: rawptr, mode: mem.Allocator_Mode,
 		if p == nil {
 			return nil, nil
 		}
-		return aligned_alloc(new_size, new_alignment, p)
+		return aligned_alloc(new_size, new_alignment, true, p)
 	}
 
 	switch mode {
-	case .Alloc:
-		return aligned_alloc(size, alignment)
+	case .Alloc, .Alloc_Non_Zeroed:
+		return aligned_alloc(size, alignment, mode == .Alloc)
 
 	case .Free:
 		aligned_free(old_memory)
@@ -87,7 +87,7 @@ _heap_allocator_proc :: proc(allocator_data: rawptr, mode: mem.Allocator_Mode,
 
 	case .Resize:
 		if old_memory == nil {
-			return aligned_alloc(size, alignment)
+			return aligned_alloc(size, alignment, true)
 		}
 		return aligned_resize(old_memory, old_size, size, alignment)
 
