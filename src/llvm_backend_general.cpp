@@ -1499,9 +1499,6 @@ LLVMTypeRef lb_type_internal_for_procedures_raw(lbModule *m, Type *type) {
 	}
 
 	unsigned param_count = 0;
-	if (type->Proc.calling_convention == ProcCC_Odin) {
-		param_count += 1;
-	}
 
 	if (type->Proc.param_count != 0) {
 		GB_ASSERT(type->Proc.params->kind == Type_Tuple);
@@ -1519,21 +1516,23 @@ LLVMTypeRef lb_type_internal_for_procedures_raw(lbModule *m, Type *type) {
 	m->internal_type_level += 1;
 	defer (m->internal_type_level -= 1);
 
+	bool return_is_tuple = false;
 	LLVMTypeRef ret = nullptr;
 	LLVMTypeRef *params = gb_alloc_array(permanent_allocator(), LLVMTypeRef, param_count);
 	bool *params_by_ptr = gb_alloc_array(permanent_allocator(), bool, param_count);
 	if (type->Proc.result_count != 0) {
 		Type *single_ret = reduce_tuple_to_single_type(type->Proc.results);
-		 if (is_type_proc(single_ret)) {
+		if (is_type_proc(single_ret)) {
 			single_ret = t_rawptr;
 		}
 		ret = lb_type(m, single_ret);
-		if (ret != nullptr) {
-			if (is_type_boolean(single_ret) &&
-			    is_calling_convention_none(type->Proc.calling_convention) &&
-			    type_size_of(single_ret) <= 1) {
-				ret = LLVMInt1TypeInContext(m->ctx);
-			}
+		if (is_type_tuple(single_ret)) {
+			return_is_tuple = true;
+		}
+		if (is_type_boolean(single_ret) &&
+		    is_calling_convention_none(type->Proc.calling_convention) &&
+		    type_size_of(single_ret) <= 1) {
+			ret = LLVMInt1TypeInContext(m->ctx);
 		}
 	}
 
@@ -1571,12 +1570,8 @@ LLVMTypeRef lb_type_internal_for_procedures_raw(lbModule *m, Type *type) {
 			params[param_index++] = param_type;
 		}
 	}
-	if (param_index < param_count) {
-		params[param_index++] = lb_type(m, t_rawptr);
-	}
 	GB_ASSERT(param_index == param_count);
-
-	lbFunctionType *ft = lb_get_abi_info(m->ctx, params, param_count, ret, ret != nullptr, type->Proc.calling_convention);
+	lbFunctionType *ft = lb_get_abi_info(m->ctx, params, param_count, ret, ret != nullptr, return_is_tuple, type->Proc.calling_convention);
 	{
 		for_array(j, ft->args) {
 			auto arg = ft->args[j];
@@ -1593,10 +1588,10 @@ LLVMTypeRef lb_type_internal_for_procedures_raw(lbModule *m, Type *type) {
 		              LLVMPrintTypeToString(ft->ret.type),
 		              LLVMGetTypeContext(ft->ret.type), ft->ctx, LLVMGetGlobalContext());
 	}
-	for_array(j, ft->args) {
-		if (params_by_ptr[j]) {
+	for (unsigned i = 0; i < param_count; i++) {
+		if (params_by_ptr[i]) {
 			// NOTE(bill): The parameter needs to be passed "indirectly", override it
-			ft->args[j].kind = lbArg_Indirect;
+			ft->args[i].kind = lbArg_Indirect;
 		}
 	}
 
@@ -2161,11 +2156,11 @@ LLVMTypeRef lb_type(lbModule *m, Type *type) {
 	return llvm_type;
 }
 
-lbFunctionType *lb_get_function_type(lbModule *m, lbProcedure *p, Type *pt) {
+lbFunctionType *lb_get_function_type(lbModule *m, Type *pt) {
 	lbFunctionType **ft_found = nullptr;
 	ft_found = map_get(&m->function_type_map, pt);
 	if (!ft_found) {
-		LLVMTypeRef llvm_proc_type = lb_type(p->module, pt);
+		LLVMTypeRef llvm_proc_type = lb_type(m, pt);
 		gb_unused(llvm_proc_type);
 		ft_found = map_get(&m->function_type_map, pt);
 	}

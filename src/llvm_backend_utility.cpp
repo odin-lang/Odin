@@ -436,7 +436,7 @@ lbValue lb_emit_or_else(lbProcedure *p, Ast *arg, Ast *else_expr, TypeAndValue c
 }
 
 void lb_build_return_stmt(lbProcedure *p, Slice<Ast *> const &return_results);
-void lb_build_return_stmt_internal(lbProcedure *p, lbValue const &res);
+void lb_build_return_stmt_internal(lbProcedure *p, lbValue res);
 
 lbValue lb_emit_or_return(lbProcedure *p, Ast *arg, TypeAndValue const &tv) {
 	lbValue lhs = {};
