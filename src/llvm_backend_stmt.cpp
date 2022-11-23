@@ -1576,9 +1576,27 @@ void lb_build_assignment(lbProcedure *p, Array<lbAddr> &lvals, Slice<Ast *> cons
 	}
 }
 
-void lb_build_return_stmt_internal(lbProcedure *p, lbValue const &res) {
-	lbFunctionType *ft = lb_get_function_type(p->module, p, p->type);
+void lb_build_return_stmt_internal(lbProcedure *p, lbValue res) {
+	lbFunctionType *ft = lb_get_function_type(p->module, p->type);
 	bool return_by_pointer = ft->ret.kind == lbArg_Indirect;
+	bool split_returns = ft->multiple_return_original_type != nullptr;
+
+	if (split_returns) {
+		GB_ASSERT(res.value != nullptr);
+		Type *res_type = res.type;
+		GB_ASSERT(is_type_tuple(res_type));
+		isize res_count = res_type->Tuple.variables.count;
+
+		isize param_offset = return_by_pointer ? 1 : 0;
+		param_offset += ft->original_arg_count;
+		for (isize i = 0; i < res_count-1; i++) {
+			lbValue ret_ptr = {};
+			ret_ptr.value = LLVMGetParam(p->value, cast(unsigned)(param_offset + i));
+			ret_ptr.type = alloc_type_pointer(res_type->Tuple.variables[i]->type);
+			lb_emit_store(p, ret_ptr, lb_emit_struct_ev(p, res, cast(i32)i));
+		}
+		res = lb_emit_struct_ev(p, res, cast(i32)(res_count-1));
+	}
 
 	if (return_by_pointer) {
 		if (res.value != nullptr) {
@@ -1617,7 +1635,7 @@ void lb_build_return_stmt(lbProcedure *p, Slice<Ast *> const &return_results) {
 	isize return_count = p->type->Proc.result_count;
 	isize res_count = return_results.count;
 
-	lbFunctionType *ft = lb_get_function_type(p->module, p, p->type);
+	lbFunctionType *ft = lb_get_function_type(p->module, p->type);
 	bool return_by_pointer = ft->ret.kind == lbArg_Indirect;
 
 	if (return_count == 0) {
