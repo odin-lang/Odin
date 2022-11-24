@@ -698,13 +698,13 @@ void lb_build_range_tuple(lbProcedure *p, Ast *expr, Type *val0_type, Type *val1
 	i32 tuple_count = cast(i32)tuple->Tuple.variables.count;
 	i32 cond_index = tuple_count-1;
 
-	lbValue cond = lb_emit_struct_ev(p, tuple_value, cond_index);
+	lbValue cond = lb_emit_tuple_ev(p, tuple_value, cond_index);
 	lb_emit_if(p, cond, body, done);
 	lb_start_block(p, body);
 
 
-	if (val0_) *val0_ = lb_emit_struct_ev(p, tuple_value, 0);
-	if (val1_) *val1_ = lb_emit_struct_ev(p, tuple_value, 1);
+	if (val0_) *val0_ = lb_emit_tuple_ev(p, tuple_value, 0);
+	if (val1_) *val1_ = lb_emit_tuple_ev(p, tuple_value, 1);
 	if (loop_) *loop_ = loop;
 	if (done_) *done_ = done;
 }
@@ -1543,6 +1543,24 @@ void lb_build_static_variables(lbProcedure *p, AstValueDecl *vd) {
 		lb_add_member(p->module, mangled_name, global_val);
 	}
 }
+void lb_append_tuple_values(lbProcedure *p, Array<lbValue> *dst_values, lbValue src_value) {
+	Type *t = src_value.type;
+	if (t->kind == Type_Tuple) {
+		lbTupleFix *tf = map_get(&p->tuple_fix_map, src_value.value);
+		if (tf) {
+			for_array(j, tf->values) {
+				array_add(dst_values, tf->values[j]);
+			}
+		} else {
+			for_array(i, t->Tuple.variables) {
+				lbValue v = lb_emit_tuple_ev(p, src_value, cast(i32)i);
+				array_add(dst_values, v);
+			}
+		}
+	} else {
+		array_add(dst_values, src_value);
+	}
+}
 
 
 void lb_build_assignment(lbProcedure *p, Array<lbAddr> &lvals, Slice<Ast *> const &values) {
@@ -1554,18 +1572,8 @@ void lb_build_assignment(lbProcedure *p, Array<lbAddr> &lvals, Slice<Ast *> cons
 
 	for_array(i, values) {
 		Ast *rhs = values[i];
-		if (is_type_tuple(type_of_expr(rhs))) {
-			lbValue init = lb_build_expr(p, rhs);
-			Type *t = init.type;
-			GB_ASSERT(t->kind == Type_Tuple);
-			for_array(i, t->Tuple.variables) {
-				lbValue v = lb_emit_struct_ev(p, init, cast(i32)i);
-				array_add(&inits, v);
-			}
-		} else {
-			lbValue init = lb_build_expr(p, rhs);
-			array_add(&inits, init);
-		}
+		lbValue init = lb_build_expr(p, rhs);
+		lb_append_tuple_values(p, &inits, init);
 	}
 
 	GB_ASSERT(lvals.count == inits.count);
@@ -1655,15 +1663,7 @@ void lb_build_return_stmt(lbProcedure *p, Slice<Ast *> const &return_results) {
 		if (res_count != 0) {
 			for (isize res_index = 0; res_index < res_count; res_index++) {
 				lbValue res = lb_build_expr(p, return_results[res_index]);
-				Type *t = res.type;
-				if (t->kind == Type_Tuple) {
-					for_array(i, t->Tuple.variables) {
-						lbValue v = lb_emit_struct_ev(p, res, cast(i32)i);
-						array_add(&results, v);
-					}
-				} else {
-					array_add(&results, res);
-				}
+				lb_append_tuple_values(p, &results, res);
 			}
 		} else {
 			for (isize res_index = 0; res_index < return_count; res_index++) {
