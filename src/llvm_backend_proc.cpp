@@ -123,6 +123,7 @@ lbProcedure *lb_create_procedure(lbModule *m, Entity *entity, bool ignore_body) 
 	p->scope_stack.allocator   = a;
 	map_init(&p->selector_values,  a, 0);
 	map_init(&p->selector_addr,    a, 0);
+	map_init(&p->tuple_fix_map,    a, 0);
 
 	if (p->is_foreign) {
 		lb_add_foreign_library_path(p->module, entity->Procedure.foreign_library);
@@ -711,15 +712,8 @@ Array<lbValue> lb_value_to_array(lbProcedure *p, lbValue value) {
 	if (t == nullptr) {
 		// Do nothing
 	} else if (is_type_tuple(t)) {
-		GB_ASSERT(t->kind == Type_Tuple);
-		auto *rt = &t->Tuple;
-		if (rt->variables.count > 0) {
-			array = array_make<lbValue>(permanent_allocator(), rt->variables.count);
-			for_array(i, rt->variables) {
-				lbValue elem = lb_emit_struct_ev(p, value, cast(i32)i);
-				array[i] = elem;
-			}
-		}
+		array = array_make<lbValue>(permanent_allocator(), 0, t->Tuple.variables.count);
+		lb_append_tuple_values(p, &array, value);
 	} else {
 		array = array_make<lbValue>(permanent_allocator(), 1);
 		array[0] = value;
@@ -1034,18 +1028,43 @@ lbValue lb_emit_call(lbProcedure *p, lbValue value, Array<lbValue> const &args, 
 
 		if (original_rt != rt) {
 			GB_ASSERT(split_returns);
-			GB_ASSERT(original_rt->kind == Type_Tuple);
+			GB_ASSERT(is_type_tuple(original_rt));
+
+			// IMPORTANT NOTE(bill, 2022-11-24)
+			// result_ptr is a dummy value which is only used to reference a tuple
+			// value for the "tuple-fix"
+			//
+			// The reason for the fake stack allocation is to have a unique pointer
+			// for the value to be used as a key within the procedure itself
+
 			lbValue result_ptr = lb_add_local_generated(p, original_rt, false).addr;
 			isize ret_count = original_rt->Tuple.variables.count;
+
+			auto tuple_fix_values = slice_make<lbValue>(permanent_allocator(), ret_count);
+			auto tuple_geps = slice_make<lbValue>(permanent_allocator(), ret_count);
+
 			isize offset = ft->original_arg_count;
 			for (isize j = 0; j < ret_count-1; j++) {
 				lbValue ret_arg_ptr = processed_args[offset + j];
 				lbValue ret_arg = lb_emit_load(p, ret_arg_ptr);
-				lb_emit_store(p, lb_emit_struct_ep(p, result_ptr, cast(i32)j), ret_arg);
+				tuple_fix_values[j] = ret_arg;
 			}
-			lb_emit_store(p, lb_emit_struct_ep(p, result_ptr, cast(i32)(ret_count-1)), result);
+			tuple_fix_values[ret_count-1] = result;
+
+		#if 0
+			for (isize j = 0; j < ret_count; j++) {
+				tuple_geps[j] = lb_emit_struct_ep(p, result_ptr, cast(i32)j);
+			}
+			for (isize j = 0; j < ret_count; j++) {
+				lb_emit_store(p, tuple_geps[j], tuple_fix_values[j]);
+			}
+		#endif
 
 			result = lb_emit_load(p, result_ptr);
+
+			lbTupleFix tf = {tuple_fix_values};
+			map_set(&p->tuple_fix_map, result_ptr.value, tf);
+			map_set(&p->tuple_fix_map, result.value, tf);
 		}
 
 	}
@@ -2338,7 +2357,7 @@ lbValue lb_build_builtin_proc(lbProcedure *p, Ast *expr, TypeAndValue const &tv,
 		);
 		LLVMSetWeak(value, weak);
 
-		if (tv.type->kind == Type_Tuple) {
+		if (is_type_tuple(tv.type)) {
 			Type *fix_typed = alloc_type_tuple();
 			slice_init(&fix_typed->Tuple.variables, permanent_allocator(), 2);
 			fix_typed->Tuple.variables[0] = tv.type->Tuple.variables[0];
@@ -3082,7 +3101,7 @@ lbValue lb_build_call_expr_internal(lbProcedure *p, Ast *expr) {
 		GB_ASSERT_MSG(tav.mode != Addressing_Invalid, "%s %s %d", expr_to_string(arg), expr_to_string(expr), tav.mode);
 		GB_ASSERT_MSG(tav.mode != Addressing_ProcGroup, "%s", expr_to_string(arg));
 		Type *at = tav.type;
-		if (at->kind == Type_Tuple) {
+		if (is_type_tuple(at)) {
 			arg_count += at->Tuple.variables.count;
 		} else {
 			arg_count++;
@@ -3122,9 +3141,16 @@ lbValue lb_build_call_expr_internal(lbProcedure *p, Ast *expr) {
 			lbValue a = lb_build_expr(p, arg);
 			Type *at = a.type;
 			if (at->kind == Type_Tuple) {
-				for_array(i, at->Tuple.variables) {
-					lbValue v = lb_emit_struct_ev(p, a, cast(i32)i);
-					args[arg_index++] = v;
+				lbTupleFix *tf = map_get(&p->tuple_fix_map, a.value);
+				if (tf) {
+					for_array(j, tf->values) {
+						args[arg_index++] = tf->values[j];
+					}
+				} else {
+					for_array(j, at->Tuple.variables) {
+						lbValue v = lb_emit_struct_ev(p, a, cast(i32)j);
+						args[arg_index++] = v;
+					}
 				}
 			} else {
 				args[arg_index++] = a;

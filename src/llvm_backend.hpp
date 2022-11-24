@@ -254,6 +254,10 @@ struct lbTargetList {
 };
 
 
+struct lbTupleFix {
+	Slice<lbValue> values;
+};
+
 enum lbProcedureFlag : u32 {
 	lbProcedureFlag_WithoutMemcpyPass = 1<<0,
 	lbProcedureFlag_DebugAllocaCopy = 1<<1,
@@ -306,6 +310,7 @@ struct lbProcedure {
 
 	PtrMap<Ast *, lbValue> selector_values;
 	PtrMap<Ast *, lbAddr>  selector_addr;
+	PtrMap<LLVMValueRef, lbTupleFix> tuple_fix_map;
 };
 
 
@@ -360,6 +365,7 @@ lbValue lb_emit_epi(lbModule *m, lbValue const &value, isize index);
 lbValue lb_emit_array_epi(lbModule *m, lbValue s, isize index);
 lbValue lb_emit_struct_ep(lbProcedure *p, lbValue s, i32 index);
 lbValue lb_emit_struct_ev(lbProcedure *p, lbValue s, i32 index);
+lbValue lb_emit_tuple_ev(lbProcedure *p, lbValue value, i32 index);
 lbValue lb_emit_array_epi(lbProcedure *p, lbValue value, isize index);
 lbValue lb_emit_array_ep(lbProcedure *p, lbValue s, lbValue index);
 lbValue lb_emit_deep_field_gep(lbProcedure *p, lbValue e, Selection sel);
