@@ -511,7 +511,14 @@ void lb_begin_procedure_body(lbProcedure *p) {
 				}
 			}
 
-			Type *ptr_type = alloc_type_pointer(reduce_tuple_to_single_type(p->type->Proc.results));
+			Type *return_ptr_type = reduce_tuple_to_single_type(p->type->Proc.results);
+			bool split_returns = ft->multiple_return_original_type != nullptr;
+			if (split_returns) {
+				GB_ASSERT(is_type_tuple(return_ptr_type));
+				auto const &variables = return_ptr_type->Tuple.variables;
+				return_ptr_type = variables[variables.count-1]->type;
+			}
+			Type *ptr_type = alloc_type_pointer(return_ptr_type);
 			Entity *e = alloc_entity_param(nullptr, make_token_ident(name), ptr_type, false, false);
 			e->flags |= EntityFlag_NoAlias;
 
