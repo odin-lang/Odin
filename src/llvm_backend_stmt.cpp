@@ -1713,7 +1713,7 @@ void lb_build_return_stmt(lbProcedure *p, Slice<Ast *> const &return_results) {
 			for_array(i, result_eps) {
 				lbValue result_ep = {};
 				result_ep.value = LLVMGetParam(p->value, cast(unsigned)(param_offset+i));
-				result_ep.type = tuple->variables[i]->type;
+				result_ep.type = alloc_type_pointer(tuple->variables[i]->type);
 				result_eps[i] = result_ep;
 			}
 			for_array(i, result_eps) {
