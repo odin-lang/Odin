@@ -1450,11 +1450,21 @@ LB_ABI_INFO(lb_get_abi_info_internal) {
 
 
 LB_ABI_INFO(lb_get_abi_info) {
-	lbFunctionType *ft = lb_get_abi_info_internal(c, arg_types, arg_count, return_type, return_is_defined, ALLOW_SPLIT_MULTI_RETURNS && return_is_tuple, calling_convention);
+	lbFunctionType *ft = lb_get_abi_info_internal(
+		c,
+		arg_types, arg_count,
+		return_type, return_is_defined,
+		ALLOW_SPLIT_MULTI_RETURNS && return_is_tuple && is_calling_convention_odin(calling_convention),
+		calling_convention);
+
+
+	// NOTE(bill): this is handled here rather than when developing the type in `lb_type_internal_for_procedures_raw`
+	// This is to make it consistent when and how it is handled
 	if (calling_convention == ProcCC_Odin) {
 		// append the `context` pointer
 		lbArgType context_param = lb_arg_type_direct(LLVMPointerType(LLVMInt8TypeInContext(c), 0));
 		array_add(&ft->args, context_param);
 	}
+
 	return ft;
 }
