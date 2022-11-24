@@ -329,17 +329,55 @@ i64 lb_alignof(LLVMTypeRef type) {
 #define LB_ABI_INFO(name) lbFunctionType *name(LLVMContextRef c, LLVMTypeRef *arg_types, unsigned arg_count, LLVMTypeRef return_type, bool return_is_defined, bool return_is_tuple, ProcCallingConvention calling_convention)
 typedef LB_ABI_INFO(lbAbiInfoType);
 
+#define LB_ABI_COMPUTE_RETURN_TYPE(name) lbArgType name(lbFunctionType *ft, LLVMContextRef c, LLVMTypeRef return_type, bool return_is_defined, bool return_is_tuple)
+typedef LB_ABI_COMPUTE_RETURN_TYPE(lbAbiComputeReturnType);
+
+
+lbArgType lb_abi_modify_return_is_tuple(lbFunctionType *ft, LLVMContextRef c, LLVMTypeRef return_type, lbAbiComputeReturnType *compute_return_type) {
+	GB_ASSERT(return_type != nullptr);
+	GB_ASSERT(compute_return_type != nullptr);
+
+	lbArgType return_arg = {};
+	if (lb_is_type_kind(return_type, LLVMStructTypeKind)) {
+		unsigned field_count = LLVMCountStructElementTypes(return_type);
+		if (field_count > 1) {
+			ft->original_arg_count = ft->args.count;
+			ft->multiple_return_original_type = return_type;
+
+			for (unsigned i = 0; i < field_count-1; i++) {
+				LLVMTypeRef field_type = LLVMStructGetTypeAtIndex(return_type, i);
+				LLVMTypeRef field_pointer_type = LLVMPointerType(field_type, 0);
+				lbArgType ret_partial = lb_arg_type_direct(field_pointer_type);
+				array_add(&ft->args, ret_partial);
+			}
+
+			// override the return type for the last field
+			LLVMTypeRef new_return_type = LLVMStructGetTypeAtIndex(return_type, field_count-1);
+			return_arg = compute_return_type(ft, c, new_return_type, true, false);
+		}
+	}
+	return return_arg;
+}
+
+#define LB_ABI_MODIFY_RETURN_IF_TUPLE_MACRO() do {                                                                  \
+	if (return_is_tuple) {                                                                                      \
+		lbArgType new_return_type = lb_abi_modify_return_is_tuple(ft, c, return_type, compute_return_type); \
+		if (new_return_type.type != nullptr) {                                                              \
+			return new_return_type;                                                                     \
+		}                                                                                                   \
+	}                                                                                                           \
+} while (0)
 
 // NOTE(bill): I hate `namespace` in C++ but this is just because I don't want to prefix everything
 namespace lbAbi386 {
 	Array<lbArgType> compute_arg_types(LLVMContextRef c, LLVMTypeRef *arg_types, unsigned arg_count);
-	lbArgType compute_return_type(LLVMContextRef c, LLVMTypeRef return_type, bool return_is_defined);
+	LB_ABI_COMPUTE_RETURN_TYPE(compute_return_type);
 
 	LB_ABI_INFO(abi_info) {
 		lbFunctionType *ft = gb_alloc_item(permanent_allocator(), lbFunctionType);
 		ft->ctx = c;
 		ft->args = compute_arg_types(c, arg_types, arg_count);
-		ft->ret = compute_return_type(c, return_type, return_is_defined);
+		ft->ret = compute_return_type(ft, c, return_type, return_is_defined, return_is_tuple);
 		ft->calling_convention = calling_convention;
 		return ft;
 	}
@@ -391,7 +429,7 @@ namespace lbAbi386 {
 		return args;
 	}
 
-	lbArgType compute_return_type(LLVMContextRef c, LLVMTypeRef return_type, bool return_is_defined) {
+	LB_ABI_COMPUTE_RETURN_TYPE(compute_return_type) {
 		if (!return_is_defined) {
 			return lb_arg_type_direct(LLVMVoidTypeInContext(c));
 		} else if (lb_is_type_kind(return_type, LLVMStructTypeKind) || lb_is_type_kind(return_type, LLVMArrayTypeKind)) {
@@ -402,6 +440,9 @@ namespace lbAbi386 {
 			case 4: return lb_arg_type_direct(return_type, LLVMIntTypeInContext(c, 32), nullptr, nullptr);
 			case 8: return lb_arg_type_direct(return_type, LLVMIntTypeInContext(c, 64), nullptr, nullptr);
 			}
+
+			LB_ABI_MODIFY_RETURN_IF_TUPLE_MACRO();
+
 			LLVMAttributeRef attr = lb_create_enum_attribute_with_type(c, "sret", return_type);
 			return lb_arg_type_indirect(return_type, attr);
 		}
@@ -411,7 +452,7 @@ namespace lbAbi386 {
 
 namespace lbAbiAmd64Win64 {
 	Array<lbArgType> compute_arg_types(LLVMContextRef c, LLVMTypeRef *arg_types, unsigned arg_count);
-	lbArgType compute_return_type(lbFunctionType *ft, LLVMContextRef c, LLVMTypeRef return_type, bool return_is_defined, bool return_is_tuple);
+	LB_ABI_COMPUTE_RETURN_TYPE(compute_return_type);
 
 	LB_ABI_INFO(abi_info) {
 		lbFunctionType *ft = gb_alloc_item(permanent_allocator(), lbFunctionType);
@@ -448,7 +489,7 @@ namespace lbAbiAmd64Win64 {
 		return args;
 	}
 
-	lbArgType compute_return_type(lbFunctionType *ft, LLVMContextRef c, LLVMTypeRef return_type, bool return_is_defined, bool return_is_tuple) {
+	LB_ABI_COMPUTE_RETURN_TYPE(compute_return_type) {
 		if (!return_is_defined) {
 			return lb_arg_type_direct(LLVMVoidTypeInContext(c));
 		} else if (lb_is_type_kind(return_type, LLVMStructTypeKind) || lb_is_type_kind(return_type, LLVMArrayTypeKind)) {
@@ -460,26 +501,7 @@ namespace lbAbiAmd64Win64 {
 			case 8: return lb_arg_type_direct(return_type, LLVMIntTypeInContext(c, 64), nullptr, nullptr);
 			}
 
-			if (return_is_tuple) {
-				GB_ASSERT(lb_is_type_kind(return_type, LLVMStructTypeKind));
-				unsigned field_count = LLVMCountStructElementTypes(return_type);
-
-				if (field_count > 1) {
-					ft->original_arg_count = ft->args.count;
-					ft->multiple_return_original_type = return_type;
-
-					for (unsigned i = 0; i < field_count-1; i++) {
-						LLVMTypeRef field_type = LLVMStructGetTypeAtIndex(return_type, i);
-						LLVMTypeRef field_pointer_type = LLVMPointerType(field_type, 0);
-						lbArgType ret_partial = lb_arg_type_direct(field_pointer_type);
-						array_add(&ft->args, ret_partial);
-					}
-
-					// override the return type for the last field
-					LLVMTypeRef new_return_type = LLVMStructGetTypeAtIndex(return_type, field_count-1);
-					return compute_return_type(ft, c, new_return_type, true, false);
-				}
-			}
+			LB_ABI_MODIFY_RETURN_IF_TUPLE_MACRO();
 
 			LLVMAttributeRef attr = lb_create_enum_attribute_with_type(c, "sret", return_type);
 			return lb_arg_type_indirect(return_type, attr);
@@ -536,7 +558,7 @@ namespace lbAbiAmd64SysV {
 		Amd64TypeAttribute_StructRect,
 	};
 
-	lbArgType compute_return_type(LLVMContextRef c, LLVMTypeRef return_type, bool return_is_defined);
+	LB_ABI_COMPUTE_RETURN_TYPE(compute_return_type);
 	void classify_with(LLVMTypeRef t, Array<RegClass> *cls, i64 ix, i64 off);
 	void fixup(LLVMTypeRef t, Array<RegClass> *cls);
 	lbArgType amd64_type(LLVMContextRef c, LLVMTypeRef type, Amd64TypeAttributeKind attribute_kind, ProcCallingConvention calling_convention);
@@ -933,7 +955,7 @@ namespace lbAbiAmd64SysV {
 		}
 	}
 
-	lbArgType compute_return_type(LLVMContextRef c, LLVMTypeRef return_type, bool return_is_defined) {
+	LB_ABI_COMPUTE_RETURN_TYPE(compute_return_type) {
 		if (!return_is_defined) {
 			return lb_arg_type_direct(LLVMVoidTypeInContext(c));
 		} else if (lb_is_type_kind(return_type, LLVMStructTypeKind)) {
@@ -944,6 +966,9 @@ namespace lbAbiAmd64SysV {
 			case 4: return lb_arg_type_direct(return_type, LLVMIntTypeInContext(c, 32), nullptr, nullptr);
 			case 8: return lb_arg_type_direct(return_type, LLVMIntTypeInContext(c, 64), nullptr, nullptr);
 			}
+
+			LB_ABI_MODIFY_RETURN_IF_TUPLE_MACRO();
+
 			LLVMAttributeRef attr = lb_create_enum_attribute_with_type(c, "sret", return_type);
 			return lb_arg_type_indirect(return_type, attr);
 		} else if (build_context.metrics.os == TargetOs_windows && lb_is_type_kind(return_type, LLVMIntegerTypeKind) && lb_sizeof(return_type) == 16) {
@@ -956,13 +981,13 @@ namespace lbAbiAmd64SysV {
 
 namespace lbAbiArm64 {
 	Array<lbArgType> compute_arg_types(LLVMContextRef c, LLVMTypeRef *arg_types, unsigned arg_count);
-	lbArgType compute_return_type(LLVMContextRef c, LLVMTypeRef return_type, bool return_is_defined);
+	LB_ABI_COMPUTE_RETURN_TYPE(compute_return_type);
 	bool is_homogenous_aggregate(LLVMContextRef c, LLVMTypeRef type, LLVMTypeRef *base_type_, unsigned *member_count_);
 
 	LB_ABI_INFO(abi_info) {
 		lbFunctionType *ft = gb_alloc_item(permanent_allocator(), lbFunctionType);
 		ft->ctx = c;
-		ft->ret = compute_return_type(c, return_type, return_is_defined);
+		ft->ret = compute_return_type(ft, c, return_type, return_is_defined, return_is_tuple);
 		ft -> args = compute_arg_types(c, arg_types, arg_count);
 		ft->calling_convention = calling_convention;
 		return ft;
@@ -1070,27 +1095,29 @@ namespace lbAbiArm64 {
 		return (member_count <= 4);
 	}
 
-	lbArgType compute_return_type(LLVMContextRef c, LLVMTypeRef type, bool return_is_defined) {
+	LB_ABI_COMPUTE_RETURN_TYPE(compute_return_type) {
 		LLVMTypeRef homo_base_type = nullptr;
 		unsigned homo_member_count = 0;
 
 		if (!return_is_defined) {
 			return lb_arg_type_direct(LLVMVoidTypeInContext(c));
-		} else if (is_register(type)) {
-			return non_struct(c, type);
-		} else if (is_homogenous_aggregate(c, type, &homo_base_type, &homo_member_count)) {
+		} else if (is_register(return_type)) {
+			return non_struct(c, return_type);
+		} else if (is_homogenous_aggregate(c, return_type, &homo_base_type, &homo_member_count)) {
 			if (is_homogenous_aggregate_small_enough(homo_base_type, homo_member_count)) {
-				return lb_arg_type_direct(type, LLVMArrayType(homo_base_type, homo_member_count), nullptr, nullptr);
+				return lb_arg_type_direct(return_type, LLVMArrayType(homo_base_type, homo_member_count), nullptr, nullptr);
 			} else {
 				//TODO(Platin): do i need to create stuff that can handle the diffrent return type?
 				//              else this needs a fix in llvm_backend_proc as we would need to cast it to the correct array type
 
+				LB_ABI_MODIFY_RETURN_IF_TUPLE_MACRO();
+
 				//LLVMTypeRef array_type = LLVMArrayType(homo_base_type, homo_member_count);
-				LLVMAttributeRef attr = lb_create_enum_attribute_with_type(c, "sret", type);
-				return lb_arg_type_indirect(type, attr);
+				LLVMAttributeRef attr = lb_create_enum_attribute_with_type(c, "sret", return_type);
+				return lb_arg_type_indirect(return_type, attr);
 			}
 		} else {
-			i64 size = lb_sizeof(type);
+			i64 size = lb_sizeof(return_type);
 			if (size <= 16) {
 				LLVMTypeRef cast_type = nullptr;
 				if (size <= 1) {
@@ -1105,10 +1132,12 @@ namespace lbAbiArm64 {
 					unsigned count = cast(unsigned)((size+7)/8);
 					cast_type = LLVMArrayType(LLVMInt64TypeInContext(c), count);
 				}
-				return lb_arg_type_direct(type, cast_type, nullptr, nullptr);
+				return lb_arg_type_direct(return_type, cast_type, nullptr, nullptr);
 			} else {
-				LLVMAttributeRef attr = lb_create_enum_attribute_with_type(c, "sret", type);
-				return lb_arg_type_indirect(type, attr);
+				LB_ABI_MODIFY_RETURN_IF_TUPLE_MACRO();
+
+				LLVMAttributeRef attr = lb_create_enum_attribute_with_type(c, "sret", return_type);
+				return lb_arg_type_indirect(return_type, attr);
 			}
 		}
 	}
@@ -1160,7 +1189,7 @@ namespace lbAbiWasm {
 		            registers/arguments if possible rather than by pointer.
 	*/
 	Array<lbArgType> compute_arg_types(LLVMContextRef c, LLVMTypeRef *arg_types, unsigned arg_count);
-	lbArgType compute_return_type(LLVMContextRef c, LLVMTypeRef return_type, bool return_is_defined);
+	LB_ABI_COMPUTE_RETURN_TYPE(compute_return_type);
 
 	enum {MAX_DIRECT_STRUCT_SIZE = 32};
 
@@ -1168,7 +1197,7 @@ namespace lbAbiWasm {
 		lbFunctionType *ft = gb_alloc_item(permanent_allocator(), lbFunctionType);
 		ft->ctx = c;
 		ft->args = compute_arg_types(c, arg_types, arg_count);
-		ft->ret = compute_return_type(c, return_type, return_is_defined);
+		ft->ret = compute_return_type(ft, c, return_type, return_is_defined, return_is_tuple);
 		ft->calling_convention = calling_convention;
 		return ft;
 	}
@@ -1260,7 +1289,7 @@ namespace lbAbiWasm {
 		return args;
 	}
 
-	lbArgType compute_return_type(LLVMContextRef c, LLVMTypeRef return_type, bool return_is_defined) {
+	LB_ABI_COMPUTE_RETURN_TYPE(compute_return_type) {
 		if (!return_is_defined) {
 			return lb_arg_type_direct(LLVMVoidTypeInContext(c));
 		} else if (lb_is_type_kind(return_type, LLVMStructTypeKind) || lb_is_type_kind(return_type, LLVMArrayTypeKind)) {
@@ -1275,6 +1304,9 @@ namespace lbAbiWasm {
 			case 4: return lb_arg_type_direct(return_type, LLVMIntTypeInContext(c, 32), nullptr, nullptr);
 			case 8: return lb_arg_type_direct(return_type, LLVMIntTypeInContext(c, 64), nullptr, nullptr);
 			}
+
+			LB_ABI_MODIFY_RETURN_IF_TUPLE_MACRO();
+
 			LLVMAttributeRef attr = lb_create_enum_attribute_with_type(c, "sret", return_type);
 			return lb_arg_type_indirect(return_type, attr);
 		}
