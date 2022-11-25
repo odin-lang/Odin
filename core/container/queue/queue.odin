@@ -40,17 +40,17 @@ destroy :: proc(q: ^$Q/Queue($T)) {
 }
 
 // The length of the queue
-len :: proc(q: $Q/Queue($T)) -> int {
+len :: proc "contextless" (q: $Q/Queue($T)) -> int {
 	return int(q.len)
 }
 
 // The current capacity of the queue
-cap :: proc(q: $Q/Queue($T)) -> int {
+cap :: proc "contextless" (q: $Q/Queue($T)) -> int {
 	return builtin.len(q.data)
 }
 
 // Remaining space in the queue (cap-len)
-space :: proc(q: $Q/Queue($T)) -> int {
+space :: proc "contextless" (q: $Q/Queue($T)) -> int {
 	return builtin.len(q.data) - int(q.len)
 }
 
@@ -70,18 +70,18 @@ get :: proc(q: ^$Q/Queue($T), #any_int i: int, loc := #caller_location) -> T {
 	return q.data[idx]
 }
 
-front :: proc(q: ^$Q/Queue($T)) -> T {
+front :: proc "contextless" (q: ^$Q/Queue($T)) -> T {
 	return q.data[q.offset]
 }
-front_ptr :: proc(q: ^$Q/Queue($T)) -> ^T {
+front_ptr :: proc "contextless" (q: ^$Q/Queue($T)) -> ^T {
 	return &q.data[q.offset]
 }
 
-back :: proc(q: ^$Q/Queue($T)) -> T {
+back :: proc "contextless" (q: ^$Q/Queue($T)) -> T {
 	idx := (q.offset+uint(q.len))%builtin.len(q.data)
 	return q.data[idx]
 }
-back_ptr :: proc(q: ^$Q/Queue($T)) -> ^T {
+back_ptr :: proc "contextless" (q: ^$Q/Queue($T)) -> ^T {
 	idx := (q.offset+uint(q.len))%builtin.len(q.data)
 	return &q.data[idx]
 }
@@ -218,7 +218,7 @@ append :: proc{push_back, push_back_elems}
 
 
 // Clear the contents of the queue
-clear :: proc(q: ^$Q/Queue($T)) {
+clear :: proc "contextless" (q: ^$Q/Queue($T)) {
 	q.len = 0
 	q.offset = 0
 }

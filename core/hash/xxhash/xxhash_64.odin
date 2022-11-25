@@ -41,7 +41,7 @@ XXH_PRIME64_4 :: 0x85EBCA77C2B2AE63 /*!< 0b1000010111101011110010100111011111000
 XXH_PRIME64_5 :: 0x27D4EB2F165667C5 /*!< 0b0010011111010100111010110010111100010110010101100110011111000101 */
 
 @(optimization_mode="speed")
-XXH64_round :: proc(acc, input: xxh_u64) -> (res: xxh_u64) {
+XXH64_round :: proc "contextless" (acc, input: xxh_u64) -> (res: xxh_u64) {
 	acc := acc
 
 	acc += input * XXH_PRIME64_2
@@ -51,14 +51,14 @@ XXH64_round :: proc(acc, input: xxh_u64) -> (res: xxh_u64) {
 }
 
 @(optimization_mode="speed")
-XXH64_mergeRound :: proc(acc, val: xxh_u64) -> (res: xxh_u64) {
+XXH64_mergeRound :: proc "contextless" (acc, val: xxh_u64) -> (res: xxh_u64) {
 	res  = acc ~ XXH64_round(0, val)
 	res  = res * XXH_PRIME64_1 + XXH_PRIME64_4
 	return res
 }
 
 @(optimization_mode="speed")
-XXH64_avalanche :: proc(h64: xxh_u64) -> (res: xxh_u64) {
+XXH64_avalanche :: proc "contextless" (h64: xxh_u64) -> (res: xxh_u64) {
 	res = h64
 	res ~= res >> 33
 	res *= XXH_PRIME64_2
@@ -69,7 +69,7 @@ XXH64_avalanche :: proc(h64: xxh_u64) -> (res: xxh_u64) {
 }
 
 @(optimization_mode="speed")
-XXH64_finalize :: proc(h64: xxh_u64, buf: []u8, alignment: Alignment) -> (res: xxh_u64) {
+XXH64_finalize :: proc "contextless" (h64: xxh_u64, buf: []u8, alignment: Alignment) -> (res: xxh_u64) {
 	buf := buf
 	length := len(buf) & 31
 	res = h64
@@ -101,7 +101,7 @@ XXH64_finalize :: proc(h64: xxh_u64, buf: []u8, alignment: Alignment) -> (res: x
 }
 
 @(optimization_mode="speed")
-XXH64_endian_align :: proc(input: []u8, seed := XXH64_DEFAULT_SEED, alignment := Alignment.Unaligned) -> (res: xxh_u64) {
+XXH64_endian_align :: proc "contextless" (input: []u8, seed := XXH64_DEFAULT_SEED, alignment := Alignment.Unaligned) -> (res: xxh_u64) {
 	buf    := input
 	length := len(buf)
 
@@ -131,7 +131,7 @@ XXH64_endian_align :: proc(input: []u8, seed := XXH64_DEFAULT_SEED, alignment :=
 	return XXH64_finalize(res, buf, alignment)
 }
 
-XXH64 :: proc(input: []u8, seed := XXH64_DEFAULT_SEED) -> (digest: XXH64_hash) {
+XXH64 :: proc "contextless" (input: []u8, seed := XXH64_DEFAULT_SEED) -> (digest: XXH64_hash) {
 	when false {
 		/*
 			Simple version, good for code maintenance, but unfortunately slow for small inputs.
@@ -177,7 +177,7 @@ XXH64_copy_state :: proc(dest, src: ^XXH64_state) {
 	mem_copy(dest, src, size_of(XXH64_state))
 }
 
-XXH64_reset_state :: proc(state_ptr: ^XXH64_state, seed := XXH64_DEFAULT_SEED) -> (err: Error) {
+XXH64_reset_state :: proc "contextless" (state_ptr: ^XXH64_state, seed := XXH64_DEFAULT_SEED) -> (err: Error) {
 	state := XXH64_state{}
 
 	state.v1 = seed + XXH_PRIME64_1 + XXH_PRIME64_2
@@ -192,7 +192,7 @@ XXH64_reset_state :: proc(state_ptr: ^XXH64_state, seed := XXH64_DEFAULT_SEED) -
 }
 
 @(optimization_mode="speed")
-XXH64_update :: proc(state: ^XXH64_state, input: []u8) -> (err: Error) {
+XXH64_update :: proc "contextless" (state: ^XXH64_state, input: []u8) -> (err: Error) {
 	buf    := input
 	length := len(buf)
 
@@ -246,7 +246,7 @@ XXH64_update :: proc(state: ^XXH64_state, input: []u8) -> (err: Error) {
 }
 
 @(optimization_mode="speed")
-XXH64_digest :: proc(state: ^XXH64_state) -> (res: XXH64_hash) {
+XXH64_digest :: proc "contextless" (state: ^XXH64_state) -> (res: XXH64_hash) {
 	if state.total_len >= 32 {
 		v1 := state.v1
 		v2 := state.v2
@@ -282,14 +282,14 @@ XXH64_digest :: proc(state: ^XXH64_state) -> (res: XXH64_hash) {
 	The following functions allow transformation of hash values to and from their
 	canonical format.
 */
-XXH64_canonical_from_hash :: proc(hash: XXH64_hash) -> (canonical: XXH64_canonical) {
+XXH64_canonical_from_hash :: proc "contextless" (hash: XXH64_hash) -> (canonical: XXH64_canonical) {
 	#assert(size_of(XXH64_canonical) == size_of(XXH64_hash))
 	h := u64be(hash)
 	mem_copy(&canonical, &h, size_of(canonical))
 	return
 }
 
-XXH64_hash_from_canonical :: proc(canonical: ^XXH64_canonical) -> (hash: XXH64_hash) {
+XXH64_hash_from_canonical :: proc "contextless" (canonical: ^XXH64_canonical) -> (hash: XXH64_hash) {
 	h := (^u64be)(&canonical.digest)^
 	return XXH64_hash(h)
 }

@@ -92,12 +92,12 @@ to_upper :: proc(s: string, allocator := context.allocator) -> string {
 
 // returns true when the `c` rune is a space, '-' or '_' 
 // useful when treating strings like words in a text editor or html paths 
-is_delimiter :: proc(c: rune) -> bool {
+is_delimiter :: proc "contextless" (c: rune) -> bool {
 	return c == '-' || c == '_' || is_space(c)
 }
 
 // returns true when the `r` rune is a non alpha or `unicode.is_space` rune
-is_separator :: proc(r: rune) -> bool {
+is_separator :: proc "contextless" (r: rune) -> bool {
 	if r <= 0x7f {
 		switch r {
 		case '0'..='9': return false

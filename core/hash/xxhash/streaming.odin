@@ -89,7 +89,7 @@ XXH3_128_digest :: proc(state: ^XXH3_state) -> (hash: XXH3_128_hash) {
 
 /*======   Canonical representation   ======*/
 
-XXH3_128_canonical_from_hash :: proc(hash: XXH128_hash_t) -> (canonical: XXH128_canonical) {
+XXH3_128_canonical_from_hash :: proc "contextless" (hash: XXH128_hash_t) -> (canonical: XXH128_canonical) {
 	#assert(size_of(XXH128_canonical) == size_of(XXH128_hash_t))
 
 	t := hash
@@ -102,7 +102,7 @@ XXH3_128_canonical_from_hash :: proc(hash: XXH128_hash_t) -> (canonical: XXH128_
 	return
 }
 
-XXH3_128_hash_from_canonical :: proc(src: ^XXH128_canonical) -> (hash: u128) {
+XXH3_128_hash_from_canonical :: proc "contextless" (src: ^XXH128_canonical) -> (hash: u128) {
 	h := XXH128_hash_t{}
 
 	high := (^u64be)(&src.digest[0])^
@@ -115,7 +115,7 @@ XXH3_128_hash_from_canonical :: proc(src: ^XXH128_canonical) -> (hash: u128) {
 
 /* ===   XXH3 streaming   === */
 
-XXH3_init_state :: proc(state: ^XXH3_state) {
+XXH3_init_state :: proc "contextless" (state: ^XXH3_state) {
 	state.seed = 0
 }
 

@@ -37,7 +37,7 @@ reader_init :: proc(b: ^Reader, rd: io.Reader, size: int = DEFAULT_BUF_SIZE, all
 	b.buf = make([]byte, size, allocator)
 }
 
-reader_init_with_buf :: proc(b: ^Reader, rd: io.Reader, buf: []byte) {
+reader_init_with_buf :: proc "contextless" (b: ^Reader, rd: io.Reader, buf: []byte) {
 	reader_reset(b, rd)
 	b.buf_allocator = {}
 	b.buf = buf
@@ -49,11 +49,11 @@ reader_destroy :: proc(b: ^Reader) {
 	b^ = {}
 }
 
-reader_size :: proc(b: ^Reader) -> int {
+reader_size :: proc "contextless" (b: ^Reader) -> int {
 	return len(b.buf)
 }
 
-reader_reset :: proc(b: ^Reader, r: io.Reader) {
+reader_reset :: proc "contextless" (b: ^Reader, r: io.Reader) {
 	b.rd = r
 	b.r, b.w = 0, 0
 	b.err = nil
@@ -97,7 +97,7 @@ _reader_read_new_chunk :: proc(b: ^Reader) -> io.Error {
 }
 
 @(private)
-_reader_consume_err :: proc(b: ^Reader) -> io.Error {
+_reader_consume_err :: proc "contextless" (b: ^Reader) -> io.Error {
 	err := b.err
 	b.err = nil
 	return err
@@ -139,7 +139,7 @@ reader_peek :: proc(b: ^Reader, n: int) -> (data: []byte, err: io.Error) {
 }
 
 // reader_buffered returns the number of bytes that can be read from the current buffer
-reader_buffered :: proc(b: ^Reader) -> int {
+reader_buffered :: proc "contextless" (b: ^Reader) -> int {
 	return b.w - b.r
 }
 
@@ -240,7 +240,7 @@ reader_read_byte :: proc(b: ^Reader) -> (byte, io.Error) {
 }
 
 // reader_unread_byte unreads the last byte. Only the most recently read byte can be unread
-reader_unread_byte :: proc(b: ^Reader) -> io.Error {
+reader_unread_byte :: proc "contextless" (b: ^Reader) -> io.Error {
 	if b.last_byte < 0 || b.r == 0 && b.w > 0 {
 		return .Invalid_Unread
 	}
@@ -285,7 +285,7 @@ reader_read_rune :: proc(b: ^Reader) -> (r: rune, size: int, err: io.Error) {
 }
 
 // reader_unread_rune unreads the last rune. Only the most recently read rune can be unread
-reader_unread_rune :: proc(b: ^Reader) -> io.Error {
+reader_unread_rune :: proc "contextless" (b: ^Reader) -> io.Error {
 	if b.last_rune_size < 0 || b.r < b.last_rune_size {
 		return .Invalid_Unread
 	}
@@ -351,7 +351,7 @@ reader_write_to :: proc(b: ^Reader, w: io.Writer) -> (n: i64, err: io.Error) {
 
 
 // reader_to_stream converts a Reader into an io.Stream
-reader_to_stream :: proc(b: ^Reader) -> (s: io.Stream) {
+reader_to_stream :: proc "contextless" (b: ^Reader) -> (s: io.Stream) {
 	s.stream_data = b
 	s.stream_vtable = &_reader_vtable
 	return

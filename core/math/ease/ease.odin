@@ -475,7 +475,7 @@ flux_update :: proc(flux: ^Flux_Map($T), dt: f64) where intrinsics.type_is_float
 
 // stop a specific key inside the map
 // returns true when it successfully removed the key
-flux_stop :: proc(flux: ^Flux_Map($T), key: ^T) -> bool where intrinsics.type_is_float(T) {
+flux_stop :: proc "contextless" (flux: ^Flux_Map($T), key: ^T) -> bool where intrinsics.type_is_float(T) {
 	if key in flux.values {
 		delete_key(&flux.values, key)
 		return true
@@ -486,7 +486,7 @@ flux_stop :: proc(flux: ^Flux_Map($T), key: ^T) -> bool where intrinsics.type_is
 
 // returns the amount of time left for the tween animation, if the key exists in the map
 // returns 0 if the tween doesnt exist on the map
-flux_tween_time_left :: proc(flux: Flux_Map($T), key: ^T) -> f64 {
+flux_tween_time_left :: proc "contextless" (flux: Flux_Map($T), key: ^T) -> f64 {
 	if tween, ok := flux.values[key]; ok {
 		return ((1 - tween.progress) * tween.rate) + tween.delay
 	} else {

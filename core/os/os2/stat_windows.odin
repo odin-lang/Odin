@@ -299,7 +299,7 @@ reserved_names := [?]string{
 	"LPT1", "LPT2", "LPT3", "LPT4", "LPT5", "LPT6", "LPT7", "LPT8", "LPT9",
 }
 
-_is_reserved_name :: proc(path: string) -> bool {
+_is_reserved_name :: proc "contextless" (path: string) -> bool {
 	if len(path) == 0 {
 		return false
 	}
@@ -311,11 +311,11 @@ _is_reserved_name :: proc(path: string) -> bool {
 	return false
 }
 
-_is_UNC :: proc(path: string) -> bool {
+_is_UNC :: proc "contextless" (path: string) -> bool {
 	return _volume_name_len(path) > 2
 }
 
-_volume_name_len :: proc(path: string) -> int {
+_volume_name_len :: proc "contextless" (path: string) -> int {
 	if ODIN_OS == .Windows {
 		if len(path) < 2 {
 			return 0
@@ -354,7 +354,7 @@ _volume_name_len :: proc(path: string) -> int {
 }
 
 
-_is_abs :: proc(path: string) -> bool {
+_is_abs :: proc "contextless" (path: string) -> bool {
 	if _is_reserved_name(path) {
 		return true
 	}

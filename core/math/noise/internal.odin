@@ -474,7 +474,7 @@ GRADIENTS_4D := [N_GRADS_4D * 4]f32{
 /*
 	2D Simplex noise base.
 */
-_internal_noise_2d_unskewed_base :: proc(seed: i64, coord: Vec2) -> (value: f32) {
+_internal_noise_2d_unskewed_base :: proc "contextless" (seed: i64, coord: Vec2) -> (value: f32) {
 	// Get base points and offsets.
 	base := [2]i64{fast_floor(coord.x), fast_floor(coord.y)}
 	i    := [2]f32{f32(coord.x - f64(base.x)), f32(coord.y - f64(base.y))}
@@ -521,7 +521,7 @@ _internal_noise_2d_unskewed_base :: proc(seed: i64, coord: Vec2) -> (value: f32)
 /*
 	Generate overlapping cubic lattices for 3D OpenSimplex2 noise.
 */
-_internal_noise_3d_unrotated_base :: proc(seed: i64, coord: Vec3) -> (value: f32) {
+_internal_noise_3d_unrotated_base :: proc "contextless" (seed: i64, coord: Vec3) -> (value: f32) {
 	seed := seed
 	// Get base points and offsets.
 	// xr, yr, zr := coord.x, coord.y, coord.z
@@ -607,7 +607,7 @@ _internal_noise_3d_unrotated_base :: proc(seed: i64, coord: Vec3) -> (value: f32
 /*
 	4D OpenSimplex2 noise base.
 */
-_internal_noise_4d_unskewed_base :: proc(seed: i64, coord: Vec4) -> (value: f32) {
+_internal_noise_4d_unskewed_base :: proc "contextless" (seed: i64, coord: Vec4) -> (value: f32) {
 	seed := seed
 
 	// Get base points and offsets
@@ -691,7 +691,7 @@ _internal_noise_4d_unskewed_base :: proc(seed: i64, coord: Vec4) -> (value: f32)
 	Utility functions
 */
 @(optimization_mode="speed")
-grad_2d :: proc(seed: i64, svp: [2]i64, delta: [2]f32) -> (value: f32) {
+grad_2d :: proc "contextless" (seed: i64, svp: [2]i64, delta: [2]f32) -> (value: f32) {
 	hash := seed ~ svp.x ~ svp.y
 	hash *= HASH_MULTIPLIER
 	hash ~= hash >> (64 - N_GRADS_2D_EXPONENT + 1)
@@ -701,7 +701,7 @@ grad_2d :: proc(seed: i64, svp: [2]i64, delta: [2]f32) -> (value: f32) {
 }
 
 @(optimization_mode="speed")
-grad_3d :: proc(seed: i64, rvp: [3]i64, delta: [3]f32) -> (value: f32) {
+grad_3d :: proc "contextless" (seed: i64, rvp: [3]i64, delta: [3]f32) -> (value: f32) {
 	hash := (seed ~ rvp.x) ~ (rvp.y ~ rvp.z)
 	hash *= HASH_MULTIPLIER
 	hash ~= hash >> (64 - N_GRADS_3D_EXPONENT + 2)
@@ -711,7 +711,7 @@ grad_3d :: proc(seed: i64, rvp: [3]i64, delta: [3]f32) -> (value: f32) {
 }
 
 @(optimization_mode="speed")
-grad_4d :: proc(seed: i64, svp: [4]i64, delta: [4]f32) -> (value: f32) {
+grad_4d :: proc "contextless" (seed: i64, svp: [4]i64, delta: [4]f32) -> (value: f32) {
 	hash := seed ~ (svp.x ~ svp.y) ~ (svp.z ~ svp.w)
 	hash *= HASH_MULTIPLIER
 	hash ~= hash >> (64 - N_GRADS_4D_EXPONENT + 2)
@@ -723,12 +723,12 @@ grad_4d :: proc(seed: i64, svp: [4]i64, delta: [4]f32) -> (value: f32) {
 grad :: proc {grad_2d, grad_3d, grad_4d}
 
 @(optimization_mode="speed")
-fast_floor :: proc(x: f64) -> (floored: i64) {
+fast_floor :: proc "contextless" (x: f64) -> (floored: i64) {
 	xi := i64(x)
 	return x < f64(xi) ? xi - 1 : xi
 }
 
 @(optimization_mode="speed")
-fast_round :: proc(x: f64) -> (rounded: i64) {
+fast_round :: proc "contextless" (x: f64) -> (rounded: i64) {
 	return x < 0 ? i64(x - 0.5) : i64(x + 0.5)
 }

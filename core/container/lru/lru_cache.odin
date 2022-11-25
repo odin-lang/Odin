@@ -119,7 +119,7 @@ peek :: proc(c: ^$C/Cache($Key, $Value), key: Key) -> (value: Value, ok: bool) #
 }
 
 // exists checks for the existence of a value from a given key without updating the recent usage.
-exists :: proc(c: ^$C/Cache($Key, $Value), key: Key) -> bool {
+exists :: proc "contextless" (c: ^$C/Cache($Key, $Value), key: Key) -> bool {
 	return key in c.entries
 }
 
@@ -166,7 +166,7 @@ _call_on_remove :: proc(c: ^$C/Cache($Key, $Value), node: ^Node(Key, Value)) {
 }
 
 @(private)
-_push_front_node :: proc(c: ^$C/Cache($Key, $Value), e: ^Node(Key, Value)) {
+_push_front_node :: proc "contextless" (c: ^$C/Cache($Key, $Value), e: ^Node(Key, Value)) {
 	if c.head != nil {
 		e.next = c.head
 		e.next.prev = e
@@ -179,7 +179,7 @@ _push_front_node :: proc(c: ^$C/Cache($Key, $Value), e: ^Node(Key, Value)) {
 }
 
 @(private)
-_pop_node :: proc(c: ^$C/Cache($Key, $Value), e: ^Node(Key, Value)) {
+_pop_node :: proc "contextless" (c: ^$C/Cache($Key, $Value), e: ^Node(Key, Value)) {
 	if e == nil {
 		return
 	}

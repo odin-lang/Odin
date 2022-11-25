@@ -3,7 +3,7 @@ package hash
 import "core:intrinsics"
 
 @(optimization_mode="speed")
-crc32 :: proc(data: []byte, seed := u32(0)) -> u32 #no_bounds_check {
+crc32 :: proc "contextless" (data: []byte, seed := u32(0)) -> u32 #no_bounds_check {
 	crc := ~seed
 	buffer := raw_data(data)
 	length := len(data)

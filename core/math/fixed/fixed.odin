@@ -28,7 +28,7 @@ Fixed32_32 :: distinct Fixed(i64, 32)
 Fixed52_12 :: distinct Fixed(i64, 12)
 
 
-init_from_f64 :: proc(x: ^$T/Fixed($Backing, $Fraction_Width), val: f64) {
+init_from_f64 :: proc "contextless" (x: ^$T/Fixed($Backing, $Fraction_Width), val: f64) {
 	i, f := math.modf(val)
 	x.i  = Backing(f * (1<<Fraction_Width))
 	x.i &= 1<<Fraction_Width - 1
@@ -36,61 +36,61 @@ init_from_f64 :: proc(x: ^$T/Fixed($Backing, $Fraction_Width), val: f64) {
 }
 
 
-init_from_parts :: proc(x: ^$T/Fixed($Backing, $Fraction_Width), integer, fraction: Backing) {
+init_from_parts :: proc "contextless" (x: ^$T/Fixed($Backing, $Fraction_Width), integer, fraction: Backing) {
 	i, f := math.modf(val)
 	x.i  = fraction
 	x.i &= 1<<Fraction_Width - 1
 	x.i |= integer
 }
 
-to_f64 :: proc(x: $T/Fixed($Backing, $Fraction_Width)) -> f64 {
+to_f64 :: proc "contextless" (x: $T/Fixed($Backing, $Fraction_Width)) -> f64 {
 	res := f64(x.i >> Fraction_Width)
 	res += f64(x.i & (1<<Fraction_Width-1)) / f64(1<<Fraction_Width)
 	return res
 }
 
 
-add :: proc(x, y: $T/Fixed) -> T {
+add :: proc "contextless" (x, y: $T/Fixed) -> T {
 	return {x.i + y.i}
 }
-sub :: proc(x, y: $T/Fixed) -> T {
+sub :: proc "contextless" (x, y: $T/Fixed) -> T {
 	return {x.i - y.i}
 }
 
-mul :: proc(x, y: $T/Fixed($Backing, $Fraction_Width)) -> (z: T) {
+mul :: proc "contextless" (x, y: $T/Fixed($Backing, $Fraction_Width)) -> (z: T) {
 	z.i = intrinsics.fixed_point_mul(x.i, y.i, Fraction_Width)
 	return
 }
-mul_sat :: proc(x, y: $T/Fixed($Backing, $Fraction_Width)) -> (z: T) {
+mul_sat :: proc "contextless" (x, y: $T/Fixed($Backing, $Fraction_Width)) -> (z: T) {
 	z.i = intrinsics.fixed_point_mul_sat(x.i, y.i, Fraction_Width)
 	return
 }
 
-div :: proc(x, y: $T/Fixed($Backing, $Fraction_Width)) -> (z: T) {
+div :: proc "contextless" (x, y: $T/Fixed($Backing, $Fraction_Width)) -> (z: T) {
 	z.i = intrinsics.fixed_point_div(x.i, y.i, Fraction_Width)
 	return
 }
-div_sat :: proc(x, y: $T/Fixed($Backing, $Fraction_Width)) -> (z: T) {
+div_sat :: proc "contextless" (x, y: $T/Fixed($Backing, $Fraction_Width)) -> (z: T) {
 	z.i = intrinsics.fixed_point_div_sat(x.i, y.i, Fraction_Width)
 	return
 }
 
 
-floor :: proc(x: $T/Fixed($Backing, $Fraction_Width)) -> Backing {
+floor :: proc "contextless" (x: $T/Fixed($Backing, $Fraction_Width)) -> Backing {
 	return x.i >> Fraction_Width
 }
-ceil :: proc(x: $T/Fixed($Backing, $Fraction_Width)) -> Backing {
+ceil :: proc "contextless" (x: $T/Fixed($Backing, $Fraction_Width)) -> Backing {
 	Integer :: 8*size_of(Backing) - Fraction_Width
 	return (x.i + (1 << Integer-1)) >> Fraction_Width
 }
-round :: proc(x: $T/Fixed($Backing, $Fraction_Width)) -> Backing {
+round :: proc "contextless" (x: $T/Fixed($Backing, $Fraction_Width)) -> Backing {
 	Integer :: 8*size_of(Backing) - Fraction_Width
 	return (x.i + (1 << (Integer - 1))) >> Fraction_Width
 }
 
 
 
-append :: proc(dst: []byte, x: $T/Fixed($Backing, $Fraction_Width)) -> string {
+append :: proc "contextless" (dst: []byte, x: $T/Fixed($Backing, $Fraction_Width)) -> string {
 	x := x
 	buf: [48]byte
 	i := 0

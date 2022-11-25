@@ -60,6 +60,7 @@ import xml              "core:encoding/xml"
 
 import fmt              "core:fmt"
 import hash             "core:hash"
+import xxhash           "core:hash/xxhash"
 
 import image            "core:image"
 import netpbm           "core:image/netpbm"

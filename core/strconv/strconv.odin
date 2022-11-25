@@ -3,7 +3,7 @@ package strconv
 import "core:unicode/utf8"
 import "decimal"
 
-parse_bool :: proc(s: string, n: ^int = nil) -> (result: bool = false, ok: bool) {
+parse_bool :: proc "contextless" (s: string, n: ^int = nil) -> (result: bool = false, ok: bool) {
 	switch s {
 	case "1", "t", "T", "true", "TRUE", "True":
 		if n != nil { n^ = len(s) }
@@ -15,7 +15,7 @@ parse_bool :: proc(s: string, n: ^int = nil) -> (result: bool = false, ok: bool)
 	return
 }
 
-_digit_value :: proc(r: rune) -> int {
+_digit_value :: proc "contextless" (r: rune) -> int {
 	ri := int(r)
 	v: int = 16
 	switch r {
@@ -734,7 +734,7 @@ parse_f64 :: proc(str: string, n: ^int = nil) -> (value: f64, ok: bool) {
 		return
 	}
 
-	parse_hex :: proc(s: string, mantissa: u64, exp: int, neg, trunc: bool) -> (f64, bool) {
+	parse_hex :: proc "contextless" (s: string, mantissa: u64, exp: int, neg, trunc: bool) -> (f64, bool) {
 		info := &_f64_info
 
 		mantissa, exp := mantissa, exp
@@ -851,7 +851,7 @@ parse_f64 :: proc(str: string, n: ^int = nil) -> (value: f64, ok: bool) {
 }
 
 
-append_bool :: proc(buf: []byte, b: bool) -> string {
+append_bool :: proc "contextless" (buf: []byte, b: bool) -> string {
 	n := 0
 	if b {
 		n = copy(buf, "true")
@@ -925,19 +925,19 @@ quote :: proc(buf: []byte, str: string) -> string {
 }
 
 quote_rune :: proc(buf: []byte, r: rune) -> string {
-	write_byte :: proc(buf: []byte, i: ^int, bytes: ..byte) {
+	write_byte :: proc "contextless" (buf: []byte, i: ^int, bytes: ..byte) {
 		if i^ < len(buf) {
 			n := copy(buf[i^:], bytes[:])
 			i^ += n
 		}
 	}
-	write_string :: proc(buf: []byte, i: ^int, s: string) {
+	write_string :: proc "contextless" (buf: []byte, i: ^int, s: string) {
 		if i^ < len(buf) {
 			n := copy(buf[i^:], s)
 			i^ += n
 		}
 	}
-	write_rune :: proc(buf: []byte, i: ^int, r: rune) {
+	write_rune :: proc "contextless" (buf: []byte, i: ^int, r: rune) {
 		if i^ < len(buf) {
 			b, w := utf8.encode_rune(r)
 			n := copy(buf[i^:], b[:w])
@@ -983,8 +983,8 @@ quote_rune :: proc(buf: []byte, r: rune) -> string {
 
 
 
-unquote_char :: proc(str: string, quote: byte) -> (r: rune, multiple_bytes: bool, tail_string: string, success: bool) {
-	hex_to_int :: proc(c: byte) -> int {
+unquote_char :: proc "contextless" (str: string, quote: byte) -> (r: rune, multiple_bytes: bool, tail_string: string, success: bool) {
+	hex_to_int :: proc "contextless" (c: byte) -> int {
 		switch c {
 		case '0'..='9': return int(c-'0')
 		case 'a'..='f': return int(c-'a')+10
@@ -1079,7 +1079,7 @@ unquote_char :: proc(str: string, quote: byte) -> (r: rune, multiple_bytes: bool
 }
 
 unquote_string :: proc(lit: string, allocator := context.allocator) -> (res: string, allocated, success: bool) {
-	contains_rune :: proc(s: string, r: rune) -> int {
+	contains_rune :: proc "contextless" (s: string, r: rune) -> int {
 		for c, offset in s {
 			if c == r {
 				return offset

@@ -13,11 +13,11 @@ SEPARATOR :: '/'
 SEPARATOR_STRING :: `/`
 LIST_SEPARATOR :: ':'
 
-is_reserved_name :: proc(path: string) -> bool {
+is_reserved_name :: proc "contextless" (path: string) -> bool {
 	return false
 }
 
-is_abs :: proc(path: string) -> bool {
+is_abs :: proc "contextless" (path: string) -> bool {
 	return strings.has_prefix(path, "/")
 }
 

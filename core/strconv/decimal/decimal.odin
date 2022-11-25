@@ -93,7 +93,7 @@ set :: proc(d: ^Decimal, s: string) -> (ok: bool) {
 }
 
 decimal_to_string :: proc(buf: []byte, a: ^Decimal) -> string {
-	digit_zero :: proc(buf: []byte) -> int {
+	digit_zero :: proc "contextless" (buf: []byte) -> int {
 		for _, i in buf {
 			buf[i] = '0'
 		}
@@ -131,7 +131,7 @@ decimal_to_string :: proc(buf: []byte, a: ^Decimal) -> string {
 }
 
 // trim trailing zeros
-trim :: proc(a: ^Decimal) {
+trim :: proc "contextless" (a: ^Decimal) {
 	for a.count > 0 && a.digits[a.count-1] == '0' {
 		a.count -= 1
 	}
@@ -141,7 +141,7 @@ trim :: proc(a: ^Decimal) {
 }
 
 
-assign :: proc(a: ^Decimal, idx: u64) {
+assign :: proc "contextless" (a: ^Decimal, idx: u64) {
 	buf: [64]byte
 	n := 0
 	for i := idx; i > 0;  {
@@ -163,7 +163,7 @@ assign :: proc(a: ^Decimal, idx: u64) {
 
 
 
-shift_right :: proc(a: ^Decimal, k: uint) {
+shift_right :: proc "contextless" (a: ^Decimal, k: uint) {
 	r := 0 // read index
 	w := 0 // write index
 
@@ -284,7 +284,7 @@ shift :: proc(a: ^Decimal, i: int) {
 	}
 }
 
-can_round_up :: proc(a: ^Decimal, nd: int) -> bool {
+can_round_up :: proc "contextless" (a: ^Decimal, nd: int) -> bool {
 	if nd < 0 || nd >= a.count { return false  }
 	if a.digits[nd] == '5' && nd+1 == a.count {
 		if a.trunc {
@@ -296,7 +296,7 @@ can_round_up :: proc(a: ^Decimal, nd: int) -> bool {
 	return a.digits[nd] >= '5'
 }
 
-round :: proc(a: ^Decimal, nd: int) {
+round :: proc "contextless" (a: ^Decimal, nd: int) {
 	if nd < 0 || nd >= a.count { return }
 	if can_round_up(a, nd) {
 		round_up(a, nd)
@@ -305,7 +305,7 @@ round :: proc(a: ^Decimal, nd: int) {
 	}
 }
 
-round_up :: proc(a: ^Decimal, nd: int) {
+round_up :: proc "contextless" (a: ^Decimal, nd: int) {
 	if nd < 0 || nd >= a.count { return }
 
 	for i := nd-1; i >= 0; i -= 1 {
@@ -322,7 +322,7 @@ round_up :: proc(a: ^Decimal, nd: int) {
 	a.decimal_point += 1
 }
 
-round_down :: proc(a: ^Decimal, nd: int) {
+round_down :: proc "contextless" (a: ^Decimal, nd: int) {
 	if nd < 0 || nd >= a.count { return }
 	a.count = nd
 	trim(a)
@@ -330,7 +330,7 @@ round_down :: proc(a: ^Decimal, nd: int) {
 
 
 // Extract integer part, rounded appropriately. There are no guarantees about overflow.
-rounded_integer :: proc(a: ^Decimal) -> u64 {
+rounded_integer :: proc "contextless" (a: ^Decimal) -> u64 {
 	if a.decimal_point > 20 {
 		return 0xffff_ffff_ffff_ffff
 	}

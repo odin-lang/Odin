@@ -15,35 +15,35 @@ Reader :: struct {
 }
 
 // init the reader to the string `s` 
-reader_init :: proc(r: ^Reader, s: string) {
+reader_init :: proc "contextless" (r: ^Reader, s: string) {
 	r.s = s
 	r.i = 0
 	r.prev_rune = -1
 }
 
 // returns a stream from the reader data
-reader_to_stream :: proc(r: ^Reader) -> (s: io.Stream) {
+reader_to_stream :: proc "contextless" (r: ^Reader) -> (s: io.Stream) {
 	s.stream_data = r
 	s.stream_vtable = &_reader_vtable
 	return
 }
 
 // init a reader to the string `s` and return an io.Reader
-to_reader :: proc(r: ^Reader, s: string) -> io.Reader {
+to_reader :: proc "contextless" (r: ^Reader, s: string) -> io.Reader {
 	reader_init(r, s)
 	rr, _ := io.to_reader(reader_to_stream(r))
 	return rr
 }
 
 // init a reader to the string `s` and return an io.Reader_At
-to_reader_at :: proc(r: ^Reader, s: string) -> io.Reader_At {
+to_reader_at :: proc "contextless" (r: ^Reader, s: string) -> io.Reader_At {
 	reader_init(r, s)
 	rr, _ := io.to_reader_at(reader_to_stream(r))
 	return rr
 }
 
 // remaining length of the reader 
-reader_length :: proc(r: ^Reader) -> int {
+reader_length :: proc "contextless" (r: ^Reader) -> int {
 	if r.i >= i64(len(r.s)) {
 		return 0
 	}

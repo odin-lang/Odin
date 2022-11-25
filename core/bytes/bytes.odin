@@ -17,7 +17,7 @@ clone_safe :: proc(s: []byte, allocator := context.allocator, loc := #caller_loc
 }
 
 ptr_from_slice :: ptr_from_bytes
-ptr_from_bytes :: proc(str: []byte) -> ^byte {
+ptr_from_bytes :: proc "contextless" (str: []byte) -> ^byte {
 	d := transmute(mem.Raw_String)str
 	return d.data
 }
@@ -39,11 +39,11 @@ truncate_to_rune :: proc(str: []byte, r: rune) -> []byte {
 
 // Compares two strings, returning a value representing which one comes first lexiographically.
 // -1 for `a`; 1 for `b`, or 0 if they are equal.
-compare :: proc(lhs, rhs: []byte) -> int {
+compare :: proc "contextless" (lhs, rhs: []byte) -> int {
 	return mem.compare(lhs, rhs)
 }
 
-contains_rune :: proc(s: []byte, r: rune) -> int {
+contains_rune :: proc "contextless" (s: []byte, r: rune) -> int {
 	for c, offset in string(s) {
 		if c == r {
 			return offset
@@ -52,25 +52,25 @@ contains_rune :: proc(s: []byte, r: rune) -> int {
 	return -1
 }
 
-contains :: proc(s, substr: []byte) -> bool {
+contains :: proc "contextless" (s, substr: []byte) -> bool {
 	return index(s, substr) >= 0
 }
 
-contains_any :: proc(s, chars: []byte) -> bool {
+contains_any :: proc "contextless" (s, chars: []byte) -> bool {
 	return index_any(s, chars) >= 0
 }
 
 
-rune_count :: proc(s: []byte) -> int {
+rune_count :: proc "contextless" (s: []byte) -> int {
 	return utf8.rune_count(s)
 }
 
 
-equal :: proc(a, b: []byte) -> bool {
+equal :: proc "contextless" (a, b: []byte) -> bool {
 	return string(a) == string(b)
 }
 
-equal_fold :: proc(u, v: []byte) -> bool {
+equal_fold :: proc "contextless" (u, v: []byte) -> bool {
 	s, t := string(u), string(v)
 	loop: for s != "" && t != "" {
 		sr, tr: rune
@@ -113,11 +113,11 @@ equal_fold :: proc(u, v: []byte) -> bool {
 	return s == t
 }
 
-has_prefix :: proc(s, prefix: []byte) -> bool {
+has_prefix :: proc "contextless" (s, prefix: []byte) -> bool {
 	return len(s) >= len(prefix) && string(s[0:len(prefix)]) == string(prefix)
 }
 
-has_suffix :: proc(s, suffix: []byte) -> bool {
+has_suffix :: proc "contextless" (s, suffix: []byte) -> bool {
 	return len(s) >= len(suffix) && string(s[len(s)-len(suffix):]) == string(suffix)
 }
 
@@ -262,7 +262,7 @@ split_after_n :: proc(s, sep: []byte, n: int, allocator := context.allocator) ->
 
 
 @private
-_split_iterator :: proc(s: ^[]byte, sep: []byte, sep_save: int) -> (res: []byte, ok: bool) {
+_split_iterator :: proc "contextless" (s: ^[]byte, sep: []byte, sep_save: int) -> (res: []byte, ok: bool) {
 	if len(sep) == 0 {
 		res = s[:]
 		ok = true
@@ -285,16 +285,16 @@ _split_iterator :: proc(s: ^[]byte, sep: []byte, sep_save: int) -> (res: []byte,
 }
 
 
-split_iterator :: proc(s: ^[]byte, sep: []byte) -> ([]byte, bool) {
+split_iterator :: proc "contextless" (s: ^[]byte, sep: []byte) -> ([]byte, bool) {
 	return _split_iterator(s, sep, 0)
 }
 
-split_after_iterator :: proc(s: ^[]byte, sep: []byte) -> ([]byte, bool) {
+split_after_iterator :: proc "contextless" (s: ^[]byte, sep: []byte) -> ([]byte, bool) {
 	return _split_iterator(s, sep, len(sep))
 }
 
 
-index_byte :: proc(s: []byte, c: byte) -> int {
+index_byte :: proc "contextless" (s: []byte, c: byte) -> int {
 	for i := 0; i < len(s); i += 1 {
 		if s[i] == c {
 			return i
@@ -304,7 +304,7 @@ index_byte :: proc(s: []byte, c: byte) -> int {
 }
 
 // Returns -1 if c is not present
-last_index_byte :: proc(s: []byte, c: byte) -> int {
+last_index_byte :: proc "contextless" (s: []byte, c: byte) -> int {
 	for i := len(s)-1; i >= 0; i -= 1 {
 		if s[i] == c {
 			return i
@@ -317,8 +317,8 @@ last_index_byte :: proc(s: []byte, c: byte) -> int {
 
 @private PRIME_RABIN_KARP :: 16777619
 
-index :: proc(s, substr: []byte) -> int {
-	hash_str_rabin_karp :: proc(s: []byte) -> (hash: u32 = 0, pow: u32 = 1) {
+index :: proc "contextless" (s, substr: []byte) -> int {
+	hash_str_rabin_karp :: proc "contextless" (s: []byte) -> (hash: u32 = 0, pow: u32 = 1) {
 		for i := 0; i < len(s); i += 1 {
 			hash = hash*PRIME_RABIN_KARP + u32(s[i])
 		}
@@ -367,8 +367,8 @@ index :: proc(s, substr: []byte) -> int {
 	return -1
 }
 
-last_index :: proc(s, substr: []byte) -> int {
-	hash_str_rabin_karp_reverse :: proc(s: []byte) -> (hash: u32 = 0, pow: u32 = 1) {
+last_index :: proc "contextless" (s, substr: []byte) -> int {
+	hash_str_rabin_karp_reverse :: proc "contextless" (s: []byte) -> (hash: u32 = 0, pow: u32 = 1) {
 		for i := len(s) - 1; i >= 0; i -= 1 {
 			hash = hash*PRIME_RABIN_KARP + u32(s[i])
 		}
@@ -415,7 +415,7 @@ last_index :: proc(s, substr: []byte) -> int {
 	return -1
 }
 
-index_any :: proc(s, chars: []byte) -> int {
+index_any :: proc "contextless" (s, chars: []byte) -> int {
 	if chars == nil {
 		return -1
 	}
@@ -431,7 +431,7 @@ index_any :: proc(s, chars: []byte) -> int {
 	return -1
 }
 
-last_index_any :: proc(s, chars: []byte) -> int {
+last_index_any :: proc "contextless" (s, chars: []byte) -> int {
 	if chars == nil {
 		return -1
 	}
@@ -448,7 +448,7 @@ last_index_any :: proc(s, chars: []byte) -> int {
 	return -1
 }
 
-count :: proc(s, substr: []byte) -> int {
+count :: proc "contextless" (s, substr: []byte) -> int {
 	if len(substr) == 0 { // special case
 		return rune_count(s) + 1
 	}
@@ -556,14 +556,14 @@ remove_all :: proc(s, key: []byte, allocator := context.allocator) -> (output: [
 @(private) _ascii_space := [256]u8{'\t' = 1, '\n' = 1, '\v' = 1, '\f' = 1, '\r' = 1, ' ' = 1}
 
 
-is_ascii_space :: proc(r: rune) -> bool {
+is_ascii_space :: proc "contextless" (r: rune) -> bool {
 	if r < utf8.RUNE_SELF {
 		return _ascii_space[u8(r)] != 0
 	}
 	return false
 }
 
-is_space :: proc(r: rune) -> bool {
+is_space :: proc "contextless" (r: rune) -> bool {
 	if r < 0x2000 {
 		switch r {
 		case '\t', '\n', '\v', '\f', '\r', ' ', 0x85, 0xa0, 0x1680:
@@ -581,11 +581,18 @@ is_space :: proc(r: rune) -> bool {
 	return false
 }
 
-is_null :: proc(r: rune) -> bool {
+is_null :: proc "contextless" (r: rune) -> bool {
 	return r == 0x0000
 }
 
-index_proc :: proc(s: []byte, p: proc(rune) -> bool, truth := true) -> int {
+
+index_proc :: proc {
+	_index_proc_contextless,
+	_index_proc_odin,
+}
+
+@(private)
+_index_proc_odin :: proc "odin" (s: []byte, p: proc "odin" (rune) -> bool, truth := true) -> int {
 	for r, i in string(s) {
 		if p(r) == truth {
 			return i
@@ -594,7 +601,24 @@ index_proc :: proc(s: []byte, p: proc(rune) -> bool, truth := true) -> int {
 	return -1
 }
 
-index_proc_with_state :: proc(s: []byte, p: proc(rawptr, rune) -> bool, state: rawptr, truth := true) -> int {
+@(private)
+_index_proc_contextless :: proc "contextless" (s: []byte, p: proc "contextless" (rune) -> bool, truth := true) -> int {
+	for r, i in string(s) {
+		if p(r) == truth {
+			return i
+		}
+	}
+	return -1
+}
+
+
+index_proc_with_state :: proc {
+	_index_proc_with_state_odin,
+	_index_proc_with_state_contextless,
+}
+
+@(private)
+_index_proc_with_state_odin :: proc "odin" (s: []byte, p: proc "odin" (rawptr, rune) -> bool, state: rawptr, truth := true) -> int {
 	for r, i in string(s) {
 		if p(state, r) == truth {
 			return i
@@ -603,7 +627,24 @@ index_proc_with_state :: proc(s: []byte, p: proc(rawptr, rune) -> bool, state: r
 	return -1
 }
 
-last_index_proc :: proc(s: []byte, p: proc(rune) -> bool, truth := true) -> int {
+@(private)
+_index_proc_with_state_contextless :: proc "contextless" (s: []byte, p: proc "contextless" (rawptr, rune) -> bool, state: rawptr, truth := true) -> int {
+	for r, i in string(s) {
+		if p(state, r) == truth {
+			return i
+		}
+	}
+	return -1
+}
+
+
+last_index_proc :: proc {
+	_last_index_proc_odin,
+	_last_index_proc_contextless,
+}
+
+@(private)
+_last_index_proc_odin :: proc "odin" (s: []byte, p: proc "odin" (rune) -> bool, truth := true) -> int {
 	// TODO(bill): Probably use Rabin-Karp Search
 	for i := len(s); i > 0; {
 		r, size := utf8.decode_last_rune(s[:i])
@@ -615,7 +656,27 @@ last_index_proc :: proc(s: []byte, p: proc(rune) -> bool, truth := true) -> int 
 	return -1
 }
 
-last_index_proc_with_state :: proc(s: []byte, p: proc(rawptr, rune) -> bool, state: rawptr, truth := true) -> int {
+@(private)
+_last_index_proc_contextless :: proc "contextless" (s: []byte, p: proc "contextless" (rune) -> bool, truth := true) -> int {
+	// TODO(bill): Probably use Rabin-Karp Search
+	for i := len(s); i > 0; {
+		r, size := utf8.decode_last_rune(s[:i])
+		i -= size
+		if p(r) == truth {
+			return i
+		}
+	}
+	return -1
+}
+
+
+last_index_proc_with_state :: proc {
+	_last_index_proc_with_state_odin,
+	_last_index_proc_with_state_contextless,
+}
+
+@(private)
+_last_index_proc_with_state_odin :: proc "odin" (s: []byte, p: proc "odin" (rawptr, rune) -> bool, state: rawptr, truth := true) -> int {
 	// TODO(bill): Probably use Rabin-Karp Search
 	for i := len(s); i > 0; {
 		r, size := utf8.decode_last_rune(s[:i])
@@ -627,7 +688,27 @@ last_index_proc_with_state :: proc(s: []byte, p: proc(rawptr, rune) -> bool, sta
 	return -1
 }
 
-trim_left_proc :: proc(s: []byte, p: proc(rune) -> bool) -> []byte {
+@(private)
+_last_index_proc_with_state_contextless :: proc "contextless" (s: []byte, p: proc "contextless" (rawptr, rune) -> bool, state: rawptr, truth := true) -> int {
+	// TODO(bill): Probably use Rabin-Karp Search
+	for i := len(s); i > 0; {
+		r, size := utf8.decode_last_rune(s[:i])
+		i -= size
+		if p(state, r) == truth {
+			return i
+		}
+	}
+	return -1
+}
+
+
+trim_left_proc :: proc {
+	_trim_left_proc_odin,
+	_trim_left_proc_contextless,
+}
+
+@(private)
+_trim_left_proc_odin :: proc "odin" (s: []byte, p: proc "odin" (rune) -> bool) -> []byte {
 	i := index_proc(s, p, false)
 	if i == -1 {
 		return nil
@@ -635,8 +716,16 @@ trim_left_proc :: proc(s: []byte, p: proc(rune) -> bool) -> []byte {
 	return s[i:]
 }
 
+@(private)
+_trim_left_proc_contextless :: proc "contextless" (s: []byte, p: proc "contextless" (rune) -> bool) -> []byte {
+	i := index_proc(s, p, false)
+	if i == -1 {
+		return nil
+	}
+	return s[i:]
+}
 
-index_rune :: proc(s: []byte, r: rune) -> int {
+index_rune :: proc "contextless" (s: []byte, r: rune) -> int {
 	switch {
 	case u32(r) < utf8.RUNE_SELF:
 		return index_byte(s, byte(r))
@@ -658,7 +747,13 @@ index_rune :: proc(s: []byte, r: rune) -> int {
 }
 
 
-trim_left_proc_with_state :: proc(s: []byte, p: proc(rawptr, rune) -> bool, state: rawptr) -> []byte {
+trim_left_proc_with_state :: proc {
+	_trim_left_proc_with_state_odin,
+	_trim_left_proc_with_state_contextless,
+}
+
+@(private)
+_trim_left_proc_with_state_odin :: proc "odin" (s: []byte, p: proc "odin" (rawptr, rune) -> bool, state: rawptr) -> []byte {
 	i := index_proc_with_state(s, p, state, false)
 	if i == -1 {
 		return nil
@@ -666,7 +761,23 @@ trim_left_proc_with_state :: proc(s: []byte, p: proc(rawptr, rune) -> bool, stat
 	return s[i:]
 }
 
-trim_right_proc :: proc(s: []byte, p: proc(rune) -> bool) -> []byte {
+@(private)
+_trim_left_proc_with_state_contextless :: proc "contextless" (s: []byte, p: proc "contextless" (rawptr, rune) -> bool, state: rawptr) -> []byte {
+	i := index_proc_with_state(s, p, state, false)
+	if i == -1 {
+		return nil
+	}
+	return s[i:]
+}
+
+
+trim_right_proc :: proc {
+	_trim_right_proc_odin,
+	_trim_right_proc_contextless,
+}
+
+@(private)
+_trim_right_proc_odin :: proc "odin" (s: []byte, p: proc "odin" (rune) -> bool) -> []byte {
 	i := last_index_proc(s, p, false)
 	if i >= 0 && s[i] >= utf8.RUNE_SELF {
 		_, w := utf8.decode_rune(s[i:])
@@ -677,8 +788,9 @@ trim_right_proc :: proc(s: []byte, p: proc(rune) -> bool) -> []byte {
 	return s[0:i]
 }
 
-trim_right_proc_with_state :: proc(s: []byte, p: proc(rawptr, rune) -> bool, state: rawptr) -> []byte {
-	i := last_index_proc_with_state(s, p, state, false)
+@(private)
+_trim_right_proc_contextless :: proc "contextless" (s: []byte, p: proc "contextless" (rune) -> bool) -> []byte {
+	i := last_index_proc(s, p, false)
 	if i >= 0 && s[i] >= utf8.RUNE_SELF {
 		_, w := utf8.decode_rune(s[i:])
 		i += w
@@ -689,7 +801,36 @@ trim_right_proc_with_state :: proc(s: []byte, p: proc(rawptr, rune) -> bool, sta
 }
 
 
-is_in_cutset :: proc(state: rawptr, r: rune) -> bool {
+trim_right_proc_with_state :: proc {
+	_trim_right_proc_with_state_odin,
+	_trim_right_proc_with_state_contextless,
+}
+
+@(private)
+_trim_right_proc_with_state_odin :: proc "odin" (s: []byte, p: proc "odin" (rawptr, rune) -> bool, state: rawptr) -> []byte {
+	i := last_index_proc_with_state(s, p, state, false)
+	if i >= 0 && s[i] >= utf8.RUNE_SELF {
+		_, w := utf8.decode_rune(s[i:])
+		i += w
+	} else {
+		i += 1
+	}
+	return s[0:i]
+}
+
+@(private)
+_trim_right_proc_with_state_contextless :: proc "contextless" (s: []byte, p: proc "contextless" (rawptr, rune) -> bool, state: rawptr) -> []byte {
+	i := last_index_proc_with_state(s, p, state, false)
+	if i >= 0 && s[i] >= utf8.RUNE_SELF {
+		_, w := utf8.decode_rune(s[i:])
+		i += w
+	} else {
+		i += 1
+	}
+	return s[0:i]
+}
+
+is_in_cutset :: proc "contextless" (state: rawptr, r: rune) -> bool {
 	if state == nil {
 		return false
 	}
@@ -703,7 +844,7 @@ is_in_cutset :: proc(state: rawptr, r: rune) -> bool {
 }
 
 
-trim_left :: proc(s: []byte, cutset: []byte) -> []byte {
+trim_left :: proc "contextless" (s: []byte, cutset: []byte) -> []byte {
 	if s == nil || cutset == nil {
 		return s
 	}
@@ -711,7 +852,7 @@ trim_left :: proc(s: []byte, cutset: []byte) -> []byte {
 	return trim_left_proc_with_state(s, is_in_cutset, &state)
 }
 
-trim_right :: proc(s: []byte, cutset: []byte) -> []byte {
+trim_right :: proc "contextless" (s: []byte, cutset: []byte) -> []byte {
 	if s == nil || cutset == nil {
 		return s
 	}
@@ -719,43 +860,43 @@ trim_right :: proc(s: []byte, cutset: []byte) -> []byte {
 	return trim_right_proc_with_state(s, is_in_cutset, &state)
 }
 
-trim :: proc(s: []byte, cutset: []byte) -> []byte {
+trim :: proc "contextless" (s: []byte, cutset: []byte) -> []byte {
 	return trim_right(trim_left(s, cutset), cutset)
 }
 
-trim_left_space :: proc(s: []byte) -> []byte {
+trim_left_space :: proc "contextless" (s: []byte) -> []byte {
 	return trim_left_proc(s, is_space)
 }
 
-trim_right_space :: proc(s: []byte) -> []byte {
+trim_right_space :: proc "contextless" (s: []byte) -> []byte {
 	return trim_right_proc(s, is_space)
 }
 
-trim_space :: proc(s: []byte) -> []byte {
+trim_space :: proc "contextless" (s: []byte) -> []byte {
 	return trim_right_space(trim_left_space(s))
 }
 
 
-trim_left_null :: proc(s: []byte) -> []byte {
+trim_left_null :: proc "contextless" (s: []byte) -> []byte {
 	return trim_left_proc(s, is_null)
 }
 
-trim_right_null :: proc(s: []byte) -> []byte {
+trim_right_null :: proc "contextless" (s: []byte) -> []byte {
 	return trim_right_proc(s, is_null)
 }
 
-trim_null :: proc(s: []byte) -> []byte {
+trim_null :: proc "contextless" (s: []byte) -> []byte {
 	return trim_right_null(trim_left_null(s))
 }
 
-trim_prefix :: proc(s, prefix: []byte) -> []byte {
+trim_prefix :: proc "contextless" (s, prefix: []byte) -> []byte {
 	if has_prefix(s, prefix) {
 		return s[len(prefix):]
 	}
 	return s
 }
 
-trim_suffix :: proc(s, suffix: []byte) -> []byte {
+trim_suffix :: proc "contextless" (s, suffix: []byte) -> []byte {
 	if has_suffix(s, suffix) {
 		return s[:len(s)-len(suffix)]
 	}
@@ -843,7 +984,7 @@ split_multi :: proc(s: []byte, substrs: [][]byte, skip_empty := false, allocator
 
 
 
-split_multi_iterator :: proc(s: ^[]byte, substrs: [][]byte, skip_empty := false) -> ([]byte, bool) #no_bounds_check {
+split_multi_iterator :: proc "contextless" (s: ^[]byte, substrs: [][]byte, skip_empty := false) -> ([]byte, bool) #no_bounds_check {
 	if s == nil || s^ == nil || len(substrs) <= 0 {
 		return nil, false
 	}
@@ -988,7 +1129,7 @@ expand_tabs :: proc(s: []byte, tab_size: int, allocator := context.allocator) ->
 	return buffer_to_bytes(&b)
 }
 
-partition :: proc(str, sep: []byte) -> (head, match, tail: []byte) {
+partition :: proc "contextless" (str, sep: []byte) -> (head, match, tail: []byte) {
 	i := index(str, sep)
 	if i == -1 {
 		head = str
@@ -1141,7 +1282,13 @@ fields :: proc(s: []byte, allocator := context.allocator) -> [][]byte #no_bounds
 //
 // fields_proc makes no guarantee about the order in which it calls f(ch)
 // it assumes that `f` always returns the same value for a given ch
-fields_proc :: proc(s: []byte, f: proc(rune) -> bool, allocator := context.allocator) -> [][]byte #no_bounds_check {
+fields_proc :: proc {
+	_fields_proc_odin,
+	_fields_proc_contextless,
+}
+
+@(private)
+_fields_proc_callable :: proc(s: []byte, f: $F, allocator := context.allocator) -> [][]byte #no_bounds_check {
 	subslices := make([dynamic][]byte, 0, 32, allocator)
 
 	start, end := -1, -1
@@ -1166,4 +1313,14 @@ fields_proc :: proc(s: []byte, f: proc(rune) -> bool, allocator := context.alloc
 	}
 
 	return subslices[:]
+}
+
+@(private)
+_fields_proc_odin :: proc(s: []byte, f: proc "odin" (rune) -> bool, allocator := context.allocator) -> [][]byte {
+	return _fields_proc_callable(s, f, allocator)
+}
+
+@(private)
+_fields_proc_contextless :: proc(s: []byte, f: proc "contextless" (rune) -> bool, allocator := context.allocator) -> [][]byte {
+	return _fields_proc_callable(s, f, allocator)
 }

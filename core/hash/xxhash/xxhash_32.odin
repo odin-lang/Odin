@@ -41,7 +41,7 @@ XXH_PRIME32_4 :: 0x27D4EB2F     /*!< 0b00100111110101001110101100101111 */
 XXH_PRIME32_5 :: 0x165667B1     /*!< 0b00010110010101100110011110110001 */
 
 @(optimization_mode="speed")
-XXH32_round :: #force_inline proc(seed, input: XXH32_hash) -> (res: XXH32_hash) {
+XXH32_round :: #force_inline proc "contextless" (seed, input: XXH32_hash) -> (res: XXH32_hash) {
 	seed := seed
 
 	seed += input * XXH_PRIME32_2
@@ -54,7 +54,7 @@ XXH32_round :: #force_inline proc(seed, input: XXH32_hash) -> (res: XXH32_hash) 
 	Mix all bits
 */
 @(optimization_mode="speed")
-XXH32_avalanche :: #force_inline proc(h32: u32) -> (res: u32) {
+XXH32_avalanche :: #force_inline proc "contextless" (h32: u32) -> (res: u32) {
 	h32 := h32
 
 	h32 ~= h32 >> 15
@@ -66,15 +66,15 @@ XXH32_avalanche :: #force_inline proc(h32: u32) -> (res: u32) {
 }
 
 @(optimization_mode="speed")
-XXH32_finalize :: #force_inline proc(h32: u32, buf: []u8, alignment: Alignment) -> (res: u32) {
-	process_1 :: #force_inline proc(h32: u32, buf: []u8) -> (h32_res: u32, buf_res: []u8) {
+XXH32_finalize :: #force_inline proc "contextless" (h32: u32, buf: []u8, alignment: Alignment) -> (res: u32) {
+	process_1 :: #force_inline proc "contextless" (h32: u32, buf: []u8) -> (h32_res: u32, buf_res: []u8) {
 		#no_bounds_check b := u32(buf[0])
 		h32_res = h32 + b * XXH_PRIME32_5
 		h32_res = XXH_rotl32(h32_res, 11) * XXH_PRIME32_1
 		#no_bounds_check return h32_res, buf[1:]
 	}
 
-	process_4 :: #force_inline proc(h32: u32, buf: []u8, alignment: Alignment) -> (h32_res: u32, buf_res: []u8) {
+	process_4 :: #force_inline proc "contextless" (h32: u32, buf: []u8, alignment: Alignment) -> (h32_res: u32, buf_res: []u8) {
 		b := XXH32_read32(buf, alignment)
 		h32_res = h32 + b * XXH_PRIME32_3
 		h32_res = XXH_rotl32(h32_res, 17) * XXH_PRIME32_4
@@ -144,7 +144,7 @@ XXH32_finalize :: #force_inline proc(h32: u32, buf: []u8, alignment: Alignment) 
 }
 
 @(optimization_mode="speed")
-XXH32_endian_align :: #force_inline proc(input: []u8, seed := XXH32_DEFAULT_SEED, alignment: Alignment) -> (res: XXH32_hash) {
+XXH32_endian_align :: #force_inline proc "contextless" (input: []u8, seed := XXH32_DEFAULT_SEED, alignment: Alignment) -> (res: XXH32_hash) {
 	buf := input
 	length := len(input)
 
@@ -170,7 +170,7 @@ XXH32_endian_align :: #force_inline proc(input: []u8, seed := XXH32_DEFAULT_SEED
 	return XXH32_finalize(res, buf, alignment)
 }
 
-XXH32 :: proc(input: []u8, seed := XXH32_DEFAULT_SEED) -> (digest: XXH32_hash) {
+XXH32 :: proc "contextless" (input: []u8, seed := XXH32_DEFAULT_SEED) -> (digest: XXH32_hash) {
 	when false {
 		/*
 			Simple version, good for code maintenance, but unfortunately slow for small inputs.
@@ -211,7 +211,7 @@ XXH32_copy_state :: proc(dest, src: ^XXH32_state) {
 	mem_copy(dest, src, size_of(XXH32_state))
 }
 
-XXH32_reset_state :: proc(state_ptr: ^XXH32_state, seed := XXH32_DEFAULT_SEED) -> (err: Error) {
+XXH32_reset_state :: proc "contextless" (state_ptr: ^XXH32_state, seed := XXH32_DEFAULT_SEED) -> (err: Error) {
 	state := XXH32_state{}
 
 	state.v1 = seed + XXH_PRIME32_1 + XXH_PRIME32_2
@@ -225,7 +225,7 @@ XXH32_reset_state :: proc(state_ptr: ^XXH32_state, seed := XXH32_DEFAULT_SEED) -
 	return .None
 }
 
-XXH32_update :: proc(state: ^XXH32_state, input: []u8) -> (err: Error) {
+XXH32_update :: proc "contextless" (state: ^XXH32_state, input: []u8) -> (err: Error) {
 
 	buf    := input
 	length := len(buf)
@@ -280,7 +280,7 @@ XXH32_update :: proc(state: ^XXH32_state, input: []u8) -> (err: Error) {
 	return .None
 }
 
-XXH32_digest :: proc(state: ^XXH32_state) -> (res: XXH32_hash) {
+XXH32_digest :: proc "contextless" (state: ^XXH32_state) -> (res: XXH32_hash) {
 	if state.large_len > 0 {
 		res = XXH_rotl32(state.v1, 1)  + XXH_rotl32(state.v2, 7) + XXH_rotl32(state.v3, 12) + XXH_rotl32(state.v4, 18)
 	} else {
@@ -308,14 +308,14 @@ XXH32_digest :: proc(state: ^XXH32_state) -> (res: XXH32_hash) {
 	The following functions allow transformation of hash values to and from their
 	canonical format.
 */
-XXH32_canonical_from_hash :: proc(hash: XXH32_hash) -> (canonical: XXH32_canonical) {
+XXH32_canonical_from_hash :: proc "contextless" (hash: XXH32_hash) -> (canonical: XXH32_canonical) {
 	#assert(size_of(XXH32_canonical) == size_of(XXH32_hash))
 	h := u32be(hash)
 	mem_copy(&canonical, &h, size_of(canonical))
 	return
 }
 
-XXH32_hash_from_canonical :: proc(canonical: ^XXH32_canonical) -> (hash: XXH32_hash) {
+XXH32_hash_from_canonical :: proc "contextless" (canonical: ^XXH32_canonical) -> (hash: XXH32_hash) {
 	h := (^u32be)(&canonical.digest)^
 	return XXH32_hash(h)
 }

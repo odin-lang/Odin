@@ -35,7 +35,7 @@ Bit_Array_Iterator :: struct {
 	Out:
 		- it:   ^Bit_Array_Iterator - the iterator that holds iteration state
 */
-make_iterator :: proc (ba: ^Bit_Array) -> (it: Bit_Array_Iterator) {
+make_iterator :: proc "contextless" (ba: ^Bit_Array) -> (it: Bit_Array_Iterator) {
 	return Bit_Array_Iterator { array = ba }
 }
 
@@ -49,7 +49,7 @@ make_iterator :: proc (ba: ^Bit_Array) -> (it: Bit_Array_Iterator) {
 		- ok:	  bool - `true` if the iterator returned a valid index,
 			  `false` if there were no more bits
 */
-iterate_by_all :: proc (it: ^Bit_Array_Iterator) -> (set: bool, index: int, ok: bool) {
+iterate_by_all :: proc "contextless" (it: ^Bit_Array_Iterator) -> (set: bool, index: int, ok: bool) {
 	index = it.word_idx * NUM_BITS + int(it.bit_idx) + it.array.bias
 	if index > it.array.max_index { return false, 0, false }
 
@@ -74,7 +74,7 @@ iterate_by_all :: proc (it: ^Bit_Array_Iterator) -> (set: bool, index: int, ok: 
 		- ok:	  bool - `true` if the iterator returned a valid index,
 			  `false` if there were no more bits set
 */
-iterate_by_set :: proc (it: ^Bit_Array_Iterator) -> (index: int, ok: bool) {
+iterate_by_set :: proc "contextless" (it: ^Bit_Array_Iterator) -> (index: int, ok: bool) {
 	return iterate_internal_(it, true)
 }
 
@@ -87,12 +87,12 @@ iterate_by_set :: proc (it: ^Bit_Array_Iterator) -> (index: int, ok: bool) {
 		- ok:	  bool - `true` if the iterator returned a valid index,
 			  `false` if there were no more unset bits
 */
-iterate_by_unset:: proc (it: ^Bit_Array_Iterator) -> (index: int, ok: bool) {
+iterate_by_unset:: proc "contextless" (it: ^Bit_Array_Iterator) -> (index: int, ok: bool) {
 	return iterate_internal_(it, false)
 }
 
 @(private="file")
-iterate_internal_ :: proc (it: ^Bit_Array_Iterator, $ITERATE_SET_BITS: bool) -> (index: int, ok: bool) {
+iterate_internal_ :: proc "contextless" (it: ^Bit_Array_Iterator, $ITERATE_SET_BITS: bool) -> (index: int, ok: bool) {
 	word := it.array.bits[it.word_idx] if len(it.array.bits) > it.word_idx else 0
 	when ! ITERATE_SET_BITS { word = ~word }
 
@@ -233,7 +233,7 @@ create :: proc(max_index: int, min_index := 0, allocator := context.allocator) -
 /*
 	Sets all bits to `false`.
 */
-clear :: proc(ba: ^Bit_Array) {
+clear :: proc "contextless" (ba: ^Bit_Array) {
 	if ba == nil { return }
 	mem.zero_slice(ba.bits[:])
 }

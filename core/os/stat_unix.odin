@@ -51,14 +51,14 @@ File_Info :: struct {
 */
 
 @private
-_make_time_from_unix_file_time :: proc(uft: Unix_File_Time) -> time.Time {
+_make_time_from_unix_file_time :: proc "contextless" (uft: Unix_File_Time) -> time.Time {
 	return time.Time{
 		_nsec = uft.nanoseconds + uft.seconds * 1_000_000_000,
 	}
 }
 
 @private
-_fill_file_info_from_stat :: proc(fi: ^File_Info, s: OS_Stat) {
+_fill_file_info_from_stat :: proc "contextless" (fi: ^File_Info, s: OS_Stat) {
 	fi.size = s.size
 	fi.mode = cast(File_Mode)s.mode
 	fi.is_dir = S_ISDIR(s.mode)
@@ -72,8 +72,8 @@ _fill_file_info_from_stat :: proc(fi: ^File_Info, s: OS_Stat) {
 
 
 @private
-path_base :: proc(path: string) -> string {
-	is_separator :: proc(c: byte) -> bool {
+path_base :: proc "contextless" (path: string) -> string {
+	is_separator :: proc "contextless" (c: byte) -> bool {
 		return c == '/'
 	}
 

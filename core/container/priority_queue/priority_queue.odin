@@ -44,13 +44,13 @@ destroy :: proc(pq: ^$Q/Priority_Queue($T)) {
 reserve :: proc(pq: ^$Q/Priority_Queue($T), capacity: int) {
 	builtin.reserve(&pq.queue, capacity)
 }
-clear :: proc(pq: ^$Q/Priority_Queue($T)) {
+clear :: proc "contextless" (pq: ^$Q/Priority_Queue($T)) {
 	builtin.clear(&pq.queue)
 }
-len :: proc(pq: $Q/Priority_Queue($T)) -> int {
+len :: proc "contextless" (pq: $Q/Priority_Queue($T)) -> int {
 	return builtin.len(pq.queue)
 }
-cap :: proc(pq: $Q/Priority_Queue($T)) -> int {
+cap :: proc "contextless" (pq: $Q/Priority_Queue($T)) -> int {
 	return builtin.cap(pq.queue)
 }
 

@@ -7,7 +7,7 @@ import "core:strings"
 SEPARATOR_CHARS :: `/\`
 
 // is_separator checks whether the byte is a valid separator character
-is_separator :: proc(c: byte) -> bool {
+is_separator :: proc "contextless" (c: byte) -> bool {
 	switch c {
 	case '/':  return true
 	case '\\': return ODIN_OS == .Windows
@@ -16,11 +16,11 @@ is_separator :: proc(c: byte) -> bool {
 }
 
 @(private)
-is_slash :: proc(c: byte) -> bool {
+is_slash :: proc "contextless" (c: byte) -> bool {
 	return c == '\\' || c == '/'
 }
 
-split :: proc(path: string) -> (dir, file: string) {
+split :: proc "contextless" (path: string) -> (dir, file: string) {
 	vol := volume_name(path)
 	i := len(path) - 1
 	for i >= len(vol) && !is_separator(path[i]) {
@@ -29,11 +29,11 @@ split :: proc(path: string) -> (dir, file: string) {
 	return path[:i+1], path[i+1:]
 }
 
-volume_name :: proc(path: string) -> string {
+volume_name :: proc "contextless" (path: string) -> string {
 	return path[:volume_name_len(path)]
 }
 
-volume_name_len :: proc(path: string) -> int {
+volume_name_len :: proc "contextless" (path: string) -> int {
 	if ODIN_OS == .Windows {
 		if len(path) < 2 {
 			return 0
@@ -81,7 +81,7 @@ volume_name_len :: proc(path: string) -> int {
 
 	Returns "." if the path is an empty string.
 */
-base :: proc(path: string) -> string {
+base :: proc "contextless" (path: string) -> string {
 	if path == "" {
 		return "."
 	}
@@ -121,7 +121,7 @@ base :: proc(path: string) -> string {
 	Returns an empty string if there is no stem. e.g: '.gitignore'.
 	Returns an empty string if there's a trailing path separator.
 */
-stem :: proc(path: string) -> string {
+stem :: proc "contextless" (path: string) -> string {
 	if len(path) > 0 && is_separator(path[len(path) - 1]) {
 		// NOTE(tetra): Trailing separator
 		return ""
@@ -154,7 +154,7 @@ stem :: proc(path: string) -> string {
 	Returns an empty string if there is no stem. e.g: '.gitignore'.
 	Returns an empty string if there's a trailing path separator.
 */
-short_stem :: proc(path: string) -> string {
+short_stem :: proc "contextless" (path: string) -> string {
 	s := stem(path)
 	if i := strings.index_byte(s, '.'); i != -1 {
 		return s[:i]
@@ -177,7 +177,7 @@ short_stem :: proc(path: string) -> string {
 	Returns an empty string if there is no dot.
 	Returns an empty string if there is a trailing path separator.
 */
-ext :: proc(path: string) -> string {
+ext :: proc "contextless" (path: string) -> string {
 	for i := len(path)-1; i >= 0 && !is_separator(path[i]); i -= 1 {
 		if path[i] == '.' {
 			return path[i:]
@@ -200,7 +200,7 @@ ext :: proc(path: string) -> string {
 	Returns an empty string if there is no dot.
 	Returns an empty string if there is a trailing path separator.
 */
-long_ext :: proc(path: string) -> string {
+long_ext :: proc "contextless" (path: string) -> string {
 	if len(path) > 0 && is_separator(path[len(path) - 1]) {
 		// NOTE(tetra): Trailing separator
 		return ""

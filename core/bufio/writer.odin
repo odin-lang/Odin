@@ -27,7 +27,7 @@ writer_init :: proc(b: ^Writer, wr: io.Writer, size: int = DEFAULT_BUF_SIZE, all
 	b.buf = make([]byte, size, allocator)
 }
 
-writer_init_with_buf :: proc(b: ^Writer, wr: io.Writer, buf: []byte) {
+writer_init_with_buf :: proc "contextless" (b: ^Writer, wr: io.Writer, buf: []byte) {
 	writer_reset(b, wr)
 	b.buf_allocator = {}
 	b.buf = buf
@@ -40,11 +40,11 @@ writer_destroy :: proc(b: ^Writer) {
 }
 
 // writer_size returns the size of underlying buffer in bytes
-writer_size :: proc(b: ^Writer) -> int {
+writer_size :: proc "contextless" (b: ^Writer) -> int {
 	return len(b.buf)
 }
 
-writer_reset :: proc(b: ^Writer, w: io.Writer) {
+writer_reset :: proc "contextless" (b: ^Writer, w: io.Writer) {
 	b.wr = w
 	b.n = 0
 	b.err = nil
@@ -77,12 +77,12 @@ writer_flush :: proc(b: ^Writer) -> io.Error {
 }
 
 // writer_available returns how many bytes are unused in the buffer
-writer_available :: proc(b: ^Writer) -> int {
+writer_available :: proc "contextless" (b: ^Writer) -> int {
 	return len(b.buf) - b.n
 }
 
 // writer_buffered returns the number of bytes that have been writted into the current buffer
-writer_buffered :: proc(b: ^Writer) -> int {
+writer_buffered :: proc "contextless" (b: ^Writer) -> int {
 	return b.n
 }
 
@@ -221,7 +221,7 @@ writer_read_from :: proc(b: ^Writer, r: io.Reader) -> (n: i64, err: io.Error) {
 
 
 // writer_to_stream converts a Writer into an io.Stream
-writer_to_stream :: proc(b: ^Writer) -> (s: io.Stream) {
+writer_to_stream :: proc "contextless" (b: ^Writer) -> (s: io.Stream) {
 	s.stream_data = b
 	s.stream_vtable = &_writer_vtable
 	return

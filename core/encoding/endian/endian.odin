@@ -7,7 +7,7 @@ Byte_Order :: enum u8 {
 
 PLATFORM_BYTE_ORDER :: Byte_Order.Little when ODIN_ENDIAN == .Little else Byte_Order.Big
 
-get_u16 :: proc(b: []byte, order: Byte_Order) -> (v: u16, ok: bool) {
+get_u16 :: proc "contextless" (b: []byte, order: Byte_Order) -> (v: u16, ok: bool) {
 	if len(b) < 2 {
 		return 0, false
 	}
@@ -18,7 +18,7 @@ get_u16 :: proc(b: []byte, order: Byte_Order) -> (v: u16, ok: bool) {
 	}
 	return v, true
 }
-get_u32 :: proc(b: []byte, order: Byte_Order) -> (v: u32, ok: bool) {
+get_u32 :: proc "contextless" (b: []byte, order: Byte_Order) -> (v: u32, ok: bool) {
 	if len(b) < 4 {
 		return 0, false
 	}
@@ -30,7 +30,7 @@ get_u32 :: proc(b: []byte, order: Byte_Order) -> (v: u32, ok: bool) {
 	return v, true
 }
 
-get_u64 :: proc(b: []byte, order: Byte_Order) -> (v: u64, ok: bool) {
+get_u64 :: proc "contextless" (b: []byte, order: Byte_Order) -> (v: u64, ok: bool) {
 	if len(b) < 8 {
 		return 0, false
 	}
@@ -44,34 +44,34 @@ get_u64 :: proc(b: []byte, order: Byte_Order) -> (v: u64, ok: bool) {
 	return v, true
 }
 
-get_i16 :: proc(b: []byte, order: Byte_Order) -> (i16, bool) {
+get_i16 :: proc "contextless" (b: []byte, order: Byte_Order) -> (i16, bool) {
 	v, ok := get_u16(b, order)
 	return i16(v), ok
 }
-get_i32 :: proc(b: []byte, order: Byte_Order) -> (i32, bool) {
+get_i32 :: proc "contextless" (b: []byte, order: Byte_Order) -> (i32, bool) {
 	v, ok := get_u32(b, order)
 	return i32(v), ok
 }
-get_i64 :: proc(b: []byte, order: Byte_Order) -> (i64, bool) {
+get_i64 :: proc "contextless" (b: []byte, order: Byte_Order) -> (i64, bool) {
 	v, ok := get_u64(b, order)
 	return i64(v), ok
 }
 
-get_f16 :: proc(b: []byte, order: Byte_Order) -> (f16, bool) {
+get_f16 :: proc "contextless" (b: []byte, order: Byte_Order) -> (f16, bool) {
 	v, ok := get_u16(b, order)
 	return transmute(f16)v, ok
 }
-get_f32 :: proc(b: []byte, order: Byte_Order) -> (f32, bool) {
+get_f32 :: proc "contextless" (b: []byte, order: Byte_Order) -> (f32, bool) {
 	v, ok := get_u32(b, order)
 	return transmute(f32)v, ok
 }
-get_f64 :: proc(b: []byte, order: Byte_Order) -> (f64, bool) {
+get_f64 :: proc "contextless" (b: []byte, order: Byte_Order) -> (f64, bool) {
 	v, ok := get_u64(b, order)
 	return transmute(f64)v, ok
 }
 
 
-put_u16 :: proc(b: []byte, order: Byte_Order, v: u16) -> bool {
+put_u16 :: proc "contextless" (b: []byte, order: Byte_Order, v: u16) -> bool {
 	if len(b) < 2 {
 		return false
 	}
@@ -84,7 +84,7 @@ put_u16 :: proc(b: []byte, order: Byte_Order, v: u16) -> bool {
 	}
 	return true
 }
-put_u32 :: proc(b: []byte, order: Byte_Order, v: u32) -> bool {
+put_u32 :: proc "contextless" (b: []byte, order: Byte_Order, v: u32) -> bool {
 	if len(b) < 4 {
 		return false
 	}
@@ -101,7 +101,7 @@ put_u32 :: proc(b: []byte, order: Byte_Order, v: u32) -> bool {
 	}
 	return true
 }
-put_u64 :: proc(b: []byte, order: Byte_Order, v: u64) -> bool {
+put_u64 :: proc "contextless" (b: []byte, order: Byte_Order, v: u64) -> bool {
 	if len(b) < 8 {
 		return false
 	}
@@ -127,27 +127,27 @@ put_u64 :: proc(b: []byte, order: Byte_Order, v: u64) -> bool {
 	return true
 }
 
-put_i16 :: proc(b: []byte, order: Byte_Order, v: i16) -> bool {
+put_i16 :: proc "contextless" (b: []byte, order: Byte_Order, v: i16) -> bool {
 	return put_u16(b, order, u16(v))
 }
 
-put_i32 :: proc(b: []byte, order: Byte_Order, v: i32) -> bool {
+put_i32 :: proc "contextless" (b: []byte, order: Byte_Order, v: i32) -> bool {
 	return put_u32(b, order, u32(v))
 }
 
-put_i64 :: proc(b: []byte, order: Byte_Order, v: i64) -> bool {
+put_i64 :: proc "contextless" (b: []byte, order: Byte_Order, v: i64) -> bool {
 	return put_u64(b, order, u64(v))
 }
 
 
-put_f16 :: proc(b: []byte, order: Byte_Order, v: f16) -> bool {
+put_f16 :: proc "contextless" (b: []byte, order: Byte_Order, v: f16) -> bool {
 	return put_u16(b, order, transmute(u16)v)
 }
 
-put_f32 :: proc(b: []byte, order: Byte_Order, v: f32) -> bool {
+put_f32 :: proc "contextless" (b: []byte, order: Byte_Order, v: f32) -> bool {
 	return put_u32(b, order, transmute(u32)v)
 }
 
-put_f64 :: proc(b: []byte, order: Byte_Order, v: f64) -> bool {
+put_f64 :: proc "contextless" (b: []byte, order: Byte_Order, v: f64) -> bool {
 	return put_u64(b, order, transmute(u64)v)
 }

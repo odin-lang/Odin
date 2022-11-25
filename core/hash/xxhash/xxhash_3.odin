@@ -112,13 +112,13 @@ XXH128_canonical :: struct {
 	@return The low 64 bits of the product XOR'd by the high 64 bits.
 */
 @(optimization_mode="speed")
-XXH_mul_64_to_128_fold_64 :: #force_inline proc(lhs, rhs: xxh_u64) -> (res: xxh_u64) {
+XXH_mul_64_to_128_fold_64 :: #force_inline proc "contextless" (lhs, rhs: xxh_u64) -> (res: xxh_u64) {
 	t := u128(lhs) * u128(rhs)
 	return u64(t & 0xFFFFFFFFFFFFFFFF) ~ u64(t >> 64)
 }
 
 @(optimization_mode="speed")
-XXH_xorshift_64 :: #force_inline proc(v: xxh_u64, auto_cast shift: uint) -> (res: xxh_u64) {
+XXH_xorshift_64 :: #force_inline proc "contextless" (v: xxh_u64, auto_cast shift: uint) -> (res: xxh_u64) {
 	return v ~ (v >> shift)
 }
 
@@ -126,7 +126,7 @@ XXH_xorshift_64 :: #force_inline proc(v: xxh_u64, auto_cast shift: uint) -> (res
 	This is a fast avalanche stage, suitable when input bits are already partially mixed
 */
 @(optimization_mode="speed")
-XXH3_avalanche :: #force_inline proc(h64: xxh_u64) -> (res: xxh_u64) {
+XXH3_avalanche :: #force_inline proc "contextless" (h64: xxh_u64) -> (res: xxh_u64) {
 	res = XXH_xorshift_64(h64, 37)
 	res *= 0x165667919E3779F9
 	res = XXH_xorshift_64(res, 32)
@@ -138,7 +138,7 @@ XXH3_avalanche :: #force_inline proc(h64: xxh_u64) -> (res: xxh_u64) {
 	preferable when input has not been previously mixed
 */
 @(optimization_mode="speed")
-XXH3_rrmxmx :: #force_inline proc(h64, length: xxh_u64) -> (res: xxh_u64) {
+XXH3_rrmxmx :: #force_inline proc "contextless" (h64, length: xxh_u64) -> (res: xxh_u64) {
 	/* this mix is inspired by Pelle Evensen's rrmxmx */
 	res = h64
 	res ~= XXH_rotl64(res, 49) ~ XXH_rotl64(res, 24)
@@ -446,7 +446,7 @@ XXH3_hashLong_128b_withSeed :: #force_no_inline proc(input: []u8, seed: xxh_u64,
 	return XXH3_hashLong_128b_withSeed_internal(input, seed, secret, XXH3_accumulate_512, XXH3_scramble_accumulator , XXH3_init_custom_secret)
 }
 
-XXH3_hashLong128_f :: #type proc(input: []u8, seed: xxh_u64, secret: []u8)  -> (res: XXH3_128_hash)
+XXH3_hashLong128_f :: #type proc(input: []u8, seed: xxh_u64, secret: []u8) -> (res: XXH3_128_hash)
 
 @(optimization_mode="speed")
 XXH3_128bits_internal :: #force_inline proc(
@@ -700,7 +700,7 @@ XXH_ACC_NB               :: (XXH_STRIPE_LEN / size_of(xxh_u64))
 XXH_SECRET_LASTACC_START :: 7 /* not aligned on 8, last secret is different from acc & scrambler */
 
 @(optimization_mode="speed")
-XXH_writeLE64 :: #force_inline proc(dst: []u8, v64: u64le) {
+XXH_writeLE64 :: #force_inline proc "contextless" (dst: []u8, v64: u64le) {
 	v := v64
 	mem_copy(raw_data(dst), &v, size_of(v64))
 }
@@ -921,7 +921,7 @@ XXH3_hashLong_64b_withSeed :: #force_no_inline proc(input: []u8, seed: xxh_u64, 
 }
 
 
-XXH3_hashLong64_f :: #type proc(input: []u8, seed: xxh_u64, secret: []u8)  -> (res: xxh_u64)
+XXH3_hashLong64_f :: #type proc(input: []u8, seed: xxh_u64, secret: []u8) -> (res: xxh_u64)
 
 @(optimization_mode="speed")
 XXH3_64bits_internal :: proc(input: []u8, seed: xxh_u64, secret: []u8, f_hashLong: XXH3_hashLong64_f) -> (hash: xxh_u64) {

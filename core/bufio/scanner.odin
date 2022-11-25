@@ -67,7 +67,7 @@ scanner_destroy :: proc(s: ^Scanner) {
 
 
 // Returns the first non-EOF error that was encountered by the scanner
-scanner_error :: proc(s: ^Scanner) -> Scanner_Error {
+scanner_error :: proc "contextless" (s: ^Scanner) -> Scanner_Error {
 	switch s._err {
 	case .EOF, nil:
 		return nil
@@ -79,7 +79,7 @@ scanner_error :: proc(s: ^Scanner) -> Scanner_Error {
 // The underlying array may point to data that may be overwritten
 // by another call to scanner_scan.
 // Treat the returned value as if it is immutable.
-scanner_bytes :: proc(s: ^Scanner) -> []byte {
+scanner_bytes :: proc "contextless" (s: ^Scanner) -> []byte {
 	return s.token
 }
 
@@ -87,13 +87,13 @@ scanner_bytes :: proc(s: ^Scanner) -> []byte {
 // The underlying array may point to data that may be overwritten
 // by another call to scanner_scan.
 // Treat the returned value as if it is immutable.
-scanner_text :: proc(s: ^Scanner) -> string {
+scanner_text :: proc "contextless" (s: ^Scanner) -> string {
 	return string(s.token)
 }
 
 // scanner_scan advances the scanner
 scanner_scan :: proc(s: ^Scanner) -> bool {
-	set_err :: proc(s: ^Scanner, err: Scanner_Error) {
+	set_err :: proc "contextless" (s: ^Scanner, err: Scanner_Error) {
 		switch s._err {
 		case nil, .EOF:
 			s._err = err
@@ -229,14 +229,14 @@ scanner_scan :: proc(s: ^Scanner) -> bool {
 	}
 }
 
-scan_bytes :: proc(data: []byte, at_eof: bool) -> (advance: int, token: []byte, err: Scanner_Error, final_token: bool) {
+scan_bytes :: proc "contextless" (data: []byte, at_eof: bool) -> (advance: int, token: []byte, err: Scanner_Error, final_token: bool) {
 	if at_eof && len(data) == 0 {
 		return
 	}
 	return 1, data[0:1], nil, false
 }
 
-scan_runes :: proc(data: []byte, at_eof: bool) -> (advance: int, token: []byte, err: Scanner_Error, final_token: bool) {
+scan_runes :: proc "contextless" (data: []byte, at_eof: bool) -> (advance: int, token: []byte, err: Scanner_Error, final_token: bool) {
 	if at_eof && len(data) == 0 {
 		return
 	}
@@ -265,7 +265,7 @@ scan_runes :: proc(data: []byte, at_eof: bool) -> (advance: int, token: []byte, 
 	return
 }
 
-scan_words :: proc(data: []byte, at_eof: bool) -> (advance: int, token: []byte, err: Scanner_Error, final_token: bool) {
+scan_words :: proc "contextless" (data: []byte, at_eof: bool) -> (advance: int, token: []byte, err: Scanner_Error, final_token: bool) {
 	is_space :: proc "contextless" (r:  rune) -> bool {
 		switch r {
 		// lower ones

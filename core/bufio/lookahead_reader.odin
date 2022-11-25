@@ -13,14 +13,14 @@ Loadahead_Reader :: struct {
 	n:   int,
 }
 
-lookahead_reader_init :: proc(lr: ^Loadahead_Reader, r: io.Reader, buf: []byte) -> ^Loadahead_Reader {
+lookahead_reader_init :: proc "contextless" (lr: ^Loadahead_Reader, r: io.Reader, buf: []byte) -> ^Loadahead_Reader {
 	lr.r = r
 	lr.buf = buf
 	lr.n = 0
 	return lr
 }
 
-lookahead_reader_buffer :: proc(lr: ^Loadahead_Reader) -> []byte {
+lookahead_reader_buffer :: proc "contextless" (lr: ^Loadahead_Reader) -> []byte {
 	return lr.buf[:lr.n]
 }
 
@@ -64,7 +64,7 @@ lookahead_reader_peek_all :: proc(lr: ^Loadahead_Reader) -> ([]byte, io.Error) {
 
 
 // lookahead_reader_consume drops the first n populated bytes from the Lookahead_Reader.
-lookahead_reader_consume :: proc(lr: ^Loadahead_Reader, n: int) -> io.Error {
+lookahead_reader_consume :: proc "contextless" (lr: ^Loadahead_Reader, n: int) -> io.Error {
 	switch {
 	case n == 0:
 		return nil
@@ -78,6 +78,6 @@ lookahead_reader_consume :: proc(lr: ^Loadahead_Reader, n: int) -> io.Error {
 	return nil
 }
 
-lookahead_reader_consume_all :: proc(lr: ^Loadahead_Reader) -> io.Error {
+lookahead_reader_consume_all :: proc "contextless" (lr: ^Loadahead_Reader) -> io.Error {
 	return lookahead_reader_consume(lr, lr.n)
 }

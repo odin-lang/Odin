@@ -20,7 +20,7 @@ Sorter :: struct(K: typeid) where intrinsics.type_is_valid_map_key(K)  {
 }
 
 @(private="file")
-make_relations :: proc(sorter: ^$S/Sorter($K)) -> (r: Relations(K)) {
+make_relations :: proc "contextless" (sorter: ^$S/Sorter($K)) -> (r: Relations(K)) {
 	r.dependents.allocator = sorter.dependents_allocator
 	return
 }

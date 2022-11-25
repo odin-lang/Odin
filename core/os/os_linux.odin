@@ -253,13 +253,13 @@ S_ISGID :: 0o2000 // Set group id on execution
 S_ISVTX :: 0o1000 // Directory restrcted delete
 
 
-S_ISLNK  :: #force_inline proc(m: u32) -> bool { return (m & S_IFMT) == S_IFLNK  }
-S_ISREG  :: #force_inline proc(m: u32) -> bool { return (m & S_IFMT) == S_IFREG  }
-S_ISDIR  :: #force_inline proc(m: u32) -> bool { return (m & S_IFMT) == S_IFDIR  }
-S_ISCHR  :: #force_inline proc(m: u32) -> bool { return (m & S_IFMT) == S_IFCHR  }
-S_ISBLK  :: #force_inline proc(m: u32) -> bool { return (m & S_IFMT) == S_IFBLK  }
-S_ISFIFO :: #force_inline proc(m: u32) -> bool { return (m & S_IFMT) == S_IFIFO  }
-S_ISSOCK :: #force_inline proc(m: u32) -> bool { return (m & S_IFMT) == S_IFSOCK }
+S_ISLNK  :: #force_inline proc "contextless" (m: u32) -> bool { return (m & S_IFMT) == S_IFLNK  }
+S_ISREG  :: #force_inline proc "contextless" (m: u32) -> bool { return (m & S_IFMT) == S_IFREG  }
+S_ISDIR  :: #force_inline proc "contextless" (m: u32) -> bool { return (m & S_IFMT) == S_IFDIR  }
+S_ISCHR  :: #force_inline proc "contextless" (m: u32) -> bool { return (m & S_IFMT) == S_IFCHR  }
+S_ISBLK  :: #force_inline proc "contextless" (m: u32) -> bool { return (m & S_IFMT) == S_IFBLK  }
+S_ISFIFO :: #force_inline proc "contextless" (m: u32) -> bool { return (m & S_IFMT) == S_IFIFO  }
+S_ISSOCK :: #force_inline proc "contextless" (m: u32) -> bool { return (m & S_IFMT) == S_IFSOCK }
 
 F_OK :: 0 // Test for file existance
 X_OK :: 1 // Test for execute permission
@@ -270,11 +270,11 @@ AT_FDCWD            :: ~uintptr(99)	/* -100 */
 AT_REMOVEDIR        :: uintptr(0x200)
 AT_SYMLINK_NOFOLLOW :: uintptr(0x100)
 
-_unix_personality :: proc(persona: u64) -> int {
+_unix_personality :: proc "contextless" (persona: u64) -> int {
 	return int(intrinsics.syscall(unix.SYS_personality, uintptr(persona)))
 }
 
-_unix_fork :: proc() -> Pid {
+_unix_fork :: proc "contextless" () -> Pid {
 	when ODIN_ARCH != .arm64 {
 		res := int(intrinsics.syscall(unix.SYS_fork))
 	} else {
@@ -283,7 +283,7 @@ _unix_fork :: proc() -> Pid {
 	return -1 if res < 0 else Pid(res)
 }
 
-_unix_open :: proc(path: cstring, flags: int, mode: int = 0o000) -> Handle {
+_unix_open :: proc "contextless" (path: cstring, flags: int, mode: int = 0o000) -> Handle {
 	when ODIN_ARCH != .arm64 {
 		res := int(intrinsics.syscall(unix.SYS_open, uintptr(rawptr(path)), uintptr(flags), uintptr(mode)))
 	} else { // NOTE: arm64 does not have open
@@ -292,19 +292,19 @@ _unix_open :: proc(path: cstring, flags: int, mode: int = 0o000) -> Handle {
 	return -1 if res < 0 else Handle(res)
 }
 
-_unix_close :: proc(fd: Handle) -> int {
+_unix_close :: proc "contextless" (fd: Handle) -> int {
 	return int(intrinsics.syscall(unix.SYS_close, uintptr(fd)))
 }
 
-_unix_read :: proc(fd: Handle, buf: rawptr, size: uint) -> int {
+_unix_read :: proc "contextless" (fd: Handle, buf: rawptr, size: uint) -> int {
 	return int(intrinsics.syscall(unix.SYS_read, uintptr(fd), uintptr(buf), uintptr(size)))
 }
 
-_unix_write :: proc(fd: Handle, buf: rawptr, size: uint) -> int {
+_unix_write :: proc "contextless" (fd: Handle, buf: rawptr, size: uint) -> int {
 	return int(intrinsics.syscall(unix.SYS_write, uintptr(fd), uintptr(buf), uintptr(size)))
 }
 
-_unix_seek :: proc(fd: Handle, offset: i64, whence: int) -> i64 {
+_unix_seek :: proc "contextless" (fd: Handle, offset: i64, whence: int) -> i64 {
 	when ODIN_ARCH == .amd64 || ODIN_ARCH == .arm64 {
 		return i64(intrinsics.syscall(unix.SYS_lseek, uintptr(fd), uintptr(offset), uintptr(whence)))
 	} else {
@@ -316,7 +316,7 @@ _unix_seek :: proc(fd: Handle, offset: i64, whence: int) -> i64 {
 	}
 }
 
-_unix_stat :: proc(path: cstring, stat: ^OS_Stat) -> int {
+_unix_stat :: proc "contextless" (path: cstring, stat: ^OS_Stat) -> int {
 	when ODIN_ARCH == .amd64 {
 		return int(intrinsics.syscall(unix.SYS_stat, uintptr(rawptr(path)), uintptr(stat)))
 	} else when ODIN_ARCH != .arm64 {
@@ -326,7 +326,7 @@ _unix_stat :: proc(path: cstring, stat: ^OS_Stat) -> int {
 	}
 }
 
-_unix_fstat :: proc(fd: Handle, stat: ^OS_Stat) -> int {
+_unix_fstat :: proc "contextless" (fd: Handle, stat: ^OS_Stat) -> int {
 	when ODIN_ARCH == .amd64 || ODIN_ARCH == .arm64 {
 		return int(intrinsics.syscall(unix.SYS_fstat, uintptr(fd), uintptr(stat)))
 	} else {
@@ -334,7 +334,7 @@ _unix_fstat :: proc(fd: Handle, stat: ^OS_Stat) -> int {
 	}
 }
 
-_unix_lstat :: proc(path: cstring, stat: ^OS_Stat) -> int {
+_unix_lstat :: proc "contextless" (path: cstring, stat: ^OS_Stat) -> int {
 	when ODIN_ARCH == .amd64 {
 		return int(intrinsics.syscall(unix.SYS_lstat, uintptr(rawptr(path)), uintptr(stat)))
 	} else when ODIN_ARCH != .arm64 {
@@ -344,7 +344,7 @@ _unix_lstat :: proc(path: cstring, stat: ^OS_Stat) -> int {
 	}
 }
 
-_unix_readlink :: proc(path: cstring, buf: rawptr, bufsiz: uint) -> int {
+_unix_readlink :: proc "contextless" (path: cstring, buf: rawptr, bufsiz: uint) -> int {
 	when ODIN_ARCH != .arm64 {
 		return int(intrinsics.syscall(unix.SYS_readlink, uintptr(rawptr(path)), uintptr(buf), uintptr(bufsiz)))
 	} else { // NOTE: arm64 does not have readlink
@@ -352,7 +352,7 @@ _unix_readlink :: proc(path: cstring, buf: rawptr, bufsiz: uint) -> int {
 	}
 }
 
-_unix_access :: proc(path: cstring, mask: int) -> int {
+_unix_access :: proc "contextless" (path: cstring, mask: int) -> int {
 	when ODIN_ARCH != .arm64 {
 		return int(intrinsics.syscall(unix.SYS_access, uintptr(rawptr(path)), uintptr(mask)))
 	} else { // NOTE: arm64 does not have access
@@ -360,15 +360,15 @@ _unix_access :: proc(path: cstring, mask: int) -> int {
 	}
 }
 
-_unix_getcwd :: proc(buf: rawptr, size: uint) -> int {
+_unix_getcwd :: proc "contextless" (buf: rawptr, size: uint) -> int {
 	return int(intrinsics.syscall(unix.SYS_getcwd, uintptr(buf), uintptr(size)))
 }
 
-_unix_chdir :: proc(path: cstring) -> int {
+_unix_chdir :: proc "contextless" (path: cstring) -> int {
 	return int(intrinsics.syscall(unix.SYS_chdir, uintptr(rawptr(path))))
 }
 
-_unix_rename :: proc(old, new: cstring) -> int {
+_unix_rename :: proc "contextless" (old, new: cstring) -> int {
 	when ODIN_ARCH != .arm64 {
 		return int(intrinsics.syscall(unix.SYS_rename, uintptr(rawptr(old)), uintptr(rawptr(new))))
 	} else { // NOTE: arm64 does not have rename
@@ -376,7 +376,7 @@ _unix_rename :: proc(old, new: cstring) -> int {
 	}
 }
 
-_unix_unlink :: proc(path: cstring) -> int {
+_unix_unlink :: proc "contextless" (path: cstring) -> int {
 	when ODIN_ARCH != .arm64 {
 		return int(intrinsics.syscall(unix.SYS_unlink, uintptr(rawptr(path))))
 	} else { // NOTE: arm64 does not have unlink
@@ -384,7 +384,7 @@ _unix_unlink :: proc(path: cstring) -> int {
 	}
 }
 
-_unix_rmdir :: proc(path: cstring) -> int {
+_unix_rmdir :: proc "contextless" (path: cstring) -> int {
 	when ODIN_ARCH != .arm64 {
 		return int(intrinsics.syscall(unix.SYS_rmdir, uintptr(rawptr(path))))
 	} else { // NOTE: arm64 does not have rmdir
@@ -392,7 +392,7 @@ _unix_rmdir :: proc(path: cstring) -> int {
 	}
 }
 
-_unix_mkdir :: proc(path: cstring, mode: u32) -> int {
+_unix_mkdir :: proc "contextless" (path: cstring, mode: u32) -> int {
 	when ODIN_ARCH != .arm64 {
 		return int(intrinsics.syscall(unix.SYS_mkdir, uintptr(rawptr(path)), uintptr(mode)))
 	} else { // NOTE: arm64 does not have mkdir
@@ -427,13 +427,13 @@ foreign dl {
 	@(link_name="dlerror")          _unix_dlerror       :: proc() -> cstring ---
 }
 
-is_path_separator :: proc(r: rune) -> bool {
+is_path_separator :: proc "contextless" (r: rune) -> bool {
 	return r == '/'
 }
 
 // determine errno from syscall return value
 @private
-_get_errno :: proc(res: int) -> Errno {
+_get_errno :: proc "contextless" (res: int) -> Errno {
 	if res < 0 && res > -4096 {
 		return Errno(-res)
 	}
@@ -441,11 +441,11 @@ _get_errno :: proc(res: int) -> Errno {
 }
 
 // get errno from libc
-get_last_error :: proc() -> int {
+get_last_error :: proc "contextless" () -> int {
 	return __errno_location()^
 }
 
-personality :: proc(persona: u64) -> (Errno) {
+personality :: proc "contextless" (persona: u64) -> (Errno) {
 	res := _unix_personality(persona)
 	if res == -1 {
 		return _get_errno(res)
@@ -453,7 +453,7 @@ personality :: proc(persona: u64) -> (Errno) {
 	return ERROR_NONE
 }
 
-fork :: proc() -> (Pid, Errno) {
+fork :: proc "contextless" () -> (Pid, Errno) {
 	pid := _unix_fork()
 	if pid == -1 {
 		return -1, _get_errno(int(pid))
@@ -470,11 +470,11 @@ open :: proc(path: string, flags: int = O_RDONLY, mode: int = 0) -> (Handle, Err
 	return handle, ERROR_NONE
 }
 
-close :: proc(fd: Handle) -> Errno {
+close :: proc "contextless" (fd: Handle) -> Errno {
 	return _get_errno(_unix_close(fd))
 }
 
-read :: proc(fd: Handle, data: []byte) -> (int, Errno) {
+read :: proc "contextless" (fd: Handle, data: []byte) -> (int, Errno) {
 	bytes_read := _unix_read(fd, &data[0], c.size_t(len(data)))
 	if bytes_read < 0 {
 		return -1, _get_errno(bytes_read)
@@ -482,7 +482,7 @@ read :: proc(fd: Handle, data: []byte) -> (int, Errno) {
 	return bytes_read, ERROR_NONE
 }
 
-write :: proc(fd: Handle, data: []byte) -> (int, Errno) {
+write :: proc "contextless" (fd: Handle, data: []byte) -> (int, Errno) {
 	if len(data) == 0 {
 		return 0, ERROR_NONE
 	}
@@ -493,7 +493,7 @@ write :: proc(fd: Handle, data: []byte) -> (int, Errno) {
 	return int(bytes_written), ERROR_NONE
 }
 
-seek :: proc(fd: Handle, offset: i64, whence: int) -> (i64, Errno) {
+seek :: proc "contextless" (fd: Handle, offset: i64, whence: int) -> (i64, Errno) {
 	res := _unix_seek(fd, offset, whence)
 	if res < 0 {
 		return -1, _get_errno(int(res))
@@ -502,13 +502,13 @@ seek :: proc(fd: Handle, offset: i64, whence: int) -> (i64, Errno) {
 }
 
 file_size :: proc(fd: Handle) -> (i64, Errno) {
-    // deliberately uninitialized; the syscall fills this buffer for us
-    s: OS_Stat = ---
-    result := _unix_fstat(fd, &s)
-    if result < 0 {
-        return 0, _get_errno(result)
-    }
-    return max(s.size, 0), ERROR_NONE
+	// deliberately uninitialized; the syscall fills this buffer for us
+	s: OS_Stat = ---
+	result := _unix_fstat(fd, &s)
+	if result < 0 {
+		return 0, _get_errno(result)
+	}
+	return max(s.size, 0), ERROR_NONE
 }
 
 rename :: proc(old_path, new_path: string) -> Errno {

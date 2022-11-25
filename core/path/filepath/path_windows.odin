@@ -15,7 +15,7 @@ reserved_names := [?]string{
 	"LPT1", "LPT2", "LPT3", "LPT4", "LPT5", "LPT6", "LPT7", "LPT8", "LPT9",
 }
 
-is_reserved_name :: proc(path: string) -> bool {
+is_reserved_name :: proc "contextless" (path: string) -> bool {
 	if len(path) == 0 {
 		return false
 	}
@@ -27,12 +27,12 @@ is_reserved_name :: proc(path: string) -> bool {
 	return false
 }
 
-is_UNC :: proc(path: string) -> bool {
+is_UNC :: proc "contextless" (path: string) -> bool {
 	return volume_name_len(path) > 2
 }
 
 
-is_abs :: proc(path: string) -> bool {
+is_abs :: proc "contextless" (path: string) -> bool {
 	if is_reserved_name(path) {
 		return true
 	}

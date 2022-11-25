@@ -32,7 +32,7 @@ Match_Error :: enum {
 //
 // NOTE(bill): This is effectively the shell pattern matching system found
 //
-match :: proc(pattern, name: string) -> (matched: bool, err: Match_Error) {
+match :: proc "contextless" (pattern, name: string) -> (matched: bool, err: Match_Error) {
 	pattern, name := pattern, name
 	pattern_loop: for len(pattern) > 0 {
 		star: bool
@@ -77,7 +77,7 @@ match :: proc(pattern, name: string) -> (matched: bool, err: Match_Error) {
 
 
 @(private="file")
-scan_chunk :: proc(pattern: string) -> (star: bool, chunk, rest: string) {
+scan_chunk :: proc "contextless" (pattern: string) -> (star: bool, chunk, rest: string) {
 	pattern := pattern
 	for len(pattern) > 0 && pattern[0] == '*' {
 		pattern = pattern[1:]
@@ -109,7 +109,7 @@ scan_chunk :: proc(pattern: string) -> (star: bool, chunk, rest: string) {
 }
 
 @(private="file")
-match_chunk :: proc(chunk, s: string) -> (rest: string, ok: bool, err: Match_Error) {
+match_chunk :: proc "contextless" (chunk, s: string) -> (rest: string, ok: bool, err: Match_Error) {
 	chunk, s := chunk, s
 	for len(chunk) > 0 {
 		if len(s) == 0 {
@@ -182,7 +182,7 @@ match_chunk :: proc(chunk, s: string) -> (rest: string, ok: bool, err: Match_Err
 }
 
 @(private="file")
-get_escape :: proc(chunk: string) -> (r: rune, next_chunk: string, err: Match_Error) {
+get_escape :: proc "contextless" (chunk: string) -> (r: rune, next_chunk: string, err: Match_Error) {
 	if len(chunk) == 0 || chunk[0] == '-' || chunk[0] == ']' {
 		err = .Syntax_Error
 		return
@@ -312,7 +312,7 @@ _glob :: proc(dir, pattern: string, matches: ^[dynamic]string, allocator := cont
 }
 
 @(private)
-has_meta :: proc(path: string) -> bool {
+has_meta :: proc "contextless" (path: string) -> bool {
 	when ODIN_OS == .Windows {
 		CHARS :: `*?[`
 	} else {
@@ -322,7 +322,7 @@ has_meta :: proc(path: string) -> bool {
 }
 
 @(private)
-clean_glob_path :: proc(path: string) -> string {
+clean_glob_path :: proc "contextless" (path: string) -> string {
 	switch path {
 	case "":
 		return "."
@@ -334,7 +334,7 @@ clean_glob_path :: proc(path: string) -> string {
 
 
 @(private)
-clean_glob_path_windows :: proc(path: string, temp_buf: []byte) -> (prefix_len: int, cleaned: string) {
+clean_glob_path_windows :: proc "contextless" (path: string, temp_buf: []byte) -> (prefix_len: int, cleaned: string) {
 	vol_len := volume_name_len(path)
 	switch {
 	case path == "":

@@ -20,7 +20,7 @@ Vec4 :: [4]f64
 /*
 	2D Simplex noise, standard lattice orientation.
 */
-noise_2d :: proc(seed: i64, coord: Vec2) -> (value: f32) {
+noise_2d :: proc "contextless" (seed: i64, coord: Vec2) -> (value: f32) {
 	// Get points for A2* lattice
 	skew   := SKEW_2D * (coord.x + coord.y)
 	skewed := coord + skew
@@ -35,7 +35,7 @@ noise_2d :: proc(seed: i64, coord: Vec2) -> (value: f32) {
 	unless your map is centered around an equator. It's a subtle
 	difference, but the option is here to make it an easy choice.
 */
-noise_2d_improve_x :: proc(seed: i64, coord: Vec2) -> (value: f32) {
+noise_2d_improve_x :: proc "contextless" (seed: i64, coord: Vec2) -> (value: f32) {
 	// Skew transform and rotation baked into one.
 	xx := coord.x * ROOT_2_OVER_2
 	yy := coord.y * (ROOT_2_OVER_2 * (1 + 2 * SKEW_2D))
@@ -51,7 +51,7 @@ noise_2d_improve_x :: proc(seed: i64, coord: Vec2) -> (value: f32) {
 	If Z is vertical in world coordinates, call `noise_3d_improve_xz(x, y, Z)`.
 	For a time varied animation, call `noise_3d_improve_xz(x, y, T)`.
 */
-noise_3d_improve_xy :: proc(seed: i64, coord: Vec3) -> (value: f32) {
+noise_3d_improve_xy :: proc "contextless" (seed: i64, coord: Vec3) -> (value: f32) {
 	/*
 		Re-orient the cubic lattices without skewing, so Z points up the main lattice diagonal,
 		and the planes formed by XY are moved far out of alignment with the cube faces.
@@ -75,7 +75,7 @@ noise_3d_improve_xy :: proc(seed: i64, coord: Vec3) -> (value: f32) {
 	If Z is vertical in world coordinates, call `noise_3d_improve_xz(x, Z, y)` or use `noise_3d_improve_xy`.
 	For a time varied animation, call `noise_3d_improve_xz(x, T, y)` or use `noise_3d_improve_xy`.
 */
-noise_3d_improve_xz :: proc(seed: i64, coord: Vec3) -> (value: f32) {
+noise_3d_improve_xz :: proc "contextless" (seed: i64, coord: Vec3) -> (value: f32) {
 	/*
 		Re-orient the cubic lattices without skewing, so Y points up the main lattice diagonal,
 		and the planes formed by XZ are moved far out of alignment with the cube faces.
@@ -96,7 +96,7 @@ noise_3d_improve_xz :: proc(seed: i64, coord: Vec3) -> (value: f32) {
 	Use `noise_3d_improve_xy` or `noise_3d_improve_xz` instead, wherever appropriate.
 	They have less diagonal bias. This function's best use is as a fallback.
 */
-noise_3d_fallback :: proc(seed: i64, coord: Vec3) -> (value: f32) {
+noise_3d_fallback :: proc "contextless" (seed: i64, coord: Vec3) -> (value: f32) {
 	/*
 		Re-orient the cubic lattices via rotation, to produce a familiar look.
 		Orthonormal rotation. Not a skew transform.
@@ -114,7 +114,7 @@ noise_3d_fallback :: proc(seed: i64, coord: Vec3) -> (value: f32) {
 	Recommended for time-varied animations which texture a 3D object (W=time)
 	in a space where Z is vertical.
 */
-noise_4d_improve_xyz_improve_xy :: proc(seed: i64, coord: Vec4) -> (value: f32) {
+noise_4d_improve_xyz_improve_xy :: proc "contextless" (seed: i64, coord: Vec4) -> (value: f32) {
 	xy := coord.x + coord.y
 	s2 := xy * -0.21132486540518699998
 	zz := coord.z * 0.28867513459481294226
@@ -133,7 +133,7 @@ noise_4d_improve_xyz_improve_xy :: proc(seed: i64, coord: Vec4) -> (value: f32) 
 	Recommended for time-varied animations which texture a 3D object (W=time)
 	in a space where Y is vertical.
 */
-noise_4d_improve_xyz_improve_xz :: proc(seed: i64, coord: Vec4) -> (value: f32) {
+noise_4d_improve_xyz_improve_xz :: proc "contextless" (seed: i64, coord: Vec4) -> (value: f32) {
 	xz := coord.x + coord.z
 	s2 := xz * -0.21132486540518699998
 	yy := coord.y * 0.28867513459481294226
@@ -152,7 +152,7 @@ noise_4d_improve_xyz_improve_xz :: proc(seed: i64, coord: Vec4) -> (value: f32) 
 	Recommended for time-varied animations which texture a 3D object (W=time)
 	where there isn't a clear distinction between horizontal and vertical
 */
-noise_4d_improve_xyz :: proc(seed: i64, coord: Vec4) -> (value: f32) {
+noise_4d_improve_xyz :: proc "contextless" (seed: i64, coord: Vec4) -> (value: f32) {
 	xyz := coord.x + coord.y + coord.z
 	ww  := coord.w * 0.2236067977499788
 	s2  := xyz * -0.16666666666666666 + ww
@@ -164,7 +164,7 @@ noise_4d_improve_xyz :: proc(seed: i64, coord: Vec4) -> (value: f32) {
 /*
 	4D OpenSimplex2 noise, fallback lattice orientation.
 */
-noise_4d_fallback :: proc(seed: i64, coord: Vec4) -> (value: f32) {
+noise_4d_fallback :: proc "contextless" (seed: i64, coord: Vec4) -> (value: f32) {
 	// Get points for A4 lattice
 	skew := f64(SKEW_4D) * (coord.x + coord.y + coord.z + coord.w)
 	return _internal_noise_4d_unskewed_base(seed, coord + skew)

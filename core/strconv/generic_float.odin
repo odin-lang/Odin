@@ -103,10 +103,10 @@ format_digits :: proc(buf: []byte, shortest: bool, neg: bool, digs: Decimal_Slic
 		n: int,
 	}
 
-	to_bytes :: proc(b: Buffer) -> []byte {
+	to_bytes :: proc "contextless" (b: Buffer) -> []byte {
 		return b.b[:b.n]
 	}
-	add_bytes :: proc(buf: ^Buffer, bytes: ..byte) {
+	add_bytes :: proc "contextless" (buf: ^Buffer, bytes: ..byte) {
 		buf.n += copy(buf.b[buf.n:], bytes)
 	}
 

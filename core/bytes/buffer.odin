@@ -48,30 +48,30 @@ buffer_destroy :: proc(b: ^Buffer) {
 	buffer_reset(b)
 }
 
-buffer_to_bytes :: proc(b: ^Buffer) -> []byte {
+buffer_to_bytes :: proc "contextless" (b: ^Buffer) -> []byte {
 	return b.buf[b.off:]
 }
 
-buffer_to_string :: proc(b: ^Buffer) -> string {
+buffer_to_string :: proc "contextless" (b: ^Buffer) -> string {
 	if b == nil {
 		return "<nil>"
 	}
 	return string(b.buf[b.off:])
 }
 
-buffer_is_empty :: proc(b: ^Buffer) -> bool {
+buffer_is_empty :: proc "contextless" (b: ^Buffer) -> bool {
 	return len(b.buf) <= b.off
 }
 
-buffer_length :: proc(b: ^Buffer) -> int {
+buffer_length :: proc "contextless" (b: ^Buffer) -> int {
 	return len(b.buf) - b.off
 }
 
-buffer_capacity :: proc(b: ^Buffer) -> int {
+buffer_capacity :: proc "contextless" (b: ^Buffer) -> int {
 	return cap(b.buf)
 }
 
-buffer_reset :: proc(b: ^Buffer) {
+buffer_reset :: proc "contextless" (b: ^Buffer) {
 	clear(&b.buf)
 	b.off = 0
 	b.last_read = .Invalid
@@ -201,7 +201,7 @@ buffer_write_rune :: proc(b: ^Buffer, r: rune) -> (n: int, err: io.Error) {
 	return
 }
 
-buffer_next :: proc(b: ^Buffer, n: int) -> []byte {
+buffer_next :: proc "contextless" (b: ^Buffer, n: int) -> []byte {
 	n := n
 	b.last_read = .Invalid
 	m := buffer_length(b)
@@ -216,7 +216,7 @@ buffer_next :: proc(b: ^Buffer, n: int) -> []byte {
 	return data
 }
 
-buffer_read :: proc(b: ^Buffer, p: []byte) -> (n: int, err: io.Error) {
+buffer_read :: proc "contextless" (b: ^Buffer, p: []byte) -> (n: int, err: io.Error) {
 	b.last_read = .Invalid
 	if buffer_is_empty(b) {
 		buffer_reset(b)
@@ -233,11 +233,11 @@ buffer_read :: proc(b: ^Buffer, p: []byte) -> (n: int, err: io.Error) {
 	return
 }
 
-buffer_read_ptr :: proc(b: ^Buffer, ptr: rawptr, size: int) -> (n: int, err: io.Error) {
+buffer_read_ptr :: proc "contextless" (b: ^Buffer, ptr: rawptr, size: int) -> (n: int, err: io.Error) {
 	return buffer_read(b, ([^]byte)(ptr)[:size])
 }
 
-buffer_read_at :: proc(b: ^Buffer, p: []byte, offset: int) -> (n: int, err: io.Error) {
+buffer_read_at :: proc "contextless" (b: ^Buffer, p: []byte, offset: int) -> (n: int, err: io.Error) {
 	b.last_read = .Invalid
 
 	if uint(offset) >= len(b.buf) {
@@ -252,7 +252,7 @@ buffer_read_at :: proc(b: ^Buffer, p: []byte, offset: int) -> (n: int, err: io.E
 }
 
 
-buffer_read_byte :: proc(b: ^Buffer) -> (byte, io.Error) {
+buffer_read_byte :: proc "contextless" (b: ^Buffer) -> (byte, io.Error) {
 	if buffer_is_empty(b) {
 		buffer_reset(b)
 		return 0, .EOF
@@ -263,7 +263,7 @@ buffer_read_byte :: proc(b: ^Buffer) -> (byte, io.Error) {
 	return c, nil
 }
 
-buffer_read_rune :: proc(b: ^Buffer) -> (r: rune, size: int, err: io.Error) {
+buffer_read_rune :: proc "contextless" (b: ^Buffer) -> (r: rune, size: int, err: io.Error) {
 	if buffer_is_empty(b) {
 		buffer_reset(b)
 		return 0, 0, .EOF
@@ -280,7 +280,7 @@ buffer_read_rune :: proc(b: ^Buffer) -> (r: rune, size: int, err: io.Error) {
 	return
 }
 
-buffer_unread_byte :: proc(b: ^Buffer) -> io.Error {
+buffer_unread_byte :: proc "contextless" (b: ^Buffer) -> io.Error {
 	if b.last_read == .Invalid {
 		return .Invalid_Unread
 	}
@@ -291,7 +291,7 @@ buffer_unread_byte :: proc(b: ^Buffer) -> io.Error {
 	return nil
 }
 
-buffer_unread_rune :: proc(b: ^Buffer) -> io.Error {
+buffer_unread_rune :: proc "contextless" (b: ^Buffer) -> io.Error {
 	if b.last_read <= .Invalid {
 		return .Invalid_Unread
 	}
@@ -303,7 +303,7 @@ buffer_unread_rune :: proc(b: ^Buffer) -> io.Error {
 }
 
 
-buffer_read_bytes :: proc(b: ^Buffer, delim: byte) -> (line: []byte, err: io.Error) {
+buffer_read_bytes :: proc "contextless" (b: ^Buffer, delim: byte) -> (line: []byte, err: io.Error) {
 	i := index_byte(b.buf[b.off:], delim)
 	end := b.off + i + 1
 	if i < 0 {
@@ -316,7 +316,7 @@ buffer_read_bytes :: proc(b: ^Buffer, delim: byte) -> (line: []byte, err: io.Err
 	return
 }
 
-buffer_read_string :: proc(b: ^Buffer, delim: byte) -> (line: string, err: io.Error) {
+buffer_read_string :: proc "contextless" (b: ^Buffer, delim: byte) -> (line: string, err: io.Error) {
 	slice: []byte
 	slice, err = buffer_read_bytes(b, delim)
 	return string(slice), err
@@ -369,7 +369,7 @@ buffer_read_from :: proc(b: ^Buffer, r: io.Reader) -> (n: i64, err: io.Error) #n
 }
 
 
-buffer_to_stream :: proc(b: ^Buffer) -> (s: io.Stream) {
+buffer_to_stream :: proc "contextless" (b: ^Buffer) -> (s: io.Stream) {
 	s.stream_data = b
 	s.stream_vtable = &_buffer_vtable
 	return

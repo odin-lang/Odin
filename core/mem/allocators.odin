@@ -9,7 +9,7 @@ nil_allocator_proc :: proc(allocator_data: rawptr, mode: Allocator_Mode,
 	return nil, nil
 }
 
-nil_allocator :: proc() -> Allocator {
+nil_allocator :: proc "contextless" () -> Allocator {
 	return Allocator{
 		procedure = nil_allocator_proc,
 		data = nil,
@@ -31,7 +31,7 @@ Arena_Temp_Memory :: struct {
 }
 
 
-arena_init :: proc(a: ^Arena, data: []byte) {
+arena_init :: proc "contextless" (a: ^Arena, data: []byte) {
 	a.data       = data
 	a.offset     = 0
 	a.peak_used  = 0
@@ -46,7 +46,7 @@ init_arena :: proc(a: ^Arena, data: []byte) {
 	a.temp_count = 0
 }
 
-arena_allocator :: proc(arena: ^Arena) -> Allocator {
+arena_allocator :: proc "contextless" (arena: ^Arena) -> Allocator {
 	return Allocator{
 		procedure = arena_allocator_proc,
 		data = arena,
@@ -100,7 +100,7 @@ arena_allocator_proc :: proc(allocator_data: rawptr, mode: Allocator_Mode,
 	return nil, nil
 }
 
-begin_arena_temp_memory :: proc(a: ^Arena) -> Arena_Temp_Memory {
+begin_arena_temp_memory :: proc "contextless" (a: ^Arena) -> Arena_Temp_Memory {
 	tmp: Arena_Temp_Memory
 	tmp.arena = a
 	tmp.prev_offset = a.offset
@@ -286,7 +286,7 @@ scratch_allocator_proc :: proc(allocator_data: rawptr, mode: Allocator_Mode,
 	return nil, nil
 }
 
-scratch_allocator :: proc(allocator: ^Scratch_Allocator) -> Allocator {
+scratch_allocator :: proc "contextless" (allocator: ^Scratch_Allocator) -> Allocator {
 	return Allocator{
 		procedure = scratch_allocator_proc,
 		data = allocator,
@@ -310,7 +310,7 @@ Stack :: struct {
 	peak_used: int,
 }
 
-stack_init :: proc(s: ^Stack, data: []byte) {
+stack_init :: proc "contextless" (s: ^Stack, data: []byte) {
 	s.data = data
 	s.prev_offset = 0
 	s.curr_offset = 0
@@ -318,14 +318,14 @@ stack_init :: proc(s: ^Stack, data: []byte) {
 }
 
 @(deprecated="prefer 'mem.stack_init'")
-init_stack :: proc(s: ^Stack, data: []byte) {
+init_stack :: proc "contextless" (s: ^Stack, data: []byte) {
 	s.data = data
 	s.prev_offset = 0
 	s.curr_offset = 0
 	s.peak_used = 0
 }
 
-stack_allocator :: proc(stack: ^Stack) -> Allocator {
+stack_allocator :: proc "contextless" (stack: ^Stack) -> Allocator {
 	return Allocator{
 		procedure = stack_allocator_proc,
 		data = stack,
@@ -477,20 +477,20 @@ Small_Stack :: struct {
 	peak_used: int,
 }
 
-small_stack_init :: proc(s: ^Small_Stack, data: []byte) {
+small_stack_init :: proc "contextless" (s: ^Small_Stack, data: []byte) {
 	s.data      = data
 	s.offset    = 0
 	s.peak_used = 0
 }
 
 @(deprecated="prefer 'small_stack_init'")
-init_small_stack :: proc(s: ^Small_Stack, data: []byte) {
+init_small_stack :: proc "contextless" (s: ^Small_Stack, data: []byte) {
 	s.data      = data
 	s.offset    = 0
 	s.peak_used = 0
 }
 
-small_stack_allocator :: proc(stack: ^Small_Stack) -> Allocator {
+small_stack_allocator :: proc "contextless" (stack: ^Small_Stack) -> Allocator {
 	return Allocator{
 		procedure = small_stack_allocator_proc,
 		data      = stack,
@@ -673,7 +673,7 @@ dynamic_pool_allocator_proc :: proc(allocator_data: rawptr, mode: Allocator_Mode
 }
 
 
-dynamic_pool_allocator :: proc(pool: ^Dynamic_Pool) -> Allocator {
+dynamic_pool_allocator :: proc "contextless" (pool: ^Dynamic_Pool) -> Allocator {
 	return Allocator{
 		procedure = dynamic_pool_allocator_proc,
 		data = pool,
@@ -836,7 +836,7 @@ panic_allocator_proc :: proc(allocator_data: rawptr, mode: Allocator_Mode,
 	return nil, nil
 }
 
-panic_allocator :: proc() -> Allocator {
+panic_allocator :: proc "contextless" () -> Allocator {
 	return Allocator{
 		procedure = panic_allocator_proc,
 		data = nil,
@@ -885,7 +885,7 @@ tracking_allocator_clear :: proc(t: ^Tracking_Allocator) {
 }
 
 
-tracking_allocator :: proc(data: ^Tracking_Allocator) -> Allocator {
+tracking_allocator :: proc "contextless" (data: ^Tracking_Allocator) -> Allocator {
 	return Allocator{
 		data = data,
 		procedure = tracking_allocator_proc,

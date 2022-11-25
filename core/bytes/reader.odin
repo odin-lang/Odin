@@ -9,30 +9,30 @@ Reader :: struct {
 	prev_rune: int,    // previous reading index of rune or < 0
 }
 
-reader_init :: proc(r: ^Reader, s: []byte) {
+reader_init :: proc "contextless" (r: ^Reader, s: []byte) {
 	r.s = s
 	r.i = 0
 	r.prev_rune = -1
 }
 
-reader_to_stream :: proc(r: ^Reader) -> (s: io.Stream) {
+reader_to_stream :: proc "contextless" (r: ^Reader) -> (s: io.Stream) {
 	s.stream_data = r
 	s.stream_vtable = &_reader_vtable
 	return
 }
 
-reader_length :: proc(r: ^Reader) -> int {
+reader_length :: proc "contextless" (r: ^Reader) -> int {
 	if r.i >= i64(len(r.s)) {
 		return 0
 	}
 	return int(i64(len(r.s)) - r.i)
 }
 
-reader_size :: proc(r: ^Reader) -> i64 {
+reader_size :: proc "contextless" (r: ^Reader) -> i64 {
 	return i64(len(r.s))
 }
 
-reader_read :: proc(r: ^Reader, p: []byte) -> (n: int, err: io.Error) {
+reader_read :: proc "contextless" (r: ^Reader, p: []byte) -> (n: int, err: io.Error) {
 	if r.i >= i64(len(r.s)) {
 		return 0, .EOF
 	}
@@ -41,7 +41,7 @@ reader_read :: proc(r: ^Reader, p: []byte) -> (n: int, err: io.Error) {
 	r.i += i64(n)
 	return
 }
-reader_read_at :: proc(r: ^Reader, p: []byte, off: i64) -> (n: int, err: io.Error) {
+reader_read_at :: proc "contextless" (r: ^Reader, p: []byte, off: i64) -> (n: int, err: io.Error) {
 	if off < 0 {
 		return 0, .Invalid_Offset
 	}
@@ -54,7 +54,7 @@ reader_read_at :: proc(r: ^Reader, p: []byte, off: i64) -> (n: int, err: io.Erro
 	}
 	return
 }
-reader_read_byte :: proc(r: ^Reader) -> (byte, io.Error) {
+reader_read_byte :: proc "contextless" (r: ^Reader) -> (byte, io.Error) {
 	r.prev_rune = -1
 	if r.i >= i64(len(r.s)) {
 		return 0, .EOF
@@ -63,7 +63,7 @@ reader_read_byte :: proc(r: ^Reader) -> (byte, io.Error) {
 	r.i += 1
 	return b, nil
 }
-reader_unread_byte :: proc(r: ^Reader) -> io.Error {
+reader_unread_byte :: proc "contextless" (r: ^Reader) -> io.Error {
 	if r.i <= 0 {
 		return .Invalid_Unread
 	}
@@ -71,7 +71,7 @@ reader_unread_byte :: proc(r: ^Reader) -> io.Error {
 	r.i -= 1
 	return nil
 }
-reader_read_rune :: proc(r: ^Reader) -> (ch: rune, size: int, err: io.Error) {
+reader_read_rune :: proc "contextless" (r: ^Reader) -> (ch: rune, size: int, err: io.Error) {
 	if r.i >= i64(len(r.s)) {
 		r.prev_rune = -1
 		return 0, 0, .EOF
@@ -85,7 +85,7 @@ reader_read_rune :: proc(r: ^Reader) -> (ch: rune, size: int, err: io.Error) {
 	r.i += i64(size)
 	return
 }
-reader_unread_rune :: proc(r: ^Reader) -> io.Error {
+reader_unread_rune :: proc "contextless" (r: ^Reader) -> io.Error {
 	if r.i <= 0 {
 		return .Invalid_Unread
 	}
@@ -96,7 +96,7 @@ reader_unread_rune :: proc(r: ^Reader) -> io.Error {
 	r.prev_rune = -1
 	return nil
 }
-reader_seek :: proc(r: ^Reader, offset: i64, whence: io.Seek_From) -> (i64, io.Error) {
+reader_seek :: proc "contextless" (r: ^Reader, offset: i64, whence: io.Seek_From) -> (i64, io.Error) {
 	r.prev_rune = -1
 	abs: i64
 	switch whence {

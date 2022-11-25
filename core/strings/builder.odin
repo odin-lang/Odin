@@ -96,12 +96,12 @@ _builder_stream_vtable := io.Stream_VTable{
 }
 
 // return an `io.Stream` from a builder
-to_stream :: proc(b: ^Builder) -> io.Stream {
+to_stream :: proc "contextless" (b: ^Builder) -> io.Stream {
 	return io.Stream{stream_vtable=&_builder_stream_vtable, stream_data=b}
 }
 
 // return an `io.Writer` from a builder
-to_writer :: proc(b: ^Builder) -> io.Writer {
+to_writer :: proc "contextless" (b: ^Builder) -> io.Writer {
 	return io.to_writer(to_stream(b))
 }
 
@@ -117,7 +117,7 @@ builder_grow :: proc(b: ^Builder, cap: int) {
 }
 
 // clear the builder byte buffer content
-builder_reset :: proc(b: ^Builder) {
+builder_reset :: proc "contextless" (b: ^Builder) {
 	clear(&b.buf)
 }
 
@@ -146,22 +146,22 @@ builder_from_bytes :: proc(backing: []byte) -> Builder {
 builder_from_slice :: builder_from_bytes
 
 // cast the builder byte buffer to a string and return it
-to_string :: proc(b: Builder) -> string {
+to_string :: proc "contextless" (b: Builder) -> string {
 	return string(b.buf[:])
 }
 
 // return the length of the builder byte buffer
-builder_len :: proc(b: Builder) -> int {
+builder_len :: proc "contextless" (b: Builder) -> int {
 	return len(b.buf)
 }
 
 // return the cap of the builder byte buffer
-builder_cap :: proc(b: Builder) -> int {
+builder_cap :: proc "contextless" (b: Builder) -> int {
 	return cap(b.buf)
 }
 
 // returns the space left in the builder byte buffer to use up
-builder_space :: proc(b: Builder) -> int {
+builder_space :: proc "contextless" (b: Builder) -> int {
 	return cap(b.buf) - len(b.buf)
 }
 
@@ -242,7 +242,7 @@ write_string :: proc(b: ^Builder, s: string) -> (n: int) {
 
 // pops and returns the last byte in the builder
 // returns 0 when the builder is empty
-pop_byte :: proc(b: ^Builder) -> (r: byte) {
+pop_byte :: proc "contextless" (b: ^Builder) -> (r: byte) {
 	if len(b.buf) == 0 {
 		return 0
 	}
@@ -255,7 +255,7 @@ pop_byte :: proc(b: ^Builder) -> (r: byte) {
 
 // pops the last rune in the builder and returns the popped rune and its rune width
 // returns 0, 0 when the builder is empty
-pop_rune :: proc(b: ^Builder) -> (r: rune, width: int) {
+pop_rune :: proc "contextless" (b: ^Builder) -> (r: rune, width: int) {
 	if len(b.buf) == 0 {
 		return 0, 0
 	}

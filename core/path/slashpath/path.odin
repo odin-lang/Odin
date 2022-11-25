@@ -8,13 +8,13 @@ package slashpath
 import "core:strings"
 
 // is_separator checks whether the byte is a valid separator character
-is_separator :: proc(c: byte) -> bool {
+is_separator :: proc "contextless" (c: byte) -> bool {
 	return c == '/'
 }
 
 
 // is_abs checks whether the path is absolute
-is_abs :: proc(path: string) -> bool {
+is_abs :: proc "contextless" (path: string) -> bool {
 	return len(path) > 0 && path[0] == '/'
 }
 
@@ -66,7 +66,7 @@ dir :: proc(path: string, allocator := context.allocator) -> string {
 // separating it into a directory and file name component.
 // If there is no slash in path, it returns an empty dir and file set to path
 // The returned values have the property that path = dir+file
-split :: proc(path: string) -> (dir, file: string) {
+split :: proc "contextless" (path: string) -> (dir, file: string) {
 	i := strings.last_index(path, "/")
 	return path[:i+1], path[i+1:]
 }

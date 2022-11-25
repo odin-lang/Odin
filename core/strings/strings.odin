@@ -32,34 +32,34 @@ clone_to_cstring :: proc(s: string, allocator := context.allocator, loc := #call
 
 // returns a string from a byte pointer `ptr` and byte length `len`
 // the string is valid as long as the parameters stay alive
-string_from_ptr :: proc(ptr: ^byte, len: int) -> string {
+string_from_ptr :: proc "contextless" (ptr: ^byte, len: int) -> string {
 	return transmute(string)mem.Raw_String{ptr, len}
 }
 
 // returns a string from a byte pointer `ptr and byte length `len`
 // searches for a nul byte from 0..<len, otherwhise `len` will be the end size
-string_from_nul_terminated_ptr :: proc(ptr: ^byte, len: int) -> string {
+string_from_nul_terminated_ptr :: proc "contextless" (ptr: ^byte, len: int) -> string {
 	s := transmute(string)mem.Raw_String{ptr, len}
 	s = truncate_to_byte(s, 0)
 	return s
 }
 
 // returns the raw ^byte start of the string `str`
-ptr_from_string :: proc(str: string) -> ^byte {
+ptr_from_string :: proc "contextless" (str: string) -> ^byte {
 	d := transmute(mem.Raw_String)str
 	return d.data
 }
 
 // returns the transmute of string `str` to a cstring
 // not safe since the origin string may not contain a nul byte
-unsafe_string_to_cstring :: proc(str: string) -> cstring {
+unsafe_string_to_cstring :: proc "contextless" (str: string) -> cstring {
 	d := transmute(mem.Raw_String)str
 	return cstring(d.data)
 }
 
 // returns a string truncated to the first time it finds the byte `b`
 // uses the `len` of the string `str` when it couldn't find the input
-truncate_to_byte :: proc(str: string, b: byte) -> string {
+truncate_to_byte :: proc "contextless" (str: string, b: byte) -> string {
 	n := index_byte(str, b)
 	if n < 0 {
 		n = len(str)
@@ -69,7 +69,7 @@ truncate_to_byte :: proc(str: string, b: byte) -> string {
 
 // returns a string truncated to the first time it finds the rune `r`
 // uses the `len` of the string `str` when it couldn't find the input
-truncate_to_rune :: proc(str: string, r: rune) -> string {
+truncate_to_rune :: proc "contextless" (str: string, r: rune) -> string {
 	n := index_rune(str, r)
 	if n < 0 {
 		n = len(str)
@@ -116,12 +116,12 @@ clone_from_cstring_bounded :: proc(ptr: cstring, len: int, allocator := context.
 
 // Compares two strings, returning a value representing which one comes first lexiographically.
 // -1 for `lhs`; 1 for `rhs`, or 0 if they are equal.
-compare :: proc(lhs, rhs: string) -> int {
+compare :: proc "contextless" (lhs, rhs: string) -> int {
 	return mem.compare(transmute([]byte)lhs, transmute([]byte)rhs)
 }
 
 // returns the byte offset of the rune `r` in the string `s`, -1 when not found
-contains_rune :: proc(s: string, r: rune) -> int {
+contains_rune :: proc "contextless" (s: string, r: rune) -> int {
 	for c, offset in s {
 		if c == r {
 			return offset
@@ -137,7 +137,7 @@ contains_rune :: proc(s: string, r: rune) -> int {
 	strings.contains("testing", "ing") -> true
 	strings.contains("testing", "text") -> false
 */
-contains :: proc(s, substr: string) -> bool {
+contains :: proc "contextless" (s, substr: string) -> bool {
 	return index(s, substr) >= 0
 }
 
@@ -149,7 +149,7 @@ contains :: proc(s, substr: string) -> bool {
 	strings.contains_any("test", "et") -> true
 	strings.contains_any("test", "a") -> false
 */
-contains_any :: proc(s, chars: string) -> bool {
+contains_any :: proc "contextless" (s, chars: string) -> bool {
 	return index_any(s, chars) >= 0
 }
 
@@ -159,7 +159,7 @@ contains_any :: proc(s, chars: string) -> bool {
 	strings.rune_count("test") -> 4
 	strings.rune_count("testö") -> 5, where len("testö") -> 6
 */
-rune_count :: proc(s: string) -> int {
+rune_count :: proc "contextless" (s: string) -> int {
 	return utf8.rune_count_in_string(s)
 }
 
@@ -172,7 +172,7 @@ rune_count :: proc(s: string) -> int {
 	strings.equal_fold("Test", "tEsT") -> true
 	strings.equal_fold("test", "tes") -> false
 */
-equal_fold :: proc(u, v: string) -> bool {
+equal_fold :: proc "contextless" (u, v: string) -> bool {
 	s, t := u, v
 	loop: for s != "" && t != "" {
 		sr, tr: rune
@@ -223,7 +223,7 @@ equal_fold :: proc(u, v: string) -> bool {
 	strings.prefix_length("telephone", "te") -> 2
 	strings.prefix_length("testing", "est") -> 0
 */
-prefix_length :: proc(a, b: string) -> (n: int) {
+prefix_length :: proc "contextless" (a, b: string) -> (n: int) {
 	_len := min(len(a), len(b))
 
 	// Scan for matches including partial codepoints.
@@ -255,7 +255,7 @@ prefix_length :: proc(a, b: string) -> (n: int) {
 	strings.has_prefix("telephone", "te") -> true
 	strings.has_prefix("testing", "est") -> false
 */
-has_prefix :: proc(s, prefix: string) -> bool {
+has_prefix :: proc "contextless" (s, prefix: string) -> bool {
 	return len(s) >= len(prefix) && s[0:len(prefix)] == prefix
 }
 
@@ -267,7 +267,7 @@ has_prefix :: proc(s, prefix: string) -> bool {
 	strings.has_suffix("todo.doc", ".txt") -> false
 	strings.has_suffix("todo.doc.txt", ".txt") -> true
 */
-has_suffix :: proc(s, suffix: string) -> bool {
+has_suffix :: proc "contextless" (s, suffix: string) -> bool {
 	return len(s) >= len(suffix) && s[len(s)-len(suffix):] == suffix
 }
 
@@ -520,7 +520,7 @@ split_after_n :: proc(s, sep: string, n: int, allocator := context.allocator) ->
 }
 
 @private
-_split_iterator :: proc(s: ^string, sep: string, sep_save: int) -> (res: string, ok: bool) {
+_split_iterator :: proc "contextless" (s: ^string, sep: string, sep_save: int) -> (res: string, ok: bool) {
 	// stop once the string is empty or nil
 	if s == nil || len(s^) == 0 {
 		return
@@ -556,7 +556,7 @@ _split_iterator :: proc(s: ^string, sep: string, sep_save: int) -> (res: string,
 		fmt.eprintln(str) // every loop -> a b c d e
 	}
 */
-split_by_byte_iterator :: proc(s: ^string, sep: u8) -> (res: string, ok: bool) {
+split_by_byte_iterator :: proc "contextless" (s: ^string, sep: u8) -> (res: string, ok: bool) {
 	m := index_byte(s^, sep)
 	if m < 0 {
 		// not found
@@ -580,7 +580,7 @@ split_by_byte_iterator :: proc(s: ^string, sep: u8) -> (res: string, ok: bool) {
 		fmt.eprintln(str) // every loop -> a b c d e
 	}
 */
-split_iterator :: proc(s: ^string, sep: string) -> (string, bool) {
+split_iterator :: proc "contextless" (s: ^string, sep: string) -> (string, bool) {
 	return _split_iterator(s, sep, 0)
 }
 
@@ -593,13 +593,13 @@ split_iterator :: proc(s: ^string, sep: string) -> (string, bool) {
 		fmt.eprintln(str) // every loop -> a. b. c. d. e
 	}
 */
-split_after_iterator :: proc(s: ^string, sep: string) -> (string, bool) {
+split_after_iterator :: proc "contextless" (s: ^string, sep: string) -> (string, bool) {
 	return _split_iterator(s, sep, len(sep))
 }
 
 
 @(private)
-_trim_cr :: proc(s: string) -> string {
+_trim_cr :: proc "contextless" (s: string) -> string {
 	n := len(s)
 	if n > 0 {
 		if s[n-1] == '\r' {
@@ -717,7 +717,7 @@ split_lines_after_iterator :: proc(s: ^string) -> (line: string, ok: bool) {
 	strings.index_byte("test", 'x') -> -1
 	strings.index_byte("teäst", 'ä') -> -1
 */
-index_byte :: proc(s: string, c: byte) -> int {
+index_byte :: proc "contextless" (s: string, c: byte) -> int {
 	for i := 0; i < len(s); i += 1 {
 		if s[i] == c {
 			return i
@@ -735,7 +735,7 @@ index_byte :: proc(s: string, c: byte) -> int {
 	strings.index_byte("test", 'x') -> -1
 	strings.index_byte("teäst", 'ä') -> -1
 */
-last_index_byte :: proc(s: string, c: byte) -> int {
+last_index_byte :: proc "contextless" (s: string, c: byte) -> int {
 	for i := len(s)-1; i >= 0; i -= 1 {
 		if s[i] == c {
 			return i
@@ -758,7 +758,7 @@ last_index_byte :: proc(s: string, c: byte) -> int {
 	strings.index_rune("abcädef", 'e') -> 6
 	strings.index_rune("abcädef", 'f') -> 7	
 */
-index_rune :: proc(s: string, r: rune) -> int {
+index_rune :: proc "contextless" (s: string, r: rune) -> int {
 	switch {
 	case u32(r) < utf8.RUNE_SELF:
 		return index_byte(s, byte(r))
@@ -789,8 +789,8 @@ index_rune :: proc(s: string, r: rune) -> int {
 	strings.index("test", "st") -> 2
 	strings.index("test", "tt") -> -1
 */
-index :: proc(s, substr: string) -> int {
-	hash_str_rabin_karp :: proc(s: string) -> (hash: u32 = 0, pow: u32 = 1) {
+index :: proc "contextless" (s, substr: string) -> int {
+	hash_str_rabin_karp :: proc "contextless" (s: string) -> (hash: u32 = 0, pow: u32 = 1) {
 		for i := 0; i < len(s); i += 1 {
 			hash = hash*PRIME_RABIN_KARP + u32(s[i])
 		}
@@ -847,8 +847,8 @@ index :: proc(s, substr: string) -> int {
 	strings.index("test", "st") -> 2
 	strings.index("test", "tt") -> -1
 */
-last_index :: proc(s, substr: string) -> int {
-	hash_str_rabin_karp_reverse :: proc(s: string) -> (hash: u32 = 0, pow: u32 = 1) {
+last_index :: proc "contextless" (s, substr: string) -> int {
+	hash_str_rabin_karp_reverse :: proc "contextless" (s: string) -> (hash: u32 = 0, pow: u32 = 1) {
 		for i := len(s) - 1; i >= 0; i -= 1 {
 			hash = hash*PRIME_RABIN_KARP + u32(s[i])
 		}
@@ -904,7 +904,7 @@ last_index :: proc(s, substr: string) -> int {
 	strings.index_any("test", "set") -> 0
 	strings.index_any("test", "x") -> -1
 */
-index_any :: proc(s, chars: string) -> int {
+index_any :: proc "contextless" (s, chars: string) -> int {
 	if chars == "" {
 		return -1
 	}
@@ -946,7 +946,7 @@ index_any :: proc(s, chars: string) -> int {
 	strings.last_index_any("test", "set") -> 3
 	strings.last_index_any("test", "x") -> -1
 */
-last_index_any :: proc(s, chars: string) -> int {
+last_index_any :: proc "contextless" (s, chars: string) -> int {
 	if chars == "" {
 		return -1
 	}
@@ -1005,7 +1005,7 @@ last_index_any :: proc(s, chars: string) -> int {
 	strings.count("abbccc", "ab") -> 1
 	strings.count("abbccc", " ") -> 0
 */
-count :: proc(s, substr: string) -> int {
+count :: proc "contextless" (s, substr: string) -> int {
 	if len(substr) == 0 { // special case
 		return rune_count(s) + 1
 	}
@@ -1153,7 +1153,7 @@ remove_all :: proc(s, key: string, allocator := context.allocator) -> (output: s
 @(private) _ascii_space := [256]bool{'\t' = true, '\n' = true, '\v' = true, '\f' = true, '\r' = true, ' ' = true}
 
 // return true when the `r` rune is '\t', '\n', '\v', '\f', '\r' or ' '
-is_ascii_space :: proc(r: rune) -> bool {
+is_ascii_space :: proc "contextless" (r: rune) -> bool {
 	if r < utf8.RUNE_SELF {
 		return _ascii_space[u8(r)]
 	}
@@ -1161,7 +1161,7 @@ is_ascii_space :: proc(r: rune) -> bool {
 }
 
 // returns true when the `r` rune is any asci or utf8 based whitespace
-is_space :: proc(r: rune) -> bool {
+is_space :: proc "contextless" (r: rune) -> bool {
 	if r < 0x2000 {
 		switch r {
 		case '\t', '\n', '\v', '\f', '\r', ' ', 0x85, 0xa0, 0x1680:
@@ -1180,7 +1180,7 @@ is_space :: proc(r: rune) -> bool {
 }
 
 // returns true when the `r` rune is a nul byte
-is_null :: proc(r: rune) -> bool {
+is_null :: proc "contextless" (r: rune) -> bool {
 	return r == 0x0000
 }
 
@@ -1197,7 +1197,21 @@ is_null :: proc(r: rune) -> bool {
 	strings.index_proc("abcabc", call, false) -> 1
 	strings.index_proc("xyz", call) -> -1
 */
-index_proc :: proc(s: string, p: proc(rune) -> bool, truth := true) -> int {
+index_proc :: proc {
+	_index_proc_odin,
+	_index_proc_contextless,
+}
+@(private)
+_index_proc_odin :: proc "odin" (s: string, p: proc "odin" (rune) -> bool, truth := true) -> int {
+	for r, i in s {
+		if p(r) == truth {
+			return i
+		}
+	}
+	return -1
+}
+@(private)
+_index_proc_contextless :: proc "contextless" (s: string, p: proc "contextless" (rune) -> bool, truth := true) -> int {
 	for r, i in s {
 		if p(r) == truth {
 			return i
@@ -1207,7 +1221,23 @@ index_proc :: proc(s: string, p: proc(rune) -> bool, truth := true) -> int {
 }
 
 // same as `index_proc` but with a `p` procedure taking a rawptr for state
-index_proc_with_state :: proc(s: string, p: proc(rawptr, rune) -> bool, state: rawptr, truth := true) -> int {
+index_proc_with_state :: proc {
+	_index_proc_with_state_odin,
+	_index_proc_with_state_contextless,
+}
+
+@(private)
+_index_proc_with_state_odin :: proc "odin" (s: string, p: proc "odin" (rawptr, rune) -> bool, state: rawptr, truth := true) -> int {
+	for r, i in s {
+		if p(state, r) == truth {
+			return i
+		}
+	}
+	return -1
+}
+
+@(private)
+_index_proc_with_state_contextless :: proc "contextless" (s: string, p: proc "contextless" (rawptr, rune) -> bool, state: rawptr, truth := true) -> int {
 	for r, i in s {
 		if p(state, r) == truth {
 			return i
@@ -1217,7 +1247,26 @@ index_proc_with_state :: proc(s: string, p: proc(rawptr, rune) -> bool, state: r
 }
 
 // same as `index_proc` but runs through the string in reverse
-last_index_proc :: proc(s: string, p: proc(rune) -> bool, truth := true) -> int {
+last_index_proc :: proc {
+	_last_index_proc_odin,
+	_last_index_proc_contextless,
+}
+
+@(private)
+_last_index_proc_odin :: proc "odin" (s: string, p: proc "odin" (rune) -> bool, truth := true) -> int {
+	// TODO(bill): Probably use Rabin-Karp Search
+	for i := len(s); i > 0; {
+		r, size := utf8.decode_last_rune_in_string(s[:i])
+		i -= size
+		if p(r) == truth {
+			return i
+		}
+	}
+	return -1
+}
+
+@(private)
+_last_index_proc_contextless :: proc "contextless" (s: string, p: proc "contextless" (rune) -> bool, truth := true) -> int {
 	// TODO(bill): Probably use Rabin-Karp Search
 	for i := len(s); i > 0; {
 		r, size := utf8.decode_last_rune_in_string(s[:i])
@@ -1230,7 +1279,26 @@ last_index_proc :: proc(s: string, p: proc(rune) -> bool, truth := true) -> int 
 }
 
 // same as `index_proc_with_state` but runs through the string in reverse
-last_index_proc_with_state :: proc(s: string, p: proc(rawptr, rune) -> bool, state: rawptr, truth := true) -> int {
+last_index_proc_with_state :: proc {
+	_last_index_proc_with_state_odin,
+	_last_index_proc_with_state_contextless,
+}
+
+@(private)
+_last_index_proc_with_state_odin :: proc "odin" (s: string, p: proc "odin" (rawptr, rune) -> bool, state: rawptr, truth := true) -> int {
+	// TODO(bill): Probably use Rabin-Karp Search
+	for i := len(s); i > 0; {
+		r, size := utf8.decode_last_rune_in_string(s[:i])
+		i -= size
+		if p(state, r) == truth {
+			return i
+		}
+	}
+	return -1
+}
+
+@(private)
+_last_index_proc_with_state_contextless :: proc "contextless" (s: string, p: proc "contextless" (rawptr, rune) -> bool, state: rawptr, truth := true) -> int {
 	// TODO(bill): Probably use Rabin-Karp Search
 	for i := len(s); i > 0; {
 		r, size := utf8.decode_last_rune_in_string(s[:i])
@@ -1252,7 +1320,22 @@ last_index_proc_with_state :: proc(s: string, p: proc(rawptr, rune) -> bool, sta
 	}
 	strings.trim_left_proc("testing", find) -> "ing"
 */
-trim_left_proc :: proc(s: string, p: proc(rune) -> bool) -> string {
+trim_left_proc :: proc {
+	_trim_left_proc_odin,
+	_trim_left_proc_contextless,
+}
+
+@(private)
+_trim_left_proc_odin :: proc "odin" (s: string, p: proc "odin" (rune) -> bool) -> string {
+	i := index_proc(s, p, false)
+	if i == -1 {
+		return ""
+	}
+	return s[i:]
+}
+
+@(private)
+_trim_left_proc_contextless :: proc "contextless" (s: string, p: proc "contextless" (rune) -> bool) -> string {
 	i := index_proc(s, p, false)
 	if i == -1 {
 		return ""
@@ -1264,7 +1347,22 @@ trim_left_proc :: proc(s: string, p: proc(rune) -> bool) -> string {
 	trims the input string `s` until the procedure `p` with state returns false
 	returns an empty string when no match was found at all
 */
-trim_left_proc_with_state :: proc(s: string, p: proc(rawptr, rune) -> bool, state: rawptr) -> string {
+trim_left_proc_with_state :: proc {
+	_trim_left_proc_with_state_odin,
+	_trim_left_proc_with_state_contextless,
+}
+
+@(private)
+_trim_left_proc_with_state_odin :: proc "odin" (s: string, p: proc "odin" (rawptr, rune) -> bool, state: rawptr) -> string {
+	i := index_proc_with_state(s, p, state, false)
+	if i == -1 {
+		return ""
+	}
+	return s[i:]
+}
+
+@(private)
+_trim_left_proc_with_state_contextless :: proc "contextless" (s: string, p: proc "contextless" (rawptr, rune) -> bool, state: rawptr) -> string {
 	i := index_proc_with_state(s, p, state, false)
 	if i == -1 {
 		return ""
@@ -1282,7 +1380,25 @@ trim_left_proc_with_state :: proc(s: string, p: proc(rawptr, rune) -> bool, stat
 	}
 	strings.trim_left_proc("testing", find) -> "test"
 */
-trim_right_proc :: proc(s: string, p: proc(rune) -> bool) -> string {
+trim_right_proc :: proc {
+	_trim_right_proc_odin,
+	_trim_right_proc_contextless,
+}
+
+@(private)
+_trim_right_proc_odin :: proc "odin" (s: string, p: proc "odin" (rune) -> bool) -> string {
+	i := last_index_proc(s, p, false)
+	if i >= 0 && s[i] >= utf8.RUNE_SELF {
+		_, w := utf8.decode_rune_in_string(s[i:])
+		i += w
+	} else {
+		i += 1
+	}
+	return s[0:i]
+}
+
+@(private)
+_trim_right_proc_contextless :: proc "contextless" (s: string, p: proc "contextless" (rune) -> bool) -> string {
 	i := last_index_proc(s, p, false)
 	if i >= 0 && s[i] >= utf8.RUNE_SELF {
 		_, w := utf8.decode_rune_in_string(s[i:])
@@ -1297,7 +1413,25 @@ trim_right_proc :: proc(s: string, p: proc(rune) -> bool) -> string {
 	trims the input string `s` from the right until the procedure `p` with state returns false
 	returns an empty string when no match was found at all
 */
-trim_right_proc_with_state :: proc(s: string, p: proc(rawptr, rune) -> bool, state: rawptr) -> string {
+trim_right_proc_with_state :: proc {
+	_trim_right_proc_with_state_odin,
+	_trim_right_proc_with_state_contextless,
+}
+
+@(private)
+_trim_right_proc_with_state_odin :: proc "odin" (s: string, p: proc "odin" (rawptr, rune) -> bool, state: rawptr) -> string {
+	i := last_index_proc_with_state(s, p, state, false)
+	if i >= 0 && s[i] >= utf8.RUNE_SELF {
+		_, w := utf8.decode_rune_in_string(s[i:])
+		i += w
+	} else {
+		i += 1
+	}
+	return s[0:i]
+}
+
+@(private)
+_trim_right_proc_with_state_contextless :: proc "contextless" (s: string, p: proc "contextless" (rawptr, rune) -> bool, state: rawptr) -> string {
 	i := last_index_proc_with_state(s, p, state, false)
 	if i >= 0 && s[i] >= utf8.RUNE_SELF {
 		_, w := utf8.decode_rune_in_string(s[i:])
@@ -1309,7 +1443,7 @@ trim_right_proc_with_state :: proc(s: string, p: proc(rawptr, rune) -> bool, sta
 }
 
 // procedure for `trim_*_proc` variants, which has a string rawptr cast + rune comparison
-is_in_cutset :: proc(state: rawptr, r: rune) -> bool {
+is_in_cutset :: proc "contextless" (state: rawptr, r: rune) -> bool {
 	if state == nil {
 		return false
 	}
@@ -1323,7 +1457,7 @@ is_in_cutset :: proc(state: rawptr, r: rune) -> bool {
 }
 
 // trims the `cutset` string from the `s` string
-trim_left :: proc(s: string, cutset: string) -> string {
+trim_left :: proc "contextless" (s: string, cutset: string) -> string {
 	if s == "" || cutset == "" {
 		return s
 	}
@@ -1332,7 +1466,7 @@ trim_left :: proc(s: string, cutset: string) -> string {
 }
 
 // trims the `cutset` string from the `s` string from the right
-trim_right :: proc(s: string, cutset: string) -> string {
+trim_right :: proc "contextless" (s: string, cutset: string) -> string {
 	if s == "" || cutset == "" {
 		return s
 	}
@@ -1341,37 +1475,37 @@ trim_right :: proc(s: string, cutset: string) -> string {
 }
 
 // trims the `cutset` string from the `s` string, both from left and right
-trim :: proc(s: string, cutset: string) -> string {
+trim :: proc "contextless" (s: string, cutset: string) -> string {
 	return trim_right(trim_left(s, cutset), cutset)
 }
 
 // trims until a valid non space rune: "\t\txyz\t\t" -> "xyz\t\t"
-trim_left_space :: proc(s: string) -> string {
+trim_left_space :: proc "contextless" (s: string) -> string {
 	return trim_left_proc(s, is_space)
 }
 
 // trims from the right until a valid non space rune: "\t\txyz\t\t" -> "\t\txyz"
-trim_right_space :: proc(s: string) -> string {
+trim_right_space :: proc "contextless" (s: string) -> string {
 	return trim_right_proc(s, is_space)
 }
 
 // trims from both sides until a valid non space rune: "\t\txyz\t\t" -> "xyz"
-trim_space :: proc(s: string) -> string {
+trim_space :: proc "contextless" (s: string) -> string {
 	return trim_right_space(trim_left_space(s))
 }
 
 // trims nul runes from the left: "\x00\x00testing\x00\x00" -> "testing\x00\x00"
-trim_left_null :: proc(s: string) -> string {
+trim_left_null :: proc "contextless" (s: string) -> string {
 	return trim_left_proc(s, is_null)
 }
 
 // trims nul runes from the right: "\x00\x00testing\x00\x00" -> "\x00\x00testing"
-trim_right_null :: proc(s: string) -> string {
+trim_right_null :: proc "contextless" (s: string) -> string {
 	return trim_right_proc(s, is_null)
 }
 
 // trims nul runes from both sides: "\x00\x00testing\x00\x00" -> "testing"
-trim_null :: proc(s: string) -> string {
+trim_null :: proc "contextless" (s: string) -> string {
 	return trim_right_null(trim_left_null(s))
 }
 
@@ -1382,7 +1516,7 @@ trim_null :: proc(s: string) -> string {
 	strings.trim_prefix("testing", "test") -> "ing"
 	strings.trim_prefix("testing", "abc") -> "testing"
 */
-trim_prefix :: proc(s, prefix: string) -> string {
+trim_prefix :: proc "contextless" (s, prefix: string) -> string {
 	if has_prefix(s, prefix) {
 		return s[len(prefix):]
 	}
@@ -1396,7 +1530,7 @@ trim_prefix :: proc(s, prefix: string) -> string {
 	strings.trim_suffix("todo.txt", ".txt") -> "todo"
 	strings.trim_suffix("todo.doc", ".txt") -> "todo.doc"
 */
-trim_suffix :: proc(s, suffix: string) -> string {
+trim_suffix :: proc "contextless" (s, suffix: string) -> string {
 	if has_suffix(s, suffix) {
 		return s[:len(s)-len(suffix)]
 	}
@@ -1664,7 +1798,7 @@ expand_tabs :: proc(s: string, tab_size: int, allocator := context.allocator) ->
 	strings.partition(text, "hi") -> head: "testing t", match: "hi", tail: "s out"
 	strings.partition(text, "xyz") -> head: "testing this out", match: "", tail: ""
 */
-partition :: proc(str, sep: string) -> (head, match, tail: string) {
+partition :: proc "contextless" (str, sep: string) -> (head, match, tail: string) {
 	i := index(str, sep)
 	if i == -1 {
 		head = str
@@ -1826,7 +1960,8 @@ fields :: proc(s: string, allocator := context.allocator) -> []string #no_bounds
 //
 // fields_proc makes no guarantee about the order in which it calls f(ch)
 // it assumes that `f` always returns the same value for a given ch
-fields_proc :: proc(s: string, f: proc(rune) -> bool, allocator := context.allocator) -> []string #no_bounds_check {
+@(private)
+_fields_proc_callable :: proc(s: string, f: $F, allocator := context.allocator) -> []string #no_bounds_check {
 	substrings := make([dynamic]string, 0, 32, allocator)
 
 	start, end := -1, -1
@@ -1853,10 +1988,24 @@ fields_proc :: proc(s: string, f: proc(rune) -> bool, allocator := context.alloc
 	return substrings[:]
 }
 
+@(private)
+_fields_proc_odin :: proc(s: string, f: proc "odin" (rune) -> bool, allocator := context.allocator) -> []string {
+	return _fields_proc_callable(s, f, allocator)
+}
+
+@(private)
+_fields_proc_contextless :: proc(s: string, f: proc "contextless" (rune) -> bool, allocator := context.allocator) -> []string {
+	return _fields_proc_callable(s, f, allocator)
+}
+
+fields_proc :: proc {
+	_fields_proc_odin,
+	_fields_proc_contextless,
+}
 
 // `fields_iterator` returns the first run of characters in `s` that does not contain white space, defined by `unicode.is_space`
 // `s` will then start from any space after the substring, or be an empty string if the substring was the remaining characters
-fields_iterator :: proc(s: ^string) -> (field: string, ok: bool) {
+fields_iterator :: proc "contextless" (s: ^string) -> (field: string, ok: bool) {
 	start, end := -1, -1
 	for r, offset in s {
 		end = offset
