@@ -122,10 +122,6 @@ foreign lib {
 	zip_end :: proc(pZip: ^zip_archive) -> bool ---
 }
 
-/*
-Because MINIZ_NO_STDIO is defined, some functions are not compiled in due to stdio dependency.
-I want to keep C dependencies to a minimum, so I reimplemented some procedures in pure Odin.
-*/
 @private
 zip_set_error :: #force_inline proc "contextless" (zip: ^zip_archive, err_num: zip_error) -> bool {
 	if zip != nil {
