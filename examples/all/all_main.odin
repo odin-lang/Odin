@@ -171,6 +171,7 @@ _ :: varint
 _ :: xml
 _ :: fmt
 _ :: hash
+_ :: xxhash
 _ :: image
 _ :: netpbm
 _ :: png
