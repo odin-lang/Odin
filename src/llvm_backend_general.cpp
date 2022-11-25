@@ -2868,7 +2868,7 @@ lbValue lb_build_cond(lbProcedure *p, Ast *cond, lbBlock *true_block, lbBlock *f
 }
 
 
-lbAddr lb_add_local(lbProcedure *p, Type *type, Entity *e, bool zero_init, i32 param_index, bool force_no_init) {
+lbAddr lb_add_local(lbProcedure *p, Type *type, Entity *e, bool zero_init, bool force_no_init) {
 	GB_ASSERT(p->decl_block != p->curr_block);
 	LLVMPositionBuilderAtEnd(p->builder, p->decl_block->block);
 
@@ -2922,7 +2922,7 @@ lbAddr lb_add_local_generated(lbProcedure *p, Type *type, bool zero_init) {
 }
 
 lbAddr lb_add_local_generated_temp(lbProcedure *p, Type *type, i64 min_alignment) {
-	lbAddr res = lb_add_local(p, type, nullptr, false, 0, true);
+	lbAddr res = lb_add_local(p, type, nullptr, false, true);
 	lb_try_update_alignment(res.addr, cast(unsigned)min_alignment);
 	return res;
 }

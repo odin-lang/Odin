@@ -1,4 +1,3 @@
-
 LLVMValueRef lb_call_intrinsic(lbProcedure *p, const char *name, LLVMValueRef* args, unsigned arg_count, LLVMTypeRef* types, unsigned type_count)
 {
 	unsigned id = LLVMLookupIntrinsicID(name, gb_strlen(name));
@@ -596,16 +595,69 @@ void lb_begin_procedure_body(lbProcedure *p) {
 				if (e->token.string != "") {
 					GB_ASSERT(!is_blank_ident(e->token));
 
-					// NOTE(bill): Don't even bother trying to optimize this with the return ptr value
-					// This will violate the defer rules if you do:
-					//         foo :: proc() -> (x, y: T) {
-					//                 defer x = ... // defer is executed after the `defer`
-					//                 return // the values returned should be zeroed
-					//         }
-					// NOTE(bill): REALLY, don't even bother.
-					//
-					// IMPORTANT NOTE(bill): REALLY, don't even bother!!!!!!
-					lbAddr res = lb_add_local(p, e->type, e);
+					lbAddr res = {};
+					if (p->entity && p->entity->decl_info &&
+					    p->entity->decl_info->defer_use_checked &&
+					    p->entity->decl_info->defer_used == 0) {
+
+						// NOTE(bill): this is a bodge to get around the issue of the problem BELOW
+						// We check to see if we ever use a defer statement ever within a procedure and if it
+						// if it never happens, see if you can possibly do take the return value pointer
+						//
+						// NOTE(bill): this could be buggy in that I have missed a case where `defer` was used
+						//
+						// TODO(bill): This could be optimized to check to see where a `defer` only uses
+						// the variable in question
+
+						bool has_return_ptr = p->return_ptr.addr.value != nullptr;
+						lbValue ptr = {};
+
+						if (ft->multiple_return_original_type != nullptr) {
+							isize the_offset = -1;
+							if (i+1 < results->variables.count) {
+								the_offset = cast(isize)param_offset + ft->original_arg_count + i;
+							} else if (has_return_ptr) {
+								GB_ASSERT(i+1 == results->variables.count);
+								the_offset = 0;
+							}
+							if (the_offset >= 0) {
+								lbValue ptr = {};
+								ptr.value = LLVMGetParam(p->value, cast(unsigned)the_offset);
+								ptr.type = alloc_type_pointer(e->type);
+
+
+							}
+						} else if (has_return_ptr) {
+							lbValue ptr = p->return_ptr.addr;
+
+							if (results->variables.count > 1) {
+								ptr = lb_emit_tuple_ep(p, ptr, cast(i32)i);
+							}
+							GB_ASSERT(is_type_pointer(ptr.type));
+							GB_ASSERT(are_types_identical(type_deref(ptr.type), e->type));
+						}
+
+						if (ptr.value != nullptr) {
+							lb_add_entity(p->module, e, ptr);
+							lb_add_debug_local_variable(p, ptr.value, e->type, e->token);
+							// NOTE(bill): no need to zero on the callee side as it is zeroed on the caller side
+
+							res = lb_addr(ptr);
+						}
+					}
+
+					if (res.addr.type == nullptr) {
+						// NOTE(bill): Don't even bother trying to optimize this with the return ptr value
+						// This will violate the defer rules if you do:
+						//         foo :: proc() -> (x, y: T) {
+						//                 defer x = ... // defer is executed after the `defer`
+						//                 return // the values returned should be zeroed
+						//         }
+						// NOTE(bill): REALLY, don't even bother.
+						//
+						// IMPORTANT NOTE(bill): REALLY, don't even bother!!!!!!
+						res = lb_add_local(p, e->type, e);
+					}
 
 					if (e->Variable.param_value.kind != ParameterValue_Invalid) {
 						lbValue c = lb_handle_param_value(p, e->type, e->Variable.param_value, e->token.pos);
@@ -1006,7 +1058,7 @@ lbValue lb_emit_call(lbProcedure *p, lbValue value, Array<lbValue> const &args, 
 			GB_ASSERT(rt->kind == Type_Tuple);
 			for (isize j = 0; j < rt->Tuple.variables.count-1; j++) {
 				Type *partial_return_type = rt->Tuple.variables[j]->type;
-				lbValue partial_return_ptr = lb_add_local_generated(p, partial_return_type, true).addr;
+				lbValue partial_return_ptr = lb_add_local(p, partial_return_type, nullptr, true, false).addr;
 				array_add(&processed_args, partial_return_ptr);
 			}
 			rt = reduce_tuple_to_single_type(rt->Tuple.variables[rt->Tuple.variables.count-1]->type);
