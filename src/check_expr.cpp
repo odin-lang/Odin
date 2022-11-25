@@ -285,6 +285,37 @@ void error_operand_no_value(Operand *o) {
 	}
 }
 
+void add_map_get_dependencies(CheckerContext *c) {
+	if (build_context.use_static_map_calls) {
+		add_package_dependency(c, "runtime", "map_desired_position");
+		add_package_dependency(c, "runtime", "map_probe_distance");
+	} else {
+		add_package_dependency(c, "runtime", "__dynamic_map_get");
+	}
+}
+
+void add_map_set_dependencies(CheckerContext *c) {
+	init_core_source_code_location(c->checker);
+
+	if (t_map_set_proc == nullptr) {
+		Type *map_set_args[5] = {/*map*/t_rawptr, /*hash*/t_uintptr, /*key*/t_rawptr, /*value*/t_rawptr, /*#caller_location*/t_source_code_location};
+		t_map_set_proc = alloc_type_proc_from_types(map_set_args, gb_count_of(map_set_args), t_rawptr, false, ProcCC_Odin);
+	}
+
+	if (build_context.use_static_map_calls) {
+		add_package_dependency(c, "runtime", "__dynamic_map_check_grow");
+		add_package_dependency(c, "runtime", "map_insert_hash_dynamic");
+	} else {
+		add_package_dependency(c, "runtime", "__dynamic_map_set");
+	}
+}
+
+void add_map_reserve_dependencies(CheckerContext *c) {
+	init_core_source_code_location(c->checker);
+	add_package_dependency(c, "runtime", "__dynamic_map_reserve");
+}
+
+
 
 void check_scope_decls(CheckerContext *c, Slice<Ast *> const &nodes, isize reserve_size) {
 	Scope *s = c->scope;
@@ -580,6 +611,9 @@ i64 check_distance_between_types(CheckerContext *c, Operand *operand, Type *type
 		}
 		return -1;
 	}
+	if (operand->mode == Addressing_ProcGroup && !is_type_proc(type)) {
+		return -1;
+	}
 
 	Type *s = operand->type;
 
@@ -731,16 +765,13 @@ i64 check_distance_between_types(CheckerContext *c, Operand *operand, Type *type
 		}
 
 		// TODO(bill): Determine which rule is a better on in practice
-		#if 1
-			if (dst->Union.variants.count == 1) {
-				Type *vt = dst->Union.variants[0];
-				i64 score = check_distance_between_types(c, operand, vt);
-				if (score >= 0) {
-					return score+2;
-				}
+		if (dst->Union.variants.count == 1) {
+			Type *vt = dst->Union.variants[0];
+			i64 score = check_distance_between_types(c, operand, vt);
+			if (score >= 0) {
+				return score+2;
 			}
-		#else
-			// NOTE(bill): check to see you can assign to it with one of the variants?
+		} else if (is_type_untyped(src)) {
 			i64 prev_lowest_score = -1;
 			i64 lowest_score = -1;
 			for_array(i, dst->Union.variants) {
@@ -764,7 +795,7 @@ i64 check_distance_between_types(CheckerContext *c, Operand *operand, Type *type
 					return lowest_score+2;
 				}
 			}
-		#endif
+		}
 	}
 
 	if (is_type_relative_pointer(dst)) {
@@ -972,22 +1003,24 @@ void check_assignment(CheckerContext *c, Operand *operand, Type *type, String co
 	}
 
 	if (operand->mode == Addressing_ProcGroup) {
-		Array<Entity *> procs = proc_group_entities(c, *operand);
 		bool good = false;
-		// NOTE(bill): These should be done
-		for_array(i, procs) {
-			Type *t = base_type(procs[i]->type);
-			if (t == t_invalid) {
-				continue;
-			}
-			Operand x = {};
-			x.mode = Addressing_Value;
-			x.type = t;
-			if (check_is_assignable_to(c, &x, type)) {
-				Entity *e = procs[i];
-				add_entity_use(c, operand->expr, e);
-				good = true;
-				break;
+		if (type != nullptr && is_type_proc(type)) {
+			Array<Entity *> procs = proc_group_entities(c, *operand);
+			// NOTE(bill): These should be done
+			for_array(i, procs) {
+				Type *t = base_type(procs[i]->type);
+				if (t == t_invalid) {
+					continue;
+				}
+				Operand x = {};
+				x.mode = Addressing_Value;
+				x.type = t;
+				if (check_is_assignable_to(c, &x, type)) {
+					Entity *e = procs[i];
+					add_entity_use(c, operand->expr, e);
+					good = true;
+					break;
+				}
 			}
 		}
 
@@ -1364,8 +1397,6 @@ bool is_polymorphic_type_assignable(CheckerContext *c, Type *poly, Type *source,
 			bool key   = is_polymorphic_type_assignable(c, poly->Map.key, source->Map.key, true, modify_type);
 			bool value = is_polymorphic_type_assignable(c, poly->Map.value, source->Map.value, true, modify_type);
 			if (key || value) {
-				poly->Map.entry_type = nullptr;
-				poly->Map.internal_type = nullptr;
 				poly->Map.lookup_result_type = nullptr;
 				init_map_internal_types(poly);
 				return true;
@@ -1478,7 +1509,7 @@ Entity *check_ident(CheckerContext *c, Operand *o, Ast *n, Type *named_type, Typ
 		Array<Entity *> procs = pge->entities;
 		bool skip = false;
 
-		if (type_hint != nullptr) {
+		if (type_hint != nullptr && is_type_proc(type_hint)) {
 			// NOTE(bill): These should be done
 			for_array(i, procs) {
 				Type *t = base_type(procs[i]->type);
@@ -3246,7 +3277,7 @@ void check_binary_expr(CheckerContext *c, Operand *x, Ast *node, Type *type_hint
 				check_assignment(c, x, yt->Map.key, str_lit("map 'not_in'"));
 			}
 
-			add_package_dependency(c, "runtime", "__dynamic_map_get");
+			add_map_get_dependencies(c);
 		} else if (is_type_bit_set(rhs_type)) {
 			Type *yt = base_type(rhs_type);
 
@@ -3336,6 +3367,24 @@ void check_binary_expr(CheckerContext *c, Operand *x, Ast *node, Type *type_hint
 	if (y->mode == Addressing_Builtin) {
 		x->mode = Addressing_Invalid;
 		error(y->expr, "built-in expression in binary expression");
+		return;
+	}
+	if (x->mode == Addressing_ProcGroup) {
+		x->mode = Addressing_Invalid;
+		if (x->proc_group != nullptr) {
+			error(x->expr, "procedure group '%.*s' used in binary expression", LIT(x->proc_group->token.string));
+		} else {
+			error(x->expr, "procedure group used in binary expression");
+		}
+		return;
+	}
+	if (y->mode == Addressing_ProcGroup) {
+		x->mode = Addressing_Invalid;
+		if (x->proc_group != nullptr) {
+			error(y->expr, "procedure group '%.*s' used in binary expression", LIT(y->proc_group->token.string));
+		} else {
+			error(y->expr, "procedure group used in binary expression");
+		}
 		return;
 	}
 
@@ -5496,6 +5545,8 @@ CALL_ARGUMENT_CHECKER(check_named_call_arguments) {
 			GB_ASSERT(is_type_proc(gept));
 			proc_type = gept;
 			pt = &gept->Proc;
+		} else {
+			err = CallArgumentError_WrongTypes;
 		}
 	}
 
@@ -5830,6 +5881,7 @@ CallArgumentData check_call_arguments(CheckerContext *c, Operand *operand, Type 
 				Entity *proc = procs[proc_index];
 				Type *pt = base_type(proc->type);
 				if (!(pt != nullptr && is_type_proc(pt))) {
+					proc_index++;
 					continue;
 				}
 
@@ -6127,6 +6179,7 @@ CallArgumentData check_call_arguments(CheckerContext *c, Operand *operand, Type 
 			}
 			result_type = t_invalid;
 		} else {
+			GB_ASSERT(valids.count == 1);
 			Ast *ident = operand->expr;
 			while (ident->kind == Ast_SelectorExpr) {
 				Ast *s = ident->SelectorExpr.selector;
@@ -8557,8 +8610,8 @@ ExprKind check_compound_literal(CheckerContext *c, Operand *o, Ast *node, Type *
 		if (build_context.no_dynamic_literals && cl->elems.count) {
 			error(node, "Compound literals of dynamic types have been disabled");
 		} else {
-			add_package_dependency(c, "runtime", "__dynamic_map_reserve");
-			add_package_dependency(c, "runtime", "__dynamic_map_set");
+			add_map_reserve_dependencies(c);
+			add_map_set_dependencies(c);
 		}
 		break;
 	}
@@ -8994,8 +9047,8 @@ ExprKind check_index_expr(CheckerContext *c, Operand *o, Ast *node, Type *type_h
 		o->type = t->Map.value;
 		o->expr = node;
 
-		add_package_dependency(c, "runtime", "__dynamic_map_get");
-		add_package_dependency(c, "runtime", "__dynamic_map_set");
+		add_map_get_dependencies(c);
+		add_map_set_dependencies(c);
 		return Expr_Expr;
 	}
 

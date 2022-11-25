@@ -38,6 +38,11 @@ jobs:
           cd tests/vendor
           make
         timeout-minutes: 10
+      - name: Odin internals tests
+        run: |
+          cd tests/internal
+          make
+        timeout-minutes: 10
       - name: Odin check examples/all for Linux i386
         run: ./odin check examples/all -vet -strict-style -target:linux_i386
         timeout-minutes: 10
@@ -85,6 +90,11 @@ jobs:
       - name: Vendor library tests
         run: |
           cd tests/vendor
+          make
+        timeout-minutes: 10
+      - name: Odin internals tests
+        run: |
+          cd tests/internal
           make
         timeout-minutes: 10
       - name: Odin check examples/all for Darwin arm64
@@ -144,6 +154,13 @@ jobs:
         run: |
           call "C:\Program Files (x86)\Microsoft Visual Studio\2019\Enterprise\VC\Auxiliary\Build\vcvars64.bat
           cd tests\vendor
+          call build.bat
+        timeout-minutes: 10
+      - name: Odin internals tests
+        shell: cmd
+        run: |
+          call "C:\Program Files (x86)\Microsoft Visual Studio\2019\Enterprise\VC\Auxiliary\Build\vcvars64.bat
+          cd tests\internal
           call build.bat
         timeout-minutes: 10
       - name: core:math/big tests

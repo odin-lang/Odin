@@ -160,10 +160,10 @@ lbProcedure *lb_create_procedure(lbModule *m, Entity *entity, bool ignore_body) 
 
 	switch (entity->Procedure.optimization_mode) {
 	case ProcedureOptimizationMode_None:
-		lb_add_attribute_to_proc(m, p->value, "optnone");
 		break;
 	case ProcedureOptimizationMode_Minimal:
 		lb_add_attribute_to_proc(m, p->value, "optnone");
+		lb_add_attribute_to_proc(m, p->value, "noinline");
 		break;
 	case ProcedureOptimizationMode_Size:
 		lb_add_attribute_to_proc(m, p->value, "optsize");
@@ -586,6 +586,7 @@ void lb_begin_procedure_body(lbProcedure *p) {
 					//                 defer x = ... // defer is executed after the `defer`
 					//                 return // the values returned should be zeroed
 					//         }
+					// NOTE(bill): REALLY, don't even bother.
 					lbAddr res = lb_add_local(p, e->type, e);
 					if (e->Variable.param_value.kind != ParameterValue_Invalid) {
 						lbValue c = lb_handle_param_value(p, e->type, e->Variable.param_value, e->token.pos);
@@ -1724,7 +1725,7 @@ lbValue lb_build_builtin_proc(lbProcedure *p, Ast *expr, TypeAndValue const &tv,
 				return lb_emit_struct_ev(p, val, 0);
 			} else if (t->kind == Type_Array) {
 				GB_ASSERT(t->Array.count == 1);
-				return lb_emit_array_epi(p, val, 0);
+				return lb_emit_struct_ev(p, val, 0);
 			} else {
 				GB_PANIC("Unknown type of expand_to_tuple");
 			}
@@ -2319,10 +2320,17 @@ lbValue lb_build_builtin_proc(lbProcedure *p, Ast *expr, TypeAndValue const &tv,
 
 
 	case BuiltinProc_type_equal_proc:
-		return lb_get_equal_proc_for_type(p->module, ce->args[0]->tav.type);
+		return lb_equal_proc_for_type(p->module, ce->args[0]->tav.type);
 
 	case BuiltinProc_type_hasher_proc:
-		return lb_get_hasher_proc_for_type(p->module, ce->args[0]->tav.type);
+		return lb_hasher_proc_for_type(p->module, ce->args[0]->tav.type);
+
+	case BuiltinProc_type_map_info:
+		return lb_gen_map_info_ptr(p->module, ce->args[0]->tav.type);
+
+	case BuiltinProc_type_map_cell_info:
+		return lb_gen_map_cell_info_ptr(p->module, ce->args[0]->tav.type);
+
 
 	case BuiltinProc_fixed_point_mul:
 	case BuiltinProc_fixed_point_div:

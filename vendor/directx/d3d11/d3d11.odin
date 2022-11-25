@@ -53,11 +53,13 @@ foreign d3d11 {
 	) -> HRESULT ---
 }
 
-foreign d3d11 {
-	WKPDID_D3DDebugObjectNameW: GUID
-	WKPDID_CommentStringW:      GUID
-}
+WKPDID_D3DDebugObjectNameW_UUID_STRING :: "4CCA5FD8-921F-42C8-8566-70CAF2A9B741"
+WKPDID_D3DDebugObjectNameW_UUID        := &IID{0x4cca5fd8, 0x921f, 0x42c8, {0x85, 0x66, 0x70, 0xca, 0xf2, 0xa9, 0xb7, 0x41}}
 
+// TODO(bill): Convert these to actual internal UUID
+foreign d3d11 {
+	WKPDID_CommentStringW: GUID
+}
 @(link_prefix="D3D_")
 foreign d3d11 {
 	TEXTURE_LAYOUT_ROW_MAJOR:             GUID

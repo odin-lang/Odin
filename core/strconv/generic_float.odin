@@ -284,3 +284,89 @@ round_shortest :: proc(d: ^decimal.Decimal, mant: u64, exp: int, flt: ^Float_Inf
 	}
 
 }
+
+@(private)
+decimal_to_float_bits :: proc(d: ^decimal.Decimal, info: ^Float_Info) -> (b: u64, overflow: bool) {
+	end :: proc "contextless" (d: ^decimal.Decimal, mant: u64, exp: int, info: ^Float_Info) -> (b: u64) {
+		bits := mant & (u64(1)<<info.mantbits - 1)
+		bits |= u64((exp-info.bias) & (1<<info.expbits - 1)) << info.mantbits
+		if d.neg {
+			bits |= 1<< info.mantbits << info.expbits
+		}
+		return bits
+	}
+	set_overflow :: proc "contextless" (mant: ^u64, exp: ^int, info: ^Float_Info) -> bool {
+		mant^ = 0
+		exp^ = 1<<info.expbits - 1 + info.bias
+		return true
+	}
+
+	mant: u64
+	exp: int
+	if d.decimal_point == 0 {
+		mant = 0
+		exp = info.bias
+		b = end(d, mant, exp, info)
+		return
+	}
+
+	if d.decimal_point > 310 {
+		set_overflow(&mant, &exp, info)
+		b = end(d, mant, exp, info)
+		return
+	} else if d.decimal_point < -330 {
+		mant = 0
+		exp = info.bias
+		b = end(d, mant, exp, info)
+		return
+	}
+
+	@static power_table := [?]int{1, 3, 6, 9, 13, 16, 19, 23, 26}
+
+	exp = 0
+	for d.decimal_point > 0 {
+		n := 27 if d.decimal_point >= len(power_table) else power_table[d.decimal_point]
+		decimal.shift(d, n)
+		exp += n
+	}
+	for d.decimal_point < 0 || d.decimal_point == 0 && d.digits[0] < '5' {
+		n := 27 if -d.decimal_point >= len(power_table) else power_table[-d.decimal_point]
+		decimal.shift(d, n)
+		exp -= n
+	}
+
+	// go from [0.5, 1) to [1, 2)
+	exp -= 1
+
+	if exp < info.bias + 1 {
+		n := info.bias + 1 - exp
+		decimal.shift(d, n)
+		exp += n
+	}
+
+	if (exp-info.bias) >= (1<<info.expbits - 1) {
+		set_overflow(&mant, &exp, info)
+		b = end(d, mant, exp, info)
+		return
+	}
+
+	decimal.shift(d, int(1 + info.mantbits))
+	mant = decimal.rounded_integer(d)
+
+	if mant == 2<<info.mantbits {
+		mant >>= 1
+		exp += 1
+		if (exp-info.bias) >= (1<<info.expbits - 1) {
+			set_overflow(&mant, &exp, info)
+			b = end(d, mant, exp, info)
+			return
+		}
+	}
+
+	if mant & (1<<info.mantbits) == 0 {
+		exp = info.bias
+	}
+
+	b = end(d, mant, exp, info)
+	return
+}

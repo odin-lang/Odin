@@ -273,7 +273,7 @@ length :: proc(val: any) -> int {
 		return (^runtime.Raw_Dynamic_Array)(val.data).len
 
 	case Type_Info_Map:
-		return (^runtime.Raw_Map)(val.data).entries.len
+		return runtime.map_len((^runtime.Raw_Map)(val.data)^)
 
 	case Type_Info_String:
 		if a.is_cstring {
@@ -305,7 +305,7 @@ capacity :: proc(val: any) -> int {
 		return (^runtime.Raw_Dynamic_Array)(val.data).cap
 
 	case Type_Info_Map:
-		return (^runtime.Raw_Map)(val.data).entries.cap
+		return runtime.map_cap((^runtime.Raw_Map)(val.data)^)
 	}
 	return 0
 }

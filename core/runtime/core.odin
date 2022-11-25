@@ -143,11 +143,9 @@ Type_Info_Enum :: struct {
 	values:    []Type_Info_Enum_Value,
 }
 Type_Info_Map :: struct {
-	key:              ^Type_Info,
-	value:            ^Type_Info,
-	generated_struct: ^Type_Info,
-	key_equal:        Equal_Proc,
-	key_hasher:       Hasher_Proc,
+	key:      ^Type_Info,
+	value:    ^Type_Info,
+	map_info: ^Map_Info,
 }
 Type_Info_Bit_Set :: struct {
 	elem:       ^Type_Info,
@@ -394,9 +392,32 @@ Raw_Dynamic_Array :: struct {
 	allocator: Allocator,
 }
 
+// The raw, type-erased representation of a map.
+//
+// 32-bytes on 64-bit
+// 16-bytes on 32-bit
 Raw_Map :: struct {
-	hashes:  []Map_Index,
-	entries: Raw_Dynamic_Array,
+	// A single allocation spanning all keys, values, and hashes.
+	// {
+	//   k: Map_Cell(K) * (capacity / ks_per_cell)
+	//   v: Map_Cell(V) * (capacity / vs_per_cell)
+	//   h: Map_Cell(H) * (capacity / hs_per_cell)
+	// }
+	//
+	// The data is allocated assuming 64-byte alignment, meaning the address is
+	// always a multiple of 64. This means we have 6 bits of zeros in the pointer
+	// to store the capacity. We can store a value as large as 2^6-1 or 63 in
+	// there. This conveniently is the maximum log2 capacity we can have for a map
+	// as Odin uses signed integers to represent capacity.
+	//
+	// Since the hashes are backed by Map_Hash, which is just a 64-bit unsigned
+	// integer, the cell structure for hashes is unnecessary because 64/8 is 8 and
+	// requires no padding, meaning it can be indexed as a regular array of
+	// Map_Hash directly, though for consistency sake it's written as if it were
+	// an array of Map_Cell(Map_Hash).
+	data:      uintptr,   // 8-bytes on 64-bits, 4-bytes on 32-bits
+	len:       int,       // 8-bytes on 64-bits, 4-bytes on 32-bits
+	allocator: Allocator, // 16-bytes on 64-bits, 8-bytes on 32-bits
 }
 
 Raw_Any :: struct {
