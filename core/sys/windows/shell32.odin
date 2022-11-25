@@ -21,4 +21,5 @@ foreign shell32 {
 		psa: ^SECURITY_ATTRIBUTES,
 	) -> c_int ---
 	SHFileOperationW :: proc(lpFileOp: LPSHFILEOPSTRUCTW) -> c_int ---
+	SHGetFolderPathW :: proc(hwnd: HWND, csidl: c_int, hToken: HANDLE, dwFlags: DWORD, pszPath: LPWSTR) -> HRESULT ---
 }

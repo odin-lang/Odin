@@ -1221,6 +1221,9 @@ SWP_NOREPOSITION :: SWP_NOOWNERZORDER
 SWP_DEFERERASE     :: 0x2000 // same as SWP_DEFERDRAWING
 SWP_ASYNCWINDOWPOS :: 0x4000 // same as SWP_CREATESPB
 
+CSIDL_APPDATA        :: 0x001a // <user name>\Application Data
+CSIDL_COMMON_APPDATA :: 0x0023 // All Users\Application Data
+
 HWND_TOP       :: HWND( uintptr(0))     //  0
 HWND_BOTTOM    :: HWND( uintptr(1))     //  1
 HWND_TOPMOST   :: HWND(~uintptr(0))     // -1
