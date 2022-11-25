@@ -225,13 +225,13 @@ S_ISUID :: 0o4000 // Set user id on execution
 S_ISGID :: 0o2000 // Set group id on execution
 S_ISTXT :: 0o1000 // Sticky bit
 
-S_ISLNK  :: #force_inline proc(m: u32) -> bool { return (m & S_IFMT) == S_IFLNK  }
-S_ISREG  :: #force_inline proc(m: u32) -> bool { return (m & S_IFMT) == S_IFREG  }
-S_ISDIR  :: #force_inline proc(m: u32) -> bool { return (m & S_IFMT) == S_IFDIR  }
-S_ISCHR  :: #force_inline proc(m: u32) -> bool { return (m & S_IFMT) == S_IFCHR  }
-S_ISBLK  :: #force_inline proc(m: u32) -> bool { return (m & S_IFMT) == S_IFBLK  }
-S_ISFIFO :: #force_inline proc(m: u32) -> bool { return (m & S_IFMT) == S_IFIFO  }
-S_ISSOCK :: #force_inline proc(m: u32) -> bool { return (m & S_IFMT) == S_IFSOCK }
+S_ISLNK  :: #force_inline proc "contextless" (m: u32) -> bool { return (m & S_IFMT) == S_IFLNK  }
+S_ISREG  :: #force_inline proc "contextless" (m: u32) -> bool { return (m & S_IFMT) == S_IFREG  }
+S_ISDIR  :: #force_inline proc "contextless" (m: u32) -> bool { return (m & S_IFMT) == S_IFDIR  }
+S_ISCHR  :: #force_inline proc "contextless" (m: u32) -> bool { return (m & S_IFMT) == S_IFCHR  }
+S_ISBLK  :: #force_inline proc "contextless" (m: u32) -> bool { return (m & S_IFMT) == S_IFBLK  }
+S_ISFIFO :: #force_inline proc "contextless" (m: u32) -> bool { return (m & S_IFMT) == S_IFIFO  }
+S_ISSOCK :: #force_inline proc "contextless" (m: u32) -> bool { return (m & S_IFMT) == S_IFSOCK }
 
 F_OK :: 0x00 // Test for file existance
 X_OK :: 0x01 // Test for execute permission

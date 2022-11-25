@@ -257,13 +257,13 @@ S_ISUID :: 0o4000 // Set user id on execution
 S_ISGID :: 0o2000 // Set group id on execution
 S_ISVTX :: 0o1000 // Directory restrcted delete
 
-S_ISLNK  :: #force_inline proc(m: u16) -> bool { return (m & S_IFMT) == S_IFLNK  }
-S_ISREG  :: #force_inline proc(m: u16) -> bool { return (m & S_IFMT) == S_IFREG  }
-S_ISDIR  :: #force_inline proc(m: u16) -> bool { return (m & S_IFMT) == S_IFDIR  }
-S_ISCHR  :: #force_inline proc(m: u16) -> bool { return (m & S_IFMT) == S_IFCHR  }
-S_ISBLK  :: #force_inline proc(m: u16) -> bool { return (m & S_IFMT) == S_IFBLK  }
-S_ISFIFO :: #force_inline proc(m: u16) -> bool { return (m & S_IFMT) == S_IFIFO  }
-S_ISSOCK :: #force_inline proc(m: u16) -> bool { return (m & S_IFMT) == S_IFSOCK }
+S_ISLNK  :: #force_inline proc "contextless" (m: u16) -> bool { return (m & S_IFMT) == S_IFLNK  }
+S_ISREG  :: #force_inline proc "contextless" (m: u16) -> bool { return (m & S_IFMT) == S_IFREG  }
+S_ISDIR  :: #force_inline proc "contextless" (m: u16) -> bool { return (m & S_IFMT) == S_IFDIR  }
+S_ISCHR  :: #force_inline proc "contextless" (m: u16) -> bool { return (m & S_IFMT) == S_IFCHR  }
+S_ISBLK  :: #force_inline proc "contextless" (m: u16) -> bool { return (m & S_IFMT) == S_IFBLK  }
+S_ISFIFO :: #force_inline proc "contextless" (m: u16) -> bool { return (m & S_IFMT) == S_IFIFO  }
+S_ISSOCK :: #force_inline proc "contextless" (m: u16) -> bool { return (m & S_IFMT) == S_IFSOCK }
 
 R_OK :: 4 // Test for read permission
 W_OK :: 2 // Test for write permission
