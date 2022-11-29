@@ -82,6 +82,9 @@ fnv32_no_a :: proc(data: []byte, seed := u32(0x811c9dc5)) -> u32 {
 	return h
 }
 
+fnv32 :: fnv32_no_a // NOTE(bill): Not a fan of these aliases but seems necessary
+fnv64 :: fnv64_no_a // NOTE(bill): Not a fan of these aliases but seems necessary
+
 // If you have a choice, prefer fnv64a
 @(optimization_mode="speed")
 fnv64_no_a :: proc(data: []byte, seed := u64(0xcbf29ce484222325)) -> u64 {
@@ -91,7 +94,6 @@ fnv64_no_a :: proc(data: []byte, seed := u64(0xcbf29ce484222325)) -> u64 {
 	}
 	return h
 }
-
 @(optimization_mode="speed")
 fnv32a :: proc(data: []byte, seed := u32(0x811c9dc5)) -> u32 {
 	h: u32 = seed
