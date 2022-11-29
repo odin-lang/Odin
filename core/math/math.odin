@@ -1386,7 +1386,7 @@ atan2 :: proc{
 }
 
 atan :: proc "contextless" (x: $T) -> T where intrinsics.type_is_float(T) {
-	return atan2(1, x)
+	return atan2(x, 1)
 }
 
 
