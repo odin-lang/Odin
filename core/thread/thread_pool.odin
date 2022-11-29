@@ -117,6 +117,26 @@ started_count: int
 	}
 }
 
+// Clear the waiting tasks, finish tasks that have already started processing, and reset the counts.
+// Threads stay alive and wait for new work to be added.
+pool_clear :: proc(pool: ^thread.Pool) {
+	if sync.mutex_guard(&pool.mutex) {
+		clear(&pool.tasks)
+		pool.sem_available.impl.atomic.count = 0
+	}
+
+	for intrinsics.atomic_load(&pool.num_in_processing) > 0 {
+		thread.yield()
+	}
+
+	intrinsics.atomic_store(&pool.num_waiting, 0)
+	intrinsics.atomic_store(&pool.num_outstanding, 0)
+	intrinsics.atomic_store(&pool.num_done, 0)
+	if sync.mutex_guard(&pool.mutex) {
+		clear(&pool.tasks_done)
+	}
+}
+
 // Add a task to the thread pool.
 //
 // Tasks can be added from any thread, not just the thread that created
