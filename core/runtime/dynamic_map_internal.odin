@@ -512,11 +512,8 @@ map_reserve_dynamic :: proc "odin" (#no_alias m: ^Raw_Map, #no_alias info: ^Map_
 		}
 	}
 
-	map_free_dynamic(m^, info, loc) or_return
-
 	m.data = resized.data
-
-	return nil
+	return map_free_dynamic(m^, info, loc)
 }
 
 
@@ -561,18 +558,19 @@ map_shrink_dynamic :: proc "odin" (#no_alias m: ^Raw_Map, #no_alias info: ^Map_I
 		}
 	}
 
-	map_free_dynamic(m^, info, loc) or_return
-
 	m.data = shrunk.data
-
-	return nil
+	return map_free_dynamic(m^, info, loc)
 }
 
 @(require_results)
 map_free_dynamic :: proc "odin" (m: Raw_Map, info: ^Map_Info, loc := #caller_location) -> Allocator_Error {
 	ptr := rawptr(map_data(m))
 	size := int(map_total_allocation_size(uintptr(map_cap(m)), info))
-	return mem_free_with_size(ptr, size, m.allocator, loc)
+	err := mem_free_with_size(ptr, size, m.allocator, loc)
+	if err == .Mode_Not_Implemented {
+		err = nil
+	}
+	return err
 }
 
 @(require_results)
@@ -719,7 +717,7 @@ __dynamic_map_get :: proc "contextless" (#no_alias m: ^Raw_Map, #no_alias info: 
 
 // IMPORTANT: USED WITHIN THE COMPILER
 __dynamic_map_check_grow :: proc "odin" (#no_alias m: ^Raw_Map, #no_alias info: ^Map_Info, loc := #caller_location) -> Allocator_Error {
-	if m.len  >= map_resize_threshold(m^) {
+	if m.len >= map_resize_threshold(m^) {
 		return map_grow_dynamic(m, info, loc)
 	}
 	return nil
@@ -738,7 +736,7 @@ __dynamic_map_set :: proc "odin" (#no_alias m: ^Raw_Map, #no_alias info: ^Map_In
 	}
 
 	if __dynamic_map_check_grow(m, info, loc) != nil {
-		return nil
+		panic("HERE")
 	}
 
 	result := map_insert_hash_dynamic(m, info, hash, uintptr(key), uintptr(value))
