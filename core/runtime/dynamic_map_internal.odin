@@ -736,7 +736,7 @@ __dynamic_map_set :: proc "odin" (#no_alias m: ^Raw_Map, #no_alias info: ^Map_In
 	}
 
 	if __dynamic_map_check_grow(m, info, loc) != nil {
-		panic("HERE")
+		return nil
 	}
 
 	result := map_insert_hash_dynamic(m, info, hash, uintptr(key), uintptr(value))
