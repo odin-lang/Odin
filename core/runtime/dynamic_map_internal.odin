@@ -512,8 +512,9 @@ map_reserve_dynamic :: proc "odin" (#no_alias m: ^Raw_Map, #no_alias info: ^Map_
 		}
 	}
 
+	map_free_dynamic(m^, info, loc) or_return
 	m.data = resized.data
-	return map_free_dynamic(m^, info, loc)
+	return nil
 }
 
 
@@ -558,8 +559,9 @@ map_shrink_dynamic :: proc "odin" (#no_alias m: ^Raw_Map, #no_alias info: ^Map_I
 		}
 	}
 
+	map_free_dynamic(m^, info, loc) or_return
 	m.data = shrunk.data
-	return map_free_dynamic(m^, info, loc)
+	return nil
 }
 
 @(require_results)
@@ -567,8 +569,9 @@ map_free_dynamic :: proc "odin" (m: Raw_Map, info: ^Map_Info, loc := #caller_loc
 	ptr := rawptr(map_data(m))
 	size := int(map_total_allocation_size(uintptr(map_cap(m)), info))
 	err := mem_free_with_size(ptr, size, m.allocator, loc)
-	if err == .Mode_Not_Implemented {
-		err = nil
+	#partial switch err {
+	case .None, .Mode_Not_Implemented:
+		return nil
 	}
 	return err
 }
