@@ -124,6 +124,10 @@ Window_contentView :: proc(self: ^Window) -> ^View {
 Window_setContentView :: proc(self: ^Window, content_view: ^View) {
 	msgSend(nil, self, "setContentView:", content_view)
 }
+@(objc_type=Window, objc_name="contentLayoutRect")
+Window_contentLayoutRect :: proc(self: ^Window) -> Rect {
+	return msgSend(Rect, self, "contentLayoutRect")
+}
 @(objc_type=Window, objc_name="frame")
 Window_frame :: proc(self: ^Window) -> Rect {
 	return msgSend(Rect, self, "frame")
