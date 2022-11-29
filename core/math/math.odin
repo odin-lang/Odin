@@ -1088,7 +1088,7 @@ is_nan       :: proc{
 // If sign < 0, is_inf reports whether f is negative infinity.
 // If sign == 0, is_inf reports whether f is either infinity.
 is_inf_f16 :: proc "contextless" (x: f16, sign: int = 0) -> bool {
-	class := classify(abs(x))
+	class := classify(x)
 	switch {
 	case sign > 0:
 		return class == .Inf
@@ -1105,7 +1105,7 @@ is_inf_f16be :: proc "contextless" (x: f16be, sign: int = 0) -> bool {
 }
 
 is_inf_f32 :: proc "contextless" (x: f32, sign: int = 0) -> bool {
-	class := classify(abs(x))
+	class := classify(x)
 	switch {
 	case sign > 0:
 		return class == .Inf
@@ -1122,7 +1122,7 @@ is_inf_f32be :: proc "contextless" (x: f32be, sign: int = 0) -> bool {
 }
 
 is_inf_f64 :: proc "contextless" (x: f64, sign: int = 0) -> bool {
-	class := classify(abs(x))
+	class := classify(x)
 	switch {
 	case sign > 0:
 		return class == .Inf
@@ -1344,20 +1344,20 @@ atan2_f64 :: proc "contextless" (y, x: f64) -> f64 {
 		}
 		return copy_sign(PI, y)
 	case x == 0:
-		return copy_sign(PI*0.5, y)
+		return copy_sign(PI/2, y)
 	case is_inf(x, 0):
 		if is_inf(x, 1) {
 			if is_inf(y, 0) {
-				return copy_sign(PI*0.25, y)
+				return copy_sign(PI/4, y)
 			}
 			return copy_sign(0, y)
 		}
 		if is_inf(y, 0) {
-			return copy_sign(PI*0.75, y)
+			return copy_sign(3*PI/4, y)
 		}
 		return copy_sign(PI, y)
 	case is_inf(y, 0):
-		return copy_sign(PI*0.5, y)
+		return copy_sign(PI/2, y)
 	}
 
 	q := atan(y / x)
@@ -1386,7 +1386,7 @@ atan2 :: proc{
 }
 
 atan :: proc "contextless" (x: $T) -> T where intrinsics.type_is_float(T) {
-	return atan2(1, x)
+	return atan2(x, 1)
 }
 
 
@@ -1599,16 +1599,46 @@ acos :: proc{
 }
 
 sinh :: proc "contextless" (x: $T) -> T where intrinsics.type_is_float(T) {
-	return (exp(x) - exp(-x))*0.5
+	return copy_sign(((exp(x) - exp(-x))*0.5), x)
 }
 
 cosh :: proc "contextless" (x: $T) -> T where intrinsics.type_is_float(T) {
-	return (exp(x) + exp(-x))*0.5
+	return ((exp(x) + exp(-x))*0.5)
 }
 
-tanh :: proc "contextless" (x: $T) -> T where intrinsics.type_is_float(T) {
-	t := exp(2*x)
-	return (t - 1) / (t + 1)
+tanh :: proc "contextless" (y: $T) -> T where intrinsics.type_is_float(T) {
+	P0 :: -9.64399179425052238628e-1
+	P1 :: -9.92877231001918586564e1
+	P2 :: -1.61468768441708447952e3
+	Q0 :: +1.12811678491632931402e2
+	Q1 :: +2.23548839060100448583e3
+	Q2 :: +4.84406305325125486048e3
+
+	MAXLOG :: 8.8029691931113054295988e+01 // log(2**127)
+
+
+	x := f64(y)
+	z := abs(x)
+	switch {
+	case z > 0.5*MAXLOG:
+		if x < 0 {
+			return -1
+		}
+		return 1
+	case z >= 0.625:
+		s := exp(2 * z)
+		z = 1 - 2/(s+1)
+		if x < 0 {
+			z = -z
+		}
+	case:
+		if x == 0 {
+			return T(x)
+		}
+		s := x * x
+		z = x + x*s*((P0*s+P1)*s+P2)/(((s+Q0)*s+Q1)*s+Q2)
+	}
+	return T(z)
 }
 
 asinh :: proc "contextless" (y: $T) -> T where intrinsics.type_is_float(T) {
