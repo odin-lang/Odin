@@ -795,6 +795,37 @@ MSG :: struct {
 
 LPMSG :: ^MSG
 
+// WM_NCHITTEST and MOUSEHOOKSTRUCT Mouse Position Codes
+HTERROR       :: -2
+HTTRANSPARENT :: -1
+HTNOWHERE     :: 0
+HTCLIENT      :: 1
+HTCAPTION     :: 2
+HTSYSMENU     :: 3
+HTGROWBOX     :: 4
+HTSIZE        :: HTGROWBOX
+HTMENU        :: 5
+HTHSCROLL     :: 6
+HTVSCROLL     :: 7
+HTMINBUTTON   :: 8
+HTMAXBUTTON   :: 9
+HTLEFT        :: 10
+HTRIGHT       :: 11
+HTTOP         :: 12
+HTTOPLEFT     :: 13
+HTTOPRIGHT    :: 14
+HTBOTTOM      :: 15
+HTBOTTOMLEFT  :: 16
+HTBOTTOMRIGHT :: 17
+HTBORDER      :: 18
+HTREDUCE      :: HTMINBUTTON
+HTZOOM        :: HTMAXBUTTON
+HTSIZEFIRST   :: HTLEFT
+HTSIZELAST    :: HTBOTTOMRIGHT
+HTOBJECT      :: 19
+HTCLOSE       :: 20
+HTHELP        :: 21
+
 TEXTMETRICW :: struct {
 	tmHeight: LONG,
 	tmAscent: LONG,
@@ -1220,6 +1251,9 @@ SWP_NOREPOSITION :: SWP_NOOWNERZORDER
 
 SWP_DEFERERASE     :: 0x2000 // same as SWP_DEFERDRAWING
 SWP_ASYNCWINDOWPOS :: 0x4000 // same as SWP_CREATESPB
+
+CSIDL_APPDATA        :: 0x001a // <user name>\Application Data
+CSIDL_COMMON_APPDATA :: 0x0023 // All Users\Application Data
 
 HWND_TOP       :: HWND( uintptr(0))     //  0
 HWND_BOTTOM    :: HWND( uintptr(1))     //  1

@@ -12,14 +12,20 @@ TEST_fail  := 0
 when ODIN_TEST {
 	expect  :: testing.expect
 	log     :: testing.log
+	errorf  :: testing.errorf
 } else {
 	expect  :: proc(t: ^testing.T, condition: bool, message: string, loc := #caller_location) {
 		TEST_count += 1
 		if !condition {
 			TEST_fail += 1
-			fmt.printf("[%v] FAIL %v\n", loc, message)
+			fmt.printf("[%v:%s] FAIL %v\n", loc, loc.procedure, message)
 			return
 		}
+	}
+	errorf  :: proc(t: ^testing.T, message: string, args: ..any, loc := #caller_location) {
+		TEST_fail += 1
+		fmt.printf("[%v:%s] Error %v\n", loc, loc.procedure, fmt.tprintf(message, ..args))
+		return
 	}
 	log     :: proc(t: ^testing.T, v: any, loc := #caller_location) {
 		fmt.printf("[%v] ", loc)
