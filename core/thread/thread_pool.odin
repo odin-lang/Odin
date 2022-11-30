@@ -36,6 +36,7 @@ Pool :: struct {
 	// end of atomics
 
 	is_running: bool,
+	is_clearing: bool,
 
 	threads: []^Thread,
 
@@ -121,8 +122,9 @@ started_count: int
 // Threads stay alive and wait for new work to be added.
 pool_clear :: proc(pool: ^Pool) {
 	if sync.mutex_guard(&pool.mutex) {
+		intrinsics.atomic_store(&pool.is_clearing, true)
 		clear(&pool.tasks)
-		pool.sem_available.impl.atomic.count = 0
+		for sync.wait_with_timeout(&pool.sem_available, 0) {}
 	}
 
 	for intrinsics.atomic_load(&pool.num_in_processing) > 0 {
@@ -134,6 +136,7 @@ pool_clear :: proc(pool: ^Pool) {
 	intrinsics.atomic_store(&pool.num_done, 0)
 	if sync.mutex_guard(&pool.mutex) {
 		clear(&pool.tasks_done)
+		intrinsics.atomic_store(&pool.is_clearing, false)
 	}
 }
 
