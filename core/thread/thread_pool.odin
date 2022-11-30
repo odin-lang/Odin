@@ -124,12 +124,12 @@ pool_clear :: proc(pool: ^Pool) {
 	if sync.mutex_guard(&pool.mutex) {
 		intrinsics.atomic_store(&pool.is_clearing, true)
 		clear(&pool.tasks)
-		for sync.wait_with_timeout(&pool.sem_available, 0) {}
 	}
 
 	for intrinsics.atomic_load(&pool.num_in_processing) > 0 {
 		yield()
 	}
+	for sync.wait_with_timeout(&pool.sem_available, 0) {}
 
 	intrinsics.atomic_store(&pool.num_waiting, 0)
 	intrinsics.atomic_store(&pool.num_outstanding, 0)
