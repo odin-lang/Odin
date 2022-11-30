@@ -15,7 +15,7 @@ when ODIN_TEST {
 		TEST_count += 1
 		if !condition {
 			TEST_fail += 1
-			fmt.printf("[%v] %v\n", loc, message)
+			fmt.printf("%v %v\n", loc, message)
 			return
 		}
 	}
@@ -166,6 +166,12 @@ test_match :: proc(t: ^testing.T) {
 		{ " testing this", "^testing", "", false },
 		{ "testing this", "^%w+", "testing", true },
 		{ " testing this", "^%w+", "", false },
+
+		// balanced string %b
+		{ "testing (this) out", "%b()", "(this)", true },
+		{ "testing athisz out", "%baz", "athisz", true },
+		{ "testing _this_ out", "%b__", "_this_", true },
+		{ "testing _this_ out", "%b_", "", false },
 	}
 
 	captures: [lua.MAXCAPTURES]lua.Match
@@ -294,19 +300,47 @@ test_gsub :: proc(t: ^testing.T) {
 
 @test
 test_gfind :: proc(t: ^testing.T) {
-	{
-		haystack := "test1 123 test2 123 test3"
-		pattern := "%w+" 
-		captures: [lua.MAXCAPTURES]lua.Match
-		s := &haystack
-		output := [?]string { "test1", "123", "test2", "123", "test3" }
-		index: int
+	haystack := "test1 123 test2 123 test3"
+	pattern := "%w+" 
+	captures: [lua.MAXCAPTURES]lua.Match
+	s := &haystack
+	output := [?]string { "test1", "123", "test2", "123", "test3" }
+	index: int
 
-		for word in lua.gfind(s, pattern, &captures) {
-			expect(t, output[index] == word, fmt.tprintf("GFIND %d failed: %s != %s\n", index, output[index], word))
-			index += 1
-		}
+	for word in lua.gfind(s, pattern, &captures) {
+		expect(t, output[index] == word, fmt.tprintf("GFIND %d failed: %s != %s\n", index, output[index], word))
+		index += 1
 	}
+}
+
+test_frontier :: proc(t: ^testing.T) {
+	Temp :: struct {
+		t: ^testing.T,
+		index: int,
+		output: [3]string,
+	}
+	
+	call :: proc(data: rawptr, word: string) {
+		temp := cast(^Temp) data
+		expect(
+			temp.t, 
+			word == temp.output[temp.index], 
+			fmt.tprintf("frontier temp didnt match: %s != %s\n", word, temp.output[temp.index]),
+		)
+		temp.index += 1
+	}
+
+	temp := Temp {
+		t = t,
+		output = {
+			"THE",
+			"QUICK",
+			"JUMPS",
+		},
+	}
+
+	// https://lua-users.org/wiki/FrontierPattern example taken from here
+	lua.gsub_with("THE (QUICK) brOWN FOx JUMPS", "%f[%a]%u+%f[%A]", &temp, call)
 }
 
 main :: proc() {
@@ -317,6 +351,7 @@ main :: proc() {
 	test_gmatch(&t)
 	test_gsub(&t)
 	test_gfind(&t)
+	test_frontier(&t)
 
 	fmt.printf("%v/%v tests successful.\n", TEST_count - TEST_fail, TEST_count)
 	if TEST_fail > 0 {

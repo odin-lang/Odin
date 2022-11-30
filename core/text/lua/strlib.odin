@@ -19,6 +19,7 @@ Error :: enum {
 	Invalid_Capture_Index,
 	Invalid_Pattern_Capture,
 	Unfinished_Capture,
+	Malformed_Pattern,
 }
 
 L_ESC :: '%'
@@ -143,20 +144,22 @@ classend :: proc(ms: ^MatchState, p: int) -> (int, Error) {
 				p += 1
 			}
 
-			// TODO double check
-			for {
-				ch := ms.pattern[p]
+			for ms.pattern[p] != ']' {
+				// if p == len(ms.pattern) {
+				// 	return 0, .Malformed_Pattern
+				// }
 
-				if ch == L_ESC && p <= len(ms.pattern) {
+				ch := ms.pattern[p]
+				p += 1
+
+				if p < len(ms.pattern) && ch == L_ESC {
 					// skip escapes like '%'
 					p += 1
 				}
 
-				if ms.pattern[p] == ']' {
-					break
-				}
-
-				p += 1
+				// if ms.pattern[p] == ']' {
+				// 	break
+				// }
 			}
 
 			return p + 1, .OK
@@ -183,13 +186,14 @@ matchbracketclass :: proc(ms: ^MatchState, c: u8, p, ec: int) -> bool {
 	for p < ec {
 		ch := ms.pattern[p]
 
-		if ms.pattern[p] == L_ESC {
+		// e.g. %a
+		if ms.pattern[p] == L_ESC { 
 			p += 1
 
 			if match_class(c, ms.pattern[p]) {
 				return sig
 			}
-		} else if ms.pattern[p + 1] == '-' && p + 2 < len(ms.pattern) {
+		} else if p + 2 < len(ms.pattern) && ms.pattern[p + 1] == '-' {
 			// e.g. [a-z] check
 			if ms.pattern[p] <= c && c <= ms.pattern[p + 2] {
 				return sig
@@ -219,39 +223,40 @@ singlematch :: proc(ms: ^MatchState, s, p, ep: int) -> bool {
 	}
 }
 
-// matchbalance :: proc(ms: ^MatchState, s, p: int) -> (int, Error) {
-// 	s_begin := s
-// 	s := s + 1
-// 	cont := 0
+matchbalance :: proc(ms: ^MatchState, s, p: int) -> (int, Error) {
+	if p >= len(ms.pattern) - 1 {
+		return INVALID, .Invalid_Pattern_Capture
+	}
 
-// 	begin := ms.pattern[p]
-// 	end := ms.pattern[p + 1]
-// 	print("BALANCED between", rune(begin), "AND", rune(end))
+	// skip until the src and pattern match
+	if ms.src[s] != ms.pattern[p] {
+		return INVALID, .OK
+	}
 
-// 	for s < len(ms.src) {
-// 		ch := ms.src[s]
-// 		print("\t", rune(ch))
+	s_begin := s
+	cont := 1
+	s := s + 1
+	begin := ms.pattern[p]
+	end := ms.pattern[p + 1]
 
-// 		if ch == end {
-// 			cont -= 1
-// 			print("END", cont)
+	for s < len(ms.src) {
+		ch := ms.src[s]
 
-// 			if cont == 0 {
-// 				print("BALANCED RET", s + 1, len(ms.src), ms.src[s_begin:s + 1])
-// 				return s + 1
-// 			}
-// 		} else if ch == begin {
-// 			cont += 1
-// 			print("BEGIN", cont)
-// 		}
+		if ch == end {
+			cont -= 1
 
-// 		s += 1
-// 	}
+			if cont == 0 {
+				return s + 1, .OK
+			}
+		} else if ch == begin {
+			cont += 1
+		}
 
-// 	print("OUT OF BALANCE", cont)
-// 	// out of balance
-// 	return 0, .
-// }
+		s += 1
+	}
+
+	return INVALID, .OK
+}
 
 max_expand :: proc(ms: ^MatchState, s, p, ep: int) -> (res: int, err: Error) {
 	i := 0
@@ -263,7 +268,6 @@ max_expand :: proc(ms: ^MatchState, s, p, ep: int) -> (res: int, err: Error) {
 		result := match(ms, s + i, ep + 1) or_return
 
 		if result != INVALID {
-			// print("SET", result)
 			return result, .OK
 		}
 
@@ -368,35 +372,34 @@ match :: proc(ms: ^MatchState, s, p: int) -> (unused: int, err: Error) {
 			switch ms.pattern[p + 1] {
 				// balanced string
 				case 'b': {
-					// res := matchbalance(ms, s, p + 2)
+					s = matchbalance(ms, s, p + 2) or_return
 
-					// if data, ok := res.?; ok {
-					// 	// s = data
-					// 	// eg after %b()
-					// 	// print("SUCCESS")
-					// 	return patt_match(ms, s, p + 4)
-					// }
-
+					if s != INVALID {
+						// eg after %b()
+						return match(ms, s, p + 4)
+					}
 				}
 
 				// frontier
 				case 'f': {
-					// p += 2
+					p += 2
 					
-					// if ms.pattern[p] != '[' {
-					// 	print("missing '[' after %f in pattern")
-					// 	return nil
-					// }
+					if ms.pattern[p] != '[' {
+						return INVALID, .Invalid_Pattern_Capture
+					}
 
-					// ep := classend(ms, p).?
-					// previous := 0 if s == 0 else s - 1
+					ep := classend(ms, p) or_return
+					previous := s == 0 ? '\x00' : ms.src[s - 1]
+					// allow last character to count too
+					current := s >= len(ms.src) ? '\x00' : ms.src[s]
 
-					// if !matchbracketclass(ms, ms.src[previous], p, ep - 1) && 
-					// 	matchbracketclass(ms, ms.src[s], p, ep) {
-					// 	return patt_match(ms, s, ep)
-					// }
+					// fmt.eprintln("TRY", rune(ms.src[s]), ep)
+					if !matchbracketclass(ms, previous, p, ep - 1) && 
+						matchbracketclass(ms, current, p, ep - 1) {
+						return match(ms, s, ep)
+					}
 
-					// return nil
+					s = INVALID
 				}
 
 				// capture group
@@ -416,7 +419,6 @@ match :: proc(ms: ^MatchState, s, p: int) -> (unused: int, err: Error) {
 
 		case: {
 			return match_default(ms, s, p)
-			// print("PATT DEF", rune(ms.src[s]), rune(ms.pattern[p]))
 		}
 	}
 
@@ -426,11 +428,9 @@ match :: proc(ms: ^MatchState, s, p: int) -> (unused: int, err: Error) {
 match_default :: proc(ms: ^MatchState, s, p: int) -> (unused: int, err: Error) {
 	s := s
 	ep := classend(ms, p) or_return
-	// ch := s < len(ms.src) ? rune(ms.src[s]) : 0
 
 	if !singlematch(ms, s, p, ep) {
 		epc := ep < len(ms.pattern) ? ms.pattern[ep] : 0
-		// print("+++", rune(epc))
 
 		if epc == '*' || epc == '?' || epc == '-' {
 			return match(ms, s, ep + 1)
@@ -439,7 +439,6 @@ match_default :: proc(ms: ^MatchState, s, p: int) -> (unused: int, err: Error) {
 		}
 	} else {
 		epc := ep < len(ms.pattern) ? ms.pattern[ep] : 0
-		// print("~~~", ch, rune(epc))
 
 		switch epc {
 			case '?': {
@@ -652,7 +651,7 @@ gmatch :: proc(
 	return
 }
 
-// gsub with builder
+// gsub with builder, replace patterns found with the replace content
 gsub_builder :: proc(
 	builder: ^strings.Builder,
 	haystack: string,
@@ -702,9 +701,38 @@ gsub_allocator :: proc(
 	return gsub_builder(&builder, haystack, pattern, replace)
 }
 
+// call a procedure on every match in the haystack
+gsub_with :: proc(
+	haystack: string,
+	pattern: string,
+	data: rawptr,
+	call: proc(data: rawptr, word: string),
+) {
+	// find matches
+	captures: [MAXCAPTURES]Match
+	haystack := haystack
+
+	for {
+		length, err := find_aux(haystack, pattern, 0, false, &captures)
+
+		// done
+		if length == 0 || err != .OK {
+			break
+		}
+
+		cap := captures[0]
+
+		word := haystack[cap.start:cap.end]
+		call(data, word)
+
+		// advance string till end
+		haystack = haystack[cap.end:]
+	}
+}
+
 gsub :: proc { gsub_builder, gsub_allocator }
 
-// iterative find with first capture only
+// iterative find with zeroth capture only
 gfind :: proc(
 	haystack: ^string,
 	pattern: string,
