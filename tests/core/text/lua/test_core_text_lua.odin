@@ -261,14 +261,15 @@ test_captures :: proc(t: ^testing.T) {
 	}
 }
 
+gmatch_check :: proc(t: ^testing.T, index: int, a: []string, b: string) {
+	if failed(t, a[index] == b) {
+		logf(t, "GMATCH %d failed!\n", index)
+		logf(t, "\t%s != %s\n", a[index], b)
+	}
+}
+
 @test
 test_gmatch :: proc(t: ^testing.T) {
-	gmatch_check :: proc(t: ^testing.T, index: int, a: []string, b: string) {
-		if failed(t, a[index] == b) {
-			logf(t, "GMATCH %d failed!\n", index)
-			logf(t, "\t%s != %s\n", a[index], b)
-		}
-	}
 
 	{
 		haystack := "testing this out 123"
@@ -347,7 +348,7 @@ test_frontier :: proc(t: ^testing.T) {
 		output: [3]string,
 	}
 	
-	call :: proc(data: rawptr, word: string) {
+	call :: proc(data: rawptr, word: string, haystack: string, captures: []lua.Match) {
 		temp := cast(^Temp) data
 
 		if failed(temp.t, word == temp.output[temp.index]) {
@@ -373,28 +374,31 @@ test_frontier :: proc(t: ^testing.T) {
 
 @test
 test_utf8 :: proc(t: ^testing.T) {
-	// {
-	// 	haystack := "恥ずべき恥フク恥ロ"
-	// 	s := &haystack
-	// 	captures: [lua.MAXCAPTURES]lua.Match
-
-	// 	for word in lua.gmatch(s, "恥", &captures) {
-	// 		fmt.eprintln(word)
-	// 	}
-	// }
-
 	{
-		haystack := "恥ずべき恥フク恥ロ"
+		haystack := "恥ず べき恥 フク恥ロ"
 		s := &haystack
 		captures: [lua.MAXCAPTURES]lua.Match
+		output := [?]string { "恥ず", "べき恥", "フク恥ロ" }
+		index: int
 
-		for word in lua.gmatch(s, "w+", &captures) {
-			fmt.eprintln(word)
+		for word in lua.gmatch(s, "%w+", &captures) {
+			gmatch_check(t, index, output[:], word)
+			index += 1
 		}
 	}
+}
 
-	// captures: [MAXCAPTURES]Match
-	// length, err := lua.find_aux("damn, pattern,)
+@test
+test_case_insensitive :: proc(t: ^testing.T) {
+	{
+		pattern := lua.pattern_case_insensitive("test", 256, context.temp_allocator)
+		goal := "[tT][eE][sS][tT]"
+		
+		if failed(t, pattern == goal) {
+			logf(t, "Case Insensitive Pattern doesn't match result\n")
+			logf(t, "\t%s != %s\n", pattern, goal)
+		}
+	}
 }
 
 main :: proc() {
@@ -410,8 +414,8 @@ main :: proc() {
 	test_gsub(&t)
 	test_gfind(&t)
 	test_frontier(&t)
-
-	// test_utf8(&t)
+	test_utf8(&t)
+	test_case_insensitive(&t)
 
 	fmt.wprintf(w, "%v/%v tests successful.\n", TEST_count - TEST_fail, TEST_count)
 	if TEST_fail > 0 {

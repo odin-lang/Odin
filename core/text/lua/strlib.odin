@@ -788,12 +788,23 @@ gsub_allocator :: proc(
 	return gsub_builder(&builder, haystack, pattern, replace)
 }
 
+Gsub_Proc :: proc(
+	// optional passed data
+	data: rawptr, 
+	// word match found
+	word: string, 
+	// current haystack for found captures
+	haystack: string, 
+	// found captures - empty for no captures
+	captures: []Match,
+)
+
 // call a procedure on every match in the haystack
 gsub_with :: proc(
 	haystack: string,
 	pattern: string,
 	data: rawptr,
-	call: proc(data: rawptr, word: string),
+	call: Gsub_Proc,
 ) {
 	// find matches
 	captures: [MAXCAPTURES]Match
@@ -810,7 +821,7 @@ gsub_with :: proc(
 		cap := captures[0]
 
 		word := haystack[cap.byte_start:cap.byte_end]
-		call(data, word)
+		call(data, word, haystack, captures[1:length])
 
 		// advance string till end
 		haystack = haystack[cap.byte_end:]
@@ -838,3 +849,42 @@ gfind :: proc(
 
 	return
 }
+
+// rebuilds a pattern into a case insensitive pattern
+pattern_case_insensitive_builder :: proc(
+	builder: ^strings.Builder, 
+	pattern: string,
+) -> (res: string) {
+	p := pattern
+	last_percent: bool
+
+	for len(p) > 0 {
+		char, size := utf8.decode_rune_in_string(p)
+
+		if unicode.is_alpha(char) && !last_percent {
+			// write character class in manually
+			strings.write_byte(builder, '[')
+			strings.write_rune(builder, unicode.to_lower(char))
+			strings.write_rune(builder, unicode.to_upper(char))
+			strings.write_byte(builder, ']')
+		} else {
+			strings.write_rune(builder, char)
+		}
+
+		last_percent = char == L_ESC 
+		p = p[size:]
+	}
+
+	return strings.to_string(builder^)
+}
+
+pattern_case_insensitive_allocator :: proc(
+	pattern: string, 
+	cap: int = 256,
+	allocator := context.allocator,
+) -> (res: string) {
+	builder := strings.builder_make(0, cap, context.temp_allocator)
+	return pattern_case_insensitive_builder(&builder, pattern)	
+}
+
+pattern_case_insensitive :: proc { pattern_case_insensitive_builder, pattern_case_insensitive_allocator }
