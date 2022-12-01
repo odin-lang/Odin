@@ -1,5 +1,6 @@
 package strlib
 
+import "core:runtime"
 import "core:unicode"
 import "core:unicode/utf8"
 import "core:strings"
@@ -899,3 +900,134 @@ pattern_case_insensitive_allocator :: proc(
 }
 
 pattern_case_insensitive :: proc { pattern_case_insensitive_builder, pattern_case_insensitive_allocator }
+
+find_test :: proc(
+	haystack: string,
+	pattern: string, 
+	offset: int = 0, 
+	captures: ..^Match,
+) -> (start, end: int, ok: bool) #no_bounds_check {
+	matches: [MAXCAPTURES]Match
+	length, err := find_aux(haystack, pattern, offset, true, &matches)
+	
+	ok = length > 0 && err == .OK
+	match := matches[0]
+	start = match.byte_start
+	end = match.byte_end
+	
+	for arg, i in captures {
+		arg^ = matches[i + 1]
+	}
+
+	return
+}
+
+match_test :: proc(
+	haystack: string,
+	pattern: string, 
+	offset: int = 0, 
+	captures: ..^Match,
+) -> (word: string, ok: bool) #no_bounds_check {
+	matches: [MAXCAPTURES]Match
+	length, err := find_aux(haystack, pattern, offset, true, &matches)
+	
+	ok = length > 0 && err == .OK
+	match := matches[0]
+	word = haystack[match.byte_start:match.byte_end]
+	
+	for arg, i in captures {
+		arg^ = matches[i + 1]
+	}
+	
+	return
+}
+
+Matcher :: struct {
+	haystack: string,
+	pattern: string,
+	captures: [MAXCAPTURES]Match,
+	captures_length: int,
+	offset: int,
+	err: Error,
+
+	// changing content for iterators
+	iter: string,
+}
+
+// matcher
+matcher_init :: proc(haystack, pattern: string, offset: int = 0) -> (res: Matcher) {
+	res.haystack = haystack
+	res.pattern = pattern
+	res.offset = offset
+	res.iter = haystack
+	return
+}
+
+matcher_find :: proc(matcher: ^Matcher) -> (start, end: int, ok: bool) #no_bounds_check {
+	matcher.captures_length, matcher.err = find_aux(
+		matcher.haystack, 
+		matcher.pattern, 
+		matcher.offset, 
+		true, 
+		&matcher.captures,
+	)
+	ok = matcher.captures_length > 0 && matcher.err == .OK
+	match := matcher.captures[0]
+	start = match.byte_start
+	end = match.byte_end
+	return
+}
+
+matcher_match :: proc(matcher: ^Matcher) -> (word: string, ok: bool) #no_bounds_check {
+	matcher.captures_length, matcher.err = find_aux(
+		matcher.haystack, 
+		matcher.pattern, 
+		matcher.offset, 
+		false, 
+		&matcher.captures,
+	)
+	ok = matcher.captures_length > 0 && matcher.err == .OK
+	match := matcher.captures[0]
+	word = matcher.haystack[match.byte_start:match.byte_end]
+	return
+}
+
+// get the capture at the correct spot
+matcher_capture :: proc(matcher: ^Matcher, index: int, loc := #caller_location) -> string #no_bounds_check {
+	runtime.bounds_check_error_loc(loc, index + 1, MAXCAPTURES - 1)
+	cap := matcher.captures[index + 1]
+	return matcher.haystack[cap.byte_start:cap.byte_end]
+}
+
+matcher_capture_raw :: proc(matcher: ^Matcher, index: int, loc := #caller_location) -> Match #no_bounds_check {
+	runtime.bounds_check_error_loc(loc, index + 1, MAXCAPTURES - 1)
+	return matcher.captures[index + 1]
+}
+
+matcher_gmatch :: matcher_match_iter
+
+matcher_match_iter :: proc(matcher: ^Matcher) -> (res: string, ok: bool) {
+	if len(matcher.iter) > 0 {
+		matcher.captures_length, matcher.err = find_aux(
+			matcher.iter, 
+			matcher.pattern, 
+			matcher.offset, 
+			false, 
+			&matcher.captures,
+		)
+
+		if matcher.captures_length != 0 && matcher.err == .OK {
+			ok = true
+			first := matcher.captures_length > 1 ? 1 : 0
+			match := matcher.captures[first]
+			res = matcher.iter[match.byte_start:match.byte_end]
+			matcher.iter = matcher.iter[match.byte_end:]
+		}
+	}
+
+	return
+}
+
+matcher_captures_slice :: proc(matcher: ^Matcher) -> []Match {
+	return matcher.captures[1:matcher.captures_length]
+}
