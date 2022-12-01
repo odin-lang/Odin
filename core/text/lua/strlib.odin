@@ -23,6 +23,7 @@ Error :: enum {
 	Unfinished_Capture,
 	Malformed_Pattern,
 	Rune_Error,
+	Match_Invalid,
 }
 
 L_ESC :: '%'
@@ -183,15 +184,19 @@ classend :: proc(ms: ^MatchState, p: int) -> (step: int, err: Error) {
 
 		case '[': {
 			// fine with step by 1
-			if ms.pattern[step] == '^' {
+			if step + 1 < len(ms.pattern) && ms.pattern[step] == '^' {
 				step += 1
 			}
 
 			// run till end is reached
-			for ms.pattern[step] != ']' {
+			for {
 				if step == len(ms.pattern) {
 					err = .Malformed_Pattern
 					return
+				}
+
+				if ms.pattern[step] == ']' {
+					break
 				}
 
 				// dont care about utf8 here
@@ -417,7 +422,7 @@ match :: proc(ms: ^MatchState, s, p: int) -> (unused: int, err: Error) {
 	char, _ := utf8_peek(ms.pattern[p:]) or_return
 	switch char {
 		case '(': {
-			if ms.pattern[p + 1] == ')' {
+			if p + 1 < len(ms.pattern) && ms.pattern[p + 1] == ')' {
 				s = start_capture(ms, s, p + 2, CAP_POSITION) or_return
 			} else {
 				s = start_capture(ms, s, p + 1, CAP_UNFINISHED) or_return
@@ -582,7 +587,7 @@ push_onecapture :: proc(
 			}
 
 			case CAP_POSITION: {
-				matches[i] = { init - 1, init - 1 }
+				matches[i] = { init, init + 1 }
 			}
 
 			case: {
@@ -697,8 +702,14 @@ find_aux :: proc(
 		res := match(&ms, s, p) or_return
 
 		if res != INVALID {
+			// disallow non advancing match
+			if s == res {
+				err = .Match_Invalid
+			} 
+			
 			// NOTE(Skytrias): first result is reserved for a full match
 			matches[0] = { s, res }
+
 			// rest are the actual captures
 			captures = push_captures(&ms, -1, -1, matches[1:]) or_return
 			captures += 1
