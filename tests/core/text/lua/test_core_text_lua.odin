@@ -4,21 +4,28 @@ import lua "core:text/lua"
 import "core:testing"
 import "core:fmt"
 import "core:os"
+import "core:io"
 
 TEST_count: int
 TEST_fail: int
 
-when ODIN_TEST {
-	expect  :: testing.expect
-} else {
-	expect  :: proc(t: ^testing.T, condition: bool, message: string, loc := #caller_location) {
-		TEST_count += 1
-		if !condition {
-			TEST_fail += 1
-			fmt.printf("%v %v\n", loc, message)
-			return
-		}
+// inline expect with custom props
+failed :: proc(t: ^testing.T, ok: bool, loc := #caller_location) -> bool {
+	TEST_count += 1
+	
+	if !ok {
+		fmt.wprintf(t.w, "%v: ", loc)
+		t.error_count += 1	
+		TEST_fail += 1
 	}
+
+	return !ok
+}
+
+expect :: testing.expect
+
+logf :: proc(t: ^testing.T, format: string, args: ..any) {
+	fmt.wprintf(t.w, format, ..args)
 }
 
 // find correct byte offsets 
@@ -55,20 +62,20 @@ test_find :: proc(t: ^testing.T) {
 	}
 
 	captures: [lua.MAXCAPTURES]lua.Match
-	for entry in ENTRIES {
+	for entry, i in ENTRIES {
 		captures[0] = {}
 		length, err := lua.find_aux(entry.s, entry.p, entry.offset, true, &captures)
 		cap := captures[0]
 		ok := length > 0 && err == .OK
-		success := entry.match.ok == ok && entry.match.start == cap.start && entry.match.end == cap.end 
+		success := entry.match.ok == ok && entry.match.start == cap.byte_start && entry.match.end == cap.byte_end 
 
-		if !success {
-			fmt.eprintf("Find failed for: haystack = %s\tpattern = %s\n", entry.s, entry.p)
+		if failed(t, success) {
+			logf(t, "Find %d failed!\n", i)
+			logf(t, "\tHAYSTACK %s\tPATTERN %s\n", entry.s, entry.p)
+			logf(t, "\tSTART: %d == %d?\n", entry.match.start, cap.byte_start)
+			logf(t, "\tEND: %d == %d?\n", entry.match.end, cap.byte_end)
+			logf(t, "\tErr: %v\tLength %d\n", err, length)			
 		}
-
-		expect(t, entry.match.start == cap.start, "match start didnt match")
-		expect(t, entry.match.end == cap.end, "match end didnt match",)
-		expect(t, entry.match.ok == ok, "find result didnt match")
 	}
 }
 
@@ -179,16 +186,15 @@ test_match :: proc(t: ^testing.T) {
 		captures[0] = {}
 		length, err := lua.find_aux(entry.s, entry.p, 0, false, &captures)
 		ok := length > 0 && err == .OK
-		result := entry.s[captures[0].start:captures[0].end]
+		result := entry.s[captures[0].byte_start:captures[0].byte_end]
 		success := entry.ok == ok && result == entry.result
 
-		if !success {
-			fmt.eprintf("Match failed for: haystack = %s\tpattern = %s\n", entry.s, entry.p)
-			fmt.eprintf("Match invalid result! |WANTED:| %s |GOT:| %s\n", entry.result, result)
+		if failed(t, success) {
+			logf(t, "Match %d failed!\n", i)
+			logf(t, "\tHAYSTACK %s\tPATTERN %s\n", entry.s, entry.p)
+			logf(t, "\tResults: WANTED %s\tGOT %s\n", entry.result, result)
+			logf(t, "\tErr: %v\tLength %d\n", err, length)
 		}
-
-		expect(t, entry.ok == ok, "find result didnt match")
-		expect(t, result == entry.result, "entry result didnt match")
 	}
 }
 
@@ -202,12 +208,17 @@ test_captures :: proc(t: ^testing.T) {
 	// match all captures
 	compare_captures :: proc(t: ^testing.T, test: ^Temp, haystack: string, comp: []string, loc := #caller_location) {
 		length, err := lua.find_aux(haystack, test.pattern, 0, false, &test.captures)
-		expect(t, len(comp) == length, "didnt match input comparison strings", loc)
+		if failed(t, len(comp) == length) {
+			logf(t, "Captures Compare Failed -> Lengths %d != %d\n", len(comp), length)
+		}
 
 		for i in 0..<length {
 			cap := test.captures[i]
-			text := haystack[cap.start:cap.end]
-			expect(t, comp[i] == text, "didnt match comparison string", loc)
+			text := haystack[cap.byte_start:cap.byte_end]
+
+			if failed(t, comp[i] == text) {
+				logf(t, "Capture don't equal -> %s != %s\n", comp[i], text)
+			}
 		}
 	}
 
@@ -215,7 +226,12 @@ test_captures :: proc(t: ^testing.T) {
 	matches :: proc(t: ^testing.T, test: ^Temp, haystack: string, ok: bool, loc := #caller_location) {
 		length, err := lua.find_aux(haystack, test.pattern, 0, false, &test.captures)
 		result := length > 0 && err == .OK
-		expect(t, result == ok, "result didnt eq", loc)
+
+		if failed(t, result == ok) {
+			logf(t, "Capture match failed!\n")
+			logf(t, "\tErr: %v\n", err)
+			logf(t, "\tLength: %v\n", length)
+		}
 	}
 
 	temp := Temp { pattern = "(one).+" }
@@ -238,8 +254,8 @@ test_captures :: proc(t: ^testing.T) {
 		lua.find_aux(haystack, pattern, 0, false, &captures)
 		cap1 := captures[1]
 		cap2 := captures[2]
-		text1 := haystack[cap1.start:cap1.end]
-		text2 := haystack[cap2.start:cap2.end]
+		text1 := haystack[cap1.byte_start:cap1.byte_end]
+		text2 := haystack[cap2.byte_start:cap2.byte_end]
 		expect(t, text1 == "233", "Multi-Capture failed at 1")
 		expect(t, text2 == "hello", "Multi-Capture failed at 2")
 	}
@@ -247,6 +263,13 @@ test_captures :: proc(t: ^testing.T) {
 
 @test
 test_gmatch :: proc(t: ^testing.T) {
+	gmatch_check :: proc(t: ^testing.T, index: int, a: []string, b: string) {
+		if failed(t, a[index] == b) {
+			logf(t, "GMATCH %d failed!\n", index)
+			logf(t, "\t%s != %s\n", a[index], b)
+		}
+	}
+
 	{
 		haystack := "testing this out 123"
 		pattern := "%w+"
@@ -256,7 +279,7 @@ test_gmatch :: proc(t: ^testing.T) {
 		index: int
 
 		for match in lua.gmatch(s, pattern, &captures) {
-			expect(t, output[index] == match, fmt.tprintf("GMATCH %d failed: %s != %s\n", index, output[index], match))
+			gmatch_check(t, index, output[:], match)
 			index += 1
 		}
 	}
@@ -270,7 +293,7 @@ test_gmatch :: proc(t: ^testing.T) {
 		index: int
 
 		for match in lua.gmatch(s, pattern, &captures) {
-			expect(t, output[index] == match, fmt.tprintf("GMATCH %d failed: %s != %s\n", index, output[index], match))
+			gmatch_check(t, index, output[:], match)
 			index += 1
 		}
 	}
@@ -284,7 +307,7 @@ test_gmatch :: proc(t: ^testing.T) {
 		index: int
 
 		for match in lua.gmatch(s, pattern, &captures) {
-			expect(t, output[index] == match, fmt.tprintf("GMATCH %d failed: %s != %s\n", index, output[index], match))
+			gmatch_check(t, index, output[:], match)
 			index += 1
 		}
 	}		
@@ -308,11 +331,15 @@ test_gfind :: proc(t: ^testing.T) {
 	index: int
 
 	for word in lua.gfind(s, pattern, &captures) {
-		expect(t, output[index] == word, fmt.tprintf("GFIND %d failed: %s != %s\n", index, output[index], word))
+		if failed(t, output[index] == word) {
+			logf(t, "GFIND %d failed!\n", index)
+			logf(t, "\t%s != %s\n", output[index], word)
+		}
 		index += 1
 	}
 }
 
+@test
 test_frontier :: proc(t: ^testing.T) {
 	Temp :: struct {
 		t: ^testing.T,
@@ -322,11 +349,12 @@ test_frontier :: proc(t: ^testing.T) {
 	
 	call :: proc(data: rawptr, word: string) {
 		temp := cast(^Temp) data
-		expect(
-			temp.t, 
-			word == temp.output[temp.index], 
-			fmt.tprintf("frontier temp didnt match: %s != %s\n", word, temp.output[temp.index]),
-		)
+
+		if failed(temp.t, word == temp.output[temp.index]) {
+			logf(temp.t, "GSUB_WITH %d failed!\n", temp.index)
+			logf(temp.t, "\t%s != %s\n", temp.output[temp.index], word)			
+		}
+
 		temp.index += 1
 	}
 
@@ -343,8 +371,38 @@ test_frontier :: proc(t: ^testing.T) {
 	lua.gsub_with("THE (QUICK) brOWN FOx JUMPS", "%f[%a]%u+%f[%A]", &temp, call)
 }
 
+@test
+test_utf8 :: proc(t: ^testing.T) {
+	// {
+	// 	haystack := "恥ずべき恥フク恥ロ"
+	// 	s := &haystack
+	// 	captures: [lua.MAXCAPTURES]lua.Match
+
+	// 	for word in lua.gmatch(s, "恥", &captures) {
+	// 		fmt.eprintln(word)
+	// 	}
+	// }
+
+	{
+		haystack := "恥ずべき恥フク恥ロ"
+		s := &haystack
+		captures: [lua.MAXCAPTURES]lua.Match
+
+		for word in lua.gmatch(s, "w+", &captures) {
+			fmt.eprintln(word)
+		}
+	}
+
+	// captures: [MAXCAPTURES]Match
+	// length, err := lua.find_aux("damn, pattern,)
+}
+
 main :: proc() {
 	t: testing.T
+	stream := os.stream_from_handle(os.stdout)
+	w := io.to_writer(stream)
+	t.w = w
+	
 	test_find(&t)
 	test_match(&t)
 	test_captures(&t)
@@ -353,7 +411,9 @@ main :: proc() {
 	test_gfind(&t)
 	test_frontier(&t)
 
-	fmt.printf("%v/%v tests successful.\n", TEST_count - TEST_fail, TEST_count)
+	// test_utf8(&t)
+
+	fmt.wprintf(w, "%v/%v tests successful.\n", TEST_count - TEST_fail, TEST_count)
 	if TEST_fail > 0 {
 		os.exit(1)
 	}
