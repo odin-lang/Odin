@@ -3248,9 +3248,8 @@ DECL_ATTRIBUTE_PROC(proc_decl_attribute) {
 }
 
 DECL_ATTRIBUTE_PROC(var_decl_attribute) {
-	ExactValue ev = check_decl_attribute_value(c, value);
-
 	if (name == ATTRIBUTE_USER_TAG_NAME) {
+		ExactValue ev = check_decl_attribute_value(c, value);
 		if (ev.kind != ExactValue_String) {
 			error(elem, "Expected a string value for '%.*s'", LIT(name));
 		}
@@ -3262,6 +3261,7 @@ DECL_ATTRIBUTE_PROC(var_decl_attribute) {
 		ac->is_static = true;
 		return true;
 	} else if (name == "thread_local") {
+		ExactValue ev = check_decl_attribute_value(c, value);
 		if (ac->init_expr_list_count > 0) {
 			error(elem, "A thread local variable declaration cannot have initialization values");
 		} else if (c->foreign_context.curr_library) {
@@ -3336,6 +3336,7 @@ DECL_ATTRIBUTE_PROC(var_decl_attribute) {
 		}
 		return true;
 	} else if (name == "link_name") {
+		ExactValue ev = check_decl_attribute_value(c, value);
 		if (ev.kind == ExactValue_String) {
 			ac->link_name = ev.value_string;
 			if (!is_foreign_name_valid(ac->link_name)) {
@@ -3346,6 +3347,7 @@ DECL_ATTRIBUTE_PROC(var_decl_attribute) {
 		}
 		return true;
 	} else if (name == "link_prefix") {
+		ExactValue ev = check_decl_attribute_value(c, value);
 		if (ev.kind == ExactValue_String) {
 			ac->link_prefix = ev.value_string;
 			if (!is_foreign_name_valid(ac->link_prefix)) {
@@ -3356,6 +3358,7 @@ DECL_ATTRIBUTE_PROC(var_decl_attribute) {
 		}
 		return true;
 	} else if (name == "link_section") {
+		ExactValue ev = check_decl_attribute_value(c, value);
 		if (ev.kind == ExactValue_String) {
 			ac->link_section = ev.value_string;
 			if (!is_foreign_name_valid(ac->link_section)) {
