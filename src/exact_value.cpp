@@ -952,15 +952,15 @@ bool compare_exact_values(TokenKind op, ExactValue x, ExactValue y) {
 
 	case ExactValue_Typeid:
 		switch (op) {
-		case Token_CmpEq: return are_types_identical(x.value_typeid, y.value_typeid);
-		case Token_NotEq: return !are_types_identical(x.value_typeid, y.value_typeid);
+		case Token_CmpEq: return x.value_typeid == y.value_typeid;
+		case Token_NotEq: return x.value_typeid != y.value_typeid;
 		}
 		break;
 
 	case ExactValue_Procedure:
 		switch (op) {
-		case Token_CmpEq: return are_types_identical(x.value_typeid, y.value_typeid);
-		case Token_NotEq: return !are_types_identical(x.value_typeid, y.value_typeid);
+		case Token_CmpEq: return x.value_typeid == y.value_typeid;
+		case Token_NotEq: return x.value_typeid != y.value_typeid;
 		}
 		break;
 	}
