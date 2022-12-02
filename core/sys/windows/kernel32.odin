@@ -120,6 +120,12 @@ foreign kernel32 {
 		bManualReset: BOOL,
 		lpTimerName: LPCWSTR,
 	) -> HANDLE ---
+	CreateWaitableTimerExW :: proc(
+		lpTimerAttributes: LPSECURITY_ATTRIBUTES,
+		lpTimerName: LPCWSTR,
+		dwFlags: DWORD,
+		dwDesiredAccess: DWORD,
+	) -> HANDLE ---
 	SetWaitableTimerEx :: proc(
 		hTimer: HANDLE,
 		lpDueTime: ^LARGE_INTEGER,
