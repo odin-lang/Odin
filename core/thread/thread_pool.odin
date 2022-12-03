@@ -33,13 +33,13 @@ Pool :: struct {
 	num_in_processing: int,
 	num_outstanding:   int, // num_waiting + num_in_processing
 	num_done:          int,
+	is_running:        bool,
+	is_clearing:       bool,
 	// end of atomics
 
-	is_running: bool,
-	is_clearing: bool,
+	empty_event: sync.Cond,
 
 	threads: []^Thread,
-
 
 	tasks:      [dynamic]Task,
 	tasks_done: [dynamic]Task,
@@ -67,6 +67,9 @@ pool_init :: proc(pool: ^Pool, allocator: mem.Allocator, thread_count: int) {
 
 				if task, ok := pool_pop_waiting(pool); ok {
 					pool_do_work(pool, task)
+				} 
+				if pool_num_outstanding(pool) == 0 {
+					sync.cond_broadcast(&pool.empty_event)
 				}
 			}
 
@@ -121,23 +124,25 @@ started_count: int
 // Clear the waiting tasks, finish tasks that have already started processing, and reset the counts.
 // Threads stay alive and wait for new work to be added.
 pool_clear :: proc(pool: ^Pool) {
-	if sync.mutex_guard(&pool.mutex) {
-		intrinsics.atomic_store(&pool.is_clearing, true)
-		clear(&pool.tasks)
-	}
+	intrinsics.atomic_store(&pool.is_clearing, true)
+	sync.mutex_lock(&pool.mutex)
+	intrinsics.atomic_sub(&pool.num_waiting, len(pool.tasks))
+	intrinsics.atomic_sub(&pool.num_outstanding, len(pool.tasks))
+	clear(&pool.tasks)
+	// Make sure at least one thread will wake up to signal the empty event
+	sync.post(&pool.sem_available, 1)
+	sync.cond_wait(&pool.empty_event, &pool.mutex)
+	sync.mutex_unlock(&pool.mutex)
 
-	for intrinsics.atomic_load(&pool.num_in_processing) > 0 {
-		yield()
-	}
+	// Help the worker threads exhaust the semaphore
 	for sync.wait_with_timeout(&pool.sem_available, 0) {}
 
 	intrinsics.atomic_store(&pool.num_waiting, 0)
 	intrinsics.atomic_store(&pool.num_outstanding, 0)
 	intrinsics.atomic_store(&pool.num_done, 0)
-	if sync.mutex_guard(&pool.mutex) {
-		clear(&pool.tasks_done)
-		intrinsics.atomic_store(&pool.is_clearing, false)
-	}
+	sync.guard(&pool.mutex)
+	clear(&pool.tasks_done)
+	intrinsics.atomic_store(&pool.is_clearing, false)
 }
 
 // Add a task to the thread pool.
@@ -247,4 +252,16 @@ pool_finish :: proc(pool: ^Pool) {
 		pool_do_work(pool, task)
 	}
 	pool_join(pool)
+}
+
+// Process the rest of the tasks and waits for all threads to finish
+pool_finish_keep_alive :: proc(pool: ^Pool) {
+	for task in pool_pop_waiting(pool) {
+		pool_do_work(pool, task)
+	}
+
+	sync.mutex_lock(&pool.mutex)
+	// Make sure one thread will wake up to signal the empty event
+	sync.post(&pool.sem_available, 1)
+	sync.cond_wait(&pool.empty_event, &pool.mutex)
 }
