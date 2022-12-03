@@ -255,7 +255,7 @@ pool_finish :: proc(pool: ^Pool) {
 }
 
 // Process the rest of the tasks and waits for all threads to finish
-pool_finish_keep_alive :: proc(pool: ^Pool) {
+pool_wait :: proc(pool: ^Pool) {
 	for task in pool_pop_waiting(pool) {
 		pool_do_work(pool, task)
 	}
@@ -264,4 +264,5 @@ pool_finish_keep_alive :: proc(pool: ^Pool) {
 	// Make sure one thread will wake up to signal the empty event
 	sync.post(&pool.sem_available, 1)
 	sync.cond_wait(&pool.empty_event, &pool.mutex)
+	sync.mutex_unlock(&pool.mutex)
 }
