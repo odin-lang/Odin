@@ -7,15 +7,9 @@ Includes procedures to load OpenGL function pointers. Currently only supports th
 ```go
 gl.load_up_to(4, 5, proc(p: rawptr, name: cstring) do (cast(^rawptr)p)^ = glfw.GetProcAddress(name); );
 ```
-[odin-glfw](https://github.com/vassvik/odin-glfw) also provides a useful helper you can pass straight to `gl.load_up_to`:
+`vendor:glfw` also provides a useful helper you can pass straight to `gl.load_up_to`:
 ```go
 gl.load_up_to(4, 5, glfw.gl_set_proc_address);
-```
-
-#### NOTE: It is recommended to put this into the shared collection:
-```
-cd /path/to/Odin/shared
-git clone https://github.com/vassvik/odin-gl.git
 ```
 
 ## Extra utility procedures (Outdated. See the end of `gl.odin`)
