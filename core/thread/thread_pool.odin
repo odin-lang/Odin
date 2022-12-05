@@ -121,9 +121,24 @@ started_count: int
 	}
 }
 
+pool_wait_for_running :: proc(pool: ^Pool) {
+	sync.mutex_lock(&pool.mutex)
+	// Make sure at least one thread will wake up to signal the empty event
+	sync.post(&pool.sem_available, 1)
+	sync.cond_wait(&pool.empty_event, &pool.mutex)
+	sync.mutex_unlock(&pool.mutex)
+}
+
+pool_cancel_pending :: proc(pool: ^Pool) {
+	sync.guard(&pool.mutex)
+	intrinsics.atomic_sub(&pool.num_waiting, len(pool.tasks))
+	intrinsics.atomic_sub(&pool.num_outstanding, len(pool.tasks))
+	clear(&pool.tasks)
+}
+
 // Clear the waiting tasks, finish tasks that have already started processing, and reset the counts.
 // Threads stay alive and wait for new work to be added.
-pool_clear :: proc(pool: ^Pool) {
+pool_cancel_and_wait_for_running :: proc(pool: ^Pool) {
 	intrinsics.atomic_store(&pool.is_clearing, true)
 	sync.mutex_lock(&pool.mutex)
 	intrinsics.atomic_sub(&pool.num_waiting, len(pool.tasks))
@@ -139,9 +154,9 @@ pool_clear :: proc(pool: ^Pool) {
 
 	intrinsics.atomic_store(&pool.num_waiting, 0)
 	intrinsics.atomic_store(&pool.num_outstanding, 0)
-	intrinsics.atomic_store(&pool.num_done, 0)
-	sync.guard(&pool.mutex)
-	clear(&pool.tasks_done)
+	/*intrinsics.atomic_store(&pool.num_done, 0)*/
+	/*sync.guard(&pool.mutex)*/
+	/*clear(&pool.tasks_done)*/
 	intrinsics.atomic_store(&pool.is_clearing, false)
 }
 
