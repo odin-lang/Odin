@@ -85,3 +85,8 @@ foreign Opengl32 {
 	wglUseFontBitmaps         :: proc(hdc: HDC, first, count, list_base: DWORD) -> BOOL ---
 	wglUseFontOutlines        :: proc(hdc: HDC, first, count, list_base: DWORD, deviation, extrusion: f32, format: c.int, gmf: LPGLYPHMETRICSFLOAT) -> BOOL ---
 }
+
+// Used by vendor:OpenGL
+gl_set_proc_address :: proc(p: rawptr, name: cstring) {
+	(^rawptr)(p)^ = wglGetProcAddress(name)
+}
