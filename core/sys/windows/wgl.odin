@@ -85,3 +85,15 @@ foreign Opengl32 {
 	wglUseFontBitmaps         :: proc(hdc: HDC, first, count, list_base: DWORD) -> BOOL ---
 	wglUseFontOutlines        :: proc(hdc: HDC, first, count, list_base: DWORD, deviation, extrusion: f32, format: c.int, gmf: LPGLYPHMETRICSFLOAT) -> BOOL ---
 }
+
+// Used by vendor:OpenGL
+// https://www.khronos.org/opengl/wiki/Load_OpenGL_Functions#Windows
+gl_set_proc_address :: proc(p: rawptr, name: cstring) {
+	func := wglGetProcAddress(name)
+	switch uintptr(func) {
+	case 0, 1, 2, 3, ~uintptr(0):
+		module := LoadLibraryW(L("opengl32.dll"))
+		func = GetProcAddress(module, name)
+	}
+	(^rawptr)(p)^ = func
+}
