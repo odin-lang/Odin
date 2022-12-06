@@ -90,7 +90,8 @@ foreign Opengl32 {
 // https://www.khronos.org/opengl/wiki/Load_OpenGL_Functions#Windows
 gl_set_proc_address :: proc(p: rawptr, name: cstring) {
 	func := wglGetProcAddress(name)
-	if uintptr(func) == 0 || uintptr(func) == 1 || uintptr(func) == 2 || uintptr(func) == 3 || uintptr(func) == ~uintptr(0) {
+	switch uintptr(func) {
+	case 0, 1, 2, 3, ~uintptr(0):
 		module := LoadLibraryW(L("opengl32.dll"))
 		func = GetProcAddress(module, name)
 	}
