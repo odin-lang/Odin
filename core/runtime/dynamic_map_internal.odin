@@ -644,7 +644,7 @@ map_erase_dynamic :: #force_inline proc "contextless" (#no_alias m: ^Raw_Map, #n
 		// TODO(bill): determine a good value for this empirically
 		// if we do not implement backward shift deletion
 		PROBE_COUNT :: 8
-		for i in 0..<PROBE_COUNT {
+		for _ in 0..<PROBE_COUNT {
 			next_index := (curr_index + 1) & mask
 			if next_index == index {
 				// looped around
