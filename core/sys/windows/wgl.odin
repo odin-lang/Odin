@@ -87,6 +87,13 @@ foreign Opengl32 {
 }
 
 // Used by vendor:OpenGL
+// https://www.khronos.org/opengl/wiki/Load_OpenGL_Functions#Windows
 gl_set_proc_address :: proc(p: rawptr, name: cstring) {
-	(^rawptr)(p)^ = wglGetProcAddress(name)
+	func := wglGetProcAddress(name)
+	switch uintptr(func) {
+	case 0, 1, 2, 3, ~uintptr(0):
+		module := LoadLibraryW(L("opengl32.dll"))
+		func = GetProcAddress(module, name)
+	}
+	(^rawptr)(p)^ = func
 }
