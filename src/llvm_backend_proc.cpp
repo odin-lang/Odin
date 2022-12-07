@@ -346,6 +346,7 @@ lbProcedure *lb_create_dummy_procedure(lbModule *m, String link_name, Type *type
 	p->blocks.allocator        = a;
 	p->branch_blocks.allocator = a;
 	p->context_stack.allocator = a;
+	map_init(&p->tuple_fix_map, a, 0);
 
 
 	char *c_link_name = alloc_cstring(permanent_allocator(), p->name);
