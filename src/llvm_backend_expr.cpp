@@ -134,7 +134,7 @@ lbValue lb_emit_unary_arith(lbProcedure *p, TokenKind op, lbValue x, Type *type)
 		Type *elem_type = base_array_type(type);
 
 		// NOTE(bill): Doesn't need to be zero because it will be initialized in the loops
-		lbAddr res_addr = lb_add_local(p, type, nullptr, false, 0, true);
+		lbAddr res_addr = lb_add_local(p, type, nullptr, false, true);
 		lbValue res = lb_addr_get_ptr(p, res_addr);
 
 		bool inline_array_arith = lb_can_try_to_inline_array_arith(type);

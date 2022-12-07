@@ -254,15 +254,13 @@ struct lbTargetList {
 };
 
 
+struct lbTupleFix {
+	Slice<lbValue> values;
+};
+
 enum lbProcedureFlag : u32 {
 	lbProcedureFlag_WithoutMemcpyPass = 1<<0,
 	lbProcedureFlag_DebugAllocaCopy = 1<<1,
-};
-
-struct lbCopyElisionHint {
-	lbValue ptr;
-	Ast *   ast;
-	bool    used;
 };
 
 struct lbProcedure {
@@ -310,10 +308,9 @@ struct lbProcedure {
 
 	LLVMMetadataRef debug_info;
 
-	lbCopyElisionHint copy_elision_hint;
-
 	PtrMap<Ast *, lbValue> selector_values;
 	PtrMap<Ast *, lbAddr>  selector_addr;
+	PtrMap<LLVMValueRef, lbTupleFix> tuple_fix_map;
 };
 
 
@@ -368,6 +365,7 @@ lbValue lb_emit_epi(lbModule *m, lbValue const &value, isize index);
 lbValue lb_emit_array_epi(lbModule *m, lbValue s, isize index);
 lbValue lb_emit_struct_ep(lbProcedure *p, lbValue s, i32 index);
 lbValue lb_emit_struct_ev(lbProcedure *p, lbValue s, i32 index);
+lbValue lb_emit_tuple_ev(lbProcedure *p, lbValue value, i32 index);
 lbValue lb_emit_array_epi(lbProcedure *p, lbValue value, isize index);
 lbValue lb_emit_array_ep(lbProcedure *p, lbValue s, lbValue index);
 lbValue lb_emit_deep_field_gep(lbProcedure *p, lbValue e, Selection sel);
@@ -383,7 +381,7 @@ lbValue lb_emit_byte_swap(lbProcedure *p, lbValue value, Type *end_type);
 void lb_emit_defer_stmts(lbProcedure *p, lbDeferExitKind kind, lbBlock *block);
 lbValue lb_emit_transmute(lbProcedure *p, lbValue value, Type *t);
 lbValue lb_emit_comp(lbProcedure *p, TokenKind op_kind, lbValue left, lbValue right);
-lbValue lb_emit_call(lbProcedure *p, lbValue value, Array<lbValue> const &args, ProcInlining inlining = ProcInlining_none, bool use_return_ptr_hint = false);
+lbValue lb_emit_call(lbProcedure *p, lbValue value, Array<lbValue> const &args, ProcInlining inlining = ProcInlining_none);
 lbValue lb_emit_conv(lbProcedure *p, lbValue value, Type *t);
 lbValue lb_emit_comp_against_nil(lbProcedure *p, TokenKind op_kind, lbValue x);
 
@@ -400,7 +398,7 @@ lbContextData *lb_push_context_onto_stack_from_implicit_parameter(lbProcedure *p
 
 
 lbAddr lb_add_global_generated(lbModule *m, Type *type, lbValue value={}, Entity **entity_=nullptr);
-lbAddr lb_add_local(lbProcedure *p, Type *type, Entity *e=nullptr, bool zero_init=true, i32 param_index=0, bool force_no_init=false);
+lbAddr lb_add_local(lbProcedure *p, Type *type, Entity *e=nullptr, bool zero_init=true, bool force_no_init=false);
 
 void lb_add_foreign_library_path(lbModule *m, Entity *e);
 
@@ -496,10 +494,6 @@ LLVMValueRef llvm_alloca(lbProcedure *p, LLVMTypeRef llvm_type, isize alignment,
 void lb_mem_zero_ptr(lbProcedure *p, LLVMValueRef ptr, Type *type, unsigned alignment);
 
 void lb_emit_init_context(lbProcedure *p, lbAddr addr);
-
-lbCopyElisionHint lb_set_copy_elision_hint(lbProcedure *p, lbAddr const &addr, Ast *ast);
-void lb_reset_copy_elision_hint(lbProcedure *p, lbCopyElisionHint prev_hint);
-lbValue lb_consume_copy_elision_hint(lbProcedure *p);
 
 
 lbStructFieldRemapping lb_get_struct_remapping(lbModule *m, Type *t);

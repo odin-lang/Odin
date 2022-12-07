@@ -2018,6 +2018,9 @@ void check_stmt_internal(CheckerContext *ctx, Ast *node, u32 flags) {
 			ctx->in_defer = true;
 			check_stmt(ctx, ds->stmt, 0);
 			ctx->in_defer = out_in_defer;
+			if (ctx->decl) {
+				ctx->decl->defer_used += 1;
+			}
 		}
 	case_end;
 

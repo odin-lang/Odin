@@ -1,31 +1,3 @@
-lbCopyElisionHint lb_set_copy_elision_hint(lbProcedure *p, lbAddr const &addr, Ast *ast) {
-	lbCopyElisionHint prev = p->copy_elision_hint;
-	p->copy_elision_hint.used = false;
-	p->copy_elision_hint.ptr = {};
-	p->copy_elision_hint.ast = nullptr;
-	#if 0
-	if (addr.kind == lbAddr_Default && addr.addr.value != nullptr) {
-		p->copy_elision_hint.ptr = lb_addr_get_ptr(p, addr);
-		p->copy_elision_hint.ast = unparen_expr(ast);
-	}
-	#endif
-	return prev;
-}
-
-void lb_reset_copy_elision_hint(lbProcedure *p, lbCopyElisionHint prev_hint) {
-	p->copy_elision_hint = prev_hint;
-}
-
-
-lbValue lb_consume_copy_elision_hint(lbProcedure *p) {
-	lbValue return_ptr = p->copy_elision_hint.ptr;
-	p->copy_elision_hint.used = true;
-	p->copy_elision_hint.ptr = {};
-	p->copy_elision_hint.ast = nullptr;
-	return return_ptr;
-}
-
-
 void lb_build_constant_value_decl(lbProcedure *p, AstValueDecl *vd) {
 	if (vd == nullptr || vd->is_mutable) {
 		return;
@@ -726,13 +698,13 @@ void lb_build_range_tuple(lbProcedure *p, Ast *expr, Type *val0_type, Type *val1
 	i32 tuple_count = cast(i32)tuple->Tuple.variables.count;
 	i32 cond_index = tuple_count-1;
 
-	lbValue cond = lb_emit_struct_ev(p, tuple_value, cond_index);
+	lbValue cond = lb_emit_tuple_ev(p, tuple_value, cond_index);
 	lb_emit_if(p, cond, body, done);
 	lb_start_block(p, body);
 
 
-	if (val0_) *val0_ = lb_emit_struct_ev(p, tuple_value, 0);
-	if (val1_) *val1_ = lb_emit_struct_ev(p, tuple_value, 1);
+	if (val0_) *val0_ = lb_emit_tuple_ev(p, tuple_value, 0);
+	if (val1_) *val1_ = lb_emit_tuple_ev(p, tuple_value, 1);
 	if (loop_) *loop_ = loop;
 	if (done_) *done_ = done;
 }
@@ -1571,6 +1543,24 @@ void lb_build_static_variables(lbProcedure *p, AstValueDecl *vd) {
 		lb_add_member(p->module, mangled_name, global_val);
 	}
 }
+void lb_append_tuple_values(lbProcedure *p, Array<lbValue> *dst_values, lbValue src_value) {
+	Type *t = src_value.type;
+	if (t->kind == Type_Tuple) {
+		lbTupleFix *tf = map_get(&p->tuple_fix_map, src_value.value);
+		if (tf) {
+			for_array(j, tf->values) {
+				array_add(dst_values, tf->values[j]);
+			}
+		} else {
+			for_array(i, t->Tuple.variables) {
+				lbValue v = lb_emit_tuple_ev(p, src_value, cast(i32)i);
+				array_add(dst_values, v);
+			}
+		}
+	} else {
+		array_add(dst_values, src_value);
+	}
+}
 
 
 void lb_build_assignment(lbProcedure *p, Array<lbAddr> &lvals, Slice<Ast *> const &values) {
@@ -1582,23 +1572,8 @@ void lb_build_assignment(lbProcedure *p, Array<lbAddr> &lvals, Slice<Ast *> cons
 
 	for_array(i, values) {
 		Ast *rhs = values[i];
-		if (is_type_tuple(type_of_expr(rhs))) {
-			lbValue init = lb_build_expr(p, rhs);
-			Type *t = init.type;
-			GB_ASSERT(t->kind == Type_Tuple);
-			for_array(i, t->Tuple.variables) {
-				lbValue v = lb_emit_struct_ev(p, init, cast(i32)i);
-				array_add(&inits, v);
-			}
-		} else {
-			auto prev_hint = lb_set_copy_elision_hint(p, lvals[inits.count], rhs);
-			lbValue init = lb_build_expr(p, rhs);
-			if (p->copy_elision_hint.used) {
-				lvals[inits.count] = {}; // zero lval
-			}
-			lb_reset_copy_elision_hint(p, prev_hint);
-			array_add(&inits, init);
-		}
+		lbValue init = lb_build_expr(p, rhs);
+		lb_append_tuple_values(p, &inits, init);
 	}
 
 	GB_ASSERT(lvals.count == inits.count);
@@ -1609,9 +1584,14 @@ void lb_build_assignment(lbProcedure *p, Array<lbAddr> &lvals, Slice<Ast *> cons
 	}
 }
 
-void lb_build_return_stmt_internal(lbProcedure *p, lbValue const &res) {
-	lbFunctionType *ft = lb_get_function_type(p->module, p, p->type);
+void lb_build_return_stmt_internal(lbProcedure *p, lbValue res) {
+	lbFunctionType *ft = lb_get_function_type(p->module, p->type);
 	bool return_by_pointer = ft->ret.kind == lbArg_Indirect;
+	bool split_returns = ft->multiple_return_original_type != nullptr;
+
+	if (split_returns) {
+		GB_ASSERT(res.value == nullptr || !is_type_tuple(res.type));
+	}
 
 	if (return_by_pointer) {
 		if (res.value != nullptr) {
@@ -1650,7 +1630,7 @@ void lb_build_return_stmt(lbProcedure *p, Slice<Ast *> const &return_results) {
 	isize return_count = p->type->Proc.result_count;
 	isize res_count = return_results.count;
 
-	lbFunctionType *ft = lb_get_function_type(p->module, p, p->type);
+	lbFunctionType *ft = lb_get_function_type(p->module, p->type);
 	bool return_by_pointer = ft->ret.kind == lbArg_Indirect;
 
 	if (return_count == 0) {
@@ -1683,15 +1663,7 @@ void lb_build_return_stmt(lbProcedure *p, Slice<Ast *> const &return_results) {
 		if (res_count != 0) {
 			for (isize res_index = 0; res_index < res_count; res_index++) {
 				lbValue res = lb_build_expr(p, return_results[res_index]);
-				Type *t = res.type;
-				if (t->kind == Type_Tuple) {
-					for_array(i, t->Tuple.variables) {
-						lbValue v = lb_emit_struct_ev(p, res, cast(i32)i);
-						array_add(&results, v);
-					}
-				} else {
-					array_add(&results, res);
-				}
+				lb_append_tuple_values(p, &results, res);
 			}
 		} else {
 			for (isize res_index = 0; res_index < return_count; res_index++) {
@@ -1727,35 +1699,68 @@ void lb_build_return_stmt(lbProcedure *p, Slice<Ast *> const &return_results) {
 			}
 		}
 
-		Type *ret_type = p->type->Proc.results;
+		bool split_returns = ft->multiple_return_original_type != nullptr;
+		if (split_returns) {
+			auto result_values = slice_make<lbValue>(temporary_allocator(), results.count);
+			auto result_eps = slice_make<lbValue>(temporary_allocator(), results.count-1);
 
-		// NOTE(bill): Doesn't need to be zero because it will be initialized in the loops
-		if (return_by_pointer) {
-			res = p->return_ptr.addr;
+			for_array(i, results) {
+				result_values[i] = lb_emit_conv(p, results[i], tuple->variables[i]->type);
+			}
+
+			isize param_offset = return_by_pointer ? 1 : 0;
+			param_offset += ft->original_arg_count;
+			for_array(i, result_eps) {
+				lbValue result_ep = {};
+				result_ep.value = LLVMGetParam(p->value, cast(unsigned)(param_offset+i));
+				result_ep.type = alloc_type_pointer(tuple->variables[i]->type);
+				result_eps[i] = result_ep;
+			}
+			for_array(i, result_eps) {
+				lb_emit_store(p, result_eps[i], result_values[i]);
+			}
+			if (return_by_pointer) {
+				GB_ASSERT(result_values.count-1 == result_eps.count);
+				lb_addr_store(p, p->return_ptr, result_values[result_values.count-1]);
+
+				lb_emit_defer_stmts(p, lbDeferExit_Return, nullptr);
+				LLVMBuildRetVoid(p->builder);
+				return;
+			} else {
+				return lb_build_return_stmt_internal(p, result_values[result_values.count-1]);
+			}
+
 		} else {
-			res = lb_add_local_generated(p, ret_type, false).addr;
-		}
+			Type *ret_type = p->type->Proc.results;
 
-		auto result_values = slice_make<lbValue>(temporary_allocator(), results.count);
-		auto result_eps = slice_make<lbValue>(temporary_allocator(), results.count);
+			// NOTE(bill): Doesn't need to be zero because it will be initialized in the loops
+			if (return_by_pointer) {
+				res = p->return_ptr.addr;
+			} else {
+				res = lb_add_local_generated(p, ret_type, false).addr;
+			}
 
-		for_array(i, results) {
-			result_values[i] = lb_emit_conv(p, results[i], tuple->variables[i]->type);
-		}
-		for_array(i, results) {
-			result_eps[i] = lb_emit_struct_ep(p, res, cast(i32)i);
-		}
-		for_array(i, result_values) {
-			lb_emit_store(p, result_eps[i], result_values[i]);
-		}
+			auto result_values = slice_make<lbValue>(temporary_allocator(), results.count);
+			auto result_eps = slice_make<lbValue>(temporary_allocator(), results.count);
 
-		if (return_by_pointer) {
-			lb_emit_defer_stmts(p, lbDeferExit_Return, nullptr);
-			LLVMBuildRetVoid(p->builder);
-			return;
-		}
+			for_array(i, results) {
+				result_values[i] = lb_emit_conv(p, results[i], tuple->variables[i]->type);
+			}
+			for_array(i, results) {
+				result_eps[i] = lb_emit_struct_ep(p, res, cast(i32)i);
+			}
+			for_array(i, result_eps) {
+				lb_emit_store(p, result_eps[i], result_values[i]);
+			}
 
-		res = lb_emit_load(p, res);
+			if (return_by_pointer) {
+				lb_emit_defer_stmts(p, lbDeferExit_Return, nullptr);
+				LLVMBuildRetVoid(p->builder);
+				return;
+			}
+
+			res = lb_emit_load(p, res);
+		}
 	}
 	lb_build_return_stmt_internal(p, res);
 }
