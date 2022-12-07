@@ -230,6 +230,8 @@ map_data :: #force_inline proc "contextless" (m: Raw_Map) -> uintptr {
 
 Map_Hash :: uintptr
 
+TOMBSTONE_MASK :: 1<<(size_of(Map_Hash)*8 - 1)
+
 // Procedure to check if a slot is empty for a given hash. This is represented
 // by the zero value to make the zero value useful. This is a procedure just
 // for prose reasons.
@@ -241,14 +243,12 @@ map_hash_is_empty :: #force_inline proc "contextless" (hash: Map_Hash) -> bool {
 @(require_results)
 map_hash_is_deleted :: #force_no_inline proc "contextless" (hash: Map_Hash) -> bool {
 	// The MSB indicates a tombstone
-	N :: size_of(Map_Hash)*8 - 1
-	return hash >> N != 0
+	return hash & TOMBSTONE_MASK != 0
 }
 @(require_results)
 map_hash_is_valid :: #force_inline proc "contextless" (hash: Map_Hash) -> bool {
 	// The MSB indicates a tombstone
-	N :: size_of(Map_Hash)*8 - 1
-	return (hash != 0) & (hash >> N == 0)
+	return (hash != 0) & (hash & TOMBSTONE_MASK == 0)
 }
 
 
@@ -627,15 +627,58 @@ map_exists_dynamic :: proc "contextless" (m: Raw_Map, #no_alias info: ^Map_Info,
 
 @(require_results)
 map_erase_dynamic :: #force_inline proc "contextless" (#no_alias m: ^Raw_Map, #no_alias info: ^Map_Info, k: uintptr) -> (old_k, old_v: uintptr, ok: bool) {
-	MASK :: 1 << (size_of(Map_Hash)*8 - 1)
-
 	index := map_lookup_dynamic(m^, info, k) or_return
 	ks, vs, hs, _, _ := map_kvh_data_dynamic(m^, info)
-	hs[index] |= MASK
+	hs[index] |= TOMBSTONE_MASK
 	old_k = map_cell_index_dynamic(ks, info.ks, index)
 	old_v = map_cell_index_dynamic(vs, info.vs, index)
 	m.len -= 1
 	ok = true
+
+	{ // coalesce tombstones
+		// HACK NOTE(bill): This is an ugly bodge but it is coalescing the tombstone slots
+		// TODO(bill): we should do backward shift deletion and not rely on tombstone slots
+		mask := (uintptr(1)<<map_log2_cap(m^)) - 1
+		curr_index := uintptr(index)
+
+		// TODO(bill): determine a good value for this empirically
+		// if we do not implement backward shift deletion
+		PROBE_COUNT :: 8
+		for _ in 0..<PROBE_COUNT {
+			next_index := (curr_index + 1) & mask
+			if next_index == index {
+				// looped around
+				break
+			}
+
+			// if the next element is empty or has zero probe distance, then any lookup
+			// will always fail on the next, so we can clear both of them
+			hash := hs[next_index]
+			if map_hash_is_empty(hash) || map_probe_distance(m^, hash, next_index) == 0 {
+				hs[curr_index] = 0
+				return
+			}
+
+			// now the next element will have a probe count of at least one,
+			// so it can use the delete slot instead
+			hs[curr_index] = hs[next_index]
+
+			mem_copy_non_overlapping(
+				rawptr(map_cell_index_dynamic(ks, info.ks, curr_index)),
+				rawptr(map_cell_index_dynamic(ks, info.ks, next_index)),
+				int(info.ks.size_of_type),
+			)
+			mem_copy_non_overlapping(
+				rawptr(map_cell_index_dynamic(vs, info.vs, curr_index)),
+				rawptr(map_cell_index_dynamic(vs, info.vs, next_index)),
+				int(info.vs.size_of_type),
+			)
+
+			curr_index = next_index
+		}
+
+		hs[curr_index] |= TOMBSTONE_MASK
+	}
 	return
 }
 
