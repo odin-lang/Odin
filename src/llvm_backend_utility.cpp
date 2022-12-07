@@ -339,16 +339,16 @@ void lb_emit_try_lhs_rhs(lbProcedure *p, Ast *arg, TypeAndValue const &tv, lbVal
 	if (is_type_tuple(value.type)) {
 		i32 n = cast(i32)(value.type->Tuple.variables.count-1);
 		if (value.type->Tuple.variables.count == 2) {
-			lhs = lb_emit_struct_ev(p, value, 0);
+			lhs = lb_emit_tuple_ev(p, value, 0);
 		} else {
 			lbAddr lhs_addr = lb_add_local_generated(p, tv.type, false);
 			lbValue lhs_ptr = lb_addr_get_ptr(p, lhs_addr);
 			for (i32 i = 0; i < n; i++) {
-				lb_emit_store(p, lb_emit_struct_ep(p, lhs_ptr, i), lb_emit_struct_ev(p, value, i));
+				lb_emit_store(p, lb_emit_struct_ep(p, lhs_ptr, i), lb_emit_tuple_ev(p, value, i));
 			}
 			lhs = lb_addr_load(p, lhs_addr);
 		}
-		rhs = lb_emit_struct_ev(p, value, n);
+		rhs = lb_emit_tuple_ev(p, value, n);
 	} else {
 		rhs = value;
 	}
@@ -436,7 +436,7 @@ lbValue lb_emit_or_else(lbProcedure *p, Ast *arg, Ast *else_expr, TypeAndValue c
 }
 
 void lb_build_return_stmt(lbProcedure *p, Slice<Ast *> const &return_results);
-void lb_build_return_stmt_internal(lbProcedure *p, lbValue const &res);
+void lb_build_return_stmt_internal(lbProcedure *p, lbValue res);
 
 lbValue lb_emit_or_return(lbProcedure *p, Ast *arg, TypeAndValue const &tv) {
 	lbValue lhs = {};
@@ -943,6 +943,54 @@ char const *llvm_type_kinds[] = {
 	"LLVMBFloatTypeKind",
 };
 
+gb_internal lbValue lb_emit_struct_ep_internal(lbProcedure *p, lbValue s, i32 index, Type *result_type) {
+	Type *t = base_type(type_deref(s.type));
+
+	i32 original_index = index;
+	index = lb_convert_struct_index(p->module, t, index);
+
+	if (lb_is_const(s)) {
+		// NOTE(bill): this cannot be replaced with lb_emit_epi
+		lbModule *m = p->module;
+		lbValue res = {};
+		LLVMValueRef indices[2] = {llvm_zero(m), LLVMConstInt(lb_type(m, t_i32), index, false)};
+		res.value = LLVMConstGEP2(lb_type(m, type_deref(s.type)), s.value, indices, gb_count_of(indices));
+		res.type = alloc_type_pointer(result_type);
+		return res;
+	} else {
+		lbValue res = {};
+		LLVMTypeRef st = lb_type(p->module, type_deref(s.type));
+		// gb_printf_err("%s\n", type_to_string(s.type));
+		// gb_printf_err("%s\n", LLVMPrintTypeToString(LLVMTypeOf(s.value)));
+		// gb_printf_err("%d\n", index);
+		GB_ASSERT_MSG(LLVMGetTypeKind(st) == LLVMStructTypeKind, "%s", llvm_type_kinds[LLVMGetTypeKind(st)]);
+		unsigned count = LLVMCountStructElementTypes(st);
+		GB_ASSERT_MSG(count >= cast(unsigned)index, "%u %d %d", count, index, original_index);
+
+		res.value = LLVMBuildStructGEP2(p->builder, st, s.value, cast(unsigned)index, "");
+		res.type = alloc_type_pointer(result_type);
+		return res;
+	}
+}
+
+lbValue lb_emit_tuple_ep(lbProcedure *p, lbValue ptr, i32 index) {
+	Type *t = type_deref(ptr.type);
+	GB_ASSERT(is_type_tuple(t));
+	Type *result_type = t->Tuple.variables[index]->type;
+
+	lbValue res = {};
+	lbTupleFix *tf = map_get(&p->tuple_fix_map, ptr.value);
+	if (tf) {
+		res = tf->values[index];
+		GB_ASSERT(are_types_identical(res.type, result_type));
+		res = lb_address_from_load_or_generate_local(p, res);
+	} else {
+		res = lb_emit_struct_ep_internal(p, ptr, index, result_type);
+	}
+	return res;
+}
+
+
 lbValue lb_emit_struct_ep(lbProcedure *p, lbValue s, i32 index) {
 	GB_ASSERT(is_type_pointer(s.type));
 	Type *t = base_type(type_deref(s.type));
@@ -958,8 +1006,7 @@ lbValue lb_emit_struct_ep(lbProcedure *p, lbValue s, i32 index) {
 		GB_ASSERT(index == -1);
 		return lb_emit_union_tag_ptr(p, s);
 	} else if (is_type_tuple(t)) {
-		GB_ASSERT(t->Tuple.variables.count > 0);
-		result_type = t->Tuple.variables[index]->type;
+		return lb_emit_tuple_ep(p, s, index);
 	} else if (is_type_complex(t)) {
 		Type *ft = base_complex_elem_type(t);
 		switch (index) {
@@ -1024,34 +1071,45 @@ lbValue lb_emit_struct_ep(lbProcedure *p, lbValue s, i32 index) {
 
 	GB_ASSERT_MSG(result_type != nullptr, "%s %d", type_to_string(t), index);
 	
-	i32 original_index = index;
-	index = lb_convert_struct_index(p->module, t, index);
-	
-	if (lb_is_const(s)) {
-		// NOTE(bill): this cannot be replaced with lb_emit_epi
-		lbModule *m = p->module;
-		lbValue res = {};
-		LLVMValueRef indices[2] = {llvm_zero(m), LLVMConstInt(lb_type(m, t_i32), index, false)};
-		res.value = LLVMConstGEP2(lb_type(m, type_deref(s.type)), s.value, indices, gb_count_of(indices));
-		res.type = alloc_type_pointer(result_type);
-		return res;
+	return lb_emit_struct_ep_internal(p, s, index, result_type);
+}
+
+lbValue lb_emit_tuple_ev(lbProcedure *p, lbValue value, i32 index) {
+	Type *t = value.type;
+	GB_ASSERT(is_type_tuple(t));
+	Type *result_type = t->Tuple.variables[index]->type;
+
+	lbValue res = {};
+	lbTupleFix *tf = map_get(&p->tuple_fix_map, value.value);
+	if (tf) {
+		res = tf->values[index];
+		GB_ASSERT(are_types_identical(res.type, result_type));
 	} else {
-		lbValue res = {};
-		LLVMTypeRef st = lb_type(p->module, type_deref(s.type));
-		// gb_printf_err("%s\n", type_to_string(s.type));
-		// gb_printf_err("%s\n", LLVMPrintTypeToString(LLVMTypeOf(s.value)));
-		// gb_printf_err("%d\n", index);
-		GB_ASSERT_MSG(LLVMGetTypeKind(st) == LLVMStructTypeKind, "%s", llvm_type_kinds[LLVMGetTypeKind(st)]);
-		unsigned count = LLVMCountStructElementTypes(st);
-		GB_ASSERT_MSG(count >= cast(unsigned)index, "%u %d %d", count, index, original_index);
-		
-		res.value = LLVMBuildStructGEP2(p->builder, st, s.value, cast(unsigned)index, "");
-		res.type = alloc_type_pointer(result_type);
-		return res;
+		if (t->Tuple.variables.count == 1) {
+			GB_ASSERT(index == 0);
+			// value.type = result_type;
+			return value;
+		}
+		if (LLVMIsALoadInst(value.value)) {
+			lbValue res = {};
+			res.value = LLVMGetOperand(value.value, 0);
+			res.type = alloc_type_pointer(value.type);
+			lbValue ptr = lb_emit_struct_ep(p, res, index);
+			return lb_emit_load(p, ptr);
+		}
+
+		res.value = LLVMBuildExtractValue(p->builder, value.value, cast(unsigned)index, "");
+		res.type = result_type;
 	}
+	return res;
 }
 
 lbValue lb_emit_struct_ev(lbProcedure *p, lbValue s, i32 index) {
+	Type *t = base_type(s.type);
+	if (is_type_tuple(t)) {
+		return lb_emit_tuple_ev(p, s, index);
+	}
+
 	if (LLVMIsALoadInst(s.value)) {
 		lbValue res = {};
 		res.value = LLVMGetOperand(s.value, 0);
@@ -1060,7 +1118,6 @@ lbValue lb_emit_struct_ev(lbProcedure *p, lbValue s, i32 index) {
 		return lb_emit_load(p, ptr);
 	}
 
-	Type *t = base_type(s.type);
 	Type *result_type = nullptr;
 
 	switch (t->kind) {
@@ -1113,12 +1170,7 @@ lbValue lb_emit_struct_ev(lbProcedure *p, lbValue s, i32 index) {
 		GB_PANIC("lb_emit_union_tag_value");
 
 	case Type_Tuple:
-		GB_ASSERT(t->Tuple.variables.count > 0);
-		result_type = t->Tuple.variables[index]->type;
-		if (t->Tuple.variables.count == 1) {
-			return s;
-		}
-		break;
+		return lb_emit_tuple_ev(p, s, index);
 	case Type_Slice:
 		switch (index) {
 		case 0: result_type = alloc_type_pointer(t->Slice.elem); break;
