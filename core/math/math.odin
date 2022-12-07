@@ -114,6 +114,92 @@ exp       :: proc{
 	exp_f64, exp_f64le, exp_f64be,
 }
 
+pow10_f16le :: proc "contextless" (x: f16le) -> f16le { return #force_inline f16le(pow10_f16(f16(x))) }
+pow10_f16be :: proc "contextless" (x: f16be) -> f16be { return #force_inline f16be(pow10_f16(f16(x))) }
+pow10_f32le :: proc "contextless" (x: f32le) -> f32le { return #force_inline f32le(pow10_f32(f32(x))) }
+pow10_f32be :: proc "contextless" (x: f32be) -> f32be { return #force_inline f32be(pow10_f32(f32(x))) }
+pow10_f64le :: proc "contextless" (x: f64le) -> f64le { return #force_inline f64le(pow10_f64(f64(x))) }
+pow10_f64be :: proc "contextless" (x: f64be) -> f64be { return #force_inline f64be(pow10_f64(f64(x))) }
+pow10       :: proc{
+	pow10_f16, pow10_f16le, pow10_f16be,
+	pow10_f32, pow10_f32le, pow10_f32be,
+	pow10_f64, pow10_f64le, pow10_f64be,
+}
+
+pow10_f16 :: proc "contextless" (n: f16) -> f16 {
+	@static pow10_pos_tab := [?]f16{
+		1e00, 1e01, 1e02, 1e03, 1e04,
+	}
+	@static pow10_neg_tab := [?]f16{
+		1e-00, 1e-01, 1e-02, 1e-03, 1e-04, 1e-05, 1e-06, 1e-07,
+	}
+
+	if 0 <= n && n <= 4 {
+		return pow10_pos_tab[uint(n)]
+	}
+	if -7 <= n && n <= 0 {
+		return pow10_neg_tab[uint(-n)]
+	}
+	if n > 0 {
+		return inf_f16(1)
+	}
+	return 0
+}
+
+pow10_f32 :: proc "contextless" (n: f32) -> f32 {
+	@static pow10_pos_tab := [?]f32{
+		1e00, 1e01, 1e02, 1e03, 1e04, 1e05, 1e06, 1e07, 1e08, 1e09,
+		1e10, 1e11, 1e12, 1e13, 1e14, 1e15, 1e16, 1e17, 1e18, 1e19,
+		1e20, 1e21, 1e22, 1e23, 1e24, 1e25, 1e26, 1e27, 1e28, 1e29,
+		1e30, 1e31, 1e32, 1e33, 1e34, 1e35, 1e36, 1e37, 1e38,
+	}
+	@static pow10_neg_tab := [?]f32{
+		1e-00, 1e-01, 1e-02, 1e-03, 1e-04, 1e-05, 1e-06, 1e-07, 1e-08, 1e-09,
+		1e-10, 1e-11, 1e-12, 1e-13, 1e-14, 1e-15, 1e-16, 1e-17, 1e-18, 1e-19,
+		1e-20, 1e-21, 1e-22, 1e-23, 1e-24, 1e-25, 1e-26, 1e-27, 1e-28, 1e-29,
+		1e-30, 1e-31, 1e-32, 1e-33, 1e-34, 1e-35, 1e-36, 1e-37, 1e-38, 1e-39,
+		1e-40, 1e-41, 1e-42, 1e-43, 1e-44, 1e-45,
+	}
+
+	if 0 <= n && n <= 38 {
+		return pow10_pos_tab[uint(n)]
+	}
+	if -45 <= n && n <= 0 {
+		return pow10_neg_tab[uint(-n)]
+	}
+	if n > 0 {
+		return inf_f32(1)
+	}
+	return 0
+}
+
+pow10_f64 :: proc "contextless" (n: f64) -> f64 {
+	@static pow10_tab := [?]f64{
+		1e00, 1e01, 1e02, 1e03, 1e04, 1e05, 1e06, 1e07, 1e08, 1e09,
+		1e10, 1e11, 1e12, 1e13, 1e14, 1e15, 1e16, 1e17, 1e18, 1e19,
+		1e20, 1e21, 1e22, 1e23, 1e24, 1e25, 1e26, 1e27, 1e28, 1e29,
+		1e30, 1e31,
+	}
+	@static pow10_pos_tab32 := [?]f64{
+		1e00, 1e32, 1e64, 1e96, 1e128, 1e160, 1e192, 1e224, 1e256, 1e288,
+	}
+	@static pow10_neg_tab32 := [?]f64{
+		1e-00, 1e-32, 1e-64, 1e-96, 1e-128, 1e-160, 1e-192, 1e-224, 1e-256, 1e-288, 1e-320,
+	}
+
+	if 0 <= n && n <= 308 {
+		return pow10_pos_tab32[uint(n)/32] * pow10_tab[uint(n)%32]
+	}
+	if -323 <= n && n <= 0 {
+		return pow10_neg_tab32[uint(-n)/32] / pow10_tab[uint(-n)%32]
+	}
+
+	if n > 0 {
+		return inf_f64(1)
+	}
+	return 0
+}
+
 
 
 ldexp_f64 :: proc "contextless" (val: f64, exp: int) -> f64 {
