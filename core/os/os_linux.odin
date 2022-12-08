@@ -441,7 +441,7 @@ _get_errno :: proc(res: int) -> Errno {
 }
 
 // get errno from libc
-get_last_error :: proc() -> int {
+get_last_error :: proc "contextless" () -> int {
 	return __errno_location()^
 }
 

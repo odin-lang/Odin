@@ -333,7 +333,7 @@ foreign dl {
 	@(link_name="dlerror") _unix_dlerror :: proc() -> cstring ---
 }
 
-get_last_error :: proc() -> int {
+get_last_error :: proc "contextless" () -> int {
 	return __error()^
 }
 
