@@ -282,7 +282,15 @@ Once :: struct {
 }
 
 // once_do calls the procedure fn if and only if once_do is being called for the first for this instance of Once.
-once_do :: proc(o: ^Once, fn: proc()) {
+once_do :: proc{
+	once_do_without_data,
+	once_do_without_data_contextless,
+	once_do_with_data,
+	once_do_with_data_contextless,
+}
+
+// once_do_without_data calls the procedure fn if and only if once_do_without_data is being called for the first for this instance of Once.
+once_do_without_data :: proc(o: ^Once, fn: proc()) {
 	@(cold)
 	do_slow :: proc(o: ^Once, fn: proc()) {
 		guard(&o.m)
@@ -292,11 +300,60 @@ once_do :: proc(o: ^Once, fn: proc()) {
 		}
 	}
 
-	
 	if atomic_load_explicit(&o.done, .Acquire) == false {
 		do_slow(o, fn)
 	}
 }
+
+// once_do_without_data calls the procedure fn if and only if once_do_without_data is being called for the first for this instance of Once.
+once_do_without_data_contextless :: proc(o: ^Once, fn: proc "contextless" ()) {
+	@(cold)
+	do_slow :: proc(o: ^Once, fn: proc "contextless" ()) {
+		guard(&o.m)
+		if !o.done {
+			fn()
+			atomic_store_explicit(&o.done, true, .Release)
+		}
+	}
+
+	if atomic_load_explicit(&o.done, .Acquire) == false {
+		do_slow(o, fn)
+	}
+}
+
+// once_do_with_data calls the procedure fn if and only if once_do_with_data is being called for the first for this instance of Once.
+once_do_with_data :: proc(o: ^Once, fn: proc(data: rawptr), data: rawptr) {
+	@(cold)
+	do_slow :: proc(o: ^Once, fn: proc(data: rawptr), data: rawptr) {
+		guard(&o.m)
+		if !o.done {
+			fn(data)
+			atomic_store_explicit(&o.done, true, .Release)
+		}
+	}
+
+	if atomic_load_explicit(&o.done, .Acquire) == false {
+		do_slow(o, fn, data)
+	}
+}
+
+// once_do_with_data_contextless calls the procedure fn if and only if once_do_with_data_contextless is being called for the first for this instance of Once.
+once_do_with_data_contextless :: proc "contextless" (o: ^Once, fn: proc "contextless" (data: rawptr), data: rawptr) {
+	@(cold)
+	do_slow :: proc "contextless" (o: ^Once, fn: proc "contextless" (data: rawptr), data: rawptr) {
+		guard(&o.m)
+		if !o.done {
+			fn(data)
+			atomic_store_explicit(&o.done, true, .Release)
+		}
+	}
+
+	if atomic_load_explicit(&o.done, .Acquire) == false {
+		do_slow(o, fn, data)
+	}
+}
+
+
 
 
 
