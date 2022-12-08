@@ -23,16 +23,3 @@ make_any :: proc "contextless" (data: rawptr, id: typeid) -> any {
 }
 
 raw_data :: builtin.raw_data
-
-
-Poly_Raw_Map_Entry :: struct($Key, $Value: typeid) {
-	hash:  uintptr,
-	next:  int,
-	key:   Key,
-	value: Value,	
-}
-
-Poly_Raw_Map :: struct($Key, $Value: typeid) {
-	hashes:  []int,
-	entries: [dynamic]Poly_Raw_Map_Entry(Key, Value),
-}
