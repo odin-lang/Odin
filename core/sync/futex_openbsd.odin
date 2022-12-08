@@ -21,7 +21,7 @@ foreign libc {
 	_unix_futex :: proc "c" (f: ^Futex, op: c.int, val: u32, timeout: rawptr) -> c.int ---
 }
 
-_futex_wait :: proc(f: ^Futex, expected: u32) -> bool {
+_futex_wait :: proc "contextless" (f: ^Futex, expected: u32) -> bool {
 	res := _unix_futex(f, FUTEX_WAIT_PRIVATE, expected, nil)
 
 	if res != -1 {
@@ -32,10 +32,10 @@ _futex_wait :: proc(f: ^Futex, expected: u32) -> bool {
 		return false
 	}
 
-	panic("futex_wait failure")
+	_panic("futex_wait failure")
 }
 
-_futex_wait_with_timeout :: proc(f: ^Futex, expected: u32, duration: time.Duration) -> bool {
+_futex_wait_with_timeout :: proc "contextless" (f: ^Futex, expected: u32, duration: time.Duration) -> bool {
 	if duration <= 0 {
 		return false
 	}
@@ -58,21 +58,21 @@ _futex_wait_with_timeout :: proc(f: ^Futex, expected: u32, duration: time.Durati
 		return false
 	}
 
-	panic("futex_wait_with_timeout failure")
+	_panic("futex_wait_with_timeout failure")
 }
 
-_futex_signal :: proc(f: ^Futex) {
+_futex_signal :: proc "contextless" (f: ^Futex) {
 	res := _unix_futex(f, FUTEX_WAKE_PRIVATE, 1, nil)
 
 	if res == -1 {
-		panic("futex_wake_single failure")
+		_panic("futex_wake_single failure")
 	}
 }
 
-_futex_broadcast :: proc(f: ^Futex)  {
+_futex_broadcast :: proc "contextless" (f: ^Futex)  {
 	res := _unix_futex(f, FUTEX_WAKE_PRIVATE, u32(max(i32)), nil)
 
 	if res == -1 {
-		panic("_futex_wake_all failure")
+		_panic("_futex_wake_all failure")
 	}
 }

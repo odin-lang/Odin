@@ -11,7 +11,7 @@ Wait_Group :: struct {
 	cond:    Cond,
 }
 
-wait_group_add :: proc(wg: ^Wait_Group, delta: int) {
+wait_group_add :: proc "contextless" (wg: ^Wait_Group, delta: int) {
 	if delta == 0 {
 		return
 	}
@@ -20,32 +20,32 @@ wait_group_add :: proc(wg: ^Wait_Group, delta: int) {
 
 	atomic_add(&wg.counter, delta)
 	if wg.counter < 0 {
-		panic("sync.Wait_Group negative counter")
+		_panic("sync.Wait_Group negative counter")
 	}
 	if wg.counter == 0 {
 		cond_broadcast(&wg.cond)
 		if wg.counter != 0 {
-			panic("sync.Wait_Group misuse: sync.wait_group_add called concurrently with sync.wait_group_wait")
+			_panic("sync.Wait_Group misuse: sync.wait_group_add called concurrently with sync.wait_group_wait")
 		}
 	}
 }
 
-wait_group_done :: proc(wg: ^Wait_Group) {
+wait_group_done :: proc "contextless" (wg: ^Wait_Group) {
 	wait_group_add(wg, -1)
 }
 
-wait_group_wait :: proc(wg: ^Wait_Group) {
+wait_group_wait :: proc "contextless" (wg: ^Wait_Group) {
 	guard(&wg.mutex)
 
 	if wg.counter != 0 {
 		cond_wait(&wg.cond, &wg.mutex)
 		if wg.counter != 0 {
-			panic("sync.Wait_Group misuse: sync.wait_group_add called concurrently with sync.wait_group_wait")
+			_panic("sync.Wait_Group misuse: sync.wait_group_add called concurrently with sync.wait_group_wait")
 		}
 	}
 }
 
-wait_group_wait_with_timeout :: proc(wg: ^Wait_Group, duration: time.Duration) -> bool {
+wait_group_wait_with_timeout :: proc "contextless" (wg: ^Wait_Group, duration: time.Duration) -> bool {
 	if duration <= 0 {
 		return false
 	}
@@ -56,7 +56,7 @@ wait_group_wait_with_timeout :: proc(wg: ^Wait_Group, duration: time.Duration) -
 			return false
 		}
 		if wg.counter != 0 {
-			panic("sync.Wait_Group misuse: sync.wait_group_add called concurrently with sync.wait_group_wait")
+			_panic("sync.Wait_Group misuse: sync.wait_group_add called concurrently with sync.wait_group_wait")
 		}
 	}
 	return true
@@ -76,7 +76,7 @@ Example:
 
 	barrier := &sync.Barrier{}
 
-	main :: proc() {
+	main :: proc "contextless" () {
 		fmt.println("Start")
 
 		THREAD_COUNT :: 4
@@ -107,7 +107,7 @@ Barrier :: struct {
 	thread_count:  int,
 }
 
-barrier_init :: proc(b: ^Barrier, thread_count: int) {
+barrier_init :: proc "contextless" (b: ^Barrier, thread_count: int) {
 	b.index = 0
 	b.generation_id = 0
 	b.thread_count = thread_count
@@ -115,7 +115,7 @@ barrier_init :: proc(b: ^Barrier, thread_count: int) {
 
 // Block the current thread until all threads have rendezvoused
 // Barrier can be reused after all threads rendezvoused once, and can be used continuously
-barrier_wait :: proc(b: ^Barrier) -> (is_leader: bool) {
+barrier_wait :: proc "contextless" (b: ^Barrier) -> (is_leader: bool) {
 	guard(&b.mutex)
 	local_gen := b.generation_id
 	b.index += 1
@@ -141,7 +141,7 @@ Auto_Reset_Event :: struct {
 	sema:   Sema,
 }
 
-auto_reset_event_signal :: proc(e: ^Auto_Reset_Event) {
+auto_reset_event_signal :: proc "contextless" (e: ^Auto_Reset_Event) {
 	old_status := atomic_load_explicit(&e.status, .Relaxed)
 	for {
 		new_status := old_status + 1 if old_status < 1 else 1
@@ -155,7 +155,7 @@ auto_reset_event_signal :: proc(e: ^Auto_Reset_Event) {
 	}
 }
 
-auto_reset_event_wait :: proc(e: ^Auto_Reset_Event) {
+auto_reset_event_wait :: proc "contextless" (e: ^Auto_Reset_Event) {
 	old_status := atomic_sub_explicit(&e.status, 1, .Acquire)
 	if old_status < 1 {
 		sema_wait(&e.sema)
@@ -169,18 +169,18 @@ Ticket_Mutex :: struct {
 	serving: uint,
 }
 
-ticket_mutex_lock :: #force_inline proc(m: ^Ticket_Mutex) {
+ticket_mutex_lock :: #force_inline proc "contextless" (m: ^Ticket_Mutex) {
 	ticket := atomic_add_explicit(&m.ticket, 1, .Relaxed)
 	for ticket != atomic_load_explicit(&m.serving, .Acquire) {
 		cpu_relax()
 	}
 }
 
-ticket_mutex_unlock :: #force_inline proc(m: ^Ticket_Mutex) {
+ticket_mutex_unlock :: #force_inline proc "contextless" (m: ^Ticket_Mutex) {
 	atomic_add_explicit(&m.serving, 1, .Relaxed)
 }
 @(deferred_in=ticket_mutex_unlock)
-ticket_mutex_guard :: proc(m: ^Ticket_Mutex) -> bool {
+ticket_mutex_guard :: proc "contextless" (m: ^Ticket_Mutex) -> bool {
 	ticket_mutex_lock(m)
 	return true
 }
@@ -191,25 +191,25 @@ Benaphore :: struct {
 	sema:    Sema,
 }
 
-benaphore_lock :: proc(b: ^Benaphore) {
+benaphore_lock :: proc "contextless" (b: ^Benaphore) {
 	if atomic_add_explicit(&b.counter, 1, .Acquire) > 1 {
 		sema_wait(&b.sema)
 	}
 }
 
-benaphore_try_lock :: proc(b: ^Benaphore) -> bool {
+benaphore_try_lock :: proc "contextless" (b: ^Benaphore) -> bool {
 	v, _ := atomic_compare_exchange_strong_explicit(&b.counter, 0, 1, .Acquire, .Acquire)
 	return v == 0
 }
 
-benaphore_unlock :: proc(b: ^Benaphore) {
+benaphore_unlock :: proc "contextless" (b: ^Benaphore) {
 	if atomic_sub_explicit(&b.counter, 1, .Release) > 0 {
 		sema_post(&b.sema)
 	}
 }
 
 @(deferred_in=benaphore_unlock)
-benaphore_guard :: proc(m: ^Benaphore) -> bool {
+benaphore_guard :: proc "contextless" (m: ^Benaphore) -> bool {
 	benaphore_lock(m)
 	return true
 }
@@ -221,7 +221,7 @@ Recursive_Benaphore :: struct {
 	sema:      Sema,
 }
 
-recursive_benaphore_lock :: proc(b: ^Recursive_Benaphore) {
+recursive_benaphore_lock :: proc "contextless" (b: ^Recursive_Benaphore) {
 	tid := current_thread_id()
 	if atomic_add_explicit(&b.counter, 1, .Acquire) > 1 {
 		if tid != b.owner {
@@ -233,7 +233,7 @@ recursive_benaphore_lock :: proc(b: ^Recursive_Benaphore) {
 	b.recursion += 1
 }
 
-recursive_benaphore_try_lock :: proc(b: ^Recursive_Benaphore) -> bool {
+recursive_benaphore_try_lock :: proc "contextless" (b: ^Recursive_Benaphore) -> bool {
 	tid := current_thread_id()
 	if b.owner == tid {
 		atomic_add_explicit(&b.counter, 1, .Acquire)
@@ -248,9 +248,9 @@ recursive_benaphore_try_lock :: proc(b: ^Recursive_Benaphore) -> bool {
 	return true
 }
 
-recursive_benaphore_unlock :: proc(b: ^Recursive_Benaphore) {
+recursive_benaphore_unlock :: proc "contextless" (b: ^Recursive_Benaphore) {
 	tid := current_thread_id()
-	assert(tid == b.owner)
+	_assert(tid == b.owner, "tid != b.owner")
 	b.recursion -= 1
 	recursion := b.recursion
 	if recursion == 0 {
@@ -265,7 +265,7 @@ recursive_benaphore_unlock :: proc(b: ^Recursive_Benaphore) {
 }
 
 @(deferred_in=recursive_benaphore_unlock)
-recursive_benaphore_guard :: proc(m: ^Recursive_Benaphore) -> bool {
+recursive_benaphore_guard :: proc "contextless" (m: ^Recursive_Benaphore) -> bool {
 	recursive_benaphore_lock(m)
 	return true
 }
@@ -314,7 +314,7 @@ Parker :: struct {
 // Blocks the current thread until the token is made available.
 //
 // Assumes this is only called by the thread that owns the Parker.
-park :: proc(p: ^Parker) {
+park :: proc "contextless" (p: ^Parker) {
 	EMPTY    :: 0
 	NOTIFIED :: 1
 	PARKED   :: max(u32)
@@ -333,7 +333,7 @@ park :: proc(p: ^Parker) {
 // for a limited duration.
 //
 // Assumes this is only called by the thread that owns the Parker
-park_with_timeout :: proc(p: ^Parker, duration: time.Duration) {
+park_with_timeout :: proc "contextless" (p: ^Parker, duration: time.Duration) {
 	EMPTY    :: 0
 	NOTIFIED :: 1
 	PARKED   :: max(u32)
@@ -345,7 +345,7 @@ park_with_timeout :: proc(p: ^Parker, duration: time.Duration) {
 }
 
 // Automatically makes thee token available if it was not already.
-unpark :: proc(p: ^Parker)  {
+unpark :: proc "contextless" (p: ^Parker)  {
 	EMPTY    :: 0
 	NOTIFIED :: 1
 	PARKED   :: max(Futex)
