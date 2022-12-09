@@ -1046,16 +1046,14 @@ void lb_finalize_objc_names(lbProcedure *p) {
 
 	LLVMSetLinkage(p->value, LLVMInternalLinkage);
 	lb_begin_procedure_body(p);
-	for_array(i, m->objc_classes.entries) {
-		auto const &entry = m->objc_classes.entries[i];
+	for (auto const &entry : m->objc_classes) {
 		String name = entry.key.string;
 		args[0] = lb_const_value(m, t_cstring, exact_value_string(name));
 		lbValue ptr = lb_emit_runtime_call(p, "objc_lookUpClass", args);
 		lb_addr_store(p, entry.value, ptr);
 	}
 
-	for_array(i, m->objc_selectors.entries) {
-		auto const &entry = m->objc_selectors.entries[i];
+	for (auto const &entry : m->objc_selectors) {
 		String name = entry.key.string;
 		args[0] = lb_const_value(m, t_cstring, exact_value_string(name));
 		lbValue ptr = lb_emit_runtime_call(p, "sel_registerName", args);
@@ -1505,20 +1503,20 @@ WORKER_TASK_PROC(lb_llvm_function_pass_worker_proc) {
 		}
 	}
 
-	for_array(i, m->equal_procs.entries) {
-		lbProcedure *p = m->equal_procs.entries[i].value;
+	for (auto const &entry : m->equal_procs) {
+		lbProcedure *p = entry.value;
 		lb_run_function_pass_manager(default_function_pass_manager, p);
 	}
-	for_array(i, m->hasher_procs.entries) {
-		lbProcedure *p = m->hasher_procs.entries[i].value;
+	for (auto const &entry : m->hasher_procs) {
+		lbProcedure *p = entry.value;
 		lb_run_function_pass_manager(default_function_pass_manager, p);
 	}
-	for_array(i, m->map_get_procs.entries) {
-		lbProcedure *p = m->map_get_procs.entries[i].value;
+	for (auto const &entry : m->map_get_procs) {
+		lbProcedure *p = entry.value;
 		lb_run_function_pass_manager(default_function_pass_manager, p);
 	}
-	for_array(i, m->map_set_procs.entries) {
-		lbProcedure *p = m->map_set_procs.entries[i].value;
+	for (auto const &entry : m->map_set_procs) {
+		lbProcedure *p = entry.value;
 		lb_run_function_pass_manager(default_function_pass_manager, p);
 	}
 
@@ -1636,8 +1634,8 @@ void lb_generate_code(lbGenerator *gen) {
 	}
 
 	char const *target_triple = alloc_cstring(permanent_allocator(), build_context.metrics.target_triplet);
-	for_array(i, gen->modules.entries) {
-		LLVMSetTarget(gen->modules.entries[i].value->mod, target_triple);
+	for (auto const &entry : gen->modules) {
+		LLVMSetTarget(entry.value->mod, target_triple);
 	}
 
 	LLVMTargetRef target = {};
@@ -1701,7 +1699,7 @@ void lb_generate_code(lbGenerator *gen) {
 
 	// NOTE(bill): Target Machine Creation
 	// NOTE(bill, 2021-05-04): Target machines must be unique to each module because they are not thread safe
-	auto target_machines = array_make<LLVMTargetMachineRef>(permanent_allocator(), gen->modules.entries.count);
+	auto target_machines = array_make<LLVMTargetMachineRef>(permanent_allocator(), 0, gen->modules.entries.count);
 
 	// NOTE(dweiler): Dynamic libraries require position-independent code.
 	LLVMRelocMode reloc_mode = LLVMRelocDefault;
@@ -1727,21 +1725,25 @@ void lb_generate_code(lbGenerator *gen) {
 		break;
 	}
 
-	for_array(i, gen->modules.entries) {
-		target_machines[i] = LLVMCreateTargetMachine(
+	for (auto const entry : gen->modules) {
+		auto target_machine = LLVMCreateTargetMachine(
 			target, target_triple, llvm_cpu,
 			llvm_features,
 			code_gen_level,
 			reloc_mode,
 			code_mode);
-		LLVMSetModuleDataLayout(gen->modules.entries[i].value->mod, LLVMCreateTargetDataLayout(target_machines[i]));
+		array_add(&target_machines, target_machine);
+
+		lbModule *m = entry.value;
+		m->target_machine = target_machine;
+		LLVMSetModuleDataLayout(m->mod, LLVMCreateTargetDataLayout(target_machine));
 	}
 
-	for_array(i, gen->modules.entries) {
-		lbModule *m = gen->modules.entries[i].value;
+	for (auto const &entry : gen->modules) {
+		lbModule *m = entry.value;
 		if (m->debug_builder) { // Debug Info
-			for_array(i, info->files.entries) {
-				AstFile *f = info->files.entries[i].value;
+			for (auto const &file_entry : info->files) {
+				AstFile *f = file_entry.value;
 				String fullpath = f->fullpath;
 				String filename = remove_directory_from_path(fullpath);
 				String directory = directory_from_path(fullpath);
@@ -2060,8 +2062,8 @@ void lb_generate_code(lbGenerator *gen) {
 	gb_unused(startup_runtime);
 
 	if (build_context.ODIN_DEBUG) {
-		for_array(i, builtin_pkg->scope->elements.entries) {
-			Entity *e = builtin_pkg->scope->elements.entries[i].value;
+		for (auto const &entry : builtin_pkg->scope->elements) {
+			Entity *e = entry.value;
 			add_debug_info_for_global_constant_from_entity(gen, e);
 		}
 	}
@@ -2130,10 +2132,9 @@ void lb_generate_code(lbGenerator *gen) {
 	}
 
 	TIME_SECTION("LLVM Procedure Generation");
-	for_array(j, gen->modules.entries) {
-		lbModule *m = gen->modules.entries[j].value;
-		for_array(i, m->procedures_to_generate) {
-			lbProcedure *p = m->procedures_to_generate[i];
+	for (auto const &entry : gen->modules) {
+		lbModule *m = entry.value;
+		for (lbProcedure *p : m->procedures_to_generate) {
 			lb_generate_procedure(m, p);
 		}
 	}
@@ -2143,10 +2144,9 @@ void lb_generate_code(lbGenerator *gen) {
 		lb_create_main_procedure(default_module, startup_runtime);
 	}
 
-	for_array(j, gen->modules.entries) {
-		lbModule *m = gen->modules.entries[j].value;
-		for_array(i, m->missing_procedures_to_check) {
-			lbProcedure *p = m->missing_procedures_to_check[i];
+	for (auto const &entry : gen->modules) {
+		lbModule *m = entry.value;
+		for (lbProcedure *p : m->missing_procedures_to_check) {
 			debugf("Generate missing procedure: %.*s\n", LIT(p->name));
 			lb_generate_procedure(m, p);
 		}
@@ -2155,24 +2155,9 @@ void lb_generate_code(lbGenerator *gen) {
 	lb_finalize_objc_names(objc_names);
 
 	if (build_context.ODIN_DEBUG) {
-		TIME_SECTION("LLVM Debug Info for global constant value declarations");
-		{
-			// lbModule *m = default_module;
-
-
-		}
-		// if (gen->modules.entries.count == 1) {
-		// } else {
-		// 	for_array(j, gen->modules.entries) {
-		// 		lbModule *m = gen->modules.entries[j].value;
-		// 		if (m->debug_builder != nullptr) {
-		// 		}
-		// 	}
-		// }
-
 		TIME_SECTION("LLVM Debug Info Complete Types and Finalize");
-		for_array(j, gen->modules.entries) {
-			lbModule *m = gen->modules.entries[j].value;
+		for (auto const &entry : gen->modules) {
+			lbModule *m = entry.value;
 			if (m->debug_builder != nullptr) {
 				lb_debug_complete_types(m);
 				LLVMDIBuilderFinalize(m->debug_builder);
@@ -2183,23 +2168,22 @@ void lb_generate_code(lbGenerator *gen) {
 
 
 	TIME_SECTION("LLVM Function Pass");
-	for_array(i, gen->modules.entries) {
-		lbModule *m = gen->modules.entries[i].value;
-
+	for (auto const &entry : gen->modules) {
+		lbModule *m = entry.value;
 		lb_llvm_function_pass_worker_proc(m);
 	}
 
 	TIME_SECTION("LLVM Module Pass");
 
-	for_array(i, gen->modules.entries) {
-		lbModule *m = gen->modules.entries[i].value;
+	for (auto const &entry : gen->modules) {
+		lbModule *m = entry.value;
 		
 		lb_run_remove_unused_function_pass(m);
 		lb_run_remove_unused_globals_pass(m);
 
 		auto wd = gb_alloc_item(permanent_allocator(), lbLLVMModulePassWorkerData);
 		wd->m = m;
-		wd->target_machine = target_machines[i];
+		wd->target_machine = m->target_machine;
 
 		lb_llvm_module_pass_worker_proc(wd);
 	}
@@ -2214,8 +2198,8 @@ void lb_generate_code(lbGenerator *gen) {
 	}
 
 
-	for_array(j, gen->modules.entries) {
-		lbModule *m = gen->modules.entries[j].value;
+	for (auto const &entry : gen->modules) {
+		lbModule *m = entry.value;
 		if (LLVMVerifyModule(m->mod, LLVMReturnStatusAction, &llvm_error)) {
 			gb_printf_err("LLVM Error:\n%s\n", llvm_error);
 			if (build_context.keep_temp_files) {
@@ -2236,8 +2220,8 @@ void lb_generate_code(lbGenerator *gen) {
 	    build_context.build_mode == BuildMode_LLVM_IR) {
 		TIME_SECTION("LLVM Print Module to File");
 
-		for_array(j, gen->modules.entries) {
-			lbModule *m = gen->modules.entries[j].value;
+		for (auto const &entry : gen->modules) {
+			lbModule *m = entry.value;
 
 			if (lb_is_module_empty(m)) {
 				continue;
@@ -2260,10 +2244,9 @@ void lb_generate_code(lbGenerator *gen) {
 
 	TIME_SECTION("LLVM Add Foreign Library Paths");
 
-	for_array(j, gen->modules.entries) {
-		lbModule *m = gen->modules.entries[j].value;
-		for_array(i, m->info->required_foreign_imports_through_force) {
-			Entity *e = m->info->required_foreign_imports_through_force[i];
+	for (auto const &entry : gen->modules) {
+		lbModule *m = entry.value;
+		for (Entity *e : m->info->required_foreign_imports_through_force) {
 			lb_add_foreign_library_path(m, e);
 		}
 
@@ -2275,16 +2258,16 @@ void lb_generate_code(lbGenerator *gen) {
 	TIME_SECTION("LLVM Object Generation");
 	
 	isize non_empty_module_count = 0;
-	for_array(j, gen->modules.entries) {
-		lbModule *m = gen->modules.entries[j].value;
+	for (auto const &entry : gen->modules) {
+		lbModule *m = entry.value;
 		if (!lb_is_module_empty(m)) {
 			non_empty_module_count += 1;
 		}
 	}
 
 	if (do_threading && non_empty_module_count > 1) {
-		for_array(j, gen->modules.entries) {
-			lbModule *m = gen->modules.entries[j].value;
+		for (auto const &entry : gen->modules) {
+			lbModule *m = entry.value;
 			if (lb_is_module_empty(m)) {
 				continue;
 			}
@@ -2295,7 +2278,7 @@ void lb_generate_code(lbGenerator *gen) {
 			array_add(&gen->output_temp_paths, filepath_ll);
 
 			auto *wd = gb_alloc_item(permanent_allocator(), lbLLVMEmitWorker);
-			wd->target_machine = target_machines[j];
+			wd->target_machine = m->target_machine;
 			wd->code_gen_file_type = code_gen_file_type;
 			wd->filepath_obj = filepath_obj;
 			wd->m = m;
@@ -2304,8 +2287,8 @@ void lb_generate_code(lbGenerator *gen) {
 
 		thread_pool_wait(&global_thread_pool);
 	} else {
-		for_array(j, gen->modules.entries) {
-			lbModule *m = gen->modules.entries[j].value;
+		for (auto const &entry : gen->modules) {
+			lbModule *m = entry.value;
 			if (lb_is_module_empty(m)) {
 				continue;
 			}
@@ -2319,7 +2302,7 @@ void lb_generate_code(lbGenerator *gen) {
 
 			TIME_SECTION_WITH_LEN(section_name, gb_string_length(section_name));
 
-			if (LLVMTargetMachineEmitToFile(target_machines[j], m->mod, cast(char *)filepath_obj.text, code_gen_file_type, &llvm_error)) {
+			if (LLVMTargetMachineEmitToFile(m->target_machine, m->mod, cast(char *)filepath_obj.text, code_gen_file_type, &llvm_error)) {
 				gb_printf_err("LLVM Error: %s\n", llvm_error);
 				gb_exit(1);
 				return;

@@ -137,8 +137,8 @@ bool lb_init_generator(lbGenerator *gen, Checker *c) {
 	ptr_set_init(&gen->foreign_libraries_set, heap_allocator(), 1024);
 
 	if (USE_SEPARATE_MODULES) {
-		for_array(i, gen->info->packages.entries) {
-			AstPackage *pkg = gen->info->packages.entries[i].value;
+		for (auto const &entry : gen->info->packages) {
+			AstPackage *pkg = entry.value;
 
 			auto m = gb_alloc_item(permanent_allocator(), lbModule);
 			m->pkg = pkg;
@@ -153,8 +153,8 @@ bool lb_init_generator(lbGenerator *gen, Checker *c) {
 	lb_init_module(&gen->default_module, c);
 
 
-	for_array(i, gen->modules.entries) {
-		lbModule *m = gen->modules.entries[i].value;
+	for (auto const &entry : gen->modules) {
+		lbModule *m = entry.value;
 		LLVMContextRef ctx = LLVMGetModuleContext(m->mod);
 		map_set(&gen->modules_through_ctx, ctx, m);
 	}

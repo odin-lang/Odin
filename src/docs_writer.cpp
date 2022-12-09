@@ -480,11 +480,11 @@ OdinDocTypeIndex odin_doc_type(OdinDocWriter *w, Type *type) {
 	if (found) {
 		return *found;
 	}
-	for_array(i, w->type_cache.entries) {
+	for (auto const &entry : w->type_cache) {
 		// NOTE(bill): THIS IS SLOW
-		Type *other = w->type_cache.entries[i].key;
+		Type *other = entry.key;
 		if (are_types_identical_unique_tuples(type, other)) {
-			OdinDocTypeIndex index = w->type_cache.entries[i].value;
+			OdinDocTypeIndex index = entry.value;
 			map_set(&w->type_cache, type, index);
 			return index;
 		}
@@ -914,23 +914,21 @@ OdinDocEntityIndex odin_doc_add_entity(OdinDocWriter *w, Entity *e) {
 void odin_doc_update_entities(OdinDocWriter *w) {
 	{
 		// NOTE(bill): Double pass, just in case entities are created on odin_doc_type
-		auto entities = array_make<Entity *>(heap_allocator(), w->entity_cache.entries.count);
+		auto entities = array_make<Entity *>(heap_allocator(), 0, w->entity_cache.entries.count);
 		defer (array_free(&entities));
 
-		for_array(i, w->entity_cache.entries) {
-			Entity *e = w->entity_cache.entries[i].key;
-			entities[i] = e;
+		for (auto const &entry : w->entity_cache) {
+			array_add(&entities, entry.key);
 		}
-		for_array(i, entities) {
-			Entity *e = entities[i];
+		for (Entity *e : entities) {
 			OdinDocTypeIndex type_index = odin_doc_type(w, e->type);
 			gb_unused(type_index);
 		}
 	}
 
-	for_array(i, w->entity_cache.entries) {
-		Entity *e = w->entity_cache.entries[i].key;
-		OdinDocEntityIndex entity_index = w->entity_cache.entries[i].value;
+	for (auto const &entry : w->entity_cache) {
+		Entity *e = entry.key;
+		OdinDocEntityIndex entity_index = entry.value;
 		OdinDocTypeIndex type_index = odin_doc_type(w, e->type);
 
 		OdinDocEntityIndex foreign_library = 0;
@@ -948,8 +946,8 @@ void odin_doc_update_entities(OdinDocWriter *w) {
 				auto pges = array_make<OdinDocEntityIndex>(heap_allocator(), 0, e->ProcGroup.entities.count);
 				defer (array_free(&pges));
 
-				for_array(j, e->ProcGroup.entities) {
-					OdinDocEntityIndex index = odin_doc_add_entity(w, e->ProcGroup.entities[j]);
+				for (Entity *entity : e->ProcGroup.entities) {
+					OdinDocEntityIndex index = odin_doc_add_entity(w, entity);
 					array_add(&pges, index);
 				}
 				grouped_entities = odin_write_slice(w, pges.data, pges.count);
@@ -979,9 +977,9 @@ OdinDocArray<OdinDocScopeEntry> odin_doc_add_pkg_entries(OdinDocWriter *w, AstPa
 	auto entries = array_make<OdinDocScopeEntry>(heap_allocator(), 0, w->entity_cache.entries.count);
 	defer (array_free(&entries));
 
-	for_array(i, pkg->scope->elements.entries) {
-		String name = pkg->scope->elements.entries[i].key.string;
-		Entity *e = pkg->scope->elements.entries[i].value;
+	for (auto const &entry : pkg->scope->elements) {
+		String name = entry.key.string;
+		Entity *e = entry.value;
 		switch (e->kind) {
 		case Entity_Invalid:
 		case Entity_Nil:
@@ -1021,8 +1019,8 @@ OdinDocArray<OdinDocScopeEntry> odin_doc_add_pkg_entries(OdinDocWriter *w, AstPa
 void odin_doc_write_docs(OdinDocWriter *w) {
 	auto pkgs = array_make<AstPackage *>(heap_allocator(), 0, w->info->packages.entries.count);
 	defer (array_free(&pkgs));
-	for_array(i, w->info->packages.entries) {
-		AstPackage *pkg = w->info->packages.entries[i].value;
+	for (auto const &entry : w->info->packages) {
+		AstPackage *pkg = entry.value;
 		if (build_context.cmd_doc_flags & CmdDocFlag_AllPackages) {
 			array_add(&pkgs, pkg);
 		} else {

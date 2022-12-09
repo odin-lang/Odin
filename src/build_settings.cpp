@@ -1328,23 +1328,26 @@ void enable_target_feature(TokenPos pos, String const &target_feature_list) {
 
 char const *target_features_set_to_cstring(gbAllocator allocator, bool with_quotes) {
 	isize len = 0;
-	for_array(i, build_context.target_features_set.entries) {
+	isize i = 0;
+	for (auto const &entry : build_context.target_features_set) {
 		if (i != 0) {
 			len += 1;
 		}
-		String feature = build_context.target_features_set.entries[i].value;
+		String feature = entry.value;
 		len += feature.len;
 		if (with_quotes) len += 2;
+		i += 1;
 	}
 	char *features = gb_alloc_array(allocator, char, len+1);
 	len = 0;
-	for_array(i, build_context.target_features_set.entries) {
+	i = 0;
+	for (auto const &entry : build_context.target_features_set) {
 		if (i != 0) {
 			features[len++] = ',';
 		}
 
 		if (with_quotes) features[len++] = '"';
-		String feature = build_context.target_features_set.entries[i].value;
+		String feature = entry.value;
 		gb_memmove(features + len, feature.text, feature.len);
 		len += feature.len;
 		if (with_quotes) features[len++] = '"';

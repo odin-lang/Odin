@@ -122,6 +122,7 @@ struct lbModule {
 	LLVMContextRef ctx;
 
 	struct lbGenerator *gen;
+	LLVMTargetMachineRef target_machine;
 
 	CheckerInfo *info;
 	AstPackage *pkg; // associated

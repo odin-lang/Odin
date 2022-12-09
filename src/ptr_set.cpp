@@ -233,3 +233,24 @@ gb_inline void ptr_set_clear(PtrSet<T> *s) {
 		s->hashes.data[i] = MAP_SENTINEL;
 	}
 }
+
+
+template <typename T>
+PtrSetEntry<T> *begin(PtrSet<T> &m) {
+	return m.entries.data;
+}
+template <typename T>
+PtrSetEntry<T> const *begin(PtrSet<T> const &m) {
+	return m.entries.data;
+}
+
+
+template <typename T>
+PtrSetEntry<T> *end(PtrSet<T> &m) {
+	return m.entries.data + m.entries.count;
+}
+
+template <typename T>
+PtrSetEntry<T> const *end(PtrSet<T> const &m) {
+	return m.entries.data + m.entries.count;
+}

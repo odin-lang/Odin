@@ -3455,9 +3455,8 @@ bool check_builtin_procedure(CheckerContext *c, Operand *operand, Ast *call, i32
 			error(ce->args[0], "Expected a constant string for '%.*s'", LIT(builtin_name));
 		} else if (operand->value.kind == ExactValue_String) {
 			String pkg_name = operand->value.value_string;
-			// TODO(bill): probably should have this be a `StringMap` eventually
-			for_array(i, c->info->packages.entries) {
-				AstPackage *pkg = c->info->packages.entries[i].value;
+			for (auto const &entry : c->info->packages) {
+				AstPackage *pkg = entry.value;
 				if (pkg->name == pkg_name) {
 					value = true;
 					break;

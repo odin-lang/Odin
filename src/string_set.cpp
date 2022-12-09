@@ -215,3 +215,21 @@ gb_inline void string_set_clear(StringSet *s) {
 		s->hashes.data[i] = MAP_SENTINEL;
 	}
 }
+
+
+
+StringSetEntry *begin(StringSet &m) {
+	return m.entries.data;
+}
+StringSetEntry const *begin(StringSet const &m) {
+	return m.entries.data;
+}
+
+
+StringSetEntry *end(StringSet &m) {
+	return m.entries.data + m.entries.count;
+}
+
+StringSetEntry const *end(StringSet const &m) {
+	return m.entries.data + m.entries.count;
+}
