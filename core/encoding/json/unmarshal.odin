@@ -576,6 +576,7 @@ unmarshal_array :: proc(p: ^Parser, v: any) -> (err: Unmarshal_Error) {
 		return UNSUPPORTED_TYPE
 		
 	case reflect.Type_Info_Quaternion:
+		// NOTE(Leo): As above, allow lengths which are less than the dst array
 		if int(length) > 4 {
 			return UNSUPPORTED_TYPE
 		}

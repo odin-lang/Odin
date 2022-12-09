@@ -161,14 +161,12 @@ marshal_to_writer :: proc(w: io.Writer, v: any, opt: ^Marshal_Options) -> (err: 
 		io.write_byte(w, ']')    or_return
 
 	case runtime.Type_Info_Quaternion:
-
 		switch q in a {
 		case quaternion64: marshal_to_writer(w, []f16{imag(q), jmag(q), kmag(q), real(q)}, opt)
 		case quaternion128: marshal_to_writer(w, []f32{imag(q), jmag(q), kmag(q), real(q)}, opt)
 		case quaternion256: marshal_to_writer(w, []f64{imag(q), jmag(q), kmag(q), real(q)}, opt)
 		case: return .Unsupported_Type
 		}
-
 
 	case runtime.Type_Info_String:
 		switch s in a {
