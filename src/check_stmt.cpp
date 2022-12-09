@@ -1949,6 +1949,7 @@ void check_stmt_internal(CheckerContext *ctx, Ast *node, u32 flags) {
 					entity = alloc_entity_variable(ctx->scope, token, type, EntityState_Resolved);
 					entity->flags |= EntityFlag_ForValue;
 					entity->flags |= EntityFlag_Value;
+					entity->identifier = name;
 					if (i == addressable_index && use_by_reference_for_value) {
 						entity->flags &= ~EntityFlag_Value;
 					}
@@ -1973,6 +1974,7 @@ void check_stmt_internal(CheckerContext *ctx, Ast *node, u32 flags) {
 
 			if (entity == nullptr) {
 				entity = alloc_entity_dummy_variable(builtin_pkg->scope, ast_token(name));
+				entity->identifier = name; // might not be an identifier
 			}
 
 			array_add(&entities, entity);
