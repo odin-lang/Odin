@@ -1086,76 +1086,75 @@ lbProcedure *lb_create_startup_runtime(lbModule *main_module, lbProcedure *start
 		LLVMBuildCall2(p->builder, lb_type_internal_for_procedures_raw(main_module, objc_names->type), objc_names->value, nullptr, 0, "");
 	}
 
-	for_array(i, global_variables) {
-		auto *var = &global_variables[i];
-		if (var->is_initialized) {
+	for (auto &var : global_variables) {
+		if (var.is_initialized) {
 			continue;
 		}
 
 		lbModule *entity_module = main_module;
 
-		Entity *e = var->decl->entity;
+		Entity *e = var.decl->entity;
 		GB_ASSERT(e->kind == Entity_Variable);
 		e->code_gen_module = entity_module;
 
-		Ast *init_expr = var->decl->init_expr;
+		Ast *init_expr = var.decl->init_expr;
 		if (init_expr != nullptr)  {
 			lbValue init = lb_build_expr(p, init_expr);
 			if (init.value == nullptr) {
-				LLVMTypeRef global_type = llvm_addr_type(p->module, var->var);
+				LLVMTypeRef global_type = llvm_addr_type(p->module, var.var);
 				if (is_type_untyped_undef(init.type)) {
-					// LLVMSetInitializer(var->var.value, LLVMGetUndef(global_type));
-					LLVMSetInitializer(var->var.value, LLVMConstNull(global_type));
-					var->is_initialized = true;
+					// LLVMSetInitializer(var.var.value, LLVMGetUndef(global_type));
+					LLVMSetInitializer(var.var.value, LLVMConstNull(global_type));
+					var.is_initialized = true;
 					continue;
 				} else if (is_type_untyped_nil(init.type)) {
-					LLVMSetInitializer(var->var.value, LLVMConstNull(global_type));
-					var->is_initialized = true;
+					LLVMSetInitializer(var.var.value, LLVMConstNull(global_type));
+					var.is_initialized = true;
 					continue;
 				}
 				GB_PANIC("Invalid init value, got %s", expr_to_string(init_expr));
 			}
 
 			if (is_type_any(e->type) || is_type_union(e->type)) {
-				var->init = init;
+				var.init = init;
 			} else if (lb_is_const_or_global(init)) {
-				if (!var->is_initialized) {
+				if (!var.is_initialized) {
 					if (is_type_proc(init.type)) {
 						init.value = LLVMConstPointerCast(init.value, lb_type(p->module, init.type));
 					}
-					LLVMSetInitializer(var->var.value, init.value);
-					var->is_initialized = true;
+					LLVMSetInitializer(var.var.value, init.value);
+					var.is_initialized = true;
 					continue;
 				}
 			} else {
-				var->init = init;
+				var.init = init;
 			}
 		}
 
-		if (var->init.value != nullptr) {
-			GB_ASSERT(!var->is_initialized);
-			Type *t = type_deref(var->var.type);
+		if (var.init.value != nullptr) {
+			GB_ASSERT(!var.is_initialized);
+			Type *t = type_deref(var.var.type);
 
 			if (is_type_any(t)) {
 				// NOTE(bill): Edge case for 'any' type
-				Type *var_type = default_type(var->init.type);
-				lbAddr g = lb_add_global_generated(main_module, var_type, var->init);
-				lb_addr_store(p, g, var->init);
+				Type *var_type = default_type(var.init.type);
+				lbAddr g = lb_add_global_generated(main_module, var_type, var.init);
+				lb_addr_store(p, g, var.init);
 				lbValue gp = lb_addr_get_ptr(p, g);
 
-				lbValue data = lb_emit_struct_ep(p, var->var, 0);
-				lbValue ti   = lb_emit_struct_ep(p, var->var, 1);
+				lbValue data = lb_emit_struct_ep(p, var.var, 0);
+				lbValue ti   = lb_emit_struct_ep(p, var.var, 1);
 				lb_emit_store(p, data, lb_emit_conv(p, gp, t_rawptr));
 				lb_emit_store(p, ti,   lb_type_info(main_module, var_type));
 			} else {
-				LLVMTypeRef vt = llvm_addr_type(p->module, var->var);
-				lbValue src0 = lb_emit_conv(p, var->init, t);
+				LLVMTypeRef vt = llvm_addr_type(p->module, var.var);
+				lbValue src0 = lb_emit_conv(p, var.init, t);
 				LLVMValueRef src = OdinLLVMBuildTransmute(p, src0.value, vt);
-				LLVMValueRef dst = var->var.value;
+				LLVMValueRef dst = var.var.value;
 				LLVMBuildStore(p->builder, src, dst);
 			}
 
-			var->is_initialized = true;
+			var.is_initialized = true;
 		}
 	}
 	
@@ -1253,8 +1252,8 @@ lbProcedure *lb_create_main_procedure(lbModule *m, lbProcedure *startup_runtime)
 		LLVMValueRef indices[2] = {};
 		indices[0] = LLVMConstInt(lb_type(m, t_i32), 0, false);
 
-		for_array(i, m->info->testing_procedures) {
-			Entity *testing_proc = m->info->testing_procedures[i];
+		isize testing_proc_index = 0;
+		for (Entity *testing_proc : m->info->testing_procedures) {
 			String name = testing_proc->token.string;
 
 			String pkg_name = {};
@@ -1265,7 +1264,7 @@ lbProcedure *lb_create_main_procedure(lbModule *m, lbProcedure *startup_runtime)
 			lbValue v_name = lb_find_or_add_entity_string(m, name);
 			lbValue v_proc = lb_find_procedure_value_from_entity(m, testing_proc);
 
-			indices[1] = LLVMConstInt(lb_type(m, t_int), i, false);
+			indices[1] = LLVMConstInt(lb_type(m, t_int), testing_proc_index++, false);
 
 			LLVMValueRef vals[3] = {};
 			vals[0] = v_pkg.value;
@@ -1473,9 +1472,7 @@ WORKER_TASK_PROC(lb_llvm_function_pass_worker_proc) {
 	lb_populate_function_pass_manager(m, default_function_pass_manager_without_memcpy, true, build_context.optimization_level);
 	LLVMFinalizeFunctionPassManager(default_function_pass_manager_without_memcpy);
 
-
-	for_array(i, m->procedures_to_generate) {
-		lbProcedure *p = m->procedures_to_generate[i];
+	for (lbProcedure *p : m->procedures_to_generate) {
 		if (p->body != nullptr) { // Build Procedure
 			if (p->flags & lbProcedureFlag_WithoutMemcpyPass) {
 				lb_run_function_pass_manager(default_function_pass_manager_without_memcpy, p);
@@ -1818,9 +1815,7 @@ void lb_generate_code(lbGenerator *gen) {
 			// NOTE(bill): Removes need for heap allocation by making it global memory
 			isize count = 0;
 
-			for_array(entry_index, m->info->type_info_types) {
-				Type *t = m->info->type_info_types[entry_index];
-
+			for (Type *t : m->info->type_info_types) {
 				isize index = lb_type_info_index(m->info, t, false);
 				if (index < 0) {
 					continue;
@@ -1891,8 +1886,7 @@ void lb_generate_code(lbGenerator *gen) {
 	isize global_variable_max_count = 0;
 	bool already_has_entry_point = false;
 
-	for_array(i, info->entities) {
-		Entity *e = info->entities[i];
+	for (Entity *e : info->entities) {
 		String name = e->token.string;
 
 		if (e->kind == Entity_Variable) {
@@ -1921,9 +1915,7 @@ void lb_generate_code(lbGenerator *gen) {
 
 	auto global_variables = array_make<lbGlobalVariable>(permanent_allocator(), 0, global_variable_max_count);
 
-	for_array(i, info->variable_init_order) {
-		DeclInfo *d = info->variable_init_order[i];
-
+	for (DeclInfo *d : info->variable_init_order) {
 		Entity *e = d->entity;
 
 		if ((e->scope->flags & ScopeFlag_File) == 0) {
@@ -2068,8 +2060,7 @@ void lb_generate_code(lbGenerator *gen) {
 	}
 
 	TIME_SECTION("LLVM Global Procedures and Types");
-	for_array(i, info->entities) {
-		Entity *e = info->entities[i];
+	for (Entity *e : info->entities) {
 		String  name  = e->token.string;
 		Scope * scope = e->scope;
 
@@ -2133,7 +2124,8 @@ void lb_generate_code(lbGenerator *gen) {
 	TIME_SECTION("LLVM Procedure Generation");
 	for (auto const &entry : gen->modules) {
 		lbModule *m = entry.value;
-		for_array(i, m->procedures_to_generate) {
+		// NOTE(bill): procedures may be added during generation
+		for (isize i = 0; i < m->procedures_to_generate.count; i++) {
 			lbProcedure *p = m->procedures_to_generate[i];
 			lb_generate_procedure(m, p);
 		}
@@ -2146,7 +2138,8 @@ void lb_generate_code(lbGenerator *gen) {
 
 	for (auto const &entry : gen->modules) {
 		lbModule *m = entry.value;
-		for_array(i, m->missing_procedures_to_check) {
+		// NOTE(bill): procedures may be added during generation
+		for (isize i = 0; i < m->missing_procedures_to_check.count; i++) {
 			lbProcedure *p = m->missing_procedures_to_check[i];
 			debugf("Generate missing procedure: %.*s\n", LIT(p->name));
 			lb_generate_procedure(m, p);
