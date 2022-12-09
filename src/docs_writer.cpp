@@ -977,9 +977,9 @@ OdinDocArray<OdinDocScopeEntry> odin_doc_add_pkg_entries(OdinDocWriter *w, AstPa
 	auto entries = array_make<OdinDocScopeEntry>(heap_allocator(), 0, w->entity_cache.entries.count);
 	defer (array_free(&entries));
 
-	for (auto const &entry : pkg->scope->elements) {
-		String name = entry.key.string;
-		Entity *e = entry.value;
+	for (auto const &element : pkg->scope->elements) {
+		String name = element.key.string;
+		Entity *e = element.value;
 		switch (e->kind) {
 		case Entity_Invalid:
 		case Entity_Nil:
