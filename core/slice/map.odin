@@ -37,7 +37,7 @@ Map_Entry_Info :: struct($Key, $Value: typeid) {
 }
 
 
-map_entries :: proc(m: $M/map[$K]$V, allocator := context.allocator) -> (entries: []Map_Entry(K, V), err: runtime.Allocator) {
+map_entries :: proc(m: $M/map[$K]$V, allocator := context.allocator) -> (entries: []Map_Entry(K, V), err: runtime.Allocator_Error) {
 	entries = make(type_of(entries), len(m), allocator) or_return
 	i := 0
 	for key, value in m {
