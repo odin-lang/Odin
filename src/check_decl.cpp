@@ -1499,8 +1499,8 @@ void check_proc_body(CheckerContext *ctx_, Token token, DeclInfo *decl, Type *ty
 				if (t->kind == Type_Struct) {
 					Scope *scope = t->Struct.scope;
 					GB_ASSERT(scope != nullptr);
-					MUTEX_GUARD_BLOCK(scope->mutex) for_array(i, scope->elements.entries) {
-						Entity *f = scope->elements.entries[i].value;
+					MUTEX_GUARD_BLOCK(scope->mutex) for (auto const &entry : scope->elements) {
+						Entity *f = entry.value;
 						if (f->kind == Entity_Variable) {
 							Entity *uvar = alloc_entity_using_variable(e, f->token, f->type, nullptr);
 							if (is_value) uvar->flags |= EntityFlag_Value;
@@ -1599,12 +1599,12 @@ void check_proc_body(CheckerContext *ctx_, Token token, DeclInfo *decl, Type *ty
 
 			// NOTE(bill): Add the dependencies from the procedure literal (lambda)
 			// But only at the procedure level
-			for_array(i, decl->deps.entries) {
-				Entity *e = decl->deps.entries[i].ptr;
+			for (auto const &entry : decl->deps) {
+				Entity *e = entry.ptr;
 				ptr_set_add(&decl->parent->deps, e);
 			}
-			for_array(i, decl->type_info_deps.entries) {
-				Type *t = decl->type_info_deps.entries[i].ptr;
+			for (auto const &entry : decl->type_info_deps) {
+				Type *t = entry.ptr;
 				ptr_set_add(&decl->parent->type_info_deps, t);
 			}
 

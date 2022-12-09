@@ -205,8 +205,8 @@ void check_did_you_mean_objc_entity(String const &name, Entity *e, bool is_type,
 
 	DidYouMeanAnswers d = did_you_mean_make(heap_allocator(), set.entries.count, name);
 	defer (did_you_mean_destroy(&d));
-	for_array(i, set.entries) {
-		did_you_mean_append(&d, set.entries[i].value);
+	for (auto const &entry : set) {
+		did_you_mean_append(&d, entry.value);
 	}
 	check_did_you_mean_print(&d, prefix);
 }
@@ -242,12 +242,10 @@ void check_did_you_mean_scope(String const &name, Scope *scope, char const *pref
 	DidYouMeanAnswers d = did_you_mean_make(heap_allocator(), scope->elements.entries.count, name);
 	defer (did_you_mean_destroy(&d));
 
-	mutex_lock(&scope->mutex);
-	for_array(i, scope->elements.entries) {
-		Entity *e = scope->elements.entries[i].value;
+	MUTEX_GUARD_BLOCK(&scope->mutex) for (auto const &entry : scope->elements) {
+		Entity *e = entry.value;
 		did_you_mean_append(&d, e->token.string);
 	}
-	mutex_unlock(&scope->mutex);
 	check_did_you_mean_print(&d, prefix);
 }
 
@@ -322,8 +320,8 @@ void check_scope_decls(CheckerContext *c, Slice<Ast *> const &nodes, isize reser
 
 	check_collect_entities(c, nodes);
 
-	for_array(i, s->elements.entries) {
-		Entity *e = s->elements.entries[i].value;
+	for (auto const &entry : s->elements) {
+		Entity *e = entry.value;
 		switch (e->kind) {
 		case Entity_Constant:
 		case Entity_TypeName:
@@ -4918,8 +4916,8 @@ isize add_dependencies_from_unpacking(CheckerContext *c, Entity **lhs, isize lhs
 			if (e != nullptr) {
 				DeclInfo *decl = decl_info_of_entity(e);
 				if (decl != nullptr) {
-					for_array(k, decl->deps.entries) {
-						Entity *dep = decl->deps.entries[k].ptr;
+					for (auto const &entry : decl->deps) {
+						Entity *dep = entry.ptr;
 						ptr_set_add(&c->decl->deps, dep);
 					}
 				}
@@ -5671,8 +5669,7 @@ Entity **populate_proc_parameter_list(CheckerContext *c, Type *proc_type, isize 
 
 bool evaluate_where_clauses(CheckerContext *ctx, Ast *call_expr, Scope *scope, Slice<Ast *> *clauses, bool print_err) {
 	if (clauses != nullptr) {
-		for_array(i, *clauses) {
-			Ast *clause = (*clauses)[i];
+		for (Ast *clause : *clauses) {
 			Operand o = {};
 			check_expr(ctx, &o, clause);
 			if (o.mode != Addressing_Constant) {
@@ -5693,8 +5690,8 @@ bool evaluate_where_clauses(CheckerContext *ctx, Ast *call_expr, Scope *scope, S
 
 					if (scope != nullptr) {
 						isize print_count = 0;
-						for_array(j, scope->elements.entries) {
-							Entity *e = scope->elements.entries[j].value;
+						for (auto const &entry : scope->elements) {
+							Entity *e = entry.value;
 							switch (e->kind) {
 							case Entity_TypeName: {
 								if (print_count == 0) error_line("\n\tWith the following definitions:\n");

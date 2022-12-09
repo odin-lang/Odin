@@ -449,8 +449,8 @@ void generate_and_print_query_data_global_definitions(Checker *c, Timings *timin
 		auto sorted_packages = array_make<AstPackage *>(query_value_allocator, 0, c->info.packages.entries.count);
 		defer (array_free(&sorted_packages));
 
-		for_array(i, c->info.packages.entries) {
-			AstPackage *pkg = c->info.packages.entries[i].value;
+		for (auto const &entry : c->info.packages) {
+			AstPackage *pkg = entry.value;
 			if (pkg != nullptr) {
 				array_add(&sorted_packages, pkg);
 			}
@@ -880,8 +880,8 @@ void generate_and_print_query_data_go_to_definitions(Checker *c) {
 
 	isize file_path_memory_needed = 0;
 	auto files = array_make<GoToDefFileMap>(a, 0, c->info.files.entries.count);
-	for_array(i, c->info.files.entries) {
-		AstFile *f = c->info.files.entries[i].value;
+	for (auto const &entry : c->info.files) {
+		AstFile *f = entry.value;
 		file_path_memory_needed += f->fullpath.len+1; // add NUL terminator
 
 

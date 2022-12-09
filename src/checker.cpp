@@ -308,8 +308,8 @@ Scope *create_scope_from_package(CheckerContext *c, AstPackage *pkg) {
 }
 
 void destroy_scope(Scope *scope) {
-	for_array(i, scope->elements.entries) {
-		Entity *e =scope->elements.entries[i].value;
+	for (auto const &entry : scope->elements) {
+		Entity *e = entry.value;
 		if (e->kind == Entity_Variable) {
 			if (!(e->flags & EntityFlag_Used)) {
 #if 0
@@ -659,8 +659,8 @@ void check_scope_usage(Checker *c, Scope *scope) {
 	Array<VettedEntity> vetted_entities = {};
 	array_init(&vetted_entities, heap_allocator());
 
-	MUTEX_GUARD_BLOCK(scope->mutex) for_array(i, scope->elements.entries) {
-		Entity *e = scope->elements.entries[i].value;
+	MUTEX_GUARD_BLOCK(scope->mutex) for (auto const &entry : scope->elements) {
+		Entity *e = entry.value;
 		if (e == nullptr) continue;
 		VettedEntity ve_unused = {};
 		VettedEntity ve_shadowed = {};
@@ -755,9 +755,8 @@ AstPackage *get_core_package(CheckerInfo *info, String name) {
 		gb_printf_err("Name: %.*s\n", LIT(name));
 		gb_printf_err("Fullpath: %.*s\n", LIT(path));
 		
-		for_array(i, info->packages.entries) {
-			auto *entry = &info->packages.entries[i];
-			gb_printf_err("%.*s\n", LIT(entry->key.string));
+		for (auto const &entry : info->packages) {
+			gb_printf_err("%.*s\n", LIT(entry.key.string));
 		}
 		GB_ASSERT_MSG(found != nullptr, "Missing core package %.*s", LIT(name));
 	}
@@ -1065,9 +1064,9 @@ void init_universal(void) {
 	}
 
 	bool defined_values_double_declaration = false;
-	for_array(i, bc->defined_values.entries) {
-		char const *name = bc->defined_values.entries[i].key;
-		ExactValue value = bc->defined_values.entries[i].value;
+	for (auto const &entry : bc->defined_values) {
+		char const *name = entry.key;
+		ExactValue value = entry.value;
 		GB_ASSERT(value.kind != ExactValue_Invalid);
 
 		Type *type = nullptr;
@@ -1418,10 +1417,9 @@ isize type_info_index(CheckerInfo *info, Type *type, bool error_on_failure) {
 	if (entry_index < 0) {
 		// NOTE(bill): Do manual search
 		// TODO(bill): This is O(n) and can be very slow
-		for_array(i, info->type_info_map.entries){
-			auto *e = &info->type_info_map.entries[i];
-			if (are_types_identical_unique_tuples(e->key, type)) {
-				entry_index = e->value;
+		for (auto const &e : info->type_info_map) {
+			if (are_types_identical_unique_tuples(e.key, type)) {
+				entry_index = e.value;
 				// NOTE(bill): Add it to the search map
 				map_set(&info->type_info_map, type, entry_index);
 				break;
@@ -1781,11 +1779,10 @@ void add_type_info_type_internal(CheckerContext *c, Type *t) {
 
 	bool prev = false;
 	isize ti_index = -1;
-	for_array(i, c->info->type_info_map.entries) {
-		auto *e = &c->info->type_info_map.entries[i];
-		if (are_types_identical_unique_tuples(t, e->key)) {
+	for (auto const &e : c->info->type_info_map) {
+		if (are_types_identical_unique_tuples(t, e.key)) {
 			// Duplicate entry
-			ti_index = e->value;
+			ti_index = e.value;
 			prev = true;
 			break;
 		}
@@ -1908,8 +1905,8 @@ void add_type_info_type_internal(CheckerContext *c, Type *t) {
 
 	case Type_Struct:
 		if (bt->Struct.scope != nullptr) {
-			for_array(i, bt->Struct.scope->elements.entries) {
-				Entity *e = bt->Struct.scope->elements.entries[i].value;
+			for (auto const &entry : bt->Struct.scope->elements) {
+				Entity *e = entry.value;
 				switch (bt->Struct.soa_kind) {
 				case StructSoa_Dynamic:
 					add_type_info_type_internal(c, t_allocator);
@@ -2132,8 +2129,8 @@ void add_min_dep_type_info(Checker *c, Type *t) {
 
 	case Type_Struct:
 		if (bt->Struct.scope != nullptr) {
-			for_array(i, bt->Struct.scope->elements.entries) {
-				Entity *e = bt->Struct.scope->elements.entries[i].value;
+			for (auto const &entry : bt->Struct.scope->elements) {
+				Entity *e = entry.value;
 				switch (bt->Struct.soa_kind) {
 				case StructSoa_Dynamic:
 					add_min_dep_type_info(c, t_allocator);
@@ -2230,13 +2227,12 @@ void add_dependency_to_set(Checker *c, Entity *entity) {
 		return;
 	}
 
-	for_array(i, decl->type_info_deps.entries) {
-		Type *type = decl->type_info_deps.entries[i].ptr;
-		add_min_dep_type_info(c, type);
+	for (auto const &entry : decl->type_info_deps) {
+		add_min_dep_type_info(c, entry.ptr);
 	}
 
-	for_array(i, decl->deps.entries) {
-		Entity *e = decl->deps.entries[i].ptr;
+	for (auto const &entry : decl->deps) {
+		Entity *e = entry.ptr;
 		add_dependency_to_set(c, e);
 		if (e->kind == Entity_Procedure && e->Procedure.is_foreign) {
 			Entity *fl = e->Procedure.foreign_library;
@@ -2430,8 +2426,8 @@ void generate_minimum_dependency_set(Checker *c, Entity *start) {
 		Scope *testing_scope = testing_package->scope;
 
 		// Add all of testing library as a dependency
-		for_array(i, testing_scope->elements.entries) {
-			Entity *e = testing_scope->elements.entries[i].value;
+		for (auto const &entry : testing_scope->elements) {
+			Entity *e = entry.value;
 			if (e != nullptr) {
 				e->flags |= EntityFlag_Used;
 				add_dependency_to_set(c, e);
@@ -2445,8 +2441,8 @@ void generate_minimum_dependency_set(Checker *c, Entity *start) {
 		AstPackage *pkg = c->info.init_package;
 		Scope *s = pkg->scope;
 
-		for_array(i, s->elements.entries) {
-			Entity *e = s->elements.entries[i].value;
+		for (auto const &entry : s->elements) {
+			Entity *e = entry.value;
 			if (e->kind != Entity_Procedure) {
 				continue;
 			}
@@ -2512,15 +2508,15 @@ Array<EntityGraphNode *> generate_entity_dependency_graph(CheckerInfo *info, gbA
 
 	TIME_SECTION("generate_entity_dependency_graph: Calculate edges for graph M - Part 1");
 	// Calculate edges for graph M
-	for_array(i, M.entries) {
-		EntityGraphNode *n = M.entries[i].value;
+	for (auto const &entry : M) {
+		EntityGraphNode *n = entry.value;
 		Entity *e = n->entity;
 
 		DeclInfo *decl = decl_info_of_entity(e);
 		GB_ASSERT(decl != nullptr);
 
-		for_array(j, decl->deps.entries) {
-			Entity *dep = decl->deps.entries[j].ptr;
+		for (auto const &entry : decl->deps) {
+			Entity *dep = entry.ptr;
 			if (dep->flags & EntityFlag_Field) {
 				continue;
 			}
@@ -2539,23 +2535,22 @@ Array<EntityGraphNode *> generate_entity_dependency_graph(CheckerInfo *info, gbA
 	TIME_SECTION("generate_entity_dependency_graph: Calculate edges for graph M - Part 2");
 	auto G = array_make<EntityGraphNode *>(allocator, 0, M.entries.count);
 
-	for_array(i, M.entries) {
-		auto *entry = &M.entries[i];
-		auto *e = entry->key;
-		EntityGraphNode *n = entry->value;
+	for (auto const &m_entry : M) {
+		auto *e = m_entry.key;
+		EntityGraphNode *n = m_entry.value;
 
 		if (e->kind == Entity_Procedure) {
 			// Connect each pred 'p' of 'n' with each succ 's' and from
 			// the procedure node
-			for_array(j, n->pred.entries) {
-				EntityGraphNode *p = n->pred.entries[j].ptr;
+			for (auto const &p_entry : n->pred) {
+				EntityGraphNode *p = p_entry.ptr;
 
 				// Ignore self-cycles
 				if (p != n) {
 					// Each succ 's' of 'n' becomes a succ of 'p', and
 					// each pred 'p' of 'n' becomes a pred of 's'
-					for_array(k, n->succ.entries) {
-						EntityGraphNode *s = n->succ.entries[k].ptr;
+					for (auto const &s_entry : n->succ) {
+						EntityGraphNode *s = s_entry.ptr;
 						// Ignore self-cycles
 						if (s != n) {
 							if (p->entity->kind == Entity_Procedure &&
@@ -4273,9 +4268,10 @@ Array<ImportGraphNode *> generate_import_dependency_graph(Checker *c) {
 	Array<ImportGraphNode *> G = {};
 	array_init(&G, heap_allocator(), 0, M.entries.count);
 
-	for_array(i, M.entries) {
-		auto n = M.entries[i].value;
-		n->index = i;
+	isize i = 0;
+	for (auto const &entry : M) {
+		auto n = entry.value;
+		n->index = i++;
 		n->dep_count = n->succ.entries.count;
 		GB_ASSERT(n->dep_count >= 0);
 		array_add(&G, n);
@@ -4376,8 +4372,8 @@ void check_add_import_decl(CheckerContext *ctx, Ast *decl) {
 	} else {
 		AstPackage **found = string_map_get(pkgs, id->fullpath);
 		if (found == nullptr) {
-			for_array(pkg_index, pkgs->entries) {
-				AstPackage *pkg = pkgs->entries[pkg_index].value;
+			for (auto const &entry : *pkgs) {
+				AstPackage *pkg = entry.value;
 				gb_printf_err("%.*s\n", LIT(pkg->fullpath));
 			}
 			gb_printf_err("%s\n", token_pos_to_string(token.pos));
@@ -4871,8 +4867,8 @@ void check_import_entities(Checker *c) {
 			}
 		}
 
-		for_array(i, n->pred.entries) {
-			ImportGraphNode *p = n->pred.entries[i].ptr;
+		for (auto const &entry : n->pred) {
+			ImportGraphNode *p = entry.ptr;
 			p->dep_count = gb_max(p->dep_count-1, 0);
 			priority_queue_fix(&pq, p->index);
 		}
@@ -4979,8 +4975,8 @@ bool find_entity_path_tuple(Type *tuple, Entity *end, PtrSet<Entity *> *visited,
 		if (var_decl == nullptr) {
 			continue;
 		}
-		for_array(i, var_decl->deps.entries) {
-			Entity *dep = var_decl->deps.entries[i].ptr;
+		for (auto const &entry : var_decl->deps) {
+			Entity *dep = entry.ptr;
 			if (dep == end) {
 				auto path = array_make<Entity *>(heap_allocator());
 				array_add(&path, dep);
@@ -5032,8 +5028,8 @@ Array<Entity *> find_entity_path(Entity *start, Entity *end, PtrSet<Entity *> *v
 				return path;
 			}
 		} else {
-			for_array(i, decl->deps.entries) {
-				Entity *dep = decl->deps.entries[i].ptr;
+			for (auto const &entry : decl->deps) {
+				Entity *dep = entry.ptr;
 				if (dep == end) {
 					auto path = array_make<Entity *>(heap_allocator());
 					array_add(&path, dep);
@@ -5091,8 +5087,8 @@ void calculate_global_init_order(Checker *c) {
 			}
 		}
 
-		for_array(i, n->pred.entries) {
-			EntityGraphNode *p = n->pred.entries[i].ptr;
+		for (auto const &entry : n->pred) {
+			EntityGraphNode *p = entry.ptr;
 			p->dep_count -= 1;
 			p->dep_count = gb_max(p->dep_count, 0);
 			priority_queue_fix(&pq, p->index);
@@ -5217,8 +5213,8 @@ void check_unchecked_bodies(Checker *c) {
 	map_init(&untyped, heap_allocator());
 	defer (map_destroy(&untyped));
 
-	for_array(i, c->info.minimum_dependency_set.entries) {
-		Entity *e = c->info.minimum_dependency_set.entries[i].ptr;
+	for (auto const &entry : c->info.minimum_dependency_set) {
+		Entity *e = entry.ptr;
 		if (e == nullptr || e->kind != Entity_Procedure) {
 			continue;
 		}
@@ -5267,8 +5263,8 @@ void check_test_procedures(Checker *c) {
 	AstPackage *pkg = c->info.init_package;
 	Scope *s = pkg->scope;
 
-	for_array(i, build_context.test_names.entries) {
-		String name = build_context.test_names.entries[i].value;
+	for (auto const &entry : build_context.test_names) {
+		String name = entry.value;
 		Entity *e = scope_lookup(s, name);
 		if (e == nullptr) {
 			Token tok = {};
@@ -5422,9 +5418,9 @@ void add_untyped_expressions(CheckerInfo *cinfo, UntypedExprInfoMap *untyped) {
 	if (untyped == nullptr) {
 		return;
 	}
-	for_array(i, untyped->entries) {
-		Ast *expr = untyped->entries[i].key;
-		ExprInfo *info = untyped->entries[i].value;
+	for (auto const &entry : *untyped) {
+		Ast *expr = entry.key;
+		ExprInfo *info = entry.value;
 		if (expr != nullptr && info != nullptr) {
 			mpmc_enqueue(&cinfo->checker->global_untyped_queue, UntypedExprInfo{expr, info});
 		}
@@ -5590,8 +5586,8 @@ void check_unique_package_names(Checker *c) {
 	string_map_init(&pkgs, heap_allocator(), 2*c->info.packages.entries.count);
 	defer (string_map_destroy(&pkgs));
 
-	for_array(i, c->info.packages.entries) {
-		AstPackage *pkg = c->info.packages.entries[i].value;
+	for (auto const &entry : c->info.packages) {
+		AstPackage *pkg = entry.value;
 		if (pkg->files.count == 0) {
 			continue; // Sanity check
 		}
@@ -5752,8 +5748,8 @@ void check_parsed_files(Checker *c) {
 	check_merge_queues_into_arrays(c);
 
 	TIME_SECTION("check scope usage");
-	for_array(i, c->info.files.entries) {
-		AstFile *f = c->info.files.entries[i].value;
+	for (auto const &entry : c->info.files) {
+		AstFile *f = entry.value;
 		check_scope_usage(c, f->scope);
 	}
 
@@ -5789,8 +5785,8 @@ void check_parsed_files(Checker *c) {
 			DeclInfo *decl = e->decl_info;
 			ast_node(pl, ProcLit, decl->proc_lit);
 			if (pl->inlining == ProcInlining_inline) {
-				for_array(j, decl->deps.entries) {
-					Entity *dep = decl->deps.entries[j].ptr;
+				for (auto const &entry : decl->deps) {
+					Entity *dep = entry.ptr;
 					if (dep == e) {
 						error(e->token, "Cannot inline recursive procedure '%.*s'", LIT(e->token.string));
 						break;

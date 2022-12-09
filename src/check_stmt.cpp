@@ -622,9 +622,9 @@ bool check_using_stmt_entity(CheckerContext *ctx, AstUsingStmt *us, Ast *expr, b
 
 	case Entity_ImportName: {
 		Scope *scope = e->ImportName.scope;
-		MUTEX_GUARD_BLOCK(scope->mutex) for_array(i, scope->elements.entries) {
-			String name = scope->elements.entries[i].key.string;
-			Entity *decl = scope->elements.entries[i].value;
+		MUTEX_GUARD_BLOCK(scope->mutex) for (auto const &entry : scope->elements) {
+			String name = entry.key.string;
+			Entity *decl = entry.value;
 			if (!is_entity_exported(decl)) continue;
 
 			Entity *found = scope_insert_with_name(ctx->scope, name, decl);
@@ -652,8 +652,8 @@ bool check_using_stmt_entity(CheckerContext *ctx, AstUsingStmt *us, Ast *expr, b
 		if (t->kind == Type_Struct) {
 			Scope *found = t->Struct.scope;
 			GB_ASSERT(found != nullptr);
-			for_array(i, found->elements.entries) {
-				Entity *f = found->elements.entries[i].value;
+			for (auto const &entry : found->elements) {
+				Entity *f = entry.value;
 				if (f->kind == Entity_Variable) {
 					Entity *uvar = alloc_entity_using_variable(e, f->token, f->type, expr);
 					if (!is_ptr && e->flags & EntityFlag_Value) uvar->flags |= EntityFlag_Value;
@@ -2370,8 +2370,8 @@ void check_stmt_internal(CheckerContext *ctx, Ast *node, u32 flags) {
 						
 						Scope *scope = t->Struct.scope;
 						GB_ASSERT(scope != nullptr);
-						for_array(i, scope->elements.entries) {
-							Entity *f = scope->elements.entries[i].value;
+						for (auto const &entry : scope->elements) {
+							Entity *f = entry.value;
 							if (f->kind == Entity_Variable) {
 								Entity *uvar = alloc_entity_using_variable(e, f->token, f->type, nullptr);
 								uvar->flags |= (e->flags & EntityFlag_Value);

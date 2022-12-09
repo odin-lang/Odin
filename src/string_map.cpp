@@ -30,6 +30,8 @@ struct StringMapEntry {
 
 template <typename T>
 struct StringMap {
+	using K = String;
+	using V = T;
 	Slice<MapIndex>           hashes;
 	Array<StringMapEntry<T> > entries;
 };
@@ -270,3 +272,24 @@ gb_inline void string_map_clear(StringMap<T> *h) {
 	}
 }
 
+
+
+template <typename T>
+StringMapEntry<T> *begin(StringMap<T> &m) {
+	return m.entries.data;
+}
+template <typename T>
+StringMapEntry<T> const *begin(StringMap<T> const &m) {
+	return m.entries.data;
+}
+
+
+template <typename T>
+StringMapEntry<T> *end(StringMap<T> &m) {
+	return m.entries.data + m.entries.count;
+}
+
+template <typename T>
+StringMapEntry<T> const *end(StringMap<T> const &m) {
+	return m.entries.data + m.entries.count;
+}

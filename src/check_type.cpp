@@ -1791,8 +1791,8 @@ Type *check_get_params(CheckerContext *ctx, Scope *scope, Ast *_params, bool *is
 
 	isize specialization_count = 0;
 	if (scope != nullptr) {
-		for_array(i, scope->elements.entries) {
-			Entity *e = scope->elements.entries[i].value;
+		for (auto const &entry : scope->elements) {
+			Entity *e = entry.value;
 			if (e->kind == Entity_TypeName) {
 				Type *t = e->type;
 				if (t->kind == Type_Generic &&

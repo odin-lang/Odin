@@ -339,3 +339,24 @@ void multi_map_remove_all(PtrMap<K, V> *h, K key) {
 	}
 }
 #endif
+
+
+template <typename K, typename V>
+PtrMapEntry<K, V> *begin(PtrMap<K, V> &m) {
+	return m.entries.data;
+}
+template <typename K, typename V>
+PtrMapEntry<K, V> const *begin(PtrMap<K, V> const &m) {
+	return m.entries.data;
+}
+
+
+template <typename K, typename V>
+PtrMapEntry<K, V> *end(PtrMap<K, V> &m) {
+	return m.entries.data + m.entries.count;
+}
+
+template <typename K, typename V>
+PtrMapEntry<K, V> const *end(PtrMap<K, V> const &m) {
+	return m.entries.data + m.entries.count;
+}

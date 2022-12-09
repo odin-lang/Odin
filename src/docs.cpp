@@ -222,8 +222,8 @@ void print_doc_package(CheckerInfo *info, AstPackage *pkg) {
 	if (pkg->scope != nullptr) {
 		auto entities = array_make<Entity *>(heap_allocator(), 0, pkg->scope->elements.entries.count);
 		defer (array_free(&entities));
-		for_array(i, pkg->scope->elements.entries) {
-			Entity *e = pkg->scope->elements.entries[i].value;
+		for (auto const &entry : pkg->scope->elements) {
+			Entity *e = entry.value;
 			switch (e->kind) {
 			case Entity_Invalid:
 			case Entity_Builtin:
@@ -359,8 +359,8 @@ void generate_documentation(Checker *c) {
 		odin_doc_write(info, output_file_path);
 	} else {
 		auto pkgs = array_make<AstPackage *>(permanent_allocator(), 0, info->packages.entries.count);
-		for_array(i, info->packages.entries) {
-			AstPackage *pkg = info->packages.entries[i].value;
+		for (auto const &entry : info->packages) {
+			AstPackage *pkg = entry.value;
 			if (build_context.cmd_doc_flags & CmdDocFlag_AllPackages) {
 				array_add(&pkgs, pkg);
 			} else {
