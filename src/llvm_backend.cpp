@@ -1725,18 +1725,17 @@ void lb_generate_code(lbGenerator *gen) {
 		break;
 	}
 
-	for (auto const entry : gen->modules) {
-		auto target_machine = LLVMCreateTargetMachine(
+	for (auto const &entry : gen->modules) {
+		LLVMTargetMachineRef target_machine = LLVMCreateTargetMachine(
 			target, target_triple, llvm_cpu,
 			llvm_features,
 			code_gen_level,
 			reloc_mode,
 			code_mode);
-		array_add(&target_machines, target_machine);
-
 		lbModule *m = entry.value;
 		m->target_machine = target_machine;
 		LLVMSetModuleDataLayout(m->mod, LLVMCreateTargetDataLayout(target_machine));
+		array_add(&target_machines, target_machine);
 	}
 
 	for (auto const &entry : gen->modules) {
@@ -2134,7 +2133,8 @@ void lb_generate_code(lbGenerator *gen) {
 	TIME_SECTION("LLVM Procedure Generation");
 	for (auto const &entry : gen->modules) {
 		lbModule *m = entry.value;
-		for (lbProcedure *p : m->procedures_to_generate) {
+		for_array(i, m->procedures_to_generate) {
+			lbProcedure *p = m->procedures_to_generate[i];
 			lb_generate_procedure(m, p);
 		}
 	}
@@ -2146,7 +2146,8 @@ void lb_generate_code(lbGenerator *gen) {
 
 	for (auto const &entry : gen->modules) {
 		lbModule *m = entry.value;
-		for (lbProcedure *p : m->missing_procedures_to_check) {
+		for_array(i, m->missing_procedures_to_check) {
+			lbProcedure *p = m->missing_procedures_to_check[i];
 			debugf("Generate missing procedure: %.*s\n", LIT(p->name));
 			lb_generate_procedure(m, p);
 		}
@@ -2177,7 +2178,6 @@ void lb_generate_code(lbGenerator *gen) {
 
 	for (auto const &entry : gen->modules) {
 		lbModule *m = entry.value;
-		
 		lb_run_remove_unused_function_pass(m);
 		lb_run_remove_unused_globals_pass(m);
 
@@ -2222,7 +2222,6 @@ void lb_generate_code(lbGenerator *gen) {
 
 		for (auto const &entry : gen->modules) {
 			lbModule *m = entry.value;
-
 			if (lb_is_module_empty(m)) {
 				continue;
 			}
@@ -2246,7 +2245,8 @@ void lb_generate_code(lbGenerator *gen) {
 
 	for (auto const &entry : gen->modules) {
 		lbModule *m = entry.value;
-		for (Entity *e : m->info->required_foreign_imports_through_force) {
+		for_array(i, m->info->required_foreign_imports_through_force) {
+			Entity *e = m->info->required_foreign_imports_through_force[i];
 			lb_add_foreign_library_path(m, e);
 		}
 
