@@ -531,7 +531,7 @@ not_equal          :: proc{not_equal_single, not_equal_array}
 
 any :: proc(x: $A/[$N]bool) -> (out: bool) {
 	for e in x {
-		if x {
+		if e {
 			return true
 		}
 	}
