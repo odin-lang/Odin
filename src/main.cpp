@@ -764,7 +764,7 @@ bool parse_build_flags(Array<String> args) {
 	auto build_flags = array_make<BuildFlag>(heap_allocator(), 0, BuildFlag_COUNT);
 	add_flag(&build_flags, BuildFlag_Help,                    str_lit("help"),                      BuildFlagParam_None,    Command_all);
 	add_flag(&build_flags, BuildFlag_SingleFile,              str_lit("file"),                      BuildFlagParam_None,    Command__does_build | Command__does_check);
-	add_flag(&build_flags, BuildFlag_OutFile,                 str_lit("out"),                       BuildFlagParam_String,  Command__does_build &~ Command_test);
+	add_flag(&build_flags, BuildFlag_OutFile,                 str_lit("out"),                       BuildFlagParam_String,  Command__does_build | Command_test);
 	add_flag(&build_flags, BuildFlag_OptimizationMode,        str_lit("o"),                         BuildFlagParam_String,  Command__does_build);
 	add_flag(&build_flags, BuildFlag_OptimizationMode,        str_lit("O"),                         BuildFlagParam_String,  Command__does_build);
 	add_flag(&build_flags, BuildFlag_ShowTimings,             str_lit("show-timings"),              BuildFlagParam_None,    Command__does_check);
@@ -1930,7 +1930,7 @@ void print_show_help(String const arg0, String const &command) {
 		print_usage_line(3, "odin check <dir>                # Type check package in <dir>");
 		print_usage_line(3, "odin check filename.odin -file  # Type check single-file package, must contain entry point.");
 	} else if (command == "test") {
-		print_usage_line(1, "test      Build ands runs procedures with the attribute @(test) in the initial package");
+		print_usage_line(1, "test      Build and runs procedures with the attribute @(test) in the initial package");
 	} else if (command == "query") {
 		print_usage_line(1, "query     [experimental] Parse, type check, and output a .json file containing information about the program");
 	} else if (command == "doc") {
