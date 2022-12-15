@@ -40,7 +40,7 @@ main :: proc() {
 
 @test
 test_parse_demo :: proc(t: ^testing.T) {
-	pkg, ok := parser.parse_package_from_path("examples/demo")
+	pkg, ok := parser.parse_package_from_path("../../examples/demo")
 	
 	expect(t, ok == true, "parser.parse_package_from_path failed")
 
