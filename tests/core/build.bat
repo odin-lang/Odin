@@ -75,3 +75,8 @@ echo ---
 echo Running core:slice tests
 echo ---
 %PATH_TO_ODIN% run slice %COMMON% -out:test_core_slice.exe
+
+echo ---
+echo Running core:odin/parser tests
+echo ---
+%PATH_TO_ODIN% run odin %COMMON% -out:test_core_parser.exe
