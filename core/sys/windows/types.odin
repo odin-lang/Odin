@@ -3083,6 +3083,11 @@ ADDRINFOA :: struct {
 	ai_next: ^ADDRINFOA,
 }
 
+sockaddr  :: struct {
+	sa_family: USHORT,
+	sa_data:   [14]byte,
+}
+
 sockaddr_in :: struct {
 	sin_family: ADDRESS_FAMILY,
 	sin_port: u16be,
