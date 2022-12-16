@@ -46,7 +46,7 @@ Image :: struct {
 	height:        int,
 	channels:      int,
 	depth:         int, // Channel depth in bits, typically 8 or 16
-	pixels:        bytes.Buffer,
+	pixels:        bytes.Buffer `fmt:"-"`,
 	/*
 		Some image loaders/writers can return/take an optional background color.
 		For convenience, we return them as u16 so we don't need to switch on the type
@@ -54,12 +54,14 @@ Image :: struct {
 	*/
 	background:    Maybe(RGB_Pixel_16),
 	metadata:      Image_Metadata,
+	which:         Which_File_Type,
 }
 
-Image_Metadata :: union {
+Image_Metadata :: union #shared_nil {
 	^Netpbm_Info,
 	^PNG_Info,
 	^QOI_Info,
+	^TGA_Info,
 }
 
 
@@ -167,11 +169,13 @@ Error :: union #shared_nil {
 
 General_Image_Error :: enum {
 	None = 0,
+	Unsupported_Option,
 	// File I/O
 	Unable_To_Read_File,
 	Unable_To_Write_File,
 
 	// Invalid
+	Unsupported_Format,
 	Invalid_Signature,
 	Invalid_Input_Image,
 	Image_Dimensions_Too_Large,
@@ -374,10 +378,20 @@ QOI_Info :: struct {
 	header: QOI_Header,
 }
 
+TGA_Data_Type :: enum u8  {
+	No_Image_Data             = 0,
+	Uncompressed_Color_Mapped = 1,
+	Uncompressed_RGB          = 2,
+	Uncompressed_Black_White  = 3,
+	Compressed_Color_Mapped   = 9,
+	Compressed_RGB            = 10,
+	Compressed_Black_White    = 11,
+}
+
 TGA_Header :: struct #packed {
 	id_length:        u8,
 	color_map_type:   u8,
-	data_type_code:   u8,
+	data_type_code:   TGA_Data_Type,
 	color_map_origin: u16le,
 	color_map_length: u16le,
 	color_map_depth:  u8,
@@ -387,6 +401,52 @@ TGA_Header :: struct #packed {
 	image_descriptor: u8,
 }
 #assert(size_of(TGA_Header) == 18)
+
+New_TGA_Signature :: "TRUEVISION-XFILE.\x00"
+
+TGA_Footer :: struct #packed {
+	extension_area_offset:      u32le,
+	developer_directory_offset: u32le,
+	signature:                  [18]u8 `fmt:"s,0"`, // Should match signature if New TGA.
+}
+#assert(size_of(TGA_Footer) == 26)
+
+TGA_Extension :: struct #packed {
+	extension_size:          u16le,               // Size of this struct. If not 495 bytes it means it's an unsupported version.
+	author_name:             [41]u8  `fmt:"s,0"`, // Author name, ASCII. Zero-terminated
+	author_comments:         [324]u8 `fmt:"s,0"`, // Author comments, formatted as 4 lines of 80 character lines, each zero terminated.
+	datetime:                struct {month, day, year, hour, minute, second: u16le},
+	job_name:                [41]u8  `fmt:"s,0"`, // Author name, ASCII. Zero-terminated
+	job_time:                struct {hour, minute, second: u16le},
+	software_id:             [41]u8  `fmt:"s,0"`, // Software ID name, ASCII. Zero-terminated
+	software_version: struct #packed {
+		number: u16le, // Version number * 100
+		letter: u8 `fmt:"r"`,   // " " if not used
+	},
+	key_color:               [4]u8,    // ARGB key color used at time of production
+	aspect_ratio:            [2]u16le, // Numerator / Denominator
+	gamma:                   [2]u16le, // Numerator / Denominator, range should be 0.0..10.0
+	color_correction_offset: u32le,    // 0 if no color correction information
+	postage_stamp_offset:    u32le,    // 0 if no thumbnail
+	scanline_offset:         u32le,    // 0 if no scanline table
+	attributes:              TGA_Alpha_Kind,
+}
+#assert(size_of(TGA_Extension) == 495)
+
+TGA_Alpha_Kind :: enum u8 {
+	None,
+	Undefined_Ignore,
+	Undefined_Retain,
+	Useful,
+	Premultiplied,
+}
+
+TGA_Info :: struct {
+	header:    TGA_Header,
+	image_id:  string,
+	footer:    Maybe(TGA_Footer),
+	extension: Maybe(TGA_Extension),
+}
 
 // Function to help with image buffer calculations
 compute_buffer_size :: proc(width, height, channels, depth: int, extra_row_bytes := int(0)) -> (size: int) {
@@ -467,7 +527,7 @@ return_single_channel :: proc(img: ^Image, channel: Channel) -> (res: ^Image, ok
 }
 
 // Does the image have 1 or 2 channels, a valid bit depth (8 or 16),
-// Is the pointer valid, are the dimenions valid?
+// Is the pointer valid, are the dimensions valid?
 is_valid_grayscale_image :: proc(img: ^Image) -> (ok: bool) {
 	// Were we actually given a valid image?
 	if img == nil {
@@ -487,7 +547,7 @@ is_valid_grayscale_image :: proc(img: ^Image) -> (ok: bool) {
 	// This returns 0 if any of the inputs is zero.
 	bytes_expected := compute_buffer_size(img.width, img.height, img.channels, img.depth)
 
-	// If the dimenions are invalid or the buffer size doesn't match the image characteristics, bail.
+	// If the dimensions are invalid or the buffer size doesn't match the image characteristics, bail.
 	if bytes_expected == 0 || bytes_expected != len(img.pixels.buf) || img.width * img.height > MAX_DIMENSIONS {
 		return false
 	}
@@ -496,7 +556,7 @@ is_valid_grayscale_image :: proc(img: ^Image) -> (ok: bool) {
 }
 
 // Does the image have 3 or 4 channels, a valid bit depth (8 or 16),
-// Is the pointer valid, are the dimenions valid?
+// Is the pointer valid, are the dimensions valid?
 is_valid_color_image :: proc(img: ^Image) -> (ok: bool) {
 	// Were we actually given a valid image?
 	if img == nil {
@@ -516,7 +576,7 @@ is_valid_color_image :: proc(img: ^Image) -> (ok: bool) {
 	// This returns 0 if any of the inputs is zero.
 	bytes_expected := compute_buffer_size(img.width, img.height, img.channels, img.depth)
 
-	// If the dimenions are invalid or the buffer size doesn't match the image characteristics, bail.
+	// If the dimensions are invalid or the buffer size doesn't match the image characteristics, bail.
 	if bytes_expected == 0 || bytes_expected != len(img.pixels.buf) || img.width * img.height > MAX_DIMENSIONS {
 		return false
 	}
@@ -525,7 +585,7 @@ is_valid_color_image :: proc(img: ^Image) -> (ok: bool) {
 }
 
 // Does the image have 1..4 channels, a valid bit depth (8 or 16),
-// Is the pointer valid, are the dimenions valid?
+// Is the pointer valid, are the dimensions valid?
 is_valid_image :: proc(img: ^Image) -> (ok: bool) {
 	// Were we actually given a valid image?
 	if img == nil {

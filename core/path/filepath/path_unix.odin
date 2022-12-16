@@ -38,7 +38,7 @@ abs :: proc(path: string, allocator := context.allocator) -> (string, bool) {
 	return path_str, true
 }
 
-join :: proc(elems: ..string, allocator := context.allocator) -> string {
+join :: proc(elems: []string, allocator := context.allocator) -> string {
 	for e, i in elems {
 		if e != "" {
 			p := strings.join(elems[i:], SEPARATOR_STRING, context.temp_allocator)

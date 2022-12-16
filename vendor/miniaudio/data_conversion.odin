@@ -36,77 +36,106 @@ linear_resampler_config :: struct {
 }
 
 linear_resampler :: struct {
-	config: linear_resampler_config,
+	config:        linear_resampler_config,
 	inAdvanceInt:  u32,
 	inAdvanceFrac: u32,
 	inTimeInt:     u32,
 	inTimeFrac:    u32,
 	x0: struct #raw_union {
-		f32: [MAX_CHANNELS]f32,
-		s16: [MAX_CHANNELS]i16,
+		f32: [^]f32,
+		s16: [^]i16,
 	}, /* The previous input frame. */
 	x1: struct #raw_union {
-		f32: [MAX_CHANNELS]f32,
-		s16: [MAX_CHANNELS]i16,
+		f32: [^]f32,
+		s16: [^]i16,
 	}, /* The next input frame. */
 	lpf: lpf,
+
+	/* Memory management. */
+	_pHeap:    rawptr,
+	_ownsHeap: b32,
+}
+
+resampling_backend :: struct {}
+resampling_backend_vtable :: struct {
+	onGetHeapSize:                 proc "c" (pUserData: rawptr, pConfig: ^resampler_config, pHeapSizeInBytes: ^c.size_t) -> result,
+	onInit:                        proc "c" (pUserData: rawptr, pConfig: ^resampler_config, pHeap: rawptr, ppBackend: ^^resampling_backend) -> result,
+	onUninit:                      proc "c" (pUserData: rawptr, pBackend: ^resampling_backend, pAllocationCallbacks: ^allocation_callbacks),
+	onProcess:                     proc "c" (pUserData: rawptr, pBackend: ^resampling_backend, pFramesIn: rawptr, pFrameCountIn: ^u64, pFramesOut: rawptr, pFrameCountOut: ^u64) -> result,
+	onSetRate:                     proc "c" (pUserData: rawptr, pBackend: ^resampling_backend, sampleRateIn: u32, sampleRateOut: u32) -> result,           /* Optional. Rate changes will be disabled. */
+	onGetInputLatency:             proc "c" (pUserData: rawptr, pBackend: ^resampling_backend) -> u64,                                                     /* Optional. Latency will be reported as 0. */
+	onGetOutputLatency:            proc "c" (pUserData: rawptr, pBackend: ^resampling_backend) -> u64,                                                     /* Optional. Latency will be reported as 0. */
+	onGetRequiredInputFrameCount:  proc "c" (pUserData: rawptr, pBackend: ^resampling_backend, outputFrameCount: u64, pInputFrameCount: ^u64) -> result,   /* Optional. Latency mitigation will be disabled. */
+	onGetExpectedOutputFrameCount: proc "c" (pUserData: rawptr, pBackend: ^resampling_backend, inputFrameCount: u64, pOutputFrameCount: ^u64) -> result,   /* Optional. Latency mitigation will be disabled. */
+	onReset:                       proc "c" (pUserData: rawptr, pBackend: ^resampling_backend) -> result,
 }
 
 resample_algorithm :: enum {
 	linear = 0,   /* Fastest, lowest quality. Optional low-pass filtering. Default. */
-	speex,
+	custom,
 }
 
 resampler_config :: struct {
-	format:        format, /* Must be either ma_format_f32 or ma_format_s16. */
-	channels:      u32,
-	sampleRateIn:  u32,
-	sampleRateOut: u32,
-	algorithm:     resample_algorithm,
+	format:           format, /* Must be either ma_format_f32 or ma_format_s16. */
+	channels:         u32,
+	sampleRateIn:     u32,
+	sampleRateOut:    u32,
+	algorithm:        resample_algorithm, /* When set to ma_resample_algorithm_custom, pBackendVTable will be used. */
+	pBackendVTable:   ^resampling_backend_vtable,
+	pBackendUserData: rawptr,
 	linear: struct {
 		lpfOrder:         u32,
-		lpfNyquistFactor: f64,
-	},
-	speex: struct {
-		quality: c.int, /* 0 to 10. Defaults to 3. */
 	},
 }
 
 resampler :: struct {
-	config: resampler_config,
+	pBackend:         ^resampling_backend,
+	pBackendVTable:   ^resampling_backend_vtable,
+	pBackendUserData: rawptr,
+	format:           format,
+	channels:         u32,
+	sampleRateIn:     u32,
+	sampleRateOut:    u32,
 	state: struct #raw_union {
 		linear: linear_resampler,
-		speex: struct {
-			pSpeexResamplerState: rawptr, /* SpeexResamplerState* */
-		},
-	},
+	},    /* State for stock resamplers so we can avoid a malloc. For stock resamplers, pBackend will point here. */
+
+	/* Memory management. */
+	_pHeap:    rawptr,
+	_ownsHeap: b32,
 }
 
 @(default_calling_convention="c", link_prefix="ma_")
 foreign lib {
 	linear_resampler_config_init :: proc(format: format, channels: u32, sampleRateIn, sampleRateOut: u32) -> linear_resampler_config ---
 
-	linear_resampler_init                            :: proc(pConfig: ^linear_resampler_config, pResampler: ^linear_resampler) -> result ---
-	linear_resampler_uninit                          :: proc(pResampler: ^linear_resampler) ---
+	linear_resampler_get_heap_size                   :: proc(pConfig: ^linear_resampler_config, pHeapSizeInBytes: ^c.size_t) -> result ---
+	linear_resampler_init_preallocated               :: proc(pConfig: ^linear_resampler_config, pHeap: rawptr, pResampler: ^linear_resampler) -> result ---
+	linear_resampler_init                            :: proc(pConfig: ^linear_resampler_config, pAllocationCallbacks: ^allocation_callbacks, pResampler: ^linear_resampler) -> result ---
+	linear_resampler_uninit                          :: proc(pResampler: ^linear_resampler, pAllocationCallbacks: ^allocation_callbacks) ---
 	linear_resampler_process_pcm_frames              :: proc(pResampler: ^linear_resampler, pFramesIn: rawptr, pFrameCountIn: ^u64, pFramesOut: rawptr, pFrameCountOut: ^u64) -> result ---
 	linear_resampler_set_rate                        :: proc(pResampler: ^linear_resampler, sampleRateIn, sampleRateOut: u32) -> result ---
 	linear_resampler_set_rate_ratio                  :: proc(pResampler: ^linear_resampler, ratioInOut: f32) -> result ---
-	linear_resampler_get_required_input_frame_count  :: proc(pResampler: ^linear_resampler, outputFrameCount: u64) -> u64 ---
-	linear_resampler_get_expected_output_frame_count :: proc(pResampler: ^linear_resampler, inputFrameCount:  u64) -> u64 ---
 	linear_resampler_get_input_latency               :: proc(pResampler: ^linear_resampler) -> u64 ---
 	linear_resampler_get_output_latency              :: proc(pResampler: ^linear_resampler) -> u64 ---
+	linear_resampler_get_required_input_frame_count  :: proc(pResampler: ^linear_resampler, outputFrameCount: u64, pInputFrameCount: ^u64) -> result ---
+	linear_resampler_get_expected_output_frame_count :: proc(pResampler: ^linear_resampler, inputFrameCount: u64, pOutputFrameCount: ^u64) -> result ---
+	linear_resampler_reset                           :: proc(pResampler: ^linear_resampler) -> result ---
 
 	resampler_config_init :: proc(format: format, channels: u32, sampleRateIn, sampleRateOut: u32, algorithm: resample_algorithm) -> resampler_config ---
+
+	resampler_get_heap_size     :: proc(pConfig: ^resampler_config, pHeapSizeInBytes: ^c.size_t) -> result ---
+	resampler_init_preallocated :: proc(pConfig: ^resampler_config, pHeap: rawptr, pResampler: ^resampler) -> result ---
 
 	/*
 	Initializes a new resampler object from a config.
 	*/
-	resampler_init :: proc(pConfig: ^resampler_config, pResampler: ^resampler) -> result ---
+	resampler_init :: proc(pConfig: ^resampler_config, pAllocationCallbacks: ^allocation_callbacks, pResampler: ^resampler) -> result ---
 
 	/*
 	Uninitializes a resampler.
 	*/
-	resampler_uninit :: proc(pResampler: ^resampler) ---
+	resampler_uninit :: proc(pResampler: ^resampler, pAllocationCallbacks: ^allocation_callbacks) ---
 
 	/*
 	Converts the given input data.
@@ -145,23 +174,6 @@ foreign lib {
 	*/
 	resampler_set_rate_ratio :: proc(pResampler: ^resampler, ratio: f32) -> result ---
 
-
-	/*
-	Calculates the number of whole input frames that would need to be read from the client in order to output the specified
-	number of output frames.
-
-	The returned value does not include cached input frames. It only returns the number of extra frames that would need to be
-	read from the input buffer in order to output the specified number of output frames.
-	*/
-	resampler_get_required_input_frame_count :: proc(pResampler: ^resampler, outputFrameCount: u64) -> u64 ---
-
-	/*
-	Calculates the number of whole output frames that would be output after fully reading and consuming the specified number of
-	input frames.
-	*/
-	resampler_get_expected_output_frame_count :: proc(pResampler: ^resampler, inputFrameCount: u64) -> u64 ---
-
-
 	/*
 	Retrieves the latency introduced by the resampler in input frames.
 	*/
@@ -171,6 +183,26 @@ foreign lib {
 	Retrieves the latency introduced by the resampler in output frames.
 	*/
 	resampler_get_output_latency :: proc(pResampler: ^resampler) -> u64 ---
+
+	/*
+	Calculates the number of whole input frames that would need to be read from the client in order to output the specified
+	number of output frames.
+
+	The returned value does not include cached input frames. It only returns the number of extra frames that would need to be
+	read from the input buffer in order to output the specified number of output frames.
+	*/
+	resampler_get_required_input_frame_count :: proc(pResampler: ^resampler, outputFrameCount: u64, pInputFrameCount: ^u64) -> result ---
+
+	/*
+	Calculates the number of whole output frames that would be output after fully reading and consuming the specified number of
+	input frames.
+	*/
+	resampler_get_expected_output_frame_count :: proc(pResampler: ^resampler, inputFrameCount: u64, pOutputFrameCount: ^u64) -> result ---
+
+	/*
+	Resets the resampler's timer and clears it's internal cache.
+	*/
+	resampler_reset :: proc(pResampler: ^resampler) -> result ---
 }
 
 
@@ -179,42 +211,63 @@ foreign lib {
 Channel Conversion
 
 **************************************************************************************************************************************************************/
+channel_conversion_path :: enum c.int {
+	unknown,
+	passthrough,
+	mono_out,    /* Converting to mono. */
+	mono_in,     /* Converting from mono. */
+	shuffle,     /* Simple shuffle. Will use this when all channels are present in both input and output channel maps, but just in a different order. */
+	weights,     /* Blended based on weights. */
+}
+
+mono_expansion_mode :: enum c.int {
+	duplicate = 0,   /* The default. */
+	average,         /* Average the mono channel across all channels. */
+	stereo_only,     /* Duplicate to the left and right channels only and ignore the others. */
+	default = duplicate,
+}
+
 channel_converter_config :: struct {
-	format:        format,
-	channelsIn:    u32,
-	channelsOut:   u32,
-	channelMapIn:  [MAX_CHANNELS]channel,
-	channelMapOut: [MAX_CHANNELS]channel,
-	mixingMode:    channel_mix_mode,
-	weights:       [MAX_CHANNELS][MAX_CHANNELS]f32,  /* [in][out]. Only used when mixingMode is set to ma_channel_mix_mode_custom_weights. */
+	format:         format,
+	channelsIn:     u32,
+	channelsOut:    u32,
+	pChannelMapIn:  [^]channel,
+	pChannelMapOut: [^]channel,
+	mixingMode:     channel_mix_mode,
+	ppWeights:      ^[^]f32,  /* [in][out]. Only used when mixingMode is set to ma_channel_mix_mode_custom_weights. */
 }
 
 channel_converter :: struct {
-	format:        format,
-	channelsIn:    u32,
-	channelsOut:   u32,
-	channelMapIn:  [MAX_CHANNELS]channel,
-	channelMapOut: [MAX_CHANNELS]channel,
-	mixingMode:    channel_mix_mode,
-	weights: struct #raw_union {
-		f32: [MAX_CHANNELS][MAX_CHANNELS]f32,
-		s16: [MAX_CHANNELS][MAX_CHANNELS]i32,
+	format:         format,
+	channelsIn:     u32,
+	channelsOut:    u32,
+	mixingMode:     channel_mix_mode,
+	conversionPath: channel_conversion_path,
+	pChannelMapIn:  [^]channel,
+	pChannelMapOut: [^]channel,
+	pShuffleTable:  [^]u8,
+	weights: struct #raw_union { /* [in][out] */
+		f32: ^[^]f32,
+		s16: ^[^]i32,
 	},
-	isPassthrough:         b8,
-	isSimpleShuffle:       b8,
-	isSimpleMonoExpansion: b8,
-	isStereoToMono:        b8,
-	shuffleTable:          [MAX_CHANNELS]u8,
+
+	/* Memory management. */
+	_pHeap:   rawptr,
+	_ownsHeap: b32,
 }
 
 
 @(default_calling_convention="c", link_prefix="ma_")
 foreign lib {
-	channel_converter_config_init :: proc(format: format, channelsIn: u32, pChannelMapIn: ^channel, channelsOut: u32, pChannelMapOut: ^channel, mixingMode: channel_mix_mode) -> channel_converter_config ---
+	channel_converter_config_init :: proc(format: format, channelsIn: u32, pChannelMapIn: [^]channel, channelsOut: u32, pChannelMapOut: [^]channel, mixingMode: channel_mix_mode) -> channel_converter_config ---
 
-	channel_converter_init               :: proc(pConfig: ^channel_converter_config, pConverter: ^channel_converter) -> result ---
-	channel_converter_uninit             :: proc(pConverter: ^channel_converter) ---
-	channel_converter_process_pcm_frames :: proc(pConverter: ^channel_converter, pFramesOut: rawptr, pFramesIn: rawptr, frameCount: u64) -> result ---
+	channel_converter_get_heap_size          :: proc(pConfig: ^channel_converter_config, pHeapSizeInBytes: ^c.size_t) -> result ---
+	channel_converter_init_preallocated      :: proc(pConfig: ^channel_converter_config, pHeap: rawptr, pConverter: ^channel_converter) -> result ---
+	channel_converter_init                   :: proc(pConfig: ^channel_converter_config, pAllocationCallbacks: ^allocation_callbacks, pConverter: ^channel_converter) -> result ---
+	channel_converter_uninit                 :: proc(pConverter: ^channel_converter, pAllocationCallbacks: ^allocation_callbacks) ---
+	channel_converter_process_pcm_frames     :: proc(pConverter: ^channel_converter, pFramesOut, pFramesIn: rawptr, frameCount: u64) -> result ---
+	channel_converter_get_input_channel_map  :: proc(pConverter: ^channel_converter, pChannelMap: [^]channel, channelMapCap: c.size_t) -> result ---
+	channel_converter_get_output_channel_map :: proc(pConverter: ^channel_converter, pChannelMap: [^]channel, channelMapCap: c.size_t) -> result ---
 }
 
 
@@ -224,32 +277,39 @@ Data Conversion
 
 **************************************************************************************************************************************************************/
 data_converter_config :: struct {
-	formatIn:       format,
-	formatOut:      format,
-	channelsIn:     u32,
-	channelsOut:    u32,
-	sampleRateIn:   u32,
-	sampleRateOut:  u32,
-	channelMapIn:   [MAX_CHANNELS]channel,
-	channelMapOut:  [MAX_CHANNELS]channel,
-	ditherMode:     dither_mode,
-	channelMixMode: channel_mix_mode,
-	channelWeights: [MAX_CHANNELS][MAX_CHANNELS]f32, /* [in][out]. Only used when channelMixMode is set to ma_channel_mix_mode_custom_weights. */
-	resampling: struct {
-		algorithm: resample_algorithm,
-		allowDynamicSampleRate: b32,
-		linear: struct {
-			lpfOrderL:        u32,
-			lpfNyquistFactor: f64,
-		},
-		speex: struct {
-			quality: c.int,
-		},
-	},
+	formatIn:               format,
+	formatOut:              format,
+	channelsIn:             u32,
+	channelsOut:            u32,
+	sampleRateIn:           u32,
+	sampleRateOut:          u32,
+	pChannelMapIn:          [^]channel,
+	pChannelMapOut:         [^]channel,
+	ditherMode:             dither_mode,
+	channelMixMode:         channel_mix_mode,
+	ppChannelWeights:       ^[^]f32, /* [in][out]. Only used when channelMixMode is set to ma_channel_mix_mode_custom_weights. */
+	allowDynamicSampleRate: b32,
+	resampling:             resampler_config,
+}
+
+data_converter_execution_path :: enum c.int {
+	passthrough,       /* No conversion. */
+	format_only,       /* Only format conversion. */
+	channels_only,     /* Only channel conversion. */
+	resample_only,     /* Only resampling. */
+	resample_first,    /* All conversions, but resample as the first step. */
+	channels_first,    /* All conversions, but channels as the first step. */
 }
 
 data_converter :: struct {
-	config:                  data_converter_config,
+	formatIn:                format,
+	formatOut:               format,
+	channelsIn:              u32,
+	channelsOut:             u32,
+	sampleRateIn:            u32,
+	sampleRateOut:           u32,
+	ditherMode:              dither_mode,
+	executionPath:           data_converter_execution_path, /* The execution path the data converter will follow when processing. */
 	channelConverter:        channel_converter,
 	resampler:               resampler,
 	hasPreFormatConversion:  b8,
@@ -257,6 +317,10 @@ data_converter :: struct {
 	hasChannelConverter:     b8,
 	hasResampler:            b8,
 	isPassthrough:           b8,
+
+	/* Memory management. */
+	_ownsHeap: b8,
+	_pHeap:    rawptr,
 }
 
 
@@ -265,15 +329,20 @@ foreign lib {
 	data_converter_config_init_default :: proc() -> data_converter_config ---
 	data_converter_config_init :: proc(formatIn, formatOut: format, channelsIn, channelsOut: u32, sampleRateIn, sampleRateOut: u32) -> data_converter_config ---
 
-	data_converter_init                            :: proc(pConfig: ^data_converter_config, pConverter: ^data_converter) -> result ---
-	data_converter_uninit                          :: proc(pConverter: ^data_converter) ---
+	data_converter_get_heap_size                   :: proc(pConfig: ^data_converter_config, pHeapSizeInBytes: ^c.size_t) -> result ---
+	data_converter_init_preallocated               :: proc(pConfig: ^data_converter_config, pHeap: rawptr, pConverter: ^data_converter) -> result ---
+	data_converter_init                            :: proc(pConfig: ^data_converter_config, pAllocationCallbacks: ^allocation_callbacks, pConverter: ^data_converter) -> result ---
+	data_converter_uninit                          :: proc(pConverter: ^data_converter, pAllocationCallbacks: ^allocation_callbacks) ---
 	data_converter_process_pcm_frames              :: proc(pConverter: ^data_converter, pFramesIn: rawptr, pFrameCountIn: ^u64, pFramesOut: rawptr, pFrameCountOut: ^u64) -> result ---
 	data_converter_set_rate                        :: proc(pConverter: ^data_converter, sampleRateIn, sampleRateOut: u32) -> result ---
 	data_converter_set_rate_ratio                  :: proc(pConverter: ^data_converter, ratioInOut: f32) -> result ---
-	data_converter_get_required_input_frame_count  :: proc(pConverter: ^data_converter, outputFrameCount: u64) -> u64 ---
-	data_converter_get_expected_output_frame_count :: proc(pConverter: ^data_converter, inputFrameCount:  u64) -> u64 ---
 	data_converter_get_input_latency               :: proc(pConverter: ^data_converter) -> u64 ---
 	data_converter_get_output_latency              :: proc(pConverter: ^data_converter) -> u64 ---
+	data_converter_get_required_input_frame_count  :: proc(pConverter: ^data_converter, outputFrameCount: u64, pInputFrameCount: ^u64) -> result ---
+	data_converter_get_expected_output_frame_count :: proc(pConverter: ^data_converter, inputFrameCount: u64, pOutputFrameCount: ^u64) -> result ---
+	data_converter_get_input_channel_map           :: proc(pConverter: ^data_converter, pChannelMap: [^]channel, channelMapCap: c.size_t) -> result ---
+	data_converter_get_output_channel_map          :: proc(pConverter: ^data_converter, pChannelMap: [^]channel, channelMapCap: c.size_t) -> result ---
+	data_converter_reset                           :: proc(pConverter: ^data_converter) -> result ---
 }
 
 /************************************************************************************************************************************************************
@@ -332,43 +401,40 @@ CHANNEL_INDEX_NULL :: 255
 
 @(default_calling_convention="c", link_prefix="ma_")
 foreign lib {
-	/* Retrieves the channel position of the specified channel based on miniaudio's default channel map. */
-	channel_map_get_default_channel :: proc(channelCount: u32, channelIndex: u32) -> channel ---
-
 	/*
 	Retrieves the channel position of the specified channel in the given channel map.
 
 	The pChannelMap parameter can be null, in which case miniaudio's default channel map will be assumed.
 	*/
-	channel_map_get_channel :: proc(pChannelMap: ^channel, channelCount: u32, channelIndex: u32) -> channel ---
+	channel_map_get_channel :: proc(pChannelMap: [^]channel, channelCount: u32, channelIndex: u32) -> channel ---
 
 	/*
 	Initializes a blank channel map.
 
 	When a blank channel map is specified anywhere it indicates that the native channel map should be used.
 	*/
-	channel_map_init_blank :: proc(channels: u32, pChannelMap: ^channel) ---
+	channel_map_init_blank :: proc(pChannelMap: [^]channel, channels: u32) ---
 
 	/*
 	Helper for retrieving a standard channel map.
 
-	The output channel map buffer must have a capacity of at least `channels`.
+	The output channel map buffer must have a capacity of at least `channelMapCap`.
 	*/
-	get_standard_channel_map :: proc(standardChannelMap: standard_channel_map, channels: u32, pChannelMap: ^channel) ---
+	channel_map_init_standard :: proc(standardChannelMap: standard_channel_map, pChannelMap: [^]channel, channelMapCap: c.size_t, channels: u32) ---
 
 	/*
 	Copies a channel map.
 
 	Both input and output channel map buffers must have a capacity of at at least `channels`.
 	*/
-	channel_map_copy :: proc(pOut: ^channel, pIn: ^channel, channels: u32) ---
+	channel_map_copy :: proc(pOut: [^]channel, pIn: [^]channel, channels: u32) ---
 
 	/*
 	Copies a channel map if one is specified, otherwise copies the default channel map.
 
 	The output buffer must have a capacity of at least `channels`. If not NULL, the input channel map must also have a capacity of at least `channels`.
 	*/
-	channel_map_copy_or_default :: proc(pOut: ^channel, pIn: ^channel, channels: u32) ---
+	channel_map_copy_or_default :: proc(pOut: [^]channel, channelMapCapOut: c.size_t, pIn: [^]channel, channels: u32) ---
 
 
 	/*
@@ -378,12 +444,12 @@ foreign lib {
 	is usually treated as a passthrough.
 
 	Invalid channel maps:
-	  - A channel map with no channels
-	  - A channel map with more than one channel and a mono channel
+		- A channel map with no channels
+		- A channel map with more than one channel and a mono channel
 
 	The channel map buffer must have a capacity of at least `channels`.
 	*/
-	channel_map_valid :: proc(channels: u32, pChannelMap: ^channel) -> b32 ---
+	channel_map_is_valid :: proc(pChannelMap: [^]channel, channels: u32) -> b32 ---
 
 	/*
 	Helper for comparing two channel maps for equality.
@@ -392,22 +458,23 @@ foreign lib {
 
 	Both channels map buffers must have a capacity of at least `channels`.
 	*/
-	channel_map_equal :: proc(channels: u32, pChannelMapA, pChannelMapB: ^channel) -> b32 ---
+	channel_map_is_equal :: proc(pChannelMapA, pChannelMapB: [^]channel, channels: u32) -> b32 ---
 
 	/*
 	Helper for determining if a channel map is blank (all channels set to MA_CHANNEL_NONE).
 
 	The channel map buffer must have a capacity of at least `channels`.
 	*/
-	channel_map_blank :: proc(channels: u32, pChannelMap: ^channel) -> b32 ---
+	channel_map_is_blank :: proc(pChannelMap: [^]channel, channels: u32) -> b32 ---
 
 	/*
 	Helper for determining whether or not a channel is present in the given channel map.
 
 	The channel map buffer must have a capacity of at least `channels`.
 	*/
-	channel_map_contains_channel_position :: proc(channels: u32, pChannelMap: ^channel, channelPosition: channel) -> b32 ---
+	channel_map_contains_channel_position :: proc(channels: u32, pChannelMap: [^]channel, channelPosition: channel) -> b32 ---
 }
+
 
 /************************************************************************************************************************************************************
 
@@ -461,9 +528,9 @@ foreign lib {
 	rb_uninit               :: proc(pRB: ^rb) ---
 	rb_reset                :: proc(pRB: ^rb) ---
 	rb_acquire_read         :: proc(pRB: ^rb, pSizeInBytes: ^c.size_t, ppBufferOut: ^rawptr) -> result ---
-	rb_commit_read          :: proc(pRB: ^rb, sizeInBytes: c.size_t, pBufferOut: rawptr) -> result ---
+	rb_commit_read          :: proc(pRB: ^rb, sizeInBytes: c.size_t) -> result ---
 	rb_acquire_write        :: proc(pRB: ^rb, pSizeInBytes: ^c.size_t, ppBufferOut: ^rawptr) -> result ---
-	rb_commit_write         :: proc(pRB: ^rb, sizeInBytes: c.size_t, pBufferOut: rawptr) -> result ---
+	rb_commit_write         :: proc(pRB: ^rb, sizeInBytes: c.size_t) -> result ---
 	rb_seek_read            :: proc(pRB: ^rb, offsetInBytes: c.size_t) -> result ---
 	rb_seek_write           :: proc(pRB: ^rb, offsetInBytes: c.size_t) -> result ---
 	rb_pointer_distance     :: proc(pRB: ^rb) -> i32 ---    /* Returns the distance between the write pointer and the read pointer. Should never be negative for a correct program. Will return the number of bytes that can be read before the read pointer hits the write pointer. */

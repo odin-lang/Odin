@@ -69,6 +69,23 @@ get :: proc(q: ^$Q/Queue($T), #any_int i: int, loc := #caller_location) -> T {
 	idx := (uint(i)+q.offset)%builtin.len(q.data)
 	return q.data[idx]
 }
+
+front :: proc(q: ^$Q/Queue($T)) -> T {
+	return q.data[q.offset]
+}
+front_ptr :: proc(q: ^$Q/Queue($T)) -> ^T {
+	return &q.data[q.offset]
+}
+
+back :: proc(q: ^$Q/Queue($T)) -> T {
+	idx := (q.offset+uint(q.len))%builtin.len(q.data)
+	return q.data[idx]
+}
+back_ptr :: proc(q: ^$Q/Queue($T)) -> ^T {
+	idx := (q.offset+uint(q.len))%builtin.len(q.data)
+	return &q.data[idx]
+}
+
 set :: proc(q: ^$Q/Queue($T), #any_int i: int, val: T, loc := #caller_location) {
 	runtime.bounds_check_error_loc(loc, i, builtin.len(q.data))
 	
@@ -79,6 +96,18 @@ get_ptr :: proc(q: ^$Q/Queue($T), #any_int i: int, loc := #caller_location) -> ^
 	runtime.bounds_check_error_loc(loc, i, builtin.len(q.data))
 	
 	idx := (uint(i)+q.offset)%builtin.len(q.data)
+	return &q.data[idx]
+}
+
+peek_front :: proc(q: ^$Q/Queue($T), loc := #caller_location) -> ^T {
+	runtime.bounds_check_error_loc(loc, 0, builtin.len(q.data))
+	idx := q.offset%builtin.len(q.data)
+	return &q.data[idx]
+}
+
+peek_back :: proc(q: ^$Q/Queue($T), loc := #caller_location) -> ^T {
+	runtime.bounds_check_error_loc(loc, int(q.len - 1), builtin.len(q.data))
+	idx := (uint(q.len - 1)+q.offset)%builtin.len(q.data)
 	return &q.data[idx]
 }
 

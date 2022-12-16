@@ -51,6 +51,7 @@ PAGE_TARGETS_INVALID   :: 0x40000000
 PAGE_TARGETS_NO_UPDATE :: 0x40000000
 
 ERROR_INVALID_ADDRESS :: 487
+ERROR_COMMITMENT_LIMIT :: 1455
 
 @(default_calling_convention="stdcall")
 foreign Kernel32 {
@@ -76,12 +77,13 @@ _commit :: proc "contextless" (data: rawptr, size: uint) -> Allocator_Error {
 	result := VirtualAlloc(data, size, MEM_COMMIT, PAGE_READWRITE)
 	if result == nil {
 		switch err := GetLastError(); err {
-		case ERROR_INVALID_ADDRESS:
+		case 0:
+			return .Invalid_Argument
+		case ERROR_INVALID_ADDRESS, ERROR_COMMITMENT_LIMIT:
 			return .Out_Of_Memory
 		}
 
-		// TODO(bill): Handle errors correctly
-		return .Invalid_Argument
+		return .Out_Of_Memory
 	}
 	return nil
 }

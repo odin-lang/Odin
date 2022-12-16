@@ -38,10 +38,10 @@ IUnknown_VTable :: struct {
 
 @(default_calling_convention="stdcall")
 foreign dxgi {
-	CreateDXGIFactory      :: proc(riid: ^IID, ppFactory: rawptr) -> HRESULT ---
-	CreateDXGIFactory1     :: proc(riid: ^IID, ppFactory: rawptr) -> HRESULT ---
-	CreateDXGIFactory2     :: proc(Flags: u32, riid: ^IID, ppFactory: rawptr) -> HRESULT ---
-	DXGIGetDebugInterface1 :: proc(Flags: u32, riid: ^IID, pDebug: rawptr) -> HRESULT ---
+	CreateDXGIFactory      :: proc(riid: ^IID, ppFactory: ^rawptr) -> HRESULT ---
+	CreateDXGIFactory1     :: proc(riid: ^IID, ppFactory: ^rawptr) -> HRESULT ---
+	CreateDXGIFactory2     :: proc(Flags: u32, riid: ^IID, ppFactory: ^rawptr) -> HRESULT ---
+	DXGIGetDebugInterface1 :: proc(Flags: u32, riid: ^IID, pDebug: ^rawptr) -> HRESULT ---
 }
 
 STANDARD_MULTISAMPLE_QUALITY_PATTERN :: 0xffffffff
@@ -57,14 +57,15 @@ CPU_ACCESS :: enum u32 {
 	FIELD      = 15,
 }
 
-USAGE :: enum u32 { // TODO: convert to bit_set
-	SHADER_INPUT         = 0x00000010,
-	RENDER_TARGET_OUTPUT = 0x00000020,
-	BACK_BUFFER          = 0x00000040,
-	SHARED               = 0x00000080,
-	READ_ONLY            = 0x00000100,
-	DISCARD_ON_PRESENT   = 0x00000200,
-	UNORDERED_ACCESS     = 0x00000400,
+USAGE :: distinct bit_set[USAGE_FLAG; u32]
+USAGE_FLAG :: enum u32 {
+	SHADER_INPUT         =  4,
+	RENDER_TARGET_OUTPUT =  5,
+	BACK_BUFFER          =  6,
+	SHARED               =  7,
+	READ_ONLY            =  8,
+	DISCARD_ON_PRESENT   =  9,
+	UNORDERED_ACCESS     = 10,
 }
 
 RESOURCE_PRIORITY :: enum u32 {
@@ -75,37 +76,45 @@ RESOURCE_PRIORITY :: enum u32 {
 	MAXIMUM = 0xc8000000,
 }
 
-MAP :: enum u32 { // TODO: convert to bit_set
+MAP :: enum u32 {
 	READ    = 1,
 	WRITE   = 2,
 	DISCARD = 4,
 }
 
-ENUM_MODES :: enum u32 { // TODO: convert to bit_set
-	INTERLACED      = 1,
-	SCALING         = 2,
-	STEREO          = 4,
-	DISABLED_STEREO = 8,
+ENUM_MODES :: distinct bit_set[ENUM_MODE; u32]
+ENUM_MODE :: enum u32 {
+	INTERLACED      = 0,
+	SCALING         = 1,
+	STEREO          = 2,
+	DISABLED_STEREO = 3,
 }
 
 MAX_SWAP_CHAIN_BUFFERS :: 16
-PRESENT :: enum u32 { // TODO: convert to bit_set
-	TEST                  = 0x00000001,
-	DO_NOT_SEQUENCE       = 0x00000002,
-	RESTART               = 0x00000004,
-	DO_NOT_WAIT           = 0x00000008,
-	STEREO_PREFER_RIGHT   = 0x00000010,
-	STEREO_TEMPORARY_MONO = 0x00000020,
-	RESTRICT_TO_OUTPUT    = 0x00000040,
-	USE_DURATION          = 0x00000100,
-	ALLOW_TEARING         = 0x00000200,
+PRESENT :: distinct bit_set[PRESENT_FLAG; u32]
+PRESENT_FLAG :: enum u32 {
+	TEST                  = 0,
+	DO_NOT_SEQUENCE       = 1,
+	RESTART               = 2,
+	DO_NOT_WAIT           = 3,
+	STEREO_PREFER_RIGHT   = 4,
+	STEREO_TEMPORARY_MONO = 5,
+	RESTRICT_TO_OUTPUT    = 6,
+
+	USE_DURATION          = 8,
+	ALLOW_TEARING         = 9,
 }
 
-MWA :: enum u32 { // TODO: convert to bit_set
-	NO_WINDOW_CHANGES = 1 << 0,
-	NO_ALT_ENTER      = 1 << 1,
-	NO_PRINT_SCREEN   = 1 << 2,
-	VALID             = 0x7,
+MWA :: distinct bit_set[MWA_FLAG; u32]
+MWA_FLAG :: enum u32 {
+	NO_WINDOW_CHANGES = 0,
+	NO_ALT_ENTER      = 1,
+	NO_PRINT_SCREEN   = 2,
+}
+MWA_VALID :: MWA{
+	.NO_WINDOW_CHANGES,
+	.NO_ALT_ENTER,
+	.NO_PRINT_SCREEN,
 }
 
 SHARED_RESOURCE_READ  :: 0x80000000
@@ -1139,3 +1148,32 @@ IAdapter3_VTable :: struct {
 	RegisterVideoMemoryBudgetChangeNotificationEvent:     proc "stdcall" (this: ^IAdapter3, hEvent: HANDLE, pdwCookie: ^u32) -> HRESULT,
 	UnregisterVideoMemoryBudgetChangeNotification:        proc "stdcall" (this: ^IAdapter3, dwCookie: u32),
 }
+
+ERROR_ACCESS_DENIED                :: HRESULT(-2005270485) //0x887A002B
+ERROR_ACCESS_LOST                  :: HRESULT(-2005270490) //0x887A0026
+ERROR_ALREADY_EXISTS               :: HRESULT(-2005270474) //0x887A0036
+ERROR_CANNOT_PROTECT_CONTENT       :: HRESULT(-2005270486) //0x887A002A
+ERROR_DEVICE_HUNG                  :: HRESULT(-2005270522) //0x887A0006
+ERROR_DEVICE_REMOVED               :: HRESULT(-2005270523) //0x887A0005
+ERROR_DEVICE_RESET                 :: HRESULT(-2005270521) //0x887A0007
+ERROR_DRIVER_INTERNAL_ERROR        :: HRESULT(-2005270496) //0x887A0020
+ERROR_FRAME_STATISTICS_DISJOINT    :: HRESULT(-2005270517) //0x887A000B
+ERROR_GRAPHICS_VIDPN_SOURCE_IN_USE :: HRESULT(-2005270516) //0x887A000C
+ERROR_INVALID_CALL                 :: HRESULT(-2005270527) //0x887A0001
+ERROR_MORE_DATA                    :: HRESULT(-2005270525) //0x887A0003
+ERROR_NAME_ALREADY_EXISTS          :: HRESULT(-2005270484) //0x887A002C
+ERROR_NONEXCLUSIVE                 :: HRESULT(-2005270495) //0x887A0021
+ERROR_NOT_CURRENTLY_AVAILABLE      :: HRESULT(-2005270494) //0x887A0022
+ERROR_NOT_FOUND                    :: HRESULT(-2005270526) //0x887A0002
+ERROR_REMOTE_CLIENT_DISCONNECTED   :: HRESULT(-2005270493) //0x887A0023
+ERROR_REMOTE_OUTOFMEMORY           :: HRESULT(-2005270492) //0x887A0024
+ERROR_RESTRICT_TO_OUTPUT_STALE     :: HRESULT(-2005270487) //0x887A0029
+ERROR_SDK_COMPONENT_MISSING        :: HRESULT(-2005270483) //0x887A002D
+ERROR_SESSION_DISCONNECTED         :: HRESULT(-2005270488) //0x887A0028
+ERROR_UNSUPPORTED                  :: HRESULT(-2005270524) //0x887A0004
+ERROR_WAIT_TIMEOUT                 :: HRESULT(-2005270489) //0x887A0027
+ERROR_WAS_STILL_DRAWING            :: HRESULT(-2005270518) //0x887A000A
+
+STATUS_OCCLUDED                    :: HRESULT(  142213121) //0x087A0001
+STATUS_MODE_CHANGED                :: HRESULT(  142213127) //0x087A0007
+STATUS_MODE_CHANGE_IN_PROGRESS     :: HRESULT(  142213128) //0x087A0008

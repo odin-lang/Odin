@@ -107,7 +107,7 @@ Node :: struct {
 /* Conventions */
 /* ------------
 Much of HxA's use is based on convention. HxA lets users store arbitrary data in its structure that can be parsed but whose semantic meaning does not need to be understood.
-A few conventions are hard, and some are soft. Hard convention that a user HAS to follow in order to produce a valid file. Hard conventions simplify parsing becaus the parser can make some assumptions. Soft convenbtions are basicly recomendations of how to store common data.
+A few conventions are hard, and some are soft. Hard convention that a user HAS to follow in order to produce a valid file. Hard conventions simplify parsing becaus the parser can make some assumptions. Soft convenbtions are basically recomendations of how to store common data.
 If you use HxA for something not covered by the conventions but need a convention for your use case. Please let us know so that we can add it!
 */
 

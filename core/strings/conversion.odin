@@ -10,7 +10,7 @@ to_valid_utf8 :: proc(s, replacement: string, allocator := context.allocator) ->
 	}
 
 	b: Builder
-	init_builder(&b, 0, 0, allocator)
+	builder_init(&b, 0, 0, allocator)
 
 	s := s
 	for c, i in s {
@@ -20,7 +20,7 @@ to_valid_utf8 :: proc(s, replacement: string, allocator := context.allocator) ->
 
 		_, w := utf8.decode_rune_in_string(s[i:])
 		if w == 1 {
-			grow_builder(&b, len(s) + len(replacement))
+			builder_grow(&b, len(s) + len(replacement))
 			write_string(&b, s[:i])
 			s = s[i:]
 			break
@@ -67,9 +67,9 @@ to_valid_utf8 :: proc(s, replacement: string, allocator := context.allocator) ->
 */
 to_lower :: proc(s: string, allocator := context.allocator) -> string {
 	b: Builder
-	init_builder(&b, 0, len(s), allocator)
+	builder_init(&b, 0, len(s), allocator)
 	for r in s {
-		write_rune_builder(&b, unicode.to_lower(r))
+		write_rune(&b, unicode.to_lower(r))
 	}
 	return to_string(b)
 }
@@ -83,9 +83,9 @@ to_lower :: proc(s: string, allocator := context.allocator) -> string {
 */
 to_upper :: proc(s: string, allocator := context.allocator) -> string {
 	b: Builder
-	init_builder(&b, 0, len(s), allocator)
+	builder_init(&b, 0, len(s), allocator)
 	for r in s {
-		write_rune_builder(&b, unicode.to_upper(r))
+		write_rune(&b, unicode.to_upper(r))
 	}
 	return to_string(b)
 }
@@ -147,7 +147,7 @@ to_camel_case :: proc(s: string, allocator := context.allocator) -> string {
 	s := s
 	s = trim_space(s)
 	b: Builder
-	init_builder(&b, 0, len(s), allocator)
+	builder_init(&b, 0, len(s), allocator)
 	w := to_writer(&b)
 
 	string_case_iterator(w, s, proc(w: io.Writer, prev, curr, next: rune) {
@@ -172,7 +172,7 @@ to_pascal_case :: proc(s: string, allocator := context.allocator) -> string {
 	s := s
 	s = trim_space(s)
 	b: Builder
-	init_builder(&b, 0, len(s), allocator)
+	builder_init(&b, 0, len(s), allocator)
 	w := to_writer(&b)
 
 	string_case_iterator(w, s, proc(w: io.Writer, prev, curr, next: rune) {
@@ -203,7 +203,7 @@ to_delimiter_case :: proc(s: string, delimiter: rune, all_upper_case: bool, allo
 	s := s
 	s = trim_space(s)
 	b: Builder
-	init_builder(&b, 0, len(s), allocator)
+	builder_init(&b, 0, len(s), allocator)
 	w := to_writer(&b)
 
 	adjust_case := unicode.to_upper if all_upper_case else unicode.to_lower
@@ -272,7 +272,7 @@ to_ada_case :: proc(s: string, allocator := context.allocator) -> string {
 	s := s
 	s = trim_space(s)
 	b: Builder
-	init_builder(&b, 0, len(s), allocator)
+	builder_init(&b, 0, len(s), allocator)
 	w := to_writer(&b)
 
 	prev, curr: rune

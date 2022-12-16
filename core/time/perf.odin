@@ -1,6 +1,6 @@
 package time
 
-import "core:mem"
+import "core:runtime"
 
 Tick :: struct {
 	_nsec: i64, // relative amount
@@ -50,9 +50,9 @@ Benchmark_Error :: enum {
 }
 
 Benchmark_Options :: struct {
-	setup:     #type proc(options: ^Benchmark_Options, allocator: mem.Allocator) -> (err: Benchmark_Error),
-	bench:     #type proc(options: ^Benchmark_Options, allocator: mem.Allocator) -> (err: Benchmark_Error),
-	teardown:  #type proc(options: ^Benchmark_Options, allocator: mem.Allocator) -> (err: Benchmark_Error),
+	setup:     #type proc(options: ^Benchmark_Options, allocator: runtime.Allocator) -> (err: Benchmark_Error),
+	bench:     #type proc(options: ^Benchmark_Options, allocator: runtime.Allocator) -> (err: Benchmark_Error),
+	teardown:  #type proc(options: ^Benchmark_Options, allocator: runtime.Allocator) -> (err: Benchmark_Error),
 
 	rounds:    int,
 	bytes:     int,

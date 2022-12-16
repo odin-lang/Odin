@@ -1,6 +1,7 @@
 package math
 
 import "core:intrinsics"
+import "core:builtin"
 _ :: intrinsics
 
 Float_Class :: enum {
@@ -35,6 +36,11 @@ MAX_F16_PRECISION ::  4 // Maximum number of meaningful digits after the decimal
 
 RAD_PER_DEG :: TAU/360.0
 DEG_PER_RAD :: 360.0/TAU
+
+abs :: builtin.abs
+min :: builtin.min
+max :: builtin.max
+clamp :: builtin.clamp
 
 sqrt_f16le :: proc "contextless" (x: f16le) -> f16le { return #force_inline f16le(sqrt_f16(f16(x))) }
 sqrt_f16be :: proc "contextless" (x: f16be) -> f16be { return #force_inline f16be(sqrt_f16(f16(x))) }
@@ -106,6 +112,92 @@ exp       :: proc{
 	exp_f16, exp_f16le, exp_f16be,
 	exp_f32, exp_f32le, exp_f32be,
 	exp_f64, exp_f64le, exp_f64be,
+}
+
+pow10_f16le :: proc "contextless" (x: f16le) -> f16le { return #force_inline f16le(pow10_f16(f16(x))) }
+pow10_f16be :: proc "contextless" (x: f16be) -> f16be { return #force_inline f16be(pow10_f16(f16(x))) }
+pow10_f32le :: proc "contextless" (x: f32le) -> f32le { return #force_inline f32le(pow10_f32(f32(x))) }
+pow10_f32be :: proc "contextless" (x: f32be) -> f32be { return #force_inline f32be(pow10_f32(f32(x))) }
+pow10_f64le :: proc "contextless" (x: f64le) -> f64le { return #force_inline f64le(pow10_f64(f64(x))) }
+pow10_f64be :: proc "contextless" (x: f64be) -> f64be { return #force_inline f64be(pow10_f64(f64(x))) }
+pow10       :: proc{
+	pow10_f16, pow10_f16le, pow10_f16be,
+	pow10_f32, pow10_f32le, pow10_f32be,
+	pow10_f64, pow10_f64le, pow10_f64be,
+}
+
+pow10_f16 :: proc "contextless" (n: f16) -> f16 {
+	@static pow10_pos_tab := [?]f16{
+		1e00, 1e01, 1e02, 1e03, 1e04,
+	}
+	@static pow10_neg_tab := [?]f16{
+		1e-00, 1e-01, 1e-02, 1e-03, 1e-04, 1e-05, 1e-06, 1e-07,
+	}
+
+	if 0 <= n && n <= 4 {
+		return pow10_pos_tab[uint(n)]
+	}
+	if -7 <= n && n <= 0 {
+		return pow10_neg_tab[uint(-n)]
+	}
+	if n > 0 {
+		return inf_f16(1)
+	}
+	return 0
+}
+
+pow10_f32 :: proc "contextless" (n: f32) -> f32 {
+	@static pow10_pos_tab := [?]f32{
+		1e00, 1e01, 1e02, 1e03, 1e04, 1e05, 1e06, 1e07, 1e08, 1e09,
+		1e10, 1e11, 1e12, 1e13, 1e14, 1e15, 1e16, 1e17, 1e18, 1e19,
+		1e20, 1e21, 1e22, 1e23, 1e24, 1e25, 1e26, 1e27, 1e28, 1e29,
+		1e30, 1e31, 1e32, 1e33, 1e34, 1e35, 1e36, 1e37, 1e38,
+	}
+	@static pow10_neg_tab := [?]f32{
+		1e-00, 1e-01, 1e-02, 1e-03, 1e-04, 1e-05, 1e-06, 1e-07, 1e-08, 1e-09,
+		1e-10, 1e-11, 1e-12, 1e-13, 1e-14, 1e-15, 1e-16, 1e-17, 1e-18, 1e-19,
+		1e-20, 1e-21, 1e-22, 1e-23, 1e-24, 1e-25, 1e-26, 1e-27, 1e-28, 1e-29,
+		1e-30, 1e-31, 1e-32, 1e-33, 1e-34, 1e-35, 1e-36, 1e-37, 1e-38, 1e-39,
+		1e-40, 1e-41, 1e-42, 1e-43, 1e-44, 1e-45,
+	}
+
+	if 0 <= n && n <= 38 {
+		return pow10_pos_tab[uint(n)]
+	}
+	if -45 <= n && n <= 0 {
+		return pow10_neg_tab[uint(-n)]
+	}
+	if n > 0 {
+		return inf_f32(1)
+	}
+	return 0
+}
+
+pow10_f64 :: proc "contextless" (n: f64) -> f64 {
+	@static pow10_tab := [?]f64{
+		1e00, 1e01, 1e02, 1e03, 1e04, 1e05, 1e06, 1e07, 1e08, 1e09,
+		1e10, 1e11, 1e12, 1e13, 1e14, 1e15, 1e16, 1e17, 1e18, 1e19,
+		1e20, 1e21, 1e22, 1e23, 1e24, 1e25, 1e26, 1e27, 1e28, 1e29,
+		1e30, 1e31,
+	}
+	@static pow10_pos_tab32 := [?]f64{
+		1e00, 1e32, 1e64, 1e96, 1e128, 1e160, 1e192, 1e224, 1e256, 1e288,
+	}
+	@static pow10_neg_tab32 := [?]f64{
+		1e-00, 1e-32, 1e-64, 1e-96, 1e-128, 1e-160, 1e-192, 1e-224, 1e-256, 1e-288, 1e-320,
+	}
+
+	if 0 <= n && n <= 308 {
+		return pow10_pos_tab32[uint(n)/32] * pow10_tab[uint(n)%32]
+	}
+	if -323 <= n && n <= 0 {
+		return pow10_neg_tab32[uint(-n)/32] / pow10_tab[uint(-n)%32]
+	}
+
+	if n > 0 {
+		return inf_f64(1)
+	}
+	return 0
 }
 
 
@@ -185,16 +277,23 @@ log       :: proc{
 	log_f64, log_f64le, log_f64be,
 }
 
-log2_f16   :: logb_f16
-log2_f16le :: logb_f16le
-log2_f16be :: logb_f16be
-log2_f32   :: logb_f32
-log2_f32le :: logb_f32le
-log2_f32be :: logb_f32be
-log2_f64   :: logb_f64
-log2_f64le :: logb_f64le
-log2_f64be :: logb_f64be
-log2       :: logb
+log2_f16   :: proc "contextless" (x: f16)   -> f16   { return log(f16(x), f16(2.0)) }
+log2_f16le :: proc "contextless" (x: f16le) -> f16le { return f16le(log_f16(f16(x), f16(2.0))) }
+log2_f16be :: proc "contextless" (x: f16be) -> f16be { return f16be(log_f16(f16(x), f16(2.0))) }
+
+log2_f32   :: proc "contextless" (x: f32)   -> f32   { return log(f32(x), f32(2.0)) }
+log2_f32le :: proc "contextless" (x: f32le) -> f32le { return f32le(log_f32(f32(x), f32(2.0))) }
+log2_f32be :: proc "contextless" (x: f32be) -> f32be { return f32be(log_f32(f32(x), f32(2.0))) }
+
+log2_f64   :: proc "contextless" (x: f64)   -> f64   { return log(f64(x), f64(2.0)) }
+log2_f64le :: proc "contextless" (x: f64le) -> f64le { return f64le(log_f64(f64(x), f64(2.0))) }
+log2_f64be :: proc "contextless" (x: f64be) -> f64be { return f64be(log_f64(f64(x), f64(2.0))) }
+
+log2       :: proc{
+	log2_f16, log2_f16le, log2_f16be,
+	log2_f32, log2_f32le, log2_f32be,
+	log2_f64, log2_f64le, log2_f64be,
+}
 
 log10_f16   :: proc "contextless" (x: f16)   -> f16   { return ln(x)/LN10 }
 log10_f16le :: proc "contextless" (x: f16le) -> f16le { return f16le(log10_f16(f16(x))) }
@@ -606,6 +705,25 @@ floor_mod :: proc "contextless" (x, y: $T) -> T
 	}
 	return r
 }
+
+divmod :: #force_inline proc "contextless" (x, y: $T) -> (div, mod: T)
+	where intrinsics.type_is_integer(T) {
+	div = x / y
+	mod = x % y
+	return
+}
+
+floor_divmod :: #force_inline proc "contextless" (x, y: $T) -> (div, mod: T)
+	where intrinsics.type_is_integer(T) {
+	div = x / y
+	mod = x % y
+	if (div > 0 && y < 0) || (mod < 0 && y > 0) {
+		div -= 1
+		mod += y
+	}
+	return
+}
+
 
 modf_f16   :: proc "contextless" (x: f16) -> (int: f16, frac: f16) {
 	shift :: F16_SHIFT
@@ -1056,7 +1174,7 @@ is_nan       :: proc{
 // If sign < 0, is_inf reports whether f is negative infinity.
 // If sign == 0, is_inf reports whether f is either infinity.
 is_inf_f16 :: proc "contextless" (x: f16, sign: int = 0) -> bool {
-	class := classify(abs(x))
+	class := classify(x)
 	switch {
 	case sign > 0:
 		return class == .Inf
@@ -1073,7 +1191,7 @@ is_inf_f16be :: proc "contextless" (x: f16be, sign: int = 0) -> bool {
 }
 
 is_inf_f32 :: proc "contextless" (x: f32, sign: int = 0) -> bool {
-	class := classify(abs(x))
+	class := classify(x)
 	switch {
 	case sign > 0:
 		return class == .Inf
@@ -1090,7 +1208,7 @@ is_inf_f32be :: proc "contextless" (x: f32be, sign: int = 0) -> bool {
 }
 
 is_inf_f64 :: proc "contextless" (x: f64, sign: int = 0) -> bool {
-	class := classify(abs(x))
+	class := classify(x)
 	switch {
 	case sign > 0:
 		return class == .Inf
@@ -1312,20 +1430,20 @@ atan2_f64 :: proc "contextless" (y, x: f64) -> f64 {
 		}
 		return copy_sign(PI, y)
 	case x == 0:
-		return copy_sign(PI*0.5, y)
+		return copy_sign(PI/2, y)
 	case is_inf(x, 0):
 		if is_inf(x, 1) {
 			if is_inf(y, 0) {
-				return copy_sign(PI*0.25, y)
+				return copy_sign(PI/4, y)
 			}
 			return copy_sign(0, y)
 		}
 		if is_inf(y, 0) {
-			return copy_sign(PI*0.75, y)
+			return copy_sign(3*PI/4, y)
 		}
 		return copy_sign(PI, y)
 	case is_inf(y, 0):
-		return copy_sign(PI*0.5, y)
+		return copy_sign(PI/2, y)
 	}
 
 	q := atan(y / x)
@@ -1347,34 +1465,266 @@ atan2_f64be :: proc "contextless" (y, x: f64be) -> f64be {
 }
 
 atan2 :: proc{
-	atan2_f16, atan2_f16le, atan2_f16be,
-	atan2_f32, atan2_f32le, atan2_f32be,
-	atan2_f64, atan2_f64le, atan2_f64be,
+	atan2_f64, atan2_f32, atan2_f16,
+	atan2_f64le, atan2_f64be,
+	atan2_f32le, atan2_f32be,
+	atan2_f16le, atan2_f16be,
 }
 
 atan :: proc "contextless" (x: $T) -> T where intrinsics.type_is_float(T) {
 	return atan2(x, 1)
 }
 
-asin :: proc "contextless" (x: $T) -> T where intrinsics.type_is_float(T) {
-	return atan2(x, 1 + sqrt(1 - x*x))
+
+
+asin_f64 :: proc "contextless" (x: f64) -> f64 {
+	/* origin: FreeBSD /usr/src/lib/msun/src/e_asin.c */
+	/*
+	 * ====================================================
+	 * Copyright (C) 1993 by Sun Microsystems, Inc. All rights reserved.
+	 *
+	 * Developed at SunSoft, a Sun Microsystems, Inc. business.
+	 * Permission to use, copy, modify, and distribute this
+	 * software is freely granted, provided that this notice
+	 * is preserved.
+	 * ====================================================
+	 */
+
+	pio2_hi :: 0h3FF921FB54442D18
+	pio2_lo :: 0h3C91A62633145C07
+	pS0     :: 0h3FC5555555555555
+	pS1     :: 0hBFD4D61203EB6F7D
+	pS2     :: 0h3FC9C1550E884455
+	pS3     :: 0hBFA48228B5688F3B
+	pS4     :: 0h3F49EFE07501B288
+	pS5     :: 0h3F023DE10DFDF709
+	qS1     :: 0hC0033A271C8A2D4B
+	qS2     :: 0h40002AE59C598AC8
+	qS3     :: 0hBFE6066C1B8D0159
+	qS4     :: 0h3FB3B8C5B12E9282
+
+	R :: #force_inline proc "contextless" (z: f64) -> f64 {
+		p, q: f64
+		p = z*(pS0+z*(pS1+z*(pS2+z*(pS3+z*(pS4+z*pS5)))))
+		q = 1.0+z*(qS1+z*(qS2+z*(qS3+z*qS4)))
+		return p/q
+	}
+
+	x := x
+	z, r, s: f64
+	dwords := transmute([2]u32)x
+	hx := dwords[1]
+	ix := hx & 0x7fffffff
+	/* |x| >= 1 or nan */
+	if ix >= 0x3ff00000 {
+		lx := dwords[0]
+		if (ix-0x3ff00000 | lx) == 0 {
+			/* asin(1) = +-pi/2 with inexact */
+			return x*pio2_hi + 1e-120
+		}
+		return 0/(x-x)
+	}
+	/* |x| < 0.5 */
+	if ix < 0x3fe00000 {
+		/* if 0x1p-1022 <= |x| < 0x1p-26, avoid raising underflow */
+		if ix < 0x3e500000 && ix >= 0x00100000 {
+			return x
+		}
+		return x + x*R(x*x)
+	}
+	/* 1 > |x| >= 0.5 */
+	z = (1 - abs(x))*0.5
+	s = sqrt(z)
+	r = R(z)
+	if ix >= 0x3fef3333 {  /* if |x| > 0.975 */
+		x = pio2_hi-(2*(s+s*r)-pio2_lo)
+	} else {
+		f, c: f64
+		/* f+c = sqrt(z) */
+		f = s
+		(^u64)(&f)^ &= 0xffffffff_00000000
+		c = (z-f*f)/(s+f)
+		x = 0.5*pio2_hi - (2*s*r - (pio2_lo-2*c) - (0.5*pio2_hi-2*f))
+	}
+	return -x if hx >> 31 != 0 else x
+}
+asin_f64le :: proc "contextless" (x: f64le) -> f64le {
+	return f64le(asin_f64(f64(x)))
+}
+asin_f64be :: proc "contextless" (x: f64be) -> f64be {
+	return f64be(asin_f64(f64(x)))
+}
+asin_f32 :: proc "contextless" (x: f32) -> f32 {
+	return f32(asin_f64(f64(x)))
+}
+asin_f32le :: proc "contextless" (x: f32le) -> f32le {
+	return f32le(asin_f64(f64(x)))
+}
+asin_f32be :: proc "contextless" (x: f32be) -> f32be {
+	return f32be(asin_f64(f64(x)))
+}
+asin_f16 :: proc "contextless" (x: f16) -> f16 {
+	return f16(asin_f64(f64(x)))
+}
+asin_f16le :: proc "contextless" (x: f16le) -> f16le {
+	return f16le(asin_f64(f64(x)))
+}
+asin_f16be :: proc "contextless" (x: f16be) -> f16be {
+	return f16be(asin_f64(f64(x)))
+}
+asin :: proc{
+	asin_f64, asin_f32, asin_f16,
+	asin_f64le, asin_f64be,
+	asin_f32le, asin_f32be,
+	asin_f16le, asin_f16be,
 }
 
-acos :: proc "contextless" (x: $T) -> T where intrinsics.type_is_float(T) {
-	return 2 * atan2(sqrt(1 - x), sqrt(1 + x))
+
+acos_f64 :: proc "contextless" (x: f64) -> f64 {
+	/* origin: FreeBSD /usr/src/lib/msun/src/e_acos.c */
+	/*
+	 * ====================================================
+	 * Copyright (C) 1993 by Sun Microsystems, Inc. All rights reserved.
+	 *
+	 * Developed at SunSoft, a Sun Microsystems, Inc. business.
+	 * Permission to use, copy, modify, and distribute this
+	 * software is freely granted, provided that this notice
+	 * is preserved.
+	 * ====================================================
+	 */
+
+	pio2_hi :: 0h3FF921FB54442D18
+	pio2_lo :: 0h3C91A62633145C07
+	pS0     :: 0h3FC5555555555555
+	pS1     :: 0hBFD4D61203EB6F7D
+	pS2     :: 0h3FC9C1550E884455
+	pS3     :: 0hBFA48228B5688F3B
+	pS4     :: 0h3F49EFE07501B288
+	pS5     :: 0h3F023DE10DFDF709
+	qS1     :: 0hC0033A271C8A2D4B
+	qS2     :: 0h40002AE59C598AC8
+	qS3     :: 0hBFE6066C1B8D0159
+	qS4     :: 0h3FB3B8C5B12E9282
+
+	R :: #force_inline proc "contextless" (z: f64) -> f64 {
+		p, q: f64
+		p = z*(pS0+z*(pS1+z*(pS2+z*(pS3+z*(pS4+z*pS5)))))
+		q = 1.0+z*(qS1+z*(qS2+z*(qS3+z*qS4)))
+		return p/q
+	}
+
+	z, w, s, c, df: f64
+	dwords := transmute([2]u32)x
+	hx := dwords[1]
+	ix := hx & 0x7fffffff
+	/* |x| >= 1 or nan */
+	if ix >= 0x3ff00000 {
+		lx := dwords[0]
+
+		if (ix-0x3ff00000 | lx) == 0 {
+			/* acos(1)=0, acos(-1)=pi */
+			if hx >> 31 != 0 {
+				return 2*pio2_hi + 1e-120
+			}
+			return 0
+		}
+		return 0/(x-x)
+	}
+	/* |x| < 0.5 */
+	if ix < 0x3fe00000 {
+		if ix <= 0x3c600000 { /* |x| < 2**-57 */
+			return pio2_hi + 1e-120
+		}
+		return pio2_hi - (x - (pio2_lo-x*R(x*x)))
+	}
+	/* x < -0.5 */
+	if hx >> 31 != 0 {
+		z = (1.0+x)*0.5
+		s = sqrt(z)
+		w = R(z)*s-pio2_lo
+		return 2*(pio2_hi - (s+w))
+	}
+	/* x > 0.5 */
+	z = (1.0-x)*0.5
+	s = sqrt(z)
+	df = s
+	(^u64)(&df)^ &= 0xffffffff_00000000
+	c = (z-df*df)/(s+df)
+	w = R(z)*s+c
+	return 2*(df+w)
+}
+acos_f64le :: proc "contextless" (x: f64le) -> f64le {
+	return f64le(acos_f64(f64(x)))
+}
+acos_f64be :: proc "contextless" (x: f64be) -> f64be {
+	return f64be(acos_f64(f64(x)))
+}
+acos_f32 :: proc "contextless" (x: f32) -> f32 {
+	return f32(acos_f64(f64(x)))
+}
+acos_f32le :: proc "contextless" (x: f32le) -> f32le {
+	return f32le(acos_f64(f64(x)))
+}
+acos_f32be :: proc "contextless" (x: f32be) -> f32be {
+	return f32be(acos_f64(f64(x)))
+}
+acos_f16 :: proc "contextless" (x: f16) -> f16 {
+	return f16(acos_f64(f64(x)))
+}
+acos_f16le :: proc "contextless" (x: f16le) -> f16le {
+	return f16le(acos_f64(f64(x)))
+}
+acos_f16be :: proc "contextless" (x: f16be) -> f16be {
+	return f16be(acos_f64(f64(x)))
+}
+acos :: proc{
+	acos_f64, acos_f32, acos_f16,
+	acos_f64le, acos_f64be,
+	acos_f32le, acos_f32be,
+	acos_f16le, acos_f16be,
 }
 
 sinh :: proc "contextless" (x: $T) -> T where intrinsics.type_is_float(T) {
-	return (exp(x) - exp(-x))*0.5
+	return copy_sign(((exp(x) - exp(-x))*0.5), x)
 }
 
 cosh :: proc "contextless" (x: $T) -> T where intrinsics.type_is_float(T) {
-	return (exp(x) + exp(-x))*0.5
+	return ((exp(x) + exp(-x))*0.5)
 }
 
-tanh :: proc "contextless" (x: $T) -> T where intrinsics.type_is_float(T) {
-	t := exp(2*x)
-	return (t - 1) / (t + 1)
+tanh :: proc "contextless" (y: $T) -> T where intrinsics.type_is_float(T) {
+	P0 :: -9.64399179425052238628e-1
+	P1 :: -9.92877231001918586564e1
+	P2 :: -1.61468768441708447952e3
+	Q0 :: +1.12811678491632931402e2
+	Q1 :: +2.23548839060100448583e3
+	Q2 :: +4.84406305325125486048e3
+
+	MAXLOG :: 8.8029691931113054295988e+01 // log(2**127)
+
+
+	x := f64(y)
+	z := abs(x)
+	switch {
+	case z > 0.5*MAXLOG:
+		if x < 0 {
+			return -1
+		}
+		return 1
+	case z >= 0.625:
+		s := exp(2 * z)
+		z = 1 - 2/(s+1)
+		if x < 0 {
+			z = -z
+		}
+	case:
+		if x == 0 {
+			return T(x)
+		}
+		s := x * x
+		z = x + x*s*((P0*s+P1)*s+P2)/(((s+Q0)*s+Q1)*s+Q2)
+	}
+	return T(z)
 }
 
 asinh :: proc "contextless" (y: $T) -> T where intrinsics.type_is_float(T) {

@@ -1,3 +1,5 @@
+#define ALLOW_SPLIT_MULTI_RETURNS true
+
 enum lbArgKind {
 	lbArg_Direct,
 	lbArg_Indirect,
@@ -48,7 +50,15 @@ struct lbFunctionType {
 	ProcCallingConvention calling_convention;
 	Array<lbArgType> args;
 	lbArgType        ret;
+
+	LLVMTypeRef      multiple_return_original_type; // nullptr if not used
+	isize            original_arg_count;
 };
+
+gbAllocator lb_function_type_args_allocator(void) {
+	return heap_allocator();
+}
+
 
 i64 llvm_align_formula(i64 off, i64 a) {
 	return (off + a - 1) / a * a;
@@ -62,7 +72,7 @@ bool lb_is_type_kind(LLVMTypeRef type, LLVMTypeKind kind) {
 	return LLVMGetTypeKind(type) == kind;
 }
 
-LLVMTypeRef lb_function_type_to_llvm_ptr(lbFunctionType *ft, bool is_var_arg) {
+LLVMTypeRef lb_function_type_to_llvm_raw(lbFunctionType *ft, bool is_var_arg) {
 	unsigned arg_count = cast(unsigned)ft->args.count;
 	unsigned offset = 0;
 
@@ -100,7 +110,9 @@ LLVMTypeRef lb_function_type_to_llvm_ptr(lbFunctionType *ft, bool is_var_arg) {
 			}
 			args[arg_index++] = arg_type;
 		} else if (arg->kind == lbArg_Indirect) {
-			GB_ASSERT(!lb_is_type_kind(arg->type, LLVMPointerTypeKind));
+			if (ft->multiple_return_original_type == nullptr || i < ft->original_arg_count) {
+				GB_ASSERT(!lb_is_type_kind(arg->type, LLVMPointerTypeKind));
+			}
 			args[arg_index++] = LLVMPointerType(arg->type, 0);
 		} else if (arg->kind == lbArg_Ignore) {
 			// ignore
@@ -108,8 +120,14 @@ LLVMTypeRef lb_function_type_to_llvm_ptr(lbFunctionType *ft, bool is_var_arg) {
 	}
 	unsigned total_arg_count = arg_index;
 	LLVMTypeRef func_type = LLVMFunctionType(ret, args, total_arg_count, is_var_arg);
-	return LLVMPointerType(func_type, 0);
+	return func_type;
 }
+
+
+// LLVMTypeRef lb_function_type_to_llvm_ptr(lbFunctionType *ft, bool is_var_arg) {
+// 	LLVMTypeRef func_type = lb_function_type_to_llvm_raw(ft, is_var_arg);
+// 	return LLVMPointerType(func_type, 0);
+// }
 
 
 void lb_add_function_type_attributes(LLVMValueRef fn, lbFunctionType *ft, ProcCallingConvention calling_convention) {
@@ -139,6 +157,13 @@ void lb_add_function_type_attributes(LLVMValueRef fn, lbFunctionType *ft, ProcCa
 		}
 		if (arg->align_attribute) {
 			LLVMAddAttributeAtIndex(fn, arg_index+1, arg->align_attribute);
+		}
+
+		if (ft->multiple_return_original_type) {
+			if (ft->original_arg_count <= i) {
+				LLVMAddAttributeAtIndex(fn, arg_index+1, noalias_attr);
+				LLVMAddAttributeAtIndex(fn, arg_index+1, nonnull_attr);
+			}
 		}
 
 		arg_index++;
@@ -217,7 +242,7 @@ i64 lb_sizeof(LLVMTypeRef type) {
 		break;
 	case LLVMArrayTypeKind:
 		{
-			LLVMTypeRef elem = LLVMGetElementType(type);
+			LLVMTypeRef elem = OdinLLVMGetArrayElementType(type);
 			i64 elem_size = lb_sizeof(elem);
 			i64 count = LLVMGetArrayLength(type);
 			i64 size = count * elem_size;
@@ -229,11 +254,11 @@ i64 lb_sizeof(LLVMTypeRef type) {
 		return 8;
 	case LLVMVectorTypeKind:
 		{
-			LLVMTypeRef elem = LLVMGetElementType(type);
+			LLVMTypeRef elem = OdinLLVMGetVectorElementType(type);
 			i64 elem_size = lb_sizeof(elem);
 			i64 count = LLVMGetVectorSize(type);
 			i64 size = count * elem_size;
-			return gb_clamp(next_pow2(size), 1, build_context.max_align);
+			return next_pow2(size);
 		}
 
 	}
@@ -277,18 +302,18 @@ i64 lb_alignof(LLVMTypeRef type) {
 		}
 		break;
 	case LLVMArrayTypeKind:
-		return lb_alignof(LLVMGetElementType(type));
+		return lb_alignof(OdinLLVMGetArrayElementType(type));
 
 	case LLVMX86_MMXTypeKind:
 		return 8;
 	case LLVMVectorTypeKind:
 		{
 			// TODO(bill): This appears to be correct but LLVM isn't necessarily "great" with regards to documentation
-			LLVMTypeRef elem = LLVMGetElementType(type);
+			LLVMTypeRef elem = OdinLLVMGetVectorElementType(type);
 			i64 elem_size = lb_sizeof(elem);
 			i64 count = LLVMGetVectorSize(type);
 			i64 size = count * elem_size;
-			return gb_clamp(next_pow2(size), 1, build_context.max_align);
+			return gb_clamp(next_pow2(size), 1, build_context.max_simd_align);
 		}
 
 	}
@@ -301,20 +326,58 @@ i64 lb_alignof(LLVMTypeRef type) {
 }
 
 
-#define LB_ABI_INFO(name) lbFunctionType *name(LLVMContextRef c, LLVMTypeRef *arg_types, unsigned arg_count, LLVMTypeRef return_type, bool return_is_defined, ProcCallingConvention calling_convention)
+#define LB_ABI_INFO(name) lbFunctionType *name(LLVMContextRef c, LLVMTypeRef *arg_types, unsigned arg_count, LLVMTypeRef return_type, bool return_is_defined, bool return_is_tuple, ProcCallingConvention calling_convention)
 typedef LB_ABI_INFO(lbAbiInfoType);
 
+#define LB_ABI_COMPUTE_RETURN_TYPE(name) lbArgType name(lbFunctionType *ft, LLVMContextRef c, LLVMTypeRef return_type, bool return_is_defined, bool return_is_tuple)
+typedef LB_ABI_COMPUTE_RETURN_TYPE(lbAbiComputeReturnType);
+
+
+lbArgType lb_abi_modify_return_is_tuple(lbFunctionType *ft, LLVMContextRef c, LLVMTypeRef return_type, lbAbiComputeReturnType *compute_return_type) {
+	GB_ASSERT(return_type != nullptr);
+	GB_ASSERT(compute_return_type != nullptr);
+
+	lbArgType return_arg = {};
+	if (lb_is_type_kind(return_type, LLVMStructTypeKind)) {
+		unsigned field_count = LLVMCountStructElementTypes(return_type);
+		if (field_count > 1) {
+			ft->original_arg_count = ft->args.count;
+			ft->multiple_return_original_type = return_type;
+
+			for (unsigned i = 0; i < field_count-1; i++) {
+				LLVMTypeRef field_type = LLVMStructGetTypeAtIndex(return_type, i);
+				LLVMTypeRef field_pointer_type = LLVMPointerType(field_type, 0);
+				lbArgType ret_partial = lb_arg_type_direct(field_pointer_type);
+				array_add(&ft->args, ret_partial);
+			}
+
+			// override the return type for the last field
+			LLVMTypeRef new_return_type = LLVMStructGetTypeAtIndex(return_type, field_count-1);
+			return_arg = compute_return_type(ft, c, new_return_type, true, false);
+		}
+	}
+	return return_arg;
+}
+
+#define LB_ABI_MODIFY_RETURN_IF_TUPLE_MACRO() do {                                                                  \
+	if (return_is_tuple) {                                                                                      \
+		lbArgType new_return_type = lb_abi_modify_return_is_tuple(ft, c, return_type, compute_return_type); \
+		if (new_return_type.type != nullptr) {                                                              \
+			return new_return_type;                                                                     \
+		}                                                                                                   \
+	}                                                                                                           \
+} while (0)
 
 // NOTE(bill): I hate `namespace` in C++ but this is just because I don't want to prefix everything
 namespace lbAbi386 {
 	Array<lbArgType> compute_arg_types(LLVMContextRef c, LLVMTypeRef *arg_types, unsigned arg_count);
-	lbArgType compute_return_type(LLVMContextRef c, LLVMTypeRef return_type, bool return_is_defined);
+	LB_ABI_COMPUTE_RETURN_TYPE(compute_return_type);
 
 	LB_ABI_INFO(abi_info) {
 		lbFunctionType *ft = gb_alloc_item(permanent_allocator(), lbFunctionType);
 		ft->ctx = c;
 		ft->args = compute_arg_types(c, arg_types, arg_count);
-		ft->ret = compute_return_type(c, return_type, return_is_defined);
+		ft->ret = compute_return_type(ft, c, return_type, return_is_defined, return_is_tuple);
 		ft->calling_convention = calling_convention;
 		return ft;
 	}
@@ -347,7 +410,7 @@ namespace lbAbi386 {
 	}
 
 	Array<lbArgType> compute_arg_types(LLVMContextRef c, LLVMTypeRef *arg_types, unsigned arg_count) {
-		auto args = array_make<lbArgType>(heap_allocator(), arg_count);
+		auto args = array_make<lbArgType>(lb_function_type_args_allocator(), arg_count);
 
 		for (unsigned i = 0; i < arg_count; i++) {
 			LLVMTypeRef t = arg_types[i];
@@ -366,7 +429,7 @@ namespace lbAbi386 {
 		return args;
 	}
 
-	lbArgType compute_return_type(LLVMContextRef c, LLVMTypeRef return_type, bool return_is_defined) {
+	LB_ABI_COMPUTE_RETURN_TYPE(compute_return_type) {
 		if (!return_is_defined) {
 			return lb_arg_type_direct(LLVMVoidTypeInContext(c));
 		} else if (lb_is_type_kind(return_type, LLVMStructTypeKind) || lb_is_type_kind(return_type, LLVMArrayTypeKind)) {
@@ -377,6 +440,9 @@ namespace lbAbi386 {
 			case 4: return lb_arg_type_direct(return_type, LLVMIntTypeInContext(c, 32), nullptr, nullptr);
 			case 8: return lb_arg_type_direct(return_type, LLVMIntTypeInContext(c, 64), nullptr, nullptr);
 			}
+
+			LB_ABI_MODIFY_RETURN_IF_TUPLE_MACRO();
+
 			LLVMAttributeRef attr = lb_create_enum_attribute_with_type(c, "sret", return_type);
 			return lb_arg_type_indirect(return_type, attr);
 		}
@@ -386,19 +452,19 @@ namespace lbAbi386 {
 
 namespace lbAbiAmd64Win64 {
 	Array<lbArgType> compute_arg_types(LLVMContextRef c, LLVMTypeRef *arg_types, unsigned arg_count);
-
+	LB_ABI_COMPUTE_RETURN_TYPE(compute_return_type);
 
 	LB_ABI_INFO(abi_info) {
 		lbFunctionType *ft = gb_alloc_item(permanent_allocator(), lbFunctionType);
 		ft->ctx = c;
 		ft->args = compute_arg_types(c, arg_types, arg_count);
-		ft->ret = lbAbi386::compute_return_type(c, return_type, return_is_defined);
+		ft->ret = compute_return_type(ft, c, return_type, return_is_defined, return_is_tuple);
 		ft->calling_convention = calling_convention;
 		return ft;
 	}
 
 	Array<lbArgType> compute_arg_types(LLVMContextRef c, LLVMTypeRef *arg_types, unsigned arg_count) {
-		auto args = array_make<lbArgType>(heap_allocator(), arg_count);
+		auto args = array_make<lbArgType>(lb_function_type_args_allocator(), arg_count);
 
 		for (unsigned i = 0; i < arg_count; i++) {
 			LLVMTypeRef t = arg_types[i];
@@ -421,6 +487,26 @@ namespace lbAbiAmd64Win64 {
 			}
 		}
 		return args;
+	}
+
+	LB_ABI_COMPUTE_RETURN_TYPE(compute_return_type) {
+		if (!return_is_defined) {
+			return lb_arg_type_direct(LLVMVoidTypeInContext(c));
+		} else if (lb_is_type_kind(return_type, LLVMStructTypeKind) || lb_is_type_kind(return_type, LLVMArrayTypeKind)) {
+			i64 sz = lb_sizeof(return_type);
+			switch (sz) {
+			case 1: return lb_arg_type_direct(return_type, LLVMIntTypeInContext(c,  8), nullptr, nullptr);
+			case 2: return lb_arg_type_direct(return_type, LLVMIntTypeInContext(c, 16), nullptr, nullptr);
+			case 4: return lb_arg_type_direct(return_type, LLVMIntTypeInContext(c, 32), nullptr, nullptr);
+			case 8: return lb_arg_type_direct(return_type, LLVMIntTypeInContext(c, 64), nullptr, nullptr);
+			}
+
+			LB_ABI_MODIFY_RETURN_IF_TUPLE_MACRO();
+
+			LLVMAttributeRef attr = lb_create_enum_attribute_with_type(c, "sret", return_type);
+			return lb_arg_type_indirect(return_type, attr);
+		}
+		return lbAbi386::non_struct(c, return_type, true);
 	}
 };
 
@@ -472,7 +558,7 @@ namespace lbAbiAmd64SysV {
 		Amd64TypeAttribute_StructRect,
 	};
 
-	lbArgType compute_return_type(LLVMContextRef c, LLVMTypeRef return_type, bool return_is_defined);
+	LB_ABI_COMPUTE_RETURN_TYPE(compute_return_type);
 	void classify_with(LLVMTypeRef t, Array<RegClass> *cls, i64 ix, i64 off);
 	void fixup(LLVMTypeRef t, Array<RegClass> *cls);
 	lbArgType amd64_type(LLVMContextRef c, LLVMTypeRef type, Amd64TypeAttributeKind attribute_kind, ProcCallingConvention calling_convention);
@@ -484,7 +570,7 @@ namespace lbAbiAmd64SysV {
 		ft->ctx = c;
 		ft->calling_convention = calling_convention;
 
-		ft->args = array_make<lbArgType>(heap_allocator(), arg_count);
+		ft->args = array_make<lbArgType>(lb_function_type_args_allocator(), arg_count);
 		for (unsigned i = 0; i < arg_count; i++) {
 			ft->args[i] = amd64_type(c, arg_types[i], Amd64TypeAttribute_ByVal, calling_convention);
 		}
@@ -531,6 +617,22 @@ namespace lbAbiAmd64SysV {
 		return false;
 	}
 
+	bool is_llvm_type_slice_like(LLVMTypeRef type) {
+		if (!lb_is_type_kind(type, LLVMStructTypeKind)) {
+			return false;
+		}
+		if (LLVMCountStructElementTypes(type) != 2) {
+			return false;
+		}
+		LLVMTypeRef fields[2] = {};
+		LLVMGetStructElementTypes(type, fields);
+		if (!lb_is_type_kind(fields[0], LLVMPointerTypeKind)) {
+			return false;
+		}
+		return lb_is_type_kind(fields[1], LLVMIntegerTypeKind) && lb_sizeof(fields[1]) == 8;
+
+	}
+
 	lbArgType amd64_type(LLVMContextRef c, LLVMTypeRef type, Amd64TypeAttributeKind attribute_kind, ProcCallingConvention calling_convention) {
 		if (is_register(type)) {
 			LLVMAttributeRef attribute = nullptr;
@@ -544,16 +646,25 @@ namespace lbAbiAmd64SysV {
 		if (is_mem_cls(cls, attribute_kind)) {
 			LLVMAttributeRef attribute = nullptr;
 			if (attribute_kind == Amd64TypeAttribute_ByVal) {
-				if (!is_calling_convention_odin(calling_convention)) {
+				// if (!is_calling_convention_odin(calling_convention)) {
 					return lb_arg_type_indirect_byval(c, type);
-				}
-				attribute = nullptr;
+				// }
+				// attribute = nullptr;
 			} else if (attribute_kind == Amd64TypeAttribute_StructRect) {
 				attribute = lb_create_enum_attribute_with_type(c, "sret", type);
 			}
 			return lb_arg_type_indirect(type, attribute);
 		} else {
-			return lb_arg_type_direct(type, llreg(c, cls), nullptr, nullptr);
+			LLVMTypeRef reg_type = nullptr;
+			if (is_llvm_type_slice_like(type)) {
+				// NOTE(bill): This is to make the ABI look closer to what the
+				// original code is just for slices/strings whilst still adhering
+				// the ABI rules for SysV
+				reg_type = type;
+			} else {
+				reg_type = llreg(c, cls);
+			}
+			return lb_arg_type_direct(type, reg_type, nullptr, nullptr);
 		}
 	}
 
@@ -787,7 +898,7 @@ namespace lbAbiAmd64SysV {
 		case LLVMArrayTypeKind:
 			{
 				i64 len = LLVMGetArrayLength(t);
-				LLVMTypeRef elem = LLVMGetElementType(t);
+				LLVMTypeRef elem = OdinLLVMGetArrayElementType(t);
 				i64 elem_sz = lb_sizeof(elem);
 				for (i64 i = 0; i < len; i++) {
 					classify_with(elem, cls, ix, off + i*elem_sz);
@@ -797,20 +908,27 @@ namespace lbAbiAmd64SysV {
 		case LLVMVectorTypeKind:
 			{
 				i64 len = LLVMGetVectorSize(t);
-				LLVMTypeRef elem = LLVMGetElementType(t);
+				LLVMTypeRef elem = OdinLLVMGetVectorElementType(t);
 				i64 elem_sz = lb_sizeof(elem);
 				LLVMTypeKind elem_kind = LLVMGetTypeKind(elem);
 				RegClass reg = RegClass_NoClass;
+				unsigned elem_width = LLVMGetIntTypeWidth(elem);
 				switch (elem_kind) {
 				case LLVMIntegerTypeKind:
 				case LLVMHalfTypeKind:
-					switch (LLVMGetIntTypeWidth(elem)) {
-					case 8:  reg = RegClass_SSEInt8;
-					case 16: reg = RegClass_SSEInt16;
-					case 32: reg = RegClass_SSEInt32;
-					case 64: reg = RegClass_SSEInt64;
+					switch (elem_width) {
+					case 8:  reg = RegClass_SSEInt8;  break;
+					case 16: reg = RegClass_SSEInt16; break;
+					case 32: reg = RegClass_SSEInt32; break;
+					case 64: reg = RegClass_SSEInt64; break;
 					default:
-						GB_PANIC("Unhandled integer width for vector type");
+						if (elem_width > 64) {
+							for (i64 i = 0; i < len; i++) {
+								classify_with(elem, cls, ix, off + i*elem_sz);
+							}
+							break;
+						}
+						GB_PANIC("Unhandled integer width for vector type %u", elem_width);
 					}
 					break;
 				case LLVMFloatTypeKind:
@@ -837,7 +955,7 @@ namespace lbAbiAmd64SysV {
 		}
 	}
 
-	lbArgType compute_return_type(LLVMContextRef c, LLVMTypeRef return_type, bool return_is_defined) {
+	LB_ABI_COMPUTE_RETURN_TYPE(compute_return_type) {
 		if (!return_is_defined) {
 			return lb_arg_type_direct(LLVMVoidTypeInContext(c));
 		} else if (lb_is_type_kind(return_type, LLVMStructTypeKind)) {
@@ -848,6 +966,9 @@ namespace lbAbiAmd64SysV {
 			case 4: return lb_arg_type_direct(return_type, LLVMIntTypeInContext(c, 32), nullptr, nullptr);
 			case 8: return lb_arg_type_direct(return_type, LLVMIntTypeInContext(c, 64), nullptr, nullptr);
 			}
+
+			LB_ABI_MODIFY_RETURN_IF_TUPLE_MACRO();
+
 			LLVMAttributeRef attr = lb_create_enum_attribute_with_type(c, "sret", return_type);
 			return lb_arg_type_indirect(return_type, attr);
 		} else if (build_context.metrics.os == TargetOs_windows && lb_is_type_kind(return_type, LLVMIntegerTypeKind) && lb_sizeof(return_type) == 16) {
@@ -860,13 +981,13 @@ namespace lbAbiAmd64SysV {
 
 namespace lbAbiArm64 {
 	Array<lbArgType> compute_arg_types(LLVMContextRef c, LLVMTypeRef *arg_types, unsigned arg_count);
-	lbArgType compute_return_type(LLVMContextRef c, LLVMTypeRef return_type, bool return_is_defined);
+	LB_ABI_COMPUTE_RETURN_TYPE(compute_return_type);
 	bool is_homogenous_aggregate(LLVMContextRef c, LLVMTypeRef type, LLVMTypeRef *base_type_, unsigned *member_count_);
 
 	LB_ABI_INFO(abi_info) {
 		lbFunctionType *ft = gb_alloc_item(permanent_allocator(), lbFunctionType);
 		ft->ctx = c;
-		ft->ret = compute_return_type(c, return_type, return_is_defined);
+		ft->ret = compute_return_type(ft, c, return_type, return_is_defined, return_is_tuple);
 		ft -> args = compute_arg_types(c, arg_types, arg_count);
 		ft->calling_convention = calling_convention;
 		return ft;
@@ -900,7 +1021,7 @@ namespace lbAbiArm64 {
 		if (len == 0) {
 			return false;
 		}
-		LLVMTypeRef elem = LLVMGetElementType(type);
+		LLVMTypeRef elem = OdinLLVMGetArrayElementType(type);
 		LLVMTypeRef base_type = nullptr;
 		unsigned member_count = 0;
 		if (is_homogenous_aggregate(c, elem, &base_type, &member_count)) {
@@ -969,32 +1090,34 @@ namespace lbAbiArm64 {
 		}
 		return false;
 	}
-    
-    unsigned is_homogenous_aggregate_small_enough(LLVMTypeRef *base_type_, unsigned member_count_) {
-        return (member_count_ <= 4);
-    }
 
-	lbArgType compute_return_type(LLVMContextRef c, LLVMTypeRef type, bool return_is_defined) {
-		LLVMTypeRef homo_base_type = {};
+	unsigned is_homogenous_aggregate_small_enough(LLVMTypeRef base_type, unsigned member_count) {
+		return (member_count <= 4);
+	}
+
+	LB_ABI_COMPUTE_RETURN_TYPE(compute_return_type) {
+		LLVMTypeRef homo_base_type = nullptr;
 		unsigned homo_member_count = 0;
 
 		if (!return_is_defined) {
 			return lb_arg_type_direct(LLVMVoidTypeInContext(c));
-		} else if (is_register(type)) {
-			return non_struct(c, type);
-		} else if (is_homogenous_aggregate(c, type, &homo_base_type, &homo_member_count)) {
-            if(is_homogenous_aggregate_small_enough(&homo_base_type, homo_member_count)) {
-                return lb_arg_type_direct(type, LLVMArrayType(homo_base_type, homo_member_count), nullptr, nullptr);
-            } else {
-                //TODO(Platin): do i need to create stuff that can handle the diffrent return type?
-                //              else this needs a fix in llvm_backend_proc as we would need to cast it to the correct array type
-                
-                //LLVMTypeRef array_type = LLVMArrayType(homo_base_type, homo_member_count);
-                LLVMAttributeRef attr = lb_create_enum_attribute_with_type(c, "sret", type);
-                return lb_arg_type_indirect(type, attr);
-            }
+		} else if (is_register(return_type)) {
+			return non_struct(c, return_type);
+		} else if (is_homogenous_aggregate(c, return_type, &homo_base_type, &homo_member_count)) {
+			if (is_homogenous_aggregate_small_enough(homo_base_type, homo_member_count)) {
+				return lb_arg_type_direct(return_type, LLVMArrayType(homo_base_type, homo_member_count), nullptr, nullptr);
+			} else {
+				//TODO(Platin): do i need to create stuff that can handle the diffrent return type?
+				//              else this needs a fix in llvm_backend_proc as we would need to cast it to the correct array type
+
+				LB_ABI_MODIFY_RETURN_IF_TUPLE_MACRO();
+
+				//LLVMTypeRef array_type = LLVMArrayType(homo_base_type, homo_member_count);
+				LLVMAttributeRef attr = lb_create_enum_attribute_with_type(c, "sret", return_type);
+				return lb_arg_type_indirect(return_type, attr);
+			}
 		} else {
-			i64 size = lb_sizeof(type);
+			i64 size = lb_sizeof(return_type);
 			if (size <= 16) {
 				LLVMTypeRef cast_type = nullptr;
 				if (size <= 1) {
@@ -1009,16 +1132,18 @@ namespace lbAbiArm64 {
 					unsigned count = cast(unsigned)((size+7)/8);
 					cast_type = LLVMArrayType(LLVMInt64TypeInContext(c), count);
 				}
-				return lb_arg_type_direct(type, cast_type, nullptr, nullptr);
+				return lb_arg_type_direct(return_type, cast_type, nullptr, nullptr);
 			} else {
-				LLVMAttributeRef attr = lb_create_enum_attribute_with_type(c, "sret", type);
-				return lb_arg_type_indirect(type, attr);
+				LB_ABI_MODIFY_RETURN_IF_TUPLE_MACRO();
+
+				LLVMAttributeRef attr = lb_create_enum_attribute_with_type(c, "sret", return_type);
+				return lb_arg_type_indirect(return_type, attr);
 			}
 		}
 	}
     
 	Array<lbArgType> compute_arg_types(LLVMContextRef c, LLVMTypeRef *arg_types, unsigned arg_count) {
-		auto args = array_make<lbArgType>(heap_allocator(), arg_count);
+		auto args = array_make<lbArgType>(lb_function_type_args_allocator(), arg_count);
 
 		for (unsigned i = 0; i < arg_count; i++) {
 			LLVMTypeRef type = arg_types[i];
@@ -1056,15 +1181,23 @@ namespace lbAbiArm64 {
 	}
 }
 
-namespace lbAbiWasm32 {
+namespace lbAbiWasm {
+	/*
+		NOTE(bill): All of this is custom since there is not an "official"
+		            ABI definition for WASM, especially for Odin.
+		            The approach taken optimizes for passing things in multiple
+		            registers/arguments if possible rather than by pointer.
+	*/
 	Array<lbArgType> compute_arg_types(LLVMContextRef c, LLVMTypeRef *arg_types, unsigned arg_count);
-	lbArgType compute_return_type(LLVMContextRef c, LLVMTypeRef return_type, bool return_is_defined);
+	LB_ABI_COMPUTE_RETURN_TYPE(compute_return_type);
+
+	enum {MAX_DIRECT_STRUCT_SIZE = 32};
 
 	LB_ABI_INFO(abi_info) {
 		lbFunctionType *ft = gb_alloc_item(permanent_allocator(), lbFunctionType);
 		ft->ctx = c;
 		ft->args = compute_arg_types(c, arg_types, arg_count);
-		ft->ret = compute_return_type(c, return_type, return_is_defined);
+		ft->ret = compute_return_type(ft, c, return_type, return_is_defined, return_is_tuple);
 		ft->calling_convention = calling_convention;
 		return ft;
 	}
@@ -1087,7 +1220,7 @@ namespace lbAbiWasm32 {
 		return lb_arg_type_direct(type, nullptr, nullptr, attr);
 	}
 	
-	bool is_struct_valid_elem_type(LLVMTypeRef type) {
+	bool is_basic_register_type(LLVMTypeRef type) {
 		switch (LLVMGetTypeKind(type)) {
 		case LLVMHalfTypeKind:
 		case LLVMFloatTypeKind:
@@ -1099,7 +1232,33 @@ namespace lbAbiWasm32 {
 		}	
 		return false;
 	}
-	
+
+	bool type_can_be_direct(LLVMTypeRef type) {
+		LLVMTypeKind kind = LLVMGetTypeKind(type);
+		i64 sz = lb_sizeof(type);
+		if (sz == 0) {
+			return false;
+		}
+		if (sz <= MAX_DIRECT_STRUCT_SIZE) {
+			if (kind == LLVMArrayTypeKind) {
+				if (is_basic_register_type(OdinLLVMGetArrayElementType(type))) {
+					return true;
+				}
+			} else if (kind == LLVMStructTypeKind) {
+				unsigned count = LLVMCountStructElementTypes(type);
+				for (unsigned i = 0; i < count; i++) {
+					LLVMTypeRef elem = LLVMStructGetTypeAtIndex(type, i);
+					if (!is_basic_register_type(elem)) {
+						return false;
+					}
+
+				}
+				return true;
+			}
+		}
+		return false;
+	}
+
 	lbArgType is_struct(LLVMContextRef c, LLVMTypeRef type) {
 		LLVMTypeKind kind = LLVMGetTypeKind(type);
 		GB_ASSERT(kind == LLVMArrayTypeKind || kind == LLVMStructTypeKind);
@@ -1108,35 +1267,15 @@ namespace lbAbiWasm32 {
 		if (sz == 0) {
 			return lb_arg_type_ignore(type);
 		}
-		if (sz <= 16) {
-			if (kind == LLVMArrayTypeKind) {
-				LLVMTypeRef elem = LLVMGetElementType(type);
-				if (is_struct_valid_elem_type(elem)) {
-					return lb_arg_type_direct(type);
-				}
-			} else if (kind == LLVMStructTypeKind) {
-				bool can_be_direct = true;
-				unsigned count = LLVMCountStructElementTypes(type);
-				for (unsigned i = 0; i < count; i++) {
-					LLVMTypeRef elem = LLVMStructGetTypeAtIndex(type, i);
-					if (!is_struct_valid_elem_type(elem)) {
-						can_be_direct = false;
-						break;
-					}
-					
-				}
-				if (can_be_direct) {
-					return lb_arg_type_direct(type);
-				}
-			}
+		if (type_can_be_direct(type)) {
+			return lb_arg_type_direct(type);
 		}
-		
 		return lb_arg_type_indirect(type, nullptr);
 	}
 	
 
 	Array<lbArgType> compute_arg_types(LLVMContextRef c, LLVMTypeRef *arg_types, unsigned arg_count) {
-		auto args = array_make<lbArgType>(heap_allocator(), arg_count);
+		auto args = array_make<lbArgType>(lb_function_type_args_allocator(), arg_count);
 
 		for (unsigned i = 0; i < arg_count; i++) {
 			LLVMTypeRef t = arg_types[i];
@@ -1150,10 +1289,14 @@ namespace lbAbiWasm32 {
 		return args;
 	}
 
-	lbArgType compute_return_type(LLVMContextRef c, LLVMTypeRef return_type, bool return_is_defined) {
+	LB_ABI_COMPUTE_RETURN_TYPE(compute_return_type) {
 		if (!return_is_defined) {
 			return lb_arg_type_direct(LLVMVoidTypeInContext(c));
 		} else if (lb_is_type_kind(return_type, LLVMStructTypeKind) || lb_is_type_kind(return_type, LLVMArrayTypeKind)) {
+			if (type_can_be_direct(return_type)) {
+				return lb_arg_type_direct(return_type);
+			}
+
 			i64 sz = lb_sizeof(return_type);
 			switch (sz) {
 			case 1: return lb_arg_type_direct(return_type, LLVMIntTypeInContext(c, 8),  nullptr, nullptr);
@@ -1161,6 +1304,9 @@ namespace lbAbiWasm32 {
 			case 4: return lb_arg_type_direct(return_type, LLVMIntTypeInContext(c, 32), nullptr, nullptr);
 			case 8: return lb_arg_type_direct(return_type, LLVMIntTypeInContext(c, 64), nullptr, nullptr);
 			}
+
+			LB_ABI_MODIFY_RETURN_IF_TUPLE_MACRO();
+
 			LLVMAttributeRef attr = lb_create_enum_attribute_with_type(c, "sret", return_type);
 			return lb_arg_type_indirect(return_type, attr);
 		}
@@ -1210,7 +1356,7 @@ namespace lbAbiArm32 {
 	}
 
 	Array<lbArgType> compute_arg_types(LLVMContextRef c, LLVMTypeRef *arg_types, unsigned arg_count, ProcCallingConvention calling_convention) {
-		auto args = array_make<lbArgType>(heap_allocator(), arg_count);
+		auto args = array_make<lbArgType>(lb_function_type_args_allocator(), arg_count);
 
 		for (unsigned i = 0; i < arg_count; i++) {
 			LLVMTypeRef t = arg_types[i];
@@ -1251,14 +1397,14 @@ namespace lbAbiArm32 {
 };
 
 
-LB_ABI_INFO(lb_get_abi_info) {
+LB_ABI_INFO(lb_get_abi_info_internal) {
 	switch (calling_convention) {
 	case ProcCC_None:
 	case ProcCC_InlineAsm:
 		{
 			lbFunctionType *ft = gb_alloc_item(permanent_allocator(), lbFunctionType);
 			ft->ctx = c;
-			ft->args = array_make<lbArgType>(heap_allocator(), arg_count);
+			ft->args = array_make<lbArgType>(lb_function_type_args_allocator(), arg_count);
 			for (unsigned i = 0; i < arg_count; i++) {
 				ft->args[i] = lb_arg_type_direct(arg_types[i]);
 			}
@@ -1272,37 +1418,55 @@ LB_ABI_INFO(lb_get_abi_info) {
 		}
 	case ProcCC_Win64:
 		GB_ASSERT(build_context.metrics.arch == TargetArch_amd64);
-		return lbAbiAmd64Win64::abi_info(c, arg_types, arg_count, return_type, return_is_defined, calling_convention);
+		return lbAbiAmd64Win64::abi_info(c, arg_types, arg_count, return_type, return_is_defined, return_is_tuple, calling_convention);
 	case ProcCC_SysV:
 		GB_ASSERT(build_context.metrics.arch == TargetArch_amd64);
-		return lbAbiAmd64SysV::abi_info(c, arg_types, arg_count, return_type, return_is_defined, calling_convention);
+		return lbAbiAmd64SysV::abi_info(c, arg_types, arg_count, return_type, return_is_defined, return_is_tuple, calling_convention);
 	}
 
 	switch (build_context.metrics.arch) {
 	case TargetArch_amd64:
-		if (build_context.metrics.os == TargetOs_windows || build_context.metrics.abi == TargetABI_Win64) {
-			return lbAbiAmd64Win64::abi_info(c, arg_types, arg_count, return_type, return_is_defined, calling_convention);
+		if (build_context.metrics.os == TargetOs_windows) {
+			return lbAbiAmd64Win64::abi_info(c, arg_types, arg_count, return_type, return_is_defined, return_is_tuple, calling_convention);
+		} else if (build_context.metrics.abi == TargetABI_Win64) {
+			return lbAbiAmd64Win64::abi_info(c, arg_types, arg_count, return_type, return_is_defined, return_is_tuple, calling_convention);
 		} else if (build_context.metrics.abi == TargetABI_SysV) {
-			return lbAbiAmd64SysV::abi_info(c, arg_types, arg_count, return_type, return_is_defined, calling_convention);
+			return lbAbiAmd64SysV::abi_info(c, arg_types, arg_count, return_type, return_is_defined, return_is_tuple, calling_convention);
 		} else {
-			return lbAbiAmd64SysV::abi_info(c, arg_types, arg_count, return_type, return_is_defined, calling_convention);
+			return lbAbiAmd64SysV::abi_info(c, arg_types, arg_count, return_type, return_is_defined, return_is_tuple, calling_convention);
 		}
 	case TargetArch_i386:
-		return lbAbi386::abi_info(c, arg_types, arg_count, return_type, return_is_defined, calling_convention);
+		return lbAbi386::abi_info(c, arg_types, arg_count, return_type, return_is_defined, return_is_tuple, calling_convention);
 	case TargetArch_arm32:
-		return lbAbiArm32::abi_info(c, arg_types, arg_count, return_type, return_is_defined, calling_convention);
+		return lbAbiArm32::abi_info(c, arg_types, arg_count, return_type, return_is_defined, return_is_tuple, calling_convention);
 	case TargetArch_arm64:
-		return lbAbiArm64::abi_info(c, arg_types, arg_count, return_type, return_is_defined, calling_convention);
+		return lbAbiArm64::abi_info(c, arg_types, arg_count, return_type, return_is_defined, return_is_tuple, calling_convention);
 	case TargetArch_wasm32:
-		// TODO(bill): implement wasm32's ABI correct 
-		// NOTE(bill): this ABI is only an issue for WASI compatibility
-		return lbAbiWasm32::abi_info(c, arg_types, arg_count, return_type, return_is_defined, calling_convention);
 	case TargetArch_wasm64:
-		// TODO(bill): implement wasm64's ABI correct 
-		// NOTE(bill): this ABI is only an issue for WASI compatibility
-		return lbAbiAmd64SysV::abi_info(c, arg_types, arg_count, return_type, return_is_defined, calling_convention);
+		return lbAbiWasm::abi_info(c, arg_types, arg_count, return_type, return_is_defined, return_is_tuple, calling_convention);
 	}
 
 	GB_PANIC("Unsupported ABI");
 	return {};
+}
+
+
+LB_ABI_INFO(lb_get_abi_info) {
+	lbFunctionType *ft = lb_get_abi_info_internal(
+		c,
+		arg_types, arg_count,
+		return_type, return_is_defined,
+		ALLOW_SPLIT_MULTI_RETURNS && return_is_tuple && is_calling_convention_odin(calling_convention),
+		calling_convention);
+
+
+	// NOTE(bill): this is handled here rather than when developing the type in `lb_type_internal_for_procedures_raw`
+	// This is to make it consistent when and how it is handled
+	if (calling_convention == ProcCC_Odin) {
+		// append the `context` pointer
+		lbArgType context_param = lb_arg_type_direct(LLVMPointerType(LLVMInt8TypeInContext(c), 0));
+		array_add(&ft->args, context_param);
+	}
+
+	return ft;
 }

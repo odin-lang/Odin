@@ -1,7 +1,10 @@
 package libc
 
 when ODIN_OS == .Windows {
-	foreign import libc "system:libucrt.lib"
+	foreign import libc {
+		"system:libucrt.lib",
+		"system:legacy_stdio_definitions.lib",
+	}
 } else when ODIN_OS == .Darwin {
 	foreign import libc "system:System.framework"
 } else {
@@ -196,7 +199,7 @@ foreign libc {
 	getc      :: proc(stream: ^FILE) -> int ---
 	getchar   :: proc() -> int ---
 	putc      :: proc(c: int, stream: ^FILE) -> int ---
-	putchar   :: proc() -> int ---
+	putchar   :: proc(c: int) -> int ---
 	puts      :: proc(s: cstring) -> int ---
 	ungetc    :: proc(c: int, stream: ^FILE) -> int ---
 	fread     :: proc(ptr: rawptr, size: size_t, nmemb: size_t, stream: ^FILE) -> size_t ---

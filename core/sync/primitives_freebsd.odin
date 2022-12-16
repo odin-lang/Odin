@@ -2,8 +2,14 @@
 //+private
 package sync
 
-import "core:os"
+import "core:c"
+
+foreign import dl "system:dl"
+
+foreign dl {
+	pthread_getthreadid_np :: proc "c" () -> c.int ---
+}
 
 _current_thread_id :: proc "contextless" () -> int {
-	return os.current_thread_id()
+	return int(pthread_getthreadid_np())
 }

@@ -1,4 +1,4 @@
-package whirlpool
+package vendor_whirlpool
 
 /*
     Copyright 2021 zhibog

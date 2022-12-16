@@ -24,21 +24,15 @@ import "core:os"
 /*
 	Default configuration for DNS resolution.
 */
+getenv :: proc(key: string, allocator := context.allocator) -> (val: string) {
+	return os.get_env(key, allocator)
+}
 when ODIN_OS == .Windows {
-	getenv :: proc(key: string) -> (val: string) {
-		return os.get_env(key)
-	}
-
 	DEFAULT_DNS_CONFIGURATION :: DNS_Configuration{
 		resolv_conf        = "",
 		hosts_file         = "%WINDIR%\\system32\\drivers\\etc\\hosts",
 	}
 } else when ODIN_OS == .Linux || ODIN_OS == .Darwin || ODIN_OS == .OpenBSD {
-	getenv :: proc(key: string) -> (val: string) {
-		val, _ = os.getenv(key)
-		return
-	}
-
 	DEFAULT_DNS_CONFIGURATION :: DNS_Configuration{
 		resolv_conf        = "/etc/resolv.conf",
 		hosts_file         = "/etc/hosts",
@@ -612,7 +606,7 @@ validate_hostname :: proc(hostname: string) -> (ok: bool) {
 			switch ch {
 			case:
 				return
-			case 'a'..'z', 'A'..'Z', '0'..'9', '-':
+			case 'a'..='z', 'A'..='Z', '0'..='9', '-':
 				continue
 			}
 		}

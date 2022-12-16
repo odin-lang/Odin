@@ -36,10 +36,8 @@ import "core:strings"
 
 likely :: intrinsics.expect
 
-DEFAULT_Options :: Options{
-	flags            = {
-		.Ignore_Unsupported,
-	},
+DEFAULT_OPTIONS :: Options{
+	flags = {.Ignore_Unsupported},
 	expected_doctype = "",
 }
 
@@ -51,7 +49,7 @@ Option_Flag :: enum {
 	Input_May_Be_Modified,
 
 	/*
-		Document MUST start with `<?xml` prolog.
+		Document MUST start with `<?xml` prologue.
 	*/
 	Must_Have_Prolog,
 
@@ -94,7 +92,7 @@ Document :: struct {
 	elements:      [dynamic]Element,
 	element_count: Element_ID,
 
-	prolog:   Attributes,
+	prologue: Attributes,
 	encoding: Encoding,
 
 	doctype: struct {
@@ -138,12 +136,12 @@ Element :: struct {
 	children: [dynamic]Element_ID,
 }
 
-Attr :: struct {
+Attribute :: struct {
 	key: string,
 	val: string,
 }
 
-Attributes :: [dynamic]Attr
+Attributes :: [dynamic]Attribute
 
 Options :: struct {
 	flags:            Option_Flags,
@@ -221,7 +219,7 @@ Error :: enum {
 /*
 	Implementation starts here.
 */
-parse_from_slice :: proc(data: []u8, options := DEFAULT_Options, path := "", error_handler := default_error_handler, allocator := context.allocator) -> (doc: ^Document, err: Error) {
+parse_bytes :: proc(data: []u8, options := DEFAULT_OPTIONS, path := "", error_handler := default_error_handler, allocator := context.allocator) -> (doc: ^Document, err: Error) {
 	data := data
 	context.allocator = allocator
 
@@ -411,10 +409,10 @@ parse_from_slice :: proc(data: []u8, options := DEFAULT_Options, path := "", err
 				#partial switch next.kind {
 				case .Ident:
 					if len(next.text) == 3 && strings.to_lower(next.text, context.temp_allocator) == "xml" {
-						parse_prolog(doc) or_return
-					} else if len(doc.prolog) > 0 {
+						parse_prologue(doc) or_return
+					} else if len(doc.prologue) > 0 {
 						/*
-							We've already seen a prolog.
+							We've already seen a prologue.
 						*/
 						return doc, .Too_Many_Prologs
 					} else {
@@ -481,7 +479,7 @@ parse_from_slice :: proc(data: []u8, options := DEFAULT_Options, path := "", err
 		}
 	}
 
-	if .Must_Have_Prolog in opts.flags && len(doc.prolog) == 0 {
+	if .Must_Have_Prolog in opts.flags && len(doc.prologue) == 0 {
 		return doc, .No_Prolog
 	}
 
@@ -493,16 +491,16 @@ parse_from_slice :: proc(data: []u8, options := DEFAULT_Options, path := "", err
 	return doc, .None
 }
 
-parse_from_string :: proc(data: string, options := DEFAULT_Options, path := "", error_handler := default_error_handler, allocator := context.allocator) -> (doc: ^Document, err: Error) {
+parse_string :: proc(data: string, options := DEFAULT_OPTIONS, path := "", error_handler := default_error_handler, allocator := context.allocator) -> (doc: ^Document, err: Error) {
 	_data := transmute([]u8)data
 
-	return parse_from_slice(_data, options, path, error_handler, allocator)
+	return parse_bytes(_data, options, path, error_handler, allocator)
 }
 
-parse :: proc { parse_from_string, parse_from_slice }
+parse :: proc { parse_string, parse_bytes }
 
 // Load an XML file
-load_from_file :: proc(filename: string, options := DEFAULT_Options, error_handler := default_error_handler, allocator := context.allocator) -> (doc: ^Document, err: Error) {
+load_from_file :: proc(filename: string, options := DEFAULT_OPTIONS, error_handler := default_error_handler, allocator := context.allocator) -> (doc: ^Document, err: Error) {
 	context.allocator = allocator
 	options := options
 
@@ -511,7 +509,7 @@ load_from_file :: proc(filename: string, options := DEFAULT_Options, error_handl
 
 	options.flags += { .Input_May_Be_Modified }
 
-	return parse_from_slice(data, options, filename, error_handler, allocator)
+	return parse_bytes(data, options, filename, error_handler, allocator)
 }
 
 destroy :: proc(doc: ^Document) {
@@ -523,7 +521,7 @@ destroy :: proc(doc: ^Document) {
 	}
 	delete(doc.elements)
 
-	delete(doc.prolog)
+	delete(doc.prologue)
 	delete(doc.comments)
 	delete(doc.input)
 
@@ -556,7 +554,7 @@ expect :: proc(t: ^Tokenizer, kind: Token_Kind) -> (tok: Token, err: Error) {
 	return tok, .Unexpected_Token
 }
 
-parse_attribute :: proc(doc: ^Document) -> (attr: Attr, offset: int, err: Error) {
+parse_attribute :: proc(doc: ^Document) -> (attr: Attribute, offset: int, err: Error) {
 	assert(doc != nil)
 	context.allocator = doc.allocator
 	t := doc.tokenizer
@@ -574,7 +572,7 @@ parse_attribute :: proc(doc: ^Document) -> (attr: Attr, offset: int, err: Error)
 	return
 }
 
-check_duplicate_attributes :: proc(t: ^Tokenizer, attribs: Attributes, attr: Attr, offset: int) -> (err: Error) {
+check_duplicate_attributes :: proc(t: ^Tokenizer, attribs: Attributes, attr: Attribute, offset: int) -> (err: Error) {
 	for a in attribs {
 		if attr.key == a.key {
 			error(t, offset, "Duplicate attribute: %v\n", attr.key)
@@ -598,21 +596,21 @@ parse_attributes :: proc(doc: ^Document, attribs: ^Attributes) -> (err: Error) {
 	return .None
 }
 
-parse_prolog :: proc(doc: ^Document) -> (err: Error) {
+parse_prologue :: proc(doc: ^Document) -> (err: Error) {
 	assert(doc != nil)
 	context.allocator = doc.allocator
 	t := doc.tokenizer
 
 	offset := t.offset
-	parse_attributes(doc, &doc.prolog) or_return
+	parse_attributes(doc, &doc.prologue) or_return
 
-	for attr in doc.prolog {
+	for attr in doc.prologue {
 		switch attr.key {
 		case "version":
 			switch attr.val {
 			case "1.0", "1.1":
 			case:
-				error(t, offset, "[parse_prolog] Warning: Unhandled XML version: %v\n", attr.val)
+				error(t, offset, "[parse_prologue] Warning: Unhandled XML version: %v\n", attr.val)
 			}
 
 		case "encoding":
@@ -627,7 +625,7 @@ parse_prolog :: proc(doc: ^Document) -> (err: Error) {
 				/*
 					Unrecognized encoding, assume UTF-8.
 				*/
-				error(t, offset, "[parse_prolog] Warning: Unrecognized encoding: %v\n", attr.val)
+				error(t, offset, "[parse_prologue] Warning: Unrecognized encoding: %v\n", attr.val)
 			}
 
 		case:

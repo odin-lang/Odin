@@ -695,11 +695,6 @@ void check_union_type(CheckerContext *ctx, Type *union_type, Ast *node, Array<Op
 			error(ut->align, "A union with #no_nil must have at least 2 variants");
 		}
 		break;
-	case UnionType_maybe:
-		if (variants.count != 1) {
-			error(ut->align, "A union with #maybe must have at 1 variant, got %lld", cast(long long)variants.count);
-		}
-		break;
 	}
 
 	if (ut->align != nullptr) {
@@ -1234,13 +1229,13 @@ bool check_type_specialization_to(CheckerContext *ctx, Type *specialization, Typ
 }
 
 
-Type *determine_type_from_polymorphic(CheckerContext *ctx, Type *poly_type, Operand operand) {
+Type *determine_type_from_polymorphic(CheckerContext *ctx, Type *poly_type, Operand const &operand) {
 	bool modify_type = !ctx->no_polymorphic_errors;
 	bool show_error = modify_type && !ctx->hide_polymorphic_errors;
 	if (!is_operand_value(operand)) {
 		if (show_error) {
 			gbString pts = type_to_string(poly_type);
-			gbString ots = type_to_string(operand.type);
+			gbString ots = type_to_string(operand.type, true);
 			defer (gb_string_free(pts));
 			defer (gb_string_free(ots));
 			error(operand.expr, "Cannot determine polymorphic type from parameter: '%s' to '%s'", ots, pts);
@@ -1253,7 +1248,7 @@ Type *determine_type_from_polymorphic(CheckerContext *ctx, Type *poly_type, Oper
 	}
 	if (show_error) {
 		gbString pts = type_to_string(poly_type);
-		gbString ots = type_to_string(operand.type);
+		gbString ots = type_to_string(operand.type, true);
 		defer (gb_string_free(pts));
 		defer (gb_string_free(ots));
 		error(operand.expr, "Cannot determine polymorphic type from parameter: '%s' to '%s'", ots, pts);
@@ -1345,7 +1340,9 @@ ParameterValue handle_parameter_value(CheckerContext *ctx, Type *in_type, Type *
 					param_value.kind = ParameterValue_Constant;
 					param_value.value = o.value;
 				} else {
-					error(expr, "Default parameter must be a constant, %d", o.mode);
+					gbString s = expr_to_string(o.expr);
+					error(expr, "Default parameter must be a constant, got %s", s);
+					gb_string_free(s);
 				}
 			}
 		} else {
@@ -1614,6 +1611,10 @@ Type *check_get_params(CheckerContext *ctx, Scope *scope, Ast *_params, bool *is
 					error(name, "'#any_int' can only be applied to variable fields");
 					p->flags &= ~FieldFlag_any_int;
 				}
+				if (p->flags&FieldFlag_by_ptr) {
+					error(name, "'#by_ptr' can only be applied to variable fields");
+					p->flags &= ~FieldFlag_by_ptr;
+				}
 
 				param = alloc_entity_type_name(scope, name->Ident.token, type, EntityState_Resolved);
 				param->TypeName.is_type_alias = true;
@@ -1628,6 +1629,8 @@ Type *check_get_params(CheckerContext *ctx, Scope *scope, Ast *_params, bool *is
 						// This is just to add the error message to determine_type_from_polymorphic which
 						// depends on valid position information
 						op.expr = _params;
+						op.mode = Addressing_Invalid;
+						op.type = t_invalid;
 					}
 					if (is_type_polymorphic_type) {
 						type = determine_type_from_polymorphic(ctx, type, op);
@@ -1642,8 +1645,10 @@ Type *check_get_params(CheckerContext *ctx, Scope *scope, Ast *_params, bool *is
 						bool valid = false;
 						if (is_type_proc(op.type)) {
 							Entity *proc_entity = entity_from_expr(op.expr);
-							valid = proc_entity != nullptr;
-							poly_const = exact_value_procedure(proc_entity->identifier.load() ? proc_entity->identifier.load() : op.expr);
+							valid = (proc_entity != nullptr) && (op.value.kind == ExactValue_Procedure);
+							if (valid) {
+								poly_const = exact_value_procedure(proc_entity->identifier.load() ? proc_entity->identifier.load() : op.expr);
+							}
 						}
 						if (!valid) {
 							if (op.mode == Addressing_Constant) {
@@ -1690,10 +1695,17 @@ Type *check_get_params(CheckerContext *ctx, Scope *scope, Ast *_params, bool *is
 
 				if (p->flags&FieldFlag_no_alias) {
 					if (!is_type_pointer(type)) {
-						error(name, "'#no_alias' can only be applied to fields of pointer type");
+						error(name, "'#no_alias' can only be applied pointer typed parameters");
 						p->flags &= ~FieldFlag_no_alias; // Remove the flag
 					}
 				}
+				if (p->flags&FieldFlag_by_ptr) {
+					if (is_type_internally_pointer_like(type)) {
+						error(name, "'#by_ptr' can only be applied to non-pointer-like parameters");
+						p->flags &= ~FieldFlag_by_ptr; // Remove the flag
+					}
+				}
+
 				if (is_poly_name) {
 					if (p->flags&FieldFlag_no_alias) {
 						error(name, "'#no_alias' can only be applied to non constant values");
@@ -1710,6 +1722,10 @@ Type *check_get_params(CheckerContext *ctx, Scope *scope, Ast *_params, bool *is
 					if (p->flags&FieldFlag_const) {
 						error(name, "'#const' can only be applied to variable fields");
 						p->flags &= ~FieldFlag_const;
+					}
+					if (p->flags&FieldFlag_by_ptr) {
+						error(name, "'#by_ptr' can only be applied to variable fields");
+						p->flags &= ~FieldFlag_by_ptr;
 					}
 
 					if (!is_type_constant_type(type) && !is_type_polymorphic(type)) {
@@ -1742,6 +1758,9 @@ Type *check_get_params(CheckerContext *ctx, Scope *scope, Ast *_params, bool *is
 			}
 			if (p->flags&FieldFlag_const) {
 				param->flags |= EntityFlag_ConstInput;
+			}
+			if (p->flags&FieldFlag_by_ptr) {
+				param->flags |= EntityFlag_ByPtr;
 			}
 
 			param->state = EntityState_Resolved; // NOTE(bill): This should have be resolved whilst determining it
@@ -1989,22 +2008,21 @@ bool check_procedure_type(CheckerContext *ctx, Type *type, Ast *proc_type_node, 
 			}
 		}
 	}
-	if (pt->tags & ProcTag_optional_second) {
+	if (pt->tags & ProcTag_optional_allocator_error) {
 		if (optional_ok) {
-			error(proc_type_node, "A procedure type cannot have both an #optional_ok tag and #optional_second");
+			error(proc_type_node, "A procedure type cannot have both an #optional_ok tag and #optional_allocator_error");
 		}
 		optional_ok = true;
 		if (result_count != 2) {
-			error(proc_type_node, "A procedure type with the #optional_second tag requires 2 return values, got %td", result_count);
+			error(proc_type_node, "A procedure type with the #optional_allocator_error tag requires 2 return values, got %td", result_count);
 		} else {
-			bool ok = false;
-			AstFile *file = proc_type_node->file();
-			if (file && file->pkg) {
-				ok = file->pkg->scope == ctx->info->runtime_package->scope;
-			}
+			init_mem_allocator(c->checker);
 
-			if (!ok) {
-				error(proc_type_node, "A procedure type with the #optional_second may only be allowed within 'package runtime'");
+			Type *type = results->Tuple.variables[1]->type;
+			if (!are_types_identical(type, t_allocator_error)) {
+				gbString t = type_to_string(type);
+				error(proc_type_node, "A procedure type with the #optional_allocator_error expects a `runtime.Allocator_Error`, got '%s'", t);
+				gb_string_free(t);
 			}
 		}
 	}
@@ -2160,72 +2178,36 @@ Type *make_optional_ok_type(Type *value, bool typed) {
 	return t;
 }
 
-void init_map_entry_type(Type *type) {
-	GB_ASSERT(type->kind == Type_Map);
-	if (type->Map.entry_type != nullptr) return;
 
-	// NOTE(bill): The preload types may have not been set yet
-	GB_ASSERT(t_map_hash != nullptr);
+// IMPORTANT NOTE(bill): This must match the definition in dynamic_map_internal.odin
+enum : i64 {
+	MAP_CACHE_LINE_LOG2 = 6,
+	MAP_CACHE_LINE_SIZE = 1 << MAP_CACHE_LINE_LOG2
+};
+GB_STATIC_ASSERT(MAP_CACHE_LINE_SIZE >= 64);
+void map_cell_size_and_len(Type *type, i64 *size_, i64 *len_) {
+	i64 elem_sz = type_size_of(type);
 
-	/*
-	struct {
-		hash:  uintptr,
-		next:  int,
-		key:   Key,
-		value: Value,
+	i64 len = 1;
+	if (0 < elem_sz && elem_sz < MAP_CACHE_LINE_SIZE) {
+		len = MAP_CACHE_LINE_SIZE / elem_sz;
 	}
-	*/
-	Scope *s = create_scope(nullptr, builtin_pkg->scope);
-
-	auto fields = slice_make<Entity *>(permanent_allocator(), 4);
-	fields[0] = alloc_entity_field(s, make_token_ident(str_lit("hash")),  t_uintptr,       false, 0, EntityState_Resolved);
-	fields[1] = alloc_entity_field(s, make_token_ident(str_lit("next")),  t_int,           false, 1, EntityState_Resolved);
-	fields[2] = alloc_entity_field(s, make_token_ident(str_lit("key")),   type->Map.key,   false, 2, EntityState_Resolved);
-	fields[3] = alloc_entity_field(s, make_token_ident(str_lit("value")), type->Map.value, false, 3, EntityState_Resolved);
-
-	Type *entry_type = alloc_type_struct();
-	entry_type->Struct.fields  = fields;
-	entry_type->Struct.tags    = gb_alloc_array(permanent_allocator(), String, fields.count);
-	
-	type_set_offsets(entry_type);
-	type->Map.entry_type = entry_type;
+	i64 size = align_formula(elem_sz * len, MAP_CACHE_LINE_SIZE);
+	if (size_) *size_ = size;
+	if (len_)  *len_ = len;
 }
 
 void init_map_internal_types(Type *type) {
 	GB_ASSERT(type->kind == Type_Map);
-	init_map_entry_type(type);
-	if (type->Map.internal_type != nullptr) return;
-	if (type->Map.generated_struct_type != nullptr) return;
+	GB_ASSERT(t_allocator != nullptr);
+	if (type->Map.lookup_result_type != nullptr) return;
 
 	Type *key   = type->Map.key;
 	Type *value = type->Map.value;
 	GB_ASSERT(key != nullptr);
 	GB_ASSERT(value != nullptr);
 
-	Type *generated_struct_type = alloc_type_struct();
-
-	/*
-	struct {
-		hashes:  []int;
-		entries: [dynamic]EntryType;
-	}
-	*/
-	Scope *s = create_scope(nullptr, builtin_pkg->scope);
-
-	Type *hashes_type  = alloc_type_slice(t_int);
-	Type *entries_type = alloc_type_dynamic_array(type->Map.entry_type);
-
-
-	auto fields = slice_make<Entity *>(permanent_allocator(), 2);
-	fields[0] = alloc_entity_field(s, make_token_ident(str_lit("hashes")),  hashes_type,  false, 0, EntityState_Resolved);
-	fields[1] = alloc_entity_field(s, make_token_ident(str_lit("entries")), entries_type, false, 1, EntityState_Resolved);
-
-	generated_struct_type->Struct.fields = fields;
-	type_set_offsets(generated_struct_type);
-	
-	type->Map.generated_struct_type = generated_struct_type;
-	type->Map.internal_type         = generated_struct_type;
-	type->Map.lookup_result_type    = make_optional_ok_type(value);
+	type->Map.lookup_result_type = make_optional_ok_type(value);
 }
 
 void add_map_key_type_dependencies(CheckerContext *ctx, Type *key) {
@@ -2241,35 +2223,27 @@ void add_map_key_type_dependencies(CheckerContext *ctx, Type *key) {
 		}
 
 		if (is_type_simple_compare(key)) {
-			i64 sz = type_size_of(key);
-			if (1 <= sz && sz <= 16) {
-				char buf[20] = {};
-				gb_snprintf(buf, 20, "default_hasher%d", cast(i32)sz);
-				add_package_dependency(ctx, "runtime", buf);
-				return;
-			} else {
-				add_package_dependency(ctx, "runtime", "default_hasher_n");
-				return;
-			}
+			add_package_dependency(ctx, "runtime", "default_hasher");
+			return;
 		}
 
 		if (key->kind == Type_Struct) {
-			add_package_dependency(ctx, "runtime", "default_hasher_n");
+			add_package_dependency(ctx, "runtime", "default_hasher");
 			for_array(i, key->Struct.fields) {
 				Entity *field = key->Struct.fields[i];
 				add_map_key_type_dependencies(ctx, field->type);
 			}
 		} else if (key->kind == Type_Union) {
-			add_package_dependency(ctx, "runtime", "default_hasher_n");
+			add_package_dependency(ctx, "runtime", "default_hasher");
 			for_array(i, key->Union.variants) {
 				Type *v = key->Union.variants[i];
 				add_map_key_type_dependencies(ctx, v);
 			}
 		} else if (key->kind == Type_EnumeratedArray) {
-			add_package_dependency(ctx, "runtime", "default_hasher_n");
+			add_package_dependency(ctx, "runtime", "default_hasher");
 			add_map_key_type_dependencies(ctx, key->EnumeratedArray.elem);
 		} else if (key->kind == Type_Array) {
-			add_package_dependency(ctx, "runtime", "default_hasher_n");
+			add_package_dependency(ctx, "runtime", "default_hasher");
 			add_map_key_type_dependencies(ctx, key->Array.elem);
 		}
 	}
@@ -2316,9 +2290,7 @@ void check_matrix_type(CheckerContext *ctx, Type **type, Ast *node) {
 	
 	i64 row_count = check_array_count(ctx, &row, mt->row_count);
 	i64 column_count = check_array_count(ctx, &column, mt->column_count);
-	
-	Type *elem = check_type_expr(ctx, mt->elem, nullptr);
-	
+
 	Type *generic_row = nullptr;
 	Type *generic_column = nullptr;
 	
@@ -2330,22 +2302,25 @@ void check_matrix_type(CheckerContext *ctx, Type **type, Ast *node) {
 		generic_column = column.type;
 	}
 	
-	if (row_count < MATRIX_ELEMENT_COUNT_MIN && generic_row == nullptr) {
+	if (generic_row == nullptr && row_count < MATRIX_ELEMENT_COUNT_MIN) {
 		gbString s = expr_to_string(row.expr);
 		error(row.expr, "Invalid matrix row count, expected %d+ rows, got %s", MATRIX_ELEMENT_COUNT_MIN, s);
 		gb_string_free(s);
 	}
 	
-	if (column_count < MATRIX_ELEMENT_COUNT_MIN && generic_column == nullptr) {
+	if (generic_column == nullptr && column_count < MATRIX_ELEMENT_COUNT_MIN) {
 		gbString s = expr_to_string(column.expr);
 		error(column.expr, "Invalid matrix column count, expected %d+ rows, got %s", MATRIX_ELEMENT_COUNT_MIN, s);
 		gb_string_free(s);
 	}
 	
-	if (row_count*column_count > MATRIX_ELEMENT_COUNT_MAX) {
+	if ((generic_row == nullptr && generic_column == nullptr) && row_count*column_count > MATRIX_ELEMENT_COUNT_MAX) {
 		i64 element_count = row_count*column_count;
 		error(column.expr, "Matrix types are limited to a maximum of %d elements, got %lld", MATRIX_ELEMENT_COUNT_MAX, cast(long long)element_count);
 	}
+
+
+	Type *elem = check_type_expr(ctx, mt->elem, nullptr);
 	
 	if (!is_type_valid_for_matrix_elems(elem)) {
 		if (elem == t_typeid) {
@@ -2678,14 +2653,55 @@ bool check_type_internal(CheckerContext *ctx, Ast *e, Type **type, Type *named_t
 	case_ast_node(ue, UnaryExpr, e);
 		switch (ue->op.kind) {
 		case Token_Pointer:
-			*type = alloc_type_pointer(check_type(ctx, ue->expr));
-			set_base_type(named_type, *type);
-			return true;
+			{
+				Type *elem = check_type(ctx, ue->expr);
+				*type = alloc_type_pointer(elem);
+				set_base_type(named_type, *type);
+				return true;
+			}
 		}
 	case_end;
 
 	case_ast_node(pt, PointerType, e);
-		*type = alloc_type_pointer(check_type(ctx, pt->type));
+		CheckerContext c = *ctx;
+		c.type_path = new_checker_type_path();
+		defer (destroy_checker_type_path(c.type_path));
+
+		Type *elem = t_invalid;
+		Operand o = {};
+		check_expr_or_type(&c, &o, pt->type);
+		if (o.mode != Addressing_Invalid && o.mode != Addressing_Type) {
+			// NOTE(bill): call check_type_expr again to get a consistent error message
+			begin_error_block();
+			elem = check_type_expr(&c, pt->type, nullptr);
+			if (o.mode == Addressing_Variable) {
+				gbString s = expr_to_string(pt->type);
+				error_line("\tSuggestion: ^ is used for pointer types, did you mean '&%s'?\n", s);
+				gb_string_free(s);
+			}
+			end_error_block();
+		} else {
+			elem = o.type;
+		}
+
+		if (pt->tag != nullptr) {
+			GB_ASSERT(pt->tag->kind == Ast_BasicDirective);
+			String name = pt->tag->BasicDirective.name.string;
+			if (name == "soa") {
+				// TODO(bill): generic #soa pointers
+				if (is_type_soa_struct(elem)) {
+					*type = alloc_type_soa_pointer(elem);
+				} else {
+					error(pt->tag, "#soa pointers require an #soa record type as the element");
+					*type = alloc_type_pointer(elem);
+				}
+			} else {
+				error(pt->tag, "Invalid tag applied to pointer, got #%.*s", LIT(name));
+				*type = alloc_type_pointer(elem);
+			}
+		} else {
+			*type = alloc_type_pointer(elem);
+		}
 		set_base_type(named_type, *type);
 		return true;
 	case_end;
@@ -2795,15 +2811,27 @@ bool check_type_internal(CheckerContext *ctx, Ast *e, Type **type, Type *named_t
 				if (name == "soa") {
 					*type = make_soa_struct_fixed(ctx, e, at->elem, elem, count, generic_type);
 				} else if (name == "simd") {
-					if (!is_type_valid_vector_elem(elem)) {
+					if (!is_type_valid_vector_elem(elem) && !is_type_polymorphic(elem)) {
 						gbString str = type_to_string(elem);
-						error(at->elem, "Invalid element type for 'intrinsics.simd_vector', expected an integer or float with no specific endianness, got '%s'", str);
+						error(at->elem, "Invalid element type for #simd, expected an integer, float, or boolean with no specific endianness, got '%s'", str);
 						gb_string_free(str);
 						*type = alloc_type_array(elem, count, generic_type);
 						goto array_end;
 					}
 
-					*type = alloc_type_simd_vector(count, elem);
+					if (generic_type != nullptr) {
+						// Ignore
+					} else if (count < 1 || !is_power_of_two(count)) {
+						error(at->count, "Invalid length for #simd, expected a power of two length, got '%lld'", cast(long long)count);
+						*type = alloc_type_array(elem, count, generic_type);
+						goto array_end;
+					}
+
+					*type = alloc_type_simd_vector(count, elem, generic_type);
+
+					if (count > SIMD_ELEMENT_COUNT_MAX) {
+						error(at->count, "#simd support a maximum element count of %d, got %lld", SIMD_ELEMENT_COUNT_MAX, cast(long long)count);
+					}
 				} else {
 					error(at->tag, "Invalid tag applied to array, got #%.*s", LIT(name));
 					*type = alloc_type_array(elem, count, generic_type);

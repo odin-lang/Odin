@@ -123,9 +123,6 @@ O_ASYNC    :: 0x02000
 O_CLOEXEC  :: 0x80000
 
 
-SEEK_SET   :: 0
-SEEK_CUR   :: 1
-SEEK_END   :: 2
 SEEK_DATA  :: 3
 SEEK_HOLE  :: 4
 SEEK_MAX   :: SEEK_HOLE
@@ -244,13 +241,13 @@ S_ISGID :: 0o2000 // Set group id on execution
 S_ISVTX :: 0o1000 // Directory restrcted delete
 
 
-S_ISLNK  :: #force_inline proc(m: mode_t) -> bool do return (m & S_IFMT) == S_IFLNK
-S_ISREG  :: #force_inline proc(m: mode_t) -> bool do return (m & S_IFMT) == S_IFREG
-S_ISDIR  :: #force_inline proc(m: mode_t) -> bool do return (m & S_IFMT) == S_IFDIR
-S_ISCHR  :: #force_inline proc(m: mode_t) -> bool do return (m & S_IFMT) == S_IFCHR
-S_ISBLK  :: #force_inline proc(m: mode_t) -> bool do return (m & S_IFMT) == S_IFBLK
-S_ISFIFO :: #force_inline proc(m: mode_t) -> bool do return (m & S_IFMT) == S_IFIFO
-S_ISSOCK :: #force_inline proc(m: mode_t) -> bool do return (m & S_IFMT) == S_IFSOCK
+S_ISLNK  :: #force_inline proc(m: mode_t) -> bool { return (m & S_IFMT) == S_IFLNK  }
+S_ISREG  :: #force_inline proc(m: mode_t) -> bool { return (m & S_IFMT) == S_IFREG  }
+S_ISDIR  :: #force_inline proc(m: mode_t) -> bool { return (m & S_IFMT) == S_IFDIR  }
+S_ISCHR  :: #force_inline proc(m: mode_t) -> bool { return (m & S_IFMT) == S_IFCHR  }
+S_ISBLK  :: #force_inline proc(m: mode_t) -> bool { return (m & S_IFMT) == S_IFBLK  }
+S_ISFIFO :: #force_inline proc(m: mode_t) -> bool { return (m & S_IFMT) == S_IFIFO  }
+S_ISSOCK :: #force_inline proc(m: mode_t) -> bool { return (m & S_IFMT) == S_IFSOCK }
 
 F_OK :: 0 // Test for file existance
 X_OK :: 1 // Test for execute permission
@@ -260,7 +257,7 @@ R_OK :: 4 // Test for read permission
 foreign libc {
 	@(link_name="__error")		__errno_location :: proc() -> ^int ---
 
-	@(link_name="open")             _unix_open       :: proc(path: cstring, flags: c.int, mode: c.int) -> Handle ---
+	@(link_name="open")             _unix_open          :: proc(path: cstring, flags: c.int, mode: c.int) -> Handle ---
 	@(link_name="close")            _unix_close         :: proc(fd: Handle) -> c.int ---
 	@(link_name="read")             _unix_read          :: proc(fd: Handle, buf: rawptr, size: c.size_t) -> c.ssize_t ---
 	@(link_name="write")            _unix_write         :: proc(fd: Handle, buf: rawptr, size: c.size_t) -> c.ssize_t ---
@@ -306,7 +303,7 @@ is_path_separator :: proc(r: rune) -> bool {
 	return r == '/'
 }
 
-get_last_error :: proc() -> int {
+get_last_error :: proc "contextless" () -> int {
 	return __errno_location()^
 }
 
@@ -606,9 +603,15 @@ access :: proc(path: string, mask: int) -> (bool, Errno) {
 	return true, ERROR_NONE
 }
 
-heap_alloc :: proc(size: int) -> rawptr {
-	assert(size >= 0)
-	return _unix_calloc(1, c.size_t(size))
+heap_alloc :: proc(size: int, zero_memory := true) -> rawptr {
+	if size <= 0 {
+		return nil
+	}
+	if zero_memory {
+		return _unix_calloc(1, c.size_t(size))
+	} else {
+		return _unix_malloc(c.size_t(size))
+	}
 }
 
 heap_resize :: proc(ptr: rawptr, new_size: int) -> rawptr {
@@ -621,13 +624,18 @@ heap_free :: proc(ptr: rawptr) {
 	_unix_free(ptr)
 }
 
-getenv :: proc(name: string) -> (string, bool) {
-	path_str := strings.clone_to_cstring(name, context.temp_allocator)
+lookup_env :: proc(key: string, allocator := context.allocator) -> (value: string, found: bool) {
+	path_str := strings.clone_to_cstring(key, context.temp_allocator)
 	cstr := _unix_getenv(path_str)
 	if cstr == nil {
 		return "", false
 	}
-	return string(cstr), true
+	return strings.clone(string(cstr), allocator), true
+}
+
+get_env :: proc(key: string, allocator := context.allocator) -> (value: string) {
+	value, _ = lookup_env(key, allocator)
+	return
 }
 
 get_current_directory :: proc() -> string {

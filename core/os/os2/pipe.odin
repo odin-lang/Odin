@@ -1,5 +1,5 @@
 package os2
 
-pipe :: proc() -> (r, w: Handle, err: Error) {
+pipe :: proc() -> (r, w: ^File, err: Error) {
 	return _pipe()
 }

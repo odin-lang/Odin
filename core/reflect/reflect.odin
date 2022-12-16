@@ -1,8 +1,9 @@
 package reflect
 
 import "core:runtime"
-import "core:mem"
 import "core:intrinsics"
+import "core:mem"
+_ :: mem
 _ :: intrinsics
 
 Type_Info :: runtime.Type_Info
@@ -34,6 +35,7 @@ Type_Info_Simd_Vector      :: runtime.Type_Info_Simd_Vector
 Type_Info_Relative_Pointer :: runtime.Type_Info_Relative_Pointer
 Type_Info_Relative_Slice   :: runtime.Type_Info_Relative_Slice
 Type_Info_Matrix           :: runtime.Type_Info_Matrix
+Type_Info_Soa_Pointer      :: runtime.Type_Info_Soa_Pointer
 
 Type_Info_Enum_Value :: runtime.Type_Info_Enum_Value
 
@@ -68,6 +70,7 @@ Type_Kind :: enum {
 	Relative_Pointer,
 	Relative_Slice,
 	Matrix,
+	Soa_Pointer,
 }
 
 
@@ -102,6 +105,7 @@ type_kind :: proc(T: typeid) -> Type_Kind {
 		case Type_Info_Relative_Pointer: return .Relative_Pointer
 		case Type_Info_Relative_Slice:   return .Relative_Slice
 		case Type_Info_Matrix:           return .Matrix
+		case Type_Info_Soa_Pointer:      return .Soa_Pointer
 		}
 
 	}
@@ -119,46 +123,17 @@ backing_type_kind :: proc(T: typeid) -> Type_Kind {
 }
 
 
-type_info_base :: proc(info: ^Type_Info) -> ^Type_Info {
-	if info == nil { return nil }
-
-	base := info
-	loop: for {
-		#partial switch i in base.variant {
-		case Type_Info_Named: base = i.base
-		case: break loop
-		}
-	}
-	return base
-}
-
-
-type_info_core :: proc(info: ^Type_Info) -> ^Type_Info {
-	if info == nil { return nil }
-
-	base := info
-	loop: for {
-		#partial switch i in base.variant {
-		case Type_Info_Named:  base = i.base
-		case Type_Info_Enum:   base = i.base
-		case: break loop
-		}
-	}
-	return base
-}
+type_info_base :: runtime.type_info_base
+type_info_core :: runtime.type_info_core 
 type_info_base_without_enum :: type_info_core
 
 
-typeid_base :: proc(id: typeid) -> typeid {
-	ti := type_info_of(id)
-	ti = type_info_base(ti)
-	return ti.id
+when !ODIN_DISALLOW_RTTI {
+	typeid_base :: runtime.typeid_base
+	typeid_core :: runtime.typeid_core
+	typeid_base_without_enum :: typeid_core
 }
-typeid_core :: proc(id: typeid) -> typeid {
-	ti := type_info_base_without_enum(type_info_of(id))
-	return ti.id
-}
-typeid_base_without_enum :: typeid_core
+
 
 any_base :: proc(v: any) -> any {
 	v := v
@@ -194,6 +169,7 @@ typeid_elem :: proc(id: typeid) -> typeid {
 		}
 	case Type_Info_Pointer:          return v.elem.id
 	case Type_Info_Multi_Pointer:    return v.elem.id
+	case Type_Info_Soa_Pointer:      return v.elem.id
 	case Type_Info_Array:            return v.elem.id
 	case Type_Info_Enumerated_Array: return v.elem.id
 	case Type_Info_Slice:            return v.elem.id
@@ -220,7 +196,7 @@ align_of_typeid :: proc(T: typeid) -> int {
 as_bytes :: proc(v: any) -> []byte {
 	if v != nil {
 		sz := size_of_typeid(v.id)
-		return mem.slice_ptr((^byte)(v.data), sz)
+		return ([^]byte)(v.data)[:sz]
 	}
 	return nil
 }
@@ -262,19 +238,19 @@ length :: proc(val: any) -> int {
 		return a.count
 
 	case Type_Info_Slice:
-		return (^mem.Raw_Slice)(val.data).len
+		return (^runtime.Raw_Slice)(val.data).len
 
 	case Type_Info_Dynamic_Array:
-		return (^mem.Raw_Dynamic_Array)(val.data).len
+		return (^runtime.Raw_Dynamic_Array)(val.data).len
 
 	case Type_Info_Map:
-		return (^mem.Raw_Map)(val.data).entries.len
+		return runtime.map_len((^runtime.Raw_Map)(val.data)^)
 
 	case Type_Info_String:
 		if a.is_cstring {
 			return len((^cstring)(val.data)^)
 		} else {
-			return (^mem.Raw_String)(val.data).len
+			return (^runtime.Raw_String)(val.data).len
 		}
 	}
 	return 0
@@ -297,10 +273,10 @@ capacity :: proc(val: any) -> int {
 		return a.count
 
 	case Type_Info_Dynamic_Array:
-		return (^mem.Raw_Dynamic_Array)(val.data).cap
+		return (^runtime.Raw_Dynamic_Array)(val.data).cap
 
 	case Type_Info_Map:
-		return (^mem.Raw_Map)(val.data).entries.cap
+		return runtime.map_cap((^runtime.Raw_Map)(val.data)^)
 	}
 	return 0
 }
@@ -340,14 +316,14 @@ index :: proc(val: any, i: int, loc := #caller_location) -> any {
 		return any{data, a.elem.id}
 
 	case Type_Info_Slice:
-		raw := (^mem.Raw_Slice)(val.data)
+		raw := (^runtime.Raw_Slice)(val.data)
 		runtime.bounds_check_error_loc(loc, i, raw.len)
 		offset := uintptr(a.elem.size * i)
 		data := rawptr(uintptr(raw.data) + offset)
 		return any{data, a.elem.id}
 
 	case Type_Info_Dynamic_Array:
-		raw := (^mem.Raw_Dynamic_Array)(val.data)
+		raw := (^runtime.Raw_Dynamic_Array)(val.data)
 		runtime.bounds_check_error_loc(loc, i, raw.len)
 		offset := uintptr(a.elem.size * i)
 		data := rawptr(uintptr(raw.data) + offset)
@@ -356,7 +332,7 @@ index :: proc(val: any, i: int, loc := #caller_location) -> any {
 	case Type_Info_String:
 		if a.is_cstring { return nil }
 
-		raw := (^mem.Raw_String)(val.data)
+		raw := (^runtime.Raw_String)(val.data)
 		runtime.bounds_check_error_loc(loc, i, raw.len)
 		offset := uintptr(size_of(u8) * i)
 		data := rawptr(uintptr(raw.data) + offset)
@@ -654,7 +630,7 @@ union_variant_type_info :: proc(a: any) -> ^Type_Info {
 }
 
 type_info_union_is_pure_maybe :: proc(info: runtime.Type_Info_Union) -> bool {
-	return info.maybe && len(info.variants) == 1 && is_pointer(info.variants[0])
+	return len(info.variants) == 1 && is_pointer(info.variants[0])
 }
 
 union_variant_typeid :: proc(a: any) -> typeid {
@@ -724,6 +700,26 @@ get_union_variant_raw_tag :: proc(a: any) -> i64 {
 	}
 	panic("expected a union to reflect.get_union_variant_raw_tag")
 }
+
+get_union_variant :: proc(a: any) -> any {
+	if a == nil {
+		return nil
+	}
+	id := union_variant_typeid(a)
+	if id == nil {
+		return nil
+	}
+	return any{a.data, id}
+}
+
+get_union_as_ptr_variants :: proc(val: ^$T) -> (res: intrinsics.type_convert_variants_to_pointers(T)) where intrinsics.type_is_union(T) {
+	ptr := rawptr(val)
+	tag := get_union_variant_raw_tag(val^)
+	mem.copy(&res, &ptr, size_of(ptr))
+	set_union_variant_raw_tag(res, tag)
+	return
+}
+
 
 
 set_union_variant_raw_tag :: proc(a: any, tag: i64) {
@@ -822,17 +818,17 @@ set_union_value :: proc(dst: any, value: any) -> bool {
 	ti := runtime.type_info_base(type_info_of(dst.id))
 	if info, ok := ti.variant.(runtime.Type_Info_Union); ok {
 		if value.id == nil {
-			mem.zero(dst.data, ti.size)
+			intrinsics.mem_zero(dst.data, ti.size)
 			return true
 		}
 		if ti.id == runtime.typeid_base(value.id) {
-			mem.copy(dst.data, value.data, ti.size)
+			intrinsics.mem_copy(dst.data, value.data, ti.size)
 			return true
 		}
 		
 		if type_info_union_is_pure_maybe(info) {
 			if variant := info.variants[0]; variant.id == value.id {
-				mem.copy(dst.data, value.data, variant.size)
+				intrinsics.mem_copy(dst.data, value.data, variant.size)
 				return true
 			}
 			return false
@@ -844,7 +840,7 @@ set_union_value :: proc(dst: any, value: any) -> bool {
 				if !info.no_nil {
 					tag += 1
 				}
-				mem.copy(dst.data, value.data, variant.size)
+				intrinsics.mem_copy(dst.data, value.data, variant.size)
 				set_union_variant_raw_tag(dst, tag)
 				return true
 			}
@@ -1337,11 +1333,11 @@ as_raw_data :: proc(a: any) -> (value: rawptr, valid: bool) {
 
 	case Type_Info_Slice:
 		valid = true
-		value = (^mem.Raw_Slice)(a.data).data
+		value = (^runtime.Raw_Slice)(a.data).data
 
 	case Type_Info_Dynamic_Array:
 		valid = true
-		value = (^mem.Raw_Dynamic_Array)(a.data).data
+		value = (^runtime.Raw_Dynamic_Array)(a.data).data
 	}
 
 	return
@@ -1383,7 +1379,7 @@ equal :: proc(a, b: any, including_indirect_array_recursion := false, recursion_
 	}
 
 	if .Simple_Compare in t.flags {
-		return mem.compare_byte_ptrs((^byte)(a.data), (^byte)(b.data), t.size) == 0
+		return runtime.memory_compare(a.data, b.data, t.size) == 0
 	}
 	
 	t = runtime.type_info_core(t)
@@ -1419,8 +1415,9 @@ equal :: proc(a, b: any, including_indirect_array_recursion := false, recursion_
 		Type_Info_Enum,
 		Type_Info_Simd_Vector,
 		Type_Info_Relative_Pointer,
+		Type_Info_Soa_Pointer,
 		Type_Info_Matrix:
-		return mem.compare_byte_ptrs((^byte)(a.data), (^byte)(b.data), t.size) == 0
+		return runtime.memory_compare(a.data, b.data, t.size) == 0
 		
 	case Type_Info_String:
 		if v.is_cstring {
@@ -1474,8 +1471,8 @@ equal :: proc(a, b: any, including_indirect_array_recursion := false, recursion_
 		if !including_indirect_array_recursion {
 			return false
 		}
-		array_a := (^mem.Raw_Slice)(a.data)
-		array_b := (^mem.Raw_Slice)(b.data)
+		array_a := (^runtime.Raw_Slice)(a.data)
+		array_b := (^runtime.Raw_Slice)(b.data)
 		if array_a.len != array_b.len {
 			return false
 		}
@@ -1494,8 +1491,8 @@ equal :: proc(a, b: any, including_indirect_array_recursion := false, recursion_
 		if !including_indirect_array_recursion {
 			return false
 		}
-		array_a := (^mem.Raw_Dynamic_Array)(a.data)
-		array_b := (^mem.Raw_Dynamic_Array)(b.data)
+		array_a := (^runtime.Raw_Dynamic_Array)(a.data)
+		array_b := (^runtime.Raw_Dynamic_Array)(b.data)
 		if array_a.len != array_b.len {
 			return false
 		}
@@ -1503,7 +1500,7 @@ equal :: proc(a, b: any, including_indirect_array_recursion := false, recursion_
 			return true
 		}
 		if .Simple_Compare in v.elem.flags {
-			return mem.compare_byte_ptrs((^byte)(array_a.data), (^byte)(array_b.data), array_a.len * v.elem.size) == 0
+			return runtime.memory_compare((^byte)(array_a.data), (^byte)(array_b.data), array_a.len * v.elem.size) == 0
 		}
 		
 		for i in 0..<array_a.len {

@@ -119,6 +119,14 @@ See also LICENSE.txt in the `portmidi` directory itself.
 
 See also LICENSE in the `ENet` directory itself.
 
+## GGPO
+
+[GGPO](https://www.ggpo.net/) GGPO Rollback Networking SDK.
+
+Zero-input latency networking library for peer-to-peer games.
+
+See also LICENSE in the `GGPO` directory itself.
+
 ## Botan
 
 [Botan](https://botan.randombit.net/) Crypto and TLS library.
@@ -127,3 +135,27 @@ See also LICENSE in the `ENet` directory itself.
 
 See also LICENSE in the `botan` directory itself.
 Includes full bindings as well as wrappers to match the `core:crypto` API.
+
+## CommonMark
+
+[CMark](https://github.com/commonmark/cmark) CommonMark parsing library.
+
+See also LICENSE in the `commonmark` directory itself.
+Includes full bindings and Windows `.lib` and `.dll`.
+
+## CommonMark
+
+[zlib](https://github.com/madler/zlib) data compression library
+
+See also LICENSE in the `zlib` directory itself.
+Includes full bindings.
+
+
+## cgltf
+
+
+[cgltf](https://github.com/jkuhlmann/cgltf) is a [glTF2.0](https://registry.khronos.org/glTF/specs/2.0/glTF-2.0.html) loader and writer.
+
+Used in: [bgfx](https://github.com/bkaradzic/bgfx), [Filament](https://github.com/google/filament), [gltfpack](https://github.com/zeux/meshoptimizer/tree/master/gltf), [raylib](https://github.com/raysan5/raylib), [Unigine](https://developer.unigine.com/en/docs/2.14.1/third_party?rlang=cpp#cgltf), and more!
+
+Se also LICENCE in `cgltf` directory itself.

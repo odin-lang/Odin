@@ -102,7 +102,7 @@ E_Deflate :: compress.Deflate_Error
 
 GZIP_MAX_PAYLOAD_SIZE :: i64(max(u32le))
 
-load :: proc{load_from_slice, load_from_file, load_from_context}
+load :: proc{load_from_bytes, load_from_file, load_from_context}
 
 load_from_file :: proc(filename: string, buf: ^bytes.Buffer, expected_output_size := -1, allocator := context.allocator) -> (err: Error) {
 	context.allocator = allocator
@@ -112,16 +112,16 @@ load_from_file :: proc(filename: string, buf: ^bytes.Buffer, expected_output_siz
 
 	err = E_General.File_Not_Found
 	if ok {
-		err = load_from_slice(data, buf, len(data), expected_output_size)
+		err = load_from_bytes(data, buf, len(data), expected_output_size)
 	}
 	return
 }
 
-load_from_slice :: proc(slice: []u8, buf: ^bytes.Buffer, known_gzip_size := -1, expected_output_size := -1, allocator := context.allocator) -> (err: Error) {
+load_from_bytes :: proc(data: []byte, buf: ^bytes.Buffer, known_gzip_size := -1, expected_output_size := -1, allocator := context.allocator) -> (err: Error) {
 	buf := buf
 
 	z := &compress.Context_Memory_Input{
-		input_data = slice,
+		input_data = data,
 		output = buf,
 	}
 	return load_from_context(z, buf, known_gzip_size, expected_output_size, allocator)

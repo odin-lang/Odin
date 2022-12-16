@@ -5,7 +5,7 @@ import stbrp "vendor:stb/rect_pack"
 
 when ODIN_OS == .Windows { foreign import stbtt "../lib/stb_truetype.lib" }
 when ODIN_OS == .Linux   { foreign import stbtt "../lib/stb_truetype.a"   }
-when ODIN_OS == .Darwin  { foreign import stbtt "../lib/stb_truetype.a"   }
+when ODIN_OS == .Darwin  { foreign import stbtt "../lib/darwin/stb_truetype.a"   }
 
 
 ///////////////////////////////////////////////////////////////////////////////
@@ -226,7 +226,7 @@ foreign stbtt {
 	// (.ttf) files only contain one font. The number of fonts can be used for
 	// indexing with the previous function where the index is between zero and one
 	// less than the total fonts. If an error occurs, -1 is returned.
-	GetNumberOfFonts :: proc(data: [^]byte) -> b32 ---
+	GetNumberOfFonts :: proc(data: [^]byte) -> c.int ---
 	
 	// Each .ttf/.ttc file may have more than one font. Each font has a sequential
 	// index number starting from 0. Call this function to get the font offset for

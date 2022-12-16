@@ -1,4 +1,4 @@
-package md5
+package vendor_md5
 
 /*
     Copyright 2021 zhibog

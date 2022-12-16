@@ -3,7 +3,23 @@ package sys_windows
 
 foreign import shell32 "system:Shell32.lib"
 
-@(default_calling_convention = "std")
+@(default_calling_convention="stdcall")
 foreign shell32 {
 	CommandLineToArgvW :: proc(cmd_list: wstring, num_args: ^c_int) -> ^wstring ---
+	ShellExecuteW :: proc(
+		hwnd: HWND,
+		lpOperation: LPCWSTR,
+		lpFile: LPCWSTR,
+		lpParameters: LPCWSTR,
+		lpDirectory: LPCWSTR,
+		nShowCmd: INT,
+	) -> HINSTANCE ---
+	ShellExecuteExW :: proc(pExecInfo: ^SHELLEXECUTEINFOW) -> BOOL ---
+	SHCreateDirectoryExW :: proc(
+		hwnd: HWND,
+		pszPath: LPCWSTR,
+		psa: ^SECURITY_ATTRIBUTES,
+	) -> c_int ---
+	SHFileOperationW :: proc(lpFileOp: LPSHFILEOPSTRUCTW) -> c_int ---
+	SHGetFolderPathW :: proc(hwnd: HWND, csidl: c_int, hToken: HANDLE, dwFlags: DWORD, pszPath: LPWSTR) -> HRESULT ---
 }

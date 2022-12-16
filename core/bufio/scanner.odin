@@ -66,7 +66,7 @@ scanner_destroy :: proc(s: ^Scanner) {
 }
 
 
-// Returns the first non-EOF error that was encounted by the scanner
+// Returns the first non-EOF error that was encountered by the scanner
 scanner_error :: proc(s: ^Scanner) -> Scanner_Error {
 	switch s._err {
 	case .EOF, nil:

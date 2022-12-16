@@ -25,8 +25,8 @@ import "core:strings"
 
 MAX_RUNE_CODEPOINT :: int(unicode.MAX_RUNE)
 
-write_rune   :: strings.write_rune_builder
-write_string :: strings.write_string_builder
+write_rune   :: strings.write_rune
+write_string :: strings.write_string
 
 Error :: enum u8 {
 	None = 0,
@@ -94,8 +94,8 @@ decode_xml :: proc(input: string, options := XML_Decode_Options{}, allocator := 
 	l := len(input)
 	if l == 0 { return "", .None }
 
-	builder := strings.make_builder()
-	defer strings.destroy_builder(&builder)
+	builder := strings.builder_make()
+	defer strings.builder_destroy(&builder)
 
 	t := Tokenizer{src=input}
 	in_data := false
@@ -231,16 +231,16 @@ xml_decode_entity :: proc(entity: string) -> (decoded: rune, ok: bool) {
 		for len(entity) > 0 {
 			r := entity[0]
 			switch r {
-			case '0'..'9':
+			case '0'..='9':
 				val *= base
 				val += int(r - '0')
 
-			case 'a'..'f':
+			case 'a'..='f':
 				if base == 10 { return -1, false }
 				val *= base
 				val += int(r - 'a' + 10)
 
-			case 'A'..'F':
+			case 'A'..='F':
 				if base == 10 { return -1, false }
 				val *= base
 				val += int(r - 'A' + 10)

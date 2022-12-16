@@ -13,6 +13,7 @@ struct StringSet {
 void string_set_init   (StringSet *s, gbAllocator a, isize capacity = 16);
 void string_set_destroy(StringSet *s);
 void string_set_add    (StringSet *s, String const &str);
+bool string_set_update (StringSet *s, String const &str); // returns true if it previously existed
 bool string_set_exists (StringSet *s, String const &str);
 void string_set_remove (StringSet *s, String const &str);
 void string_set_clear  (StringSet *s);
@@ -147,6 +148,34 @@ void string_set_add(StringSet *s, String const &str) {
 	if (string_set__full(s)) {
 		string_set_grow(s);
 	}
+}
+
+bool string_set_update(StringSet *s, String const &str) {
+	bool exists = false;
+	MapIndex index;
+	MapFindResult fr;
+	StringHashKey key = string_hash_string(str);
+	if (s->hashes.count == 0) {
+		string_set_grow(s);
+	}
+	fr = string_set__find(s, key);
+	if (fr.entry_index != MAP_SENTINEL) {
+		index = fr.entry_index;
+		exists = true;
+	} else {
+		index = string_set__add_entry(s, key);
+		if (fr.entry_prev != MAP_SENTINEL) {
+			s->entries[fr.entry_prev].next = index;
+		} else {
+			s->hashes[fr.hash_index] = index;
+		}
+	}
+	s->entries[index].value = str;
+
+	if (string_set__full(s)) {
+		string_set_grow(s);
+	}
+	return exists;
 }
 
 

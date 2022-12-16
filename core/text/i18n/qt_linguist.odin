@@ -27,7 +27,7 @@ TS_XML_Options := xml.Options{
 	expected_doctype = "TS",
 }
 
-parse_qt_linguist_from_slice :: proc(data: []u8, options := DEFAULT_PARSE_OPTIONS, pluralizer: proc(int) -> int = nil, allocator := context.allocator) -> (translation: ^Translation, err: Error) {
+parse_qt_linguist_from_bytes :: proc(data: []byte, options := DEFAULT_PARSE_OPTIONS, pluralizer: proc(int) -> int = nil, allocator := context.allocator) -> (translation: ^Translation, err: Error) {
 	context.allocator = allocator
 
 	ts, xml_err := xml.parse(data, TS_XML_Options)
@@ -59,9 +59,9 @@ parse_qt_linguist_from_slice :: proc(data: []u8, options := DEFAULT_PARSE_OPTION
 			return translation, .TS_File_Expected_Context_Name,
 		}
 
-		section_name := strings.intern_get(&translation.intern, "")
+		section_name, _ := strings.intern_get(&translation.intern, "")
 		if !options.merge_sections {
-			section_name = strings.intern_get(&translation.intern, ts.elements[section_name_id].value)
+			section_name, _ = strings.intern_get(&translation.intern, ts.elements[section_name_id].value)
 		}
 
 		if section_name not_in translation.k_v {
@@ -92,8 +92,8 @@ parse_qt_linguist_from_slice :: proc(data: []u8, options := DEFAULT_PARSE_OPTION
 				return translation, .TS_File_Expected_Translation
 			}
 
-			source := strings.intern_get(&translation.intern, ts.elements[source_id].value)
-			xlat   := strings.intern_get(&translation.intern, ts.elements[translation_id].value)
+			source, _ := strings.intern_get(&translation.intern, ts.elements[source_id].value)
+			xlat,   _ := strings.intern_get(&translation.intern, ts.elements[translation_id].value)
 
 			if source in section {
 				return translation, .Duplicate_Key
@@ -124,7 +124,7 @@ parse_qt_linguist_from_slice :: proc(data: []u8, options := DEFAULT_PARSE_OPTION
 					if !numerus_found {
 						break
 					}
-					numerus := strings.intern_get(&translation.intern, ts.elements[numerus_id].value)
+					numerus, _ := strings.intern_get(&translation.intern, ts.elements[numerus_id].value)
 					section[source][num_plurals] = numerus
 
 					num_plurals += 1
@@ -150,7 +150,7 @@ parse_qt_linguist_file :: proc(filename: string, options := DEFAULT_PARSE_OPTION
 
 	if !data_ok { return {}, .File_Error }
 
-	return parse_qt_linguist_from_slice(data, options, pluralizer, allocator)
+	return parse_qt_linguist_from_bytes(data, options, pluralizer, allocator)
 }
 
-parse_qt :: proc { parse_qt_linguist_file, parse_qt_linguist_from_slice }
+parse_qt :: proc { parse_qt_linguist_file, parse_qt_linguist_from_bytes }

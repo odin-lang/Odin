@@ -1,4 +1,4 @@
-package skein512
+package vendor_skein512
 
 /*
     Copyright 2021 zhibog

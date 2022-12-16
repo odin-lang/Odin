@@ -2,7 +2,6 @@ package os
 
 import win32 "core:sys/windows"
 import "core:strings"
-import "core:time"
 
 read_dir :: proc(fd: Handle, n: int, allocator := context.allocator) -> (fi: []File_Info, err: Errno) {
 	find_data_to_file_info :: proc(base_path: string, d: ^win32.WIN32_FIND_DATAW) -> (fi: File_Info) {
@@ -13,7 +12,7 @@ read_dir :: proc(fd: Handle, n: int, allocator := context.allocator) -> (fi: []F
 		if d.cFileName[0] == '.' && d.cFileName[1] == '.' && d.cFileName[2] == 0 {
 			return
 		}
-		path := strings.concatenate({base_path, `\`, win32.utf16_to_utf8(d.cFileName[:])})
+		path := strings.concatenate({base_path, `\`, win32.utf16_to_utf8(d.cFileName[:]) or_else ""})
 		fi.fullpath = path
 		fi.name = basename(path)
 		fi.size = i64(d.nFileSizeHigh)<<32 + i64(d.nFileSizeLow)
@@ -41,9 +40,7 @@ read_dir :: proc(fd: Handle, n: int, allocator := context.allocator) -> (fi: []F
 			// fi.mode |= file_type_mode(h);
 		}
 
-		fi.creation_time     = time.unix(0, win32.FILETIME_as_unix_nanoseconds(d.ftCreationTime))
-		fi.modification_time = time.unix(0, win32.FILETIME_as_unix_nanoseconds(d.ftLastWriteTime))
-		fi.access_time       = time.unix(0, win32.FILETIME_as_unix_nanoseconds(d.ftLastAccessTime))
+		windows_set_file_info_times(&fi, d)
 
 		fi.is_dir = fi.mode & File_Mode_Dir != 0
 		return

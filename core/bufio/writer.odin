@@ -223,14 +223,14 @@ writer_read_from :: proc(b: ^Writer, r: io.Reader) -> (n: i64, err: io.Error) {
 // writer_to_stream converts a Writer into an io.Stream
 writer_to_stream :: proc(b: ^Writer) -> (s: io.Stream) {
 	s.stream_data = b
-	s.stream_vtable = _writer_vtable
+	s.stream_vtable = &_writer_vtable
 	return
 }
 
 
 
 @(private)
-_writer_vtable := &io.Stream_VTable{
+_writer_vtable := io.Stream_VTable{
 	impl_destroy = proc(s: io.Stream) -> io.Error {
 		b := (^Writer)(s.stream_data)
 		writer_destroy(b)

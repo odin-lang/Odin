@@ -3,11 +3,10 @@ package sys_windows
 
 foreign import kernel32 "system:Kernel32.lib"
 
-
-
 @(default_calling_convention="stdcall")
 foreign kernel32 {
-	OutputDebugStringA :: proc(lpOutputString: LPCSTR) ---
+	OutputDebugStringA :: proc(lpOutputString: LPCSTR) --- // The only A thing that is allowed
+	OutputDebugStringW :: proc(lpOutputString: LPCWSTR) ---
 
 	ReadConsoleW :: proc(hConsoleInput: HANDLE,
 	                     lpBuffer: LPVOID,
@@ -23,12 +22,20 @@ foreign kernel32 {
 
 	GetConsoleMode :: proc(hConsoleHandle: HANDLE,
 	                       lpMode: LPDWORD) -> BOOL ---
-
+	SetConsoleMode :: proc(hConsoleHandle: HANDLE,
+	                       dwMode: DWORD) -> BOOL ---
+	SetConsoleCursorPosition :: proc(hConsoleHandle: HANDLE,
+						   dwCursorPosition: COORD) -> BOOL ---
 
 	GetFileInformationByHandle :: proc(hFile: HANDLE, lpFileInformation: LPBY_HANDLE_FILE_INFORMATION) -> BOOL ---
 	SetHandleInformation :: proc(hObject: HANDLE,
 	                             dwMask: DWORD,
 	                             dwFlags: DWORD) -> BOOL ---
+	SetFileInformationByHandle :: proc(hFile:                HANDLE,
+	                                   FileInformationClass: FILE_INFO_BY_HANDLE_CLASS,
+	                                   lpFileInformation:    LPVOID,
+	                                   dwBufferSize:         DWORD) -> BOOL ---
+
 
 	AddVectoredExceptionHandler :: proc(FirstHandler: ULONG, VectoredHandler: PVECTORED_EXCEPTION_HANDLER) -> LPVOID ---
 	AddVectoredContinueHandler  :: proc(FirstHandler: ULONG, VectoredHandler: PVECTORED_EXCEPTION_HANDLER) -> LPVOID ---
@@ -89,6 +96,15 @@ foreign kernel32 {
 		dwCreationFlags: DWORD,
 		lpThreadId: LPDWORD,
 	) -> HANDLE ---
+	CreateRemoteThread :: proc(
+		hProcess: HANDLE,
+		lpThreadAttributes: LPSECURITY_ATTRIBUTES,
+		dwStackSize: SIZE_T,
+		lpStartAddress: proc "stdcall" (rawptr) -> DWORD,
+		lpParameter: LPVOID,
+		dwCreationFlags: DWORD,
+		lpThreadId: LPDWORD,
+	) -> HANDLE ---
 	SwitchToThread :: proc() -> BOOL ---
 	ResumeThread :: proc(thread: HANDLE) -> DWORD ---
 	GetThreadPriority :: proc(thread: HANDLE) -> c_int ---
@@ -96,13 +112,19 @@ foreign kernel32 {
 	GetExitCodeThread :: proc(thread: HANDLE, exit_code: ^DWORD) -> BOOL ---
 	TerminateThread :: proc(thread: HANDLE, exit_code: DWORD) -> BOOL ---
 
-	CreateSemaphoreW :: proc(attributes: LPSECURITY_ATTRIBUTES, initial_count, maximum_count: LONG, name: LPCSTR) -> HANDLE ---
+	CreateSemaphoreW :: proc(attributes: LPSECURITY_ATTRIBUTES, initial_count, maximum_count: LONG, name: LPCWSTR) -> HANDLE ---
 	ReleaseSemaphore :: proc(semaphore: HANDLE, release_count: LONG, previous_count: ^LONG) -> BOOL ---
 
 	CreateWaitableTimerW :: proc(
 		lpTimerAttributes: LPSECURITY_ATTRIBUTES,
 		bManualReset: BOOL,
 		lpTimerName: LPCWSTR,
+	) -> HANDLE ---
+	CreateWaitableTimerExW :: proc(
+		lpTimerAttributes: LPSECURITY_ATTRIBUTES,
+		lpTimerName: LPCWSTR,
+		dwFlags: DWORD,
+		dwDesiredAccess: DWORD,
 	) -> HANDLE ---
 	SetWaitableTimerEx :: proc(
 		hTimer: HANDLE,
@@ -232,12 +254,24 @@ foreign kernel32 {
 	GetModuleHandleW :: proc(lpModuleName: LPCWSTR) -> HMODULE ---
 	GetModuleHandleA :: proc(lpModuleName: LPCSTR) -> HMODULE ---
 	GetSystemTimeAsFileTime :: proc(lpSystemTimeAsFileTime: LPFILETIME) ---
+	GetSystemTimePreciseAsFileTime :: proc(lpSystemTimeAsFileTime: LPFILETIME) ---
+	FileTimeToSystemTime :: proc(lpFileTime: ^FILETIME, lpSystemTime: ^SYSTEMTIME) -> BOOL ---
+	SystemTimeToTzSpecificLocalTime :: proc(
+		lpTimeZoneInformation: ^TIME_ZONE_INFORMATION,
+		lpUniversalTime: ^SYSTEMTIME,
+		lpLocalTime: ^SYSTEMTIME,
+	) -> BOOL ---
+	SystemTimeToFileTime :: proc(
+		lpSystemTime: ^SYSTEMTIME,
+		lpFileTime: LPFILETIME,
+	) -> BOOL ---
 	CreateEventW :: proc(
 		lpEventAttributes: LPSECURITY_ATTRIBUTES,
 		bManualReset: BOOL,
 		bInitialState: BOOL,
 		lpName: LPCWSTR,
 	) -> HANDLE ---
+	ResetEvent :: proc(hEvent: HANDLE) -> BOOL ---
 	WaitForMultipleObjects :: proc(
 		nCount: DWORD,
 		lpHandles: ^HANDLE,
@@ -266,12 +300,28 @@ foreign kernel32 {
 	HeapReAlloc :: proc(hHeap: HANDLE, dwFlags: DWORD, lpMem: LPVOID, dwBytes: SIZE_T) -> LPVOID ---
 	HeapFree :: proc(hHeap: HANDLE, dwFlags: DWORD, lpMem: LPVOID) -> BOOL ---
 
+	LocalAlloc :: proc(flags: UINT, bytes: SIZE_T) -> LPVOID ---
+	LocalReAlloc :: proc(mem: LPVOID, bytes: SIZE_T, flags: UINT) -> LPVOID ---
+	LocalFree :: proc(mem: LPVOID) -> LPVOID ---
+
+
+	ReadDirectoryChangesW :: proc(
+		hDirectory: HANDLE,
+		lpBuffer: LPVOID,
+		nBufferLength: DWORD,
+		bWatchSubtree: BOOL,
+		dwNotifyFilter: DWORD,
+		lpBytesReturned: LPDWORD,
+		lpOverlapped: LPOVERLAPPED,
+		lpCompletionRoutine: LPOVERLAPPED_COMPLETION_ROUTINE,
+	) -> BOOL ---
+
 	InitializeSRWLock          :: proc(SRWLock: ^SRWLOCK) ---
 	AcquireSRWLockExclusive    :: proc(SRWLock: ^SRWLOCK) ---
-	TryAcquireSRWLockExclusive :: proc(SRWLock: ^SRWLOCK) -> BOOL ---
+	TryAcquireSRWLockExclusive :: proc(SRWLock: ^SRWLOCK) -> BOOLEAN ---
 	ReleaseSRWLockExclusive    :: proc(SRWLock: ^SRWLOCK) ---
 	AcquireSRWLockShared    :: proc(SRWLock: ^SRWLOCK) ---
-	TryAcquireSRWLockShared :: proc(SRWLock: ^SRWLOCK) -> BOOL ---
+	TryAcquireSRWLockShared :: proc(SRWLock: ^SRWLOCK) -> BOOLEAN ---
 	ReleaseSRWLockShared    :: proc(SRWLock: ^SRWLOCK) ---
 
 	InitializeConditionVariable :: proc(ConditionVariable: ^CONDITION_VARIABLE) ---
@@ -304,10 +354,25 @@ foreign kernel32 {
 	SetEndOfFile :: proc(hFile: HANDLE) -> BOOL ---
 
 	CreatePipe :: proc(hReadPipe, hWritePipe: ^HANDLE, lpPipeAttributes: LPSECURITY_ATTRIBUTES, nSize: DWORD) -> BOOL ---
+
+	ConnectNamedPipe :: proc(hNamedPipe: HANDLE, lpOverlapped: LPOVERLAPPED,) -> BOOL ---
+	DisconnectNamedPipe :: proc(hNamedPipe: HANDLE,) -> BOOL ---
+	WaitNamedPipeW :: proc(lpNamedPipeName: LPCWSTR, nTimeOut: DWORD,) -> BOOL ---
+
+	SetConsoleCtrlHandler :: proc(HandlerRoutine: PHANDLER_ROUTINE, Add: BOOL) -> BOOL ---
+	GenerateConsoleCtrlEvent :: proc(dwCtrlEvent: DWORD, dwProcessGroupId: DWORD) -> BOOL ---
+	FreeConsole :: proc() -> BOOL ---
+	GetConsoleWindow :: proc() -> HWND ---
+
+	GetDiskFreeSpaceExW :: proc(
+		lpDirectoryName: LPCWSTR,
+		lpFreeBytesAvailableToCaller: PULARGE_INTEGER,
+		lpTotalNumberOfBytes: PULARGE_INTEGER,
+		lpTotalNumberOfFreeBytes: PULARGE_INTEGER,
+	) -> BOOL ---
 }
 
 
-STANDARD_RIGHTS_REQUIRED     :: DWORD(0x000F0000)
 SECTION_QUERY                :: DWORD(0x0001)
 SECTION_MAP_WRITE            :: DWORD(0x0002)
 SECTION_MAP_READ             :: DWORD(0x0004)
@@ -616,6 +681,13 @@ foreign kernel32 {
 	) -> BOOL ---
 }
 
+@(default_calling_convention="stdcall")
+foreign kernel32 {
+	GlobalMemoryStatusEx :: proc(
+		lpBuffer: ^MEMORYSTATUSEX,
+	) -> BOOL ---
+}
+
 PBAD_MEMORY_CALLBACK_ROUTINE :: #type proc "stdcall" ()
 
 @(default_calling_convention="stdcall")
@@ -757,4 +829,173 @@ foreign kernel32 {
 		BaseAddress: PVOID,
 		UnmapFlags: ULONG,
 	) -> BOOL ---
+}
+
+@(default_calling_convention="stdcall")
+foreign kernel32 {
+	GetProductInfo :: proc(
+		OSMajorVersion: DWORD,
+		OSMinorVersion: DWORD,
+		SpMajorVersion: DWORD,
+		SpMinorVersion: DWORD,
+		product_type: ^Windows_Product_Type,
+	) -> BOOL ---
+}
+
+HandlerRoutine :: proc "stdcall" (dwCtrlType: DWORD) -> BOOL
+PHANDLER_ROUTINE :: HandlerRoutine
+
+
+
+
+DCB_Config :: struct {
+	fParity: bool,
+	fOutxCtsFlow: bool,
+	fOutxDsrFlow: bool,
+	fDtrControl: DTR_Control,
+	fDsrSensitivity: bool,
+	fTXContinueOnXoff: bool,
+	fOutX: bool,
+	fInX: bool,
+	fErrorChar: bool,
+	fNull: bool,
+	fRtsControl: RTS_Control,
+	fAbortOnError: bool,
+	BaudRate: DWORD,
+	ByteSize: BYTE,
+	Parity: Parity,
+	StopBits: Stop_Bits,
+	XonChar: byte,
+	XoffChar: byte,
+	ErrorChar: byte,
+	EvtChar: byte,
+}
+DTR_Control :: enum byte {
+	Disable = 0,
+	Enable = 1,
+	Handshake = 2,
+}
+RTS_Control :: enum byte {
+	Disable   = 0,
+	Enable    = 1,
+	Handshake = 2,
+	Toggle    = 3,
+}
+Parity :: enum byte {
+	None  = 0,
+	Odd   = 1,
+	Even  = 2,
+	Mark  = 3,
+	Space = 4,
+}
+Stop_Bits :: enum byte {
+	One = 0,
+	One_And_A_Half = 1,
+	Two = 2,
+}
+
+// A helper procedure to set the values of a DCB structure.
+init_dcb_with_config :: proc "contextless" (dcb: ^DCB, config: DCB_Config) {
+	out: u32
+
+	// NOTE(tetra, 2022-09-21): On both Clang 14 on Windows, and MSVC, the bits in the bitfield
+	// appear to be defined from LSB to MSB order.
+	// i.e: `fBinary` (the first bitfield in the C source) is the LSB in the `settings` u32.
+
+	out |= u32(1) << 0 // fBinary must always be true on Windows.
+
+	out |= u32(config.fParity) << 1
+	out |= u32(config.fOutxCtsFlow) << 2
+	out |= u32(config.fOutxDsrFlow) << 3
+
+	out |= u32(config.fDtrControl) << 4
+
+	out |= u32(config.fDsrSensitivity) << 6
+	out |= u32(config.fTXContinueOnXoff) << 7
+	out |= u32(config.fOutX) << 8
+	out |= u32(config.fInX) << 9
+	out |= u32(config.fErrorChar) << 10
+	out |= u32(config.fNull) << 11
+
+	out |= u32(config.fRtsControl) << 12
+
+	out |= u32(config.fAbortOnError) << 14
+
+	dcb.settings = out
+
+	dcb.BaudRate = config.BaudRate
+	dcb.ByteSize = config.ByteSize
+	dcb.Parity = config.Parity
+	dcb.StopBits = config.StopBits
+	dcb.XonChar = config.XonChar
+	dcb.XoffChar = config.XoffChar
+	dcb.ErrorChar = config.ErrorChar
+	dcb.EvtChar = config.EvtChar
+
+	dcb.DCBlength = size_of(DCB)
+}
+get_dcb_config :: proc "contextless" (dcb: DCB) -> (config: DCB_Config) {
+	config.fParity = bool((dcb.settings >> 1) & 0x01)
+	config.fOutxCtsFlow = bool((dcb.settings >> 2) & 0x01)
+	config.fOutxDsrFlow = bool((dcb.settings >> 3) & 0x01)
+
+	config.fDtrControl = DTR_Control((dcb.settings >> 4) & 0x02)
+
+	config.fDsrSensitivity = bool((dcb.settings >> 6) & 0x01)
+	config.fTXContinueOnXoff = bool((dcb.settings >> 7) & 0x01)
+	config.fOutX = bool((dcb.settings >> 8) & 0x01)
+	config.fInX = bool((dcb.settings >> 9) & 0x01)
+	config.fErrorChar = bool((dcb.settings >> 10) & 0x01)
+	config.fNull = bool((dcb.settings >> 11) & 0x01)
+
+	config.fRtsControl = RTS_Control((dcb.settings >> 12) & 0x02)
+
+	config.fAbortOnError = bool((dcb.settings >> 14) & 0x01)
+
+	config.BaudRate = dcb.BaudRate
+	config.ByteSize = dcb.ByteSize
+	config.Parity = dcb.Parity
+	config.StopBits = dcb.StopBits
+	config.XonChar = dcb.XonChar
+	config.XoffChar = dcb.XoffChar
+	config.ErrorChar = dcb.ErrorChar
+	config.EvtChar = dcb.EvtChar
+
+	return
+}
+
+// NOTE(tetra): See get_dcb_config() and init_dcb_with_config() for help with initializing this.
+DCB :: struct {
+	DCBlength: DWORD, // NOTE(tetra): Must be set to size_of(DCB).
+	BaudRate: DWORD,
+	settings: u32, // NOTE(tetra): These are bitfields in the C struct.
+	wReserved: WORD,
+	XOnLim: WORD,
+	XOffLim: WORD,
+	ByteSize: BYTE,
+	Parity: Parity,
+	StopBits: Stop_Bits,
+	XonChar: byte,
+	XoffChar: byte,
+	ErrorChar: byte,
+	EofChar: byte,
+	EvtChar: byte,
+	wReserved1: WORD,
+}
+
+@(default_calling_convention="stdcall")
+foreign kernel32 {
+	GetCommState :: proc(handle: HANDLE, dcb: ^DCB) -> BOOL ---
+	SetCommState :: proc(handle: HANDLE, dcb: ^DCB) -> BOOL ---
+}
+
+
+LPFIBER_START_ROUTINE :: #type proc "stdcall" (lpFiberParameter: LPVOID)
+
+@(default_calling_convention = "stdcall")
+foreign kernel32 {
+	CreateFiber :: proc(dwStackSize: SIZE_T, lpStartAddress: LPFIBER_START_ROUTINE, lpParameter: LPVOID) -> LPVOID ---
+	DeleteFiber :: proc(lpFiber: LPVOID) ---
+	ConvertThreadToFiber :: proc(lpParameter: LPVOID) -> LPVOID ---
+	SwitchToFiber :: proc(lpFiber: LPVOID) ---
 }

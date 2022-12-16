@@ -36,6 +36,11 @@ NotFound :: IntegerMax
 
 Float :: distinct (f32 when size_of(uint) == 4 else f64)
 
+Point :: struct {
+	x: Float,
+	y: Float,
+}
+
 Size :: struct {
 	width:  Float,
 	height: Float,

@@ -4,7 +4,6 @@ package unix
 foreign import "system:pthread"
 
 import "core:c"
-import "core:time"
 
 PTHREAD_CANCEL_STATE :: enum c.int {
 	Enable       = 0,
@@ -25,10 +24,6 @@ foreign pthread {
 
 	// retval is a pointer to a location to put the return value of the thread proc.
 	pthread_join :: proc(t: pthread_t, retval: ^rawptr) -> c.int ---
-
-	pthread_setcancelstate :: proc(state: PTHREAD_CANCEL_STATE, old_state: ^PTHREAD_CANCEL_STATE) -> c.int ---
-	pthread_setcanceltype  :: proc(state: PTHREAD_CANCEL_TYPE,  old_state: ^PTHREAD_CANCEL_TYPE) -> c.int ---
-	pthread_cancel :: proc(t: pthread_t) -> c.int ---
 
 	pthread_self :: proc() -> pthread_t ---
 
@@ -85,7 +80,7 @@ foreign pthread {
 
 	// assumes the mutex is pre-locked
 	pthread_cond_wait :: proc(cond: ^pthread_cond_t, mutex: ^pthread_mutex_t) -> c.int ---
-	pthread_cond_timedwait :: proc(cond: ^pthread_cond_t, mutex: ^pthread_mutex_t, timeout: ^time.TimeSpec) -> c.int ---
+	pthread_cond_timedwait :: proc(cond: ^pthread_cond_t, mutex: ^pthread_mutex_t, timeout: ^timespec) -> c.int ---
 
 	pthread_condattr_init :: proc(attrs: ^pthread_condattr_t) -> c.int ---
 	pthread_condattr_destroy :: proc(attrs: ^pthread_condattr_t) -> c.int ---
@@ -108,7 +103,7 @@ foreign pthread {
 
 	pthread_mutex_lock :: proc(mutex: ^pthread_mutex_t) -> c.int ---
 
-	pthread_mutex_timedlock :: proc(mutex: ^pthread_mutex_t, timeout: ^time.TimeSpec) -> c.int ---
+	pthread_mutex_timedlock :: proc(mutex: ^pthread_mutex_t, timeout: ^timespec) -> c.int ---
 
 	pthread_mutex_unlock :: proc(mutex: ^pthread_mutex_t) -> c.int ---
 

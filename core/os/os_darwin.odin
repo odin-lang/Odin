@@ -164,9 +164,6 @@ O_SYNC     :: 0x0080
 O_ASYNC    :: 0x0040
 O_CLOEXEC  :: 0x1000000
 
-SEEK_SET   :: 0
-SEEK_CUR   :: 1
-SEEK_END   :: 2
 SEEK_DATA  :: 3
 SEEK_HOLE  :: 4
 SEEK_MAX   :: SEEK_HOLE
@@ -280,7 +277,7 @@ foreign libc {
 	@(link_name="__error") __error :: proc() -> ^int ---
 
 	@(link_name="open")             _unix_open          :: proc(path: cstring, flags: i32, mode: u16) -> Handle ---
-	@(link_name="close")            _unix_close         :: proc(handle: Handle) ---
+	@(link_name="close")            _unix_close         :: proc(handle: Handle) -> c.int ---
 	@(link_name="read")             _unix_read          :: proc(handle: Handle, buffer: rawptr, count: int) -> int ---
 	@(link_name="write")            _unix_write         :: proc(handle: Handle, buffer: rawptr, count: int) -> int ---
 	@(link_name="lseek")            _unix_lseek         :: proc(fs: Handle, offset: int, whence: int) -> int ---
@@ -299,13 +296,13 @@ foreign libc {
 
 	@(link_name="closedir")         _unix_closedir      :: proc(dirp: Dir) -> c.int ---
 	@(link_name="rewinddir")        _unix_rewinddir     :: proc(dirp: Dir) ---
-	
-	@(link_name="fcntl")            _unix_fcntl         :: proc(fd: Handle, cmd: c.int, buf: ^byte) -> c.int ---
+
+	@(link_name="__fcntl")          _unix__fcntl        :: proc(fd: Handle, cmd: c.int, buf: ^byte) -> c.int ---
 
 	@(link_name="rename") _unix_rename :: proc(old: cstring, new: cstring) -> c.int ---
 	@(link_name="remove") _unix_remove :: proc(path: cstring) -> c.int ---
 
-	@(link_name="fchmod") _unix_fchmod :: proc(fildes: Handle, mode: u16) -> c.int ---
+	@(link_name="fchmod") _unix_fchmod :: proc(fd: Handle, mode: u16) -> c.int ---
 
 	@(link_name="malloc")   _unix_malloc   :: proc(size: int) -> rawptr ---
 	@(link_name="calloc")   _unix_calloc   :: proc(num, size: int) -> rawptr ---
@@ -337,7 +334,7 @@ foreign dl {
 	@(link_name="dlerror") _unix_dlerror :: proc() -> cstring ---
 }
 
-get_last_error :: proc() -> int {
+get_last_error :: proc "contextless" () -> int {
 	return __error()^
 }
 
@@ -365,35 +362,56 @@ when  ODIN_OS == .Darwin && ODIN_ARCH == .arm64 {
 	return handle, 0
 }
 
-fchmod :: proc(fildes: Handle, mode: u16) -> Errno {
-	return cast(Errno)_unix_fchmod(fildes, mode)
+fchmod :: proc(fd: Handle, mode: u16) -> Errno {
+	return cast(Errno)_unix_fchmod(fd, mode)
 }
 
-close :: proc(fd: Handle) {
-	_unix_close(fd)
+close :: proc(fd: Handle) -> bool {
+	return _unix_close(fd) == 0
 }
+
+@(private)
+MAX_RW :: 0x7fffffff // The limit on Darwin is max(i32), trying to read/write more than that fails.
 
 write :: proc(fd: Handle, data: []u8) -> (int, Errno) {
 	assert(fd != -1)
 
-	if len(data) == 0 {
-		return 0, 0
+	bytes_total := len(data)
+	bytes_written_total := 0
+
+	for bytes_written_total < bytes_total {
+		bytes_to_write := min(bytes_total - bytes_written_total, MAX_RW)
+		slice := data[bytes_written_total:bytes_written_total + bytes_to_write]
+		bytes_written := _unix_write(fd, raw_data(slice), bytes_to_write)
+		if bytes_written == -1 {
+			return bytes_written_total, 1
+		}
+		bytes_written_total += bytes_written
 	}
-	bytes_written := _unix_write(fd, raw_data(data), len(data))
-	if bytes_written == -1 {
-		return 0, 1
-	}
-	return bytes_written, 0
+
+	return bytes_written_total, 0
 }
 
 read :: proc(fd: Handle, data: []u8) -> (int, Errno) {
 	assert(fd != -1)
 
-	bytes_read := _unix_read(fd, raw_data(data), len(data))
-	if bytes_read == -1 {
-		return 0, 1
+	bytes_total := len(data)
+	bytes_read_total := 0
+
+	for bytes_read_total < bytes_total {
+		bytes_to_read := min(bytes_total - bytes_read_total, MAX_RW)
+		slice := data[bytes_read_total:bytes_read_total + bytes_to_read]
+		bytes_read := _unix_read(fd, raw_data(slice), bytes_to_read)
+		if bytes_read == -1 {
+			return bytes_read_total, 1
+		}
+		if bytes_read == 0 {
+			break
+		}
+		bytes_read_total += bytes_read
 	}
-	return bytes_read, 0
+
+	return bytes_read_total, 0
 }
 
 seek :: proc(fd: Handle, offset: i64, whence: int) -> (i64, Errno) {
@@ -477,16 +495,21 @@ is_dir_path :: proc(path: string, follow_links: bool = true) -> bool {
 is_file :: proc {is_file_path, is_file_handle}
 is_dir :: proc {is_dir_path, is_dir_handle}
 
+exists :: proc(path: string) -> bool {
+	cpath := strings.clone_to_cstring(path, context.temp_allocator)
+	res := _unix_access(cpath, O_RDONLY)
+	return res == 0
+}
 
 rename :: proc(old: string, new: string) -> bool {
 	old_cstr := strings.clone_to_cstring(old, context.temp_allocator)
 	new_cstr := strings.clone_to_cstring(new, context.temp_allocator)
-	return _unix_rename(old_cstr, new_cstr) != -1 
+	return _unix_rename(old_cstr, new_cstr) != -1
 }
 
 remove :: proc(path: string) -> bool {
 	path_cstr := strings.clone_to_cstring(path, context.temp_allocator)
-	return _unix_remove(path_cstr) != -1 
+	return _unix_remove(path_cstr) != -1
 }
 
 @private
@@ -550,7 +573,7 @@ _rewinddir :: proc(dirp: Dir) {
 _readdir :: proc(dirp: Dir) -> (entry: Dirent, err: Errno, end_of_stream: bool) {
 	result: ^Dirent
 	rc := _unix_readdir_r(dirp, &entry, &result)
-	
+
 	if rc != 0 {
 		err = Errno(get_last_error())
 		return
@@ -590,12 +613,12 @@ _readlink :: proc(path: string) -> (string, Errno) {
 
 absolute_path_from_handle :: proc(fd: Handle) -> (string, Errno) {
 	buf : [256]byte
-	res  := _unix_fcntl(fd, F_GETPATH, &buf[0])
+	res  := _unix__fcntl(fd, F_GETPATH, &buf[0])
 	if	res != 0 {
 		return "", Errno(get_last_error())
 	}
 
-	path := strings.clone_from_cstring(cstring(&buf[0]), context.temp_allocator)
+	path := strings.clone_from_cstring(cstring(&buf[0]))
 	return path, ERROR_NONE
 }
 
@@ -624,9 +647,15 @@ access :: proc(path: string, mask: int) -> bool {
 	return _unix_access(cstr, mask) == 0
 }
 
-heap_alloc :: proc(size: int) -> rawptr {
-	assert(size > 0)
-	return _unix_calloc(1, size)
+heap_alloc :: proc(size: int, zero_memory := true) -> rawptr {
+	if size <= 0 {
+		return nil
+	}
+	if zero_memory {
+		return _unix_calloc(1, size)
+	} else {
+		return _unix_malloc(size)
+	}
 }
 heap_resize :: proc(ptr: rawptr, new_size: int) -> rawptr {
 	// NOTE: _unix_realloc doesn't guarantee new memory will be zeroed on
@@ -637,13 +666,18 @@ heap_free :: proc(ptr: rawptr) {
 	_unix_free(ptr)
 }
 
-getenv :: proc(name: string) -> (string, bool) {
-	path_str := strings.clone_to_cstring(name, context.temp_allocator)
+lookup_env :: proc(key: string, allocator := context.allocator) -> (value: string, found: bool) {
+	path_str := strings.clone_to_cstring(key, context.temp_allocator)
 	cstr := _unix_getenv(path_str)
 	if cstr == nil {
 		return "", false
 	}
-	return string(cstr), true
+	return strings.clone(string(cstr), allocator), true
+}
+
+get_env :: proc(key: string, allocator := context.allocator) -> (value: string) {
+	value, _ = lookup_env(key, allocator)
+	return
 }
 
 get_current_directory :: proc() -> string {

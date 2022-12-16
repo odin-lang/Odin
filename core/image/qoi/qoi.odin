@@ -180,9 +180,9 @@ save_to_file :: proc(output: string, img: ^Image, options := Options{}, allocato
 
 save :: proc{save_to_memory, save_to_file}
 
-load_from_slice :: proc(slice: []u8, options := Options{}, allocator := context.allocator) -> (img: ^Image, err: Error) {
+load_from_bytes :: proc(data: []byte, options := Options{}, allocator := context.allocator) -> (img: ^Image, err: Error) {
 	ctx := &compress.Context_Memory_Input{
-		input_data = slice,
+		input_data = data,
 	}
 
 	img, err = load_from_context(ctx, options, allocator)
@@ -196,10 +196,9 @@ load_from_file :: proc(filename: string, options := Options{}, allocator := cont
 	defer delete(data)
 
 	if ok {
-		return load_from_slice(data, options)
+		return load_from_bytes(data, options)
 	} else {
-		img = new(Image)
-		return img, .Unable_To_Read_File
+		return nil, .Unable_To_Read_File
 	}
 }
 
@@ -225,6 +224,7 @@ load_from_context :: proc(ctx: ^$C, options := Options{}, allocator := context.a
 	if img == nil {
 		img = new(Image)
 	}
+	img.which = .QOI
 
 	if .return_metadata in options {
 		info := new(image.QOI_Info)
@@ -359,7 +359,7 @@ load_from_context :: proc(ctx: ^$C, options := Options{}, allocator := context.a
 	return
 }
 
-load :: proc{load_from_file, load_from_slice, load_from_context}
+load :: proc{load_from_file, load_from_bytes, load_from_context}
 
 /*
 	Cleanup of image-specific data.
@@ -403,4 +403,9 @@ qoi_hash :: #force_inline proc(pixel: RGBA_Pixel) -> (index: u8) {
 	i4 := u16(pixel.a) * 11
 
 	return u8((i1 + i2 + i3 + i4) & 63)
+}
+
+@(init, private)
+_register :: proc() {
+	image.register(.QOI, load_from_bytes, destroy)
 }

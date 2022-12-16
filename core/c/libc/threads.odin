@@ -8,7 +8,7 @@ tss_dtor_t   :: proc "c" (rawptr)
 when ODIN_OS == .Windows {
 	foreign import libc {
 		"system:libucrt.lib", 
-		"system:msvcprt.lib"
+		"system:msvcprt.lib",
 	}
 
 	thrd_success        :: 0                             // _Thrd_success
@@ -77,7 +77,7 @@ when ODIN_OS == .Windows {
 when ODIN_OS == .Linux {
 	foreign import libc {
 		"system:c",
-		"system:pthread"
+		"system:pthread",
 	}
 
 	thrd_success        :: 0
