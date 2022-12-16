@@ -20,7 +20,7 @@ full_path_from_name :: proc(name: string, allocator := context.allocator) -> (pa
 			return "", Errno(win32.GetLastError())
 		}
 		if n <= u32(len(buf)) {
-			return win32.utf16_to_utf8(buf[:n], allocator), ERROR_NONE
+			return win32.utf16_to_utf8(buf[:n], allocator) or_else "", ERROR_NONE
 		}
 		resize(&buf, len(buf)*2)
 	}
@@ -136,7 +136,7 @@ cleanpath_from_handle :: proc(fd: Handle) -> (string, Errno) {
 	if err != 0 {
 		return "", err
 	}
-	return win32.utf16_to_utf8(buf, context.allocator), err
+	return win32.utf16_to_utf8(buf, context.allocator) or_else "", err
 }
 @(private)
 cleanpath_from_handle_u16 :: proc(fd: Handle) -> ([]u16, Errno) {
@@ -157,7 +157,7 @@ cleanpath_from_handle_u16 :: proc(fd: Handle) -> ([]u16, Errno) {
 cleanpath_from_buf :: proc(buf: []u16) -> string {
 	buf := buf
 	buf = cleanpath_strip_prefix(buf)
-	return win32.utf16_to_utf8(buf, context.allocator)
+	return win32.utf16_to_utf8(buf, context.allocator) or_else ""
 }
 
 @(private)
@@ -229,15 +229,20 @@ file_mode_from_file_attributes :: proc(FileAttributes: win32.DWORD, h: win32.HAN
 }
 
 @(private)
+windows_set_file_info_times :: proc(fi: ^File_Info, d: ^$T) {
+	fi.creation_time     = time.unix(0, win32.FILETIME_as_unix_nanoseconds(d.ftCreationTime))
+	fi.modification_time = time.unix(0, win32.FILETIME_as_unix_nanoseconds(d.ftLastWriteTime))
+	fi.access_time       = time.unix(0, win32.FILETIME_as_unix_nanoseconds(d.ftLastAccessTime))
+}
+
+@(private)
 file_info_from_win32_file_attribute_data :: proc(d: ^win32.WIN32_FILE_ATTRIBUTE_DATA, name: string) -> (fi: File_Info, e: Errno) {
 	fi.size = i64(d.nFileSizeHigh)<<32 + i64(d.nFileSizeLow)
 
 	fi.mode |= file_mode_from_file_attributes(d.dwFileAttributes, nil, 0)
 	fi.is_dir = fi.mode & File_Mode_Dir != 0
 
-	fi.creation_time     = time.unix(0, win32.FILETIME_as_unix_nanoseconds(d.ftCreationTime))
-	fi.modification_time = time.unix(0, win32.FILETIME_as_unix_nanoseconds(d.ftLastWriteTime))
-	fi.access_time       = time.unix(0, win32.FILETIME_as_unix_nanoseconds(d.ftLastAccessTime))
+	windows_set_file_info_times(&fi, d)
 
 	fi.fullpath, e = full_path_from_name(name)
 	fi.name = basename(fi.fullpath)
@@ -252,9 +257,7 @@ file_info_from_win32_find_data :: proc(d: ^win32.WIN32_FIND_DATAW, name: string)
 	fi.mode |= file_mode_from_file_attributes(d.dwFileAttributes, nil, 0)
 	fi.is_dir = fi.mode & File_Mode_Dir != 0
 
-	fi.creation_time     = time.unix(0, win32.FILETIME_as_unix_nanoseconds(d.ftCreationTime))
-	fi.modification_time = time.unix(0, win32.FILETIME_as_unix_nanoseconds(d.ftLastWriteTime))
-	fi.access_time       = time.unix(0, win32.FILETIME_as_unix_nanoseconds(d.ftLastAccessTime))
+	windows_set_file_info_times(&fi, d)
 
 	fi.fullpath, e = full_path_from_name(name)
 	fi.name = basename(fi.fullpath)
@@ -290,10 +293,7 @@ file_info_from_get_file_information_by_handle :: proc(path: string, h: win32.HAN
 	fi.mode |= file_mode_from_file_attributes(ti.FileAttributes, h, ti.ReparseTag)
 	fi.is_dir = fi.mode & File_Mode_Dir != 0
 
-	fi.creation_time     = time.unix(0, win32.FILETIME_as_unix_nanoseconds(d.ftCreationTime))
-	fi.modification_time = time.unix(0, win32.FILETIME_as_unix_nanoseconds(d.ftLastWriteTime))
-	fi.access_time       = time.unix(0, win32.FILETIME_as_unix_nanoseconds(d.ftLastAccessTime))
-
+	windows_set_file_info_times(&fi, &d)
 
 	return fi, ERROR_NONE
 }

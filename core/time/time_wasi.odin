@@ -1,15 +1,16 @@
+//+private
 //+build wasi
 package time
 
 import wasi "core:sys/wasm/wasi"
 
-IS_SUPPORTED :: false
+_IS_SUPPORTED :: false
 
-now :: proc() -> Time {
+_now :: proc "contextless" () -> Time {
 	return {}
 }
 
-sleep :: proc(d: Duration) {
+_sleep :: proc "contextless" (d: Duration) {
 }
 
 _tick_now :: proc "contextless" () -> Tick {
@@ -21,3 +22,5 @@ _tick_now :: proc "contextless" () -> Tick {
 	return {}
 }
 
+_yield :: proc "contextless" () {
+}

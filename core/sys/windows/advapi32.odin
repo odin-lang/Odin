@@ -3,6 +3,8 @@ package sys_windows
 
 foreign import advapi32 "system:Advapi32.lib"
 
+HCRYPTPROV :: distinct HANDLE
+
 @(default_calling_convention="stdcall")
 foreign advapi32 {
 	@(link_name = "SystemFunction036")
@@ -10,6 +12,10 @@ foreign advapi32 {
 	OpenProcessToken :: proc(ProcessHandle: HANDLE,
 	                         DesiredAccess: DWORD,
 	                         TokenHandle: ^HANDLE) -> BOOL ---
+
+	CryptAcquireContextW :: proc(hProv: ^HCRYPTPROV, szContainer, szProvider: wstring, dwProvType, dwFlags: DWORD) -> DWORD ---
+	CryptGenRandom       :: proc(hProv: HCRYPTPROV, dwLen: DWORD, buf: LPVOID) -> DWORD ---
+	CryptReleaseContext  :: proc(hProv: HCRYPTPROV, dwFlags: DWORD) -> DWORD ---
 }
 
 // Necessary to create a token to impersonate a user with for CreateProcessAsUser
@@ -63,5 +69,93 @@ foreign advapi32 {
 		lpCurrentDirectory: wstring,
 		lpStartupInfo: LPSTARTUPINFO,
 		lpProcessInformation: LPPROCESS_INFORMATION,
+	) -> BOOL ---
+
+	RegCreateKeyExW :: proc(
+		hKey: HKEY,
+		lpSubKey: LPCWSTR,
+		Reserved: DWORD,
+		lpClass: LPWSTR,
+		dwOptions: DWORD,
+		samDesired: REGSAM,
+		lpSecurityAttributes: LPSECURITY_ATTRIBUTES,
+		phkResult: PHKEY,
+		lpdwDisposition: LPDWORD,
+	) -> LSTATUS ---
+
+	RegOpenKeyW :: proc(
+		hKey: HKEY,
+		lpSubKey: LPCWSTR,
+		phkResult: PHKEY,
+	) -> LSTATUS ---
+
+	RegOpenKeyExW :: proc(
+		hKey: HKEY,
+		lpSubKey: LPCWSTR,
+		ulOptions: DWORD,
+		samDesired: REGSAM,
+		phkResult: PHKEY,
+	) -> LSTATUS ---
+
+	RegCloseKey :: proc(
+		hKey: HKEY,
+	) -> LSTATUS ---
+
+	RegGetValueW :: proc(
+		hkey: HKEY,
+		lpSubKey: LPCWSTR,
+		lpValue: LPCWSTR,
+		dwFlags: DWORD,
+		pdwType: LPDWORD,
+		pvData: PVOID,
+		pcbData: LPDWORD,
+	) -> LSTATUS ---
+
+	RegSetValueExW :: proc(
+		hKey: HKEY,
+		lpValueName: LPCWSTR,
+		Reserved: DWORD,
+		dwType: DWORD,
+		lpData: ^BYTE,
+		cbData: DWORD,
+	) -> LSTATUS ---
+
+	RegSetKeyValueW :: proc(
+		hKey: HKEY,
+		lpSubKey: LPCWSTR,
+		lpValueName: LPCWSTR,
+		dwType: DWORD,
+		lpData: LPCVOID,
+		cbData: DWORD,
+	) -> LSTATUS ---
+
+	GetFileSecurityW :: proc(
+		lpFileName: LPCWSTR,
+		RequestedInformation: SECURITY_INFORMATION,
+		pSecurityDescriptor: PSECURITY_DESCRIPTOR,
+		nLength: DWORD,
+		lpnLengthNeeded: LPDWORD,
+	) -> BOOL ---
+
+	DuplicateToken :: proc(
+		ExistingTokenHandle: HANDLE,
+		ImpersonationLevel: SECURITY_IMPERSONATION_LEVEL,
+		DuplicateTokenHandle: PHANDLE,
+	) -> BOOL ---
+
+	MapGenericMask :: proc(
+		AccessMask: PDWORD,
+		GenericMapping: PGENERIC_MAPPING,
+	) ---
+
+	AccessCheck :: proc(
+		pSecurityDescriptor: PSECURITY_DESCRIPTOR,
+		ClientToken: HANDLE,
+		DesiredAccess: DWORD,
+		GenericMapping: PGENERIC_MAPPING,
+		PrivilegeSet: PPRIVILEGE_SET,
+		PrivilegeSetLength: LPDWORD,
+		GrantedAccess: LPDWORD,
+		AccessStatus: LPBOOL,
 	) -> BOOL ---
 }

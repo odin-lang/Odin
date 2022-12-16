@@ -167,7 +167,7 @@ when ODIN_OS == .Freestanding || ODIN_OS == .JS || ODIN_DEFAULT_TO_NIL_ALLOCATOR
 		}
 
 		switch mode {
-		case .Alloc:
+		case .Alloc, .Alloc_Non_Zeroed:
 			data, err = default_temp_allocator_alloc(s, size, alignment, loc)
 		case .Free:
 			err = default_temp_allocator_free(s, old_memory, loc)
@@ -181,11 +181,11 @@ when ODIN_OS == .Freestanding || ODIN_OS == .JS || ODIN_DEFAULT_TO_NIL_ALLOCATOR
 		case .Query_Features:
 			set := (^Allocator_Mode_Set)(old_memory)
 			if set != nil {
-				set^ = {.Alloc, .Free, .Free_All, .Resize, .Query_Features}
+				set^ = {.Alloc, .Alloc_Non_Zeroed, .Free, .Free_All, .Resize, .Query_Features}
 			}
 
 		case .Query_Info:
-			// Nothing to give
+			return nil, .Mode_Not_Implemented
 		}
 
 		return

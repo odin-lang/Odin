@@ -1,5 +1,5 @@
 name: CI
-on: [push, pull_request]
+on: [push, pull_request, workflow_dispatch]
 
 jobs:
   build_linux:
@@ -38,10 +38,10 @@ jobs:
           cd tests/vendor
           make
         timeout-minutes: 10
-      - name: Odin issues tests
+      - name: Odin internals tests
         run: |
-          cd tests/issues
-          ./run.sh
+          cd tests/internal
+          make
         timeout-minutes: 10
       - name: Odin check examples/all for Linux i386
         run: ./odin check examples/all -vet -strict-style -target:linux_i386
@@ -92,10 +92,10 @@ jobs:
           cd tests/vendor
           make
         timeout-minutes: 10
-      - name: Odin issues tests
+      - name: Odin internals tests
         run: |
-          cd tests/issues
-          ./run.sh
+          cd tests/internal
+          make
         timeout-minutes: 10
       - name: Odin check examples/all for Darwin arm64
         run: ./odin check examples/all -vet -strict-style -target:darwin_arm64
@@ -156,19 +156,19 @@ jobs:
           cd tests\vendor
           call build.bat
         timeout-minutes: 10
+      - name: Odin internals tests
+        shell: cmd
+        run: |
+          call "C:\Program Files (x86)\Microsoft Visual Studio\2019\Enterprise\VC\Auxiliary\Build\vcvars64.bat
+          cd tests\internal
+          call build.bat
+        timeout-minutes: 10
       - name: core:math/big tests
         shell: cmd
         run: |
           call "C:\Program Files (x86)\Microsoft Visual Studio\2019\Enterprise\VC\Auxiliary\Build\vcvars64.bat
           cd tests\core\math\big
           call build.bat
-        timeout-minutes: 10
-      - name: Odin issues tests
-        shell: cmd
-        run: |
-          call "C:\Program Files (x86)\Microsoft Visual Studio\2019\Enterprise\VC\Auxiliary\Build\vcvars64.bat
-          cd tests\issues
-          call run.bat
         timeout-minutes: 10
       - name: Odin check examples/all for Windows 32bits
         shell: cmd

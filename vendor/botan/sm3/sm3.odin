@@ -1,4 +1,4 @@
-package sm3
+package vendor_sm3
 
 /*
     Copyright 2021 zhibog

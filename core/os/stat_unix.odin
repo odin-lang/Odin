@@ -119,7 +119,6 @@ lstat :: proc(name: string, allocator := context.allocator) -> (fi: File_Info, e
 }
 
 stat :: proc(name: string, allocator := context.allocator) -> (fi: File_Info, err: Errno) {
-
 	context.allocator = allocator
 
 	s: OS_Stat

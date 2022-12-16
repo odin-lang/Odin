@@ -1,6 +1,7 @@
 package mem_virtual
 
 import "core:mem"
+import "core:intrinsics"
 
 DEFAULT_PAGE_SIZE := uint(4096)
 
@@ -63,6 +64,7 @@ memory_block_alloc :: proc(committed, reserved: uint, flags: Memory_Block_Flags)
 	}
 	
 	page_size := DEFAULT_PAGE_SIZE
+	assert(mem.is_power_of_two(uintptr(page_size)))
 	committed := committed
 	committed = clamp(committed, 0, reserved)
 	
@@ -82,8 +84,7 @@ memory_block_alloc :: proc(committed, reserved: uint, flags: Memory_Block_Flags)
 	pmblock := platform_memory_alloc(0, total_size) or_return
 	
 	pmblock.block.base = ([^]byte)(uintptr(pmblock) + base_offset)
-	commit_err := platform_memory_commit(pmblock, uint(base_offset) + committed)
-	assert(commit_err == nil)
+	platform_memory_commit(pmblock, uint(base_offset) + committed) or_return
 
 	// Should be zeroed
 	assert(pmblock.block.used == 0)
@@ -95,18 +96,11 @@ memory_block_alloc :: proc(committed, reserved: uint, flags: Memory_Block_Flags)
 	pmblock.block.committed = committed
 	pmblock.block.reserved  = reserved
 
-	sentinel := &global_platform_memory_block_sentinel
-	platform_mutex_lock()
-	pmblock.next = sentinel
-	pmblock.prev = sentinel.prev
-	pmblock.prev.next = pmblock
-	pmblock.next.prev = pmblock
-	platform_mutex_unlock()
 	
 	return &pmblock.block, nil
 }
 
-alloc_from_memory_block :: proc(block: ^Memory_Block, min_size, alignment: int) -> (data: []byte, err: Allocator_Error) {
+alloc_from_memory_block :: proc(block: ^Memory_Block, min_size, alignment: uint) -> (data: []byte, err: Allocator_Error) {
 	calc_alignment_offset :: proc "contextless" (block: ^Memory_Block, alignment: uintptr) -> uint {
 		alignment_offset := uint(0)
 		ptr := uintptr(block.base[block.used:])
@@ -134,11 +128,18 @@ alloc_from_memory_block :: proc(block: ^Memory_Block, min_size, alignment: int) 
 		return nil
 	}
 
+	if block == nil {
+		return nil, .Out_Of_Memory
+	}
 
 	alignment_offset := calc_alignment_offset(block, uintptr(alignment))
-	size := uint(min_size) + alignment_offset
+	size, size_ok := safe_add(min_size, alignment_offset)
+	if !size_ok {
+		err = .Out_Of_Memory
+		return
+	}
 
-	if block.used + size > block.reserved {
+	if to_be_used, ok := safe_add(block.used, size); !ok || to_be_used > block.reserved {
 		err = .Out_Of_Memory
 		return
 	}
@@ -153,12 +154,14 @@ alloc_from_memory_block :: proc(block: ^Memory_Block, min_size, alignment: int) 
 
 memory_block_dealloc :: proc(block_to_free: ^Memory_Block) {
 	if block := (^Platform_Memory_Block)(block_to_free); block != nil {
-		platform_mutex_lock()
-		block.prev.next = block.next
-		block.next.prev = block.prev
-		platform_mutex_unlock()
-		
 		platform_memory_free(block)
 	}
 }
 
+
+
+@(private)
+safe_add :: #force_inline proc "contextless" (x, y: uint) -> (uint, bool) {
+	z, did_overflow := intrinsics.overflow_add(x, y)
+	return z, !did_overflow
+}

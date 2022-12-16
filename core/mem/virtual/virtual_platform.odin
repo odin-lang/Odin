@@ -1,13 +1,10 @@
 //+private
 package mem_virtual
 
-import "core:sync"
-
 Platform_Memory_Block :: struct {
 	block:      Memory_Block,
 	committed:  uint,
 	reserved:   uint,
-	prev, next: ^Platform_Memory_Block,
 } 
 
 platform_memory_alloc :: proc "contextless" (to_commit, to_reserve: uint) -> (block: ^Platform_Memory_Block, err: Allocator_Error) {
@@ -33,28 +30,6 @@ platform_memory_free :: proc "contextless" (block: ^Platform_Memory_Block) {
 	}
 }
 
-platform_mutex_lock :: proc() {
-	sync.mutex_lock(&global_memory_block_mutex)
-}
-
-platform_mutex_unlock :: proc() {
-	sync.mutex_unlock(&global_memory_block_mutex)
-}
-
-global_memory_block_mutex: sync.Mutex
-global_platform_memory_block_sentinel: Platform_Memory_Block
-global_platform_memory_block_sentinel_set: bool
-
-@(init)
-platform_memory_init :: proc() {
-	if !global_platform_memory_block_sentinel_set {
-		_platform_memory_init()
-		global_platform_memory_block_sentinel.prev = &global_platform_memory_block_sentinel
-		global_platform_memory_block_sentinel.next = &global_platform_memory_block_sentinel
-		global_platform_memory_block_sentinel_set = true
-	}
-}
-
 platform_memory_commit :: proc "contextless" (block: ^Platform_Memory_Block, to_commit: uint) -> (err: Allocator_Error) {
 	if to_commit < block.committed {
 		return nil
@@ -62,7 +37,6 @@ platform_memory_commit :: proc "contextless" (block: ^Platform_Memory_Block, to_
 	if to_commit > block.reserved {
 		return .Out_Of_Memory
 	}
-
 
 	commit(block, to_commit) or_return
 	block.committed = to_commit

@@ -309,7 +309,7 @@ init :: proc(ctx: ^Context) {
 	ctx.draw_frame  = default_draw_frame
 	ctx._style      = default_style
 	ctx.style       = &ctx._style
-	ctx.text_input  = strings.builder_from_slice(ctx._text_store[:])
+	ctx.text_input  = strings.builder_from_bytes(ctx._text_store[:])
 }
 
 begin :: proc(ctx: ^Context) {
@@ -353,7 +353,7 @@ end :: proc(ctx: ^Context) {
 
 	/* reset input state */
 	ctx.key_pressed_bits = {} // clear
-	strings.reset_builder(&ctx.text_input)
+	strings.builder_reset(&ctx.text_input)
 	ctx.mouse_pressed_bits = {} // clear
 	ctx.mouse_released_bits = {} // clear
 	ctx.scroll_delta = Vec2{0, 0}

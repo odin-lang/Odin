@@ -161,6 +161,10 @@ buffer_write :: proc(b: ^Buffer, p: []byte) -> (n: int, err: io.Error) {
 	return copy(b.buf[m:], p), nil
 }
 
+buffer_write_ptr :: proc(b: ^Buffer, ptr: rawptr, size: int) -> (n: int, err: io.Error) {
+	return buffer_write(b, ([^]byte)(ptr)[:size])
+}
+
 buffer_write_string :: proc(b: ^Buffer, s: string) -> (n: int, err: io.Error) {
 	b.last_read = .Invalid
 	m, ok := _buffer_try_grow(b, len(s))
@@ -229,17 +233,18 @@ buffer_read :: proc(b: ^Buffer, p: []byte) -> (n: int, err: io.Error) {
 	return
 }
 
+buffer_read_ptr :: proc(b: ^Buffer, ptr: rawptr, size: int) -> (n: int, err: io.Error) {
+	return buffer_read(b, ([^]byte)(ptr)[:size])
+}
+
 buffer_read_at :: proc(b: ^Buffer, p: []byte, offset: int) -> (n: int, err: io.Error) {
 	b.last_read = .Invalid
 
-	if offset < 0 || offset >= len(b.buf) {
+	if uint(offset) >= len(b.buf) {
 		err = .Invalid_Offset
 		return
 	}
-
-	if 0 <= offset && offset < len(b.buf) {
-		n = copy(p, b.buf[offset:])
-	}
+	n = copy(p, b.buf[offset:])
 	if n > 0 {
 		b.last_read = .Read
 	}
@@ -366,12 +371,12 @@ buffer_read_from :: proc(b: ^Buffer, r: io.Reader) -> (n: i64, err: io.Error) #n
 
 buffer_to_stream :: proc(b: ^Buffer) -> (s: io.Stream) {
 	s.stream_data = b
-	s.stream_vtable = _buffer_vtable
+	s.stream_vtable = &_buffer_vtable
 	return
 }
 
 @(private)
-_buffer_vtable := &io.Stream_VTable{
+_buffer_vtable := io.Stream_VTable{
 	impl_size = proc(s: io.Stream) -> i64 {
 		b := (^Buffer)(s.stream_data)
 		return i64(buffer_capacity(b))

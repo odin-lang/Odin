@@ -271,7 +271,7 @@ _glob :: proc(dir, pattern: string, matches: ^[dynamic]string, allocator := cont
 	}
 
 
-	d, derr := os.open(dir)
+	d, derr := os.open(dir, os.O_RDONLY)
 	if derr != 0 {
 		return
 	}
@@ -305,7 +305,7 @@ _glob :: proc(dir, pattern: string, matches: ^[dynamic]string, allocator := cont
 		n := fi.name
 		matched := match(pattern, n) or_return
 		if matched {
-			append(&m, join(dir, n))
+			append(&m, join({dir, n}))
 		}
 	}
 	return

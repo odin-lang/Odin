@@ -28,7 +28,7 @@ BINARY  :: Formats{.P4, .P5, .P6} + PAM + PFM
 
 load :: proc {
 	load_from_file,
-	load_from_buffer,
+	load_from_bytes,
 }
 
 load_from_file :: proc(filename: string, allocator := context.allocator) -> (img: ^Image, err: Error) {
@@ -40,13 +40,14 @@ load_from_file :: proc(filename: string, allocator := context.allocator) -> (img
 		return
 	}
 
-	return load_from_buffer(data)
+	return load_from_bytes(data)
 }
 
-load_from_buffer :: proc(data: []byte, allocator := context.allocator) -> (img: ^Image, err: Error) {
+load_from_bytes :: proc(data: []byte, allocator := context.allocator) -> (img: ^Image, err: Error) {
 	context.allocator = allocator
 
 	img = new(Image)
+	img.which = .NetPBM
 
 	header: Header; defer header_destroy(&header)
 	header_size: int
@@ -129,7 +130,7 @@ save_to_buffer :: proc(img: ^Image, custom_info: Info = {}, allocator := context
 
 	// we will write to a string builder
 	data: strings.Builder
-	strings.init_builder(&data)
+	strings.builder_init(&data)
 
 	// all PNM headers start with the format
 	fmt.sbprintf(&data, "%s\n", header.format)
@@ -408,7 +409,7 @@ _parse_header_pam :: proc(data: []byte, allocator := context.allocator) -> (head
 
 	// string buffer for the tupltype
 	tupltype: strings.Builder
-	strings.init_builder(&tupltype, context.temp_allocator); defer strings.destroy_builder(&tupltype)
+	strings.builder_init(&tupltype, context.temp_allocator); defer strings.builder_destroy(&tupltype)
 	fmt.sbprint(&tupltype, "")
 
 	// PAM uses actual lines, so we can iterate easily
@@ -748,4 +749,15 @@ autoselect_pbm_format_from_image :: proc(img: ^Image, prefer_binary := true, for
 
 	// We couldn't find a suitable format
 	return {}, false
+}
+
+@(init, private)
+_register :: proc() {
+	loader :: proc(data: []byte, options: image.Options, allocator: mem.Allocator) -> (img: ^Image, err: Error) {
+		return load_from_bytes(data, allocator)
+	}
+	destroyer :: proc(img: ^Image) {
+		_ = destroy(img)
+	}
+	image.register(.NetPBM, loader, destroyer)
 }

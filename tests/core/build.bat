@@ -75,3 +75,8 @@ echo ---
 echo Running core:net
 echo ---
 %PATH_TO_ODIN% run net %COMMON% -out:test_core_net.exe
+
+echo ---
+echo Running core:slice tests
+echo ---
+%PATH_TO_ODIN% run slice %COMMON% -out:test_core_slice.exe

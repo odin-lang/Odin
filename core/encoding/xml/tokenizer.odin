@@ -198,7 +198,7 @@ is_valid_identifier_rune :: proc(r: rune) -> bool {
 		switch r {
 		case '_', '-', ':':        return true
 		case 'A'..='Z', 'a'..='z': return true
-		case '0'..'9':             return true
+		case '0'..='9':            return true
 		case -1:                   return false
 		}
 	}

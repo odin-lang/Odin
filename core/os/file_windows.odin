@@ -162,7 +162,8 @@ read :: proc(fd: Handle, data: []byte) -> (int, Errno) {
 	total_read: int
 	length := len(data)
 
-	to_read := min(win32.DWORD(length), MAX_RW)
+	// NOTE(Jeroen): `length` can't be casted to win32.DWORD here because it'll overflow if > 4 GiB and return 0 if exactly that.
+	to_read := min(i64(length), MAX_RW)
 
 	e: win32.BOOL
 	if is_console {
@@ -172,7 +173,8 @@ read :: proc(fd: Handle, data: []byte) -> (int, Errno) {
 			return int(total_read), err
 		}
 	} else {
-		e = win32.ReadFile(handle, &data[total_read], to_read, &single_read_length, nil)
+		// NOTE(Jeroen): So we cast it here *after* we've ensured that `to_read` is at most MAX_RW (1 GiB)
+		e = win32.ReadFile(handle, &data[total_read], win32.DWORD(to_read), &single_read_length, nil)
 	}
 	if single_read_length <= 0 || !e {
 		err := Errno(win32.GetLastError())
@@ -365,7 +367,7 @@ get_current_directory :: proc(allocator := context.allocator) -> string {
 
 	win32.ReleaseSRWLockExclusive(&cwd_lock)
 
-	return win32.utf16_to_utf8(dir_buf_wstr, allocator)
+	return win32.utf16_to_utf8(dir_buf_wstr, allocator) or_else ""
 }
 
 set_current_directory :: proc(path: string) -> (err: Errno) {
@@ -384,20 +386,33 @@ set_current_directory :: proc(path: string) -> (err: Errno) {
 
 
 
-change_directory :: proc(path: string) -> Errno {
+change_directory :: proc(path: string) -> (err: Errno) {
 	wpath := win32.utf8_to_wstring(path, context.temp_allocator)
-	return Errno(win32.SetCurrentDirectoryW(wpath))
+
+	if !win32.SetCurrentDirectoryW(wpath) {
+		err = Errno(win32.GetLastError())
+	}
+	return
 }
 
-make_directory :: proc(path: string, mode: u32) -> Errno {
+make_directory :: proc(path: string, mode: u32 = 0) -> (err: Errno) {
+	// Mode is unused on Windows, but is needed on *nix
 	wpath := win32.utf8_to_wstring(path, context.temp_allocator)
-	return Errno(win32.CreateDirectoryW(wpath, nil))
+
+	if !win32.CreateDirectoryW(wpath, nil) {
+		err = Errno(win32.GetLastError())
+	}
+	return
 }
 
 
-remove_directory :: proc(path: string) -> Errno {
+remove_directory :: proc(path: string) -> (err: Errno) {
 	wpath := win32.utf8_to_wstring(path, context.temp_allocator)
-	return Errno(win32.RemoveDirectoryW(wpath))
+
+	if !win32.RemoveDirectoryW(wpath) {
+		err = Errno(win32.GetLastError())
+	}
+	return
 }
 
 
@@ -463,23 +478,31 @@ fix_long_path :: proc(path: string) -> string {
 }
 
 
-link :: proc(old_name, new_name: string) -> Errno {
+link :: proc(old_name, new_name: string) -> (err: Errno) {
 	n := win32.utf8_to_wstring(fix_long_path(new_name))
 	o := win32.utf8_to_wstring(fix_long_path(old_name))
 	return Errno(win32.CreateHardLinkW(n, o, nil))
 }
 
-unlink :: proc(path: string) -> Errno {
+unlink :: proc(path: string) -> (err: Errno) {
 	wpath := win32.utf8_to_wstring(path, context.temp_allocator)
-	return Errno(win32.DeleteFileW(wpath))
+
+	if !win32.DeleteFileW(wpath) {
+		err = Errno(win32.GetLastError())
+	}
+	return
 }
 
 
 
-rename :: proc(old_path, new_path: string) -> Errno {
+rename :: proc(old_path, new_path: string) -> (err: Errno) {
 	from := win32.utf8_to_wstring(old_path, context.temp_allocator)
 	to := win32.utf8_to_wstring(new_path, context.temp_allocator)
-	return Errno(win32.MoveFileExW(from, to, win32.MOVEFILE_REPLACE_EXISTING))
+
+	if !win32.MoveFileExW(from, to, win32.MOVEFILE_REPLACE_EXISTING) {
+		err = Errno(win32.GetLastError())
+	}
+	return
 }
 
 

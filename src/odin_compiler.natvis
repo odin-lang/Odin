@@ -1,0 +1,28 @@
+<?xml version="1.0" encoding="utf-8"?>
+<AutoVisualizer xmlns="http://schemas.microsoft.com/vstudio/debugger/natvis/2010">
+	<Type Name="String">
+		<DisplayString>{text,[len]s8}</DisplayString>
+		<StringView>text,[len]s8</StringView>
+	</Type>
+	<Type Name="Array&lt;*&gt;">
+		<DisplayString>{{ size={count} capacity={capacity} }}</DisplayString>
+		<Expand>
+			<ArrayItems>
+				<Size>count</Size>
+				<ValuePointer>data</ValuePointer>
+			</ArrayItems>
+		</Expand>
+	</Type>
+	<Type Name="Slice&lt;*&gt;">
+		<DisplayString>{{ size={count} }}</DisplayString>
+		<Expand>
+			<ArrayItems>
+				<Size>count</Size>
+				<ValuePointer>data</ValuePointer>
+			</ArrayItems>
+		</Expand>
+	</Type>
+	<Type Name="lbProcedure">
+		<DisplayString>Procedure {name}</DisplayString>
+	</Type>
+</AutoVisualizer>

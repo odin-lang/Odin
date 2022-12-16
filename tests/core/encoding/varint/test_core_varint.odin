@@ -79,8 +79,8 @@ test_leb128 :: proc(t: ^testing.T) {
 		}
 	}
 
-	for num_bytes in 1..uint(16) {
-		for _ in 0..RANDOM_TESTS {
+	for num_bytes in 1..=uint(16) {
+		for _ in 0..=RANDOM_TESTS {
 			unsigned, signed := get_random(num_bytes)
 
 			{
@@ -109,7 +109,7 @@ test_leb128 :: proc(t: ^testing.T) {
 get_random :: proc(byte_count: uint) -> (u: u128, i: i128) {
 	assert(byte_count >= 0 && byte_count <= size_of(u128))
 
-	for _ in 1..byte_count {
+	for _ in 1..=byte_count {
 		u <<= 8
 		u |= u128(rand.uint32() & 0xff)
 	}

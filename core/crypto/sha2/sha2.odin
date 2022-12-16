@@ -419,8 +419,10 @@ update :: proc(ctx: ^$T, data: []byte) {
     sha2_transf(ctx, shifted_message, block_nb)
 
     rem_len = new_len % CURR_BLOCK_SIZE
-    when T == Sha256_Context      {copy(ctx.block[:], shifted_message[block_nb << 6:rem_len])}
-    else when T == Sha512_Context {copy(ctx.block[:], shifted_message[block_nb << 7:rem_len])}
+    if rem_len > 0 {
+        when T == Sha256_Context      {copy(ctx.block[:], shifted_message[block_nb << 6:rem_len])} 
+        else when T == Sha512_Context {copy(ctx.block[:], shifted_message[block_nb << 7:rem_len])}
+    }
 
     ctx.length = rem_len
     when T == Sha256_Context      {ctx.tot_len += (block_nb + 1) << 6}

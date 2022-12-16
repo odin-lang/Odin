@@ -269,6 +269,9 @@ bin/
 # - Linux/MacOS
 odin
 odin.dSYM
+*.bin
+demo.bin
+libLLVM*.so*
 
 # shared collection
 shared/
@@ -281,3 +284,4 @@ shared/
 *.sublime-workspace
 examples/bug/
 build.sh
+!core/debug/

@@ -68,6 +68,11 @@ are_types_identical :: proc(a, b: ^Type_Info) -> bool {
 		y := b.variant.(Type_Info_Multi_Pointer) or_return
 		return are_types_identical(x.elem, y.elem)
 
+	case Type_Info_Soa_Pointer:
+		y := b.variant.(Type_Info_Soa_Pointer) or_return
+		return are_types_identical(x.elem, y.elem)
+
+
 	case Type_Info_Procedure:
 		y := b.variant.(Type_Info_Procedure) or_return
 		switch {
@@ -256,6 +261,22 @@ is_multi_pointer :: proc(info: ^Type_Info) -> bool {
 	_, ok := type_info_base(info).variant.(Type_Info_Multi_Pointer)
 	return ok
 }
+is_soa_pointer :: proc(info: ^Type_Info) -> bool {
+	if info == nil { return false }
+	_, ok := type_info_base(info).variant.(Type_Info_Soa_Pointer)
+	return ok
+}
+is_pointer_internally :: proc(info: ^Type_Info) -> bool {
+	if info == nil { return false }
+	#partial switch v in info.variant {
+	case Type_Info_Pointer, Type_Info_Multi_Pointer,
+	     Type_Info_Procedure:
+		return true
+	case Type_Info_String:
+		return v.is_cstring
+	}
+	return false
+}
 is_procedure :: proc(info: ^Type_Info) -> bool {
 	if info == nil { return false }
 	_, ok := type_info_base(info).variant.(Type_Info_Procedure)
@@ -279,6 +300,11 @@ is_dynamic_array :: proc(info: ^Type_Info) -> bool {
 is_dynamic_map :: proc(info: ^Type_Info) -> bool {
 	if info == nil { return false }
 	_, ok := type_info_base(info).variant.(Type_Info_Map)
+	return ok
+}
+is_bit_set :: proc(info: ^Type_Info) -> bool {
+	if info == nil { return false }
+	_, ok := type_info_base(info).variant.(Type_Info_Bit_Set)
 	return ok
 }
 is_slice :: proc(info: ^Type_Info) -> bool {
@@ -426,6 +452,9 @@ write_type_writer :: proc(w: io.Writer, ti: ^Type_Info, n_written: ^int = nil) -
 	case Type_Info_Multi_Pointer:
 		io.write_string(w, "[^]", &n) or_return
 		write_type(w, info.elem, &n) or_return
+	case Type_Info_Soa_Pointer:
+		io.write_string(w, "#soa ^", &n) or_return
+		write_type(w, info.elem, &n) or_return
 	case Type_Info_Procedure:
 		io.write_string(w, "proc", &n) or_return
 		if info.params == nil {
@@ -531,9 +560,8 @@ write_type_writer :: proc(w: io.Writer, ti: ^Type_Info, n_written: ^int = nil) -
 
 	case Type_Info_Union:
 		io.write_string(w, "union ", &n) or_return
-		if info.maybe {
-			io.write_string(w, "#maybe ", &n) or_return
-		}
+		if info.no_nil     { io.write_string(w, "#no_nil ", &n)     or_return }
+		if info.shared_nil { io.write_string(w, "#shared_nil ", &n) or_return }
 		if info.custom_align {
 			io.write_string(w, "#align ",      &n) or_return
 			io.write_i64(w, i64(ti.align), 10, &n) or_return
@@ -563,11 +591,11 @@ write_type_writer :: proc(w: io.Writer, ti: ^Type_Info, n_written: ^int = nil) -
 			write_type(w, info.elem, &n) or_return
 		case is_rune(info.elem):
 			io.write_encoded_rune(w, rune(info.lower), true, &n) or_return
-			io.write_string(w, "..",                         &n) or_return
+			io.write_string(w, "..=",                        &n) or_return
 			io.write_encoded_rune(w, rune(info.upper), true, &n) or_return
 		case:
 			io.write_i64(w, info.lower, 10, &n) or_return
-			io.write_string(w, "..",        &n) or_return
+			io.write_string(w, "..=",       &n) or_return
 			io.write_i64(w, info.upper, 10, &n) or_return
 		}
 		if info.underlying != nil {

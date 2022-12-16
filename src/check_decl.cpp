@@ -313,13 +313,19 @@ void check_type_decl(CheckerContext *ctx, Entity *e, Ast *init_expr, Type *def) 
 	}
 	named->Named.base = base;
 
-	if (is_distinct && is_type_typeid(e->type)) {
-		error(init_expr, "'distinct' cannot be applied to 'typeid'");
-		is_distinct = false;
-	}
-	if (is_distinct && is_type_any(e->type)) {
-		error(init_expr, "'distinct' cannot be applied to 'any'");
-		is_distinct = false;
+	if (is_distinct) {
+		if (is_type_typeid(e->type)) {
+			error(init_expr, "'distinct' cannot be applied to 'typeid'");
+			is_distinct = false;
+		} else if (is_type_any(e->type)) {
+			error(init_expr, "'distinct' cannot be applied to 'any'");
+			is_distinct = false;
+		} else if (is_type_simd_vector(e->type) || is_type_soa_pointer(e->type)) {
+			gbString str = type_to_string(e->type);
+			error(init_expr, "'distinct' cannot be applied to '%s'", str);
+			gb_string_free(str);
+			is_distinct = false;
+		}
 	}
 	if (!is_distinct) {
 		e->type = bt;
@@ -893,6 +899,18 @@ void check_proc_decl(CheckerContext *ctx, Entity *e, DeclInfo *d) {
 		}
 	}
 
+	if (ac.require_target_feature.len != 0 && ac.enable_target_feature.len != 0) {
+		error(e->token, "Attributes @(require_target_feature=...) and @(enable_target_feature=...) cannot be used together");
+	} else if (ac.require_target_feature.len != 0) {
+		if (check_target_feature_is_enabled(e->token.pos, ac.require_target_feature)) {
+			e->Procedure.target_feature = ac.require_target_feature;
+		} else {
+			e->Procedure.target_feature_disabled = true;
+		}
+	} else if (ac.enable_target_feature.len != 0) {
+		enable_target_feature(e->token.pos, ac.enable_target_feature);
+		e->Procedure.target_feature = ac.enable_target_feature;
+	}
 
 	switch (e->Procedure.optimization_mode) {
 	case ProcedureOptimizationMode_None:
@@ -996,10 +1014,12 @@ void check_proc_decl(CheckerContext *ctx, Entity *e, DeclInfo *d) {
 		}
 	}
 
-	if (pt->result_count == 0 && ac.require_results) {
-		error(pl->type, "'require_results' is not needed on a procedure with no results");
-	} else {
-		pt->require_results = ac.require_results;
+	if (ac.require_results) {
+		if (pt->result_count == 0) {
+			error(pl->type, "'require_results' is not needed on a procedure with no results");
+		} else {
+			pt->require_results = true;
+		}
 	}
 
 	if (ac.link_name.len > 0) {
@@ -1018,18 +1038,16 @@ void check_proc_decl(CheckerContext *ctx, Entity *e, DeclInfo *d) {
 		}
 		Entity *foreign_library = init_entity_foreign_library(ctx, e);
 		
-		if (is_arch_wasm()) {
+		if (is_arch_wasm() && foreign_library != nullptr) {
 			String module_name = str_lit("env");
-			if (foreign_library != nullptr) {
-				GB_ASSERT (foreign_library->kind == Entity_LibraryName);
-				if (foreign_library->LibraryName.paths.count != 1) {
-					error(foreign_library->token, "'foreign import' for '%.*s' architecture may only have one path, got %td", 
-					      LIT(target_arch_names[build_context.metrics.arch]), foreign_library->LibraryName.paths.count);
-				}
-				
-				if (foreign_library->LibraryName.paths.count >= 1) {
-					module_name = foreign_library->LibraryName.paths[0];
-				}
+			GB_ASSERT (foreign_library->kind == Entity_LibraryName);
+			if (foreign_library->LibraryName.paths.count != 1) {
+				error(foreign_library->token, "'foreign import' for '%.*s' architecture may only have one path, got %td",
+				      LIT(target_arch_names[build_context.metrics.arch]), foreign_library->LibraryName.paths.count);
+			}
+
+			if (foreign_library->LibraryName.paths.count >= 1) {
+				module_name = foreign_library->LibraryName.paths[0];
 			}
 			name = concatenate3_strings(permanent_allocator(), module_name, WASM_MODULE_NAME_SEPARATOR, name);
 		}
@@ -1311,20 +1329,20 @@ void check_proc_group_decl(CheckerContext *ctx, Entity *&pg_entity, DeclInfo *d)
 
 			if (!both_have_where_clauses) switch (kind) {
 			case ProcOverload_Identical:
-				error(p->token, "Overloaded procedure '%.*s' as the same type as another procedure in the procedure group '%.*s'", LIT(name), LIT(proc_group_name));
+				error(p->token, "Overloaded procedure '%.*s' has the same type as another procedure in the procedure group '%.*s'", LIT(name), LIT(proc_group_name));
 				is_invalid = true;
 				break;
 			// case ProcOverload_CallingConvention:
-				// error(p->token, "Overloaded procedure '%.*s' as the same type as another procedure in the procedure group '%.*s'", LIT(name), LIT(proc_group_name));
+				// error(p->token, "Overloaded procedure '%.*s' has the same type as another procedure in the procedure group '%.*s'", LIT(name), LIT(proc_group_name));
 				// is_invalid = true;
 				// break;
 			case ProcOverload_ParamVariadic:
-				error(p->token, "Overloaded procedure '%.*s' as the same type as another procedure in the procedure group '%.*s'", LIT(name), LIT(proc_group_name));
+				error(p->token, "Overloaded procedure '%.*s' has the same type as another procedure in the procedure group '%.*s'", LIT(name), LIT(proc_group_name));
 				is_invalid = true;
 				break;
 			case ProcOverload_ResultCount:
 			case ProcOverload_ResultTypes:
-				error(p->token, "Overloaded procedure '%.*s' as the same parameters but different results in the procedure group '%.*s'", LIT(name), LIT(proc_group_name));
+				error(p->token, "Overloaded procedure '%.*s' has the same parameters but different results in the procedure group '%.*s'", LIT(name), LIT(proc_group_name));
 				is_invalid = true;
 				break;
 			case ProcOverload_Polymorphic:
@@ -1470,6 +1488,11 @@ void check_proc_body(CheckerContext *ctx_, Token token, DeclInfo *decl, Type *ty
 				if (!(e->flags & EntityFlag_Using)) {
 					continue;
 				}
+				if (is_blank_ident(e->token)) {
+                    error(e->token, "'using' a procedure parameter requires a non blank identifier");
+					break;
+				}
+
 				bool is_value = (e->flags & EntityFlag_Value) != 0 && !is_type_pointer(e->type);
 				String name = e->token.string;
 				Type *t = base_type(type_deref(e->type));
@@ -1521,7 +1544,11 @@ void check_proc_body(CheckerContext *ctx_, Token token, DeclInfo *decl, Type *ty
 			// NOTE(bill): Don't err here
 		}
 
+		GB_ASSERT(decl->defer_use_checked == false);
+
 		check_stmt_list(ctx, bs->stmts, Stmt_CheckScopeDecls);
+
+		decl->defer_use_checked = true;
 
 		for_array(i, bs->stmts) {
 			Ast *stmt = bs->stmts[i];
@@ -1557,6 +1584,7 @@ void check_proc_body(CheckerContext *ctx_, Token token, DeclInfo *decl, Type *ty
 				}
 			}
 		}
+
 	}
 	check_close_scope(ctx);
 

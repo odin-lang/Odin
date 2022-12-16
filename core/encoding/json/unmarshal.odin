@@ -209,7 +209,7 @@ unmarshal_value :: proc(p: ^Parser, v: any) -> (err: Unmarshal_Error) {
 		variant := u.variants[0]
 		v.id = variant.id
 		ti = reflect.type_info_base(variant)
-		if !(u.maybe && reflect.is_pointer(variant)) {
+		if !reflect.is_pointer_internally(variant) {
 			tag := any{rawptr(uintptr(v.data) + u.tag_offset), u.tag_type.id}
 			assign_int(tag, 1)
 		}
@@ -325,7 +325,7 @@ unmarshal_object :: proc(p: ^Parser, v: any, end_token: Token_Kind) -> (err: Unm
 	UNSUPPORTED_TYPE := Unsupported_Type_Error{v.id, p.curr_token}
 	
 	if end_token == .Close_Brace {
-		assert(expect_token(p, .Open_Brace) == nil)
+		unmarshal_expect_token(p, .Open_Brace)
 	}
 
 	v := v
@@ -384,9 +384,14 @@ unmarshal_object :: proc(p: ^Parser, v: any, end_token: Token_Kind) -> (err: Unm
 					break struct_loop
 				}
 				continue struct_loop
+			} else {
+				// allows skipping unused struct fields
+				parse_value(p) or_return
+				if parse_comma(p) {
+					break struct_loop
+				}
+				continue struct_loop
 			}
-			
-			return Unsupported_Type_Error{v.id, p.curr_token}
 		}
 		
 	case reflect.Type_Info_Map:
@@ -394,11 +399,9 @@ unmarshal_object :: proc(p: ^Parser, v: any, end_token: Token_Kind) -> (err: Unm
 			return UNSUPPORTED_TYPE
 		}
 		raw_map := (^mem.Raw_Map)(v.data)
-		if raw_map.entries.allocator.procedure == nil {
-			raw_map.entries.allocator = p.allocator
+		if raw_map.allocator.procedure == nil {
+			raw_map.allocator = p.allocator
 		}
-		
-		header := runtime.__get_map_header_runtime(raw_map, t)
 		
 		elem_backing := bytes_make(t.value.size, t.value.align, p.allocator) or_return
 		defer delete(elem_backing, p.allocator)
@@ -415,19 +418,16 @@ unmarshal_object :: proc(p: ^Parser, v: any, end_token: Token_Kind) -> (err: Unm
 				delete(key, p.allocator)
 				return err
 			}
-			
-			hash := runtime.Map_Hash {
-				hash = runtime.default_hasher_string(&key, 0),
-				key_ptr = &key,
-			}
-			
+
+			key_ptr := rawptr(&key)
+
 			key_cstr: cstring
 			if reflect.is_cstring(t.key) {
 				key_cstr = cstring(raw_data(key))
-				hash.key_ptr = &key_cstr
+				key_ptr = &key_cstr
 			}
 			
-			set_ptr := runtime.__dynamic_map_set(header, hash, map_backing_value.data)
+			set_ptr := runtime.__dynamic_map_set_without_hash(raw_map, t.map_info, key_ptr, map_backing_value.data)
 			if set_ptr == nil {
 				delete(key, p.allocator)
 			} 
@@ -473,7 +473,7 @@ unmarshal_object :: proc(p: ^Parser, v: any, end_token: Token_Kind) -> (err: Unm
 	}
 	
 	if end_token == .Close_Brace {
-		assert(expect_token(p, .Close_Brace) == nil)
+		unmarshal_expect_token(p, .Close_Brace)
 	}
 	return
 }

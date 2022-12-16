@@ -7,6 +7,8 @@ foreign import gdi32 "system:Gdi32.lib"
 foreign gdi32 {
 	GetStockObject :: proc(i: c_int) -> HGDIOBJ ---
 	SelectObject :: proc(hdc: HDC, h: HGDIOBJ) -> HGDIOBJ ---
+	DeleteObject :: proc(ho: HGDIOBJ) -> BOOL ---
+	SetBkColor :: proc(hdc: HDC, color: COLORREF) -> COLORREF ---
 
 	CreateDIBPatternBrush :: proc(h: HGLOBAL, iUsage: UINT) -> HBRUSH ---
 
@@ -60,15 +62,25 @@ foreign gdi32 {
 
 	SetPixelFormat :: proc(hdc: HDC, format: c_int, ppfd: ^PIXELFORMATDESCRIPTOR) -> BOOL ---
 	ChoosePixelFormat :: proc(hdc: HDC, ppfd: ^PIXELFORMATDESCRIPTOR) -> c_int ---
+	DescribePixelFormat :: proc(hdc: HDC, iPixelFormat: c_int, nBytes: UINT, ppfd: ^PIXELFORMATDESCRIPTOR) -> c_int ---
 	SwapBuffers :: proc(HDC) -> BOOL ---
 
 	SetDCBrushColor :: proc(hdc: HDC, color: COLORREF) -> COLORREF ---
 	GetDCBrushColor :: proc(hdc: HDC) -> COLORREF ---
 	PatBlt :: proc(hdc: HDC, x, y, w, h: c_int, rop: DWORD) -> BOOL ---
+	Rectangle :: proc(hdc: HDC, left, top, right, bottom: c_int) -> BOOL ---
+
+	CreateFontW :: proc(
+		cHeight, cWidth, cEscapement, cOrientation, cWeight: c_int,
+		bItalic, bUnderline, bStrikeOut, iCharSet, iOutPrecision: DWORD,
+		iClipPrecision, iQuality, iPitchAndFamily: DWORD,
+		pszFaceName: LPCWSTR,
+	) -> HFONT ---
+	TextOutW :: proc(hdc: HDC, x, y: c_int, lpString: LPCWSTR, c: c_int) -> BOOL ---
+	GetTextExtentPoint32W :: proc(hdc: HDC, lpString: LPCWSTR, c: c_int, psizl: LPSIZE) -> BOOL ---
+	GetTextMetricsW :: proc(hdc: HDC, lptm: LPTEXTMETRICW) -> BOOL ---
 }
 
-// Windows colors are packed as ABGR
 RGB :: #force_inline proc "contextless" (r, g, b: u8) -> COLORREF {
-	res: [4]u8 = {0, b, g, r}
-	return transmute(COLORREF)res
+	return transmute(COLORREF)[4]u8{r, g, b, 0}
 }

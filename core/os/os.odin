@@ -9,6 +9,10 @@ OS :: ODIN_OS
 ARCH :: ODIN_ARCH
 ENDIAN :: ODIN_ENDIAN
 
+SEEK_SET :: 0
+SEEK_CUR :: 1
+SEEK_END :: 2
+
 write_string :: proc(fd: Handle, str: string) -> (int, Errno) {
 	return write(fd, transmute([]byte)str)
 }
@@ -116,7 +120,7 @@ read_entire_file_from_handle :: proc(fd: Handle, allocator := context.allocator)
 
 	data = make([]byte, int(length), allocator)
 	if data == nil {
-	return nil, false
+	    return nil, false
 	}
 
 	bytes_read, read_err := read_full(fd, data)
@@ -174,7 +178,7 @@ heap_allocator_proc :: proc(allocator_data: rawptr, mode: mem.Allocator_Mode,
 	// the pointer we return to the user.
 	//
 
-	aligned_alloc :: proc(size, alignment: int, old_ptr: rawptr = nil) -> ([]byte, mem.Allocator_Error) {
+	aligned_alloc :: proc(size, alignment: int, old_ptr: rawptr = nil, zero_memory := true) -> ([]byte, mem.Allocator_Error) {
 		a := max(alignment, align_of(rawptr))
 		space := size + a - 1
 
@@ -183,7 +187,7 @@ heap_allocator_proc :: proc(allocator_data: rawptr, mode: mem.Allocator_Mode,
 			original_old_ptr := mem.ptr_offset((^rawptr)(old_ptr), -1)^
 			allocated_mem = heap_resize(original_old_ptr, space+size_of(rawptr))
 		} else {
-			allocated_mem = heap_alloc(space+size_of(rawptr))
+			allocated_mem = heap_alloc(space+size_of(rawptr), zero_memory)
 		}
 		aligned_mem := rawptr(mem.ptr_offset((^u8)(allocated_mem), size_of(rawptr)))
 
@@ -222,8 +226,8 @@ heap_allocator_proc :: proc(allocator_data: rawptr, mode: mem.Allocator_Mode,
 	}
 
 	switch mode {
-	case .Alloc:
-		return aligned_alloc(size, alignment)
+	case .Alloc, .Alloc_Non_Zeroed:
+		return aligned_alloc(size, alignment, nil, mode == .Alloc)
 
 	case .Free:
 		aligned_free(old_memory)
@@ -240,7 +244,7 @@ heap_allocator_proc :: proc(allocator_data: rawptr, mode: mem.Allocator_Mode,
 	case .Query_Features:
 		set := (^mem.Allocator_Mode_Set)(old_memory)
 		if set != nil {
-			set^ = {.Alloc, .Free, .Resize, .Query_Features}
+			set^ = {.Alloc, .Alloc_Non_Zeroed, .Free, .Resize, .Query_Features}
 		}
 		return nil, nil
 

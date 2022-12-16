@@ -1,8 +1,5 @@
 #include <math.h>
 
-// TODO(bill): Big numbers
-// IMPORTANT TODO(bill): This needs to be completely fixed!!!!!!!!
-
 gb_global BlockingMutex hash_exact_value_mutex;
 
 struct Ast;
@@ -502,6 +499,13 @@ i64 exact_value_to_i64(ExactValue v) {
 	}
 	return 0;
 }
+u64 exact_value_to_u64(ExactValue v) {
+	v = exact_value_to_integer(v);
+	if (v.kind == ExactValue_Integer) {
+		return big_int_to_u64(&v.value_integer);
+	}
+	return 0;
+}
 f64 exact_value_to_f64(ExactValue v) {
 	v = exact_value_to_float(v);
 	if (v.kind == ExactValue_Float) {
@@ -948,15 +952,15 @@ bool compare_exact_values(TokenKind op, ExactValue x, ExactValue y) {
 
 	case ExactValue_Typeid:
 		switch (op) {
-		case Token_CmpEq: return are_types_identical(x.value_typeid, y.value_typeid);
-		case Token_NotEq: return !are_types_identical(x.value_typeid, y.value_typeid);
+		case Token_CmpEq: return x.value_typeid == y.value_typeid;
+		case Token_NotEq: return x.value_typeid != y.value_typeid;
 		}
 		break;
 
 	case ExactValue_Procedure:
 		switch (op) {
-		case Token_CmpEq: return are_types_identical(x.value_typeid, y.value_typeid);
-		case Token_NotEq: return !are_types_identical(x.value_typeid, y.value_typeid);
+		case Token_CmpEq: return x.value_typeid == y.value_typeid;
+		case Token_NotEq: return x.value_typeid != y.value_typeid;
 		}
 		break;
 	}

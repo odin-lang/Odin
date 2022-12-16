@@ -2,14 +2,12 @@ package slice
 
 import "core:intrinsics"
 import "core:runtime"
-import "core:mem"
 
 _ :: intrinsics
 _ :: runtime
-_ :: mem
 
-map_keys :: proc(m: $M/map[$K]$V, allocator := context.allocator) -> (keys: []K) {
-	keys = make(type_of(keys), len(m), allocator)
+map_keys :: proc(m: $M/map[$K]$V, allocator := context.allocator) -> (keys: []K, err: runtime.Allocator_Error) {
+	keys = make(type_of(keys), len(m), allocator) or_return
 	i := 0
 	for key in m {
 		keys[i] = key
@@ -17,8 +15,8 @@ map_keys :: proc(m: $M/map[$K]$V, allocator := context.allocator) -> (keys: []K)
 	}
 	return
 }
-map_values :: proc(m: $M/map[$K]$V, allocator := context.allocator) -> (values: []V) {
-	values = make(type_of(values), len(m), allocator)
+map_values :: proc(m: $M/map[$K]$V, allocator := context.allocator) -> (values: []V, err: runtime.Allocator_Error) {
+	values = make(type_of(values), len(m), allocator) or_return
 	i := 0
 	for _, value in m {
 		values[i] = value
@@ -39,8 +37,8 @@ Map_Entry_Info :: struct($Key, $Value: typeid) {
 }
 
 
-map_entries :: proc(m: $M/map[$K]$V, allocator := context.allocator) -> (entries: []Map_Entry(K, V)) {
-	entries = make(type_of(entries), len(m), allocator)
+map_entries :: proc(m: $M/map[$K]$V, allocator := context.allocator) -> (entries: []Map_Entry(K, V), err: runtime.Allocator_Error) {
+	entries = make(type_of(entries), len(m), allocator) or_return
 	i := 0
 	for key, value in m {
 		entries[i].key   = key
@@ -52,30 +50,26 @@ map_entries :: proc(m: $M/map[$K]$V, allocator := context.allocator) -> (entries
 
 map_entry_infos :: proc(m: $M/map[$K]$V, allocator := context.allocator) -> (entries: []Map_Entry_Info(K, V)) #no_bounds_check {
 	m := m
-	rm := (^mem.Raw_Map)(&m)
+	rm := (^runtime.Raw_Map)(&m)
 
-	info := runtime.type_info_base(type_info_of(M)).variant.(runtime.Type_Info_Map)
-	gs := runtime.type_info_base(info.generated_struct).variant.(runtime.Type_Info_Struct)
-	ed := runtime.type_info_base(gs.types[1]).variant.(runtime.Type_Info_Dynamic_Array)
-	entry_type := ed.elem.variant.(runtime.Type_Info_Struct)
-	key_offset :=  entry_type.offsets[2]
-	value_offset :=  entry_type.offsets[3]
-	entry_size := uintptr(ed.elem_size)
+	info := type_info_base(type_info_of(M)).variant.(Type_Info_Map)
+	if info.map_info != nil {
+		entries = make(type_of(entries), len(m), allocator) or_return
 
-	entries = make(type_of(entries), rm.entries.len)
+		map_cap := uintptr(cap(m))
+		ks, vs, hs, _, _ := runtime.map_kvh_data_dynamic(rm^, info.map_info)
+		entry_index := 0
+		for bucket_index in 0..<map_cap {
+			if hash := hs[bucket_index]; runtime.map_hash_is_valid(hash) {
+				key   := runtime.map_cell_index_dynamic(ks, &info.map_info.ks, bucket_index)
+				value := runtime.map_cell_index_dynamic(vs, &info.map_info.vs, bucket_index)
+				entries[entry_index].hash  = hash
+				entries[entry_index].key   = (^K)(key)^
+				entries[entry_index].value = (^V)(value)^
 
-	data := uintptr(rm.entries.data)
-	for i in 0..<rm.entries.len {
-		header := (^runtime.Map_Entry_Header)(data)
-
-		hash  := header.hash
-		key   := (^K)(data + key_offset)^
-		value := (^V)(data + value_offset)^
-
-		entries[i] = {hash, key, value}
-
-		data += entry_size
+				entry_index += 1
+			}
+		}
 	}
-
 	return
 }

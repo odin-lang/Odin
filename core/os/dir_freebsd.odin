@@ -1,6 +1,5 @@
 package os
 
-import "core:strings"
 import "core:mem"
 
 read_dir :: proc(fd: Handle, n: int, allocator := context.allocator) -> (fi: []File_Info, err: Errno) {
@@ -51,10 +50,13 @@ read_dir :: proc(fd: Handle, n: int, allocator := context.allocator) -> (fi: []F
 			continue
 		}
 
-		fullpath := strings.join( []string{ dirpath, filename }, "/", context.temp_allocator)
+		fullpath := make([]byte, len(dirpath)+1+len(filename))
+		copy(fullpath, dirpath)
+		copy(fullpath[len(dirpath):], "/")
+		copy(fullpath[len(dirpath)+1:], filename)
 		defer delete(fullpath, context.temp_allocator)
 
-		fi_, err = stat(fullpath, allocator)
+		fi_, err = stat(string(fullpath), allocator)
 		if err != ERROR_NONE {
 			for fi__ in dfi {
 				file_info_delete(fi__, allocator)

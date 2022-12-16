@@ -53,7 +53,7 @@ join :: proc(thread: ^Thread) {
 }
 
 
-join_mulitple :: proc(threads: ..^Thread) {
+join_multiple :: proc(threads: ..^Thread) {
 	_join_multiple(..threads)
 }
 

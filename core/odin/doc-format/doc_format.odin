@@ -186,6 +186,7 @@ Type_Kind :: enum u32le {
 	Relative_Slice     = 21,
 	Multi_Pointer      = 22,
 	Matrix             = 23,
+	Soa_Pointer        = 24,
 }
 
 Type_Elems_Cap :: 4
@@ -245,6 +246,7 @@ Type :: struct {
 	// .Relative_Slice     - 2 types:   0=slice type, 1=base integer
 	// .Multi_Pointer      - 1 type:    0=element
 	// .Matrix             - 1 type:    0=element
+	// .Soa_Pointer        - 1 type:    0=element
 	types: Array(Type_Index),
 
 	// Used by:

@@ -519,7 +519,7 @@ join_adjacent_string_literals :: proc(cpp: ^Preprocessor, initial_tok: ^Token) {
 
 
 quote_string :: proc(s: string) -> []byte {
-	b := strings.make_builder(0, len(s)+2)
+	b := strings.builder_make(0, len(s)+2)
 	io.write_quoted_string(strings.to_writer(&b), s, '"')
 	return b.buf[:]
 }
@@ -1276,7 +1276,7 @@ preprocess_internal :: proc(cpp: ^Preprocessor, tok: ^Token) -> ^Token {
 				if start.file != nil {
 					dir = filepath.dir(start.file.name)
 				}
-				path := filepath.join(dir, filename)
+				path := filepath.join({dir, filename})
 				if os.exists(path) {
 					tok = include_file(cpp, tok, path, start.next.next)
 					continue

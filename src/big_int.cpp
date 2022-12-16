@@ -71,7 +71,7 @@ void big_int_and    (BigInt *dst, BigInt const *x, BigInt const *y);
 void big_int_and_not(BigInt *dst, BigInt const *x, BigInt const *y);
 void big_int_xor    (BigInt *dst, BigInt const *x, BigInt const *y);
 void big_int_or     (BigInt *dst, BigInt const *x, BigInt const *y);
-void big_int_not    (BigInt *dst, BigInt const *x, u64 bit_count, bool is_signed);
+void big_int_not    (BigInt *dst, BigInt const *x, i32 bit_count, bool is_signed);
 
 
 void big_int_add_eq(BigInt *dst, BigInt const *x);

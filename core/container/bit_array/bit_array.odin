@@ -186,6 +186,33 @@ set :: proc(ba: ^Bit_Array, #any_int index: uint, allocator := context.allocator
 }
 
 /*
+	In:
+		- ba:    ^Bit_Array - a pointer to the Bit Array
+		- index: The bit index. Can be an enum member.
+
+	Out:
+		- ok:    Whether or not we managed to unset requested bit.
+
+	`unset` automatically resizes the Bit Array to accommodate the requested index if needed.
+*/
+unset :: proc(ba: ^Bit_Array, #any_int index: uint, allocator := context.allocator) -> (ok: bool) {
+
+	idx := int(index) - ba.bias
+
+	if ba == nil || int(index) < ba.bias { return false }
+	context.allocator = allocator
+
+	leg_index := idx >> INDEX_SHIFT
+	bit_index := idx &  INDEX_MASK
+
+	resize_if_needed(ba, leg_index) or_return
+
+	ba.max_index = max(idx, ba.max_index)
+	ba.bits[leg_index] &= ~(1 << uint(bit_index))
+	return true
+}
+
+/*
 	A helper function to create a Bit Array with optional bias, in case your smallest index is non-zero (including negative).
 */
 create :: proc(max_index: int, min_index := 0, allocator := context.allocator) -> (res: ^Bit_Array, ok: bool) #optional_ok {

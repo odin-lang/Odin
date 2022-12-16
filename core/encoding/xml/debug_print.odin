@@ -23,7 +23,7 @@ print :: proc(writer: io.Writer, doc: ^Document) -> (written: int, err: io.Error
 
 	written += wprintf(writer, "[XML Prolog]\n")
 
-	for attr in doc.prolog {
+	for attr in doc.prologue {
 		written += wprintf(writer, "\t%v: %v\n", attr.key, attr.val)
 	}
 

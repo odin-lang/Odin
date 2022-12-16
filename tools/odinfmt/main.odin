@@ -55,7 +55,7 @@ format_file :: proc(filepath: string) -> (string, bool) {
 
 files: [dynamic]string;
 
-walk_files :: proc(info: os.File_Info, in_err: os.Errno) -> (err: os.Errno, skip_dir: bool) {
+walk_files :: proc(info: os.File_Info, in_err: os.Errno, user_data: rawptr) -> (err: os.Errno, skip_dir: bool) {
 	if info.is_dir {
 		return 0, false;
 	}
@@ -70,7 +70,7 @@ walk_files :: proc(info: os.File_Info, in_err: os.Errno) -> (err: os.Errno, skip
 }
 
 main :: proc() {
-	init_global_temporary_allocator(mem.megabytes(100));
+	init_global_temporary_allocator(mem.Megabyte * 100)
 
 	args: Args;
 
@@ -111,7 +111,7 @@ main :: proc() {
 			}
 		}
 	} else if os.is_dir(path) {
-		filepath.walk(path, walk_files);
+		filepath.walk(path, walk_files, nil);
 
 		for file in files {
 

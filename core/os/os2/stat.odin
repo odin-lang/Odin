@@ -1,6 +1,7 @@
 package os2
 
 import "core:time"
+import "core:runtime"
 
 File_Info :: struct {
 	fullpath: string,
@@ -13,26 +14,26 @@ File_Info :: struct {
 	access_time:       time.Time,
 }
 
-file_info_slice_delete :: proc(infos: []File_Info, allocator := context.allocator) {
+file_info_slice_delete :: proc(infos: []File_Info, allocator: runtime.Allocator) {
 	for i := len(infos)-1; i >= 0; i -= 1 {
 		file_info_delete(infos[i], allocator)
 	}
 	delete(infos, allocator)
 }
 
-file_info_delete :: proc(fi: File_Info, allocator := context.allocator) {
+file_info_delete :: proc(fi: File_Info, allocator: runtime.Allocator) {
 	delete(fi.fullpath, allocator)
 }
 
-fstat :: proc(fd: Handle, allocator := context.allocator) -> (File_Info, Maybe(Path_Error)) {
-	return _fstat(fd, allocator)
+fstat :: proc(f: ^File, allocator: runtime.Allocator) -> (File_Info, Error) {
+	return _fstat(f, allocator)
 }
 
-stat :: proc(name: string, allocator := context.allocator) -> (File_Info, Maybe(Path_Error)) {
+stat :: proc(name: string, allocator: runtime.Allocator) -> (File_Info, Error) {
 	return _stat(name, allocator)
 }
 
-lstat :: proc(name: string, allocator := context.allocator) -> (File_Info, Maybe(Path_Error)) {
+lstat :: proc(name: string, allocator: runtime.Allocator) -> (File_Info, Error) {
 	return _lstat(name, allocator)
 }
 

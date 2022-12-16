@@ -1,21 +1,27 @@
+//+private
 package time
 
 import win32 "core:sys/windows"
 
-IS_SUPPORTED :: true
+_IS_SUPPORTED :: true
 
-now :: proc() -> Time {
+_now :: proc "contextless" () -> Time {
 	file_time: win32.FILETIME
-	win32.GetSystemTimeAsFileTime(&file_time)
-	ns := win32.FILETIME_as_unix_nanoseconds(file_time)
-	return Time{_nsec=ns}
+
+	ns: i64
+
+	// monotonic
+	win32.GetSystemTimePreciseAsFileTime(&file_time)
+
+	dt := u64(transmute(u64le)file_time) // in 100ns units
+	ns = i64((dt - 116444736000000000) * 100) // convert to ns
+
+	return unix(0, ns)
 }
 
-sleep :: proc(d: Duration) {
+_sleep :: proc "contextless" (d: Duration) {
 	win32.Sleep(win32.DWORD(d/Millisecond))
 }
-
-
 
 _tick_now :: proc "contextless" () -> Tick {
 	mul_div_u64 :: proc "contextless" (val, num, den: i64) -> i64 {

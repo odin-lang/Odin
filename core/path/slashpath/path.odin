@@ -146,7 +146,7 @@ clean :: proc(path: string, allocator := context.allocator) -> string {
 }
 
 // join joins numerous path elements into a single path
-join :: proc(elems: ..string, allocator := context.allocator) -> string {
+join :: proc(elems: []string, allocator := context.allocator) -> string {
 	context.allocator = allocator
 	for elem, i in elems {
 		if elem != "" {

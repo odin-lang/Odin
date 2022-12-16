@@ -14,14 +14,14 @@ _ :: mem
 	Turn a pointer and a length into a slice.
 */
 from_ptr :: proc "contextless" (ptr: ^$T, count: int) -> []T {
-    return ([^]T)(ptr)[:count]
+	return ([^]T)(ptr)[:count]
 }
 
 /*
 	Turn a pointer and a length into a byte slice.
 */
 bytes_from_ptr :: proc "contextless" (ptr: rawptr, byte_count: int) -> []byte {
-    return ([^]byte)(ptr)[:byte_count]
+	return ([^]byte)(ptr)[:byte_count]
 }
 
 /*
@@ -170,6 +170,21 @@ simple_equal :: proc(a, b: $T/[]$E) -> bool where intrinsics.type_is_simple_comp
 	return mem.compare_ptrs(raw_data(a), raw_data(b), len(a)*size_of(E)) == 0
 }
 
+/*
+	return the prefix length common between slices `a` and `b`.
+
+	slice.prefix_length([]u8{1, 2, 3, 4}, []u8{1}) -> 1
+	slice.prefix_length([]u8{1, 2, 3, 4}, []u8{1, 2, 3}) -> 3
+	slice.prefix_length([]u8{1, 2, 3, 4}, []u8{2, 3, 4}) -> 0
+*/
+prefix_length :: proc(a, b: $T/[]$E) -> (n: int) where intrinsics.type_is_comparable(E) {
+	_len := builtin.min(len(a), len(b))
+
+	#no_bounds_check for n < _len && a[n] == b[n] {
+		n += 1
+	}
+	return
+}
 
 has_prefix :: proc(array: $T/[]$E, needle: E) -> bool where intrinsics.type_is_comparable(E) {
 	n := len(needle)
@@ -306,14 +321,14 @@ last_ptr :: proc(array: $T/[]$E) -> ^E {
 }
 
 get :: proc(array: $T/[]$E, index: int) -> (value: E, ok: bool) {
-	if 0 <= index && index < len(array) {
+	if uint(index) < len(array) {
 		value = array[index]
 		ok = true
 	}
 	return
 }
 get_ptr :: proc(array: $T/[]$E, index: int) -> (value: ^E, ok: bool) {
-	if 0 <= index && index < len(array) {
+	if uint(index) < len(array) {
 		value = &array[index]
 		ok = true
 	}
@@ -493,4 +508,11 @@ dot_product :: proc(a, b: $S/[]$T) -> (r: T, ok: bool)
 		r += a[i] * b[i]
 	}
 	return r, true
+}
+
+
+// Convert a pointer to an enumerated array to a slice of the element type
+enumerated_array :: proc(ptr: ^$T) -> []intrinsics.type_elem_type(T)
+	where intrinsics.type_is_enumerated_array(T) {
+	return ([^]intrinsics.type_elem_type(T))(ptr)[:len(T)]
 }

@@ -14,6 +14,13 @@ clone :: proc(s: string, allocator := context.allocator, loc := #caller_location
 	return string(c[:len(s)])
 }
 
+// returns a clone of the string `s` allocated using the `allocator`
+clone_safe :: proc(s: string, allocator := context.allocator, loc := #caller_location) -> (str: string, err: mem.Allocator_Error) {
+	c := make([]byte, len(s), allocator, loc) or_return
+	copy(c, s)
+	return string(c[:len(s)]), nil
+}
+
 // returns a clone of the string `s` allocated using the `allocator` as a cstring
 // a nul byte is appended to the clone, to make the cstring safe
 clone_to_cstring :: proc(s: string, allocator := context.allocator, loc := #caller_location) -> cstring {
@@ -209,6 +216,38 @@ equal_fold :: proc(u, v: string) -> bool {
 }
 
 /*
+	return the prefix length common between strings `a` and `b`.
+
+	strings.prefix_length("testing", "test") -> 4
+	strings.prefix_length("testing", "te") -> 2
+	strings.prefix_length("telephone", "te") -> 2
+	strings.prefix_length("testing", "est") -> 0
+*/
+prefix_length :: proc(a, b: string) -> (n: int) {
+	_len := min(len(a), len(b))
+
+	// Scan for matches including partial codepoints.
+	#no_bounds_check for n < _len && a[n] == b[n] {
+		n += 1
+	}
+
+	// Now scan to ignore partial codepoints.
+	if n > 0 {
+		s := a[:n]
+		n = 0
+		for {
+			r0, w := utf8.decode_rune(s[n:])
+			if r0 != utf8.RUNE_ERROR {
+				n += w
+			} else {
+				break
+			}
+		}
+	}
+	return
+}
+
+/*
 	return true when the string `prefix` is contained at the start of the string `s`
 
 	strings.has_prefix("testing", "test") -> true
@@ -260,6 +299,25 @@ join :: proc(a: []string, sep: string, allocator := context.allocator) -> string
 	return string(b)
 }
 
+join_safe :: proc(a: []string, sep: string, allocator := context.allocator) -> (str: string, err: mem.Allocator_Error) {
+	if len(a) == 0 {
+		return "", nil
+	}
+
+	n := len(sep) * (len(a) - 1)
+	for s in a {
+		n += len(s)
+	}
+
+	b := make([]byte, n, allocator) or_return
+	i := copy(b, a[0])
+	for s in a[1:] {
+		i += copy(b[i:], sep)
+		i += copy(b[i:], s)
+	}
+	return string(b), nil
+}
+
 /*
 	returns a combined string from the slice of strings `a` without a seperator
 	allocates the string using the `allocator`
@@ -283,6 +341,23 @@ concatenate :: proc(a: []string, allocator := context.allocator) -> string {
 		i += copy(b[i:], s)
 	}
 	return string(b)
+}
+
+concatenate_safe :: proc(a: []string, allocator := context.allocator) -> (res: string, err: mem.Allocator_Error) {
+	if len(a) == 0 {
+		return "", nil
+	}
+
+	n := 0
+	for s in a {
+		n += len(s)
+	}
+	b := make([]byte, n, allocator) or_return
+	i := 0
+	for s in a {
+		i += copy(b[i:], s)
+	}
+	return string(b), nil
 }
 
 /*
@@ -685,7 +760,7 @@ last_index_byte :: proc(s: string, c: byte) -> int {
 */
 index_rune :: proc(s: string, r: rune) -> int {
 	switch {
-	case 0 <= r && r < utf8.RUNE_SELF:
+	case u32(r) < utf8.RUNE_SELF:
 		return index_byte(s, byte(r))
 
 	case r == utf8.RUNE_ERROR:
@@ -862,14 +937,14 @@ index_any :: proc(s, chars: string) -> int {
 }
 
 /*
-	returns the index of any first char of `chars` found in `s`, -1 if not found
+	returns the last matching index in `s` of any char in `chars` found in `s`, -1 if not found
 	iterates the string in reverse
 
-	strings.index_any("test", "s") -> 2
-	strings.index_any("test", "se") -> 2
-	strings.index_any("test", "et") -> 1
-	strings.index_any("test", "set") -> 3
-	strings.index_any("test", "x") -> -1
+	strings.last_index_any("test", "s") -> 2
+	strings.last_index_any("test", "se") -> 2
+	strings.last_index_any("test", "et") -> 3
+	strings.last_index_any("test", "set") -> 3
+	strings.last_index_any("test", "x") -> -1
 */
 last_index_any :: proc(s, chars: string) -> int {
 	if chars == "" {
@@ -1478,7 +1553,7 @@ split_multi_iterate :: proc(using sm: ^Split_Multi) -> (res: string, ok: bool) #
 scrub :: proc(s: string, replacement: string, allocator := context.allocator) -> string {
 	str := s
 	b: Builder
-	init_builder(&b, 0, len(s), allocator)
+	builder_init(&b, 0, len(s), allocator)
 
 	has_error := false
 	cursor := 0
@@ -1547,7 +1622,7 @@ expand_tabs :: proc(s: string, tab_size: int, allocator := context.allocator) ->
 	}
 
 	b: Builder
-	init_builder(&b, allocator)
+	builder_init(&b, allocator)
 	writer := to_writer(&b)
 	str := s
 	column: int
@@ -1611,12 +1686,12 @@ centre_justify :: proc(str: string, length: int, pad: string, allocator := conte
 		return clone(str, allocator)
 	}
 
-	remains := length-1
+	remains := length-n
 	pad_len := rune_count(pad)
 
 	b: Builder
-	init_builder(&b, allocator)
-	grow_builder(&b, len(str) + (remains/pad_len + 1)*len(pad))
+	builder_init(&b, allocator)
+	builder_grow(&b, len(str) + (remains/pad_len + 1)*len(pad))
 
 	w := to_writer(&b)
 
@@ -1627,19 +1702,19 @@ centre_justify :: proc(str: string, length: int, pad: string, allocator := conte
 	return to_string(b)
 }
 
-// left_justify returns a string with a pad string at left side if the str's rune length is smaller than length
+// left_justify returns a string with a pad string at right side if the str's rune length is smaller than length
 left_justify :: proc(str: string, length: int, pad: string, allocator := context.allocator) -> string {
 	n := rune_count(str)
 	if n >= length || pad == "" {
 		return clone(str, allocator)
 	}
 
-	remains := length-1
+	remains := length-n
 	pad_len := rune_count(pad)
 
 	b: Builder
-	init_builder(&b, allocator)
-	grow_builder(&b, len(str) + (remains/pad_len + 1)*len(pad))
+	builder_init(&b, allocator)
+	builder_grow(&b, len(str) + (remains/pad_len + 1)*len(pad))
 
 	w := to_writer(&b)
 
@@ -1649,19 +1724,19 @@ left_justify :: proc(str: string, length: int, pad: string, allocator := context
 	return to_string(b)
 }
 
-// right_justify returns a string with a pad string at right side if the str's rune length is smaller than length
+// right_justify returns a string with a pad string at left side if the str's rune length is smaller than length
 right_justify :: proc(str: string, length: int, pad: string, allocator := context.allocator) -> string {
 	n := rune_count(str)
 	if n >= length || pad == "" {
 		return clone(str, allocator)
 	}
 
-	remains := length-1
+	remains := length-n
 	pad_len := rune_count(pad)
 
 	b: Builder
-	init_builder(&b, allocator)
-	grow_builder(&b, len(str) + (remains/pad_len + 1)*len(pad))
+	builder_init(&b, allocator)
+	builder_grow(&b, len(str) + (remains/pad_len + 1)*len(pad))
 
 	w := to_writer(&b)
 

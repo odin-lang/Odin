@@ -25,11 +25,13 @@ zero_explicit :: proc "contextless" (data: rawptr, len: int) -> rawptr {
 	intrinsics.atomic_thread_fence(.Seq_Cst) // Prevent reordering
 	return data
 }
-zero_item :: proc "contextless" (item: $P/^$T) {
+zero_item :: proc "contextless" (item: $P/^$T) -> P {
 	intrinsics.mem_zero(item, size_of(T))
+	return item
 }
-zero_slice :: proc "contextless" (data: $T/[]$E) {
+zero_slice :: proc "contextless" (data: $T/[]$E) -> T {
 	zero(raw_data(data), size_of(E)*len(data))
+	return data
 }
 
 
@@ -52,48 +54,7 @@ compare :: proc "contextless" (a, b: []byte) -> int {
 }
 
 compare_byte_ptrs :: proc "contextless" (a, b: ^byte, n: int) -> int #no_bounds_check {
-	switch {
-	case a == b:
-		return 0
-	case a == nil:
-		return -1
-	case b == nil:
-		return -1
-	case n == 0:
-		return 0
-	}
-
-	x := slice_ptr(a, n)
-	y := slice_ptr(b, n)
-
-	SU :: size_of(uintptr)
-	fast := n/SU + 1
-	offset := (fast-1)*SU
-	curr_block := 0
-	if n < SU {
-		fast = 0
-	}
-
-	la := slice_ptr((^uintptr)(a), fast)
-	lb := slice_ptr((^uintptr)(b), fast)
-
-	for /**/; curr_block < fast; curr_block += 1 {
-		if la[curr_block] ~ lb[curr_block] != 0 {
-			for pos := curr_block*SU; pos < n; pos += 1 {
-				if x[pos] ~ y[pos] != 0 {
-					return (int(x[pos]) - int(y[pos])) < 0 ? -1 : +1
-				}
-			}
-		}
-	}
-
-	for /**/; offset < n; offset += 1 {
-		if x[offset] ~ y[offset] != 0 {
-			return (int(x[offset]) - int(y[offset])) < 0 ? -1 : +1
-		}
-	}
-
-	return 0
+	return runtime.memory_compare(a, b, n)
 }
 
 check_zero :: proc(data: []byte) -> bool {
@@ -106,6 +67,12 @@ check_zero_ptr :: proc(ptr: rawptr, len: int) -> bool {
 		return true
 	case ptr == nil:
 		return true
+	}
+	switch len {
+	case 1: return (^u8)(ptr)^ == 0
+	case 2: return intrinsics.unaligned_load((^u16)(ptr)) == 0
+	case 4: return intrinsics.unaligned_load((^u32)(ptr)) == 0
+	case 8: return intrinsics.unaligned_load((^u64)(ptr)) == 0
 	}
 
 	start := uintptr(ptr)
@@ -150,7 +117,7 @@ slice_ptr :: proc "contextless" (ptr: ^$T, len: int) -> []T {
 	return ([^]T)(ptr)[:len]
 }
 
-byte_slice :: #force_inline proc "contextless" (data: rawptr, len: int) -> []byte {
+byte_slice :: #force_inline proc "contextless" (data: rawptr, #any_int len: int) -> []byte {
 	return ([^]u8)(data)[:max(len, 0)]
 }
 

@@ -24,7 +24,7 @@ reader_init :: proc(r: ^Reader, s: string) {
 // returns a stream from the reader data
 reader_to_stream :: proc(r: ^Reader) -> (s: io.Stream) {
 	s.stream_data = r
-	s.stream_vtable = _reader_vtable
+	s.stream_vtable = &_reader_vtable
 	return
 }
 
@@ -39,20 +39,6 @@ to_reader :: proc(r: ^Reader, s: string) -> io.Reader {
 to_reader_at :: proc(r: ^Reader, s: string) -> io.Reader_At {
 	reader_init(r, s)
 	rr, _ := io.to_reader_at(reader_to_stream(r))
-	return rr
-}
-
-// init a reader to the string `s` and return an io.Byte_Reader
-to_byte_reader :: proc(r: ^Reader, s: string) -> io.Byte_Reader {
-	reader_init(r, s)
-	rr, _ := io.to_byte_reader(reader_to_stream(r))
-	return rr
-}
-
-// init a reader to the string `s` and return an io.Rune_Reader
-to_rune_reader :: proc(r: ^Reader, s: string) -> io.Rune_Reader {
-	reader_init(r, s)
-	rr, _ := io.to_rune_reader(reader_to_stream(r))
 	return rr
 }
 
@@ -191,7 +177,7 @@ reader_write_to :: proc(r: ^Reader, w: io.Writer) -> (n: i64, err: io.Error) {
 }
 
 @(private)
-_reader_vtable := &io.Stream_VTable{
+_reader_vtable := io.Stream_VTable{
 	impl_size = proc(s: io.Stream) -> i64 {
 		r := (^Reader)(s.stream_data)
 		return reader_size(r)

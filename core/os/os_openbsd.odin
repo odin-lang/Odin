@@ -125,10 +125,6 @@ O_EXCL     :: 0x00800
 O_NOCTTY   :: 0x08000
 O_CLOEXEC  :: 0x10000
 
-SEEK_SET :: 0
-SEEK_CUR :: 1
-SEEK_END :: 2
-
 RTLD_LAZY     :: 0x001
 RTLD_NOW      :: 0x002
 RTLD_LOCAL    :: 0x000
@@ -298,7 +294,7 @@ is_path_separator :: proc(r: rune) -> bool {
 	return r == '/'
 }
 
-get_last_error :: proc() -> int {
+get_last_error :: proc "contextless" () -> int {
 	return __errno()^
 }
 
@@ -609,9 +605,15 @@ access :: proc(path: string, mask: int) -> (bool, Errno) {
 	return true, ERROR_NONE
 }
 
-heap_alloc :: proc(size: int) -> rawptr {
-	assert(size >= 0)
-	return _unix_calloc(1, c.size_t(size))
+heap_alloc :: proc(size: int, zero_memory := true) -> rawptr {
+	if size <= 0 {
+		return nil
+	}
+	if zero_memory {
+		return _unix_calloc(1, c.size_t(size))
+	} else {
+		return _unix_malloc(c.size_t(size))
+	}
 }
 
 heap_resize :: proc(ptr: rawptr, new_size: int) -> rawptr {
@@ -624,13 +626,18 @@ heap_free :: proc(ptr: rawptr) {
 	_unix_free(ptr)
 }
 
-getenv :: proc(name: string) -> (string, bool) {
-	path_str := strings.clone_to_cstring(name, context.temp_allocator)
+lookup_env :: proc(key: string, allocator := context.allocator) -> (value: string, found: bool) {
+	path_str := strings.clone_to_cstring(key, context.temp_allocator)
 	cstr := _unix_getenv(path_str)
 	if cstr == nil {
 		return "", false
 	}
-	return string(cstr), true
+	return strings.clone(string(cstr), allocator), true
+}
+
+get_env :: proc(key: string, allocator := context.allocator) -> (value: string) {
+	value, _ = lookup_env(key, allocator)
+	return
 }
 
 get_current_directory :: proc() -> string {

@@ -4,7 +4,7 @@ package glfw
 /* Versions */
 VERSION_MAJOR    :: 3
 VERSION_MINOR    :: 3
-VERSION_REVISION :: 4
+VERSION_REVISION :: 8
 
 /* Booleans */
 TRUE  :: true
@@ -338,6 +338,9 @@ LOCK_KEY_MODS        :: 0x00033004
 CURSOR_NORMAL   :: 0x00034001
 CURSOR_HIDDEN   :: 0x00034002
 CURSOR_DISABLED :: 0x00034003
+
+/* Mouse motion */
+RAW_MOUSE_MOTION :: 0x00033005
 
 /* Behavior? */
 ANY_RELEASE_BEHAVIOR   :: 0

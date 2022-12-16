@@ -10,14 +10,14 @@ when ODIN_DEFAULT_TO_NIL_ALLOCATOR {
 	                                size, alignment: int,
 	                                old_memory: rawptr, old_size: int, loc := #caller_location) -> (data: []byte, err: Allocator_Error) {
 		switch mode {
-		case .Alloc:
-			data, err = _windows_default_alloc(size, alignment)
+		case .Alloc, .Alloc_Non_Zeroed:
+			data, err = _windows_default_alloc(size, alignment, mode == .Alloc)
 
 		case .Free:
 			_windows_default_free(old_memory)
 
 		case .Free_All:
-			// NOTE(tetra): Do nothing.
+			return nil, .Mode_Not_Implemented
 
 		case .Resize:
 			data, err = _windows_default_resize(old_memory, old_size, size, alignment)
@@ -25,11 +25,11 @@ when ODIN_DEFAULT_TO_NIL_ALLOCATOR {
 		case .Query_Features:
 			set := (^Allocator_Mode_Set)(old_memory)
 			if set != nil {
-				set^ = {.Alloc, .Free, .Resize, .Query_Features}
+				set^ = {.Alloc, .Alloc_Non_Zeroed, .Free, .Resize, .Query_Features}
 			}
 
 		case .Query_Info:
-			// Do nothing
+			return nil, .Mode_Not_Implemented
 		}
 
 		return

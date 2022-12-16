@@ -81,7 +81,7 @@ max_single :: proc(a: $T) -> (out: ELEM_TYPE(T)) where IS_NUMERIC(ELEM_TYPE(T)) 
 		} else when N == 2 {
 			out = builtin.max(a[0], a[1])
 		} else when N == 3 {
-			out = builtin.max(a[0], a[1], a[3])
+			out = builtin.max(a[0], a[1], a[2])
 		}else {
 			out = builtin.max(a[0], a[1])
 			for i in 2..<N {
@@ -426,14 +426,14 @@ distance :: proc(p0, p1: $V/[$N]$E) -> E where IS_NUMERIC(E) {
 }
 
 reflect :: proc(I, N: $T) -> (out: T) where IS_ARRAY(T), IS_FLOAT(ELEM_TYPE(T)) {
-	b := n * (2 * dot(n, i))
-	return i - b
+	b := N * (2 * dot(N, I))
+	return I - b
 }
 refract :: proc(I, N: $T) -> (out: T) where IS_ARRAY(T), IS_FLOAT(ELEM_TYPE(T)) {
-	dv := dot(n, i)
+	dv := dot(N, I)
 	k := 1 - eta*eta - (1 - dv*dv)
-	a := i * eta
-	b := n * eta*dv*math.sqrt(k)
+	a := I * eta
+	b := N * eta*dv*math.sqrt(k)
 	return (a - b) * E(int(k >= 0))
 }
 
@@ -531,7 +531,7 @@ not_equal          :: proc{not_equal_single, not_equal_array}
 
 any :: proc(x: $A/[$N]bool) -> (out: bool) {
 	for e in x {
-		if x {
+		if e {
 			return true
 		}
 	}

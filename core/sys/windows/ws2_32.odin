@@ -87,6 +87,19 @@ foreign ws2_32 {
 		res: ^^ADDRINFOA,
 	) -> c_int ---
 	freeaddrinfo :: proc(res: ^ADDRINFOA) ---
+	FreeAddrInfoExW :: proc(pAddrInfoEx: PADDRINFOEXW) ---
+	GetAddrInfoExW :: proc(
+		pName:               PCWSTR,
+		pServiceName:        PCWSTR,
+		dwNameSpace:         DWORD,
+		lpNspId:             LPGUID,
+		hints:               ^ADDRINFOEXW,
+		ppResult:            ^PADDRINFOEXW,
+		timeout:             ^timeval,
+		lpOverlapped:        LPOVERLAPPED,
+		lpCompletionRoutine: LPLOOKUPSERVICE_COMPLETION_ROUTINE,
+		lpHandle:            LPHANDLE) -> INT ---
+
 	select :: proc(
 		nfds: c_int,
 		readfds: ^fd_set,
