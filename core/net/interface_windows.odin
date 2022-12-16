@@ -143,7 +143,7 @@ enumerate_interfaces :: proc(allocator := context.allocator) -> (interfaces: []N
 	Takes a UTF-16 wstring and clones it.
 */
 wstring_to_string :: proc(s: ^u16, max_size := 256, allocator := context.allocator) -> (res: string) {
-	temp := sys.wstring_to_utf8((sys.wstring)(s), max_size, context.temp_allocator)
+	temp, err := sys.wstring_to_utf8((sys.wstring)(s), max_size, context.temp_allocator)
 	return strings.clone(temp[:len(temp)], allocator)
 }
 
