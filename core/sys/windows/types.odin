@@ -153,10 +153,6 @@ TIMER_QUERY_STATE  :: 0x0001
 TIMER_MODIFY_STATE :: 0x0002
 TIMER_ALL_ACCESS   :: STANDARD_RIGHTS_REQUIRED | SYNCHRONIZE | TIMER_QUERY_STATE | TIMER_MODIFY_STATE
 
-SOCKET :: distinct uintptr // TODO
-socklen_t :: c_int
-ADDRESS_FAMILY :: USHORT
-
 TRUE  :: BOOL(true)
 FALSE :: BOOL(false)
 
@@ -1867,30 +1863,6 @@ BI_BITFIELDS :: 3
 BI_JPEG      :: 4
 BI_PNG       :: 5
 
-WSA_FLAG_OVERLAPPED: DWORD : 0x01
-WSA_FLAG_NO_HANDLE_INHERIT: DWORD : 0x80
-
-WSADESCRIPTION_LEN :: 256
-WSASYS_STATUS_LEN :: 128
-WSAPROTOCOL_LEN: DWORD : 255
-INVALID_SOCKET :: ~SOCKET(0)
-
-WSAEACCES: c_int : 10013
-WSAEINVAL: c_int : 10022
-WSAEWOULDBLOCK: c_int : 10035
-WSAEPROTOTYPE: c_int : 10041
-WSAEADDRINUSE: c_int : 10048
-WSAEADDRNOTAVAIL: c_int : 10049
-WSAECONNABORTED: c_int : 10053
-WSAECONNRESET: c_int : 10054
-WSAENOTCONN: c_int : 10057
-WSAESHUTDOWN: c_int : 10058
-WSAETIMEDOUT: c_int : 10060
-WSAECONNREFUSED: c_int : 10061
-WSATRY_AGAIN: c_int : 11002
-
-MAX_PROTOCOL_CHAIN: DWORD : 7
-
 MAXIMUM_REPARSE_DATA_BUFFER_SIZE :: 16 * 1024
 FSCTL_GET_REPARSE_POINT: DWORD : 0x900a8
 IO_REPARSE_TAG_SYMLINK: DWORD : 0xa000000c
@@ -2362,73 +2334,11 @@ ADDRESS_MODE :: enum c_int {
 	AddrModeFlat,
 }
 
-SOCKADDR_STORAGE_LH :: struct {
-	ss_family: ADDRESS_FAMILY,
-	__ss_pad1: [6]CHAR,
-	__ss_align: i64,
-	__ss_pad2: [112]CHAR,
-}
-
-ADDRINFOA :: struct {
-	ai_flags: c_int,
-	ai_family: c_int,
-	ai_socktype: c_int,
-	ai_protocol: c_int,
-	ai_addrlen: size_t,
-	ai_canonname: ^c_char,
-	ai_addr: ^SOCKADDR,
-	ai_next: ^ADDRINFOA,
-}
-
-PADDRINFOEXW  :: ^ADDRINFOEXW
-LPADDRINFOEXW :: ^ADDRINFOEXW
-ADDRINFOEXW :: struct {
-	ai_flags:     c_int,
-	ai_family:    c_int,
-	ai_socktype:  c_int,
-	ai_protocol:  c_int,
-	ai_addrlen:   size_t,
-	ai_canonname: wstring,
-	ai_addr:      ^sockaddr,
-	ai_blob:      rawptr,
-	ai_bloblen:   size_t,
-	ai_provider:  LPGUID,
-	ai_next:      ^ADDRINFOEXW,
-}
-
 LPLOOKUPSERVICE_COMPLETION_ROUTINE :: #type proc "stdcall" (
 	dwErrorCode: DWORD,
 	dwNumberOfBytesTransfered: DWORD,
 	lpOverlapped: LPOVERLAPPED,
 )
-
-sockaddr  :: struct {
-	sa_family: USHORT,
-	sa_data:   [14]byte,
-}
-
-sockaddr_in :: struct {
-	sin_family: ADDRESS_FAMILY,
-	sin_port: USHORT,
-	sin_addr: in_addr,
-	sin_zero: [8]CHAR,
-}
-
-sockaddr_in6 :: struct {
-	sin6_family: ADDRESS_FAMILY,
-	sin6_port: USHORT,
-	sin6_flowinfo: c_ulong,
-	sin6_addr: in6_addr,
-	sin6_scope_id: c_ulong,
-}
-
-in_addr :: struct {
-	s_addr: u32,
-}
-
-in6_addr :: struct {
-	s6_addr: [16]u8,
-}
 
 EXCEPTION_DISPOSITION :: enum c_int {
 	ExceptionContinueExecution,
