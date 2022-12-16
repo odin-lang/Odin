@@ -182,7 +182,7 @@ parse_ip6_address :: proc(address_and_maybe_port: string) -> (addr: IP6_Address,
 
 	for ch, i in address {
 		switch ch {
-		case '0'..'9', 'a'..'f', 'A'..'F':
+		case '0'..='9', 'a'..='f', 'A'..='F':
 			piece_end += 1
 
 		case ':':
@@ -751,11 +751,11 @@ parse_ip_component :: proc(input: string, max_value := u64(max(u32)), bases := D
 
 	parse_loop: for ch in input {
 		switch ch {
-		case '0'..'7':
+		case '0'..='7':
 			digit_bytes += 1
 			value = value * base + u64(ch - '0')
 
-		case '8'..'9':
+		case '8'..='9':
 			digit_bytes += 1
 
 			if base == 8 {
@@ -766,7 +766,7 @@ parse_ip_component :: proc(input: string, max_value := u64(max(u32)), bases := D
 			}
 			value = value * base + u64(ch - '0')
 
-		case 'a'..'f':
+		case 'a'..='f':
 			digit_bytes += 1
 
 			if base == 8 || base == 10 {
@@ -777,7 +777,7 @@ parse_ip_component :: proc(input: string, max_value := u64(max(u32)), bases := D
 			}
 			value = value * base + (u64(ch - 'a') + 10)
 
-		case 'A'..'F':
+		case 'A'..='F':
 			digit_bytes += 1
 
 			if base == 8 || base == 10 {

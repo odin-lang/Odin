@@ -606,7 +606,7 @@ validate_hostname :: proc(hostname: string) -> (ok: bool) {
 			switch ch {
 			case:
 				return
-			case 'a'..'z', 'A'..'Z', '0'..'9', '-':
+			case 'a'..='z', 'A'..='Z', '0'..='9', '-':
 				continue
 			}
 		}
