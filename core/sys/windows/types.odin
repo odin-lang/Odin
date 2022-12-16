@@ -2431,7 +2431,6 @@ FILE_ATTRIBUTE_TAG_INFO :: struct {
 }
 
 
-
 // https://docs.microsoft.com/en-gb/windows/win32/api/sysinfoapi/ns-sysinfoapi-system_info
 SYSTEM_INFO :: struct {
 	using _: struct #raw_union {
@@ -3106,6 +3105,21 @@ in6_addr :: struct {
 	s6_addr: [16]u8,
 }
 
+PADDRINFOEXW  :: ^ADDRINFOEXW
+LPADDRINFOEXW :: ^ADDRINFOEXW
+ADDRINFOEXW :: struct {
+	ai_flags:     c_int,
+	ai_family:    c_int,
+	ai_socktype:  c_int,
+	ai_protocol:  c_int,
+	ai_addrlen:   size_t,
+	ai_canonname: wstring,
+	ai_addr:      ^sockaddr,
+	ai_blob:      rawptr,
+	ai_bloblen:   size_t,
+	ai_provider:  LPGUID,
+	ai_next:      ^ADDRINFOEXW,
+}
 
 DNS_STATUS :: distinct DWORD // zero is success
 DNS_INFO_NO_RECORDS :: 9501
