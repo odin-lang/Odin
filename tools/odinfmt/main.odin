@@ -3,6 +3,7 @@ package odinfmt
 import "core:os"
 import "core:odin/tokenizer"
 import "core:odin/format"
+import "core:odin/parser"
 import "core:fmt"
 import "core:strings"
 import "core:path/filepath"
@@ -47,7 +48,7 @@ print_arg_error :: proc(args: []string, error: flag.Flag_Error) {
 
 format_file :: proc(filepath: string) -> (string, bool) {
 	if data, ok := os.read_entire_file(filepath); ok {
-		return format.format(filepath, string(data), format.default_style);
+		return format.format(filepath, string(data), format.default_style, parser.Flags{.Optional_Semicolons});
 	} else {
 		return "", false;
 	}
