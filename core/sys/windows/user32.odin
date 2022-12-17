@@ -62,6 +62,8 @@ foreign user32 {
 	PostThreadMessageA :: proc(idThread: DWORD, Msg: UINT, wParam: WPARAM, lParam: LPARAM) -> BOOL ---
 	PostThreadMessageW :: proc(idThread: DWORD, Msg: UINT, wParam: WPARAM, lParam: LPARAM) -> BOOL ---
 
+	RegisterWindowMessageW :: proc(lpString: LPCWSTR) -> UINT ---
+
 	PostQuitMessage :: proc(nExitCode: c_int) ---
 
 	GetQueueStatus :: proc(flags: UINT) -> DWORD ---
@@ -142,6 +144,7 @@ foreign user32 {
 	GetCursorPos :: proc(lpPoint: LPPOINT) -> BOOL ---
 	SetCursorPos :: proc(X: c_int, Y: c_int) -> BOOL ---
 	SetCursor :: proc(hCursor: HCURSOR) -> HCURSOR ---
+	ShowCursor:: proc(bShow: BOOL) -> c_int ---
 
 	EnumDisplaySettingsW :: proc(lpszDeviceName: LPCWSTR, iModeNum: DWORD, lpDevMode: ^DEVMODEW) -> BOOL ---
 

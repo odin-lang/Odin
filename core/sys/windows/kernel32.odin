@@ -370,6 +370,8 @@ foreign kernel32 {
 		lpTotalNumberOfBytes: PULARGE_INTEGER,
 		lpTotalNumberOfFreeBytes: PULARGE_INTEGER,
 	) -> BOOL ---
+    FindFirstChangeNotificationW :: proc(lpPathName: LPCWSTR, bWatchSubtree: BOOL, dwNotifyFilter: DWORD) -> HANDLE ---
+    FindNextChangeNotification :: proc(hChangeHandle: HANDLE) -> BOOL ---
 }
 
 
