@@ -1,4 +1,4 @@
-isize lb_type_info_index(CheckerInfo *info, Type *type, bool err_on_not_found=true) {
+gb_internal isize lb_type_info_index(CheckerInfo *info, Type *type, bool err_on_not_found=true) {
 	auto *set = &info->minimum_dependency_type_info_set;
 	isize index = type_info_index(info, type, err_on_not_found);
 	if (index >= 0) {
@@ -13,7 +13,7 @@ isize lb_type_info_index(CheckerInfo *info, Type *type, bool err_on_not_found=tr
 	return -1;
 }
 
-lbValue lb_typeid(lbModule *m, Type *type) {
+gb_internal lbValue lb_typeid(lbModule *m, Type *type) {
 	GB_ASSERT(!build_context.disallow_rtti);
 
 	type = default_type(type);
@@ -90,7 +90,7 @@ lbValue lb_typeid(lbModule *m, Type *type) {
 	return res;
 }
 
-lbValue lb_type_info(lbModule *m, Type *type) {
+gb_internal lbValue lb_type_info(lbModule *m, Type *type) {
 	GB_ASSERT(!build_context.disallow_rtti);
 
 	type = default_type(type);
@@ -102,36 +102,36 @@ lbValue lb_type_info(lbModule *m, Type *type) {
 	return lb_emit_array_epi(m, data, index);
 }
 
-LLVMTypeRef lb_get_procedure_raw_type(lbModule *m, Type *type) {
+gb_internal LLVMTypeRef lb_get_procedure_raw_type(lbModule *m, Type *type) {
 	return lb_type_internal_for_procedures_raw(m, type);
 }
 
 
-lbValue lb_type_info_member_types_offset(lbProcedure *p, isize count) {
+gb_internal lbValue lb_type_info_member_types_offset(lbProcedure *p, isize count) {
 	GB_ASSERT(p->module == &p->module->gen->default_module);
 	lbValue offset = lb_emit_array_epi(p, lb_global_type_info_member_types.addr, lb_global_type_info_member_types_index);
 	lb_global_type_info_member_types_index += cast(i32)count;
 	return offset;
 }
-lbValue lb_type_info_member_names_offset(lbProcedure *p, isize count) {
+gb_internal lbValue lb_type_info_member_names_offset(lbProcedure *p, isize count) {
 	GB_ASSERT(p->module == &p->module->gen->default_module);
 	lbValue offset = lb_emit_array_epi(p, lb_global_type_info_member_names.addr, lb_global_type_info_member_names_index);
 	lb_global_type_info_member_names_index += cast(i32)count;
 	return offset;
 }
-lbValue lb_type_info_member_offsets_offset(lbProcedure *p, isize count) {
+gb_internal lbValue lb_type_info_member_offsets_offset(lbProcedure *p, isize count) {
 	GB_ASSERT(p->module == &p->module->gen->default_module);
 	lbValue offset = lb_emit_array_epi(p, lb_global_type_info_member_offsets.addr, lb_global_type_info_member_offsets_index);
 	lb_global_type_info_member_offsets_index += cast(i32)count;
 	return offset;
 }
-lbValue lb_type_info_member_usings_offset(lbProcedure *p, isize count) {
+gb_internal lbValue lb_type_info_member_usings_offset(lbProcedure *p, isize count) {
 	GB_ASSERT(p->module == &p->module->gen->default_module);
 	lbValue offset = lb_emit_array_epi(p, lb_global_type_info_member_usings.addr, lb_global_type_info_member_usings_index);
 	lb_global_type_info_member_usings_index += cast(i32)count;
 	return offset;
 }
-lbValue lb_type_info_member_tags_offset(lbProcedure *p, isize count) {
+gb_internal lbValue lb_type_info_member_tags_offset(lbProcedure *p, isize count) {
 	GB_ASSERT(p->module == &p->module->gen->default_module);
 	lbValue offset = lb_emit_array_epi(p, lb_global_type_info_member_tags.addr, lb_global_type_info_member_tags_index);
 	lb_global_type_info_member_tags_index += cast(i32)count;
@@ -139,7 +139,7 @@ lbValue lb_type_info_member_tags_offset(lbProcedure *p, isize count) {
 }
 
 
-void lb_setup_type_info_data(lbProcedure *p) { // NOTE(bill): Setup type_info data
+gb_internal void lb_setup_type_info_data(lbProcedure *p) { // NOTE(bill): Setup type_info data
 	if (build_context.disallow_rtti) {
 		return;
 	}
