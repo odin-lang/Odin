@@ -30,7 +30,7 @@
 	NOTE(Jeroen): This prints the Windows product edition only, to be called from `print_platform_details`.
 */
 #if defined(GB_SYSTEM_WINDOWS)
-void report_windows_product_type(DWORD ProductType) {
+gb_internal void report_windows_product_type(DWORD ProductType) {
 	switch (ProductType) {
 	case PRODUCT_ULTIMATE:
 		gb_printf("Ultimate");
@@ -154,7 +154,7 @@ void report_windows_product_type(DWORD ProductType) {
 }
 #endif
 
-void odin_cpuid(int leaf, int result[]) {
+gb_internal void odin_cpuid(int leaf, int result[]) {
 	#if defined(GB_CPU_ARM)
 		return;
 
@@ -169,7 +169,7 @@ void odin_cpuid(int leaf, int result[]) {
 	#endif
 }
 
-void report_cpu_info() {
+gb_internal void report_cpu_info() {
 	gb_printf("\tCPU:  ");
 
 	#if defined(GB_CPU_X86)
@@ -220,7 +220,7 @@ void report_cpu_info() {
 /*
 	Report the amount of installed RAM.
 */
-void report_ram_info() {
+gb_internal void report_ram_info() {
 	gb_printf("\tRAM:  ");
 
 	#if defined(GB_SYSTEM_WINDOWS)
@@ -271,7 +271,7 @@ void report_ram_info() {
 	#endif
 }
 
-void report_os_info() {
+gb_internal void report_os_info() {
 	gb_printf("\tOS:   ");
 
 	#if defined(GB_SYSTEM_WINDOWS)
@@ -966,7 +966,7 @@ void report_os_info() {
 }
 
 // NOTE(Jeroen): `odin report` prints some system information for easier bug reporting.
-void print_bug_report_help() {
+gb_internal void print_bug_report_help() {
 	gb_printf("Where to find more information and get into contact when you encounter a bug:\n\n");
 	gb_printf("\tWebsite: https://odin-lang.org\n");
 	gb_printf("\tGitHub:  https://github.com/odin-lang/Odin/issues\n");

@@ -1,7 +1,7 @@
 struct QueryValue;
 struct QueryValuePair;
 
-gbAllocator query_value_allocator = {};
+gb_global gbAllocator query_value_allocator = {};
 
 enum QueryKind {
 	Query_Invalid,
@@ -189,16 +189,16 @@ struct QueryValueMap : QueryValue {
 	return v; \
 }
 
-DEF_QUERY_PROC(QueryValueString,  String const &,                query_value_string);
-DEF_QUERY_PROC(QueryValueBoolean, bool,                          query_value_boolean);
-DEF_QUERY_PROC(QueryValueInteger, i64,                           query_value_integer);
-DEF_QUERY_PROC(QueryValueFloat,   f64,                           query_value_float);
-DEF_QUERY_PROC(QueryValueArray,   Array<QueryValue *> const &,   query_value_array);
-DEF_QUERY_PROC(QueryValueMap,     Array<QueryValuePair> const &, query_value_map);
-DEF_QUERY_PROC0(QueryValueArray,  query_value_array);
-DEF_QUERY_PROC0(QueryValueMap,    query_value_map);
+gb_internal DEF_QUERY_PROC(QueryValueString,  String const &,                query_value_string);
+gb_internal DEF_QUERY_PROC(QueryValueBoolean, bool,                          query_value_boolean);
+gb_internal DEF_QUERY_PROC(QueryValueInteger, i64,                           query_value_integer);
+gb_internal DEF_QUERY_PROC(QueryValueFloat,   f64,                           query_value_float);
+gb_internal DEF_QUERY_PROC(QueryValueArray,   Array<QueryValue *> const &,   query_value_array);
+gb_internal DEF_QUERY_PROC(QueryValueMap,     Array<QueryValuePair> const &, query_value_map);
+gb_internal DEF_QUERY_PROC0(QueryValueArray,  query_value_array);
+gb_internal DEF_QUERY_PROC0(QueryValueMap,    query_value_map);
 
-isize qprintf(bool format, isize indent, char const *fmt, ...) {
+gb_internal isize qprintf(bool format, isize indent, char const *fmt, ...) {
 	if (format) while (indent --> 0) {
 		gb_printf("\t");
 	}
@@ -209,7 +209,7 @@ isize qprintf(bool format, isize indent, char const *fmt, ...) {
 	return res;
 }
 
-bool qv_valid_char(u8 c) {
+gb_internal bool qv_valid_char(u8 c) {
 	if (c >= 0x80) {
 		return false;
 	}
@@ -227,7 +227,7 @@ bool qv_valid_char(u8 c) {
 	return true;
 }
 
-void print_query_data_as_json(QueryValue *value, bool format = true, isize indent = 0) {
+gb_internal void print_query_data_as_json(QueryValue *value, bool format = true, isize indent = 0) {
 	if (value == nullptr) {
 		gb_printf("null");
 		return;
@@ -359,7 +359,7 @@ void print_query_data_as_json(QueryValue *value, bool format = true, isize inden
 
 
 
-int query_data_package_compare(void const *a, void const *b) {
+gb_internal int query_data_package_compare(void const *a, void const *b) {
 	AstPackage *x = *cast(AstPackage *const *)a;
 	AstPackage *y = *cast(AstPackage *const *)b;
 
@@ -377,7 +377,7 @@ int query_data_package_compare(void const *a, void const *b) {
 	return 0;
 }
 
-int query_data_definition_compare(void const *a, void const *b) {
+gb_internal int query_data_definition_compare(void const *a, void const *b) {
 	Entity *x = *cast(Entity *const *)a;
 	Entity *y = *cast(Entity *const *)b;
 
@@ -399,7 +399,7 @@ int query_data_definition_compare(void const *a, void const *b) {
 	return string_compare(x->token.string, y->token.string);
 }
 
-int entity_name_compare(void const *a, void const *b) {
+gb_internal int entity_name_compare(void const *a, void const *b) {
 	Entity *x = *cast(Entity *const *)a;
 	Entity *y = *cast(Entity *const *)b;
 	if (x == y) {
@@ -413,10 +413,10 @@ int entity_name_compare(void const *a, void const *b) {
 }
 
 
-void generate_and_print_query_data_global_definitions(Checker *c, Timings *timings);
-void generate_and_print_query_data_go_to_definitions(Checker *c);
+gb_internal void generate_and_print_query_data_global_definitions(Checker *c, Timings *timings);
+gb_internal void generate_and_print_query_data_go_to_definitions(Checker *c);
 
-void generate_and_print_query_data(Checker *c, Timings *timings) {
+gb_internal void generate_and_print_query_data(Checker *c, Timings *timings) {
 	query_value_allocator = heap_allocator();
 	switch (build_context.query_data_set_settings.kind) {
 	case QueryDataSet_GlobalDefinitions:
@@ -429,7 +429,7 @@ void generate_and_print_query_data(Checker *c, Timings *timings) {
 }
 
 
-void generate_and_print_query_data_global_definitions(Checker *c, Timings *timings) {
+gb_internal void generate_and_print_query_data_global_definitions(Checker *c, Timings *timings) {
 	auto *root = query_value_map();
 
 	if (global_error_collector.errors.count > 0) {
@@ -805,7 +805,7 @@ struct BinaryArray {
 };
 
 template <typename T>
-Array<T> binary_array_from_data(BinaryArray<T> ba, void *data) {
+gb_internal Array<T> binary_array_from_data(BinaryArray<T> ba, void *data) {
 	Array<T> res = {};
 	res.data     = cast(T *)(cast(u8 *)data + ba.offset);
 	res.count    = ba.length;
@@ -841,7 +841,7 @@ struct GoToDefFileMap {
 };
 
 
-int go_to_def_file_map_compare(void const *a, void const *b) {
+gb_internal int go_to_def_file_map_compare(void const *a, void const *b) {
 	GoToDefFileMap const *x = cast(GoToDefFileMap const *)a;
 	GoToDefFileMap const *y = cast(GoToDefFileMap const *)b;
 	if (x == y) {
@@ -859,7 +859,7 @@ int go_to_def_file_map_compare(void const *a, void const *b) {
 	return 0;
 }
 
-int quick_ident_compare(void const *a, void const *b) {
+gb_internal int quick_ident_compare(void const *a, void const *b) {
 	Ast *x = *cast(Ast **)a;
 	Ast *y = *cast(Ast **)b;
 
@@ -873,7 +873,7 @@ int quick_ident_compare(void const *a, void const *b) {
 }
 
 
-void generate_and_print_query_data_go_to_definitions(Checker *c) {
+gb_internal void generate_and_print_query_data_go_to_definitions(Checker *c) {
 	GB_ASSERT(c->info.allow_identifier_uses);
 
 	gbAllocator a = query_value_allocator;
