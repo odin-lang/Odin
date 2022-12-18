@@ -151,10 +151,10 @@ gb_global isize max_keyword_size = 11;
 gb_global bool keyword_indices[16] = {};
 
 
-gb_inline u32 keyword_hash(u8 const *text, isize len) {
+gb_internal gb_inline u32 keyword_hash(u8 const *text, isize len) {
 	return fnv32a(text, len);
 }
-void add_keyword_hash_entry(String const &s, TokenKind kind) {
+gb_internal void add_keyword_hash_entry(String const &s, TokenKind kind) {
 	max_keyword_size = gb_max(max_keyword_size, s.len);
 
 	keyword_indices[s.len] = true;
@@ -169,7 +169,7 @@ void add_keyword_hash_entry(String const &s, TokenKind kind) {
 	entry->kind = kind;
 	entry->text = s;
 }
-void init_keyword_hash_table(void) {
+gb_internal void init_keyword_hash_table(void) {
 	for (i32 kind = Token__KeywordBegin+1; kind < Token__KeywordEnd; kind++) {
 		add_keyword_hash_entry(token_strings[kind], cast(TokenKind)kind);
 	}
@@ -191,8 +191,8 @@ void init_keyword_hash_table(void) {
 gb_global Array<String>           global_file_path_strings; // index is file id
 gb_global Array<struct AstFile *> global_files; // index is file id
 
-String   get_file_path_string(i32 index);
-struct AstFile *thread_safe_get_ast_file_from_id(i32 index);
+gb_internal String   get_file_path_string(i32 index);
+gb_internal struct AstFile *thread_safe_get_ast_file_from_id(i32 index);
 
 struct TokenPos {
 	i32 file_id;
@@ -201,7 +201,7 @@ struct TokenPos {
 	i32 column; // starting at 1
 };
 
-i32 token_pos_cmp(TokenPos const &a, TokenPos const &b) {
+gb_internal i32 token_pos_cmp(TokenPos const &a, TokenPos const &b) {
 	if (a.offset != b.offset) {
 		return (a.offset < b.offset) ? -1 : +1;
 	}
@@ -214,12 +214,12 @@ i32 token_pos_cmp(TokenPos const &a, TokenPos const &b) {
 	return string_compare(get_file_path_string(a.file_id), get_file_path_string(b.file_id));
 }
 
-bool operator==(TokenPos const &a, TokenPos const &b) { return token_pos_cmp(a, b) == 0; }
-bool operator!=(TokenPos const &a, TokenPos const &b) { return token_pos_cmp(a, b) != 0; }
-bool operator< (TokenPos const &a, TokenPos const &b) { return token_pos_cmp(a, b) <  0; }
-bool operator<=(TokenPos const &a, TokenPos const &b) { return token_pos_cmp(a, b) <= 0; }
-bool operator> (TokenPos const &a, TokenPos const &b) { return token_pos_cmp(a, b) >  0; }
-bool operator>=(TokenPos const &a, TokenPos const &b) { return token_pos_cmp(a, b) >= 0; }
+gb_internal gb_inline bool operator==(TokenPos const &a, TokenPos const &b) { return token_pos_cmp(a, b) == 0; }
+gb_internal gb_inline bool operator!=(TokenPos const &a, TokenPos const &b) { return token_pos_cmp(a, b) != 0; }
+gb_internal gb_inline bool operator< (TokenPos const &a, TokenPos const &b) { return token_pos_cmp(a, b) <  0; }
+gb_internal gb_inline bool operator<=(TokenPos const &a, TokenPos const &b) { return token_pos_cmp(a, b) <= 0; }
+gb_internal gb_inline bool operator> (TokenPos const &a, TokenPos const &b) { return token_pos_cmp(a, b) >  0; }
+gb_internal gb_inline bool operator>=(TokenPos const &a, TokenPos const &b) { return token_pos_cmp(a, b) >= 0; }
 
 
 TokenPos token_pos_add_column(TokenPos pos) {
@@ -243,36 +243,36 @@ struct Token {
 Token empty_token = {Token_Invalid};
 Token blank_token = {Token_Ident, 0, {cast(u8 *)"_", 1}};
 
-Token make_token_ident(String s) {
+gb_internal Token make_token_ident(String s) {
 	Token t = {Token_Ident, 0, s};
 	return t;
 }
-Token make_token_ident(char const *s) {
+gb_internal Token make_token_ident(char const *s) {
 	Token t = {Token_Ident, 0, make_string_c(s)};
 	return t;
 }
 
-bool token_is_newline(Token const &tok) {
+gb_internal bool token_is_newline(Token const &tok) {
 	return tok.kind == Token_Semicolon && tok.string == "\n";
 }
 
-gb_inline bool token_is_literal(TokenKind t) {
+gb_internal gb_inline bool token_is_literal(TokenKind t) {
 	return gb_is_between(t, Token__LiteralBegin+1, Token__LiteralEnd-1);
 }
-gb_inline bool token_is_operator(TokenKind t) {
+gb_internal gb_inline bool token_is_operator(TokenKind t) {
 	return gb_is_between(t, Token__OperatorBegin+1, Token__OperatorEnd-1);
 }
-gb_inline bool token_is_keyword(TokenKind t) {
+gb_internal gb_inline bool token_is_keyword(TokenKind t) {
 	return gb_is_between(t, Token__KeywordBegin+1, Token__KeywordEnd-1);
 }
-gb_inline bool token_is_comparison(TokenKind t) {
+gb_internal gb_inline bool token_is_comparison(TokenKind t) {
 	return gb_is_between(t, Token__ComparisonBegin+1, Token__ComparisonEnd-1);
 }
-gb_inline bool token_is_shift(TokenKind t) {
+gb_internal gb_inline bool token_is_shift(TokenKind t) {
 	return t == Token_Shl || t == Token_Shr;
 }
 
-gb_inline void print_token(Token t) { gb_printf("%.*s\n", LIT(t.string)); }
+gb_internal gb_inline void print_token(Token t) { gb_printf("%.*s\n", LIT(t.string)); }
 
 #include "error.cpp"
 
@@ -309,7 +309,7 @@ struct Tokenizer {
 };
 
 
-void tokenizer_err(Tokenizer *t, char const *msg, ...) {
+gb_internal void tokenizer_err(Tokenizer *t, char const *msg, ...) {
 	va_list va;
 	i32 column = t->column_minus_one+1;
 	if (column < 1) {
@@ -328,7 +328,7 @@ void tokenizer_err(Tokenizer *t, char const *msg, ...) {
 	t->error_count++;
 }
 
-void tokenizer_err(Tokenizer *t, TokenPos const &pos, char const *msg, ...) {
+gb_internal void tokenizer_err(Tokenizer *t, TokenPos const &pos, char const *msg, ...) {
 	va_list va;
 	i32 column = t->column_minus_one+1;
 	if (column < 1) {
@@ -342,7 +342,7 @@ void tokenizer_err(Tokenizer *t, TokenPos const &pos, char const *msg, ...) {
 	t->error_count++;
 }
 
-void advance_to_next_rune(Tokenizer *t) {
+gb_internal void advance_to_next_rune(Tokenizer *t) {
 	if (t->curr_rune == '\n') {
 		t->column_minus_one = -1;
 		t->line_count++;
@@ -372,7 +372,7 @@ void advance_to_next_rune(Tokenizer *t) {
 	}
 }
 
-void init_tokenizer_with_data(Tokenizer *t, String const &fullpath, void const *data, isize size) {
+gb_internal void init_tokenizer_with_data(Tokenizer *t, String const &fullpath, void const *data, isize size) {
 	t->fullpath = fullpath;
 	t->line_count = 1;
 
@@ -386,7 +386,7 @@ void init_tokenizer_with_data(Tokenizer *t, String const &fullpath, void const *
 	}
 }
 
-TokenizerInitError loaded_file_error_map_to_tokenizer[LoadedFile_COUNT] = {
+gb_global TokenizerInitError loaded_file_error_map_to_tokenizer[LoadedFile_COUNT] = {
 	TokenizerInit_None,         /*LoadedFile_None*/
 	TokenizerInit_Empty,        /*LoadedFile_Empty*/
 	TokenizerInit_FileTooLarge, /*LoadedFile_FileTooLarge*/
@@ -395,7 +395,7 @@ TokenizerInitError loaded_file_error_map_to_tokenizer[LoadedFile_COUNT] = {
 	TokenizerInit_Permission,   /*LoadedFile_Permission*/
 };
 
-TokenizerInitError init_tokenizer_from_fullpath(Tokenizer *t, String const &fullpath, bool copy_file_contents) {
+gb_internal TokenizerInitError init_tokenizer_from_fullpath(Tokenizer *t, String const &fullpath, bool copy_file_contents) {
 	LoadedFileError file_err = load_file_32(
 		alloc_cstring(temporary_allocator(), fullpath), 
 		&t->loaded_file,
@@ -416,7 +416,7 @@ TokenizerInitError init_tokenizer_from_fullpath(Tokenizer *t, String const &full
 	return err;
 }
 
-gb_inline i32 digit_value(Rune r) {
+gb_internal gb_inline i32 digit_value(Rune r) {
 	switch (r) {
 	case '0': case '1': case '2': case '3': case '4': case '5': case '6': case '7': case '8': case '9':
 		return r - '0';
@@ -428,20 +428,20 @@ gb_inline i32 digit_value(Rune r) {
 	return 16; // NOTE(bill): Larger than highest possible
 }
 
-gb_inline void scan_mantissa(Tokenizer *t, i32 base) {
+gb_internal gb_inline void scan_mantissa(Tokenizer *t, i32 base) {
 	while (digit_value(t->curr_rune) < base || t->curr_rune == '_') {
 		advance_to_next_rune(t);
 	}
 }
 
-u8 peek_byte(Tokenizer *t, isize offset=0) {
+gb_internal u8 peek_byte(Tokenizer *t, isize offset=0) {
 	if (t->read_curr+offset < t->end) {
 		return t->read_curr[offset];
 	}
 	return 0;
 }
 
-void scan_number_to_token(Tokenizer *t, Token *token, bool seen_decimal_point) {
+gb_internal void scan_number_to_token(Tokenizer *t, Token *token, bool seen_decimal_point) {
 	token->kind = Token_Integer;
 	token->string = {t->curr, 1};
 	token->pos.file_id = t->curr_file_id;
@@ -566,7 +566,7 @@ end:
 }
 
 
-bool scan_escape(Tokenizer *t) {
+gb_internal bool scan_escape(Tokenizer *t) {
 	isize len = 0;
 	u32 base = 0, max = 0, x = 0;
 
@@ -633,13 +633,13 @@ bool scan_escape(Tokenizer *t) {
 }
 
 
-gb_inline void tokenizer_skip_line(Tokenizer *t) {
+gb_internal gb_inline void tokenizer_skip_line(Tokenizer *t) {
 	while (t->curr_rune != '\n' && t->curr_rune != GB_RUNE_EOF) {
 		advance_to_next_rune(t);
 	}
 }
 
-gb_inline void tokenizer_skip_whitespace(Tokenizer *t, bool on_newline) {
+gb_internal gb_inline void tokenizer_skip_whitespace(Tokenizer *t, bool on_newline) {
 	if (on_newline) {
 		for (;;) {
 			switch (t->curr_rune) {
@@ -666,7 +666,7 @@ gb_inline void tokenizer_skip_whitespace(Tokenizer *t, bool on_newline) {
 	}
 }
 
-void tokenizer_get_token(Tokenizer *t, Token *token, int repeat=0) {
+gb_internal void tokenizer_get_token(Tokenizer *t, Token *token, int repeat=0) {
 	tokenizer_skip_whitespace(t, t->insert_semicolon);
 
 	token->kind = Token_Invalid;

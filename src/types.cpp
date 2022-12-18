@@ -2571,20 +2571,6 @@ bool lookup_subtype_polymorphic_selection(Type *dst, Type *src, Selection *sel) 
 
 
 
-
-Type *strip_type_aliasing(Type *x) {
-	if (x == nullptr) {
-		return x;
-	}
-	if (x->kind == Type_Named) {
-		Entity *e = x->Named.type_name;
-		if (e != nullptr && e->kind == Entity_TypeName && e->TypeName.is_type_alias) {
-			return x->Named.base;
-		}
-	}
-	return x;
-}
-
 bool are_types_identical_internal(Type *x, Type *y, bool check_tuple_names);
 
 bool are_types_identical(Type *x, Type *y) {
@@ -2605,193 +2591,156 @@ bool are_types_identical_internal(Type *x, Type *y, bool check_tuple_names) {
 		return false;
 	}
 
-	x = strip_type_aliasing(x);
-	y = strip_type_aliasing(y);
+	if (x->kind == Type_Named) {
+		Entity *e = x->Named.type_name;
+		if (e != nullptr && e->kind == Entity_TypeName && e->TypeName.is_type_alias) {
+			x = x->Named.base;
+		}
+	}
+	if (y->kind == Type_Named) {
+		Entity *e = y->Named.type_name;
+		if (e != nullptr && e->kind == Entity_TypeName && e->TypeName.is_type_alias) {
+			y = y->Named.base;
+		}
+	}
+	if (x->kind != y->kind) {
+		return false;
+	}
 
 	switch (x->kind) {
 	case Type_Generic:
-		if (y->kind == Type_Generic) {
-			return are_types_identical(x->Generic.specialized, y->Generic.specialized);
-		}
-		break;
+		return are_types_identical(x->Generic.specialized, y->Generic.specialized);
 
 	case Type_Basic:
-		if (y->kind == Type_Basic) {
-			return x->Basic.kind == y->Basic.kind;
-		}
-		break;
+		return x->Basic.kind == y->Basic.kind;
 
 	case Type_EnumeratedArray:
-		if (y->kind == Type_EnumeratedArray) {
-			return are_types_identical(x->EnumeratedArray.index, y->EnumeratedArray.index) &&
-			       are_types_identical(x->EnumeratedArray.elem,  y->EnumeratedArray.elem);
-		}
-		break;
+		return are_types_identical(x->EnumeratedArray.index, y->EnumeratedArray.index) &&
+		       are_types_identical(x->EnumeratedArray.elem,  y->EnumeratedArray.elem);
 
 	case Type_Array:
-		if (y->kind == Type_Array) {
-			return (x->Array.count == y->Array.count) && are_types_identical(x->Array.elem, y->Array.elem);
-		}
-		break;
+		return (x->Array.count == y->Array.count) && are_types_identical(x->Array.elem, y->Array.elem);
 		
 	case Type_Matrix:
-		if (y->kind == Type_Matrix) {
-			return x->Matrix.row_count == y->Matrix.row_count &&
-			       x->Matrix.column_count == y->Matrix.column_count &&
-			       are_types_identical(x->Matrix.elem, y->Matrix.elem);
-		}
-		break;
+		return x->Matrix.row_count == y->Matrix.row_count &&
+		       x->Matrix.column_count == y->Matrix.column_count &&
+		       are_types_identical(x->Matrix.elem, y->Matrix.elem);
 
 	case Type_DynamicArray:
-		if (y->kind == Type_DynamicArray) {
-			return are_types_identical(x->DynamicArray.elem, y->DynamicArray.elem);
-		}
-		break;
+		return are_types_identical(x->DynamicArray.elem, y->DynamicArray.elem);
 
 	case Type_Slice:
-		if (y->kind == Type_Slice) {
-			return are_types_identical(x->Slice.elem, y->Slice.elem);
-		}
-		break;
+		return are_types_identical(x->Slice.elem, y->Slice.elem);
 
 	case Type_BitSet:
-		if (y->kind == Type_BitSet) {
-			return are_types_identical(x->BitSet.elem, y->BitSet.elem) &&
-			       are_types_identical(x->BitSet.underlying, y->BitSet.underlying) &&
-			       x->BitSet.lower == y->BitSet.lower &&
-			       x->BitSet.upper == y->BitSet.upper;
-		}
-		break;
+		return are_types_identical(x->BitSet.elem, y->BitSet.elem) &&
+		       are_types_identical(x->BitSet.underlying, y->BitSet.underlying) &&
+		       x->BitSet.lower == y->BitSet.lower &&
+		       x->BitSet.upper == y->BitSet.upper;
 
 
 	case Type_Enum:
 		return x == y; // NOTE(bill): All enums are unique
 
 	case Type_Union:
-		if (y->kind == Type_Union) {
-			if (x->Union.variants.count == y->Union.variants.count &&
-			    x->Union.custom_align == y->Union.custom_align &&
-			    x->Union.kind == y->Union.kind) {
-				// NOTE(bill): zeroth variant is nullptr
-				for_array(i, x->Union.variants) {
-					if (!are_types_identical(x->Union.variants[i], y->Union.variants[i])) {
-						return false;
-					}
+		if (x->Union.variants.count == y->Union.variants.count &&
+		    x->Union.custom_align == y->Union.custom_align &&
+		    x->Union.kind == y->Union.kind) {
+			// NOTE(bill): zeroth variant is nullptr
+			for_array(i, x->Union.variants) {
+				if (!are_types_identical(x->Union.variants[i], y->Union.variants[i])) {
+					return false;
 				}
-				return true;
 			}
+			return true;
 		}
 		break;
 
 	case Type_Struct:
-		if (y->kind == Type_Struct) {
-			if (x->Struct.is_raw_union == y->Struct.is_raw_union &&
-			    x->Struct.fields.count == y->Struct.fields.count &&
-			    x->Struct.is_packed    == y->Struct.is_packed &&
-			    x->Struct.custom_align == y->Struct.custom_align &&
-			    x->Struct.soa_kind == y->Struct.soa_kind &&
-			    x->Struct.soa_count == y->Struct.soa_count &&
-			    are_types_identical(x->Struct.soa_elem, y->Struct.soa_elem)) {
-				// TODO(bill); Fix the custom alignment rule
-				for_array(i, x->Struct.fields) {
-					Entity *xf = x->Struct.fields[i];
-					Entity *yf = y->Struct.fields[i];
-					if (xf->kind != yf->kind) {
-						return false;
-					}
-					if (!are_types_identical(xf->type, yf->type)) {
-						return false;
-					}
-					if (xf->token.string != yf->token.string) {
-						return false;
-					}
-					if (x->Struct.tags[i] != y->Struct.tags[i]) {
-						return false;
-					}
-					u64 xf_flags = (xf->flags&EntityFlags_IsSubtype);
-					u64 yf_flags = (yf->flags&EntityFlags_IsSubtype);
-					if (xf_flags != yf_flags) {
-						return false;
-					}
+		if (x->Struct.is_raw_union == y->Struct.is_raw_union &&
+		    x->Struct.fields.count == y->Struct.fields.count &&
+		    x->Struct.is_packed    == y->Struct.is_packed &&
+		    x->Struct.custom_align == y->Struct.custom_align &&
+		    x->Struct.soa_kind == y->Struct.soa_kind &&
+		    x->Struct.soa_count == y->Struct.soa_count &&
+		    are_types_identical(x->Struct.soa_elem, y->Struct.soa_elem)) {
+			// TODO(bill); Fix the custom alignment rule
+			for_array(i, x->Struct.fields) {
+				Entity *xf = x->Struct.fields[i];
+				Entity *yf = y->Struct.fields[i];
+				if (xf->kind != yf->kind) {
+					return false;
 				}
-				return true;
+				if (!are_types_identical(xf->type, yf->type)) {
+					return false;
+				}
+				if (xf->token.string != yf->token.string) {
+					return false;
+				}
+				if (x->Struct.tags[i] != y->Struct.tags[i]) {
+					return false;
+				}
+				u64 xf_flags = (xf->flags&EntityFlags_IsSubtype);
+				u64 yf_flags = (yf->flags&EntityFlags_IsSubtype);
+				if (xf_flags != yf_flags) {
+					return false;
+				}
 			}
+			return true;
 		}
 		break;
 
 	case Type_Pointer:
-		if (y->kind == Type_Pointer) {
-			return are_types_identical(x->Pointer.elem, y->Pointer.elem);
-		}
-		break;
+		return are_types_identical(x->Pointer.elem, y->Pointer.elem);
 
 	case Type_MultiPointer:
-		if (y->kind == Type_MultiPointer) {
-			return are_types_identical(x->MultiPointer.elem, y->MultiPointer.elem);
-		}
-		break;
+		return are_types_identical(x->MultiPointer.elem, y->MultiPointer.elem);
 
 	case Type_SoaPointer:
-		if (y->kind == Type_SoaPointer) {
-			return are_types_identical(x->SoaPointer.elem, y->SoaPointer.elem);
-		}
-		break;
+		return are_types_identical(x->SoaPointer.elem, y->SoaPointer.elem);
 
 	case Type_Named:
-		if (y->kind == Type_Named) {
-			return x->Named.type_name == y->Named.type_name;
-		}
-		break;
+		return x->Named.type_name == y->Named.type_name;
 
 	case Type_Tuple:
-		if (y->kind == Type_Tuple) {
-			if (x->Tuple.variables.count == y->Tuple.variables.count &&
-			    x->Tuple.is_packed == y->Tuple.is_packed) {
-				for_array(i, x->Tuple.variables) {
-					Entity *xe = x->Tuple.variables[i];
-					Entity *ye = y->Tuple.variables[i];
-					if (xe->kind != ye->kind || !are_types_identical(xe->type, ye->type)) {
-						return false;
-					}
-					if (check_tuple_names) {
-						if (xe->token.string != ye->token.string) {
-							return false;
-						}
-					}
-					if (xe->kind == Entity_Constant && !compare_exact_values(Token_CmpEq, xe->Constant.value, ye->Constant.value)) {
-						// NOTE(bill): This is needed for polymorphic procedures
+		if (x->Tuple.variables.count == y->Tuple.variables.count &&
+		    x->Tuple.is_packed == y->Tuple.is_packed) {
+			for_array(i, x->Tuple.variables) {
+				Entity *xe = x->Tuple.variables[i];
+				Entity *ye = y->Tuple.variables[i];
+				if (xe->kind != ye->kind || !are_types_identical(xe->type, ye->type)) {
+					return false;
+				}
+				if (check_tuple_names) {
+					if (xe->token.string != ye->token.string) {
 						return false;
 					}
 				}
-				return true;
+				if (xe->kind == Entity_Constant && !compare_exact_values(Token_CmpEq, xe->Constant.value, ye->Constant.value)) {
+					// NOTE(bill): This is needed for polymorphic procedures
+					return false;
+				}
 			}
+			return true;
 		}
 		break;
 
 	case Type_Proc:
-		if (y->kind == Type_Proc) {
-			return x->Proc.calling_convention == y->Proc.calling_convention &&
-			       x->Proc.c_vararg    == y->Proc.c_vararg    &&
-			       x->Proc.variadic    == y->Proc.variadic    &&
-			       x->Proc.diverging   == y->Proc.diverging   &&
-			       x->Proc.optional_ok == y->Proc.optional_ok &&
-			       are_types_identical(x->Proc.params, y->Proc.params) &&
-			       are_types_identical(x->Proc.results, y->Proc.results);
-		}
-		break;
+		return x->Proc.calling_convention == y->Proc.calling_convention &&
+		       x->Proc.c_vararg    == y->Proc.c_vararg    &&
+		       x->Proc.variadic    == y->Proc.variadic    &&
+		       x->Proc.diverging   == y->Proc.diverging   &&
+		       x->Proc.optional_ok == y->Proc.optional_ok &&
+		       are_types_identical(x->Proc.params, y->Proc.params) &&
+		       are_types_identical(x->Proc.results, y->Proc.results);
 
 	case Type_Map:
-		if (y->kind == Type_Map) {
-			return are_types_identical(x->Map.key,   y->Map.key) &&
-			       are_types_identical(x->Map.value, y->Map.value);
-		}
-		break;
+		return are_types_identical(x->Map.key,   y->Map.key) &&
+		       are_types_identical(x->Map.value, y->Map.value);
 
 	case Type_SimdVector:
-		if (y->kind == Type_SimdVector) {
-			if (x->SimdVector.count == y->SimdVector.count) {
-				return are_types_identical(x->SimdVector.elem, y->SimdVector.elem);
-			}
+		if (x->SimdVector.count == y->SimdVector.count) {
+			return are_types_identical(x->SimdVector.elem, y->SimdVector.elem);
 		}
 		break;
 	}

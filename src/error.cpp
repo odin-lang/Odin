@@ -17,11 +17,11 @@ gb_global ErrorCollector global_error_collector;
 #define MAX_ERROR_COLLECTOR_COUNT (36)
 
 
-bool any_errors(void) {
+gb_internal bool any_errors(void) {
 	return global_error_collector.count.load() != 0;
 }
 
-void init_global_error_collector(void) {
+gb_internal void init_global_error_collector(void) {
 	mutex_init(&global_error_collector.mutex);
 	mutex_init(&global_error_collector.block_mutex);
 	mutex_init(&global_error_collector.error_out_mutex);
@@ -35,9 +35,9 @@ void init_global_error_collector(void) {
 
 // temporary
 // defined in build_settings.cpp
-char *token_pos_to_string(TokenPos const &pos);
+gb_internal char *token_pos_to_string(TokenPos const &pos);
 
-bool set_file_path_string(i32 index, String const &path) {
+gb_internal bool set_file_path_string(i32 index, String const &path) {
 	bool ok = false;
 	GB_ASSERT(index >= 0);
 	mutex_lock(&global_error_collector.string_mutex);
@@ -55,7 +55,7 @@ bool set_file_path_string(i32 index, String const &path) {
 	return ok;
 }
 
-bool thread_safe_set_ast_file_from_id(i32 index, AstFile *file) {
+gb_internal bool thread_safe_set_ast_file_from_id(i32 index, AstFile *file) {
 	bool ok = false;
 	GB_ASSERT(index >= 0);
 	mutex_lock(&global_error_collector.string_mutex);
@@ -73,7 +73,7 @@ bool thread_safe_set_ast_file_from_id(i32 index, AstFile *file) {
 	return ok;
 }
 
-String get_file_path_string(i32 index) {
+gb_internal String get_file_path_string(i32 index) {
 	GB_ASSERT(index >= 0);
 	mutex_lock(&global_error_collector.string_mutex);
 
@@ -86,7 +86,7 @@ String get_file_path_string(i32 index) {
 	return path;
 }
 
-AstFile *thread_safe_get_ast_file_from_id(i32 index) {
+gb_internal AstFile *thread_safe_get_ast_file_from_id(i32 index) {
 	GB_ASSERT(index >= 0);
 	mutex_lock(&global_error_collector.string_mutex);
 
@@ -101,12 +101,12 @@ AstFile *thread_safe_get_ast_file_from_id(i32 index) {
 
 
 
-void begin_error_block(void) {
+gb_internal void begin_error_block(void) {
 	mutex_lock(&global_error_collector.block_mutex);
 	global_error_collector.in_block.store(true);
 }
 
-void end_error_block(void) {
+gb_internal void end_error_block(void) {
 	if (global_error_collector.error_buffer.count > 0) {
 		isize n = global_error_collector.error_buffer.count;
 		u8 *text = gb_alloc_array(permanent_allocator(), u8, n+1);
@@ -127,7 +127,7 @@ void end_error_block(void) {
 #define ERROR_OUT_PROC(name) void name(char const *fmt, va_list va)
 typedef ERROR_OUT_PROC(ErrorOutProc);
 
-ERROR_OUT_PROC(default_error_out_va) {
+gb_internal ERROR_OUT_PROC(default_error_out_va) {
 	gbFile *f = gb_file_get_standard(gbFileStandard_Error);
 
 	char buf[4096] = {};
@@ -154,15 +154,15 @@ ERROR_OUT_PROC(default_error_out_va) {
 }
 
 
-ErrorOutProc *error_out_va = default_error_out_va;
+gb_global ErrorOutProc *error_out_va = default_error_out_va;
 
 // NOTE: defined in build_settings.cpp
-bool global_warnings_as_errors(void);
-bool global_ignore_warnings(void);
-bool show_error_line(void);
-gbString get_file_line_as_string(TokenPos const &pos, i32 *offset);
+gb_internal bool global_warnings_as_errors(void);
+gb_internal bool global_ignore_warnings(void);
+gb_internal bool show_error_line(void);
+gb_internal gbString get_file_line_as_string(TokenPos const &pos, i32 *offset);
 
-void error_out(char const *fmt, ...) {
+gb_internal void error_out(char const *fmt, ...) {
 	va_list va;
 	va_start(va, fmt);
 	error_out_va(fmt, va);
@@ -170,7 +170,7 @@ void error_out(char const *fmt, ...) {
 }
 
 
-bool show_error_on_line(TokenPos const &pos, TokenPos end) {
+gb_internal bool show_error_on_line(TokenPos const &pos, TokenPos end) {
 	if (!show_error_line()) {
 		return false;
 	}
@@ -237,7 +237,7 @@ bool show_error_on_line(TokenPos const &pos, TokenPos end) {
 	return false;
 }
 
-void error_va(TokenPos const &pos, TokenPos end, char const *fmt, va_list va) {
+gb_internal void error_va(TokenPos const &pos, TokenPos end, char const *fmt, va_list va) {
 	global_error_collector.count.fetch_add(1);
 
 	mutex_lock(&global_error_collector.mutex);
@@ -257,7 +257,7 @@ void error_va(TokenPos const &pos, TokenPos end, char const *fmt, va_list va) {
 	}
 }
 
-void warning_va(TokenPos const &pos, TokenPos end, char const *fmt, va_list va) {
+gb_internal void warning_va(TokenPos const &pos, TokenPos end, char const *fmt, va_list va) {
 	if (global_warnings_as_errors()) {
 		error_va(pos, end, fmt, va);
 		return;
@@ -280,11 +280,11 @@ void warning_va(TokenPos const &pos, TokenPos end, char const *fmt, va_list va) 
 }
 
 
-void error_line_va(char const *fmt, va_list va) {
+gb_internal void error_line_va(char const *fmt, va_list va) {
 	error_out_va(fmt, va);
 }
 
-void error_no_newline_va(TokenPos const &pos, char const *fmt, va_list va) {
+gb_internal void error_no_newline_va(TokenPos const &pos, char const *fmt, va_list va) {
 	mutex_lock(&global_error_collector.mutex);
 	global_error_collector.count++;
 	// NOTE(bill): Duplicate error, skip it
@@ -303,7 +303,7 @@ void error_no_newline_va(TokenPos const &pos, char const *fmt, va_list va) {
 }
 
 
-void syntax_error_va(TokenPos const &pos, TokenPos end, char const *fmt, va_list va) {
+gb_internal void syntax_error_va(TokenPos const &pos, TokenPos end, char const *fmt, va_list va) {
 	mutex_lock(&global_error_collector.mutex);
 	global_error_collector.count++;
 	// NOTE(bill): Duplicate error, skip it
@@ -323,7 +323,7 @@ void syntax_error_va(TokenPos const &pos, TokenPos end, char const *fmt, va_list
 	}
 }
 
-void syntax_warning_va(TokenPos const &pos, TokenPos end, char const *fmt, va_list va) {
+gb_internal void syntax_warning_va(TokenPos const &pos, TokenPos end, char const *fmt, va_list va) {
 	if (global_warnings_as_errors()) {
 		syntax_error_va(pos, end, fmt, va);
 		return;
@@ -347,21 +347,21 @@ void syntax_warning_va(TokenPos const &pos, TokenPos end, char const *fmt, va_li
 
 
 
-void warning(Token const &token, char const *fmt, ...) {
+gb_internal void warning(Token const &token, char const *fmt, ...) {
 	va_list va;
 	va_start(va, fmt);
 	warning_va(token.pos, {}, fmt, va);
 	va_end(va);
 }
 
-void error(Token const &token, char const *fmt, ...) {
+gb_internal void error(Token const &token, char const *fmt, ...) {
 	va_list va;
 	va_start(va, fmt);
 	error_va(token.pos, {}, fmt, va);
 	va_end(va);
 }
 
-void error(TokenPos pos, char const *fmt, ...) {
+gb_internal void error(TokenPos pos, char const *fmt, ...) {
 	va_list va;
 	va_start(va, fmt);
 	Token token = {};
@@ -370,7 +370,7 @@ void error(TokenPos pos, char const *fmt, ...) {
 	va_end(va);
 }
 
-void error_line(char const *fmt, ...) {
+gb_internal void error_line(char const *fmt, ...) {
 	va_list va;
 	va_start(va, fmt);
 	error_line_va(fmt, va);
@@ -378,21 +378,21 @@ void error_line(char const *fmt, ...) {
 }
 
 
-void syntax_error(Token const &token, char const *fmt, ...) {
+gb_internal void syntax_error(Token const &token, char const *fmt, ...) {
 	va_list va;
 	va_start(va, fmt);
 	syntax_error_va(token.pos, {}, fmt, va);
 	va_end(va);
 }
 
-void syntax_error(TokenPos pos, char const *fmt, ...) {
+gb_internal void syntax_error(TokenPos pos, char const *fmt, ...) {
 	va_list va;
 	va_start(va, fmt);
 	syntax_error_va(pos, {}, fmt, va);
 	va_end(va);
 }
 
-void syntax_warning(Token const &token, char const *fmt, ...) {
+gb_internal void syntax_warning(Token const &token, char const *fmt, ...) {
 	va_list va;
 	va_start(va, fmt);
 	syntax_warning_va(token.pos, {}, fmt, va);
@@ -400,7 +400,7 @@ void syntax_warning(Token const &token, char const *fmt, ...) {
 }
 
 
-void compiler_error(char const *fmt, ...) {
+gb_internal void compiler_error(char const *fmt, ...) {
 	va_list va;
 
 	va_start(va, fmt);

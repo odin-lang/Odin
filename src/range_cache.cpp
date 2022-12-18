@@ -10,17 +10,17 @@ struct RangeCache {
 };
 
 
-RangeCache range_cache_make(gbAllocator a) {
+gb_internal RangeCache range_cache_make(gbAllocator a) {
 	RangeCache cache = {};
 	array_init(&cache.ranges, a);
 	return cache;
 }
 
-void range_cache_destroy(RangeCache *c) {
+gb_internal void range_cache_destroy(RangeCache *c) {
 	array_free(&c->ranges);
 }
 
-bool range_cache_add_index(RangeCache *c, i64 index) {
+gb_internal bool range_cache_add_index(RangeCache *c, i64 index) {
 	for_array(i, c->ranges) {
 		RangeValue v = c->ranges[i];
 		if (v.lo <= index && index <= v.hi) {
@@ -33,7 +33,7 @@ bool range_cache_add_index(RangeCache *c, i64 index) {
 }
 
 
-bool range_cache_add_range(RangeCache *c, i64 lo, i64 hi) {
+gb_internal bool range_cache_add_range(RangeCache *c, i64 lo, i64 hi) {
 	GB_ASSERT(lo <= hi);
 	for_array(i, c->ranges) {
 		RangeValue v = c->ranges[i];
@@ -59,7 +59,7 @@ bool range_cache_add_range(RangeCache *c, i64 lo, i64 hi) {
 }
 
 
-bool range_cache_index_exists(RangeCache *c, i64 index) {
+gb_internal bool range_cache_index_exists(RangeCache *c, i64 index) {
 	for_array(i, c->ranges) {
 		RangeValue v = c->ranges[i];
 		if (v.lo <= index && index <= v.hi) {

@@ -1,5 +1,5 @@
 
-gb_inline void zero_size(void *ptr, isize len) {
+gb_internal gb_inline void zero_size(void *ptr, isize len) {
 	memset(ptr, 0, len);
 }
 
@@ -7,27 +7,27 @@ gb_inline void zero_size(void *ptr, isize len) {
 
 
 template <typename U, typename V>
-gb_inline U bit_cast(V &v) { return reinterpret_cast<U &>(v); }
+gb_internal gb_inline U bit_cast(V &v) { return reinterpret_cast<U &>(v); }
 
 template <typename U, typename V>
-gb_inline U const &bit_cast(V const &v) { return reinterpret_cast<U const &>(v); }
+gb_internal gb_inline U const &bit_cast(V const &v) { return reinterpret_cast<U const &>(v); }
 
 
-gb_inline i64 align_formula(i64 size, i64 align) {
+gb_internal gb_inline i64 align_formula(i64 size, i64 align) {
 	if (align > 0) {
 		i64 result = size + align-1;
 		return result - result%align;
 	}
 	return size;
 }
-gb_inline isize align_formula_isize(isize size, isize align) {
+gb_internal gb_inline isize align_formula_isize(isize size, isize align) {
 	if (align > 0) {
 		isize result = size + align-1;
 		return result - result%align;
 	}
 	return size;
 }
-gb_inline void *align_formula_ptr(void *ptr, isize align) {
+gb_internal gb_inline void *align_formula_ptr(void *ptr, isize align) {
 	if (align > 0) {
 		uintptr result = (cast(uintptr)ptr) + align-1;
 		return (void *)(result - result%align);
@@ -39,9 +39,9 @@ gb_inline void *align_formula_ptr(void *ptr, isize align) {
 gb_global BlockingMutex global_memory_block_mutex;
 gb_global BlockingMutex global_memory_allocator_mutex;
 
-void platform_virtual_memory_init(void);
+gb_internal void platform_virtual_memory_init(void);
 
-void virtual_memory_init(void) {
+gb_internal void virtual_memory_init(void) {
 	mutex_init(&global_memory_block_mutex);
 	mutex_init(&global_memory_allocator_mutex);
 	platform_virtual_memory_init();
@@ -66,13 +66,13 @@ enum { DEFAULT_MINIMUM_BLOCK_SIZE = 8ll*1024ll*1024ll };
 
 gb_global isize DEFAULT_PAGE_SIZE = 4096;
 
-MemoryBlock *virtual_memory_alloc(isize size);
-void virtual_memory_dealloc(MemoryBlock *block);
-void *arena_alloc(Arena *arena, isize min_size, isize alignment);
-void arena_free_all(Arena *arena);
+gb_internal MemoryBlock *virtual_memory_alloc(isize size);
+gb_internal void virtual_memory_dealloc(MemoryBlock *block);
+gb_internal void *arena_alloc(Arena *arena, isize min_size, isize alignment);
+gb_internal void arena_free_all(Arena *arena);
 
 
-isize arena_align_forward_offset(Arena *arena, isize alignment) {
+gb_internal isize arena_align_forward_offset(Arena *arena, isize alignment) {
 	isize alignment_offset = 0;
 	isize ptr = cast(isize)(arena->curr_block->base + arena->curr_block->used);
 	isize mask = alignment-1;
@@ -82,7 +82,7 @@ isize arena_align_forward_offset(Arena *arena, isize alignment) {
 	return alignment_offset;
 }
 
-void *arena_alloc(Arena *arena, isize min_size, isize alignment) {
+gb_internal void *arena_alloc(Arena *arena, isize min_size, isize alignment) {
 	GB_ASSERT(gb_is_power_of_two(alignment));
 	
 	BlockingMutex *mutex = &global_memory_allocator_mutex;
@@ -123,7 +123,7 @@ void *arena_alloc(Arena *arena, isize min_size, isize alignment) {
 	return ptr;	
 }
 
-void arena_free_all(Arena *arena) {
+gb_internal void arena_free_all(Arena *arena) {
 	while (arena->curr_block != nullptr) {
 		MemoryBlock *free_block = arena->curr_block;
 		arena->curr_block = free_block->prev;
@@ -142,12 +142,12 @@ struct PlatformMemoryBlock {
 gb_global std::atomic<isize> global_platform_memory_total_usage;
 gb_global PlatformMemoryBlock global_platform_memory_block_sentinel;
 
-PlatformMemoryBlock *platform_virtual_memory_alloc(isize total_size);
-void platform_virtual_memory_free(PlatformMemoryBlock *block);
-void platform_virtual_memory_protect(void *memory, isize size);
+gb_internal PlatformMemoryBlock *platform_virtual_memory_alloc(isize total_size);
+gb_internal void platform_virtual_memory_free(PlatformMemoryBlock *block);
+gb_internal void platform_virtual_memory_protect(void *memory, isize size);
 
 #if defined(GB_SYSTEM_WINDOWS)
-	void platform_virtual_memory_init(void) {
+	gb_internal void platform_virtual_memory_init(void) {
 		global_platform_memory_block_sentinel.prev = &global_platform_memory_block_sentinel;	
 		global_platform_memory_block_sentinel.next = &global_platform_memory_block_sentinel;
 		
@@ -157,7 +157,7 @@ void platform_virtual_memory_protect(void *memory, isize size);
 		GB_ASSERT(gb_is_power_of_two(DEFAULT_PAGE_SIZE));
 	}
 
-	PlatformMemoryBlock *platform_virtual_memory_alloc(isize total_size) {
+	gb_internal PlatformMemoryBlock *platform_virtual_memory_alloc(isize total_size) {
 		PlatformMemoryBlock *pmblock = (PlatformMemoryBlock *)VirtualAlloc(0, total_size, MEM_RESERVE|MEM_COMMIT, PAGE_READWRITE);
 		if (pmblock == nullptr) {
 			gb_printf_err("Out of Virtual memory, oh no...\n");
@@ -168,17 +168,17 @@ void platform_virtual_memory_protect(void *memory, isize size);
 		global_platform_memory_total_usage += total_size;
 		return pmblock;
 	}
-	void platform_virtual_memory_free(PlatformMemoryBlock *block) {
+	gb_internal void platform_virtual_memory_free(PlatformMemoryBlock *block) {
 		global_platform_memory_total_usage -= block->total_size;
 		GB_ASSERT(VirtualFree(block, 0, MEM_RELEASE));
 	}
-	void platform_virtual_memory_protect(void *memory, isize size) {
+	gb_internal void platform_virtual_memory_protect(void *memory, isize size) {
 		DWORD old_protect = 0;
 		BOOL is_protected = VirtualProtect(memory, size, PAGE_NOACCESS, &old_protect);
 		GB_ASSERT(is_protected);
 	}
 #else
-	void platform_virtual_memory_init(void) {
+	gb_internal void platform_virtual_memory_init(void) {
 		global_platform_memory_block_sentinel.prev = &global_platform_memory_block_sentinel;	
 		global_platform_memory_block_sentinel.next = &global_platform_memory_block_sentinel;
 		
@@ -186,7 +186,7 @@ void platform_virtual_memory_protect(void *memory, isize size);
 		GB_ASSERT(gb_is_power_of_two(DEFAULT_PAGE_SIZE));
 	}
 	
-	PlatformMemoryBlock *platform_virtual_memory_alloc(isize total_size) {
+	gb_internal PlatformMemoryBlock *platform_virtual_memory_alloc(isize total_size) {
 		PlatformMemoryBlock *pmblock = (PlatformMemoryBlock *)mmap(nullptr, total_size, PROT_READ | PROT_WRITE, MAP_ANONYMOUS | MAP_PRIVATE, -1, 0);
 		if (pmblock == nullptr) {
 			gb_printf_err("Out of Virtual memory, oh no...\n");
@@ -197,18 +197,18 @@ void platform_virtual_memory_protect(void *memory, isize size);
 		global_platform_memory_total_usage += total_size;
 		return pmblock;
 	}
-	void platform_virtual_memory_free(PlatformMemoryBlock *block) {
+	gb_internal void platform_virtual_memory_free(PlatformMemoryBlock *block) {
 		isize size = block->total_size;
 		global_platform_memory_total_usage -= size;
 		munmap(block, size);
 	}
-	void platform_virtual_memory_protect(void *memory, isize size) {
+	gb_internal void platform_virtual_memory_protect(void *memory, isize size) {
 		int err = mprotect(memory, size, PROT_NONE);
 		GB_ASSERT(err == 0);
 	}
 #endif
 
-MemoryBlock *virtual_memory_alloc(isize size) {
+gb_internal MemoryBlock *virtual_memory_alloc(isize size) {
 	isize const page_size = DEFAULT_PAGE_SIZE; 
 	
 	isize total_size     = size + gb_size_of(PlatformMemoryBlock);
@@ -250,7 +250,7 @@ MemoryBlock *virtual_memory_alloc(isize size) {
 	return &pmblock->block;
 }
 
-void virtual_memory_dealloc(MemoryBlock *block_to_free) {
+gb_internal void virtual_memory_dealloc(MemoryBlock *block_to_free) {
 	PlatformMemoryBlock *block = cast(PlatformMemoryBlock *)block_to_free;
 	if (block != nullptr) {
 		mutex_lock(&global_memory_block_mutex);
@@ -265,9 +265,9 @@ void virtual_memory_dealloc(MemoryBlock *block_to_free) {
 
 
 
-GB_ALLOCATOR_PROC(arena_allocator_proc);
+gb_internal GB_ALLOCATOR_PROC(arena_allocator_proc);
 
-gbAllocator arena_allocator(Arena *arena) {
+gb_internal gbAllocator arena_allocator(Arena *arena) {
 	gbAllocator a;
 	a.proc = arena_allocator_proc;
 	a.data = arena;
@@ -275,7 +275,7 @@ gbAllocator arena_allocator(Arena *arena) {
 }
 
 
-GB_ALLOCATOR_PROC(arena_allocator_proc) {
+gb_internal GB_ALLOCATOR_PROC(arena_allocator_proc) {
 	void *ptr = nullptr;
 	Arena *arena = cast(Arena *)allocator_data;
 	GB_ASSERT_NOT_NULL(arena);
@@ -307,11 +307,11 @@ GB_ALLOCATOR_PROC(arena_allocator_proc) {
 
 
 gb_global gb_thread_local Arena permanent_arena = {nullptr, DEFAULT_MINIMUM_BLOCK_SIZE, true};
-gbAllocator permanent_allocator() {
+gb_internal gbAllocator permanent_allocator() {
 	return arena_allocator(&permanent_arena);
 }
 
-gbAllocator temporary_allocator() {
+gb_internal gbAllocator temporary_allocator() {
 	return permanent_allocator();
 }
 
@@ -320,9 +320,9 @@ gbAllocator temporary_allocator() {
 
 
 
-GB_ALLOCATOR_PROC(heap_allocator_proc);
+gb_internal GB_ALLOCATOR_PROC(heap_allocator_proc);
 
-gbAllocator heap_allocator(void) {
+gb_internal gbAllocator heap_allocator(void) {
 	gbAllocator a;
 	a.proc = heap_allocator_proc;
 	a.data = nullptr;
@@ -330,7 +330,7 @@ gbAllocator heap_allocator(void) {
 }
 
 
-GB_ALLOCATOR_PROC(heap_allocator_proc) {
+gb_internal GB_ALLOCATOR_PROC(heap_allocator_proc) {
 	void *ptr = nullptr;
 	gb_unused(allocator_data);
 	gb_unused(old_size);
@@ -460,7 +460,7 @@ GB_ALLOCATOR_PROC(heap_allocator_proc) {
 
 
 template <typename T>
-void resize_array_raw(T **array, gbAllocator const &a, isize old_count, isize new_count) {
+gb_internal void resize_array_raw(T **array, gbAllocator const &a, isize old_count, isize new_count) {
 	GB_ASSERT(new_count >= 0);
 	if (new_count == 0) {
 		gb_free(a, *array);

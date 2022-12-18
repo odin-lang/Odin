@@ -10,20 +10,20 @@ struct PtrSet {
 	Array<PtrSetEntry<T>> entries;
 };
 
-template <typename T> void ptr_set_init   (PtrSet<T> *s, gbAllocator a, isize capacity = 16);
-template <typename T> void ptr_set_destroy(PtrSet<T> *s);
-template <typename T> T    ptr_set_add    (PtrSet<T> *s, T ptr);
-template <typename T> bool ptr_set_update (PtrSet<T> *s, T ptr); // returns true if it previously existed
-template <typename T> bool ptr_set_exists (PtrSet<T> *s, T ptr);
-template <typename T> void ptr_set_remove (PtrSet<T> *s, T ptr);
-template <typename T> void ptr_set_clear  (PtrSet<T> *s);
-template <typename T> void ptr_set_grow   (PtrSet<T> *s);
-template <typename T> void ptr_set_rehash (PtrSet<T> *s, isize new_count);
-template <typename T> void ptr_set_reserve(PtrSet<T> *h, isize cap);
+template <typename T> gb_internal void ptr_set_init   (PtrSet<T> *s, gbAllocator a, isize capacity = 16);
+template <typename T> gb_internal void ptr_set_destroy(PtrSet<T> *s);
+template <typename T> gb_internal T    ptr_set_add    (PtrSet<T> *s, T ptr);
+template <typename T> gb_internal bool ptr_set_update (PtrSet<T> *s, T ptr); // returns true if it previously existed
+template <typename T> gb_internal bool ptr_set_exists (PtrSet<T> *s, T ptr);
+template <typename T> gb_internal void ptr_set_remove (PtrSet<T> *s, T ptr);
+template <typename T> gb_internal void ptr_set_clear  (PtrSet<T> *s);
+template <typename T> gb_internal void ptr_set_grow   (PtrSet<T> *s);
+template <typename T> gb_internal void ptr_set_rehash (PtrSet<T> *s, isize new_count);
+template <typename T> gb_internal void ptr_set_reserve(PtrSet<T> *h, isize cap);
 
 
 template <typename T>
-void ptr_set_init(PtrSet<T> *s, gbAllocator a, isize capacity) {
+gb_internal void ptr_set_init(PtrSet<T> *s, gbAllocator a, isize capacity) {
 	if (capacity != 0) {
 		capacity = next_pow2_isize(gb_max(16, capacity));
 	}
@@ -36,7 +36,7 @@ void ptr_set_init(PtrSet<T> *s, gbAllocator a, isize capacity) {
 }
 
 template <typename T>
-void ptr_set_destroy(PtrSet<T> *s) {
+gb_internal void ptr_set_destroy(PtrSet<T> *s) {
 	slice_free(&s->hashes, s->entries.allocator);
 	array_free(&s->entries);
 }
@@ -93,13 +93,13 @@ gb_internal bool ptr_set__full(PtrSet<T> *s) {
 }
 
 template <typename T>
-gb_inline void ptr_set_grow(PtrSet<T> *s) {
+gb_internal gb_inline void ptr_set_grow(PtrSet<T> *s) {
 	isize new_count = gb_max(s->hashes.count<<1, 16);
 	ptr_set_rehash(s, new_count);
 }
 
 template <typename T>
-void ptr_set_reset_entries(PtrSet<T> *s) {
+gb_internal void ptr_set_reset_entries(PtrSet<T> *s) {
 	for (isize i = 0; i < s->hashes.count; i++) {
 		s->hashes.data[i] = MAP_SENTINEL;
 	}
@@ -117,7 +117,7 @@ void ptr_set_reset_entries(PtrSet<T> *s) {
 }
 
 template <typename T>
-void ptr_set_reserve(PtrSet<T> *s, isize cap) {
+gb_internal void ptr_set_reserve(PtrSet<T> *s, isize cap) {
 	array_reserve(&s->entries, cap);
 	if (s->entries.count*2 < s->hashes.count) {
 		return;
@@ -128,18 +128,18 @@ void ptr_set_reserve(PtrSet<T> *s, isize cap) {
 
 
 template <typename T>
-void ptr_set_rehash(PtrSet<T> *s, isize new_count) {
+gb_internal void ptr_set_rehash(PtrSet<T> *s, isize new_count) {
 	ptr_set_reserve(s, new_count);
 }
 
 template <typename T>
-gb_inline bool ptr_set_exists(PtrSet<T> *s, T ptr) {
+gb_internal gb_inline bool ptr_set_exists(PtrSet<T> *s, T ptr) {
 	isize index = ptr_set__find(s, ptr).entry_index;
 	return index != MAP_SENTINEL;
 }
 
 template <typename T>
-gb_inline isize ptr_entry_index(PtrSet<T> *s, T ptr) {
+gb_internal gb_inline isize ptr_entry_index(PtrSet<T> *s, T ptr) {
 	isize index = ptr_set__find(s, ptr).entry_index;
 	if (index != MAP_SENTINEL) {
 		return index;
@@ -149,7 +149,7 @@ gb_inline isize ptr_entry_index(PtrSet<T> *s, T ptr) {
 
 // Returns true if it already exists
 template <typename T>
-T ptr_set_add(PtrSet<T> *s, T ptr) {
+gb_internal T ptr_set_add(PtrSet<T> *s, T ptr) {
 	MapIndex index;
 	MapFindResult fr;
 	if (s->hashes.count == 0) {
@@ -171,7 +171,7 @@ T ptr_set_add(PtrSet<T> *s, T ptr) {
 }
 
 template <typename T>
-bool ptr_set_update(PtrSet<T> *s, T ptr) { // returns true if it previously existsed
+gb_internal bool ptr_set_update(PtrSet<T> *s, T ptr) { // returns true if it previously existsed
 	bool exists = false;
 	MapIndex index;
 	MapFindResult fr;
@@ -198,7 +198,7 @@ bool ptr_set_update(PtrSet<T> *s, T ptr) { // returns true if it previously exis
 
 
 template <typename T>
-void ptr_set__erase(PtrSet<T> *s, MapFindResult fr) {
+gb_internal void ptr_set__erase(PtrSet<T> *s, MapFindResult fr) {
 	MapFindResult last;
 	if (fr.entry_prev == MAP_SENTINEL) {
 		s->hashes.data[fr.hash_index] = s->entries.data[fr.entry_index].next;
@@ -219,7 +219,7 @@ void ptr_set__erase(PtrSet<T> *s, MapFindResult fr) {
 }
 
 template <typename T>
-void ptr_set_remove(PtrSet<T> *s, T ptr) {
+gb_internal void ptr_set_remove(PtrSet<T> *s, T ptr) {
 	MapFindResult fr = ptr_set__find(s, ptr);
 	if (fr.entry_index != MAP_SENTINEL) {
 		ptr_set__erase(s, fr);
@@ -227,7 +227,7 @@ void ptr_set_remove(PtrSet<T> *s, T ptr) {
 }
 
 template <typename T>
-gb_inline void ptr_set_clear(PtrSet<T> *s) {
+gb_internal gb_inline void ptr_set_clear(PtrSet<T> *s) {
 	array_clear(&s->entries);
 	for (isize i = 0; i < s->hashes.count; i++) {
 		s->hashes.data[i] = MAP_SENTINEL;
@@ -236,21 +236,21 @@ gb_inline void ptr_set_clear(PtrSet<T> *s) {
 
 
 template <typename T>
-PtrSetEntry<T> *begin(PtrSet<T> &m) {
+gb_internal PtrSetEntry<T> *begin(PtrSet<T> &m) {
 	return m.entries.data;
 }
 template <typename T>
-PtrSetEntry<T> const *begin(PtrSet<T> const &m) {
+gb_internal PtrSetEntry<T> const *begin(PtrSet<T> const &m) {
 	return m.entries.data;
 }
 
 
 template <typename T>
-PtrSetEntry<T> *end(PtrSet<T> &m) {
+gb_internal PtrSetEntry<T> *end(PtrSet<T> &m) {
 	return m.entries.data + m.entries.count;
 }
 
 template <typename T>
-PtrSetEntry<T> const *end(PtrSet<T> const &m) {
+gb_internal PtrSetEntry<T> const *end(PtrSet<T> const &m) {
 	return m.entries.data + m.entries.count;
 }

@@ -258,7 +258,7 @@ enum ProcCallingConvention : i32 {
 	ProcCC_ForeignBlockDefault = -1,
 };
 
-char const *proc_calling_convention_strings[ProcCC_MAX] = {
+gb_global char const *proc_calling_convention_strings[ProcCC_MAX] = {
 	"",
 	"odin",
 	"contextless",
@@ -272,7 +272,7 @@ char const *proc_calling_convention_strings[ProcCC_MAX] = {
 	"sysv",
 };
 
-ProcCallingConvention default_calling_convention(void) {
+gb_internal ProcCallingConvention default_calling_convention(void) {
 	return ProcCC_Odin;
 }
 
@@ -332,7 +332,7 @@ enum InlineAsmDialectKind : u8 {
 	InlineAsmDialect_COUNT,
 };
 
-char const *inline_asm_dialect_strings[InlineAsmDialect_COUNT] = {
+gb_global char const *inline_asm_dialect_strings[InlineAsmDialect_COUNT] = {
 	"",
 	"att",
 	"intel",
@@ -729,7 +729,7 @@ enum AstKind : u16 {
 	Ast_COUNT,
 };
 
-String const ast_strings[] = {
+gb_global String const ast_strings[] = {
 	{cast(u8 *)"invalid node", gb_size_of("invalid node")},
 #define AST_KIND(_kind_name_, name, ...) {cast(u8 *)name, gb_size_of(name)-1},
 	AST_KINDS
@@ -742,7 +742,7 @@ String const ast_strings[] = {
 #undef AST_KIND
 
 
-isize const ast_variant_sizes[] = {
+gb_global isize const ast_variant_sizes[] = {
 	0,
 #define AST_KIND(_kind_name_, name, ...) gb_size_of(GB_JOIN2(Ast, _kind_name_)),
 	AST_KINDS
@@ -793,33 +793,33 @@ struct Ast {
 #endif
 
 
-gb_inline bool is_ast_expr(Ast *node) {
+gb_internal gb_inline bool is_ast_expr(Ast *node) {
 	return gb_is_between(node->kind, Ast__ExprBegin+1, Ast__ExprEnd-1);
 }
-gb_inline bool is_ast_stmt(Ast *node) {
+gb_internal gb_inline bool is_ast_stmt(Ast *node) {
 	return gb_is_between(node->kind, Ast__StmtBegin+1, Ast__StmtEnd-1);
 }
-gb_inline bool is_ast_complex_stmt(Ast *node) {
+gb_internal gb_inline bool is_ast_complex_stmt(Ast *node) {
 	return gb_is_between(node->kind, Ast__ComplexStmtBegin+1, Ast__ComplexStmtEnd-1);
 }
-gb_inline bool is_ast_decl(Ast *node) {
+gb_internal gb_inline bool is_ast_decl(Ast *node) {
 	return gb_is_between(node->kind, Ast__DeclBegin+1, Ast__DeclEnd-1);
 }
-gb_inline bool is_ast_type(Ast *node) {
+gb_internal gb_inline bool is_ast_type(Ast *node) {
 	return gb_is_between(node->kind, Ast__TypeBegin+1, Ast__TypeEnd-1);
 }
-gb_inline bool is_ast_when_stmt(Ast *node) {
+gb_internal gb_inline bool is_ast_when_stmt(Ast *node) {
 	return node->kind == Ast_WhenStmt;
 }
 
 gb_global gb_thread_local Arena global_thread_local_ast_arena = {};
 
-gbAllocator ast_allocator(AstFile *f) {
+gb_internal gbAllocator ast_allocator(AstFile *f) {
 	Arena *arena = &global_thread_local_ast_arena;
 	return arena_allocator(arena);
 }
 
-Ast *alloc_ast_node(AstFile *f, AstKind kind);
+gb_internal Ast *alloc_ast_node(AstFile *f, AstKind kind);
 
-gbString expr_to_string(Ast *expression);
-bool allow_field_separator(AstFile *f);
+gb_internal gbString expr_to_string(Ast *expression);
+gb_internal bool allow_field_separator(AstFile *f);
