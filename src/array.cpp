@@ -10,14 +10,14 @@ struct Array {
 
 	T &operator[](isize index) {
 		#if !defined(NO_ARRAY_BOUNDS_CHECK)
-			GB_ASSERT_MSG(0 <= index && index < count, "Index %td is out of bounds ranges 0..<%td", index, count);
+			GB_ASSERT_MSG(cast(usize)index < cast(usize)count, "Index %td is out of bounds ranges 0..<%td", index, count);
 		#endif
 		return data[index];
 	}
 
 	T const &operator[](isize index) const {
 		#if !defined(NO_ARRAY_BOUNDS_CHECK)
-			GB_ASSERT_MSG(0 <= index && index < count, "Index %td is out of bounds ranges 0..<%td", index, count);
+			GB_ASSERT_MSG(cast(usize)index < cast(usize)count, "Index %td is out of bounds ranges 0..<%td", index, count);
 		#endif
 		return data[index];
 	}
@@ -58,14 +58,14 @@ struct Slice {
 
 	gb_inline T &operator[](isize index) {
 		#if !defined(NO_ARRAY_BOUNDS_CHECK)
-			GB_ASSERT_MSG(0 <= index && index < count, "Index %td is out of bounds ranges 0..<%td", index, count);
+			GB_ASSERT_MSG(cast(usize)index < cast(usize)count, "Index %td is out of bounds ranges 0..<%td", index, count);
 		#endif
 		return data[index];
 	}
 
 	gb_inline T const &operator[](isize index) const {
 		#if !defined(NO_ARRAY_BOUNDS_CHECK)
-			GB_ASSERT_MSG(0 <= index && index < count, "Index %td is out of bounds ranges 0..<%td", index, count);
+			GB_ASSERT_MSG(cast(usize)index < cast(usize)count, "Index %td is out of bounds ranges 0..<%td", index, count);
 		#endif
 		return data[index];
 	}
