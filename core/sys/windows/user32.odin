@@ -100,6 +100,7 @@ foreign user32 {
 	AdjustWindowRectExForDpi :: proc(lpRect: LPRECT, dwStyle: DWORD, bMenu: BOOL, dwExStyle: DWORD, dpi: UINT) -> BOOL ---
 
 	SystemParametersInfoW :: proc(uiAction, uiParam: UINT, pvParam: PVOID, fWinIni: UINT) -> BOOL ---
+	GetMonitorInfoW :: proc(hMonitor: HMONITOR, lpmi: LPMONITORINFO) -> BOOL ---
 
 	GetWindowDC :: proc(hWnd: HWND) -> HDC ---
 	GetDC :: proc(hWnd: HWND) -> HDC ---
