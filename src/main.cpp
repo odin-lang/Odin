@@ -8,20 +8,20 @@
 #include "build_settings.cpp"
 
 gb_global ThreadPool global_thread_pool;
-void init_global_thread_pool(void) {
+gb_internal void init_global_thread_pool(void) {
 	isize thread_count = gb_max(build_context.thread_count, 1);
 	isize worker_count = thread_count-1; // NOTE(bill): The main thread will also be used for work
 	thread_pool_init(&global_thread_pool, permanent_allocator(), worker_count, "ThreadPoolWorker");
 }
-bool global_thread_pool_add_task(WorkerTaskProc *proc, void *data) {
+gb_internal bool global_thread_pool_add_task(WorkerTaskProc *proc, void *data) {
 	return thread_pool_add_task(&global_thread_pool, proc, data);
 }
-void global_thread_pool_wait(void) {
+gb_internal void global_thread_pool_wait(void) {
 	thread_pool_wait(&global_thread_pool);
 }
 
 
-void debugf(char const *fmt, ...) {
+gb_internal void debugf(char const *fmt, ...) {
 	if (build_context.show_debug_messages) {
 		gb_printf_err("[DEBUG] ");
 		va_list va;
@@ -62,7 +62,7 @@ gb_global Timings global_timings = {0};
 #include "bug_report.cpp"
 
 // NOTE(bill): 'name' is used in debugging and profiling modes
-i32 system_exec_command_line_app(char const *name, char const *fmt, ...) {
+gb_internal i32 system_exec_command_line_app(char const *name, char const *fmt, ...) {
 	isize const cmd_cap = 64<<20; // 64 MiB should be more than enough
 	char *cmd_line = gb_alloc_array(gb_heap_allocator(), char, cmd_cap);
 	isize cmd_len = 0;
@@ -124,7 +124,7 @@ i32 system_exec_command_line_app(char const *name, char const *fmt, ...) {
 }
 
 
-i32 linker_stage(lbGenerator *gen) {
+gb_internal i32 linker_stage(lbGenerator *gen) {
 	i32 result = 0;
 	Timings *timings = &global_timings;
 
@@ -524,7 +524,7 @@ i32 linker_stage(lbGenerator *gen) {
 	return result;
 }
 
-Array<String> setup_args(int argc, char const **argv) {
+gb_internal Array<String> setup_args(int argc, char const **argv) {
 	gbAllocator a = heap_allocator();
 
 #if defined(GB_SYSTEM_WINDOWS)
@@ -553,7 +553,7 @@ Array<String> setup_args(int argc, char const **argv) {
 #endif
 }
 
-void print_usage_line(i32 indent, char const *fmt, ...) {
+gb_internal void print_usage_line(i32 indent, char const *fmt, ...) {
 	while (indent --> 0) {
 		gb_printf_err("\t");
 	}
@@ -564,7 +564,7 @@ void print_usage_line(i32 indent, char const *fmt, ...) {
 	gb_printf_err("\n");
 }
 
-void usage(String argv0) {
+gb_internal void usage(String argv0) {
 	print_usage_line(0, "%.*s is a tool for managing Odin source code", LIT(argv0));
 	print_usage_line(0, "Usage:");
 	print_usage_line(1, "%.*s command [arguments]", LIT(argv0));
@@ -687,12 +687,12 @@ struct BuildFlag {
 };
 
 
-void add_flag(Array<BuildFlag> *build_flags, BuildFlagKind kind, String name, BuildFlagParamKind param_kind, u32 command_support, bool allow_mulitple=false) {
+gb_internal void add_flag(Array<BuildFlag> *build_flags, BuildFlagKind kind, String name, BuildFlagParamKind param_kind, u32 command_support, bool allow_mulitple=false) {
 	BuildFlag flag = {kind, name, param_kind, command_support, allow_mulitple};
 	array_add(build_flags, flag);
 }
 
-ExactValue build_param_to_exact_value(String name, String param) {
+gb_internal ExactValue build_param_to_exact_value(String name, String param) {
 	ExactValue value = {};
 
 	/*
@@ -747,7 +747,7 @@ ExactValue build_param_to_exact_value(String name, String param) {
 }
 
 // Writes a did-you-mean message for formerly deprecated flags.
-void did_you_mean_flag(String flag) {
+gb_internal void did_you_mean_flag(String flag) {
 	gbAllocator a = heap_allocator();
 	String name = copy_string(a, flag);
 	defer (gb_free(a, name.text));
@@ -760,7 +760,7 @@ void did_you_mean_flag(String flag) {
 	gb_printf_err("Unknown flag: '%.*s'\n", LIT(flag));
 }
 
-bool parse_build_flags(Array<String> args) {
+gb_internal bool parse_build_flags(Array<String> args) {
 	auto build_flags = array_make<BuildFlag>(heap_allocator(), 0, BuildFlag_COUNT);
 	add_flag(&build_flags, BuildFlag_Help,                    str_lit("help"),                      BuildFlagParam_None,    Command_all);
 	add_flag(&build_flags, BuildFlag_SingleFile,              str_lit("file"),                      BuildFlagParam_None,    Command__does_build | Command__does_check);
@@ -1651,7 +1651,7 @@ bool parse_build_flags(Array<String> args) {
 	return !bad_flags;
 }
 
-void timings_export_all(Timings *t, Checker *c, bool timings_are_finalized = false) {
+gb_internal void timings_export_all(Timings *t, Checker *c, bool timings_are_finalized = false) {
 	GB_ASSERT((!(build_context.export_timings_format == TimingsExportUnspecified) && build_context.export_timings_file.len > 0));
 
 	/*
@@ -1749,7 +1749,7 @@ void timings_export_all(Timings *t, Checker *c, bool timings_are_finalized = fal
 	gb_printf("Done.\n");
 }
 
-void show_timings(Checker *c, Timings *t) {
+gb_internal void show_timings(Checker *c, Timings *t) {
 	Parser *p      = c->parser;
 	isize lines    = p->total_line_count;
 	isize tokens   = p->total_token_count;
@@ -1878,7 +1878,7 @@ void show_timings(Checker *c, Timings *t) {
 	}
 }
 
-void remove_temp_files(lbGenerator *gen) {
+gb_internal void remove_temp_files(lbGenerator *gen) {
 	if (build_context.keep_temp_files) return;
 
 	TIME_SECTION("remove keep temp files");
@@ -1902,7 +1902,7 @@ void remove_temp_files(lbGenerator *gen) {
 }
 
 
-void print_show_help(String const arg0, String const &command) {
+gb_internal void print_show_help(String const arg0, String const &command) {
 	print_usage_line(0, "%.*s is a tool for managing Odin source code", LIT(arg0));
 	print_usage_line(0, "Usage:");
 	print_usage_line(1, "%.*s %.*s [arguments]", LIT(arg0), LIT(command));
@@ -2248,7 +2248,7 @@ void print_show_help(String const arg0, String const &command) {
 	}
 }
 
-void print_show_unused(Checker *c) {
+gb_internal void print_show_unused(Checker *c) {
 	CheckerInfo *info = &c->info;
 
 	auto unused = array_make<Entity *>(permanent_allocator(), 0, info->entities.count);
@@ -2322,7 +2322,7 @@ void print_show_unused(Checker *c) {
 	print_usage_line(0, "");
 }
 
-bool check_env(void) {
+gb_internal bool check_env(void) {
 	gbAllocator a = heap_allocator();
 	char const *odin_root = gb_get_env("ODIN_ROOT", a);
 	defer (gb_free(a, cast(void *)odin_root));
@@ -2348,7 +2348,7 @@ struct StripSemicolonFile {
 	i64 written;
 };
 
-gbFileError write_file_with_stripped_tokens(gbFile *f, AstFile *file, i64 *written_) {
+gb_internal gbFileError write_file_with_stripped_tokens(gbFile *f, AstFile *file, i64 *written_) {
 	i64 written = 0;
 	gbFileError err = gbFileError_None;
 	u8 const *file_data = file->tokenizer.start;
@@ -2388,7 +2388,7 @@ gbFileError write_file_with_stripped_tokens(gbFile *f, AstFile *file, i64 *writt
 	return err;
 }
 
-int strip_semicolons(Parser *parser) {
+gb_internal int strip_semicolons(Parser *parser) {
 	isize file_count = 0;
 	for_array(i, parser->packages) {
 		AstPackage *pkg = parser->packages[i];

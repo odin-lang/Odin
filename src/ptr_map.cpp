@@ -26,7 +26,7 @@ struct PtrMap {
 };
 
 
-u32 ptr_map_hash_key(uintptr key) {
+gb_internal gb_inline u32 ptr_map_hash_key(uintptr key) {
 #if defined(GB_ARCH_64_BIT)
 	key = (~key) + (key << 21);
 	key = key ^ (key >> 24);
@@ -41,35 +41,35 @@ u32 ptr_map_hash_key(uintptr key) {
 	return (word >> 22u) ^ word;
 #endif
 }
-u32 ptr_map_hash_key(void const *key) {
+gb_internal gb_inline u32 ptr_map_hash_key(void const *key) {
 	return ptr_map_hash_key((uintptr)key);
 }
 
 
-template <typename K, typename V> void map_init             (PtrMap<K, V> *h, gbAllocator a, isize capacity = 16);
-template <typename K, typename V> void map_destroy          (PtrMap<K, V> *h);
-template <typename K, typename V> V *  map_get              (PtrMap<K, V> *h, K key);
-template <typename K, typename V> void map_set              (PtrMap<K, V> *h, K key, V const &value);
-template <typename K, typename V> void map_remove           (PtrMap<K, V> *h, K key);
-template <typename K, typename V> void map_clear            (PtrMap<K, V> *h);
-template <typename K, typename V> void map_grow             (PtrMap<K, V> *h);
-template <typename K, typename V> void map_rehash           (PtrMap<K, V> *h, isize new_count);
-template <typename K, typename V> void map_reserve          (PtrMap<K, V> *h, isize cap);
+template <typename K, typename V> gb_internal void map_init             (PtrMap<K, V> *h, gbAllocator a, isize capacity = 16);
+template <typename K, typename V> gb_internal void map_destroy          (PtrMap<K, V> *h);
+template <typename K, typename V> gb_internal V *  map_get              (PtrMap<K, V> *h, K key);
+template <typename K, typename V> gb_internal void map_set              (PtrMap<K, V> *h, K key, V const &value);
+template <typename K, typename V> gb_internal void map_remove           (PtrMap<K, V> *h, K key);
+template <typename K, typename V> gb_internal void map_clear            (PtrMap<K, V> *h);
+template <typename K, typename V> gb_internal void map_grow             (PtrMap<K, V> *h);
+template <typename K, typename V> gb_internal void map_rehash           (PtrMap<K, V> *h, isize new_count);
+template <typename K, typename V> gb_internal void map_reserve          (PtrMap<K, V> *h, isize cap);
 
 #if PTR_MAP_ENABLE_MULTI_MAP
 // Mutlivalued map procedure
-template <typename K, typename V> PtrMapEntry<K, V> * multi_map_find_first(PtrMap<K, V> *h, K key);
-template <typename K, typename V> PtrMapEntry<K, V> * multi_map_find_next (PtrMap<K, V> *h, PtrMapEntry<K, V> *e);
+template <typename K, typename V> gb_internal PtrMapEntry<K, V> * multi_map_find_first(PtrMap<K, V> *h, K key);
+template <typename K, typename V> gb_internal PtrMapEntry<K, V> * multi_map_find_next (PtrMap<K, V> *h, PtrMapEntry<K, V> *e);
 
-template <typename K, typename V> isize multi_map_count     (PtrMap<K, V> *h, K key);
-template <typename K, typename V> void  multi_map_get_all   (PtrMap<K, V> *h, K key, V *items);
-template <typename K, typename V> void  multi_map_insert    (PtrMap<K, V> *h, K key, V const &value);
-template <typename K, typename V> void  multi_map_remove    (PtrMap<K, V> *h, K key, PtrMapEntry<K, V> *e);
-template <typename K, typename V> void  multi_map_remove_all(PtrMap<K, V> *h, K key);
+template <typename K, typename V> gb_internal isize multi_map_count     (PtrMap<K, V> *h, K key);
+template <typename K, typename V> gb_internal void  multi_map_get_all   (PtrMap<K, V> *h, K key, V *items);
+template <typename K, typename V> gb_internal void  multi_map_insert    (PtrMap<K, V> *h, K key, V const &value);
+template <typename K, typename V> gb_internal void  multi_map_remove    (PtrMap<K, V> *h, K key, PtrMapEntry<K, V> *e);
+template <typename K, typename V> gb_internal void  multi_map_remove_all(PtrMap<K, V> *h, K key);
 #endif
 
 template <typename K, typename V>
-gb_inline void map_init(PtrMap<K, V> *h, gbAllocator a, isize capacity) {
+gb_internal gb_inline void map_init(PtrMap<K, V> *h, gbAllocator a, isize capacity) {
 	capacity = next_pow2_isize(capacity);
 	slice_init(&h->hashes,  a, capacity);
 	array_init(&h->entries, a, 0, capacity);
@@ -79,7 +79,7 @@ gb_inline void map_init(PtrMap<K, V> *h, gbAllocator a, isize capacity) {
 }
 
 template <typename K, typename V>
-gb_inline void map_destroy(PtrMap<K, V> *h) {
+gb_internal gb_inline void map_destroy(PtrMap<K, V> *h) {
 	slice_free(&h->hashes, h->entries.allocator);
 	array_free(&h->entries);
 }
@@ -137,13 +137,13 @@ gb_internal b32 map__full(PtrMap<K, V> *h) {
 }
 
 template <typename K, typename V>
-gb_inline void map_grow(PtrMap<K, V> *h) {
+gb_internal gb_inline void map_grow(PtrMap<K, V> *h) {
 	isize new_count = gb_max(h->hashes.count<<1, 16);
 	map_rehash(h, new_count);
 }
 
 template <typename K, typename V>
-void map_reset_entries(PtrMap<K, V> *h) {
+gb_internal void map_reset_entries(PtrMap<K, V> *h) {
 	for (isize i = 0; i < h->hashes.count; i++) {
 		h->hashes.data[i] = MAP_SENTINEL;
 	}
@@ -161,7 +161,7 @@ void map_reset_entries(PtrMap<K, V> *h) {
 }
 
 template <typename K, typename V>
-void map_reserve(PtrMap<K, V> *h, isize cap) {
+gb_internal void map_reserve(PtrMap<K, V> *h, isize cap) {
 	array_reserve(&h->entries, cap);
 	if (h->entries.count*2 < h->hashes.count) {
 		return;
@@ -172,12 +172,12 @@ void map_reserve(PtrMap<K, V> *h, isize cap) {
 
 
 template <typename K, typename V>
-void map_rehash(PtrMap<K, V> *h, isize new_count) {
+gb_internal void map_rehash(PtrMap<K, V> *h, isize new_count) {
 	map_reserve(h, new_count);
 }
 
 template <typename K, typename V>
-V *map_get(PtrMap<K, V> *h, K key) {
+gb_internal V *map_get(PtrMap<K, V> *h, K key) {
 	MapIndex index = map__find(h, key).entry_index;
 	if (index != MAP_SENTINEL) {
 		return &h->entries.data[index].value;
@@ -186,14 +186,14 @@ V *map_get(PtrMap<K, V> *h, K key) {
 }
 
 template <typename K, typename V>
-V &map_must_get(PtrMap<K, V> *h, K key) {
+gb_internal V &map_must_get(PtrMap<K, V> *h, K key) {
 	MapIndex index = map__find(h, key).entry_index;
 	GB_ASSERT(index != MAP_SENTINEL);
 	return h->entries.data[index].value;
 }
 
 template <typename K, typename V>
-void map_set(PtrMap<K, V> *h, K key, V const &value) {
+gb_internal void map_set(PtrMap<K, V> *h, K key, V const &value) {
 	MapIndex index;
 	MapFindResult fr;
 	if (h->hashes.count == 0) {
@@ -219,7 +219,7 @@ void map_set(PtrMap<K, V> *h, K key, V const &value) {
 
 
 template <typename K, typename V>
-void map__erase(PtrMap<K, V> *h, MapFindResult const &fr) {
+gb_internal void map__erase(PtrMap<K, V> *h, MapFindResult const &fr) {
 	MapFindResult last;
 	if (fr.entry_prev == MAP_SENTINEL) {
 		h->hashes.data[fr.hash_index] = h->entries.data[fr.entry_index].next;
@@ -242,7 +242,7 @@ void map__erase(PtrMap<K, V> *h, MapFindResult const &fr) {
 }
 
 template <typename K, typename V>
-void map_remove(PtrMap<K, V> *h, K key) {
+gb_internal void map_remove(PtrMap<K, V> *h, K key) {
 	MapFindResult fr = map__find(h, key);
 	if (fr.entry_index != MAP_SENTINEL) {
 		map__erase(h, fr);
@@ -250,7 +250,7 @@ void map_remove(PtrMap<K, V> *h, K key) {
 }
 
 template <typename K, typename V>
-gb_inline void map_clear(PtrMap<K, V> *h) {
+gb_internal gb_inline void map_clear(PtrMap<K, V> *h) {
 	array_clear(&h->entries);
 	for (isize i = 0; i < h->hashes.count; i++) {
 		h->hashes.data[i] = MAP_SENTINEL;
@@ -260,7 +260,7 @@ gb_inline void map_clear(PtrMap<K, V> *h) {
 
 #if PTR_MAP_ENABLE_MULTI_MAP
 template <typename K, typename V>
-PtrMapEntry<K, V> *multi_map_find_first(PtrMap<K, V> *h, K key) {
+gb_internal PtrMapEntry<K, V> *multi_map_find_first(PtrMap<K, V> *h, K key) {
 	MapIndex i = map__find(h, key).entry_index;
 	if (i == MAP_SENTINEL) {
 		return nullptr;
@@ -269,7 +269,7 @@ PtrMapEntry<K, V> *multi_map_find_first(PtrMap<K, V> *h, K key) {
 }
 
 template <typename K, typename V>
-PtrMapEntry<K, V> *multi_map_find_next(PtrMap<K, V> *h, PtrMapEntry<K, V> *e) {
+gb_internal PtrMapEntry<K, V> *multi_map_find_next(PtrMap<K, V> *h, PtrMapEntry<K, V> *e) {
 	MapIndex i = e->next;
 	while (i != MAP_SENTINEL) {
 		if (h->entries.data[i].key == e->key) {
@@ -281,7 +281,7 @@ PtrMapEntry<K, V> *multi_map_find_next(PtrMap<K, V> *h, PtrMapEntry<K, V> *e) {
 }
 
 template <typename K, typename V>
-isize multi_map_count(PtrMap<K, V> *h, K key) {
+gb_internal isize multi_map_count(PtrMap<K, V> *h, K key) {
 	isize count = 0;
 	PtrMapEntry<K, V> *e = multi_map_find_first(h, key);
 	while (e != nullptr) {
@@ -292,7 +292,7 @@ isize multi_map_count(PtrMap<K, V> *h, K key) {
 }
 
 template <typename K, typename V>
-void multi_map_get_all(PtrMap<K, V> *h, K key, V *items) {
+gb_internal void multi_map_get_all(PtrMap<K, V> *h, K key, V *items) {
 	isize i = 0;
 	PtrMapEntry<K, V> *e = multi_map_find_first(h, key);
 	while (e != nullptr) {
@@ -302,7 +302,7 @@ void multi_map_get_all(PtrMap<K, V> *h, K key, V *items) {
 }
 
 template <typename K, typename V>
-void multi_map_insert(PtrMap<K, V> *h, K key, V const &value) {
+gb_internal void multi_map_insert(PtrMap<K, V> *h, K key, V const &value) {
 	MapFindResult fr;
 	MapIndex i;
 	if (h->hashes.count == 0) {
@@ -325,7 +325,7 @@ void multi_map_insert(PtrMap<K, V> *h, K key, V const &value) {
 }
 
 template <typename K, typename V>
-void multi_map_remove(PtrMap<K, V> *h, K key, PtrMapEntry<K, V> *e) {
+gb_internal void multi_map_remove(PtrMap<K, V> *h, K key, PtrMapEntry<K, V> *e) {
 	MapFindResult fr = map__find_from_entry(h, e);
 	if (fr.entry_index != MAP_SENTINEL) {
 		map__erase(h, fr);
@@ -333,7 +333,7 @@ void multi_map_remove(PtrMap<K, V> *h, K key, PtrMapEntry<K, V> *e) {
 }
 
 template <typename K, typename V>
-void multi_map_remove_all(PtrMap<K, V> *h, K key) {
+gb_internal void multi_map_remove_all(PtrMap<K, V> *h, K key) {
 	while (map_get(h, key) != nullptr) {
 		map_remove(h, key);
 	}
@@ -342,21 +342,21 @@ void multi_map_remove_all(PtrMap<K, V> *h, K key) {
 
 
 template <typename K, typename V>
-PtrMapEntry<K, V> *begin(PtrMap<K, V> &m) {
+gb_internal PtrMapEntry<K, V> *begin(PtrMap<K, V> &m) {
 	return m.entries.data;
 }
 template <typename K, typename V>
-PtrMapEntry<K, V> const *begin(PtrMap<K, V> const &m) {
+gb_internal PtrMapEntry<K, V> const *begin(PtrMap<K, V> const &m) {
 	return m.entries.data;
 }
 
 
 template <typename K, typename V>
-PtrMapEntry<K, V> *end(PtrMap<K, V> &m) {
+gb_internal PtrMapEntry<K, V> *end(PtrMap<K, V> &m) {
 	return m.entries.data + m.entries.count;
 }
 
 template <typename K, typename V>
-PtrMapEntry<K, V> const *end(PtrMap<K, V> const &m) {
+gb_internal PtrMapEntry<K, V> const *end(PtrMap<K, V> const &m) {
 	return m.entries.data + m.entries.count;
 }

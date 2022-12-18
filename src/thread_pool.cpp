@@ -23,9 +23,9 @@ struct ThreadPool {
 	
 };
 
-THREAD_PROC(thread_pool_thread_proc);
+gb_internal THREAD_PROC(thread_pool_thread_proc);
 
-void thread_pool_init(ThreadPool *pool, gbAllocator const &a, isize thread_count, char const *worker_name) {
+gb_internal void thread_pool_init(ThreadPool *pool, gbAllocator const &a, isize thread_count, char const *worker_name) {
 	pool->allocator = a;
 	pool->stop = false;
 	mutex_init(&pool->mutex);
@@ -43,7 +43,7 @@ void thread_pool_init(ThreadPool *pool, gbAllocator const &a, isize thread_count
 	}
 }
 
-void thread_pool_destroy(ThreadPool *pool) {
+gb_internal void thread_pool_destroy(ThreadPool *pool) {
 	mutex_lock(&pool->mutex);
 	pool->stop = true;
 	condition_broadcast(&pool->task_cond);
@@ -64,23 +64,23 @@ void thread_pool_destroy(ThreadPool *pool) {
 	condition_destroy(&pool->task_cond);
 }
 
-bool thread_pool_queue_empty(ThreadPool *pool) {
+gb_internal bool thread_pool_queue_empty(ThreadPool *pool) {
 	return pool->task_queue == nullptr;
 }
 
-WorkerTask *thread_pool_queue_pop(ThreadPool *pool) {
+gb_internal WorkerTask *thread_pool_queue_pop(ThreadPool *pool) {
 	GB_ASSERT(pool->task_queue != nullptr);
 	WorkerTask *task = pool->task_queue;
 	pool->task_queue = task->next;
 	return task;
 }
-void thread_pool_queue_push(ThreadPool *pool, WorkerTask *task) {
+gb_internal void thread_pool_queue_push(ThreadPool *pool, WorkerTask *task) {
 	GB_ASSERT(task != nullptr);
 	task->next = pool->task_queue;
 	pool->task_queue = task;
 }
 
-bool thread_pool_add_task(ThreadPool *pool, WorkerTaskProc *proc, void *data) {
+gb_internal bool thread_pool_add_task(ThreadPool *pool, WorkerTaskProc *proc, void *data) {
 	GB_ASSERT(proc != nullptr);
 	mutex_lock(&pool->mutex);
 	WorkerTask *task = gb_alloc_item(permanent_allocator(), WorkerTask);
@@ -101,11 +101,11 @@ bool thread_pool_add_task(ThreadPool *pool, WorkerTaskProc *proc, void *data) {
 }	
 
 
-void thread_pool_do_task(WorkerTask *task) {
+gb_internal void thread_pool_do_task(WorkerTask *task) {
 	task->do_work(task->data);
 }
 
-void thread_pool_wait(ThreadPool *pool) {
+gb_internal void thread_pool_wait(ThreadPool *pool) {
 	if (pool->threads.count == 0) {
 		while (!thread_pool_queue_empty(pool)) {
 			thread_pool_do_task(thread_pool_queue_pop(pool));
@@ -138,7 +138,7 @@ void thread_pool_wait(ThreadPool *pool) {
 }
 
 
-THREAD_PROC(thread_pool_thread_proc) {
+gb_internal THREAD_PROC(thread_pool_thread_proc) {
 	ThreadPool *pool = cast(ThreadPool *)thread->user_data;
 	
 	for (;;) {

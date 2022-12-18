@@ -1,4 +1,4 @@
-Token ast_token(Ast *node) {
+gb_internal Token ast_token(Ast *node) {
 	switch (node->kind) {
 	case Ast_Ident:          return node->Ident.token;
 	case Ast_Implicit:       return node->Implicit;
@@ -360,6 +360,6 @@ Token ast_end_token(Ast *node) {
 	return empty_token;
 }
 
-TokenPos ast_end_pos(Ast *node) {
+gb_internal TokenPos ast_end_pos(Ast *node) {
 	return token_pos_end(ast_end_token(node));
 }
