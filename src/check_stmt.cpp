@@ -1520,12 +1520,6 @@ gb_internal void check_stmt_internal(CheckerContext *ctx, Ast *node, u32 flags) 
 		}
 	case_end;
 
-	case_ast_node(ts, TagStmt, node);
-		// TODO(bill): Tag Statements
-		error(node, "Tag statements are not supported yet");
-		check_stmt(ctx, ts->stmt, flags);
-	case_end;
-
 	case_ast_node(as, AssignStmt, node);
 		switch (as->op.kind) {
 		case Token_Eq: {

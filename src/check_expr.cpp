@@ -5103,16 +5103,6 @@ gb_internal bool check_unpack_arguments(CheckerContext *ctx, Entity **lhs, isize
 	return optional_ok;
 }
 
-
-gb_internal bool is_expr_constant_zero(Ast *expr) {
-	GB_ASSERT(expr != nullptr);
-	auto v = exact_value_to_integer(expr->tav.value);
-	if (v.kind == ExactValue_Integer) {
-		return big_int_cmp_zero(&v.value_integer) == 0;
-	}
-	return false;
-}
-
 gb_internal isize get_procedure_param_count_excluding_defaults(Type *pt, isize *param_count_) {
 	GB_ASSERT(pt != nullptr);
 	GB_ASSERT(pt->kind == Type_Proc);
@@ -5424,20 +5414,6 @@ gb_internal isize lookup_procedure_parameter(TypeProc *pt, String parameter_name
 			continue;
 		}
 		if (name == parameter_name) {
-			return i;
-		}
-	}
-	return -1;
-}
-gb_internal isize lookup_procedure_result(TypeProc *pt, String result_name) {
-	isize result_count = pt->result_count;
-	for (isize i = 0; i < result_count; i++) {
-		Entity *e = pt->results->Tuple.variables[i];
-		String name = e->token.string;
-		if (is_blank_ident(name)) {
-			continue;
-		}
-		if (name == result_name) {
 			return i;
 		}
 	}

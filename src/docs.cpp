@@ -85,15 +85,6 @@ gb_internal void print_doc_line(i32 indent, char const *fmt, ...) {
 	va_end(va);
 	gb_printf("\n");
 }
-gb_internal void print_doc_line_no_newline(i32 indent, char const *fmt, ...) {
-	while (indent --> 0) {
-		gb_printf("\t");
-	}
-	va_list va;
-	va_start(va, fmt);
-	gb_printf_va(fmt, va);
-	va_end(va);
-}
 gb_internal void print_doc_line_no_newline(i32 indent, String const &data) {
 	while (indent --> 0) {
 		gb_printf("\t");

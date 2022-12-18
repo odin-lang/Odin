@@ -457,11 +457,6 @@ AST_KIND(_StmtBegin,     "", bool) \
 	AST_KIND(BadStmt,    "bad statement",                 struct { Token begin, end; }) \
 	AST_KIND(EmptyStmt,  "empty statement",               struct { Token token; }) \
 	AST_KIND(ExprStmt,   "expression statement",          struct { Ast *expr; } ) \
-	AST_KIND(TagStmt,    "tag statement", struct { \
-		Token token; \
-		Token name; \
-		Ast * stmt; \
-	}) \
 	AST_KIND(AssignStmt, "assign statement", struct { \
 		Token op; \
 		Slice<Ast *> lhs, rhs; \

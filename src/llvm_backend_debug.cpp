@@ -14,12 +14,6 @@ gb_internal void lb_set_llvm_metadata(lbModule *m, void *key, LLVMMetadataRef va
 	}
 }
 
-gb_internal LLVMMetadataRef lb_get_llvm_file_metadata_from_node(lbModule *m, Ast *node) {
-	if (node == nullptr) {
-		return nullptr;
-	}
-	return lb_get_llvm_metadata(m, node->file());
-}
 
 gb_internal LLVMMetadataRef lb_get_current_debug_scope(lbProcedure *p) {
 	GB_ASSERT_MSG(p->debug_info != nullptr, "missing debug information for %.*s", LIT(p->name));

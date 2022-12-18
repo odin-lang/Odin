@@ -50,6 +50,10 @@ gb_internal void debugf(char const *fmt, ...);
 #include "string.cpp"
 #include "range_cache.cpp"
 
+#if defined(GB_SYSTEM_WINDOWS)
+	#pragma warning(push)
+	#pragma warning(disable: 4505)
+#endif
 
 gb_internal gb_inline bool is_power_of_two(i64 x) {
 	if (x <= 0) {
@@ -900,3 +904,8 @@ gb_internal Slice<DistanceAndTarget> did_you_mean_results(DidYouMeanAnswers *d) 
 	}
 	return slice_array(d->distances, 0, count);
 }
+
+
+#if defined(GB_SYSTEM_WINDOWS)
+	#pragma warning(pop)
+#endif

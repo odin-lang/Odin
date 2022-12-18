@@ -272,12 +272,6 @@ gb_internal lbValue lb_emit_epi(lbModule *m, lbValue const &value, isize index) 
 gb_internal LLVMValueRef llvm_zero(lbModule *m) {
 	return LLVMConstInt(lb_type(m, t_int), 0, false);
 }
-gb_internal LLVMValueRef llvm_zero32(lbModule *m) {
-	return LLVMConstInt(lb_type(m, t_i32), 0, false);
-}
-gb_internal LLVMValueRef llvm_one(lbModule *m) {
-	return LLVMConstInt(lb_type(m, t_i32), 1, false);
-}
 
 gb_internal LLVMValueRef llvm_alloca(lbProcedure *p, LLVMTypeRef llvm_type, isize alignment, char const *name) {
 	LLVMPositionBuilderAtEnd(p->builder, p->decl_block->block);
@@ -874,14 +868,6 @@ gb_internal void lb_addr_store(lbProcedure *p, lbAddr addr, lbValue value) {
 	lb_emit_store(p, addr.addr, value);
 }
 
-gb_internal void lb_const_store(lbValue ptr, lbValue value) {
-	GB_ASSERT(lb_is_const(ptr));
-	GB_ASSERT(lb_is_const(value));
-	GB_ASSERT(is_type_pointer(ptr.type));
-	LLVMSetInitializer(ptr.value, value.value);
-}
-
-
 gb_internal bool lb_is_type_proc_recursive(Type *t) {
 	for (;;) {
 		if (t == nullptr) {
@@ -1325,21 +1311,6 @@ gb_internal void lb_clone_struct_type(LLVMTypeRef dst, LLVMTypeRef src) {
 	LLVMTypeRef *fields = gb_alloc_array(temporary_allocator(), LLVMTypeRef, field_count);
 	LLVMGetStructElementTypes(src, fields);
 	LLVMStructSetBody(dst, fields, field_count, LLVMIsPackedStruct(src));
-}
-
-gb_internal LLVMTypeRef lb_alignment_prefix_type_hack(lbModule *m, i64 alignment) {
-	switch (alignment) {
-	case 1:
-		return LLVMArrayType(lb_type(m, t_u8), 0);
-	case 2:
-		return LLVMArrayType(lb_type(m, t_u16), 0);
-	case 4:
-		return LLVMArrayType(lb_type(m, t_u32), 0);
-	case 8:
-		return LLVMArrayType(lb_type(m, t_u64), 0);
-	default: case 16:
-		return LLVMArrayType(LLVMVectorType(lb_type(m, t_u32), 4), 0);
-	}
 }
 
 gb_internal String lb_mangle_name(lbModule *m, Entity *e) {
@@ -2202,9 +2173,6 @@ gb_internal void lb_add_member(lbModule *m, String const &name, lbValue val) {
 		string_map_set(&m->members, name, val);
 	}
 }
-gb_internal void lb_add_member(lbModule *m, StringHashKey const &key, lbValue val) {
-	string_map_set(&m->members, key, val);
-}
 gb_internal void lb_add_procedure_value(lbModule *m, lbProcedure *p) {
 	if (p->entity != nullptr) {
 		map_set(&m->procedure_values, p->value, p->entity);
@@ -2493,42 +2461,6 @@ gb_internal lbValue lb_find_or_add_entity_string(lbModule *m, String const &str)
 	return res;
 }
 
-gb_internal lbValue lb_find_or_add_entity_string_byte_slice(lbModule *m, String const &str) {
-	LLVMValueRef indices[2] = {llvm_zero(m), llvm_zero(m)};
-	LLVMValueRef data = LLVMConstStringInContext(m->ctx,
-		cast(char const *)str.text,
-		cast(unsigned)str.len,
-		false);
-
-
-	char *name = nullptr;
-	{
-		isize max_len = 7+8+1;
-		name = gb_alloc_array(permanent_allocator(), char, max_len);
-		u32 id = m->gen->global_array_index.fetch_add(1);
-		isize len = gb_snprintf(name, max_len, "csbs$%x", id);
-		len -= 1;
-	}
-	LLVMTypeRef type = LLVMTypeOf(data);
-	LLVMValueRef global_data = LLVMAddGlobal(m->mod, type, name);
-	LLVMSetInitializer(global_data, data);
-	lb_make_global_private_const(global_data);
-	LLVMSetAlignment(global_data, 1);
-
-	LLVMValueRef ptr = nullptr;
-	if (str.len != 0) {
-		ptr = LLVMConstInBoundsGEP2(type, global_data, indices, 2);
-	} else {
-		ptr = LLVMConstNull(lb_type(m, t_u8_ptr));
-	}
-	LLVMValueRef len = LLVMConstInt(lb_type(m, t_int), str.len, true);
-	LLVMValueRef values[2] = {ptr, len};
-
-	lbValue res = {};
-	res.value = llvm_const_named_struct(m, t_u8_slice, values, 2);
-	res.type = t_u8_slice;
-	return res;
-}
 gb_internal lbValue lb_find_or_add_entity_string_byte_slice_with_type(lbModule *m, String const &str, Type *slice_type) {
 	GB_ASSERT(is_type_slice(slice_type));
 	LLVMValueRef indices[2] = {llvm_zero(m), llvm_zero(m)};

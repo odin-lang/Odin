@@ -237,9 +237,6 @@ gb_internal Ast *clone_ast(Ast *node) {
 	case Ast_ExprStmt:
 		n->ExprStmt.expr = clone_ast(n->ExprStmt.expr);
 		break;
-	case Ast_TagStmt:
-		n->TagStmt.stmt = clone_ast(n->TagStmt.stmt);
-		break;
 	case Ast_AssignStmt:
 		n->AssignStmt.lhs = clone_ast_array(n->AssignStmt.lhs);
 		n->AssignStmt.rhs = clone_ast_array(n->AssignStmt.rhs);
@@ -494,14 +491,6 @@ gb_internal Ast *ast_tag_expr(AstFile *f, Token token, Token name, Ast *expr) {
 	result->TagExpr.token = token;
 	result->TagExpr.name = name;
 	result->TagExpr.expr = expr;
-	return result;
-}
-
-gb_internal Ast *ast_tag_stmt(AstFile *f, Token token, Token name, Ast *stmt) {
-	Ast *result = alloc_ast_node(f, Ast_TagStmt);
-	result->TagStmt.token = token;
-	result->TagStmt.name = name;
-	result->TagStmt.stmt = stmt;
 	return result;
 }
 
@@ -1308,16 +1297,6 @@ gb_internal Token advance_token(AstFile *f) {
 	return prev;
 }
 
-gb_internal bool peek_token_kind(AstFile *f, TokenKind kind) {
-	for (isize i = f->curr_token_index+1; i < f->tokens.count; i++) {
-		Token tok = f->tokens[i];
-		if (kind != Token_Comment && tok.kind == Token_Comment) {
-			continue;
-		}
-		return tok.kind == kind;
-	}
-	return false;
-}
 
 gb_internal Token peek_token(AstFile *f) {
 	for (isize i = f->curr_token_index+1; i < f->tokens.count; i++) {
@@ -1436,17 +1415,6 @@ gb_internal Token expect_operator(AstFile *f) {
 		f->tokens[f->curr_token_index].flags |= TokenFlag_Replace;
 	}
 	
-	advance_token(f);
-	return prev;
-}
-
-gb_internal Token expect_keyword(AstFile *f) {
-	Token prev = f->curr_token;
-	if (!gb_is_between(prev.kind, Token__KeywordBegin+1, Token__KeywordEnd-1)) {
-		String p = token_to_string(prev);
-		syntax_error(f->curr_token, "Expected a keyword, got '%.*s'",
-		             LIT(p));
-	}
 	advance_token(f);
 	return prev;
 }
@@ -1955,10 +1923,6 @@ gb_internal void check_polymorphic_params_for_type(AstFile *f, Ast *polymorphic_
 gb_internal bool ast_on_same_line(Token const &x, Ast *yp) {
 	Token y = ast_token(yp);
 	return x.pos.line == y.pos.line;
-}
-
-gb_internal bool ast_on_same_line(Ast *x, Ast *y) {
-	return ast_on_same_line(ast_token(x), y);
 }
 
 gb_internal Ast *parse_force_inlining_operand(AstFile *f, Token token) {

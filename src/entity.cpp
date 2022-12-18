@@ -404,14 +404,6 @@ gb_internal Entity *alloc_entity_proc_group(Scope *scope, Token token, Type *typ
 	return entity;
 }
 
-
-gb_internal Entity *alloc_entity_builtin(Scope *scope, Token token, Type *type, i32 id) {
-	Entity *entity = alloc_entity(Entity_Builtin, scope, token, type);
-	entity->Builtin.id = id;
-	entity->state = EntityState_Resolved;
-	return entity;
-}
-
 gb_internal Entity *alloc_entity_import_name(Scope *scope, Token token, Type *type,
                                  String path, String name, Scope *import_scope) {
 	Entity *entity = alloc_entity(Entity_ImportName, scope, token, type);

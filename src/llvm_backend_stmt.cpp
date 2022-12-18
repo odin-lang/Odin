@@ -378,16 +378,6 @@ gb_internal lbValue lb_map_cell_index_static(lbProcedure *p, Type *type, lbValue
 	return lb_emit_ptr_offset(p, elems_ptr, data_index);
 }
 
-gb_internal void lb_map_kvh_data_static(lbProcedure *p, lbValue map_value, lbValue *ks_, lbValue *vs_, lbValue *hs_) {
-	lbValue capacity = lb_map_cap(p, map_value);
-	lbValue ks = lb_map_data_uintptr(p, map_value);
-	lbValue vs = {};
-	lbValue hs = {};
-	if (ks_) *ks_ = ks;
-	if (vs_) *vs_ = vs;
-	if (hs_) *hs_ = hs;
-}
-
 gb_internal lbValue lb_map_hash_is_valid(lbProcedure *p, lbValue hash) {
 	// N :: size_of(uintptr)*8 - 1
 	// (hash != 0) & (hash>>N == 0)
