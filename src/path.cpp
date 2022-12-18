@@ -1,7 +1,7 @@
 /*
 	Path handling utilities.
 */
-String remove_extension_from_path(String const &s) {
+gb_internal String remove_extension_from_path(String const &s) {
 	for (isize i = s.len-1; i >= 0; i--) {
 		if (s[i] == '.') {
 			return substring(s, 0, i);
@@ -10,7 +10,7 @@ String remove_extension_from_path(String const &s) {
 	return s;
 }
 
-String remove_directory_from_path(String const &s) {
+gb_internal String remove_directory_from_path(String const &s) {
 	isize len = 0;
 	for (isize i = s.len-1; i >= 0; i--) {
 		if (s[i] == '/' ||
@@ -22,9 +22,9 @@ String remove_directory_from_path(String const &s) {
 	return substring(s, s.len-len, s.len);
 }
 
-bool path_is_directory(String path);
+gb_internal bool path_is_directory(String path);
 
-String directory_from_path(String const &s) {
+gb_internal String directory_from_path(String const &s) {
 	if (path_is_directory(s)) {
 		return s;
 	}
@@ -43,7 +43,7 @@ String directory_from_path(String const &s) {
 }
 
 #if defined(GB_SYSTEM_WINDOWS)
-	bool path_is_directory(String path) {
+	gb_internal bool path_is_directory(String path) {
 		gbAllocator a = heap_allocator();
 		String16 wstr = string_to_string16(a, path);
 		defer (gb_free(a, wstr.text));
@@ -55,7 +55,7 @@ String directory_from_path(String const &s) {
 	}
 
 #else
-	bool path_is_directory(String path) {
+	gb_internal bool path_is_directory(String path) {
 		gbAllocator a = heap_allocator();
 		char *copy = cast(char *)copy_string(a, path).text;
 		defer (gb_free(a, copy));
@@ -69,7 +69,7 @@ String directory_from_path(String const &s) {
 #endif
 
 
-String path_to_full_path(gbAllocator a, String path) {
+gb_internal String path_to_full_path(gbAllocator a, String path) {
 	gbAllocator ha = heap_allocator();
 	char *path_c = gb_alloc_str_len(ha, cast(char *)path.text, path.len);
 	defer (gb_free(ha, path_c));
@@ -93,7 +93,7 @@ struct Path {
 };
 
 // NOTE(Jeroen): Naively turns a Path into a string.
-String path_to_string(gbAllocator a, Path path) {
+gb_internal String path_to_string(gbAllocator a, Path path) {
 	if (path.basename.len + path.name.len + path.ext.len == 0) {
 		return make_string(nullptr, 0);
 	}
@@ -121,7 +121,7 @@ String path_to_string(gbAllocator a, Path path) {
 }
 
 // NOTE(Jeroen): Naively turns a Path into a string, then normalizes it using `path_to_full_path`.
-String path_to_full_path(gbAllocator a, Path path) {
+gb_internal String path_to_full_path(gbAllocator a, Path path) {
 	String temp = path_to_string(heap_allocator(), path);
 	defer (gb_free(heap_allocator(), temp.text));
 
@@ -130,7 +130,7 @@ String path_to_full_path(gbAllocator a, Path path) {
 
 // NOTE(Jeroen): Takes a path like "odin" or "W:\Odin", turns it into a full path,
 // and then breaks it into its components to make a Path.
-Path path_from_string(gbAllocator a, String const &path) {
+gb_internal Path path_from_string(gbAllocator a, String const &path) {
 	Path res = {};
 
 	if (path.len == 0) return res;
@@ -161,7 +161,7 @@ Path path_from_string(gbAllocator a, String const &path) {
 }
 
 // NOTE(Jeroen): Takes a path String and returns the last path element.
-String last_path_element(String const &path) {
+gb_internal String last_path_element(String const &path) {
 	isize count = 0;
 	u8 * start = (u8 *)(&path.text[path.len - 1]);
 	for (isize length = path.len; length > 0 && path.text[length - 1] != '/'; length--) {
@@ -177,7 +177,7 @@ String last_path_element(String const &path) {
 	return STR_LIT("");
 }
 
-bool path_is_directory(Path path) {
+gb_internal bool path_is_directory(Path path) {
 	String path_string = path_to_full_path(heap_allocator(), path);
 	defer (gb_free(heap_allocator(), path_string.text));
 
@@ -204,7 +204,7 @@ enum ReadDirectoryError {
 	ReadDirectory_COUNT,
 };
 
-i64 get_file_size(String path) {
+gb_internal i64 get_file_size(String path) {
 	char *c_str = alloc_cstring(heap_allocator(), path);
 	defer (gb_free(heap_allocator(), c_str));
 
@@ -219,7 +219,7 @@ i64 get_file_size(String path) {
 
 
 #if defined(GB_SYSTEM_WINDOWS)
-ReadDirectoryError read_directory(String path, Array<FileInfo> *fi) {
+gb_internal ReadDirectoryError read_directory(String path, Array<FileInfo> *fi) {
 	GB_ASSERT(fi != nullptr);
 
 	gbAllocator a = heap_allocator();
@@ -314,7 +314,7 @@ ReadDirectoryError read_directory(String path, Array<FileInfo> *fi) {
 
 #include <dirent.h>
 
-ReadDirectoryError read_directory(String path, Array<FileInfo> *fi) {
+gb_internal ReadDirectoryError read_directory(String path, Array<FileInfo> *fi) {
 	GB_ASSERT(fi != nullptr);
 
 	gbAllocator a = heap_allocator();
