@@ -7,7 +7,7 @@ struct PriorityQueue {
 };
 
 template <typename T>
-bool priority_queue_shift_down(PriorityQueue<T> *pq, isize i0, isize n) {
+static bool priority_queue_shift_down(PriorityQueue<T> *pq, isize i0, isize n) {
 	// O(n log n)
 	isize i = i0;
 	isize j, j1, j2;
@@ -29,7 +29,7 @@ bool priority_queue_shift_down(PriorityQueue<T> *pq, isize i0, isize n) {
 }
 
 template <typename T>
-void priority_queue_shift_up(PriorityQueue<T> *pq, isize j) {
+static void priority_queue_shift_up(PriorityQueue<T> *pq, isize j) {
 	while (0 <= j && j < pq->queue.count) {
 		isize i = (j-1)/2;
 		if (i == j || pq->cmp(&pq->queue[0], j, i) >= 0) {
@@ -43,20 +43,20 @@ void priority_queue_shift_up(PriorityQueue<T> *pq, isize j) {
 // NOTE(bill): When an element at index `i0` has changed its value, this will fix the
 // the heap ordering. This using a basic "heapsort" with shift up and a shift down parts.
 template <typename T>
-void priority_queue_fix(PriorityQueue<T> *pq, isize i) {
+static void priority_queue_fix(PriorityQueue<T> *pq, isize i) {
 	if (!priority_queue_shift_down(pq, i, pq->queue.count)) {
 		priority_queue_shift_up(pq, i);
 	}
 }
 
 template <typename T>
-void priority_queue_push(PriorityQueue<T> *pq, T const &value) {
+static void priority_queue_push(PriorityQueue<T> *pq, T const &value) {
 	array_add(&pq->queue, value);
 	priority_queue_shift_up(pq, pq->queue.count-1);
 }
 
 template <typename T>
-T priority_queue_pop(PriorityQueue<T> *pq) {
+static T priority_queue_pop(PriorityQueue<T> *pq) {
 	GB_ASSERT(pq->queue.count > 0);
 
 	isize n = pq->queue.count - 1;
@@ -67,7 +67,7 @@ T priority_queue_pop(PriorityQueue<T> *pq) {
 
 
 template <typename T>
-T priority_queue_remove(PriorityQueue<T> *pq, isize i) {
+static T priority_queue_remove(PriorityQueue<T> *pq, isize i) {
 	GB_ASSERT(0 <= i && i < pq->queue.count);
 	isize n = pq->queue.count - 1;
 	if (n != i) {

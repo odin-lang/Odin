@@ -23,7 +23,7 @@ struct MPMCQueue {
 
 
 
-void mpmc_internal_init_indices(MPMCQueueAtomicIdx *indices, i32 offset, i32 size) {
+static void mpmc_internal_init_indices(MPMCQueueAtomicIdx *indices, i32 offset, i32 size) {
 	GB_ASSERT(offset % 8 == 0);
 	GB_ASSERT(size % 8 == 0);
 
@@ -43,7 +43,7 @@ void mpmc_internal_init_indices(MPMCQueueAtomicIdx *indices, i32 offset, i32 siz
 
 
 template <typename T>
-void mpmc_init(MPMCQueue<T> *q, gbAllocator a, isize size_i) {
+static void mpmc_init(MPMCQueue<T> *q, gbAllocator a, isize size_i) {
 	if (size_i < 8) {
 		size_i = 8;
 	}
@@ -64,7 +64,7 @@ void mpmc_init(MPMCQueue<T> *q, gbAllocator a, isize size_i) {
 
 
 template <typename T>
-void mpmc_destroy(MPMCQueue<T> *q) {
+static void mpmc_destroy(MPMCQueue<T> *q) {
 	mutex_destroy(&q->mutex);
 	gb_free(q->allocator, q->nodes);
 	gb_free(q->allocator, q->indices);
@@ -72,7 +72,7 @@ void mpmc_destroy(MPMCQueue<T> *q) {
 
 
 template <typename T>
-bool mpmc_internal_grow(MPMCQueue<T> *q) {
+static bool mpmc_internal_grow(MPMCQueue<T> *q) {
 	mutex_lock(&q->mutex);
 	i32 old_size = q->mask+1;
 	i32 new_size = old_size*2;
@@ -95,7 +95,7 @@ bool mpmc_internal_grow(MPMCQueue<T> *q) {
 }
 
 template <typename T>
-i32 mpmc_enqueue(MPMCQueue<T> *q, T const &data) {
+static i32 mpmc_enqueue(MPMCQueue<T> *q, T const &data) {
 	GB_ASSERT(q->mask != 0);
 
 	i32 head_idx = q->head_idx.load(std::memory_order_relaxed);
@@ -125,7 +125,7 @@ i32 mpmc_enqueue(MPMCQueue<T> *q, T const &data) {
 }
 
 template <typename T>
-bool mpmc_dequeue(MPMCQueue<T> *q, T *data_) {
+static bool mpmc_dequeue(MPMCQueue<T> *q, T *data_) {
 	if (q->mask == 0) {
 		return false;
 	}

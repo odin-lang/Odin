@@ -333,10 +333,10 @@ struct BuildContext {
 
 gb_global BuildContext build_context = {0};
 
-bool global_warnings_as_errors(void) {
+static bool global_warnings_as_errors(void) {
 	return build_context.warnings_as_errors;
 }
-bool global_ignore_warnings(void) {
+static bool global_ignore_warnings(void) {
 	return build_context.ignore_warnings;
 }
 
@@ -504,7 +504,7 @@ gb_global NamedTargetMetrics named_targets[] = {
 
 NamedTargetMetrics *selected_target_metrics;
 
-TargetOsKind get_target_os_from_string(String str) {
+static TargetOsKind get_target_os_from_string(String str) {
 	for (isize i = 0; i < TargetOs_COUNT; i++) {
 		if (str_eq_ignore_case(target_os_names[i], str)) {
 			return cast(TargetOsKind)i;
@@ -513,7 +513,7 @@ TargetOsKind get_target_os_from_string(String str) {
 	return TargetOs_Invalid;
 }
 
-TargetArchKind get_target_arch_from_string(String str) {
+static TargetArchKind get_target_arch_from_string(String str) {
 	for (isize i = 0; i < TargetArch_COUNT; i++) {
 		if (str_eq_ignore_case(target_arch_names[i], str)) {
 			return cast(TargetArchKind)i;
@@ -523,7 +523,7 @@ TargetArchKind get_target_arch_from_string(String str) {
 }
 
 
-bool is_excluded_target_filename(String name) {
+static bool is_excluded_target_filename(String name) {
 	String original_name = name;
 	name = remove_extension_from_path(name);
 
@@ -588,13 +588,13 @@ struct LibraryCollections {
 
 gb_global Array<LibraryCollections> library_collections = {0};
 
-void add_library_collection(String name, String path) {
+static void add_library_collection(String name, String path) {
 	// TODO(bill): Check the path is valid and a directory
 	LibraryCollections lc = {name, string_trim_whitespace(path)};
 	array_add(&library_collections, lc);
 }
 
-bool find_library_collection_path(String name, String *path) {
+static bool find_library_collection_path(String name, String *path) {
 	for_array(i, library_collections) {
 		if (library_collections[i].name == name) {
 			if (path) *path = library_collections[i].path;
@@ -604,7 +604,7 @@ bool find_library_collection_path(String name, String *path) {
 	return false;
 }
 
-bool is_arch_wasm(void) {
+static bool is_arch_wasm(void) {
 	switch (build_context.metrics.arch) {
 	case TargetArch_wasm32:
 	case TargetArch_wasm64:
@@ -613,7 +613,7 @@ bool is_arch_wasm(void) {
 	return false;
 }
 
-bool is_arch_x86(void) {
+static bool is_arch_x86(void) {
 	switch (build_context.metrics.arch) {
 	case TargetArch_i386:
 	case TargetArch_amd64:
@@ -622,7 +622,7 @@ bool is_arch_x86(void) {
 	return false;
 }
 
-bool allow_check_foreign_filepath(void) {
+static bool allow_check_foreign_filepath(void) {
 	switch (build_context.metrics.arch) {
 	case TargetArch_wasm32:
 	case TargetArch_wasm64:
@@ -644,7 +644,7 @@ String const NIX_SEPARATOR_STRING   = {cast(u8 *)"/",  1};
 String const WASM_MODULE_NAME_SEPARATOR = str_lit("..");
 
 String internal_odin_root_dir(void);
-String odin_root_dir(void) {
+static String odin_root_dir(void) {
 	if (global_module_path_set) {
 		return global_module_path;
 	}
@@ -670,7 +670,7 @@ String odin_root_dir(void) {
 
 
 #if defined(GB_SYSTEM_WINDOWS)
-String internal_odin_root_dir(void) {
+static String internal_odin_root_dir(void) {
 	String path = global_module_path;
 	isize len, i;
 	wchar_t *text;
@@ -725,7 +725,7 @@ String internal_odin_root_dir(void) {
 
 String path_to_fullpath(gbAllocator a, String s);
 
-String internal_odin_root_dir(void) {
+static String internal_odin_root_dir(void) {
 	String path = global_module_path;
 	isize len, i;
 	u8 *text;
@@ -779,7 +779,7 @@ String internal_odin_root_dir(void) {
 
 String path_to_fullpath(gbAllocator a, String s);
 
-String internal_odin_root_dir(void) {
+static String internal_odin_root_dir(void) {
 	String path = global_module_path;
 	isize len, i;
 	u8 *text;
@@ -938,7 +938,7 @@ String internal_odin_root_dir(void) {
 gb_global BlockingMutex fullpath_mutex;
 
 #if defined(GB_SYSTEM_WINDOWS)
-String path_to_fullpath(gbAllocator a, String s) {
+static String path_to_fullpath(gbAllocator a, String s) {
 	String result = {};
 	mutex_lock(&fullpath_mutex);
 	defer (mutex_unlock(&fullpath_mutex));
@@ -965,7 +965,7 @@ String path_to_fullpath(gbAllocator a, String s) {
 	return result;
 }
 #elif defined(GB_SYSTEM_OSX) || defined(GB_SYSTEM_UNIX)
-String path_to_fullpath(gbAllocator a, String s) {
+static String path_to_fullpath(gbAllocator a, String s) {
 	char *p;
 	mutex_lock(&fullpath_mutex);
 	p = realpath(cast(char *)s.text, 0);
@@ -978,7 +978,7 @@ String path_to_fullpath(gbAllocator a, String s) {
 #endif
 
 
-String get_fullpath_relative(gbAllocator a, String base_dir, String path) {
+static String get_fullpath_relative(gbAllocator a, String base_dir, String path) {
 	u8 *str = gb_alloc_array(heap_allocator(), u8, base_dir.len+1+path.len+1);
 	defer (gb_free(heap_allocator(), str));
 
@@ -1004,7 +1004,7 @@ String get_fullpath_relative(gbAllocator a, String base_dir, String path) {
 }
 
 
-String get_fullpath_core(gbAllocator a, String path) {
+static String get_fullpath_core(gbAllocator a, String path) {
 	String module_dir = odin_root_dir();
 
 	String core = str_lit("core/");
@@ -1024,11 +1024,11 @@ String get_fullpath_core(gbAllocator a, String path) {
 	return path_to_fullpath(a, res);
 }
 
-bool show_error_line(void) {
+static bool show_error_line(void) {
 	return build_context.show_error_line;
 }
 
-bool has_asm_extension(String const &path) {
+static bool has_asm_extension(String const &path) {
 	String ext = path_extension(path);
 	if (ext == ".asm") {
 		return true;
@@ -1056,7 +1056,7 @@ char *token_pos_to_string(TokenPos const &pos) {
 	return s;
 }
 
-void init_build_context(TargetMetrics *cross_target) {
+static void init_build_context(TargetMetrics *cross_target) {
 	BuildContext *bc = &build_context;
 
 	gb_affinity_init(&bc->affinity);
@@ -1280,12 +1280,12 @@ Array<String> split_by_comma(String const &list) {
 	return res;
 }
 
-bool check_target_feature_is_valid(TokenPos pos, String const &feature) {
+static bool check_target_feature_is_valid(TokenPos pos, String const &feature) {
 	// TODO(bill): check_target_feature_is_valid
 	return true;
 }
 
-bool check_target_feature_is_enabled(TokenPos pos, String const &target_feature_list) {
+static bool check_target_feature_is_enabled(TokenPos pos, String const &target_feature_list) {
 	BuildContext *bc = &build_context;
 	mutex_lock(&bc->target_features_mutex);
 	defer (mutex_unlock(&bc->target_features_mutex));
@@ -1307,7 +1307,7 @@ bool check_target_feature_is_enabled(TokenPos pos, String const &target_feature_
 	return true;
 }
 
-void enable_target_feature(TokenPos pos, String const &target_feature_list) {
+static void enable_target_feature(TokenPos pos, String const &target_feature_list) {
 	BuildContext *bc = &build_context;
 	mutex_lock(&bc->target_features_mutex);
 	defer (mutex_unlock(&bc->target_features_mutex));
@@ -1356,7 +1356,7 @@ char const *target_features_set_to_cstring(gbAllocator allocator, bool with_quot
 
 // NOTE(Jeroen): Set/create the output and other paths and report an error as appropriate.
 // We've previously called `parse_build_flags`, so `out_filepath` should be set.
-bool init_build_paths(String init_filename) {
+static bool init_build_paths(String init_filename) {
 	gbAllocator   ha = heap_allocator();
 	BuildContext *bc = &build_context;
 

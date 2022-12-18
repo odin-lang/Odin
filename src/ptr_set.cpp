@@ -23,7 +23,7 @@ template <typename T> void ptr_set_reserve(PtrSet<T> *h, isize cap);
 
 
 template <typename T>
-void ptr_set_init(PtrSet<T> *s, gbAllocator a, isize capacity) {
+static void ptr_set_init(PtrSet<T> *s, gbAllocator a, isize capacity) {
 	if (capacity != 0) {
 		capacity = next_pow2_isize(gb_max(16, capacity));
 	}
@@ -36,13 +36,13 @@ void ptr_set_init(PtrSet<T> *s, gbAllocator a, isize capacity) {
 }
 
 template <typename T>
-void ptr_set_destroy(PtrSet<T> *s) {
+static void ptr_set_destroy(PtrSet<T> *s) {
 	slice_free(&s->hashes, s->entries.allocator);
 	array_free(&s->entries);
 }
 
 template <typename T>
-gb_internal MapIndex ptr_set__add_entry(PtrSet<T> *s, T ptr) {
+static gb_internal MapIndex ptr_set__add_entry(PtrSet<T> *s, T ptr) {
 	PtrSetEntry<T> e = {};
 	e.ptr = ptr;
 	e.next = MAP_SENTINEL;
@@ -52,7 +52,7 @@ gb_internal MapIndex ptr_set__add_entry(PtrSet<T> *s, T ptr) {
 
 
 template <typename T>
-gb_internal MapFindResult ptr_set__find(PtrSet<T> *s, T ptr) {
+static gb_internal MapFindResult ptr_set__find(PtrSet<T> *s, T ptr) {
 	MapFindResult fr = {MAP_SENTINEL, MAP_SENTINEL, MAP_SENTINEL};
 	if (s->hashes.count != 0) {
 		u32 hash = ptr_map_hash_key(ptr);
@@ -70,7 +70,7 @@ gb_internal MapFindResult ptr_set__find(PtrSet<T> *s, T ptr) {
 }
 
 template <typename T>
-gb_internal MapFindResult ptr_set__find_from_entry(PtrSet<T> *s, PtrSetEntry<T> *e) {
+static gb_internal MapFindResult ptr_set__find_from_entry(PtrSet<T> *s, PtrSetEntry<T> *e) {
 	MapFindResult fr = {MAP_SENTINEL, MAP_SENTINEL, MAP_SENTINEL};
 	if (s->hashes.count != 0) {
 		u32 hash = ptr_map_hash_key(e->ptr);
@@ -88,18 +88,18 @@ gb_internal MapFindResult ptr_set__find_from_entry(PtrSet<T> *s, PtrSetEntry<T> 
 }
 
 template <typename T>
-gb_internal bool ptr_set__full(PtrSet<T> *s) {
+static gb_internal bool ptr_set__full(PtrSet<T> *s) {
 	return 0.75f * s->hashes.count <= s->entries.count;
 }
 
 template <typename T>
-gb_inline void ptr_set_grow(PtrSet<T> *s) {
+static gb_inline void ptr_set_grow(PtrSet<T> *s) {
 	isize new_count = gb_max(s->hashes.count<<1, 16);
 	ptr_set_rehash(s, new_count);
 }
 
 template <typename T>
-void ptr_set_reset_entries(PtrSet<T> *s) {
+static void ptr_set_reset_entries(PtrSet<T> *s) {
 	for (isize i = 0; i < s->hashes.count; i++) {
 		s->hashes.data[i] = MAP_SENTINEL;
 	}
@@ -117,7 +117,7 @@ void ptr_set_reset_entries(PtrSet<T> *s) {
 }
 
 template <typename T>
-void ptr_set_reserve(PtrSet<T> *s, isize cap) {
+static void ptr_set_reserve(PtrSet<T> *s, isize cap) {
 	array_reserve(&s->entries, cap);
 	if (s->entries.count*2 < s->hashes.count) {
 		return;
@@ -128,18 +128,18 @@ void ptr_set_reserve(PtrSet<T> *s, isize cap) {
 
 
 template <typename T>
-void ptr_set_rehash(PtrSet<T> *s, isize new_count) {
+static void ptr_set_rehash(PtrSet<T> *s, isize new_count) {
 	ptr_set_reserve(s, new_count);
 }
 
 template <typename T>
-gb_inline bool ptr_set_exists(PtrSet<T> *s, T ptr) {
+static gb_inline bool ptr_set_exists(PtrSet<T> *s, T ptr) {
 	isize index = ptr_set__find(s, ptr).entry_index;
 	return index != MAP_SENTINEL;
 }
 
 template <typename T>
-gb_inline isize ptr_entry_index(PtrSet<T> *s, T ptr) {
+static gb_inline isize ptr_entry_index(PtrSet<T> *s, T ptr) {
 	isize index = ptr_set__find(s, ptr).entry_index;
 	if (index != MAP_SENTINEL) {
 		return index;
@@ -149,7 +149,7 @@ gb_inline isize ptr_entry_index(PtrSet<T> *s, T ptr) {
 
 // Returns true if it already exists
 template <typename T>
-T ptr_set_add(PtrSet<T> *s, T ptr) {
+static T ptr_set_add(PtrSet<T> *s, T ptr) {
 	MapIndex index;
 	MapFindResult fr;
 	if (s->hashes.count == 0) {
@@ -171,7 +171,7 @@ T ptr_set_add(PtrSet<T> *s, T ptr) {
 }
 
 template <typename T>
-bool ptr_set_update(PtrSet<T> *s, T ptr) { // returns true if it previously existsed
+static bool ptr_set_update(PtrSet<T> *s, T ptr) { // returns true if it previously existsed
 	bool exists = false;
 	MapIndex index;
 	MapFindResult fr;
@@ -198,7 +198,7 @@ bool ptr_set_update(PtrSet<T> *s, T ptr) { // returns true if it previously exis
 
 
 template <typename T>
-void ptr_set__erase(PtrSet<T> *s, MapFindResult fr) {
+static void ptr_set__erase(PtrSet<T> *s, MapFindResult fr) {
 	MapFindResult last;
 	if (fr.entry_prev == MAP_SENTINEL) {
 		s->hashes.data[fr.hash_index] = s->entries.data[fr.entry_index].next;
@@ -219,7 +219,7 @@ void ptr_set__erase(PtrSet<T> *s, MapFindResult fr) {
 }
 
 template <typename T>
-void ptr_set_remove(PtrSet<T> *s, T ptr) {
+static void ptr_set_remove(PtrSet<T> *s, T ptr) {
 	MapFindResult fr = ptr_set__find(s, ptr);
 	if (fr.entry_index != MAP_SENTINEL) {
 		ptr_set__erase(s, fr);
@@ -227,7 +227,7 @@ void ptr_set_remove(PtrSet<T> *s, T ptr) {
 }
 
 template <typename T>
-gb_inline void ptr_set_clear(PtrSet<T> *s) {
+static gb_inline void ptr_set_clear(PtrSet<T> *s) {
 	array_clear(&s->entries);
 	for (isize i = 0; i < s->hashes.count; i++) {
 		s->hashes.data[i] = MAP_SENTINEL;

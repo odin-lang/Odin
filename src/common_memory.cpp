@@ -1,5 +1,5 @@
 
-gb_inline void zero_size(void *ptr, isize len) {
+static gb_inline void zero_size(void *ptr, isize len) {
 	memset(ptr, 0, len);
 }
 
@@ -7,20 +7,20 @@ gb_inline void zero_size(void *ptr, isize len) {
 
 
 template <typename U, typename V>
-gb_inline U bit_cast(V &v) { return reinterpret_cast<U &>(v); }
+static gb_inline U bit_cast(V &v) { return reinterpret_cast<U &>(v); }
 
 template <typename U, typename V>
 gb_inline U const &bit_cast(V const &v) { return reinterpret_cast<U const &>(v); }
 
 
-gb_inline i64 align_formula(i64 size, i64 align) {
+static gb_inline i64 align_formula(i64 size, i64 align) {
 	if (align > 0) {
 		i64 result = size + align-1;
 		return result - result%align;
 	}
 	return size;
 }
-gb_inline isize align_formula_isize(isize size, isize align) {
+static gb_inline isize align_formula_isize(isize size, isize align) {
 	if (align > 0) {
 		isize result = size + align-1;
 		return result - result%align;
@@ -41,7 +41,7 @@ gb_global BlockingMutex global_memory_allocator_mutex;
 
 void platform_virtual_memory_init(void);
 
-void virtual_memory_init(void) {
+static void virtual_memory_init(void) {
 	mutex_init(&global_memory_block_mutex);
 	mutex_init(&global_memory_allocator_mutex);
 	platform_virtual_memory_init();
@@ -72,7 +72,7 @@ void *arena_alloc(Arena *arena, isize min_size, isize alignment);
 void arena_free_all(Arena *arena);
 
 
-isize arena_align_forward_offset(Arena *arena, isize alignment) {
+static isize arena_align_forward_offset(Arena *arena, isize alignment) {
 	isize alignment_offset = 0;
 	isize ptr = cast(isize)(arena->curr_block->base + arena->curr_block->used);
 	isize mask = alignment-1;
@@ -123,7 +123,7 @@ void *arena_alloc(Arena *arena, isize min_size, isize alignment) {
 	return ptr;	
 }
 
-void arena_free_all(Arena *arena) {
+static void arena_free_all(Arena *arena) {
 	while (arena->curr_block != nullptr) {
 		MemoryBlock *free_block = arena->curr_block;
 		arena->curr_block = free_block->prev;
@@ -250,7 +250,7 @@ MemoryBlock *virtual_memory_alloc(isize size) {
 	return &pmblock->block;
 }
 
-void virtual_memory_dealloc(MemoryBlock *block_to_free) {
+static void virtual_memory_dealloc(MemoryBlock *block_to_free) {
 	PlatformMemoryBlock *block = cast(PlatformMemoryBlock *)block_to_free;
 	if (block != nullptr) {
 		mutex_lock(&global_memory_block_mutex);
@@ -267,7 +267,7 @@ void virtual_memory_dealloc(MemoryBlock *block_to_free) {
 
 GB_ALLOCATOR_PROC(arena_allocator_proc);
 
-gbAllocator arena_allocator(Arena *arena) {
+static gbAllocator arena_allocator(Arena *arena) {
 	gbAllocator a;
 	a.proc = arena_allocator_proc;
 	a.data = arena;
@@ -307,11 +307,11 @@ GB_ALLOCATOR_PROC(arena_allocator_proc) {
 
 
 gb_global gb_thread_local Arena permanent_arena = {nullptr, DEFAULT_MINIMUM_BLOCK_SIZE, true};
-gbAllocator permanent_allocator() {
+static gbAllocator permanent_allocator() {
 	return arena_allocator(&permanent_arena);
 }
 
-gbAllocator temporary_allocator() {
+static gbAllocator temporary_allocator() {
 	return permanent_allocator();
 }
 
@@ -322,7 +322,7 @@ gbAllocator temporary_allocator() {
 
 GB_ALLOCATOR_PROC(heap_allocator_proc);
 
-gbAllocator heap_allocator(void) {
+static gbAllocator heap_allocator(void) {
 	gbAllocator a;
 	a.proc = heap_allocator_proc;
 	a.data = nullptr;
@@ -460,7 +460,7 @@ GB_ALLOCATOR_PROC(heap_allocator_proc) {
 
 
 template <typename T>
-void resize_array_raw(T **array, gbAllocator const &a, isize old_count, isize new_count) {
+static void resize_array_raw(T **array, gbAllocator const &a, isize old_count, isize new_count) {
 	GB_ASSERT(new_count >= 0);
 	if (new_count == 0) {
 		gb_free(a, *array);

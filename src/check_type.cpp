@@ -1,6 +1,6 @@
 ParameterValue handle_parameter_value(CheckerContext *ctx, Type *in_type, Type **out_type_, Ast *expr, bool allow_caller_location);
 
-void populate_using_array_index(CheckerContext *ctx, Ast *node, AstField *field, Type *t, String name, i32 idx) {
+static void populate_using_array_index(CheckerContext *ctx, Ast *node, AstField *field, Type *t, String name, i32 idx) {
 	t = base_type(t);
 	GB_ASSERT(t->kind == Type_Array);
 	Entity *e = scope_lookup_current(ctx->scope, name);
@@ -27,7 +27,7 @@ void populate_using_array_index(CheckerContext *ctx, Ast *node, AstField *field,
 	}
 }
 
-void populate_using_entity_scope(CheckerContext *ctx, Ast *node, AstField *field, Type *t) {
+static void populate_using_entity_scope(CheckerContext *ctx, Ast *node, AstField *field, Type *t) {
 	if (t == nullptr) {
 		return;
 	}
@@ -81,7 +81,7 @@ void populate_using_entity_scope(CheckerContext *ctx, Ast *node, AstField *field
 	}
 }
 
-bool does_field_type_allow_using(Type *t) {
+static bool does_field_type_allow_using(Type *t) {
 	t = base_type(t);
 	if (is_type_struct(t)) {
 		return true;
@@ -219,7 +219,7 @@ void check_struct_fields(CheckerContext *ctx, Ast *node, Slice<Entity *> *fields
 }
 
 
-bool check_custom_align(CheckerContext *ctx, Ast *node, i64 *align_) {
+static bool check_custom_align(CheckerContext *ctx, Ast *node, i64 *align_) {
 	GB_ASSERT(align_ != nullptr);
 	Operand o = {};
 	check_expr(ctx, &o, node);
@@ -320,7 +320,7 @@ Entity *find_polymorphic_record_entity(CheckerContext *ctx, Type *original_type,
 }
 
 
-void add_polymorphic_record_entity(CheckerContext *ctx, Ast *node, Type *named_type, Type *original_type) {
+static void add_polymorphic_record_entity(CheckerContext *ctx, Ast *node, Type *named_type, Type *original_type) {
 	GB_ASSERT(is_type_named(named_type));
 	gbAllocator a = heap_allocator();
 	Scope *s = ctx->scope->parent;
@@ -540,7 +540,7 @@ Type *check_record_polymorphic_params(CheckerContext *ctx, Ast *polymorphic_para
 	return polymorphic_params_type;
 }
 
-bool check_record_poly_operand_specialization(CheckerContext *ctx, Type *record_type, Array<Operand> *poly_operands, bool *is_polymorphic_) {
+static bool check_record_poly_operand_specialization(CheckerContext *ctx, Type *record_type, Array<Operand> *poly_operands, bool *is_polymorphic_) {
 	if (poly_operands == nullptr) {
 		return false;
 	}
@@ -569,7 +569,7 @@ bool check_record_poly_operand_specialization(CheckerContext *ctx, Type *record_
 }
 
 
-void check_struct_type(CheckerContext *ctx, Type *struct_type, Ast *node, Array<Operand> *poly_operands, Type *named_type, Type *original_type_for_poly) {
+static void check_struct_type(CheckerContext *ctx, Type *struct_type, Ast *node, Array<Operand> *poly_operands, Type *named_type, Type *original_type_for_poly) {
 	GB_ASSERT(is_type_struct(struct_type));
 	ast_node(st, StructType, node);
 
@@ -626,7 +626,7 @@ void check_struct_type(CheckerContext *ctx, Type *struct_type, Ast *node, Array<
 		}
 	}
 }
-void check_union_type(CheckerContext *ctx, Type *union_type, Ast *node, Array<Operand> *poly_operands, Type *named_type, Type *original_type_for_poly) {
+static void check_union_type(CheckerContext *ctx, Type *union_type, Ast *node, Array<Operand> *poly_operands, Type *named_type, Type *original_type_for_poly) {
 	GB_ASSERT(is_type_union(union_type));
 	ast_node(ut, UnionType, node);
 
@@ -709,7 +709,7 @@ void check_union_type(CheckerContext *ctx, Type *union_type, Ast *node, Array<Op
 	}
 }
 
-void check_enum_type(CheckerContext *ctx, Type *enum_type, Type *named_type, Ast *node) {
+static void check_enum_type(CheckerContext *ctx, Type *enum_type, Type *named_type, Ast *node) {
 	ast_node(et, EnumType, node);
 	GB_ASSERT(is_type_enum(enum_type));
 
@@ -851,7 +851,7 @@ void check_enum_type(CheckerContext *ctx, Type *enum_type, Type *named_type, Ast
 	enum_type->Enum.max_value_index = max_value_index;
 }
 
-bool is_type_valid_bit_set_range(Type *t) {
+static bool is_type_valid_bit_set_range(Type *t) {
 	if (is_type_integer(t)) {
 		return true;
 	}
@@ -861,7 +861,7 @@ bool is_type_valid_bit_set_range(Type *t) {
 	return false;
 }
 
-void check_bit_set_type(CheckerContext *c, Type *type, Type *named_type, Ast *node) {
+static void check_bit_set_type(CheckerContext *c, Type *type, Type *named_type, Ast *node) {
 	ast_node(bs, BitSetType, node);
 	GB_ASSERT(type->kind == Type_BitSet);
 	type->BitSet.node = node;
@@ -1102,7 +1102,7 @@ void check_bit_set_type(CheckerContext *c, Type *type, Type *named_type, Ast *no
 }
 
 
-bool check_type_specialization_to(CheckerContext *ctx, Type *specialization, Type *type, bool compound, bool modify_type) {
+static bool check_type_specialization_to(CheckerContext *ctx, Type *specialization, Type *type, bool compound, bool modify_type) {
 	if (type == nullptr ||
 	    type == t_invalid) {
 		return true;
@@ -1256,7 +1256,7 @@ Type *determine_type_from_polymorphic(CheckerContext *ctx, Type *poly_type, Oper
 	return t_invalid;
 }
 
-bool is_expr_from_a_parameter(CheckerContext *ctx, Ast *expr) {
+static bool is_expr_from_a_parameter(CheckerContext *ctx, Ast *expr) {
 	if (expr == nullptr) {
 		return false;
 	}
@@ -1275,7 +1275,7 @@ bool is_expr_from_a_parameter(CheckerContext *ctx, Ast *expr) {
 }
 
 
-ParameterValue handle_parameter_value(CheckerContext *ctx, Type *in_type, Type **out_type_, Ast *expr, bool allow_caller_location) {
+static ParameterValue handle_parameter_value(CheckerContext *ctx, Type *in_type, Type **out_type_, Ast *expr, bool allow_caller_location) {
 	ParameterValue param_value = {};
 	param_value.original_ast_expr = expr;
 	if (expr == nullptr) {
@@ -1928,7 +1928,7 @@ Type *check_get_results(CheckerContext *ctx, Scope *scope, Ast *_results) {
 
 
 // NOTE(bill): 'operands' is for generating non generic procedure type
-bool check_procedure_type(CheckerContext *ctx, Type *type, Ast *proc_type_node, Array<Operand> *operands) {
+static bool check_procedure_type(CheckerContext *ctx, Type *type, Ast *proc_type_node, Array<Operand> *operands) {
 	ast_node(pt, ProcType, proc_type_node);
 
 	if (ctx->polymorphic_scope == nullptr && ctx->allow_polymorphic_types) {
@@ -2084,7 +2084,7 @@ bool check_procedure_type(CheckerContext *ctx, Type *type, Ast *proc_type_node, 
 }
 
 
-i64 check_array_count(CheckerContext *ctx, Operand *o, Ast *e) {
+static i64 check_array_count(CheckerContext *ctx, Operand *o, Ast *e) {
 	if (e == nullptr) {
 		return 0;
 	}
@@ -2185,7 +2185,7 @@ enum : i64 {
 	MAP_CACHE_LINE_SIZE = 1 << MAP_CACHE_LINE_LOG2
 };
 GB_STATIC_ASSERT(MAP_CACHE_LINE_SIZE >= 64);
-void map_cell_size_and_len(Type *type, i64 *size_, i64 *len_) {
+static void map_cell_size_and_len(Type *type, i64 *size_, i64 *len_) {
 	i64 elem_sz = type_size_of(type);
 
 	i64 len = 1;
@@ -2197,7 +2197,7 @@ void map_cell_size_and_len(Type *type, i64 *size_, i64 *len_) {
 	if (len_)  *len_ = len;
 }
 
-void init_map_internal_types(Type *type) {
+static void init_map_internal_types(Type *type) {
 	GB_ASSERT(type->kind == Type_Map);
 	GB_ASSERT(t_allocator != nullptr);
 	if (type->Map.lookup_result_type != nullptr) return;
@@ -2210,7 +2210,7 @@ void init_map_internal_types(Type *type) {
 	type->Map.lookup_result_type = make_optional_ok_type(value);
 }
 
-void add_map_key_type_dependencies(CheckerContext *ctx, Type *key) {
+static void add_map_key_type_dependencies(CheckerContext *ctx, Type *key) {
 	key = core_type(key);
 
 	if (is_type_cstring(key)) {
@@ -2249,7 +2249,7 @@ void add_map_key_type_dependencies(CheckerContext *ctx, Type *key) {
 	}
 }
 
-void check_map_type(CheckerContext *ctx, Type *type, Ast *node) {
+static void check_map_type(CheckerContext *ctx, Type *type, Ast *node) {
 	GB_ASSERT(type->kind == Type_Map);
 	ast_node(mt, MapType, node);
 
@@ -2282,7 +2282,7 @@ void check_map_type(CheckerContext *ctx, Type *type, Ast *node) {
 	// error(node, "'map' types are not yet implemented");
 }
 
-void check_matrix_type(CheckerContext *ctx, Type **type, Ast *node) {
+static void check_matrix_type(CheckerContext *ctx, Type **type, Ast *node) {
 	ast_node(mt, MatrixType, node);
 	
 	Operand row = {};
@@ -2514,7 +2514,7 @@ Type *make_soa_struct_dynamic_array(CheckerContext *ctx, Ast *array_typ_expr, As
 	return make_soa_struct_internal(ctx, array_typ_expr, elem_expr, elem, -1, nullptr, StructSoa_Dynamic);
 }
 
-bool check_type_internal(CheckerContext *ctx, Ast *e, Type **type, Type *named_type) {
+static bool check_type_internal(CheckerContext *ctx, Ast *e, Type **type, Type *named_type) {
 	GB_ASSERT_NOT_NULL(type);
 	if (e == nullptr) {
 		*type = t_invalid;

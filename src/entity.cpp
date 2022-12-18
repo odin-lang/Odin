@@ -116,7 +116,7 @@ struct ParameterValue {
 	};
 };
 
-bool has_parameter_value(ParameterValue const &param_value) {
+static bool has_parameter_value(ParameterValue const &param_value) {
 	if (param_value.kind != ParameterValue_Invalid) {
 		return true;
 	}
@@ -266,7 +266,7 @@ struct Entity {
 	};
 };
 
-bool is_entity_kind_exported(EntityKind kind, bool allow_builtin = false) {
+static bool is_entity_kind_exported(EntityKind kind, bool allow_builtin = false) {
 	switch (kind) {
 	case Entity_Builtin:
 		return allow_builtin;
@@ -278,7 +278,7 @@ bool is_entity_kind_exported(EntityKind kind, bool allow_builtin = false) {
 	return true;
 }
 
-bool is_entity_exported(Entity *e, bool allow_builtin = false) {
+static bool is_entity_exported(Entity *e, bool allow_builtin = false) {
 	// TODO(bill): Determine the actual exportation rules for imports of entities
 	GB_ASSERT(e != nullptr);
 	if (!is_entity_kind_exported(e->kind, allow_builtin)) {
@@ -300,7 +300,7 @@ bool is_entity_exported(Entity *e, bool allow_builtin = false) {
 	return true;
 }
 
-bool entity_has_deferred_procedure(Entity *e) {
+static bool entity_has_deferred_procedure(Entity *e) {
 	GB_ASSERT(e != nullptr);
 	if (e->kind == Entity_Procedure) {
 		return e->Procedure.deferred_procedure.entity != nullptr;

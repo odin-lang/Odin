@@ -34,7 +34,7 @@ Slice<T> from_array(OdinDocHeaderBase *base, OdinDocArray<T> const &a) {
 	return s;
 }
 
-String from_string(OdinDocHeaderBase *base, OdinDocString const &s) {
+static String from_string(OdinDocHeaderBase *base, OdinDocString const &s) {
 	String str = {};
 	str.text = cast(u8 *)(cast(uintptr)base + cast(uintptr)s.offset);
 	str.len  = cast(isize)s.length;

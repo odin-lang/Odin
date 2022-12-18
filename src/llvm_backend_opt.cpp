@@ -37,7 +37,7 @@ void lb_add_function_simplifcation_passes(LLVMPassManagerRef mpm, i32 optimizati
 void lb_populate_module_pass_manager(LLVMTargetMachineRef target_machine, LLVMPassManagerRef mpm, i32 optimization_level);
 void lb_populate_function_pass_manager_specific(lbModule *m, LLVMPassManagerRef fpm, i32 optimization_level);
 
-LLVMBool lb_must_preserve_predicate_callback(LLVMValueRef value, void *user_data) {
+static LLVMBool lb_must_preserve_predicate_callback(LLVMValueRef value, void *user_data) {
 	lbModule *m = cast(lbModule *)user_data;
 	if (m == nullptr) {
 		return false;
@@ -55,7 +55,7 @@ LLVMBool lb_must_preserve_predicate_callback(LLVMValueRef value, void *user_data
 #define LLVM_ADD_CONSTANT_VALUE_PASS(fpm) 
 #endif
 
-void lb_basic_populate_function_pass_manager(LLVMPassManagerRef fpm, i32 optimization_level) {
+static void lb_basic_populate_function_pass_manager(LLVMPassManagerRef fpm, i32 optimization_level) {
 	if (false && optimization_level == 0 && build_context.ODIN_DEBUG) {
 		LLVMAddMergedLoadStoreMotionPass(fpm);
 	} else {
@@ -68,7 +68,7 @@ void lb_basic_populate_function_pass_manager(LLVMPassManagerRef fpm, i32 optimiz
 	}
 }
 
-void lb_populate_function_pass_manager(lbModule *m, LLVMPassManagerRef fpm, bool ignore_memcpy_pass, i32 optimization_level) {
+static void lb_populate_function_pass_manager(lbModule *m, LLVMPassManagerRef fpm, bool ignore_memcpy_pass, i32 optimization_level) {
 	// NOTE(bill): Treat -opt:3 as if it was -opt:2
 	// TODO(bill): Determine which opt definitions should exist in the first place
 	optimization_level = gb_clamp(optimization_level, 0, 2);
@@ -102,7 +102,7 @@ void lb_populate_function_pass_manager(lbModule *m, LLVMPassManagerRef fpm, bool
 #endif
 }
 
-void lb_populate_function_pass_manager_specific(lbModule *m, LLVMPassManagerRef fpm, i32 optimization_level) {
+static void lb_populate_function_pass_manager_specific(lbModule *m, LLVMPassManagerRef fpm, i32 optimization_level) {
 	// NOTE(bill): Treat -opt:3 as if it was -opt:2
 	// TODO(bill): Determine which opt definitions should exist in the first place
 	optimization_level = gb_clamp(optimization_level, 0, 2);
@@ -141,7 +141,7 @@ void lb_populate_function_pass_manager_specific(lbModule *m, LLVMPassManagerRef 
 #endif
 }
 
-void lb_add_function_simplifcation_passes(LLVMPassManagerRef mpm, i32 optimization_level) {
+static void lb_add_function_simplifcation_passes(LLVMPassManagerRef mpm, i32 optimization_level) {
 	LLVMAddCFGSimplificationPass(mpm);
 
 	LLVMAddJumpThreadingPass(mpm);
@@ -177,7 +177,7 @@ void lb_add_function_simplifcation_passes(LLVMPassManagerRef mpm, i32 optimizati
 }
 
 
-void lb_populate_module_pass_manager(LLVMTargetMachineRef target_machine, LLVMPassManagerRef mpm, i32 optimization_level) {
+static void lb_populate_module_pass_manager(LLVMTargetMachineRef target_machine, LLVMPassManagerRef mpm, i32 optimization_level) {
 
 	// NOTE(bill): Treat -opt:3 as if it was -opt:2
 	// TODO(bill): Determine which opt definitions should exist in the first place
@@ -266,7 +266,7 @@ void lb_populate_module_pass_manager(LLVMTargetMachineRef target_machine, LLVMPa
 	optimization of Odin programs	
 **************************************************************************/
 
-void lb_run_remove_dead_instruction_pass(lbProcedure *p) {
+static void lb_run_remove_dead_instruction_pass(lbProcedure *p) {
 	isize removal_count = 0;
 	isize pass_count = 0;
 	isize const max_pass_count = 10;
@@ -358,7 +358,7 @@ void lb_run_remove_dead_instruction_pass(lbProcedure *p) {
 }
 
 
-void lb_run_function_pass_manager(LLVMPassManagerRef fpm, lbProcedure *p) {
+static void lb_run_function_pass_manager(LLVMPassManagerRef fpm, lbProcedure *p) {
 	LLVMRunFunctionPassManager(fpm, p->value);
 	// NOTE(bill): LLVMAddDCEPass doesn't seem to be exported in the official DLL's for LLVM
 	// which means we cannot rely upon it
@@ -367,7 +367,7 @@ void lb_run_function_pass_manager(LLVMPassManagerRef fpm, lbProcedure *p) {
 	lb_run_remove_dead_instruction_pass(p);
 }
 
-void llvm_delete_function(LLVMValueRef func) {
+static void llvm_delete_function(LLVMValueRef func) {
 	// for (LLVMBasicBlockRef block = LLVMGetFirstBasicBlock(func); block != nullptr; /**/) {
 	// 	LLVMBasicBlockRef curr_block = block;
 	// 	block = LLVMGetNextBasicBlock(block);
@@ -382,7 +382,7 @@ void llvm_delete_function(LLVMValueRef func) {
 	LLVMDeleteFunction(func);
 }
 
-void lb_append_to_compiler_used(lbModule *m, LLVMValueRef func) {
+static void lb_append_to_compiler_used(lbModule *m, LLVMValueRef func) {
 	LLVMValueRef global = LLVMGetNamedGlobal(m->mod, "llvm.compiler.used");
 
 	LLVMValueRef *constants;
@@ -419,7 +419,7 @@ void lb_append_to_compiler_used(lbModule *m, LLVMValueRef func) {
 	LLVMSetInitializer(global, initializer);
 }
 
-void lb_run_remove_unused_function_pass(lbModule *m) {
+static void lb_run_remove_unused_function_pass(lbModule *m) {
 	isize removal_count = 0;
 	isize pass_count = 0;
 	isize const max_pass_count = 10;
@@ -470,7 +470,7 @@ void lb_run_remove_unused_function_pass(lbModule *m) {
 }
 
 
-void lb_run_remove_unused_globals_pass(lbModule *m) {
+static void lb_run_remove_unused_globals_pass(lbModule *m) {
 	isize removal_count = 0;
 	isize pass_count = 0;
 	isize const max_pass_count = 10;

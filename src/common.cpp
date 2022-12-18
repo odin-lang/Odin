@@ -51,14 +51,14 @@ void debugf(char const *fmt, ...);
 #include "range_cache.cpp"
 
 
-bool is_power_of_two(i64 x) {
+static bool is_power_of_two(i64 x) {
 	if (x <= 0) {
 		return false;
 	}
 	return !(x & (x-1));
 }
 
-int isize_cmp(isize x, isize y) {
+static int isize_cmp(isize x, isize y) {
 	if (x < y) {
 		return -1;
 	} else if (x > y) {
@@ -66,7 +66,7 @@ int isize_cmp(isize x, isize y) {
 	}
 	return 0;
 }
-int u64_cmp(u64 x, u64 y) {
+static int u64_cmp(u64 x, u64 y) {
 	if (x < y) {
 		return -1;
 	} else if (x > y) {
@@ -74,7 +74,7 @@ int u64_cmp(u64 x, u64 y) {
 	}
 	return 0;
 }
-int i64_cmp(i64 x, i64 y) {
+static int i64_cmp(i64 x, i64 y) {
 	if (x < y) {
 		return -1;
 	} else if (x > y) {
@@ -82,7 +82,7 @@ int i64_cmp(i64 x, i64 y) {
 	}
 	return 0;
 }
-int i32_cmp(i32 x, i32 y) {
+static int i32_cmp(i32 x, i32 y) {
 	if (x < y) {
 		return -1;
 	} else if (x > y) {
@@ -91,7 +91,7 @@ int i32_cmp(i32 x, i32 y) {
 	return 0;
 }
 
-u32 fnv32a(void const *data, isize len) {
+static u32 fnv32a(void const *data, isize len) {
 	u8 const *bytes = cast(u8 const *)data;
 	u32 h = 0x811c9dc5;
 	
@@ -112,7 +112,7 @@ u32 fnv32a(void const *data, isize len) {
 	return h;
 }
 
-u64 fnv64a(void const *data, isize len) {
+static u64 fnv64a(void const *data, isize len) {
 	u8 const *bytes = cast(u8 const *)data;
 	u64 h = 0xcbf29ce484222325ull;
 	
@@ -133,7 +133,7 @@ u64 fnv64a(void const *data, isize len) {
 	return h;
 }
 
-u64 u64_digit_value(Rune r) {
+static u64 u64_digit_value(Rune r) {
 	switch (r) {
 	case '0': return 0;
 	case '1': return 1;
@@ -162,7 +162,7 @@ u64 u64_digit_value(Rune r) {
 }
 
 
-u64 u64_from_string(String string) {
+static u64 u64_from_string(String string) {
 	u64 base = 10;
 	bool has_prefix = false;
 	if (string.len > 2 && string[0] == '0') {
@@ -205,7 +205,7 @@ gb_global char const global_num_to_char_table[] =
 	"abcdefghijklmnopqrstuvwxyz"
 	"@$";
 
-String u64_to_string(u64 v, char *out_buf, isize out_buf_len) {
+static String u64_to_string(u64 v, char *out_buf, isize out_buf_len) {
 	char buf[32] = {0};
 	isize i = gb_size_of(buf);
 
@@ -220,7 +220,7 @@ String u64_to_string(u64 v, char *out_buf, isize out_buf_len) {
 	gb_memmove(out_buf, &buf[i], len);
 	return make_string(cast(u8 *)out_buf, len);
 }
-String i64_to_string(i64 a, char *out_buf, isize out_buf_len) {
+static String i64_to_string(i64 a, char *out_buf, isize out_buf_len) {
 	char buf[32] = {0};
 	isize i = gb_size_of(buf);
 	bool negative = false;
@@ -282,17 +282,17 @@ gb_global u64 const unsigned_integer_maxs[] = {
 };
 
 
-bool add_overflow_u64(u64 x, u64 y, u64 *result) {
+static bool add_overflow_u64(u64 x, u64 y, u64 *result) {
 	*result = x + y;
 	return *result < x || *result < y;
 }
 
-bool sub_overflow_u64(u64 x, u64 y, u64 *result) {
+static bool sub_overflow_u64(u64 x, u64 y, u64 *result) {
 	*result = x - y;
 	return *result > x;
 }
 
-void mul_overflow_u64(u64 x, u64 y, u64 *lo, u64 *hi) {
+static void mul_overflow_u64(u64 x, u64 y, u64 *lo, u64 *hi) {
 #if defined(GB_COMPILER_MSVC) && defined(GB_ARCH_64_BIT)
 	*lo = _umul128(x, y, hi);
 #else
@@ -367,14 +367,14 @@ char const *string_intern(String const &string) {
 	return string_intern(cast(char const *)string.text, string.len);
 }
 
-void init_string_interner(void) {
+static void init_string_interner(void) {
 	map_init(&string_intern_map, heap_allocator());
 }
 
 
 
 
-i32 next_pow2(i32 n) {
+static i32 next_pow2(i32 n) {
 	if (n <= 0) {
 		return 0;
 	}
@@ -387,7 +387,7 @@ i32 next_pow2(i32 n) {
 	n++;
 	return n;
 }
-i64 next_pow2(i64 n) {
+static i64 next_pow2(i64 n) {
 	if (n <= 0) {
 		return 0;
 	}
@@ -401,7 +401,7 @@ i64 next_pow2(i64 n) {
 	n++;
 	return n;
 }
-isize next_pow2_isize(isize n) {
+static isize next_pow2_isize(isize n) {
 	if (n <= 0) {
 		return 0;
 	}
@@ -417,7 +417,7 @@ isize next_pow2_isize(isize n) {
 	n++;
 	return n;
 }
-u32 next_pow2_u32(u32 n) {
+static u32 next_pow2_u32(u32 n) {
 	if (n == 0) {
 		return 0;
 	}
@@ -432,7 +432,7 @@ u32 next_pow2_u32(u32 n) {
 }
 
 
-i32 bit_set_count(u32 x) {
+static i32 bit_set_count(u32 x) {
 	x -= ((x >> 1) & 0x55555555);
 	x = (((x >> 2) & 0x33333333) + (x & 0x33333333));
 	x = (((x >> 4) + x) & 0x0f0f0f0f);
@@ -442,13 +442,13 @@ i32 bit_set_count(u32 x) {
 	return cast(i32)(x & 0x0000003f);
 }
 
-i64 bit_set_count(u64 x) {
+static i64 bit_set_count(u64 x) {
 	u32 a = *(cast(u32 *)&x);
 	u32 b = *(cast(u32 *)&x + 1);
 	return bit_set_count(a) + bit_set_count(b);
 }
 
-u32 floor_log2(u32 x) {
+static u32 floor_log2(u32 x) {
 	x |= x >> 1;
 	x |= x >> 2;
 	x |= x >> 4;
@@ -457,7 +457,7 @@ u32 floor_log2(u32 x) {
 	return cast(u32)(bit_set_count(x) - 1);
 }
 
-u64 floor_log2(u64 x) {
+static u64 floor_log2(u64 x) {
 	x |= x >> 1;
 	x |= x >> 2;
 	x |= x >> 4;
@@ -468,7 +468,7 @@ u64 floor_log2(u64 x) {
 }
 
 
-u32 ceil_log2(u32 x) {
+static u32 ceil_log2(u32 x) {
 	i32 y = cast(i32)(x & (x-1));
 	y |= -y;
 	y >>= 32-1;
@@ -480,7 +480,7 @@ u32 ceil_log2(u32 x) {
 	return cast(u32)(bit_set_count(x) - 1 - y);
 }
 
-u64 ceil_log2(u64 x) {
+static u64 ceil_log2(u64 x) {
 	i64 y = cast(i64)(x & (x-1));
 	y |= -y;
 	y >>= 64-1;
@@ -493,7 +493,7 @@ u64 ceil_log2(u64 x) {
 	return cast(u64)(bit_set_count(x) - 1 - y);
 }
 
-u32 prev_pow2(u32 n) {
+static u32 prev_pow2(u32 n) {
 	if (n == 0) {
 		return 0;
 	}
@@ -504,7 +504,7 @@ u32 prev_pow2(u32 n) {
 	n |= n >> 16;
 	return n - (n >> 1);
 }
-i32 prev_pow2(i32 n) {
+static i32 prev_pow2(i32 n) {
 	if (n <= 0) {
 		return 0;
 	}
@@ -515,7 +515,7 @@ i32 prev_pow2(i32 n) {
 	n |= n >> 16;
 	return n - (n >> 1);
 }
-i64 prev_pow2(i64 n) {
+static i64 prev_pow2(i64 n) {
 	if (n <= 0) {
 		return 0;
 	}
@@ -528,7 +528,7 @@ i64 prev_pow2(i64 n) {
 	return n - (n >> 1);
 }
 
-u16 f32_to_f16(f32 value) {
+static u16 f32_to_f16(f32 value) {
 	union { u32 i; f32 f; } v;
 	i32 i, s, e, m;
 
@@ -579,7 +579,7 @@ u16 f32_to_f16(f32 value) {
 	}
 }
 
-f32 f16_to_f32(u16 value) {
+static f32 f16_to_f32(u16 value) {
 	typedef union { u32 u; f32 f; } fp32;
 	fp32 v;
 
@@ -595,7 +595,7 @@ f32 f16_to_f32(u16 value) {
 	return v.f;
 }
 
-f64 gb_sqrt(f64 x) {
+static f64 gb_sqrt(f64 x) {
 	return sqrt(x);
 }
 
@@ -706,7 +706,7 @@ enum LoadedFileError {
 	LoadedFile_COUNT,
 };
 
-LoadedFileError load_file_32(char const *fullpath, LoadedFile *memory_mapped_file, bool copy_file_contents) {
+static LoadedFileError load_file_32(char const *fullpath, LoadedFile *memory_mapped_file, bool copy_file_contents) {
 	LoadedFileError err = LoadedFile_None;
 	
 	if (!copy_file_contents) {
@@ -811,7 +811,7 @@ LoadedFileError load_file_32(char const *fullpath, LoadedFile *memory_mapped_fil
 
 #define USE_DAMERAU_LEVENSHTEIN 1
 
-isize levenstein_distance_case_insensitive(String const &a, String const &b) {
+static isize levenstein_distance_case_insensitive(String const &a, String const &b) {
 	isize w = b.len+1;
 	isize h = a.len+1;
 	isize *matrix = gb_alloc_array(temporary_allocator(), isize, w*h);
@@ -870,16 +870,16 @@ struct DidYouMeanAnswers {
 
 enum {MAX_SMALLEST_DID_YOU_MEAN_DISTANCE = 3-USE_DAMERAU_LEVENSHTEIN};
 
-DidYouMeanAnswers did_you_mean_make(gbAllocator allocator, isize cap, String const &key) {
+static DidYouMeanAnswers did_you_mean_make(gbAllocator allocator, isize cap, String const &key) {
 	DidYouMeanAnswers d = {};
 	array_init(&d.distances, allocator, 0, cap);
 	d.key = key;
 	return d;
 }
-void did_you_mean_destroy(DidYouMeanAnswers *d) {
+static void did_you_mean_destroy(DidYouMeanAnswers *d) {
 	array_free(&d->distances);
 }
-void did_you_mean_append(DidYouMeanAnswers *d, String const &target) {
+static void did_you_mean_append(DidYouMeanAnswers *d, String const &target) {
 	if (target.len == 0 || target == "_") {
 		return;
 	}

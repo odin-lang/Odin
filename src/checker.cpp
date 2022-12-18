@@ -6,7 +6,7 @@ void check_expr_or_type(CheckerContext *c, Operand *operand, Ast *expression, Ty
 void add_comparison_procedures_for_fields(CheckerContext *c, Type *t);
 Type *check_type(CheckerContext *ctx, Ast *e);
 
-bool is_operand_value(Operand o) {
+static bool is_operand_value(Operand o) {
 	switch (o.mode) {
 	case Addressing_Value:
 	case Addressing_Context:
@@ -22,14 +22,14 @@ bool is_operand_value(Operand o) {
 	}
 	return false;
 }
-bool is_operand_nil(Operand o) {
+static bool is_operand_nil(Operand o) {
 	return o.mode == Addressing_Value && o.type == t_untyped_nil;
 }
-bool is_operand_undef(Operand o) {
+static bool is_operand_undef(Operand o) {
 	return o.mode == Addressing_Value && o.type == t_untyped_undef;
 }
 
-bool check_rtti_type_disallowed(Token const &token, Type *type, char const *format) {
+static bool check_rtti_type_disallowed(Token const &token, Type *type, char const *format) {
 	if (build_context.disallow_rtti && type) {
 		if (is_type_any(type)) {
 			gbString t = type_to_string(type);
@@ -41,12 +41,12 @@ bool check_rtti_type_disallowed(Token const &token, Type *type, char const *form
 	return false;
 }
 
-bool check_rtti_type_disallowed(Ast *expr, Type *type, char const *format) {
+static bool check_rtti_type_disallowed(Ast *expr, Type *type, char const *format) {
 	GB_ASSERT(expr != nullptr);
 	return check_rtti_type_disallowed(ast_token(expr), type, format);
 }
 
-void scope_reset(Scope *scope) {
+static void scope_reset(Scope *scope) {
 	if (scope == nullptr) return;
 
 	scope->head_child.store(nullptr, std::memory_order_relaxed);
@@ -54,14 +54,14 @@ void scope_reset(Scope *scope) {
 	ptr_set_clear(&scope->imported);
 }
 
-void scope_reserve(Scope *scope, isize capacity) {
+static void scope_reserve(Scope *scope, isize capacity) {
 	isize cap = 2*capacity;
 	if (cap > scope->elements.hashes.count) {
 		string_map_rehash(&scope->elements, capacity);
 	}
 }
 
-i32 is_scope_an_ancestor(Scope *parent, Scope *child) {
+static i32 is_scope_an_ancestor(Scope *parent, Scope *child) {
 	i32 i = 0;
 	while (child != nullptr) {
 		if (parent == child) {
@@ -73,35 +73,35 @@ i32 is_scope_an_ancestor(Scope *parent, Scope *child) {
 	return -1;
 }
 
-void entity_graph_node_set_destroy(EntityGraphNodeSet *s) {
+static void entity_graph_node_set_destroy(EntityGraphNodeSet *s) {
 	if (s->hashes.data != nullptr) {
 		ptr_set_destroy(s);
 	}
 }
 
-void entity_graph_node_set_add(EntityGraphNodeSet *s, EntityGraphNode *n) {
+static void entity_graph_node_set_add(EntityGraphNodeSet *s, EntityGraphNode *n) {
 	if (s->hashes.data == nullptr) {
 		ptr_set_init(s, heap_allocator());
 	}
 	ptr_set_add(s, n);
 }
 
-bool entity_graph_node_set_exists(EntityGraphNodeSet *s, EntityGraphNode *n) {
+static bool entity_graph_node_set_exists(EntityGraphNodeSet *s, EntityGraphNode *n) {
 	return ptr_set_exists(s, n);
 }
 
-void entity_graph_node_set_remove(EntityGraphNodeSet *s, EntityGraphNode *n) {
+static void entity_graph_node_set_remove(EntityGraphNodeSet *s, EntityGraphNode *n) {
 	ptr_set_remove(s, n);
 }
 
-void entity_graph_node_destroy(EntityGraphNode *n, gbAllocator a) {
+static void entity_graph_node_destroy(EntityGraphNode *n, gbAllocator a) {
 	entity_graph_node_set_destroy(&n->pred);
 	entity_graph_node_set_destroy(&n->succ);
 	gb_free(a, n);
 }
 
 
-int entity_graph_node_cmp(EntityGraphNode **data, isize i, isize j) {
+static int entity_graph_node_cmp(EntityGraphNode **data, isize i, isize j) {
 	EntityGraphNode *x = data[i];
 	EntityGraphNode *y = data[j];
 	u64 a = x->entity->order_in_src;
@@ -115,7 +115,7 @@ int entity_graph_node_cmp(EntityGraphNode **data, isize i, isize j) {
 	return +1;
 }
 
-void entity_graph_node_swap(EntityGraphNode **data, isize i, isize j) {
+static void entity_graph_node_swap(EntityGraphNode **data, isize i, isize j) {
 	EntityGraphNode *x = data[i];
 	EntityGraphNode *y = data[j];
 	data[i] = y;
@@ -126,24 +126,24 @@ void entity_graph_node_swap(EntityGraphNode **data, isize i, isize j) {
 
 
 
-void import_graph_node_set_destroy(ImportGraphNodeSet *s) {
+static void import_graph_node_set_destroy(ImportGraphNodeSet *s) {
 	if (s->hashes.data != nullptr) {
 		ptr_set_destroy(s);
 	}
 }
 
-void import_graph_node_set_add(ImportGraphNodeSet *s, ImportGraphNode *n) {
+static void import_graph_node_set_add(ImportGraphNodeSet *s, ImportGraphNode *n) {
 	if (s->hashes.data == nullptr) {
 		ptr_set_init(s, heap_allocator());
 	}
 	ptr_set_add(s, n);
 }
 
-bool import_graph_node_set_exists(ImportGraphNodeSet *s, ImportGraphNode *n) {
+static bool import_graph_node_set_exists(ImportGraphNodeSet *s, ImportGraphNode *n) {
 	return ptr_set_exists(s, n);
 }
 
-void import_graph_node_set_remove(ImportGraphNodeSet *s, ImportGraphNode *n) {
+static void import_graph_node_set_remove(ImportGraphNodeSet *s, ImportGraphNode *n) {
 	ptr_set_remove(s, n);
 }
 
@@ -154,14 +154,14 @@ ImportGraphNode *import_graph_node_create(gbAllocator a, AstPackage *pkg) {
 	return n;
 }
 
-void import_graph_node_destroy(ImportGraphNode *n, gbAllocator a) {
+static void import_graph_node_destroy(ImportGraphNode *n, gbAllocator a) {
 	import_graph_node_set_destroy(&n->pred);
 	import_graph_node_set_destroy(&n->succ);
 	gb_free(a, n);
 }
 
 
-int import_graph_node_cmp(ImportGraphNode **data, isize i, isize j) {
+static int import_graph_node_cmp(ImportGraphNode **data, isize i, isize j) {
 	ImportGraphNode *x = data[i];
 	ImportGraphNode *y = data[j];
 	GB_ASSERT(x != y);
@@ -177,7 +177,7 @@ int import_graph_node_cmp(ImportGraphNode **data, isize i, isize j) {
 	return 0;
 }
 
-void import_graph_node_swap(ImportGraphNode **data, isize i, isize j) {
+static void import_graph_node_swap(ImportGraphNode **data, isize i, isize j) {
 	ImportGraphNode *x = data[i];
 	ImportGraphNode *y = data[j];
 	data[i] = y;
@@ -199,7 +199,7 @@ GB_COMPARE_PROC(ast_node_cmp) {
 
 
 
-void init_decl_info(DeclInfo *d, Scope *scope, DeclInfo *parent) {
+static void init_decl_info(DeclInfo *d, Scope *scope, DeclInfo *parent) {
 	d->parent = parent;
 	d->scope  = scope;
 	ptr_set_init(&d->deps,           heap_allocator());
@@ -213,12 +213,12 @@ DeclInfo *make_decl_info(Scope *scope, DeclInfo *parent) {
 	return d;
 }
 
-void destroy_declaration_info(DeclInfo *d) {
+static void destroy_declaration_info(DeclInfo *d) {
 	ptr_set_destroy(&d->deps);
 	array_free(&d->labels);
 }
 
-bool decl_info_has_init(DeclInfo *d) {
+static bool decl_info_has_init(DeclInfo *d) {
 	if (d->init_expr != nullptr) {
 		return true;
 	}
@@ -307,7 +307,7 @@ Scope *create_scope_from_package(CheckerContext *c, AstPackage *pkg) {
 	return s;
 }
 
-void destroy_scope(Scope *scope) {
+static void destroy_scope(Scope *scope) {
 	for_array(i, scope->elements.entries) {
 		Entity *e =scope->elements.entries[i].value;
 		if (e->kind == Entity_Variable) {
@@ -331,7 +331,7 @@ void destroy_scope(Scope *scope) {
 }
 
 
-void add_scope(CheckerContext *c, Ast *node, Scope *scope) {
+static void add_scope(CheckerContext *c, Ast *node, Scope *scope) {
 	GB_ASSERT(node != nullptr);
 	GB_ASSERT(scope != nullptr);
 	scope->node = node;
@@ -375,7 +375,7 @@ Scope *scope_of_node(Ast *node) {
 }
 
 
-void check_open_scope(CheckerContext *c, Ast *node) {
+static void check_open_scope(CheckerContext *c, Ast *node) {
 	node = unparen_expr(node);
 	GB_ASSERT(node->kind == Ast_Invalid ||
 	          is_ast_stmt(node) ||
@@ -397,7 +397,7 @@ void check_open_scope(CheckerContext *c, Ast *node) {
 	c->state_flags |= StateFlag_bounds_check;
 }
 
-void check_close_scope(CheckerContext *c) {
+static void check_close_scope(CheckerContext *c) {
 	c->scope = c->scope->parent;
 }
 
@@ -410,7 +410,7 @@ Entity *scope_lookup_current(Scope *s, String const &name) {
 	return nullptr;
 }
 
-void scope_lookup_parent(Scope *scope, String const &name, Scope **scope_, Entity **entity_) {
+static void scope_lookup_parent(Scope *scope, String const &name, Scope **scope_, Entity **entity_) {
 	if (scope != nullptr) {
 		bool gone_thru_proc = false;
 		bool gone_thru_package = false;
@@ -528,7 +528,7 @@ struct VettedEntity {
 	Entity *entity;
 	Entity *other;
 };
-void init_vetted_entity(VettedEntity *ve, VettedEntityKind kind, Entity *entity, Entity *other=nullptr)  {
+static void init_vetted_entity(VettedEntity *ve, VettedEntityKind kind, Entity *entity, Entity *other=nullptr)  {
 	ve->kind = kind;
 	ve->entity = entity;
 	ve->other = other;
@@ -544,7 +544,7 @@ GB_COMPARE_PROC(vetted_entity_variable_pos_cmp) {
 	return token_pos_cmp(x->token.pos, y->token.pos);
 }
 
-bool check_vet_shadowing_assignment(Checker *c, Entity *shadowed, Ast *expr) {
+static bool check_vet_shadowing_assignment(Checker *c, Entity *shadowed, Ast *expr) {
 	Ast *init = unparen_expr(expr);
 	if (init == nullptr) {
 		return false;
@@ -568,7 +568,7 @@ bool check_vet_shadowing_assignment(Checker *c, Entity *shadowed, Ast *expr) {
 }
 
 
-bool check_vet_shadowing(Checker *c, Entity *e, VettedEntity *ve) {
+static bool check_vet_shadowing(Checker *c, Entity *e, VettedEntity *ve) {
 	if (e->kind != Entity_Variable) {
 		return false;
 	}
@@ -634,7 +634,7 @@ bool check_vet_shadowing(Checker *c, Entity *e, VettedEntity *ve) {
 	return true;
 }
 
-bool check_vet_unused(Checker *c, Entity *e, VettedEntity *ve) {
+static bool check_vet_unused(Checker *c, Entity *e, VettedEntity *ve) {
 	if ((e->flags&EntityFlag_Used) == 0) {
 		switch (e->kind) {
 		case Entity_Variable:
@@ -652,7 +652,7 @@ bool check_vet_unused(Checker *c, Entity *e, VettedEntity *ve) {
 	return false;
 }
 
-void check_scope_usage(Checker *c, Scope *scope) {
+static void check_scope_usage(Checker *c, Scope *scope) {
 	bool vet_unused = true;
 	bool vet_shadowing = true;
 
@@ -728,12 +728,12 @@ void check_scope_usage(Checker *c, Scope *scope) {
 }
 
 
-void add_dependency(CheckerInfo *info, DeclInfo *d, Entity *e) {
+static void add_dependency(CheckerInfo *info, DeclInfo *d, Entity *e) {
 	mutex_lock(&info->deps_mutex);
 	ptr_set_add(&d->deps, e);
 	mutex_unlock(&info->deps_mutex);
 }
-void add_type_info_dependency(CheckerInfo *info, DeclInfo *d, Type *type, bool require_mutex) {
+static void add_type_info_dependency(CheckerInfo *info, DeclInfo *d, Type *type, bool require_mutex) {
 	if (d == nullptr) {
 		return;
 	}
@@ -765,7 +765,7 @@ AstPackage *get_core_package(CheckerInfo *info, String name) {
 }
 
 
-void add_package_dependency(CheckerContext *c, char const *package_name, char const *name) {
+static void add_package_dependency(CheckerContext *c, char const *package_name, char const *name) {
 	String n = make_string_c(name);
 	AstPackage *p = get_core_package(&c->checker->info, make_string_c(package_name));
 	Entity *e = scope_lookup(p->scope, n);
@@ -775,7 +775,7 @@ void add_package_dependency(CheckerContext *c, char const *package_name, char co
 	add_dependency(c->info, c->decl, e);
 }
 
-void try_to_add_package_dependency(CheckerContext *c, char const *package_name, char const *name) {
+static void try_to_add_package_dependency(CheckerContext *c, char const *package_name, char const *name) {
 	String n = make_string_c(name);
 	AstPackage *p = get_core_package(&c->checker->info, make_string_c(package_name));
 	Entity *e = scope_lookup(p->scope, n);
@@ -788,7 +788,7 @@ void try_to_add_package_dependency(CheckerContext *c, char const *package_name, 
 }
 
 
-void add_declaration_dependency(CheckerContext *c, Entity *e) {
+static void add_declaration_dependency(CheckerContext *c, Entity *e) {
 	if (e == nullptr) {
 		return;
 	}
@@ -811,22 +811,22 @@ Entity *add_global_entity(Entity *entity, Scope *scope=builtin_pkg->scope) {
 	return entity;
 }
 
-void add_global_constant(char const *name, Type *type, ExactValue value) {
+static void add_global_constant(char const *name, Type *type, ExactValue value) {
 	Entity *entity = alloc_entity(Entity_Constant, nullptr, make_token_ident(name), type);
 	entity->Constant.value = value;
 	add_global_entity(entity);
 }
 
 
-void add_global_string_constant(char const *name, String const &value) {
+static void add_global_string_constant(char const *name, String const &value) {
 	add_global_constant(name, t_untyped_string, exact_value_string(value));
 }
 
-void add_global_bool_constant(char const *name, bool value) {
+static void add_global_bool_constant(char const *name, bool value) {
 	add_global_constant(name, t_untyped_bool, exact_value_bool(value));
 }
 
-void add_global_type_entity(String name, Type *type) {
+static void add_global_type_entity(String name, Type *type) {
 	add_global_entity(alloc_entity_type_name(nullptr, make_token_ident(name), type));
 }
 
@@ -883,7 +883,7 @@ Slice<Entity *> add_global_enum_type(String const &type_name, GlobalEnumValue *v
 
 	return slice_from_array(fields);
 }
-void add_global_enum_constant(Slice<Entity *> const &fields, char const *name, i64 value) {
+static void add_global_enum_constant(Slice<Entity *> const &fields, char const *name, i64 value) {
 	for (Entity *field : fields) {
 		GB_ASSERT(field->kind == Entity_Constant);
 		if (value == exact_value_to_i64(field->Constant.value)) {
@@ -906,7 +906,7 @@ Type *add_global_type_name(Scope *scope, String const &type_name, Type *backing_
 }
 
 
-void init_universal(void) {
+static void init_universal(void) {
 	BuildContext *bc = &build_context;
 
 	builtin_pkg    = create_builtin_package("builtin");
@@ -1123,7 +1123,7 @@ void init_universal(void) {
 
 
 
-void init_checker_info(CheckerInfo *i) {
+static void init_checker_info(CheckerInfo *i) {
 	gbAllocator a = heap_allocator();
 
 	TIME_SECTION("checker info: general");
@@ -1181,7 +1181,7 @@ void init_checker_info(CheckerInfo *i) {
 	string_map_init(&i->load_file_cache, a);
 }
 
-void destroy_checker_info(CheckerInfo *i) {
+static void destroy_checker_info(CheckerInfo *i) {
 	array_free(&i->definitions);
 	array_free(&i->entities);
 	map_destroy(&i->global_untyped);
@@ -1218,7 +1218,7 @@ void destroy_checker_info(CheckerInfo *i) {
 	string_map_destroy(&i->load_file_cache);
 }
 
-CheckerContext make_checker_context(Checker *c) {
+static CheckerContext make_checker_context(Checker *c) {
 	CheckerContext ctx = {};
 	ctx.checker   = c;
 	ctx.info      = &c->info;
@@ -1231,12 +1231,12 @@ CheckerContext make_checker_context(Checker *c) {
 	ctx.poly_level = 0;
 	return ctx;
 }
-void destroy_checker_context(CheckerContext *ctx) {
+static void destroy_checker_context(CheckerContext *ctx) {
 	destroy_checker_type_path(ctx->type_path);
 	destroy_checker_poly_path(ctx->poly_path);
 }
 
-void add_curr_ast_file(CheckerContext *ctx, AstFile *file) {
+static void add_curr_ast_file(CheckerContext *ctx, AstFile *file) {
 	if (file != nullptr) {
 		ctx->file  = file;
 		ctx->decl  = file->pkg->decl_info;
@@ -1244,7 +1244,7 @@ void add_curr_ast_file(CheckerContext *ctx, AstFile *file) {
 		ctx->pkg   = file->pkg;
 	}
 }
-void reset_checker_context(CheckerContext *ctx, AstFile *file, UntypedExprInfoMap *untyped) {
+static void reset_checker_context(CheckerContext *ctx, AstFile *file, UntypedExprInfoMap *untyped) {
 	if (ctx == nullptr) {
 		return;
 	}
@@ -1259,7 +1259,7 @@ void reset_checker_context(CheckerContext *ctx, AstFile *file, UntypedExprInfoMa
 
 
 
-void init_checker(Checker *c) {
+static void init_checker(Checker *c) {
 	gbAllocator a = heap_allocator();
 
 	TIME_SECTION("init checker info");
@@ -1279,7 +1279,7 @@ void init_checker(Checker *c) {
 	c->builtin_ctx = make_checker_context(c);
 }
 
-void destroy_checker(Checker *c) {
+static void destroy_checker(Checker *c) {
 	destroy_checker_info(&c->info);
 
 	destroy_checker_context(&c->builtin_ctx);
@@ -1291,7 +1291,7 @@ void destroy_checker(Checker *c) {
 }
 
 
-TypeAndValue type_and_value_of_expr(Ast *expr) {
+static TypeAndValue type_and_value_of_expr(Ast *expr) {
 	TypeAndValue tav = {};
 	if (expr != nullptr) {
 		tav = expr->tav;
@@ -1378,7 +1378,7 @@ ExprInfo *check_get_expr_info(CheckerContext *c, Ast *expr) {
 	}
 }
 
-void check_set_expr_info(CheckerContext *c, Ast *expr, AddressingMode mode, Type *type, ExactValue value) {
+static void check_set_expr_info(CheckerContext *c, Ast *expr, AddressingMode mode, Type *type, ExactValue value) {
 	if (c->untyped != nullptr) {
 		map_set(c->untyped, expr, make_expr_info(mode, type, value, false));
 	} else {
@@ -1388,7 +1388,7 @@ void check_set_expr_info(CheckerContext *c, Ast *expr, AddressingMode mode, Type
 	}
 }
 
-void check_remove_expr_info(CheckerContext *c, Ast *e) {
+static void check_remove_expr_info(CheckerContext *c, Ast *e) {
 	if (c->untyped != nullptr) {
 		map_remove(c->untyped, e);
 		GB_ASSERT(map_get(c->untyped, e) == nullptr);
@@ -1402,7 +1402,7 @@ void check_remove_expr_info(CheckerContext *c, Ast *e) {
 }
 
 
-isize type_info_index(CheckerInfo *info, Type *type, bool error_on_failure) {
+static isize type_info_index(CheckerInfo *info, Type *type, bool error_on_failure) {
 	type = default_type(type);
 	if (type == t_llvm_bool) {
 		type = t_bool;
@@ -1438,7 +1438,7 @@ isize type_info_index(CheckerInfo *info, Type *type, bool error_on_failure) {
 }
 
 
-void add_untyped(CheckerContext *c, Ast *expr, AddressingMode mode, Type *type, ExactValue value) {
+static void add_untyped(CheckerContext *c, Ast *expr, AddressingMode mode, Type *type, ExactValue value) {
 	if (expr == nullptr) {
 		return;
 	}
@@ -1455,7 +1455,7 @@ void add_untyped(CheckerContext *c, Ast *expr, AddressingMode mode, Type *type, 
 	check_set_expr_info(c, expr, mode, type, value);
 }
 
-void add_type_and_value(CheckerInfo *i, Ast *expr, AddressingMode mode, Type *type, ExactValue value) {
+static void add_type_and_value(CheckerInfo *i, Ast *expr, AddressingMode mode, Type *type, ExactValue value) {
 	if (expr == nullptr) {
 		return;
 	}
@@ -1491,7 +1491,7 @@ void add_type_and_value(CheckerInfo *i, Ast *expr, AddressingMode mode, Type *ty
 	mutex_unlock(&i->type_and_value_mutex);
 }
 
-void add_entity_definition(CheckerInfo *i, Ast *identifier, Entity *entity) {
+static void add_entity_definition(CheckerInfo *i, Ast *identifier, Entity *entity) {
 	GB_ASSERT(identifier != nullptr);
 	GB_ASSERT(identifier->kind == Ast_Ident);
 	// if (is_blank_ident(identifier)) {
@@ -1507,7 +1507,7 @@ void add_entity_definition(CheckerInfo *i, Ast *identifier, Entity *entity) {
 	mpmc_enqueue(&i->definition_queue, entity);
 }
 
-bool redeclaration_error(String name, Entity *prev, Entity *found) {
+static bool redeclaration_error(String name, Entity *prev, Entity *found) {
 	TokenPos pos = found->token.pos;
 	Entity *up = found->using_parent;
 	if (up != nullptr) {
@@ -1550,7 +1550,7 @@ bool redeclaration_error(String name, Entity *prev, Entity *found) {
 	return false;
 }
 
-void add_entity_flags_from_file(CheckerContext *c, Entity *e, Scope *scope) {
+static void add_entity_flags_from_file(CheckerContext *c, Entity *e, Scope *scope) {
 	if (c->file != nullptr && (c->file->flags & AstFile_IsLazy) != 0 && scope->flags & ScopeFlag_File) {
 		AstPackage *pkg = c->file->pkg;
 		if (pkg->kind == Package_Init && e->kind == Entity_Procedure && e->token.string == "main") {
@@ -1563,7 +1563,7 @@ void add_entity_flags_from_file(CheckerContext *c, Entity *e, Scope *scope) {
 	}
 }
 
-bool add_entity_with_name(CheckerContext *c, Scope *scope, Ast *identifier, Entity *entity, String name) {
+static bool add_entity_with_name(CheckerContext *c, Scope *scope, Ast *identifier, Entity *entity, String name) {
 	if (scope == nullptr) {
 		return false;
 	}
@@ -1583,11 +1583,11 @@ bool add_entity_with_name(CheckerContext *c, Scope *scope, Ast *identifier, Enti
 	}
 	return true;
 }
-bool add_entity(CheckerContext *c, Scope *scope, Ast *identifier, Entity *entity) {
+static bool add_entity(CheckerContext *c, Scope *scope, Ast *identifier, Entity *entity) {
 	return add_entity_with_name(c, scope, identifier, entity, entity->token.string);
 }
 
-void add_entity_use(CheckerContext *c, Ast *identifier, Entity *entity) {
+static void add_entity_use(CheckerContext *c, Ast *identifier, Entity *entity) {
 	if (entity == nullptr) {
 		return;
 	}
@@ -1624,7 +1624,7 @@ void add_entity_use(CheckerContext *c, Ast *identifier, Entity *entity) {
 }
 
 
-bool could_entity_be_lazy(Entity *e, DeclInfo *d) {
+static bool could_entity_be_lazy(Entity *e, DeclInfo *d) {
 	if ((e->flags & EntityFlag_Lazy) == 0) {
 		return false;
 	}
@@ -1675,7 +1675,7 @@ bool could_entity_be_lazy(Entity *e, DeclInfo *d) {
 	return true;
 }
 
-void add_entity_and_decl_info(CheckerContext *c, Ast *identifier, Entity *e, DeclInfo *d, bool is_exported) {
+static void add_entity_and_decl_info(CheckerContext *c, Ast *identifier, Entity *e, DeclInfo *d, bool is_exported) {
 	if (identifier == nullptr) {
 		// NOTE(bill): Should only happen on errors
 		error(e->token, "Invalid variable declaration");
@@ -1740,14 +1740,14 @@ void add_entity_and_decl_info(CheckerContext *c, Ast *identifier, Entity *e, Dec
 }
 
 
-void add_implicit_entity(CheckerContext *c, Ast *clause, Entity *e) {
+static void add_implicit_entity(CheckerContext *c, Ast *clause, Entity *e) {
 	GB_ASSERT(clause != nullptr);
 	GB_ASSERT(e != nullptr);
 	GB_ASSERT(clause->kind == Ast_CaseClause);
 	clause->CaseClause.implicit_entity = e;
 }
 
-void add_type_info_type(CheckerContext *c, Type *t) {
+static void add_type_info_type(CheckerContext *c, Type *t) {
 	void add_type_info_type_internal(CheckerContext *c, Type *t);
 
 	if (build_context.disallow_rtti) {
@@ -1759,7 +1759,7 @@ void add_type_info_type(CheckerContext *c, Type *t) {
 	mutex_unlock(&c->info->type_info_mutex);
 }
 
-void add_type_info_type_internal(CheckerContext *c, Type *t) {
+static void add_type_info_type_internal(CheckerContext *c, Type *t) {
 	if (t == nullptr) {
 		return;
 	}
@@ -1985,7 +1985,7 @@ void add_type_info_type_internal(CheckerContext *c, Type *t) {
 
 gb_global bool global_procedure_body_in_worker_queue = false;
 
-void check_procedure_later(CheckerContext *c, ProcInfo *info) {
+static void check_procedure_later(CheckerContext *c, ProcInfo *info) {
 	GB_ASSERT(info != nullptr);
 	GB_ASSERT(info->decl != nullptr);
 
@@ -1997,7 +1997,7 @@ void check_procedure_later(CheckerContext *c, ProcInfo *info) {
 	mpmc_enqueue(queue, info);
 }
 
-void check_procedure_later(CheckerContext *c, AstFile *file, Token token, DeclInfo *decl, Type *type, Ast *body, u64 tags) {
+static void check_procedure_later(CheckerContext *c, AstFile *file, Token token, DeclInfo *decl, Type *type, Ast *body, u64 tags) {
 	ProcInfo *info = gb_alloc_item(permanent_allocator(), ProcInfo);
 	info->file  = file;
 	info->token = token;
@@ -2009,7 +2009,7 @@ void check_procedure_later(CheckerContext *c, AstFile *file, Token token, DeclIn
 }
 
 
-void add_min_dep_type_info(Checker *c, Type *t) {
+static void add_min_dep_type_info(Checker *c, Type *t) {
 	if (t == nullptr) {
 		return;
 	}
@@ -2204,7 +2204,7 @@ void add_min_dep_type_info(Checker *c, Type *t) {
 }
 
 
-void add_dependency_to_set(Checker *c, Entity *entity) {
+static void add_dependency_to_set(Checker *c, Entity *entity) {
 	if (entity == nullptr) {
 		return;
 	}
@@ -2258,7 +2258,7 @@ void add_dependency_to_set(Checker *c, Entity *entity) {
 	}
 }
 
-void force_add_dependency_entity(Checker *c, Scope *scope, String const &name) {
+static void force_add_dependency_entity(Checker *c, Scope *scope, String const &name) {
 	Entity *e = scope_lookup(scope, name);
 	if (e == nullptr) {
 		return;
@@ -2270,7 +2270,7 @@ void force_add_dependency_entity(Checker *c, Scope *scope, String const &name) {
 
 
 
-void generate_minimum_dependency_set(Checker *c, Entity *start) {
+static void generate_minimum_dependency_set(Checker *c, Entity *start) {
 	isize entity_count = c->info.entities.count;
 	isize min_dep_set_cap = next_pow2_isize(entity_count*4); // empirically determined factor
 
@@ -2483,7 +2483,7 @@ void generate_minimum_dependency_set(Checker *c, Entity *start) {
 #undef FORCE_ADD_RUNTIME_ENTITIES
 }
 
-bool is_entity_a_dependency(Entity *e) {
+static bool is_entity_a_dependency(Entity *e) {
 	if (e == nullptr) return false;
 	switch (e->kind) {
 	case Entity_Procedure:
@@ -2673,13 +2673,13 @@ CheckerTypePath *new_checker_type_path() {
 	return tp;
 }
 
-void destroy_checker_type_path(CheckerTypePath *tp) {
+static void destroy_checker_type_path(CheckerTypePath *tp) {
 	array_free(tp);
 	gb_free(heap_allocator(), tp);
 }
 
 
-void check_type_path_push(CheckerContext *c, Entity *e) {
+static void check_type_path_push(CheckerContext *c, Entity *e) {
 	GB_ASSERT(c->type_path != nullptr);
 	GB_ASSERT(e != nullptr);
 	array_add(c->type_path, e);
@@ -2697,13 +2697,13 @@ CheckerPolyPath *new_checker_poly_path(void) {
 	return pp;
 }
 
-void destroy_checker_poly_path(CheckerPolyPath *pp) {
+static void destroy_checker_poly_path(CheckerPolyPath *pp) {
 	array_free(pp);
 	gb_free(heap_allocator(), pp);
 }
 
 
-void check_poly_path_push(CheckerContext *c, Type *t) {
+static void check_poly_path_push(CheckerContext *c, Type *t) {
 	GB_ASSERT(c->poly_path != nullptr);
 	GB_ASSERT(t != nullptr);
 	GB_ASSERT(is_type_polymorphic(t));
@@ -2740,7 +2740,7 @@ Array<Entity *> proc_group_entities_cloned(CheckerContext *c, Operand o) {
 
 
 
-void init_core_type_info(Checker *c) {
+static void init_core_type_info(Checker *c) {
 	if (t_type_info != nullptr) {
 		return;
 	}
@@ -2821,7 +2821,7 @@ void init_core_type_info(Checker *c) {
 	t_type_info_soa_pointer_ptr      = alloc_type_pointer(t_type_info_soa_pointer);
 }
 
-void init_mem_allocator(Checker *c) {
+static void init_mem_allocator(Checker *c) {
 	if (t_allocator != nullptr) {
 		return;
 	}
@@ -2830,7 +2830,7 @@ void init_mem_allocator(Checker *c) {
 	t_allocator_error = find_core_type(c, str_lit("Allocator_Error"));
 }
 
-void init_core_context(Checker *c) {
+static void init_core_context(Checker *c) {
 	if (t_context != nullptr) {
 		return;
 	}
@@ -2838,7 +2838,7 @@ void init_core_context(Checker *c) {
 	t_context_ptr = alloc_type_pointer(t_context);
 }
 
-void init_core_source_code_location(Checker *c) {
+static void init_core_source_code_location(Checker *c) {
 	if (t_source_code_location != nullptr) {
 		return;
 	}
@@ -2846,7 +2846,7 @@ void init_core_source_code_location(Checker *c) {
 	t_source_code_location_ptr = alloc_type_pointer(t_source_code_location);
 }
 
-void init_core_map_type(Checker *c) {
+static void init_core_map_type(Checker *c) {
 	if (t_map_info != nullptr) {
 		return;
 	}
@@ -2860,7 +2860,7 @@ void init_core_map_type(Checker *c) {
 	t_raw_map_ptr       = alloc_type_pointer(t_raw_map);
 }
 
-void init_preload(Checker *c) {
+static void init_preload(Checker *c) {
 	init_core_type_info(c);
 	init_mem_allocator(c);
 	init_core_context(c);
@@ -2868,7 +2868,7 @@ void init_preload(Checker *c) {
 	init_core_map_type(c);
 }
 
-ExactValue check_decl_attribute_value(CheckerContext *c, Ast *value) {
+static ExactValue check_decl_attribute_value(CheckerContext *c, Ast *value) {
 	ExactValue ev = {};
 	if (value != nullptr) {
 		Operand op = {};
@@ -3417,7 +3417,7 @@ DECL_ATTRIBUTE_PROC(type_decl_attribute) {
 
 
 
-void check_decl_attributes(CheckerContext *c, Array<Ast *> const &attributes, DeclAttributeProc *proc, AttributeContext *ac) {
+static void check_decl_attributes(CheckerContext *c, Array<Ast *> const &attributes, DeclAttributeProc *proc, AttributeContext *ac) {
 	if (attributes.count == 0) return;
 
 	String original_link_prefix = {};
@@ -3485,7 +3485,7 @@ void check_decl_attributes(CheckerContext *c, Array<Ast *> const &attributes, De
 }
 
 
-isize get_total_value_count(Slice<Ast *> const &values) {
+static isize get_total_value_count(Slice<Ast *> const &values) {
 	isize count = 0;
 	for_array(i, values) {
 		Type *t = type_of_expr(values[i]);
@@ -3503,7 +3503,7 @@ isize get_total_value_count(Slice<Ast *> const &values) {
 	return count;
 }
 
-bool check_arity_match(CheckerContext *c, AstValueDecl *vd, bool is_global) {
+static bool check_arity_match(CheckerContext *c, AstValueDecl *vd, bool is_global) {
 	isize lhs = vd->names.count;
 	isize rhs = 0;
 	if (is_global) {
@@ -3546,7 +3546,7 @@ bool check_arity_match(CheckerContext *c, AstValueDecl *vd, bool is_global) {
 	return true;
 }
 
-void check_collect_entities_from_when_stmt(CheckerContext *c, AstWhenStmt *ws) {
+static void check_collect_entities_from_when_stmt(CheckerContext *c, AstWhenStmt *ws) {
 	Operand operand = {Addressing_Invalid};
 	if (!ws->is_cond_determined) {
 		check_expr(c, &operand, ws->cond);
@@ -3582,7 +3582,7 @@ void check_collect_entities_from_when_stmt(CheckerContext *c, AstWhenStmt *ws) {
 	}
 }
 
-void check_builtin_attributes(CheckerContext *ctx, Entity *e, Array<Ast *> *attributes) {
+static void check_builtin_attributes(CheckerContext *ctx, Entity *e, Array<Ast *> *attributes) {
 	switch (e->kind) {
 	case Entity_ProcGroup:
 	case Entity_Procedure:
@@ -3645,7 +3645,7 @@ void check_builtin_attributes(CheckerContext *ctx, Entity *e, Array<Ast *> *attr
 	}
 }
 
-void check_collect_value_decl(CheckerContext *c, Ast *decl) {
+static void check_collect_value_decl(CheckerContext *c, Ast *decl) {
 	if (decl->state_flags & StateFlag_BeenHandled) return;
 	decl->state_flags |= StateFlag_BeenHandled;
 
@@ -3896,7 +3896,7 @@ void check_collect_value_decl(CheckerContext *c, Ast *decl) {
 	}
 }
 
-void check_add_foreign_block_decl(CheckerContext *ctx, Ast *decl) {
+static void check_add_foreign_block_decl(CheckerContext *ctx, Ast *decl) {
 	if (decl->state_flags & StateFlag_BeenHandled) return;
 	decl->state_flags |= StateFlag_BeenHandled;
 
@@ -3917,7 +3917,7 @@ void check_add_foreign_block_decl(CheckerContext *ctx, Ast *decl) {
 	check_collect_entities(&c, block->stmts);
 }
 
-bool correct_single_type_alias(CheckerContext *c, Entity *e) {
+static bool correct_single_type_alias(CheckerContext *c, Entity *e) {
 	if (e->kind == Entity_Constant) {
 		DeclInfo *d = e->decl_info;
 		if (d != nullptr && d->init_expr != nullptr) {
@@ -3932,7 +3932,7 @@ bool correct_single_type_alias(CheckerContext *c, Entity *e) {
 	return false;
 }
 
-bool correct_type_alias_in_scope_backwards(CheckerContext *c, Scope *s) {
+static bool correct_type_alias_in_scope_backwards(CheckerContext *c, Scope *s) {
 	isize n = s->elements.entries.count;
 	bool correction = false;
 	for (isize i = n-1; i >= 0; i--) {
@@ -3940,7 +3940,7 @@ bool correct_type_alias_in_scope_backwards(CheckerContext *c, Scope *s) {
 	}
 	return correction;
 }
-bool correct_type_alias_in_scope_forwards(CheckerContext *c, Scope *s) {
+static bool correct_type_alias_in_scope_forwards(CheckerContext *c, Scope *s) {
 	isize n = s->elements.entries.count;
 	bool correction = false;
 	for (isize i = 0; i < n; i++) {
@@ -3950,7 +3950,7 @@ bool correct_type_alias_in_scope_forwards(CheckerContext *c, Scope *s) {
 }
 
 
-void correct_type_aliases_in_scope(CheckerContext *c, Scope *s) {
+static void correct_type_aliases_in_scope(CheckerContext *c, Scope *s) {
 	// NOTE(bill, 2022-02-04): This is used to solve the problem caused by type aliases
 	// of type aliases being "confused" as constants
 	//
@@ -3971,7 +3971,7 @@ void correct_type_aliases_in_scope(CheckerContext *c, Scope *s) {
 
 
 // NOTE(bill): If file_scopes == nullptr, this will act like a local scope
-void check_collect_entities(CheckerContext *c, Slice<Ast *> const &nodes) {
+static void check_collect_entities(CheckerContext *c, Slice<Ast *> const &nodes) {
 	AstFile *curr_file = nullptr;
 	if ((c->scope->flags&ScopeFlag_File) != 0) {
 		curr_file = c->scope->file;
@@ -4061,7 +4061,7 @@ CheckerContext *create_checker_context(Checker *c) {
 	return ctx;
 }
 
-void check_single_global_entity(Checker *c, Entity *e, DeclInfo *d) {
+static void check_single_global_entity(Checker *c, Entity *e, DeclInfo *d) {
 	GB_ASSERT(e != nullptr);
 	GB_ASSERT(d != nullptr);
 
@@ -4094,7 +4094,7 @@ void check_single_global_entity(Checker *c, Entity *e, DeclInfo *d) {
 	check_entity_decl(ctx, e, d, nullptr);
 }
 
-void check_all_global_entities(Checker *c) {
+static void check_all_global_entities(Checker *c) {
 	// NOTE(bill): This must be single threaded
 	// Don't bother trying
 	for_array(i, c->info.entities) {
@@ -4112,7 +4112,7 @@ void check_all_global_entities(Checker *c) {
 }
 
 
-bool is_string_an_identifier(String s) {
+static bool is_string_an_identifier(String s) {
 	isize offset = 0;
 	if (s.len < 1) {
 		return false;
@@ -4136,7 +4136,7 @@ bool is_string_an_identifier(String s) {
 	return offset == s.len;
 }
 
-String path_to_entity_name(String name, String fullpath, bool strip_extension=true) {
+static String path_to_entity_name(String name, String fullpath, bool strip_extension=true) {
 	if (name.len != 0) {
 		return name;
 	}
@@ -4182,7 +4182,7 @@ String path_to_entity_name(String name, String fullpath, bool strip_extension=tr
 
 #if 1
 
-void add_import_dependency_node(Checker *c, Ast *decl, PtrMap<AstPackage *, ImportGraphNode *> *M) {
+static void add_import_dependency_node(Checker *c, Ast *decl, PtrMap<AstPackage *, ImportGraphNode *> *M) {
 	AstPackage *parent_pkg = decl->file()->pkg;
 
 	switch (decl->kind) {
@@ -4339,7 +4339,7 @@ Array<ImportPathItem> find_import_path(Checker *c, AstPackage *start, AstPackage
 }
 #endif
 
-String get_invalid_import_name(String input) {
+static String get_invalid_import_name(String input) {
 	isize slash = 0;
 	for (isize i = input.len-1; i >= 0; i--) {
 		if (input[i] == '/' || input[i] == '\\') {
@@ -4351,7 +4351,7 @@ String get_invalid_import_name(String input) {
 	return input;
 }
 
-void check_add_import_decl(CheckerContext *ctx, Ast *decl) {
+static void check_add_import_decl(CheckerContext *ctx, Ast *decl) {
 	if (decl->state_flags & StateFlag_BeenHandled) return;
 	decl->state_flags |= StateFlag_BeenHandled;
 
@@ -4453,7 +4453,7 @@ DECL_ATTRIBUTE_PROC(foreign_import_decl_attribute) {
 	return false;
 }
 
-void check_add_foreign_import_decl(CheckerContext *ctx, Ast *decl) {
+static void check_add_foreign_import_decl(CheckerContext *ctx, Ast *decl) {
 	if (decl->state_flags & StateFlag_BeenHandled) return;
 	decl->state_flags |= StateFlag_BeenHandled;
 
@@ -4522,7 +4522,7 @@ void check_add_foreign_import_decl(CheckerContext *ctx, Ast *decl) {
 bool collect_file_decls(CheckerContext *ctx, Slice<Ast *> const &decls);
 bool collect_file_decls_from_when_stmt(CheckerContext *ctx, AstWhenStmt *ws);
 
-bool collect_when_stmt_from_file(CheckerContext *ctx, AstWhenStmt *ws) {
+static bool collect_when_stmt_from_file(CheckerContext *ctx, AstWhenStmt *ws) {
 	Operand operand = {Addressing_Invalid};
 	if (!ws->is_cond_determined) {
 		check_expr(ctx, &operand, ws->cond);
@@ -4561,7 +4561,7 @@ bool collect_when_stmt_from_file(CheckerContext *ctx, AstWhenStmt *ws) {
 	return false;
 }
 
-bool collect_file_decls_from_when_stmt(CheckerContext *ctx, AstWhenStmt *ws) {
+static bool collect_file_decls_from_when_stmt(CheckerContext *ctx, AstWhenStmt *ws) {
 	Operand operand = {Addressing_Invalid};
 	if (!ws->is_cond_determined) {
 		check_expr(ctx, &operand, ws->cond);
@@ -4598,7 +4598,7 @@ bool collect_file_decls_from_when_stmt(CheckerContext *ctx, AstWhenStmt *ws) {
 }
 
 
-bool collect_file_decl(CheckerContext *ctx, Ast *decl) {
+static bool collect_file_decl(CheckerContext *ctx, Ast *decl) {
 	GB_ASSERT(ctx->scope->flags&ScopeFlag_File);
 
 	AstFile *curr_file = ctx->scope->file;
@@ -4662,7 +4662,7 @@ bool collect_file_decl(CheckerContext *ctx, Ast *decl) {
 	return false;
 }
 
-bool collect_file_decls(CheckerContext *ctx, Slice<Ast *> const &decls) {
+static bool collect_file_decls(CheckerContext *ctx, Slice<Ast *> const &decls) {
 	GB_ASSERT(ctx->scope->flags&ScopeFlag_File);
 
 	for_array(i, decls) {
@@ -4683,7 +4683,7 @@ GB_COMPARE_PROC(sort_file_by_name) {
 	return string_compare(x_name, y_name);
 }
 
-void check_create_file_scopes(Checker *c) {
+static void check_create_file_scopes(Checker *c) {
 	for_array(i, c->parser->packages) {
 		AstPackage *pkg = c->parser->packages[i];
 		isize total_pkg_decl_count = 0;
@@ -4709,7 +4709,7 @@ struct ThreadProcCheckerSection {
 };
 
 
-void check_with_workers(Checker *c, WorkerTaskProc *proc, isize total_count) {
+static void check_with_workers(Checker *c, WorkerTaskProc *proc, isize total_count) {
 	isize thread_count = gb_max(build_context.thread_count, 1);
 	isize worker_count = thread_count-1; // NOTE(bill): The main thread will also be used for work
 	if (!build_context.threaded_checker) {
@@ -4779,11 +4779,11 @@ WORKER_TASK_PROC(thread_proc_collect_entities) {
 }
 
 
-void check_collect_entities_all(Checker *c) {
+static void check_collect_entities_all(Checker *c) {
 	check_with_workers(c, thread_proc_collect_entities, c->info.files.entries.count);
 }
 
-void check_export_entities_in_pkg(CheckerContext *ctx, AstPackage *pkg, UntypedExprInfoMap *untyped) {
+static void check_export_entities_in_pkg(CheckerContext *ctx, AstPackage *pkg, UntypedExprInfoMap *untyped) {
 	if (pkg->files.count != 0) {
 		AstPackageExportedEntity item = {};
 		while (mpmc_dequeue(&pkg->exported_entity_queue, &item)) {
@@ -4819,11 +4819,11 @@ WORKER_TASK_PROC(thread_proc_check_export_entities) {
 	return 0;
 }
 
-void check_export_entities(Checker *c) {
+static void check_export_entities(Checker *c) {
 	check_with_workers(c, thread_proc_check_export_entities, c->info.packages.entries.count);
 }
 
-void check_import_entities(Checker *c) {
+static void check_import_entities(Checker *c) {
 	Array<ImportGraphNode *> dep_graph = generate_import_dependency_graph(c);
 	defer ({
 		for_array(i, dep_graph) {
@@ -4967,7 +4967,7 @@ void check_import_entities(Checker *c) {
 
 Array<Entity *> find_entity_path(Entity *start, Entity *end, PtrSet<Entity *> *visited = nullptr);
 
-bool find_entity_path_tuple(Type *tuple, Entity *end, PtrSet<Entity *> *visited, Array<Entity *> *path_) {
+static bool find_entity_path_tuple(Type *tuple, Entity *end, PtrSet<Entity *> *visited, Array<Entity *> *path_) {
 	GB_ASSERT(path_ != nullptr);
 	if (tuple == nullptr) {
 		return false;
@@ -5051,7 +5051,7 @@ Array<Entity *> find_entity_path(Entity *start, Entity *end, PtrSet<Entity *> *v
 }
 
 
-void calculate_global_init_order(Checker *c) {
+static void calculate_global_init_order(Checker *c) {
 	CheckerInfo *info = &c->info;
 
 	TIME_SECTION("calculate_global_init_order: generate entity dependency graph");
@@ -5126,7 +5126,7 @@ void calculate_global_init_order(Checker *c) {
 }
 
 
-bool check_proc_info(Checker *c, ProcInfo *pi, UntypedExprInfoMap *untyped, ProcBodyQueue *procs_to_check_queue) {
+static bool check_proc_info(Checker *c, ProcInfo *pi, UntypedExprInfoMap *untyped, ProcBodyQueue *procs_to_check_queue) {
 	if (pi == nullptr) {
 		return false;
 	}
@@ -5207,7 +5207,7 @@ GB_STATIC_ASSERT(sizeof(isize) == sizeof(void *));
 
 bool consume_proc_info_queue(Checker *c, ProcInfo *pi, ProcBodyQueue *q, UntypedExprInfoMap *untyped);
 
-void check_unchecked_bodies(Checker *c) {
+static void check_unchecked_bodies(Checker *c) {
 	// NOTE(2021-02-26, bill): Sanity checker
 	// This is a partial hack to make sure all procedure bodies have been checked
 	// even ones which should not exist, due to the multithreaded nature of the parser
@@ -5259,7 +5259,7 @@ void check_unchecked_bodies(Checker *c) {
 
 }
 
-void check_test_procedures(Checker *c) {
+static void check_test_procedures(Checker *c) {
 	if (build_context.test_names.entries.count == 0) {
 		return;
 	}
@@ -5294,7 +5294,7 @@ void check_test_procedures(Checker *c) {
 
 gb_global std::atomic<isize> total_bodies_checked;
 
-bool consume_proc_info_queue(Checker *c, ProcInfo *pi, ProcBodyQueue *q, UntypedExprInfoMap *untyped) {
+static bool consume_proc_info_queue(Checker *c, ProcInfo *pi, ProcBodyQueue *q, UntypedExprInfoMap *untyped) {
 	GB_ASSERT(pi->decl != nullptr);
 	if (pi->decl->parent && pi->decl->parent->entity) {
 		Entity *parent = pi->decl->parent->entity;
@@ -5342,7 +5342,7 @@ WORKER_TASK_PROC(thread_proc_body) {
 	return 0;
 }
 
-void check_procedure_bodies(Checker *c) {
+static void check_procedure_bodies(Checker *c) {
 	GB_ASSERT(c != nullptr);
 
 	u32 thread_count = cast(u32)gb_max(build_context.thread_count, 1);
@@ -5418,7 +5418,7 @@ void check_procedure_bodies(Checker *c) {
 
 	global_procedure_body_in_worker_queue = false;
 }
-void add_untyped_expressions(CheckerInfo *cinfo, UntypedExprInfoMap *untyped) {
+static void add_untyped_expressions(CheckerInfo *cinfo, UntypedExprInfoMap *untyped) {
 	if (untyped == nullptr) {
 		return;
 	}
@@ -5432,7 +5432,7 @@ void add_untyped_expressions(CheckerInfo *cinfo, UntypedExprInfoMap *untyped) {
 	map_clear(untyped);
 }
 
-void check_deferred_procedures(Checker *c) {
+static void check_deferred_procedures(Checker *c) {
 	for (Entity *src = nullptr; mpmc_dequeue(&c->procs_with_deferred_to_check, &src); /**/) {
 		GB_ASSERT(src->kind == Entity_Procedure);
 
@@ -5585,7 +5585,7 @@ void check_deferred_procedures(Checker *c) {
 
 }
 
-void check_unique_package_names(Checker *c) {
+static void check_unique_package_names(Checker *c) {
 	StringMap<AstPackage *> pkgs = {}; // Key: package name
 	string_map_init(&pkgs, heap_allocator(), 2*c->info.packages.entries.count);
 	defer (string_map_destroy(&pkgs));
@@ -5618,7 +5618,7 @@ void check_unique_package_names(Checker *c) {
 	}
 }
 
-void check_add_entities_from_queues(Checker *c) {
+static void check_add_entities_from_queues(Checker *c) {
 	isize cap = c->info.entities.count + c->info.entity_queue.count.load(std::memory_order_relaxed);
 	array_reserve(&c->info.entities, cap);
 	for (Entity *e; mpmc_dequeue(&c->info.entity_queue, &e); /**/) {
@@ -5626,7 +5626,7 @@ void check_add_entities_from_queues(Checker *c) {
 	}
 }
 
-void check_add_definitions_from_queues(Checker *c) {
+static void check_add_definitions_from_queues(Checker *c) {
 	isize cap = c->info.definitions.count + c->info.definition_queue.count.load(std::memory_order_relaxed);
 	array_reserve(&c->info.definitions, cap);
 	for (Entity *e; mpmc_dequeue(&c->info.definition_queue, &e); /**/) {
@@ -5634,7 +5634,7 @@ void check_add_definitions_from_queues(Checker *c) {
 	}
 }
 
-void check_merge_queues_into_arrays(Checker *c) {
+static void check_merge_queues_into_arrays(Checker *c) {
 	check_add_entities_from_queues(c);
 	check_add_definitions_from_queues(c);
 }
@@ -5677,11 +5677,11 @@ GB_COMPARE_PROC(init_procedures_cmp) {
 }
 
 
-void check_sort_init_procedures(Checker *c) {
+static void check_sort_init_procedures(Checker *c) {
 	gb_sort_array(c->info.init_procedures.data, c->info.init_procedures.count, init_procedures_cmp);
 }
 
-void add_type_info_for_type_definitions(Checker *c) {
+static void add_type_info_for_type_definitions(Checker *c) {
 	for_array(i, c->info.definitions) {
 		Entity *e = c->info.definitions[i];
 		if (e->kind == Entity_TypeName && e->type != nullptr) {
@@ -5693,7 +5693,7 @@ void add_type_info_for_type_definitions(Checker *c) {
 	}
 }
 
-void check_parsed_files(Checker *c) {
+static void check_parsed_files(Checker *c) {
 	TIME_SECTION("map full filepaths to scope");
 	add_type_info_type(&c->builtin_ctx, t_invalid);
 

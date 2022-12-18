@@ -3,7 +3,7 @@
 // #undef at the bottom of this file
 #define ALLOW_NEWLINE (!build_context.strict_style)
 
-Token token_end_of_line(AstFile *f, Token tok) {
+static Token token_end_of_line(AstFile *f, Token tok) {
 	u8 const *start = f->tokenizer.start + tok.pos.offset;
 	u8 const *s = start;
 	while (*s && *s != '\n' && s < f->tokenizer.end) {
@@ -13,7 +13,7 @@ Token token_end_of_line(AstFile *f, Token tok) {
 	return tok;
 }
 
-gbString get_file_line_as_string(TokenPos const &pos, i32 *offset_) {
+static gbString get_file_line_as_string(TokenPos const &pos, i32 *offset_) {
 	AstFile *file = thread_safe_get_ast_file_from_id(pos.file_id);
 	if (file == nullptr) {
 		return nullptr;
@@ -55,7 +55,7 @@ gbString get_file_line_as_string(TokenPos const &pos, i32 *offset_) {
 
 
 
-isize ast_node_size(AstKind kind) {
+static isize ast_node_size(AstKind kind) {
 	return align_formula_isize(gb_size_of(AstCommonStuff) + ast_variant_sizes[kind], gb_align_of(void *));
 
 }
@@ -403,7 +403,7 @@ Ast *clone_ast(Ast *node) {
 }
 
 
-void error(Ast *node, char const *fmt, ...) {
+static void error(Ast *node, char const *fmt, ...) {
 	Token token = {};
 	TokenPos end_pos = {};
 	if (node != nullptr) {
@@ -421,7 +421,7 @@ void error(Ast *node, char const *fmt, ...) {
 	}
 }
 
-void error_no_newline(Ast *node, char const *fmt, ...) {
+static void error_no_newline(Ast *node, char const *fmt, ...) {
 	Token token = {};
 	if (node != nullptr) {
 		token = ast_token(node);
@@ -436,7 +436,7 @@ void error_no_newline(Ast *node, char const *fmt, ...) {
 	}
 }
 
-void warning(Ast *node, char const *fmt, ...) {
+static void warning(Ast *node, char const *fmt, ...) {
 	Token token = {};
 	TokenPos end_pos = {};
 	if (node != nullptr) {
@@ -449,7 +449,7 @@ void warning(Ast *node, char const *fmt, ...) {
 	va_end(va);
 }
 
-void syntax_error(Ast *node, char const *fmt, ...) {
+static void syntax_error(Ast *node, char const *fmt, ...) {
 	Token token = {};
 	TokenPos end_pos = {};
 	if (node != nullptr) {
@@ -467,14 +467,14 @@ void syntax_error(Ast *node, char const *fmt, ...) {
 }
 
 
-bool ast_node_expect(Ast *node, AstKind kind) {
+static bool ast_node_expect(Ast *node, AstKind kind) {
 	if (node->kind != kind) {
 		syntax_error(node, "Expected %.*s, got %.*s", LIT(ast_strings[kind]), LIT(ast_strings[node->kind]));
 		return false;
 	}
 	return true;
 }
-bool ast_node_expect2(Ast *node, AstKind kind0, AstKind kind1) {
+static bool ast_node_expect2(Ast *node, AstKind kind0, AstKind kind1) {
 	if (node->kind != kind0 && node->kind != kind1) {
 		syntax_error(node, "Expected %.*s or %.*s, got %.*s", LIT(ast_strings[kind0]), LIT(ast_strings[kind1]), LIT(ast_strings[node->kind]));
 		return false;
@@ -631,7 +631,7 @@ Ast *ast_undef(AstFile *f, Token token) {
 	return result;
 }
 
-ExactValue exact_value_from_token(AstFile *f, Token const &token) {
+static ExactValue exact_value_from_token(AstFile *f, Token const &token) {
 	String s = token.string;
 	switch (token.kind) {
 	case Token_Rune:
@@ -648,7 +648,7 @@ ExactValue exact_value_from_token(AstFile *f, Token const &token) {
 	return exact_value_from_basic_literal(token.kind, s);
 }
 
-String string_value_from_token(AstFile *f, Token const &token) {
+static String string_value_from_token(AstFile *f, Token const &token) {
 	ExactValue value = exact_value_from_token(f, token);
 	String str = {};
 	if (value.kind == ExactValue_String) {
@@ -1199,7 +1199,7 @@ Ast *ast_attribute(AstFile *f, Token token, Token open, Token close, Array<Ast *
 }
 
 
-bool next_token0(AstFile *f) {
+static bool next_token0(AstFile *f) {
 	if (f->curr_token_index+1 < f->tokens.count) {
 		f->curr_token = f->tokens[++f->curr_token_index];
 		return true;
@@ -1209,7 +1209,7 @@ bool next_token0(AstFile *f) {
 }
 
 
-Token consume_comment(AstFile *f, isize *end_line_) {
+static Token consume_comment(AstFile *f, isize *end_line_) {
 	Token tok = f->curr_token;
 	GB_ASSERT(tok.kind == Token_Comment);
 	isize end_line = tok.pos.line;
@@ -1257,7 +1257,7 @@ CommentGroup *consume_comment_group(AstFile *f, isize n, isize *end_line_) {
 	return comments;
 }
 
-void consume_comment_groups(AstFile *f, Token prev) {
+static void consume_comment_groups(AstFile *f, Token prev) {
 	if (f->curr_token.kind == Token_Comment) {
 		CommentGroup *comment = nullptr;
 		isize end_line = 0;
@@ -1281,11 +1281,11 @@ void consume_comment_groups(AstFile *f, Token prev) {
 	}
 }
 
-gb_inline bool ignore_newlines(AstFile *f) {
+static gb_inline bool ignore_newlines(AstFile *f) {
 	return f->expr_level > 0;
 }
 
-Token advance_token(AstFile *f) {
+static Token advance_token(AstFile *f) {
 	f->lead_comment = nullptr;
 	f->line_comment = nullptr;
 
@@ -1308,7 +1308,7 @@ Token advance_token(AstFile *f) {
 	return prev;
 }
 
-bool peek_token_kind(AstFile *f, TokenKind kind) {
+static bool peek_token_kind(AstFile *f, TokenKind kind) {
 	for (isize i = f->curr_token_index+1; i < f->tokens.count; i++) {
 		Token tok = f->tokens[i];
 		if (kind != Token_Comment && tok.kind == Token_Comment) {
@@ -1319,7 +1319,7 @@ bool peek_token_kind(AstFile *f, TokenKind kind) {
 	return false;
 }
 
-Token peek_token(AstFile *f) {
+static Token peek_token(AstFile *f) {
 	for (isize i = f->curr_token_index+1; i < f->tokens.count; i++) {
 		Token tok = f->tokens[i];
 		if (tok.kind == Token_Comment) {
@@ -1330,7 +1330,7 @@ Token peek_token(AstFile *f) {
 	return {};
 }
 
-bool skip_possible_newline(AstFile *f) {
+static bool skip_possible_newline(AstFile *f) {
 	if (token_is_newline(f->curr_token)) {
 		advance_token(f);
 		return true;
@@ -1338,7 +1338,7 @@ bool skip_possible_newline(AstFile *f) {
 	return false;
 }
 
-bool skip_possible_newline_for_literal(AstFile *f) {
+static bool skip_possible_newline_for_literal(AstFile *f) {
 	Token curr = f->curr_token;
 	if (token_is_newline(curr)) {
 		Token next = peek_token(f);
@@ -1356,7 +1356,7 @@ bool skip_possible_newline_for_literal(AstFile *f) {
 	return false;
 }
 
-String token_to_string(Token const &tok) {
+static String token_to_string(Token const &tok) {
 	String p = token_strings[tok.kind];
 	if (token_is_newline(tok)) {
 		p = str_lit("newline");
@@ -1365,7 +1365,7 @@ String token_to_string(Token const &tok) {
 }
 
 
-Token expect_token(AstFile *f, TokenKind kind) {
+static Token expect_token(AstFile *f, TokenKind kind) {
 	Token prev = f->curr_token;
 	if (prev.kind != kind) {
 		String c = token_strings[kind];
@@ -1380,7 +1380,7 @@ Token expect_token(AstFile *f, TokenKind kind) {
 	return prev;
 }
 
-Token expect_token_after(AstFile *f, TokenKind kind, char const *msg) {
+static Token expect_token_after(AstFile *f, TokenKind kind, char const *msg) {
 	Token prev = f->curr_token;
 	if (prev.kind != kind) {
 		String p = token_to_string(prev);
@@ -1400,7 +1400,7 @@ Token expect_token_after(AstFile *f, TokenKind kind, char const *msg) {
 }
 
 
-bool is_token_range(TokenKind kind) {
+static bool is_token_range(TokenKind kind) {
 	switch (kind) {
 	case Token_Ellipsis:
 	case Token_RangeFull:
@@ -1409,12 +1409,12 @@ bool is_token_range(TokenKind kind) {
 	}
 	return false;
 }
-bool is_token_range(Token tok) {
+static bool is_token_range(Token tok) {
 	return is_token_range(tok.kind);
 }
 
 
-Token expect_operator(AstFile *f) {
+static Token expect_operator(AstFile *f) {
 	Token prev = f->curr_token;
 	if ((prev.kind == Token_in || prev.kind == Token_not_in) && (f->expr_level >= 0 || f->allow_in_expr)) {
 		// okay
@@ -1440,7 +1440,7 @@ Token expect_operator(AstFile *f) {
 	return prev;
 }
 
-Token expect_keyword(AstFile *f) {
+static Token expect_keyword(AstFile *f) {
 	Token prev = f->curr_token;
 	if (!gb_is_between(prev.kind, Token__KeywordBegin+1, Token__KeywordEnd-1)) {
 		String p = token_to_string(prev);
@@ -1451,7 +1451,7 @@ Token expect_keyword(AstFile *f) {
 	return prev;
 }
 
-bool allow_token(AstFile *f, TokenKind kind) {
+static bool allow_token(AstFile *f, TokenKind kind) {
 	Token prev = f->curr_token;
 	if (prev.kind == kind) {
 		advance_token(f);
@@ -1460,7 +1460,7 @@ bool allow_token(AstFile *f, TokenKind kind) {
 	return false;
 }
 
-Token expect_closing_brace_of_field_list(AstFile *f) {
+static Token expect_closing_brace_of_field_list(AstFile *f) {
 	Token token = f->curr_token;
 	if (allow_token(f, Token_CloseBrace)) {
 		return token;
@@ -1476,19 +1476,19 @@ Token expect_closing_brace_of_field_list(AstFile *f) {
 	return expect_token(f, Token_CloseBrace);
 }
 
-bool is_blank_ident(String str) {
+static bool is_blank_ident(String str) {
 	if (str.len == 1) {
 		return str[0] == '_';
 	}
 	return false;
 }
-bool is_blank_ident(Token token) {
+static bool is_blank_ident(Token token) {
 	if (token.kind == Token_Ident) {
 		return is_blank_ident(token.string);
 	}
 	return false;
 }
-bool is_blank_ident(Ast *node) {
+static bool is_blank_ident(Ast *node) {
 	if (node->kind == Ast_Ident) {
 		ast_node(i, Ident, node);
 		return is_blank_ident(i->token.string);
@@ -1499,7 +1499,7 @@ bool is_blank_ident(Ast *node) {
 
 
 // NOTE(bill): Go to next statement to prevent numerous error messages popping up
-void fix_advance_to_next_stmt(AstFile *f) {
+static void fix_advance_to_next_stmt(AstFile *f) {
 	for (;;) {
 		Token t = f->curr_token;
 		switch (t.kind) {
@@ -1543,7 +1543,7 @@ void fix_advance_to_next_stmt(AstFile *f) {
 	}
 }
 
-Token expect_closing(AstFile *f, TokenKind kind, String const &context) {
+static Token expect_closing(AstFile *f, TokenKind kind, String const &context) {
 	if (f->curr_token.kind != kind &&
 	    f->curr_token.kind == Token_Semicolon &&
 	    (f->curr_token.string == "\n" || f->curr_token.kind == Token_EOF)) {
@@ -1557,7 +1557,7 @@ Token expect_closing(AstFile *f, TokenKind kind, String const &context) {
 	return expect_token(f, kind);
 }
 
-void assign_removal_flag_to_semicolon(AstFile *f) {
+static void assign_removal_flag_to_semicolon(AstFile *f) {
 	// NOTE(bill): this is used for rewriting files to strip unneeded semicolons
 	Token *prev_token = &f->tokens[f->prev_token_index];
 	Token *curr_token = &f->tokens[f->curr_token_index];
@@ -1587,7 +1587,7 @@ void assign_removal_flag_to_semicolon(AstFile *f) {
 	}
 }
 
-void expect_semicolon(AstFile *f) {
+static void expect_semicolon(AstFile *f) {
 	Token prev_token = {};
 
 	if (allow_token(f, Token_Semicolon)) {
@@ -1792,14 +1792,14 @@ Ast *parse_value(AstFile *f) {
 Ast *parse_type_or_ident(AstFile *f);
 
 
-void check_proc_add_tag(AstFile *f, Ast *tag_expr, u64 *tags, ProcTag tag, String const &tag_name) {
+static void check_proc_add_tag(AstFile *f, Ast *tag_expr, u64 *tags, ProcTag tag, String const &tag_name) {
 	if (*tags & tag) {
 		syntax_error(tag_expr, "Procedure tag already used: %.*s", LIT(tag_name));
 	}
 	*tags |= tag;
 }
 
-bool is_foreign_name_valid(String const &name) {
+static bool is_foreign_name_valid(String const &name) {
 	if (name.len == 0) {
 		return false;
 	}
@@ -1847,7 +1847,7 @@ bool is_foreign_name_valid(String const &name) {
 	return true;
 }
 
-void parse_proc_tags(AstFile *f, u64 *tags) {
+static void parse_proc_tags(AstFile *f, u64 *tags) {
 	GB_ASSERT(tags != nullptr);
 
 	while (f->curr_token.kind == Token_Hash) {
@@ -1929,7 +1929,7 @@ Ast *convert_stmt_to_body(AstFile *f, Ast *stmt) {
 }
 
 
-void check_polymorphic_params_for_type(AstFile *f, Ast *polymorphic_params, Token token) {
+static void check_polymorphic_params_for_type(AstFile *f, Ast *polymorphic_params, Token token) {
 	if (polymorphic_params == nullptr) {
 		return;
 	}
@@ -1952,12 +1952,12 @@ void check_polymorphic_params_for_type(AstFile *f, Ast *polymorphic_params, Toke
 	}
 }
 
-bool ast_on_same_line(Token const &x, Ast *yp) {
+static bool ast_on_same_line(Token const &x, Ast *yp) {
 	Token y = ast_token(yp);
 	return x.pos.line == y.pos.line;
 }
 
-bool ast_on_same_line(Ast *x, Ast *y) {
+static bool ast_on_same_line(Ast *x, Ast *y) {
 	return ast_on_same_line(ast_token(x), y);
 }
 
@@ -2712,7 +2712,7 @@ Ast *parse_operand(AstFile *f, bool lhs) {
 	return nullptr;
 }
 
-bool is_literal_type(Ast *node) {
+static bool is_literal_type(Ast *node) {
 	node = unparen_expr(node);
 	switch (node->kind) {
 	case Ast_BadExpr:
@@ -2997,7 +2997,7 @@ Ast *parse_unary_expr(AstFile *f, bool lhs) {
 	return parse_atom_expr(f, parse_operand(f, lhs), lhs);
 }
 
-bool is_ast_range(Ast *expr) {
+static bool is_ast_range(Ast *expr) {
 	if (expr == nullptr) {
 		return false;
 	}
@@ -3008,7 +3008,7 @@ bool is_ast_range(Ast *expr) {
 }
 
 // NOTE(bill): result == priority
-i32 token_precedence(AstFile *f, TokenKind t) {
+static i32 token_precedence(AstFile *f, TokenKind t) {
 	switch (t) {
 	case Token_Question:
 	case Token_if:
@@ -3177,7 +3177,7 @@ Ast *parse_type(AstFile *f) {
 	return type;
 }
 
-void parse_foreign_block_decl(AstFile *f, Array<Ast *> *decls) {
+static void parse_foreign_block_decl(AstFile *f, Array<Ast *> *decls) {
 	Ast *decl = parse_stmt(f);
 	switch (decl->kind) {
 	case Ast_EmptyStmt:
@@ -3448,7 +3448,7 @@ Ast *parse_results(AstFile *f, bool *diverging) {
 }
 
 
-ProcCallingConvention string_to_calling_convention(String const &s) {
+static ProcCallingConvention string_to_calling_convention(String const &s) {
 	if (s == "odin")        return ProcCC_Odin;
 	if (s == "contextless") return ProcCC_Contextless;
 	if (s == "cdecl")       return ProcCC_CDecl;
@@ -3574,7 +3574,7 @@ gb_global ParseFieldPrefixMapping parse_field_prefix_mappings[] = {
 };
 
 
-FieldFlag is_token_field_prefix(AstFile *f) {
+static FieldFlag is_token_field_prefix(AstFile *f) {
 	switch (f->curr_token.kind) {
 	case Token_EOF:
 		return FieldFlag_Invalid;
@@ -3604,7 +3604,7 @@ FieldFlag is_token_field_prefix(AstFile *f) {
 	return FieldFlag_Invalid;
 }
 
-u32 parse_field_prefixes(AstFile *f) {
+static u32 parse_field_prefixes(AstFile *f) {
 	i32 counts[gb_count_of(parse_field_prefix_mappings)] = {};
 
 	for (;;) {
@@ -3646,7 +3646,7 @@ u32 parse_field_prefixes(AstFile *f) {
 	return field_flags;
 }
 
-u32 check_field_prefixes(AstFile *f, isize name_count, u32 allowed_flags, u32 set_flags) {
+static u32 check_field_prefixes(AstFile *f, isize name_count, u32 allowed_flags, u32 set_flags) {
 	for (i32 i = 0; i < gb_count_of(parse_field_prefix_mappings); i++) {
 		bool err = false;
 		auto const &m = parse_field_prefix_mappings[i];
@@ -3719,7 +3719,7 @@ Array<Ast *> convert_to_ident_list(AstFile *f, Array<AstAndFlags> list, bool ign
 }
 
 
-bool allow_field_separator(AstFile *f) {
+static bool allow_field_separator(AstFile *f) {
 	Token token = f->curr_token;
 	if (allow_token(f, Token_Comma)) {
 		return true;
@@ -3747,7 +3747,7 @@ Ast *parse_struct_field_list(AstFile *f, isize *name_count_) {
 
 
 // Returns true if any are polymorphic names
-bool check_procedure_name_list(Array<Ast *> const &names) {
+static bool check_procedure_name_list(Array<Ast *> const &names) {
 	if (names.count == 0) {
 		return false;
 	}
@@ -4034,7 +4034,7 @@ Ast *parse_do_body(AstFile *f, Token const &token, char const *msg) {
 	return body;
 }
 
-bool parse_control_statement_semicolon_separator(AstFile *f) {
+static bool parse_control_statement_semicolon_separator(AstFile *f) {
 	Token tok = peek_token(f);
 	if (tok.kind != Token_OpenBrace) {
 		return allow_token(f, Token_Semicolon);
@@ -4802,7 +4802,7 @@ Array<Ast *> parse_stmt_list(AstFile *f) {
 }
 
 
-ParseFileError init_ast_file(AstFile *f, String const &fullpath, TokenPos *err_pos) {
+static ParseFileError init_ast_file(AstFile *f, String const &fullpath, TokenPos *err_pos) {
 	GB_ASSERT(f != nullptr);
 	f->fullpath = string_trim_whitespace(fullpath); // Just in case
 	set_file_path_string(f->id, fullpath);
@@ -4881,14 +4881,14 @@ ParseFileError init_ast_file(AstFile *f, String const &fullpath, TokenPos *err_p
 	return ParseFile_None;
 }
 
-void destroy_ast_file(AstFile *f) {
+static void destroy_ast_file(AstFile *f) {
 	GB_ASSERT(f != nullptr);
 	array_free(&f->tokens);
 	array_free(&f->comments);
 	array_free(&f->imports);
 }
 
-bool init_parser(Parser *p) {
+static bool init_parser(Parser *p) {
 	GB_ASSERT(p != nullptr);
 	string_set_init(&p->imported_files, heap_allocator());
 	array_init(&p->packages, heap_allocator());
@@ -4902,7 +4902,7 @@ bool init_parser(Parser *p) {
 	return true;
 }
 
-void destroy_parser(Parser *p) {
+static void destroy_parser(Parser *p) {
 	GB_ASSERT(p != nullptr);
 	// TODO(bill): Fix memory leak
 	for_array(i, p->packages) {
@@ -4930,7 +4930,7 @@ void destroy_parser(Parser *p) {
 }
 
 
-void parser_add_package(Parser *p, AstPackage *pkg) {
+static void parser_add_package(Parser *p, AstPackage *pkg) {
 	mutex_lock(&p->packages_mutex);
 	pkg->id = p->packages.count+1;
 	array_add(&p->packages, pkg);
@@ -4949,7 +4949,7 @@ WORKER_TASK_PROC(parser_worker_proc) {
 }
 
 
-void parser_add_file_to_process(Parser *p, AstPackage *pkg, FileInfo fi, TokenPos pos) {
+static void parser_add_file_to_process(Parser *p, AstPackage *pkg, FileInfo fi, TokenPos pos) {
 	// TODO(bill): Use a better allocator
 	ImportedFile f = {pkg, fi, pos, p->file_to_process_count++};
 	auto wd = gb_alloc_item(permanent_allocator(), ParserWorkerData);
@@ -4987,7 +4987,7 @@ WORKER_TASK_PROC(foreign_file_worker_proc) {
 }
 
 
-void parser_add_foreign_file_to_process(Parser *p, AstPackage *pkg, AstForeignFileKind kind, FileInfo fi, TokenPos pos) {
+static void parser_add_foreign_file_to_process(Parser *p, AstPackage *pkg, AstForeignFileKind kind, FileInfo fi, TokenPos pos) {
 	// TODO(bill): Use a better allocator
 	ImportedFile f = {pkg, fi, pos, p->file_to_process_count++};
 	auto wd = gb_alloc_item(permanent_allocator(), ForeignFileWorkerData);
@@ -5097,7 +5097,7 @@ gb_global Rune illegal_import_runes[] = {
 	'|', ',',  '<', '>', '?',
 };
 
-bool is_import_path_valid(String const &path) {
+static bool is_import_path_valid(String const &path) {
 	if (path.len > 0) {
 		u8 *start = path.text;
 		u8 *end = path.text + path.len;
@@ -5129,7 +5129,7 @@ bool is_import_path_valid(String const &path) {
 	return false;
 }
 
-bool is_build_flag_path_valid(String const &path) {
+static bool is_build_flag_path_valid(String const &path) {
 	if (path.len > 0) {
 		u8 *start = path.text;
 		u8 *end = path.text + path.len;
@@ -5171,7 +5171,7 @@ bool is_build_flag_path_valid(String const &path) {
 }
 
 
-bool is_package_name_reserved(String const &name) {
+static bool is_package_name_reserved(String const &name) {
 	if (name == "builtin") {
 		return true;
 	} else if (name == "intrinsics") {
@@ -5181,7 +5181,7 @@ bool is_package_name_reserved(String const &name) {
 }
 
 
-bool determine_path_from_string(BlockingMutex *file_mutex, Ast *node, String base_dir, String const &original_string, String *path) {
+static bool determine_path_from_string(BlockingMutex *file_mutex, Ast *node, String base_dir, String const &original_string, String *path) {
 	GB_ASSERT(path != nullptr);
 
 	// NOTE(bill): if file_mutex == nullptr, this means that the code is used within the semantics stage
@@ -5297,7 +5297,7 @@ bool determine_path_from_string(BlockingMutex *file_mutex, Ast *node, String bas
 
 void parse_setup_file_decls(Parser *p, AstFile *f, String const &base_dir, Slice<Ast *> &decls);
 
-void parse_setup_file_when_stmt(Parser *p, AstFile *f, String const &base_dir, AstWhenStmt *ws) {
+static void parse_setup_file_when_stmt(Parser *p, AstFile *f, String const &base_dir, AstWhenStmt *ws) {
 	if (ws->body != nullptr) {
 		auto stmts = ws->body->BlockStmt.stmts;
 		parse_setup_file_decls(p, f, base_dir, stmts);
@@ -5316,7 +5316,7 @@ void parse_setup_file_when_stmt(Parser *p, AstFile *f, String const &base_dir, A
 	}
 }
 
-void parse_setup_file_decls(Parser *p, AstFile *f, String const &base_dir, Slice<Ast *> &decls) {
+static void parse_setup_file_decls(Parser *p, AstFile *f, String const &base_dir, Slice<Ast *> &decls) {
 	for_array(i, decls) {
 		Ast *node = decls[i];
 		if (!is_ast_decl(node) &&
@@ -5389,7 +5389,7 @@ void parse_setup_file_decls(Parser *p, AstFile *f, String const &base_dir, Slice
 	}
 }
 
-String build_tag_get_token(String s, String *out) {
+static String build_tag_get_token(String s, String *out) {
 	s = string_trim_whitespace(s);
 	isize n = 0;
 	while (n < s.len) {
@@ -5408,7 +5408,7 @@ String build_tag_get_token(String s, String *out) {
 	return s;
 }
 
-bool parse_build_tag(Token token_for_pos, String s) {
+static bool parse_build_tag(Token token_for_pos, String s) {
 	String const prefix = str_lit("+build");
 	GB_ASSERT(string_starts_with(s, prefix));
 	s = string_trim_whitespace(substring(s, prefix.len, s.len));
@@ -5473,7 +5473,7 @@ bool parse_build_tag(Token token_for_pos, String s) {
 	return any_correct;
 }
 
-String dir_from_path(String path) {
+static String dir_from_path(String path) {
 	String base_dir = path;
 	for (isize i = path.len-1; i >= 0; i--) {
 		if (base_dir[i] == '\\' ||
@@ -5485,7 +5485,7 @@ String dir_from_path(String path) {
 	return base_dir;
 }
 
-isize calc_decl_count(Ast *decl) {
+static isize calc_decl_count(Ast *decl) {
 	isize count = 0;
 	switch (decl->kind) {
 	case Ast_BlockStmt:
@@ -5516,7 +5516,7 @@ isize calc_decl_count(Ast *decl) {
 	return count;
 }
 
-bool parse_build_project_directory_tag(Token token_for_pos, String s) {
+static bool parse_build_project_directory_tag(Token token_for_pos, String s) {
 	String const prefix = str_lit("+build-project-name");
 	GB_ASSERT(string_starts_with(s, prefix));
 	s = string_trim_whitespace(substring(s, prefix.len, s.len));
@@ -5561,7 +5561,7 @@ bool parse_build_project_directory_tag(Token token_for_pos, String s) {
 	return any_correct;
 }
 
-bool parse_file(Parser *p, AstFile *f) {
+static bool parse_file(Parser *p, AstFile *f) {
 	if (f->tokens.count == 0) {
 		return true;
 	}
@@ -5694,7 +5694,7 @@ bool parse_file(Parser *p, AstFile *f) {
 }
 
 
-ParseFileError process_imported_file(Parser *p, ImportedFile imported_file) {
+static ParseFileError process_imported_file(Parser *p, ImportedFile imported_file) {
 	AstPackage *pkg = imported_file.pkg;
 	FileInfo    fi  = imported_file.fi;
 	TokenPos    pos = imported_file.pos;
@@ -5778,7 +5778,7 @@ ParseFileError process_imported_file(Parser *p, ImportedFile imported_file) {
 }
 
 
-ParseFileError parse_packages(Parser *p, String init_filename) {
+static ParseFileError parse_packages(Parser *p, String init_filename) {
 	GB_ASSERT(init_filename.text[init_filename.len] == 0);
 
 	String init_fullpath = path_to_full_path(heap_allocator(), init_filename);

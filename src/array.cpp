@@ -86,7 +86,7 @@ Slice<T> slice_make(gbAllocator const &allocator, isize count) {
 }
 
 template <typename T>
-void slice_init(Slice<T> *s, gbAllocator const &allocator, isize count) {
+static void slice_init(Slice<T> *s, gbAllocator const &allocator, isize count) {
 	GB_ASSERT(count >= 0);
 	s->data = gb_alloc_array(allocator, T, count);
 	if (count > 0) {
@@ -96,12 +96,12 @@ void slice_init(Slice<T> *s, gbAllocator const &allocator, isize count) {
 }
 
 template <typename T>
-void slice_free(Slice<T> *s, gbAllocator const &allocator) {
+static void slice_free(Slice<T> *s, gbAllocator const &allocator) {
 	gb_free(allocator, s->data);
 }
 
 template <typename T>
-void slice_resize(Slice<T> *s, gbAllocator const &allocator, isize new_count) {
+static void slice_resize(Slice<T> *s, gbAllocator const &allocator, isize new_count) {
 	resize_array_raw(&s->data, allocator, s->count, new_count);
 	s->count = new_count;
 }
@@ -138,17 +138,17 @@ Slice<T> slice_clone_from_array(gbAllocator const &allocator, Array<T> const &a)
 
 
 template <typename T>
-void slice_copy(Slice<T> *slice, Slice<T> const &data) {
+static void slice_copy(Slice<T> *slice, Slice<T> const &data) {
 	isize n = gb_min(slice->count, data.count);
 	gb_memmove(slice->data, data.data, gb_size_of(T)*n);
 }
 template <typename T>
-void slice_copy(Slice<T> *slice, Slice<T> const &data, isize offset) {
+static void slice_copy(Slice<T> *slice, Slice<T> const &data, isize offset) {
 	isize n = gb_clamp(slice->count-offset, 0, data.count);
 	gb_memmove(slice->data+offset, data.data, gb_size_of(T)*n);
 }
 template <typename T>
-void slice_copy(Slice<T> *slice, Slice<T> const &data, isize offset, isize count) {
+static void slice_copy(Slice<T> *slice, Slice<T> const &data, isize offset, isize count) {
 	isize n = gb_clamp(slice->count-offset, 0, gb_min(data.count, count));
 	gb_memmove(slice->data+offset, data.data, gb_size_of(T)*n);
 }
@@ -169,7 +169,7 @@ gb_inline Slice<T> slice(Slice<T> const &array, isize lo, isize hi) {
 
 
 template <typename T>
-void slice_ordered_remove(Slice<T> *array, isize index) {
+static void slice_ordered_remove(Slice<T> *array, isize index) {
 	GB_ASSERT(0 <= index && index < array->count);
 
 	isize bytes = gb_size_of(T) * (array->count-(index+1));
@@ -178,7 +178,7 @@ void slice_ordered_remove(Slice<T> *array, isize index) {
 }
 
 template <typename T>
-void slice_unordered_remove(Slice<T> *array, isize index) {
+static void slice_unordered_remove(Slice<T> *array, isize index) {
 	GB_ASSERT(0 <= index && index < array->count);
 
 	isize n = array->count-1;
@@ -190,11 +190,11 @@ void slice_unordered_remove(Slice<T> *array, isize index) {
 
 
 template <typename T>
-void array_copy(Array<T> *array, Array<T> const &data, isize offset) {
+static void array_copy(Array<T> *array, Array<T> const &data, isize offset) {
 	gb_memmove(array->data+offset, data.data, gb_size_of(T)*data.count);
 }
 template <typename T>
-void array_copy(Array<T> *array, Array<T> const &data, isize offset, isize count) {
+static void array_copy(Array<T> *array, Array<T> const &data, isize offset, isize count) {
 	gb_memmove(array->data+offset, data.data, gb_size_of(T)*gb_min(data.count, count));
 }
 
@@ -210,18 +210,18 @@ T *array_end_ptr(Array<T> *array) {
 
 
 template <typename T>
-gb_inline void array_init(Array<T> *array, gbAllocator const &a) {
+static gb_inline void array_init(Array<T> *array, gbAllocator const &a) {
 	isize cap = ARRAY_GROW_FORMULA(0);
 	array_init(array, a, 0, cap);
 }
 
 template <typename T>
-gb_inline void array_init(Array<T> *array, gbAllocator const &a, isize count) {
+static gb_inline void array_init(Array<T> *array, gbAllocator const &a, isize count) {
 	array_init(array, a, count, count);
 }
 
 template <typename T>
-gb_inline void array_init(Array<T> *array, gbAllocator const &a, isize count, isize capacity) {
+static gb_inline void array_init(Array<T> *array, gbAllocator const &a, isize count, isize capacity) {
 	array->allocator = a;
 	array->data = nullptr;
 	if (capacity > 0) {
@@ -275,7 +275,7 @@ gb_inline Array<T> array_make(gbAllocator const &a, isize count, isize capacity)
 
 
 template <typename T>
-gb_inline void array_free(Array<T> *array) {
+static gb_inline void array_free(Array<T> *array) {
 	if (array->allocator.proc != nullptr) {
 		gb_free(array->allocator, array->data);
 	}
@@ -284,7 +284,7 @@ gb_inline void array_free(Array<T> *array) {
 }
 
 template <typename T>
-void array__grow(Array<T> *array, isize min_capacity) {
+static void array__grow(Array<T> *array, isize min_capacity) {
 	isize new_capacity = ARRAY_GROW_FORMULA(array->capacity);
 	if (new_capacity < min_capacity) {
 		new_capacity = min_capacity;
@@ -293,7 +293,7 @@ void array__grow(Array<T> *array, isize min_capacity) {
 }
 
 template <typename T>
-void array_add(Array<T> *array, T const &t) {
+static void array_add(Array<T> *array, T const &t) {
 	if (array->capacity < array->count+1) {
 		array__grow(array, 0);
 	}
@@ -314,7 +314,7 @@ T *array_add_and_get(Array<T> *array) {
 
 
 template <typename T>
-void array_add_elems(Array<T> *array, T const *elems, isize elem_count) {
+static void array_add_elems(Array<T> *array, T const *elems, isize elem_count) {
 	GB_ASSERT(elem_count >= 0);
 	if (array->capacity < array->count+elem_count) {
 		array__grow(array, array->count+elem_count);
@@ -325,26 +325,26 @@ void array_add_elems(Array<T> *array, T const *elems, isize elem_count) {
 
 
 template <typename T>
-gb_inline T array_pop(Array<T> *array) {
+static gb_inline T array_pop(Array<T> *array) {
 	GB_ASSERT(array->count > 0);
 	array->count--;
 	return array->data[array->count];
 }
 
 template <typename T>
-void array_clear(Array<T> *array) {
+static void array_clear(Array<T> *array) {
 	array->count = 0;
 }
 
 template <typename T>
-void array_reserve(Array<T> *array, isize capacity) {
+static void array_reserve(Array<T> *array, isize capacity) {
 	if (array->capacity < capacity) {
 		array_set_capacity(array, capacity);
 	}
 }
 
 template <typename T>
-void array_resize(Array<T> *array, isize count) {
+static void array_resize(Array<T> *array, isize count) {
 	if (array->capacity < count) {
 		array__grow(array, count);
 	}
@@ -352,7 +352,7 @@ void array_resize(Array<T> *array, isize count) {
 }
 
 template <typename T>
-void array_set_capacity(Array<T> *array, isize capacity) {
+static void array_set_capacity(Array<T> *array, isize capacity) {
 	if (capacity == array->capacity) {
 		return;
 	}
@@ -402,7 +402,7 @@ Array<T> array_clone(gbAllocator const &allocator, Array<T> const &array) {
 
 
 template <typename T>
-void array_ordered_remove(Array<T> *array, isize index) {
+static void array_ordered_remove(Array<T> *array, isize index) {
 	GB_ASSERT(0 <= index && index < array->count);
 
 	isize bytes = gb_size_of(T) * (array->count-(index+1));
@@ -411,7 +411,7 @@ void array_ordered_remove(Array<T> *array, isize index) {
 }
 
 template <typename T>
-void array_unordered_remove(Array<T> *array, isize index) {
+static void array_unordered_remove(Array<T> *array, isize index) {
 	GB_ASSERT(0 <= index && index < array->count);
 
 	isize n = array->count-1;

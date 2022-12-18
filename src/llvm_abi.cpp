@@ -21,18 +21,18 @@ struct lbArgType {
 i64 lb_sizeof(LLVMTypeRef type);
 i64 lb_alignof(LLVMTypeRef type);
 
-lbArgType lb_arg_type_direct(LLVMTypeRef type, LLVMTypeRef cast_type, LLVMTypeRef pad_type, LLVMAttributeRef attr) {
+static lbArgType lb_arg_type_direct(LLVMTypeRef type, LLVMTypeRef cast_type, LLVMTypeRef pad_type, LLVMAttributeRef attr) {
 	return lbArgType{lbArg_Direct, type, cast_type, pad_type, attr, nullptr, 0, false};
 }
-lbArgType lb_arg_type_direct(LLVMTypeRef type) {
+static lbArgType lb_arg_type_direct(LLVMTypeRef type) {
 	return lb_arg_type_direct(type, nullptr, nullptr, nullptr);
 }
 
-lbArgType lb_arg_type_indirect(LLVMTypeRef type, LLVMAttributeRef attr) {
+static lbArgType lb_arg_type_indirect(LLVMTypeRef type, LLVMAttributeRef attr) {
 	return lbArgType{lbArg_Indirect, type, nullptr, nullptr, attr, nullptr, 0, false};
 }
 
-lbArgType lb_arg_type_indirect_byval(LLVMContextRef c, LLVMTypeRef type) {
+static lbArgType lb_arg_type_indirect_byval(LLVMContextRef c, LLVMTypeRef type) {
 	i64 alignment = lb_alignof(type);
 	alignment = gb_max(alignment, 8);
 
@@ -41,7 +41,7 @@ lbArgType lb_arg_type_indirect_byval(LLVMContextRef c, LLVMTypeRef type) {
 	return lbArgType{lbArg_Indirect, type, nullptr, nullptr, byval_attr, align_attr, alignment, true};
 }
 
-lbArgType lb_arg_type_ignore(LLVMTypeRef type) {
+static lbArgType lb_arg_type_ignore(LLVMTypeRef type) {
 	return lbArgType{lbArg_Ignore, type, nullptr, nullptr, nullptr, nullptr, 0, false};
 }
 
@@ -55,24 +55,24 @@ struct lbFunctionType {
 	isize            original_arg_count;
 };
 
-gbAllocator lb_function_type_args_allocator(void) {
+static gbAllocator lb_function_type_args_allocator(void) {
 	return heap_allocator();
 }
 
 
-i64 llvm_align_formula(i64 off, i64 a) {
+static i64 llvm_align_formula(i64 off, i64 a) {
 	return (off + a - 1) / a * a;
 }
 
 
-bool lb_is_type_kind(LLVMTypeRef type, LLVMTypeKind kind) {
+static bool lb_is_type_kind(LLVMTypeRef type, LLVMTypeKind kind) {
 	if (type == nullptr) {
 		return false;
 	}
 	return LLVMGetTypeKind(type) == kind;
 }
 
-LLVMTypeRef lb_function_type_to_llvm_raw(lbFunctionType *ft, bool is_var_arg) {
+static LLVMTypeRef lb_function_type_to_llvm_raw(lbFunctionType *ft, bool is_var_arg) {
 	unsigned arg_count = cast(unsigned)ft->args.count;
 	unsigned offset = 0;
 
@@ -130,7 +130,7 @@ LLVMTypeRef lb_function_type_to_llvm_raw(lbFunctionType *ft, bool is_var_arg) {
 // }
 
 
-void lb_add_function_type_attributes(LLVMValueRef fn, lbFunctionType *ft, ProcCallingConvention calling_convention) {
+static void lb_add_function_type_attributes(LLVMValueRef fn, lbFunctionType *ft, ProcCallingConvention calling_convention) {
 	if (ft == nullptr) {
 		return;
 	}
@@ -201,7 +201,7 @@ void lb_add_function_type_attributes(LLVMValueRef fn, lbFunctionType *ft, ProcCa
 }
 
 
-i64 lb_sizeof(LLVMTypeRef type) {
+static i64 lb_sizeof(LLVMTypeRef type) {
 	LLVMTypeKind kind = LLVMGetTypeKind(type);
 	switch (kind) {
 	case LLVMVoidTypeKind:
@@ -267,7 +267,7 @@ i64 lb_sizeof(LLVMTypeRef type) {
 	return 0;
 }
 
-i64 lb_alignof(LLVMTypeRef type) {
+static i64 lb_alignof(LLVMTypeRef type) {
 	LLVMTypeKind kind = LLVMGetTypeKind(type);
 	switch (kind) {
 	case LLVMVoidTypeKind:
@@ -333,7 +333,7 @@ typedef LB_ABI_INFO(lbAbiInfoType);
 typedef LB_ABI_COMPUTE_RETURN_TYPE(lbAbiComputeReturnType);
 
 
-lbArgType lb_abi_modify_return_is_tuple(lbFunctionType *ft, LLVMContextRef c, LLVMTypeRef return_type, lbAbiComputeReturnType *compute_return_type) {
+static lbArgType lb_abi_modify_return_is_tuple(lbFunctionType *ft, LLVMContextRef c, LLVMTypeRef return_type, lbAbiComputeReturnType *compute_return_type) {
 	GB_ASSERT(return_type != nullptr);
 	GB_ASSERT(compute_return_type != nullptr);
 

@@ -1,4 +1,4 @@
-bool is_diverging_expr(Ast *expr) {
+static bool is_diverging_expr(Ast *expr) {
 	expr = unparen_expr(expr);
 	if (expr->kind != Ast_CallExpr) {
 		return false;
@@ -23,14 +23,14 @@ bool is_diverging_expr(Ast *expr) {
 	t = base_type(t);
 	return t != nullptr && t->kind == Type_Proc && t->Proc.diverging;
 }
-bool is_diverging_stmt(Ast *stmt) {
+static bool is_diverging_stmt(Ast *stmt) {
 	if (stmt->kind != Ast_ExprStmt) {
 		return false;
 	}
 	return is_diverging_expr(stmt->ExprStmt.expr);
 }
 
-bool contains_deferred_call(Ast *node) {
+static bool contains_deferred_call(Ast *node) {
 	if (node->viral_state_flags & ViralStateFlag_ContainsDeferredProcedure) {
 		return true;
 	}
@@ -61,7 +61,7 @@ bool contains_deferred_call(Ast *node) {
 	return false;
 }
 
-void check_stmt_list(CheckerContext *ctx, Slice<Ast *> const &stmts, u32 flags) {
+static void check_stmt_list(CheckerContext *ctx, Slice<Ast *> const &stmts, u32 flags) {
 	if (stmts.count == 0) {
 		return;
 	}
@@ -137,7 +137,7 @@ void check_stmt_list(CheckerContext *ctx, Slice<Ast *> const &stmts, u32 flags) 
 	}
 }
 
-bool check_is_terminating_list(Slice<Ast *> const &stmts, String const &label) {
+static bool check_is_terminating_list(Slice<Ast *> const &stmts, String const &label) {
 	// Iterate backwards
 	for (isize n = stmts.count-1; n >= 0; n--) {
 		Ast *stmt = stmts[n];
@@ -155,7 +155,7 @@ bool check_is_terminating_list(Slice<Ast *> const &stmts, String const &label) {
 	return false;
 }
 
-bool check_has_break_list(Slice<Ast *> const &stmts, String const &label, bool implicit) {
+static bool check_has_break_list(Slice<Ast *> const &stmts, String const &label, bool implicit) {
 	for_array(i, stmts) {
 		Ast *stmt = stmts[i];
 		if (check_has_break(stmt, label, implicit)) {
@@ -166,7 +166,7 @@ bool check_has_break_list(Slice<Ast *> const &stmts, String const &label, bool i
 }
 
 
-bool check_has_break(Ast *stmt, String const &label, bool implicit) {
+static bool check_has_break(Ast *stmt, String const &label, bool implicit) {
 	switch (stmt->kind) {
 	case Ast_BranchStmt:
 		if (stmt->BranchStmt.token.kind == Token_break) {
@@ -225,7 +225,7 @@ bool check_has_break(Ast *stmt, String const &label, bool implicit) {
 
 // NOTE(bill): The last expression has to be a 'return' statement
 // TODO(bill): This is a mild hack and should be probably handled properly
-bool check_is_terminating(Ast *node, String const &label) {
+static bool check_is_terminating(Ast *node, String const &label) {
 	switch (node->kind) {
 	case_ast_node(rs, ReturnStmt, node);
 		return true;
@@ -478,7 +478,7 @@ Type *check_assignment_variable(CheckerContext *ctx, Operand *lhs, Operand *rhs)
 
 
 void check_stmt_internal(CheckerContext *ctx, Ast *node, u32 flags);
-void check_stmt(CheckerContext *ctx, Ast *node, u32 flags) {
+static void check_stmt(CheckerContext *ctx, Ast *node, u32 flags) {
 	u32 prev_state_flags = ctx->state_flags;
 
 	if (node->state_flags != 0) {
@@ -510,7 +510,7 @@ void check_stmt(CheckerContext *ctx, Ast *node, u32 flags) {
 }
 
 
-void check_when_stmt(CheckerContext *ctx, AstWhenStmt *ws, u32 flags) {
+static void check_when_stmt(CheckerContext *ctx, AstWhenStmt *ws, u32 flags) {
 	Operand operand = {Addressing_Invalid};
 	check_expr(ctx, &operand, ws->cond);
 	if (operand.mode != Addressing_Constant || !is_type_boolean(operand.type)) {
@@ -539,7 +539,7 @@ void check_when_stmt(CheckerContext *ctx, AstWhenStmt *ws, u32 flags) {
 	}
 }
 
-void check_label(CheckerContext *ctx, Ast *label, Ast *parent) {
+static void check_label(CheckerContext *ctx, Ast *label, Ast *parent) {
 	if (label == nullptr) {
 		return;
 	}
@@ -582,7 +582,7 @@ void check_label(CheckerContext *ctx, Ast *label, Ast *parent) {
 }
 
 // Returns 'true' for 'continue', 'false' for 'return'
-bool check_using_stmt_entity(CheckerContext *ctx, AstUsingStmt *us, Ast *expr, bool is_selector, Entity *e) {
+static bool check_using_stmt_entity(CheckerContext *ctx, AstUsingStmt *us, Ast *expr, bool is_selector, Entity *e) {
 	if (e == nullptr) {
 		if (is_blank_ident(expr)) {
 			error(us->token, "'using' in a statement is not allowed with the blank identifier '_'");
@@ -704,7 +704,7 @@ bool check_using_stmt_entity(CheckerContext *ctx, AstUsingStmt *us, Ast *expr, b
 	return true;
 }
 
-void check_inline_range_stmt(CheckerContext *ctx, Ast *node, u32 mod_flags) {
+static void check_inline_range_stmt(CheckerContext *ctx, Ast *node, u32 mod_flags) {
 	ast_node(irs, UnrollRangeStmt, node);
 	check_open_scope(ctx, node);
 
@@ -863,7 +863,7 @@ void check_inline_range_stmt(CheckerContext *ctx, Ast *node, u32 mod_flags) {
 	check_close_scope(ctx);
 }
 
-void check_switch_stmt(CheckerContext *ctx, Ast *node, u32 mod_flags) {
+static void check_switch_stmt(CheckerContext *ctx, Ast *node, u32 mod_flags) {
 	ast_node(ss, SwitchStmt, node);
 
 	Operand x = {};
@@ -1092,7 +1092,7 @@ enum TypeSwitchKind {
 	TypeSwitch_Any,
 };
 
-TypeSwitchKind check_valid_type_switch_type(Type *type) {
+static TypeSwitchKind check_valid_type_switch_type(Type *type) {
 	type = type_deref(type);
 	if (is_type_union(type)) {
 		return TypeSwitch_Union;
@@ -1103,7 +1103,7 @@ TypeSwitchKind check_valid_type_switch_type(Type *type) {
 	return TypeSwitch_Invalid;
 }
 
-void check_type_switch_stmt(CheckerContext *ctx, Ast *node, u32 mod_flags) {
+static void check_type_switch_stmt(CheckerContext *ctx, Ast *node, u32 mod_flags) {
 	ast_node(ss, TypeSwitchStmt, node);
 	Operand x = {};
 
@@ -1318,7 +1318,7 @@ void check_type_switch_stmt(CheckerContext *ctx, Ast *node, u32 mod_flags) {
 	}
 }
 
-void check_block_stmt_for_errors(CheckerContext *ctx, Ast *body)  {
+static void check_block_stmt_for_errors(CheckerContext *ctx, Ast *body)  {
 	if (body->kind != Ast_BlockStmt) {
 		return;
 	}
@@ -1377,7 +1377,7 @@ void check_block_stmt_for_errors(CheckerContext *ctx, Ast *body)  {
 	}
 }
 
-bool all_operands_valid(Array<Operand> const &operands) {
+static bool all_operands_valid(Array<Operand> const &operands) {
 	if (any_errors()) {
 		for_array(i, operands) {
 			if (operands[i].type == t_invalid) {
@@ -1388,7 +1388,7 @@ bool all_operands_valid(Array<Operand> const &operands) {
 	return true;
 }
 
-bool check_stmt_internal_builtin_proc_id(Ast *expr, BuiltinProcId *id_) {
+static bool check_stmt_internal_builtin_proc_id(Ast *expr, BuiltinProcId *id_) {
 	BuiltinProcId id = BuiltinProc_Invalid;
 	Entity *e = entity_of_node(expr);
 	if (e != nullptr && e->kind == Entity_Builtin) {
@@ -1400,7 +1400,7 @@ bool check_stmt_internal_builtin_proc_id(Ast *expr, BuiltinProcId *id_) {
 	return id != BuiltinProc_Invalid;
 }
 
-bool check_expr_is_stack_variable(Ast *expr) {
+static bool check_expr_is_stack_variable(Ast *expr) {
 	/*
 	expr = unparen_expr(expr);
 	Entity *e = entity_of_node(expr);
@@ -1419,7 +1419,7 @@ bool check_expr_is_stack_variable(Ast *expr) {
 	return false;
 }
 
-void check_stmt_internal(CheckerContext *ctx, Ast *node, u32 flags) {
+static void check_stmt_internal(CheckerContext *ctx, Ast *node, u32 flags) {
 	u32 mod_flags = flags & (~Stmt_FallthroughAllowed);
 	switch (node->kind) {
 	case_ast_node(_, EmptyStmt, node); case_end;

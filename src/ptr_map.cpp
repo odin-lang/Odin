@@ -26,7 +26,7 @@ struct PtrMap {
 };
 
 
-u32 ptr_map_hash_key(uintptr key) {
+static u32 ptr_map_hash_key(uintptr key) {
 #if defined(GB_ARCH_64_BIT)
 	key = (~key) + (key << 21);
 	key = key ^ (key >> 24);
@@ -41,7 +41,7 @@ u32 ptr_map_hash_key(uintptr key) {
 	return (word >> 22u) ^ word;
 #endif
 }
-u32 ptr_map_hash_key(void const *key) {
+static u32 ptr_map_hash_key(void const *key) {
 	return ptr_map_hash_key((uintptr)key);
 }
 
@@ -69,7 +69,7 @@ template <typename K, typename V> void  multi_map_remove_all(PtrMap<K, V> *h, K 
 #endif
 
 template <typename K, typename V>
-gb_inline void map_init(PtrMap<K, V> *h, gbAllocator a, isize capacity) {
+static gb_inline void map_init(PtrMap<K, V> *h, gbAllocator a, isize capacity) {
 	capacity = next_pow2_isize(capacity);
 	slice_init(&h->hashes,  a, capacity);
 	array_init(&h->entries, a, 0, capacity);
@@ -79,13 +79,13 @@ gb_inline void map_init(PtrMap<K, V> *h, gbAllocator a, isize capacity) {
 }
 
 template <typename K, typename V>
-gb_inline void map_destroy(PtrMap<K, V> *h) {
+static gb_inline void map_destroy(PtrMap<K, V> *h) {
 	slice_free(&h->hashes, h->entries.allocator);
 	array_free(&h->entries);
 }
 
 template <typename K, typename V>
-gb_internal MapIndex map__add_entry(PtrMap<K, V> *h, K key) {
+static gb_internal MapIndex map__add_entry(PtrMap<K, V> *h, K key) {
 	PtrMapEntry<K, V> e = {};
 	e.key = key;
 	e.next = MAP_SENTINEL;
@@ -94,7 +94,7 @@ gb_internal MapIndex map__add_entry(PtrMap<K, V> *h, K key) {
 }
 
 template <typename K, typename V>
-gb_internal MapFindResult map__find(PtrMap<K, V> *h, K key) {
+static gb_internal MapFindResult map__find(PtrMap<K, V> *h, K key) {
 	MapFindResult fr = {MAP_SENTINEL, MAP_SENTINEL, MAP_SENTINEL};
 	if (h->hashes.count == 0) {
 		return fr;
@@ -113,7 +113,7 @@ gb_internal MapFindResult map__find(PtrMap<K, V> *h, K key) {
 }
 
 template <typename K, typename V>
-gb_internal MapFindResult map__find_from_entry(PtrMap<K, V> *h, PtrMapEntry<K, V> *e) {
+static gb_internal MapFindResult map__find_from_entry(PtrMap<K, V> *h, PtrMapEntry<K, V> *e) {
 	MapFindResult fr = {MAP_SENTINEL, MAP_SENTINEL, MAP_SENTINEL};
 	if (h->hashes.count == 0) {
 		return fr;
@@ -132,18 +132,18 @@ gb_internal MapFindResult map__find_from_entry(PtrMap<K, V> *h, PtrMapEntry<K, V
 }
 
 template <typename K, typename V>
-gb_internal b32 map__full(PtrMap<K, V> *h) {
+static gb_internal b32 map__full(PtrMap<K, V> *h) {
 	return 0.75f * h->hashes.count <= h->entries.count;
 }
 
 template <typename K, typename V>
-gb_inline void map_grow(PtrMap<K, V> *h) {
+static gb_inline void map_grow(PtrMap<K, V> *h) {
 	isize new_count = gb_max(h->hashes.count<<1, 16);
 	map_rehash(h, new_count);
 }
 
 template <typename K, typename V>
-void map_reset_entries(PtrMap<K, V> *h) {
+static void map_reset_entries(PtrMap<K, V> *h) {
 	for (isize i = 0; i < h->hashes.count; i++) {
 		h->hashes.data[i] = MAP_SENTINEL;
 	}
@@ -161,7 +161,7 @@ void map_reset_entries(PtrMap<K, V> *h) {
 }
 
 template <typename K, typename V>
-void map_reserve(PtrMap<K, V> *h, isize cap) {
+static void map_reserve(PtrMap<K, V> *h, isize cap) {
 	array_reserve(&h->entries, cap);
 	if (h->entries.count*2 < h->hashes.count) {
 		return;
@@ -172,7 +172,7 @@ void map_reserve(PtrMap<K, V> *h, isize cap) {
 
 
 template <typename K, typename V>
-void map_rehash(PtrMap<K, V> *h, isize new_count) {
+static void map_rehash(PtrMap<K, V> *h, isize new_count) {
 	map_reserve(h, new_count);
 }
 
@@ -193,7 +193,7 @@ V &map_must_get(PtrMap<K, V> *h, K key) {
 }
 
 template <typename K, typename V>
-void map_set(PtrMap<K, V> *h, K key, V const &value) {
+static void map_set(PtrMap<K, V> *h, K key, V const &value) {
 	MapIndex index;
 	MapFindResult fr;
 	if (h->hashes.count == 0) {
@@ -219,7 +219,7 @@ void map_set(PtrMap<K, V> *h, K key, V const &value) {
 
 
 template <typename K, typename V>
-void map__erase(PtrMap<K, V> *h, MapFindResult const &fr) {
+static void map__erase(PtrMap<K, V> *h, MapFindResult const &fr) {
 	MapFindResult last;
 	if (fr.entry_prev == MAP_SENTINEL) {
 		h->hashes.data[fr.hash_index] = h->entries.data[fr.entry_index].next;
@@ -242,7 +242,7 @@ void map__erase(PtrMap<K, V> *h, MapFindResult const &fr) {
 }
 
 template <typename K, typename V>
-void map_remove(PtrMap<K, V> *h, K key) {
+static void map_remove(PtrMap<K, V> *h, K key) {
 	MapFindResult fr = map__find(h, key);
 	if (fr.entry_index != MAP_SENTINEL) {
 		map__erase(h, fr);
@@ -250,7 +250,7 @@ void map_remove(PtrMap<K, V> *h, K key) {
 }
 
 template <typename K, typename V>
-gb_inline void map_clear(PtrMap<K, V> *h) {
+static gb_inline void map_clear(PtrMap<K, V> *h) {
 	array_clear(&h->entries);
 	for (isize i = 0; i < h->hashes.count; i++) {
 		h->hashes.data[i] = MAP_SENTINEL;
@@ -281,7 +281,7 @@ PtrMapEntry<K, V> *multi_map_find_next(PtrMap<K, V> *h, PtrMapEntry<K, V> *e) {
 }
 
 template <typename K, typename V>
-isize multi_map_count(PtrMap<K, V> *h, K key) {
+static isize multi_map_count(PtrMap<K, V> *h, K key) {
 	isize count = 0;
 	PtrMapEntry<K, V> *e = multi_map_find_first(h, key);
 	while (e != nullptr) {
@@ -292,7 +292,7 @@ isize multi_map_count(PtrMap<K, V> *h, K key) {
 }
 
 template <typename K, typename V>
-void multi_map_get_all(PtrMap<K, V> *h, K key, V *items) {
+static void multi_map_get_all(PtrMap<K, V> *h, K key, V *items) {
 	isize i = 0;
 	PtrMapEntry<K, V> *e = multi_map_find_first(h, key);
 	while (e != nullptr) {
@@ -302,7 +302,7 @@ void multi_map_get_all(PtrMap<K, V> *h, K key, V *items) {
 }
 
 template <typename K, typename V>
-void multi_map_insert(PtrMap<K, V> *h, K key, V const &value) {
+static void multi_map_insert(PtrMap<K, V> *h, K key, V const &value) {
 	MapFindResult fr;
 	MapIndex i;
 	if (h->hashes.count == 0) {
@@ -325,7 +325,7 @@ void multi_map_insert(PtrMap<K, V> *h, K key, V const &value) {
 }
 
 template <typename K, typename V>
-void multi_map_remove(PtrMap<K, V> *h, K key, PtrMapEntry<K, V> *e) {
+static void multi_map_remove(PtrMap<K, V> *h, K key, PtrMapEntry<K, V> *e) {
 	MapFindResult fr = map__find_from_entry(h, e);
 	if (fr.entry_index != MAP_SENTINEL) {
 		map__erase(h, fr);
@@ -333,7 +333,7 @@ void multi_map_remove(PtrMap<K, V> *h, K key, PtrMapEntry<K, V> *e) {
 }
 
 template <typename K, typename V>
-void multi_map_remove_all(PtrMap<K, V> *h, K key) {
+static void multi_map_remove_all(PtrMap<K, V> *h, K key) {
 	while (map_get(h, key) != nullptr) {
 		map_remove(h, key);
 	}

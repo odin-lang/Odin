@@ -44,7 +44,7 @@ void semaphore_init   (Semaphore *s);
 void semaphore_destroy(Semaphore *s);
 void semaphore_post   (Semaphore *s, i32 count);
 void semaphore_wait   (Semaphore *s);
-void semaphore_release(Semaphore *s) { semaphore_post(s, 1); }
+static void semaphore_release(Semaphore *s) { semaphore_post(s, 1); }
 
 
 void condition_init(Condition *c);
@@ -279,7 +279,7 @@ struct Barrier {
 	isize thread_count;	
 };
 
-void barrier_init(Barrier *b, isize thread_count) {
+static void barrier_init(Barrier *b, isize thread_count) {
 	mutex_init(&b->mutex);
 	condition_init(&b->cond);
 	b->index = 0;
@@ -287,13 +287,13 @@ void barrier_init(Barrier *b, isize thread_count) {
 	b->thread_count = 0;
 }
 
-void barrier_destroy(Barrier *b) {
+static void barrier_destroy(Barrier *b) {
 	condition_destroy(&b->cond);
 	mutex_destroy(&b->mutex);
 }
 
 // Returns true if it is the leader
-bool barrier_wait(Barrier *b) {
+static bool barrier_wait(Barrier *b) {
 	mutex_lock(&b->mutex);
 	defer (mutex_unlock(&b->mutex));
 	isize local_gen = b->generation_id;
@@ -313,7 +313,7 @@ bool barrier_wait(Barrier *b) {
 
 
 
-u32 thread_current_id(void) {
+static u32 thread_current_id(void) {
 	u32 thread_id;
 #if defined(GB_SYSTEM_WINDOWS)
 	#if defined(GB_ARCH_32_BIT) && defined(GB_CPU_X86)
@@ -340,7 +340,7 @@ u32 thread_current_id(void) {
 }
 
 
-gb_inline void yield_thread(void) {
+static gb_inline void yield_thread(void) {
 #if defined(GB_SYSTEM_WINDOWS)
 	_mm_pause();
 #elif defined(GB_SYSTEM_OSX)
@@ -358,7 +358,7 @@ gb_inline void yield_thread(void) {
 #endif
 }
 
-gb_inline void yield(void) {
+static gb_inline void yield(void) {
 #if defined(GB_SYSTEM_WINDOWS)
 	YieldProcessor();
 #else
@@ -367,7 +367,7 @@ gb_inline void yield(void) {
 }
 
 
-void thread_init(Thread *t) {
+static void thread_init(Thread *t) {
 	gb_zero_item(t);
 #if defined(GB_SYSTEM_WINDOWS)
 	t->win32_handle = INVALID_HANDLE_VALUE;
@@ -378,14 +378,14 @@ void thread_init(Thread *t) {
 	semaphore_init(t->semaphore);
 }
 
-void thread_destroy(Thread *t) {
+static void thread_destroy(Thread *t) {
 	thread_join(t);
 	semaphore_destroy(t->semaphore);
 	gb_free(heap_allocator(), t->semaphore);
 }
 
 
-void gb__thread_run(Thread *t) {
+static void gb__thread_run(Thread *t) {
 	semaphore_release(t->semaphore);
 	t->return_value = t->proc(t);
 }
@@ -413,9 +413,9 @@ void gb__thread_run(Thread *t) {
 	}
 #endif
 
-void thread_start(Thread *t, ThreadProc *proc, void *user_data) { thread_start_with_stack(t, proc, user_data, 0); }
+static void thread_start(Thread *t, ThreadProc *proc, void *user_data) { thread_start_with_stack(t, proc, user_data, 0); }
 
-void thread_start_with_stack(Thread *t, ThreadProc *proc, void *user_data, isize stack_size) {
+static void thread_start_with_stack(Thread *t, ThreadProc *proc, void *user_data, isize stack_size) {
 	GB_ASSERT(!t->is_running.load());
 	GB_ASSERT(proc != NULL);
 	t->proc = proc;
@@ -441,7 +441,7 @@ void thread_start_with_stack(Thread *t, ThreadProc *proc, void *user_data, isize
 	semaphore_wait(t->semaphore);
 }
 
-void thread_join(Thread *t) {
+static void thread_join(Thread *t) {
 	if (!t->is_running.load()) {
 		return;
 	}
@@ -457,9 +457,9 @@ void thread_join(Thread *t) {
 	t->is_running.store(false);
 }
 
-bool thread_is_running(Thread const *t) { return t->is_running.load(); }
+static bool thread_is_running(Thread const *t) { return t->is_running.load(); }
 
-void thread_set_name(Thread *t, char const *name) {
+static void thread_set_name(Thread *t, char const *name) {
 #if defined(GB_COMPILER_MSVC)
 	#pragma pack(push, 8)
 		typedef struct {

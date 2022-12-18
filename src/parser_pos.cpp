@@ -1,4 +1,4 @@
-Token ast_token(Ast *node) {
+static Token ast_token(Ast *node) {
 	switch (node->kind) {
 	case Ast_Ident:          return node->Ident.token;
 	case Ast_Implicit:       return node->Implicit;
@@ -111,7 +111,7 @@ Token ast_token(Ast *node) {
 	return empty_token;
 }
 
-TokenPos token_pos_end(Token const &token) {
+static TokenPos token_pos_end(Token const &token) {
 	TokenPos pos = token.pos;
 	pos.offset += cast(i32)token.string.len;
 	for (isize i = 0; i < token.string.len; i++) {
@@ -127,7 +127,7 @@ TokenPos token_pos_end(Token const &token) {
 	return pos;
 }
 
-Token ast_end_token(Ast *node) {
+static Token ast_end_token(Ast *node) {
 	GB_ASSERT(node != nullptr);
 
 	switch (node->kind) {
@@ -360,6 +360,6 @@ Token ast_end_token(Ast *node) {
 	return empty_token;
 }
 
-TokenPos ast_end_pos(Ast *node) {
+static TokenPos ast_end_pos(Ast *node) {
 	return token_pos_end(ast_end_token(node));
 }

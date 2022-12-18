@@ -1,4 +1,4 @@
-void lb_build_constant_value_decl(lbProcedure *p, AstValueDecl *vd) {
+static void lb_build_constant_value_decl(lbProcedure *p, AstValueDecl *vd) {
 	if (vd == nullptr || vd->is_mutable) {
 		return;
 	}
@@ -105,7 +105,7 @@ void lb_build_constant_value_decl(lbProcedure *p, AstValueDecl *vd) {
 }
 
 
-void lb_build_stmt_list(lbProcedure *p, Slice<Ast *> const &stmts) {
+static void lb_build_stmt_list(lbProcedure *p, Slice<Ast *> const &stmts) {
 	for_array(i, stmts) {
 		Ast *stmt = stmts[i];
 		switch (stmt->kind) {
@@ -125,7 +125,7 @@ void lb_build_stmt_list(lbProcedure *p, Slice<Ast *> const &stmts) {
 
 
 
-lbBranchBlocks lb_lookup_branch_blocks(lbProcedure *p, Ast *ident) {
+static lbBranchBlocks lb_lookup_branch_blocks(lbProcedure *p, Ast *ident) {
 	GB_ASSERT(ident->kind == Ast_Ident);
 	Entity *e = entity_of_node(ident);
 	GB_ASSERT(e->kind == Entity_Label);
@@ -170,11 +170,11 @@ lbTargetList *lb_push_target_list(lbProcedure *p, Ast *label, lbBlock *break_, l
 	return tl;
 }
 
-void lb_pop_target_list(lbProcedure *p) {
+static void lb_pop_target_list(lbProcedure *p) {
 	p->target_list = p->target_list->prev;
 }
 
-void lb_open_scope(lbProcedure *p, Scope *s) {
+static void lb_open_scope(lbProcedure *p, Scope *s) {
 	lbModule *m = p->module;
 	if (m->debug_builder) {
 		LLVMMetadataRef curr_metadata = lb_get_llvm_metadata(m, s);
@@ -211,7 +211,7 @@ void lb_open_scope(lbProcedure *p, Scope *s) {
 
 }
 
-void lb_close_scope(lbProcedure *p, lbDeferExitKind kind, lbBlock *block, bool pop_stack=true) {
+static void lb_close_scope(lbProcedure *p, lbDeferExitKind kind, lbBlock *block, bool pop_stack=true) {
 	lb_emit_defer_stmts(p, kind, block);
 	GB_ASSERT(p->scope_index > 0);
 
@@ -230,7 +230,7 @@ void lb_close_scope(lbProcedure *p, lbDeferExitKind kind, lbBlock *block, bool p
 	array_pop(&p->scope_stack);
 }
 
-void lb_build_when_stmt(lbProcedure *p, AstWhenStmt *ws) {
+static void lb_build_when_stmt(lbProcedure *p, AstWhenStmt *ws) {
 	TypeAndValue tv = type_and_value_of_expr(ws->cond);
 	GB_ASSERT(is_type_boolean(tv.type));
 	GB_ASSERT(tv.value.kind == ExactValue_Bool);
@@ -342,7 +342,7 @@ void lb_build_range_indexed(lbProcedure *p, lbValue expr, Type *val_type, lbValu
 	if (done_) *done_ = done;
 }
 
-lbValue lb_map_cell_index_static(lbProcedure *p, Type *type, lbValue cells_ptr, lbValue index) {
+static lbValue lb_map_cell_index_static(lbProcedure *p, Type *type, lbValue cells_ptr, lbValue index) {
 	i64 size, len;
 	i64 elem_sz = type_size_of(type);
 	map_cell_size_and_len(type, &size, &len);
@@ -378,7 +378,7 @@ lbValue lb_map_cell_index_static(lbProcedure *p, Type *type, lbValue cells_ptr, 
 	return lb_emit_ptr_offset(p, elems_ptr, data_index);
 }
 
-void lb_map_kvh_data_static(lbProcedure *p, lbValue map_value, lbValue *ks_, lbValue *vs_, lbValue *hs_) {
+static void lb_map_kvh_data_static(lbProcedure *p, lbValue map_value, lbValue *ks_, lbValue *vs_, lbValue *hs_) {
 	lbValue capacity = lb_map_cap(p, map_value);
 	lbValue ks = lb_map_data_uintptr(p, map_value);
 	lbValue vs = {};
@@ -388,7 +388,7 @@ void lb_map_kvh_data_static(lbProcedure *p, lbValue map_value, lbValue *ks_, lbV
 	if (hs_) *hs_ = hs;
 }
 
-lbValue lb_map_hash_is_valid(lbProcedure *p, lbValue hash) {
+static lbValue lb_map_hash_is_valid(lbProcedure *p, lbValue hash) {
 	// N :: size_of(uintptr)*8 - 1
 	// (hash != 0) & (hash>>N == 0)
 
@@ -630,7 +630,7 @@ void lb_build_range_interval(lbProcedure *p, AstBinaryExpr *node,
 	lb_start_block(p, done);
 }
 
-void lb_build_range_enum(lbProcedure *p, Type *enum_type, Type *val_type, lbValue *val_, lbValue *idx_, lbBlock **loop_, lbBlock **done_) {
+static void lb_build_range_enum(lbProcedure *p, Type *enum_type, Type *val_type, lbValue *val_, lbValue *idx_, lbBlock **loop_, lbBlock **done_) {
 	lbModule *m = p->module;
 
 	Type *t = enum_type;
@@ -709,7 +709,7 @@ void lb_build_range_tuple(lbProcedure *p, Ast *expr, Type *val0_type, Type *val1
 	if (done_) *done_ = done;
 }
 
-void lb_build_range_stmt_struct_soa(lbProcedure *p, AstRangeStmt *rs, Scope *scope) {
+static void lb_build_range_stmt_struct_soa(lbProcedure *p, AstRangeStmt *rs, Scope *scope) {
 	Ast *expr = unparen_expr(rs->expr);
 	TypeAndValue tav = type_and_value_of_expr(expr);
 
@@ -778,7 +778,7 @@ void lb_build_range_stmt_struct_soa(lbProcedure *p, AstRangeStmt *rs, Scope *sco
 
 }
 
-void lb_build_range_stmt(lbProcedure *p, AstRangeStmt *rs, Scope *scope) {
+static void lb_build_range_stmt(lbProcedure *p, AstRangeStmt *rs, Scope *scope) {
 	Ast *expr = unparen_expr(rs->expr);
 
 	if (is_ast_range(expr)) {
@@ -923,7 +923,7 @@ void lb_build_range_stmt(lbProcedure *p, AstRangeStmt *rs, Scope *scope) {
 	lb_start_block(p, done);
 }
 
-void lb_build_unroll_range_stmt(lbProcedure *p, AstUnrollRangeStmt *rs, Scope *scope) {
+static void lb_build_unroll_range_stmt(lbProcedure *p, AstUnrollRangeStmt *rs, Scope *scope) {
 	lbModule *m = p->module;
 
 	lb_open_scope(p, scope); // Open scope here
@@ -1089,7 +1089,7 @@ void lb_build_unroll_range_stmt(lbProcedure *p, AstUnrollRangeStmt *rs, Scope *s
 	lb_close_scope(p, lbDeferExit_Default, nullptr);
 }
 
-bool lb_switch_stmt_can_be_trivial_jump_table(AstSwitchStmt *ss, bool *default_found_) {
+static bool lb_switch_stmt_can_be_trivial_jump_table(AstSwitchStmt *ss, bool *default_found_) {
 	if (ss->tag == nullptr) {
 		return false;
 	}
@@ -1138,7 +1138,7 @@ bool lb_switch_stmt_can_be_trivial_jump_table(AstSwitchStmt *ss, bool *default_f
 }
 
 
-void lb_build_switch_stmt(lbProcedure *p, AstSwitchStmt *ss, Scope *scope) {
+static void lb_build_switch_stmt(lbProcedure *p, AstSwitchStmt *ss, Scope *scope) {
 	lb_open_scope(p, scope);
 
 	if (ss->init != nullptr) {
@@ -1300,7 +1300,7 @@ void lb_build_switch_stmt(lbProcedure *p, AstSwitchStmt *ss, Scope *scope) {
 	lb_close_scope(p, lbDeferExit_Default, done);
 }
 
-void lb_store_type_case_implicit(lbProcedure *p, Ast *clause, lbValue value) {
+static void lb_store_type_case_implicit(lbProcedure *p, Ast *clause, lbValue value) {
 	Entity *e = implicit_entity_of_node(clause);
 	GB_ASSERT(e != nullptr);
 	if (e->flags & EntityFlag_Value) {
@@ -1315,7 +1315,7 @@ void lb_store_type_case_implicit(lbProcedure *p, Ast *clause, lbValue value) {
 	}
 }
 
-lbAddr lb_store_range_stmt_val(lbProcedure *p, Ast *stmt_val, lbValue value) {
+static lbAddr lb_store_range_stmt_val(lbProcedure *p, Ast *stmt_val, lbValue value) {
 	Entity *e = entity_of_node(stmt_val);
 	if (e == nullptr) {
 		return {};
@@ -1335,7 +1335,7 @@ lbAddr lb_store_range_stmt_val(lbProcedure *p, Ast *stmt_val, lbValue value) {
 	return addr;
 }
 
-void lb_type_case_body(lbProcedure *p, Ast *label, Ast *clause, lbBlock *body, lbBlock *done) {
+static void lb_type_case_body(lbProcedure *p, Ast *label, Ast *clause, lbBlock *body, lbBlock *done) {
 	ast_node(cc, CaseClause, clause);
 
 	lb_push_target_list(p, label, done, nullptr, nullptr);
@@ -1346,7 +1346,7 @@ void lb_type_case_body(lbProcedure *p, Ast *label, Ast *clause, lbBlock *body, l
 	lb_emit_jump(p, done);
 }
 
-void lb_build_type_switch_stmt(lbProcedure *p, AstTypeSwitchStmt *ss) {
+static void lb_build_type_switch_stmt(lbProcedure *p, AstTypeSwitchStmt *ss) {
 	lbModule *m = p->module;
 	lb_open_scope(p, ss->scope);
 
@@ -1480,7 +1480,7 @@ void lb_build_type_switch_stmt(lbProcedure *p, AstTypeSwitchStmt *ss) {
 }
 
 
-void lb_build_static_variables(lbProcedure *p, AstValueDecl *vd) {
+static void lb_build_static_variables(lbProcedure *p, AstValueDecl *vd) {
 	for_array(i, vd->names) {
 		lbValue value = {};
 		if (vd->values.count > 0) {
@@ -1543,7 +1543,7 @@ void lb_build_static_variables(lbProcedure *p, AstValueDecl *vd) {
 		lb_add_member(p->module, mangled_name, global_val);
 	}
 }
-void lb_append_tuple_values(lbProcedure *p, Array<lbValue> *dst_values, lbValue src_value) {
+static void lb_append_tuple_values(lbProcedure *p, Array<lbValue> *dst_values, lbValue src_value) {
 	Type *t = src_value.type;
 	if (t->kind == Type_Tuple) {
 		lbTupleFix *tf = map_get(&p->tuple_fix_map, src_value.value);
@@ -1563,7 +1563,7 @@ void lb_append_tuple_values(lbProcedure *p, Array<lbValue> *dst_values, lbValue 
 }
 
 
-void lb_build_assignment(lbProcedure *p, Array<lbAddr> &lvals, Slice<Ast *> const &values) {
+static void lb_build_assignment(lbProcedure *p, Array<lbAddr> &lvals, Slice<Ast *> const &values) {
 	if (values.count == 0) {
 		return;
 	}
@@ -1584,7 +1584,7 @@ void lb_build_assignment(lbProcedure *p, Array<lbAddr> &lvals, Slice<Ast *> cons
 	}
 }
 
-void lb_build_return_stmt_internal(lbProcedure *p, lbValue res) {
+static void lb_build_return_stmt_internal(lbProcedure *p, lbValue res) {
 	lbFunctionType *ft = lb_get_function_type(p->module, p->type);
 	bool return_by_pointer = ft->ret.kind == lbArg_Indirect;
 	bool split_returns = ft->multiple_return_original_type != nullptr;
@@ -1621,7 +1621,7 @@ void lb_build_return_stmt_internal(lbProcedure *p, lbValue res) {
 		LLVMBuildRet(p->builder, ret_val);
 	}
 }
-void lb_build_return_stmt(lbProcedure *p, Slice<Ast *> const &return_results) {
+static void lb_build_return_stmt(lbProcedure *p, Slice<Ast *> const &return_results) {
 	lb_ensure_abi_function_type(p->module, p);
 
 	lbValue res = {};
@@ -1765,7 +1765,7 @@ void lb_build_return_stmt(lbProcedure *p, Slice<Ast *> const &return_results) {
 	lb_build_return_stmt_internal(p, res);
 }
 
-void lb_build_if_stmt(lbProcedure *p, Ast *node) {
+static void lb_build_if_stmt(lbProcedure *p, Ast *node) {
 	ast_node(is, IfStmt, node);
 	lb_open_scope(p, is->scope); // Scope #1
 	defer (lb_close_scope(p, lbDeferExit_Default, nullptr));
@@ -1852,7 +1852,7 @@ void lb_build_if_stmt(lbProcedure *p, Ast *node) {
 	lb_start_block(p, done);
 }
 
-void lb_build_for_stmt(lbProcedure *p, Ast *node) {
+static void lb_build_for_stmt(lbProcedure *p, Ast *node) {
 	ast_node(fs, ForStmt, node);
 
 	lb_open_scope(p, fs->scope); // Open Scope here
@@ -1912,7 +1912,7 @@ void lb_build_for_stmt(lbProcedure *p, Ast *node) {
 	lb_close_scope(p, lbDeferExit_Default, nullptr);
 }
 
-void lb_build_assign_stmt_array(lbProcedure *p, TokenKind op, lbAddr const &lhs, lbValue const &value) {
+static void lb_build_assign_stmt_array(lbProcedure *p, TokenKind op, lbAddr const &lhs, lbValue const &value) {
 	GB_ASSERT(op != Token_Eq);
 
 	Type *lhs_type = lb_addr_type(lhs);
@@ -2055,7 +2055,7 @@ void lb_build_assign_stmt_array(lbProcedure *p, TokenKind op, lbAddr const &lhs,
 		lb_loop_end(p, loop_data);
 	}
 }
-void lb_build_assign_stmt(lbProcedure *p, AstAssignStmt *as) {
+static void lb_build_assign_stmt(lbProcedure *p, AstAssignStmt *as) {
 	if (as->op.kind == Token_Eq) {
 		auto lvals = array_make<lbAddr>(permanent_allocator(), 0, as->lhs.count);
 
@@ -2113,7 +2113,7 @@ void lb_build_assign_stmt(lbProcedure *p, AstAssignStmt *as) {
 }
 
 
-void lb_build_stmt(lbProcedure *p, Ast *node) {
+static void lb_build_stmt(lbProcedure *p, Ast *node) {
 	Ast *prev_stmt = p->curr_stmt;
 	defer (p->curr_stmt = prev_stmt);
 	p->curr_stmt = node;
@@ -2308,7 +2308,7 @@ void lb_build_stmt(lbProcedure *p, Ast *node) {
 
 
 
-void lb_build_defer_stmt(lbProcedure *p, lbDefer const &d) {
+static void lb_build_defer_stmt(lbProcedure *p, lbDefer const &d) {
 	if (p->curr_block == nullptr) {
 		return;
 	}
@@ -2337,7 +2337,7 @@ void lb_build_defer_stmt(lbProcedure *p, lbDefer const &d) {
 	}
 }
 
-void lb_emit_defer_stmts(lbProcedure *p, lbDeferExitKind kind, lbBlock *block) {
+static void lb_emit_defer_stmts(lbProcedure *p, lbDeferExitKind kind, lbBlock *block) {
 	isize count = p->defer_stmts.count;
 	isize i = count;
 	while (i --> 0) {
@@ -2364,7 +2364,7 @@ void lb_emit_defer_stmts(lbProcedure *p, lbDeferExitKind kind, lbBlock *block) {
 	}
 }
 
-void lb_add_defer_node(lbProcedure *p, isize scope_index, Ast *stmt) {
+static void lb_add_defer_node(lbProcedure *p, isize scope_index, Ast *stmt) {
 	Type *pt = base_type(p->type);
 	GB_ASSERT(pt->kind == Type_Proc);
 	if (pt->Proc.calling_convention == ProcCC_Odin) {
@@ -2379,7 +2379,7 @@ void lb_add_defer_node(lbProcedure *p, isize scope_index, Ast *stmt) {
 	d->stmt = stmt;
 }
 
-void lb_add_defer_proc(lbProcedure *p, isize scope_index, lbValue deferred, Array<lbValue> const &result_as_args) {
+static void lb_add_defer_proc(lbProcedure *p, isize scope_index, lbValue deferred, Array<lbValue> const &result_as_args) {
 	Type *pt = base_type(p->type);
 	GB_ASSERT(pt->kind == Type_Proc);
 	if (pt->Proc.calling_convention == ProcCC_Odin) {
