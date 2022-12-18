@@ -72,7 +72,7 @@ gb_internal Ast *alloc_ast_node(AstFile *f, AstKind kind) {
 	node->kind = kind;
 	node->file_id = f ? f->id : 0;
 
-	global_total_node_memory_allocated += size;
+	global_total_node_memory_allocated.fetch_add(size);
 
 	return node;
 }

@@ -165,11 +165,11 @@ gb_internal void platform_virtual_memory_protect(void *memory, isize size);
 			gb_printf_err("Total Usage: %lld bytes\n", cast(long long)global_platform_memory_total_usage);
 			GB_ASSERT_MSG(pmblock != nullptr, "Out of Virtual Memory, oh no...");
 		}
-		global_platform_memory_total_usage += total_size;
+		global_platform_memory_total_usage.fetch_add(total_size);
 		return pmblock;
 	}
 	gb_internal void platform_virtual_memory_free(PlatformMemoryBlock *block) {
-		global_platform_memory_total_usage -= block->total_size;
+		global_platform_memory_total_usage.fetch_sub(block->total_size);
 		GB_ASSERT(VirtualFree(block, 0, MEM_RELEASE));
 	}
 	gb_internal void platform_virtual_memory_protect(void *memory, isize size) {
