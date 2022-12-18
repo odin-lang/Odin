@@ -4029,9 +4029,8 @@ gb_internal bool has_type_got_objc_class_attribute(Type *t) {
 
 
 
+gb_internal bool internal_check_is_assignable_to(Type *src, Type *dst);
 gb_internal bool is_type_objc_object(Type *t) {
-	bool internal_check_is_assignable_to(Type *src, Type *dst);
-
 	return internal_check_is_assignable_to(t, t_objc_object);
 }
 
