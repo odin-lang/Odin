@@ -15,16 +15,6 @@ struct Quaternion256 {
 	f64 imag, jmag, kmag, real;
 };
 
-gb_internal Quaternion256 quaternion256_inverse(Quaternion256 x) {
-	f64 invmag2 = 1.0 / (x.real*x.real + x.imag*x.imag + x.jmag*x.jmag + x.kmag*x.kmag);
-	x.real = +x.real * invmag2;
-	x.imag = -x.imag * invmag2;
-	x.jmag = -x.jmag * invmag2;
-	x.kmag = -x.kmag * invmag2;
-	return x;
-}
-
-
 enum ExactValueKind {
 	ExactValue_Invalid    = 0,
 
@@ -453,44 +443,44 @@ gb_internal ExactValue exact_value_kmag(ExactValue v) {
 	return r;
 }
 
-gb_internal ExactValue exact_value_make_imag(ExactValue v) {
-	switch (v.kind) {
-	case ExactValue_Integer:
-		return exact_value_complex(0, exact_value_to_float(v).value_float);
-	case ExactValue_Float:
-		return exact_value_complex(0, v.value_float);
-	default:
-		GB_PANIC("Expected an integer or float type for 'exact_value_make_imag'");
-	}
-	ExactValue r = {ExactValue_Invalid};
-	return r;
-}
+// gb_internal ExactValue exact_value_make_imag(ExactValue v) {
+// 	switch (v.kind) {
+// 	case ExactValue_Integer:
+// 		return exact_value_complex(0, exact_value_to_float(v).value_float);
+// 	case ExactValue_Float:
+// 		return exact_value_complex(0, v.value_float);
+// 	default:
+// 		GB_PANIC("Expected an integer or float type for 'exact_value_make_imag'");
+// 	}
+// 	ExactValue r = {ExactValue_Invalid};
+// 	return r;
+// }
 
-gb_internal ExactValue exact_value_make_jmag(ExactValue v) {
-	switch (v.kind) {
-	case ExactValue_Integer:
-		return exact_value_quaternion(0, 0, exact_value_to_float(v).value_float, 0);
-	case ExactValue_Float:
-		return exact_value_quaternion(0, 0, v.value_float, 0);
-	default:
-		GB_PANIC("Expected an integer or float type for 'exact_value_make_imag'");
-	}
-	ExactValue r = {ExactValue_Invalid};
-	return r;
-}
+// gb_internal ExactValue exact_value_make_jmag(ExactValue v) {
+// 	switch (v.kind) {
+// 	case ExactValue_Integer:
+// 		return exact_value_quaternion(0, 0, exact_value_to_float(v).value_float, 0);
+// 	case ExactValue_Float:
+// 		return exact_value_quaternion(0, 0, v.value_float, 0);
+// 	default:
+// 		GB_PANIC("Expected an integer or float type for 'exact_value_make_jmag'");
+// 	}
+// 	ExactValue r = {ExactValue_Invalid};
+// 	return r;
+// }
 
-gb_internal ExactValue exact_value_make_kmag(ExactValue v) {
-	switch (v.kind) {
-	case ExactValue_Integer:
-		return exact_value_quaternion(0, 0, 0, exact_value_to_float(v).value_float);
-	case ExactValue_Float:
-		return exact_value_quaternion(0, 0, 0, v.value_float);
-	default:
-		GB_PANIC("Expected an integer or float type for 'exact_value_make_imag'");
-	}
-	ExactValue r = {ExactValue_Invalid};
-	return r;
-}
+// gb_internal ExactValue exact_value_make_kmag(ExactValue v) {
+// 	switch (v.kind) {
+// 	case ExactValue_Integer:
+// 		return exact_value_quaternion(0, 0, 0, exact_value_to_float(v).value_float);
+// 	case ExactValue_Float:
+// 		return exact_value_quaternion(0, 0, 0, v.value_float);
+// 	default:
+// 		GB_PANIC("Expected an integer or float type for 'exact_value_make_kmag'");
+// 	}
+// 	ExactValue r = {ExactValue_Invalid};
+// 	return r;
+// }
 
 gb_internal i64 exact_value_to_i64(ExactValue v) {
 	v = exact_value_to_integer(v);

@@ -149,7 +149,6 @@ enum CommandKind : u32 {
 	Command_run             = 1<<0,
 	Command_build           = 1<<1,
 	Command_check           = 1<<3,
-	Command_query           = 1<<4,
 	Command_doc             = 1<<5,
 	Command_version         = 1<<6,
 	Command_test            = 1<<7,
@@ -157,7 +156,7 @@ enum CommandKind : u32 {
 	Command_strip_semicolon = 1<<8,
 	Command_bug_report      = 1<<9,
 
-	Command__does_check = Command_run|Command_build|Command_check|Command_query|Command_doc|Command_test|Command_strip_semicolon,
+	Command__does_check = Command_run|Command_build|Command_check|Command_doc|Command_test|Command_strip_semicolon,
 	Command__does_build = Command_run|Command_build|Command_test,
 	Command_all = ~(u32)0,
 };
@@ -166,7 +165,6 @@ gb_global char const *odin_command_strings[32] = {
 	"run",
 	"build",
 	"check",
-	"query",
 	"doc",
 	"version",
 	"test",
@@ -315,8 +313,6 @@ struct BuildContext {
 
 	u32 cmd_doc_flags;
 	Array<String> extra_packages;
-
-	QueryDataSetSettings query_data_set_settings;
 
 	StringSet test_names;
 

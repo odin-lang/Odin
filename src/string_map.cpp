@@ -18,8 +18,6 @@ gb_internal gb_inline bool string_hash_key_equal(StringHashKey const &a, StringH
 	}
 	return false;
 }
-gb_internal bool operator==(StringHashKey const &a, StringHashKey const &b) { return string_hash_key_equal(a, b); }
-gb_internal bool operator!=(StringHashKey const &a, StringHashKey const &b) { return !string_hash_key_equal(a, b); }
 
 template <typename T>
 struct StringMapEntry {

@@ -397,8 +397,6 @@ struct CheckerContext {
 
 	CheckerTypePath *type_path;
 	isize            type_level; // TODO(bill): Actually handle correctly
-	CheckerPolyPath *poly_path;
-	isize            poly_level; // TODO(bill): Actually handle correctly
 
 	UntypedExprInfoMap *untyped;
 
@@ -488,12 +486,6 @@ gb_internal void destroy_checker_type_path(CheckerTypePath *tp);
 
 gb_internal void    check_type_path_push(CheckerContext *c, Entity *e);
 gb_internal Entity *check_type_path_pop (CheckerContext *c);
-
-gb_internal CheckerPolyPath *new_checker_poly_path();
-gb_internal void destroy_checker_poly_path(CheckerPolyPath *);
-
-gb_internal void  check_poly_path_push(CheckerContext *c, Type *t);
-gb_internal Type *check_poly_path_pop (CheckerContext *c);
 
 gb_internal void init_core_context(Checker *c);
 gb_internal void init_mem_allocator(Checker *c);

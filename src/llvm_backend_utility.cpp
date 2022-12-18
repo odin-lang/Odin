@@ -599,14 +599,6 @@ gb_internal lbValue lb_emit_reverse_bits(lbProcedure *p, lbValue x, Type *type) 
 }
 
 
-gb_internal lbValue lb_emit_bit_set_card(lbProcedure *p, lbValue x) {
-	GB_ASSERT(is_type_bit_set(x.type));
-	Type *underlying = bit_set_to_int(x.type);
-	lbValue card = lb_emit_count_ones(p, x, underlying);
-	return lb_emit_conv(p, card, t_int);
-}
-
-
 gb_internal lbValue lb_emit_union_cast_only_ok_check(lbProcedure *p, lbValue value, Type *type, TokenPos pos) {
 	GB_ASSERT(is_type_tuple(type));
 	lbModule *m = p->module;
@@ -1492,10 +1484,6 @@ gb_internal lbValue lb_dynamic_array_len(lbProcedure *p, lbValue da) {
 gb_internal lbValue lb_dynamic_array_cap(lbProcedure *p, lbValue da) {
 	GB_ASSERT(is_type_dynamic_array(da.type));
 	return lb_emit_struct_ev(p, da, 2);
-}
-gb_internal lbValue lb_dynamic_array_allocator(lbProcedure *p, lbValue da) {
-	GB_ASSERT(is_type_dynamic_array(da.type));
-	return lb_emit_struct_ev(p, da, 3);
 }
 
 gb_internal lbValue lb_map_len(lbProcedure *p, lbValue value) {

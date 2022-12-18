@@ -383,46 +383,46 @@ gb_internal lbProcedure *lb_create_dummy_procedure(lbModule *m, String link_name
 }
 
 
-gb_internal lbValue lb_value_param(lbProcedure *p, Entity *e, Type *abi_type, i32 index, lbParamPasskind *kind_) {
-	lbParamPasskind kind = lbParamPass_Value;
+// gb_internal lbValue lb_value_param(lbProcedure *p, Entity *e, Type *abi_type, i32 index, lbParamPasskind *kind_) {
+// 	lbParamPasskind kind = lbParamPass_Value;
 
-	if (e != nullptr && !are_types_identical(abi_type, e->type)) {
-		if (is_type_pointer(abi_type)) {
-			GB_ASSERT(e->kind == Entity_Variable);
-			Type *av = core_type(type_deref(abi_type));
-			if (are_types_identical(av, core_type(e->type))) {
-				kind = lbParamPass_Pointer;
-				if (e->flags&EntityFlag_Value) {
-					kind = lbParamPass_ConstRef;
-				}
-			} else {
-				kind = lbParamPass_BitCast;
-			}
-		} else if (is_type_integer(abi_type)) {
-			kind = lbParamPass_Integer;
-		} else if (abi_type == t_llvm_bool) {
-			kind = lbParamPass_Value;
-		} else if (is_type_boolean(abi_type)) {
-			kind = lbParamPass_Integer;
-		} else if (is_type_simd_vector(abi_type)) {
-			kind = lbParamPass_BitCast;
-		} else if (is_type_float(abi_type)) {
-			kind = lbParamPass_BitCast;
-		} else if (is_type_tuple(abi_type)) {
-			kind = lbParamPass_Tuple;
-		} else if (is_type_proc(abi_type)) {
-			kind = lbParamPass_Value;
-		} else {
-			GB_PANIC("Invalid abi type pass kind %s", type_to_string(abi_type));
-		}
-	}
+// 	if (e != nullptr && !are_types_identical(abi_type, e->type)) {
+// 		if (is_type_pointer(abi_type)) {
+// 			GB_ASSERT(e->kind == Entity_Variable);
+// 			Type *av = core_type(type_deref(abi_type));
+// 			if (are_types_identical(av, core_type(e->type))) {
+// 				kind = lbParamPass_Pointer;
+// 				if (e->flags&EntityFlag_Value) {
+// 					kind = lbParamPass_ConstRef;
+// 				}
+// 			} else {
+// 				kind = lbParamPass_BitCast;
+// 			}
+// 		} else if (is_type_integer(abi_type)) {
+// 			kind = lbParamPass_Integer;
+// 		} else if (abi_type == t_llvm_bool) {
+// 			kind = lbParamPass_Value;
+// 		} else if (is_type_boolean(abi_type)) {
+// 			kind = lbParamPass_Integer;
+// 		} else if (is_type_simd_vector(abi_type)) {
+// 			kind = lbParamPass_BitCast;
+// 		} else if (is_type_float(abi_type)) {
+// 			kind = lbParamPass_BitCast;
+// 		} else if (is_type_tuple(abi_type)) {
+// 			kind = lbParamPass_Tuple;
+// 		} else if (is_type_proc(abi_type)) {
+// 			kind = lbParamPass_Value;
+// 		} else {
+// 			GB_PANIC("Invalid abi type pass kind %s", type_to_string(abi_type));
+// 		}
+// 	}
 
-	if (kind_) *kind_ = kind;
-	lbValue res = {};
-	res.value = LLVMGetParam(p->value, cast(unsigned)index);
-	res.type = abi_type;
-	return res;
-}
+// 	if (kind_) *kind_ = kind;
+// 	lbValue res = {};
+// 	res.value = LLVMGetParam(p->value, cast(unsigned)index);
+// 	res.type = abi_type;
+// 	return res;
+// }
 
 
 
@@ -1165,14 +1165,6 @@ gb_internal lbValue lb_emit_call(lbProcedure *p, lbValue value, Array<lbValue> c
 	return result;
 }
 
-gb_internal LLVMValueRef llvm_splat_float(i64 count, LLVMTypeRef type, f64 value) {
-	LLVMValueRef v = LLVMConstReal(type, value);
-	LLVMValueRef *values = gb_alloc_array(temporary_allocator(), LLVMValueRef, count);
-	for (i64 i = 0; i < count; i++) {
-		values[i] = v;
-	}
-	return LLVMConstVector(values, cast(unsigned)count);
-}
 gb_internal LLVMValueRef llvm_splat_int(i64 count, LLVMTypeRef type, i64 value, bool is_signed=false) {
 	LLVMValueRef v = LLVMConstInt(type, value, is_signed);
 	LLVMValueRef *values = gb_alloc_array(temporary_allocator(), LLVMValueRef, count);

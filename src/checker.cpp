@@ -61,18 +61,6 @@ gb_internal void scope_reserve(Scope *scope, isize capacity) {
 	}
 }
 
-gb_internal i32 is_scope_an_ancestor(Scope *parent, Scope *child) {
-	i32 i = 0;
-	while (child != nullptr) {
-		if (parent == child) {
-			return i;
-		}
-		child = child->parent;
-		i++;
-	}
-	return -1;
-}
-
 gb_internal void entity_graph_node_set_destroy(EntityGraphNodeSet *s) {
 	if (s->hashes.data != nullptr) {
 		ptr_set_destroy(s);
@@ -86,9 +74,9 @@ gb_internal void entity_graph_node_set_add(EntityGraphNodeSet *s, EntityGraphNod
 	ptr_set_add(s, n);
 }
 
-gb_internal bool entity_graph_node_set_exists(EntityGraphNodeSet *s, EntityGraphNode *n) {
-	return ptr_set_exists(s, n);
-}
+// gb_internal bool entity_graph_node_set_exists(EntityGraphNodeSet *s, EntityGraphNode *n) {
+// 	return ptr_set_exists(s, n);
+// }
 
 gb_internal void entity_graph_node_set_remove(EntityGraphNodeSet *s, EntityGraphNode *n) {
 	ptr_set_remove(s, n);
@@ -139,13 +127,13 @@ gb_internal void import_graph_node_set_add(ImportGraphNodeSet *s, ImportGraphNod
 	ptr_set_add(s, n);
 }
 
-gb_internal bool import_graph_node_set_exists(ImportGraphNodeSet *s, ImportGraphNode *n) {
-	return ptr_set_exists(s, n);
-}
+// gb_internal bool import_graph_node_set_exists(ImportGraphNodeSet *s, ImportGraphNode *n) {
+// 	return ptr_set_exists(s, n);
+// }
 
-gb_internal void import_graph_node_set_remove(ImportGraphNodeSet *s, ImportGraphNode *n) {
-	ptr_set_remove(s, n);
-}
+// gb_internal void import_graph_node_set_remove(ImportGraphNodeSet *s, ImportGraphNode *n) {
+// 	ptr_set_remove(s, n);
+// }
 
 gb_internal ImportGraphNode *import_graph_node_create(gbAllocator a, AstPackage *pkg) {
 	ImportGraphNode *n = gb_alloc_item(a, ImportGraphNode);
@@ -186,15 +174,6 @@ gb_internal void import_graph_node_swap(ImportGraphNode **data, isize i, isize j
 	y->index = i;
 }
 
-gb_internal GB_COMPARE_PROC(ast_node_cmp) {
-	Ast *x = *cast(Ast **)a;
-	Ast *y = *cast(Ast **)b;
-	Token i = ast_token(x);
-	Token j = ast_token(y);
-	return token_pos_cmp(i.pos, j.pos);
-}
-
-
 
 
 
@@ -213,27 +192,27 @@ gb_internal DeclInfo *make_decl_info(Scope *scope, DeclInfo *parent) {
 	return d;
 }
 
-gb_internal void destroy_declaration_info(DeclInfo *d) {
-	ptr_set_destroy(&d->deps);
-	array_free(&d->labels);
-}
+// gb_internal void destroy_declaration_info(DeclInfo *d) {
+// 	ptr_set_destroy(&d->deps);
+// 	array_free(&d->labels);
+// }
 
-gb_internal bool decl_info_has_init(DeclInfo *d) {
-	if (d->init_expr != nullptr) {
-		return true;
-	}
-	if (d->proc_lit != nullptr) {
-		switch (d->proc_lit->kind) {
-		case_ast_node(pl, ProcLit, d->proc_lit);
-			if (pl->body != nullptr) {
-				return true;
-			}
-		case_end;
-		}
-	}
+// gb_internal bool decl_info_has_init(DeclInfo *d) {
+// 	if (d->init_expr != nullptr) {
+// 		return true;
+// 	}
+// 	if (d->proc_lit != nullptr) {
+// 		switch (d->proc_lit->kind) {
+// 		case_ast_node(pl, ProcLit, d->proc_lit);
+// 			if (pl->body != nullptr) {
+// 				return true;
+// 			}
+// 		case_end;
+// 		}
+// 	}
 
-	return false;
-}
+// 	return false;
+// }
 
 
 
@@ -528,11 +507,6 @@ struct VettedEntity {
 	Entity *entity;
 	Entity *other;
 };
-gb_internal void init_vetted_entity(VettedEntity *ve, VettedEntityKind kind, Entity *entity, Entity *other=nullptr)  {
-	ve->kind = kind;
-	ve->entity = entity;
-	ve->other = other;
-}
 
 
 gb_internal GB_COMPARE_PROC(vetted_entity_variable_pos_cmp) {
@@ -1144,7 +1118,7 @@ gb_internal void init_checker_info(CheckerInfo *i) {
 
 
 
-	i->allow_identifier_uses = build_context.query_data_set_settings.kind == QueryDataSet_GoToDefinitions;
+	i->allow_identifier_uses = false;
 	if (i->allow_identifier_uses) {
 		array_init(&i->identifier_uses, a);
 	}
@@ -1226,13 +1200,10 @@ gb_internal CheckerContext make_checker_context(Checker *c) {
 
 	ctx.type_path = new_checker_type_path();
 	ctx.type_level = 0;
-	ctx.poly_path = new_checker_poly_path();
-	ctx.poly_level = 0;
 	return ctx;
 }
 gb_internal void destroy_checker_context(CheckerContext *ctx) {
 	destroy_checker_type_path(ctx->type_path);
-	destroy_checker_poly_path(ctx->poly_path);
 }
 
 gb_internal void add_curr_ast_file(CheckerContext *ctx, AstFile *file) {
@@ -1348,17 +1319,17 @@ gb_internal DeclInfo *decl_info_of_entity(Entity *e) {
 	return nullptr;
 }
 
-gb_internal DeclInfo *decl_info_of_ident(Ast *ident) {
-	return decl_info_of_entity(entity_of_node(ident));
-}
+// gb_internal DeclInfo *decl_info_of_ident(Ast *ident) {
+// 	return decl_info_of_entity(entity_of_node(ident));
+// }
 
-gb_internal AstFile *ast_file_of_filename(CheckerInfo *i, String filename) {
-	AstFile **found = string_map_get(&i->files, filename);
-	if (found != nullptr) {
-		return *found;
-	}
-	return nullptr;
-}
+// gb_internal AstFile *ast_file_of_filename(CheckerInfo *i, String filename) {
+// 	AstFile **found = string_map_get(&i->files, filename);
+// 	if (found != nullptr) {
+// 		return *found;
+// 	}
+// 	return nullptr;
+// }
 gb_internal ExprInfo *check_get_expr_info(CheckerContext *c, Ast *expr) {
 	if (c->untyped != nullptr) {
 		ExprInfo **found = map_get(c->untyped, expr);
@@ -2684,32 +2655,6 @@ gb_internal Entity *check_type_path_pop(CheckerContext *c) {
 }
 
 
-gb_internal CheckerPolyPath *new_checker_poly_path(void) {
-	gbAllocator a = heap_allocator();
-	auto *pp = gb_alloc_item(a, CheckerPolyPath);
-	array_init(pp, a, 0, 16);
-	return pp;
-}
-
-gb_internal void destroy_checker_poly_path(CheckerPolyPath *pp) {
-	array_free(pp);
-	gb_free(heap_allocator(), pp);
-}
-
-
-gb_internal void check_poly_path_push(CheckerContext *c, Type *t) {
-	GB_ASSERT(c->poly_path != nullptr);
-	GB_ASSERT(t != nullptr);
-	GB_ASSERT(is_type_polymorphic(t));
-	array_add(c->poly_path, t);
-}
-
-gb_internal Type *check_poly_path_pop(CheckerContext *c) {
-	GB_ASSERT(c->poly_path != nullptr);
-	return array_pop(c->poly_path);
-}
-
-
 
 gb_internal Array<Entity *> proc_group_entities(CheckerContext *c, Operand o) {
 	Array<Entity *> procs = {};
@@ -2876,13 +2821,6 @@ gb_internal ExactValue check_decl_attribute_value(CheckerContext *c, Ast *value)
 		}
 	}
 	return ev;
-}
-
-gb_internal Type *check_decl_attribute_type(CheckerContext *c, Ast *value) {
-	if (value != nullptr) {
-		return check_type(c, value);
-	}
-	return nullptr;
 }
 
 

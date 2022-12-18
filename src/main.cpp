@@ -3,7 +3,14 @@
 #include "common.cpp"
 #include "timings.cpp"
 #include "tokenizer.cpp"
+#if defined(GB_SYSTEM_WINDOWS)
+	#pragma warning(push)
+	#pragma warning(disable: 4505)
+#endif
 #include "big_int.cpp"
+#if defined(GB_SYSTEM_WINDOWS)
+	#pragma warning(pop)
+#endif
 #include "exact_value.cpp"
 #include "build_settings.cpp"
 
@@ -58,7 +65,6 @@ gb_global Timings global_timings = {0};
 	#endif
 #endif
 
-#include "query_data.cpp"
 #include "bug_report.cpp"
 
 // NOTE(bill): 'name' is used in debugging and profiling modes
@@ -573,7 +579,6 @@ gb_internal void usage(String argv0) {
 	print_usage_line(1, "                  one must contain the program's entry point, all must be in the same package.");
 	print_usage_line(1, "run               same as 'build', but also then runs the newly compiled executable.");
 	print_usage_line(1, "check             parse, and type check a directory of .odin files");
-	print_usage_line(1, "query             parse, type check, and output a .json file containing information about the program");
 	print_usage_line(1, "strip-semicolon   parse, type check, and remove unneeded semicolons from the entire program");
 	print_usage_line(1, "test              build and runs procedures with the attribute @(test) in the initial package");
 	print_usage_line(1, "doc               generate documentation on a directory of .odin files");
@@ -816,12 +821,6 @@ gb_internal bool parse_build_flags(Array<String> args) {
 	add_flag(&build_flags, BuildFlag_DisallowRTTI,            str_lit("disallow-rtti"),             BuildFlagParam_None,    Command__does_check);
 
 	add_flag(&build_flags, BuildFlag_UseStaticMapCalls,       str_lit("use-static-map-calls"),      BuildFlagParam_None,    Command__does_check);
-
-
-	add_flag(&build_flags, BuildFlag_Compact,                 str_lit("compact"),                   BuildFlagParam_None,    Command_query);
-	add_flag(&build_flags, BuildFlag_GlobalDefinitions,       str_lit("global-definitions"),        BuildFlagParam_None,    Command_query);
-	add_flag(&build_flags, BuildFlag_GoToDefinitions,         str_lit("go-to-definitions"),         BuildFlagParam_None,    Command_query);
-
 
 	add_flag(&build_flags, BuildFlag_Short,                   str_lit("short"),                     BuildFlagParam_None,    Command_doc);
 	add_flag(&build_flags, BuildFlag_AllPackages,             str_lit("all-packages"),              BuildFlagParam_None,    Command_doc);
@@ -1445,39 +1444,6 @@ gb_internal bool parse_build_flags(Array<String> args) {
 							build_context.strict_style_init_only = true;
 							break;
 						}
-						case BuildFlag_Compact: {
-							if (!build_context.query_data_set_settings.ok) {
-								gb_printf_err("Invalid use of -compact flag, only allowed with 'odin query'\n");
-								bad_flags = true;
-							} else {
-								build_context.query_data_set_settings.compact = true;
-							}
-							break;
-						}
-						case BuildFlag_GlobalDefinitions: {
-							if (!build_context.query_data_set_settings.ok) {
-								gb_printf_err("Invalid use of -global-definitions flag, only allowed with 'odin query'\n");
-								bad_flags = true;
-							} else if (build_context.query_data_set_settings.kind != QueryDataSet_Invalid) {
-								gb_printf_err("Invalid use of -global-definitions flag, a previous flag for 'odin query' was set\n");
-								bad_flags = true;
-							} else {
-								build_context.query_data_set_settings.kind = QueryDataSet_GlobalDefinitions;
-							}
-							break;
-						}
-						case BuildFlag_GoToDefinitions: {
-							if (!build_context.query_data_set_settings.ok) {
-								gb_printf_err("Invalid use of -go-to-definitions flag, only allowed with 'odin query'\n");
-								bad_flags = true;
-							} else if (build_context.query_data_set_settings.kind != QueryDataSet_Invalid) {
-								gb_printf_err("Invalid use of -global-definitions flag, a previous flag for 'odin query' was set\n");
-								bad_flags = true;
-							} else {
-								build_context.query_data_set_settings.kind = QueryDataSet_GoToDefinitions;
-							}
-							break;
-						}
 						case BuildFlag_Short:
 							build_context.cmd_doc_flags |= CmdDocFlag_Short;
 							break;
@@ -1638,16 +1604,6 @@ gb_internal bool parse_build_flags(Array<String> args) {
 		gb_printf_err("`-export-timings:<format>` requires `-show-timings` or `-show-more-timings` to be present\n");
 		bad_flags = true;
 	}
-
-	if (build_context.query_data_set_settings.ok) {
-		if (build_context.query_data_set_settings.kind == QueryDataSet_Invalid) {
-			gb_printf_err("'odin query' requires a flag determining the kind of query data set to be returned\n");
-			gb_printf_err("\t-global-definitions : outputs a JSON file of global definitions\n");
-			gb_printf_err("\t-go-to-definitions  : outputs a OGTD binary file of go to definitions for identifiers within an Odin project\n");
-			bad_flags = true;
-		}
-	}
-
 	return !bad_flags;
 }
 
@@ -1931,8 +1887,6 @@ gb_internal void print_show_help(String const arg0, String const &command) {
 		print_usage_line(3, "odin check filename.odin -file  # Type check single-file package, must contain entry point.");
 	} else if (command == "test") {
 		print_usage_line(1, "test      Build ands runs procedures with the attribute @(test) in the initial package");
-	} else if (command == "query") {
-		print_usage_line(1, "query     [experimental] Parse, type check, and output a .json file containing information about the program");
 	} else if (command == "doc") {
 		print_usage_line(1, "doc       generate documentation from a directory of .odin files");
 		print_usage_line(2, "Examples:");
@@ -2627,15 +2581,6 @@ int main(int arg_count, char const **arg_ptr) {
 		build_context.command_kind = Command_strip_semicolon;
 		build_context.no_output_files = true;
 		init_filename = args[2];
-	} else if (command == "query") {
-		if (args.count < 3) {
-			usage(args[0]);
-			return 1;
-		}
-		build_context.command_kind = Command_query;
-		build_context.no_output_files = true;
-		build_context.query_data_set_settings.ok = true;
-		init_filename = args[2];
 	} else if (command == "doc") {
 		if (args.count < 3) {
 			usage(args[0]);
@@ -2824,12 +2769,8 @@ int main(int arg_count, char const **arg_ptr) {
 			print_show_unused(checker);
 		}
 
-		if (build_context.query_data_set_settings.ok) {
-			generate_and_print_query_data(checker, &global_timings);
-		} else {
-			if (build_context.show_timings) {
-				show_timings(checker, &global_timings);
-			}
+		if (build_context.show_timings) {
+			show_timings(checker, &global_timings);
 		}
 
 		if (global_error_collector.count != 0) {

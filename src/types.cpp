@@ -430,15 +430,6 @@ gb_internal Selection sub_selection(Selection const &sel, isize offset) {
 	return res;
 }
 
-gb_internal Selection sub_selection_with_length(Selection const &sel, isize offset, isize len) {
-	Selection res = {};
-	res.index.data = sel.index.data + offset;
-	res.index.count = gb_max(len, gb_max(sel.index.count - offset, 0));
-	res.index.capacity = res.index.count;
-	return res;
-}
-
-
 
 gb_global Type basic_types[] = {
 	{Type_Basic, {Basic_Invalid,           0,                                          0, STR_LIT("invalid type")}},
@@ -1089,15 +1080,6 @@ gb_internal Type *alloc_type_proc(Scope *scope, Type *params, isize param_count,
 
 gb_internal bool is_type_valid_for_keys(Type *t);
 
-gb_internal Type *alloc_type_map(i64 count, Type *key, Type *value) {
-	if (key != nullptr) {
-		GB_ASSERT(value != nullptr);
-	}
-	Type *t = alloc_type(Type_Map);
-	t->Map.key   = key;
-	t->Map.value = value;
-	return t;
-}
 
 gb_internal Type *alloc_type_bit_set() {
 	Type *t = alloc_type(Type_BitSet);
@@ -1151,19 +1133,6 @@ gb_internal bool is_type_named(Type *t) {
 		return true;
 	}
 	return t->kind == Type_Named;
-}
-gb_internal bool is_type_named_alias(Type *t) {
-	if (!is_type_named(t)) {
-		return false;
-	}
-	Entity *e = t->Named.type_name;
-	if (e == nullptr) {
-		return false;
-	}
-	if (e->kind != Entity_TypeName) {
-		return false;
-	}
-	return e->TypeName.is_type_alias;
 }
 
 gb_internal bool is_type_boolean(Type *t) {
@@ -1326,27 +1295,6 @@ gb_internal bool is_type_complex_or_quaternion(Type *t) {
 	t = core_type(t);
 	if (t->kind == Type_Basic) {
 		return (t->Basic.flags & (BasicFlag_Complex|BasicFlag_Quaternion)) != 0;
-	}
-	return false;
-}
-gb_internal bool is_type_f16(Type *t) {
-	t = core_type(t);
-	if (t->kind == Type_Basic) {
-		return t->Basic.kind == Basic_f16;
-	}
-	return false;
-}
-gb_internal bool is_type_f32(Type *t) {
-	t = core_type(t);
-	if (t->kind == Type_Basic) {
-		return t->Basic.kind == Basic_f32;
-	}
-	return false;
-}
-gb_internal bool is_type_f64(Type *t) {
-	t = core_type(t);
-	if (t->kind == Type_Basic) {
-		return t->Basic.kind == Basic_f64;
 	}
 	return false;
 }
@@ -1549,10 +1497,6 @@ gb_internal bool is_type_proc(Type *t) {
 gb_internal bool is_type_asm_proc(Type *t) {
 	t = base_type(t);
 	return t->kind == Type_Proc && t->Proc.calling_convention == ProcCC_InlineAsm;
-}
-gb_internal bool is_type_poly_proc(Type *t) {
-	t = base_type(t);
-	return t->kind == Type_Proc && t->Proc.is_polymorphic;
 }
 gb_internal bool is_type_simd_vector(Type *t) {
 	t = base_type(t);
@@ -1915,11 +1859,6 @@ gb_internal bool is_type_empty_union(Type *t) {
 	t = base_type(t);
 	return t->kind == Type_Union && t->Union.variants.count == 0;
 }
-gb_internal bool is_type_empty_struct(Type *t) {
-	t = base_type(t);
-	return t->kind == Type_Struct && !t->Struct.is_raw_union && t->Struct.fields.count == 0;
-}
-
 
 gb_internal bool is_type_valid_for_keys(Type *t) {
 	t = core_type(t);
@@ -4049,20 +3988,6 @@ gb_internal Type *reduce_tuple_to_single_type(Type *original_type) {
 		}
 	}
 	return original_type;
-}
-
-
-gb_internal Type *alloc_type_struct_from_field_types(Type **field_types, isize field_count, bool is_packed) {
-	Type *t = alloc_type_struct();
-	t->Struct.fields = slice_make<Entity *>(heap_allocator(), field_count);
-
-	Scope *scope = nullptr;
-	for_array(i, t->Struct.fields) {
-		t->Struct.fields[i] = alloc_entity_field(scope, blank_token, field_types[i], false, cast(i32)i, EntityState_Resolved);
-	}
-	t->Struct.is_packed = is_packed;
-
-	return t;
 }
 
 gb_internal Type *alloc_type_tuple_from_field_types(Type **field_types, isize field_count, bool is_packed, bool must_be_tuple) {

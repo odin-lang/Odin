@@ -605,11 +605,11 @@ gb_internal lbValue lb_map_get_proc_for_type(lbModule *m, Type *type) {
 	return {p->value, p->type};
 }
 
-gb_internal void lb_debug_print(lbProcedure *p, String const &str) {
-	auto args = array_make<lbValue>(heap_allocator(), 1);
-	args[0] = lb_const_string(p->module, str);
-	lb_emit_runtime_call(p, "print_string", args);
-}
+// gb_internal void lb_debug_print(lbProcedure *p, String const &str) {
+// 	auto args = array_make<lbValue>(heap_allocator(), 1);
+// 	args[0] = lb_const_string(p->module, str);
+// 	lb_emit_runtime_call(p, "print_string", args);
+// }
 
 gb_internal lbValue lb_map_set_proc_for_type(lbModule *m, Type *type) {
 	GB_ASSERT(build_context.use_static_map_calls);

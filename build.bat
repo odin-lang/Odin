@@ -62,6 +62,7 @@ if %release_mode% EQU 0 ( rem Debug
 set compiler_warnings= ^
 	-W4 -WX ^
 	-wd4100 -wd4101 -wd4127 -wd4146 ^
+	-wd4505 ^
 	-wd4456 -wd4457
 
 set compiler_includes= ^

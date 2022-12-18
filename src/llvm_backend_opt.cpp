@@ -37,16 +37,16 @@ gb_internal void lb_add_function_simplifcation_passes(LLVMPassManagerRef mpm, i3
 gb_internal void lb_populate_module_pass_manager(LLVMTargetMachineRef target_machine, LLVMPassManagerRef mpm, i32 optimization_level);
 gb_internal void lb_populate_function_pass_manager_specific(lbModule *m, LLVMPassManagerRef fpm, i32 optimization_level);
 
-gb_internal LLVMBool lb_must_preserve_predicate_callback(LLVMValueRef value, void *user_data) {
-	lbModule *m = cast(lbModule *)user_data;
-	if (m == nullptr) {
-		return false;
-	}
-	if (value == nullptr) {
-		return false;
-	}
-	return LLVMIsAAllocaInst(value) != nullptr;
-}
+// gb_internal LLVMBool lb_must_preserve_predicate_callback(LLVMValueRef value, void *user_data) {
+// 	lbModule *m = cast(lbModule *)user_data;
+// 	if (m == nullptr) {
+// 		return false;
+// 	}
+// 	if (value == nullptr) {
+// 		return false;
+// 	}
+// 	return LLVMIsAAllocaInst(value) != nullptr;
+// }
 
 
 #if LLVM_VERSION_MAJOR < 12

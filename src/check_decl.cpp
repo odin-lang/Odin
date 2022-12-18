@@ -232,16 +232,6 @@ gb_internal Ast *remove_type_alias_clutter(Ast *node) {
 	}
 }
 
-gb_internal isize total_attribute_count(DeclInfo *decl) {
-	isize attribute_count = 0;
-	for_array(i, decl->attributes) {
-		Ast *attr = decl->attributes[i];
-		if (attr->kind != Ast_Attribute) continue;
-		attribute_count += attr->Attribute.elems.count;
-	}
-	return attribute_count;
-}
-
 gb_internal Type *clone_enum_type(CheckerContext *ctx, Type *original_enum_type, Type *named_type) {
 	// NOTE(bill, 2022-02-05): Stupid edge case for `distinct` declarations
 	//
