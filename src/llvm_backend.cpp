@@ -1165,7 +1165,7 @@ lbProcedure *lb_create_startup_runtime(lbModule *main_module, lbProcedure *start
 	
 	for (Entity *e : info->init_procedures) {
 		lbValue value = lb_find_procedure_value_from_entity(main_module, e);
-		lb_emit_call(p, value, {}, ProcInlining_none, false);
+		lb_emit_call(p, value, {}, ProcInlining_none);
 	}
 
 
@@ -1243,7 +1243,7 @@ lbProcedure *lb_create_main_procedure(lbModule *m, lbProcedure *startup_runtime)
 	}
 	
 	lbValue startup_runtime_value = {startup_runtime->value, startup_runtime->type};
-	lb_emit_call(p, startup_runtime_value, {}, ProcInlining_none, false);
+	lb_emit_call(p, startup_runtime_value, {}, ProcInlining_none);
 
 	if (build_context.command_kind == Command_test) {
 		Type *t_Internal_Test = find_type_in_pkg(m->info, str_lit("testing"), str_lit("Internal_Test"));
@@ -1304,7 +1304,7 @@ lbProcedure *lb_create_main_procedure(lbModule *m, lbProcedure *startup_runtime)
 	
 	if (call_cleanup) {
 		lbValue cleanup_runtime_value = lb_find_runtime_value(m, str_lit("_cleanup_runtime"));
-		lb_emit_call(p, cleanup_runtime_value, {}, ProcInlining_none, false);
+		lb_emit_call(p, cleanup_runtime_value, {}, ProcInlining_none);
 	}
 	
 

@@ -1544,7 +1544,11 @@ void check_proc_body(CheckerContext *ctx_, Token token, DeclInfo *decl, Type *ty
 			// NOTE(bill): Don't err here
 		}
 
+		GB_ASSERT(decl->defer_use_checked == false);
+
 		check_stmt_list(ctx, bs->stmts, Stmt_CheckScopeDecls);
+
+		decl->defer_use_checked = true;
 
 		for_array(i, bs->stmts) {
 			Ast *stmt = bs->stmts[i];
@@ -1580,6 +1584,7 @@ void check_proc_body(CheckerContext *ctx_, Token token, DeclInfo *decl, Type *ty
 				}
 			}
 		}
+
 	}
 	check_close_scope(ctx);
 
