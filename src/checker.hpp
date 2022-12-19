@@ -158,6 +158,7 @@ struct DeclInfo {
 	bool          is_using;
 	bool          where_clauses_evaluated;
 	bool          proc_checked;
+	BlockingMutex proc_checked_mutex;
 	isize         defer_used;
 	bool          defer_use_checked;
 
@@ -377,13 +378,17 @@ struct CheckerInfo {
 };
 
 struct CheckerContext {
+	// Order matters here
+	BlockingMutex  mutex;
 	Checker *      checker;
 	CheckerInfo *  info;
+
 	AstPackage *   pkg;
 	AstFile *      file;
 	Scope *        scope;
 	DeclInfo *     decl;
 
+	// Order doesn't matter after this
 	u32            state_flags;
 	bool           in_defer; // TODO(bill): Actually handle correctly
 	Type *         type_hint;

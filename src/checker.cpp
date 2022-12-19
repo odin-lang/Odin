@@ -184,6 +184,7 @@ gb_internal void init_decl_info(DeclInfo *d, Scope *scope, DeclInfo *parent) {
 	ptr_set_init(&d->deps,           heap_allocator());
 	ptr_set_init(&d->type_info_deps, heap_allocator());
 	array_init  (&d->labels,         heap_allocator());
+	mutex_init(&d->proc_checked_mutex);
 }
 
 gb_internal DeclInfo *make_decl_info(Scope *scope, DeclInfo *parent) {
@@ -193,6 +194,7 @@ gb_internal DeclInfo *make_decl_info(Scope *scope, DeclInfo *parent) {
 }
 
 // gb_internal void destroy_declaration_info(DeclInfo *d) {
+// 	mutex_destroy(&d->proc_checked_mutex);
 // 	ptr_set_destroy(&d->deps);
 // 	array_free(&d->labels);
 // }
@@ -1200,30 +1202,51 @@ gb_internal CheckerContext make_checker_context(Checker *c) {
 
 	ctx.type_path = new_checker_type_path();
 	ctx.type_level = 0;
+	mutex_init(&ctx.mutex);
 	return ctx;
 }
 gb_internal void destroy_checker_context(CheckerContext *ctx) {
+	mutex_destroy(&ctx->mutex);
 	destroy_checker_type_path(ctx->type_path);
 }
 
-gb_internal void add_curr_ast_file(CheckerContext *ctx, AstFile *file) {
+gb_internal bool add_curr_ast_file(CheckerContext *ctx, AstFile *file) {
 	if (file != nullptr) {
 		ctx->file  = file;
 		ctx->decl  = file->pkg->decl_info;
 		ctx->scope = file->scope;
 		ctx->pkg   = file->pkg;
+		return true;
 	}
+	return false;
 }
 gb_internal void reset_checker_context(CheckerContext *ctx, AstFile *file, UntypedExprInfoMap *untyped) {
 	if (ctx == nullptr) {
 		return;
 	}
-	destroy_checker_context(ctx);
+	GB_ASSERT(ctx->checker != nullptr);
+	mutex_lock(&ctx->mutex);
+
 	auto *queue = ctx->procs_to_check_queue;
-	*ctx = make_checker_context(ctx->checker);
+	auto type_path = ctx->type_path;
+	array_clear(type_path);
+
+	zero_size(&ctx->pkg, gb_size_of(CheckerContext) - gb_offset_of(CheckerContext, pkg));
+
+	ctx->file = nullptr;
+	ctx->scope = builtin_pkg->scope;
+	ctx->pkg = builtin_pkg;
+	ctx->decl = nullptr;
+
+	ctx->type_path = type_path;
+	ctx->type_level = 0;
+
 	add_curr_ast_file(ctx, file);
+
 	ctx->procs_to_check_queue = queue;
 	ctx->untyped = untyped;
+
+	mutex_unlock(&ctx->mutex);
 }
 
 
@@ -5067,11 +5090,14 @@ gb_internal bool check_proc_info(Checker *c, ProcInfo *pi, UntypedExprInfoMap *u
 		return false;
 	}
 	Entity *e = pi->decl->entity;
-	if (pi->decl->proc_checked) {
-		if (e != nullptr) {
-			GB_ASSERT(e->flags & EntityFlag_ProcBodyChecked);
+
+	MUTEX_GUARD_BLOCK(&pi->decl->proc_checked_mutex) {
+		if (pi->decl->proc_checked) {
+			if (e != nullptr) {
+				GB_ASSERT(e->flags & EntityFlag_ProcBodyChecked);
+			}
+			return true;
 		}
-		return true;
 	}
 
 	CheckerContext ctx = make_checker_context(c);
@@ -5128,10 +5154,12 @@ gb_internal bool check_proc_info(Checker *c, ProcInfo *pi, UntypedExprInfoMap *u
 	}
 
 	check_proc_body(&ctx, pi->token, pi->decl, pi->type, pi->body);
-	if (e != nullptr) {
-		e->flags |= EntityFlag_ProcBodyChecked;
+	MUTEX_GUARD_BLOCK(&pi->decl->proc_checked_mutex) {
+		if (e != nullptr) {
+			e->flags |= EntityFlag_ProcBodyChecked;
+		}
+		pi->decl->proc_checked = true;
 	}
-	pi->decl->proc_checked = true;
 	add_untyped_expressions(&c->info, ctx.untyped);
 	return true;
 }
