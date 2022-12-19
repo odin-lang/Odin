@@ -207,6 +207,11 @@ foreign user32 {
 	SetLayeredWindowAttributes  :: proc(hWnd: HWND, crKey: COLORREF, bAlpha: BYTE, dwFlags: DWORD) -> BOOL ---
 
 	FillRect :: proc(hDC: HDC, lprc: ^RECT, hbr: HBRUSH) -> int ---
+	EqualRect :: proc(lprc1: ^RECT, lprc2: ^RECT) -> BOOL ---
+
+	GetWindowInfo :: proc(hwnd: HWND, pwi: PWINDOWINFO) -> BOOL ---
+	GetWindowPlacement :: proc(hWnd: HWND, lpwndpl: ^WINDOWPLACEMENT) -> BOOL ---
+	SetWindowRgn :: proc(hWnd: HWND, hRgn: HRGN, bRedraw: BOOL) -> int ---
 }
 
 CreateWindowW :: #force_inline proc "stdcall" (
@@ -437,3 +442,27 @@ RI_MOUSE_BUTTON_5_DOWN :: 0x0100
 RI_MOUSE_BUTTON_5_UP :: 0x0200
 RI_MOUSE_WHEEL :: 0x0400
 RI_MOUSE_HWHEEL :: 0x0800
+
+WINDOWPLACEMENT :: struct {
+	length: UINT,
+	flags: UINT,
+	showCmd: UINT,
+	ptMinPosition: POINT,
+  	ptMaxPosition: POINT,
+  	rcNormalPosition: RECT,
+  	rcDevice: RECT,
+}
+
+WINDOWINFO :: struct {
+	cbSize: DWORD,
+	rcWindow: RECT,
+	rcClient: RECT,
+	dwStyle: DWORD,
+	dwExStyle: DWORD,
+	dwWindowStatus: DWORD,
+	cxWindowBorders: UINT,
+	cyWindowBorders: UINT,
+	atomWindowType: ATOM,
+	wCreatorVersion: WORD,
+}
+PWINDOWINFO :: ^WINDOWINFO
