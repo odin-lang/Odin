@@ -202,6 +202,8 @@ foreign user32 {
 	GetRawInputDeviceList :: proc(pRawInputDeviceList: PRAWINPUTDEVICELIST, puiNumDevices: PUINT, cbSize: UINT) -> UINT ---
 	GetRegisteredRawInputDevices :: proc(pRawInputDevices: PRAWINPUTDEVICE, puiNumDevices: PUINT, cbSize: UINT) -> UINT ---
 	RegisterRawInputDevices :: proc(pRawInputDevices: PCRAWINPUTDEVICE, uiNumDevices: UINT, cbSize: UINT) -> BOOL ---
+
+	SetLayeredWindowAttributes  :: proc(hWnd: HWND, crKey: COLORREF, bAlpha: BYTE, dwFlags: DWORD) -> BOOL ---
 }
 
 CreateWindowW :: #force_inline proc "stdcall" (
