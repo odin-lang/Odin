@@ -212,6 +212,7 @@ foreign user32 {
 	GetWindowInfo :: proc(hwnd: HWND, pwi: PWINDOWINFO) -> BOOL ---
 	GetWindowPlacement :: proc(hWnd: HWND, lpwndpl: ^WINDOWPLACEMENT) -> BOOL ---
 	SetWindowRgn :: proc(hWnd: HWND, hRgn: HRGN, bRedraw: BOOL) -> int ---
+	CreateRectRgnIndirect :: proc(lprect: ^RECT) -> HRGN ---
 }
 
 CreateWindowW :: #force_inline proc "stdcall" (
