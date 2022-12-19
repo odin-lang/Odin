@@ -3,9 +3,6 @@ package sys_windows
 
 foreign import dwmapi "system:Dwmapi.lib"
 
-MARGINS :: distinct [4]int
-PMARGINS :: ^MARGINS
-
 DWMWINDOWATTRIBUTE :: enum {
 	DWMWA_NCRENDERING_ENABLED,
 	DWMWA_NCRENDERING_POLICY,
