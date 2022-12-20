@@ -61,8 +61,7 @@ gb_internal u32  thread_current_id(void);
 
 gb_internal void thread_init_and_start           (Thread *t, ThreadProc *proc, void *data);
 gb_internal void thread_init_and_start_with_stack(Thread *t, ThreadProc *proc, void *data, isize stack_size);
-gb_internal void thread_destroy         (Thread *t);
-gb_internal void thread_join            (Thread *t);
+gb_internal void thread_join_and_destroy(Thread *t);
 gb_internal bool thread_is_running      (Thread const *t);
 gb_internal void thread_set_name        (Thread *t, char const *name);
 
@@ -326,11 +325,6 @@ gb_internal gb_inline void yield(void) {
 #endif
 }
 
-gb_internal void thread_destroy(Thread *t) {
-	thread_join(t);
-}
-
-
 gb_internal void private__thread_run(Thread *t) {
 	t->return_value = t->proc(t);
 }
@@ -390,7 +384,7 @@ gb_internal void thread_init_and_start_with_stack(Thread *t, ThreadProc *proc, v
 #endif
 }
 
-gb_internal void thread_join(Thread *t) {
+gb_internal void thread_join_and_destroy(Thread *t) {
 	if (!t->is_running.load()) {
 		return;
 	}
