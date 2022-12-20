@@ -4967,10 +4967,9 @@ gb_internal AstPackage *try_add_import_path(Parser *p, String const &path, Strin
 	String const FILE_EXT = str_lit(".odin");
 
 	MUTEX_GUARD_BLOCK(&p->import_mutex) {
-		if (string_set_exists(&p->imported_files, path)) {
+		if (string_set_update(&p->imported_files, path)) {
 			return nullptr;
 		}
-		string_set_add(&p->imported_files, path);
 	}
 
 	AstPackage *pkg = gb_alloc_item(permanent_allocator(), AstPackage);

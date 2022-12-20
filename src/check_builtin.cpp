@@ -3126,13 +3126,11 @@ gb_internal bool check_builtin_procedure(CheckerContext *c, Operand *operand, As
 			}
 
 
-			if (string_set_exists(&name_set, name)) {
+			if (string_set_update(&name_set, name)) {
 				error(op.expr, "Field argument name '%.*s' already exists", LIT(name));
 			} else {
 				array_add(&types, arg_type->Slice.elem);
 				array_add(&names, name);
-
-				string_set_add(&name_set, name);
 			}
 		}
 

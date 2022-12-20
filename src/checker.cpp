@@ -3414,11 +3414,9 @@ gb_internal void check_decl_attributes(CheckerContext *c, Array<Ast *> const &at
 				continue;
 			}
 
-			if (string_set_exists(&set, name)) {
+			if (string_set_update(&set, name)) {
 				error(elem, "Previous declaration of '%.*s'", LIT(name));
 				continue;
-			} else {
-				string_set_add(&set, name);
 			}
 
 			if (!proc(c, elem, name, value, ac)) {
@@ -4969,10 +4967,9 @@ gb_internal Array<Entity *> find_entity_path(Entity *start, Entity *end, PtrSet<
 
 	Array<Entity *> empty_path = {};
 
-	if (ptr_set_exists(visited, start)) {
+	if (ptr_set_update(visited, start)) {
 		return empty_path;
 	}
-	ptr_set_add(visited, start);
 
 	DeclInfo *decl = start->decl_info;
 	if (decl) {
