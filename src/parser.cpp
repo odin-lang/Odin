@@ -4966,14 +4966,12 @@ gb_internal void parser_add_foreign_file_to_process(Parser *p, AstPackage *pkg, 
 gb_internal AstPackage *try_add_import_path(Parser *p, String const &path, String const &rel_path, TokenPos pos, PackageKind kind = Package_Normal) {
 	String const FILE_EXT = str_lit(".odin");
 
-	mutex_lock(&p->import_mutex);
-	defer (mutex_unlock(&p->import_mutex));
-
-	if (string_set_exists(&p->imported_files, path)) {
-		return nullptr;
+	MUTEX_GUARD_BLOCK(&p->import_mutex) {
+		if (string_set_exists(&p->imported_files, path)) {
+			return nullptr;
+		}
+		string_set_add(&p->imported_files, path);
 	}
-	string_set_add(&p->imported_files, path);
-
 
 	AstPackage *pkg = gb_alloc_item(permanent_allocator(), AstPackage);
 	pkg->kind = kind;
@@ -4991,8 +4989,8 @@ gb_internal AstPackage *try_add_import_path(Parser *p, String const &path, Strin
 		fi.is_dir = false;
 
 		pkg->is_single_file = true;
-		parser_add_file_to_process(p, pkg, fi, pos);
 		parser_add_package(p, pkg);
+		parser_add_file_to_process(p, pkg, fi, pos);
 		return pkg;
 	}
 
