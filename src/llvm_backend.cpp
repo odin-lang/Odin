@@ -1740,12 +1740,9 @@ gb_internal void lb_generate_code(lbGenerator *gen) {
 		if (m->debug_builder) { // Debug Info
 			for (auto const &file_entry : info->files) {
 				AstFile *f = file_entry.value;
-				String fullpath = f->fullpath;
-				String filename = remove_directory_from_path(fullpath);
-				String directory = directory_from_path(fullpath);
 				LLVMMetadataRef res = LLVMDIBuilderCreateFile(m->debug_builder,
-					cast(char const *)filename.text, filename.len,
-					cast(char const *)directory.text, directory.len);
+					cast(char const *)f->filename.text, f->filename.len,
+					cast(char const *)f->directory.text, f->directory.len);
 				lb_set_llvm_metadata(m, f, res);
 			}
 

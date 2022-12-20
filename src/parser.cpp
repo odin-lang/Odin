@@ -4768,8 +4768,10 @@ gb_internal Array<Ast *> parse_stmt_list(AstFile *f) {
 
 gb_internal ParseFileError init_ast_file(AstFile *f, String const &fullpath, TokenPos *err_pos) {
 	GB_ASSERT(f != nullptr);
-	f->fullpath = string_trim_whitespace(fullpath); // Just in case
-	set_file_path_string(f->id, fullpath);
+	f->fullpath  = string_trim_whitespace(fullpath); // Just in case
+	f->filename  = remove_directory_from_path(f->fullpath);
+	f->directory = directory_from_path(f->fullpath);
+	set_file_path_string(f->id, f->fullpath);
 	thread_safe_set_ast_file_from_id(f->id, f);
 	if (!string_ends_with(f->fullpath, str_lit(".odin"))) {
 		return ParseFile_WrongExtension;
