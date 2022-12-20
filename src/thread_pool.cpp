@@ -1,13 +1,24 @@
 // thread_pool.cpp
 
+struct WorkerTask;
+struct ThreadPool;
+
 #define WORKER_TASK_PROC(name) isize name(void *data)
 typedef WORKER_TASK_PROC(WorkerTaskProc);
+
+gb_internal void thread_pool_init(ThreadPool *pool, gbAllocator const &a, isize thread_count, char const *worker_name);
+gb_internal void thread_pool_destroy(ThreadPool *pool);
+gb_internal bool thread_pool_add_task(ThreadPool *pool, WorkerTaskProc *proc, void *data);
+gb_internal void thread_pool_wait(ThreadPool *pool);
+
 
 struct WorkerTask {
 	WorkerTask *    next;
 	WorkerTaskProc *do_work;
 	void *          data;
+	ThreadPool *    pool;
 };
+
 
 struct ThreadPool {
 	gbAllocator   allocator;
@@ -89,6 +100,7 @@ gb_internal bool thread_pool_add_task(ThreadPool *pool, WorkerTaskProc *proc, vo
 		GB_PANIC("Out of memory");
 		return false;
 	}
+	task->pool = pool;
 	task->do_work = proc;
 	task->data = data;
 		
