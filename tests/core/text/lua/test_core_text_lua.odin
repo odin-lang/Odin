@@ -196,7 +196,7 @@ test_match :: proc(t: ^testing.T) {
 test_captures :: proc(t: ^testing.T) {
 	Temp :: struct {
 		pattern: string,
-		captures: [lua.MAXCAPTURES]lua.Match,
+		captures: [lua.MAX_CAPTURES]lua.Match,
 	}
 
 	// match all captures
@@ -244,7 +244,7 @@ test_captures :: proc(t: ^testing.T) {
 	{
 		haystack := " 233   hello dolly"
 		pattern := "%s*(%d+)%s+(%S+)"
-		captures: [lua.MAXCAPTURES]lua.Match
+		captures: [lua.MAX_CAPTURES]lua.Match
 		lua.find_aux(haystack, pattern, 0, false, &captures)
 		cap1 := captures[1]
 		cap2 := captures[2]
@@ -304,7 +304,7 @@ test_gsub :: proc(t: ^testing.T) {
 test_gfind :: proc(t: ^testing.T) {
 	haystack := "test1 123 test2 123 test3"
 	pattern := "%w+" 
-	captures: [lua.MAXCAPTURES]lua.Match
+	captures: [lua.MAX_CAPTURES]lua.Match
 	s := &haystack
 	output := [?]string { "test1", "123", "test2", "123", "test3" }
 	index: int
