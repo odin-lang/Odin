@@ -61,21 +61,18 @@ test_find :: proc(t: ^testing.T) {
 		{ "helelo", "h.-l", 0, { 0, 3, true } },
 	}
 
-	captures: [lua.MAXCAPTURES]lua.Match
 	for entry, i in ENTRIES {
-		captures[0] = {}
-		length, err := lua.find_aux(entry.s, entry.p, entry.offset, true, &captures)
-		cap := captures[0]
-		ok := length > 0 && err == .OK
-		success := entry.match.ok == ok && entry.match.start == cap.byte_start && entry.match.end == cap.byte_end 
+		matcher := lua.matcher_init(entry.s, entry.p, entry.offset)
+		start, end, ok := lua.matcher_find(&matcher)
+		success := entry.match.ok == ok && start == entry.match.start && end == entry.match.end
 
 		if failed(t, success) {
 			logf(t, "Find %d failed!\n", i)
 			logf(t, "\tHAYSTACK %s\tPATTERN %s\n", entry.s, entry.p)
-			logf(t, "\tSTART: %d == %d?\n", entry.match.start, cap.byte_start)
-			logf(t, "\tEND: %d == %d?\n", entry.match.end, cap.byte_end)
-			logf(t, "\tErr: %v\tLength %d\n", err, length)			
-		}
+			logf(t, "\tSTART: %d == %d?\n", entry.match.start, start)
+			logf(t, "\tEND: %d == %d?\n", entry.match.end, end)
+			logf(t, "\tErr: %v\tLength %d\n", matcher.err, matcher.captures_length)			
+		}		
 	}
 }
 
@@ -181,19 +178,16 @@ test_match :: proc(t: ^testing.T) {
 		{ "testing _this_ out", "%b_", "", false },
 	}
 
-	captures: [lua.MAXCAPTURES]lua.Match
 	for entry, i in ENTRIES {
-		captures[0] = {}
-		length, err := lua.find_aux(entry.s, entry.p, 0, false, &captures)
-		ok := length > 0 && err == .OK
-		result := entry.s[captures[0].byte_start:captures[0].byte_end]
+		matcher := lua.matcher_init(entry.s, entry.p)
+		result, ok := lua.matcher_match(&matcher)
 		success := entry.ok == ok && result == entry.result
 
 		if failed(t, success) {
 			logf(t, "Match %d failed!\n", i)
 			logf(t, "\tHAYSTACK %s\tPATTERN %s\n", entry.s, entry.p)
 			logf(t, "\tResults: WANTED %s\tGOT %s\n", entry.result, result)
-			logf(t, "\tErr: %v\tLength %d\n", err, length)
+			logf(t, "\tErr: %v\tLength %d\n", matcher.err, matcher.captures_length)
 		}
 	}
 }
@@ -270,46 +264,30 @@ gmatch_check :: proc(t: ^testing.T, index: int, a: []string, b: string) {
 
 @test
 test_gmatch :: proc(t: ^testing.T) {
-
 	{
-		haystack := "testing this out 123"
-		pattern := "%w+"
-		s := &haystack
-		captures: [lua.MAXCAPTURES]lua.Match
+		matcher := lua.matcher_init("testing this out 123", "%w+")
 		output := [?]string { "testing", "this", "out", "123" }
-		index: int
-
-		for match in lua.gmatch(s, pattern, &captures) {
+		
+		for match, index in lua.matcher_gmatch(&matcher) {
 			gmatch_check(t, index, output[:], match)
-			index += 1
 		}
 	}
 
 	{
-		haystack := "#afdde6"
-		pattern := "%x%x"
-		s := &haystack
-		captures: [lua.MAXCAPTURES]lua.Match
+		matcher := lua.matcher_init("#afdde6", "%x%x")
 		output := [?]string { "af", "dd", "e6" }
-		index: int
-
-		for match in lua.gmatch(s, pattern, &captures) {
+		
+		for match, index in lua.matcher_gmatch(&matcher) {
 			gmatch_check(t, index, output[:], match)
-			index += 1
 		}
 	}
 
 	{
-		haystack := "testing outz captures yo outz outtz"
-		pattern := "(out)z"
-		s := &haystack
-		captures: [lua.MAXCAPTURES]lua.Match
+		matcher := lua.matcher_init("testing outz captures yo outz outtz", "(out)z")
 		output := [?]string { "out", "out" }
-		index: int
 
-		for match in lua.gmatch(s, pattern, &captures) {
+		for match, index in lua.matcher_gmatch(&matcher) {
 			gmatch_check(t, index, output[:], match)
-			index += 1
 		}
 	}		
 }
@@ -374,17 +352,11 @@ test_frontier :: proc(t: ^testing.T) {
 
 @test
 test_utf8 :: proc(t: ^testing.T) {
-	{
-		haystack := "恥ず べき恥 フク恥ロ"
-		s := &haystack
-		captures: [lua.MAXCAPTURES]lua.Match
-		output := [?]string { "恥ず", "べき恥", "フク恥ロ" }
-		index: int
+	matcher := lua.matcher_init("恥ず べき恥 フク恥ロ", "%w+")
+	output := [?]string { "恥ず", "べき恥", "フク恥ロ" }
 
-		for word in lua.gmatch(s, "%w+", &captures) {
-			gmatch_check(t, index, output[:], word)
-			index += 1
-		}
+	for match, index in lua.matcher_gmatch(&matcher) {
+		gmatch_check(t, index, output[:], match)
 	}
 }
 

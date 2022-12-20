@@ -952,6 +952,7 @@ Matcher :: struct {
 
 	// changing content for iterators
 	iter: string,
+	iter_index: int,
 }
 
 // matcher
@@ -1006,7 +1007,7 @@ matcher_capture_raw :: proc(matcher: ^Matcher, index: int, loc := #caller_locati
 
 matcher_gmatch :: matcher_match_iter
 
-matcher_match_iter :: proc(matcher: ^Matcher) -> (res: string, ok: bool) {
+matcher_match_iter :: proc(matcher: ^Matcher) -> (res: string, index: int, ok: bool) {
 	if len(matcher.iter) > 0 {
 		matcher.captures_length, matcher.err = find_aux(
 			matcher.iter, 
@@ -1020,7 +1021,13 @@ matcher_match_iter :: proc(matcher: ^Matcher) -> (res: string, ok: bool) {
 			ok = true
 			first := matcher.captures_length > 1 ? 1 : 0
 			match := matcher.captures[first]
+			
+			// output
 			res = matcher.iter[match.byte_start:match.byte_end]
+			index = matcher.iter_index
+			
+			// advance
+			matcher.iter_index += 1
 			matcher.iter = matcher.iter[match.byte_end:]
 		}
 	}
