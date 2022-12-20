@@ -816,6 +816,14 @@ gb_internal bool type_ptr_set_update(PtrSet<Type *> *s, Type *t) {
 	if (ptr_set_exists(s, t)) {
 		return true;
 	}
+	ptr_set_add(s, t);
+	return false;
+}
+
+gb_internal bool type_ptr_set_exists(PtrSet<Type *> *s, Type *t) {
+	if (ptr_set_exists(s, t)) {
+		return true;
+	}
 
 	// TODO(bill, 2019-10-05): This is very slow and it's probably a lot
 	// faster to cache types correctly
