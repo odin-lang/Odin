@@ -152,6 +152,8 @@ gb_internal void thread_pool_wait(ThreadPool *pool) {
 
 gb_internal THREAD_PROC(thread_pool_thread_proc) {
 	ThreadPool *pool = cast(ThreadPool *)thread->user_data;
+	spall_auto_thread_init();
+	defer(spall_auto_thread_quit());
 	
 	for (;;) {
 		mutex_lock(&pool->mutex);

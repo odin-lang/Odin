@@ -27,7 +27,7 @@ struct Thread {
 	isize          user_index;
 	isize volatile return_value;
 
-	Semaphore * semaphore;
+	//Semaphore * semaphore;
 	isize       stack_size;
 	std::atomic<bool> is_running;
 };
@@ -336,19 +336,19 @@ gb_internal void thread_init(Thread *t) {
 #else
 	t->posix_handle = 0;
 #endif
-	t->semaphore = gb_alloc_item(heap_allocator(), Semaphore);
-	semaphore_init(t->semaphore);
+	//t->semaphore = gb_alloc_item(heap_allocator(), Semaphore);
+	//semaphore_init(t->semaphore);
 }
 
 gb_internal void thread_destroy(Thread *t) {
 	thread_join(t);
-	semaphore_destroy(t->semaphore);
-	gb_free(heap_allocator(), t->semaphore);
+	//semaphore_destroy(t->semaphore);
+	//gb_free(heap_allocator(), t->semaphore);
 }
 
 
 gb_internal void gb__thread_run(Thread *t) {
-	semaphore_release(t->semaphore);
+	//semaphore_release(t->semaphore);
 	t->return_value = t->proc(t);
 }
 
@@ -400,7 +400,7 @@ gb_internal void thread_start_with_stack(Thread *t, ThreadProc *proc, void *user
 	}
 #endif
 
-	semaphore_wait(t->semaphore);
+	//semaphore_wait(t->semaphore);
 }
 
 gb_internal void thread_join(Thread *t) {

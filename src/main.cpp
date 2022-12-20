@@ -1,5 +1,7 @@
 // #define NO_ARRAY_BOUNDS_CHECK
 
+#include "spall_auto.h"
+
 #include "common.cpp"
 #include "timings.cpp"
 #include "tokenizer.cpp"
@@ -2487,6 +2489,12 @@ gb_internal int strip_semicolons(Parser *parser) {
 }
 
 int main(int arg_count, char const **arg_ptr) {
+	spall_auto_init();
+	defer (spall_auto_quit());
+
+	spall_auto_thread_init();
+	defer (spall_auto_thread_quit());
+
 	if (arg_count < 2) {
 		usage(make_string_c(arg_ptr[0]));
 		return 1;
@@ -2814,3 +2822,8 @@ int main(int arg_count, char const **arg_ptr) {
 	}
 	return 0;
 }
+
+#define SPALL_BUFFER_PROFILING
+#define SPALL_BUFFER_PROFILING_GET_TIME() __rdtsc()
+#define SPALL_AUTO_IMPLEMENTATION
+#include "spall_auto.h"
