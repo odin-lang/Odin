@@ -27,7 +27,6 @@ struct Thread {
 	isize          user_index;
 	isize volatile return_value;
 
-	//Semaphore * semaphore;
 	isize       stack_size;
 	std::atomic<bool> is_running;
 };
@@ -60,11 +59,9 @@ gb_internal void condition_wait_with_timeout(Condition *c, BlockingMutex *m, u32
 
 gb_internal u32  thread_current_id(void);
 
-gb_internal void thread_init            (Thread *t);
-gb_internal void thread_destroy         (Thread *t);
-gb_internal void thread_start           (Thread *t, ThreadProc *proc, void *data);
-gb_internal void thread_start_with_stack(Thread *t, ThreadProc *proc, void *data, isize stack_size);
-gb_internal void thread_join            (Thread *t);
+gb_internal void thread_init_and_start           (Thread *t, ThreadProc *proc, void *data);
+gb_internal void thread_init_and_start_with_stack(Thread *t, ThreadProc *proc, void *data, isize stack_size);
+gb_internal void thread_join_and_destroy(Thread *t);
 gb_internal bool thread_is_running      (Thread const *t);
 gb_internal void thread_set_name        (Thread *t, char const *name);
 
@@ -328,27 +325,7 @@ gb_internal gb_inline void yield(void) {
 #endif
 }
 
-
-gb_internal void thread_init(Thread *t) {
-	gb_zero_item(t);
-#if defined(GB_SYSTEM_WINDOWS)
-	t->win32_handle = INVALID_HANDLE_VALUE;
-#else
-	t->posix_handle = 0;
-#endif
-	//t->semaphore = gb_alloc_item(heap_allocator(), Semaphore);
-	//semaphore_init(t->semaphore);
-}
-
-gb_internal void thread_destroy(Thread *t) {
-	thread_join(t);
-	//semaphore_destroy(t->semaphore);
-	//gb_free(heap_allocator(), t->semaphore);
-}
-
-
-gb_internal void gb__thread_run(Thread *t) {
-	//semaphore_release(t->semaphore);
+gb_internal void private__thread_run(Thread *t) {
 	t->return_value = t->proc(t);
 }
 
@@ -356,7 +333,7 @@ gb_internal void gb__thread_run(Thread *t) {
 	gb_internal DWORD __stdcall internal_thread_proc(void *arg) {
 		Thread *t = cast(Thread *)arg;
 		t->is_running.store(true);
-		gb__thread_run(t);
+		private__thread_run(t);
 		return 0;
 	}
 #else
@@ -370,14 +347,20 @@ gb_internal void gb__thread_run(Thread *t) {
 		
 		Thread *t = cast(Thread *)arg;
 		t->is_running.store(true);
-		gb__thread_run(t);
+		private__thread_run(t);
 		return NULL;
 	}
 #endif
 
-gb_internal void thread_start(Thread *t, ThreadProc *proc, void *user_data) { thread_start_with_stack(t, proc, user_data, 0); }
+gb_internal void thread_init_and_start(Thread *t, ThreadProc *proc, void *user_data) { thread_init_and_start_with_stack(t, proc, user_data, 0); }
 
-gb_internal void thread_start_with_stack(Thread *t, ThreadProc *proc, void *user_data, isize stack_size) {
+gb_internal void thread_init_and_start_with_stack(Thread *t, ThreadProc *proc, void *user_data, isize stack_size) {
+	gb_zero_item(t);
+#if defined(GB_SYSTEM_WINDOWS)
+	t->win32_handle = INVALID_HANDLE_VALUE;
+#else
+	t->posix_handle = 0;
+#endif
 	GB_ASSERT(!t->is_running.load());
 	GB_ASSERT(proc != NULL);
 	t->proc = proc;
@@ -391,19 +374,17 @@ gb_internal void thread_start_with_stack(Thread *t, ThreadProc *proc, void *user
 	{
 		pthread_attr_t attr;
 		pthread_attr_init(&attr);
+		defer (pthread_attr_destroy(&attr));
 		pthread_attr_setdetachstate(&attr, PTHREAD_CREATE_JOINABLE);
 		if (stack_size != 0) {
 			pthread_attr_setstacksize(&attr, stack_size);
 		}
 		pthread_create(&t->posix_handle, &attr, internal_thread_proc, t);
-		pthread_attr_destroy(&attr);
 	}
 #endif
-
-	//semaphore_wait(t->semaphore);
 }
 
-gb_internal void thread_join(Thread *t) {
+gb_internal void thread_join_and_destroy(Thread *t) {
 	if (!t->is_running.load()) {
 		return;
 	}

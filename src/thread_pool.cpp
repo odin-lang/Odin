@@ -45,12 +45,7 @@ gb_internal void thread_pool_init(ThreadPool *pool, gbAllocator const &a, isize 
 	slice_init(&pool->threads, a, thread_count);
 	for_array(i, pool->threads) {
 		Thread *t = &pool->threads[i];
-		thread_init(t);
-	}
-	
-	for_array(i, pool->threads) {
-		Thread *t = &pool->threads[i];
-		thread_start(t, thread_pool_thread_proc, pool);
+		thread_init_and_start(t, thread_pool_thread_proc, pool);
 	}
 }
 
@@ -62,14 +57,9 @@ gb_internal void thread_pool_destroy(ThreadPool *pool) {
 
 	for_array(i, pool->threads) {
 		Thread *t = &pool->threads[i];
-		thread_join(t);
+		thread_join_and_destroy(t);
 	}
-	
-	for_array(i, pool->threads) {
-		Thread *t = &pool->threads[i];
-		thread_destroy(t);
-	}
-	
+
 	gb_free(pool->allocator, pool->threads.data);
 	mutex_destroy(&pool->mutex);
 	condition_destroy(&pool->task_cond);
