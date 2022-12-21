@@ -50,6 +50,7 @@ Font :: struct {
 
 	info: stbtt.fontinfo,
 	loadedData: []byte,
+	freeLoadedData: bool, // in case you dont want loadedData to be removed
 
 	ascender: f32,
 	descender: f32,
@@ -147,7 +148,11 @@ Init :: proc(using ctx: ^FontContext, w, h: int, loc: QuadLocation) {
 
 Destroy :: proc(using ctx: ^FontContext) {
 	for font in &fonts {
-		delete(font.loadedData)
+		if font.freeLoadedData {
+			delete(font.loadedData)
+		}
+
+		delete(font.name)
 		delete(font.glyphs)
 	}
 
@@ -349,7 +354,7 @@ AddFontPath :: proc(
 		log.panicf("FONT: failed to read font at %s", path)
 	}
 
-	return AddFontMem(ctx, name, data)
+	return AddFontMem(ctx, name, data, true)
 }
 
 // push a font to the font stack
@@ -358,10 +363,12 @@ AddFontMem :: proc(
 	ctx: ^FontContext,
 	name: string,
 	data: []u8, 
+	freeLoadedData: bool,
 ) -> int {
 	append(&ctx.fonts, Font {})
 	res := &ctx.fonts[len(ctx.fonts) - 1]
 	res.loadedData = data
+	res.freeLoadedData = freeLoadedData
 	res.name = strings.clone(name)
 
 	stbtt.InitFont(&res.info, &res.loadedData[0], 0)
