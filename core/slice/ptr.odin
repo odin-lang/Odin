@@ -75,15 +75,25 @@ ptr_rotate :: proc(left: int, mid: ^$T, right: int) {
 		// TODO(bill): Optimization with a buffer for smaller ranges
 		for left > 0 && right > 0 {
 			if left >= right {
-				ptr_swap_non_overlapping(ptr_sub(mid, right), mid, right * size_of(T))
-				mid = ptr_sub(mid, right)
+				for {
+					ptr_swap_non_overlapping(ptr_sub(mid, right), mid, right * size_of(T))
+					mid = ptr_sub(mid, right)
 
-				left -= right
+					left -= right
+					if left < right {
+						break
+					}
+				}
 			} else {
-				ptr_swap_non_overlapping(ptr_sub(mid, left), mid, left * size_of(T))
-				mid = ptr_add(mid, left)
+				for {
+					ptr_swap_non_overlapping(ptr_sub(mid, left), mid, left * size_of(T))
+					mid = ptr_add(mid, left)
 
-				right -= left
+					right -= left
+					if right < left {
+						break
+					}
+				}
 			}
 		}
 	}
