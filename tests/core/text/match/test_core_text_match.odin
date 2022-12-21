@@ -1,6 +1,6 @@
 package test_strlib
 
-import lua "core:text/lua"
+import "core:text/match"
 import "core:testing"
 import "core:fmt"
 import "core:os"
@@ -62,8 +62,8 @@ test_find :: proc(t: ^testing.T) {
 	}
 
 	for entry, i in ENTRIES {
-		matcher := lua.matcher_init(entry.s, entry.p, entry.offset)
-		start, end, ok := lua.matcher_find(&matcher)
+		matcher := match.matcher_init(entry.s, entry.p, entry.offset)
+		start, end, ok := match.matcher_find(&matcher)
 		success := entry.match.ok == ok && start == entry.match.start && end == entry.match.end
 
 		if failed(t, success) {
@@ -179,8 +179,8 @@ test_match :: proc(t: ^testing.T) {
 	}
 
 	for entry, i in ENTRIES {
-		matcher := lua.matcher_init(entry.s, entry.p)
-		result, ok := lua.matcher_match(&matcher)
+		matcher := match.matcher_init(entry.s, entry.p)
+		result, ok := match.matcher_match(&matcher)
 		success := entry.ok == ok && result == entry.result
 
 		if failed(t, success) {
@@ -196,12 +196,12 @@ test_match :: proc(t: ^testing.T) {
 test_captures :: proc(t: ^testing.T) {
 	Temp :: struct {
 		pattern: string,
-		captures: [lua.MAX_CAPTURES]lua.Match,
+		captures: [match.MAX_CAPTURES]match.Match,
 	}
 
 	// match all captures
 	compare_captures :: proc(t: ^testing.T, test: ^Temp, haystack: string, comp: []string, loc := #caller_location) {
-		length, err := lua.find_aux(haystack, test.pattern, 0, false, &test.captures)
+		length, err := match.find_aux(haystack, test.pattern, 0, false, &test.captures)
 		if failed(t, len(comp) == length) {
 			logf(t, "Captures Compare Failed -> Lengths %d != %d\n", len(comp), length)
 		}
@@ -218,7 +218,7 @@ test_captures :: proc(t: ^testing.T) {
 
 	// match to expected results
 	matches :: proc(t: ^testing.T, test: ^Temp, haystack: string, ok: bool, loc := #caller_location) {
-		length, err := lua.find_aux(haystack, test.pattern, 0, false, &test.captures)
+		length, err := match.find_aux(haystack, test.pattern, 0, false, &test.captures)
 		result := length > 0 && err == .OK
 
 		if failed(t, result == ok) {
@@ -244,8 +244,8 @@ test_captures :: proc(t: ^testing.T) {
 	{
 		haystack := " 233   hello dolly"
 		pattern := "%s*(%d+)%s+(%S+)"
-		captures: [lua.MAX_CAPTURES]lua.Match
-		lua.find_aux(haystack, pattern, 0, false, &captures)
+		captures: [match.MAX_CAPTURES]match.Match
+		match.find_aux(haystack, pattern, 0, false, &captures)
 		cap1 := captures[1]
 		cap2 := captures[2]
 		text1 := haystack[cap1.byte_start:cap1.byte_end]
@@ -265,28 +265,28 @@ gmatch_check :: proc(t: ^testing.T, index: int, a: []string, b: string) {
 @test
 test_gmatch :: proc(t: ^testing.T) {
 	{
-		matcher := lua.matcher_init("testing this out 123", "%w+")
+		matcher := match.matcher_init("testing this out 123", "%w+")
 		output := [?]string { "testing", "this", "out", "123" }
 		
-		for match, index in lua.matcher_gmatch(&matcher) {
+		for match, index in match.matcher_gmatch(&matcher) {
 			gmatch_check(t, index, output[:], match)
 		}
 	}
 
 	{
-		matcher := lua.matcher_init("#afdde6", "%x%x")
+		matcher := match.matcher_init("#afdde6", "%x%x")
 		output := [?]string { "af", "dd", "e6" }
 		
-		for match, index in lua.matcher_gmatch(&matcher) {
+		for match, index in match.matcher_gmatch(&matcher) {
 			gmatch_check(t, index, output[:], match)
 		}
 	}
 
 	{
-		matcher := lua.matcher_init("testing outz captures yo outz outtz", "(out)z")
+		matcher := match.matcher_init("testing outz captures yo outz outtz", "(out)z")
 		output := [?]string { "out", "out" }
 
-		for match, index in lua.matcher_gmatch(&matcher) {
+		for match, index in match.matcher_gmatch(&matcher) {
 			gmatch_check(t, index, output[:], match)
 		}
 	}		
@@ -294,9 +294,9 @@ test_gmatch :: proc(t: ^testing.T) {
 
 @test
 test_gsub :: proc(t: ^testing.T) {
-	result := lua.gsub("testing123testing", "%d+", " sup ", context.temp_allocator)
+	result := match.gsub("testing123testing", "%d+", " sup ", context.temp_allocator)
 	expect(t, result == "testing sup testing", "GSUB 0: failed")
-	result = lua.gsub("testing123testing", "%a+", "345", context.temp_allocator)
+	result = match.gsub("testing123testing", "%a+", "345", context.temp_allocator)
 	expect(t, result == "345123345", "GSUB 1: failed")
 }
 
@@ -304,12 +304,12 @@ test_gsub :: proc(t: ^testing.T) {
 test_gfind :: proc(t: ^testing.T) {
 	haystack := "test1 123 test2 123 test3"
 	pattern := "%w+" 
-	captures: [lua.MAX_CAPTURES]lua.Match
+	captures: [match.MAX_CAPTURES]match.Match
 	s := &haystack
 	output := [?]string { "test1", "123", "test2", "123", "test3" }
 	index: int
 
-	for word in lua.gfind(s, pattern, &captures) {
+	for word in match.gfind(s, pattern, &captures) {
 		if failed(t, output[index] == word) {
 			logf(t, "GFIND %d failed!\n", index)
 			logf(t, "\t%s != %s\n", output[index], word)
@@ -326,7 +326,7 @@ test_frontier :: proc(t: ^testing.T) {
 		output: [3]string,
 	}
 	
-	call :: proc(data: rawptr, word: string, haystack: string, captures: []lua.Match) {
+	call :: proc(data: rawptr, word: string, haystack: string, captures: []match.Match) {
 		temp := cast(^Temp) data
 
 		if failed(temp.t, word == temp.output[temp.index]) {
@@ -347,15 +347,15 @@ test_frontier :: proc(t: ^testing.T) {
 	}
 
 	// https://lua-users.org/wiki/FrontierPattern example taken from here
-	lua.gsub_with("THE (QUICK) brOWN FOx JUMPS", "%f[%a]%u+%f[%A]", &temp, call)
+	match.gsub_with("THE (QUICK) brOWN FOx JUMPS", "%f[%a]%u+%f[%A]", &temp, call)
 }
 
 @test
 test_utf8 :: proc(t: ^testing.T) {
-	matcher := lua.matcher_init("恥ず べき恥 フク恥ロ", "%w+")
+	matcher := match.matcher_init("恥ず べき恥 フク恥ロ", "%w+")
 	output := [?]string { "恥ず", "べき恥", "フク恥ロ" }
 
-	for match, index in lua.matcher_gmatch(&matcher) {
+	for match, index in match.matcher_gmatch(&matcher) {
 		gmatch_check(t, index, output[:], match)
 	}
 }
@@ -363,7 +363,7 @@ test_utf8 :: proc(t: ^testing.T) {
 @test
 test_case_insensitive :: proc(t: ^testing.T) {
 	{
-		pattern := lua.pattern_case_insensitive("test", 256, context.temp_allocator)
+		pattern := match.pattern_case_insensitive("test", 256, context.temp_allocator)
 		goal := "[tT][eE][sS][tT]"
 		
 		if failed(t, pattern == goal) {
