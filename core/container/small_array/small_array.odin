@@ -1,6 +1,8 @@
 package container_small_array
 
 import "core:builtin"
+import "core:runtime"
+_ :: runtime
 
 Small_Array :: struct($N: int, $T: typeid) where N >= 0 {
 	data: [N]T,
@@ -30,6 +32,20 @@ get :: proc "contextless" (a: $A/Small_Array($N, $T), index: int) -> T {
 }
 get_ptr :: proc "contextless" (a: ^$A/Small_Array($N, $T), index: int) -> ^T {
 	return &a.data[index]
+}
+
+get_safe :: proc(a: $A/Small_Array($N, $T), index: int) -> (T, bool) #no_bounds_check {
+	if index < 0 || index >= a.len {
+		return {}, false
+	}
+	return a.data[index], true
+}
+
+get_ptr_safe :: proc(a: ^$A/Small_Array($N, $T), index: int) -> (^T, bool) #no_bounds_check {
+	if index < 0 || index >= a.len {
+		return {}, false
+	}
+	return &a.data[index], true
 }
 
 set :: proc "contextless" (a: ^$A/Small_Array($N, $T), index: int, item: T) {
@@ -93,13 +109,30 @@ pop_front_safe :: proc "contextless" (a: ^$A/Small_Array($N, $T)) -> (item: T, o
 		copy(s[:], s[1:])
 		a.len -= 1
 		ok = true
-	} 
+	}
 	return
 }
 
 consume :: proc "odin" (a: ^$A/Small_Array($N, $T), count: int, loc := #caller_location) {
 	assert(condition=a.len >= count, loc=loc)
 	a.len -= count
+}
+
+ordered_remove :: proc "contextless" (a: ^$A/Small_Array($N, $T), index: int, loc := #caller_location) #no_bounds_check {
+    runtime.bounds_check_error_loc(loc, index, a.len)
+    if index+1 < a.len {
+		copy(a.data[index:], a.data[index+1:])
+	}
+	a.len -= 1
+}
+
+unordered_remove :: proc "contextless" (a: ^$A/Small_Array($N, $T), index: int, loc := #caller_location) #no_bounds_check {
+    runtime.bounds_check_error_loc(loc, index, a.len)
+	n := a.len-1
+	if index != n {
+		a.data[index] = a.data[n]
+	}
+    a.len -= 1
 }
 
 clear :: proc "contextless" (a: ^$A/Small_Array($N, $T)) {
@@ -109,6 +142,18 @@ clear :: proc "contextless" (a: ^$A/Small_Array($N, $T)) {
 push_back_elems :: proc "contextless" (a: ^$A/Small_Array($N, $T), items: ..T) {
 	n := copy(a.data[a.len:], items[:])
 	a.len += n
+}
+
+inject_at :: proc "contextless" (a: ^$A/Small_Array($N, $T), item: T, index: int) -> bool #no_bounds_check {
+	if a.len < cap(a^) && index >= 0 && index <= len(a^) {
+		a.len += 1
+		for i := a.len - 1; i >= index + 1; i -= 1 {
+			a.data[i] = a.data[i - 1]
+		}
+		a.data[index] = item
+		return true
+	}
+	return false
 }
 
 append_elem  :: push_back
