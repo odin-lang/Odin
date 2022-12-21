@@ -36,7 +36,7 @@ DWMNCRENDERINGPOLICY :: enum {
 	DWMNCRP_DISABLED,
 	DWMNCRP_ENABLED,
 	DWMNCRP_LAST,
-};
+}
 
 @(default_calling_convention="stdcall")
 foreign dwmapi {
