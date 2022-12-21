@@ -1,4 +1,4 @@
-package strlib
+package text_match
 
 import "core:runtime"
 import "core:unicode"
