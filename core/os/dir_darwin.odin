@@ -14,10 +14,11 @@ read_dir :: proc(fd: Handle, n: int, allocator := context.allocator) -> (fi: []F
 
 	dirpath: string
 	dirpath, err = absolute_path_from_handle(fd)
-
 	if err != ERROR_NONE {
 		return
 	}
+
+	defer delete(dirpath)
 
 	n := n
 	size := n
