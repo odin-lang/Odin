@@ -220,7 +220,7 @@ rotate_left :: proc(array: $T/[]$E, mid: int) {
 	k := n - m
 	// FIXME: (ap29600) this cast is a temporary fix for the compiler not matching
 	// [^T] with $P/^$T
-	p := cast(^int)raw_data(array)
+	p := cast(^E)raw_data(array)
 	ptr_rotate(m, ptr_add(p, m), k)
 }
 rotate_right :: proc(array: $T/[]$E, k: int) {
