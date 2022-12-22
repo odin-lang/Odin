@@ -132,9 +132,8 @@ struct AstFile {
 	CommentGroup *docs;             // current docs
 	Array<CommentGroup *> comments; // All the comments!
 
-	// TODO(bill): make this a basic queue as it does not require
-	// any multiple thread capabilities
-	MPMCQueue<Ast *> delayed_decls_queues[AstDelayQueue_COUNT];
+	// This is effectively a queue but does not require any multi-threading capabilities
+	Array<Ast *> delayed_decls_queues[AstDelayQueue_COUNT];
 
 #define PARSER_MAX_FIX_COUNT 6
 	isize    fix_count;

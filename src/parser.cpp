@@ -5651,7 +5651,7 @@ gb_internal bool parse_file(Parser *p, AstFile *f) {
 	f->time_to_parse = cast(f64)(end-start)/cast(f64)time_stamp__freq();
 
 	for (int i = 0; i < AstDelayQueue_COUNT; i++) {
-		mpmc_init(f->delayed_decls_queues+i, heap_allocator(), f->delayed_decl_count);
+		array_init(f->delayed_decls_queues+i, heap_allocator(), 0, f->delayed_decl_count);
 	}
 
 

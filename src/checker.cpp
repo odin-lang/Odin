@@ -3941,7 +3941,7 @@ gb_internal void check_collect_entities(CheckerContext *c, Slice<Ast *> const &n
 					if (c->collect_delayed_decls) {
 						if (decl->state_flags & StateFlag_BeenHandled) return;
 						decl->state_flags |= StateFlag_BeenHandled;
-						mpmc_enqueue(&curr_file->delayed_decls_queues[AstDelayQueue_Expr], expr);
+						array_add(&curr_file->delayed_decls_queues[AstDelayQueue_Expr], expr);
 					}
 					continue;
 				}
@@ -3969,7 +3969,7 @@ gb_internal void check_collect_entities(CheckerContext *c, Slice<Ast *> const &n
 				continue;
 			}
 			// Will be handled later
-			mpmc_enqueue(&curr_file->delayed_decls_queues[AstDelayQueue_Import], decl);
+			array_add(&curr_file->delayed_decls_queues[AstDelayQueue_Import], decl);
 		case_end;
 
 		case_ast_node(fl, ForeignImportDecl, decl);
@@ -4607,7 +4607,7 @@ gb_internal bool collect_file_decl(CheckerContext *ctx, Ast *decl) {
 		if (es->expr->kind == Ast_CallExpr) {
 			ast_node(ce, CallExpr, es->expr);
 			if (ce->proc->kind == Ast_BasicDirective) {
-				mpmc_enqueue(&curr_file->delayed_decls_queues[AstDelayQueue_Expr], es->expr);
+				array_add(&curr_file->delayed_decls_queues[AstDelayQueue_Expr], es->expr);
 			}
 		}
 	case_end;
@@ -4861,9 +4861,10 @@ gb_internal void check_import_entities(Checker *c) {
 			ctx.collect_delayed_decls = true;
 
 			// Check import declarations first to simplify things
-			for (Ast *id = nullptr; mpmc_dequeue(&f->delayed_decls_queues[AstDelayQueue_Import], &id); /**/) {
-				check_add_import_decl(&ctx, id);
+			for (Ast *decl : f->delayed_decls_queues[AstDelayQueue_Import]) {
+				check_add_import_decl(&ctx, decl);
 			}
+			array_clear(&f->delayed_decls_queues[AstDelayQueue_Import]);
 
 			if (collect_file_decls(&ctx, f->decls)) {
 				check_export_entities_in_pkg(&ctx, pkg, &untyped);
@@ -4889,10 +4890,10 @@ gb_internal void check_import_entities(Checker *c) {
 			AstFile *f = pkg->files[i];
 			reset_checker_context(&ctx, f, &untyped);
 
-			auto *q = &f->delayed_decls_queues[AstDelayQueue_Import];
-			for (Ast *decl = nullptr; mpmc_dequeue(q, &decl); /**/) {
+			for (Ast *decl : f->delayed_decls_queues[AstDelayQueue_Import]) {
 				check_add_import_decl(&ctx, decl);
 			}
+			array_clear(&f->delayed_decls_queues[AstDelayQueue_Import]);
 			add_untyped_expressions(ctx.info, &untyped);
 		}
 
@@ -4908,11 +4909,12 @@ gb_internal void check_import_entities(Checker *c) {
 			AstFile *f = pkg->files[i];
 			reset_checker_context(&ctx, f, &untyped);
 
-			auto *q = &f->delayed_decls_queues[AstDelayQueue_Expr];
-			for (Ast *expr = nullptr; mpmc_dequeue(q, &expr); /**/) {
+			for (Ast *expr : f->delayed_decls_queues[AstDelayQueue_Expr]) {
 				Operand o = {};
 				check_expr(&ctx, &o, expr);
 			}
+			array_clear(&f->delayed_decls_queues[AstDelayQueue_Expr]);
+
 			add_untyped_expressions(ctx.info, &untyped);
 		}
 	}
