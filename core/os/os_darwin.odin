@@ -345,16 +345,15 @@ open :: proc(path: string, flags: int = O_RDWR, mode: int = 0) -> (Handle, Errno
 	cstr := strings.clone_to_cstring(path, context.temp_allocator)
 	handle := _unix_open(cstr, i32(flags), u16(mode))
 	if handle == -1 {
-		return INVALID_HANDLE, 1
+		return INVALID_HANDLE, cast(Errno)get_last_error()
 	}
 
 when  ODIN_OS == .Darwin && ODIN_ARCH == .arm64 {
-	if mode != 0 {
 	if mode != 0 && !is_dir_handle(handle) {
 		err := fchmod(handle, cast(u16)mode)
 		if err != 0 {
 			_unix_close(handle)
-			return INVALID_HANDLE, 1
+			return INVALID_HANDLE, cast(Errno)err
 		}
 	}
 }
