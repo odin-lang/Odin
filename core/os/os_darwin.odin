@@ -350,6 +350,7 @@ open :: proc(path: string, flags: int = O_RDWR, mode: int = 0) -> (Handle, Errno
 
 when  ODIN_OS == .Darwin && ODIN_ARCH == .arm64 {
 	if mode != 0 {
+	if mode != 0 && !is_dir_handle(handle) {
 		err := fchmod(handle, cast(u16)mode)
 		if err != 0 {
 			_unix_close(handle)
