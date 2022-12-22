@@ -89,7 +89,6 @@ gb_internal void check_or_else_split_types(CheckerContext *c, Operand *x, String
 
 
 gb_internal void check_or_else_expr_no_value_error(CheckerContext *c, String const &name, Operand const &x, Type *type_hint) {
-	// TODO(bill): better error message
 	gbString t = type_to_string(x.type);
 	error(x.expr, "'%.*s' does not return a value, value is of type %s", LIT(name), t);
 	if (is_type_union(type_deref(x.type))) {
@@ -2559,7 +2558,7 @@ gb_internal bool check_builtin_procedure(CheckerContext *c, Operand *operand, As
 		if (is_type_struct(type)) {
 			isize variable_count = type->Struct.fields.count;
 			slice_init(&tuple->Tuple.variables, a, variable_count);
-			// TODO(bill): Should I copy each of the entities or is this good enough?
+			// NOTE(bill): don't copy the entities, this should be good enough
 			gb_memmove_array(tuple->Tuple.variables.data, type->Struct.fields.data, variable_count);
 		} else if (is_type_array(type)) {
 			isize variable_count = cast(isize)type->Array.count;
@@ -3766,9 +3765,7 @@ gb_internal bool check_builtin_procedure(CheckerContext *c, Operand *operand, As
 				mp_err err = mp_pack(rop, max_count, &written, MP_LSB_FIRST, size, endian, nails, &x.value.value_integer);
 				GB_ASSERT(err == MP_OKAY);
 
-				if (id == BuiltinProc_reverse_bits) {
-					// TODO(bill): Should this even be allowed at compile time?
-				} else {
+				if (id != BuiltinProc_reverse_bits) {
 					u64 v = 0;
 					switch (id) {
 					case BuiltinProc_count_ones:

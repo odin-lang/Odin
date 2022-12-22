@@ -10,7 +10,6 @@ gb_internal Type *check_init_variable(CheckerContext *ctx, Entity *e, Operand *o
 			gbString expr_str = expr_to_string(operand->expr);
 
 			// TODO(bill): is this a good enough error message?
-			// TODO(bill): Actually allow built in procedures to be passed around and thus be created on use
 			error(operand->expr,
 				  "Cannot assign built-in procedure '%s' in %.*s",
 				  expr_str,
@@ -122,13 +121,6 @@ gb_internal void check_init_variables(CheckerContext *ctx, Entity **lhs, isize l
 	check_unpack_arguments(ctx, lhs, lhs_count, &operands, inits, true, false);
 
 	isize rhs_count = operands.count;
-	for_array(i, operands) {
-		if (operands[i].mode == Addressing_Invalid) {
-			// TODO(bill): Should I ignore invalid parameters?
-			// rhs_count--;
-		}
-	}
-
 	isize max = gb_min(lhs_count, rhs_count);
 	for (isize i = 0; i < max; i++) {
 		Entity *e = lhs[i];

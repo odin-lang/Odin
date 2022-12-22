@@ -404,7 +404,6 @@ gb_internal void scope_lookup_parent(Scope *scope, String const &name, Scope **s
 			if (found) {
 				Entity *e = *found;
 				if (gone_thru_proc) {
-					// IMPORTANT TODO(bill): Is this correct?!
 					if (e->kind == Entity_Label) {
 						continue;
 					}
@@ -1409,8 +1408,7 @@ gb_internal isize type_info_index(CheckerInfo *info, Type *type, bool error_on_f
 		entry_index = *found_entry_index;
 	}
 	if (entry_index < 0) {
-		// NOTE(bill): Do manual search
-		// TODO(bill): This is O(n) and can be very slow
+		// NOTE(bill): Do manual linear search
 		for (auto const &e : info->type_info_map) {
 			if (are_types_identical_unique_tuples(e.key, type)) {
 				entry_index = e.value;
@@ -2350,7 +2348,7 @@ gb_internal void generate_minimum_dependency_set(Checker *c, Entity *start) {
 
 	for_array(i, c->info.definitions) {
 		Entity *e = c->info.definitions[i];
-		if (e->scope == builtin_pkg->scope) { // TODO(bill): is the check enough?
+		if (e->scope == builtin_pkg->scope) {
 			if (e->type == nullptr) {
 				add_dependency_to_set(c, e);
 			}
@@ -3965,7 +3963,6 @@ gb_internal void check_collect_entities(CheckerContext *c, Slice<Ast *> const &n
 			if (curr_file == nullptr) {
 				error(decl, "import declarations are only allowed in the file scope");
 				// NOTE(bill): _Should_ be caught by the parser
-				// TODO(bill): Better error handling if it isn't
 				continue;
 			}
 			// Will be handled later
@@ -3976,7 +3973,6 @@ gb_internal void check_collect_entities(CheckerContext *c, Slice<Ast *> const &n
 			if ((c->scope->flags&ScopeFlag_File) == 0) {
 				error(decl, "%.*s declarations are only allowed in the file scope", LIT(fl->token.string));
 				// NOTE(bill): _Should_ be caught by the parser
-				// TODO(bill): Better error handling if it isn't
 				continue;
 			}
 			check_add_foreign_import_decl(c, decl);
@@ -4167,7 +4163,6 @@ gb_internal void add_import_dependency_node(Checker *c, Ast *decl, PtrMap<AstPac
 		GB_ASSERT(found_node != nullptr);
 		n = *found_node;
 
-		// TODO(bill): How should the edges be attached for 'import'?
 		import_graph_node_set_add(&n->succ, m);
 		import_graph_node_set_add(&m->pred, n);
 		ptr_set_add(&m->scope->imported, n->scope);
