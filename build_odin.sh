@@ -28,6 +28,16 @@ config_darwin() {
 	ARCH=$(uname -m)
 	: ${LLVM_CONFIG=llvm-config}
 
+	if ! command -v "${LLVM_CONFIG}" &> /dev/null; then
+		echo "You can provide path to llvm-config by either:"
+		echo "  1) Prepending 'LLVM_CONFIG=/path/to/bin/llvm-config' to your command"
+		echo "  2) Appending the directory containing llvm-config to your PATH"
+		echo "    - For example, execute 'export PATH=\"\$PATH:/path/to/llvm/bin\"' before the build command"
+		echo "    - Appending ensures your system's clang++ compiler comes first in your PATH"
+		echo "To get the path to your LLVM installation, execute 'brew info llvm@version'"
+		panic "Unable to find lvvm-config"
+	fi
+
 	# allow for arm only llvm's with version 13
 	if [ ARCH == arm64 ]; then
 		MIN_LLVM_VERSION=("13.0.0")
