@@ -8,7 +8,7 @@ gb_internal bool is_diverging_expr(Ast *expr) {
 		return name == "panic";
 	}
 	Ast *proc = unparen_expr(expr->CallExpr.proc);
-	TypeAndValue tv = proc->tav;
+	TypeAndValue tv = proc->tav();
 	if (tv.mode == Addressing_Builtin) {
 		Entity *e = entity_of_node(proc);
 		BuiltinProcId id = BuiltinProc_Invalid;
@@ -250,7 +250,7 @@ gb_internal bool check_is_terminating(Ast *node, String const &label) {
 
 	case_ast_node(ws, WhenStmt, node);
 		// TODO(bill): Is this logic correct for when statements?
-		auto const &tv = ws->cond->tav;
+		auto const &tv = ws->cond->tav();
 		if (tv.mode != Addressing_Constant) {
 			// NOTE(bill): Check the things regardless as a bug occurred earlier
 			if (ws->else_stmt != nullptr) {
@@ -411,7 +411,7 @@ gb_internal Type *check_assignment_variable(CheckerContext *ctx, Operand *lhs, O
 		Ast *ln = unparen_expr(lhs->expr);
 		if (ln->kind == Ast_IndexExpr) {
 			Ast *x = ln->IndexExpr.expr;
-			TypeAndValue tav = x->tav;
+			TypeAndValue tav = x->tav();
 			GB_ASSERT(tav.mode != Addressing_Invalid);
 			if (tav.mode != Addressing_Variable) {
 				if (!is_type_pointer(tav.type)) {
@@ -1497,7 +1497,7 @@ gb_internal void check_stmt_internal(CheckerContext *ctx, Ast *node, u32 flags) 
 					break;
 				}
 
-				switch (be->left->tav.mode) {
+				switch (be->left->tav().mode) {
 				case Addressing_Context:
 				case Addressing_Variable:
 				case Addressing_MapIndex:
@@ -2331,7 +2331,7 @@ gb_internal void check_stmt_internal(CheckerContext *ctx, Ast *node, u32 flags) 
 							error(e->token, "A static variable declaration with a default value must be constant");
 						} else {
 							Ast *value = vd->values[i];
-							if (value->tav.mode != Addressing_Constant) {
+							if (value->tav().mode != Addressing_Constant) {
 								error(e->token, "A static variable declaration with a default value must be constant");
 							}
 						}

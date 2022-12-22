@@ -1516,7 +1516,7 @@ gb_internal lbValue lb_build_builtin_simd_proc(lbProcedure *p, Ast *expr, TypeAn
 			BigInt bi_count = {};
 			big_int_from_i64(&bi_count, count);
 
-			TypeAndValue const &tv = ce->args[1]->tav;
+			TypeAndValue const &tv = ce->args[1]->tav();
 			ExactValue val = exact_value_to_integer(tv.value);
 			GB_ASSERT(val.kind == ExactValue_Integer);
 			BigInt *bi = &val.value_integer;
@@ -2428,16 +2428,16 @@ gb_internal lbValue lb_build_builtin_proc(lbProcedure *p, Ast *expr, TypeAndValu
 
 
 	case BuiltinProc_type_equal_proc:
-		return lb_equal_proc_for_type(p->module, ce->args[0]->tav.type);
+		return lb_equal_proc_for_type(p->module, ce->args[0]->tav().type);
 
 	case BuiltinProc_type_hasher_proc:
-		return lb_hasher_proc_for_type(p->module, ce->args[0]->tav.type);
+		return lb_hasher_proc_for_type(p->module, ce->args[0]->tav().type);
 
 	case BuiltinProc_type_map_info:
-		return lb_gen_map_info_ptr(p->module, ce->args[0]->tav.type);
+		return lb_gen_map_info_ptr(p->module, ce->args[0]->tav().type);
 
 	case BuiltinProc_type_map_cell_info:
-		return lb_gen_map_cell_info_ptr(p->module, ce->args[0]->tav.type);
+		return lb_gen_map_cell_info_ptr(p->module, ce->args[0]->tav().type);
 
 
 	case BuiltinProc_fixed_point_mul:
@@ -2505,7 +2505,7 @@ gb_internal lbValue lb_build_builtin_proc(lbProcedure *p, Ast *expr, TypeAndValu
 	case BuiltinProc_prefetch_write_data:
 		{
 			lbValue ptr = lb_emit_conv(p, lb_build_expr(p, ce->args[0]), t_rawptr);
-			unsigned long long locality = cast(unsigned long long)exact_value_to_i64(ce->args[1]->tav.value);
+			unsigned long long locality = cast(unsigned long long)exact_value_to_i64(ce->args[1]->tav().value);
 			unsigned long long rw = 0;
 			unsigned long long cache = 0;
 			switch (id) {
@@ -3060,8 +3060,8 @@ gb_internal lbValue lb_build_call_expr_internal(lbProcedure *p, Ast *expr) {
 		}
 	}
 
-	if (proc_expr->tav.mode == Addressing_Constant) {
-		ExactValue v = proc_expr->tav.value;
+	if (proc_expr->tav().mode == Addressing_Constant) {
+		ExactValue v = proc_expr->tav().value;
 		switch (v.kind) {
 		case ExactValue_Integer:
 			{
@@ -3070,7 +3070,7 @@ gb_internal lbValue lb_build_call_expr_internal(lbProcedure *p, Ast *expr) {
 				x.value = LLVMConstInt(lb_type(m, t_uintptr), u, false);
 				x.type = t_uintptr;
 				x = lb_emit_conv(p, x, t_rawptr);
-				value = lb_emit_conv(p, x, proc_expr->tav.type);
+				value = lb_emit_conv(p, x, proc_expr->tav().type);
 				break;
 			}
 		case ExactValue_Pointer:
@@ -3080,7 +3080,7 @@ gb_internal lbValue lb_build_call_expr_internal(lbProcedure *p, Ast *expr) {
 				x.value = LLVMConstInt(lb_type(m, t_uintptr), u, false);
 				x.type = t_uintptr;
 				x = lb_emit_conv(p, x, t_rawptr);
-				value = lb_emit_conv(p, x, proc_expr->tav.type);
+				value = lb_emit_conv(p, x, proc_expr->tav().type);
 				break;
 			}
 		}
