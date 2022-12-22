@@ -2569,8 +2569,8 @@ gb_internal bool check_type_internal(CheckerContext *ctx, Ast *e, Type **type, T
 	case_end;
 
 	case_ast_node(tt, TypeidType, e);
-		e->tav.mode = Addressing_Type;
-		e->tav.type = t_typeid;
+		e->tav().mode = Addressing_Type;
+		e->tav().type = t_typeid;
 		*type = t_typeid;
 		set_base_type(named_type, *type);
 		return true;
