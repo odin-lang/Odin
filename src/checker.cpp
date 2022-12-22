@@ -1287,13 +1287,13 @@ gb_internal void destroy_checker(Checker *c) {
 gb_internal TypeAndValue type_and_value_of_expr(Ast *expr) {
 	TypeAndValue tav = {};
 	if (expr != nullptr) {
-		tav = expr->tav();
+		tav = expr->tav;
 	}
 	return tav;
 }
 
 gb_internal Type *type_of_expr(Ast *expr) {
-	TypeAndValue tav = expr->tav();
+	TypeAndValue tav = expr->tav;
 	if (tav.mode != Addressing_Invalid) {
 		return tav.type;
 	}
@@ -1462,20 +1462,20 @@ gb_internal void add_type_and_value(CheckerInfo *i, Ast *expr, AddressingMode mo
 	Ast *prev_expr = nullptr;
 	while (prev_expr != expr) {
 		prev_expr = expr;
-		expr->tav().mode = mode;
-		if (type != nullptr && expr->tav().type != nullptr &&
-		    is_type_any(type) && is_type_untyped(expr->tav().type)) {
+		expr->tav.mode = mode;
+		if (type != nullptr && expr->tav.type != nullptr &&
+		    is_type_any(type) && is_type_untyped(expr->tav.type)) {
 			// ignore
 		} else {
-			expr->tav().type = type;
+			expr->tav.type = type;
 		}
 
 		if (mode == Addressing_Constant || mode == Addressing_Invalid) {
-			expr->tav().value = value;
+			expr->tav.value = value;
 		} else if (mode == Addressing_Value && is_type_typeid(type)) {
-			expr->tav().value = value;
+			expr->tav.value = value;
 		} else if (mode == Addressing_Value && is_type_proc(type)) {
-			expr->tav().value = value;
+			expr->tav.value = value;
 		}
 
 		expr = unparen_expr(expr);
@@ -3635,8 +3635,8 @@ gb_internal void check_collect_value_decl(CheckerContext *c, Ast *decl) {
 				if (value != nullptr) {
 					if (value->kind == Ast_BasicLit && value->BasicLit.token.kind == Token_String) {
 						String v = {};
-						if (value->tav().value.kind == ExactValue_String) {
-							v = value->tav().value.value_string;
+						if (value->tav.value.kind == ExactValue_String) {
+							v = value->tav.value.value_string;
 						}
 						if (v == "file") {
 							kind = EntityVisiblity_PrivateToFile;

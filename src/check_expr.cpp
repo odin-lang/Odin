@@ -2119,7 +2119,7 @@ gb_internal bool check_is_not_addressable(CheckerContext *c, Operand *o) {
 			return true;
 		}
 		ast_node(ta, TypeAssertion, expr);
-		TypeAndValue tv = ta->expr->tav();
+		TypeAndValue tv = ta->expr->tav;
 		if (is_type_pointer(tv.type)) {
 			return false;
 		}
@@ -2590,7 +2590,7 @@ gb_internal void check_shift(CheckerContext *c, Operand *x, Operand *y, Ast *nod
 		TokenPos pos = ast_token(x->expr).pos;
 		if (x_is_untyped) {
 			if (x->expr != nullptr) {
-				x->expr->tav().is_lhs = true;
+				x->expr->tav.is_lhs = true;
 			}
 			x->mode = Addressing_Value;
 			if (type_hint) {
@@ -3567,9 +3567,9 @@ gb_internal Operand make_operand_from_node(Ast *node) {
 	GB_ASSERT(node != nullptr);
 	Operand x = {};
 	x.expr  = node;
-	x.mode  = node->tav().mode;
-	x.type  = node->tav().type;
-	x.value = node->tav().value;
+	x.mode  = node->tav.mode;
+	x.type  = node->tav.type;
+	x.value = node->tav.value;
 	return x;
 }
 
@@ -3579,8 +3579,8 @@ gb_internal void update_untyped_expr_type(CheckerContext *c, Ast *e, Type *type,
 	ExprInfo *old = check_get_expr_info(c, e);
 	if (old == nullptr) {
 		if (type != nullptr && type != t_invalid) {
-			if (e->tav().type == nullptr || e->tav().type == t_invalid) {
-				add_type_and_value(c->info, e, e->tav().mode, type ? type : e->tav().type, e->tav().value);
+			if (e->tav.type == nullptr || e->tav.type == t_invalid) {
+				add_type_and_value(c->info, e, e->tav.mode, type ? type : e->tav.type, e->tav.value);
 				if (e->kind == Ast_TernaryIfExpr) {
 					update_untyped_expr_type(c, e->TernaryIfExpr.x, type, final);
 					update_untyped_expr_type(c, e->TernaryIfExpr.y, type, final);
@@ -4146,7 +4146,7 @@ gb_internal ExactValue get_constant_field_single(CheckerContext *c, ExactValue v
 		}
 
 		if (cl->elems[0]->kind == Ast_FieldValue) {
-			if (is_type_struct(node->tav().type)) {
+			if (is_type_struct(node->tav.type)) {
 				bool found = false;
 				for_array(i, cl->elems) {
 					Ast *elem = cl->elems[i];
@@ -4155,10 +4155,10 @@ gb_internal ExactValue get_constant_field_single(CheckerContext *c, ExactValue v
 					}
 					ast_node(fv, FieldValue, elem);
 					String name = fv->field->Ident.token.string;
-					Selection sub_sel = lookup_field(node->tav().type, name, false);
+					Selection sub_sel = lookup_field(node->tav.type, name, false);
 					defer (array_free(&sub_sel.index));
 					if (sub_sel.index[0] == index) {
-						value = fv->value->tav().value;
+						value = fv->value->tav.value;
 						found = true;
 						break;
 					}
@@ -4167,7 +4167,7 @@ gb_internal ExactValue get_constant_field_single(CheckerContext *c, ExactValue v
 					// Use the zero value if it is not found
 					value = {};
 				}
-			} else if (is_type_array(node->tav().type) || is_type_enumerated_array(node->tav().type)) {
+			} else if (is_type_array(node->tav.type) || is_type_enumerated_array(node->tav.type)) {
 				for_array(i, cl->elems) {
 					Ast *elem = cl->elems[i];
 					if (elem->kind != Ast_FieldValue) {
@@ -4176,8 +4176,8 @@ gb_internal ExactValue get_constant_field_single(CheckerContext *c, ExactValue v
 					ast_node(fv, FieldValue, elem);
 					if (is_ast_range(fv->field)) {
 						ast_node(ie, BinaryExpr, fv->field);
-						TypeAndValue lo_tav = ie->left->tav();
-						TypeAndValue hi_tav = ie->right->tav();
+						TypeAndValue lo_tav = ie->left->tav;
+						TypeAndValue hi_tav = ie->right->tav;
 						GB_ASSERT(lo_tav.mode == Addressing_Constant);
 						GB_ASSERT(hi_tav.mode == Addressing_Constant);
 
@@ -4187,39 +4187,39 @@ gb_internal ExactValue get_constant_field_single(CheckerContext *c, ExactValue v
 
 						i64 corrected_index = index;
 
-						if (is_type_enumerated_array(node->tav().type)) {
-							Type *bt = base_type(node->tav().type);
+						if (is_type_enumerated_array(node->tav.type)) {
+							Type *bt = base_type(node->tav.type);
 							GB_ASSERT(bt->kind == Type_EnumeratedArray);
 							corrected_index = index + exact_value_to_i64(*bt->EnumeratedArray.min_value);
 						}
 						if (op != Token_RangeHalf) {
 							if (lo <= corrected_index && corrected_index <= hi) {
-								TypeAndValue tav = fv->value->tav();
+								TypeAndValue tav = fv->value->tav;
 								if (success_) *success_ = true;
 								if (finish_) *finish_ = false;
 								return tav.value;
 							}
 						} else {
 							if (lo <= corrected_index && corrected_index < hi) {
-								TypeAndValue tav = fv->value->tav();
+								TypeAndValue tav = fv->value->tav;
 								if (success_) *success_ = true;
 								if (finish_) *finish_ = false;
 								return tav.value;
 							}
 						}
 					} else {
-						TypeAndValue index_tav = fv->field->tav();
+						TypeAndValue index_tav = fv->field->tav;
 						GB_ASSERT(index_tav.mode == Addressing_Constant);
 						ExactValue index_value = index_tav.value;
-						if (is_type_enumerated_array(node->tav().type)) {
-							Type *bt = base_type(node->tav().type);
+						if (is_type_enumerated_array(node->tav.type)) {
+							Type *bt = base_type(node->tav.type);
 							GB_ASSERT(bt->kind == Type_EnumeratedArray);
 							index_value = exact_value_sub(index_value, *bt->EnumeratedArray.min_value);
 						}
 
 						i64 field_index = exact_value_to_i64(index_value);
 						if (index == field_index) {
-							TypeAndValue tav = fv->value->tav();
+							TypeAndValue tav = fv->value->tav;
 							if (success_) *success_ = true;
 							if (finish_) *finish_ = false;
 							return tav.value;;
@@ -4241,7 +4241,7 @@ gb_internal ExactValue get_constant_field_single(CheckerContext *c, ExactValue v
 				return value;
 			}
 
-			TypeAndValue tav = cl->elems[index]->tav();
+			TypeAndValue tav = cl->elems[index]->tav;
 			if (tav.mode == Addressing_Constant) {
 				if (success_) *success_ = true;
 				if (finish_) *finish_ = false;
@@ -8663,7 +8663,7 @@ gb_internal ExprKind check_compound_literal(CheckerContext *c, Operand *o, Ast *
 				Ast *e = cl->elems[i];
 				GB_ASSERT(e->kind != Ast_FieldValue);
 
-				TypeAndValue tav = e->tav();
+				TypeAndValue tav = e->tav;
 				if (tav.mode != Addressing_Constant) {
 					continue;
 				}
@@ -8863,9 +8863,9 @@ gb_internal ExprKind check_selector_call_expr(CheckerContext *c, Operand *o, Ast
 	if (se->modified_call) {
 		// Prevent double evaluation
 		o->expr  = node;
-		o->type  = node->tav().type;
-		o->value = node->tav().value;
-		o->mode  = node->tav().mode;
+		o->type  = node->tav.type;
+		o->value = node->tav.value;
+		o->mode  = node->tav.mode;
 		return Expr_Expr;
 	}
 
@@ -8927,9 +8927,9 @@ gb_internal ExprKind check_selector_call_expr(CheckerContext *c, Operand *o, Ast
 	}
 
 	Operand y = {};
-	y.mode = first_arg->tav().mode;
-	y.type = first_arg->tav().type;
-	y.value = first_arg->tav().value;
+	y.mode = first_arg->tav.mode;
+	y.type = first_arg->tav.type;
+	y.value = first_arg->tav.value;
 
 	if (check_is_assignable_to(c, &y, first_type)) {
 		// Do nothing, it's valid
@@ -9385,7 +9385,7 @@ gb_internal ExprKind check_expr_base_internal(CheckerContext *c, Operand *o, Ast
 
 	case_ast_node(bl, BasicLit, node);
 		Type *t = t_invalid;
-		switch (node->tav().value.kind) {
+		switch (node->tav.value.kind) {
 		case ExactValue_String:     t = t_untyped_string;     break;
 		case ExactValue_Float:      t = t_untyped_float;      break;
 		case ExactValue_Complex:    t = t_untyped_complex;    break;
@@ -9403,7 +9403,7 @@ gb_internal ExprKind check_expr_base_internal(CheckerContext *c, Operand *o, Ast
 
 		o->mode  = Addressing_Constant;
 		o->type  = t;
-		o->value = node->tav().value;
+		o->value = node->tav.value;
 	case_end;
 
 	case_ast_node(bd, BasicDirective, node);
@@ -9859,12 +9859,12 @@ gb_internal bool is_exact_value_zero(ExactValue const &v) {
 			} else {
 				for_array(i, cl->elems) {
 					Ast *elem = cl->elems[i];
-					if (elem->tav().mode != Addressing_Constant) {
-						// if (elem->tav().value.kind != ExactValue_Invalid) {
+					if (elem->tav.mode != Addressing_Constant) {
+						// if (elem->tav.value.kind != ExactValue_Invalid) {
 						return false;
 						// }
 					}
-					if (!is_exact_value_zero(elem->tav().value)) {
+					if (!is_exact_value_zero(elem->tav.value)) {
 						return false;
 					}
 				}
