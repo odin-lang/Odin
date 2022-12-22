@@ -754,7 +754,7 @@ struct AstCommonStuff {
 	u8           state_flags;
 	u8           viral_state_flags;
 	i32          file_id;
-	TypeAndValue tav; // TODO(bill): Make this a pointer to minimize 'Ast' size
+	TypeAndValue tav; // NOTE(bill): Making this a pointer is slower
 };
 
 struct Ast {
@@ -762,7 +762,7 @@ struct Ast {
 	u8           state_flags;
 	u8           viral_state_flags;
 	i32          file_id;
-	TypeAndValue tav; // TODO(bill): Make this a pointer to minimize 'Ast' size
+	TypeAndValue tav; // NOTE(bill): Making this a pointer is slower
 
 	// IMPORTANT NOTE(bill): This must be at the end since the AST is allocated to be size of the variant
 	union {
