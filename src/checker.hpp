@@ -390,7 +390,7 @@ struct CheckerContext {
 
 	// Order doesn't matter after this
 	u32            state_flags;
-	bool           in_defer; // TODO(bill): Actually handle correctly
+	bool           in_defer;
 	Type *         type_hint;
 
 	String         proc_name;
@@ -401,7 +401,7 @@ struct CheckerContext {
 	ForeignContext foreign_context;
 
 	CheckerTypePath *type_path;
-	isize            type_level; // TODO(bill): Actually handle correctly
+	isize            type_level;
 
 	UntypedExprInfoMap *untyped;
 
