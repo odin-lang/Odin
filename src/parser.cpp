@@ -4858,13 +4858,10 @@ gb_internal bool init_parser(Parser *p) {
 	GB_ASSERT(p != nullptr);
 	string_set_init(&p->imported_files, heap_allocator());
 	array_init(&p->packages, heap_allocator());
-	array_init(&p->package_imports, heap_allocator());
-	mutex_init(&p->wait_mutex);
-	mutex_init(&p->import_mutex);
-	mutex_init(&p->file_add_mutex);
+	mutex_init(&p->imported_files_mutex);
 	mutex_init(&p->file_decl_mutex);
 	mutex_init(&p->packages_mutex);
-	mpmc_init(&p->file_error_queue, heap_allocator(), 1024);
+	mutex_init(&p->file_error_mutex);
 	return true;
 }
 
@@ -4879,20 +4876,12 @@ gb_internal void destroy_parser(Parser *p) {
 		array_free(&pkg->files);
 		array_free(&pkg->foreign_files);
 	}
-#if 0
-	for_array(i, p->package_imports) {
-		// gb_free(heap_allocator(), p->package_imports[i].text);
-	}
-#endif
 	array_free(&p->packages);
-	array_free(&p->package_imports);
 	string_set_destroy(&p->imported_files);
-	mutex_destroy(&p->wait_mutex);
-	mutex_destroy(&p->import_mutex);
-	mutex_destroy(&p->file_add_mutex);
+	mutex_destroy(&p->imported_files_mutex);
 	mutex_destroy(&p->file_decl_mutex);
 	mutex_destroy(&p->packages_mutex);
-	mpmc_destroy(&p->file_error_queue);
+	mutex_destroy(&p->file_error_mutex);
 }
 
 
@@ -4909,7 +4898,18 @@ gb_internal WORKER_TASK_PROC(parser_worker_proc) {
 	ParserWorkerData *wd = cast(ParserWorkerData *)data;
 	ParseFileError err = process_imported_file(wd->parser, wd->imported_file);
 	if (err != ParseFile_None) {
-		mpmc_enqueue(&wd->parser->file_error_queue, err);
+		auto *node = gb_alloc_item(permanent_allocator(), ParseFileErrorNode);
+		node->err = err;
+
+		mutex_lock(&wd->parser->file_error_mutex);
+		if (wd->parser->file_error_tail != nullptr) {
+			wd->parser->file_error_tail->next = node;
+		}
+		wd->parser->file_error_tail = node;
+		if (wd->parser->file_error_head == nullptr) {
+			wd->parser->file_error_head = node;
+		}
+		mutex_unlock(&wd->parser->file_error_mutex);
 	}
 	return cast(isize)err;
 }
@@ -4926,7 +4926,6 @@ gb_internal void parser_add_file_to_process(Parser *p, AstPackage *pkg, FileInfo
 
 gb_internal WORKER_TASK_PROC(foreign_file_worker_proc) {
 	ForeignFileWorkerData *wd = cast(ForeignFileWorkerData *)data;
-	Parser *p = wd->parser;
 	ImportedFile *imp = &wd->imported_file;
 	AstPackage *pkg = imp->pkg;
 
@@ -4946,9 +4945,9 @@ gb_internal WORKER_TASK_PROC(foreign_file_worker_proc) {
 		// TODO(bill): Actually do something with it
 		break;
 	}
-	mutex_lock(&p->file_add_mutex);
+	mutex_lock(&pkg->foreign_files_mutex);
 	array_add(&pkg->foreign_files, foreign_file);
-	mutex_unlock(&p->file_add_mutex);
+	mutex_unlock(&pkg->foreign_files_mutex);
 	return 0;
 }
 
@@ -4968,7 +4967,7 @@ gb_internal void parser_add_foreign_file_to_process(Parser *p, AstPackage *pkg, 
 gb_internal AstPackage *try_add_import_path(Parser *p, String const &path, String const &rel_path, TokenPos pos, PackageKind kind = Package_Normal) {
 	String const FILE_EXT = str_lit(".odin");
 
-	MUTEX_GUARD_BLOCK(&p->import_mutex) {
+	MUTEX_GUARD_BLOCK(&p->imported_files_mutex) {
 		if (string_set_update(&p->imported_files, path)) {
 			return nullptr;
 		}
@@ -4979,6 +4978,9 @@ gb_internal AstPackage *try_add_import_path(Parser *p, String const &path, Strin
 	pkg->fullpath = path;
 	array_init(&pkg->files, heap_allocator());
 	pkg->foreign_files.allocator = heap_allocator();
+	mutex_init(&pkg->files_mutex);
+	mutex_init(&pkg->foreign_files_mutex);
+
 
 	// NOTE(bill): Single file initial package
 	if (kind == Package_Init && string_ends_with(path, FILE_EXT)) {
@@ -5716,10 +5718,9 @@ gb_internal ParseFileError process_imported_file(Parser *p, ImportedFile importe
 	}
 
 	if (parse_file(p, file)) {
-		mutex_lock(&p->file_add_mutex);
-		defer (mutex_unlock(&p->file_add_mutex));
-
-		array_add(&pkg->files, file);
+		MUTEX_GUARD_BLOCK(&pkg->files_mutex) {
+			array_add(&pkg->files, file);
+		}
 
 		if (pkg->name.len == 0) {
 			pkg->name = file->package_name;
@@ -5733,8 +5734,8 @@ gb_internal ParseFileError process_imported_file(Parser *p, ImportedFile importe
 			}
 		}
 
-		p->total_line_count += file->tokenizer.line_count;
-		p->total_token_count += file->tokens.count;
+		p->total_line_count.fetch_add(file->tokenizer.line_count);
+		p->total_token_count.fetch_add(file->tokens.count);
 	}
 
 	return ParseFile_None;
@@ -5771,9 +5772,6 @@ gb_internal ParseFileError parse_packages(Parser *p, String init_filename) {
 
 
 	{ // Add these packages serially and then process them parallel
-		mutex_lock(&p->wait_mutex);
-		defer (mutex_unlock(&p->wait_mutex));
-		
 		TokenPos init_pos = {};
 		{
 			String s = get_fullpath_core(heap_allocator(), str_lit("runtime"));
@@ -5808,9 +5806,9 @@ gb_internal ParseFileError parse_packages(Parser *p, String init_filename) {
 	
 	global_thread_pool_wait();
 
-	for (ParseFileError err = ParseFile_None; mpmc_dequeue(&p->file_error_queue, &err); /**/) {
-		if (err != ParseFile_None) {
-			return err;
+	for (ParseFileErrorNode *node = p->file_error_head; node != nullptr; node = node->next) {
+		if (node->err != ParseFile_None) {
+			return node->err;
 		}
 	}
 
