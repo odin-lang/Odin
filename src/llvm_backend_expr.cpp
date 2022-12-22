@@ -1330,7 +1330,7 @@ gb_internal lbValue lb_build_binary_expr(lbProcedure *p, Ast *expr) {
 
 	TypeAndValue tv = type_and_value_of_expr(expr);
 
-	if (is_type_matrix(be->left->tav().type) || is_type_matrix(be->right->tav().type)) {
+	if (is_type_matrix(be->left->tav.type) || is_type_matrix(be->right->tav.type)) {
 		lbValue left = lb_build_expr(p, be->left);
 		lbValue right = lb_build_expr(p, be->right);
 		return lb_emit_arith_matrix(p, be->op.kind, left, right, default_type(tv.type), false);
@@ -1372,12 +1372,12 @@ gb_internal lbValue lb_build_binary_expr(lbProcedure *p, Ast *expr) {
 
 	case Token_CmpEq:
 	case Token_NotEq:
-		if (is_type_untyped_nil(be->right->tav().type)) {
+		if (is_type_untyped_nil(be->right->tav.type)) {
 			lbValue left = lb_build_expr(p, be->left);
 			lbValue cmp = lb_emit_comp_against_nil(p, be->op.kind, left);
 			Type *type = default_type(tv.type);
 			return lb_emit_conv(p, cmp, type);
-		} else if (is_type_untyped_nil(be->left->tav().type)) {
+		} else if (is_type_untyped_nil(be->left->tav.type)) {
 			lbValue right = lb_build_expr(p, be->right);
 			lbValue cmp = lb_emit_comp_against_nil(p, be->op.kind, right);
 			Type *type = default_type(tv.type);
@@ -1392,11 +1392,11 @@ gb_internal lbValue lb_build_binary_expr(lbProcedure *p, Ast *expr) {
 			lbValue left = {};
 			lbValue right = {};
 
-			if (be->left->tav().mode == Addressing_Type) {
-				left = lb_typeid(p->module, be->left->tav().type);
+			if (be->left->tav.mode == Addressing_Type) {
+				left = lb_typeid(p->module, be->left->tav.type);
 			}
-			if (be->right->tav().mode == Addressing_Type) {
-				right = lb_typeid(p->module, be->right->tav().type);
+			if (be->right->tav.mode == Addressing_Type) {
+				right = lb_typeid(p->module, be->right->tav.type);
 			}
 			if (left.value == nullptr)  left  = lb_build_expr(p, be->left);
 			if (right.value == nullptr) right = lb_build_expr(p, be->right);
@@ -3093,7 +3093,7 @@ gb_internal lbValue lb_build_expr_internal(lbProcedure *p, Ast *expr) {
 	if (tv.value.kind != ExactValue_Invalid) {
 		// NOTE(bill): The commented out code below is just for debug purposes only
 		// if (is_type_untyped(type)) {
-		// 	gb_printf_err("%s %s : %s @ %p\n", token_pos_to_string(expr_pos), expr_to_string(expr), type_to_string(expr->tav().type), expr);
+		// 	gb_printf_err("%s %s : %s @ %p\n", token_pos_to_string(expr_pos), expr_to_string(expr), type_to_string(expr->tav.type), expr);
 		// 	GB_PANIC("%s\n", type_to_string(tv.type));
 		// }
 
@@ -3514,8 +3514,8 @@ gb_internal void lb_build_addr_compound_lit_populate(lbProcedure *p, Slice<Ast *
 			}
 			if (is_ast_range(fv->field)) {
 				ast_node(ie, BinaryExpr, fv->field);
-				TypeAndValue lo_tav = ie->left->tav();
-				TypeAndValue hi_tav = ie->right->tav();
+				TypeAndValue lo_tav = ie->left->tav;
+				TypeAndValue hi_tav = ie->right->tav;
 				GB_ASSERT(lo_tav.mode == Addressing_Constant);
 				GB_ASSERT(hi_tav.mode == Addressing_Constant);
 
@@ -3556,7 +3556,7 @@ gb_internal void lb_build_addr_compound_lit_populate(lbProcedure *p, Slice<Ast *
 					}
 				}
 			} else {
-				auto tav = fv->field->tav();
+				auto tav = fv->field->tav;
 				GB_ASSERT(tav.mode == Addressing_Constant);
 				i64 index = exact_value_to_i64(tav.value);
 
@@ -3632,7 +3632,7 @@ gb_internal lbAddr lb_build_addr_index_expr(lbProcedure *p, Ast *expr) {
 		return lb_addr_soa_variable(val, index, ie->index);
 	}
 
-	if (ie->expr->tav().mode == Addressing_SoaVariable) {
+	if (ie->expr->tav.mode == Addressing_SoaVariable) {
 		// SOA Structures for slices/dynamic arrays
 		GB_ASSERT(is_type_pointer(type_of_expr(ie->expr)));
 
@@ -4451,8 +4451,8 @@ gb_internal lbAddr lb_build_addr_internal(lbProcedure *p, Ast *expr) {
 					a = lb_addr_get_ptr(p, addr);
 				}
 
-				GB_ASSERT(is_type_array(expr->tav().type));
-				return lb_addr_swizzle(a, expr->tav().type, swizzle_count, swizzle_indices);
+				GB_ASSERT(is_type_array(expr->tav.type));
+				return lb_addr_swizzle(a, expr->tav.type, swizzle_count, swizzle_indices);
 			}
 
 			Selection sel = lookup_field(type, selector, false);
@@ -4621,7 +4621,7 @@ gb_internal lbAddr lb_build_addr_internal(lbProcedure *p, Ast *expr) {
 
 	case_ast_node(ce, CallExpr, expr);
 		BuiltinProcId builtin_id = BuiltinProc_Invalid;
-		if (ce->proc->tav().mode == Addressing_Builtin) {
+		if (ce->proc->tav.mode == Addressing_Builtin) {
 			Entity *e = entity_of_node(ce->proc);
 			if (e != nullptr) {
 				builtin_id = cast(BuiltinProcId)e->Builtin.id;
@@ -4629,7 +4629,7 @@ gb_internal lbAddr lb_build_addr_internal(lbProcedure *p, Ast *expr) {
 				builtin_id = BuiltinProc_DIRECTIVE;
 			}
 		}
-		auto const &tv = expr->tav();
+		auto const &tv = expr->tav;
 		if (builtin_id == BuiltinProc_swizzle &&
 		    is_type_array(tv.type)) {
 		    	// NOTE(bill, 2021-08-09): `swizzle` has some bizarre semantics so it needs to be

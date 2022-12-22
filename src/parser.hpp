@@ -754,7 +754,7 @@ struct AstCommonStuff {
 	u8           state_flags;
 	u8           viral_state_flags;
 	i32          file_id;
-	TypeAndValue *tav_; // TODO(bill): Make this a pointer to minimize 'Ast' size
+	TypeAndValue tav; // TODO(bill): Make this a pointer to minimize 'Ast' size
 };
 
 struct Ast {
@@ -762,7 +762,7 @@ struct Ast {
 	u8           state_flags;
 	u8           viral_state_flags;
 	i32          file_id;
-	TypeAndValue *tav_; // TODO(bill): Make this a pointer to minimize 'Ast' size
+	TypeAndValue tav; // TODO(bill): Make this a pointer to minimize 'Ast' size
 
 	// IMPORTANT NOTE(bill): This must be at the end since the AST is allocated to be size of the variant
 	union {
@@ -771,9 +771,6 @@ struct Ast {
 #undef AST_KIND
 	};
 	
-	gb_inline TypeAndValue &tav() const {
-		return *this->tav_;
-	}
 	
 	// NOTE(bill): I know I dislike methods but this is hopefully a temporary thing 
 	// for refactoring purposes

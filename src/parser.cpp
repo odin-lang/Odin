@@ -71,7 +71,6 @@ gb_internal Ast *alloc_ast_node(AstFile *f, AstKind kind) {
 	Ast *node = cast(Ast *)gb_alloc(a, size);
 	node->kind = kind;
 	node->file_id = f ? f->id : 0;
-	node->tav_ = gb_alloc_item(a, TypeAndValue);
 
 	global_total_node_memory_allocated.fetch_add(size);
 
@@ -107,9 +106,6 @@ gb_internal Ast *clone_ast(Ast *node) {
 	AstFile *f = node->thread_safe_file();
 	Ast *n = alloc_ast_node(f, node->kind);
 	gb_memmove(n, node, ast_node_size(node->kind));
-	TypeAndValue *new_tav = gb_alloc_item(ast_allocator(f), TypeAndValue);
-	*new_tav = *node->tav_;
-	n->tav_ = new_tav;
 
 	switch (n->kind) {
 	default: GB_PANIC("Unhandled Ast %.*s", LIT(ast_strings[n->kind])); break;
@@ -654,8 +650,8 @@ gb_internal String string_value_from_token(AstFile *f, Token const &token) {
 gb_internal Ast *ast_basic_lit(AstFile *f, Token basic_lit) {
 	Ast *result = alloc_ast_node(f, Ast_BasicLit);
 	result->BasicLit.token = basic_lit;
-	result->tav().mode = Addressing_Constant;
-	result->tav().value = exact_value_from_token(f, basic_lit);
+	result->tav.mode = Addressing_Constant;
+	result->tav.value = exact_value_from_token(f, basic_lit);
 	return result;
 }
 

@@ -952,11 +952,11 @@ gb_internal void lb_build_unroll_range_stmt(lbProcedure *p, AstUnrollRangeStmt *
 		TokenKind op = expr->BinaryExpr.op.kind;
 		Ast *start_expr = expr->BinaryExpr.left;
 		Ast *end_expr   = expr->BinaryExpr.right;
-		GB_ASSERT(start_expr->tav().mode == Addressing_Constant);
-		GB_ASSERT(end_expr->tav().mode == Addressing_Constant);
+		GB_ASSERT(start_expr->tav.mode == Addressing_Constant);
+		GB_ASSERT(end_expr->tav.mode == Addressing_Constant);
 
-		ExactValue start = start_expr->tav().value;
-		ExactValue end   = end_expr->tav().value;
+		ExactValue start = start_expr->tav.value;
+		ExactValue end   = end_expr->tav.value;
 		if (op != Token_RangeHalf) { // .. [start, end] (or ..=)
 			ExactValue index = exact_value_i64(0);
 			for (ExactValue val = start;
@@ -1006,16 +1006,16 @@ gb_internal void lb_build_unroll_range_stmt(lbProcedure *p, AstUnrollRangeStmt *
 		if (val0_type) val0_addr = lb_build_addr(p, rs->val0);
 		if (val1_type) val1_addr = lb_build_addr(p, rs->val1);
 
-		GB_ASSERT(expr->tav().mode == Addressing_Constant);
+		GB_ASSERT(expr->tav.mode == Addressing_Constant);
 
-		Type *t = base_type(expr->tav().type);
+		Type *t = base_type(expr->tav.type);
 
 
 		switch (t->kind) {
 		case Type_Basic:
 			GB_ASSERT(is_type_string(t));
 			{
-				ExactValue value = expr->tav().value;
+				ExactValue value = expr->tav.value;
 				GB_ASSERT(value.kind == ExactValue_String);
 				String str = value.value_string;
 				Rune codepoint = 0;
@@ -1109,7 +1109,7 @@ gb_internal bool lb_switch_stmt_can_be_trivial_jump_table(AstSwitchStmt *ss, boo
 			if (is_ast_range(expr)) {
 				return false;
 			}
-			if (expr->tav().mode == Addressing_Type) {
+			if (expr->tav.mode == Addressing_Type) {
 				GB_ASSERT(is_typeid);
 				continue;
 			}
@@ -1209,12 +1209,12 @@ gb_internal void lb_build_switch_stmt(lbProcedure *p, AstSwitchStmt *ss, Scope *
 
 			if (switch_instr != nullptr) {
 				lbValue on_val = {};
-				if (expr->tav().mode == Addressing_Type) {
+				if (expr->tav.mode == Addressing_Type) {
 					GB_ASSERT(is_type_typeid(tag.type));
-					lbValue e = lb_typeid(p->module, expr->tav().type);
+					lbValue e = lb_typeid(p->module, expr->tav.type);
 					on_val = lb_emit_conv(p, e, tag.type);
 				} else {
-					GB_ASSERT(expr->tav().mode == Addressing_Constant);
+					GB_ASSERT(expr->tav.mode == Addressing_Constant);
 					GB_ASSERT(!is_ast_range(expr));
 
 					on_val = lb_build_expr(p, expr);
@@ -1245,9 +1245,9 @@ gb_internal void lb_build_switch_stmt(lbProcedure *p, AstSwitchStmt *ss, Scope *
 				lbValue cond_rhs = lb_emit_comp(p, op, tag, rhs);
 				cond = lb_emit_arith(p, Token_And, cond_lhs, cond_rhs, t_bool);
 			} else {
-				if (expr->tav().mode == Addressing_Type) {
+				if (expr->tav.mode == Addressing_Type) {
 					GB_ASSERT(is_type_typeid(tag.type));
-					lbValue e = lb_typeid(p->module, expr->tav().type);
+					lbValue e = lb_typeid(p->module, expr->tav.type);
 					e = lb_emit_conv(p, e, tag.type);
 					cond = lb_emit_comp(p, Token_CmpEq, tag, e);
 				} else {
@@ -1476,11 +1476,11 @@ gb_internal void lb_build_static_variables(lbProcedure *p, AstValueDecl *vd) {
 		if (vd->values.count > 0) {
 			GB_ASSERT(vd->names.count == vd->values.count);
 			Ast *ast_value = vd->values[i];
-			GB_ASSERT(ast_value->tav().mode == Addressing_Constant ||
-			          ast_value->tav().mode == Addressing_Invalid);
+			GB_ASSERT(ast_value->tav.mode == Addressing_Constant ||
+			          ast_value->tav.mode == Addressing_Invalid);
 
 			bool allow_local = false;
-			value = lb_const_value(p->module, ast_value->tav().type, ast_value->tav().value, allow_local);
+			value = lb_const_value(p->module, ast_value->tav.type, ast_value->tav.value, allow_local);
 		}
 
 		Ast *ident = vd->names[i];
@@ -2068,7 +2068,7 @@ gb_internal void lb_build_assign_stmt(lbProcedure *p, AstAssignStmt *as) {
 	op_ += Token_Add - Token_AddEq; // Convert += to +
 	TokenKind op = cast(TokenKind)op_;
 	if (op == Token_CmpAnd || op == Token_CmpOr) {
-		Type *type = as->lhs[0]->tav().type;
+		Type *type = as->lhs[0]->tav.type;
 		lbValue new_value = lb_emit_logical_binary_expr(p, op, as->lhs[0], as->rhs[0], type);
 
 		lbAddr lhs = lb_build_addr(p, as->lhs[0]);
