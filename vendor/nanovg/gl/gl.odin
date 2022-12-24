@@ -1020,11 +1020,11 @@ __renderFlush :: proc(uptr: rawptr) {
 			__blendFuncSeparate(ctx, &call.blendFunc)
 
 			switch call.type {
-				case .NONE: {}
-				case .FILL: __fill(ctx, call)
-				case .CONVEX_FILL: __convexFill(ctx, call)
-				case .STROKE: __stroke(ctx, call)
-				case .TRIANGLES: __triangles(ctx, call)
+			case .NONE: {}
+			case .FILL: __fill(ctx, call)
+			case .CONVEX_FILL: __convexFill(ctx, call)
+			case .STROKE: __stroke(ctx, call)
+			case .TRIANGLES: __triangles(ctx, call)
 			}
 		}
 

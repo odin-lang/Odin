@@ -1302,30 +1302,21 @@ __appendCommands :: proc(ctx: ^Context, values: []f32) {
 		cmd := Commands(values[i])
 
 		switch cmd {
-			case .MOVE_TO, .LINE_TO: {
-				TransformPoint(&values[i + 1], &values[i + 2], state.xform, values[i + 1], values[i + 2])
-				i += 3
-			}
+		case .MOVE_TO, .LINE_TO:
+			TransformPoint(&values[i + 1], &values[i + 2], state.xform, values[i + 1], values[i + 2])
+			i += 3
 
-			case .BEZIER_TO: {
-				TransformPoint(&values[i + 1], &values[i + 2], state.xform, values[i + 1], values[i + 2])
-				TransformPoint(&values[i + 3], &values[i + 4], state.xform, values[i + 3], values[i + 4])
-				TransformPoint(&values[i + 5], &values[i + 6], state.xform, values[i + 5], values[i + 6])
-				i += 7
-			}
+		case .BEZIER_TO:
+			TransformPoint(&values[i + 1], &values[i + 2], state.xform, values[i + 1], values[i + 2])
+			TransformPoint(&values[i + 3], &values[i + 4], state.xform, values[i + 3], values[i + 4])
+			TransformPoint(&values[i + 5], &values[i + 6], state.xform, values[i + 5], values[i + 6])
+			i += 7
 
-			case .CLOSE: {
-				i += 1
-			}
+		case .CLOSE: i += 1
+		case .WINDING: i += 2
 
-			case .WINDING: {
-				i += 2
-			}
-
-			// default
-			case: {
-				i += 1
-			}
+		// default
+		case: i += 1
 		}
 	}
 
@@ -1510,45 +1501,38 @@ __flattenPaths :: proc(ctx: ^Context) {
 		cmd := Commands(ctx.commands[i])
 		
 		switch cmd {
-			case .MOVE_TO: {
-				__addPath(ctx)
-				p := ctx.commands[i + 1:]
-				__addPoint(ctx, p[0], p[1], { .CORNER })
-				i += 3
+		case .MOVE_TO:
+			__addPath(ctx)
+			p := ctx.commands[i + 1:]
+			__addPoint(ctx, p[0], p[1], { .CORNER })
+			i += 3
+
+		case .LINE_TO:
+			p := ctx.commands[i + 1:]
+			__addPoint(ctx, p[0], p[1], { .CORNER })
+			i += 3
+
+		case .BEZIER_TO:
+			last := __lastPoint(ctx)
+		
+			if last != nil {
+				cp1 := ctx.commands[i + 1:]
+				cp2 := ctx.commands[i + 3:]
+				p := ctx.commands[i + 5:]
+				__tesselateBezier(ctx, last.x,last.y, cp1[0],cp1[1], cp2[0],cp2[1], p[0],p[1], 0, { .CORNER })
 			}
 
-			case .LINE_TO: {
-				p := ctx.commands[i + 1:]
-				__addPoint(ctx, p[0], p[1], { .CORNER })
-				i += 3
-			}
+			i += 7
 
-			case .BEZIER_TO: {
-				last := __lastPoint(ctx)
-			
-				if last != nil {
-					cp1 := ctx.commands[i + 1:]
-					cp2 := ctx.commands[i + 3:]
-					p := ctx.commands[i + 5:]
-					__tesselateBezier(ctx, last.x,last.y, cp1[0],cp1[1], cp2[0],cp2[1], p[0],p[1], 0, { .CORNER })
-				}
+		case .CLOSE:
+			__closePath(ctx)
+			i += 1
 
-				i += 7
-			}
+		case .WINDING:
+			__pathWinding(ctx, Winding(ctx.commands[i + 1]))
+			i += 2
 
-			case .CLOSE: {
-				__closePath(ctx)
-				i += 1
-			}
-
-			case .WINDING: {
-				__pathWinding(ctx, Winding(ctx.commands[i + 1]))
-				i += 2
-			}
-
-			case: {
-				i += 1
-			}
+		case: i += 1
 		}
 	}
 
@@ -2520,7 +2504,7 @@ Ellipse :: proc(ctx: ^Context, cx, cy, rx, ry: f32) {
 		__cmdf(.BEZIER_TO), cx+rx*KAPPA, cy+ry, cx+rx, cy+ry*KAPPA, cx+rx, cy,
 		__cmdf(.BEZIER_TO), cx+rx, cy-ry*KAPPA, cx+rx*KAPPA, cy-ry, cx, cy-ry,
 		__cmdf(.BEZIER_TO), cx-rx*KAPPA, cy-ry, cx-rx, cy-ry*KAPPA, cx-rx, cy,
-		__cmdf(.CLOSE)		
+		__cmdf(.CLOSE),
 	}
 	__appendCommands(ctx, values[:])
 }
@@ -2674,8 +2658,8 @@ CreateFont :: proc(ctx: ^Context, name, filename: string) -> int {
 
 // Creates font by loading it from the specified memory chunk.
 // Returns handle to the font.
-CreateFontMem :: proc(ctx: ^Context, name: string, slice: []byte) -> int {
-	return fontstash.AddFontMem(&ctx.fs, name, slice)
+CreateFontMem :: proc(ctx: ^Context, name: string, slice: []byte, free_loaded_data: bool) -> int {
+	return fontstash.AddFontMem(&ctx.fs, name, slice, free_loaded_data)
 }
 
 // Finds a loaded font of specified name, and returns handle to it, or -1 if the font is not found.
@@ -2890,15 +2874,15 @@ TextIcon :: proc(ctx: ^Context, x, y: f32, codepoint: rune) -> f32 {
 	x := x * scale
 	y := y * scale
 	switch fstate.ah {
-		case .LEFT: {}
-		case .CENTER: {
-			width := fontstash.CodepointWidth(font, codepoint, fscale)
-			x = math.round(x - width * 0.5)
-		}
-		case .RIGHT: {
-			width := fontstash.CodepointWidth(font, codepoint, fscale)
-			x -= width
-		}
+	case .LEFT: {}
+	
+	case .CENTER: 
+		width := fontstash.CodepointWidth(font, codepoint, fscale)
+		x = math.round(x - width * 0.5)
+
+	case .RIGHT: 
+		width := fontstash.CodepointWidth(font, codepoint, fscale)
+		x -= width
 	}
 
 	// align vertically
@@ -3190,35 +3174,30 @@ TextBreakLines :: proc(
 		prev_iter = iter
 
 		switch iter.codepoint {
-			case '\t', '\v', '\f', ' ', 0x00a0: {
-				// NBSP
-				type = .Space
-			}
+		case '\t', '\v', '\f', ' ', 0x00a0:
+			// NBSP
+			type = .Space
 
-			case '\n': {
-				type = pcodepoint == 13 ? .Space : .Newline
-			}
-			
-			case '\r': {
-				type = pcodepoint == 10 ? .Space : .Newline
-			}
+		case '\n':
+			type = pcodepoint == 13 ? .Space : .Newline
+		
+		case '\r':
+			type = pcodepoint == 10 ? .Space : .Newline
 
-			case 0x0085: { 
-				// NEL
-				type = .Newline
-			}
+		case 0x0085: 
+			// NEL
+			type = .Newline
 
-			case: {
-				if (iter.codepoint >= 0x4E00 && iter.codepoint <= 0x9FFF) ||
-					(iter.codepoint >= 0x3000 && iter.codepoint <= 0x30FF) ||
-					(iter.codepoint >= 0xFF00 && iter.codepoint <= 0xFFEF) ||
-					(iter.codepoint >= 0x1100 && iter.codepoint <= 0x11FF) ||
-					(iter.codepoint >= 0x3130 && iter.codepoint <= 0x318F) ||
-					(iter.codepoint >= 0xAC00 && iter.codepoint <= 0xD7AF) {
-					type = .CJK
-				}	else {
-					type = .Char
-				}
+		case: 
+			if (iter.codepoint >= 0x4E00 && iter.codepoint <= 0x9FFF) ||
+				(iter.codepoint >= 0x3000 && iter.codepoint <= 0x30FF) ||
+				(iter.codepoint >= 0xFF00 && iter.codepoint <= 0xFFEF) ||
+				(iter.codepoint >= 0x1100 && iter.codepoint <= 0x11FF) ||
+				(iter.codepoint >= 0x3130 && iter.codepoint <= 0x318F) ||
+				(iter.codepoint >= 0xAC00 && iter.codepoint <= 0xD7AF) {
+				type = .CJK
+			}	else {
+				type = .Char
 			}
 		}
 
@@ -3426,9 +3405,9 @@ TextBoxBounds :: proc(
 			
 			// Horizontal bounds
 			switch halign {
-				case .LEFT: dx = 0
-				case .CENTER: dx = breakRowWidth*0.5 - row.width*0.5
-				case .RIGHT: dx = breakRowWidth - row.width
+			case .LEFT: dx = 0
+			case .CENTER: dx = breakRowWidth*0.5 - row.width*0.5
+			case .RIGHT: dx = breakRowWidth - row.width
 			}
 
 			rminx = x + row.minx + dx

@@ -816,22 +816,20 @@ __getVerticalAlign :: proc(
 	pixelSize: i16,
 ) -> (res: f32) {
 	switch ctx.location {
-		case .TOPLEFT: {
-			switch av {
-				case .TOP: res = font.ascender * f32(pixelSize) / 10
-				case .MIDDLE: res = (font.ascender + font.descender) / 2 * f32(pixelSize) / 10
-				case .BASELINE: res = 0
-				case .BOTTOM: res = font.descender * f32(pixelSize) / 10
-			}
+	case .TOPLEFT:
+		switch av {
+		case .TOP: res = font.ascender * f32(pixelSize) / 10
+		case .MIDDLE: res = (font.ascender + font.descender) / 2 * f32(pixelSize) / 10
+		case .BASELINE: res = 0
+		case .BOTTOM: res = font.descender * f32(pixelSize) / 10
 		}
 
-		case .BOTTOMLEFT: {
-			switch av {
-				case .TOP: res = -font.ascender * f32(pixelSize) / 10
-				case .MIDDLE: res = -(font.ascender + font.descender) / 2 * f32(pixelSize) / 10
-				case .BASELINE: res = 0
-				case .BOTTOM: res = -font.descender * f32(pixelSize) / 10
-			}
+	case .BOTTOMLEFT: 
+		switch av {
+			case .TOP: res = -font.ascender * f32(pixelSize) / 10
+			case .MIDDLE: res = -(font.ascender + font.descender) / 2 * f32(pixelSize) / 10
+			case .BASELINE: res = 0
+			case .BOTTOM: res = -font.descender * f32(pixelSize) / 10
 		}
 	}
 
@@ -1005,35 +1003,33 @@ __getQuad :: proc(
 	y1 = f32(glyph.y1 - 1)
 
 	switch ctx.location {
-		case .TOPLEFT: {
-			rx = math.floor(x^ + xoff)
-			ry = math.floor(y^ + yoff)
-			
-			quad.x0 = rx
-			quad.y0 = ry
-			quad.x1 = rx + x1 - x0
-			quad.y1 = ry + y1 - y0
+	case .TOPLEFT:
+		rx = math.floor(x^ + xoff)
+		ry = math.floor(y^ + yoff)
+		
+		quad.x0 = rx
+		quad.y0 = ry
+		quad.x1 = rx + x1 - x0
+		quad.y1 = ry + y1 - y0
 
-			quad.s0 = x0 * ctx.itw
-			quad.t0 = y0 * ctx.ith
-			quad.s1 = x1 * ctx.itw
-			quad.t1 = y1 * ctx.ith
-		}
+		quad.s0 = x0 * ctx.itw
+		quad.t0 = y0 * ctx.ith
+		quad.s1 = x1 * ctx.itw
+		quad.t1 = y1 * ctx.ith
 
-		case .BOTTOMLEFT: {
-			rx = math.floor(x^ + xoff)
-			ry = math.floor(y^ - yoff)
+	case .BOTTOMLEFT:
+		rx = math.floor(x^ + xoff)
+		ry = math.floor(y^ - yoff)
 
-			quad.x0 = rx
-			quad.y0 = ry
-			quad.x1 = rx + x1 - x0
-			quad.y1 = ry - y1 + y0
+		quad.x0 = rx
+		quad.y0 = ry
+		quad.x1 = rx + x1 - x0
+		quad.y1 = ry - y1 + y0
 
-			quad.s0 = x0 * ctx.itw
-			quad.t0 = y0 * ctx.ith
-			quad.s1 = x1 * ctx.itw
-			quad.t1 = y1 * ctx.ith
-		}
+		quad.s0 = x0 * ctx.itw
+		quad.t0 = y0 * ctx.ith
+		quad.s1 = x1 * ctx.itw
+		quad.t1 = y1 * ctx.ith
 	}
 
 	x^ += f32(int(f32(glyph.xadvance) / 10 + 0.5))
@@ -1056,15 +1052,15 @@ TextIterInit :: proc(
 	x := x
 	y := y
 	switch state.ah {
-		case .LEFT: {}
-		case .CENTER: {
-			width := TextBounds(ctx, text, x, y, nil)
-			x = math.round(x - width * 0.5)
-		}
-		case .RIGHT: {
-			width := TextBounds(ctx, text, x, y, nil)
-			x -= width
-		}
+	case .LEFT: {}
+
+	case .CENTER:
+		width := TextBounds(ctx, text, x, y, nil)
+		x = math.round(x - width * 0.5)
+
+	case .RIGHT: 
+		width := TextBounds(ctx, text, x, y, nil)
+		x -= width
 	}
 
 	// align vertically
@@ -1184,15 +1180,15 @@ TextBounds :: proc(
 	// horizontal alignment
 	advance := x - start_x
 	switch state.ah {
-		case .LEFT: {}
-		case .CENTER: {
-			minx -= advance * 0.5
-			maxx -= advance * 0.5
-		}
-		case .RIGHT: {
-			minx -= advance
-			maxx -= advance
-		}
+	case .LEFT: {}
+
+	case .CENTER: 
+		minx -= advance * 0.5
+		maxx -= advance * 0.5
+
+	case .RIGHT:
+		minx -= advance
+		maxx -= advance
 	}
 
 	if bounds != nil {
