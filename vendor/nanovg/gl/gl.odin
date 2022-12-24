@@ -26,9 +26,7 @@ CreateFlag :: enum {
 }
 CreateFlags :: bit_set[CreateFlag]
 
-FRAG_BINDING :: 0
-USE_STATE_FILTER :: true
-GL_UNIFORMARRAY_SIZE :: 11
+USE_STATE_FILTER :: #config(USE_STATE_FILTER, true)
 
 UniformLoc :: enum {
 	VIEW_SIZE,
@@ -92,6 +90,7 @@ Path :: struct {
 }
 
 when GL2_IMPLEMENTATION {
+	GL_UNIFORMARRAY_SIZE :: 11
 	FragUniforms :: struct #raw_union {
 		using _: struct {
 			scissorMat: [12]f32, // matrices are actually 3 vec4s
@@ -128,10 +127,11 @@ when GL2_IMPLEMENTATION {
 	}
 }
 
-GL2_IMPLEMENTATION :: false
-GL3_IMPLEMENTATION :: true
-GLES2_IMPLEMENTATION :: false
-GLES3_IMPLEMENTATION :: false
+DEFAULT_IMPLEMENTATION_STRING :: #config(NANOVG_GL_IMPL, "GL3")
+GL2_IMPLEMENTATION   :: DEFAULT_IMPLEMENTATION_STRING  == "GL2"
+GL3_IMPLEMENTATION   :: DEFAULT_IMPLEMENTATION_STRING  == "GL3"
+GLES2_IMPLEMENTATION :: DEFAULT_IMPLEMENTATION_STRING  == "GLES2"
+GLES3_IMPLEMENTATION :: DEFAULT_IMPLEMENTATION_STRING  == "GLES3"
 
 when GL2_IMPLEMENTATION {
 	GL2 :: true
@@ -174,6 +174,7 @@ Context :: struct {
 	fragBuf: u32, // USE_UNIFORMBUFFER
 	fragSize: int,
 	flags: CreateFlags,
+	frag_binding: u32,
 
 	// Per frame buffers
 	calls: [dynamic]Call,
@@ -372,7 +373,7 @@ __renderCreate :: proc(uptr: rawptr) -> bool {
 
 	when GL_USE_UNIFORMBUFFER {
 		// Create UBOs
-		gl.UniformBlockBinding(ctx.shader.prog, u32(ctx.shader.loc[.FRAG]), FRAG_BINDING)
+		gl.UniformBlockBinding(ctx.shader.prog, u32(ctx.shader.loc[.FRAG]), ctx.frag_binding)
 		gl.GenBuffers(1, &ctx.fragBuf)
 		gl.GetIntegerv(gl.UNIFORM_BUFFER_OFFSET_ALIGNMENT, &align)
 	} 
@@ -436,7 +437,7 @@ __renderCreateTexture :: proc(
 
 	when GL2 {
 		if .GENERATE_MIPMAPS in imageFlags {
-			gl.TexParameteri(gl.TEXTURE_2D, GENERATE_MIPMAP, 1)
+			gl.TexParameteri(gl.TEXTURE_2D, gl.GENERATE_MIPMAP, 1)
 		}
 	}
 
@@ -444,8 +445,7 @@ __renderCreateTexture :: proc(
 		gl.TexImage2D(gl.TEXTURE_2D, 0, gl.RGBA, i32(w), i32(h), 0, gl.RGBA, gl.UNSIGNED_BYTE, raw_data(data))
 	} else {
 		when GLES2 || GL2 {
-			// TODO missing in odin
-			gl.TexImage2D(gl.TEXTURE_2D, 0, gl.LUMINANCE, w, h, 0, gl.LUMINANCE, gl.UNSIGNED_BYTE, data)
+			gl.TexImage2D(gl.TEXTURE_2D, 0, gl.LUMINANCE, i32(w), i32(h), 0, gl.LUMINANCE, gl.UNSIGNED_BYTE, raw_data(data))
 		} else when GLES3 {
 			gl.TexImage2D(gl.TEXTURE_2D, 0, gl.R8, i32(w), i32(h), 0, gl.RED, gl.UNSIGNED_BYTE, raw_data(data))
 		} else {
@@ -783,7 +783,7 @@ __convertPaint :: proc(
 
 __setUniforms :: proc(ctx: ^Context, uniformOffset: int, image: int) {
 	when GL_USE_UNIFORMBUFFER {
-		gl.BindBufferRange(gl.UNIFORM_BUFFER, FRAG_BINDING, ctx.fragBuf, uniformOffset, size_of(FragUniforms))
+		gl.BindBufferRange(gl.UNIFORM_BUFFER, ctx.frag_binding, ctx.fragBuf, uniformOffset, size_of(FragUniforms))
 	} else {
 		frag := __fragUniformPtr(ctx, uniformOffset)
 		gl.Uniform4fv(ctx.shader.loc[.FRAG], GL_UNIFORMARRAY_SIZE, cast(^f32) frag)
