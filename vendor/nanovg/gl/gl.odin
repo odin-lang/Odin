@@ -89,8 +89,9 @@ Path :: struct {
 	strokeCount: int,
 }
 
+GL_UNIFORMARRAY_SIZE :: 11
+
 when GL2_IMPLEMENTATION {
-	GL_UNIFORMARRAY_SIZE :: 11
 	FragUniforms :: struct #raw_union {
 		using _: struct {
 			scissorMat: [12]f32, // matrices are actually 3 vec4s
@@ -415,7 +416,7 @@ __renderCreateTexture :: proc(
 			// No mips.
 			if .GENERATE_MIPMAPS in imageFlags {
 				log.errorf("Mip-maps is not support for non power-of-two textures (%d x %d)\n", w, h);
-				excl(&imageFlags, nvg.Image_Flag.GENERATE_MIPMAPS)
+				excl(&imageFlags, ImageFlags { .GENERATE_MIPMAPS })
 			}
 		}
 	}
@@ -643,8 +644,7 @@ __renderUpdateTexture :: proc(
 		gl.TexSubImage2D(gl.TEXTURE_2D, 0, i32(x), i32(y), i32(w), i32(h), gl.RGBA, gl.UNSIGNED_BYTE, raw_data(data))
 	} else {
 		when GLES2 || GL2 {
-			// TODO is missing in odin
-			// gl.TexSubImage2D(gl.TEXTURE_2D, 0, i32(x), i32(y), i32(w), i32(h), gl.LUMINANCE, gl.UNSIGNED_BYTE, raw_data(data))
+			gl.TexSubImage2D(gl.TEXTURE_2D, 0, i32(x), i32(y), i32(w), i32(h), gl.LUMINANCE, gl.UNSIGNED_BYTE, raw_data(data))
 		} else {
 			gl.TexSubImage2D(gl.TEXTURE_2D, 0, i32(x), i32(y), i32(w), i32(h), gl.RED, gl.UNSIGNED_BYTE, raw_data(data))
 		}
