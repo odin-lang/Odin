@@ -153,7 +153,7 @@ scratch_allocator_proc :: proc(allocator_data: rawptr, mode: Allocator_Mode,
 	s := (^Scratch_Allocator)(allocator_data)
 
 	if s.data == nil {
-		DEFAULT_BACKING_SIZE :: 1<<22
+		DEFAULT_BACKING_SIZE :: 4 * Megabyte
 		if !(context.allocator.procedure != scratch_allocator_proc &&
 		     context.allocator.data != allocator_data) {
 			panic("cyclic initialization of the scratch allocator with itself")
