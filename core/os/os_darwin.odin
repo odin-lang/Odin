@@ -342,21 +342,33 @@ get_last_error_string :: proc() -> string {
 }
 
 open :: proc(path: string, flags: int = O_RDWR, mode: int = 0) -> (Handle, Errno) {
+	isDir := is_dir_path(path)
+	flags := flags
+	if isDir {
+		/*
+			@INFO(Platin): To make it impossible to use the wrong flag for dir's 
+			               as you can't write to a dir only read which makes it fail to open
+		*/
+		flags = O_RDONLY
+	}
+
 	cstr := strings.clone_to_cstring(path, context.temp_allocator)
 	handle := _unix_open(cstr, i32(flags), u16(mode))
 	if handle == -1 {
-		return INVALID_HANDLE, 1
+		return INVALID_HANDLE, cast(Errno)get_last_error()
 	}
 
-when  ODIN_OS == .Darwin && ODIN_ARCH == .arm64 {
-	if mode != 0 {
+	/*
+		@INFO(Platin): this is only done because O_CREATE for some reason fails to apply mode
+		               should not happen if the handle is a directory
+	*/
+	if mode != 0 && !isDir {
 		err := fchmod(handle, cast(u16)mode)
 		if err != 0 {
 			_unix_close(handle)
-			return INVALID_HANDLE, 1
+			return INVALID_HANDLE, cast(Errno)err
 		}
 	}
-}
 
 	return handle, 0
 }

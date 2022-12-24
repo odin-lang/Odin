@@ -987,8 +987,8 @@ namespace lbAbiArm64 {
 	LB_ABI_INFO(abi_info) {
 		lbFunctionType *ft = gb_alloc_item(permanent_allocator(), lbFunctionType);
 		ft->ctx = c;
+		ft->args = compute_arg_types(c, arg_types, arg_count);
 		ft->ret = compute_return_type(ft, c, return_type, return_is_defined, return_is_tuple);
-		ft -> args = compute_arg_types(c, arg_types, arg_count);
 		ft->calling_convention = calling_convention;
 		return ft;
 	}
