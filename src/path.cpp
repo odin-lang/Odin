@@ -107,7 +107,9 @@ String path_to_string(gbAllocator a, Path path) {
 
 	isize i = 0;
 	gb_memmove(str+i, path.basename.text, path.basename.len); i += path.basename.len;
+	
 	gb_memmove(str+i, "/", 1);                                i += 1;
+	
 	gb_memmove(str+i, path.name.text,     path.name.len);     i += path.name.len;
 	if (path.ext.len > 0) {
 		gb_memmove(str+i, ".", 1);                            i += 1;
@@ -150,6 +152,7 @@ Path path_from_string(gbAllocator a, String const &path) {
 		return res;
 	}
 
+	// Note(Dragos): Is the copy_string required if it's a substring?
 	isize name_start = (res.basename.len > 0) ? res.basename.len + 1 : res.basename.len;
 	res.name         = substring(fullpath, name_start, fullpath.len);
 	res.name         = remove_extension_from_path(res.name);
