@@ -142,7 +142,7 @@ gb_internal void thread_pool_wait(ThreadPool *pool) {
 
 gb_internal THREAD_PROC(thread_pool_thread_proc) {
 	ThreadPool *pool = cast(ThreadPool *)thread->user_data;
-	spall_auto_thread_init();
+	spall_auto_thread_init(pthread_self(), SPALL_DEFAULT_BUFFER_SIZE, SPALL_DEFAULT_SYMBOL_CACHE_SIZE);
 	defer(spall_auto_thread_quit());
 	
 	for (;;) {

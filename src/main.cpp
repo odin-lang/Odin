@@ -2489,10 +2489,10 @@ gb_internal int strip_semicolons(Parser *parser) {
 }
 
 int main(int arg_count, char const **arg_ptr) {
-	spall_auto_init();
+	spall_auto_init((char *)"odin.spall");
 	defer (spall_auto_quit());
 
-	spall_auto_thread_init();
+	spall_auto_thread_init(pthread_self(), SPALL_DEFAULT_BUFFER_SIZE, SPALL_DEFAULT_SYMBOL_CACHE_SIZE);
 	defer (spall_auto_thread_quit());
 
 	if (arg_count < 2) {
@@ -2823,7 +2823,7 @@ int main(int arg_count, char const **arg_ptr) {
 	return 0;
 }
 
+#define SPALL_AUTO_IMPLEMENTATION
 #define SPALL_BUFFER_PROFILING
 #define SPALL_BUFFER_PROFILING_GET_TIME() __rdtsc()
-#define SPALL_AUTO_IMPLEMENTATION
 #include "spall_auto.h"
