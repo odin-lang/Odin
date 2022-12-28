@@ -1237,7 +1237,7 @@ gb_internal void check_type_switch_stmt(CheckerContext *ctx, Ast *node, u32 mod_
 					GB_PANIC("Unknown type to type switch statement");
 				}
 
-				if (type_ptr_set_exists(&seen, y.type)) {
+				if (type_ptr_set_update(&seen, y.type)) {
 					TokenPos pos = cc->token.pos;
 					gbString expr_str = expr_to_string(y.expr);
 					error(y.expr,
@@ -1248,7 +1248,6 @@ gb_internal void check_type_switch_stmt(CheckerContext *ctx, Ast *node, u32 mod_
 					gb_string_free(expr_str);
 					break;
 				}
-				ptr_set_add(&seen, y.type);
 			}
 		}
 

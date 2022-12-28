@@ -394,7 +394,7 @@ gb_global TargetMetrics target_darwin_arm64 = {
 	TargetArch_arm64,
 	8, 8, 16,
 	str_lit("arm64-apple-macosx11.0.0"),
-	str_lit("e-m:o-i64:64-i128:128-n32:64-S128"), // TODO(bill): Is this correct?
+	str_lit("e-m:o-i64:64-i128:128-n32:64-S128"),
 };
 
 gb_global TargetMetrics target_freebsd_i386 = {
@@ -585,7 +585,6 @@ struct LibraryCollections {
 gb_global Array<LibraryCollections> library_collections = {0};
 
 gb_internal void add_library_collection(String name, String path) {
-	// TODO(bill): Check the path is valid and a directory
 	LibraryCollections lc = {name, string_trim_whitespace(path)};
 	array_add(&library_collections, lc);
 }

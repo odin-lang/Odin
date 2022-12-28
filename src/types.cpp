@@ -812,6 +812,14 @@ gb_internal void init_type_mutex(void) {
 	mutex_init(&g_type_mutex);
 }
 
+gb_internal bool type_ptr_set_update(PtrSet<Type *> *s, Type *t) {
+	if (ptr_set_exists(s, t)) {
+		return true;
+	}
+	ptr_set_add(s, t);
+	return false;
+}
+
 gb_internal bool type_ptr_set_exists(PtrSet<Type *> *s, Type *t) {
 	if (ptr_set_exists(s, t)) {
 		return true;

@@ -404,7 +404,6 @@ gb_internal void scope_lookup_parent(Scope *scope, String const &name, Scope **s
 			if (found) {
 				Entity *e = *found;
 				if (gone_thru_proc) {
-					// IMPORTANT TODO(bill): Is this correct?!
 					if (e->kind == Entity_Label) {
 						continue;
 					}
@@ -1409,8 +1408,7 @@ gb_internal isize type_info_index(CheckerInfo *info, Type *type, bool error_on_f
 		entry_index = *found_entry_index;
 	}
 	if (entry_index < 0) {
-		// NOTE(bill): Do manual search
-		// TODO(bill): This is O(n) and can be very slow
+		// NOTE(bill): Do manual linear search
 		for (auto const &e : info->type_info_map) {
 			if (are_types_identical_unique_tuples(e.key, type)) {
 				entry_index = e.value;
@@ -2350,7 +2348,7 @@ gb_internal void generate_minimum_dependency_set(Checker *c, Entity *start) {
 
 	for_array(i, c->info.definitions) {
 		Entity *e = c->info.definitions[i];
-		if (e->scope == builtin_pkg->scope) { // TODO(bill): is the check enough?
+		if (e->scope == builtin_pkg->scope) {
 			if (e->type == nullptr) {
 				add_dependency_to_set(c, e);
 			}
@@ -3414,11 +3412,9 @@ gb_internal void check_decl_attributes(CheckerContext *c, Array<Ast *> const &at
 				continue;
 			}
 
-			if (string_set_exists(&set, name)) {
+			if (string_set_update(&set, name)) {
 				error(elem, "Previous declaration of '%.*s'", LIT(name));
 				continue;
-			} else {
-				string_set_add(&set, name);
 			}
 
 			if (!proc(c, elem, name, value, ac)) {
@@ -3943,7 +3939,7 @@ gb_internal void check_collect_entities(CheckerContext *c, Slice<Ast *> const &n
 					if (c->collect_delayed_decls) {
 						if (decl->state_flags & StateFlag_BeenHandled) return;
 						decl->state_flags |= StateFlag_BeenHandled;
-						mpmc_enqueue(&curr_file->delayed_decls_queues[AstDelayQueue_Expr], expr);
+						array_add(&curr_file->delayed_decls_queues[AstDelayQueue_Expr], expr);
 					}
 					continue;
 				}
@@ -3967,18 +3963,16 @@ gb_internal void check_collect_entities(CheckerContext *c, Slice<Ast *> const &n
 			if (curr_file == nullptr) {
 				error(decl, "import declarations are only allowed in the file scope");
 				// NOTE(bill): _Should_ be caught by the parser
-				// TODO(bill): Better error handling if it isn't
 				continue;
 			}
 			// Will be handled later
-			mpmc_enqueue(&curr_file->delayed_decls_queues[AstDelayQueue_Import], decl);
+			array_add(&curr_file->delayed_decls_queues[AstDelayQueue_Import], decl);
 		case_end;
 
 		case_ast_node(fl, ForeignImportDecl, decl);
 			if ((c->scope->flags&ScopeFlag_File) == 0) {
 				error(decl, "%.*s declarations are only allowed in the file scope", LIT(fl->token.string));
 				// NOTE(bill): _Should_ be caught by the parser
-				// TODO(bill): Better error handling if it isn't
 				continue;
 			}
 			check_add_foreign_import_decl(c, decl);
@@ -4169,7 +4163,6 @@ gb_internal void add_import_dependency_node(Checker *c, Ast *decl, PtrMap<AstPac
 		GB_ASSERT(found_node != nullptr);
 		n = *found_node;
 
-		// TODO(bill): How should the edges be attached for 'import'?
 		import_graph_node_set_add(&n->succ, m);
 		import_graph_node_set_add(&m->pred, n);
 		ptr_set_add(&m->scope->imported, n->scope);
@@ -4609,7 +4602,7 @@ gb_internal bool collect_file_decl(CheckerContext *ctx, Ast *decl) {
 		if (es->expr->kind == Ast_CallExpr) {
 			ast_node(ce, CallExpr, es->expr);
 			if (ce->proc->kind == Ast_BasicDirective) {
-				mpmc_enqueue(&curr_file->delayed_decls_queues[AstDelayQueue_Expr], es->expr);
+				array_add(&curr_file->delayed_decls_queues[AstDelayQueue_Expr], es->expr);
 			}
 		}
 	case_end;
@@ -4863,9 +4856,10 @@ gb_internal void check_import_entities(Checker *c) {
 			ctx.collect_delayed_decls = true;
 
 			// Check import declarations first to simplify things
-			for (Ast *id = nullptr; mpmc_dequeue(&f->delayed_decls_queues[AstDelayQueue_Import], &id); /**/) {
-				check_add_import_decl(&ctx, id);
+			for (Ast *decl : f->delayed_decls_queues[AstDelayQueue_Import]) {
+				check_add_import_decl(&ctx, decl);
 			}
+			array_clear(&f->delayed_decls_queues[AstDelayQueue_Import]);
 
 			if (collect_file_decls(&ctx, f->decls)) {
 				check_export_entities_in_pkg(&ctx, pkg, &untyped);
@@ -4891,10 +4885,10 @@ gb_internal void check_import_entities(Checker *c) {
 			AstFile *f = pkg->files[i];
 			reset_checker_context(&ctx, f, &untyped);
 
-			auto *q = &f->delayed_decls_queues[AstDelayQueue_Import];
-			for (Ast *decl = nullptr; mpmc_dequeue(q, &decl); /**/) {
+			for (Ast *decl : f->delayed_decls_queues[AstDelayQueue_Import]) {
 				check_add_import_decl(&ctx, decl);
 			}
+			array_clear(&f->delayed_decls_queues[AstDelayQueue_Import]);
 			add_untyped_expressions(ctx.info, &untyped);
 		}
 
@@ -4910,11 +4904,12 @@ gb_internal void check_import_entities(Checker *c) {
 			AstFile *f = pkg->files[i];
 			reset_checker_context(&ctx, f, &untyped);
 
-			auto *q = &f->delayed_decls_queues[AstDelayQueue_Expr];
-			for (Ast *expr = nullptr; mpmc_dequeue(q, &expr); /**/) {
+			for (Ast *expr : f->delayed_decls_queues[AstDelayQueue_Expr]) {
 				Operand o = {};
 				check_expr(&ctx, &o, expr);
 			}
+			array_clear(&f->delayed_decls_queues[AstDelayQueue_Expr]);
+
 			add_untyped_expressions(ctx.info, &untyped);
 		}
 	}
@@ -4969,10 +4964,9 @@ gb_internal Array<Entity *> find_entity_path(Entity *start, Entity *end, PtrSet<
 
 	Array<Entity *> empty_path = {};
 
-	if (ptr_set_exists(visited, start)) {
+	if (ptr_set_update(visited, start)) {
 		return empty_path;
 	}
-	ptr_set_add(visited, start);
 
 	DeclInfo *decl = start->decl_info;
 	if (decl) {

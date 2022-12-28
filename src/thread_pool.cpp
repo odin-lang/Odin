@@ -83,10 +83,8 @@ gb_internal void thread_pool_queue_push(ThreadPool *pool, WorkerTask *task) {
 
 gb_internal bool thread_pool_add_task(ThreadPool *pool, WorkerTaskProc *proc, void *data) {
 	GB_ASSERT(proc != nullptr);
-	mutex_lock(&pool->mutex);
 	WorkerTask *task = gb_alloc_item(permanent_allocator(), WorkerTask);
 	if (task == nullptr) {
-		mutex_unlock(&pool->mutex);
 		GB_PANIC("Out of memory");
 		return false;
 	}
@@ -94,9 +92,10 @@ gb_internal bool thread_pool_add_task(ThreadPool *pool, WorkerTaskProc *proc, vo
 	task->do_work = proc;
 	task->data = data;
 		
+	mutex_lock(&pool->mutex);
 	thread_pool_queue_push(pool, task);
 	GB_ASSERT(pool->ready >= 0);
-	pool->ready++;
+	pool->ready.fetch_add(1);
 	condition_broadcast(&pool->task_cond);
 	mutex_unlock(&pool->mutex);
 	return true;
@@ -111,7 +110,7 @@ gb_internal void thread_pool_wait(ThreadPool *pool) {
 	if (pool->threads.count == 0) {
 		while (!thread_pool_queue_empty(pool)) {
 			thread_pool_do_task(thread_pool_queue_pop(pool));
-			--pool->ready;
+			pool->ready.fetch_sub(1);
 		}
 		GB_ASSERT(pool->ready == 0);
 		return;

@@ -62,15 +62,6 @@ enum PackageKind {
 	Package_Init,
 };
 
-struct ImportedPackage {
-	PackageKind kind;
-	String      path;
-	String      rel_path;
-	TokenPos    pos; // import
-	isize       index;
-};
-
-
 struct ImportedFile {
 	AstPackage *pkg;
 	FileInfo    fi;
@@ -99,7 +90,11 @@ struct AstFile {
 	Scope *      scope;
 
 	Ast *        pkg_decl;
+
 	String       fullpath;
+	String       filename;
+	String       directory;
+
 	Tokenizer    tokenizer;
 	Array<Token> tokens;
 	isize        curr_token_index;
@@ -108,6 +103,7 @@ struct AstFile {
 	Token        prev_token; // previous non-comment
 	Token        package_token;
 	String       package_name;
+
 
 	// >= 0: In Expression
 	// <  0: In Control Clause
@@ -136,9 +132,8 @@ struct AstFile {
 	CommentGroup *docs;             // current docs
 	Array<CommentGroup *> comments; // All the comments!
 
-	// TODO(bill): make this a basic queue as it does not require
-	// any multiple thread capabilities
-	MPMCQueue<Ast *> delayed_decls_queues[AstDelayQueue_COUNT];
+	// This is effectively a queue but does not require any multi-threading capabilities
+	Array<Ast *> delayed_decls_queues[AstDelayQueue_COUNT];
 
 #define PARSER_MAX_FIX_COUNT 6
 	isize    fix_count;
@@ -177,6 +172,9 @@ struct AstPackage {
 	bool                  is_single_file;
 	isize                 order;
 
+	BlockingMutex         files_mutex;
+	BlockingMutex         foreign_files_mutex;
+
 	MPMCQueue<AstPackageExportedEntity> exported_entity_queue;
 
 	// NOTE(bill): Created/set in checker
@@ -186,20 +184,33 @@ struct AstPackage {
 };
 
 
+struct ParseFileErrorNode {
+	ParseFileErrorNode *next, *prev;
+	ParseFileError      err;
+};
+
 struct Parser {
-	String                    init_fullpath;
-	StringSet                 imported_files; // fullpath
-	Array<AstPackage *>       packages;
-	Array<ImportedPackage>    package_imports;
-	isize                     file_to_process_count;
-	isize                     total_token_count;
-	isize                     total_line_count;
-	BlockingMutex             wait_mutex;
-	BlockingMutex             import_mutex;
-	BlockingMutex             file_add_mutex;
-	BlockingMutex             file_decl_mutex;
-	BlockingMutex             packages_mutex;
-	MPMCQueue<ParseFileError> file_error_queue;
+	String                 init_fullpath;
+
+	StringSet              imported_files; // fullpath
+	BlockingMutex          imported_files_mutex;
+
+	Array<AstPackage *>    packages;
+	BlockingMutex          packages_mutex;
+
+	std::atomic<isize>     file_to_process_count;
+	std::atomic<isize>     total_token_count;
+	std::atomic<isize>     total_line_count;
+
+	// TODO(bill): What should this mutex be per?
+	//  * Parser
+	//  * Package
+	//  * File
+	BlockingMutex          file_decl_mutex;
+
+	BlockingMutex          file_error_mutex;
+	ParseFileErrorNode *   file_error_head;
+	ParseFileErrorNode *   file_error_tail;
 };
 
 struct ParserWorkerData {
@@ -749,7 +760,7 @@ struct AstCommonStuff {
 	u8           state_flags;
 	u8           viral_state_flags;
 	i32          file_id;
-	TypeAndValue tav; // TODO(bill): Make this a pointer to minimize 'Ast' size
+	TypeAndValue tav; // NOTE(bill): Making this a pointer is slower
 };
 
 struct Ast {
@@ -757,7 +768,7 @@ struct Ast {
 	u8           state_flags;
 	u8           viral_state_flags;
 	i32          file_id;
-	TypeAndValue tav; // TODO(bill): Make this a pointer to minimize 'Ast' size
+	TypeAndValue tav; // NOTE(bill): Making this a pointer is slower
 
 	// IMPORTANT NOTE(bill): This must be at the end since the AST is allocated to be size of the variant
 	union {
