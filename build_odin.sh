@@ -7,7 +7,7 @@ set -eu
 : ${LDFLAGS=}
 : ${ODIN_VERSION=dev-$(date +"%Y-%m")}
 
-CPPFLAGS="$CPPFLAGS -g -DODIN_VERSION_RAW=\"$ODIN_VERSION\""
+CPPFLAGS="$CPPFLAGS -DODIN_VERSION_RAW=\"$ODIN_VERSION\""
 CXXFLAGS="$CXXFLAGS -std=c++14"
 LDFLAGS="$LDFLAGS -pthread -lm -lstdc++"
 
