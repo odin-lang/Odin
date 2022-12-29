@@ -45,7 +45,7 @@ if "%2" == "1" (
 
 set odin_version_raw="dev-%curr_year%-%curr_month%"
 
-set compiler_flags= -nologo -Oi -TP -fp:precise -FC -EHsc- -GR- -GF -Xclang -finstrument-functions
+set compiler_flags= -nologo -Oi -TP -fp:precise -FC -EHsc- -GR- -GF
 set compiler_defines= -DODIN_VERSION_RAW=\"%odin_version_raw%\"
 
 for /f %%i in ('git rev-parse --short HEAD') do set GIT_SHA=%%i
@@ -63,12 +63,13 @@ set compiler_warnings= ^
 	-W3 ^
 	-wd4100 -wd4101 -wd4127 -wd4146 ^
 	-wd4505 ^
-	-wd4456 -wd4457 -Wno-unused-variable -Wno-switch -Wno-unused-value
+	-wd4456 -wd4457
 
 set compiler_includes= ^
 	/Isrc\
 set libs= ^
 	kernel32.lib ^
+	Synchronization.lib ^
 	bin\llvm\windows\LLVM-C.lib
 
 set linker_flags= -incremental:no -opt:ref -subsystem:console
@@ -85,7 +86,7 @@ set linker_settings=%libs% %linker_flags%
 del *.pdb > NUL 2> NUL
 del *.ilk > NUL 2> NUL
 
-clang-cl %compiler_settings% "src\main.cpp" "src\libtommath.cpp" /link %linker_settings% -OUT:%exe_name%
+cl %compiler_settings% "src\main.cpp" "src\libtommath.cpp" /link %linker_settings% -OUT:%exe_name%
 if %errorlevel% neq 0 goto end_of_build
 
 call build_vendor.bat

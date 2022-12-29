@@ -31,7 +31,7 @@ struct Thread {
 	pthread_t posix_handle;
 #endif
 	
-	int idx;
+	isize idx;
 
 	WorkerTask *queue;
 	size_t capacity;
@@ -69,8 +69,8 @@ gb_internal void condition_wait_with_timeout(Condition *c, BlockingMutex *m, u32
 
 gb_internal u32  thread_current_id(void);
 
-gb_internal void thread_init                     (ThreadPool *pool, Thread *t, int idx);
-gb_internal void thread_init_and_start           (ThreadPool *pool, Thread *t, int idx);
+gb_internal void thread_init                     (ThreadPool *pool, Thread *t, isize idx);
+gb_internal void thread_init_and_start           (ThreadPool *pool, Thread *t, isize idx);
 gb_internal void thread_join_and_destroy(Thread *t);
 gb_internal void thread_set_name        (Thread *t, char const *name);
 
@@ -355,7 +355,7 @@ gb_internal void *internal_thread_proc(void *arg) {
 }
 #endif
 
-gb_internal void thread_init(ThreadPool *pool, Thread *t, int idx) {
+gb_internal void thread_init(ThreadPool *pool, Thread *t, isize idx) {
 	gb_zero_item(t);
 #if defined(GB_SYSTEM_WINDOWS)
 	t->win32_handle = INVALID_HANDLE_VALUE;
@@ -370,7 +370,7 @@ gb_internal void thread_init(ThreadPool *pool, Thread *t, int idx) {
 	t->idx = idx;
 }
 
-gb_internal void thread_init_and_start(ThreadPool *pool, Thread *t, int idx) {
+gb_internal void thread_init_and_start(ThreadPool *pool, Thread *t, isize idx) {
 	thread_init(pool, t, idx);
 	isize stack_size = 0;
 

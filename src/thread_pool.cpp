@@ -146,8 +146,6 @@ gb_internal THREAD_PROC(thread_pool_thread_proc) {
 	WorkerTask task;
 	Thread *current_thread = thread;
 	ThreadPool *pool = current_thread->pool;
-	spall_auto_thread_init(current_thread->idx, SPALL_DEFAULT_BUFFER_SIZE, SPALL_DEFAULT_SYMBOL_CACHE_SIZE);
-	defer(spall_auto_thread_quit());
 
 	for (;;) {
 work_start:
@@ -169,7 +167,7 @@ work_start:
 
 		// If there's still work somewhere and we don't have it, steal it
 		if (pool->tasks_left) {
-			int idx = current_thread->idx;
+			isize idx = current_thread->idx;
 			for_array(i, pool->threads) {
 				if (!pool->tasks_left) {
 					break;
