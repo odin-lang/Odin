@@ -529,7 +529,7 @@ gb_internal void tpool_wake_addr(Futex *addr) {
 
 gb_internal void tpool_wait_on_addr(Futex *addr, Footex val) {
 	for (;;) {
-		int ret = WaitOnAddress(addr, (void *)&val, sizeof(val), INFINITE);
+		WaitOnAddress(addr, (void *)&val, sizeof(val), INFINITE);
 		if (*addr != val) break;
 	}
 }
