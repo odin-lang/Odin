@@ -481,8 +481,8 @@ typedef volatile int64_t Footex;
 #define UL_COMPARE_AND_WAIT	0x00000001
 #define ULF_NO_ERRNO        0x01000000
 
-int __ulock_wait(uint32_t operation, void *addr, uint64_t value, uint32_t timeout); /* timeout is specified in microseconds */
-int __ulock_wake(uint32_t operation, void *addr, uint64_t wake_value);
+extern "C" int __ulock_wait(uint32_t operation, void *addr, uint64_t value, uint32_t timeout); /* timeout is specified in microseconds */
+extern "C" int __ulock_wake(uint32_t operation, void *addr, uint64_t wake_value);
 
 gb_internal void tpool_wake_addr(Futex *addr) {
 	for (;;) {
