@@ -3,13 +3,12 @@
 struct WorkerTask;
 struct ThreadPool;
 
+gb_thread_local Thread *current_thread;
+
 gb_internal void thread_pool_init(ThreadPool *pool, gbAllocator const &a, isize thread_count, char const *worker_name);
 gb_internal void thread_pool_destroy(ThreadPool *pool);
 gb_internal bool thread_pool_add_task(ThreadPool *pool, WorkerTaskProc *proc, void *data);
 gb_internal void thread_pool_wait(ThreadPool *pool);
-
-
-
 
 struct ThreadPool {
 	gbAllocator   allocator;
@@ -23,7 +22,6 @@ struct ThreadPool {
 	Futex tasks_left;
 };
 
-
 gb_internal void thread_pool_init(ThreadPool *pool, gbAllocator const &a, isize thread_count, char const *worker_name) {
 	mutex_init(&pool->task_lock);
 	condition_init(&pool->tasks_available);
@@ -33,6 +31,7 @@ gb_internal void thread_pool_init(ThreadPool *pool, gbAllocator const &a, isize 
 
 	// setup the main thread
 	thread_init(pool, &pool->threads[0], 0);
+	current_thread = &pool->threads[0];
 
 	for_array_off(i, 1, pool->threads) {
 		Thread *t = &pool->threads[i];
@@ -63,7 +62,7 @@ void thread_pool_queue_push(Thread *thread, WorkerTask task) {
 	uint64_t capture;
 	uint64_t new_capture;
 	do {
-		capture = thread->head_and_tail;
+		capture = thread->head_and_tail.load();
 
 		uint64_t mask = thread->capacity - 1;
 		uint64_t head = (capture >> 32) & mask;
@@ -87,7 +86,7 @@ bool thread_pool_queue_pop(Thread *thread, WorkerTask *task) {
 	uint64_t capture;
 	uint64_t new_capture;
 	do {
-		capture = thread->head_and_tail;
+		capture = thread->head_and_tail.load();
 
 		uint64_t mask = thread->capacity - 1;
 		uint64_t head = (capture >> 32) & mask;
@@ -112,13 +111,12 @@ gb_internal bool thread_pool_add_task(ThreadPool *pool, WorkerTaskProc *proc, vo
 	task.do_work = proc;
 	task.data = data;
 		
-	thread_pool_queue_push(&pool->threads[0], task);
+	thread_pool_queue_push(current_thread, task);
 	return true;
 }	
 
 gb_internal void thread_pool_wait(ThreadPool *pool) {
 	WorkerTask task;
-	Thread *current_thread = &pool->threads[0];
 
 	while (pool->tasks_left) {
 
@@ -144,7 +142,7 @@ gb_internal void thread_pool_wait(ThreadPool *pool) {
 
 gb_internal THREAD_PROC(thread_pool_thread_proc) {
 	WorkerTask task;
-	Thread *current_thread = thread;
+	current_thread = thread;
 	ThreadPool *pool = current_thread->pool;
 
 	for (;;) {
