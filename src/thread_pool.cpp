@@ -29,7 +29,7 @@ gb_internal void thread_pool_init(ThreadPool *pool, gbAllocator const &a, isize 
 	condition_init(&pool->tasks_available);
 
 	pool->allocator = a;
-	slice_init(&pool->threads, a, thread_count);
+	slice_init(&pool->threads, a, thread_count + 1);
 
 	// setup the main thread
 	thread_init(pool, &pool->threads[0], 0);

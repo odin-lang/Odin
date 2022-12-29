@@ -2492,7 +2492,7 @@ int main(int arg_count, char const **arg_ptr) {
 	spall_auto_init((char *)"odin.spall");
 	defer (spall_auto_quit());
 
-	spall_auto_thread_init(pthread_self(), SPALL_DEFAULT_BUFFER_SIZE, SPALL_DEFAULT_SYMBOL_CACHE_SIZE);
+	spall_auto_thread_init(0, SPALL_DEFAULT_BUFFER_SIZE, SPALL_DEFAULT_SYMBOL_CACHE_SIZE);
 	defer (spall_auto_thread_quit());
 
 	if (arg_count < 2) {
