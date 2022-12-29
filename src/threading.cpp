@@ -474,7 +474,7 @@ gb_internal void tpool_wait_on_addr(Futex *addr, Footex val) {
 	}
 }
 
-#if defined(GB_SYSTEM_FREEBSD)
+#elif defined(GB_SYSTEM_FREEBSD)
 
 #include <sys/types.h>
 #include <sys/umtx.h>
