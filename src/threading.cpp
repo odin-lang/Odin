@@ -512,22 +512,29 @@ typedef std::atomic<int32_t> Futex;
 typedef volatile int32_t Footex;
 
 gb_internal void tpool_wake_addr(Futex *addr) {
-	int ret = futex((volatile uint32_t *)addr, FUTEX_WAKE | FUTEX_PRIVATE_FLAG, 1, NULL, NULL);
-	if (ret == -1) {
-		perror("Futex wake");
-		GB_PANIC("futex wake fail");
+	for (;;) {
+		int ret = futex((volatile uint32_t *)addr, FUTEX_WAKE | FUTEX_PRIVATE_FLAG, 1, NULL, NULL);
+		if (ret == -1) {
+			if (errno == ETIMEDOUT || errno == EINTR) {
+				continue;
+			}
+
+			perror("Futex wake");
+			GB_PANIC("futex wake fail");
+		} else if (ret == 1) {
+			return;
+		}
 	}
 }
 
 gb_internal void tpool_wait_on_addr(Futex *addr, Footex val) {
 	for (;;) {
 		int ret = futex((volatile uint32_t *)addr, FUTEX_WAIT | FUTEX_PRIVATE_FLAG, val, NULL, NULL);
-		if (ret != -1) {
+		if (ret == -1) {
 			if (*addr != val) {
 				return;
 			}
 
-		} else {
 			if (errno == ETIMEDOUT || errno == EINTR) {
 				continue;
 			}
