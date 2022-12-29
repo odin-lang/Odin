@@ -31,7 +31,8 @@
 
 gb_internal gbAllocator heap_allocator(void);
 
-#define for_array(index_, array_) for (isize index_ = 0; index_ < (array_).count; index_++)
+#define for_array_off(index_, off_, array_) for (isize index_ = off_; index_ < (array_).count; index_++)
+#define for_array(index_, array_) for_array_off(index_, 0, array_)
 
 gb_internal i32 next_pow2(i32 n);
 gb_internal i64 next_pow2(i64 n);
