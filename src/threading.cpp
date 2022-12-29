@@ -473,6 +473,37 @@ gb_internal void tpool_wait_on_addr(Futex *addr, Footex val) {
 		}
 	}
 }
+
+#if defined(GB_SYSTEM_FREEBSD)
+
+#include <sys/types.h>
+#include <sys/umtx.h>
+
+typedef std::atomic<int32_t> Futex;
+typedef volatile int32_t Footex;
+
+gb_internal void tpool_wake_addr(Futex *addr) {
+	_umtx_op(addr, UMTX_OP_WAKE, 1, 0, 0);
+}
+
+gb_internal void tpool_wait_on_addr(Futex *addr, Footex val) {
+	for (;;) {
+		int ret = _umtx_op(addr, UMTX_OP_WAIT_UINT, val, 0, NULL);
+		if (ret == 0) {
+			if (errno == ETIMEDOUT || errno == EINTR) {
+				continue;
+			}
+
+			perror("Futex wait");
+			GB_PANIC("Failed in futex wait!\n");
+		} else if (ret == 0) {
+			if (*addr != val) {
+				return;
+			}
+		}
+	}
+}
+
 #elif defined(GB_SYSTEM_OSX)
 
 typedef std::atomic<int64_t> Futex;
