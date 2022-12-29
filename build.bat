@@ -45,7 +45,7 @@ if "%2" == "1" (
 
 set odin_version_raw="dev-%curr_year%-%curr_month%"
 
-set compiler_flags= -nologo -Oi -TP -fp:precise -FC -EHsc- -GR- -GF
+set compiler_flags= -nologo -Oi -TP -fp:precise -Gm- -MP -FC -EHsc- -GR- -GF
 set compiler_defines= -DODIN_VERSION_RAW=\"%odin_version_raw%\"
 
 for /f %%i in ('git rev-parse --short HEAD') do set GIT_SHA=%%i
@@ -60,7 +60,7 @@ if %release_mode% EQU 0 ( rem Debug
 )
 
 set compiler_warnings= ^
-	-W3 ^
+	-W4 -WX ^
 	-wd4100 -wd4101 -wd4127 -wd4146 ^
 	-wd4505 ^
 	-wd4456 -wd4457
