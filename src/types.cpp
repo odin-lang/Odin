@@ -2678,8 +2678,8 @@ gb_internal bool are_types_identical_internal(Type *x, Type *y, bool check_tuple
 		       x->Proc.variadic    == y->Proc.variadic    &&
 		       x->Proc.diverging   == y->Proc.diverging   &&
 		       x->Proc.optional_ok == y->Proc.optional_ok &&
-		       are_types_identical(x->Proc.params, y->Proc.params) &&
-		       are_types_identical(x->Proc.results, y->Proc.results);
+		       are_types_identical_internal(x->Proc.params, y->Proc.params, check_tuple_names) &&
+		       are_types_identical_internal(x->Proc.results, y->Proc.results, check_tuple_names);
 
 	case Type_Map:
 		return are_types_identical(x->Map.key,   y->Map.key) &&

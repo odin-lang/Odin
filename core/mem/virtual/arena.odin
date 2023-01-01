@@ -19,11 +19,11 @@ Arena :: struct {
 
 
 // 1 MiB should be enough to start with
-DEFAULT_ARENA_STATIC_COMMIT_SIZE         :: 1<<20
+DEFAULT_ARENA_STATIC_COMMIT_SIZE         :: mem.Megabyte
 DEFAULT_ARENA_GROWING_MINIMUM_BLOCK_SIZE :: DEFAULT_ARENA_STATIC_COMMIT_SIZE
 
 // 1 GiB on 64-bit systems, 128 MiB on 32-bit systems by default
-DEFAULT_ARENA_STATIC_RESERVE_SIZE :: 1<<30 when size_of(uintptr) == 8 else 1<<27
+DEFAULT_ARENA_STATIC_RESERVE_SIZE :: mem.Gigabyte when size_of(uintptr) == 8 else 128 * mem.Megabyte
 
 
 
