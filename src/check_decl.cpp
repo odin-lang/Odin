@@ -1,7 +1,7 @@
-void check_stmt          (CheckerContext *ctx, Ast *node, u32 flags);
+gb_internal void check_stmt(CheckerContext *ctx, Ast *node, u32 flags);
 
 // NOTE(bill): 'content_name' is for debugging and error messages
-Type *check_init_variable(CheckerContext *ctx, Entity *e, Operand *operand, String context_name) {
+gb_internal Type *check_init_variable(CheckerContext *ctx, Entity *e, Operand *operand, String context_name) {
 	if (operand->mode == Addressing_Invalid ||
 		operand->type == t_invalid ||
 		e->type == t_invalid) {
@@ -10,7 +10,6 @@ Type *check_init_variable(CheckerContext *ctx, Entity *e, Operand *operand, Stri
 			gbString expr_str = expr_to_string(operand->expr);
 
 			// TODO(bill): is this a good enough error message?
-			// TODO(bill): Actually allow built in procedures to be passed around and thus be created on use
 			error(operand->expr,
 				  "Cannot assign built-in procedure '%s' in %.*s",
 				  expr_str,
@@ -110,7 +109,7 @@ Type *check_init_variable(CheckerContext *ctx, Entity *e, Operand *operand, Stri
 	return e->type;
 }
 
-void check_init_variables(CheckerContext *ctx, Entity **lhs, isize lhs_count, Slice<Ast *> const &inits, String context_name) {
+gb_internal void check_init_variables(CheckerContext *ctx, Entity **lhs, isize lhs_count, Slice<Ast *> const &inits, String context_name) {
 	if ((lhs == nullptr || lhs_count == 0) && inits.count == 0) {
 		return;
 	}
@@ -122,13 +121,6 @@ void check_init_variables(CheckerContext *ctx, Entity **lhs, isize lhs_count, Sl
 	check_unpack_arguments(ctx, lhs, lhs_count, &operands, inits, true, false);
 
 	isize rhs_count = operands.count;
-	for_array(i, operands) {
-		if (operands[i].mode == Addressing_Invalid) {
-			// TODO(bill): Should I ignore invalid parameters?
-			// rhs_count--;
-		}
-	}
-
 	isize max = gb_min(lhs_count, rhs_count);
 	for (isize i = 0; i < max; i++) {
 		Entity *e = lhs[i];
@@ -144,7 +136,7 @@ void check_init_variables(CheckerContext *ctx, Entity **lhs, isize lhs_count, Sl
 	}
 }
 
-void check_init_constant(CheckerContext *ctx, Entity *e, Operand *operand) {
+gb_internal void check_init_constant(CheckerContext *ctx, Entity *e, Operand *operand) {
 	if (operand->mode == Addressing_Invalid ||
 		operand->type == t_invalid ||
 		e->type == t_invalid) {
@@ -184,7 +176,7 @@ void check_init_constant(CheckerContext *ctx, Entity *e, Operand *operand) {
 }
 
 
-bool is_type_distinct(Ast *node) {
+gb_internal bool is_type_distinct(Ast *node) {
 	for (;;) {
 		if (node == nullptr) {
 			return false;
@@ -217,7 +209,7 @@ bool is_type_distinct(Ast *node) {
 	return false;
 }
 
-Ast *remove_type_alias_clutter(Ast *node) {
+gb_internal Ast *remove_type_alias_clutter(Ast *node) {
 	for (;;) {
 		if (node == nullptr) {
 			return nullptr;
@@ -232,17 +224,7 @@ Ast *remove_type_alias_clutter(Ast *node) {
 	}
 }
 
-isize total_attribute_count(DeclInfo *decl) {
-	isize attribute_count = 0;
-	for_array(i, decl->attributes) {
-		Ast *attr = decl->attributes[i];
-		if (attr->kind != Ast_Attribute) continue;
-		attribute_count += attr->Attribute.elems.count;
-	}
-	return attribute_count;
-}
-
-Type *clone_enum_type(CheckerContext *ctx, Type *original_enum_type, Type *named_type) {
+gb_internal Type *clone_enum_type(CheckerContext *ctx, Type *original_enum_type, Type *named_type) {
 	// NOTE(bill, 2022-02-05): Stupid edge case for `distinct` declarations
 	//
 	//         X :: enum {A, B, C}
@@ -288,7 +270,7 @@ Type *clone_enum_type(CheckerContext *ctx, Type *original_enum_type, Type *named
 	return et;
 }
 
-void check_type_decl(CheckerContext *ctx, Entity *e, Ast *init_expr, Type *def) {
+gb_internal void check_type_decl(CheckerContext *ctx, Entity *e, Ast *init_expr, Type *def) {
 	GB_ASSERT(e->type == nullptr);
 
 	DeclInfo *decl = decl_info_of_entity(e);
@@ -390,7 +372,7 @@ void check_type_decl(CheckerContext *ctx, Entity *e, Ast *init_expr, Type *def) 
 }
 
 
-void override_entity_in_scope(Entity *original_entity, Entity *new_entity) {
+gb_internal void override_entity_in_scope(Entity *original_entity, Entity *new_entity) {
 	// NOTE(bill): The original_entity's scope may not be same scope that it was inserted into
 	// e.g. file entity inserted into its package scope
 	String original_name = original_entity->token.string;
@@ -433,7 +415,7 @@ void override_entity_in_scope(Entity *original_entity, Entity *new_entity) {
 
 
 
-void check_const_decl(CheckerContext *ctx, Entity *e, Ast *type_expr, Ast *init, Type *named_type) {
+gb_internal void check_const_decl(CheckerContext *ctx, Entity *e, Ast *type_expr, Ast *init, Type *named_type) {
 	GB_ASSERT(e->type == nullptr);
 	GB_ASSERT(e->kind == Entity_Constant);
 	init = unparen_expr(init);
@@ -609,12 +591,12 @@ void check_const_decl(CheckerContext *ctx, Entity *e, Ast *type_expr, Ast *init,
 
 
 typedef bool TypeCheckSig(Type *t);
-bool sig_compare(TypeCheckSig *a, Type *x, Type *y) {
+gb_internal bool sig_compare(TypeCheckSig *a, Type *x, Type *y) {
 	x = core_type(x);
 	y = core_type(y);
 	return (a(x) && a(y));
 }
-bool sig_compare(TypeCheckSig *a, TypeCheckSig *b, Type *x, Type *y) {
+gb_internal bool sig_compare(TypeCheckSig *a, TypeCheckSig *b, Type *x, Type *y) {
 	x = core_type(x);
 	y = core_type(y);
 	if (a == b) {
@@ -623,7 +605,7 @@ bool sig_compare(TypeCheckSig *a, TypeCheckSig *b, Type *x, Type *y) {
 	return ((a(x) && b(y)) || (b(x) && a(y)));
 }
 
-bool signature_parameter_similar_enough(Type *x, Type *y) {
+gb_internal bool signature_parameter_similar_enough(Type *x, Type *y) {
 	if (sig_compare(is_type_pointer, x, y)) {
 		return true;
 	}
@@ -674,7 +656,7 @@ bool signature_parameter_similar_enough(Type *x, Type *y) {
 }
 
 
-bool are_signatures_similar_enough(Type *a_, Type *b_) {
+gb_internal bool are_signatures_similar_enough(Type *a_, Type *b_) {
 	GB_ASSERT(a_->kind == Type_Proc);
 	GB_ASSERT(b_->kind == Type_Proc);
 	TypeProc *a = &a_->Proc;
@@ -704,7 +686,7 @@ bool are_signatures_similar_enough(Type *a_, Type *b_) {
 	return true;
 }
 
-Entity *init_entity_foreign_library(CheckerContext *ctx, Entity *e) {
+gb_internal Entity *init_entity_foreign_library(CheckerContext *ctx, Entity *e) {
 	Ast *ident = nullptr;
 	Entity **foreign_library = nullptr;
 
@@ -747,7 +729,7 @@ Entity *init_entity_foreign_library(CheckerContext *ctx, Entity *e) {
 	return nullptr;
 }
 
-String handle_link_name(CheckerContext *ctx, Token token, String link_name, String link_prefix) {
+gb_internal String handle_link_name(CheckerContext *ctx, Token token, String link_name, String link_prefix) {
 	if (link_prefix.len > 0) {
 		if (link_name.len > 0) {
 			error(token, "'link_name' and 'link_prefix' cannot be used together");
@@ -764,7 +746,7 @@ String handle_link_name(CheckerContext *ctx, Token token, String link_name, Stri
 	return link_name;
 }
 
-void check_proc_decl(CheckerContext *ctx, Entity *e, DeclInfo *d) {
+gb_internal void check_proc_decl(CheckerContext *ctx, Entity *e, DeclInfo *d) {
 	GB_ASSERT(e->type == nullptr);
 	if (d->proc_lit->kind != Ast_ProcLit) {
 		// TOOD(bill): Better error message
@@ -1121,7 +1103,7 @@ void check_proc_decl(CheckerContext *ctx, Entity *e, DeclInfo *d) {
 	}
 }
 
-void check_global_variable_decl(CheckerContext *ctx, Entity *&e, Ast *type_expr, Ast *init_expr) {
+gb_internal void check_global_variable_decl(CheckerContext *ctx, Entity *&e, Ast *type_expr, Ast *init_expr) {
 	GB_ASSERT(e->type == nullptr);
 	GB_ASSERT(e->kind == Entity_Variable);
 
@@ -1239,7 +1221,7 @@ void check_global_variable_decl(CheckerContext *ctx, Entity *&e, Ast *type_expr,
 	check_rtti_type_disallowed(e->token, e->type, "A variable declaration is using a type, %s, which has been disallowed");
 }
 
-void check_proc_group_decl(CheckerContext *ctx, Entity *&pg_entity, DeclInfo *d) {
+gb_internal void check_proc_group_decl(CheckerContext *ctx, Entity *&pg_entity, DeclInfo *d) {
 	GB_ASSERT(pg_entity->kind == Entity_ProcGroup);
 	auto *pge = &pg_entity->ProcGroup;
 	String proc_group_name = pg_entity->token.string;
@@ -1367,7 +1349,7 @@ void check_proc_group_decl(CheckerContext *ctx, Entity *&pg_entity, DeclInfo *d)
 
 }
 
-void check_entity_decl(CheckerContext *ctx, Entity *e, DeclInfo *d, Type *named_type) {
+gb_internal void check_entity_decl(CheckerContext *ctx, Entity *e, DeclInfo *d, Type *named_type) {
 	if (e->state == EntityState_Resolved)  {
 		return;
 	}
@@ -1437,7 +1419,7 @@ struct ProcUsingVar {
 };
 
 
-void check_proc_body(CheckerContext *ctx_, Token token, DeclInfo *decl, Type *type, Ast *body) {
+gb_internal void check_proc_body(CheckerContext *ctx_, Token token, DeclInfo *decl, Type *type, Ast *body) {
 	if (body == nullptr) {
 		return;
 	}
@@ -1499,8 +1481,8 @@ void check_proc_body(CheckerContext *ctx_, Token token, DeclInfo *decl, Type *ty
 				if (t->kind == Type_Struct) {
 					Scope *scope = t->Struct.scope;
 					GB_ASSERT(scope != nullptr);
-					MUTEX_GUARD_BLOCK(scope->mutex) for_array(i, scope->elements.entries) {
-						Entity *f = scope->elements.entries[i].value;
+					MUTEX_GUARD_BLOCK(scope->mutex) for (auto const &entry : scope->elements) {
+						Entity *f = entry.value;
 						if (f->kind == Entity_Variable) {
 							Entity *uvar = alloc_entity_using_variable(e, f->token, f->type, nullptr);
 							if (is_value) uvar->flags |= EntityFlag_Value;
@@ -1599,12 +1581,12 @@ void check_proc_body(CheckerContext *ctx_, Token token, DeclInfo *decl, Type *ty
 
 			// NOTE(bill): Add the dependencies from the procedure literal (lambda)
 			// But only at the procedure level
-			for_array(i, decl->deps.entries) {
-				Entity *e = decl->deps.entries[i].ptr;
+			for (auto const &entry : decl->deps) {
+				Entity *e = entry.ptr;
 				ptr_set_add(&decl->parent->deps, e);
 			}
-			for_array(i, decl->type_info_deps.entries) {
-				Type *t = decl->type_info_deps.entries[i].ptr;
+			for (auto const &entry : decl->type_info_deps) {
+				Type *t = entry.ptr;
 				ptr_set_add(&decl->parent->type_info_deps, t);
 			}
 

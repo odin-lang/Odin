@@ -1,4 +1,4 @@
-bool is_diverging_expr(Ast *expr) {
+gb_internal bool is_diverging_expr(Ast *expr) {
 	expr = unparen_expr(expr);
 	if (expr->kind != Ast_CallExpr) {
 		return false;
@@ -23,14 +23,14 @@ bool is_diverging_expr(Ast *expr) {
 	t = base_type(t);
 	return t != nullptr && t->kind == Type_Proc && t->Proc.diverging;
 }
-bool is_diverging_stmt(Ast *stmt) {
+gb_internal bool is_diverging_stmt(Ast *stmt) {
 	if (stmt->kind != Ast_ExprStmt) {
 		return false;
 	}
 	return is_diverging_expr(stmt->ExprStmt.expr);
 }
 
-bool contains_deferred_call(Ast *node) {
+gb_internal bool contains_deferred_call(Ast *node) {
 	if (node->viral_state_flags & ViralStateFlag_ContainsDeferredProcedure) {
 		return true;
 	}
@@ -61,7 +61,7 @@ bool contains_deferred_call(Ast *node) {
 	return false;
 }
 
-void check_stmt_list(CheckerContext *ctx, Slice<Ast *> const &stmts, u32 flags) {
+gb_internal void check_stmt_list(CheckerContext *ctx, Slice<Ast *> const &stmts, u32 flags) {
 	if (stmts.count == 0) {
 		return;
 	}
@@ -137,7 +137,7 @@ void check_stmt_list(CheckerContext *ctx, Slice<Ast *> const &stmts, u32 flags) 
 	}
 }
 
-bool check_is_terminating_list(Slice<Ast *> const &stmts, String const &label) {
+gb_internal bool check_is_terminating_list(Slice<Ast *> const &stmts, String const &label) {
 	// Iterate backwards
 	for (isize n = stmts.count-1; n >= 0; n--) {
 		Ast *stmt = stmts[n];
@@ -155,7 +155,7 @@ bool check_is_terminating_list(Slice<Ast *> const &stmts, String const &label) {
 	return false;
 }
 
-bool check_has_break_list(Slice<Ast *> const &stmts, String const &label, bool implicit) {
+gb_internal bool check_has_break_list(Slice<Ast *> const &stmts, String const &label, bool implicit) {
 	for_array(i, stmts) {
 		Ast *stmt = stmts[i];
 		if (check_has_break(stmt, label, implicit)) {
@@ -166,7 +166,7 @@ bool check_has_break_list(Slice<Ast *> const &stmts, String const &label, bool i
 }
 
 
-bool check_has_break(Ast *stmt, String const &label, bool implicit) {
+gb_internal bool check_has_break(Ast *stmt, String const &label, bool implicit) {
 	switch (stmt->kind) {
 	case Ast_BranchStmt:
 		if (stmt->BranchStmt.token.kind == Token_break) {
@@ -225,7 +225,7 @@ bool check_has_break(Ast *stmt, String const &label, bool implicit) {
 
 // NOTE(bill): The last expression has to be a 'return' statement
 // TODO(bill): This is a mild hack and should be probably handled properly
-bool check_is_terminating(Ast *node, String const &label) {
+gb_internal bool check_is_terminating(Ast *node, String const &label) {
 	switch (node->kind) {
 	case_ast_node(rs, ReturnStmt, node);
 		return true;
@@ -327,7 +327,7 @@ bool check_is_terminating(Ast *node, String const &label) {
 
 
 
-Type *check_assignment_variable(CheckerContext *ctx, Operand *lhs, Operand *rhs) {
+gb_internal Type *check_assignment_variable(CheckerContext *ctx, Operand *lhs, Operand *rhs) {
 	if (rhs->mode == Addressing_Invalid) {
 		return nullptr;
 	}
@@ -477,8 +477,8 @@ Type *check_assignment_variable(CheckerContext *ctx, Operand *lhs, Operand *rhs)
 }
 
 
-void check_stmt_internal(CheckerContext *ctx, Ast *node, u32 flags);
-void check_stmt(CheckerContext *ctx, Ast *node, u32 flags) {
+gb_internal void check_stmt_internal(CheckerContext *ctx, Ast *node, u32 flags);
+gb_internal void check_stmt(CheckerContext *ctx, Ast *node, u32 flags) {
 	u32 prev_state_flags = ctx->state_flags;
 
 	if (node->state_flags != 0) {
@@ -510,7 +510,7 @@ void check_stmt(CheckerContext *ctx, Ast *node, u32 flags) {
 }
 
 
-void check_when_stmt(CheckerContext *ctx, AstWhenStmt *ws, u32 flags) {
+gb_internal void check_when_stmt(CheckerContext *ctx, AstWhenStmt *ws, u32 flags) {
 	Operand operand = {Addressing_Invalid};
 	check_expr(ctx, &operand, ws->cond);
 	if (operand.mode != Addressing_Constant || !is_type_boolean(operand.type)) {
@@ -539,7 +539,7 @@ void check_when_stmt(CheckerContext *ctx, AstWhenStmt *ws, u32 flags) {
 	}
 }
 
-void check_label(CheckerContext *ctx, Ast *label, Ast *parent) {
+gb_internal void check_label(CheckerContext *ctx, Ast *label, Ast *parent) {
 	if (label == nullptr) {
 		return;
 	}
@@ -582,7 +582,7 @@ void check_label(CheckerContext *ctx, Ast *label, Ast *parent) {
 }
 
 // Returns 'true' for 'continue', 'false' for 'return'
-bool check_using_stmt_entity(CheckerContext *ctx, AstUsingStmt *us, Ast *expr, bool is_selector, Entity *e) {
+gb_internal bool check_using_stmt_entity(CheckerContext *ctx, AstUsingStmt *us, Ast *expr, bool is_selector, Entity *e) {
 	if (e == nullptr) {
 		if (is_blank_ident(expr)) {
 			error(us->token, "'using' in a statement is not allowed with the blank identifier '_'");
@@ -622,9 +622,9 @@ bool check_using_stmt_entity(CheckerContext *ctx, AstUsingStmt *us, Ast *expr, b
 
 	case Entity_ImportName: {
 		Scope *scope = e->ImportName.scope;
-		MUTEX_GUARD_BLOCK(scope->mutex) for_array(i, scope->elements.entries) {
-			String name = scope->elements.entries[i].key.string;
-			Entity *decl = scope->elements.entries[i].value;
+		MUTEX_GUARD_BLOCK(scope->mutex) for (auto const &entry : scope->elements) {
+			String name = entry.key.string;
+			Entity *decl = entry.value;
 			if (!is_entity_exported(decl)) continue;
 
 			Entity *found = scope_insert_with_name(ctx->scope, name, decl);
@@ -652,8 +652,8 @@ bool check_using_stmt_entity(CheckerContext *ctx, AstUsingStmt *us, Ast *expr, b
 		if (t->kind == Type_Struct) {
 			Scope *found = t->Struct.scope;
 			GB_ASSERT(found != nullptr);
-			for_array(i, found->elements.entries) {
-				Entity *f = found->elements.entries[i].value;
+			for (auto const &entry : found->elements) {
+				Entity *f = entry.value;
 				if (f->kind == Entity_Variable) {
 					Entity *uvar = alloc_entity_using_variable(e, f->token, f->type, expr);
 					if (!is_ptr && e->flags & EntityFlag_Value) uvar->flags |= EntityFlag_Value;
@@ -704,7 +704,7 @@ bool check_using_stmt_entity(CheckerContext *ctx, AstUsingStmt *us, Ast *expr, b
 	return true;
 }
 
-void check_inline_range_stmt(CheckerContext *ctx, Ast *node, u32 mod_flags) {
+gb_internal void check_inline_range_stmt(CheckerContext *ctx, Ast *node, u32 mod_flags) {
 	ast_node(irs, UnrollRangeStmt, node);
 	check_open_scope(ctx, node);
 
@@ -863,7 +863,7 @@ void check_inline_range_stmt(CheckerContext *ctx, Ast *node, u32 mod_flags) {
 	check_close_scope(ctx);
 }
 
-void check_switch_stmt(CheckerContext *ctx, Ast *node, u32 mod_flags) {
+gb_internal void check_switch_stmt(CheckerContext *ctx, Ast *node, u32 mod_flags) {
 	ast_node(ss, SwitchStmt, node);
 
 	Operand x = {};
@@ -1092,7 +1092,7 @@ enum TypeSwitchKind {
 	TypeSwitch_Any,
 };
 
-TypeSwitchKind check_valid_type_switch_type(Type *type) {
+gb_internal TypeSwitchKind check_valid_type_switch_type(Type *type) {
 	type = type_deref(type);
 	if (is_type_union(type)) {
 		return TypeSwitch_Union;
@@ -1103,7 +1103,7 @@ TypeSwitchKind check_valid_type_switch_type(Type *type) {
 	return TypeSwitch_Invalid;
 }
 
-void check_type_switch_stmt(CheckerContext *ctx, Ast *node, u32 mod_flags) {
+gb_internal void check_type_switch_stmt(CheckerContext *ctx, Ast *node, u32 mod_flags) {
 	ast_node(ss, TypeSwitchStmt, node);
 	Operand x = {};
 
@@ -1237,7 +1237,7 @@ void check_type_switch_stmt(CheckerContext *ctx, Ast *node, u32 mod_flags) {
 					GB_PANIC("Unknown type to type switch statement");
 				}
 
-				if (type_ptr_set_exists(&seen, y.type)) {
+				if (type_ptr_set_update(&seen, y.type)) {
 					TokenPos pos = cc->token.pos;
 					gbString expr_str = expr_to_string(y.expr);
 					error(y.expr,
@@ -1248,7 +1248,6 @@ void check_type_switch_stmt(CheckerContext *ctx, Ast *node, u32 mod_flags) {
 					gb_string_free(expr_str);
 					break;
 				}
-				ptr_set_add(&seen, y.type);
 			}
 		}
 
@@ -1318,7 +1317,7 @@ void check_type_switch_stmt(CheckerContext *ctx, Ast *node, u32 mod_flags) {
 	}
 }
 
-void check_block_stmt_for_errors(CheckerContext *ctx, Ast *body)  {
+gb_internal void check_block_stmt_for_errors(CheckerContext *ctx, Ast *body)  {
 	if (body->kind != Ast_BlockStmt) {
 		return;
 	}
@@ -1377,7 +1376,7 @@ void check_block_stmt_for_errors(CheckerContext *ctx, Ast *body)  {
 	}
 }
 
-bool all_operands_valid(Array<Operand> const &operands) {
+gb_internal bool all_operands_valid(Array<Operand> const &operands) {
 	if (any_errors()) {
 		for_array(i, operands) {
 			if (operands[i].type == t_invalid) {
@@ -1388,7 +1387,7 @@ bool all_operands_valid(Array<Operand> const &operands) {
 	return true;
 }
 
-bool check_stmt_internal_builtin_proc_id(Ast *expr, BuiltinProcId *id_) {
+gb_internal bool check_stmt_internal_builtin_proc_id(Ast *expr, BuiltinProcId *id_) {
 	BuiltinProcId id = BuiltinProc_Invalid;
 	Entity *e = entity_of_node(expr);
 	if (e != nullptr && e->kind == Entity_Builtin) {
@@ -1400,7 +1399,7 @@ bool check_stmt_internal_builtin_proc_id(Ast *expr, BuiltinProcId *id_) {
 	return id != BuiltinProc_Invalid;
 }
 
-bool check_expr_is_stack_variable(Ast *expr) {
+gb_internal bool check_expr_is_stack_variable(Ast *expr) {
 	/*
 	expr = unparen_expr(expr);
 	Entity *e = entity_of_node(expr);
@@ -1419,7 +1418,7 @@ bool check_expr_is_stack_variable(Ast *expr) {
 	return false;
 }
 
-void check_stmt_internal(CheckerContext *ctx, Ast *node, u32 flags) {
+gb_internal void check_stmt_internal(CheckerContext *ctx, Ast *node, u32 flags) {
 	u32 mod_flags = flags & (~Stmt_FallthroughAllowed);
 	switch (node->kind) {
 	case_ast_node(_, EmptyStmt, node); case_end;
@@ -1518,12 +1517,6 @@ void check_stmt_internal(CheckerContext *ctx, Ast *node, u32 flags) {
 			break;
 		}
 		}
-	case_end;
-
-	case_ast_node(ts, TagStmt, node);
-		// TODO(bill): Tag Statements
-		error(node, "Tag statements are not supported yet");
-		check_stmt(ctx, ts->stmt, flags);
 	case_end;
 
 	case_ast_node(as, AssignStmt, node);
@@ -1949,6 +1942,7 @@ void check_stmt_internal(CheckerContext *ctx, Ast *node, u32 flags) {
 					entity = alloc_entity_variable(ctx->scope, token, type, EntityState_Resolved);
 					entity->flags |= EntityFlag_ForValue;
 					entity->flags |= EntityFlag_Value;
+					entity->identifier = name;
 					if (i == addressable_index && use_by_reference_for_value) {
 						entity->flags &= ~EntityFlag_Value;
 					}
@@ -1973,6 +1967,7 @@ void check_stmt_internal(CheckerContext *ctx, Ast *node, u32 flags) {
 
 			if (entity == nullptr) {
 				entity = alloc_entity_dummy_variable(builtin_pkg->scope, ast_token(name));
+				entity->identifier = name; // might not be an identifier
 			}
 
 			array_add(&entities, entity);
@@ -2370,8 +2365,8 @@ void check_stmt_internal(CheckerContext *ctx, Ast *node, u32 flags) {
 						
 						Scope *scope = t->Struct.scope;
 						GB_ASSERT(scope != nullptr);
-						for_array(i, scope->elements.entries) {
-							Entity *f = scope->elements.entries[i].value;
+						for (auto const &entry : scope->elements) {
+							Entity *f = entry.value;
 							if (f->kind == Entity_Variable) {
 								Entity *uvar = alloc_entity_using_variable(e, f->token, f->type, nullptr);
 								uvar->flags |= (e->flags & EntityFlag_Value);

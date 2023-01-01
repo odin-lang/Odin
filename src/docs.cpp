@@ -28,7 +28,7 @@ gb_global char const *print_entity_names[Entity_Count] = {
 };
 
 
-GB_COMPARE_PROC(cmp_entities_for_printing) {
+gb_internal GB_COMPARE_PROC(cmp_entities_for_printing) {
 	GB_ASSERT(a != nullptr);
 	GB_ASSERT(b != nullptr);
 	Entity *x = *cast(Entity **)a;
@@ -56,7 +56,7 @@ GB_COMPARE_PROC(cmp_entities_for_printing) {
 	return res;
 }
 
-GB_COMPARE_PROC(cmp_ast_package_by_name) {
+gb_internal GB_COMPARE_PROC(cmp_ast_package_by_name) {
 	GB_ASSERT(a != nullptr);
 	GB_ASSERT(b != nullptr);
 	AstPackage *x = *cast(AstPackage **)a;
@@ -67,7 +67,7 @@ GB_COMPARE_PROC(cmp_ast_package_by_name) {
 #include "docs_format.cpp"
 #include "docs_writer.cpp"
 
-void print_doc_line(i32 indent, String const &data) {
+gb_internal void print_doc_line(i32 indent, String const &data) {
 	while (indent --> 0) {
 		gb_printf("\t");
 	}
@@ -75,7 +75,7 @@ void print_doc_line(i32 indent, String const &data) {
 	gb_printf("\n");
 }
 
-void print_doc_line(i32 indent, char const *fmt, ...) {
+gb_internal void print_doc_line(i32 indent, char const *fmt, ...) {
 	while (indent --> 0) {
 		gb_printf("\t");
 	}
@@ -85,16 +85,7 @@ void print_doc_line(i32 indent, char const *fmt, ...) {
 	va_end(va);
 	gb_printf("\n");
 }
-void print_doc_line_no_newline(i32 indent, char const *fmt, ...) {
-	while (indent --> 0) {
-		gb_printf("\t");
-	}
-	va_list va;
-	va_start(va, fmt);
-	gb_printf_va(fmt, va);
-	va_end(va);
-}
-void print_doc_line_no_newline(i32 indent, String const &data) {
+gb_internal void print_doc_line_no_newline(i32 indent, String const &data) {
 	while (indent --> 0) {
 		gb_printf("\t");
 	}
@@ -102,7 +93,7 @@ void print_doc_line_no_newline(i32 indent, String const &data) {
 }
 
 
-bool print_doc_comment_group_string(i32 indent, CommentGroup *g) {
+gb_internal bool print_doc_comment_group_string(i32 indent, CommentGroup *g) {
 	if (g == nullptr) {
 		return false;
 	}
@@ -191,7 +182,7 @@ bool print_doc_comment_group_string(i32 indent, CommentGroup *g) {
 
 
 
-void print_doc_expr(Ast *expr) {
+gb_internal void print_doc_expr(Ast *expr) {
 	gbString s = nullptr;
 	if (build_context.cmd_doc_flags & CmdDocFlag_Short) {
 		s = expr_to_string_shorthand(expr);
@@ -202,8 +193,7 @@ void print_doc_expr(Ast *expr) {
 	gb_string_free(s);
 }
 
-
-void print_doc_package(CheckerInfo *info, AstPackage *pkg) {
+gb_internal void print_doc_package(CheckerInfo *info, AstPackage *pkg) {
 	if (pkg == nullptr) {
 		return;
 	}
@@ -222,8 +212,8 @@ void print_doc_package(CheckerInfo *info, AstPackage *pkg) {
 	if (pkg->scope != nullptr) {
 		auto entities = array_make<Entity *>(heap_allocator(), 0, pkg->scope->elements.entries.count);
 		defer (array_free(&entities));
-		for_array(i, pkg->scope->elements.entries) {
-			Entity *e = pkg->scope->elements.entries[i].value;
+		for (auto const &entry : pkg->scope->elements) {
+			Entity *e = entry.value;
 			switch (e->kind) {
 			case Entity_Invalid:
 			case Entity_Builtin:
@@ -320,7 +310,7 @@ void print_doc_package(CheckerInfo *info, AstPackage *pkg) {
 
 }
 
-void generate_documentation(Checker *c) {
+gb_internal void generate_documentation(Checker *c) {
 	CheckerInfo *info = &c->info;
 
 	if (build_context.cmd_doc_flags & CmdDocFlag_DocFormat) {
@@ -359,8 +349,8 @@ void generate_documentation(Checker *c) {
 		odin_doc_write(info, output_file_path);
 	} else {
 		auto pkgs = array_make<AstPackage *>(permanent_allocator(), 0, info->packages.entries.count);
-		for_array(i, info->packages.entries) {
-			AstPackage *pkg = info->packages.entries[i].value;
+		for (auto const &entry : info->packages) {
+			AstPackage *pkg = entry.value;
 			if (build_context.cmd_doc_flags & CmdDocFlag_AllPackages) {
 				array_add(&pkgs, pkg);
 			} else {
