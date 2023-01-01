@@ -1532,6 +1532,25 @@ gb_internal bool init_build_paths(String init_filename) {
 			output_name = remove_extension_from_path(output_name);
 			output_name = copy_string(ha, string_trim_whitespace(output_name));
 			output_path = path_from_string(ha, output_name);
+			
+			// Note(Dragos): This is a fix for empty filenames
+			// Turn the trailing folder into the file name
+			if (output_path.name.len == 0) {
+				isize len = output_path.basename.len;
+				while (len > 1 && output_path.basename[len - 1] != '/') {
+					len -= 1;
+				}
+				// We reached the slash
+				String old_basename = output_path.basename;
+				output_path.basename.len = len - 1; // Remove the slash
+				output_path.name = substring(old_basename, len, old_basename.len);
+				output_path.basename = copy_string(ha, output_path.basename);
+				output_path.name = copy_string(ha, output_path.name);
+				// The old basename is wrong. Delete it
+				gb_free(ha, old_basename.text);
+				
+				
+			}
 
 			// Replace extension.
 			if (output_path.ext.len > 0) {
