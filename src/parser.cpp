@@ -1905,13 +1905,11 @@ gb_internal void check_polymorphic_params_for_type(AstFile *f, Ast *polymorphic_
 		return;
 	}
 	ast_node(fl, FieldList, polymorphic_params);
-	for_array(fi, fl->list) {
-		Ast *field = fl->list[fi];
+	for (Ast *field : fl->list) {
 		if (field->kind != Ast_Field) {
 			continue;
 		}
-		for_array(i, field->Field.names) {
-			Ast *name = field->Field.names[i];
+		for (Ast *name : field->Field.names) {
 			if (name->kind != field->Field.names[0]->kind) {
 				syntax_error(name, "Mixture of polymorphic names using both $ and not for %.*s parameters", LIT(token.string));
 				return;
@@ -3473,16 +3471,14 @@ gb_internal Ast *parse_proc_type(AstFile *f, Token proc_token) {
 	u64 tags = 0;
 	bool is_generic = false;
 
-	for_array(i, params->FieldList.list) {
-		Ast *param = params->FieldList.list[i];
+	for (Ast *param : params->FieldList.list) {
 		ast_node(field, Field, param);
 		if (field->type != nullptr) {
 		    if (field->type->kind == Ast_PolyType) {
 				is_generic = true;
 				goto end;
 			}
-			for_array(j, field->names) {
-				Ast *name = field->names[j];
+			for (Ast *name : field->names) {
 				if (name->kind == Ast_PolyType) {
 					is_generic = true;
 					goto end;
@@ -3646,8 +3642,9 @@ struct AstAndFlags {
 gb_internal Array<Ast *> convert_to_ident_list(AstFile *f, Array<AstAndFlags> list, bool ignore_flags, bool allow_poly_names) {
 	auto idents = array_make<Ast *>(heap_allocator(), 0, list.count);
 	// Convert to ident list
-	for_array(i, list) {
-		Ast *ident = list[i].node;
+	isize i = 0;
+	for (AstAndFlags const &item : list) {
+		Ast *ident = item.node;
 
 		if (!ignore_flags) {
 			if (i != 0) {
@@ -3678,6 +3675,7 @@ gb_internal Array<Ast *> convert_to_ident_list(AstFile *f, Array<AstAndFlags> li
 			break;
 		}
 		array_add(&idents, ident);
+		i += 1;
 	}
 	return idents;
 }
@@ -3919,8 +3917,8 @@ gb_internal Ast *parse_field_list(AstFile *f, isize *name_count_, u32 allowed_fl
 		return ast_field_list(f, start_token, params);
 	}
 
-	for_array(i, list) {
-		Ast *type = list[i].node;
+	for (AstAndFlags const &item : list) {
+		Ast *type = item.node;
 		Token token = blank_token;
 		if (allowed_flags&FieldFlag_Results) {
 			// NOTE(bill): Make this nothing and not `_`
@@ -3930,9 +3928,9 @@ gb_internal Ast *parse_field_list(AstFile *f, isize *name_count_, u32 allowed_fl
 		auto names = array_make<Ast *>(heap_allocator(), 1);
 		token.pos = ast_token(type).pos;
 		names[0] = ast_ident(f, token);
-		u32 flags = check_field_prefixes(f, list.count, allowed_flags, list[i].flags);
+		u32 flags = check_field_prefixes(f, list.count, allowed_flags, item.flags);
 		Token tag = {};
-		Ast *param = ast_field(f, names, list[i].node, nullptr, flags, tag, docs, f->line_comment);
+		Ast *param = ast_field(f, names, item.node, nullptr, flags, tag, docs, f->line_comment);
 		array_add(&params, param);
 	}
 
@@ -4864,10 +4862,9 @@ gb_internal bool init_parser(Parser *p) {
 gb_internal void destroy_parser(Parser *p) {
 	GB_ASSERT(p != nullptr);
 	// TODO(bill): Fix memory leak
-	for_array(i, p->packages) {
-		AstPackage *pkg = p->packages[i];
-		for_array(j, pkg->files) {
-			destroy_ast_file(pkg->files[j]);
+	for (AstPackage *pkg : p->packages) {
+		for (AstFile *file : pkg->files) {
+			destroy_ast_file(file);
 		}
 		array_free(&pkg->files);
 		array_free(&pkg->foreign_files);
@@ -4878,10 +4875,10 @@ gb_internal void destroy_parser(Parser *p) {
 
 
 gb_internal void parser_add_package(Parser *p, AstPackage *pkg) {
-	mutex_lock(&p->packages_mutex);
-	pkg->id = p->packages.count+1;
-	array_add(&p->packages, pkg);
-	mutex_unlock(&p->packages_mutex);
+	MUTEX_GUARD_BLOCK(&p->packages_mutex) {
+		pkg->id = p->packages.count+1;
+		array_add(&p->packages, pkg);
+	}
 }
 
 gb_internal ParseFileError process_imported_file(Parser *p, ImportedFile imported_file);
@@ -4893,15 +4890,15 @@ gb_internal WORKER_TASK_PROC(parser_worker_proc) {
 		auto *node = gb_alloc_item(permanent_allocator(), ParseFileErrorNode);
 		node->err = err;
 
-		mutex_lock(&wd->parser->file_error_mutex);
-		if (wd->parser->file_error_tail != nullptr) {
-			wd->parser->file_error_tail->next = node;
+		MUTEX_GUARD_BLOCK(&wd->parser->file_error_mutex) {
+			if (wd->parser->file_error_tail != nullptr) {
+				wd->parser->file_error_tail->next = node;
+			}
+			wd->parser->file_error_tail = node;
+			if (wd->parser->file_error_head == nullptr) {
+				wd->parser->file_error_head = node;
+			}
 		}
-		wd->parser->file_error_tail = node;
-		if (wd->parser->file_error_head == nullptr) {
-			wd->parser->file_error_head = node;
-		}
-		mutex_unlock(&wd->parser->file_error_mutex);
 	}
 	return cast(isize)err;
 }
@@ -4937,9 +4934,9 @@ gb_internal WORKER_TASK_PROC(foreign_file_worker_proc) {
 		// TODO(bill): Actually do something with it
 		break;
 	}
-	mutex_lock(&pkg->foreign_files_mutex);
-	array_add(&pkg->foreign_files, foreign_file);
-	mutex_unlock(&pkg->foreign_files_mutex);
+	MUTEX_GUARD_BLOCK(&pkg->foreign_files_mutex) {
+		array_add(&pkg->foreign_files, foreign_file);
+	}
 	return 0;
 }
 
@@ -4973,13 +4970,13 @@ gb_internal AstPackage *try_add_import_path(Parser *p, String const &path, Strin
 
 	// NOTE(bill): Single file initial package
 	if (kind == Package_Init && string_ends_with(path, FILE_EXT)) {
-
 		FileInfo fi = {};
 		fi.name = filename_from_path(path);
 		fi.fullpath = path;
 		fi.size = get_file_size(path);
 		fi.is_dir = false;
 
+		array_reserve(&pkg->files, 1);
 		pkg->is_single_file = true;
 		parser_add_package(p, pkg);
 		parser_add_file_to_process(p, pkg, fi, pos);
@@ -5017,8 +5014,17 @@ gb_internal AstPackage *try_add_import_path(Parser *p, String const &path, Strin
 		return nullptr;
 	}
 
-	for_array(list_index, list) {
-		FileInfo fi = list[list_index];
+	isize files_to_reserve = 1; // always reserve 1
+	for (FileInfo fi : list) {
+		String name = fi.name;
+		String ext = path_extension(name);
+		if (ext == FILE_EXT && !is_excluded_target_filename(name)) {
+			files_to_reserve += 1;
+		}
+	}
+
+	array_reserve(&pkg->files, files_to_reserve);
+	for (FileInfo fi : list) {
 		String name = fi.name;
 		String ext = path_extension(name);
 		if (ext == FILE_EXT) {
@@ -5311,14 +5317,14 @@ gb_internal void parse_setup_file_decls(Parser *p, AstFile *f, String const &bas
 
 			auto fullpaths = array_make<String>(permanent_allocator(), 0, fl->filepaths.count);
 
-			for_array(fp_idx, fl->filepaths) {
-				String file_str = string_trim_whitespace(string_value_from_token(f, fl->filepaths[fp_idx]));
+			for (Token const &fp : fl->filepaths) {
+				String file_str = string_trim_whitespace(string_value_from_token(f, fp));
 				String fullpath = file_str;
 				if (allow_check_foreign_filepath()) {
 					String foreign_path = {};
 					bool ok = determine_path_from_string(&p->file_decl_mutex, node, base_dir, file_str, &foreign_path);
 					if (!ok) {
-						decls[i] = ast_bad_decl(f, fl->filepaths[fp_idx], fl->filepaths[fl->filepaths.count-1]);
+						decls[i] = ast_bad_decl(f, fp, fl->filepaths[fl->filepaths.count-1]);
 						goto end;
 					}
 					fullpath = foreign_path;
@@ -5443,8 +5449,8 @@ gb_internal isize calc_decl_count(Ast *decl) {
 	isize count = 0;
 	switch (decl->kind) {
 	case Ast_BlockStmt:
-		for_array(i, decl->BlockStmt.stmts) {
-			count += calc_decl_count(decl->BlockStmt.stmts.data[i]);
+		for (Ast *stmt : decl->BlockStmt.stmts) {
+			count += calc_decl_count(stmt);
 		}
 		break;
 	case Ast_WhenStmt:
@@ -5564,8 +5570,8 @@ gb_internal bool parse_file(Parser *p, AstFile *f) {
 	f->package_name = package_name.string;
 
 	if (!f->pkg->is_single_file && docs != nullptr && docs->list.count > 0) {
-		for_array(i, docs->list) {
-			Token tok = docs->list[i]; GB_ASSERT(tok.kind == Token_Comment);
+		for (Token const &tok : docs->list) {
+			GB_ASSERT(tok.kind == Token_Comment);
 			String str = tok.string;
 			if (string_starts_with(str, str_lit("//"))) {
 				String lc = string_trim_whitespace(substring(str, 2, str.len));
@@ -5776,8 +5782,7 @@ gb_internal ParseFileError parse_packages(Parser *p, String init_filename) {
 		}
 		
 
-		for_array(i, build_context.extra_packages) {
-			String path = build_context.extra_packages[i];
+		for (String const &path : build_context.extra_packages) {
 			String fullpath = path_to_full_path(heap_allocator(), path); // LEAK?
 			if (!path_is_directory(fullpath)) {
 				String const ext = str_lit(".odin");
