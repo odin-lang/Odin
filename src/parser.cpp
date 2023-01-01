@@ -4858,10 +4858,6 @@ gb_internal bool init_parser(Parser *p) {
 	GB_ASSERT(p != nullptr);
 	string_set_init(&p->imported_files, heap_allocator());
 	array_init(&p->packages, heap_allocator());
-	mutex_init(&p->imported_files_mutex);
-	mutex_init(&p->file_decl_mutex);
-	mutex_init(&p->packages_mutex);
-	mutex_init(&p->file_error_mutex);
 	return true;
 }
 
@@ -4878,10 +4874,6 @@ gb_internal void destroy_parser(Parser *p) {
 	}
 	array_free(&p->packages);
 	string_set_destroy(&p->imported_files);
-	mutex_destroy(&p->imported_files_mutex);
-	mutex_destroy(&p->file_decl_mutex);
-	mutex_destroy(&p->packages_mutex);
-	mutex_destroy(&p->file_error_mutex);
 }
 
 
@@ -4978,9 +4970,6 @@ gb_internal AstPackage *try_add_import_path(Parser *p, String const &path, Strin
 	pkg->fullpath = path;
 	array_init(&pkg->files, heap_allocator());
 	pkg->foreign_files.allocator = heap_allocator();
-	mutex_init(&pkg->files_mutex);
-	mutex_init(&pkg->foreign_files_mutex);
-
 
 	// NOTE(bill): Single file initial package
 	if (kind == Package_Init && string_ends_with(path, FILE_EXT)) {

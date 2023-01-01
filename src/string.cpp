@@ -1,10 +1,5 @@
 gb_global BlockingMutex string_buffer_mutex = {};
 
-gb_internal void init_string_buffer_memory(void) {
-	mutex_init(&string_buffer_mutex);
-}
-
-
 // NOTE(bill): Used for UTF-8 strings
 struct String {
 	u8 *  text;

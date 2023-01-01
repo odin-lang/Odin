@@ -48,30 +48,22 @@ gb_internal void futex_wait(Futex *addr, Footex val);
 gb_internal void futex_signal(Futex *addr);
 gb_internal void futex_broadcast(Futex *addr);
 
-gb_internal void mutex_init    (BlockingMutex *m);
-gb_internal void mutex_destroy (BlockingMutex *m);
 gb_internal void mutex_lock    (BlockingMutex *m);
 gb_internal bool mutex_try_lock(BlockingMutex *m);
 gb_internal void mutex_unlock  (BlockingMutex *m);
-gb_internal void mutex_init    (RecursiveMutex *m);
-gb_internal void mutex_destroy (RecursiveMutex *m);
+
 gb_internal void mutex_lock    (RecursiveMutex *m);
 gb_internal bool mutex_try_lock(RecursiveMutex *m);
 gb_internal void mutex_unlock  (RecursiveMutex *m);
 
-gb_internal void semaphore_init   (Semaphore *s);
-gb_internal void semaphore_destroy(Semaphore *s);
 gb_internal void semaphore_post   (Semaphore *s, i32 count);
 gb_internal void semaphore_wait   (Semaphore *s);
 gb_internal void semaphore_release(Semaphore *s) { semaphore_post(s, 1); }
 
 
-gb_internal void condition_init(Condition *c);
-gb_internal void condition_destroy(Condition *c);
 gb_internal void condition_broadcast(Condition *c);
 gb_internal void condition_signal(Condition *c);
 gb_internal void condition_wait(Condition *c, BlockingMutex *m);
-gb_internal void condition_wait_with_timeout(Condition *c, BlockingMutex *m, u32 timeout_in_ms);
 
 gb_internal u32  thread_current_id(void);
 
@@ -122,12 +114,7 @@ struct RecursiveMutex {
 	Futex owner;
 	i32   recursion;
 };
-gb_internal void mutex_init(RecursiveMutex *m) {
 
-}
-gb_internal void mutex_destroy(RecursiveMutex *m) {
-
-}
 gb_internal void mutex_lock(RecursiveMutex *m) {
 	Futex tid = cast(i32)thread_current_id();
 	for (;;) {
@@ -166,12 +153,6 @@ struct Semaphore {
 	Futex count;
 };
 
-gb_internal void semaphore_init(Semaphore *s) {
-
-}
-gb_internal void semaphore_destroy(Semaphore *s) {
-
-}
 gb_internal void semaphore_post(Semaphore *s, i32 count) {
 	s->count.fetch_add(count, std::memory_order_release);
 	if (s->count == 1) {
@@ -198,10 +179,6 @@ gb_internal void semaphore_wait(Semaphore *s) {
 	struct BlockingMutex {
 		SRWLOCK srwlock;
 	};
-	gb_internal void mutex_init(BlockingMutex *m) {
-	}
-	gb_internal void mutex_destroy(BlockingMutex *m) {
-	}
 	gb_internal void mutex_lock(BlockingMutex *m) {
 		AcquireSRWLockExclusive(&m->srwlock);
 	}
@@ -229,10 +206,6 @@ gb_internal void semaphore_wait(Semaphore *s) {
 	gb_internal void condition_wait(Condition *c, BlockingMutex *m) {
 		SleepConditionVariableSRW(&c->cond, &m->srwlock, INFINITE, 0);
 	}
-	gb_internal void condition_wait_with_timeout(Condition *c, BlockingMutex *m, u32 timeout_in_ms) {
-		SleepConditionVariableSRW(&c->cond, &m->srwlock, timeout_in_ms, 0);
-	}
-
 #else
 	enum Internal_Mutex_State : i32 {
 		Internal_Mutex_State_Unlocked = 0,
@@ -250,9 +223,6 @@ gb_internal void semaphore_wait(Semaphore *s) {
 			return *(Futex const *)&this->state_;
 		}
 	};
-
-	gb_internal void mutex_init(BlockingMutex *m) {};
-	gb_internal void mutex_destroy(BlockingMutex *m) {};
 
 	gb_no_inline gb_internal void mutex_lock_slow(BlockingMutex *m, i32 curr_state) {
 		i32 new_state = curr_state;
@@ -322,9 +292,6 @@ gb_internal void semaphore_wait(Semaphore *s) {
 			return *(Futex const *)&this->state_;
 		}
 	};
-
-	gb_internal void condition_init(Condition *c) {}
-	gb_internal void condition_destroy(Condition *c) {}
 
 	gb_internal void condition_broadcast(Condition *c) {
 		c->state().fetch_add(1, std::memory_order_release);

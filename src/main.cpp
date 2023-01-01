@@ -2498,15 +2498,10 @@ int main(int arg_count, char const **arg_ptr) {
 	MAIN_TIME_SECTION("initialization");
 
 	virtual_memory_init();
-	mutex_init(&fullpath_mutex);
-	mutex_init(&hash_exact_value_mutex);
-	mutex_init(&global_type_name_objc_metadata_mutex);
 
-	init_string_buffer_memory();
 	init_string_interner();
 	init_global_error_collector();
 	init_keyword_hash_table();
-	init_type_mutex();
 
 	if (!check_env()) {
 		return 1;

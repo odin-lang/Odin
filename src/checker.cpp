@@ -184,7 +184,6 @@ gb_internal void init_decl_info(DeclInfo *d, Scope *scope, DeclInfo *parent) {
 	ptr_set_init(&d->deps,           heap_allocator());
 	ptr_set_init(&d->type_info_deps, heap_allocator());
 	array_init  (&d->labels,         heap_allocator());
-	mutex_init(&d->proc_checked_mutex);
 }
 
 gb_internal DeclInfo *make_decl_info(Scope *scope, DeclInfo *parent) {
@@ -225,7 +224,6 @@ gb_internal Scope *create_scope(CheckerInfo *info, Scope *parent, isize init_ele
 	s->parent = parent;
 	string_map_init(&s->elements, heap_allocator(), init_elements_capacity);
 	ptr_set_init(&s->imported, heap_allocator(), 0);
-	mutex_init(&s->mutex);
 
 	if (parent != nullptr && parent != builtin_pkg->scope) {
 		Scope *prev_head_child = parent->head_child.exchange(s, std::memory_order_acq_rel);
@@ -306,7 +304,6 @@ gb_internal void destroy_scope(Scope *scope) {
 
 	string_map_destroy(&scope->elements);
 	ptr_set_destroy(&scope->imported);
-	mutex_destroy(&scope->mutex);
 
 	// NOTE(bill): No need to free scope as it "should" be allocated in an arena (except for the global scope)
 }
@@ -1134,24 +1131,9 @@ gb_internal void init_checker_info(CheckerInfo *i) {
 
 	TIME_SECTION("checker info: mutexes");
 
-	mutex_init(&i->gen_procs_mutex);
-	mutex_init(&i->gen_types_mutex);
-	mutex_init(&i->lazy_mutex);
-	mutex_init(&i->builtin_mutex);
-	mutex_init(&i->global_untyped_mutex);
-	mutex_init(&i->type_info_mutex);
-	mutex_init(&i->deps_mutex);
-	mutex_init(&i->type_and_value_mutex);
-	mutex_init(&i->identifier_uses_mutex);
-	mutex_init(&i->foreign_mutex);
-
-	semaphore_init(&i->collect_semaphore);
-
 	mpmc_init(&i->intrinsics_entry_point_usage, a, 1<<10); // just waste some memory here, even if it probably never used
 
-	mutex_init(&i->objc_types_mutex);
 	map_init(&i->objc_msgSend_types, a);
-	mutex_init(&i->load_file_mutex);
 	string_map_init(&i->load_file_cache, a);
 }
 
@@ -1175,20 +1157,7 @@ gb_internal void destroy_checker_info(CheckerInfo *i) {
 	mpmc_destroy(&i->required_global_variable_queue);
 	mpmc_destroy(&i->required_foreign_imports_through_force_queue);
 
-	mutex_destroy(&i->gen_procs_mutex);
-	mutex_destroy(&i->gen_types_mutex);
-	mutex_destroy(&i->lazy_mutex);
-	mutex_destroy(&i->builtin_mutex);
-	mutex_destroy(&i->global_untyped_mutex);
-	mutex_destroy(&i->type_info_mutex);
-	mutex_destroy(&i->deps_mutex);
-	mutex_destroy(&i->type_and_value_mutex);
-	mutex_destroy(&i->identifier_uses_mutex);
-	mutex_destroy(&i->foreign_mutex);
-
-	mutex_destroy(&i->objc_types_mutex);
 	map_destroy(&i->objc_msgSend_types);
-	mutex_init(&i->load_file_mutex);
 	string_map_destroy(&i->load_file_cache);
 }
 
@@ -1201,11 +1170,9 @@ gb_internal CheckerContext make_checker_context(Checker *c) {
 
 	ctx.type_path = new_checker_type_path();
 	ctx.type_level = 0;
-	mutex_init(&ctx.mutex);
 	return ctx;
 }
 gb_internal void destroy_checker_context(CheckerContext *ctx) {
-	mutex_destroy(&ctx->mutex);
 	destroy_checker_type_path(ctx->type_path);
 }
 
@@ -1264,7 +1231,6 @@ gb_internal void init_checker(Checker *c) {
 
 	// NOTE(bill): 1 Mi elements should be enough on average
 	mpmc_init(&c->procs_to_check_queue, heap_allocator(), 1<<20);
-	semaphore_init(&c->procs_to_check_semaphore);
 
 	mpmc_init(&c->global_untyped_queue, a, 1<<20);
 
@@ -1277,8 +1243,6 @@ gb_internal void destroy_checker(Checker *c) {
 	destroy_checker_context(&c->builtin_ctx);
 
 	mpmc_destroy(&c->procs_to_check_queue);
-	semaphore_destroy(&c->procs_to_check_semaphore);
-
 	mpmc_destroy(&c->global_untyped_queue);
 }
 

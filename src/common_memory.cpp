@@ -42,8 +42,6 @@ gb_global BlockingMutex global_memory_allocator_mutex;
 gb_internal void platform_virtual_memory_init(void);
 
 gb_internal void virtual_memory_init(void) {
-	mutex_init(&global_memory_block_mutex);
-	mutex_init(&global_memory_allocator_mutex);
 	platform_virtual_memory_init();
 }
 

@@ -22,10 +22,6 @@ gb_internal bool any_errors(void) {
 }
 
 gb_internal void init_global_error_collector(void) {
-	mutex_init(&global_error_collector.mutex);
-	mutex_init(&global_error_collector.block_mutex);
-	mutex_init(&global_error_collector.error_out_mutex);
-	mutex_init(&global_error_collector.string_mutex);
 	array_init(&global_error_collector.errors, heap_allocator());
 	array_init(&global_error_collector.error_buffer, heap_allocator());
 	array_init(&global_file_path_strings, heap_allocator(), 1, 4096);

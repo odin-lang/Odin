@@ -52,7 +52,6 @@ gb_internal void mpmc_init(MPMCQueue<T> *q, gbAllocator a, isize size_i) {
 	size = next_pow2(size);
 	GB_ASSERT(gb_is_power_of_two(size));
 
-	mutex_init(&q->mutex);
 	q->mask = size-1;
 	q->allocator = a;
 	q->nodes   = gb_alloc_array(a, T, size);
@@ -65,7 +64,6 @@ gb_internal void mpmc_init(MPMCQueue<T> *q, gbAllocator a, isize size_i) {
 
 template <typename T>
 gb_internal void mpmc_destroy(MPMCQueue<T> *q) {
-	mutex_destroy(&q->mutex);
 	gb_free(q->allocator, q->nodes);
 	gb_free(q->allocator, q->indices);
 }

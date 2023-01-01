@@ -132,7 +132,6 @@ gb_internal bool lb_init_generator(lbGenerator *gen, Checker *c) {
 	map_init(&gen->anonymous_proc_lits, heap_allocator(), 1024);
 
 
-	mutex_init(&gen->foreign_mutex);
 	array_init(&gen->foreign_libraries,       heap_allocator(), 0, 1024);
 	ptr_set_init(&gen->foreign_libraries_set, heap_allocator(), 1024);
 

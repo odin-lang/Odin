@@ -154,7 +154,6 @@ struct TypeNameObjCMetadata {
 gb_internal TypeNameObjCMetadata *create_type_name_obj_c_metadata() {
 	TypeNameObjCMetadata *md = gb_alloc_item(permanent_allocator(), TypeNameObjCMetadata);
 	md->mutex = gb_alloc_item(permanent_allocator(), BlockingMutex);
-	mutex_init(md->mutex);
 	array_init(&md->type_entries,  heap_allocator());
 	array_init(&md->value_entries, heap_allocator());
 	return md;

@@ -23,9 +23,6 @@ struct ThreadPool {
 };
 
 gb_internal void thread_pool_init(ThreadPool *pool, gbAllocator const &a, isize thread_count, char const *worker_name) {
-	mutex_init(&pool->task_lock);
-	condition_init(&pool->tasks_available);
-
 	pool->allocator = a;
 	slice_init(&pool->threads, a, thread_count + 1);
 
@@ -54,8 +51,6 @@ gb_internal void thread_pool_destroy(ThreadPool *pool) {
 	}
 
 	gb_free(pool->allocator, pool->threads.data);
-	mutex_destroy(&pool->task_lock);
-	condition_destroy(&pool->tasks_available);
 }
 
 void thread_pool_queue_push(Thread *thread, WorkerTask task) {

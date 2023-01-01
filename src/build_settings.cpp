@@ -1363,7 +1363,6 @@ gb_internal bool init_build_paths(String init_filename) {
 	array_init(&bc->build_paths, permanent_allocator(), BuildPathCOUNT);
 
 	string_set_init(&bc->target_features_set, heap_allocator(), 1024);
-	mutex_init(&bc->target_features_mutex);
 
 	// [BuildPathMainPackage] Turn given init path into a `Path`, which includes normalizing it into a full path.
 	bc->build_paths[BuildPath_Main_Package] = path_from_string(ha, init_filename);
