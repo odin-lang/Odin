@@ -69,6 +69,7 @@ set compiler_includes= ^
 	/Isrc\
 set libs= ^
 	kernel32.lib ^
+	Synchronization.lib ^
 	bin\llvm\windows\LLVM-C.lib
 
 set linker_flags= -incremental:no -opt:ref -subsystem:console
