@@ -41,6 +41,11 @@ struct Thread {
 	struct ThreadPool *pool;
 };
 
+typedef std::atomic<int32_t> Futex;
+typedef volatile int32_t     Footex;
+
+gb_internal void futex_wait(Futex *addr, Footex val);
+gb_internal void futex_signal(Futex *addr);
 
 gb_internal void mutex_init    (BlockingMutex *m);
 gb_internal void mutex_destroy (BlockingMutex *m);
@@ -441,12 +446,9 @@ gb_internal void thread_set_name(Thread *t, char const *name) {
 #include <linux/futex.h>
 #include <sys/syscall.h>
 
-typedef std::atomic<int32_t> Futex;
-typedef volatile int32_t Footex;
-
-gb_internal void tpool_wake_addr(Futex *addr) {
+gb_internal void futex_signal(Futex *addr) {
 	for (;;) {
-		int ret = syscall(SYS_futex, addr, FUTEX_WAKE, 1, NULL, NULL, 0);
+		int ret = syscall(SYS_futex, addr, FUTEX_WAKE | FUTEX_PRIVATE_FLAG, 1, NULL, NULL, 0);
 		if (ret == -1) {
 			perror("Futex wake");
 			GB_PANIC("Failed in futex wake!\n");
@@ -456,9 +458,9 @@ gb_internal void tpool_wake_addr(Futex *addr) {
 	}
 }
 
-gb_internal void tpool_wait_on_addr(Futex *addr, Footex val) {
+gb_internal void futex_wait(Futex *addr, Footex val) {
 	for (;;) {
-		int ret = syscall(SYS_futex, addr, FUTEX_WAIT, val, NULL, NULL, 0);
+		int ret = syscall(SYS_futex, addr, FUTEX_WAIT | FUTEX_PRIVATE_FLAG, val, NULL, NULL, 0);
 		if (ret == -1) {
 			if (errno != EAGAIN) {
 				perror("Futex wait");
@@ -479,14 +481,11 @@ gb_internal void tpool_wait_on_addr(Futex *addr, Footex val) {
 #include <sys/types.h>
 #include <sys/umtx.h>
 
-typedef std::atomic<int32_t> Futex;
-typedef volatile int32_t Footex;
-
-gb_internal void tpool_wake_addr(Futex *addr) {
+gb_internal void futex_signal(Futex *addr) {
 	_umtx_op(addr, UMTX_OP_WAKE, 1, 0, 0);
 }
 
-gb_internal void tpool_wait_on_addr(Futex *addr, Footex val) {
+gb_internal void futex_wait(Futex *addr, Footex val) {
 	for (;;) {
 		int ret = _umtx_op(addr, UMTX_OP_WAIT_UINT, val, 0, NULL);
 		if (ret == 0) {
@@ -508,10 +507,7 @@ gb_internal void tpool_wait_on_addr(Futex *addr, Footex val) {
 
 #include <sys/futex.h>
 
-typedef std::atomic<int32_t> Futex;
-typedef volatile int32_t Footex;
-
-gb_internal void tpool_wake_addr(Futex *addr) {
+gb_internal void futex_signal(Futex *addr) {
 	for (;;) {
 		int ret = futex((volatile uint32_t *)addr, FUTEX_WAKE | FUTEX_PRIVATE_FLAG, 1, NULL, NULL);
 		if (ret == -1) {
@@ -527,7 +523,7 @@ gb_internal void tpool_wake_addr(Futex *addr) {
 	}
 }
 
-gb_internal void tpool_wait_on_addr(Futex *addr, Footex val) {
+gb_internal void futex_wait(Futex *addr, Footex val) {
 	for (;;) {
 		int ret = futex((volatile uint32_t *)addr, FUTEX_WAIT | FUTEX_PRIVATE_FLAG, val, NULL, NULL);
 		if (ret == -1) {
@@ -547,16 +543,13 @@ gb_internal void tpool_wait_on_addr(Futex *addr, Footex val) {
 
 #elif defined(GB_SYSTEM_OSX)
 
-typedef std::atomic<int64_t> Futex;
-typedef volatile int64_t Footex;
-
 #define UL_COMPARE_AND_WAIT	0x00000001
 #define ULF_NO_ERRNO        0x01000000
 
 extern "C" int __ulock_wait(uint32_t operation, void *addr, uint64_t value, uint32_t timeout); /* timeout is specified in microseconds */
 extern "C" int __ulock_wake(uint32_t operation, void *addr, uint64_t wake_value);
 
-gb_internal void tpool_wake_addr(Futex *addr) {
+gb_internal void futex_signal(Futex *addr) {
 	for (;;) {
 		int ret = __ulock_wake(UL_COMPARE_AND_WAIT | ULF_NO_ERRNO, addr, 0);
 		if (ret >= 0) {
@@ -572,7 +565,7 @@ gb_internal void tpool_wake_addr(Futex *addr) {
 	}
 }
 
-gb_internal void tpool_wait_on_addr(Futex *addr, Footex val) {
+gb_internal void futex_wait(Futex *addr, Footex val) {
 	for (;;) {
 		int ret = __ulock_wait(UL_COMPARE_AND_WAIT | ULF_NO_ERRNO, addr, val, 0);
 		if (ret >= 0) {
@@ -592,14 +585,12 @@ gb_internal void tpool_wait_on_addr(Futex *addr, Footex val) {
 	}
 }
 #elif defined(GB_SYSTEM_WINDOWS)
-typedef std::atomic<int64_t> Futex;
-typedef volatile int64_t Footex;
 
-gb_internal void tpool_wake_addr(Futex *addr) {
+gb_internal void futex_signal(Futex *addr) {
 	WakeByAddressSingle((void *)addr);
 }
 
-gb_internal void tpool_wait_on_addr(Futex *addr, Footex val) {
+gb_internal void futex_wait(Futex *addr, Footex val) {
 	for (;;) {
 		WaitOnAddress(addr, (void *)&val, sizeof(val), INFINITE);
 		if (*addr != val) break;

@@ -136,7 +136,7 @@ gb_internal void thread_pool_wait(ThreadPool *pool) {
 			break;
 		}
 
-		tpool_wait_on_addr(&pool->tasks_left, rem_tasks);
+		futex_wait(&pool->tasks_left, rem_tasks);
 	}
 }
 
@@ -160,7 +160,7 @@ work_start:
 			finished_tasks += 1;
 		}
 		if (finished_tasks > 0 && !pool->tasks_left) {
-			tpool_wake_addr(&pool->tasks_left);
+			futex_signal(&pool->tasks_left);
 		}
 
 		// If there's still work somewhere and we don't have it, steal it
@@ -183,7 +183,7 @@ work_start:
 				pool->tasks_left.fetch_sub(1);
 
 				if (!pool->tasks_left) {
-					tpool_wake_addr(&pool->tasks_left);
+					futex_signal(&pool->tasks_left);
 				}
 
 				goto work_start;
