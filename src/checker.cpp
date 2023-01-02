@@ -1,5 +1,3 @@
-#define MULTITHREAD_CHECKER 1
-
 #include "entity.cpp"
 #include "types.cpp"
 
@@ -1943,7 +1941,7 @@ gb_internal void check_procedure_later(Checker *c, ProcInfo *info) {
 	GB_ASSERT(info != nullptr);
 	GB_ASSERT(info->decl != nullptr);
 
-	if (MULTITHREAD_CHECKER && global_procedure_body_in_worker_queue) {
+	if (global_procedure_body_in_worker_queue) {
 		thread_pool_add_task(check_proc_info_worker_proc, info);
 	} else {
 		GB_ASSERT(global_procedure_body_in_worker_queue == false);
@@ -4617,51 +4615,6 @@ gb_internal void check_create_file_scopes(Checker *c) {
 	}
 }
 
-struct ThreadProcCheckerSection {
-	Checker *checker;
-	isize offset;
-	isize count;
-};
-
-
-gb_internal void check_with_workers(Checker *c, WorkerTaskProc *proc, isize total_count) {
-	isize thread_count = global_thread_pool.threads.count;
-	isize worker_count = thread_count-1; // NOTE(bill): The main thread will also be used for work
-	if (!build_context.threaded_checker) {
-		worker_count = 0;
-	}
-
-	semaphore_post(&c->info.collect_semaphore, cast(i32)thread_count);
-	if (worker_count == 0) {
-		ThreadProcCheckerSection section_all = {};
-		section_all.checker = c;
-		section_all.offset = 0;
-		section_all.count = total_count;
-		proc(&section_all);
-		return;
-	}
-
-	isize file_load_count = (total_count+thread_count-1)/thread_count;
-	isize remaining_count = total_count;
-
-	ThreadProcCheckerSection *thread_data = gb_alloc_array(permanent_allocator(), ThreadProcCheckerSection, thread_count);
-	for (isize i = 0; i < thread_count; i++) {
-		ThreadProcCheckerSection *data = thread_data + i;
-		data->checker = c;
-		data->offset = total_count-remaining_count;
-		data->count = file_load_count;
-		remaining_count -= file_load_count;
-	}
-	GB_ASSERT(remaining_count <= 0);
-
-
-	for (isize i = 0; i < thread_count; i++) {
-		thread_pool_add_task(proc, thread_data+i);
-	}
-	thread_pool_wait();
-	semaphore_wait(&c->info.collect_semaphore);
-}
-
 struct CollectEntityWorkerData {
 	Checker *c;
 	CheckerContext ctx;
@@ -4699,18 +4652,11 @@ gb_internal void check_collect_entities_all(Checker *c) {
 		map_init(&wd->untyped, heap_allocator());
 	}
 
-	if (MULTITHREAD_CHECKER || build_context.threaded_checker) {
-		for (auto const &entry : c->info.files.entries) {
-			AstFile *f = entry.value;
-			thread_pool_add_task(check_collect_entities_all_worker_proc, f);
-		}
-		thread_pool_wait();
-	} else {
-		for (auto const &entry : c->info.files.entries) {
-			AstFile *f = entry.value;
-			check_collect_entities_all_worker_proc(f);
-		}
+	for (auto const &entry : c->info.files.entries) {
+		AstFile *f = entry.value;
+		thread_pool_add_task(check_collect_entities_all_worker_proc, f);
 	}
+	thread_pool_wait();
 }
 
 gb_internal void check_export_entities_in_pkg(CheckerContext *ctx, AstPackage *pkg, UntypedExprInfoMap *untyped) {
