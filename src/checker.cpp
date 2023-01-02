@@ -743,21 +743,17 @@ gb_internal void check_scope_usage(Checker *c, Scope *scope) {
 
 
 gb_internal void add_dependency(CheckerInfo *info, DeclInfo *d, Entity *e) {
-	mutex_lock(&info->deps_mutex);
+	mutex_lock(&d->deps_mutex);
 	ptr_set_add(&d->deps, e);
-	mutex_unlock(&info->deps_mutex);
+	mutex_unlock(&d->deps_mutex);
 }
-gb_internal void add_type_info_dependency(CheckerInfo *info, DeclInfo *d, Type *type, bool require_mutex) {
+gb_internal void add_type_info_dependency(CheckerInfo *info, DeclInfo *d, Type *type) {
 	if (d == nullptr) {
 		return;
 	}
-	if (require_mutex) {
-		mutex_lock(&info->deps_mutex);
-	}
+	mutex_lock(&d->type_info_deps_mutex);
 	ptr_set_add(&d->type_info_deps, type);
-	if (require_mutex) {
-		mutex_unlock(&info->deps_mutex);
-	}
+	mutex_unlock(&d->type_info_deps_mutex);
 }
 
 gb_internal AstPackage *get_core_package(CheckerInfo *info, String name) {
@@ -1157,13 +1153,6 @@ gb_internal void init_checker_info(CheckerInfo *i) {
 	array_init(&i->required_foreign_imports_through_force, a, 0, 0);
 
 
-
-	i->allow_identifier_uses = false;
-	if (i->allow_identifier_uses) {
-		array_init(&i->identifier_uses, a);
-	}
-
-
 	TIME_SECTION("checker info: mpmc queues");
 
 	mpmc_init(&i->entity_queue, a, 1<<20);
@@ -1194,7 +1183,6 @@ gb_internal void destroy_checker_info(CheckerInfo *i) {
 	string_map_destroy(&i->files);
 	string_map_destroy(&i->packages);
 	array_free(&i->variable_init_order);
-	array_free(&i->identifier_uses);
 	array_free(&i->required_foreign_imports_through_force);
 
 	mpmc_destroy(&i->entity_queue);
@@ -1597,12 +1585,6 @@ gb_internal void add_entity_use(CheckerContext *c, Ast *identifier, Entity *enti
 
 		identifier->Ident.entity = entity;
 
-		if (c->info->allow_identifier_uses) {
-			mutex_lock(&c->info->identifier_uses_mutex);
-			array_add(&c->info->identifier_uses, identifier);
-			mutex_unlock(&c->info->identifier_uses_mutex);
-		}
-
 		String dmsg = entity->deprecated_message;
 		if (dmsg.len > 0) {
 			warning(identifier, "%.*s is deprecated: %.*s", LIT(entity->token.string), LIT(dmsg));
@@ -1767,7 +1749,7 @@ gb_internal void add_type_info_type_internal(CheckerContext *c, Type *t) {
 		return;
 	}
 
-	add_type_info_dependency(c->info, c->decl, t, false);
+	add_type_info_dependency(c->info, c->decl, t);
 
 	auto found = map_get(&c->info->type_info_map, t);
 	if (found != nullptr) {

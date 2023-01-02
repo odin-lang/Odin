@@ -179,8 +179,12 @@ struct DeclInfo {
 	CommentGroup *comment;
 	CommentGroup *docs;
 
-	PtrSet<Entity *>  deps;
+	BlockingMutex    deps_mutex;
+	PtrSet<Entity *> deps;
+
+	BlockingMutex     type_info_deps_mutex;
 	PtrSet<Type *>    type_info_deps;
+
 	Array<BlockLabel> labels;
 };
 
@@ -374,11 +378,6 @@ struct CheckerInfo {
 
 	BlockingMutex foreign_mutex; // NOT recursive
 	StringMap<Entity *> foreigns;
-
-	// only used by 'odin query'
-	bool          allow_identifier_uses;
-	BlockingMutex identifier_uses_mutex;
-	Array<Ast *>  identifier_uses;
 
 	// NOTE(bill): These are actually MPSC queues
 	// TODO(bill): Convert them to be MPSC queues
