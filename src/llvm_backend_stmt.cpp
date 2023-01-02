@@ -57,9 +57,8 @@ gb_internal void lb_build_constant_value_decl(lbProcedure *p, AstValueDecl *vd) 
 		if (pl->body != nullptr) {
 			auto *found = map_get(&info->gen_procs, ident);
 			if (found) {
-				auto procs = *found;
-				for_array(i, procs) {
-					Entity *e = procs[i];
+				MUTEX_GUARD(&found->mutex);
+				for (Entity *e : found->procs) {
 					if (!ptr_set_exists(min_dep_set, e)) {
 						continue;
 					}

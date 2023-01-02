@@ -311,6 +311,11 @@ struct LoadFileCache {
 	StringMap<u64> hashes;
 };
 
+struct GenProcsData {
+	Array<Entity *> procs;
+	BlockingMutex   mutex;
+};
+
 // CheckerInfo stores all the symbol information for a type-checked program
 struct CheckerInfo {
 	Checker *checker;
@@ -360,7 +365,7 @@ struct CheckerInfo {
 
 	RecursiveMutex gen_procs_mutex;
 	RecursiveMutex gen_types_mutex;
-	PtrMap<Ast *, Array<Entity *> > gen_procs; // Key: Ast * | Identifier -> Entity
+	PtrMap<Ast *, GenProcsData > gen_procs; // Key: Ast * | Identifier -> Entity
 	PtrMap<Type *, Array<Entity *> > gen_types; 
 
 	BlockingMutex type_info_mutex; // NOT recursive

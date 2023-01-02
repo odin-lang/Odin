@@ -193,8 +193,7 @@ gb_internal void check_did_you_mean_objc_entity(String const &name, Entity *e, b
 	GB_ASSERT(e->kind == Entity_TypeName);
 	GB_ASSERT(e->TypeName.objc_metadata != nullptr);
 	auto *objc_metadata = e->TypeName.objc_metadata;
-	mutex_lock(objc_metadata->mutex);
-	defer (mutex_unlock(objc_metadata->mutex));
+	MUTEX_GUARD(objc_metadata->mutex);
 
 	StringSet set = {};
 	string_set_init(&set, heap_allocator());
@@ -369,8 +368,7 @@ gb_internal bool find_or_generate_polymorphic_procedure(CheckerContext *old_c, E
 		GB_ASSERT(dst == nullptr);
 	}
 
-	mutex_lock(&info->gen_procs_mutex);
-	defer (mutex_unlock(&info->gen_procs_mutex));
+	// MUTEX_GUARD(&info->gen_procs_mutex);
 
 	if (!src->Proc.is_polymorphic || src->Proc.is_poly_specialized) {
 		return false;
@@ -436,11 +434,14 @@ gb_internal bool find_or_generate_polymorphic_procedure(CheckerContext *old_c, E
 		return false;
 	}
 
-	auto *found_gen_procs = map_get(&info->gen_procs, base_entity->identifier.load());
+	GenProcsData *found_gen_procs = nullptr;
+
+	MUTEX_GUARD(&info->gen_procs_mutex);
+
+	found_gen_procs = map_get(&info->gen_procs, base_entity->identifier.load());
 	if (found_gen_procs) {
-		auto procs = *found_gen_procs;
-		for_array(i, procs) {
-			Entity *other = procs[i];
+		MUTEX_GUARD(&found_gen_procs->mutex);
+		for (Entity *other : found_gen_procs->procs) {
 			Type *pt = base_type(other->type);
 			if (are_types_identical(pt, final_proc_type)) {
 				if (poly_proc_data) {
@@ -463,15 +464,13 @@ gb_internal bool find_or_generate_polymorphic_procedure(CheckerContext *old_c, E
 		// LEAK TODO(bill): Cloning this AST may be leaky
 		Ast *cloned_proc_type_node = clone_ast(pt->node);
 		success = check_procedure_type(&nctx, final_proc_type, cloned_proc_type_node, &operands);
-
 		if (!success) {
 			return false;
 		}
 
 		if (found_gen_procs) {
-			auto procs = *found_gen_procs;
-			for_array(i, procs) {
-				Entity *other = procs[i];
+			MUTEX_GUARD(&found_gen_procs->mutex);
+			for (Entity *other : found_gen_procs->procs) {
 				Type *pt = base_type(other->type);
 				if (are_types_identical(pt, final_proc_type)) {
 					if (poly_proc_data) {
@@ -567,11 +566,13 @@ gb_internal bool find_or_generate_polymorphic_procedure(CheckerContext *old_c, E
 	proc_info->poly_def_node = poly_def_node;
 
 	if (found_gen_procs) {
-		array_add(found_gen_procs, entity);
+		MUTEX_GUARD(&found_gen_procs->mutex);
+		array_add(&found_gen_procs->procs, entity);
 	} else {
-		auto array = array_make<Entity *>(heap_allocator());
-		array_add(&array, entity);
-		map_set(&info->gen_procs, base_entity->identifier.load(), array);
+		GenProcsData gen_proc_data = {};
+		gen_proc_data.procs = array_make<Entity *>(heap_allocator());
+		array_add(&gen_proc_data.procs, entity);
+		map_set(&info->gen_procs, base_entity->identifier.load(), gen_proc_data);
 	}
 
 	if (poly_proc_data) {

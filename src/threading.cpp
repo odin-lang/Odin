@@ -77,22 +77,23 @@ gb_internal void yield_process(void);
 
 
 struct MutexGuard {
-	MutexGuard() = delete;
+	MutexGuard()                   = delete;
 	MutexGuard(MutexGuard const &) = delete;
+	MutexGuard(MutexGuard &&)      = delete;
 
-	MutexGuard(BlockingMutex *bm) : bm{bm} {
+	explicit MutexGuard(BlockingMutex *bm) noexcept : bm{bm} {
 		mutex_lock(this->bm);
 	}
-	MutexGuard(RecursiveMutex *rm) : rm{rm} {
+	explicit MutexGuard(RecursiveMutex *rm) noexcept : rm{rm} {
 		mutex_lock(this->rm);
 	}
-	MutexGuard(BlockingMutex &bm) : bm{&bm} {
+	explicit MutexGuard(BlockingMutex &bm) noexcept : bm{&bm} {
 		mutex_lock(this->bm);
 	}
-	MutexGuard(RecursiveMutex &rm) : rm{&rm} {
+	explicit MutexGuard(RecursiveMutex &rm) noexcept : rm{&rm} {
 		mutex_lock(this->rm);
 	}
-	~MutexGuard() {
+	~MutexGuard() noexcept {
 		if (this->bm) {
 			mutex_unlock(this->bm);
 		} else if (this->rm) {
@@ -100,14 +101,14 @@ struct MutexGuard {
 		}
 	}
 
-	operator bool() const { return true; }
+	operator bool() const noexcept { return true; }
 
 	BlockingMutex *bm;
 	RecursiveMutex *rm;
 };
 
 #define MUTEX_GUARD_BLOCK(m) if (MutexGuard GB_DEFER_3(_mutex_guard_){m})
-#define MUTEX_GUARD(m) MutexGuard GB_DEFER_3(_mutex_guard_){m}
+#define MUTEX_GUARD(m) mutex_lock(m); defer (mutex_unlock(m))
 
 
 struct RecursiveMutex {
