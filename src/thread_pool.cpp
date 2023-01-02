@@ -21,6 +21,10 @@ struct ThreadPool {
 	Futex tasks_left;
 };
 
+gb_internal isize current_thread_index(void) {
+	return current_thread ? current_thread->idx : 0;
+}
+
 gb_internal void thread_pool_init(ThreadPool *pool, gbAllocator const &a, isize thread_count, char const *worker_name) {
 	pool->allocator = a;
 	slice_init(&pool->threads, a, thread_count + 1);

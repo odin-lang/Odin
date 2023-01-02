@@ -417,8 +417,6 @@ gb_internal bool find_or_generate_polymorphic_procedure(CheckerContext *old_c, E
 
 	CheckerContext nctx = *old_c;
 
-	nctx.procs_to_check_queue = old_c->procs_to_check_queue;
-
 	Scope *scope = create_scope(info, base_entity->scope);
 	scope->flags |= ScopeFlag_Proc;
 	nctx.scope = scope;
@@ -566,7 +564,7 @@ gb_internal bool find_or_generate_polymorphic_procedure(CheckerContext *old_c, E
 	}
 
 	// NOTE(bill): Check the newly generated procedure body
-	check_procedure_later(&nctx, proc_info);
+	check_procedure_later(nctx.checker, proc_info);
 
 	return true;
 }
@@ -6187,7 +6185,7 @@ gb_internal CallArgumentData check_call_arguments(CheckerContext *c, Operand *op
 				decl->where_clauses_evaluated = true;
 
 				if (ok && (data.gen_entity->flags & EntityFlag_ProcBodyChecked) == 0) {
-					check_procedure_later(c, e->file, e->token, decl, e->type, decl->proc_lit->ProcLit.body, decl->proc_lit->ProcLit.tags);
+					check_procedure_later(c->checker, e->file, e->token, decl, e->type, decl->proc_lit->ProcLit.body, decl->proc_lit->ProcLit.tags);
 				}
 			}
 			return data;
@@ -6225,7 +6223,7 @@ gb_internal CallArgumentData check_call_arguments(CheckerContext *c, Operand *op
 			decl->where_clauses_evaluated = true;
 
 			if (ok && (data.gen_entity->flags & EntityFlag_ProcBodyChecked) == 0) {
-				check_procedure_later(c, e->file, e->token, decl, e->type, decl->proc_lit->ProcLit.body, decl->proc_lit->ProcLit.tags);
+				check_procedure_later(c->checker, e->file, e->token, decl, e->type, decl->proc_lit->ProcLit.body, decl->proc_lit->ProcLit.tags);
 			}
 		}
 		return data;
@@ -9447,7 +9445,7 @@ gb_internal ExprKind check_expr_base_internal(CheckerContext *c, Operand *o, Ast
 			}
 
 			pl->decl = decl;
-			check_procedure_later(&ctx, ctx.file, empty_token, decl, type, pl->body, pl->tags);
+			check_procedure_later(ctx.checker, ctx.file, empty_token, decl, type, pl->body, pl->tags);
 		}
 		check_close_scope(&ctx);
 

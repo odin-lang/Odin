@@ -1195,7 +1195,6 @@ gb_internal void reset_checker_context(CheckerContext *ctx, AstFile *file, Untyp
 	GB_ASSERT(ctx->checker != nullptr);
 	mutex_lock(&ctx->mutex);
 
-	auto *queue = ctx->procs_to_check_queue;
 	auto type_path = ctx->type_path;
 	array_clear(type_path);
 
@@ -1211,7 +1210,6 @@ gb_internal void reset_checker_context(CheckerContext *ctx, AstFile *file, Untyp
 
 	add_curr_ast_file(ctx, file);
 
-	ctx->procs_to_check_queue = queue;
 	ctx->untyped = untyped;
 
 	mutex_unlock(&ctx->mutex);
@@ -1232,7 +1230,7 @@ gb_internal void init_checker(Checker *c) {
 	mpmc_init(&c->procs_with_deferred_to_check, a, 1<<10);
 
 	// NOTE(bill): 1 Mi elements should be enough on average
-	mpmc_init(&c->procs_to_check_queue, heap_allocator(), 1<<20);
+	array_init(&c->procs_to_check, heap_allocator(), 0, 1<<20);
 
 	mpmc_init(&c->global_untyped_queue, a, 1<<20);
 
@@ -1244,7 +1242,7 @@ gb_internal void destroy_checker(Checker *c) {
 
 	destroy_checker_context(&c->builtin_ctx);
 
-	mpmc_destroy(&c->procs_to_check_queue);
+	array_free(&c->procs_to_check);
 	mpmc_destroy(&c->global_untyped_queue);
 }
 
@@ -1941,23 +1939,19 @@ gb_global std::atomic<bool> global_procedure_body_in_worker_queue = false;
 
 gb_internal WORKER_TASK_PROC(check_proc_info_worker_proc);
 
-gb_internal void check_procedure_later(CheckerContext *c, ProcInfo *info) {
+gb_internal void check_procedure_later(Checker *c, ProcInfo *info) {
 	GB_ASSERT(info != nullptr);
 	GB_ASSERT(info->decl != nullptr);
 
 	if (MULTITHREAD_CHECKER && global_procedure_body_in_worker_queue) {
 		thread_pool_add_task(check_proc_info_worker_proc, info);
 	} else {
-		if (build_context.threaded_checker && global_procedure_body_in_worker_queue) {
-			GB_ASSERT(c->procs_to_check_queue != nullptr);
-		}
-
-		auto *queue = c->procs_to_check_queue ? c->procs_to_check_queue : &c->checker->procs_to_check_queue;
-		mpmc_enqueue(queue, info);
+		GB_ASSERT(global_procedure_body_in_worker_queue == false);
+		array_add(&c->procs_to_check, info);
 	}
 }
 
-gb_internal void check_procedure_later(CheckerContext *c, AstFile *file, Token token, DeclInfo *decl, Type *type, Ast *body, u64 tags) {
+gb_internal void check_procedure_later(Checker *c, AstFile *file, Token token, DeclInfo *decl, Type *type, Ast *body, u64 tags) {
 	ProcInfo *info = gb_alloc_item(permanent_allocator(), ProcInfo);
 	info->file  = file;
 	info->token = token;
@@ -4677,11 +4671,7 @@ struct CollectEntityWorkerData {
 gb_global CollectEntityWorkerData *collect_entity_worker_data;
 
 gb_internal WORKER_TASK_PROC(check_collect_entities_all_worker_proc) {
-	isize thread_idx = 0;
-	if (current_thread) {
-		thread_idx = current_thread->idx;
-	}
-	CollectEntityWorkerData *wd = &collect_entity_worker_data[thread_idx];
+	CollectEntityWorkerData *wd = &collect_entity_worker_data[current_thread_index()];
 
 	Checker *c = wd->c;
 	CheckerContext *ctx = &wd->ctx;
@@ -4738,10 +4728,8 @@ gb_internal void check_export_entities_in_pkg(CheckerContext *ctx, AstPackage *p
 }
 
 gb_internal WORKER_TASK_PROC(check_export_entities_worker_proc) {
-	isize thread_idx = current_thread ? current_thread->idx : 0;
-
 	AstPackage *pkg = (AstPackage *)data;
-	auto *wd = &collect_entity_worker_data[thread_idx];
+	auto *wd = &collect_entity_worker_data[current_thread_index()];
 	check_export_entities_in_pkg(&wd->ctx, pkg, &wd->untyped);
 	return 0;
 }
@@ -5069,7 +5057,7 @@ gb_internal void calculate_global_init_order(Checker *c) {
 }
 
 
-gb_internal bool check_proc_info(Checker *c, ProcInfo *pi, UntypedExprInfoMap *untyped, ProcBodyQueue *procs_to_check_queue) {
+gb_internal bool check_proc_info(Checker *c, ProcInfo *pi, UntypedExprInfoMap *untyped) {
 	if (pi == nullptr) {
 		return false;
 	}
@@ -5085,16 +5073,15 @@ gb_internal bool check_proc_info(Checker *c, ProcInfo *pi, UntypedExprInfoMap *u
 			}
 			return true;
 		}
+		if (e != nullptr && (e->flags & EntityFlag_ProcBodyChecked) != 0) {
+			GB_ASSERT(pi->decl->proc_checked);
+			return true;
+		}
+		pi->decl->proc_checked = true;
+		if (e != nullptr) {
+			e->flags |= EntityFlag_ProcBodyChecked;
+		}
 	}
-
-	CheckerContext ctx = make_checker_context(c);
-	defer (destroy_checker_context(&ctx));
-	reset_checker_context(&ctx, pi->file, untyped);
-	ctx.decl = pi->decl;
-
-	GB_ASSERT(procs_to_check_queue != nullptr || MULTITHREAD_CHECKER);
-
-	ctx.procs_to_check_queue = procs_to_check_queue;
 
 	GB_ASSERT(pi->type->kind == Type_Proc);
 	TypeProc *pt = &pi->type->Proc;
@@ -5115,6 +5102,12 @@ gb_internal bool check_proc_info(Checker *c, ProcInfo *pi, UntypedExprInfoMap *u
 			return false;
 		}
 	}
+
+
+	CheckerContext ctx = make_checker_context(c);
+	defer (destroy_checker_context(&ctx));
+	reset_checker_context(&ctx, pi->file, untyped);
+	ctx.decl = pi->decl;
 
 	bool bounds_check    = (pi->tags & ProcTag_bounds_check)    != 0;
 	bool no_bounds_check = (pi->tags & ProcTag_no_bounds_check) != 0;
@@ -5138,24 +5131,14 @@ gb_internal bool check_proc_info(Checker *c, ProcInfo *pi, UntypedExprInfoMap *u
 		ctx.state_flags &= ~StateFlag_type_assert;
 	}
 
-	if (pi->body != nullptr && e != nullptr) {
-		GB_ASSERT((e->flags & EntityFlag_ProcBodyChecked) == 0);
-	}
-
 	check_proc_body(&ctx, pi->token, pi->decl, pi->type, pi->body);
-	MUTEX_GUARD_BLOCK(&pi->decl->proc_checked_mutex) {
-		if (e != nullptr) {
-			e->flags |= EntityFlag_ProcBodyChecked;
-		}
-		pi->decl->proc_checked = true;
-	}
 	add_untyped_expressions(&c->info, ctx.untyped);
 	return true;
 }
 
 GB_STATIC_ASSERT(sizeof(isize) == sizeof(void *));
 
-gb_internal bool consume_proc_info_queue(Checker *c, ProcInfo *pi, ProcBodyQueue *q, UntypedExprInfoMap *untyped);
+gb_internal bool consume_proc_info_queue(Checker *c, ProcInfo *pi, UntypedExprInfoMap *untyped);
 
 gb_internal void check_unchecked_bodies(Checker *c) {
 	// NOTE(2021-02-26, bill): Sanity checker
@@ -5193,15 +5176,13 @@ gb_internal void check_unchecked_bodies(Checker *c) {
 			}
 
 			debugf("unchecked: %.*s\n", LIT(e->token.string));
-			mpmc_enqueue(&c->procs_to_check_queue, pi);
+			array_add(&c->procs_to_check, pi);
 		}
 	}
 
-	auto *q = &c->procs_to_check_queue;
-	ProcInfo *pi = nullptr;
-	while (mpmc_dequeue(q, &pi)) {
+	for (ProcInfo *pi : c->procs_to_check) {
 		Entity *e = pi->decl->entity;
-		if (consume_proc_info_queue(c, pi, q, &untyped)) {
+		if (consume_proc_info_queue(c, pi, &untyped)) {
 			add_dependency_to_set(c, e);
 			GB_ASSERT(e->flags & EntityFlag_ProcBodyChecked);
 		}
@@ -5245,7 +5226,7 @@ gb_internal void check_test_procedures(Checker *c) {
 
 gb_global std::atomic<isize> total_bodies_checked;
 
-gb_internal bool consume_proc_info_queue(Checker *c, ProcInfo *pi, ProcBodyQueue *q, UntypedExprInfoMap *untyped) {
+gb_internal bool consume_proc_info_queue(Checker *c, ProcInfo *pi, UntypedExprInfoMap *untyped) {
 	GB_ASSERT(pi->decl != nullptr);
 	if (pi->decl->parent && pi->decl->parent->entity) {
 		Entity *parent = pi->decl->parent->entity;
@@ -5253,14 +5234,14 @@ gb_internal bool consume_proc_info_queue(Checker *c, ProcInfo *pi, ProcBodyQueue
 		// This is prevent any possible race conditions in evaluation when multithreaded
 		// NOTE(bill): In single threaded mode, this should never happen
 		if (parent->kind == Entity_Procedure && (parent->flags & EntityFlag_ProcBodyChecked) == 0) {
-			mpmc_enqueue(q, pi);
+			check_procedure_later(c, pi);
 			return false;
 		}
 	}
 	if (untyped) {
 		map_clear(untyped);
 	}
-	bool ok = check_proc_info(c, pi, untyped, q);
+	bool ok = check_proc_info(c, pi, untyped);
 	total_bodies_checked.fetch_add(1, std::memory_order_relaxed);
 	return ok;
 }
@@ -5273,12 +5254,9 @@ struct CheckProcedureBodyWorkerData {
 gb_global CheckProcedureBodyWorkerData *check_procedure_bodies_worker_data;
 
 gb_internal WORKER_TASK_PROC(check_proc_info_worker_proc) {
-	isize thread_idx = 0;
-	if (current_thread) {
-		thread_idx = current_thread->idx;
-	}
-	UntypedExprInfoMap *untyped = &check_procedure_bodies_worker_data[thread_idx].untyped;
-	Checker *c = check_procedure_bodies_worker_data[thread_idx].c;
+	auto *wd = &check_procedure_bodies_worker_data[current_thread_index()];
+	UntypedExprInfoMap *untyped = &wd->untyped;
+	Checker *c = wd->c;
 
 	ProcInfo *pi = cast(ProcInfo *)data;
 
@@ -5294,7 +5272,7 @@ gb_internal WORKER_TASK_PROC(check_proc_info_worker_proc) {
 		}
 	}
 	map_clear(untyped);
-	bool ok = check_proc_info(c, pi, untyped, nullptr);
+	bool ok = check_proc_info(c, pi, untyped);
 	total_bodies_checked.fetch_add(1, std::memory_order_relaxed);
 	return !ok;
 }
@@ -5321,13 +5299,11 @@ gb_internal void check_procedure_bodies(Checker *c) {
 	});
 
 	if (thread_count == 1) {
-		auto *this_queue = &c->procs_to_check_queue;
-
 		UntypedExprInfoMap *untyped = &check_procedure_bodies_worker_data[0].untyped;
-
-		for (ProcInfo *pi = nullptr; mpmc_dequeue(this_queue, &pi); /**/) {
-			consume_proc_info_queue(c, pi, this_queue, untyped);
+		for_array(i, c->procs_to_check) {
+			consume_proc_info_queue(c, c->procs_to_check[i], untyped);
 		}
+		array_clear(&c->procs_to_check);
 
 		debugf("Total Procedure Bodies Checked: %td\n", total_bodies_checked.load(std::memory_order_relaxed));
 		return;
@@ -5335,12 +5311,12 @@ gb_internal void check_procedure_bodies(Checker *c) {
 
 	global_procedure_body_in_worker_queue = true;
 
-	for (ProcInfo *pi = nullptr; mpmc_dequeue(&c->procs_to_check_queue, &pi); /**/) {
-		thread_pool_add_task(check_proc_info_worker_proc, pi);
+	isize prev_procs_to_check_count = c->procs_to_check.count;
+	for_array(i, c->procs_to_check) {
+		thread_pool_add_task(check_proc_info_worker_proc, c->procs_to_check[i]);
 	}
-
-	isize global_remaining = c->procs_to_check_queue.count.load(std::memory_order_relaxed);
-	GB_ASSERT(global_remaining == 0);
+	GB_ASSERT(prev_procs_to_check_count == c->procs_to_check.count);
+	array_clear(&c->procs_to_check);
 
 	thread_pool_wait();
 

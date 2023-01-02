@@ -418,8 +418,6 @@ struct CheckerContext {
 	Scope *    polymorphic_scope;
 
 	Ast *assignment_lhs_hint;
-
-	ProcBodyQueue *procs_to_check_queue;
 };
 
 
@@ -430,9 +428,7 @@ struct Checker {
 	CheckerContext builtin_ctx;
 
 	MPMCQueue<Entity *> procs_with_deferred_to_check;
-
-	ProcBodyQueue procs_to_check_queue;
-	Semaphore procs_to_check_semaphore;
+	Array<ProcInfo *> procs_to_check;
 
 	// TODO(bill): Technically MPSC queue
 	MPMCQueue<UntypedExprInfo> global_untyped_queue;
