@@ -1451,7 +1451,7 @@ gb_internal void add_type_and_value(CheckerInfo *i, Ast *expr, AddressingMode mo
 		return;
 	}
 
-	// mutex_lock(&i->type_and_value_mutex);
+	mutex_lock(&i->type_and_value_mutex);
 	Ast *prev_expr = nullptr;
 	while (prev_expr != expr) {
 		prev_expr = expr;
@@ -1473,7 +1473,7 @@ gb_internal void add_type_and_value(CheckerInfo *i, Ast *expr, AddressingMode mo
 
 		expr = unparen_expr(expr);
 	}
-	// mutex_unlock(&i->type_and_value_mutex);
+	mutex_unlock(&i->type_and_value_mutex);
 }
 
 gb_internal void add_entity_definition(CheckerInfo *i, Ast *identifier, Entity *entity) {
