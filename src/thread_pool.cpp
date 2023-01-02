@@ -38,11 +38,11 @@ gb_internal void thread_pool_init(ThreadPool *pool, gbAllocator const &a, isize 
 		thread_init_and_start(pool, t, i);
 	}
 
-	pool->running = true;
+	pool->running.store(true);
 }
 
 gb_internal void thread_pool_destroy(ThreadPool *pool) {
-	pool->running = false;
+	pool->running.store(false);
 
 	for_array_off(i, 1, pool->threads) {
 		Thread *t = &pool->threads[i];
@@ -139,12 +139,7 @@ gb_internal THREAD_PROC(thread_pool_thread_proc) {
 	current_thread = thread;
 	ThreadPool *pool = current_thread->pool;
 
-	for (;;) {
-work_start:
-		if (!pool->running.load()) {
-			break;
-		}
-
+	while (pool->running.load()) {
 		// If we've got tasks to process, work through them
 		usize finished_tasks = 0;
 		while (thread_pool_queue_pop(current_thread, &task)) {
@@ -180,13 +175,15 @@ work_start:
 					futex_signal(&pool->tasks_left);
 				}
 
-				goto work_start;
+				goto main_loop_continue;
 			}
 		}
 
 		// if we've done all our work, and there's nothing to steal, go to sleep
 		i32 state = pool->tasks_available.load();
 		futex_wait(&pool->tasks_available, state);
+
+		main_loop_continue:;
 	}
 
 	return 0;
