@@ -117,7 +117,8 @@ struct RecursiveMutex {
 };
 
 gb_internal void mutex_lock(RecursiveMutex *m) {
-	Futex tid = cast(i32)thread_current_id();
+	Futex tid;
+	tid.store(cast(i32)thread_current_id());
 	for (;;) {
 		i32 prev_owner = 0;
 		m->owner.compare_exchange_strong(prev_owner, tid, std::memory_order_acquire, std::memory_order_acquire);
@@ -130,7 +131,8 @@ gb_internal void mutex_lock(RecursiveMutex *m) {
 	}
 }
 gb_internal bool mutex_try_lock(RecursiveMutex *m) {
-	Futex tid = cast(i32)thread_current_id();
+	Futex tid;
+	tid.store(cast(i32)thread_current_id());
 	i32 prev_owner = 0;
 	m->owner.compare_exchange_strong(prev_owner, tid, std::memory_order_acquire, std::memory_order_acquire);
 	if (prev_owner == 0 || prev_owner == tid) {
