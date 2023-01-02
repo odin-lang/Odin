@@ -393,7 +393,7 @@ gb_internal void thread_init(ThreadPool *pool, Thread *t, isize idx) {
 #endif
 
 	t->capacity = 1 << 14; // must be a power of 2
-	t->queue = (WorkerTask *)calloc(sizeof(WorkerTask), t->capacity);
+	t->queue = gb_alloc_array(heap_allocator(), WorkerTask, t->capacity);
 	t->head_and_tail = 0;
 	t->pool = pool;
 	t->idx = idx;
@@ -429,6 +429,8 @@ gb_internal void thread_join_and_destroy(Thread *t) {
 	pthread_join(t->posix_handle, NULL);
 	t->posix_handle = 0;
 #endif
+
+	gb_free(heap_allocator(), t->queue);
 }
 
 gb_internal void thread_set_name(Thread *t, char const *name) {

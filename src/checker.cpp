@@ -1935,7 +1935,7 @@ gb_internal void add_type_info_type_internal(CheckerContext *c, Type *t) {
 
 
 
-gb_global bool global_procedure_body_in_worker_queue = false;
+gb_global std::atomic<bool> global_procedure_body_in_worker_queue = false;
 
 gb_internal void check_procedure_later(CheckerContext *c, ProcInfo *info) {
 	GB_ASSERT(info != nullptr);
@@ -5263,6 +5263,7 @@ gb_internal WORKER_TASK_PROC(thread_proc_body) {
 
 gb_internal void check_procedure_bodies(Checker *c) {
 	GB_ASSERT(c != nullptr);
+
 
 	u32 thread_count = cast(u32)gb_max(build_context.thread_count, 1);
 	u32 worker_count = thread_count-1; // NOTE(bill): The main thread will also be used for work
