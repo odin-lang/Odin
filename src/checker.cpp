@@ -51,6 +51,7 @@ gb_internal bool check_rtti_type_disallowed(Ast *expr, Type *type, char const *f
 gb_internal void scope_reset(Scope *scope) {
 	if (scope == nullptr) return;
 
+	MUTEX_GUARD(&scope->mutex);
 	scope->head_child.store(nullptr, std::memory_order_relaxed);
 	string_map_clear(&scope->elements);
 	ptr_set_clear(&scope->imported);

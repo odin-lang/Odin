@@ -167,7 +167,7 @@ gb_internal THREAD_PROC(thread_pool_thread_proc) {
 				idx = (idx + 1) % cast(usize)pool->threads.count;
 
 				Thread *thread = &pool->threads.data[idx];
-				WorkerTask task, another_task;
+				WorkerTask task;
 				if (!thread_pool_queue_pop(thread, &task)) {
 					continue;
 				}

@@ -439,7 +439,6 @@ gb_internal bool find_or_generate_polymorphic_procedure(CheckerContext *old_c, E
 	// @@GPM //////////////////////////
 	mutex_lock(&info->gen_procs_mutex);
 	///////////////////////////////////
-
 	auto *found = map_get(&info->gen_procs, base_entity->identifier.load());
 	if (found) {
 		gen_procs = *found;
@@ -462,6 +461,9 @@ gb_internal bool find_or_generate_polymorphic_procedure(CheckerContext *old_c, E
 		gen_procs->procs.allocator = heap_allocator();
 		map_set(&info->gen_procs, base_entity->identifier.load(), gen_procs);
 	}
+	// @@GPM ////////////////////////////
+	mutex_unlock(&info->gen_procs_mutex);
+	/////////////////////////////////////
 
 	{
 		// LEAK TODO(bill): This is technically a memory leak as it has to generate the type twice
@@ -475,11 +477,6 @@ gb_internal bool find_or_generate_polymorphic_procedure(CheckerContext *old_c, E
 		// LEAK TODO(bill): Cloning this AST may be leaky
 		Ast *cloned_proc_type_node = clone_ast(pt->node);
 		success = check_procedure_type(&nctx, final_proc_type, cloned_proc_type_node, &operands);
-
-		// @@GPM ////////////////////////////
-		mutex_unlock(&info->gen_procs_mutex);
-		/////////////////////////////////////
-
 		if (!success) {
 			return false;
 		}
