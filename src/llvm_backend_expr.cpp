@@ -3404,11 +3404,7 @@ gb_internal lbAddr lb_build_addr_from_entity(lbProcedure *p, Entity *e, Ast *exp
 
 
 	lbValue v = {};
-	lbValue *found = nullptr;
-	found = map_get(&p->local_entity_map, e);
-	if (found == nullptr) {
-		found = map_get(&p->module->values, e);
-	}
+	lbValue *found = map_get(&p->module->values, e);
 	if (found) {
 		v = *found;
 	} else if (e->kind == Entity_Variable && e->flags & EntityFlag_Using) {

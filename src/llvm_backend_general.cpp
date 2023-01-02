@@ -2844,10 +2844,6 @@ gb_internal lbAddr lb_add_local(lbProcedure *p, Type *type, Entity *e, bool zero
 		lb_mem_zero_ptr(p, ptr, type, alignment);
 	}
 
-	if (e != nullptr) {
-		map_set(&p->local_entity_map, e, val);
-	}
-
 	return lb_addr(val);
 }
 

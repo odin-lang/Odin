@@ -301,7 +301,6 @@ struct lbProcedure {
 	lbBlock *        curr_block;
 	lbTargetList *   target_list;
 	PtrMap<Entity *, lbValue> direct_parameters;
-	PtrMap<Entity *, lbValue> local_entity_map;
 
 	Ast *curr_stmt;
 

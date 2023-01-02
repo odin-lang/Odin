@@ -487,7 +487,6 @@ gb_internal void lb_begin_procedure_body(lbProcedure *p) {
 	lb_start_block(p, p->entry_block);
 
 	map_init(&p->direct_parameters, heap_allocator());
-	map_init(&p->local_entity_map, heap_allocator());
 
 	GB_ASSERT(p->type != nullptr);
 
