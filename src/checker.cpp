@@ -1731,10 +1731,7 @@ gb_internal void add_type_info_type(CheckerContext *c, Type *t) {
 	if (build_context.disallow_rtti) {
 		return;
 	}
-
-	mutex_lock(&c->info->type_info_mutex);
 	add_type_info_type_internal(c, t);
-	mutex_unlock(&c->info->type_info_mutex);
 }
 
 gb_internal void add_type_info_type_internal(CheckerContext *c, Type *t) {
@@ -1751,33 +1748,35 @@ gb_internal void add_type_info_type_internal(CheckerContext *c, Type *t) {
 
 	add_type_info_dependency(c->info, c->decl, t);
 
-	auto found = map_get(&c->info->type_info_map, t);
-	if (found != nullptr) {
-		// Types have already been added
-		return;
-	}
-
-	bool prev = false;
-	isize ti_index = -1;
-	for (auto const &e : c->info->type_info_map) {
-		if (are_types_identical_unique_tuples(t, e.key)) {
-			// Duplicate entry
-			ti_index = e.value;
-			prev = true;
-			break;
+	MUTEX_GUARD_BLOCK(&c->info->type_info_mutex) {
+		auto found = map_get(&c->info->type_info_map, t);
+		if (found != nullptr) {
+			// Types have already been added
+			return;
 		}
-	}
-	if (ti_index < 0) {
-		// Unique entry
-		// NOTE(bill): map entries grow linearly and in order
-		ti_index = c->info->type_info_types.count;
-		array_add(&c->info->type_info_types, t);
-	}
-	map_set(&c->checker->info.type_info_map, t, ti_index);
 
-	if (prev) {
-		// NOTE(bill): If a previous one exists already, no need to continue
-		return;
+		bool prev = false;
+		isize ti_index = -1;
+		for (auto const &e : c->info->type_info_map) {
+			if (are_types_identical_unique_tuples(t, e.key)) {
+				// Duplicate entry
+				ti_index = e.value;
+				prev = true;
+				break;
+			}
+		}
+		if (ti_index < 0) {
+			// Unique entry
+			// NOTE(bill): map entries grow linearly and in order
+			ti_index = c->info->type_info_types.count;
+			array_add(&c->info->type_info_types, t);
+		}
+		map_set(&c->checker->info.type_info_map, t, ti_index);
+
+		if (prev) {
+			// NOTE(bill): If a previous one exists already, no need to continue
+			return;
+		}
 	}
 
 	// Add nested types
