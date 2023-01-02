@@ -1471,7 +1471,7 @@ gb_internal bool check_proc_body(CheckerContext *ctx_, Token token, DeclInfo *de
 					continue;
 				}
 				if (is_blank_ident(e->token)) {
-                    error(e->token, "'using' a procedure parameter requires a non blank identifier");
+					error(e->token, "'using' a procedure parameter requires a non blank identifier");
 					break;
 				}
 

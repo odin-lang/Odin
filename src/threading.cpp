@@ -472,26 +472,18 @@ gb_internal void thread_set_name(Thread *t, char const *name) {
 #include <sys/syscall.h>
 
 gb_internal void futex_signal(Futex *addr) {
-	for (;;) {
-		int ret = syscall(SYS_futex, addr, FUTEX_WAKE | FUTEX_PRIVATE_FLAG, 1, NULL, NULL, 0);
-		if (ret == -1) {
-			perror("Futex wake");
-			GB_PANIC("Failed in futex wake!\n");
-		} else if (ret > 0) {
-			return;
-		}
+	int ret = syscall(SYS_futex, addr, FUTEX_WAKE | FUTEX_PRIVATE_FLAG, 1, NULL, NULL, 0);
+	if (ret == -1) {
+		perror("Futex wake");
+		GB_PANIC("Failed in futex wake!\n");
 	}
 }
 
 gb_internal void futex_broadcast(Futex *addr) {
-	for (;;) {
-		int ret = syscall(SYS_futex, addr, FUTEX_WAKE | FUTEX_PRIVATE_FLAG, INT32_MAX, NULL, NULL, 0);
-		if (ret == -1) {
-			perror("Futex wake");
-			GB_PANIC("Failed in futex wake!\n");
-		} else if (ret > 0) {
-			return;
-		}
+	int ret = syscall(SYS_futex, addr, FUTEX_WAKE | FUTEX_PRIVATE_FLAG, INT32_MAX, NULL, NULL, 0);
+	if (ret == -1) {
+		perror("Futex wake");
+		GB_PANIC("Failed in futex wake!\n");
 	}
 }
 
