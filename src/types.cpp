@@ -3383,8 +3383,6 @@ gb_internal i64 type_align_of_internal(Type *t, TypePath *path) {
 	if (t->failure) {
 		return FAILURE_ALIGNMENT;
 	}
-	mutex_lock(&g_type_mutex);
-	defer (mutex_unlock(&g_type_mutex));
 
 	t = base_type(t);
 
@@ -3408,6 +3406,8 @@ gb_internal i64 type_align_of_internal(Type *t, TypePath *path) {
 	} break;
 
 	case Type_Array: {
+		MUTEX_GUARD(&g_type_mutex);
+
 		Type *elem = t->Array.elem;
 		bool pop = type_path_push(path, elem);
 		if (path->failure) {
@@ -3419,6 +3419,8 @@ gb_internal i64 type_align_of_internal(Type *t, TypePath *path) {
 	}
 
 	case Type_EnumeratedArray: {
+		MUTEX_GUARD(&g_type_mutex);
+
 		Type *elem = t->EnumeratedArray.elem;
 		bool pop = type_path_push(path, elem);
 		if (path->failure) {
@@ -3438,6 +3440,8 @@ gb_internal i64 type_align_of_internal(Type *t, TypePath *path) {
 
 
 	case Type_Tuple: {
+		MUTEX_GUARD(&g_type_mutex);
+
 		i64 max = 1;
 		for_array(i, t->Tuple.variables) {
 			i64 align = type_align_of_internal(t->Tuple.variables[i]->type, path);
@@ -3461,6 +3465,8 @@ gb_internal i64 type_align_of_internal(Type *t, TypePath *path) {
 			return gb_max(t->Union.custom_align, 1);
 		}
 
+		MUTEX_GUARD(&g_type_mutex);
+
 		i64 max = 1;
 		for_array(i, t->Union.variants) {
 			Type *variant = t->Union.variants[i];
@@ -3481,39 +3487,27 @@ gb_internal i64 type_align_of_internal(Type *t, TypePath *path) {
 		if (t->Struct.custom_align > 0) {
 			return gb_max(t->Struct.custom_align, 1);
 		}
-		if (t->Struct.is_raw_union) {
-			i64 max = 1;
-			for_array(i, t->Struct.fields) {
-				Type *field_type = t->Struct.fields[i]->type;
-				bool pop = type_path_push(path, field_type);
-				if (path->failure) {
-					return FAILURE_ALIGNMENT;
-				}
-				i64 align = type_align_of_internal(field_type, path);
-				if (pop) type_path_pop(path);
-				if (max < align) {
-					max = align;
-				}
-			}
-			return max;
-		} else if (t->Struct.fields.count > 0) {
-			i64 max = 1;
-			// NOTE(bill): Check the fields to check for cyclic definitions
-			for_array(i, t->Struct.fields) {
-				Type *field_type = t->Struct.fields[i]->type;
-				bool pop = type_path_push(path, field_type);
-				if (path->failure) return FAILURE_ALIGNMENT;
-				i64 align = type_align_of_internal(field_type, path);
-				if (pop) type_path_pop(path);
-				if (max < align) {
-					max = align;
-				}
-			}
-			if (t->Struct.is_packed) {
-				return 1;
-			}
-			return max;
+
+		if (t->Struct.is_packed) {
+			return 1;
 		}
+
+		MUTEX_GUARD(&g_type_mutex);
+
+		i64 max = 1;
+		for_array(i, t->Struct.fields) {
+			Type *field_type = t->Struct.fields[i]->type;
+			bool pop = type_path_push(path, field_type);
+			if (path->failure) {
+				return FAILURE_ALIGNMENT;
+			}
+			i64 align = type_align_of_internal(field_type, path);
+			if (pop) type_path_pop(path);
+			if (max < align) {
+				max = align;
+			}
+		}
+		return max;
 	} break;
 
 	case Type_BitSet: {
@@ -3579,8 +3573,7 @@ gb_internal i64 *type_set_offsets_of(Slice<Entity *> const &fields, bool is_pack
 }
 
 gb_internal bool type_set_offsets(Type *t) {
-	mutex_lock(&g_type_mutex);
-	defer (mutex_unlock(&g_type_mutex));
+	MUTEX_GUARD(&g_type_mutex); // TODO(bill): only per struct
 
 	t = base_type(t);
 	if (t->kind == Type_Struct) {
@@ -3609,12 +3602,11 @@ gb_internal i64 type_size_of_internal(Type *t, TypePath *path) {
 	if (t->failure) {
 		return FAILURE_SIZE;
 	}
-	mutex_lock(&g_type_mutex);
-	defer (mutex_unlock(&g_type_mutex));
-
 
 	switch (t->kind) {
 	case Type_Named: {
+		MUTEX_GUARD(&g_type_mutex);
+
 		bool pop = type_path_push(path, t);
 		if (path->failure) {
 			return FAILURE_ALIGNMENT;
@@ -3652,6 +3644,8 @@ gb_internal i64 type_size_of_internal(Type *t, TypePath *path) {
 		return build_context.word_size*2;
 
 	case Type_Array: {
+		MUTEX_GUARD(&g_type_mutex);
+
 		i64 count, align, size, alignment;
 		count = t->Array.count;
 		if (count == 0) {
@@ -3667,6 +3661,8 @@ gb_internal i64 type_size_of_internal(Type *t, TypePath *path) {
 	} break;
 
 	case Type_EnumeratedArray: {
+		MUTEX_GUARD(&g_type_mutex);
+
 		i64 count, align, size, alignment;
 		count = t->EnumeratedArray.count;
 		if (count == 0) {
@@ -3699,6 +3695,8 @@ gb_internal i64 type_size_of_internal(Type *t, TypePath *path) {
 		return (1 + 1 + 2)*build_context.word_size;
 
 	case Type_Tuple: {
+		MUTEX_GUARD(&g_type_mutex);
+
 		i64 count, align, size;
 		count = t->Tuple.variables.count;
 		if (count == 0) {
@@ -3717,6 +3715,8 @@ gb_internal i64 type_size_of_internal(Type *t, TypePath *path) {
 		if (t->Union.variants.count == 0) {
 			return 0;
 		}
+		MUTEX_GUARD(&g_type_mutex);
+
 		i64 align = type_align_of_internal(t, path);
 		if (path->failure) {
 			return FAILURE_SIZE;
@@ -3754,6 +3754,8 @@ gb_internal i64 type_size_of_internal(Type *t, TypePath *path) {
 
 
 	case Type_Struct: {
+		MUTEX_GUARD(&g_type_mutex);
+
 		if (t->Struct.is_raw_union) {
 			i64 count = t->Struct.fields.count;
 			i64 align = type_align_of_internal(t, path);
