@@ -641,6 +641,7 @@ gb_internal void futex_broadcast(Futex *addr) {
 
 gb_internal void futex_wait(Futex *addr, Footex val) {
 	for (;;) {
+		enum { ULF_WAKE_ALL = 0x00000100 };
 		int ret = __ulock_wait(UL_COMPARE_AND_WAIT | ULF_NO_ERRNO | ULF_WAKE_ALL, addr, val, 0);
 		if (ret >= 0) {
 			if (*addr != val) {
