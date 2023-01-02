@@ -937,16 +937,20 @@ gb_global BlockingMutex fullpath_mutex;
 #if defined(GB_SYSTEM_WINDOWS)
 gb_internal String path_to_fullpath(gbAllocator a, String s) {
 	String result = {};
-	mutex_lock(&fullpath_mutex);
-	defer (mutex_unlock(&fullpath_mutex));
 
 	String16 string16 = string_to_string16(heap_allocator(), s);
 	defer (gb_free(heap_allocator(), string16.text));
 
-	DWORD len = GetFullPathNameW(&string16[0], 0, nullptr, nullptr);
+	DWORD len;
+
+	mutex_lock(&fullpath_mutex);
+
+	len = GetFullPathNameW(&string16[0], 0, nullptr, nullptr);
 	if (len != 0) {
 		wchar_t *text = gb_alloc_array(permanent_allocator(), wchar_t, len+1);
 		GetFullPathNameW(&string16[0], len, text, nullptr);
+		mutex_unlock(&fullpath_mutex);
+
 		text[len] = 0;
 		result = string16_to_string(a, make_string16(text, len));
 		result = string_trim_whitespace(result);
@@ -957,6 +961,8 @@ gb_internal String path_to_fullpath(gbAllocator a, String s) {
 				result.text[i] = '/';
 			}
 		}
+	} else {
+		mutex_unlock(&fullpath_mutex);
 	}
 
 	return result;
