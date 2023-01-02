@@ -4660,40 +4660,65 @@ gb_internal void check_with_workers(Checker *c, WorkerTaskProc *proc, isize tota
 	semaphore_wait(&c->info.collect_semaphore);
 }
 
+struct CollectEntityWorkerData {
+	Checker *c;
+	CheckerContext ctx;
+	UntypedExprInfoMap untyped;
+};
 
-gb_internal WORKER_TASK_PROC(thread_proc_collect_entities) {
-	auto *cs = cast(ThreadProcCheckerSection *)data;
-	Checker *c = cs->checker;
-	CheckerContext collect_entity_ctx = make_checker_context(c);
-	defer (destroy_checker_context(&collect_entity_ctx));
+gb_global CollectEntityWorkerData *collect_entity_worker_data;
 
-	CheckerContext *ctx = &collect_entity_ctx;
-
-	UntypedExprInfoMap untyped = {};
-	map_init(&untyped, heap_allocator());
-
-	isize offset = cs->offset;
-	isize file_end = gb_min(offset+cs->count, c->info.files.entries.count);
-
-	for (isize i = offset; i < file_end; i++) {
-		AstFile *f = c->info.files.entries[i].value;
-		reset_checker_context(ctx, f, &untyped);
-
-		check_collect_entities(ctx, f->decls);
-		GB_ASSERT(ctx->collect_delayed_decls == false);
-
-		add_untyped_expressions(&c->info, ctx->untyped);
+WORKER_TASK_PROC(check_collect_entities_all_worker_proc) {
+	isize thread_idx = 0;
+	if (current_thread) {
+		thread_idx = current_thread->idx;
 	}
+	CollectEntityWorkerData *wd = &collect_entity_worker_data[thread_idx];
 
-	map_destroy(&untyped);
+	Checker *c = wd->c;
+	CheckerContext *ctx = &wd->ctx;
+	UntypedExprInfoMap *untyped = &wd->untyped;
 
-	semaphore_release(&c->info.collect_semaphore);
+	AstFile *f = cast(AstFile *)data;
+	reset_checker_context(ctx, f, untyped);
+
+	check_collect_entities(ctx, f->decls);
+	GB_ASSERT(ctx->collect_delayed_decls == false);
+
+	add_untyped_expressions(&c->info, ctx->untyped);
+
 	return 0;
 }
 
-
 gb_internal void check_collect_entities_all(Checker *c) {
-	check_with_workers(c, thread_proc_collect_entities, c->info.files.entries.count);
+	isize thread_count = global_thread_pool.threads.count;
+
+	collect_entity_worker_data = gb_alloc_array(permanent_allocator(), CollectEntityWorkerData, thread_count);
+	for (isize i = 0; i < thread_count; i++) {
+		auto *wd = &collect_entity_worker_data[i];
+		wd->c = c;
+		wd->ctx = make_checker_context(c);
+		map_init(&wd->untyped, heap_allocator());
+	}
+
+	if (build_context.threaded_checker) {
+		for (auto const &entry : c->info.files.entries) {
+			AstFile *f = entry.value;
+			global_thread_pool_add_task(check_collect_entities_all_worker_proc, f);
+		}
+		global_thread_pool_wait();
+	} else {
+		for (auto const &entry : c->info.files.entries) {
+			AstFile *f = entry.value;
+			check_collect_entities_all_worker_proc(f);
+		}
+	}
+
+	for (isize i = 0; i < thread_count; i++) {
+		auto *wd = &collect_entity_worker_data[i];
+		map_destroy(&wd->untyped);
+		destroy_checker_context(&wd->ctx);
+	}
 }
 
 gb_internal void check_export_entities_in_pkg(CheckerContext *ctx, AstPackage *pkg, UntypedExprInfoMap *untyped) {
