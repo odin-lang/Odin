@@ -548,9 +548,9 @@ gb_internal void futex_wait(Futex *addr, Footex val) {
 
 #include <sys/futex.h>
 
-gb_internal void futex_signal(Futex *addr) {
+gb_internal void futex_signal(Futex *f) {
 	for (;;) {
-		int ret = futex((volatile uint32_t *)addr, FUTEX_WAKE | FUTEX_PRIVATE_FLAG, 1, NULL, NULL);
+		int ret = futex((volatile uint32_t *)f, FUTEX_WAKE | FUTEX_PRIVATE_FLAG, 1, NULL, NULL);
 		if (ret == -1) {
 			if (errno == ETIMEDOUT || errno == EINTR) {
 				continue;
@@ -565,9 +565,9 @@ gb_internal void futex_signal(Futex *addr) {
 }
 
 
-gb_internal void futex_broadcast(Futex *addr) {
+gb_internal void futex_broadcast(Futex *f) {
 	for (;;) {
-		int ret = futex((volatile uint32_t *)addr, FUTEX_WAKE | FUTEX_PRIVATE_FLAG, INT32_MAX, NULL, NULL);
+		int ret = futex((volatile uint32_t *)f, FUTEX_WAKE | FUTEX_PRIVATE_FLAG, INT32_MAX, NULL, NULL);
 		if (ret == -1) {
 			if (errno == ETIMEDOUT || errno == EINTR) {
 				continue;
@@ -581,11 +581,11 @@ gb_internal void futex_broadcast(Futex *addr) {
 	}
 }
 
-gb_internal void futex_wait(Futex *addr, Footex val) {
+gb_internal void futex_wait(Futex *f, Footex val) {
 	for (;;) {
-		int ret = futex((volatile uint32_t *)addr, FUTEX_WAIT | FUTEX_PRIVATE_FLAG, val, NULL, NULL);
+		int ret = futex((volatile uint32_t *)f, FUTEX_WAIT | FUTEX_PRIVATE_FLAG, val, NULL, NULL);
 		if (ret == -1) {
-			if (*addr != val) {
+			if (*f != val) {
 				return;
 			}
 
@@ -607,9 +607,9 @@ gb_internal void futex_wait(Futex *addr, Footex val) {
 extern "C" int __ulock_wait(uint32_t operation, void *addr, uint64_t value, uint32_t timeout); /* timeout is specified in microseconds */
 extern "C" int __ulock_wake(uint32_t operation, void *addr, uint64_t wake_value);
 
-gb_internal void futex_signal(Futex *addr) {
+gb_internal void futex_signal(Futex *f) {
 	for (;;) {
-		int ret = __ulock_wake(UL_COMPARE_AND_WAIT | ULF_NO_ERRNO, addr, 0);
+		int ret = __ulock_wake(UL_COMPARE_AND_WAIT | ULF_NO_ERRNO, f, 0);
 		if (ret >= 0) {
 			return;
 		}
@@ -623,28 +623,28 @@ gb_internal void futex_signal(Futex *addr) {
 	}
 }
 
-gb_internal void futex_broadcast(Futex *addr) {
-	for (;;) {
-		int ret = __ulock_wake(UL_COMPARE_AND_WAIT | ULF_NO_ERRNO, addr, 0);
-		if (ret >= 0) {
-			return;
-		}
-		if (ret == EINTR || ret == EFAULT) {
-			continue;
-		}
-		if (ret == ENOENT) {
-			return;
-		}
-		GB_PANIC("Failed in futex wake!\n");
-	}
-}
-
-gb_internal void futex_wait(Futex *addr, Footex val) {
+gb_internal void futex_broadcast(Futex *f) {
 	for (;;) {
 		enum { ULF_WAKE_ALL = 0x00000100 };
-		int ret = __ulock_wait(UL_COMPARE_AND_WAIT | ULF_NO_ERRNO | ULF_WAKE_ALL, addr, val, 0);
+		int ret = __ulock_wake(UL_COMPARE_AND_WAIT | ULF_NO_ERRNO | ULF_WAKE_ALL, f, 0);
 		if (ret >= 0) {
-			if (*addr != val) {
+			return;
+		}
+		if (ret == EINTR || ret == EFAULT) {
+			continue;
+		}
+		if (ret == ENOENT) {
+			return;
+		}
+		GB_PANIC("Failed in futex wake!\n");
+	}
+}
+
+gb_internal void futex_wait(Futex *f, Footex val) {
+	for (;;) {
+		int ret = __ulock_wait(UL_COMPARE_AND_WAIT | ULF_NO_ERRNO, f, val, 0);
+		if (ret >= 0) {
+			if (*f != val) {
 				return;
 			}
 			continue;
@@ -661,19 +661,18 @@ gb_internal void futex_wait(Futex *addr, Footex val) {
 }
 #elif defined(GB_SYSTEM_WINDOWS)
 
-gb_internal void futex_signal(Futex *addr) {
-	WakeByAddressSingle((void *)addr);
+gb_internal void futex_signal(Futex *f) {
+	WakeByAddressSingle(f);
 }
 
-gb_internal void futex_broadcast(Futex *addr) {
-	WakeByAddressAll((void *)addr);
+gb_internal void futex_broadcast(Futex *f) {
+	WakeByAddressAll(f);
 }
 
-gb_internal void futex_wait(Futex *addr, Footex val) {
-	for (;;) {
-		WaitOnAddress(addr, (void *)&val, sizeof(val), INFINITE);
-		if (*addr != val) break;
-	}
+gb_internal void futex_wait(Futex *f, Footex val) {
+	do {
+		WaitOnAddress(f, (void *)&val, sizeof(val), INFINITE);
+	} while (f->load() == val);
 }
 #endif
 
