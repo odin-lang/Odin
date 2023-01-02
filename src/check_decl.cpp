@@ -1581,16 +1581,21 @@ gb_internal bool check_proc_body(CheckerContext *ctx_, Token token, DeclInfo *de
 		Scope *ps = decl->parent->scope;
 		if (ps->flags & (ScopeFlag_File & ScopeFlag_Pkg & ScopeFlag_Global)) {
 			return true;
-		} else MUTEX_GUARD_BLOCK(&ctx->info->deps_mutex) {
+		} else {
 			// NOTE(bill): Add the dependencies from the procedure literal (lambda)
 			// But only at the procedure level
-			for (auto const &entry : decl->deps) {
-				Entity *e = entry.ptr;
-				ptr_set_add(&decl->parent->deps, e);
+
+			MUTEX_GUARD_BLOCK(decl->deps_mutex) MUTEX_GUARD_BLOCK(decl->parent->deps_mutex) {
+				for (auto const &entry : decl->deps) {
+					Entity *e = entry.ptr;
+					ptr_set_add(&decl->parent->deps, e);
+				}
 			}
-			for (auto const &entry : decl->type_info_deps) {
-				Type *t = entry.ptr;
-				ptr_set_add(&decl->parent->type_info_deps, t);
+			MUTEX_GUARD_BLOCK(decl->type_info_deps_mutex) MUTEX_GUARD_BLOCK(decl->parent->type_info_deps_mutex) {
+				for (auto const &entry : decl->type_info_deps) {
+					Type *t = entry.ptr;
+					ptr_set_add(&decl->parent->type_info_deps, t);
+				}
 			}
 		}
 	}
