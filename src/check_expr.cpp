@@ -852,7 +852,7 @@ gb_internal i64 check_distance_between_types(CheckerContext *c, Operand *operand
 		PolyProcData poly_proc_data = {};
 		if (check_polymorphic_procedure_assignment(c, operand, type, operand->expr, &poly_proc_data)) {
 			Entity *e = poly_proc_data.gen_entity;
-			add_type_and_value(c->info, operand->expr, Addressing_Value, e->type, {});
+			add_type_and_value(c, operand->expr, Addressing_Value, e->type, {});
 			add_entity_use(c, operand->expr, e);
 			return 4;
 		}
@@ -1082,7 +1082,7 @@ gb_internal void check_assignment(CheckerContext *c, Operand *operand, Type *typ
 	if (check_is_assignable_to(c, operand, type)) {
 		if (operand->mode == Addressing_Type && is_type_typeid(type)) {
 			add_type_info_type(c, operand->type);
-			add_type_and_value(c->info, operand->expr, Addressing_Value, type, exact_value_typeid(operand->type));
+			add_type_and_value(c, operand->expr, Addressing_Value, type, exact_value_typeid(operand->type));
 		}
 	} else {
 		gbString expr_str    = expr_to_string(operand->expr);
@@ -2374,7 +2374,7 @@ gb_internal void check_comparison(CheckerContext *c, Operand *x, Operand *y, Tok
 	if (x->mode == Addressing_Type && is_type_typeid(y->type)) {
 		add_type_info_type(c, x->type);
 		add_type_info_type(c, y->type);
-		add_type_and_value(c->info, x->expr, Addressing_Value, y->type, exact_value_typeid(x->type));
+		add_type_and_value(c, x->expr, Addressing_Value, y->type, exact_value_typeid(x->type));
 
 		x->mode = Addressing_Value;
 		x->type = t_untyped_bool;
@@ -2382,7 +2382,7 @@ gb_internal void check_comparison(CheckerContext *c, Operand *x, Operand *y, Tok
 	} else if (is_type_typeid(x->type) && y->mode == Addressing_Type) {
 		add_type_info_type(c, x->type);
 		add_type_info_type(c, y->type);
-		add_type_and_value(c->info, y->expr, Addressing_Value, x->type, exact_value_typeid(y->type));
+		add_type_and_value(c, y->expr, Addressing_Value, x->type, exact_value_typeid(y->type));
 
 		x->mode = Addressing_Value;
 		x->type = t_untyped_bool;
@@ -3615,7 +3615,7 @@ gb_internal void update_untyped_expr_type(CheckerContext *c, Ast *e, Type *type,
 	if (old == nullptr) {
 		if (type != nullptr && type != t_invalid) {
 			if (e->tav.type == nullptr || e->tav.type == t_invalid) {
-				add_type_and_value(c->info, e, e->tav.mode, type ? type : e->tav.type, e->tav.value);
+				add_type_and_value(c, e, e->tav.mode, type ? type : e->tav.type, e->tav.value);
 				if (e->kind == Ast_TernaryIfExpr) {
 					update_untyped_expr_type(c, e->TernaryIfExpr.x, type, final);
 					update_untyped_expr_type(c, e->TernaryIfExpr.y, type, final);
@@ -3721,7 +3721,7 @@ gb_internal void update_untyped_expr_type(CheckerContext *c, Ast *e, Type *type,
 		return;
 	}
 
-	add_type_and_value(c->info, e, old->mode, type, old->value);
+	add_type_and_value(c, e, old->mode, type, old->value);
 }
 
 gb_internal void update_untyped_expr_value(CheckerContext *c, Ast *e, ExactValue value) {
@@ -4569,7 +4569,7 @@ gb_internal Entity *check_selector(CheckerContext *c, Operand *operand, Ast *nod
 				operand->mode = Addressing_ProcGroup;
 				operand->proc_group = entity;
 
-				add_type_and_value(c->info, operand->expr, operand->mode, operand->type, operand->value);
+				add_type_and_value(c, operand->expr, operand->mode, operand->type, operand->value);
 				return entity;
 			}
 			GB_ASSERT_MSG(entity->type != nullptr, "%.*s (%.*s)", LIT(entity->token.string), LIT(entity_strings[entity->kind]));
@@ -4738,7 +4738,7 @@ gb_internal Entity *check_selector(CheckerContext *c, Operand *operand, Ast *nod
 			}
 
 			Entity *swizzle_entity = alloc_entity_variable(nullptr, make_token_ident(field_name), operand->type, EntityState_Resolved);
-			add_type_and_value(c->info, operand->expr, operand->mode, operand->type, operand->value);
+			add_type_and_value(c, operand->expr, operand->mode, operand->type, operand->value);
 			return swizzle_entity;
 		}
 	end_of_array_selector_swizzle:;
@@ -4782,7 +4782,7 @@ gb_internal Entity *check_selector(CheckerContext *c, Operand *operand, Ast *nod
 			operand->value = field_value;
 			operand->type = entity->type;
 			add_entity_use(c, selector, entity);
-			add_type_and_value(c->info, operand->expr, operand->mode, operand->type, operand->value);
+			add_type_and_value(c, operand->expr, operand->mode, operand->type, operand->value);
 			return entity;
 		}
 
@@ -4807,7 +4807,7 @@ gb_internal Entity *check_selector(CheckerContext *c, Operand *operand, Ast *nod
 			operand->value = field_value;
 			operand->type = entity->type;
 			add_entity_use(c, selector, entity);
-			add_type_and_value(c->info, operand->expr, operand->mode, operand->type, operand->value);
+			add_type_and_value(c, operand->expr, operand->mode, operand->type, operand->value);
 			return entity;
 		}
 
@@ -4895,7 +4895,7 @@ gb_internal Entity *check_selector(CheckerContext *c, Operand *operand, Ast *nod
 		break;
 	}
 
-	add_type_and_value(c->info, operand->expr, operand->mode, operand->type, operand->value);
+	add_type_and_value(c, operand->expr, operand->mode, operand->type, operand->value);
 
 	return entity;
 }
@@ -5361,7 +5361,7 @@ gb_internal CALL_ARGUMENT_CHECKER(check_call_arguments_internal) {
 
 				if (o.mode == Addressing_Type && is_type_typeid(e->type)) {
 					add_type_info_type(c, o.type);
-					add_type_and_value(c->info, o.expr, Addressing_Value, e->type, exact_value_typeid(o.type));
+					add_type_and_value(c, o.expr, Addressing_Value, e->type, exact_value_typeid(o.type));
 				} else if (show_error && is_type_untyped(o.type)) {
 					update_untyped_expr_type(c, o.expr, t, true);
 				}
@@ -5412,7 +5412,7 @@ gb_internal CALL_ARGUMENT_CHECKER(check_call_arguments_internal) {
 					}
 					if (o.mode == Addressing_Type && is_type_typeid(t)) {
 						add_type_info_type(c, o.type);
-						add_type_and_value(c->info, o.expr, Addressing_Value, t, exact_value_typeid(o.type));
+						add_type_and_value(c, o.expr, Addressing_Value, t, exact_value_typeid(o.type));
 					} else if (show_error && is_type_untyped(o.type)) {
 						update_untyped_expr_type(c, o.expr, t, true);
 					}
@@ -5425,7 +5425,7 @@ gb_internal CALL_ARGUMENT_CHECKER(check_call_arguments_internal) {
 		data->score = score;
 		data->result_type = final_proc_type->Proc.results;
 		data->gen_entity = gen_entity;
-		add_type_and_value(c->info, ce->proc, Addressing_Value, final_proc_type, {});
+		add_type_and_value(c, ce->proc, Addressing_Value, final_proc_type, {});
 	}
 
 	return err;
@@ -5625,7 +5625,7 @@ gb_internal CALL_ARGUMENT_CHECKER(check_named_call_arguments) {
 
 		if (o->mode == Addressing_Type && is_type_typeid(e->type)) {
 			add_type_info_type(c, o->type);
-			add_type_and_value(c->info, o->expr, Addressing_Value, e->type, exact_value_typeid(o->type));
+			add_type_and_value(c, o->expr, Addressing_Value, e->type, exact_value_typeid(o->type));
 		}
 	}
 
@@ -5633,7 +5633,7 @@ gb_internal CALL_ARGUMENT_CHECKER(check_named_call_arguments) {
 		data->score = score;
 		data->result_type = pt->results;
 		data->gen_entity = gen_entity;
-		add_type_and_value(c->info, ce->proc, Addressing_Value, proc_type, {});
+		add_type_and_value(c, ce->proc, Addressing_Value, proc_type, {});
 	}
 
 	return err;
@@ -6635,7 +6635,7 @@ gb_internal ExprKind check_call_expr(CheckerContext *c, Operand *operand, Ast *c
 			operand->builtin_id = BuiltinProc_DIRECTIVE;
 			operand->expr = proc;
 			operand->type = t_invalid;
-			add_type_and_value(c->info, proc, operand->mode, operand->type, operand->value);
+			add_type_and_value(c, proc, operand->mode, operand->type, operand->value);
 		} else {
 			error(proc, "Unknown directive: #%.*s", LIT(name));
 			operand->expr = proc;
@@ -6713,7 +6713,7 @@ gb_internal ExprKind check_call_expr(CheckerContext *c, Operand *operand, Ast *c
 				GB_ASSERT(ot->kind == Type_Named);
 				Entity *e = ot->Named.type_name;
 				add_entity_use(c, ident, e);
-				add_type_and_value(c->info, call, Addressing_Type, ot, empty_exact_value);
+				add_type_and_value(c, call, Addressing_Type, ot, empty_exact_value);
 			} else {
 				operand->mode = Addressing_Invalid;
 				operand->type = t_invalid;
@@ -6885,7 +6885,7 @@ gb_internal ExprKind check_call_expr(CheckerContext *c, Operand *operand, Ast *c
 		}
 	}
 
-	// add_type_and_value(c->info, operand->expr, operand->mode, operand->type, operand->value);
+	// add_type_and_value(c, operand->expr, operand->mode, operand->type, operand->value);
 
 	return Expr_Expr;
 }
@@ -7129,8 +7129,8 @@ gb_internal bool check_range(CheckerContext *c, Ast *node, Operand *x, Operand *
 		return false;
 	}
 
-	add_type_and_value(c->info, ie->left,  x->mode, x->type, x->value);
-	add_type_and_value(c->info, ie->right, y->mode, y->type, y->value);
+	add_type_and_value(c, ie->left,  x->mode, x->type, x->value);
+	add_type_and_value(c, ie->right, y->mode, y->type, y->value);
 
 	return true;
 }
@@ -7146,7 +7146,7 @@ gb_internal bool check_is_operand_compound_lit_constant(CheckerContext *c, Opera
 			return true;
 		}
 		if (expr->kind == Ast_ProcLit) {
-			add_type_and_value(c->info, expr, Addressing_Constant, type_of_expr(expr), exact_value_procedure(expr));
+			add_type_and_value(c, expr, Addressing_Constant, type_of_expr(expr), exact_value_procedure(expr));
 			return true;
 		}
 	}
@@ -7255,7 +7255,7 @@ gb_internal void check_promote_optional_ok(CheckerContext *c, Operand *x, Type *
 		Type *pt = base_type(type_of_expr(expr->CallExpr.proc));
 		if (is_type_proc(pt)) {
 			Type *tuple = pt->Proc.results;
-			add_type_and_value(c->info, x->expr, x->mode, tuple, x->value);
+			add_type_and_value(c, x->expr, x->mode, tuple, x->value);
 
 			if (pt->Proc.result_count >= 2) {
 				if (ok_type_) *ok_type_ = tuple->Tuple.variables[1]->type;
@@ -7268,7 +7268,7 @@ gb_internal void check_promote_optional_ok(CheckerContext *c, Operand *x, Type *
 
 	Type *tuple = make_optional_ok_type(x->type);
 	if (ok_type_) *ok_type_ = tuple->Tuple.variables[1]->type;
-	add_type_and_value(c->info, x->expr, x->mode, tuple, x->value);
+	add_type_and_value(c, x->expr, x->mode, tuple, x->value);
 	x->type = tuple;
 	GB_ASSERT(is_type_tuple(type_of_expr(x->expr)));
 }
@@ -7688,7 +7688,7 @@ gb_internal ExprKind check_or_else_expr(CheckerContext *c, Operand *o, Ast *node
 	Type *left_type = nullptr;
 	Type *right_type = nullptr;
 	check_or_else_split_types(c, &x, name, &left_type, &right_type);
-	add_type_and_value(&c->checker->info, arg, x.mode, x.type, x.value);
+	add_type_and_value(c, arg, x.mode, x.type, x.value);
 
 	if (left_type != nullptr) {
 		if (!y_is_diverging) {
@@ -7723,7 +7723,7 @@ gb_internal ExprKind check_or_return_expr(CheckerContext *c, Operand *o, Ast *no
 	Type *left_type = nullptr;
 	Type *right_type = nullptr;
 	check_or_return_split_types(c, &x, name, &left_type, &right_type);
-	add_type_and_value(&c->checker->info, re->expr, x.mode, x.type, x.value);
+	add_type_and_value(c, re->expr, x.mode, x.type, x.value);
 
 	if (right_type == nullptr) {
 		check_or_else_expr_no_value_error(c, name, x, type_hint);
@@ -8149,7 +8149,7 @@ gb_internal ExprKind check_compound_literal(CheckerContext *c, Operand *o, Ast *
 						error(elem, "Expected a constant integer as an array field");
 						continue;
 					}
-					// add_type_and_value(c->info, op_index.expr, op_index.mode, op_index.type, op_index.value);
+					// add_type_and_value(c, op_index.expr, op_index.mode, op_index.type, op_index.value);
 
 					i64 index = exact_value_to_i64(op_index.value);
 
@@ -9783,7 +9783,7 @@ gb_internal ExprKind check_expr_base(CheckerContext *c, Operand *o, Ast *node, T
 	}
 	check_rtti_type_disallowed(node, o->type, "An expression is using a type, %s, which has been disallowed");
 
-	add_type_and_value(c->info, node, o->mode, o->type, o->value);
+	add_type_and_value(c, node, o->mode, o->type, o->value);
 	return kind;
 }
 

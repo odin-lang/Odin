@@ -45,7 +45,7 @@ gb_internal Type *check_init_variable(CheckerContext *ctx, Entity *e, Operand *o
 	if (operand->mode == Addressing_Type) {
 		if (e->type != nullptr && is_type_typeid(e->type)) {
 			add_type_info_type(ctx, operand->type);
-			add_type_and_value(ctx->info, operand->expr, Addressing_Value, e->type, exact_value_typeid(operand->type));
+			add_type_and_value(ctx, operand->expr, Addressing_Value, e->type, exact_value_typeid(operand->type));
 			return e->type;
 		} else {
 			gbString t = type_to_string(operand->type);
@@ -1585,13 +1585,16 @@ gb_internal bool check_proc_body(CheckerContext *ctx_, Token token, DeclInfo *de
 			// NOTE(bill): Add the dependencies from the procedure literal (lambda)
 			// But only at the procedure level
 
-			MUTEX_GUARD_BLOCK(decl->deps_mutex) MUTEX_GUARD_BLOCK(decl->parent->deps_mutex) {
+			MUTEX_GUARD_BLOCK(decl->deps_mutex)
+			MUTEX_GUARD_BLOCK(decl->parent->deps_mutex) {
 				for (auto const &entry : decl->deps) {
 					Entity *e = entry.ptr;
 					ptr_set_add(&decl->parent->deps, e);
 				}
 			}
-			MUTEX_GUARD_BLOCK(decl->type_info_deps_mutex) MUTEX_GUARD_BLOCK(decl->parent->type_info_deps_mutex) {
+
+			MUTEX_GUARD_BLOCK(decl->type_info_deps_mutex)
+			MUTEX_GUARD_BLOCK(decl->parent->type_info_deps_mutex) {
 				for (auto const &entry : decl->type_info_deps) {
 					Type *t = entry.ptr;
 					ptr_set_add(&decl->parent->type_info_deps, t);

@@ -3045,7 +3045,7 @@ gb_internal Type *check_type_expr(CheckerContext *ctx, Ast *e, Type *named_type)
 	#endif
 
 	if (is_type_typed(type)) {
-		add_type_and_value(ctx->info, e, Addressing_Type, type, empty_exact_value);
+		add_type_and_value(ctx, e, Addressing_Type, type, empty_exact_value);
 	} else {
 		gbString name = type_to_string(type);
 		error(e, "Invalid type definition of %s", name);

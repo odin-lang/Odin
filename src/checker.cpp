@@ -1440,7 +1440,7 @@ gb_internal void add_untyped(CheckerContext *c, Ast *expr, AddressingMode mode, 
 	check_set_expr_info(c, expr, mode, type, value);
 }
 
-gb_internal void add_type_and_value(CheckerInfo *i, Ast *expr, AddressingMode mode, Type *type, ExactValue value) {
+gb_internal void add_type_and_value(CheckerContext *ctx, Ast *expr, AddressingMode mode, Type *type, ExactValue value) {
 	if (expr == nullptr) {
 		return;
 	}
@@ -1451,7 +1451,12 @@ gb_internal void add_type_and_value(CheckerInfo *i, Ast *expr, AddressingMode mo
 		return;
 	}
 
-	mutex_lock(&i->type_and_value_mutex);
+	BlockingMutex *mutex = &ctx->info->type_and_value_mutex;
+	if (ctx->pkg) {
+		mutex = &ctx->pkg->type_and_value_mutex;
+	}
+
+	mutex_lock(mutex);
 	Ast *prev_expr = nullptr;
 	while (prev_expr != expr) {
 		prev_expr = expr;
@@ -1473,7 +1478,7 @@ gb_internal void add_type_and_value(CheckerInfo *i, Ast *expr, AddressingMode mo
 
 		expr = unparen_expr(expr);
 	}
-	mutex_unlock(&i->type_and_value_mutex);
+	mutex_unlock(mutex);
 }
 
 gb_internal void add_entity_definition(CheckerInfo *i, Ast *identifier, Entity *entity) {
@@ -5701,7 +5706,7 @@ gb_internal void check_parsed_files(Checker *c) {
 		if (is_type_typed(u.info->type)) {
 			compiler_error("%s (type %s) is typed!", expr_to_string(u.expr), type_to_string(u.info->type));
 		}
-		add_type_and_value(&c->info, u.expr, u.info->mode, u.info->type, u.info->value);
+		add_type_and_value(&c->builtin_ctx, u.expr, u.info->mode, u.info->type, u.info->value);
 	}
 
 
