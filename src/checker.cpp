@@ -5218,6 +5218,31 @@ gb_internal void check_unchecked_bodies(Checker *c) {
 	global_after_checking_procedure_bodies = true;
 }
 
+gb_internal void check_safety_all_procedures_for_unchecked(Checker *c) {
+	GB_ASSERT(DEBUG_CHECK_ALL_PROCEDURES);
+	UntypedExprInfoMap untyped = {};
+	map_init(&untyped, heap_allocator());
+	defer (map_destroy(&untyped));
+
+
+	for_array(i, c->info.all_procedures) {
+		ProcInfo *pi = c->info.all_procedures[i];
+		GB_ASSERT(pi != nullptr);
+		GB_ASSERT(pi->decl != nullptr);
+		Entity *e = pi->decl->entity;
+		auto proc_checked_state = pi->decl->proc_checked_state.load();
+		if (e && ((e->flags & EntityFlag_ProcBodyChecked) == 0)) {
+			if ((e->flags & EntityFlag_Used) != 0) {
+				debugf("%.*s :: %s\n", LIT(e->token.string), type_to_string(e->type));
+				debugf("proc body unchecked\n");
+				debugf("Checked State: %s\n\n", ProcCheckedState_strings[proc_checked_state]);
+
+				consume_proc_info(c, pi, &untyped);
+			}
+		}
+	}
+}
+
 gb_internal void check_test_procedures(Checker *c) {
 	if (build_context.test_names.entries.count == 0) {
 		return;
@@ -5790,26 +5815,8 @@ gb_internal void check_parsed_files(Checker *c) {
 	GB_ASSERT(c->procs_to_check.count == 0);
 
 	if (DEBUG_CHECK_ALL_PROCEDURES) {
-		UntypedExprInfoMap untyped = {};
-		map_init(&untyped, heap_allocator());
-		defer (map_destroy(&untyped));
-
-		for_array(i, c->info.all_procedures) {
-			ProcInfo *pi = c->info.all_procedures[i];
-			GB_ASSERT(pi != nullptr);
-			GB_ASSERT(pi->decl != nullptr);
-			Entity *e = pi->decl->entity;
-			auto proc_checked_state = pi->decl->proc_checked_state.load();
-			if (e && ((e->flags & EntityFlag_ProcBodyChecked) == 0)) {
-				if ((e->flags & EntityFlag_Used) != 0) {
-					debugf("%.*s :: %s\n", LIT(e->token.string), type_to_string(e->type));
-					debugf("proc body unchecked\n");
-					debugf("Checked State: %s\n\n", ProcCheckedState_strings[proc_checked_state]);
-
-					consume_proc_info(c, pi, &untyped);
-				}
-			}
-		}
+		TIME_SECTION("check unchecked (safety measure)");
+		check_safety_all_procedures_for_unchecked(c);
 	}
 
 	debugf("Total Procedure Bodies Checked: %td\n", total_bodies_checked.load(std::memory_order_relaxed));
