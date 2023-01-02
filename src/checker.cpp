@@ -5050,7 +5050,10 @@ gb_internal bool check_proc_info(Checker *c, ProcInfo *pi, UntypedExprInfoMap *u
 		return false;
 	}
 
-	MUTEX_GUARD(&pi->decl->proc_checked_mutex);
+	if (!mutex_try_lock(&pi->decl->proc_checked_mutex)) {
+		return false;
+	}
+	defer (mutex_unlock(&pi->decl->proc_checked_mutex));
 
 	Entity *e = pi->decl->entity;
 	switch (pi->decl->proc_checked_state.load()) {
