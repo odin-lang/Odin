@@ -2272,7 +2272,7 @@ gb_internal void lb_generate_code(lbGenerator *gen) {
 			wd->code_gen_file_type = code_gen_file_type;
 			wd->filepath_obj = filepath_obj;
 			wd->m = m;
-			global_thread_pool_add_task(lb_llvm_emit_worker_proc, wd);
+			thread_pool_add_task(lb_llvm_emit_worker_proc, wd);
 		}
 
 		thread_pool_wait(&global_thread_pool);

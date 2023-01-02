@@ -20,10 +20,10 @@ gb_internal void init_global_thread_pool(void) {
 	isize worker_count = thread_count-1; // NOTE(bill): The main thread will also be used for work
 	thread_pool_init(&global_thread_pool, permanent_allocator(), worker_count, "ThreadPoolWorker");
 }
-gb_internal bool global_thread_pool_add_task(WorkerTaskProc *proc, void *data) {
+gb_internal bool thread_pool_add_task(WorkerTaskProc *proc, void *data) {
 	return thread_pool_add_task(&global_thread_pool, proc, data);
 }
-gb_internal void global_thread_pool_wait(void) {
+gb_internal void thread_pool_wait(void) {
 	thread_pool_wait(&global_thread_pool);
 }
 

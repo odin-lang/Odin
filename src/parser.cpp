@@ -4910,7 +4910,7 @@ gb_internal void parser_add_file_to_process(Parser *p, AstPackage *pkg, FileInfo
 	auto wd = gb_alloc_item(permanent_allocator(), ParserWorkerData);
 	wd->parser = p;
 	wd->imported_file = f;
-	global_thread_pool_add_task(parser_worker_proc, wd);
+	thread_pool_add_task(parser_worker_proc, wd);
 }
 
 gb_internal WORKER_TASK_PROC(foreign_file_worker_proc) {
@@ -4948,7 +4948,7 @@ gb_internal void parser_add_foreign_file_to_process(Parser *p, AstPackage *pkg, 
 	wd->parser = p;
 	wd->imported_file = f;
 	wd->foreign_kind = kind;
-	global_thread_pool_add_task(foreign_file_worker_proc, wd);
+	thread_pool_add_task(foreign_file_worker_proc, wd);
 }
 
 
@@ -5798,7 +5798,7 @@ gb_internal ParseFileError parse_packages(Parser *p, String init_filename) {
 		}
 	}
 	
-	global_thread_pool_wait();
+	thread_pool_wait();
 
 	for (ParseFileErrorNode *node = p->file_error_head; node != nullptr; node = node->next) {
 		if (node->err != ParseFile_None) {

@@ -4654,9 +4654,9 @@ gb_internal void check_with_workers(Checker *c, WorkerTaskProc *proc, isize tota
 
 
 	for (isize i = 0; i < thread_count; i++) {
-		global_thread_pool_add_task(proc, thread_data+i);
+		thread_pool_add_task(proc, thread_data+i);
 	}
-	global_thread_pool_wait();
+	thread_pool_wait();
 	semaphore_wait(&c->info.collect_semaphore);
 }
 
@@ -4704,9 +4704,9 @@ gb_internal void check_collect_entities_all(Checker *c) {
 	if (build_context.threaded_checker) {
 		for (auto const &entry : c->info.files.entries) {
 			AstFile *f = entry.value;
-			global_thread_pool_add_task(check_collect_entities_all_worker_proc, f);
+			thread_pool_add_task(check_collect_entities_all_worker_proc, f);
 		}
-		global_thread_pool_wait();
+		thread_pool_wait();
 	} else {
 		for (auto const &entry : c->info.files.entries) {
 			AstFile *f = entry.value;
@@ -5350,9 +5350,9 @@ gb_internal void check_procedure_bodies(Checker *c) {
 	semaphore_post(&c->procs_to_check_semaphore, cast(i32)thread_count);
 
 	for (isize i = 0; i < thread_count; i++) {
-		global_thread_pool_add_task(thread_proc_body, thread_data+i);
+		thread_pool_add_task(thread_proc_body, thread_data+i);
 	}
-	global_thread_pool_wait();
+	thread_pool_wait();
 	semaphore_wait(&c->procs_to_check_semaphore);
 
 	isize global_remaining = c->procs_to_check_queue.count.load(std::memory_order_relaxed);
