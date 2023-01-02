@@ -1,3 +1,5 @@
+#define MULTITHREAD_CHECKER 1
+
 #include "entity.cpp"
 #include "types.cpp"
 
@@ -1937,16 +1939,22 @@ gb_internal void add_type_info_type_internal(CheckerContext *c, Type *t) {
 
 gb_global std::atomic<bool> global_procedure_body_in_worker_queue = false;
 
+gb_internal WORKER_TASK_PROC(check_proc_info_worker_proc);
+
 gb_internal void check_procedure_later(CheckerContext *c, ProcInfo *info) {
 	GB_ASSERT(info != nullptr);
 	GB_ASSERT(info->decl != nullptr);
 
-	if (build_context.threaded_checker && global_procedure_body_in_worker_queue) {
-		GB_ASSERT(c->procs_to_check_queue != nullptr);
-	}
+	if (MULTITHREAD_CHECKER && global_procedure_body_in_worker_queue) {
+		thread_pool_add_task(check_proc_info_worker_proc, info);
+	} else {
+		if (build_context.threaded_checker && global_procedure_body_in_worker_queue) {
+			GB_ASSERT(c->procs_to_check_queue != nullptr);
+		}
 
-	auto *queue = c->procs_to_check_queue ? c->procs_to_check_queue : &c->checker->procs_to_check_queue;
-	mpmc_enqueue(queue, info);
+		auto *queue = c->procs_to_check_queue ? c->procs_to_check_queue : &c->checker->procs_to_check_queue;
+		mpmc_enqueue(queue, info);
+	}
 }
 
 gb_internal void check_procedure_later(CheckerContext *c, AstFile *file, Token token, DeclInfo *decl, Type *type, Ast *body, u64 tags) {
@@ -4623,7 +4631,7 @@ struct ThreadProcCheckerSection {
 
 
 gb_internal void check_with_workers(Checker *c, WorkerTaskProc *proc, isize total_count) {
-	isize thread_count = gb_max(build_context.thread_count, 1);
+	isize thread_count = global_thread_pool.threads.count;
 	isize worker_count = thread_count-1; // NOTE(bill): The main thread will also be used for work
 	if (!build_context.threaded_checker) {
 		worker_count = 0;
@@ -4668,7 +4676,7 @@ struct CollectEntityWorkerData {
 
 gb_global CollectEntityWorkerData *collect_entity_worker_data;
 
-WORKER_TASK_PROC(check_collect_entities_all_worker_proc) {
+gb_internal WORKER_TASK_PROC(check_collect_entities_all_worker_proc) {
 	isize thread_idx = 0;
 	if (current_thread) {
 		thread_idx = current_thread->idx;
@@ -4701,7 +4709,7 @@ gb_internal void check_collect_entities_all(Checker *c) {
 		map_init(&wd->untyped, heap_allocator());
 	}
 
-	if (build_context.threaded_checker) {
+	if (MULTITHREAD_CHECKER || build_context.threaded_checker) {
 		for (auto const &entry : c->info.files.entries) {
 			AstFile *f = entry.value;
 			thread_pool_add_task(check_collect_entities_all_worker_proc, f);
@@ -4712,12 +4720,6 @@ gb_internal void check_collect_entities_all(Checker *c) {
 			AstFile *f = entry.value;
 			check_collect_entities_all_worker_proc(f);
 		}
-	}
-
-	for (isize i = 0; i < thread_count; i++) {
-		auto *wd = &collect_entity_worker_data[i];
-		map_destroy(&wd->untyped);
-		destroy_checker_context(&wd->ctx);
 	}
 }
 
@@ -4735,30 +4737,32 @@ gb_internal void check_export_entities_in_pkg(CheckerContext *ctx, AstPackage *p
 	}
 }
 
-gb_internal WORKER_TASK_PROC(thread_proc_check_export_entities) {
-	auto cs = cast(ThreadProcCheckerSection *)data;
-	Checker *c = cs->checker;
+gb_internal WORKER_TASK_PROC(check_export_entities_worker_proc) {
+	isize thread_idx = current_thread ? current_thread->idx : 0;
 
-	CheckerContext ctx = make_checker_context(c);
-	defer (destroy_checker_context(&ctx));
-
-	UntypedExprInfoMap untyped = {};
-	map_init(&untyped, heap_allocator());
-
-	isize end = gb_min(cs->offset + cs->count, c->info.packages.entries.count);
-	for (isize i = cs->offset; i < end; i++) {
-		AstPackage *pkg = c->info.packages.entries[i].value;
-		check_export_entities_in_pkg(&ctx, pkg, &untyped);
-	}
-
-	map_destroy(&untyped);
-
-	semaphore_release(&c->info.collect_semaphore);
+	AstPackage *pkg = (AstPackage *)data;
+	auto *wd = &collect_entity_worker_data[thread_idx];
+	check_export_entities_in_pkg(&wd->ctx, pkg, &wd->untyped);
 	return 0;
 }
 
+
 gb_internal void check_export_entities(Checker *c) {
-	check_with_workers(c, thread_proc_check_export_entities, c->info.packages.entries.count);
+	isize thread_count = global_thread_pool.threads.count;
+
+	// NOTE(bill): reuse `collect_entity_worker_data`
+
+	for (isize i = 0; i < thread_count; i++) {
+		auto *wd = &collect_entity_worker_data[i];
+		map_clear(&wd->untyped);
+		wd->ctx = make_checker_context(c);
+	}
+
+	for (auto const &entry : c->info.packages.entries) {
+		AstPackage *pkg = entry.value;
+		thread_pool_add_task(check_export_entities_worker_proc, pkg);
+	}
+	thread_pool_wait();
 }
 
 gb_internal void check_import_entities(Checker *c) {
@@ -5087,8 +5091,10 @@ gb_internal bool check_proc_info(Checker *c, ProcInfo *pi, UntypedExprInfoMap *u
 	defer (destroy_checker_context(&ctx));
 	reset_checker_context(&ctx, pi->file, untyped);
 	ctx.decl = pi->decl;
+
+	GB_ASSERT(procs_to_check_queue != nullptr || MULTITHREAD_CHECKER);
+
 	ctx.procs_to_check_queue = procs_to_check_queue;
-	GB_ASSERT(procs_to_check_queue != nullptr);
 
 	GB_ASSERT(pi->type->kind == Type_Proc);
 	TypeProc *pt = &pi->type->Proc;
@@ -5201,6 +5207,7 @@ gb_internal void check_unchecked_bodies(Checker *c) {
 		}
 	}
 
+	thread_pool_wait();
 }
 
 gb_internal void check_test_procedures(Checker *c) {
@@ -5258,54 +5265,69 @@ gb_internal bool consume_proc_info_queue(Checker *c, ProcInfo *pi, ProcBodyQueue
 	return ok;
 }
 
-struct ThreadProcBodyData {
-	Checker *checker;
-	ProcBodyQueue *queue;
-	u32 thread_index;
-	u32 thread_count;
-	ThreadProcBodyData *all_data;
+struct CheckProcedureBodyWorkerData {
+	Checker *c;
+	UntypedExprInfoMap untyped;
 };
 
-gb_internal WORKER_TASK_PROC(thread_proc_body) {
-	ThreadProcBodyData *bd = cast(ThreadProcBodyData *)data;
-	Checker *c = bd->checker;
-	GB_ASSERT(c != nullptr);
-	ProcBodyQueue *this_queue = bd->queue;
+gb_global CheckProcedureBodyWorkerData *check_procedure_bodies_worker_data;
 
-	UntypedExprInfoMap untyped = {};
-	map_init(&untyped, heap_allocator());
-
-	for (ProcInfo *pi; mpmc_dequeue(this_queue, &pi); /**/) {
-		consume_proc_info_queue(c, pi, this_queue, &untyped);
+gb_internal WORKER_TASK_PROC(check_proc_info_worker_proc) {
+	isize thread_idx = 0;
+	if (current_thread) {
+		thread_idx = current_thread->idx;
 	}
+	UntypedExprInfoMap *untyped = &check_procedure_bodies_worker_data[thread_idx].untyped;
+	Checker *c = check_procedure_bodies_worker_data[thread_idx].c;
 
-	map_destroy(&untyped);
+	ProcInfo *pi = cast(ProcInfo *)data;
 
-	semaphore_release(&c->procs_to_check_semaphore);
-
-	return 0;
+	GB_ASSERT(pi->decl != nullptr);
+	if (pi->decl->parent && pi->decl->parent->entity) {
+		Entity *parent = pi->decl->parent->entity;
+		// NOTE(bill): Only check a nested procedure if its parent's body has been checked first
+		// This is prevent any possible race conditions in evaluation when multithreaded
+		// NOTE(bill): In single threaded mode, this should never happen
+		if (parent->kind == Entity_Procedure && (parent->flags & EntityFlag_ProcBodyChecked) == 0) {
+			thread_pool_add_task(check_proc_info_worker_proc, pi);
+			return 1;
+		}
+	}
+	map_clear(untyped);
+	bool ok = check_proc_info(c, pi, untyped, nullptr);
+	total_bodies_checked.fetch_add(1, std::memory_order_relaxed);
+	return !ok;
 }
+
 
 gb_internal void check_procedure_bodies(Checker *c) {
 	GB_ASSERT(c != nullptr);
 
 
-	u32 thread_count = cast(u32)gb_max(build_context.thread_count, 1);
-	u32 worker_count = thread_count-1; // NOTE(bill): The main thread will also be used for work
+	u32 thread_count = cast(u32)global_thread_pool.threads.count;
 	if (!build_context.threaded_checker) {
-		worker_count = 0;
+		thread_count = 1;
 	}
-	if (worker_count == 0) {
+
+	check_procedure_bodies_worker_data = gb_alloc_array(permanent_allocator(), CheckProcedureBodyWorkerData, thread_count);
+
+	for (isize i = 0; i < thread_count; i++) {
+		check_procedure_bodies_worker_data[i].c = c;
+		map_init(&check_procedure_bodies_worker_data[i].untyped, heap_allocator());
+	}
+
+	defer (for (isize i = 0; i < thread_count; i++) {
+		map_destroy(&check_procedure_bodies_worker_data[i].untyped);
+	});
+
+	if (thread_count == 1) {
 		auto *this_queue = &c->procs_to_check_queue;
 
-		UntypedExprInfoMap untyped = {};
-		map_init(&untyped, heap_allocator());
+		UntypedExprInfoMap *untyped = &check_procedure_bodies_worker_data[0].untyped;
 
 		for (ProcInfo *pi = nullptr; mpmc_dequeue(this_queue, &pi); /**/) {
-			consume_proc_info_queue(c, pi, this_queue, &untyped);
+			consume_proc_info_queue(c, pi, this_queue, untyped);
 		}
-
-		map_destroy(&untyped);
 
 		debugf("Total Procedure Bodies Checked: %td\n", total_bodies_checked.load(std::memory_order_relaxed));
 		return;
@@ -5313,50 +5335,14 @@ gb_internal void check_procedure_bodies(Checker *c) {
 
 	global_procedure_body_in_worker_queue = true;
 
-	isize original_queue_count = c->procs_to_check_queue.count.load(std::memory_order_relaxed);
-	isize load_count = (original_queue_count+thread_count-1)/thread_count;
-
-	ThreadProcBodyData *thread_data = gb_alloc_array(permanent_allocator(), ThreadProcBodyData, thread_count);
-	for (u32 i = 0; i < thread_count; i++) {
-		ThreadProcBodyData *data = thread_data + i;
-		data->checker = c;
-		data->queue = gb_alloc_item(permanent_allocator(), ProcBodyQueue);
-		data->thread_index = i;
-		data->thread_count = thread_count;
-		data->all_data = thread_data;
-		// NOTE(bill) 2x the amount assumes on average only 1 nested procedure
-		// TODO(bill): Determine a good heuristic
-		mpmc_init(data->queue, heap_allocator(), next_pow2_isize(load_count*2));
+	for (ProcInfo *pi = nullptr; mpmc_dequeue(&c->procs_to_check_queue, &pi); /**/) {
+		thread_pool_add_task(check_proc_info_worker_proc, pi);
 	}
-
-	// Distibute the work load into multiple queues
-	for (isize j = 0; j < load_count; j++) {
-		for (isize i = 0; i < thread_count; i++) {
-			ProcBodyQueue *queue = thread_data[i].queue;
-			ProcInfo *pi = nullptr;
-			if (!mpmc_dequeue(&c->procs_to_check_queue, &pi)) {
-				break;
-			}
-			mpmc_enqueue(queue, pi);
-		}
-	}
-	isize total_queued = 0;
-	for (isize i = 0; i < thread_count; i++) {
-		ProcBodyQueue *queue = thread_data[i].queue;
-		total_queued += queue->count.load();
-	}
-	GB_ASSERT(total_queued == original_queue_count);
-
-	semaphore_post(&c->procs_to_check_semaphore, cast(i32)thread_count);
-
-	for (isize i = 0; i < thread_count; i++) {
-		thread_pool_add_task(thread_proc_body, thread_data+i);
-	}
-	thread_pool_wait();
-	semaphore_wait(&c->procs_to_check_semaphore);
 
 	isize global_remaining = c->procs_to_check_queue.count.load(std::memory_order_relaxed);
 	GB_ASSERT(global_remaining == 0);
+
+	thread_pool_wait();
 
 	debugf("Total Procedure Bodies Checked: %td\n", total_bodies_checked.load(std::memory_order_relaxed));
 
