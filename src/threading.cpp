@@ -193,10 +193,6 @@ gb_internal void semaphore_wait(Semaphore *s) {
 		CONDITION_VARIABLE cond;
 	};
 	
-	gb_internal void condition_init(Condition *c) {
-	}
-	gb_internal void condition_destroy(Condition *c) {
-	}
 	gb_internal void condition_broadcast(Condition *c) {
 		WakeAllConditionVariable(&c->cond);
 	}

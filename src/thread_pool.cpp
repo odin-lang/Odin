@@ -61,9 +61,7 @@ void thread_pool_queue_push(Thread *thread, WorkerTask task) {
 		u64 tail = ((u32)capture) & mask;
 
 		u64 new_head = (head + 1) & mask;
-		if (new_head == tail) {
-			GB_PANIC("Thread Queue Full!\n");
-		}
+		GB_ASSERT_MSG(new_head != tail, "Thread Queue Full!");
 
 		// This *must* be done in here, to avoid a potential race condition where we no longer own the slot by the time we're assigning
 		thread->queue[head] = task;
@@ -139,7 +137,7 @@ gb_internal THREAD_PROC(thread_pool_thread_proc) {
 
 	for (;;) {
 work_start:
-		if (!pool->running) {
+		if (!pool->running.load()) {
 			break;
 		}
 
