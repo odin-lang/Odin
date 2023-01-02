@@ -1978,8 +1978,8 @@ gb_internal void add_type_info_type_internal(CheckerContext *c, Type *t) {
 
 
 
-gb_global std::atomic<bool> global_procedure_body_in_worker_queue = false;
-gb_global std::atomic<bool> global_after_checking_procedure_bodies = false;
+gb_global std::atomic<bool> global_procedure_body_in_worker_queue;
+gb_global std::atomic<bool> global_after_checking_procedure_bodies;
 
 gb_internal WORKER_TASK_PROC(check_proc_info_worker_proc);
 

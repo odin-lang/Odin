@@ -142,6 +142,8 @@ gb_internal THREAD_PROC(thread_pool_thread_proc) {
 	while (pool->running.load()) {
 		// If we've got tasks to process, work through them
 		usize finished_tasks = 0;
+		i32 state;
+
 		while (thread_pool_queue_pop(current_thread, &task)) {
 			task.do_work(task.data);
 			pool->tasks_left.fetch_sub(1, std::memory_order_release);
@@ -180,7 +182,7 @@ gb_internal THREAD_PROC(thread_pool_thread_proc) {
 		}
 
 		// if we've done all our work, and there's nothing to steal, go to sleep
-		i32 state = pool->tasks_available.load();
+		state = pool->tasks_available.load();
 		futex_wait(&pool->tasks_available, state);
 
 		main_loop_continue:;
