@@ -436,14 +436,19 @@ gb_internal bool find_or_generate_polymorphic_procedure(CheckerContext *old_c, E
 
 	GenProcsData *found_gen_procs = nullptr;
 
-	MUTEX_GUARD(&info->gen_procs_mutex);
+	// @@GPM
+	mutex_lock(&info->gen_procs_mutex);
 
 	found_gen_procs = map_get(&info->gen_procs, base_entity->identifier.load());
+
 	if (found_gen_procs) {
 		MUTEX_GUARD(&found_gen_procs->mutex);
 		for (Entity *other : found_gen_procs->procs) {
 			Type *pt = base_type(other->type);
 			if (are_types_identical(pt, final_proc_type)) {
+				// @@GPM
+				mutex_unlock(&info->gen_procs_mutex);
+
 				if (poly_proc_data) {
 					poly_proc_data->gen_entity = other;
 				}
@@ -465,6 +470,8 @@ gb_internal bool find_or_generate_polymorphic_procedure(CheckerContext *old_c, E
 		Ast *cloned_proc_type_node = clone_ast(pt->node);
 		success = check_procedure_type(&nctx, final_proc_type, cloned_proc_type_node, &operands);
 		if (!success) {
+			// @@GPM
+			mutex_unlock(&info->gen_procs_mutex);
 			return false;
 		}
 
@@ -473,6 +480,9 @@ gb_internal bool find_or_generate_polymorphic_procedure(CheckerContext *old_c, E
 			for (Entity *other : found_gen_procs->procs) {
 				Type *pt = base_type(other->type);
 				if (are_types_identical(pt, final_proc_type)) {
+					// @@GPM
+					mutex_unlock(&info->gen_procs_mutex);
+
 					if (poly_proc_data) {
 						poly_proc_data->gen_entity = other;
 					}
@@ -496,6 +506,11 @@ gb_internal bool find_or_generate_polymorphic_procedure(CheckerContext *old_c, E
 				}
 			}
 		}
+	}
+
+	if (found_gen_procs) {
+		// @@GPM
+		mutex_unlock(&info->gen_procs_mutex);
 	}
 
 
@@ -555,6 +570,19 @@ gb_internal bool find_or_generate_polymorphic_procedure(CheckerContext *old_c, E
 		}
 	}
 
+	if (found_gen_procs) {
+		MUTEX_GUARD(&found_gen_procs->mutex);
+		array_add(&found_gen_procs->procs, entity);
+	} else {
+		GenProcsData gen_proc_data = {};
+		gen_proc_data.procs = array_make<Entity *>(heap_allocator());
+		array_add(&gen_proc_data.procs, entity);
+		map_set(&info->gen_procs, base_entity->identifier.load(), gen_proc_data);
+
+		// @@GPM
+		mutex_unlock(&info->gen_procs_mutex);
+	}
+
 	ProcInfo *proc_info = gb_alloc_item(permanent_allocator(), ProcInfo);
 	proc_info->file  = file;
 	proc_info->token = token;
@@ -565,15 +593,6 @@ gb_internal bool find_or_generate_polymorphic_procedure(CheckerContext *old_c, E
 	proc_info->generated_from_polymorphic = true;
 	proc_info->poly_def_node = poly_def_node;
 
-	if (found_gen_procs) {
-		MUTEX_GUARD(&found_gen_procs->mutex);
-		array_add(&found_gen_procs->procs, entity);
-	} else {
-		GenProcsData gen_proc_data = {};
-		gen_proc_data.procs = array_make<Entity *>(heap_allocator());
-		array_add(&gen_proc_data.procs, entity);
-		map_set(&info->gen_procs, base_entity->identifier.load(), gen_proc_data);
-	}
 
 	if (poly_proc_data) {
 		poly_proc_data->gen_entity = entity;
