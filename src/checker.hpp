@@ -369,7 +369,7 @@ struct CheckerInfo {
 
 	RecursiveMutex gen_procs_mutex;
 	RecursiveMutex gen_types_mutex;
-	PtrMap<Ast *, GenProcsData > gen_procs; // Key: Ast * | Identifier -> Entity
+	PtrMap<Ast *, GenProcsData *> gen_procs; // Key: Ast * | Identifier -> Entity
 	PtrMap<Type *, Array<Entity *> > gen_types; 
 
 	BlockingMutex type_info_mutex; // NOT recursive

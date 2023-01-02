@@ -434,20 +434,22 @@ gb_internal bool find_or_generate_polymorphic_procedure(CheckerContext *old_c, E
 		return false;
 	}
 
-	GenProcsData *found_gen_procs = nullptr;
+	GenProcsData *gen_procs = nullptr;
 
-	// @@GPM
+	// @@GPM //////////////////////////
 	mutex_lock(&info->gen_procs_mutex);
+	///////////////////////////////////
 
-	found_gen_procs = map_get(&info->gen_procs, base_entity->identifier.load());
-
-	if (found_gen_procs) {
-		MUTEX_GUARD(&found_gen_procs->mutex);
-		for (Entity *other : found_gen_procs->procs) {
+	auto *found = map_get(&info->gen_procs, base_entity->identifier.load());
+	if (found) {
+		gen_procs = *found;
+		MUTEX_GUARD(&gen_procs->mutex);
+		for (Entity *other : gen_procs->procs) {
 			Type *pt = base_type(other->type);
 			if (are_types_identical(pt, final_proc_type)) {
-				// @@GPM
+				// @@GPM ////////////////////////////
 				mutex_unlock(&info->gen_procs_mutex);
+				/////////////////////////////////////
 
 				if (poly_proc_data) {
 					poly_proc_data->gen_entity = other;
@@ -455,6 +457,10 @@ gb_internal bool find_or_generate_polymorphic_procedure(CheckerContext *old_c, E
 				return true;
 			}
 		}
+	} else {
+		gen_procs = gb_alloc_item(permanent_allocator(), GenProcsData);
+		gen_procs->procs.allocator = heap_allocator();
+		map_set(&info->gen_procs, base_entity->identifier.load(), gen_procs);
 	}
 
 	{
@@ -469,48 +475,41 @@ gb_internal bool find_or_generate_polymorphic_procedure(CheckerContext *old_c, E
 		// LEAK TODO(bill): Cloning this AST may be leaky
 		Ast *cloned_proc_type_node = clone_ast(pt->node);
 		success = check_procedure_type(&nctx, final_proc_type, cloned_proc_type_node, &operands);
+
+		// @@GPM ////////////////////////////
+		mutex_unlock(&info->gen_procs_mutex);
+		/////////////////////////////////////
+
 		if (!success) {
-			// @@GPM
-			mutex_unlock(&info->gen_procs_mutex);
 			return false;
 		}
 
-		if (found_gen_procs) {
-			MUTEX_GUARD(&found_gen_procs->mutex);
-			for (Entity *other : found_gen_procs->procs) {
-				Type *pt = base_type(other->type);
-				if (are_types_identical(pt, final_proc_type)) {
-					// @@GPM
-					mutex_unlock(&info->gen_procs_mutex);
-
-					if (poly_proc_data) {
-						poly_proc_data->gen_entity = other;
-					}
-
-					DeclInfo *decl = other->decl_info;
-					if (decl->proc_checked_state != ProcCheckedState_Checked) {
-						ProcInfo *proc_info = gb_alloc_item(permanent_allocator(), ProcInfo);
-						proc_info->file  = other->file;
-						proc_info->token = other->token;
-						proc_info->decl  = decl;
-						proc_info->type  = other->type;
-						proc_info->body  = decl->proc_lit->ProcLit.body;
-						proc_info->tags  = other->Procedure.tags;;
-						proc_info->generated_from_polymorphic = true;
-						proc_info->poly_def_node = poly_def_node;
-
-						check_procedure_later(nctx.checker, proc_info);
-					}
-
-					return true;
+		MUTEX_GUARD(&gen_procs->mutex);
+		for (Entity *other : gen_procs->procs) {
+			Type *pt = base_type(other->type);
+			if (are_types_identical(pt, final_proc_type)) {
+				if (poly_proc_data) {
+					poly_proc_data->gen_entity = other;
 				}
+
+				DeclInfo *decl = other->decl_info;
+				if (decl->proc_checked_state != ProcCheckedState_Checked) {
+					ProcInfo *proc_info = gb_alloc_item(permanent_allocator(), ProcInfo);
+					proc_info->file  = other->file;
+					proc_info->token = other->token;
+					proc_info->decl  = decl;
+					proc_info->type  = other->type;
+					proc_info->body  = decl->proc_lit->ProcLit.body;
+					proc_info->tags  = other->Procedure.tags;;
+					proc_info->generated_from_polymorphic = true;
+					proc_info->poly_def_node = poly_def_node;
+
+					check_procedure_later(nctx.checker, proc_info);
+				}
+
+				return true;
 			}
 		}
-	}
-
-	if (found_gen_procs) {
-		// @@GPM
-		mutex_unlock(&info->gen_procs_mutex);
 	}
 
 
@@ -570,17 +569,8 @@ gb_internal bool find_or_generate_polymorphic_procedure(CheckerContext *old_c, E
 		}
 	}
 
-	if (found_gen_procs) {
-		MUTEX_GUARD(&found_gen_procs->mutex);
-		array_add(&found_gen_procs->procs, entity);
-	} else {
-		GenProcsData gen_proc_data = {};
-		gen_proc_data.procs = array_make<Entity *>(heap_allocator());
-		array_add(&gen_proc_data.procs, entity);
-		map_set(&info->gen_procs, base_entity->identifier.load(), gen_proc_data);
-
-		// @@GPM
-		mutex_unlock(&info->gen_procs_mutex);
+	MUTEX_GUARD_BLOCK(&gen_procs->mutex) {
+		array_add(&gen_procs->procs, entity);
 	}
 
 	ProcInfo *proc_info = gb_alloc_item(permanent_allocator(), ProcInfo);
