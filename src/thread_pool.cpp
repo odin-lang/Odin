@@ -30,7 +30,7 @@ gb_internal void thread_pool_init(ThreadPool *pool, gbAllocator const &a, isize 
 	slice_init(&pool->threads, a, thread_count + 1);
 
 	// NOTE: this needs to be initialized before any thread starts
-	pool->running.store(true);
+	pool->running.store(true, std::memory_order_seq_cst);
 
 	// setup the main thread
 	thread_init(pool, &pool->threads[0], 0);
@@ -43,7 +43,7 @@ gb_internal void thread_pool_init(ThreadPool *pool, gbAllocator const &a, isize 
 }
 
 gb_internal void thread_pool_destroy(ThreadPool *pool) {
-	pool->running.store(false);
+	pool->running.store(false, std::memory_order_seq_cst);
 
 	for_array_off(i, 1, pool->threads) {
 		Thread *t = &pool->threads[i];
@@ -114,7 +114,7 @@ gb_internal bool thread_pool_add_task(ThreadPool *pool, WorkerTaskProc *proc, vo
 gb_internal void thread_pool_wait(ThreadPool *pool) {
 	WorkerTask task;
 
-	while (pool->tasks_left.load()) {
+	while (pool->tasks_left.load(std::memory_order_acquire)) {
 		// if we've got tasks on our queue, run them
 		while (thread_pool_queue_pop(current_thread, &task)) {
 			task.do_work(task.data);
@@ -126,7 +126,7 @@ gb_internal void thread_pool_wait(ThreadPool *pool) {
 		// This *must* be executed in this order, so the futex wakes immediately
 		// if rem_tasks has changed since we checked last, otherwise the program
 		// will permanently sleep
-		Footex rem_tasks = pool->tasks_left.load();
+		Footex rem_tasks = pool->tasks_left.load(std::memory_order_acquire);
 		if (rem_tasks == 0) {
 			return;
 		}
@@ -141,7 +141,7 @@ gb_internal THREAD_PROC(thread_pool_thread_proc) {
 	ThreadPool *pool = current_thread->pool;
 	// debugf("worker id: %td\n", current_thread->idx);
 
-	while (pool->running.load()) {
+	while (pool->running.load(std::memory_order_seq_cst)) {
 		// If we've got tasks to process, work through them
 		usize finished_tasks = 0;
 		i32 state;
@@ -152,30 +152,29 @@ gb_internal THREAD_PROC(thread_pool_thread_proc) {
 
 			finished_tasks += 1;
 		}
-		if (finished_tasks > 0 && pool->tasks_left.load() == 0) {
+		if (finished_tasks > 0 && pool->tasks_left.load(std::memory_order_acquire) == 0) {
 			futex_signal(&pool->tasks_left);
 		}
 
 		// If there's still work somewhere and we don't have it, steal it
-		if (pool->tasks_left.load()) {
+		if (pool->tasks_left.load(std::memory_order_acquire)) {
 			usize idx = cast(usize)current_thread->idx;
 			for_array(i, pool->threads) {
-				if (pool->tasks_left.load() == 0) {
+				if (pool->tasks_left.load(std::memory_order_acquire) == 0) {
 					break;
 				}
 
 				idx = (idx + 1) % cast(usize)pool->threads.count;
 
 				Thread *thread = &pool->threads.data[idx];
-				WorkerTask task;
+				WorkerTask task, another_task;
 				if (!thread_pool_queue_pop(thread, &task)) {
 					continue;
 				}
-
 				task.do_work(task.data);
 				pool->tasks_left.fetch_sub(1, std::memory_order_release);
 
-				if (pool->tasks_left.load() == 0) {
+				if (pool->tasks_left.load(std::memory_order_acquire) == 0) {
 					futex_signal(&pool->tasks_left);
 				}
 
