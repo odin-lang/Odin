@@ -1419,9 +1419,9 @@ struct ProcUsingVar {
 };
 
 
-gb_internal void check_proc_body(CheckerContext *ctx_, Token token, DeclInfo *decl, Type *type, Ast *body) {
+gb_internal bool check_proc_body(CheckerContext *ctx_, Token token, DeclInfo *decl, Type *type, Ast *body) {
 	if (body == nullptr) {
-		return;
+		return false;
 	}
 	GB_ASSERT(body->kind == Ast_BlockStmt);
 
@@ -1502,7 +1502,7 @@ gb_internal void check_proc_body(CheckerContext *ctx_, Token token, DeclInfo *de
 	MUTEX_GUARD_BLOCK(ctx->scope->mutex) for_array(i, using_entities) {
 		Entity *e = using_entities[i].e;
 		Entity *uvar = using_entities[i].uvar;
-		Entity *prev = scope_insert(ctx->scope, uvar, false);
+		Entity *prev = scope_insert_no_mutex(ctx->scope, uvar);
 		if (prev != nullptr) {
 			error(e->token, "Namespace collision while 'using' procedure argument '%.*s' of: %.*s", LIT(e->token.string), LIT(prev->token.string));
 			error_line("%.*s != %.*s\n", LIT(uvar->token.string), LIT(prev->token.string));
@@ -1514,7 +1514,7 @@ gb_internal void check_proc_body(CheckerContext *ctx_, Token token, DeclInfo *de
 	bool where_clause_ok = evaluate_where_clauses(ctx, nullptr, decl->scope, &decl->proc_lit->ProcLit.where_clauses, !decl->where_clauses_evaluated);
 	if (!where_clause_ok) {
 		// NOTE(bill, 2019-08-31): Don't check the body as the where clauses failed
-		return;
+		return false;
 	}
 
 	check_open_scope(ctx, body);
@@ -1526,7 +1526,12 @@ gb_internal void check_proc_body(CheckerContext *ctx_, Token token, DeclInfo *de
 			// NOTE(bill): Don't err here
 		}
 
-		GB_ASSERT(decl->defer_use_checked == false);
+		GB_ASSERT(decl->proc_checked_state != ProcCheckedState_Checked);
+		if (decl->defer_use_checked) {
+			GB_ASSERT(is_type_polymorphic(type, true));
+			error(token, "Defer Use Checked: %.*s", LIT(decl->entity->token.string));
+			GB_ASSERT(decl->defer_use_checked == false);
+		}
 
 		check_stmt_list(ctx, bs->stmts, Stmt_CheckScopeDecls);
 
@@ -1575,10 +1580,8 @@ gb_internal void check_proc_body(CheckerContext *ctx_, Token token, DeclInfo *de
 	if (decl->parent != nullptr) {
 		Scope *ps = decl->parent->scope;
 		if (ps->flags & (ScopeFlag_File & ScopeFlag_Pkg & ScopeFlag_Global)) {
-			return;
-		} else {
-			mutex_lock(&ctx->info->deps_mutex);
-
+			return true;
+		} else MUTEX_GUARD_BLOCK(&ctx->info->deps_mutex) {
 			// NOTE(bill): Add the dependencies from the procedure literal (lambda)
 			// But only at the procedure level
 			for (auto const &entry : decl->deps) {
@@ -1589,8 +1592,8 @@ gb_internal void check_proc_body(CheckerContext *ctx_, Token token, DeclInfo *de
 				Type *t = entry.ptr;
 				ptr_set_add(&decl->parent->type_info_deps, t);
 			}
-
-			mutex_unlock(&ctx->info->deps_mutex);
 		}
 	}
+
+	return true;
 }

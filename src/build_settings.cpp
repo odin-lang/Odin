@@ -291,6 +291,7 @@ struct BuildContext {
 	bool   show_error_line;
 
 	bool   ignore_lazy;
+	bool   ignore_llvm_build;
 
 	bool   use_subsystem_windows;
 	bool   ignore_microsoft_magic;

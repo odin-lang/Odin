@@ -2714,7 +2714,6 @@ gb_internal lbValue lb_find_value_from_entity(lbModule *m, Entity *e) {
 			return g;
 		}
 	}
-
 	GB_PANIC("\n\tError in: %s, missing value '%.*s'\n", token_pos_to_string(e->token.pos), LIT(e->token.string));
 	return {};
 }
@@ -2843,6 +2842,10 @@ gb_internal lbAddr lb_add_local(lbProcedure *p, Type *type, Entity *e, bool zero
 
 	if (zero_init) {
 		lb_mem_zero_ptr(p, ptr, type, alignment);
+	}
+
+	if (e != nullptr) {
+		map_set(&p->local_entity_map, e, val);
 	}
 
 	return lb_addr(val);

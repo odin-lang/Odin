@@ -2255,6 +2255,12 @@ gb_internal void lb_generate_code(lbGenerator *gen) {
 		}
 	}
 
+	if (build_context.ignore_llvm_build) {
+		gb_printf_err("LLVM SUCCESS!\n");
+		gb_exit(1);
+		return;
+	}
+
 	if (do_threading && non_empty_module_count > 1) {
 		for (auto const &entry : gen->modules) {
 			lbModule *m = entry.value;

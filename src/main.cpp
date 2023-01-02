@@ -660,6 +660,7 @@ enum BuildFlagKind {
 
 	// internal use only
 	BuildFlag_InternalIgnoreLazy,
+	BuildFlag_InternalIgnoreLLVMBuild,
 
 #if defined(GB_SYSTEM_WINDOWS)
 	BuildFlag_IgnoreVsSearch,
@@ -832,6 +833,7 @@ gb_internal bool parse_build_flags(Array<String> args) {
 	add_flag(&build_flags, BuildFlag_ErrorPosStyle,           str_lit("error-pos-style"),           BuildFlagParam_String,  Command_all);
 
 	add_flag(&build_flags, BuildFlag_InternalIgnoreLazy,      str_lit("internal-ignore-lazy"),      BuildFlagParam_None,    Command_all);
+	add_flag(&build_flags, BuildFlag_InternalIgnoreLLVMBuild, str_lit("internal-ignore-llvm-build"),BuildFlagParam_None,    Command_all);
 
 #if defined(GB_SYSTEM_WINDOWS)
 	add_flag(&build_flags, BuildFlag_IgnoreVsSearch,          str_lit("ignore-vs-search"),          BuildFlagParam_None,    Command__does_build);
@@ -1490,6 +1492,9 @@ gb_internal bool parse_build_flags(Array<String> args) {
 
 						case BuildFlag_InternalIgnoreLazy:
 							build_context.ignore_lazy = true;
+							break;
+						case BuildFlag_InternalIgnoreLLVMBuild:
+							build_context.ignore_llvm_build = true;
 							break;
 					#if defined(GB_SYSTEM_WINDOWS)
 						case BuildFlag_IgnoreVsSearch: {

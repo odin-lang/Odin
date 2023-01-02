@@ -142,6 +142,20 @@ typedef DECL_ATTRIBUTE_PROC(DeclAttributeProc);
 gb_internal void check_decl_attributes(CheckerContext *c, Array<Ast *> const &attributes, DeclAttributeProc *proc, AttributeContext *ac);
 
 
+enum ProcCheckedState : u8 {
+	ProcCheckedState_Unchecked,
+	ProcCheckedState_InProgress,
+	ProcCheckedState_Checked,
+
+	ProcCheckedState_COUNT
+};
+
+char const *ProcCheckedState_strings[ProcCheckedState_COUNT] {
+	"Unchecked",
+	"In Progress",
+	"Checked",
+};
+
 // DeclInfo is used to store information of certain declarations to allow for "any order" usage
 struct DeclInfo {
 	DeclInfo *    parent; // NOTE(bill): only used for procedure literals at the moment
@@ -157,7 +171,7 @@ struct DeclInfo {
 	Type *        gen_proc_type; // Precalculated
 	bool          is_using;
 	bool          where_clauses_evaluated;
-	bool          proc_checked;
+	std::atomic<ProcCheckedState> proc_checked_state;
 	BlockingMutex proc_checked_mutex;
 	isize         defer_used;
 	bool          defer_use_checked;
@@ -375,6 +389,9 @@ struct CheckerInfo {
 
 	BlockingMutex load_file_mutex;
 	StringMap<LoadFileCache *> load_file_cache;
+
+	BlockingMutex all_procedures_mutex;;
+	Array<ProcInfo *> all_procedures;
 };
 
 struct CheckerContext {
@@ -458,7 +475,7 @@ gb_internal Entity *entity_of_node(Ast *expr);
 gb_internal Entity *scope_lookup_current(Scope *s, String const &name);
 gb_internal Entity *scope_lookup (Scope *s, String const &name);
 gb_internal void    scope_lookup_parent (Scope *s, String const &name, Scope **scope_, Entity **entity_);
-gb_internal Entity *scope_insert (Scope *s, Entity *entity, bool use_mutex=true);
+gb_internal Entity *scope_insert (Scope *s, Entity *entity);
 
 
 gb_internal void      add_type_and_value      (CheckerInfo *i, Ast *expression, AddressingMode mode, Type *type, ExactValue value);

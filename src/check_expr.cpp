@@ -86,7 +86,6 @@ gb_internal Entity * find_polymorphic_record_entity (CheckerContext *c, Type *or
 gb_internal void     check_not_tuple                (CheckerContext *c, Operand *operand);
 gb_internal void     convert_to_typed               (CheckerContext *c, Operand *operand, Type *target_type);
 gb_internal gbString expr_to_string                 (Ast *expression);
-gb_internal void     check_proc_body                (CheckerContext *c, Token token, DeclInfo *decl, Type *type, Ast *body);
 gb_internal void     update_untyped_expr_type       (CheckerContext *c, Ast *e, Type *type, bool final);
 gb_internal bool     check_is_terminating           (Ast *node, String const &label);
 gb_internal bool     check_has_break                (Ast *stmt, String const &label, bool implicit);
@@ -478,6 +477,22 @@ gb_internal bool find_or_generate_polymorphic_procedure(CheckerContext *old_c, E
 					if (poly_proc_data) {
 						poly_proc_data->gen_entity = other;
 					}
+
+					DeclInfo *decl = other->decl_info;
+					if (decl->proc_checked_state != ProcCheckedState_Checked) {
+						ProcInfo *proc_info = gb_alloc_item(permanent_allocator(), ProcInfo);
+						proc_info->file  = other->file;
+						proc_info->token = other->token;
+						proc_info->decl  = decl;
+						proc_info->type  = other->type;
+						proc_info->body  = decl->proc_lit->ProcLit.body;
+						proc_info->tags  = other->Procedure.tags;;
+						proc_info->generated_from_polymorphic = true;
+						proc_info->poly_def_node = poly_def_node;
+
+						check_procedure_later(nctx.checker, proc_info);
+					}
+
 					return true;
 				}
 			}
@@ -518,7 +533,8 @@ gb_internal bool find_or_generate_polymorphic_procedure(CheckerContext *old_c, E
 	d->gen_proc_type = final_proc_type;
 	d->type_expr = pl->type;
 	d->proc_lit = proc_lit;
-	d->proc_checked = false;
+	d->proc_checked_state = ProcCheckedState_Unchecked;
+	d->defer_use_checked = false;
 
 	Entity *entity = alloc_entity_procedure(nullptr, token, final_proc_type, tags);
 	entity->identifier = ident;
@@ -528,7 +544,8 @@ gb_internal bool find_or_generate_polymorphic_procedure(CheckerContext *old_c, E
 	entity->scope = scope->parent;
 	entity->file = base_entity->file;
 	entity->pkg = base_entity->pkg;
-	entity->flags &= ~EntityFlag_ProcBodyChecked;
+	entity->flags = 0;
+	d->entity = entity;
 
 	AstFile *file = nullptr;
 	{

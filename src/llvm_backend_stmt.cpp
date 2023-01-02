@@ -1531,6 +1531,9 @@ gb_internal void lb_build_static_variables(lbProcedure *p, AstValueDecl *vd) {
 		lbValue global_val = {global, alloc_type_pointer(e->type)};
 		lb_add_entity(p->module, e, global_val);
 		lb_add_member(p->module, mangled_name, global_val);
+		if (e) {
+			map_set(&p->local_entity_map, e, global_val);
+		}
 	}
 }
 gb_internal void lb_append_tuple_values(lbProcedure *p, Array<lbValue> *dst_values, lbValue src_value) {
@@ -2188,9 +2191,10 @@ gb_internal void lb_build_stmt(lbProcedure *p, Ast *node) {
 			for_array(i, vd->names) {
 				Ast *name = vd->names[i];
 				if (!is_blank_ident(name)) {
+					GB_ASSERT(name->kind == Ast_Ident);
 					Entity *e = entity_of_node(name);
 					TokenPos pos = ast_token(name).pos;
-					GB_ASSERT_MSG(e != nullptr, "%s", token_pos_to_string(pos));
+					GB_ASSERT_MSG(e != nullptr, "\n%s missing entity for %.*s", token_pos_to_string(pos), LIT(name->Ident.token.string));
 					if (e->flags & EntityFlag_Static) {
 						// NOTE(bill): If one of the entities is static, they all are
 						is_static = true;

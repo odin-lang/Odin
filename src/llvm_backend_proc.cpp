@@ -68,7 +68,7 @@ gb_internal lbProcedure *lb_create_procedure(lbModule *m, Entity *entity, bool i
 	GB_ASSERT(entity != nullptr);
 	GB_ASSERT(entity->kind == Entity_Procedure);
 	if (!entity->Procedure.is_foreign) {
-		GB_ASSERT_MSG(entity->flags & EntityFlag_ProcBodyChecked, "%.*s :: %s", LIT(entity->token.string), type_to_string(entity->type));
+		GB_ASSERT_MSG(entity->flags & EntityFlag_ProcBodyChecked, "%.*s :: %s (was parapoly: %d)", LIT(entity->token.string), type_to_string(entity->type), is_type_polymorphic(entity->type, true));
 	}
 
 	String link_name = {};
@@ -487,6 +487,7 @@ gb_internal void lb_begin_procedure_body(lbProcedure *p) {
 	lb_start_block(p, p->entry_block);
 
 	map_init(&p->direct_parameters, heap_allocator());
+	map_init(&p->local_entity_map, heap_allocator());
 
 	GB_ASSERT(p->type != nullptr);
 
