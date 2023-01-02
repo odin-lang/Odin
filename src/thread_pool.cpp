@@ -29,6 +29,9 @@ gb_internal void thread_pool_init(ThreadPool *pool, gbAllocator const &a, isize 
 	pool->allocator = a;
 	slice_init(&pool->threads, a, thread_count + 1);
 
+	// NOTE: this needs to be initialized before any thread starts
+	pool->running.store(true);
+
 	// setup the main thread
 	thread_init(pool, &pool->threads[0], 0);
 	current_thread = &pool->threads[0];
@@ -37,8 +40,6 @@ gb_internal void thread_pool_init(ThreadPool *pool, gbAllocator const &a, isize 
 		Thread *t = &pool->threads[i];
 		thread_init_and_start(pool, t, i);
 	}
-
-	pool->running.store(true);
 }
 
 gb_internal void thread_pool_destroy(ThreadPool *pool) {
@@ -138,6 +139,7 @@ gb_internal THREAD_PROC(thread_pool_thread_proc) {
 	WorkerTask task;
 	current_thread = thread;
 	ThreadPool *pool = current_thread->pool;
+	// debugf("worker id: %td\n", current_thread->idx);
 
 	while (pool->running.load()) {
 		// If we've got tasks to process, work through them
