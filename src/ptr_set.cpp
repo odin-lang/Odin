@@ -6,11 +6,11 @@ struct PtrSetEntry {
 
 template <typename T>
 struct PtrSet {
-	Slice<MapIndex>    hashes;
+	Slice<MapIndex>       hashes;
 	Array<PtrSetEntry<T>> entries;
 };
 
-template <typename T> gb_internal void ptr_set_init   (PtrSet<T> *s, gbAllocator a, isize capacity = 16);
+template <typename T> gb_internal void ptr_set_init   (PtrSet<T> *s, isize capacity = 16);
 template <typename T> gb_internal void ptr_set_destroy(PtrSet<T> *s);
 template <typename T> gb_internal T    ptr_set_add    (PtrSet<T> *s, T ptr);
 template <typename T> gb_internal bool ptr_set_update (PtrSet<T> *s, T ptr); // returns true if it previously existed
@@ -21,15 +21,18 @@ template <typename T> gb_internal void ptr_set_grow   (PtrSet<T> *s);
 template <typename T> gb_internal void ptr_set_rehash (PtrSet<T> *s, isize new_count);
 template <typename T> gb_internal void ptr_set_reserve(PtrSet<T> *h, isize cap);
 
+gb_internal gbAllocator ptr_set_allocator(void) {
+	return heap_allocator();
+}
 
 template <typename T>
-gb_internal void ptr_set_init(PtrSet<T> *s, gbAllocator a, isize capacity) {
+gb_internal void ptr_set_init(PtrSet<T> *s, isize capacity) {
 	if (capacity != 0) {
 		capacity = next_pow2_isize(gb_max(16, capacity));
 	}
 
-	slice_init(&s->hashes,  a, capacity);
-	array_init(&s->entries, a, 0, capacity);
+	slice_init(&s->hashes,  ptr_set_allocator(), capacity);
+	array_init(&s->entries, ptr_set_allocator(), 0, capacity);
 	for (isize i = 0; i < capacity; i++) {
 		s->hashes.data[i] = MAP_SENTINEL;
 	}
@@ -37,6 +40,9 @@ gb_internal void ptr_set_init(PtrSet<T> *s, gbAllocator a, isize capacity) {
 
 template <typename T>
 gb_internal void ptr_set_destroy(PtrSet<T> *s) {
+	if (s->entries.allocator.proc == nullptr) {
+		s->entries.allocator = ptr_set_allocator();
+	}
 	slice_free(&s->hashes, s->entries.allocator);
 	array_free(&s->entries);
 }
@@ -118,6 +124,9 @@ gb_internal void ptr_set_reset_entries(PtrSet<T> *s) {
 
 template <typename T>
 gb_internal void ptr_set_reserve(PtrSet<T> *s, isize cap) {
+	if (s->entries.allocator.proc == nullptr) {
+		s->entries.allocator = ptr_set_allocator();
+	}
 	array_reserve(&s->entries, cap);
 	if (s->entries.count*2 < s->hashes.count) {
 		return;
@@ -139,7 +148,7 @@ gb_internal gb_inline bool ptr_set_exists(PtrSet<T> *s, T ptr) {
 }
 
 template <typename T>
-gb_internal gb_inline isize ptr_entry_index(PtrSet<T> *s, T ptr) {
+gb_internal gb_inline isize ptr_set_entry_index(PtrSet<T> *s, T ptr) {
 	isize index = ptr_set__find(s, ptr).entry_index;
 	if (index != MAP_SENTINEL) {
 		return index;

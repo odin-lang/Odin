@@ -72,7 +72,7 @@ gb_internal void entity_graph_node_set_destroy(EntityGraphNodeSet *s) {
 
 gb_internal void entity_graph_node_set_add(EntityGraphNodeSet *s, EntityGraphNode *n) {
 	if (s->hashes.data == nullptr) {
-		ptr_set_init(s, heap_allocator());
+		ptr_set_init(s);
 	}
 	ptr_set_add(s, n);
 }
@@ -118,15 +118,10 @@ gb_internal void entity_graph_node_swap(EntityGraphNode **data, isize i, isize j
 
 
 gb_internal void import_graph_node_set_destroy(ImportGraphNodeSet *s) {
-	if (s->hashes.data != nullptr) {
-		ptr_set_destroy(s);
-	}
+	ptr_set_destroy(s);
 }
 
 gb_internal void import_graph_node_set_add(ImportGraphNodeSet *s, ImportGraphNode *n) {
-	if (s->hashes.data == nullptr) {
-		ptr_set_init(s, heap_allocator());
-	}
 	ptr_set_add(s, n);
 }
 
@@ -185,8 +180,8 @@ gb_internal void init_decl_info(DeclInfo *d, Scope *scope, DeclInfo *parent) {
 	gb_zero_item(d);
 	d->parent = parent;
 	d->scope  = scope;
-	ptr_set_init(&d->deps,           heap_allocator());
-	ptr_set_init(&d->type_info_deps, heap_allocator());
+	ptr_set_init(&d->deps);
+	ptr_set_init(&d->type_info_deps);
 	array_init  (&d->labels,         heap_allocator());
 }
 
@@ -227,7 +222,7 @@ gb_internal Scope *create_scope(CheckerInfo *info, Scope *parent, isize init_ele
 	Scope *s = gb_alloc_item(permanent_allocator(), Scope);
 	s->parent = parent;
 	string_map_init(&s->elements, heap_allocator(), init_elements_capacity);
-	ptr_set_init(&s->imported, heap_allocator(), 0);
+	ptr_set_init(&s->imported, 0);
 
 	if (parent != nullptr && parent != builtin_pkg->scope) {
 		Scope *prev_head_child = parent->head_child.exchange(s, std::memory_order_acq_rel);
@@ -2270,8 +2265,8 @@ gb_internal void generate_minimum_dependency_set(Checker *c, Entity *start) {
 	isize entity_count = c->info.entities.count;
 	isize min_dep_set_cap = next_pow2_isize(entity_count*4); // empirically determined factor
 
-	ptr_set_init(&c->info.minimum_dependency_set, heap_allocator(), min_dep_set_cap);
-	ptr_set_init(&c->info.minimum_dependency_type_info_set, heap_allocator());
+	ptr_set_init(&c->info.minimum_dependency_set, min_dep_set_cap);
+	ptr_set_init(&c->info.minimum_dependency_type_info_set);
 
 #define FORCE_ADD_RUNTIME_ENTITIES(condition, ...) do {                                              \
 	if (condition) {                                                                             \
@@ -3388,7 +3383,6 @@ gb_internal void check_decl_attributes(CheckerContext *c, Array<Ast *> const &at
 	}
 
 	StringSet set = {};
-	string_set_init(&set, heap_allocator());
 	defer (string_set_destroy(&set));
 
 	for_array(i, attributes) {
@@ -4759,7 +4753,6 @@ gb_internal void check_import_entities(Checker *c) {
 	auto pq = priority_queue_create(dep_graph, import_graph_node_cmp, import_graph_node_swap);
 
 	PtrSet<AstPackage *> emitted = {};
-	ptr_set_init(&emitted, heap_allocator());
 	defer (ptr_set_destroy(&emitted));
 
 	Array<ImportGraphNode *> package_order = {};
@@ -4773,7 +4766,6 @@ gb_internal void check_import_entities(Checker *c) {
 
 		if (n->dep_count > 0) {
 			PtrSet<AstPackage *> visited = {};
-			ptr_set_init(&visited, heap_allocator());
 			defer (ptr_set_destroy(&visited));
 
 			auto path = find_import_path(c, pkg, pkg, &visited);
@@ -4927,7 +4919,6 @@ gb_internal Array<Entity *> find_entity_path(Entity *start, Entity *end, PtrSet<
 	bool made_visited = false;
 	if (visited == nullptr) {
 		made_visited = true;
-		ptr_set_init(&visited_, heap_allocator());
 		visited = &visited_;
 	}
 	defer (if (made_visited) {
@@ -4990,7 +4981,6 @@ gb_internal void calculate_global_init_order(Checker *c) {
 	auto pq = priority_queue_create(dep_graph, entity_graph_node_cmp, entity_graph_node_swap);
 
 	PtrSet<DeclInfo *> emitted = {};
-	ptr_set_init(&emitted, heap_allocator());
 	defer (ptr_set_destroy(&emitted));
 
 	TIME_SECTION("calculate_global_init_order: queue sort");

@@ -212,11 +212,11 @@ gb_internal i32 linker_stage(lbGenerator *gen) {
 
 
 			StringSet libs = {};
-			string_set_init(&libs, heap_allocator(), 64);
+			string_set_init(&libs, 64);
 			defer (string_set_destroy(&libs));
 
 			StringSet asm_files = {};
-			string_set_init(&asm_files, heap_allocator(), 64);
+			string_set_init(&asm_files, 64);
 			defer (string_set_destroy(&asm_files));
 
 			for_array(j, gen->foreign_libraries) {
@@ -371,7 +371,7 @@ gb_internal i32 linker_stage(lbGenerator *gen) {
 			defer (gb_string_free(lib_str));
 
 			StringSet libs = {};
-			string_set_init(&libs, heap_allocator(), 64);
+			string_set_init(&libs, 64);
 			defer (string_set_destroy(&libs));
 
 			for_array(j, gen->foreign_libraries) {
@@ -2518,7 +2518,7 @@ int main(int arg_count, char const **arg_ptr) {
 
 	map_init(&build_context.defined_values, heap_allocator());
 	build_context.extra_packages.allocator = heap_allocator();
-	string_set_init(&build_context.test_names, heap_allocator());
+	string_set_init(&build_context.test_names);
 
 	Array<String> args = setup_args(arg_count, arg_ptr);
 

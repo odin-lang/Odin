@@ -1369,7 +1369,7 @@ gb_internal bool init_build_paths(String init_filename) {
 	// NOTE(Jeroen): We're pre-allocating BuildPathCOUNT slots so that certain paths are always at the same enumerated index.
 	array_init(&bc->build_paths, permanent_allocator(), BuildPathCOUNT);
 
-	string_set_init(&bc->target_features_set, heap_allocator(), 1024);
+	string_set_init(&bc->target_features_set, 1024);
 
 	// [BuildPathMainPackage] Turn given init path into a `Path`, which includes normalizing it into a full path.
 	bc->build_paths[BuildPath_Main_Package] = path_from_string(ha, init_filename);

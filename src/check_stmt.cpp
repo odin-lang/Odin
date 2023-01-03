@@ -1185,7 +1185,6 @@ gb_internal void check_type_switch_stmt(CheckerContext *ctx, Ast *node, u32 mod_
 	}
 
 	PtrSet<Type *> seen = {};
-	ptr_set_init(&seen, heap_allocator());
 	defer (ptr_set_destroy(&seen));
 
 	for_array(i, bs->stmts) {

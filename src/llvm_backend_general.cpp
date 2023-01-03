@@ -133,7 +133,7 @@ gb_internal bool lb_init_generator(lbGenerator *gen, Checker *c) {
 
 
 	array_init(&gen->foreign_libraries,       heap_allocator(), 0, 1024);
-	ptr_set_init(&gen->foreign_libraries_set, heap_allocator(), 1024);
+	ptr_set_init(&gen->foreign_libraries_set, 1024);
 
 	if (USE_SEPARATE_MODULES) {
 		for (auto const &entry : gen->info->packages) {

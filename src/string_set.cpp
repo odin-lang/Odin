@@ -10,7 +10,7 @@ struct StringSet {
 };
 
 
-gb_internal void string_set_init   (StringSet *s, gbAllocator a, isize capacity = 16);
+gb_internal void string_set_init   (StringSet *s, isize capacity = 16);
 gb_internal void string_set_destroy(StringSet *s);
 gb_internal void string_set_add    (StringSet *s, String const &str);
 gb_internal bool string_set_update (StringSet *s, String const &str); // returns true if it previously existed
@@ -20,18 +20,24 @@ gb_internal void string_set_clear  (StringSet *s);
 gb_internal void string_set_grow   (StringSet *s);
 gb_internal void string_set_rehash (StringSet *s, isize new_count);
 
+gb_internal gbAllocator string_set_allocator(void) {
+	return heap_allocator();
+}
 
-gb_internal gb_inline void string_set_init(StringSet *s, gbAllocator a, isize capacity) {
+gb_internal gb_inline void string_set_init(StringSet *s, isize capacity) {
 	capacity = next_pow2_isize(gb_max(16, capacity));
 	
-	slice_init(&s->hashes,  a, capacity);
-	array_init(&s->entries, a, 0, capacity);
+	slice_init(&s->hashes,  string_set_allocator(), capacity);
+	array_init(&s->entries, string_set_allocator(), 0, capacity);
 	for (isize i = 0; i < capacity; i++) {
 		s->hashes.data[i] = MAP_SENTINEL;
 	}
 }
 
 gb_internal gb_inline void string_set_destroy(StringSet *s) {
+	if (s->entries.allocator.proc == nullptr) {
+		s->entries.allocator = string_set_allocator();
+	}
 	slice_free(&s->hashes, s->entries.allocator);
 	array_free(&s->entries);
 }
@@ -106,6 +112,9 @@ gb_internal void string_set_reset_entries(StringSet *s) {
 }
 
 gb_internal void string_set_reserve(StringSet *s, isize cap) {
+	if (s->entries.allocator.proc == nullptr) {
+		s->entries.allocator = string_set_allocator();
+	}
 	array_reserve(&s->entries, cap);
 	if (s->entries.count*2 < s->hashes.count) {
 		return;
@@ -215,7 +224,6 @@ gb_internal gb_inline void string_set_clear(StringSet *s) {
 		s->hashes.data[i] = MAP_SENTINEL;
 	}
 }
-
 
 
 gb_internal StringSetEntry *begin(StringSet &m) {

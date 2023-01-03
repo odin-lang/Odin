@@ -4854,7 +4854,7 @@ gb_internal void destroy_ast_file(AstFile *f) {
 
 gb_internal bool init_parser(Parser *p) {
 	GB_ASSERT(p != nullptr);
-	string_set_init(&p->imported_files, heap_allocator());
+	string_set_init(&p->imported_files);
 	array_init(&p->packages, heap_allocator());
 	return true;
 }

@@ -196,7 +196,6 @@ gb_internal void check_did_you_mean_objc_entity(String const &name, Entity *e, b
 	MUTEX_GUARD(objc_metadata->mutex);
 
 	StringSet set = {};
-	string_set_init(&set, heap_allocator());
 	defer (string_set_destroy(&set));
 	populate_check_did_you_mean_objc_entity(&set, e, is_type);
 

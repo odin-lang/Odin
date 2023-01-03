@@ -1235,7 +1235,7 @@ gb_internal void check_proc_group_decl(CheckerContext *ctx, Entity *&pg_entity, 
 	pg_entity->type = t_invalid;
 
 	PtrSet<Entity *> entity_set = {};
-	ptr_set_init(&entity_set, heap_allocator(), 2*pg->args.count);
+	ptr_set_init(&entity_set, 2*pg->args.count);
 
 	for_array(i, pg->args) {
 		Ast *arg = pg->args[i];
