@@ -202,8 +202,8 @@ gb_internal void check_did_you_mean_objc_entity(String const &name, Entity *e, b
 
 	DidYouMeanAnswers d = did_you_mean_make(heap_allocator(), set.entries.count, name);
 	defer (did_you_mean_destroy(&d));
-	for (auto const &entry : set) {
-		did_you_mean_append(&d, entry.value);
+	for (String const &target : set) {
+		did_you_mean_append(&d, target);
 	}
 	check_did_you_mean_print(&d, prefix);
 }
@@ -4942,8 +4942,7 @@ gb_internal isize add_dependencies_from_unpacking(CheckerContext *c, Entity **lh
 			if (e != nullptr) {
 				DeclInfo *decl = decl_info_of_entity(e);
 				if (decl != nullptr) {
-					for (auto const &entry : decl->deps) {
-						Entity *dep = entry.ptr;
+					for (Entity *dep : decl->deps) {
 						ptr_set_add(&c->decl->deps, dep);
 					}
 				}

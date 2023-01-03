@@ -1587,16 +1587,14 @@ gb_internal bool check_proc_body(CheckerContext *ctx_, Token token, DeclInfo *de
 
 			MUTEX_GUARD_BLOCK(decl->deps_mutex)
 			MUTEX_GUARD_BLOCK(decl->parent->deps_mutex) {
-				for (auto const &entry : decl->deps) {
-					Entity *e = entry.ptr;
+				for (Entity *e : decl->deps) {
 					ptr_set_add(&decl->parent->deps, e);
 				}
 			}
 
 			MUTEX_GUARD_BLOCK(decl->type_info_deps_mutex)
 			MUTEX_GUARD_BLOCK(decl->parent->type_info_deps_mutex) {
-				for (auto const &entry : decl->type_info_deps) {
-					Type *t = entry.ptr;
+				for (Type *t : decl->type_info_deps) {
 					ptr_set_add(&decl->parent->type_info_deps, t);
 				}
 			}

@@ -2,6 +2,10 @@ template <typename T>
 struct PtrSetEntry {
 	T        ptr;
 	MapIndex next;
+
+	operator T() const noexcept {
+		return this->ptr;
+	}
 };
 
 template <typename T>
@@ -245,21 +249,21 @@ gb_internal gb_inline void ptr_set_clear(PtrSet<T> *s) {
 
 
 template <typename T>
-gb_internal PtrSetEntry<T> *begin(PtrSet<T> &m) {
+gb_internal PtrSetEntry<T> *begin(PtrSet<T> &m) noexcept {
 	return m.entries.data;
 }
 template <typename T>
-gb_internal PtrSetEntry<T> const *begin(PtrSet<T> const &m) {
+gb_internal PtrSetEntry<T> const *begin(PtrSet<T> const &m) noexcept {
 	return m.entries.data;
 }
 
 
 template <typename T>
-gb_internal PtrSetEntry<T> *end(PtrSet<T> &m) {
+gb_internal PtrSetEntry<T> *end(PtrSet<T> &m) noexcept {
 	return m.entries.data + m.entries.count;
 }
 
 template <typename T>
-gb_internal PtrSetEntry<T> const *end(PtrSet<T> const &m) {
+gb_internal PtrSetEntry<T> const *end(PtrSet<T> const &m) noexcept {
 	return m.entries.data + m.entries.count;
 }

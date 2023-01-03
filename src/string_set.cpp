@@ -2,6 +2,13 @@ struct StringSetEntry {
 	u32      hash;
 	MapIndex next;
 	String   value;
+
+	operator String const() const noexcept {
+		return this->value;
+	}
+	operator String const &() const noexcept {
+		return this->value;
+	}
 };
 
 struct StringSet {
@@ -226,18 +233,18 @@ gb_internal gb_inline void string_set_clear(StringSet *s) {
 }
 
 
-gb_internal StringSetEntry *begin(StringSet &m) {
+gb_internal StringSetEntry *begin(StringSet &m) noexcept {
 	return m.entries.data;
 }
-gb_internal StringSetEntry const *begin(StringSet const &m) {
+gb_internal StringSetEntry const *begin(StringSet const &m) noexcept {
 	return m.entries.data;
 }
 
 
-gb_internal StringSetEntry *end(StringSet &m) {
+gb_internal StringSetEntry *end(StringSet &m) noexcept {
 	return m.entries.data + m.entries.count;
 }
 
-gb_internal StringSetEntry const *end(StringSet const &m) {
+gb_internal StringSetEntry const *end(StringSet const &m) noexcept {
 	return m.entries.data + m.entries.count;
 }

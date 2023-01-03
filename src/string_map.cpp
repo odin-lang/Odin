@@ -1,6 +1,13 @@
 struct StringHashKey {
 	u32    hash;
 	String string;
+
+	operator String() const noexcept {
+		return this->string;
+	}
+	operator String const &() const noexcept {
+		return this->string;
+	}
 };
 
 gb_internal gb_inline StringHashKey string_hash_string(String const &s) {
@@ -283,11 +290,11 @@ gb_internal gb_inline void string_map_clear(StringMap<T> *h) {
 
 
 template <typename T>
-gb_internal StringMapEntry<T> *begin(StringMap<T> &m) {
+gb_internal StringMapEntry<T> *begin(StringMap<T> &m) noexcept {
 	return m.entries.data;
 }
 template <typename T>
-gb_internal StringMapEntry<T> const *begin(StringMap<T> const &m) {
+gb_internal StringMapEntry<T> const *begin(StringMap<T> const &m) noexcept {
 	return m.entries.data;
 }
 
@@ -298,6 +305,6 @@ gb_internal StringMapEntry<T> *end(StringMap<T> &m) {
 }
 
 template <typename T>
-gb_internal StringMapEntry<T> const *end(StringMap<T> const &m) {
+gb_internal StringMapEntry<T> const *end(StringMap<T> const &m) noexcept {
 	return m.entries.data + m.entries.count;
 }

@@ -2222,12 +2222,11 @@ gb_internal void add_dependency_to_set(Checker *c, Entity *entity) {
 		return;
 	}
 
-	for (auto const &entry : decl->type_info_deps) {
-		add_min_dep_type_info(c, entry.ptr);
+	for (Type *t : decl->type_info_deps) {
+		add_min_dep_type_info(c, t);
 	}
 
-	for (auto const &entry : decl->deps) {
-		Entity *e = entry.ptr;
+	for (Entity *e : decl->deps) {
 		add_dependency_to_set(c, e);
 		if (e->kind == Entity_Procedure && e->Procedure.is_foreign) {
 			Entity *fl = e->Procedure.foreign_library;
@@ -2510,8 +2509,7 @@ gb_internal Array<EntityGraphNode *> generate_entity_dependency_graph(CheckerInf
 		DeclInfo *decl = decl_info_of_entity(e);
 		GB_ASSERT(decl != nullptr);
 
-		for (auto const &entry : decl->deps) {
-			Entity *dep = entry.ptr;
+		for (Entity *dep : decl->deps) {
 			if (dep->flags & EntityFlag_Field) {
 				continue;
 			}
@@ -2537,15 +2535,12 @@ gb_internal Array<EntityGraphNode *> generate_entity_dependency_graph(CheckerInf
 		if (e->kind == Entity_Procedure) {
 			// Connect each pred 'p' of 'n' with each succ 's' and from
 			// the procedure node
-			for (auto const &p_entry : n->pred) {
-				EntityGraphNode *p = p_entry.ptr;
-
+			for (EntityGraphNode *p : n->pred) {
 				// Ignore self-cycles
 				if (p != n) {
 					// Each succ 's' of 'n' becomes a succ of 'p', and
 					// each pred 'p' of 'n' becomes a pred of 's'
-					for (auto const &s_entry : n->succ) {
-						EntityGraphNode *s = s_entry.ptr;
+					for (EntityGraphNode *s  : n->succ) {
 						// Ignore self-cycles
 						if (s != n) {
 							if (p->entity->kind == Entity_Procedure &&
@@ -4784,8 +4779,7 @@ gb_internal void check_import_entities(Checker *c) {
 			}
 		}
 
-		for (auto const &entry : n->pred) {
-			ImportGraphNode *p = entry.ptr;
+		for (ImportGraphNode *p : n->pred) {
 			p->dep_count = gb_max(p->dep_count-1, 0);
 			priority_queue_fix(&pq, p->index);
 		}
@@ -4893,8 +4887,7 @@ gb_internal bool find_entity_path_tuple(Type *tuple, Entity *end, PtrSet<Entity 
 		if (var_decl == nullptr) {
 			continue;
 		}
-		for (auto const &entry : var_decl->deps) {
-			Entity *dep = entry.ptr;
+		for (Entity *dep : var_decl->deps) {
 			if (dep == end) {
 				auto path = array_make<Entity *>(heap_allocator());
 				array_add(&path, dep);
@@ -4944,8 +4937,7 @@ gb_internal Array<Entity *> find_entity_path(Entity *start, Entity *end, PtrSet<
 				return path;
 			}
 		} else {
-			for (auto const &entry : decl->deps) {
-				Entity *dep = entry.ptr;
+			for (Entity *dep : decl->deps) {
 				if (dep == end) {
 					auto path = array_make<Entity *>(heap_allocator());
 					array_add(&path, dep);
@@ -5002,8 +4994,7 @@ gb_internal void calculate_global_init_order(Checker *c) {
 			}
 		}
 
-		for (auto const &entry : n->pred) {
-			EntityGraphNode *p = entry.ptr;
+		for (EntityGraphNode *p : n->pred) {
 			p->dep_count -= 1;
 			p->dep_count = gb_max(p->dep_count, 0);
 			priority_queue_fix(&pq, p->index);
@@ -5163,8 +5154,7 @@ gb_internal void check_unchecked_bodies(Checker *c) {
 	// use the `procs_to_check` array
 	global_procedure_body_in_worker_queue = false;
 
-	for (auto const &entry : c->info.minimum_dependency_set) {
-		Entity *e = entry.ptr;
+	for (Entity *e : c->info.minimum_dependency_set) {
 		if (e == nullptr || e->kind != Entity_Procedure) {
 			continue;
 		}
@@ -5239,8 +5229,7 @@ gb_internal void check_test_procedures(Checker *c) {
 	AstPackage *pkg = c->info.init_package;
 	Scope *s = pkg->scope;
 
-	for (auto const &entry : build_context.test_names) {
-		String name = entry.value;
+	for (String const &name : build_context.test_names) {
 		Entity *e = scope_lookup(s, name);
 		if (e == nullptr) {
 			Token tok = {};
@@ -5744,8 +5733,7 @@ gb_internal void check_parsed_files(Checker *c) {
 			DeclInfo *decl = e->decl_info;
 			ast_node(pl, ProcLit, decl->proc_lit);
 			if (pl->inlining == ProcInlining_inline) {
-				for (auto const &entry : decl->deps) {
-					Entity *dep = entry.ptr;
+				for (Entity *dep : decl->deps) {
 					if (dep == e) {
 						error(e->token, "Cannot inline recursive procedure '%.*s'", LIT(e->token.string));
 						break;
