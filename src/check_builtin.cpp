@@ -3573,7 +3573,7 @@ gb_internal bool check_builtin_procedure(CheckerContext *c, Operand *operand, As
 		Entity *base_type_entity = alloc_entity_type_name(scope, token, elem, EntityState_Resolved);
 		add_entity(c, scope, nullptr, base_type_entity);
 
-		add_type_info_type(c, soa_struct);
+		// add_type_info_type(c, soa_struct);
 
 		operand->type = soa_struct;
 		break;

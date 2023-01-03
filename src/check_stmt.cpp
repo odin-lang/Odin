@@ -1132,7 +1132,7 @@ gb_internal void check_type_switch_stmt(CheckerContext *ctx, Ast *node, u32 mod_
 
 	check_expr(ctx, &x, rhs);
 	check_assignment(ctx, &x, nullptr, str_lit("type switch expression"));
-	add_type_info_type(ctx, x.type);
+	// add_type_info_type(ctx, x.type);
 
 	TypeSwitchKind switch_kind = check_valid_type_switch_type(x.type);
 	if (switch_kind == TypeSwitch_Invalid) {
@@ -1223,7 +1223,7 @@ gb_internal void check_type_switch_stmt(CheckerContext *ctx, Ast *node, u32 mod_
 						continue;
 					}
 					case_type = y.type;
-					add_type_info_type(ctx, y.type);
+					// add_type_info_type(ctx, y.type);
 				} else if (switch_kind == TypeSwitch_Any) {
 					case_type = y.type;
 					add_type_info_type(ctx, y.type);
@@ -1259,7 +1259,9 @@ gb_internal void check_type_switch_stmt(CheckerContext *ctx, Ast *node, u32 mod_
 		if (case_type == nullptr) {
 			case_type = x.type;
 		}
-		add_type_info_type(ctx, case_type);
+		if (switch_kind == TypeSwitch_Any) {
+			add_type_info_type(ctx, case_type);
+		}
 
 		check_open_scope(ctx, stmt);
 		{
