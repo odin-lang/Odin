@@ -8,10 +8,12 @@
 
 struct BlockingMutex;
 struct RecursiveMutex;
+struct RwMutex;
 struct Semaphore;
 struct Condition;
 struct Thread;
 struct ThreadPool;
+struct Parker;
 
 #define THREAD_PROC(name) isize name(struct Thread *thread)
 gb_internal THREAD_PROC(thread_pool_thread_proc);
@@ -56,6 +58,13 @@ gb_internal void mutex_lock    (RecursiveMutex *m);
 gb_internal bool mutex_try_lock(RecursiveMutex *m);
 gb_internal void mutex_unlock  (RecursiveMutex *m);
 
+gb_internal void rw_mutex_lock           (RwMutex *m);
+gb_internal bool rw_mutex_try_lock       (RwMutex *m);
+gb_internal void rw_mutex_unlock         (RwMutex *m);
+gb_internal void rw_mutex_shared_lock    (RwMutex *m);
+gb_internal bool rw_mutex_try_shared_lock(RwMutex *m);
+gb_internal void rw_mutex_shared_unlock  (RwMutex *m);
+
 gb_internal void semaphore_post   (Semaphore *s, i32 count);
 gb_internal void semaphore_wait   (Semaphore *s);
 gb_internal void semaphore_release(Semaphore *s) { semaphore_post(s, 1); }
@@ -64,6 +73,10 @@ gb_internal void semaphore_release(Semaphore *s) { semaphore_post(s, 1); }
 gb_internal void condition_broadcast(Condition *c);
 gb_internal void condition_signal(Condition *c);
 gb_internal void condition_wait(Condition *c, BlockingMutex *m);
+
+gb_internal void park(Parker *p);
+gb_internal void unpark_one(Parker *p);
+gb_internal void unpark_all(Parker *p);
 
 gb_internal u32  thread_current_id(void);
 
@@ -205,6 +218,30 @@ gb_internal void semaphore_wait(Semaphore *s) {
 	gb_internal void condition_wait(Condition *c, BlockingMutex *m) {
 		SleepConditionVariableSRW(&c->cond, &m->srwlock, INFINITE, 0);
 	}
+
+	struct RwMutex {
+		SRWLOCK srwlock;
+	};
+
+	gb_internal void rw_mutex_lock(RwMutex *m) {
+		AcquireSRWLockExclusive(&m->srwlock);
+	}
+	gb_internal bool rw_mutex_try_lock(RwMutex *m) {
+		return !!TryAcquireSRWLockExclusive(&m->srwlock);
+	}
+	gb_internal void rw_mutex_unlock(RwMutex *m) {
+		ReleaseSRWLockExclusive(&m->srwlock);
+	}
+
+	gb_internal void rw_mutex_shared_lock(RwMutex *m) {
+		AcquireSRWLockShared(&m->srwlock);
+	}
+	gb_internal bool rw_mutex_try_shared_lock(RwMutex *m) {
+		return !!TryAcquireSRWLockShared(&m->srwlock);
+	}
+	gb_internal void rw_mutex_shared_unlock(RwMutex *m) {
+		ReleaseSRWLockShared(&m->srwlock);
+	}
 #else
 	enum Internal_Mutex_State : i32 {
 		Internal_Mutex_State_Unlocked = 0,
@@ -306,7 +343,66 @@ gb_internal void semaphore_wait(Semaphore *s) {
 		futex_wait(&c->state(), state);
 		mutex_lock(m);
 	}
+
+	struct RwMutex {
+		// TODO(bill): make this a proper RW mutex
+		BlockingMutex mutex;
+	};
+
+	gb_internal void rw_mutex_lock(RwMutex *m) {
+		mutex_lock(&m->mutex);
+	}
+	gb_internal bool rw_mutex_try_lock(RwMutex *m) {
+		return mutex_try_lock(&m->mutex);
+	}
+	gb_internal void rw_mutex_unlock(RwMutex *m) {
+		mutex_unlock(&m->mutex);
+	}
+
+	gb_internal void rw_mutex_shared_lock(RwMutex *m) {
+		mutex_lock(&m->mutex);
+	}
+	gb_internal bool rw_mutex_try_shared_lock(RwMutex *m) {
+		return mutex_try_lock(&m->mutex);
+	}
+	gb_internal void rw_mutex_shared_unlock(RwMutex *m) {
+		mutex_unlock(&m->mutex);
+	}
 #endif
+
+struct Parker {
+	Futex state;
+};
+enum ParkerState : u32 {
+	ParkerState_Empty    = 0,
+	ParkerState_Notified = 1,
+	ParkerState_Parked   = UINT32_MAX,
+};
+
+gb_internal void park(Parker *p) {
+	if (p->state.fetch_sub(1, std::memory_order_acquire) == ParkerState_Notified) {
+		return;
+	}
+	for (;;) {
+		futex_wait(&p->state, ParkerState_Parked);
+		i32 notified = ParkerState_Empty;
+		if (p->state.compare_exchange_strong(notified, ParkerState_Empty, std::memory_order_acquire, std::memory_order_acquire)) {
+			return;
+		}
+	}
+}
+
+gb_internal void unpark_one(Parker *p) {
+	if (p->state.exchange(ParkerState_Notified, std::memory_order_release) == ParkerState_Parked) {
+		futex_signal(&p->state);
+	}
+}
+
+gb_internal void unpark_all(Parker *p) {
+	if (p->state.exchange(ParkerState_Notified, std::memory_order_release) == ParkerState_Parked) {
+		futex_broadcast(&p->state);
+	}
+}
 
 
 gb_internal u32 thread_current_id(void) {

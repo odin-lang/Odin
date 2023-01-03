@@ -236,10 +236,12 @@ gb_internal void check_did_you_mean_scope(String const &name, Scope *scope, char
 	DidYouMeanAnswers d = did_you_mean_make(heap_allocator(), scope->elements.entries.count, name);
 	defer (did_you_mean_destroy(&d));
 
-	MUTEX_GUARD_BLOCK(&scope->mutex) for (auto const &entry : scope->elements) {
+	rw_mutex_shared_lock(&scope->mutex);
+	for (auto const &entry : scope->elements) {
 		Entity *e = entry.value;
 		did_you_mean_append(&d, e->token.string);
 	}
+	rw_mutex_shared_unlock(&scope->mutex);
 	check_did_you_mean_print(&d, prefix);
 }
 

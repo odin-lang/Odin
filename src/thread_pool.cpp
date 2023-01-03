@@ -47,7 +47,7 @@ gb_internal void thread_pool_destroy(ThreadPool *pool) {
 
 	for_array_off(i, 1, pool->threads) {
 		Thread *t = &pool->threads[i];
-		pool->tasks_available.fetch_add(1, std::memory_order_release);
+		pool->tasks_available.fetch_add(1, std::memory_order_relaxed);
 		futex_broadcast(&pool->tasks_available);
 		thread_join_and_destroy(t);
 	}
@@ -74,7 +74,7 @@ void thread_pool_queue_push(Thread *thread, WorkerTask task) {
 	} while (!thread->head_and_tail.compare_exchange_weak(capture, new_capture));
 
 	thread->pool->tasks_left.fetch_add(1, std::memory_order_release);
-	thread->pool->tasks_available.fetch_add(1, std::memory_order_release);
+	thread->pool->tasks_available.fetch_add(1, std::memory_order_relaxed);
 	futex_broadcast(&thread->pool->tasks_available);
 }
 
@@ -82,7 +82,7 @@ bool thread_pool_queue_pop(Thread *thread, WorkerTask *task) {
 	u64 capture;
 	u64 new_capture;
 	do {
-		capture = thread->head_and_tail.load();
+		capture = thread->head_and_tail.load(std::memory_order_acquire);
 
 		u64 mask = thread->capacity - 1;
 		u64 head = (capture >> 32) & mask;
@@ -97,7 +97,7 @@ bool thread_pool_queue_pop(Thread *thread, WorkerTask *task) {
 		*task = thread->queue[tail];
 
 		new_capture = (head << 32) | new_tail;
-	} while (!thread->head_and_tail.compare_exchange_weak(capture, new_capture));
+	} while (!thread->head_and_tail.compare_exchange_weak(capture, new_capture, std::memory_order_release));
 
 	return true;
 }
@@ -168,22 +168,21 @@ gb_internal THREAD_PROC(thread_pool_thread_proc) {
 
 				Thread *thread = &pool->threads.data[idx];
 				WorkerTask task;
-				if (!thread_pool_queue_pop(thread, &task)) {
-					continue;
-				}
-				task.do_work(task.data);
-				pool->tasks_left.fetch_sub(1, std::memory_order_release);
+				if (thread_pool_queue_pop(thread, &task)) {
+					task.do_work(task.data);
+					pool->tasks_left.fetch_sub(1, std::memory_order_release);
 
-				if (pool->tasks_left.load(std::memory_order_acquire) == 0) {
-					futex_signal(&pool->tasks_left);
-				}
+					if (pool->tasks_left.load(std::memory_order_acquire) == 0) {
+						futex_signal(&pool->tasks_left);
+					}
 
-				goto main_loop_continue;
+					goto main_loop_continue;
+				}
 			}
 		}
 
 		// if we've done all our work, and there's nothing to steal, go to sleep
-		state = pool->tasks_available.load();
+		state = pool->tasks_available.load(std::memory_order_acquire);
 		futex_wait(&pool->tasks_available, state);
 
 		main_loop_continue:;

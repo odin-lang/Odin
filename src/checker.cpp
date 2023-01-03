@@ -51,10 +51,11 @@ gb_internal bool check_rtti_type_disallowed(Ast *expr, Type *type, char const *f
 gb_internal void scope_reset(Scope *scope) {
 	if (scope == nullptr) return;
 
-	MUTEX_GUARD(&scope->mutex);
+	rw_mutex_lock(&scope->mutex);
 	scope->head_child.store(nullptr, std::memory_order_relaxed);
 	string_map_clear(&scope->elements);
 	ptr_set_clear(&scope->imported);
+	rw_mutex_unlock(&scope->mutex);
 }
 
 gb_internal void scope_reserve(Scope *scope, isize capacity) {
@@ -180,9 +181,9 @@ gb_internal void init_decl_info(DeclInfo *d, Scope *scope, DeclInfo *parent) {
 	gb_zero_item(d);
 	d->parent = parent;
 	d->scope  = scope;
-	ptr_set_init(&d->deps);
-	ptr_set_init(&d->type_info_deps);
-	array_init  (&d->labels,         heap_allocator());
+	ptr_set_init(&d->deps, 0);
+	ptr_set_init(&d->type_info_deps, 0);
+	d->labels.allocator = heap_allocator();
 }
 
 gb_internal DeclInfo *make_decl_info(Scope *scope, DeclInfo *parent) {
@@ -394,9 +395,9 @@ gb_internal void scope_lookup_parent(Scope *scope, String const &name, Scope **s
 		StringHashKey key = string_hash_string(name);
 		for (Scope *s = scope; s != nullptr; s = s->parent) {
 			Entity **found = nullptr;
-			mutex_lock(&s->mutex);
+			rw_mutex_shared_lock(&s->mutex);
 			found = string_map_get(&s->elements, key);
-			mutex_unlock(&s->mutex);
+			rw_mutex_shared_unlock(&s->mutex);
 			if (found) {
 				Entity *e = *found;
 				if (gone_thru_proc) {
@@ -482,7 +483,7 @@ gb_internal Entity *scope_insert_with_name(Scope *s, String const &name, Entity 
 	Entity **found = nullptr;
 	Entity *result = nullptr;
 
-	MUTEX_GUARD(&s->mutex);
+	rw_mutex_lock(&s->mutex);
 
 	found = string_map_get(&s->elements, key);
 
@@ -509,6 +510,8 @@ gb_internal Entity *scope_insert_with_name(Scope *s, String const &name, Entity 
 		entity->scope = s;
 	}
 end:;
+	rw_mutex_unlock(&s->mutex);
+
 	return result;
 }
 
@@ -669,7 +672,8 @@ gb_internal void check_scope_usage(Checker *c, Scope *scope) {
 	Array<VettedEntity> vetted_entities = {};
 	array_init(&vetted_entities, heap_allocator());
 
-	MUTEX_GUARD_BLOCK(scope->mutex) for (auto const &entry : scope->elements) {
+	rw_mutex_shared_lock(&scope->mutex);
+	for (auto const &entry : scope->elements) {
 		Entity *e = entry.value;
 		if (e == nullptr) continue;
 		VettedEntity ve_unused = {};
@@ -686,6 +690,7 @@ gb_internal void check_scope_usage(Checker *c, Scope *scope) {
 			array_add(&vetted_entities, ve_shadowed);
 		}
 	}
+	rw_mutex_shared_unlock(&scope->mutex);
 
 	gb_sort(vetted_entities.data, vetted_entities.count, gb_size_of(VettedEntity), vetted_entity_variable_pos_cmp);
 

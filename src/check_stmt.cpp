@@ -622,7 +622,10 @@ gb_internal bool check_using_stmt_entity(CheckerContext *ctx, AstUsingStmt *us, 
 
 	case Entity_ImportName: {
 		Scope *scope = e->ImportName.scope;
-		MUTEX_GUARD_BLOCK(scope->mutex) for (auto const &entry : scope->elements) {
+		rw_mutex_lock(&scope->mutex);
+		defer (rw_mutex_unlock(&scope->mutex));
+
+		for (auto const &entry : scope->elements) {
 			String name = entry.key.string;
 			Entity *decl = entry.value;
 			if (!is_entity_exported(decl)) continue;

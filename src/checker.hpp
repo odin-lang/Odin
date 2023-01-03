@@ -224,7 +224,7 @@ struct Scope {
 	std::atomic<Scope *> next;
 	std::atomic<Scope *> head_child;
 
-	BlockingMutex mutex;
+	RwMutex mutex;
 	StringMap<Entity *> elements;
 	PtrSet<Scope *> imported;
 

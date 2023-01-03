@@ -381,8 +381,8 @@ gb_internal void override_entity_in_scope(Entity *original_entity, Entity *new_e
 	if (found_scope == nullptr) {
 		return;
 	}
-	mutex_lock(&found_scope->mutex);
-	defer (mutex_unlock(&found_scope->mutex));
+	rw_mutex_lock(&found_scope->mutex);
+	defer (rw_mutex_unlock(&found_scope->mutex));
 
 	// IMPORTANT NOTE(bill, 2021-04-10): Overriding behaviour was flawed in that the
 	// original entity was still used check checked, but the checking was only
@@ -1478,7 +1478,8 @@ gb_internal bool check_proc_body(CheckerContext *ctx_, Token token, DeclInfo *de
 				if (t->kind == Type_Struct) {
 					Scope *scope = t->Struct.scope;
 					GB_ASSERT(scope != nullptr);
-					MUTEX_GUARD_BLOCK(scope->mutex) for (auto const &entry : scope->elements) {
+					rw_mutex_lock(&scope->mutex);
+					for (auto const &entry : scope->elements) {
 						Entity *f = entry.value;
 						if (f->kind == Entity_Variable) {
 							Entity *uvar = alloc_entity_using_variable(e, f->token, f->type, nullptr);
@@ -1488,6 +1489,7 @@ gb_internal bool check_proc_body(CheckerContext *ctx_, Token token, DeclInfo *de
 							array_add(&using_entities, puv);
 						}
 					}
+					rw_mutex_unlock(&scope->mutex);
 				} else {
 					error(e->token, "'using' can only be applied to variables of type struct");
 					break;
@@ -1496,7 +1498,8 @@ gb_internal bool check_proc_body(CheckerContext *ctx_, Token token, DeclInfo *de
 		}
 	}
 
-	MUTEX_GUARD_BLOCK(ctx->scope->mutex) for (auto const &entry : using_entities) {
+	rw_mutex_lock(&ctx->scope->mutex);
+	for (auto const &entry : using_entities) {
 		Entity *e = entry.e;
 		Entity *uvar = entry.uvar;
 		Entity *prev = scope_insert_no_mutex(ctx->scope, uvar);
@@ -1506,6 +1509,7 @@ gb_internal bool check_proc_body(CheckerContext *ctx_, Token token, DeclInfo *de
 			break;
 		}
 	}
+	rw_mutex_unlock(&ctx->scope->mutex);
 
 
 	bool where_clause_ok = evaluate_where_clauses(ctx, nullptr, decl->scope, &decl->proc_lit->ProcLit.where_clauses, !decl->where_clauses_evaluated);
