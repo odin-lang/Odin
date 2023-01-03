@@ -229,7 +229,6 @@ gb_internal void map_set(PtrMap<K, V> *h, K key, V const &value) {
 	}
 }
 
-
 template <typename K, typename V>
 gb_internal void map__erase(PtrMap<K, V> *h, MapFindResult const &fr) {
 	MapFindResult last;

@@ -336,7 +336,7 @@ struct CheckerInfo {
 	Scope *               init_scope;
 	Entity *              entry_point;
 	PtrSet<Entity *>      minimum_dependency_set;
-	PtrSet<isize>         minimum_dependency_type_info_set;
+	PtrMap</*type info index*/isize, /*min dep index*/isize>  minimum_dependency_type_info_set;
 
 
 

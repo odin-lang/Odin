@@ -1153,6 +1153,9 @@ gb_internal void init_checker_info(CheckerInfo *i) {
 	array_init(&i->init_procedures, a, 0, 0);
 	array_init(&i->required_foreign_imports_through_force, a, 0, 0);
 
+	map_init(&i->objc_msgSend_types);
+	string_map_init(&i->load_file_cache);
+	array_init(&i->all_procedures, heap_allocator());
 
 	TIME_SECTION("checker info: mpmc queues");
 
@@ -1160,16 +1163,7 @@ gb_internal void init_checker_info(CheckerInfo *i) {
 	mpmc_init(&i->definition_queue, a, 1<<20);
 	mpmc_init(&i->required_global_variable_queue, a, 1<<10);
 	mpmc_init(&i->required_foreign_imports_through_force_queue, a, 1<<10);
-
-	TIME_SECTION("checker info: mutexes");
-
 	mpmc_init(&i->intrinsics_entry_point_usage, a, 1<<10); // just waste some memory here, even if it probably never used
-
-	map_init(&i->objc_msgSend_types);
-	string_map_init(&i->load_file_cache);
-
-	array_init(&i->all_procedures, heap_allocator());
-
 }
 
 gb_internal void destroy_checker_info(CheckerInfo *i) {
@@ -2031,10 +2025,11 @@ gb_internal void add_min_dep_type_info(Checker *c, Type *t) {
 		ti_index = type_info_index(&c->info, t, false);
 	}
 	GB_ASSERT(ti_index >= 0);
-	if (ptr_set_update(set, ti_index)) {
-		// Type Already exists
+	if (map_get(set, ti_index)) {
+		// Type already exists;
 		return;
 	}
+	map_set(set, ti_index, set->entries.count);
 
 	// Add nested types
 	if (t->kind == Type_Named) {
@@ -2275,7 +2270,7 @@ gb_internal void generate_minimum_dependency_set(Checker *c, Entity *start) {
 	isize min_dep_set_cap = next_pow2_isize(entity_count*4); // empirically determined factor
 
 	ptr_set_init(&c->info.minimum_dependency_set, min_dep_set_cap);
-	ptr_set_init(&c->info.minimum_dependency_type_info_set);
+	map_init(&c->info.minimum_dependency_type_info_set);
 
 #define FORCE_ADD_RUNTIME_ENTITIES(condition, ...) do {                                              \
 	if (condition) {                                                                             \

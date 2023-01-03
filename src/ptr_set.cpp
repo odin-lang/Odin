@@ -12,7 +12,6 @@ struct PtrSetEntry {
 
 template <typename T>
 struct PtrSet {
-
 	Slice<MapIndex>       hashes;
 	Array<PtrSetEntry<T>> entries;
 };
@@ -152,15 +151,6 @@ template <typename T>
 gb_internal gb_inline bool ptr_set_exists(PtrSet<T> *s, T ptr) {
 	isize index = ptr_set__find(s, ptr).entry_index;
 	return index != MAP_SENTINEL;
-}
-
-template <typename T>
-gb_internal gb_inline isize ptr_set_entry_index(PtrSet<T> *s, T ptr) {
-	isize index = ptr_set__find(s, ptr).entry_index;
-	if (index != MAP_SENTINEL) {
-		return index;
-	}
-	return -1;
 }
 
 // Returns true if it already exists
