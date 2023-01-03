@@ -744,17 +744,17 @@ gb_internal void check_scope_usage(Checker *c, Scope *scope) {
 
 
 gb_internal void add_dependency(CheckerInfo *info, DeclInfo *d, Entity *e) {
-	mutex_lock(&d->deps_mutex);
+	rw_mutex_lock(&d->deps_mutex);
 	ptr_set_add(&d->deps, e);
-	mutex_unlock(&d->deps_mutex);
+	rw_mutex_unlock(&d->deps_mutex);
 }
 gb_internal void add_type_info_dependency(CheckerInfo *info, DeclInfo *d, Type *type) {
 	if (d == nullptr) {
 		return;
 	}
-	mutex_lock(&d->type_info_deps_mutex);
+	rw_mutex_lock(&d->type_info_deps_mutex);
 	ptr_set_add(&d->type_info_deps, type);
-	mutex_unlock(&d->type_info_deps_mutex);
+	rw_mutex_unlock(&d->type_info_deps_mutex);
 }
 
 gb_internal AstPackage *get_core_package(CheckerInfo *info, String name) {

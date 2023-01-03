@@ -4928,21 +4928,23 @@ gb_internal bool check_identifier_exists(Scope *s, Ast *node, bool nested = fals
 
 gb_internal isize add_dependencies_from_unpacking(CheckerContext *c, Entity **lhs, isize lhs_count, isize tuple_index, isize tuple_count) {
 	if (lhs != nullptr && c->decl != nullptr) {
-		mutex_lock(&c->info->deps_mutex);
+		// mutex_lock(&c->info->deps_mutex);
 
 		for (isize j = 0; (tuple_index + j) < lhs_count && j < tuple_count; j++) {
 			Entity *e = lhs[tuple_index + j];
 			if (e != nullptr) {
 				DeclInfo *decl = decl_info_of_entity(e);
 				if (decl != nullptr) {
+					rw_mutex_lock(&c->decl->deps_mutex);
 					for (Entity *dep : decl->deps) {
 						ptr_set_add(&c->decl->deps, dep);
 					}
+					rw_mutex_unlock(&c->decl->deps_mutex);
 				}
 			}
 		}
 
-		mutex_unlock(&c->info->deps_mutex);
+		// mutex_unlock(&c->info->deps_mutex);
 	}
 	return tuple_count;
 }

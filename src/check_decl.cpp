@@ -1584,19 +1584,26 @@ gb_internal bool check_proc_body(CheckerContext *ctx_, Token token, DeclInfo *de
 			// NOTE(bill): Add the dependencies from the procedure literal (lambda)
 			// But only at the procedure level
 
-			MUTEX_GUARD_BLOCK(decl->deps_mutex)
-			MUTEX_GUARD_BLOCK(decl->parent->deps_mutex) {
-				for (Entity *e : decl->deps) {
-					ptr_set_add(&decl->parent->deps, e);
-				}
+			rw_mutex_shared_lock(&decl->deps_mutex);
+			rw_mutex_lock(&decl->parent->deps_mutex);
+
+			for (Entity *e : decl->deps) {
+				ptr_set_add(&decl->parent->deps, e);
 			}
 
-			MUTEX_GUARD_BLOCK(decl->type_info_deps_mutex)
-			MUTEX_GUARD_BLOCK(decl->parent->type_info_deps_mutex) {
-				for (Type *t : decl->type_info_deps) {
-					ptr_set_add(&decl->parent->type_info_deps, t);
-				}
+			rw_mutex_unlock(&decl->parent->deps_mutex);
+			rw_mutex_shared_unlock(&decl->deps_mutex);
+
+
+			rw_mutex_shared_lock(&decl->type_info_deps_mutex);
+			rw_mutex_lock(&decl->parent->type_info_deps_mutex);
+
+			for (Type *t : decl->type_info_deps) {
+				ptr_set_add(&decl->parent->type_info_deps, t);
 			}
+
+			rw_mutex_unlock(&decl->parent->type_info_deps_mutex);
+			rw_mutex_shared_unlock(&decl->type_info_deps_mutex);
 		}
 	}
 

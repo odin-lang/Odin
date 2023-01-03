@@ -179,10 +179,10 @@ struct DeclInfo {
 	CommentGroup *comment;
 	CommentGroup *docs;
 
-	BlockingMutex    deps_mutex;
+	RwMutex          deps_mutex;
 	PtrSet<Entity *> deps;
 
-	BlockingMutex     type_info_deps_mutex;
+	RwMutex     type_info_deps_mutex;
 	PtrSet<Type *>    type_info_deps;
 
 	Array<BlockLabel> labels;
