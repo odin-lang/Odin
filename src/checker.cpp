@@ -1356,9 +1356,9 @@ gb_internal ExprInfo *check_get_expr_info(CheckerContext *c, Ast *expr) {
 		}
 		return nullptr;
 	} else {
-		mutex_lock(&c->info->global_untyped_mutex);
-		defer (mutex_unlock(&c->info->global_untyped_mutex));
+		rw_mutex_shared_lock(&c->info->global_untyped_mutex);
 		ExprInfo **found = map_get(&c->info->global_untyped, expr);
+		rw_mutex_shared_unlock(&c->info->global_untyped_mutex);
 		if (found) {
 			return *found;
 		}
@@ -1370,9 +1370,9 @@ gb_internal void check_set_expr_info(CheckerContext *c, Ast *expr, AddressingMod
 	if (c->untyped != nullptr) {
 		map_set(c->untyped, expr, make_expr_info(mode, type, value, false));
 	} else {
-		mutex_lock(&c->info->global_untyped_mutex);
+		rw_mutex_lock(&c->info->global_untyped_mutex);
 		map_set(&c->info->global_untyped, expr, make_expr_info(mode, type, value, false));
-		mutex_unlock(&c->info->global_untyped_mutex);
+		rw_mutex_unlock(&c->info->global_untyped_mutex);
 	}
 }
 
@@ -1382,10 +1382,10 @@ gb_internal void check_remove_expr_info(CheckerContext *c, Ast *e) {
 		GB_ASSERT(map_get(c->untyped, e) == nullptr);
 	} else {
 		auto *untyped = &c->info->global_untyped;
-		mutex_lock(&c->info->global_untyped_mutex);
+		rw_mutex_lock(&c->info->global_untyped_mutex);
 		map_remove(untyped, e);
 		GB_ASSERT(map_get(untyped, e) == nullptr);
-		mutex_unlock(&c->info->global_untyped_mutex);
+		rw_mutex_unlock(&c->info->global_untyped_mutex);
 	}
 }
 
@@ -1454,6 +1454,7 @@ gb_internal void add_type_and_value(CheckerContext *ctx, Ast *expr, AddressingMo
 
 	BlockingMutex *mutex = &ctx->info->type_and_value_mutex;
 	if (ctx->pkg) {
+		// TODO(bill): is a per package mutex is a good idea here?
 		mutex = &ctx->pkg->type_and_value_mutex;
 	}
 

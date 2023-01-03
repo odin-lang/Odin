@@ -317,7 +317,7 @@ struct LoadFileCache {
 
 struct GenProcsData {
 	Array<Entity *> procs;
-	BlockingMutex   mutex;
+	RwMutex         mutex;
 };
 
 // CheckerInfo stores all the symbol information for a type-checked program
@@ -347,14 +347,9 @@ struct CheckerInfo {
 
 
 	// Below are accessed within procedures
-	// NOTE(bill): If the semantic checker (check_proc_body) is to ever to be multithreaded,
-	// these variables will be of contention
-
-	Semaphore collect_semaphore;
-
+	RwMutex            global_untyped_mutex;
 	UntypedExprInfoMap global_untyped; // NOTE(bill): This needs to be a map and not on the Ast
 	                                   // as it needs to be iterated across afterwards
-	BlockingMutex global_untyped_mutex;
 	BlockingMutex builtin_mutex;
 
 	BlockingMutex type_and_value_mutex;
@@ -388,7 +383,7 @@ struct CheckerInfo {
 	BlockingMutex load_file_mutex;
 	StringMap<LoadFileCache *> load_file_cache;
 
-	BlockingMutex all_procedures_mutex;;
+	BlockingMutex all_procedures_mutex;
 	Array<ProcInfo *> all_procedures;
 };
 

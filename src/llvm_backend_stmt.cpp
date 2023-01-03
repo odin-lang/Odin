@@ -57,7 +57,7 @@ gb_internal void lb_build_constant_value_decl(lbProcedure *p, AstValueDecl *vd) 
 			auto *found = map_get(&info->gen_procs, ident);
 			if (found) {
 				GenProcsData *gpd = *found;
-				MUTEX_GUARD(&gpd->mutex);
+				rw_mutex_shared_lock(&gpd->mutex);
 				for (Entity *e : gpd->procs) {
 					if (!ptr_set_exists(min_dep_set, e)) {
 						continue;
@@ -65,6 +65,7 @@ gb_internal void lb_build_constant_value_decl(lbProcedure *p, AstValueDecl *vd) 
 					DeclInfo *d = decl_info_of_entity(e);
 					lb_build_nested_proc(p, &d->proc_lit->ProcLit, e);
 				}
+				rw_mutex_shared_unlock(&gpd->mutex);
 			} else {
 				lb_build_nested_proc(p, pl, e);
 			}

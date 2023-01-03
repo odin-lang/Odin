@@ -440,11 +440,11 @@ gb_internal bool find_or_generate_polymorphic_procedure(CheckerContext *old_c, E
 	auto *found = map_get(&info->gen_procs, base_entity->identifier.load());
 	if (found) {
 		gen_procs = *found;
-		mutex_lock(&gen_procs->mutex); // @local-mutex
+		rw_mutex_shared_lock(&gen_procs->mutex); // @local-mutex
 		for (Entity *other : gen_procs->procs) {
 			Type *pt = base_type(other->type);
 			if (are_types_identical(pt, final_proc_type)) {
-				mutex_unlock(&gen_procs->mutex); // @local-mutex
+				rw_mutex_shared_unlock(&gen_procs->mutex); // @local-mutex
 				// @@GPM ////////////////////////////
 				mutex_unlock(&info->gen_procs_mutex);
 				/////////////////////////////////////
@@ -455,7 +455,7 @@ gb_internal bool find_or_generate_polymorphic_procedure(CheckerContext *old_c, E
 				return true;
 			}
 		}
-		mutex_unlock(&gen_procs->mutex); // @local-mutex
+		rw_mutex_shared_unlock(&gen_procs->mutex); // @local-mutex
 	} else {
 		gen_procs = gb_alloc_item(permanent_allocator(), GenProcsData);
 		gen_procs->procs.allocator = heap_allocator();
@@ -481,11 +481,11 @@ gb_internal bool find_or_generate_polymorphic_procedure(CheckerContext *old_c, E
 			return false;
 		}
 
-		mutex_lock(&gen_procs->mutex); // @local-mutex
+		rw_mutex_shared_lock(&gen_procs->mutex); // @local-mutex
 		for (Entity *other : gen_procs->procs) {
 			Type *pt = base_type(other->type);
 			if (are_types_identical(pt, final_proc_type)) {
-				mutex_unlock(&gen_procs->mutex); // @local-mutex
+				rw_mutex_shared_unlock(&gen_procs->mutex); // @local-mutex
 
 				if (poly_proc_data) {
 					poly_proc_data->gen_entity = other;
@@ -509,7 +509,7 @@ gb_internal bool find_or_generate_polymorphic_procedure(CheckerContext *old_c, E
 				return true;
 			}
 		}
-		mutex_unlock(&gen_procs->mutex); // @local-mutex
+		rw_mutex_shared_unlock(&gen_procs->mutex); // @local-mutex
 	}
 
 
@@ -569,9 +569,9 @@ gb_internal bool find_or_generate_polymorphic_procedure(CheckerContext *old_c, E
 		}
 	}
 
-	mutex_lock(&gen_procs->mutex); // @local-mutex
+	rw_mutex_lock(&gen_procs->mutex); // @local-mutex
 		array_add(&gen_procs->procs, entity);
-	mutex_unlock(&gen_procs->mutex); // @local-mutex
+	rw_mutex_unlock(&gen_procs->mutex); // @local-mutex
 
 	ProcInfo *proc_info = gb_alloc_item(permanent_allocator(), ProcInfo);
 	proc_info->file  = file;
