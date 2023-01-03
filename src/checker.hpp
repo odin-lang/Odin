@@ -356,7 +356,7 @@ struct CheckerInfo {
 
 	RecursiveMutex lazy_mutex; // Mutex required for lazy type checking of specific files
 
-	RecursiveMutex gen_procs_mutex;
+	BlockingMutex gen_procs_mutex;
 	RecursiveMutex gen_types_mutex;
 	PtrMap<Ast *, GenProcsData *> gen_procs; // Key: Ast * | Identifier -> Entity
 	PtrMap<Type *, Array<Entity *> > gen_types; 
