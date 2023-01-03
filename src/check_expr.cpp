@@ -146,8 +146,8 @@ gb_internal void check_did_you_mean_print(DidYouMeanAnswers *d, char const *pref
 	auto results = did_you_mean_results(d);
 	if (results.count != 0) {
 		error_line("\tSuggestion: Did you mean?\n");
-		for_array(i, results) {
-			String const &target = results[i].target;
+		for (auto const &result : results) {
+			String const &target = result.target;
 			error_line("\t\t%s%.*s\n", prefix, LIT(target));
 			// error_line("\t\t%.*s %td\n", LIT(target), results[i].distance);
 		}
@@ -166,19 +166,16 @@ gb_internal void populate_check_did_you_mean_objc_entity(StringSet *set, Entity 
 	GB_ASSERT(t->kind == Type_Struct);
 
 	if (is_type) {
-		for_array(i, objc_metadata->type_entries) {
-			String name = objc_metadata->type_entries[i].name;
-			string_set_add(set, name);
+		for (auto const &entry : objc_metadata->type_entries) {
+			string_set_add(set, entry.name);
 		}
 	} else {
-		for_array(i, objc_metadata->value_entries) {
-			String name = objc_metadata->value_entries[i].name;
-			string_set_add(set, name);
+		for (auto const &entry : objc_metadata->value_entries) {
+			string_set_add(set, entry.name);
 		}
 	}
 
-	for_array(i, t->Struct.fields) {
-		Entity *f = t->Struct.fields[i];
+	for (Entity *f : t->Struct.fields) {
 		if (f->flags & EntityFlag_Using && f->type != nullptr) {
 			if (f->type->kind == Type_Named && f->type->Named.type_name) {
 				populate_check_did_you_mean_objc_entity(set, f->type->Named.type_name, is_type);
@@ -214,8 +211,8 @@ gb_internal void check_did_you_mean_type(String const &name, Array<Entity *> con
 	DidYouMeanAnswers d = did_you_mean_make(heap_allocator(), fields.count, name);
 	defer (did_you_mean_destroy(&d));
 
-	for_array(i, fields) {
-		did_you_mean_append(&d, fields[i]->token.string);
+	for (Entity *e : fields) {
+		did_you_mean_append(&d, e->token.string);
 	}
 	check_did_you_mean_print(&d, prefix);
 }
@@ -227,8 +224,8 @@ gb_internal void check_did_you_mean_type(String const &name, Slice<Entity *> con
 	DidYouMeanAnswers d = did_you_mean_make(heap_allocator(), fields.count, name);
 	defer (did_you_mean_destroy(&d));
 
-	for_array(i, fields) {
-		did_you_mean_append(&d, fields[i]->token.string);
+	for (Entity *e : fields) {
+		did_you_mean_append(&d, e->token.string);
 	}
 	check_did_you_mean_print(&d, prefix);
 }
@@ -781,8 +778,7 @@ gb_internal i64 check_distance_between_types(CheckerContext *c, Operand *operand
 	}
 
 	if (is_type_union(dst)) {
-		for_array(i, dst->Union.variants) {
-			Type *vt = dst->Union.variants[i];
+		for (Type *vt : dst->Union.variants) {
 			if (are_types_identical(vt, s)) {
 				return 1;
 			}
@@ -798,8 +794,7 @@ gb_internal i64 check_distance_between_types(CheckerContext *c, Operand *operand
 		} else if (is_type_untyped(src)) {
 			i64 prev_lowest_score = -1;
 			i64 lowest_score = -1;
-			for_array(i, dst->Union.variants) {
-				Type *vt = dst->Union.variants[i];
+			for (Type *vt : dst->Union.variants) {
 				i64 score = check_distance_between_types(c, operand, vt);
 				if (score >= 0) {
 					if (lowest_score < 0) {
@@ -1031,8 +1026,8 @@ gb_internal void check_assignment(CheckerContext *c, Operand *operand, Type *typ
 		if (type != nullptr && is_type_proc(type)) {
 			Array<Entity *> procs = proc_group_entities(c, *operand);
 			// NOTE(bill): These should be done
-			for_array(i, procs) {
-				Type *t = base_type(procs[i]->type);
+			for (Entity *e : procs) {
+				Type *t = base_type(e->type);
 				if (t == t_invalid) {
 					continue;
 				}
@@ -1040,7 +1035,6 @@ gb_internal void check_assignment(CheckerContext *c, Operand *operand, Type *typ
 				x.mode = Addressing_Value;
 				x.type = t;
 				if (check_is_assignable_to(c, &x, type)) {
-					Entity *e = procs[i];
 					add_entity_use(c, operand->expr, e);
 					good = true;
 					break;
@@ -1470,7 +1464,7 @@ gb_internal bool check_cycle(CheckerContext *c, Entity *curr, bool report) {
 		return false;
 	}
 	for_array(i, *c->type_path) {
-		Entity *prev = (*c->type_path)[i];
+		Entity *prev = c->type_path->data[i];
 		if (prev == curr) {
 			if (report) {
 				error(curr->token, "Illegal declaration cycle of `%.*s`", LIT(curr->token.string));
@@ -1535,8 +1529,8 @@ gb_internal Entity *check_ident(CheckerContext *c, Operand *o, Ast *n, Type *nam
 
 		if (type_hint != nullptr && is_type_proc(type_hint)) {
 			// NOTE(bill): These should be done
-			for_array(i, procs) {
-				Type *t = base_type(procs[i]->type);
+			for (Entity *proc : procs) {
+				Type *t = base_type(proc->type);
 				if (t == t_invalid) {
 					continue;
 				}
@@ -1544,7 +1538,7 @@ gb_internal Entity *check_ident(CheckerContext *c, Operand *o, Ast *n, Type *nam
 				x.mode = Addressing_Value;
 				x.type = t;
 				if (check_is_assignable_to(c, &x, type_hint)) {
-					e = procs[i];
+					e = proc;
 					add_entity_use(c, n, e);
 					skip = true;
 					break;
@@ -4174,8 +4168,7 @@ gb_internal ExactValue get_constant_field_single(CheckerContext *c, ExactValue v
 		if (cl->elems[0]->kind == Ast_FieldValue) {
 			if (is_type_struct(node->tav.type)) {
 				bool found = false;
-				for_array(i, cl->elems) {
-					Ast *elem = cl->elems[i];
+				for (Ast *elem : cl->elems) {
 					if (elem->kind != Ast_FieldValue) {
 						continue;
 					}
@@ -4194,8 +4187,7 @@ gb_internal ExactValue get_constant_field_single(CheckerContext *c, ExactValue v
 					value = {};
 				}
 			} else if (is_type_array(node->tav.type) || is_type_enumerated_array(node->tav.type)) {
-				for_array(i, cl->elems) {
-					Ast *elem = cl->elems[i];
+				for (Ast *elem : cl->elems) {
 					if (elem->kind != Ast_FieldValue) {
 						continue;
 					}
@@ -4578,8 +4570,7 @@ gb_internal Entity *check_selector(CheckerContext *c, Operand *operand, Ast *nod
 			if (entity->kind == Entity_ProcGroup) {
 				Array<Entity *> procs = entity->ProcGroup.entities;
 				bool skip = false;
-				for_array(i, procs) {
-					Entity *p = procs[i];
+				for (Entity *p : procs) {
 					Type *t = base_type(p->type);
 					if (t == t_invalid) {
 						continue;
@@ -4958,7 +4949,7 @@ gb_internal isize add_dependencies_from_unpacking(CheckerContext *c, Entity **lh
 gb_internal bool check_assignment_arguments(CheckerContext *ctx, Array<Operand> const &lhs, Array<Operand> *operands, Slice<Ast *> const &rhs) {
 	bool optional_ok = false;
 	isize tuple_index = 0;
-	for_array(i, rhs) {
+	for (Ast *rhs_expr : rhs) {
 		CheckerContext c_ = *ctx;
 		CheckerContext *c = &c_;
 
@@ -4970,7 +4961,7 @@ gb_internal bool check_assignment_arguments(CheckerContext *ctx, Array<Operand> 
 			type_hint = lhs[tuple_index].type;
 		}
 
-		check_expr_base(c, &o, rhs[i], type_hint);
+		check_expr_base(c, &o, rhs_expr, type_hint);
 		if (o.mode == Addressing_NoValue) {
 			error_operand_no_value(&o);
 			o.mode = Addressing_Invalid;
@@ -5022,8 +5013,8 @@ gb_internal bool check_assignment_arguments(CheckerContext *ctx, Array<Operand> 
 			}
 		} else {
 			TypeTuple *tuple = &o.type->Tuple;
-			for_array(j, tuple->variables) {
-				o.type = tuple->variables[j]->type;
+			for (Entity *e : tuple->variables) {
+				o.type = e->type;
 				array_add(operands, o);
 			}
 
@@ -5115,8 +5106,8 @@ gb_internal bool check_unpack_arguments(CheckerContext *ctx, Entity **lhs, isize
 			}
 		} else {
 			TypeTuple *tuple = &o.type->Tuple;
-			for_array(j, tuple->variables) {
-				o.type = tuple->variables[j]->type;
+			for (Entity *e : tuple->variables) {
+				o.type = e->type;
 				array_add(operands, o);
 			}
 
@@ -5459,8 +5450,7 @@ gb_internal CALL_ARGUMENT_CHECKER(check_named_call_arguments) {
 	bool *visited = gb_alloc_array(temporary_allocator(), bool, param_count);
 	auto ordered_operands = array_make<Operand>(temporary_allocator(), param_count);
 	defer ({
-		for_array(i, ordered_operands) {
-			Operand const &o = ordered_operands[i];
+		for (Operand const &o : ordered_operands) {
 			if (o.expr != nullptr) {
 				call->viral_state_flags |= o.expr->viral_state_flags;
 			}
@@ -5778,8 +5768,7 @@ gb_internal CallArgumentData check_call_arguments(CheckerContext *c, Operand *op
 					param_tuple = &pt->params->Tuple;
 				}
 				if (param_tuple != nullptr) {
-					for_array(i, param_tuple->variables) {
-						Entity *e = param_tuple->variables[i];
+					for (Entity *e : param_tuple->variables) {
 						if (is_blank_ident(e->token)) {
 							continue;
 						}
@@ -5789,8 +5778,8 @@ gb_internal CallArgumentData check_call_arguments(CheckerContext *c, Operand *op
 			}
 		} else {
 			Array<Entity *> procs = proc_group_entities(c, *operand);
-			for_array(j, procs) {
-				Type *proc_type = base_type(procs[j]->type);
+			for (Entity *proc : procs) {
+				Type *proc_type = base_type(proc->type);
 				if (is_type_proc(proc_type)) {
 					TypeProc *pt = &proc_type->Proc;
 					TypeTuple *param_tuple = nullptr;
@@ -5800,8 +5789,7 @@ gb_internal CallArgumentData check_call_arguments(CheckerContext *c, Operand *op
 					if (param_tuple == nullptr) {
 						continue;
 					}
-					for_array(i, param_tuple->variables) {
-						Entity *e = param_tuple->variables[i];
+					for (Entity *e : param_tuple->variables) {
 						if (is_blank_ident(e->token)) {
 							continue;
 						}
@@ -5865,10 +5853,10 @@ gb_internal CallArgumentData check_call_arguments(CheckerContext *c, Operand *op
 
 		if (procs.count > 1) {
 			isize max_arg_count = args.count;
-			for_array(i, args) {
+			for (Ast *arg : args) {
 				// NOTE(bill): The only thing that may have multiple values
 				// will be a call expression (assuming `or_return` and `()` will be stripped)
-				Ast *arg = strip_or_return_expr(args[i]);
+				arg = strip_or_return_expr(arg);
 				if (arg && arg->kind == Ast_CallExpr) {
 					max_arg_count = ISIZE_MAX;
 					break;
@@ -5931,8 +5919,7 @@ gb_internal CallArgumentData check_call_arguments(CheckerContext *c, Operand *op
 			// where the same positional parameter has the same type value (and ellipsis)
 			bool proc_arg_count_all_equal = true;
 			isize proc_arg_count = -1;
-			for_array(i, procs) {
-				Entity *p = procs[i];
+			for (Entity *p : procs) {
 				Type *pt = base_type(p->type);
 				if (pt != nullptr && is_type_proc(pt)) {
 					if (proc_arg_count < 0) {
@@ -5954,8 +5941,7 @@ gb_internal CallArgumentData check_call_arguments(CheckerContext *c, Operand *op
 					lhs = gb_alloc_array(heap_allocator(), Entity *, lhs_count);
 					for (isize param_index = 0; param_index < lhs_count; param_index++) {
 						Entity *e = nullptr;
-						for_array(j, procs) {
-							Entity *p = procs[j];
+						for (Entity *p : procs) {
 							Type *pt = base_type(p->type);
 							if (pt != nullptr && is_type_proc(pt)) {
 								if (e == nullptr) {
@@ -5996,8 +5982,8 @@ gb_internal CallArgumentData check_call_arguments(CheckerContext *c, Operand *op
 
 		auto proc_entities = array_make<Entity *>(heap_allocator(), 0, procs.count*2 + 1);
 		defer (array_free(&proc_entities));
-		for_array(i, procs) {
-			array_add(&proc_entities, procs[i]);
+		for (Entity *proc : procs) {
+			array_add(&proc_entities, proc);
 		}
 
 
@@ -6087,8 +6073,7 @@ gb_internal CallArgumentData check_call_arguments(CheckerContext *c, Operand *op
 			if (procs.count > 0) {
 				error_line("Did you mean to use one of the following:\n");
 			}
-			for_array(i, procs) {
-				Entity *proc = procs[i];
+			for (Entity *proc : procs) {
 				TokenPos pos = proc->token.pos;
 				Type *t = base_type(proc->type);
 				if (t == t_invalid) continue;
@@ -6647,8 +6632,7 @@ gb_internal ExprKind check_call_expr(CheckerContext *c, Operand *operand, Ast *c
 	if (args.count > 0) {
 		bool fail = false;
 		bool first_is_field_value = (args[0]->kind == Ast_FieldValue);
-		for_array(i, args) {
-			Ast *arg = args[i];
+		for (Ast *arg : args) {
 			bool mix = false;
 			if (first_is_field_value) {
 				mix = arg->kind != Ast_FieldValue;
@@ -6669,8 +6653,7 @@ gb_internal ExprKind check_call_expr(CheckerContext *c, Operand *operand, Ast *c
 	}
 
 	if (operand->mode == Addressing_Invalid) {
-		for_array(i, args) {
-			Ast *arg = args[i];
+		for (Ast *arg : args) {
 			if (arg->kind == Ast_FieldValue) {
 				arg = arg->FieldValue.value;
 			}
@@ -7166,9 +7149,7 @@ gb_internal bool attempt_implicit_selector_expr(CheckerContext *c, Operand *o, A
 		Type *union_type = base_type(th);
 		auto operands = array_make<Operand>(temporary_allocator(), 0, union_type->Union.variants.count);
 
-		for_array(i, union_type->Union.variants) {
-			Type *vt = union_type->Union.variants[i];
-
+		for (Type *vt : union_type->Union.variants) {
 			Operand x = {};
 			if (attempt_implicit_selector_expr(c, &x, ise, vt)) {
 				array_add(&operands, x);
@@ -7398,8 +7379,7 @@ gb_internal void add_to_seen_map(CheckerContext *ctx, SeenMap *seen, TokenKind u
 			}
 
 			bool found = false;
-			for_array(j, bt->Enum.fields) {
-				Entity *f = bt->Enum.fields[j];
+			for (Entity *f : bt->Enum.fields) {
 				GB_ASSERT(f->kind == Entity_Constant);
 
 				i64 fv = exact_value_to_i64(f->Constant.value);
@@ -7917,8 +7897,7 @@ gb_internal ExprKind check_compound_literal(CheckerContext *c, Operand *o, Ast *
 		if (cl->elems[0]->kind == Ast_FieldValue) {
 			bool *fields_visited = gb_alloc_array(temporary_allocator(), bool, field_count);
 
-			for_array(i, cl->elems) {
-				Ast *elem = cl->elems[i];
+			for (Ast *elem : cl->elems) {
 				if (elem->kind != Ast_FieldValue) {
 					error(elem, "Mixture of 'field = value' and value elements in a literal is not allowed");
 					continue;
@@ -8070,8 +8049,7 @@ gb_internal ExprKind check_compound_literal(CheckerContext *c, Operand *o, Ast *
 			RangeCache rc = range_cache_make(heap_allocator());
 			defer (range_cache_destroy(&rc));
 
-			for_array(i, cl->elems) {
-				Ast *elem = cl->elems[i];
+			for (Ast *elem : cl->elems) {
 				if (elem->kind != Ast_FieldValue) {
 					error(elem, "Mixture of 'field = value' and value elements in a literal is not allowed");
 					continue;
@@ -8252,8 +8230,7 @@ gb_internal ExprKind check_compound_literal(CheckerContext *c, Operand *o, Ast *
 		{
 			Type *bt = base_type(index_type);
 			GB_ASSERT(bt->kind == Type_Enum);
-			for_array(i, bt->Enum.fields) {
-				Entity *f = bt->Enum.fields[i];
+			for (Entity *f : bt->Enum.fields) {
 				if (f->kind != Entity_Constant) {
 					continue;
 				}
@@ -8288,8 +8265,7 @@ gb_internal ExprKind check_compound_literal(CheckerContext *c, Operand *o, Ast *
 			RangeCache rc = range_cache_make(heap_allocator());
 			defer (range_cache_destroy(&rc));
 
-			for_array(i, cl->elems) {
-				Ast *elem = cl->elems[i];
+			for (Ast *elem : cl->elems) {
 				if (elem->kind != Ast_FieldValue) {
 					error(elem, "Mixture of 'field = value' and value elements in a literal is not allowed");
 					continue;
@@ -8453,8 +8429,7 @@ gb_internal ExprKind check_compound_literal(CheckerContext *c, Operand *o, Ast *
 
 			auto unhandled = array_make<Entity *>(temporary_allocator(), 0, fields.count);
 
-			for_array(i, fields) {
-				Entity *f = fields[i];
+			for (Entity *f : fields) {
 				if (f->kind != Entity_Constant) {
 					continue;
 				}
@@ -8580,8 +8555,7 @@ gb_internal ExprKind check_compound_literal(CheckerContext *c, Operand *o, Ast *
 			bool key_is_typeid = is_type_typeid(t->Map.key);
 			bool value_is_typeid = is_type_typeid(t->Map.value);
 
-			for_array(i, cl->elems) {
-				Ast *elem = cl->elems[i];
+			for (Ast *elem : cl->elems) {
 				if (elem->kind != Ast_FieldValue) {
 					error(elem, "Only 'field = value' elements are allowed in a map literal");
 					continue;
@@ -8630,8 +8604,7 @@ gb_internal ExprKind check_compound_literal(CheckerContext *c, Operand *o, Ast *
 			error(cl->elems[0], "'field = value' in a bit_set a literal is not allowed");
 			is_constant = false;
 		} else {
-			for_array(index, cl->elems) {
-				Ast *elem = cl->elems[index];
+			for (Ast *elem : cl->elems) {
 				if (elem->kind == Ast_FieldValue) {
 					error(elem, "'field = value' in a bit_set a literal is not allowed");
 					continue;
@@ -8683,8 +8656,7 @@ gb_internal ExprKind check_compound_literal(CheckerContext *c, Operand *o, Ast *
 			BigInt one = {};
 			big_int_from_u64(&one, 1);
 
-			for_array(i, cl->elems) {
-				Ast *e = cl->elems[i];
+			for (Ast *e : cl->elems) {
 				GB_ASSERT(e->kind != Ast_FieldValue);
 
 				TypeAndValue tav = e->tav;
@@ -8783,8 +8755,7 @@ gb_internal ExprKind check_type_assertion(CheckerContext *c, Operand *o, Ast *no
 
 		if (bsrc->Union.variants.count != 1 && type_hint != nullptr) {
 			bool allowed = false;
-			for_array(i, bsrc->Union.variants) {
-				Type *vt = bsrc->Union.variants[i];
+			for (Type *vt : bsrc->Union.variants) {
 				if (are_types_identical(vt, type_hint)) {
 					allowed = true;
 					add_type_info_type(c, vt);
@@ -8817,8 +8788,7 @@ gb_internal ExprKind check_type_assertion(CheckerContext *c, Operand *o, Ast *no
 
 		if (is_type_union(src)) {
 			bool ok = false;
-			for_array(i, bsrc->Union.variants) {
-				Type *vt = bsrc->Union.variants[i];
+			for (Type *vt : bsrc->Union.variants) {
 				if (are_types_identical(vt, dst)) {
 					ok = true;
 					break;
@@ -8978,8 +8948,7 @@ gb_internal ExprKind check_selector_call_expr(CheckerContext *c, Operand *o, Ast
 	if (ce->args.count > 0) {
 		bool fail = false;
 		bool first_is_field_value = (ce->args[0]->kind == Ast_FieldValue);
-		for_array(i, ce->args) {
-			Ast *arg = ce->args[i];
+		for (Ast *arg : ce->args) {
 			bool mix = false;
 			if (first_is_field_value) {
 				mix = arg->kind != Ast_FieldValue;
@@ -9881,12 +9850,9 @@ gb_internal bool is_exact_value_zero(ExactValue const &v) {
 			if (cl->elems.count == 0) {
 				return true;
 			} else {
-				for_array(i, cl->elems) {
-					Ast *elem = cl->elems[i];
+				for (Ast *elem : cl->elems) {
 					if (elem->tav.mode != Addressing_Constant) {
-						// if (elem->tav.value.kind != ExactValue_Invalid) {
 						return false;
-						// }
 					}
 					if (!is_exact_value_zero(elem->tav.value)) {
 						return false;
@@ -10366,8 +10332,7 @@ gb_internal gbString write_expr_to_string(gbString str, Ast *node, bool shorthan
 
 			bool parens_needed = false;
 			if (pt->results && pt->results->kind == Ast_FieldList) {
-				for_array(i, pt->results->FieldList.list) {
-					Ast *field = pt->results->FieldList.list[i];
+				for (Ast *field : pt->results->FieldList.list) {
 					ast_node(f, Field, field);
 					if (f->names.count != 0) {
 						parens_needed = true;
