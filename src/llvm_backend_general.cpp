@@ -55,30 +55,30 @@ gb_internal void lb_init_module(lbModule *m, Checker *c) {
 	}
 
 	gbAllocator a = heap_allocator();
-	map_init(&m->types, a);
-	map_init(&m->func_raw_types, a);
-	map_init(&m->struct_field_remapping, a);
-	map_init(&m->values, a);
-	map_init(&m->soa_values, a);
-	string_map_init(&m->members, a);
-	map_init(&m->procedure_values, a);
-	string_map_init(&m->procedures, a);
-	string_map_init(&m->const_strings, a);
-	map_init(&m->function_type_map, a);
-	map_init(&m->equal_procs, a);
-	map_init(&m->hasher_procs, a);
-	map_init(&m->map_get_procs, a);
-	map_init(&m->map_set_procs, a);
+	map_init(&m->types);
+	map_init(&m->func_raw_types);
+	map_init(&m->struct_field_remapping);
+	map_init(&m->values);
+	map_init(&m->soa_values);
+	string_map_init(&m->members);
+	map_init(&m->procedure_values);
+	string_map_init(&m->procedures);
+	string_map_init(&m->const_strings);
+	map_init(&m->function_type_map);
+	map_init(&m->equal_procs);
+	map_init(&m->hasher_procs);
+	map_init(&m->map_get_procs);
+	map_init(&m->map_set_procs);
 	array_init(&m->procedures_to_generate, a, 0, 1024);
 	array_init(&m->missing_procedures_to_check, a, 0, 16);
-	map_init(&m->debug_values, a);
+	map_init(&m->debug_values);
 	array_init(&m->debug_incomplete_types, a, 0, 1024);
 
-	string_map_init(&m->objc_classes, a);
-	string_map_init(&m->objc_selectors, a);
+	string_map_init(&m->objc_classes);
+	string_map_init(&m->objc_selectors);
 
-	map_init(&m->map_info_map, a, 0);
-	map_init(&m->map_cell_info_map, a, 0);
+	map_init(&m->map_info_map, 0);
+	map_init(&m->map_cell_info_map, 0);
 
 }
 
@@ -127,9 +127,9 @@ gb_internal bool lb_init_generator(lbGenerator *gen, Checker *c) {
 
 	gen->info = &c->info;
 
-	map_init(&gen->modules, permanent_allocator(), gen->info->packages.entries.count*2);
-	map_init(&gen->modules_through_ctx, permanent_allocator(), gen->info->packages.entries.count*2);
-	map_init(&gen->anonymous_proc_lits, heap_allocator(), 1024);
+	map_init(&gen->modules, gen->info->packages.entries.count*2);
+	map_init(&gen->modules_through_ctx, gen->info->packages.entries.count*2);
+	map_init(&gen->anonymous_proc_lits, 1024);
 
 
 	array_init(&gen->foreign_libraries,       heap_allocator(), 0, 1024);

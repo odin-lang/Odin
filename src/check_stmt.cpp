@@ -929,7 +929,6 @@ gb_internal void check_switch_stmt(CheckerContext *ctx, Ast *node, u32 mod_flags
 	}
 
 	SeenMap seen = {}; // NOTE(bill): Multimap, Key: ExactValue
-	map_init(&seen, heap_allocator());
 	defer (map_destroy(&seen));
 
 	for_array(stmt_index, bs->stmts) {

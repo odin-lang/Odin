@@ -373,7 +373,7 @@ gb_internal char const *string_intern(String const &string) {
 }
 
 gb_internal void init_string_interner(void) {
-	map_init(&string_intern_map, heap_allocator());
+	map_init(&string_intern_map);
 }
 
 

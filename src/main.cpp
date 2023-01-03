@@ -2516,7 +2516,7 @@ int main(int arg_count, char const **arg_ptr) {
 	add_library_collection(str_lit("core"), get_fullpath_relative(heap_allocator(), odin_root_dir(), str_lit("core")));
 	add_library_collection(str_lit("vendor"), get_fullpath_relative(heap_allocator(), odin_root_dir(), str_lit("vendor")));
 
-	map_init(&build_context.defined_values, heap_allocator());
+	map_init(&build_context.defined_values);
 	build_context.extra_packages.allocator = heap_allocator();
 	string_set_init(&build_context.test_names);
 

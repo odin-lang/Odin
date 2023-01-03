@@ -221,7 +221,7 @@ gb_internal DeclInfo *make_decl_info(Scope *scope, DeclInfo *parent) {
 gb_internal Scope *create_scope(CheckerInfo *info, Scope *parent, isize init_elements_capacity=DEFAULT_SCOPE_CAPACITY) {
 	Scope *s = gb_alloc_item(permanent_allocator(), Scope);
 	s->parent = parent;
-	string_map_init(&s->elements, heap_allocator(), init_elements_capacity);
+	string_map_init(&s->elements, init_elements_capacity);
 	ptr_set_init(&s->imported, 0);
 
 	if (parent != nullptr && parent != builtin_pkg->scope) {
@@ -1135,14 +1135,14 @@ gb_internal void init_checker_info(CheckerInfo *i) {
 
 	array_init(&i->definitions,   a);
 	array_init(&i->entities,      a);
-	map_init(&i->global_untyped, a);
-	string_map_init(&i->foreigns, a);
-	map_init(&i->gen_procs,       a);
-	map_init(&i->gen_types,       a);
+	map_init(&i->global_untyped);
+	string_map_init(&i->foreigns);
+	map_init(&i->gen_procs);
+	map_init(&i->gen_types);
 	array_init(&i->type_info_types, a);
-	map_init(&i->type_info_map,   a);
-	string_map_init(&i->files,    a);
-	string_map_init(&i->packages, a);
+	map_init(&i->type_info_map);
+	string_map_init(&i->files);
+	string_map_init(&i->packages);
 	array_init(&i->variable_init_order, a);
 	array_init(&i->testing_procedures, a, 0, 0);
 	array_init(&i->init_procedures, a, 0, 0);
@@ -1160,8 +1160,8 @@ gb_internal void init_checker_info(CheckerInfo *i) {
 
 	mpmc_init(&i->intrinsics_entry_point_usage, a, 1<<10); // just waste some memory here, even if it probably never used
 
-	map_init(&i->objc_msgSend_types, a);
-	string_map_init(&i->load_file_cache, a);
+	map_init(&i->objc_msgSend_types);
+	string_map_init(&i->load_file_cache);
 
 	array_init(&i->all_procedures, heap_allocator());
 
@@ -2490,7 +2490,7 @@ gb_internal bool is_entity_a_dependency(Entity *e) {
 
 gb_internal Array<EntityGraphNode *> generate_entity_dependency_graph(CheckerInfo *info, gbAllocator allocator) {
 	PtrMap<Entity *, EntityGraphNode *> M = {};
-	map_init(&M, allocator, info->entities.count);
+	map_init(&M, info->entities.count);
 	defer (map_destroy(&M));
 	for_array(i, info->entities) {
 		Entity *e = info->entities[i];
@@ -4200,7 +4200,7 @@ gb_internal void add_import_dependency_node(Checker *c, Ast *decl, PtrMap<AstPac
 
 gb_internal Array<ImportGraphNode *> generate_import_dependency_graph(Checker *c) {
 	PtrMap<AstPackage *, ImportGraphNode *> M = {};
-	map_init(&M, heap_allocator(), 2*c->parser->packages.count);
+	map_init(&M, 2*c->parser->packages.count);
 	defer (map_destroy(&M));
 
 	for_array(i, c->parser->packages) {
@@ -4688,7 +4688,7 @@ gb_internal void check_collect_entities_all(Checker *c) {
 		auto *wd = &collect_entity_worker_data[i];
 		wd->c = c;
 		wd->ctx = make_checker_context(c);
-		map_init(&wd->untyped, heap_allocator());
+		map_init(&wd->untyped);
 	}
 
 	for (auto const &entry : c->info.files.entries) {
@@ -4804,7 +4804,6 @@ gb_internal void check_import_entities(Checker *c) {
 	CheckerContext ctx = make_checker_context(c);
 
 	UntypedExprInfoMap untyped = {};
-	map_init(&untyped, heap_allocator());
 	defer (map_destroy(&untyped));
 
 	isize min_pkg_index = 0;
@@ -5159,7 +5158,6 @@ gb_internal void check_unchecked_bodies(Checker *c) {
 	GB_ASSERT(c->procs_to_check.count == 0);
 
 	UntypedExprInfoMap untyped = {};
-	map_init(&untyped, heap_allocator());
 	defer (map_destroy(&untyped));
 
 	// use the `procs_to_check` array
@@ -5212,7 +5210,6 @@ gb_internal void check_unchecked_bodies(Checker *c) {
 gb_internal void check_safety_all_procedures_for_unchecked(Checker *c) {
 	GB_ASSERT(DEBUG_CHECK_ALL_PROCEDURES);
 	UntypedExprInfoMap untyped = {};
-	map_init(&untyped, heap_allocator());
 	defer (map_destroy(&untyped));
 
 
@@ -5345,7 +5342,7 @@ gb_internal void check_procedure_bodies(Checker *c) {
 
 	for (isize i = 0; i < thread_count; i++) {
 		check_procedure_bodies_worker_data[i].c = c;
-		map_init(&check_procedure_bodies_worker_data[i].untyped, heap_allocator());
+		map_init(&check_procedure_bodies_worker_data[i].untyped);
 	}
 
 	defer (for (isize i = 0; i < thread_count; i++) {
@@ -5545,7 +5542,7 @@ gb_internal void check_deferred_procedures(Checker *c) {
 
 gb_internal void check_unique_package_names(Checker *c) {
 	StringMap<AstPackage *> pkgs = {}; // Key: package name
-	string_map_init(&pkgs, heap_allocator(), 2*c->info.packages.entries.count);
+	string_map_init(&pkgs, 2*c->info.packages.entries.count);
 	defer (string_map_destroy(&pkgs));
 
 	for (auto const &entry : c->info.packages) {

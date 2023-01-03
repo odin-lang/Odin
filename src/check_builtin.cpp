@@ -1110,7 +1110,7 @@ gb_internal bool cache_load_file_directive(CheckerContext *c, Ast *call, String 
 			new_cache->path = path;
 			new_cache->data = data;
 			new_cache->file_error = file_error;
-			string_map_init(&new_cache->hashes, heap_allocator(), 32);
+			string_map_init(&new_cache->hashes, 32);
 			string_map_set(&c->info->load_file_cache, path, new_cache);
 			if (cache_) *cache_ = new_cache;
 		} else {

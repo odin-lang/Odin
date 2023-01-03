@@ -35,7 +35,7 @@ struct StringMap {
 };
 
 
-template <typename T> gb_internal void string_map_init             (StringMap<T> *h, gbAllocator a, isize capacity = 16);
+template <typename T> gb_internal void string_map_init             (StringMap<T> *h, isize capacity = 16);
 template <typename T> gb_internal void string_map_destroy          (StringMap<T> *h);
 
 template <typename T> gb_internal T *  string_map_get              (StringMap<T> *h, char const *key);
@@ -56,11 +56,15 @@ template <typename T> gb_internal void string_map_grow             (StringMap<T>
 template <typename T> gb_internal void string_map_rehash           (StringMap<T> *h, isize new_count);
 template <typename T> gb_internal void string_map_reserve          (StringMap<T> *h, isize cap);
 
+gb_internal gbAllocator string_map_allocator(void) {
+	return heap_allocator();
+}
+
 template <typename T>
-gb_internal gb_inline void string_map_init(StringMap<T> *h, gbAllocator a, isize capacity) {
+gb_internal gb_inline void string_map_init(StringMap<T> *h, isize capacity) {
 	capacity = next_pow2_isize(capacity);
-	slice_init(&h->hashes,  a, capacity);
-	array_init(&h->entries, a, 0, capacity);
+	slice_init(&h->hashes,  string_map_allocator(), capacity);
+	array_init(&h->entries, string_map_allocator(), 0, capacity);
 	for (isize i = 0; i < capacity; i++) {
 		h->hashes.data[i] = MAP_SENTINEL;
 	}
@@ -68,6 +72,9 @@ gb_internal gb_inline void string_map_init(StringMap<T> *h, gbAllocator a, isize
 
 template <typename T>
 gb_internal gb_inline void string_map_destroy(StringMap<T> *h) {
+	if (h->entries.allocator.proc == nullptr) {
+		h->entries.allocator = string_map_allocator();
+	}
 	slice_free(&h->hashes, h->entries.allocator);
 	array_free(&h->entries);
 }
@@ -147,6 +154,9 @@ gb_internal void string_map_reset_entries(StringMap<T> *h) {
 
 template <typename T>
 gb_internal void string_map_reserve(StringMap<T> *h, isize cap) {
+	if (h->entries.allocator.proc == nullptr) {
+		h->entries.allocator = string_map_allocator();
+	}
 	array_reserve(&h->entries, cap);
 	if (h->entries.count*2 < h->hashes.count) {
 		return;

@@ -5753,7 +5753,7 @@ gb_internal CallArgumentData check_call_arguments(CheckerContext *c, Operand *op
 		// in order to improve the type inference system
 
 		StringMap<Type *> type_hint_map = {}; // Key: String
-		string_map_init(&type_hint_map, heap_allocator(), 2*args.count);
+		string_map_init(&type_hint_map, 2*args.count);
 		defer (string_map_destroy(&type_hint_map));
 
 		Type *ptype = nullptr;
@@ -8283,7 +8283,6 @@ gb_internal ExprKind check_compound_literal(CheckerContext *c, Operand *o, Ast *
 		bool is_partial = cl->tag && (cl->tag->BasicDirective.name.string == "partial");
 
 		SeenMap seen = {}; // NOTE(bill): Multimap, Key: ExactValue
-		map_init(&seen, heap_allocator());
 		defer (map_destroy(&seen));
 
 		if (cl->elems.count > 0 && cl->elems[0]->kind == Ast_FieldValue) {

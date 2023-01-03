@@ -46,7 +46,7 @@ gb_internal gb_inline u32 ptr_map_hash_key(void const *key) {
 }
 
 
-template <typename K, typename V> gb_internal void map_init             (PtrMap<K, V> *h, gbAllocator a, isize capacity = 16);
+template <typename K, typename V> gb_internal void map_init             (PtrMap<K, V> *h, isize capacity = 16);
 template <typename K, typename V> gb_internal void map_destroy          (PtrMap<K, V> *h);
 template <typename K, typename V> gb_internal V *  map_get              (PtrMap<K, V> *h, K key);
 template <typename K, typename V> gb_internal void map_set              (PtrMap<K, V> *h, K key, V const &value);
@@ -68,11 +68,15 @@ template <typename K, typename V> gb_internal void  multi_map_remove    (PtrMap<
 template <typename K, typename V> gb_internal void  multi_map_remove_all(PtrMap<K, V> *h, K key);
 #endif
 
+gb_internal gbAllocator map_allocator(void) {
+	return heap_allocator();
+}
+
 template <typename K, typename V>
-gb_internal gb_inline void map_init(PtrMap<K, V> *h, gbAllocator a, isize capacity) {
+gb_internal gb_inline void map_init(PtrMap<K, V> *h, isize capacity) {
 	capacity = next_pow2_isize(capacity);
-	slice_init(&h->hashes,  a, capacity);
-	array_init(&h->entries, a, 0, capacity);
+	slice_init(&h->hashes,  map_allocator(), capacity);
+	array_init(&h->entries, map_allocator(), 0, capacity);
 	for (isize i = 0; i < capacity; i++) {
 		h->hashes.data[i] = MAP_SENTINEL;
 	}
@@ -80,6 +84,9 @@ gb_internal gb_inline void map_init(PtrMap<K, V> *h, gbAllocator a, isize capaci
 
 template <typename K, typename V>
 gb_internal gb_inline void map_destroy(PtrMap<K, V> *h) {
+	if (h->entries.allocator.proc == nullptr) {
+		h->entries.allocator = map_allocator();
+	}
 	slice_free(&h->hashes, h->entries.allocator);
 	array_free(&h->entries);
 }
@@ -162,6 +169,9 @@ gb_internal void map_reset_entries(PtrMap<K, V> *h) {
 
 template <typename K, typename V>
 gb_internal void map_reserve(PtrMap<K, V> *h, isize cap) {
+	if (h->entries.allocator.proc == nullptr) {
+		h->entries.allocator = map_allocator();
+	}
 	array_reserve(&h->entries, cap);
 	if (h->entries.count*2 < h->hashes.count) {
 		return;
