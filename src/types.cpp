@@ -748,6 +748,7 @@ gb_internal i64 type_align_of_internal(Type *t, TypePath *path);
 // IMPORTANT TODO(bill): SHould this TypePath code be removed since type cycle checking is handled much earlier on?
 
 struct TypePath {
+	RecursiveMutex mutex;
 	Array<Entity *> path; // Entity_TypeName;
 	bool failure;
 };
@@ -758,7 +759,9 @@ gb_internal void type_path_init(TypePath *tp) {
 }
 
 gb_internal void type_path_free(TypePath *tp) {
+	mutex_lock(&tp->mutex);
 	array_free(&tp->path);
+	mutex_unlock(&tp->mutex);
 }
 
 gb_internal void type_path_print_illegal_cycle(TypePath *tp, isize start_index) {
@@ -787,6 +790,8 @@ gb_internal bool type_path_push(TypePath *tp, Type *t) {
 	}
 	Entity *e = t->Named.type_name;
 
+	mutex_lock(&tp->mutex);
+
 	for (isize i = 0; i < tp->path.count; i++) {
 		Entity *p = tp->path[i];
 		if (p == e) {
@@ -795,12 +800,19 @@ gb_internal bool type_path_push(TypePath *tp, Type *t) {
 	}
 
 	array_add(&tp->path, e);
+
+	mutex_unlock(&tp->mutex);
+
 	return true;
 }
 
 gb_internal void type_path_pop(TypePath *tp) {
-	if (tp != nullptr && tp->path.count > 0) {
-		array_pop(&tp->path);
+	if (tp != nullptr) {
+		mutex_lock(&tp->mutex);
+		if (tp->path.count > 0) {
+			array_pop(&tp->path);
+		}
+		mutex_unlock(&tp->mutex);
 	}
 }
 

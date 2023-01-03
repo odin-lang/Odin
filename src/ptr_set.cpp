@@ -1,5 +1,7 @@
 template <typename T>
 struct PtrSetEntry {
+	static_assert(sizeof(T) == sizeof(void *), "Key size must be pointer size");
+
 	T        ptr;
 	MapIndex next;
 
@@ -10,6 +12,7 @@ struct PtrSetEntry {
 
 template <typename T>
 struct PtrSet {
+
 	Slice<MapIndex>       hashes;
 	Array<PtrSetEntry<T>> entries;
 };
