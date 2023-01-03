@@ -96,8 +96,7 @@ gb_internal void check_or_else_expr_no_value_error(CheckerContext *c, String con
 		gbString th = nullptr;
 		if (type_hint != nullptr) {
 			GB_ASSERT(bsrc->kind == Type_Union);
-			for_array(i, bsrc->Union.variants) {
-				Type *vt = bsrc->Union.variants[i];
+			for (Type *vt : bsrc->Union.variants) {
 				if (are_types_identical(vt, type_hint)) {
 					th = type_to_string(type_hint);
 					break;
@@ -198,8 +197,7 @@ gb_internal void add_objc_proc_type(CheckerContext *c, Ast *call, Type *return_t
 	{
 		auto variables = array_make<Entity *>(permanent_allocator(), 0, param_types.count);
 
-		for_array(i, param_types)  {
-			Type *type = param_types[i];
+		for (Type *type : param_types) {
 			Entity *param = alloc_entity_param(scope, blank_token, type, false, true);
 			array_add(&variables, param);
 		}
@@ -3071,8 +3069,7 @@ gb_internal bool check_builtin_procedure(CheckerContext *c, Operand *operand, As
 		bool first_is_field_value = (ce->args[0]->kind == Ast_FieldValue);
 
 		bool fail = false;
-		for_array(i, ce->args) {
-			Ast *arg = ce->args[i];
+		for (Ast *arg : ce->args) {
 			bool mix = false;
 			if (first_is_field_value) {
 				mix = arg->kind != Ast_FieldValue;
@@ -3088,9 +3085,8 @@ gb_internal bool check_builtin_procedure(CheckerContext *c, Operand *operand, As
 		StringSet name_set = {};
 		string_set_init(&name_set, 2*ce->args.count);
 
-		for_array(i, ce->args) {
+		for (Ast *arg : ce->args) {
 			String name = {};
-			Ast *arg = ce->args[i];
 			if (arg->kind == Ast_FieldValue) {
 				Ast *ename = arg->FieldValue.field;
 				if (!fail && ename->kind != Ast_Ident) {
@@ -4987,8 +4983,7 @@ gb_internal bool check_builtin_procedure(CheckerContext *c, Operand *operand, As
 
 			bool is_variant = false;
 
-			for_array(i, u->Union.variants) {
-				Type *vt = u->Union.variants[i];
+			for (Type *vt : u->Union.variants) {
 				if (are_types_identical(v, vt)) {
 					is_variant = true;
 					break;

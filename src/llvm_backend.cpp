@@ -240,11 +240,10 @@ gb_internal lbValue lb_equal_proc_for_type(lbModule *m, Type *type) {
 			LLVMValueRef v_switch = LLVMBuildSwitch(p->builder, left_tag.value, block_false->block, cast(unsigned)type->Union.variants.count);
 
 
-			for_array(i, type->Union.variants) {
+			for (Type *v : type->Union.variants) {
 				lbBlock *case_block = lb_create_block(p, "bcase");
 				lb_start_block(p, case_block);
 
-				Type *v = type->Union.variants[i];
 				lbValue case_tag = lb_const_union_tag(p->module, type, v);
 
 				Type *vp = alloc_type_pointer(v);
@@ -374,11 +373,10 @@ gb_internal lbValue lb_hasher_proc_for_type(lbModule *m, Type *type) {
 
 		LLVMValueRef v_switch = LLVMBuildSwitch(p->builder, tag.value, end_block->block, cast(unsigned)type->Union.variants.count);
 
-		for_array(i, type->Union.variants) {
+		for (Type *v : type->Union.variants) {
 			lbBlock *case_block = lb_create_block(p, "bcase");
 			lb_start_block(p, case_block);
 
-			Type *v = type->Union.variants[i];
 			lbValue case_tag = lb_const_union_tag(p->module, type, v);
 
 			lbValue variant_hasher = lb_hasher_proc_for_type(m, v);
@@ -2235,8 +2233,7 @@ gb_internal void lb_generate_code(lbGenerator *gen) {
 
 	for (auto const &entry : gen->modules) {
 		lbModule *m = entry.value;
-		for_array(i, m->info->required_foreign_imports_through_force) {
-			Entity *e = m->info->required_foreign_imports_through_force[i];
+		for (Entity *e : m->info->required_foreign_imports_through_force) {
 			lb_add_foreign_library_path(m, e);
 		}
 

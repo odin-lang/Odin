@@ -7,8 +7,7 @@ gb_internal void lb_build_constant_value_decl(lbProcedure *p, AstValueDecl *vd) 
 
 	static i32 global_guid = 0;
 
-	for_array(i, vd->names) {
-		Ast *ident = vd->names[i];
+	for (Ast *ident : vd->names) {
 		GB_ASSERT(ident->kind == Ast_Ident);
 		Entity *e = entity_of_node(ident);
 		GB_ASSERT(e != nullptr);
@@ -106,8 +105,7 @@ gb_internal void lb_build_constant_value_decl(lbProcedure *p, AstValueDecl *vd) 
 
 
 gb_internal void lb_build_stmt_list(lbProcedure *p, Slice<Ast *> const &stmts) {
-	for_array(i, stmts) {
-		Ast *stmt = stmts[i];
+	for (Ast *stmt : stmts) {
 		switch (stmt->kind) {
 		case_ast_node(vd, ValueDecl, stmt);
 			lb_build_constant_value_decl(p, vd);
@@ -118,8 +116,8 @@ gb_internal void lb_build_stmt_list(lbProcedure *p, Slice<Ast *> const &stmts) {
 		case_end;
 		}
 	}
-	for_array(i, stmts) {
-		lb_build_stmt(p, stmts[i]);
+	for (Ast *stmt : stmts) {
+		lb_build_stmt(p, stmt);
 	}
 }
 
@@ -129,10 +127,9 @@ gb_internal lbBranchBlocks lb_lookup_branch_blocks(lbProcedure *p, Ast *ident) {
 	GB_ASSERT(ident->kind == Ast_Ident);
 	Entity *e = entity_of_node(ident);
 	GB_ASSERT(e->kind == Entity_Label);
-	for_array(i, p->branch_blocks) {
-		lbBranchBlocks *b = &p->branch_blocks[i];
-		if (b->label == e->Label.node) {
-			return *b;
+	for (lbBranchBlocks const &b : p->branch_blocks) {
+		if (b.label == e->Label.node) {
+			return b;
 		}
 	}
 
@@ -153,13 +150,12 @@ gb_internal lbTargetList *lb_push_target_list(lbProcedure *p, Ast *label, lbBloc
 	if (label != nullptr) { // Set label blocks
 		GB_ASSERT(label->kind == Ast_Label);
 
-		for_array(i, p->branch_blocks) {
-			lbBranchBlocks *b = &p->branch_blocks[i];
-			GB_ASSERT(b->label != nullptr && label != nullptr);
-			GB_ASSERT(b->label->kind == Ast_Label);
-			if (b->label == label) {
-				b->break_    = break_;
-				b->continue_ = continue_;
+		for (lbBranchBlocks &b : p->branch_blocks) {
+			GB_ASSERT(b.label != nullptr && label != nullptr);
+			GB_ASSERT(b.label->kind == Ast_Label);
+			if (b.label == label) {
+				b.break_    = break_;
+				b.continue_ = continue_;
 				return tl;
 			}
 		}
@@ -1095,8 +1091,7 @@ gb_internal bool lb_switch_stmt_can_be_trivial_jump_table(AstSwitchStmt *ss, boo
 	}
 
 	ast_node(body, BlockStmt, ss->body);
-	for_array(i, body->stmts) {
-		Ast *clause = body->stmts[i];
+	for (Ast *clause : body->stmts) {
 		ast_node(cc, CaseClause, clause);
 
 		if (cc->list.count == 0) {
@@ -1104,8 +1099,8 @@ gb_internal bool lb_switch_stmt_can_be_trivial_jump_table(AstSwitchStmt *ss, boo
 			continue;
 		}
 
-		for_array(j, cc->list) {
-			Ast *expr = unparen_expr(cc->list[j]);
+		for (Ast *expr : cc->list) {
+			expr = unparen_expr(expr);
 			if (is_ast_range(expr)) {
 				return false;
 			}
@@ -1166,8 +1161,7 @@ gb_internal void lb_build_switch_stmt(lbProcedure *p, AstSwitchStmt *ss, Scope *
 	LLVMValueRef switch_instr = nullptr;
 	if (is_trivial) {
 		isize num_cases = 0;
-		for_array(i, body->stmts) {
-			Ast *clause = body->stmts[i];
+		for (Ast *clause : body->stmts) {
 			ast_node(cc, CaseClause, clause);
 			num_cases += cc->list.count;
 		}
@@ -1204,8 +1198,8 @@ gb_internal void lb_build_switch_stmt(lbProcedure *p, AstSwitchStmt *ss, Scope *
 		}
 
 		lbBlock *next_cond = nullptr;
-		for_array(j, cc->list) {
-			Ast *expr = unparen_expr(cc->list[j]);
+		for (Ast *expr : cc->list) {
+			expr = unparen_expr(expr);
 
 			if (switch_instr != nullptr) {
 				lbValue on_val = {};
@@ -1384,8 +1378,7 @@ gb_internal void lb_build_type_switch_stmt(lbProcedure *p, AstTypeSwitchStmt *ss
 	lbBlock *default_block = nullptr;
 	isize num_cases = 0;
 
-	for_array(i, body->stmts) {
-		Ast *clause = body->stmts[i];
+	for (Ast *clause : body->stmts) {
 		ast_node(cc, CaseClause, clause);
 		num_cases += cc->list.count;
 		if (cc->list.count == 0) {
@@ -1405,8 +1398,7 @@ gb_internal void lb_build_type_switch_stmt(lbProcedure *p, AstTypeSwitchStmt *ss
 		switch_instr = LLVMBuildSwitch(p->builder, tag.value, else_block->block, cast(unsigned)num_cases);
 	}
 
-	for_array(i, body->stmts) {
-		Ast *clause = body->stmts[i];
+	for (Ast *clause : body->stmts) {
 		ast_node(cc, CaseClause, clause);
 		lb_open_scope(p, cc->scope);
 		if (cc->list.count == 0) {
@@ -1420,9 +1412,8 @@ gb_internal void lb_build_type_switch_stmt(lbProcedure *p, AstTypeSwitchStmt *ss
 		if (p->debug_info != nullptr) {
 			LLVMSetCurrentDebugLocation2(p->builder, lb_debug_location_from_ast(p, clause));
 		}
-		Type *case_type = nullptr;
-		for_array(type_index, cc->list) {
-			case_type = type_of_expr(cc->list[type_index]);
+		for (Ast *type_expr : cc->list) {
+			Type *case_type = type_of_expr(type_expr);
 			lbValue on_val = {};
 			if (switch_kind == TypeSwitch_Union) {
 				Type *ut = base_type(type_deref(parent.type));
@@ -1538,8 +1529,8 @@ gb_internal void lb_append_tuple_values(lbProcedure *p, Array<lbValue> *dst_valu
 	if (t->kind == Type_Tuple) {
 		lbTupleFix *tf = map_get(&p->tuple_fix_map, src_value.value);
 		if (tf) {
-			for_array(j, tf->values) {
-				array_add(dst_values, tf->values[j]);
+			for (lbValue const &value : tf->values) {
+				array_add(dst_values, value);
 			}
 		} else {
 			for_array(i, t->Tuple.variables) {
@@ -1560,8 +1551,7 @@ gb_internal void lb_build_assignment(lbProcedure *p, Array<lbAddr> &lvals, Slice
 
 	auto inits = array_make<lbValue>(permanent_allocator(), 0, lvals.count);
 
-	for_array(i, values) {
-		Ast *rhs = values[i];
+	for (Ast *rhs : values) {
 		lbValue init = lb_build_expr(p, rhs);
 		lb_append_tuple_values(p, &inits, init);
 	}
@@ -1971,8 +1961,7 @@ gb_internal void lb_build_assign_stmt_array(lbProcedure *p, TokenKind op, lbAddr
 		auto indices_handled = slice_make<bool>(temporary_allocator(), bt->Array.count);
 		auto indices = slice_make<i32>(temporary_allocator(), bt->Array.count);
 		i32 index_count = 0;
-		for_array(i, lhs.swizzle_large.indices) {
-			i32 index = lhs.swizzle_large.indices[i];
+		for (i32 index : lhs.swizzle_large.indices) {
 			if (indices_handled[index]) {
 				continue;
 			}
@@ -2049,8 +2038,7 @@ gb_internal void lb_build_assign_stmt(lbProcedure *p, AstAssignStmt *as) {
 	if (as->op.kind == Token_Eq) {
 		auto lvals = array_make<lbAddr>(permanent_allocator(), 0, as->lhs.count);
 
-		for_array(i, as->lhs) {
-			Ast *lhs = as->lhs[i];
+		for (Ast *lhs : as->lhs) {
 			lbAddr lval = {};
 			if (!is_blank_ident(lhs)) {
 				lval = lb_build_addr(p, lhs);
@@ -2185,8 +2173,7 @@ gb_internal void lb_build_stmt(lbProcedure *p, Ast *node) {
 
 		bool is_static = false;
 		if (vd->names.count > 0) {
-			for_array(i, vd->names) {
-				Ast *name = vd->names[i];
+			for (Ast *name : vd->names) {
 				if (!is_blank_ident(name)) {
 					GB_ASSERT(name->kind == Ast_Ident);
 					Entity *e = entity_of_node(name);
@@ -2208,8 +2195,7 @@ gb_internal void lb_build_stmt(lbProcedure *p, Ast *node) {
 
 		auto lvals = array_make<lbAddr>(permanent_allocator(), 0, vd->names.count);
 
-		for_array(i, vd->names) {
-			Ast *name = vd->names[i];
+		for (Ast *name : vd->names) {
 			lbAddr lval = {};
 			if (!is_blank_ident(name)) {
 				Entity *e = entity_of_node(name);

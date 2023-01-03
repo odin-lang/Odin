@@ -354,8 +354,7 @@ gb_internal void check_type_decl(CheckerContext *ctx, Entity *e, Ast *init_expr,
 
 			Type *t = base_type(e->type);
 			if (t->kind == Type_Enum) {
-				for_array(i, t->Enum.fields) {
-					Entity *f = t->Enum.fields[i];
+				for (Entity *f : t->Enum.fields) {
 					if (f->kind != Entity_Constant) {
 						continue;
 					}
@@ -1237,8 +1236,7 @@ gb_internal void check_proc_group_decl(CheckerContext *ctx, Entity *&pg_entity, 
 	PtrSet<Entity *> entity_set = {};
 	ptr_set_init(&entity_set, 2*pg->args.count);
 
-	for_array(i, pg->args) {
-		Ast *arg = pg->args[i];
+	for (Ast *arg : pg->args) {
 		Entity *e = nullptr;
 		Operand o = {};
 		if (arg->kind == Ast_Ident) {
@@ -1271,7 +1269,7 @@ gb_internal void check_proc_group_decl(CheckerContext *ctx, Entity *&pg_entity, 
 
 	ptr_set_destroy(&entity_set);
 
-	for_array(j, pge->entities) {
+	for (isize j = 0; j < pge->entities.count; j++) {
 		Entity *p = pge->entities[j];
 		if (p->type == t_invalid) {
 			// NOTE(bill): This invalid overload has already been handled
@@ -1462,8 +1460,7 @@ gb_internal bool check_proc_body(CheckerContext *ctx_, Token token, DeclInfo *de
 	{
 		if (type->Proc.param_count > 0) {
 			TypeTuple *params = &type->Proc.params->Tuple;
-			for_array(i, params->variables) {
-				Entity *e = params->variables[i];
+			for (Entity *e : params->variables) {
 				if (e->kind != Entity_Variable) {
 					continue;
 				}
@@ -1499,9 +1496,9 @@ gb_internal bool check_proc_body(CheckerContext *ctx_, Token token, DeclInfo *de
 		}
 	}
 
-	MUTEX_GUARD_BLOCK(ctx->scope->mutex) for_array(i, using_entities) {
-		Entity *e = using_entities[i].e;
-		Entity *uvar = using_entities[i].uvar;
+	MUTEX_GUARD_BLOCK(ctx->scope->mutex) for (auto const &entry : using_entities) {
+		Entity *e = entry.e;
+		Entity *uvar = entry.uvar;
 		Entity *prev = scope_insert_no_mutex(ctx->scope, uvar);
 		if (prev != nullptr) {
 			error(e->token, "Namespace collision while 'using' procedure argument '%.*s' of: %.*s", LIT(e->token.string), LIT(prev->token.string));
@@ -1519,8 +1516,8 @@ gb_internal bool check_proc_body(CheckerContext *ctx_, Token token, DeclInfo *de
 
 	check_open_scope(ctx, body);
 	{
-		for_array(i, using_entities) {
-			Entity *uvar = using_entities[i].uvar;
+		for (auto const &entry : using_entities) {
+			Entity *uvar = entry.uvar;
 			Entity *prev = scope_insert(ctx->scope, uvar);
 			gb_unused(prev);
 			// NOTE(bill): Don't err here
@@ -1537,12 +1534,10 @@ gb_internal bool check_proc_body(CheckerContext *ctx_, Token token, DeclInfo *de
 
 		decl->defer_use_checked = true;
 
-		for_array(i, bs->stmts) {
-			Ast *stmt = bs->stmts[i];
+		for (Ast *stmt : bs->stmts) {
 			if (stmt->kind == Ast_ValueDecl) {
 				ast_node(vd, ValueDecl, stmt);
-				for_array(j, vd->names) {
-					Ast *name = vd->names[j];
+				for (Ast *name : vd->names) {
 					if (!is_blank_ident(name)) {
 						if (name->kind == Ast_Ident) {
 							GB_ASSERT(name->Ident.entity != nullptr);
