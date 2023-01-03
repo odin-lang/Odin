@@ -64,11 +64,9 @@ gb_global std::atomic<isize> global_total_node_memory_allocated;
 
 // NOTE(bill): And this below is why is I/we need a new language! Discriminated unions are a pain in C/C++
 gb_internal Ast *alloc_ast_node(AstFile *f, AstKind kind) {
-	gbAllocator a = ast_allocator(f);
-
 	isize size = ast_node_size(kind);
 
-	Ast *node = cast(Ast *)gb_alloc(a, size);
+	Ast *node = cast(Ast *)arena_alloc(&global_thread_local_ast_arena, size, 16);
 	node->kind = kind;
 	node->file_id = f ? f->id : 0;
 

@@ -2535,13 +2535,13 @@ gb_internal bool are_types_identical_internal(Type *x, Type *y, bool check_tuple
 
 	if (x->kind == Type_Named) {
 		Entity *e = x->Named.type_name;
-		if (e != nullptr && e->kind == Entity_TypeName && e->TypeName.is_type_alias) {
+		if (e->TypeName.is_type_alias) {
 			x = x->Named.base;
 		}
 	}
 	if (y->kind == Type_Named) {
 		Entity *e = y->Named.type_name;
-		if (e != nullptr && e->kind == Entity_TypeName && e->TypeName.is_type_alias) {
+		if (e->TypeName.is_type_alias) {
 			y = y->Named.base;
 		}
 	}

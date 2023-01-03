@@ -821,9 +821,8 @@ gb_internal gb_inline bool is_ast_when_stmt(Ast *node) {
 
 gb_global gb_thread_local Arena global_thread_local_ast_arena = {};
 
-gb_internal gbAllocator ast_allocator(AstFile *f) {
-	Arena *arena = &global_thread_local_ast_arena;
-	return arena_allocator(arena);
+gb_internal gb_inline gbAllocator ast_allocator(AstFile *f) {
+	return arena_allocator(&global_thread_local_ast_arena);
 }
 
 gb_internal Ast *alloc_ast_node(AstFile *f, AstKind kind);

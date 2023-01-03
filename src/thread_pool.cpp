@@ -5,7 +5,7 @@ struct ThreadPool;
 
 gb_thread_local Thread *current_thread;
 
-gb_internal void thread_pool_init(ThreadPool *pool, gbAllocator const &a, isize thread_count, char const *worker_name);
+gb_internal void thread_pool_init(ThreadPool *pool, gbAllocator const &a, isize worker_count, char const *worker_name);
 gb_internal void thread_pool_destroy(ThreadPool *pool);
 gb_internal bool thread_pool_add_task(ThreadPool *pool, WorkerTaskProc *proc, void *data);
 gb_internal void thread_pool_wait(ThreadPool *pool);
@@ -25,9 +25,9 @@ gb_internal isize current_thread_index(void) {
 	return current_thread ? current_thread->idx : 0;
 }
 
-gb_internal void thread_pool_init(ThreadPool *pool, gbAllocator const &a, isize thread_count, char const *worker_name) {
+gb_internal void thread_pool_init(ThreadPool *pool, gbAllocator const &a, isize worker_count, char const *worker_name) {
 	pool->allocator = a;
-	slice_init(&pool->threads, a, thread_count + 1);
+	slice_init(&pool->threads, a, worker_count + 1);
 
 	// NOTE: this needs to be initialized before any thread starts
 	pool->running.store(true, std::memory_order_seq_cst);

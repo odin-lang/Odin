@@ -398,6 +398,7 @@ gb_internal void thread_init(ThreadPool *pool, Thread *t, isize idx) {
 	t->idx = idx;
 }
 
+
 gb_internal void thread_init_and_start(ThreadPool *pool, Thread *t, isize idx) {
 	thread_init(pool, t, idx);
 	isize stack_size = 0;

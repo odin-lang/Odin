@@ -13,11 +13,11 @@
 #endif
 #include "exact_value.cpp"
 #include "build_settings.cpp"
-
 gb_global ThreadPool global_thread_pool;
 gb_internal void init_global_thread_pool(void) {
 	isize thread_count = gb_max(build_context.thread_count, 1);
-	thread_pool_init(&global_thread_pool, permanent_allocator(), thread_count, "ThreadPoolWorker");
+	isize worker_count = thread_count-1;
+	thread_pool_init(&global_thread_pool, permanent_allocator(), worker_count, "ThreadPoolWorker");
 }
 gb_internal bool thread_pool_add_task(WorkerTaskProc *proc, void *data) {
 	return thread_pool_add_task(&global_thread_pool, proc, data);

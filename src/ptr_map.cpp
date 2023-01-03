@@ -27,6 +27,7 @@ struct PtrMap {
 
 
 gb_internal gb_inline u32 ptr_map_hash_key(uintptr key) {
+	u32 res;
 #if defined(GB_ARCH_64_BIT)
 	key = (~key) + (key << 21);
 	key = key ^ (key >> 24);
@@ -34,12 +35,13 @@ gb_internal gb_inline u32 ptr_map_hash_key(uintptr key) {
 	key = key ^ (key >> 14);
 	key = (key + (key << 2)) + (key << 4);
 	key = key ^ (key << 28);
-	return cast(u32)key;
+	res = cast(u32)key;
 #elif defined(GB_ARCH_32_BIT)
 	u32 state = ((u32)key) * 747796405u + 2891336453u;
 	u32 word = ((state >> ((state >> 28u) + 4u)) ^ state) * 277803737u;
-	return (word >> 22u) ^ word;
+	res = (word >> 22u) ^ word;
 #endif
+	return res ^ (res == MAP_SENTINEL);
 }
 gb_internal gb_inline u32 ptr_map_hash_key(void const *key) {
 	return ptr_map_hash_key((uintptr)key);
