@@ -1453,7 +1453,9 @@ gb_internal void add_type_and_value(CheckerContext *ctx, Ast *expr, AddressingMo
 	}
 
 	BlockingMutex *mutex = &ctx->info->type_and_value_mutex;
-	if (ctx->pkg) {
+	if (ctx->decl) {
+		mutex = &ctx->decl->type_and_value_mutex;
+	} else if (ctx->pkg) {
 		// TODO(bill): is a per package mutex is a good idea here?
 		mutex = &ctx->pkg->type_and_value_mutex;
 	}
@@ -1749,7 +1751,7 @@ gb_internal void add_type_info_type_internal(CheckerContext *c, Type *t) {
 	if (is_type_untyped(t)) {
 		return; // Could be nil
 	}
-	if (is_type_polymorphic(base_type(t))) {
+	if (is_type_polymorphic(t)) {
 		return;
 	}
 
@@ -1764,6 +1766,8 @@ gb_internal void add_type_info_type_internal(CheckerContext *c, Type *t) {
 
 		bool prev = false;
 		isize ti_index = -1;
+		// NOTE(bill): this is a linear lookup, and is most likely very costly
+		// as this map keeps growing linearly
 		for (auto const &e : c->info->type_info_map) {
 			if (are_types_identical_unique_tuples(t, e.key)) {
 				// Duplicate entry

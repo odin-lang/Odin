@@ -185,6 +185,8 @@ struct DeclInfo {
 	RwMutex     type_info_deps_mutex;
 	PtrSet<Type *>    type_info_deps;
 
+	BlockingMutex type_and_value_mutex;
+
 	Array<BlockLabel> labels;
 };
 
