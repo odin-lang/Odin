@@ -357,12 +357,6 @@ struct CheckerInfo {
 	BlockingMutex global_untyped_mutex;
 	BlockingMutex builtin_mutex;
 
-	// NOT recursive & only used at the end of `check_proc_body`
-	// and in `add_dependency`.
-	// This is a possible source of contention but probably not
-	// too much of a problem in practice
-	BlockingMutex deps_mutex;
-
 	BlockingMutex type_and_value_mutex;
 
 	RecursiveMutex lazy_mutex; // Mutex required for lazy type checking of specific files
