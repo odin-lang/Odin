@@ -23,9 +23,6 @@ template <typename T> gb_internal bool ptr_set_update (PtrSet<T> *s, T ptr); // 
 template <typename T> gb_internal bool ptr_set_exists (PtrSet<T> *s, T ptr);
 template <typename T> gb_internal void ptr_set_remove (PtrSet<T> *s, T ptr);
 template <typename T> gb_internal void ptr_set_clear  (PtrSet<T> *s);
-template <typename T> gb_internal void ptr_set_grow   (PtrSet<T> *s);
-template <typename T> gb_internal void ptr_set_rehash (PtrSet<T> *s, isize new_count);
-template <typename T> gb_internal void ptr_set_reserve(PtrSet<T> *h, isize cap);
 
 gb_internal gbAllocator ptr_set_allocator(void) {
 	return heap_allocator();
@@ -105,12 +102,6 @@ gb_internal bool ptr_set__full(PtrSet<T> *s) {
 }
 
 template <typename T>
-gb_internal gb_inline void ptr_set_grow(PtrSet<T> *s) {
-	isize new_count = gb_max(s->hashes.count<<1, 16);
-	ptr_set_rehash(s, new_count);
-}
-
-template <typename T>
 gb_internal void ptr_set_reset_entries(PtrSet<T> *s) {
 	for (isize i = 0; i < s->hashes.count; i++) {
 		s->hashes.data[i] = MAP_SENTINEL;
@@ -141,11 +132,12 @@ gb_internal void ptr_set_reserve(PtrSet<T> *s, isize cap) {
 	ptr_set_reset_entries(s);
 }
 
-
 template <typename T>
-gb_internal void ptr_set_rehash(PtrSet<T> *s, isize new_count) {
+gb_internal gb_inline void ptr_set_grow(PtrSet<T> *s) {
+	isize new_count = gb_max(s->hashes.count<<1, 16);
 	ptr_set_reserve(s, new_count);
 }
+
 
 template <typename T>
 gb_internal gb_inline bool ptr_set_exists(PtrSet<T> *s, T ptr) {
