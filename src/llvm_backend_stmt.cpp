@@ -50,13 +50,11 @@ gb_internal void lb_build_constant_value_decl(lbProcedure *p, AstValueDecl *vd) 
 			continue; // It's an alias
 		}
 
-		CheckerInfo *info = p->module->info;
 		DeclInfo *decl = decl_info_of_entity(e);
 		ast_node(pl, ProcLit, decl->proc_lit);
 		if (pl->body != nullptr) {
-			auto *found = map_get(&info->gen_procs, ident);
-			if (found) {
-				GenProcsData *gpd = *found;
+			GenProcsData *gpd = e->Procedure.gen_procs;
+			if (gpd) {
 				rw_mutex_shared_lock(&gpd->mutex);
 				for (Entity *e : gpd->procs) {
 					if (!ptr_set_exists(min_dep_set, e)) {

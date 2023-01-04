@@ -130,7 +130,7 @@ enum EntityConstantFlags : u32 {
 	EntityConstantFlag_ImplicitEnumValue = 1<<0,
 };
 
-enum ProcedureOptimizationMode : u32 {
+enum ProcedureOptimizationMode : u8 {
 	ProcedureOptimizationMode_Default,
 	ProcedureOptimizationMode_None,
 	ProcedureOptimizationMode_Minimal,
@@ -233,6 +233,9 @@ struct Entity {
 			String  link_name;
 			String  link_prefix;
 			DeferredProcedure deferred_procedure;
+
+			struct GenProcsData *gen_procs;
+			BlockingMutex gen_procs_mutex;
 			ProcedureOptimizationMode optimization_mode;
 			bool    is_foreign                 : 1;
 			bool    is_export                  : 1;
