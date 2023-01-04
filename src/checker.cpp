@@ -66,15 +66,10 @@ gb_internal void scope_reserve(Scope *scope, isize capacity) {
 }
 
 gb_internal void entity_graph_node_set_destroy(EntityGraphNodeSet *s) {
-	if (s->hashes.data != nullptr) {
-		ptr_set_destroy(s);
-	}
+	ptr_set_destroy(s);
 }
 
 gb_internal void entity_graph_node_set_add(EntityGraphNodeSet *s, EntityGraphNode *n) {
-	if (s->hashes.data == nullptr) {
-		ptr_set_init(s);
-	}
 	ptr_set_add(s, n);
 }
 
@@ -2556,7 +2551,6 @@ gb_internal Array<EntityGraphNode *> generate_entity_dependency_graph(CheckerInf
 							}
 							// IMPORTANT NOTE/TODO(bill, 2020-11-15): These three calls take the majority of the
 							// the time to process
-
 							entity_graph_node_set_add(&p->succ, s);
 							entity_graph_node_set_add(&s->pred, p);
 							// Remove edge to 'n'
@@ -2577,7 +2571,7 @@ gb_internal Array<EntityGraphNode *> generate_entity_dependency_graph(CheckerInf
 	for_array(i, G) {
 		EntityGraphNode *n = G[i];
 		n->index = i;
-		n->dep_count = n->succ.entries.count;
+		n->dep_count = n->succ.count;
 		GB_ASSERT(n->dep_count >= 0);
 	}
 
@@ -4228,7 +4222,7 @@ gb_internal Array<ImportGraphNode *> generate_import_dependency_graph(Checker *c
 	for (auto const &entry : M) {
 		auto n = entry.value;
 		n->index = i++;
-		n->dep_count = n->succ.entries.count;
+		n->dep_count = n->succ.count;
 		GB_ASSERT(n->dep_count >= 0);
 		array_add(&G, n);
 	}
@@ -5706,17 +5700,6 @@ gb_internal void check_parsed_files(Checker *c) {
 		check_scope_usage(c, f->scope);
 	}
 
-	TIME_SECTION("add untyped expression values");
-	// Add untyped expression values
-	for (UntypedExprInfo u = {}; mpmc_dequeue(&c->global_untyped_queue, &u); /**/) {
-		GB_ASSERT(u.expr != nullptr && u.info != nullptr);
-		if (is_type_typed(u.info->type)) {
-			compiler_error("%s (type %s) is typed!", expr_to_string(u.expr), type_to_string(u.info->type));
-		}
-		add_type_and_value(&c->builtin_ctx, u.expr, u.info->mode, u.info->type, u.info->value);
-	}
-
-
 	TIME_SECTION("add basic type information");
 	// Add "Basic" type information
 	for (isize i = 0; i < Basic_COUNT; i++) {
@@ -5809,6 +5792,16 @@ gb_internal void check_parsed_files(Checker *c) {
 	check_merge_queues_into_arrays(c);
 	GB_ASSERT(c->info.entity_queue.count.load(std::memory_order_relaxed) == 0);
 	GB_ASSERT(c->info.definition_queue.count.load(std::memory_order_relaxed) == 0);
+
+	TIME_SECTION("add untyped expression values");
+	// Add untyped expression values
+	for (UntypedExprInfo u = {}; mpmc_dequeue(&c->global_untyped_queue, &u); /**/) {
+		GB_ASSERT(u.expr != nullptr && u.info != nullptr);
+		if (is_type_typed(u.info->type)) {
+			compiler_error("%s (type %s) is typed!", expr_to_string(u.expr), type_to_string(u.info->type));
+		}
+		add_type_and_value(&c->builtin_ctx, u.expr, u.info->mode, u.info->type, u.info->value);
+	}
 
 	TIME_SECTION("sort init procedures");
 	check_sort_init_procedures(c);

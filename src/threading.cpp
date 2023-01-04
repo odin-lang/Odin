@@ -699,13 +699,13 @@ extern "C" int __ulock_wake(uint32_t operation, void *addr, uint64_t wake_value)
 gb_internal void futex_signal(Futex *f) {
 	for (;;) {
 		int ret = __ulock_wake(UL_COMPARE_AND_WAIT | ULF_NO_ERRNO, f, 0);
-		if (ret >= 0) {
+		if (ret == 0) {
 			return;
 		}
-		if (ret == EINTR || ret == EFAULT) {
+		if (ret == -EINTR || ret == -EFAULT) {
 			continue;
 		}
-		if (ret == ENOENT) {
+		if (ret == -ENOENT) {
 			return;
 		}
 		GB_PANIC("Failed in futex wake!\n");
@@ -716,13 +716,13 @@ gb_internal void futex_broadcast(Futex *f) {
 	for (;;) {
 		enum { ULF_WAKE_ALL = 0x00000100 };
 		int ret = __ulock_wake(UL_COMPARE_AND_WAIT | ULF_NO_ERRNO | ULF_WAKE_ALL, f, 0);
-		if (ret >= 0) {
+		if (ret == 0) {
 			return;
 		}
-		if (ret == EINTR || ret == EFAULT) {
+		if (ret == -EINTR || ret == -EFAULT) {
 			continue;
 		}
-		if (ret == ENOENT) {
+		if (ret == -ENOENT) {
 			return;
 		}
 		GB_PANIC("Failed in futex wake!\n");
@@ -732,16 +732,16 @@ gb_internal void futex_broadcast(Futex *f) {
 gb_internal void futex_wait(Futex *f, Footex val) {
 	for (;;) {
 		int ret = __ulock_wait(UL_COMPARE_AND_WAIT | ULF_NO_ERRNO, f, val, 0);
-		if (ret >= 0) {
+		if (ret == 0) {
 			if (*f != val) {
 				return;
 			}
 			continue;
 		}
-		if (ret == EINTR || ret == EFAULT) {
-			continue;
+		if (ret == -EINTR || ret == -EFAULT) {
+			-continue;
 		}
-		if (ret == ENOENT) {
+		if (ret == -ENOENT) {
 			return;
 		}
 

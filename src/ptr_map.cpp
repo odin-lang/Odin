@@ -41,7 +41,7 @@ gb_internal gb_inline u32 ptr_map_hash_key(uintptr key) {
 	u32 word = ((state >> ((state >> 28u) + 4u)) ^ state) * 277803737u;
 	res = (word >> 22u) ^ word;
 #endif
-	return res ^ (res == MAP_SENTINEL);
+	return res;
 }
 gb_internal gb_inline u32 ptr_map_hash_key(void const *key) {
 	return ptr_map_hash_key((uintptr)key);
