@@ -45,3 +45,11 @@ Size :: struct {
 	width:  Float,
 	height: Float,
 }
+
+when size_of(Float) == 4 {
+	_SIZE_ENCODING :: "{NSSize=ff}"
+	_POINT_ENCODING :: "{NSPoint=ff}"
+} else {
+	_SIZE_ENCODING :: "{CGSize=dd}"
+	_POINT_ENCODING :: "{CGPoint=dd}"
+}

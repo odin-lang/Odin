@@ -28,3 +28,13 @@ URL_initFileURLWithPath :: proc(self: ^URL, path: ^String) -> ^URL {
 URL_fileSystemRepresentation :: proc(self: ^URL) -> ^String {
 	return msgSend(^String, self, "fileSystemRepresentation")
 }
+
+@(objc_type=URL, objc_name="absoluteString")
+URL_absoluteString :: proc(self: ^URL) -> ^String {
+	return msgSend(^String, self, "absoluteString")
+}
+
+@(objc_type=URL, objc_name="path")
+URL_path :: proc(self: ^URL) -> ^String {
+	return msgSend(^String, self, "path")
+}
