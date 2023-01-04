@@ -3363,7 +3363,7 @@ gb_internal i64 type_size_of(Type *t) {
 	} else if (t->kind != Type_Basic && t->cached_size >= 0) {
 		return t->cached_size;
 	}
-	TypePath path = {0};
+	TypePath path{};
 	type_path_init(&path);
 	t->cached_size = type_size_of_internal(t, &path);
 	type_path_free(&path);
@@ -3381,7 +3381,7 @@ gb_internal i64 type_align_of(Type *t) {
 		return t->cached_align;
 	}
 
-	TypePath path = {0};
+	TypePath path{};
 	type_path_init(&path);
 	t->cached_align = type_align_of_internal(t, &path);
 	type_path_free(&path);
