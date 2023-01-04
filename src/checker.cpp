@@ -2030,7 +2030,10 @@ gb_internal void add_min_dep_type_info(Checker *c, Type *t) {
 		// Type already exists;
 		return;
 	}
-	map_set(set, ti_index, set->entries.count);
+	// IMPORTANT NOTE(bill): this must be copied as `map_set` takes a const ref
+	// and effectively assigns the `+1` of the value
+	isize const count = set->entries.count;
+	map_set(set, ti_index, count);
 
 	// Add nested types
 	if (t->kind == Type_Named) {

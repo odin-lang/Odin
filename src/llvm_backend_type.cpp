@@ -186,7 +186,7 @@ gb_internal void lb_setup_type_info_data(lbProcedure *p) { // NOTE(bill): Setup 
 		if (entry_index <= 0) {
 			continue;
 		}
-		
+
 		if (entries_handled[entry_index]) {
 			continue;
 		}
