@@ -327,6 +327,11 @@ struct GenProcsData {
 	RwMutex         mutex;
 };
 
+struct GenTypesData {
+	Array<Entity *> types;
+	RwMutex         mutex;
+};
+
 // CheckerInfo stores all the symbol information for a type-checked program
 struct CheckerInfo {
 	Checker *checker;
@@ -364,9 +369,9 @@ struct CheckerInfo {
 	RecursiveMutex lazy_mutex; // Mutex required for lazy type checking of specific files
 
 	BlockingMutex gen_procs_mutex;
-	RecursiveMutex gen_types_mutex;
+	RwMutex       gen_types_mutex;
 	PtrMap<Ast *, GenProcsData *> gen_procs; // Key: Ast * | Identifier -> Entity
-	PtrMap<Type *, Array<Entity *> > gen_types; 
+	PtrMap<Type *, GenTypesData > gen_types;
 
 	BlockingMutex type_info_mutex; // NOT recursive
 	Array<Type *> type_info_types;

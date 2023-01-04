@@ -222,7 +222,6 @@ gb_internal i64 get_file_size(String path) {
 gb_internal ReadDirectoryError read_directory(String path, Array<FileInfo> *fi) {
 	GB_ASSERT(fi != nullptr);
 
-	gbAllocator a = heap_allocator();
 
 	while (path.len > 0) {
 		Rune end = path[path.len-1];
@@ -239,9 +238,7 @@ gb_internal ReadDirectoryError read_directory(String path, Array<FileInfo> *fi) 
 		return ReadDirectory_InvalidPath;
 	}
 	{
-		char *c_str = alloc_cstring(a, path);
-		defer (gb_free(a, c_str));
-
+		char *c_str = alloc_cstring(temporary_allocator(), path);
 		gbFile f = {};
 		gbFileError file_err = gb_file_open(&f, c_str);
 		defer (gb_file_close(&f));
@@ -258,6 +255,7 @@ gb_internal ReadDirectoryError read_directory(String path, Array<FileInfo> *fi) 
 	}
 
 
+	gbAllocator a = heap_allocator();
 	char *new_path = gb_alloc_array(a, char, path.len+3);
 	defer (gb_free(a, new_path));
 
@@ -280,8 +278,8 @@ gb_internal ReadDirectoryError read_directory(String path, Array<FileInfo> *fi) 
 
 	do {
 		wchar_t *filename_w = file_data.cFileName;
-		i64 size = cast(i64)file_data.nFileSizeLow;
-		size |= (cast(i64)file_data.nFileSizeHigh) << 32;
+		u64 size = cast(u64)file_data.nFileSizeLow;
+		size |= (cast(u64)file_data.nFileSizeHigh) << 32;
 		String name = string16_to_string(a, make_string16_c(filename_w));
 		if (name == "." || name == "..") {
 			gb_free(a, name.text);
@@ -299,7 +297,7 @@ gb_internal ReadDirectoryError read_directory(String path, Array<FileInfo> *fi) 
 		FileInfo info = {};
 		info.name = name;
 		info.fullpath = path_to_full_path(a, filepath);
-		info.size = size;
+		info.size = cast(i64)size;
 		info.is_dir = (file_data.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY) != 0;
 		array_add(fi, info);
 	} while (FindNextFileW(find_file, &file_data));
