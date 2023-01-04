@@ -159,6 +159,11 @@ char const *ProcCheckedState_strings[ProcCheckedState_COUNT] {
 // DeclInfo is used to store information of certain declarations to allow for "any order" usage
 struct DeclInfo {
 	DeclInfo *    parent; // NOTE(bill): only used for procedure literals at the moment
+
+	BlockingMutex next_mutex;
+	DeclInfo *    next_child;
+	DeclInfo *    next_sibling;
+
 	Scope *       scope;
 
 	Entity *entity;

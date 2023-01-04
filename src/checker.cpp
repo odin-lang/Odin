@@ -174,6 +174,12 @@ gb_internal void import_graph_node_swap(ImportGraphNode **data, isize i, isize j
 
 gb_internal void init_decl_info(DeclInfo *d, Scope *scope, DeclInfo *parent) {
 	gb_zero_item(d);
+	if (parent) {
+		mutex_lock(&parent->next_mutex);
+		d->next_sibling = parent->next_child;
+		parent->next_child = d;
+		mutex_unlock(&parent->next_mutex);
+	}
 	d->parent = parent;
 	d->scope  = scope;
 	ptr_set_init(&d->deps, 0);
@@ -5316,15 +5322,8 @@ gb_internal WORKER_TASK_PROC(check_proc_info_worker_proc) {
 	return 1;
 }
 
-
-gb_internal void check_procedure_bodies(Checker *c) {
-	GB_ASSERT(c != nullptr);
-
-
+gb_internal void check_init_worker_data(Checker *c) {
 	u32 thread_count = cast(u32)global_thread_pool.threads.count;
-	if (!build_context.threaded_checker) {
-		thread_count = 1;
-	}
 
 	check_procedure_bodies_worker_data = gb_alloc_array(permanent_allocator(), CheckProcedureBodyWorkerData, thread_count);
 
@@ -5332,10 +5331,15 @@ gb_internal void check_procedure_bodies(Checker *c) {
 		check_procedure_bodies_worker_data[i].c = c;
 		map_init(&check_procedure_bodies_worker_data[i].untyped);
 	}
+}
 
-	defer (for (isize i = 0; i < thread_count; i++) {
-		map_destroy(&check_procedure_bodies_worker_data[i].untyped);
-	});
+gb_internal void check_procedure_bodies(Checker *c) {
+	GB_ASSERT(c != nullptr);
+
+	u32 thread_count = cast(u32)global_thread_pool.threads.count;
+	if (!build_context.threaded_checker) {
+		thread_count = 1;
+	}
 
 	if (thread_count == 1) {
 		UntypedExprInfoMap *untyped = &check_procedure_bodies_worker_data[0].untyped;
@@ -5636,6 +5640,50 @@ gb_internal void add_type_info_for_type_definitions(Checker *c) {
 	}
 }
 
+gb_internal void check_walk_all_dependencies(DeclInfo *decl) {
+	if (decl == nullptr) {
+		return;
+	}
+	for (DeclInfo *child = decl->next_child; child != nullptr; child = child->next_sibling) {
+		check_walk_all_dependencies(child);
+	}
+	if (decl->parent && decl->parent->entity && decl->parent->entity->kind == Entity_Procedure) {
+		Scope *ps = decl->parent->scope;
+		if (ps->flags & (ScopeFlag_File & ScopeFlag_Pkg & ScopeFlag_Global)) {
+			return;
+		} else {
+			// NOTE(bill): Add the dependencies from the procedure literal (lambda)
+			// But only at the procedure level
+			rw_mutex_shared_lock(&decl->deps_mutex);
+			rw_mutex_lock(&decl->parent->deps_mutex);
+
+			for (Entity *e : decl->deps) {
+				ptr_set_add(&decl->parent->deps, e);
+			}
+
+			rw_mutex_unlock(&decl->parent->deps_mutex);
+			rw_mutex_shared_unlock(&decl->deps_mutex);
+
+			rw_mutex_shared_lock(&decl->type_info_deps_mutex);
+			rw_mutex_lock(&decl->parent->type_info_deps_mutex);
+
+			for (Type *t : decl->type_info_deps) {
+				ptr_set_add(&decl->parent->type_info_deps, t);
+			}
+
+			rw_mutex_unlock(&decl->parent->type_info_deps_mutex);
+			rw_mutex_shared_unlock(&decl->type_info_deps_mutex);
+		}
+	}
+}
+
+gb_internal void check_update_dependency_tree_for_procedures(Checker *c) {
+	for (Entity *e : c->info.entities) {
+		DeclInfo *decl = e->decl_info;
+		check_walk_all_dependencies(decl);
+	}
+}
+
 gb_internal void check_parsed_files(Checker *c) {
 	TIME_SECTION("map full filepaths to scope");
 	add_type_info_type(&c->builtin_ctx, t_invalid);
@@ -5656,6 +5704,9 @@ gb_internal void check_parsed_files(Checker *c) {
 			c->info.runtime_package = p;
 		}
 	}
+
+	TIME_SECTION("init worker data");
+	check_init_worker_data(c);
 
 	TIME_SECTION("create file scopes");
 	check_create_file_scopes(c);
@@ -5743,6 +5794,9 @@ gb_internal void check_parsed_files(Checker *c) {
 	TIME_SECTION("add type info for type definitions");
 	add_type_info_for_type_definitions(c);
 	check_merge_queues_into_arrays(c);
+
+	TIME_SECTION("update dependency tree for procedures");
+	check_update_dependency_tree_for_procedures(c);
 
 	TIME_SECTION("generate minimum dependency set");
 	generate_minimum_dependency_set(c, c->info.entry_point);

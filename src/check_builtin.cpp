@@ -1118,8 +1118,7 @@ gb_internal bool cache_load_file_directive(CheckerContext *c, Ast *call, String 
 		}
 	});
 
-	char *c_str = alloc_cstring(heap_allocator(), path);
-	defer (gb_free(heap_allocator(), c_str));
+	char *c_str = alloc_cstring(temporary_allocator(), path);
 
 	gbFile f = {};
 	if (cache == nullptr) {
