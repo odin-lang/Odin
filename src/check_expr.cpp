@@ -435,18 +435,17 @@ gb_internal bool find_or_generate_polymorphic_procedure(CheckerContext *old_c, E
 	GB_ASSERT(base_entity->identifier.load()->kind == Ast_Ident);
 	GB_ASSERT(base_entity->kind == Entity_Procedure);
 
-
 	mutex_lock(&base_entity->Procedure.gen_procs_mutex); // @entity-mutex
-
 	gen_procs = base_entity->Procedure.gen_procs;
 	if (gen_procs) {
 		rw_mutex_shared_lock(&gen_procs->mutex); // @local-mutex
+
+		mutex_unlock(&base_entity->Procedure.gen_procs_mutex); // @entity-mutex
 
 		for (Entity *other : gen_procs->procs) {
 			Type *pt = base_type(other->type);
 			if (are_types_identical(pt, final_proc_type)) {
 				rw_mutex_shared_unlock(&gen_procs->mutex); // @local-mutex
-				mutex_unlock(&base_entity->Procedure.gen_procs_mutex); // @entity-mutex
 
 				if (poly_proc_data) {
 					poly_proc_data->gen_entity = other;
@@ -460,9 +459,9 @@ gb_internal bool find_or_generate_polymorphic_procedure(CheckerContext *old_c, E
 		gen_procs = gb_alloc_item(permanent_allocator(), GenProcsData);
 		gen_procs->procs.allocator = heap_allocator();
 		base_entity->Procedure.gen_procs = gen_procs;
+		mutex_unlock(&base_entity->Procedure.gen_procs_mutex); // @entity-mutex
 	}
 
-	mutex_unlock(&base_entity->Procedure.gen_procs_mutex); // @entity-mutex
 
 	{
 		// LEAK TODO(bill): This is technically a memory leak as it has to generate the type twice
