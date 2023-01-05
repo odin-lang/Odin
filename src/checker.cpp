@@ -2026,14 +2026,13 @@ gb_internal void add_min_dep_type_info(Checker *c, Type *t) {
 		ti_index = type_info_index(&c->info, t, false);
 	}
 	GB_ASSERT(ti_index >= 0);
-	if (map_get(set, ti_index)) {
-		// Type already exists;
-		return;
-	}
 	// IMPORTANT NOTE(bill): this must be copied as `map_set` takes a const ref
 	// and effectively assigns the `+1` of the value
 	isize const count = set->entries.count;
-	map_set(set, ti_index, count);
+	if (map_set_if_not_previously_exists(set, ti_index, count)) {
+		// Type already exists;
+		return;
+	}
 
 	// Add nested types
 	if (t->kind == Type_Named) {
@@ -5650,34 +5649,7 @@ gb_internal void check_walk_all_dependencies(DeclInfo *decl) {
 	for (DeclInfo *child = decl->next_child; child != nullptr; child = child->next_sibling) {
 		check_walk_all_dependencies(child);
 	}
-	if (decl->parent && decl->parent->entity && decl->parent->entity->kind == Entity_Procedure) {
-		Scope *ps = decl->parent->scope;
-		if (ps->flags & (ScopeFlag_File & ScopeFlag_Pkg & ScopeFlag_Global)) {
-			return;
-		} else {
-			// NOTE(bill): Add the dependencies from the procedure literal (lambda)
-			// But only at the procedure level
-			rw_mutex_shared_lock(&decl->deps_mutex);
-			rw_mutex_lock(&decl->parent->deps_mutex);
-
-			for (Entity *e : decl->deps) {
-				ptr_set_add(&decl->parent->deps, e);
-			}
-
-			rw_mutex_unlock(&decl->parent->deps_mutex);
-			rw_mutex_shared_unlock(&decl->deps_mutex);
-
-			rw_mutex_shared_lock(&decl->type_info_deps_mutex);
-			rw_mutex_lock(&decl->parent->type_info_deps_mutex);
-
-			for (Type *t : decl->type_info_deps) {
-				ptr_set_add(&decl->parent->type_info_deps, t);
-			}
-
-			rw_mutex_unlock(&decl->parent->type_info_deps_mutex);
-			rw_mutex_shared_unlock(&decl->type_info_deps_mutex);
-		}
-	}
+	add_deps_from_child_to_parent(decl);
 }
 
 gb_internal void check_update_dependency_tree_for_procedures(Checker *c) {

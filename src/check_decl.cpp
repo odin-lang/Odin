@@ -1411,6 +1411,37 @@ end:;
 }
 
 
+gb_internal void add_deps_from_child_to_parent(DeclInfo *decl) {
+	if (decl && decl->parent) {
+		Scope *ps = decl->parent->scope;
+		if (ps->flags & (ScopeFlag_File & ScopeFlag_Pkg & ScopeFlag_Global)) {
+			return;
+		} else {
+			// NOTE(bill): Add the dependencies from the procedure literal (lambda)
+			// But only at the procedure level
+			rw_mutex_shared_lock(&decl->deps_mutex);
+			rw_mutex_lock(&decl->parent->deps_mutex);
+
+			for (Entity *e : decl->deps) {
+				ptr_set_add(&decl->parent->deps, e);
+			}
+
+			rw_mutex_unlock(&decl->parent->deps_mutex);
+			rw_mutex_shared_unlock(&decl->deps_mutex);
+
+			rw_mutex_shared_lock(&decl->type_info_deps_mutex);
+			rw_mutex_lock(&decl->parent->type_info_deps_mutex);
+
+			for (Type *t : decl->type_info_deps) {
+				ptr_set_add(&decl->parent->type_info_deps, t);
+			}
+
+			rw_mutex_unlock(&decl->parent->type_info_deps_mutex);
+			rw_mutex_shared_unlock(&decl->type_info_deps_mutex);
+		}
+	}
+}
+
 struct ProcUsingVar {
 	Entity *e;
 	Entity *uvar;
@@ -1576,34 +1607,7 @@ gb_internal bool check_proc_body(CheckerContext *ctx_, Token token, DeclInfo *de
 
 	check_scope_usage(ctx->checker, ctx->scope);
 
-	// if (decl->parent) {
-	// 	Scope *ps = decl->parent->scope;
-	// 	if (ps->flags & (ScopeFlag_File & ScopeFlag_Pkg & ScopeFlag_Global)) {
-	// 		return true;
-	// 	} else {
-	// 		// NOTE(bill): Add the dependencies from the procedure literal (lambda)
-	// 		// But only at the procedure level
-	// 		rw_mutex_shared_lock(&decl->deps_mutex);
-	// 		rw_mutex_lock(&decl->parent->deps_mutex);
-
-	// 		for (Entity *e : decl->deps) {
-	// 			ptr_set_add(&decl->parent->deps, e);
-	// 		}
-
-	// 		rw_mutex_unlock(&decl->parent->deps_mutex);
-	// 		rw_mutex_shared_unlock(&decl->deps_mutex);
-
-	// 		rw_mutex_shared_lock(&decl->type_info_deps_mutex);
-	// 		rw_mutex_lock(&decl->parent->type_info_deps_mutex);
-
-	// 		for (Type *t : decl->type_info_deps) {
-	// 			ptr_set_add(&decl->parent->type_info_deps, t);
-	// 		}
-
-	// 		rw_mutex_unlock(&decl->parent->type_info_deps_mutex);
-	// 		rw_mutex_shared_unlock(&decl->type_info_deps_mutex);
-	// 	}
-	// }
+	add_deps_from_child_to_parent(decl);
 
 	return true;
 }

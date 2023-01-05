@@ -8777,8 +8777,8 @@ gb_internal ExprKind check_type_assertion(CheckerContext *c, Operand *o, Ast *no
 			return kind;
 		}
 
-		// add_type_info_type(c, o->type);
-		// add_type_info_type(c, bsrc->Union.variants[0]);
+		add_type_info_type(c, o->type);
+		add_type_info_type(c, bsrc->Union.variants[0]);
 
 		o->type = bsrc->Union.variants[0];
 		o->mode = Addressing_OptionalOk;
@@ -8810,8 +8810,8 @@ gb_internal ExprKind check_type_assertion(CheckerContext *c, Operand *o, Ast *no
 				return kind;
 			}
 
-			// add_type_info_type(c, o->type);
-			// add_type_info_type(c, t);
+			add_type_info_type(c, o->type);
+			add_type_info_type(c, t);
 
 			o->type = t;
 			o->mode = Addressing_OptionalOk;

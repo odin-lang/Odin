@@ -52,6 +52,7 @@ template <typename K, typename V> gb_internal void map_init             (PtrMap<
 template <typename K, typename V> gb_internal void map_destroy          (PtrMap<K, V> *h);
 template <typename K, typename V> gb_internal V *  map_get              (PtrMap<K, V> *h, K key);
 template <typename K, typename V> gb_internal void map_set              (PtrMap<K, V> *h, K key, V const &value);
+template <typename K, typename V> gb_internal bool map_set_if_not_previously_exists(PtrMap<K, V> *h, K key, V const &value); // returns true if it previously existed
 template <typename K, typename V> gb_internal void map_remove           (PtrMap<K, V> *h, K key);
 template <typename K, typename V> gb_internal void map_clear            (PtrMap<K, V> *h);
 template <typename K, typename V> gb_internal void map_grow             (PtrMap<K, V> *h);
@@ -239,6 +240,34 @@ gb_internal void map_set(PtrMap<K, V> *h, K key, V const &value) {
 		map_grow(h);
 	}
 }
+
+// returns true if it previously existed
+template <typename K, typename V>
+gb_internal bool map_set_if_not_previously_exists(PtrMap<K, V> *h, K key, V const &value) {
+	MapIndex index;
+	MapFindResult fr;
+	if (h->hashes.count == 0) {
+		map_grow(h);
+	}
+	fr = map__find(h, key);
+	if (fr.entry_index != MAP_SENTINEL) {
+		return true;
+	} else {
+		index = map__add_entry(h, key);
+		if (fr.entry_prev != MAP_SENTINEL) {
+			h->entries.data[fr.entry_prev].next = index;
+		} else {
+			h->hashes.data[fr.hash_index] = index;
+		}
+	}
+	h->entries.data[index].value = value;
+
+	if (map__full(h)) {
+		map_grow(h);
+	}
+	return false;
+}
+
 
 template <typename K, typename V>
 gb_internal void map__erase(PtrMap<K, V> *h, MapFindResult const &fr) {

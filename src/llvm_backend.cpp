@@ -1920,6 +1920,7 @@ gb_internal void lb_generate_code(lbGenerator *gen) {
 		if (!ptr_set_exists(min_dep_set, e)) {
 			continue;
 		}
+
 		DeclInfo *decl = decl_info_of_entity(e);
 		if (decl == nullptr) {
 			continue;
