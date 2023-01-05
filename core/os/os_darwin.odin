@@ -314,6 +314,7 @@ foreign libc {
 	@(link_name="realpath") _unix_realpath :: proc(path: cstring, resolved_path: rawptr) -> rawptr ---
 
 	@(link_name="strerror") _darwin_string_error :: proc(num : c.int) -> cstring ---
+	@(link_name="sysctlbyname") _sysctlbyname    :: proc(path: cstring, oldp: rawptr, oldlenp: rawptr, newp: rawptr, newlen: int) -> c.int ---
 
 	@(link_name="exit")    _unix_exit :: proc(status: c.int) -> ! ---
 }
@@ -771,6 +772,17 @@ get_page_size :: proc() -> int {
 	return page_size
 }
 
+get_processor_thread_count :: proc() -> int {
+	count : int = 0
+	count_size := size_of(count)
+	if _sysctlbyname("hw.logicalcpu", rawptr(count), rawptr(count_size), 0, 0) == 0 {
+		if count > 0 {
+			return count
+		}
+	}
+
+	return 1
+}
 
 _alloc_command_line_arguments :: proc() -> []string {
 	res := make([]string, len(runtime.args__))

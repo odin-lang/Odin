@@ -126,6 +126,28 @@ get_page_size :: proc() -> int {
 	return page_size
 }
 
+get_processor_thread_count :: proc() -> int {
+	length : c.int = 0
+	result := windows.GetLogicalProcessorInformation(nil, &length)
+
+	thread_count := 0
+	if !result && win32.GetLastError() == 122 && length > 0 {
+		processors := make([]windows.SYSTEM_LOGICAL_PROCESSOR_INFORMATION, length, context.temp_allocator)
+
+		result = windows.GetLogicalProcessorInformation(&processors[0], &length)
+		if result {
+			core_count := 0
+			for processor in processors {
+				if processor.Relationship == windows.RelationProcessorCore {
+					thread := intrinsics.count_ones(processor.ProcessorMask)
+					thread_count += thread
+				}
+			}
+		}
+	}
+
+	return thread_count
+}
 
 
 exit :: proc "contextless" (code: int) -> ! {
