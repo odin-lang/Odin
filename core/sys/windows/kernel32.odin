@@ -1032,7 +1032,7 @@ CACHE_DESCRIPTOR :: struct {
 SYSTEM_LOGICAL_PROCESSOR_INFORMATION :: struct {
 	ProcessorMask: ULONGPTR,
 	Relationship: LOGICAL_PROCESSOR_RELATIONSHIP,
-	DUMMYUNIONNAME :: union {
+	DUMMYUNIONNAME :: struct #raw_union {
 		ProcessorCore :: struct {
 			Flags: BYTE,
 		},
