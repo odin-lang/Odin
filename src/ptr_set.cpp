@@ -12,7 +12,7 @@ struct TypeIsPointer<T *> {
 template <typename T>
 struct PtrSet {
 	static_assert(TypeIsPointer<T>::value, "PtrSet::T must be a pointer");
-	static constexpr T TOMBSTONE = (T)(~uintptr(0));
+	static constexpr uintptr TOMBSTONE = ~(uintptr)(0ull);
 
 	T *   keys;
 	usize count;
@@ -133,7 +133,7 @@ gb_internal bool ptr_set_update(PtrSet<T> *s, T ptr) { // returns true if it pre
 	for (usize i = 0; i < s->capacity; i++) {
 		T *key = &s->keys[hash_index];
 		GB_ASSERT(*key != ptr);
-		if (*key == PtrSet<T>::TOMBSTONE || *key == nullptr) {
+		if (*key == (T)PtrSet<T>::TOMBSTONE || *key == nullptr) {
 			*key = ptr;
 			s->count++;
 			return false;
@@ -157,7 +157,7 @@ gb_internal void ptr_set_remove(PtrSet<T> *s, T ptr) {
 	isize index = ptr_set__find(s, ptr);
 	if (index >= 0) {
 		GB_ASSERT(s->count > 0);
-		s->keys[index] = PtrSet<T>::TOMBSTONE;
+		s->keys[index] = (T)PtrSet<T>::TOMBSTONE;
 		s->count--;
 	}
 }
@@ -180,7 +180,7 @@ struct PtrSetIterator {
 				return *this;
 			}
 			T key = set->keys[index];
-			if (key != nullptr && key != PtrSet<T>::TOMBSTONE) {
+			if (key != nullptr && key != (T)PtrSet<T>::TOMBSTONE) {
 				return *this;
 			}
 		}
@@ -202,7 +202,7 @@ gb_internal PtrSetIterator<T> begin(PtrSet<T> &set) noexcept {
 	usize index = 0;
 	while (index < set.capacity) {
 		T key = set.keys[index];
-		if (key != nullptr && key != PtrSet<T>::TOMBSTONE) {
+		if (key != nullptr && key != (T)PtrSet<T>::TOMBSTONE) {
 			break;
 		}
 		index++;

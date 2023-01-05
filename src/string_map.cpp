@@ -180,9 +180,18 @@ gb_internal void string_map_rehash(StringMap<T> *h, isize new_count) {
 
 template <typename T>
 gb_internal T *string_map_get(StringMap<T> *h, StringHashKey const &key) {
-	isize index = string_map__find(h, key).entry_index;
-	if (index != MAP_SENTINEL) {
-		return &h->entries.data[index].value;
+	MapFindResult fr = {MAP_SENTINEL, MAP_SENTINEL, MAP_SENTINEL};
+	if (h->hashes.count != 0) {
+		fr.hash_index = cast(MapIndex)(key.hash & (h->hashes.count-1));
+		fr.entry_index = h->hashes.data[fr.hash_index];
+		while (fr.entry_index != MAP_SENTINEL) {
+			auto *entry = &h->entries.data[fr.entry_index];
+			if (string_hash_key_equal(entry->key, key)) {
+				return &entry->value;
+			}
+			fr.entry_prev = fr.entry_index;
+			fr.entry_index = entry->next;
+		}
 	}
 	return nullptr;
 }

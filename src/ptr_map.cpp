@@ -112,11 +112,12 @@ gb_internal MapFindResult map__find(PtrMap<K, V> *h, K key) {
 	fr.hash_index = cast(MapIndex)(hash & (h->hashes.count-1));
 	fr.entry_index = h->hashes.data[fr.hash_index];
 	while (fr.entry_index != MAP_SENTINEL) {
-		if (h->entries.data[fr.entry_index].key == key) {
+		auto *entry = &h->entries.data[fr.entry_index];
+		if (entry->key == key) {
 			return fr;
 		}
 		fr.entry_prev = fr.entry_index;
-		fr.entry_index = h->entries.data[fr.entry_index].next;
+		fr.entry_index = entry->next;
 	}
 	return fr;
 }
@@ -190,18 +191,28 @@ gb_internal void map_rehash(PtrMap<K, V> *h, isize new_count) {
 
 template <typename K, typename V>
 gb_internal V *map_get(PtrMap<K, V> *h, K key) {
-	MapIndex index = map__find(h, key).entry_index;
-	if (index != MAP_SENTINEL) {
-		return &h->entries.data[index].value;
+	MapFindResult fr = {MAP_SENTINEL, MAP_SENTINEL, MAP_SENTINEL};
+	if (h->hashes.count != 0) {
+		u32 hash = ptr_map_hash_key(key);
+		fr.hash_index = cast(MapIndex)(hash & (h->hashes.count-1));
+		fr.entry_index = h->hashes.data[fr.hash_index];
+		while (fr.entry_index != MAP_SENTINEL) {
+			auto *entry = &h->entries.data[fr.entry_index];
+			if (entry->key == key) {
+				return &entry->value;
+			}
+			fr.entry_prev = fr.entry_index;
+			fr.entry_index = entry->next;
+		}
 	}
 	return nullptr;
 }
 
 template <typename K, typename V>
 gb_internal V &map_must_get(PtrMap<K, V> *h, K key) {
-	MapIndex index = map__find(h, key).entry_index;
-	GB_ASSERT(index != MAP_SENTINEL);
-	return h->entries.data[index].value;
+	V *ptr = map_get(h, key);
+	GB_ASSERT(ptr != nullptr);
+	return *ptr;
 }
 
 template <typename K, typename V>
