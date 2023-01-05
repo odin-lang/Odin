@@ -163,6 +163,7 @@ struct lbModule {
 	u32 nested_type_name_guid;
 
 	Array<lbProcedure *> procedures_to_generate;
+	Array<Entity *> global_procedures_and_types_to_create;
 
 	lbProcedure *curr_procedure;
 
