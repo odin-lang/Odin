@@ -1420,89 +1420,89 @@ gb_internal WORKER_TASK_PROC(lb_llvm_emit_worker_proc) {
 	return 0;
 }
 
-gb_internal WORKER_TASK_PROC(lb_llvm_function_pass_worker_proc) {
-	GB_ASSERT(MULTITHREAD_OBJECT_GENERATION);
 
-	auto m = cast(lbModule *)data;
+gb_internal void lb_llvm_function_pass_per_function_internal(lbModule *module, lbProcedure *p, lbFunctionPassManagerKind pass_manager_kind = lbFunctionPassManager_default) {
+	LLVMPassManagerRef pass_manager = module->function_pass_managers[pass_manager_kind];
+	lb_run_function_pass_manager(pass_manager, p);
+}
 
-	LLVMPassManagerRef default_function_pass_manager = LLVMCreateFunctionPassManagerForModule(m->mod);
-	LLVMPassManagerRef function_pass_manager_minimal = LLVMCreateFunctionPassManagerForModule(m->mod);
-	LLVMPassManagerRef function_pass_manager_size = LLVMCreateFunctionPassManagerForModule(m->mod);
-	LLVMPassManagerRef function_pass_manager_speed = LLVMCreateFunctionPassManagerForModule(m->mod);
+gb_internal void lb_llvm_function_pass_per_module(lbModule *m) {
+	{
+		GB_ASSERT(m->function_pass_managers[lbFunctionPassManager_default] == nullptr);
 
-	LLVMInitializeFunctionPassManager(default_function_pass_manager);
-	LLVMInitializeFunctionPassManager(function_pass_manager_minimal);
-	LLVMInitializeFunctionPassManager(function_pass_manager_size);
-	LLVMInitializeFunctionPassManager(function_pass_manager_speed);
+		m->function_pass_managers[lbFunctionPassManager_default]                = LLVMCreateFunctionPassManagerForModule(m->mod);
+		m->function_pass_managers[lbFunctionPassManager_default_without_memcpy] = LLVMCreateFunctionPassManagerForModule(m->mod);
+		m->function_pass_managers[lbFunctionPassManager_minimal]                = LLVMCreateFunctionPassManagerForModule(m->mod);
+		m->function_pass_managers[lbFunctionPassManager_size]                   = LLVMCreateFunctionPassManagerForModule(m->mod);
+		m->function_pass_managers[lbFunctionPassManager_speed]                  = LLVMCreateFunctionPassManagerForModule(m->mod);
 
-	lb_populate_function_pass_manager(m, default_function_pass_manager, false, build_context.optimization_level);
-	lb_populate_function_pass_manager_specific(m, function_pass_manager_minimal, 0);
-	lb_populate_function_pass_manager_specific(m, function_pass_manager_size,    1);
-	lb_populate_function_pass_manager_specific(m, function_pass_manager_speed,   2);
+		LLVMInitializeFunctionPassManager(m->function_pass_managers[lbFunctionPassManager_default]);
+		LLVMInitializeFunctionPassManager(m->function_pass_managers[lbFunctionPassManager_default_without_memcpy]);
+		LLVMInitializeFunctionPassManager(m->function_pass_managers[lbFunctionPassManager_minimal]);
+		LLVMInitializeFunctionPassManager(m->function_pass_managers[lbFunctionPassManager_size]);
+		LLVMInitializeFunctionPassManager(m->function_pass_managers[lbFunctionPassManager_speed]);
 
-	LLVMFinalizeFunctionPassManager(default_function_pass_manager);
-	LLVMFinalizeFunctionPassManager(function_pass_manager_minimal);
-	LLVMFinalizeFunctionPassManager(function_pass_manager_size);
-	LLVMFinalizeFunctionPassManager(function_pass_manager_speed);
+		lb_populate_function_pass_manager(m, m->function_pass_managers[lbFunctionPassManager_default],                false, build_context.optimization_level);
+		lb_populate_function_pass_manager(m, m->function_pass_managers[lbFunctionPassManager_default_without_memcpy], true,  build_context.optimization_level);
+		lb_populate_function_pass_manager_specific(m, m->function_pass_managers[lbFunctionPassManager_minimal], 0);
+		lb_populate_function_pass_manager_specific(m, m->function_pass_managers[lbFunctionPassManager_size],    1);
+		lb_populate_function_pass_manager_specific(m, m->function_pass_managers[lbFunctionPassManager_speed],   2);
 
-	if (m == &m->gen->default_module) {
-		lb_run_function_pass_manager(default_function_pass_manager, m->gen->startup_type_info);
-		lb_run_function_pass_manager(default_function_pass_manager, m->gen->startup_runtime);
-		lb_finalize_objc_names(m->gen->objc_names);
+		LLVMFinalizeFunctionPassManager(m->function_pass_managers[lbFunctionPassManager_default]);
+		LLVMFinalizeFunctionPassManager(m->function_pass_managers[lbFunctionPassManager_default_without_memcpy]);
+		LLVMFinalizeFunctionPassManager(m->function_pass_managers[lbFunctionPassManager_minimal]);
+		LLVMFinalizeFunctionPassManager(m->function_pass_managers[lbFunctionPassManager_size]);
+		LLVMFinalizeFunctionPassManager(m->function_pass_managers[lbFunctionPassManager_speed]);
 	}
 
-
-	LLVMPassManagerRef default_function_pass_manager_without_memcpy = LLVMCreateFunctionPassManagerForModule(m->mod);
-	LLVMInitializeFunctionPassManager(default_function_pass_manager_without_memcpy);
-	lb_populate_function_pass_manager(m, default_function_pass_manager_without_memcpy, true, build_context.optimization_level);
-	LLVMFinalizeFunctionPassManager(default_function_pass_manager_without_memcpy);
+	if (m == &m->gen->default_module) {
+		lb_llvm_function_pass_per_function_internal(m, m->gen->startup_type_info);
+		lb_llvm_function_pass_per_function_internal(m, m->gen->startup_runtime);
+		lb_llvm_function_pass_per_function_internal(m, m->gen->objc_names);
+	}
 
 	for (lbProcedure *p : m->procedures_to_generate) {
 		if (p->body != nullptr) { // Build Procedure
+			lbFunctionPassManagerKind pass_manager_kind = lbFunctionPassManager_default;
 			if (p->flags & lbProcedureFlag_WithoutMemcpyPass) {
-				lb_run_function_pass_manager(default_function_pass_manager_without_memcpy, p);
+				pass_manager_kind = lbFunctionPassManager_default_without_memcpy;
 			} else {
 				if (p->entity && p->entity->kind == Entity_Procedure) {
 					switch (p->entity->Procedure.optimization_mode) {
 					case ProcedureOptimizationMode_None:
 					case ProcedureOptimizationMode_Minimal:
-						lb_run_function_pass_manager(function_pass_manager_minimal, p);
+						pass_manager_kind = lbFunctionPassManager_minimal;
 						break;
 					case ProcedureOptimizationMode_Size:
-						lb_run_function_pass_manager(function_pass_manager_size, p);
+						pass_manager_kind = lbFunctionPassManager_size;
 						break;
 					case ProcedureOptimizationMode_Speed:
-						lb_run_function_pass_manager(function_pass_manager_speed, p);
-						break;
-					default:
-						lb_run_function_pass_manager(default_function_pass_manager, p);
+						pass_manager_kind = lbFunctionPassManager_speed;
 						break;
 					}
-				} else {
-					lb_run_function_pass_manager(default_function_pass_manager, p);
 				}
 			}
+
+			lb_llvm_function_pass_per_function_internal(m, p, pass_manager_kind);
 		}
 	}
 
 	for (auto const &entry : m->equal_procs) {
 		lbProcedure *p = entry.value;
-		lb_run_function_pass_manager(default_function_pass_manager, p);
+		lb_llvm_function_pass_per_function_internal(m, p);
 	}
 	for (auto const &entry : m->hasher_procs) {
 		lbProcedure *p = entry.value;
-		lb_run_function_pass_manager(default_function_pass_manager, p);
+		lb_llvm_function_pass_per_function_internal(m, p);
 	}
 	for (auto const &entry : m->map_get_procs) {
 		lbProcedure *p = entry.value;
-		lb_run_function_pass_manager(default_function_pass_manager, p);
+		lb_llvm_function_pass_per_function_internal(m, p);
 	}
 	for (auto const &entry : m->map_set_procs) {
 		lbProcedure *p = entry.value;
-		lb_run_function_pass_manager(default_function_pass_manager, p);
+		lb_llvm_function_pass_per_function_internal(m, p);
 	}
-
-	return 0;
 }
 
 
@@ -2125,6 +2125,10 @@ gb_internal bool lb_generate_code(lbGenerator *gen) {
 		}
 	}
 
+	if (gen->modules.entries.count <= 1) {
+		do_threading = false;
+	}
+
 	TIME_SECTION("LLVM Procedure Generation");
 	for (auto const &entry : gen->modules) {
 		lbModule *m = entry.value;
@@ -2142,6 +2146,7 @@ gb_internal bool lb_generate_code(lbGenerator *gen) {
 		lb_create_main_procedure(default_module, gen->startup_runtime);
 	}
 
+	TIME_SECTION("LLVM Procedure Generation (missing)");
 	for (auto const &entry : gen->modules) {
 		lbModule *m = entry.value;
 		// NOTE(bill): procedures may be added during generation
@@ -2153,6 +2158,11 @@ gb_internal bool lb_generate_code(lbGenerator *gen) {
 	}
 
 	thread_pool_wait();
+
+	if (gen->objc_names) {
+		TIME_SECTION("Finalize objc names");
+		lb_finalize_objc_names(gen->objc_names);
+	}
 
 	if (build_context.ODIN_DEBUG) {
 		TIME_SECTION("LLVM Debug Info Complete Types and Finalize");
@@ -2180,11 +2190,7 @@ gb_internal bool lb_generate_code(lbGenerator *gen) {
 	TIME_SECTION("LLVM Function Pass");
 	for (auto const &entry : gen->modules) {
 		lbModule *m = entry.value;
-		// if (do_threading) {
-			// thread_pool_add_task(lb_llvm_function_pass_worker_proc, m);
-		// } else {
-			lb_llvm_function_pass_worker_proc(m);
-		// }
+		lb_llvm_function_pass_per_module(m);
 	}
 	thread_pool_wait();
 

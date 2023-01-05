@@ -2,7 +2,9 @@ gb_internal LLVMMetadataRef lb_get_llvm_metadata(lbModule *m, void *key) {
 	if (key == nullptr) {
 		return nullptr;
 	}
+	mutex_lock(&m->debug_values_mutex);
 	auto found = map_get(&m->debug_values, key);
+	mutex_unlock(&m->debug_values_mutex);
 	if (found) {
 		return *found;
 	}
@@ -10,7 +12,9 @@ gb_internal LLVMMetadataRef lb_get_llvm_metadata(lbModule *m, void *key) {
 }
 gb_internal void lb_set_llvm_metadata(lbModule *m, void *key, LLVMMetadataRef value) {
 	if (key != nullptr) {
+		mutex_lock(&m->debug_values_mutex);
 		map_set(&m->debug_values, key, value);
+		mutex_unlock(&m->debug_values_mutex);
 	}
 }
 
@@ -491,6 +495,9 @@ gb_internal LLVMMetadataRef lb_get_base_scope_metadata(lbModule *m, Scope *scope
 }
 
 gb_internal LLVMMetadataRef lb_debug_type(lbModule *m, Type *type) {
+	mutex_lock(&m->debug_values_mutex);
+	defer (mutex_unlock(&m->debug_values_mutex));
+
 	GB_ASSERT(type != nullptr);
 	LLVMMetadataRef found = lb_get_llvm_metadata(m, type);
 	if (found != nullptr) {

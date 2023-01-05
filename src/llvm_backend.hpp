@@ -117,6 +117,16 @@ struct lbIncompleteDebugType {
 
 typedef Slice<i32> lbStructFieldRemapping;
 
+enum lbFunctionPassManagerKind {
+	lbFunctionPassManager_default,
+	lbFunctionPassManager_default_without_memcpy,
+	lbFunctionPassManager_minimal,
+	lbFunctionPassManager_size,
+	lbFunctionPassManager_speed,
+
+	lbFunctionPassManager_COUNT
+};
+
 struct lbModule {
 	LLVMModuleRef mod;
 	LLVMContextRef ctx;
@@ -158,6 +168,8 @@ struct lbModule {
 
 	LLVMDIBuilderRef debug_builder;
 	LLVMMetadataRef debug_compile_unit;
+
+	RecursiveMutex debug_values_mutex;
 	PtrMap<void *, LLVMMetadataRef> debug_values; 
 
 	Array<lbIncompleteDebugType> debug_incomplete_types;
@@ -167,6 +179,8 @@ struct lbModule {
 
 	PtrMap<Type *, lbAddr> map_cell_info_map; // address of runtime.Map_Info
 	PtrMap<Type *, lbAddr> map_info_map;      // address of runtime.Map_Cell_Info
+
+	LLVMPassManagerRef function_pass_managers[lbFunctionPassManager_COUNT];
 };
 
 struct lbGenerator {
