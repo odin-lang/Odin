@@ -1029,16 +1029,19 @@ CACHE_DESCRIPTOR :: struct {
 	Type: PROCESSOR_CACHE_TYPE,
 }
 
+ProcessorCore :: struct {
+	Flags: BYTE,
+}
+NumaNode :: struct {
+	NodeNumber: DWORD,
+}
 DUMMYUNIONNAME_u :: struct #raw_union {
-	ProcessorCore :: struct {
-		Flags: BYTE,
-	},
-	NumaNode :: struct {
-		NodeNumber: DWORD,
-	},
+	Core: ProcessorCore,
+	Node: NumaNode,
 	Cache: CACHE_DESCRIPTOR,
 	Reserved: [2]ULONGLONG,
-},
+}
+
 SYSTEM_LOGICAL_PROCESSOR_INFORMATION :: struct {
 	ProcessorMask: ULONGPTR,
 	Relationship: LOGICAL_PROCESSOR_RELATIONSHIP,
