@@ -32,7 +32,7 @@ gb_internal void lb_build_constant_value_decl(lbProcedure *p, AstValueDecl *vd) 
 			continue;
 		}
 
-		lb_set_nested_type_name_ir_mangled_name(e, p);
+		lb_set_nested_type_name_ir_mangled_name(e, p, p->module);
 	}
 
 	for_array(i, vd->names) {

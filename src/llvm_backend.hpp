@@ -132,6 +132,8 @@ struct lbModule {
 	PtrMap<void *, lbStructFieldRemapping> struct_field_remapping; // Key: LLVMTypeRef or Type *
 	i32 internal_type_level;
 
+	RecursiveMutex values_mutex;
+
 	PtrMap<Entity *, lbValue> values;           
 	PtrMap<Entity *, lbAddr>  soa_values;       
 	StringMap<lbValue>  members;
@@ -178,6 +180,7 @@ struct lbGenerator {
 	PtrMap<LLVMContextRef, lbModule *> modules_through_ctx; 
 	lbModule default_module;
 
+	BlockingMutex anonymous_proc_lits_mutex;
 	PtrMap<Ast *, lbProcedure *> anonymous_proc_lits; 
 
 	BlockingMutex foreign_mutex;

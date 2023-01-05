@@ -316,6 +316,7 @@ gb_internal bool lb_is_instr_terminating(LLVMValueRef instr) {
 
 
 gb_internal lbModule *lb_pkg_module(lbGenerator *gen, AstPackage *pkg) {
+	// NOTE(bill): no need for a mutex since it's immutable
 	auto *found = map_get(&gen->modules, pkg);
 	if (found) {
 		return *found;
@@ -1354,7 +1355,7 @@ gb_internal String lb_mangle_name(lbModule *m, Entity *e) {
 	return mangled_name;
 }
 
-gb_internal String lb_set_nested_type_name_ir_mangled_name(Entity *e, lbProcedure *p) {
+gb_internal String lb_set_nested_type_name_ir_mangled_name(Entity *e, lbProcedure *p, lbModule *module) {
 	// NOTE(bill, 2020-03-08): A polymorphic procedure may take a nested type declaration
 	// and as a result, the declaration does not have time to determine what it should be
 
@@ -1421,7 +1422,7 @@ gb_internal String lb_get_entity_name(lbModule *m, Entity *e, String default_nam
 	}
 
 	if (e->kind == Entity_TypeName && (e->scope->flags & ScopeFlag_File) == 0) {
-		return lb_set_nested_type_name_ir_mangled_name(e, nullptr);
+		return lb_set_nested_type_name_ir_mangled_name(e, nullptr, m);
 	}
 
 	String name = {};
@@ -2164,19 +2165,25 @@ gb_internal void lb_ensure_abi_function_type(lbModule *m, lbProcedure *p) {
 
 gb_internal void lb_add_entity(lbModule *m, Entity *e, lbValue val) {
 	if (e != nullptr) {
+		mutex_lock(&m->values_mutex);
 		map_set(&m->values, e, val);
+		mutex_unlock(&m->values_mutex);
 	}
 }
 gb_internal void lb_add_member(lbModule *m, String const &name, lbValue val) {
 	if (name.len > 0) {
+		mutex_lock(&m->values_mutex);
 		string_map_set(&m->members, name, val);
+		mutex_unlock(&m->values_mutex);
 	}
 }
 gb_internal void lb_add_procedure_value(lbModule *m, lbProcedure *p) {
+	mutex_lock(&m->values_mutex);
 	if (p->entity != nullptr) {
 		map_set(&m->procedure_values, p->value, p->entity);
 	}
 	string_map_set(&m->procedures, p->name, p);
+	mutex_unlock(&m->values_mutex);
 }
 
 
@@ -2519,6 +2526,8 @@ gb_internal lbValue lb_find_ident(lbProcedure *p, lbModule *m, Entity *e, Ast *e
 			return *found;
 		}
 	}
+	mutex_lock(&m->values_mutex);
+	defer (mutex_unlock(&m->values_mutex));
 
 	auto *found = map_get(&m->values, e);
 	if (found) {
@@ -2538,7 +2547,6 @@ gb_internal lbValue lb_find_ident(lbProcedure *p, lbModule *m, Entity *e, Ast *e
 	if (USE_SEPARATE_MODULES) {
 		lbModule *other_module = lb_pkg_module(m->gen, e->pkg);
 		if (other_module != m) {
-
 			String name = lb_get_entity_name(other_module, e);
 
 			lb_set_entity_from_other_modules_linkage_correctly(other_module, e, name);
@@ -2568,6 +2576,9 @@ gb_internal lbValue lb_find_procedure_value_from_entity(lbModule *m, Entity *e) 
 	GB_ASSERT(is_type_proc(e->type));
 	e = strip_entity_wrapping(e);
 	GB_ASSERT(e != nullptr);
+
+	mutex_lock(&m->values_mutex);
+	defer (mutex_unlock(&m->values_mutex));
 
 	auto *found = map_get(&m->values, e);
 	if (found) {
@@ -2656,6 +2667,10 @@ gb_internal lbValue lb_find_value_from_entity(lbModule *m, Entity *e) {
 	if (e->kind == Entity_Procedure) {
 		return lb_find_procedure_value_from_entity(m, e);
 	}
+
+	mutex_lock(&m->values_mutex);
+	defer (mutex_unlock(&m->values_mutex));
+
 
 	auto *found = map_get(&m->values, e);
 	if (found) {
