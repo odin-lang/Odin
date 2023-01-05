@@ -14,25 +14,16 @@ gb_internal gb_inline U const &bit_cast(V const &v) { return reinterpret_cast<U 
 
 
 gb_internal gb_inline i64 align_formula(i64 size, i64 align) {
-	if (align > 0) {
-		i64 result = size + align-1;
-		return result - result%align;
-	}
-	return size;
+	i64 result = size + align-1;
+	return result - (i64)((u64)result%(u64)align);
 }
 gb_internal gb_inline isize align_formula_isize(isize size, isize align) {
-	if (align > 0) {
-		isize result = size + align-1;
-		return result - result%align;
-	}
-	return size;
+	isize result = size + align-1;
+	return result - (isize)((usize)result%(usize)align);
 }
 gb_internal gb_inline void *align_formula_ptr(void *ptr, isize align) {
-	if (align > 0) {
-		uintptr result = (cast(uintptr)ptr) + align-1;
-		return (void *)(result - result%align);
-	}
-	return ptr;
+	uintptr result = (cast(uintptr)ptr) + align-1;
+	return (void *)(result - result%align);
 }
 
 
