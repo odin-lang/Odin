@@ -562,6 +562,7 @@ gb_internal void tpool_wake_addr(Futex *addr) {
 		if (ret >= 0) {
 			return;
 		}
+		ret = -ret;
 		if (ret == EINTR || ret == EFAULT) {
 			continue;
 		}
@@ -581,6 +582,7 @@ gb_internal void tpool_wait_on_addr(Futex *addr, Footex val) {
 			}
 			continue;
 		}
+		ret = -ret;
 		if (ret == EINTR || ret == EFAULT) {
 			continue;
 		}
