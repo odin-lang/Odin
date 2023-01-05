@@ -359,6 +359,9 @@ gb_internal void lb_run_remove_dead_instruction_pass(lbProcedure *p) {
 
 
 gb_internal void lb_run_function_pass_manager(LLVMPassManagerRef fpm, lbProcedure *p) {
+	if (p == nullptr) {
+		return;
+	}
 	LLVMRunFunctionPassManager(fpm, p->value);
 	// NOTE(bill): LLVMAddDCEPass doesn't seem to be exported in the official DLL's for LLVM
 	// which means we cannot rely upon it

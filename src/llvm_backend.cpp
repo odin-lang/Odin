@@ -990,10 +990,6 @@ gb_internal lbProcedure *lb_create_startup_type_info(lbModule *m) {
 	if (build_context.disallow_rtti) {
 		return nullptr;
 	}
-	LLVMPassManagerRef default_function_pass_manager = LLVMCreateFunctionPassManagerForModule(m->mod);
-	lb_populate_function_pass_manager(m, default_function_pass_manager, false, build_context.optimization_level);
-	LLVMFinalizeFunctionPassManager(default_function_pass_manager);
-
 	Type *proc_type = alloc_type_proc(nullptr, nullptr, 0, nullptr, 0, false, ProcCC_CDecl);
 
 	lbProcedure *p = lb_create_dummy_procedure(m, str_lit(LB_STARTUP_TYPE_INFO_PROC_NAME), proc_type);
@@ -1014,9 +1010,6 @@ gb_internal lbProcedure *lb_create_startup_type_info(lbModule *m) {
 		gb_printf_err("\n\n\n\n");
 		LLVMVerifyFunction(p->value, LLVMAbortProcessAction);
 	}
-
-	lb_run_function_pass_manager(default_function_pass_manager, p);
-
 	return p;
 }
 
@@ -1037,11 +1030,6 @@ gb_internal void lb_finalize_objc_names(lbProcedure *p) {
 	}
 	lbModule *m = p->module;
 
-	LLVMPassManagerRef default_function_pass_manager = LLVMCreateFunctionPassManagerForModule(m->mod);
-	lb_populate_function_pass_manager(m, default_function_pass_manager, false, build_context.optimization_level);
-	LLVMFinalizeFunctionPassManager(default_function_pass_manager);
-
-
 	auto args = array_make<lbValue>(permanent_allocator(), 1);
 
 	LLVMSetLinkage(p->value, LLVMInternalLinkage);
@@ -1061,16 +1049,9 @@ gb_internal void lb_finalize_objc_names(lbProcedure *p) {
 	}
 
 	lb_end_procedure_body(p);
-
-	lb_run_function_pass_manager(default_function_pass_manager, p);
-
 }
 
 gb_internal lbProcedure *lb_create_startup_runtime(lbModule *main_module, lbProcedure *startup_type_info, lbProcedure *objc_names, Array<lbGlobalVariable> &global_variables) { // Startup Runtime
-	LLVMPassManagerRef default_function_pass_manager = LLVMCreateFunctionPassManagerForModule(main_module->mod);
-	lb_populate_function_pass_manager(main_module, default_function_pass_manager, false, build_context.optimization_level);
-	LLVMFinalizeFunctionPassManager(default_function_pass_manager);
-
 	Type *proc_type = alloc_type_proc(nullptr, nullptr, 0, nullptr, 0, false, ProcCC_Odin);
 
 	lbProcedure *p = lb_create_dummy_procedure(main_module, str_lit(LB_STARTUP_RUNTIME_PROC_NAME), proc_type);
@@ -1174,8 +1155,6 @@ gb_internal lbProcedure *lb_create_startup_runtime(lbModule *main_module, lbProc
 		gb_printf_err("\n\n\n\n");
 		LLVMVerifyFunction(p->value, LLVMAbortProcessAction);
 	}
-
-	lb_run_function_pass_manager(default_function_pass_manager, p);
 
 	return p;
 }
@@ -1466,6 +1445,12 @@ gb_internal WORKER_TASK_PROC(lb_llvm_function_pass_worker_proc) {
 	LLVMFinalizeFunctionPassManager(function_pass_manager_size);
 	LLVMFinalizeFunctionPassManager(function_pass_manager_speed);
 
+	if (m == &m->gen->default_module) {
+		lb_run_function_pass_manager(default_function_pass_manager, m->gen->startup_type_info);
+		lb_run_function_pass_manager(default_function_pass_manager, m->gen->startup_runtime);
+		lb_finalize_objc_names(m->gen->objc_names);
+	}
+
 
 	LLVMPassManagerRef default_function_pass_manager_without_memcpy = LLVMCreateFunctionPassManagerForModule(m->mod);
 	LLVMInitializeFunctionPassManager(default_function_pass_manager_without_memcpy);
@@ -1584,6 +1569,16 @@ gb_internal WORKER_TASK_PROC(lb_generate_procedures_worker_proc) {
 	for (isize i = 0; i < m->procedures_to_generate.count; i++) {
 		lbProcedure *p = m->procedures_to_generate[i];
 		lb_generate_procedure(p->module, p);
+	}
+	return 0;
+}
+
+gb_internal WORKER_TASK_PROC(lb_generate_missing_procedures_to_check_worker_proc) {
+	lbModule *m = cast(lbModule *)data;
+	for (isize i = 0; i < m->missing_procedures_to_check.count; i++) {
+		lbProcedure *p = m->missing_procedures_to_check[i];
+		debugf("Generate missing procedure: %.*s\n", LIT(p->name));
+		lb_generate_procedure(m, p);
 	}
 	return 0;
 }
@@ -2055,13 +2050,11 @@ gb_internal bool lb_generate_code(lbGenerator *gen) {
 	}
 
 	TIME_SECTION("LLVM Runtime Type Information Creation");
-	lbProcedure *startup_type_info = lb_create_startup_type_info(default_module);
-
-	lbProcedure *objc_names = lb_create_objc_names(default_module);
+	gen->startup_type_info = lb_create_startup_type_info(default_module);
+	gen->objc_names = lb_create_objc_names(default_module);
 
 	TIME_SECTION("LLVM Runtime Startup Creation (Global Variables)");
-	lbProcedure *startup_runtime = lb_create_startup_runtime(default_module, startup_type_info, objc_names, global_variables);
-	gb_unused(startup_runtime);
+	gen->startup_runtime = lb_create_startup_runtime(default_module, gen->startup_type_info, gen->objc_names, global_variables);
 
 	if (build_context.ODIN_DEBUG) {
 		for (auto const &entry : builtin_pkg->scope->elements) {
@@ -2146,20 +2139,20 @@ gb_internal bool lb_generate_code(lbGenerator *gen) {
 
 	if (build_context.command_kind == Command_test && !already_has_entry_point) {
 		TIME_SECTION("LLVM main");
-		lb_create_main_procedure(default_module, startup_runtime);
+		lb_create_main_procedure(default_module, gen->startup_runtime);
 	}
 
 	for (auto const &entry : gen->modules) {
 		lbModule *m = entry.value;
 		// NOTE(bill): procedures may be added during generation
-		for (isize i = 0; i < m->missing_procedures_to_check.count; i++) {
-			lbProcedure *p = m->missing_procedures_to_check[i];
-			debugf("Generate missing procedure: %.*s\n", LIT(p->name));
-			lb_generate_procedure(m, p);
+		if (do_threading) {
+			thread_pool_add_task(lb_generate_missing_procedures_to_check_worker_proc, m);
+		} else {
+			lb_generate_missing_procedures_to_check_worker_proc(m);
 		}
 	}
 
-	lb_finalize_objc_names(objc_names);
+	thread_pool_wait();
 
 	if (build_context.ODIN_DEBUG) {
 		TIME_SECTION("LLVM Debug Info Complete Types and Finalize");

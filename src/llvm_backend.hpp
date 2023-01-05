@@ -189,6 +189,10 @@ struct lbGenerator {
 
 	std::atomic<u32> global_array_index;
 	std::atomic<u32> global_generated_index;
+
+	lbProcedure *startup_type_info;
+	lbProcedure *startup_runtime;
+	lbProcedure *objc_names;
 };
 
 
