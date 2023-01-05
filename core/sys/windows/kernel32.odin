@@ -371,7 +371,7 @@ foreign kernel32 {
 		lpTotalNumberOfFreeBytes: PULARGE_INTEGER,
 	) -> BOOL ---
 
-	GetLogicalProcessorInformation :: proc(buffer: ^LOGICAL_PROCESSOR_INFORMATION, returnedLength: PDWORD) -> BOOL ---
+	GetLogicalProcessorInformation :: proc(buffer: ^SYSTEM_LOGICAL_PROCESSOR_INFORMATION, returnedLength: PDWORD) -> BOOL ---
 }
 
 
