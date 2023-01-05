@@ -1579,7 +1579,16 @@ gb_internal void lb_generate_procedure(lbModule *m, lbProcedure *p) {
 }
 
 
-gb_internal void lb_generate_code(lbGenerator *gen) {
+gb_internal WORKER_TASK_PROC(lb_generate_procedures_worker_proc) {
+	lbModule *m = cast(lbModule *)data;
+	for (isize i = 0; i < m->procedures_to_generate.count; i++) {
+		lbProcedure *p = m->procedures_to_generate[i];
+		lb_generate_procedure(p->module, p);
+	}
+	return 0;
+}
+
+gb_internal bool lb_generate_code(lbGenerator *gen) {
 	TIME_SECTION("LLVM Initializtion");
 
 	isize thread_count = gb_max(build_context.thread_count, 1);
@@ -2126,12 +2135,14 @@ gb_internal void lb_generate_code(lbGenerator *gen) {
 	TIME_SECTION("LLVM Procedure Generation");
 	for (auto const &entry : gen->modules) {
 		lbModule *m = entry.value;
-		// NOTE(bill): procedures may be added during generation
-		for (isize i = 0; i < m->procedures_to_generate.count; i++) {
-			lbProcedure *p = m->procedures_to_generate[i];
-			lb_generate_procedure(m, p);
+		if (do_threading) {
+			thread_pool_add_task(lb_generate_procedures_worker_proc, m);
+		} else {
+			lb_generate_procedures_worker_proc(m);
 		}
 	}
+
+	thread_pool_wait();
 
 	if (build_context.command_kind == Command_test && !already_has_entry_point) {
 		TIME_SECTION("LLVM main");
@@ -2221,11 +2232,11 @@ gb_internal void lb_generate_code(lbGenerator *gen) {
 				if (LLVMPrintModuleToFile(m->mod, cast(char const *)filepath_ll.text, &llvm_error)) {
 					gb_printf_err("LLVM Error: %s\n", llvm_error);
 					gb_exit(1);
-					return;
+					return false;
 				}
 			}
 			gb_exit(1);
-			return;
+			return false;
 		}
 	}
 	llvm_error = nullptr;
@@ -2243,14 +2254,13 @@ gb_internal void lb_generate_code(lbGenerator *gen) {
 			if (LLVMPrintModuleToFile(m->mod, cast(char const *)filepath_ll.text, &llvm_error)) {
 				gb_printf_err("LLVM Error: %s\n", llvm_error);
 				gb_exit(1);
-				return;
+				return false;
 			}
 			array_add(&gen->output_temp_paths, filepath_ll);
 
 		}
 		if (build_context.build_mode == BuildMode_LLVM_IR) {
-			gb_exit(0);
-			return;
+			return true;
 		}
 	}
 
@@ -2270,9 +2280,8 @@ gb_internal void lb_generate_code(lbGenerator *gen) {
 	TIME_SECTION("LLVM Object Generation");
 	
 	if (build_context.ignore_llvm_build) {
-		gb_printf_err("LLVM SUCCESS!\n");
-		gb_exit(1);
-		return;
+		gb_printf_err("LLVM object generation has been ignored!\n");
+		return false;
 	}
 
 	if (do_threading) {
@@ -2315,10 +2324,12 @@ gb_internal void lb_generate_code(lbGenerator *gen) {
 			if (LLVMTargetMachineEmitToFile(m->target_machine, m->mod, cast(char *)filepath_obj.text, code_gen_file_type, &llvm_error)) {
 				gb_printf_err("LLVM Error: %s\n", llvm_error);
 				gb_exit(1);
-				return;
+				return false;
 			}
 		}
 	}
 
 	gb_sort_array(gen->foreign_libraries.data, gen->foreign_libraries.count, foreign_library_cmp);
+
+	return true;
 }

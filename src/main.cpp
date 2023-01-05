@@ -2784,19 +2784,19 @@ int main(int arg_count, char const **arg_ptr) {
 	if (!lb_init_generator(gen, checker)) {
 		return 1;
 	}
-	lb_generate_code(gen);
-
-	switch (build_context.build_mode) {
-	case BuildMode_Executable:
-	case BuildMode_DynamicLibrary:
-		i32 result = linker_stage(gen);
-		if (result) {
-			if (build_context.show_timings) {
-				show_timings(checker, &global_timings);
+	if (lb_generate_code(gen)) {
+		switch (build_context.build_mode) {
+		case BuildMode_Executable:
+		case BuildMode_DynamicLibrary:
+			i32 result = linker_stage(gen);
+			if (result) {
+				if (build_context.show_timings) {
+					show_timings(checker, &global_timings);
+				}
+				return result;
 			}
-			return result;
+			break;
 		}
-		break;
 	}
 
 	remove_temp_files(gen);
