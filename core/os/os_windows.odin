@@ -130,7 +130,7 @@ get_page_size :: proc() -> int {
 
 @(private)
 _processor_core_count :: proc() -> int {
-	length : c.int = 0
+	length : win32.DWORD = 0
 	result := win32.GetLogicalProcessorInformation(nil, &length)
 
 	thread_count := 0
@@ -140,9 +140,9 @@ _processor_core_count :: proc() -> int {
 		result = win32.GetLogicalProcessorInformation(&processors[0], &length)
 		if result {
 			for processor in processors {
-				if processor.Relationship == win32.RelationProcessorCore {
+				if processor.Relationship == .RelationProcessorCore {
 					thread := intrinsics.count_ones(processor.ProcessorMask)
-					thread_count += thread
+					thread_count += int(thread)
 				}
 			}
 		}
