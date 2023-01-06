@@ -4,7 +4,6 @@ package os
 import win32 "core:sys/windows"
 import "core:runtime"
 import "core:intrinsics"
-import "core:c"
 
 Handle    :: distinct uintptr
 File_Time :: distinct u64
