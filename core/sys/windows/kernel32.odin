@@ -1043,7 +1043,7 @@ DUMMYUNIONNAME_u :: struct #raw_union {
 }
 
 SYSTEM_LOGICAL_PROCESSOR_INFORMATION :: struct {
-	ProcessorMask: ULONGPTR,
+	ProcessorMask: ULONG_PTR,
 	Relationship: LOGICAL_PROCESSOR_RELATIONSHIP,
 	DummyUnion: DUMMYUNIONNAME_u,
 }

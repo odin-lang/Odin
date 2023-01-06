@@ -4,6 +4,7 @@ package os
 import win32 "core:sys/windows"
 import "core:runtime"
 import "core:intrinsics"
+import "core:c"
 
 Handle    :: distinct uintptr
 File_Time :: distinct u64
@@ -139,7 +140,7 @@ _processor_core_count :: proc() -> int {
 		result = win32.GetLogicalProcessorInformation(&processors[0], &length)
 		if result {
 			for processor in processors {
-				if processor.Relationship == windows.RelationProcessorCore {
+				if processor.Relationship == win32.RelationProcessorCore {
 					thread := intrinsics.count_ones(processor.ProcessorMask)
 					thread_count += thread
 				}
