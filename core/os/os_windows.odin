@@ -127,7 +127,8 @@ get_page_size :: proc() -> int {
 	return page_size
 }
 
-get_processor_thread_count :: proc() -> int {
+@(private)
+_processor_core_count :: proc() -> int {
 	length : c.int = 0
 	result := win32.GetLogicalProcessorInformation(nil, &length)
 
@@ -148,7 +149,6 @@ get_processor_thread_count :: proc() -> int {
 
 	return thread_count
 }
-
 
 exit :: proc "contextless" (code: int) -> ! {
 	runtime._cleanup_runtime_contextless()

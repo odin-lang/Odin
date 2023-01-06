@@ -879,9 +879,9 @@ get_page_size :: proc() -> int {
 	return page_size
 }
 
-get_processor_thread_count :: proc() -> int {
-	thread_count := int(_unix_get_nprocs())
-	return thread_count
+@(private)
+_processor_core_count :: proc() -> int {
+	return int(_unix_get_nprocs())
 }
 
 _alloc_command_line_arguments :: proc() -> []string {

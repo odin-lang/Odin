@@ -703,7 +703,8 @@ get_page_size :: proc() -> int {
 	return page_size
 }
 
-get_processor_thread_count :: proc() -> int {
+@(private)
+_processor_core_count :: proc() -> int {
 	count : int = 0
 	count_size := size_of(count)
 	if _sysctlbyname("hw.logicalcpu", &count, &count_size, nil, 0) == 0 {

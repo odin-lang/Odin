@@ -706,9 +706,10 @@ get_page_size :: proc() -> int {
 }
 
 _SC_NPROCESSORS_ONLN :: 503
-get_processor_thread_count :: proc() -> int {
-	thread_count := int(_sysconf(_SC_NPROCESSORS_ONLN))
-	return thread_count
+
+@(private)
+_processor_core_count :: proc() -> int {
+	return int(_sysconf(_SC_NPROCESSORS_ONLN))
 }
 
 _alloc_command_line_arguments :: proc() -> []string {
