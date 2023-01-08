@@ -678,7 +678,7 @@ _fmt_int :: proc(fi: ^Info, u: u64, base: int, is_signed: bool, bit_size: int, d
 		}
 	} else if fi.zero && fi.width_set {
 		prec = fi.width
-		if neg || fi.plus || fi.space {
+		if neg || fi.plus {
 			// There needs to be space for the "sign"
 			prec -= 1
 		}
@@ -697,7 +697,6 @@ _fmt_int :: proc(fi: ^Info, u: u64, base: int, is_signed: bool, bit_size: int, d
 	flags: strconv.Int_Flags
 	if fi.hash && !fi.zero { flags |= {.Prefix} }
 	if fi.plus             { flags |= {.Plus}   }
-	if fi.space            { flags |= {.Space}  }
 	s := strconv.append_bits(buf[start:], u, base, is_signed, bit_size, digits, flags)
 
 	if fi.hash && fi.zero && fi.indent == 0 {
@@ -744,7 +743,7 @@ _fmt_int_128 :: proc(fi: ^Info, u: u128, base: int, is_signed: bool, bit_size: i
 		}
 	} else if fi.zero && fi.width_set {
 		prec = fi.width
-		if neg || fi.plus || fi.space {
+		if neg || fi.plus {
 			// There needs to be space for the "sign"
 			prec -= 1
 		}
@@ -763,7 +762,6 @@ _fmt_int_128 :: proc(fi: ^Info, u: u128, base: int, is_signed: bool, bit_size: i
 	flags: strconv.Int_Flags
 	if fi.hash && !fi.zero { flags |= {.Prefix} }
 	if fi.plus             { flags |= {.Plus}   }
-	if fi.space            { flags |= {.Space}  }
 	s := strconv.append_bits_128(buf[start:], u, base, is_signed, bit_size, digits, flags)
 
 	if fi.hash && fi.zero && fi.indent == 0 {
@@ -867,79 +865,37 @@ _pad :: proc(fi: ^Info, s: string) {
 	}
 }
 
+fmt_float_as :: proc(fi: ^Info, v: f64, bit_size: int, verb: rune, float_fmt: byte) {
+	prec: int = 3
+	if fi.prec_set {
+		prec = fi.prec
+	}
+	buf: [386]byte
+
+	// Can return "NaN", "+Inf", "-Inf", "+<value>", "-<value>".
+	str := strconv.append_float(buf[:], v, float_fmt, prec, bit_size)
+	assert(len(str) >= 2);
+
+	if !fi.plus { // '+' modifier means preserve all signs.
+		switch {
+			case str[0] == 'N': // Not a "NaN"
+			case str[1] == 'I': // Not a "±Inf"
+			case str[0] == '+': // Found "+<value>"
+				// Strip + sign
+				str = str[1:] 
+		}
+	}
+
+	_pad(fi, str)
+}
+
 fmt_float :: proc(fi: ^Info, v: f64, bit_size: int, verb: rune) {
 	switch verb {
 	case 'f', 'F', 'g', 'G', 'v':
-		prec: int = 3
-		if fi.prec_set {
-			prec = fi.prec
-		}
-		buf: [386]byte
-
-		str := strconv.append_float(buf[1:], v, 'f', prec, bit_size)
-		b := buf[:len(str)+1]
-		if b[1] == '+' || b[1] == '-' {
-			b = b[1:]
-		} else {
-			b[0] = '+'
-		}
-
-		if fi.space && !fi.plus && b[0] == '+' {
-			b[0] = ' '
-		}
-
-		if len(b) > 1 && (b[1] == 'N' || b[1] == 'I') {
-			io.write_string(fi.writer, string(b), &fi.n)
-			return
-		}
-
-		if fi.plus || b[0] != '+' {
-			if fi.zero && fi.width_set && fi.width > len(b) {
-				io.write_byte(fi.writer, b[0], &fi.n)
-				fmt_write_padding(fi, fi.width - len(b))
-				io.write_string(fi.writer, string(b[1:]), &fi.n)
-			} else {
-				_pad(fi, string(b))
-			}
-		} else {
-			_pad(fi, string(b[1:]))
-		}
-
+		fmt_float_as(fi, v, bit_size, verb, 'f')
 	case 'e', 'E':
-		prec: int = 3
-		if fi.prec_set {
-			prec = fi.prec
-		}
-		buf: [386]byte
-
-		str := strconv.append_float(buf[1:], v, 'e', prec, bit_size)
-		b := buf[:len(str)+1]
-		if b[1] == '+' || b[1] == '-' {
-			b = b[1:]
-		} else {
-			b[0] = '+'
-		}
-
-		if fi.space && !fi.plus && b[0] == '+' {
-			b[0] = ' '
-		}
-
-		if len(b) > 1 && (b[1] == 'N' || b[1] == 'I') {
-			io.write_string(fi.writer, string(b), &fi.n)
-			return
-		}
-
-		if fi.plus || str[0] != '+' {
-			if fi.zero && fi.width_set && fi.width > len(b) {
-				io.write_byte(fi.writer, b[0], &fi.n)
-				fmt_write_padding(fi, fi.width - len(b))
-				io.write_string(fi.writer, string(b[1:]), &fi.n)
-			} else {
-				_pad(fi, string(b))
-			}
-		} else {
-			_pad(fi, string(b[1:]))
-		}
+		// BUG(): "%.3e" returns "3.000e+00"
+		fmt_float_as(fi, v, bit_size, verb, 'e')
 
 	case 'h', 'H':
 		prev_fi := fi^
