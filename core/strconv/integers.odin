@@ -3,7 +3,6 @@ package strconv
 Int_Flag :: enum {
 	Prefix,
 	Plus,
-	Space,
 }
 Int_Flags :: bit_set[Int_Flag]
 
