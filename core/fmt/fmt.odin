@@ -865,7 +865,7 @@ _pad :: proc(fi: ^Info, s: string) {
 	}
 }
 
-fmt_float_as :: proc(fi: ^Info, v: f64, bit_size: int, verb: rune, float_fmt: byte) {
+_fmt_float_as :: proc(fi: ^Info, v: f64, bit_size: int, verb: rune, float_fmt: byte) {
 	prec: int = 3
 	if fi.prec_set {
 		prec = fi.prec
@@ -874,7 +874,7 @@ fmt_float_as :: proc(fi: ^Info, v: f64, bit_size: int, verb: rune, float_fmt: by
 
 	// Can return "NaN", "+Inf", "-Inf", "+<value>", "-<value>".
 	str := strconv.append_float(buf[:], v, float_fmt, prec, bit_size)
-	assert(len(str) >= 2);
+	assert(len(str) >= 2)
 
 	if !fi.plus { // '+' modifier means preserve all signs.
 		switch {
@@ -892,10 +892,10 @@ fmt_float_as :: proc(fi: ^Info, v: f64, bit_size: int, verb: rune, float_fmt: by
 fmt_float :: proc(fi: ^Info, v: f64, bit_size: int, verb: rune) {
 	switch verb {
 	case 'f', 'F', 'g', 'G', 'v':
-		fmt_float_as(fi, v, bit_size, verb, 'f')
+		_fmt_float_as(fi, v, bit_size, verb, 'f')
 	case 'e', 'E':
 		// BUG(): "%.3e" returns "3.000e+00"
-		fmt_float_as(fi, v, bit_size, verb, 'e')
+		_fmt_float_as(fi, v, bit_size, verb, 'e')
 
 	case 'h', 'H':
 		prev_fi := fi^
