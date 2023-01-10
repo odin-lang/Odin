@@ -261,3 +261,7 @@ heap_allocator :: proc() -> mem.Allocator {
 		data = nil,
 	}
 }
+
+processor_core_count :: proc() -> int {
+	return _processor_core_count()
+}
