@@ -866,23 +866,16 @@ _pad :: proc(fi: ^Info, s: string) {
 }
 
 _fmt_float_as :: proc(fi: ^Info, v: f64, bit_size: int, verb: rune, float_fmt: byte) {
-	prec: int = 3
-	if fi.prec_set {
-		prec = fi.prec
-	}
+	prec := fi.prec if fi.prec_set else 3
 	buf: [386]byte
 
 	// Can return "NaN", "+Inf", "-Inf", "+<value>", "-<value>".
 	str := strconv.append_float(buf[:], v, float_fmt, prec, bit_size)
-	assert(len(str) >= 2)
 
-	if !fi.plus { // '+' modifier means preserve all signs.
-		switch {
-			case str[0] == 'N': // Not a "NaN"
-			case str[1] == 'I': // Not a "±Inf"
-			case str[0] == '+': // Found "+<value>"
-				// Strip + sign
-				str = str[1:] 
+	if !fi.plus {
+		// Strip sign from "+<value>" but not "+Inf".
+		if str[0] == '+' && str[1] != 'I' {
+			str = str[1:] 
 		}
 	}
 
