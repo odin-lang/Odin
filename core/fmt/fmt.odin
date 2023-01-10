@@ -547,7 +547,7 @@ _parse_int :: proc(s: string, offset: int) -> (result: int, new_offset: int, ok:
 	is_digit :: #force_inline proc(r: byte) -> bool { return '0' <= r && r <= '9' }
 
 	new_offset = offset
-	for new_offset <= len(s) {
+	for new_offset < len(s) {
 		c := s[new_offset]
 		if !is_digit(c) {
 			break
