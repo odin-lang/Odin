@@ -1851,7 +1851,7 @@ gb_internal bool lb_generate_code(lbGenerator *gen) {
 	isize thread_count = gb_max(build_context.thread_count, 1);
 	isize worker_count = thread_count-1;
 
-	LLVMBool do_threading = (LLVMIsMultithreaded() && USE_SEPARATE_MODULES && MULTITHREAD_OBJECT_GENERATION && worker_count > 0);
+	bool do_threading = !!(LLVMIsMultithreaded() && USE_SEPARATE_MODULES && MULTITHREAD_OBJECT_GENERATION && worker_count > 0);
 
 	lbModule *default_module = &gen->default_module;
 	CheckerInfo *info = gen->info;
