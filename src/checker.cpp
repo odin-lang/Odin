@@ -5339,7 +5339,7 @@ gb_internal void check_procedure_bodies(Checker *c) {
 	GB_ASSERT(c != nullptr);
 
 	u32 thread_count = cast(u32)global_thread_pool.threads.count;
-	if (!build_context.threaded_checker) {
+	if (build_context.no_threaded_checker) {
 		thread_count = 1;
 	}
 
