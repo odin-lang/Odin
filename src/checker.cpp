@@ -1735,10 +1735,6 @@ gb_internal void add_type_info_type(CheckerContext *c, Type *t) {
 	if (build_context.disallow_rtti) {
 		return;
 	}
-	add_type_info_type_internal(c, t);
-}
-
-gb_internal void add_type_info_type_internal(CheckerContext *c, Type *t) {
 	if (t == nullptr) {
 		return;
 	}
@@ -1747,6 +1743,14 @@ gb_internal void add_type_info_type_internal(CheckerContext *c, Type *t) {
 		return; // Could be nil
 	}
 	if (is_type_polymorphic(t)) {
+		return;
+	}
+
+	add_type_info_type_internal(c, t);
+}
+
+gb_internal void add_type_info_type_internal(CheckerContext *c, Type *t) {
+	if (t == nullptr) {
 		return;
 	}
 
