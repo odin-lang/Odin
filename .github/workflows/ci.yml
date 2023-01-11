@@ -123,11 +123,6 @@ jobs:
         run: |
           call "C:\Program Files (x86)\Microsoft Visual Studio\2019\Enterprise\VC\Auxiliary\Build\vcvars64.bat
           odin check examples/demo -vet
-      - name: Odin check -threaded-checker
-        shell: cmd
-        run: |
-          call "C:\Program Files (x86)\Microsoft Visual Studio\2019\Enterprise\VC\Auxiliary\Build\vcvars64.bat
-          odin check examples/demo -vet -threaded-checker
         timeout-minutes: 10
       - name: Odin run
         shell: cmd
