@@ -220,11 +220,9 @@ gb_internal DeclInfo *make_decl_info(Scope *scope, DeclInfo *parent) {
 
 
 
-gb_internal Scope *create_scope(CheckerInfo *info, Scope *parent, isize init_elements_capacity=DEFAULT_SCOPE_CAPACITY) {
+gb_internal Scope *create_scope(CheckerInfo *info, Scope *parent) {
 	Scope *s = gb_alloc_item(permanent_allocator(), Scope);
 	s->parent = parent;
-	string_map_init(&s->elements, init_elements_capacity);
-	ptr_set_init(&s->imported, 0);
 
 	if (parent != nullptr && parent != builtin_pkg->scope) {
 		Scope *prev_head_child = parent->head_child.exchange(s, std::memory_order_acq_rel);
@@ -246,7 +244,8 @@ gb_internal Scope *create_scope_from_file(CheckerInfo *info, AstFile *f) {
 	GB_ASSERT(f->pkg->scope != nullptr);
 
 	isize init_elements_capacity = gb_max(DEFAULT_SCOPE_CAPACITY, 2*f->total_file_decl_count);
-	Scope *s = create_scope(info, f->pkg->scope, init_elements_capacity);
+	Scope *s = create_scope(info, f->pkg->scope);
+	string_map_init(&s->elements, init_elements_capacity);
 
 
 	s->flags |= ScopeFlag_File;
@@ -265,7 +264,8 @@ gb_internal Scope *create_scope_from_package(CheckerContext *c, AstPackage *pkg)
 	}
 
 	isize init_elements_capacity = gb_max(DEFAULT_SCOPE_CAPACITY, 2*total_pkg_decl_count);
-	Scope *s = create_scope(c->info, builtin_pkg->scope, init_elements_capacity);
+	Scope *s = create_scope(c->info, builtin_pkg->scope);
+	string_map_init(&s->elements, init_elements_capacity);
 
 	s->flags |= ScopeFlag_Pkg;
 	s->pkg = pkg;
@@ -1753,7 +1753,8 @@ gb_internal void add_type_info_type_internal(CheckerContext *c, Type *t) {
 	add_type_info_dependency(c->info, c->decl, t);
 
 	MUTEX_GUARD_BLOCK(&c->info->type_info_mutex) {
-		auto found = map_get(&c->info->type_info_map, t);
+		MapFindResult fr;
+		auto found = map_try_get(&c->info->type_info_map, t, &fr);
 		if (found != nullptr) {
 			// Types have already been added
 			return;
@@ -1777,7 +1778,7 @@ gb_internal void add_type_info_type_internal(CheckerContext *c, Type *t) {
 			ti_index = c->info->type_info_types.count;
 			array_add(&c->info->type_info_types, t);
 		}
-		map_set(&c->checker->info.type_info_map, t, ti_index);
+		map_set_internal_from_try_get(&c->checker->info.type_info_map, t, ti_index, fr);
 
 		if (prev) {
 			// NOTE(bill): If a previous one exists already, no need to continue

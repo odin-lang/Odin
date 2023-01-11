@@ -2405,7 +2405,8 @@ gb_internal Type *make_soa_struct_internal(CheckerContext *ctx, Ast *array_typ_e
 		}
 		soa_struct->Struct.soa_count = cast(i32)count;
 
-		scope = create_scope(ctx->info, ctx->scope, 8);
+		scope = create_scope(ctx->info, ctx->scope);
+		string_map_init(&scope->elements, 8);
 		soa_struct->Struct.scope = scope;
 
 		String params_xyzw[4] = {

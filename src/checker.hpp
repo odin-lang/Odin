@@ -223,7 +223,7 @@ enum ScopeFlag : i32 {
 	ScopeFlag_ContextDefined = 1<<16,
 };
 
-enum { DEFAULT_SCOPE_CAPACITY = 29 };
+enum { DEFAULT_SCOPE_CAPACITY = 32 };
 
 struct Scope {
 	Ast *         node;

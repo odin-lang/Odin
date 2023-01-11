@@ -192,6 +192,26 @@ gb_internal void map_rehash(PtrMap<K, V> *h, isize new_count) {
 
 template <typename K, typename V>
 gb_internal V *map_get(PtrMap<K, V> *h, K key) {
+	MapIndex hash_index  = MAP_SENTINEL;
+	MapIndex entry_prev  = MAP_SENTINEL;
+	MapIndex entry_index = MAP_SENTINEL;
+	if (h->hashes.count != 0) {
+		u32 hash = ptr_map_hash_key(key);
+		hash_index = cast(MapIndex)(hash & (h->hashes.count-1));
+		entry_index = h->hashes.data[hash_index];
+		while (entry_index != MAP_SENTINEL) {
+			auto *entry = &h->entries.data[entry_index];
+			if (entry->key == key) {
+				return &entry->value;
+			}
+			entry_prev = entry_index;
+			entry_index = entry->next;
+		}
+	}
+	return nullptr;
+}
+template <typename K, typename V>
+gb_internal V *map_try_get(PtrMap<K, V> *h, K key, MapFindResult *fr_) {
 	MapFindResult fr = {MAP_SENTINEL, MAP_SENTINEL, MAP_SENTINEL};
 	if (h->hashes.count != 0) {
 		u32 hash = ptr_map_hash_key(key);
@@ -206,7 +226,23 @@ gb_internal V *map_get(PtrMap<K, V> *h, K key) {
 			fr.entry_index = entry->next;
 		}
 	}
+	if (h->hashes.count == 0 || map__full(h)) {
+		map_grow(h);
+	}
+	if (fr_) *fr_ = fr;
 	return nullptr;
+}
+
+
+template <typename K, typename V>
+gb_internal void map_set_internal_from_try_get(PtrMap<K, V> *h, K key, V const &value, MapFindResult const &fr) {
+	MapIndex index = map__add_entry(h, key);
+	if (fr.entry_prev != MAP_SENTINEL) {
+		h->entries.data[fr.entry_prev].next = index;
+	} else {
+		h->hashes.data[fr.hash_index] = index;
+	}
+	h->entries.data[index].value = value;
 }
 
 template <typename K, typename V>

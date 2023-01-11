@@ -2528,14 +2528,6 @@ gb_internal bool lookup_subtype_polymorphic_selection(Type *dst, Type *src, Sele
 gb_internal bool are_types_identical_internal(Type *x, Type *y, bool check_tuple_names);
 
 gb_internal bool are_types_identical(Type *x, Type *y) {
-	return are_types_identical_internal(x, y, false);
-}
-gb_internal bool are_types_identical_unique_tuples(Type *x, Type *y) {
-	return are_types_identical_internal(x, y, true);
-}
-
-
-gb_internal bool are_types_identical_internal(Type *x, Type *y, bool check_tuple_names) {
 	if (x == y) {
 		return true;
 	}
@@ -2560,6 +2552,64 @@ gb_internal bool are_types_identical_internal(Type *x, Type *y, bool check_tuple
 	if (x->kind != y->kind) {
 		return false;
 	}
+
+	return are_types_identical_internal(x, y, false);
+}
+gb_internal bool are_types_identical_unique_tuples(Type *x, Type *y) {
+	if (x == y) {
+		return true;
+	}
+
+	if (!x | !y) {
+		return false;
+	}
+
+	if (x->kind == Type_Named) {
+		Entity *e = x->Named.type_name;
+		if (e->TypeName.is_type_alias) {
+			x = x->Named.base;
+		}
+	}
+	if (y->kind == Type_Named) {
+		Entity *e = y->Named.type_name;
+		if (e->TypeName.is_type_alias) {
+			y = y->Named.base;
+		}
+	}
+	if (x->kind != y->kind) {
+		return false;
+	}
+
+	return are_types_identical_internal(x, y, true);
+}
+
+
+gb_internal bool are_types_identical_internal(Type *x, Type *y, bool check_tuple_names) {
+	if (x == y) {
+		return true;
+	}
+
+	if (!x | !y) {
+		return false;
+	}
+
+	#if 0
+	if (x->kind == Type_Named) {
+		Entity *e = x->Named.type_name;
+		if (e->TypeName.is_type_alias) {
+			x = x->Named.base;
+		}
+	}
+	if (y->kind == Type_Named) {
+		Entity *e = y->Named.type_name;
+		if (e->TypeName.is_type_alias) {
+			y = y->Named.base;
+		}
+	}
+	if (x->kind != y->kind) {
+		return false;
+	}
+	#endif
 
 	switch (x->kind) {
 	case Type_Generic:
