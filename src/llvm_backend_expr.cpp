@@ -61,8 +61,7 @@ gb_internal lbValue lb_emit_logical_binary_expr(lbProcedure *p, TokenKind op, As
 	GB_ASSERT(incoming_values.count > 0);
 
 	LLVMTypeRef phi_type = nullptr;
-	for_array(i, incoming_values) {
-		LLVMValueRef incoming_value = incoming_values[i];
+	for (LLVMValueRef incoming_value : incoming_values) {
 		if (!LLVMIsConstant(incoming_value)) {
 			phi_type = LLVMTypeOf(incoming_value);
 			break;
@@ -1921,8 +1920,7 @@ gb_internal lbValue lb_emit_conv(lbProcedure *p, lbValue value, Type *t) {
 	}
 
 	if (is_type_union(dst)) {
-		for_array(i, dst->Union.variants) {
-			Type *vt = dst->Union.variants[i];
+		for (Type *vt : dst->Union.variants) {
 			if (are_types_identical(vt, src_type)) {
 				lbAddr parent = lb_add_local_generated(p, t, true);
 				lb_emit_store_union_variant(p, parent.addr, value, vt);
@@ -3596,8 +3594,7 @@ gb_internal void lb_build_addr_compound_lit_populate(lbProcedure *p, Slice<Ast *
 	}
 }
 gb_internal void lb_build_addr_compound_lit_assign_array(lbProcedure *p, Array<lbCompoundLitElemTempData> const &temp_data) {
-	for_array(i, temp_data) {
-		auto td = temp_data[i];
+	for (auto const &td : temp_data) {
 		if (td.value.value != nullptr) {
 			if (td.elem_length > 0) {
 				auto loop_data = lb_loop_start(p, cast(isize)td.elem_length, t_i32);
@@ -4129,8 +4126,7 @@ gb_internal lbAddr lb_build_addr_compound_lit(lbProcedure *p, Ast *expr) {
 		lbValue err = lb_dynamic_map_reserve(p, v.addr, 2*cl->elems.count, pos);
 		gb_unused(err);
 
-		for_array(field_index, cl->elems) {
-			Ast *elem = cl->elems[field_index];
+		for (Ast *elem : cl->elems) {
 			ast_node(fv, FieldValue, elem);
 
 			lbValue key   = lb_build_expr(p, fv->field);
@@ -4304,8 +4300,7 @@ gb_internal lbAddr lb_build_addr_compound_lit(lbProcedure *p, Ast *expr) {
 			lb_addr_store(p, v, lb_const_value(p->module, type, exact_value_compound(expr)));
 
 			lbValue lower = lb_const_value(p->module, t_int, exact_value_i64(bt->BitSet.lower));
-			for_array(i, cl->elems) {
-				Ast *elem = cl->elems[i];
+			for (Ast *elem : cl->elems) {
 				GB_ASSERT(elem->kind != Ast_FieldValue);
 
 				if (lb_is_elem_const(elem, et)) {
@@ -4359,8 +4354,7 @@ gb_internal lbAddr lb_build_addr_compound_lit(lbProcedure *p, Ast *expr) {
 
 			// TODO(bill): reduce the need for individual `insertelement` if a `shufflevector`
 			// might be a better option
-			for_array(i, temp_data) {
-				auto td = temp_data[i];
+			for (auto const &td : temp_data) {
 				if (td.value.value != nullptr) {
 					if (td.elem_length > 0) {
 						for (i64 k = 0; k < td.elem_length; k++) {

@@ -1,3 +1,5 @@
+#define DEBUG_CHECK_ALL_PROCEDURES 1
+
 #include "entity.cpp"
 #include "types.cpp"
 
@@ -49,9 +51,11 @@ gb_internal bool check_rtti_type_disallowed(Ast *expr, Type *type, char const *f
 gb_internal void scope_reset(Scope *scope) {
 	if (scope == nullptr) return;
 
+	rw_mutex_lock(&scope->mutex);
 	scope->head_child.store(nullptr, std::memory_order_relaxed);
 	string_map_clear(&scope->elements);
 	ptr_set_clear(&scope->imported);
+	rw_mutex_unlock(&scope->mutex);
 }
 
 gb_internal void scope_reserve(Scope *scope, isize capacity) {
@@ -62,15 +66,10 @@ gb_internal void scope_reserve(Scope *scope, isize capacity) {
 }
 
 gb_internal void entity_graph_node_set_destroy(EntityGraphNodeSet *s) {
-	if (s->hashes.data != nullptr) {
-		ptr_set_destroy(s);
-	}
+	ptr_set_destroy(s);
 }
 
 gb_internal void entity_graph_node_set_add(EntityGraphNodeSet *s, EntityGraphNode *n) {
-	if (s->hashes.data == nullptr) {
-		ptr_set_init(s, heap_allocator());
-	}
 	ptr_set_add(s, n);
 }
 
@@ -115,15 +114,10 @@ gb_internal void entity_graph_node_swap(EntityGraphNode **data, isize i, isize j
 
 
 gb_internal void import_graph_node_set_destroy(ImportGraphNodeSet *s) {
-	if (s->hashes.data != nullptr) {
-		ptr_set_destroy(s);
-	}
+	ptr_set_destroy(s);
 }
 
 gb_internal void import_graph_node_set_add(ImportGraphNodeSet *s, ImportGraphNode *n) {
-	if (s->hashes.data == nullptr) {
-		ptr_set_init(s, heap_allocator());
-	}
 	ptr_set_add(s, n);
 }
 
@@ -179,12 +173,18 @@ gb_internal void import_graph_node_swap(ImportGraphNode **data, isize i, isize j
 
 
 gb_internal void init_decl_info(DeclInfo *d, Scope *scope, DeclInfo *parent) {
+	gb_zero_item(d);
+	if (parent) {
+		mutex_lock(&parent->next_mutex);
+		d->next_sibling = parent->next_child;
+		parent->next_child = d;
+		mutex_unlock(&parent->next_mutex);
+	}
 	d->parent = parent;
 	d->scope  = scope;
-	ptr_set_init(&d->deps,           heap_allocator());
-	ptr_set_init(&d->type_info_deps, heap_allocator());
-	array_init  (&d->labels,         heap_allocator());
-	mutex_init(&d->proc_checked_mutex);
+	ptr_set_init(&d->deps, 0);
+	ptr_set_init(&d->type_info_deps, 0);
+	d->labels.allocator = heap_allocator();
 }
 
 gb_internal DeclInfo *make_decl_info(Scope *scope, DeclInfo *parent) {
@@ -220,12 +220,9 @@ gb_internal DeclInfo *make_decl_info(Scope *scope, DeclInfo *parent) {
 
 
 
-gb_internal Scope *create_scope(CheckerInfo *info, Scope *parent, isize init_elements_capacity=DEFAULT_SCOPE_CAPACITY) {
+gb_internal Scope *create_scope(CheckerInfo *info, Scope *parent) {
 	Scope *s = gb_alloc_item(permanent_allocator(), Scope);
 	s->parent = parent;
-	string_map_init(&s->elements, heap_allocator(), init_elements_capacity);
-	ptr_set_init(&s->imported, heap_allocator(), 0);
-	mutex_init(&s->mutex);
 
 	if (parent != nullptr && parent != builtin_pkg->scope) {
 		Scope *prev_head_child = parent->head_child.exchange(s, std::memory_order_acq_rel);
@@ -247,7 +244,8 @@ gb_internal Scope *create_scope_from_file(CheckerInfo *info, AstFile *f) {
 	GB_ASSERT(f->pkg->scope != nullptr);
 
 	isize init_elements_capacity = gb_max(DEFAULT_SCOPE_CAPACITY, 2*f->total_file_decl_count);
-	Scope *s = create_scope(info, f->pkg->scope, init_elements_capacity);
+	Scope *s = create_scope(info, f->pkg->scope);
+	string_map_init(&s->elements, init_elements_capacity);
 
 
 	s->flags |= ScopeFlag_File;
@@ -266,7 +264,8 @@ gb_internal Scope *create_scope_from_package(CheckerContext *c, AstPackage *pkg)
 	}
 
 	isize init_elements_capacity = gb_max(DEFAULT_SCOPE_CAPACITY, 2*total_pkg_decl_count);
-	Scope *s = create_scope(c->info, builtin_pkg->scope, init_elements_capacity);
+	Scope *s = create_scope(c->info, builtin_pkg->scope);
+	string_map_init(&s->elements, init_elements_capacity);
 
 	s->flags |= ScopeFlag_Pkg;
 	s->pkg = pkg;
@@ -306,7 +305,6 @@ gb_internal void destroy_scope(Scope *scope) {
 
 	string_map_destroy(&scope->elements);
 	ptr_set_destroy(&scope->imported);
-	mutex_destroy(&scope->mutex);
 
 	// NOTE(bill): No need to free scope as it "should" be allocated in an arena (except for the global scope)
 }
@@ -398,9 +396,9 @@ gb_internal void scope_lookup_parent(Scope *scope, String const &name, Scope **s
 		StringHashKey key = string_hash_string(name);
 		for (Scope *s = scope; s != nullptr; s = s->parent) {
 			Entity **found = nullptr;
-			mutex_lock(&s->mutex);
+			rw_mutex_shared_lock(&s->mutex);
 			found = string_map_get(&s->elements, key);
-			mutex_unlock(&s->mutex);
+			rw_mutex_shared_unlock(&s->mutex);
 			if (found) {
 				Entity *e = *found;
 				if (gone_thru_proc) {
@@ -441,9 +439,7 @@ gb_internal Entity *scope_lookup(Scope *s, String const &name) {
 	return entity;
 }
 
-
-
-gb_internal Entity *scope_insert_with_name(Scope *s, String const &name, Entity *entity, bool use_mutex=true) {
+gb_internal Entity *scope_insert_with_name_no_mutex(Scope *s, String const &name, Entity *entity) {
 	if (name == "") {
 		return nullptr;
 	}
@@ -451,9 +447,6 @@ gb_internal Entity *scope_insert_with_name(Scope *s, String const &name, Entity 
 	Entity **found = nullptr;
 	Entity *result = nullptr;
 
-	if (use_mutex) mutex_lock(&s->mutex);
-	defer (if (use_mutex) mutex_unlock(&s->mutex));
-	
 	found = string_map_get(&s->elements, key);
 
 	if (found) {
@@ -482,9 +475,55 @@ end:;
 	return result;
 }
 
-gb_internal Entity *scope_insert(Scope *s, Entity *entity, bool use_mutex) {
+
+gb_internal Entity *scope_insert_with_name(Scope *s, String const &name, Entity *entity) {
+	if (name == "") {
+		return nullptr;
+	}
+	StringHashKey key = string_hash_string(name);
+	Entity **found = nullptr;
+	Entity *result = nullptr;
+
+	rw_mutex_lock(&s->mutex);
+
+	found = string_map_get(&s->elements, key);
+
+	if (found) {
+		if (entity != *found) {
+			result = *found;
+		}
+		goto end;
+	}
+	if (s->parent != nullptr && (s->parent->flags & ScopeFlag_Proc) != 0) {
+		found = string_map_get(&s->parent->elements, key);
+		if (found) {
+			if ((*found)->flags & EntityFlag_Result) {
+				if (entity != *found) {
+					result = *found;
+				}
+				goto end;
+			}
+		}
+	}
+
+	string_map_set(&s->elements, key, entity);
+	if (entity->scope == nullptr) {
+		entity->scope = s;
+	}
+end:;
+	rw_mutex_unlock(&s->mutex);
+
+	return result;
+}
+
+gb_internal Entity *scope_insert(Scope *s, Entity *entity) {
 	String name = entity->token.string;
-	return scope_insert_with_name(s, name, entity, use_mutex);
+	return scope_insert_with_name(s, name, entity);
+}
+
+gb_internal Entity *scope_insert_no_mutex(Scope *s, Entity *entity) {
+	String name = entity->token.string;
+	return scope_insert_with_name_no_mutex(s, name, entity);
 }
 
 
@@ -634,7 +673,8 @@ gb_internal void check_scope_usage(Checker *c, Scope *scope) {
 	Array<VettedEntity> vetted_entities = {};
 	array_init(&vetted_entities, heap_allocator());
 
-	MUTEX_GUARD_BLOCK(scope->mutex) for (auto const &entry : scope->elements) {
+	rw_mutex_shared_lock(&scope->mutex);
+	for (auto const &entry : scope->elements) {
 		Entity *e = entry.value;
 		if (e == nullptr) continue;
 		VettedEntity ve_unused = {};
@@ -651,6 +691,7 @@ gb_internal void check_scope_usage(Checker *c, Scope *scope) {
 			array_add(&vetted_entities, ve_shadowed);
 		}
 	}
+	rw_mutex_shared_unlock(&scope->mutex);
 
 	gb_sort(vetted_entities.data, vetted_entities.count, gb_size_of(VettedEntity), vetted_entity_variable_pos_cmp);
 
@@ -704,21 +745,17 @@ gb_internal void check_scope_usage(Checker *c, Scope *scope) {
 
 
 gb_internal void add_dependency(CheckerInfo *info, DeclInfo *d, Entity *e) {
-	mutex_lock(&info->deps_mutex);
+	rw_mutex_lock(&d->deps_mutex);
 	ptr_set_add(&d->deps, e);
-	mutex_unlock(&info->deps_mutex);
+	rw_mutex_unlock(&d->deps_mutex);
 }
-gb_internal void add_type_info_dependency(CheckerInfo *info, DeclInfo *d, Type *type, bool require_mutex) {
+gb_internal void add_type_info_dependency(CheckerInfo *info, DeclInfo *d, Type *type) {
 	if (d == nullptr) {
 		return;
 	}
-	if (require_mutex) {
-		mutex_lock(&info->deps_mutex);
-	}
+	rw_mutex_lock(&d->type_info_deps_mutex);
 	ptr_set_add(&d->type_info_deps, type);
-	if (require_mutex) {
-		mutex_unlock(&info->deps_mutex);
-	}
+	rw_mutex_unlock(&d->type_info_deps_mutex);
 }
 
 gb_internal AstPackage *get_core_package(CheckerInfo *info, String name) {
@@ -1104,26 +1141,22 @@ gb_internal void init_checker_info(CheckerInfo *i) {
 
 	array_init(&i->definitions,   a);
 	array_init(&i->entities,      a);
-	map_init(&i->global_untyped, a);
-	string_map_init(&i->foreigns, a);
-	map_init(&i->gen_procs,       a);
-	map_init(&i->gen_types,       a);
+	map_init(&i->global_untyped);
+	string_map_init(&i->foreigns);
+	// map_init(&i->gen_procs);
+	map_init(&i->gen_types);
 	array_init(&i->type_info_types, a);
-	map_init(&i->type_info_map,   a);
-	string_map_init(&i->files,    a);
-	string_map_init(&i->packages, a);
+	map_init(&i->type_info_map);
+	string_map_init(&i->files);
+	string_map_init(&i->packages);
 	array_init(&i->variable_init_order, a);
 	array_init(&i->testing_procedures, a, 0, 0);
 	array_init(&i->init_procedures, a, 0, 0);
 	array_init(&i->required_foreign_imports_through_force, a, 0, 0);
 
-
-
-	i->allow_identifier_uses = false;
-	if (i->allow_identifier_uses) {
-		array_init(&i->identifier_uses, a);
-	}
-
+	map_init(&i->objc_msgSend_types);
+	string_map_init(&i->load_file_cache);
+	array_init(&i->all_procedures, heap_allocator());
 
 	TIME_SECTION("checker info: mpmc queues");
 
@@ -1131,28 +1164,7 @@ gb_internal void init_checker_info(CheckerInfo *i) {
 	mpmc_init(&i->definition_queue, a, 1<<20);
 	mpmc_init(&i->required_global_variable_queue, a, 1<<10);
 	mpmc_init(&i->required_foreign_imports_through_force_queue, a, 1<<10);
-
-	TIME_SECTION("checker info: mutexes");
-
-	mutex_init(&i->gen_procs_mutex);
-	mutex_init(&i->gen_types_mutex);
-	mutex_init(&i->lazy_mutex);
-	mutex_init(&i->builtin_mutex);
-	mutex_init(&i->global_untyped_mutex);
-	mutex_init(&i->type_info_mutex);
-	mutex_init(&i->deps_mutex);
-	mutex_init(&i->type_and_value_mutex);
-	mutex_init(&i->identifier_uses_mutex);
-	mutex_init(&i->foreign_mutex);
-
-	semaphore_init(&i->collect_semaphore);
-
 	mpmc_init(&i->intrinsics_entry_point_usage, a, 1<<10); // just waste some memory here, even if it probably never used
-
-	mutex_init(&i->objc_types_mutex);
-	map_init(&i->objc_msgSend_types, a);
-	mutex_init(&i->load_file_mutex);
-	string_map_init(&i->load_file_cache, a);
 }
 
 gb_internal void destroy_checker_info(CheckerInfo *i) {
@@ -1160,14 +1172,13 @@ gb_internal void destroy_checker_info(CheckerInfo *i) {
 	array_free(&i->entities);
 	map_destroy(&i->global_untyped);
 	string_map_destroy(&i->foreigns);
-	map_destroy(&i->gen_procs);
+	// map_destroy(&i->gen_procs);
 	map_destroy(&i->gen_types);
 	array_free(&i->type_info_types);
 	map_destroy(&i->type_info_map);
 	string_map_destroy(&i->files);
 	string_map_destroy(&i->packages);
 	array_free(&i->variable_init_order);
-	array_free(&i->identifier_uses);
 	array_free(&i->required_foreign_imports_through_force);
 
 	mpmc_destroy(&i->entity_queue);
@@ -1175,20 +1186,7 @@ gb_internal void destroy_checker_info(CheckerInfo *i) {
 	mpmc_destroy(&i->required_global_variable_queue);
 	mpmc_destroy(&i->required_foreign_imports_through_force_queue);
 
-	mutex_destroy(&i->gen_procs_mutex);
-	mutex_destroy(&i->gen_types_mutex);
-	mutex_destroy(&i->lazy_mutex);
-	mutex_destroy(&i->builtin_mutex);
-	mutex_destroy(&i->global_untyped_mutex);
-	mutex_destroy(&i->type_info_mutex);
-	mutex_destroy(&i->deps_mutex);
-	mutex_destroy(&i->type_and_value_mutex);
-	mutex_destroy(&i->identifier_uses_mutex);
-	mutex_destroy(&i->foreign_mutex);
-
-	mutex_destroy(&i->objc_types_mutex);
 	map_destroy(&i->objc_msgSend_types);
-	mutex_init(&i->load_file_mutex);
 	string_map_destroy(&i->load_file_cache);
 }
 
@@ -1201,11 +1199,9 @@ gb_internal CheckerContext make_checker_context(Checker *c) {
 
 	ctx.type_path = new_checker_type_path();
 	ctx.type_level = 0;
-	mutex_init(&ctx.mutex);
 	return ctx;
 }
 gb_internal void destroy_checker_context(CheckerContext *ctx) {
-	mutex_destroy(&ctx->mutex);
 	destroy_checker_type_path(ctx->type_path);
 }
 
@@ -1226,7 +1222,6 @@ gb_internal void reset_checker_context(CheckerContext *ctx, AstFile *file, Untyp
 	GB_ASSERT(ctx->checker != nullptr);
 	mutex_lock(&ctx->mutex);
 
-	auto *queue = ctx->procs_to_check_queue;
 	auto type_path = ctx->type_path;
 	array_clear(type_path);
 
@@ -1242,7 +1237,6 @@ gb_internal void reset_checker_context(CheckerContext *ctx, AstFile *file, Untyp
 
 	add_curr_ast_file(ctx, file);
 
-	ctx->procs_to_check_queue = queue;
 	ctx->untyped = untyped;
 
 	mutex_unlock(&ctx->mutex);
@@ -1263,8 +1257,7 @@ gb_internal void init_checker(Checker *c) {
 	mpmc_init(&c->procs_with_deferred_to_check, a, 1<<10);
 
 	// NOTE(bill): 1 Mi elements should be enough on average
-	mpmc_init(&c->procs_to_check_queue, heap_allocator(), 1<<20);
-	semaphore_init(&c->procs_to_check_semaphore);
+	array_init(&c->procs_to_check, heap_allocator(), 0, 1<<20);
 
 	mpmc_init(&c->global_untyped_queue, a, 1<<20);
 
@@ -1276,9 +1269,7 @@ gb_internal void destroy_checker(Checker *c) {
 
 	destroy_checker_context(&c->builtin_ctx);
 
-	mpmc_destroy(&c->procs_to_check_queue);
-	semaphore_destroy(&c->procs_to_check_semaphore);
-
+	array_free(&c->procs_to_check);
 	mpmc_destroy(&c->global_untyped_queue);
 }
 
@@ -1360,9 +1351,9 @@ gb_internal ExprInfo *check_get_expr_info(CheckerContext *c, Ast *expr) {
 		}
 		return nullptr;
 	} else {
-		mutex_lock(&c->info->global_untyped_mutex);
-		defer (mutex_unlock(&c->info->global_untyped_mutex));
+		rw_mutex_shared_lock(&c->info->global_untyped_mutex);
 		ExprInfo **found = map_get(&c->info->global_untyped, expr);
+		rw_mutex_shared_unlock(&c->info->global_untyped_mutex);
 		if (found) {
 			return *found;
 		}
@@ -1374,9 +1365,9 @@ gb_internal void check_set_expr_info(CheckerContext *c, Ast *expr, AddressingMod
 	if (c->untyped != nullptr) {
 		map_set(c->untyped, expr, make_expr_info(mode, type, value, false));
 	} else {
-		mutex_lock(&c->info->global_untyped_mutex);
+		rw_mutex_lock(&c->info->global_untyped_mutex);
 		map_set(&c->info->global_untyped, expr, make_expr_info(mode, type, value, false));
-		mutex_unlock(&c->info->global_untyped_mutex);
+		rw_mutex_unlock(&c->info->global_untyped_mutex);
 	}
 }
 
@@ -1386,10 +1377,10 @@ gb_internal void check_remove_expr_info(CheckerContext *c, Ast *e) {
 		GB_ASSERT(map_get(c->untyped, e) == nullptr);
 	} else {
 		auto *untyped = &c->info->global_untyped;
-		mutex_lock(&c->info->global_untyped_mutex);
+		rw_mutex_lock(&c->info->global_untyped_mutex);
 		map_remove(untyped, e);
 		GB_ASSERT(map_get(untyped, e) == nullptr);
-		mutex_unlock(&c->info->global_untyped_mutex);
+		rw_mutex_unlock(&c->info->global_untyped_mutex);
 	}
 }
 
@@ -1445,7 +1436,7 @@ gb_internal void add_untyped(CheckerContext *c, Ast *expr, AddressingMode mode, 
 	check_set_expr_info(c, expr, mode, type, value);
 }
 
-gb_internal void add_type_and_value(CheckerInfo *i, Ast *expr, AddressingMode mode, Type *type, ExactValue value) {
+gb_internal void add_type_and_value(CheckerContext *ctx, Ast *expr, AddressingMode mode, Type *type, ExactValue value) {
 	if (expr == nullptr) {
 		return;
 	}
@@ -1456,7 +1447,15 @@ gb_internal void add_type_and_value(CheckerInfo *i, Ast *expr, AddressingMode mo
 		return;
 	}
 
-	mutex_lock(&i->type_and_value_mutex);
+	BlockingMutex *mutex = &ctx->info->type_and_value_mutex;
+	if (ctx->decl) {
+		mutex = &ctx->decl->type_and_value_mutex;
+	} else if (ctx->pkg) {
+		// TODO(bill): is a per package mutex is a good idea here?
+		mutex = &ctx->pkg->type_and_value_mutex;
+	}
+
+	mutex_lock(mutex);
 	Ast *prev_expr = nullptr;
 	while (prev_expr != expr) {
 		prev_expr = expr;
@@ -1478,7 +1477,7 @@ gb_internal void add_type_and_value(CheckerInfo *i, Ast *expr, AddressingMode mo
 
 		expr = unparen_expr(expr);
 	}
-	mutex_unlock(&i->type_and_value_mutex);
+	mutex_unlock(mutex);
 }
 
 gb_internal void add_entity_definition(CheckerInfo *i, Ast *identifier, Entity *entity) {
@@ -1589,12 +1588,6 @@ gb_internal void add_entity_use(CheckerContext *c, Ast *identifier, Entity *enti
 		entity->identifier.compare_exchange_strong(empty_ident, identifier);
 
 		identifier->Ident.entity = entity;
-
-		if (c->info->allow_identifier_uses) {
-			mutex_lock(&c->info->identifier_uses_mutex);
-			array_add(&c->info->identifier_uses, identifier);
-			mutex_unlock(&c->info->identifier_uses_mutex);
-		}
 
 		String dmsg = entity->deprecated_message;
 		if (dmsg.len > 0) {
@@ -1742,13 +1735,6 @@ gb_internal void add_type_info_type(CheckerContext *c, Type *t) {
 	if (build_context.disallow_rtti) {
 		return;
 	}
-
-	mutex_lock(&c->info->type_info_mutex);
-	add_type_info_type_internal(c, t);
-	mutex_unlock(&c->info->type_info_mutex);
-}
-
-gb_internal void add_type_info_type_internal(CheckerContext *c, Type *t) {
 	if (t == nullptr) {
 		return;
 	}
@@ -1756,39 +1742,52 @@ gb_internal void add_type_info_type_internal(CheckerContext *c, Type *t) {
 	if (is_type_untyped(t)) {
 		return; // Could be nil
 	}
-	if (is_type_polymorphic(base_type(t))) {
+	if (is_type_polymorphic(t)) {
 		return;
 	}
 
-	add_type_info_dependency(c->info, c->decl, t, false);
+	add_type_info_type_internal(c, t);
+}
 
-	auto found = map_get(&c->info->type_info_map, t);
-	if (found != nullptr) {
-		// Types have already been added
+gb_internal void add_type_info_type_internal(CheckerContext *c, Type *t) {
+	if (t == nullptr) {
 		return;
 	}
 
-	bool prev = false;
-	isize ti_index = -1;
-	for (auto const &e : c->info->type_info_map) {
-		if (are_types_identical_unique_tuples(t, e.key)) {
-			// Duplicate entry
-			ti_index = e.value;
-			prev = true;
-			break;
+	add_type_info_dependency(c->info, c->decl, t);
+
+	MUTEX_GUARD_BLOCK(&c->info->type_info_mutex) {
+		MapFindResult fr;
+		auto found = map_try_get(&c->info->type_info_map, t, &fr);
+		if (found != nullptr) {
+			// Types have already been added
+			return;
 		}
-	}
-	if (ti_index < 0) {
-		// Unique entry
-		// NOTE(bill): map entries grow linearly and in order
-		ti_index = c->info->type_info_types.count;
-		array_add(&c->info->type_info_types, t);
-	}
-	map_set(&c->checker->info.type_info_map, t, ti_index);
 
-	if (prev) {
-		// NOTE(bill): If a previous one exists already, no need to continue
-		return;
+		bool prev = false;
+		isize ti_index = -1;
+		// NOTE(bill): this is a linear lookup, and is most likely very costly
+		// as this map keeps growing linearly
+		for (auto const &e : c->info->type_info_map) {
+			if (are_types_identical_unique_tuples(t, e.key)) {
+				// Duplicate entry
+				ti_index = e.value;
+				prev = true;
+				break;
+			}
+		}
+		if (ti_index < 0) {
+			// Unique entry
+			// NOTE(bill): map entries grow linearly and in order
+			ti_index = c->info->type_info_types.count;
+			array_add(&c->info->type_info_types, t);
+		}
+		map_set_internal_from_try_get(&c->checker->info.type_info_map, t, ti_index, fr);
+
+		if (prev) {
+			// NOTE(bill): If a previous one exists already, no need to continue
+			return;
+		}
 	}
 
 	// Add nested types
@@ -1971,21 +1970,36 @@ gb_internal void add_type_info_type_internal(CheckerContext *c, Type *t) {
 
 
 
-gb_global bool global_procedure_body_in_worker_queue = false;
+gb_global std::atomic<bool> global_procedure_body_in_worker_queue;
+gb_global std::atomic<bool> global_after_checking_procedure_bodies;
 
-gb_internal void check_procedure_later(CheckerContext *c, ProcInfo *info) {
+gb_internal WORKER_TASK_PROC(check_proc_info_worker_proc);
+
+gb_internal void check_procedure_later(Checker *c, ProcInfo *info) {
 	GB_ASSERT(info != nullptr);
 	GB_ASSERT(info->decl != nullptr);
 
-	if (build_context.threaded_checker && global_procedure_body_in_worker_queue) {
-		GB_ASSERT(c->procs_to_check_queue != nullptr);
+	if (global_after_checking_procedure_bodies) {
+		Entity *e = info->decl->entity;
+		debugf("CHECK PROCEDURE LATER! %.*s :: %s {...}\n", LIT(e->token.string), type_to_string(e->type));
 	}
 
-	auto *queue = c->procs_to_check_queue ? c->procs_to_check_queue : &c->checker->procs_to_check_queue;
-	mpmc_enqueue(queue, info);
+	if (global_procedure_body_in_worker_queue.load()) {
+		thread_pool_add_task(check_proc_info_worker_proc, info);
+	} else {
+		array_add(&c->procs_to_check, info);
+	}
+
+	if (DEBUG_CHECK_ALL_PROCEDURES) {
+		MUTEX_GUARD_BLOCK(&c->info.all_procedures_mutex) {
+			GB_ASSERT(info != nullptr);
+			GB_ASSERT(info->decl != nullptr);
+			array_add(&c->info.all_procedures, info);
+		}
+	}
 }
 
-gb_internal void check_procedure_later(CheckerContext *c, AstFile *file, Token token, DeclInfo *decl, Type *type, Ast *body, u64 tags) {
+gb_internal void check_procedure_later(Checker *c, AstFile *file, Token token, DeclInfo *decl, Type *type, Ast *body, u64 tags) {
 	ProcInfo *info = gb_alloc_item(permanent_allocator(), ProcInfo);
 	info->file  = file;
 	info->token = token;
@@ -2017,8 +2031,11 @@ gb_internal void add_min_dep_type_info(Checker *c, Type *t) {
 		ti_index = type_info_index(&c->info, t, false);
 	}
 	GB_ASSERT(ti_index >= 0);
-	if (ptr_set_update(set, ti_index)) {
-		// Type Already exists
+	// IMPORTANT NOTE(bill): this must be copied as `map_set` takes a const ref
+	// and effectively assigns the `+1` of the value
+	isize const count = set->entries.count;
+	if (map_set_if_not_previously_exists(set, ti_index, count)) {
+		// Type already exists;
 		return;
 	}
 
@@ -2218,12 +2235,11 @@ gb_internal void add_dependency_to_set(Checker *c, Entity *entity) {
 		return;
 	}
 
-	for (auto const &entry : decl->type_info_deps) {
-		add_min_dep_type_info(c, entry.ptr);
+	for (Type *t : decl->type_info_deps) {
+		add_min_dep_type_info(c, t);
 	}
 
-	for (auto const &entry : decl->deps) {
-		Entity *e = entry.ptr;
+	for (Entity *e : decl->deps) {
 		add_dependency_to_set(c, e);
 		if (e->kind == Entity_Procedure && e->Procedure.is_foreign) {
 			Entity *fl = e->Procedure.foreign_library;
@@ -2261,8 +2277,8 @@ gb_internal void generate_minimum_dependency_set(Checker *c, Entity *start) {
 	isize entity_count = c->info.entities.count;
 	isize min_dep_set_cap = next_pow2_isize(entity_count*4); // empirically determined factor
 
-	ptr_set_init(&c->info.minimum_dependency_set, heap_allocator(), min_dep_set_cap);
-	ptr_set_init(&c->info.minimum_dependency_type_info_set, heap_allocator());
+	ptr_set_init(&c->info.minimum_dependency_set, min_dep_set_cap);
+	map_init(&c->info.minimum_dependency_type_info_set);
 
 #define FORCE_ADD_RUNTIME_ENTITIES(condition, ...) do {                                              \
 	if (condition) {                                                                             \
@@ -2486,7 +2502,7 @@ gb_internal bool is_entity_a_dependency(Entity *e) {
 
 gb_internal Array<EntityGraphNode *> generate_entity_dependency_graph(CheckerInfo *info, gbAllocator allocator) {
 	PtrMap<Entity *, EntityGraphNode *> M = {};
-	map_init(&M, allocator, info->entities.count);
+	map_init(&M, info->entities.count);
 	defer (map_destroy(&M));
 	for_array(i, info->entities) {
 		Entity *e = info->entities[i];
@@ -2506,8 +2522,7 @@ gb_internal Array<EntityGraphNode *> generate_entity_dependency_graph(CheckerInf
 		DeclInfo *decl = decl_info_of_entity(e);
 		GB_ASSERT(decl != nullptr);
 
-		for (auto const &entry : decl->deps) {
-			Entity *dep = entry.ptr;
+		for (Entity *dep : decl->deps) {
 			if (dep->flags & EntityFlag_Field) {
 				continue;
 			}
@@ -2533,15 +2548,12 @@ gb_internal Array<EntityGraphNode *> generate_entity_dependency_graph(CheckerInf
 		if (e->kind == Entity_Procedure) {
 			// Connect each pred 'p' of 'n' with each succ 's' and from
 			// the procedure node
-			for (auto const &p_entry : n->pred) {
-				EntityGraphNode *p = p_entry.ptr;
-
+			for (EntityGraphNode *p : n->pred) {
 				// Ignore self-cycles
 				if (p != n) {
 					// Each succ 's' of 'n' becomes a succ of 'p', and
 					// each pred 'p' of 'n' becomes a pred of 's'
-					for (auto const &s_entry : n->succ) {
-						EntityGraphNode *s = s_entry.ptr;
+					for (EntityGraphNode *s  : n->succ) {
 						// Ignore self-cycles
 						if (s != n) {
 							if (p->entity->kind == Entity_Procedure &&
@@ -2552,7 +2564,6 @@ gb_internal Array<EntityGraphNode *> generate_entity_dependency_graph(CheckerInf
 							}
 							// IMPORTANT NOTE/TODO(bill, 2020-11-15): These three calls take the majority of the
 							// the time to process
-
 							entity_graph_node_set_add(&p->succ, s);
 							entity_graph_node_set_add(&s->pred, p);
 							// Remove edge to 'n'
@@ -2573,7 +2584,7 @@ gb_internal Array<EntityGraphNode *> generate_entity_dependency_graph(CheckerInf
 	for_array(i, G) {
 		EntityGraphNode *n = G[i];
 		n->index = i;
-		n->dep_count = n->succ.entries.count;
+		n->dep_count = n->succ.count;
 		GB_ASSERT(n->dep_count >= 0);
 	}
 
@@ -3379,7 +3390,6 @@ gb_internal void check_decl_attributes(CheckerContext *c, Array<Ast *> const &at
 	}
 
 	StringSet set = {};
-	string_set_init(&set, heap_allocator());
 	defer (string_set_destroy(&set));
 
 	for_array(i, attributes) {
@@ -4197,7 +4207,7 @@ gb_internal void add_import_dependency_node(Checker *c, Ast *decl, PtrMap<AstPac
 
 gb_internal Array<ImportGraphNode *> generate_import_dependency_graph(Checker *c) {
 	PtrMap<AstPackage *, ImportGraphNode *> M = {};
-	map_init(&M, heap_allocator(), 2*c->parser->packages.count);
+	map_init(&M, 2*c->parser->packages.count);
 	defer (map_destroy(&M));
 
 	for_array(i, c->parser->packages) {
@@ -4225,7 +4235,7 @@ gb_internal Array<ImportGraphNode *> generate_import_dependency_graph(Checker *c
 	for (auto const &entry : M) {
 		auto n = entry.value;
 		n->index = i++;
-		n->dep_count = n->succ.entries.count;
+		n->dep_count = n->succ.count;
 		GB_ASSERT(n->dep_count >= 0);
 		array_add(&G, n);
 	}
@@ -4651,85 +4661,48 @@ gb_internal void check_create_file_scopes(Checker *c) {
 	}
 }
 
-struct ThreadProcCheckerSection {
-	Checker *checker;
-	isize offset;
-	isize count;
+struct CollectEntityWorkerData {
+	Checker *c;
+	CheckerContext ctx;
+	UntypedExprInfoMap untyped;
 };
 
+gb_global CollectEntityWorkerData *collect_entity_worker_data;
 
-gb_internal void check_with_workers(Checker *c, WorkerTaskProc *proc, isize total_count) {
-	isize thread_count = gb_max(build_context.thread_count, 1);
-	isize worker_count = thread_count-1; // NOTE(bill): The main thread will also be used for work
-	if (!build_context.threaded_checker) {
-		worker_count = 0;
-	}
+gb_internal WORKER_TASK_PROC(check_collect_entities_all_worker_proc) {
+	CollectEntityWorkerData *wd = &collect_entity_worker_data[current_thread_index()];
 
-	semaphore_post(&c->info.collect_semaphore, cast(i32)thread_count);
-	if (worker_count == 0) {
-		ThreadProcCheckerSection section_all = {};
-		section_all.checker = c;
-		section_all.offset = 0;
-		section_all.count = total_count;
-		proc(&section_all);
-		return;
-	}
+	Checker *c = wd->c;
+	CheckerContext *ctx = &wd->ctx;
+	UntypedExprInfoMap *untyped = &wd->untyped;
 
-	isize file_load_count = (total_count+thread_count-1)/thread_count;
-	isize remaining_count = total_count;
+	AstFile *f = cast(AstFile *)data;
+	reset_checker_context(ctx, f, untyped);
 
-	ThreadProcCheckerSection *thread_data = gb_alloc_array(permanent_allocator(), ThreadProcCheckerSection, thread_count);
-	for (isize i = 0; i < thread_count; i++) {
-		ThreadProcCheckerSection *data = thread_data + i;
-		data->checker = c;
-		data->offset = total_count-remaining_count;
-		data->count = file_load_count;
-		remaining_count -= file_load_count;
-	}
-	GB_ASSERT(remaining_count <= 0);
+	check_collect_entities(ctx, f->decls);
+	GB_ASSERT(ctx->collect_delayed_decls == false);
 
+	add_untyped_expressions(&c->info, ctx->untyped);
 
-	for (isize i = 0; i < thread_count; i++) {
-		global_thread_pool_add_task(proc, thread_data+i);
-	}
-	global_thread_pool_wait();
-	semaphore_wait(&c->info.collect_semaphore);
-}
-
-
-gb_internal WORKER_TASK_PROC(thread_proc_collect_entities) {
-	auto *cs = cast(ThreadProcCheckerSection *)data;
-	Checker *c = cs->checker;
-	CheckerContext collect_entity_ctx = make_checker_context(c);
-	defer (destroy_checker_context(&collect_entity_ctx));
-
-	CheckerContext *ctx = &collect_entity_ctx;
-
-	UntypedExprInfoMap untyped = {};
-	map_init(&untyped, heap_allocator());
-
-	isize offset = cs->offset;
-	isize file_end = gb_min(offset+cs->count, c->info.files.entries.count);
-
-	for (isize i = offset; i < file_end; i++) {
-		AstFile *f = c->info.files.entries[i].value;
-		reset_checker_context(ctx, f, &untyped);
-
-		check_collect_entities(ctx, f->decls);
-		GB_ASSERT(ctx->collect_delayed_decls == false);
-
-		add_untyped_expressions(&c->info, ctx->untyped);
-	}
-
-	map_destroy(&untyped);
-
-	semaphore_release(&c->info.collect_semaphore);
 	return 0;
 }
 
-
 gb_internal void check_collect_entities_all(Checker *c) {
-	check_with_workers(c, thread_proc_collect_entities, c->info.files.entries.count);
+	isize thread_count = global_thread_pool.threads.count;
+
+	collect_entity_worker_data = gb_alloc_array(permanent_allocator(), CollectEntityWorkerData, thread_count);
+	for (isize i = 0; i < thread_count; i++) {
+		auto *wd = &collect_entity_worker_data[i];
+		wd->c = c;
+		wd->ctx = make_checker_context(c);
+		map_init(&wd->untyped);
+	}
+
+	for (auto const &entry : c->info.files.entries) {
+		AstFile *f = entry.value;
+		thread_pool_add_task(check_collect_entities_all_worker_proc, f);
+	}
+	thread_pool_wait();
 }
 
 gb_internal void check_export_entities_in_pkg(CheckerContext *ctx, AstPackage *pkg, UntypedExprInfoMap *untyped) {
@@ -4746,30 +4719,30 @@ gb_internal void check_export_entities_in_pkg(CheckerContext *ctx, AstPackage *p
 	}
 }
 
-gb_internal WORKER_TASK_PROC(thread_proc_check_export_entities) {
-	auto cs = cast(ThreadProcCheckerSection *)data;
-	Checker *c = cs->checker;
-
-	CheckerContext ctx = make_checker_context(c);
-	defer (destroy_checker_context(&ctx));
-
-	UntypedExprInfoMap untyped = {};
-	map_init(&untyped, heap_allocator());
-
-	isize end = gb_min(cs->offset + cs->count, c->info.packages.entries.count);
-	for (isize i = cs->offset; i < end; i++) {
-		AstPackage *pkg = c->info.packages.entries[i].value;
-		check_export_entities_in_pkg(&ctx, pkg, &untyped);
-	}
-
-	map_destroy(&untyped);
-
-	semaphore_release(&c->info.collect_semaphore);
+gb_internal WORKER_TASK_PROC(check_export_entities_worker_proc) {
+	AstPackage *pkg = (AstPackage *)data;
+	auto *wd = &collect_entity_worker_data[current_thread_index()];
+	check_export_entities_in_pkg(&wd->ctx, pkg, &wd->untyped);
 	return 0;
 }
 
+
 gb_internal void check_export_entities(Checker *c) {
-	check_with_workers(c, thread_proc_check_export_entities, c->info.packages.entries.count);
+	isize thread_count = global_thread_pool.threads.count;
+
+	// NOTE(bill): reuse `collect_entity_worker_data`
+
+	for (isize i = 0; i < thread_count; i++) {
+		auto *wd = &collect_entity_worker_data[i];
+		map_clear(&wd->untyped);
+		wd->ctx = make_checker_context(c);
+	}
+
+	for (auto const &entry : c->info.packages.entries) {
+		AstPackage *pkg = entry.value;
+		thread_pool_add_task(check_export_entities_worker_proc, pkg);
+	}
+	thread_pool_wait();
 }
 
 gb_internal void check_import_entities(Checker *c) {
@@ -4787,7 +4760,6 @@ gb_internal void check_import_entities(Checker *c) {
 	auto pq = priority_queue_create(dep_graph, import_graph_node_cmp, import_graph_node_swap);
 
 	PtrSet<AstPackage *> emitted = {};
-	ptr_set_init(&emitted, heap_allocator());
 	defer (ptr_set_destroy(&emitted));
 
 	Array<ImportGraphNode *> package_order = {};
@@ -4801,7 +4773,6 @@ gb_internal void check_import_entities(Checker *c) {
 
 		if (n->dep_count > 0) {
 			PtrSet<AstPackage *> visited = {};
-			ptr_set_init(&visited, heap_allocator());
 			defer (ptr_set_destroy(&visited));
 
 			auto path = find_import_path(c, pkg, pkg, &visited);
@@ -4820,8 +4791,7 @@ gb_internal void check_import_entities(Checker *c) {
 			}
 		}
 
-		for (auto const &entry : n->pred) {
-			ImportGraphNode *p = entry.ptr;
+		for (ImportGraphNode *p : n->pred) {
 			p->dep_count = gb_max(p->dep_count-1, 0);
 			priority_queue_fix(&pq, p->index);
 		}
@@ -4840,7 +4810,6 @@ gb_internal void check_import_entities(Checker *c) {
 	CheckerContext ctx = make_checker_context(c);
 
 	UntypedExprInfoMap untyped = {};
-	map_init(&untyped, heap_allocator());
 	defer (map_destroy(&untyped));
 
 	isize min_pkg_index = 0;
@@ -4930,8 +4899,7 @@ gb_internal bool find_entity_path_tuple(Type *tuple, Entity *end, PtrSet<Entity 
 		if (var_decl == nullptr) {
 			continue;
 		}
-		for (auto const &entry : var_decl->deps) {
-			Entity *dep = entry.ptr;
+		for (Entity *dep : var_decl->deps) {
 			if (dep == end) {
 				auto path = array_make<Entity *>(heap_allocator());
 				array_add(&path, dep);
@@ -4955,7 +4923,6 @@ gb_internal Array<Entity *> find_entity_path(Entity *start, Entity *end, PtrSet<
 	bool made_visited = false;
 	if (visited == nullptr) {
 		made_visited = true;
-		ptr_set_init(&visited_, heap_allocator());
 		visited = &visited_;
 	}
 	defer (if (made_visited) {
@@ -4982,8 +4949,7 @@ gb_internal Array<Entity *> find_entity_path(Entity *start, Entity *end, PtrSet<
 				return path;
 			}
 		} else {
-			for (auto const &entry : decl->deps) {
-				Entity *dep = entry.ptr;
+			for (Entity *dep : decl->deps) {
 				if (dep == end) {
 					auto path = array_make<Entity *>(heap_allocator());
 					array_add(&path, dep);
@@ -5018,7 +4984,6 @@ gb_internal void calculate_global_init_order(Checker *c) {
 	auto pq = priority_queue_create(dep_graph, entity_graph_node_cmp, entity_graph_node_swap);
 
 	PtrSet<DeclInfo *> emitted = {};
-	ptr_set_init(&emitted, heap_allocator());
 	defer (ptr_set_destroy(&emitted));
 
 	TIME_SECTION("calculate_global_init_order: queue sort");
@@ -5041,8 +5006,7 @@ gb_internal void calculate_global_init_order(Checker *c) {
 			}
 		}
 
-		for (auto const &entry : n->pred) {
-			EntityGraphNode *p = entry.ptr;
+		for (EntityGraphNode *p : n->pred) {
 			p->dep_count -= 1;
 			p->dep_count = gb_max(p->dep_count, 0);
 			priority_queue_fix(&pq, p->index);
@@ -5076,30 +5040,36 @@ gb_internal void calculate_global_init_order(Checker *c) {
 }
 
 
-gb_internal bool check_proc_info(Checker *c, ProcInfo *pi, UntypedExprInfoMap *untyped, ProcBodyQueue *procs_to_check_queue) {
+gb_internal bool check_proc_info(Checker *c, ProcInfo *pi, UntypedExprInfoMap *untyped) {
 	if (pi == nullptr) {
 		return false;
 	}
 	if (pi->type == nullptr) {
 		return false;
 	}
-	Entity *e = pi->decl->entity;
 
-	MUTEX_GUARD_BLOCK(&pi->decl->proc_checked_mutex) {
-		if (pi->decl->proc_checked) {
-			if (e != nullptr) {
-				GB_ASSERT(e->flags & EntityFlag_ProcBodyChecked);
-			}
-			return true;
-		}
+	if (!mutex_try_lock(&pi->decl->proc_checked_mutex)) {
+		return false;
 	}
+	defer (mutex_unlock(&pi->decl->proc_checked_mutex));
 
-	CheckerContext ctx = make_checker_context(c);
-	defer (destroy_checker_context(&ctx));
-	reset_checker_context(&ctx, pi->file, untyped);
-	ctx.decl = pi->decl;
-	ctx.procs_to_check_queue = procs_to_check_queue;
-	GB_ASSERT(procs_to_check_queue != nullptr);
+	Entity *e = pi->decl->entity;
+	switch (pi->decl->proc_checked_state.load()) {
+	case ProcCheckedState_InProgress:
+		if (e) {
+			GB_ASSERT(global_procedure_body_in_worker_queue.load());
+		}
+		return false;
+	case ProcCheckedState_Checked:
+		if (e != nullptr) {
+			GB_ASSERT(e->flags & EntityFlag_ProcBodyChecked);
+		}
+		return true;
+	case ProcCheckedState_Unchecked:
+		// okay
+		break;
+	}
+	pi->decl->proc_checked_state.store(ProcCheckedState_InProgress);
 
 	GB_ASSERT(pi->type->kind == Type_Proc);
 	TypeProc *pt = &pi->type->Proc;
@@ -5111,15 +5081,25 @@ gb_internal bool check_proc_info(Checker *c, ProcInfo *pi, UntypedExprInfoMap *u
 			token = ast_token(pi->poly_def_node);
 		}
 		error(token, "Unspecialized polymorphic procedure '%.*s'", LIT(name));
+		pi->decl->proc_checked_state.store(ProcCheckedState_Unchecked);
 		return false;
 	}
 
 	if (pt->is_polymorphic && pt->is_poly_specialized) {
+		Entity *e = pi->decl->entity;
+		GB_ASSERT(e != nullptr);
 		if ((e->flags & EntityFlag_Used) == 0) {
 			// NOTE(bill, 2019-08-31): It was never used, don't check
+			// NOTE(bill, 2023-01-02): This may need to be checked again if it is used elsewhere?
+		pi->decl->proc_checked_state.store(ProcCheckedState_Unchecked);
 			return false;
 		}
 	}
+
+	CheckerContext ctx = make_checker_context(c);
+	defer (destroy_checker_context(&ctx));
+	reset_checker_context(&ctx, pi->file, untyped);
+	ctx.decl = pi->decl;
 
 	bool bounds_check    = (pi->tags & ProcTag_bounds_check)    != 0;
 	bool no_bounds_check = (pi->tags & ProcTag_no_bounds_check) != 0;
@@ -5143,24 +5123,34 @@ gb_internal bool check_proc_info(Checker *c, ProcInfo *pi, UntypedExprInfoMap *u
 		ctx.state_flags &= ~StateFlag_type_assert;
 	}
 
-	if (pi->body != nullptr && e != nullptr) {
-		GB_ASSERT((e->flags & EntityFlag_ProcBodyChecked) == 0);
+	bool body_was_checked = check_proc_body(&ctx, pi->token, pi->decl, pi->type, pi->body);
+
+	if (body_was_checked) {
+		pi->decl->proc_checked_state.store(ProcCheckedState_Checked);
+		if (pi->body) {
+			Entity *e = pi->decl->entity;
+			if (e != nullptr) {
+				e->flags |= EntityFlag_ProcBodyChecked;
+			}
+		}
+	} else {
+		pi->decl->proc_checked_state.store(ProcCheckedState_Unchecked);
+		if (pi->body) {
+			Entity *e = pi->decl->entity;
+			if (e != nullptr) {
+				e->flags &= ~EntityFlag_ProcBodyChecked;
+			}
+		}
 	}
 
-	check_proc_body(&ctx, pi->token, pi->decl, pi->type, pi->body);
-	MUTEX_GUARD_BLOCK(&pi->decl->proc_checked_mutex) {
-		if (e != nullptr) {
-			e->flags |= EntityFlag_ProcBodyChecked;
-		}
-		pi->decl->proc_checked = true;
-	}
 	add_untyped_expressions(&c->info, ctx.untyped);
+
 	return true;
 }
 
 GB_STATIC_ASSERT(sizeof(isize) == sizeof(void *));
 
-gb_internal bool consume_proc_info_queue(Checker *c, ProcInfo *pi, ProcBodyQueue *q, UntypedExprInfoMap *untyped);
+gb_internal bool consume_proc_info(Checker *c, ProcInfo *pi, UntypedExprInfoMap *untyped);
 
 gb_internal void check_unchecked_bodies(Checker *c) {
 	// NOTE(2021-02-26, bill): Sanity checker
@@ -5168,12 +5158,15 @@ gb_internal void check_unchecked_bodies(Checker *c) {
 	// even ones which should not exist, due to the multithreaded nature of the parser
 	// HACK TODO(2021-02-26, bill): Actually fix this race condition
 
+	GB_ASSERT(c->procs_to_check.count == 0);
+
 	UntypedExprInfoMap untyped = {};
-	map_init(&untyped, heap_allocator());
 	defer (map_destroy(&untyped));
 
-	for (auto const &entry : c->info.minimum_dependency_set) {
-		Entity *e = entry.ptr;
+	// use the `procs_to_check` array
+	global_procedure_body_in_worker_queue = false;
+
+	for (Entity *e : c->info.minimum_dependency_set) {
 		if (e == nullptr || e->kind != Entity_Procedure) {
 			continue;
 		}
@@ -5198,20 +5191,46 @@ gb_internal void check_unchecked_bodies(Checker *c) {
 			}
 
 			debugf("unchecked: %.*s\n", LIT(e->token.string));
-			mpmc_enqueue(&c->procs_to_check_queue, pi);
+			check_procedure_later(c, pi);
 		}
 	}
 
-	auto *q = &c->procs_to_check_queue;
-	ProcInfo *pi = nullptr;
-	while (mpmc_dequeue(q, &pi)) {
+	if (!global_procedure_body_in_worker_queue) {
+		for_array(i, c->procs_to_check) {
+			ProcInfo *pi = c->procs_to_check[i];
+			consume_proc_info(c, pi, &untyped);
+		}
+		array_clear(&c->procs_to_check);
+	} else {
+		thread_pool_wait();
+	}
+
+	global_procedure_body_in_worker_queue = false;
+	global_after_checking_procedure_bodies = true;
+}
+
+gb_internal void check_safety_all_procedures_for_unchecked(Checker *c) {
+	GB_ASSERT(DEBUG_CHECK_ALL_PROCEDURES);
+	UntypedExprInfoMap untyped = {};
+	defer (map_destroy(&untyped));
+
+
+	for_array(i, c->info.all_procedures) {
+		ProcInfo *pi = c->info.all_procedures[i];
+		GB_ASSERT(pi != nullptr);
+		GB_ASSERT(pi->decl != nullptr);
 		Entity *e = pi->decl->entity;
-		if (consume_proc_info_queue(c, pi, q, &untyped)) {
-			add_dependency_to_set(c, e);
-			GB_ASSERT(e->flags & EntityFlag_ProcBodyChecked);
+		auto proc_checked_state = pi->decl->proc_checked_state.load();
+		if (e && ((e->flags & EntityFlag_ProcBodyChecked) == 0)) {
+			if ((e->flags & EntityFlag_Used) != 0) {
+				debugf("%.*s :: %s\n", LIT(e->token.string), type_to_string(e->type));
+				debugf("proc body unchecked\n");
+				debugf("Checked State: %s\n\n", ProcCheckedState_strings[proc_checked_state]);
+
+				consume_proc_info(c, pi, &untyped);
+			}
 		}
 	}
-
 }
 
 gb_internal void check_test_procedures(Checker *c) {
@@ -5222,8 +5241,7 @@ gb_internal void check_test_procedures(Checker *c) {
 	AstPackage *pkg = c->info.init_package;
 	Scope *s = pkg->scope;
 
-	for (auto const &entry : build_context.test_names) {
-		String name = entry.value;
+	for (String const &name : build_context.test_names) {
 		Entity *e = scope_lookup(s, name);
 		if (e == nullptr) {
 			Token tok = {};
@@ -5249,7 +5267,49 @@ gb_internal void check_test_procedures(Checker *c) {
 
 gb_global std::atomic<isize> total_bodies_checked;
 
-gb_internal bool consume_proc_info_queue(Checker *c, ProcInfo *pi, ProcBodyQueue *q, UntypedExprInfoMap *untyped) {
+gb_internal bool consume_proc_info(Checker *c, ProcInfo *pi, UntypedExprInfoMap *untyped) {
+	GB_ASSERT(pi->decl != nullptr);
+	switch (pi->decl->proc_checked_state.load()) {
+	case ProcCheckedState_InProgress:
+		return false;
+	case ProcCheckedState_Checked:
+		return true;
+	}
+
+	if (pi->decl->parent && pi->decl->parent->entity) {
+		Entity *parent = pi->decl->parent->entity;
+		// NOTE(bill): Only check a nested procedure if its parent's body has been checked first
+		// This is prevent any possible race conditions in evaluation when multithreaded
+		// NOTE(bill): In single threaded mode, this should never happen
+		if (parent->kind == Entity_Procedure && (parent->flags & EntityFlag_ProcBodyChecked) == 0) {
+			check_procedure_later(c, pi);
+			return false;
+		}
+	}
+	if (untyped) {
+		map_clear(untyped);
+	}
+	if (check_proc_info(c, pi, untyped)) {
+		total_bodies_checked.fetch_add(1, std::memory_order_relaxed);
+		return true;
+	}
+	return false;
+}
+
+struct CheckProcedureBodyWorkerData {
+	Checker *c;
+	UntypedExprInfoMap untyped;
+};
+
+gb_global CheckProcedureBodyWorkerData *check_procedure_bodies_worker_data;
+
+gb_internal WORKER_TASK_PROC(check_proc_info_worker_proc) {
+	auto *wd = &check_procedure_bodies_worker_data[current_thread_index()];
+	UntypedExprInfoMap *untyped = &wd->untyped;
+	Checker *c = wd->c;
+
+	ProcInfo *pi = cast(ProcInfo *)data;
+
 	GB_ASSERT(pi->decl != nullptr);
 	if (pi->decl->parent && pi->decl->parent->entity) {
 		Entity *parent = pi->decl->parent->entity;
@@ -5257,65 +5317,43 @@ gb_internal bool consume_proc_info_queue(Checker *c, ProcInfo *pi, ProcBodyQueue
 		// This is prevent any possible race conditions in evaluation when multithreaded
 		// NOTE(bill): In single threaded mode, this should never happen
 		if (parent->kind == Entity_Procedure && (parent->flags & EntityFlag_ProcBodyChecked) == 0) {
-			mpmc_enqueue(q, pi);
-			return false;
+			thread_pool_add_task(check_proc_info_worker_proc, pi);
+			return 1;
 		}
 	}
-	if (untyped) {
-		map_clear(untyped);
+	map_clear(untyped);
+	if (check_proc_info(c, pi, untyped)) {
+		total_bodies_checked.fetch_add(1, std::memory_order_relaxed);
+		return 0;
 	}
-	bool ok = check_proc_info(c, pi, untyped, q);
-	total_bodies_checked.fetch_add(1, std::memory_order_relaxed);
-	return ok;
+	return 1;
 }
 
-struct ThreadProcBodyData {
-	Checker *checker;
-	ProcBodyQueue *queue;
-	u32 thread_index;
-	u32 thread_count;
-	ThreadProcBodyData *all_data;
-};
+gb_internal void check_init_worker_data(Checker *c) {
+	u32 thread_count = cast(u32)global_thread_pool.threads.count;
 
-gb_internal WORKER_TASK_PROC(thread_proc_body) {
-	ThreadProcBodyData *bd = cast(ThreadProcBodyData *)data;
-	Checker *c = bd->checker;
-	GB_ASSERT(c != nullptr);
-	ProcBodyQueue *this_queue = bd->queue;
+	check_procedure_bodies_worker_data = gb_alloc_array(permanent_allocator(), CheckProcedureBodyWorkerData, thread_count);
 
-	UntypedExprInfoMap untyped = {};
-	map_init(&untyped, heap_allocator());
-
-	for (ProcInfo *pi; mpmc_dequeue(this_queue, &pi); /**/) {
-		consume_proc_info_queue(c, pi, this_queue, &untyped);
+	for (isize i = 0; i < thread_count; i++) {
+		check_procedure_bodies_worker_data[i].c = c;
+		map_init(&check_procedure_bodies_worker_data[i].untyped);
 	}
-
-	map_destroy(&untyped);
-
-	semaphore_release(&c->procs_to_check_semaphore);
-
-	return 0;
 }
 
 gb_internal void check_procedure_bodies(Checker *c) {
 	GB_ASSERT(c != nullptr);
 
-	u32 thread_count = cast(u32)gb_max(build_context.thread_count, 1);
-	u32 worker_count = thread_count-1; // NOTE(bill): The main thread will also be used for work
-	if (!build_context.threaded_checker) {
-		worker_count = 0;
+	u32 thread_count = cast(u32)global_thread_pool.threads.count;
+	if (build_context.no_threaded_checker) {
+		thread_count = 1;
 	}
-	if (worker_count == 0) {
-		auto *this_queue = &c->procs_to_check_queue;
 
-		UntypedExprInfoMap untyped = {};
-		map_init(&untyped, heap_allocator());
-
-		for (ProcInfo *pi = nullptr; mpmc_dequeue(this_queue, &pi); /**/) {
-			consume_proc_info_queue(c, pi, this_queue, &untyped);
+	if (thread_count == 1) {
+		UntypedExprInfoMap *untyped = &check_procedure_bodies_worker_data[0].untyped;
+		for_array(i, c->procs_to_check) {
+			consume_proc_info(c, c->procs_to_check[i], untyped);
 		}
-
-		map_destroy(&untyped);
+		array_clear(&c->procs_to_check);
 
 		debugf("Total Procedure Bodies Checked: %td\n", total_bodies_checked.load(std::memory_order_relaxed));
 		return;
@@ -5323,53 +5361,14 @@ gb_internal void check_procedure_bodies(Checker *c) {
 
 	global_procedure_body_in_worker_queue = true;
 
-	isize original_queue_count = c->procs_to_check_queue.count.load(std::memory_order_relaxed);
-	isize load_count = (original_queue_count+thread_count-1)/thread_count;
-
-	ThreadProcBodyData *thread_data = gb_alloc_array(permanent_allocator(), ThreadProcBodyData, thread_count);
-	for (u32 i = 0; i < thread_count; i++) {
-		ThreadProcBodyData *data = thread_data + i;
-		data->checker = c;
-		data->queue = gb_alloc_item(permanent_allocator(), ProcBodyQueue);
-		data->thread_index = i;
-		data->thread_count = thread_count;
-		data->all_data = thread_data;
-		// NOTE(bill) 2x the amount assumes on average only 1 nested procedure
-		// TODO(bill): Determine a good heuristic
-		mpmc_init(data->queue, heap_allocator(), next_pow2_isize(load_count*2));
+	isize prev_procs_to_check_count = c->procs_to_check.count;
+	for_array(i, c->procs_to_check) {
+		thread_pool_add_task(check_proc_info_worker_proc, c->procs_to_check[i]);
 	}
+	GB_ASSERT(prev_procs_to_check_count == c->procs_to_check.count);
+	array_clear(&c->procs_to_check);
 
-	// Distibute the work load into multiple queues
-	for (isize j = 0; j < load_count; j++) {
-		for (isize i = 0; i < thread_count; i++) {
-			ProcBodyQueue *queue = thread_data[i].queue;
-			ProcInfo *pi = nullptr;
-			if (!mpmc_dequeue(&c->procs_to_check_queue, &pi)) {
-				break;
-			}
-			mpmc_enqueue(queue, pi);
-		}
-	}
-	isize total_queued = 0;
-	for (isize i = 0; i < thread_count; i++) {
-		ProcBodyQueue *queue = thread_data[i].queue;
-		total_queued += queue->count.load();
-	}
-	GB_ASSERT(total_queued == original_queue_count);
-
-	semaphore_post(&c->procs_to_check_semaphore, cast(i32)thread_count);
-
-	for (isize i = 0; i < thread_count; i++) {
-		global_thread_pool_add_task(thread_proc_body, thread_data+i);
-	}
-	global_thread_pool_wait();
-	semaphore_wait(&c->procs_to_check_semaphore);
-
-	isize global_remaining = c->procs_to_check_queue.count.load(std::memory_order_relaxed);
-	GB_ASSERT(global_remaining == 0);
-
-	debugf("Total Procedure Bodies Checked: %td\n", total_bodies_checked.load(std::memory_order_relaxed));
-
+	thread_pool_wait();
 
 	global_procedure_body_in_worker_queue = false;
 }
@@ -5542,7 +5541,7 @@ gb_internal void check_deferred_procedures(Checker *c) {
 
 gb_internal void check_unique_package_names(Checker *c) {
 	StringMap<AstPackage *> pkgs = {}; // Key: package name
-	string_map_init(&pkgs, heap_allocator(), 2*c->info.packages.entries.count);
+	string_map_init(&pkgs, 2*c->info.packages.entries.count);
 	defer (string_map_destroy(&pkgs));
 
 	for (auto const &entry : c->info.packages) {
@@ -5648,6 +5647,23 @@ gb_internal void add_type_info_for_type_definitions(Checker *c) {
 	}
 }
 
+gb_internal void check_walk_all_dependencies(DeclInfo *decl) {
+	if (decl == nullptr) {
+		return;
+	}
+	for (DeclInfo *child = decl->next_child; child != nullptr; child = child->next_sibling) {
+		check_walk_all_dependencies(child);
+	}
+	add_deps_from_child_to_parent(decl);
+}
+
+gb_internal void check_update_dependency_tree_for_procedures(Checker *c) {
+	for (Entity *e : c->info.entities) {
+		DeclInfo *decl = e->decl_info;
+		check_walk_all_dependencies(decl);
+	}
+}
+
 gb_internal void check_parsed_files(Checker *c) {
 	TIME_SECTION("map full filepaths to scope");
 	add_type_info_type(&c->builtin_ctx, t_invalid);
@@ -5668,6 +5684,9 @@ gb_internal void check_parsed_files(Checker *c) {
 			c->info.runtime_package = p;
 		}
 	}
+
+	TIME_SECTION("init worker data");
+	check_init_worker_data(c);
 
 	TIME_SECTION("create file scopes");
 	check_create_file_scopes(c);
@@ -5712,17 +5731,6 @@ gb_internal void check_parsed_files(Checker *c) {
 		check_scope_usage(c, f->scope);
 	}
 
-	TIME_SECTION("add untyped expression values");
-	// Add untyped expression values
-	for (UntypedExprInfo u = {}; mpmc_dequeue(&c->global_untyped_queue, &u); /**/) {
-		GB_ASSERT(u.expr != nullptr && u.info != nullptr);
-		if (is_type_typed(u.info->type)) {
-			compiler_error("%s (type %s) is typed!", expr_to_string(u.expr), type_to_string(u.info->type));
-		}
-		add_type_and_value(&c->info, u.expr, u.info->mode, u.info->type, u.info->value);
-	}
-
-
 	TIME_SECTION("add basic type information");
 	// Add "Basic" type information
 	for (isize i = 0; i < Basic_COUNT; i++) {
@@ -5744,8 +5752,7 @@ gb_internal void check_parsed_files(Checker *c) {
 			DeclInfo *decl = e->decl_info;
 			ast_node(pl, ProcLit, decl->proc_lit);
 			if (pl->inlining == ProcInlining_inline) {
-				for (auto const &entry : decl->deps) {
-					Entity *dep = entry.ptr;
+				for (Entity *dep : decl->deps) {
 					if (dep == e) {
 						error(e->token, "Cannot inline recursive procedure '%.*s'", LIT(e->token.string));
 						break;
@@ -5764,15 +5771,21 @@ gb_internal void check_parsed_files(Checker *c) {
 	TIME_SECTION("check test procedures");
 	check_test_procedures(c);
 
-	TIME_SECTION("check bodies have all been checked");
-	check_unchecked_bodies(c);
-
 	TIME_SECTION("add type info for type definitions");
 	add_type_info_for_type_definitions(c);
 	check_merge_queues_into_arrays(c);
 
+	TIME_SECTION("update dependency tree for procedures");
+	check_update_dependency_tree_for_procedures(c);
+
 	TIME_SECTION("generate minimum dependency set");
 	generate_minimum_dependency_set(c, c->info.entry_point);
+
+	TIME_SECTION("check bodies have all been checked");
+	check_unchecked_bodies(c);
+
+	check_merge_queues_into_arrays(c);
+
 
 	TIME_SECTION("check entry point");
 	if (build_context.build_mode == BuildMode_Executable && !build_context.no_entry_point && build_context.command_kind != Command_test) {
@@ -5796,13 +5809,33 @@ gb_internal void check_parsed_files(Checker *c) {
 		}
 	}
 
+	thread_pool_wait();
+	GB_ASSERT(c->procs_to_check.count == 0);
+
+	if (DEBUG_CHECK_ALL_PROCEDURES) {
+		TIME_SECTION("check unchecked (safety measure)");
+		check_safety_all_procedures_for_unchecked(c);
+	}
+
+	debugf("Total Procedure Bodies Checked: %td\n", total_bodies_checked.load(std::memory_order_relaxed));
+
 	TIME_SECTION("check unique package names");
 	check_unique_package_names(c);
 
-
 	TIME_SECTION("sanity checks");
+	check_merge_queues_into_arrays(c);
 	GB_ASSERT(c->info.entity_queue.count.load(std::memory_order_relaxed) == 0);
 	GB_ASSERT(c->info.definition_queue.count.load(std::memory_order_relaxed) == 0);
+
+	TIME_SECTION("add untyped expression values");
+	// Add untyped expression values
+	for (UntypedExprInfo u = {}; mpmc_dequeue(&c->global_untyped_queue, &u); /**/) {
+		GB_ASSERT(u.expr != nullptr && u.info != nullptr);
+		if (is_type_typed(u.info->type)) {
+			compiler_error("%s (type %s) is typed!", expr_to_string(u.expr), type_to_string(u.info->type));
+		}
+		add_type_and_value(&c->builtin_ctx, u.expr, u.info->mode, u.info->type, u.info->value);
+	}
 
 	TIME_SECTION("sort init procedures");
 	check_sort_init_procedures(c);
@@ -5818,6 +5851,7 @@ gb_internal void check_parsed_files(Checker *c) {
 			}
 		}
 	}
+
 
 	TIME_SECTION("type check finish");
 }

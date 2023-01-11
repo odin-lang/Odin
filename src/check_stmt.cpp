@@ -622,7 +622,10 @@ gb_internal bool check_using_stmt_entity(CheckerContext *ctx, AstUsingStmt *us, 
 
 	case Entity_ImportName: {
 		Scope *scope = e->ImportName.scope;
-		MUTEX_GUARD_BLOCK(scope->mutex) for (auto const &entry : scope->elements) {
+		rw_mutex_lock(&scope->mutex);
+		defer (rw_mutex_unlock(&scope->mutex));
+
+		for (auto const &entry : scope->elements) {
 			String name = entry.key.string;
 			Entity *decl = entry.value;
 			if (!is_entity_exported(decl)) continue;
@@ -929,19 +932,17 @@ gb_internal void check_switch_stmt(CheckerContext *ctx, Ast *node, u32 mod_flags
 	}
 
 	SeenMap seen = {}; // NOTE(bill): Multimap, Key: ExactValue
-	map_init(&seen, heap_allocator());
 	defer (map_destroy(&seen));
 
-	for_array(stmt_index, bs->stmts) {
-		Ast *stmt = bs->stmts[stmt_index];
+	for (Ast *stmt : bs->stmts) {
 		if (stmt->kind != Ast_CaseClause) {
 			// NOTE(bill): error handled by above multiple default checker
 			continue;
 		}
 		ast_node(cc, CaseClause, stmt);
 
-		for_array(j, cc->list) {
-			Ast *expr = unparen_expr(cc->list[j]);
+		for (Ast *expr : cc->list) {
+			expr = unparen_expr(expr);
 
 			if (is_ast_range(expr)) {
 				ast_node(be, BinaryExpr, expr);
@@ -1053,8 +1054,7 @@ gb_internal void check_switch_stmt(CheckerContext *ctx, Ast *node, u32 mod_flags
 
 		auto unhandled = array_make<Entity *>(temporary_allocator(), 0, fields.count);
 
-		for_array(i, fields) {
-			Entity *f = fields[i];
+		for (Entity *f : fields) {
 			if (f->kind != Entity_Constant) {
 				continue;
 			}
@@ -1073,8 +1073,7 @@ gb_internal void check_switch_stmt(CheckerContext *ctx, Ast *node, u32 mod_flags
 				error_no_newline(node, "Unhandled switch case: %.*s", LIT(unhandled[0]->token.string));
 			} else {
 				error(node, "Unhandled switch cases:");
-				for_array(i, unhandled) {
-					Entity *f = unhandled[i];
+				for (Entity *f : unhandled) {
 					error_line("\t%.*s\n", LIT(f->token.string));
 				}
 			}
@@ -1133,7 +1132,7 @@ gb_internal void check_type_switch_stmt(CheckerContext *ctx, Ast *node, u32 mod_
 
 	check_expr(ctx, &x, rhs);
 	check_assignment(ctx, &x, nullptr, str_lit("type switch expression"));
-	add_type_info_type(ctx, x.type);
+	// add_type_info_type(ctx, x.type);
 
 	TypeSwitchKind switch_kind = check_valid_type_switch_type(x.type);
 	if (switch_kind == TypeSwitch_Invalid) {
@@ -1155,8 +1154,7 @@ gb_internal void check_type_switch_stmt(CheckerContext *ctx, Ast *node, u32 mod_
 	// NOTE(bill): Check for multiple defaults
 	Ast *first_default = nullptr;
 	ast_node(bs, BlockStmt, ss->body);
-	for_array(i, bs->stmts) {
-		Ast *stmt = bs->stmts[i];
+	for (Ast *stmt : bs->stmts) {
 		Ast *default_stmt = nullptr;
 		if (stmt->kind == Ast_CaseClause) {
 			ast_node(cc, CaseClause, stmt);
@@ -1185,11 +1183,9 @@ gb_internal void check_type_switch_stmt(CheckerContext *ctx, Ast *node, u32 mod_
 	}
 
 	PtrSet<Type *> seen = {};
-	ptr_set_init(&seen, heap_allocator());
 	defer (ptr_set_destroy(&seen));
 
-	for_array(i, bs->stmts) {
-		Ast *stmt = bs->stmts[i];
+	for (Ast *stmt : bs->stmts) {
 		if (stmt->kind != Ast_CaseClause) {
 			// NOTE(bill): error handled by above multiple default checker
 			continue;
@@ -1200,8 +1196,7 @@ gb_internal void check_type_switch_stmt(CheckerContext *ctx, Ast *node, u32 mod_
 		Type *bt = base_type(type_deref(x.type));
 
 		Type *case_type = nullptr;
-		for_array(type_index, cc->list) {
-			Ast *type_expr = cc->list[type_index];
+		for (Ast *type_expr : cc->list) {
 			if (type_expr != nullptr) { // Otherwise it's a default expression
 				Operand y = {};
 				check_expr_or_type(ctx, &y, type_expr);
@@ -1215,8 +1210,7 @@ gb_internal void check_type_switch_stmt(CheckerContext *ctx, Ast *node, u32 mod_
 				if (switch_kind == TypeSwitch_Union) {
 					GB_ASSERT(is_type_union(bt));
 					bool tag_type_found = false;
-					for_array(j, bt->Union.variants) {
-						Type *vt = bt->Union.variants[j];
+					for (Type *vt : bt->Union.variants) {
 						if (are_types_identical(vt, y.type)) {
 							tag_type_found = true;
 							break;
@@ -1229,7 +1223,7 @@ gb_internal void check_type_switch_stmt(CheckerContext *ctx, Ast *node, u32 mod_
 						continue;
 					}
 					case_type = y.type;
-					add_type_info_type(ctx, y.type);
+					// add_type_info_type(ctx, y.type);
 				} else if (switch_kind == TypeSwitch_Any) {
 					case_type = y.type;
 					add_type_info_type(ctx, y.type);
@@ -1265,7 +1259,9 @@ gb_internal void check_type_switch_stmt(CheckerContext *ctx, Ast *node, u32 mod_
 		if (case_type == nullptr) {
 			case_type = x.type;
 		}
-		add_type_info_type(ctx, case_type);
+		if (switch_kind == TypeSwitch_Any) {
+			add_type_info_type(ctx, case_type);
+		}
 
 		check_open_scope(ctx, stmt);
 		{
@@ -1290,10 +1286,10 @@ gb_internal void check_type_switch_stmt(CheckerContext *ctx, Ast *node, u32 mod_
 
 		auto unhandled = array_make<Type *>(temporary_allocator(), 0, variants.count);
 
-		for_array(i, variants) {
-			Type *t = variants[i];
+		for (Type *t : variants) {
 			if (!type_ptr_set_exists(&seen, t)) {
 				array_add(&unhandled, t);
+				gb_printf_err("HERE: %p %s\n", t, type_to_string(t));
 			}
 		}
 
@@ -1304,8 +1300,7 @@ gb_internal void check_type_switch_stmt(CheckerContext *ctx, Ast *node, u32 mod_
 				gb_string_free(s);
 			} else {
 				error_no_newline(node, "Unhandled switch cases:\n");
-				for_array(i, unhandled) {
-					Type *t = unhandled[i];
+				for (Type *t : unhandled) {
 					gbString s = type_to_string(t);
 					error_line("\t%s\n", s);
 					gb_string_free(s);
@@ -1342,8 +1337,7 @@ gb_internal void check_block_stmt_for_errors(CheckerContext *ctx, Ast *body)  {
 
 		isize stmt_count = 0;
 		Ast *the_stmt = nullptr;
-		for_array(i, bs->stmts) {
-			Ast *stmt = bs->stmts[i];
+		for (Ast *stmt : bs->stmts) {
 			GB_ASSERT(stmt != nullptr);
 			switch (stmt->kind) {
 			case_ast_node(es, EmptyStmt, stmt);
@@ -1361,8 +1355,7 @@ gb_internal void check_block_stmt_for_errors(CheckerContext *ctx, Ast *body)  {
 
 		if (stmt_count == 1) {
 			if (the_stmt->kind == Ast_ValueDecl) {
-				for_array(i, the_stmt->ValueDecl.names) {
-					Ast *name = the_stmt->ValueDecl.names[i];
+				for (Ast *name : the_stmt->ValueDecl.names) {
 					if (name->kind != Ast_Ident) {
 						continue;
 					}
@@ -1378,8 +1371,8 @@ gb_internal void check_block_stmt_for_errors(CheckerContext *ctx, Ast *body)  {
 
 gb_internal bool all_operands_valid(Array<Operand> const &operands) {
 	if (any_errors()) {
-		for_array(i, operands) {
-			if (operands[i].type == t_invalid) {
+		for (Operand const &o : operands) {
+			if (o.type == t_invalid) {
 				return false;
 			}
 		}
@@ -1550,16 +1543,9 @@ gb_internal void check_stmt_internal(CheckerContext *ctx, Ast *node, u32 flags) 
 
 			check_assignment_arguments(ctx, lhs_operands, &rhs_operands, as->rhs);
 
-			isize rhs_count = rhs_operands.count;
-			for_array(i, rhs_operands) {
-				if (rhs_operands[i].mode == Addressing_Invalid) {
-					// TODO(bill): Should I ignore invalid parameters?
-					// rhs_count--;
-				}
-			}
-
 			auto lhs_to_ignore = array_make<bool>(temporary_allocator(), lhs_count);
 
+			isize rhs_count = rhs_operands.count;
 			isize max = gb_min(lhs_count, rhs_count);
 			for (isize i = 0; i < max; i++) {
 				if (lhs_to_ignore[i]) {
@@ -1858,8 +1844,8 @@ gb_internal void check_stmt_internal(CheckerContext *ctx, Ast *node, u32 flags) 
 							break;
 						}
 
-						for_array(ti, t->Tuple.variables) {
-							array_add(&vals, t->Tuple.variables[ti]->type);
+						for (Entity *e : t->Tuple.variables) {
+							array_add(&vals, e->type);
 						}
 
 						if (rs->vals.count > 1 && rs->vals[1] != nullptr && count < 3) {
@@ -1978,8 +1964,7 @@ gb_internal void check_stmt_internal(CheckerContext *ctx, Ast *node, u32 flags) 
 			}
 		}
 
-		for_array(i, entities) {
-			Entity *e = entities[i];
+		for (Entity *e : entities) {
 			DeclInfo *d = decl_info_of_entity(e);
 			GB_ASSERT(d == nullptr);
 			add_entity(ctx, ctx->scope, e->identifier, e);
@@ -2093,8 +2078,8 @@ gb_internal void check_stmt_internal(CheckerContext *ctx, Ast *node, u32 flags) 
 			error(us->token, "Empty 'using' list");
 			return;
 		}
-		for_array(i, us->list) {
-			Ast *expr = unparen_expr(us->list[i]);
+		for (Ast *expr : us->list) {
+			expr = unparen_expr(expr);
 			Entity *e = nullptr;
 
 			bool is_selector = false;
@@ -2134,8 +2119,7 @@ gb_internal void check_stmt_internal(CheckerContext *ctx, Ast *node, u32 flags) 
 		check_decl_attributes(&c, fb->attributes, foreign_block_decl_attribute, nullptr);
 
 		ast_node(block, BlockStmt, fb->body);
-		for_array(i, block->stmts) {
-			Ast *decl = block->stmts[i];
+		for (Ast *decl : block->stmts) {
 			if (decl->kind == Ast_ValueDecl && decl->ValueDecl.is_mutable) {
 				check_stmt(&c, decl, flags);
 			}
@@ -2148,8 +2132,7 @@ gb_internal void check_stmt_internal(CheckerContext *ctx, Ast *node, u32 flags) 
 			isize entity_count = 0;
 
 			isize new_name_count = 0;
-			for_array(i, vd->names) {
-				Ast *name = vd->names[i];
+			for (Ast *name : vd->names) {
 				Entity *entity = nullptr;
 				if (name->kind != Ast_Ident) {
 					error(name, "A variable declaration must be an identifier");
@@ -2195,8 +2178,7 @@ gb_internal void check_stmt_internal(CheckerContext *ctx, Ast *node, u32 flags) 
 				begin_error_block();
 				error(node, "No new declarations on the left hand side");
 				bool all_underscore = true;
-				for_array(i, vd->names) {
-					Ast *name = vd->names[i];
+				for (Ast *name : vd->names) {
 					if (name->kind == Ast_Ident) {
 						if (!is_blank_ident(name)) {
 							all_underscore = false;
@@ -2390,8 +2372,7 @@ gb_internal void check_stmt_internal(CheckerContext *ctx, Ast *node, u32 flags) 
 		} else {
 			// constant value declaration
 			// NOTE(bill): Check `_` declarations
-			for_array(i, vd->names) {
-				Ast *name = vd->names[i];
+			for (Ast *name : vd->names) {
 				if (is_blank_ident(name)) {
 					Entity *e = name->Ident.entity;
 					DeclInfo *d = decl_info_of_entity(e);

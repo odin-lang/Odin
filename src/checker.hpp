@@ -142,9 +142,28 @@ typedef DECL_ATTRIBUTE_PROC(DeclAttributeProc);
 gb_internal void check_decl_attributes(CheckerContext *c, Array<Ast *> const &attributes, DeclAttributeProc *proc, AttributeContext *ac);
 
 
+enum ProcCheckedState : u8 {
+	ProcCheckedState_Unchecked,
+	ProcCheckedState_InProgress,
+	ProcCheckedState_Checked,
+
+	ProcCheckedState_COUNT
+};
+
+char const *ProcCheckedState_strings[ProcCheckedState_COUNT] {
+	"Unchecked",
+	"In Progress",
+	"Checked",
+};
+
 // DeclInfo is used to store information of certain declarations to allow for "any order" usage
 struct DeclInfo {
 	DeclInfo *    parent; // NOTE(bill): only used for procedure literals at the moment
+
+	BlockingMutex next_mutex;
+	DeclInfo *    next_child;
+	DeclInfo *    next_sibling;
+
 	Scope *       scope;
 
 	Entity *entity;
@@ -157,7 +176,7 @@ struct DeclInfo {
 	Type *        gen_proc_type; // Precalculated
 	bool          is_using;
 	bool          where_clauses_evaluated;
-	bool          proc_checked;
+	std::atomic<ProcCheckedState> proc_checked_state;
 	BlockingMutex proc_checked_mutex;
 	isize         defer_used;
 	bool          defer_use_checked;
@@ -165,8 +184,14 @@ struct DeclInfo {
 	CommentGroup *comment;
 	CommentGroup *docs;
 
-	PtrSet<Entity *>  deps;
+	RwMutex          deps_mutex;
+	PtrSet<Entity *> deps;
+
+	RwMutex     type_info_deps_mutex;
 	PtrSet<Type *>    type_info_deps;
+
+	BlockingMutex type_and_value_mutex;
+
 	Array<BlockLabel> labels;
 };
 
@@ -198,7 +223,7 @@ enum ScopeFlag : i32 {
 	ScopeFlag_ContextDefined = 1<<16,
 };
 
-enum { DEFAULT_SCOPE_CAPACITY = 29 };
+enum { DEFAULT_SCOPE_CAPACITY = 32 };
 
 struct Scope {
 	Ast *         node;
@@ -206,7 +231,7 @@ struct Scope {
 	std::atomic<Scope *> next;
 	std::atomic<Scope *> head_child;
 
-	BlockingMutex mutex;
+	RwMutex mutex;
 	StringMap<Entity *> elements;
 	PtrSet<Scope *> imported;
 
@@ -297,6 +322,16 @@ struct LoadFileCache {
 	StringMap<u64> hashes;
 };
 
+struct GenProcsData {
+	Array<Entity *> procs;
+	RwMutex         mutex;
+};
+
+struct GenTypesData {
+	Array<Entity *> types;
+	RwMutex         mutex;
+};
+
 // CheckerInfo stores all the symbol information for a type-checked program
 struct CheckerInfo {
 	Checker *checker;
@@ -311,7 +346,7 @@ struct CheckerInfo {
 	Scope *               init_scope;
 	Entity *              entry_point;
 	PtrSet<Entity *>      minimum_dependency_set;
-	PtrSet<isize>         minimum_dependency_type_info_set;
+	PtrMap</*type info index*/isize, /*min dep index*/isize>  minimum_dependency_type_info_set;
 
 
 
@@ -324,30 +359,17 @@ struct CheckerInfo {
 
 
 	// Below are accessed within procedures
-	// NOTE(bill): If the semantic checker (check_proc_body) is to ever to be multithreaded,
-	// these variables will be of contention
-
-	Semaphore collect_semaphore;
-
+	RwMutex            global_untyped_mutex;
 	UntypedExprInfoMap global_untyped; // NOTE(bill): This needs to be a map and not on the Ast
 	                                   // as it needs to be iterated across afterwards
-	BlockingMutex global_untyped_mutex;
 	BlockingMutex builtin_mutex;
-
-	// NOT recursive & only used at the end of `check_proc_body`
-	// and in `add_dependency`.
-	// This is a possible source of contention but probably not
-	// too much of a problem in practice
-	BlockingMutex deps_mutex;
 
 	BlockingMutex type_and_value_mutex;
 
 	RecursiveMutex lazy_mutex; // Mutex required for lazy type checking of specific files
 
-	RecursiveMutex gen_procs_mutex;
-	RecursiveMutex gen_types_mutex;
-	PtrMap<Ast *, Array<Entity *> > gen_procs; // Key: Ast * | Identifier -> Entity
-	PtrMap<Type *, Array<Entity *> > gen_types; 
+	RwMutex       gen_types_mutex;
+	PtrMap<Type *, GenTypesData > gen_types;
 
 	BlockingMutex type_info_mutex; // NOT recursive
 	Array<Type *> type_info_types;
@@ -355,11 +377,6 @@ struct CheckerInfo {
 
 	BlockingMutex foreign_mutex; // NOT recursive
 	StringMap<Entity *> foreigns;
-
-	// only used by 'odin query'
-	bool          allow_identifier_uses;
-	BlockingMutex identifier_uses_mutex;
-	Array<Ast *>  identifier_uses;
 
 	// NOTE(bill): These are actually MPSC queues
 	// TODO(bill): Convert them to be MPSC queues
@@ -375,6 +392,9 @@ struct CheckerInfo {
 
 	BlockingMutex load_file_mutex;
 	StringMap<LoadFileCache *> load_file_cache;
+
+	BlockingMutex all_procedures_mutex;
+	Array<ProcInfo *> all_procedures;
 };
 
 struct CheckerContext {
@@ -418,8 +438,6 @@ struct CheckerContext {
 	Scope *    polymorphic_scope;
 
 	Ast *assignment_lhs_hint;
-
-	ProcBodyQueue *procs_to_check_queue;
 };
 
 
@@ -430,9 +448,7 @@ struct Checker {
 	CheckerContext builtin_ctx;
 
 	MPMCQueue<Entity *> procs_with_deferred_to_check;
-
-	ProcBodyQueue procs_to_check_queue;
-	Semaphore procs_to_check_semaphore;
+	Array<ProcInfo *> procs_to_check;
 
 	// TODO(bill): Technically MPSC queue
 	MPMCQueue<UntypedExprInfo> global_untyped_queue;
@@ -462,10 +478,10 @@ gb_internal Entity *entity_of_node(Ast *expr);
 gb_internal Entity *scope_lookup_current(Scope *s, String const &name);
 gb_internal Entity *scope_lookup (Scope *s, String const &name);
 gb_internal void    scope_lookup_parent (Scope *s, String const &name, Scope **scope_, Entity **entity_);
-gb_internal Entity *scope_insert (Scope *s, Entity *entity, bool use_mutex=true);
+gb_internal Entity *scope_insert (Scope *s, Entity *entity);
 
 
-gb_internal void      add_type_and_value      (CheckerInfo *i, Ast *expression, AddressingMode mode, Type *type, ExactValue value);
+gb_internal void      add_type_and_value      (CheckerContext *c, Ast *expression, AddressingMode mode, Type *type, ExactValue value);
 gb_internal ExprInfo *check_get_expr_info     (CheckerContext *c, Ast *expr);
 gb_internal void      add_untyped             (CheckerContext *c, Ast *expression, AddressingMode mode, Type *basic_type, ExactValue value);
 gb_internal void      add_entity_use          (CheckerContext *c, Ast *identifier, Entity *entity);

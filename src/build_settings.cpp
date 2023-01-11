@@ -291,13 +291,14 @@ struct BuildContext {
 	bool   show_error_line;
 
 	bool   ignore_lazy;
+	bool   ignore_llvm_build;
 
 	bool   use_subsystem_windows;
 	bool   ignore_microsoft_magic;
 	bool   linker_map_file;
 
 	bool   use_separate_modules;
-	bool   threaded_checker;
+	bool   no_threaded_checker;
 
 	bool   show_debug_messages;
 	
@@ -936,16 +937,20 @@ gb_global BlockingMutex fullpath_mutex;
 #if defined(GB_SYSTEM_WINDOWS)
 gb_internal String path_to_fullpath(gbAllocator a, String s) {
 	String result = {};
-	mutex_lock(&fullpath_mutex);
-	defer (mutex_unlock(&fullpath_mutex));
 
 	String16 string16 = string_to_string16(heap_allocator(), s);
 	defer (gb_free(heap_allocator(), string16.text));
 
-	DWORD len = GetFullPathNameW(&string16[0], 0, nullptr, nullptr);
+	DWORD len;
+
+	mutex_lock(&fullpath_mutex);
+
+	len = GetFullPathNameW(&string16[0], 0, nullptr, nullptr);
 	if (len != 0) {
 		wchar_t *text = gb_alloc_array(permanent_allocator(), wchar_t, len+1);
 		GetFullPathNameW(&string16[0], len, text, nullptr);
+		mutex_unlock(&fullpath_mutex);
+
 		text[len] = 0;
 		result = string16_to_string(a, make_string16(text, len));
 		result = string_trim_whitespace(result);
@@ -956,6 +961,8 @@ gb_internal String path_to_fullpath(gbAllocator a, String s) {
 				result.text[i] = '/';
 			}
 		}
+	} else {
+		mutex_unlock(&fullpath_mutex);
 	}
 
 	return result;
@@ -1325,11 +1332,10 @@ gb_internal void enable_target_feature(TokenPos pos, String const &target_featur
 gb_internal char const *target_features_set_to_cstring(gbAllocator allocator, bool with_quotes) {
 	isize len = 0;
 	isize i = 0;
-	for (auto const &entry : build_context.target_features_set) {
+	for (String const &feature : build_context.target_features_set) {
 		if (i != 0) {
 			len += 1;
 		}
-		String feature = entry.value;
 		len += feature.len;
 		if (with_quotes) len += 2;
 		i += 1;
@@ -1337,13 +1343,12 @@ gb_internal char const *target_features_set_to_cstring(gbAllocator allocator, bo
 	char *features = gb_alloc_array(allocator, char, len+1);
 	len = 0;
 	i = 0;
-	for (auto const &entry : build_context.target_features_set) {
+	for (String const &feature : build_context.target_features_set) {
 		if (i != 0) {
 			features[len++] = ',';
 		}
 
 		if (with_quotes) features[len++] = '"';
-		String feature = entry.value;
 		gb_memmove(features + len, feature.text, feature.len);
 		len += feature.len;
 		if (with_quotes) features[len++] = '"';
@@ -1362,8 +1367,7 @@ gb_internal bool init_build_paths(String init_filename) {
 	// NOTE(Jeroen): We're pre-allocating BuildPathCOUNT slots so that certain paths are always at the same enumerated index.
 	array_init(&bc->build_paths, permanent_allocator(), BuildPathCOUNT);
 
-	string_set_init(&bc->target_features_set, heap_allocator(), 1024);
-	mutex_init(&bc->target_features_mutex);
+	string_set_init(&bc->target_features_set, 1024);
 
 	// [BuildPathMainPackage] Turn given init path into a `Path`, which includes normalizing it into a full path.
 	bc->build_paths[BuildPath_Main_Package] = path_from_string(ha, init_filename);

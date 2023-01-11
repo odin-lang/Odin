@@ -96,8 +96,7 @@ gb_internal void check_or_else_expr_no_value_error(CheckerContext *c, String con
 		gbString th = nullptr;
 		if (type_hint != nullptr) {
 			GB_ASSERT(bsrc->kind == Type_Union);
-			for_array(i, bsrc->Union.variants) {
-				Type *vt = bsrc->Union.variants[i];
+			for (Type *vt : bsrc->Union.variants) {
 				if (are_types_identical(vt, type_hint)) {
 					th = type_to_string(type_hint);
 					break;
@@ -198,8 +197,7 @@ gb_internal void add_objc_proc_type(CheckerContext *c, Ast *call, Type *return_t
 	{
 		auto variables = array_make<Entity *>(permanent_allocator(), 0, param_types.count);
 
-		for_array(i, param_types)  {
-			Type *type = param_types[i];
+		for (Type *type : param_types) {
 			Entity *param = alloc_entity_param(scope, blank_token, type, false, true);
 			array_add(&variables, param);
 		}
@@ -1110,7 +1108,7 @@ gb_internal bool cache_load_file_directive(CheckerContext *c, Ast *call, String 
 			new_cache->path = path;
 			new_cache->data = data;
 			new_cache->file_error = file_error;
-			string_map_init(&new_cache->hashes, heap_allocator(), 32);
+			string_map_init(&new_cache->hashes, 32);
 			string_map_set(&c->info->load_file_cache, path, new_cache);
 			if (cache_) *cache_ = new_cache;
 		} else {
@@ -1120,8 +1118,7 @@ gb_internal bool cache_load_file_directive(CheckerContext *c, Ast *call, String 
 		}
 	});
 
-	char *c_str = alloc_cstring(heap_allocator(), path);
-	defer (gb_free(heap_allocator(), c_str));
+	char *c_str = alloc_cstring(temporary_allocator(), path);
 
 	gbFile f = {};
 	if (cache == nullptr) {
@@ -3071,8 +3068,7 @@ gb_internal bool check_builtin_procedure(CheckerContext *c, Operand *operand, As
 		bool first_is_field_value = (ce->args[0]->kind == Ast_FieldValue);
 
 		bool fail = false;
-		for_array(i, ce->args) {
-			Ast *arg = ce->args[i];
+		for (Ast *arg : ce->args) {
 			bool mix = false;
 			if (first_is_field_value) {
 				mix = arg->kind != Ast_FieldValue;
@@ -3086,11 +3082,10 @@ gb_internal bool check_builtin_procedure(CheckerContext *c, Operand *operand, As
 			}
 		}
 		StringSet name_set = {};
-		string_set_init(&name_set, heap_allocator(), 2*ce->args.count);
+		string_set_init(&name_set, 2*ce->args.count);
 
-		for_array(i, ce->args) {
+		for (Ast *arg : ce->args) {
 			String name = {};
-			Ast *arg = ce->args[i];
 			if (arg->kind == Ast_FieldValue) {
 				Ast *ename = arg->FieldValue.field;
 				if (!fail && ename->kind != Ast_Ident) {
@@ -3577,7 +3572,7 @@ gb_internal bool check_builtin_procedure(CheckerContext *c, Operand *operand, As
 		Entity *base_type_entity = alloc_entity_type_name(scope, token, elem, EntityState_Resolved);
 		add_entity(c, scope, nullptr, base_type_entity);
 
-		add_type_info_type(c, soa_struct);
+		// add_type_info_type(c, soa_struct);
 
 		operand->type = soa_struct;
 		break;
@@ -4987,8 +4982,7 @@ gb_internal bool check_builtin_procedure(CheckerContext *c, Operand *operand, As
 
 			bool is_variant = false;
 
-			for_array(i, u->Union.variants) {
-				Type *vt = u->Union.variants[i];
+			for (Type *vt : u->Union.variants) {
 				if (are_types_identical(v, vt)) {
 					is_variant = true;
 					break;

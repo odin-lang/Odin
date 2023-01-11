@@ -748,6 +748,7 @@ gb_internal i64 type_align_of_internal(Type *t, TypePath *path);
 // IMPORTANT TODO(bill): SHould this TypePath code be removed since type cycle checking is handled much earlier on?
 
 struct TypePath {
+	RecursiveMutex mutex;
 	Array<Entity *> path; // Entity_TypeName;
 	bool failure;
 };
@@ -758,7 +759,9 @@ gb_internal void type_path_init(TypePath *tp) {
 }
 
 gb_internal void type_path_free(TypePath *tp) {
+	mutex_lock(&tp->mutex);
 	array_free(&tp->path);
+	mutex_unlock(&tp->mutex);
 }
 
 gb_internal void type_path_print_illegal_cycle(TypePath *tp, isize start_index) {
@@ -787,6 +790,8 @@ gb_internal bool type_path_push(TypePath *tp, Type *t) {
 	}
 	Entity *e = t->Named.type_name;
 
+	mutex_lock(&tp->mutex);
+
 	for (isize i = 0; i < tp->path.count; i++) {
 		Entity *p = tp->path[i];
 		if (p == e) {
@@ -795,22 +800,25 @@ gb_internal bool type_path_push(TypePath *tp, Type *t) {
 	}
 
 	array_add(&tp->path, e);
+
+	mutex_unlock(&tp->mutex);
+
 	return true;
 }
 
 gb_internal void type_path_pop(TypePath *tp) {
-	if (tp != nullptr && tp->path.count > 0) {
-		array_pop(&tp->path);
+	if (tp != nullptr) {
+		mutex_lock(&tp->mutex);
+		if (tp->path.count > 0) {
+			array_pop(&tp->path);
+		}
+		mutex_unlock(&tp->mutex);
 	}
 }
 
 
 #define FAILURE_SIZE      0
 #define FAILURE_ALIGNMENT 0
-
-gb_internal void init_type_mutex(void) {
-	mutex_init(&g_type_mutex);
-}
 
 gb_internal bool type_ptr_set_update(PtrSet<Type *> *s, Type *t) {
 	if (ptr_set_exists(s, t)) {
@@ -827,8 +835,7 @@ gb_internal bool type_ptr_set_exists(PtrSet<Type *> *s, Type *t) {
 
 	// TODO(bill, 2019-10-05): This is very slow and it's probably a lot
 	// faster to cache types correctly
-	for (auto const &entry : *s) {
-		Type *f = entry.ptr;
+	for (Type *f : *s) {
 		if (are_types_identical(t, f)) {
 			ptr_set_add(s, t);
 			return true;
@@ -2521,14 +2528,6 @@ gb_internal bool lookup_subtype_polymorphic_selection(Type *dst, Type *src, Sele
 gb_internal bool are_types_identical_internal(Type *x, Type *y, bool check_tuple_names);
 
 gb_internal bool are_types_identical(Type *x, Type *y) {
-	return are_types_identical_internal(x, y, false);
-}
-gb_internal bool are_types_identical_unique_tuples(Type *x, Type *y) {
-	return are_types_identical_internal(x, y, true);
-}
-
-
-gb_internal bool are_types_identical_internal(Type *x, Type *y, bool check_tuple_names) {
 	if (x == y) {
 		return true;
 	}
@@ -2540,19 +2539,77 @@ gb_internal bool are_types_identical_internal(Type *x, Type *y, bool check_tuple
 
 	if (x->kind == Type_Named) {
 		Entity *e = x->Named.type_name;
-		if (e != nullptr && e->kind == Entity_TypeName && e->TypeName.is_type_alias) {
+		if (e->TypeName.is_type_alias) {
 			x = x->Named.base;
 		}
 	}
 	if (y->kind == Type_Named) {
 		Entity *e = y->Named.type_name;
-		if (e != nullptr && e->kind == Entity_TypeName && e->TypeName.is_type_alias) {
+		if (e->TypeName.is_type_alias) {
 			y = y->Named.base;
 		}
 	}
 	if (x->kind != y->kind) {
 		return false;
 	}
+
+	return are_types_identical_internal(x, y, false);
+}
+gb_internal bool are_types_identical_unique_tuples(Type *x, Type *y) {
+	if (x == y) {
+		return true;
+	}
+
+	if (!x | !y) {
+		return false;
+	}
+
+	if (x->kind == Type_Named) {
+		Entity *e = x->Named.type_name;
+		if (e->TypeName.is_type_alias) {
+			x = x->Named.base;
+		}
+	}
+	if (y->kind == Type_Named) {
+		Entity *e = y->Named.type_name;
+		if (e->TypeName.is_type_alias) {
+			y = y->Named.base;
+		}
+	}
+	if (x->kind != y->kind) {
+		return false;
+	}
+
+	return are_types_identical_internal(x, y, true);
+}
+
+
+gb_internal bool are_types_identical_internal(Type *x, Type *y, bool check_tuple_names) {
+	if (x == y) {
+		return true;
+	}
+
+	if (!x | !y) {
+		return false;
+	}
+
+	#if 0
+	if (x->kind == Type_Named) {
+		Entity *e = x->Named.type_name;
+		if (e->TypeName.is_type_alias) {
+			x = x->Named.base;
+		}
+	}
+	if (y->kind == Type_Named) {
+		Entity *e = y->Named.type_name;
+		if (e->TypeName.is_type_alias) {
+			y = y->Named.base;
+		}
+	}
+	if (x->kind != y->kind) {
+		return false;
+	}
+	#endif
 
 	switch (x->kind) {
 	case Type_Generic:
@@ -3350,35 +3407,55 @@ gb_internal i64 type_size_of(Type *t) {
 	if (t == nullptr) {
 		return 0;
 	}
-	// NOTE(bill): Always calculate the size when it is a Type_Basic
-	if (t->kind == Type_Named && t->cached_size >= 0) {
+	i64 size = -1;
+	if (t->kind == Type_Basic) {
+		GB_ASSERT_MSG(is_type_typed(t), "%s", type_to_string(t));
+		switch (t->Basic.kind) {
+		case Basic_string:  size = 2*build_context.word_size; break;
+		case Basic_cstring: size = build_context.word_size;   break;
+		case Basic_any:     size = 2*build_context.word_size; break;
+		case Basic_typeid:  size = build_context.word_size;   break;
 
-	} else if (t->kind != Type_Basic && t->cached_size >= 0) {
-		return t->cached_size;
+		case Basic_int: case Basic_uint: case Basic_uintptr: case Basic_rawptr:
+			size = build_context.word_size;
+			break;
+		default:
+			size = t->Basic.size;
+			break;
+		}
+		t->cached_size.store(size);
+		return size;
+	} else if (t->kind != Type_Named && t->cached_size >= 0) {
+		return t->cached_size.load();
+	} else {
+		TypePath path{};
+		type_path_init(&path);
+		{
+			MUTEX_GUARD(&g_type_mutex);
+			size = type_size_of_internal(t, &path);
+			t->cached_size.store(size);
+		}
+		type_path_free(&path);
+		return size;
 	}
-	TypePath path = {0};
-	type_path_init(&path);
-	t->cached_size = type_size_of_internal(t, &path);
-	type_path_free(&path);
-	return t->cached_size;
 }
 
 gb_internal i64 type_align_of(Type *t) {
 	if (t == nullptr) {
 		return 1;
 	}
-	// NOTE(bill): Always calculate the size when it is a Type_Basic
-	if (t->kind == Type_Named && t->cached_align >= 0) {
-
-	} if (t->kind != Type_Basic && t->cached_align > 0) {
-		return t->cached_align;
+	if (t->kind != Type_Named && t->cached_align > 0) {
+		return t->cached_align.load();
 	}
 
-	TypePath path = {0};
+	TypePath path{};
 	type_path_init(&path);
-	t->cached_align = type_align_of_internal(t, &path);
+	{
+		MUTEX_GUARD(&g_type_mutex);
+		t->cached_align.store(type_align_of_internal(t, &path));
+	}
 	type_path_free(&path);
-	return t->cached_align;
+	return t->cached_align.load();
 }
 
 
@@ -3387,8 +3464,6 @@ gb_internal i64 type_align_of_internal(Type *t, TypePath *path) {
 	if (t->failure) {
 		return FAILURE_ALIGNMENT;
 	}
-	mutex_lock(&g_type_mutex);
-	defer (mutex_unlock(&g_type_mutex));
 
 	t = base_type(t);
 
@@ -3485,39 +3560,25 @@ gb_internal i64 type_align_of_internal(Type *t, TypePath *path) {
 		if (t->Struct.custom_align > 0) {
 			return gb_max(t->Struct.custom_align, 1);
 		}
-		if (t->Struct.is_raw_union) {
-			i64 max = 1;
-			for_array(i, t->Struct.fields) {
-				Type *field_type = t->Struct.fields[i]->type;
-				bool pop = type_path_push(path, field_type);
-				if (path->failure) {
-					return FAILURE_ALIGNMENT;
-				}
-				i64 align = type_align_of_internal(field_type, path);
-				if (pop) type_path_pop(path);
-				if (max < align) {
-					max = align;
-				}
-			}
-			return max;
-		} else if (t->Struct.fields.count > 0) {
-			i64 max = 1;
-			// NOTE(bill): Check the fields to check for cyclic definitions
-			for_array(i, t->Struct.fields) {
-				Type *field_type = t->Struct.fields[i]->type;
-				bool pop = type_path_push(path, field_type);
-				if (path->failure) return FAILURE_ALIGNMENT;
-				i64 align = type_align_of_internal(field_type, path);
-				if (pop) type_path_pop(path);
-				if (max < align) {
-					max = align;
-				}
-			}
-			if (t->Struct.is_packed) {
-				return 1;
-			}
-			return max;
+
+		if (t->Struct.is_packed) {
+			return 1;
 		}
+
+		i64 max = 1;
+		for_array(i, t->Struct.fields) {
+			Type *field_type = t->Struct.fields[i]->type;
+			bool pop = type_path_push(path, field_type);
+			if (path->failure) {
+				return FAILURE_ALIGNMENT;
+			}
+			i64 align = type_align_of_internal(field_type, path);
+			if (pop) type_path_pop(path);
+			if (max < align) {
+				max = align;
+			}
+		}
+		return max;
 	} break;
 
 	case Type_BitSet: {
@@ -3583,8 +3644,7 @@ gb_internal i64 *type_set_offsets_of(Slice<Entity *> const &fields, bool is_pack
 }
 
 gb_internal bool type_set_offsets(Type *t) {
-	mutex_lock(&g_type_mutex);
-	defer (mutex_unlock(&g_type_mutex));
+	MUTEX_GUARD(&g_type_mutex); // TODO(bill): only per struct
 
 	t = base_type(t);
 	if (t->kind == Type_Struct) {
@@ -3613,9 +3673,6 @@ gb_internal i64 type_size_of_internal(Type *t, TypePath *path) {
 	if (t->failure) {
 		return FAILURE_SIZE;
 	}
-	mutex_lock(&g_type_mutex);
-	defer (mutex_unlock(&g_type_mutex));
-
 
 	switch (t->kind) {
 	case Type_Named: {

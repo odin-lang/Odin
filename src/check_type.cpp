@@ -257,63 +257,67 @@ gb_internal bool check_custom_align(CheckerContext *ctx, Ast *node, i64 *align_)
 
 
 gb_internal Entity *find_polymorphic_record_entity(CheckerContext *ctx, Type *original_type, isize param_count, Array<Operand> const &ordered_operands, bool *failure) {
-	mutex_lock(&ctx->info->gen_types_mutex);
-	defer (mutex_unlock(&ctx->info->gen_types_mutex));
+	rw_mutex_shared_lock(&ctx->info->gen_types_mutex); // @@global
 
 	auto *found_gen_types = map_get(&ctx->info->gen_types, original_type);
-	if (found_gen_types != nullptr) {
-		// GB_ASSERT_MSG(ordered_operands.count >= param_count, "%td >= %td", ordered_operands.count, param_count);
+	if (found_gen_types == nullptr) {
+		rw_mutex_shared_unlock(&ctx->info->gen_types_mutex); // @@global
+		return nullptr;
+	}
 
-		for_array(i, *found_gen_types) {
-			Entity *e = (*found_gen_types)[i];
-			Type *t = base_type(e->type);
-			TypeTuple *tuple = get_record_polymorphic_params(t);
-			GB_ASSERT(param_count == tuple->variables.count);
+	rw_mutex_shared_lock(&found_gen_types->mutex); // @@local
+	defer (rw_mutex_shared_unlock(&found_gen_types->mutex)); // @@local
 
-			bool skip = false;
+	rw_mutex_shared_unlock(&ctx->info->gen_types_mutex); // @@global
 
-			for (isize j = 0; j < param_count; j++) {
-				Entity *p = tuple->variables[j];
-				Operand o = {};
-				if (j < ordered_operands.count) {
-					o = ordered_operands[j];
-				}
-				if (o.expr == nullptr) {
-					continue;
-				}
-				Entity *oe = entity_of_node(o.expr);
-				if (p == oe) {
-					// NOTE(bill): This is the same type, make sure that it will be be same thing and use that
-					// Saves on a lot of checking too below
-					continue;
-				}
+	for (Entity *e : found_gen_types->types) {
+		Type *t = base_type(e->type);
+		TypeTuple *tuple = get_record_polymorphic_params(t);
+		GB_ASSERT(param_count == tuple->variables.count);
 
-				if (p->kind == Entity_TypeName) {
-					if (is_type_polymorphic(o.type)) {
-						// NOTE(bill): Do not add polymorphic version to the gen_types
-						skip = true;
-						break;
-					}
-					if (!are_types_identical(o.type, p->type)) {
-						skip = true;
-						break;
-					}
-				} else if (p->kind == Entity_Constant) {
-					if (!compare_exact_values(Token_CmpEq, o.value, p->Constant.value)) {
-						skip = true;
-						break;
-					}
-					if (!are_types_identical(o.type, p->type)) {
-						skip = true;
-						break;
-					}
-				} else {
-					GB_PANIC("Unknown entity kind");
-				}
+		bool skip = false;
+
+		for (isize j = 0; j < param_count; j++) {
+			Entity *p = tuple->variables[j];
+			Operand o = {};
+			if (j < ordered_operands.count) {
+				o = ordered_operands[j];
 			}
-			if (!skip) {
-				return e;
+			if (o.expr == nullptr) {
+				continue;
 			}
+			Entity *oe = entity_of_node(o.expr);
+			if (p == oe) {
+				// NOTE(bill): This is the same type, make sure that it will be be same thing and use that
+				// Saves on a lot of checking too below
+				continue;
+			}
+
+			if (p->kind == Entity_TypeName) {
+				if (is_type_polymorphic(o.type)) {
+					// NOTE(bill): Do not add polymorphic version to the gen_types
+					skip = true;
+					break;
+				}
+				if (!are_types_identical(o.type, p->type)) {
+					skip = true;
+					break;
+				}
+			} else if (p->kind == Entity_Constant) {
+				if (!compare_exact_values(Token_CmpEq, o.value, p->Constant.value)) {
+					skip = true;
+					break;
+				}
+				if (!are_types_identical(o.type, p->type)) {
+					skip = true;
+					break;
+				}
+			} else {
+				GB_PANIC("Unknown entity kind");
+			}
+		}
+		if (!skip) {
+			return e;
 		}
 	}
 	return nullptr;
@@ -346,16 +350,19 @@ gb_internal void add_polymorphic_record_entity(CheckerContext *ctx, Ast *node, T
 	// TODO(bill): Is this even correct? Or should the metadata be copied?
 	e->TypeName.objc_metadata = original_type->Named.type_name->TypeName.objc_metadata;
 
-	mutex_lock(&ctx->info->gen_types_mutex);
+	rw_mutex_lock(&ctx->info->gen_types_mutex);
 	auto *found_gen_types = map_get(&ctx->info->gen_types, original_type);
 	if (found_gen_types) {
-		array_add(found_gen_types, e);
+		rw_mutex_lock(&found_gen_types->mutex);
+		array_add(&found_gen_types->types, e);
+		rw_mutex_unlock(&found_gen_types->mutex);
 	} else {
-		auto array = array_make<Entity *>(heap_allocator());
-		array_add(&array, e);
-		map_set(&ctx->info->gen_types, original_type, array);
+		GenTypesData gen_types = {};
+		gen_types.types = array_make<Entity *>(heap_allocator());
+		array_add(&gen_types.types, e);
+		map_set(&ctx->info->gen_types, original_type, gen_types);
 	}
-	mutex_unlock(&ctx->info->gen_types_mutex);
+	rw_mutex_unlock(&ctx->info->gen_types_mutex);
 }
 
 gb_internal Type *check_record_polymorphic_params(CheckerContext *ctx, Ast *polymorphic_params,
@@ -2398,7 +2405,8 @@ gb_internal Type *make_soa_struct_internal(CheckerContext *ctx, Ast *array_typ_e
 		}
 		soa_struct->Struct.soa_count = cast(i32)count;
 
-		scope = create_scope(ctx->info, ctx->scope, 8);
+		scope = create_scope(ctx->info, ctx->scope);
+		string_map_init(&scope->elements, 8);
 		soa_struct->Struct.scope = scope;
 
 		String params_xyzw[4] = {
@@ -3045,7 +3053,7 @@ gb_internal Type *check_type_expr(CheckerContext *ctx, Ast *e, Type *named_type)
 	#endif
 
 	if (is_type_typed(type)) {
-		add_type_and_value(ctx->info, e, Addressing_Type, type, empty_exact_value);
+		add_type_and_value(ctx, e, Addressing_Type, type, empty_exact_value);
 	} else {
 		gbString name = type_to_string(type);
 		error(e, "Invalid type definition of %s", name);

@@ -27,6 +27,7 @@ struct PtrMap {
 
 
 gb_internal gb_inline u32 ptr_map_hash_key(uintptr key) {
+	u32 res;
 #if defined(GB_ARCH_64_BIT)
 	key = (~key) + (key << 21);
 	key = key ^ (key >> 24);
@@ -34,22 +35,24 @@ gb_internal gb_inline u32 ptr_map_hash_key(uintptr key) {
 	key = key ^ (key >> 14);
 	key = (key + (key << 2)) + (key << 4);
 	key = key ^ (key << 28);
-	return cast(u32)key;
+	res = cast(u32)key;
 #elif defined(GB_ARCH_32_BIT)
 	u32 state = ((u32)key) * 747796405u + 2891336453u;
 	u32 word = ((state >> ((state >> 28u) + 4u)) ^ state) * 277803737u;
-	return (word >> 22u) ^ word;
+	res = (word >> 22u) ^ word;
 #endif
+	return res;
 }
 gb_internal gb_inline u32 ptr_map_hash_key(void const *key) {
 	return ptr_map_hash_key((uintptr)key);
 }
 
 
-template <typename K, typename V> gb_internal void map_init             (PtrMap<K, V> *h, gbAllocator a, isize capacity = 16);
+template <typename K, typename V> gb_internal void map_init             (PtrMap<K, V> *h, isize capacity = 16);
 template <typename K, typename V> gb_internal void map_destroy          (PtrMap<K, V> *h);
 template <typename K, typename V> gb_internal V *  map_get              (PtrMap<K, V> *h, K key);
 template <typename K, typename V> gb_internal void map_set              (PtrMap<K, V> *h, K key, V const &value);
+template <typename K, typename V> gb_internal bool map_set_if_not_previously_exists(PtrMap<K, V> *h, K key, V const &value); // returns true if it previously existed
 template <typename K, typename V> gb_internal void map_remove           (PtrMap<K, V> *h, K key);
 template <typename K, typename V> gb_internal void map_clear            (PtrMap<K, V> *h);
 template <typename K, typename V> gb_internal void map_grow             (PtrMap<K, V> *h);
@@ -68,11 +71,15 @@ template <typename K, typename V> gb_internal void  multi_map_remove    (PtrMap<
 template <typename K, typename V> gb_internal void  multi_map_remove_all(PtrMap<K, V> *h, K key);
 #endif
 
+gb_internal gbAllocator map_allocator(void) {
+	return heap_allocator();
+}
+
 template <typename K, typename V>
-gb_internal gb_inline void map_init(PtrMap<K, V> *h, gbAllocator a, isize capacity) {
+gb_internal gb_inline void map_init(PtrMap<K, V> *h, isize capacity) {
 	capacity = next_pow2_isize(capacity);
-	slice_init(&h->hashes,  a, capacity);
-	array_init(&h->entries, a, 0, capacity);
+	slice_init(&h->hashes,  map_allocator(), capacity);
+	array_init(&h->entries, map_allocator(), 0, capacity);
 	for (isize i = 0; i < capacity; i++) {
 		h->hashes.data[i] = MAP_SENTINEL;
 	}
@@ -80,6 +87,9 @@ gb_internal gb_inline void map_init(PtrMap<K, V> *h, gbAllocator a, isize capaci
 
 template <typename K, typename V>
 gb_internal gb_inline void map_destroy(PtrMap<K, V> *h) {
+	if (h->entries.allocator.proc == nullptr) {
+		h->entries.allocator = map_allocator();
+	}
 	slice_free(&h->hashes, h->entries.allocator);
 	array_free(&h->entries);
 }
@@ -103,11 +113,12 @@ gb_internal MapFindResult map__find(PtrMap<K, V> *h, K key) {
 	fr.hash_index = cast(MapIndex)(hash & (h->hashes.count-1));
 	fr.entry_index = h->hashes.data[fr.hash_index];
 	while (fr.entry_index != MAP_SENTINEL) {
-		if (h->entries.data[fr.entry_index].key == key) {
+		auto *entry = &h->entries.data[fr.entry_index];
+		if (entry->key == key) {
 			return fr;
 		}
 		fr.entry_prev = fr.entry_index;
-		fr.entry_index = h->entries.data[fr.entry_index].next;
+		fr.entry_index = entry->next;
 	}
 	return fr;
 }
@@ -162,6 +173,9 @@ gb_internal void map_reset_entries(PtrMap<K, V> *h) {
 
 template <typename K, typename V>
 gb_internal void map_reserve(PtrMap<K, V> *h, isize cap) {
+	if (h->entries.allocator.proc == nullptr) {
+		h->entries.allocator = map_allocator();
+	}
 	array_reserve(&h->entries, cap);
 	if (h->entries.count*2 < h->hashes.count) {
 		return;
@@ -178,18 +192,64 @@ gb_internal void map_rehash(PtrMap<K, V> *h, isize new_count) {
 
 template <typename K, typename V>
 gb_internal V *map_get(PtrMap<K, V> *h, K key) {
-	MapIndex index = map__find(h, key).entry_index;
-	if (index != MAP_SENTINEL) {
-		return &h->entries.data[index].value;
+	MapIndex hash_index  = MAP_SENTINEL;
+	MapIndex entry_prev  = MAP_SENTINEL;
+	MapIndex entry_index = MAP_SENTINEL;
+	if (h->hashes.count != 0) {
+		u32 hash = ptr_map_hash_key(key);
+		hash_index = cast(MapIndex)(hash & (h->hashes.count-1));
+		entry_index = h->hashes.data[hash_index];
+		while (entry_index != MAP_SENTINEL) {
+			auto *entry = &h->entries.data[entry_index];
+			if (entry->key == key) {
+				return &entry->value;
+			}
+			entry_prev = entry_index;
+			entry_index = entry->next;
+		}
 	}
 	return nullptr;
+}
+template <typename K, typename V>
+gb_internal V *map_try_get(PtrMap<K, V> *h, K key, MapFindResult *fr_) {
+	MapFindResult fr = {MAP_SENTINEL, MAP_SENTINEL, MAP_SENTINEL};
+	if (h->hashes.count != 0) {
+		u32 hash = ptr_map_hash_key(key);
+		fr.hash_index = cast(MapIndex)(hash & (h->hashes.count-1));
+		fr.entry_index = h->hashes.data[fr.hash_index];
+		while (fr.entry_index != MAP_SENTINEL) {
+			auto *entry = &h->entries.data[fr.entry_index];
+			if (entry->key == key) {
+				return &entry->value;
+			}
+			fr.entry_prev = fr.entry_index;
+			fr.entry_index = entry->next;
+		}
+	}
+	if (h->hashes.count == 0 || map__full(h)) {
+		map_grow(h);
+	}
+	if (fr_) *fr_ = fr;
+	return nullptr;
+}
+
+
+template <typename K, typename V>
+gb_internal void map_set_internal_from_try_get(PtrMap<K, V> *h, K key, V const &value, MapFindResult const &fr) {
+	MapIndex index = map__add_entry(h, key);
+	if (fr.entry_prev != MAP_SENTINEL) {
+		h->entries.data[fr.entry_prev].next = index;
+	} else {
+		h->hashes.data[fr.hash_index] = index;
+	}
+	h->entries.data[index].value = value;
 }
 
 template <typename K, typename V>
 gb_internal V &map_must_get(PtrMap<K, V> *h, K key) {
-	MapIndex index = map__find(h, key).entry_index;
-	GB_ASSERT(index != MAP_SENTINEL);
-	return h->entries.data[index].value;
+	V *ptr = map_get(h, key);
+	GB_ASSERT(ptr != nullptr);
+	return *ptr;
 }
 
 template <typename K, typename V>
@@ -215,6 +275,33 @@ gb_internal void map_set(PtrMap<K, V> *h, K key, V const &value) {
 	if (map__full(h)) {
 		map_grow(h);
 	}
+}
+
+// returns true if it previously existed
+template <typename K, typename V>
+gb_internal bool map_set_if_not_previously_exists(PtrMap<K, V> *h, K key, V const &value) {
+	MapIndex index;
+	MapFindResult fr;
+	if (h->hashes.count == 0) {
+		map_grow(h);
+	}
+	fr = map__find(h, key);
+	if (fr.entry_index != MAP_SENTINEL) {
+		return true;
+	} else {
+		index = map__add_entry(h, key);
+		if (fr.entry_prev != MAP_SENTINEL) {
+			h->entries.data[fr.entry_prev].next = index;
+		} else {
+			h->hashes.data[fr.hash_index] = index;
+		}
+	}
+	h->entries.data[index].value = value;
+
+	if (map__full(h)) {
+		map_grow(h);
+	}
+	return false;
 }
 
 

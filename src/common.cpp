@@ -43,9 +43,9 @@ gb_internal void debugf(char const *fmt, ...);
 #error Odin on Windows requires a 64-bit build-system. The 'Developer Command Prompt' for VS still defaults to 32-bit shell. The 64-bit shell can be found under the name 'x64 Native Tools Command Prompt' for VS. For more information, please see https://odin-lang.org/docs/install/#for-windows
 #endif
 
-#include "threading.cpp"
 #include "unicode.cpp"
 #include "array.cpp"
+#include "threading.cpp"
 #include "queue.cpp"
 #include "common_memory.cpp"
 #include "string.cpp"
@@ -373,7 +373,7 @@ gb_internal char const *string_intern(String const &string) {
 }
 
 gb_internal void init_string_interner(void) {
-	map_init(&string_intern_map, heap_allocator());
+	map_init(&string_intern_map);
 }
 
 

@@ -130,7 +130,7 @@ enum EntityConstantFlags : u32 {
 	EntityConstantFlag_ImplicitEnumValue = 1<<0,
 };
 
-enum ProcedureOptimizationMode : u32 {
+enum ProcedureOptimizationMode : u8 {
 	ProcedureOptimizationMode_Default,
 	ProcedureOptimizationMode_None,
 	ProcedureOptimizationMode_Minimal,
@@ -154,7 +154,6 @@ struct TypeNameObjCMetadata {
 gb_internal TypeNameObjCMetadata *create_type_name_obj_c_metadata() {
 	TypeNameObjCMetadata *md = gb_alloc_item(permanent_allocator(), TypeNameObjCMetadata);
 	md->mutex = gb_alloc_item(permanent_allocator(), BlockingMutex);
-	mutex_init(md->mutex);
 	array_init(&md->type_entries,  heap_allocator());
 	array_init(&md->value_entries, heap_allocator());
 	return md;
@@ -234,6 +233,9 @@ struct Entity {
 			String  link_name;
 			String  link_prefix;
 			DeferredProcedure deferred_procedure;
+
+			struct GenProcsData *gen_procs;
+			BlockingMutex gen_procs_mutex;
 			ProcedureOptimizationMode optimization_mode;
 			bool    is_foreign                 : 1;
 			bool    is_export                  : 1;

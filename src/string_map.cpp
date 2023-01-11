@@ -1,6 +1,13 @@
 struct StringHashKey {
 	u32    hash;
 	String string;
+
+	operator String() const noexcept {
+		return this->string;
+	}
+	operator String const &() const noexcept {
+		return this->string;
+	}
 };
 
 gb_internal gb_inline StringHashKey string_hash_string(String const &s) {
@@ -35,7 +42,7 @@ struct StringMap {
 };
 
 
-template <typename T> gb_internal void string_map_init             (StringMap<T> *h, gbAllocator a, isize capacity = 16);
+template <typename T> gb_internal void string_map_init             (StringMap<T> *h, isize capacity = 16);
 template <typename T> gb_internal void string_map_destroy          (StringMap<T> *h);
 
 template <typename T> gb_internal T *  string_map_get              (StringMap<T> *h, char const *key);
@@ -56,11 +63,15 @@ template <typename T> gb_internal void string_map_grow             (StringMap<T>
 template <typename T> gb_internal void string_map_rehash           (StringMap<T> *h, isize new_count);
 template <typename T> gb_internal void string_map_reserve          (StringMap<T> *h, isize cap);
 
+gb_internal gbAllocator string_map_allocator(void) {
+	return heap_allocator();
+}
+
 template <typename T>
-gb_internal gb_inline void string_map_init(StringMap<T> *h, gbAllocator a, isize capacity) {
+gb_internal gb_inline void string_map_init(StringMap<T> *h, isize capacity) {
 	capacity = next_pow2_isize(capacity);
-	slice_init(&h->hashes,  a, capacity);
-	array_init(&h->entries, a, 0, capacity);
+	slice_init(&h->hashes,  string_map_allocator(), capacity);
+	array_init(&h->entries, string_map_allocator(), 0, capacity);
 	for (isize i = 0; i < capacity; i++) {
 		h->hashes.data[i] = MAP_SENTINEL;
 	}
@@ -68,6 +79,9 @@ gb_internal gb_inline void string_map_init(StringMap<T> *h, gbAllocator a, isize
 
 template <typename T>
 gb_internal gb_inline void string_map_destroy(StringMap<T> *h) {
+	if (h->entries.allocator.proc == nullptr) {
+		h->entries.allocator = string_map_allocator();
+	}
 	slice_free(&h->hashes, h->entries.allocator);
 	array_free(&h->entries);
 }
@@ -147,6 +161,9 @@ gb_internal void string_map_reset_entries(StringMap<T> *h) {
 
 template <typename T>
 gb_internal void string_map_reserve(StringMap<T> *h, isize cap) {
+	if (h->entries.allocator.proc == nullptr) {
+		h->entries.allocator = string_map_allocator();
+	}
 	array_reserve(&h->entries, cap);
 	if (h->entries.count*2 < h->hashes.count) {
 		return;
@@ -163,9 +180,18 @@ gb_internal void string_map_rehash(StringMap<T> *h, isize new_count) {
 
 template <typename T>
 gb_internal T *string_map_get(StringMap<T> *h, StringHashKey const &key) {
-	isize index = string_map__find(h, key).entry_index;
-	if (index != MAP_SENTINEL) {
-		return &h->entries.data[index].value;
+	MapFindResult fr = {MAP_SENTINEL, MAP_SENTINEL, MAP_SENTINEL};
+	if (h->hashes.count != 0) {
+		fr.hash_index = cast(MapIndex)(key.hash & (h->hashes.count-1));
+		fr.entry_index = h->hashes.data[fr.hash_index];
+		while (fr.entry_index != MAP_SENTINEL) {
+			auto *entry = &h->entries.data[fr.entry_index];
+			if (string_hash_key_equal(entry->key, key)) {
+				return &entry->value;
+			}
+			fr.entry_prev = fr.entry_index;
+			fr.entry_index = entry->next;
+		}
 	}
 	return nullptr;
 }
@@ -273,11 +299,11 @@ gb_internal gb_inline void string_map_clear(StringMap<T> *h) {
 
 
 template <typename T>
-gb_internal StringMapEntry<T> *begin(StringMap<T> &m) {
+gb_internal StringMapEntry<T> *begin(StringMap<T> &m) noexcept {
 	return m.entries.data;
 }
 template <typename T>
-gb_internal StringMapEntry<T> const *begin(StringMap<T> const &m) {
+gb_internal StringMapEntry<T> const *begin(StringMap<T> const &m) noexcept {
 	return m.entries.data;
 }
 
@@ -288,6 +314,6 @@ gb_internal StringMapEntry<T> *end(StringMap<T> &m) {
 }
 
 template <typename T>
-gb_internal StringMapEntry<T> const *end(StringMap<T> const &m) {
+gb_internal StringMapEntry<T> const *end(StringMap<T> const &m) noexcept {
 	return m.entries.data + m.entries.count;
 }

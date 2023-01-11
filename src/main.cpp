@@ -13,17 +13,16 @@
 #endif
 #include "exact_value.cpp"
 #include "build_settings.cpp"
-
 gb_global ThreadPool global_thread_pool;
 gb_internal void init_global_thread_pool(void) {
 	isize thread_count = gb_max(build_context.thread_count, 1);
-	isize worker_count = thread_count-1; // NOTE(bill): The main thread will also be used for work
+	isize worker_count = thread_count-1;
 	thread_pool_init(&global_thread_pool, permanent_allocator(), worker_count, "ThreadPoolWorker");
 }
-gb_internal bool global_thread_pool_add_task(WorkerTaskProc *proc, void *data) {
+gb_internal bool thread_pool_add_task(WorkerTaskProc *proc, void *data) {
 	return thread_pool_add_task(&global_thread_pool, proc, data);
 }
-gb_internal void global_thread_pool_wait(void) {
+gb_internal void thread_pool_wait(void) {
 	thread_pool_wait(&global_thread_pool);
 }
 
@@ -213,11 +212,11 @@ gb_internal i32 linker_stage(lbGenerator *gen) {
 
 
 			StringSet libs = {};
-			string_set_init(&libs, heap_allocator(), 64);
+			string_set_init(&libs, 64);
 			defer (string_set_destroy(&libs));
 
 			StringSet asm_files = {};
-			string_set_init(&asm_files, heap_allocator(), 64);
+			string_set_init(&asm_files, 64);
 			defer (string_set_destroy(&asm_files));
 
 			for_array(j, gen->foreign_libraries) {
@@ -372,7 +371,7 @@ gb_internal i32 linker_stage(lbGenerator *gen) {
 			defer (gb_string_free(lib_str));
 
 			StringSet libs = {};
-			string_set_init(&libs, heap_allocator(), 64);
+			string_set_init(&libs, 64);
 			defer (string_set_destroy(&libs));
 
 			for_array(j, gen->foreign_libraries) {
@@ -618,7 +617,6 @@ enum BuildFlagKind {
 	BuildFlag_NoEntryPoint,
 	BuildFlag_UseLLD,
 	BuildFlag_UseSeparateModules,
-	BuildFlag_ThreadedChecker,
 	BuildFlag_NoThreadedChecker,
 	BuildFlag_ShowDebugMessages,
 	BuildFlag_Vet,
@@ -660,6 +658,7 @@ enum BuildFlagKind {
 
 	// internal use only
 	BuildFlag_InternalIgnoreLazy,
+	BuildFlag_InternalIgnoreLLVMBuild,
 
 #if defined(GB_SYSTEM_WINDOWS)
 	BuildFlag_IgnoreVsSearch,
@@ -793,7 +792,6 @@ gb_internal bool parse_build_flags(Array<String> args) {
 	add_flag(&build_flags, BuildFlag_NoEntryPoint,            str_lit("no-entry-point"),            BuildFlagParam_None,    Command__does_check &~ Command_test);
 	add_flag(&build_flags, BuildFlag_UseLLD,                  str_lit("lld"),                       BuildFlagParam_None,    Command__does_build);
 	add_flag(&build_flags, BuildFlag_UseSeparateModules,      str_lit("use-separate-modules"),      BuildFlagParam_None,    Command__does_build);
-	add_flag(&build_flags, BuildFlag_ThreadedChecker,         str_lit("threaded-checker"),          BuildFlagParam_None,    Command__does_check);
 	add_flag(&build_flags, BuildFlag_NoThreadedChecker,       str_lit("no-threaded-checker"),       BuildFlagParam_None,    Command__does_check);
 	add_flag(&build_flags, BuildFlag_ShowDebugMessages,       str_lit("show-debug-messages"),       BuildFlagParam_None,    Command_all);
 	add_flag(&build_flags, BuildFlag_Vet,                     str_lit("vet"),                       BuildFlagParam_None,    Command__does_check);
@@ -832,6 +830,7 @@ gb_internal bool parse_build_flags(Array<String> args) {
 	add_flag(&build_flags, BuildFlag_ErrorPosStyle,           str_lit("error-pos-style"),           BuildFlagParam_String,  Command_all);
 
 	add_flag(&build_flags, BuildFlag_InternalIgnoreLazy,      str_lit("internal-ignore-lazy"),      BuildFlagParam_None,    Command_all);
+	add_flag(&build_flags, BuildFlag_InternalIgnoreLLVMBuild, str_lit("internal-ignore-llvm-build"),BuildFlagParam_None,    Command_all);
 
 #if defined(GB_SYSTEM_WINDOWS)
 	add_flag(&build_flags, BuildFlag_IgnoreVsSearch,          str_lit("ignore-vs-search"),          BuildFlagParam_None,    Command__does_build);
@@ -1310,20 +1309,8 @@ gb_internal bool parse_build_flags(Array<String> args) {
 						case BuildFlag_UseSeparateModules:
 							build_context.use_separate_modules = true;
 							break;
-						case BuildFlag_ThreadedChecker: {
-							#if defined(DEFAULT_TO_THREADED_CHECKER)
-							gb_printf_err("-threaded-checker is the default on this platform\n");
-							bad_flags = true;
-							#endif
-							build_context.threaded_checker = true;
-							break;
-						}
 						case BuildFlag_NoThreadedChecker: {
-							#if !defined(DEFAULT_TO_THREADED_CHECKER)
-							gb_printf_err("-no-threaded-checker is the default on this platform\n");
-							bad_flags = true;
-							#endif
-							build_context.threaded_checker = false;
+							build_context.no_threaded_checker = true;
 							break;
 						}
 						case BuildFlag_ShowDebugMessages:
@@ -1490,6 +1477,9 @@ gb_internal bool parse_build_flags(Array<String> args) {
 
 						case BuildFlag_InternalIgnoreLazy:
 							build_context.ignore_lazy = true;
+							break;
+						case BuildFlag_InternalIgnoreLLVMBuild:
+							build_context.ignore_llvm_build = true;
 							break;
 					#if defined(GB_SYSTEM_WINDOWS)
 						case BuildFlag_IgnoreVsSearch: {
@@ -2498,15 +2488,10 @@ int main(int arg_count, char const **arg_ptr) {
 	MAIN_TIME_SECTION("initialization");
 
 	virtual_memory_init();
-	mutex_init(&fullpath_mutex);
-	mutex_init(&hash_exact_value_mutex);
-	mutex_init(&global_type_name_objc_metadata_mutex);
 
-	init_string_buffer_memory();
 	init_string_interner();
 	init_global_error_collector();
 	init_keyword_hash_table();
-	init_type_mutex();
 
 	if (!check_env()) {
 		return 1;
@@ -2517,9 +2502,9 @@ int main(int arg_count, char const **arg_ptr) {
 	add_library_collection(str_lit("core"), get_fullpath_relative(heap_allocator(), odin_root_dir(), str_lit("core")));
 	add_library_collection(str_lit("vendor"), get_fullpath_relative(heap_allocator(), odin_root_dir(), str_lit("vendor")));
 
-	map_init(&build_context.defined_values, heap_allocator());
+	map_init(&build_context.defined_values);
 	build_context.extra_packages.allocator = heap_allocator();
-	string_set_init(&build_context.test_names, heap_allocator());
+	string_set_init(&build_context.test_names);
 
 	Array<String> args = setup_args(arg_count, arg_ptr);
 
@@ -2785,19 +2770,19 @@ int main(int arg_count, char const **arg_ptr) {
 	if (!lb_init_generator(gen, checker)) {
 		return 1;
 	}
-	lb_generate_code(gen);
-
-	switch (build_context.build_mode) {
-	case BuildMode_Executable:
-	case BuildMode_DynamicLibrary:
-		i32 result = linker_stage(gen);
-		if (result) {
-			if (build_context.show_timings) {
-				show_timings(checker, &global_timings);
+	if (lb_generate_code(gen)) {
+		switch (build_context.build_mode) {
+		case BuildMode_Executable:
+		case BuildMode_DynamicLibrary:
+			i32 result = linker_stage(gen);
+			if (result) {
+				if (build_context.show_timings) {
+					show_timings(checker, &global_timings);
+				}
+				return result;
 			}
-			return result;
+			break;
 		}
-		break;
 	}
 
 	remove_temp_files(gen);

@@ -53,13 +53,12 @@ gb_internal void odin_doc_writer_item_tracker_init(OdinDocWriterItemTracker<T> *
 gb_internal void odin_doc_writer_prepare(OdinDocWriter *w) {
 	w->state = OdinDocWriterState_Preparing;
 
-	gbAllocator a = heap_allocator();
-	string_map_init(&w->string_cache, a);
+	string_map_init(&w->string_cache);
 
-	map_init(&w->file_cache, a);
-	map_init(&w->pkg_cache, a);
-	map_init(&w->entity_cache, a);
-	map_init(&w->type_cache, a);
+	map_init(&w->file_cache);
+	map_init(&w->pkg_cache);
+	map_init(&w->entity_cache);
+	map_init(&w->type_cache);
 
 	odin_doc_writer_item_tracker_init(&w->files,    1);
 	odin_doc_writer_item_tracker_init(&w->pkgs,     1);

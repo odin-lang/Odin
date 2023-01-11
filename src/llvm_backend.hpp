@@ -117,6 +117,16 @@ struct lbIncompleteDebugType {
 
 typedef Slice<i32> lbStructFieldRemapping;
 
+enum lbFunctionPassManagerKind {
+	lbFunctionPassManager_default,
+	lbFunctionPassManager_default_without_memcpy,
+	lbFunctionPassManager_minimal,
+	lbFunctionPassManager_size,
+	lbFunctionPassManager_speed,
+
+	lbFunctionPassManager_COUNT
+};
+
 struct lbModule {
 	LLVMModuleRef mod;
 	LLVMContextRef ctx;
@@ -131,6 +141,8 @@ struct lbModule {
 	PtrMap<Type *, LLVMTypeRef> func_raw_types;
 	PtrMap<void *, lbStructFieldRemapping> struct_field_remapping; // Key: LLVMTypeRef or Type *
 	i32 internal_type_level;
+
+	RecursiveMutex values_mutex;
 
 	PtrMap<Entity *, lbValue> values;           
 	PtrMap<Entity *, lbAddr>  soa_values;       
@@ -151,11 +163,14 @@ struct lbModule {
 	u32 nested_type_name_guid;
 
 	Array<lbProcedure *> procedures_to_generate;
+	Array<Entity *> global_procedures_and_types_to_create;
 
 	lbProcedure *curr_procedure;
 
 	LLVMDIBuilderRef debug_builder;
 	LLVMMetadataRef debug_compile_unit;
+
+	RecursiveMutex debug_values_mutex;
 	PtrMap<void *, LLVMMetadataRef> debug_values; 
 
 	Array<lbIncompleteDebugType> debug_incomplete_types;
@@ -165,6 +180,8 @@ struct lbModule {
 
 	PtrMap<Type *, lbAddr> map_cell_info_map; // address of runtime.Map_Info
 	PtrMap<Type *, lbAddr> map_info_map;      // address of runtime.Map_Cell_Info
+
+	LLVMPassManagerRef function_pass_managers[lbFunctionPassManager_COUNT];
 };
 
 struct lbGenerator {
@@ -178,6 +195,7 @@ struct lbGenerator {
 	PtrMap<LLVMContextRef, lbModule *> modules_through_ctx; 
 	lbModule default_module;
 
+	BlockingMutex anonymous_proc_lits_mutex;
 	PtrMap<Ast *, lbProcedure *> anonymous_proc_lits; 
 
 	BlockingMutex foreign_mutex;
@@ -186,6 +204,10 @@ struct lbGenerator {
 
 	std::atomic<u32> global_array_index;
 	std::atomic<u32> global_generated_index;
+
+	lbProcedure *startup_type_info;
+	lbProcedure *startup_runtime;
+	lbProcedure *objc_names;
 };
 
 

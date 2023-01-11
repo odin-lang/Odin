@@ -68,7 +68,7 @@ gb_internal lbProcedure *lb_create_procedure(lbModule *m, Entity *entity, bool i
 	GB_ASSERT(entity != nullptr);
 	GB_ASSERT(entity->kind == Entity_Procedure);
 	if (!entity->Procedure.is_foreign) {
-		GB_ASSERT_MSG(entity->flags & EntityFlag_ProcBodyChecked, "%.*s :: %s", LIT(entity->token.string), type_to_string(entity->type));
+		GB_ASSERT_MSG(entity->flags & EntityFlag_ProcBodyChecked, "%.*s :: %s (was parapoly: %d)", LIT(entity->token.string), type_to_string(entity->type), is_type_polymorphic(entity->type, true));
 	}
 
 	String link_name = {};
@@ -119,9 +119,9 @@ gb_internal lbProcedure *lb_create_procedure(lbModule *m, Entity *entity, bool i
 	p->branch_blocks.allocator = a;
 	p->context_stack.allocator = a;
 	p->scope_stack.allocator   = a;
-	map_init(&p->selector_values,  a, 0);
-	map_init(&p->selector_addr,    a, 0);
-	map_init(&p->tuple_fix_map,    a, 0);
+	map_init(&p->selector_values,  0);
+	map_init(&p->selector_addr,    0);
+	map_init(&p->tuple_fix_map,    0);
 
 	if (p->is_foreign) {
 		lb_add_foreign_library_path(p->module, entity->Procedure.foreign_library);
@@ -345,7 +345,7 @@ gb_internal lbProcedure *lb_create_dummy_procedure(lbModule *m, String link_name
 	p->blocks.allocator        = a;
 	p->branch_blocks.allocator = a;
 	p->context_stack.allocator = a;
-	map_init(&p->tuple_fix_map, a, 0);
+	map_init(&p->tuple_fix_map, 0);
 
 
 	char *c_link_name = alloc_cstring(permanent_allocator(), p->name);
@@ -486,7 +486,7 @@ gb_internal void lb_begin_procedure_body(lbProcedure *p) {
 	p->entry_block = lb_create_block(p, "entry", true);
 	lb_start_block(p, p->entry_block);
 
-	map_init(&p->direct_parameters, heap_allocator());
+	map_init(&p->direct_parameters);
 
 	GB_ASSERT(p->type != nullptr);
 
