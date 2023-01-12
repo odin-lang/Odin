@@ -380,8 +380,7 @@ gb_internal void add_polymorphic_record_entity(CheckerContext *ctx, Ast *node, T
 
 gb_internal Type *check_record_polymorphic_params(CheckerContext *ctx, Ast *polymorphic_params,
                                                   bool *is_polymorphic_,
-                                                  Ast *node, Array<Operand> *poly_operands,
-                                                  Type *named_type, Type *original_type_for_poly) {
+                                                  Ast *node, Array<Operand> *poly_operands) {
 	Type *polymorphic_params_type = nullptr;
 	bool can_check_fields = true;
 	GB_ASSERT(is_polymorphic_ != nullptr);
@@ -548,11 +547,6 @@ gb_internal Type *check_record_polymorphic_params(CheckerContext *ctx, Ast *poly
 		}
 	}
 
-	if (original_type_for_poly != nullptr) {
-		GB_ASSERT(named_type != nullptr);
-		add_polymorphic_record_entity(ctx, node, named_type, original_type_for_poly);
-	}
-
 	if (!*is_polymorphic_) {
 		*is_polymorphic_ = polymorphic_params != nullptr && poly_operands == nullptr;
 	}
@@ -620,10 +614,13 @@ gb_internal void check_struct_type(CheckerContext *ctx, Type *struct_type, Ast *
 	struct_type->Struct.polymorphic_params = check_record_polymorphic_params(
 		ctx, st->polymorphic_params,
 		&struct_type->Struct.is_polymorphic,
-		node, poly_operands,
-		named_type, original_type_for_poly
-	);;
+		node, poly_operands
+	);
 	struct_type->Struct.is_poly_specialized = check_record_poly_operand_specialization(ctx, struct_type, poly_operands, &struct_type->Struct.is_polymorphic);
+	if (original_type_for_poly) {
+		GB_ASSERT(named_type != nullptr);
+		add_polymorphic_record_entity(ctx, node, named_type, original_type_for_poly);
+	}
 
 	if (!struct_type->Struct.is_polymorphic) {
 		if (st->where_clauses.count > 0 && st->polymorphic_params == nullptr) {
@@ -655,10 +652,13 @@ gb_internal void check_union_type(CheckerContext *ctx, Type *union_type, Ast *no
 	union_type->Union.polymorphic_params = check_record_polymorphic_params(
 		ctx, ut->polymorphic_params,
 		&union_type->Union.is_polymorphic,
-		node, poly_operands,
-		named_type, original_type_for_poly
+		node, poly_operands
 	);
 	union_type->Union.is_poly_specialized = check_record_poly_operand_specialization(ctx, union_type, poly_operands, &union_type->Union.is_polymorphic);
+	if (original_type_for_poly) {
+		GB_ASSERT(named_type != nullptr);
+		add_polymorphic_record_entity(ctx, node, named_type, original_type_for_poly);
+	}
 
 	if (!union_type->Union.is_polymorphic) {
 		if (ut->where_clauses.count > 0 && ut->polymorphic_params == nullptr) {
