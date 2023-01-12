@@ -48,6 +48,7 @@ struct Arena {
 	MemoryBlock * curr_block;
 	isize         minimum_block_size;
 	BlockingMutex mutex;
+	isize         temp_count;
 };
 
 enum { DEFAULT_MINIMUM_BLOCK_SIZE = 8ll*1024ll*1024ll };
@@ -245,7 +246,66 @@ gb_internal void virtual_memory_dealloc(MemoryBlock *block_to_free) {
 	}
 }
 
+struct ArenaTemp {
+	Arena *      arena;
+	MemoryBlock *block;
+	isize        used;
+};
 
+ArenaTemp arena_temp_begin(Arena *arena) {
+	GB_ASSERT(arena);
+	ArenaTemp temp = {};
+	temp.arena = arena;
+	temp.block = arena->curr_block;
+	if (arena->curr_block != nullptr) {
+		temp.used = arena->curr_block->used;
+	}
+	arena->temp_count += 1;
+	return temp;
+}
+
+void arena_temp_end(ArenaTemp const &temp) {
+	GB_ASSERT(temp.arena);
+	Arena *arena = temp.arena;
+	bool memory_block_found = false;
+	for (MemoryBlock *block = arena->curr_block; block != nullptr; block = block->prev) {
+		if (block == temp.block) {
+			memory_block_found = true;
+			break;
+		}
+	}
+	GB_ASSERT_MSG(memory_block_found, "memory block stored within ArenaTemp not owned by Arena");
+
+	while (arena->curr_block != temp.block) {
+		MemoryBlock *free_block = arena->curr_block;
+		if (free_block != nullptr) {
+			arena->curr_block = free_block->prev;
+			virtual_memory_dealloc(free_block);
+		}
+	}
+
+	MemoryBlock *block = arena->curr_block;
+	if (block) {
+		GB_ASSERT_MSG(block->used >= temp.used, "out of order use of arena_temp_end");
+		isize amount_to_zero = gb_min(block->used - temp.used, block->size - block->used);
+		gb_zero_size(block->base + temp.used, amount_to_zero);
+		block->used = temp.used;
+	}
+
+	GB_ASSERT_MSG(arena->temp_count > 0, "double-use of arena_temp_end");
+	arena->temp_count -= 1;
+}
+
+
+struct ArenaTempGuard {
+	ArenaTempGuard(Arena *arena) {
+		this->temp = arena_temp_begin(arena);
+	}
+	~ArenaTempGuard() {
+		arena_temp_end(this->temp);
+	}
+	ArenaTemp temp;
+};
 
 
 gb_internal GB_ALLOCATOR_PROC(arena_allocator_proc);
@@ -294,11 +354,13 @@ gb_internal gbAllocator permanent_allocator() {
 	return arena_allocator(&permanent_arena);
 }
 
+gb_global gb_thread_local Arena temporary_arena = {nullptr, DEFAULT_MINIMUM_BLOCK_SIZE};
 gb_internal gbAllocator temporary_allocator() {
-	return permanent_allocator();
+	return arena_allocator(&temporary_arena);
 }
 
-
+#define TEMPORARY_ALLOCATOR_GUARD() ArenaTempGuard GB_DEFER_3(_arena_guard_){&temporary_arena}
+#define PERMANENT_ALLOCATOR_GUARD() ArenaTempGuard GB_DEFER_3(_arena_guard_){&permanent_arena}
 
 
 

@@ -1118,6 +1118,7 @@ gb_internal bool cache_load_file_directive(CheckerContext *c, Ast *call, String 
 		}
 	});
 
+	TEMPORARY_ALLOCATOR_GUARD();
 	char *c_str = alloc_cstring(temporary_allocator(), path);
 
 	gbFile f = {};
@@ -3062,6 +3063,7 @@ gb_internal bool check_builtin_procedure(CheckerContext *c, Operand *operand, As
 	}
 
 	case BuiltinProc_soa_zip: {
+		TEMPORARY_ALLOCATOR_GUARD();
 		auto types = array_make<Type *>(temporary_allocator(), 0, ce->args.count);
 		auto names = array_make<String>(temporary_allocator(), 0, ce->args.count);
 

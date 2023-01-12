@@ -716,6 +716,8 @@ gb_internal LoadedFileError load_file_32(char const *fullpath, LoadedFile *memor
 	
 	if (!copy_file_contents) {
 	#if defined(GB_SYSTEM_WINDOWS)
+		TEMPORARY_ALLOCATOR_GUARD();
+
 		isize w_len = 0;
 		wchar_t *w_str = gb__alloc_utf8_to_ucs2(temporary_allocator(), fullpath, &w_len);
 		if (w_str == nullptr) {
@@ -817,6 +819,8 @@ gb_internal LoadedFileError load_file_32(char const *fullpath, LoadedFile *memor
 #define USE_DAMERAU_LEVENSHTEIN 1
 
 gb_internal isize levenstein_distance_case_insensitive(String const &a, String const &b) {
+	TEMPORARY_ALLOCATOR_GUARD();
+
 	isize w = b.len+1;
 	isize h = a.len+1;
 	isize *matrix = gb_alloc_array(temporary_allocator(), isize, w*h);

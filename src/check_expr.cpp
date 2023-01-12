@@ -86,6 +86,7 @@ gb_internal Entity * find_polymorphic_record_entity (CheckerContext *c, Type *or
 gb_internal void     check_not_tuple                (CheckerContext *c, Operand *operand);
 gb_internal void     convert_to_typed               (CheckerContext *c, Operand *operand, Type *target_type);
 gb_internal gbString expr_to_string                 (Ast *expression);
+gb_internal gbString expr_to_string                 (Ast *expression, gbAllocator allocator);
 gb_internal void     update_untyped_expr_type       (CheckerContext *c, Ast *e, Type *type, bool final);
 gb_internal bool     check_is_terminating           (Ast *node, String const &label);
 gb_internal bool     check_has_break                (Ast *stmt, String const &label, bool implicit);
@@ -2404,8 +2405,8 @@ gb_internal void check_comparison(CheckerContext *c, Operand *x, Operand *y, Tok
 			if (x->type == err_type && is_operand_nil(*x)) {
 				err_type = y->type;
 			}
-			gbString type_string = type_to_string(err_type);
-			defer (gb_string_free(type_string));
+			TEMPORARY_ALLOCATOR_GUARD();
+			gbString type_string = type_to_string(err_type, temporary_allocator());
 			err_str = gb_string_make(temporary_allocator(),
 				gb_bprintf("operator '%.*s' not defined for type '%s'", LIT(token_strings[op]), type_string));
 		} else {
@@ -2417,20 +2418,19 @@ gb_internal void check_comparison(CheckerContext *c, Operand *x, Operand *y, Tok
 			add_comparison_procedures_for_fields(c, comparison_type);
 		}
 	} else {
+		TEMPORARY_ALLOCATOR_GUARD();
 		gbString xt, yt;
 		if (x->mode == Addressing_ProcGroup) {
-			xt = gb_string_make(heap_allocator(), "procedure group");
+			xt = gb_string_make(temporary_allocator(), "procedure group");
 		} else {
 			xt = type_to_string(x->type);
 		}
 		if (y->mode == Addressing_ProcGroup) {
-			yt = gb_string_make(heap_allocator(), "procedure group");
+			yt = gb_string_make(temporary_allocator(), "procedure group");
 		} else {
 			yt = type_to_string(y->type);
 		}
 		err_str = gb_string_make(temporary_allocator(), gb_bprintf("mismatched types '%s' and '%s'", xt, yt));
-		gb_string_free(yt);
-		gb_string_free(xt);
 	}
 
 	if (err_str != nullptr) {
@@ -3893,6 +3893,8 @@ gb_internal void convert_to_typed(CheckerContext *c, Operand *operand, Type *tar
 
 	case Type_Union:
 		if (!is_operand_nil(*operand) && !is_operand_undef(*operand)) {
+			TEMPORARY_ALLOCATOR_GUARD();
+
 			isize count = t->Union.variants.count;
 			ValidIndexAndScore *valids = gb_alloc_array(temporary_allocator(), ValidIndexAndScore, count);
 			isize valid_count = 0;
@@ -4057,10 +4059,10 @@ gb_internal bool check_index_value(CheckerContext *c, Type *main_type, bool open
 	    (c->state_flags & StateFlag_no_bounds_check) == 0) {
 		BigInt i = exact_value_to_integer(operand.value).value_integer;
 		if (i.sign && !is_type_enum(index_type) && !is_type_multi_pointer(main_type)) {
+			TEMPORARY_ALLOCATOR_GUARD();
 			String idx_str = big_int_to_string(temporary_allocator(), &i);
-			gbString expr_str = expr_to_string(operand.expr);
+			gbString expr_str = expr_to_string(operand.expr, temporary_allocator());
 			error(operand.expr, "Index '%s' cannot be a negative value, got %.*s", expr_str, LIT(idx_str));
-			gb_string_free(expr_str);
 			if (value) *value = 0;
 			return false;
 		}
@@ -4120,10 +4122,10 @@ gb_internal bool check_index_value(CheckerContext *c, Type *main_type, bool open
 				}
 
 				if (out_of_bounds) {
+					TEMPORARY_ALLOCATOR_GUARD();
 					String idx_str = big_int_to_string(temporary_allocator(), &i);
-					gbString expr_str = expr_to_string(operand.expr);
+					gbString expr_str = expr_to_string(operand.expr, temporary_allocator());
 					error(operand.expr, "Index '%s' is out of bounds range 0..<%lld, got %.*s", expr_str, max_count, LIT(idx_str));
-					gb_string_free(expr_str);
 					return false;
 				}
 
@@ -5446,6 +5448,8 @@ gb_internal CALL_ARGUMENT_CHECKER(check_named_call_arguments) {
 	bool show_error = show_error_mode == CallArgumentMode_ShowErrors;
 	CallArgumentError err = CallArgumentError_None;
 
+	TEMPORARY_ALLOCATOR_GUARD();
+
 	isize param_count = pt->param_count;
 	bool *visited = gb_alloc_array(temporary_allocator(), bool, param_count);
 	auto ordered_operands = array_make<Operand>(temporary_allocator(), param_count);
@@ -6358,6 +6362,8 @@ gb_internal CallArgumentError check_polymorphic_record_type(CheckerContext *c, O
 		ordered_operands = array_make<Operand>(permanent_allocator(), param_count);
 		array_copy(&ordered_operands, operands, 0);
 	} else {
+		TEMPORARY_ALLOCATOR_GUARD();
+
 		bool *visited = gb_alloc_array(temporary_allocator(), bool, param_count);
 
 		// LEAK(bill)
@@ -7146,6 +7152,8 @@ gb_internal bool attempt_implicit_selector_expr(CheckerContext *c, Operand *o, A
 		return true;
 	}
 	if (is_type_union(th)) {
+		TEMPORARY_ALLOCATOR_GUARD();
+
 		Type *union_type = base_type(th);
 		auto operands = array_make<Operand>(temporary_allocator(), 0, union_type->Union.variants.count);
 
@@ -7329,6 +7337,8 @@ gb_internal void add_constant_switch_case(CheckerContext *ctx, SeenMap *seen, Op
 	uintptr key = hash_exact_value(operand.value);
 	TypeAndToken *found = map_get(seen, key);
 	if (found != nullptr) {
+		TEMPORARY_ALLOCATOR_GUARD();
+
 		isize count = multi_map_count(seen, key);
 		TypeAndToken *taps = gb_alloc_array(temporary_allocator(), TypeAndToken, count);
 
@@ -7895,6 +7905,8 @@ gb_internal ExprKind check_compound_literal(CheckerContext *c, Operand *o, Ast *
 		}
 
 		if (cl->elems[0]->kind == Ast_FieldValue) {
+			TEMPORARY_ALLOCATOR_GUARD();
+
 			bool *fields_visited = gb_alloc_array(temporary_allocator(), bool, field_count);
 
 			for (Ast *elem : cl->elems) {
@@ -8423,6 +8435,8 @@ gb_internal ExprKind check_compound_literal(CheckerContext *c, Operand *o, Ast *
 
 		// NOTE(bill): Check for missing cases when `#partial literal` is not present
 		if (cl->elems.count > 0 && !was_error && !is_partial) {
+			TEMPORARY_ALLOCATOR_GUARD();
+
 			Type *et = base_type(index_type);
 			GB_ASSERT(et->kind == Type_Enum);
 			auto fields = et->Enum.fields;
@@ -10468,6 +10482,9 @@ gb_internal gbString write_expr_to_string(gbString str, Ast *node, bool shorthan
 
 gb_internal gbString expr_to_string(Ast *expression) {
 	return write_expr_to_string(gb_string_make(heap_allocator(), ""), expression, false);
+}
+gb_internal gbString expr_to_string(Ast *expression, gbAllocator allocator) {
+	return write_expr_to_string(gb_string_make(allocator, ""), expression, false);
 }
 gb_internal gbString expr_to_string_shorthand(Ast *expression) {
 	return write_expr_to_string(gb_string_make(heap_allocator(), ""), expression, true);

@@ -1048,6 +1048,8 @@ gb_internal void check_switch_stmt(CheckerContext *ctx, Ast *node, u32 mod_flags
 	}
 
 	if (!is_partial && is_type_enum(x.type)) {
+		TEMPORARY_ALLOCATOR_GUARD();
+
 		Type *et = base_type(x.type);
 		GB_ASSERT(is_type_enum(et));
 		auto fields = et->Enum.fields;
@@ -1280,6 +1282,8 @@ gb_internal void check_type_switch_stmt(CheckerContext *ctx, Ast *node, u32 mod_
 	}
 
 	if (!is_partial && is_type_union(type_deref(x.type))) {
+		TEMPORARY_ALLOCATOR_GUARD();
+
 		Type *ut = base_type(type_deref(x.type));
 		GB_ASSERT(is_type_union(ut));
 		auto variants = ut->Union.variants;
@@ -1523,6 +1527,7 @@ gb_internal void check_stmt_internal(CheckerContext *ctx, Ast *node, u32 flags) 
 				return;
 			}
 
+			TEMPORARY_ALLOCATOR_GUARD();
 
 			// NOTE(bill): If there is a bad syntax error, rhs > lhs which would mean there would need to be
 			// an extra allocation
@@ -1743,6 +1748,8 @@ gb_internal void check_stmt_internal(CheckerContext *ctx, Ast *node, u32 flags) 
 
 
 	case_ast_node(rs, RangeStmt, node);
+		TEMPORARY_ALLOCATOR_GUARD();
+
 		u32 new_flags = mod_flags | Stmt_BreakAllowed | Stmt_ContinueAllowed;
 
 		check_open_scope(ctx, node);

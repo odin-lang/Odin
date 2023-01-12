@@ -477,6 +477,7 @@ gb_internal void big_int_or(BigInt *dst, BigInt const *x, BigInt const *y) {
 }
 
 gb_internal void debug_print_big_int(BigInt const *x) {
+	TEMPORARY_ALLOCATOR_GUARD();
 	String s = big_int_to_string(temporary_allocator(), x, 10);
 	gb_printf_err("[DEBUG] %.*s\n", LIT(s));
 }
