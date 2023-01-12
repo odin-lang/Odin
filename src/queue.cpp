@@ -69,10 +69,13 @@ gb_internal bool mpsc_dequeue(MPSCQueue<T> *q, T *value_) {
 	if (next) {
 		q->tail.store(next, std::memory_order_relaxed);
 		// `tail` is now "dead" and needs to be "freed"
-		if (*value_) *value_ = next->value;
+		tail->value = next->value;
+		T value = tail->value;
+		if (value_) *value_ = value;
 		q->count.fetch_sub(1, std::memory_order_acq_rel);
 		return true;
 	}
+	GB_ASSERT(q->count.load(std::memory_order_acquire) == 0);
 	return false;
 }
 

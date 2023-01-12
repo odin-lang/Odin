@@ -43,11 +43,21 @@ gb_internal void debugf(char const *fmt, ...);
 #error Odin on Windows requires a 64-bit build-system. The 'Developer Command Prompt' for VS still defaults to 32-bit shell. The 64-bit shell can be found under the name 'x64 Native Tools Command Prompt' for VS. For more information, please see https://odin-lang.org/docs/install/#for-windows
 #endif
 
+template <typename T>
+struct TypeIsPointer {
+	enum {value = false};
+};
+
+template <typename T>
+struct TypeIsPointer<T *> {
+	enum {value = true};
+};
+
 #include "unicode.cpp"
 #include "array.cpp"
 #include "threading.cpp"
-#include "queue.cpp"
 #include "common_memory.cpp"
+#include "queue.cpp"
 #include "string.cpp"
 #include "range_cache.cpp"
 

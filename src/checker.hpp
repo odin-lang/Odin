@@ -380,11 +380,11 @@ struct CheckerInfo {
 	// NOTE(bill): These are actually MPSC queues
 	// TODO(bill): Convert them to be MPSC queues
 	MPSCQueue<Entity *> definition_queue;
-	MPMCQueue<Entity *> entity_queue;
-	MPMCQueue<Entity *> required_global_variable_queue;
-	MPMCQueue<Entity *> required_foreign_imports_through_force_queue;
+	MPSCQueue<Entity *> entity_queue;
+	MPSCQueue<Entity *> required_global_variable_queue;
+	MPSCQueue<Entity *> required_foreign_imports_through_force_queue;
 
-	MPMCQueue<Ast *> intrinsics_entry_point_usage;
+	MPSCQueue<Ast *> intrinsics_entry_point_usage;
 
 	BlockingMutex objc_types_mutex;
 	PtrMap<Ast *, ObjcMsgData> objc_msgSend_types;

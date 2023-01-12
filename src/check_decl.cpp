@@ -1124,7 +1124,7 @@ gb_internal void check_global_variable_decl(CheckerContext *ctx, Entity *&e, Ast
 
 	if (ac.require_declaration) {
 		e->flags |= EntityFlag_Require;
-		mpmc_enqueue(&ctx->info->required_global_variable_queue, e);
+		mpsc_enqueue(&ctx->info->required_global_variable_queue, e);
 	}
 
 

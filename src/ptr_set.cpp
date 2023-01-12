@@ -1,15 +1,4 @@
 template <typename T>
-struct TypeIsPointer {
-	enum {value = false};
-};
-
-template <typename T>
-struct TypeIsPointer<T *> {
-	enum {value = true};
-};
-
-
-template <typename T>
 struct PtrSet {
 	static_assert(TypeIsPointer<T>::value, "PtrSet::T must be a pointer");
 	static constexpr uintptr TOMBSTONE = ~(uintptr)(0ull);

@@ -1160,11 +1160,11 @@ gb_internal void init_checker_info(CheckerInfo *i) {
 
 	TIME_SECTION("checker info: mpmc queues");
 
-	mpmc_init(&i->entity_queue, a, 1<<20);
-	mpsc_init(&i->definition_queue, a); //, 1<<20);
-	mpmc_init(&i->required_global_variable_queue, a, 1<<10);
-	mpmc_init(&i->required_foreign_imports_through_force_queue, a, 1<<10);
-	mpmc_init(&i->intrinsics_entry_point_usage, a, 1<<10); // just waste some memory here, even if it probably never used
+	mpsc_init(&i->entity_queue, a); // 1<<20);
+	mpsc_init(&i->definition_queue, a); //); // 1<<20);
+	mpsc_init(&i->required_global_variable_queue, a); // 1<<10);
+	mpsc_init(&i->required_foreign_imports_through_force_queue, a); // 1<<10);
+	mpsc_init(&i->intrinsics_entry_point_usage, a); // 1<<10); // just waste some memory here, even if it probably never used
 }
 
 gb_internal void destroy_checker_info(CheckerInfo *i) {
@@ -1181,10 +1181,10 @@ gb_internal void destroy_checker_info(CheckerInfo *i) {
 	array_free(&i->variable_init_order);
 	array_free(&i->required_foreign_imports_through_force);
 
-	mpmc_destroy(&i->entity_queue);
+	mpsc_destroy(&i->entity_queue);
 	mpsc_destroy(&i->definition_queue);
-	mpmc_destroy(&i->required_global_variable_queue);
-	mpmc_destroy(&i->required_foreign_imports_through_force_queue);
+	mpsc_destroy(&i->required_global_variable_queue);
+	mpsc_destroy(&i->required_foreign_imports_through_force_queue);
 
 	map_destroy(&i->objc_msgSend_types);
 	string_map_destroy(&i->load_file_cache);
@@ -1711,7 +1711,8 @@ gb_internal void add_entity_and_decl_info(CheckerContext *c, Ast *identifier, En
 
 	is_lazy = (e->flags & EntityFlag_Lazy) == EntityFlag_Lazy;
 	if (!is_lazy) {
-		queue_count = mpmc_enqueue(&info->entity_queue, e);
+		GB_ASSERT(e != nullptr);
+		queue_count = mpsc_enqueue(&info->entity_queue, e);
 	}
 
 	if (e->token.pos.file_id != 0) {
@@ -2375,12 +2376,12 @@ gb_internal void generate_minimum_dependency_set(Checker *c, Entity *start) {
 		}
 	}
 
-	for (Entity *e; mpmc_dequeue(&c->info.required_foreign_imports_through_force_queue, &e); /**/) {
+	for (Entity *e; mpsc_dequeue(&c->info.required_foreign_imports_through_force_queue, &e); /**/) {
 		array_add(&c->info.required_foreign_imports_through_force, e);
 		add_dependency_to_set(c, e);
 	}
 
-	for (Entity *e; mpmc_dequeue(&c->info.required_global_variable_queue, &e); /**/) {
+	for (Entity *e; mpsc_dequeue(&c->info.required_global_variable_queue, &e); /**/) {
 		e->flags |= EntityFlag_Used;
 		add_dependency_to_set(c, e);
 	}
@@ -4058,6 +4059,7 @@ gb_internal void check_all_global_entities(Checker *c) {
 	// Don't bother trying
 	for_array(i, c->info.entities) {
 		Entity *e = c->info.entities[i];
+		GB_ASSERT(e != nullptr);
 		if (e->flags & EntityFlag_Lazy) {
 			continue;
 		}
@@ -4461,7 +4463,7 @@ gb_internal void check_add_foreign_import_decl(CheckerContext *ctx, Ast *decl) {
 	AttributeContext ac = {};
 	check_decl_attributes(ctx, fl->attributes, foreign_import_decl_attribute, &ac);
 	if (ac.require_declaration) {
-		mpmc_enqueue(&ctx->info->required_foreign_imports_through_force_queue, e);
+		mpsc_enqueue(&ctx->info->required_foreign_imports_through_force_queue, e);
 		add_entity_use(ctx, nullptr, e);
 	}
 	if (ac.foreign_import_priority_index != 0) {
@@ -5575,7 +5577,7 @@ gb_internal void check_unique_package_names(Checker *c) {
 gb_internal void check_add_entities_from_queues(Checker *c) {
 	isize cap = c->info.entities.count + c->info.entity_queue.count.load(std::memory_order_relaxed);
 	array_reserve(&c->info.entities, cap);
-	for (Entity *e; mpmc_dequeue(&c->info.entity_queue, &e); /**/) {
+	for (Entity *e; mpsc_dequeue(&c->info.entity_queue, &e); /**/) {
 		array_add(&c->info.entities, e);
 	}
 }
@@ -5843,7 +5845,7 @@ gb_internal void check_parsed_files(Checker *c) {
 	if (c->info.intrinsics_entry_point_usage.count > 0) {
 		TIME_SECTION("check intrinsics.__entry_point usage");
 		Ast *node = nullptr;
-		while (mpmc_dequeue(&c->info.intrinsics_entry_point_usage, &node)) {
+		while (mpsc_dequeue(&c->info.intrinsics_entry_point_usage, &node)) {
 			if (c->info.entry_point == nullptr && node != nullptr) {
 				if (node->file()->pkg->kind != Package_Runtime) {
 					warning(node, "usage of intrinsics.__entry_point will be a no-op");

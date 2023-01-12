@@ -1687,7 +1687,7 @@ gb_internal bool check_builtin_procedure(CheckerContext *c, Operand *operand, As
 	case BuiltinProc___entry_point:
 		operand->mode = Addressing_NoValue;
 		operand->type = nullptr;
-		mpmc_enqueue(&c->info->intrinsics_entry_point_usage, call);
+		mpsc_enqueue(&c->info->intrinsics_entry_point_usage, call);
 		break;
 
 	case BuiltinProc_DIRECTIVE:
