@@ -1,3 +1,85 @@
+template <typename T>
+struct MPSCNode {
+	std::atomic<MPSCNode<T> *> next;
+	T value;
+};
+
+//
+// Multiple Producer Single Consumer Lockless Queue
+// URL: https://www.1024cores.net
+//
+template <typename T>
+struct MPSCQueue {
+	std::atomic<MPSCNode<T> *> head;
+	std::atomic<MPSCNode<T> *> tail;
+	std::atomic<isize> count;
+	MPSCNode<T> sentinel;
+	gbAllocator allocator;
+};
+
+template <typename T> gb_internal void         mpsc_init   (MPSCQueue<T> *q, gbAllocator const &allocator);
+template <typename T> gb_internal void         mpsc_destroy(MPSCQueue<T> *q);
+template <typename T> gb_internal isize        mpsc_enqueue(MPSCQueue<T> *q, T const &value);
+template <typename T> gb_internal bool         mpsc_dequeue(MPSCQueue<T> *q, T *value_);
+template <typename T> gb_internal MPSCNode<T> *mpsc_tail   (MPSCQueue<T> *q);
+
+template <typename T>
+gb_internal void mpsc_init(MPSCQueue<T> *q, gbAllocator const &allocator) {
+	q->allocator = allocator;
+	q->count.store(0, std::memory_order_relaxed);
+	q->head.store(&q->sentinel, std::memory_order_relaxed);
+	q->tail.store(&q->sentinel, std::memory_order_relaxed);
+	q->sentinel.next.store(nullptr, std::memory_order_relaxed);
+}
+
+template <typename T>
+gb_internal void mpsc_destroy(MPSCQueue<T> *q) {
+	while (mpsc_dequeue(q, (T *)nullptr)) {}
+	// DO NOTHING for the time being
+}
+
+
+template <typename T>
+gb_internal MPSCNode<T> *mpsc_alloc_node(MPSCQueue<T> *q, T const &value) {
+	auto node = gb_alloc_item(q->allocator, MPSCNode<T>);
+	node->value = value;
+	return node;
+}
+
+template <typename T>
+gb_internal isize mpsc_enqueue(MPSCQueue<T> *q, MPSCNode<T> *node) {
+	node->next.store(nullptr, std::memory_order_relaxed);
+	auto prev = q->head.exchange(node, std::memory_order_acq_rel);
+	prev->next.store(node, std::memory_order_release);
+	isize count = 1 + q->count.fetch_add(1, std::memory_order_acq_rel);
+	return count;
+}
+
+template <typename T>
+gb_internal isize mpsc_enqueue(MPSCQueue<T> *q, T const &value) {
+	auto node = mpsc_alloc_node(q, value);
+	return mpsc_enqueue(q, node);
+}
+
+
+template <typename T>
+gb_internal bool mpsc_dequeue(MPSCQueue<T> *q, T *value_) {
+	auto tail = q->tail.load(std::memory_order_relaxed);
+	auto next = tail->next.load(std::memory_order_relaxed);
+	if (next) {
+		q->tail.store(next, std::memory_order_relaxed);
+		// `tail` is now "dead" and needs to be "freed"
+		if (*value_) *value_ = next->value;
+		q->count.fetch_sub(1, std::memory_order_acq_rel);
+		return true;
+	}
+	return false;
+}
+
+////////////////////////////
+
+
+
 #define MPMC_CACHE_LINE_SIZE 64
 
 typedef std::atomic<i32> MPMCQueueAtomicIdx;

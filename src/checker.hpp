@@ -303,7 +303,6 @@ struct UntypedExprInfo {
 };
 
 typedef PtrMap<Ast *, ExprInfo *> UntypedExprInfoMap; 
-typedef MPMCQueue<ProcInfo *> ProcBodyQueue;
 
 enum ObjcMsgKind : u32 {
 	ObjcMsg_normal,
@@ -380,7 +379,7 @@ struct CheckerInfo {
 
 	// NOTE(bill): These are actually MPSC queues
 	// TODO(bill): Convert them to be MPSC queues
-	MPMCQueue<Entity *> definition_queue;
+	MPSCQueue<Entity *> definition_queue;
 	MPMCQueue<Entity *> entity_queue;
 	MPMCQueue<Entity *> required_global_variable_queue;
 	MPMCQueue<Entity *> required_foreign_imports_through_force_queue;

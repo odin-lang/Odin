@@ -1161,7 +1161,7 @@ gb_internal void init_checker_info(CheckerInfo *i) {
 	TIME_SECTION("checker info: mpmc queues");
 
 	mpmc_init(&i->entity_queue, a, 1<<20);
-	mpmc_init(&i->definition_queue, a, 1<<20);
+	mpsc_init(&i->definition_queue, a); //, 1<<20);
 	mpmc_init(&i->required_global_variable_queue, a, 1<<10);
 	mpmc_init(&i->required_foreign_imports_through_force_queue, a, 1<<10);
 	mpmc_init(&i->intrinsics_entry_point_usage, a, 1<<10); // just waste some memory here, even if it probably never used
@@ -1182,7 +1182,7 @@ gb_internal void destroy_checker_info(CheckerInfo *i) {
 	array_free(&i->required_foreign_imports_through_force);
 
 	mpmc_destroy(&i->entity_queue);
-	mpmc_destroy(&i->definition_queue);
+	mpsc_destroy(&i->definition_queue);
 	mpmc_destroy(&i->required_global_variable_queue);
 	mpmc_destroy(&i->required_foreign_imports_through_force_queue);
 
@@ -1493,7 +1493,7 @@ gb_internal void add_entity_definition(CheckerInfo *i, Ast *identifier, Entity *
 	GB_ASSERT(entity != nullptr);
 	identifier->Ident.entity = entity;
 	entity->identifier = identifier;
-	mpmc_enqueue(&i->definition_queue, entity);
+	mpsc_enqueue(&i->definition_queue, entity);
 }
 
 gb_internal bool redeclaration_error(String name, Entity *prev, Entity *found) {
@@ -5583,7 +5583,7 @@ gb_internal void check_add_entities_from_queues(Checker *c) {
 gb_internal void check_add_definitions_from_queues(Checker *c) {
 	isize cap = c->info.definitions.count + c->info.definition_queue.count.load(std::memory_order_relaxed);
 	array_reserve(&c->info.definitions, cap);
-	for (Entity *e; mpmc_dequeue(&c->info.definition_queue, &e); /**/) {
+	for (Entity *e; mpsc_dequeue(&c->info.definition_queue, &e); /**/) {
 		array_add(&c->info.definitions, e);
 	}
 }
