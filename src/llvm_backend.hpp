@@ -191,7 +191,7 @@ struct lbGenerator {
 	Array<String> output_temp_paths;
 	String   output_base;
 	String   output_name;
-	PtrMap<AstPackage *, lbModule *> modules; 
+	PtrMap<void *, lbModule *> modules; // key is `AstPackage *` (`void *` is used for future use)
 	PtrMap<LLVMContextRef, lbModule *> modules_through_ctx; 
 	lbModule default_module;
 

@@ -74,7 +74,7 @@ gb_internal lbProcedure *lb_create_procedure(lbModule *m, Entity *entity, bool i
 	String link_name = {};
 
 	if (ignore_body) {
-		lbModule *other_module = lb_pkg_module(m->gen, entity->pkg);
+		lbModule *other_module = lb_module_of_entity(m->gen, entity);
 		link_name = lb_get_entity_name(other_module, entity);
 	} else {
 		link_name = lb_get_entity_name(m, entity);

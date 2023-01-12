@@ -1177,7 +1177,7 @@ gb_internal void add_debug_info_for_global_constant_from_entity(lbGenerator *gen
 	}
 	lbModule *m = &gen->default_module;
 	if (USE_SEPARATE_MODULES) {
-		m = lb_pkg_module(gen, e->pkg);
+		m = lb_module_of_entity(gen, e);
 	}
 
 	if (is_type_integer(e->type)) {

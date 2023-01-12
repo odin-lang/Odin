@@ -143,13 +143,13 @@ gb_internal bool lb_init_generator(lbGenerator *gen, Checker *c) {
 			auto m = gb_alloc_item(permanent_allocator(), lbModule);
 			m->pkg = pkg;
 			m->gen = gen;
-			map_set(&gen->modules, pkg, m);
+			map_set(&gen->modules, cast(void *)pkg, m);
 			lb_init_module(m, c);
 		}
 	}
 
 	gen->default_module.gen = gen;
-	map_set(&gen->modules, cast(AstPackage *)nullptr, &gen->default_module);
+	map_set(&gen->modules, cast(void *)nullptr, &gen->default_module);
 	lb_init_module(&gen->default_module, c);
 
 
@@ -315,16 +315,21 @@ gb_internal bool lb_is_instr_terminating(LLVMValueRef instr) {
 }
 
 
-
-gb_internal lbModule *lb_pkg_module(lbGenerator *gen, AstPackage *pkg) {
-	// NOTE(bill): no need for a mutex since it's immutable
-	auto *found = map_get(&gen->modules, pkg);
-	if (found) {
-		return *found;
+gb_internal lbModule *lb_module_of_entity(lbGenerator *gen, Entity *e) {
+	GB_ASSERT(e != nullptr);
+	if (e->pkg) {
+		lbModule **found = nullptr;
+		found = map_get(&gen->modules, cast(void *)e->file);
+		if (found) {
+			return *found;
+		}
+		found = map_get(&gen->modules, cast(void *)e->pkg);
+		if (found) {
+			return *found;
+		}
 	}
 	return &gen->default_module;
 }
-
 
 gb_internal lbAddr lb_addr(lbValue addr) {
 	lbAddr v = {lbAddr_Default, addr};
@@ -2546,7 +2551,7 @@ gb_internal lbValue lb_find_ident(lbProcedure *p, lbModule *m, Entity *e, Ast *e
 		return lb_find_procedure_value_from_entity(m, e);
 	}
 	if (USE_SEPARATE_MODULES) {
-		lbModule *other_module = lb_pkg_module(m->gen, e->pkg);
+		lbModule *other_module = lb_module_of_entity(m->gen, e);
 		if (other_module != m) {
 			String name = lb_get_entity_name(other_module, e);
 
@@ -2590,7 +2595,7 @@ gb_internal lbValue lb_find_procedure_value_from_entity(lbModule *m, Entity *e) 
 
 	lbModule *other_module = m;
 	if (USE_SEPARATE_MODULES) {
-		other_module = lb_pkg_module(m->gen, e->pkg);
+		other_module = lb_module_of_entity(m->gen, e);
 	}
 	if (other_module == m) {
 		debugf("Missing Procedure (lb_find_procedure_value_from_entity): %.*s\n", LIT(e->token.string));
@@ -2687,7 +2692,7 @@ gb_internal lbValue lb_find_value_from_entity(lbModule *m, Entity *e) {
 	}
 
 	if (USE_SEPARATE_MODULES) {
-		lbModule *other_module = lb_pkg_module(m->gen, e->pkg);
+		lbModule *other_module = lb_module_of_entity(m->gen, e);
 
 		// TODO(bill): correct this logic
 		bool is_external = other_module != m;
