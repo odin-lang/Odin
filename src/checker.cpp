@@ -1256,6 +1256,7 @@ gb_internal void init_checker(Checker *c) {
 
 	// NOTE(bill): 1 Mi elements should be enough on average
 	array_init(&c->procs_to_check, heap_allocator(), 0, 1<<20);
+	array_init(&c->nested_proc_lits, heap_allocator(), 0, 1<<20);
 
 	mpsc_init(&c->global_untyped_queue, a); // , 1<<20);
 
@@ -1267,6 +1268,7 @@ gb_internal void destroy_checker(Checker *c) {
 
 	destroy_checker_context(&c->builtin_ctx);
 
+	array_free(&c->nested_proc_lits);
 	array_free(&c->procs_to_check);
 	mpsc_destroy(&c->global_untyped_queue);
 }
@@ -5657,6 +5659,11 @@ gb_internal void check_walk_all_dependencies(DeclInfo *decl) {
 }
 
 gb_internal void check_update_dependency_tree_for_procedures(Checker *c) {
+	mutex_lock(&c->nested_proc_lits_mutex);
+	for (DeclInfo *decl : c->nested_proc_lits) {
+		check_walk_all_dependencies(decl);
+	}
+	mutex_unlock(&c->nested_proc_lits_mutex);
 	for (Entity *e : c->info.entities) {
 		DeclInfo *decl = e->decl_info;
 		check_walk_all_dependencies(decl);

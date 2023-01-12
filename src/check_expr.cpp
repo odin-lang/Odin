@@ -9455,6 +9455,9 @@ gb_internal ExprKind check_expr_base_internal(CheckerContext *c, Operand *o, Ast
 
 			pl->decl = decl;
 			check_procedure_later(ctx.checker, ctx.file, empty_token, decl, type, pl->body, pl->tags);
+			mutex_lock(&ctx.checker->nested_proc_lits_mutex);
+			array_add(&ctx.checker->nested_proc_lits, decl);
+			mutex_unlock(&ctx.checker->nested_proc_lits_mutex);
 		}
 		check_close_scope(&ctx);
 

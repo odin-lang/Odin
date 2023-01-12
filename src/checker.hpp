@@ -449,6 +449,10 @@ struct Checker {
 	MPSCQueue<Entity *> procs_with_deferred_to_check;
 	Array<ProcInfo *> procs_to_check;
 
+	BlockingMutex nested_proc_lits_mutex;
+	Array<DeclInfo *> nested_proc_lits;
+
+
 	MPSCQueue<UntypedExprInfo> global_untyped_queue;
 };
 
