@@ -1608,10 +1608,7 @@ gb_internal bool check_proc_body(CheckerContext *ctx_, Token token, DeclInfo *de
 
 	check_scope_usage(ctx->checker, ctx->scope);
 
-	if (decl->entity == nullptr) {
-		// Only care about nested procedure literals
-		add_deps_from_child_to_parent(decl);
-	}
+	add_deps_from_child_to_parent(decl);
 
 	return true;
 }
