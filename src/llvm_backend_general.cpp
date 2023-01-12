@@ -19,7 +19,9 @@ gb_internal void lb_init_module(lbModule *m, Checker *c) {
 	m->info = &c->info;
 
 	gbString module_name = gb_string_make(heap_allocator(), "odin_package");
-	if (m->pkg) {
+	if (m->file) {
+		module_name = gb_string_append_fmt(module_name, "-%u", m->file->id+1);
+	} else if (m->pkg) {
 		module_name = gb_string_appendc(module_name, "-");
 		module_name = gb_string_append_length(module_name, m->pkg->name.text, m->pkg->name.len);
 	} else if (USE_SEPARATE_MODULES) {
@@ -139,12 +141,22 @@ gb_internal bool lb_init_generator(lbGenerator *gen, Checker *c) {
 	if (USE_SEPARATE_MODULES) {
 		for (auto const &entry : gen->info->packages) {
 			AstPackage *pkg = entry.value;
-
+		#if 1
 			auto m = gb_alloc_item(permanent_allocator(), lbModule);
 			m->pkg = pkg;
 			m->gen = gen;
 			map_set(&gen->modules, cast(void *)pkg, m);
 			lb_init_module(m, c);
+		#else
+			for (AstFile *file : pkg->files) {
+				auto m = gb_alloc_item(permanent_allocator(), lbModule);
+				m->file = file;
+				m->pkg = pkg;
+				m->gen = gen;
+				map_set(&gen->modules, cast(void *)file, m);
+				lb_init_module(m, c);
+			}
+		#endif
 		}
 	}
 

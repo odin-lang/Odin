@@ -135,7 +135,8 @@ struct lbModule {
 	LLVMTargetMachineRef target_machine;
 
 	CheckerInfo *info;
-	AstPackage *pkg; // associated
+	AstPackage *pkg; // possibly associated
+	AstFile *file;   // possibly associated
 
 	PtrMap<Type *, LLVMTypeRef> types;
 	PtrMap<Type *, LLVMTypeRef> func_raw_types;

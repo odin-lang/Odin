@@ -1488,7 +1488,12 @@ gb_internal String lb_filepath_ll_for_module(lbModule *m) {
 		build_context.build_paths[BuildPath_Output].name
 	);
 
-	if (m->pkg) {
+	if (m->file) {
+		char buf[32] = {};
+		isize n = gb_snprintf(buf, gb_size_of(buf), "-%u", m->file->id);
+		String suffix = make_string((u8 *)buf, n-1);
+		path = concatenate_strings(permanent_allocator(), path, suffix);
+	} else if (m->pkg) {
 		path = concatenate3_strings(permanent_allocator(), path, STR_LIT("-"), m->pkg->name);
 	} else if (USE_SEPARATE_MODULES) {
 		path = concatenate_strings(permanent_allocator(), path, STR_LIT("-builtin"));
@@ -1504,7 +1509,12 @@ gb_internal String lb_filepath_obj_for_module(lbModule *m) {
 		build_context.build_paths[BuildPath_Output].name
 	);
 
-	if (m->pkg) {
+	if (m->file) {
+		char buf[32] = {};
+		isize n = gb_snprintf(buf, gb_size_of(buf), "-%u", m->file->id);
+		String suffix = make_string((u8 *)buf, n-1);
+		path = concatenate_strings(permanent_allocator(), path, suffix);
+	} else if (m->pkg) {
 		path = concatenate3_strings(permanent_allocator(), path, STR_LIT("-"), m->pkg->name);
 	}
 
@@ -1852,7 +1862,6 @@ gb_internal bool lb_generate_code(lbGenerator *gen) {
 	isize worker_count = thread_count-1;
 
 	bool do_threading = !!(LLVMIsMultithreaded() && USE_SEPARATE_MODULES && MULTITHREAD_OBJECT_GENERATION && worker_count > 0);
-	do_threading = false;
 
 	lbModule *default_module = &gen->default_module;
 	CheckerInfo *info = gen->info;
@@ -2388,7 +2397,6 @@ gb_internal bool lb_generate_code(lbGenerator *gen) {
 			if (lb_is_module_empty(m)) {
 				continue;
 			}
-
 			String filepath_ll = lb_filepath_ll_for_module(m);
 			if (LLVMPrintModuleToFile(m->mod, cast(char const *)filepath_ll.text, &llvm_error)) {
 				gb_printf_err("LLVM Error: %s\n", llvm_error);
