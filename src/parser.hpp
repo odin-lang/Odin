@@ -176,6 +176,7 @@ struct AstPackage {
 	BlockingMutex         foreign_files_mutex;
 	BlockingMutex         type_and_value_mutex;
 
+	// NOTE(bill): This must be a MPMCQueue
 	MPMCQueue<AstPackageExportedEntity> exported_entity_queue;
 
 	// NOTE(bill): Created/set in checker

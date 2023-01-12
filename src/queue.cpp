@@ -10,11 +10,12 @@ struct MPSCNode {
 //
 template <typename T>
 struct MPSCQueue {
+	gbAllocator allocator;
+	std::atomic<isize> count;
+
 	std::atomic<MPSCNode<T> *> head;
 	std::atomic<MPSCNode<T> *> tail;
-	std::atomic<isize> count;
 	MPSCNode<T> sentinel;
-	gbAllocator allocator;
 };
 
 template <typename T> gb_internal void         mpsc_init   (MPSCQueue<T> *q, gbAllocator const &allocator);
@@ -29,6 +30,7 @@ gb_internal void mpsc_init(MPSCQueue<T> *q, gbAllocator const &allocator) {
 	q->count.store(0, std::memory_order_relaxed);
 	q->head.store(&q->sentinel, std::memory_order_relaxed);
 	q->tail.store(&q->sentinel, std::memory_order_relaxed);
+
 	q->sentinel.next.store(nullptr, std::memory_order_relaxed);
 }
 
@@ -36,14 +38,20 @@ template <typename T>
 gb_internal void mpsc_destroy(MPSCQueue<T> *q) {
 	while (mpsc_dequeue(q, (T *)nullptr)) {}
 	// DO NOTHING for the time being
+	// free the nodes later
 }
 
 
 template <typename T>
 gb_internal MPSCNode<T> *mpsc_alloc_node(MPSCQueue<T> *q, T const &value) {
-	auto node = gb_alloc_item(q->allocator, MPSCNode<T>);
-	node->value = value;
-	return node;
+	auto new_node = gb_alloc_item(q->allocator, MPSCNode<T>);
+	new_node->value = value;
+	return new_node;
+}
+
+template <typename T>
+gb_internal void mpsc_free_node(MPSCQueue<T> *q, MPSCNode<T> *node) {
+	// TODO(bill): reuse the free nodes
 }
 
 template <typename T>
@@ -68,10 +76,8 @@ gb_internal bool mpsc_dequeue(MPSCQueue<T> *q, T *value_) {
 	auto next = tail->next.load(std::memory_order_relaxed);
 	if (next) {
 		q->tail.store(next, std::memory_order_relaxed);
-		// `tail` is now "dead" and needs to be "freed"
-		tail->value = next->value;
-		T value = tail->value;
-		if (value_) *value_ = value;
+		if (value_) *value_ = next->value;
+		mpsc_free_node(q, tail);
 		q->count.fetch_sub(1, std::memory_order_acq_rel);
 		return true;
 	}

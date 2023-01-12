@@ -446,11 +446,10 @@ struct Checker {
 
 	CheckerContext builtin_ctx;
 
-	MPMCQueue<Entity *> procs_with_deferred_to_check;
+	MPSCQueue<Entity *> procs_with_deferred_to_check;
 	Array<ProcInfo *> procs_to_check;
 
-	// TODO(bill): Technically MPSC queue
-	MPMCQueue<UntypedExprInfo> global_untyped_queue;
+	MPSCQueue<UntypedExprInfo> global_untyped_queue;
 };
 
 

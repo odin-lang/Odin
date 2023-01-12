@@ -1254,12 +1254,12 @@ gb_internal void init_checker(Checker *c) {
 	c->info.checker = c;
 
 	TIME_SECTION("init proc queues");
-	mpmc_init(&c->procs_with_deferred_to_check, a, 1<<10);
+	mpsc_init(&c->procs_with_deferred_to_check, a); //, 1<<10);
 
 	// NOTE(bill): 1 Mi elements should be enough on average
 	array_init(&c->procs_to_check, heap_allocator(), 0, 1<<20);
 
-	mpmc_init(&c->global_untyped_queue, a, 1<<20);
+	mpsc_init(&c->global_untyped_queue, a); // , 1<<20);
 
 	c->builtin_ctx = make_checker_context(c);
 }
@@ -1270,7 +1270,7 @@ gb_internal void destroy_checker(Checker *c) {
 	destroy_checker_context(&c->builtin_ctx);
 
 	array_free(&c->procs_to_check);
-	mpmc_destroy(&c->global_untyped_queue);
+	mpsc_destroy(&c->global_untyped_queue);
 }
 
 
@@ -4647,10 +4647,10 @@ gb_internal GB_COMPARE_PROC(sort_file_by_name) {
 gb_internal void check_create_file_scopes(Checker *c) {
 	for_array(i, c->parser->packages) {
 		AstPackage *pkg = c->parser->packages[i];
-		isize total_pkg_decl_count = 0;
 
 		gb_sort_array(pkg->files.data, pkg->files.count, sort_file_by_name);
 
+		isize total_pkg_decl_count = 0;
 		for_array(j, pkg->files) {
 			AstFile *f = pkg->files[j];
 			string_map_set(&c->info.files, f->fullpath, f);
@@ -5382,14 +5382,14 @@ gb_internal void add_untyped_expressions(CheckerInfo *cinfo, UntypedExprInfoMap 
 		Ast *expr = entry.key;
 		ExprInfo *info = entry.value;
 		if (expr != nullptr && info != nullptr) {
-			mpmc_enqueue(&cinfo->checker->global_untyped_queue, UntypedExprInfo{expr, info});
+			mpsc_enqueue(&cinfo->checker->global_untyped_queue, UntypedExprInfo{expr, info});
 		}
 	}
 	map_clear(untyped);
 }
 
 gb_internal void check_deferred_procedures(Checker *c) {
-	for (Entity *src = nullptr; mpmc_dequeue(&c->procs_with_deferred_to_check, &src); /**/) {
+	for (Entity *src = nullptr; mpsc_dequeue(&c->procs_with_deferred_to_check, &src); /**/) {
 		GB_ASSERT(src->kind == Entity_Procedure);
 
 		DeferredProcedureKind dst_kind = src->Procedure.deferred_procedure.kind;
@@ -5831,7 +5831,7 @@ gb_internal void check_parsed_files(Checker *c) {
 
 	TIME_SECTION("add untyped expression values");
 	// Add untyped expression values
-	for (UntypedExprInfo u = {}; mpmc_dequeue(&c->global_untyped_queue, &u); /**/) {
+	for (UntypedExprInfo u = {}; mpsc_dequeue(&c->global_untyped_queue, &u); /**/) {
 		GB_ASSERT(u.expr != nullptr && u.info != nullptr);
 		if (is_type_typed(u.info->type)) {
 			compiler_error("%s (type %s) is typed!", expr_to_string(u.expr), type_to_string(u.info->type));

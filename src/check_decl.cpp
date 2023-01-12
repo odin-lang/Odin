@@ -1010,7 +1010,7 @@ gb_internal void check_proc_decl(CheckerContext *ctx, Entity *e, DeclInfo *d) {
 
 	if (ac.deferred_procedure.entity != nullptr) {
 		e->Procedure.deferred_procedure = ac.deferred_procedure;
-		mpmc_enqueue(&ctx->checker->procs_with_deferred_to_check, e);
+		mpsc_enqueue(&ctx->checker->procs_with_deferred_to_check, e);
 	}
 
 	if (is_foreign) {
