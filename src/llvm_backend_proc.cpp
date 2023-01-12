@@ -190,11 +190,6 @@ gb_internal lbProcedure *lb_create_procedure(lbModule *m, Entity *entity, bool i
 		lb_add_attribute_to_proc(m, p->value, "cold");
 	}
 
-	lbValue proc_value = {p->value, p->type};
-	lb_add_entity(m, entity,  proc_value);
-	lb_add_member(m, p->name, proc_value);
-	lb_add_procedure_value(m, p);
-
 	if (p->is_export) {
 		LLVMSetLinkage(p->value, LLVMDLLExportLinkage);
 		LLVMSetDLLStorageClass(p->value, LLVMDLLExportStorageClass);
@@ -202,7 +197,9 @@ gb_internal lbProcedure *lb_create_procedure(lbModule *m, Entity *entity, bool i
 
 		lb_set_wasm_export_attributes(p->value, p->name);
 	} else if (!p->is_foreign) {
-		if (!USE_SEPARATE_MODULES) {
+		if (USE_SEPARATE_MODULES) {
+			LLVMSetLinkage(p->value, LLVMExternalLinkage);
+		} else {
 			LLVMSetLinkage(p->value, LLVMInternalLinkage);
 
 			// NOTE(bill): if a procedure is defined in package runtime and uses a custom link name,
@@ -315,6 +312,11 @@ gb_internal lbProcedure *lb_create_procedure(lbModule *m, Entity *entity, bool i
 			lb_set_llvm_metadata(m, p, p->debug_info);
 		}
 	}
+
+	lbValue proc_value = {p->value, p->type};
+	lb_add_entity(m, entity,  proc_value);
+	lb_add_member(m, p->name, proc_value);
+	lb_add_procedure_value(m, p);
 
 	return p;
 }

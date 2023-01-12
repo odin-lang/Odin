@@ -5092,7 +5092,7 @@ gb_internal bool check_proc_info(Checker *c, ProcInfo *pi, UntypedExprInfoMap *u
 		if ((e->flags & EntityFlag_Used) == 0) {
 			// NOTE(bill, 2019-08-31): It was never used, don't check
 			// NOTE(bill, 2023-01-02): This may need to be checked again if it is used elsewhere?
-		pi->decl->proc_checked_state.store(ProcCheckedState_Unchecked);
+			pi->decl->proc_checked_state.store(ProcCheckedState_Unchecked);
 			return false;
 		}
 	}

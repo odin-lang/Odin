@@ -1852,6 +1852,7 @@ gb_internal bool lb_generate_code(lbGenerator *gen) {
 	isize worker_count = thread_count-1;
 
 	bool do_threading = !!(LLVMIsMultithreaded() && USE_SEPARATE_MODULES && MULTITHREAD_OBJECT_GENERATION && worker_count > 0);
+	do_threading = false;
 
 	lbModule *default_module = &gen->default_module;
 	CheckerInfo *info = gen->info;
@@ -2067,9 +2068,7 @@ gb_internal bool lb_generate_code(lbGenerator *gen) {
 			Type *t = alloc_type_array(t_type_info, max_type_info_count);
 			LLVMValueRef g = LLVMAddGlobal(m->mod, lb_type(m, t), LB_TYPE_INFO_DATA_NAME);
 			LLVMSetInitializer(g, LLVMConstNull(lb_type(m, t)));
-			if (!USE_SEPARATE_MODULES) {
-				LLVMSetLinkage(g, LLVMInternalLinkage);
-			}
+			LLVMSetLinkage(g, USE_SEPARATE_MODULES ? LLVMExternalLinkage : LLVMInternalLinkage);
 
 			lbValue value = {};
 			value.value = g;
@@ -2241,11 +2240,7 @@ gb_internal bool lb_generate_code(lbGenerator *gen) {
 			LLVMSetLinkage(g.value, LLVMDLLExportLinkage);
 			LLVMSetDLLStorageClass(g.value, LLVMDLLExportStorageClass);
 		} else if (!is_foreign) {
-			if (USE_SEPARATE_MODULES) {
-				LLVMSetLinkage(g.value, LLVMExternalLinkage);
-			} else {
-				LLVMSetLinkage(g.value, LLVMInternalLinkage);
-			}
+			LLVMSetLinkage(g.value, USE_SEPARATE_MODULES ? LLVMExternalLinkage : LLVMInternalLinkage);
 		}
 		lb_set_linkage_from_entity_flags(m, g.value, e->flags);
 		

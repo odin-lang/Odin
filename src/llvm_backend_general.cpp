@@ -2598,7 +2598,15 @@ gb_internal lbValue lb_find_procedure_value_from_entity(lbModule *m, Entity *e) 
 	ignore_body = other_module != m;
 
 	lbProcedure *missing_proc = lb_create_procedure(m, e, ignore_body);
-	if (!ignore_body) {
+	if (ignore_body) {
+		mutex_lock(&other_module->values_mutex);
+		auto *found = map_get(&other_module->values, e);
+		if (found == nullptr) {
+			lbProcedure *missing_proc_in_other_module = lb_create_procedure(other_module, e, false);
+			array_add(&other_module->missing_procedures_to_check, missing_proc_in_other_module);
+		}
+		mutex_unlock(&other_module->values_mutex);
+	} else {
 		array_add(&m->missing_procedures_to_check, missing_proc);
 	}
 	found = map_get(&m->values, e);
