@@ -16,7 +16,7 @@
 gb_global ThreadPool global_thread_pool;
 gb_internal void init_global_thread_pool(void) {
 	isize thread_count = gb_max(build_context.thread_count, 1);
-	isize worker_count = thread_count-1;
+	isize worker_count = thread_count; // +1
 	thread_pool_init(&global_thread_pool, permanent_allocator(), worker_count, "ThreadPoolWorker");
 }
 gb_internal bool thread_pool_add_task(WorkerTaskProc *proc, void *data) {
