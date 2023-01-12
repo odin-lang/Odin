@@ -329,12 +329,14 @@ gb_internal bool lb_is_instr_terminating(LLVMValueRef instr) {
 
 gb_internal lbModule *lb_module_of_entity(lbGenerator *gen, Entity *e) {
 	GB_ASSERT(e != nullptr);
-	if (e->pkg) {
-		lbModule **found = nullptr;
+	lbModule **found = nullptr;
+	if (e->file) {
 		found = map_get(&gen->modules, cast(void *)e->file);
 		if (found) {
 			return *found;
 		}
+	}
+	if (e->pkg) {
 		found = map_get(&gen->modules, cast(void *)e->pkg);
 		if (found) {
 			return *found;
