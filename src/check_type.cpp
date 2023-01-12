@@ -272,7 +272,20 @@ gb_internal Entity *find_polymorphic_record_entity(CheckerContext *ctx, Type *or
 
 	for (Entity *e : found_gen_types->types) {
 		Type *t = base_type(e->type);
-		TypeTuple *tuple = get_record_polymorphic_params(t);
+		TypeTuple *tuple = nullptr;
+		switch (t->kind) {
+		case Type_Struct:
+			if (t->Struct.polymorphic_params) {
+				tuple = &t->Struct.polymorphic_params->Tuple;
+			}
+			break;
+		case Type_Union:
+			if (t->Union.polymorphic_params) {
+				tuple = &t->Union.polymorphic_params->Tuple;
+			}
+			break;
+		}
+		GB_ASSERT_MSG(tuple != nullptr, "%s :: %s", type_to_string(e->type), type_to_string(t));
 		GB_ASSERT(param_count == tuple->variables.count);
 
 		bool skip = false;
