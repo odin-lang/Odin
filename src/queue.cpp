@@ -11,36 +11,31 @@ struct MPSCNode {
 template <typename T>
 struct MPSCQueue {
 	gbAllocator allocator;
-	std::atomic<isize> count;
 
+	MPSCNode<T> sentinel;
 	std::atomic<MPSCNode<T> *> head;
 	std::atomic<MPSCNode<T> *> tail;
-	MPSCNode<T> sentinel;
+	std::atomic<isize> count;
 };
 
-template <typename T> gb_internal void         mpsc_init   (MPSCQueue<T> *q, gbAllocator const &allocator);
-template <typename T> gb_internal void         mpsc_destroy(MPSCQueue<T> *q);
-template <typename T> gb_internal isize        mpsc_enqueue(MPSCQueue<T> *q, T const &value);
-template <typename T> gb_internal bool         mpsc_dequeue(MPSCQueue<T> *q, T *value_);
-template <typename T> gb_internal MPSCNode<T> *mpsc_tail   (MPSCQueue<T> *q);
+template <typename T> gb_internal void  mpsc_init   (MPSCQueue<T> *q, gbAllocator const &allocator);
+template <typename T> gb_internal void  mpsc_destroy(MPSCQueue<T> *q);
+template <typename T> gb_internal isize mpsc_enqueue(MPSCQueue<T> *q, T const &value);
+template <typename T> gb_internal bool  mpsc_dequeue(MPSCQueue<T> *q, T *value_);
 
 template <typename T>
 gb_internal void mpsc_init(MPSCQueue<T> *q, gbAllocator const &allocator) {
 	q->allocator = allocator;
-	q->count.store(0, std::memory_order_relaxed);
+	q->sentinel.next.store(nullptr, std::memory_order_relaxed);
 	q->head.store(&q->sentinel, std::memory_order_relaxed);
 	q->tail.store(&q->sentinel, std::memory_order_relaxed);
-
-	q->sentinel.next.store(nullptr, std::memory_order_relaxed);
+	q->count.store(0, std::memory_order_relaxed);
 }
 
 template <typename T>
 gb_internal void mpsc_destroy(MPSCQueue<T> *q) {
-	while (mpsc_dequeue(q, (T *)nullptr)) {}
-	// DO NOTHING for the time being
-	// free the nodes later
+	GB_ASSERT(q->count.load() == 0);
 }
-
 
 template <typename T>
 gb_internal MPSCNode<T> *mpsc_alloc_node(MPSCQueue<T> *q, T const &value) {
@@ -51,7 +46,7 @@ gb_internal MPSCNode<T> *mpsc_alloc_node(MPSCQueue<T> *q, T const &value) {
 
 template <typename T>
 gb_internal void mpsc_free_node(MPSCQueue<T> *q, MPSCNode<T> *node) {
-	// TODO(bill): reuse the free nodes
+	// TODO(bill): determine a good way to handle the freed nodes rather than letting them leak
 }
 
 template <typename T>
@@ -59,7 +54,7 @@ gb_internal isize mpsc_enqueue(MPSCQueue<T> *q, MPSCNode<T> *node) {
 	node->next.store(nullptr, std::memory_order_relaxed);
 	auto prev = q->head.exchange(node, std::memory_order_acq_rel);
 	prev->next.store(node, std::memory_order_release);
-	isize count = 1 + q->count.fetch_add(1, std::memory_order_acq_rel);
+	isize count = 1 + q->count.fetch_add(1, std::memory_order_relaxed);
 	return count;
 }
 
@@ -77,8 +72,8 @@ gb_internal bool mpsc_dequeue(MPSCQueue<T> *q, T *value_) {
 	if (next) {
 		q->tail.store(next, std::memory_order_relaxed);
 		if (value_) *value_ = next->value;
+		q->count.fetch_sub(1, std::memory_order_relaxed);
 		mpsc_free_node(q, tail);
-		q->count.fetch_sub(1, std::memory_order_acq_rel);
 		return true;
 	}
 	GB_ASSERT(q->count.load(std::memory_order_acquire) == 0);

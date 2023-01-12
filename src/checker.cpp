@@ -1158,8 +1158,6 @@ gb_internal void init_checker_info(CheckerInfo *i) {
 	string_map_init(&i->load_file_cache);
 	array_init(&i->all_procedures, heap_allocator());
 
-	TIME_SECTION("checker info: mpmc queues");
-
 	mpsc_init(&i->entity_queue, a); // 1<<20);
 	mpsc_init(&i->definition_queue, a); //); // 1<<20);
 	mpsc_init(&i->required_global_variable_queue, a); // 1<<10);
@@ -1711,7 +1709,6 @@ gb_internal void add_entity_and_decl_info(CheckerContext *c, Ast *identifier, En
 
 	is_lazy = (e->flags & EntityFlag_Lazy) == EntityFlag_Lazy;
 	if (!is_lazy) {
-		GB_ASSERT(e != nullptr);
 		queue_count = mpsc_enqueue(&info->entity_queue, e);
 	}
 
