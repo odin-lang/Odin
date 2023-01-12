@@ -1411,7 +1411,6 @@ gb_internal bool init_build_paths(String init_filename) {
 		if ((bc->command_kind & Command__does_build) && (!bc->ignore_microsoft_magic)) {
 			// NOTE(ic): It would be nice to extend this so that we could specify the Visual Studio version that we want instead of defaulting to the latest.
 			Find_Result find_result = find_visual_studio_and_windows_sdk();
-			defer (mc_free_all());
 
 			if (find_result.windows_sdk_version == 0) {
 				gb_printf_err("Windows SDK not found.\n");

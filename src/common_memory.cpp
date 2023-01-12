@@ -306,10 +306,11 @@ gb_internal gbAllocator temporary_allocator() {
 gb_internal GB_ALLOCATOR_PROC(heap_allocator_proc);
 
 gb_internal gbAllocator heap_allocator(void) {
-	gbAllocator a;
-	a.proc = heap_allocator_proc;
-	a.data = nullptr;
-	return a;
+	return arena_allocator(&permanent_arena);
+	// gbAllocator a;
+	// a.proc = heap_allocator_proc;
+	// a.data = nullptr;
+	// return a;
 }
 
 

@@ -1716,6 +1716,16 @@ gb_internal void show_timings(Checker *c, Timings *t) {
 
 	timings_print_all(t);
 
+	if (build_context.show_more_timings) {
+	#if defined(GB_SYSTEM_WINDOWS)
+		PROCESS_MEMORY_COUNTERS p = {sizeof(p)};
+		if (GetProcessMemoryInfo(GetCurrentProcess(), &p, sizeof(p))) {
+			gb_printf("\n");
+			gb_printf("Peak Memory Size: %.3f MiB\n", (cast(f64)p.PeakWorkingSetSize) / cast(f64)(1024ull * 1024ull));
+		}
+	#endif
+	}
+
 	if (!(build_context.export_timings_format == TimingsExportUnspecified)) {
 		timings_export_all(t, c, true);
 	}
@@ -2481,13 +2491,12 @@ int main(int arg_count, char const **arg_ptr) {
 		usage(make_string_c(arg_ptr[0]));
 		return 1;
 	}
+	virtual_memory_init();
 
 	timings_init(&global_timings, str_lit("Total Time"), 2048);
 	defer (timings_destroy(&global_timings));
 
 	MAIN_TIME_SECTION("initialization");
-
-	virtual_memory_init();
 
 	init_string_interner();
 	init_global_error_collector();

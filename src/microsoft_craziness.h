@@ -45,7 +45,7 @@
 //
 // Here is the API you need to know about:
 //
-gb_global gbAllocator mc_allocator = heap_allocator();
+gb_global gbAllocator mc_allocator = permanent_allocator();
 
 struct Find_Result {
 	int windows_sdk_version;   // Zero if no Windows SDK found.
@@ -89,10 +89,6 @@ gb_internal void mc_free(String str) {
 
 gb_internal void mc_free(String16 str) {
 	if (str.len) gb_free(mc_allocator, str.text);
-}
-
-gb_internal void mc_free_all() {
-	gb_free_all(mc_allocator);
 }
 
 typedef struct _MC_Find_Data {
