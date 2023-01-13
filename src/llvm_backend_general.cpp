@@ -148,6 +148,7 @@ gb_internal bool lb_init_generator(lbGenerator *gen, Checker *c) {
 			map_set(&gen->modules, cast(void *)pkg, m);
 			lb_init_module(m, c);
 		#else
+			// NOTE(bill): Probably per file is not a good idea, so leave this for later
 			for (AstFile *file : pkg->files) {
 				auto m = gb_alloc_item(permanent_allocator(), lbModule);
 				m->file = file;

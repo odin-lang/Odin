@@ -35,8 +35,6 @@ struct StringMapEntry {
 
 template <typename T>
 struct StringMap {
-	using K = String;
-	using V = T;
 	Slice<MapIndex>           hashes;
 	Array<StringMapEntry<T> > entries;
 };
@@ -53,15 +51,14 @@ template <typename T> gb_internal T &  string_map_must_get         (StringMap<T>
 template <typename T> gb_internal T &  string_map_must_get         (StringMap<T> *h, String const &key);
 template <typename T> gb_internal T &  string_map_must_get         (StringMap<T> *h, StringHashKey const &key);
 
-template <typename T> gb_internal void string_map_set              (StringMap<T> *h, StringHashKey const &key, T const &value);
-template <typename T> gb_internal void string_map_set              (StringMap<T> *h, String const &key, T const &value);
 template <typename T> gb_internal void string_map_set              (StringMap<T> *h, char const *key,   T const &value);
+template <typename T> gb_internal void string_map_set              (StringMap<T> *h, String const &key, T const &value);
+template <typename T> gb_internal void string_map_set              (StringMap<T> *h, StringHashKey const &key, T const &value);
 
-template <typename T> gb_internal void string_map_remove           (StringMap<T> *h, StringHashKey const &key);
+// template <typename T> gb_internal void string_map_remove           (StringMap<T> *h, StringHashKey const &key);
 template <typename T> gb_internal void string_map_clear            (StringMap<T> *h);
 template <typename T> gb_internal void string_map_grow             (StringMap<T> *h);
-template <typename T> gb_internal void string_map_rehash           (StringMap<T> *h, isize new_count);
-template <typename T> gb_internal void string_map_reserve          (StringMap<T> *h, isize cap);
+template <typename T> gb_internal void string_map_reserve          (StringMap<T> *h, isize new_count);
 
 gb_internal gbAllocator string_map_allocator(void) {
 	return heap_allocator();
@@ -137,7 +134,7 @@ gb_internal b32 string_map__full(StringMap<T> *h) {
 template <typename T>
 gb_inline void string_map_grow(StringMap<T> *h) {
 	isize new_count = gb_max(h->hashes.count<<1, 16);
-	string_map_rehash(h, new_count);
+	string_map_reserve(h, new_count);
 }
 
 
@@ -170,12 +167,6 @@ gb_internal void string_map_reserve(StringMap<T> *h, isize cap) {
 	}
 	slice_resize(&h->hashes, h->entries.allocator, cap*2);
 	string_map_reset_entries(h);
-}
-
-
-template <typename T>
-gb_internal void string_map_rehash(StringMap<T> *h, isize new_count) {
-	string_map_reserve(h, new_count);
 }
 
 template <typename T>
@@ -259,34 +250,34 @@ gb_internal gb_inline void string_map_set(StringMap<T> *h, char const *key, T co
 }
 
 
-template <typename T>
-gb_internal void string_map__erase(StringMap<T> *h, MapFindResult const &fr) {
-	MapFindResult last;
-	if (fr.entry_prev == MAP_SENTINEL) {
-		h->hashes.data[fr.hash_index] = h->entries.data[fr.entry_index].next;
-	} else {
-		h->entries.data[fr.entry_prev].next = h->entries.data[fr.entry_index].next;
-	}
-	if (fr.entry_index == h->entries.count-1) {
-		array_pop(&h->entries);
-		return;
-	}
-	h->entries.data[fr.entry_index] = h->entries.data[h->entries.count-1];
-	last = string_map__find(h, h->entries.data[fr.entry_index].key);
-	if (last.entry_prev != MAP_SENTINEL) {
-		h->entries.data[last.entry_prev].next = fr.entry_index;
-	} else {
-		h->hashes.data[last.hash_index] = fr.entry_index;
-	}
-}
+// template <typename T>
+// gb_internal void string_map__erase(StringMap<T> *h, MapFindResult const &fr) {
+// 	MapFindResult last;
+// 	if (fr.entry_prev == MAP_SENTINEL) {
+// 		h->hashes.data[fr.hash_index] = h->entries.data[fr.entry_index].next;
+// 	} else {
+// 		h->entries.data[fr.entry_prev].next = h->entries.data[fr.entry_index].next;
+// 	}
+// 	if (fr.entry_index == h->entries.count-1) {
+// 		array_pop(&h->entries);
+// 		return;
+// 	}
+// 	h->entries.data[fr.entry_index] = h->entries.data[h->entries.count-1];
+// 	last = string_map__find(h, h->entries.data[fr.entry_index].key);
+// 	if (last.entry_prev != MAP_SENTINEL) {
+// 		h->entries.data[last.entry_prev].next = fr.entry_index;
+// 	} else {
+// 		h->hashes.data[last.hash_index] = fr.entry_index;
+// 	}
+// }
 
-template <typename T>
-gb_internal void string_map_remove(StringMap<T> *h, StringHashKey const &key) {
-	MapFindResult fr = string_map__find(h, key);
-	if (fr.entry_index != MAP_SENTINEL) {
-		string_map__erase(h, fr);
-	}
-}
+// template <typename T>
+// gb_internal void string_map_remove(StringMap<T> *h, StringHashKey const &key) {
+// 	MapFindResult fr = string_map__find(h, key);
+// 	if (fr.entry_index != MAP_SENTINEL) {
+// 		string_map__erase(h, fr);
+// 	}
+// }
 
 template <typename T>
 gb_internal gb_inline void string_map_clear(StringMap<T> *h) {

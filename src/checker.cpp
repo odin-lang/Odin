@@ -58,11 +58,8 @@ gb_internal void scope_reset(Scope *scope) {
 	rw_mutex_unlock(&scope->mutex);
 }
 
-gb_internal void scope_reserve(Scope *scope, isize capacity) {
-	isize cap = 2*capacity;
-	if (cap > scope->elements.hashes.count) {
-		string_map_rehash(&scope->elements, capacity);
-	}
+gb_internal void scope_reserve(Scope *scope, isize count) {
+	string_map_reserve(&scope->elements, 2*count);
 }
 
 gb_internal void entity_graph_node_set_destroy(EntityGraphNodeSet *s) {
@@ -4699,7 +4696,7 @@ gb_internal void check_collect_entities_all(Checker *c) {
 		map_init(&wd->untyped);
 	}
 
-	for (auto const &entry : c->info.files.entries) {
+	for (auto const &entry : c->info.files) {
 		AstFile *f = entry.value;
 		thread_pool_add_task(check_collect_entities_all_worker_proc, f);
 	}
@@ -4739,7 +4736,7 @@ gb_internal void check_export_entities(Checker *c) {
 		wd->ctx = make_checker_context(c);
 	}
 
-	for (auto const &entry : c->info.packages.entries) {
+	for (auto const &entry : c->info.packages) {
 		AstPackage *pkg = entry.value;
 		thread_pool_add_task(check_export_entities_worker_proc, pkg);
 	}

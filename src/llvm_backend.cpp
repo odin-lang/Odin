@@ -1625,6 +1625,7 @@ gb_internal bool lb_llvm_object_generation(lbGenerator *gen, bool do_threading) 
 
 			String filepath_ll = lb_filepath_ll_for_module(m);
 			String filepath_obj = lb_filepath_obj_for_module(m);
+			gb_printf_err("%.*s\n", LIT(filepath_obj));
 			array_add(&gen->output_object_paths, filepath_obj);
 			array_add(&gen->output_temp_paths, filepath_ll);
 
