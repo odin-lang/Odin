@@ -89,7 +89,7 @@ gb_internal Array<Ast *> clone_ast_array(Array<Ast *> const &array, AstFile *f) 
 gb_internal Slice<Ast *> clone_ast_array(Slice<Ast *> const &array, AstFile *f) {
 	Slice<Ast *> result = {};
 	if (array.count > 0) {
-		result = slice_clone(permanent_allocator(), array);
+		result = slice_clone(ast_allocator(nullptr), array);
 		for_array(i, array) {
 			result[i] = clone_ast(array[i], f);
 		}

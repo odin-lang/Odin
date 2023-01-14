@@ -509,7 +509,7 @@ gb_internal GB_ALLOCATOR_PROC(heap_allocator_proc) {
 
 
 template <typename T>
-gb_internal isize resize_array_raw(T **array, gbAllocator const &a, isize old_count, isize new_count) {
+gb_internal isize resize_array_raw(T **array, gbAllocator const &a, isize old_count, isize new_count, isize custom_alignment=1) {
 	GB_ASSERT(new_count >= 0);
 	if (new_count == 0) {
 		gb_free(a, *array);
@@ -521,7 +521,7 @@ gb_internal isize resize_array_raw(T **array, gbAllocator const &a, isize old_co
 	}
 	isize old_size = old_count * gb_size_of(T);
 	isize new_size = new_count * gb_size_of(T);
-	isize alignment = gb_align_of(T);
+	isize alignment = gb_max(gb_align_of(T), custom_alignment);
 	auto new_data = cast(T *)gb_resize_align(a, *array, old_size, new_size, alignment);
 	GB_ASSERT(new_data != nullptr);
 	*array = new_data;
