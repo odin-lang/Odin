@@ -322,6 +322,12 @@ gb_internal i32 linker_stage(lbGenerator *gen) {
 					}
 				}
 
+				switch (build_context.build_mode) {
+				case BuildMode_Executable:
+					link_settings = gb_string_append_fmt(link_settings, " /NOIMPLIB /NOEXP");
+					break;
+				}
+
 				result = system_exec_command_line_app("msvc-link",
 					"\"%.*slink.exe\" %s %.*s -OUT:\"%.*s\" %s "
 					"/nologo /incremental:no /opt:ref /subsystem:%s "
