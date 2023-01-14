@@ -2201,18 +2201,18 @@ gb_internal Type *make_optional_ok_type(Type *value, bool typed) {
 
 // IMPORTANT NOTE(bill): This must match the definition in dynamic_map_internal.odin
 enum : i64 {
-	MAP_CACHE_LINE_LOG2 = 6,
-	MAP_CACHE_LINE_SIZE = 1 << MAP_CACHE_LINE_LOG2
+	MAP_CELL_CACHE_LINE_LOG2 = 6,
+	MAP_CELL_CACHE_LINE_SIZE = 1 << MAP_CELL_CACHE_LINE_LOG2,
 };
-GB_STATIC_ASSERT(MAP_CACHE_LINE_SIZE >= 64);
+GB_STATIC_ASSERT(MAP_CELL_CACHE_LINE_SIZE >= 64);
 gb_internal void map_cell_size_and_len(Type *type, i64 *size_, i64 *len_) {
 	i64 elem_sz = type_size_of(type);
 
 	i64 len = 1;
-	if (0 < elem_sz && elem_sz < MAP_CACHE_LINE_SIZE) {
-		len = MAP_CACHE_LINE_SIZE / elem_sz;
+	if (0 < elem_sz && elem_sz < MAP_CELL_CACHE_LINE_SIZE) {
+		len = MAP_CELL_CACHE_LINE_SIZE / elem_sz;
 	}
-	i64 size = align_formula(elem_sz * len, MAP_CACHE_LINE_SIZE);
+	i64 size = align_formula(elem_sz * len, MAP_CELL_CACHE_LINE_SIZE);
 	if (size_) *size_ = size;
 	if (len_)  *len_ = len;
 }

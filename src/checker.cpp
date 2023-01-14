@@ -2030,7 +2030,7 @@ gb_internal void add_min_dep_type_info(Checker *c, Type *t) {
 	GB_ASSERT(ti_index >= 0);
 	// IMPORTANT NOTE(bill): this must be copied as `map_set` takes a const ref
 	// and effectively assigns the `+1` of the value
-	isize const count = set->entries.count;
+	isize const count = set->count;
 	if (map_set_if_not_previously_exists(set, ti_index, count)) {
 		// Type already exists;
 		return;
@@ -2536,7 +2536,7 @@ gb_internal Array<EntityGraphNode *> generate_entity_dependency_graph(CheckerInf
 	// This means that the entity graph node set will have to be thread safe
 
 	TIME_SECTION("generate_entity_dependency_graph: Calculate edges for graph M - Part 2");
-	auto G = array_make<EntityGraphNode *>(allocator, 0, M.entries.count);
+	auto G = array_make<EntityGraphNode *>(allocator, 0, M.count);
 
 	for (auto const &m_entry : M) {
 		auto *e = m_entry.key;
@@ -4227,7 +4227,7 @@ gb_internal Array<ImportGraphNode *> generate_import_dependency_graph(Checker *c
 	}
 
 	Array<ImportGraphNode *> G = {};
-	array_init(&G, heap_allocator(), 0, M.entries.count);
+	array_init(&G, heap_allocator(), 0, M.count);
 
 	isize i = 0;
 	for (auto const &entry : M) {
@@ -4655,7 +4655,7 @@ gb_internal void check_create_file_scopes(Checker *c) {
 			total_pkg_decl_count += f->total_file_decl_count;
 		}
 
-		mpmc_init(&pkg->exported_entity_queue, heap_allocator(), total_pkg_decl_count);
+		mpmc_init(&pkg->exported_entity_queue, total_pkg_decl_count);
 	}
 }
 

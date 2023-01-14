@@ -743,7 +743,7 @@ gb_internal lbValue lb_generate_anonymous_proc_lit(lbModule *m, String const &pr
 	// parent$count
 	isize name_len = prefix_name.len + 1 + 8 + 1;
 	char *name_text = gb_alloc_array(permanent_allocator(), char, name_len);
-	i32 name_id = cast(i32)m->gen->anonymous_proc_lits.entries.count;
+	i32 name_id = cast(i32)m->gen->anonymous_proc_lits.count;
 
 	name_len = gb_snprintf(name_text, name_len, "%.*s$anon-%d", LIT(prefix_name), name_id);
 	String name = make_string((u8 *)name_text, name_len-1);
@@ -1625,7 +1625,7 @@ gb_internal bool lb_llvm_object_generation(lbGenerator *gen, bool do_threading) 
 
 			String filepath_ll = lb_filepath_ll_for_module(m);
 			String filepath_obj = lb_filepath_obj_for_module(m);
-			gb_printf_err("%.*s\n", LIT(filepath_obj));
+			// gb_printf_err("%.*s\n", LIT(filepath_obj));
 			array_add(&gen->output_object_paths, filepath_obj);
 			array_add(&gen->output_temp_paths, filepath_ll);
 
@@ -1977,7 +1977,7 @@ gb_internal bool lb_generate_code(lbGenerator *gen) {
 
 	// NOTE(bill): Target Machine Creation
 	// NOTE(bill, 2021-05-04): Target machines must be unique to each module because they are not thread safe
-	auto target_machines = array_make<LLVMTargetMachineRef>(permanent_allocator(), 0, gen->modules.entries.count);
+	auto target_machines = array_make<LLVMTargetMachineRef>(permanent_allocator(), 0, gen->modules.count);
 
 	// NOTE(dweiler): Dynamic libraries require position-independent code.
 	LLVMRelocMode reloc_mode = LLVMRelocDefault;
@@ -2073,7 +2073,7 @@ gb_internal bool lb_generate_code(lbGenerator *gen) {
 		lbModule *m = default_module;
 
 		{ // Add type info data
-			isize max_type_info_count = info->minimum_dependency_type_info_set.entries.count+1;
+			isize max_type_info_count = info->minimum_dependency_type_info_set.count+1;
 			// gb_printf_err("max_type_info_count: %td\n", max_type_info_count);
 			Type *t = alloc_type_array(t_type_info, max_type_info_count);
 			LLVMValueRef g = LLVMAddGlobal(m->mod, lb_type(m, t), LB_TYPE_INFO_DATA_NAME);
@@ -2330,7 +2330,7 @@ gb_internal bool lb_generate_code(lbGenerator *gen) {
 		}
 	}
 
-	if (gen->modules.entries.count <= 1) {
+	if (gen->modules.count <= 1) {
 		do_threading = false;
 	}
 

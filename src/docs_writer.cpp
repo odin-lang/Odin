@@ -913,7 +913,7 @@ gb_internal OdinDocEntityIndex odin_doc_add_entity(OdinDocWriter *w, Entity *e) 
 gb_internal void odin_doc_update_entities(OdinDocWriter *w) {
 	{
 		// NOTE(bill): Double pass, just in case entities are created on odin_doc_type
-		auto entities = array_make<Entity *>(heap_allocator(), 0, w->entity_cache.entries.count);
+		auto entities = array_make<Entity *>(heap_allocator(), 0, w->entity_cache.count);
 		defer (array_free(&entities));
 
 		for (auto const &entry : w->entity_cache) {
@@ -973,7 +973,7 @@ gb_internal OdinDocArray<OdinDocScopeEntry> odin_doc_add_pkg_entries(OdinDocWrit
 		return {};
 	}
 
-	auto entries = array_make<OdinDocScopeEntry>(heap_allocator(), 0, w->entity_cache.entries.count);
+	auto entries = array_make<OdinDocScopeEntry>(heap_allocator(), 0, w->entity_cache.count);
 	defer (array_free(&entries));
 
 	for (auto const &element : pkg->scope->elements) {

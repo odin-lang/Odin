@@ -1,10 +1,5 @@
 GB_STATIC_ASSERT(sizeof(MapIndex) == sizeof(u32));
 
-enum {
-	STRING_MAP_CACHE_LINE_SIZE_POW = 6,
-	STRING_MAP_CACHE_LINE_SIZE = 1<<STRING_MAP_CACHE_LINE_SIZE_POW,
-	STRING_MAP_CACHE_LINE_MASK = STRING_MAP_CACHE_LINE_SIZE-1,
-};
 
 struct StringHashKey {
 	u32    hash;
@@ -85,13 +80,13 @@ gb_internal gb_inline void string_map_destroy(StringMap<T> *h) {
 
 template <typename T>
 gb_internal void string_map__resize_hashes(StringMap<T> *h, usize count) {
-	h->hashes_count = cast(u32)resize_array_raw(&h->hashes, string_map_allocator(), h->hashes_count, count, STRING_MAP_CACHE_LINE_SIZE);
+	h->hashes_count = cast(u32)resize_array_raw(&h->hashes, string_map_allocator(), h->hashes_count, count, MAP_CACHE_LINE_SIZE);
 }
 
 
 template <typename T>
 gb_internal void string_map__reserve_entries(StringMap<T> *h, usize capacity) {
-	h->entries_capacity = cast(u32)resize_array_raw(&h->entries, string_map_allocator(), h->entries_capacity, capacity, STRING_MAP_CACHE_LINE_SIZE);
+	h->entries_capacity = cast(u32)resize_array_raw(&h->entries, string_map_allocator(), h->entries_capacity, capacity, MAP_CACHE_LINE_SIZE);
 }
 
 
