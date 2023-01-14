@@ -210,7 +210,7 @@ gb_internal void print_doc_package(CheckerInfo *info, AstPackage *pkg) {
 	}
 
 	if (pkg->scope != nullptr) {
-		auto entities = array_make<Entity *>(heap_allocator(), 0, pkg->scope->elements.entries.count);
+		auto entities = array_make<Entity *>(heap_allocator(), 0, pkg->scope->elements.count);
 		defer (array_free(&entities));
 		for (auto const &entry : pkg->scope->elements) {
 			Entity *e = entry.value;
@@ -348,7 +348,7 @@ gb_internal void generate_documentation(Checker *c) {
 
 		odin_doc_write(info, output_file_path);
 	} else {
-		auto pkgs = array_make<AstPackage *>(permanent_allocator(), 0, info->packages.entries.count);
+		auto pkgs = array_make<AstPackage *>(permanent_allocator(), 0, info->packages.count);
 		for (auto const &entry : info->packages) {
 			AstPackage *pkg = entry.value;
 			if (build_context.cmd_doc_flags & CmdDocFlag_AllPackages) {

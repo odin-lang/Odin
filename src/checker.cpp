@@ -765,7 +765,7 @@ gb_internal AstPackage *get_core_package(CheckerInfo *info, String name) {
 		gb_printf_err("Fullpath: %.*s\n", LIT(path));
 		
 		for (auto const &entry : info->packages) {
-			gb_printf_err("%.*s\n", LIT(entry.key.string));
+			gb_printf_err("%.*s\n", LIT(entry.key));
 		}
 		GB_ASSERT_MSG(found != nullptr, "Missing core package %.*s", LIT(name));
 	}
@@ -3891,16 +3891,16 @@ gb_internal bool correct_single_type_alias(CheckerContext *c, Entity *e) {
 }
 
 gb_internal bool correct_type_alias_in_scope_backwards(CheckerContext *c, Scope *s) {
-	isize n = s->elements.entries.count;
 	bool correction = false;
-	for (isize i = n-1; i >= 0; i--) {
+	u32 n = s->elements.count;
+	for (u32 i = n-1; i < n; i--) {
 		correction |= correct_single_type_alias(c, s->elements.entries[i].value);
 	}
 	return correction;
 }
 gb_internal bool correct_type_alias_in_scope_forwards(CheckerContext *c, Scope *s) {
-	isize n = s->elements.entries.count;
 	bool correction = false;
+	u32 n = s->elements.count;
 	for (isize i = 0; i < n; i++) {
 		correction |= correct_single_type_alias(c, s->elements.entries[i].value);
 	}
@@ -5539,7 +5539,7 @@ gb_internal void check_deferred_procedures(Checker *c) {
 
 gb_internal void check_unique_package_names(Checker *c) {
 	StringMap<AstPackage *> pkgs = {}; // Key: package name
-	string_map_init(&pkgs, 2*c->info.packages.entries.count);
+	string_map_init(&pkgs, 2*c->info.packages.count);
 	defer (string_map_destroy(&pkgs));
 
 	for (auto const &entry : c->info.packages) {

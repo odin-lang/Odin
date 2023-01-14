@@ -1035,14 +1035,14 @@ gb_internal void lb_finalize_objc_names(lbProcedure *p) {
 	LLVMSetLinkage(p->value, LLVMInternalLinkage);
 	lb_begin_procedure_body(p);
 	for (auto const &entry : m->objc_classes) {
-		String name = entry.key.string;
+		String name = entry.key;
 		args[0] = lb_const_value(m, t_cstring, exact_value_string(name));
 		lbValue ptr = lb_emit_runtime_call(p, "objc_lookUpClass", args);
 		lb_addr_store(p, entry.value, ptr);
 	}
 
 	for (auto const &entry : m->objc_selectors) {
-		String name = entry.key.string;
+		String name = entry.key;
 		args[0] = lb_const_value(m, t_cstring, exact_value_string(name));
 		lbValue ptr = lb_emit_runtime_call(p, "sel_registerName", args);
 		lb_addr_store(p, entry.value, ptr);

@@ -130,8 +130,8 @@ gb_internal bool lb_init_generator(lbGenerator *gen, Checker *c) {
 
 	gen->info = &c->info;
 
-	map_init(&gen->modules, gen->info->packages.entries.count*2);
-	map_init(&gen->modules_through_ctx, gen->info->packages.entries.count*2);
+	map_init(&gen->modules, gen->info->packages.count*2);
+	map_init(&gen->modules_through_ctx, gen->info->packages.count*2);
 	map_init(&gen->anonymous_proc_lits, 1024);
 
 

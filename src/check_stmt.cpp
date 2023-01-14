@@ -626,7 +626,7 @@ gb_internal bool check_using_stmt_entity(CheckerContext *ctx, AstUsingStmt *us, 
 		defer (rw_mutex_unlock(&scope->mutex));
 
 		for (auto const &entry : scope->elements) {
-			String name = entry.key.string;
+			String name = entry.key;
 			Entity *decl = entry.value;
 			if (!is_entity_exported(decl)) continue;
 
@@ -1323,7 +1323,7 @@ gb_internal void check_block_stmt_for_errors(CheckerContext *ctx, Ast *body)  {
 	ast_node(bs, BlockStmt, body);
 	// NOTE(bill, 2020-09-23): This logic is prevent common erros with block statements
 	// e.g. if cond { x := 123; } // this is an error
-	if (bs->scope != nullptr && bs->scope->elements.entries.count > 0) {
+	if (bs->scope != nullptr && bs->scope->elements.count > 0) {
 		if (bs->scope->parent->node != nullptr) {
 			switch (bs->scope->parent->node->kind) {
 			case Ast_IfStmt:

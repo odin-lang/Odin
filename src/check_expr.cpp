@@ -234,7 +234,7 @@ gb_internal void check_did_you_mean_type(String const &name, Slice<Entity *> con
 gb_internal void check_did_you_mean_scope(String const &name, Scope *scope, char const *prefix = "") {
 	ERROR_BLOCK();
 
-	DidYouMeanAnswers d = did_you_mean_make(heap_allocator(), scope->elements.entries.count, name);
+	DidYouMeanAnswers d = did_you_mean_make(heap_allocator(), scope->elements.count, name);
 	defer (did_you_mean_destroy(&d));
 
 	rw_mutex_shared_lock(&scope->mutex);

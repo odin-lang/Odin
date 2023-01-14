@@ -977,7 +977,7 @@ gb_internal OdinDocArray<OdinDocScopeEntry> odin_doc_add_pkg_entries(OdinDocWrit
 	defer (array_free(&entries));
 
 	for (auto const &element : pkg->scope->elements) {
-		String name = element.key.string;
+		String name = element.key;
 		Entity *e = element.value;
 		switch (e->kind) {
 		case Entity_Invalid:
@@ -1016,7 +1016,7 @@ gb_internal OdinDocArray<OdinDocScopeEntry> odin_doc_add_pkg_entries(OdinDocWrit
 
 
 gb_internal void odin_doc_write_docs(OdinDocWriter *w) {
-	auto pkgs = array_make<AstPackage *>(heap_allocator(), 0, w->info->packages.entries.count);
+	auto pkgs = array_make<AstPackage *>(heap_allocator(), 0, w->info->packages.count);
 	defer (array_free(&pkgs));
 	for (auto const &entry : w->info->packages) {
 		AstPackage *pkg = entry.value;
