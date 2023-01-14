@@ -27,13 +27,17 @@ gb_internal void thread_pool_wait(void) {
 }
 
 
+gb_global BlockingMutex debugf_mutex;
+
 gb_internal void debugf(char const *fmt, ...) {
 	if (build_context.show_debug_messages) {
+		mutex_lock(&debugf_mutex);
 		gb_printf_err("[DEBUG] ");
 		va_list va;
 		va_start(va, fmt);
 		(void)gb_printf_err_va(fmt, va);
 		va_end(va);
+		mutex_unlock(&debugf_mutex);
 	}
 }
 

@@ -1283,7 +1283,7 @@ gb_internal WORKER_TASK_PROC(lb_llvm_emit_worker_proc) {
 		gb_printf_err("LLVM Error: %s\n", llvm_error);
 		gb_exit(1);
 	}
-
+	debugf("Generated File: %.*s\n", LIT(wd->filepath_obj));
 	return 0;
 }
 
@@ -1659,6 +1659,7 @@ gb_internal bool lb_llvm_object_generation(lbGenerator *gen, bool do_threading) 
 				gb_exit(1);
 				return false;
 			}
+			debugf("Generated File: %.*s\n", LIT(filepath_obj));
 		}
 	}
 	return true;

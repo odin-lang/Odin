@@ -5187,8 +5187,6 @@ gb_internal void check_unchecked_bodies(Checker *c) {
 			if (pi->body == nullptr) {
 				continue;
 			}
-
-			debugf("unchecked: %.*s\n", LIT(e->token.string));
 			check_procedure_later(c, pi);
 		}
 	}
@@ -5219,11 +5217,12 @@ gb_internal void check_safety_all_procedures_for_unchecked(Checker *c) {
 		GB_ASSERT(pi->decl != nullptr);
 		Entity *e = pi->decl->entity;
 		auto proc_checked_state = pi->decl->proc_checked_state.load();
+		gb_unused(proc_checked_state);
 		if (e && ((e->flags & EntityFlag_ProcBodyChecked) == 0)) {
 			if ((e->flags & EntityFlag_Used) != 0) {
-				debugf("%.*s :: %s\n", LIT(e->token.string), type_to_string(e->type));
-				debugf("proc body unchecked\n");
-				debugf("Checked State: %s\n\n", ProcCheckedState_strings[proc_checked_state]);
+				// debugf("%.*s :: %s\n", LIT(e->token.string), type_to_string(e->type));
+				// debugf("proc body unchecked\n");
+				// debugf("Checked State: %s\n\n", ProcCheckedState_strings[proc_checked_state]);
 
 				consume_proc_info(c, pi, &untyped);
 			}
