@@ -52,8 +52,8 @@ jobs:
       - name: Odin check examples/all for OpenBSD amd64
         run: ./odin check examples/all -vet -strict-style -target:openbsd_amd64
         timeout-minutes: 10
-  build_macOS:
-    runs-on: macos-latest
+  build_macOS_m1:
+    runs-on: [macos-latest, ARM64]
     steps:
       - uses: actions/checkout@v1
       - name: Download LLVM, botan and setup PATH
@@ -97,8 +97,53 @@ jobs:
           cd tests/internal
           make
         timeout-minutes: 10
-      - name: Odin check examples/all for Darwin arm64
-        run: ./odin check examples/all -vet -strict-style -target:darwin_arm64
+      - name: Odin check examples/all for Linux arm64
+        run: ./odin check examples/all -vet -strict-style -target:linux_arm64
+        timeout-minutes: 10
+  build_macOS_x64:
+    runs-on: [macos-latest, x64]
+    steps:
+      - uses: actions/checkout@v1
+      - name: Download LLVM, botan and setup PATH
+        run: |
+          brew install llvm@11 botan
+          echo "/usr/local/opt/llvm@11/bin" >> $GITHUB_PATH
+          TMP_PATH=$(xcrun --show-sdk-path)/user/include
+          echo "CPATH=$TMP_PATH" >> $GITHUB_ENV
+      - name: build odin
+        run: ./build_odin.sh release
+      - name: Odin version
+        run: ./odin version
+        timeout-minutes: 1
+      - name: Odin report
+        run: ./odin report
+        timeout-minutes: 1
+      - name: Odin check
+        run: ./odin check examples/demo -vet
+        timeout-minutes: 10
+      - name: Odin run
+        run: ./odin run examples/demo
+        timeout-minutes: 10
+      - name: Odin run -debug
+        run: ./odin run examples/demo -debug
+        timeout-minutes: 10
+      - name: Odin check examples/all
+        run: ./odin check examples/all -strict-style
+        timeout-minutes: 10
+      - name: Core library tests
+        run: |
+          cd tests/core
+          make
+        timeout-minutes: 10
+      - name: Vendor library tests
+        run: |
+          cd tests/vendor
+          make
+        timeout-minutes: 10
+      - name: Odin internals tests
+        run: |
+          cd tests/internal
+          make
         timeout-minutes: 10
       - name: Odin check examples/all for Linux arm64
         run: ./odin check examples/all -vet -strict-style -target:linux_arm64
