@@ -2186,25 +2186,25 @@ gb_internal void lb_ensure_abi_function_type(lbModule *m, lbProcedure *p) {
 
 gb_internal void lb_add_entity(lbModule *m, Entity *e, lbValue val) {
 	if (e != nullptr) {
-		mutex_lock(&m->values_mutex);
+		rw_mutex_lock(&m->values_mutex);
 		map_set(&m->values, e, val);
-		mutex_unlock(&m->values_mutex);
+		rw_mutex_unlock(&m->values_mutex);
 	}
 }
 gb_internal void lb_add_member(lbModule *m, String const &name, lbValue val) {
 	if (name.len > 0) {
-		mutex_lock(&m->values_mutex);
+		rw_mutex_lock(&m->values_mutex);
 		string_map_set(&m->members, name, val);
-		mutex_unlock(&m->values_mutex);
+		rw_mutex_unlock(&m->values_mutex);
 	}
 }
 gb_internal void lb_add_procedure_value(lbModule *m, lbProcedure *p) {
-	mutex_lock(&m->values_mutex);
+	rw_mutex_lock(&m->values_mutex);
 	if (p->entity != nullptr) {
 		map_set(&m->procedure_values, p->value, p->entity);
 	}
 	string_map_set(&m->procedures, p->name, p);
-	mutex_unlock(&m->values_mutex);
+	rw_mutex_unlock(&m->values_mutex);
 }
 
 
@@ -2549,9 +2549,9 @@ gb_internal lbValue lb_find_ident(lbProcedure *p, lbModule *m, Entity *e, Ast *e
 	}
 
 	lbValue *found = nullptr;
-	mutex_lock(&m->values_mutex);
+	rw_mutex_shared_lock(&m->values_mutex);
 	found = map_get(&m->values, e);
-	mutex_unlock(&m->values_mutex);
+	rw_mutex_shared_unlock(&m->values_mutex);
 
 	if (found) {
 
@@ -2602,9 +2602,9 @@ gb_internal lbValue lb_find_procedure_value_from_entity(lbModule *m, Entity *e) 
 	GB_ASSERT(e != nullptr);
 
 	lbValue *found = nullptr;
-	mutex_lock(&m->values_mutex);
+	rw_mutex_shared_lock(&m->values_mutex);
 	found = map_get(&m->values, e);
-	mutex_unlock(&m->values_mutex);
+	rw_mutex_shared_unlock(&m->values_mutex);
 	if (found) {
 		return *found;
 	}
@@ -2623,9 +2623,9 @@ gb_internal lbValue lb_find_procedure_value_from_entity(lbModule *m, Entity *e) 
 	lbProcedure *missing_proc = lb_create_procedure(m, e, ignore_body);
 	if (ignore_body) {
 		GB_ASSERT(other_module != nullptr);
-		mutex_lock(&other_module->values_mutex);
+		rw_mutex_shared_lock(&other_module->values_mutex);
 		auto *found = map_get(&other_module->values, e);
-		mutex_unlock(&other_module->values_mutex);
+		rw_mutex_shared_unlock(&other_module->values_mutex);
 		if (found == nullptr) {
 			lbProcedure *missing_proc_in_other_module = lb_create_procedure(other_module, e, false);
 			array_add(&other_module->missing_procedures_to_check, missing_proc_in_other_module);
@@ -2702,9 +2702,9 @@ gb_internal lbValue lb_find_value_from_entity(lbModule *m, Entity *e) {
 	}
 
 	lbValue *found = nullptr;
-	mutex_lock(&m->values_mutex);
+	rw_mutex_shared_lock(&m->values_mutex);
 	found = map_get(&m->values, e);
-	mutex_unlock(&m->values_mutex);
+	rw_mutex_shared_unlock(&m->values_mutex);
 	if (found) {
 		return *found;
 	}
