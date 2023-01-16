@@ -5,14 +5,13 @@ struct ThreadPool;
 
 gb_thread_local Thread *current_thread;
 
-gb_internal void thread_pool_init(ThreadPool *pool, gbAllocator const &a, isize worker_count, char const *worker_name);
+gb_internal void thread_pool_init(ThreadPool *pool, isize worker_count, char const *worker_name);
 gb_internal void thread_pool_destroy(ThreadPool *pool);
 gb_internal bool thread_pool_add_task(ThreadPool *pool, WorkerTaskProc *proc, void *data);
 gb_internal void thread_pool_wait(ThreadPool *pool);
 
 struct ThreadPool {
-	gbAllocator   allocator;
-
+	gbAllocator threads_allocator;
 	Slice<Thread> threads;
 	std::atomic<bool> running;
 
@@ -25,9 +24,9 @@ gb_internal isize current_thread_index(void) {
 	return current_thread ? current_thread->idx : 0;
 }
 
-gb_internal void thread_pool_init(ThreadPool *pool, gbAllocator const &a, isize worker_count, char const *worker_name) {
-	pool->allocator = a;
-	slice_init(&pool->threads, a, worker_count + 1);
+gb_internal void thread_pool_init(ThreadPool *pool, isize worker_count, char const *worker_name) {
+	pool->threads_allocator = permanent_allocator();
+	slice_init(&pool->threads, pool->threads_allocator, worker_count + 1);
 
 	// NOTE: this needs to be initialized before any thread starts
 	pool->running.store(true, std::memory_order_seq_cst);
@@ -52,7 +51,7 @@ gb_internal void thread_pool_destroy(ThreadPool *pool) {
 		thread_join_and_destroy(t);
 	}
 
-	gb_free(pool->allocator, pool->threads.data);
+	gb_free(pool->threads_allocator, pool->threads.data);
 }
 
 void thread_pool_queue_push(Thread *thread, WorkerTask task) {
