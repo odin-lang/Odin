@@ -7535,7 +7535,7 @@ gb_internal ExprKind check_ternary_if_expr(CheckerContext *c, Operand *o, Ast *n
 
 	o->mode = Addressing_Value;
 	o->expr = node;
-	if (type_hint != nullptr && is_type_untyped(o->type)) {
+	if (type_hint != nullptr && is_type_untyped(o->type) && !is_type_any(type_hint)) {
 		if (check_cast_internal(c, &x, type_hint) &&
 		    check_cast_internal(c, &y, type_hint)) {
 			convert_to_typed(c, o, type_hint);
