@@ -823,6 +823,7 @@ get_current_directory :: proc() -> string {
 			return strings.string_from_nul_terminated_ptr(&buf[0], len(buf))
 		}
 		if _get_errno(res) != ERANGE {
+			delete(buf)
 			return ""
 		}
 		resize(&buf, len(buf)+page_size)

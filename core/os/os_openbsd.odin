@@ -649,6 +649,7 @@ get_current_directory :: proc() -> string {
 			return string(cwd)
 		}
 		if Errno(get_last_error()) != ERANGE {
+			delete(buf)
 			return ""
 		}
 		resize(&buf, len(buf) + MAX_PATH)
