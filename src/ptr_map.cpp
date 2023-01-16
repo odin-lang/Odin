@@ -100,12 +100,12 @@ gb_internal gb_inline void map_destroy(PtrMap<K, V> *h) {
 
 template <typename K, typename V>
 gb_internal void map__resize_hashes(PtrMap<K, V> *h, usize count) {
-	h->hashes_count = cast(u32)resize_array_raw(&h->hashes, string_map_allocator(), h->hashes_count, count, MAP_CACHE_LINE_SIZE);
+	h->hashes_count = cast(u32)resize_array_raw(&h->hashes, map_allocator(), h->hashes_count, count, MAP_CACHE_LINE_SIZE);
 }
 
 template <typename K, typename V>
 gb_internal void map__reserve_entries(PtrMap<K, V> *h, usize capacity) {
-	h->entries_capacity = cast(u32)resize_array_raw(&h->entries, string_map_allocator(), h->entries_capacity, capacity, MAP_CACHE_LINE_SIZE);
+	h->entries_capacity = cast(u32)resize_array_raw(&h->entries, map_allocator(), h->entries_capacity, capacity, MAP_CACHE_LINE_SIZE);
 }
 
 
