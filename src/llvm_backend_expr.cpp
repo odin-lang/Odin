@@ -3097,6 +3097,9 @@ gb_internal lbValue lb_build_expr_internal(lbProcedure *p, Ast *expr) {
 
 		// NOTE(bill): Short on constant values
 		return lb_const_value(p->module, type, tv.value);
+	} else if (tv.mode == Addressing_Type) {
+		// NOTE(bill, 2023-01-16): is this correct? I hope so at least
+		return lb_typeid(m, tv.type);
 	}
 
 	switch (expr->kind) {

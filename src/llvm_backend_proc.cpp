@@ -3125,6 +3125,8 @@ gb_internal lbValue lb_build_call_expr_internal(lbProcedure *p, Ast *expr) {
 				GB_ASSERT(e->kind == Entity_Variable);
 				if (args[i].value == nullptr) {
 					args[i] = lb_handle_param_value(p, e->type, e->Variable.param_value, ast_token(expr).pos);
+				} else if (is_type_typeid(e->type) && !is_type_typeid(args[i].type)) {
+					args[i] = lb_typeid(p->module, args[i].type);
 				} else {
 					args[i] = lb_emit_conv(p, args[i], e->type);
 				}
@@ -3274,7 +3276,12 @@ gb_internal lbValue lb_build_call_expr_internal(lbProcedure *p, Ast *expr) {
 						continue;
 					}
 					GB_ASSERT_MSG(args[i].value != nullptr, "%.*s", LIT(e->token.string));
-					args[i] = lb_emit_conv(p, args[i], e->type);
+					if (is_type_typeid(e->type) && !is_type_typeid(args[i].type)) {
+						GB_ASSERT(LLVMIsNull(args[i].value));
+						args[i] = lb_typeid(p->module, args[i].type);
+					} else {
+						args[i] = lb_emit_conv(p, args[i], e->type);
+					}
 				}
 			}
 		}
