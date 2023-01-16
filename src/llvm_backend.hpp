@@ -143,7 +143,7 @@ struct lbModule {
 	PtrMap<void *, lbStructFieldRemapping> struct_field_remapping; // Key: LLVMTypeRef or Type *
 	i32 internal_type_level;
 
-	RecursiveMutex values_mutex;
+	BlockingMutex values_mutex;
 
 	PtrMap<Entity *, lbValue> values;           
 	PtrMap<Entity *, lbAddr>  soa_values;       

@@ -2547,11 +2547,14 @@ gb_internal lbValue lb_find_ident(lbProcedure *p, lbModule *m, Entity *e, Ast *e
 			return *found;
 		}
 	}
-	mutex_lock(&m->values_mutex);
-	defer (mutex_unlock(&m->values_mutex));
 
-	auto *found = map_get(&m->values, e);
+	lbValue *found = nullptr;
+	mutex_lock(&m->values_mutex);
+	found = map_get(&m->values, e);
+	mutex_unlock(&m->values_mutex);
+
 	if (found) {
+
 		auto v = *found;
 		// NOTE(bill): This is because pointers are already pointers in LLVM
 		if (is_type_proc(v.type)) {
@@ -2598,10 +2601,10 @@ gb_internal lbValue lb_find_procedure_value_from_entity(lbModule *m, Entity *e) 
 	e = strip_entity_wrapping(e);
 	GB_ASSERT(e != nullptr);
 
+	lbValue *found = nullptr;
 	mutex_lock(&m->values_mutex);
-	defer (mutex_unlock(&m->values_mutex));
-
-	auto *found = map_get(&m->values, e);
+	found = map_get(&m->values, e);
+	mutex_unlock(&m->values_mutex);
 	if (found) {
 		return *found;
 	}
@@ -2698,11 +2701,10 @@ gb_internal lbValue lb_find_value_from_entity(lbModule *m, Entity *e) {
 		return lb_find_procedure_value_from_entity(m, e);
 	}
 
+	lbValue *found = nullptr;
 	mutex_lock(&m->values_mutex);
-	defer (mutex_unlock(&m->values_mutex));
-
-
-	auto *found = map_get(&m->values, e);
+	found = map_get(&m->values, e);
+	mutex_unlock(&m->values_mutex);
 	if (found) {
 		return *found;
 	}
