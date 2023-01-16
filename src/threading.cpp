@@ -1,9 +1,29 @@
 #if defined(GB_SYSTEM_LINUX)
 #include <signal.h>
+#if __has_include(<valgrind/helgrind.h>)
+#include <valgrind/helgrind.h>
+#define HAS_VALGRIND
+#endif
 #endif
 #if defined(GB_SYSTEM_WINDOWS)
 	#pragma warning(push)
 	#pragma warning(disable: 4505)
+#endif
+
+#if defined(HAS_VALGRIND)
+#define ANNOTATE_LOCK_PRE(m, t) VALGRIND_HG_MUTEX_LOCK_PRE(m, t)
+#define ANNOTATE_LOCK_POST(m) VALGRIND_HG_MUTEX_LOCK_POST(m)
+#define ANNOTATE_UNLOCK_PRE(m) VALGRIND_HG_MUTEX_UNLOCK_PRE(m)
+#define ANNOTATE_UNLOCK_POST(m) VALGRIND_HG_MUTEX_UNLOCK_POST(m)
+#define ANNOTATE_SEM_WAIT_POST(s) VALGRIND_HG_SEM_WAIT_POST(s)
+#define ANNOTATE_SEM_POST_PRE(s) VALGRIND_HG_SEM_POST_PRE(s)
+#else
+#define ANNOTATE_LOCK_PRE(m, t)
+#define ANNOTATE_LOCK_POST(m)
+#define ANNOTATE_UNLOCK_PRE(m)
+#define ANNOTATE_UNLOCK_POST(m)
+#define ANNOTATE_SEM_WAIT_POST(s)
+#define ANNOTATE_SEM_POST_PRE(s)
 #endif
 
 struct BlockingMutex;
@@ -32,7 +52,7 @@ struct Thread {
 #else
 	pthread_t posix_handle;
 #endif
-	
+
 	isize idx;
 
 	WorkerTask *queue;
@@ -208,7 +228,7 @@ gb_internal void semaphore_wait(Semaphore *s) {
 	struct Condition {
 		CONDITION_VARIABLE cond;
 	};
-	
+
 	gb_internal void condition_broadcast(Condition *c) {
 		WakeAllConditionVariable(&c->cond);
 	}
@@ -250,6 +270,14 @@ gb_internal void semaphore_wait(Semaphore *s) {
 	};
 
 	struct BlockingMutex {
+		#if defined(HAS_VALGRIND)
+		BlockingMutex() {
+			VALGRIND_HG_MUTEX_INIT_POST(this, 0);
+		}
+		~BlockingMutex() {
+			VALGRIND_HG_MUTEX_DESTROY_PRE(this);
+		}
+		#endif
 		i32 state_;
 
 		Futex &state() {
@@ -289,14 +317,21 @@ gb_internal void semaphore_wait(Semaphore *s) {
 	}
 
 	gb_internal void mutex_lock(BlockingMutex *m) {
+		ANNOTATE_LOCK_PRE(m, 0);
 		i32 v = m->state().exchange(Internal_Mutex_State_Locked, std::memory_order_acquire);
 		if (v != Internal_Mutex_State_Unlocked) {
 			mutex_lock_slow(m, v);
 		}
+		ANNOTATE_LOCK_POST(m);
 	}
 	gb_internal bool mutex_try_lock(BlockingMutex *m) {
+		ANNOTATE_LOCK_PRE(m, 1);
 		i32 v = m->state().exchange(Internal_Mutex_State_Locked, std::memory_order_acquire);
-		return v == Internal_Mutex_State_Unlocked;
+		if (v == Internal_Mutex_State_Unlocked) {
+			ANNOTATE_LOCK_POST(m);
+			return true;
+		}
+		return false;
 	}
 
 	gb_no_inline gb_internal void mutex_unlock_slow(BlockingMutex *m) {
@@ -304,6 +339,7 @@ gb_internal void semaphore_wait(Semaphore *s) {
 	}
 
 	gb_internal void mutex_unlock(BlockingMutex *m) {
+		ANNOTATE_UNLOCK_PRE(m);
 		i32 v = m->state().exchange(Internal_Mutex_State_Unlocked, std::memory_order_release);
 		switch (v) {
 		case Internal_Mutex_State_Unlocked:
@@ -316,8 +352,9 @@ gb_internal void semaphore_wait(Semaphore *s) {
 			mutex_unlock_slow(m);
 			break;
 		}
+		ANNOTATE_UNLOCK_POST(m);
 	}
-		
+
 	struct Condition {
 		i32 state_;
 
@@ -472,7 +509,7 @@ gb_internal void *internal_thread_proc(void *arg) {
 	sigfillset(&mask);
 	GB_ASSERT_MSG(pthread_sigmask(SIG_BLOCK, &mask, nullptr) == 0, "failed to block signals");
 #endif
-	
+
 	Thread *t = cast(Thread *)arg;
 	thread_pool_thread_proc(t);
 	return NULL;
