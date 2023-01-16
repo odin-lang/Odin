@@ -7323,8 +7323,10 @@ gb_internal void check_matrix_index_expr(CheckerContext *c, Operand *o, Ast *nod
 	i64 column_index = 0;
 	bool row_ok = check_index_value(c, t, false, ie->row_index, row_count, &row_index, nullptr);
 	bool column_ok = check_index_value(c, t, false, ie->column_index, column_count, &column_index, nullptr);
-	
-	
+	if (is_const && (ie->row_index->tav.mode != Addressing_Constant || ie->column_index->tav.mode != Addressing_Constant)) {
+		error(o->expr, "Cannot index constant matrix with non-constant indices '%s'", expr_to_string(node));
+	}
+
 	gb_unused(row_ok);
 	gb_unused(column_ok);
 }
