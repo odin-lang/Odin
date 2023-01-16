@@ -661,9 +661,10 @@ union_variant_typeid :: proc(a: any) -> typeid {
 		case: unimplemented()
 		}
 
-		if a.data != nil && tag != 0 {
-			i := tag if info.no_nil else tag-1
-			return info.variants[i].id
+		if info.no_nil {
+			return info.variants[tag].id
+		} else if tag != 0 {
+			return info.variants[tag-1].id
 		}
 
 		return nil
