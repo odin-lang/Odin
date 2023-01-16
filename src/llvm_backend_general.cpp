@@ -2622,11 +2622,11 @@ gb_internal lbValue lb_find_procedure_value_from_entity(lbModule *m, Entity *e) 
 		GB_ASSERT(other_module != nullptr);
 		mutex_lock(&other_module->values_mutex);
 		auto *found = map_get(&other_module->values, e);
+		mutex_unlock(&other_module->values_mutex);
 		if (found == nullptr) {
 			lbProcedure *missing_proc_in_other_module = lb_create_procedure(other_module, e, false);
 			array_add(&other_module->missing_procedures_to_check, missing_proc_in_other_module);
 		}
-		mutex_unlock(&other_module->values_mutex);
 	} else {
 		array_add(&m->missing_procedures_to_check, missing_proc);
 	}
