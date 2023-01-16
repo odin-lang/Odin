@@ -4896,6 +4896,17 @@ gb_internal bool is_type_normal_pointer(Type *ptr, Type **elem) {
 	return false;
 }
 
+gb_internal bool is_type_valid_atomic_type(Type *elem) {
+	elem = core_type(elem);
+	if (elem->kind == Type_BitSet) {
+		elem = bit_set_to_int(elem);
+	}
+	if (elem->kind != Type_Basic) {
+		return false;
+	}
+	return (elem->Basic.flags & (BasicFlag_Boolean|BasicFlag_OrderedNumeric)) != 0;
+}
+
 gb_internal bool check_identifier_exists(Scope *s, Ast *node, bool nested = false, Scope **out_scope = nullptr) {
 	switch (node->kind) {
 	case_ast_node(i, Ident, node);

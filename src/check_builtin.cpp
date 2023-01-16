@@ -1188,6 +1188,15 @@ gb_internal bool is_valid_type_for_load(Type *type) {
 	return false;
 }
 
+gb_internal bool check_atomic_ptr_argument(Operand *operand, String const &builtin_name, Type *elem) {
+	if (!is_type_valid_atomic_type(elem)) {
+		error(operand->expr, "Only an integer, floating-point, boolean, or pointer can be used as an atomic for '%.*s'", LIT(builtin_name));
+		return false;
+	}
+	return true;
+
+}
+
 gb_internal LoadDirectiveResult check_load_directive(CheckerContext *c, Operand *operand, Ast *call, Type *type_hint, bool err_on_not_found) {
 	ast_node(ce, CallExpr, call);
 	ast_node(bd, BasicDirective, ce->proc);
@@ -4246,6 +4255,9 @@ gb_internal bool check_builtin_procedure(CheckerContext *c, Operand *operand, As
 				error(operand->expr, "Expected a pointer for '%.*s'", LIT(builtin_name));
 				return false;
 			}
+			if (id == BuiltinProc_atomic_store && !check_atomic_ptr_argument(operand, builtin_name, elem)) {
+				return false;
+			}
 			Operand x = {};
 			check_expr_with_type_hint(c, &x, ce->args[1], elem);
 			check_assignment(c, &x, elem, builtin_name);
@@ -4260,6 +4272,9 @@ gb_internal bool check_builtin_procedure(CheckerContext *c, Operand *operand, As
 			Type *elem = nullptr;
 			if (!is_type_normal_pointer(operand->type, &elem)) {
 				error(operand->expr, "Expected a pointer for '%.*s'", LIT(builtin_name));
+				return false;
+			}
+			if (!check_atomic_ptr_argument(operand, builtin_name, elem)) {
 				return false;
 			}
 			Operand x = {};
@@ -4294,6 +4309,10 @@ gb_internal bool check_builtin_procedure(CheckerContext *c, Operand *operand, As
 				error(operand->expr, "Expected a pointer for '%.*s'", LIT(builtin_name));
 				return false;
 			}
+			if (id == BuiltinProc_atomic_load && !check_atomic_ptr_argument(operand, builtin_name, elem)) {
+				return false;
+			}
+
 			operand->type = elem;
 			operand->mode = Addressing_Value;
 			break;
@@ -4304,6 +4323,9 @@ gb_internal bool check_builtin_procedure(CheckerContext *c, Operand *operand, As
 			Type *elem = nullptr;
 			if (!is_type_normal_pointer(operand->type, &elem)) {
 				error(operand->expr, "Expected a pointer for '%.*s'", LIT(builtin_name));
+				return false;
+			}
+			if (!check_atomic_ptr_argument(operand, builtin_name, elem)) {
 				return false;
 			}
 
@@ -4335,6 +4357,9 @@ gb_internal bool check_builtin_procedure(CheckerContext *c, Operand *operand, As
 			Type *elem = nullptr;
 			if (!is_type_normal_pointer(operand->type, &elem)) {
 				error(operand->expr, "Expected a pointer for '%.*s'", LIT(builtin_name));
+				return false;
+			}
+			if (!check_atomic_ptr_argument(operand, builtin_name, elem)) {
 				return false;
 			}
 			Operand x = {};
@@ -4372,6 +4397,9 @@ gb_internal bool check_builtin_procedure(CheckerContext *c, Operand *operand, As
 			Type *elem = nullptr;
 			if (!is_type_normal_pointer(operand->type, &elem)) {
 				error(operand->expr, "Expected a pointer for '%.*s'", LIT(builtin_name));
+				return false;
+			}
+			if (!check_atomic_ptr_argument(operand, builtin_name, elem)) {
 				return false;
 			}
 			Operand x = {};
@@ -4412,6 +4440,9 @@ gb_internal bool check_builtin_procedure(CheckerContext *c, Operand *operand, As
 				error(operand->expr, "Expected a pointer for '%.*s'", LIT(builtin_name));
 				return false;
 			}
+			if (!check_atomic_ptr_argument(operand, builtin_name, elem)) {
+				return false;
+			}
 			Operand x = {};
 			Operand y = {};
 			check_expr_with_type_hint(c, &x, ce->args[1], elem);
@@ -4437,6 +4468,9 @@ gb_internal bool check_builtin_procedure(CheckerContext *c, Operand *operand, As
 			Type *elem = nullptr;
 			if (!is_type_normal_pointer(operand->type, &elem)) {
 				error(operand->expr, "Expected a pointer for '%.*s'", LIT(builtin_name));
+				return false;
+			}
+			if (!check_atomic_ptr_argument(operand, builtin_name, elem)) {
 				return false;
 			}
 			Operand x = {};
