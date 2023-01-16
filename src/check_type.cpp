@@ -1619,10 +1619,6 @@ gb_internal Type *check_get_params(CheckerContext *ctx, Scope *scope, Ast *_para
 					}
 				}
 
-				if (p->flags&FieldFlag_auto_cast) {
-					error(name, "'auto_cast' can only be applied to variable fields");
-					p->flags &= ~FieldFlag_auto_cast;
-				}
 				if (p->flags&FieldFlag_const) {
 					error(name, "'#const' can only be applied to variable fields");
 					p->flags &= ~FieldFlag_const;
@@ -1681,11 +1677,7 @@ gb_internal Type *check_get_params(CheckerContext *ctx, Scope *scope, Ast *_para
 					}
 					if (type != t_invalid && !check_is_assignable_to(ctx, &op, type)) {
 						bool ok = true;
-						if (p->flags&FieldFlag_auto_cast) {
-							if (!check_is_castable_to(ctx, &op, type)) {
-								ok = false;
-							}
-						} else if (p->flags&FieldFlag_any_int) {
+						if (p->flags&FieldFlag_any_int) {
 							if ((!is_type_integer(op.type) && !is_type_enum(op.type)) || (!is_type_integer(type) && !is_type_enum(type))) {
 								ok = false;
 							} else if (!check_is_castable_to(ctx, &op, type)) {
@@ -1731,10 +1723,6 @@ gb_internal Type *check_get_params(CheckerContext *ctx, Scope *scope, Ast *_para
 						error(name, "'#no_alias' can only be applied to non constant values");
 						p->flags &= ~FieldFlag_no_alias; // Remove the flag
 					}
-					if (p->flags&FieldFlag_auto_cast) {
-						error(name, "'auto_cast' can only be applied to variable fields");
-						p->flags &= ~FieldFlag_auto_cast;
-					}
 					if (p->flags&FieldFlag_any_int) {
 						error(name, "'#any_int' can only be applied to variable fields");
 						p->flags &= ~FieldFlag_any_int;
@@ -1764,9 +1752,6 @@ gb_internal Type *check_get_params(CheckerContext *ctx, Scope *scope, Ast *_para
 			}
 			if (p->flags&FieldFlag_no_alias) {
 				param->flags |= EntityFlag_NoAlias;
-			}
-			if (p->flags&FieldFlag_auto_cast) {
-				param->flags |= EntityFlag_AutoCast;
 			}
 			if (p->flags&FieldFlag_any_int) {
 				if (!is_type_integer(param->type) && !is_type_enum(param->type)) {

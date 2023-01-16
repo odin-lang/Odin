@@ -150,14 +150,14 @@ make_soa_dynamic_array :: proc($T: typeid/#soa[dynamic]$E, allocator := context.
 }
 
 @builtin
-make_soa_dynamic_array_len :: proc($T: typeid/#soa[dynamic]$E, auto_cast length: int, allocator := context.allocator, loc := #caller_location) -> (array: T) {
+make_soa_dynamic_array_len :: proc($T: typeid/#soa[dynamic]$E, #any_int length: int, allocator := context.allocator, loc := #caller_location) -> (array: T) {
 	context.allocator = allocator
 	resize_soa(&array, length, loc)
 	return
 }
 
 @builtin
-make_soa_dynamic_array_len_cap :: proc($T: typeid/#soa[dynamic]$E, auto_cast length, capacity: int, allocator := context.allocator, loc := #caller_location) -> (array: T) {
+make_soa_dynamic_array_len_cap :: proc($T: typeid/#soa[dynamic]$E, #any_int length, capacity: int, allocator := context.allocator, loc := #caller_location) -> (array: T) {
 	context.allocator = allocator
 	if reserve_soa(&array, capacity, loc) {
 		resize_soa(&array, length, loc)

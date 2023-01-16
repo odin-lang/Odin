@@ -5321,9 +5321,7 @@ gb_internal CALL_ARGUMENT_CHECKER(check_call_arguments_internal) {
 				i64 s = 0;
 				if (!check_is_assignable_to_with_score(c, &o, t, &s, param_is_variadic)) {
 					bool ok = false;
-					if (e->flags & EntityFlag_AutoCast) {
-						ok = check_is_castable_to(c, &o, t);
-					} else if (e->flags & EntityFlag_AnyInt) {
+					if (e->flags & EntityFlag_AnyInt) {
 						if (is_type_integer(t)) {
 							ok = check_is_castable_to(c, &o, t);
 						}
@@ -5592,9 +5590,6 @@ gb_internal CALL_ARGUMENT_CHECKER(check_named_call_arguments) {
 			i64 s = 0;
 			if (!check_is_assignable_to_with_score(c, o, e->type, &s, param_is_variadic)) {
 				bool ok = false;
-				if (e->flags & EntityFlag_AutoCast) {
-					ok = check_is_castable_to(c, o, e->type);
-				}
 				if (ok) {
 					s = assign_score_function(MAXIMUM_TYPE_DISTANCE);
 				} else {
@@ -10242,9 +10237,6 @@ gb_internal gbString write_expr_to_string(gbString str, Ast *node, bool shorthan
 		}
 		if (f->flags&FieldFlag_c_vararg) {
 			str = gb_string_appendc(str, "#c_vararg ");
-		}
-		if (f->flags&FieldFlag_auto_cast) {
-			str = gb_string_appendc(str, "auto_cast ");
 		}
 		if (f->flags&FieldFlag_any_int) {
 			str = gb_string_appendc(str, "#any_int ");

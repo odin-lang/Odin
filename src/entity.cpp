@@ -61,7 +61,7 @@ enum EntityFlag : u64 {
 	EntityFlag_ProcBodyChecked = 1ull<<21,
 
 	EntityFlag_CVarArg       = 1ull<<22,
-	EntityFlag_AutoCast      = 1ull<<23,
+
 	EntityFlag_AnyInt        = 1ull<<24,
 
 	EntityFlag_Disabled      = 1ull<<25,

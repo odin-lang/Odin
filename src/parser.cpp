@@ -3524,7 +3524,6 @@ struct ParseFieldPrefixMapping {
 
 gb_global ParseFieldPrefixMapping parse_field_prefix_mappings[] = {
 	{str_lit("using"),      Token_using,     FieldFlag_using},
-	{str_lit("auto_cast"),  Token_auto_cast, FieldFlag_auto_cast},
 	{str_lit("no_alias"),   Token_Hash,      FieldFlag_no_alias},
 	{str_lit("c_vararg"),   Token_Hash,      FieldFlag_c_vararg},
 	{str_lit("const"),      Token_Hash,      FieldFlag_const},
@@ -3541,9 +3540,6 @@ gb_internal FieldFlag is_token_field_prefix(AstFile *f) {
 
 	case Token_using:
 		return FieldFlag_using;
-
-	case Token_auto_cast:
-		return FieldFlag_auto_cast;
 
 	case Token_Hash:
 		advance_token(f);

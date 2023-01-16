@@ -312,7 +312,7 @@ enum FieldFlag : u32 {
 	FieldFlag_using     = 1<<1,
 	FieldFlag_no_alias  = 1<<2,
 	FieldFlag_c_vararg  = 1<<3,
-	FieldFlag_auto_cast = 1<<4,
+
 	FieldFlag_const     = 1<<5,
 	FieldFlag_any_int   = 1<<6,
 	FieldFlag_subtype   = 1<<7,
@@ -327,7 +327,7 @@ enum FieldFlag : u32 {
 	FieldFlag_Invalid   = 1u<<31,
 
 	// Parameter List Restrictions
-	FieldFlag_Signature = FieldFlag_ellipsis|FieldFlag_using|FieldFlag_no_alias|FieldFlag_c_vararg|FieldFlag_auto_cast|FieldFlag_const|FieldFlag_any_int|FieldFlag_by_ptr,
+	FieldFlag_Signature = FieldFlag_ellipsis|FieldFlag_using|FieldFlag_no_alias|FieldFlag_c_vararg|FieldFlag_const|FieldFlag_any_int|FieldFlag_by_ptr,
 	FieldFlag_Struct    = FieldFlag_using|FieldFlag_subtype|FieldFlag_Tags,
 };
 
