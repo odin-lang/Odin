@@ -4949,7 +4949,7 @@ gb_internal void parser_add_foreign_file_to_process(Parser *p, AstPackage *pkg, 
 
 
 // NOTE(bill): Returns true if it's added
-gb_internal AstPackage *try_add_import_path(Parser *p, String const &path, String const &rel_path, TokenPos pos, PackageKind kind = Package_Normal) {
+gb_internal AstPackage *try_add_import_path(Parser *p, String path, String const &rel_path, TokenPos pos, PackageKind kind = Package_Normal) {
 	String const FILE_EXT = str_lit(".odin");
 
 	MUTEX_GUARD_BLOCK(&p->imported_files_mutex) {
@@ -4957,6 +4957,8 @@ gb_internal AstPackage *try_add_import_path(Parser *p, String const &path, Strin
 			return nullptr;
 		}
 	}
+
+	path = copy_string(permanent_allocator(), path);
 
 	AstPackage *pkg = gb_alloc_item(permanent_allocator(), AstPackage);
 	pkg->kind = kind;
@@ -5715,6 +5717,7 @@ gb_internal ParseFileError process_imported_file(Parser *p, ImportedFile importe
 			array_add(&pkg->files, file);
 		}
 
+		mutex_lock(&pkg->name_mutex);
 		if (pkg->name.len == 0) {
 			pkg->name = file->package_name;
 		} else if (pkg->name != file->package_name) {
@@ -5726,6 +5729,7 @@ gb_internal ParseFileError process_imported_file(Parser *p, ImportedFile importe
 				syntax_error(tok, "Different package name, expected '%.*s', got '%.*s'", LIT(pkg->name), LIT(file->package_name));
 			}
 		}
+		mutex_unlock(&pkg->name_mutex);
 
 		p->total_line_count.fetch_add(file->tokenizer.line_count);
 		p->total_token_count.fetch_add(file->tokens.count);
