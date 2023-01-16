@@ -304,10 +304,10 @@ gb_internal lbValue lb_hasher_proc_for_type(lbModule *m, Type *type) {
 		return {(*found)->value, (*found)->type};
 	}
 
-	static u32 proc_index = 0;
+	static std::atomic<u32> proc_index = 0;
 
 	char buf[32] = {};
-	isize n = gb_snprintf(buf, 32, "__$hasher%u", ++proc_index);
+	isize n = gb_snprintf(buf, 32, "__$hasher%u", 1+proc_index.fetch_add(1));
 	char *str = gb_alloc_str_len(permanent_allocator(), buf, n-1);
 	String proc_name = make_string_c(str);
 
