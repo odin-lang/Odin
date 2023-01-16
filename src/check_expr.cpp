@@ -4898,6 +4898,9 @@ gb_internal bool is_type_normal_pointer(Type *ptr, Type **elem) {
 
 gb_internal bool is_type_valid_atomic_type(Type *elem) {
 	elem = core_type(elem);
+	if (is_type_internally_pointer_like(elem)) {
+		return true;
+	}
 	if (elem->kind == Type_BitSet) {
 		elem = bit_set_to_int(elem);
 	}

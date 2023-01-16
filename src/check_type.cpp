@@ -1655,6 +1655,12 @@ gb_internal Type *check_get_params(CheckerContext *ctx, Scope *scope, Ast *_para
 						} else if (!ctx->no_polymorphic_errors) {
 							// NOTE(bill): The type should be determined now and thus, no need to determine the type any more
 							is_type_polymorphic_type = false;
+							Entity *proc_entity = entity_from_expr(op.expr);
+							if ((proc_entity != nullptr) && (op.value.kind == ExactValue_Procedure)) {
+								if (is_type_polymorphic(proc_entity->type, false)) {
+									error(op.expr, "Cannot determine complete type of partial polymorphic procedure");
+								}
+							}
 						}
 					}
 					if (is_poly_name) {
