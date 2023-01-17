@@ -45,3 +45,9 @@ Size :: struct {
 	width:  Float,
 	height: Float,
 }
+
+when size_of(UInteger) == 8 {
+	_UINTEGER_ENCODING :: "Q"
+} else {
+	_UINTEGER_ENCODING :: "I"
+}
