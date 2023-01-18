@@ -509,6 +509,11 @@ gb_internal bool lb_is_matrix_simdable(Type *t) {
 	case TargetArch_arm64:
 		break;
 	}
+
+	if (type_align_of(t) < 16) {
+		// it's not aligned well enough to use the vector instructions
+		return false;
+	}
 	
 	if (elem->kind == Type_Basic) {
 		switch (elem->Basic.kind) {
