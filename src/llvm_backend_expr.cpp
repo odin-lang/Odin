@@ -1168,6 +1168,9 @@ gb_internal lbValue lb_emit_arith(lbProcedure *p, TokenKind op, lbValue lhs, lbV
 		}
 	}
 
+	lhs = lb_emit_conv(p, lhs, type);
+	rhs = lb_emit_conv(p, rhs, type);
+
 	if (is_type_integer(type) && is_type_different_to_arch_endianness(type)) {
 		switch (op) {
 		case Token_AndNot:
@@ -1196,10 +1199,7 @@ gb_internal lbValue lb_emit_arith(lbProcedure *p, TokenKind op, lbValue lhs, lbV
 		return lb_emit_byte_swap(p, res, type);
 	}
 
-handle_op:
-	lhs = lb_emit_conv(p, lhs, type);
-	rhs = lb_emit_conv(p, rhs, type);
-
+handle_op:;
 	lbValue res = {};
 	res.type = type;
 
