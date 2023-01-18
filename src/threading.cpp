@@ -85,9 +85,8 @@ gb_internal void rw_mutex_shared_lock    (RwMutex *m);
 gb_internal bool rw_mutex_try_shared_lock(RwMutex *m);
 gb_internal void rw_mutex_shared_unlock  (RwMutex *m);
 
-gb_internal void semaphore_post   (Semaphore *s, i32 count);
-gb_internal void semaphore_wait   (Semaphore *s);
-gb_internal void semaphore_release(Semaphore *s) { semaphore_post(s, 1); }
+gb_internal void semaphore_post(Semaphore *s, i32 count);
+gb_internal void semaphore_wait(Semaphore *s);
 
 
 gb_internal void condition_broadcast(Condition *c);
@@ -186,26 +185,32 @@ gb_internal void mutex_unlock(RecursiveMutex *m) {
 }
 
 struct Semaphore {
-	Futex count;
+	Footex count_;
+	Futex &count() noexcept {
+		return *(Futex *)&this->count_;
+	}
+	Futex const &count() const noexcept {
+		return *(Futex *)&this->count_;
+	}
 };
 
 gb_internal void semaphore_post(Semaphore *s, i32 count) {
-	s->count.fetch_add(count, std::memory_order_release);
-	if (s->count == 1) {
-		futex_signal(&s->count);
+	s->count().fetch_add(count, std::memory_order_release);
+	if (s->count().load() == 1) {
+		futex_signal(&s->count());
 	} else {
-		futex_broadcast(&s->count);
+		futex_broadcast(&s->count());
 	}
 }
 gb_internal void semaphore_wait(Semaphore *s) {
 	for (;;) {
-		i32 original_count = s->count.load(std::memory_order_relaxed);
+		i32 original_count = s->count().load(std::memory_order_relaxed);
 		while (original_count == 0) {
-			futex_wait(&s->count, original_count);
-			original_count = s->count;
+			futex_wait(&s->count(), original_count);
+			original_count = s->count().load(std::memory_order_relaxed);
 		}
 
-		if (!s->count.compare_exchange_strong(original_count, original_count-1, std::memory_order_acquire, std::memory_order_acquire)) {
+		if (!s->count().compare_exchange_strong(original_count, original_count-1, std::memory_order_acquire, std::memory_order_acquire)) {
 			return;
 		}
 	}
