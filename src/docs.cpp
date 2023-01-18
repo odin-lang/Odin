@@ -49,10 +49,9 @@ gb_internal GB_COMPARE_PROC(cmp_entities_for_printing) {
 	int ox = print_entity_kind_ordering[x->kind];
 	int oy = print_entity_kind_ordering[y->kind];
 	res = ox - oy;
-	if (res != 0) {
-		return res;
+	if (res == 0) {
+		res = string_compare(x->token.string, y->token.string);
 	}
-	res = string_compare(x->token.string, y->token.string);
 	return res;
 }
 
@@ -230,6 +229,12 @@ gb_internal void print_doc_package(CheckerInfo *info, AstPackage *pkg) {
 				// Fine
 				break;
 			}
+			if (e->pkg != pkg) {
+				continue;
+			}
+			if (!is_entity_exported(e)) {
+				continue;
+			}
 			array_add(&entities, e);
 		}
 		gb_sort_array(entities.data, entities.count, cmp_entities_for_printing);
@@ -237,16 +242,7 @@ gb_internal void print_doc_package(CheckerInfo *info, AstPackage *pkg) {
 		bool show_docs = (build_context.cmd_doc_flags & CmdDocFlag_Short) == 0;
 
 		EntityKind curr_entity_kind = Entity_Invalid;
-		for_array(i, entities) {
-			Entity *e = entities[i];
-			if (e->pkg != pkg) {
-				continue;
-			}
-			if (!is_entity_exported(e)) {
-				continue;
-			}
-
-
+		for (Entity *e : entities) {
 			if (curr_entity_kind != e->kind) {
 				if (curr_entity_kind != Entity_Invalid) {
 					print_doc_line(0, "");
@@ -287,7 +283,7 @@ gb_internal void print_doc_package(CheckerInfo *info, AstPackage *pkg) {
 				print_doc_expr(init_expr);
 			}
 
-			gb_printf(";\n");
+			gb_printf("\n");
 
 			if (show_docs) {
 				print_doc_comment_group_string(3, docs);

@@ -106,42 +106,23 @@ gb_internal void string_to_lower(String *s) {
 	}
 }
 
-gb_internal int string_compare(String const &x, String const &y) {
-	if (x.len != y.len || x.text != y.text) {
-		isize n, fast, offset, curr_block;
-		isize *la, *lb;
-		isize pos;
-
-		n = gb_min(x.len, y.len);
-
-		fast = n/gb_size_of(isize) + 1;
-		offset = (fast-1)*gb_size_of(isize);
-		curr_block = 0;
-		if (n <= gb_size_of(isize)) {
-			fast = 0;
-		}
-
-		la = cast(isize *)x.text;
-		lb = cast(isize *)y.text;
-
-		for (; curr_block < fast; curr_block++) {
-			if (la[curr_block] ^ lb[curr_block]) {
-				for (pos = curr_block*gb_size_of(isize); pos < n; pos++) {
-					if (x[pos] ^ y[pos]) {
-						return cast(int)x[pos] - cast(int)y[pos];
-					}
-				}
-			}
-		}
-
-		for (; offset < n; offset++) {
-			if (x[offset] ^ y[offset]) {
-				return cast(int)x[offset] - cast(int)y[offset];
-			}
-		}
-		return cast(int)(x.len - y.len);
+gb_internal int string_compare(String const &a, String const &b) {
+	if (a.text == b.text) {
+		return 0;
 	}
-	return 0;
+	if (a.text == nullptr) {
+		return -1;
+	}
+	if (b.text == nullptr) {
+		return +1;
+	}
+
+	uintptr n = gb_min(a.len, b.len);
+	int res = memcmp(a.text, b.text, n);
+	if (res == 0) {
+		res = cast(int)(a.len - b.len);
+	}
+	return res;
 }
 
 gb_internal isize string_index_byte(String const &s, u8 x) {
