@@ -108,7 +108,7 @@ gb_internal void string_to_lower(String *s) {
 
 gb_internal int string_compare(String const &a, String const &b) {
 	if (a.text == b.text) {
-		return 0;
+		return cast(int)(a.len - b.len);
 	}
 	if (a.text == nullptr) {
 		return -1;
