@@ -98,7 +98,7 @@ ApplicationDelegateTemplate :: struct {
 	// Managing Windows
 	applicationWillUpdate: proc(notification: ^Notification),
 	applicationDidUpdate: proc(notification: ^Notification),
-	applicationShouldHandleReopenHasVisibleWindows: proc(notification: ^Notification, flag: BOOL) -> BOOL,
+	applicationShouldHandleReopenHasVisibleWindows: proc(sender: ^Application, flag: BOOL) -> BOOL,
 	// Managing the Dock Menu
 	applicationDockMenu: proc(sender: ^Application) -> ^Menu,
 	// Localizing Keyboard Shortcuts
@@ -109,7 +109,7 @@ ApplicationDelegateTemplate :: struct {
 	applicationDidChangeScreenParameters: proc(notification: ^Notification),
 	// Continuing User Activities
 	applicationWillContinueUserActivityWithType: proc(application: ^Application, userActivityType: ^String) -> BOOL,
-	applicationContinueUserActivityRestorationHandler: proc(application: ^Application, userActivity: ^UserActivity, restorationHandler: proc(^Array)) -> BOOL,
+	applicationContinueUserActivityRestorationHandler: proc(application: ^Application, userActivity: ^UserActivity, restorationHandler: ^Block) -> BOOL,
 	applicationDidFailToContinueUserActivityWithTypeError: proc(application: ^Application, userActivityType: ^String, error: ^Error),
 	applicationDidUpdateUserActivity: proc(application: ^Application, userActivity: ^UserActivity),
 	// Handling Push Notifications
@@ -125,7 +125,7 @@ ApplicationDelegateTemplate :: struct {
 	// Opening Files
 	applicationOpenURLs: proc(application: ^Application, urls: ^Array),
 	applicationOpenFile: proc(sender: ^Application, filename: ^String) -> BOOL,
-	applicationOpenFileWithoutUI: proc(sender: ^Application, filename: ^String) -> BOOL,
+	applicationOpenFileWithoutUI: proc(sender: id, filename: ^String) -> BOOL,
 	applicationOpenTempFile: proc(sender: ^Application, filename: ^String) -> BOOL,
 	applicationOpenFiles: proc(sender: ^Application, filenames: ^Array),
 	applicationShouldOpenUntitledFile: proc(sender: ^Application) -> BOOL,
@@ -277,10 +277,10 @@ application_delegate_register_and_alloc :: proc(template: ApplicationDelegateTem
 		class_addMethod(class, intrinsics.objc_find_selector("applicationDidUpdate:"), auto_cast applicationDidUpdate, "v@:@")
 	}
 	if template.applicationShouldHandleReopenHasVisibleWindows != nil {
-		applicationShouldHandleReopenHasVisibleWindows :: proc "c" (self: id, notification: ^Notification, flag: BOOL) -> BOOL {
+		applicationShouldHandleReopenHasVisibleWindows :: proc "c" (self: id, sender: ^Application, flag: BOOL) -> BOOL {
 			del := cast(^_ApplicationDelegateInternal)object_getIndexedIvars(self)
 			context = del._context
-			return del.applicationShouldHandleReopenHasVisibleWindows(notification, flag)
+			return del.applicationShouldHandleReopenHasVisibleWindows(sender, flag)
 		}
 		class_addMethod(class, intrinsics.objc_find_selector("applicationShouldHandleReopen:hasVisibleWindows:"), auto_cast applicationShouldHandleReopenHasVisibleWindows, "B@:@B")
 	}
@@ -325,7 +325,7 @@ application_delegate_register_and_alloc :: proc(template: ApplicationDelegateTem
 		class_addMethod(class, intrinsics.objc_find_selector("application:willContinueUserActivityWithType:"), auto_cast applicationWillContinueUserActivityWithType, "B@:@@")
 	}
 	if template.applicationContinueUserActivityRestorationHandler != nil {
-		applicationContinueUserActivityRestorationHandler :: proc "c" (self: id, application: ^Application, userActivity: ^UserActivity, restorationHandler: proc(^Array)) -> BOOL {
+		applicationContinueUserActivityRestorationHandler :: proc "c" (self: id, application: ^Application, userActivity: ^UserActivity, restorationHandler: ^Block) -> BOOL {
 			del := cast(^_ApplicationDelegateInternal)object_getIndexedIvars(self)
 			context = del._context
 			return del.applicationContinueUserActivityRestorationHandler(application, userActivity, restorationHandler)
@@ -405,7 +405,7 @@ application_delegate_register_and_alloc :: proc(template: ApplicationDelegateTem
 		class_addMethod(class, intrinsics.objc_find_selector("application:openFile:"), auto_cast applicationOpenFile, "B@:@@")
 	}
 	if template.applicationOpenFileWithoutUI != nil {
-		applicationOpenFileWithoutUI :: proc "c" (self: id, sender: ^Application, filename: ^String) -> BOOL {
+		applicationOpenFileWithoutUI :: proc "c" (self: id, sender: id, filename: ^String) -> BOOL {
 			del := cast(^_ApplicationDelegateInternal)object_getIndexedIvars(self)
 			context = del._context
 			return del.applicationOpenFileWithoutUI(sender, filename)
