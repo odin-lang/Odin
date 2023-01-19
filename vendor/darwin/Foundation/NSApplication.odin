@@ -23,6 +23,37 @@ ApplicationPrintReply :: enum UInteger {
 	PrintingFailure = 3,
 }
 
+ApplicationPresentationOptionFlag :: enum UInteger {
+	AutoHideDock = 0,
+	HideDock = 1,
+	AutoHideMenuBar = 2,
+	HideMenuBar = 3,
+	DisableAppleMenu = 4,
+	DisableProcessSwitching = 5,
+	DisableForceQuit = 6,
+	DisableSessionTermination = 7,
+	DisableHideApplication = 8,
+	DisableMenuBarTransparency = 9,
+	FullScreen = 10,
+	AutoHideToolbar = 11,
+	DisableCursorLocationAssistance = 12,
+}
+ApplicationPresentationOptions :: distinct bit_set[ApplicationPresentationOptionFlag; UInteger]
+ApplicationPresentationOptionsDefault                         :: ApplicationPresentationOptions {}
+ApplicationPresentationOptionsAutoHideDock                    :: ApplicationPresentationOptions {.AutoHideDock}
+ApplicationPresentationOptionsHideDock                        :: ApplicationPresentationOptions {.HideDock}
+ApplicationPresentationOptionsAutoHideMenuBar                 :: ApplicationPresentationOptions {.AutoHideMenuBar}
+ApplicationPresentationOptionsHideMenuBar                     :: ApplicationPresentationOptions {.HideMenuBar}
+ApplicationPresentationOptionsDisableAppleMenu                :: ApplicationPresentationOptions {.DisableAppleMenu}
+ApplicationPresentationOptionsDisableProcessSwitching         :: ApplicationPresentationOptions {.DisableProcessSwitching}
+ApplicationPresentationOptionsDisableForceQuit                :: ApplicationPresentationOptions {.DisableForceQuit}
+ApplicationPresentationOptionsDisableSessionTermination       :: ApplicationPresentationOptions {.DisableSessionTermination}
+ApplicationPresentationOptionsDisableHideApplication          :: ApplicationPresentationOptions {.DisableHideApplication}
+ApplicationPresentationOptionsDisableMenuBarTransparency      :: ApplicationPresentationOptions {.DisableMenuBarTransparency}
+ApplicationPresentationOptionsFullScreen                      :: ApplicationPresentationOptions {.FullScreen}
+ApplicationPresentationOptionsAutoHideToolbar                 :: ApplicationPresentationOptions {.AutoHideToolbar}
+ApplicationPresentationOptionsDisableCursorLocationAssistance :: ApplicationPresentationOptions {.DisableCursorLocationAssistance}
+
 @(objc_class="NSApplication")
 Application :: struct {using _: Object}
 

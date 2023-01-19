@@ -51,3 +51,11 @@ when size_of(UInteger) == 8 {
 } else {
 	_UINTEGER_ENCODING :: "I"
 }
+
+when size_of(Float) == 8 {
+	_POINT_ENCODING :: "{CGPoint=dd}"
+	_SIZE_ENCODING :: "{CGSize=dd}"
+} else {
+	_POINT_ENCODING :: "{NSPoint=ff}"
+	_SIZE_ENCODING :: "{NSSize=ff}"
+}
