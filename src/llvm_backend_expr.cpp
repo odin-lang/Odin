@@ -1558,13 +1558,13 @@ gb_internal lbValue lb_emit_conv(lbProcedure *p, lbValue value, Type *t) {
 	if (is_type_boolean(src) && dst == t_llvm_bool) {
 		lbValue res = {};
 		res.value = LLVMBuildTrunc(p->builder, value.value, lb_type(m, dst), "");
-		res.type = dst;
+		res.type = t;
 		return res;
 	}
 	if (src == t_llvm_bool && is_type_boolean(dst)) {
 		lbValue res = {};
 		res.value = LLVMBuildZExt(p->builder, value.value, lb_type(m, dst), "");
-		res.type = dst;
+		res.type = t;
 		return res;
 	}
 
@@ -2162,7 +2162,7 @@ gb_internal lbValue lb_emit_conv(lbProcedure *p, lbValue value, Type *t) {
 		// bit_set <-> integer
 		if (is_type_integer(src) && is_type_bit_set(dst)) {
 			lbValue res = lb_emit_conv(p, value, bit_set_to_int(dst));
-			res.type = dst;
+			res.type = t;
 			return res;
 		}
 		if (is_type_bit_set(src) && is_type_integer(dst)) {
