@@ -3,6 +3,8 @@ package strconv
 import "core:unicode/utf8"
 import "decimal"
 
+import "core:c/libc"
+
 parse_bool :: proc(s: string, n: ^int = nil) -> (result: bool = false, ok: bool) {
 	switch s {
 	case "1", "t", "T", "true", "TRUE", "True":
@@ -819,7 +821,7 @@ parse_f64 :: proc(str: string, n: ^int = nil) -> (value: f64, ok: bool) {
 		}
 
 		if mantissa>>_f64_info.mantbits != 0 {
-			return
+			break trunc_block
 		}
 		f := f64(mantissa)
 		if neg {
@@ -842,14 +844,24 @@ parse_f64 :: proc(str: string, n: ^int = nil) -> (value: f64, ok: bool) {
 		}
 	}
 
-	d: decimal.Decimal
-	decimal.set(&d, str[:nr])
-	b, overflow := decimal_to_float_bits(&d, &_f64_info)
-	value = transmute(f64)b
-	ok = !overflow
-	return
-}
+	// Solve import cycle
+	clone_to_cstring :: proc(s: string, allocator := context.allocator, loc := #caller_location) -> cstring {
+		c := make([]byte, len(s)+1, allocator, loc)
+		copy(c, s)
+		c[len(s)] = 0
+		return cstring(&c[0])
+	}
 
+	cstr := clone_to_cstring(s=str, allocator=context.temp_allocator)
+	return libc.strtod(cstr, nil), true
+
+	// d: decimal.Decimal
+	// decimal.set(&d, str[:nr])
+	// b, overflow := decimal_to_float_bits(&d, &_f64_info)
+	// value = transmute(f64)b
+	// ok = !overflow
+	// return
+}
 
 append_bool :: proc(buf: []byte, b: bool) -> string {
 	n := 0
