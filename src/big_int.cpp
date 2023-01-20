@@ -561,40 +561,63 @@ gb_internal String big_int_to_string(gbAllocator allocator, BigInt const *x, u64
 	Array<char> buf = {};
 	array_init(&buf, allocator, 0, 32);
 
-	BigInt v = {};
-	mp_init_copy(&v, x);
+	if (x->used >= 498) { // 2^498 ~ 10^150
+		mp_int val = {};
+		mp_abs(x, &val);
+		int exp = 0;
+		mp_err err = mp_log_n(&val, 10, &exp);
+		GB_ASSERT(err == MP_OKAY);
+		GB_ASSERT(exp >= 100);
 
-	if (v.sign) {
-		array_add(&buf, '-');
-		mp_abs(&v, &v);
-	}
+		mp_int thousand_below = {};
+		mp_int thousand_above = {};
+		mp_init_i32(&thousand_below, 10);
 
-	isize first_word_idx = buf.count;
+		mp_expt_n(&thousand_below, exp-3, &thousand_below);
+		mp_div(&val, &thousand_below, &thousand_above, nullptr);
 
-	BigInt r = {};
-	BigInt b = {};
-	big_int_from_u64(&b, base);
+		double mant = 1.0e-3 * mp_get_double(&thousand_above);
 
-	u8 digit = 0;
-	while (big_int_cmp(&v, &b) >= 0) {
-		big_int_quo_rem(&v, &b, &v, &r);
+		char val_buf[256] = {};
+		isize n = gb_snprintf(val_buf, gb_size_of(val_buf)-1, "~ %s%.fe%u", (x->sign ? "-" : ""), mant, exp);
+
+		array_add_elems(&buf, val_buf, n-1);
+	} else {
+		BigInt v = {};
+		mp_init_copy(&v, x);
+
+		if (v.sign) {
+			array_add(&buf, '-');
+			mp_abs(&v, &v);
+		}
+
+		isize first_word_idx = buf.count;
+
+		BigInt r = {};
+		BigInt b = {};
+		big_int_from_u64(&b, base);
+
+		u8 digit = 0;
+		while (big_int_cmp(&v, &b) >= 0) {
+			big_int_quo_rem(&v, &b, &v, &r);
+			digit = cast(u8)big_int_to_u64(&r);
+			array_add(&buf, digit_to_char(digit));
+		}
+
+		big_int_rem(&r, &v, &b);
 		digit = cast(u8)big_int_to_u64(&r);
 		array_add(&buf, digit_to_char(digit));
+
+		big_int_dealloc(&r);
+		big_int_dealloc(&b);
+
+		for (isize i = first_word_idx; i < buf.count/2; i++) {
+			isize j = buf.count + first_word_idx - i - 1;
+			char tmp = buf[i];
+			buf[i] = buf[j];
+			buf[j] = tmp;
+		}
+
 	}
-
-	big_int_rem(&r, &v, &b);
-	digit = cast(u8)big_int_to_u64(&r);
-	array_add(&buf, digit_to_char(digit));
-
-	big_int_dealloc(&r);
-	big_int_dealloc(&b);
-
-	for (isize i = first_word_idx; i < buf.count/2; i++) {
-		isize j = buf.count + first_word_idx - i - 1;
-		char tmp = buf[i];
-		buf[i] = buf[j];
-		buf[j] = tmp;
-	}
-
 	return make_string(cast(u8 *)buf.data, buf.count);
 }

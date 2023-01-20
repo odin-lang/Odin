@@ -2321,7 +2321,7 @@ gb_internal void lb_emit_defer_stmts(lbProcedure *p, lbDeferExitKind kind, lbBlo
 
 		if (kind == lbDeferExit_Default) {
 			if (p->scope_index == d.scope_index &&
-			    d.scope_index > 0) { // TODO(bill): Which is correct: > 0 or > 1?
+			    d.scope_index > 0) {
 				lb_build_defer_stmt(p, d);
 				array_pop(&p->defer_stmts);
 				continue;
