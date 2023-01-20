@@ -1,7 +1,6 @@
 package strconv
 
 import "core:unicode/utf8"
-import "decimal"
 
 import "core:c/libc"
 
