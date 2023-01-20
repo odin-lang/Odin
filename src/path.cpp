@@ -2,6 +2,9 @@
 	Path handling utilities.
 */
 gb_internal String remove_extension_from_path(String const &s) {
+	if (s.len != 0 && s.text[s.len-1] == '.') {
+		return s;
+	}
 	for (isize i = s.len-1; i >= 0; i--) {
 		if (s[i] == '.') {
 			return substring(s, 0, i);
