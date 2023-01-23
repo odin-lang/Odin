@@ -1446,6 +1446,11 @@ gb_internal void lb_debug_info_complete_types_and_finalize(lbGenerator *gen) {
 		lbModule *m = entry.value;
 		if (m->debug_builder != nullptr) {
 			lb_debug_complete_types(m);
+		}
+	}
+	for (auto const &entry : gen->modules) {
+		lbModule *m = entry.value;
+		if (m->debug_builder != nullptr) {
 			LLVMDIBuilderFinalize(m->debug_builder);
 		}
 	}
@@ -1649,7 +1654,7 @@ gb_internal bool lb_llvm_object_generation(lbGenerator *gen, bool do_threading) 
 			array_add(&gen->output_object_paths, filepath_obj);
 
 			String short_name = remove_directory_from_path(filepath_obj);
-			gbString section_name = gb_string_make(heap_allocator(), "LLVM Generate Object: ");
+			gbString section_name = gb_string_make(permanent_allocator(), "LLVM Generate Object: ");
 			section_name = gb_string_append_length(section_name, short_name.text, short_name.len);
 
 			TIME_SECTION_WITH_LEN(section_name, gb_string_length(section_name));
@@ -1774,7 +1779,7 @@ gb_internal lbProcedure *lb_create_main_procedure(lbModule *m, lbProcedure *star
 
 		lbValue runner = lb_find_package_value(m, str_lit("testing"), str_lit("runner"));
 
-		auto args = array_make<lbValue>(heap_allocator(), 1);
+		auto args = array_make<lbValue>(permanent_allocator(), 1);
 		args[0] = lb_addr_load(p, all_tests_slice);
 		lb_emit_call(p, runner, args);
 	} else {
@@ -2028,7 +2033,9 @@ gb_internal bool lb_generate_code(lbGenerator *gen) {
 				lb_set_llvm_metadata(m, f, res);
 			}
 
-			gbString producer = gb_string_make(heap_allocator(), "odin");
+			TEMPORARY_ALLOCATOR_GUARD();
+
+			gbString producer = gb_string_make(temporary_allocator(), "odin");
 			// producer = gb_string_append_fmt(producer, " version %.*s", LIT(ODIN_VERSION));
 			// #ifdef NIGHTLY
 			// producer = gb_string_appendc(producer, "-nightly");
@@ -2037,7 +2044,7 @@ gb_internal bool lb_generate_code(lbGenerator *gen) {
 			// producer = gb_string_append_fmt(producer, "-%s", GIT_SHA);
 			// #endif
 
-			gbString split_name = gb_string_make(heap_allocator(), "");
+			gbString split_name = gb_string_make(temporary_allocator(), "");
 
 			LLVMBool is_optimized = build_context.optimization_level > 0;
 			AstFile *init_file = m->info->init_package->files[0];
@@ -2374,7 +2381,7 @@ gb_internal bool lb_generate_code(lbGenerator *gen) {
 
 
 	TIME_SECTION("LLVM Function Pass");
-	lb_llvm_function_passes(gen, do_threading);
+	lb_llvm_function_passes(gen, do_threading && !build_context.ODIN_DEBUG);
 
 	TIME_SECTION("LLVM Module Pass");
 	lb_llvm_module_passes(gen, do_threading);

@@ -254,6 +254,8 @@ struct ArenaTemp {
 
 ArenaTemp arena_temp_begin(Arena *arena) {
 	GB_ASSERT(arena);
+	MUTEX_GUARD(&arena->mutex);
+
 	ArenaTemp temp = {};
 	temp.arena = arena;
 	temp.block = arena->curr_block;
@@ -267,6 +269,8 @@ ArenaTemp arena_temp_begin(Arena *arena) {
 void arena_temp_end(ArenaTemp const &temp) {
 	GB_ASSERT(temp.arena);
 	Arena *arena = temp.arena;
+	MUTEX_GUARD(&arena->mutex);
+
 	bool memory_block_found = false;
 	for (MemoryBlock *block = arena->curr_block; block != nullptr; block = block->prev) {
 		if (block == temp.block) {
@@ -359,23 +363,26 @@ gb_internal gbAllocator temporary_allocator() {
 	return arena_allocator(&temporary_arena);
 }
 
-#define TEMPORARY_ALLOCATOR_GUARD()
-#define PERMANENT_ALLOCATOR_GUARD()
+// #define TEMPORARY_ALLOCATOR_GUARD()
+// #define PERMANENT_ALLOCATOR_GUARD()
 
-// #define TEMPORARY_ALLOCATOR_GUARD() ArenaTempGuard GB_DEFER_3(_arena_guard_){&temporary_arena}
-// #define PERMANENT_ALLOCATOR_GUARD() ArenaTempGuard GB_DEFER_3(_arena_guard_){&permanent_arena}
+#define TEMPORARY_ALLOCATOR_GUARD() ArenaTempGuard GB_DEFER_3(_arena_guard_){&temporary_arena}
+#define PERMANENT_ALLOCATOR_GUARD() ArenaTempGuard GB_DEFER_3(_arena_guard_){&permanent_arena}
 
 
 
+gb_internal bool IS_ODIN_DEBUG(void);
 
 gb_internal GB_ALLOCATOR_PROC(heap_allocator_proc);
 
 gb_internal gbAllocator heap_allocator(void) {
+	if (IS_ODIN_DEBUG()) {
+		gbAllocator a;
+		a.proc = heap_allocator_proc;
+		a.data = nullptr;
+		return a;
+	}
 	return arena_allocator(&permanent_arena);
-	// gbAllocator a;
-	// a.proc = heap_allocator_proc;
-	// a.data = nullptr;
-	// return a;
 }
 
 

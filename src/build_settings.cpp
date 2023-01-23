@@ -330,6 +330,11 @@ struct BuildContext {
 
 gb_global BuildContext build_context = {0};
 
+gb_internal bool IS_ODIN_DEBUG(void) {
+	return build_context.ODIN_DEBUG;
+}
+
+
 gb_internal bool global_warnings_as_errors(void) {
 	return build_context.warnings_as_errors;
 }

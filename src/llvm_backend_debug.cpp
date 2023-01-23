@@ -620,6 +620,8 @@ gb_internal void lb_debug_complete_types(lbModule *m) {
 	unsigned const word_bits = cast(unsigned)(8*build_context.word_size);
 
 	for_array(debug_incomplete_type_index, m->debug_incomplete_types) {
+		TEMPORARY_ALLOCATOR_GUARD();
+
 		auto const &idt = m->debug_incomplete_types[debug_incomplete_type_index];
 		GB_ASSERT(idt.type != nullptr);
 		GB_ASSERT(idt.metadata != nullptr);
@@ -1125,11 +1127,11 @@ gb_internal void lb_add_debug_context_variable(lbProcedure *p, lbAddr const &ctx
 }
 
 
-gb_internal String debug_info_mangle_constant_name(Entity *e, bool *did_allocate_) {
+gb_internal String debug_info_mangle_constant_name(Entity *e, gbAllocator const &allocator, bool *did_allocate_) {
 	String name = e->token.string;
 	if (e->pkg && e->pkg->name.len > 0) {
 		// NOTE(bill): C++ NONSENSE FOR DEBUG SHITE!
-		name = concatenate3_strings(heap_allocator(), e->pkg->name, str_lit("::"), name);
+		name = concatenate3_strings(allocator, e->pkg->name, str_lit("::"), name);
 		if (did_allocate_) *did_allocate_ = true;
 	}
 	return name;
@@ -1154,11 +1156,8 @@ gb_internal void add_debug_info_global_variable_expr(lbModule *m, String const &
 gb_internal void add_debug_info_for_global_constant_internal_i64(lbModule *m, Entity *e, LLVMMetadataRef dtype, i64 v) {
 	LLVMMetadataRef expr = LLVMDIBuilderCreateConstantValueExpression(m->debug_builder, v);
 
-	bool did_allocate = false;
-	String name = debug_info_mangle_constant_name(e, &did_allocate);
-	defer (if (did_allocate) {
-		gb_free(heap_allocator(), name.text);
-	});
+	TEMPORARY_ALLOCATOR_GUARD();
+	String name = debug_info_mangle_constant_name(e, temporary_allocator(), nullptr);
 
 	add_debug_info_global_variable_expr(m, name, dtype, expr);
 	if ((e->pkg && e->pkg->kind == Package_Init) ||

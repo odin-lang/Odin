@@ -60,7 +60,7 @@ gb_internal uintptr hash_exact_value(ExactValue v) {
 	case ExactValue_Bool:
 		return gb_fnv32a(&v.value_bool, gb_size_of(v.value_bool));
 	case ExactValue_String:
-		return ptr_map_hash_key(string_intern(v.value_string));
+		return gb_fnv32a(v.value_string.text, v.value_string.len);
 	case ExactValue_Integer:
 		{
 			u32 key = gb_fnv32a(v.value_integer.dp, gb_size_of(*v.value_integer.dp) * v.value_integer.used);
