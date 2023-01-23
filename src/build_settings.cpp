@@ -1249,7 +1249,14 @@ gb_internal void init_build_context(TargetMetrics *cross_target) {
 
 	bc->optimization_level = gb_clamp(bc->optimization_level, 0, 3);
 
-	bc->ODIN_VALGRIND_SUPPORT = is_arch_x86() && build_context.metrics.os != TargetOs_windows;
+	bc->ODIN_VALGRIND_SUPPORT = false;
+	if (build_context.metrics.os != TargetOs_windows) {
+		switch (bc->metrics.arch) {
+		case TargetArch_amd64:
+			bc->ODIN_VALGRIND_SUPPORT = true;
+			break;
+		}
+	}
 
 	#undef LINK_FLAG_X64
 	#undef LINK_FLAG_386
