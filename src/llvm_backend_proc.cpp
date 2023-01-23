@@ -2946,7 +2946,7 @@ gb_internal lbValue lb_build_builtin_proc(lbProcedure *p, Ast *expr, TypeAndValu
 					LLVMTypeRef func_type = lb_get_procedure_raw_type(p->module, type);
 					LLVMValueRef the_asm = llvm_get_inline_asm(
 						func_type,
-						str_lit("rolq $3, %rdi; rolq $13, %rdi\n rolq $61, %rdi; rolq $51, %rdi\n xchgq %rbx, %rbx"),
+						str_lit("rolq $$3, %rdi; rolq $$13, %rdi\n rolq $$61, %rdi; rolq $$51, %rdi\n xchgq %rbx, %rbx"),
 						str_lit("={rdx},{rdx},{rax},cc,memory"),
 						true
 					);
