@@ -363,11 +363,11 @@ gb_internal gbAllocator temporary_allocator() {
 	return arena_allocator(&temporary_arena);
 }
 
-// #define TEMPORARY_ALLOCATOR_GUARD()
-// #define PERMANENT_ALLOCATOR_GUARD()
+#define TEMPORARY_ALLOCATOR_GUARD()
+#define PERMANENT_ALLOCATOR_GUARD()
 
-#define TEMPORARY_ALLOCATOR_GUARD() ArenaTempGuard GB_DEFER_3(_arena_guard_){&temporary_arena}
-#define PERMANENT_ALLOCATOR_GUARD() ArenaTempGuard GB_DEFER_3(_arena_guard_){&permanent_arena}
+// #define TEMPORARY_ALLOCATOR_GUARD() ArenaTempGuard GB_DEFER_3(_arena_guard_){&temporary_arena}
+// #define PERMANENT_ALLOCATOR_GUARD() ArenaTempGuard GB_DEFER_3(_arena_guard_){&permanent_arena}
 
 
 
