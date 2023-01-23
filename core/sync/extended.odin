@@ -110,7 +110,7 @@ Barrier :: struct {
 }
 
 barrier_init :: proc "contextless" (b: ^Barrier, thread_count: int) {
-	when ODIN_ARCH == .amd64 {
+	when ODIN_VALGRIND_SUPPORT {
 		vg.helgrind_barrier_resize_pre(b, uint(thread_count))
 	}
 	b.index = 0
@@ -121,7 +121,7 @@ barrier_init :: proc "contextless" (b: ^Barrier, thread_count: int) {
 // Block the current thread until all threads have rendezvoused
 // Barrier can be reused after all threads rendezvoused once, and can be used continuously
 barrier_wait :: proc "contextless" (b: ^Barrier) -> (is_leader: bool) {
-	when ODIN_ARCH == .amd64 {
+	when ODIN_VALGRIND_SUPPORT {
 		vg.helgrind_barrier_wait_pre(b)
 	}
 	guard(&b.mutex)
