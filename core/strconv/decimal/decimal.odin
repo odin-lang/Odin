@@ -214,25 +214,128 @@ shift_right :: proc(a: ^Decimal, k: uint) {
 	trim(a)
 }
 
-shift_left :: proc(a: ^Decimal, k: uint) {
-	// NOTE(bill): used to determine buffer size required for the decimal from the binary shift
-	// 'k' means `1<<k` == `2^k` which equates to roundup(k*log10(2)) digits required
-	log10_2 :: 0.301029995663981195213738894724493026768189881462108541310
-	capacity := int(f64(k)*log10_2 + 1)
+import "core:runtime"
+println :: proc(args: ..any) {
+	for arg, i in args {
+		if i != 0 {
+			runtime.print_string(" ")
+		}
+		switch v in arg {
+		case string:  runtime.print_string(v)
+		case rune:    runtime.print_rune(v)
+		case int:     runtime.print_int(v)
+		case uint:    runtime.print_uint(v)
+		case u8:      runtime.print_u64(u64(v))
+		case u16:     runtime.print_u64(u64(v))
+		case u32:     runtime.print_u64(u64(v))
+		case u64:     runtime.print_u64(v)
+		case i8:      runtime.print_i64(i64(v))
+		case i16:     runtime.print_i64(i64(v))
+		case i32:     runtime.print_i64(i64(v))
+		case i64:     runtime.print_i64(v)
+		case uintptr: runtime.print_uintptr(v)
+		case bool:    runtime.print_string("true" if v else "false")
+		}
+	}
+	runtime.print_string("\n")
+}
 
-	r := a.count          // read index
-	w := a.count+capacity // write index
+@(private="file")
+_shift_left_offsets := [?]struct{delta: int, cutoff: string}{
+	{ 0, ""},
+	{ 1, "5"},
+	{ 1, "25"},
+	{ 1, "125"},
+	{ 2, "625"},
+	{ 2, "3125"},
+	{ 2, "15625"},
+	{ 3, "78125"},
+	{ 3, "390625"},
+	{ 3, "1953125"},
+	{ 4, "9765625"},
+	{ 4, "48828125"},
+	{ 4, "244140625"},
+	{ 4, "1220703125"},
+	{ 5, "6103515625"},
+	{ 5, "30517578125"},
+	{ 5, "152587890625"},
+	{ 6, "762939453125"},
+	{ 6, "3814697265625"},
+	{ 6, "19073486328125"},
+	{ 7, "95367431640625"},
+	{ 7, "476837158203125"},
+	{ 7, "2384185791015625"},
+	{ 7, "11920928955078125"},
+	{ 8, "59604644775390625"},
+	{ 8, "298023223876953125"},
+	{ 8, "1490116119384765625"},
+	{ 9, "7450580596923828125"},
+	{ 9, "37252902984619140625"},
+	{ 9, "186264514923095703125"},
+	{10, "931322574615478515625"},
+	{10, "4656612873077392578125"},
+	{10, "23283064365386962890625"},
+	{10, "116415321826934814453125"},
+	{11, "582076609134674072265625"},
+	{11, "2910383045673370361328125"},
+	{11, "14551915228366851806640625"},
+	{12, "72759576141834259033203125"},
+	{12, "363797880709171295166015625"},
+	{12, "1818989403545856475830078125"},
+	{13, "9094947017729282379150390625"},
+	{13, "45474735088646411895751953125"},
+	{13, "227373675443232059478759765625"},
+	{13, "1136868377216160297393798828125"},
+	{14, "5684341886080801486968994140625"},
+	{14, "28421709430404007434844970703125"},
+	{14, "142108547152020037174224853515625"},
+	{15, "710542735760100185871124267578125"},
+	{15, "3552713678800500929355621337890625"},
+	{15, "17763568394002504646778106689453125"},
+	{16, "88817841970012523233890533447265625"},
+	{16, "444089209850062616169452667236328125"},
+	{16, "2220446049250313080847263336181640625"},
+	{16, "11102230246251565404236316680908203125"},
+	{17, "55511151231257827021181583404541015625"},
+	{17, "277555756156289135105907917022705078125"},
+	{17, "1387778780781445675529539585113525390625"},
+	{18, "6938893903907228377647697925567626953125"},
+	{18, "34694469519536141888238489627838134765625"},
+	{18, "173472347597680709441192448139190673828125"},
+	{19, "867361737988403547205962240695953369140625"},
+}
 
-	d := len(a.digits)
+shift_left :: proc(a: ^Decimal, k: uint) #no_bounds_check {
+	prefix_less :: #force_inline proc "contextless" (b: []byte, s: string) -> bool #no_bounds_check {
+		for i in 0..<len(s) {
+			if i >= len(b) {
+				return true
+			}
+			if b[i] != s[i] {
+				return b[i] < s[i]
+			}
+		}
+		return false
+	}
+
+	assert(k < 61)
+
+	delta := _shift_left_offsets[k].delta
+	if prefix_less(a.digits[:a.count], _shift_left_offsets[k].cutoff) {
+		delta -= 1
+	}
+
+	read_index  := a.count
+	write_index := a.count+delta
 
 	n: uint
-	for r -= 1; r >= 0; r -= 1 {
-		n += (uint(a.digits[r]) - '0') << k
+	for read_index -= 1; read_index >= 0; read_index -= 1 {
+		n += (uint(a.digits[read_index]) - '0') << k
 		quo := n/10
 		rem := n - 10*quo
-		w -= 1
-		if w < d {
-			a.digits[w] = byte('0' + rem)
+		write_index -= 1
+		if write_index < len(a.digits) {
+			a.digits[write_index] = byte('0' + rem)
 		} else if rem != 0 {
 			a.trunc = true
 		}
@@ -242,21 +345,18 @@ shift_left :: proc(a: ^Decimal, k: uint) {
 	for n > 0 {
 		quo := n/10
 		rem := n - 10*quo
-		w -= 1
-		if w < d {
-			a.digits[w] = byte('0' + rem)
+		write_index -= 1
+		if write_index < len(a.digits) {
+			a.digits[write_index] = byte('0' + rem)
 		} else if rem != 0 {
 			a.trunc = true
 		}
 		n = quo
 	}
 
-	// NOTE(bill): Remove unused buffer size
-	assert(w >= 0)
-	capacity -= w
+	a.decimal_point += delta
 
-	a.count = min(a.count+capacity, d)
-	a.decimal_point += capacity
+	a.count = clamp(a.count, 0, len(a.digits))
 	trim(a)
 }
 
