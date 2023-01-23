@@ -1,6 +1,8 @@
 package sync
 
 import "core:time"
+import vg "core:sys/valgrind"
+_ :: vg
 
 // A Wait_Group waits for a collection of threads to finish
 //
@@ -108,6 +110,9 @@ Barrier :: struct {
 }
 
 barrier_init :: proc "contextless" (b: ^Barrier, thread_count: int) {
+	when ODIN_ARCH == .amd64 {
+		vg.helgrind_barrier_resize_pre(b, uint(thread_count))
+	}
 	b.index = 0
 	b.generation_id = 0
 	b.thread_count = thread_count
@@ -116,6 +121,9 @@ barrier_init :: proc "contextless" (b: ^Barrier, thread_count: int) {
 // Block the current thread until all threads have rendezvoused
 // Barrier can be reused after all threads rendezvoused once, and can be used continuously
 barrier_wait :: proc "contextless" (b: ^Barrier) -> (is_leader: bool) {
+	when ODIN_ARCH == .amd64 {
+		vg.helgrind_barrier_wait_pre(b)
+	}
 	guard(&b.mutex)
 	local_gen := b.generation_id
 	b.index += 1
