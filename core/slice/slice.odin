@@ -77,8 +77,7 @@ swap_between :: proc(a, b: $T/[]$E) {
 reverse :: proc(array: $T/[]$E) {
 	n := len(array)/2
 	for i in 0..<n {
-		a, b := i, len(array)-i-1
-		array[a], array[b] = array[b], array[a]
+		swap(array, i, len(array)-i-1)
 	}
 }
 
