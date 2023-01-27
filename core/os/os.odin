@@ -93,7 +93,7 @@ file_size_from_path :: proc(path: string) -> i64 {
 	return length
 }
 
-read_entire_file_from_filename :: proc(name: string, allocator := context.allocator) -> (data: []byte, success: bool) {
+read_entire_file_from_filename :: proc(name: string, allocator := context.allocator, loc := #caller_location) -> (data: []byte, success: bool) {
 	context.allocator = allocator
 
 	fd, err := open(name, O_RDONLY, 0)
@@ -102,10 +102,10 @@ read_entire_file_from_filename :: proc(name: string, allocator := context.alloca
 	}
 	defer close(fd)
 
-	return read_entire_file_from_handle(fd, allocator)
+	return read_entire_file_from_handle(fd, allocator, loc)
 }
 
-read_entire_file_from_handle :: proc(fd: Handle, allocator := context.allocator) -> (data: []byte, success: bool) {
+read_entire_file_from_handle :: proc(fd: Handle, allocator := context.allocator, loc := #caller_location) -> (data: []byte, success: bool) {
 	context.allocator = allocator
 
 	length: i64
@@ -118,7 +118,7 @@ read_entire_file_from_handle :: proc(fd: Handle, allocator := context.allocator)
 		return nil, true
 	}
 
-	data = make([]byte, int(length), allocator)
+	data = make([]byte, int(length), allocator, loc)
 	if data == nil {
 	    return nil, false
 	}
@@ -216,7 +216,7 @@ heap_allocator_proc :: proc(allocator_data: rawptr, mode: mem.Allocator_Mode,
 		}
 
 		new_memory = aligned_alloc(new_size, new_alignment, p) or_return
-		
+
 		// NOTE: heap_resize does not zero the new memory, so we do it
 		if new_size > old_size {
 			new_region := mem.raw_data(new_memory[old_size:])
