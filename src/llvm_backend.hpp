@@ -324,6 +324,7 @@ struct lbProcedure {
 	lbBlock *        curr_block;
 	lbTargetList *   target_list;
 	PtrMap<Entity *, lbValue> direct_parameters;
+	bool             in_multi_assignment;
 
 	Ast *curr_stmt;
 

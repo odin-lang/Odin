@@ -937,7 +937,7 @@ gb_internal void lb_emit_store(lbProcedure *p, lbValue ptr, lbValue value) {
 
 	enum {MAX_STORE_SIZE = 64};
 
-	if (lb_sizeof(LLVMTypeOf(value.value)) > MAX_STORE_SIZE) {
+	if (!p->in_multi_assignment && lb_sizeof(LLVMTypeOf(value.value)) > MAX_STORE_SIZE) {
 		if (LLVMIsALoadInst(value.value)) {
 			LLVMValueRef dst_ptr = ptr.value;
 			LLVMValueRef src_ptr_original = LLVMGetOperand(value.value, 0);
@@ -964,15 +964,16 @@ gb_internal void lb_emit_store(lbProcedure *p, lbValue ptr, lbValue value) {
 		}
 	}
 
+	LLVMValueRef instr = nullptr;
 	if (lb_is_type_proc_recursive(a)) {
 		// NOTE(bill, 2020-11-11): Because of certain LLVM rules, a procedure value may be
 		// stored as regular pointer with no procedure information
 
  		LLVMTypeRef rawptr_type = lb_type(p->module, t_rawptr);
  		LLVMTypeRef rawptr_ptr_type = LLVMPointerType(rawptr_type, 0);
-		LLVMBuildStore(p->builder,
-		               LLVMBuildPointerCast(p->builder, value.value, rawptr_type, ""),
-		               LLVMBuildPointerCast(p->builder, ptr.value, rawptr_ptr_type, ""));
+		instr = LLVMBuildStore(p->builder,
+		                       LLVMBuildPointerCast(p->builder, value.value, rawptr_type, ""),
+		                       LLVMBuildPointerCast(p->builder, ptr.value, rawptr_ptr_type, ""));
 	} else {
 		Type *ca = core_type(a);
 		if (ca->kind == Type_Basic || ca->kind == Type_Proc) {
@@ -981,8 +982,9 @@ gb_internal void lb_emit_store(lbProcedure *p, lbValue ptr, lbValue value) {
 			GB_ASSERT_MSG(are_types_identical(a, value.type), "%s != %s", type_to_string(a), type_to_string(value.type));
 		}
 
-		LLVMBuildStore(p->builder, value.value, ptr.value);
+		instr = LLVMBuildStore(p->builder, value.value, ptr.value);
 	}
+	LLVMSetVolatile(instr, p->in_multi_assignment);
 }
 
 gb_internal LLVMTypeRef llvm_addr_type(lbModule *module, lbValue addr_val) {

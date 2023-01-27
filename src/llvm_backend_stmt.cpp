@@ -1555,12 +1555,25 @@ gb_internal void lb_build_assignment(lbProcedure *p, Array<lbAddr> &lvals, Slice
 		lb_append_tuple_values(p, &inits, init);
 	}
 
+	bool prev_in_assignment = p->in_multi_assignment;
+
+	isize lval_count = 0;
+	for (lbAddr const &lval : lvals) {
+		if (lval.addr.value != nullptr) {
+			// check if it is not a blank identifier
+			lval_count += 1;
+		}
+	}
+	p->in_multi_assignment = lval_count > 1;
+
 	GB_ASSERT(lvals.count == inits.count);
 	for_array(i, inits) {
 		lbAddr lval = lvals[i];
 		lbValue init = inits[i];
 		lb_addr_store(p, lval, init);
 	}
+
+	p->in_multi_assignment = prev_in_assignment;
 }
 
 gb_internal void lb_build_return_stmt_internal(lbProcedure *p, lbValue res) {
@@ -2047,6 +2060,7 @@ gb_internal void lb_build_assign_stmt(lbProcedure *p, AstAssignStmt *as) {
 		lb_build_assignment(p, lvals, as->rhs);
 		return;
 	}
+
 	GB_ASSERT(as->lhs.count == 1);
 	GB_ASSERT(as->rhs.count == 1);
 	// NOTE(bill): Only 1 += 1 is allowed, no tuples
