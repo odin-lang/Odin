@@ -1,6 +1,7 @@
 package mem_virtual
 
 import "core:mem"
+import "core:sync"
 
 Arena_Kind :: enum uint {
 	Growing = 0, // Chained memory blocks (singly linked list).
@@ -15,6 +16,7 @@ Arena :: struct {
 	total_reserved:     uint,
 	minimum_block_size: uint,
 	temp_count:         uint,
+	mutex:              sync.Mutex,
 }
 
 
@@ -78,6 +80,8 @@ arena_alloc :: proc(arena: ^Arena, size: uint, alignment: uint, loc := #caller_l
 		return nil, nil
 	}
 
+	sync.mutex_guard(&arena.mutex)
+
 	switch arena.kind {
 	case .Growing:
 		if arena.curr_block == nil || (safe_add(arena.curr_block.used, size) or_else 0) > arena.curr_block.reserved {
@@ -116,6 +120,8 @@ arena_alloc :: proc(arena: ^Arena, size: uint, alignment: uint, loc := #caller_l
 }
 
 arena_static_reset_to :: proc(arena: ^Arena, pos: uint, loc := #caller_location) -> bool {
+	sync.mutex_guard(&arena.mutex)
+
 	if arena.curr_block != nil {
 		assert(arena.kind != .Growing, "expected a non .Growing arena", loc)
 
@@ -135,6 +141,7 @@ arena_static_reset_to :: proc(arena: ^Arena, pos: uint, loc := #caller_location)
 }
 
 arena_growing_free_last_memory_block :: proc(arena: ^Arena, loc := #caller_location) {
+	sync.mutex_guard(&arena.mutex)
 	if free_block := arena.curr_block; free_block != nil {
 		assert(arena.kind == .Growing, "expected a .Growing arena", loc)
 		arena.curr_block = free_block.prev
@@ -145,6 +152,7 @@ arena_growing_free_last_memory_block :: proc(arena: ^Arena, loc := #caller_locat
 arena_free_all :: proc(arena: ^Arena) {
 	switch arena.kind {
 	case .Growing:
+		sync.mutex_guard(&arena.mutex)
 		for arena.curr_block != nil {
 			arena_growing_free_last_memory_block(arena)
 		}
@@ -287,6 +295,8 @@ Arena_Temp :: struct {
 @(require_results)
 arena_temp_begin :: proc(arena: ^Arena, loc := #caller_location) -> (temp: Arena_Temp) {
 	assert(arena != nil, "nil arena", loc)
+	sync.mutex_guard(&arena.mutex)
+
 	temp.arena = arena
 	temp.block = arena.curr_block
 	if arena.curr_block != nil {
@@ -299,6 +309,7 @@ arena_temp_begin :: proc(arena: ^Arena, loc := #caller_location) -> (temp: Arena
 arena_temp_end :: proc(temp: Arena_Temp, loc := #caller_location) {
 	assert(temp.arena != nil, "nil arena", loc)
 	arena := temp.arena
+	sync.mutex_guard(&arena.mutex)
 
 	memory_block_found := false
 	for block := arena.curr_block; block != nil; block = block.prev {
@@ -321,6 +332,16 @@ arena_temp_end :: proc(temp: Arena_Temp, loc := #caller_location) {
 		mem.zero_slice(block.base[temp.used:][:amount_to_zero])
 		block.used = temp.used
 	}
+
+	assert(arena.temp_count > 0, "double-use of arena_temp_end", loc)
+	arena.temp_count -= 1
+}
+
+// Ignore the use of a `arena_temp_begin` entirely
+arena_temp_ignore :: proc(temp: Arena_Temp, loc := #caller_location) {
+	assert(temp.arena != nil, "nil arena", loc)
+	arena := temp.arena
+	sync.mutex_guard(&arena.mutex)
 
 	assert(arena.temp_count > 0, "double-use of arena_temp_end", loc)
 	arena.temp_count -= 1
