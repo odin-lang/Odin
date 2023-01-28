@@ -2375,7 +2375,7 @@ gb_internal void check_comparison(CheckerContext *c, Operand *x, Operand *y, Tok
 		return;
 	}
 
-
+	TEMPORARY_ALLOCATOR_GUARD();
 	gbString err_str = nullptr;
 
 	if (check_is_assignable_to(c, x, y->type) ||
@@ -2405,7 +2405,6 @@ gb_internal void check_comparison(CheckerContext *c, Operand *x, Operand *y, Tok
 			if (x->type == err_type && is_operand_nil(*x)) {
 				err_type = y->type;
 			}
-			TEMPORARY_ALLOCATOR_GUARD();
 			gbString type_string = type_to_string(err_type, temporary_allocator());
 			err_str = gb_string_make(temporary_allocator(),
 				gb_bprintf("operator '%.*s' not defined for type '%s'", LIT(token_strings[op]), type_string));
@@ -2418,7 +2417,6 @@ gb_internal void check_comparison(CheckerContext *c, Operand *x, Operand *y, Tok
 			add_comparison_procedures_for_fields(c, comparison_type);
 		}
 	} else {
-		TEMPORARY_ALLOCATOR_GUARD();
 		gbString xt, yt;
 		if (x->mode == Addressing_ProcGroup) {
 			xt = gb_string_make(temporary_allocator(), "procedure group");

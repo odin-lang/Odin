@@ -271,34 +271,46 @@ void arena_temp_end(ArenaTemp const &temp) {
 	Arena *arena = temp.arena;
 	MUTEX_GUARD(&arena->mutex);
 
-	bool memory_block_found = false;
-	for (MemoryBlock *block = arena->curr_block; block != nullptr; block = block->prev) {
-		if (block == temp.block) {
-			memory_block_found = true;
-			break;
+	if (temp.block) {
+		bool memory_block_found = false;
+		for (MemoryBlock *block = arena->curr_block; block != nullptr; block = block->prev) {
+			if (block == temp.block) {
+				memory_block_found = true;
+				break;
+			}
 		}
-	}
-	GB_ASSERT_MSG(memory_block_found, "memory block stored within ArenaTemp not owned by Arena");
+		GB_ASSERT_MSG(memory_block_found, "memory block stored within ArenaTemp not owned by Arena");
 
-	while (arena->curr_block != temp.block) {
-		MemoryBlock *free_block = arena->curr_block;
-		if (free_block != nullptr) {
-			arena->curr_block = free_block->prev;
-			virtual_memory_dealloc(free_block);
+		while (arena->curr_block != temp.block) {
+			MemoryBlock *free_block = arena->curr_block;
+			if (free_block != nullptr) {
+				arena->curr_block = free_block->prev;
+				virtual_memory_dealloc(free_block);
+			}
 		}
-	}
 
-	MemoryBlock *block = arena->curr_block;
-	if (block) {
-		GB_ASSERT_MSG(block->used >= temp.used, "out of order use of arena_temp_end");
-		isize amount_to_zero = gb_min(block->used - temp.used, block->size - block->used);
-		gb_zero_size(block->base + temp.used, amount_to_zero);
-		block->used = temp.used;
+		MemoryBlock *block = arena->curr_block;
+		if (block) {
+			GB_ASSERT_MSG(block->used >= temp.used, "out of order use of arena_temp_end");
+			isize amount_to_zero = gb_min(block->used - temp.used, block->size - block->used);
+			gb_zero_size(block->base + temp.used, amount_to_zero);
+			block->used = temp.used;
+		}
 	}
 
 	GB_ASSERT_MSG(arena->temp_count > 0, "double-use of arena_temp_end");
 	arena->temp_count -= 1;
 }
+
+void arena_temp_ignore(ArenaTemp const &temp) {
+	GB_ASSERT(temp.arena);
+	Arena *arena = temp.arena;
+	MUTEX_GUARD(&arena->mutex);
+
+	GB_ASSERT_MSG(arena->temp_count > 0, "double-use of arena_temp_end");
+	arena->temp_count -= 1;
+}
+
 
 
 struct ArenaTempGuard {
@@ -363,11 +375,13 @@ gb_internal gbAllocator temporary_allocator() {
 	return arena_allocator(&temporary_arena);
 }
 
-#define TEMPORARY_ALLOCATOR_GUARD()
-#define PERMANENT_ALLOCATOR_GUARD()
 
-// #define TEMPORARY_ALLOCATOR_GUARD() ArenaTempGuard GB_DEFER_3(_arena_guard_){&temporary_arena}
-// #define PERMANENT_ALLOCATOR_GUARD() ArenaTempGuard GB_DEFER_3(_arena_guard_){&permanent_arena}
+#define TEMP_ARENA_GUARD(arena) ArenaTempGuard GB_DEFER_3(_arena_guard_){arena}
+
+
+// #define TEMPORARY_ALLOCATOR_GUARD()
+#define TEMPORARY_ALLOCATOR_GUARD() TEMP_ARENA_GUARD(&temporary_arena)
+#define PERMANENT_ALLOCATOR_GUARD()
 
 
 

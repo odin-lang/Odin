@@ -311,26 +311,28 @@ arena_temp_end :: proc(temp: Arena_Temp, loc := #caller_location) {
 	arena := temp.arena
 	sync.mutex_guard(&arena.mutex)
 
-	memory_block_found := false
-	for block := arena.curr_block; block != nil; block = block.prev {
-		if block == temp.block {
-			memory_block_found = true
-			break
+	if temp.block != nil {
+		memory_block_found := false
+		for block := arena.curr_block; block != nil; block = block.prev {
+			if block == temp.block {
+				memory_block_found = true
+				break
+			}
 		}
-	}
-	if !memory_block_found {
-		assert(arena.curr_block == temp.block, "memory block stored within Arena_Temp not owned by Arena", loc)
-	}
+		if !memory_block_found {
+			assert(arena.curr_block == temp.block, "memory block stored within Arena_Temp not owned by Arena", loc)
+		}
 
-	for arena.curr_block != temp.block {
-		arena_growing_free_last_memory_block(arena)
-	}
+		for arena.curr_block != temp.block {
+			arena_growing_free_last_memory_block(arena)
+		}
 
-	if block := arena.curr_block; block != nil {
-		assert(block.used >= temp.used, "out of order use of arena_temp_end", loc)
-		amount_to_zero := min(block.used-temp.used, block.reserved-block.used)
-		mem.zero_slice(block.base[temp.used:][:amount_to_zero])
-		block.used = temp.used
+		if block := arena.curr_block; block != nil {
+			assert(block.used >= temp.used, "out of order use of arena_temp_end", loc)
+			amount_to_zero := min(block.used-temp.used, block.reserved-block.used)
+			mem.zero_slice(block.base[temp.used:][:amount_to_zero])
+			block.used = temp.used
+		}
 	}
 
 	assert(arena.temp_count > 0, "double-use of arena_temp_end", loc)

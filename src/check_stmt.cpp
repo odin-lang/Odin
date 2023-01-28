@@ -1415,6 +1415,503 @@ gb_internal bool check_expr_is_stack_variable(Ast *expr) {
 	return false;
 }
 
+gb_internal void check_range_stmt(CheckerContext *ctx, Ast *node, u32 mod_flags) {
+	ast_node(rs, RangeStmt, node);
+
+	TEMPORARY_ALLOCATOR_GUARD();
+
+	u32 new_flags = mod_flags | Stmt_BreakAllowed | Stmt_ContinueAllowed;
+
+	check_open_scope(ctx, node);
+	check_label(ctx, rs->label, node);
+
+	auto vals = array_make<Type *>(temporary_allocator(), 0, 2);
+	auto entities = array_make<Entity *>(temporary_allocator(), 0, 2);
+	bool is_map = false;
+	bool use_by_reference_for_value = false;
+	bool is_soa = false;
+
+	Ast *expr = unparen_expr(rs->expr);
+
+	isize max_val_count = 2;
+	if (is_ast_range(expr)) {
+		ast_node(ie, BinaryExpr, expr);
+		Operand x = {};
+		Operand y = {};
+
+		bool ok = check_range(ctx, expr, &x, &y, nullptr);
+		if (!ok) {
+			goto skip_expr_range_stmt;
+		}
+		array_add(&vals, x.type);
+		array_add(&vals, t_int);
+	} else {
+		Operand operand = {Addressing_Invalid};
+		check_expr_base(ctx, &operand, expr, nullptr);
+		error_operand_no_value(&operand);
+
+		if (operand.mode == Addressing_Type) {
+			if (!is_type_enum(operand.type)) {
+				gbString t = type_to_string(operand.type);
+				error(operand.expr, "Cannot iterate over the type '%s'", t);
+				gb_string_free(t);
+				goto skip_expr_range_stmt;
+			} else {
+				array_add(&vals, operand.type);
+				array_add(&vals, t_int);
+				add_type_info_type(ctx, operand.type);
+				goto skip_expr_range_stmt;
+			}
+		} else if (operand.mode != Addressing_Invalid) {
+			bool is_ptr = is_type_pointer(operand.type);
+			Type *t = base_type(type_deref(operand.type));
+			switch (t->kind) {
+			case Type_Basic:
+				if (is_type_string(t) && t->Basic.kind != Basic_cstring) {
+					array_add(&vals, t_rune);
+					array_add(&vals, t_int);
+					add_package_dependency(ctx, "runtime", "string_decode_rune");
+				}
+				break;
+
+			case Type_EnumeratedArray:
+				if (is_ptr) use_by_reference_for_value = true;
+				array_add(&vals, t->EnumeratedArray.elem);
+				array_add(&vals, t->EnumeratedArray.index);
+				break;
+
+			case Type_Array:
+				if (is_ptr) use_by_reference_for_value = true;
+				array_add(&vals, t->Array.elem);
+				array_add(&vals, t_int);
+				break;
+
+			case Type_DynamicArray:
+				if (is_ptr) use_by_reference_for_value = true;
+				array_add(&vals, t->DynamicArray.elem);
+				array_add(&vals, t_int);
+				break;
+
+			case Type_Slice:
+				if (is_ptr) use_by_reference_for_value = true;
+				array_add(&vals, t->Slice.elem);
+				array_add(&vals, t_int);
+				break;
+
+			case Type_Map:
+				if (is_ptr) use_by_reference_for_value = true;
+				is_map = true;
+				array_add(&vals, t->Map.key);
+				array_add(&vals, t->Map.value);
+				break;
+
+			case Type_Tuple:
+				{
+					isize count = t->Tuple.variables.count;
+					if (count < 1 || count > 3) {
+						check_not_tuple(ctx, &operand);
+						error_line("\tMultiple return valued parameters in a range statement are limited to a maximum of 2 usable values with a trailing boolean for the conditional\n");
+						break;
+					}
+					Type *cond_type = t->Tuple.variables[count-1]->type;
+					if (!is_type_boolean(cond_type)) {
+						gbString s = type_to_string(cond_type);
+						error(operand.expr, "The final type of %td-valued expression must be a boolean, got %s", count, s);
+						gb_string_free(s);
+						break;
+					}
+
+					for (Entity *e : t->Tuple.variables) {
+						array_add(&vals, e->type);
+					}
+
+					if (rs->vals.count > 1 && rs->vals[1] != nullptr && count < 3) {
+						gbString s = type_to_string(t);
+						error(operand.expr, "Expected a 3-valued expression on the rhs, got (%s)", s);
+						gb_string_free(s);
+						break;
+					}
+
+					if (rs->vals.count > 0 && rs->vals[0] != nullptr && count < 2) {
+						gbString s = type_to_string(t);
+						error(operand.expr, "Expected at least a 2-valued expression on the rhs, got (%s)", s);
+						gb_string_free(s);
+						break;
+					}
+
+				}
+				break;
+
+			case Type_Struct:
+				if (t->Struct.soa_kind != StructSoa_None) {
+					is_soa = true;
+					if (is_ptr) use_by_reference_for_value = true;
+					array_add(&vals, t->Struct.soa_elem);
+					array_add(&vals, t_int);
+				}
+				break;
+			}
+		}
+
+		if (vals.count == 0 || vals[0] == nullptr) {
+			gbString s = expr_to_string(operand.expr);
+			gbString t = type_to_string(operand.type);
+			defer (gb_string_free(s));
+			defer (gb_string_free(t));
+
+			error(operand.expr, "Cannot iterate over '%s' of type '%s'", s, t);
+
+			if (rs->vals.count == 1) {
+				Type *t = type_deref(operand.type);
+				if (is_type_map(t) || is_type_bit_set(t)) {
+					gbString v = expr_to_string(rs->vals[0]);
+					defer (gb_string_free(v));
+					error_line("\tSuggestion: place parentheses around the expression\n");
+					error_line("\t            for (%s in %s) {\n", v, s);
+				}
+			}
+		}
+	}
+
+	skip_expr_range_stmt:; // NOTE(zhiayang): again, declaring a variable immediately after a label... weird.
+
+	if (rs->vals.count > max_val_count) {
+		error(rs->vals[max_val_count], "Expected a maximum of %td identifier%s, got %td", max_val_count, max_val_count == 1 ? "" : "s", rs->vals.count);
+	}
+
+	auto rhs = slice_from_array(vals);
+	auto lhs = slice_make<Ast *>(temporary_allocator(), rhs.count);
+	slice_copy(&lhs, rs->vals);
+
+	isize addressable_index = cast(isize)is_map;
+
+	for_array(i, rhs) {
+		if (lhs[i] == nullptr) {
+			continue;
+		}
+		Ast * name = lhs[i];
+		Type *type = rhs[i];
+
+		Entity *entity = nullptr;
+		if (name->kind == Ast_Ident) {
+			Token token = name->Ident.token;
+			String str = token.string;
+			Entity *found = nullptr;
+
+			if (!is_blank_ident(str)) {
+				found = scope_lookup_current(ctx->scope, str);
+			}
+			if (found == nullptr) {
+				entity = alloc_entity_variable(ctx->scope, token, type, EntityState_Resolved);
+				entity->flags |= EntityFlag_ForValue;
+				entity->flags |= EntityFlag_Value;
+				entity->identifier = name;
+				if (i == addressable_index && use_by_reference_for_value) {
+					entity->flags &= ~EntityFlag_Value;
+				}
+				if (is_soa) {
+					if (i == 0) {
+						entity->flags |= EntityFlag_SoaPtrField;
+					}
+				}
+
+				add_entity_definition(&ctx->checker->info, name, entity);
+			} else {
+				TokenPos pos = found->token.pos;
+				error(token,
+				      "Redeclaration of '%.*s' in this scope\n"
+				      "\tat %s",
+				      LIT(str), token_pos_to_string(pos));
+				entity = found;
+			}
+		} else {
+			error(name, "A variable declaration must be an identifier");
+		}
+
+		if (entity == nullptr) {
+			entity = alloc_entity_dummy_variable(builtin_pkg->scope, ast_token(name));
+			entity->identifier = name; // might not be an identifier
+		}
+
+		array_add(&entities, entity);
+
+		if (type == nullptr) {
+			entity->type = t_invalid;
+			entity->flags |= EntityFlag_Used;
+		}
+	}
+
+	for (Entity *e : entities) {
+		DeclInfo *d = decl_info_of_entity(e);
+		GB_ASSERT(d == nullptr);
+		add_entity(ctx, ctx->scope, e->identifier, e);
+		d = make_decl_info(ctx->scope, ctx->decl);
+		add_entity_and_decl_info(ctx, e->identifier, e, d);
+	}
+
+	check_stmt(ctx, rs->body, new_flags);
+
+	check_close_scope(ctx);
+}
+
+gb_internal void check_value_decl_stmt(CheckerContext *ctx, Ast *node, u32 mod_flags) {
+	ast_node(vd, ValueDecl, node);
+	if (!vd->is_mutable) {
+		// constant value declaration
+		// NOTE(bill): Check `_` declarations
+		for (Ast *name : vd->names) {
+			if (is_blank_ident(name)) {
+				Entity *e = name->Ident.entity;
+				DeclInfo *d = decl_info_of_entity(e);
+				if (d != nullptr) {
+					check_entity_decl(ctx, e, d, nullptr);
+				}
+			}
+		}
+		return;
+	}
+	Entity **entities = gb_alloc_array(permanent_allocator(), Entity *, vd->names.count);
+	isize entity_count = 0;
+
+	isize new_name_count = 0;
+	for (Ast *name : vd->names) {
+		Entity *entity = nullptr;
+		if (name->kind != Ast_Ident) {
+			error(name, "A variable declaration must be an identifier");
+		} else {
+			Token token = name->Ident.token;
+			String str = token.string;
+			Entity *found = nullptr;
+			// NOTE(bill): Ignore assignments to '_'
+			if (!is_blank_ident(str)) {
+				found = scope_lookup_current(ctx->scope, str);
+				new_name_count += 1;
+			}
+			if (found == nullptr) {
+				entity = alloc_entity_variable(ctx->scope, token, nullptr);
+				entity->identifier = name;
+
+				Ast *fl = ctx->foreign_context.curr_library;
+				if (fl != nullptr) {
+					GB_ASSERT(fl->kind == Ast_Ident);
+					entity->Variable.is_foreign = true;
+					entity->Variable.foreign_library_ident = fl;
+				}
+			} else {
+				TokenPos pos = found->token.pos;
+				error(token,
+				      "Redeclaration of '%.*s' in this scope\n"
+				      "\tat %s",
+				      LIT(str), token_pos_to_string(pos));
+				entity = found;
+			}
+		}
+		if (entity == nullptr) {
+			entity = alloc_entity_dummy_variable(builtin_pkg->scope, ast_token(name));
+		}
+		entity->parent_proc_decl = ctx->curr_proc_decl;
+		entities[entity_count++] = entity;
+		if (name->kind == Ast_Ident) {
+			name->Ident.entity = entity;
+		}
+	}
+
+	if (new_name_count == 0) {
+		begin_error_block();
+		error(node, "No new declarations on the left hand side");
+		bool all_underscore = true;
+		for (Ast *name : vd->names) {
+			if (name->kind == Ast_Ident) {
+				if (!is_blank_ident(name)) {
+					all_underscore = false;
+					break;
+				}
+			} else {
+				all_underscore = false;
+				break;
+			}
+		}
+		if (all_underscore) {
+			error_line("\tSuggestion: Try changing the declaration (:=) to an assignment (=)\n");
+		}
+
+		end_error_block();
+	}
+
+	Type *init_type = nullptr;
+	if (vd->type != nullptr) {
+		init_type = check_type(ctx, vd->type);
+		if (init_type == nullptr) {
+			init_type = t_invalid;
+		} else if (is_type_polymorphic(base_type(init_type))) {
+			gbString str = type_to_string(init_type);
+			error(vd->type, "Invalid use of a polymorphic type '%s' in variable declaration", str);
+			gb_string_free(str);
+			init_type = t_invalid;
+		}
+	}
+
+
+	// TODO NOTE(bill): This technically checks things multple times
+	AttributeContext ac = make_attribute_context(ctx->foreign_context.link_prefix);
+	check_decl_attributes(ctx, vd->attributes, var_decl_attribute, &ac);
+
+	for (isize i = 0; i < entity_count; i++) {
+		Entity *e = entities[i];
+		GB_ASSERT(e != nullptr);
+		if (e->flags & EntityFlag_Visited) {
+			e->type = t_invalid;
+			continue;
+		}
+		e->flags |= EntityFlag_Visited;
+
+		e->state = EntityState_InProgress;
+		if (e->type == nullptr) {
+			e->type = init_type;
+			e->state = EntityState_Resolved;
+		}
+		ac.link_name = handle_link_name(ctx, e->token, ac.link_name, ac.link_prefix);
+
+		if (ac.link_name.len > 0) {
+			e->Variable.link_name = ac.link_name;
+		}
+
+		e->flags &= ~EntityFlag_Static;
+		if (ac.is_static) {
+			String name = e->token.string;
+			if (name == "_") {
+				error(e->token, "The 'static' attribute is not allowed to be applied to '_'");
+			} else {
+				e->flags |= EntityFlag_Static;
+				if (ctx->in_defer) {
+					error(e->token, "'static' variables cannot be declared within a defer statement");
+				}
+			}
+		}
+		if (ac.thread_local_model != "") {
+			String name = e->token.string;
+			if (name == "_") {
+				error(e->token, "The 'thread_local' attribute is not allowed to be applied to '_'");
+			} else {
+				e->flags |= EntityFlag_Static;
+				if (ctx->in_defer) {
+					error(e->token, "'thread_local' variables cannot be declared within a defer statement");
+				}
+			}
+			e->Variable.thread_local_model = ac.thread_local_model;
+		}
+
+		if (is_arch_wasm() && e->Variable.thread_local_model.len != 0) {
+			error(e->token, "@(thread_local) is not supported for this target platform");
+		}
+
+
+		if (ac.is_static && ac.thread_local_model != "") {
+			error(e->token, "The 'static' attribute is not needed if 'thread_local' is applied");
+		}
+	}
+
+	check_init_variables(ctx, entities, entity_count, vd->values, str_lit("variable declaration"));
+	check_arity_match(ctx, vd, false);
+
+	for (isize i = 0; i < entity_count; i++) {
+		Entity *e = entities[i];
+
+		if (e->Variable.is_foreign) {
+			if (vd->values.count > 0) {
+				error(e->token, "A foreign variable declaration cannot have a default value");
+			}
+
+			String name = e->token.string;
+			if (e->Variable.link_name.len > 0) {
+				name = e->Variable.link_name;
+			}
+
+			if (vd->values.count > 0) {
+				error(e->token, "A foreign variable declaration cannot have a default value");
+			}
+			init_entity_foreign_library(ctx, e);
+
+			auto *fp = &ctx->checker->info.foreigns;
+			StringHashKey key = string_hash_string(name);
+			Entity **found = string_map_get(fp, key);
+			if (found) {
+				Entity *f = *found;
+				TokenPos pos = f->token.pos;
+				Type *this_type = base_type(e->type);
+				Type *other_type = base_type(f->type);
+				if (!are_types_identical(this_type, other_type)) {
+					error(e->token,
+					      "Foreign entity '%.*s' previously declared elsewhere with a different type\n"
+					      "\tat %s",
+					      LIT(name), token_pos_to_string(pos));
+				}
+			} else {
+				string_map_set(fp, key, e);
+			}
+		} else if (e->flags & EntityFlag_Static) {
+			if (vd->values.count > 0) {
+				if (entity_count != vd->values.count) {
+					error(e->token, "A static variable declaration with a default value must be constant");
+				} else {
+					Ast *value = vd->values[i];
+					if (value->tav.mode != Addressing_Constant) {
+						error(e->token, "A static variable declaration with a default value must be constant");
+					}
+				}
+			}
+		}
+		add_entity(ctx, ctx->scope, e->identifier, e);
+	}
+
+	if (vd->is_using != 0) {
+		Token token = ast_token(node);
+		if (vd->type != nullptr && entity_count > 1) {
+			error(token, "'using' can only be applied to one variable of the same type");
+			// TODO(bill): Should a 'continue' happen here?
+		}
+
+		for (isize entity_index = 0; entity_index < 1; entity_index++) {
+			Entity *e = entities[entity_index];
+			if (e == nullptr) {
+				continue;
+			}
+			if (e->kind != Entity_Variable) {
+				continue;
+			}
+			String name = e->token.string;
+			Type *t = base_type(type_deref(e->type));
+
+			if (is_blank_ident(name)) {
+				error(token, "'using' cannot be applied variable declared as '_'");
+			} else if (is_type_struct(t) || is_type_raw_union(t)) {
+				ERROR_BLOCK();
+
+				Scope *scope = t->Struct.scope;
+				GB_ASSERT(scope != nullptr);
+				for (auto const &entry : scope->elements) {
+					Entity *f = entry.value;
+					if (f->kind == Entity_Variable) {
+						Entity *uvar = alloc_entity_using_variable(e, f->token, f->type, nullptr);
+						uvar->flags |= (e->flags & EntityFlag_Value);
+						Entity *prev = scope_insert(ctx->scope, uvar);
+						if (prev != nullptr) {
+							error(token, "Namespace collision while 'using' '%.*s' of: %.*s", LIT(name), LIT(prev->token.string));
+							return;
+						}
+					}
+				}
+
+				add_entity_use(ctx, nullptr, e);
+			} else {
+				// NOTE(bill): skip the rest to remove extra errors
+				error(token, "'using' can only be applied to variables of type struct or raw_union");
+				return;
+			}
+		}
+	}
+}
+
 gb_internal void check_stmt_internal(CheckerContext *ctx, Ast *node, u32 flags) {
 	u32 mod_flags = flags & (~Stmt_FallthroughAllowed);
 	switch (node->kind) {
@@ -1748,240 +2245,7 @@ gb_internal void check_stmt_internal(CheckerContext *ctx, Ast *node, u32 flags) 
 
 
 	case_ast_node(rs, RangeStmt, node);
-		TEMPORARY_ALLOCATOR_GUARD();
-
-		u32 new_flags = mod_flags | Stmt_BreakAllowed | Stmt_ContinueAllowed;
-
-		check_open_scope(ctx, node);
-		check_label(ctx, rs->label, node);
-
-		auto vals = array_make<Type *>(temporary_allocator(), 0, 2);
-		auto entities = array_make<Entity *>(temporary_allocator(), 0, 2);
-		bool is_map = false;
-		bool use_by_reference_for_value = false;
-		bool is_soa = false;
-
-		Ast *expr = unparen_expr(rs->expr);
-
-		isize max_val_count = 2;
-		if (is_ast_range(expr)) {
-			ast_node(ie, BinaryExpr, expr);
-			Operand x = {};
-			Operand y = {};
-
-			bool ok = check_range(ctx, expr, &x, &y, nullptr);
-			if (!ok) {
-				goto skip_expr_range_stmt;
-			}
-			array_add(&vals, x.type);
-			array_add(&vals, t_int);
-		} else {
-			Operand operand = {Addressing_Invalid};
-			check_expr_base(ctx, &operand, expr, nullptr);
-			error_operand_no_value(&operand);
-
-			if (operand.mode == Addressing_Type) {
-				if (!is_type_enum(operand.type)) {
-					gbString t = type_to_string(operand.type);
-					error(operand.expr, "Cannot iterate over the type '%s'", t);
-					gb_string_free(t);
-					goto skip_expr_range_stmt;
-				} else {
-					array_add(&vals, operand.type);
-					array_add(&vals, t_int);
-					add_type_info_type(ctx, operand.type);
-					goto skip_expr_range_stmt;
-				}
-			} else if (operand.mode != Addressing_Invalid) {
-				bool is_ptr = is_type_pointer(operand.type);
-				Type *t = base_type(type_deref(operand.type));
-				switch (t->kind) {
-				case Type_Basic:
-					if (is_type_string(t) && t->Basic.kind != Basic_cstring) {
-						array_add(&vals, t_rune);
-						array_add(&vals, t_int);
-						add_package_dependency(ctx, "runtime", "string_decode_rune");
-					}
-					break;
-
-				case Type_EnumeratedArray:
-					if (is_ptr) use_by_reference_for_value = true;
-					array_add(&vals, t->EnumeratedArray.elem);
-					array_add(&vals, t->EnumeratedArray.index);
-					break;
-
-				case Type_Array:
-					if (is_ptr) use_by_reference_for_value = true;
-					array_add(&vals, t->Array.elem);
-					array_add(&vals, t_int);
-					break;
-
-				case Type_DynamicArray:
-					if (is_ptr) use_by_reference_for_value = true;
-					array_add(&vals, t->DynamicArray.elem);
-					array_add(&vals, t_int);
-					break;
-
-				case Type_Slice:
-					if (is_ptr) use_by_reference_for_value = true;
-					array_add(&vals, t->Slice.elem);
-					array_add(&vals, t_int);
-					break;
-
-				case Type_Map:
-					if (is_ptr) use_by_reference_for_value = true;
-					is_map = true;
-					array_add(&vals, t->Map.key);
-					array_add(&vals, t->Map.value);
-					break;
-
-				case Type_Tuple:
-					{
-						isize count = t->Tuple.variables.count;
-						if (count < 1 || count > 3) {
-							check_not_tuple(ctx, &operand);
-							error_line("\tMultiple return valued parameters in a range statement are limited to a maximum of 2 usable values with a trailing boolean for the conditional\n");
-							break;
-						}
-						Type *cond_type = t->Tuple.variables[count-1]->type;
-						if (!is_type_boolean(cond_type)) {
-							gbString s = type_to_string(cond_type);
-							error(operand.expr, "The final type of %td-valued expression must be a boolean, got %s", count, s);
-							gb_string_free(s);
-							break;
-						}
-
-						for (Entity *e : t->Tuple.variables) {
-							array_add(&vals, e->type);
-						}
-
-						if (rs->vals.count > 1 && rs->vals[1] != nullptr && count < 3) {
-							gbString s = type_to_string(t);
-							error(operand.expr, "Expected a 3-valued expression on the rhs, got (%s)", s);
-							gb_string_free(s);
-							break;
-						}
-
-						if (rs->vals.count > 0 && rs->vals[0] != nullptr && count < 2) {
-							gbString s = type_to_string(t);
-							error(operand.expr, "Expected at least a 2-valued expression on the rhs, got (%s)", s);
-							gb_string_free(s);
-							break;
-						}
-
-					}
-					break;
-
-				case Type_Struct:
-					if (t->Struct.soa_kind != StructSoa_None) {
-						is_soa = true;
-						if (is_ptr) use_by_reference_for_value = true;
-						array_add(&vals, t->Struct.soa_elem);
-						array_add(&vals, t_int);
-					}
-					break;
-				}
-			}
-
-			if (vals.count == 0 || vals[0] == nullptr) {
-				gbString s = expr_to_string(operand.expr);
-				gbString t = type_to_string(operand.type);
-				defer (gb_string_free(s));
-				defer (gb_string_free(t));
-
-				error(operand.expr, "Cannot iterate over '%s' of type '%s'", s, t);
-
-				if (rs->vals.count == 1) {
-					Type *t = type_deref(operand.type);
-					if (is_type_map(t) || is_type_bit_set(t)) {
-						gbString v = expr_to_string(rs->vals[0]);
-						defer (gb_string_free(v));
-						error_line("\tSuggestion: place parentheses around the expression\n");
-						error_line("\t            for (%s in %s) {\n", v, s);
-					}
-				}
-			}
-		}
-
-		skip_expr_range_stmt:; // NOTE(zhiayang): again, declaring a variable immediately after a label... weird.
-
-		if (rs->vals.count > max_val_count) {
-			error(rs->vals[max_val_count], "Expected a maximum of %td identifier%s, got %td", max_val_count, max_val_count == 1 ? "" : "s", rs->vals.count);
-		}
-
-		auto rhs = slice_from_array(vals);
-		auto lhs = slice_make<Ast *>(temporary_allocator(), rhs.count);
-		slice_copy(&lhs, rs->vals);
-
-		isize addressable_index = cast(isize)is_map;
-
-		for_array(i, rhs) {
-			if (lhs[i] == nullptr) {
-				continue;
-			}
-			Ast * name = lhs[i];
-			Type *type = rhs[i];
-
-			Entity *entity = nullptr;
-			if (name->kind == Ast_Ident) {
-				Token token = name->Ident.token;
-				String str = token.string;
-				Entity *found = nullptr;
-
-				if (!is_blank_ident(str)) {
-					found = scope_lookup_current(ctx->scope, str);
-				}
-				if (found == nullptr) {
-					entity = alloc_entity_variable(ctx->scope, token, type, EntityState_Resolved);
-					entity->flags |= EntityFlag_ForValue;
-					entity->flags |= EntityFlag_Value;
-					entity->identifier = name;
-					if (i == addressable_index && use_by_reference_for_value) {
-						entity->flags &= ~EntityFlag_Value;
-					}
-					if (is_soa) {
-						if (i == 0) {
-							entity->flags |= EntityFlag_SoaPtrField;
-						}
-					}
-
-					add_entity_definition(&ctx->checker->info, name, entity);
-				} else {
-					TokenPos pos = found->token.pos;
-					error(token,
-					      "Redeclaration of '%.*s' in this scope\n"
-					      "\tat %s",
-					      LIT(str), token_pos_to_string(pos));
-					entity = found;
-				}
-			} else {
-				error(name, "A variable declaration must be an identifier");
-			}
-
-			if (entity == nullptr) {
-				entity = alloc_entity_dummy_variable(builtin_pkg->scope, ast_token(name));
-				entity->identifier = name; // might not be an identifier
-			}
-
-			array_add(&entities, entity);
-
-			if (type == nullptr) {
-				entity->type = t_invalid;
-				entity->flags |= EntityFlag_Used;
-			}
-		}
-
-		for (Entity *e : entities) {
-			DeclInfo *d = decl_info_of_entity(e);
-			GB_ASSERT(d == nullptr);
-			add_entity(ctx, ctx->scope, e->identifier, e);
-			d = make_decl_info(ctx->scope, ctx->decl);
-			add_entity_and_decl_info(ctx, e->identifier, e, d);
-		}
-
-		check_stmt(ctx, rs->body, new_flags);
-
-		check_close_scope(ctx);
+		check_range_stmt(ctx, node, mod_flags);
 	case_end;
 
 	case_ast_node(irs, UnrollRangeStmt, node);
@@ -2134,262 +2398,7 @@ gb_internal void check_stmt_internal(CheckerContext *ctx, Ast *node, u32 flags) 
 	case_end;
 
 	case_ast_node(vd, ValueDecl, node);
-		if (vd->is_mutable) {
-			Entity **entities = gb_alloc_array(permanent_allocator(), Entity *, vd->names.count);
-			isize entity_count = 0;
-
-			isize new_name_count = 0;
-			for (Ast *name : vd->names) {
-				Entity *entity = nullptr;
-				if (name->kind != Ast_Ident) {
-					error(name, "A variable declaration must be an identifier");
-				} else {
-					Token token = name->Ident.token;
-					String str = token.string;
-					Entity *found = nullptr;
-					// NOTE(bill): Ignore assignments to '_'
-					if (!is_blank_ident(str)) {
-						found = scope_lookup_current(ctx->scope, str);
-						new_name_count += 1;
-					}
-					if (found == nullptr) {
-						entity = alloc_entity_variable(ctx->scope, token, nullptr);
-						entity->identifier = name;
-
-						Ast *fl = ctx->foreign_context.curr_library;
-						if (fl != nullptr) {
-							GB_ASSERT(fl->kind == Ast_Ident);
-							entity->Variable.is_foreign = true;
-							entity->Variable.foreign_library_ident = fl;
-						}
-					} else {
-						TokenPos pos = found->token.pos;
-						error(token,
-						      "Redeclaration of '%.*s' in this scope\n"
-						      "\tat %s",
-						      LIT(str), token_pos_to_string(pos));
-						entity = found;
-					}
-				}
-				if (entity == nullptr) {
-					entity = alloc_entity_dummy_variable(builtin_pkg->scope, ast_token(name));
-				}
-				entity->parent_proc_decl = ctx->curr_proc_decl;
-				entities[entity_count++] = entity;
-				if (name->kind == Ast_Ident) {
-					name->Ident.entity = entity;
-				}
-			}
-
-			if (new_name_count == 0) {
-				begin_error_block();
-				error(node, "No new declarations on the left hand side");
-				bool all_underscore = true;
-				for (Ast *name : vd->names) {
-					if (name->kind == Ast_Ident) {
-						if (!is_blank_ident(name)) {
-							all_underscore = false;
-							break;
-						}
-					} else {
-						all_underscore = false;
-						break;
-					}
-				}
-				if (all_underscore) {
-					error_line("\tSuggestion: Try changing the declaration (:=) to an assignment (=)\n");
-				}
-
-				end_error_block();
-			}
-
-			Type *init_type = nullptr;
-			if (vd->type != nullptr) {
-				init_type = check_type(ctx, vd->type);
-				if (init_type == nullptr) {
-					init_type = t_invalid;
-				} else if (is_type_polymorphic(base_type(init_type))) {
-					gbString str = type_to_string(init_type);
-					error(vd->type, "Invalid use of a polymorphic type '%s' in variable declaration", str);
-					gb_string_free(str);
-					init_type = t_invalid;
-				}
-			}
-
-
-			// TODO NOTE(bill): This technically checks things multple times
-			AttributeContext ac = make_attribute_context(ctx->foreign_context.link_prefix);
-			check_decl_attributes(ctx, vd->attributes, var_decl_attribute, &ac);
-
-			for (isize i = 0; i < entity_count; i++) {
-				Entity *e = entities[i];
-				GB_ASSERT(e != nullptr);
-				if (e->flags & EntityFlag_Visited) {
-					e->type = t_invalid;
-					continue;
-				}
-				e->flags |= EntityFlag_Visited;
-
-				e->state = EntityState_InProgress;
-				if (e->type == nullptr) {
-					e->type = init_type;
-					e->state = EntityState_Resolved;
-				}
-				ac.link_name = handle_link_name(ctx, e->token, ac.link_name, ac.link_prefix);
-
-				if (ac.link_name.len > 0) {
-					e->Variable.link_name = ac.link_name;
-				}
-
-				e->flags &= ~EntityFlag_Static;
-				if (ac.is_static) {
-					String name = e->token.string;
-					if (name == "_") {
-						error(e->token, "The 'static' attribute is not allowed to be applied to '_'");
-					} else {
-						e->flags |= EntityFlag_Static;
-						if (ctx->in_defer) {
-							error(e->token, "'static' variables cannot be declared within a defer statement");
-						}
-					}
-				}
-				if (ac.thread_local_model != "") {
-					String name = e->token.string;
-					if (name == "_") {
-						error(e->token, "The 'thread_local' attribute is not allowed to be applied to '_'");
-					} else {
-						e->flags |= EntityFlag_Static;
-						if (ctx->in_defer) {
-							error(e->token, "'thread_local' variables cannot be declared within a defer statement");
-						}
-					}
-					e->Variable.thread_local_model = ac.thread_local_model;
-				}
-
-				if (is_arch_wasm() && e->Variable.thread_local_model.len != 0) {
-					error(e->token, "@(thread_local) is not supported for this target platform");
-				}
-				
-
-				if (ac.is_static && ac.thread_local_model != "") {
-					error(e->token, "The 'static' attribute is not needed if 'thread_local' is applied");
-				}
-			}
-
-			check_init_variables(ctx, entities, entity_count, vd->values, str_lit("variable declaration"));
-			check_arity_match(ctx, vd, false);
-
-			for (isize i = 0; i < entity_count; i++) {
-				Entity *e = entities[i];
-
-				if (e->Variable.is_foreign) {
-					if (vd->values.count > 0) {
-						error(e->token, "A foreign variable declaration cannot have a default value");
-					}
-
-					String name = e->token.string;
-					if (e->Variable.link_name.len > 0) {
-						name = e->Variable.link_name;
-					}
-
-					if (vd->values.count > 0) {
-						error(e->token, "A foreign variable declaration cannot have a default value");
-					}
-					init_entity_foreign_library(ctx, e);
-
-					auto *fp = &ctx->checker->info.foreigns;
-					StringHashKey key = string_hash_string(name);
-					Entity **found = string_map_get(fp, key);
-					if (found) {
-						Entity *f = *found;
-						TokenPos pos = f->token.pos;
-						Type *this_type = base_type(e->type);
-						Type *other_type = base_type(f->type);
-						if (!are_types_identical(this_type, other_type)) {
-							error(e->token,
-							      "Foreign entity '%.*s' previously declared elsewhere with a different type\n"
-							      "\tat %s",
-							      LIT(name), token_pos_to_string(pos));
-						}
-					} else {
-						string_map_set(fp, key, e);
-					}
-				} else if (e->flags & EntityFlag_Static) {
-					if (vd->values.count > 0) {
-						if (entity_count != vd->values.count) {
-							error(e->token, "A static variable declaration with a default value must be constant");
-						} else {
-							Ast *value = vd->values[i];
-							if (value->tav.mode != Addressing_Constant) {
-								error(e->token, "A static variable declaration with a default value must be constant");
-							}
-						}
-					}
-				}
-				add_entity(ctx, ctx->scope, e->identifier, e);
-			}
-
-			if (vd->is_using != 0) {
-				Token token = ast_token(node);
-				if (vd->type != nullptr && entity_count > 1) {
-					error(token, "'using' can only be applied to one variable of the same type");
-					// TODO(bill): Should a 'continue' happen here?
-				}
-
-				for (isize entity_index = 0; entity_index < 1; entity_index++) {
-					Entity *e = entities[entity_index];
-					if (e == nullptr) {
-						continue;
-					}
-					if (e->kind != Entity_Variable) {
-						continue;
-					}
-					String name = e->token.string;
-					Type *t = base_type(type_deref(e->type));
-
-					if (is_blank_ident(name)) {
-						error(token, "'using' cannot be applied variable declared as '_'");
-					} else if (is_type_struct(t) || is_type_raw_union(t)) {
-						ERROR_BLOCK();
-						
-						Scope *scope = t->Struct.scope;
-						GB_ASSERT(scope != nullptr);
-						for (auto const &entry : scope->elements) {
-							Entity *f = entry.value;
-							if (f->kind == Entity_Variable) {
-								Entity *uvar = alloc_entity_using_variable(e, f->token, f->type, nullptr);
-								uvar->flags |= (e->flags & EntityFlag_Value);
-								Entity *prev = scope_insert(ctx->scope, uvar);
-								if (prev != nullptr) {
-									error(token, "Namespace collision while 'using' '%.*s' of: %.*s", LIT(name), LIT(prev->token.string));
-									return;
-								}
-							}
-						}
-
-						add_entity_use(ctx, nullptr, e);
-					} else {
-						// NOTE(bill): skip the rest to remove extra errors
-						error(token, "'using' can only be applied to variables of type struct or raw_union");
-						return;
-					}
-				}
-			}
-
-		} else {
-			// constant value declaration
-			// NOTE(bill): Check `_` declarations
-			for (Ast *name : vd->names) {
-				if (is_blank_ident(name)) {
-					Entity *e = name->Ident.entity;
-					DeclInfo *d = decl_info_of_entity(e);
-					if (d != nullptr) {
-						check_entity_decl(ctx, e, d, nullptr);
-					}
-				}
-			}
-
-		}
+		check_value_decl_stmt(ctx, node, mod_flags);
 	case_end;
 	}
 }

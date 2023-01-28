@@ -1050,7 +1050,6 @@ gb_internal bool has_asm_extension(String const &path) {
 
 // temporary
 gb_internal char *token_pos_to_string(TokenPos const &pos) {
-	TEMPORARY_ALLOCATOR_GUARD();
 	gbString s = gb_string_make_reserve(temporary_allocator(), 128);
 	String file = get_file_path_string(pos.file_id);
 	switch (build_context.ODIN_ERROR_POS_STYLE) {
