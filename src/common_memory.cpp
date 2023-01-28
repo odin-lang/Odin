@@ -375,6 +375,8 @@ gb_internal bool IS_ODIN_DEBUG(void);
 
 gb_internal GB_ALLOCATOR_PROC(heap_allocator_proc);
 
+
+gb_global gb_thread_local Arena heap_arena = {nullptr, DEFAULT_MINIMUM_BLOCK_SIZE};
 gb_internal gbAllocator heap_allocator(void) {
 	if (IS_ODIN_DEBUG()) {
 		gbAllocator a;
@@ -382,7 +384,7 @@ gb_internal gbAllocator heap_allocator(void) {
 		a.data = nullptr;
 		return a;
 	}
-	return arena_allocator(&permanent_arena);
+	return arena_allocator(&heap_arena);
 }
 
 
