@@ -223,8 +223,7 @@ gb_internal i32 linker_stage(lbGenerator *gen) {
 			string_set_init(&asm_files, 64);
 			defer (string_set_destroy(&asm_files));
 
-			for_array(j, gen->foreign_libraries) {
-				Entity *e = gen->foreign_libraries[j];
+			for (Entity *e : gen->foreign_libraries) {
 				GB_ASSERT(e->kind == Entity_LibraryName);
 				for_array(i, e->LibraryName.paths) {
 					String lib = string_trim_whitespace(e->LibraryName.paths[i]);
@@ -287,8 +286,7 @@ gb_internal i32 linker_stage(lbGenerator *gen) {
 
 			gbString object_files = gb_string_make(heap_allocator(), "");
 			defer (gb_string_free(object_files));
-			for_array(i, gen->output_object_paths) {
-				String object_path = gen->output_object_paths[i];
+			for (String const &object_path : gen->output_object_paths) {
 				object_files = gb_string_append_fmt(object_files, "\"%.*s\" ", LIT(object_path));
 			}
 
@@ -331,9 +329,9 @@ gb_internal i32 linker_stage(lbGenerator *gen) {
 				result = system_exec_command_line_app("msvc-link",
 					"\"%.*slink.exe\" %s %.*s -OUT:\"%.*s\" %s "
 					"/nologo /incremental:no /opt:ref /subsystem:%s "
-					" %.*s "
-					" %.*s "
-					" %s "
+					"%.*s "
+					"%.*s "
+					"%s "
 					"",
 					LIT(vs_exe_path), object_files, LIT(res_path), LIT(output_filename),
 					link_settings,
@@ -349,9 +347,9 @@ gb_internal i32 linker_stage(lbGenerator *gen) {
 				result = system_exec_command_line_app("msvc-lld-link",
 					"\"%.*s\\bin\\lld-link\" %s -OUT:\"%.*s\" %s "
 					"/nologo /incremental:no /opt:ref /subsystem:%s "
-					" %.*s "
-					" %.*s "
-					" %s "
+					"%.*s "
+					"%.*s "
+					"%s "
 					"",
 					LIT(build_context.ODIN_ROOT), object_files, LIT(output_filename),
 					link_settings,
@@ -384,11 +382,10 @@ gb_internal i32 linker_stage(lbGenerator *gen) {
 			string_set_init(&libs, 64);
 			defer (string_set_destroy(&libs));
 
-			for_array(j, gen->foreign_libraries) {
-				Entity *e = gen->foreign_libraries[j];
+			for (Entity *e : gen->foreign_libraries) {
 				GB_ASSERT(e->kind == Entity_LibraryName);
-				for_array(i, e->LibraryName.paths) {
-					String lib = string_trim_whitespace(e->LibraryName.paths[i]);
+				for (String lib : e->LibraryName.paths) {
+					lib = string_trim_whitespace(lib);
 					if (lib.len == 0) {
 						continue;
 					}
@@ -440,8 +437,7 @@ gb_internal i32 linker_stage(lbGenerator *gen) {
 
 			gbString object_files = gb_string_make(heap_allocator(), "");
 			defer (gb_string_free(object_files));
-			for_array(i, gen->output_object_paths) {
-				String object_path = gen->output_object_paths[i];
+			for (String object_path : gen->output_object_paths) {
 				object_files = gb_string_append_fmt(object_files, "\"%.*s\" ", LIT(object_path));
 			}
 
@@ -856,8 +852,7 @@ gb_internal bool parse_build_flags(Array<String> args) {
 	bool set_flags[BuildFlag_COUNT] = {};
 
 	bool bad_flags = false;
-	for_array(i, flag_args) {
-		String flag = flag_args[i];
+	for (String flag : flag_args) {
 		if (flag[0] != '-') {
 			gb_printf_err("Invalid flag: %.*s\n", LIT(flag));
 			continue;
@@ -886,8 +881,7 @@ gb_internal bool parse_build_flags(Array<String> args) {
 		bool found = false;
 
 		BuildFlag found_bf = {};
-		for_array(build_flag_index, build_flags) {
-			BuildFlag bf = build_flags[build_flag_index];
+		for (BuildFlag const &bf : build_flags) {
 			if (bf.name == name) {
 				found = true;
 				found_bf = bf;
@@ -1646,10 +1640,9 @@ gb_internal void timings_export_all(Timings *t, Checker *c, bool timings_are_fin
 		isize files           = 0;
 		isize packages        = p->packages.count;
 		isize total_file_size = 0;
-		for_array(i, p->packages) {
-			files += p->packages[i]->files.count;
-			for_array(j, p->packages[i]->files) {
-				AstFile *file = p->packages[i]->files[j];
+		for (AstPackage *pkg : p->packages) {
+			files += pkg->files.count;
+			for (AstFile *file : pkg->files) {
 				total_file_size += file->tokenizer.end - file->tokenizer.start;
 			}
 		}
@@ -1673,8 +1666,7 @@ gb_internal void timings_export_all(Timings *t, Checker *c, bool timings_are_fin
 		gb_fprintf(&f, "\t\t{\"name\": \"%.*s\", \"millis\": %.3f},\n",
 		    LIT(t->total.label), total_time);
 
-		for_array(i, t->sections) {
-			TimeStamp ts = t->sections[i];
+		for (TimeStamp const &ts : t->sections) {
 			f64 section_time = time_stamp(ts, t->freq, unit);
 			gb_fprintf(&f, "\t\t{\"name\": \"%.*s\", \"millis\": %.3f},\n",
 			    LIT(ts.label), section_time);
@@ -1695,8 +1687,7 @@ gb_internal void timings_export_all(Timings *t, Checker *c, bool timings_are_fin
 		*/
 		gb_fprintf(&f, "\"%.*s\", %d\n", LIT(t->total.label), int(total_time));
 
-		for_array(i, t->sections) {
-			TimeStamp ts = t->sections[i];
+		for (TimeStamp const &ts : t->sections) {
 			f64 section_time = time_stamp(ts, t->freq, unit);
 			gb_fprintf(&f, "\"%.*s\", %d\n", LIT(ts.label), int(section_time));
 		}
@@ -1714,10 +1705,9 @@ gb_internal void show_timings(Checker *c, Timings *t) {
 	isize total_file_size = 0;
 	f64 total_tokenizing_time = 0;
 	f64 total_parsing_time = 0;
-	for_array(i, p->packages) {
-		files += p->packages[i]->files.count;
-		for_array(j, p->packages[i]->files) {
-			AstFile *file = p->packages[i]->files[j];
+	for (AstPackage *pkg : p->packages) {
+		files += pkg->files.count;
+		for (AstFile *file : pkg->files) {
 			total_tokenizing_time += file->time_to_tokenize;
 			total_parsing_time += file->time_to_parse;
 			total_file_size += file->tokenizer.end - file->tokenizer.start;
@@ -1778,8 +1768,7 @@ gb_internal void show_timings(Checker *c, Timings *t) {
 		}
 		{
 			TimeStamp ts = {};
-			for_array(i, t->sections) {
-				TimeStamp s = t->sections[i];
+			for (TimeStamp const &s : t->sections) {
 				if (s.label == "parse files") {
 					ts = s;
 					break;
@@ -1802,8 +1791,7 @@ gb_internal void show_timings(Checker *c, Timings *t) {
 		{
 			TimeStamp ts = {};
 			TimeStamp ts_end = {};
-			for_array(i, t->sections) {
-				TimeStamp s = t->sections[i];
+			for (TimeStamp const &s : t->sections) {
 				if (s.label == "type check") {
 					ts = s;
 				}
@@ -1849,8 +1837,7 @@ gb_internal void remove_temp_files(lbGenerator *gen) {
 
 	TIME_SECTION("remove keep temp files");
 
-	for_array(i, gen->output_temp_paths) {
-		String path = gen->output_temp_paths[i];
+	for (String const &path : gen->output_temp_paths) {
 		gb_file_remove(cast(char const *)path.text);
 	}
 
@@ -1858,8 +1845,7 @@ gb_internal void remove_temp_files(lbGenerator *gen) {
 		switch (build_context.build_mode) {
 		case BuildMode_Executable:
 		case BuildMode_DynamicLibrary:
-			for_array(i, gen->output_object_paths) {
-				String path = gen->output_object_paths[i];
+			for (String const &path : gen->output_object_paths) {
 				gb_file_remove(cast(char const *)path.text);
 			}
 			break;
@@ -2216,8 +2202,7 @@ gb_internal void print_show_unused(Checker *c) {
 	CheckerInfo *info = &c->info;
 
 	auto unused = array_make<Entity *>(permanent_allocator(), 0, info->entities.count);
-	for_array(i, info->entities) {
-		Entity *e = info->entities[i];
+	for (Entity *e : info->entities) {
 		if (e == nullptr) {
 			continue;
 		}
@@ -2264,8 +2249,7 @@ gb_internal void print_show_unused(Checker *c) {
 
 	AstPackage *curr_pkg = nullptr;
 	EntityKind curr_entity_kind = Entity_Invalid;
-	for_array(i, unused) {
-		Entity *e = unused[i];
+	for (Entity *e : unused) {
 		if (curr_pkg != e->pkg) {
 			curr_pkg = e->pkg;
 			curr_entity_kind = Entity_Invalid;
@@ -2318,19 +2302,18 @@ gb_internal gbFileError write_file_with_stripped_tokens(gbFile *f, AstFile *file
 	u8 const *file_data = file->tokenizer.start;
 	i32 prev_offset = 0;
 	i32 const end_offset = cast(i32)(file->tokenizer.end - file->tokenizer.start);
-	for_array(i, file->tokens) {
-		Token *token = &file->tokens[i];
-		if (token->flags & (TokenFlag_Remove|TokenFlag_Replace)) {
-			i32 offset = token->pos.offset;
+	for (Token const &token : file->tokens) {
+		if (token.flags & (TokenFlag_Remove|TokenFlag_Replace)) {
+			i32 offset = token.pos.offset;
 			i32 to_write = offset-prev_offset;
 			if (!gb_file_write(f, file_data+prev_offset, to_write)) {
 				return gbFileError_Invalid;
 			}
 			written += to_write;
-			prev_offset = token_pos_end(*token).offset;
+			prev_offset = token_pos_end(token).offset;
 		}
-		if (token->flags & TokenFlag_Replace) {
-			if (token->kind == Token_Ellipsis) {
+		if (token.flags & TokenFlag_Replace) {
+			if (token.kind == Token_Ellipsis) {
 				if (!gb_file_write(f, "..=", 3)) {
 					return gbFileError_Invalid;
 				}
@@ -2354,22 +2337,17 @@ gb_internal gbFileError write_file_with_stripped_tokens(gbFile *f, AstFile *file
 
 gb_internal int strip_semicolons(Parser *parser) {
 	isize file_count = 0;
-	for_array(i, parser->packages) {
-		AstPackage *pkg = parser->packages[i];
+	for (AstPackage *pkg : parser->packages) {
 		file_count += pkg->files.count;
 	}
 
 	auto generated_files = array_make<StripSemicolonFile>(permanent_allocator(), 0, file_count);
 
-	for_array(i, parser->packages) {
-		AstPackage *pkg = parser->packages[i];
-		for_array(j, pkg->files) {
-			AstFile *file = pkg->files[j];
-
+	for (AstPackage *pkg : parser->packages) {
+		for (AstFile *file : pkg->files) {
 			bool nothing_to_change = true;
-			for_array(i, file->tokens) {
-				Token *token = &file->tokens[i];
-				if (token->flags) {
+			for (Token const &token : file->tokens) {
+				if (token.flags) {
 					nothing_to_change = false;
 					break;
 				}
@@ -2397,9 +2375,8 @@ gb_internal int strip_semicolons(Parser *parser) {
 	isize generated_count = 0;
 	bool failed = false;
 
-	for_array(i, generated_files) {
-		auto *file = &generated_files[i];
-		char const *filename = cast(char const *)file->new_fullpath.text;
+	for (StripSemicolonFile &file : generated_files) {
+		char const *filename = cast(char const *)file.new_fullpath.text;
 		gbFileError err = gbFileError_None;
 		defer (if (err != gbFileError_None) {
 			failed = true;
@@ -2417,11 +2394,11 @@ gb_internal int strip_semicolons(Parser *parser) {
 		defer (err = gb_file_truncate(&f, written));
 
 		debugf("Write file with stripped tokens: %s\n", filename);
-		err = write_file_with_stripped_tokens(&f, file->file, &written);
+		err = write_file_with_stripped_tokens(&f, file.file, &written);
 		if (err) {
 			break;
 		}
-		file->written = written;
+		file.written = written;
 	}
 
 	if (failed) {
@@ -2436,12 +2413,10 @@ gb_internal int strip_semicolons(Parser *parser) {
 
 	isize overwritten_files = 0;
 
-	for_array(i, generated_files) {
-		auto *file = &generated_files[i];
-
-		char const *old_fullpath = cast(char const *)file->old_fullpath.text;
-		char const *old_fullpath_backup = cast(char const *)file->old_fullpath_backup.text;
-		char const *new_fullpath = cast(char const *)file->new_fullpath.text;
+	for (StripSemicolonFile const &file : generated_files) {
+		char const *old_fullpath = cast(char const *)file.old_fullpath.text;
+		char const *old_fullpath_backup = cast(char const *)file.old_fullpath_backup.text;
+		char const *new_fullpath = cast(char const *)file.new_fullpath.text;
 
 		debugf("Copy '%s' to '%s'\n", old_fullpath, old_fullpath_backup);
 		if (!gb_file_copy(old_fullpath, old_fullpath_backup, false)) {
