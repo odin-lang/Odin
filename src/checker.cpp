@@ -256,8 +256,8 @@ gb_internal Scope *create_scope_from_package(CheckerContext *c, AstPackage *pkg)
 	GB_ASSERT(pkg != nullptr);
 
 	isize total_pkg_decl_count = 0;
-	for_array(j, pkg->files) {
-		total_pkg_decl_count += pkg->files.data[j]->total_file_decl_count;
+	for (AstFile *file : pkg->files) {
+		total_pkg_decl_count += file->total_file_decl_count;
 	}
 
 	isize init_elements_capacity = gb_max(DEFAULT_SCOPE_CAPACITY, 2*total_pkg_decl_count);
@@ -692,8 +692,7 @@ gb_internal void check_scope_usage(Checker *c, Scope *scope) {
 
 	gb_sort(vetted_entities.data, vetted_entities.count, gb_size_of(VettedEntity), vetted_entity_variable_pos_cmp);
 
-	for_array(i, vetted_entities) {
-		auto ve = vetted_entities[i];
+	for (auto const &ve : vetted_entities) {
 		Entity *e = ve.entity;
 		Entity *other = ve.other;
 		String name = e->token.string;
@@ -1617,11 +1616,9 @@ gb_internal bool could_entity_be_lazy(Entity *e, DeclInfo *d) {
 		return false;
 	}
 
-	for_array(i, d->attributes) {
-		Ast *attr = d->attributes[i];
+	for (Ast *attr : d->attributes) {
 		if (attr->kind != Ast_Attribute) continue;
-		for_array(j, attr->Attribute.elems) {
-			Ast *elem = attr->Attribute.elems[j];
+		for (Ast *elem : attr->Attribute.elems) {
 			String name = {};
 
 			switch (elem->kind) {

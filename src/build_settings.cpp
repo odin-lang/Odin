@@ -596,9 +596,9 @@ gb_internal void add_library_collection(String name, String path) {
 }
 
 gb_internal bool find_library_collection_path(String name, String *path) {
-	for_array(i, library_collections) {
-		if (library_collections[i].name == name) {
-			if (path) *path = library_collections[i].path;
+	for (auto const &lc : library_collections) {
+		if (lc.name == name) {
+			if (path) *path = lc.path;
 			return true;
 		}
 	}
@@ -1307,8 +1307,7 @@ gb_internal bool check_target_feature_is_enabled(TokenPos pos, String const &tar
 
 	auto items = split_by_comma(target_feature_list);
 	array_free(&items);
-	for_array(i, items) {
-		String const &item = items.data[i];
+	for (String const &item : items) {
 		if (!check_target_feature_is_valid(pos, item)) {
 			error(pos, "Target feature '%.*s' is not valid", LIT(item));
 			return false;
@@ -1328,8 +1327,7 @@ gb_internal void enable_target_feature(TokenPos pos, String const &target_featur
 	defer (mutex_unlock(&bc->target_features_mutex));
 
 	auto items = split_by_comma(target_feature_list);
-	for_array(i, items) {
-		String const &item = items.data[i];
+	for (String const &item : items) {
 		if (!check_target_feature_is_valid(pos, item)) {
 			error(pos, "Target feature '%.*s' is not valid", LIT(item));
 			continue;
