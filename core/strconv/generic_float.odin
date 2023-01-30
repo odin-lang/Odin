@@ -326,7 +326,7 @@ decimal_to_float_bits :: proc(d: ^decimal.Decimal, info: ^Float_Info) -> (b: u64
 	exp = 0
 	for d.decimal_point > 0 {
 		n := 27 if d.decimal_point >= len(power_table) else power_table[d.decimal_point]
-		decimal.shift(d, n)
+		decimal.shift(d, -n)
 		exp += n
 	}
 	for d.decimal_point < 0 || d.decimal_point == 0 && d.digits[0] < '5' {
