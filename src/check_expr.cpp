@@ -7518,11 +7518,13 @@ gb_internal ExprKind check_ternary_if_expr(CheckerContext *c, Operand *o, Ast *n
 		return kind;
 	}
 
-	convert_to_typed(c, &x, type_hint ? type_hint : y.type);
+	bool use_type_hint = type_hint != nullptr && (is_operand_nil(x) || is_operand_nil(y));
+
+	convert_to_typed(c, &x, use_type_hint ? type_hint : y.type);
 	if (x.mode == Addressing_Invalid) {
 		return kind;
 	}
-	convert_to_typed(c, &y, type_hint ? type_hint : x.type);
+	convert_to_typed(c, &y, use_type_hint ? type_hint : x.type);
 	if (y.mode == Addressing_Invalid) {
 		x.mode = Addressing_Invalid;
 		return kind;
@@ -7530,7 +7532,7 @@ gb_internal ExprKind check_ternary_if_expr(CheckerContext *c, Operand *o, Ast *n
 
 	// NOTE(bill, 2023-01-30): Allow for expression like this:
 	//     x: union{f32} = f32(123) if cond else nil
-	if (type_hint && !ternary_compare_types(x.type, y.type)) {
+	if (type_hint && !is_type_any(type_hint) && !ternary_compare_types(x.type, y.type)) {
 		if (check_is_assignable_to(c, &x, type_hint) && check_is_assignable_to(c, &y, type_hint)) {
 			check_cast(c, &x, type_hint);
 			check_cast(c, &y, type_hint);
