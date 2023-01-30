@@ -850,7 +850,6 @@ set_union_variant_type_info :: proc(a: any, tag_ti: ^Type_Info) {
 	panic("expected a union to reflect.set_union_variant_type_info")
 }
 
-@(require_results)
 set_union_value :: proc(dst: any, value: any) -> bool {
 	if dst == nil { return false }
 
