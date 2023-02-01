@@ -3924,6 +3924,7 @@ gb_internal void correct_type_aliases_in_scope(CheckerContext *c, Scope *s) {
 	}
 }
 
+gb_internal bool collect_file_decl(CheckerContext *ctx, Ast *decl);
 
 // NOTE(bill): If file_scopes == nullptr, this will act like a local scope
 gb_internal void check_collect_entities(CheckerContext *c, Slice<Ast *> const &nodes) {
@@ -4003,6 +4004,13 @@ gb_internal void check_collect_entities(CheckerContext *c, Slice<Ast *> const &n
 			Ast *decl = nodes[decl_index];
 			if (decl->kind == Ast_WhenStmt) {
 				check_collect_entities_from_when_stmt(c, &decl->WhenStmt);
+			}
+		}
+	} else if (c->foreign_context.curr_library) {
+		for_array(decl_index, nodes) {
+			Ast *decl = nodes[decl_index];
+			if (decl->kind == Ast_WhenStmt) {
+				collect_file_decl(c, decl);
 			}
 		}
 	}
