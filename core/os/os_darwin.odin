@@ -314,6 +314,7 @@ foreign libc {
 	@(link_name="realpath") _unix_realpath :: proc(path: cstring, resolved_path: rawptr) -> rawptr ---
 
 	@(link_name="strerror") _darwin_string_error :: proc(num : c.int) -> cstring ---
+	@(link_name="sysctlbyname") _sysctlbyname    :: proc(path: cstring, oldp: rawptr, oldlenp: rawptr, newp: rawptr, newlen: int) -> c.int ---
 
 	@(link_name="exit")    _unix_exit :: proc(status: c.int) -> ! ---
 }
@@ -333,7 +334,7 @@ foreign dl {
 	@(link_name="dlerror") _unix_dlerror :: proc() -> cstring ---
 }
 
-get_last_error :: proc() -> int {
+get_last_error :: proc "contextless" () -> int {
 	return __error()^
 }
 
@@ -342,21 +343,33 @@ get_last_error_string :: proc() -> string {
 }
 
 open :: proc(path: string, flags: int = O_RDWR, mode: int = 0) -> (Handle, Errno) {
+	isDir := is_dir_path(path)
+	flags := flags
+	if isDir {
+		/*
+			@INFO(Platin): To make it impossible to use the wrong flag for dir's 
+			               as you can't write to a dir only read which makes it fail to open
+		*/
+		flags = O_RDONLY
+	}
+
 	cstr := strings.clone_to_cstring(path, context.temp_allocator)
 	handle := _unix_open(cstr, i32(flags), u16(mode))
 	if handle == -1 {
-		return INVALID_HANDLE, 1
+		return INVALID_HANDLE, cast(Errno)get_last_error()
 	}
 
-when  ODIN_OS == .Darwin && ODIN_ARCH == .arm64 {
-	if mode != 0 {
+	/*
+		@INFO(Platin): this is only done because O_CREATE for some reason fails to apply mode
+		               should not happen if the handle is a directory
+	*/
+	if mode != 0 && !isDir {
 		err := fchmod(handle, cast(u16)mode)
 		if err != 0 {
 			_unix_close(handle)
-			return INVALID_HANDLE, 1
+			return INVALID_HANDLE, cast(Errno)err
 		}
 	}
-}
 
 	return handle, 0
 }
@@ -688,6 +701,7 @@ get_current_directory :: proc() -> string {
 			return string(cwd)
 		}
 		if Errno(get_last_error()) != ERANGE {
+			delete(buf)
 			return ""
 		}
 		resize(&buf, len(buf)+page_size)
@@ -759,6 +773,18 @@ get_page_size :: proc() -> int {
 	return page_size
 }
 
+@(private)
+_processor_core_count :: proc() -> int {
+	count : int = 0
+	count_size := size_of(count)
+	if _sysctlbyname("hw.logicalcpu", &count, &count_size, nil, 0) == 0 {
+		if count > 0 {
+			return count
+		}
+	}
+
+	return 1
+}
 
 _alloc_command_line_arguments :: proc() -> []string {
 	res := make([]string, len(runtime.args__))

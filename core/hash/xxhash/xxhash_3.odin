@@ -118,7 +118,7 @@ XXH_mul_64_to_128_fold_64 :: #force_inline proc(lhs, rhs: xxh_u64) -> (res: xxh_
 }
 
 @(optimization_mode="speed")
-XXH_xorshift_64 :: #force_inline proc(v: xxh_u64, auto_cast shift: uint) -> (res: xxh_u64) {
+XXH_xorshift_64 :: #force_inline proc(v: xxh_u64, #any_int shift: uint) -> (res: xxh_u64) {
 	return v ~ (v >> shift)
 }
 

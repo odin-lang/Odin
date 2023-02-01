@@ -39,22 +39,22 @@ CustomWaitOnAddress :: proc "stdcall" (Address: rawptr, CompareAddress: rawptr, 
 }
 
 
-_futex_wait :: proc(f: ^Futex, expect: u32) -> bool {
+_futex_wait :: proc "contextless" (f: ^Futex, expect: u32) -> bool {
 	expect := expect
 	return CustomWaitOnAddress(f, &expect, size_of(expect), nil)
 }
 
-_futex_wait_with_timeout :: proc(f: ^Futex, expect: u32, duration: time.Duration) -> bool {
+_futex_wait_with_timeout :: proc "contextless" (f: ^Futex, expect: u32, duration: time.Duration) -> bool {
 	expect := expect
 	// NOTE(bill): for some bizarre reason, this has be a negative number
 	timeout := -i64(duration / 100)
 	return CustomWaitOnAddress(f, &expect, size_of(expect), &timeout)
 }
 
-_futex_signal :: proc(f: ^Futex) {
+_futex_signal :: proc "contextless" (f: ^Futex) {
 	WakeByAddressSingle(f)
 }
 
-_futex_broadcast :: proc(f: ^Futex) {
+_futex_broadcast :: proc "contextless" (f: ^Futex) {
 	WakeByAddressAll(f)
 }

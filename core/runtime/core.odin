@@ -329,6 +329,12 @@ Allocator :: struct {
 	data:      rawptr,
 }
 
+Byte     :: 1
+Kilobyte :: 1024 * Byte
+Megabyte :: 1024 * Kilobyte
+Gigabyte :: 1024 * Megabyte
+Terabyte :: 1024 * Gigabyte
+
 // Logging stuff
 
 Logger_Level :: enum uint {

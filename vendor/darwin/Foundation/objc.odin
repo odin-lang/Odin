@@ -15,8 +15,10 @@ foreign Foundation {
 
 	class_addMethod :: proc "c" (cls: Class, name: SEL, imp: IMP, types: cstring) -> BOOL ---
 	class_getInstanceMethod :: proc "c" (cls: Class, name: SEL) -> Method ---
+	class_createInstance :: proc "c" (cls: Class, extraBytes: c.size_t) -> id ---
 
 	method_setImplementation :: proc "c" (method: Method, imp: IMP) ---
+	object_getIndexedIvars :: proc(obj: id) -> rawptr ---
 }
 
 

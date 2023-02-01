@@ -100,6 +100,7 @@ foreign user32 {
 	AdjustWindowRectExForDpi :: proc(lpRect: LPRECT, dwStyle: DWORD, bMenu: BOOL, dwExStyle: DWORD, dpi: UINT) -> BOOL ---
 
 	SystemParametersInfoW :: proc(uiAction, uiParam: UINT, pvParam: PVOID, fWinIni: UINT) -> BOOL ---
+	GetMonitorInfoW :: proc(hMonitor: HMONITOR, lpmi: LPMONITORINFO) -> BOOL ---
 
 	GetWindowDC :: proc(hWnd: HWND) -> HDC ---
 	GetDC :: proc(hWnd: HWND) -> HDC ---
@@ -122,6 +123,8 @@ foreign user32 {
 
 	GetKeyState :: proc(nVirtKey: c_int) -> SHORT ---
 	GetAsyncKeyState :: proc(vKey: c_int) -> SHORT ---
+	
+	GetKeyboardState :: proc(lpKeyState: PBYTE) -> BOOL ---
 
 	MapVirtualKeyW :: proc(uCode: UINT, uMapType: UINT) -> UINT ---
 
@@ -202,6 +205,17 @@ foreign user32 {
 	GetRawInputDeviceList :: proc(pRawInputDeviceList: PRAWINPUTDEVICELIST, puiNumDevices: PUINT, cbSize: UINT) -> UINT ---
 	GetRegisteredRawInputDevices :: proc(pRawInputDevices: PRAWINPUTDEVICE, puiNumDevices: PUINT, cbSize: UINT) -> UINT ---
 	RegisterRawInputDevices :: proc(pRawInputDevices: PCRAWINPUTDEVICE, uiNumDevices: UINT, cbSize: UINT) -> BOOL ---
+
+	SetLayeredWindowAttributes  :: proc(hWnd: HWND, crKey: COLORREF, bAlpha: BYTE, dwFlags: DWORD) -> BOOL ---
+
+	FillRect :: proc(hDC: HDC, lprc: ^RECT, hbr: HBRUSH) -> int ---
+	EqualRect :: proc(lprc1: ^RECT, lprc2: ^RECT) -> BOOL ---
+
+	GetWindowInfo :: proc(hwnd: HWND, pwi: PWINDOWINFO) -> BOOL ---
+	GetWindowPlacement :: proc(hWnd: HWND, lpwndpl: ^WINDOWPLACEMENT) -> BOOL ---
+	SetWindowRgn :: proc(hWnd: HWND, hRgn: HRGN, bRedraw: BOOL) -> int ---
+	CreateRectRgnIndirect :: proc(lprect: ^RECT) -> HRGN ---
+	GetSystemMetricsForDpi :: proc(nIndex: int, dpi: UINT) -> int ---
 }
 
 CreateWindowW :: #force_inline proc "stdcall" (
@@ -432,3 +446,27 @@ RI_MOUSE_BUTTON_5_DOWN :: 0x0100
 RI_MOUSE_BUTTON_5_UP :: 0x0200
 RI_MOUSE_WHEEL :: 0x0400
 RI_MOUSE_HWHEEL :: 0x0800
+
+WINDOWPLACEMENT :: struct {
+	length: UINT,
+	flags: UINT,
+	showCmd: UINT,
+	ptMinPosition: POINT,
+  	ptMaxPosition: POINT,
+  	rcNormalPosition: RECT,
+  	rcDevice: RECT,
+}
+
+WINDOWINFO :: struct {
+	cbSize: DWORD,
+	rcWindow: RECT,
+	rcClient: RECT,
+	dwStyle: DWORD,
+	dwExStyle: DWORD,
+	dwWindowStatus: DWORD,
+	cxWindowBorders: UINT,
+	cyWindowBorders: UINT,
+	atomWindowType: ATOM,
+	wCreatorVersion: WORD,
+}
+PWINDOWINFO :: ^WINDOWINFO

@@ -262,10 +262,14 @@ marshal_to_writer :: proc(w: io.Writer, v: any, opt: ^Marshal_Options) -> (err: 
 			}
 			map_cap := uintptr(runtime.map_cap(m^))
 			ks, vs, hs, _, _ := runtime.map_kvh_data_dynamic(m^, info.map_info)
+
+			i := 0
 			for bucket_index in 0..<map_cap {
 				if !runtime.map_hash_is_valid(hs[bucket_index]) {
 					continue
 				}
+				opt_write_iteration(w, opt, i) or_return
+				i += 1
 
 				key   := rawptr(runtime.map_cell_index_dynamic(ks, info.map_info.ks, bucket_index))
 				value := rawptr(runtime.map_cell_index_dynamic(vs, info.map_info.vs, bucket_index))

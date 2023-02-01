@@ -38,6 +38,7 @@ HHOOK :: distinct HANDLE
 HKEY :: distinct HANDLE
 HDESK :: distinct HANDLE
 HFONT :: distinct HANDLE
+HRGN :: distinct HANDLE
 BOOL :: distinct b32
 BYTE :: distinct u8
 BOOLEAN :: distinct b8
@@ -1553,6 +1554,25 @@ USER_TIMER_MINIMUM :: 0x0000000A
 WA_INACTIVE    :: 0
 WA_ACTIVE      :: 1
 WA_CLICKACTIVE :: 2
+
+// Struct pointed to by WM_GETMINMAXINFO lParam
+MINMAXINFO :: struct {
+	ptReserved: POINT,
+	ptMaxSize: POINT,
+	ptMaxPosition: POINT,
+	ptMinTrackSize: POINT,
+	ptMaxTrackSize: POINT,
+}
+PMINMAXINFO  :: ^MINMAXINFO
+LPMINMAXINFO :: PMINMAXINFO
+
+MONITORINFO :: struct {
+	cbSize: DWORD,
+	rcMonitor: RECT,
+	rcWork: RECT,
+	dwFlags: DWORD,
+}
+LPMONITORINFO :: ^MONITORINFO
 
 // SetWindowsHook() codes
 WH_MIN             :: -1

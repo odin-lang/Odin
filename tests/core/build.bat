@@ -72,6 +72,16 @@ echo ---
 %PATH_TO_ODIN% run text\i18n %COMMON% -out:test_core_i18n.exe
 
 echo ---
+echo Running core:text/lua tests
+echo ---
+%PATH_TO_ODIN% run text\lua %COMMON% -out:test_core_lua_strlib.exe
+
+echo ---
 echo Running core:slice tests
 echo ---
 %PATH_TO_ODIN% run slice %COMMON% -out:test_core_slice.exe
+
+echo ---
+echo Running core:container tests
+echo ---
+%PATH_TO_ODIN% run container %COMMON% %COLLECTION% -out:test_core_container.exe

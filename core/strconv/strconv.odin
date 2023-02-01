@@ -819,7 +819,7 @@ parse_f64 :: proc(str: string, n: ^int = nil) -> (value: f64, ok: bool) {
 		}
 
 		if mantissa>>_f64_info.mantbits != 0 {
-			return
+			break trunc_block
 		}
 		f := f64(mantissa)
 		if neg {
@@ -841,7 +841,6 @@ parse_f64 :: proc(str: string, n: ^int = nil) -> (value: f64, ok: bool) {
 			return f / pow10[-exp], true
 		}
 	}
-
 	d: decimal.Decimal
 	decimal.set(&d, str[:nr])
 	b, overflow := decimal_to_float_bits(&d, &_f64_info)

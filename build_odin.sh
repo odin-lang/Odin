@@ -50,7 +50,7 @@ config_darwin() {
 		panic "Requirement: llvm-config must be base version smaller than 15"
 	fi
 
-	LDFLAGS="$LDFLAGS -liconv -ldl"
+	LDFLAGS="$LDFLAGS -liconv -ldl -framework System"
 	CXXFLAGS="$CXXFLAGS $($LLVM_CONFIG --cxxflags --ldflags)"
 	LDFLAGS="$LDFLAGS -lLLVM-C"
 }

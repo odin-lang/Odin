@@ -269,6 +269,7 @@ foreign libc {
 	@(link_name="mkdir")	_unix_mkdir	:: proc(path: cstring, mode: mode_t) -> c.int ---
 
 	@(link_name="getpagesize") _unix_getpagesize :: proc() -> c.int ---
+	@(link_name="sysconf") _sysconf :: proc(name: c.int) -> c.long ---
 	@(link_name="fdopendir") _unix_fdopendir :: proc(fd: Handle) -> Dir ---
 	@(link_name="closedir")	_unix_closedir	:: proc(dirp: Dir) -> c.int ---
 	@(link_name="rewinddir") _unix_rewinddir :: proc(dirp: Dir) ---
@@ -294,7 +295,7 @@ is_path_separator :: proc(r: rune) -> bool {
 	return r == '/'
 }
 
-get_last_error :: proc() -> int {
+get_last_error :: proc "contextless" () -> int {
 	return __errno()^
 }
 
@@ -648,6 +649,7 @@ get_current_directory :: proc() -> string {
 			return string(cwd)
 		}
 		if Errno(get_last_error()) != ERANGE {
+			delete(buf)
 			return ""
 		}
 		resize(&buf, len(buf) + MAX_PATH)
@@ -704,6 +706,12 @@ get_page_size :: proc() -> int {
 	return page_size
 }
 
+_SC_NPROCESSORS_ONLN :: 503
+
+@(private)
+_processor_core_count :: proc() -> int {
+	return int(_sysconf(_SC_NPROCESSORS_ONLN))
+}
 
 _alloc_command_line_arguments :: proc() -> []string {
 	res := make([]string, len(runtime.args__))

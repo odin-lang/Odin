@@ -3,31 +3,41 @@
 #include "common.cpp"
 #include "timings.cpp"
 #include "tokenizer.cpp"
+#if defined(GB_SYSTEM_WINDOWS)
+	#pragma warning(push)
+	#pragma warning(disable: 4505)
+#endif
 #include "big_int.cpp"
+#if defined(GB_SYSTEM_WINDOWS)
+	#pragma warning(pop)
+#endif
 #include "exact_value.cpp"
 #include "build_settings.cpp"
-
 gb_global ThreadPool global_thread_pool;
-void init_global_thread_pool(void) {
+gb_internal void init_global_thread_pool(void) {
 	isize thread_count = gb_max(build_context.thread_count, 1);
-	isize worker_count = thread_count-1; // NOTE(bill): The main thread will also be used for work
-	thread_pool_init(&global_thread_pool, permanent_allocator(), worker_count, "ThreadPoolWorker");
+	isize worker_count = thread_count; // +1
+	thread_pool_init(&global_thread_pool, worker_count, "ThreadPoolWorker");
 }
-bool global_thread_pool_add_task(WorkerTaskProc *proc, void *data) {
+gb_internal bool thread_pool_add_task(WorkerTaskProc *proc, void *data) {
 	return thread_pool_add_task(&global_thread_pool, proc, data);
 }
-void global_thread_pool_wait(void) {
+gb_internal void thread_pool_wait(void) {
 	thread_pool_wait(&global_thread_pool);
 }
 
 
-void debugf(char const *fmt, ...) {
+gb_global BlockingMutex debugf_mutex;
+
+gb_internal void debugf(char const *fmt, ...) {
 	if (build_context.show_debug_messages) {
+		mutex_lock(&debugf_mutex);
 		gb_printf_err("[DEBUG] ");
 		va_list va;
 		va_start(va, fmt);
 		(void)gb_printf_err_va(fmt, va);
 		va_end(va);
+		mutex_unlock(&debugf_mutex);
 	}
 }
 
@@ -58,11 +68,10 @@ gb_global Timings global_timings = {0};
 	#endif
 #endif
 
-#include "query_data.cpp"
 #include "bug_report.cpp"
 
 // NOTE(bill): 'name' is used in debugging and profiling modes
-i32 system_exec_command_line_app(char const *name, char const *fmt, ...) {
+gb_internal i32 system_exec_command_line_app(char const *name, char const *fmt, ...) {
 	isize const cmd_cap = 64<<20; // 64 MiB should be more than enough
 	char *cmd_line = gb_alloc_array(gb_heap_allocator(), char, cmd_cap);
 	isize cmd_len = 0;
@@ -124,7 +133,7 @@ i32 system_exec_command_line_app(char const *name, char const *fmt, ...) {
 }
 
 
-i32 linker_stage(lbGenerator *gen) {
+gb_internal i32 linker_stage(lbGenerator *gen) {
 	i32 result = 0;
 	Timings *timings = &global_timings;
 
@@ -207,15 +216,14 @@ i32 linker_stage(lbGenerator *gen) {
 
 
 			StringSet libs = {};
-			string_set_init(&libs, heap_allocator(), 64);
+			string_set_init(&libs, 64);
 			defer (string_set_destroy(&libs));
 
 			StringSet asm_files = {};
-			string_set_init(&asm_files, heap_allocator(), 64);
+			string_set_init(&asm_files, 64);
 			defer (string_set_destroy(&asm_files));
 
-			for_array(j, gen->foreign_libraries) {
-				Entity *e = gen->foreign_libraries[j];
+			for (Entity *e : gen->foreign_libraries) {
 				GB_ASSERT(e->kind == Entity_LibraryName);
 				for_array(i, e->LibraryName.paths) {
 					String lib = string_trim_whitespace(e->LibraryName.paths[i]);
@@ -278,8 +286,7 @@ i32 linker_stage(lbGenerator *gen) {
 
 			gbString object_files = gb_string_make(heap_allocator(), "");
 			defer (gb_string_free(object_files));
-			for_array(i, gen->output_object_paths) {
-				String object_path = gen->output_object_paths[i];
+			for (String const &object_path : gen->output_object_paths) {
 				object_files = gb_string_append_fmt(object_files, "\"%.*s\" ", LIT(object_path));
 			}
 
@@ -313,12 +320,18 @@ i32 linker_stage(lbGenerator *gen) {
 					}
 				}
 
+				switch (build_context.build_mode) {
+				case BuildMode_Executable:
+					link_settings = gb_string_append_fmt(link_settings, " /NOIMPLIB /NOEXP");
+					break;
+				}
+
 				result = system_exec_command_line_app("msvc-link",
 					"\"%.*slink.exe\" %s %.*s -OUT:\"%.*s\" %s "
 					"/nologo /incremental:no /opt:ref /subsystem:%s "
-					" %.*s "
-					" %.*s "
-					" %s "
+					"%.*s "
+					"%.*s "
+					"%s "
 					"",
 					LIT(vs_exe_path), object_files, LIT(res_path), LIT(output_filename),
 					link_settings,
@@ -334,9 +347,9 @@ i32 linker_stage(lbGenerator *gen) {
 				result = system_exec_command_line_app("msvc-lld-link",
 					"\"%.*s\\bin\\lld-link\" %s -OUT:\"%.*s\" %s "
 					"/nologo /incremental:no /opt:ref /subsystem:%s "
-					" %.*s "
-					" %.*s "
-					" %s "
+					"%.*s "
+					"%.*s "
+					"%s "
 					"",
 					LIT(build_context.ODIN_ROOT), object_files, LIT(output_filename),
 					link_settings,
@@ -366,14 +379,13 @@ i32 linker_stage(lbGenerator *gen) {
 			defer (gb_string_free(lib_str));
 
 			StringSet libs = {};
-			string_set_init(&libs, heap_allocator(), 64);
+			string_set_init(&libs, 64);
 			defer (string_set_destroy(&libs));
 
-			for_array(j, gen->foreign_libraries) {
-				Entity *e = gen->foreign_libraries[j];
+			for (Entity *e : gen->foreign_libraries) {
 				GB_ASSERT(e->kind == Entity_LibraryName);
-				for_array(i, e->LibraryName.paths) {
-					String lib = string_trim_whitespace(e->LibraryName.paths[i]);
+				for (String lib : e->LibraryName.paths) {
+					lib = string_trim_whitespace(lib);
 					if (lib.len == 0) {
 						continue;
 					}
@@ -425,8 +437,7 @@ i32 linker_stage(lbGenerator *gen) {
 
 			gbString object_files = gb_string_make(heap_allocator(), "");
 			defer (gb_string_free(object_files));
-			for_array(i, gen->output_object_paths) {
-				String object_path = gen->output_object_paths[i];
+			for (String object_path : gen->output_object_paths) {
 				object_files = gb_string_append_fmt(object_files, "\"%.*s\" ", LIT(object_path));
 			}
 
@@ -524,7 +535,7 @@ i32 linker_stage(lbGenerator *gen) {
 	return result;
 }
 
-Array<String> setup_args(int argc, char const **argv) {
+gb_internal Array<String> setup_args(int argc, char const **argv) {
 	gbAllocator a = heap_allocator();
 
 #if defined(GB_SYSTEM_WINDOWS)
@@ -553,7 +564,7 @@ Array<String> setup_args(int argc, char const **argv) {
 #endif
 }
 
-void print_usage_line(i32 indent, char const *fmt, ...) {
+gb_internal void print_usage_line(i32 indent, char const *fmt, ...) {
 	while (indent --> 0) {
 		gb_printf_err("\t");
 	}
@@ -564,7 +575,7 @@ void print_usage_line(i32 indent, char const *fmt, ...) {
 	gb_printf_err("\n");
 }
 
-void usage(String argv0) {
+gb_internal void usage(String argv0) {
 	print_usage_line(0, "%.*s is a tool for managing Odin source code", LIT(argv0));
 	print_usage_line(0, "Usage:");
 	print_usage_line(1, "%.*s command [arguments]", LIT(argv0));
@@ -573,7 +584,6 @@ void usage(String argv0) {
 	print_usage_line(1, "                  one must contain the program's entry point, all must be in the same package.");
 	print_usage_line(1, "run               same as 'build', but also then runs the newly compiled executable.");
 	print_usage_line(1, "check             parse, and type check a directory of .odin files");
-	print_usage_line(1, "query             parse, type check, and output a .json file containing information about the program");
 	print_usage_line(1, "strip-semicolon   parse, type check, and remove unneeded semicolons from the entire program");
 	print_usage_line(1, "test              build and runs procedures with the attribute @(test) in the initial package");
 	print_usage_line(1, "doc               generate documentation on a directory of .odin files");
@@ -613,7 +623,6 @@ enum BuildFlagKind {
 	BuildFlag_NoEntryPoint,
 	BuildFlag_UseLLD,
 	BuildFlag_UseSeparateModules,
-	BuildFlag_ThreadedChecker,
 	BuildFlag_NoThreadedChecker,
 	BuildFlag_ShowDebugMessages,
 	BuildFlag_Vet,
@@ -655,6 +664,7 @@ enum BuildFlagKind {
 
 	// internal use only
 	BuildFlag_InternalIgnoreLazy,
+	BuildFlag_InternalIgnoreLLVMBuild,
 
 #if defined(GB_SYSTEM_WINDOWS)
 	BuildFlag_IgnoreVsSearch,
@@ -687,12 +697,12 @@ struct BuildFlag {
 };
 
 
-void add_flag(Array<BuildFlag> *build_flags, BuildFlagKind kind, String name, BuildFlagParamKind param_kind, u32 command_support, bool allow_mulitple=false) {
+gb_internal void add_flag(Array<BuildFlag> *build_flags, BuildFlagKind kind, String name, BuildFlagParamKind param_kind, u32 command_support, bool allow_mulitple=false) {
 	BuildFlag flag = {kind, name, param_kind, command_support, allow_mulitple};
 	array_add(build_flags, flag);
 }
 
-ExactValue build_param_to_exact_value(String name, String param) {
+gb_internal ExactValue build_param_to_exact_value(String name, String param) {
 	ExactValue value = {};
 
 	/*
@@ -747,7 +757,7 @@ ExactValue build_param_to_exact_value(String name, String param) {
 }
 
 // Writes a did-you-mean message for formerly deprecated flags.
-void did_you_mean_flag(String flag) {
+gb_internal void did_you_mean_flag(String flag) {
 	gbAllocator a = heap_allocator();
 	String name = copy_string(a, flag);
 	defer (gb_free(a, name.text));
@@ -760,11 +770,11 @@ void did_you_mean_flag(String flag) {
 	gb_printf_err("Unknown flag: '%.*s'\n", LIT(flag));
 }
 
-bool parse_build_flags(Array<String> args) {
+gb_internal bool parse_build_flags(Array<String> args) {
 	auto build_flags = array_make<BuildFlag>(heap_allocator(), 0, BuildFlag_COUNT);
 	add_flag(&build_flags, BuildFlag_Help,                    str_lit("help"),                      BuildFlagParam_None,    Command_all);
 	add_flag(&build_flags, BuildFlag_SingleFile,              str_lit("file"),                      BuildFlagParam_None,    Command__does_build | Command__does_check);
-	add_flag(&build_flags, BuildFlag_OutFile,                 str_lit("out"),                       BuildFlagParam_String,  Command__does_build &~ Command_test);
+	add_flag(&build_flags, BuildFlag_OutFile,                 str_lit("out"),                       BuildFlagParam_String,  Command__does_build | Command_test);
 	add_flag(&build_flags, BuildFlag_OptimizationMode,        str_lit("o"),                         BuildFlagParam_String,  Command__does_build);
 	add_flag(&build_flags, BuildFlag_OptimizationMode,        str_lit("O"),                         BuildFlagParam_String,  Command__does_build);
 	add_flag(&build_flags, BuildFlag_ShowTimings,             str_lit("show-timings"),              BuildFlagParam_None,    Command__does_check);
@@ -788,7 +798,6 @@ bool parse_build_flags(Array<String> args) {
 	add_flag(&build_flags, BuildFlag_NoEntryPoint,            str_lit("no-entry-point"),            BuildFlagParam_None,    Command__does_check &~ Command_test);
 	add_flag(&build_flags, BuildFlag_UseLLD,                  str_lit("lld"),                       BuildFlagParam_None,    Command__does_build);
 	add_flag(&build_flags, BuildFlag_UseSeparateModules,      str_lit("use-separate-modules"),      BuildFlagParam_None,    Command__does_build);
-	add_flag(&build_flags, BuildFlag_ThreadedChecker,         str_lit("threaded-checker"),          BuildFlagParam_None,    Command__does_check);
 	add_flag(&build_flags, BuildFlag_NoThreadedChecker,       str_lit("no-threaded-checker"),       BuildFlagParam_None,    Command__does_check);
 	add_flag(&build_flags, BuildFlag_ShowDebugMessages,       str_lit("show-debug-messages"),       BuildFlagParam_None,    Command_all);
 	add_flag(&build_flags, BuildFlag_Vet,                     str_lit("vet"),                       BuildFlagParam_None,    Command__does_check);
@@ -817,12 +826,6 @@ bool parse_build_flags(Array<String> args) {
 
 	add_flag(&build_flags, BuildFlag_UseStaticMapCalls,       str_lit("use-static-map-calls"),      BuildFlagParam_None,    Command__does_check);
 
-
-	add_flag(&build_flags, BuildFlag_Compact,                 str_lit("compact"),                   BuildFlagParam_None,    Command_query);
-	add_flag(&build_flags, BuildFlag_GlobalDefinitions,       str_lit("global-definitions"),        BuildFlagParam_None,    Command_query);
-	add_flag(&build_flags, BuildFlag_GoToDefinitions,         str_lit("go-to-definitions"),         BuildFlagParam_None,    Command_query);
-
-
 	add_flag(&build_flags, BuildFlag_Short,                   str_lit("short"),                     BuildFlagParam_None,    Command_doc);
 	add_flag(&build_flags, BuildFlag_AllPackages,             str_lit("all-packages"),              BuildFlagParam_None,    Command_doc);
 	add_flag(&build_flags, BuildFlag_DocFormat,               str_lit("doc-format"),                BuildFlagParam_None,    Command_doc);
@@ -833,6 +836,7 @@ bool parse_build_flags(Array<String> args) {
 	add_flag(&build_flags, BuildFlag_ErrorPosStyle,           str_lit("error-pos-style"),           BuildFlagParam_String,  Command_all);
 
 	add_flag(&build_flags, BuildFlag_InternalIgnoreLazy,      str_lit("internal-ignore-lazy"),      BuildFlagParam_None,    Command_all);
+	add_flag(&build_flags, BuildFlag_InternalIgnoreLLVMBuild, str_lit("internal-ignore-llvm-build"),BuildFlagParam_None,    Command_all);
 
 #if defined(GB_SYSTEM_WINDOWS)
 	add_flag(&build_flags, BuildFlag_IgnoreVsSearch,          str_lit("ignore-vs-search"),          BuildFlagParam_None,    Command__does_build);
@@ -848,8 +852,7 @@ bool parse_build_flags(Array<String> args) {
 	bool set_flags[BuildFlag_COUNT] = {};
 
 	bool bad_flags = false;
-	for_array(i, flag_args) {
-		String flag = flag_args[i];
+	for (String flag : flag_args) {
 		if (flag[0] != '-') {
 			gb_printf_err("Invalid flag: %.*s\n", LIT(flag));
 			continue;
@@ -878,8 +881,7 @@ bool parse_build_flags(Array<String> args) {
 		bool found = false;
 
 		BuildFlag found_bf = {};
-		for_array(build_flag_index, build_flags) {
-			BuildFlag bf = build_flags[build_flag_index];
+		for (BuildFlag const &bf : build_flags) {
 			if (bf.name == name) {
 				found = true;
 				found_bf = bf;
@@ -1311,20 +1313,8 @@ bool parse_build_flags(Array<String> args) {
 						case BuildFlag_UseSeparateModules:
 							build_context.use_separate_modules = true;
 							break;
-						case BuildFlag_ThreadedChecker: {
-							#if defined(DEFAULT_TO_THREADED_CHECKER)
-							gb_printf_err("-threaded-checker is the default on this platform\n");
-							bad_flags = true;
-							#endif
-							build_context.threaded_checker = true;
-							break;
-						}
 						case BuildFlag_NoThreadedChecker: {
-							#if !defined(DEFAULT_TO_THREADED_CHECKER)
-							gb_printf_err("-no-threaded-checker is the default on this platform\n");
-							bad_flags = true;
-							#endif
-							build_context.threaded_checker = false;
+							build_context.no_threaded_checker = true;
 							break;
 						}
 						case BuildFlag_ShowDebugMessages:
@@ -1445,39 +1435,6 @@ bool parse_build_flags(Array<String> args) {
 							build_context.strict_style_init_only = true;
 							break;
 						}
-						case BuildFlag_Compact: {
-							if (!build_context.query_data_set_settings.ok) {
-								gb_printf_err("Invalid use of -compact flag, only allowed with 'odin query'\n");
-								bad_flags = true;
-							} else {
-								build_context.query_data_set_settings.compact = true;
-							}
-							break;
-						}
-						case BuildFlag_GlobalDefinitions: {
-							if (!build_context.query_data_set_settings.ok) {
-								gb_printf_err("Invalid use of -global-definitions flag, only allowed with 'odin query'\n");
-								bad_flags = true;
-							} else if (build_context.query_data_set_settings.kind != QueryDataSet_Invalid) {
-								gb_printf_err("Invalid use of -global-definitions flag, a previous flag for 'odin query' was set\n");
-								bad_flags = true;
-							} else {
-								build_context.query_data_set_settings.kind = QueryDataSet_GlobalDefinitions;
-							}
-							break;
-						}
-						case BuildFlag_GoToDefinitions: {
-							if (!build_context.query_data_set_settings.ok) {
-								gb_printf_err("Invalid use of -go-to-definitions flag, only allowed with 'odin query'\n");
-								bad_flags = true;
-							} else if (build_context.query_data_set_settings.kind != QueryDataSet_Invalid) {
-								gb_printf_err("Invalid use of -global-definitions flag, a previous flag for 'odin query' was set\n");
-								bad_flags = true;
-							} else {
-								build_context.query_data_set_settings.kind = QueryDataSet_GoToDefinitions;
-							}
-							break;
-						}
 						case BuildFlag_Short:
 							build_context.cmd_doc_flags |= CmdDocFlag_Short;
 							break;
@@ -1524,6 +1481,9 @@ bool parse_build_flags(Array<String> args) {
 
 						case BuildFlag_InternalIgnoreLazy:
 							build_context.ignore_lazy = true;
+							break;
+						case BuildFlag_InternalIgnoreLLVMBuild:
+							build_context.ignore_llvm_build = true;
 							break;
 					#if defined(GB_SYSTEM_WINDOWS)
 						case BuildFlag_IgnoreVsSearch: {
@@ -1638,20 +1598,10 @@ bool parse_build_flags(Array<String> args) {
 		gb_printf_err("`-export-timings:<format>` requires `-show-timings` or `-show-more-timings` to be present\n");
 		bad_flags = true;
 	}
-
-	if (build_context.query_data_set_settings.ok) {
-		if (build_context.query_data_set_settings.kind == QueryDataSet_Invalid) {
-			gb_printf_err("'odin query' requires a flag determining the kind of query data set to be returned\n");
-			gb_printf_err("\t-global-definitions : outputs a JSON file of global definitions\n");
-			gb_printf_err("\t-go-to-definitions  : outputs a OGTD binary file of go to definitions for identifiers within an Odin project\n");
-			bad_flags = true;
-		}
-	}
-
 	return !bad_flags;
 }
 
-void timings_export_all(Timings *t, Checker *c, bool timings_are_finalized = false) {
+gb_internal void timings_export_all(Timings *t, Checker *c, bool timings_are_finalized = false) {
 	GB_ASSERT((!(build_context.export_timings_format == TimingsExportUnspecified) && build_context.export_timings_file.len > 0));
 
 	/*
@@ -1690,10 +1640,9 @@ void timings_export_all(Timings *t, Checker *c, bool timings_are_finalized = fal
 		isize files           = 0;
 		isize packages        = p->packages.count;
 		isize total_file_size = 0;
-		for_array(i, p->packages) {
-			files += p->packages[i]->files.count;
-			for_array(j, p->packages[i]->files) {
-				AstFile *file = p->packages[i]->files[j];
+		for (AstPackage *pkg : p->packages) {
+			files += pkg->files.count;
+			for (AstFile *file : pkg->files) {
 				total_file_size += file->tokenizer.end - file->tokenizer.start;
 			}
 		}
@@ -1717,8 +1666,7 @@ void timings_export_all(Timings *t, Checker *c, bool timings_are_finalized = fal
 		gb_fprintf(&f, "\t\t{\"name\": \"%.*s\", \"millis\": %.3f},\n",
 		    LIT(t->total.label), total_time);
 
-		for_array(i, t->sections) {
-			TimeStamp ts = t->sections[i];
+		for (TimeStamp const &ts : t->sections) {
 			f64 section_time = time_stamp(ts, t->freq, unit);
 			gb_fprintf(&f, "\t\t{\"name\": \"%.*s\", \"millis\": %.3f},\n",
 			    LIT(ts.label), section_time);
@@ -1739,8 +1687,7 @@ void timings_export_all(Timings *t, Checker *c, bool timings_are_finalized = fal
 		*/
 		gb_fprintf(&f, "\"%.*s\", %d\n", LIT(t->total.label), int(total_time));
 
-		for_array(i, t->sections) {
-			TimeStamp ts = t->sections[i];
+		for (TimeStamp const &ts : t->sections) {
 			f64 section_time = time_stamp(ts, t->freq, unit);
 			gb_fprintf(&f, "\"%.*s\", %d\n", LIT(ts.label), int(section_time));
 		}
@@ -1749,7 +1696,7 @@ void timings_export_all(Timings *t, Checker *c, bool timings_are_finalized = fal
 	gb_printf("Done.\n");
 }
 
-void show_timings(Checker *c, Timings *t) {
+gb_internal void show_timings(Checker *c, Timings *t) {
 	Parser *p      = c->parser;
 	isize lines    = p->total_line_count;
 	isize tokens   = p->total_token_count;
@@ -1758,10 +1705,9 @@ void show_timings(Checker *c, Timings *t) {
 	isize total_file_size = 0;
 	f64 total_tokenizing_time = 0;
 	f64 total_parsing_time = 0;
-	for_array(i, p->packages) {
-		files += p->packages[i]->files.count;
-		for_array(j, p->packages[i]->files) {
-			AstFile *file = p->packages[i]->files[j];
+	for (AstPackage *pkg : p->packages) {
+		files += pkg->files.count;
+		for (AstFile *file : pkg->files) {
 			total_tokenizing_time += file->time_to_tokenize;
 			total_parsing_time += file->time_to_parse;
 			total_file_size += file->tokenizer.end - file->tokenizer.start;
@@ -1769,6 +1715,16 @@ void show_timings(Checker *c, Timings *t) {
 	}
 
 	timings_print_all(t);
+
+	if (build_context.show_more_timings) {
+	#if defined(GB_SYSTEM_WINDOWS)
+		PROCESS_MEMORY_COUNTERS p = {sizeof(p)};
+		if (GetProcessMemoryInfo(GetCurrentProcess(), &p, sizeof(p))) {
+			gb_printf("\n");
+			gb_printf("Peak Memory Size: %.3f MiB\n", (cast(f64)p.PeakWorkingSetSize) / cast(f64)(1024ull * 1024ull));
+		}
+	#endif
+	}
 
 	if (!(build_context.export_timings_format == TimingsExportUnspecified)) {
 		timings_export_all(t, c, true);
@@ -1812,8 +1768,7 @@ void show_timings(Checker *c, Timings *t) {
 		}
 		{
 			TimeStamp ts = {};
-			for_array(i, t->sections) {
-				TimeStamp s = t->sections[i];
+			for (TimeStamp const &s : t->sections) {
 				if (s.label == "parse files") {
 					ts = s;
 					break;
@@ -1836,8 +1791,7 @@ void show_timings(Checker *c, Timings *t) {
 		{
 			TimeStamp ts = {};
 			TimeStamp ts_end = {};
-			for_array(i, t->sections) {
-				TimeStamp s = t->sections[i];
+			for (TimeStamp const &s : t->sections) {
 				if (s.label == "type check") {
 					ts = s;
 				}
@@ -1878,13 +1832,12 @@ void show_timings(Checker *c, Timings *t) {
 	}
 }
 
-void remove_temp_files(lbGenerator *gen) {
+gb_internal void remove_temp_files(lbGenerator *gen) {
 	if (build_context.keep_temp_files) return;
 
 	TIME_SECTION("remove keep temp files");
 
-	for_array(i, gen->output_temp_paths) {
-		String path = gen->output_temp_paths[i];
+	for (String const &path : gen->output_temp_paths) {
 		gb_file_remove(cast(char const *)path.text);
 	}
 
@@ -1892,8 +1845,7 @@ void remove_temp_files(lbGenerator *gen) {
 		switch (build_context.build_mode) {
 		case BuildMode_Executable:
 		case BuildMode_DynamicLibrary:
-			for_array(i, gen->output_object_paths) {
-				String path = gen->output_object_paths[i];
+			for (String const &path : gen->output_object_paths) {
 				gb_file_remove(cast(char const *)path.text);
 			}
 			break;
@@ -1902,7 +1854,7 @@ void remove_temp_files(lbGenerator *gen) {
 }
 
 
-void print_show_help(String const arg0, String const &command) {
+gb_internal void print_show_help(String const arg0, String const &command) {
 	print_usage_line(0, "%.*s is a tool for managing Odin source code", LIT(arg0));
 	print_usage_line(0, "Usage:");
 	print_usage_line(1, "%.*s %.*s [arguments]", LIT(arg0), LIT(command));
@@ -1930,9 +1882,7 @@ void print_show_help(String const arg0, String const &command) {
 		print_usage_line(3, "odin check <dir>                # Type check package in <dir>");
 		print_usage_line(3, "odin check filename.odin -file  # Type check single-file package, must contain entry point.");
 	} else if (command == "test") {
-		print_usage_line(1, "test      Build ands runs procedures with the attribute @(test) in the initial package");
-	} else if (command == "query") {
-		print_usage_line(1, "query     [experimental] Parse, type check, and output a .json file containing information about the program");
+		print_usage_line(1, "test      Build and runs procedures with the attribute @(test) in the initial package");
 	} else if (command == "doc") {
 		print_usage_line(1, "doc       generate documentation from a directory of .odin files");
 		print_usage_line(2, "Examples:");
@@ -2248,12 +2198,11 @@ void print_show_help(String const arg0, String const &command) {
 	}
 }
 
-void print_show_unused(Checker *c) {
+gb_internal void print_show_unused(Checker *c) {
 	CheckerInfo *info = &c->info;
 
 	auto unused = array_make<Entity *>(permanent_allocator(), 0, info->entities.count);
-	for_array(i, info->entities) {
-		Entity *e = info->entities[i];
+	for (Entity *e : info->entities) {
 		if (e == nullptr) {
 			continue;
 		}
@@ -2300,8 +2249,7 @@ void print_show_unused(Checker *c) {
 
 	AstPackage *curr_pkg = nullptr;
 	EntityKind curr_entity_kind = Entity_Invalid;
-	for_array(i, unused) {
-		Entity *e = unused[i];
+	for (Entity *e : unused) {
 		if (curr_pkg != e->pkg) {
 			curr_pkg = e->pkg;
 			curr_entity_kind = Entity_Invalid;
@@ -2322,7 +2270,7 @@ void print_show_unused(Checker *c) {
 	print_usage_line(0, "");
 }
 
-bool check_env(void) {
+gb_internal bool check_env(void) {
 	gbAllocator a = heap_allocator();
 	char const *odin_root = gb_get_env("ODIN_ROOT", a);
 	defer (gb_free(a, cast(void *)odin_root));
@@ -2348,25 +2296,24 @@ struct StripSemicolonFile {
 	i64 written;
 };
 
-gbFileError write_file_with_stripped_tokens(gbFile *f, AstFile *file, i64 *written_) {
+gb_internal gbFileError write_file_with_stripped_tokens(gbFile *f, AstFile *file, i64 *written_) {
 	i64 written = 0;
 	gbFileError err = gbFileError_None;
 	u8 const *file_data = file->tokenizer.start;
 	i32 prev_offset = 0;
 	i32 const end_offset = cast(i32)(file->tokenizer.end - file->tokenizer.start);
-	for_array(i, file->tokens) {
-		Token *token = &file->tokens[i];
-		if (token->flags & (TokenFlag_Remove|TokenFlag_Replace)) {
-			i32 offset = token->pos.offset;
+	for (Token const &token : file->tokens) {
+		if (token.flags & (TokenFlag_Remove|TokenFlag_Replace)) {
+			i32 offset = token.pos.offset;
 			i32 to_write = offset-prev_offset;
 			if (!gb_file_write(f, file_data+prev_offset, to_write)) {
 				return gbFileError_Invalid;
 			}
 			written += to_write;
-			prev_offset = token_pos_end(*token).offset;
+			prev_offset = token_pos_end(token).offset;
 		}
-		if (token->flags & TokenFlag_Replace) {
-			if (token->kind == Token_Ellipsis) {
+		if (token.flags & TokenFlag_Replace) {
+			if (token.kind == Token_Ellipsis) {
 				if (!gb_file_write(f, "..=", 3)) {
 					return gbFileError_Invalid;
 				}
@@ -2388,24 +2335,19 @@ gbFileError write_file_with_stripped_tokens(gbFile *f, AstFile *file, i64 *writt
 	return err;
 }
 
-int strip_semicolons(Parser *parser) {
+gb_internal int strip_semicolons(Parser *parser) {
 	isize file_count = 0;
-	for_array(i, parser->packages) {
-		AstPackage *pkg = parser->packages[i];
+	for (AstPackage *pkg : parser->packages) {
 		file_count += pkg->files.count;
 	}
 
 	auto generated_files = array_make<StripSemicolonFile>(permanent_allocator(), 0, file_count);
 
-	for_array(i, parser->packages) {
-		AstPackage *pkg = parser->packages[i];
-		for_array(j, pkg->files) {
-			AstFile *file = pkg->files[j];
-
+	for (AstPackage *pkg : parser->packages) {
+		for (AstFile *file : pkg->files) {
 			bool nothing_to_change = true;
-			for_array(i, file->tokens) {
-				Token *token = &file->tokens[i];
-				if (token->flags) {
+			for (Token const &token : file->tokens) {
+				if (token.flags) {
 					nothing_to_change = false;
 					break;
 				}
@@ -2433,9 +2375,8 @@ int strip_semicolons(Parser *parser) {
 	isize generated_count = 0;
 	bool failed = false;
 
-	for_array(i, generated_files) {
-		auto *file = &generated_files[i];
-		char const *filename = cast(char const *)file->new_fullpath.text;
+	for (StripSemicolonFile &file : generated_files) {
+		char const *filename = cast(char const *)file.new_fullpath.text;
 		gbFileError err = gbFileError_None;
 		defer (if (err != gbFileError_None) {
 			failed = true;
@@ -2453,11 +2394,11 @@ int strip_semicolons(Parser *parser) {
 		defer (err = gb_file_truncate(&f, written));
 
 		debugf("Write file with stripped tokens: %s\n", filename);
-		err = write_file_with_stripped_tokens(&f, file->file, &written);
+		err = write_file_with_stripped_tokens(&f, file.file, &written);
 		if (err) {
 			break;
 		}
-		file->written = written;
+		file.written = written;
 	}
 
 	if (failed) {
@@ -2472,12 +2413,10 @@ int strip_semicolons(Parser *parser) {
 
 	isize overwritten_files = 0;
 
-	for_array(i, generated_files) {
-		auto *file = &generated_files[i];
-
-		char const *old_fullpath = cast(char const *)file->old_fullpath.text;
-		char const *old_fullpath_backup = cast(char const *)file->old_fullpath_backup.text;
-		char const *new_fullpath = cast(char const *)file->new_fullpath.text;
+	for (StripSemicolonFile const &file : generated_files) {
+		char const *old_fullpath = cast(char const *)file.old_fullpath.text;
+		char const *old_fullpath_backup = cast(char const *)file.old_fullpath_backup.text;
+		char const *new_fullpath = cast(char const *)file.new_fullpath.text;
 
 		debugf("Copy '%s' to '%s'\n", old_fullpath, old_fullpath_backup);
 		if (!gb_file_copy(old_fullpath, old_fullpath_backup, false)) {
@@ -2537,22 +2476,16 @@ int main(int arg_count, char const **arg_ptr) {
 		usage(make_string_c(arg_ptr[0]));
 		return 1;
 	}
+	virtual_memory_init();
 
 	timings_init(&global_timings, str_lit("Total Time"), 2048);
 	defer (timings_destroy(&global_timings));
 
 	MAIN_TIME_SECTION("initialization");
 
-	virtual_memory_init();
-	mutex_init(&fullpath_mutex);
-	mutex_init(&hash_exact_value_mutex);
-	mutex_init(&global_type_name_objc_metadata_mutex);
-
-	init_string_buffer_memory();
 	init_string_interner();
 	init_global_error_collector();
 	init_keyword_hash_table();
-	init_type_mutex();
 
 	if (!check_env()) {
 		return 1;
@@ -2563,9 +2496,9 @@ int main(int arg_count, char const **arg_ptr) {
 	add_library_collection(str_lit("core"), get_fullpath_relative(heap_allocator(), odin_root_dir(), str_lit("core")));
 	add_library_collection(str_lit("vendor"), get_fullpath_relative(heap_allocator(), odin_root_dir(), str_lit("vendor")));
 
-	map_init(&build_context.defined_values, heap_allocator());
+	map_init(&build_context.defined_values);
 	build_context.extra_packages.allocator = heap_allocator();
-	string_set_init(&build_context.test_names, heap_allocator());
+	string_set_init(&build_context.test_names);
 
 	Array<String> args = setup_args(arg_count, arg_ptr);
 
@@ -2626,15 +2559,6 @@ int main(int arg_count, char const **arg_ptr) {
 		}
 		build_context.command_kind = Command_strip_semicolon;
 		build_context.no_output_files = true;
-		init_filename = args[2];
-	} else if (command == "query") {
-		if (args.count < 3) {
-			usage(args[0]);
-			return 1;
-		}
-		build_context.command_kind = Command_query;
-		build_context.no_output_files = true;
-		build_context.query_data_set_settings.ok = true;
 		init_filename = args[2];
 	} else if (command == "doc") {
 		if (args.count < 3) {
@@ -2824,12 +2748,8 @@ int main(int arg_count, char const **arg_ptr) {
 			print_show_unused(checker);
 		}
 
-		if (build_context.query_data_set_settings.ok) {
-			generate_and_print_query_data(checker, &global_timings);
-		} else {
-			if (build_context.show_timings) {
-				show_timings(checker, &global_timings);
-			}
+		if (build_context.show_timings) {
+			show_timings(checker, &global_timings);
 		}
 
 		if (global_error_collector.count != 0) {
@@ -2844,19 +2764,19 @@ int main(int arg_count, char const **arg_ptr) {
 	if (!lb_init_generator(gen, checker)) {
 		return 1;
 	}
-	lb_generate_code(gen);
-
-	switch (build_context.build_mode) {
-	case BuildMode_Executable:
-	case BuildMode_DynamicLibrary:
-		i32 result = linker_stage(gen);
-		if (result) {
-			if (build_context.show_timings) {
-				show_timings(checker, &global_timings);
+	if (lb_generate_code(gen)) {
+		switch (build_context.build_mode) {
+		case BuildMode_Executable:
+		case BuildMode_DynamicLibrary:
+			i32 result = linker_stage(gen);
+			if (result) {
+				if (build_context.show_timings) {
+					show_timings(checker, &global_timings);
+				}
+				return result;
 			}
-			return result;
+			break;
 		}
-		break;
 	}
 
 	remove_temp_files(gen);
