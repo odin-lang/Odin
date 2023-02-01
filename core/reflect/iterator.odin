@@ -2,6 +2,7 @@ package reflect
 
 import "core:runtime"
 
+@(require_results)
 iterate_array :: proc(val: any, it: ^int) -> (elem: any, index: int, ok: bool) {
 	if val == nil || it == nil {
 		return
@@ -41,6 +42,7 @@ iterate_array :: proc(val: any, it: ^int) -> (elem: any, index: int, ok: bool) {
 	return
 }
 
+@(require_results)
 iterate_map :: proc(val: any, it: ^int) -> (key, value: any, ok: bool) {
 	if val == nil || it == nil {
 		return

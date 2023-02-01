@@ -3,11 +3,11 @@ package mem
 import "core:runtime"
 import "core:intrinsics"
 
-Byte     :: 1
-Kilobyte :: 1024 * Byte
-Megabyte :: 1024 * Kilobyte
-Gigabyte :: 1024 * Megabyte
-Terabyte :: 1024 * Gigabyte
+Byte     :: runtime.Byte
+Kilobyte :: runtime.Kilobyte
+Megabyte :: runtime.Megabyte
+Gigabyte :: runtime.Gigabyte
+Terabyte :: runtime.Terabyte
 
 set :: proc "contextless" (data: rawptr, value: byte, len: int) -> rawptr {
 	return runtime.memset(data, i32(value), len)

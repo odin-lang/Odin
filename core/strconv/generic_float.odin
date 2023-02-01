@@ -287,13 +287,13 @@ round_shortest :: proc(d: ^decimal.Decimal, mant: u64, exp: int, flt: ^Float_Inf
 
 @(private)
 decimal_to_float_bits :: proc(d: ^decimal.Decimal, info: ^Float_Info) -> (b: u64, overflow: bool) {
-	end :: proc "contextless" (d: ^decimal.Decimal, mant: u64, exp: int, info: ^Float_Info) -> (b: u64) {
-		bits := mant & (u64(1)<<info.mantbits - 1)
+	end :: proc "contextless" (d: ^decimal.Decimal, mant: u64, exp: int, info: ^Float_Info) -> (bits: u64) {
+		bits = mant & (u64(1)<<info.mantbits - 1)
 		bits |= u64((exp-info.bias) & (1<<info.expbits - 1)) << info.mantbits
 		if d.neg {
 			bits |= 1<< info.mantbits << info.expbits
 		}
-		return bits
+		return
 	}
 	set_overflow :: proc "contextless" (mant: ^u64, exp: ^int, info: ^Float_Info) -> bool {
 		mant^ = 0
@@ -303,7 +303,7 @@ decimal_to_float_bits :: proc(d: ^decimal.Decimal, info: ^Float_Info) -> (b: u64
 
 	mant: u64
 	exp: int
-	if d.decimal_point == 0 {
+	if d.count == 0 {
 		mant = 0
 		exp = info.bias
 		b = end(d, mant, exp, info)
@@ -326,7 +326,7 @@ decimal_to_float_bits :: proc(d: ^decimal.Decimal, info: ^Float_Info) -> (b: u64
 	exp = 0
 	for d.decimal_point > 0 {
 		n := 27 if d.decimal_point >= len(power_table) else power_table[d.decimal_point]
-		decimal.shift(d, n)
+		decimal.shift(d, -n)
 		exp += n
 	}
 	for d.decimal_point < 0 || d.decimal_point == 0 && d.digits[0] < '5' {

@@ -287,6 +287,7 @@ foreign libc {
 	
 	@(link_name="getenv")           _unix_getenv        :: proc(cstring) -> cstring ---
 	@(link_name="realpath")         _unix_realpath      :: proc(path: cstring, resolved_path: rawptr) -> rawptr ---
+	@(link_name="sysctlbyname")     _sysctlbyname       :: proc(path: cstring, oldp: rawptr, oldlenp: rawptr, newp: rawptr, newlen: int) -> c.int ---
 
 	@(link_name="exit")             _unix_exit          :: proc(status: c.int) -> ! ---
 }
@@ -303,7 +304,7 @@ is_path_separator :: proc(r: rune) -> bool {
 	return r == '/'
 }
 
-get_last_error :: proc() -> int {
+get_last_error :: proc "contextless" () -> int {
 	return __errno_location()^
 }
 
@@ -650,6 +651,7 @@ get_current_directory :: proc() -> string {
 			return string(cwd)
 		}
 		if Errno(get_last_error()) != ERANGE {
+			delete(buf)
 			return ""
 		}
 		resize(&buf, len(buf)+page_size)
@@ -700,6 +702,19 @@ get_page_size :: proc() -> int {
 
 	page_size = int(_unix_getpagesize())
 	return page_size
+}
+
+@(private)
+_processor_core_count :: proc() -> int {
+	count : int = 0
+	count_size := size_of(count)
+	if _sysctlbyname("hw.logicalcpu", &count, &count_size, nil, 0) == 0 {
+		if count > 0 {
+			return count
+		}
+	}
+
+	return 1
 }
 
 

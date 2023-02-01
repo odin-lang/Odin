@@ -3,7 +3,6 @@ package strconv
 Int_Flag :: enum {
 	Prefix,
 	Plus,
-	Space,
 }
 Int_Flags :: bit_set[Int_Flag]
 
@@ -73,8 +72,6 @@ append_bits :: proc(buf: []byte, x: u64, base: int, is_signed: bool, bit_size: i
 		i-=1; a[i] = '-'
 	case .Plus in flags:
 		i-=1; a[i] = '+'
-	case .Space in flags:
-		i-=1; a[i] = ' '
 	}
 
 	out := a[i:]
@@ -157,8 +154,6 @@ append_bits_128 :: proc(buf: []byte, x: u128, base: int, is_signed: bool, bit_si
 		i-=1; a[i] = '-'
 	case .Plus in flags:
 		i-=1; a[i] = '+'
-	case .Space in flags:
-		i-=1; a[i] = ' '
 	}
 
 	out := a[i:]

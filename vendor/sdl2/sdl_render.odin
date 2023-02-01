@@ -49,9 +49,9 @@ TextureAccess :: enum c.int {
 	TARGET,    /**< Texture can be used as a render target */
 }
 
-SDL_TEXTUREMODULATE_NONE  :: 0x00000000 /**< No modulation */
-SDL_TEXTUREMODULATE_COLOR :: 0x00000001 /**< srcC = srcC * color */
-SDL_TEXTUREMODULATE_ALPHA :: 0x00000002 /**< srcA = srcA * alpha */
+TEXTUREMODULATE_NONE  :: 0x00000000 /**< No modulation */
+TEXTUREMODULATE_COLOR :: 0x00000001 /**< srcC = srcC * color */
+TEXTUREMODULATE_ALPHA :: 0x00000002 /**< srcA = srcA * alpha */
 
 /**
  * Flip constants for SDL_RenderCopyEx

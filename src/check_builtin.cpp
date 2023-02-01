@@ -1,6 +1,6 @@
 typedef bool (BuiltinTypeIsProc)(Type *t);
 
-BuiltinTypeIsProc *builtin_type_is_procs[BuiltinProc__type_simple_boolean_end - BuiltinProc__type_simple_boolean_begin] = {
+gb_global BuiltinTypeIsProc *builtin_type_is_procs[BuiltinProc__type_simple_boolean_end - BuiltinProc__type_simple_boolean_begin] = {
 	nullptr, // BuiltinProc__type_simple_boolean_begin
 
 	is_type_boolean,
@@ -51,7 +51,7 @@ BuiltinTypeIsProc *builtin_type_is_procs[BuiltinProc__type_simple_boolean_end - 
 };
 
 
-void check_or_else_right_type(CheckerContext *c, Ast *expr, String const &name, Type *right_type) {
+gb_internal void check_or_else_right_type(CheckerContext *c, Ast *expr, String const &name, Type *right_type) {
 	if (right_type == nullptr) {
 		return;
 	}
@@ -62,7 +62,7 @@ void check_or_else_right_type(CheckerContext *c, Ast *expr, String const &name, 
 	}
 }
 
-void check_or_else_split_types(CheckerContext *c, Operand *x, String const &name, Type **left_type_, Type **right_type_) {
+gb_internal void check_or_else_split_types(CheckerContext *c, Operand *x, String const &name, Type **left_type_, Type **right_type_) {
 	Type *left_type = nullptr;
 	Type *right_type = nullptr;
 	if (x->type->kind == Type_Tuple) {
@@ -88,8 +88,7 @@ void check_or_else_split_types(CheckerContext *c, Operand *x, String const &name
 }
 
 
-void check_or_else_expr_no_value_error(CheckerContext *c, String const &name, Operand const &x, Type *type_hint) {
-	// TODO(bill): better error message
+gb_internal void check_or_else_expr_no_value_error(CheckerContext *c, String const &name, Operand const &x, Type *type_hint) {
 	gbString t = type_to_string(x.type);
 	error(x.expr, "'%.*s' does not return a value, value is of type %s", LIT(name), t);
 	if (is_type_union(type_deref(x.type))) {
@@ -97,8 +96,7 @@ void check_or_else_expr_no_value_error(CheckerContext *c, String const &name, Op
 		gbString th = nullptr;
 		if (type_hint != nullptr) {
 			GB_ASSERT(bsrc->kind == Type_Union);
-			for_array(i, bsrc->Union.variants) {
-				Type *vt = bsrc->Union.variants[i];
+			for (Type *vt : bsrc->Union.variants) {
 				if (are_types_identical(vt, type_hint)) {
 					th = type_to_string(type_hint);
 					break;
@@ -118,7 +116,7 @@ void check_or_else_expr_no_value_error(CheckerContext *c, String const &name, Op
 }
 
 
-void check_or_return_split_types(CheckerContext *c, Operand *x, String const &name, Type **left_type_, Type **right_type_) {
+gb_internal void check_or_return_split_types(CheckerContext *c, Operand *x, String const &name, Type **left_type_, Type **right_type_) {
 	Type *left_type = nullptr;
 	Type *right_type = nullptr;
 	if (x->type->kind == Type_Tuple) {
@@ -144,7 +142,7 @@ void check_or_return_split_types(CheckerContext *c, Operand *x, String const &na
 }
 
 
-bool does_require_msgSend_stret(Type *return_type) {
+gb_internal bool does_require_msgSend_stret(Type *return_type) {
 	if (return_type == nullptr) {
 		return false;
 	}
@@ -165,7 +163,7 @@ bool does_require_msgSend_stret(Type *return_type) {
 	return false;
 }
 
-ObjcMsgKind get_objc_proc_kind(Type *return_type) {
+gb_internal ObjcMsgKind get_objc_proc_kind(Type *return_type) {
 	if (return_type == nullptr) {
 		return ObjcMsg_normal;
 	}
@@ -189,7 +187,7 @@ ObjcMsgKind get_objc_proc_kind(Type *return_type) {
 	return ObjcMsg_normal;
 }
 
-void add_objc_proc_type(CheckerContext *c, Ast *call, Type *return_type, Slice<Type *> param_types) {
+gb_internal void add_objc_proc_type(CheckerContext *c, Ast *call, Type *return_type, Slice<Type *> param_types) {
 	ObjcMsgKind kind = get_objc_proc_kind(return_type);
 
 	Scope *scope = create_scope(c->info, nullptr);
@@ -199,8 +197,7 @@ void add_objc_proc_type(CheckerContext *c, Ast *call, Type *return_type, Slice<T
 	{
 		auto variables = array_make<Entity *>(permanent_allocator(), 0, param_types.count);
 
-		for_array(i, param_types)  {
-			Type *type = param_types[i];
+		for (Type *type : param_types) {
 			Entity *param = alloc_entity_param(scope, blank_token, type, false, true);
 			array_add(&variables, param);
 		}
@@ -230,7 +227,7 @@ void add_objc_proc_type(CheckerContext *c, Ast *call, Type *return_type, Slice<T
 	try_to_add_package_dependency(c, "runtime", "objc_msgSend_stret");
 }
 
-bool is_constant_string(CheckerContext *c, String const &builtin_name, Ast *expr, String *name_) {
+gb_internal bool is_constant_string(CheckerContext *c, String const &builtin_name, Ast *expr, String *name_) {
 	Operand op = {};
 	check_expr(c, &op, expr);
 	if (op.mode == Addressing_Constant && op.value.kind == ExactValue_String) {
@@ -245,7 +242,7 @@ bool is_constant_string(CheckerContext *c, String const &builtin_name, Ast *expr
 	return false;
 }
 
-bool check_builtin_objc_procedure(CheckerContext *c, Operand *operand, Ast *call, i32 id, Type *type_hint) {
+gb_internal bool check_builtin_objc_procedure(CheckerContext *c, Operand *operand, Ast *call, i32 id, Type *type_hint) {
 	String const &builtin_name = builtin_procs[id].name;
 
 	if (build_context.metrics.os != TargetOs_darwin) {
@@ -387,7 +384,7 @@ bool check_builtin_objc_procedure(CheckerContext *c, Operand *operand, Ast *call
 	}
 }
 
-bool check_atomic_memory_order_argument(CheckerContext *c, Ast *expr, String const &builtin_name, OdinAtomicMemoryOrder *memory_order_, char const *extra_message = nullptr) {
+gb_internal bool check_atomic_memory_order_argument(CheckerContext *c, Ast *expr, String const &builtin_name, OdinAtomicMemoryOrder *memory_order_, char const *extra_message = nullptr) {
 	Operand x = {};
 	check_expr_with_type_hint(c, &x, expr, t_atomic_memory_order);
 	if (x.mode == Addressing_Invalid) {
@@ -417,7 +414,7 @@ bool check_atomic_memory_order_argument(CheckerContext *c, Ast *expr, String con
 }
 
 
-bool check_builtin_simd_operation(CheckerContext *c, Operand *operand, Ast *call, i32 id, Type *type_hint) {
+gb_internal bool check_builtin_simd_operation(CheckerContext *c, Operand *operand, Ast *call, i32 id, Type *type_hint) {
 	ast_node(ce, CallExpr, call);
 
 	String const &builtin_name = builtin_procs[id].name;
@@ -1081,7 +1078,7 @@ bool check_builtin_simd_operation(CheckerContext *c, Operand *operand, Ast *call
 	return false;
 }
 
-bool cache_load_file_directive(CheckerContext *c, Ast *call, String const &original_string, bool err_on_not_found, LoadFileCache **cache_) {
+gb_internal bool cache_load_file_directive(CheckerContext *c, Ast *call, String const &original_string, bool err_on_not_found, LoadFileCache **cache_) {
 	ast_node(ce, CallExpr, call);
 	ast_node(bd, BasicDirective, ce->proc);
 	String builtin_name = bd->name.string;
@@ -1111,7 +1108,7 @@ bool cache_load_file_directive(CheckerContext *c, Ast *call, String const &origi
 			new_cache->path = path;
 			new_cache->data = data;
 			new_cache->file_error = file_error;
-			string_map_init(&new_cache->hashes, heap_allocator(), 32);
+			string_map_init(&new_cache->hashes, 32);
 			string_map_set(&c->info->load_file_cache, path, new_cache);
 			if (cache_) *cache_ = new_cache;
 		} else {
@@ -1121,8 +1118,8 @@ bool cache_load_file_directive(CheckerContext *c, Ast *call, String const &origi
 		}
 	});
 
-	char *c_str = alloc_cstring(heap_allocator(), path);
-	defer (gb_free(heap_allocator(), c_str));
+	TEMPORARY_ALLOCATOR_GUARD();
+	char *c_str = alloc_cstring(temporary_allocator(), path);
 
 	gbFile f = {};
 	if (cache == nullptr) {
@@ -1170,7 +1167,7 @@ bool cache_load_file_directive(CheckerContext *c, Ast *call, String const &origi
 }
 
 
-bool is_valid_type_for_load(Type *type) {
+gb_internal bool is_valid_type_for_load(Type *type) {
 	if (type == t_invalid) {
 		return false;
 	} else if (is_type_string(type)) {
@@ -1191,7 +1188,16 @@ bool is_valid_type_for_load(Type *type) {
 	return false;
 }
 
-LoadDirectiveResult check_load_directive(CheckerContext *c, Operand *operand, Ast *call, Type *type_hint, bool err_on_not_found) {
+gb_internal bool check_atomic_ptr_argument(Operand *operand, String const &builtin_name, Type *elem) {
+	if (!is_type_valid_atomic_type(elem)) {
+		error(operand->expr, "Only an integer, floating-point, boolean, or pointer can be used as an atomic for '%.*s'", LIT(builtin_name));
+		return false;
+	}
+	return true;
+
+}
+
+gb_internal LoadDirectiveResult check_load_directive(CheckerContext *c, Operand *operand, Ast *call, Type *type_hint, bool err_on_not_found) {
 	ast_node(ce, CallExpr, call);
 	ast_node(bd, BasicDirective, ce->proc);
 	String name = bd->name.string;
@@ -1256,7 +1262,7 @@ LoadDirectiveResult check_load_directive(CheckerContext *c, Operand *operand, As
 }
 
 
-bool check_builtin_procedure_directive(CheckerContext *c, Operand *operand, Ast *call, Type *type_hint) {
+gb_internal bool check_builtin_procedure_directive(CheckerContext *c, Operand *operand, Ast *call, Type *type_hint) {
 	ast_node(ce, CallExpr, call);
 	ast_node(bd, BasicDirective, ce->proc);
 	String name = bd->name.string;
@@ -1581,7 +1587,7 @@ bool check_builtin_procedure_directive(CheckerContext *c, Operand *operand, Ast 
 	return true;
 }
 
-bool check_builtin_procedure(CheckerContext *c, Operand *operand, Ast *call, i32 id, Type *type_hint) {
+gb_internal bool check_builtin_procedure(CheckerContext *c, Operand *operand, Ast *call, i32 id, Type *type_hint) {
 	ast_node(ce, CallExpr, call);
 	if (ce->inlining != ProcInlining_none) {
 		error(call, "Inlining operators are not allowed on built-in procedures");
@@ -1690,7 +1696,7 @@ bool check_builtin_procedure(CheckerContext *c, Operand *operand, Ast *call, i32
 	case BuiltinProc___entry_point:
 		operand->mode = Addressing_NoValue;
 		operand->type = nullptr;
-		mpmc_enqueue(&c->info->intrinsics_entry_point_usage, call);
+		mpsc_enqueue(&c->info->intrinsics_entry_point_usage, call);
 		break;
 
 	case BuiltinProc_DIRECTIVE:
@@ -2559,7 +2565,7 @@ bool check_builtin_procedure(CheckerContext *c, Operand *operand, Ast *call, i32
 		if (is_type_struct(type)) {
 			isize variable_count = type->Struct.fields.count;
 			slice_init(&tuple->Tuple.variables, a, variable_count);
-			// TODO(bill): Should I copy each of the entities or is this good enough?
+			// NOTE(bill): don't copy the entities, this should be good enough
 			gb_memmove_array(tuple->Tuple.variables.data, type->Struct.fields.data, variable_count);
 		} else if (is_type_array(type)) {
 			isize variable_count = cast(isize)type->Array.count;
@@ -3066,14 +3072,14 @@ bool check_builtin_procedure(CheckerContext *c, Operand *operand, Ast *call, i32
 	}
 
 	case BuiltinProc_soa_zip: {
+		TEMPORARY_ALLOCATOR_GUARD();
 		auto types = array_make<Type *>(temporary_allocator(), 0, ce->args.count);
 		auto names = array_make<String>(temporary_allocator(), 0, ce->args.count);
 
 		bool first_is_field_value = (ce->args[0]->kind == Ast_FieldValue);
 
 		bool fail = false;
-		for_array(i, ce->args) {
-			Ast *arg = ce->args[i];
+		for (Ast *arg : ce->args) {
 			bool mix = false;
 			if (first_is_field_value) {
 				mix = arg->kind != Ast_FieldValue;
@@ -3087,11 +3093,10 @@ bool check_builtin_procedure(CheckerContext *c, Operand *operand, Ast *call, i32
 			}
 		}
 		StringSet name_set = {};
-		string_set_init(&name_set, heap_allocator(), 2*ce->args.count);
+		string_set_init(&name_set, 2*ce->args.count);
 
-		for_array(i, ce->args) {
+		for (Ast *arg : ce->args) {
 			String name = {};
-			Ast *arg = ce->args[i];
 			if (arg->kind == Ast_FieldValue) {
 				Ast *ename = arg->FieldValue.field;
 				if (!fail && ename->kind != Ast_Ident) {
@@ -3126,13 +3131,11 @@ bool check_builtin_procedure(CheckerContext *c, Operand *operand, Ast *call, i32
 			}
 
 
-			if (string_set_exists(&name_set, name)) {
+			if (string_set_update(&name_set, name)) {
 				error(op.expr, "Field argument name '%.*s' already exists", LIT(name));
 			} else {
 				array_add(&types, arg_type->Slice.elem);
 				array_add(&names, name);
-
-				string_set_add(&name_set, name);
 			}
 		}
 
@@ -3455,9 +3458,8 @@ bool check_builtin_procedure(CheckerContext *c, Operand *operand, Ast *call, i32
 			error(ce->args[0], "Expected a constant string for '%.*s'", LIT(builtin_name));
 		} else if (operand->value.kind == ExactValue_String) {
 			String pkg_name = operand->value.value_string;
-			// TODO(bill): probably should have this be a `StringMap` eventually
-			for_array(i, c->info->packages.entries) {
-				AstPackage *pkg = c->info->packages.entries[i].value;
+			for (auto const &entry : c->info->packages) {
+				AstPackage *pkg = entry.value;
 				if (pkg->name == pkg_name) {
 					value = true;
 					break;
@@ -3769,9 +3771,7 @@ bool check_builtin_procedure(CheckerContext *c, Operand *operand, Ast *call, i32
 				mp_err err = mp_pack(rop, max_count, &written, MP_LSB_FIRST, size, endian, nails, &x.value.value_integer);
 				GB_ASSERT(err == MP_OKAY);
 
-				if (id == BuiltinProc_reverse_bits) {
-					// TODO(bill): Should this even be allowed at compile time?
-				} else {
+				if (id != BuiltinProc_reverse_bits) {
 					u64 v = 0;
 					switch (id) {
 					case BuiltinProc_count_ones:
@@ -4255,6 +4255,9 @@ bool check_builtin_procedure(CheckerContext *c, Operand *operand, Ast *call, i32
 				error(operand->expr, "Expected a pointer for '%.*s'", LIT(builtin_name));
 				return false;
 			}
+			if (id == BuiltinProc_atomic_store && !check_atomic_ptr_argument(operand, builtin_name, elem)) {
+				return false;
+			}
 			Operand x = {};
 			check_expr_with_type_hint(c, &x, ce->args[1], elem);
 			check_assignment(c, &x, elem, builtin_name);
@@ -4269,6 +4272,9 @@ bool check_builtin_procedure(CheckerContext *c, Operand *operand, Ast *call, i32
 			Type *elem = nullptr;
 			if (!is_type_normal_pointer(operand->type, &elem)) {
 				error(operand->expr, "Expected a pointer for '%.*s'", LIT(builtin_name));
+				return false;
+			}
+			if (!check_atomic_ptr_argument(operand, builtin_name, elem)) {
 				return false;
 			}
 			Operand x = {};
@@ -4303,6 +4309,10 @@ bool check_builtin_procedure(CheckerContext *c, Operand *operand, Ast *call, i32
 				error(operand->expr, "Expected a pointer for '%.*s'", LIT(builtin_name));
 				return false;
 			}
+			if (id == BuiltinProc_atomic_load && !check_atomic_ptr_argument(operand, builtin_name, elem)) {
+				return false;
+			}
+
 			operand->type = elem;
 			operand->mode = Addressing_Value;
 			break;
@@ -4313,6 +4323,9 @@ bool check_builtin_procedure(CheckerContext *c, Operand *operand, Ast *call, i32
 			Type *elem = nullptr;
 			if (!is_type_normal_pointer(operand->type, &elem)) {
 				error(operand->expr, "Expected a pointer for '%.*s'", LIT(builtin_name));
+				return false;
+			}
+			if (!check_atomic_ptr_argument(operand, builtin_name, elem)) {
 				return false;
 			}
 
@@ -4344,6 +4357,9 @@ bool check_builtin_procedure(CheckerContext *c, Operand *operand, Ast *call, i32
 			Type *elem = nullptr;
 			if (!is_type_normal_pointer(operand->type, &elem)) {
 				error(operand->expr, "Expected a pointer for '%.*s'", LIT(builtin_name));
+				return false;
+			}
+			if (!check_atomic_ptr_argument(operand, builtin_name, elem)) {
 				return false;
 			}
 			Operand x = {};
@@ -4381,6 +4397,9 @@ bool check_builtin_procedure(CheckerContext *c, Operand *operand, Ast *call, i32
 			Type *elem = nullptr;
 			if (!is_type_normal_pointer(operand->type, &elem)) {
 				error(operand->expr, "Expected a pointer for '%.*s'", LIT(builtin_name));
+				return false;
+			}
+			if (!check_atomic_ptr_argument(operand, builtin_name, elem)) {
 				return false;
 			}
 			Operand x = {};
@@ -4421,6 +4440,9 @@ bool check_builtin_procedure(CheckerContext *c, Operand *operand, Ast *call, i32
 				error(operand->expr, "Expected a pointer for '%.*s'", LIT(builtin_name));
 				return false;
 			}
+			if (!check_atomic_ptr_argument(operand, builtin_name, elem)) {
+				return false;
+			}
 			Operand x = {};
 			Operand y = {};
 			check_expr_with_type_hint(c, &x, ce->args[1], elem);
@@ -4446,6 +4468,9 @@ bool check_builtin_procedure(CheckerContext *c, Operand *operand, Ast *call, i32
 			Type *elem = nullptr;
 			if (!is_type_normal_pointer(operand->type, &elem)) {
 				error(operand->expr, "Expected a pointer for '%.*s'", LIT(builtin_name));
+				return false;
+			}
+			if (!check_atomic_ptr_argument(operand, builtin_name, elem)) {
 				return false;
 			}
 			Operand x = {};
@@ -4993,8 +5018,7 @@ bool check_builtin_procedure(CheckerContext *c, Operand *operand, Ast *call, i32
 
 			bool is_variant = false;
 
-			for_array(i, u->Union.variants) {
-				Type *vt = u->Union.variants[i];
+			for (Type *vt : u->Union.variants) {
 				if (are_types_identical(v, vt)) {
 					is_variant = true;
 					break;

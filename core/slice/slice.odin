@@ -77,8 +77,7 @@ swap_between :: proc(a, b: $T/[]$E) {
 reverse :: proc(array: $T/[]$E) {
 	n := len(array)/2
 	for i in 0..<n {
-		a, b := i, len(array)-i-1
-		array[a], array[b] = array[b], array[a]
+		swap(array, i, len(array)-i-1)
 	}
 }
 
@@ -218,8 +217,10 @@ rotate_left :: proc(array: $T/[]$E, mid: int) {
 	n := len(array)
 	m := mid %% n
 	k := n - m
-	p := raw_data(array)
-	ptr_rotate(mid, ptr_add(p, mid), k)
+	// FIXME: (ap29600) this cast is a temporary fix for the compiler not matching
+	// [^T] with $P/^$T
+	p := cast(^E)raw_data(array)
+	ptr_rotate(m, ptr_add(p, m), k)
 }
 rotate_right :: proc(array: $T/[]$E, k: int) {
 	rotate_left(array, -k)

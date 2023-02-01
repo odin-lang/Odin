@@ -3,16 +3,15 @@ package reflect
 import "core:io"
 import "core:strings"
 
+@(require_results)
 are_types_identical :: proc(a, b: ^Type_Info) -> bool {
 	if a == b {
 		return true
 	}
 
-	if (a == nil && b != nil) ||
-	   (a != nil && b == nil) {
+	if a == nil || b == nil {
 		return false
 	}
-
 
 	switch {
 	case a.size != b.size, a.align != b.align:
@@ -180,6 +179,7 @@ are_types_identical :: proc(a, b: ^Type_Info) -> bool {
 	return false
 }
 
+@(require_results)
 is_signed :: proc(info: ^Type_Info) -> bool {
 	if info == nil { return false }
 	#partial switch i in type_info_base(info).variant {
@@ -188,6 +188,7 @@ is_signed :: proc(info: ^Type_Info) -> bool {
 	}
 	return false
 }
+@(require_results)
 is_unsigned :: proc(info: ^Type_Info) -> bool {
 	if info == nil { return false }
 	#partial switch i in type_info_base(info).variant {
@@ -197,6 +198,7 @@ is_unsigned :: proc(info: ^Type_Info) -> bool {
 	return false
 }
 
+@(require_results)
 is_byte :: proc(info: ^Type_Info) -> bool {
 	if info == nil { return false }
 	#partial switch i in type_info_base(info).variant {
@@ -206,66 +208,79 @@ is_byte :: proc(info: ^Type_Info) -> bool {
 }
 
 
+@(require_results)
 is_integer :: proc(info: ^Type_Info) -> bool {
 	if info == nil { return false }
 	_, ok := type_info_base(info).variant.(Type_Info_Integer)
 	return ok
 }
+@(require_results)
 is_rune :: proc(info: ^Type_Info) -> bool {
 	if info == nil { return false }
 	_, ok := type_info_base(info).variant.(Type_Info_Rune)
 	return ok
 }
+@(require_results)
 is_float :: proc(info: ^Type_Info) -> bool {
 	if info == nil { return false }
 	_, ok := type_info_base(info).variant.(Type_Info_Float)
 	return ok
 }
+@(require_results)
 is_complex :: proc(info: ^Type_Info) -> bool {
 	if info == nil { return false }
 	_, ok := type_info_base(info).variant.(Type_Info_Complex)
 	return ok
 }
+@(require_results)
 is_quaternion :: proc(info: ^Type_Info) -> bool {
 	if info == nil { return false }
 	_, ok := type_info_base(info).variant.(Type_Info_Quaternion)
 	return ok
 }
+@(require_results)
 is_any :: proc(info: ^Type_Info) -> bool {
 	if info == nil { return false }
 	_, ok := type_info_base(info).variant.(Type_Info_Any)
 	return ok
 }
+@(require_results)
 is_string :: proc(info: ^Type_Info) -> bool {
 	if info == nil { return false }
 	_, ok := type_info_base(info).variant.(Type_Info_String)
 	return ok
 }
+@(require_results)
 is_cstring :: proc(info: ^Type_Info) -> bool {
 	if info == nil { return false }
 	v, ok := type_info_base(info).variant.(Type_Info_String)
 	return ok && v.is_cstring
 }
+@(require_results)
 is_boolean :: proc(info: ^Type_Info) -> bool {
 	if info == nil { return false }
 	_, ok := type_info_base(info).variant.(Type_Info_Boolean)
 	return ok
 }
+@(require_results)
 is_pointer :: proc(info: ^Type_Info) -> bool {
 	if info == nil { return false }
 	_, ok := type_info_base(info).variant.(Type_Info_Pointer)
 	return ok
 }
+@(require_results)
 is_multi_pointer :: proc(info: ^Type_Info) -> bool {
 	if info == nil { return false }
 	_, ok := type_info_base(info).variant.(Type_Info_Multi_Pointer)
 	return ok
 }
+@(require_results)
 is_soa_pointer :: proc(info: ^Type_Info) -> bool {
 	if info == nil { return false }
 	_, ok := type_info_base(info).variant.(Type_Info_Soa_Pointer)
 	return ok
 }
+@(require_results)
 is_pointer_internally :: proc(info: ^Type_Info) -> bool {
 	if info == nil { return false }
 	#partial switch v in info.variant {
@@ -277,76 +292,91 @@ is_pointer_internally :: proc(info: ^Type_Info) -> bool {
 	}
 	return false
 }
+@(require_results)
 is_procedure :: proc(info: ^Type_Info) -> bool {
 	if info == nil { return false }
 	_, ok := type_info_base(info).variant.(Type_Info_Procedure)
 	return ok
 }
+@(require_results)
 is_array :: proc(info: ^Type_Info) -> bool {
 	if info == nil { return false }
 	_, ok := type_info_base(info).variant.(Type_Info_Array)
 	return ok
 }
+@(require_results)
 is_enumerated_array :: proc(info: ^Type_Info) -> bool {
 	if info == nil { return false }
 	_, ok := type_info_base(info).variant.(Type_Info_Enumerated_Array)
 	return ok
 }
+@(require_results)
 is_dynamic_array :: proc(info: ^Type_Info) -> bool {
 	if info == nil { return false }
 	_, ok := type_info_base(info).variant.(Type_Info_Dynamic_Array)
 	return ok
 }
+@(require_results)
 is_dynamic_map :: proc(info: ^Type_Info) -> bool {
 	if info == nil { return false }
 	_, ok := type_info_base(info).variant.(Type_Info_Map)
 	return ok
 }
+@(require_results)
 is_bit_set :: proc(info: ^Type_Info) -> bool {
 	if info == nil { return false }
 	_, ok := type_info_base(info).variant.(Type_Info_Bit_Set)
 	return ok
 }
+@(require_results)
 is_slice :: proc(info: ^Type_Info) -> bool {
 	if info == nil { return false }
 	_, ok := type_info_base(info).variant.(Type_Info_Slice)
 	return ok
 }
+@(require_results)
 is_tuple :: proc(info: ^Type_Info) -> bool {
 	if info == nil { return false }
 	_, ok := type_info_base(info).variant.(Type_Info_Tuple)
 	return ok
 }
+@(require_results)
 is_struct :: proc(info: ^Type_Info) -> bool {
 	if info == nil { return false }
 	s, ok := type_info_base(info).variant.(Type_Info_Struct)
 	return ok && !s.is_raw_union
 }
+@(require_results)
 is_raw_union :: proc(info: ^Type_Info) -> bool {
 	if info == nil { return false }
 	s, ok := type_info_base(info).variant.(Type_Info_Struct)
 	return ok && s.is_raw_union
 }
+@(require_results)
 is_union :: proc(info: ^Type_Info) -> bool {
 	if info == nil { return false }
 	_, ok := type_info_base(info).variant.(Type_Info_Union)
 	return ok
 }
+@(require_results)
 is_enum :: proc(info: ^Type_Info) -> bool {
 	if info == nil { return false }
 	_, ok := type_info_base(info).variant.(Type_Info_Enum)
 	return ok
 }
+@(require_results)
 is_simd_vector :: proc(info: ^Type_Info) -> bool {
 	if info == nil { return false }
 	_, ok := type_info_base(info).variant.(Type_Info_Simd_Vector)
 	return ok
 }
+@(require_results)
 is_relative_pointer :: proc(info: ^Type_Info) -> bool {
 	if info == nil { return false }
 	_, ok := type_info_base(info).variant.(Type_Info_Relative_Pointer)
 	return ok
 }
+@(require_results)
 is_relative_slice :: proc(info: ^Type_Info) -> bool {
 	if info == nil { return false }
 	_, ok := type_info_base(info).variant.(Type_Info_Relative_Slice)

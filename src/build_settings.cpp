@@ -57,7 +57,7 @@ enum TargetABIKind : u16 {
 };
 
 
-String target_os_names[TargetOs_COUNT] = {
+gb_global String target_os_names[TargetOs_COUNT] = {
 	str_lit(""),
 	str_lit("windows"),
 	str_lit("darwin"),
@@ -72,7 +72,7 @@ String target_os_names[TargetOs_COUNT] = {
 	str_lit("freestanding"),
 };
 
-String target_arch_names[TargetArch_COUNT] = {
+gb_global String target_arch_names[TargetArch_COUNT] = {
 	str_lit(""),
 	str_lit("amd64"),
 	str_lit("i386"),
@@ -82,19 +82,19 @@ String target_arch_names[TargetArch_COUNT] = {
 	str_lit("wasm64"),
 };
 
-String target_endian_names[TargetEndian_COUNT] = {
+gb_global String target_endian_names[TargetEndian_COUNT] = {
 	str_lit(""),
 	str_lit("little"),
 	str_lit("big"),
 };
 
-String target_abi_names[TargetABI_COUNT] = {
+gb_global String target_abi_names[TargetABI_COUNT] = {
 	str_lit(""),
 	str_lit("win64"),
 	str_lit("sysv"),
 };
 
-TargetEndianKind target_endians[TargetArch_COUNT] = {
+gb_global TargetEndianKind target_endians[TargetArch_COUNT] = {
 	TargetEndian_Invalid,
 	TargetEndian_Little,
 	TargetEndian_Little,
@@ -107,7 +107,7 @@ TargetEndianKind target_endians[TargetArch_COUNT] = {
 #define ODIN_VERSION_RAW "dev-unknown-unknown"
 #endif
 
-String const ODIN_VERSION = str_lit(ODIN_VERSION_RAW);
+gb_global String const ODIN_VERSION = str_lit(ODIN_VERSION_RAW);
 
 
 
@@ -149,7 +149,6 @@ enum CommandKind : u32 {
 	Command_run             = 1<<0,
 	Command_build           = 1<<1,
 	Command_check           = 1<<3,
-	Command_query           = 1<<4,
 	Command_doc             = 1<<5,
 	Command_version         = 1<<6,
 	Command_test            = 1<<7,
@@ -157,16 +156,15 @@ enum CommandKind : u32 {
 	Command_strip_semicolon = 1<<8,
 	Command_bug_report      = 1<<9,
 
-	Command__does_check = Command_run|Command_build|Command_check|Command_query|Command_doc|Command_test|Command_strip_semicolon,
+	Command__does_check = Command_run|Command_build|Command_check|Command_doc|Command_test|Command_strip_semicolon,
 	Command__does_build = Command_run|Command_build|Command_test,
 	Command_all = ~(u32)0,
 };
 
-char const *odin_command_strings[32] = {
+gb_global char const *odin_command_strings[32] = {
 	"run",
 	"build",
 	"check",
-	"query",
 	"doc",
 	"version",
 	"test",
@@ -293,13 +291,14 @@ struct BuildContext {
 	bool   show_error_line;
 
 	bool   ignore_lazy;
+	bool   ignore_llvm_build;
 
 	bool   use_subsystem_windows;
 	bool   ignore_microsoft_magic;
 	bool   linker_map_file;
 
 	bool   use_separate_modules;
-	bool   threaded_checker;
+	bool   no_threaded_checker;
 
 	bool   show_debug_messages;
 	
@@ -316,8 +315,6 @@ struct BuildContext {
 	u32 cmd_doc_flags;
 	Array<String> extra_packages;
 
-	QueryDataSetSettings query_data_set_settings;
-
 	StringSet test_names;
 
 	gbAffinity affinity;
@@ -333,10 +330,15 @@ struct BuildContext {
 
 gb_global BuildContext build_context = {0};
 
-bool global_warnings_as_errors(void) {
+gb_internal bool IS_ODIN_DEBUG(void) {
+	return build_context.ODIN_DEBUG;
+}
+
+
+gb_internal bool global_warnings_as_errors(void) {
 	return build_context.warnings_as_errors;
 }
-bool global_ignore_warnings(void) {
+gb_internal bool global_ignore_warnings(void) {
 	return build_context.ignore_warnings;
 }
 
@@ -398,7 +400,7 @@ gb_global TargetMetrics target_darwin_arm64 = {
 	TargetArch_arm64,
 	8, 8, 16,
 	str_lit("arm64-apple-macosx11.0.0"),
-	str_lit("e-m:o-i64:64-i128:128-n32:64-S128"), // TODO(bill): Is this correct?
+	str_lit("e-m:o-i64:64-i128:128-n32:64-S128"),
 };
 
 gb_global TargetMetrics target_freebsd_i386 = {
@@ -502,9 +504,9 @@ gb_global NamedTargetMetrics named_targets[] = {
 	{ str_lit("freestanding_amd64_sysv"), &target_freestanding_amd64_sysv },
 };
 
-NamedTargetMetrics *selected_target_metrics;
+gb_global NamedTargetMetrics *selected_target_metrics;
 
-TargetOsKind get_target_os_from_string(String str) {
+gb_internal TargetOsKind get_target_os_from_string(String str) {
 	for (isize i = 0; i < TargetOs_COUNT; i++) {
 		if (str_eq_ignore_case(target_os_names[i], str)) {
 			return cast(TargetOsKind)i;
@@ -513,7 +515,7 @@ TargetOsKind get_target_os_from_string(String str) {
 	return TargetOs_Invalid;
 }
 
-TargetArchKind get_target_arch_from_string(String str) {
+gb_internal TargetArchKind get_target_arch_from_string(String str) {
 	for (isize i = 0; i < TargetArch_COUNT; i++) {
 		if (str_eq_ignore_case(target_arch_names[i], str)) {
 			return cast(TargetArchKind)i;
@@ -523,7 +525,7 @@ TargetArchKind get_target_arch_from_string(String str) {
 }
 
 
-bool is_excluded_target_filename(String name) {
+gb_internal bool is_excluded_target_filename(String name) {
 	String original_name = name;
 	name = remove_extension_from_path(name);
 
@@ -588,23 +590,22 @@ struct LibraryCollections {
 
 gb_global Array<LibraryCollections> library_collections = {0};
 
-void add_library_collection(String name, String path) {
-	// TODO(bill): Check the path is valid and a directory
+gb_internal void add_library_collection(String name, String path) {
 	LibraryCollections lc = {name, string_trim_whitespace(path)};
 	array_add(&library_collections, lc);
 }
 
-bool find_library_collection_path(String name, String *path) {
-	for_array(i, library_collections) {
-		if (library_collections[i].name == name) {
-			if (path) *path = library_collections[i].path;
+gb_internal bool find_library_collection_path(String name, String *path) {
+	for (auto const &lc : library_collections) {
+		if (lc.name == name) {
+			if (path) *path = lc.path;
 			return true;
 		}
 	}
 	return false;
 }
 
-bool is_arch_wasm(void) {
+gb_internal bool is_arch_wasm(void) {
 	switch (build_context.metrics.arch) {
 	case TargetArch_wasm32:
 	case TargetArch_wasm64:
@@ -613,7 +614,7 @@ bool is_arch_wasm(void) {
 	return false;
 }
 
-bool is_arch_x86(void) {
+gb_internal bool is_arch_x86(void) {
 	switch (build_context.metrics.arch) {
 	case TargetArch_i386:
 	case TargetArch_amd64:
@@ -622,7 +623,7 @@ bool is_arch_x86(void) {
 	return false;
 }
 
-bool allow_check_foreign_filepath(void) {
+gb_internal bool allow_check_foreign_filepath(void) {
 	switch (build_context.metrics.arch) {
 	case TargetArch_wasm32:
 	case TargetArch_wasm64:
@@ -638,13 +639,14 @@ bool allow_check_foreign_filepath(void) {
 // is_abs_path
 // has_subdir
 
-String const WIN32_SEPARATOR_STRING = {cast(u8 *)"\\", 1};
-String const NIX_SEPARATOR_STRING   = {cast(u8 *)"/",  1};
+gb_global String const WIN32_SEPARATOR_STRING = {cast(u8 *)"\\", 1};
+gb_global String const NIX_SEPARATOR_STRING   = {cast(u8 *)"/",  1};
 
-String const WASM_MODULE_NAME_SEPARATOR = str_lit("..");
+gb_global String const WASM_MODULE_NAME_SEPARATOR = str_lit("..");
 
-String internal_odin_root_dir(void);
-String odin_root_dir(void) {
+gb_internal String internal_odin_root_dir(void);
+
+gb_internal String odin_root_dir(void) {
 	if (global_module_path_set) {
 		return global_module_path;
 	}
@@ -670,7 +672,7 @@ String odin_root_dir(void) {
 
 
 #if defined(GB_SYSTEM_WINDOWS)
-String internal_odin_root_dir(void) {
+gb_internal String internal_odin_root_dir(void) {
 	String path = global_module_path;
 	isize len, i;
 	wchar_t *text;
@@ -723,9 +725,9 @@ String internal_odin_root_dir(void) {
 
 #include <mach-o/dyld.h>
 
-String path_to_fullpath(gbAllocator a, String s);
+gb_internal String path_to_fullpath(gbAllocator a, String s);
 
-String internal_odin_root_dir(void) {
+gb_internal String internal_odin_root_dir(void) {
 	String path = global_module_path;
 	isize len, i;
 	u8 *text;
@@ -777,9 +779,9 @@ String internal_odin_root_dir(void) {
 // NOTE: Linux / Unix is unfinished and not tested very well.
 #include <sys/stat.h>
 
-String path_to_fullpath(gbAllocator a, String s);
+gb_internal String path_to_fullpath(gbAllocator a, String s);
 
-String internal_odin_root_dir(void) {
+gb_internal String internal_odin_root_dir(void) {
 	String path = global_module_path;
 	isize len, i;
 	u8 *text;
@@ -938,18 +940,22 @@ String internal_odin_root_dir(void) {
 gb_global BlockingMutex fullpath_mutex;
 
 #if defined(GB_SYSTEM_WINDOWS)
-String path_to_fullpath(gbAllocator a, String s) {
+gb_internal String path_to_fullpath(gbAllocator a, String s) {
 	String result = {};
-	mutex_lock(&fullpath_mutex);
-	defer (mutex_unlock(&fullpath_mutex));
 
 	String16 string16 = string_to_string16(heap_allocator(), s);
 	defer (gb_free(heap_allocator(), string16.text));
 
-	DWORD len = GetFullPathNameW(&string16[0], 0, nullptr, nullptr);
+	DWORD len;
+
+	mutex_lock(&fullpath_mutex);
+
+	len = GetFullPathNameW(&string16[0], 0, nullptr, nullptr);
 	if (len != 0) {
 		wchar_t *text = gb_alloc_array(permanent_allocator(), wchar_t, len+1);
 		GetFullPathNameW(&string16[0], len, text, nullptr);
+		mutex_unlock(&fullpath_mutex);
+
 		text[len] = 0;
 		result = string16_to_string(a, make_string16(text, len));
 		result = string_trim_whitespace(result);
@@ -960,12 +966,14 @@ String path_to_fullpath(gbAllocator a, String s) {
 				result.text[i] = '/';
 			}
 		}
+	} else {
+		mutex_unlock(&fullpath_mutex);
 	}
 
 	return result;
 }
 #elif defined(GB_SYSTEM_OSX) || defined(GB_SYSTEM_UNIX)
-String path_to_fullpath(gbAllocator a, String s) {
+gb_internal String path_to_fullpath(gbAllocator a, String s) {
 	char *p;
 	mutex_lock(&fullpath_mutex);
 	p = realpath(cast(char *)s.text, 0);
@@ -978,7 +986,7 @@ String path_to_fullpath(gbAllocator a, String s) {
 #endif
 
 
-String get_fullpath_relative(gbAllocator a, String base_dir, String path) {
+gb_internal String get_fullpath_relative(gbAllocator a, String base_dir, String path) {
 	u8 *str = gb_alloc_array(heap_allocator(), u8, base_dir.len+1+path.len+1);
 	defer (gb_free(heap_allocator(), str));
 
@@ -1004,7 +1012,7 @@ String get_fullpath_relative(gbAllocator a, String base_dir, String path) {
 }
 
 
-String get_fullpath_core(gbAllocator a, String path) {
+gb_internal String get_fullpath_core(gbAllocator a, String path) {
 	String module_dir = odin_root_dir();
 
 	String core = str_lit("core/");
@@ -1024,11 +1032,11 @@ String get_fullpath_core(gbAllocator a, String path) {
 	return path_to_fullpath(a, res);
 }
 
-bool show_error_line(void) {
+gb_internal bool show_error_line(void) {
 	return build_context.show_error_line;
 }
 
-bool has_asm_extension(String const &path) {
+gb_internal bool has_asm_extension(String const &path) {
 	String ext = path_extension(path);
 	if (ext == ".asm") {
 		return true;
@@ -1041,7 +1049,7 @@ bool has_asm_extension(String const &path) {
 }
 
 // temporary
-char *token_pos_to_string(TokenPos const &pos) {
+gb_internal char *token_pos_to_string(TokenPos const &pos) {
 	gbString s = gb_string_make_reserve(temporary_allocator(), 128);
 	String file = get_file_path_string(pos.file_id);
 	switch (build_context.ODIN_ERROR_POS_STYLE) {
@@ -1056,7 +1064,7 @@ char *token_pos_to_string(TokenPos const &pos) {
 	return s;
 }
 
-void init_build_context(TargetMetrics *cross_target) {
+gb_internal void init_build_context(TargetMetrics *cross_target) {
 	BuildContext *bc = &build_context;
 
 	gb_affinity_init(&bc->affinity);
@@ -1245,7 +1253,14 @@ void init_build_context(TargetMetrics *cross_target) {
 
 	bc->optimization_level = gb_clamp(bc->optimization_level, 0, 3);
 
-	bc->ODIN_VALGRIND_SUPPORT = is_arch_x86() && build_context.metrics.os != TargetOs_windows;
+	bc->ODIN_VALGRIND_SUPPORT = false;
+	if (build_context.metrics.os != TargetOs_windows) {
+		switch (bc->metrics.arch) {
+		case TargetArch_amd64:
+			bc->ODIN_VALGRIND_SUPPORT = true;
+			break;
+		}
+	}
 
 	#undef LINK_FLAG_X64
 	#undef LINK_FLAG_386
@@ -1258,7 +1273,7 @@ void init_build_context(TargetMetrics *cross_target) {
 #endif
 
 
-Array<String> split_by_comma(String const &list) {
+gb_internal Array<String> split_by_comma(String const &list) {
 	isize n = 1;
 	for (isize i = 0; i < list.len; i++) {
 		if (list.text[i] == ',') {
@@ -1280,20 +1295,19 @@ Array<String> split_by_comma(String const &list) {
 	return res;
 }
 
-bool check_target_feature_is_valid(TokenPos pos, String const &feature) {
+gb_internal bool check_target_feature_is_valid(TokenPos pos, String const &feature) {
 	// TODO(bill): check_target_feature_is_valid
 	return true;
 }
 
-bool check_target_feature_is_enabled(TokenPos pos, String const &target_feature_list) {
+gb_internal bool check_target_feature_is_enabled(TokenPos pos, String const &target_feature_list) {
 	BuildContext *bc = &build_context;
 	mutex_lock(&bc->target_features_mutex);
 	defer (mutex_unlock(&bc->target_features_mutex));
 
 	auto items = split_by_comma(target_feature_list);
 	array_free(&items);
-	for_array(i, items) {
-		String const &item = items.data[i];
+	for (String const &item : items) {
 		if (!check_target_feature_is_valid(pos, item)) {
 			error(pos, "Target feature '%.*s' is not valid", LIT(item));
 			return false;
@@ -1307,14 +1321,13 @@ bool check_target_feature_is_enabled(TokenPos pos, String const &target_feature_
 	return true;
 }
 
-void enable_target_feature(TokenPos pos, String const &target_feature_list) {
+gb_internal void enable_target_feature(TokenPos pos, String const &target_feature_list) {
 	BuildContext *bc = &build_context;
 	mutex_lock(&bc->target_features_mutex);
 	defer (mutex_unlock(&bc->target_features_mutex));
 
 	auto items = split_by_comma(target_feature_list);
-	for_array(i, items) {
-		String const &item = items.data[i];
+	for (String const &item : items) {
 		if (!check_target_feature_is_valid(pos, item)) {
 			error(pos, "Target feature '%.*s' is not valid", LIT(item));
 			continue;
@@ -1326,25 +1339,26 @@ void enable_target_feature(TokenPos pos, String const &target_feature_list) {
 }
 
 
-char const *target_features_set_to_cstring(gbAllocator allocator, bool with_quotes) {
+gb_internal char const *target_features_set_to_cstring(gbAllocator allocator, bool with_quotes) {
 	isize len = 0;
-	for_array(i, build_context.target_features_set.entries) {
+	isize i = 0;
+	for (String const &feature : build_context.target_features_set) {
 		if (i != 0) {
 			len += 1;
 		}
-		String feature = build_context.target_features_set.entries[i].value;
 		len += feature.len;
 		if (with_quotes) len += 2;
+		i += 1;
 	}
 	char *features = gb_alloc_array(allocator, char, len+1);
 	len = 0;
-	for_array(i, build_context.target_features_set.entries) {
+	i = 0;
+	for (String const &feature : build_context.target_features_set) {
 		if (i != 0) {
 			features[len++] = ',';
 		}
 
 		if (with_quotes) features[len++] = '"';
-		String feature = build_context.target_features_set.entries[i].value;
 		gb_memmove(features + len, feature.text, feature.len);
 		len += feature.len;
 		if (with_quotes) features[len++] = '"';
@@ -1356,15 +1370,14 @@ char const *target_features_set_to_cstring(gbAllocator allocator, bool with_quot
 
 // NOTE(Jeroen): Set/create the output and other paths and report an error as appropriate.
 // We've previously called `parse_build_flags`, so `out_filepath` should be set.
-bool init_build_paths(String init_filename) {
+gb_internal bool init_build_paths(String init_filename) {
 	gbAllocator   ha = heap_allocator();
 	BuildContext *bc = &build_context;
 
 	// NOTE(Jeroen): We're pre-allocating BuildPathCOUNT slots so that certain paths are always at the same enumerated index.
 	array_init(&bc->build_paths, permanent_allocator(), BuildPathCOUNT);
 
-	string_set_init(&bc->target_features_set, heap_allocator(), 1024);
-	mutex_init(&bc->target_features_mutex);
+	string_set_init(&bc->target_features_set, 1024);
 
 	// [BuildPathMainPackage] Turn given init path into a `Path`, which includes normalizing it into a full path.
 	bc->build_paths[BuildPath_Main_Package] = path_from_string(ha, init_filename);
@@ -1408,7 +1421,6 @@ bool init_build_paths(String init_filename) {
 		if ((bc->command_kind & Command__does_build) && (!bc->ignore_microsoft_magic)) {
 			// NOTE(ic): It would be nice to extend this so that we could specify the Visual Studio version that we want instead of defaulting to the latest.
 			Find_Result find_result = find_visual_studio_and_windows_sdk();
-			defer (mc_free_all());
 
 			if (find_result.windows_sdk_version == 0) {
 				gb_printf_err("Windows SDK not found.\n");
@@ -1533,6 +1545,25 @@ bool init_build_paths(String init_filename) {
 			output_name = remove_extension_from_path(output_name);
 			output_name = copy_string(ha, string_trim_whitespace(output_name));
 			output_path = path_from_string(ha, output_name);
+			
+			// Note(Dragos): This is a fix for empty filenames
+			// Turn the trailing folder into the file name
+			if (output_path.name.len == 0) {
+				isize len = output_path.basename.len;
+				while (len > 1 && output_path.basename[len - 1] != '/') {
+					len -= 1;
+				}
+				// We reached the slash
+				String old_basename = output_path.basename;
+				output_path.basename.len = len - 1; // Remove the slash
+				output_path.name = substring(old_basename, len, old_basename.len);
+				output_path.basename = copy_string(ha, output_path.basename);
+				output_path.name = copy_string(ha, output_path.name);
+				// The old basename is wrong. Delete it
+				gb_free(ha, old_basename.text);
+				
+				
+			}
 
 			// Replace extension.
 			if (output_path.ext.len > 0) {

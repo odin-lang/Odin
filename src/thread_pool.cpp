@@ -1,165 +1,191 @@
 // thread_pool.cpp
 
-#define WORKER_TASK_PROC(name) isize name(void *data)
-typedef WORKER_TASK_PROC(WorkerTaskProc);
+struct WorkerTask;
+struct ThreadPool;
 
-struct WorkerTask {
-	WorkerTask *    next;
-	WorkerTaskProc *do_work;
-	void *          data;
-};
+gb_thread_local Thread *current_thread;
+
+gb_internal void thread_pool_init(ThreadPool *pool, isize worker_count, char const *worker_name);
+gb_internal void thread_pool_destroy(ThreadPool *pool);
+gb_internal bool thread_pool_add_task(ThreadPool *pool, WorkerTaskProc *proc, void *data);
+gb_internal void thread_pool_wait(ThreadPool *pool);
 
 struct ThreadPool {
-	gbAllocator   allocator;
-	BlockingMutex mutex;
-	Condition     task_cond;
-	
+	gbAllocator threads_allocator;
 	Slice<Thread> threads;
-	
-	WorkerTask *task_queue;
-	
-	std::atomic<isize> ready;
-	std::atomic<bool>  stop;
-	
+	std::atomic<bool> running;
+
+	Futex tasks_available;
+
+	Futex tasks_left;
 };
 
-THREAD_PROC(thread_pool_thread_proc);
+gb_internal isize current_thread_index(void) {
+	return current_thread ? current_thread->idx : 0;
+}
 
-void thread_pool_init(ThreadPool *pool, gbAllocator const &a, isize thread_count, char const *worker_name) {
-	pool->allocator = a;
-	pool->stop = false;
-	mutex_init(&pool->mutex);
-	condition_init(&pool->task_cond);
-	
-	slice_init(&pool->threads, a, thread_count);
-	for_array(i, pool->threads) {
+gb_internal void thread_pool_init(ThreadPool *pool, isize worker_count, char const *worker_name) {
+	pool->threads_allocator = permanent_allocator();
+	slice_init(&pool->threads, pool->threads_allocator, worker_count + 1);
+
+	// NOTE: this needs to be initialized before any thread starts
+	pool->running.store(true, std::memory_order_seq_cst);
+
+	// setup the main thread
+	thread_init(pool, &pool->threads[0], 0);
+	current_thread = &pool->threads[0];
+
+	for_array_off(i, 1, pool->threads) {
 		Thread *t = &pool->threads[i];
-		thread_init(t);
+		thread_init_and_start(pool, t, i);
 	}
-	
-	for_array(i, pool->threads) {
+}
+
+gb_internal void thread_pool_destroy(ThreadPool *pool) {
+	pool->running.store(false, std::memory_order_seq_cst);
+
+	for_array_off(i, 1, pool->threads) {
 		Thread *t = &pool->threads[i];
-		thread_start(t, thread_pool_thread_proc, pool);
+		pool->tasks_available.fetch_add(1, std::memory_order_relaxed);
+		futex_broadcast(&pool->tasks_available);
+		thread_join_and_destroy(t);
 	}
+
+	gb_free(pool->threads_allocator, pool->threads.data);
 }
 
-void thread_pool_destroy(ThreadPool *pool) {
-	mutex_lock(&pool->mutex);
-	pool->stop = true;
-	condition_broadcast(&pool->task_cond);
-	mutex_unlock(&pool->mutex);
+void thread_pool_queue_push(Thread *thread, WorkerTask task) {
+	u64 capture;
+	u64 new_capture;
+	do {
+		capture = thread->head_and_tail.load();
 
-	for_array(i, pool->threads) {
-		Thread *t = &pool->threads[i];
-		thread_join(t);
-	}
-	
-	for_array(i, pool->threads) {
-		Thread *t = &pool->threads[i];
-		thread_destroy(t);
-	}
-	
-	gb_free(pool->allocator, pool->threads.data);
-	mutex_destroy(&pool->mutex);
-	condition_destroy(&pool->task_cond);
+		u64 mask = thread->capacity - 1;
+		u64 head = (capture >> 32) & mask;
+		u64 tail = ((u32)capture) & mask;
+
+		u64 new_head = (head + 1) & mask;
+		GB_ASSERT_MSG(new_head != tail, "Thread Queue Full!");
+
+		// This *must* be done in here, to avoid a potential race condition where we no longer own the slot by the time we're assigning
+		thread->queue[head] = task;
+		new_capture = (new_head << 32) | tail;
+	} while (!thread->head_and_tail.compare_exchange_weak(capture, new_capture));
+
+	thread->pool->tasks_left.fetch_add(1, std::memory_order_release);
+	thread->pool->tasks_available.fetch_add(1, std::memory_order_relaxed);
+	futex_broadcast(&thread->pool->tasks_available);
 }
 
-bool thread_pool_queue_empty(ThreadPool *pool) {
-	return pool->task_queue == nullptr;
+bool thread_pool_queue_pop(Thread *thread, WorkerTask *task) {
+	u64 capture;
+	u64 new_capture;
+	do {
+		capture = thread->head_and_tail.load(std::memory_order_acquire);
+
+		u64 mask = thread->capacity - 1;
+		u64 head = (capture >> 32) & mask;
+		u64 tail = ((u32)capture) & mask;
+
+		u64 new_tail = (tail + 1) & mask;
+		if (tail == head) {
+			return false;
+		}
+
+		// Making a copy of the task before we increment the tail, avoiding the same potential race condition as above
+		*task = thread->queue[tail];
+
+		new_capture = (head << 32) | new_tail;
+	} while (!thread->head_and_tail.compare_exchange_weak(capture, new_capture, std::memory_order_release));
+
+	return true;
 }
 
-WorkerTask *thread_pool_queue_pop(ThreadPool *pool) {
-	GB_ASSERT(pool->task_queue != nullptr);
-	WorkerTask *task = pool->task_queue;
-	pool->task_queue = task->next;
-	return task;
-}
-void thread_pool_queue_push(ThreadPool *pool, WorkerTask *task) {
-	GB_ASSERT(task != nullptr);
-	task->next = pool->task_queue;
-	pool->task_queue = task;
-}
-
-bool thread_pool_add_task(ThreadPool *pool, WorkerTaskProc *proc, void *data) {
-	GB_ASSERT(proc != nullptr);
-	mutex_lock(&pool->mutex);
-	WorkerTask *task = gb_alloc_item(permanent_allocator(), WorkerTask);
-	if (task == nullptr) {
-		mutex_unlock(&pool->mutex);
-		GB_PANIC("Out of memory");
-		return false;
-	}
-	task->do_work = proc;
-	task->data = data;
+gb_internal bool thread_pool_add_task(ThreadPool *pool, WorkerTaskProc *proc, void *data) {
+	WorkerTask task = {};
+	task.do_work = proc;
+	task.data = data;
 		
-	thread_pool_queue_push(pool, task);
-	GB_ASSERT(pool->ready >= 0);
-	pool->ready++;
-	condition_broadcast(&pool->task_cond);
-	mutex_unlock(&pool->mutex);
+	thread_pool_queue_push(current_thread, task);
 	return true;
 }	
 
+gb_internal void thread_pool_wait(ThreadPool *pool) {
+	WorkerTask task;
 
-void thread_pool_do_task(WorkerTask *task) {
-	task->do_work(task->data);
-}
-
-void thread_pool_wait(ThreadPool *pool) {
-	if (pool->threads.count == 0) {
-		while (!thread_pool_queue_empty(pool)) {
-			thread_pool_do_task(thread_pool_queue_pop(pool));
-			--pool->ready;
+	while (pool->tasks_left.load(std::memory_order_acquire)) {
+		// if we've got tasks on our queue, run them
+		while (thread_pool_queue_pop(current_thread, &task)) {
+			task.do_work(task.data);
+			pool->tasks_left.fetch_sub(1, std::memory_order_release);
 		}
-		GB_ASSERT(pool->ready == 0);
-		return;
-	}
-	for (;;) {
-		mutex_lock(&pool->mutex);
 
-		while (!pool->stop && pool->ready > 0 && thread_pool_queue_empty(pool)) {
-			condition_wait(&pool->task_cond, &pool->mutex);
-		}
-		if ((pool->stop || pool->ready == 0) && thread_pool_queue_empty(pool)) {
-			mutex_unlock(&pool->mutex);
+
+		// is this mem-barriered enough?
+		// This *must* be executed in this order, so the futex wakes immediately
+		// if rem_tasks has changed since we checked last, otherwise the program
+		// will permanently sleep
+		Footex rem_tasks = pool->tasks_left.load(std::memory_order_acquire);
+		if (rem_tasks == 0) {
 			return;
 		}
 
-		WorkerTask *task = thread_pool_queue_pop(pool);
-		mutex_unlock(&pool->mutex);
-	
-		thread_pool_do_task(task);
-		if (--pool->ready == 0) {
-			mutex_lock(&pool->mutex);
-			condition_broadcast(&pool->task_cond);
-			mutex_unlock(&pool->mutex);
-		}
+		futex_wait(&pool->tasks_left, rem_tasks);
 	}
 }
 
+gb_internal THREAD_PROC(thread_pool_thread_proc) {
+	WorkerTask task;
+	current_thread = thread;
+	ThreadPool *pool = current_thread->pool;
+	// debugf("worker id: %td\n", current_thread->idx);
 
-THREAD_PROC(thread_pool_thread_proc) {
-	ThreadPool *pool = cast(ThreadPool *)thread->user_data;
-	
-	for (;;) {
-		mutex_lock(&pool->mutex);
+	while (pool->running.load(std::memory_order_seq_cst)) {
+		// If we've got tasks to process, work through them
+		usize finished_tasks = 0;
+		i32 state;
 
-		while (!pool->stop && thread_pool_queue_empty(pool)) {
-			condition_wait(&pool->task_cond, &pool->mutex);
+		while (thread_pool_queue_pop(current_thread, &task)) {
+			task.do_work(task.data);
+			pool->tasks_left.fetch_sub(1, std::memory_order_release);
+
+			finished_tasks += 1;
 		}
-		if (pool->stop && thread_pool_queue_empty(pool)) {
-			mutex_unlock(&pool->mutex);
-			return 0;
+		if (finished_tasks > 0 && pool->tasks_left.load(std::memory_order_acquire) == 0) {
+			futex_signal(&pool->tasks_left);
 		}
 
-		WorkerTask *task = thread_pool_queue_pop(pool);
-		mutex_unlock(&pool->mutex);
-	
-		thread_pool_do_task(task);
-		if (--pool->ready == 0) {
-			mutex_lock(&pool->mutex);
-			condition_broadcast(&pool->task_cond);
-			mutex_unlock(&pool->mutex);
+		// If there's still work somewhere and we don't have it, steal it
+		if (pool->tasks_left.load(std::memory_order_acquire)) {
+			usize idx = cast(usize)current_thread->idx;
+			for_array(i, pool->threads) {
+				if (pool->tasks_left.load(std::memory_order_acquire) == 0) {
+					break;
+				}
+
+				idx = (idx + 1) % cast(usize)pool->threads.count;
+
+				Thread *thread = &pool->threads.data[idx];
+				WorkerTask task;
+				if (thread_pool_queue_pop(thread, &task)) {
+					task.do_work(task.data);
+					pool->tasks_left.fetch_sub(1, std::memory_order_release);
+
+					if (pool->tasks_left.load(std::memory_order_acquire) == 0) {
+						futex_signal(&pool->tasks_left);
+					}
+
+					goto main_loop_continue;
+				}
+			}
 		}
+
+		// if we've done all our work, and there's nothing to steal, go to sleep
+		state = pool->tasks_available.load(std::memory_order_acquire);
+		futex_wait(&pool->tasks_available, state);
+
+		main_loop_continue:;
 	}
+
+	return 0;
 }

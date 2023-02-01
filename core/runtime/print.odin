@@ -2,6 +2,73 @@ package runtime
 
 _INTEGER_DIGITS :: "0123456789abcdefghijklmnopqrstuvwxyz"
 
+when !ODIN_DISALLOW_RTTI {
+	print_any_single :: proc(arg: any) {
+		x := arg
+		if loc, ok := x.(Source_Code_Location); ok {
+			print_caller_location(loc)
+			return
+		}
+		x.id = typeid_base(x.id)
+		switch v in x {
+		case typeid:     print_typeid(v)
+		case ^Type_Info: print_type(v)
+
+		case string:  print_string(v)
+		case cstring: print_string(string(v))
+		case []byte:  print_string(string(v))
+
+		case rune:  print_rune(v)
+
+		case u8:    print_u64(u64(v))
+		case u16:   print_u64(u64(v))
+		case u16le: print_u64(u64(v))
+		case u16be: print_u64(u64(v))
+		case u32:   print_u64(u64(v))
+		case u32le: print_u64(u64(v))
+		case u32be: print_u64(u64(v))
+		case u64:   print_u64(u64(v))
+		case u64le: print_u64(u64(v))
+		case u64be: print_u64(u64(v))
+
+		case i8:    print_i64(i64(v))
+		case i16:   print_i64(i64(v))
+		case i16le: print_i64(i64(v))
+		case i16be: print_i64(i64(v))
+		case i32:   print_i64(i64(v))
+		case i32le: print_i64(i64(v))
+		case i32be: print_i64(i64(v))
+		case i64:   print_i64(i64(v))
+		case i64le: print_i64(i64(v))
+		case i64be: print_i64(i64(v))
+
+		case int:     print_int(v)
+		case uint:    print_uint(v)
+		case uintptr: print_uintptr(v)
+
+		case:
+			ti := type_info_of(x.id)
+			#partial switch v in ti.variant {
+			case Type_Info_Pointer:
+				print_uintptr((^uintptr)(x.data)^)
+				return
+			}
+
+			print_string("<invalid-value>")
+		}
+	}
+	println_any :: proc(args: ..any) {
+		loop: for arg, i in args {
+			if i != 0 {
+				print_string(" ")
+			}
+			print_any_single(arg)
+		}
+		print_string("\n")
+	}
+}
+
+
 encode_rune :: proc "contextless" (c: rune) -> ([4]u8, int) {
 	r := c
 

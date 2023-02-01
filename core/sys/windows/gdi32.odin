@@ -62,6 +62,7 @@ foreign gdi32 {
 
 	SetPixelFormat :: proc(hdc: HDC, format: c_int, ppfd: ^PIXELFORMATDESCRIPTOR) -> BOOL ---
 	ChoosePixelFormat :: proc(hdc: HDC, ppfd: ^PIXELFORMATDESCRIPTOR) -> c_int ---
+	DescribePixelFormat :: proc(hdc: HDC, iPixelFormat: c_int, nBytes: UINT, ppfd: ^PIXELFORMATDESCRIPTOR) -> c_int ---
 	SwapBuffers :: proc(HDC) -> BOOL ---
 
 	SetDCBrushColor :: proc(hdc: HDC, color: COLORREF) -> COLORREF ---
@@ -78,6 +79,8 @@ foreign gdi32 {
 	TextOutW :: proc(hdc: HDC, x, y: c_int, lpString: LPCWSTR, c: c_int) -> BOOL ---
 	GetTextExtentPoint32W :: proc(hdc: HDC, lpString: LPCWSTR, c: c_int, psizl: LPSIZE) -> BOOL ---
 	GetTextMetricsW :: proc(hdc: HDC, lptm: LPTEXTMETRICW) -> BOOL ---
+
+	CreateSolidBrush :: proc(color: COLORREF) -> HBRUSH ---
 }
 
 RGB :: #force_inline proc "contextless" (r, g, b: u8) -> COLORREF {

@@ -62,15 +62,6 @@ enum PackageKind {
 	Package_Init,
 };
 
-struct ImportedPackage {
-	PackageKind kind;
-	String      path;
-	String      rel_path;
-	TokenPos    pos; // import
-	isize       index;
-};
-
-
 struct ImportedFile {
 	AstPackage *pkg;
 	FileInfo    fi;
@@ -99,7 +90,11 @@ struct AstFile {
 	Scope *      scope;
 
 	Ast *        pkg_decl;
+
 	String       fullpath;
+	String       filename;
+	String       directory;
+
 	Tokenizer    tokenizer;
 	Array<Token> tokens;
 	isize        curr_token_index;
@@ -108,6 +103,7 @@ struct AstFile {
 	Token        prev_token; // previous non-comment
 	Token        package_token;
 	String       package_name;
+
 
 	// >= 0: In Expression
 	// <  0: In Control Clause
@@ -136,9 +132,8 @@ struct AstFile {
 	CommentGroup *docs;             // current docs
 	Array<CommentGroup *> comments; // All the comments!
 
-	// TODO(bill): make this a basic queue as it does not require
-	// any multiple thread capabilities
-	MPMCQueue<Ast *> delayed_decls_queues[AstDelayQueue_COUNT];
+	// This is effectively a queue but does not require any multi-threading capabilities
+	Array<Ast *> delayed_decls_queues[AstDelayQueue_COUNT];
 
 #define PARSER_MAX_FIX_COUNT 6
 	isize    fix_count;
@@ -177,6 +172,12 @@ struct AstPackage {
 	bool                  is_single_file;
 	isize                 order;
 
+	BlockingMutex         files_mutex;
+	BlockingMutex         foreign_files_mutex;
+	BlockingMutex         type_and_value_mutex;
+	BlockingMutex         name_mutex;
+
+	// NOTE(bill): This must be a MPMCQueue
 	MPMCQueue<AstPackageExportedEntity> exported_entity_queue;
 
 	// NOTE(bill): Created/set in checker
@@ -186,20 +187,33 @@ struct AstPackage {
 };
 
 
+struct ParseFileErrorNode {
+	ParseFileErrorNode *next, *prev;
+	ParseFileError      err;
+};
+
 struct Parser {
-	String                    init_fullpath;
-	StringSet                 imported_files; // fullpath
-	Array<AstPackage *>       packages;
-	Array<ImportedPackage>    package_imports;
-	isize                     file_to_process_count;
-	isize                     total_token_count;
-	isize                     total_line_count;
-	BlockingMutex             wait_mutex;
-	BlockingMutex             import_mutex;
-	BlockingMutex             file_add_mutex;
-	BlockingMutex             file_decl_mutex;
-	BlockingMutex             packages_mutex;
-	MPMCQueue<ParseFileError> file_error_queue;
+	String                 init_fullpath;
+
+	StringSet              imported_files; // fullpath
+	BlockingMutex          imported_files_mutex;
+
+	Array<AstPackage *>    packages;
+	BlockingMutex          packages_mutex;
+
+	std::atomic<isize>     file_to_process_count;
+	std::atomic<isize>     total_token_count;
+	std::atomic<isize>     total_line_count;
+
+	// TODO(bill): What should this mutex be per?
+	//  * Parser
+	//  * Package
+	//  * File
+	BlockingMutex          file_decl_mutex;
+
+	BlockingMutex          file_error_mutex;
+	ParseFileErrorNode *   file_error_head;
+	ParseFileErrorNode *   file_error_tail;
 };
 
 struct ParserWorkerData {
@@ -258,7 +272,7 @@ enum ProcCallingConvention : i32 {
 	ProcCC_ForeignBlockDefault = -1,
 };
 
-char const *proc_calling_convention_strings[ProcCC_MAX] = {
+gb_global char const *proc_calling_convention_strings[ProcCC_MAX] = {
 	"",
 	"odin",
 	"contextless",
@@ -272,7 +286,7 @@ char const *proc_calling_convention_strings[ProcCC_MAX] = {
 	"sysv",
 };
 
-ProcCallingConvention default_calling_convention(void) {
+gb_internal ProcCallingConvention default_calling_convention(void) {
 	return ProcCC_Odin;
 }
 
@@ -299,7 +313,7 @@ enum FieldFlag : u32 {
 	FieldFlag_using     = 1<<1,
 	FieldFlag_no_alias  = 1<<2,
 	FieldFlag_c_vararg  = 1<<3,
-	FieldFlag_auto_cast = 1<<4,
+
 	FieldFlag_const     = 1<<5,
 	FieldFlag_any_int   = 1<<6,
 	FieldFlag_subtype   = 1<<7,
@@ -314,7 +328,7 @@ enum FieldFlag : u32 {
 	FieldFlag_Invalid   = 1u<<31,
 
 	// Parameter List Restrictions
-	FieldFlag_Signature = FieldFlag_ellipsis|FieldFlag_using|FieldFlag_no_alias|FieldFlag_c_vararg|FieldFlag_auto_cast|FieldFlag_const|FieldFlag_any_int|FieldFlag_by_ptr,
+	FieldFlag_Signature = FieldFlag_ellipsis|FieldFlag_using|FieldFlag_no_alias|FieldFlag_c_vararg|FieldFlag_const|FieldFlag_any_int|FieldFlag_by_ptr,
 	FieldFlag_Struct    = FieldFlag_using|FieldFlag_subtype|FieldFlag_Tags,
 };
 
@@ -332,7 +346,7 @@ enum InlineAsmDialectKind : u8 {
 	InlineAsmDialect_COUNT,
 };
 
-char const *inline_asm_dialect_strings[InlineAsmDialect_COUNT] = {
+gb_global char const *inline_asm_dialect_strings[InlineAsmDialect_COUNT] = {
 	"",
 	"att",
 	"intel",
@@ -457,11 +471,6 @@ AST_KIND(_StmtBegin,     "", bool) \
 	AST_KIND(BadStmt,    "bad statement",                 struct { Token begin, end; }) \
 	AST_KIND(EmptyStmt,  "empty statement",               struct { Token token; }) \
 	AST_KIND(ExprStmt,   "expression statement",          struct { Ast *expr; } ) \
-	AST_KIND(TagStmt,    "tag statement", struct { \
-		Token token; \
-		Token name; \
-		Ast * stmt; \
-	}) \
 	AST_KIND(AssignStmt, "assign statement", struct { \
 		Token op; \
 		Slice<Ast *> lhs, rhs; \
@@ -729,7 +738,7 @@ enum AstKind : u16 {
 	Ast_COUNT,
 };
 
-String const ast_strings[] = {
+gb_global String const ast_strings[] = {
 	{cast(u8 *)"invalid node", gb_size_of("invalid node")},
 #define AST_KIND(_kind_name_, name, ...) {cast(u8 *)name, gb_size_of(name)-1},
 	AST_KINDS
@@ -742,7 +751,7 @@ String const ast_strings[] = {
 #undef AST_KIND
 
 
-isize const ast_variant_sizes[] = {
+gb_global isize const ast_variant_sizes[] = {
 	0,
 #define AST_KIND(_kind_name_, name, ...) gb_size_of(GB_JOIN2(Ast, _kind_name_)),
 	AST_KINDS
@@ -754,7 +763,7 @@ struct AstCommonStuff {
 	u8           state_flags;
 	u8           viral_state_flags;
 	i32          file_id;
-	TypeAndValue tav; // TODO(bill): Make this a pointer to minimize 'Ast' size
+	TypeAndValue tav; // NOTE(bill): Making this a pointer is slower
 };
 
 struct Ast {
@@ -762,7 +771,7 @@ struct Ast {
 	u8           state_flags;
 	u8           viral_state_flags;
 	i32          file_id;
-	TypeAndValue tav; // TODO(bill): Make this a pointer to minimize 'Ast' size
+	TypeAndValue tav; // NOTE(bill): Making this a pointer is slower
 
 	// IMPORTANT NOTE(bill): This must be at the end since the AST is allocated to be size of the variant
 	union {
@@ -793,33 +802,32 @@ struct Ast {
 #endif
 
 
-gb_inline bool is_ast_expr(Ast *node) {
+gb_internal gb_inline bool is_ast_expr(Ast *node) {
 	return gb_is_between(node->kind, Ast__ExprBegin+1, Ast__ExprEnd-1);
 }
-gb_inline bool is_ast_stmt(Ast *node) {
+gb_internal gb_inline bool is_ast_stmt(Ast *node) {
 	return gb_is_between(node->kind, Ast__StmtBegin+1, Ast__StmtEnd-1);
 }
-gb_inline bool is_ast_complex_stmt(Ast *node) {
+gb_internal gb_inline bool is_ast_complex_stmt(Ast *node) {
 	return gb_is_between(node->kind, Ast__ComplexStmtBegin+1, Ast__ComplexStmtEnd-1);
 }
-gb_inline bool is_ast_decl(Ast *node) {
+gb_internal gb_inline bool is_ast_decl(Ast *node) {
 	return gb_is_between(node->kind, Ast__DeclBegin+1, Ast__DeclEnd-1);
 }
-gb_inline bool is_ast_type(Ast *node) {
+gb_internal gb_inline bool is_ast_type(Ast *node) {
 	return gb_is_between(node->kind, Ast__TypeBegin+1, Ast__TypeEnd-1);
 }
-gb_inline bool is_ast_when_stmt(Ast *node) {
+gb_internal gb_inline bool is_ast_when_stmt(Ast *node) {
 	return node->kind == Ast_WhenStmt;
 }
 
 gb_global gb_thread_local Arena global_thread_local_ast_arena = {};
 
-gbAllocator ast_allocator(AstFile *f) {
-	Arena *arena = &global_thread_local_ast_arena;
-	return arena_allocator(arena);
+gb_internal gb_inline gbAllocator ast_allocator(AstFile *f) {
+	return arena_allocator(&global_thread_local_ast_arena);
 }
 
-Ast *alloc_ast_node(AstFile *f, AstKind kind);
+gb_internal Ast *alloc_ast_node(AstFile *f, AstKind kind);
 
-gbString expr_to_string(Ast *expression);
-bool allow_field_separator(AstFile *f);
+gb_internal gbString expr_to_string(Ast *expression);
+gb_internal bool allow_field_separator(AstFile *f);

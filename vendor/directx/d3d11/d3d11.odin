@@ -2384,7 +2384,7 @@ IDeviceContext_VTable :: struct {
 	GSSetSamplers:                             proc "stdcall" (this: ^IDeviceContext, StartSlot: u32, NumSamplers: u32, ppSamplers: ^^ISamplerState),
 	OMSetRenderTargets:                        proc "stdcall" (this: ^IDeviceContext, NumViews: u32, ppRenderTargetViews: ^^IRenderTargetView, pDepthStencilView: ^IDepthStencilView),
 	OMSetRenderTargetsAndUnorderedAccessViews: proc "stdcall" (this: ^IDeviceContext, NumRTVs: u32, ppRenderTargetViews: ^^IRenderTargetView, pDepthStencilView: ^IDepthStencilView, UAVStartSlot: u32, NumUAVs: u32, ppUnorderedAccessViews: ^^IUnorderedAccessView, pUAVInitialCounts: ^u32),
-	OMSetBlendState:                           proc "stdcall" (this: ^IDeviceContext, pBlendState: ^IBlendState, BlendFactor: ^[4]f32, SampleMask: COLOR_WRITE_ENABLE_MASK),
+	OMSetBlendState:                           proc "stdcall" (this: ^IDeviceContext, pBlendState: ^IBlendState, BlendFactor: ^[4]f32, SampleMask: u32),
 	OMSetDepthStencilState:                    proc "stdcall" (this: ^IDeviceContext, pDepthStencilState: ^IDepthStencilState, StencilRef: u32),
 	SOSetTargets:                              proc "stdcall" (this: ^IDeviceContext, NumBuffers: u32, ppSOTargets: ^^IBuffer, pOffsets: ^u32),
 	DrawAuto:                                  proc "stdcall" (this: ^IDeviceContext),

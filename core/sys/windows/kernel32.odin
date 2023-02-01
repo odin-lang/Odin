@@ -370,6 +370,8 @@ foreign kernel32 {
 		lpTotalNumberOfBytes: PULARGE_INTEGER,
 		lpTotalNumberOfFreeBytes: PULARGE_INTEGER,
 	) -> BOOL ---
+
+	GetLogicalProcessorInformation :: proc(buffer: ^SYSTEM_LOGICAL_PROCESSOR_INFORMATION, returnedLength: PDWORD) -> BOOL ---
 }
 
 
@@ -998,4 +1000,50 @@ foreign kernel32 {
 	DeleteFiber :: proc(lpFiber: LPVOID) ---
 	ConvertThreadToFiber :: proc(lpParameter: LPVOID) -> LPVOID ---
 	SwitchToFiber :: proc(lpFiber: LPVOID) ---
+}
+
+LOGICAL_PROCESSOR_RELATIONSHIP :: enum c_int {
+	RelationProcessorCore,
+	RelationNumaNode,
+	RelationCache,
+	RelationProcessorPackage,
+	RelationGroup,
+	RelationProcessorDie,
+	RelationNumaNodeEx,
+	RelationProcessorModule,
+	RelationAll = 0xffff,
+}
+
+PROCESSOR_CACHE_TYPE :: enum c_int {
+	CacheUnified,
+	CacheInstruction,
+	CacheData,
+	CacheTrace,
+}
+
+CACHE_DESCRIPTOR :: struct {
+	Level: BYTE,
+	Associativity: BYTE,
+	LineSize: WORD,
+	Size: DWORD,
+	Type: PROCESSOR_CACHE_TYPE,
+}
+
+ProcessorCore :: struct {
+	Flags: BYTE,
+}
+NumaNode :: struct {
+	NodeNumber: DWORD,
+}
+DUMMYUNIONNAME_u :: struct #raw_union {
+	Core: ProcessorCore,
+	Node: NumaNode,
+	Cache: CACHE_DESCRIPTOR,
+	Reserved: [2]ULONGLONG,
+}
+
+SYSTEM_LOGICAL_PROCESSOR_INFORMATION :: struct {
+	ProcessorMask: ULONG_PTR,
+	Relationship: LOGICAL_PROCESSOR_RELATIONSHIP,
+	DummyUnion: DUMMYUNIONNAME_u,
 }

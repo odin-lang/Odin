@@ -404,6 +404,7 @@ foreign libc {
 	@(link_name="__errno_location") __errno_location    :: proc() -> ^int ---
 
 	@(link_name="getpagesize")      _unix_getpagesize   :: proc() -> c.int ---
+	@(link_name="get_nprocs")       _unix_get_nprocs    :: proc() -> c.int ---
 	@(link_name="fdopendir")        _unix_fdopendir     :: proc(fd: Handle) -> Dir ---
 	@(link_name="closedir")         _unix_closedir      :: proc(dirp: Dir) -> c.int ---
 	@(link_name="rewinddir")        _unix_rewinddir     :: proc(dirp: Dir) ---
@@ -441,7 +442,7 @@ _get_errno :: proc(res: int) -> Errno {
 }
 
 // get errno from libc
-get_last_error :: proc() -> int {
+get_last_error :: proc "contextless" () -> int {
 	return __errno_location()^
 }
 
@@ -822,6 +823,7 @@ get_current_directory :: proc() -> string {
 			return strings.string_from_nul_terminated_ptr(&buf[0], len(buf))
 		}
 		if _get_errno(res) != ERANGE {
+			delete(buf)
 			return ""
 		}
 		resize(&buf, len(buf)+page_size)
@@ -878,6 +880,10 @@ get_page_size :: proc() -> int {
 	return page_size
 }
 
+@(private)
+_processor_core_count :: proc() -> int {
+	return int(_unix_get_nprocs())
+}
 
 _alloc_command_line_arguments :: proc() -> []string {
 	res := make([]string, len(runtime.args__))

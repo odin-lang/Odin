@@ -1,27 +1,25 @@
-LLVMMetadataRef lb_get_llvm_metadata(lbModule *m, void *key) {
+gb_internal LLVMMetadataRef lb_get_llvm_metadata(lbModule *m, void *key) {
 	if (key == nullptr) {
 		return nullptr;
 	}
+	mutex_lock(&m->debug_values_mutex);
 	auto found = map_get(&m->debug_values, key);
+	mutex_unlock(&m->debug_values_mutex);
 	if (found) {
 		return *found;
 	}
 	return nullptr;
 }
-void lb_set_llvm_metadata(lbModule *m, void *key, LLVMMetadataRef value) {
+gb_internal void lb_set_llvm_metadata(lbModule *m, void *key, LLVMMetadataRef value) {
 	if (key != nullptr) {
+		mutex_lock(&m->debug_values_mutex);
 		map_set(&m->debug_values, key, value);
+		mutex_unlock(&m->debug_values_mutex);
 	}
 }
 
-LLVMMetadataRef lb_get_llvm_file_metadata_from_node(lbModule *m, Ast *node) {
-	if (node == nullptr) {
-		return nullptr;
-	}
-	return lb_get_llvm_metadata(m, node->file());
-}
 
-LLVMMetadataRef lb_get_current_debug_scope(lbProcedure *p) {
+gb_internal LLVMMetadataRef lb_get_current_debug_scope(lbProcedure *p) {
 	GB_ASSERT_MSG(p->debug_info != nullptr, "missing debug information for %.*s", LIT(p->name));
 
 	for (isize i = p->scope_stack.count-1; i >= 0; i--) {
@@ -34,21 +32,21 @@ LLVMMetadataRef lb_get_current_debug_scope(lbProcedure *p) {
 	return p->debug_info;
 }
 
-LLVMMetadataRef lb_debug_location_from_token_pos(lbProcedure *p, TokenPos pos) {
+gb_internal LLVMMetadataRef lb_debug_location_from_token_pos(lbProcedure *p, TokenPos pos) {
 	LLVMMetadataRef scope = lb_get_current_debug_scope(p);
 	GB_ASSERT_MSG(scope != nullptr, "%.*s", LIT(p->name));
 	return LLVMDIBuilderCreateDebugLocation(p->module->ctx, cast(unsigned)pos.line, cast(unsigned)pos.column, scope, nullptr);
 }
-LLVMMetadataRef lb_debug_location_from_ast(lbProcedure *p, Ast *node) {
+gb_internal LLVMMetadataRef lb_debug_location_from_ast(lbProcedure *p, Ast *node) {
 	GB_ASSERT(node != nullptr);
 	return lb_debug_location_from_token_pos(p, ast_token(node).pos);
 }
-LLVMMetadataRef lb_debug_end_location_from_ast(lbProcedure *p, Ast *node) {
+gb_internal LLVMMetadataRef lb_debug_end_location_from_ast(lbProcedure *p, Ast *node) {
 	GB_ASSERT(node != nullptr);
 	return lb_debug_location_from_token_pos(p, ast_end_token(node).pos);
 }
 
-LLVMMetadataRef lb_debug_type_internal_proc(lbModule *m, Type *type) {
+gb_internal LLVMMetadataRef lb_debug_type_internal_proc(lbModule *m, Type *type) {
 	i64 size = type_size_of(type); // Check size
 	gb_unused(size);
 
@@ -93,7 +91,7 @@ LLVMMetadataRef lb_debug_type_internal_proc(lbModule *m, Type *type) {
 	return LLVMDIBuilderCreateSubroutineType(m->debug_builder, file, parameters, parameter_count, flags);
 }
 
-LLVMMetadataRef lb_debug_struct_field(lbModule *m, String const &name, Type *type, u64 offset_in_bits) {
+gb_internal LLVMMetadataRef lb_debug_struct_field(lbModule *m, String const &name, Type *type, u64 offset_in_bits) {
 	unsigned field_line = 1;
 	LLVMDIFlags field_flags = LLVMDIFlagZero;
 
@@ -107,7 +105,7 @@ LLVMMetadataRef lb_debug_struct_field(lbModule *m, String const &name, Type *typ
 		field_flags, lb_debug_type(m, type)
 	);
 }
-LLVMMetadataRef lb_debug_basic_struct(lbModule *m, String const &name, u64 size_in_bits, u32 align_in_bits, LLVMMetadataRef *elements, unsigned element_count) {
+gb_internal LLVMMetadataRef lb_debug_basic_struct(lbModule *m, String const &name, u64 size_in_bits, u32 align_in_bits, LLVMMetadataRef *elements, unsigned element_count) {
 	AstPackage *pkg = m->info->runtime_package;
 	GB_ASSERT(pkg->files.count != 0);
 	LLVMMetadataRef file = lb_get_llvm_metadata(m, pkg->files[0]);
@@ -117,7 +115,7 @@ LLVMMetadataRef lb_debug_basic_struct(lbModule *m, String const &name, u64 size_
 }
 
 
-LLVMMetadataRef lb_debug_type_basic_type(lbModule *m, String const &name, u64 size_in_bits, LLVMDWARFTypeEncoding encoding, LLVMDIFlags flags = LLVMDIFlagZero) {
+gb_internal LLVMMetadataRef lb_debug_type_basic_type(lbModule *m, String const &name, u64 size_in_bits, LLVMDWARFTypeEncoding encoding, LLVMDIFlags flags = LLVMDIFlagZero) {
 	LLVMMetadataRef basic_type = LLVMDIBuilderCreateBasicType(m->debug_builder, cast(char const *)name.text, name.len, size_in_bits, encoding, flags);
 #if 1
 	LLVMMetadataRef final_decl = LLVMDIBuilderCreateTypedef(m->debug_builder, basic_type, cast(char const *)name.text, name.len, nullptr, 0, nullptr, cast(u32)size_in_bits);
@@ -127,7 +125,7 @@ LLVMMetadataRef lb_debug_type_basic_type(lbModule *m, String const &name, u64 si
 #endif
 }
 
-LLVMMetadataRef lb_debug_type_internal(lbModule *m, Type *type) {
+gb_internal LLVMMetadataRef lb_debug_type_internal(lbModule *m, Type *type) {
 	i64 size = type_size_of(type); // Check size
 	gb_unused(size);
 
@@ -474,7 +472,7 @@ LLVMMetadataRef lb_debug_type_internal(lbModule *m, Type *type) {
 	return nullptr;
 }
 
-LLVMMetadataRef lb_get_base_scope_metadata(lbModule *m, Scope *scope) {
+gb_internal LLVMMetadataRef lb_get_base_scope_metadata(lbModule *m, Scope *scope) {
 	LLVMMetadataRef found = nullptr;
 	for (;;) {
 		if (scope == nullptr) {
@@ -496,12 +494,14 @@ LLVMMetadataRef lb_get_base_scope_metadata(lbModule *m, Scope *scope) {
 	}
 }
 
-LLVMMetadataRef lb_debug_type(lbModule *m, Type *type) {
+gb_internal LLVMMetadataRef lb_debug_type(lbModule *m, Type *type) {
 	GB_ASSERT(type != nullptr);
 	LLVMMetadataRef found = lb_get_llvm_metadata(m, type);
 	if (found != nullptr) {
 		return found;
 	}
+
+	MUTEX_GUARD(&m->debug_values_mutex);
 
 	if (type->kind == Type_Named) {
 		LLVMMetadataRef file = nullptr;
@@ -615,11 +615,13 @@ LLVMMetadataRef lb_debug_type(lbModule *m, Type *type) {
 	return dt;
 }
 
-void lb_debug_complete_types(lbModule *m) {
+gb_internal void lb_debug_complete_types(lbModule *m) {
 	/* unsigned const word_size = cast(unsigned)build_context.word_size; */
 	unsigned const word_bits = cast(unsigned)(8*build_context.word_size);
 
 	for_array(debug_incomplete_type_index, m->debug_incomplete_types) {
+		TEMPORARY_ALLOCATOR_GUARD();
+
 		auto const &idt = m->debug_incomplete_types[debug_incomplete_type_index];
 		GB_ASSERT(idt.type != nullptr);
 		GB_ASSERT(idt.metadata != nullptr);
@@ -962,7 +964,7 @@ void lb_debug_complete_types(lbModule *m) {
 
 
 
-void lb_add_debug_local_variable(lbProcedure *p, LLVMValueRef ptr, Type *type, Token const &token) {
+gb_internal void lb_add_debug_local_variable(lbProcedure *p, LLVMValueRef ptr, Type *type, Token const &token) {
 	if (p->debug_info == nullptr) {
 		return;
 	}
@@ -1024,7 +1026,7 @@ void lb_add_debug_local_variable(lbProcedure *p, LLVMValueRef ptr, Type *type, T
 	LLVMDIBuilderInsertDeclareAtEnd(m->debug_builder, storage, var_info, llvm_expr, llvm_debug_loc, block);
 }
 
-void lb_add_debug_param_variable(lbProcedure *p, LLVMValueRef ptr, Type *type, Token const &token, unsigned arg_number, lbBlock *block, lbArgKind arg_kind) {
+gb_internal void lb_add_debug_param_variable(lbProcedure *p, LLVMValueRef ptr, Type *type, Token const &token, unsigned arg_number, lbBlock *block, lbArgKind arg_kind) {
 	if (p->debug_info == nullptr) {
 		return;
 	}
@@ -1097,7 +1099,7 @@ void lb_add_debug_param_variable(lbProcedure *p, LLVMValueRef ptr, Type *type, T
 }
 
 
-void lb_add_debug_context_variable(lbProcedure *p, lbAddr const &ctx) {
+gb_internal void lb_add_debug_context_variable(lbProcedure *p, lbAddr const &ctx) {
 	if (!p->debug_info || !p->body) {
 		return;
 	}
@@ -1125,17 +1127,17 @@ void lb_add_debug_context_variable(lbProcedure *p, lbAddr const &ctx) {
 }
 
 
-String debug_info_mangle_constant_name(Entity *e, bool *did_allocate_) {
+gb_internal String debug_info_mangle_constant_name(Entity *e, gbAllocator const &allocator, bool *did_allocate_) {
 	String name = e->token.string;
 	if (e->pkg && e->pkg->name.len > 0) {
 		// NOTE(bill): C++ NONSENSE FOR DEBUG SHITE!
-		name = concatenate3_strings(heap_allocator(), e->pkg->name, str_lit("::"), name);
+		name = concatenate3_strings(allocator, e->pkg->name, str_lit("::"), name);
 		if (did_allocate_) *did_allocate_ = true;
 	}
 	return name;
 }
 
-void add_debug_info_global_variable_expr(lbModule *m, String const &name, LLVMMetadataRef dtype, LLVMMetadataRef expr) {
+gb_internal void add_debug_info_global_variable_expr(lbModule *m, String const &name, LLVMMetadataRef dtype, LLVMMetadataRef expr) {
 	LLVMMetadataRef scope = nullptr;
 	LLVMMetadataRef file = nullptr;
 	unsigned line = 0;
@@ -1151,14 +1153,11 @@ void add_debug_info_global_variable_expr(lbModule *m, String const &name, LLVMMe
 		expr, decl, 8/*AlignInBits*/);
 }
 
-void add_debug_info_for_global_constant_internal_i64(lbModule *m, Entity *e, LLVMMetadataRef dtype, i64 v) {
+gb_internal void add_debug_info_for_global_constant_internal_i64(lbModule *m, Entity *e, LLVMMetadataRef dtype, i64 v) {
 	LLVMMetadataRef expr = LLVMDIBuilderCreateConstantValueExpression(m->debug_builder, v);
 
-	bool did_allocate = false;
-	String name = debug_info_mangle_constant_name(e, &did_allocate);
-	defer (if (did_allocate) {
-		gb_free(heap_allocator(), name.text);
-	});
+	TEMPORARY_ALLOCATOR_GUARD();
+	String name = debug_info_mangle_constant_name(e, temporary_allocator(), nullptr);
 
 	add_debug_info_global_variable_expr(m, name, dtype, expr);
 	if ((e->pkg && e->pkg->kind == Package_Init) ||
@@ -1167,7 +1166,7 @@ void add_debug_info_for_global_constant_internal_i64(lbModule *m, Entity *e, LLV
 	}
 }
 
-void add_debug_info_for_global_constant_from_entity(lbGenerator *gen, Entity *e) {
+gb_internal void add_debug_info_for_global_constant_from_entity(lbGenerator *gen, Entity *e) {
 	if (e == nullptr || e->kind != Entity_Constant) {
 		return;
 	}
@@ -1176,7 +1175,7 @@ void add_debug_info_for_global_constant_from_entity(lbGenerator *gen, Entity *e)
 	}
 	lbModule *m = &gen->default_module;
 	if (USE_SEPARATE_MODULES) {
-		m = lb_pkg_module(gen, e->pkg);
+		m = lb_module_of_entity(gen, e);
 	}
 
 	if (is_type_integer(e->type)) {
