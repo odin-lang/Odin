@@ -25,7 +25,7 @@ foreign lib {
 	*/
 	spinlock_unlock :: proc(/*volatile*/ pSpinlock: ^spinlock) -> result ---
 
-when NO_THREADING {
+when !NO_THREADING {
 	/*
 	Creates a mutex.
 
