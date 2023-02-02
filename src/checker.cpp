@@ -3851,10 +3851,9 @@ gb_internal void check_collect_value_decl(CheckerContext *c, Ast *decl) {
 	}
 }
 
-gb_internal void check_add_foreign_block_decl(CheckerContext *ctx, Ast *decl) {
-	if (decl->state_flags & StateFlag_BeenHandled) return;
-	decl->state_flags |= StateFlag_BeenHandled;
+gb_internal bool collect_file_decls(CheckerContext *ctx, Slice<Ast *> const &decls);
 
+gb_internal bool check_add_foreign_block_decl(CheckerContext *ctx, Ast *decl) {
 	ast_node(fb, ForeignBlockDecl, decl);
 	Ast *foreign_library = fb->foreign_library;
 
@@ -3869,7 +3868,11 @@ gb_internal void check_add_foreign_block_decl(CheckerContext *ctx, Ast *decl) {
 	check_decl_attributes(&c, fb->attributes, foreign_block_decl_attribute, nullptr);
 
 	ast_node(block, BlockStmt, fb->body);
+	if (c.collect_delayed_decls && (c.scope->flags&ScopeFlag_File) != 0) {
+		return collect_file_decls(&c, block->stmts);
+	}
 	check_collect_entities(&c, block->stmts);
+	return false;
 }
 
 gb_internal bool correct_single_type_alias(CheckerContext *c, Entity *e) {
@@ -3923,8 +3926,6 @@ gb_internal void correct_type_aliases_in_scope(CheckerContext *c, Scope *s) {
 		}
 	}
 }
-
-gb_internal bool collect_file_decl(CheckerContext *ctx, Ast *decl);
 
 // NOTE(bill): If file_scopes == nullptr, this will act like a local scope
 gb_internal void check_collect_entities(CheckerContext *c, Slice<Ast *> const &nodes) {
@@ -4004,13 +4005,6 @@ gb_internal void check_collect_entities(CheckerContext *c, Slice<Ast *> const &n
 			Ast *decl = nodes[decl_index];
 			if (decl->kind == Ast_WhenStmt) {
 				check_collect_entities_from_when_stmt(c, &decl->WhenStmt);
-			}
-		}
-	} else if (c->foreign_context.curr_library) {
-		for_array(decl_index, nodes) {
-			Ast *decl = nodes[decl_index];
-			if (decl->kind == Ast_WhenStmt) {
-				collect_file_decl(c, decl);
 			}
 		}
 	}
@@ -4584,7 +4578,9 @@ gb_internal bool collect_file_decl(CheckerContext *ctx, Ast *decl) {
 	case_end;
 
 	case_ast_node(fb, ForeignBlockDecl, decl);
-		check_add_foreign_block_decl(ctx, decl);
+		if (check_add_foreign_block_decl(ctx, decl)) {
+			return true;
+		}
 	case_end;
 
 	case_ast_node(ws, WhenStmt, decl);
