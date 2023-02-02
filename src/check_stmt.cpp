@@ -1912,6 +1912,315 @@ gb_internal void check_value_decl_stmt(CheckerContext *ctx, Ast *node, u32 mod_f
 	}
 }
 
+gb_internal void check_expr_stmt(CheckerContext *ctx, Ast *node) {
+	ast_node(es, ExprStmt, node);
+
+	Operand operand = {Addressing_Invalid};
+	ExprKind kind = check_expr_base(ctx, &operand, es->expr, nullptr);
+	switch (operand.mode) {
+	case Addressing_Type:
+		{
+			gbString str = type_to_string(operand.type);
+			error(node, "'%s' is not an expression", str);
+			gb_string_free(str);
+			break;
+		}
+	case Addressing_NoValue:
+		return;
+	}
+	if (kind == Expr_Stmt) {
+		return;
+	}
+
+	Ast *expr = strip_or_return_expr(operand.expr);
+	if (expr->kind == Ast_CallExpr) {
+		BuiltinProcId builtin_id = BuiltinProc_Invalid;
+		bool do_require = false;
+
+		AstCallExpr *ce = &expr->CallExpr;
+		Type *t = base_type(type_of_expr(ce->proc));
+		if (t->kind == Type_Proc) {
+			do_require = t->Proc.require_results;
+		} else if (check_stmt_internal_builtin_proc_id(ce->proc, &builtin_id)) {
+			auto const &bp = builtin_procs[builtin_id];
+			do_require = bp.kind == Expr_Expr && !bp.ignore_results;
+		}
+		if (do_require) {
+			gbString expr_str = expr_to_string(ce->proc);
+			error(node, "'%s' requires that its results must be handled", expr_str);
+			gb_string_free(expr_str);
+		}
+		return;
+	} else if (expr->kind == Ast_SelectorCallExpr) {
+		BuiltinProcId builtin_id = BuiltinProc_Invalid;
+		bool do_require = false;
+
+		AstSelectorCallExpr *se = &expr->SelectorCallExpr;
+		ast_node(ce, CallExpr, se->call);
+		Type *t = base_type(type_of_expr(ce->proc));
+		if (t == nullptr) {
+			gbString expr_str = expr_to_string(ce->proc);
+			error(node, "'%s' is not a value field nor procedure", expr_str);
+			gb_string_free(expr_str);
+			return;
+		}
+		if (t->kind == Type_Proc) {
+			do_require = t->Proc.require_results;
+		} else if (check_stmt_internal_builtin_proc_id(ce->proc, &builtin_id)) {
+			auto const &bp = builtin_procs[builtin_id];
+			do_require = bp.kind == Expr_Expr && !bp.ignore_results;
+		}
+		if (do_require) {
+			gbString expr_str = expr_to_string(ce->proc);
+			error(node, "'%s' requires that its results must be handled", expr_str);
+			gb_string_free(expr_str);
+		}
+		return;
+	}
+	gbString expr_str = expr_to_string(operand.expr);
+	error(node, "Expression is not used: '%s'", expr_str);
+	gb_string_free(expr_str);
+	if (operand.expr->kind == Ast_BinaryExpr) {
+		ast_node(be, BinaryExpr, operand.expr);
+		if (be->op.kind != Token_CmpEq) {
+			return;
+		}
+
+		switch (be->left->tav.mode) {
+		case Addressing_Context:
+		case Addressing_Variable:
+		case Addressing_MapIndex:
+		case Addressing_SoaVariable:
+			{
+				gbString lhs = expr_to_string(be->left);
+				gbString rhs = expr_to_string(be->right);
+				error_line("\tSuggestion: Did you mean to do an assignment?\n", lhs, rhs);
+				error_line("\t            '%s = %s;'\n", lhs, rhs);
+				gb_string_free(rhs);
+				gb_string_free(lhs);
+			}
+			break;
+		}
+	}
+}
+
+gb_internal void check_assign_stmt(CheckerContext *ctx, Ast *node) {
+	ast_node(as, AssignStmt, node);
+
+	if (as->op.kind == Token_Eq) {
+		// a, b, c = 1, 2, 3;  // Multisided
+
+		isize lhs_count = as->lhs.count;
+		if (lhs_count == 0) {
+			error(as->op, "Missing lhs in assignment statement");
+			return;
+		}
+
+		TEMPORARY_ALLOCATOR_GUARD();
+
+		// NOTE(bill): If there is a bad syntax error, rhs > lhs which would mean there would need to be
+		// an extra allocation
+		auto lhs_operands = array_make<Operand>(temporary_allocator(), lhs_count);
+		auto rhs_operands = array_make<Operand>(temporary_allocator(), 0, 2*lhs_count);
+
+		for_array(i, as->lhs) {
+			if (is_blank_ident(as->lhs[i])) {
+				Operand *o = &lhs_operands[i];
+				o->expr = as->lhs[i];
+				o->mode = Addressing_Value;
+			} else {
+				ctx->assignment_lhs_hint = unparen_expr(as->lhs[i]);
+				check_expr(ctx, &lhs_operands[i], as->lhs[i]);
+			}
+		}
+		ctx->assignment_lhs_hint = nullptr; // Reset the assignment_lhs_hint
+
+		check_assignment_arguments(ctx, lhs_operands, &rhs_operands, as->rhs);
+
+		auto lhs_to_ignore = array_make<bool>(temporary_allocator(), lhs_count);
+
+		isize rhs_count = rhs_operands.count;
+		isize max = gb_min(lhs_count, rhs_count);
+		for (isize i = 0; i < max; i++) {
+			if (lhs_to_ignore[i]) {
+				continue;
+			}
+			check_assignment_variable(ctx, &lhs_operands[i], &rhs_operands[i]);
+		}
+		if (lhs_count != rhs_count) {
+			error(as->lhs[0], "Assignment count mismatch '%td' = '%td'", lhs_count, rhs_count);
+		}
+
+	} else {
+		// a += 1; // Single-sided
+		Token op = as->op;
+		if (as->lhs.count != 1 || as->rhs.count != 1) {
+			error(op, "Assignment operation '%.*s' requires single-valued expressions", LIT(op.string));
+			return;
+		}
+		if (!gb_is_between(op.kind, Token__AssignOpBegin+1, Token__AssignOpEnd-1)) {
+			error(op, "Unknown Assignment operation '%.*s'", LIT(op.string));
+			return;
+		}
+		Operand lhs = {Addressing_Invalid};
+		Operand rhs = {Addressing_Invalid};
+		Ast *binary_expr = alloc_ast_node(node->file(), Ast_BinaryExpr);
+		ast_node(be, BinaryExpr, binary_expr);
+		be->op = op;
+		be->op.kind = cast(TokenKind)(cast(i32)be->op.kind - (Token_AddEq - Token_Add));
+		 // NOTE(bill): Only use the first one will be used
+		be->left  = as->lhs[0];
+		be->right = as->rhs[0];
+
+		check_expr(ctx, &lhs, as->lhs[0]);
+		check_binary_expr(ctx, &rhs, binary_expr, nullptr, true);
+		if (rhs.mode != Addressing_Invalid) {
+			// NOTE(bill): Only use the first one will be used
+			check_assignment_variable(ctx, &lhs, &rhs);
+		}
+	}
+}
+
+gb_internal void check_if_stmt(CheckerContext *ctx, Ast *node, u32 mod_flags) {
+	ast_node(is, IfStmt, node);
+	check_open_scope(ctx, node);
+
+	check_label(ctx, is->label, node);
+
+	if (is->init != nullptr) {
+		check_stmt(ctx, is->init, 0);
+	}
+
+	Operand operand = {Addressing_Invalid};
+	check_expr(ctx, &operand, is->cond);
+	if (operand.mode != Addressing_Invalid && !is_type_boolean(operand.type)) {
+		error(is->cond, "Non-boolean condition in 'if' statement");
+	}
+
+	check_stmt(ctx, is->body, mod_flags);
+
+	if (is->else_stmt != nullptr) {
+		switch (is->else_stmt->kind) {
+		case Ast_IfStmt:
+		case Ast_BlockStmt:
+			check_stmt(ctx, is->else_stmt, mod_flags);
+			break;
+		default:
+			error(is->else_stmt, "Invalid 'else' statement in 'if' statement");
+			break;
+		}
+	}
+
+	check_close_scope(ctx);
+}
+
+gb_internal void check_return_stmt(CheckerContext *ctx, Ast *node) {
+	ast_node(rs, ReturnStmt, node);
+
+	GB_ASSERT(ctx->curr_proc_sig != nullptr);
+
+	if (ctx->in_defer) {
+		error(rs->token, "'return' cannot be used within a defer statement");
+		return;
+	}
+
+	Type *proc_type = ctx->curr_proc_sig;
+	GB_ASSERT(proc_type != nullptr);
+	GB_ASSERT(proc_type->kind == Type_Proc);
+
+	TypeProc *pt = &proc_type->Proc;
+	if (pt->diverging) {
+		error(rs->token, "Diverging procedures may not return");
+		return;
+	}
+
+	Entity **result_entities = nullptr;
+	isize result_count = 0;
+	bool has_named_results = pt->has_named_results;
+	if (pt->results) {
+		result_entities = proc_type->Proc.results->Tuple.variables.data;
+		result_count = proc_type->Proc.results->Tuple.variables.count;
+	}
+
+	auto operands = array_make<Operand>(heap_allocator(), 0, 2*rs->results.count);
+	defer (array_free(&operands));
+
+	check_unpack_arguments(ctx, result_entities, result_count, &operands, rs->results, true, false);
+
+	if (result_count == 0 && rs->results.count > 0) {
+		error(rs->results[0], "No return values expected");
+	} else if (has_named_results && operands.count == 0) {
+		// Okay
+	} else if (operands.count != result_count) {
+		// Ignore error message as it has most likely already been reported
+		if (all_operands_valid(operands)) {
+			error(node, "Expected %td return values, got %td", result_count, operands.count);
+		}
+	} else {
+		for (isize i = 0; i < result_count; i++) {
+			Entity *e = pt->results->Tuple.variables[i];
+			Operand *o = &operands[i];
+			check_assignment(ctx, o, e->type, str_lit("return statement"));
+			if (is_type_untyped(o->type)) {
+				update_untyped_expr_type(ctx, o->expr, e->type, true);
+			}
+
+
+			// NOTE(bill): This is very basic escape analysis
+			// This needs to be improved tremendously, and a lot of it done during the
+			// middle-end (or LLVM side) to improve checks and error messages
+			Ast *expr = unparen_expr(o->expr);
+			if (expr->kind == Ast_UnaryExpr && expr->UnaryExpr.op.kind == Token_And) {
+				Ast *x = unparen_expr(expr->UnaryExpr.expr);
+				if (x->kind == Ast_CompoundLit) {
+					error(expr, "Cannot return the address to a stack value from a procedure");
+				} else if (x->kind == Ast_IndexExpr) {
+					Ast *array = x->IndexExpr.expr;
+					if (is_type_array_like(type_of_expr(array)) && check_expr_is_stack_variable(array)) {
+						gbString t = type_to_string(type_of_expr(array));
+						error(expr, "Cannot return the address to an element of stack variable from a procedure, of type %s", t);
+						gb_string_free(t);
+					}
+				} else {
+					if (check_expr_is_stack_variable(x)) {
+						error(expr, "Cannot return the address to a stack variable from a procedure");
+					}
+				}
+			}
+		}
+	}
+}
+
+gb_internal void check_for_stmt(CheckerContext *ctx, Ast *node, u32 mod_flags) {
+	ast_node(fs, ForStmt, node);
+	mod_flags |= Stmt_BreakAllowed | Stmt_ContinueAllowed;
+
+	check_open_scope(ctx, node);
+	check_label(ctx, fs->label, node); // TODO(bill): What should the label's "scope" be?
+
+	if (fs->init != nullptr) {
+		check_stmt(ctx, fs->init, 0);
+	}
+	if (fs->cond != nullptr) {
+		Operand o = {Addressing_Invalid};
+		check_expr(ctx, &o, fs->cond);
+		if (o.mode != Addressing_Invalid && !is_type_boolean(o.type)) {
+			error(fs->cond, "Non-boolean condition in 'for' statement");
+		}
+	}
+	if (fs->post != nullptr) {
+		check_stmt(ctx, fs->post, 0);
+
+		if (fs->post->kind != Ast_AssignStmt) {
+			error(fs->post, "'for' statement post statement must be a simple statement");
+		}
+	}
+	check_stmt(ctx, fs->body, mod_flags);
+
+	check_close_scope(ctx);
+}
+
+
 gb_internal void check_stmt_internal(CheckerContext *ctx, Ast *node, u32 flags) {
 	u32 mod_flags = flags & (~Stmt_FallthroughAllowed);
 	switch (node->kind) {
@@ -1920,179 +2229,11 @@ gb_internal void check_stmt_internal(CheckerContext *ctx, Ast *node, u32 flags) 
 	case_ast_node(_, BadDecl,   node); case_end;
 
 	case_ast_node(es, ExprStmt, node)
-		Operand operand = {Addressing_Invalid};
-		ExprKind kind = check_expr_base(ctx, &operand, es->expr, nullptr);
-		switch (operand.mode) {
-		case Addressing_Type: {
-			gbString str = type_to_string(operand.type);
-			error(node, "'%s' is not an expression", str);
-			gb_string_free(str);
-
-			break;
-		}
-		case Addressing_NoValue:
-			return;
-		default: {
-			if (kind == Expr_Stmt) {
-				return;
-			}
-
-			Ast *expr = strip_or_return_expr(operand.expr);
-			if (expr->kind == Ast_CallExpr) {
-				BuiltinProcId builtin_id = BuiltinProc_Invalid;
-				bool do_require = false;
-
-				AstCallExpr *ce = &expr->CallExpr;
-				Type *t = base_type(type_of_expr(ce->proc));
-				if (t->kind == Type_Proc) {
-					do_require = t->Proc.require_results;
-				} else if (check_stmt_internal_builtin_proc_id(ce->proc, &builtin_id)) {
-					auto const &bp = builtin_procs[builtin_id];
-					do_require = bp.kind == Expr_Expr && !bp.ignore_results;
-				}
-				if (do_require) {
-					gbString expr_str = expr_to_string(ce->proc);
-					error(node, "'%s' requires that its results must be handled", expr_str);
-					gb_string_free(expr_str);
-				}
-				return;
-			} else if (expr->kind == Ast_SelectorCallExpr) {
-				BuiltinProcId builtin_id = BuiltinProc_Invalid;
-				bool do_require = false;
-
-				AstSelectorCallExpr *se = &expr->SelectorCallExpr;
-				ast_node(ce, CallExpr, se->call);
-				Type *t = base_type(type_of_expr(ce->proc));
-				if (t == nullptr) {
-					gbString expr_str = expr_to_string(ce->proc);
-					error(node, "'%s' is not a value field nor procedure", expr_str);
-					gb_string_free(expr_str);
-					return;
-				}
-				if (t->kind == Type_Proc) {
-					do_require = t->Proc.require_results;
-				} else if (check_stmt_internal_builtin_proc_id(ce->proc, &builtin_id)) {
-					auto const &bp = builtin_procs[builtin_id];
-					do_require = bp.kind == Expr_Expr && !bp.ignore_results;
-				}
-				if (do_require) {
-					gbString expr_str = expr_to_string(ce->proc);
-					error(node, "'%s' requires that its results must be handled", expr_str);
-					gb_string_free(expr_str);
-				}
-				return;
-			}
-			gbString expr_str = expr_to_string(operand.expr);
-			error(node, "Expression is not used: '%s'", expr_str);
-			gb_string_free(expr_str);
-			if (operand.expr->kind == Ast_BinaryExpr) {
-				ast_node(be, BinaryExpr, operand.expr);
-				if (be->op.kind != Token_CmpEq) {
-					break;
-				}
-
-				switch (be->left->tav.mode) {
-				case Addressing_Context:
-				case Addressing_Variable:
-				case Addressing_MapIndex:
-				case Addressing_SoaVariable:
-					{
-						gbString lhs = expr_to_string(be->left);
-						gbString rhs = expr_to_string(be->right);
-						error_line("\tSuggestion: Did you mean to do an assignment?\n", lhs, rhs);
-						error_line("\t            '%s = %s;'\n", lhs, rhs);
-						gb_string_free(rhs);
-						gb_string_free(lhs);
-					}
-					break;
-				}
-			}
-
-			break;
-		}
-		}
+		check_expr_stmt(ctx, node);
 	case_end;
 
 	case_ast_node(as, AssignStmt, node);
-		switch (as->op.kind) {
-		case Token_Eq: {
-			// a, b, c = 1, 2, 3;  // Multisided
-
-			isize lhs_count = as->lhs.count;
-			if (lhs_count == 0) {
-				error(as->op, "Missing lhs in assignment statement");
-				return;
-			}
-
-			TEMPORARY_ALLOCATOR_GUARD();
-
-			// NOTE(bill): If there is a bad syntax error, rhs > lhs which would mean there would need to be
-			// an extra allocation
-			auto lhs_operands = array_make<Operand>(temporary_allocator(), lhs_count);
-			auto rhs_operands = array_make<Operand>(temporary_allocator(), 0, 2*lhs_count);
-
-			for_array(i, as->lhs) {
-				if (is_blank_ident(as->lhs[i])) {
-					Operand *o = &lhs_operands[i];
-					o->expr = as->lhs[i];
-					o->mode = Addressing_Value;
-				} else {
-					ctx->assignment_lhs_hint = unparen_expr(as->lhs[i]);
-					check_expr(ctx, &lhs_operands[i], as->lhs[i]);
-				}
-			}
-			ctx->assignment_lhs_hint = nullptr; // Reset the assignment_lhs_hint
-
-			check_assignment_arguments(ctx, lhs_operands, &rhs_operands, as->rhs);
-
-			auto lhs_to_ignore = array_make<bool>(temporary_allocator(), lhs_count);
-
-			isize rhs_count = rhs_operands.count;
-			isize max = gb_min(lhs_count, rhs_count);
-			for (isize i = 0; i < max; i++) {
-				if (lhs_to_ignore[i]) {
-					continue;
-				}
-				check_assignment_variable(ctx, &lhs_operands[i], &rhs_operands[i]);
-			}
-			if (lhs_count != rhs_count) {
-				error(as->lhs[0], "Assignment count mismatch '%td' = '%td'", lhs_count, rhs_count);
-			}
-			break;
-		}
-
-		default: {
-			// a += 1; // Single-sided
-			Token op = as->op;
-			if (as->lhs.count != 1 || as->rhs.count != 1) {
-				error(op, "Assignment operation '%.*s' requires single-valued expressions", LIT(op.string));
-				return;
-			}
-			if (!gb_is_between(op.kind, Token__AssignOpBegin+1, Token__AssignOpEnd-1)) {
-				error(op, "Unknown Assignment operation '%.*s'", LIT(op.string));
-				return;
-			}
-			Operand lhs = {Addressing_Invalid};
-			Operand rhs = {Addressing_Invalid};
-			Ast *binary_expr = alloc_ast_node(node->file(), Ast_BinaryExpr);
-			ast_node(be, BinaryExpr, binary_expr);
-			be->op = op;
-			be->op.kind = cast(TokenKind)(cast(i32)be->op.kind - (Token_AddEq - Token_Add));
-			 // NOTE(bill): Only use the first one will be used
-			be->left  = as->lhs[0];
-			be->right = as->rhs[0];
-
-			check_expr(ctx, &lhs, as->lhs[0]);
-			check_binary_expr(ctx, &rhs, binary_expr, nullptr, true);
-			if (rhs.mode == Addressing_Invalid) {
-				return;
-			}
-			// NOTE(bill): Only use the first one will be used
-			check_assignment_variable(ctx, &lhs, &rhs);
-
-			break;
-		}
-		}
+		check_assign_stmt(ctx, node);
 	case_end;
 
 	case_ast_node(bs, BlockStmt, node);
@@ -2105,35 +2246,7 @@ gb_internal void check_stmt_internal(CheckerContext *ctx, Ast *node, u32 flags) 
 	case_end;
 
 	case_ast_node(is, IfStmt, node);
-		check_open_scope(ctx, node);
-
-		check_label(ctx, is->label, node);
-
-		if (is->init != nullptr) {
-			check_stmt(ctx, is->init, 0);
-		}
-
-		Operand operand = {Addressing_Invalid};
-		check_expr(ctx, &operand, is->cond);
-		if (operand.mode != Addressing_Invalid && !is_type_boolean(operand.type)) {
-			error(is->cond, "Non-boolean condition in 'if' statement");
-		}
-
-		check_stmt(ctx, is->body, mod_flags);
-
-		if (is->else_stmt != nullptr) {
-			switch (is->else_stmt->kind) {
-			case Ast_IfStmt:
-			case Ast_BlockStmt:
-				check_stmt(ctx, is->else_stmt, mod_flags);
-				break;
-			default:
-				error(is->else_stmt, "Invalid 'else' statement in 'if' statement");
-				break;
-			}
-		}
-
-		check_close_scope(ctx);
+		check_if_stmt(ctx, node, mod_flags);
 	case_end;
 
 	case_ast_node(ws, WhenStmt, node);
@@ -2141,108 +2254,12 @@ gb_internal void check_stmt_internal(CheckerContext *ctx, Ast *node, u32 flags) 
 	case_end;
 
 	case_ast_node(rs, ReturnStmt, node);
-		GB_ASSERT(ctx->curr_proc_sig != nullptr);
-
-		if (ctx->in_defer) {
-			error(rs->token, "'return' cannot be used within a defer statement");
-			break;
-		}
-
-		Type *proc_type = ctx->curr_proc_sig;
-		GB_ASSERT(proc_type != nullptr);
-		GB_ASSERT(proc_type->kind == Type_Proc);
-
-		TypeProc *pt = &proc_type->Proc;
-		if (pt->diverging) {
-			error(rs->token, "Diverging procedures may not return");
-			break;
-		}
-
-		Entity **result_entities = nullptr;
-		isize result_count = 0;
-		bool has_named_results = pt->has_named_results;
-		if (pt->results) {
-			result_entities = proc_type->Proc.results->Tuple.variables.data;
-			result_count = proc_type->Proc.results->Tuple.variables.count;
-		}
-
-		auto operands = array_make<Operand>(heap_allocator(), 0, 2*rs->results.count);
-		defer (array_free(&operands));
-
-		check_unpack_arguments(ctx, result_entities, result_count, &operands, rs->results, true, false);
-
-		if (result_count == 0 && rs->results.count > 0) {
-			error(rs->results[0], "No return values expected");
-		} else if (has_named_results && operands.count == 0) {
-			// Okay
-		} else if (operands.count != result_count) {
-			// Ignore error message as it has most likely already been reported
-			if (all_operands_valid(operands)) {
-				error(node, "Expected %td return values, got %td", result_count, operands.count);
-			}
-		} else {
-			for (isize i = 0; i < result_count; i++) {
-				Entity *e = pt->results->Tuple.variables[i];
-				Operand *o = &operands[i];
-				check_assignment(ctx, o, e->type, str_lit("return statement"));
-				if (is_type_untyped(o->type)) {
-					update_untyped_expr_type(ctx, o->expr, e->type, true);
-				}
-
-
-				// NOTE(bill): This is very basic escape analysis
-				// This needs to be improved tremendously, and a lot of it done during the
-				// middle-end (or LLVM side) to improve checks and error messages
-				Ast *expr = unparen_expr(o->expr);
-				if (expr->kind == Ast_UnaryExpr && expr->UnaryExpr.op.kind == Token_And) {
-					Ast *x = unparen_expr(expr->UnaryExpr.expr);
-					if (x->kind == Ast_CompoundLit) {
-						error(expr, "Cannot return the address to a stack value from a procedure");
-					} else if (x->kind == Ast_IndexExpr) {
-						Ast *array = x->IndexExpr.expr;
-						if (is_type_array_like(type_of_expr(array)) && check_expr_is_stack_variable(array)) {
-							gbString t = type_to_string(type_of_expr(array));
-							error(expr, "Cannot return the address to an element of stack variable from a procedure, of type %s", t);
-							gb_string_free(t);
-						}
-					} else {
-						if (check_expr_is_stack_variable(x)) {
-							error(expr, "Cannot return the address to a stack variable from a procedure");
-						}
-					}
-				}
-			}
-		}
+		check_return_stmt(ctx, node);
 	case_end;
 
 	case_ast_node(fs, ForStmt, node);
-		u32 new_flags = mod_flags | Stmt_BreakAllowed | Stmt_ContinueAllowed;
-
-		check_open_scope(ctx, node);
-		check_label(ctx, fs->label, node); // TODO(bill): What should the label's "scope" be?
-
-		if (fs->init != nullptr) {
-			check_stmt(ctx, fs->init, 0);
-		}
-		if (fs->cond != nullptr) {
-			Operand o = {Addressing_Invalid};
-			check_expr(ctx, &o, fs->cond);
-			if (o.mode != Addressing_Invalid && !is_type_boolean(o.type)) {
-				error(fs->cond, "Non-boolean condition in 'for' statement");
-			}
-		}
-		if (fs->post != nullptr) {
-			check_stmt(ctx, fs->post, 0);
-
-			if (fs->post->kind != Ast_AssignStmt) {
-				error(fs->post, "'for' statement post statement must be a simple statement");
-			}
-		}
-		check_stmt(ctx, fs->body, new_flags);
-
-		check_close_scope(ctx);
+		check_for_stmt(ctx, node, mod_flags);
 	case_end;
-
 
 	case_ast_node(rs, RangeStmt, node);
 		check_range_stmt(ctx, node, mod_flags);
