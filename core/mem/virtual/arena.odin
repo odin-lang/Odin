@@ -141,7 +141,6 @@ arena_static_reset_to :: proc(arena: ^Arena, pos: uint, loc := #caller_location)
 }
 
 arena_growing_free_last_memory_block :: proc(arena: ^Arena, loc := #caller_location) {
-	sync.mutex_guard(&arena.mutex)
 	if free_block := arena.curr_block; free_block != nil {
 		assert(arena.kind == .Growing, "expected a .Growing arena", loc)
 		arena.curr_block = free_block.prev
