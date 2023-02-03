@@ -495,11 +495,11 @@ gb_internal lbValue lb_map_get_proc_for_type(lbModule *m, Type *type) {
 
 	lb_add_proc_attribute_at_index(p, 1+0, "nonnull");
 	lb_add_proc_attribute_at_index(p, 1+0, "noalias");
-	lb_add_proc_attribute_at_index(p, 1+0, "readonly");
+	// lb_add_proc_attribute_at_index(p, 1+0, "readonly");
 
 	lb_add_proc_attribute_at_index(p, 1+2, "nonnull");
 	lb_add_proc_attribute_at_index(p, 1+2, "noalias");
-	lb_add_proc_attribute_at_index(p, 1+2, "readonly");
+	// lb_add_proc_attribute_at_index(p, 1+2, "readonly");
 
 	lbBlock *loop_block = lb_create_block(p, "loop");
 	lbBlock *hash_block = lb_create_block(p, "hash");
@@ -907,7 +907,7 @@ gb_internal lbValue lb_internal_dynamic_map_get_ptr(lbProcedure *p, lbValue cons
 	lbValue key_ptr = {};
 	lbValue hash = lb_gen_map_key_hash(p, key, map_type->Map.key, &key_ptr);
 
-	if (true || build_context.dynamic_map_calls) {
+	if (build_context.dynamic_map_calls) {
 		auto args = array_make<lbValue>(permanent_allocator(), 4);
 		args[0] = lb_emit_transmute(p, map_ptr, t_raw_map_ptr);
 		args[1] = lb_gen_map_info_ptr(p->module, map_type);
