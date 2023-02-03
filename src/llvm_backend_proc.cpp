@@ -538,6 +538,10 @@ gb_internal void lb_begin_procedure_body(lbProcedure *p) {
 		if (p->type->Proc.params != nullptr) {
 			TypeTuple *params = &p->type->Proc.params->Tuple;
 
+			unsigned raw_input_parameters_count = LLVMCountParams(p->value);
+			p->raw_input_parameters = array_make<LLVMValueRef>(permanent_allocator(), raw_input_parameters_count);
+			LLVMGetParams(p->value, p->raw_input_parameters.data);
+
 			unsigned param_index = 0;
 			for_array(i, params->variables) {
 				Entity *e = params->variables[i];
@@ -1028,9 +1032,14 @@ gb_internal lbValue lb_emit_call(lbProcedure *p, lbValue value, Array<lbValue> c
 			} else if (arg->kind == lbArg_Indirect) {
 				lbValue ptr = {};
 				if (arg->is_byval) {
-					if (is_odin_cc && are_types_identical(original_type, t_source_code_location)) {
-						ptr = lb_address_from_load_or_generate_local(p, x);
-					} else {
+					if (is_odin_cc) {
+						if (are_types_identical(original_type, t_source_code_location)) {
+							ptr = lb_address_from_load_or_generate_local(p, x);
+						} else {
+							ptr = lb_address_from_load_if_readonly_parameter(p, x);
+						}
+					}
+					if (ptr.value == nullptr) {
 						ptr = lb_copy_value_to_ptr(p, x, original_type, arg->byval_alignment);
 					}
 				} else if (is_odin_cc) {

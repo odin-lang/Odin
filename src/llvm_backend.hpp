@@ -325,6 +325,7 @@ struct lbProcedure {
 	lbTargetList *   target_list;
 	PtrMap<Entity *, lbValue> direct_parameters;
 	bool             in_multi_assignment;
+	Array<LLVMValueRef> raw_input_parameters;
 
 	Ast *curr_stmt;
 

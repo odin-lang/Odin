@@ -495,11 +495,11 @@ gb_internal lbValue lb_map_get_proc_for_type(lbModule *m, Type *type) {
 
 	lb_add_proc_attribute_at_index(p, 1+0, "nonnull");
 	lb_add_proc_attribute_at_index(p, 1+0, "noalias");
-	// lb_add_proc_attribute_at_index(p, 1+0, "readonly");
+	lb_add_proc_attribute_at_index(p, 1+0, "readonly");
 
 	lb_add_proc_attribute_at_index(p, 1+2, "nonnull");
 	lb_add_proc_attribute_at_index(p, 1+2, "noalias");
-	// lb_add_proc_attribute_at_index(p, 1+2, "readonly");
+	lb_add_proc_attribute_at_index(p, 1+2, "readonly");
 
 	lbBlock *loop_block = lb_create_block(p, "loop");
 	lbBlock *hash_block = lb_create_block(p, "hash");
@@ -598,6 +598,8 @@ gb_internal lbValue lb_map_get_proc_for_type(lbModule *m, Type *type) {
 		lbValue res = lb_const_nil(m, t_rawptr);
 		LLVMBuildRet(p->builder, res.value);
 	}
+
+	gb_printf_err("%s\n", LLVMPrintValueToString(p->value));
 
 
 	return {p->value, p->type};
