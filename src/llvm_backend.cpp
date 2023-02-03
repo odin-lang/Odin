@@ -480,11 +480,11 @@ gb_internal lbValue lb_map_get_proc_for_type(lbModule *m, Type *type) {
 	defer (lb_end_procedure_body(p));
 
 	LLVMSetLinkage(p->value, LLVMInternalLinkage);
-	lb_add_attribute_to_proc(m, p->value, "readonly");
+	// lb_add_attribute_to_proc(m, p->value, "readonly");
 	lb_add_attribute_to_proc(m, p->value, "nounwind");
-	if (build_context.ODIN_DEBUG) {
+	// if (build_context.ODIN_DEBUG) {
 		lb_add_attribute_to_proc(m, p->value, "noinline");
-	}
+	// }
 
 	LLVMValueRef x = LLVMGetParam(p->value, 0);
 	LLVMValueRef y = LLVMGetParam(p->value, 1);
