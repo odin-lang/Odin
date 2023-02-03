@@ -281,12 +281,12 @@ gb_internal void error_operand_no_value(Operand *o) {
 }
 
 gb_internal void add_map_get_dependencies(CheckerContext *c) {
-	if (build_context.dynamic_map_calls) {
+	// if (build_context.dynamic_map_calls) {
 		add_package_dependency(c, "runtime", "__dynamic_map_get");
-	} else {
+	// } else {
 		add_package_dependency(c, "runtime", "map_desired_position");
 		add_package_dependency(c, "runtime", "map_probe_distance");
-	}
+	// }
 }
 
 gb_internal void add_map_set_dependencies(CheckerContext *c) {
