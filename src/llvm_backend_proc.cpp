@@ -1035,8 +1035,8 @@ gb_internal lbValue lb_emit_call(lbProcedure *p, lbValue value, Array<lbValue> c
 					if (is_odin_cc) {
 						if (are_types_identical(original_type, t_source_code_location)) {
 							ptr = lb_address_from_load_or_generate_local(p, x);
-						} else {
-							ptr = lb_address_from_load_if_readonly_parameter(p, x);
+						// } else {
+						// 	ptr = lb_address_from_load_if_readonly_parameter(p, x);
 						}
 					}
 					if (ptr.value == nullptr) {

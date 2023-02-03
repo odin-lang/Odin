@@ -1253,6 +1253,9 @@ gb_internal void init_build_context(TargetMetrics *cross_target) {
 
 	bc->optimization_level = gb_clamp(bc->optimization_level, 0, 3);
 
+	// ENFORCE DYNAMIC MAP CALLS
+	bc->dynamic_map_calls = true;
+
 	bc->ODIN_VALGRIND_SUPPORT = false;
 	if (build_context.metrics.os != TargetOs_windows) {
 		switch (bc->metrics.arch) {
