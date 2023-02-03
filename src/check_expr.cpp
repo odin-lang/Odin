@@ -281,11 +281,11 @@ gb_internal void error_operand_no_value(Operand *o) {
 }
 
 gb_internal void add_map_get_dependencies(CheckerContext *c) {
-	if (build_context.use_static_map_calls) {
+	if (build_context.dynamic_map_calls) {
+		add_package_dependency(c, "runtime", "__dynamic_map_get");
+	} else {
 		add_package_dependency(c, "runtime", "map_desired_position");
 		add_package_dependency(c, "runtime", "map_probe_distance");
-	} else {
-		add_package_dependency(c, "runtime", "__dynamic_map_get");
 	}
 }
 
@@ -297,11 +297,11 @@ gb_internal void add_map_set_dependencies(CheckerContext *c) {
 		t_map_set_proc = alloc_type_proc_from_types(map_set_args, gb_count_of(map_set_args), t_rawptr, false, ProcCC_Odin);
 	}
 
-	if (build_context.use_static_map_calls) {
+	if (build_context.dynamic_map_calls) {
+		add_package_dependency(c, "runtime", "__dynamic_map_set");
+	} else {
 		add_package_dependency(c, "runtime", "__dynamic_map_check_grow");
 		add_package_dependency(c, "runtime", "map_insert_hash_dynamic");
-	} else {
-		add_package_dependency(c, "runtime", "__dynamic_map_set");
 	}
 }
 

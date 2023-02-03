@@ -647,7 +647,7 @@ enum BuildFlagKind {
 	BuildFlag_StrictStyleInitOnly,
 	BuildFlag_ForeignErrorProcedures,
 	BuildFlag_DisallowRTTI,
-	BuildFlag_UseStaticMapCalls,
+	BuildFlag_DynamicMapCalls,
 
 	BuildFlag_Compact,
 	BuildFlag_GlobalDefinitions,
@@ -824,7 +824,7 @@ gb_internal bool parse_build_flags(Array<String> args) {
 
 	add_flag(&build_flags, BuildFlag_DisallowRTTI,            str_lit("disallow-rtti"),             BuildFlagParam_None,    Command__does_check);
 
-	add_flag(&build_flags, BuildFlag_UseStaticMapCalls,       str_lit("use-static-map-calls"),      BuildFlagParam_None,    Command__does_check);
+	add_flag(&build_flags, BuildFlag_DynamicMapCalls,         str_lit("dynamic-map-calls"),         BuildFlagParam_None,    Command__does_check);
 
 	add_flag(&build_flags, BuildFlag_Short,                   str_lit("short"),                     BuildFlagParam_None,    Command_doc);
 	add_flag(&build_flags, BuildFlag_AllPackages,             str_lit("all-packages"),              BuildFlagParam_None,    Command_doc);
@@ -1407,8 +1407,8 @@ gb_internal bool parse_build_flags(Array<String> args) {
 						case BuildFlag_DisallowRTTI:
 							build_context.disallow_rtti = true;
 							break;
-						case BuildFlag_UseStaticMapCalls:
-							build_context.use_static_map_calls = true;
+						case BuildFlag_DynamicMapCalls:
+							build_context.dynamic_map_calls = true;
 							break;
 						case BuildFlag_DefaultToNilAllocator:
 							build_context.ODIN_DEFAULT_TO_NIL_ALLOCATOR = true;
@@ -2130,6 +2130,11 @@ gb_internal void print_show_help(String const arg0, String const &command) {
 
 		print_usage_line(1, "-disable-red-zone");
 		print_usage_line(2, "Disable red zone on a supported freestanding target");
+		print_usage_line(0, "");
+
+		print_usage_line(1, "-dynamic-map-calls");
+		print_usage_line(2, "Use dynamic map calls to minimize code generation at the cost of runtime execution");
+		print_usage_line(0, "");
 	}
 
 	if (check) {

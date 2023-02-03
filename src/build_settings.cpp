@@ -306,7 +306,7 @@ struct BuildContext {
 
 	bool   disallow_rtti;
 
-	bool   use_static_map_calls;
+	bool   dynamic_map_calls;
 
 	RelocMode reloc_mode;
 	bool   disable_red_zone;
