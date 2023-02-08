@@ -1478,10 +1478,9 @@ gb_internal void add_type_and_value(CheckerContext *ctx, Ast *expr, AddressingMo
 
 gb_internal void add_entity_definition(CheckerInfo *i, Ast *identifier, Entity *entity) {
 	GB_ASSERT(identifier != nullptr);
-	GB_ASSERT(identifier->kind == Ast_Ident);
-	// if (is_blank_ident(identifier)) {
-		// return;
-	// }
+	if (identifier->kind != Ast_Ident) {
+		return;
+	}
 	if (identifier->Ident.entity != nullptr) {
 		// NOTE(bill): Identifier has already been handled
 		return;
