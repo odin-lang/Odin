@@ -2744,7 +2744,7 @@ gb_internal void init_core_type_info(Checker *c) {
 	t_type_info_enumerated_array = find_core_type(c, str_lit("Type_Info_Enumerated_Array"));
 	t_type_info_dynamic_array    = find_core_type(c, str_lit("Type_Info_Dynamic_Array"));
 	t_type_info_slice            = find_core_type(c, str_lit("Type_Info_Slice"));
-	t_type_info_tuple            = find_core_type(c, str_lit("Type_Info_Tuple"));
+	t_type_info_parameters       = find_core_type(c, str_lit("Type_Info_Parameters"));
 	t_type_info_struct           = find_core_type(c, str_lit("Type_Info_Struct"));
 	t_type_info_union            = find_core_type(c, str_lit("Type_Info_Union"));
 	t_type_info_enum             = find_core_type(c, str_lit("Type_Info_Enum"));
@@ -2773,7 +2773,7 @@ gb_internal void init_core_type_info(Checker *c) {
 	t_type_info_enumerated_array_ptr = alloc_type_pointer(t_type_info_enumerated_array);
 	t_type_info_dynamic_array_ptr    = alloc_type_pointer(t_type_info_dynamic_array);
 	t_type_info_slice_ptr            = alloc_type_pointer(t_type_info_slice);
-	t_type_info_tuple_ptr            = alloc_type_pointer(t_type_info_tuple);
+	t_type_info_parameters_ptr       = alloc_type_pointer(t_type_info_parameters);
 	t_type_info_struct_ptr           = alloc_type_pointer(t_type_info_struct);
 	t_type_info_union_ptr            = alloc_type_pointer(t_type_info_union);
 	t_type_info_enum_ptr             = alloc_type_pointer(t_type_info_enum);

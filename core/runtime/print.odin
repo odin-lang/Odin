@@ -303,7 +303,7 @@ print_type :: proc "contextless" (ti: ^Type_Info) {
 		if info.params == nil {
 			print_string("()")
 		} else {
-			t := info.params.variant.(Type_Info_Tuple)
+			t := info.params.variant.(Type_Info_Parameters)
 			print_byte('(')
 			for t, i in t.types {
 				if i > 0 { print_string(", ") }
@@ -315,7 +315,7 @@ print_type :: proc "contextless" (ti: ^Type_Info) {
 			print_string(" -> ")
 			print_type(info.results)
 		}
-	case Type_Info_Tuple:
+	case Type_Info_Parameters:
 		count := len(info.names)
 		if count != 1 { print_byte('(') }
 		for name, i in info.names {
