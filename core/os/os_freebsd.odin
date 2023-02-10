@@ -577,7 +577,7 @@ _readlink :: proc(path: string) -> (string, Errno) {
 		}	
 	}
 
-	return "", nil
+	return "", Errno{}
 }
 
 // XXX FreeBSD
