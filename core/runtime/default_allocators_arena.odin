@@ -30,7 +30,6 @@ safe_add :: #force_inline proc "contextless" (x, y: uint) -> (uint, bool) {
 memory_block_alloc :: proc(allocator: Allocator, capacity: uint, loc := #caller_location) -> (block: ^Memory_Block, err: Allocator_Error) {
 	total_size := uint(capacity + size_of(Memory_Block))
 	base_offset    := uintptr(size_of(Memory_Block))
-	protect_offset := uintptr(0)
 
 	min_alignment: int = max(16, align_of(Memory_Block))
 	data := mem_alloc(int(total_size), min_alignment, allocator, loc) or_return
