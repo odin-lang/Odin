@@ -255,7 +255,11 @@ arena_temp_begin :: proc(arena: ^Arena, loc := #caller_location) -> (temp: Arena
 }
 
 arena_temp_end :: proc(temp: Arena_Temp, loc := #caller_location) {
-	assert(temp.arena != nil, "nil arena", loc)
+	if temp.arena == nil {
+		assert(temp.block == nil)
+		assert(temp.used == 0)
+		return
+	}
 	arena := temp.arena
 
 	if temp.block != nil {
