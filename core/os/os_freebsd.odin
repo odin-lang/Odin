@@ -576,7 +576,8 @@ _readlink :: proc(path: string) -> (string, Errno) {
 			return strings.string_from_ptr(&buf[0], rc), ERROR_NONE
 		}	
 	}
-	unreachable()
+
+	return "", nil
 }
 
 // XXX FreeBSD
