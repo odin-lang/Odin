@@ -18,6 +18,7 @@ Arena :: struct {
 	total_used:         uint,
 	total_capacity:     uint,
 	minimum_block_size: uint,
+	temp_count:         uint,
 }
 
 @(private, require_results)
@@ -140,14 +141,19 @@ arena_init :: proc(arena: ^Arena, size: uint, backing_allocator: Allocator, loc 
 }
 
 
-// `arena_free_all` will free all but the first memory block, and then reset the memory block
-arena_free_all :: proc(arena: ^Arena, loc := #caller_location) {
-	for arena.curr_block != nil && arena.curr_block.prev != nil {
-		free_block := arena.curr_block
+arena_free_last_memory_block :: proc(arena: ^Arena, loc := #caller_location) {
+	if free_block := arena.curr_block; free_block != nil {
 		arena.curr_block = free_block.prev
 
 		arena.total_capacity -= free_block.capacity
 		memory_block_dealloc(free_block, loc)
+	}
+}
+
+// `arena_free_all` will free all but the first memory block, and then reset the memory block
+arena_free_all :: proc(arena: ^Arena, loc := #caller_location) {
+	for arena.curr_block != nil && arena.curr_block.prev != nil {
+		arena_free_last_memory_block(arena, loc)
 	}
 
 	if arena.curr_block != nil {
@@ -224,4 +230,71 @@ arena_allocator_proc :: proc(allocator_data: rawptr, mode: Allocator_Mode,
 	}
 
 	return
+}
+
+
+
+
+Arena_Temp :: struct {
+	arena: ^Arena,
+	block: ^Memory_Block,
+	used:  uint,
+}
+
+@(require_results)
+arena_temp_begin :: proc(arena: ^Arena, loc := #caller_location) -> (temp: Arena_Temp) {
+	assert(arena != nil, "nil arena", loc)
+
+	temp.arena = arena
+	temp.block = arena.curr_block
+	if arena.curr_block != nil {
+		temp.used = arena.curr_block.used
+	}
+	arena.temp_count += 1
+	return
+}
+
+arena_temp_end :: proc(temp: Arena_Temp, loc := #caller_location) {
+	assert(temp.arena != nil, "nil arena", loc)
+	arena := temp.arena
+
+	if temp.block != nil {
+		memory_block_found := false
+		for block := arena.curr_block; block != nil; block = block.prev {
+			if block == temp.block {
+				memory_block_found = true
+				break
+			}
+		}
+		if !memory_block_found {
+			assert(arena.curr_block == temp.block, "memory block stored within Arena_Temp not owned by Arena", loc)
+		}
+
+		for arena.curr_block != temp.block {
+			arena_free_last_memory_block(arena)
+		}
+
+		if block := arena.curr_block; block != nil {
+			assert(block.used >= temp.used, "out of order use of arena_temp_end", loc)
+			amount_to_zero := min(block.used-temp.used, block.capacity-block.used)
+			intrinsics.mem_zero(block.base[temp.used:], amount_to_zero)
+			block.used = temp.used
+		}
+	}
+
+	assert(arena.temp_count > 0, "double-use of arena_temp_end", loc)
+	arena.temp_count -= 1
+}
+
+// Ignore the use of a `arena_temp_begin` entirely
+arena_temp_ignore :: proc(temp: Arena_Temp, loc := #caller_location) {
+	assert(temp.arena != nil, "nil arena", loc)
+	arena := temp.arena
+
+	assert(arena.temp_count > 0, "double-use of arena_temp_end", loc)
+	arena.temp_count -= 1
+}
+
+arena_check_temp :: proc(arena: ^Arena, loc := #caller_location) {
+	assert(arena.temp_count == 0, "Arena_Temp not been ended", loc)
 }
