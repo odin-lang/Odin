@@ -11,6 +11,14 @@ when ODIN_OS == .Freestanding || ODIN_OS == .JS || ODIN_DEFAULT_TO_NIL_ALLOCATOR
 	default_temp_allocator_destroy :: proc(s: ^Default_Temp_Allocator) {}
 	
 	default_temp_allocator_proc :: nil_allocator_proc
+
+	@(require_results)
+	default_temp_allocator_temp_begin :: proc(loc := #caller_location) -> (temp: Arena_Temp) {
+		return
+	}
+
+	default_temp_allocator_temp_end :: proc(temp: Arena_Temp, loc := #caller_location) {
+	}
 } else {
 	Default_Temp_Allocator :: struct {
 		arena: Arena,
@@ -34,7 +42,26 @@ when ODIN_OS == .Freestanding || ODIN_OS == .JS || ODIN_DEFAULT_TO_NIL_ALLOCATOR
 		s := (^Default_Temp_Allocator)(allocator_data)
 		return arena_allocator_proc(&s.arena, mode, size, alignment, old_memory, old_size, loc)
 	}
+
+	@(require_results)
+	default_temp_allocator_temp_begin :: proc(loc := #caller_location) -> (temp: Arena_Temp) {
+		if context.temp_allocator.data != &global_default_temp_allocator_data {
+			return
+		}
+
+		return arena_temp_begin(&global_default_temp_allocator_data.arena, loc)
+	}
+
+	default_temp_allocator_temp_end :: proc(temp: Arena_Temp, loc := #caller_location) {
+		arena_temp_end(temp, loc)
+	}
 }
+
+@(deferred_out=default_temp_allocator_temp_end)
+DEFAULT_TEMP_ALLOCATOR_TEMP_GUARD :: #force_inline proc(loc := #caller_location) -> (Arena_Temp, Source_Code_Location) {
+	return default_temp_allocator_temp_begin(loc), loc
+}
+
 
 default_temp_allocator :: proc(allocator: ^Default_Temp_Allocator) -> Allocator {
 	return Allocator{
