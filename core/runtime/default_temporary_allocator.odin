@@ -45,11 +45,10 @@ when ODIN_OS == .Freestanding || ODIN_OS == .JS || ODIN_DEFAULT_TO_NIL_ALLOCATOR
 
 	@(require_results)
 	default_temp_allocator_temp_begin :: proc(loc := #caller_location) -> (temp: Arena_Temp) {
-		if context.temp_allocator.data != &global_default_temp_allocator_data {
-			return
+		if context.temp_allocator.data == &global_default_temp_allocator_data {
+			temp = arena_temp_begin(&global_default_temp_allocator_data.arena, loc)
 		}
-
-		return arena_temp_begin(&global_default_temp_allocator_data.arena, loc)
+		return
 	}
 
 	default_temp_allocator_temp_end :: proc(temp: Arena_Temp, loc := #caller_location) {
@@ -58,8 +57,12 @@ when ODIN_OS == .Freestanding || ODIN_OS == .JS || ODIN_DEFAULT_TO_NIL_ALLOCATOR
 }
 
 @(deferred_out=default_temp_allocator_temp_end)
-DEFAULT_TEMP_ALLOCATOR_TEMP_GUARD :: #force_inline proc(loc := #caller_location) -> (Arena_Temp, Source_Code_Location) {
-	return default_temp_allocator_temp_begin(loc), loc
+DEFAULT_TEMP_ALLOCATOR_TEMP_GUARD :: #force_inline proc(ignore := false, loc := #caller_location) -> (Arena_Temp, Source_Code_Location) {
+	if ignore {
+		return {}, loc
+	} else {
+		return default_temp_allocator_temp_begin(loc), loc
+	}
 }
 
 

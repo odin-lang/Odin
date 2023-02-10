@@ -2,6 +2,7 @@ package os
 
 import "core:strings"
 import "core:mem"
+import "core:runtime"
 
 read_dir :: proc(fd: Handle, n: int, allocator := context.allocator) -> (fi: []File_Info, err: Errno) {
 	dirp: Dir
@@ -51,6 +52,7 @@ read_dir :: proc(fd: Handle, n: int, allocator := context.allocator) -> (fi: []F
 			continue
 		}
 
+		runtime.DEFAULT_TEMP_ALLOCATOR_TEMP_GUARD(ignore = context.temp_allocator == allocator)
 		fullpath := strings.join( []string{ dirpath, filename }, "/", context.temp_allocator)
 		defer delete(fullpath, context.temp_allocator)
 

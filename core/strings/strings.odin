@@ -5,6 +5,7 @@ import "core:io"
 import "core:mem"
 import "core:slice"
 import "core:unicode"
+import "core:runtime"
 import "core:unicode/utf8"
 
 // returns a clone of the string `s` allocated using the `allocator`
@@ -1425,7 +1426,9 @@ split_multi :: proc(s: string, substrs: []string, allocator := context.allocator
 
 	// TODO maybe remove duplicate substrs
 	// sort substrings by string size, largest to smallest
+	runtime.DEFAULT_TEMP_ALLOCATOR_TEMP_GUARD()
 	temp_substrs := slice.clone(substrs, context.temp_allocator)
+	defer delete(temp_substrs)
 	slice.sort_by(temp_substrs, proc(a, b: string) -> bool {
 		return len(a) > len(b)	
 	})
