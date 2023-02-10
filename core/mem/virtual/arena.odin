@@ -148,12 +148,12 @@ arena_growing_free_last_memory_block :: proc(arena: ^Arena, loc := #caller_locat
 	}
 }
 
-arena_free_all :: proc(arena: ^Arena) {
+arena_free_all :: proc(arena: ^Arena, loc := #caller_location) {
 	switch arena.kind {
 	case .Growing:
 		sync.mutex_guard(&arena.mutex)
 		for arena.curr_block != nil {
-			arena_growing_free_last_memory_block(arena)
+			arena_growing_free_last_memory_block(arena, loc)
 		}
 		arena.total_reserved = 0
 	case .Static, .Buffer:
@@ -240,17 +240,17 @@ arena_allocator_proc :: proc(allocator_data: rawptr, mode: mem.Allocator_Mode,
 
 	switch mode {
 	case .Alloc, .Alloc_Non_Zeroed:
-		return arena_alloc(arena, size, alignment)
+		return arena_alloc(arena, size, alignment, location)
 	case .Free:
 		err = .Mode_Not_Implemented
 	case .Free_All:
-		arena_free_all(arena)
+		arena_free_all(arena, location)
 	case .Resize:
 		old_data := ([^]byte)(old_memory)
 
 		switch {
 		case old_data == nil:
-			return arena_alloc(arena, size, alignment)
+			return arena_alloc(arena, size, alignment, location)
 		case size == old_size:
 			// return old memory
 			data = old_data[:size]
@@ -264,7 +264,7 @@ arena_allocator_proc :: proc(allocator_data: rawptr, mode: mem.Allocator_Mode,
 			return
 		}
 
-		new_memory := arena_alloc(arena, size, alignment) or_return
+		new_memory := arena_alloc(arena, size, alignment, location) or_return
 		if new_memory == nil {
 			return
 		}
