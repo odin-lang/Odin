@@ -1,7 +1,6 @@
 package os
 
 import "core:mem"
-import "core:runtime"
 
 read_dir :: proc(fd: Handle, n: int, allocator := context.allocator) -> (fi: []File_Info, err: Errno) {
 	dirp: Dir
