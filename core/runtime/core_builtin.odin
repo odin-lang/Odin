@@ -231,13 +231,12 @@ make_dynamic_array_len_cap :: proc($T: typeid/[dynamic]$E, #any_int len: int, #a
 	return
 }
 @(builtin)
-make_map :: proc($T: typeid/map[$K]$E, #any_int capacity: int = 1<<MAP_MIN_LOG2_CAPACITY, allocator := context.allocator, loc := #caller_location) -> T {
+make_map :: proc($T: typeid/map[$K]$E, #any_int capacity: int = 1<<MAP_MIN_LOG2_CAPACITY, allocator := context.allocator, loc := #caller_location) -> (m: T, err: Allocator_Error) #optional_allocator_error {
 	make_map_expr_error_loc(loc, capacity)
 	context.allocator = allocator
 
-	m: T
-	reserve_map(&m, capacity, loc)
-	return m
+	err = reserve_map(&m, capacity, loc)
+	return
 }
 @(builtin)
 make_multi_pointer :: proc($T: typeid/[^]$E, #any_int len: int, allocator := context.allocator, loc := #caller_location) -> (mp: T, err: Allocator_Error) #optional_allocator_error {
@@ -276,10 +275,8 @@ clear_map :: proc "contextless" (m: ^$T/map[$K]$V) {
 }
 
 @builtin
-reserve_map :: proc(m: ^$T/map[$K]$V, capacity: int, loc := #caller_location) {
-	if m != nil {
-		__dynamic_map_reserve((^Raw_Map)(m), map_info(T), uint(capacity), loc)
-	}
+reserve_map :: proc(m: ^$T/map[$K]$V, capacity: int, loc := #caller_location) -> Allocator_Error {
+	return __dynamic_map_reserve((^Raw_Map)(m), map_info(T), uint(capacity), loc) if m != nil else nil
 }
 
 /*
