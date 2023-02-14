@@ -984,7 +984,7 @@ gb_internal void lb_emit_store(lbProcedure *p, lbValue ptr, lbValue value) {
 
 		instr = LLVMBuildStore(p->builder, value.value, ptr.value);
 	}
-	LLVMSetVolatile(instr, p->in_multi_assignment);
+	// LLVMSetVolatile(instr, p->in_multi_assignment);
 }
 
 gb_internal LLVMTypeRef llvm_addr_type(lbModule *module, lbValue addr_val) {
