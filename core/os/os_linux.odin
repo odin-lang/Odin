@@ -476,7 +476,11 @@ close :: proc(fd: Handle) -> Errno {
 }
 
 read :: proc(fd: Handle, data: []byte) -> (int, Errno) {
-	bytes_read := _unix_read(fd, &data[0], c.size_t(len(data)))
+	if len(data) == 0 {
+		return 0, ERROR_NONE
+	}
+
+	bytes_read := _unix_read(fd, raw_data(data), c.size_t(len(data)))
 	if bytes_read < 0 {
 		return -1, _get_errno(bytes_read)
 	}
@@ -487,11 +491,35 @@ write :: proc(fd: Handle, data: []byte) -> (int, Errno) {
 	if len(data) == 0 {
 		return 0, ERROR_NONE
 	}
-	bytes_written := _unix_write(fd, &data[0], uint(len(data)))
+
+	bytes_written := _unix_write(fd, raw_data(data), uint(len(data)))
 	if bytes_written < 0 {
 		return -1, _get_errno(bytes_written)
 	}
-	return int(bytes_written), ERROR_NONE
+	return bytes_written, ERROR_NONE
+}
+read_at :: proc(fd: Handle, data: []byte, offset: i64) -> (int, Errno) {
+	if len(data) == 0 {
+		return 0, ERROR_NONE
+	}
+
+	bytes_read := unix.sys_pread(int(fd), raw_data(data), c.size_t(len(data)), offset)
+	if bytes_read < 0 {
+		return -1, _get_errno(bytes_read)
+	}
+	return bytes_read, ERROR_NONE
+}
+
+write_at :: proc(fd: Handle, data: []byte, offset: i64) -> (int, Errno) {
+	if len(data) == 0 {
+		return 0, ERROR_NONE
+	}
+
+	bytes_written := unix.sys_pwrite(int(fd), raw_data(data), uint(len(data)), offset)
+	if bytes_written < 0 {
+		return -1, _get_errno(bytes_written)
+	}
+	return bytes_written, ERROR_NONE
 }
 
 seek :: proc(fd: Handle, offset: i64, whence: int) -> (i64, Errno) {
