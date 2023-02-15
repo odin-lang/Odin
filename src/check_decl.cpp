@@ -816,9 +816,14 @@ gb_internal void check_proc_decl(CheckerContext *ctx, Entity *e, DeclInfo *d) {
 	if (ac.test) {
 		e->flags |= EntityFlag_Test;
 	}
-	if (ac.init) {
+	if (ac.init && ac.fini) {
+		error(e->token, "A procedure cannot be both declared as @(init) and @(fini)");
+	} else if (ac.init) {
 		e->flags |= EntityFlag_Init;
+	} else if (ac.fini) {
+		e->flags |= EntityFlag_Fini;
 	}
+
 	if (ac.set_cold) {
 		e->flags |= EntityFlag_Cold;
 	}

@@ -1161,6 +1161,34 @@ gb_internal lbProcedure *lb_create_startup_runtime(lbModule *main_module, lbProc
 	return p;
 }
 
+gb_internal lbProcedure *lb_create_cleanup_runtime(lbModule *main_module) { // Cleanup Runtime
+	Type *proc_type = alloc_type_proc(nullptr, nullptr, 0, nullptr, 0, false, ProcCC_Odin);
+
+	lbProcedure *p = lb_create_dummy_procedure(main_module, str_lit(LB_CLEANUP_RUNTIME_PROC_NAME), proc_type);
+	p->is_startup = true;
+
+	lb_begin_procedure_body(p);
+
+	CheckerInfo *info = main_module->gen->info;
+
+	for (Entity *e : info->fini_procedures) {
+		lbValue value = lb_find_procedure_value_from_entity(main_module, e);
+		lb_emit_call(p, value, {}, ProcInlining_none);
+	}
+
+	lb_end_procedure_body(p);
+
+	if (!main_module->debug_builder && LLVMVerifyFunction(p->value, LLVMReturnStatusAction)) {
+		gb_printf_err("LLVM CODE GEN FAILED FOR PROCEDURE: %s\n", "main");
+		LLVMDumpValue(p->value);
+		gb_printf_err("\n\n\n\n");
+		LLVMVerifyFunction(p->value, LLVMAbortProcessAction);
+	}
+
+	return p;
+}
+
+
 gb_internal WORKER_TASK_PROC(lb_generate_procedures_and_types_per_module) {
 	lbModule *m = cast(lbModule *)data;
 	for (Entity *e : m->global_procedures_and_types_to_create) {
@@ -1328,6 +1356,7 @@ gb_internal WORKER_TASK_PROC(lb_llvm_function_pass_per_module) {
 	if (m == &m->gen->default_module) {
 		lb_llvm_function_pass_per_function_internal(m, m->gen->startup_type_info);
 		lb_llvm_function_pass_per_function_internal(m, m->gen->startup_runtime);
+		lb_llvm_function_pass_per_function_internal(m, m->gen->cleanup_runtime);
 		lb_llvm_function_pass_per_function_internal(m, m->gen->objc_names);
 	}
 
@@ -1674,7 +1703,7 @@ gb_internal bool lb_llvm_object_generation(lbGenerator *gen, bool do_threading) 
 
 
 
-gb_internal lbProcedure *lb_create_main_procedure(lbModule *m, lbProcedure *startup_runtime) {
+gb_internal lbProcedure *lb_create_main_procedure(lbModule *m, lbProcedure *startup_runtime, lbProcedure *cleanup_runtime) {
 	LLVMPassManagerRef default_function_pass_manager = LLVMCreateFunctionPassManagerForModule(m->mod);
 	lb_populate_function_pass_manager(m, default_function_pass_manager, false, build_context.optimization_level);
 	LLVMFinalizeFunctionPassManager(default_function_pass_manager);
@@ -1793,7 +1822,7 @@ gb_internal lbProcedure *lb_create_main_procedure(lbModule *m, lbProcedure *star
 
 
 	if (call_cleanup) {
-		lbValue cleanup_runtime_value = lb_find_runtime_value(m, str_lit("_cleanup_runtime"));
+		lbValue cleanup_runtime_value = {cleanup_runtime->value, cleanup_runtime->type};
 		lb_emit_call(p, cleanup_runtime_value, {}, ProcInlining_none);
 	}
 
@@ -2330,8 +2359,12 @@ gb_internal bool lb_generate_code(lbGenerator *gen) {
 	gen->startup_type_info = lb_create_startup_type_info(default_module);
 	gen->objc_names = lb_create_objc_names(default_module);
 
-	TIME_SECTION("LLVM Runtime Startup Creation (Global Variables)");
+	TIME_SECTION("LLVM Runtime Startup Creation (Global Variables & @(init))");
 	gen->startup_runtime = lb_create_startup_runtime(default_module, gen->startup_type_info, gen->objc_names, global_variables);
+
+	TIME_SECTION("LLVM Runtime Cleanup Creation & @(fini)");
+	gen->cleanup_runtime = lb_create_cleanup_runtime(default_module);
+
 
 	if (build_context.ODIN_DEBUG) {
 		for (auto const &entry : builtin_pkg->scope->elements) {
@@ -2352,7 +2385,7 @@ gb_internal bool lb_generate_code(lbGenerator *gen) {
 
 	if (build_context.command_kind == Command_test && !already_has_entry_point) {
 		TIME_SECTION("LLVM main");
-		lb_create_main_procedure(default_module, gen->startup_runtime);
+		lb_create_main_procedure(default_module, gen->startup_runtime, gen->cleanup_runtime);
 	}
 
 	TIME_SECTION("LLVM Procedure Generation (missing)");

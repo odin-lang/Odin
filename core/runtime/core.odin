@@ -507,11 +507,8 @@ Odin_Endian_Type :: type_of(ODIN_ENDIAN)
 foreign {
 	@(link_name="__$startup_runtime")
 	_startup_runtime :: proc "odin" () ---
-}
-
-@(link_name="__$cleanup_runtime")
-_cleanup_runtime :: proc() {
-	default_temp_allocator_destroy(&global_default_temp_allocator_data)
+	@(link_name="__$cleanup_runtime")
+	_cleanup_runtime :: proc "odin" () ---
 }
 
 _cleanup_runtime_contextless :: proc "contextless" () {

@@ -117,6 +117,7 @@ struct AttributeContext {
 	bool    disabled_proc       : 1;
 	bool    test                : 1;
 	bool    init                : 1;
+	bool    fini                : 1;
 	bool    set_cold            : 1;
 	u32 optimization_mode; // ProcedureOptimizationMode
 	i64 foreign_import_priority_index;
@@ -351,6 +352,7 @@ struct CheckerInfo {
 
 	Array<Entity *> testing_procedures;
 	Array<Entity *> init_procedures;
+	Array<Entity *> fini_procedures;
 
 	Array<Entity *> definitions;
 	Array<Entity *> entities;
