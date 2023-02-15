@@ -744,7 +744,7 @@ gb_internal LoadedFileError load_file_32(char const *fullpath, LoadedFile *memor
 			handle = nullptr;
 			goto window_handle_file_error;
 		}
-		
+
 		li_file_size = {};
 		if (!GetFileSizeEx(handle, &li_file_size)) {
 			goto window_handle_file_error;
@@ -754,7 +754,7 @@ gb_internal LoadedFileError load_file_32(char const *fullpath, LoadedFile *memor
 			CloseHandle(handle);
 			return LoadedFile_FileTooLarge;
 		}
-		
+
 		if (file_size == 0) {
 			CloseHandle(handle);
 			err = LoadedFile_Empty;
@@ -763,10 +763,10 @@ gb_internal LoadedFileError load_file_32(char const *fullpath, LoadedFile *memor
 			memory_mapped_file->size   = 0;
 			return err;
 		}
-		
+
 		file_mapping = CreateFileMappingW(handle, nullptr, PAGE_READONLY, 0, 0, nullptr);
 		CloseHandle(handle);
-		
+
 		file_data = MapViewOfFileEx(file_mapping, FILE_MAP_READ, 0, 0, 0/*file_size*/, nullptr/*base address*/);
 		memory_mapped_file->handle = cast(void *)file_mapping;
 		memory_mapped_file->data = file_data;

@@ -254,7 +254,7 @@ _symlink :: proc(old_name, new_name: string) -> Error {
 	return _ok_or_error(unix.sys_symlink(old_name_cstr, new_name_cstr))
 }
 
-_read_link_cstr :: proc(name_cstr: cstring, allocator := context.allocator) -> (string, Error) {
+_read_link_cstr :: proc(name_cstr: cstring, allocator: runtime.Allocator) -> (string, Error) {
 	bufsz : uint = 256
 	buf := make([]byte, bufsz, allocator)
 	for {
@@ -272,7 +272,7 @@ _read_link_cstr :: proc(name_cstr: cstring, allocator := context.allocator) -> (
 	}
 }
 
-_read_link :: proc(name: string, allocator := context.allocator) -> (string, Error) {
+_read_link :: proc(name: string, allocator: runtime.Allocator) -> (string, Error) {
 	name_cstr, allocated := _name_to_cstring(name)
 	defer if allocated {
 		delete(name_cstr)

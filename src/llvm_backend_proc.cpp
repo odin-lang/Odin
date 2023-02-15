@@ -1836,7 +1836,7 @@ gb_internal lbValue lb_build_builtin_proc(lbProcedure *p, Ast *expr, TypeAndValu
 		return lb_emit_conjugate(p, val, tv.type);
 	}
 
-	case BuiltinProc_expand_to_tuple: {
+	case BuiltinProc_expand_values: {
 		lbValue val = lb_build_expr(p, ce->args[0]);
 		Type *t = base_type(val.type);
 
@@ -1848,7 +1848,7 @@ gb_internal lbValue lb_build_builtin_proc(lbProcedure *p, Ast *expr, TypeAndValu
 				GB_ASSERT(t->Array.count == 1);
 				return lb_emit_struct_ev(p, val, 0);
 			} else {
-				GB_PANIC("Unknown type of expand_to_tuple");
+				GB_PANIC("Unknown type of expand_values");
 			}
 
 		}
@@ -1874,7 +1874,7 @@ gb_internal lbValue lb_build_builtin_proc(lbProcedure *p, Ast *expr, TypeAndValu
 				lb_emit_store(p, ep, f);
 			}
 		} else {
-			GB_PANIC("Unknown type of expand_to_tuple");
+			GB_PANIC("Unknown type of expand_values");
 		}
 		return lb_emit_load(p, tuple);
 	}

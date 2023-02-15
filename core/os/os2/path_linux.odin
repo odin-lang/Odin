@@ -229,7 +229,7 @@ _setwd :: proc(dir: string) -> Error {
 	return _ok_or_error(unix.sys_chdir(dir_cstr))
 }
 
-_get_full_path :: proc(fd: int, allocator := context.allocator) -> string {
+_get_full_path :: proc(fd: int, allocator: runtime.Allocator) -> string {
 	PROC_FD_PATH :: "/proc/self/fd/"
 
 	buf: [32]u8
