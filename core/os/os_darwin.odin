@@ -404,7 +404,7 @@ read :: proc(fd: Handle, data: []u8) -> (int, Errno) {
 		return 0, ERROR_NONE
 	}
 
-	bytes_read := _unix_read(fd, raw_data(slice), c.size_t(len(data)))
+	bytes_read := _unix_read(fd, raw_data(data), c.size_t(len(data)))
 	if bytes_read < 0 {
 		return -1, _get_errno(bytes_read)
 	}
