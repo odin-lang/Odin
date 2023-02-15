@@ -5104,7 +5104,7 @@ PARAMETER_DESC :: struct {
 }
 
 IShaderReflectionType :: struct {
-	vtable: ^IShaderReflectionType_VTable,
+	using vtable: ^IShaderReflectionType_VTable,
 }
 IShaderReflectionType_VTable :: struct {
 	GetDesc:              proc "stdcall" (this: ^IShaderReflectionType, pDesc: ^SHADER_TYPE_DESC) -> HRESULT,
@@ -5121,7 +5121,7 @@ IShaderReflectionType_VTable :: struct {
 }
 
 IShaderReflectionVariable :: struct {
-	vtable: ^IShaderReflectionVariable_VTable,
+	using vtable: ^IShaderReflectionVariable_VTable,
 }
 IShaderReflectionVariable_VTable :: struct {
 	GetDesc:          proc "stdcall" (this: ^IShaderReflectionVariable, pDesc: ^SHADER_VARIABLE_DESC) -> HRESULT,
@@ -5131,7 +5131,7 @@ IShaderReflectionVariable_VTable :: struct {
 }
 
 IShaderReflectionConstantBuffer :: struct {
-	vtable: ^IShaderReflectionConstantBuffer_VTable,
+	using vtable: ^IShaderReflectionConstantBuffer_VTable,
 }
 IShaderReflectionConstantBuffer_VTable :: struct {
 	GetDesc:            proc "stdcall" (this: ^IShaderReflectionConstantBuffer, pDesc: ^SHADER_BUFFER_DESC) -> HRESULT,
