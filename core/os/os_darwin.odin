@@ -279,6 +279,8 @@ foreign libc {
 	@(link_name="close")            _unix_close         :: proc(handle: Handle) -> c.int ---
 	@(link_name="read")             _unix_read          :: proc(handle: Handle, buffer: rawptr, count: int) -> int ---
 	@(link_name="write")            _unix_write         :: proc(handle: Handle, buffer: rawptr, count: int) -> int ---
+	@(link_name="pread")            _unix_pread         :: proc(handle: Handle, buffer: rawptr, count: int, offset: i64) -> int ---
+	@(link_name="pwrite")           _unix_pwrite        :: proc(handle: Handle, buffer: rawptr, count: int, offset: i64) -> int ---
 	@(link_name="lseek")            _unix_lseek         :: proc(fs: Handle, offset: int, whence: int) -> int ---
 	@(link_name="gettid")           _unix_gettid        :: proc() -> u64 ---
 	@(link_name="getpagesize")      _unix_getpagesize   :: proc() -> i32 ---
@@ -385,45 +387,51 @@ close :: proc(fd: Handle) -> bool {
 @(private)
 MAX_RW :: 0x7fffffff // The limit on Darwin is max(i32), trying to read/write more than that fails.
 
-write :: proc(fd: Handle, data: []u8) -> (int, Errno) {
-	assert(fd != -1)
-
-	bytes_total := len(data)
-	bytes_written_total := 0
-
-	for bytes_written_total < bytes_total {
-		bytes_to_write := min(bytes_total - bytes_written_total, MAX_RW)
-		slice := data[bytes_written_total:bytes_written_total + bytes_to_write]
-		bytes_written := _unix_write(fd, raw_data(slice), bytes_to_write)
-		if bytes_written == -1 {
-			return bytes_written_total, 1
-		}
-		bytes_written_total += bytes_written
+write :: proc(fd: Handle, data: []byte) -> (int, Errno) {
+	if len(data) == 0 {
+		return 0, ERROR_NONE
 	}
 
-	return bytes_written_total, 0
+	bytes_written := _unix_write(fd, raw_data(data), c.size_t(len(data)))
+	if bytes_written < 0 {
+		return -1, _get_errno(bytes_written)
+	}
+	return bytes_written, ERROR_NONE
 }
 
 read :: proc(fd: Handle, data: []u8) -> (int, Errno) {
-	assert(fd != -1)
-
-	bytes_total := len(data)
-	bytes_read_total := 0
-
-	for bytes_read_total < bytes_total {
-		bytes_to_read := min(bytes_total - bytes_read_total, MAX_RW)
-		slice := data[bytes_read_total:bytes_read_total + bytes_to_read]
-		bytes_read := _unix_read(fd, raw_data(slice), bytes_to_read)
-		if bytes_read == -1 {
-			return bytes_read_total, 1
-		}
-		if bytes_read == 0 {
-			break
-		}
-		bytes_read_total += bytes_read
+	if len(data) == 0 {
+		return 0, ERROR_NONE
 	}
 
-	return bytes_read_total, 0
+	bytes_read := _unix_read(fd, raw_data(slice), c.size_t(len(data)))
+	if bytes_read < 0 {
+		return -1, _get_errno(bytes_read)
+	}
+	return bytes_read, ERROR_NONE
+}
+read_at :: proc(fd: Handle, data: []byte, offset: i64) -> (int, Errno) {
+	if len(data) == 0 {
+		return 0, ERROR_NONE
+	}
+
+	bytes_read := _unix_pread(int(fd), raw_data(data), c.size_t(len(data)), offset)
+	if bytes_read < 0 {
+		return -1, _get_errno(bytes_read)
+	}
+	return bytes_read, ERROR_NONE
+}
+
+write_at :: proc(fd: Handle, data: []byte, offset: i64) -> (int, Errno) {
+	if len(data) == 0 {
+		return 0, ERROR_NONE
+	}
+
+	bytes_written := _unix_pwrite(int(fd), raw_data(data), c.size_t(len(data)), offset)
+	if bytes_written < 0 {
+		return -1, _get_errno(bytes_written)
+	}
+	return bytes_written, ERROR_NONE
 }
 
 seek :: proc(fd: Handle, offset: i64, whence: int) -> (i64, Errno) {
