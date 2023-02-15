@@ -277,10 +277,10 @@ foreign libc {
 
 	@(link_name="open")             _unix_open          :: proc(path: cstring, flags: i32, mode: u16) -> Handle ---
 	@(link_name="close")            _unix_close         :: proc(handle: Handle) -> c.int ---
-	@(link_name="read")             _unix_read          :: proc(handle: Handle, buffer: rawptr, count: int) -> int ---
-	@(link_name="write")            _unix_write         :: proc(handle: Handle, buffer: rawptr, count: int) -> int ---
-	@(link_name="pread")            _unix_pread         :: proc(handle: Handle, buffer: rawptr, count: int, offset: i64) -> int ---
-	@(link_name="pwrite")           _unix_pwrite        :: proc(handle: Handle, buffer: rawptr, count: int, offset: i64) -> int ---
+	@(link_name="read")             _unix_read          :: proc(handle: Handle, buffer: rawptr, count: c.size_t) -> int ---
+	@(link_name="write")            _unix_write         :: proc(handle: Handle, buffer: rawptr, count: c.size_t) -> int ---
+	@(link_name="pread")            _unix_pread         :: proc(handle: Handle, buffer: rawptr, count: c.size_t, offset: i64) -> int ---
+	@(link_name="pwrite")           _unix_pwrite        :: proc(handle: Handle, buffer: rawptr, count: c.size_t, offset: i64) -> int ---
 	@(link_name="lseek")            _unix_lseek         :: proc(fs: Handle, offset: int, whence: int) -> int ---
 	@(link_name="gettid")           _unix_gettid        :: proc() -> u64 ---
 	@(link_name="getpagesize")      _unix_getpagesize   :: proc() -> i32 ---
@@ -394,7 +394,7 @@ write :: proc(fd: Handle, data: []byte) -> (int, Errno) {
 
 	bytes_written := _unix_write(fd, raw_data(data), c.size_t(len(data)))
 	if bytes_written < 0 {
-		return -1, _get_errno(bytes_written)
+		return -1, Errno(get_last_error())
 	}
 	return bytes_written, ERROR_NONE
 }
@@ -406,7 +406,7 @@ read :: proc(fd: Handle, data: []u8) -> (int, Errno) {
 
 	bytes_read := _unix_read(fd, raw_data(data), c.size_t(len(data)))
 	if bytes_read < 0 {
-		return -1, _get_errno(bytes_read)
+		return -1, Errno(get_last_error())
 	}
 	return bytes_read, ERROR_NONE
 }
@@ -415,9 +415,9 @@ read_at :: proc(fd: Handle, data: []byte, offset: i64) -> (int, Errno) {
 		return 0, ERROR_NONE
 	}
 
-	bytes_read := _unix_pread(int(fd), raw_data(data), c.size_t(len(data)), offset)
+	bytes_read := _unix_pread(fd, raw_data(data), c.size_t(len(data)), offset)
 	if bytes_read < 0 {
-		return -1, _get_errno(bytes_read)
+		return -1, Errno(get_last_error())
 	}
 	return bytes_read, ERROR_NONE
 }
@@ -427,9 +427,9 @@ write_at :: proc(fd: Handle, data: []byte, offset: i64) -> (int, Errno) {
 		return 0, ERROR_NONE
 	}
 
-	bytes_written := _unix_pwrite(int(fd), raw_data(data), c.size_t(len(data)), offset)
+	bytes_written := _unix_pwrite(fd, raw_data(data), c.size_t(len(data)), offset)
 	if bytes_written < 0 {
-		return -1, _get_errno(bytes_written)
+		return -1, Errno(get_last_error())
 	}
 	return bytes_written, ERROR_NONE
 }
