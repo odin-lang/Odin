@@ -2210,6 +2210,15 @@ gb_internal lbValue lb_compare_records(lbProcedure *p, TokenKind op_kind, lbValu
 	lbValue left_ptr  = lb_address_from_load_or_generate_local(p, left);
 	lbValue right_ptr = lb_address_from_load_or_generate_local(p, right);
 	lbValue res = {};
+	if (type_size_of(type) == 0) {
+		switch (op_kind) {
+		case Token_CmpEq:
+			return lb_const_bool(p->module, t_bool, true);
+		case Token_NotEq:
+			return lb_const_bool(p->module, t_bool, false);
+		}
+		GB_PANIC("invalid operator");
+	}
 	if (is_type_simple_compare(type)) {
 		// TODO(bill): Test to see if this is actually faster!!!!
 		auto args = array_make<lbValue>(permanent_allocator(), 3);
