@@ -1835,6 +1835,17 @@ gb_internal void show_timings(Checker *c, Timings *t) {
 gb_internal void remove_temp_files(lbGenerator *gen) {
 	if (build_context.keep_temp_files) return;
 
+	switch (build_context.build_mode) {
+	case BuildMode_Executable:
+	case BuildMode_DynamicLibrary:
+		break;
+
+	case BuildMode_Object:
+	case BuildMode_Assembly:
+	case BuildMode_LLVM_IR:
+		return;
+	}
+
 	TIME_SECTION("remove keep temp files");
 
 	for (String const &path : gen->output_temp_paths) {
