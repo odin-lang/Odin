@@ -1045,9 +1045,25 @@ gb_internal lbValue lb_emit_call(lbProcedure *p, lbValue value, Array<lbValue> c
 				} else if (is_odin_cc) {
 					// NOTE(bill): Odin parameters are immutable so the original value can be passed if possible
 					// i.e. `T const &` in C++
-					ptr = lb_address_from_load_or_generate_local(p, x);
+					if (LLVMIsConstant(x.value)) {
+						// NOTE(bill): if the value is already constant, then just it as a global variable
+						// and pass it by pointer
+						lbAddr addr = lb_add_global_generated(p->module, original_type, x);
+						lb_make_global_private_const(addr);
+						ptr = addr.addr;
+					} else {
+						ptr = lb_address_from_load_or_generate_local(p, x);
+					}
 				} else {
-					ptr = lb_copy_value_to_ptr(p, x, original_type, 16);
+					if (LLVMIsConstant(x.value)) {
+						// NOTE(bill): if the value is already constant, then just it as a global variable
+						// and pass it by pointer
+						lbAddr addr = lb_add_global_generated(p->module, original_type, x);
+						lb_make_global_private_const(addr);
+						ptr = addr.addr;
+					} else {
+						ptr = lb_copy_value_to_ptr(p, x, original_type, 16);
+					}
 				}
 				array_add(&processed_args, ptr);
 			}
