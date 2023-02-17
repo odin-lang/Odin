@@ -3138,7 +3138,7 @@ gb_internal lbValue lb_build_expr_internal(lbProcedure *p, Ast *expr) {
 		Entity *e = entity_from_expr(expr);
 		e = strip_entity_wrapping(e);
 
-		GB_ASSERT_MSG(e != nullptr, "%s", expr_to_string(expr));
+		GB_ASSERT_MSG(e != nullptr, "%s in %.*s %p", expr_to_string(expr), LIT(p->name), expr);
 		if (e->kind == Entity_Builtin) {
 			Token token = ast_token(expr);
 			GB_PANIC("TODO(bill): lb_build_expr Entity_Builtin '%.*s'\n"

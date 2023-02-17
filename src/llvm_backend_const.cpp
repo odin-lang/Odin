@@ -411,7 +411,6 @@ gb_internal lbValue lb_const_value(lbModule *m, Type *type, ExactValue value, bo
 		Ast *expr = unparen_expr(value.value_procedure);
 		if (expr->kind == Ast_ProcLit) {
 			res = lb_generate_anonymous_proc_lit(m, str_lit("_proclit"), expr);
-
 		} else {
 			Entity *e = entity_from_expr(expr);
 			res = lb_find_procedure_value_from_entity(m, e);

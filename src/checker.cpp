@@ -1416,7 +1416,7 @@ gb_internal isize type_info_index(CheckerInfo *info, Type *type, bool error_on_f
 }
 
 
-gb_internal void add_untyped(CheckerContext *c, Ast *expr, AddressingMode mode, Type *type, ExactValue value) {
+gb_internal void add_untyped(CheckerContext *c, Ast *expr, AddressingMode mode, Type *type, ExactValue const &value) {
 	if (expr == nullptr) {
 		return;
 	}
@@ -1433,7 +1433,7 @@ gb_internal void add_untyped(CheckerContext *c, Ast *expr, AddressingMode mode, 
 	check_set_expr_info(c, expr, mode, type, value);
 }
 
-gb_internal void add_type_and_value(CheckerContext *ctx, Ast *expr, AddressingMode mode, Type *type, ExactValue value) {
+gb_internal void add_type_and_value(CheckerContext *ctx, Ast *expr, AddressingMode mode, Type *type, ExactValue const &value) {
 	if (expr == nullptr) {
 		return;
 	}
