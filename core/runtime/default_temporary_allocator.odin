@@ -202,5 +202,4 @@ default_temp_allocator :: proc(allocator: ^Default_Temp_Allocator) -> Allocator 
 @(fini, private)
 _destroy_temp_allocator_fini :: proc() {
 	default_temp_allocator_destroy(&global_default_temp_allocator_data)
-	print_string("fini")
 }
