@@ -82,6 +82,7 @@ gb_internal void lb_init_module(lbModule *m, Checker *c) {
 
 	map_init(&m->map_info_map, 0);
 	map_init(&m->map_cell_info_map, 0);
+	map_init(&m->exact_value_compound_literal_addr_map, 1024);
 
 }
 

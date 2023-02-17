@@ -1523,7 +1523,8 @@ gb_internal void lb_build_static_variables(lbProcedure *p, AstValueDecl *vd) {
 		lb_add_member(p->module, mangled_name, global_val);
 	}
 }
-gb_internal void lb_append_tuple_values(lbProcedure *p, Array<lbValue> *dst_values, lbValue src_value) {
+gb_internal isize lb_append_tuple_values(lbProcedure *p, Array<lbValue> *dst_values, lbValue src_value) {
+	isize init_count = dst_values->count;
 	Type *t = src_value.type;
 	if (t->kind == Type_Tuple) {
 		lbTupleFix *tf = map_get(&p->tuple_fix_map, src_value.value);
@@ -1540,6 +1541,7 @@ gb_internal void lb_append_tuple_values(lbProcedure *p, Array<lbValue> *dst_valu
 	} else {
 		array_add(dst_values, src_value);
 	}
+	return dst_values->count - init_count;
 }
 
 
@@ -2218,7 +2220,41 @@ gb_internal void lb_build_stmt(lbProcedure *p, Ast *node) {
 			}
 			array_add(&lvals, lval);
 		}
-		lb_build_assignment(p, lvals, vd->values);
+
+		auto const &values = vd->values;
+		if (values.count > 0) {
+			auto inits = array_make<lbValue>(permanent_allocator(), 0, lvals.count);
+
+			isize lval_index = 0;
+			for (Ast *rhs : values) {
+				rhs = unparen_expr(rhs);
+				lbValue init = lb_build_expr(p, rhs);
+			#if 1
+				// NOTE(bill, 2023-02-17): lb_const_value might produce a stack local variable for the
+				// compound literal, so reusing that variable should minimize the stack wastage
+				if (rhs->kind == Ast_CompoundLit) {
+					lbAddr *comp_lit_addr = map_get(&p->module->exact_value_compound_literal_addr_map, rhs);
+					if (comp_lit_addr) {
+						Entity *e = entity_of_node(vd->names[lval_index]);
+						if (e) {
+							lb_add_entity(p->module, e, comp_lit_addr->addr);
+							lvals[lval_index] = {}; // do nothing so that nothing will assign to it
+						}
+					}
+				}
+			#endif
+
+				lval_index += lb_append_tuple_values(p, &inits, init);
+			}
+			GB_ASSERT(lval_index == lvals.count);
+
+			GB_ASSERT(lvals.count == inits.count);
+			for_array(i, inits) {
+				lbAddr lval = lvals[i];
+				lbValue init = inits[i];
+				lb_addr_store(p, lval, init);
+			}
+		}
 	case_end;
 
 	case_ast_node(as, AssignStmt, node);

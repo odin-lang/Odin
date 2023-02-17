@@ -182,6 +182,8 @@ struct lbModule {
 	PtrMap<Type *, lbAddr> map_cell_info_map; // address of runtime.Map_Info
 	PtrMap<Type *, lbAddr> map_info_map;      // address of runtime.Map_Cell_Info
 
+	PtrMap<Ast *, lbAddr> exact_value_compound_literal_addr_map; // Key: Ast_CompoundLit
+
 	LLVMPassManagerRef function_pass_managers[lbFunctionPassManager_COUNT];
 };
 
