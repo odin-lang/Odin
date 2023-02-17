@@ -1480,23 +1480,6 @@ gb_internal bool check_proc_body(CheckerContext *ctx_, Token token, DeclInfo *de
 	ctx->curr_proc_sig  = type;
 	ctx->curr_proc_calling_convention = type->Proc.calling_convention;
 
-	if (ctx->proc_name == "sort") {
-		if (type->Proc.param_count > 0) {
-			TypeTuple *params = &type->Proc.params->Tuple;
-			for (Entity *e : params->variables) {
-				if (e->kind == Entity_Constant) {
-					Ast *ident = e->identifier.load();
-					if (ident) {
-						add_entity(ctx, e->scope, ident, e);
-						ident->tav.mode = Addressing_Constant;
-						ident->tav.value = e->Constant.value;
-						ident->tav.type = e->type;
-					}
-				}
-			}
-		}
-	}
-
 	if (ctx->pkg->name != "runtime") {
 		switch (type->Proc.calling_convention) {
 		case ProcCC_None:
@@ -1547,6 +1530,19 @@ gb_internal bool check_proc_body(CheckerContext *ctx_, Token token, DeclInfo *de
 				} else {
 					error(e->token, "'using' can only be applied to variables of type struct");
 					break;
+				}
+			}
+
+			// Add constant data to the identifier directly
+			for (Entity *e : params->variables) {
+				if (e->kind == Entity_Constant) {
+					Ast *ident = e->identifier.load();
+					if (ident) {
+						add_entity(ctx, e->scope, ident, e);
+						ident->tav.mode = Addressing_Constant;
+						ident->tav.value = e->Constant.value;
+						ident->tav.type = e->type;
+					}
 				}
 			}
 		}
