@@ -5419,7 +5419,17 @@ gb_internal CALL_ARGUMENT_CHECKER(check_call_arguments_internal) {
 		data->result_type = final_proc_type->Proc.results;
 		data->gen_entity = gen_entity;
 
-		add_type_and_value(c, ce->proc, Addressing_Value, final_proc_type, {});
+
+		Ast *proc_lit = nullptr;
+		if (ce->proc->tav.value.kind == ExactValue_Procedure) {
+			Ast *vp = unparen_expr(ce->proc->tav.value.value_procedure);
+			if (vp && vp->kind == Ast_ProcLit) {
+				proc_lit = vp;
+			}
+		}
+		if (proc_lit == nullptr) {
+			add_type_and_value(c, ce->proc, Addressing_Value, final_proc_type, {});
+		}
 	}
 
 	return err;
