@@ -5418,9 +5418,8 @@ gb_internal CALL_ARGUMENT_CHECKER(check_call_arguments_internal) {
 		data->score = score;
 		data->result_type = final_proc_type->Proc.results;
 		data->gen_entity = gen_entity;
-		if (!are_types_identical(final_proc_type, ce->proc->tav.type)) {
-			add_type_and_value(c, ce->proc, Addressing_Value, final_proc_type, {});
-		}
+
+		add_type_and_value(c, ce->proc, Addressing_Value, final_proc_type, {});
 	}
 
 	return err;

@@ -1532,19 +1532,6 @@ gb_internal bool check_proc_body(CheckerContext *ctx_, Token token, DeclInfo *de
 					break;
 				}
 			}
-
-			// Add constant data to the identifier directly
-			for (Entity *e : params->variables) {
-				if (e->kind == Entity_Constant) {
-					Ast *ident = e->identifier.load();
-					if (ident) {
-						add_entity(ctx, e->scope, ident, e);
-						ident->tav.mode = Addressing_Constant;
-						ident->tav.value = e->Constant.value;
-						ident->tav.type = e->type;
-					}
-				}
-			}
 		}
 	}
 
