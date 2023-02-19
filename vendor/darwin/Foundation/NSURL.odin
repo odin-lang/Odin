@@ -25,6 +25,6 @@ URL_initFileURLWithPath :: proc(self: ^URL, path: ^String) -> ^URL {
 }
 
 @(objc_type=URL, objc_name="fileSystemRepresentation")
-URL_fileSystemRepresentation :: proc(self: ^URL) -> ^String {
-	return msgSend(^String, self, "fileSystemRepresentation")
+URL_fileSystemRepresentation :: proc(self: ^URL) -> cstring {
+	return msgSend(cstring, self, "fileSystemRepresentation")
 }
