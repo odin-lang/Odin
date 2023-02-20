@@ -24,6 +24,6 @@ _get_tsc_frequency :: proc "contextless" () -> u64 {
 	qpc_frequency: win32.LARGE_INTEGER
 	win32.QueryPerformanceFrequency(&qpc_frequency)
 
-	frequency = ((tsc_end - tsc_begin) * qpc_frequency) / (qpc_end - qpc_begin)
+	frequency = u64((u128(tsc_end - tsc_begin) * u128(qpc_frequency)) / u128(qpc_end - qpc_begin))
 	return frequency
 }
