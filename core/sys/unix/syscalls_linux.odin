@@ -1537,6 +1537,7 @@ MAP_SHARED          :: 0x1
 MAP_PRIVATE         :: 0x2
 MAP_SHARED_VALIDATE :: 0x3
 MAP_ANONYMOUS       :: 0x20
+MAP_FAILED          :: -1
 
 // mremap flags
 MREMAP_MAYMOVE   :: 1
@@ -1562,6 +1563,155 @@ MADV_DODUMP      :: 17
 MADV_WIPEONFORK  :: 18
 MADV_KEEPONFORK  :: 19
 MADV_HWPOISON    :: 100
+
+// perf event data
+Perf_Sample :: struct #raw_union {
+	period:    u64,
+	frequency: u64,
+}
+Perf_Wakeup :: struct #raw_union {
+	events:    u32,
+	watermark: u32,
+}
+Perf_Field1 :: struct #raw_union {
+	breakpoint_addr: u64,
+	kprobe_func:     u64,
+	uprobe_path:     u64,
+	config1:         u64,
+}
+Perf_Field2 :: struct #raw_union {
+	breakpoint_len: u64,
+	kprobe_addr:    u64,
+	uprobe_offset:  u64,
+	config2:        u64,
+}
+Perf_Event_Attr :: struct #packed {
+	type:   u32,
+	size:   u32,
+	config: u64,
+	sample: Perf_Sample,
+	sample_type: u64,
+	read_format: u64,
+	flags:       Perf_Flags,
+	wakeup: Perf_Wakeup,
+	breakpoint_type: u32,
+	field1: Perf_Field1,
+	field2: Perf_Field2,
+	branch_sample_type: u64,
+	sample_regs_user:   u64,
+	sample_stack_user:  u32,
+	clock_id:           i32,
+	sample_regs_intr:   u64,
+	aux_watermark:      u32,
+	sample_max_stack:   u16,
+	_padding:           u16,
+}
+
+Perf_Event_Flags :: distinct bit_set[Perf_Event_Flag; u64]
+Perf_Event_Flag :: enum u64 {
+	Bit0               = 0,
+	Bit0_Is_Deprecated = 1,
+	User_Rdpmc         = 2,
+	User_Time          = 3,
+	User_Time_Zero     = 4,
+	User_Time_Short    = 5,
+}
+Perf_Capabilities :: struct #raw_union {
+	capabilities: u64,
+	flags: Perf_Event_Flags,
+}
+Perf_Event_mmap_Page :: struct #packed {
+	version:        u32,
+	compat_version: u32,
+	lock:           u32,
+	index:          u32,
+	offset:         i64,
+	time_enabled:   u64,
+	time_running:   u64,
+	cap: Perf_Capabilities,
+	pmc_width:      u16,
+	time_shift:     u16,
+	time_mult:      u32,
+	time_offset:    u64,
+	time_zero:      u64,
+	size:           u32,
+	reserved1:      u32,
+	time_cycles:    u64,
+	time_mask:      u64,
+	reserved2:      [116*8]u8,
+	data_head:      u64,
+	data_tail:      u64,
+	data_offset:    u64,
+	data_size:      u64,
+	aux_head:       u64,
+	aux_tail:       u64,
+	aux_offset:     u64,
+	aux_size:       u64,
+}
+
+Perf_Type_Id :: enum u32 {
+	Hardware   = 0,
+	Software   = 1,
+	Tracepoint = 2,
+	HW_Cache   = 3,
+	Raw        = 4,
+	Breakpoint = 5,
+}
+
+Perf_Hardware_Id :: enum u64 {
+	CPU_Cycles              = 0,
+	Instructions            = 1,
+	Cache_References        = 2,
+	Cache_Misses            = 3,
+	Branch_Instructions     = 4,
+	Branch_Misses           = 5,
+	Bus_Cycles              = 6,
+	Stalled_Cycles_Frontend = 7,
+	Stalled_Cycles_Backend  = 8,
+	Ref_CPU_Cycles          = 9,
+}
+
+Perf_Flags :: distinct bit_set[Perf_Flag; u64]
+Perf_Flag :: enum u64 {
+	Disabled       = 0,
+	Inherit        = 1,
+	Pinned         = 2,
+	Exclusive      = 3,
+	Exclude_User   = 4,
+	Exclude_Kernel = 5,
+	Exclude_HV     = 6,
+	Exclude_Idle   = 7,
+	mmap           = 8,
+	Comm           = 9,
+	Freq           = 10,
+	Inherit_Stat   = 11,
+	Enable_On_Exec = 12,
+	Task           = 13,
+	Watermark      = 14,
+	Precise_IP_0   = 15,
+	Precise_IP_1   = 16,
+	mmap_Data      = 17,
+	Sample_Id_All  = 18,
+	Exclude_Host   = 19,
+	Exclude_Guest  = 20,
+	Exclude_Callchain_Kernel = 21,
+	Exclude_Callchain_User   = 22,
+	mmap2          = 23,
+	Comm_Exec      = 24,
+	Use_Clockid    = 25,
+	Context_Switch = 26,
+	Write_Backward = 27,
+	Namespaces     = 28,
+	KSymbol        = 29,
+	BPF_Event      = 30,
+	Aux_Output     = 31,
+	CGroup         = 32,
+	Text_Poke      = 33,
+	Build_Id       = 34,
+	Inherit_Thread = 35,
+	Remove_On_Exec = 36,
+	Sigtrap        = 37,
+}
 
 sys_gettid :: proc "contextless" () -> int {
 	return cast(int)intrinsics.syscall(SYS_gettid)
@@ -1844,6 +1994,10 @@ sys_madvise :: proc "contextless" (addr: rawptr, length: uint, advice: int) -> i
 //       As of Linux 5.1, there is a utimensat_time64 function.  Maybe use this in the future?
 sys_utimensat :: proc "contextless" (dfd: int, path: cstring, times: rawptr, flags: int) -> int {
 	return int(intrinsics.syscall(SYS_utimensat, uintptr(dfd), uintptr(rawptr(path)), uintptr(times), uintptr(flags)))
+}
+
+sys_perf_event_open :: proc "contextless" (event_attr: rawptr, pid: i32, cpu: i32, group_fd: i32, flags: u32) -> int {
+	return int(intrinsics.syscall(SYS_perf_event_open, uintptr(event_attr), uintptr(pid), uintptr(cpu), uintptr(group_fd), uintptr(flags)))
 }
 
 get_errno :: proc "contextless" (res: int) -> i32 {

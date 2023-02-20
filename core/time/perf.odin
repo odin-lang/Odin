@@ -1,6 +1,7 @@
 package time
 
 import "core:runtime"
+import "core:intrinsics"
 
 Tick :: struct {
 	_nsec: i64, // relative amount
@@ -38,6 +39,26 @@ SCOPED_TICK_DURATION :: proc "contextless" (d: ^Duration) -> Tick {
 
 _tick_duration_end :: proc "contextless" (d: ^Duration, t: Tick) {
 	d^ = tick_since(t)
+}
+
+when ODIN_ARCH == .amd64 {
+	_has_invariant_tsc :: proc "contextless" () -> bool {
+		eax, _, _, _ := intrinsics.x86_cpuid(0x80_000_000, 0)
+
+		// Is this processor *really* ancient?
+		if eax < 0x80_000_007 {
+			return false
+		}
+
+		// check if the invariant TSC bit is set
+		_, _, _, edx := intrinsics.x86_cpuid(0x80_000_007, 0)
+		return (edx & (1 << 8)) != 0
+
+	}
+} else {
+	_has_invariant_tsc :: proc "contextless" () -> bool {
+		return false
+	}
 }
 
 /*
