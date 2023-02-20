@@ -1537,7 +1537,6 @@ MAP_SHARED          :: 0x1
 MAP_PRIVATE         :: 0x2
 MAP_SHARED_VALIDATE :: 0x3
 MAP_ANONYMOUS       :: 0x20
-MAP_FAILED          :: -1
 
 // mremap flags
 MREMAP_MAYMOVE   :: 1

@@ -25,7 +25,7 @@ _get_tsc_frequency :: proc "contextless" () -> u64 {
 
 	page_size : uint = 4096
 	ret := unix.sys_mmap(nil, page_size, unix.PROT_READ, unix.MAP_SHARED, fd, 0)
-	if ret == unix.MAP_FAILED {
+	if ret < 0 && > -4096 {
 		frequency = 1
 		return 0
 	}
