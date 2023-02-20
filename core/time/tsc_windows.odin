@@ -2,6 +2,7 @@
 //+build windows
 package time
 
+import "core:instrinsics"
 import win32 "core:sys/windows"
 
 _get_tsc_frequency :: proc "contextless" () -> u64 {
