@@ -1921,7 +1921,7 @@ gb_internal void check_expr_stmt(CheckerContext *ctx, Ast *node) {
 	case Addressing_Type:
 		{
 			gbString str = type_to_string(operand.type);
-			error(node, "'%s' is not an expression", str);
+			error(node, "'%s' is not an expression but a type and cannot be used as a statement", str);
 			gb_string_free(str);
 			break;
 		}
