@@ -4745,20 +4745,29 @@ gb_internal Entity *check_selector(CheckerContext *c, Operand *operand, Ast *nod
 		gbString op_str   = expr_to_string(op_expr);
 		gbString type_str = type_to_string_shorthand(operand->type);
 		gbString sel_str  = expr_to_string(selector);
-		error(op_expr, "'%s' of type '%s' has no field '%s'", op_str, type_str, sel_str);
 
-		if (operand->type != nullptr && selector->kind == Ast_Ident) {
-			String const &name = selector->Ident.token.string;
-			Type *bt = base_type(operand->type);
-			if (operand->type->kind == Type_Named &&
-			    operand->type->Named.type_name &&
-			    operand->type->Named.type_name->kind == Entity_TypeName &&
-			    operand->type->Named.type_name->TypeName.objc_metadata) {
-				check_did_you_mean_objc_entity(name, operand->type->Named.type_name, operand->mode == Addressing_Type);
-			} else if (bt->kind == Type_Struct) {
-				check_did_you_mean_type(name, bt->Struct.fields);
-			} else if (bt->kind == Type_Enum) {
-				check_did_you_mean_type(name, bt->Enum.fields);
+		if (operand->mode == Addressing_Type) {
+			if (is_type_polymorphic(operand->type, true)) {
+				error(op_expr, "Type '%s' has no field nor polymorphic parameter '%s'", op_str, sel_str);
+			} else {
+				error(op_expr, "Type '%s' has no field '%s'", op_str, sel_str);
+			}
+		} else {
+			error(op_expr, "'%s' of type '%s' has no field '%s'", op_str, type_str, sel_str);
+
+			if (operand->type != nullptr && selector->kind == Ast_Ident) {
+				String const &name = selector->Ident.token.string;
+				Type *bt = base_type(operand->type);
+				if (operand->type->kind == Type_Named &&
+				    operand->type->Named.type_name &&
+				    operand->type->Named.type_name->kind == Entity_TypeName &&
+				    operand->type->Named.type_name->TypeName.objc_metadata) {
+					check_did_you_mean_objc_entity(name, operand->type->Named.type_name, operand->mode == Addressing_Type);
+				} else if (bt->kind == Type_Struct) {
+					check_did_you_mean_type(name, bt->Struct.fields);
+				} else if (bt->kind == Type_Enum) {
+					check_did_you_mean_type(name, bt->Enum.fields);
+				}
 			}
 		}
 
