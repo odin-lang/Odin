@@ -5,7 +5,7 @@ package time
 import "core:intrinsics"
 import "core:sys/unix"
 
-_get_tsc_frequency :: proc "contextless" () -> (u64, bool) {
+_x86_get_tsc_frequency :: proc "contextless" () -> (u64, bool) {
 	perf_attr := unix.Perf_Event_Attr{}
 	perf_attr.type = u32(unix.Perf_Type_Id.Hardware)
 	perf_attr.config = u64(unix.Perf_Hardware_Id.Instructions)
