@@ -2,22 +2,20 @@
 //+build darwin
 package time
 
-import "core:sys/darwin"
+import "core:c"
 
-_get_tsc_frequency :: proc "contextless" () -> u64 {
-	@(static) frequency : u64 = 0
-	if frequency > 0 {
-		return frequency
-	}
+foreign import libc "System.framework"
+foreign libc {
+	@(link_name="sysctlbyname") _sysctlbyname    :: proc(path: cstring, oldp: rawptr, oldlenp: rawptr, newp: rawptr, newlen: int) -> c.int ---
+}
 
+_x86_get_tsc_frequency :: proc "contextless" () -> (u64, bool) {
 	tmp_freq : u64 = 0
 	tmp_size : i64 = size_of(tmp_freq)
-	ret := darwin.syscall_sysctlbyname("machdep.tsc.frequency", &tmp_freq, &tmp_size, nil, 0)
+	ret := _sysctlbyname("machdep.tsc.frequency", &tmp_freq, &tmp_size, nil, 0)
 	if ret < 0 {
-		frequency = 1
-		return 0
+		return 0, false
 	}
 
-	frequency = tmp_freq
-	return frequency
+	return tmp_freq, true
 }

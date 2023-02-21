@@ -5,12 +5,7 @@ package time
 import "core:intrinsics"
 import win32 "core:sys/windows"
 
-_get_tsc_frequency :: proc "contextless" () -> u64 {
-	@(static) frequency : u64 = 0
-	if frequency > 0 {
-		return frequency
-	}
-
+_get_tsc_frequency :: proc "contextless" () -> (u64, bool) {
 	qpc_begin: win32.LARGE_INTEGER
 	win32.QueryPerformanceCounter(&qpc_begin)
 	tsc_begin := intrinsics.read_cycle_counter()
@@ -25,5 +20,5 @@ _get_tsc_frequency :: proc "contextless" () -> u64 {
 	win32.QueryPerformanceFrequency(&qpc_frequency)
 
 	frequency = u64((u128(tsc_end - tsc_begin) * u128(qpc_frequency)) / u128(qpc_end - qpc_begin))
-	return frequency
+	return frequency, true
 }

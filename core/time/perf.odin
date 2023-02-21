@@ -42,7 +42,7 @@ _tick_duration_end :: proc "contextless" (d: ^Duration, t: Tick) {
 }
 
 when ODIN_ARCH == .amd64 {
-	_has_invariant_tsc :: proc "contextless" () -> bool {
+	x86_has_invariant_tsc :: proc "contextless" () -> bool {
 		eax, _, _, _ := intrinsics.x86_cpuid(0x80_000_000, 0)
 
 		// Is this processor *really* ancient?
@@ -53,11 +53,10 @@ when ODIN_ARCH == .amd64 {
 		// check if the invariant TSC bit is set
 		_, _, _, edx := intrinsics.x86_cpuid(0x80_000_007, 0)
 		return (edx & (1 << 8)) != 0
-
 	}
-} else {
-	_has_invariant_tsc :: proc "contextless" () -> bool {
-		return false
+
+	x86_get_tsc_frequency :: proc "contextless" () -> (u64, bool) {
+		return _x86_get_tsc_frequency()
 	}
 }
 
