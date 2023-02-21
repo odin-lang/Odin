@@ -2116,16 +2116,21 @@ gb_internal bool check_is_expressible(CheckerContext *ctx, Operand *o, Type *typ
 			o->mode = Addressing_Invalid;
 		);
 
+		ERROR_BLOCK();
+
+
 		if (is_type_numeric(o->type) && is_type_numeric(type)) {
 			if (!is_type_integer(o->type) && is_type_integer(type)) {
 				error(o->expr, "'%s' truncated to '%s', got %s", a, b, s);
 			} else {
-				ERROR_BLOCK();
-				error(o->expr, "Cannot convert numeric value '%s' to '%s' from '%s', got %s", a, b, c, s);
+				if (are_types_identical(o->type, type)) {
+					error(o->expr, "Numeric value '%s' cannot be represented by '%s', got %s", a, c, s);
+				} else {
+					error(o->expr, "Cannot convert numeric value '%s' to '%s' from '%s', got %s", a, b, c, s);
+				}
 				check_assignment_error_suggestion(ctx, o, type);
 			}
 		} else {
-			ERROR_BLOCK();
 			error(o->expr, "Cannot convert '%s' to '%s' from '%s', got %s", a, b, c, s);
 			check_assignment_error_suggestion(ctx, o, type);
 		}
@@ -2597,10 +2602,12 @@ gb_internal void check_shift(CheckerContext *c, Operand *x, Operand *y, Ast *nod
 				x->type = t_untyped_integer;
 			}
 
+			x->expr = node;
 			x->value = exact_value_shift(be->op.kind, x_val, y_val);
 
+
 			if (is_type_typed(x->type)) {
-				check_is_expressible(c, x, base_type(x->type));
+				check_is_expressible(c, x, x->type);
 			}
 			return;
 		}
