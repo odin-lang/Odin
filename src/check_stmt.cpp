@@ -725,7 +725,7 @@ gb_internal void check_inline_range_stmt(CheckerContext *ctx, Ast *node, u32 mod
 		Operand x = {};
 		Operand y = {};
 
-		bool ok = check_range(ctx, expr, &x, &y, &inline_for_depth);
+		bool ok = check_range(ctx, expr, true, &x, &y, &inline_for_depth);
 		if (!ok) {
 			goto skip_expr;
 		}
@@ -1439,7 +1439,7 @@ gb_internal void check_range_stmt(CheckerContext *ctx, Ast *node, u32 mod_flags)
 		Operand x = {};
 		Operand y = {};
 
-		bool ok = check_range(ctx, expr, &x, &y, nullptr);
+		bool ok = check_range(ctx, expr, true, &x, &y, nullptr);
 		if (!ok) {
 			goto skip_expr_range_stmt;
 		}

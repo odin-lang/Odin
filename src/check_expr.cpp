@@ -7040,7 +7040,7 @@ gb_internal bool ternary_compare_types(Type *x, Type *y) {
 }
 
 
-gb_internal bool check_range(CheckerContext *c, Ast *node, Operand *x, Operand *y, ExactValue *inline_for_depth_, Type *type_hint=nullptr) {
+gb_internal bool check_range(CheckerContext *c, Ast *node, bool is_for_loop, Operand *x, Operand *y, ExactValue *inline_for_depth_, Type *type_hint=nullptr) {
 	if (!is_ast_range(node)) {
 		return false;
 	}
@@ -7089,9 +7089,17 @@ gb_internal bool check_range(CheckerContext *c, Ast *node, Operand *x, Operand *
 	}
 
 	Type *type = x->type;
-	if (!is_type_integer(type) && !is_type_float(type) && !is_type_pointer(type) && !is_type_enum(type)) {
-		error(ie->op, "Only numerical and pointer types are allowed within interval expressions");
-		return false;
+
+	if (is_for_loop) {
+		if (!is_type_integer(type) && !is_type_float(type) && !is_type_enum(type)) {
+			error(ie->op, "Only numerical types are allowed within interval expressions");
+			return false;
+		}
+	} else {
+		if (!is_type_integer(type) && !is_type_float(type) && !is_type_pointer(type) && !is_type_enum(type)) {
+			error(ie->op, "Only numerical and pointer types are allowed within interval expressions");
+			return false;
+		}
 	}
 
 	if (x->mode == Addressing_Constant &&
@@ -8104,7 +8112,7 @@ gb_internal ExprKind check_compound_literal(CheckerContext *c, Operand *o, Ast *
 
 					Operand x = {};
 					Operand y = {};
-					bool ok = check_range(c, fv->field, &x, &y, nullptr);
+					bool ok = check_range(c, fv->field, false, &x, &y, nullptr);
 					if (!ok) {
 						continue;
 					}
@@ -8320,7 +8328,7 @@ gb_internal ExprKind check_compound_literal(CheckerContext *c, Operand *o, Ast *
 
 					Operand x = {};
 					Operand y = {};
-					bool ok = check_range(c, fv->field, &x, &y, nullptr, index_type);
+					bool ok = check_range(c, fv->field, false, &x, &y, nullptr, index_type);
 					if (!ok) {
 						continue;
 					}
