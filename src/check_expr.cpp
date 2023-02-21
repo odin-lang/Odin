@@ -2915,17 +2915,32 @@ gb_internal void check_cast(CheckerContext *c, Operand *x, Type *type) {
 	bool can_convert = check_cast_internal(c, x, type);
 
 	if (!can_convert) {
-		gbString expr_str = expr_to_string(x->expr);
-		gbString to_type  = type_to_string(type);
-		gbString from_type = type_to_string(x->type);
-		error(x->expr, "Cannot cast '%s' as '%s' from '%s'", expr_str, to_type, from_type);
-		gb_string_free(from_type);
-		gb_string_free(to_type);
-		gb_string_free(expr_str);
-
-		check_cast_error_suggestion(c, x, type);
+		TEMPORARY_ALLOCATOR_GUARD();
+		gbString expr_str  = expr_to_string(x->expr, temporary_allocator());
+		gbString to_type   = type_to_string(type,    temporary_allocator());
+		gbString from_type = type_to_string(x->type, temporary_allocator());
 
 		x->mode = Addressing_Invalid;
+
+		begin_error_block();
+		error(x->expr, "Cannot cast '%s' as '%s' from '%s'", expr_str, to_type, from_type);
+		if (is_const_expr) {
+			gbString val_str = exact_value_to_string(x->value);
+			if (is_type_float(x->type) && is_type_integer(type)) {
+				error_line("\t%s cannot be expressed without truncation/rounding as the type '%s'\n", val_str, to_type);
+
+				// NOTE(bill): keep the mode and modify the type to minimize errors further on
+				x->mode = Addressing_Constant;
+				x->type = type;
+			} else {
+				error_line("\t%s cannot be expressed as the type '%s'\n", val_str, to_type);
+			}
+			gb_string_free(val_str);
+		}
+		check_cast_error_suggestion(c, x, type);
+
+		end_error_block();
+
 		return;
 	}
 
