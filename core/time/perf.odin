@@ -54,10 +54,10 @@ when ODIN_ARCH == .amd64 {
 		_, _, _, edx := intrinsics.x86_cpuid(0x80_000_007, 0)
 		return (edx & (1 << 8)) != 0
 	}
+}
 
-	x86_get_tsc_frequency :: proc "contextless" () -> (u64, bool) {
-		return _x86_get_tsc_frequency()
-	}
+get_tsc_frequency :: proc "contextless" () -> (u64, bool) {
+	return _get_tsc_frequency()
 }
 
 /*
