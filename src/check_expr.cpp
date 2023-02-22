@@ -2019,6 +2019,47 @@ gb_internal bool check_representable_as_constant(CheckerContext *c, ExactValue i
 }
 
 
+gb_internal bool check_integer_exceed_suggestion(CheckerContext *c, Operand *o, Type *type) {
+	if (is_type_integer(type) && o->value.kind == ExactValue_Integer) {
+		gbString b = type_to_string(type);
+
+		i64 sz = type_size_of(type);
+		BigInt *bi = &o->value.value_integer;
+		if (is_type_unsigned(type)) {
+			if (big_int_is_neg(bi)) {
+				error_line("\tA negative value cannot be represented by the unsigned integer type '%s'\n", b);
+			} else {
+				BigInt one = big_int_make_u64(1);
+				BigInt max_size = big_int_make_u64(1);
+				BigInt bits = big_int_make_i64(8*sz);
+				big_int_shl_eq(&max_size, &bits);
+				big_int_sub_eq(&max_size, &one);
+				String max_size_str = big_int_to_string(temporary_allocator(), &max_size);
+				error_line("\tThe maximum value that can be represented by '%s' is '%.*s'\n", b, LIT(max_size_str));
+			}
+		} else {
+			BigInt zero = big_int_make_u64(0);
+			BigInt one = big_int_make_u64(1);
+			BigInt max_size = big_int_make_u64(1);
+			BigInt bits = big_int_make_i64(8*sz - 1);
+			big_int_shl_eq(&max_size, &bits);
+			if (big_int_is_neg(bi)) {
+				big_int_neg(&max_size, &max_size);
+				String max_size_str = big_int_to_string(temporary_allocator(), &max_size);
+				error_line("\tThe minimum value that can be represented by '%s' is '%.*s'\n", b, LIT(max_size_str));
+			} else {
+				big_int_sub_eq(&max_size, &one);
+				String max_size_str = big_int_to_string(temporary_allocator(), &max_size);
+				error_line("\tThe maximum value that can be represented by '%s' is '%.*s'\n", b, LIT(max_size_str));
+			}
+		}
+
+		gb_string_free(b);
+
+		return true;
+	}
+	return false;
+}
 gb_internal void check_assignment_error_suggestion(CheckerContext *c, Operand *o, Type *type) {
 	gbString a = expr_to_string(o->expr);
 	gbString b = type_to_string(type);
@@ -2050,6 +2091,8 @@ gb_internal void check_assignment_error_suggestion(CheckerContext *c, Operand *o
 		error_line("\t            whereas slices in general are assumed to be mutable.\n");
 	} else if (is_type_u8_slice(src) && are_types_identical(dst, t_string) && o->mode != Addressing_Constant) {
 		error_line("\tSuggestion: the expression may be casted to %s\n", b);
+	} else if (check_integer_exceed_suggestion(c, o, type)) {
+		return;
 	}
 }
 
@@ -2089,8 +2132,8 @@ gb_internal void check_cast_error_suggestion(CheckerContext *c, Operand *o, Type
 		}
 	} else if (are_types_identical(src, t_string) && is_type_u8_slice(dst)) {
 		error_line("\tSuggestion: a string may be transmuted to %s\n", b);
-	} else if (is_type_u8_slice(src) && are_types_identical(dst, t_string) && o->mode != Addressing_Constant) {
-		error_line("\tSuggestion: the expression may be casted to %s\n", b);
+	} else if (check_integer_exceed_suggestion(c, o, type)) {
+		return;
 	}
 }
 
@@ -2124,10 +2167,11 @@ gb_internal bool check_is_expressible(CheckerContext *ctx, Operand *o, Type *typ
 				error(o->expr, "'%s' truncated to '%s', got %s", a, b, s);
 			} else {
 				if (are_types_identical(o->type, type)) {
-					error(o->expr, "Numeric value '%s' cannot be represented by '%s', got %s", a, c, s);
+					error(o->expr, "Numeric value '%s' from '%s' cannot be represented by '%s'", s, a, b);
 				} else {
-					error(o->expr, "Cannot convert numeric value '%s' to '%s' from '%s', got %s", a, b, c, s);
+					error(o->expr, "Cannot convert numeric value '%s' from '%s' to '%s' from '%s'", s, a, b, c);
 				}
+
 				check_assignment_error_suggestion(ctx, o, type);
 			}
 		} else {
@@ -2934,15 +2978,21 @@ gb_internal void check_cast(CheckerContext *c, Operand *x, Type *type) {
 		if (is_const_expr) {
 			gbString val_str = exact_value_to_string(x->value);
 			if (is_type_float(x->type) && is_type_integer(type)) {
-				error_line("\t%s cannot be expressed without truncation/rounding as the type '%s'\n", val_str, to_type);
+				error_line("\t%s cannot be represented without truncation/rounding as the type '%s'\n", val_str, to_type);
 
 				// NOTE(bill): keep the mode and modify the type to minimize errors further on
 				x->mode = Addressing_Constant;
 				x->type = type;
 			} else {
-				error_line("\t%s cannot be expressed as the type '%s'\n", val_str, to_type);
+				error_line("\t'%s' cannot be represented as the type '%s'\n", val_str, to_type);
+				if (is_type_numeric(type)) {
+					// NOTE(bill): keep the mode and modify the type to minimize errors further on
+					x->mode = Addressing_Constant;
+					x->type = type;
+				}
 			}
 			gb_string_free(val_str);
+
 		}
 		check_cast_error_suggestion(c, x, type);
 

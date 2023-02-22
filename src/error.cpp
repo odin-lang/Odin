@@ -97,15 +97,37 @@ gb_internal AstFile *thread_safe_get_ast_file_from_id(i32 index) {
 
 
 
+// NOTE: defined in build_settings.cpp
+gb_internal bool global_warnings_as_errors(void);
+gb_internal bool global_ignore_warnings(void);
+gb_internal bool show_error_line(void);
+gb_internal gbString get_file_line_as_string(TokenPos const &pos, i32 *offset);
+
+gb_internal void warning(Token const &token, char const *fmt, ...);
+gb_internal void error(Token const &token, char const *fmt, ...);
+gb_internal void error(TokenPos pos, char const *fmt, ...);
+gb_internal void error_line(char const *fmt, ...);
+gb_internal void syntax_error(Token const &token, char const *fmt, ...);
+gb_internal void syntax_error(TokenPos pos, char const *fmt, ...);
+gb_internal void syntax_warning(Token const &token, char const *fmt, ...);
+gb_internal void compiler_error(char const *fmt, ...);
+
 gb_internal void begin_error_block(void) {
 	mutex_lock(&global_error_collector.block_mutex);
 	global_error_collector.in_block.store(true);
 }
 
 gb_internal void end_error_block(void) {
-	if (global_error_collector.error_buffer.count > 0) {
-		isize n = global_error_collector.error_buffer.count;
-		u8 *text = gb_alloc_array(permanent_allocator(), u8, n+1);
+	isize n = global_error_collector.error_buffer.count;
+	if (n > 0) {
+		u8 *text = global_error_collector.error_buffer.data;
+		if (show_error_line() && n >= 2 && !(text[n-2] == '\n' && text[n-1] == '\n')) {
+			// add an extra new line as padding when the error line is being shown
+			error_line("\n");
+		}
+
+		n = global_error_collector.error_buffer.count;
+		text = gb_alloc_array(permanent_allocator(), u8, n+1);
 		gb_memmove(text, global_error_collector.error_buffer.data, n);
 		text[n] = 0;
 		String s = {text, n};
@@ -152,11 +174,6 @@ gb_internal ERROR_OUT_PROC(default_error_out_va) {
 
 gb_global ErrorOutProc *error_out_va = default_error_out_va;
 
-// NOTE: defined in build_settings.cpp
-gb_internal bool global_warnings_as_errors(void);
-gb_internal bool global_ignore_warnings(void);
-gb_internal bool show_error_line(void);
-gb_internal gbString get_file_line_as_string(TokenPos const &pos, i32 *offset);
 
 gb_internal void error_out(char const *fmt, ...) {
 	va_list va;

@@ -578,7 +578,7 @@ gb_internal void check_const_decl(CheckerContext *ctx, Entity *e, Ast *type_expr
 	if (operand.mode == Addressing_Invalid ||
 		base_type(operand.type) == t_invalid) {
 		gbString str = expr_to_string(init);
-		error(e->token, "Invalid declaration type '%s'", str);
+		error(init, "Invalid declaration value '%s'", str);
 		gb_string_free(str);
 	}
 
