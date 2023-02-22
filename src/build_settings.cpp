@@ -289,6 +289,7 @@ struct BuildContext {
 	bool   ignore_warnings;
 	bool   warnings_as_errors;
 	bool   hide_error_line;
+	bool   has_ansi_terminal_colours;
 
 	bool   ignore_lazy;
 	bool   ignore_llvm_build;
@@ -1034,6 +1035,9 @@ gb_internal String get_fullpath_core(gbAllocator a, String path) {
 
 gb_internal bool show_error_line(void) {
 	return !build_context.hide_error_line;
+}
+gb_internal bool has_ansi_terminal_colours(void) {
+	return build_context.has_ansi_terminal_colours;
 }
 
 gb_internal bool has_asm_extension(String const &path) {

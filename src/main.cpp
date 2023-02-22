@@ -2494,6 +2494,20 @@ gb_internal int strip_semicolons(Parser *parser) {
 	return cast(int)failed;
 }
 
+gb_internal void init_terminal(void) {
+	build_context.has_ansi_terminal_colours = false;
+#if defined(GB_SYSTEM_WINDOWS)
+	HANDLE hnd = GetStdHandle(STD_ERROR_HANDLE);
+	DWORD mode = 0;
+	if (GetConsoleMode(hnd, &mode)) {
+		enum {FLAG_ENABLE_VIRTUAL_TERMINAL_PROCESSING = 0x0004};
+		if (SetConsoleMode(hnd, mode|FLAG_ENABLE_VIRTUAL_TERMINAL_PROCESSING)) {
+			build_context.has_ansi_terminal_colours = true;
+		}
+	}
+#endif
+}
+
 int main(int arg_count, char const **arg_ptr) {
 	if (arg_count < 2) {
 		usage(make_string_c(arg_ptr[0]));
@@ -2509,6 +2523,7 @@ int main(int arg_count, char const **arg_ptr) {
 	init_string_interner();
 	init_global_error_collector();
 	init_keyword_hash_table();
+	init_terminal();
 
 	if (!check_env()) {
 		return 1;
