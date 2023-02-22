@@ -264,7 +264,7 @@ gb_internal bool show_error_on_line(TokenPos const &pos, TokenPos end) {
 			ELLIPSIS_PADDING = 8 // `...  ...`
 		};
 
-		error_out("\n\t");
+		error_out("\t");
 
 		terminal_set_colours(TerminalStyle_Bold, TerminalColour_White);
 
