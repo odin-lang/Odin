@@ -2506,6 +2506,16 @@ gb_internal void init_terminal(void) {
 		}
 	}
 #endif
+
+	if (!build_context.has_ansi_terminal_colours) {
+		gbAllocator a = heap_allocator();
+		char const *odin_terminal_ = gb_get_env("ODIN_TERMINAL", a);
+		defer (gb_free(a, cast(void *)odin_terminal_));
+		String odin_terminal = make_string_c(odin_terminal_);
+		if (str_eq_ignore_case(odin_terminal, str_lit("ansi"))) {
+			build_context.has_ansi_terminal_colours = true;
+		}
+	}
 }
 
 int main(int arg_count, char const **arg_ptr) {
