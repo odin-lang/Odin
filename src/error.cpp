@@ -264,7 +264,7 @@ gb_internal bool show_error_on_line(TokenPos const &pos, TokenPos end) {
 			ELLIPSIS_PADDING = 8 // `...  ...`
 		};
 
-		error_out("\t");
+		error_out("\n\t");
 
 		terminal_set_colours(TerminalStyle_Bold, TerminalColour_White);
 
@@ -345,6 +345,9 @@ gb_internal void error_va(TokenPos const &pos, TokenPos end, char const *fmt, va
 	} else if (global_error_collector.prev != pos) {
 		global_error_collector.prev = pos;
 		error_out_pos(pos);
+		if (has_ansi_terminal_colours()) {
+			error_out_coloured("Error: ", TerminalStyle_Normal, TerminalColour_Red);
+		}
 		error_out_va(fmt, va);
 		error_out("\n");
 		show_error_on_line(pos, end);
@@ -395,6 +398,9 @@ gb_internal void error_no_newline_va(TokenPos const &pos, char const *fmt, va_li
 	} else if (global_error_collector.prev != pos) {
 		global_error_collector.prev = pos;
 		error_out_pos(pos);
+		if (has_ansi_terminal_colours()) {
+			error_out_coloured("Error: ", TerminalStyle_Normal, TerminalColour_Red);
+		}
 		error_out_va(fmt, va);
 	}
 	mutex_unlock(&global_error_collector.mutex);

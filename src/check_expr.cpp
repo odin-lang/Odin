@@ -2397,7 +2397,7 @@ gb_internal void add_comparison_procedures_for_fields(CheckerContext *c, Type *t
 }
 
 
-gb_internal void check_comparison(CheckerContext *c, Operand *x, Operand *y, TokenKind op) {
+gb_internal void check_comparison(CheckerContext *c, Ast *node, Operand *x, Operand *y, TokenKind op) {
 	if (x->mode == Addressing_Type && y->mode == Addressing_Type) {
 		bool comp = are_types_identical(x->type, y->type);
 		switch (op) {
@@ -2485,7 +2485,7 @@ gb_internal void check_comparison(CheckerContext *c, Operand *x, Operand *y, Tok
 	}
 
 	if (err_str != nullptr) {
-		error(x->expr, "Cannot compare expression, %s", err_str);
+		error(node, "Cannot compare expression, %s", err_str);
 		x->type = t_untyped_bool;
 	} else {
 		if (x->mode == Addressing_Constant &&
@@ -3498,7 +3498,7 @@ gb_internal void check_binary_expr(CheckerContext *c, Operand *x, Ast *node, Typ
 
 
 	if (token_is_comparison(op.kind)) {
-		check_comparison(c, x, y, op.kind);
+		check_comparison(c, node, x, y, op.kind);
 		return;
 	}
 

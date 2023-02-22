@@ -978,19 +978,19 @@ gb_internal void check_switch_stmt(CheckerContext *ctx, Ast *node, u32 mod_flags
 
 				Operand a = lhs;
 				Operand b = rhs;
-				check_comparison(ctx, &a, &x, Token_LtEq);
+				check_comparison(ctx, expr, &a, &x, Token_LtEq);
 				if (a.mode == Addressing_Invalid) {
 					continue;
 				}
 
-				check_comparison(ctx, &b, &x, upper_op);
+				check_comparison(ctx, expr, &b, &x, upper_op);
 				if (b.mode == Addressing_Invalid) {
 					continue;
 				}
 
 				Operand a1 = lhs;
 				Operand b1 = rhs;
-				check_comparison(ctx, &a1, &b1, Token_LtEq);
+				check_comparison(ctx, expr, &a1, &b1, Token_LtEq);
 
 				add_to_seen_map(ctx, &seen, upper_op, x, lhs, rhs);
 
@@ -1029,7 +1029,7 @@ gb_internal void check_switch_stmt(CheckerContext *ctx, Ast *node, u32 mod_flags
 
 					// NOTE(bill): the ordering here matters
 					Operand z = y;
-					check_comparison(ctx, &z, &x, Token_CmpEq);
+					check_comparison(ctx, expr, &z, &x, Token_CmpEq);
 					if (z.mode == Addressing_Invalid) {
 						continue;
 					}
