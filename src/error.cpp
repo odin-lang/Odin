@@ -268,6 +268,8 @@ gb_internal bool show_error_on_line(TokenPos const &pos, TokenPos end) {
 
 		terminal_set_colours(TerminalStyle_Bold, TerminalColour_White);
 
+		isize squiggle_extra = 0;
+
 		if (line.len+MAX_TAB_WIDTH+ELLIPSIS_PADDING > MAX_LINE_LENGTH) {
 			i32 const half_width = MAX_LINE_LENGTH/2;
 			i32 left  = cast(i32)(offset);
@@ -280,6 +282,7 @@ gb_internal bool show_error_on_line(TokenPos const &pos, TokenPos end) {
 
 			line = string_trim_whitespace(line);
 
+			squiggle_extra = ELLIPSIS_PADDING/2 + 1;
 			offset = left + ELLIPSIS_PADDING/2;
 
 			error_out("... %.*s ...", LIT(line));
@@ -302,10 +305,10 @@ gb_internal bool show_error_on_line(TokenPos const &pos, TokenPos end) {
 				}
 			} else if (end.line == pos.line && end.column > pos.column) {
 				i32 length = gb_min(end.offset - pos.offset, cast(i32)(line.len-offset));
-				for (i32 i = 1; i < length-1; i++) {
+				for (i32 i = 1; i < length-1+squiggle_extra; i++) {
 					error_out("~");
 				}
-				if (length > 1) {
+				if (length > 1 && squiggle_extra == 0) {
 					error_out("^");
 				}
 			}
