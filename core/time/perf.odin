@@ -6,7 +6,6 @@ import "core:intrinsics"
 Tick :: struct {
 	_nsec: i64, // relative amount
 }
-
 tick_now :: proc "contextless" () -> Tick {
 	return _tick_now()
 }
@@ -56,8 +55,38 @@ when ODIN_ARCH == .amd64 {
 	}
 }
 
+has_invariant_tsc :: proc "contextless" () -> bool {
+	when ODIN_ARCH == .amd64 {
+		return x86_has_invariant_tsc()
+	}
+
+	return false
+}
+
+_get_tsc_frequency_fallback :: proc "contextless" () -> u64 {
+	tsc_begin := intrinsics.read_cycle_counter()
+	tick_begin := tick_now()
+
+	sleep(2 * Second)
+
+	tsc_end := intrinsics.read_cycle_counter()
+	tick_end := tick_now()
+
+	time_diff := u128(duration_nanoseconds(tick_diff(tick_begin, tick_end)))
+	return u64((u128(tsc_end - tsc_begin) * 1_000_000_000) / time_diff)
+}
+
 get_tsc_frequency :: proc "contextless" () -> (u64, bool) {
-	return _get_tsc_frequency()
+	if !has_invariant_tsc() {
+		return 0, false
+	}
+
+	hz, ok := _get_tsc_frequency()
+	if !ok {
+		hz = _get_tsc_frequency_fallback()
+	}
+
+	return hz, true
 }
 
 /*
