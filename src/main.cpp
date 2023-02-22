@@ -659,6 +659,7 @@ enum BuildFlagKind {
 
 	BuildFlag_IgnoreWarnings,
 	BuildFlag_WarningsAsErrors,
+	BuildFlag_TerseErrors,
 	BuildFlag_VerboseErrors,
 	BuildFlag_ErrorPosStyle,
 
@@ -832,6 +833,7 @@ gb_internal bool parse_build_flags(Array<String> args) {
 
 	add_flag(&build_flags, BuildFlag_IgnoreWarnings,          str_lit("ignore-warnings"),           BuildFlagParam_None,    Command_all);
 	add_flag(&build_flags, BuildFlag_WarningsAsErrors,        str_lit("warnings-as-errors"),        BuildFlagParam_None,    Command_all);
+	add_flag(&build_flags, BuildFlag_TerseErrors,             str_lit("terse-errors"),              BuildFlagParam_None,    Command_all);
 	add_flag(&build_flags, BuildFlag_VerboseErrors,           str_lit("verbose-errors"),            BuildFlagParam_None,    Command_all);
 	add_flag(&build_flags, BuildFlag_ErrorPosStyle,           str_lit("error-pos-style"),           BuildFlagParam_String,  Command_all);
 
@@ -1462,8 +1464,13 @@ gb_internal bool parse_build_flags(Array<String> args) {
 							}
 							break;
 						}
+
+						case BuildFlag_TerseErrors:
+							build_context.hide_error_line = true;
+							break;
 						case BuildFlag_VerboseErrors:
-							build_context.show_error_line = true;
+							gb_printf_err("-verbose-errors is not the default, -terse-errors can now disable it\n");
+							build_context.hide_error_line = false;
 							break;
 
 						case BuildFlag_ErrorPosStyle:

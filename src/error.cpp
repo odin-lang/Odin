@@ -121,7 +121,26 @@ gb_internal void end_error_block(void) {
 	isize n = global_error_collector.error_buffer.count;
 	if (n > 0) {
 		u8 *text = global_error_collector.error_buffer.data;
-		if (show_error_line() && n >= 2 && !(text[n-2] == '\n' && text[n-1] == '\n')) {
+
+		bool add_extra_newline = false;
+
+		if (show_error_line()) {
+			if (n >= 2 && !(text[n-2] == '\n' && text[n-1] == '\n')) {
+				add_extra_newline = true;
+			}
+		} else {
+			isize newline_count = 0;
+			for (isize i = 0; i < n; i++) {
+				if (text[i] == '\n') {
+					newline_count += 1;
+				}
+			}
+			if (newline_count > 1) {
+				add_extra_newline = true;
+			}
+		}
+
+		if (add_extra_newline) {
 			// add an extra new line as padding when the error line is being shown
 			error_line("\n");
 		}
@@ -198,12 +217,12 @@ gb_internal bool show_error_on_line(TokenPos const &pos, TokenPos end) {
 		// TODO(bill): This assumes ASCII
 
 		enum {
-			MAX_LINE_LENGTH  = 76,
+			MAX_LINE_LENGTH  = 80,
 			MAX_TAB_WIDTH    = 8,
-			ELLIPSIS_PADDING = 8
+			ELLIPSIS_PADDING = 8 // `...  ...`
 		};
 
-		error_out("\n\t");
+		error_out("\t");
 		if (line.len+MAX_TAB_WIDTH+ELLIPSIS_PADDING > MAX_LINE_LENGTH) {
 			i32 const half_width = MAX_LINE_LENGTH/2;
 			i32 left  = cast(i32)(offset);
@@ -244,7 +263,7 @@ gb_internal bool show_error_on_line(TokenPos const &pos, TokenPos end) {
 			}
 		}
 
-		error_out("\n\n");
+		error_out("\n");
 		return true;
 	}
 	return false;

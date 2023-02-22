@@ -1679,9 +1679,13 @@ gb_internal bool check_unary_op(CheckerContext *c, Operand *o, Token op) {
 
 	case Token_Not:
 		if (!is_type_boolean(type)) {
+			ERROR_BLOCK();
 			str = expr_to_string(o->expr);
-			error(op, "Operator '%.*s' is only allowed on boolean expression", LIT(op.string));
+			error(op, "Operator '%.*s' is only allowed on boolean expressions", LIT(op.string));
 			gb_string_free(str);
+			if (is_type_integer(type)) {
+				error_line("\tSuggestion: Did you mean to use the bitwise not operator '~'?\n");
+			}
 		}
 		break;
 

@@ -288,7 +288,7 @@ struct BuildContext {
 
 	bool   ignore_warnings;
 	bool   warnings_as_errors;
-	bool   show_error_line;
+	bool   hide_error_line;
 
 	bool   ignore_lazy;
 	bool   ignore_llvm_build;
@@ -1033,7 +1033,7 @@ gb_internal String get_fullpath_core(gbAllocator a, String path) {
 }
 
 gb_internal bool show_error_line(void) {
-	return build_context.show_error_line;
+	return !build_context.hide_error_line;
 }
 
 gb_internal bool has_asm_extension(String const &path) {
