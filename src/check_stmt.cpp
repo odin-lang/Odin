@@ -1293,7 +1293,6 @@ gb_internal void check_type_switch_stmt(CheckerContext *ctx, Ast *node, u32 mod_
 		for (Type *t : variants) {
 			if (!type_ptr_set_exists(&seen, t)) {
 				array_add(&unhandled, t);
-				gb_printf_err("HERE: %p %s\n", t, type_to_string(t));
 			}
 		}
 

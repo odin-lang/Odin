@@ -229,191 +229,191 @@ _Proc_Bsdinfo :: struct {
 
 /*--==========================================================================--*/
 
-syscall_fsync :: #force_inline proc(fildes: c.int) -> bool {
+syscall_fsync :: #force_inline proc "contextless" (fildes: c.int) -> bool {
 	return !(cast(bool)intrinsics.syscall(unix_offset_syscall(.fsync), uintptr(fildes)))
 }
 
-syscall_write :: #force_inline proc (fildes: c.int, buf: ^byte, nbyte: u64) -> bool {
+syscall_write :: #force_inline proc "contextless" (fildes: c.int, buf: ^byte, nbyte: u64) -> bool {
 	return !(cast(bool)intrinsics.syscall(unix_offset_syscall(.write),  uintptr(fildes), uintptr(buf), uintptr(nbyte)))
 }
  
-syscall_read :: #force_inline proc(fildes: c.int, buf: ^byte, nbyte: u64) -> i64 {
+syscall_read :: #force_inline proc "contextless" (fildes: c.int, buf: ^byte, nbyte: u64) -> i64 {
 	return cast(i64)intrinsics.syscall(unix_offset_syscall(.read), uintptr(fildes), uintptr(buf), uintptr(nbyte))
 }
 
-syscall_open :: #force_inline proc(path: cstring, oflag: u32, mode: u32) -> c.int {
+syscall_open :: #force_inline proc "contextless" (path: cstring, oflag: u32, mode: u32) -> c.int {
 	return cast(c.int)intrinsics.syscall(unix_offset_syscall(.open), transmute(uintptr)path, uintptr(oflag), uintptr(mode))
 }
 
-syscall_close :: #force_inline proc(fd: c.int) -> bool {
+syscall_close :: #force_inline proc "contextless" (fd: c.int) -> bool {
 	return !(cast(bool)intrinsics.syscall(unix_offset_syscall(.close), uintptr(fd)))
 }
 
-syscall_fchmod :: #force_inline proc(fildes: c.int, mode: u32) -> c.int {
+syscall_fchmod :: #force_inline proc "contextless" (fildes: c.int, mode: u32) -> c.int {
 	return (cast(c.int)intrinsics.syscall(unix_offset_syscall(.fchmod), uintptr(fildes), uintptr(mode)))
 }
 
-syscall_chmod :: #force_inline proc(path: cstring, mode: u32) -> c.int {
+syscall_chmod :: #force_inline proc "contextless" (path: cstring, mode: u32) -> c.int {
 	return (cast(c.int)intrinsics.syscall(unix_offset_syscall(.chmod), transmute(uintptr)path, uintptr(mode)))
 }
 
-syscall_mkdir :: #force_inline proc(path: cstring, mode: u32) -> c.int {
+syscall_mkdir :: #force_inline proc "contextless" (path: cstring, mode: u32) -> c.int {
 	return (cast(c.int)intrinsics.syscall(unix_offset_syscall(.mkdir), transmute(uintptr)path, uintptr(mode)))
 }
 
-syscall_mkdir_at :: #force_inline proc(fd: c.int, path: cstring, mode: u32) -> c.int {
+syscall_mkdir_at :: #force_inline proc "contextless" (fd: c.int, path: cstring, mode: u32) -> c.int {
 	return (cast(c.int)intrinsics.syscall(unix_offset_syscall(.mkdir), uintptr(fd), transmute(uintptr)path, uintptr(mode)))
 }
 
-syscall_rmdir :: #force_inline proc(path: cstring, mode: u32) -> c.int {
+syscall_rmdir :: #force_inline proc "contextless" (path: cstring, mode: u32) -> c.int {
 	return (cast(c.int)intrinsics.syscall(unix_offset_syscall(.rmdir), transmute(uintptr)path, uintptr(mode)))
 }
 
-syscall_rename :: #force_inline proc(path_old: cstring, path_new: cstring) -> c.int {
+syscall_rename :: #force_inline proc "contextless" (path_old: cstring, path_new: cstring) -> c.int {
 	return (cast(c.int)intrinsics.syscall(unix_offset_syscall(.rename), transmute(uintptr)path_old, transmute(uintptr)path_new))
 }
 
-syscall_rename_at :: #force_inline proc(from_fd: c.int, from: cstring, to_fd: c.int, to: cstring) -> c.int {
+syscall_rename_at :: #force_inline proc "contextless" (from_fd: c.int, from: cstring, to_fd: c.int, to: cstring) -> c.int {
 	return (cast(c.int)intrinsics.syscall(unix_offset_syscall(.renameat), uintptr(from_fd), transmute(uintptr)from, uintptr(to_fd), transmute(uintptr)to))
 }
 
-syscall_lseek :: #force_inline proc(fd: c.int, offset: i64, whence: c.int) -> i64 {
+syscall_lseek :: #force_inline proc "contextless" (fd: c.int, offset: i64, whence: c.int) -> i64 {
 	return cast(i64)intrinsics.syscall(unix_offset_syscall(.lseek), uintptr(fd), uintptr(offset), uintptr(whence))
 }
 
-syscall_gettid :: #force_inline proc() -> u64 {
+syscall_gettid :: #force_inline proc "contextless" () -> u64 {
 	return cast(u64)intrinsics.syscall(unix_offset_syscall(.gettid))
 }
 
-syscall_fstat :: #force_inline proc(fd: c.int, status: ^stat) -> c.int {
+syscall_fstat :: #force_inline proc "contextless" (fd: c.int, status: ^stat) -> c.int {
 	return cast(c.int)intrinsics.syscall(unix_offset_syscall(.fstat), uintptr(fd), uintptr(status))
 }
 
-syscall_lstat :: #force_inline proc(path: cstring, status: ^stat) -> c.int {
+syscall_lstat :: #force_inline proc "contextless" (path: cstring, status: ^stat) -> c.int {
 	return cast(c.int)intrinsics.syscall(unix_offset_syscall(.lstat), transmute(uintptr)path, uintptr(status))
 }
 
-syscall_stat :: #force_inline proc(path: cstring, status: ^stat) -> c.int {
+syscall_stat :: #force_inline proc "contextless" (path: cstring, status: ^stat) -> c.int {
 	return cast(c.int)intrinsics.syscall(unix_offset_syscall(.stat), transmute(uintptr)path, uintptr(status))
 }
 
-syscall_fstatat :: #force_inline proc(fd: c.int, path: cstring, status: ^stat) -> c.int {
+syscall_fstatat :: #force_inline proc "contextless" (fd: c.int, path: cstring, status: ^stat) -> c.int {
 	return cast(c.int)intrinsics.syscall(unix_offset_syscall(.fstatat), uintptr(fd), transmute(uintptr)path, uintptr(status))
 }
 
-syscall_link :: #force_inline proc(path: cstring, to_link: cstring) -> c.int {
+syscall_link :: #force_inline proc "contextless" (path: cstring, to_link: cstring) -> c.int {
 	return cast(c.int)intrinsics.syscall(unix_offset_syscall(.link), transmute(uintptr)path, transmute(uintptr)to_link)
 }
 
-syscall_linkat :: #force_inline proc(fd: c.int, path: cstring, fd2: c.int, to_link: cstring) -> c.int {
+syscall_linkat :: #force_inline proc "contextless" (fd: c.int, path: cstring, fd2: c.int, to_link: cstring) -> c.int {
 	return cast(c.int)intrinsics.syscall(unix_offset_syscall(.linkat), uintptr(fd), transmute(uintptr)path, uintptr(fd2), transmute(uintptr)to_link)
 }
 
-syscall_readlink :: #force_inline proc(path: cstring, buf: ^u8, buf_size: u64) -> i64 {
+syscall_readlink :: #force_inline proc "contextless" (path: cstring, buf: ^u8, buf_size: u64) -> i64 {
 	return cast(i64)intrinsics.syscall(unix_offset_syscall(.readlink), transmute(uintptr)path, uintptr(buf), uintptr(buf_size))
 }
 
-syscall_readlinkat :: #force_inline proc(fd: c.int, path: cstring, buf: ^u8, buf_size: u64) -> i64 {
+syscall_readlinkat :: #force_inline proc "contextless" (fd: c.int, path: cstring, buf: ^u8, buf_size: u64) -> i64 {
 	return cast(i64)intrinsics.syscall(unix_offset_syscall(.readlinkat), uintptr(fd), transmute(uintptr)path, uintptr(buf), uintptr(buf_size))
 }
 
-syscall_access :: #force_inline proc(path: cstring, mode: c.int) -> c.int {
+syscall_access :: #force_inline proc "contextless" (path: cstring, mode: c.int) -> c.int {
 	return cast(c.int)intrinsics.syscall(unix_offset_syscall(.access), transmute(uintptr)path, uintptr(mode))
 }
 
-syscall_faccessat :: #force_inline proc(fd: c.int, path: cstring, mode: c.int, flag: c.int) -> c.int {
+syscall_faccessat :: #force_inline proc "contextless" (fd: c.int, path: cstring, mode: c.int, flag: c.int) -> c.int {
 	return cast(c.int)intrinsics.syscall(unix_offset_syscall(.faccessat), uintptr(fd), transmute(uintptr)path, uintptr(mode), uintptr(flag))
 }
 
-syscall_getdirentries :: #force_inline proc(fd: c.int, buf: ^u8, nbytes: c.int, base_pointer: ^u32) -> c.int {
+syscall_getdirentries :: #force_inline proc "contextless" (fd: c.int, buf: ^u8, nbytes: c.int, base_pointer: ^u32) -> c.int {
 	return cast(c.int)intrinsics.syscall(unix_offset_syscall(.getdirentries), uintptr(fd), uintptr(buf), uintptr(nbytes), uintptr(base_pointer))
 }
 
-syscall_truncate :: #force_inline proc (path: cstring, length: off_t) -> c.int {
+syscall_truncate :: #force_inline proc "contextless" (path: cstring, length: off_t) -> c.int {
 	return cast(c.int)intrinsics.syscall(unix_offset_syscall(.truncate), transmute(uintptr)path, uintptr(length))
 }
 
-syscall_ftruncate :: #force_inline proc (fd: c.int, length: off_t) -> c.int {
+syscall_ftruncate :: #force_inline proc "contextless" (fd: c.int, length: off_t) -> c.int {
 	return cast(c.int)intrinsics.syscall(unix_offset_syscall(.ftruncate), uintptr(fd), uintptr(length))
 }
 
-syscall_sysctl :: #force_inline proc (name: ^c.int, namelen: c.uint, oldp: rawptr, oldlenp: ^i64, newp: ^i8, newlen: i64) -> c.int {
+syscall_sysctl :: #force_inline proc "contextless" (name: ^c.int, namelen: c.uint, oldp: rawptr, oldlenp: ^i64, newp: ^i8, newlen: i64) -> c.int {
 	return cast(c.int)intrinsics.syscall(unix_offset_syscall(.sysctl), uintptr(name), uintptr(namelen), uintptr(oldp), uintptr(oldlenp), uintptr(newp), uintptr(newlen))
 }
 
-syscall_copyfile ::  #force_inline proc(from: cstring, to: cstring, state: rawptr, flags: u32) -> c.int {
+syscall_copyfile ::  #force_inline proc "contextless" (from: cstring, to: cstring, state: rawptr, flags: u32) -> c.int {
 	return cast(c.int)intrinsics.syscall(unix_offset_syscall(.copyfile), transmute(uintptr)from, transmute(uintptr)to, uintptr(state), uintptr(flags))
 } 
 
 // think about this? last arg should be more than one
-syscall_fcntl :: #force_inline proc(fd: c.int, cmd: c.int, other: rawptr) -> c.int {
+syscall_fcntl :: #force_inline proc "contextless" (fd: c.int, cmd: c.int, other: rawptr) -> c.int {
 	return cast(c.int)intrinsics.syscall(unix_offset_syscall(.fsctl), uintptr(fd), uintptr(cmd), uintptr(other))
 }
 
-syscall_exit :: #force_inline proc(code: c.int) {
+syscall_exit :: #force_inline proc "contextless" (code: c.int) {
 	intrinsics.syscall(unix_offset_syscall(.exit), uintptr(code))
 }
 
-syscall_kill :: #force_inline proc(pid: pid_t, sig: c.int) -> c.int {
+syscall_kill :: #force_inline proc "contextless" (pid: pid_t, sig: c.int) -> c.int {
 	return cast(c.int)intrinsics.syscall(unix_offset_syscall(.kill), uintptr(pid), uintptr(sig))
 }
 
-syscall_dup :: #force_inline proc(fd: c.int) -> c.int {
+syscall_dup :: #force_inline proc "contextless" (fd: c.int) -> c.int {
 	return cast(c.int)intrinsics.syscall(unix_offset_syscall(.dup), uintptr(fd))
 }
 
-syscall_execve :: #force_inline proc(path: cstring, argv: [^]cstring, env: [^]cstring) -> c.int {
+syscall_execve :: #force_inline proc "contextless" (path: cstring, argv: [^]cstring, env: [^]cstring) -> c.int {
 	return cast(c.int)intrinsics.syscall(unix_offset_syscall(.execve), transmute(uintptr)path, transmute(uintptr)argv, transmute(uintptr)env)
 }
 
-syscall_munmap :: #force_inline proc(addr: rawptr, len: u64) -> c.int {
+syscall_munmap :: #force_inline proc "contextless" (addr: rawptr, len: u64) -> c.int {
 	return cast(c.int)intrinsics.syscall(unix_offset_syscall(.mmap), uintptr(addr), uintptr(len))
 }
 
-syscall_mmap :: #force_inline proc(addr: ^u8, len: u64, port: c.int, flags: c.int, fd: int, offset: off_t) -> ^u8 {
+syscall_mmap :: #force_inline proc "contextless" (addr: ^u8, len: u64, port: c.int, flags: c.int, fd: int, offset: off_t) -> ^u8 {
 	return cast(^u8)intrinsics.syscall(unix_offset_syscall(.mmap), uintptr(addr), uintptr(len), uintptr(port), uintptr(flags), uintptr(fd), uintptr(offset))
 }
 
-syscall_flock :: #force_inline proc(fd: c.int, operation: c.int) -> c.int {
+syscall_flock :: #force_inline proc "contextless" (fd: c.int, operation: c.int) -> c.int {
 	return cast(c.int)intrinsics.syscall(unix_offset_syscall(.flock), uintptr(fd), uintptr(operation)) 
 }
 
-syscall_utimes :: #force_inline proc(path: cstring, times: ^timeval) -> c.int {
+syscall_utimes :: #force_inline proc "contextless" (path: cstring, times: ^timeval) -> c.int {
 	return cast(c.int)intrinsics.syscall(unix_offset_syscall(.utimes), transmute(uintptr)path, uintptr(times))
 }
 
-syscall_futimes :: #force_inline proc(fd: c.int, times: ^timeval) -> c.int {
+syscall_futimes :: #force_inline proc "contextless" (fd: c.int, times: ^timeval) -> c.int {
 	return cast(c.int)intrinsics.syscall(unix_offset_syscall(.futimes), uintptr(fd), uintptr(times))
 }
 
-syscall_adjtime :: #force_inline proc(delta: ^timeval, old_delta: ^timeval) -> c.int {
+syscall_adjtime :: #force_inline proc "contextless" (delta: ^timeval, old_delta: ^timeval) -> c.int {
 	return cast(c.int)intrinsics.syscall(unix_offset_syscall(.adjtime), uintptr(delta), uintptr(old_delta))
 }
 
-syscall_sysctlbyname :: #force_inline proc(name: cstring, oldp: rawptr, oldlenp: ^i64, newp: rawptr, newlen: i64) -> c.int {
+syscall_sysctlbyname :: #force_inline proc "contextless" (name: cstring, oldp: rawptr, oldlenp: ^i64, newp: rawptr, newlen: i64) -> c.int {
 	return cast(c.int)intrinsics.syscall(unix_offset_syscall(.sysctlbyname), transmute(uintptr)name, uintptr(oldp), uintptr(oldlenp), uintptr(newp), uintptr(newlen))
 }
 
-syscall_proc_info :: #force_inline proc(num: c.int, pid: u32, flavor: c.int, arg: u64, buffer: rawptr, buffer_size: c.int) -> c.int {
+syscall_proc_info :: #force_inline proc "contextless" (num: c.int, pid: u32, flavor: c.int, arg: u64, buffer: rawptr, buffer_size: c.int) -> c.int {
 	return cast(c.int)intrinsics.syscall(unix_offset_syscall(.proc_info), uintptr(num), uintptr(pid), uintptr(flavor), uintptr(arg), uintptr(buffer), uintptr(buffer_size))
 }
 
-syscall_openat :: #force_inline proc(fd: int, path: cstring, oflag: u32, mode: u32) -> c.int {
+syscall_openat :: #force_inline proc "contextless" (fd: int, path: cstring, oflag: u32, mode: u32) -> c.int {
 	return cast(c.int)intrinsics.syscall(unix_offset_syscall(.openat), uintptr(fd), transmute(uintptr)path, uintptr(oflag), uintptr(mode))
 } 
 
-syscall_getentropy :: #force_inline proc(buf: [^]u8, buflen: u64) -> c.int {
+syscall_getentropy :: #force_inline proc "contextless" (buf: [^]u8, buflen: u64) -> c.int {
 	return cast(c.int)intrinsics.syscall(unix_offset_syscall(.getentropy), uintptr(buf), uintptr(buflen))
 }
 
-syscall_pipe :: #force_inline proc(fds: [^]c.int) -> c.int {
+syscall_pipe :: #force_inline proc "contextless" (fds: [^]c.int) -> c.int {
 	return cast(c.int)intrinsics.syscall(unix_offset_syscall(.getentropy), uintptr(&fds[0]), uintptr(&fds[1]))
 }
 
-syscall_chdir :: #force_inline proc(path: cstring) -> c.int {
+syscall_chdir :: #force_inline proc "contextless" (path: cstring) -> c.int {
 	return cast(c.int)intrinsics.syscall(unix_offset_syscall(.getentropy), transmute(uintptr)path)
 }
 
-syscall_fchdir :: #force_inline proc(fd: c.int, path: cstring) -> c.int {
+syscall_fchdir :: #force_inline proc "contextless" (fd: c.int, path: cstring) -> c.int {
 	return cast(c.int)intrinsics.syscall(unix_offset_syscall(.getentropy), uintptr(fd), transmute(uintptr)path)
 }
