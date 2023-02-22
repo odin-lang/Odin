@@ -41,6 +41,7 @@ _tick_duration_end :: proc "contextless" (d: ^Duration, t: Tick) {
 }
 
 when ODIN_ARCH == .amd64 {
+	@(private)
 	x86_has_invariant_tsc :: proc "contextless" () -> bool {
 		eax, _, _, _ := intrinsics.x86_cpuid(0x80_000_000, 0)
 
@@ -63,27 +64,24 @@ has_invariant_tsc :: proc "contextless" () -> bool {
 	return false
 }
 
-_get_tsc_frequency_fallback :: proc "contextless" () -> u64 {
-	tsc_begin := intrinsics.read_cycle_counter()
-	tick_begin := tick_now()
-
-	sleep(2 * Second)
-
-	tsc_end := intrinsics.read_cycle_counter()
-	tick_end := tick_now()
-
-	time_diff := u128(duration_nanoseconds(tick_diff(tick_begin, tick_end)))
-	return u64((u128(tsc_end - tsc_begin) * 1_000_000_000) / time_diff)
-}
-
-get_tsc_frequency :: proc "contextless" () -> (u64, bool) {
+tsc_frequency :: proc "contextless" () -> (u64, bool) {
 	if !has_invariant_tsc() {
 		return 0, false
 	}
 
 	hz, ok := _get_tsc_frequency()
 	if !ok {
-		hz = _get_tsc_frequency_fallback()
+		// fallback to approximate TSC
+		tsc_begin := intrinsics.read_cycle_counter()
+		tick_begin := tick_now()
+
+		sleep(2 * Second)
+
+		tsc_end := intrinsics.read_cycle_counter()
+		tick_end := tick_now()
+
+		time_diff := u128(duration_nanoseconds(tick_diff(tick_begin, tick_end)))
+		hz = u64((u128(tsc_end - tsc_begin) * 1_000_000_000) / time_diff)
 	}
 
 	return hz, true
