@@ -725,7 +725,7 @@ gb_internal void check_inline_range_stmt(CheckerContext *ctx, Ast *node, u32 mod
 		Operand x = {};
 		Operand y = {};
 
-		bool ok = check_range(ctx, expr, &x, &y, &inline_for_depth);
+		bool ok = check_range(ctx, expr, true, &x, &y, &inline_for_depth);
 		if (!ok) {
 			goto skip_expr;
 		}
@@ -978,19 +978,19 @@ gb_internal void check_switch_stmt(CheckerContext *ctx, Ast *node, u32 mod_flags
 
 				Operand a = lhs;
 				Operand b = rhs;
-				check_comparison(ctx, &a, &x, Token_LtEq);
+				check_comparison(ctx, expr, &a, &x, Token_LtEq);
 				if (a.mode == Addressing_Invalid) {
 					continue;
 				}
 
-				check_comparison(ctx, &b, &x, upper_op);
+				check_comparison(ctx, expr, &b, &x, upper_op);
 				if (b.mode == Addressing_Invalid) {
 					continue;
 				}
 
 				Operand a1 = lhs;
 				Operand b1 = rhs;
-				check_comparison(ctx, &a1, &b1, Token_LtEq);
+				check_comparison(ctx, expr, &a1, &b1, Token_LtEq);
 
 				add_to_seen_map(ctx, &seen, upper_op, x, lhs, rhs);
 
@@ -1029,7 +1029,7 @@ gb_internal void check_switch_stmt(CheckerContext *ctx, Ast *node, u32 mod_flags
 
 					// NOTE(bill): the ordering here matters
 					Operand z = y;
-					check_comparison(ctx, &z, &x, Token_CmpEq);
+					check_comparison(ctx, expr, &z, &x, Token_CmpEq);
 					if (z.mode == Addressing_Invalid) {
 						continue;
 					}
@@ -1293,7 +1293,6 @@ gb_internal void check_type_switch_stmt(CheckerContext *ctx, Ast *node, u32 mod_
 		for (Type *t : variants) {
 			if (!type_ptr_set_exists(&seen, t)) {
 				array_add(&unhandled, t);
-				gb_printf_err("HERE: %p %s\n", t, type_to_string(t));
 			}
 		}
 
@@ -1439,7 +1438,7 @@ gb_internal void check_range_stmt(CheckerContext *ctx, Ast *node, u32 mod_flags)
 		Operand x = {};
 		Operand y = {};
 
-		bool ok = check_range(ctx, expr, &x, &y, nullptr);
+		bool ok = check_range(ctx, expr, true, &x, &y, nullptr);
 		if (!ok) {
 			goto skip_expr_range_stmt;
 		}
@@ -1921,7 +1920,7 @@ gb_internal void check_expr_stmt(CheckerContext *ctx, Ast *node) {
 	case Addressing_Type:
 		{
 			gbString str = type_to_string(operand.type);
-			error(node, "'%s' is not an expression", str);
+			error(node, "'%s' is not an expression but a type and cannot be used as a statement", str);
 			gb_string_free(str);
 			break;
 		}

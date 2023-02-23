@@ -2,6 +2,9 @@ package runtime
 
 _INTEGER_DIGITS :: "0123456789abcdefghijklmnopqrstuvwxyz"
 
+@(private="file")
+_INTEGER_DIGITS_VAR := _INTEGER_DIGITS
+
 when !ODIN_DISALLOW_RTTI {
 	print_any_single :: proc(arg: any) {
 		x := arg
@@ -105,14 +108,14 @@ encode_rune :: proc "contextless" (c: rune) -> ([4]u8, int) {
 	return buf, 4
 }
 
-print_string :: proc "contextless" (str: string) -> (int, _OS_Errno) {
-	return os_write(transmute([]byte)str)
+print_string :: proc "contextless" (str: string) -> (n: int) {
+	n, _ = os_write(transmute([]byte)str)
+	return
 }
 
-print_strings :: proc "contextless" (args: ..string) -> (n: int, err: _OS_Errno) {
+print_strings :: proc "contextless" (args: ..string) -> (n: int) {
 	for str in args {
-		m: int
-		m, err = os_write(transmute([]byte)str)
+		m, err := os_write(transmute([]byte)str)
 		n += m
 		if err != 0 {
 			break
@@ -121,8 +124,9 @@ print_strings :: proc "contextless" (args: ..string) -> (n: int, err: _OS_Errno)
 	return
 }
 
-print_byte :: proc "contextless" (b: byte) -> (int, _OS_Errno) {
-	return os_write([]byte{b})
+print_byte :: proc "contextless" (b: byte) -> (n: int) {
+	n, _ = os_write([]byte{b})
+	return
 }
 
 print_encoded_rune :: proc "contextless" (r: rune) {
@@ -141,11 +145,10 @@ print_encoded_rune :: proc "contextless" (r: rune) {
 		if r <= 0 {
 			print_string("\\x00")
 		} else if r < 32 {
-			digits := _INTEGER_DIGITS
 			n0, n1 := u8(r) >> 4, u8(r) & 0xf
 			print_string("\\x")
-			print_byte(digits[n0])
-			print_byte(digits[n1])
+			print_byte(_INTEGER_DIGITS_VAR[n0])
+			print_byte(_INTEGER_DIGITS_VAR[n1])
 		} else {
 			print_rune(r)
 		}
@@ -153,7 +156,7 @@ print_encoded_rune :: proc "contextless" (r: rune) {
 	print_byte('\'')
 }
 
-print_rune :: proc "contextless" (r: rune) -> (int, _OS_Errno) #no_bounds_check {
+print_rune :: proc "contextless" (r: rune) -> int #no_bounds_check {
 	RUNE_SELF :: 0x80
 
 	if r < RUNE_SELF {
@@ -161,29 +164,27 @@ print_rune :: proc "contextless" (r: rune) -> (int, _OS_Errno) #no_bounds_check 
 	}
 
 	b, n := encode_rune(r)
-	return os_write(b[:n])
+	m, _ := os_write(b[:n])
+	return m
 }
 
 
 print_u64 :: proc "contextless" (x: u64) #no_bounds_check {
-	digits := _INTEGER_DIGITS
-
 	a: [129]byte
 	i := len(a)
 	b := u64(10)
 	u := x
 	for u >= b {
-		i -= 1; a[i] = digits[u % b]
+		i -= 1; a[i] = _INTEGER_DIGITS_VAR[u % b]
 		u /= b
 	}
-	i -= 1; a[i] = digits[u % b]
+	i -= 1; a[i] = _INTEGER_DIGITS_VAR[u % b]
 
 	os_write(a[i:])
 }
 
 
 print_i64 :: proc "contextless" (x: i64) #no_bounds_check {
-	digits := _INTEGER_DIGITS
 	b :: i64(10)
 
 	u := x
@@ -193,10 +194,10 @@ print_i64 :: proc "contextless" (x: i64) #no_bounds_check {
 	a: [129]byte
 	i := len(a)
 	for u >= b {
-		i -= 1; a[i] = digits[u % b]
+		i -= 1; a[i] = _INTEGER_DIGITS_VAR[u % b]
 		u /= b
 	}
-	i -= 1; a[i] = digits[u % b]
+	i -= 1; a[i] = _INTEGER_DIGITS_VAR[u % b]
 	if neg {
 		i -= 1; a[i] = '-'
 	}

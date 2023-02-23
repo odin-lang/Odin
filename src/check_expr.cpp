@@ -1679,9 +1679,13 @@ gb_internal bool check_unary_op(CheckerContext *c, Operand *o, Token op) {
 
 	case Token_Not:
 		if (!is_type_boolean(type)) {
+			ERROR_BLOCK();
 			str = expr_to_string(o->expr);
-			error(op, "Operator '%.*s' is only allowed on boolean expression", LIT(op.string));
+			error(op, "Operator '%.*s' is only allowed on boolean expressions", LIT(op.string));
 			gb_string_free(str);
+			if (is_type_integer(type)) {
+				error_line("\tSuggestion: Did you mean to use the bitwise not operator '~'?\n");
+			}
 		}
 		break;
 
@@ -2019,6 +2023,47 @@ gb_internal bool check_representable_as_constant(CheckerContext *c, ExactValue i
 }
 
 
+gb_internal bool check_integer_exceed_suggestion(CheckerContext *c, Operand *o, Type *type) {
+	if (is_type_integer(type) && o->value.kind == ExactValue_Integer) {
+		gbString b = type_to_string(type);
+
+		i64 sz = type_size_of(type);
+		BigInt *bi = &o->value.value_integer;
+		if (is_type_unsigned(type)) {
+			if (big_int_is_neg(bi)) {
+				error_line("\tA negative value cannot be represented by the unsigned integer type '%s'\n", b);
+			} else {
+				BigInt one = big_int_make_u64(1);
+				BigInt max_size = big_int_make_u64(1);
+				BigInt bits = big_int_make_i64(8*sz);
+				big_int_shl_eq(&max_size, &bits);
+				big_int_sub_eq(&max_size, &one);
+				String max_size_str = big_int_to_string(temporary_allocator(), &max_size);
+				error_line("\tThe maximum value that can be represented by '%s' is '%.*s'\n", b, LIT(max_size_str));
+			}
+		} else {
+			BigInt zero = big_int_make_u64(0);
+			BigInt one = big_int_make_u64(1);
+			BigInt max_size = big_int_make_u64(1);
+			BigInt bits = big_int_make_i64(8*sz - 1);
+			big_int_shl_eq(&max_size, &bits);
+			if (big_int_is_neg(bi)) {
+				big_int_neg(&max_size, &max_size);
+				String max_size_str = big_int_to_string(temporary_allocator(), &max_size);
+				error_line("\tThe minimum value that can be represented by '%s' is '%.*s'\n", b, LIT(max_size_str));
+			} else {
+				big_int_sub_eq(&max_size, &one);
+				String max_size_str = big_int_to_string(temporary_allocator(), &max_size);
+				error_line("\tThe maximum value that can be represented by '%s' is '%.*s'\n", b, LIT(max_size_str));
+			}
+		}
+
+		gb_string_free(b);
+
+		return true;
+	}
+	return false;
+}
 gb_internal void check_assignment_error_suggestion(CheckerContext *c, Operand *o, Type *type) {
 	gbString a = expr_to_string(o->expr);
 	gbString b = type_to_string(type);
@@ -2050,6 +2095,8 @@ gb_internal void check_assignment_error_suggestion(CheckerContext *c, Operand *o
 		error_line("\t            whereas slices in general are assumed to be mutable.\n");
 	} else if (is_type_u8_slice(src) && are_types_identical(dst, t_string) && o->mode != Addressing_Constant) {
 		error_line("\tSuggestion: the expression may be casted to %s\n", b);
+	} else if (check_integer_exceed_suggestion(c, o, type)) {
+		return;
 	}
 }
 
@@ -2089,8 +2136,8 @@ gb_internal void check_cast_error_suggestion(CheckerContext *c, Operand *o, Type
 		}
 	} else if (are_types_identical(src, t_string) && is_type_u8_slice(dst)) {
 		error_line("\tSuggestion: a string may be transmuted to %s\n", b);
-	} else if (is_type_u8_slice(src) && are_types_identical(dst, t_string) && o->mode != Addressing_Constant) {
-		error_line("\tSuggestion: the expression may be casted to %s\n", b);
+	} else if (check_integer_exceed_suggestion(c, o, type)) {
+		return;
 	}
 }
 
@@ -2116,16 +2163,22 @@ gb_internal bool check_is_expressible(CheckerContext *ctx, Operand *o, Type *typ
 			o->mode = Addressing_Invalid;
 		);
 
+		ERROR_BLOCK();
+
+
 		if (is_type_numeric(o->type) && is_type_numeric(type)) {
 			if (!is_type_integer(o->type) && is_type_integer(type)) {
 				error(o->expr, "'%s' truncated to '%s', got %s", a, b, s);
 			} else {
-				ERROR_BLOCK();
-				error(o->expr, "Cannot convert numeric value '%s' to '%s' from '%s', got %s", a, b, c, s);
+				if (are_types_identical(o->type, type)) {
+					error(o->expr, "Numeric value '%s' from '%s' cannot be represented by '%s'", s, a, b);
+				} else {
+					error(o->expr, "Cannot convert numeric value '%s' from '%s' to '%s' from '%s'", s, a, b, c);
+				}
+
 				check_assignment_error_suggestion(ctx, o, type);
 			}
 		} else {
-			ERROR_BLOCK();
 			error(o->expr, "Cannot convert '%s' to '%s' from '%s', got %s", a, b, c, s);
 			check_assignment_error_suggestion(ctx, o, type);
 		}
@@ -2344,7 +2397,7 @@ gb_internal void add_comparison_procedures_for_fields(CheckerContext *c, Type *t
 }
 
 
-gb_internal void check_comparison(CheckerContext *c, Operand *x, Operand *y, TokenKind op) {
+gb_internal void check_comparison(CheckerContext *c, Ast *node, Operand *x, Operand *y, TokenKind op) {
 	if (x->mode == Addressing_Type && y->mode == Addressing_Type) {
 		bool comp = are_types_identical(x->type, y->type);
 		switch (op) {
@@ -2432,7 +2485,7 @@ gb_internal void check_comparison(CheckerContext *c, Operand *x, Operand *y, Tok
 	}
 
 	if (err_str != nullptr) {
-		error(x->expr, "Cannot compare expression, %s", err_str);
+		error(node, "Cannot compare expression, %s", err_str);
 		x->type = t_untyped_bool;
 	} else {
 		if (x->mode == Addressing_Constant &&
@@ -2597,10 +2650,12 @@ gb_internal void check_shift(CheckerContext *c, Operand *x, Operand *y, Ast *nod
 				x->type = t_untyped_integer;
 			}
 
+			x->expr = node;
 			x->value = exact_value_shift(be->op.kind, x_val, y_val);
 
+
 			if (is_type_typed(x->type)) {
-				check_is_expressible(c, x, base_type(x->type));
+				check_is_expressible(c, x, x->type);
 			}
 			return;
 		}
@@ -2915,17 +2970,38 @@ gb_internal void check_cast(CheckerContext *c, Operand *x, Type *type) {
 	bool can_convert = check_cast_internal(c, x, type);
 
 	if (!can_convert) {
-		gbString expr_str = expr_to_string(x->expr);
-		gbString to_type  = type_to_string(type);
-		gbString from_type = type_to_string(x->type);
-		error(x->expr, "Cannot cast '%s' as '%s' from '%s'", expr_str, to_type, from_type);
-		gb_string_free(from_type);
-		gb_string_free(to_type);
-		gb_string_free(expr_str);
-
-		check_cast_error_suggestion(c, x, type);
+		TEMPORARY_ALLOCATOR_GUARD();
+		gbString expr_str  = expr_to_string(x->expr, temporary_allocator());
+		gbString to_type   = type_to_string(type,    temporary_allocator());
+		gbString from_type = type_to_string(x->type, temporary_allocator());
 
 		x->mode = Addressing_Invalid;
+
+		begin_error_block();
+		error(x->expr, "Cannot cast '%s' as '%s' from '%s'", expr_str, to_type, from_type);
+		if (is_const_expr) {
+			gbString val_str = exact_value_to_string(x->value);
+			if (is_type_float(x->type) && is_type_integer(type)) {
+				error_line("\t%s cannot be represented without truncation/rounding as the type '%s'\n", val_str, to_type);
+
+				// NOTE(bill): keep the mode and modify the type to minimize errors further on
+				x->mode = Addressing_Constant;
+				x->type = type;
+			} else {
+				error_line("\t'%s' cannot be represented as the type '%s'\n", val_str, to_type);
+				if (is_type_numeric(type)) {
+					// NOTE(bill): keep the mode and modify the type to minimize errors further on
+					x->mode = Addressing_Constant;
+					x->type = type;
+				}
+			}
+			gb_string_free(val_str);
+
+		}
+		check_cast_error_suggestion(c, x, type);
+
+		end_error_block();
+
 		return;
 	}
 
@@ -3422,7 +3498,7 @@ gb_internal void check_binary_expr(CheckerContext *c, Operand *x, Ast *node, Typ
 
 
 	if (token_is_comparison(op.kind)) {
-		check_comparison(c, x, y, op.kind);
+		check_comparison(c, node, x, y, op.kind);
 		return;
 	}
 
@@ -4730,20 +4806,29 @@ gb_internal Entity *check_selector(CheckerContext *c, Operand *operand, Ast *nod
 		gbString op_str   = expr_to_string(op_expr);
 		gbString type_str = type_to_string_shorthand(operand->type);
 		gbString sel_str  = expr_to_string(selector);
-		error(op_expr, "'%s' of type '%s' has no field '%s'", op_str, type_str, sel_str);
 
-		if (operand->type != nullptr && selector->kind == Ast_Ident) {
-			String const &name = selector->Ident.token.string;
-			Type *bt = base_type(operand->type);
-			if (operand->type->kind == Type_Named &&
-			    operand->type->Named.type_name &&
-			    operand->type->Named.type_name->kind == Entity_TypeName &&
-			    operand->type->Named.type_name->TypeName.objc_metadata) {
-				check_did_you_mean_objc_entity(name, operand->type->Named.type_name, operand->mode == Addressing_Type);
-			} else if (bt->kind == Type_Struct) {
-				check_did_you_mean_type(name, bt->Struct.fields);
-			} else if (bt->kind == Type_Enum) {
-				check_did_you_mean_type(name, bt->Enum.fields);
+		if (operand->mode == Addressing_Type) {
+			if (is_type_polymorphic(operand->type, true)) {
+				error(op_expr, "Type '%s' has no field nor polymorphic parameter '%s'", op_str, sel_str);
+			} else {
+				error(op_expr, "Type '%s' has no field '%s'", op_str, sel_str);
+			}
+		} else {
+			error(op_expr, "'%s' of type '%s' has no field '%s'", op_str, type_str, sel_str);
+
+			if (operand->type != nullptr && selector->kind == Ast_Ident) {
+				String const &name = selector->Ident.token.string;
+				Type *bt = base_type(operand->type);
+				if (operand->type->kind == Type_Named &&
+				    operand->type->Named.type_name &&
+				    operand->type->Named.type_name->kind == Entity_TypeName &&
+				    operand->type->Named.type_name->TypeName.objc_metadata) {
+					check_did_you_mean_objc_entity(name, operand->type->Named.type_name, operand->mode == Addressing_Type);
+				} else if (bt->kind == Type_Struct) {
+					check_did_you_mean_type(name, bt->Struct.fields);
+				} else if (bt->kind == Type_Enum) {
+					check_did_you_mean_type(name, bt->Enum.fields);
+				}
 			}
 		}
 
@@ -5418,7 +5503,18 @@ gb_internal CALL_ARGUMENT_CHECKER(check_call_arguments_internal) {
 		data->score = score;
 		data->result_type = final_proc_type->Proc.results;
 		data->gen_entity = gen_entity;
-		add_type_and_value(c, ce->proc, Addressing_Value, final_proc_type, {});
+
+
+		Ast *proc_lit = nullptr;
+		if (ce->proc->tav.value.kind == ExactValue_Procedure) {
+			Ast *vp = unparen_expr(ce->proc->tav.value.value_procedure);
+			if (vp && vp->kind == Ast_ProcLit) {
+				proc_lit = vp;
+			}
+		}
+		if (proc_lit == nullptr) {
+			add_type_and_value(c, ce->proc, Addressing_Value, final_proc_type, {});
+		}
 	}
 
 	return err;
@@ -7029,7 +7125,7 @@ gb_internal bool ternary_compare_types(Type *x, Type *y) {
 }
 
 
-gb_internal bool check_range(CheckerContext *c, Ast *node, Operand *x, Operand *y, ExactValue *inline_for_depth_, Type *type_hint=nullptr) {
+gb_internal bool check_range(CheckerContext *c, Ast *node, bool is_for_loop, Operand *x, Operand *y, ExactValue *inline_for_depth_, Type *type_hint=nullptr) {
 	if (!is_ast_range(node)) {
 		return false;
 	}
@@ -7078,9 +7174,17 @@ gb_internal bool check_range(CheckerContext *c, Ast *node, Operand *x, Operand *
 	}
 
 	Type *type = x->type;
-	if (!is_type_integer(type) && !is_type_float(type) && !is_type_pointer(type) && !is_type_enum(type)) {
-		error(ie->op, "Only numerical and pointer types are allowed within interval expressions");
-		return false;
+
+	if (is_for_loop) {
+		if (!is_type_integer(type) && !is_type_float(type) && !is_type_enum(type)) {
+			error(ie->op, "Only numerical types are allowed within interval expressions");
+			return false;
+		}
+	} else {
+		if (!is_type_integer(type) && !is_type_float(type) && !is_type_pointer(type) && !is_type_enum(type)) {
+			error(ie->op, "Only numerical and pointer types are allowed within interval expressions");
+			return false;
+		}
 	}
 
 	if (x->mode == Addressing_Constant &&
@@ -8093,7 +8197,7 @@ gb_internal ExprKind check_compound_literal(CheckerContext *c, Operand *o, Ast *
 
 					Operand x = {};
 					Operand y = {};
-					bool ok = check_range(c, fv->field, &x, &y, nullptr);
+					bool ok = check_range(c, fv->field, false, &x, &y, nullptr);
 					if (!ok) {
 						continue;
 					}
@@ -8309,7 +8413,7 @@ gb_internal ExprKind check_compound_literal(CheckerContext *c, Operand *o, Ast *
 
 					Operand x = {};
 					Operand y = {};
-					bool ok = check_range(c, fv->field, &x, &y, nullptr, index_type);
+					bool ok = check_range(c, fv->field, false, &x, &y, nullptr, index_type);
 					if (!ok) {
 						continue;
 					}

@@ -2210,6 +2210,15 @@ gb_internal lbValue lb_compare_records(lbProcedure *p, TokenKind op_kind, lbValu
 	lbValue left_ptr  = lb_address_from_load_or_generate_local(p, left);
 	lbValue right_ptr = lb_address_from_load_or_generate_local(p, right);
 	lbValue res = {};
+	if (type_size_of(type) == 0) {
+		switch (op_kind) {
+		case Token_CmpEq:
+			return lb_const_bool(p->module, t_bool, true);
+		case Token_NotEq:
+			return lb_const_bool(p->module, t_bool, false);
+		}
+		GB_PANIC("invalid operator");
+	}
 	if (is_type_simple_compare(type)) {
 		// TODO(bill): Test to see if this is actually faster!!!!
 		auto args = array_make<lbValue>(permanent_allocator(), 3);
@@ -3138,7 +3147,7 @@ gb_internal lbValue lb_build_expr_internal(lbProcedure *p, Ast *expr) {
 		Entity *e = entity_from_expr(expr);
 		e = strip_entity_wrapping(e);
 
-		GB_ASSERT_MSG(e != nullptr, "%s", expr_to_string(expr));
+		GB_ASSERT_MSG(e != nullptr, "%s in %.*s %p", expr_to_string(expr), LIT(p->name), expr);
 		if (e->kind == Entity_Builtin) {
 			Token token = ast_token(expr);
 			GB_PANIC("TODO(bill): lb_build_expr Entity_Builtin '%.*s'\n"

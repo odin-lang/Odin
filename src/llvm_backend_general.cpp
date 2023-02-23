@@ -82,6 +82,7 @@ gb_internal void lb_init_module(lbModule *m, Checker *c) {
 
 	map_init(&m->map_info_map, 0);
 	map_init(&m->map_cell_info_map, 0);
+	map_init(&m->exact_value_compound_literal_addr_map, 1024);
 
 }
 
@@ -1586,6 +1587,10 @@ gb_internal LLVMTypeRef lb_type_internal_for_procedures_raw(lbModule *m, Type *t
 		if (params_by_ptr[i]) {
 			// NOTE(bill): The parameter needs to be passed "indirectly", override it
 			ft->args[i].kind = lbArg_Indirect;
+			ft->args[i].attribute = nullptr;
+			ft->args[i].align_attribute = nullptr;
+			ft->args[i].byval_alignment = 0;
+			ft->args[i].is_byval = false;
 		}
 	}
 

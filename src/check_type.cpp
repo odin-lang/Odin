@@ -1666,17 +1666,21 @@ gb_internal Type *check_get_params(CheckerContext *ctx, Scope *scope, Ast *_para
 					if (is_poly_name) {
 						bool valid = false;
 						if (is_type_proc(op.type)) {
-							Entity *proc_entity = entity_from_expr(op.expr);
-							valid = (proc_entity != nullptr) && (op.value.kind == ExactValue_Procedure);
-							if (valid) {
+							Ast *expr = unparen_expr(op.expr);
+							Entity *proc_entity = entity_from_expr(expr);
+							if (proc_entity) {
 								poly_const = exact_value_procedure(proc_entity->identifier.load() ? proc_entity->identifier.load() : op.expr);
+								valid = true;
+							} else if (expr->kind == Ast_ProcLit) {
+								poly_const = exact_value_procedure(expr);
+								valid = true;
 							}
 						}
 						if (!valid) {
 							if (op.mode == Addressing_Constant) {
 								poly_const = op.value;
 							} else {
-								error(op.expr, "Expected a constant value for this polymorphic name parameter");
+								error(op.expr, "Expected a constant value for this polymorphic name parameter, got %s", expr_to_string(op.expr));
 								success = false;
 							}
 						}

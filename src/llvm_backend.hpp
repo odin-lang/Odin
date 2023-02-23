@@ -182,6 +182,8 @@ struct lbModule {
 	PtrMap<Type *, lbAddr> map_cell_info_map; // address of runtime.Map_Info
 	PtrMap<Type *, lbAddr> map_info_map;      // address of runtime.Map_Cell_Info
 
+	PtrMap<Ast *, lbAddr> exact_value_compound_literal_addr_map; // Key: Ast_CompoundLit
+
 	LLVMPassManagerRef function_pass_managers[lbFunctionPassManager_COUNT];
 };
 
@@ -208,6 +210,7 @@ struct lbGenerator {
 
 	lbProcedure *startup_type_info;
 	lbProcedure *startup_runtime;
+	lbProcedure *cleanup_runtime;
 	lbProcedure *objc_names;
 };
 
@@ -540,6 +543,7 @@ gb_internal LLVMTypeRef OdinLLVMGetArrayElementType(LLVMTypeRef type);
 gb_internal LLVMTypeRef OdinLLVMGetVectorElementType(LLVMTypeRef type);
 
 #define LB_STARTUP_RUNTIME_PROC_NAME   "__$startup_runtime"
+#define LB_CLEANUP_RUNTIME_PROC_NAME   "__$cleanup_runtime"
 #define LB_STARTUP_TYPE_INFO_PROC_NAME "__$startup_type_info"
 #define LB_TYPE_INFO_DATA_NAME       "__$type_info_data"
 #define LB_TYPE_INFO_TYPES_NAME      "__$type_info_types_data"
