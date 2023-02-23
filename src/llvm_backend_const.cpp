@@ -411,7 +411,6 @@ gb_internal lbValue lb_const_value(lbModule *m, Type *type, ExactValue value, bo
 		Ast *expr = unparen_expr(value.value_procedure);
 		if (expr->kind == Ast_ProcLit) {
 			res = lb_generate_anonymous_proc_lit(m, str_lit("_proclit"), expr);
-
 		} else {
 			Entity *e = entity_from_expr(expr);
 			res = lb_find_procedure_value_from_entity(m, e);
@@ -461,6 +460,8 @@ gb_internal lbValue lb_const_value(lbModule *m, Type *type, ExactValue value, bo
 					LLVMValueRef ptr = LLVMBuildInBoundsGEP2(p->builder, llvm_type, array_data, indices, 2, "");
 					LLVMValueRef len = LLVMConstInt(lb_type(m, t_int), count, true);
 					lbAddr slice = lb_add_local_generated(p, type, false);
+					map_set(&m->exact_value_compound_literal_addr_map, value.value_compound, slice);
+
 					lb_fill_slice(p, slice, {ptr, alloc_type_pointer(elem)}, {len, t_int});
 					return lb_addr_load(p, slice);
 				}
@@ -1043,6 +1044,8 @@ gb_internal lbValue lb_const_value(lbModule *m, Type *type, ExactValue value, bo
 				GB_ASSERT(is_local);
 				lbProcedure *p = m->curr_procedure;
 				lbAddr v = lb_add_local_generated(p, res.type, true);
+				map_set(&m->exact_value_compound_literal_addr_map, value.value_compound, v);
+
 				LLVMBuildStore(p->builder, constant_value, v.addr.value);
 				for (isize i = 0; i < value_count; i++) {
 					LLVMValueRef val = old_values[i];

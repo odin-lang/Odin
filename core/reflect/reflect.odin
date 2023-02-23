@@ -25,7 +25,8 @@ Type_Info_Array            :: runtime.Type_Info_Array
 Type_Info_Enumerated_Array :: runtime.Type_Info_Enumerated_Array
 Type_Info_Dynamic_Array    :: runtime.Type_Info_Dynamic_Array
 Type_Info_Slice            :: runtime.Type_Info_Slice
-Type_Info_Tuple            :: runtime.Type_Info_Tuple
+Type_Info_Parameters       :: runtime.Type_Info_Parameters
+Type_Info_Tuple            :: runtime.Type_Info_Parameters
 Type_Info_Struct           :: runtime.Type_Info_Struct
 Type_Info_Union            :: runtime.Type_Info_Union
 Type_Info_Enum             :: runtime.Type_Info_Enum
@@ -96,7 +97,7 @@ type_kind :: proc(T: typeid) -> Type_Kind {
 		case Type_Info_Enumerated_Array: return .Enumerated_Array
 		case Type_Info_Dynamic_Array:    return .Dynamic_Array
 		case Type_Info_Slice:            return .Slice
-		case Type_Info_Tuple:            return .Tuple
+		case Type_Info_Parameters:       return .Tuple
 		case Type_Info_Struct:           return .Struct
 		case Type_Info_Union:            return .Union
 		case Type_Info_Enum:             return .Enum
@@ -1438,7 +1439,7 @@ equal :: proc(a, b: any, including_indirect_array_recursion := false, recursion_
 	switch v in t.variant {
 	case Type_Info_Named:
 		unreachable()
-	case Type_Info_Tuple:
+	case Type_Info_Parameters:
 		unreachable()
 	case Type_Info_Any:
 		if !including_indirect_array_recursion {

@@ -1,6 +1,6 @@
 package darwin
 
-unix_offset_syscall :: proc(number: System_Call_Number) -> uintptr {
+unix_offset_syscall :: proc "contextless" (number: System_Call_Number) -> uintptr {
     return uintptr(number) + uintptr(0x2000000)
 }
 

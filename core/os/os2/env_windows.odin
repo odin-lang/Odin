@@ -65,7 +65,19 @@ _environ :: proc(allocator: runtime.Allocator) -> []string {
 	}
 	defer win32.FreeEnvironmentStringsW(envs)
 
-	r := make([dynamic]string, 0, 50, allocator)
+	n := 0
+	for from, i, p := 0, 0, envs; true; i += 1 {
+		c := ([^]u16)(p)[i]
+		if c == 0 {
+			if i <= from {
+				break
+			}
+			n += 1
+			from = i + 1
+		}
+	}
+
+	r := make([dynamic]string, 0, n, allocator)
 	for from, i, p := 0, 0, envs; true; i += 1 {
 		c := ([^]u16)(p)[i]
 		if c == 0 {

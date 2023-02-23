@@ -624,7 +624,7 @@ gb_global Type *t_type_info_array                = nullptr;
 gb_global Type *t_type_info_enumerated_array     = nullptr;
 gb_global Type *t_type_info_dynamic_array        = nullptr;
 gb_global Type *t_type_info_slice                = nullptr;
-gb_global Type *t_type_info_tuple                = nullptr;
+gb_global Type *t_type_info_parameters           = nullptr;
 gb_global Type *t_type_info_struct               = nullptr;
 gb_global Type *t_type_info_union                = nullptr;
 gb_global Type *t_type_info_enum                 = nullptr;
@@ -653,7 +653,7 @@ gb_global Type *t_type_info_array_ptr            = nullptr;
 gb_global Type *t_type_info_enumerated_array_ptr = nullptr;
 gb_global Type *t_type_info_dynamic_array_ptr    = nullptr;
 gb_global Type *t_type_info_slice_ptr            = nullptr;
-gb_global Type *t_type_info_tuple_ptr            = nullptr;
+gb_global Type *t_type_info_parameters_ptr       = nullptr;
 gb_global Type *t_type_info_struct_ptr           = nullptr;
 gb_global Type *t_type_info_union_ptr            = nullptr;
 gb_global Type *t_type_info_enum_ptr             = nullptr;
@@ -2313,9 +2313,6 @@ gb_internal bool is_type_comparable(Type *t) {
 		return true;
 
 	case Type_Struct:
-		if (type_size_of(t) == 0) {
-			return false;
-		}
 		if (t->Struct.soa_kind != StructSoa_None) {
 			return false;
 		}
@@ -2331,9 +2328,6 @@ gb_internal bool is_type_comparable(Type *t) {
 		return true;
 
 	case Type_Union:
-		if (type_size_of(t) == 0) {
-			return false;
-		}
 		for_array(i, t->Union.variants) {
 			Type *v = t->Union.variants[i];
 			if (!is_type_comparable(v)) {

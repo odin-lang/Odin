@@ -2543,7 +2543,7 @@ IDevice_VTable :: struct {
 	CreateSampler:                    proc "stdcall" (this: ^IDevice, pDesc: ^SAMPLER_DESC, DestDescriptor: CPU_DESCRIPTOR_HANDLE),
 	CopyDescriptors:                  proc "stdcall" (this: ^IDevice, NumDestDescriptorRanges: u32, pDestDescriptorRangeStarts: ^CPU_DESCRIPTOR_HANDLE, pDestDescriptorRangeSizes: ^u32, NumSrcDescriptorRanges: u32, pSrcDescriptorRangeStarts: ^CPU_DESCRIPTOR_HANDLE, pSrcDescriptorRangeSizes: ^u32, DescriptorHeapsType: DESCRIPTOR_HEAP_TYPE),
 	CopyDescriptorsSimple:            proc "stdcall" (this: ^IDevice, NumDescriptors: u32, DestDescriptorRangeStart: CPU_DESCRIPTOR_HANDLE, SrcDescriptorRangeStart: CPU_DESCRIPTOR_HANDLE, DescriptorHeapsType: DESCRIPTOR_HEAP_TYPE),
-	GetResourceAllocationInfo:        proc "stdcall" (this: ^IDevice, visibleMask: u32, numResourceDescs: u32, pResourceDescs: ^RESOURCE_DESC) -> RESOURCE_ALLOCATION_INFO,
+	GetResourceAllocationInfo:        proc "stdcall" (this: ^IDevice, RetVal: ^RESOURCE_ALLOCATION_INFO, visibleMask: u32, numResourceDescs: u32, pResourceDescs: ^RESOURCE_DESC),
 	GetCustomHeapProperties:          proc "stdcall" (this: ^IDevice, nodeMask: u32, heapType: HEAP_TYPE) -> HEAP_PROPERTIES,
 	CreateCommittedResource:          proc "stdcall" (this: ^IDevice, pHeapProperties: ^HEAP_PROPERTIES, HeapFlags: HEAP_FLAGS, pDesc: ^RESOURCE_DESC, InitialResourceState: RESOURCE_STATES, pOptimizedClearValue: ^CLEAR_VALUE, riidResource: ^IID, ppvResource: ^rawptr) -> HRESULT,
 	CreateHeap:                       proc "stdcall" (this: ^IDevice, pDesc: ^HEAP_DESC, riid: ^IID, ppvHeap: ^rawptr) -> HRESULT,
@@ -2728,7 +2728,7 @@ IDevice4_VTable :: struct {
 	CreateCommittedResource1:       proc "stdcall" (this: ^IDevice4, pHeapProperties: ^HEAP_PROPERTIES, HeapFlags: HEAP_FLAGS, pDesc: ^RESOURCE_DESC, InitialResourceState: RESOURCE_STATES, pOptimizedClearValue: ^CLEAR_VALUE, pProtectedSession: ^IProtectedResourceSession, riidResource: ^IID, ppvResource: ^rawptr) -> HRESULT,
 	CreateHeap1:                    proc "stdcall" (this: ^IDevice4, pDesc: ^HEAP_DESC, pProtectedSession: ^IProtectedResourceSession, riid: ^IID, ppvHeap: ^rawptr) -> HRESULT,
 	CreateReservedResource1:        proc "stdcall" (this: ^IDevice4, pDesc: ^RESOURCE_DESC, InitialState: RESOURCE_STATES, pOptimizedClearValue: ^CLEAR_VALUE, pProtectedSession: ^IProtectedResourceSession, riid: ^IID, ppvResource: ^rawptr) -> HRESULT,
-	GetResourceAllocationInfo1:     proc "stdcall" (this: ^IDevice4, visibleMask: u32, numResourceDescs: u32, pResourceDescs: ^RESOURCE_DESC, pResourceAllocationInfo1: ^RESOURCE_ALLOCATION_INFO1) -> RESOURCE_ALLOCATION_INFO,
+	GetResourceAllocationInfo1:     proc "stdcall" (this: ^IDevice4, RetVal: ^RESOURCE_ALLOCATION_INFO, visibleMask: u32, numResourceDescs: u32, pResourceDescs: ^RESOURCE_DESC, pResourceAllocationInfo1: ^RESOURCE_ALLOCATION_INFO1),
 }
 
 LIFETIME_STATE :: enum i32 {
@@ -3516,7 +3516,7 @@ IDevice8 :: struct #raw_union {
 }
 IDevice8_VTable :: struct {
 	using id3d12device7_vtable: IDevice7_VTable,
-	GetResourceAllocationInfo2:               proc "stdcall" (this: ^IDevice8, visibleMask: u32, numResourceDescs: u32, pResourceDescs: ^RESOURCE_DESC1, pResourceAllocationInfo1: ^RESOURCE_ALLOCATION_INFO1) -> RESOURCE_ALLOCATION_INFO,
+	GetResourceAllocationInfo2:               proc "stdcall" (this: ^IDevice8, RetVal: ^RESOURCE_ALLOCATION_INFO, visibleMask: u32, numResourceDescs: u32, pResourceDescs: ^RESOURCE_DESC1, pResourceAllocationInfo1: ^RESOURCE_ALLOCATION_INFO1),
 	CreateCommittedResource2:                 proc "stdcall" (this: ^IDevice8, pHeapProperties: ^HEAP_PROPERTIES, HeapFlags: HEAP_FLAGS, pDesc: ^RESOURCE_DESC1, InitialResourceState: RESOURCE_STATES, pOptimizedClearValue: ^CLEAR_VALUE, pProtectedSession: ^IProtectedResourceSession, riidResource: ^IID, ppvResource: ^rawptr) -> HRESULT,
 	CreatePlacedResource1:                    proc "stdcall" (this: ^IDevice8, pHeap: ^IHeap, HeapOffset: u64, pDesc: ^RESOURCE_DESC1, InitialState: RESOURCE_STATES, pOptimizedClearValue: ^CLEAR_VALUE, riid: ^IID, ppvResource: ^rawptr) -> HRESULT,
 	CreateSamplerFeedbackUnorderedAccessView: proc "stdcall" (this: ^IDevice8, pTargetedResource: ^IResource, pFeedbackResource: ^IResource, DestDescriptor: CPU_DESCRIPTOR_HANDLE),
@@ -5104,7 +5104,7 @@ PARAMETER_DESC :: struct {
 }
 
 IShaderReflectionType :: struct {
-	vtable: ^IShaderReflectionType_VTable,
+	using vtable: ^IShaderReflectionType_VTable,
 }
 IShaderReflectionType_VTable :: struct {
 	GetDesc:              proc "stdcall" (this: ^IShaderReflectionType, pDesc: ^SHADER_TYPE_DESC) -> HRESULT,
@@ -5121,7 +5121,7 @@ IShaderReflectionType_VTable :: struct {
 }
 
 IShaderReflectionVariable :: struct {
-	vtable: ^IShaderReflectionVariable_VTable,
+	using vtable: ^IShaderReflectionVariable_VTable,
 }
 IShaderReflectionVariable_VTable :: struct {
 	GetDesc:          proc "stdcall" (this: ^IShaderReflectionVariable, pDesc: ^SHADER_VARIABLE_DESC) -> HRESULT,
@@ -5131,7 +5131,7 @@ IShaderReflectionVariable_VTable :: struct {
 }
 
 IShaderReflectionConstantBuffer :: struct {
-	vtable: ^IShaderReflectionConstantBuffer_VTable,
+	using vtable: ^IShaderReflectionConstantBuffer_VTable,
 }
 IShaderReflectionConstantBuffer_VTable :: struct {
 	GetDesc:            proc "stdcall" (this: ^IShaderReflectionConstantBuffer, pDesc: ^SHADER_BUFFER_DESC) -> HRESULT,

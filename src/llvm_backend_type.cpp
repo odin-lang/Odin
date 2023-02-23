@@ -541,8 +541,7 @@ gb_internal void lb_setup_type_info_data(lbProcedure *p) { // NOTE(bill): Setup 
 			break;
 		}
 		case Type_Tuple: {
-			tag = lb_const_ptr_cast(m, variant_ptr, t_type_info_tuple_ptr);
-
+			tag = lb_const_ptr_cast(m, variant_ptr, t_type_info_parameters_ptr);
 
 			lbValue memory_types = lb_type_info_member_types_offset(p, t->Tuple.variables.count);
 			lbValue memory_names = lb_type_info_member_names_offset(p, t->Tuple.variables.count);

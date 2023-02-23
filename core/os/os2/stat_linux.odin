@@ -83,7 +83,7 @@ _Stat :: struct {
 }
 
 
-_fstat :: proc(f: ^File, allocator := context.allocator) -> (File_Info, Error) {
+_fstat :: proc(f: ^File, allocator: runtime.Allocator) -> (File_Info, Error) {
 	return _fstat_internal(f.impl.fd, allocator)
 }
 
@@ -111,7 +111,7 @@ _fstat_internal :: proc(fd: int, allocator: runtime.Allocator) -> (File_Info, Er
 }
 
 // NOTE: _stat and _lstat are using _fstat to avoid a race condition when populating fullpath
-_stat :: proc(name: string, allocator := context.allocator) -> (File_Info, Error) {
+_stat :: proc(name: string, allocator: runtime.Allocator) -> (File_Info, Error) {
 	name_cstr, allocated := _name_to_cstring(name)
 	defer if allocated {
 		delete(name_cstr)
@@ -125,7 +125,7 @@ _stat :: proc(name: string, allocator := context.allocator) -> (File_Info, Error
 	return _fstat_internal(fd, allocator)
 }
 
-_lstat :: proc(name: string, allocator := context.allocator) -> (File_Info, Error) {
+_lstat :: proc(name: string, allocator: runtime.Allocator) -> (File_Info, Error) {
 	name_cstr, allocated := _name_to_cstring(name)
 	defer if allocated {
 		delete(name_cstr)
