@@ -53,6 +53,11 @@ struct TypeIsPointer<T *> {
 	enum {value = true};
 };
 
+template <typename T> struct TypeIsPtrSizedInteger { enum {value = false}; };
+template <> struct TypeIsPtrSizedInteger<isize> { enum {value = true}; };
+template <> struct TypeIsPtrSizedInteger<usize> { enum {value = true}; };
+
+
 #include "unicode.cpp"
 #include "array.cpp"
 #include "threading.cpp"

@@ -430,7 +430,6 @@ gb_internal Selection sub_selection(Selection const &sel, isize offset) {
 	return res;
 }
 
-
 gb_global Type basic_types[] = {
 	{Type_Basic, {Basic_Invalid,           0,                                          0, STR_LIT("invalid type")}},
 
