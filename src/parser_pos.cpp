@@ -23,6 +23,9 @@ gb_internal Token ast_token(Ast *node) {
 		if (node->SelectorExpr.expr != nullptr) {
 			return ast_token(node->SelectorExpr.expr);
 		}
+		if (node->SelectorExpr.selector != nullptr) {
+			return ast_token(node->SelectorExpr.selector);
+		}
 		return node->SelectorExpr.token;
 	case Ast_SelectorCallExpr:
 		if (node->SelectorCallExpr.expr != nullptr) {
