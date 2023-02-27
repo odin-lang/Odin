@@ -20,8 +20,8 @@ gb_internal Token ast_token(Ast *node) {
 	case Ast_ParenExpr:     return node->ParenExpr.open;
 	case Ast_CallExpr:      return ast_token(node->CallExpr.proc);
 	case Ast_SelectorExpr:
-		if (node->SelectorExpr.selector != nullptr) {
-			return ast_token(node->SelectorExpr.selector);
+		if (node->SelectorExpr.expr != nullptr) {
+			return ast_token(node->SelectorExpr.expr);
 		}
 		return node->SelectorExpr.token;
 	case Ast_SelectorCallExpr:

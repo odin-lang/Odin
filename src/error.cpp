@@ -261,30 +261,31 @@ gb_internal bool show_error_on_line(TokenPos const &pos, TokenPos end) {
 		enum {
 			MAX_LINE_LENGTH  = 80,
 			MAX_TAB_WIDTH    = 8,
-			ELLIPSIS_PADDING = 8 // `...  ...`
+			ELLIPSIS_PADDING = 8, // `...  ...`
+			MAX_LINE_LENGTH_PADDED = MAX_LINE_LENGTH-MAX_TAB_WIDTH-ELLIPSIS_PADDING,
 		};
 
 		error_out("\t");
 
 		terminal_set_colours(TerminalStyle_Bold, TerminalColour_White);
 
+
+		i32 error_length = gb_max(end.offset - pos.offset, 1);
+
 		isize squiggle_extra = 0;
 
-		if (line.len+MAX_TAB_WIDTH+ELLIPSIS_PADDING > MAX_LINE_LENGTH) {
-			i32 const half_width = MAX_LINE_LENGTH/2;
-			i32 left  = cast(i32)(offset);
-			i32 right = cast(i32)(line.len - offset);
-			left  = gb_min(left, half_width);
-			right = gb_min(right, half_width);
-
+		if (line.len > MAX_LINE_LENGTH_PADDED) {
+			i32 left = MAX_TAB_WIDTH;
 			line.text += offset-left;
-			line.len  -= offset+right-left;
-
-			line = string_trim_whitespace(line);
-
-			squiggle_extra = ELLIPSIS_PADDING/2 + 1;
-			offset = left + ELLIPSIS_PADDING/2;
-
+			line.len  -= offset-left;
+			offset = left+MAX_TAB_WIDTH/2;
+			if (line.len > MAX_LINE_LENGTH_PADDED) {
+				line.len = MAX_LINE_LENGTH_PADDED;
+				if (error_length > line.len-left) {
+					error_length = cast(i32)line.len - left;
+					squiggle_extra = 1;
+				}
+			}
 			error_out("... %.*s ...", LIT(line));
 		} else {
 			error_out("%.*s", LIT(line));
@@ -304,11 +305,10 @@ gb_internal bool show_error_on_line(TokenPos const &pos, TokenPos end) {
 					error_out("~");
 				}
 			} else if (end.line == pos.line && end.column > pos.column) {
-				i32 length = gb_min(end.offset - pos.offset, cast(i32)(line.len-offset));
-				for (i32 i = 1; i < length-1+squiggle_extra; i++) {
+				for (i32 i = 1; i < error_length-1+squiggle_extra; i++) {
 					error_out("~");
 				}
-				if (length > 1 && squiggle_extra == 0) {
+				if (error_length > 1 && squiggle_extra == 0) {
 					error_out("^");
 				}
 			}
