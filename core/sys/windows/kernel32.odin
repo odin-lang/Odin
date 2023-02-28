@@ -315,6 +315,13 @@ foreign kernel32 {
 		lpOverlapped: LPOVERLAPPED,
 		lpCompletionRoutine: LPOVERLAPPED_COMPLETION_ROUTINE,
 	) -> BOOL ---
+	FindFirstChangeNotificationW :: proc(
+		lpPathName: LPWSTR,
+		bWatchSubtree: BOOL,
+		dwNotifyFilter: DWORD,
+	) -> HANDLE ---
+	FindNextChangeNotification :: proc(hChangeHandle: HANDLE) -> BOOL ---
+	FindCloseChangeNotification :: proc(hChangeHandle: HANDLE) -> BOOL ---
 
 	InitializeSRWLock          :: proc(SRWLock: ^SRWLOCK) ---
 	AcquireSRWLockExclusive    :: proc(SRWLock: ^SRWLOCK) ---
