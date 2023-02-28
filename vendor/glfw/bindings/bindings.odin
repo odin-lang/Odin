@@ -3,13 +3,24 @@ package glfw_bindings
 import "core:c"
 import vk "vendor:vulkan"
 
+GLFW_DYNAMIC :: #config(GLFW_DYNAMIC, false)
+
 when ODIN_OS == .Windows {
-	foreign import glfw { 
-		"../lib/glfw3_mt.lib",
-		"system:user32.lib", 
-		"system:gdi32.lib", 
-		"system:shell32.lib",
-	} 
+	when GLFW_DYNAMIC {
+		foreign import glfw {
+			"../lib/glfw3dll.lib",
+			"system:user32.lib", 
+			"system:gdi32.lib", 
+			"system:shell32.lib",
+		}
+	} else {
+		foreign import glfw {
+			"../lib/glfw3mt.lib",
+			"system:user32.lib",
+			"system:gdi32.lib",
+			"system:shell32.lib",
+		}
+	}
 } else when ODIN_OS == .Linux {
 	// TODO: Add the billion-or-so static libs to link to in linux
 	foreign import glfw "system:glfw"
