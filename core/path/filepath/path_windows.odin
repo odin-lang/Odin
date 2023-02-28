@@ -1,6 +1,7 @@
 package filepath
 
 import "core:strings"
+import "core:runtime"
 import "core:os"
 import win32 "core:sys/windows"
 
@@ -60,25 +61,25 @@ temp_full_path :: proc(name: string) -> (path: string, err: os.Errno) {
 	}
 
 	p := win32.utf8_to_utf16(name, ta)
-	buf := make([dynamic]u16, 100, ta)
-	for {
-		n := win32.GetFullPathNameW(raw_data(p), u32(len(buf)), raw_data(buf), nil)
-		if n == 0 {
-			delete(buf)
-			return "", os.Errno(win32.GetLastError())
-		}
-		if n <= u32(len(buf)) {
-			return win32.utf16_to_utf8(buf[:n], ta) or_else "", os.ERROR_NONE
-		}
-		resize(&buf, len(buf)*2)
+	n := win32.GetFullPathNameW(raw_data(p), 0, nil, nil)
+	if n == 0 {
+		return "", os.Errno(win32.GetLastError())
 	}
 
-	return
+	buf := make([]u16, n, ta)
+	n = win32.GetFullPathNameW(raw_data(p), u32(len(buf)), raw_data(buf), nil)
+	if n == 0 {
+		delete(buf)
+		return "", os.Errno(win32.GetLastError())
+	}
+
+	return win32.utf16_to_utf8(buf[:n], ta) or_else "", os.ERROR_NONE
 }
 
 
 
 abs :: proc(path: string, allocator := context.allocator) -> (string, bool) {
+	runtime.DEFAULT_TEMP_ALLOCATOR_TEMP_GUARD(ignore = allocator == context.temp_allocator)
 	full_path, err := temp_full_path(path)
 	if err != 0 {
 		return "", false
@@ -99,6 +100,8 @@ join :: proc(elems: []string, allocator := context.allocator) -> string {
 
 join_non_empty :: proc(elems: []string, allocator := context.allocator) -> string {
 	context.allocator = allocator
+
+	runtime.DEFAULT_TEMP_ALLOCATOR_TEMP_GUARD(ignore = allocator == context.temp_allocator)
 	
 	if len(elems[0]) == 2 && elems[0][1] == ':' {
 		i := 1

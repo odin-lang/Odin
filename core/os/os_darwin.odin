@@ -355,6 +355,7 @@ open :: proc(path: string, flags: int = O_RDWR, mode: int = 0) -> (Handle, Errno
 		flags = O_RDONLY
 	}
 
+	runtime.DEFAULT_TEMP_ALLOCATOR_TEMP_GUARD()
 	cstr := strings.clone_to_cstring(path, context.temp_allocator)
 	handle := _unix_open(cstr, i32(flags), u16(mode))
 	if handle == -1 {
@@ -516,24 +517,28 @@ is_file :: proc {is_file_path, is_file_handle}
 is_dir :: proc {is_dir_path, is_dir_handle}
 
 exists :: proc(path: string) -> bool {
+	runtime.DEFAULT_TEMP_ALLOCATOR_TEMP_GUARD()
 	cpath := strings.clone_to_cstring(path, context.temp_allocator)
 	res := _unix_access(cpath, O_RDONLY)
 	return res == 0
 }
 
 rename :: proc(old: string, new: string) -> bool {
+	runtime.DEFAULT_TEMP_ALLOCATOR_TEMP_GUARD()
 	old_cstr := strings.clone_to_cstring(old, context.temp_allocator)
 	new_cstr := strings.clone_to_cstring(new, context.temp_allocator)
 	return _unix_rename(old_cstr, new_cstr) != -1
 }
 
 remove :: proc(path: string) -> bool {
+	runtime.DEFAULT_TEMP_ALLOCATOR_TEMP_GUARD()
 	path_cstr := strings.clone_to_cstring(path, context.temp_allocator)
 	return _unix_remove(path_cstr) != -1
 }
 
 @private
 _stat :: proc(path: string) -> (OS_Stat, Errno) {
+	runtime.DEFAULT_TEMP_ALLOCATOR_TEMP_GUARD()
 	cstr := strings.clone_to_cstring(path, context.temp_allocator)
 
 	s: OS_Stat
@@ -546,6 +551,7 @@ _stat :: proc(path: string) -> (OS_Stat, Errno) {
 
 @private
 _lstat :: proc(path: string) -> (OS_Stat, Errno) {
+	runtime.DEFAULT_TEMP_ALLOCATOR_TEMP_GUARD()
 	cstr := strings.clone_to_cstring(path, context.temp_allocator)
 
 	s: OS_Stat
@@ -611,6 +617,7 @@ _readdir :: proc(dirp: Dir) -> (entry: Dirent, err: Errno, end_of_stream: bool) 
 
 @private
 _readlink :: proc(path: string) -> (string, Errno) {
+	runtime.DEFAULT_TEMP_ALLOCATOR_TEMP_GUARD(ignore = context.temp_allocator == context.allocator)
 	path_cstr := strings.clone_to_cstring(path, context.temp_allocator)
 
 	bufsz : uint = 256
@@ -648,6 +655,7 @@ absolute_path_from_relative :: proc(rel: string) -> (path: string, err: Errno) {
 		rel = "."
 	}
 
+	runtime.DEFAULT_TEMP_ALLOCATOR_TEMP_GUARD(ignore = context.temp_allocator == context.allocator)
 	rel_cstr := strings.clone_to_cstring(rel, context.temp_allocator)
 
 	path_ptr := _unix_realpath(rel_cstr, nil)
@@ -663,6 +671,7 @@ absolute_path_from_relative :: proc(rel: string) -> (path: string, err: Errno) {
 }
 
 access :: proc(path: string, mask: int) -> bool {
+	runtime.DEFAULT_TEMP_ALLOCATOR_TEMP_GUARD()
 	cstr := strings.clone_to_cstring(path, context.temp_allocator)
 	return _unix_access(cstr, mask) == 0
 }
@@ -687,6 +696,7 @@ heap_free :: proc(ptr: rawptr) {
 }
 
 lookup_env :: proc(key: string, allocator := context.allocator) -> (value: string, found: bool) {
+	runtime.DEFAULT_TEMP_ALLOCATOR_TEMP_GUARD(ignore = context.temp_allocator == allocator)
 	path_str := strings.clone_to_cstring(key, context.temp_allocator)
 	cstr := _unix_getenv(path_str)
 	if cstr == nil {
@@ -718,6 +728,7 @@ get_current_directory :: proc() -> string {
 }
 
 set_current_directory :: proc(path: string) -> (err: Errno) {
+	runtime.DEFAULT_TEMP_ALLOCATOR_TEMP_GUARD()
 	cstr := strings.clone_to_cstring(path, context.temp_allocator)
 	res := _unix_chdir(cstr)
 	if res == -1 {
@@ -727,6 +738,7 @@ set_current_directory :: proc(path: string) -> (err: Errno) {
 }
 
 make_directory :: proc(path: string, mode: u16 = 0o775) -> Errno {
+	runtime.DEFAULT_TEMP_ALLOCATOR_TEMP_GUARD()
 	path_cstr := strings.clone_to_cstring(path, context.temp_allocator)
 	res := _unix_mkdir(path_cstr, mode)
 	if res == -1 {
@@ -751,12 +763,14 @@ current_thread_id :: proc "contextless" () -> int {
 }
 
 dlopen :: proc(filename: string, flags: int) -> rawptr {
+	runtime.DEFAULT_TEMP_ALLOCATOR_TEMP_GUARD()
 	cstr := strings.clone_to_cstring(filename, context.temp_allocator)
 	handle := _unix_dlopen(cstr, flags)
 	return handle
 }
 dlsym :: proc(handle: rawptr, symbol: string) -> rawptr {
 	assert(handle != nil)
+	runtime.DEFAULT_TEMP_ALLOCATOR_TEMP_GUARD()
 	cstr := strings.clone_to_cstring(symbol, context.temp_allocator)
 	proc_handle := _unix_dlsym(handle, cstr)
 	return proc_handle

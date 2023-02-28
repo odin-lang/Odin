@@ -2,6 +2,7 @@ package os
 
 import win32 "core:sys/windows"
 import "core:intrinsics"
+import "core:runtime"
 import "core:unicode/utf16"
 
 is_path_separator :: proc(c: byte) -> bool {
@@ -327,6 +328,7 @@ get_std_handle :: proc "contextless" (h: uint) -> Handle {
 
 
 exists :: proc(path: string) -> bool {
+	runtime.DEFAULT_TEMP_ALLOCATOR_TEMP_GUARD()
 	wpath := win32.utf8_to_wstring(path, context.temp_allocator)
 	attribs := win32.GetFileAttributesW(wpath)
 
@@ -334,6 +336,7 @@ exists :: proc(path: string) -> bool {
 }
 
 is_file :: proc(path: string) -> bool {
+	runtime.DEFAULT_TEMP_ALLOCATOR_TEMP_GUARD()
 	wpath := win32.utf8_to_wstring(path, context.temp_allocator)
 	attribs := win32.GetFileAttributesW(wpath)
 
@@ -344,6 +347,7 @@ is_file :: proc(path: string) -> bool {
 }
 
 is_dir :: proc(path: string) -> bool {
+	runtime.DEFAULT_TEMP_ALLOCATOR_TEMP_GUARD()
 	wpath := win32.utf8_to_wstring(path, context.temp_allocator)
 	attribs := win32.GetFileAttributesW(wpath)
 
@@ -358,6 +362,8 @@ is_dir :: proc(path: string) -> bool {
 
 get_current_directory :: proc(allocator := context.allocator) -> string {
 	win32.AcquireSRWLockExclusive(&cwd_lock)
+
+	runtime.DEFAULT_TEMP_ALLOCATOR_TEMP_GUARD(ignore = context.temp_allocator == allocator)
 
 	sz_utf16 := win32.GetCurrentDirectoryW(0, nil)
 	dir_buf_wstr := make([]u16, sz_utf16, context.temp_allocator) // the first time, it _includes_ the NUL.
@@ -387,6 +393,7 @@ set_current_directory :: proc(path: string) -> (err: Errno) {
 
 
 change_directory :: proc(path: string) -> (err: Errno) {
+	runtime.DEFAULT_TEMP_ALLOCATOR_TEMP_GUARD()
 	wpath := win32.utf8_to_wstring(path, context.temp_allocator)
 
 	if !win32.SetCurrentDirectoryW(wpath) {
@@ -396,6 +403,7 @@ change_directory :: proc(path: string) -> (err: Errno) {
 }
 
 make_directory :: proc(path: string, mode: u32 = 0) -> (err: Errno) {
+	runtime.DEFAULT_TEMP_ALLOCATOR_TEMP_GUARD()
 	// Mode is unused on Windows, but is needed on *nix
 	wpath := win32.utf8_to_wstring(path, context.temp_allocator)
 
@@ -407,6 +415,7 @@ make_directory :: proc(path: string, mode: u32 = 0) -> (err: Errno) {
 
 
 remove_directory :: proc(path: string) -> (err: Errno) {
+	runtime.DEFAULT_TEMP_ALLOCATOR_TEMP_GUARD()
 	wpath := win32.utf8_to_wstring(path, context.temp_allocator)
 
 	if !win32.RemoveDirectoryW(wpath) {
@@ -479,12 +488,14 @@ fix_long_path :: proc(path: string) -> string {
 
 
 link :: proc(old_name, new_name: string) -> (err: Errno) {
+	runtime.DEFAULT_TEMP_ALLOCATOR_TEMP_GUARD()
 	n := win32.utf8_to_wstring(fix_long_path(new_name))
 	o := win32.utf8_to_wstring(fix_long_path(old_name))
 	return Errno(win32.CreateHardLinkW(n, o, nil))
 }
 
 unlink :: proc(path: string) -> (err: Errno) {
+	runtime.DEFAULT_TEMP_ALLOCATOR_TEMP_GUARD()
 	wpath := win32.utf8_to_wstring(path, context.temp_allocator)
 
 	if !win32.DeleteFileW(wpath) {
@@ -496,6 +507,7 @@ unlink :: proc(path: string) -> (err: Errno) {
 
 
 rename :: proc(old_path, new_path: string) -> (err: Errno) {
+	runtime.DEFAULT_TEMP_ALLOCATOR_TEMP_GUARD()
 	from := win32.utf8_to_wstring(old_path, context.temp_allocator)
 	to := win32.utf8_to_wstring(new_path, context.temp_allocator)
 
