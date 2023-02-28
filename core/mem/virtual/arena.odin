@@ -143,6 +143,9 @@ arena_static_reset_to :: proc(arena: ^Arena, pos: uint, loc := #caller_location)
 arena_growing_free_last_memory_block :: proc(arena: ^Arena, loc := #caller_location) {
 	if free_block := arena.curr_block; free_block != nil {
 		assert(arena.kind == .Growing, "expected a .Growing arena", loc)
+		arena.total_used -= free_block.used
+		arena.total_reserved -= free_block.reserved
+
 		arena.curr_block = free_block.prev
 		memory_block_dealloc(free_block)
 	}
@@ -152,22 +155,30 @@ arena_free_all :: proc(arena: ^Arena, loc := #caller_location) {
 	switch arena.kind {
 	case .Growing:
 		sync.mutex_guard(&arena.mutex)
-		for arena.curr_block != nil {
+		// NOTE(bill): Free all but the first memory block (if it exists)
+		for arena.curr_block != nil && arena.curr_block.prev != nil {
 			arena_growing_free_last_memory_block(arena, loc)
 		}
-		arena.total_reserved = 0
+		// Zero the first block's memory
+		if arena.curr_block != nil {
+			mem.zero(arena.curr_block.base, int(arena.curr_block.used))
+			arena.curr_block.used = 0
+		}
+		arena.total_used = 0
 	case .Static, .Buffer:
 		arena_static_reset_to(arena, 0)
 	}
 	arena.total_used = 0
 }
 
-arena_destroy :: proc(arena: ^Arena) {
-	arena_free_all(arena)
+arena_destroy :: proc(arena: ^Arena, loc := #caller_location) {
+	sync.mutex_guard(&arena.mutex)
 	if arena.kind != .Buffer {
-		memory_block_dealloc(arena.curr_block)
+		for arena.curr_block != nil {
+			arena_growing_free_last_memory_block(arena, loc)
+		}
 	}
-	arena.curr_block = nil
+	arena.curr_block     = nil
 	arena.total_used     = 0
 	arena.total_reserved = 0
 	arena.temp_count     = 0
