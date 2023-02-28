@@ -236,13 +236,13 @@ S_IRUSR :: 0o0400 // R for owner
 S_IWUSR :: 0o0200 // W for owner
 S_IXUSR :: 0o0100 // X for owner
 
-	// Read, write, execute/search by group
+// Read, write, execute/search by group
 S_IRWXG :: 0o0070 // RWX mask for group
 S_IRGRP :: 0o0040 // R for group
 S_IWGRP :: 0o0020 // W for group
 S_IXGRP :: 0o0010 // X for group
 
-	// Read, write, execute/search by others
+// Read, write, execute/search by others
 S_IRWXO :: 0o0007 // RWX mask for other
 S_IROTH :: 0o0004 // R for other
 S_IWOTH :: 0o0002 // W for other
@@ -334,6 +334,7 @@ fork :: proc() -> (Pid, Errno) {
 }
 
 execvp :: proc(path: string, args: []string) -> Errno {
+	runtime.DEFAULT_TEMP_ALLOCATOR_TEMP_GUARD()
 	path_cstr := strings.clone_to_cstring(path, context.temp_allocator)
 
 	args_cstrs := make([]cstring, len(args) + 2, context.temp_allocator)
@@ -417,13 +418,13 @@ seek :: proc(fd: Handle, offset: i64, whence: int) -> (i64, Errno) {
 }
 
 file_size :: proc(fd: Handle) -> (i64, Errno) {
-    // deliberately uninitialized; the syscall fills this buffer for us
-    s: OS_Stat = ---
-    result := unix.sys_fstat(int(fd), rawptr(&s))
-    if result < 0 {
-        return 0, _get_errno(result)
-    }
-    return max(s.size, 0), ERROR_NONE
+	// deliberately uninitialized; the syscall fills this buffer for us
+	s: OS_Stat = ---
+	result := unix.sys_fstat(int(fd), rawptr(&s))
+	if result < 0 {
+		return 0, _get_errno(result)
+	}
+	return max(s.size, 0), ERROR_NONE
 }
 
 rename :: proc(old_path, new_path: string) -> Errno {
