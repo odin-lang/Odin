@@ -1,5 +1,8 @@
 package glfw
 
+/* Config */
+GLFW_DYNAMIC :: #config(GLFW_DYNAMIC, false)
+
 /*** Constants ***/
 /* Versions */
 VERSION_MAJOR    :: 3
