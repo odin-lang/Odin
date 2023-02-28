@@ -7,6 +7,7 @@ import "core:strings"
 import "core:unicode/utf16"
 
 import "core:fmt"
+import "core:runtime"
 
 @(private)
 version_string_buf: [1024]u8
@@ -313,6 +314,8 @@ read_reg :: proc(hkey: sys.HKEY, subkey, val: string, $T: typeid) -> (res: T, ok
 	if len(subkey) == 0 || len(val) == 0 {
 		return {}, false
 	}
+
+	runtime.DEFAULT_TEMP_ALLOCATOR_TEMP_GUARD()
 
 	key_name_wide := make([]u16, BUF_SIZE, context.temp_allocator)
 	val_name_wide := make([]u16, BUF_SIZE, context.temp_allocator)

@@ -8,6 +8,7 @@ import "core:os"
 import "core:strconv"
 import "core:strings"
 import "core:unicode"
+import "core:runtime"
 
 Image        :: image.Image
 Format       :: image.Netpbm_Format
@@ -406,6 +407,8 @@ _parse_header_pam :: proc(data: []byte, allocator := context.allocator) -> (head
 		return
 	}
 	length = header_end_index + len(HEADER_END)
+
+	runtime.DEFAULT_TEMP_ALLOCATOR_TEMP_GUARD(ignore = context.temp_allocator == allocator)
 
 	// string buffer for the tupltype
 	tupltype: strings.Builder

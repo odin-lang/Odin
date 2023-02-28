@@ -915,7 +915,7 @@ gb_internal lbStructFieldRemapping lb_get_struct_remapping(lbModule *m, Type *t)
 	if (field_remapping == nullptr) {
 		field_remapping = map_get(&m->struct_field_remapping, cast(void *)t);
 	}
-	GB_ASSERT(field_remapping != nullptr);
+	GB_ASSERT_MSG(field_remapping != nullptr, "%s", type_to_string(t));
 	return *field_remapping;
 }
 

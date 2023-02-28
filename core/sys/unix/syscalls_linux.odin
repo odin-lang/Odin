@@ -1563,6 +1563,9 @@ MADV_WIPEONFORK  :: 18
 MADV_KEEPONFORK  :: 19
 MADV_HWPOISON    :: 100
 
+// pipe2 flags
+O_CLOEXEC :: 0o2000000
+
 // perf event data
 Perf_Sample :: struct #raw_union {
 	period:    u64,
@@ -1713,14 +1716,14 @@ Perf_Flag :: enum u64 {
 }
 
 sys_gettid :: proc "contextless" () -> int {
-	return cast(int)intrinsics.syscall(SYS_gettid)
+	return int(intrinsics.syscall(SYS_gettid))
 }
 
-sys_getrandom :: proc "contextless" (buf: [^]byte, buflen: int, flags: uint) -> int {
-	return cast(int)intrinsics.syscall(SYS_getrandom, uintptr(buf), uintptr(buflen), uintptr(flags))
+sys_getrandom :: proc "contextless" (buf: [^]byte, buflen: uint, flags: int) -> int {
+	return int(intrinsics.syscall(SYS_getrandom, uintptr(buf), uintptr(buflen), uintptr(flags)))
 }
 
-sys_open :: proc "contextless" (path: cstring, flags: int, mode: int = 0o000) -> int {
+sys_open :: proc "contextless" (path: cstring, flags: int, mode: uint = 0o000) -> int {
 	when ODIN_ARCH != .arm64 {
 		return int(intrinsics.syscall(SYS_open, uintptr(rawptr(path)), uintptr(flags), uintptr(mode)))
 	} else { // NOTE: arm64 does not have open
@@ -1728,7 +1731,7 @@ sys_open :: proc "contextless" (path: cstring, flags: int, mode: int = 0o000) ->
 	}
 }
 
-sys_openat :: proc "contextless" (dfd: int, path: cstring, flags: int, mode: int = 0o000) -> int {
+sys_openat :: proc "contextless" (dfd: int, path: cstring, flags: int, mode: uint = 0o000) -> int {
 	return int(intrinsics.syscall(SYS_openat, uintptr(dfd), uintptr(rawptr(path)), uintptr(flags), uintptr(mode)))
 }
 
@@ -1840,7 +1843,7 @@ sys_fchdir :: proc "contextless" (fd: int) -> int {
 	return int(intrinsics.syscall(SYS_fchdir, uintptr(fd)))
 }
 
-sys_chmod :: proc "contextless" (path: cstring, mode: int) -> int {
+sys_chmod :: proc "contextless" (path: cstring, mode: uint) -> int {
 	when ODIN_ARCH != .arm64 {
 		return int(intrinsics.syscall(SYS_chmod, uintptr(rawptr(path)), uintptr(mode)))
 	} else { // NOTE: arm64 does not have chmod
@@ -1848,7 +1851,7 @@ sys_chmod :: proc "contextless" (path: cstring, mode: int) -> int {
 	}
 }
 
-sys_fchmod :: proc "contextless" (fd: int, mode: int) -> int {
+sys_fchmod :: proc "contextless" (fd: int, mode: uint) -> int {
 	return int(intrinsics.syscall(SYS_fchmod, uintptr(fd), uintptr(mode)))
 }
 
@@ -1908,7 +1911,7 @@ sys_rmdir :: proc "contextless" (path: cstring) -> int {
 	}
 }
 
-sys_mkdir :: proc "contextless" (path: cstring, mode: int) -> int {
+sys_mkdir :: proc "contextless" (path: cstring, mode: uint) -> int {
 	when ODIN_ARCH != .arm64 {
 		return int(intrinsics.syscall(SYS_mkdir, uintptr(rawptr(path)), uintptr(mode)))
 	} else { // NOTE: arm64 does not have mkdir
@@ -1916,11 +1919,11 @@ sys_mkdir :: proc "contextless" (path: cstring, mode: int) -> int {
 	}
 }
 
-sys_mkdirat :: proc "contextless" (dfd: int, path: cstring, mode: int) -> int {
+sys_mkdirat :: proc "contextless" (dfd: int, path: cstring, mode: uint) -> int {
 	return int(intrinsics.syscall(SYS_mkdirat, uintptr(dfd), uintptr(rawptr(path)), uintptr(mode)))
 }
 
-sys_mknod :: proc "contextless" (path: cstring, mode: int, dev: int) -> int {
+sys_mknod :: proc "contextless" (path: cstring, mode: uint, dev: int) -> int {
 	when ODIN_ARCH != .arm64 {
 		return int(intrinsics.syscall(SYS_mknod, uintptr(rawptr(path)), uintptr(mode), uintptr(dev)))
 	} else { // NOTE: arm64 does not have mknod
@@ -1928,7 +1931,7 @@ sys_mknod :: proc "contextless" (path: cstring, mode: int, dev: int) -> int {
 	}
 }
 
-sys_mknodat :: proc "contextless" (dfd: int, path: cstring, mode: int, dev: int) -> int {
+sys_mknodat :: proc "contextless" (dfd: int, path: cstring, mode: uint, dev: int) -> int {
 	return int(intrinsics.syscall(SYS_mknodat, uintptr(dfd), uintptr(rawptr(path)), uintptr(mode), uintptr(dev)))
 }
 
@@ -1967,6 +1970,16 @@ sys_fork :: proc "contextless" () -> int {
 		return int(intrinsics.syscall(SYS_clone, SIGCHLD))
 	}
 }
+sys_pipe2 :: proc "contextless" (fds: rawptr, flags: int) -> int {
+	return int(intrinsics.syscall(SYS_pipe2, uintptr(fds), uintptr(flags)))
+}
+sys_dup2 :: proc "contextless" (oldfd: int, newfd: int) -> int {
+	when ODIN_ARCH != .arm64 {
+		return int(intrinsics.syscall(SYS_dup2, uintptr(oldfd), uintptr(newfd)))
+	} else {
+		return int(intrinsics.syscall(SYS_dup3, uintptr(oldfd), uintptr(newfd), 0))
+	}
+}
 
 sys_mmap :: proc "contextless" (addr: rawptr, length: uint, prot, flags, fd: int, offset: uintptr) -> int {
 	return int(intrinsics.syscall(SYS_mmap, uintptr(addr), uintptr(length), uintptr(prot), uintptr(flags), uintptr(fd), offset))
@@ -1997,6 +2010,10 @@ sys_utimensat :: proc "contextless" (dfd: int, path: cstring, times: rawptr, fla
 
 sys_perf_event_open :: proc "contextless" (event_attr: rawptr, pid: i32, cpu: i32, group_fd: i32, flags: u32) -> int {
 	return int(intrinsics.syscall(SYS_perf_event_open, uintptr(event_attr), uintptr(pid), uintptr(cpu), uintptr(group_fd), uintptr(flags)))
+}
+
+sys_personality :: proc(persona: u64) -> int {
+	return int(intrinsics.syscall(SYS_personality, uintptr(persona)))
 }
 
 get_errno :: proc "contextless" (res: int) -> i32 {

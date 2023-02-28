@@ -4044,7 +4044,6 @@ gb_internal lbAddr lb_build_addr_slice_expr(lbProcedure *p, Ast *expr) {
 	return {};
 }
 
-
 gb_internal lbAddr lb_build_addr_compound_lit(lbProcedure *p, Ast *expr) {
 	ast_node(cl, CompoundLit, expr);
 
@@ -4093,12 +4092,25 @@ gb_internal lbAddr lb_build_addr_compound_lit(lbProcedure *p, Ast *expr) {
 					ast_node(fv, FieldValue, elem);
 					String name = fv->field->Ident.token.string;
 					Selection sel = lookup_field(bt, name, false);
-					index = sel.index[0];
+					GB_ASSERT(!sel.indirect);
+
 					elem = fv->value;
-					TypeAndValue tav = type_and_value_of_expr(elem);
+					if (sel.index.count > 1) {
+						if (lb_is_nested_possibly_constant(type, sel, elem)) {
+							continue;
+						}
+						lbValue dst = lb_emit_deep_field_gep(p, comp_lit_ptr, sel);
+						field_expr = lb_build_expr(p, elem);
+						field_expr = lb_emit_conv(p, field_expr, sel.entity->type);
+						lb_emit_store(p, dst, field_expr);
+						continue;
+					}
+
+					index = sel.index[0];
 				} else {
-					TypeAndValue tav = type_and_value_of_expr(elem);
 					Selection sel = lookup_field_from_index(bt, st->fields[field_index]->Variable.field_index);
+					GB_ASSERT(sel.index.count == 1);
+					GB_ASSERT(!sel.indirect);
 					index = sel.index[0];
 				}
 

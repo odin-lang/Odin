@@ -1309,6 +1309,8 @@ gb_internal ParameterValue handle_parameter_value(CheckerContext *ctx, Type *in_
 		init_core_source_code_location(ctx->checker);
 		param_value.kind = ParameterValue_Location;
 		o.type = t_source_code_location;
+		o.mode = Addressing_Value;
+		o.expr = expr;
 
 		if (in_type) {
 			check_assignment(ctx, &o, in_type, str_lit("parameter value"));
