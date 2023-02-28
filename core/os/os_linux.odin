@@ -270,136 +270,6 @@ AT_FDCWD            :: ~uintptr(99)	/* -100 */
 AT_REMOVEDIR        :: uintptr(0x200)
 AT_SYMLINK_NOFOLLOW :: uintptr(0x100)
 
-_unix_personality :: proc(persona: u64) -> int {
-	return int(intrinsics.syscall(unix.SYS_personality, uintptr(persona)))
-}
-
-_unix_fork :: proc() -> Pid {
-	when ODIN_ARCH != .arm64 {
-		res := int(intrinsics.syscall(unix.SYS_fork))
-	} else {
-		res := int(intrinsics.syscall(unix.SYS_clone, unix.SIGCHLD))
-	}
-	return -1 if res < 0 else Pid(res)
-}
-
-_unix_open :: proc(path: cstring, flags: int, mode: int = 0o000) -> Handle {
-	when ODIN_ARCH != .arm64 {
-		res := int(intrinsics.syscall(unix.SYS_open, uintptr(rawptr(path)), uintptr(flags), uintptr(mode)))
-	} else { // NOTE: arm64 does not have open
-		res := int(intrinsics.syscall(unix.SYS_openat, AT_FDCWD, uintptr(rawptr(path)), uintptr(flags), uintptr(mode)))
-	}
-	return -1 if res < 0 else Handle(res)
-}
-
-_unix_close :: proc(fd: Handle) -> int {
-	return int(intrinsics.syscall(unix.SYS_close, uintptr(fd)))
-}
-
-_unix_read :: proc(fd: Handle, buf: rawptr, size: uint) -> int {
-	return int(intrinsics.syscall(unix.SYS_read, uintptr(fd), uintptr(buf), uintptr(size)))
-}
-
-_unix_write :: proc(fd: Handle, buf: rawptr, size: uint) -> int {
-	return int(intrinsics.syscall(unix.SYS_write, uintptr(fd), uintptr(buf), uintptr(size)))
-}
-
-_unix_seek :: proc(fd: Handle, offset: i64, whence: int) -> i64 {
-	when ODIN_ARCH == .amd64 || ODIN_ARCH == .arm64 {
-		return i64(intrinsics.syscall(unix.SYS_lseek, uintptr(fd), uintptr(offset), uintptr(whence)))
-	} else {
-		low := uintptr(offset & 0xFFFFFFFF)
-		high := uintptr(offset >> 32)
-		result: i64
-		res := i64(intrinsics.syscall(unix.SYS__llseek, uintptr(fd), high, low, uintptr(&result), uintptr(whence)))
-		return -1 if res < 0 else result
-	}
-}
-
-_unix_stat :: proc(path: cstring, stat: ^OS_Stat) -> int {
-	when ODIN_ARCH == .amd64 {
-		return int(intrinsics.syscall(unix.SYS_stat, uintptr(rawptr(path)), uintptr(stat)))
-	} else when ODIN_ARCH != .arm64 {
-		return int(intrinsics.syscall(unix.SYS_stat64, uintptr(rawptr(path)), uintptr(stat)))
-	} else { // NOTE: arm64 does not have stat
-		return int(intrinsics.syscall(unix.SYS_fstatat, AT_FDCWD, uintptr(rawptr(path)), uintptr(stat), 0))
-	}
-}
-
-_unix_fstat :: proc(fd: Handle, stat: ^OS_Stat) -> int {
-	when ODIN_ARCH == .amd64 || ODIN_ARCH == .arm64 {
-		return int(intrinsics.syscall(unix.SYS_fstat, uintptr(fd), uintptr(stat)))
-	} else {
-		return int(intrinsics.syscall(unix.SYS_fstat64, uintptr(fd), uintptr(stat)))
-	}
-}
-
-_unix_lstat :: proc(path: cstring, stat: ^OS_Stat) -> int {
-	when ODIN_ARCH == .amd64 {
-		return int(intrinsics.syscall(unix.SYS_lstat, uintptr(rawptr(path)), uintptr(stat)))
-	} else when ODIN_ARCH != .arm64 {
-		return int(intrinsics.syscall(unix.SYS_lstat64, uintptr(rawptr(path)), uintptr(stat)))
-	} else { // NOTE: arm64 does not have any lstat
-		return int(intrinsics.syscall(unix.SYS_fstatat, AT_FDCWD, uintptr(rawptr(path)), uintptr(stat), AT_SYMLINK_NOFOLLOW))
-	}
-}
-
-_unix_readlink :: proc(path: cstring, buf: rawptr, bufsiz: uint) -> int {
-	when ODIN_ARCH != .arm64 {
-		return int(intrinsics.syscall(unix.SYS_readlink, uintptr(rawptr(path)), uintptr(buf), uintptr(bufsiz)))
-	} else { // NOTE: arm64 does not have readlink
-		return int(intrinsics.syscall(unix.SYS_readlinkat, AT_FDCWD, uintptr(rawptr(path)), uintptr(buf), uintptr(bufsiz)))
-	}
-}
-
-_unix_access :: proc(path: cstring, mask: int) -> int {
-	when ODIN_ARCH != .arm64 {
-		return int(intrinsics.syscall(unix.SYS_access, uintptr(rawptr(path)), uintptr(mask)))
-	} else { // NOTE: arm64 does not have access
-		return int(intrinsics.syscall(unix.SYS_faccessat, AT_FDCWD, uintptr(rawptr(path)), uintptr(mask)))
-	}
-}
-
-_unix_getcwd :: proc(buf: rawptr, size: uint) -> int {
-	return int(intrinsics.syscall(unix.SYS_getcwd, uintptr(buf), uintptr(size)))
-}
-
-_unix_chdir :: proc(path: cstring) -> int {
-	return int(intrinsics.syscall(unix.SYS_chdir, uintptr(rawptr(path))))
-}
-
-_unix_rename :: proc(old, new: cstring) -> int {
-	when ODIN_ARCH != .arm64 {
-		return int(intrinsics.syscall(unix.SYS_rename, uintptr(rawptr(old)), uintptr(rawptr(new))))
-	} else { // NOTE: arm64 does not have rename
-		return int(intrinsics.syscall(unix.SYS_renameat, AT_FDCWD, uintptr(rawptr(old)), uintptr(rawptr(new))))
-	}
-}
-
-_unix_unlink :: proc(path: cstring) -> int {
-	when ODIN_ARCH != .arm64 {
-		return int(intrinsics.syscall(unix.SYS_unlink, uintptr(rawptr(path))))
-	} else { // NOTE: arm64 does not have unlink
-		return int(intrinsics.syscall(unix.SYS_unlinkat, AT_FDCWD, uintptr(rawptr(path)), 0))
-	}
-}
-
-_unix_rmdir :: proc(path: cstring) -> int {
-	when ODIN_ARCH != .arm64 {
-		return int(intrinsics.syscall(unix.SYS_rmdir, uintptr(rawptr(path))))
-	} else { // NOTE: arm64 does not have rmdir
-		return int(intrinsics.syscall(unix.SYS_unlinkat, AT_FDCWD, uintptr(rawptr(path)), AT_REMOVEDIR))
-	}
-}
-
-_unix_mkdir :: proc(path: cstring, mode: u32) -> int {
-	when ODIN_ARCH != .arm64 {
-		return int(intrinsics.syscall(unix.SYS_mkdir, uintptr(rawptr(path)), uintptr(mode)))
-	} else { // NOTE: arm64 does not have mkdir
-		return int(intrinsics.syscall(unix.SYS_mkdirat, AT_FDCWD, uintptr(rawptr(path)), uintptr(mode)))
-	}
-}
-
 foreign libc {
 	@(link_name="__errno_location") __errno_location    :: proc() -> ^int ---
 
@@ -415,6 +285,7 @@ foreign libc {
 	@(link_name="free")             _unix_free          :: proc(ptr: rawptr) ---
 	@(link_name="realloc")          _unix_realloc       :: proc(ptr: rawptr, size: c.size_t) -> rawptr ---
 
+	@(link_name="execvp")           _unix_execvp       :: proc(path: cstring, argv: [^]cstring) -> int ---
 	@(link_name="getenv")           _unix_getenv        :: proc(cstring) -> cstring ---
 	@(link_name="putenv")           _unix_putenv        :: proc(cstring) -> c.int ---
 	@(link_name="realpath")         _unix_realpath      :: proc(path: cstring, resolved_path: rawptr) -> rawptr ---
@@ -447,7 +318,7 @@ get_last_error :: proc "contextless" () -> int {
 }
 
 personality :: proc(persona: u64) -> (Errno) {
-	res := _unix_personality(persona)
+	res := unix.sys_personality(persona)
 	if res == -1 {
 		return _get_errno(res)
 	}
@@ -455,24 +326,37 @@ personality :: proc(persona: u64) -> (Errno) {
 }
 
 fork :: proc() -> (Pid, Errno) {
-	pid := _unix_fork()
+	pid := unix.sys_fork()
 	if pid == -1 {
-		return -1, _get_errno(int(pid))
+		return -1, _get_errno(pid)
 	}
-	return pid, ERROR_NONE
+	return Pid(pid), ERROR_NONE
 }
 
-open :: proc(path: string, flags: int = O_RDONLY, mode: int = 0) -> (Handle, Errno) {
-	cstr := strings.clone_to_cstring(path, context.temp_allocator)
-	handle := _unix_open(cstr, flags, mode)
-	if handle < 0 {
-		return INVALID_HANDLE, _get_errno(int(handle))
+execvp :: proc(path: string, args: []string) -> Errno {
+	path_cstr := strings.clone_to_cstring(path, context.temp_allocator)
+
+	args_cstrs := make([]cstring, len(args) + 2, context.temp_allocator)
+	args_cstrs[0] = strings.clone_to_cstring(path, context.temp_allocator)
+	for i := 0; i < len(args); i += 1 {
+		args_cstrs[i+1] = strings.clone_to_cstring(args[i], context.temp_allocator)
 	}
-	return handle, ERROR_NONE
+
+	_unix_execvp(path_cstr, raw_data(args_cstrs))
+	return Errno(get_last_error())
+}
+
+open :: proc(path: string, flags: int = O_RDONLY, mode: int = 0o000) -> (Handle, Errno) {
+	cstr := strings.clone_to_cstring(path, context.temp_allocator)
+	handle := unix.sys_open(cstr, flags, uint(mode))
+	if handle < 0 {
+		return INVALID_HANDLE, _get_errno(handle)
+	}
+	return Handle(handle), ERROR_NONE
 }
 
 close :: proc(fd: Handle) -> Errno {
-	return _get_errno(_unix_close(fd))
+	return _get_errno(unix.sys_close(int(fd)))
 }
 
 read :: proc(fd: Handle, data: []byte) -> (int, Errno) {
@@ -480,7 +364,7 @@ read :: proc(fd: Handle, data: []byte) -> (int, Errno) {
 		return 0, ERROR_NONE
 	}
 
-	bytes_read := _unix_read(fd, raw_data(data), c.size_t(len(data)))
+	bytes_read := unix.sys_read(int(fd), raw_data(data), len(data))
 	if bytes_read < 0 {
 		return -1, _get_errno(bytes_read)
 	}
@@ -492,7 +376,7 @@ write :: proc(fd: Handle, data: []byte) -> (int, Errno) {
 		return 0, ERROR_NONE
 	}
 
-	bytes_written := _unix_write(fd, raw_data(data), uint(len(data)))
+	bytes_written := unix.sys_write(int(fd), raw_data(data), len(data))
 	if bytes_written < 0 {
 		return -1, _get_errno(bytes_written)
 	}
@@ -503,7 +387,7 @@ read_at :: proc(fd: Handle, data: []byte, offset: i64) -> (int, Errno) {
 		return 0, ERROR_NONE
 	}
 
-	bytes_read := unix.sys_pread(int(fd), raw_data(data), c.size_t(len(data)), offset)
+	bytes_read := unix.sys_pread(int(fd), raw_data(data), len(data), offset)
 	if bytes_read < 0 {
 		return -1, _get_errno(bytes_read)
 	}
@@ -523,17 +407,17 @@ write_at :: proc(fd: Handle, data: []byte, offset: i64) -> (int, Errno) {
 }
 
 seek :: proc(fd: Handle, offset: i64, whence: int) -> (i64, Errno) {
-	res := _unix_seek(fd, offset, whence)
+	res := unix.sys_lseek(int(fd), offset, whence)
 	if res < 0 {
 		return -1, _get_errno(int(res))
 	}
-	return res, ERROR_NONE
+	return i64(res), ERROR_NONE
 }
 
 file_size :: proc(fd: Handle) -> (i64, Errno) {
     // deliberately uninitialized; the syscall fills this buffer for us
     s: OS_Stat = ---
-    result := _unix_fstat(fd, &s)
+    result := unix.sys_fstat(int(fd), rawptr(&s))
     if result < 0 {
         return 0, _get_errno(result)
     }
@@ -543,22 +427,22 @@ file_size :: proc(fd: Handle) -> (i64, Errno) {
 rename :: proc(old_path, new_path: string) -> Errno {
 	old_path_cstr := strings.clone_to_cstring(old_path, context.temp_allocator)
 	new_path_cstr := strings.clone_to_cstring(new_path, context.temp_allocator)
-	return _get_errno(_unix_rename(old_path_cstr, new_path_cstr))
+	return _get_errno(unix.sys_rename(old_path_cstr, new_path_cstr))
 }
 
 remove :: proc(path: string) -> Errno {
 	path_cstr := strings.clone_to_cstring(path, context.temp_allocator)
-	return _get_errno(_unix_unlink(path_cstr))
+	return _get_errno(unix.sys_unlink(path_cstr))
 }
 
 make_directory :: proc(path: string, mode: u32 = 0o775) -> Errno {
 	path_cstr := strings.clone_to_cstring(path, context.temp_allocator)
-	return _get_errno(_unix_mkdir(path_cstr, mode))
+	return _get_errno(unix.sys_mkdir(path_cstr, uint(mode)))
 }
 
 remove_directory :: proc(path: string) -> Errno {
 	path_cstr := strings.clone_to_cstring(path, context.temp_allocator)
-	return _get_errno(_unix_rmdir(path_cstr))
+	return _get_errno(unix.sys_rmdir(path_cstr))
 }
 
 is_file_handle :: proc(fd: Handle) -> bool {
@@ -611,7 +495,7 @@ is_dir :: proc {is_dir_path, is_dir_handle}
 
 exists :: proc(path: string) -> bool {
 	cpath := strings.clone_to_cstring(path, context.temp_allocator)
-	res := _unix_access(cpath, O_RDONLY)
+	res := unix.sys_access(cpath, O_RDONLY)
 	return res == 0
 }
 
@@ -649,7 +533,7 @@ _stat :: proc(path: string) -> (OS_Stat, Errno) {
 
 	// deliberately uninitialized; the syscall fills this buffer for us
 	s: OS_Stat = ---
-	result := _unix_stat(cstr, &s)
+	result := unix.sys_stat(cstr, &s)
 	if result < 0 {
 		return s, _get_errno(result)
 	}
@@ -662,7 +546,7 @@ _lstat :: proc(path: string) -> (OS_Stat, Errno) {
 
 	// deliberately uninitialized; the syscall fills this buffer for us
 	s: OS_Stat = ---
-	result := _unix_lstat(cstr, &s)
+	result := unix.sys_lstat(cstr, &s)
 	if result < 0 {
 		return s, _get_errno(result)
 	}
@@ -673,7 +557,7 @@ _lstat :: proc(path: string) -> (OS_Stat, Errno) {
 _fstat :: proc(fd: Handle) -> (OS_Stat, Errno) {
 	// deliberately uninitialized; the syscall fills this buffer for us
 	s: OS_Stat = ---
-	result := _unix_fstat(fd, &s)
+	result := unix.sys_fstat(int(fd), rawptr(&s))
 	if result < 0 {
 		return s, _get_errno(result)
 	}
@@ -730,7 +614,7 @@ _readlink :: proc(path: string) -> (string, Errno) {
 	bufsz : uint = 256
 	buf := make([]byte, bufsz)
 	for {
-		rc := _unix_readlink(path_cstr, &(buf[0]), bufsz)
+		rc := unix.sys_readlink(path_cstr, &(buf[0]), bufsz)
 		if rc < 0 {
 			delete(buf)
 			return "", _get_errno(rc)
@@ -777,7 +661,7 @@ absolute_path_from_relative :: proc(rel: string) -> (path: string, err: Errno) {
 
 access :: proc(path: string, mask: int) -> (bool, Errno) {
 	cstr := strings.clone_to_cstring(path, context.temp_allocator)
-	result := _unix_access(cstr, mask)
+	result := unix.sys_access(cstr, mask)
 	if result < 0 {
 		return false, _get_errno(result)
 	}
@@ -845,7 +729,7 @@ get_current_directory :: proc() -> string {
 	page_size := get_page_size()
 	buf := make([dynamic]u8, page_size)
 	for {
-		#no_bounds_check res := _unix_getcwd(&buf[0], uint(len(buf)))
+		#no_bounds_check res := unix.sys_getcwd(&buf[0], uint(len(buf)))
 
 		if res >= 0 {
 			return strings.string_from_nul_terminated_ptr(&buf[0], len(buf))
@@ -861,7 +745,7 @@ get_current_directory :: proc() -> string {
 
 set_current_directory :: proc(path: string) -> (err: Errno) {
 	cstr := strings.clone_to_cstring(path, context.temp_allocator)
-	res := _unix_chdir(cstr)
+	res := unix.sys_chdir(cstr)
 	if res < 0 {
 		return _get_errno(res)
 	}
