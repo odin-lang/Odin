@@ -1155,6 +1155,7 @@ gb_internal void init_checker_info(CheckerInfo *i) {
 	array_init(&i->variable_init_order, a);
 	array_init(&i->testing_procedures, a, 0, 0);
 	array_init(&i->init_procedures, a, 0, 0);
+	array_init(&i->fini_procedures, a, 0, 0);
 	array_init(&i->required_foreign_imports_through_force, a, 0, 0);
 
 	map_init(&i->objc_msgSend_types);
@@ -1422,7 +1423,7 @@ gb_internal isize type_info_index(CheckerInfo *info, Type *type, bool error_on_f
 }
 
 
-gb_internal void add_untyped(CheckerContext *c, Ast *expr, AddressingMode mode, Type *type, ExactValue value) {
+gb_internal void add_untyped(CheckerContext *c, Ast *expr, AddressingMode mode, Type *type, ExactValue const &value) {
 	if (expr == nullptr) {
 		return;
 	}
@@ -1439,7 +1440,7 @@ gb_internal void add_untyped(CheckerContext *c, Ast *expr, AddressingMode mode, 
 	check_set_expr_info(c, expr, mode, type, value);
 }
 
-gb_internal void add_type_and_value(CheckerContext *ctx, Ast *expr, AddressingMode mode, Type *type, ExactValue value) {
+gb_internal void add_type_and_value(CheckerContext *ctx, Ast *expr, AddressingMode mode, Type *type, ExactValue const &value) {
 	if (expr == nullptr) {
 		return;
 	}
@@ -1546,7 +1547,7 @@ gb_internal void add_entity_flags_from_file(CheckerContext *c, Entity *e, Scope 
 		AstPackage *pkg = c->file->pkg;
 		if (pkg->kind == Package_Init && e->kind == Entity_Procedure && e->token.string == "main") {
 			// Do nothing
-		} else if (e->flags & (EntityFlag_Test|EntityFlag_Init)) {
+		} else if (e->flags & (EntityFlag_Test|EntityFlag_Init|EntityFlag_Fini)) {
 			// Do nothing
 		} else {
 			e->flags |= EntityFlag_Lazy;
@@ -1614,7 +1615,7 @@ gb_internal bool could_entity_be_lazy(Entity *e, DeclInfo *d) {
 		return false;
 	}
 
-	if (e->flags & (EntityFlag_Test|EntityFlag_Init)) {
+	if (e->flags & (EntityFlag_Test|EntityFlag_Init|EntityFlag_Fini)) {
 		return false;
 	} else if (e->kind == Entity_Variable && e->Variable.is_export) {
 		return false;
@@ -2423,6 +2424,28 @@ gb_internal void generate_minimum_dependency_set(Checker *c, Entity *start) {
 					add_dependency_to_set(c, e);
 					array_add(&c->info.init_procedures, e);
 				}
+			} else if (e->flags & EntityFlag_Fini) {
+				Type *t = base_type(e->type);
+				GB_ASSERT(t->kind == Type_Proc);
+
+				bool is_fini = true;
+
+				if (t->Proc.param_count != 0 || t->Proc.result_count != 0) {
+					gbString str = type_to_string(t);
+					error(e->token, "@(fini) procedures must have a signature type with no parameters nor results, got %s", str);
+					gb_string_free(str);
+					is_fini = false;
+				}
+
+				if ((e->scope->flags & (ScopeFlag_File|ScopeFlag_Pkg)) == 0) {
+					error(e->token, "@(fini) procedures must be declared at the file scope");
+					is_fini = false;
+				}
+
+				if (is_fini) {
+					add_dependency_to_set(c, e);
+					array_add(&c->info.fini_procedures, e);
+				}
 			}
 			break;
 		}
@@ -2973,6 +2996,12 @@ gb_internal DECL_ATTRIBUTE_PROC(proc_decl_attribute) {
 			error(value, "'%.*s' expects no parameter, or a string literal containing \"file\" or \"package\"", LIT(name));
 		}
 		ac->init = true;
+		return true;
+	} else if (name == "fini") {
+		if (value != nullptr) {
+			error(value, "'%.*s' expects no parameter, or a string literal containing \"file\" or \"package\"", LIT(name));
+		}
+		ac->fini = true;
 		return true;
 	} else if (name == "deferred") {
 		if (value != nullptr) {
@@ -3615,6 +3644,7 @@ gb_internal void check_collect_value_decl(CheckerContext *c, Ast *decl) {
 	EntityVisiblityKind entity_visibility_kind = c->foreign_context.visibility_kind;
 	bool is_test = false;
 	bool is_init = false;
+	bool is_fini = false;
 
 	for_array(i, vd->attributes) {
 		Ast *attr = vd->attributes[i];
@@ -3674,6 +3704,8 @@ gb_internal void check_collect_value_decl(CheckerContext *c, Ast *decl) {
 				is_test = true;
 			} else if (name == "init") {
 				is_init = true;
+			} else if (name == "fini") {
+				is_fini = true;
 			}
 		}
 	}
@@ -3807,8 +3839,12 @@ gb_internal void check_collect_value_decl(CheckerContext *c, Ast *decl) {
 				if (is_test) {
 					e->flags |= EntityFlag_Test;
 				}
-				if (is_init) {
+				if (is_init && is_fini) {
+					error(name, "A procedure cannot be both declared as @(init) and @(fini)");
+				} else if (is_init) {
 					e->flags |= EntityFlag_Init;
+				} else if (is_fini) {
+					e->flags |= EntityFlag_Fini;
 				}
 			} else if (init->kind == Ast_ProcGroup) {
 				ast_node(pg, ProcGroup, init);
@@ -5634,9 +5670,14 @@ gb_internal GB_COMPARE_PROC(init_procedures_cmp) {
 	return i32_cmp(x->token.pos.offset, y->token.pos.offset);
 }
 
+gb_internal GB_COMPARE_PROC(fini_procedures_cmp) {
+	return init_procedures_cmp(b, a);
+}
 
-gb_internal void check_sort_init_procedures(Checker *c) {
+
+gb_internal void check_sort_init_and_fini_procedures(Checker *c) {
 	gb_sort_array(c->info.init_procedures.data, c->info.init_procedures.count, init_procedures_cmp);
+	gb_sort_array(c->info.fini_procedures.data, c->info.fini_procedures.count, fini_procedures_cmp);
 }
 
 gb_internal void add_type_info_for_type_definitions(Checker *c) {
@@ -5846,8 +5887,8 @@ gb_internal void check_parsed_files(Checker *c) {
 		add_type_and_value(&c->builtin_ctx, u.expr, u.info->mode, u.info->type, u.info->value);
 	}
 
-	TIME_SECTION("sort init procedures");
-	check_sort_init_procedures(c);
+	TIME_SECTION("sort init and fini procedures");
+	check_sort_init_and_fini_procedures(c);
 
 	if (c->info.intrinsics_entry_point_usage.count > 0) {
 		TIME_SECTION("check intrinsics.__entry_point usage");

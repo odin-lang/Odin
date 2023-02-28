@@ -659,6 +659,7 @@ enum BuildFlagKind {
 
 	BuildFlag_IgnoreWarnings,
 	BuildFlag_WarningsAsErrors,
+	BuildFlag_TerseErrors,
 	BuildFlag_VerboseErrors,
 	BuildFlag_ErrorPosStyle,
 
@@ -832,6 +833,7 @@ gb_internal bool parse_build_flags(Array<String> args) {
 
 	add_flag(&build_flags, BuildFlag_IgnoreWarnings,          str_lit("ignore-warnings"),           BuildFlagParam_None,    Command_all);
 	add_flag(&build_flags, BuildFlag_WarningsAsErrors,        str_lit("warnings-as-errors"),        BuildFlagParam_None,    Command_all);
+	add_flag(&build_flags, BuildFlag_TerseErrors,             str_lit("terse-errors"),              BuildFlagParam_None,    Command_all);
 	add_flag(&build_flags, BuildFlag_VerboseErrors,           str_lit("verbose-errors"),            BuildFlagParam_None,    Command_all);
 	add_flag(&build_flags, BuildFlag_ErrorPosStyle,           str_lit("error-pos-style"),           BuildFlagParam_String,  Command_all);
 
@@ -1462,8 +1464,13 @@ gb_internal bool parse_build_flags(Array<String> args) {
 							}
 							break;
 						}
+
+						case BuildFlag_TerseErrors:
+							build_context.hide_error_line = true;
+							break;
 						case BuildFlag_VerboseErrors:
-							build_context.show_error_line = true;
+							gb_printf_err("-verbose-errors is not the default, -terse-errors can now disable it\n");
+							build_context.hide_error_line = false;
 							break;
 
 						case BuildFlag_ErrorPosStyle:
@@ -1834,6 +1841,17 @@ gb_internal void show_timings(Checker *c, Timings *t) {
 
 gb_internal void remove_temp_files(lbGenerator *gen) {
 	if (build_context.keep_temp_files) return;
+
+	switch (build_context.build_mode) {
+	case BuildMode_Executable:
+	case BuildMode_DynamicLibrary:
+		break;
+
+	case BuildMode_Object:
+	case BuildMode_Assembly:
+	case BuildMode_LLVM_IR:
+		return;
+	}
 
 	TIME_SECTION("remove keep temp files");
 
@@ -2476,6 +2494,30 @@ gb_internal int strip_semicolons(Parser *parser) {
 	return cast(int)failed;
 }
 
+gb_internal void init_terminal(void) {
+	build_context.has_ansi_terminal_colours = false;
+#if defined(GB_SYSTEM_WINDOWS)
+	HANDLE hnd = GetStdHandle(STD_ERROR_HANDLE);
+	DWORD mode = 0;
+	if (GetConsoleMode(hnd, &mode)) {
+		enum {FLAG_ENABLE_VIRTUAL_TERMINAL_PROCESSING = 0x0004};
+		if (SetConsoleMode(hnd, mode|FLAG_ENABLE_VIRTUAL_TERMINAL_PROCESSING)) {
+			build_context.has_ansi_terminal_colours = true;
+		}
+	}
+#endif
+
+	if (!build_context.has_ansi_terminal_colours) {
+		gbAllocator a = heap_allocator();
+		char const *odin_terminal_ = gb_get_env("ODIN_TERMINAL", a);
+		defer (gb_free(a, cast(void *)odin_terminal_));
+		String odin_terminal = make_string_c(odin_terminal_);
+		if (str_eq_ignore_case(odin_terminal, str_lit("ansi"))) {
+			build_context.has_ansi_terminal_colours = true;
+		}
+	}
+}
+
 int main(int arg_count, char const **arg_ptr) {
 	if (arg_count < 2) {
 		usage(make_string_c(arg_ptr[0]));
@@ -2491,6 +2533,7 @@ int main(int arg_count, char const **arg_ptr) {
 	init_string_interner();
 	init_global_error_collector();
 	init_keyword_hash_table();
+	init_terminal();
 
 	if (!check_env()) {
 		return 1;

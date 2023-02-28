@@ -430,7 +430,6 @@ gb_internal Selection sub_selection(Selection const &sel, isize offset) {
 	return res;
 }
 
-
 gb_global Type basic_types[] = {
 	{Type_Basic, {Basic_Invalid,           0,                                          0, STR_LIT("invalid type")}},
 
@@ -2313,9 +2312,6 @@ gb_internal bool is_type_comparable(Type *t) {
 		return true;
 
 	case Type_Struct:
-		if (type_size_of(t) == 0) {
-			return false;
-		}
 		if (t->Struct.soa_kind != StructSoa_None) {
 			return false;
 		}
@@ -2331,9 +2327,6 @@ gb_internal bool is_type_comparable(Type *t) {
 		return true;
 
 	case Type_Union:
-		if (type_size_of(t) == 0) {
-			return false;
-		}
 		for_array(i, t->Union.variants) {
 			Type *v = t->Union.variants[i];
 			if (!is_type_comparable(v)) {

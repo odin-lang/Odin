@@ -2210,6 +2210,15 @@ gb_internal lbValue lb_compare_records(lbProcedure *p, TokenKind op_kind, lbValu
 	lbValue left_ptr  = lb_address_from_load_or_generate_local(p, left);
 	lbValue right_ptr = lb_address_from_load_or_generate_local(p, right);
 	lbValue res = {};
+	if (type_size_of(type) == 0) {
+		switch (op_kind) {
+		case Token_CmpEq:
+			return lb_const_bool(p->module, t_bool, true);
+		case Token_NotEq:
+			return lb_const_bool(p->module, t_bool, false);
+		}
+		GB_PANIC("invalid operator");
+	}
 	if (is_type_simple_compare(type)) {
 		// TODO(bill): Test to see if this is actually faster!!!!
 		auto args = array_make<lbValue>(permanent_allocator(), 3);
@@ -3138,7 +3147,7 @@ gb_internal lbValue lb_build_expr_internal(lbProcedure *p, Ast *expr) {
 		Entity *e = entity_from_expr(expr);
 		e = strip_entity_wrapping(e);
 
-		GB_ASSERT_MSG(e != nullptr, "%s", expr_to_string(expr));
+		GB_ASSERT_MSG(e != nullptr, "%s in %.*s %p", expr_to_string(expr), LIT(p->name), expr);
 		if (e->kind == Entity_Builtin) {
 			Token token = ast_token(expr);
 			GB_PANIC("TODO(bill): lb_build_expr Entity_Builtin '%.*s'\n"
@@ -4035,7 +4044,6 @@ gb_internal lbAddr lb_build_addr_slice_expr(lbProcedure *p, Ast *expr) {
 	return {};
 }
 
-
 gb_internal lbAddr lb_build_addr_compound_lit(lbProcedure *p, Ast *expr) {
 	ast_node(cl, CompoundLit, expr);
 
@@ -4084,12 +4092,25 @@ gb_internal lbAddr lb_build_addr_compound_lit(lbProcedure *p, Ast *expr) {
 					ast_node(fv, FieldValue, elem);
 					String name = fv->field->Ident.token.string;
 					Selection sel = lookup_field(bt, name, false);
-					index = sel.index[0];
+					GB_ASSERT(!sel.indirect);
+
 					elem = fv->value;
-					TypeAndValue tav = type_and_value_of_expr(elem);
+					if (sel.index.count > 1) {
+						if (lb_is_nested_possibly_constant(type, sel, elem)) {
+							continue;
+						}
+						lbValue dst = lb_emit_deep_field_gep(p, comp_lit_ptr, sel);
+						field_expr = lb_build_expr(p, elem);
+						field_expr = lb_emit_conv(p, field_expr, sel.entity->type);
+						lb_emit_store(p, dst, field_expr);
+						continue;
+					}
+
+					index = sel.index[0];
 				} else {
-					TypeAndValue tav = type_and_value_of_expr(elem);
 					Selection sel = lookup_field_from_index(bt, st->fields[field_index]->Variable.field_index);
+					GB_ASSERT(sel.index.count == 1);
+					GB_ASSERT(!sel.indirect);
 					index = sel.index[0];
 				}
 

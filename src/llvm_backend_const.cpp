@@ -386,6 +386,31 @@ gb_internal LLVMValueRef lb_big_int_to_llvm(lbModule *m, Type *original_type, Bi
 	return value;
 }
 
+gb_internal bool lb_is_nested_possibly_constant(Type *ft, Selection const &sel, Ast *elem) {
+	GB_ASSERT(!sel.indirect);
+	for (i32 index : sel.index) {
+		Type *bt = base_type(ft);
+		switch (bt->kind) {
+		case Type_Struct:
+			if (bt->Struct.is_raw_union) {
+				return false;
+			}
+			ft = bt->Struct.fields[index]->type;
+			break;
+		case Type_Array:
+			ft = bt->Array.elem;
+			break;
+		default:
+			return false;
+		}
+	}
+
+
+	if (is_type_raw_union(ft) || is_type_typeid(ft)) {
+		return false;
+	}
+	return lb_is_elem_const(elem, ft);
+}
 
 gb_internal lbValue lb_const_value(lbModule *m, Type *type, ExactValue value, bool allow_local) {
 	LLVMContextRef ctx = m->ctx;
@@ -411,7 +436,6 @@ gb_internal lbValue lb_const_value(lbModule *m, Type *type, ExactValue value, bo
 		Ast *expr = unparen_expr(value.value_procedure);
 		if (expr->kind == Ast_ProcLit) {
 			res = lb_generate_anonymous_proc_lit(m, str_lit("_proclit"), expr);
-
 		} else {
 			Entity *e = entity_from_expr(expr);
 			res = lb_find_procedure_value_from_entity(m, e);
@@ -461,6 +485,8 @@ gb_internal lbValue lb_const_value(lbModule *m, Type *type, ExactValue value, bo
 					LLVMValueRef ptr = LLVMBuildInBoundsGEP2(p->builder, llvm_type, array_data, indices, 2, "");
 					LLVMValueRef len = LLVMConstInt(lb_type(m, t_int), count, true);
 					lbAddr slice = lb_add_local_generated(p, type, false);
+					map_set(&m->exact_value_compound_literal_addr_map, value.value_compound, slice);
+
 					lb_fill_slice(p, slice, {ptr, alloc_type_pointer(elem)}, {len, t_int});
 					return lb_addr_load(p, slice);
 				}
@@ -978,12 +1004,58 @@ gb_internal lbValue lb_const_value(lbModule *m, Type *type, ExactValue value, bo
 						GB_ASSERT(tav.mode != Addressing_Invalid);
 
 						Selection sel = lookup_field(type, name, false);
+						GB_ASSERT(!sel.indirect);
+
 						Entity *f = type->Struct.fields[sel.index[0]];
-							
 						i32 index = field_remapping[f->Variable.field_index];
 						if (elem_type_can_be_constant(f->type)) {
-							values[index] = lb_const_value(m, f->type, tav.value, allow_local).value;
-							visited[index] = true;
+							if (sel.index.count == 1) {
+								values[index] = lb_const_value(m, f->type, tav.value, allow_local).value;
+								visited[index] = true;
+							} else {
+								if (!visited[index]) {
+									values[index] = lb_const_value(m, f->type, {}, false).value;
+									visited[index] = true;
+								}
+								unsigned idx_list_len = cast(unsigned)sel.index.count-1;
+								unsigned *idx_list = gb_alloc_array(temporary_allocator(), unsigned, idx_list_len);
+
+								if (lb_is_nested_possibly_constant(type, sel, fv->value)) {
+									bool is_constant = true;
+									Type *cv_type = f->type;
+									for (isize j = 1; j < sel.index.count; j++) {
+										i32 index = sel.index[j];
+										Type *cvt = base_type(cv_type);
+
+										if (cvt->kind == Type_Struct) {
+											if (cvt->Struct.is_raw_union) {
+												// sanity check which should have been caught by `lb_is_nested_possibly_constant`
+												is_constant = false;
+												break;
+											}
+											cv_type = cvt->Struct.fields[index]->type;
+
+											if (is_type_struct(cv_type)) {
+												auto cv_field_remapping = lb_get_struct_remapping(m, cv_type);
+												idx_list[j-1] = cast(unsigned)cv_field_remapping[index];
+											} else {
+												idx_list[j-1] = cast(unsigned)index;
+											}
+										} else if (cvt->kind == Type_Array) {
+											cv_type = cvt->Array.elem;
+
+											idx_list[j-1] = cast(unsigned)index;
+										} else {
+											GB_PANIC("UNKNOWN TYPE: %s", type_to_string(cv_type));
+										}
+									}
+									if (is_constant) {
+										LLVMValueRef elem_value = lb_const_value(m, tav.type, tav.value, allow_local).value;
+										GB_ASSERT(LLVMIsConstant(elem_value));
+										values[index] = LLVMConstInsertValue(values[index], elem_value, idx_list, idx_list_len);
+									}
+								}
+							}
 						}
 					}
 				} else {
@@ -1043,6 +1115,8 @@ gb_internal lbValue lb_const_value(lbModule *m, Type *type, ExactValue value, bo
 				GB_ASSERT(is_local);
 				lbProcedure *p = m->curr_procedure;
 				lbAddr v = lb_add_local_generated(p, res.type, true);
+				map_set(&m->exact_value_compound_literal_addr_map, value.value_compound, v);
+
 				LLVMBuildStore(p->builder, constant_value, v.addr.value);
 				for (isize i = 0; i < value_count; i++) {
 					LLVMValueRef val = old_values[i];
