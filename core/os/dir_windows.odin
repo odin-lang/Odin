@@ -2,6 +2,7 @@ package os
 
 import win32 "core:sys/windows"
 import "core:strings"
+import "core:runtime"
 
 read_dir :: proc(fd: Handle, n: int, allocator := context.allocator) -> (fi: []File_Info, err: Errno) {
 	find_data_to_file_info :: proc(base_path: string, d: ^win32.WIN32_FIND_DATAW) -> (fi: File_Info) {
@@ -65,13 +66,16 @@ read_dir :: proc(fd: Handle, n: int, allocator := context.allocator) -> (fi: []F
 		n = -1
 		size = 100
 	}
-	dfi := make([dynamic]File_Info, 0, size)
+	runtime.DEFAULT_TEMP_ALLOCATOR_TEMP_GUARD(ignore = context.temp_allocator == allocator)
 
 	wpath: []u16
-	wpath, err = cleanpath_from_handle_u16(fd)
+	wpath, err = cleanpath_from_handle_u16(fd, context.temp_allocator)
 	if len(wpath) == 0 || err != ERROR_NONE {
 		return
 	}
+
+	dfi := make([dynamic]File_Info, 0, size)
+
 	wpath_search := make([]u16, len(wpath)+3, context.temp_allocator)
 	copy(wpath_search, wpath)
 	wpath_search[len(wpath)+0] = '\\'

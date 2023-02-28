@@ -7,6 +7,7 @@ when ODIN_OS == .Darwin {
 	foreign import libc "system:c"
 }
 
+import "core:runtime"
 import "core:strings"
 
 SEPARATOR :: '/'
@@ -41,6 +42,7 @@ abs :: proc(path: string, allocator := context.allocator) -> (string, bool) {
 join :: proc(elems: []string, allocator := context.allocator) -> string {
 	for e, i in elems {
 		if e != "" {
+			runtime.DEFAULT_TEMP_ALLOCATOR_TEMP_GUARD(ignore = context.temp_allocator == allocator)
 			p := strings.join(elems[i:], SEPARATOR_STRING, context.temp_allocator)
 			return clean(p, allocator)
 		}

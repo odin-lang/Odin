@@ -20,6 +20,8 @@ is_slash :: proc(c: byte) -> bool {
 	return c == '\\' || c == '/'
 }
 
+// Splits path immediate following the last separator; separating the path into a directory and file.
+// If no separator is found, `dir` will be empty and `path` set to `path`.
 split :: proc(path: string) -> (dir, file: string) {
 	vol := volume_name(path)
 	i := len(path) - 1
@@ -29,10 +31,18 @@ split :: proc(path: string) -> (dir, file: string) {
 	return path[:i+1], path[i+1:]
 }
 
+/*
+	Returns leading volume name.
+
+	e.g.
+	  "C:\foo\bar\baz" will return "C:" on Windows.
+	  Everything else will be "".
+*/
 volume_name :: proc(path: string) -> string {
 	return path[:volume_name_len(path)]
 }
 
+// Returns the length of the volume name in bytes.
 volume_name_len :: proc(path: string) -> int {
 	if ODIN_OS == .Windows {
 		if len(path) < 2 {
@@ -74,7 +84,7 @@ volume_name_len :: proc(path: string) -> int {
 /*
 	Gets the file name and extension from a path.
 
-	i.e:
+	e.g.
 	  'path/to/name.tar.gz' -> 'name.tar.gz'
 	  'path/to/name.txt'    -> 'name.txt'
 	  'path/to/name'        -> 'name'
@@ -114,7 +124,7 @@ base :: proc(path: string) -> string {
 	Only the last dot is considered when splitting the file extension.
 	See `short_stem`.
 
-	i.e:
+	e.g.
 	  'name.tar.gz' -> 'name.tar'
 	  'name.txt'    -> 'name'
 
@@ -147,7 +157,7 @@ stem :: proc(path: string) -> string {
 
 	The first dot is used to split off the file extension, unlike `stem` which uses the last dot.
 
-	i.e:
+	e.g.
 	  'name.tar.gz' -> 'name'
 	  'name.txt'    -> 'name'
 
@@ -170,7 +180,7 @@ short_stem :: proc(path: string) -> string {
 	Only the last dot is considered when splitting the file extension.
 	See `long_ext`.
 
-	i.e:
+	e.g.
 	  'name.tar.gz' -> '.gz'
 	  'name.txt'    -> '.txt'
 
@@ -193,7 +203,7 @@ ext :: proc(path: string) -> string {
 
 	The first dot is used to split off the file extension, unlike `ext` which uses the last dot.
 
-	i.e:
+	e.g.
 	  'name.tar.gz' -> '.tar.gz'
 	  'name.txt'    -> '.txt'
 
@@ -219,6 +229,21 @@ long_ext :: proc(path: string) -> string {
 	return ""
 }
 
+/*
+	Returns the shortest path name equivalent to `path` through solely lexical processing.
+	It applies the folliwng rules until none of them can be applied:
+
+	* Replace multiple separators with a single one
+	* Remove each current directory (`.`) path name element
+	* Remove each inner parent directory (`..`) path and the preceding paths
+	* Remove `..` that begin at the root of a path
+	* All possible separators are replaced with the OS specific separator
+
+	The return path ends in a slash only if it represents the root of a directory (`C:\` on Windows and  `/` on *nix systems).
+
+	If the result of the path is an empty string, the returned path with be `"."`.
+
+*/
 clean :: proc(path: string, allocator := context.allocator) -> string {
 	context.allocator = allocator
 
@@ -299,6 +324,7 @@ clean :: proc(path: string, allocator := context.allocator) -> string {
 	return cleaned
 }
 
+// Returns the result of replacing each forward slash `/` character in the path with the separate OS specific character.
 from_slash :: proc(path: string, allocator := context.allocator) -> (new_path: string, new_allocation: bool) {
 	if SEPARATOR == '/' {
 		return path, false
@@ -306,6 +332,7 @@ from_slash :: proc(path: string, allocator := context.allocator) -> (new_path: s
 	return strings.replace_all(path, "/", SEPARATOR_STRING, allocator)
 }
 
+// Returns the result of replacing each OS specific separator with a forward slash `/` character.
 to_slash :: proc(path: string, allocator := context.allocator) -> (new_path: string, new_allocation: bool) {
 	if SEPARATOR == '/' {
 		return path, false
@@ -320,6 +347,13 @@ Relative_Error :: enum {
 	Cannot_Relate,
 }
 
+/*
+	Returns a relative path that is lexically equivalent to the `target_path` when joined with the `base_path` with an OS specific separator.
+
+	e.g. `join(base_path, rel(base_path, target_path))` is equivalent to `target_path`
+
+	On failure, the `Relative_Error` will be state it cannot compute the necessary relative path.
+*/
 rel :: proc(base_path, target_path: string, allocator := context.allocator) -> (string, Relative_Error) {
 	context.allocator = allocator
 	base_clean, target_clean := clean(base_path), clean(target_path)
@@ -398,6 +432,11 @@ rel :: proc(base_path, target_path: string, allocator := context.allocator) -> (
 	return target[t0:], .None
 }
 
+/*
+	Returns all but the last element path, usually the path's directory. Once the final element has been removed,
+	`dir` calls `clean` on the path and trailing separators are removed. If the path consists purely of separators,
+	then `"."` is returned.
+*/
 dir :: proc(path: string, allocator := context.allocator) -> string {
         context.allocator = allocator
 	vol := volume_name(path)

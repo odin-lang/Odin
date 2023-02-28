@@ -4615,7 +4615,7 @@ gb_internal Entity *check_selector(CheckerContext *c, Operand *operand, Ast *nod
 			entity = scope_lookup_current(import_scope, entity_name);
 			bool allow_builtin = false;
 			if (!is_entity_declared_for_selector(entity, import_scope, &allow_builtin)) {
-				error(op_expr, "'%.*s' is not declared by '%.*s'", LIT(entity_name), LIT(import_name));
+				error(node, "'%.*s' is not declared by '%.*s'", LIT(entity_name), LIT(import_name));
 				operand->mode = Addressing_Invalid;
 				operand->expr = node;
 
@@ -4635,7 +4635,7 @@ gb_internal Entity *check_selector(CheckerContext *c, Operand *operand, Ast *nod
 
 			if (!is_entity_exported(entity, allow_builtin)) {
 				gbString sel_str = expr_to_string(selector);
-				error(op_expr, "'%s' is not exported by '%.*s'", sel_str, LIT(import_name));
+				error(node, "'%s' is not exported by '%.*s'", sel_str, LIT(import_name));
 				gb_string_free(sel_str);
 				// NOTE(bill): make the state valid still, even if it's "invalid"
 				// operand->mode = Addressing_Invalid;
@@ -6840,6 +6840,10 @@ gb_internal ExprKind check_call_expr(CheckerContext *c, Operand *operand, Ast *c
 
 	if (operand->mode == Addressing_Builtin) {
 		i32 id = operand->builtin_id;
+		Entity *e = entity_of_node(operand->expr);
+		if (e != nullptr && e->token.string == "expand_to_tuple") {
+			warning(operand->expr, "'expand_to_tuple' has been replaced with 'expand_values'");
+		}
 		if (!check_builtin_procedure(c, operand, call, id, type_hint)) {
 			operand->mode = Addressing_Invalid;
 			operand->type = t_invalid;
@@ -7890,6 +7894,124 @@ gb_internal ExprKind check_or_return_expr(CheckerContext *c, Operand *o, Ast *no
 	return Expr_Expr;
 }
 
+
+gb_internal void check_compound_literal_field_values(CheckerContext *c, Slice<Ast *> const &elems, Operand *o, Type *type, bool &is_constant) {
+	Type *bt = base_type(type);
+
+	StringSet fields_visited = {};
+	defer (string_set_destroy(&fields_visited));
+
+	StringMap<String> fields_visited_through_raw_union = {};
+	defer (string_map_destroy(&fields_visited_through_raw_union));
+
+	for (Ast *elem : elems) {
+		if (elem->kind != Ast_FieldValue) {
+			error(elem, "Mixture of 'field = value' and value elements in a literal is not allowed");
+			continue;
+		}
+		ast_node(fv, FieldValue, elem);
+		if (fv->field->kind != Ast_Ident) {
+			gbString expr_str = expr_to_string(fv->field);
+			error(elem, "Invalid field name '%s' in structure literal", expr_str);
+			gb_string_free(expr_str);
+			continue;
+		}
+		String name = fv->field->Ident.token.string;
+
+		Selection sel = lookup_field(type, name, o->mode == Addressing_Type);
+		bool is_unknown = sel.entity == nullptr;
+		if (is_unknown) {
+			error(fv->field, "Unknown field '%.*s' in structure literal", LIT(name));
+			continue;
+		}
+
+		Entity *field = bt->Struct.fields[sel.index[0]];
+		add_entity_use(c, fv->field, field);
+		if (string_set_update(&fields_visited, name)) {
+			if (sel.index.count > 1) {
+				if (String *found = string_map_get(&fields_visited_through_raw_union, sel.entity->token.string)) {
+					error(fv->field, "Field '%.*s' is already initialized due to a previously assigned struct #raw_union field '%.*s'", LIT(sel.entity->token.string), LIT(*found));
+				} else {
+					error(fv->field, "Duplicate or reused field '%.*s' in structure literal", LIT(sel.entity->token.string));
+				}
+			} else {
+				error(fv->field, "Duplicate field '%.*s' in structure literal", LIT(field->token.string));
+			}
+			continue;
+		} else if (String *found = string_map_get(&fields_visited_through_raw_union, sel.entity->token.string)) {
+			error(fv->field, "Field '%.*s' is already initialized due to a previously assigned struct #raw_union field '%.*s'", LIT(sel.entity->token.string), LIT(*found));
+			continue;
+		}
+		if (sel.indirect) {
+			error(fv->field, "Cannot assign to the %d-nested anonymous indirect field '%.*s' in a structure literal", cast(int)sel.index.count-1, LIT(name));
+			continue;
+		}
+
+		if (sel.index.count > 1) {
+			if (is_constant) {
+				Type *ft = type;
+				for (i32 index : sel.index) {
+					Type *bt = base_type(ft);
+					switch (bt->kind) {
+					case Type_Struct:
+						if (bt->Struct.is_raw_union) {
+							is_constant = false;
+							break;
+						}
+						ft = bt->Struct.fields[index]->type;
+						break;
+					case Type_Array:
+						ft = bt->Array.elem;
+						break;
+					default:
+						GB_PANIC("invalid type: %s", type_to_string(ft));
+						break;
+					}
+				}
+				if (is_constant &&
+				    (is_type_any(ft) || is_type_union(ft) || is_type_raw_union(ft) || is_type_typeid(ft))) {
+					is_constant = false;
+				}
+			}
+
+			Type *nested_ft = bt;
+			for (i32 index : sel.index) {
+				Type *bt = base_type(nested_ft);
+				switch (bt->kind) {
+				case Type_Struct:
+					if (bt->Struct.is_raw_union) {
+						for (Entity *re : bt->Struct.fields) {
+							string_map_set(&fields_visited_through_raw_union, re->token.string, sel.entity->token.string);
+						}
+					}
+					nested_ft = bt->Struct.fields[index]->type;
+					break;
+				case Type_Array:
+					nested_ft = bt->Array.elem;
+					break;
+				default:
+					GB_PANIC("invalid type %s", type_to_string(nested_ft));
+					break;
+				}
+			}
+			field = sel.entity;
+		}
+
+
+		Operand o = {};
+		check_expr_or_type(c, &o, fv->value, field->type);
+
+		if (is_type_any(field->type) || is_type_union(field->type) || is_type_raw_union(field->type) || is_type_typeid(field->type)) {
+			is_constant = false;
+		}
+		if (is_constant) {
+			is_constant = check_is_operand_compound_lit_constant(c, &o);
+		}
+
+		check_assignment(c, &o, field->type, str_lit("structure literal"));
+	}
+}
+
 gb_internal ExprKind check_compound_literal(CheckerContext *c, Operand *o, Ast *node, Type *type_hint) {
 	ExprKind kind = Expr_Expr;
 	ast_node(cl, CompoundLit, node);
@@ -7977,44 +8099,12 @@ gb_internal ExprKind check_compound_literal(CheckerContext *c, Operand *o, Ast *
 						error(node, "%s ('struct #raw_union') compound literals are only allowed to contain up to 1 'field = value' element, got %td", type_str, cl->elems.count);
 						gb_string_free(type_str);
 					} else {
-						Ast *elem = cl->elems[0];
-						ast_node(fv, FieldValue, elem);
-						if (fv->field->kind != Ast_Ident) {
-							gbString expr_str = expr_to_string(fv->field);
-							error(elem, "Invalid field name '%s' in structure literal", expr_str);
-							gb_string_free(expr_str);
-							break;
-						}
-
-						String name = fv->field->Ident.token.string;
-
-						Selection sel = lookup_field(type, name, o->mode == Addressing_Type);
-						bool is_unknown = sel.entity == nullptr;
-						if (is_unknown) {
-							error(elem, "Unknown field '%.*s' in structure literal", LIT(name));
-							break;
-						}
-
-						if (sel.index.count > 1) {
-							error(elem, "Cannot assign to an anonymous field '%.*s' in a structure literal (at the moment)", LIT(name));
-							break;
-						}
-
-						Entity *field = t->Struct.fields[sel.index[0]];
-						add_entity_use(c, fv->field, field);
-
-						Operand o = {};
-						check_expr_or_type(c, &o, fv->value, field->type);
-
-
-						check_assignment(c, &o, field->type, str_lit("structure literal"));
+						check_compound_literal_field_values(c, cl->elems, o, type, is_constant);
 					}
-
 				}
 			}
 			break;
 		}
-
 
 		isize field_count = t->Struct.fields.count;
 		isize min_field_count = t->Struct.fields.count;
@@ -8029,58 +8119,7 @@ gb_internal ExprKind check_compound_literal(CheckerContext *c, Operand *o, Ast *
 		}
 
 		if (cl->elems[0]->kind == Ast_FieldValue) {
-			TEMPORARY_ALLOCATOR_GUARD();
-
-			bool *fields_visited = gb_alloc_array(temporary_allocator(), bool, field_count);
-
-			for (Ast *elem : cl->elems) {
-				if (elem->kind != Ast_FieldValue) {
-					error(elem, "Mixture of 'field = value' and value elements in a literal is not allowed");
-					continue;
-				}
-				ast_node(fv, FieldValue, elem);
-				if (fv->field->kind != Ast_Ident) {
-					gbString expr_str = expr_to_string(fv->field);
-					error(elem, "Invalid field name '%s' in structure literal", expr_str);
-					gb_string_free(expr_str);
-					continue;
-				}
-				String name = fv->field->Ident.token.string;
-
-				Selection sel = lookup_field(type, name, o->mode == Addressing_Type);
-				bool is_unknown = sel.entity == nullptr;
-				if (is_unknown) {
-					error(elem, "Unknown field '%.*s' in structure literal", LIT(name));
-					continue;
-				}
-
-				if (sel.index.count > 1) {
-					error(elem, "Cannot assign to an anonymous field '%.*s' in a structure literal (at the moment)", LIT(name));
-					continue;
-				}
-
-				Entity *field = t->Struct.fields[sel.index[0]];
-				add_entity_use(c, fv->field, field);
-
-				if (fields_visited[sel.index[0]]) {
-					error(elem, "Duplicate field '%.*s' in structure literal", LIT(name));
-					continue;
-				}
-
-				fields_visited[sel.index[0]] = true;
-
-				Operand o = {};
-				check_expr_or_type(c, &o, fv->value, field->type);
-
-				if (is_type_any(field->type) || is_type_union(field->type) || is_type_raw_union(field->type) || is_type_typeid(field->type)) {
-					is_constant = false;
-				}
-				if (is_constant) {
-					is_constant = check_is_operand_compound_lit_constant(c, &o);
-				}
-
-				check_assignment(c, &o, field->type, str_lit("structure literal"));
-			}
+			check_compound_literal_field_values(c, cl->elems, o, type, is_constant);
 		} else {
 			bool seen_field_value = false;
 

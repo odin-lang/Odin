@@ -1070,6 +1070,13 @@ gb_internal void init_universal(void) {
 			}
 		}
 	}
+	{
+		BuiltinProcId id = BuiltinProc_expand_values;
+		String name = str_lit("expand_to_tuple");
+		Entity *entity = alloc_entity(Entity_Builtin, nullptr, make_token_ident(name), t_invalid);
+		entity->Builtin.id = id;
+		add_global_entity(entity, builtin_pkg->scope);
+	}
 
 	bool defined_values_double_declaration = false;
 	for (auto const &entry : bc->defined_values) {

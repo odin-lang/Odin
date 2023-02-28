@@ -346,6 +346,8 @@ unmarshal_object :: proc(p: ^Parser, v: any, end_token: Token_Kind) -> (err: Unm
 			
 			fields := reflect.struct_fields_zipped(ti.id)
 			
+			runtime.DEFAULT_TEMP_ALLOCATOR_TEMP_GUARD(ignore = context.temp_allocator == context.allocator)
+
 			field_used := make([]bool, len(fields), context.temp_allocator)
 			
 			use_field_idx := -1

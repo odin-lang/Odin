@@ -1,6 +1,6 @@
 template <typename T>
 struct PtrSet {
-	static_assert(TypeIsPointer<T>::value, "PtrSet::T must be a pointer");
+	static_assert(TypeIsPointer<T>::value || TypeIsPtrSizedInteger<T>::value, "PtrSet::T must be a pointer");
 	static constexpr uintptr TOMBSTONE = ~(uintptr)(0ull);
 
 	T *   keys;

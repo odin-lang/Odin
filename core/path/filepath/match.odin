@@ -218,7 +218,6 @@ get_escape :: proc(chunk: string) -> (r: rune, next_chunk: string, err: Match_Er
 //
 // glob ignores file system errors
 //
-
 glob :: proc(pattern: string, allocator := context.allocator) -> (matches: []string, err: Match_Error) {
 	context.allocator = allocator
 
@@ -261,6 +260,8 @@ glob :: proc(pattern: string, allocator := context.allocator) -> (matches: []str
 	}
 	return
 }
+
+// Internal implementation of `glob`, not meant to be used by the user. Prefer `glob`.
 _glob :: proc(dir, pattern: string, matches: ^[dynamic]string, allocator := context.allocator) -> (m: [dynamic]string, e: Match_Error) {
 	context.allocator = allocator
 

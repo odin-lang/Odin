@@ -1,6 +1,7 @@
 package os
 
 import "core:time"
+import "core:runtime"
 import win32 "core:sys/windows"
 
 @(private)
@@ -11,6 +12,7 @@ full_path_from_name :: proc(name: string, allocator := context.allocator) -> (pa
 	if name == "" {
 		name = "."
 	}
+	runtime.DEFAULT_TEMP_ALLOCATOR_TEMP_GUARD(ignore = context.temp_allocator == allocator)
 	p := win32.utf8_to_utf16(name, context.temp_allocator)
 	buf := make([dynamic]u16, 100)
 	defer delete(buf)
@@ -36,6 +38,7 @@ _stat :: proc(name: string, create_file_attributes: u32, allocator := context.al
 
 	context.allocator = allocator
 
+	runtime.DEFAULT_TEMP_ALLOCATOR_TEMP_GUARD(ignore = context.temp_allocator == allocator)
 
 	wname := win32.utf8_to_wstring(fix_long_path(name), context.temp_allocator)
 	fa: win32.WIN32_FILE_ATTRIBUTE_DATA
@@ -132,14 +135,15 @@ cleanpath_strip_prefix :: proc(buf: []u16) -> []u16 {
 
 @(private)
 cleanpath_from_handle :: proc(fd: Handle) -> (string, Errno) {
-	buf, err := cleanpath_from_handle_u16(fd)
+	runtime.DEFAULT_TEMP_ALLOCATOR_TEMP_GUARD(ignore = context.temp_allocator == context.allocator)
+	buf, err := cleanpath_from_handle_u16(fd, context.temp_allocator)
 	if err != 0 {
 		return "", err
 	}
 	return win32.utf16_to_utf8(buf, context.allocator) or_else "", err
 }
 @(private)
-cleanpath_from_handle_u16 :: proc(fd: Handle) -> ([]u16, Errno) {
+cleanpath_from_handle_u16 :: proc(fd: Handle, allocator: runtime.Allocator) -> ([]u16, Errno) {
 	if fd == 0 {
 		return nil, ERROR_INVALID_HANDLE
 	}
@@ -149,7 +153,7 @@ cleanpath_from_handle_u16 :: proc(fd: Handle) -> ([]u16, Errno) {
 	if n == 0 {
 		return nil, Errno(win32.GetLastError())
 	}
-	buf := make([]u16, max(n, win32.DWORD(260))+1, context.temp_allocator)
+	buf := make([]u16, max(n, win32.DWORD(260))+1, allocator)
 	buf_len := win32.GetFinalPathNameByHandleW(h, raw_data(buf), n, 0)
 	return buf[:buf_len], ERROR_NONE
 }

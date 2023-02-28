@@ -5,6 +5,7 @@
 // To manipulate operating system specific paths, use the path/filepath package
 package slashpath
 
+import "core:runtime"
 import "core:strings"
 
 // is_separator checks whether the byte is a valid separator character
@@ -150,8 +151,9 @@ join :: proc(elems: []string, allocator := context.allocator) -> string {
 	context.allocator = allocator
 	for elem, i in elems {
 		if elem != "" {
+			runtime.DEFAULT_TEMP_ALLOCATOR_TEMP_GUARD(ignore = context.temp_allocator == allocator)
 			s := strings.join(elems[i:], "/", context.temp_allocator)
-			return clean(s)
+			return clean(s, allocator)
 		}
 	}
 	return ""

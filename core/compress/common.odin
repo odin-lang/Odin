@@ -212,6 +212,8 @@ read_slice_from_memory :: #force_inline proc(z: ^Context_Memory_Input, size: int
 
 @(optimization_mode="speed")
 read_slice_from_stream :: #force_inline proc(z: ^Context_Stream_Input, size: int) -> (res: []u8, err: io.Error) {
+	// TODO: REMOVE ALL USE OF context.temp_allocator here
+	// the is literally no need for it
 	b := make([]u8, size, context.temp_allocator)
 	_, e := z.input->impl_read(b[:])
 	if e == .None {
