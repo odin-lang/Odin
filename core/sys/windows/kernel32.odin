@@ -370,6 +370,9 @@ foreign kernel32 {
 	GenerateConsoleCtrlEvent :: proc(dwCtrlEvent: DWORD, dwProcessGroupId: DWORD) -> BOOL ---
 	FreeConsole :: proc() -> BOOL ---
 	GetConsoleWindow :: proc() -> HWND ---
+	GetConsoleScreenBufferInfo :: proc(hConsoleOutput: HANDLE, lpConsoleScreenBufferInfo: PCONSOLE_SCREEN_BUFFER_INFO) -> BOOL ---
+	SetConsoleScreenBufferSize :: proc(hConsoleOutput: HANDLE, dwSize: COORD) -> BOOL ---
+	SetConsoleWindowInfo :: proc(hConsoleOutput: HANDLE, bAbsolute : BOOL, lpConsoleWindow: ^SMALL_RECT) -> BOOL ---
 
 	GetDiskFreeSpaceExW :: proc(
 		lpDirectoryName: LPCWSTR,

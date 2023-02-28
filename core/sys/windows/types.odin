@@ -3884,3 +3884,21 @@ COORD :: struct {
 	X: SHORT,
 	Y: SHORT,
 }
+
+SMALL_RECT :: struct {
+	Left: SHORT,
+	Top: SHORT,
+	Right: SHORT,
+	Bottom: SHORT,
+}
+
+CONSOLE_SCREEN_BUFFER_INFO :: struct {
+	dwSize: COORD,
+	dwCursorPosition: COORD,
+	wAttributes: WORD,
+	srWindow: SMALL_RECT,
+	dwMaximumWindowSize: COORD,
+}
+
+
+PCONSOLE_SCREEN_BUFFER_INFO :: ^CONSOLE_SCREEN_BUFFER_INFO
