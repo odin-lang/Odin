@@ -15,7 +15,7 @@ when ODIN_OS == .Windows {
 		}
 	} else {
 		foreign import glfw {
-			"../lib/glfw3mt.lib",
+			"../lib/glfw3_mt.lib",
 			"system:user32.lib",
 			"system:gdi32.lib",
 			"system:shell32.lib",
