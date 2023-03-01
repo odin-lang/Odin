@@ -67,7 +67,7 @@ ENOPROTOOPT:		Errno : 42		/* Protocol not available */
 EPROTONOSUPPORT:	Errno : 43		/* Protocol not supported */
 ESOCKTNOSUPPORT:	Errno : 44		/* Socket type not supported */
 ENOTSUP:			Errno : 45		/* Operation not supported */
-EOPNOTSUPP::        ENOTSUP
+EOPNOTSUPP::		ENOTSUP
 EPFNOSUPPORT:		Errno : 46		/* Protocol family not supported */
 EAFNOSUPPORT:		Errno : 47		/* Address family not supported by protocol family */
 EADDRINUSE:			Errno : 48		/* Address already in use */
