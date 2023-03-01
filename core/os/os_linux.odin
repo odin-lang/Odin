@@ -14,6 +14,7 @@ Handle    :: distinct i32
 Pid       :: distinct i32
 File_Time :: distinct u64
 Errno     :: distinct i32
+Socket    :: distinct int
 
 INVALID_HANDLE :: ~Handle(0)
 
@@ -230,6 +231,13 @@ RTLD_LAZY         :: 0x001
 RTLD_NOW          :: 0x002
 RTLD_BINDING_MASK :: 0x3
 RTLD_GLOBAL       :: 0x100
+
+socklen_t :: c.int
+
+Timeval :: struct {
+	seconds: i64,
+	nanoseconds: int,
+}
 
 // "Argv" arguments converted to Odin strings
 args := _alloc_command_line_arguments()

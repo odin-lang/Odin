@@ -63,8 +63,8 @@ split_url :: proc(url: string, allocator := context.allocator) -> (scheme, host,
 join_url :: proc(scheme, host, path: string, queries: map[string]string, allocator := context.allocator) -> string {
 	using strings
 
-	b := make_builder(allocator)
-	grow_builder(&b, len(scheme) + 3 + len(host) + 1 + len(path))
+	b := builder_make(allocator)
+	builder_grow(&b, len(scheme) + 3 + len(host) + 1 + len(path))
 
 	write_string(&b, scheme)
 	write_string(&b, "://")
@@ -91,19 +91,19 @@ join_url :: proc(scheme, host, path: string, queries: map[string]string, allocat
 percent_encode :: proc(s: string, allocator := context.allocator) -> string {
 	using strings
 
-	b := make_builder(allocator)
-	grow_builder(&b, len(s) + 16) // NOTE(tetra): A reasonable number to allow for the number of things we need to escape.
+	b := builder_make(allocator)
+	builder_grow(&b, len(s) + 16) // NOTE(tetra): A reasonable number to allow for the number of things we need to escape.
 
 	for ch in s {
 		switch ch {
 		case 'A'..='Z', 'a'..='z', '0'..='9', '-', '_', '.', '~':
-			write_rune_builder(&b, ch)
+			write_rune(&b, ch)
 		case:
 			bytes, n := utf8.encode_rune(ch)
 			for byte in bytes[:n] {
 				buf: [2]u8 = ---
 				t := strconv.append_int(buf[:], i64(byte), 16)
-				write_rune_builder(&b, '%')
+				write_rune(&b, '%')
 				write_string(&b, t)
 			}
 		}
@@ -115,8 +115,8 @@ percent_encode :: proc(s: string, allocator := context.allocator) -> string {
 percent_decode :: proc(encoded_string: string, allocator := context.allocator) -> (decoded_string: string, ok: bool) {
 	using strings
 
-	b := make_builder(allocator)
-	grow_builder(&b, len(encoded_string))
+	b := builder_make(allocator)
+	builder_grow(&b, len(encoded_string))
 	defer if !ok do destroy_builder(&b)
 
 	stack_buf: [4]u8
@@ -137,7 +137,7 @@ percent_decode :: proc(encoded_string: string, allocator := context.allocator) -
 		s = s[1:]
 
 		if s[0] == '%' {
-			write_rune_builder(&b, '%')
+			write_rune(&b, '%')
 			s = s[1:]
 			continue
 		}
@@ -147,26 +147,26 @@ percent_decode :: proc(encoded_string: string, allocator := context.allocator) -
 		n: int
 		n, _ = strconv.parse_int(s[:2], 16)
 		switch n {
-		case 0x20:  write_rune_builder(&b, ' ')
-		case 0x21:  write_rune_builder(&b, '!')
-		case 0x23:  write_rune_builder(&b, '#')
-		case 0x24:  write_rune_builder(&b, '$')
-		case 0x25:  write_rune_builder(&b, '%')
-		case 0x26:  write_rune_builder(&b, '&')
-		case 0x27:  write_rune_builder(&b, '\'')
-		case 0x28:  write_rune_builder(&b, '(')
-		case 0x29:  write_rune_builder(&b, ')')
-		case 0x2A:  write_rune_builder(&b, '*')
-		case 0x2B:  write_rune_builder(&b, '+')
-		case 0x2C:  write_rune_builder(&b, ',')
-		case 0x2F:  write_rune_builder(&b, '/')
-		case 0x3A:  write_rune_builder(&b, ':')
-		case 0x3B:  write_rune_builder(&b, ';')
-		case 0x3D:  write_rune_builder(&b, '=')
-		case 0x3F:  write_rune_builder(&b, '?')
-		case 0x40:  write_rune_builder(&b, '@')
-		case 0x5B:  write_rune_builder(&b, '[')
-		case 0x5D:  write_rune_builder(&b, ']')
+		case 0x20:  write_rune(&b, ' ')
+		case 0x21:  write_rune(&b, '!')
+		case 0x23:  write_rune(&b, '#')
+		case 0x24:  write_rune(&b, '$')
+		case 0x25:  write_rune(&b, '%')
+		case 0x26:  write_rune(&b, '&')
+		case 0x27:  write_rune(&b, '\'')
+		case 0x28:  write_rune(&b, '(')
+		case 0x29:  write_rune(&b, ')')
+		case 0x2A:  write_rune(&b, '*')
+		case 0x2B:  write_rune(&b, '+')
+		case 0x2C:  write_rune(&b, ',')
+		case 0x2F:  write_rune(&b, '/')
+		case 0x3A:  write_rune(&b, ':')
+		case 0x3B:  write_rune(&b, ';')
+		case 0x3D:  write_rune(&b, '=')
+		case 0x3F:  write_rune(&b, '?')
+		case 0x40:  write_rune(&b, '@')
+		case 0x5B:  write_rune(&b, '[')
+		case 0x5D:  write_rune(&b, ']')
 		case:
 			// utf-8 bytes
 			// TODO(tetra): Audit this - 4 bytes???
@@ -174,7 +174,7 @@ percent_decode :: proc(encoded_string: string, allocator := context.allocator) -
 			append(&pending, s[1])
 			if len(pending) == 4 {
 				r, _ := utf8.decode_rune(pending[:])
-				write_rune_builder(&b, r)
+				write_rune(&b, r)
 				clear(&pending)
 			}
 		}

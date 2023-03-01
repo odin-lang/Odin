@@ -1518,6 +1518,7 @@ when ODIN_ARCH == .amd64 {
 	#panic("Unsupported architecture")
 }
 
+
 // syscall related constants
 AT_FDCWD            :: ~uintptr(99)
 AT_REMOVEDIR        :: uintptr(0x200)
@@ -2012,7 +2013,7 @@ sys_socket :: proc "contextless" (domain: int, type: int, protocol: int) -> int 
 	return int(intrinsics.syscall(unix.SYS_socket, uintptr(domain), uintptr(type), uintptr(protocol)))
 }
 
-sys_connect :: proc "contextless" (sd: int, addr: rawptr, len: socklen_t) -> int {
+sys_connect :: proc "contextless" (sd: int, addr: rawptr, len: i32) -> int {
 	return int(intrinsics.syscall(unix.SYS_connect, uintptr(sd), uintptr(addr), uintptr(len)))
 }
 
@@ -2024,11 +2025,11 @@ sys_listen :: proc "contextless" (sd: int, backlog: int) -> int {
 	return int(intrinsics.syscall(unix.SYS_listen, uintptr(sd), uintptr(backlog)))
 }
 
-sys_bind :: proc "contextless" (sd: int, addr: rawptr, len: socklen_t) -> int {
+sys_bind :: proc "contextless" (sd: int, addr: rawptr, len: i32) -> int {
 	return int(intrinsics.syscall(unix.SYS_bind, uintptr(sd), uintptr(addr), uintptr(len)))
 }
 
-sys_setsockopt :: proc "contextless" (sd: int, level: int, optname: int, optval: rawptr, optlen: socklen_t) -> int {
+sys_setsockopt :: proc "contextless" (sd: int, level: int, optname: int, optval: rawptr, optlen: i32) -> int {
 	return int(intrinsics.syscall(unix.SYS_setsockopt, uintptr(sd), uintptr(level), uintptr(optname), uintptr(optval), uintptr(optlen)))
 }
 
@@ -2036,7 +2037,7 @@ sys_recvfrom :: proc "contextless" (sd: int, buf: rawptr, len: uint, flags: int,
 	return i64(intrinsics.syscall(unix.SYS_recvfrom, uintptr(sd), uintptr(buf), uintptr(len), uintptr(flags), uintptr(addr), uintptr(alen)))
 }
 
-sys_sendto :: proc "contextless" (sd: int, buf: rawptr, len: uint, flags: int, addr: rawptr, alen: socklen_t) -> i64 {
+sys_sendto :: proc "contextless" (sd: int, buf: rawptr, len: uint, flags: int, addr: rawptr, alen: i32) -> i64 {
 	return i64(intrinsics.syscall(unix.SYS_sendto, uintptr(sd), uintptr(buf), uintptr(len), uintptr(flags), uintptr(addr), uintptr(alen)))
 }
 

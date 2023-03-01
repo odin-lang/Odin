@@ -182,7 +182,7 @@ parse_ip6_address :: proc(address_and_maybe_port: string) -> (addr: IP6_Address,
 
 	for ch, i in address {
 		switch ch {
-		case '0'..'9', 'a'..'f', 'A'..'F':
+		case '0'..='9', 'a'..='f', 'A'..='F':
 			piece_end += 1
 
 		case ':':
@@ -522,7 +522,7 @@ join_port :: proc(address_or_host: string, port: int, allocator := context.alloc
 	addr_or_host, _, ok := split_port(address_or_host)
 	if !ok do return addr_or_host
 
-	b := strings.make_builder(allocator)
+	b := strings.builder_make(allocator)
 
 	addr := parse_address(addr_or_host)
 	if addr == nil {
@@ -560,7 +560,7 @@ map_to_ip6 :: proc(addr: Address) -> Address {
 	See RFC 5952 section 4 for IPv6 representation recommendations.
 */
 address_to_string :: proc(addr: Address, allocator := context.temp_allocator) -> string {
-	b := strings.make_builder(allocator)
+	b := strings.builder_make(allocator)
 	switch v in addr {
 	case IP4_Address:
 		fmt.sbprintf(&b, "%v.%v.%v.%v", v[0], v[1], v[2], v[3])
@@ -657,7 +657,7 @@ endpoint_to_string :: proc(ep: Endpoint, allocator := context.temp_allocator) ->
 		return address_to_string(ep.address, allocator)
 	} else {
 		s := address_to_string(ep.address, context.temp_allocator)
-		b := strings.make_builder(allocator)
+		b := strings.builder_make(allocator)
 		switch a in ep.address {
 		case IP4_Address:  fmt.sbprintf(&b, "%v:%v",   s, ep.port)
 		case IP6_Address:  fmt.sbprintf(&b, "[%v]:%v", s, ep.port)
@@ -751,11 +751,11 @@ parse_ip_component :: proc(input: string, max_value := u64(max(u32)), bases := D
 
 	parse_loop: for ch in input {
 		switch ch {
-		case '0'..'7':
+		case '0'..='7':
 			digit_bytes += 1
 			value = value * base + u64(ch - '0')
 
-		case '8'..'9':
+		case '8'..='9':
 			digit_bytes += 1
 
 			if base == 8 {
@@ -766,7 +766,7 @@ parse_ip_component :: proc(input: string, max_value := u64(max(u32)), bases := D
 			}
 			value = value * base + u64(ch - '0')
 
-		case 'a'..'f':
+		case 'a'..='f':
 			digit_bytes += 1
 
 			if base == 8 || base == 10 {
@@ -777,7 +777,7 @@ parse_ip_component :: proc(input: string, max_value := u64(max(u32)), bases := D
 			}
 			value = value * base + (u64(ch - 'a') + 10)
 
-		case 'A'..'F':
+		case 'A'..='F':
 			digit_bytes += 1
 
 			if base == 8 || base == 10 {
