@@ -56,13 +56,13 @@ physical_address_to_string :: proc(phy_addr: []u8, allocator := context.allocato
 
 	for b, i in phy_addr {
 		if i > 0 {
-			strings.write_rune_builder(&buf, ':')
+			strings.write_rune(&buf, ':')
 		}
 
 		hi := rune(MAC_HEX[b >> 4])
 		lo := rune(MAC_HEX[b & 15])
-		strings.write_rune_builder(&buf, hi)
-		strings.write_rune_builder(&buf, lo)
+		strings.write_rune(&buf, hi)
+		strings.write_rune(&buf, lo)
 	}
 	return strings.to_string(buf)
 }

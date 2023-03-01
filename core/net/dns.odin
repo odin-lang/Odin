@@ -25,20 +25,11 @@ import "core:os"
 	Default configuration for DNS resolution.
 */
 when ODIN_OS == .Windows {
-	getenv :: proc(key: string) -> (val: string) {
-		return os.get_env(key)
-	}
-
 	DEFAULT_DNS_CONFIGURATION :: DNS_Configuration{
 		resolv_conf        = "",
 		hosts_file         = "%WINDIR%\\system32\\drivers\\etc\\hosts",
 	}
 } else when ODIN_OS == .Linux || ODIN_OS == .Darwin || ODIN_OS == .OpenBSD {
-	getenv :: proc(key: string) -> (val: string) {
-		val, _ = os.getenv(key)
-		return
-	}
-
 	DEFAULT_DNS_CONFIGURATION :: DNS_Configuration{
 		resolv_conf        = "/etc/resolv.conf",
 		hosts_file         = "/etc/hosts",
@@ -81,7 +72,7 @@ replace_environment_path :: proc(path: string, allocator := context.allocator) -
 	assert(right > 0 && right <= len(path)) // should be covered by there being two %
 
 	env_key := path[left: right]
-	env_val := getenv(env_key)
+	env_val := os.get_env(env_key)
 	defer delete(env_val)
 
 	res, _ = strings.replace(path, path[left - 1: right + 1], env_val, 1)

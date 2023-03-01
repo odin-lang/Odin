@@ -117,7 +117,7 @@ percent_decode :: proc(encoded_string: string, allocator := context.allocator) -
 
 	b := builder_make(allocator)
 	builder_grow(&b, len(encoded_string))
-	defer if !ok do destroy_builder(&b)
+	defer if !ok do builder_destroy(&b)
 
 	stack_buf: [4]u8
 	pending := mem.buffer_from_slice(stack_buf[:])
