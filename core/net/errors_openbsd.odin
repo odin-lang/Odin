@@ -104,22 +104,17 @@ TCP_Recv_Error :: enum c.int {
 }
 
 UDP_Recv_Error :: enum c.int {
-	// The buffer is too small to fit the entire message, and the message was truncated.
-	Truncated = c.int(os.EMSGSIZE),
-	// The so-called socket is not an open socket.
-	Not_Socket = c.int(os.ENOTSOCK),
-	// The so-called socket is, in fact, not even a valid descriptor.
-	Not_Descriptor = c.int(os.EBADF),
-	// The buffer did not point to a valid location in memory.
-	Bad_Buffer = c.int(os.EFAULT),
-	// A signal occurred before any data was transmitted. See signal(7).
-	Interrupted = c.int(os.EINTR),
+	Truncated        = c.int(os.EMSGSIZE), // The buffer is too small to fit the entire message, and the message was truncated.
+	Not_Socket       = c.int(os.ENOTSOCK), // The so-called socket is not an open socket.
+	Not_Descriptor   = c.int(os.EBADF),    // The so-called socket is, in fact, not even a valid descriptor.
+	Bad_Buffer       = c.int(os.EFAULT),   // The buffer did not point to a valid location in memory.
+	Interrupted      = c.int(os.EINTR),    // A signal occurred before any data was transmitted. See signal(7).
 
 	// The send timeout duration passed before all data was sent.
 	// See Socket_Option.Send_Timeout.
 	// NOTE: No, really. Presumably this means something different for nonblocking sockets...
-	Timeout = c.int(os.EWOULDBLOCK), 
-	Socket_Not_Bound = c.int(os.EINVAL), // The socket must be bound for this operation, but isn't.
+	Timeout          = c.int(os.EWOULDBLOCK), 
+	Socket_Not_Bound = c.int(os.EINVAL),   // The socket must be bound for this operation, but isn't.
 }
 
 // TODO
