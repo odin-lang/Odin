@@ -84,8 +84,7 @@ sockaddr_basic_to_endpoint :: proc(native_addr: ^os.SOCKADDR) -> (ep: Endpoint) 
 			port = port,
 		}
 	case:
-		//panic("native_addr is neither IP4 or IP6 address")
-		return {}
+		panic("native_addr is neither IP4 or IP6 address")
 	}
 	return
 }

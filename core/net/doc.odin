@@ -42,6 +42,5 @@
 		  this and panic to avoid temp allocations prematurely overwriting data and garbling results,
 		  or worse. This means that should you replace the temp allocator with an insufficient one,
 		  we'll do our best to loudly complain the first time you try it.
-
 */
 package net

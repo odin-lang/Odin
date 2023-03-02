@@ -54,13 +54,9 @@ destroy_dns_configuration :: proc() {
 
 dns_configuration := DEFAULT_DNS_CONFIGURATION
 
-/*
-	Always allocates for consistency.
-*/
+// Always allocates for consistency.
 replace_environment_path :: proc(path: string, allocator := context.allocator) -> (res: string, ok: bool) {
-	/*
-		Nothing to replace. Return a clone of the original.
-	*/
+	// Nothing to replace. Return a clone of the original.
 	if strings.count(path, "%") != 2 {
 		return strings.clone(path), true
 	}
@@ -76,7 +72,6 @@ replace_environment_path :: proc(path: string, allocator := context.allocator) -
 	defer delete(env_val)
 
 	res, _ = strings.replace(path, path[left - 1: right + 1], env_val, 1)
-
 	return res, true
 }
 
@@ -171,9 +166,7 @@ resolve_ip6 :: proc(hostname_and_maybe_port: string) -> (ep6: Endpoint, err: Net
 	unreachable()
 }
 
-/*
-	`get_dns_records` uses OS-specific methods to query DNS records.
-*/
+// `get_dns_records` uses OS-specific methods to query DNS records.
 when ODIN_OS == .Windows {
 	get_dns_records_from_os :: get_dns_records_windows
 } else when ODIN_OS == .Linux || ODIN_OS == .Darwin || ODIN_OS == .OpenBSD {
@@ -434,9 +427,7 @@ load_hosts :: proc(hosts_file_path: string, allocator := context.allocator) -> (
 	return _hosts[:], true
 }
 
-/*
-	www.google.com -> 3www6google3com0
-*/
+// www.google.com -> 3www6google3com0
 encode_hostname :: proc(b: ^strings.Builder, hostname: string, allocator := context.allocator) -> (ok: bool) {
 	_hostname := hostname
 	for section in strings.split_iterator(&_hostname, ".") {

@@ -22,10 +22,8 @@ package net
 import "core:runtime"
 
 /*
-	TUNEABLES
-*/
+	TUNEABLES - See also top of `dns.odin` for DNS configuration.
 
-/*
 	Determines the default value for whether dial_tcp() and accept_tcp() will set TCP_NODELAY on the new
 	socket, and the client socket, respectively.
 	This can also be set on a per-socket basis using the 'options' optional parameter to those procedures.
@@ -44,25 +42,17 @@ import "core:runtime"
 	However, you can avoid this by buffering things up yourself if you wish to send a lot of
 	short data chunks, when TCP_NODELAY is enabled on that socket.
 */
+
 ODIN_NET_TCP_NODELAY_DEFAULT :: #config(ODIN_NET_TCP_NODELAY_DEFAULT, true)
 
-/*
-	See also top of `dns.odin` for DNS configuration.
-*/
-
-/*
-	COMMON DEFINITIONS
-*/
-
+// COMMON DEFINITIONS
 Maybe :: runtime.Maybe
 
 General_Error :: enum {
 	Unable_To_Enumerate_Network_Interfaces = 1,
 }
 
-/*
-	`Platform_Error` is used to wrap errors returned by the different platforms that defy translation into a common error.
-*/
+// `Platform_Error` is used to wrap errors returned by the different platforms that don't fit a common error.
 Platform_Error :: enum u32 {}
 
 /*
@@ -93,7 +83,6 @@ Network_Error :: union {
 	DNS_Error,
 }
 
-
 Resolve_Error :: enum {
 	Unable_To_Resolve = 1,
 }
@@ -107,10 +96,7 @@ DNS_Error :: enum {
 	System_Error,
 }
 
-/*
-	SOCKET OPTIONS & DEFINITIONS
-*/
-
+// SOCKET OPTIONS & DEFINITIONS
 TCP_Options :: struct {
 	no_delay: bool,
 }
@@ -195,9 +181,7 @@ Network_Interface :: struct {
 	},
 }
 
-/*
-	Empty bit set is unknown state.
-*/
+// Empty bit set is unknown state.
 Link_States :: enum u32 {
 	Up               = 1,
 	Down             = 2,
@@ -261,18 +245,14 @@ Address_Duplication :: enum i32 {
 	Preferred  = 4,
 }
 
-/*
-	DNS DEFINITIONS
-*/
-
+// DNS DEFINITIONS
 DNS_Configuration :: struct {
-	/*
-		Configuration files.
-	*/
+	// Configuration files.
 	resolv_conf: string,
 	hosts_file:  string,
 
-	// TODO: Allow loading these up with `reload_configuration()` call or the like so we don't have to do it each call.
+	// TODO: Allow loading these up with `reload_configuration()` call or the like,
+	// so we don't have to do it each call.
 	name_servers:       []Endpoint,
 	hosts_file_entries: []DNS_Record,
 }
@@ -295,25 +275,19 @@ DNS_Record_Type :: enum u16 {
 	SRV            = DNS_TYPE_SRV,
 }
 
-/*
-	Base DNS Record. All DNS responses will carry a hostname and TTL (time to live) field.
-*/
+// Base DNS Record. All DNS responses will carry a hostname and TTL (time to live) field.
 DNS_Record_Base :: struct {
 	record_name: string,
-	ttl_seconds: u32,    	// The time in seconds that this service will take to update, after the record is updated.
+	ttl_seconds: u32, // The time in seconds that this service will take to update, after the record is updated.
 }
 
-/*
-	An IP4 address that the domain name maps to. There can be any number of these.
-*/
+// An IP4 address that the domain name maps to. There can be any number of these.
 DNS_Record_IP4 :: struct {
 	using base: DNS_Record_Base,
 	address:    IP4_Address,
 }
 
-/*
-	An IPv6 address that the domain name maps to. There can be any number of these.
-*/
+// An IPv6 address that the domain name maps to. There can be any number of these.
 DNS_Record_IP6 :: struct {
 	using base: DNS_Record_Base,
 	address:    IP6_Address,
@@ -356,15 +330,17 @@ DNS_Record_MX :: struct {
 	preference: int,
 }
 
-// An endpoint for a service that is available through the domain name.
-// This is the way to discover the services that a domain name provides.
-//
-// Clients MUST attempt to contact the host with the lowest priority that they can reach.
-// If two hosts have the same priority, they should be contacted in the order according to their weight.
-// Hosts with larger weights should have a proportionally higher chance of being contacted by clients.
-// A weight of zero indicates a very low weight, or, when there is no choice (to reduce visual noise).
-//
-// The host may be "." to indicate that it is "decidedly not available" on this domain.
+/*
+	An endpoint for a service that is available through the domain name.
+	This is the way to discover the services that a domain name provides.
+
+	Clients MUST attempt to contact the host with the lowest priority that they can reach.
+	If two hosts have the same priority, they should be contacted in the order according to their weight.
+	Hosts with larger weights should have a proportionally higher chance of being contacted by clients.
+	A weight of zero indicates a very low weight, or, when there is no choice (to reduce visual noise).
+
+	The host may be "." to indicate that it is "decidedly not available" on this domain.
+*/
 DNS_Record_SRV :: struct {
 	// base contains the full name of this record.
 	// e.g: _sip._tls.example.com

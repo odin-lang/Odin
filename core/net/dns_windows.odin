@@ -22,14 +22,16 @@ import "core:mem"
 
 import win "core:sys/windows"
 
-// Performs a recursive DNS query for records of a particular type for the hostname.
-//
-// NOTE: This procedure instructs the DNS resolver to recursively perform CNAME requests on our behalf,
-// meaning that DNS queries for a hostname will resolve through CNAME records until an
-// IP address is reached.
-//
-// WARNING: This procedure allocates memory for each record returned; deleting just the returned slice is not enough!
-// See `destroy_records`.
+/*
+	Performs a recursive DNS query for records of a particular type for the hostname.
+
+	NOTE: This procedure instructs the DNS resolver to recursively perform CNAME requests on our behalf,
+	meaning that DNS queries for a hostname will resolve through CNAME records until an
+	IP address is reached.
+
+	WARNING: This procedure allocates memory for each record returned; deleting just the returned slice is not enough!
+	See `destroy_records`.
+*/
 get_dns_records_windows :: proc(hostname: string, type: DNS_Record_Type, allocator := context.allocator) -> (records: []DNS_Record, err: DNS_Error) {
 	context.allocator = allocator
 
@@ -54,7 +56,6 @@ get_dns_records_windows :: proc(hostname: string, type: DNS_Record_Type, allocat
 		if r.wType != u16(type) do continue // NOTE(tetra): Should never happen, but...
 		count += 1
 	}
-
 
 	recs := make([dynamic]DNS_Record, 0, count)
 	if recs == nil do return nil, .System_Error // return no results if OOM.

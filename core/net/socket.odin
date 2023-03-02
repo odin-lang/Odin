@@ -16,10 +16,7 @@
 */
 package net
 
-//
 // TODO(tetra): Bluetooth, Raw
-//
-
 any_socket_to_socket :: proc(any_socket: Any_Socket) -> Socket {
 	switch s in any_socket {
 	case TCP_Socket:  return Socket(s)

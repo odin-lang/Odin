@@ -31,10 +31,10 @@ import "core:fmt"
 
 	The port, if present, is required to be a base 10 number in the range 0-65535, inclusive.
 
-	If `non_decimal_address` is true, `aton` is told each component must be decimal and max 255.
+	If `allow_non_decimal` is true, `aton` is told each component must be decimal and max 255.
 */
-parse_ip4_address :: proc(address_and_maybe_port: string, non_decimal_address := false) -> (addr: IP4_Address, ok: bool) {
-	res, res_ok := aton(address_and_maybe_port, .IP4, !non_decimal_address)
+parse_ip4_address :: proc(address_and_maybe_port: string, allow_non_decimal := false) -> (addr: IP4_Address, ok: bool) {
+	res, res_ok := aton(address_and_maybe_port, .IP4, !allow_non_decimal)
 	if ip4, ip4_ok := res.(IP4_Address); ip4_ok {
 		return ip4, res_ok
 	}
@@ -58,12 +58,10 @@ parse_ip4_address :: proc(address_and_maybe_port: string, non_decimal_address :=
 
 	The port, if present, is required to be a base 10 number in the range 0-65535, inclusive.
 */
-aton :: proc(address_and_maybe_port: string, family: Address_Family, is_decimal_only := false) -> (addr: Address, ok: bool) {
+aton :: proc(address_and_maybe_port: string, family: Address_Family, allow_decimal_only := false) -> (addr: Address, ok: bool) {
 	switch family {
 	case .IP4:
-		/*
-			There is no valid address shorter than `0.0.0.0`.
-		*/
+		// There is no valid address shorter than `0.0.0.0`.
 		if len(address_and_maybe_port) < 7 {
 			return {}, false
 		}
@@ -76,7 +74,7 @@ aton :: proc(address_and_maybe_port: string, family: Address_Family, is_decimal_
 		max_value := u64(max(u32))
 		bases     := DEFAULT_DIGIT_BASES
 
-		if is_decimal_only {
+		if allow_decimal_only {
 			max_value = 255
 			bases     = {.Dec}
 		}
@@ -86,10 +84,8 @@ aton :: proc(address_and_maybe_port: string, family: Address_Family, is_decimal_
 				return {}, false
 			}
 
-			/*
-				Decimal-only addresses may not have a leading zero.
-			*/
-			if is_decimal_only && len(address) > 1 && address[0] == '0' && address[1] != '.' {
+			// Decimal-only addresses may not have a leading zero.
+			if allow_decimal_only && len(address) > 1 && address[0] == '0' && address[1] != '.' {
 				return
 			}
 
@@ -108,9 +104,7 @@ aton :: proc(address_and_maybe_port: string, family: Address_Family, is_decimal_
 			i += 1
 		}
 
-		/*
-			Distribute parts.
-		*/
+		// Distribute parts.
 		switch i {
 		case 1:
 			buf[1] = buf[0] & 0xffffff
@@ -155,14 +149,10 @@ IPv6_MIN_COLONS        :: 2
 IPv6_PIECE_COUNT       :: 8
 
 parse_ip6_address :: proc(address_and_maybe_port: string) -> (addr: IP6_Address, ok: bool) {
-	/*
-		If we have an IPv6 address of the form [IP]:Port, first get us just the IP.
-	*/
+	// If we have an IPv6 address of the form [IP]:Port, first get us just the IP.
 	address, _ := split_port(address_and_maybe_port) or_return
 
-	/*
-		Early bailouts based on length and number of pieces.
-	*/
+	// Early bailouts based on length and number of pieces.
 	if len(address) < IPv6_MIN_STRING_LENGTH || len(address) > IPv6_MAX_STRING_LENGTH { return }
 
 	/*
@@ -186,10 +176,7 @@ parse_ip6_address :: proc(address_and_maybe_port: string) -> (addr: IP6_Address,
 			piece_end += 1
 
 		case ':':
-			/*
-				If we see a `:` after a `.`, it means an IPv4 part was sandwiched between IPv6,
-				instead of it being the tail: invalid.
-			*/
+			// If we see a `:` after a `.`, it means an IPv4 part was sandwiched between IPv6, instead of it being the tail: invalid.
 			if dot_count > 0 { return }
 
 			pieces_temp[colon_count] = address[piece_start:piece_end]
@@ -197,18 +184,13 @@ parse_ip6_address :: proc(address_and_maybe_port: string) -> (addr: IP6_Address,
 			colon_count += 1
 			if colon_count > IPv6_PIECE_COUNT { return }
 
-			/*
-				If there's anything left, put it in the next piece.
-			*/
+			// If there's anything left, put it in the next piece.
 			piece_start = i + 1
 			piece_end   = piece_start
 
 		case '.':
-			/*
-				IPv4 address is treated as one piece. No need to update `piece_*`.
-			*/
+			// IPv4 address is treated as one piece. No need to update `piece_*`.
 			dot_count += 1
-
 
 		case: // Invalid character, return early
 			return
@@ -217,19 +199,13 @@ parse_ip6_address :: proc(address_and_maybe_port: string) -> (addr: IP6_Address,
 
 	if colon_count < IPv6_MIN_COLONS { return }
 
-	/*
-		Assign the last piece string.
-	*/
+	// Assign the last piece string.
 	pieces_temp[colon_count] = address[piece_start:]
 
-	/*
-		`pieces` now holds the same output as it would if had used `strings.split`.
-	*/
+	// `pieces` now holds the same output as it would if had used `strings.split`.
 	pieces := pieces_temp[:colon_count + 1]
 
-	/*
-		Check if we have what looks like an embedded IPv4 address.
-	*/
+	// Check if we have what looks like an embedded IPv4 address.
 	ipv4:      IP4_Address
 	have_ipv4: bool
 
@@ -252,19 +228,12 @@ parse_ip6_address :: proc(address_and_maybe_port: string) -> (addr: IP6_Address,
 		if !have_ipv4 { return }
 	}
 
-	/*
-		Check for `::` being used more than once, and save the skip.
-	*/
+	// Check for `::` being used more than once, and save the skip.
 	zero_skip := -1
-	for i in 1..<len(pieces) - 1 {
+	for i in 1..<colon_count {
 		if pieces[i] == "" {
-			/*
-				Return if skip has already been set.
-			*/
-			if zero_skip != -1 {
-				return
-			}
-
+			// Return if skip has already been set.
+			if zero_skip != -1 { return }
 			zero_skip = i
 		}
 	}
@@ -279,28 +248,22 @@ parse_ip6_address :: proc(address_and_maybe_port: string) -> (addr: IP6_Address,
 
 	if zero_skip != -1 {
 		before_skip = zero_skip
-		after_skip  = len(pieces) - zero_skip - 1
+		after_skip  = colon_count - zero_skip
 
-		/*
-			An IPv4 "piece" accounts for 2 IPv6 pieces we haven't added to the pieces slice, so add 1.
-		*/
+		// An IPv4 "piece" accounts for 2 IPv6 pieces we haven't added to the pieces slice, so add 1.
 		if have_ipv4 {
 			after_skip += 1
 		}
 
-		/*
-			Adjust for leading `::`.
-		*/
+		// Adjust for leading `::`.
 		if pieces[0] == "" {
 			before_skip -= 1
 			// Leading `:` can only be part of `::`.
 			if before_skip > 0 { return }
 		}
 
-		/*
-			Adjust for trailing `::`.
-		*/
-		if pieces[len(pieces) - 1] == "" {
+		// Adjust for trailing `::`.
+		if pieces[colon_count] == "" {
 			after_skip -= 1
 			// Trailing `:` can only be part of `::`.
 			if after_skip > 0 { return }
@@ -318,20 +281,16 @@ parse_ip6_address :: proc(address_and_maybe_port: string) -> (addr: IP6_Address,
 			No zero skip means everything is part of "before the skip".
 			An IPv4 "piece" accounts for 2 IPv6 pieces we haven't added to the pieces slice, so add 1.
 		*/
-		piece_count := len(pieces)
+		piece_count := colon_count + 1
 		if have_ipv4 {
 			piece_count += 1
 		}
 
-		/*
-			Do we have the complete set?
-		*/
+		// Do we have the complete set?
 		if piece_count != IPv6_PIECE_COUNT { return }
 
-		/*
-			Validate leading and trailing empty parts, as they can only be part of a `::`.
-		*/
-		if pieces[0] == "" || pieces[len(pieces) - 1] == "" { return }
+		// Validate leading and trailing empty parts, as they can only be part of a `::`.
+		if pieces[0] == "" || pieces[colon_count] == "" { return }
 
 
 		before_skip = piece_count
@@ -339,9 +298,7 @@ parse_ip6_address :: proc(address_and_maybe_port: string) -> (addr: IP6_Address,
 		num_skipped = 0
 	}
 
-	/*
-		Now try to parse the pieces into a 8 16-bit pieces.
-	*/
+	// Now try to parse the pieces into a 8 16-bit pieces.
 	piece_values: [IPv6_PIECE_COUNT]u16be
 
 	idx     := 0
@@ -358,9 +315,7 @@ parse_ip6_address :: proc(address_and_maybe_port: string) -> (addr: IP6_Address,
 
 		piece := pieces[idx]
 
-		/*
-			An IPv6 piece can at most contain 4 hex digits.
-		*/
+		// An IPv6 piece can at most contain 4 hex digits.
 		if len(piece) > 4 { return }
 
 		if piece != "" {
@@ -393,9 +348,7 @@ parse_ip6_address :: proc(address_and_maybe_port: string) -> (addr: IP6_Address,
 
 			piece := pieces[idx]
 
-			/*
-				An IPv6 piece can at most contain 4 hex digits.
-			*/
+			// An IPv6 piece can contain at most 4 hex digits.
 			if len(piece) > 4 { return }
 
 			if piece != "" {
@@ -408,20 +361,16 @@ parse_ip6_address :: proc(address_and_maybe_port: string) -> (addr: IP6_Address,
 		}
 	}
 
-	/*
-		Distribute IPv4 address into last two pieces, if applicable.
-	*/
+	// Distribute IPv4 address into last two pieces, if applicable.
 	if have_ipv4 {
 		val := u16(ipv4[0]) << 8
 		val |= u16(ipv4[1])
 		piece_values[6] = u16be(val)
 
-
 		val  = u16(ipv4[2]) << 8
 		val |= u16(ipv4[3])
 		piece_values[7] = u16be(val)
 	}
-
 	return transmute(IP6_Address)piece_values, true
 }
 
@@ -430,22 +379,21 @@ parse_ip6_address :: proc(address_and_maybe_port: string) -> (addr: IP6_Address,
 	If it's determined not to be, try as an IPv4 address, optionally in non-decimal format.
 */
 parse_address :: proc(address_and_maybe_port: string, non_decimal_address := false) -> Address {
-	addr6, ok6 := parse_ip6_address(address_and_maybe_port)
-	if ok6 do return addr6
-	addr4, ok4 := parse_ip4_address(address_and_maybe_port, non_decimal_address)
-	if ok4 do return addr4
+	if addr6, ok6 := parse_ip6_address(address_and_maybe_port); ok6 {
+		return addr6
+	}
+	if addr4, ok4 := parse_ip4_address(address_and_maybe_port, non_decimal_address); ok4 {
+		return addr4
+	}
 	return nil
 }
 
 parse_endpoint :: proc(endpoint_str: string) -> (ep: Endpoint, ok: bool) {
-	addr_str, port, split_ok := split_port(endpoint_str)
-	if !split_ok do return
-
-	addr := parse_address(addr_str)
-	if addr == nil do return
-
-	ep = Endpoint { address = addr, port = port }
-	ok = true
+	if addr_str, port, split_ok := split_port(endpoint_str); split_ok {
+		if addr := parse_address(addr_str); addr != nil {
+			return Endpoint { address = addr, port = port }, true
+		}
+	}
 	return
 }
 
@@ -565,9 +513,7 @@ address_to_string :: proc(addr: Address, allocator := context.temp_allocator) ->
 	case IP4_Address:
 		fmt.sbprintf(&b, "%v.%v.%v.%v", v[0], v[1], v[2], v[3])
 	case IP6_Address:
-		/*
-			First find the longest run of zeroes.
-		*/
+		// First find the longest run of zeroes.
 		Zero_Run :: struct {
 			start: int,
 			end:   int,
@@ -609,9 +555,7 @@ address_to_string :: proc(addr: Address, allocator := context.temp_allocator) ->
 				}
 			}
 
-			/*
-				If we were in a run, this is where we reset it.
-			*/
+			// If we were in a run, this is where we reset it.
 			if val != 0 {
 				run = {-1, -1}
 			}
@@ -621,9 +565,7 @@ address_to_string :: proc(addr: Address, allocator := context.temp_allocator) ->
 
 		for val, i in addr {
 			if best.start == i || best.end == i {
-				/*
-					For the left and right side of the best zero run, print a `:`.
-				*/
+				// For the left and right side of the best zero run, print a `:`.
 				fmt.sbprint(&b, ":")
 			} else if i < best.start {
 				/*
@@ -710,9 +652,7 @@ DEFAULT_DIGIT_BASES :: Digit_Parse_Bases{.Dec, .Oct, .Hex}
 	Numbers will otherwise be considered to be in base 10.
 */
 parse_ip_component :: proc(input: string, max_value := u64(max(u32)), bases := DEFAULT_DIGIT_BASES) -> (value: u64, bytes_consumed: int, ok: bool) {
-	/*
-		Default to base 10
-	*/
+	// Default to base 10
 	base         := u64(10)
 	input        := input
 
@@ -732,9 +672,7 @@ parse_ip_component :: proc(input: string, max_value := u64(max(u32)), bases := D
 		if bases != {.IPv6} { return } // Must be used on its own.
 		base = 16
 	} else {
-		/*
-			Scan for and consume prefix, if applicable.
-		*/
+		// Scan for and consume prefix, if applicable.
 		if len(input) >= 2 && input[0] == '0' {
 			if .Hex in bases && (input[1] == 'x' || input[1] == 'X') {
 				base         = 16
@@ -759,9 +697,7 @@ parse_ip_component :: proc(input: string, max_value := u64(max(u32)), bases := D
 			digit_bytes += 1
 
 			if base == 8 {
-				/*
-					Out of range for octal numbers.
-				*/
+				// Out of range for octal numbers.
 				return value, digit_bytes + prefix_bytes, false
 			}
 			value = value * base + u64(ch - '0')
@@ -770,9 +706,7 @@ parse_ip_component :: proc(input: string, max_value := u64(max(u32)), bases := D
 			digit_bytes += 1
 
 			if base == 8 || base == 10 {
-				/*
-					Out of range for octal and decimal numbers.
-				*/
+				// Out of range for octal and decimal numbers.
 				return value, digit_bytes + prefix_bytes, false
 			}
 			value = value * base + (u64(ch - 'a') + 10)
@@ -781,9 +715,7 @@ parse_ip_component :: proc(input: string, max_value := u64(max(u32)), bases := D
 			digit_bytes += 1
 
 			if base == 8 || base == 10 {
-				/*
-					Out of range for octal and decimal numbers.
-				*/
+				// Out of range for octal and decimal numbers.
 				return value, digit_bytes + prefix_bytes, false
 			}
 			value = value * base + (u64(ch - 'A') + 10)
@@ -797,22 +729,16 @@ parse_ip_component :: proc(input: string, max_value := u64(max(u32)), bases := D
 			break parse_loop
 
 		case:
-			/*
-				Invalid character encountered.
-			*/
+			// Invalid character encountered.
 			return value, digit_bytes + prefix_bytes, false
 		}
 
 		if value > max_value {
-			/*
-				Out-of-range number.
-			*/
+			// Out-of-range number.
 			return value, digit_bytes + prefix_bytes, false
 		}
 	}
 
-	/*
-		If we consumed at least 1 digit byte, `value` *should* continue a valid number in an appropriate base in the allowable range.
-	*/
+	// If we consumed at least 1 digit byte, `value` *should* continue a valid number in an appropriate base in the allowable range.
 	return value, digit_bytes + prefix_bytes, digit_bytes >= 1
 }
