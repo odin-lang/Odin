@@ -58,7 +58,7 @@ dns_configuration := DEFAULT_DNS_CONFIGURATION
 replace_environment_path :: proc(path: string, allocator := context.allocator) -> (res: string, ok: bool) {
 	// Nothing to replace. Return a clone of the original.
 	if strings.count(path, "%") != 2 {
-		return strings.clone(path), true
+		return strings.clone(path, allocator), true
 	}
 
 	left  := strings.index(path, "%") + 1
@@ -68,10 +68,10 @@ replace_environment_path :: proc(path: string, allocator := context.allocator) -
 	assert(right > 0 && right <= len(path)) // should be covered by there being two %
 
 	env_key := path[left: right]
-	env_val := os.get_env(env_key)
+	env_val := os.get_env(env_key, allocator)
 	defer delete(env_val)
 
-	res, _ = strings.replace(path, path[left - 1: right + 1], env_val, 1)
+	res, _ = strings.replace(path, path[left - 1: right + 1], env_val, 1, allocator)
 	return res, true
 }
 
@@ -356,10 +356,7 @@ unpack_dns_header :: proc(id: u16be, bits: u16be) -> (hdr: DNS_Header) {
 load_resolv_conf :: proc(resolv_conf_path: string, allocator := context.allocator) -> (name_servers: []Endpoint, ok: bool) {
 	context.allocator = allocator
 
-	res, success := os.read_entire_file_from_filename(resolv_conf_path)
-	if !success {
-		return
-	}
+	res := os.read_entire_file_from_filename(resolv_conf_path) or_return
 	defer delete(res)
 	resolv_str := string(res)
 
@@ -393,10 +390,7 @@ load_resolv_conf :: proc(resolv_conf_path: string, allocator := context.allocato
 load_hosts :: proc(hosts_file_path: string, allocator := context.allocator) -> (hosts: []DNS_Host_Entry, ok: bool) {
 	context.allocator = allocator
 
-	res, success := os.read_entire_file_from_filename(hosts_file_path, allocator)
-	if !success {
-		return
-	}
+	res := os.read_entire_file_from_filename(hosts_file_path, allocator) or_return
 	defer delete(res)
 
 	_hosts := make([dynamic]DNS_Host_Entry, 0, allocator)
@@ -800,7 +794,7 @@ parse_response :: proc(response: []u8, filter: DNS_Record_Type = nil, allocator 
 
 	cur_idx := header_size_bytes
 
-	for i := 0; i < question_count; i += 1 {
+	for _ in 0..<question_count {
 		if cur_idx == len(response) {
 			continue
 		}
@@ -812,7 +806,7 @@ parse_response :: proc(response: []u8, filter: DNS_Record_Type = nil, allocator 
 		cur_idx += hn_sz + dq_sz
 	}
 
-	for i := 0; i < answer_count; i += 1 {
+	for _ in 0..<answer_count {
 		if cur_idx == len(response) {
 			continue
 		}
@@ -825,7 +819,7 @@ parse_response :: proc(response: []u8, filter: DNS_Record_Type = nil, allocator 
 		append(&_records, rec)
 	}
 
-	for i := 0; i < authority_count; i += 1 {
+	for _ in 0..<authority_count {
 		if cur_idx == len(response) {
 			continue
 		}
@@ -838,7 +832,7 @@ parse_response :: proc(response: []u8, filter: DNS_Record_Type = nil, allocator 
 		append(&_records, rec)
 	}
 
-	for i := 0; i < additional_count; i += 1 {
+	for _ in 0..<additional_count {
 		if cur_idx == len(response) {
 			continue
 		}

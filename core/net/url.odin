@@ -25,7 +25,7 @@ split_url :: proc(url: string, allocator := context.allocator) -> (scheme, host,
 	s := url
 
 	i := strings.last_index(s, "://")
-	if i != -1 {
+	if i >= 0 {
 		scheme = s[:i]
 		s = s[i+3:]
 	}

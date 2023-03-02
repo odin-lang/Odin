@@ -34,11 +34,8 @@ import "core:fmt"
 	If `allow_non_decimal` is true, `aton` is told each component must be decimal and max 255.
 */
 parse_ip4_address :: proc(address_and_maybe_port: string, allow_non_decimal := false) -> (addr: IP4_Address, ok: bool) {
-	res, res_ok := aton(address_and_maybe_port, .IP4, !allow_non_decimal)
-	if ip4, ip4_ok := res.(IP4_Address); ip4_ok {
-		return ip4, res_ok
-	}
-	return {}, false
+	res := aton(address_and_maybe_port, .IP4, !allow_non_decimal) or_return
+	return res.?
 }
 
 /*
@@ -432,7 +429,7 @@ parse_hostname_or_endpoint :: proc(endpoint_str: string) -> (target: Host_Or_End
 // Returns ok=false if port is not a number.
 split_port :: proc(endpoint_str: string) -> (addr_or_host: string, port: int, ok: bool) {
 	// IP6 [addr_or_host]:port
-	if i := strings.last_index(endpoint_str, "]:"); i != -1 {
+	if i := strings.last_index(endpoint_str, "]:"); i >= 0 {
 		addr_or_host = endpoint_str[1:i]
 		port, ok = strconv.parse_int(endpoint_str[i+2:], 10)
 
