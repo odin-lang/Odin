@@ -23,16 +23,6 @@ import "core:time"
 
 Platform_Socket :: os.Socket
 
-Create_Socket_Error :: enum c.int {
-	Family_Not_Supported_For_This_Socket = c.int(os.EAFNOSUPPORT),
-	No_Socket_Descriptors_Available = c.int(os.EMFILE),
-	No_Buffer_Space_Available = c.int(os.ENOBUFS),
-	No_Memory_Available_Available = c.int(os.ENOMEM),
-	Protocol_Unsupported_By_System = c.int(os.EPROTONOSUPPORT),
-	Wrong_Protocol_For_Socket = c.int(os.EPROTONOSUPPORT),
-	Family_And_Socket_Type_Mismatch = c.int(os.EPROTONOSUPPORT),
-}
-
 create_socket :: proc(family: Address_Family, protocol: Socket_Protocol) -> (socket: Any_Socket, err: Network_Error) {
 	c_type, c_protocol, c_family: int
 
@@ -64,25 +54,6 @@ create_socket :: proc(family: Address_Family, protocol: Socket_Protocol) -> (soc
 	}
 }
 
-
-Dial_Error :: enum c.int {
-	Port_Required = -1,
-
-	Address_In_Use = c.int(os.EADDRINUSE),
-	In_Progress = c.int(os.EINPROGRESS),
-	Cannot_Use_Any_Address = c.int(os.EADDRNOTAVAIL),
-	Wrong_Family_For_Socket = c.int(os.EAFNOSUPPORT),
-	Refused = c.int(os.ECONNREFUSED),
-	Is_Listening_Socket = c.int(os.EACCES),
-	Already_Connected = c.int(os.EISCONN),
-	Network_Unreachable = c.int(os.ENETUNREACH), // Device is offline
-	Host_Unreachable = c.int(os.EHOSTUNREACH), // Remote host cannot be reached
-	No_Buffer_Space_Available = c.int(os.ENOBUFS),
-	Not_Socket = c.int(os.ENOTSOCK),
-	Timeout = c.int(os.ETIMEDOUT),
-	Would_Block = c.int(os.EWOULDBLOCK), // TODO: we may need special handling for this; maybe make a socket a struct with metadata?
-}
-
 dial_tcp_from_endpoint :: proc(endpoint: Endpoint, options := default_tcp_options) -> (skt: TCP_Socket, err: Network_Error) {
 	if endpoint.port == 0 {
 		return 0, .Port_Required
@@ -107,22 +78,6 @@ dial_tcp_from_endpoint :: proc(endpoint: Endpoint, options := default_tcp_option
 	return
 }
 
-
-Bind_Error :: enum c.int {
-	// Another application is currently bound to this endpoint.
-	Address_In_Use = c.int(os.EADDRINUSE),
-	// The address is not a local address on this machine.
-	Given_Nonlocal_Address = c.int(os.EADDRNOTAVAIL),
-	// To bind a UDP socket to the broadcast address, the appropriate socket option must be set.
-	Broadcast_Disabled = c.int(os.EACCES),
-	// The address family of the address does not match that of the socket.
-	Address_Family_Mismatch = c.int(os.EFAULT),
-	// The socket is already bound to an address.
-	Already_Bound = c.int(os.EINVAL),
-	// There are not enough ephemeral ports available.
-	No_Ports_Available = c.int(os.ENOBUFS),
-}
-
 bind :: proc(skt: Any_Socket, ep: Endpoint) -> (err: Network_Error) {
 	sockaddr := endpoint_to_sockaddr(ep)
 	s := any_socket_to_socket(skt)
@@ -132,7 +87,6 @@ bind :: proc(skt: Any_Socket, ep: Endpoint) -> (err: Network_Error) {
 	}
 	return
 }
-
 
 // This type of socket becomes bound when you try to send data.
 // This is likely what you want if you want to send data unsolicited.
@@ -154,18 +108,6 @@ make_bound_udp_socket :: proc(bound_address: Address, port: int) -> (skt: UDP_So
 	skt = make_unbound_udp_socket(family_from_address(bound_address)) or_return
 	bind(skt, {bound_address, port}) or_return
 	return
-}
-
-
-
-Listen_Error :: enum c.int {
-	Address_In_Use = c.int(os.EADDRINUSE),
-	Already_Connected = c.int(os.EISCONN),
-	No_Socket_Descriptors_Available = c.int(os.EMFILE),
-	No_Buffer_Space_Available = c.int(os.ENOBUFS),
-	Nonlocal_Address = c.int(os.EADDRNOTAVAIL),
-	Not_Socket = c.int(os.ENOTSOCK),
-	Listening_Not_Supported_For_This_Socket = c.int(os.EOPNOTSUPP),
 }
 
 listen_tcp :: proc(interface_endpoint: Endpoint, backlog := 1000) -> (skt: TCP_Socket, err: Network_Error) {
@@ -193,18 +135,6 @@ listen_tcp :: proc(interface_endpoint: Endpoint, backlog := 1000) -> (skt: TCP_S
 	return
 }
 
-
-
-Accept_Error :: enum c.int {
-	Reset = c.int(os.ECONNRESET), // TODO(tetra): Is this error actually possible here? Or is like Linux, in which case we can remove it.
-	Not_Listening = c.int(os.EINVAL),
-	No_Socket_Descriptors_Available_For_Client_Socket = c.int(os.EMFILE),
-	No_Buffer_Space_Available = c.int(os.ENOBUFS),
-	Not_Socket = c.int(os.ENOTSOCK),
-	Not_Connection_Oriented_Socket = c.int(os.EOPNOTSUPP),
-	Would_Block = c.int(os.EWOULDBLOCK), // TODO: we may need special handling for this; maybe make a socket a struct with metadata?
-}
-
 accept_tcp :: proc(sock: TCP_Socket) -> (client: TCP_Socket, source: Endpoint, err: Network_Error) {
 	sockaddr: os.SOCKADDR_STORAGE_LH
 	sockaddrlen := c.int(size_of(sockaddr))
@@ -219,26 +149,9 @@ accept_tcp :: proc(sock: TCP_Socket) -> (client: TCP_Socket, source: Endpoint, e
 	return
 }
 
-
-
 close :: proc(skt: Any_Socket) {
 	s := any_socket_to_socket(skt)
 	os.close(os.Handle(Platform_Socket(s)))
-}
-
-
-
-TCP_Recv_Error :: enum c.int {
-	Shutdown = c.int(os.ESHUTDOWN),
-	Not_Connected = c.int(os.ENOTCONN),
-	Connection_Broken = c.int(os.ENETRESET), // TODO(tetra): Is this error actually possible here?
-	Not_Socket = c.int(os.ENOTSOCK),
-	Aborted = c.int(os.ECONNABORTED),
-	Connection_Closed = c.int(os.ECONNRESET), // TODO(tetra): Determine when this is different from the syscall returning n=0 and maybe normalize them?
-	Offline = c.int(os.ENETDOWN),
-	Host_Unreachable = c.int(os.EHOSTUNREACH),
-	Interrupted = c.int(os.EINTR),
-	Timeout = c.int(os.EWOULDBLOCK), // NOTE: No, really. Presumably this means something different for nonblocking sockets...
 }
 
 recv_tcp :: proc(skt: TCP_Socket, buf: []byte) -> (bytes_read: int, err: Network_Error) {
@@ -251,25 +164,6 @@ recv_tcp :: proc(skt: TCP_Socket, buf: []byte) -> (bytes_read: int, err: Network
 		return
 	}
 	return int(res), nil
-}
-
-UDP_Recv_Error :: enum c.int {
-	// The buffer is too small to fit the entire message, and the message was truncated.
-	Truncated = c.int(os.EMSGSIZE),
-	// The so-called socket is not an open socket.
-	Not_Socket = c.int(os.ENOTSOCK),
-	// The so-called socket is, in fact, not even a valid descriptor.
-	Not_Descriptor = c.int(os.EBADF),
-	// The buffer did not point to a valid location in memory.
-	Bad_Buffer = c.int(os.EFAULT),
-	// A signal occurred before any data was transmitted.
-	// See signal(7).
-	Interrupted = c.int(os.EINTR),
-	// The send timeout duration passed before all data was sent.
-	// See Socket_Option.Send_Timeout.
-	Timeout = c.int(os.EWOULDBLOCK), // NOTE: No, really. Presumably this means something different for nonblocking sockets...
-	// The socket must be bound for this operation, but isn't.
-	Socket_Not_Bound = c.int(os.EINVAL),
 }
 
 recv_udp :: proc(skt: UDP_Socket, buf: []byte) -> (bytes_read: int, remote_endpoint: Endpoint, err: Network_Error) {
@@ -292,32 +186,6 @@ recv_udp :: proc(skt: UDP_Socket, buf: []byte) -> (bytes_read: int, remote_endpo
 
 recv :: proc{recv_tcp, recv_udp}
 
-
-
-// TODO
-TCP_Send_Error :: enum c.int {
-	Aborted = c.int(os.ECONNABORTED), // TODO: merge with other errors?
-	Connection_Closed = c.int(os.ECONNRESET),
-	Not_Connected = c.int(os.ENOTCONN),
-	Shutdown = c.int(os.ESHUTDOWN),
-	// The send queue was full.
-	// This is usually a transient issue.
-	//
-	// This also shouldn't normally happen on Linux, as data is dropped if it
-	// doesn't fit in the send queue.
-	No_Buffer_Space_Available = c.int(os.ENOBUFS),
-	Offline = c.int(os.ENETDOWN),
-	Host_Unreachable = c.int(os.EHOSTUNREACH),
-	// A signal occurred before any data was transmitted.
-	// See signal(7).
-	Interrupted = c.int(os.EINTR),
-	// The send timeout duration passed before all data was sent.
-	// See Socket_Option.Send_Timeout.
-	Timeout = c.int(os.EWOULDBLOCK), // NOTE: No, really. Presumably this means something different for nonblocking sockets...
-	// The so-called socket is not an open socket.
-	Not_Socket = c.int(os.ENOTSOCK),
-}
-
 // Repeatedly sends data until the entire buffer is sent.
 // If a send fails before all data is sent, returns the amount
 // sent up to that point.
@@ -333,36 +201,6 @@ send_tcp :: proc(skt: TCP_Socket, buf: []byte) -> (bytes_written: int, err: Netw
 		bytes_written += int(res)
 	}
 	return
-}
-
-// TODO
-UDP_Send_Error :: enum c.int {
-	// The message is too big. No data was sent.
-	Truncated = c.int(os.EMSGSIZE),
-	// TODO: not sure what the exact circumstances for this is yet
-	Network_Unreachable = c.int(os.ENETUNREACH),
-	// There are no more emphemeral outbound ports available to bind the socket to, in order to send.
-	No_Outbound_Ports_Available = c.int(os.EAGAIN),
-	// The send timeout duration passed before all data was sent.
-	// See Socket_Option.Send_Timeout.
-	Timeout = c.int(os.EWOULDBLOCK), // NOTE: No, really. Presumably this means something different for nonblocking sockets...
-	// The so-called socket is not an open socket.
-	Not_Socket = c.int(os.ENOTSOCK),
-	// The so-called socket is, in fact, not even a valid descriptor.
-	Not_Descriptor = c.int(os.EBADF),
-	// The buffer did not point to a valid location in memory.
-	Bad_Buffer = c.int(os.EFAULT),
-	// A signal occurred before any data was transmitted.
-	// See signal(7).
-	Interrupted = c.int(os.EINTR),
-	// The send queue was full.
-	// This is usually a transient issue.
-	//
-	// This also shouldn't normally happen on Linux, as data is dropped if it
-	// doesn't fit in the send queue.
-	No_Buffer_Space_Available = c.int(os.ENOBUFS),
-	// No memory was available to properly manage the send queue.
-	No_Memory_Available = c.int(os.ENOMEM),
 }
 
 send_udp :: proc(skt: UDP_Socket, buf: []byte, to: Endpoint) -> (bytes_written: int, err: Network_Error) {
@@ -382,22 +220,10 @@ send_udp :: proc(skt: UDP_Socket, buf: []byte, to: Endpoint) -> (bytes_written: 
 
 send :: proc{send_tcp, send_udp}
 
-
-
-
 Shutdown_Manner :: enum c.int {
 	Receive = c.int(os.SHUT_RD),
-	Send = c.int(os.SHUT_WR),
-	Both = c.int(os.SHUT_RDWR),
-}
-
-Shutdown_Error :: enum c.int {
-	Aborted = c.int(os.ECONNABORTED),
-	Reset = c.int(os.ECONNRESET),
-	Offline = c.int(os.ENETDOWN),
-	Not_Connected = c.int(os.ENOTCONN),
-	Not_Socket = c.int(os.ENOTSOCK),
-	Invalid_Manner = c.int(os.EINVAL),
+	Send    = c.int(os.SHUT_WR),
+	Both    = c.int(os.SHUT_RDWR),
 }
 
 shutdown :: proc(skt: Any_Socket, manner: Shutdown_Manner) -> (err: Network_Error) {
@@ -409,29 +235,16 @@ shutdown :: proc(skt: Any_Socket, manner: Shutdown_Manner) -> (err: Network_Erro
 	return
 }
 
-
-
-
 Socket_Option :: enum c.int {
-	Reuse_Address = c.int(os.SO_REUSEADDR),
-	Keep_Alive = c.int(os.SO_KEEPALIVE),
+	Reuse_Address             = c.int(os.SO_REUSEADDR),
+	Keep_Alive                = c.int(os.SO_KEEPALIVE),
 	Out_Of_Bounds_Data_Inline = c.int(os.SO_OOBINLINE),
-	TCP_Nodelay = c.int(os.TCP_NODELAY),
-
-	Linger = c.int(os.SO_LINGER),
-
-	Receive_Buffer_Size = c.int(os.SO_RCVBUF),
-	Send_Buffer_Size = c.int(os.SO_SNDBUF),
-	Receive_Timeout = c.int(os.SO_RCVTIMEO),
-	Send_Timeout = c.int(os.SO_SNDTIMEO),
-}
-
-Socket_Option_Error :: enum c.int {
-	Offline = c.int(os.ENETDOWN),
-	Timeout_When_Keepalive_Set = c.int(os.ENETRESET),
-	Invalid_Option_For_Socket = c.int(os.ENOPROTOOPT),
-	Reset_When_Keepalive_Set = c.int(os.ENOTCONN),
-	Not_Socket = c.int(os.ENOTSOCK),
+	TCP_Nodelay               = c.int(os.TCP_NODELAY),
+	Linger                    = c.int(os.SO_LINGER),
+	Receive_Buffer_Size       = c.int(os.SO_RCVBUF),
+	Send_Buffer_Size          = c.int(os.SO_SNDBUF),
+	Receive_Timeout           = c.int(os.SO_RCVTIMEO),
+	Send_Timeout              = c.int(os.SO_SNDTIMEO),
 }
 
 set_option :: proc(s: Any_Socket, option: Socket_Option, value: any, loc := #caller_location) -> Network_Error {
