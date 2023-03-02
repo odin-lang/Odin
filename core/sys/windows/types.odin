@@ -3767,6 +3767,24 @@ COORD :: struct {
 	Y: SHORT,
 }
 
+SMALL_RECT :: struct {
+	Left: SHORT,
+	Top: SHORT,
+	Right: SHORT,
+	Bottom: SHORT,
+}
+
+CONSOLE_SCREEN_BUFFER_INFO :: struct {
+	dwSize: COORD,
+	dwCursorPosition: COORD,
+	wAttributes: WORD,
+	srWindow: SMALL_RECT,
+	dwMaximumWindowSize: COORD,
+}
+
+
+PCONSOLE_SCREEN_BUFFER_INFO :: ^CONSOLE_SCREEN_BUFFER_INFO
+
 //
 // Networking
 //
@@ -3909,39 +3927,39 @@ ipv6_mreq :: struct {
 }
 
 SOCKADDR_STORAGE_LH :: struct {
-	ss_family: ADDRESS_FAMILY,
-	__ss_pad1: [6]CHAR,
+	ss_family:  ADDRESS_FAMILY,
+	__ss_pad1:  [6]CHAR,
 	__ss_align: i64,
-	__ss_pad2: [112]CHAR,
+	__ss_pad2:  [112]CHAR,
 }
 
 ADDRINFOA :: struct {
-	ai_flags: c_int,
-	ai_family: c_int,
-	ai_socktype: c_int,
-	ai_protocol: c_int,
-	ai_addrlen: size_t,
+	ai_flags:     c_int,
+	ai_family:    c_int,
+	ai_socktype:  c_int,
+	ai_protocol:  c_int,
+	ai_addrlen:   size_t,
 	ai_canonname: ^c_char,
-	ai_addr: ^SOCKADDR,
-	ai_next: ^ADDRINFOA,
+	ai_addr:      ^SOCKADDR,
+	ai_next:      ^ADDRINFOA,
 }
 
 sockaddr :: struct {
 	sa_family: USHORT,
-	sa_data: [14]byte,
+	sa_data:   [14]byte,
 }
 
 sockaddr_in :: struct {
 	sin_family: ADDRESS_FAMILY,
-	sin_port: u16be,
-	sin_addr: in_addr,
-	sin_zero: [8]CHAR,
+	sin_port:   u16be,
+	sin_addr:   in_addr,
+	sin_zero:   [8]CHAR,
 }
 sockaddr_in6 :: struct {
-	sin6_family: ADDRESS_FAMILY,
-	sin6_port: u16be,
+	sin6_family:   ADDRESS_FAMILY,
+	sin6_port:     u16be,
 	sin6_flowinfo: c_ulong,
-	sin6_addr: in6_addr,
+	sin6_addr:     in6_addr,
 	sin6_scope_id: c_ulong,
 }
 
@@ -3968,36 +3986,36 @@ DNS_RECORD :: struct {
     _: DWORD,
     Data: struct #raw_union {
         CNAME: DNS_PTR_DATAA,
-        A: u32be, // Ipv4 Address
-        AAAA: u128be, // Ipv6 Address
-        TXT: DNS_TXT_DATAA,
-        NS: DNS_PTR_DATAA,
-        MX: DNS_MX_DATAA,
-        SRV: DNS_SRV_DATAA,
+        A:     u32be,  // Ipv4 Address
+        AAAA:  u128be, // Ipv6 Address
+        TXT:   DNS_TXT_DATAA,
+        NS:    DNS_PTR_DATAA,
+        MX:    DNS_MX_DATAA,
+        SRV:   DNS_SRV_DATAA,
     },
 }
 
 DNS_TXT_DATAA :: struct {
     dwStringCount: DWORD,
-    pStringArray: cstring,
+    pStringArray:  cstring,
 }
 
 DNS_PTR_DATAA :: cstring
 
 DNS_MX_DATAA :: struct {
     pNameExchange: cstring, // the hostname
-    wPreference: WORD, // lower values preferred
-    _: WORD, // padding.
+    wPreference: WORD,      // lower values preferred
+    _: WORD,                // padding.
 }
 DNS_SRV_DATAA :: struct {
 	pNameTarget: cstring,
-	wPriority: u16,
-	wWeight: u16,
-	wPort: u16,
-	_: WORD, // padding
+	wPriority:   u16,
+	wWeight:     u16,
+	wPort:       u16,
+	_:           WORD, // padding
 }
 
 SOCKADDR :: struct {
 	sa_family: ADDRESS_FAMILY,
-	sa_data: [14]CHAR,
+	sa_data:   [14]CHAR,
 }
