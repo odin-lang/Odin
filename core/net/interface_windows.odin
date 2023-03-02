@@ -63,13 +63,21 @@ enumerate_interfaces :: proc(allocator := context.allocator) -> (interfaces: []N
  	}
 
  	_interfaces := make([dynamic]Network_Interface, 0, allocator)
-
  	for adapter := (^sys.IP_Adapter_Addresses)(raw_data(buf)); adapter != nil; adapter = adapter.Next {
+		friendly_name, err1 := sys.wstring_to_utf8(sys.wstring(adapter.FriendlyName), 256, allocator)
+		if err1 != nil { return {}, Platform_Error(err1) }
+
+		description, err2 :=  sys.wstring_to_utf8(sys.wstring(adapter.Description), 256, allocator)
+		if err2 != nil { return {}, Platform_Error(err2) }
+
+		dns_suffix, err3  :=  sys.wstring_to_utf8(sys.wstring(adapter.DnsSuffix), 256, allocator)
+		if err3 != nil { return {}, Platform_Error(err3) }
+
 		interface := Network_Interface{
 			adapter_name  = strings.clone(string(adapter.AdapterName)),
- 			friendly_name = wstring_to_string(adapter.FriendlyName),
- 			description   = wstring_to_string(adapter.Description),
- 			dns_suffix    = wstring_to_string(adapter.DnsSuffix),
+ 			friendly_name = friendly_name,
+ 			description   = description,
+ 			dns_suffix    = dns_suffix,
 
  			mtu  = adapter.MTU,
 
@@ -137,14 +145,6 @@ enumerate_interfaces :: proc(allocator := context.allocator) -> (interfaces: []N
  	}
 
 	return _interfaces[:], {}
-}
-
-/*
-	Takes a UTF-16 Wstring and clones it.
-*/
-wstring_to_string :: proc(s: ^u16, max_size := 256, allocator := context.allocator) -> (res: string) {
-	temp := sys.wstring_to_utf8((sys.Wstring)(s), max_size, context.temp_allocator)
-	return strings.clone(temp[:len(temp)], allocator)
 }
 
 /*
