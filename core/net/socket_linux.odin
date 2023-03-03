@@ -22,9 +22,20 @@ import "core:c"
 import "core:os"
 import "core:time"
 
-Platform_Socket :: os.Socket
+Socket_Option :: enum c.int {
+	Reuse_Address             = c.int(os.SO_REUSEADDR),
+	Keep_Alive                = c.int(os.SO_KEEPALIVE),
+	Out_Of_Bounds_Data_Inline = c.int(os.SO_OOBINLINE),
+	TCP_Nodelay               = c.int(os.TCP_NODELAY),
+	Linger                    = c.int(os.SO_LINGER),
+	Receive_Buffer_Size       = c.int(os.SO_RCVBUF),
+	Send_Buffer_Size          = c.int(os.SO_SNDBUF),
+	Receive_Timeout           = c.int(os.SO_RCVTIMEO_NEW),
+	Send_Timeout              = c.int(os.SO_SNDTIMEO_NEW),
+}
 
-create_socket :: proc(family: Address_Family, protocol: Socket_Protocol) -> (socket: Any_Socket, err: Network_Error) {
+@(private)
+_create_socket :: proc(family: Address_Family, protocol: Socket_Protocol) -> (socket: Any_Socket, err: Network_Error) {
 	c_type, c_protocol, c_family: int
 
 	switch family {
@@ -55,7 +66,8 @@ create_socket :: proc(family: Address_Family, protocol: Socket_Protocol) -> (soc
 	}
 }
 
-dial_tcp_from_endpoint :: proc(endpoint: Endpoint, options := default_tcp_options) -> (skt: TCP_Socket, err: Network_Error) {
+@(private)
+_dial_tcp_from_endpoint :: proc(endpoint: Endpoint, options := default_tcp_options) -> (skt: TCP_Socket, err: Network_Error) {
 	if endpoint.port == 0 {
 		return 0, .Port_Required
 	}
@@ -70,31 +82,32 @@ dial_tcp_from_endpoint :: proc(endpoint: Endpoint, options := default_tcp_option
 	_ = set_option(skt, .Reuse_Address, true)
 
 	sockaddr := _endpoint_to_sockaddr(endpoint)
-	res := os.connect(Platform_Socket(skt), (^os.SOCKADDR)(&sockaddr), size_of(sockaddr))
+	res := os.connect(os.Socket(skt), (^os.SOCKADDR)(&sockaddr), size_of(sockaddr))
 	if res != os.ERROR_NONE {
 		err = Dial_Error(res)
 		return
 	}
 
 	if options.no_delay {
-		_ = set_option(sock, .TCP_Nodelay, true) // NOTE(tetra): Not vital to succeed; error ignored
+		_ = _set_option(sock, .TCP_Nodelay, true) // NOTE(tetra): Not vital to succeed; error ignored
 	}
 
 	return
 }
 
-
-bind :: proc(skt: Any_Socket, ep: Endpoint) -> (err: Network_Error) {
+@(private)
+_bind :: proc(skt: Any_Socket, ep: Endpoint) -> (err: Network_Error) {
 	sockaddr := _endpoint_to_sockaddr(ep)
 	s := any_socket_to_socket(skt)
-	res := os.bind(Platform_Socket(s), (^os.SOCKADDR)(&sockaddr), size_of(sockaddr))
+	res := os.bind(os.Socket(s), (^os.SOCKADDR)(&sockaddr), size_of(sockaddr))
 	if res != os.ERROR_NONE {
 		err = Bind_Error(res)
 	}
 	return
 }
 
-listen_tcp :: proc(interface_endpoint: Endpoint, backlog := 1000) -> (skt: TCP_Socket, err: Network_Error) {
+@(private)
+_listen_tcp :: proc(interface_endpoint: Endpoint, backlog := 1000) -> (skt: TCP_Socket, err: Network_Error) {
 	assert(backlog > 0 && i32(backlog) < max(i32))
 
 	family := family_from_endpoint(interface_endpoint)
@@ -110,7 +123,7 @@ listen_tcp :: proc(interface_endpoint: Endpoint, backlog := 1000) -> (skt: TCP_S
 
 	bind(sock, interface_endpoint) or_return
 
-	res := os.listen(Platform_Socket(skt), backlog)
+	res := os.listen(os.Socket(skt), backlog)
 	if res != os.ERROR_NONE {
 		err = Listen_Error(res)
 		return
@@ -119,11 +132,12 @@ listen_tcp :: proc(interface_endpoint: Endpoint, backlog := 1000) -> (skt: TCP_S
 	return
 }
 
-accept_tcp :: proc(sock: TCP_Socket, options := default_tcp_options) -> (client: TCP_Socket, source: Endpoint, err: Network_Error) {
+@(private)
+_accept_tcp :: proc(sock: TCP_Socket, options := default_tcp_options) -> (client: TCP_Socket, source: Endpoint, err: Network_Error) {
 	sockaddr: os.SOCKADDR_STORAGE_LH
 	sockaddrlen := c.int(size_of(sockaddr))
 
-	client_sock, ok := os.accept(Platform_Socket(sock), cast(^os.SOCKADDR) &sockaddr, &sockaddrlen)
+	client_sock, ok := os.accept(os.Socket(sock), cast(^os.SOCKADDR) &sockaddr, &sockaddrlen)
 	if ok != os.ERROR_NONE {
 		err = Accept_Error(ok)
 		return
@@ -131,23 +145,23 @@ accept_tcp :: proc(sock: TCP_Socket, options := default_tcp_options) -> (client:
 	client = TCP_Socket(client_sock)
 	source = _sockaddr_storage_to_endpoint(&sockaddr)
 	if options.no_delay {
-		_ = set_option(client, .TCP_Nodelay, true) // NOTE(tetra): Not vital to succeed; error ignored
+		_ = _set_option(client, .TCP_Nodelay, true) // NOTE(tetra): Not vital to succeed; error ignored
 	}
 	return
 }
 
-
-
-close :: proc(skt: Any_Socket) {
+@(private)
+_close :: proc(skt: Any_Socket) {
 	s := any_socket_to_socket(skt)
-	os.close(os.Handle(Platform_Socket(s)))
+	os.close(os.Handle(os.Socket(s)))
 }
 
-recv_tcp :: proc(skt: TCP_Socket, buf: []byte) -> (bytes_read: int, err: Network_Error) {
+@(private)
+_recv_tcp :: proc(skt: TCP_Socket, buf: []byte) -> (bytes_read: int, err: Network_Error) {
 	if len(buf) <= 0 {
 		return
 	}
-	res, ok := os.recv(Platform_Socket(skt), buf, 0)
+	res, ok := os.recv(os.Socket(skt), buf, 0)
 	if ok != os.ERROR_NONE {
 		err = TCP_Recv_Error(ok)
 		return
@@ -155,7 +169,8 @@ recv_tcp :: proc(skt: TCP_Socket, buf: []byte) -> (bytes_read: int, err: Network
 	return int(res), nil
 }
 
-recv_udp :: proc(skt: UDP_Socket, buf: []byte) -> (bytes_read: int, remote_endpoint: Endpoint, err: Network_Error) {
+@(private)
+_recv_udp :: proc(skt: UDP_Socket, buf: []byte) -> (bytes_read: int, remote_endpoint: Endpoint, err: Network_Error) {
 	if len(buf) <= 0 {
 		return
 	}
@@ -167,7 +182,7 @@ recv_udp :: proc(skt: UDP_Socket, buf: []byte) -> (bytes_read: int, remote_endpo
 	// and no error is returned.
 	// However, if you pass MSG_TRUNC here, 'res' will be the size of the incoming message, rather than how much was read.
 	// We can use this fact to detect this condition and return .Buffer_Too_Small.
-	res, ok := os.recvfrom(Platform_Socket(skt), buf, os.MSG_TRUNC, cast(^os.SOCKADDR) &from, &fromsize)
+	res, ok := os.recvfrom(os.Socket(skt), buf, os.MSG_TRUNC, cast(^os.SOCKADDR) &from, &fromsize)
 	if ok != os.ERROR_NONE {
 		err = UDP_Recv_Error(ok)
 		return
@@ -185,17 +200,12 @@ recv_udp :: proc(skt: UDP_Socket, buf: []byte) -> (bytes_read: int, remote_endpo
 	return
 }
 
-recv :: proc{recv_tcp, recv_udp}
-
-
-// Repeatedly sends data until the entire buffer is sent.
-// If a send fails before all data is sent, returns the amount
-// sent up to that point.
-send_tcp :: proc(skt: TCP_Socket, buf: []byte) -> (bytes_written: int, err: Network_Error) {
+@(private)
+_send_tcp :: proc(skt: TCP_Socket, buf: []byte) -> (bytes_written: int, err: Network_Error) {
 	for bytes_written < len(buf) {
 		limit := min(int(max(i32)), len(buf) - bytes_written)
 		remaining := buf[bytes_written:][:limit]
-		res, ok := os.send(Platform_Socket(skt), remaining, 0)
+		res, ok := os.send(os.Socket(skt), remaining, 0)
 		if ok != os.ERROR_NONE {
 			err = TCP_Send_Error(ok)
 			return
@@ -205,13 +215,10 @@ send_tcp :: proc(skt: TCP_Socket, buf: []byte) -> (bytes_written: int, err: Netw
 	return
 }
 
-// Sends a single UDP datagram packet.
-//
-// Datagrams are limited in size; attempting to send more than this limit at once will result in a Message_Too_Long error.
-// UDP packets are not guarenteed to be received in order.
-send_udp :: proc(skt: UDP_Socket, buf: []byte, to: Endpoint) -> (bytes_written: int, err: Network_Error) {
+@(private)
+_send_udp :: proc(skt: UDP_Socket, buf: []byte, to: Endpoint) -> (bytes_written: int, err: Network_Error) {
 	toaddr := _endpoint_to_sockaddr(to)
-	res, os_err := os.sendto(Platform_Socket(skt), buf, 0, cast(^os.SOCKADDR) &toaddr, size_of(toaddr))
+	res, os_err := os.sendto(os.Socket(skt), buf, 0, cast(^os.SOCKADDR) &toaddr, size_of(toaddr))
 	if os_err != os.ERROR_NONE {
 		err = UDP_Send_Error(os_err)
 		return
@@ -220,36 +227,18 @@ send_udp :: proc(skt: UDP_Socket, buf: []byte, to: Endpoint) -> (bytes_written: 
 	return
 }
 
-send :: proc{send_tcp, send_udp}
-
-Shutdown_Manner :: enum c.int {
-	Receive = c.int(os.SHUT_RD),
-	Send    = c.int(os.SHUT_WR),
-	Both    = c.int(os.SHUT_RDWR),
-}
-
-shutdown :: proc(skt: Any_Socket, manner: Shutdown_Manner) -> (err: Network_Error) {
+@(private)
+_shutdown :: proc(skt: Any_Socket, manner: Shutdown_Manner) -> (err: Network_Error) {
 	s := any_socket_to_socket(skt)
-	res := os.shutdown(Platform_Socket(s), int(manner))
+	res := os.shutdown(os.Socket(s), int(manner))
 	if res != os.ERROR_NONE {
 		return Shutdown_Error(res)
 	}
 	return
 }
 
-Socket_Option :: enum c.int {
-	Reuse_Address             = c.int(os.SO_REUSEADDR),
-	Keep_Alive                = c.int(os.SO_KEEPALIVE),
-	Out_Of_Bounds_Data_Inline = c.int(os.SO_OOBINLINE),
-	TCP_Nodelay               = c.int(os.TCP_NODELAY),
-	Linger                    = c.int(os.SO_LINGER),
-	Receive_Buffer_Size       = c.int(os.SO_RCVBUF),
-	Send_Buffer_Size          = c.int(os.SO_SNDBUF),
-	Receive_Timeout           = c.int(os.SO_RCVTIMEO_NEW),
-	Send_Timeout              = c.int(os.SO_SNDTIMEO_NEW),
-}
-
-set_option :: proc(s: Any_Socket, option: Socket_Option, value: any, loc := #caller_location) -> Network_Error {
+@(private)
+_set_option :: proc(s: Any_Socket, option: Socket_Option, value: any, loc := #caller_location) -> Network_Error {
 	level := os.SOL_SOCKET if option != .TCP_Nodelay else os.IPPROTO_TCP
 
 	// NOTE(tetra, 2022-02-15): On Linux, you cannot merely give a single byte for a bool;
@@ -319,7 +308,7 @@ set_option :: proc(s: Any_Socket, option: Socket_Option, value: any, loc := #cal
 	}
 
 	skt := any_socket_to_socket(s)
-	res := os.setsockopt(Platform_Socket(skt), int(level), int(option), ptr, len)
+	res := os.setsockopt(os.Socket(skt), int(level), int(option), ptr, len)
 	if res != os.ERROR_NONE {
 		return Socket_Option_Error(res)
 	}

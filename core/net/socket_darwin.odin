@@ -24,6 +24,18 @@ import "core:time"
 
 Platform_Socket :: os.Socket
 
+Socket_Option :: enum c.int {
+	Reuse_Address             = c.int(os.SO_REUSEADDR),
+	Keep_Alive                = c.int(os.SO_KEEPALIVE),
+	Out_Of_Bounds_Data_Inline = c.int(os.SO_OOBINLINE),
+	TCP_Nodelay               = c.int(os.TCP_NODELAY),
+	Linger                    = c.int(os.SO_LINGER),
+	Receive_Buffer_Size       = c.int(os.SO_RCVBUF),
+	Send_Buffer_Size          = c.int(os.SO_SNDBUF),
+	Receive_Timeout           = c.int(os.SO_RCVTIMEO),
+	Send_Timeout              = c.int(os.SO_SNDTIMEO),
+}
+
 create_socket :: proc(family: Address_Family, protocol: Socket_Protocol) -> (socket: Any_Socket, err: Network_Error) {
 	c_type, c_protocol, c_family: int
 
@@ -163,8 +175,6 @@ recv_udp :: proc(skt: UDP_Socket, buf: []byte) -> (bytes_read: int, remote_endpo
 	return
 }
 
-recv :: proc{recv_tcp, recv_udp}
-
 // Repeatedly sends data until the entire buffer is sent.
 // If a send fails before all data is sent, returns the amount
 // sent up to that point.
@@ -197,14 +207,6 @@ send_udp :: proc(skt: UDP_Socket, buf: []byte, to: Endpoint) -> (bytes_written: 
 	return
 }
 
-send :: proc{send_tcp, send_udp}
-
-Shutdown_Manner :: enum c.int {
-	Receive = c.int(os.SHUT_RD),
-	Send    = c.int(os.SHUT_WR),
-	Both    = c.int(os.SHUT_RDWR),
-}
-
 shutdown :: proc(skt: Any_Socket, manner: Shutdown_Manner) -> (err: Network_Error) {
 	s := any_socket_to_socket(skt)
 	res := os.shutdown(Platform_Socket(s), int(manner))
@@ -212,18 +214,6 @@ shutdown :: proc(skt: Any_Socket, manner: Shutdown_Manner) -> (err: Network_Erro
 		return Shutdown_Error(res)
 	}
 	return
-}
-
-Socket_Option :: enum c.int {
-	Reuse_Address             = c.int(os.SO_REUSEADDR),
-	Keep_Alive                = c.int(os.SO_KEEPALIVE),
-	Out_Of_Bounds_Data_Inline = c.int(os.SO_OOBINLINE),
-	TCP_Nodelay               = c.int(os.TCP_NODELAY),
-	Linger                    = c.int(os.SO_LINGER),
-	Receive_Buffer_Size       = c.int(os.SO_RCVBUF),
-	Send_Buffer_Size          = c.int(os.SO_SNDBUF),
-	Receive_Timeout           = c.int(os.SO_RCVTIMEO),
-	Send_Timeout              = c.int(os.SO_SNDTIMEO),
 }
 
 set_option :: proc(s: Any_Socket, option: Socket_Option, value: any, loc := #caller_location) -> Network_Error {

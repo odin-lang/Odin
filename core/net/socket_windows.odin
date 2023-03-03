@@ -62,7 +62,7 @@ _create_socket :: proc(family: Address_Family, protocol: Socket_Protocol) -> (so
 }
 
 @(private)
-_dial_tcp_from_endpoint :: proc(endpoint: Endpoint, options := default_tcp_options) -> (skt: TCP_Socket, err: Network_Error) {
+_dial_tcp_from_endpoint :: proc(endpoint: Endpoint, options := default_tcp_options) -> (socket: TCP_Socket, err: Network_Error) {
 	if endpoint.port == 0 {
 		err = .Port_Required
 		return
@@ -70,15 +70,15 @@ _dial_tcp_from_endpoint :: proc(endpoint: Endpoint, options := default_tcp_optio
 
 	family := family_from_endpoint(endpoint)
 	sock := create_socket(family, .TCP) or_return
-	skt = sock.(TCP_Socket)
+	socket = sock.(TCP_Socket)
 
 	// NOTE(tetra): This is so that if we crash while the socket is open, we can
 	// bypass the cooldown period, and allow the next run of the program to
 	// use the same address immediately.
-	_ = set_option(skt, .Reuse_Address, true)
+	_ = set_option(socket, .Reuse_Address, true)
 
 	sockaddr := _endpoint_to_sockaddr(endpoint)
-	res := win.connect(Platform_Socket(skt), &sockaddr, size_of(sockaddr))
+	res := win.connect(Platform_Socket(socket), &sockaddr, size_of(sockaddr))
 	if res < 0 {
 		err = Dial_Error(win.WSAGetLastError())
 		return
@@ -92,9 +92,9 @@ _dial_tcp_from_endpoint :: proc(endpoint: Endpoint, options := default_tcp_optio
 }
 
 @(private)
-_bind :: proc(skt: Any_Socket, ep: Endpoint) -> (err: Network_Error) {
+_bind :: proc(socket: Any_Socket, ep: Endpoint) -> (err: Network_Error) {
 	sockaddr := _endpoint_to_sockaddr(ep)
-	s := any_socket_to_socket(skt)
+	s := any_socket_to_socket(socket)
 	res := win.bind(Platform_Socket(s), &sockaddr, size_of(sockaddr))
 	if res < 0 {
 		err = Bind_Error(win.WSAGetLastError())
@@ -103,18 +103,18 @@ _bind :: proc(skt: Any_Socket, ep: Endpoint) -> (err: Network_Error) {
 }
 
 @(private)
-_listen_tcp :: proc(interface_endpoint: Endpoint, backlog := 1000) -> (skt: TCP_Socket, err: Network_Error) {
+_listen_tcp :: proc(interface_endpoint: Endpoint, backlog := 1000) -> (socket: TCP_Socket, err: Network_Error) {
 	family := family_from_endpoint(interface_endpoint)
 	sock := create_socket(family, .TCP) or_return
-	skt = sock.(TCP_Socket)
+	socket = sock.(TCP_Socket)
 
 	// NOTE(tetra): While I'm not 100% clear on it, my understanding is that this will
 	// prevent hijacking of the server's endpoint by other applications.
-	set_option(skt, .Exclusive_Addr_Use, true) or_return
+	set_option(socket, .Exclusive_Addr_Use, true) or_return
 
 	bind(sock, interface_endpoint) or_return
 
-	if res := win.listen(Platform_Socket(skt), i32(backlog)); res == win.SOCKET_ERROR {
+	if res := win.listen(Platform_Socket(socket), i32(backlog)); res == win.SOCKET_ERROR {
 		err = Listen_Error(win.WSAGetLastError())
 	}
 	return
@@ -148,18 +148,18 @@ _accept_tcp :: proc(sock: TCP_Socket, options := default_tcp_options) -> (client
 }
 
 @(private)
-_close :: proc(skt: Any_Socket) {
-	if s := any_socket_to_socket(skt); s != {} {
+_close :: proc(socket: Any_Socket) {
+	if s := any_socket_to_socket(socket); s != {} {
 		win.closesocket(Platform_Socket(s))
 	}
 }
 
 @(private)
-_recv_tcp :: proc(skt: TCP_Socket, buf: []byte) -> (bytes_read: int, err: Network_Error) {
+_recv_tcp :: proc(socket: TCP_Socket, buf: []byte) -> (bytes_read: int, err: Network_Error) {
 	if len(buf) <= 0 {
 		return
 	}
-	res := win.recv(Platform_Socket(skt), raw_data(buf), c.int(len(buf)), 0)
+	res := win.recv(Platform_Socket(socket), raw_data(buf), c.int(len(buf)), 0)
 	if res < 0 {
 		err = TCP_Recv_Error(win.WSAGetLastError())
 		return
@@ -168,14 +168,14 @@ _recv_tcp :: proc(skt: TCP_Socket, buf: []byte) -> (bytes_read: int, err: Networ
 }
 
 @(private)
-_recv_udp :: proc(skt: UDP_Socket, buf: []byte) -> (bytes_read: int, remote_endpoint: Endpoint, err: Network_Error) {
+_recv_udp :: proc(socket: UDP_Socket, buf: []byte) -> (bytes_read: int, remote_endpoint: Endpoint, err: Network_Error) {
 	if len(buf) <= 0 {
 		return
 	}
 
 	from: win.SOCKADDR_STORAGE_LH
 	fromsize := c.int(size_of(from))
-	res := win.recvfrom(Platform_Socket(skt), raw_data(buf), c.int(len(buf)), 0, &from, &fromsize)
+	res := win.recvfrom(Platform_Socket(socket), raw_data(buf), c.int(len(buf)), 0, &from, &fromsize)
 	if res < 0 {
 		err = UDP_Recv_Error(win.WSAGetLastError())
 		return
@@ -187,11 +187,11 @@ _recv_udp :: proc(skt: UDP_Socket, buf: []byte) -> (bytes_read: int, remote_endp
 }
 
 @(private)
-_send_tcp :: proc(skt: TCP_Socket, buf: []byte) -> (bytes_written: int, err: Network_Error) {
+_send_tcp :: proc(socket: TCP_Socket, buf: []byte) -> (bytes_written: int, err: Network_Error) {
 	for bytes_written < len(buf) {
 		limit := min(int(max(i32)), len(buf) - bytes_written)
 		remaining := buf[bytes_written:]
-		res := win.send(Platform_Socket(skt), raw_data(remaining), c.int(limit), 0)
+		res := win.send(Platform_Socket(socket), raw_data(remaining), c.int(limit), 0)
 		if res < 0 {
 			err = TCP_Send_Error(win.WSAGetLastError())
 			return
@@ -202,14 +202,14 @@ _send_tcp :: proc(skt: TCP_Socket, buf: []byte) -> (bytes_written: int, err: Net
 }
 
 @(private)
-_send_udp :: proc(skt: UDP_Socket, buf: []byte, to: Endpoint) -> (bytes_written: int, err: Network_Error) {
+_send_udp :: proc(socket: UDP_Socket, buf: []byte, to: Endpoint) -> (bytes_written: int, err: Network_Error) {
 	if len(buf) > int(max(c.int)) {
 		// NOTE(tetra): If we don't guard this, we'll return (0, nil) instead, which is misleading.
 		err = .Message_Too_Long
 		return
 	}
 	toaddr := _endpoint_to_sockaddr(to)
-	res := win.sendto(Platform_Socket(skt), raw_data(buf), c.int(len(buf)), 0, &toaddr, size_of(toaddr))
+	res := win.sendto(Platform_Socket(socket), raw_data(buf), c.int(len(buf)), 0, &toaddr, size_of(toaddr))
 	if res < 0 {
 		err = UDP_Send_Error(win.WSAGetLastError())
 		return
@@ -219,8 +219,8 @@ _send_udp :: proc(skt: UDP_Socket, buf: []byte, to: Endpoint) -> (bytes_written:
 }
 
 @(private)
-_shutdown :: proc(skt: Any_Socket, manner: Shutdown_Manner) -> (err: Network_Error) {
-	s := any_socket_to_socket(skt)
+_shutdown :: proc(socket: Any_Socket, manner: Shutdown_Manner) -> (err: Network_Error) {
+	s := any_socket_to_socket(socket)
 	res := win.shutdown(Platform_Socket(s), c.int(manner))
 	if res < 0 {
 		return Shutdown_Error(win.WSAGetLastError())
@@ -303,8 +303,8 @@ _set_option :: proc(s: Any_Socket, option: Socket_Option, value: any, loc := #ca
 			len = size_of(int_value)
 	}
 
-	skt := any_socket_to_socket(s)
-	res := win.setsockopt(Platform_Socket(skt), c.int(level), c.int(option), ptr, len)
+	socket := any_socket_to_socket(s)
+	res := win.setsockopt(Platform_Socket(socket), c.int(level), c.int(option), ptr, len)
 	if res < 0 {
 		return Socket_Option_Error(win.WSAGetLastError())
 	}

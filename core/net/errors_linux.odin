@@ -158,6 +158,12 @@ UDP_Send_Error :: enum c.int {
 	No_Memory_Available         = c.int(os.ENOMEM), // No memory was available to properly manage the send queue.
 }
 
+Shutdown_Manner :: enum c.int {
+	Receive = c.int(os.SHUT_RD),
+	Send    = c.int(os.SHUT_WR),
+	Both    = c.int(os.SHUT_RDWR),
+}
+
 Shutdown_Error :: enum c.int {
 	Aborted        = c.int(os.ECONNABORTED),
 	Reset          = c.int(os.ECONNRESET),
