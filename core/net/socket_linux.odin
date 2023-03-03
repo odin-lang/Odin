@@ -328,12 +328,12 @@ set_option :: proc(s: Any_Socket, option: Socket_Option, value: any, loc := #cal
 		.Send_Buffer_Size:
 			// TODO: check for out of range values and return .Value_Out_Of_Range?
 			switch i in value {
-			case i8, u8:   i2 := i; int_value = os.socklen_t((^u8)(&i2)^)
-			case i16, u16: i2 := i; int_value = os.socklen_t((^u16)(&i2)^)
-			case i32, u32: i2 := i; int_value = os.socklen_t((^u32)(&i2)^)
-			case i64, u64: i2 := i; int_value = os.socklen_t((^u64)(&i2)^)
+			case   i8,   u8: i2 := i; int_value = os.socklen_t((^u8)(&i2)^)
+			case  i16,  u16: i2 := i; int_value = os.socklen_t((^u16)(&i2)^)
+			case  i32,  u32: i2 := i; int_value = os.socklen_t((^u32)(&i2)^)
+			case  i64,  u64: i2 := i; int_value = os.socklen_t((^u64)(&i2)^)
 			case i128, u128: i2 := i; int_value = os.socklen_t((^u128)(&i2)^)
-			case int, uint: i2 := i; int_value = os.socklen_t((^uint)(&i2)^)
+			case  int, uint: i2 := i; int_value = os.socklen_t((^uint)(&i2)^)
 			case:
 				panic("set_option() value must be an integer here", loc)
 			}

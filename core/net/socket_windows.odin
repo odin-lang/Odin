@@ -317,12 +317,12 @@ set_option :: proc(s: Any_Socket, option: Socket_Option, value: any, loc := #cal
 		.Receive_Buffer_Size,
 		.Send_Buffer_Size:
 			switch i in value {
-			case i8, u8:   i2 := i; int_value = c.int((^u8)(&i2)^)
-			case i16, u16: i2 := i; int_value = c.int((^u16)(&i2)^)
-			case i32, u32: i2 := i; int_value = c.int((^u32)(&i2)^)
-			case i64, u64: i2 := i; int_value = c.int((^u64)(&i2)^)
+			case  i8,    u8: i2 := i; int_value = c.int((^u8)(&i2)^)
+			case  i16,  u16: i2 := i; int_value = c.int((^u16)(&i2)^)
+			case  i32,  u32: i2 := i; int_value = c.int((^u32)(&i2)^)
+			case  i64,  u64: i2 := i; int_value = c.int((^u64)(&i2)^)
 			case i128, u128: i2 := i; int_value = c.int((^u128)(&i2)^)
-			case int, uint: i2 := i; int_value = c.int((^uint)(&i2)^)
+			case  int, uint: i2 := i; int_value = c.int((^uint)(&i2)^)
 			case:
 				panic("set_option() value must be an integer here", loc)
 			}

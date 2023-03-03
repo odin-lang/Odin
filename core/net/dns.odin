@@ -348,7 +348,7 @@ unpack_dns_header :: proc(id: u16be, bits: u16be) -> (hdr: DNS_Header) {
 	hdr.is_truncated           = (bits & (1 <<  9)) != 0
 	hdr.is_recursion_desired   = (bits & (1 <<  8)) != 0
 	hdr.is_recursion_available = (bits & (1 <<  7)) != 0
-	hdr.response_code = DNS_Response_Code(bits & 0xF)
+	hdr.response_code          = DNS_Response_Code(bits & 0xF)
 
 	return hdr
 }
@@ -422,7 +422,7 @@ load_hosts :: proc(hosts_file_path: string, allocator := context.allocator) -> (
 }
 
 // www.google.com -> 3www6google3com0
-encode_hostname :: proc(b: ^strings.Builder, hostname: string, allocator := context.allocator) -> (ok: bool) {
+encode_hostname :: proc(b: ^strings.Builder, hostname: string) -> (ok: bool) {
 	_hostname := hostname
 	for section in strings.split_iterator(&_hostname, ".") {
 		if len(section) > LABEL_MAX {
@@ -437,7 +437,7 @@ encode_hostname :: proc(b: ^strings.Builder, hostname: string, allocator := cont
 	return true
 }
 
-skip_hostname :: proc(packet: []u8, start_idx: int, allocator := context.allocator) -> (encode_size: int, ok: bool) {
+skip_hostname :: proc(packet: []u8, start_idx: int) -> (encode_size: int, ok: bool) {
 	out_size := 0
 
 	cur_idx := start_idx
@@ -690,9 +690,9 @@ parse_record :: proc(packet: []u8, cur_off: ^int, filter: DNS_Record_Type = nil)
 				return
 			}
 
-			priority: u16be = mem.slice_data_cast([]u16be, data)[0]
-			weight:   u16be = mem.slice_data_cast([]u16be, data)[1]
-			port:     u16be = mem.slice_data_cast([]u16be, data)[2]
+			_data := mem.slice_data_cast([]u16be, data)
+
+			priority, weight, port := _data[0], _data[1], _data[2]
 			target, _ := decode_hostname(packet, data_off + (size_of(u16be) * 3)) or_return
 
 			// NOTE(tetra): Srv record name should be of the form '_servicename._protocol.hostname'
@@ -800,7 +800,7 @@ parse_response :: proc(response: []u8, filter: DNS_Record_Type = nil, allocator 
 		}
 
 		dq_sz :: 4
-		hn_sz := skip_hostname(response, cur_idx, context.temp_allocator) or_return
+		hn_sz := skip_hostname(response, cur_idx) or_return
 		dns_query := mem.slice_data_cast([]u16be, response[cur_idx+hn_sz:cur_idx+hn_sz+dq_sz])
 
 		cur_idx += hn_sz + dq_sz
