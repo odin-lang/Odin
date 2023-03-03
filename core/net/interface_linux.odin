@@ -1,4 +1,11 @@
-//+build linux, darwin, openbsd, !windows
+package net
+//+build linux
+
+/*
+	Package net implements cross-platform Berkeley Sockets, DNS resolution and associated procedures.
+	For other protocols and their features, see subdirectories of this package.
+*/
+
 /*
 	Copyright 2022 Tetralux        <tetraluxonpc@gmail.com>
 	Copyright 2022 Colin Davidson  <colrdavidson@gmail.com>
@@ -9,17 +16,8 @@
 		Tetralux:        Initial implementation
 		Colin Davidson:  Linux platform code, OSX platform code, Odin-native DNS resolver
 		Jeroen van Rijn: Cross platform unification, code style, documentation
-*/
 
-/*
-	Package net implements cross-platform Berkeley Sockets, DNS resolution and associated procedures.
-	For other protocols and their features, see subdirectories of this package.
-*/
-package net
-
-/*
 	This file uses `getifaddrs` libc call to enumerate interfaces.
-
 	TODO: When we have raw sockets, split off into its own file for Linux so we can use the NETLINK protocol and bypass libc.
 */
 
@@ -65,7 +63,7 @@ enumerate_interfaces :: proc(allocator := context.allocator) -> (interfaces: []N
 		if ifaddr.address != nil {
 			switch int(ifaddr.address.sa_family) {
 			case os.AF_INET, os.AF_INET6:
-				address = sockaddr_to_endpoint(ifaddr.address).address
+				address = _sockaddr_basic_to_endpoint(ifaddr.address).address
 
 			case os.AF_PACKET:
 				/*
@@ -87,7 +85,7 @@ enumerate_interfaces :: proc(allocator := context.allocator) -> (interfaces: []N
 		if ifaddr.netmask != nil {
 			switch int(ifaddr.netmask.sa_family) {
 			case os.AF_INET, os.AF_INET6:
-			 	netmask = Netmask(sockaddr_to_endpoint(ifaddr.netmask).address)
+			 	netmask = Netmask(_sockaddr_basic_to_endpoint(ifaddr.netmask).address)
 			case:
 			}
 		}
@@ -95,7 +93,7 @@ enumerate_interfaces :: proc(allocator := context.allocator) -> (interfaces: []N
 		if ifaddr.broadcast_or_dest != nil && .BROADCAST in ifaddr.flags {
 			switch int(ifaddr.broadcast_or_dest.sa_family) {
 			case os.AF_INET, os.AF_INET6:
-			 	broadcast := sockaddr_to_endpoint(ifaddr.broadcast_or_dest).address
+			 	broadcast := _sockaddr_basic_to_endpoint(ifaddr.broadcast_or_dest).address
 			 	append(&iface.multicast, broadcast)
 			case:
 			}

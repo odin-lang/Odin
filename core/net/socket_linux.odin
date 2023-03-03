@@ -1,4 +1,11 @@
+package net
 // +build linux
+
+/*
+	Package net implements cross-platform Berkeley Sockets, DNS resolution and associated procedures.
+	For other protocols and their features, see subdirectories of this package.
+*/
+
 /*
 	Copyright 2022 Tetralux        <tetraluxonpc@gmail.com>
 	Copyright 2022 Colin Davidson  <colrdavidson@gmail.com>
@@ -10,12 +17,6 @@
 		Colin Davidson:  Linux platform code, OSX platform code, Odin-native DNS resolver
 		Jeroen van Rijn: Cross platform unification, code style, documentation
 */
-
-/*
-	Package net implements cross-platform Berkeley Sockets, DNS resolution and associated procedures.
-	For other protocols and their features, see subdirectories of this package.
-*/
-package net
 
 import "core:c"
 import "core:os"
@@ -68,7 +69,7 @@ dial_tcp_from_endpoint :: proc(endpoint: Endpoint, options := default_tcp_option
 	// use the same address immediately.
 	_ = set_option(skt, .Reuse_Address, true)
 
-	sockaddr := endpoint_to_sockaddr(endpoint)
+	sockaddr := _endpoint_to_sockaddr(endpoint)
 	res := os.connect(Platform_Socket(skt), (^os.SOCKADDR)(&sockaddr), size_of(sockaddr))
 	if res != os.ERROR_NONE {
 		err = Dial_Error(res)
@@ -84,7 +85,7 @@ dial_tcp_from_endpoint :: proc(endpoint: Endpoint, options := default_tcp_option
 
 
 bind :: proc(skt: Any_Socket, ep: Endpoint) -> (err: Network_Error) {
-	sockaddr := endpoint_to_sockaddr(ep)
+	sockaddr := _endpoint_to_sockaddr(ep)
 	s := any_socket_to_socket(skt)
 	res := os.bind(Platform_Socket(s), (^os.SOCKADDR)(&sockaddr), size_of(sockaddr))
 	if res != os.ERROR_NONE {
@@ -152,7 +153,7 @@ accept_tcp :: proc(sock: TCP_Socket, options := default_tcp_options) -> (client:
 		return
 	}
 	client = TCP_Socket(client_sock)
-	source = sockaddr_to_endpoint(&sockaddr)
+	source = _sockaddr_storage_to_endpoint(&sockaddr)
 	if options.no_delay {
 		_ = set_option(client, .TCP_Nodelay, true) // NOTE(tetra): Not vital to succeed; error ignored
 	}
@@ -197,7 +198,7 @@ recv_udp :: proc(skt: UDP_Socket, buf: []byte) -> (bytes_read: int, remote_endpo
 	}
 
 	bytes_read = int(res)
-	remote_endpoint = sockaddr_to_endpoint(&from)
+	remote_endpoint = _sockaddr_storage_to_endpoint(&from)
 
 	if bytes_read > len(buf) {
 		// NOTE(tetra): The buffer has been filled, with a partial message.
@@ -233,7 +234,7 @@ send_tcp :: proc(skt: TCP_Socket, buf: []byte) -> (bytes_written: int, err: Netw
 // Datagrams are limited in size; attempting to send more than this limit at once will result in a Message_Too_Long error.
 // UDP packets are not guarenteed to be received in order.
 send_udp :: proc(skt: UDP_Socket, buf: []byte, to: Endpoint) -> (bytes_written: int, err: Network_Error) {
-	toaddr := endpoint_to_sockaddr(to)
+	toaddr := _endpoint_to_sockaddr(to)
 	res, os_err := os.sendto(Platform_Socket(skt), buf, 0, cast(^os.SOCKADDR) &toaddr, size_of(toaddr))
 	if os_err != os.ERROR_NONE {
 		err = UDP_Send_Error(os_err)
@@ -348,4 +349,71 @@ set_option :: proc(s: Any_Socket, option: Socket_Option, value: any, loc := #cal
 	}
 
 	return nil
+}
+
+@(private)
+_endpoint_to_sockaddr :: proc(ep: Endpoint) -> (sockaddr: os.SOCKADDR_STORAGE_LH) {
+	switch a in ep.address {
+	case IP4_Address:
+		(^os.sockaddr_in)(&sockaddr)^ = os.sockaddr_in {
+			sin_port = u16be(ep.port),
+			sin_addr = transmute(os.in_addr) a,
+			sin_family = u16(os.AF_INET),
+		}
+		return
+	case IP6_Address:
+		(^os.sockaddr_in6)(&sockaddr)^ = os.sockaddr_in6 {
+			sin6_port = u16be(ep.port),
+			sin6_addr = transmute(os.in6_addr) a,
+			sin6_family = u16(os.AF_INET6),
+		}
+		return
+	}
+	unreachable()
+}
+
+@(private)
+_sockaddr_storage_to_endpoint :: proc(native_addr: ^os.SOCKADDR_STORAGE_LH) -> (ep: Endpoint) {
+	switch native_addr.ss_family {
+	case u16(os.AF_INET):
+		addr := cast(^os.sockaddr_in) native_addr
+		port := int(addr.sin_port)
+		ep = Endpoint {
+			address = IP4_Address(transmute([4]byte) addr.sin_addr),
+			port = port,
+		}
+	case u16(os.AF_INET6):
+		addr := cast(^os.sockaddr_in6) native_addr
+		port := int(addr.sin6_port)
+		ep = Endpoint {
+			address = IP6_Address(transmute([8]u16be) addr.sin6_addr),
+			port = port,
+		}
+	case:
+		panic("native_addr is neither IP4 or IP6 address")
+	}
+	return
+}
+
+@(private)
+_sockaddr_basic_to_endpoint :: proc(native_addr: ^os.SOCKADDR) -> (ep: Endpoint) {
+	switch native_addr.sa_family {
+	case u16(os.AF_INET):
+		addr := cast(^os.sockaddr_in) native_addr
+		port := int(addr.sin_port)
+		ep = Endpoint {
+			address = IP4_Address(transmute([4]byte) addr.sin_addr),
+			port = port,
+		}
+	case u16(os.AF_INET6):
+		addr := cast(^os.sockaddr_in6) native_addr
+		port := int(addr.sin6_port)
+		ep = Endpoint {
+			address = IP6_Address(transmute([8]u16be) addr.sin6_addr),
+			port = port,
+		}
+	case:
+		panic("native_addr is neither IP4 or IP6 address")
+	}
+	return
 }

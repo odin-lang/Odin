@@ -1,4 +1,11 @@
 //+build windows
+package net
+
+/*
+	Package net implements cross-platform Berkeley Sockets, DNS resolution and associated procedures.
+	For other protocols and their features, see subdirectories of this package.
+*/
+
 /*
 	Copyright 2022 Tetralux        <tetraluxonpc@gmail.com>
 	Copyright 2022 Colin Davidson  <colrdavidson@gmail.com>
@@ -11,28 +18,13 @@
 		Jeroen van Rijn: Cross platform unification, code style, documentation
 */
 
-/*
-	Package net implements cross-platform Berkeley Sockets, DNS resolution and associated procedures.
-	For other protocols and their features, see subdirectories of this package.
-*/
-package net
-
 import "core:strings"
 import "core:mem"
 
 import win "core:sys/windows"
 
-/*
-	Performs a recursive DNS query for records of a particular type for the hostname.
-
-	NOTE: This procedure instructs the DNS resolver to recursively perform CNAME requests on our behalf,
-	meaning that DNS queries for a hostname will resolve through CNAME records until an
-	IP address is reached.
-
-	WARNING: This procedure allocates memory for each record returned; deleting just the returned slice is not enough!
-	See `destroy_records`.
-*/
-get_dns_records_windows :: proc(hostname: string, type: DNS_Record_Type, allocator := context.allocator) -> (records: []DNS_Record, err: DNS_Error) {
+@(private)
+_get_dns_records_os :: proc(hostname: string, type: DNS_Record_Type, allocator := context.allocator) -> (records: []DNS_Record, err: DNS_Error) {
 	context.allocator = allocator
 
 	host_cstr := strings.clone_to_cstring(hostname, context.temp_allocator)

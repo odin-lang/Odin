@@ -74,7 +74,7 @@ dial_tcp_from_endpoint :: proc(endpoint: Endpoint, options := default_tcp_option
 	// use the same address immediately.
 	_ = set_option(skt, .Reuse_Address, true)
 
-	sockaddr := endpoint_to_sockaddr(endpoint)
+	sockaddr := _endpoint_to_sockaddr(endpoint)
 	res := win.connect(Platform_Socket(skt), &sockaddr, size_of(sockaddr))
 	if res < 0 {
 		err = Dial_Error(win.WSAGetLastError())
@@ -89,7 +89,7 @@ dial_tcp_from_endpoint :: proc(endpoint: Endpoint, options := default_tcp_option
 }
 
 bind :: proc(skt: Any_Socket, ep: Endpoint) -> (err: Network_Error) {
-	sockaddr := endpoint_to_sockaddr(ep)
+	sockaddr := _endpoint_to_sockaddr(ep)
 	s := any_socket_to_socket(skt)
 	res := win.bind(Platform_Socket(s), &sockaddr, size_of(sockaddr))
 	if res < 0 {
@@ -161,7 +161,7 @@ accept_tcp :: proc(sock: TCP_Socket, options := default_tcp_options) -> (client:
 			return
 		}
 		client = TCP_Socket(client_sock)
-		source = sockaddr_to_endpoint(&sockaddr)
+		source = _sockaddr_to_endpoint(&sockaddr)
 		if options.no_delay {
 			_ = set_option(client, .TCP_Nodelay, true) // NOTE(tetra): Not vital to succeed; error ignored
 		}
@@ -201,7 +201,7 @@ recv_udp :: proc(skt: UDP_Socket, buf: []byte) -> (bytes_read: int, remote_endpo
 	}
 
 	bytes_read = int(res)
-	remote_endpoint = sockaddr_to_endpoint(&from)
+	remote_endpoint = _sockaddr_to_endpoint(&from)
 	return
 }
 
@@ -235,7 +235,7 @@ send_udp :: proc(skt: UDP_Socket, buf: []byte, to: Endpoint) -> (bytes_written: 
 		err = .Message_Too_Long
 		return
 	}
-	toaddr := endpoint_to_sockaddr(to)
+	toaddr := _endpoint_to_sockaddr(to)
 	res := win.sendto(Platform_Socket(skt), raw_data(buf), c.int(len(buf)), 0, &toaddr, size_of(toaddr))
 	if res < 0 {
 		err = UDP_Send_Error(win.WSAGetLastError())
@@ -337,4 +337,49 @@ set_option :: proc(s: Any_Socket, option: Socket_Option, value: any, loc := #cal
 	}
 
 	return nil
+}
+
+
+@(private)
+_endpoint_to_sockaddr :: proc(ep: Endpoint) -> (sockaddr: win.SOCKADDR_STORAGE_LH) {
+	switch a in ep.address {
+	case IP4_Address:
+		(^win.sockaddr_in)(&sockaddr)^ = win.sockaddr_in {
+			sin_port = u16be(win.USHORT(ep.port)),
+			sin_addr = transmute(win.in_addr) a,
+			sin_family = u16(win.AF_INET),
+		}
+		return
+	case IP6_Address:
+		(^win.sockaddr_in6)(&sockaddr)^ = win.sockaddr_in6 {
+			sin6_port = u16be(win.USHORT(ep.port)),
+			sin6_addr = transmute(win.in6_addr) a,
+			sin6_family = u16(win.AF_INET6),
+		}
+		return
+	}
+	unreachable()
+}
+
+@(private)
+_sockaddr_to_endpoint :: proc(native_addr: ^win.SOCKADDR_STORAGE_LH) -> (ep: Endpoint) {
+	switch native_addr.ss_family {
+	case u16(win.AF_INET):
+		addr := cast(^win.sockaddr_in) native_addr
+		port := int(addr.sin_port)
+		ep = Endpoint {
+			address = IP4_Address(transmute([4]byte) addr.sin_addr),
+			port = port,
+		}
+	case u16(win.AF_INET6):
+		addr := cast(^win.sockaddr_in6) native_addr
+		port := int(addr.sin6_port)
+		ep = Endpoint {
+			address = IP6_Address(transmute([8]u16be) addr.sin6_addr),
+			port = port,
+		}
+	case:
+		panic("native_addr is neither IP4 or IP6 address")
+	}
+	return
 }

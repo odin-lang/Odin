@@ -113,6 +113,7 @@ resolve :: proc(hostname_and_maybe_port: string) -> (ep4, ep6: Endpoint, err: Ne
 	}
 	unreachable()
 }
+
 resolve_ip4 :: proc(hostname_and_maybe_port: string) -> (ep4: Endpoint, err: Network_Error) {
 	target := parse_hostname_or_endpoint(hostname_and_maybe_port) or_return
 	switch t in target {
@@ -139,6 +140,7 @@ resolve_ip4 :: proc(hostname_and_maybe_port: string) -> (ep4: Endpoint, err: Net
 	}
 	unreachable()
 }
+
 resolve_ip6 :: proc(hostname_and_maybe_port: string) -> (ep6: Endpoint, err: Network_Error) {
 	target := parse_hostname_or_endpoint(hostname_and_maybe_port) or_return
 	switch t in target {
@@ -166,13 +168,18 @@ resolve_ip6 :: proc(hostname_and_maybe_port: string) -> (ep6: Endpoint, err: Net
 	unreachable()
 }
 
-// `get_dns_records` uses OS-specific methods to query DNS records.
-when ODIN_OS == .Windows {
-	get_dns_records_from_os :: get_dns_records_windows
-} else when ODIN_OS == .Linux || ODIN_OS == .Darwin || ODIN_OS == .OpenBSD {
-	get_dns_records_from_os :: get_dns_records_unix
-} else {
-	#panic("get_dns_records_from_os not implemented on this OS")
+/*
+	Performs a recursive DNS query for records of a particular type for the hostname using the OS.
+
+	NOTE: This procedure instructs the DNS resolver to recursively perform CNAME requests on our behalf,
+	meaning that DNS queries for a hostname will resolve through CNAME records until an
+	IP address is reached.
+
+	IMPORTANT: This procedure allocates memory for each record returned; deleting just the returned slice is not enough!
+	See `destroy_records`.
+*/
+get_dns_records_from_os :: proc(hostname: string, type: DNS_Record_Type, allocator := context.allocator) -> (records: []DNS_Record, err: DNS_Error) {
+	return _get_dns_records_os(hostname, type, allocator)
 }
 
 /*
@@ -182,6 +189,9 @@ when ODIN_OS == .Windows {
 	NOTE: This procedure instructs the DNS resolver to recursively perform CNAME requests on our behalf,
 	meaning that DNS queries for a hostname will resolve through CNAME records until an
 	IP address is reached.
+
+	IMPORTANT: This procedure allocates memory for each record returned; deleting just the returned slice is not enough!
+	See `destroy_records`.
 */
 get_dns_records_from_nameservers :: proc(hostname: string, type: DNS_Record_Type, name_servers: []Endpoint, host_overrides: []DNS_Record, allocator := context.allocator) -> (records: []DNS_Record, err: DNS_Error) {
 	context.allocator = allocator
@@ -771,14 +781,16 @@ parse_record :: proc(packet: []u8, cur_off: ^int, filter: DNS_Record_Type = nil)
 */
 
 parse_response :: proc(response: []u8, filter: DNS_Record_Type = nil, allocator := context.allocator) -> (records: []DNS_Record, ok: bool) {
-	header_size_bytes :: 12
-	if len(response) < header_size_bytes {
+	context.allocator = allocator
+
+	HEADER_SIZE_BYTES :: 12
+	if len(response) < HEADER_SIZE_BYTES {
 		return
 	}
 
 	_records := make([dynamic]DNS_Record, 0)
 
-	dns_hdr_chunks := mem.slice_data_cast([]u16be, response[:header_size_bytes])
+	dns_hdr_chunks := mem.slice_data_cast([]u16be, response[:HEADER_SIZE_BYTES])
 	hdr := unpack_dns_header(dns_hdr_chunks[0], dns_hdr_chunks[1])
 	if !hdr.is_response {
 		return
@@ -792,7 +804,7 @@ parse_response :: proc(response: []u8, filter: DNS_Record_Type = nil, allocator 
 	authority_count := int(dns_hdr_chunks[4])
 	additional_count := int(dns_hdr_chunks[5])
 
-	cur_idx := header_size_bytes
+	cur_idx := HEADER_SIZE_BYTES
 
 	for _ in 0..<question_count {
 		if cur_idx == len(response) {

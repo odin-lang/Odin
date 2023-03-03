@@ -1,3 +1,9 @@
+package net
+/*
+	Package net implements cross-platform Berkeley Sockets, DNS resolution and associated procedures.
+	For other protocols and their features, see subdirectories of this package.
+*/
+
 /*
 	Copyright 2022 Tetralux        <tetraluxonpc@gmail.com>
 	Copyright 2022 Colin Davidson  <colrdavidson@gmail.com>
@@ -7,14 +13,8 @@
 	List of contributors:
 		Tetralux:        Initial implementation
 		Colin Davidson:  Linux platform code, OSX platform code, Odin-native DNS resolver
-		Jeroen van Rijn: Cross platform unification, code style, IPv4 + IPv6 parsers, documentation.
+		Jeroen van Rijn: Cross platform unification, code style, documentation
 */
-
-/*
-	Package net implements cross-platform Berkeley Sockets, DNS resolution and associated procedures.
-	For other protocols and their features, see subdirectories of this package.
-*/
-package net
 
 import "core:strconv"
 import "core:strings"
@@ -738,4 +738,10 @@ parse_ip_component :: proc(input: string, max_value := u64(max(u32)), bases := D
 
 	// If we consumed at least 1 digit byte, `value` *should* continue a valid number in an appropriate base in the allowable range.
 	return value, digit_bytes + prefix_bytes, digit_bytes >= 1
+}
+
+// Returns an address for each interface that can be bound to.
+get_network_interfaces :: proc() -> []Address {
+	// TODO
+	return nil
 }
