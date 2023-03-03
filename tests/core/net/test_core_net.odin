@@ -338,8 +338,8 @@ ENDPOINT := net.Endpoint{
 
 CONTENT := "Hellope!"
 
-SEND_TIMEOUT :: time.Duration(2 * time.Second)
-RECV_TIMEOUT :: time.Duration(2 * time.Second)
+SEND_TIMEOUT :: time.Duration(1 * time.Second)
+RECV_TIMEOUT :: time.Duration(1 * time.Second)
 
 Thread_Data :: struct {
 	skt: net.Any_Socket,
