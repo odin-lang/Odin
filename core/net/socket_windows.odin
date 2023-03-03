@@ -1,4 +1,11 @@
+package net
 // +build windows
+
+/*
+	Package net implements cross-platform Berkeley Sockets, DNS resolution and associated procedures.
+	For other protocols and their features, see subdirectories of this package.
+*/
+
 /*
 	Copyright 2022 Tetralux        <tetraluxonpc@gmail.com>
 	Copyright 2022 Colin Davidson  <colrdavidson@gmail.com>
@@ -11,12 +18,6 @@
 		Jeroen van Rijn: Cross platform unification, code style, documentation
 */
 
-/*
-	Package net implements cross-platform Berkeley Sockets, DNS resolution and associated procedures.
-	For other protocols and their features, see subdirectories of this package.
-*/
-package net
-
 import "core:c"
 import win "core:sys/windows"
 import "core:time"
@@ -28,7 +29,8 @@ ensure_winsock_initialized :: proc() {
 	win.ensure_winsock_initialized()
 }
 
-create_socket :: proc(family: Address_Family, protocol: Socket_Protocol) -> (socket: Any_Socket, err: Network_Error) {
+@(private)
+_create_socket :: proc(family: Address_Family, protocol: Socket_Protocol) -> (socket: Any_Socket, err: Network_Error) {
 	c_type, c_protocol, c_family: c.int
 
 	switch family {
@@ -59,7 +61,8 @@ create_socket :: proc(family: Address_Family, protocol: Socket_Protocol) -> (soc
 	}
 }
 
-dial_tcp_from_endpoint :: proc(endpoint: Endpoint, options := default_tcp_options) -> (skt: TCP_Socket, err: Network_Error) {
+@(private)
+_dial_tcp_from_endpoint :: proc(endpoint: Endpoint, options := default_tcp_options) -> (skt: TCP_Socket, err: Network_Error) {
 	if endpoint.port == 0 {
 		err = .Port_Required
 		return
@@ -88,7 +91,8 @@ dial_tcp_from_endpoint :: proc(endpoint: Endpoint, options := default_tcp_option
 	return
 }
 
-bind :: proc(skt: Any_Socket, ep: Endpoint) -> (err: Network_Error) {
+@(private)
+_bind :: proc(skt: Any_Socket, ep: Endpoint) -> (err: Network_Error) {
 	sockaddr := _endpoint_to_sockaddr(ep)
 	s := any_socket_to_socket(skt)
 	res := win.bind(Platform_Socket(s), &sockaddr, size_of(sockaddr))
@@ -98,32 +102,8 @@ bind :: proc(skt: Any_Socket, ep: Endpoint) -> (err: Network_Error) {
 	return
 }
 
-
-// This type of socket becomes bound when you try to send data.
-// This is likely what you want if you want to send data unsolicited.
-//
-// This is like a client TCP socket, except that it can send data to any remote endpoint without needing to establish a connection first.
-make_unbound_udp_socket :: proc(family: Address_Family) -> (skt: UDP_Socket, err: Network_Error) {
-	sock := create_socket(family, .UDP) or_return
-	skt = sock.(UDP_Socket)
-	return
-}
-
-// This type of socket is bound immediately, which enables it to receive data on the port.
-// Since it's UDP, it's also able to send data without receiving any first.
-//
-// This is like a listening TCP socket, except that data packets can be sent and received without needing to establish a connection first.
-//
-// The bound_address is the address of the network interface that you want to use, or a loopback address if you don't care which to use.
-make_bound_udp_socket :: proc(bound_address: Address, port: int) -> (skt: UDP_Socket, err: Network_Error) {
-	skt = make_unbound_udp_socket(family_from_address(bound_address)) or_return
-	bind(skt, {bound_address, port}) or_return
-	return
-}
-
-listen_tcp :: proc(interface_endpoint: Endpoint, backlog := 1000) -> (skt: TCP_Socket, err: Network_Error) {
-	assert(backlog > 0 && i32(backlog) < max(i32))
-
+@(private)
+_listen_tcp :: proc(interface_endpoint: Endpoint, backlog := 1000) -> (skt: TCP_Socket, err: Network_Error) {
 	family := family_from_endpoint(interface_endpoint)
 	sock := create_socket(family, .TCP) or_return
 	skt = sock.(TCP_Socket)
@@ -134,16 +114,14 @@ listen_tcp :: proc(interface_endpoint: Endpoint, backlog := 1000) -> (skt: TCP_S
 
 	bind(sock, interface_endpoint) or_return
 
-	res := win.listen(Platform_Socket(skt), i32(backlog))
-	if res == win.SOCKET_ERROR {
+	if res := win.listen(Platform_Socket(skt), i32(backlog)); res == win.SOCKET_ERROR {
 		err = Listen_Error(win.WSAGetLastError())
-		return
 	}
-
 	return
 }
 
-accept_tcp :: proc(sock: TCP_Socket, options := default_tcp_options) -> (client: TCP_Socket, source: Endpoint, err: Network_Error) {
+@(private)
+_accept_tcp :: proc(sock: TCP_Socket, options := default_tcp_options) -> (client: TCP_Socket, source: Endpoint, err: Network_Error) {
 	for {
 		sockaddr: win.SOCKADDR_STORAGE_LH
 		sockaddrlen := c.int(size_of(sockaddr))
@@ -169,13 +147,15 @@ accept_tcp :: proc(sock: TCP_Socket, options := default_tcp_options) -> (client:
 	}
 }
 
-close :: proc(skt: Any_Socket) {
+@(private)
+_close :: proc(skt: Any_Socket) {
 	if s := any_socket_to_socket(skt); s != {} {
 		win.closesocket(Platform_Socket(s))
 	}
 }
 
-recv_tcp :: proc(skt: TCP_Socket, buf: []byte) -> (bytes_read: int, err: Network_Error) {
+@(private)
+_recv_tcp :: proc(skt: TCP_Socket, buf: []byte) -> (bytes_read: int, err: Network_Error) {
 	if len(buf) <= 0 {
 		return
 	}
@@ -187,7 +167,8 @@ recv_tcp :: proc(skt: TCP_Socket, buf: []byte) -> (bytes_read: int, err: Network
 	return int(res), nil
 }
 
-recv_udp :: proc(skt: UDP_Socket, buf: []byte) -> (bytes_read: int, remote_endpoint: Endpoint, err: Network_Error) {
+@(private)
+_recv_udp :: proc(skt: UDP_Socket, buf: []byte) -> (bytes_read: int, remote_endpoint: Endpoint, err: Network_Error) {
 	if len(buf) <= 0 {
 		return
 	}
@@ -205,12 +186,8 @@ recv_udp :: proc(skt: UDP_Socket, buf: []byte) -> (bytes_read: int, remote_endpo
 	return
 }
 
-recv :: proc{recv_tcp, recv_udp}
-
-// Repeatedly sends data until the entire buffer is sent.
-// If a send fails before all data is sent, returns the amount
-// sent up to that point.
-send_tcp :: proc(skt: TCP_Socket, buf: []byte) -> (bytes_written: int, err: Network_Error) {
+@(private)
+_send_tcp :: proc(skt: TCP_Socket, buf: []byte) -> (bytes_written: int, err: Network_Error) {
 	for bytes_written < len(buf) {
 		limit := min(int(max(i32)), len(buf) - bytes_written)
 		remaining := buf[bytes_written:]
@@ -224,12 +201,8 @@ send_tcp :: proc(skt: TCP_Socket, buf: []byte) -> (bytes_written: int, err: Netw
 	return
 }
 
-
-// Sends a single UDP datagram packet.
-//
-// Datagrams are limited in size; attempting to send more than this limit at once will result in a Message_Too_Long error.
-// UDP packets are not guarenteed to be received in order.
-send_udp :: proc(skt: UDP_Socket, buf: []byte, to: Endpoint) -> (bytes_written: int, err: Network_Error) {
+@(private)
+_send_udp :: proc(skt: UDP_Socket, buf: []byte, to: Endpoint) -> (bytes_written: int, err: Network_Error) {
 	if len(buf) > int(max(c.int)) {
 		// NOTE(tetra): If we don't guard this, we'll return (0, nil) instead, which is misleading.
 		err = .Message_Too_Long
@@ -245,9 +218,8 @@ send_udp :: proc(skt: UDP_Socket, buf: []byte, to: Endpoint) -> (bytes_written: 
 	return
 }
 
-send :: proc{send_tcp, send_udp}
-
-shutdown :: proc(skt: Any_Socket, manner: Shutdown_Manner) -> (err: Network_Error) {
+@(private)
+_shutdown :: proc(skt: Any_Socket, manner: Shutdown_Manner) -> (err: Network_Error) {
 	s := any_socket_to_socket(skt)
 	res := win.shutdown(Platform_Socket(s), c.int(manner))
 	if res < 0 {
@@ -256,7 +228,8 @@ shutdown :: proc(skt: Any_Socket, manner: Shutdown_Manner) -> (err: Network_Erro
 	return
 }
 
-set_option :: proc(s: Any_Socket, option: Socket_Option, value: any, loc := #caller_location) -> Network_Error {
+@(private)
+_set_option :: proc(s: Any_Socket, option: Socket_Option, value: any, loc := #caller_location) -> Network_Error {
 	level := win.SOL_SOCKET if option != .TCP_Nodelay else win.IPPROTO_TCP
 
 	bool_value: b32
@@ -338,7 +311,6 @@ set_option :: proc(s: Any_Socket, option: Socket_Option, value: any, loc := #cal
 
 	return nil
 }
-
 
 @(private)
 _endpoint_to_sockaddr :: proc(ep: Endpoint) -> (sockaddr: win.SOCKADDR_STORAGE_LH) {

@@ -89,28 +89,6 @@ bind :: proc(skt: Any_Socket, ep: Endpoint) -> (err: Network_Error) {
 	return
 }
 
-// This type of socket becomes bound when you try to send data.
-// This is likely what you want if you want to send data unsolicited.
-//
-// This is like a client TCP socket, except that it can send data to any remote endpoint without needing to establish a connection first.
-make_unbound_udp_socket :: proc(family: Address_Family) -> (skt: UDP_Socket, err: Network_Error) {
-	sock := create_socket(family, .UDP) or_return
-	skt = sock.(UDP_Socket)
-	return
-}
-
-// This type of socket is bound immediately, which enables it to receive data on the port.
-// Since it's UDP, it's also able to send data without receiving any first.
-//
-// This is like a listening TCP socket, except that data packets can be sent and received without needing to establish a connection first.
-//
-// The bound_address is the address of the network interface that you want to use, or a loopback address if you don't care which to use.
-make_bound_udp_socket :: proc(bound_address: Address, port: int) -> (skt: UDP_Socket, err: Network_Error) {
-	skt = make_unbound_udp_socket(family_from_address(bound_address)) or_return
-	bind(skt, {bound_address, port}) or_return
-	return
-}
-
 listen_tcp :: proc(interface_endpoint: Endpoint, backlog := 1000) -> (skt: TCP_Socket, err: Network_Error) {
 	assert(backlog > 0 && i32(backlog) < max(i32))
 
