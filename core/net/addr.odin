@@ -403,7 +403,8 @@ Host_Or_Endpoint :: union {
 	Endpoint,
 }
 Parse_Endpoint_Error :: enum {
-	Bad_Port = 1,
+	None          = 0,
+	Bad_Port      = 1,
 	Bad_Address,
 	Bad_Hostname,
 }
@@ -416,12 +417,12 @@ parse_hostname_or_endpoint :: proc(endpoint_str: string) -> (target: Host_Or_End
 		return nil, .Bad_Port
 	}
 	if addr := parse_address(host); addr != nil {
-		return Endpoint{addr, port}, nil
+		return Endpoint{addr, port}, .None
 	}
 	if !validate_hostname(host) {
 		return nil, .Bad_Hostname
 	}
-	return Host{host, port}, nil
+	return Host{host, port}, .None
 }
 
 
@@ -742,6 +743,6 @@ parse_ip_component :: proc(input: string, max_value := u64(max(u32)), bases := D
 
 // Returns an address for each interface that can be bound to.
 get_network_interfaces :: proc() -> []Address {
-	// TODO
+	// TODO: Implement using `enumerate_interfaces` and returning only the addresses of active interfaces.
 	return nil
 }
