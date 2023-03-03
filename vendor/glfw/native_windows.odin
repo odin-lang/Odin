@@ -4,7 +4,11 @@ package glfw
 
 import win32 "core:sys/windows"
 
-foreign import glfw { "lib/glfw3_mt.lib", "system:user32.lib", "system:gdi32.lib", "system:shell32.lib" }
+when GLFW_DYNAMIC {
+    foreign import glfw { "lib/glfw3dll.lib", "system:user32.lib", "system:gdi32.lib", "system:shell32.lib" }
+} else {
+    foreign import glfw { "lib/glfw3_mt.lib", "system:user32.lib", "system:gdi32.lib", "system:shell32.lib" }
+}
 
 @(default_calling_convention="c", link_prefix="glfw")
 foreign glfw {
