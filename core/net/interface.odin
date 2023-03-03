@@ -1,3 +1,11 @@
+// +build windows, linux, darwin
+package net
+
+/*
+	Package net implements cross-platform Berkeley Sockets, DNS resolution and associated procedures.
+	For other protocols and their features, see subdirectories of this package.
+*/
+
 /*
 	Copyright 2022 Tetralux        <tetraluxonpc@gmail.com>
 	Copyright 2022 Colin Davidson  <colrdavidson@gmail.com>
@@ -9,12 +17,6 @@
 		Colin Davidson:  Linux platform code, OSX platform code, Odin-native DNS resolver
 		Jeroen van Rijn: Cross platform unification, code style, documentation
 */
-
-/*
-	Package net implements cross-platform Berkeley Sockets, DNS resolution and associated procedures.
-	For other protocols and their features, see subdirectories of this package.
-*/
-package net
 
 import "core:strings"
 
