@@ -1,4 +1,11 @@
+package net
 //+build windows
+
+/*
+	Package net implements cross-platform Berkeley Sockets, DNS resolution and associated procedures.
+	For other protocols and their features, see subdirectories of this package.
+*/
+
 /*
 	Copyright 2022 Tetralux        <tetraluxonpc@gmail.com>
 	Copyright 2022 Colin Davidson  <colrdavidson@gmail.com>
@@ -11,28 +18,17 @@
 		Jeroen van Rijn: Cross platform unification, code style, documentation
 */
 
-/*
-	Package net implements cross-platform Berkeley Sockets, DNS resolution and associated procedures.
-	For other protocols and their features, see subdirectories of this package.
-*/
-package net
-
 import sys     "core:sys/windows"
 import strings "core:strings"
 
-MAX_INTERFACE_ENUMERATION_TRIES :: 3
-
-/*
-	`enumerate_interfaces` retrieves a list of network interfaces with their associated properties.
-*/
-enumerate_interfaces :: proc(allocator := context.allocator) -> (interfaces: []Network_Interface, err: Network_Error) {
+_enumerate_interfaces :: proc(allocator := context.allocator) -> (interfaces: []Network_Interface, err: Network_Error) {
 	context.allocator = allocator
 
  	buf:      []u8
  	defer delete(buf)
- 	buf_size: u32
 
- 	res: u32
+ 	buf_size: u32
+ 	res:      u32
 
  	gaa: for _ in 1..=MAX_INTERFACE_ENUMERATION_TRIES {
  	 	res = sys.get_adapters_addresses(

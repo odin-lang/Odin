@@ -17,7 +17,16 @@ package net
 		Colin Davidson:  Linux platform code, OSX platform code, Odin-native DNS resolver
 		Jeroen van Rijn: Cross platform unification, code style, documentation
 
-
-	TODO: Implement. Can probably use the (current) Linux implementation,
-	which will itself be switched over to talking to the kernel via NETLINK protocol once we have raw sockets.
 */
+
+@(private)
+_enumerate_interfaces :: proc(allocator := context.allocator) -> (interfaces: []Network_Interface, err: Network_Error) {
+	context.allocator = allocator
+
+
+	// TODO: Implement. Can probably use the (current) Linux implementation,
+	// which will itself be switched over to talking to the kernel via NETLINK protocol
+	// once we have raw sockets.
+
+	unimplemented()
+}

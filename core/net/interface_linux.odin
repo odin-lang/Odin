@@ -24,10 +24,8 @@ package net
 import "core:os"
 import "core:strings"
 
-/*
-	`enumerate_interfaces` retrieves a list of network interfaces with their associated properties.
-*/
-enumerate_interfaces :: proc(allocator := context.allocator) -> (interfaces: []Network_Interface, err: Network_Error) {
+@(private)
+_enumerate_interfaces :: proc(allocator := context.allocator) -> (interfaces: []Network_Interface, err: Network_Error) {
 	context.allocator = allocator
 
 	head: ^os.ifaddrs
@@ -40,7 +38,6 @@ enumerate_interfaces :: proc(allocator := context.allocator) -> (interfaces: []N
 		Unlike Windows, *nix regrettably doesn't return all it knows about an interface in one big struct.
 		We're going to have to iterate over a list and coalesce information as we go.
 	*/
-
 	ifaces: map[string]^Network_Interface
 	defer delete(ifaces)
 
@@ -67,7 +64,7 @@ enumerate_interfaces :: proc(allocator := context.allocator) -> (interfaces: []N
 
 			case os.AF_PACKET:
 				/*
-					For some obscure reason the 64-bit `getifaddrs` calls returns a pointer to a
+					For some obscure reason the 64-bit `getifaddrs` call returns a pointer to a
 					32-bit `RTNL_LINK_STATS` structure, which of course means that tx/rx byte count
 					is truncated beyond usefulness.
 
@@ -123,7 +120,6 @@ enumerate_interfaces :: proc(allocator := context.allocator) -> (interfaces: []N
  		if .LOOPBACK in ifaddr.flags {
  			state |= {.Loopback}
  		}
-
 		iface.link.state = state
 	}
 
@@ -140,6 +136,5 @@ enumerate_interfaces :: proc(allocator := context.allocator) -> (interfaces: []N
 		append(&_interfaces, iface^)
 		free(iface)
 	}
-
 	return _interfaces[:], {}
 }

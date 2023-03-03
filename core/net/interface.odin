@@ -18,6 +18,15 @@ package net
 
 import "core:strings"
 
+MAX_INTERFACE_ENUMERATION_TRIES :: 3
+
+/*
+	`enumerate_interfaces` retrieves a list of network interfaces with their associated properties.
+*/
+enumerate_interfaces :: proc(allocator := context.allocator) -> (interfaces: []Network_Interface, err: Network_Error) {
+	return _enumerate_interfaces(allocator)
+}
+
 /*
 	`destroy_interfaces` cleans up a list of network interfaces retrieved by e.g. `enumerate_interfaces`.
 */
