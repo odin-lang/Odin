@@ -2455,12 +2455,11 @@ gb_internal void check_comparison(CheckerContext *c, Ast *node, Operand *x, Oper
 		}
 
 		if (!defined) {
-			if (x->type == err_type && is_operand_nil(*x)) {
-				err_type = y->type;
-			}
-			gbString type_string = type_to_string(err_type, temporary_allocator());
+			gbString xs = type_to_string(x->type, temporary_allocator());
+			gbString ys = type_to_string(y->type, temporary_allocator());
 			err_str = gb_string_make(temporary_allocator(),
-				gb_bprintf("operator '%.*s' not defined for type '%s'", LIT(token_strings[op]), type_string));
+				gb_bprintf("operator '%.*s' not defined between the types '%s' and '%s'", LIT(token_strings[op]), xs, ys)
+			);
 		} else {
 			Type *comparison_type = x->type;
 			if (x->type == err_type && is_operand_nil(*x)) {
