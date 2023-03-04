@@ -374,17 +374,19 @@ tcp_tests :: proc(t: ^testing.T) {
 }
 
 tcp_client :: proc(retval: rawptr) {
-	r := transmute(^Thread_Data)retval
+	send :: proc(content: []u8) -> (err: net.Network_Error) {
+		skt := net.dial_tcp(ENDPOINT) or_return
+		defer net.close(skt)
 
-	if r.skt, r.err = net.dial_tcp(ENDPOINT); r.err != nil {
+		net.set_option(skt, .Send_Timeout,    SEND_TIMEOUT)
+		net.set_option(skt, .Receive_Timeout, RECV_TIMEOUT)
+
+		_, err = net.send(skt, content)
 		return
 	}
-	defer net.close(r.skt)
 
-	net.set_option(r.skt, .Send_Timeout,    SEND_TIMEOUT)
-	net.set_option(r.skt, .Receive_Timeout, RECV_TIMEOUT)
-
-	_, r.err = net.send(r.skt.(net.TCP_Socket), transmute([]u8)CONTENT)
+	r := transmute(^Thread_Data)retval
+	r.err = send(transmute([]u8)CONTENT)
 	return
 }
 
@@ -406,6 +408,7 @@ tcp_server :: proc(retval: rawptr) {
 		return
 	}
 	defer net.close(client)
+
 
 	r.length, r.err = net.recv_tcp(client, r.data[:])
 	return

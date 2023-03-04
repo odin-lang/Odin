@@ -404,16 +404,10 @@ Host_Or_Endpoint :: union {
 	Host,
 	Endpoint,
 }
-Parse_Endpoint_Error :: enum {
-	None          = 0,
-	Bad_Port      = 1,
-	Bad_Address,
-	Bad_Hostname,
-}
 
 // Takes a string consisting of a hostname or IP address, and an optional port,
 // and return the component parts in a useful form.
-parse_hostname_or_endpoint :: proc(endpoint_str: string) -> (target: Host_Or_Endpoint, err: Network_Error) {
+parse_hostname_or_endpoint :: proc(endpoint_str: string) -> (target: Host_Or_Endpoint, err: Parse_Endpoint_Error) {
 	host, port, port_ok := split_port(endpoint_str)
 	if !port_ok {
 		return nil, .Bad_Port

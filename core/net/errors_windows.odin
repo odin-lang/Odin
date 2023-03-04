@@ -22,6 +22,7 @@ import "core:c"
 import win "core:sys/windows"
 
 Create_Socket_Error :: enum c.int {
+	None                                 = 0,
 	Network_Subsystem_Failure            = win.WSAENETDOWN,
 	Family_Not_Supported_For_This_Socket = win.WSAEAFNOSUPPORT,
 	No_Socket_Descriptors_Available      = win.WSAEMFILE,
@@ -32,6 +33,7 @@ Create_Socket_Error :: enum c.int {
 }
 
 Dial_Error :: enum c.int {
+	None                      = 0,
 	Port_Required             = -1,
 	Address_In_Use            = win.WSAEADDRINUSE,
 	In_Progress               = win.WSAEALREADY,
@@ -49,6 +51,7 @@ Dial_Error :: enum c.int {
 }
 
 Bind_Error :: enum c.int {
+	None                    = 0,
 	Address_In_Use          = win.WSAEADDRINUSE,    // Another application is currently bound to this endpoint.
 	Given_Nonlocal_Address  = win.WSAEADDRNOTAVAIL, // The address is not a local address on this machine.
 	Broadcast_Disabled      = win.WSAEACCES,        // To bind a UDP socket to the broadcast address, the appropriate socket option must be set.
@@ -58,6 +61,7 @@ Bind_Error :: enum c.int {
 }
 
 Listen_Error :: enum c.int {
+	None                                    = 0,
 	Address_In_Use                          = win.WSAEADDRINUSE,
 	Already_Connected                       = win.WSAEISCONN,
 	No_Socket_Descriptors_Available         = win.WSAEMFILE,
@@ -68,6 +72,7 @@ Listen_Error :: enum c.int {
 }
 
 Accept_Error :: enum c.int {
+	None                                              = 0,
 	Not_Listening                                     = win.WSAEINVAL,
 	No_Socket_Descriptors_Available_For_Client_Socket = win.WSAEMFILE,
 	No_Buffer_Space_Available                         = win.WSAENOBUFS,
@@ -79,6 +84,7 @@ Accept_Error :: enum c.int {
 }
 
 TCP_Recv_Error :: enum c.int {
+	None                      = 0,
 	Network_Subsystem_Failure = win.WSAENETDOWN,
 	Not_Connected             = win.WSAENOTCONN,
 	Bad_Buffer                = win.WSAEFAULT,
@@ -99,6 +105,7 @@ TCP_Recv_Error :: enum c.int {
 }
 
 UDP_Recv_Error :: enum c.int {
+	None                      = 0,
 	Network_Subsystem_Failure = win.WSAENETDOWN,
 
 	// TODO: not functionally different from Reset; merge?
@@ -124,6 +131,7 @@ UDP_Recv_Error :: enum c.int {
 // TODO: consider merging some errors to make handling them easier
 // TODO: verify once more what errors to actually expose
 TCP_Send_Error :: enum c.int {
+	None                      = 0,
 	
 	// TODO: not functionally different from Reset; merge?
 	Aborted                   = win.WSAECONNABORTED, 
@@ -148,6 +156,7 @@ TCP_Send_Error :: enum c.int {
 }
 
 UDP_Send_Error :: enum c.int {
+	None                      = 0,
 	Network_Subsystem_Failure = win.WSAENETDOWN,
 
 	// TODO: not functionally different from Reset; merge?
@@ -181,6 +190,7 @@ Shutdown_Manner :: enum c.int {
 }
 
 Shutdown_Error :: enum c.int {
+	None           = 0,
 	Aborted        = win.WSAECONNABORTED,
 	Reset          = win.WSAECONNRESET,
 	Offline        = win.WSAENETDOWN,
@@ -237,6 +247,7 @@ Socket_Option :: enum c.int {
 }
 
 Socket_Option_Error :: enum c.int {
+	None                               = 0,
 	Linger_Only_Supports_Whole_Seconds = 1,
 
 	// The given value is too big or small to be given to the OS.

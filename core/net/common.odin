@@ -50,23 +50,7 @@ ODIN_NET_TCP_NODELAY_DEFAULT :: #config(ODIN_NET_TCP_NODELAY_DEFAULT, true)
 // COMMON DEFINITIONS
 Maybe :: runtime.Maybe
 
-General_Error :: enum {
-	Unable_To_Enumerate_Network_Interfaces = 1,
-}
-
-// `Platform_Error` is used to wrap errors returned by the different platforms that don't fit a common error.
-Platform_Error :: enum u32 {}
-
-/*
-	NOTE(tetra): Enums in Network_Error should not have a named zero value.
-	If you have a proc that returns an enum with an Ok=0 value, using or_return from the callsite, when the caller returns a union, works as expected.
-	However, if that proc returns the union directly, returning the Ok value will NOT work with the caller's or_return, as it will treat Error{.Ok} as != nil, and early-return with it.
-
-	The approach currently taken to avoid this is:
-	- Remove the named zero values for the enums
-	- Use the union everywhere
-*/
-Network_Error :: union {
+Network_Error :: union #shared_nil {
 	General_Error,
 	Platform_Error,
 	Create_Socket_Error,
@@ -85,11 +69,27 @@ Network_Error :: union {
 	DNS_Error,
 }
 
-Resolve_Error :: enum {
+General_Error :: enum u32 {
+	None = 0,
+	Unable_To_Enumerate_Network_Interfaces = 1,
+}
+
+// `Platform_Error` is used to wrap errors returned by the different platforms that don't fit a common error.
+Platform_Error :: enum u32 {}
+
+Parse_Endpoint_Error :: enum {
+	None          = 0,
+	Bad_Port      = 1,
+	Bad_Address,
+	Bad_Hostname,
+}
+
+Resolve_Error :: enum u32 {
+	None = 0,
 	Unable_To_Resolve = 1,
 }
 
-DNS_Error :: enum {
+DNS_Error :: enum u32 {
 	Invalid_Hostname_Error = 1,
 	Invalid_Hosts_Config_Error,
 	Invalid_Resolv_Config_Error,
