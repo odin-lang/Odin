@@ -33,7 +33,7 @@ import "core:fmt"
 
 	The port, if present, is required to be a base 10 number in the range 0-65535, inclusive.
 
-	If `allow_non_decimal` is true, `aton` is told each component must be decimal and max 255.
+	If `allow_non_decimal` is false, `aton` is told each component must be decimal and max 255.
 */
 parse_ip4_address :: proc(address_and_maybe_port: string, allow_non_decimal := false) -> (addr: IP4_Address, ok: bool) {
 	res := aton(address_and_maybe_port, .IP4, !allow_non_decimal) or_return
