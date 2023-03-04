@@ -3,6 +3,23 @@ package sys_windows
 
 foreign import kernel32 "system:Kernel32.lib"
 
+FOREGROUND_BLUE            :: WORD(0x0001)
+FOREGROUND_GREEN           :: WORD(0x0002)
+FOREGROUND_RED             :: WORD(0x0004)
+FOREGROUND_INTENSITY       :: WORD(0x0008)
+BACKGROUND_BLUE            :: WORD(0x0010)
+BACKGROUND_GREEN           :: WORD(0x0020)
+BACKGROUND_RED             :: WORD(0x0040)
+BACKGROUND_INTENSITY       :: WORD(0x0080)
+COMMON_LVB_LEADING_BYTE    :: WORD(0x0100)
+COMMON_LVB_TRAILING_BYTE   :: WORD(0x0200)
+COMMON_LVB_GRID_HORIZONTAL :: WORD(0x0400)
+COMMON_LVB_GRID_LVERTICAL  :: WORD(0x0800)
+COMMON_LVB_GRID_RVERTICAL  :: WORD(0x1000)
+COMMON_LVB_REVERSE_VIDEO   :: WORD(0x4000)
+COMMON_LVB_UNDERSCORE      :: WORD(0x8000)
+COMMON_LVB_SBCSDBCS        :: WORD(0x0300)
+
 @(default_calling_convention="stdcall")
 foreign kernel32 {
 	OutputDebugStringA :: proc(lpOutputString: LPCSTR) --- // The only A thing that is allowed
@@ -26,6 +43,8 @@ foreign kernel32 {
 	                       dwMode: DWORD) -> BOOL ---
 	SetConsoleCursorPosition :: proc(hConsoleHandle: HANDLE,
 						   dwCursorPosition: COORD) -> BOOL ---
+	SetConsoleTextAttribute :: proc(hConsoleOutput: HANDLE,
+									wAttributes: WORD) -> BOOL ---
 
 	GetFileInformationByHandle :: proc(hFile: HANDLE, lpFileInformation: LPBY_HANDLE_FILE_INFORMATION) -> BOOL ---
 	SetHandleInformation :: proc(hObject: HANDLE,
