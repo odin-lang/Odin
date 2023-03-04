@@ -49,6 +49,7 @@ import whirlpool        "core:crypto/whirlpool"
 import x25519           "core:crypto/x25519"
 
 import dynlib           "core:dynlib"
+import net              "core:net"
 
 import base32           "core:encoding/base32"
 import base64           "core:encoding/base64"
@@ -161,6 +162,7 @@ _ :: crypto_util
 _ :: whirlpool
 _ :: x25519
 _ :: dynlib
+_ :: net
 _ :: base32
 _ :: base64
 _ :: csv
