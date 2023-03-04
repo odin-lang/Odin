@@ -22,6 +22,7 @@ import "core:c"
 import "core:os"
 
 Create_Socket_Error :: enum c.int {
+	None                                 = 0,
 	Family_Not_Supported_For_This_Socket = c.int(os.EAFNOSUPPORT),
 	No_Socket_Descriptors_Available      = c.int(os.EMFILE),
 	No_Buffer_Space_Available            = c.int(os.ENOBUFS),
@@ -32,6 +33,7 @@ Create_Socket_Error :: enum c.int {
 }
 
 Dial_Error :: enum c.int {
+	None                      = 0,
 	Port_Required             = -1,
 
 	Address_In_Use            = c.int(os.EADDRINUSE),
@@ -52,6 +54,7 @@ Dial_Error :: enum c.int {
 }
 
 Bind_Error :: enum c.int {
+	None                    = 0,
 	Address_In_Use          = c.int(os.EADDRINUSE),    // Another application is currently bound to this endpoint.
 	Given_Nonlocal_Address  = c.int(os.EADDRNOTAVAIL), // The address is not a local address on this machine.
 	Broadcast_Disabled      = c.int(os.EACCES),        // To bind a UDP socket to the broadcast address, the appropriate socket option must be set.
@@ -61,6 +64,7 @@ Bind_Error :: enum c.int {
 }
 
 Listen_Error :: enum c.int {
+	None                                    = 0,
 	Address_In_Use                          = c.int(os.EADDRINUSE),
 	Already_Connected                       = c.int(os.EISCONN),
 	No_Socket_Descriptors_Available         = c.int(os.EMFILE),
@@ -71,7 +75,7 @@ Listen_Error :: enum c.int {
 }
 
 Accept_Error :: enum c.int {
-
+	None                                              = 0,
 	// TODO(tetra): Is this error actually possible here? Or is like Linux, in which case we can remove it.
 	Reset                                             = c.int(os.ECONNRESET), 
 	Not_Listening                                     = c.int(os.EINVAL),
@@ -85,6 +89,7 @@ Accept_Error :: enum c.int {
 }
 
 TCP_Recv_Error :: enum c.int {
+	None              = 0,
 	Shutdown          = c.int(os.ESHUTDOWN),
 	Not_Connected     = c.int(os.ENOTCONN),
 
@@ -104,6 +109,7 @@ TCP_Recv_Error :: enum c.int {
 }
 
 UDP_Recv_Error :: enum c.int {
+	None           = 0,
 	Truncated      = c.int(os.EMSGSIZE), // The buffer is too small to fit the entire message, and the message was truncated.
 	Not_Socket     = c.int(os.ENOTSOCK), // The so-called socket is not an open socket.
 	Not_Descriptor = c.int(os.EBADF),    // The so-called socket is, in fact, not even a valid descriptor.
@@ -118,6 +124,8 @@ UDP_Recv_Error :: enum c.int {
 
 // TODO
 TCP_Send_Error :: enum c.int {
+	None                      = 0,
+
 	// TODO: merge with other errors?
 	Aborted                   = c.int(os.ECONNABORTED), 
 	Connection_Closed         = c.int(os.ECONNRESET),
@@ -142,6 +150,7 @@ TCP_Send_Error :: enum c.int {
 
 // TODO
 UDP_Send_Error :: enum c.int {
+	None                        = 0,
 	Truncated                   = c.int(os.EMSGSIZE), // The message is too big. No data was sent.
 
 	// TODO: not sure what the exact circumstances for this is yet
@@ -172,6 +181,7 @@ Shutdown_Manner :: enum c.int {
 }
 
 Shutdown_Error :: enum c.int {
+	None           = 0,
 	Aborted        = c.int(os.ECONNABORTED),
 	Reset          = c.int(os.ECONNRESET),
 	Offline        = c.int(os.ENETDOWN),
@@ -181,6 +191,7 @@ Shutdown_Error :: enum c.int {
 }
 
 Socket_Option_Error :: enum c.int {
+	None                       = 0,
 	Offline                    = c.int(os.ENETDOWN),
 	Timeout_When_Keepalive_Set = c.int(os.ENETRESET),
 	Invalid_Option_For_Socket  = c.int(os.ENOPROTOOPT),
