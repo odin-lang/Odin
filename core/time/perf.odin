@@ -56,6 +56,12 @@ when ODIN_ARCH == .amd64 {
 	}
 }
 
+when ODIN_OS != .Darwin && ODIN_OS != .Linux && ODIN_OS != .FreeBSD {
+	_get_tsc_frequency :: proc "contextless" () -> (u64, bool) {
+		return 0, false
+	}
+}
+
 has_invariant_tsc :: proc "contextless" () -> bool {
 	when ODIN_ARCH == .amd64 {
 		return x86_has_invariant_tsc()
