@@ -1,6 +1,7 @@
 package os
 
 import win32 "core:sys/windows"
+import "core:runtime"
 
 // lookup_env gets the value of the environment variable named by the key
 // If the variable is found in the environment the value (which can be empty) is returned and the boolean is true
@@ -18,6 +19,8 @@ lookup_env :: proc(key: string, allocator := context.allocator) -> (value: strin
 			return "", false
 		}
 	}
+	runtime.DEFAULT_TEMP_ALLOCATOR_TEMP_GUARD(ignore = context.temp_allocator == allocator)
+
 	b := make([dynamic]u16, n, context.temp_allocator)
 	n = win32.GetEnvironmentVariableW(wkey, raw_data(b), u32(len(b)))
 	if n == 0 {
@@ -87,6 +90,7 @@ environ :: proc(allocator := context.allocator) -> []string {
 
 // clear_env deletes all environment variables
 clear_env :: proc() {
+	runtime.DEFAULT_TEMP_ALLOCATOR_TEMP_GUARD()
 	envs := environ(context.temp_allocator)
 	for env in envs {
 		for j in 1..<len(env) {

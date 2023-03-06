@@ -2550,7 +2550,7 @@ gb_internal bool check_builtin_procedure(CheckerContext *c, Operand *operand, As
 		break;
 	}
 
-	case BuiltinProc_expand_to_tuple: {
+	case BuiltinProc_expand_values: {
 		Type *type = base_type(operand->type);
 		if (!is_type_struct(type) && !is_type_array(type)) {
 			gbString type_str = type_to_string(operand->type);

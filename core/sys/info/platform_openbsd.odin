@@ -4,6 +4,7 @@ package sysinfo
 import sys "core:sys/unix"
 import "core:strings"
 import "core:strconv"
+import "core:runtime"
 
 @(private)
 version_string_buf: [1024]u8
@@ -32,7 +33,9 @@ init_os_version :: proc () {
 	version := string(cstring(raw_data(kernel_version_buf[:])))
 	strings.write_string(&b, version)
 
-	// // Parse kernel version
+	runtime.DEFAULT_TEMP_ALLOCATOR_TEMP_GUARD()
+
+	// Parse kernel version
 	triplet := strings.split(version, ".", context.temp_allocator)
 	if len(triplet) == 2 {
 		major, major_ok := strconv.parse_int(triplet[0])

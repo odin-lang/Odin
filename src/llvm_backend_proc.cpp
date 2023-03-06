@@ -538,6 +538,10 @@ gb_internal void lb_begin_procedure_body(lbProcedure *p) {
 		if (p->type->Proc.params != nullptr) {
 			TypeTuple *params = &p->type->Proc.params->Tuple;
 
+			unsigned raw_input_parameters_count = LLVMCountParams(p->value);
+			p->raw_input_parameters = array_make<LLVMValueRef>(permanent_allocator(), raw_input_parameters_count);
+			LLVMGetParams(p->value, p->raw_input_parameters.data);
+
 			unsigned param_index = 0;
 			for_array(i, params->variables) {
 				Entity *e = params->variables[i];
@@ -1028,17 +1032,38 @@ gb_internal lbValue lb_emit_call(lbProcedure *p, lbValue value, Array<lbValue> c
 			} else if (arg->kind == lbArg_Indirect) {
 				lbValue ptr = {};
 				if (arg->is_byval) {
-					if (is_odin_cc && are_types_identical(original_type, t_source_code_location)) {
-						ptr = lb_address_from_load_or_generate_local(p, x);
-					} else {
+					if (is_odin_cc) {
+						if (are_types_identical(original_type, t_source_code_location)) {
+							ptr = lb_address_from_load_or_generate_local(p, x);
+						// } else {
+						// 	ptr = lb_address_from_load_if_readonly_parameter(p, x);
+						}
+					}
+					if (ptr.value == nullptr) {
 						ptr = lb_copy_value_to_ptr(p, x, original_type, arg->byval_alignment);
 					}
 				} else if (is_odin_cc) {
 					// NOTE(bill): Odin parameters are immutable so the original value can be passed if possible
 					// i.e. `T const &` in C++
-					ptr = lb_address_from_load_or_generate_local(p, x);
+					if (LLVMIsConstant(x.value)) {
+						// NOTE(bill): if the value is already constant, then just it as a global variable
+						// and pass it by pointer
+						lbAddr addr = lb_add_global_generated(p->module, original_type, x);
+						lb_make_global_private_const(addr);
+						ptr = addr.addr;
+					} else {
+						ptr = lb_address_from_load_or_generate_local(p, x);
+					}
 				} else {
-					ptr = lb_copy_value_to_ptr(p, x, original_type, 16);
+					if (LLVMIsConstant(x.value)) {
+						// NOTE(bill): if the value is already constant, then just it as a global variable
+						// and pass it by pointer
+						lbAddr addr = lb_add_global_generated(p->module, original_type, x);
+						lb_make_global_private_const(addr);
+						ptr = addr.addr;
+					} else {
+						ptr = lb_copy_value_to_ptr(p, x, original_type, 16);
+					}
 				}
 				array_add(&processed_args, ptr);
 			}
@@ -1827,7 +1852,7 @@ gb_internal lbValue lb_build_builtin_proc(lbProcedure *p, Ast *expr, TypeAndValu
 		return lb_emit_conjugate(p, val, tv.type);
 	}
 
-	case BuiltinProc_expand_to_tuple: {
+	case BuiltinProc_expand_values: {
 		lbValue val = lb_build_expr(p, ce->args[0]);
 		Type *t = base_type(val.type);
 
@@ -1839,7 +1864,7 @@ gb_internal lbValue lb_build_builtin_proc(lbProcedure *p, Ast *expr, TypeAndValu
 				GB_ASSERT(t->Array.count == 1);
 				return lb_emit_struct_ev(p, val, 0);
 			} else {
-				GB_PANIC("Unknown type of expand_to_tuple");
+				GB_PANIC("Unknown type of expand_values");
 			}
 
 		}
@@ -1865,7 +1890,7 @@ gb_internal lbValue lb_build_builtin_proc(lbProcedure *p, Ast *expr, TypeAndValu
 				lb_emit_store(p, ep, f);
 			}
 		} else {
-			GB_PANIC("Unknown type of expand_to_tuple");
+			GB_PANIC("Unknown type of expand_values");
 		}
 		return lb_emit_load(p, tuple);
 	}
@@ -2279,7 +2304,15 @@ gb_internal lbValue lb_build_builtin_proc(lbProcedure *p, Ast *expr, TypeAndValu
 			break;
 		case BuiltinProc_volatile_store:        LLVMSetVolatile(instr, true);                                        break;
 		case BuiltinProc_atomic_store:          LLVMSetOrdering(instr, LLVMAtomicOrderingSequentiallyConsistent);    break;
-		case BuiltinProc_atomic_store_explicit: LLVMSetOrdering(instr, llvm_atomic_ordering_from_odin(ce->args[2])); break;
+		case BuiltinProc_atomic_store_explicit:
+			{
+				auto ordering = llvm_atomic_ordering_from_odin(ce->args[2]);
+				LLVMSetOrdering(instr, ordering);
+				if (ordering == LLVMAtomicOrderingUnordered) {
+					LLVMSetVolatile(instr, true);
+				}
+			}
+			break;
 		}
 
 		LLVMSetAlignment(instr, cast(unsigned)type_align_of(type_deref(dst.type)));
@@ -2305,7 +2338,15 @@ gb_internal lbValue lb_build_builtin_proc(lbProcedure *p, Ast *expr, TypeAndValu
 			break;
 		case BuiltinProc_volatile_load:        LLVMSetVolatile(instr, true);                                        break;
 		case BuiltinProc_atomic_load:          LLVMSetOrdering(instr, LLVMAtomicOrderingSequentiallyConsistent);    break;
-		case BuiltinProc_atomic_load_explicit: LLVMSetOrdering(instr, llvm_atomic_ordering_from_odin(ce->args[1])); break;
+		case BuiltinProc_atomic_load_explicit:
+			{
+				auto ordering = llvm_atomic_ordering_from_odin(ce->args[1]);
+				LLVMSetOrdering(instr, ordering);
+				if (ordering == LLVMAtomicOrderingUnordered) {
+					LLVMSetVolatile(instr, true);
+				}
+			}
+			break;
 		}
 		LLVMSetAlignment(instr, cast(unsigned)type_align_of(type_deref(dst.type)));
 
@@ -2375,6 +2416,9 @@ gb_internal lbValue lb_build_builtin_proc(lbProcedure *p, Ast *expr, TypeAndValu
 		lbValue res = {};
 		res.value = LLVMBuildAtomicRMW(p->builder, op, dst.value, val.value, ordering, false);
 		res.type = tv.type;
+		if (ordering == LLVMAtomicOrderingUnordered) {
+			LLVMSetVolatile(res.value, true);
+		}
 		return res;
 	}
 
@@ -2400,7 +2444,6 @@ gb_internal lbValue lb_build_builtin_proc(lbProcedure *p, Ast *expr, TypeAndValu
 		case BuiltinProc_atomic_compare_exchange_weak_explicit:   success_ordering = llvm_atomic_ordering_from_odin(ce->args[3]); failure_ordering = llvm_atomic_ordering_from_odin(ce->args[4]); weak = true;  break;
 		}
 
-		// TODO(bill): Figure out how to make it weak
 		LLVMBool single_threaded = false;
 
 		LLVMValueRef value = LLVMBuildAtomicCmpXchg(
@@ -2411,6 +2454,9 @@ gb_internal lbValue lb_build_builtin_proc(lbProcedure *p, Ast *expr, TypeAndValu
 			single_threaded
 		);
 		LLVMSetWeak(value, weak);
+		if (success_ordering == LLVMAtomicOrderingUnordered || failure_ordering == LLVMAtomicOrderingUnordered) {
+			LLVMSetVolatile(value, true);
+		}
 
 		if (is_type_tuple(tv.type)) {
 			Type *fix_typed = alloc_type_tuple();

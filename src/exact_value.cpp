@@ -578,9 +578,7 @@ gb_internal ExactValue exact_unary_operator_value(TokenKind op, ExactValue v, i3
 	}
 	}
 
-failure:
-	GB_PANIC("Invalid unary operation, %.*s", LIT(token_strings[op]));
-
+failure:;
 	ExactValue error_value = {};
 	return error_value;
 }

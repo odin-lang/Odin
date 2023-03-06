@@ -33,6 +33,7 @@ import "core:intrinsics"
 import "core:mem"
 import "core:os"
 import "core:strings"
+import "core:runtime"
 
 likely :: intrinsics.expect
 
@@ -408,7 +409,7 @@ parse_bytes :: proc(data: []u8, options := DEFAULT_OPTIONS, path := "", error_ha
 				next := scan(t)
 				#partial switch next.kind {
 				case .Ident:
-					if len(next.text) == 3 && strings.to_lower(next.text, context.temp_allocator) == "xml" {
+					if len(next.text) == 3 && strings.equal_fold(next.text, "xml") {
 						parse_prologue(doc) or_return
 					} else if len(doc.prologue) > 0 {
 						/*
@@ -614,6 +615,7 @@ parse_prologue :: proc(doc: ^Document) -> (err: Error) {
 			}
 
 		case "encoding":
+			runtime.DEFAULT_TEMP_ALLOCATOR_TEMP_GUARD()
 			switch strings.to_lower(attr.val, context.temp_allocator) {
 			case "utf-8", "utf8":
 				doc.encoding = .UTF_8

@@ -54,7 +54,7 @@ foreign ws2_32 {
 		buf: rawptr,
 		len: c_int,
 		flags: c_int,
-		addr: ^SOCKADDR,
+		addr: ^SOCKADDR_STORAGE_LH,
 		addrlen: ^c_int,
 	) -> c_int ---
 	sendto :: proc(
@@ -62,11 +62,11 @@ foreign ws2_32 {
 		buf: rawptr,
 		len: c_int,
 		flags: c_int,
-		addr: ^SOCKADDR,
+		addr: ^SOCKADDR_STORAGE_LH,
 		addrlen: c_int,
 	) -> c_int ---
 	shutdown :: proc(socket: SOCKET, how: c_int) -> c_int ---
-	accept :: proc(socket: SOCKET, address: ^SOCKADDR, address_len: ^c_int) -> SOCKET ---
+	accept :: proc(socket: SOCKET, address: ^SOCKADDR_STORAGE_LH, address_len: ^c_int) -> SOCKET ---
 
 	setsockopt :: proc(
 		s: SOCKET,
@@ -75,11 +75,11 @@ foreign ws2_32 {
 		optval: rawptr,
 		optlen: c_int,
 	) -> c_int ---
-	getsockname :: proc(socket: SOCKET, address: ^SOCKADDR, address_len: ^c_int) -> c_int ---
-	getpeername :: proc(socket: SOCKET, address: ^SOCKADDR, address_len: ^c_int) -> c_int ---
-	bind :: proc(socket: SOCKET, address: ^SOCKADDR, address_len: socklen_t) -> c_int ---
+	getsockname :: proc(socket: SOCKET, address: ^SOCKADDR_STORAGE_LH, address_len: ^c_int) -> c_int ---
+	getpeername :: proc(socket: SOCKET, address: ^SOCKADDR_STORAGE_LH, address_len: ^c_int) -> c_int ---
+	bind :: proc(socket: SOCKET, address: ^SOCKADDR_STORAGE_LH, address_len: socklen_t) -> c_int ---
 	listen :: proc(socket: SOCKET, backlog: c_int) -> c_int ---
-	connect :: proc(socket: SOCKET, address: ^SOCKADDR, len: c_int) -> c_int ---
+	connect :: proc(socket: SOCKET, address: ^SOCKADDR_STORAGE_LH, len: c_int) -> c_int ---
 	getaddrinfo :: proc(
 		node: cstring,
 		service: cstring,
