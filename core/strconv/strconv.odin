@@ -2,6 +2,7 @@ package strconv
 
 import "core:unicode/utf8"
 import "decimal"
+import "core:runtime"
 
 parse_bool :: proc(s: string, n: ^int = nil) -> (result: bool = false, ok: bool) {
 	switch s {
@@ -708,8 +709,8 @@ parse_f64_prefix :: proc(str: string) -> (value: f64, nr: int, ok: bool) {
 				saw_digits = true
 				nd += 1
 				if nd_mant < MAX_MANT_DIGITS {
-					MAX_MANT_DIGITS *= 16
-					MAX_MANT_DIGITS += int(lower(c) - 'a' + 10)
+					mantissa *= 16
+					mantissa += u64(lower(c) - 'a' + 10)
 					nd_mant += 1
 				} else {
 					trunc = true
@@ -835,6 +836,7 @@ parse_f64_prefix :: proc(str: string) -> (value: f64, nr: int, ok: bool) {
 	mantissa, exp, neg, trunc, hex, nr = parse_components(str) or_return
 
 	if hex {
+		runtime.println_any(mantissa, exp, neg, trunc, hex, nr)
 		value, ok = parse_hex(str, mantissa, exp, neg, trunc)
 		return
 	}
