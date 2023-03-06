@@ -1,6 +1,7 @@
 package os2
 
 import "core:mem"
+import "core:runtime"
 import "core:strconv"
 import "core:unicode/utf8"
 
@@ -74,7 +75,7 @@ read_ptr :: proc(f: ^File, data: rawptr, len: int) -> (n: int, err: Error) {
 
 
 
-read_entire_file :: proc(name: string, allocator := context.allocator) -> (data: []byte, err: Error) {
+read_entire_file :: proc(name: string, allocator: runtime.Allocator) -> (data: []byte, err: Error) {
 	f, ferr := open(name)
 	if ferr != nil {
 		return nil, ferr

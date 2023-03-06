@@ -198,7 +198,7 @@ marshal_to_writer :: proc(w: io.Writer, v: any, opt: ^Marshal_Options) -> (err: 
 	case runtime.Type_Info_Procedure:
 		return .Unsupported_Type
 
-	case runtime.Type_Info_Tuple:
+	case runtime.Type_Info_Parameters:
 		return .Unsupported_Type
 
 	case runtime.Type_Info_Simd_Vector:

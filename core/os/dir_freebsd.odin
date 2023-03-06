@@ -50,7 +50,7 @@ read_dir :: proc(fd: Handle, n: int, allocator := context.allocator) -> (fi: []F
 			continue
 		}
 
-		fullpath := make([]byte, len(dirpath)+1+len(filename))
+		fullpath := make([]byte, len(dirpath)+1+len(filename), context.temp_allocator)
 		copy(fullpath, dirpath)
 		copy(fullpath[len(dirpath):], "/")
 		copy(fullpath[len(dirpath)+1:], filename)

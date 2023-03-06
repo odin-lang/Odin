@@ -868,6 +868,45 @@ gb_internal lbValue lb_address_from_load(lbProcedure *p, lbValue value) {
 	return {};
 }
 
+gb_internal lbValue lb_address_from_load_if_readonly_parameter(lbProcedure *p, lbValue x) {
+	if (!LLVMIsALoadInst(x.value)) {
+		return {};
+	}
+
+	LLVMValueRef optr = LLVMGetOperand(x.value, 0);
+	while (optr && LLVMIsABitCastInst(optr)) {
+		optr = LLVMGetOperand(optr, 0);
+	}
+	LLVMAttributeIndex param_index = 1;
+	if (p->return_ptr.addr.value) {
+		param_index++;
+	}
+
+	bool is_parameter = false;
+	for (LLVMValueRef param : p->raw_input_parameters) {
+		if (param == optr) {
+			is_parameter = true;
+			break;
+		}
+		param_index++;
+	}
+	if (is_parameter) {
+		unsigned readonly_attr_kind = LLVMGetEnumAttributeKindForName("readonly", 8);
+		unsigned n = LLVMGetAttributeCountAtIndex(p->value, param_index);
+		if (n) {
+			TEMPORARY_ALLOCATOR_GUARD();
+			LLVMAttributeRef *attrs = gb_alloc_array(temporary_allocator(), LLVMAttributeRef, n);
+			LLVMGetAttributesAtIndex(p->value, param_index, attrs);
+			for (unsigned i = 0; i < n; i++) {
+				if (LLVMGetEnumAttributeKind(attrs[i]) == readonly_attr_kind) {
+					return lb_address_from_load_or_generate_local(p, x);
+				}
+			}
+		}
+	}
+	return {};
+}
+
 
 gb_internal lbStructFieldRemapping lb_get_struct_remapping(lbModule *m, Type *t) {
 	t = base_type(t);
@@ -876,7 +915,7 @@ gb_internal lbStructFieldRemapping lb_get_struct_remapping(lbModule *m, Type *t)
 	if (field_remapping == nullptr) {
 		field_remapping = map_get(&m->struct_field_remapping, cast(void *)t);
 	}
-	GB_ASSERT(field_remapping != nullptr);
+	GB_ASSERT_MSG(field_remapping != nullptr, "%s", type_to_string(t));
 	return *field_remapping;
 }
 

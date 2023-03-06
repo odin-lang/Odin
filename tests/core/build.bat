@@ -72,6 +72,11 @@ echo ---
 %PATH_TO_ODIN% run text\i18n %COMMON% -out:test_core_i18n.exe
 
 echo ---
+echo Running core:net
+echo ---
+%PATH_TO_ODIN% run net %COMMON% -out:test_core_net.exe
+
+echo ---
 echo Running core:text/lua tests
 echo ---
 %PATH_TO_ODIN% run text\lua %COMMON% -out:test_core_lua_strlib.exe

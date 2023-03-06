@@ -1783,8 +1783,8 @@ fmt_value :: proc(fi: ^Info, v: any, verb: rune) {
 
 	type_info := type_info_of(v.id)
 	switch info in type_info.variant {
-	case runtime.Type_Info_Any:   // Ignore
-	case runtime.Type_Info_Tuple: // Ignore
+	case runtime.Type_Info_Any:        // Ignore
+	case runtime.Type_Info_Parameters: // Ignore
 
 	case runtime.Type_Info_Named:
 		fmt_named(fi, v, verb, info)

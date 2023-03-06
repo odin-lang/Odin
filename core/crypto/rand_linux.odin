@@ -12,7 +12,7 @@ _rand_bytes :: proc (dst: []byte) {
 
 	for l > 0 {
 		to_read := min(l, _MAX_PER_CALL_BYTES)
-		ret := unix.sys_getrandom(raw_data(dst), to_read, 0)
+		ret := unix.sys_getrandom(raw_data(dst), uint(to_read), 0)
 		if ret < 0 {
 			switch os.Errno(-ret) {
 			case os.EINTR:

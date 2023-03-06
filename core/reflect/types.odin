@@ -101,8 +101,8 @@ are_types_identical :: proc(a, b: ^Type_Info) -> bool {
 		y := b.variant.(Type_Info_Slice) or_return
 		return are_types_identical(x.elem, y.elem)
 
-	case Type_Info_Tuple:
-		y := b.variant.(Type_Info_Tuple) or_return
+	case Type_Info_Parameters:
+		y := b.variant.(Type_Info_Parameters) or_return
 		if len(x.types) != len(y.types) { return false }
 		for _, i in x.types {
 			xt, yt := x.types[i], y.types[i]
@@ -335,9 +335,15 @@ is_slice :: proc(info: ^Type_Info) -> bool {
 	return ok
 }
 @(require_results)
+is_parameters :: proc(info: ^Type_Info) -> bool {
+	if info == nil { return false }
+	_, ok := type_info_base(info).variant.(Type_Info_Parameters)
+	return ok
+}
+@(require_results, deprecated="prefer is_parameters")
 is_tuple :: proc(info: ^Type_Info) -> bool {
 	if info == nil { return false }
-	_, ok := type_info_base(info).variant.(Type_Info_Tuple)
+	_, ok := type_info_base(info).variant.(Type_Info_Parameters)
 	return ok
 }
 @(require_results)
@@ -490,7 +496,7 @@ write_type_writer :: proc(w: io.Writer, ti: ^Type_Info, n_written: ^int = nil) -
 		if info.params == nil {
 			io.write_string(w, "()", &n) or_return
 		} else {
-			t := info.params.variant.(Type_Info_Tuple)
+			t := info.params.variant.(Type_Info_Parameters)
 			io.write_string(w, "(", &n) or_return
 			for t, i in t.types {
 				if i > 0 {
@@ -504,7 +510,7 @@ write_type_writer :: proc(w: io.Writer, ti: ^Type_Info, n_written: ^int = nil) -
 			io.write_string(w, " -> ", &n)  or_return
 			write_type(w, info.results, &n) or_return
 		}
-	case Type_Info_Tuple:
+	case Type_Info_Parameters:
 		count := len(info.names)
 		if count != 1 { 
 			io.write_string(w, "(", &n) or_return 

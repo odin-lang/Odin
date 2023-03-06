@@ -82,6 +82,7 @@ gb_internal void lb_init_module(lbModule *m, Checker *c) {
 
 	map_init(&m->map_info_map, 0);
 	map_init(&m->map_cell_info_map, 0);
+	map_init(&m->exact_value_compound_literal_addr_map, 1024);
 
 }
 
@@ -937,8 +938,8 @@ gb_internal void lb_emit_store(lbProcedure *p, lbValue ptr, lbValue value) {
 
 	enum {MAX_STORE_SIZE = 64};
 
-	if (!p->in_multi_assignment && lb_sizeof(LLVMTypeOf(value.value)) > MAX_STORE_SIZE) {
-		if (LLVMIsALoadInst(value.value)) {
+	if (lb_sizeof(LLVMTypeOf(value.value)) > MAX_STORE_SIZE) {
+		if (!p->in_multi_assignment && LLVMIsALoadInst(value.value)) {
 			LLVMValueRef dst_ptr = ptr.value;
 			LLVMValueRef src_ptr_original = LLVMGetOperand(value.value, 0);
 			LLVMValueRef src_ptr = LLVMBuildPointerCast(p->builder, src_ptr_original, LLVMTypeOf(dst_ptr), "");
@@ -984,7 +985,7 @@ gb_internal void lb_emit_store(lbProcedure *p, lbValue ptr, lbValue value) {
 
 		instr = LLVMBuildStore(p->builder, value.value, ptr.value);
 	}
-	LLVMSetVolatile(instr, p->in_multi_assignment);
+	// LLVMSetVolatile(instr, p->in_multi_assignment);
 }
 
 gb_internal LLVMTypeRef llvm_addr_type(lbModule *module, lbValue addr_val) {
@@ -1586,6 +1587,10 @@ gb_internal LLVMTypeRef lb_type_internal_for_procedures_raw(lbModule *m, Type *t
 		if (params_by_ptr[i]) {
 			// NOTE(bill): The parameter needs to be passed "indirectly", override it
 			ft->args[i].kind = lbArg_Indirect;
+			ft->args[i].attribute = nullptr;
+			ft->args[i].align_attribute = nullptr;
+			ft->args[i].byval_alignment = 0;
+			ft->args[i].is_byval = false;
 		}
 	}
 
