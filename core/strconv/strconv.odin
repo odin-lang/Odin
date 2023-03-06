@@ -559,10 +559,12 @@ parse_f32 :: proc(s: string, n: ^int = nil) -> (value: f32, ok: bool) {
 
 
 parse_f64 :: proc(str: string, n: ^int = nil) -> (value: f64, ok: bool) {
-	value, n^, ok = parse_f64_prefix(str)
-	if ok && len(str) != n^ {
+	nr: int
+	value, nr, ok = parse_f64_prefix(str)
+	if ok && len(str) != nr {
 		ok = false
 	}
+	if n != nil { n^ = nr }
 	return
 }
 
@@ -760,7 +762,6 @@ parse_f64_prefix :: proc(str: string) -> (value: f64, nr: int, ok: bool) {
 		if mantissa != 0 {
 			exp = decimal_point - nd_mant
 		}
-		// TODO(bill): check underscore correctness
 		ok = true
 		return
 	}
