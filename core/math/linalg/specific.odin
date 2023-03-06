@@ -130,11 +130,11 @@ VECTOR3F64_Y_AXIS :: Vector3f64{0, 1, 0}
 VECTOR3F64_Z_AXIS :: Vector3f64{0, 0, 1}
 
 
-vector2_orthogonal :: proc(v: $V/[2]$E) -> V where !IS_ARRAY(E), IS_FLOAT(E) {
+vector2_orthogonal :: proc "contextless" (v: $V/[2]$E) -> V where !IS_ARRAY(E), IS_FLOAT(E) {
 	return {-v.y, v.x}
 }
 
-vector3_orthogonal :: proc(v: $V/[3]$E) -> V where !IS_ARRAY(E), IS_FLOAT(E) {
+vector3_orthogonal :: proc "contextless" (v: $V/[3]$E) -> V where !IS_ARRAY(E), IS_FLOAT(E) {
 	x := abs(v.x)
 	y := abs(v.y)
 	z := abs(v.z)
@@ -160,21 +160,21 @@ orthogonal :: proc{vector2_orthogonal, vector3_orthogonal}
 
 
 
-vector4_srgb_to_linear_f16 :: proc(col: Vector4f16) -> Vector4f16 {
+vector4_srgb_to_linear_f16 :: proc "contextless" (col: Vector4f16) -> Vector4f16 {
 	r := math.pow(col.x, 2.2)
 	g := math.pow(col.y, 2.2)
 	b := math.pow(col.z, 2.2)
 	a := col.w
 	return {r, g, b, a}
 }
-vector4_srgb_to_linear_f32 :: proc(col: Vector4f32) -> Vector4f32 {
+vector4_srgb_to_linear_f32 :: proc "contextless" (col: Vector4f32) -> Vector4f32 {
 	r := math.pow(col.x, 2.2)
 	g := math.pow(col.y, 2.2)
 	b := math.pow(col.z, 2.2)
 	a := col.w
 	return {r, g, b, a}
 }
-vector4_srgb_to_linear_f64 :: proc(col: Vector4f64) -> Vector4f64 {
+vector4_srgb_to_linear_f64 :: proc "contextless" (col: Vector4f64) -> Vector4f64 {
 	r := math.pow(col.x, 2.2)
 	g := math.pow(col.y, 2.2)
 	b := math.pow(col.z, 2.2)
@@ -188,7 +188,7 @@ vector4_srgb_to_linear :: proc{
 }
 
 
-vector4_linear_to_srgb_f16 :: proc(col: Vector4f16) -> Vector4f16 {
+vector4_linear_to_srgb_f16 :: proc "contextless" (col: Vector4f16) -> Vector4f16 {
 	a :: 2.51
 	b :: 0.03
 	c :: 2.43
@@ -209,7 +209,7 @@ vector4_linear_to_srgb_f16 :: proc(col: Vector4f16) -> Vector4f16 {
 
 	return {x, y, z, col.w}
 }
-vector4_linear_to_srgb_f32 :: proc(col: Vector4f32) -> Vector4f32 {
+vector4_linear_to_srgb_f32 :: proc "contextless" (col: Vector4f32) -> Vector4f32 {
 	a :: 2.51
 	b :: 0.03
 	c :: 2.43
@@ -230,7 +230,7 @@ vector4_linear_to_srgb_f32 :: proc(col: Vector4f32) -> Vector4f32 {
 
 	return {x, y, z, col.w}
 }
-vector4_linear_to_srgb_f64 :: proc(col: Vector4f64) -> Vector4f64 {
+vector4_linear_to_srgb_f64 :: proc "contextless" (col: Vector4f64) -> Vector4f64 {
 	a :: 2.51
 	b :: 0.03
 	c :: 2.43
@@ -258,8 +258,8 @@ vector4_linear_to_srgb :: proc{
 }
 
 
-vector4_hsl_to_rgb_f16 :: proc(h, s, l: f16, a: f16 = 1) -> Vector4f16 {
-	hue_to_rgb :: proc(p, q, t: f16) -> f16 {
+vector4_hsl_to_rgb_f16 :: proc "contextless" (h, s, l: f16, a: f16 = 1) -> Vector4f16 {
+	hue_to_rgb :: proc "contextless" (p, q, t: f16) -> f16 {
 		t := t
 		if t < 0 { t += 1 }
 		if t > 1 { t -= 1 }
@@ -285,8 +285,8 @@ vector4_hsl_to_rgb_f16 :: proc(h, s, l: f16, a: f16 = 1) -> Vector4f16 {
 	}
 	return {r, g, b, a}
 }
-vector4_hsl_to_rgb_f32 :: proc(h, s, l: f32, a: f32 = 1) -> Vector4f32 {
-	hue_to_rgb :: proc(p, q, t: f32) -> f32 {
+vector4_hsl_to_rgb_f32 :: proc "contextless" (h, s, l: f32, a: f32 = 1) -> Vector4f32 {
+	hue_to_rgb :: proc "contextless" (p, q, t: f32) -> f32 {
 		t := t
 		if t < 0 { t += 1 }
 		if t > 1 { t -= 1 }
@@ -312,8 +312,8 @@ vector4_hsl_to_rgb_f32 :: proc(h, s, l: f32, a: f32 = 1) -> Vector4f32 {
 	}
 	return {r, g, b, a}
 }
-vector4_hsl_to_rgb_f64 :: proc(h, s, l: f64, a: f64 = 1) -> Vector4f64 {
-	hue_to_rgb :: proc(p, q, t: f64) -> f64 {
+vector4_hsl_to_rgb_f64 :: proc "contextless" (h, s, l: f64, a: f64 = 1) -> Vector4f64 {
+	hue_to_rgb :: proc "contextless" (p, q, t: f64) -> f64 {
 		t := t
 		if t < 0 { t += 1 }
 		if t > 1 { t -= 1 }
@@ -346,7 +346,7 @@ vector4_hsl_to_rgb :: proc{
 }
 
 
-vector4_rgb_to_hsl_f16 :: proc(col: Vector4f16) -> Vector4f16 {
+vector4_rgb_to_hsl_f16 :: proc "contextless" (col: Vector4f16) -> Vector4f16 {
 	r := col.x
 	g := col.y
 	b := col.z
@@ -375,7 +375,7 @@ vector4_rgb_to_hsl_f16 :: proc(col: Vector4f16) -> Vector4f16 {
 
 	return {h, s, l, a}
 }
-vector4_rgb_to_hsl_f32 :: proc(col: Vector4f32) -> Vector4f32 {
+vector4_rgb_to_hsl_f32 :: proc "contextless" (col: Vector4f32) -> Vector4f32 {
 	r := col.x
 	g := col.y
 	b := col.z
@@ -404,7 +404,7 @@ vector4_rgb_to_hsl_f32 :: proc(col: Vector4f32) -> Vector4f32 {
 
 	return {h, s, l, a}
 }
-vector4_rgb_to_hsl_f64 :: proc(col: Vector4f64) -> Vector4f64 {
+vector4_rgb_to_hsl_f64 :: proc "contextless" (col: Vector4f64) -> Vector4f64 {
 	r := col.x
 	g := col.y
 	b := col.z
@@ -441,7 +441,7 @@ vector4_rgb_to_hsl :: proc{
 
 
 
-quaternion_angle_axis_f16 :: proc(angle_radians: f16, axis: Vector3f16) -> (q: Quaternionf16) {
+quaternion_angle_axis_f16 :: proc "contextless" (angle_radians: f16, axis: Vector3f16) -> (q: Quaternionf16) {
 	t := angle_radians*0.5
 	v := normalize(axis) * math.sin(t)
 	q.x = v.x
@@ -450,7 +450,7 @@ quaternion_angle_axis_f16 :: proc(angle_radians: f16, axis: Vector3f16) -> (q: Q
 	q.w = math.cos(t)
 	return
 }
-quaternion_angle_axis_f32 :: proc(angle_radians: f32, axis: Vector3f32) -> (q: Quaternionf32) {
+quaternion_angle_axis_f32 :: proc "contextless" (angle_radians: f32, axis: Vector3f32) -> (q: Quaternionf32) {
 	t := angle_radians*0.5
 	v := normalize(axis) * math.sin(t)
 	q.x = v.x
@@ -459,7 +459,7 @@ quaternion_angle_axis_f32 :: proc(angle_radians: f32, axis: Vector3f32) -> (q: Q
 	q.w = math.cos(t)
 	return
 }
-quaternion_angle_axis_f64 :: proc(angle_radians: f64, axis: Vector3f64) -> (q: Quaternionf64) {
+quaternion_angle_axis_f64 :: proc "contextless" (angle_radians: f64, axis: Vector3f64) -> (q: Quaternionf64) {
 	t := angle_radians*0.5
 	v := normalize(axis) * math.sin(t)
 	q.x = v.x
@@ -474,21 +474,21 @@ quaternion_angle_axis :: proc{
 	quaternion_angle_axis_f64,
 }
 
-angle_from_quaternion_f16 :: proc(q: Quaternionf16) -> f16 {
+angle_from_quaternion_f16 :: proc "contextless" (q: Quaternionf16) -> f16 {
 	if abs(q.w) > math.SQRT_THREE*0.5 {
 		return math.asin(math.sqrt(q.x*q.x + q.y*q.y + q.z*q.z)) * 2
 	}
 
 	return math.acos(q.w) * 2
 }
-angle_from_quaternion_f32 :: proc(q: Quaternionf32) -> f32 {
+angle_from_quaternion_f32 :: proc "contextless" (q: Quaternionf32) -> f32 {
 	if abs(q.w) > math.SQRT_THREE*0.5 {
 		return math.asin(math.sqrt(q.x*q.x + q.y*q.y + q.z*q.z)) * 2
 	}
 
 	return math.acos(q.w) * 2
 }
-angle_from_quaternion_f64 :: proc(q: Quaternionf64) -> f64 {
+angle_from_quaternion_f64 :: proc "contextless" (q: Quaternionf64) -> f64 {
 	if abs(q.w) > math.SQRT_THREE*0.5 {
 		return math.asin(math.sqrt(q.x*q.x + q.y*q.y + q.z*q.z)) * 2
 	}
@@ -501,7 +501,7 @@ angle_from_quaternion :: proc{
 	angle_from_quaternion_f64,
 }
 
-axis_from_quaternion_f16 :: proc(q: Quaternionf16) -> Vector3f16 {
+axis_from_quaternion_f16 :: proc "contextless" (q: Quaternionf16) -> Vector3f16 {
 	t1 := 1 - q.w*q.w
 	if t1 < 0 {
 		return {0, 0, 1}
@@ -509,7 +509,7 @@ axis_from_quaternion_f16 :: proc(q: Quaternionf16) -> Vector3f16 {
 	t2 := 1.0 / math.sqrt(t1)
 	return {q.x*t2, q.y*t2, q.z*t2}
 }
-axis_from_quaternion_f32 :: proc(q: Quaternionf32) -> Vector3f32 {
+axis_from_quaternion_f32 :: proc "contextless" (q: Quaternionf32) -> Vector3f32 {
 	t1 := 1 - q.w*q.w
 	if t1 < 0 {
 		return {0, 0, 1}
@@ -517,7 +517,7 @@ axis_from_quaternion_f32 :: proc(q: Quaternionf32) -> Vector3f32 {
 	t2 := 1.0 / math.sqrt(t1)
 	return {q.x*t2, q.y*t2, q.z*t2}
 }
-axis_from_quaternion_f64 :: proc(q: Quaternionf64) -> Vector3f64 {
+axis_from_quaternion_f64 :: proc "contextless" (q: Quaternionf64) -> Vector3f64 {
 	t1 := 1 - q.w*q.w
 	if t1 < 0 {
 		return {0, 0, 1}
@@ -532,17 +532,17 @@ axis_from_quaternion :: proc{
 }
 
 
-angle_axis_from_quaternion_f16 :: proc(q: Quaternionf16) -> (angle: f16, axis: Vector3f16) {
+angle_axis_from_quaternion_f16 :: proc "contextless" (q: Quaternionf16) -> (angle: f16, axis: Vector3f16) {
 	angle = angle_from_quaternion(q)
 	axis  = axis_from_quaternion(q)
 	return
 }
-angle_axis_from_quaternion_f32 :: proc(q: Quaternionf32) -> (angle: f32, axis: Vector3f32) {
+angle_axis_from_quaternion_f32 :: proc "contextless" (q: Quaternionf32) -> (angle: f32, axis: Vector3f32) {
 	angle = angle_from_quaternion(q)
 	axis  = axis_from_quaternion(q)
 	return
 }
-angle_axis_from_quaternion_f64 :: proc(q: Quaternionf64) -> (angle: f64, axis: Vector3f64) {
+angle_axis_from_quaternion_f64 :: proc "contextless" (q: Quaternionf64) -> (angle: f64, axis: Vector3f64) {
 	angle = angle_from_quaternion(q)
 	axis  = axis_from_quaternion(q)
 	return
@@ -554,7 +554,7 @@ angle_axis_from_quaternion :: proc {
 }
 
 
-quaternion_from_forward_and_up_f16 :: proc(forward, up: Vector3f16) -> Quaternionf16 {
+quaternion_from_forward_and_up_f16 :: proc "contextless" (forward, up: Vector3f16) -> Quaternionf16 {
 	f := normalize(forward)
 	s := normalize(cross(f, up))
 	u := cross(s, f)
@@ -597,7 +597,7 @@ quaternion_from_forward_and_up_f16 :: proc(forward, up: Vector3f16) -> Quaternio
 
 	return normalize(q)
 }
-quaternion_from_forward_and_up_f32 :: proc(forward, up: Vector3f32) -> Quaternionf32 {
+quaternion_from_forward_and_up_f32 :: proc "contextless" (forward, up: Vector3f32) -> Quaternionf32 {
 	f := normalize(forward)
 	s := normalize(cross(f, up))
 	u := cross(s, f)
@@ -640,7 +640,7 @@ quaternion_from_forward_and_up_f32 :: proc(forward, up: Vector3f32) -> Quaternio
 
 	return normalize(q)
 }
-quaternion_from_forward_and_up_f64 :: proc(forward, up: Vector3f64) -> Quaternionf64 {
+quaternion_from_forward_and_up_f64 :: proc "contextless" (forward, up: Vector3f64) -> Quaternionf64 {
 	f := normalize(forward)
 	s := normalize(cross(f, up))
 	u := cross(s, f)
@@ -689,13 +689,13 @@ quaternion_from_forward_and_up :: proc{
 	quaternion_from_forward_and_up_f64,
 }
 
-quaternion_look_at_f16 :: proc(eye, centre: Vector3f16, up: Vector3f16) -> Quaternionf16 {
+quaternion_look_at_f16 :: proc "contextless" (eye, centre: Vector3f16, up: Vector3f16) -> Quaternionf16 {
 	return quaternion_from_matrix3(matrix3_look_at(eye, centre, up))
 }
-quaternion_look_at_f32 :: proc(eye, centre: Vector3f32, up: Vector3f32) -> Quaternionf32 {
+quaternion_look_at_f32 :: proc "contextless" (eye, centre: Vector3f32, up: Vector3f32) -> Quaternionf32 {
 	return quaternion_from_matrix3(matrix3_look_at(eye, centre, up))
 }
-quaternion_look_at_f64 :: proc(eye, centre: Vector3f64, up: Vector3f64) -> Quaternionf64 {
+quaternion_look_at_f64 :: proc "contextless" (eye, centre: Vector3f64, up: Vector3f64) -> Quaternionf64 {
 	return quaternion_from_matrix3(matrix3_look_at(eye, centre, up))
 }
 quaternion_look_at :: proc{
@@ -706,21 +706,21 @@ quaternion_look_at :: proc{
 
 
 
-quaternion_nlerp_f16 :: proc(a, b: Quaternionf16, t: f16) -> (c: Quaternionf16) {
+quaternion_nlerp_f16 :: proc "contextless" (a, b: Quaternionf16, t: f16) -> (c: Quaternionf16) {
 	c.x = a.x + (b.x-a.x)*t
 	c.y = a.y + (b.y-a.y)*t
 	c.z = a.z + (b.z-a.z)*t
 	c.w = a.w + (b.w-a.w)*t
 	return normalize(c)
 }
-quaternion_nlerp_f32 :: proc(a, b: Quaternionf32, t: f32) -> (c: Quaternionf32) {
+quaternion_nlerp_f32 :: proc "contextless" (a, b: Quaternionf32, t: f32) -> (c: Quaternionf32) {
 	c.x = a.x + (b.x-a.x)*t
 	c.y = a.y + (b.y-a.y)*t
 	c.z = a.z + (b.z-a.z)*t
 	c.w = a.w + (b.w-a.w)*t
 	return normalize(c)
 }
-quaternion_nlerp_f64 :: proc(a, b: Quaternionf64, t: f64) -> (c: Quaternionf64) {
+quaternion_nlerp_f64 :: proc "contextless" (a, b: Quaternionf64, t: f64) -> (c: Quaternionf64) {
 	c.x = a.x + (b.x-a.x)*t
 	c.y = a.y + (b.y-a.y)*t
 	c.z = a.z + (b.z-a.z)*t
@@ -734,7 +734,7 @@ quaternion_nlerp :: proc{
 }
 
 
-quaternion_slerp_f16 :: proc(x, y: Quaternionf16, t: f16) -> (q: Quaternionf16) {
+quaternion_slerp_f16 :: proc "contextless" (x, y: Quaternionf16, t: f16) -> (q: Quaternionf16) {
 	a, b := x, y
 	cos_angle := dot(a, b)
 	if cos_angle < 0 {
@@ -761,7 +761,7 @@ quaternion_slerp_f16 :: proc(x, y: Quaternionf16, t: f16) -> (q: Quaternionf16) 
 	q.w = factor_a * a.w + factor_b * b.w
 	return
 }
-quaternion_slerp_f32 :: proc(x, y: Quaternionf32, t: f32) -> (q: Quaternionf32) {
+quaternion_slerp_f32 :: proc "contextless" (x, y: Quaternionf32, t: f32) -> (q: Quaternionf32) {
 	a, b := x, y
 	cos_angle := dot(a, b)
 	if cos_angle < 0 {
@@ -788,7 +788,7 @@ quaternion_slerp_f32 :: proc(x, y: Quaternionf32, t: f32) -> (q: Quaternionf32) 
 	q.w = factor_a * a.w + factor_b * b.w
 	return
 }
-quaternion_slerp_f64 :: proc(x, y: Quaternionf64, t: f64) -> (q: Quaternionf64) {
+quaternion_slerp_f64 :: proc "contextless" (x, y: Quaternionf64, t: f64) -> (q: Quaternionf64) {
 	a, b := x, y
 	cos_angle := dot(a, b)
 	if cos_angle < 0 {
@@ -822,15 +822,15 @@ quaternion_slerp :: proc{
 }
 
 
-quaternion_squad_f16 :: proc(q1, q2, s1, s2: Quaternionf16, h: f16) -> Quaternionf16 {
+quaternion_squad_f16 :: proc "contextless" (q1, q2, s1, s2: Quaternionf16, h: f16) -> Quaternionf16 {
 	slerp :: quaternion_slerp
 	return slerp(slerp(q1, q2, h), slerp(s1, s2, h), 2 * (1 - h) * h)
 }
-quaternion_squad_f32 :: proc(q1, q2, s1, s2: Quaternionf32, h: f32) -> Quaternionf32 {
+quaternion_squad_f32 :: proc "contextless" (q1, q2, s1, s2: Quaternionf32, h: f32) -> Quaternionf32 {
 	slerp :: quaternion_slerp
 	return slerp(slerp(q1, q2, h), slerp(s1, s2, h), 2 * (1 - h) * h)
 }
-quaternion_squad_f64 :: proc(q1, q2, s1, s2: Quaternionf64, h: f64) -> Quaternionf64 {
+quaternion_squad_f64 :: proc "contextless" (q1, q2, s1, s2: Quaternionf64, h: f64) -> Quaternionf64 {
 	slerp :: quaternion_slerp
 	return slerp(slerp(q1, q2, h), slerp(s1, s2, h), 2 * (1 - h) * h)
 }
@@ -841,21 +841,21 @@ quaternion_squad :: proc{
 }
 
 
-quaternion_from_matrix4_f16 :: proc(m: Matrix4f16) -> (q: Quaternionf16) {
+quaternion_from_matrix4_f16 :: proc "contextless" (m: Matrix4f16) -> (q: Quaternionf16) {
 	m3: Matrix3f16 = ---
 	m3[0, 0], m3[1, 0], m3[2, 0] = m[0, 0], m[1, 0], m[2, 0]
 	m3[0, 1], m3[1, 1], m3[2, 1] = m[0, 1], m[1, 1], m[2, 1]
 	m3[0, 2], m3[1, 2], m3[2, 2] = m[0, 2], m[1, 2], m[2, 2]
 	return quaternion_from_matrix3(m3)
 }
-quaternion_from_matrix4_f32 :: proc(m: Matrix4f32) -> (q: Quaternionf32) {
+quaternion_from_matrix4_f32 :: proc "contextless" (m: Matrix4f32) -> (q: Quaternionf32) {
 	m3: Matrix3f32 = ---
 	m3[0, 0], m3[1, 0], m3[2, 0] = m[0, 0], m[1, 0], m[2, 0]
 	m3[0, 1], m3[1, 1], m3[2, 1] = m[0, 1], m[1, 1], m[2, 1]
 	m3[0, 2], m3[1, 2], m3[2, 2] = m[0, 2], m[1, 2], m[2, 2]
 	return quaternion_from_matrix3(m3)
 }
-quaternion_from_matrix4_f64 :: proc(m: Matrix4f64) -> (q: Quaternionf64) {
+quaternion_from_matrix4_f64 :: proc "contextless" (m: Matrix4f64) -> (q: Quaternionf64) {
 	m3: Matrix3f64 = ---
 	m3[0, 0], m3[1, 0], m3[2, 0] = m[0, 0], m[1, 0], m[2, 0]
 	m3[0, 1], m3[1, 1], m3[2, 1] = m[0, 1], m[1, 1], m[2, 1]
@@ -869,7 +869,7 @@ quaternion_from_matrix4 :: proc{
 }
 
 
-quaternion_from_matrix3_f16 :: proc(m: Matrix3f16) -> (q: Quaternionf16) {
+quaternion_from_matrix3_f16 :: proc "contextless" (m: Matrix3f16) -> (q: Quaternionf16) {
 	four_x_squared_minus_1 := m[0, 0] - m[1, 1] - m[2, 2]
 	four_y_squared_minus_1 := m[1, 1] - m[0, 0] - m[2, 2]
 	four_z_squared_minus_1 := m[2, 2] - m[0, 0] - m[1, 1]
@@ -918,7 +918,7 @@ quaternion_from_matrix3_f16 :: proc(m: Matrix3f16) -> (q: Quaternionf16) {
 	}
 	return
 }
-quaternion_from_matrix3_f32 :: proc(m: Matrix3f32) -> (q: Quaternionf32) {
+quaternion_from_matrix3_f32 :: proc "contextless" (m: Matrix3f32) -> (q: Quaternionf32) {
 	four_x_squared_minus_1 := m[0, 0] - m[1, 1] - m[2, 2]
 	four_y_squared_minus_1 := m[1, 1] - m[0, 0] - m[2, 2]
 	four_z_squared_minus_1 := m[2, 2] - m[0, 0] - m[1, 1]
@@ -967,7 +967,7 @@ quaternion_from_matrix3_f32 :: proc(m: Matrix3f32) -> (q: Quaternionf32) {
 	}
 	return
 }
-quaternion_from_matrix3_f64 :: proc(m: Matrix3f64) -> (q: Quaternionf64) {
+quaternion_from_matrix3_f64 :: proc "contextless" (m: Matrix3f64) -> (q: Quaternionf64) {
 	four_x_squared_minus_1 := m[0, 0] - m[1, 1] - m[2, 2]
 	four_y_squared_minus_1 := m[1, 1] - m[0, 0] - m[2, 2]
 	four_z_squared_minus_1 := m[2, 2] - m[0, 0] - m[1, 1]
@@ -1023,7 +1023,7 @@ quaternion_from_matrix3 :: proc{
 }
 
 
-quaternion_between_two_vector3_f16 :: proc(from, to: Vector3f16) -> (q: Quaternionf16) {
+quaternion_between_two_vector3_f16 :: proc "contextless" (from, to: Vector3f16) -> (q: Quaternionf16) {
 	x := normalize(from)
 	y := normalize(to)
 
@@ -1044,7 +1044,7 @@ quaternion_between_two_vector3_f16 :: proc(from, to: Vector3f16) -> (q: Quaterni
 	q.z = v.z
 	return normalize(q)
 }
-quaternion_between_two_vector3_f32 :: proc(from, to: Vector3f32) -> (q: Quaternionf32) {
+quaternion_between_two_vector3_f32 :: proc "contextless" (from, to: Vector3f32) -> (q: Quaternionf32) {
 	x := normalize(from)
 	y := normalize(to)
 
@@ -1065,7 +1065,7 @@ quaternion_between_two_vector3_f32 :: proc(from, to: Vector3f32) -> (q: Quaterni
 	q.z = v.z
 	return normalize(q)
 }
-quaternion_between_two_vector3_f64 :: proc(from, to: Vector3f64) -> (q: Quaternionf64) {
+quaternion_between_two_vector3_f64 :: proc "contextless" (from, to: Vector3f64) -> (q: Quaternionf64) {
 	x := normalize(from)
 	y := normalize(to)
 
@@ -1093,7 +1093,7 @@ quaternion_between_two_vector3 :: proc{
 }
 
 
-matrix2_inverse_transpose_f16 :: proc(m: Matrix2f16) -> (c: Matrix2f16) {
+matrix2_inverse_transpose_f16 :: proc "contextless" (m: Matrix2f16) -> (c: Matrix2f16) {
 	d := m[0, 0]*m[1, 1] - m[0, 1]*m[1, 0]
 	id := 1.0/d
 	c[0, 0] = +m[1, 1] * id
@@ -1102,7 +1102,7 @@ matrix2_inverse_transpose_f16 :: proc(m: Matrix2f16) -> (c: Matrix2f16) {
 	c[1, 1] = +m[0, 0] * id
 	return c
 }
-matrix2_inverse_transpose_f32 :: proc(m: Matrix2f32) -> (c: Matrix2f32) {
+matrix2_inverse_transpose_f32 :: proc "contextless" (m: Matrix2f32) -> (c: Matrix2f32) {
 	d := m[0, 0]*m[1, 1] - m[0, 1]*m[1, 0]
 	id := 1.0/d
 	c[0, 0] = +m[1, 1] * id
@@ -1111,7 +1111,7 @@ matrix2_inverse_transpose_f32 :: proc(m: Matrix2f32) -> (c: Matrix2f32) {
 	c[1, 1] = +m[0, 0] * id
 	return c
 }
-matrix2_inverse_transpose_f64 :: proc(m: Matrix2f64) -> (c: Matrix2f64) {
+matrix2_inverse_transpose_f64 :: proc "contextless" (m: Matrix2f64) -> (c: Matrix2f64) {
 	d := m[0, 0]*m[1, 1] - m[0, 1]*m[1, 0]
 	id := 1.0/d
 	c[0, 0] = +m[1, 1] * id
@@ -1127,13 +1127,13 @@ matrix2_inverse_transpose :: proc{
 }
 
 
-matrix2_determinant_f16 :: proc(m: Matrix2f16) -> f16 {
+matrix2_determinant_f16 :: proc "contextless" (m: Matrix2f16) -> f16 {
 	return m[0, 0]*m[1, 1] - m[0, 1]*m[1, 0]
 }
-matrix2_determinant_f32 :: proc(m: Matrix2f32) -> f32 {
+matrix2_determinant_f32 :: proc "contextless" (m: Matrix2f32) -> f32 {
 	return m[0, 0]*m[1, 1] - m[0, 1]*m[1, 0]
 }
-matrix2_determinant_f64 :: proc(m: Matrix2f64) -> f64 {
+matrix2_determinant_f64 :: proc "contextless" (m: Matrix2f64) -> f64 {
 	return m[0, 0]*m[1, 1] - m[0, 1]*m[1, 0]
 }
 matrix2_determinant :: proc{
@@ -1143,7 +1143,7 @@ matrix2_determinant :: proc{
 }
 
 
-matrix2_inverse_f16 :: proc(m: Matrix2f16) -> (c: Matrix2f16) {
+matrix2_inverse_f16 :: proc "contextless" (m: Matrix2f16) -> (c: Matrix2f16) {
 	d := m[0, 0]*m[1, 1] - m[0, 1]*m[1, 0]
 	id := 1.0/d
 	c[0, 0] = +m[1, 1] * id
@@ -1152,7 +1152,7 @@ matrix2_inverse_f16 :: proc(m: Matrix2f16) -> (c: Matrix2f16) {
 	c[1, 1] = +m[0, 0] * id
 	return c
 }
-matrix2_inverse_f32 :: proc(m: Matrix2f32) -> (c: Matrix2f32) {
+matrix2_inverse_f32 :: proc "contextless" (m: Matrix2f32) -> (c: Matrix2f32) {
 	d := m[0, 0]*m[1, 1] - m[0, 1]*m[1, 0]
 	id := 1.0/d
 	c[0, 0] = +m[1, 1] * id
@@ -1161,7 +1161,7 @@ matrix2_inverse_f32 :: proc(m: Matrix2f32) -> (c: Matrix2f32) {
 	c[1, 1] = +m[0, 0] * id
 	return c
 }
-matrix2_inverse_f64 :: proc(m: Matrix2f64) -> (c: Matrix2f64) {
+matrix2_inverse_f64 :: proc "contextless" (m: Matrix2f64) -> (c: Matrix2f64) {
 	d := m[0, 0]*m[1, 1] - m[0, 1]*m[1, 0]
 	id := 1.0/d
 	c[0, 0] = +m[1, 1] * id
@@ -1177,21 +1177,21 @@ matrix2_inverse :: proc{
 }
 
 
-matrix2_adjoint_f16 :: proc(m: Matrix2f16) -> (c: Matrix2f16) {
+matrix2_adjoint_f16 :: proc "contextless" (m: Matrix2f16) -> (c: Matrix2f16) {
 	c[0, 0] = +m[1, 1]
 	c[1, 0] = -m[0, 1]
 	c[0, 1] = -m[1, 0]
 	c[1, 1] = +m[0, 0]
 	return c
 }
-matrix2_adjoint_f32 :: proc(m: Matrix2f32) -> (c: Matrix2f32) {
+matrix2_adjoint_f32 :: proc "contextless" (m: Matrix2f32) -> (c: Matrix2f32) {
 	c[0, 0] = +m[1, 1]
 	c[1, 0] = -m[0, 1]
 	c[0, 1] = -m[1, 0]
 	c[1, 1] = +m[0, 0]
 	return c
 }
-matrix2_adjoint_f64 :: proc(m: Matrix2f64) -> (c: Matrix2f64) {
+matrix2_adjoint_f64 :: proc "contextless" (m: Matrix2f64) -> (c: Matrix2f64) {
 	c[0, 0] = +m[1, 1]
 	c[1, 0] = -m[0, 1]
 	c[0, 1] = -m[1, 0]
@@ -1205,7 +1205,7 @@ matrix2_adjoint :: proc{
 }
 
 
-matrix3_from_quaternion_f16 :: proc(q: Quaternionf16) -> (m: Matrix3f16) {
+matrix3_from_quaternion_f16 :: proc "contextless" (q: Quaternionf16) -> (m: Matrix3f16) {
 	qxx := q.x * q.x
 	qyy := q.y * q.y
 	qzz := q.z * q.z
@@ -1229,7 +1229,7 @@ matrix3_from_quaternion_f16 :: proc(q: Quaternionf16) -> (m: Matrix3f16) {
 	m[2, 2] = 1 - 2 * (qxx + qyy)
 	return m
 }
-matrix3_from_quaternion_f32 :: proc(q: Quaternionf32) -> (m: Matrix3f32) {
+matrix3_from_quaternion_f32 :: proc "contextless" (q: Quaternionf32) -> (m: Matrix3f32) {
 	qxx := q.x * q.x
 	qyy := q.y * q.y
 	qzz := q.z * q.z
@@ -1253,7 +1253,7 @@ matrix3_from_quaternion_f32 :: proc(q: Quaternionf32) -> (m: Matrix3f32) {
 	m[2, 2] = 1 - 2 * (qxx + qyy)
 	return m
 }
-matrix3_from_quaternion_f64 :: proc(q: Quaternionf64) -> (m: Matrix3f64) {
+matrix3_from_quaternion_f64 :: proc "contextless" (q: Quaternionf64) -> (m: Matrix3f64) {
 	qxx := q.x * q.x
 	qyy := q.y * q.y
 	qzz := q.z * q.z
@@ -1284,13 +1284,13 @@ matrix3_from_quaternion :: proc{
 }
 
 
-matrix3_inverse_f16 :: proc(m: Matrix3f16) -> Matrix3f16 {
+matrix3_inverse_f16 :: proc "contextless" (m: Matrix3f16) -> Matrix3f16 {
 	return transpose(matrix3_inverse_transpose(m))
 }
-matrix3_inverse_f32 :: proc(m: Matrix3f32) -> Matrix3f32 {
+matrix3_inverse_f32 :: proc "contextless" (m: Matrix3f32) -> Matrix3f32 {
 	return transpose(matrix3_inverse_transpose(m))
 }
-matrix3_inverse_f64 :: proc(m: Matrix3f64) -> Matrix3f64 {
+matrix3_inverse_f64 :: proc "contextless" (m: Matrix3f64) -> Matrix3f64 {
 	return transpose(matrix3_inverse_transpose(m))
 }
 matrix3_inverse :: proc{
@@ -1300,19 +1300,19 @@ matrix3_inverse :: proc{
 }
 
 
-matrix3_determinant_f16 :: proc(m: Matrix3f16) -> f16 {
+matrix3_determinant_f16 :: proc "contextless" (m: Matrix3f16) -> f16 {
 	a := +m[0, 0] * (m[1, 1] * m[2, 2] - m[1, 2] * m[2, 1])
 	b := -m[0, 1] * (m[1, 0] * m[2, 2] - m[1, 2] * m[2, 0])
 	c := +m[0, 2] * (m[1, 0] * m[2, 1] - m[1, 1] * m[2, 0])
 	return a + b + c
 }
-matrix3_determinant_f32 :: proc(m: Matrix3f32) -> f32 {
+matrix3_determinant_f32 :: proc "contextless" (m: Matrix3f32) -> f32 {
 	a := +m[0, 0] * (m[1, 1] * m[2, 2] - m[1, 2] * m[2, 1])
 	b := -m[0, 1] * (m[1, 0] * m[2, 2] - m[1, 2] * m[2, 0])
 	c := +m[0, 2] * (m[1, 0] * m[2, 1] - m[1, 1] * m[2, 0])
 	return a + b + c
 }
-matrix3_determinant_f64 :: proc(m: Matrix3f64) -> f64 {
+matrix3_determinant_f64 :: proc "contextless" (m: Matrix3f64) -> f64 {
 	a := +m[0, 0] * (m[1, 1] * m[2, 2] - m[1, 2] * m[2, 1])
 	b := -m[0, 1] * (m[1, 0] * m[2, 2] - m[1, 2] * m[2, 0])
 	c := +m[0, 2] * (m[1, 0] * m[2, 1] - m[1, 1] * m[2, 0])
@@ -1325,7 +1325,7 @@ matrix3_determinant :: proc{
 }
 
 
-matrix3_adjoint_f16 :: proc(m: Matrix3f16) -> (adjoint: Matrix3f16) {
+matrix3_adjoint_f16 :: proc "contextless" (m: Matrix3f16) -> (adjoint: Matrix3f16) {
 	adjoint[0, 0] = +(m[1, 1] * m[2, 2] - m[2, 1] * m[1, 2])
 	adjoint[0, 1] = -(m[1, 0] * m[2, 2] - m[2, 0] * m[1, 2])
 	adjoint[0, 2] = +(m[1, 0] * m[2, 1] - m[2, 0] * m[1, 1])
@@ -1337,7 +1337,7 @@ matrix3_adjoint_f16 :: proc(m: Matrix3f16) -> (adjoint: Matrix3f16) {
 	adjoint[2, 2] = +(m[0, 0] * m[1, 1] - m[1, 0] * m[0, 1])
 	return adjoint
 }
-matrix3_adjoint_f32 :: proc(m: Matrix3f32) -> (adjoint: Matrix3f32) {
+matrix3_adjoint_f32 :: proc "contextless" (m: Matrix3f32) -> (adjoint: Matrix3f32) {
 	adjoint[0, 0] = +(m[1, 1] * m[2, 2] - m[2, 1] * m[1, 2])
 	adjoint[0, 1] = -(m[1, 0] * m[2, 2] - m[2, 0] * m[1, 2])
 	adjoint[0, 2] = +(m[1, 0] * m[2, 1] - m[2, 0] * m[1, 1])
@@ -1349,7 +1349,7 @@ matrix3_adjoint_f32 :: proc(m: Matrix3f32) -> (adjoint: Matrix3f32) {
 	adjoint[2, 2] = +(m[0, 0] * m[1, 1] - m[1, 0] * m[0, 1])
 	return adjoint
 }
-matrix3_adjoint_f64 :: proc(m: Matrix3f64) -> (adjoint: Matrix3f64) {
+matrix3_adjoint_f64 :: proc "contextless" (m: Matrix3f64) -> (adjoint: Matrix3f64) {
 	adjoint[0, 0] = +(m[1, 1] * m[2, 2] - m[2, 1] * m[1, 2])
 	adjoint[0, 1] = -(m[1, 0] * m[2, 2] - m[2, 0] * m[1, 2])
 	adjoint[0, 2] = +(m[1, 0] * m[2, 1] - m[2, 0] * m[1, 1])
@@ -1369,13 +1369,13 @@ matrix3_adjoint :: proc{
 
 
 
-matrix3_inverse_transpose_f16 :: proc(m: Matrix3f16) -> (inverse_transpose: Matrix3f16) {
+matrix3_inverse_transpose_f16 :: proc "contextless" (m: Matrix3f16) -> (inverse_transpose: Matrix3f16) {
 	return builtin.inverse_transpose(m)
 }
-matrix3_inverse_transpose_f32 :: proc(m: Matrix3f32) -> (inverse_transpose: Matrix3f32) {
+matrix3_inverse_transpose_f32 :: proc "contextless" (m: Matrix3f32) -> (inverse_transpose: Matrix3f32) {
 	return builtin.inverse_transpose(m)
 }
-matrix3_inverse_transpose_f64 :: proc(m: Matrix3f64) -> (inverse_transpose: Matrix3f64) {
+matrix3_inverse_transpose_f64 :: proc "contextless" (m: Matrix3f64) -> (inverse_transpose: Matrix3f64) {
 	return builtin.inverse_transpose(m)
 }
 matrix3_inverse_transpose :: proc{
@@ -1385,19 +1385,19 @@ matrix3_inverse_transpose :: proc{
 }
 
 
-matrix3_scale_f16 :: proc(s: Vector3f16) -> (m: Matrix3f16) {
+matrix3_scale_f16 :: proc "contextless" (s: Vector3f16) -> (m: Matrix3f16) {
 	m[0, 0] = s[0]
 	m[1, 1] = s[1]
 	m[2, 2] = s[2]
 	return m
 }
-matrix3_scale_f32 :: proc(s: Vector3f32) -> (m: Matrix3f32) {
+matrix3_scale_f32 :: proc "contextless" (s: Vector3f32) -> (m: Matrix3f32) {
 	m[0, 0] = s[0]
 	m[1, 1] = s[1]
 	m[2, 2] = s[2]
 	return m
 }
-matrix3_scale_f64 :: proc(s: Vector3f64) -> (m: Matrix3f64) {
+matrix3_scale_f64 :: proc "contextless" (s: Vector3f64) -> (m: Matrix3f64) {
 	m[0, 0] = s[0]
 	m[1, 1] = s[1]
 	m[2, 2] = s[2]
@@ -1410,7 +1410,7 @@ matrix3_scale :: proc{
 }
 
 
-matrix3_rotate_f16 :: proc(angle_radians: f16, v: Vector3f16) -> (rot: Matrix3f16) {
+matrix3_rotate_f16 :: proc "contextless" (angle_radians: f16, v: Vector3f16) -> (rot: Matrix3f16) {
 	c := math.cos(angle_radians)
 	s := math.sin(angle_radians)
 
@@ -1431,7 +1431,7 @@ matrix3_rotate_f16 :: proc(angle_radians: f16, v: Vector3f16) -> (rot: Matrix3f1
 
 	return rot
 }
-matrix3_rotate_f32 :: proc(angle_radians: f32, v: Vector3f32) -> (rot: Matrix3f32) {
+matrix3_rotate_f32 :: proc "contextless" (angle_radians: f32, v: Vector3f32) -> (rot: Matrix3f32) {
 	c := math.cos(angle_radians)
 	s := math.sin(angle_radians)
 
@@ -1452,7 +1452,7 @@ matrix3_rotate_f32 :: proc(angle_radians: f32, v: Vector3f32) -> (rot: Matrix3f3
 
 	return rot
 }
-matrix3_rotate_f64 :: proc(angle_radians: f64, v: Vector3f64) -> (rot: Matrix3f64) {
+matrix3_rotate_f64 :: proc "contextless" (angle_radians: f64, v: Vector3f64) -> (rot: Matrix3f64) {
 	c := math.cos(angle_radians)
 	s := math.sin(angle_radians)
 
@@ -1480,7 +1480,7 @@ matrix3_rotate :: proc{
 }
 
 
-matrix3_look_at_f16 :: proc(eye, centre, up: Vector3f16) -> Matrix3f16 {
+matrix3_look_at_f16 :: proc "contextless" (eye, centre, up: Vector3f16) -> Matrix3f16 {
 	f := normalize(centre - eye)
 	s := normalize(cross(f, up))
 	u := cross(s, f)
@@ -1490,7 +1490,7 @@ matrix3_look_at_f16 :: proc(eye, centre, up: Vector3f16) -> Matrix3f16 {
 		-f.x, -f.y, -f.z,
 	}
 }
-matrix3_look_at_f32 :: proc(eye, centre, up: Vector3f32) -> Matrix3f32 {
+matrix3_look_at_f32 :: proc "contextless" (eye, centre, up: Vector3f32) -> Matrix3f32 {
 	f := normalize(centre - eye)
 	s := normalize(cross(f, up))
 	u := cross(s, f)
@@ -1500,7 +1500,7 @@ matrix3_look_at_f32 :: proc(eye, centre, up: Vector3f32) -> Matrix3f32 {
 		-f.x, -f.y, -f.z,
 	}
 }
-matrix3_look_at_f64 :: proc(eye, centre, up: Vector3f64) -> Matrix3f64 {
+matrix3_look_at_f64 :: proc "contextless" (eye, centre, up: Vector3f64) -> Matrix3f64 {
 	f := normalize(centre - eye)
 	s := normalize(cross(f, up))
 	u := cross(s, f)
@@ -1517,7 +1517,7 @@ matrix3_look_at :: proc{
 }
 
 
-matrix4_from_quaternion_f16 :: proc(q: Quaternionf16) -> (m: Matrix4f16) {
+matrix4_from_quaternion_f16 :: proc "contextless" (q: Quaternionf16) -> (m: Matrix4f16) {
 	qxx := q.x * q.x
 	qyy := q.y * q.y
 	qzz := q.z * q.z
@@ -1544,7 +1544,7 @@ matrix4_from_quaternion_f16 :: proc(q: Quaternionf16) -> (m: Matrix4f16) {
 
 	return m
 }
-matrix4_from_quaternion_f32 :: proc(q: Quaternionf32) -> (m: Matrix4f32) {
+matrix4_from_quaternion_f32 :: proc "contextless" (q: Quaternionf32) -> (m: Matrix4f32) {
 	qxx := q.x * q.x
 	qyy := q.y * q.y
 	qzz := q.z * q.z
@@ -1571,7 +1571,7 @@ matrix4_from_quaternion_f32 :: proc(q: Quaternionf32) -> (m: Matrix4f32) {
 
 	return m
 }
-matrix4_from_quaternion_f64 :: proc(q: Quaternionf64) -> (m: Matrix4f64) {
+matrix4_from_quaternion_f64 :: proc "contextless" (q: Quaternionf64) -> (m: Matrix4f64) {
 	qxx := q.x * q.x
 	qyy := q.y * q.y
 	qzz := q.z * q.z
@@ -1605,19 +1605,19 @@ matrix4_from_quaternion :: proc{
 }
 
 
-matrix4_from_trs_f16 :: proc(t: Vector3f16, r: Quaternionf16, s: Vector3f16) -> Matrix4f16 {
+matrix4_from_trs_f16 :: proc "contextless" (t: Vector3f16, r: Quaternionf16, s: Vector3f16) -> Matrix4f16 {
 	translation := matrix4_translate(t)
 	rotation := matrix4_from_quaternion(r)
 	scale := matrix4_scale(s)
 	return mul(translation, mul(rotation, scale))
 }
-matrix4_from_trs_f32 :: proc(t: Vector3f32, r: Quaternionf32, s: Vector3f32) -> Matrix4f32 {
+matrix4_from_trs_f32 :: proc "contextless" (t: Vector3f32, r: Quaternionf32, s: Vector3f32) -> Matrix4f32 {
 	translation := matrix4_translate(t)
 	rotation := matrix4_from_quaternion(r)
 	scale := matrix4_scale(s)
 	return mul(translation, mul(rotation, scale))
 }
-matrix4_from_trs_f64 :: proc(t: Vector3f64, r: Quaternionf64, s: Vector3f64) -> Matrix4f64 {
+matrix4_from_trs_f64 :: proc "contextless" (t: Vector3f64, r: Quaternionf64, s: Vector3f64) -> Matrix4f64 {
 	translation := matrix4_translate(t)
 	rotation := matrix4_from_quaternion(r)
 	scale := matrix4_scale(s)
@@ -1631,13 +1631,13 @@ matrix4_from_trs :: proc{
 
 
 
-matrix4_inverse_f16 :: proc(m: Matrix4f16) -> Matrix4f16 {
+matrix4_inverse_f16 :: proc "contextless" (m: Matrix4f16) -> Matrix4f16 {
 	return transpose(matrix4_inverse_transpose(m))
 }
-matrix4_inverse_f32 :: proc(m: Matrix4f32) -> Matrix4f32 {
+matrix4_inverse_f32 :: proc "contextless" (m: Matrix4f32) -> Matrix4f32 {
 	return transpose(matrix4_inverse_transpose(m))
 }
-matrix4_inverse_f64 :: proc(m: Matrix4f64) -> Matrix4f64 {
+matrix4_inverse_f64 :: proc "contextless" (m: Matrix4f64) -> Matrix4f64 {
 	return transpose(matrix4_inverse_transpose(m))
 }
 matrix4_inverse :: proc{
@@ -1647,7 +1647,7 @@ matrix4_inverse :: proc{
 }
 
 
-matrix4_minor_f16 :: proc(m: Matrix4f16, c, r: int) -> f16 {
+matrix4_minor_f16 :: proc "contextless" (m: Matrix4f16, c, r: int) -> f16 {
 	cut_down: Matrix3f16
 	for i in 0..<3 {
 		col := i if i < c else i+1
@@ -1658,7 +1658,7 @@ matrix4_minor_f16 :: proc(m: Matrix4f16, c, r: int) -> f16 {
 	}
 	return matrix3_determinant(cut_down)
 }
-matrix4_minor_f32 :: proc(m: Matrix4f32, c, r: int) -> f32 {
+matrix4_minor_f32 :: proc "contextless" (m: Matrix4f32, c, r: int) -> f32 {
 	cut_down: Matrix3f32
 	for i in 0..<3 {
 		col := i if i < c else i+1
@@ -1669,7 +1669,7 @@ matrix4_minor_f32 :: proc(m: Matrix4f32, c, r: int) -> f32 {
 	}
 	return matrix3_determinant(cut_down)
 }
-matrix4_minor_f64 :: proc(m: Matrix4f64, c, r: int) -> f64 {
+matrix4_minor_f64 :: proc "contextless" (m: Matrix4f64, c, r: int) -> f64 {
 	cut_down: Matrix3f64
 	for i in 0..<3 {
 		col := i if i < c else i+1
@@ -1687,19 +1687,19 @@ matrix4_minor :: proc{
 }
 
 
-matrix4_cofactor_f16 :: proc(m: Matrix4f16, c, r: int) -> f16 {
+matrix4_cofactor_f16 :: proc "contextless" (m: Matrix4f16, c, r: int) -> f16 {
 	sign, minor: f16
 	sign = 1 if (c + r) % 2 == 0 else -1
 	minor = matrix4_minor(m, c, r)
 	return sign * minor
 }
-matrix4_cofactor_f32 :: proc(m: Matrix4f32, c, r: int) -> f32 {
+matrix4_cofactor_f32 :: proc "contextless" (m: Matrix4f32, c, r: int) -> f32 {
 	sign, minor: f32
 	sign = 1 if (c + r) % 2 == 0 else -1
 	minor = matrix4_minor(m, c, r)
 	return sign * minor
 }
-matrix4_cofactor_f64 :: proc(m: Matrix4f64, c, r: int) -> f64 {
+matrix4_cofactor_f64 :: proc "contextless" (m: Matrix4f64, c, r: int) -> f64 {
 	sign, minor: f64
 	sign = 1 if (c + r) % 2 == 0 else -1
 	minor = matrix4_minor(m, c, r)
@@ -1712,7 +1712,7 @@ matrix4_cofactor :: proc{
 }
 
 
-matrix4_adjoint_f16 :: proc(m: Matrix4f16) -> (adjoint: Matrix4f16) {
+matrix4_adjoint_f16 :: proc "contextless" (m: Matrix4f16) -> (adjoint: Matrix4f16) {
 	for i in 0..<4 {
 		for j in 0..<4 {
 			adjoint[i][j] = matrix4_cofactor(m, i, j)
@@ -1720,7 +1720,7 @@ matrix4_adjoint_f16 :: proc(m: Matrix4f16) -> (adjoint: Matrix4f16) {
 	}
 	return
 }
-matrix4_adjoint_f32 :: proc(m: Matrix4f32) -> (adjoint: Matrix4f32) {
+matrix4_adjoint_f32 :: proc "contextless" (m: Matrix4f32) -> (adjoint: Matrix4f32) {
 	for i in 0..<4 {
 		for j in 0..<4 {
 			adjoint[i][j] = matrix4_cofactor(m, i, j)
@@ -1728,7 +1728,7 @@ matrix4_adjoint_f32 :: proc(m: Matrix4f32) -> (adjoint: Matrix4f32) {
 	}
 	return
 }
-matrix4_adjoint_f64 :: proc(m: Matrix4f64) -> (adjoint: Matrix4f64) {
+matrix4_adjoint_f64 :: proc "contextless" (m: Matrix4f64) -> (adjoint: Matrix4f64) {
 	for i in 0..<4 {
 		for j in 0..<4 {
 			adjoint[i][j] = matrix4_cofactor(m, i, j)
@@ -1743,21 +1743,21 @@ matrix4_adjoint :: proc{
 }
 
 
-matrix4_determinant_f16 :: proc(m: Matrix4f16) -> (determinant: f16) {
+matrix4_determinant_f16 :: proc "contextless" (m: Matrix4f16) -> (determinant: f16) {
 	adjoint := matrix4_adjoint(m)
 	for i in 0..<4 {
 		determinant += m[i][0] * adjoint[i][0]
 	}
 	return
 }
-matrix4_determinant_f32 :: proc(m: Matrix4f32) -> (determinant: f32) {
+matrix4_determinant_f32 :: proc "contextless" (m: Matrix4f32) -> (determinant: f32) {
 	adjoint := matrix4_adjoint(m)
 	for i in 0..<4 {
 		determinant += m[i][0] * adjoint[i][0]
 	}
 	return
 }
-matrix4_determinant_f64 :: proc(m: Matrix4f64) -> (determinant: f64) {
+matrix4_determinant_f64 :: proc "contextless" (m: Matrix4f64) -> (determinant: f64) {
 	adjoint := matrix4_adjoint(m)
 	for i in 0..<4 {
 		determinant += m[i][0] * adjoint[i][0]
@@ -1771,7 +1771,7 @@ matrix4_determinant :: proc{
 }
 
 
-matrix4_inverse_transpose_f16 :: proc(m: Matrix4f16) -> (inverse_transpose: Matrix4f16) {
+matrix4_inverse_transpose_f16 :: proc "contextless" (m: Matrix4f16) -> (inverse_transpose: Matrix4f16) {
 	adjoint := matrix4_adjoint(m)
 	determinant: f16 = 0
 	for i in 0..<4 {
@@ -1785,7 +1785,7 @@ matrix4_inverse_transpose_f16 :: proc(m: Matrix4f16) -> (inverse_transpose: Matr
 	}
 	return
 }
-matrix4_inverse_transpose_f32 :: proc(m: Matrix4f32) -> (inverse_transpose: Matrix4f32) {
+matrix4_inverse_transpose_f32 :: proc "contextless" (m: Matrix4f32) -> (inverse_transpose: Matrix4f32) {
 	adjoint := matrix4_adjoint(m)
 	determinant: f32 = 0
 	for i in 0..<4 {
@@ -1799,7 +1799,7 @@ matrix4_inverse_transpose_f32 :: proc(m: Matrix4f32) -> (inverse_transpose: Matr
 	}
 	return
 }
-matrix4_inverse_transpose_f64 :: proc(m: Matrix4f64) -> (inverse_transpose: Matrix4f64) {
+matrix4_inverse_transpose_f64 :: proc "contextless" (m: Matrix4f64) -> (inverse_transpose: Matrix4f64) {
 	adjoint := matrix4_adjoint(m)
 	determinant: f64 = 0
 	for i in 0..<4 {
@@ -1820,21 +1820,21 @@ matrix4_inverse_transpose :: proc{
 }
 
 
-matrix4_translate_f16 :: proc(v: Vector3f16) -> Matrix4f16 {
+matrix4_translate_f16 :: proc "contextless" (v: Vector3f16) -> Matrix4f16 {
 	m := MATRIX4F16_IDENTITY
 	m[3][0] = v[0]
 	m[3][1] = v[1]
 	m[3][2] = v[2]
 	return m
 }
-matrix4_translate_f32 :: proc(v: Vector3f32) -> Matrix4f32 {
+matrix4_translate_f32 :: proc "contextless" (v: Vector3f32) -> Matrix4f32 {
 	m := MATRIX4F32_IDENTITY
 	m[3][0] = v[0]
 	m[3][1] = v[1]
 	m[3][2] = v[2]
 	return m
 }
-matrix4_translate_f64 :: proc(v: Vector3f64) -> Matrix4f64 {
+matrix4_translate_f64 :: proc "contextless" (v: Vector3f64) -> Matrix4f64 {
 	m := MATRIX4F64_IDENTITY
 	m[3][0] = v[0]
 	m[3][1] = v[1]
@@ -1848,7 +1848,7 @@ matrix4_translate :: proc{
 }
 
 
-matrix4_rotate_f16 :: proc(angle_radians: f16, v: Vector3f16) -> Matrix4f16 {
+matrix4_rotate_f16 :: proc "contextless" (angle_radians: f16, v: Vector3f16) -> Matrix4f16 {
 	c := math.cos(angle_radians)
 	s := math.sin(angle_radians)
 
@@ -1874,7 +1874,7 @@ matrix4_rotate_f16 :: proc(angle_radians: f16, v: Vector3f16) -> Matrix4f16 {
 
 	return rot
 }
-matrix4_rotate_f32 :: proc(angle_radians: f32, v: Vector3f32) -> Matrix4f32 {
+matrix4_rotate_f32 :: proc "contextless" (angle_radians: f32, v: Vector3f32) -> Matrix4f32 {
 	c := math.cos(angle_radians)
 	s := math.sin(angle_radians)
 
@@ -1900,7 +1900,7 @@ matrix4_rotate_f32 :: proc(angle_radians: f32, v: Vector3f32) -> Matrix4f32 {
 
 	return rot
 }
-matrix4_rotate_f64 :: proc(angle_radians: f64, v: Vector3f64) -> Matrix4f64 {
+matrix4_rotate_f64 :: proc "contextless" (angle_radians: f64, v: Vector3f64) -> Matrix4f64 {
 	c := math.cos(angle_radians)
 	s := math.sin(angle_radians)
 
@@ -1933,21 +1933,21 @@ matrix4_rotate :: proc{
 }
 
 
-matrix4_scale_f16 :: proc(v: Vector3f16) -> (m: Matrix4f16) {
+matrix4_scale_f16 :: proc "contextless" (v: Vector3f16) -> (m: Matrix4f16) {
 	m[0][0] = v[0]
 	m[1][1] = v[1]
 	m[2][2] = v[2]
 	m[3][3] = 1
 	return
 }
-matrix4_scale_f32 :: proc(v: Vector3f32) -> (m: Matrix4f32) {
+matrix4_scale_f32 :: proc "contextless" (v: Vector3f32) -> (m: Matrix4f32) {
 	m[0][0] = v[0]
 	m[1][1] = v[1]
 	m[2][2] = v[2]
 	m[3][3] = 1
 	return
 }
-matrix4_scale_f64 :: proc(v: Vector3f64) -> (m: Matrix4f64) {
+matrix4_scale_f64 :: proc "contextless" (v: Vector3f64) -> (m: Matrix4f64) {
 	m[0][0] = v[0]
 	m[1][1] = v[1]
 	m[2][2] = v[2]
@@ -1961,7 +1961,7 @@ matrix4_scale :: proc{
 }
 
 
-matrix4_look_at_f16 :: proc(eye, centre, up: Vector3f16, flip_z_axis := true) -> (m: Matrix4f16) {
+matrix4_look_at_f16 :: proc "contextless" (eye, centre, up: Vector3f16, flip_z_axis := true) -> (m: Matrix4f16) {
 	f := normalize(centre - eye)
 	s := normalize(cross(f, up))
 	u := cross(s, f)
@@ -1975,7 +1975,7 @@ matrix4_look_at_f16 :: proc(eye, centre, up: Vector3f16, flip_z_axis := true) ->
 		   0,    0,    0, 1,
 	}
 }
-matrix4_look_at_f32 :: proc(eye, centre, up: Vector3f32, flip_z_axis := true) -> (m: Matrix4f32) {
+matrix4_look_at_f32 :: proc "contextless" (eye, centre, up: Vector3f32, flip_z_axis := true) -> (m: Matrix4f32) {
 	f := normalize(centre - eye)
 	s := normalize(cross(f, up))
 	u := cross(s, f)
@@ -1989,7 +1989,7 @@ matrix4_look_at_f32 :: proc(eye, centre, up: Vector3f32, flip_z_axis := true) ->
 		   0,    0,    0, 1,
 	}
 }
-matrix4_look_at_f64 :: proc(eye, centre, up: Vector3f64, flip_z_axis := true) -> (m: Matrix4f64) {
+matrix4_look_at_f64 :: proc "contextless" (eye, centre, up: Vector3f64, flip_z_axis := true) -> (m: Matrix4f64) {
 	f := normalize(centre - eye)
 	s := normalize(cross(f, up))
 	u := cross(s, f)
@@ -2010,7 +2010,7 @@ matrix4_look_at :: proc{
 }
 
 
-matrix4_look_at_from_fru_f16 :: proc(eye, f, r, u: Vector3f16, flip_z_axis := true) -> (m: Matrix4f16) {
+matrix4_look_at_from_fru_f16 :: proc "contextless" (eye, f, r, u: Vector3f16, flip_z_axis := true) -> (m: Matrix4f16) {
 	f, s, u := f, r, u
 	f = normalize(f)
 	s = normalize(s)
@@ -2024,7 +2024,7 @@ matrix4_look_at_from_fru_f16 :: proc(eye, f, r, u: Vector3f16, flip_z_axis := tr
 		   0,    0,    0, 1,
 	}
 }
-matrix4_look_at_from_fru_f32 :: proc(eye, f, r, u: Vector3f32, flip_z_axis := true) -> (m: Matrix4f32) {
+matrix4_look_at_from_fru_f32 :: proc "contextless" (eye, f, r, u: Vector3f32, flip_z_axis := true) -> (m: Matrix4f32) {
 	f, s, u := f, r, u
 	f = normalize(f)
 	s = normalize(s)
@@ -2038,7 +2038,7 @@ matrix4_look_at_from_fru_f32 :: proc(eye, f, r, u: Vector3f32, flip_z_axis := tr
 		   0,    0,    0, 1,
 	}
 }
-matrix4_look_at_from_fru_f64 :: proc(eye, f, r, u: Vector3f64, flip_z_axis := true) -> (m: Matrix4f64) {
+matrix4_look_at_from_fru_f64 :: proc "contextless" (eye, f, r, u: Vector3f64, flip_z_axis := true) -> (m: Matrix4f64) {
 	f, s, u := f, r, u
 	f = normalize(f)
 	s = normalize(s)
@@ -2059,7 +2059,7 @@ matrix4_look_at_from_fru :: proc{
 }
 
 
-matrix4_perspective_f16 :: proc(fovy, aspect, near, far: f16, flip_z_axis := true) -> (m: Matrix4f16) {
+matrix4_perspective_f16 :: proc "contextless" (fovy, aspect, near, far: f16, flip_z_axis := true) -> (m: Matrix4f16) {
 	tan_half_fovy := math.tan(0.5 * fovy)
 	m[0, 0] = 1 / (aspect*tan_half_fovy)
 	m[1, 1] = 1 / (tan_half_fovy)
@@ -2073,7 +2073,7 @@ matrix4_perspective_f16 :: proc(fovy, aspect, near, far: f16, flip_z_axis := tru
 
 	return
 }
-matrix4_perspective_f32 :: proc(fovy, aspect, near, far: f32, flip_z_axis := true) -> (m: Matrix4f32) {
+matrix4_perspective_f32 :: proc "contextless" (fovy, aspect, near, far: f32, flip_z_axis := true) -> (m: Matrix4f32) {
 	tan_half_fovy := math.tan(0.5 * fovy)
 	m[0, 0] = 1 / (aspect*tan_half_fovy)
 	m[1, 1] = 1 / (tan_half_fovy)
@@ -2087,7 +2087,7 @@ matrix4_perspective_f32 :: proc(fovy, aspect, near, far: f32, flip_z_axis := tru
 
 	return
 }
-matrix4_perspective_f64 :: proc(fovy, aspect, near, far: f64, flip_z_axis := true) -> (m: Matrix4f64) {
+matrix4_perspective_f64 :: proc "contextless" (fovy, aspect, near, far: f64, flip_z_axis := true) -> (m: Matrix4f64) {
 	tan_half_fovy := math.tan(0.5 * fovy)
 	m[0, 0] = 1 / (aspect*tan_half_fovy)
 	m[1, 1] = 1 / (tan_half_fovy)
@@ -2109,7 +2109,7 @@ matrix4_perspective :: proc{
 
 
 
-matrix_ortho3d_f16 :: proc(left, right, bottom, top, near, far: f16, flip_z_axis := true) -> (m: Matrix4f16) {
+matrix_ortho3d_f16 :: proc "contextless" (left, right, bottom, top, near, far: f16, flip_z_axis := true) -> (m: Matrix4f16) {
 	m[0, 0] = +2 / (right - left)
 	m[1, 1] = +2 / (top - bottom)
 	m[2, 2] = +2 / (far - near)
@@ -2124,7 +2124,7 @@ matrix_ortho3d_f16 :: proc(left, right, bottom, top, near, far: f16, flip_z_axis
 
 	return
 }
-matrix_ortho3d_f32 :: proc(left, right, bottom, top, near, far: f32, flip_z_axis := true) -> (m: Matrix4f32) {
+matrix_ortho3d_f32 :: proc "contextless" (left, right, bottom, top, near, far: f32, flip_z_axis := true) -> (m: Matrix4f32) {
 	m[0, 0] = +2 / (right - left)
 	m[1, 1] = +2 / (top - bottom)
 	m[2, 2] = +2 / (far - near)
@@ -2139,7 +2139,7 @@ matrix_ortho3d_f32 :: proc(left, right, bottom, top, near, far: f32, flip_z_axis
 
 	return
 }
-matrix_ortho3d_f64 :: proc(left, right, bottom, top, near, far: f64, flip_z_axis := true) -> (m: Matrix4f64) {
+matrix_ortho3d_f64 :: proc "contextless" (left, right, bottom, top, near, far: f64, flip_z_axis := true) -> (m: Matrix4f64) {
 	m[0, 0] = +2 / (right - left)
 	m[1, 1] = +2 / (top - bottom)
 	m[2, 2] = +2 / (far - near)
@@ -2162,7 +2162,7 @@ matrix_ortho3d :: proc{
 
 
 
-matrix4_infinite_perspective_f16 :: proc(fovy, aspect, near: f16, flip_z_axis := true) -> (m: Matrix4f16) {
+matrix4_infinite_perspective_f16 :: proc "contextless" (fovy, aspect, near: f16, flip_z_axis := true) -> (m: Matrix4f16) {
 	tan_half_fovy := math.tan(0.5 * fovy)
 	m[0, 0] = 1 / (aspect*tan_half_fovy)
 	m[1, 1] = 1 / (tan_half_fovy)
@@ -2176,7 +2176,7 @@ matrix4_infinite_perspective_f16 :: proc(fovy, aspect, near: f16, flip_z_axis :=
 
 	return
 }
-matrix4_infinite_perspective_f32 :: proc(fovy, aspect, near: f32, flip_z_axis := true) -> (m: Matrix4f32) {
+matrix4_infinite_perspective_f32 :: proc "contextless" (fovy, aspect, near: f32, flip_z_axis := true) -> (m: Matrix4f32) {
 	tan_half_fovy := math.tan(0.5 * fovy)
 	m[0, 0] = 1 / (aspect*tan_half_fovy)
 	m[1, 1] = 1 / (tan_half_fovy)
@@ -2190,7 +2190,7 @@ matrix4_infinite_perspective_f32 :: proc(fovy, aspect, near: f32, flip_z_axis :=
 
 	return
 }
-matrix4_infinite_perspective_f64 :: proc(fovy, aspect, near: f64, flip_z_axis := true) -> (m: Matrix4f64) {
+matrix4_infinite_perspective_f64 :: proc "contextless" (fovy, aspect, near: f64, flip_z_axis := true) -> (m: Matrix4f64) {
 	tan_half_fovy := math.tan(0.5 * fovy)
 	m[0, 0] = 1 / (aspect*tan_half_fovy)
 	m[1, 1] = 1 / (tan_half_fovy)
@@ -2212,17 +2212,17 @@ matrix4_infinite_perspective :: proc{
 
 
 
-matrix2_from_scalar_f16 :: proc(f: f16) -> (m: Matrix2f16) {
+matrix2_from_scalar_f16 :: proc "contextless" (f: f16) -> (m: Matrix2f16) {
 	m[0, 0], m[1, 0] = f, 0
 	m[0, 1], m[1, 1] = 0, f
 	return
 }
-matrix2_from_scalar_f32 :: proc(f: f32) -> (m: Matrix2f32) {
+matrix2_from_scalar_f32 :: proc "contextless" (f: f32) -> (m: Matrix2f32) {
 	m[0, 0], m[1, 0] = f, 0
 	m[0, 1], m[1, 1] = 0, f
 	return
 }
-matrix2_from_scalar_f64 :: proc(f: f64) -> (m: Matrix2f64) {
+matrix2_from_scalar_f64 :: proc "contextless" (f: f64) -> (m: Matrix2f64) {
 	m[0, 0], m[1, 0] = f, 0
 	m[0, 1], m[1, 1] = 0, f
 	return
@@ -2234,19 +2234,19 @@ matrix2_from_scalar :: proc{
 }
 
 
-matrix3_from_scalar_f16 :: proc(f: f16) -> (m: Matrix3f16) {
+matrix3_from_scalar_f16 :: proc "contextless" (f: f16) -> (m: Matrix3f16) {
 	m[0, 0], m[1, 0], m[2, 0] = f, 0, 0
 	m[0, 1], m[1, 1], m[2, 1] = 0, f, 0
 	m[0, 2], m[1, 2], m[2, 2] = 0, 0, f
 	return
 }
-matrix3_from_scalar_f32 :: proc(f: f32) -> (m: Matrix3f32) {
+matrix3_from_scalar_f32 :: proc "contextless" (f: f32) -> (m: Matrix3f32) {
 	m[0, 0], m[1, 0], m[2, 0] = f, 0, 0
 	m[0, 1], m[1, 1], m[2, 1] = 0, f, 0
 	m[0, 2], m[1, 2], m[2, 2] = 0, 0, f
 	return
 }
-matrix3_from_scalar_f64 :: proc(f: f64) -> (m: Matrix3f64) {
+matrix3_from_scalar_f64 :: proc "contextless" (f: f64) -> (m: Matrix3f64) {
 	m[0, 0], m[1, 0], m[2, 0] = f, 0, 0
 	m[0, 1], m[1, 1], m[2, 1] = 0, f, 0
 	m[0, 2], m[1, 2], m[2, 2] = 0, 0, f
@@ -2259,21 +2259,21 @@ matrix3_from_scalar :: proc{
 }
 
 
-matrix4_from_scalar_f16 :: proc(f: f16) -> (m: Matrix4f16) {
+matrix4_from_scalar_f16 :: proc "contextless" (f: f16) -> (m: Matrix4f16) {
 	m[0, 0], m[1, 0], m[2, 0], m[3, 0] = f, 0, 0, 0
 	m[0, 1], m[1, 1], m[2, 1], m[3, 1] = 0, f, 0, 0
 	m[0, 2], m[1, 2], m[2, 2], m[3, 2] = 0, 0, f, 0
 	m[0, 3], m[1, 3], m[2, 3], m[3, 3] = 0, 0, 0, f
 	return
 }
-matrix4_from_scalar_f32 :: proc(f: f32) -> (m: Matrix4f32) {
+matrix4_from_scalar_f32 :: proc "contextless" (f: f32) -> (m: Matrix4f32) {
 	m[0, 0], m[1, 0], m[2, 0], m[3, 0] = f, 0, 0, 0
 	m[0, 1], m[1, 1], m[2, 1], m[3, 1] = 0, f, 0, 0
 	m[0, 2], m[1, 2], m[2, 2], m[3, 2] = 0, 0, f, 0
 	m[0, 3], m[1, 3], m[2, 3], m[3, 3] = 0, 0, 0, f
 	return
 }
-matrix4_from_scalar_f64 :: proc(f: f64) -> (m: Matrix4f64) {
+matrix4_from_scalar_f64 :: proc "contextless" (f: f64) -> (m: Matrix4f64) {
 	m[0, 0], m[1, 0], m[2, 0], m[3, 0] = f, 0, 0, 0
 	m[0, 1], m[1, 1], m[2, 1], m[3, 1] = 0, f, 0, 0
 	m[0, 2], m[1, 2], m[2, 2], m[3, 2] = 0, 0, f, 0
@@ -2287,17 +2287,17 @@ matrix4_from_scalar :: proc{
 }
 
 
-matrix2_from_matrix3_f16 :: proc(m: Matrix3f16) -> (r: Matrix2f16) {
+matrix2_from_matrix3_f16 :: proc "contextless" (m: Matrix3f16) -> (r: Matrix2f16) {
 	r[0, 0], r[1, 0] = m[0, 0], m[1, 0]
 	r[0, 1], r[1, 1] = m[0, 1], m[1, 1]
 	return
 }
-matrix2_from_matrix3_f32 :: proc(m: Matrix3f32) -> (r: Matrix2f32) {
+matrix2_from_matrix3_f32 :: proc "contextless" (m: Matrix3f32) -> (r: Matrix2f32) {
 	r[0, 0], r[1, 0] = m[0, 0], m[1, 0]
 	r[0, 1], r[1, 1] = m[0, 1], m[1, 1]
 	return
 }
-matrix2_from_matrix3_f64 :: proc(m: Matrix3f64) -> (r: Matrix2f64) {
+matrix2_from_matrix3_f64 :: proc "contextless" (m: Matrix3f64) -> (r: Matrix2f64) {
 	r[0, 0], r[1, 0] = m[0, 0], m[1, 0]
 	r[0, 1], r[1, 1] = m[0, 1], m[1, 1]
 	return
@@ -2309,17 +2309,17 @@ matrix2_from_matrix3 :: proc{
 }
 
 
-matrix2_from_matrix4_f16 :: proc(m: Matrix4f16) -> (r: Matrix2f16) {
+matrix2_from_matrix4_f16 :: proc "contextless" (m: Matrix4f16) -> (r: Matrix2f16) {
 	r[0, 0], r[1, 0] = m[0, 0], m[1, 0]
 	r[0, 1], r[1, 1] = m[0, 1], m[1, 1]
 	return
 }
-matrix2_from_matrix4_f32 :: proc(m: Matrix4f32) -> (r: Matrix2f32) {
+matrix2_from_matrix4_f32 :: proc "contextless" (m: Matrix4f32) -> (r: Matrix2f32) {
 	r[0, 0], r[1, 0] = m[0, 0], m[1, 0]
 	r[0, 1], r[1, 1] = m[0, 1], m[1, 1]
 	return
 }
-matrix2_from_matrix4_f64 :: proc(m: Matrix4f64) -> (r: Matrix2f64) {
+matrix2_from_matrix4_f64 :: proc "contextless" (m: Matrix4f64) -> (r: Matrix2f64) {
 	r[0, 0], r[1, 0] = m[0, 0], m[1, 0]
 	r[0, 1], r[1, 1] = m[0, 1], m[1, 1]
 	return
@@ -2331,19 +2331,19 @@ matrix2_from_matrix4 :: proc{
 }
 
 
-matrix3_from_matrix2_f16 :: proc(m: Matrix2f16) -> (r: Matrix3f16) {
+matrix3_from_matrix2_f16 :: proc "contextless" (m: Matrix2f16) -> (r: Matrix3f16) {
 	r[0, 0], r[1, 0], r[2, 0] = m[0, 0], m[1, 0], 0
 	r[0, 1], r[1, 1], r[2, 1] = m[0, 1], m[1, 1], 0
 	r[0, 2], r[1, 2], r[2, 2] =       0,       0, 1
 	return
 }
-matrix3_from_matrix2_f32 :: proc(m: Matrix2f32) -> (r: Matrix3f32) {
+matrix3_from_matrix2_f32 :: proc "contextless" (m: Matrix2f32) -> (r: Matrix3f32) {
 	r[0, 0], r[1, 0], r[2, 0] = m[0, 0], m[1, 0], 0
 	r[0, 1], r[1, 1], r[2, 1] = m[0, 1], m[1, 1], 0
 	r[0, 2], r[1, 2], r[2, 2] =       0,       0, 1
 	return
 }
-matrix3_from_matrix2_f64 :: proc(m: Matrix2f64) -> (r: Matrix3f64) {
+matrix3_from_matrix2_f64 :: proc "contextless" (m: Matrix2f64) -> (r: Matrix3f64) {
 	r[0, 0], r[1, 0], r[2, 0] = m[0, 0], m[1, 0], 0
 	r[0, 1], r[1, 1], r[2, 1] = m[0, 1], m[1, 1], 0
 	r[0, 2], r[1, 2], r[2, 2] =       0,       0, 1
@@ -2356,19 +2356,19 @@ matrix3_from_matrix2 :: proc{
 }
 
 
-matrix3_from_matrix4_f16 :: proc(m: Matrix4f16) -> (r: Matrix3f16) {
+matrix3_from_matrix4_f16 :: proc "contextless" (m: Matrix4f16) -> (r: Matrix3f16) {
 	r[0, 0], r[1, 0], r[2, 0] = m[0, 0], m[1, 0], m[2, 0]
 	r[0, 1], r[1, 1], r[2, 1] = m[0, 1], m[1, 1], m[2, 1]
 	r[0, 2], r[1, 2], r[2, 2] = m[0, 2], m[1, 2], m[2, 2]
 	return
 }
-matrix3_from_matrix4_f32 :: proc(m: Matrix4f32) -> (r: Matrix3f32) {
+matrix3_from_matrix4_f32 :: proc "contextless" (m: Matrix4f32) -> (r: Matrix3f32) {
 	r[0, 0], r[1, 0], r[2, 0] = m[0, 0], m[1, 0], m[2, 0]
 	r[0, 1], r[1, 1], r[2, 1] = m[0, 1], m[1, 1], m[2, 1]
 	r[0, 2], r[1, 2], r[2, 2] = m[0, 2], m[1, 2], m[2, 2]
 	return
 }
-matrix3_from_matrix4_f64 :: proc(m: Matrix4f64) -> (r: Matrix3f64) {
+matrix3_from_matrix4_f64 :: proc "contextless" (m: Matrix4f64) -> (r: Matrix3f64) {
 	r[0, 0], r[1, 0], r[2, 0] = m[0, 0], m[1, 0], m[2, 0]
 	r[0, 1], r[1, 1], r[2, 1] = m[0, 1], m[1, 1], m[2, 1]
 	r[0, 2], r[1, 2], r[2, 2] = m[0, 2], m[1, 2], m[2, 2]
@@ -2381,21 +2381,21 @@ matrix3_from_matrix4 :: proc{
 }
 
 
-matrix4_from_matrix2_f16 :: proc(m: Matrix2f16) -> (r: Matrix4f16) {
+matrix4_from_matrix2_f16 :: proc "contextless" (m: Matrix2f16) -> (r: Matrix4f16) {
 	r[0, 0], r[1, 0], r[2, 0], r[3, 0] = m[0, 0], m[1, 0], 0, 0
 	r[0, 1], r[1, 1], r[2, 1], r[3, 1] = m[0, 1], m[1, 1], 0, 0
 	r[0, 2], r[1, 2], r[2, 2], r[3, 2] =       0,       0, 1, 0
 	r[0, 3], r[1, 3], r[2, 3], r[3, 3] =       0,       0, 0, 1
 	return
 }
-matrix4_from_matrix2_f32 :: proc(m: Matrix2f32) -> (r: Matrix4f32) {
+matrix4_from_matrix2_f32 :: proc "contextless" (m: Matrix2f32) -> (r: Matrix4f32) {
 	r[0, 0], r[1, 0], r[2, 0], r[3, 0] = m[0, 0], m[1, 0], 0, 0
 	r[0, 1], r[1, 1], r[2, 1], r[3, 1] = m[0, 1], m[1, 1], 0, 0
 	r[0, 2], r[1, 2], r[2, 2], r[3, 2] =       0,       0, 1, 0
 	r[0, 3], r[1, 3], r[2, 3], r[3, 3] =       0,       0, 0, 1
 	return
 }
-matrix4_from_matrix2_f64 :: proc(m: Matrix2f64) -> (r: Matrix4f64) {
+matrix4_from_matrix2_f64 :: proc "contextless" (m: Matrix2f64) -> (r: Matrix4f64) {
 	r[0, 0], r[1, 0], r[2, 0], r[3, 0] = m[0, 0], m[1, 0], 0, 0
 	r[0, 1], r[1, 1], r[2, 1], r[3, 1] = m[0, 1], m[1, 1], 0, 0
 	r[0, 2], r[1, 2], r[2, 2], r[3, 2] =       0,       0, 1, 0
@@ -2409,21 +2409,21 @@ matrix4_from_matrix2 :: proc{
 }
 
 
-matrix4_from_matrix3_f16 :: proc(m: Matrix3f16) -> (r: Matrix4f16) {
+matrix4_from_matrix3_f16 :: proc "contextless" (m: Matrix3f16) -> (r: Matrix4f16) {
 	r[0, 0], r[1, 0], r[2, 0], r[3, 0] = m[0, 0], m[1, 0], m[2, 0], 0
 	r[0, 1], r[1, 1], r[2, 1], r[3, 1] = m[0, 1], m[1, 1], m[2, 1], 0
 	r[0, 2], r[1, 2], r[2, 2], r[3, 2] = m[0, 2], m[1, 2], m[2, 2], 0
 	r[0, 3], r[1, 3], r[2, 3], r[3, 3] =       0,       0,       0, 1
 	return
 }
-matrix4_from_matrix3_f32 :: proc(m: Matrix3f32) -> (r: Matrix4f32) {
+matrix4_from_matrix3_f32 :: proc "contextless" (m: Matrix3f32) -> (r: Matrix4f32) {
 	r[0, 0], r[1, 0], r[2, 0], r[3, 0] = m[0, 0], m[1, 0], m[2, 0], 0
 	r[0, 1], r[1, 1], r[2, 1], r[3, 1] = m[0, 1], m[1, 1], m[2, 1], 0
 	r[0, 2], r[1, 2], r[2, 2], r[3, 2] = m[0, 2], m[1, 2], m[2, 2], 0
 	r[0, 3], r[1, 3], r[2, 3], r[3, 3] =       0,       0,       0, 1
 	return
 }
-matrix4_from_matrix3_f64 :: proc(m: Matrix3f64) -> (r: Matrix4f64) {
+matrix4_from_matrix3_f64 :: proc "contextless" (m: Matrix3f64) -> (r: Matrix4f64) {
 	r[0, 0], r[1, 0], r[2, 0], r[3, 0] = m[0, 0], m[1, 0], m[2, 0], 0
 	r[0, 1], r[1, 1], r[2, 1], r[3, 1] = m[0, 1], m[1, 1], m[2, 1], 0
 	r[0, 2], r[1, 2], r[2, 2], r[3, 2] = m[0, 2], m[1, 2], m[2, 2], 0
@@ -2437,15 +2437,15 @@ matrix4_from_matrix3 :: proc{
 }
 
 
-quaternion_from_scalar_f16 :: proc(f: f16) -> (q: Quaternionf16) {
+quaternion_from_scalar_f16 :: proc "contextless" (f: f16) -> (q: Quaternionf16) {
 	q.w = f
 	return
 }
-quaternion_from_scalar_f32 :: proc(f: f32) -> (q: Quaternionf32) {
+quaternion_from_scalar_f32 :: proc "contextless" (f: f32) -> (q: Quaternionf32) {
 	q.w = f
 	return
 }
-quaternion_from_scalar_f64 :: proc(f: f64) -> (q: Quaternionf64) {
+quaternion_from_scalar_f64 :: proc "contextless" (f: f64) -> (q: Quaternionf64) {
 	q.w = f
 	return
 }
@@ -2505,7 +2505,7 @@ to_quaternion :: proc{
 
 
 
-matrix2_orthonormalize_f16 :: proc(m: Matrix2f16) -> (r: Matrix2f16) {
+matrix2_orthonormalize_f16 :: proc "contextless" (m: Matrix2f16) -> (r: Matrix2f16) {
 	r[0] = normalize(m[0])
 
 	d0 := dot(r[0], r[1])
@@ -2514,7 +2514,7 @@ matrix2_orthonormalize_f16 :: proc(m: Matrix2f16) -> (r: Matrix2f16) {
 
 	return
 }
-matrix2_orthonormalize_f32 :: proc(m: Matrix2f32) -> (r: Matrix2f32) {
+matrix2_orthonormalize_f32 :: proc "contextless" (m: Matrix2f32) -> (r: Matrix2f32) {
 	r[0] = normalize(m[0])
 
 	d0 := dot(r[0], r[1])
@@ -2523,7 +2523,7 @@ matrix2_orthonormalize_f32 :: proc(m: Matrix2f32) -> (r: Matrix2f32) {
 
 	return
 }
-matrix2_orthonormalize_f64 :: proc(m: Matrix2f64) -> (r: Matrix2f64) {
+matrix2_orthonormalize_f64 :: proc "contextless" (m: Matrix2f64) -> (r: Matrix2f64) {
 	r[0] = normalize(m[0])
 
 	d0 := dot(r[0], r[1])
@@ -2539,7 +2539,7 @@ matrix2_orthonormalize :: proc{
 }
 
 
-matrix3_orthonormalize_f16 :: proc(m: Matrix3f16) -> (r: Matrix3f16) {
+matrix3_orthonormalize_f16 :: proc "contextless" (m: Matrix3f16) -> (r: Matrix3f16) {
 	r[0] = normalize(m[0])
 
 	d0 := dot(r[0], r[1])
@@ -2553,7 +2553,7 @@ matrix3_orthonormalize_f16 :: proc(m: Matrix3f16) -> (r: Matrix3f16) {
 
 	return
 }
-matrix3_orthonormalize_f32 :: proc(m: Matrix3f32) -> (r: Matrix3f32) {
+matrix3_orthonormalize_f32 :: proc "contextless" (m: Matrix3f32) -> (r: Matrix3f32) {
 	r[0] = normalize(m[0])
 
 	d0 := dot(r[0], r[1])
@@ -2567,7 +2567,7 @@ matrix3_orthonormalize_f32 :: proc(m: Matrix3f32) -> (r: Matrix3f32) {
 
 	return
 }
-matrix3_orthonormalize_f64 :: proc(m: Matrix3f64) -> (r: Matrix3f64) {
+matrix3_orthonormalize_f64 :: proc "contextless" (m: Matrix3f64) -> (r: Matrix3f64) {
 	r[0] = normalize(m[0])
 
 	d0 := dot(r[0], r[1])
@@ -2588,13 +2588,13 @@ matrix3_orthonormalize :: proc{
 }
 
 
-vector3_orthonormalize_f16 :: proc(x, y: Vector3f16) -> (z: Vector3f16) {
+vector3_orthonormalize_f16 :: proc "contextless" (x, y: Vector3f16) -> (z: Vector3f16) {
 	return normalize(x - y * dot(y, x))
 }
-vector3_orthonormalize_f32 :: proc(x, y: Vector3f32) -> (z: Vector3f32) {
+vector3_orthonormalize_f32 :: proc "contextless" (x, y: Vector3f32) -> (z: Vector3f32) {
 	return normalize(x - y * dot(y, x))
 }
-vector3_orthonormalize_f64 :: proc(x, y: Vector3f64) -> (z: Vector3f64) {
+vector3_orthonormalize_f64 :: proc "contextless" (x, y: Vector3f64) -> (z: Vector3f64) {
 	return normalize(x - y * dot(y, x))
 }
 vector3_orthonormalize :: proc{
@@ -2611,7 +2611,7 @@ orthonormalize :: proc{
 }
 
 
-matrix4_orientation_f16 :: proc(normal, up: Vector3f16) -> Matrix4f16 {
+matrix4_orientation_f16 :: proc "contextless" (normal, up: Vector3f16) -> Matrix4f16 {
 	if all(equal(normal, up)) {
 		return MATRIX4F16_IDENTITY
 	}
@@ -2621,7 +2621,7 @@ matrix4_orientation_f16 :: proc(normal, up: Vector3f16) -> Matrix4f16 {
 
 	return matrix4_rotate(angle, rotation_axis)
 }
-matrix4_orientation_f32 :: proc(normal, up: Vector3f32) -> Matrix4f32 {
+matrix4_orientation_f32 :: proc "contextless" (normal, up: Vector3f32) -> Matrix4f32 {
 	if all(equal(normal, up)) {
 		return MATRIX4F32_IDENTITY
 	}
@@ -2631,7 +2631,7 @@ matrix4_orientation_f32 :: proc(normal, up: Vector3f32) -> Matrix4f32 {
 
 	return matrix4_rotate(angle, rotation_axis)
 }
-matrix4_orientation_f64 :: proc(normal, up: Vector3f64) -> Matrix4f64 {
+matrix4_orientation_f64 :: proc "contextless" (normal, up: Vector3f64) -> Matrix4f64 {
 	if all(equal(normal, up)) {
 		return MATRIX4F64_IDENTITY
 	}
@@ -2648,7 +2648,7 @@ matrix4_orientation :: proc{
 }
 
 
-euclidean_from_polar_f16 :: proc(polar: Vector2f16) -> Vector3f16 {
+euclidean_from_polar_f16 :: proc "contextless" (polar: Vector2f16) -> Vector3f16 {
 	latitude, longitude := polar.x, polar.y
 	cx, sx := math.cos(latitude), math.sin(latitude)
 	cy, sy := math.cos(longitude), math.sin(longitude)
@@ -2659,7 +2659,7 @@ euclidean_from_polar_f16 :: proc(polar: Vector2f16) -> Vector3f16 {
 		cx*cy,
 	}
 }
-euclidean_from_polar_f32 :: proc(polar: Vector2f32) -> Vector3f32 {
+euclidean_from_polar_f32 :: proc "contextless" (polar: Vector2f32) -> Vector3f32 {
 	latitude, longitude := polar.x, polar.y
 	cx, sx := math.cos(latitude), math.sin(latitude)
 	cy, sy := math.cos(longitude), math.sin(longitude)
@@ -2670,7 +2670,7 @@ euclidean_from_polar_f32 :: proc(polar: Vector2f32) -> Vector3f32 {
 		cx*cy,
 	}
 }
-euclidean_from_polar_f64 :: proc(polar: Vector2f64) -> Vector3f64 {
+euclidean_from_polar_f64 :: proc "contextless" (polar: Vector2f64) -> Vector3f64 {
 	latitude, longitude := polar.x, polar.y
 	cx, sx := math.cos(latitude), math.sin(latitude)
 	cy, sy := math.cos(longitude), math.sin(longitude)
@@ -2688,7 +2688,7 @@ euclidean_from_polar :: proc{
 }
 
 
-polar_from_euclidean_f16 :: proc(euclidean: Vector3f16) -> Vector3f16 {
+polar_from_euclidean_f16 :: proc "contextless" (euclidean: Vector3f16) -> Vector3f16 {
 	n := length(euclidean)
 	tmp := euclidean / n
 
@@ -2700,7 +2700,7 @@ polar_from_euclidean_f16 :: proc(euclidean: Vector3f16) -> Vector3f16 {
 		xz_dist,
 	}
 }
-polar_from_euclidean_f32 :: proc(euclidean: Vector3f32) -> Vector3f32 {
+polar_from_euclidean_f32 :: proc "contextless" (euclidean: Vector3f32) -> Vector3f32 {
 	n := length(euclidean)
 	tmp := euclidean / n
 
@@ -2712,7 +2712,7 @@ polar_from_euclidean_f32 :: proc(euclidean: Vector3f32) -> Vector3f32 {
 		xz_dist,
 	}
 }
-polar_from_euclidean_f64 :: proc(euclidean: Vector3f64) -> Vector3f64 {
+polar_from_euclidean_f64 :: proc "contextless" (euclidean: Vector3f64) -> Vector3f64 {
 	n := length(euclidean)
 	tmp := euclidean / n
 
