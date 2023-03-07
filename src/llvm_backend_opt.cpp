@@ -55,8 +55,17 @@ gb_internal void lb_populate_function_pass_manager_specific(lbModule *m, LLVMPas
 #define LLVM_ADD_CONSTANT_VALUE_PASS(fpm) 
 #endif
 
+gb_internal bool lb_opt_ignore(i32 optimization_level) {
+	optimization_level = gb_clamp(optimization_level, -1, 2);
+	return optimization_level == -1;
+}
+
 gb_internal void lb_basic_populate_function_pass_manager(LLVMPassManagerRef fpm, i32 optimization_level) {
-	if (false && optimization_level == 0 && build_context.ODIN_DEBUG) {
+	if (lb_opt_ignore(optimization_level)) {
+		return;
+	}
+
+	if (false && optimization_level <= 0 && build_context.ODIN_DEBUG) {
 		LLVMAddMergedLoadStoreMotionPass(fpm);
 	} else {
 		LLVMAddPromoteMemoryToRegisterPass(fpm);
@@ -69,14 +78,14 @@ gb_internal void lb_basic_populate_function_pass_manager(LLVMPassManagerRef fpm,
 }
 
 gb_internal void lb_populate_function_pass_manager(lbModule *m, LLVMPassManagerRef fpm, bool ignore_memcpy_pass, i32 optimization_level) {
-	// NOTE(bill): Treat -opt:3 as if it was -opt:2
-	// TODO(bill): Determine which opt definitions should exist in the first place
-	optimization_level = gb_clamp(optimization_level, 0, 2);
+	if (lb_opt_ignore(optimization_level)) {
+		return;
+	}
 
 	if (ignore_memcpy_pass) {
 		lb_basic_populate_function_pass_manager(fpm, optimization_level);
 		return;
-	} else if (optimization_level == 0) {
+	} else if (optimization_level <= 0) {
 		LLVMAddMemCpyOptPass(fpm);
 		lb_basic_populate_function_pass_manager(fpm, optimization_level);
 		return;
@@ -103,11 +112,11 @@ gb_internal void lb_populate_function_pass_manager(lbModule *m, LLVMPassManagerR
 }
 
 gb_internal void lb_populate_function_pass_manager_specific(lbModule *m, LLVMPassManagerRef fpm, i32 optimization_level) {
-	// NOTE(bill): Treat -opt:3 as if it was -opt:2
-	// TODO(bill): Determine which opt definitions should exist in the first place
-	optimization_level = gb_clamp(optimization_level, 0, 2);
+	if (lb_opt_ignore(optimization_level)) {
+		return;
+	}
 
-	if (optimization_level == 0) {
+	if (optimization_level <= 0) {
 		LLVMAddMemCpyOptPass(fpm);
 		lb_basic_populate_function_pass_manager(fpm, optimization_level);
 		return;
@@ -181,8 +190,7 @@ gb_internal void lb_populate_module_pass_manager(LLVMTargetMachineRef target_mac
 
 	// NOTE(bill): Treat -opt:3 as if it was -opt:2
 	// TODO(bill): Determine which opt definitions should exist in the first place
-	optimization_level = gb_clamp(optimization_level, 0, 2);
-	if (optimization_level == 0 && build_context.ODIN_DEBUG) {
+	if (optimization_level <= 0 && build_context.ODIN_DEBUG) {
 		return;
 	}
 
@@ -190,7 +198,7 @@ gb_internal void lb_populate_module_pass_manager(LLVMTargetMachineRef target_mac
 	LLVMAddStripDeadPrototypesPass(mpm);
 	LLVMAddAnalysisPasses(target_machine, mpm);
 	LLVMAddPruneEHPass(mpm);
-	if (optimization_level == 0) {
+	if (optimization_level <= 0) {
 		return;
 	}
 
