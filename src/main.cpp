@@ -1958,7 +1958,7 @@ gb_internal void print_show_help(String const arg0, String const &command) {
 
 		print_usage_line(1, "-o:<string>");
 		print_usage_line(2, "Set the optimization mode for compilation");
-		print_usage_line(2, "Accepted values: minimal, size, speed");
+		print_usage_line(2, "Accepted values: minimal, size, speed, none");
 		print_usage_line(2, "Example: -o:speed");
 		print_usage_line(0, "");
 	}
