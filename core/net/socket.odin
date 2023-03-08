@@ -174,3 +174,7 @@ shutdown :: proc(socket: Any_Socket, manner: Shutdown_Manner) -> (err: Network_E
 set_option :: proc(socket: Any_Socket, option: Socket_Option, value: any, loc := #caller_location) -> Network_Error {
 	return _set_option(socket, option, value, loc)
 }
+
+set_blocking :: proc(socket: Any_Socket, should_block: bool) -> (err: Network_Error) {
+	return _set_blocking(socket, should_block)
+}
