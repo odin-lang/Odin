@@ -301,6 +301,12 @@ _set_option :: proc(s: Any_Socket, option: Socket_Option, value: any, loc := #ca
 	return nil
 }
 
+@(private)
+_set_blocking :: proc(socket: Any_Socket, should_block: bool) -> (err: Network_Error) {
+	// TODO: Implement
+	unimplemented()
+}
+
 @private
 _endpoint_to_sockaddr :: proc(ep: Endpoint) -> (sockaddr: os.SOCKADDR_STORAGE_LH) {
 	switch a in ep.address {

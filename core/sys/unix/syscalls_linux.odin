@@ -2053,6 +2053,10 @@ sys_personality :: proc(persona: u64) -> int {
 	return int(intrinsics.syscall(SYS_personality, uintptr(persona)))
 }
 
+sys_fcntl :: proc "contextless" (fd: int, cmd: int, arg: int) -> int {
+	return int(intrinsics.syscall(SYS_fcntl, uintptr(fd), uintptr(cmd), uintptr(arg)))
+}
+
 get_errno :: proc "contextless" (res: int) -> i32 {
 	if res < 0 && res > -4096 {
 		return i32(-res)
