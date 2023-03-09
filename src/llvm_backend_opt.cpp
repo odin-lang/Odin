@@ -275,6 +275,9 @@ gb_internal void lb_populate_module_pass_manager(LLVMTargetMachineRef target_mac
 **************************************************************************/
 
 gb_internal void lb_run_remove_dead_instruction_pass(lbProcedure *p) {
+	unsigned debug_declare_id = LLVMLookupIntrinsicID("llvm.dbg.declare", 16);
+	GB_ASSERT(debug_declare_id != 0);
+
 	isize removal_count = 0;
 	isize pass_count = 0;
 	isize const max_pass_count = 10;
@@ -310,6 +313,8 @@ gb_internal void lb_run_remove_dead_instruction_pass(lbProcedure *p) {
 
 				// NOTE(bill): Explicit instructions are set here because some instructions could have side effects
 				switch (LLVMGetInstructionOpcode(curr_instr)) {
+				// case LLVMAlloca:
+
 				case LLVMFNeg:
 				case LLVMAdd:
 				case LLVMFAdd:
@@ -329,7 +334,6 @@ gb_internal void lb_run_remove_dead_instruction_pass(lbProcedure *p) {
 				case LLVMAnd:
 				case LLVMOr:
 				case LLVMXor:
-				case LLVMAlloca:
 				case LLVMLoad:
 				case LLVMGetElementPtr:
 				case LLVMTrunc:

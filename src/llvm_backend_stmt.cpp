@@ -2287,18 +2287,25 @@ gb_internal void lb_build_stmt(lbProcedure *p, Ast *node) {
 
 			isize lval_index = 0;
 			for (Ast *rhs : values) {
+				p->current_elision_hint = lvals[lval_index];
+
 				rhs = unparen_expr(rhs);
 				lbValue init = lb_build_expr(p, rhs);
 			#if 1
-				// NOTE(bill, 2023-02-17): lb_const_value might produce a stack local variable for the
-				// compound literal, so reusing that variable should minimize the stack wastage
-				if (rhs->kind == Ast_CompoundLit) {
-					lbAddr *comp_lit_addr = map_get(&p->module->exact_value_compound_literal_addr_map, rhs);
-					if (comp_lit_addr) {
-						Entity *e = entity_of_node(vd->names[lval_index]);
-						if (e) {
-							lb_add_entity(p->module, e, comp_lit_addr->addr);
-							lvals[lval_index] = {}; // do nothing so that nothing will assign to it
+				if (p->current_elision_hint.addr.value != lvals[lval_index].addr.value) {
+					lvals[lval_index] = {}; // do nothing so that nothing will assign to it
+				} else {
+					// NOTE(bill, 2023-02-17): lb_const_value might produce a stack local variable for the
+					// compound literal, so reusing that variable should minimize the stack wastage
+					if (rhs->kind == Ast_CompoundLit) {
+						lbAddr *comp_lit_addr = map_get(&p->module->exact_value_compound_literal_addr_map, rhs);
+						if (comp_lit_addr) {
+							Entity *e = entity_of_node(vd->names[lval_index]);
+							if (e) {
+								GB_ASSERT(p->current_elision_hint.addr.value == nullptr);
+								GB_ASSERT(p->current_elision_hint.addr.value != lvals[lval_index].addr.value);
+								lvals[lval_index] = {}; // do nothing so that nothing will assign to it
+							}
 						}
 					}
 				}
@@ -2307,6 +2314,8 @@ gb_internal void lb_build_stmt(lbProcedure *p, Ast *node) {
 				lval_index += lb_append_tuple_values(p, &inits, init);
 			}
 			GB_ASSERT(lval_index == lvals.count);
+
+			p->current_elision_hint = {};
 
 			GB_ASSERT(lvals.count == inits.count);
 			for_array(i, inits) {
