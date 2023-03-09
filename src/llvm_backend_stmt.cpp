@@ -791,15 +791,6 @@ gb_internal void lb_build_range_stmt(lbProcedure *p, AstRangeStmt *rs, Scope *sc
 		val1_type = type_of_expr(rs->vals[1]);
 	}
 
-	if (val0_type != nullptr) {
-		Entity *e = entity_of_node(rs->vals[0]);
-		lb_add_local(p, e->type, e, true);
-	}
-	if (val1_type != nullptr) {
-		Entity *e = entity_of_node(rs->vals[1]);
-		lb_add_local(p, e->type, e, true);
-	}
-
 	lbValue val = {};
 	lbValue key = {};
 	lbBlock *loop = nullptr;
