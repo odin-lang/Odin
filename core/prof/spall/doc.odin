@@ -16,6 +16,8 @@ main :: proc() {
     spall_buffer = spall.buffer_create(buffer_backing)
     defer spall.buffer_destroy(&spall_ctx, &spall_buffer)
 
+    spall.SCOPED_EVENT(&spall_ctx, &spall_buffer, #procedure)
+
     for i := 0; i < 9001; i += 1 {
 		foo()
     }
