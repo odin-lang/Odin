@@ -78,8 +78,8 @@ to_lower :: proc(s: string, allocator := context.allocator) -> string {
 	returns the input string `s` with all runes set to upper case
 	always allocates using the `allocator`
 
-	strings.to_lower("test") -> TEST
-	strings.to_lower("Test") -> TEST
+	strings.to_upper("test") -> TEST
+	strings.to_upper("Test") -> TEST
 */
 to_upper :: proc(s: string, allocator := context.allocator) -> string {
 	b: Builder
