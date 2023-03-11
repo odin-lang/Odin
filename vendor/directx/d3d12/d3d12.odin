@@ -4870,6 +4870,26 @@ IInfoQueue_VTable :: struct {
 	GetMuteDebugOutput:                           proc "stdcall" (this: ^IInfoQueue) -> BOOL,
 }
 
+MESSAGE_CALLBACK_FLAGS :: distinct bit_set[MESSAGE_CALLBACK_FLAG; u32]
+MESSAGE_CALLBACK_FLAG :: enum
+{
+  IGNORE_FILTERS = 0,
+}
+
+PFN_MESSAGE_CALLBACK :: #type proc "c" (Category: MESSAGE_CATEGORY, Severity: MESSAGE_SEVERITY, ID: MESSAGE_ID, pDescription: cstring, pContext: rawptr)
+
+IInfoQueue1_UUID_STRING :: "2852dd88-b484-4c0c-b6b1-67168500e600"
+IInfoQueue1_UUID := &IID{0x2852dd88, 0xb484, 0x4c0c, {0xb6, 0xb1, 0x67, 0x16, 0x85, 0x00, 0xe6, 0x00}}
+IInfoQueue1 :: struct #raw_union {
+	#subtype iinfo_queue: IInfoQueue,
+	using idxgiinfoqueue1_vtable: ^IInfoQueue1_VTable,
+}
+IInfoQueue1_VTable :: struct {
+	using idxgiinfoqueue_vtable: IInfoQueue_VTable,
+	RegisterMessageCallback: proc "stdcall" (this: ^IInfoQueue1, CallbackFunc: PFN_MESSAGE_CALLBACK, CallbackFilterFlags: MESSAGE_CALLBACK_FLAGS, pContext: rawptr, pCallbackCookie: ^u32) -> HRESULT,
+	UnregisterMessageCallback: proc "stdcall" (this: ^IInfoQueue1, pCallbackCookie: u32) -> HRESULT,
+}
+
 PFN_CREATE_DEVICE :: #type proc "c" (a0: ^IUnknown, a1: FEATURE_LEVEL, a2: ^IID, a3: ^rawptr) -> HRESULT
 PFN_GET_DEBUG_INTERFACE :: #type proc "c" (a0: ^IID, a1: ^rawptr) -> HRESULT
 
