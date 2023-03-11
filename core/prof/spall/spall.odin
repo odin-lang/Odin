@@ -1,4 +1,4 @@
-package prof_spall
+package spall
 
 import "core:os"
 import "core:time"
