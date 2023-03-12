@@ -1423,9 +1423,11 @@ gb_internal void lb_build_type_switch_stmt(lbProcedure *p, AstTypeSwitchStmt *ss
 				continue;
 			}
 			Entity *case_entity = implicit_entity_of_node(clause);
-			max_size = gb_max(max_size, type_size_of(case_entity->type));
-			max_align = gb_max(max_align, type_align_of(case_entity->type));
-			variants_found = true;
+			if (!is_type_untyped_nil(case_entity->type)) {
+				max_size = gb_max(max_size, type_size_of(case_entity->type));
+				max_align = gb_max(max_align, type_align_of(case_entity->type));
+				variants_found = true;
+			}
 		}
 		if (variants_found) {
 			Type *t = alloc_type_array(t_u8, max_size);
@@ -1449,6 +1451,8 @@ gb_internal void lb_build_type_switch_stmt(lbProcedure *p, AstTypeSwitchStmt *ss
 		if (p->debug_info != nullptr) {
 			LLVMSetCurrentDebugLocation2(p->builder, lb_debug_location_from_ast(p, clause));
 		}
+
+		bool saw_nil = false;
 		for (Ast *type_expr : cc->list) {
 			Type *case_type = type_of_expr(type_expr);
 			lbValue on_val = {};
@@ -1457,7 +1461,12 @@ gb_internal void lb_build_type_switch_stmt(lbProcedure *p, AstTypeSwitchStmt *ss
 				on_val = lb_const_union_tag(m, ut, case_type);
 
 			} else if (switch_kind == TypeSwitch_Any) {
-				on_val = lb_typeid(m, case_type);
+				if (is_type_untyped_nil(case_type)) {
+					saw_nil = true;
+					on_val = lb_const_nil(m, t_typeid);
+				} else {
+					on_val = lb_typeid(m, case_type);
+				}
 			}
 			GB_ASSERT(on_val.value != nullptr);
 			LLVMAddCase(switch_instr, on_val.value, body->block);
@@ -1469,7 +1478,7 @@ gb_internal void lb_build_type_switch_stmt(lbProcedure *p, AstTypeSwitchStmt *ss
 
 		bool by_reference = (case_entity->flags & EntityFlag_Value) == 0;
 
-		if (cc->list.count == 1) {
+		if (cc->list.count == 1 && !saw_nil) {
 			lbValue data = {};
 			if (switch_kind == TypeSwitch_Union) {
 				data = union_data;
