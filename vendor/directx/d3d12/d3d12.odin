@@ -4871,9 +4871,8 @@ IInfoQueue_VTable :: struct {
 }
 
 MESSAGE_CALLBACK_FLAGS :: distinct bit_set[MESSAGE_CALLBACK_FLAG; u32]
-MESSAGE_CALLBACK_FLAG :: enum
-{
-  IGNORE_FILTERS = 0,
+MESSAGE_CALLBACK_FLAG :: enum {
+	IGNORE_FILTERS = 0,
 }
 
 PFN_MESSAGE_CALLBACK :: #type proc "c" (Category: MESSAGE_CATEGORY, Severity: MESSAGE_SEVERITY, ID: MESSAGE_ID, pDescription: cstring, pContext: rawptr)
