@@ -1143,8 +1143,11 @@ gb_internal void check_global_variable_decl(CheckerContext *ctx, Entity *&e, Ast
 
 	if (is_arch_wasm() && e->Variable.thread_local_model.len != 0) {
 		e->Variable.thread_local_model.len = 0;
-		// NOTE(bill): ignore this message for the time begin
+		// NOTE(bill): ignore this message for the time being
 		// error(e->token, "@(thread_local) is not supported for this target platform");
+	}
+	if(build_context.no_tls) {
+		e->Variable.thread_local_model.len = 0;
 	}
 
 	String context_name = str_lit("variable declaration");

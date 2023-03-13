@@ -275,6 +275,7 @@ struct BuildContext {
 	bool   no_output_files;
 	bool   no_crt;
 	bool   no_entry_point;
+	bool   no_tls;
 	bool   use_lld;
 	bool   vet;
 	bool   vet_extra;
