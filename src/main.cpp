@@ -634,7 +634,7 @@ enum BuildFlagKind {
 	BuildFlag_Microarch,
 	BuildFlag_TargetFeatures,
 	BuildFlag_MinimumOSVersion,
-	BuildFlag_NoTLS,
+	BuildFlag_NoThreadLocal,
 
 	BuildFlag_RelocMode,
 	BuildFlag_DisableRedZone,
@@ -795,7 +795,7 @@ gb_internal bool parse_build_flags(Array<String> args) {
 	add_flag(&build_flags, BuildFlag_Debug,                   str_lit("debug"),                     BuildFlagParam_None,    Command__does_check);
 	add_flag(&build_flags, BuildFlag_DisableAssert,           str_lit("disable-assert"),            BuildFlagParam_None,    Command__does_check);
 	add_flag(&build_flags, BuildFlag_NoBoundsCheck,           str_lit("no-bounds-check"),           BuildFlagParam_None,    Command__does_check);
-	add_flag(&build_flags, BuildFlag_NoTLS,                   str_lit("no-tls"),                    BuildFlagParam_None,    Command__does_check);
+	add_flag(&build_flags, BuildFlag_NoThreadLocal,           str_lit("no-thread-local"),           BuildFlagParam_None,    Command__does_check);
 	add_flag(&build_flags, BuildFlag_NoDynamicLiterals,       str_lit("no-dynamic-literals"),       BuildFlagParam_None,    Command__does_check);
 	add_flag(&build_flags, BuildFlag_NoCRT,                   str_lit("no-crt"),                    BuildFlagParam_None,    Command__does_build);
 	add_flag(&build_flags, BuildFlag_NoEntryPoint,            str_lit("no-entry-point"),            BuildFlagParam_None,    Command__does_check &~ Command_test);
@@ -1314,8 +1314,8 @@ gb_internal bool parse_build_flags(Array<String> args) {
 						case BuildFlag_NoEntryPoint:
 							build_context.no_entry_point = true;
 							break;
-						case BuildFlag_NoTLS:
-							build_context.no_tls = true;
+						case BuildFlag_NoThreadLocal:
+							build_context.no_thread_local = true;
 							break;
 						case BuildFlag_UseLLD:
 							build_context.use_lld = true;
@@ -2069,7 +2069,7 @@ gb_internal void print_show_help(String const arg0, String const &command) {
 		print_usage_line(2, "Disables automatic linking with the C Run Time");
 		print_usage_line(0, "");
 
-		print_usage_line(1, "-no-tls");
+		print_usage_line(1, "-no-thread-local");
 		print_usage_line(2, "Ignore @thread_local attribute, effectively treating the program as if it is single-threaded");
 		print_usage_line(0, "");
 

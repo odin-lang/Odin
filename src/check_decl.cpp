@@ -1146,7 +1146,7 @@ gb_internal void check_global_variable_decl(CheckerContext *ctx, Entity *&e, Ast
 		// NOTE(bill): ignore this message for the time being
 		// error(e->token, "@(thread_local) is not supported for this target platform");
 	}
-	if(build_context.no_tls) {
+	if(build_context.no_thread_local) {
 		e->Variable.thread_local_model.len = 0;
 	}
 
