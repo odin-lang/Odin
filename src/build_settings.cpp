@@ -1369,6 +1369,7 @@ gb_internal char const *target_features_set_to_cstring(gbAllocator allocator, bo
 		gb_memmove(features + len, feature.text, feature.len);
 		len += feature.len;
 		if (with_quotes) features[len++] = '"';
+		i += 1;
 	}
 	features[len++] = 0;
 
