@@ -765,7 +765,7 @@ parse_f64_prefix :: proc(str: string) -> (value: f64, nr: int, ok: bool) {
 		return
 	}
 
-	parse_hex :: proc(s: string, mantissa: u64, exp: int, neg, trunc: bool) -> (f64, bool) {
+	parse_hex :: proc "contextless" (s: string, mantissa: u64, exp: int, neg, trunc: bool) -> (f64, bool) {
 		info := &_f64_info
 
 		mantissa, exp := mantissa, exp
