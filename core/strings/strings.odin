@@ -3,9 +3,7 @@ package strings
 
 import "core:io"
 import "core:mem"
-import "core:slice"
 import "core:unicode"
-import "core:runtime"
 import "core:unicode/utf8"
 
 // returns a clone of the string `s` allocated using the `allocator`
