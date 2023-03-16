@@ -191,3 +191,11 @@ Socket_Option_Error :: enum c.int {
 	Reset_When_Keepalive_Set   = c.int(os.ENOTCONN),
 	Not_Socket                 = c.int(os.ENOTSOCK),
 }
+
+Set_Blocking_Error :: enum c.int {
+	None = 0,
+
+	// TODO: add errors occuring on followig calls:
+	// flags, _ := os.fcntl(sd, os.F_GETFL, 0)
+	// os.fcntl(sd, os.F_SETFL, flags | int(os.O_NONBLOCK))
+}

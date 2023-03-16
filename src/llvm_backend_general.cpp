@@ -63,7 +63,6 @@ gb_internal void lb_init_module(lbModule *m, Checker *c) {
 	map_init(&m->values);
 	map_init(&m->soa_values);
 	string_map_init(&m->members);
-	map_init(&m->procedure_values);
 	string_map_init(&m->procedures);
 	string_map_init(&m->const_strings);
 	map_init(&m->function_type_map);
@@ -71,7 +70,13 @@ gb_internal void lb_init_module(lbModule *m, Checker *c) {
 	map_init(&m->hasher_procs);
 	map_init(&m->map_get_procs);
 	map_init(&m->map_set_procs);
-	array_init(&m->procedures_to_generate, a, 0, 1024);
+	if (build_context.use_separate_modules) {
+		array_init(&m->procedures_to_generate, a, 0, 1<<10);
+		map_init(&m->procedure_values,               1<<11);
+	} else {
+		array_init(&m->procedures_to_generate, a, 0, c->info.all_procedures.count);
+		map_init(&m->procedure_values,               c->info.all_procedures.count*2);
+	}
 	array_init(&m->global_procedures_and_types_to_create, a, 0, 1024);
 	array_init(&m->missing_procedures_to_check, a, 0, 16);
 	map_init(&m->debug_values);

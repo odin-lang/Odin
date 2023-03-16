@@ -198,3 +198,9 @@ Socket_Option_Error :: enum c.int {
 	Reset_When_Keepalive_Set   = c.int(os.ENOTCONN),
 	Not_Socket                 = c.int(os.ENOTSOCK),
 }
+
+Set_Blocking_Error :: enum c.int {
+	None = 0,
+
+	// TODO: Add errors for `set_blocking`
+}

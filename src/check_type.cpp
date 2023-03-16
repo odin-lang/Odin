@@ -674,6 +674,10 @@ gb_internal void check_union_type(CheckerContext *ctx, Type *union_type, Ast *no
 	for_array(i, ut->variants) {
 		Ast *node = ut->variants[i];
 		Type *t = check_type_expr(ctx, node, nullptr);
+		if (union_type->Union.is_polymorphic && poly_operands == nullptr) {
+			// NOTE(bill): don't add any variants if this is this is an unspecialized polymorphic record
+			continue;
+		}
 		if (t != nullptr && t != t_invalid) {
 			bool ok = true;
 			t = default_type(t);
@@ -686,8 +690,12 @@ gb_internal void check_union_type(CheckerContext *ctx, Type *union_type, Ast *no
 				for_array(j, variants) {
 					if (are_types_identical(t, variants[j])) {
 						ok = false;
+						ERROR_BLOCK();
 						gbString str = type_to_string(t);
 						error(node, "Duplicate variant type '%s'", str);
+						if (j < ut->variants.count) {
+							error_line("\tPrevious found at %s\n", token_pos_to_string(ast_token(ut->variants[j]).pos));
+						}
 						gb_string_free(str);
 						break;
 					}

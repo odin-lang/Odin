@@ -225,6 +225,11 @@ TCP_CORK:    int : 3
 
 MSG_TRUNC : int : 0x20
 
+// TODO: add remaining fcntl commands
+// reference: https://github.com/torvalds/linux/blob/master/include/uapi/asm-generic/fcntl.h
+F_GETFL: int : 3 /* Get file flags */
+F_SETFL: int : 4 /* Set file flags */
+
 // NOTE(zangent): These are OS specific!
 // Do not mix these up!
 RTLD_LAZY         :: 0x001
@@ -1073,4 +1078,12 @@ shutdown :: proc(sd: Socket, how: int) -> (Errno) {
 		return _get_errno(result)
 	}
 	return ERROR_NONE
+}
+
+fcntl :: proc(fd: int, cmd: int, arg: int) -> (int, Errno) {
+	result := unix.sys_fcntl(fd, cmd, arg)
+	if result < 0 {
+		return 0, _get_errno(result)
+	}
+	return result, ERROR_NONE
 }

@@ -311,6 +311,18 @@ _set_option :: proc(s: Any_Socket, option: Socket_Option, value: any, loc := #ca
 }
 
 @(private)
+_set_blocking :: proc(socket: Any_Socket, should_block: bool) -> (err: Network_Error) {
+	socket := any_socket_to_socket(socket)
+	arg: win.DWORD = 0 if should_block else 1
+	res := win.ioctlsocket(win.SOCKET(socket), transmute(win.c_long)win.FIONBIO, &arg)
+	if res == win.SOCKET_ERROR {
+		return Set_Blocking_Error(win.WSAGetLastError())
+	}
+
+	return nil
+}
+
+@(private)
 _endpoint_to_sockaddr :: proc(ep: Endpoint) -> (sockaddr: win.SOCKADDR_STORAGE_LH) {
 	switch a in ep.address {
 	case IP4_Address:

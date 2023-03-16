@@ -259,3 +259,15 @@ Socket_Option_Error :: enum c.int {
 	Reset_When_Keepalive_Set           = win.WSAENOTCONN,
 	Not_Socket                         = win.WSAENOTSOCK,
 }
+
+Set_Blocking_Error :: enum c.int {
+	None = 0,
+
+	Network_Subsystem_Failure          = win.WSAENETDOWN,
+	Blocking_Call_In_Progress          = win.WSAEINPROGRESS,
+	Not_Socket                         = win.WSAENOTSOCK,
+
+	// TODO: are those errors possible?
+	Network_Subsystem_Not_Initialized  = win.WSAENOTINITIALISED,
+	Invalid_Argument_Pointer           = win.WSAEFAULT,
+}
