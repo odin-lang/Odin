@@ -27,6 +27,21 @@ gb_internal void thread_pool_wait(void) {
 }
 
 
+gb_internal i64 PRINT_PEAK_USAGE(void) {
+	if (build_context.show_more_timings) {
+	#if defined(GB_SYSTEM_WINDOWS)
+		PROCESS_MEMORY_COUNTERS p = {sizeof(p)};
+		if (GetProcessMemoryInfo(GetCurrentProcess(), &p, sizeof(p))) {
+			gb_printf("\n");
+			gb_printf("Peak Memory Size: %.3f MiB\n", (cast(f64)p.PeakWorkingSetSize) / cast(f64)(1024ull * 1024ull));
+			return cast(i64)p.PeakWorkingSetSize;
+		}
+	#endif
+	}
+	return 0;
+}
+
+
 gb_global BlockingMutex debugf_mutex;
 
 gb_internal void debugf(char const *fmt, ...) {
@@ -1731,15 +1746,7 @@ gb_internal void show_timings(Checker *c, Timings *t) {
 
 	timings_print_all(t);
 
-	if (build_context.show_more_timings) {
-	#if defined(GB_SYSTEM_WINDOWS)
-		PROCESS_MEMORY_COUNTERS p = {sizeof(p)};
-		if (GetProcessMemoryInfo(GetCurrentProcess(), &p, sizeof(p))) {
-			gb_printf("\n");
-			gb_printf("Peak Memory Size: %.3f MiB\n", (cast(f64)p.PeakWorkingSetSize) / cast(f64)(1024ull * 1024ull));
-		}
-	#endif
-	}
+	PRINT_PEAK_USAGE();
 
 	if (!(build_context.export_timings_format == TimingsExportUnspecified)) {
 		timings_export_all(t, c, true);
