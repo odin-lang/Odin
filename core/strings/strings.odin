@@ -3,9 +3,7 @@ package strings
 
 import "core:io"
 import "core:mem"
-import "core:slice"
 import "core:unicode"
-import "core:runtime"
 import "core:unicode/utf8"
 
 // returns a clone of the string `s` allocated using the `allocator`
@@ -996,6 +994,36 @@ last_index_any :: proc(s, chars: string) -> int {
 	return -1
 }
 
+index_multi :: proc(s: string, substrs: []string) -> (idx: int, width: int) {
+	idx = -1
+	if s == "" || len(substrs) <= 0 {
+		return
+	}
+	// disallow "" substr
+	for substr in substrs {
+		if len(substr) == 0 {
+			return
+		}
+	}
+
+	lowest_index := len(s)
+	found := false
+	for substr in substrs {
+		if i := index(s, substr); i >= 0 {
+			if i < lowest_index {
+				lowest_index = i
+				width = len(substr)
+				found = true
+			}
+		}
+	}
+
+	if found {
+		idx = lowest_index
+	}
+	return
+}
+
 /*
 	returns the count of the string `substr` found in the string `s`
 	returns the rune_count + 1 of the string `s` on empty `substr`
@@ -1412,8 +1440,58 @@ trim_suffix :: proc(s, suffix: string) -> string {
 	res := strings.split_multi("testing,this.out_nice---done~~~last", splits[:])
 	fmt.eprintln(res) // -> [testing, this, out, nice, done, last]
 */
-split_multi :: proc(s: string, substrs: []string, allocator := context.allocator) -> (buf: []string) #no_bounds_check {
+split_multi :: proc(s: string, substrs: []string, allocator := context.allocator) -> []string #no_bounds_check {
 	if s == "" || len(substrs) <= 0 {
+		return nil
+	}
+
+	// disallow "" substr
+	for substr in substrs {
+		if len(substr) == 0 {
+			return nil
+		}
+	}
+
+	// calculate the needed len of `results`
+	n := 1
+	for it := s; len(it) > 0; {
+		i, w := index_multi(it, substrs)
+		if i < 0 {
+			break
+		}
+		n += 1
+		it = it[i+w:]
+	}
+
+	results := make([dynamic]string, 0, n, allocator)
+	{
+		it := s
+		for len(it) > 0 {
+			i, w := index_multi(it, substrs)
+			if i < 0 {
+				break
+			}
+			part := it[:i]
+			append(&results, part)
+			it = it[i+w:]
+		}
+		append(&results, it)
+	}
+	assert(len(results) == n)
+	return results[:]
+}
+
+/*
+	splits the input string `s` by all possible `substrs` []string in an iterator fashion
+	returns the split string every iteration, the full string on no match
+	splits := [?]string { "---", "~~~", ".", "_", "," }
+	it := "testing,this.out_nice---done~~~last"
+	for str in strings.split_multi_iterate(&it, splits[:]) {
+		fmt.eprintln(str) // every iteration -> [testing, this, out, nice, done, last]
+	}
+*/
+split_multi_iterate :: proc(it: ^string, substrs: []string) -> (res: string, ok: bool) #no_bounds_check {
+	if it == nil || len(it) == 0 || len(substrs) <= 0 {
 		return
 	}
 
@@ -1424,130 +1502,17 @@ split_multi :: proc(s: string, substrs: []string, allocator := context.allocator
 		}
 	}
 
-	// TODO maybe remove duplicate substrs
-	// sort substrings by string size, largest to smallest
-	runtime.DEFAULT_TEMP_ALLOCATOR_TEMP_GUARD()
-	temp_substrs := slice.clone(substrs, context.temp_allocator)
-
-	slice.sort_by(temp_substrs, proc(a, b: string) -> bool {
-		return len(a) > len(b)	
-	})
-
-	substrings_found: int
-	temp := s
-
-	// count substr results found in string
-	first_pass: for len(temp) > 0 {
-		for substr in temp_substrs {
-			size := len(substr)
-
-			// check range and compare string to substr
-			if size <= len(temp) && temp[:size] == substr {
-				substrings_found += 1
-				temp = temp[size:]
-				continue first_pass
-			}
-		}
-
-		// step through string
-		_, skip := utf8.decode_rune_in_string(temp[:])
-		temp = temp[skip:]
+	// calculate the needed len of `results`
+	i, w := index_multi(it^, substrs)
+	if i >= 0 {
+		res = it[:i]
+		it^ = it[i+w:]
+	} else {
+		// last value
+		res = it^
+		it^ = it[len(it):]
 	}
-
-	// skip when no results
-	if substrings_found < 1 {
-		return
-	}
-
-	buf = make([]string, substrings_found + 1, allocator)
-	buf_index: int
-	temp = s
-	temp_old := temp
-
-	// gather results in the same fashion
-	second_pass: for len(temp) > 0 {
-		for substr in temp_substrs {
-			size := len(substr)
-
-			// check range and compare string to substr
-			if size <= len(temp) && temp[:size] == substr {
-				buf[buf_index] = temp_old[:len(temp_old) - len(temp)]
-				buf_index += 1
-				temp = temp[size:]
-				temp_old = temp
-				continue second_pass
-			}
-		}
-
-		// step through string
-		_, skip := utf8.decode_rune_in_string(temp[:])
-		temp = temp[skip:]
-	}
-
-	buf[buf_index] = temp_old[:]
-
-	return buf
-}
-
-// state for the split multi iterator
-Split_Multi :: struct {
-	temp: string,
-	temp_old: string,
-	substrs: []string,
-}
-
-// returns split multi state with sorted `substrs`
-split_multi_init :: proc(s: string, substrs: []string) -> Split_Multi {
-	// sort substrings, largest to smallest
-	temp_substrs := slice.clone(substrs, context.temp_allocator)
-	slice.sort_by(temp_substrs, proc(a, b: string) -> bool {
-		return len(a) > len(b)	
-	})	
-
-	return {
-		temp = s,
-		temp_old = s,
-		substrs = temp_substrs,
-	}
-}
-
-/*
-	splits the input string `s` by all possible `substrs` []string in an iterator fashion
-	returns the split string every iteration, the full string on no match
-
-	splits := [?]string { "---", "~~~", ".", "_", "," }
-	state := strings.split_multi_init("testing,this.out_nice---done~~~last", splits[:])
-	for str in strings.split_multi_iterate(&state) {
-		fmt.eprintln(str) // every iteration -> [testing, this, out, nice, done, last]
-	}
-*/
-split_multi_iterate :: proc(using sm: ^Split_Multi) -> (res: string, ok: bool) #no_bounds_check {
-	pass: for len(temp) > 0 {
-		for substr in substrs {
-			size := len(substr)
-
-			// check range and compare string to substr
-			if size <= len(temp) && temp[:size] == substr {
-				res = temp_old[:len(temp_old) - len(temp)]
-				temp = temp[size:]
-				temp_old = temp
-				ok = true
-				return 	
-			}
-		}
-
-		// step through string
-		_, skip := utf8.decode_rune_in_string(temp[:])
-		temp = temp[skip:]
-	}
-
-	// allow last iteration
-	if temp_old != "" {
-		res = temp_old[:]	
-		ok = true
-		temp_old = ""
-	}
-
+	ok = true
 	return
 }
 
