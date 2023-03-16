@@ -6800,14 +6800,21 @@ gb_internal ExprKind check_call_expr(CheckerContext *c, Operand *operand, Ast *c
 				operand->type = t_invalid;
 			}
 		} else {
-			gbString str = type_to_string(t);
-			defer (gb_string_free(str));
-
 			operand->mode = Addressing_Invalid;
 			isize arg_count = args.count;
 			switch (arg_count) {
-			case 0:  error(call, "Missing argument in conversion to '%s'", str);   break;
-			default: error(call, "Too many arguments in conversion to '%s'", str); break;
+			case 0:
+				{
+					gbString str = type_to_string(t);
+					error(call, "Missing argument in conversion to '%s'", str);
+					gb_string_free(str);
+				} break;
+			default:
+				{
+					gbString str = type_to_string(t);
+					error(call, "Too many arguments in conversion to '%s'", str);
+					gb_string_free(str);
+				} break;
 			case 1: {
 				Ast *arg = args[0];
 				if (arg->kind == Ast_FieldValue) {
