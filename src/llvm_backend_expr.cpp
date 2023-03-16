@@ -1072,7 +1072,9 @@ gb_internal lbValue lb_emit_arith(lbProcedure *p, TokenKind op, lbValue lhs, lbV
 		Type *ft = base_complex_elem_type(type);
 
 		if (op == Token_Quo) {
-			auto args = array_make<lbValue>(permanent_allocator(), 2);
+			TEMPORARY_ALLOCATOR_GUARD();
+
+			auto args = array_make<lbValue>(temporary_allocator(), 2);
 			args[0] = lhs;
 			args[1] = rhs;
 
@@ -1146,7 +1148,9 @@ gb_internal lbValue lb_emit_arith(lbProcedure *p, TokenKind op, lbValue lhs, lbV
 
 			return lb_addr_load(p, res);
 		} else if (op == Token_Mul) {
-			auto args = array_make<lbValue>(permanent_allocator(), 2);
+			TEMPORARY_ALLOCATOR_GUARD();
+
+			auto args = array_make<lbValue>(temporary_allocator(), 2);
 			args[0] = lhs;
 			args[1] = rhs;
 
@@ -1156,7 +1160,9 @@ gb_internal lbValue lb_emit_arith(lbProcedure *p, TokenKind op, lbValue lhs, lbV
 			default: GB_PANIC("Unknown float type"); break;
 			}
 		} else if (op == Token_Quo) {
-			auto args = array_make<lbValue>(permanent_allocator(), 2);
+			TEMPORARY_ALLOCATOR_GUARD();
+
+			auto args = array_make<lbValue>(temporary_allocator(), 2);
 			args[0] = lhs;
 			args[1] = rhs;
 
@@ -1647,8 +1653,10 @@ gb_internal lbValue lb_emit_conv(lbProcedure *p, lbValue value, Type *t) {
 	}
 
 	if (are_types_identical(src, t_cstring) && are_types_identical(dst, t_string)) {
+		TEMPORARY_ALLOCATOR_GUARD();
+
 		lbValue c = lb_emit_conv(p, value, t_cstring);
-		auto args = array_make<lbValue>(permanent_allocator(), 1);
+		auto args = array_make<lbValue>(temporary_allocator(), 1);
 		args[0] = c;
 		lbValue s = lb_emit_runtime_call(p, "cstring_to_string", args);
 		return lb_emit_conv(p, s, dst);
@@ -1792,6 +1800,8 @@ gb_internal lbValue lb_emit_conv(lbProcedure *p, lbValue value, Type *t) {
 		}
 
 		if (is_type_integer_128bit(dst)) {
+			TEMPORARY_ALLOCATOR_GUARD();
+
 			auto args = array_make<lbValue>(temporary_allocator(), 1);
 			args[0] = value;
 			char const *call = "fixunsdfdi";
@@ -1825,6 +1835,8 @@ gb_internal lbValue lb_emit_conv(lbProcedure *p, lbValue value, Type *t) {
 		}
 
 		if (is_type_integer_128bit(src)) {
+			TEMPORARY_ALLOCATOR_GUARD();
+
 			auto args = array_make<lbValue>(temporary_allocator(), 1);
 			args[0] = value;
 			char const *call = "floattidf";
@@ -2219,16 +2231,17 @@ gb_internal lbValue lb_compare_records(lbProcedure *p, TokenKind op_kind, lbValu
 		}
 		GB_PANIC("invalid operator");
 	}
+	TEMPORARY_ALLOCATOR_GUARD();
 	if (is_type_simple_compare(type)) {
 		// TODO(bill): Test to see if this is actually faster!!!!
-		auto args = array_make<lbValue>(permanent_allocator(), 3);
+		auto args = array_make<lbValue>(temporary_allocator(), 3);
 		args[0] = lb_emit_conv(p, left_ptr, t_rawptr);
 		args[1] = lb_emit_conv(p, right_ptr, t_rawptr);
 		args[2] = lb_const_int(p->module, t_int, type_size_of(type));
 		res = lb_emit_runtime_call(p, "memory_equal", args);
 	} else {
 		lbValue value = lb_equal_proc_for_type(p->module, type);
-		auto args = array_make<lbValue>(permanent_allocator(), 2);
+		auto args = array_make<lbValue>(temporary_allocator(), 2);
 		args[0] = lb_emit_conv(p, left_ptr, t_rawptr);
 		args[1] = lb_emit_conv(p, right_ptr, t_rawptr);
 		res = lb_emit_call(p, value, args);
@@ -4052,6 +4065,8 @@ gb_internal lbAddr lb_build_addr_compound_lit(lbProcedure *p, Ast *expr) {
 
 	lbAddr v = lb_add_local_generated(p, type, true);
 
+	TEMPORARY_ALLOCATOR_GUARD();
+
 	Type *et = nullptr;
 	switch (bt->kind) {
 	case Type_Array:           et = bt->Array.elem;           break;
@@ -4247,7 +4262,7 @@ gb_internal lbAddr lb_build_addr_compound_lit(lbProcedure *p, Ast *expr) {
 		i64 item_count = gb_max(cl->max_count, cl->elems.count);
 		{
 
-			auto args = array_make<lbValue>(permanent_allocator(), 5);
+			auto args = array_make<lbValue>(temporary_allocator(), 5);
 			args[0] = lb_emit_conv(p, lb_addr_get_ptr(p, v), t_rawptr);
 			args[1] = size;
 			args[2] = align;
@@ -4267,7 +4282,7 @@ gb_internal lbAddr lb_build_addr_compound_lit(lbProcedure *p, Ast *expr) {
 		lb_build_addr_compound_lit_assign_array(p, temp_data);
 
 		{
-			auto args = array_make<lbValue>(permanent_allocator(), 6);
+			auto args = array_make<lbValue>(temporary_allocator(), 6);
 			args[0] = lb_emit_conv(p, v.addr, t_rawptr);
 			args[1] = size;
 			args[2] = align;
