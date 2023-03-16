@@ -337,8 +337,6 @@ struct lbProcedure {
 
 	LLVMMetadataRef debug_info;
 
-	lbAddr current_elision_hint;
-
 	PtrMap<Ast *, lbValue> selector_values;
 	PtrMap<Ast *, lbAddr>  selector_addr;
 	PtrMap<LLVMValueRef, lbTupleFix> tuple_fix_map;
