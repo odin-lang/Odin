@@ -2269,54 +2269,56 @@ gb_internal void lb_build_stmt(lbProcedure *p, Ast *node) {
 			return;
 		}
 
-		auto lvals = array_make<lbAddr>(permanent_allocator(), 0, vd->names.count);
-
-		for (Ast *name : vd->names) {
-			lbAddr lval = {};
-			if (!is_blank_ident(name)) {
-				Entity *e = entity_of_node(name);
-				// bool zero_init = true; // Always do it
-				bool zero_init = vd->values.count == 0;
-				lval = lb_add_local(p, e->type, e, zero_init);
-			}
-			array_add(&lvals, lval);
-		}
+		TEMPORARY_ALLOCATOR_GUARD();
 
 		auto const &values = vd->values;
-		if (values.count > 0) {
-			auto inits = array_make<lbValue>(permanent_allocator(), 0, lvals.count);
+		if (values.count == 0) {
+			auto lvals = slice_make<lbAddr>(temporary_allocator(), vd->names.count);
+			for_array(i, vd->names) {
+				Ast *name = vd->names[i];
+				if (!is_blank_ident(name)) {
+					Entity *e = entity_of_node(name);
+					// bool zero_init = true; // Always do it
+					bool zero_init = values.count == 0;
+					lvals[i] = lb_add_local(p, e->type, e, zero_init);
+				}
+			}
+		} else {
+			auto lvals_preused = slice_make<bool>(temporary_allocator(), vd->names.count);
+			auto lvals = slice_make<lbAddr>(temporary_allocator(), vd->names.count);
+			auto inits = array_make<lbValue>(temporary_allocator(), 0, lvals.count);
 
 			isize lval_index = 0;
 			for (Ast *rhs : values) {
-				p->current_elision_hint = lvals[lval_index];
-
 				rhs = unparen_expr(rhs);
 				lbValue init = lb_build_expr(p, rhs);
-			#if 1
-				if (p->current_elision_hint.addr.value != lvals[lval_index].addr.value) {
-					lvals[lval_index] = {}; // do nothing so that nothing will assign to it
-				} else {
+
+				if (rhs->kind == Ast_CompoundLit) {
 					// NOTE(bill, 2023-02-17): lb_const_value might produce a stack local variable for the
 					// compound literal, so reusing that variable should minimize the stack wastage
-					if (rhs->kind == Ast_CompoundLit) {
-						lbAddr *comp_lit_addr = map_get(&p->module->exact_value_compound_literal_addr_map, rhs);
-						if (comp_lit_addr) {
-							Entity *e = entity_of_node(vd->names[lval_index]);
-							if (e) {
-								GB_ASSERT(p->current_elision_hint.addr.value == nullptr);
-								GB_ASSERT(p->current_elision_hint.addr.value != lvals[lval_index].addr.value);
-								lvals[lval_index] = {}; // do nothing so that nothing will assign to it
-							}
+					lbAddr *comp_lit_addr = map_get(&p->module->exact_value_compound_literal_addr_map, rhs);
+					if (comp_lit_addr) {
+						if (Entity *e = entity_of_node(vd->names[lval_index])) {
+							lbValue val = comp_lit_addr->addr;
+							lb_add_entity(p->module, e, val);
+							lb_add_debug_local_variable(p, val.value, e->type, e->token);
+							lvals_preused[lval_index] = true;
 						}
 					}
 				}
-			#endif
 
 				lval_index += lb_append_tuple_values(p, &inits, init);
 			}
 			GB_ASSERT(lval_index == lvals.count);
 
-			p->current_elision_hint = {};
+			for_array(i, vd->names) {
+				Ast *name = vd->names[i];
+				if (!is_blank_ident(name) && !lvals_preused[i]) {
+					Entity *e = entity_of_node(name);
+					bool zero_init = values.count == 0;
+					lvals[i] = lb_add_local(p, e->type, e, zero_init);
+				}
+			}
 
 			GB_ASSERT(lvals.count == inits.count);
 			for_array(i, inits) {
