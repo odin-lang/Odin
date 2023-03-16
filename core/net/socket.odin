@@ -118,6 +118,9 @@ make_unbound_udp_socket :: proc(family: Address_Family) -> (socket: UDP_Socket, 
 	The `bound_address` is the address of the network interface that you want to use, or a loopback address if you don't care which to use.
 */
 make_bound_udp_socket :: proc(bound_address: Address, port: int) -> (socket: UDP_Socket, err: Network_Error) {
+	if bound_address == nil {
+		return {}, .Bad_Address
+	}
 	socket = make_unbound_udp_socket(family_from_address(bound_address)) or_return
 	bind(socket, {bound_address, port}) or_return
 	return
