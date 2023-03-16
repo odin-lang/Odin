@@ -45,7 +45,8 @@ foreign kernel32 {
 						   dwCursorPosition: COORD) -> BOOL ---
 	SetConsoleTextAttribute :: proc(hConsoleOutput: HANDLE,
 									wAttributes: WORD) -> BOOL ---
-
+	SetConsoleOutputCP :: proc(wCodePageID: UINT) -> BOOL ---
+	
 	GetFileInformationByHandle :: proc(hFile: HANDLE, lpFileInformation: LPBY_HANDLE_FILE_INFORMATION) -> BOOL ---
 	SetHandleInformation :: proc(hObject: HANDLE,
 	                             dwMask: DWORD,
