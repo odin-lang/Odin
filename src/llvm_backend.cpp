@@ -1192,15 +1192,16 @@ gb_internal lbProcedure *lb_create_cleanup_runtime(lbModule *main_module) { // C
 gb_internal WORKER_TASK_PROC(lb_generate_procedures_and_types_per_module) {
 	lbModule *m = cast(lbModule *)data;
 	for (Entity *e : m->global_procedures_and_types_to_create) {
-		String mangled_name = lb_get_entity_name(m, e);
-
-		switch (e->kind) {
-		case Entity_TypeName:
+		if (e->kind == Entity_TypeName) {
+			(void)lb_get_entity_name(m, e);
 			lb_type(m, e->type);
-			break;
-		case Entity_Procedure:
+		}
+	}
+
+	for (Entity *e : m->global_procedures_and_types_to_create) {
+		if (e->kind == Entity_Procedure) {
+			(void)lb_get_entity_name(m, e);
 			array_add(&m->procedures_to_generate, lb_create_procedure(m, e));
-			break;
 		}
 	}
 	return 0;

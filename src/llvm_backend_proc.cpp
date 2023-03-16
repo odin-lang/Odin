@@ -121,18 +121,21 @@ gb_internal lbProcedure *lb_create_procedure(lbModule *m, Entity *entity, bool i
 	p->branch_blocks.allocator = a;
 	p->context_stack.allocator = a;
 	p->scope_stack.allocator   = a;
-	map_init(&p->selector_values,  0);
-	map_init(&p->selector_addr,    0);
-	map_init(&p->tuple_fix_map,    0);
+	// map_init(&p->selector_values,  0);
+	// map_init(&p->selector_addr,    0);
+	// map_init(&p->tuple_fix_map,    0);
 
 	if (p->is_foreign) {
 		lb_add_foreign_library_path(p->module, entity->Procedure.foreign_library);
 	}
 
-	char *c_link_name = alloc_cstring(permanent_allocator(), p->name);
 	LLVMTypeRef func_type = lb_get_procedure_raw_type(m, p->type);
 
-	p->value = LLVMAddFunction(m->mod, c_link_name, func_type);
+	{
+		TEMPORARY_ALLOCATOR_GUARD();
+		char *c_link_name = alloc_cstring(temporary_allocator(), p->name);
+		p->value = LLVMAddFunction(m->mod, c_link_name, func_type);
+	}
 
 	lb_ensure_abi_function_type(m, p);
 	lb_add_function_type_attributes(p->value, p->abi_function_type, p->abi_function_type->calling_convention);
