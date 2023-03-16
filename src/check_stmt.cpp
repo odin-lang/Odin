@@ -1184,6 +1184,8 @@ gb_internal void check_type_switch_stmt(CheckerContext *ctx, Ast *node, u32 mod_
 		return;
 	}
 
+
+	Ast *nil_seen = nullptr;
 	PtrSet<Type *> seen = {};
 	defer (ptr_set_destroy(&seen));
 
@@ -1194,6 +1196,7 @@ gb_internal void check_type_switch_stmt(CheckerContext *ctx, Ast *node, u32 mod_
 		}
 		ast_node(cc, CaseClause, stmt);
 
+		bool saw_nil = false;
 		// TODO(bill): Make robust
 		Type *bt = base_type(type_deref(x.type));
 
@@ -1202,6 +1205,25 @@ gb_internal void check_type_switch_stmt(CheckerContext *ctx, Ast *node, u32 mod_
 			if (type_expr != nullptr) { // Otherwise it's a default expression
 				Operand y = {};
 				check_expr_or_type(ctx, &y, type_expr);
+
+				if (is_operand_nil(y)) {
+					if (!type_has_nil(type_deref(x.type))) {
+						error(type_expr, "'nil' case is not allowed for the type '%s'", type_to_string(type_deref(x.type)));
+						continue;
+					}
+					saw_nil = true;
+
+					if (nil_seen) {
+						ERROR_BLOCK();
+						error(type_expr, "'nil' case has already been handled previously");
+						error_line("\t 'nil' was already previously seen at %s", token_pos_to_string(ast_token(nil_seen).pos));
+					} else {
+						nil_seen = type_expr;
+					}
+					case_type = y.type;
+					continue;
+				}
+
 				if (y.mode != Addressing_Type) {
 					gbString str = expr_to_string(type_expr);
 					error(type_expr, "Expected a type as a case, got %s", str);
@@ -1255,14 +1277,16 @@ gb_internal void check_type_switch_stmt(CheckerContext *ctx, Ast *node, u32 mod_
 			is_reference = true;
 		}
 
-		if (cc->list.count > 1) {
+		if (cc->list.count > 1 || saw_nil) {
 			case_type = nullptr;
 		}
 		if (case_type == nullptr) {
 			case_type = x.type;
 		}
 		if (switch_kind == TypeSwitch_Any) {
-			add_type_info_type(ctx, case_type);
+			if (!is_type_untyped(case_type)) {
+				add_type_info_type(ctx, case_type);
+			}
 		}
 
 		check_open_scope(ctx, stmt);

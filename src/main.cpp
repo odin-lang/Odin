@@ -634,6 +634,7 @@ enum BuildFlagKind {
 	BuildFlag_Microarch,
 	BuildFlag_TargetFeatures,
 	BuildFlag_MinimumOSVersion,
+	BuildFlag_NoThreadLocal,
 
 	BuildFlag_RelocMode,
 	BuildFlag_DisableRedZone,
@@ -794,6 +795,7 @@ gb_internal bool parse_build_flags(Array<String> args) {
 	add_flag(&build_flags, BuildFlag_Debug,                   str_lit("debug"),                     BuildFlagParam_None,    Command__does_check);
 	add_flag(&build_flags, BuildFlag_DisableAssert,           str_lit("disable-assert"),            BuildFlagParam_None,    Command__does_check);
 	add_flag(&build_flags, BuildFlag_NoBoundsCheck,           str_lit("no-bounds-check"),           BuildFlagParam_None,    Command__does_check);
+	add_flag(&build_flags, BuildFlag_NoThreadLocal,           str_lit("no-thread-local"),           BuildFlagParam_None,    Command__does_check);
 	add_flag(&build_flags, BuildFlag_NoDynamicLiterals,       str_lit("no-dynamic-literals"),       BuildFlagParam_None,    Command__does_check);
 	add_flag(&build_flags, BuildFlag_NoCRT,                   str_lit("no-crt"),                    BuildFlagParam_None,    Command__does_build);
 	add_flag(&build_flags, BuildFlag_NoEntryPoint,            str_lit("no-entry-point"),            BuildFlagParam_None,    Command__does_check &~ Command_test);
@@ -1002,7 +1004,9 @@ gb_internal bool parse_build_flags(Array<String> args) {
 						}
 						case BuildFlag_OptimizationMode: {
 							GB_ASSERT(value.kind == ExactValue_String);
-							if (value.value_string == "minimal") {
+							if (value.value_string == "none") {
+								build_context.optimization_level = -1;
+							} else if (value.value_string == "minimal") {
 								build_context.optimization_level = 0;
 							} else if (value.value_string == "size") {
 								build_context.optimization_level = 1;
@@ -1014,6 +1018,7 @@ gb_internal bool parse_build_flags(Array<String> args) {
 								gb_printf_err("\tminimal\n");
 								gb_printf_err("\tsize\n");
 								gb_printf_err("\tspeed\n");
+								gb_printf_err("\tnone (useful for -debug builds)\n");
 								bad_flags = true;
 							}
 							break;
@@ -1308,6 +1313,9 @@ gb_internal bool parse_build_flags(Array<String> args) {
 							break;
 						case BuildFlag_NoEntryPoint:
 							build_context.no_entry_point = true;
+							break;
+						case BuildFlag_NoThreadLocal:
+							build_context.no_thread_local = true;
 							break;
 						case BuildFlag_UseLLD:
 							build_context.use_lld = true;
@@ -1955,7 +1963,7 @@ gb_internal void print_show_help(String const arg0, String const &command) {
 
 		print_usage_line(1, "-o:<string>");
 		print_usage_line(2, "Set the optimization mode for compilation");
-		print_usage_line(2, "Accepted values: minimal, size, speed");
+		print_usage_line(2, "Accepted values: minimal, size, speed, none");
 		print_usage_line(2, "Example: -o:speed");
 		print_usage_line(0, "");
 	}
@@ -2059,6 +2067,10 @@ gb_internal void print_show_help(String const arg0, String const &command) {
 
 		print_usage_line(1, "-no-crt");
 		print_usage_line(2, "Disables automatic linking with the C Run Time");
+		print_usage_line(0, "");
+
+		print_usage_line(1, "-no-thread-local");
+		print_usage_line(2, "Ignore @thread_local attribute, effectively treating the program as if it is single-threaded");
 		print_usage_line(0, "");
 
 		print_usage_line(1, "-lld");

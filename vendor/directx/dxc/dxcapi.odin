@@ -102,7 +102,7 @@ IBlobEncoding :: struct #raw_union {
 }
 IBlobEncoding_VTable :: struct {
 	using idxcblob_vtable: IBlob_VTable,
-	GetEncoding: proc "stdcall" (pKnown: ^BOOL, pCodePage: ^u32) -> HRESULT,
+	GetEncoding: proc "stdcall" (this: ^IBlobEncoding, pKnown: ^BOOL, pCodePage: ^u32) -> HRESULT,
 }
 
 IBlobUtf16_UUID_STRING :: "A3F84EAB-0FAA-497E-A39C-EE6ED60B2D84"

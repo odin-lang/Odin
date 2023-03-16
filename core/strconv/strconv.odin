@@ -556,19 +556,51 @@ parse_f32 :: proc(s: string, n: ^int = nil) -> (value: f32, ok: bool) {
 	return f32(v), ok
 }
 
+
+parse_f64 :: proc(str: string, n: ^int = nil) -> (value: f64, ok: bool) {
+	nr: int
+	value, nr, ok = parse_f64_prefix(str)
+	if ok && len(str) != nr {
+		ok = false
+	}
+	if n != nil { n^ = nr }
+	return
+}
+
+
+// Parses a 32-bit floating point number from a string.
+//
+// Returns ok=false if a base 10 float could not be found,
+// or if the input string contained more than just the number.
+//
+// ```
+// n, _, ok := strconv.parse_f32("12.34eee");
+// assert(n == 12.34 && ok);
+//
+// n, _, ok = strconv.parse_f32("12.34");
+// assert(n == 12.34 && ok);
+// ```
+parse_f32_prefix :: proc(str: string) -> (value: f32, nr: int, ok: bool) {
+	f: f64
+	f, nr, ok = parse_f64_prefix(str)
+	value = f32(f)
+	return
+}
+
+
 // Parses a 64-bit floating point number from a string.
 //
 // Returns ok=false if a base 10 float could not be found,
 // or if the input string contained more than just the number.
 //
 // ```
-// n, ok := strconv.parse_f32("12.34eee");
+// n, _, ok := strconv.parse_f32("12.34eee");
 // assert(n == 12.34 && ok);
 //
-// n, ok = strconv.parse_f32("12.34");
+// n, _, ok = strconv.parse_f32("12.34");
 // assert(n == 12.34 && ok);
 // ```
-parse_f64 :: proc(str: string, n: ^int = nil) -> (value: f64, ok: bool) {
+parse_f64_prefix :: proc(str: string) -> (value: f64, nr: int, ok: bool) {
 	common_prefix_len_ignore_case :: proc "contextless" (s, prefix: string) -> int {
 		n := len(prefix)
 		if n > len(s) {
@@ -678,8 +710,8 @@ parse_f64 :: proc(str: string, n: ^int = nil) -> (value: f64, ok: bool) {
 				saw_digits = true
 				nd += 1
 				if nd_mant < MAX_MANT_DIGITS {
-					MAX_MANT_DIGITS *= 16
-					MAX_MANT_DIGITS += int(lower(c) - 'a' + 10)
+					mantissa *= 16
+					mantissa += u64(lower(c) - 'a' + 10)
 					nd_mant += 1
 				} else {
 					trunc = true
@@ -729,12 +761,11 @@ parse_f64 :: proc(str: string, n: ^int = nil) -> (value: f64, ok: bool) {
 		if mantissa != 0 {
 			exp = decimal_point - nd_mant
 		}
-		// TODO(bill): check underscore correctness
 		ok = true
 		return
 	}
 
-	parse_hex :: proc(s: string, mantissa: u64, exp: int, neg, trunc: bool) -> (f64, bool) {
+	parse_hex :: proc "contextless" (s: string, mantissa: u64, exp: int, neg, trunc: bool) -> (f64, bool) {
 		info := &_f64_info
 
 		mantissa, exp := mantissa, exp
@@ -751,7 +782,7 @@ parse_f64 :: proc(str: string, n: ^int = nil) -> (value: f64, ok: bool) {
 			mantissa |= 1
 		}
 
-		for mantissa >> (info.mantbits+2) == 0 {
+		for mantissa != 0 && mantissa >> (info.mantbits+2) == 0 {
 			mantissa = mantissa>>1 | mantissa&1
 			exp += 1
 		}
@@ -795,9 +826,6 @@ parse_f64 :: proc(str: string, n: ^int = nil) -> (value: f64, ok: bool) {
 	}
 
 
-	nr: int
-	defer if n != nil { n^ = nr }
-
 	if value, nr, ok = check_special(str); ok {
 		return
 	}
@@ -808,7 +836,8 @@ parse_f64 :: proc(str: string, n: ^int = nil) -> (value: f64, ok: bool) {
 	mantissa, exp, neg, trunc, hex, nr = parse_components(str) or_return
 
 	if hex {
-		return parse_hex(str, mantissa, exp, neg, trunc)
+		value, ok = parse_hex(str, mantissa, exp, neg, trunc)
+		return
 	}
 
 	trunc_block: if !trunc {
@@ -827,7 +856,7 @@ parse_f64 :: proc(str: string, n: ^int = nil) -> (value: f64, ok: bool) {
 		}
 		switch {
 		case exp == 0:
-			return f, true
+			return f, nr, true
 		case exp > 0 && exp <= 15+22:
 			if exp > 22 {
 				f *= pow10[exp-22]
@@ -836,9 +865,9 @@ parse_f64 :: proc(str: string, n: ^int = nil) -> (value: f64, ok: bool) {
 			if f > 1e15 || f < 1e-15 {
 				break trunc_block
 			}
-			return f * pow10[exp], true
+			return f * pow10[exp], nr, true
 		case -22 <= exp && exp < 0:
-			return f / pow10[-exp], true
+			return f / pow10[-exp], nr, true
 		}
 	}
 	d: decimal.Decimal

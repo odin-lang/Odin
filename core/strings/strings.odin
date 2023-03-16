@@ -1428,7 +1428,7 @@ split_multi :: proc(s: string, substrs: []string, allocator := context.allocator
 	// sort substrings by string size, largest to smallest
 	runtime.DEFAULT_TEMP_ALLOCATOR_TEMP_GUARD()
 	temp_substrs := slice.clone(substrs, context.temp_allocator)
-	defer delete(temp_substrs)
+
 	slice.sort_by(temp_substrs, proc(a, b: string) -> bool {
 		return len(a) > len(b)	
 	})
