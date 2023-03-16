@@ -1511,6 +1511,7 @@ split_multi_iterate :: proc(it: ^string, substrs: []string) -> (res: string, ok:
 		it^ = it[i+w:]
 	} else {
 		// last value
+		res = it^
 		it^ = it[len(it):]
 	}
 	ok = true
