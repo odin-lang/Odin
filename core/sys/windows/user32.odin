@@ -109,6 +109,12 @@ foreign user32 {
 	GetDlgCtrlID :: proc(hWnd: HWND) -> c_int ---
 	GetDlgItem :: proc(hDlg: HWND, nIDDlgItem: c_int) -> HWND ---
 
+	CreatePopupMenu :: proc() -> HMENU ---
+	DestroyMenu :: proc(hMenu: HMENU) -> BOOL ---
+	AppendMenuW :: proc(hMenu: HMENU, uFlags: UINT, uIDNewItem: UINT_PTR, lpNewItem: LPCWSTR) -> BOOL ---
+	TrackPopupMenu :: proc(hMenu: HMENU, uFlags: UINT, x: int, y: int, nReserved: int, hWnd: HWND, prcRect: ^RECT) -> i32 ---
+	RegisterWindowMessageW :: proc(lpString: LPCWSTR) -> UINT ---
+
 	GetUpdateRect :: proc(hWnd: HWND, lpRect: LPRECT, bErase: BOOL) -> BOOL ---
 	ValidateRect :: proc(hWnd: HWND, lpRect: ^RECT) -> BOOL ---
 	InvalidateRect :: proc(hWnd: HWND, lpRect: ^RECT, bErase: BOOL) -> BOOL ---
@@ -205,6 +211,8 @@ foreign user32 {
 	GetRawInputDeviceList :: proc(pRawInputDeviceList: PRAWINPUTDEVICELIST, puiNumDevices: PUINT, cbSize: UINT) -> UINT ---
 	GetRegisteredRawInputDevices :: proc(pRawInputDevices: PRAWINPUTDEVICE, puiNumDevices: PUINT, cbSize: UINT) -> UINT ---
 	RegisterRawInputDevices :: proc(pRawInputDevices: PCRAWINPUTDEVICE, uiNumDevices: UINT, cbSize: UINT) -> BOOL ---
+
+	SendInput :: proc(cInputs: UINT, pInputs: [^]INPUT, cbSize: ^c_int) -> UINT ---
 
 	SetLayeredWindowAttributes  :: proc(hWnd: HWND, crKey: COLORREF, bAlpha: BYTE, dwFlags: DWORD) -> BOOL ---
 
