@@ -787,69 +787,90 @@ namespace lbAbiAmd64SysV {
 
 	gb_internal LLVMTypeRef llreg(LLVMContextRef c, Array<RegClass> const &reg_classes, LLVMTypeRef type) {
 		auto types = array_make<LLVMTypeRef>(heap_allocator(), 0, reg_classes.count);
-		for (isize i = 0; i < reg_classes.count; /**/) {
-			RegClass reg_class = reg_classes[i];
-			switch (reg_class) {
-			case RegClass_Int:
-				if (reg_classes.count == 1) {
-					array_add(&types, LLVMIntTypeInContext(c, cast(unsigned)(lb_sizeof(type)*8)));
-				} else {
-					array_add(&types, LLVMIntTypeInContext(c, 64));
-				}
-				break;
-			case RegClass_SSEFv:
-			case RegClass_SSEDv:
-			case RegClass_SSEInt8:
-			case RegClass_SSEInt16:
-			case RegClass_SSEInt32:
-			case RegClass_SSEInt64:
-				{
-					unsigned elems_per_word = 0;
-					LLVMTypeRef elem_type = nullptr;
-					switch (reg_class) {
-					case RegClass_SSEFv:
-						elems_per_word = 2;
-						elem_type = LLVMFloatTypeInContext(c);
-						break;
-					case RegClass_SSEDv:
-						elems_per_word = 1;
-						elem_type = LLVMDoubleTypeInContext(c);
-						break;
-					case RegClass_SSEInt8:
-						elems_per_word = 64/8;
-						elem_type = LLVMIntTypeInContext(c, 8);
-						break;
-					case RegClass_SSEInt16:
-						elems_per_word = 64/16;
-						elem_type = LLVMIntTypeInContext(c, 16);
-						break;
-					case RegClass_SSEInt32:
-						elems_per_word = 64/32;
-						elem_type = LLVMIntTypeInContext(c, 32);
-						break;
-					case RegClass_SSEInt64:
-						elems_per_word = 64/64;
-						elem_type = LLVMIntTypeInContext(c, 64);
-						break;
-					}
 
-					unsigned vec_len = llvec_len(reg_classes, i+1);
-					LLVMTypeRef vec_type = LLVMVectorType(elem_type, vec_len * elems_per_word);
-					array_add(&types, vec_type);
-					i += vec_len;
-					continue;
-				}
+		bool all_ints = true;
+		for (RegClass reg_class : reg_classes) {
+			if (reg_class != RegClass_Int) {
+				all_ints = false;
 				break;
-			case RegClass_SSEFs:
-				array_add(&types, LLVMFloatTypeInContext(c));
-				break;
-			case RegClass_SSEDs:
-				array_add(&types, LLVMDoubleTypeInContext(c));
-				break;
-			default:
-				GB_PANIC("Unhandled RegClass");
 			}
-			i += 1;
+		}
+
+		if (all_ints) {
+			i64 sz = lb_sizeof(type);
+			for_array(i, reg_classes) {
+				GB_ASSERT(sz != 0);
+				// TODO(bill): is this even correct? BECAUSE LLVM DOES NOT DOCUMENT ANY OF THIS!!!
+				if (sz >= 8) {
+					array_add(&types, LLVMIntTypeInContext(c, 64));
+					sz -= 8;
+				} else {
+					array_add(&types, LLVMIntTypeInContext(c, cast(unsigned)(sz*8)));
+					sz = 0;
+				}
+			}
+		} else {
+			for (isize i = 0; i < reg_classes.count; /**/) {
+				RegClass reg_class = reg_classes[i];
+				switch (reg_class) {
+				case RegClass_Int:
+					// TODO(bill): is this even correct? BECAUSE LLVM DOES NOT DOCUMENT ANY OF THIS!!!
+					array_add(&types, LLVMIntTypeInContext(c, 64));
+					break;
+				case RegClass_SSEFv:
+				case RegClass_SSEDv:
+				case RegClass_SSEInt8:
+				case RegClass_SSEInt16:
+				case RegClass_SSEInt32:
+				case RegClass_SSEInt64:
+					{
+						unsigned elems_per_word = 0;
+						LLVMTypeRef elem_type = nullptr;
+						switch (reg_class) {
+						case RegClass_SSEFv:
+							elems_per_word = 2;
+							elem_type = LLVMFloatTypeInContext(c);
+							break;
+						case RegClass_SSEDv:
+							elems_per_word = 1;
+							elem_type = LLVMDoubleTypeInContext(c);
+							break;
+						case RegClass_SSEInt8:
+							elems_per_word = 64/8;
+							elem_type = LLVMIntTypeInContext(c, 8);
+							break;
+						case RegClass_SSEInt16:
+							elems_per_word = 64/16;
+							elem_type = LLVMIntTypeInContext(c, 16);
+							break;
+						case RegClass_SSEInt32:
+							elems_per_word = 64/32;
+							elem_type = LLVMIntTypeInContext(c, 32);
+							break;
+						case RegClass_SSEInt64:
+							elems_per_word = 64/64;
+							elem_type = LLVMIntTypeInContext(c, 64);
+							break;
+						}
+
+						unsigned vec_len = llvec_len(reg_classes, i+1);
+						LLVMTypeRef vec_type = LLVMVectorType(elem_type, vec_len * elems_per_word);
+						array_add(&types, vec_type);
+						i += vec_len;
+						continue;
+					}
+					break;
+				case RegClass_SSEFs:
+					array_add(&types, LLVMFloatTypeInContext(c));
+					break;
+				case RegClass_SSEDs:
+					array_add(&types, LLVMDoubleTypeInContext(c));
+					break;
+				default:
+					GB_PANIC("Unhandled RegClass");
+				}
+				i += 1;
+			}
 		}
 
 		if (types.count == 1) {
