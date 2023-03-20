@@ -94,6 +94,7 @@ MAX_TEXT_BUFFER_LENGTH :: #config(RAYLIB_MAX_TEXT_BUFFER_LENGTH, 1024)
 
 when ODIN_OS == .Windows {
 	foreign import lib {
+		"system:msvcrt.lib",
 		"windows/raylib.lib",
 		"system:Winmm.lib",
 		"system:Gdi32.lib",
