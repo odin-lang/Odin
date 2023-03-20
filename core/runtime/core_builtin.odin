@@ -15,11 +15,15 @@ container_of :: #force_inline proc "contextless" (ptr: $P/^$Field_Type, $T: type
 }
 
 
-@thread_local global_default_temp_allocator_data: Default_Temp_Allocator
+when !NO_DEFAULT_TEMP_ALLOCATOR {
+	@thread_local global_default_temp_allocator_data: Default_Temp_Allocator
+}
 
-@builtin
+@(builtin, disabled=NO_DEFAULT_TEMP_ALLOCATOR)
 init_global_temporary_allocator :: proc(size: int, backup_allocator := context.allocator) {
-	default_temp_allocator_init(&global_default_temp_allocator_data, size, backup_allocator)
+	when !NO_DEFAULT_TEMP_ALLOCATOR {
+		default_temp_allocator_init(&global_default_temp_allocator_data, size, backup_allocator)
+	}
 }
 
 
