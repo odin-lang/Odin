@@ -58,11 +58,11 @@ _os_write :: proc "contextless" (data: []byte) -> (n: int, err: _OS_Errno) #no_b
 	return
 }
 
-heap_alloc :: proc "contextless" (size: int, zero_memory := true) -> rawptr {
+heap_alloc :: proc "contextless" (size: uint, zero_memory := true) -> rawptr {
 	HEAP_ZERO_MEMORY :: 0x00000008
-	return HeapAlloc(GetProcessHeap(), HEAP_ZERO_MEMORY if zero_memory else 0, uint(size))
+	return HeapAlloc(GetProcessHeap(), HEAP_ZERO_MEMORY if zero_memory else 0, size)
 }
-heap_resize :: proc "contextless" (ptr: rawptr, new_size: int) -> rawptr {
+heap_resize :: proc "contextless" (ptr: rawptr, new_size: uint) -> rawptr {
 	if new_size == 0 {
 		heap_free(ptr)
 		return nil
@@ -91,7 +91,7 @@ heap_free :: proc "contextless" (ptr: rawptr) {
 
 
 
-_windows_default_alloc_or_resize :: proc "contextless" (size, alignment: int, old_ptr: rawptr = nil, zero_memory := true) -> ([]byte, Allocator_Error) {
+_windows_default_alloc_or_resize :: proc "contextless" (size, alignment: uint, old_ptr: rawptr = nil, zero_memory := true) -> ([]byte, Allocator_Error) {
 	if size == 0 {
 		_windows_default_free(old_ptr)
 		return nil, nil
@@ -111,7 +111,7 @@ _windows_default_alloc_or_resize :: proc "contextless" (size, alignment: int, ol
 
 	ptr := uintptr(aligned_mem)
 	aligned_ptr := (ptr - 1 + uintptr(a)) & -uintptr(a)
-	diff := int(aligned_ptr - ptr)
+	diff := uint(aligned_ptr - ptr)
 	if (size + diff) > space {
 		return nil, .Out_Of_Memory
 	}
@@ -122,7 +122,7 @@ _windows_default_alloc_or_resize :: proc "contextless" (size, alignment: int, ol
 	return byte_slice(aligned_mem, size), nil
 }
 
-_windows_default_alloc :: proc "contextless" (size, alignment: int, zero_memory := true) -> ([]byte, Allocator_Error) {
+_windows_default_alloc :: proc "contextless" (size, alignment: uint, zero_memory := true) -> ([]byte, Allocator_Error) {
 	return _windows_default_alloc_or_resize(size, alignment, nil, zero_memory)
 }
 
@@ -133,6 +133,6 @@ _windows_default_free :: proc "contextless" (ptr: rawptr) {
 	}
 }
 
-_windows_default_resize :: proc "contextless" (p: rawptr, old_size: int, new_size: int, new_alignment: int) -> ([]byte, Allocator_Error) {
+_windows_default_resize :: proc "contextless" (p: rawptr, old_size: uint, new_size: uint, new_alignment: uint) -> ([]byte, Allocator_Error) {
 	return _windows_default_alloc_or_resize(new_size, new_alignment, p)
 }

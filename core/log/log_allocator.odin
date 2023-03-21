@@ -25,8 +25,8 @@ log_allocator :: proc(la: ^Log_Allocator) -> runtime.Allocator {
 }
 
 log_allocator_proc :: proc(allocator_data: rawptr, mode: runtime.Allocator_Mode,
-                           size, alignment: int,
-                           old_memory: rawptr, old_size: int, location := #caller_location) -> ([]byte, runtime.Allocator_Error)  {
+                           size, alignment: uint,
+                           old_memory: rawptr, old_size: uint, location := #caller_location) -> ([]byte, runtime.Allocator_Error)  {
 	la := (^Log_Allocator)(allocator_data)
 
 	padding := " " if la.prefix != "" else ""

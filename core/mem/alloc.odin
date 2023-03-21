@@ -61,16 +61,16 @@ DEFAULT_PAGE_SIZE ::
 	4 * 1024
 
 alloc :: proc(size: int, alignment: int = DEFAULT_ALIGNMENT, allocator := context.allocator, loc := #caller_location) -> rawptr {
-	data, _ := runtime.mem_alloc(size, alignment, allocator, loc)
+	data, _ := runtime.mem_alloc(uint(size), uint(alignment), allocator, loc)
 	return raw_data(data)
 }
 
 alloc_bytes :: proc(size: int, alignment: int = DEFAULT_ALIGNMENT, allocator := context.allocator, loc := #caller_location) -> ([]byte, Allocator_Error) {
-	return runtime.mem_alloc(size, alignment, allocator, loc)
+	return runtime.mem_alloc(uint(size), uint(alignment), allocator, loc)
 }
 
 alloc_bytes_non_zeroed :: proc(size: int, alignment: int = DEFAULT_ALIGNMENT, allocator := context.allocator, loc := #caller_location) -> ([]byte, Allocator_Error) {
-	return runtime.mem_alloc_non_zeroed(size, alignment, allocator, loc)
+	return runtime.mem_alloc_non_zeroed(uint(size), uint(alignment), allocator, loc)
 }
 
 free :: proc(ptr: rawptr, allocator := context.allocator, loc := #caller_location) -> Allocator_Error {
@@ -81,7 +81,7 @@ free_with_size :: proc(ptr: rawptr, byte_count: int, allocator := context.alloca
 	if ptr == nil || allocator.procedure == nil {
 		return nil
 	}
-	_, err := allocator.procedure(allocator.data, .Free, 0, 0, ptr, byte_count, loc)
+	_, err := allocator.procedure(allocator.data, .Free, 0, 0, ptr, uint(byte_count), loc)
 	return err
 }
 
@@ -94,12 +94,12 @@ free_all :: proc(allocator := context.allocator, loc := #caller_location) -> All
 }
 
 resize :: proc(ptr: rawptr, old_size, new_size: int, alignment: int = DEFAULT_ALIGNMENT, allocator := context.allocator, loc := #caller_location) -> rawptr {
-	data, _ := runtime.mem_resize(ptr, old_size, new_size, alignment, allocator, loc)
+	data, _ := runtime.mem_resize(ptr, uint(old_size), uint(new_size), uint(alignment), allocator, loc)
 	return raw_data(data)
 }
 
 resize_bytes :: proc(old_data: []byte, new_size: int, alignment: int = DEFAULT_ALIGNMENT, allocator := context.allocator, loc := #caller_location) -> ([]byte, Allocator_Error) {
-	return runtime.mem_resize(raw_data(old_data), len(old_data), new_size, alignment, allocator, loc)
+	return runtime.mem_resize(raw_data(old_data), len(old_data), uint(new_size), uint(alignment), allocator, loc)
 }
 
 query_features :: proc(allocator: Allocator, loc := #caller_location) -> (set: Allocator_Mode_Set) {
@@ -221,9 +221,9 @@ make :: proc{
 
 
 
-default_resize_align :: proc(old_memory: rawptr, old_size, new_size, alignment: int, allocator := context.allocator, loc := #caller_location) -> rawptr {
+default_resize_align :: proc(old_memory: rawptr, old_size, new_size, alignment: uint, allocator := context.allocator, loc := #caller_location) -> rawptr {
 	if old_memory == nil {
-		return alloc(new_size, alignment, allocator, loc)
+		return alloc(int(new_size), int(alignment), allocator, loc)
 	}
 
 	if new_size == 0 {
@@ -235,7 +235,7 @@ default_resize_align :: proc(old_memory: rawptr, old_size, new_size, alignment: 
 		return old_memory
 	}
 
-	new_memory := alloc(new_size, alignment, allocator, loc)
+	new_memory := alloc(int(new_size), int(alignment), allocator, loc)
 	if new_memory == nil {
 		return nil
 	}
@@ -244,11 +244,11 @@ default_resize_align :: proc(old_memory: rawptr, old_size, new_size, alignment: 
 	free(old_memory, allocator, loc)
 	return new_memory
 }
-default_resize_bytes_align :: proc(old_data: []byte, new_size, alignment: int, allocator := context.allocator, loc := #caller_location) -> ([]byte, Allocator_Error) {
+default_resize_bytes_align :: proc(old_data: []byte, new_size, alignment: uint, allocator := context.allocator, loc := #caller_location) -> ([]byte, Allocator_Error) {
 	old_memory := raw_data(old_data)
-	old_size := len(old_data)
+	old_size := uint(len(old_data))
 	if old_memory == nil {
-		return alloc_bytes(new_size, alignment, allocator, loc)
+		return alloc_bytes(int(new_size), int(alignment), allocator, loc)
 	}
 
 	if new_size == 0 {
@@ -260,7 +260,7 @@ default_resize_bytes_align :: proc(old_data: []byte, new_size, alignment: int, a
 		return old_data, .None
 	}
 
-	new_memory, err := alloc_bytes(new_size, alignment, allocator, loc)
+	new_memory, err := alloc_bytes(int(new_size), int(alignment), allocator, loc)
 	if new_memory == nil || err != nil {
 		return nil, err
 	}

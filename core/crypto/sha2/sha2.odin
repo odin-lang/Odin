@@ -443,7 +443,7 @@ final :: proc(ctx: ^$T, hash: []byte) {
     when T == Sha256_Context      {pm_len = block_nb << 6}
     else when T == Sha512_Context {pm_len = block_nb << 7}
 
-    mem.set(rawptr(&(ctx.block[ctx.length:])[0]), 0, int(uint(pm_len) - ctx.length))
+    mem.set(rawptr(&(ctx.block[ctx.length:])[0]), 0, (uint(pm_len) - ctx.length))
     ctx.block[ctx.length] = 0x80
 
     util.PUT_U32_BE(ctx.block[pm_len - 4:], len_b)

@@ -134,7 +134,7 @@ decrypt :: proc (plaintext, tag, key, nonce, aad, ciphertext: []byte) -> bool {
 	// Validate the tag in constant time.
 	if crypto.compare_constant_time(tag, derived_tag) != 1 {
 		// Zero out the plaintext, as a defense in depth measure.
-		mem.zero_explicit(raw_data(plaintext), ciphertext_len)
+		mem.zero_explicit(raw_data(plaintext), uint(ciphertext_len))
 		return false
 	}
 

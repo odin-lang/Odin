@@ -53,7 +53,7 @@ _intern_get_entry :: proc(m: ^Intern, text: string) -> (new_entry: ^Intern_Entry
 		m.allocator = context.allocator
 	}
 
-	entry_size := int(offset_of(Intern_Entry, str)) + len(text) + 1
+	entry_size := uint(offset_of(Intern_Entry, str)) + len(text) + 1
 	bytes := runtime.mem_alloc(entry_size, align_of(Intern_Entry), m.allocator) or_return
 	new_entry = (^Intern_Entry)(raw_data(bytes))
 

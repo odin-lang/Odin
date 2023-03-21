@@ -7,8 +7,8 @@ when ODIN_DEFAULT_TO_NIL_ALLOCATOR {
 	default_allocator :: nil_allocator
 } else {
 	default_allocator_proc :: proc(allocator_data: rawptr, mode: Allocator_Mode,
-	                                size, alignment: int,
-	                                old_memory: rawptr, old_size: int, loc := #caller_location) -> (data: []byte, err: Allocator_Error) {
+	                                size, alignment: uint,
+	                                old_memory: rawptr, old_size: uint, loc := #caller_location) -> (data: []byte, err: Allocator_Error) {
 		switch mode {
 		case .Alloc, .Alloc_Non_Zeroed:
 			data, err = _windows_default_alloc(size, alignment, mode == .Alloc)

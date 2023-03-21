@@ -169,8 +169,8 @@ read_ptr :: proc(fd: Handle, data: rawptr, len: int) -> (int, Errno) {
 }
 
 heap_allocator_proc :: proc(allocator_data: rawptr, mode: mem.Allocator_Mode,
-                            size, alignment: int,
-                            old_memory: rawptr, old_size: int, loc := #caller_location) -> ([]byte, mem.Allocator_Error) {
+                            size, alignment: uint,
+                            old_memory: rawptr, old_size: uint, loc := #caller_location) -> ([]byte, mem.Allocator_Error) {
 	//
 	// NOTE(tetra, 2020-01-14): The heap doesn't respect alignment.
 	// Instead, we overallocate by `alignment + size_of(rawptr) - 1`, and insert
@@ -220,14 +220,14 @@ heap_allocator_proc :: proc(allocator_data: rawptr, mode: mem.Allocator_Mode,
 		// NOTE: heap_resize does not zero the new memory, so we do it
 		if new_size > old_size {
 			new_region := mem.raw_data(new_memory[old_size:])
-			mem.zero(new_region, new_size - old_size)
+			mem.zero(new_region, uint(new_size - old_size))
 		}
 		return
 	}
 
 	switch mode {
 	case .Alloc, .Alloc_Non_Zeroed:
-		return aligned_alloc(size, alignment, nil, mode == .Alloc)
+		return aligned_alloc(int(size), int(alignment), nil, mode == .Alloc)
 
 	case .Free:
 		aligned_free(old_memory)
@@ -237,9 +237,9 @@ heap_allocator_proc :: proc(allocator_data: rawptr, mode: mem.Allocator_Mode,
 
 	case .Resize:
 		if old_memory == nil {
-			return aligned_alloc(size, alignment)
+			return aligned_alloc(int(size), int(alignment))
 		}
-		return aligned_resize(old_memory, old_size, size, alignment)
+		return aligned_resize(old_memory, int(old_size), int(size), int(alignment))
 
 	case .Query_Features:
 		set := (^mem.Allocator_Mode_Set)(old_memory)

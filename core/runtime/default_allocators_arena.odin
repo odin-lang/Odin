@@ -32,8 +32,8 @@ memory_block_alloc :: proc(allocator: Allocator, capacity: uint, loc := #caller_
 	total_size := uint(capacity + size_of(Memory_Block))
 	base_offset    := uintptr(size_of(Memory_Block))
 
-	min_alignment: int = max(16, align_of(Memory_Block))
-	data := mem_alloc(int(total_size), min_alignment, allocator, loc) or_return
+	min_alignment: uint = max(16, align_of(Memory_Block))
+	data := mem_alloc(total_size, min_alignment, allocator, loc) or_return
 	block = (^Memory_Block)(raw_data(data))
 	end := uintptr(raw_data(data)[len(data):])
 
@@ -180,13 +180,13 @@ arena_allocator :: proc(arena: ^Arena) -> Allocator {
 }
 
 arena_allocator_proc :: proc(allocator_data: rawptr, mode: Allocator_Mode,
-                             size, alignment: int,
-                             old_memory: rawptr, old_size: int,
+                             size, alignment: uint,
+                             old_memory: rawptr, old_size: uint,
                              location := #caller_location) -> (data: []byte, err: Allocator_Error) {
 	arena := (^Arena)(allocator_data)
 
-	size, alignment := uint(size), uint(alignment)
-	old_size := uint(old_size)
+	size, alignment := size, alignment
+	old_size := old_size
 
 	switch mode {
 	case .Alloc, .Alloc_Non_Zeroed:

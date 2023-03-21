@@ -178,7 +178,7 @@ arena_free_all :: proc(arena: ^Arena, loc := #caller_location) {
 		}
 		// Zero the first block's memory
 		if arena.curr_block != nil {
-			mem.zero(arena.curr_block.base, int(arena.curr_block.used))
+			mem.zero(arena.curr_block.base, arena.curr_block.used)
 			arena.curr_block.used = 0
 		}
 		arena.total_used = 0
@@ -273,8 +273,8 @@ arena_allocator :: proc(arena: ^Arena) -> mem.Allocator {
 
 // The allocator procedured by an `Allocator` produced by `arena_allocator`
 arena_allocator_proc :: proc(allocator_data: rawptr, mode: mem.Allocator_Mode,
-                             size, alignment: int,
-                             old_memory: rawptr, old_size: int,
+                             size, alignment: uint,
+                             old_memory: rawptr, old_size: uint,
                              location := #caller_location) -> (data: []byte, err: Allocator_Error) {
 	arena := (^Arena)(allocator_data)
 

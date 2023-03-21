@@ -20,7 +20,7 @@ when !NO_DEFAULT_TEMP_ALLOCATOR {
 }
 
 @(builtin, disabled=NO_DEFAULT_TEMP_ALLOCATOR)
-init_global_temporary_allocator :: proc(size: int, backup_allocator := context.allocator) {
+init_global_temporary_allocator :: proc(size: uint, backup_allocator := context.allocator) {
 	when !NO_DEFAULT_TEMP_ALLOCATOR {
 		default_temp_allocator_init(&global_default_temp_allocator_data, size, backup_allocator)
 	}
@@ -184,7 +184,7 @@ new :: proc($T: typeid, allocator := context.allocator, loc := #caller_location)
 	return new_aligned(T, align_of(T), allocator, loc)
 }
 new_aligned :: proc($T: typeid, alignment: int, allocator := context.allocator, loc := #caller_location) -> (t: ^T, err: Allocator_Error) {
-	data := mem_alloc_bytes(size_of(T), alignment, allocator, loc) or_return
+	data := mem_alloc_bytes(size_of(T), uint(alignment), allocator, loc) or_return
 	t = (^T)(raw_data(data))
 	return
 }
@@ -203,7 +203,7 @@ DEFAULT_RESERVE_CAPACITY :: 16
 
 make_aligned :: proc($T: typeid/[]$E, #any_int len: int, alignment: int, allocator := context.allocator, loc := #caller_location) -> (T, Allocator_Error) #optional_allocator_error {
 	make_slice_error_loc(loc, len)
-	data, err := mem_alloc_bytes(size_of(E)*len, alignment, allocator, loc)
+	data, err := mem_alloc_bytes(size_of(E)*uint(len), uint(alignment), allocator, loc)
 	if data == nil && size_of(E) != 0 {
 		return nil, err
 	}
@@ -226,7 +226,7 @@ make_dynamic_array_len :: proc($T: typeid/[dynamic]$E, #any_int len: int, alloca
 @(builtin)
 make_dynamic_array_len_cap :: proc($T: typeid/[dynamic]$E, #any_int len: int, #any_int cap: int, allocator := context.allocator, loc := #caller_location) -> (array: T, err: Allocator_Error) #optional_allocator_error {
 	make_dynamic_array_error_loc(loc, len, cap)
-	data := mem_alloc_bytes(size_of(E)*cap, align_of(E), allocator, loc) or_return
+	data := mem_alloc_bytes(size_of(E)*uint(cap), align_of(E), allocator, loc) or_return
 	s := Raw_Dynamic_Array{raw_data(data), len, cap, allocator}
 	if data == nil && size_of(E) != 0 {
 		s.len, s.cap = 0, 0
@@ -541,8 +541,8 @@ reserve_dynamic_array :: proc(array: ^$T/[dynamic]$E, capacity: int, loc := #cal
 	}
 	assert(a.allocator.procedure != nil)
 
-	old_size  := a.cap * size_of(E)
-	new_size  := capacity * size_of(E)
+	old_size  := uint(a.cap) * size_of(E)
+	new_size  := uint(capacity) * size_of(E)
 	allocator := a.allocator
 
 	new_data, err := mem_resize(a.data, old_size, new_size, align_of(E), allocator, loc)
@@ -572,8 +572,8 @@ resize_dynamic_array :: proc(array: ^$T/[dynamic]$E, length: int, loc := #caller
 	}
 	assert(a.allocator.procedure != nil)
 
-	old_size  := a.cap * size_of(E)
-	new_size  := length * size_of(E)
+	old_size  := uint(a.cap) * size_of(E)
+	new_size  := uint(length) * size_of(E)
 	allocator := a.allocator
 
 	new_data, err := mem_resize(a.data, old_size, new_size, align_of(E), allocator, loc)

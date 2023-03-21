@@ -310,8 +310,8 @@ Allocator_Mode_Set :: distinct bit_set[Allocator_Mode]
 
 Allocator_Query_Info :: struct {
 	pointer:   rawptr,
-	size:      Maybe(int),
-	alignment: Maybe(int),
+	size:      Maybe(uint),
+	alignment: Maybe(uint),
 }
 
 Allocator_Error :: enum byte {
@@ -323,8 +323,8 @@ Allocator_Error :: enum byte {
 }
 
 Allocator_Proc :: #type proc(allocator_data: rawptr, mode: Allocator_Mode,
-                             size, alignment: int,
-                             old_memory: rawptr, old_size: int,
+                             size, alignment: uint,
+                             old_memory: rawptr, old_size: uint,
                              location: Source_Code_Location = #caller_location) -> ([]byte, Allocator_Error)
 Allocator :: struct {
 	procedure: Allocator_Proc,

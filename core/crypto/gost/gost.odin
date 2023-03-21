@@ -159,7 +159,7 @@ update :: proc(ctx: ^Gost_Context, data: []byte) {
 
 final :: proc(ctx: ^Gost_Context, hash: []byte) {
     if ctx.partial_bytes > 0 {
-        mem.set(&ctx.partial[ctx.partial_bytes], 0, 32 - int(ctx.partial_bytes))
+        mem.set(&ctx.partial[ctx.partial_bytes], 0, uint(max(32 - int(ctx.partial_bytes), 0)))
         bytes(ctx, ctx.partial[:], u32(ctx.partial_bytes) << 3)
     }
   

@@ -6,7 +6,7 @@ NO_DEFAULT_TEMP_ALLOCATOR: bool : ODIN_OS == .Freestanding || ODIN_OS == .JS || 
 when NO_DEFAULT_TEMP_ALLOCATOR {
 	Default_Temp_Allocator :: struct {}
 	
-	default_temp_allocator_init :: proc(s: ^Default_Temp_Allocator, size: int, backing_allocator := context.allocator) {}
+	default_temp_allocator_init :: proc(s: ^Default_Temp_Allocator, size: uint, backing_allocator := context.allocator) {}
 	
 	default_temp_allocator_destroy :: proc(s: ^Default_Temp_Allocator) {}
 	
@@ -24,7 +24,7 @@ when NO_DEFAULT_TEMP_ALLOCATOR {
 		arena: Arena,
 	}
 	
-	default_temp_allocator_init :: proc(s: ^Default_Temp_Allocator, size: int, backing_allocator := context.allocator) {
+	default_temp_allocator_init :: proc(s: ^Default_Temp_Allocator, size: uint, backing_allocator := context.allocator) {
 		_ = arena_init(&s.arena, uint(size), backing_allocator)
 	}
 
@@ -36,8 +36,8 @@ when NO_DEFAULT_TEMP_ALLOCATOR {
 	}
 
 	default_temp_allocator_proc :: proc(allocator_data: rawptr, mode: Allocator_Mode,
-	                                    size, alignment: int,
-	                                    old_memory: rawptr, old_size: int, loc := #caller_location) -> (data: []byte, err: Allocator_Error) {
+	                                    size, alignment: uint,
+	                                    old_memory: rawptr, old_size: uint, loc := #caller_location) -> (data: []byte, err: Allocator_Error) {
 
 		s := (^Default_Temp_Allocator)(allocator_data)
 		return arena_allocator_proc(&s.arena, mode, size, alignment, old_memory, old_size, loc)

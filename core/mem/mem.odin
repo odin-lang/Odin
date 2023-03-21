@@ -9,14 +9,14 @@ Megabyte :: runtime.Megabyte
 Gigabyte :: runtime.Gigabyte
 Terabyte :: runtime.Terabyte
 
-set :: proc "contextless" (data: rawptr, value: byte, len: int) -> rawptr {
-	return runtime.memset(data, i32(value), len)
+set :: proc "contextless" (data: rawptr, value: byte, #any_int len: int) -> rawptr {
+	return runtime.memset(data, i32(value), int(len))
 }
-zero :: proc "contextless" (data: rawptr, len: int) -> rawptr {
+zero :: proc "contextless" (data: rawptr, #any_int len: uint) -> rawptr {
 	intrinsics.mem_zero(data, len)
 	return data
 }
-zero_explicit :: proc "contextless" (data: rawptr, len: int) -> rawptr {
+zero_explicit :: proc "contextless" (data: rawptr, #any_int len: uint) -> rawptr {
 	// This routine tries to avoid the compiler optimizing away the call,
 	// so that it is always executed.  It is intended to provided
 	// equivalent semantics to those provided by the C11 Annex K 3.7.4.1
@@ -35,7 +35,7 @@ zero_slice :: proc "contextless" (data: $T/[]$E) -> T {
 }
 
 
-copy :: proc "contextless" (dst, src: rawptr, len: int) -> rawptr {
+copy :: proc "contextless" (dst, src: rawptr, #any_int len: uint) -> rawptr {
 	intrinsics.mem_copy(dst, src, len)
 	return dst
 }
@@ -54,7 +54,7 @@ compare :: proc "contextless" (a, b: []byte) -> int {
 }
 
 compare_byte_ptrs :: proc "contextless" (a, b: ^byte, n: int) -> int #no_bounds_check {
-	return runtime.memory_compare(a, b, n)
+	return runtime.memory_compare(a, b, uint(n))
 }
 
 check_zero :: proc(data: []byte) -> bool {
@@ -242,7 +242,7 @@ align_formula :: proc "contextless" (size, align: int) -> int {
 	return result - result%align
 }
 
-calc_padding_with_header :: proc "contextless" (ptr: uintptr, align: uintptr, header_size: int) -> int {
+calc_padding_with_header :: proc "contextless" (ptr: uintptr, align: uintptr, header_size: uint) -> uint {
 	p, a := ptr, align
 	modulo := p & (a-1)
 
@@ -262,7 +262,7 @@ calc_padding_with_header :: proc "contextless" (ptr: uintptr, align: uintptr, he
 		}
 	}
 
-	return int(padding)
+	return uint(padding)
 }
 
 

@@ -347,9 +347,9 @@ map_alloc_dynamic :: proc "odin" (info: ^Map_Info, log2_capacity: uintptr, alloc
 
 	CACHE_MASK :: MAP_CACHE_LINE_SIZE - 1
 
-	size := map_total_allocation_size(capacity, info)
+	size := uint(map_total_allocation_size(capacity, info))
 
-	data := mem_alloc_non_zeroed(int(size), MAP_CACHE_LINE_SIZE, allocator, loc) or_return
+	data := mem_alloc_non_zeroed(size, MAP_CACHE_LINE_SIZE, allocator, loc) or_return
 	data_ptr := uintptr(raw_data(data))
 	if data_ptr == 0 {
 		err = .Out_Of_Memory
@@ -567,7 +567,7 @@ map_shrink_dynamic :: proc "odin" (#no_alias m: ^Raw_Map, #no_alias info: ^Map_I
 @(require_results)
 map_free_dynamic :: proc "odin" (m: Raw_Map, info: ^Map_Info, loc := #caller_location) -> Allocator_Error {
 	ptr := rawptr(map_data(m))
-	size := int(map_total_allocation_size(uintptr(map_cap(m)), info))
+	size := uint(map_total_allocation_size(uintptr(map_cap(m)), info))
 	err := mem_free_with_size(ptr, size, m.allocator, loc)
 	#partial switch err {
 	case .None, .Mode_Not_Implemented:
@@ -666,12 +666,12 @@ map_erase_dynamic :: #force_inline proc "contextless" (#no_alias m: ^Raw_Map, #n
 			mem_copy_non_overlapping(
 				rawptr(map_cell_index_dynamic(ks, info.ks, curr_index)),
 				rawptr(map_cell_index_dynamic(ks, info.ks, next_index)),
-				int(info.ks.size_of_type),
+				uint(info.ks.size_of_type),
 			)
 			mem_copy_non_overlapping(
 				rawptr(map_cell_index_dynamic(vs, info.vs, curr_index)),
 				rawptr(map_cell_index_dynamic(vs, info.vs, next_index)),
-				int(info.vs.size_of_type),
+				uint(info.vs.size_of_type),
 			)
 
 			curr_index = next_index

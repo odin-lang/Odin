@@ -15,7 +15,7 @@ RUNTIME_REQUIRE :: true
 
 
 @(private)
-byte_slice :: #force_inline proc "contextless" (data: rawptr, len: int) -> []byte #no_bounds_check {
+byte_slice :: #force_inline proc "contextless" (data: rawptr, #any_int len: int) -> []byte #no_bounds_check {
 	return ([^]byte)(data)[:max(len, 0)]
 }
 
@@ -99,18 +99,18 @@ align_forward_uintptr :: #force_inline proc(ptr, align: uintptr) -> uintptr {
 	return p
 }
 
-mem_zero :: proc "contextless" (data: rawptr, len: int) -> rawptr {
+mem_zero :: proc "contextless" (data: rawptr, len: uint) -> rawptr {
 	if data == nil {
 		return nil
 	}
-	if len <= 0 {
+	if len == 0 {
 		return data
 	}
 	intrinsics.mem_zero(data, len)
 	return data
 }
 
-mem_copy :: proc "contextless" (dst, src: rawptr, len: int) -> rawptr {
+mem_copy :: proc "contextless" (dst, src: rawptr, len: uint) -> rawptr {
 	if src != nil && dst != src && len > 0 {
 		// NOTE(bill): This _must_ be implemented like C's memmove
 		intrinsics.mem_copy(dst, src, len)
@@ -118,7 +118,7 @@ mem_copy :: proc "contextless" (dst, src: rawptr, len: int) -> rawptr {
 	return dst
 }
 
-mem_copy_non_overlapping :: proc "contextless" (dst, src: rawptr, len: int) -> rawptr {
+mem_copy_non_overlapping :: proc "contextless" (dst, src: rawptr, len: uint) -> rawptr {
 	if src != nil && dst != src && len > 0 {
 		// NOTE(bill): This _must_ be implemented like C's memcpy
 		intrinsics.mem_copy_non_overlapping(dst, src, len)
@@ -128,7 +128,7 @@ mem_copy_non_overlapping :: proc "contextless" (dst, src: rawptr, len: int) -> r
 
 DEFAULT_ALIGNMENT :: 2*align_of(rawptr)
 
-mem_alloc_bytes :: #force_inline proc(size: int, alignment: int = DEFAULT_ALIGNMENT, allocator := context.allocator, loc := #caller_location) -> ([]byte, Allocator_Error) {
+mem_alloc_bytes :: #force_inline proc(size: uint, alignment: uint = DEFAULT_ALIGNMENT, allocator := context.allocator, loc := #caller_location) -> ([]byte, Allocator_Error) {
 	if size == 0 {
 		return nil, nil
 	}
@@ -138,18 +138,18 @@ mem_alloc_bytes :: #force_inline proc(size: int, alignment: int = DEFAULT_ALIGNM
 	return allocator.procedure(allocator.data, .Alloc, size, alignment, nil, 0, loc)
 }
 
-mem_alloc :: #force_inline proc(size: int, alignment: int = DEFAULT_ALIGNMENT, allocator := context.allocator, loc := #caller_location) -> ([]byte, Allocator_Error) {
+mem_alloc :: #force_inline proc(size: uint, alignment: uint = DEFAULT_ALIGNMENT, allocator := context.allocator, loc := #caller_location) -> ([]byte, Allocator_Error) {
 	if size == 0 || allocator.procedure == nil {
 		return nil, nil
 	}
-	return allocator.procedure(allocator.data, .Alloc, size, alignment, nil, 0, loc)
+	return allocator.procedure(allocator.data, .Alloc, uint(size), uint(alignment), nil, 0, loc)
 }
 
-mem_alloc_non_zeroed :: #force_inline proc(size: int, alignment: int = DEFAULT_ALIGNMENT, allocator := context.allocator, loc := #caller_location) -> ([]byte, Allocator_Error) {
+mem_alloc_non_zeroed :: #force_inline proc(size: uint, alignment: uint = DEFAULT_ALIGNMENT, allocator := context.allocator, loc := #caller_location) -> ([]byte, Allocator_Error) {
 	if size == 0 || allocator.procedure == nil {
 		return nil, nil
 	}
-	return allocator.procedure(allocator.data, .Alloc_Non_Zeroed, size, alignment, nil, 0, loc)
+	return allocator.procedure(allocator.data, .Alloc_Non_Zeroed, uint(size), uint(alignment), nil, 0, loc)
 }
 
 mem_free :: #force_inline proc(ptr: rawptr, allocator := context.allocator, loc := #caller_location) -> Allocator_Error {
@@ -160,7 +160,7 @@ mem_free :: #force_inline proc(ptr: rawptr, allocator := context.allocator, loc 
 	return err
 }
 
-mem_free_with_size :: #force_inline proc(ptr: rawptr, byte_count: int, allocator := context.allocator, loc := #caller_location) -> Allocator_Error {
+mem_free_with_size :: #force_inline proc(ptr: rawptr, byte_count: uint, allocator := context.allocator, loc := #caller_location) -> Allocator_Error {
 	if ptr == nil || allocator.procedure == nil {
 		return nil
 	}
@@ -184,7 +184,7 @@ mem_free_all :: #force_inline proc(allocator := context.allocator, loc := #calle
 	return
 }
 
-mem_resize :: proc(ptr: rawptr, old_size, new_size: int, alignment: int = DEFAULT_ALIGNMENT, allocator := context.allocator, loc := #caller_location) -> (data: []byte, err: Allocator_Error) {
+mem_resize :: proc(ptr: rawptr, old_size, new_size: uint, alignment: uint = DEFAULT_ALIGNMENT, allocator := context.allocator, loc := #caller_location) -> (data: []byte, err: Allocator_Error) {
 	if allocator.procedure == nil {
 		return nil, nil
 	}
@@ -213,7 +213,7 @@ mem_resize :: proc(ptr: rawptr, old_size, new_size: int, alignment: int = DEFAUL
 	return
 }
 
-memory_equal :: proc "contextless" (x, y: rawptr, n: int) -> bool {
+memory_equal :: proc "contextless" (x, y: rawptr, n: uint) -> bool {
 	switch {
 	case n == 0: return true
 	case x == y: return true
@@ -278,7 +278,7 @@ memory_equal :: proc "contextless" (x, y: rawptr, n: int) -> bool {
 	}
 
 }
-memory_compare :: proc "contextless" (a, b: rawptr, n: int) -> int #no_bounds_check {
+memory_compare :: proc "contextless" (a, b: rawptr, #any_int n: uint) -> int #no_bounds_check {
 	switch {
 	case a == b:   return 0
 	case a == nil: return -1
@@ -322,7 +322,7 @@ memory_compare :: proc "contextless" (a, b: rawptr, n: int) -> int #no_bounds_ch
 	return 0
 }
 
-memory_compare_zero :: proc "contextless" (a: rawptr, n: int) -> int #no_bounds_check {
+memory_compare_zero :: proc "contextless" (a: rawptr, n: uint) -> int #no_bounds_check {
 	x := uintptr(a)
 	n := uintptr(n)
 
@@ -362,14 +362,14 @@ string_eq :: proc "contextless" (lhs, rhs: string) -> bool {
 	if x.len != y.len {
 		return false
 	}
-	return #force_inline memory_equal(x.data, y.data, x.len)
+	return #force_inline memory_equal(x.data, y.data, uint(x.len))
 }
 
 string_cmp :: proc "contextless" (a, b: string) -> int {
 	x := transmute(Raw_String)a
 	y := transmute(Raw_String)b
 
-	ret := memory_compare(x.data, y.data, min(x.len, y.len))
+	ret := memory_compare(x.data, y.data, uint(min(x.len, y.len)))
 	if ret == 0 && x.len != y.len {
 		return -1 if x.len < y.len else +1
 	}
