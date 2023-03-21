@@ -915,7 +915,7 @@ gb_internal void odin_doc_update_entities(OdinDocWriter *w) {
 		auto entities = array_make<Entity *>(heap_allocator(), 0, w->entity_cache.count);
 		defer (array_free(&entities));
 
-		ffor (u32 i = 0; i < w->entity_cache.count; i++) {
+		for (u32 i = 0; i < w->entity_cache.count; i++) {
 			Entity *e = w->entity_cache.entries[i].key;
 			array_add(&entities, e);
 		}
