@@ -731,7 +731,7 @@ ShaderLocationIndex :: enum c.int {
 	MAP_CUBEMAP,                      // Shader location: samplerCube texture: cubemap
 	MAP_IRRADIANCE,                   // Shader location: samplerCube texture: irradiance
 	MAP_PREFILTER,                    // Shader location: samplerCube texture: prefilter
-	MAP_BRDF                          // Shader location: sampler2d texture: brdf
+	MAP_BRDF,                         // Shader location: sampler2d texture: brdf
 }
 
 
@@ -745,7 +745,7 @@ ShaderUniformDataType :: enum c.int {
 	IVEC2,                            // Shader uniform type: ivec2 (2 int)
 	IVEC3,                            // Shader uniform type: ivec3 (3 int)
 	IVEC4,                            // Shader uniform type: ivec4 (4 int)
-	SAMPLER2D                         // Shader uniform type: sampler2d
+	SAMPLER2D,                        // Shader uniform type: sampler2d
 }
 
 // Pixel formats
@@ -772,7 +772,7 @@ PixelFormat :: enum c.int {
 	COMPRESSED_PVRT_RGB,              // 4 bpp
 	COMPRESSED_PVRT_RGBA,             // 4 bpp
 	COMPRESSED_ASTC_4x4_RGBA,         // 8 bpp
-	COMPRESSED_ASTC_8x8_RGBA          // 2 bpp
+	COMPRESSED_ASTC_8x8_RGBA,         // 2 bpp
 }
 
 // Texture parameters: filter mode
@@ -792,7 +792,7 @@ TextureWrap :: enum c.int {
 	REPEAT = 0,                       // Repeats texture in tiled mode
 	CLAMP,                            // Clamps texture to edge pixel in tiled mode
 	MIRROR_REPEAT,                    // Mirrors and repeats the texture in tiled mode
-	MIRROR_CLAMP                      // Mirrors and clamps to border the texture in tiled mode
+	MIRROR_CLAMP,                      // Mirrors and clamps to border the texture in tiled mode
 }
 
 // Cubemap layouts
@@ -821,7 +821,7 @@ BlendMode :: enum c.int {
 	SUBTRACT_COLORS,                  // Blend textures subtracting colors (alternative)
 	ALPHA_PREMULTIPLY,                // Blend premultiplied textures considering alpha
 	CUSTOM,                           // Blend textures using custom src/dst factors (use rlSetBlendFactors())
-	CUSTOM_SEPARATE                   // Blend textures using custom rgb/alpha separate src/dst factors (use rlSetBlendFactorsSeparate())
+	CUSTOM_SEPARATE,                  // Blend textures using custom rgb/alpha separate src/dst factors (use rlSetBlendFactorsSeparate())
 }
 
 // Gestures
