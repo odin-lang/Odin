@@ -855,7 +855,7 @@ CameraProjection :: enum c.int {
 	ORTHOGRAPHIC,                     // Orthographic projection
 }
 
-7// N-patch layout
+// N-patch layout
 NPatchLayout :: enum c.int {
 	NINE_PATCH = 0,          // Npatch layout: 3x3 tiles
 	THREE_PATCH_VERTICAL,    // Npatch layout: 1x3 tiles
