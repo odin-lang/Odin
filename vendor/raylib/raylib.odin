@@ -31,7 +31,7 @@
 *       [rlgl] glad (David Herberth - github.com/Dav1dde/glad) for OpenGL 3.3 extensions loading (PLATFORM_DESKTOP)
 *       [raudio] miniaudio (David Reid - github.com/mackron/miniaudio) for audio device/context management
 *
-*   OPTIONAL DEPENDENCIES (included):
+*   OPTIONAL DEPENDENCIES (included):`
 *       [rcore] msf_gif (Miles Fogle) for GIF recording
 *       [rcore] sinfl (Micha Mettke) for DEFLATE decompression algorithm
 *       [rcore] sdefl (Micha Mettke) for DEFLATE compression algorithm
@@ -855,7 +855,7 @@ CameraProjection :: enum c.int {
 	ORTHOGRAPHIC,                     // Orthographic projection
 }
 
-// N-patch layout
+7// N-patch layout
 NPatchLayout :: enum c.int {
 	NINE_PATCH = 0,          // Npatch layout: 3x3 tiles
 	THREE_PATCH_VERTICAL,    // Npatch layout: 1x3 tiles
@@ -887,6 +887,7 @@ foreign lib {
 	//------------------------------------------------------------------------------------
 
 	// Window-related functions
+
 	InitWindow               :: proc(width, height: c.int, title: cstring) ---  // Initialize window and OpenGL context
 	WindowShouldClose        :: proc() -> bool  ---                             // Check if KEY_ESCAPE pressed or Close icon pressed
 	CloseWindow              :: proc() ---                                      // Close window and unload OpenGL context
@@ -938,12 +939,14 @@ foreign lib {
 	// NOTE: Those functions are intended for advance users that want full control over the frame processing
 	// By default EndDrawing() does this job: draws everything + SwapScreenBuffer() + manage frame timming + PollInputEvents()
 	// To avoid that behaviour and control frame processes manually, enable in config.h: SUPPORT_CUSTOM_FRAME_CONTROL
+
 	SwapScreenBuffer :: proc() ---             // Swap back buffer with front buffer (screen drawing)
 	PollInputEvents  :: proc() ---             // Register all input events
 	WaitTime         :: proc(seconds: f64) --- // Wait for some time (halt program execution)
 
 
 	// Cursor-related functions
+
 	ShowCursor       :: proc() ---                                              // Shows cursor
 	HideCursor       :: proc() ---                                              // Hides cursor
 	IsCursorHidden   :: proc() -> bool ---                                      // Check if cursor is not visible
@@ -952,6 +955,7 @@ foreign lib {
 	IsCursorOnScreen :: proc() -> bool ---                                      // Check if cursor is on the current screen.
 
 	// Drawing-related functions
+
 	ClearBackground   :: proc(color: Color) ---               // Set background color (framebuffer clear color)
 	BeginDrawing      :: proc() ---                           // Setup canvas (framebuffer) to start drawing
 	EndDrawing        :: proc() ---                           // End canvas drawing and swap buffers (double buffering)
@@ -971,11 +975,13 @@ foreign lib {
 	EndVrStereoMode   :: proc() ---                           // End stereo rendering (requires VR simulator)
 
 	// VR stereo config functions for VR simulator
+
 	LoadVrStereoConfig   :: proc(device: VrDeviceInfo) -> VrStereoConfig --- // Load VR stereo config for VR simulator device parameters
 	UnloadVrStereoConfig :: proc(config: VrStereoConfig) ---                 // Unload VR stereo config
 
 	// Shader management functions
 	// NOTE: Shader functionality is not available on OpenGL 1.1
+
 	LoadShader              :: proc(vsFileName, fsFileName: cstring) -> Shader ---                                                        // Load shader from files and bind default locations
 	LoadShaderFromMemory    :: proc(vsCode, fsCode: cstring) -> Shader ---                                                                // Load shader from code strings and bind default locations
 	IsShaderReady           :: proc(shader: Shader) -> bool ---                                                                           // Check if a shader is ready
@@ -988,6 +994,7 @@ foreign lib {
 	UnloadShader            :: proc(shader: Shader) ---                                                                                   // Unload shader from GPU memory (VRAM)
 
 	// Screen-space-related functions
+
 	GetMouseRay        :: proc(mousePosition: Vector2, camera: Camera) -> Ray ---                      // Get a ray trace from mouse position
 	GetCameraMatrix    :: proc(camera: Camera) -> Matrix ---                                           // Get camera transform matrix (view matrix)
 	GetCameraMatrix2D  :: proc(camera: Camera2D) -> Matrix ---                                         // Get camera 2d transform matrix
@@ -997,12 +1004,14 @@ foreign lib {
 	GetWorldToScreen2D :: proc(position: Vector2, camera: Camera2D) -> Vector2 ---                     // Get the screen space position for a 2d camera world space position
 
 	// Timing-related functions
+
 	SetTargetFPS :: proc(fps: c.int) --- // Set target FPS (maximum)
 	GetFPS       :: proc() -> c.int ---  // Returns current FPS
 	GetFrameTime :: proc() -> f32 ---    // Returns time in seconds for last frame drawn (delta time)
 	GetTime      :: proc() -> f64 ---    // Returns elapsed time in seconds since InitWindow()
 
 	// Misc. functions
+
 	GetRandomValue :: proc(min, max: c.int) -> c.int --- // Returns a random value between min and max (both included)
 	SetRandomSeed  :: proc(seed: c.uint) ---             // Set the seed for the random number generator
 	TakeScreenshot :: proc(fileName: cstring) ---        // Takes a screenshot of current screen (filename extension defines format)
@@ -1018,6 +1027,7 @@ foreign lib {
 
 	// Set custom callbacks
 	// WARNING: Callbacks setup is intended for advance users
+
 	SetTraceLogCallback     :: proc(callback: TraceLogCallback) ---     // Set custom trace log
 	SetLoadFileDataCallback :: proc(callback: LoadFileDataCallback) --- // Set custom file binary data loader
 	SetSaveFileDataCallback :: proc(callback: SaveFileDataCallback) --- // Set custom file binary data saver
@@ -1025,6 +1035,7 @@ foreign lib {
 	SetSaveFileTextCallback :: proc(callback: SaveFileTextCallback) --- // Set custom file text data saver
 
 	// Files management functions
+
 	LoadFileData            :: proc(fileName: cstring, bytesRead: ^c.uint) -> [^]byte ---                      // Load file data as byte array (read)
 	UnloadFileData          :: proc(data: [^]byte) ---                                                         // Unload file data allocated by LoadFileData()
 	SaveFileData            :: proc(fileName: cstring, data: rawptr, bytesToWrite: c.uint) -> bool ---         // Save data to file from byte array (write), returns true on success
@@ -1054,6 +1065,7 @@ foreign lib {
 	GetFileModTime          :: proc(fileName: cstring) -> c.long ---                                           // Get file modification time (last write time)
 
 	// Compression/Encoding functionality
+
 	CompressData     :: proc(data: rawptr,     dataSize: c.int,     compDataSize: ^c.int) -> [^]byte ---       // Compress data (DEFLATE algorithm), memory must be MemFree()
 	DecompressData   :: proc(compData: rawptr, compDataSize: c.int, dataSize:     ^c.int) -> [^]byte ---       // Decompress data (DEFLATE algorithm), memory must be MemFree()
 	EncodeDataBase64 :: proc(data: rawptr,     dataSize: c.int,     outputSize:   ^c.int) -> [^]byte ---       // Encode data to Base64 string, memory must be MemFree()
@@ -1064,6 +1076,7 @@ foreign lib {
 	//------------------------------------------------------------------------------------
 
 	// Input-related functions: keyboard
+
 	IsKeyPressed   :: proc(key: KeyboardKey) -> bool --- // Detect if a key has been pressed once
 	IsKeyDown      :: proc(key: KeyboardKey) -> bool --- // Detect if a key is being pressed
 	IsKeyReleased  :: proc(key: KeyboardKey) -> bool --- // Detect if a key has been released once
@@ -1073,6 +1086,7 @@ foreign lib {
 	GetCharPressed :: proc() -> rune ---                 // Get char pressed (unicode), call it multiple times for chars queued
 
 	// Input-related functions: gamepads
+
 	IsGamepadAvailable       :: proc(gamepad: c.int) -> bool ---                        // Check if a gamepad is available
 	GetGamepadName           :: proc(gamepad: c.int) -> cstring ---                     // Get gamepad internal name id
 	IsGamepadButtonPressed   :: proc(gamepad: c.int, button: GamepadButton) -> bool --- // Check if a gamepad button has been pressed once
@@ -1085,6 +1099,7 @@ foreign lib {
 	SetGamepadMappings       :: proc(mappings: cstring) -> c.int ---                    // Set internal gamepad mappings (SDL_GameControllerDB)
 
 	// Input-related functions: mouse
+
 	IsMouseButtonPressed  :: proc(button: MouseButton) -> bool ---    // Detect if a mouse button has been pressed once
 	IsMouseButtonDown     :: proc(button: MouseButton) -> bool ---    // Detect if a mouse button is being pressed
 	IsMouseButtonReleased :: proc(button: MouseButton) -> bool ---    // Detect if a mouse button has been released once
@@ -1101,6 +1116,7 @@ foreign lib {
 	SetMouseCursor        :: proc(cursor: MouseCursor) ---            // Set mouse cursor
 
 	// Input-related functions: touch
+
 	GetTouchX          :: proc() -> c.int ---               // Returns touch position X for touch point 0 (relative to screen size)
 	GetTouchY          :: proc() -> c.int ---               // Returns touch position Y for touch point 0 (relative to screen size)
 	GetTouchPosition   :: proc(index: c.int) -> Vector2 --- // Returns touch position XY for a touch point index (relative to screen size)
@@ -1110,6 +1126,7 @@ foreign lib {
 	//------------------------------------------------------------------------------------
 	// Gestures and Touch Handling Functions (Module: rgestures)
 	//------------------------------------------------------------------------------------
+
 	SetGesturesEnabled     :: proc(flags: Gestures) ---          // Enable a set of gestures using flags
 	IsGestureDetected      :: proc(gesture: Gesture) -> bool --- // Check if a gesture have been detected
 	GetGestureDetected     :: proc() -> Gesture ---              // Get latest detected gesture
@@ -1122,6 +1139,7 @@ foreign lib {
 	//------------------------------------------------------------------------------------
 	// Camera System Functions (Module: camera)
 	//------------------------------------------------------------------------------------
+
 	UpdateCamera :: proc(camera: ^Camera, mode: CameraMode) ---                                   // Set camera mode (multiple camera modes available)
 	UpdateCameraPro :: proc(camera: ^Camera, movement: Vector3, rotation: Vector3, zoom: f32) --- // Update camera movement/rotation
 
@@ -1131,9 +1149,11 @@ foreign lib {
 	// Set texture and rectangle to be used on shapes drawing
 	// NOTE: It can be useful when using basic shapes and one single font,
 	// defining a font char white rectangle would allow drawing everything in a single draw call
+
 	SetShapesTexture :: proc(texture: Texture2D, source: Rectangle) ---
 
 	// Basic shapes drawing functions
+
 	DrawPixel                 :: proc(posX, posY: c.int, color: Color) ---                                                                          // Draw a pixel
 	DrawPixelV                :: proc(position: Vector2, color: Color) ---                                                                          // Draw a pixel (Vector version)
 	DrawLine                  :: proc(startPosX, startPosY, endPosX, endPosY: c.int, color: Color) ---                                              // Draw a line
@@ -1188,6 +1208,7 @@ foreign lib {
 
 	// Image loading functions
 	// NOTE: These functions do not require GPU access
+
 	LoadImage            :: proc(fileName: cstring) -> Image ---                                                               // Load image from file into CPU memory (RAM)
 	LoadImageRaw         :: proc(fileName: cstring, width, height: c.int, format: PixelFormat, headerSize: c.int) -> Image --- // Load image from RAW file data
 	LoadImageAnim        :: proc(fileName: cstring, frames: [^]c.int) -> Image ---                                             // Load image sequence from file (frames appended to image.data)
@@ -1200,6 +1221,7 @@ foreign lib {
 	ExportImageAsCode    :: proc(image: Image, fileName: cstring) -> bool ---                                                  // Export image as code file defining an array of bytes, returns true on success
 
 	// Image generation functions
+
 	GenImageColor          :: proc(width, height: c.int, color: Color) -> Image  ---                                           // Generate image: plain color
 	GenImageGradientV      :: proc(width, height: c.int, top, bottom: Color) -> Image  ---                                     // Generate image: vertical gradient
 	GenImageGradientH      :: proc(width, height: c.int, left, right: Color) -> Image  ---                                     // Generate image: horizontal gradient
@@ -1211,6 +1233,7 @@ foreign lib {
 	GenImageText           :: proc(width, height: c.int, text: cstring) -> Image  ---                                          // Generate image: grayscale image from text data
 
 	// Image manipulation functions
+
 	ImageCopy             :: proc(image: Image) -> Image ---                                                                   // Create an image duplicate (useful for transformations)
 	ImageFromImage        :: proc(image: Image, rec: Rectangle) -> Image ---                                                   // Create an image from another image piece
 	ImageText             :: proc(text: cstring, fontSize: c.int, color: Color) -> Image ---                                   // Create an image from text (default font)
@@ -1247,6 +1270,7 @@ foreign lib {
 
 	// Image drawing functions
 	// NOTE: Image software-rendering functions (CPU)
+
 	ImageClearBackground    :: proc(dst: ^Image, color: Color) ---                                                                           // Clear image background with given color
 	ImageDrawPixel          :: proc(dst: ^Image, posX, posY: c.int, color: Color) ---                                                        // Draw pixel within an image
 	ImageDrawPixelV         :: proc(dst: ^Image, position: Vector2, color: Color) ---                                                        // Draw pixel within an image (Vector version)
@@ -1266,6 +1290,7 @@ foreign lib {
 
 	// Texture loading functions
 	// NOTE: These functions require GPU access
+
 	LoadTexture          :: proc(fileName: cstring) -> Texture2D ---                        // Load texture from file into GPU memory (VRAM)
 	LoadTextureFromImage :: proc(image: Image) -> Texture2D ---                             // Load texture from image data
 	LoadTextureCubemap   :: proc(image: Image, layout: CubemapLayout) -> TextureCubemap --- // Load cubemap from image, multiple image cubemap layouts supported
@@ -1278,6 +1303,7 @@ foreign lib {
 	UpdateTextureRec     :: proc(texture: Texture2D, rec: Rectangle, pixels: rawptr) ---    // Update GPU texture rectangle with new data
 
 	// Texture configuration functions
+
 	GenTextureMipmaps :: proc(texture: ^Texture2D) ---                                                                                      // Generate GPU mipmaps for a texture
 	SetTextureFilter  :: proc(texture: Texture2D, filter: TextureFilter) ---                                                                // Set texture scaling filter mode
 	SetTextureWrap    :: proc(texture: Texture2D, wrap: TextureWrap) ---                                                                    // Set texture wrapping mode
@@ -1291,6 +1317,7 @@ foreign lib {
 	DrawTextureNPatch :: proc(texture: Texture2D, nPatchInfo: NPatchInfo, dest: Rectangle, origin: Vector2, rotation: f32, tint: Color) --- // Draws a texture (or part of it) that stretches or shrinks nicely
 
 	// Color/pixel related functions
+
 	Fade                :: proc(color: Color, alpha: f32) -> Color ---                  // Get color with alpha applied, alpha goes from 0.0f to 1.0f
 	ColorToInt          :: proc(color: Color) -> c.uint ---                             // Get hexadecimal value for a Color
 	ColorNormalize      :: proc(color: Color) -> Vector4 ---                            // Get Color normalized as float [0..1]
@@ -1315,6 +1342,7 @@ foreign lib {
 	//------------------------------------------------------------------------------------
 
 	// Font loading/unloading functions
+
 	GetFontDefault     :: proc() -> Font ---                                                                                                                  // Get the default Font
 	LoadFont           :: proc(fileName: cstring) -> Font ---                                                                                                 // Load font from file into GPU memory (VRAM)
 	LoadFontEx         :: proc(fileName: cstring, fontSize: c.int, fontChars: [^]rune, glyphCount: c.int) -> Font ---                                         // Load font from file with extended parameters, use NULL for fontChars and 0 for glyphCount to load the default character set
@@ -1328,6 +1356,7 @@ foreign lib {
 	ExportFontAsCode   :: proc(font: Font, fileName: cstring) -> bool ---                                                                                     // Export font as code file, returns true on success
 
 	// Text drawing functions
+
 	DrawFPS            :: proc(posX, posY: c.int) ---                                                                                             // Draw current FPS
 	DrawText           :: proc(text: cstring, posX, posY: c.int, fontSize: c.int, color: Color) ---                                               // Draw text (using default font)
 	DrawTextEx         :: proc(font: Font, text: cstring, position: Vector2, fontSize: f32, spacing: f32, tint: Color) ---                        // Draw text using font and additional parameters
@@ -1336,6 +1365,7 @@ foreign lib {
 	DrawTextCodepoints :: proc(font: Font, codepoints: [^]rune, count: c.int, position: Vector2, fontSize: f32, spacing: f32, tint: Color) ---    // Draw multiple character (codepoint)
 
 	// Text font info functions
+
 	MeasureText      :: proc(text: cstring, fontSize: c.int) -> c.int ---                               // Measure string width for default font
 	MeasureTextEx    :: proc(font: Font, text: cstring, fontSize: c.int, spacing: c.int) -> Vector2 --- // Measure string size for Font
 	GetGlyphIndex    :: proc(font: Font, codepoint: rune) -> c.int ---                                  // Get glyph index position in font for a codepoint (unicode character), fallback to '?' if not found
@@ -1343,6 +1373,7 @@ foreign lib {
 	GetGlyphAtlasRec :: proc(font: Font, codepoint: rune) -> Rectangle ---                              // Get glyph rectangle in font atlas for a codepoint (unicode character), fallback to '?' if not found
 
 	// Text codepoints management functions (unicode characters)
+
 	LoadUTF8             :: proc(codepoints: [^]rune, length: c.int) -> [^]byte --- // Load UTF-8 text encoded from codepoints array
 	UnloadUTF8           :: proc(text: [^]byte) ---                                 // Unload UTF-8 text encoded from codepoints array
 	LoadCodepoints       :: proc(text: rawptr, count: ^c.int) -> [^]rune ---        // Load all codepoints from a UTF-8 text string, codepoints count returned by parameter
@@ -1355,10 +1386,13 @@ foreign lib {
 
 	// Text strings management functions (no UTF-8 strings, only byte chars)
 	// NOTE: Some strings allocate memory internally for returned strings, just be careful!
+
 	TextCopy      :: proc(dst: [^]byte, src: cstring) -> c.int ---                               // Copy one string to another, returns bytes copied
 	TextIsEqual   :: proc(text1, text2: cstring) -> bool ---                                     // Check if two text string are equal
 	TextLength    :: proc(text: cstring) -> c.uint ---                                           // Get text length, checks for '\0' ending
+
 	// TextFormat is defined at the bottom of this file
+
 	TextSubtext   :: proc(text: cstring, position: c.int, length: c.int) -> cstring ---          // Get a piece of a text string
 	TextReplace   :: proc(text: [^]byte, replace, by: cstring) -> [^]byte ---                    // Replace text string (WARNING: memory must be freed!)
 	TextInsert    :: proc(text, insert: cstring, position: c.int) -> [^]byte ---                 // Insert text in a position (WARNING: memory must be freed!)
@@ -1377,6 +1411,7 @@ foreign lib {
 	//------------------------------------------------------------------------------------
 
 	// Basic geometric 3D shapes drawing functions
+
 	DrawLine3D           :: proc(startPos, endPos: Vector3, color: Color) ---                                                   // Draw a line in 3D world space
 	DrawPoint3D          :: proc(position: Vector3, color: Color) ---                                                           // Draw a point in 3D space, actually a small line
 	DrawCircle3D         :: proc(center: Vector3, radius: f32, rotationAxis: Vector3, rotationAngle: f32, color: Color) ---     // Draw a circle in 3D world space
@@ -1404,6 +1439,7 @@ foreign lib {
 	//------------------------------------------------------------------------------------
 
 	// Model management functions
+
 	LoadModel           :: proc(fileName: cstring) -> Model ---  // Load model from files (meshes and materials)
 	LoadModelFromMesh   :: proc(mesh: Mesh) -> Model ---         // Load model from generated mesh (default material)
 	IsModelReady        :: proc(model: Model) -> bool ---        // Check if a model is ready
@@ -1411,6 +1447,7 @@ foreign lib {
 	GetModelBoundingBox :: proc(model: Model) -> BoundingBox --- // Compute model bounding box limits (considers all meshes)
 
 	// Model drawing functions
+
 	DrawModel        :: proc(model: Model, position: Vector3, scale: f32, tint: Color) ---                                                                                          // Draw a model (with texture if set)
 	DrawModelEx      :: proc(model: Model, position: Vector3, rotationAxis: Vector3, rotationAngle: f32, scale: Vector3, tint: Color) ---                                           // Draw a model with extended parameters
 	DrawModelWires   :: proc(model: Model, position: Vector3, scale: f32, tint: Color) ---                                                                                          // Draw a model wires (with texture if set)
@@ -1421,6 +1458,7 @@ foreign lib {
 	DrawBillboardPro :: proc(camera: Camera, texture: Texture2D, source: Rectangle, position: Vector3, up: Vector3, size: Vector2, origin: Vector2, rotation: f32, tint: Color) --- // Draw a billboard texture defined by source and rotation
 
 	// Mesh management functions
+
 	UploadMesh         :: proc(mesh: ^Mesh, is_dynamic: bool) ---                                             // Upload mesh vertex data in GPU and provide VAO/VBO ids
 	UpdateMeshBuffer   :: proc(mesh: Mesh, index: c.int, data: rawptr, dataSize: c.int, offset: c.int) ---    // Update mesh vertex data in GPU for a specific buffer index
 	UnloadMesh         :: proc(mesh: Mesh) ---                                                                // Unload mesh data from CPU and GPU
@@ -1431,6 +1469,7 @@ foreign lib {
 	GenMeshTangents    :: proc(mesh: ^Mesh) ---                                                               // Compute mesh tangents
 
 	// Mesh generation functions
+
 	GenMeshPoly       :: proc(sides: c.int, radius: f32) -> Mesh ---               // Generate polygonal mesh
 	GenMeshPlane      :: proc(width, lengthL: f32, resX, resZ: c.int) -> Mesh ---  // Generate plane mesh (with subdivisions)
 	GenMeshCube       :: proc(width, height, length: f32) -> Mesh ---              // Generate cuboid mesh
@@ -1444,6 +1483,7 @@ foreign lib {
 	GenMeshCubicmap   :: proc(cubicmap: Image, cubeSize: Vector3) -> Mesh ---      // Generate cubes-based map mesh from image data
 
 	// Material loading/unloading functions
+
 	LoadMaterials         :: proc(fileName: cstring, materialCount: ^c.int) -> [^]Material ---            // Load materials from model file
 	LoadMaterialDefault   :: proc() -> Material ---                                                       // Load default material (Supports: DIFFUSE, SPECULAR, NORMAL maps)
 	IsMaterialReady       :: proc(material: Material) -> bool ---                                         // Check if a material is ready
@@ -1452,6 +1492,7 @@ foreign lib {
 	SetModelMeshMaterial  :: proc(model: ^Model, meshId: c.int, materialId: c.int) ---                    // Set material for a mesh
 
 	// Model animations loading/unloading functions
+
 	LoadModelAnimations   :: proc(fileName: cstring, animCount: ^c.uint) -> [^]ModelAnimation --- // Load model animations from file
 	UpdateModelAnimation  :: proc(model: Model, anim: ModelAnimation, frame: c.int) ---           // Update model animation pose
 	UnloadModelAnimation  :: proc(anim: ModelAnimation) ---                                       // Unload animation data
@@ -1459,6 +1500,7 @@ foreign lib {
 	IsModelAnimationValid :: proc(model: Model, anim: ModelAnimation) -> bool ---                 // Check model animation skeleton match
 
 	// Collision detection functions
+
 	CheckCollisionSpheres   :: proc(center1: Vector3, radius1: f32, center2: Vector3, radius2: f32) -> bool --- // Check collision between two spheres
 	CheckCollisionBoxes     :: proc(box1, box2: BoundingBox) -> bool ---                                        // Check collision between two bounding boxes
 	CheckCollisionBoxSphere :: proc(box: BoundingBox, center: Vector3, radius: f32) -> bool ---                 // Check collision between box and sphere
@@ -1473,12 +1515,14 @@ foreign lib {
 	//------------------------------------------------------------------------------------
 
 	// Audio device management functions
+
 	InitAudioDevice    :: proc() ---            // Initialize audio device and context
 	CloseAudioDevice   :: proc() ---            // Close the audio device and context
 	IsAudioDeviceReady :: proc() -> bool ---    // Check if audio device has been initialized successfully
 	SetMasterVolume    :: proc(volume: f32) --- // Set master volume (listener)
 
 	// Wave/Sound loading/unloading functions
+
 	LoadWave           :: proc(fileName: cstring) -> Wave ---                                    // Load wave data from file
 	LoadWaveFromMemory :: proc(fileType: cstring, fileData: rawptr, dataSize: c.int) -> Wave --- // Load wave from memory buffer, fileType refers to extension: i.e. '.wav'
 	IsWaveReady        :: proc(wave: Wave) -> bool ---                                           // Checks if wave data is ready
@@ -1492,6 +1536,7 @@ foreign lib {
 	ExportWaveAsCode   :: proc(wave: Wave, fileName: cstring) -> bool ---                        // Export wave sample data to code (.h), returns true on success
 
 	// Wave/Sound management functions
+
 	PlaySound         :: proc(sound: Sound) ---                                                // Play a sound
 	StopSound         :: proc(sound: Sound) ---                                                // Stop playing a sound
 	PauseSound        :: proc(sound: Sound) ---                                                // Pause a sound
@@ -1507,6 +1552,7 @@ foreign lib {
 	UnloadWaveSamples :: proc(samples: [^]f32) ---                                             // Unload samples data loaded with LoadWaveSamples()
 
 	// Music management functions
+
 	LoadMusicStream           :: proc(fileName: cstring) -> Music ---                                // Load music stream from file
 	LoadMusicStreamFromMemory :: proc(fileType: cstring, data: rawptr, dataSize: c.int) -> Music --- // Load music stream from data
 	IsMusicReady              :: proc(music: Music) -> bool ---                                      // Checks if a music stream is ready
@@ -1525,6 +1571,7 @@ foreign lib {
 	GetMusicTimePlayed        :: proc(music: Music) -> f32 ---                                       // Get current music time played (in seconds)
 
 	// AudioStream management functions
+
 	LoadAudioStream                 :: proc(sampleRate, sampleSize: c.uint, channels: c.uint) -> AudioStream --- // Load audio stream (to stream raw audio pcm data)
 	IsAudioStreamReady              :: proc(stream: AudioStream) -> bool ---                                     // Checks if an audio stream is ready
 	UnloadAudioStream               :: proc(stream: AudioStream) ---                                             // Unload audio stream and free memory
