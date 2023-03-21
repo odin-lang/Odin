@@ -121,6 +121,7 @@ struct AttributeContext {
 	bool    set_cold            : 1;
 	u32 optimization_mode; // ProcedureOptimizationMode
 	i64 foreign_import_priority_index;
+	String extra_linker_flags;
 
 	String  objc_class;
 	String  objc_name;

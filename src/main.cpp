@@ -278,6 +278,13 @@ gb_internal i32 linker_stage(lbGenerator *gen) {
 				}
 			}
 
+			for (Entity *e : gen->foreign_libraries) {
+				GB_ASSERT(e->kind == Entity_LibraryName);
+				if (e->LibraryName.extra_linker_flags.len != 0) {
+					lib_str = gb_string_append_fmt(lib_str, " %.*s", LIT(e->LibraryName.extra_linker_flags));
+				}
+			}
+
 			if (build_context.build_mode == BuildMode_DynamicLibrary) {
 				link_settings = gb_string_append_fmt(link_settings, " /DLL");
 			} else {
@@ -449,6 +456,12 @@ gb_internal i32 linker_stage(lbGenerator *gen) {
 				}
 			}
 
+			for (Entity *e : gen->foreign_libraries) {
+				GB_ASSERT(e->kind == Entity_LibraryName);
+				if (e->LibraryName.extra_linker_flags.len != 0) {
+					lib_str = gb_string_append_fmt(lib_str, " %.*s", LIT(e->LibraryName.extra_linker_flags));
+				}
+			}
 
 			gbString object_files = gb_string_make(heap_allocator(), "");
 			defer (gb_string_free(object_files));
