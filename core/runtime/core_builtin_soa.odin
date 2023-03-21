@@ -239,8 +239,8 @@ reserve_soa :: proc(array: ^$T/#soa[dynamic]$E, capacity: int, loc := #caller_lo
 	old_data := (^rawptr)(array)^
 
 	new_bytes, err := array.allocator.procedure(
-		array.allocator.data, .Alloc, new_size, max_align,
-		nil, old_size, loc,
+		array.allocator.data, .Alloc, uint(new_size), max_align,
+		nil, uint(old_size), loc,
 	)
 	if new_bytes == nil || err != nil {
 		return false
@@ -261,7 +261,7 @@ reserve_soa :: proc(array: ^$T/#soa[dynamic]$E, capacity: int, loc := #caller_lo
 		new_data_elem := rawptr(uintptr(new_data) + uintptr(new_offset))
 		old_data_elem := rawptr(uintptr(old_data) + uintptr(old_offset))
 
-		mem_copy(new_data_elem, old_data_elem, type.size * old_cap)
+		mem_copy(new_data_elem, old_data_elem, uint(type.size * old_cap))
 
 		(^rawptr)(uintptr(array) + i*size_of(rawptr))^ = new_data_elem
 
@@ -271,7 +271,7 @@ reserve_soa :: proc(array: ^$T/#soa[dynamic]$E, capacity: int, loc := #caller_lo
 
 	_, err = array.allocator.procedure(
 		array.allocator.data, .Free, 0, max_align,
-		old_data, old_size, loc,
+		old_data, uint(old_size), loc,
 	)
 
 	return true
@@ -373,7 +373,7 @@ append_soa_elems :: proc(array: ^$T/#soa[dynamic]$E, args: ..E, loc := #caller_l
 			for j in 0..<arg_len {
 				d := rawptr(dst + uintptr(j*type.size))
 				s := rawptr(src + uintptr(j*size_of(E)))
-				mem_copy(d, s, type.size)
+				mem_copy(d, s, uint(type.size))
 			}
 
 			soa_offset  += type.size * cap(array)
