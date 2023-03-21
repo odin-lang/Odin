@@ -1434,7 +1434,7 @@ gb_internal Token expect_closing_brace_of_field_list(AstFile *f) {
 		return token;
 	}
 	bool ok = true;
-	if (!f->allow_newline) {
+	if (f->allow_newline) {
 		ok = !skip_possible_newline(f);
 	}
 	if (ok && allow_token(f, Token_Semicolon)) {

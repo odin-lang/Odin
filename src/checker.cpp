@@ -4447,6 +4447,14 @@ gb_internal DECL_ATTRIBUTE_PROC(foreign_import_decl_attribute) {
 			ac->foreign_import_priority_index = exact_value_to_i64(ev);
 		}
 		return true;
+	} else if (name == "extra_linker_flags") {
+		ExactValue ev = check_decl_attribute_value(c, value);
+		if (ev.kind != ExactValue_String) {
+			error(elem, "Expected a string value for '%.*s'", LIT(name));
+		} else {
+			ac->extra_linker_flags = ev.value_string;
+		}
+		return true;
 	}
 	return false;
 }
@@ -4505,6 +4513,10 @@ gb_internal void check_add_foreign_import_decl(CheckerContext *ctx, Ast *decl) {
 	}
 	if (ac.foreign_import_priority_index != 0) {
 		e->LibraryName.priority_index = ac.foreign_import_priority_index;
+	}
+	String extra_linker_flags = string_trim_whitespace(ac.extra_linker_flags);
+	if (extra_linker_flags.len != 0) {
+		e->LibraryName.extra_linker_flags = extra_linker_flags;
 	}
 
 	if (has_asm_extension(fullpath)) {
