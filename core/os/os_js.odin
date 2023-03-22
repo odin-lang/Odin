@@ -10,38 +10,38 @@ is_path_separator :: proc(c: byte) -> bool {
 }
 
 open :: proc(path: string, mode: int = O_RDONLY, perm: int = 0) -> (Handle, Errno) {
-	panic("core:os procedure not supported on JS target")
+	unimplemented("core:os procedure not supported on JS target")
 }
 
 close :: proc(fd: Handle) -> Errno {
-	panic("core:os procedure not supported on JS target")
+	unimplemented("core:os procedure not supported on JS target")
 }
 
 flush :: proc(fd: Handle) -> (err: Errno) {
-	panic("core:os procedure not supported on JS target")
+	unimplemented("core:os procedure not supported on JS target")
 }
 
 
 
 write :: proc(fd: Handle, data: []byte) -> (int, Errno) {
-	panic("core:os procedure not supported on JS target")
+	unimplemented("core:os procedure not supported on JS target")
 }
 
 @(private="file")
 read_console :: proc(handle: Handle, b: []byte) -> (n: int, err: Errno) {
-	panic("core:os procedure not supported on JS target")
+	unimplemented("core:os procedure not supported on JS target")
 }
 
 read :: proc(fd: Handle, data: []byte) -> (int, Errno) {
-	panic("core:os procedure not supported on JS target")
+	unimplemented("core:os procedure not supported on JS target")
 }
 
 seek :: proc(fd: Handle, offset: i64, whence: int) -> (i64, Errno) {
-	panic("core:os procedure not supported on JS target")
+	unimplemented("core:os procedure not supported on JS target")
 }
 
 file_size :: proc(fd: Handle) -> (i64, Errno) {
-	panic("core:os procedure not supported on JS target")
+	unimplemented("core:os procedure not supported on JS target")
 }
 
 
@@ -50,18 +50,18 @@ MAX_RW :: 1<<30
 
 @(private)
 pread :: proc(fd: Handle, data: []byte, offset: i64) -> (int, Errno) {
-	panic("core:os procedure not supported on JS target")
+	unimplemented("core:os procedure not supported on JS target")
 }
 @(private)
 pwrite :: proc(fd: Handle, data: []byte, offset: i64) -> (int, Errno) {
-	panic("core:os procedure not supported on JS target")
+	unimplemented("core:os procedure not supported on JS target")
 }
 
 read_at :: proc(fd: Handle, data: []byte, offset: i64) -> (n: int, err: Errno) {
-	panic("core:os procedure not supported on JS target")
+	unimplemented("core:os procedure not supported on JS target")
 }
 write_at :: proc(fd: Handle, data: []byte, offset: i64) -> (n: int, err: Errno) {
-	panic("core:os procedure not supported on JS target")
+	unimplemented("core:os procedure not supported on JS target")
 }
 
 
@@ -74,96 +74,96 @@ write_at :: proc(fd: Handle, data: []byte, offset: i64) -> (n: int, err: Errno) 
 
 get_std_handle :: proc "contextless" (h: uint) -> Handle {
 	context = runtime.default_context()
-	panic("core:os procedure not supported on JS target")
+	unimplemented("core:os procedure not supported on JS target")
 }
 
 
 exists :: proc(path: string) -> bool {
-	panic("core:os procedure not supported on JS target")
+	unimplemented("core:os procedure not supported on JS target")
 }
 
 is_file :: proc(path: string) -> bool {
-	panic("core:os procedure not supported on JS target")
+	unimplemented("core:os procedure not supported on JS target")
 }
 
 is_dir :: proc(path: string) -> bool {
-	panic("core:os procedure not supported on JS target")
+	unimplemented("core:os procedure not supported on JS target")
 }
 
 // NOTE(tetra): GetCurrentDirectory is not thread safe with SetCurrentDirectory and GetFullPathName
 //@private cwd_lock := win32.SRWLOCK{} // zero is initialized
 
 get_current_directory :: proc(allocator := context.allocator) -> string {
-	panic("core:os procedure not supported on JS target")
+	unimplemented("core:os procedure not supported on JS target")
 }
 
 set_current_directory :: proc(path: string) -> (err: Errno) {
-	panic("core:os procedure not supported on JS target")
+	unimplemented("core:os procedure not supported on JS target")
 }
 
 
 
 change_directory :: proc(path: string) -> (err: Errno) {
-	panic("core:os procedure not supported on JS target")
+	unimplemented("core:os procedure not supported on JS target")
 }
 
 make_directory :: proc(path: string, mode: u32 = 0) -> (err: Errno) {
-	panic("core:os procedure not supported on JS target")
+	unimplemented("core:os procedure not supported on JS target")
 }
 
 
 remove_directory :: proc(path: string) -> (err: Errno) {
-	panic("core:os procedure not supported on JS target")
+	unimplemented("core:os procedure not supported on JS target")
 }
 
 
 
 @(private)
 is_abs :: proc(path: string) -> bool {
-	panic("core:os procedure not supported on JS target")
+	unimplemented("core:os procedure not supported on JS target")
 }
 
 @(private)
 fix_long_path :: proc(path: string) -> string {
-	panic("core:os procedure not supported on JS target")
+	unimplemented("core:os procedure not supported on JS target")
 }
 
 
 link :: proc(old_name, new_name: string) -> (err: Errno) {
-	panic("core:os procedure not supported on JS target")
+	unimplemented("core:os procedure not supported on JS target")
 }
 
 unlink :: proc(path: string) -> (err: Errno) {
-	panic("core:os procedure not supported on JS target")
+	unimplemented("core:os procedure not supported on JS target")
 }
 
 
 
 rename :: proc(old_path, new_path: string) -> (err: Errno) {
-	panic("core:os procedure not supported on JS target")
+	unimplemented("core:os procedure not supported on JS target")
 }
 
 
 ftruncate :: proc(fd: Handle, length: i64) -> (err: Errno) {
-	panic("core:os procedure not supported on JS target")
+	unimplemented("core:os procedure not supported on JS target")
 }
 
 truncate :: proc(path: string, length: i64) -> (err: Errno) {
-	panic("core:os procedure not supported on JS target")
+	unimplemented("core:os procedure not supported on JS target")
 }
 
 
 remove :: proc(name: string) -> Errno {
-	panic("core:os procedure not supported on JS target")
+	unimplemented("core:os procedure not supported on JS target")
 }
 
 
 pipe :: proc() -> (r, w: Handle, err: Errno) {
-	panic("core:os procedure not supported on JS target")
+	unimplemented("core:os procedure not supported on JS target")
 }
 
 read_dir :: proc(fd: Handle, n: int, allocator := context.allocator) -> (fi: []File_Info, err: Errno) {
-	panic("core:os procedure not supported on JS target")
+	unimplemented("core:os procedure not supported on JS target")
 }
 
 Handle    :: distinct uintptr
@@ -229,44 +229,44 @@ args := _alloc_command_line_arguments()
 
 
 last_write_time :: proc(fd: Handle) -> (File_Time, Errno) {
-	panic("core:os procedure not supported on JS target")
+	unimplemented("core:os procedure not supported on JS target")
 }
 
 last_write_time_by_name :: proc(name: string) -> (File_Time, Errno) {
-	panic("core:os procedure not supported on JS target")
+	unimplemented("core:os procedure not supported on JS target")
 }
 
 
 
 heap_alloc :: proc(size: int, zero_memory := true) -> rawptr {
-	panic("core:os procedure not supported on JS target")
+	unimplemented("core:os procedure not supported on JS target")
 }
 heap_resize :: proc(ptr: rawptr, new_size: int) -> rawptr {
-	panic("core:os procedure not supported on JS target")
+	unimplemented("core:os procedure not supported on JS target")
 }
 heap_free :: proc(ptr: rawptr) {
-	panic("core:os procedure not supported on JS target")
+	unimplemented("core:os procedure not supported on JS target")
 }
 
 get_page_size :: proc() -> int {
-	panic("core:os procedure not supported on JS target")
+	unimplemented("core:os procedure not supported on JS target")
 }
 
 @(private)
 _processor_core_count :: proc() -> int {
-	panic("core:os procedure not supported on JS target")
+	unimplemented("core:os procedure not supported on JS target")
 }
 
 exit :: proc "contextless" (code: int) -> ! {
 	context = runtime.default_context()
-	panic("core:os procedure not supported on JS target")
+	unimplemented("core:os procedure not supported on JS target")
 }
 
 
 
 current_thread_id :: proc "contextless" () -> int {
 	context = runtime.default_context()
-	panic("core:os procedure not supported on JS target")
+	unimplemented("core:os procedure not supported on JS target")
 }
 
 
