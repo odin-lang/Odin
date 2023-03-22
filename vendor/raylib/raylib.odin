@@ -34,7 +34,7 @@ Package vendor:raylib implements bindings for version 4.5 of the raylib library 
 	*       [rlgl] glad (David Herberth - github.com/Dav1dde/glad) for OpenGL 3.3 extensions loading (PLATFORM_DESKTOP)
 	*       [raudio] miniaudio (David Reid - github.com/mackron/miniaudio) for audio device/context management
 	*
-	*   OPTIONAL DEPENDENCIES (included):`
+	*   OPTIONAL DEPENDENCIES (included):
 	*       [rcore] msf_gif (Miles Fogle) for GIF recording
 	*       [rcore] sinfl (Micha Mettke) for DEFLATE decompression algorithm
 	*       [rcore] sdefl (Micha Mettke) for DEFLATE compression algorithm
