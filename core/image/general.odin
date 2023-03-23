@@ -1,6 +1,48 @@
 package image
 
-import "core:os"
+import "core:mem"
+import "core:bytes"
+
+Loader_Proc :: #type proc(data: []byte, options: Options, allocator: mem.Allocator) -> (img: ^Image, err: Error)
+Destroy_Proc :: #type proc(img: ^Image)
+
+@(private)
+_internal_loaders: [Which_File_Type]Loader_Proc
+_internal_destroyers: [Which_File_Type]Destroy_Proc
+
+register :: proc(kind: Which_File_Type, loader: Loader_Proc, destroyer: Destroy_Proc) {
+	assert(loader != nil)
+	assert(destroyer != nil)
+	assert(_internal_loaders[kind] == nil)
+	_internal_loaders[kind] = loader
+
+	assert(_internal_destroyers[kind] == nil)
+	_internal_destroyers[kind] = destroyer
+}
+
+load_from_bytes :: proc(data: []byte, options := Options{}, allocator := context.allocator) -> (img: ^Image, err: Error) {
+	loader := _internal_loaders[which(data)]
+	if loader == nil {
+		return nil, .Unsupported_Format
+	}
+	return loader(data, options, allocator)
+}
+
+
+destroy :: proc(img: ^Image, allocator := context.allocator) {
+	if img == nil {
+		return
+	}
+	context.allocator = allocator
+	destroyer := _internal_destroyers[img.which]
+	if destroyer != nil {
+		destroyer(img)
+	} else {
+		assert(img.metadata == nil)
+		bytes.buffer_destroy(&img.pixels)
+		free(img)
+	}
+}
 
 Which_File_Type :: enum {
 	Unknown,
@@ -26,11 +68,6 @@ Which_File_Type :: enum {
 	TIFF, // Tagged Image File Format
 	WebP,
 	XBM, // X BitMap
-}
-
-which :: proc{
-	which_bytes,
-	which_file,
 }
 
 which_bytes :: proc(data: []byte) -> Which_File_Type {
@@ -163,17 +200,4 @@ which_bytes :: proc(data: []byte) -> Which_File_Type {
 
 	}
 	return .Unknown
-}
-
-
-which_file :: proc(path: string) -> Which_File_Type {
-	f, err := os.open(path)
-	if err != 0 {
-		return .Unknown
-	}
-	header: [128]byte
-	os.read(f, header[:])
-	file_type := which_bytes(header[:])
-	os.close(f)
-	return file_type
 }
