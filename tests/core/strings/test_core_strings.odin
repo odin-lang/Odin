@@ -4,6 +4,7 @@ import "core:strings"
 import "core:testing"
 import "core:fmt"
 import "core:os"
+import "core:runtime"
 
 TEST_count := 0
 TEST_fail  := 0
@@ -33,6 +34,7 @@ main :: proc() {
 	test_index_any_small_string_found(&t)
 	test_index_any_larger_string_found(&t)
 	test_cut(&t)
+	test_case_conversion(&t)
 
 	fmt.printf("%v/%v tests successful.\n", TEST_count - TEST_fail, TEST_count)
 	if TEST_fail > 0 {
@@ -88,5 +90,49 @@ test_cut :: proc(t: ^testing.T) {
 		msg := fmt.tprintf("cut(\"%v\", %v, %v) expected to return \"%v\", got \"%v\"",
 			test.input, test.offset, test.length, test.output, res)
 		expect(t, res == test.output, msg)
+	}
+}
+
+Case_Kind :: enum {
+	Lower_Space_Case,
+	Upper_Space_Case,
+	Lower_Snake_Case,
+	Upper_Snake_Case,
+	Lower_Kebab_Case,
+	Upper_Kebab_Case,
+	Camel_Case,
+	Pascal_Case,
+	Ada_Case,
+}
+
+test_cases := [Case_Kind]struct{s: string, p: proc(r: string, allocator: runtime.Allocator) -> string}{
+	.Lower_Space_Case = {"hellope world", to_lower_space_case},
+	.Upper_Space_Case = {"HELLOPE WORLD", to_upper_space_case},
+	.Lower_Snake_Case = {"hellope_world", strings.to_snake_case},
+	.Upper_Snake_Case = {"HELLOPE_WORLD", strings.to_upper_snake_case},
+	.Lower_Kebab_Case = {"hellope-world", strings.to_kebab_case},
+	.Upper_Kebab_Case = {"HELLOPE-WORLD", strings.to_upper_kebab_case},
+	.Camel_Case       = {"hellopeWorld",  strings.to_camel_case},
+	.Pascal_Case      = {"HellopeWorld",  strings.to_pascal_case},
+	.Ada_Case         = {"Hellope_World", strings.to_ada_case},
+}
+
+to_lower_space_case :: proc(r: string, allocator: runtime.Allocator) -> string {
+	return strings.to_delimiter_case(r, ' ', false, allocator)
+}
+to_upper_space_case :: proc(r: string, allocator: runtime.Allocator) -> string {
+	return strings.to_delimiter_case(r, ' ', true, allocator)
+}
+
+@test
+test_case_conversion :: proc(t: ^testing.T) {
+	for entry in test_cases {
+		for test_case, case_kind in test_cases {
+			result := entry.p(test_case.s, context.allocator)
+			defer delete(result)
+
+			msg := fmt.tprintf("ERROR: Input `{}` to converter {} does not match `{}`, got `{}`.\n", test_case.s, case_kind, entry.s, result)
+			expect(t, result == entry.s, msg)
+		}
 	}
 }
