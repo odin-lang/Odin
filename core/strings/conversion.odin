@@ -265,45 +265,26 @@ to_upper_kebab_case :: proc(s: string, allocator := context.allocator) -> string
 	return to_delimiter_case(s, '-', true, allocator)
 }
 
-// converts the `s` string to "Ada_case"
+// converts the `s` string to "Ada_Case"
 to_ada_case :: proc(s: string, allocator := context.allocator) -> string {
-	delimiter :: '_'
-
 	s := s
 	s = trim_space(s)
 	b: Builder
 	builder_init(&b, 0, len(s), allocator)
 	w := to_writer(&b)
 
-	prev, curr: rune
-
-	for next in s {
-		if is_delimiter(curr) {
-			if !is_delimiter(prev) {
-				io.write_rune(w, delimiter)
+	string_case_iterator(w, s, proc(w: io.Writer, prev, curr, next: rune) {
+		if !is_delimiter(curr) {
+			if is_delimiter(prev) || prev == 0 || (unicode.is_lower(prev) && unicode.is_upper(curr)) {
+				if prev != 0 {
+					io.write_rune(w, '_')
+				}
+				io.write_rune(w, unicode.to_upper(curr))
+			} else {
+				io.write_rune(w, unicode.to_lower(curr))
 			}
-		} else if unicode.is_upper(curr) {
-			if unicode.is_lower(prev) || (unicode.is_upper(prev) && unicode.is_lower(next)) {
-				io.write_rune(w, delimiter)
-			}
-			io.write_rune(w, unicode.to_upper(curr))
-		} else if curr != 0 {
-			io.write_rune(w, unicode.to_lower(curr))
 		}
-
-		prev = curr
-		curr = next
-	}
-
-	if len(s) > 0 {
-		if unicode.is_upper(curr) && unicode.is_lower(prev) && prev != 0 {
-			io.write_rune(w, delimiter)
-			io.write_rune(w, unicode.to_upper(curr))
-		} else {
-			io.write_rune(w, unicode.to_lower(curr))
-		}
-	}
+	})
 
 	return to_string(b)
 }
-
