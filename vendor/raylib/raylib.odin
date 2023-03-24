@@ -1371,7 +1371,7 @@ foreign lib {
 	// Text font info functions
 
 	MeasureText      :: proc(text: cstring, fontSize: c.int) -> c.int ---                               // Measure string width for default font
-	MeasureTextEx    :: proc(font: Font, text: cstring, fontSize: c.int, spacing: c.int) -> Vector2 --- // Measure string size for Font
+	MeasureTextEx    :: proc(font: Font, text: cstring, fontSize: f32, spacing: f32) -> Vector2 ---     // Measure string size for Font
 	GetGlyphIndex    :: proc(font: Font, codepoint: rune) -> c.int ---                                  // Get glyph index position in font for a codepoint (unicode character), fallback to '?' if not found
 	GetGlyphInfo     :: proc(font: Font, codepoint: rune) -> GlyphInfo ---                              // Get glyph font info data for a codepoint (unicode character), fallback to '?' if not found
 	GetGlyphAtlasRec :: proc(font: Font, codepoint: rune) -> Rectangle ---                              // Get glyph rectangle in font atlas for a codepoint (unicode character), fallback to '?' if not found
