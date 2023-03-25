@@ -88,20 +88,20 @@ Error :: enum {
 
 
 destroy_value :: proc(value: Value, allocator := context.allocator) {
+	context.allocator := allocator
 	#partial switch v in value {
 	case Object:
 		for key, elem in v {
-			delete(key, allocator)
-			destroy_value(elem, allocator)
+			delete(key)
+			destroy_value(elem)
 		}
 		delete(v)
 	case Array:
 		for elem in v {
-			destroy_value(elem, allocator)
+			destroy_value(elem)
 		}
 		delete(v)
 	case String:
-		delete(v, allocator)
+		delete(v)
 	}
 }
-
