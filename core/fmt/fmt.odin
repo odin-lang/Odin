@@ -53,23 +53,20 @@ User_Formatter :: #type proc(fi: ^Info, arg: any, verb: rune) -> bool
 // 	m := cast(^SomeType)arg.data
 // 	switch verb {
 // 	case 'v', 'd':
-// 		fmt.fmt_int(fi, u64(m.value), true, 32, verb)
+// 		fmt.fmt_int(fi, u64(m.value), true, 64, verb)
 // 	case:
 // 		return false
 // 	}
 // 	return true
 // }
-// //
 // main :: proc() {
 // 	// Ensure the fmt._user_formatters map is initialized
-// 	if fmt._user_formatters == nil {
-// 		fmt._user_formatters = new(map[typeid]fmt.User_Formatter)
-// 	}
-// 	// Register the custom formatter directly to the _user_formatters map
-// 	fmt._user_formatters[type_info_of(SomeType).id] = User_Formatter
+// 	fmt.set_user_formatters(new(map[typeid]fmt.User_Formatter))
+// 	err := fmt.register_user_formatter(type_info_of(SomeType).id, User_Formatter)
+// 	assert(err == .None)
 // 	// Use the custom formatter
 // 	x := SomeType{42}
-// 	fmt.println("My custom type value: ", x)
+// 	fmt.println("Custom type value: ", x)
 // }
 
 Register_User_Formatter_Error :: enum {
@@ -90,7 +87,12 @@ _user_formatters: ^map[typeid]User_Formatter
 // NOTE: Must be called before using register_user_formatter.
 //
 set_user_formatters :: proc(m: ^map[typeid]User_Formatter) {
-	_user_formatters = m
+	if _user_formatters==nil {
+	    _user_formatters = m
+	}
+	else {
+	    panic("set_user_formatters must not be called more than once.")
+	}
 }
 // Registers a user-defined formatter for a specific typeid
 //
