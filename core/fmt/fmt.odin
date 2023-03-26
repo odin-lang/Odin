@@ -208,10 +208,10 @@ tprintf :: proc(fmt: string, args: ..any) -> string {
 	sbprintf(&str, fmt, ..args)
 	return strings.to_string(str)
 }
-// Creates a formatted string using a buffer from an array
+// Creates a formatted string using a supplied buffer as the backing array. Writes into the buffer.
 //
 // Inputs:
-// - buf: The source buffer
+// - buf: The backing buffer
 // - args: A variadic list of arguments to be formatted
 // - sep: An optional separator string (default is a single space)
 //
@@ -221,10 +221,10 @@ bprint :: proc(buf: []byte, args: ..any, sep := " ") -> string {
 	sb := strings.builder_from_bytes(buf[0:len(buf)])
 	return sbprint(buf=&sb, args=args, sep=sep)
 }
-// Creates a formatted string with a newline character at the end using a buffer from an array
+// Creates a formatted string using a supplied buffer as the backing array, appends newline. Writes into the buffer.
 //
 // Inputs:
-// - buf: The source buffer
+// - buf: The backing buffer
 // - args: A variadic list of arguments to be formatted
 // - sep: An optional separator string (default is a single space)
 //
@@ -234,10 +234,10 @@ bprintln :: proc(buf: []byte, args: ..any, sep := " ") -> string {
 	sb := strings.builder_from_bytes(buf[0:len(buf)])
 	return sbprintln(buf=&sb, args=args, sep=sep)
 }
-// Creates a formatted string using a buffer from an array and a format string
+// Creates a formatted string using a supplied buffer as the backing array. Writes into the buffer.
 //
 // Inputs:
-// - buf: The source buffer
+// - buf: The backing buffer
 // - fmt: A format string with placeholders for the provided arguments
 // - args: A variadic list of arguments to be formatted
 //
