@@ -1411,7 +1411,7 @@ gb_internal Token expect_operator(AstFile *f) {
 		             LIT(p));
 	}
 	if (f->curr_token.kind == Token_Ellipsis) {
-		syntax_warning(f->curr_token, "'..' for ranges has now been deprecated, prefer '..='");
+		syntax_warning(f->curr_token, "'..' for ranges have now been deprecated, prefer '..='");
 		f->tokens[f->curr_token_index].flags |= TokenFlag_Replace;
 	}
 	
