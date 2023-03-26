@@ -22,7 +22,7 @@ Cell :: struct {
 }
 
 Cell_Alignment :: enum {
-	Left = 1,
+	Left,
 	Center,
 	Right,
 }
@@ -92,9 +92,6 @@ set_cell_value_and_alignment :: proc(tbl: ^Table, row, col: int, value: string, 
 
 set_cell_value :: proc(tbl: ^Table, row, col: int, value: any, loc := #caller_location) {
 	cell := get_cell(tbl, row, col, loc)
-	if cell.alignment == nil {
-		cell.alignment = .Left
-	}
 	switch val in value {
 	case nil:
 		cell.text = ""
@@ -345,8 +342,6 @@ write_markdown_table :: proc(w: io.Writer, tbl: ^Table) {
 				case .Right:
 					write_byte_repeat(w, max(1, tbl.colw[col]-1, tbl.lpad, tbl.rpad), '-')
 					io.write_byte(w, ':')
-				case:
-					panic("unhandled cell alignment")
 				}
 				io.write_byte(w, '|')
 			}
@@ -384,8 +379,6 @@ write_text_align :: proc(w: io.Writer, colw, lpad, rpad: int, text: string, alig
 	case .Right:
 		write_byte_repeat(w, colw - len(text), ' ')
 		io.write_string(w, text)
-	case:
-		panic("unhandled alignment")
 	}
 	write_byte_repeat(w, rpad, ' ')
 }
