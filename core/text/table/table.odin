@@ -43,20 +43,20 @@ Table :: struct {
 	tblw: int,          // Width of entire table (including padding, excluding borders)
 }
 
-init :: proc{_init, _init_with_virtual_arena, _init_with_mem_arena}
+init :: proc{init_with_allocator, init_with_virtual_arena, init_with_mem_arena}
 
-_init :: proc(tbl: ^Table, format_allocator := context.temp_allocator, table_allocator := context.allocator) -> ^Table {
+init_with_allocator :: proc(tbl: ^Table, format_allocator := context.temp_allocator, table_allocator := context.allocator) -> ^Table {
 	tbl.table_allocator = table_allocator
 	tbl.cells = make([dynamic]Cell, tbl.table_allocator)
 	tbl.colw = make([dynamic]int, tbl.table_allocator)
 	tbl.format_allocator = format_allocator
 	return tbl
 }
-_init_with_virtual_arena :: proc(tbl: ^Table, format_arena: ^virtual.Arena, table_allocator := context.allocator) -> ^Table {
-	return _init(tbl, virtual.arena_allocator(format_arena), table_allocator)
+init_with_virtual_arena :: proc(tbl: ^Table, format_arena: ^virtual.Arena, table_allocator := context.allocator) -> ^Table {
+	return init_with_allocator(tbl, virtual.arena_allocator(format_arena), table_allocator)
 }
-_init_with_mem_arena :: proc(tbl: ^Table, format_arena: ^mem.Arena, table_allocator := context.allocator) -> ^Table {
-	return _init(tbl, mem.arena_allocator(format_arena), table_allocator)
+init_with_mem_arena :: proc(tbl: ^Table, format_arena: ^mem.Arena, table_allocator := context.allocator) -> ^Table {
+	return init_with_allocator(tbl, mem.arena_allocator(format_arena), table_allocator)
 }
 
 destroy :: proc(tbl: ^Table) {
