@@ -28,11 +28,11 @@ ascii_set_make :: proc(chars: string) -> (as: Ascii_Set, ok: bool) #no_bounds_ch
 	return
 }
 
-// Determines if a given byte is contained within an Ascii_Set.
+// Determines if a given char is contained within an Ascii_Set.
 //
 // Inputs:
 // - as: The Ascii_Set to search.
-// - c: The byte to check for in the Ascii_Set.
+// - c: The char to check for in the Ascii_Set.
 //
 // Returns: A boolean indicating if the byte is contained in the Ascii_Set (true) or not (false).
 //
