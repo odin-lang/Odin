@@ -334,13 +334,13 @@ write_markdown_table :: proc(w: io.Writer, tbl: ^Table) {
 				switch cell.alignment {
 				case .Left:
 					io.write_byte(w, ':')
-					write_byte_repeat(w, max(1, tbl.colw[col]-1, tbl.lpad, tbl.rpad), '-')
+					write_byte_repeat(w, max(1, tbl.colw[col]-1), '-')
 				case .Center:
 					io.write_byte(w, ':')
-					write_byte_repeat(w, max(1, tbl.colw[col]-2, tbl.lpad, tbl.rpad), '-')
+					write_byte_repeat(w, max(1, tbl.colw[col]-2), '-')
 					io.write_byte(w, ':')
 				case .Right:
-					write_byte_repeat(w, max(1, tbl.colw[col]-1, tbl.lpad, tbl.rpad), '-')
+					write_byte_repeat(w, max(1, tbl.colw[col]-1), '-')
 					io.write_byte(w, ':')
 				}
 				io.write_byte(w, '|')
