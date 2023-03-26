@@ -442,6 +442,8 @@ write_quoted_string :: proc(b: ^Builder, str: string, quote: byte = '"') -> (n: 
 // - r: The rune to be appended
 // - write_quote: Optional boolean flag to write the quote character (default is true)
 //
+// NOTE: The backing dynamic array may be fixed in capacity or fail to resize, `n` states the number actually written.
+//
 // Returns: The number of bytes written
 write_encoded_rune :: proc(b: ^Builder, r: rune, write_quote := true) -> (n: int) {
 	n, _ = io.write_encoded_rune(to_writer(b), r, write_quote)
@@ -461,6 +463,8 @@ write_encoded_rune :: proc(b: ^Builder, r: rune, write_quote := true) -> (n: int
 // - `r` and `quote` match and `quote` is `\\` - they will be written as two slashes
 // - `html_safe` flag in case the runes '<', '>', '&' should be encoded as digits e.g. `\u0026`
 //
+// NOTE: The backing dynamic array may be fixed in capacity or fail to resize, `n` states the number actually written.
+//
 // Returns: The number of bytes written
 write_escaped_rune :: proc(b: ^Builder, r: rune, quote: byte, html_safe := false) -> (n: int) {
 	n, _ = io.write_escaped_rune(to_writer(b), r, quote, html_safe)
@@ -476,6 +480,8 @@ write_escaped_rune :: proc(b: ^Builder, r: rune, quote: byte, html_safe := false
 // - prec: The precision
 // - bit_size: The bit size
 // - always_signed: Optional boolean flag to always include the sign (default is false)
+//
+// NOTE: The backing dynamic array may be fixed in capacity or fail to resize, `n` states the number actually written.
 //
 // Returns: The number of characters written
 write_float :: proc(b: ^Builder, f: f64, fmt: byte, prec, bit_size: int, always_signed := false) -> (n: int) {
@@ -497,6 +503,8 @@ write_float :: proc(b: ^Builder, f: f64, fmt: byte, prec, bit_size: int, always_
 // - fmt: The format byte
 // - always_signed: Optional boolean flag to always include the sign
 //
+// NOTE: The backing dynamic array may be fixed in capacity or fail to resize, `n` states the number actually written.
+//
 // Returns: The number of characters written
 write_f16 :: proc(b: ^Builder, f: f16, fmt: byte, always_signed := false) -> (n: int) {
 	buf: [384]byte
@@ -514,6 +522,16 @@ write_f16 :: proc(b: ^Builder, f: f16, fmt: byte, always_signed := false) -> (n:
 // - f: The f32 value to be appended
 // - fmt: The format byte
 // - always_signed: Optional boolean flag to always include the sign
+//
+// Usage:
+// ```odin
+// builder := strings.builder_make()
+// strings.write_f32(&builder, 3.14159, 'f') // 6
+// strings.write_string(&builder, " - ") // 3
+// strings.write_f32(&builder, -0.123, 'e') // 8
+// fmt.println(strings.to_string(builder)) // -> 3.14159012 - -1.23000003e-01
+// ```
+// NOTE: The backing dynamic array may be fixed in capacity or fail to resize, `n` states the number actually written.
 //
 // Returns: The number of characters written
 write_f32 :: proc(b: ^Builder, f: f32, fmt: byte, always_signed := false) -> (n: int) {
@@ -533,6 +551,8 @@ write_f32 :: proc(b: ^Builder, f: f32, fmt: byte, always_signed := false) -> (n:
 // - fmt: The format byte
 // - always_signed: Optional boolean flag to always include the sign
 //
+// NOTE: The backing dynamic array may be fixed in capacity or fail to resize, `n` states the number actually written.
+//
 // Returns: The number of characters written
 write_f64 :: proc(b: ^Builder, f: f64, fmt: byte, always_signed := false) -> (n: int) {
 	buf: [384]byte
@@ -549,6 +569,8 @@ write_f64 :: proc(b: ^Builder, f: f64, fmt: byte, always_signed := false) -> (n:
 // - i: The u64 value to be appended
 // - base: The optional base for the numeric representation
 //
+// NOTE: The backing dynamic array may be fixed in capacity or fail to resize, `n` states the number actually written.
+//
 // Returns: The number of characters written
 write_u64 :: proc(b: ^Builder, i: u64, base: int = 10) -> (n: int) {
 	buf: [32]byte
@@ -562,6 +584,8 @@ write_u64 :: proc(b: ^Builder, i: u64, base: int = 10) -> (n: int) {
 // - b: A pointer to the Builder
 // - i: The i64 value to be appended
 // - base: The optional base for the numeric representation
+//
+// NOTE: The backing dynamic array may be fixed in capacity or fail to resize, `n` states the number actually written.
 //
 // Returns: The number of characters written
 write_i64 :: proc(b: ^Builder, i: i64, base: int = 10) -> (n: int) {
@@ -577,6 +601,8 @@ write_i64 :: proc(b: ^Builder, i: i64, base: int = 10) -> (n: int) {
 // - i: The uint value to be appended
 // - base: The optional base for the numeric representation
 //
+// NOTE: The backing dynamic array may be fixed in capacity or fail to resize, `n` states the number actually written.
+//
 // Returns: The number of characters written
 write_uint :: proc(b: ^Builder, i: uint, base: int = 10) -> (n: int) {
 	return write_u64(b, u64(i), base)
@@ -588,6 +614,8 @@ write_uint :: proc(b: ^Builder, i: uint, base: int = 10) -> (n: int) {
 // - b: A pointer to the Builder
 // - i: The int value to be appended
 // - base: The optional base for the numeric representation
+//
+// NOTE: The backing dynamic array may be fixed in capacity or fail to resize, `n` states the number actually written.
 //
 // Returns: The number of characters written
 write_int :: proc(b: ^Builder, i: int, base: int = 10) -> (n: int) {
