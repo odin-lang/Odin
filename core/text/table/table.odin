@@ -212,12 +212,12 @@ write_html_table :: proc(w: io.Writer, tbl: ^Table) {
 	}
 
 	align_attribute :: proc(cell: ^Cell) -> string {
-		#partial switch cell.alignment {
+		switch cell.alignment {
 		case .Left:   return ` align="left"`
 		case .Center: return ` align="center"`
 		case .Right:  return ` align="right"`
 		}
-		return ""
+		unreachable()
 	}
 
 	if tbl.has_header_row {
