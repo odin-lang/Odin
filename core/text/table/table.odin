@@ -148,7 +148,7 @@ row :: proc(tbl: ^Table, values: ..any, loc := #caller_location) {
 		}
 	}
 	tbl.nr_rows += 1
-	for col := 0; col < tbl.nr_cols; col += 1 {
+	for col in 0..<tbl.nr_cols {
 		val := values[col] if col < len(values) else nil
 		set_cell_value(tbl, last_row(tbl), col, val)
 	}
