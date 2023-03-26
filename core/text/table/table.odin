@@ -389,11 +389,3 @@ write_text_align :: proc(w: io.Writer, colw, lpad, rpad: int, text: string, alig
 	}
 	write_byte_repeat(w, rpad, ' ')
 }
-
-stdio_writer :: proc() -> io.Writer {
-	return io.to_writer(os.stream_from_handle(os.stdout))
-}
-
-strings_builder_writer :: proc(b: ^strings.Builder) -> io.Writer {
-	return strings.to_writer(b)
-}
