@@ -11,8 +11,8 @@
 	row(tbl, "A_LONG_ENUM", "= 54,", "// A comment about A_LONG_ENUM")
 	row(tbl, "AN_EVEN_LONGER_ENUM", "= 1,", "// A comment about AN_EVEN_LONGER_ENUM")
 	build(tbl)
-	for row in 0..<enum_tbl.nr_rows {
-		for col in 0..<enum_tbl.nr_cols {
+	for row in 0..<tbl.nr_rows {
+		for col in 0..<tbl.nr_cols {
 			write_table_cell(stdio_writer(), tbl, row, col)
 		}
 		io.write_byte(stdio_writer(), '\n')
@@ -38,7 +38,7 @@
 	padding(tbl, 1, 1) // Left/right padding of cells
 
 	header(tbl, "AAAAAAAAA", "B")
-	header(tbl, "C") // Appends to previous header row. Same as if done header("A", "B", "C") from start.
+	header(tbl, "C") // Appends to previous header row. Same as if done header("AAAAAAAAA", "B", "C") from start.
 
 	// Create a row with two values. Since there are three columns the third
 	// value will become the empty string.
