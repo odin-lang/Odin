@@ -9,7 +9,7 @@ Intern_Entry :: struct {
 }
 // Intern is a more memory efficient string map
 //
-// Uses Specified Allocator for Intern_Entry Strings
+// Uses Specified Allocator for `Intern_Entry` strings
 //
 // Fields:
 // - allocator: The allocator used for the Intern_Entry strings

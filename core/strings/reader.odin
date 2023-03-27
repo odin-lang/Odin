@@ -3,17 +3,15 @@ package strings
 import "core:io"
 import "core:unicode/utf8"
 
-/*
-	io stream data for a string reader that can read based on bytes or runes
-	implements the vtable when using the io.Reader variants
-	"read" calls advance the current reading offset `i`
-*/
+
+//	io stream data for a string reader that can read based on bytes or runes
+//	implements the vtable when using the io.Reader variants
+//	"read" calls advance the current reading offset `i`
 Reader :: struct {
 	s:         string, // read-only buffer
 	i:         i64,    // current reading index
 	prev_rune: int,    // previous reading index of rune or < 0
 }
-
 // Initializes a string Reader with the provided string
 //
 // Inputs:
