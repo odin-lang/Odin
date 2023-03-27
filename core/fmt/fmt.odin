@@ -283,7 +283,7 @@ panicf :: proc(fmt: string, args: ..any, loc := #caller_location) -> ! {
 }
 // Creates a formatted C string
 //
-// *Allocates Using Context's Temporary Allocator*
+// *Allocates Using Context's Allocator*
 //
 // Inputs:
 // - format: A format string with placeholders for the provided arguments
