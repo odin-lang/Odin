@@ -12,7 +12,7 @@ import "core:unicode/utf8"
 //
 // Inputs:
 // - s: The string to be cloned
-// - allocator: The memory allocator to use (default: context.allocator)
+// - allocator: (default: context.allocator)
 // - loc: The caller location for debugging purposes (default: #caller_location)
 //
 // Returns: A cloned string
@@ -27,7 +27,7 @@ clone :: proc(s: string, allocator := context.allocator, loc := #caller_location
 //
 // Inputs:
 // - s: The string to be cloned
-// - allocator: The memory allocator to use (default: context.allocator)
+// - allocator: (default: context.allocator)
 // - loc: The caller location for debugging purposes (default: #caller_location)
 //
 // Returns:
@@ -44,7 +44,7 @@ clone_safe :: proc(s: string, allocator := context.allocator, loc := #caller_loc
 //
 // Inputs:
 // - s: The string to be cloned
-// - allocator: The memory allocator to use (default: context.allocator)
+// - allocator: (default: context.allocator)
 // - loc: The caller location for debugging purposes (default: #caller_location)
 //
 // Returns: A cloned cstring with an appended nul byte
@@ -139,7 +139,7 @@ truncate_to_rune :: proc(str: string, r: rune) -> string {
 //
 // Inputs:
 // - s: The byte array to be cloned
-// - allocator: The memory allocator to use (default: context.allocator)
+// - allocator: (default: context.allocator)
 // - loc: The caller location for debugging purposes (default: #caller_location)
 //
 // Returns: A cloned string from the byte array with a nul byte
@@ -155,7 +155,7 @@ clone_from_bytes :: proc(s: []byte, allocator := context.allocator, loc := #call
 //
 // Inputs:
 // - s: The cstring to be cloned
-// - allocator: The memory allocator to use (default: context.allocator)
+// - allocator: (default: context.allocator)
 // - loc: The caller location for debugging purposes (default: #caller_location)
 //
 // Returns: A cloned string from the cstring
@@ -169,7 +169,7 @@ clone_from_cstring :: proc(s: cstring, allocator := context.allocator, loc := #c
 // Inputs:
 // - ptr: A pointer to the start of the byte sequence
 // - len: The length of the byte sequence
-// - allocator: The memory allocator to use (default: context.allocator)
+// - allocator: (default: context.allocator)
 // - loc: The caller location for debugging purposes (default: #caller_location)
 //
 // NOTE: Same as `string_from_ptr`, but perform an additional `clone` operation
@@ -193,7 +193,7 @@ clone_from :: proc{
 // Inputs:
 // - ptr: A pointer to the start of the nul-terminated cstring
 // - len: The byte length of the cstring
-// - allocator: The memory allocator to use (default: context.allocator)
+// - allocator: (default: context.allocator)
 // - loc: The caller location for debugging purposes (default: #caller_location)
 //
 // NOTE: Truncates at the first nul byte encountered or the byte length.
@@ -423,7 +423,7 @@ has_suffix :: proc(s, suffix: string) -> bool {
 // Inputs:
 // - a: A slice of strings to join
 // - sep: The separator string
-// - allocator: The memory allocator to use (default is context.allocator)
+// - allocator: (default is context.allocator)
 //
 // Returns: A combined string from the slice of strings a separated with the sep string
 join :: proc(a: []string, sep: string, allocator := context.allocator) -> string {
@@ -451,7 +451,7 @@ join :: proc(a: []string, sep: string, allocator := context.allocator) -> string
 // Inputs:
 // - a: A slice of strings to join
 // - sep: The separator string
-// - allocator: The memory allocator to use (default is context.allocator)
+// - allocator: (default is context.allocator)
 //
 // Returns:
 // - str: A combined string from the slice of strings a separated with the sep string
