@@ -44,6 +44,31 @@ Info :: struct {
 // Custom formatter signature. It returns true if the formatting was successful and false when it could not be done
 User_Formatter :: #type proc(fi: ^Info, arg: any, verb: rune) -> bool
 
+// Example User Formatter:
+// SomeType :: struct {
+// 	value: int,
+// }
+// // Custom Formatter for SomeType
+// User_Formatter :: proc(fi: ^fmt.Info, arg: any, verb: rune) -> bool {
+// 	m := cast(^SomeType)arg.data
+// 	switch verb {
+// 	case 'v', 'd':
+// 		fmt.fmt_int(fi, u64(m.value), true, 8 * size_of(SomeType), verb)
+// 	case:
+// 		return false
+// 	}
+// 	return true
+// }
+// main :: proc() {
+// 	// Ensure the fmt._user_formatters map is initialized
+// 	fmt.set_user_formatters(new(map[typeid]fmt.User_Formatter))
+// 	err := fmt.register_user_formatter(type_info_of(SomeType).id, User_Formatter)
+// 	assert(err == .None)
+// 	// Use the custom formatter
+// 	x := SomeType{42}
+// 	fmt.println("Custom type value: ", x)
+// }
+
 Register_User_Formatter_Error :: enum {
 	None,
 	No_User_Formatter,
@@ -57,7 +82,8 @@ _user_formatters: ^map[typeid]User_Formatter
 // set_user_formatters assigns m to a global value allowing the user have custom print formatting for specific
 // types
 set_user_formatters :: proc(m: ^map[typeid]User_Formatter) {
-	_user_formatters = m
+	assert(_user_formatters == nil, "set_user_formatters must not be called more than once.")
+    _user_formatters = m
 }
 // register_user_formatter assigns a formatter to a specific typeid. set_user_formatters must be called
 // before any use of this procedure.
@@ -161,8 +187,16 @@ panicf :: proc(fmt: string, args: ..any, loc := #caller_location) -> ! {
 	message := tprintf(fmt, ..args)
 	p("Panic", message, loc)
 }
-
-// formatted printing for cstrings
+// Creates a formatted C string
+//
+// *Allocates Using Context's Allocator*
+//
+// Inputs:
+// - format: A format string with placeholders for the provided arguments
+// - args: A variadic list of arguments to be formatted
+//
+// Returns: A formatted C string
+//
 caprintf :: proc(format: string, args: ..any) -> cstring {
 	str: strings.Builder
 	strings.builder_init(&str)
