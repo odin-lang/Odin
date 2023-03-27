@@ -11,7 +11,7 @@ import "core:unicode/utf8"
 // Inputs:
 // - s: Input string that may contain invalid UTF-8 sequences.
 // - replacement: String to replace invalid UTF-8 sequences with.
-// - allocator: Allocator (default: context.allocator).
+// - allocator: (default: context.allocator).
 //
 // WARNING: Allocation does not occur when len(s) == 0
 //
@@ -75,7 +75,7 @@ to_valid_utf8 :: proc(s, replacement: string, allocator := context.allocator) ->
 //
 // Inputs:
 // - s: Input string to be converted.
-// - allocator: Allocator (default: context.allocator).
+// - allocator: (default: context.allocator).
 //
 // Usage:
 // ```odin
@@ -96,7 +96,7 @@ to_lower :: proc(s: string, allocator := context.allocator) -> string {
 //
 // Inputs:
 // - s: Input string to be converted.
-// - allocator: Allocator (default: context.allocator).
+// - allocator: (default: context.allocator).
 //
 // Usage:
 // ```odin
@@ -194,11 +194,11 @@ string_case_iterator :: proc(
 to_lower_camel_case :: to_camel_case
 // Converts the input string `s` to "lowerCamelCase".
 //
-// *Allocates Using Context's Allocator*
+// *Allocates Using Provided Allocator*
 //
 // Inputs:
 // - s: Input string to be converted.
-// - allocator: Allocator (default: context.allocator).
+// - allocator: (default: context.allocator).
 //
 // Returns: A "lowerCamelCase" formatted string.
 to_camel_case :: proc(s: string, allocator := context.allocator) -> string {
@@ -230,7 +230,7 @@ to_upper_camel_case :: to_pascal_case
 //
 // Inputs:
 // - s: Input string to be converted.
-// - allocator: Allocator (default: context.allocator).
+// - allocator: (default: context.allocator).
 //
 // Returns: A "PascalCase" formatted string.
 to_pascal_case :: proc(s: string, allocator := context.allocator) -> string {
@@ -262,7 +262,7 @@ to_pascal_case :: proc(s: string, allocator := context.allocator) -> string {
 // - s: The input string to be converted
 // - delimiter: The rune to be used as the delimiter between words
 // - all_upper_case: A boolean indicating if the output should be all uppercased (true) or lowercased (false)
-// - allocator: Allocator (default: context.allocator).
+// - allocator: (default: context.allocator).
 //
 // Usage:
 // ```odin
@@ -320,7 +320,7 @@ to_delimiter_case :: proc(
 //
 // Inputs:
 // - s: The input string to be converted
-// - allocator: Allocator (default: context.allocator).
+// - allocator: (default: context.allocator).
 //
 // Usage:
 // ```odin
@@ -339,7 +339,7 @@ to_screaming_snake_case :: to_upper_snake_case
 //
 // Inputs:
 // - s: The input string to be converted
-// - allocator: Allocator (default: context.allocator).
+// - allocator: (default: context.allocator).
 //
 // Usage:
 // ```odin
@@ -355,7 +355,7 @@ to_upper_snake_case :: proc(s: string, allocator := context.allocator) -> string
 //
 // Inputs:
 // - s: The input string to be converted
-// - allocator: Allocator (default: context.allocator).
+// - allocator: (default: context.allocator).
 //
 // Usage:
 // ```odin
@@ -371,7 +371,7 @@ to_kebab_case :: proc(s: string, allocator := context.allocator) -> string {
 //
 // Inputs:
 // - s: The input string to be converted
-// - allocator: Allocator (default: context.allocator).
+// - allocator: (default: context.allocator).
 //
 // Usage:
 // ```odin
@@ -387,7 +387,7 @@ to_upper_kebab_case :: proc(s: string, allocator := context.allocator) -> string
 //
 // Inputs:
 // - s: The input string to be converted
-// - allocator: Allocator (default: context.allocator).
+// - allocator: (default: context.allocator).
 //
 // Usage:
 // ```odin

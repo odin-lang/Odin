@@ -22,10 +22,10 @@ Builder :: struct {
 
 // Produces a Builder with a default length of 0 and cap of 16
 //
-// *Allocates using Context's Allocator*
+// *Allocates Using Provided Allocator*
 //
 // Inputs:
-// - allocator: The allocator to use for creating the Builder's buffer (default is context.allocator)
+// - allocator: (default is context.allocator)
 //
 // Returns: A new Builder
 builder_make_none :: proc(allocator := context.allocator) -> Builder {
@@ -34,11 +34,11 @@ builder_make_none :: proc(allocator := context.allocator) -> Builder {
 
 // Produces a Builder with a specified length and cap of max(16,len) byte buffer
 //
-// *Allocates using Context's Allocator*
+// *Allocates Using Provided Allocator*
 //
 // Inputs:
 // - len: The desired length of the Builder's buffer
-// - allocator: The allocator to use for creating the Builder's buffer (default is context.allocator)
+// - allocator: (default is context.allocator)
 //
 // Returns: A new Builder
 builder_make_len :: proc(len: int, allocator := context.allocator) -> Builder {
@@ -47,12 +47,12 @@ builder_make_len :: proc(len: int, allocator := context.allocator) -> Builder {
 
 // Produces a Builder with a specified length and cap
 //
-// *Allocates using Context's Allocator*
+// *Allocates Using Provided Allocator*
 //
 // Inputs:
 // - len: The desired length of the Builder's buffer
 // - cap: The desired capacity of the Builder's buffer, cap is max(cap, len)
-// - allocator: The allocator to use for creating the Builder's buffer (default is context.allocator)
+// - allocator: (default is context.allocator)
 //
 // Returns: A new Builder
 builder_make_len_cap :: proc(len, cap: int, allocator := context.allocator) -> Builder {
@@ -69,11 +69,11 @@ builder_make :: proc{
 // Initializes a Builder with a length of 0 and cap of 16
 // It replaces the existing `buf`
 //
-// *Allocates using Context's Allocator*
+// *Allocates Using Provided Allocator*
 //
 // Inputs:
 // - b: A pointer to the Builder
-// - allocator: The allocator to use for creating the Builder's buffer (default is context.allocator)
+// - allocator: (default is context.allocator)
 //
 // Returns: initialized ^Builder
 builder_init_none :: proc(b: ^Builder, allocator := context.allocator) -> ^Builder {
@@ -84,12 +84,12 @@ builder_init_none :: proc(b: ^Builder, allocator := context.allocator) -> ^Build
 // Initializes a Builder with a specified length and cap, which is max(len,16)
 // It replaces the existing `buf`
 //
-// *Allocates using Context's Allocator*
+// *Allocates Using Provided Allocator*
 //
 // Inputs:
 // - b: A pointer to the Builder
 // - len: The desired length of the Builder's buffer
-// - allocator: The allocator to use for creating the Builder's buffer (default is context.allocator)
+// - allocator: (default is context.allocator)
 //
 // Returns: Initialized ^Builder
 builder_init_len :: proc(b: ^Builder, len: int, allocator := context.allocator) -> ^Builder {
@@ -104,7 +104,7 @@ builder_init_len :: proc(b: ^Builder, len: int, allocator := context.allocator) 
 // - b: A pointer to the Builder
 // - len: The desired length of the Builder's buffer
 // - cap: The desired capacity of the Builder's buffer, actual max(len,cap)
-// - allocator: The allocator to use for creating the Builder's buffer (default is context.allocator)
+// - allocator: (default is context.allocator)
 //
 // Returns: A pointer to the initialized Builder
 builder_init_len_cap :: proc(b: ^Builder, len, cap: int, allocator := context.allocator) -> ^Builder {
