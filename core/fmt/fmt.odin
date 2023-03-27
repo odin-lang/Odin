@@ -53,7 +53,7 @@ User_Formatter :: #type proc(fi: ^Info, arg: any, verb: rune) -> bool
 // 	m := cast(^SomeType)arg.data
 // 	switch verb {
 // 	case 'v', 'd':
-// 		fmt.fmt_int(fi, u64(m.value), true, 64, verb)
+// 		fmt.fmt_int(fi, u64(m.value), true, 8 * size_of(SomeType), verb)
 // 	case:
 // 		return false
 // 	}
@@ -87,12 +87,8 @@ _user_formatters: ^map[typeid]User_Formatter
 // NOTE: Must be called before using register_user_formatter.
 //
 set_user_formatters :: proc(m: ^map[typeid]User_Formatter) {
-	if _user_formatters==nil {
-	    _user_formatters = m
-	}
-	else {
-	    panic("set_user_formatters must not be called more than once.")
-	}
+	assert(_user_formatters == nil, "set_user_formatters must not be called more than once.")
+    _user_formatters = m
 }
 // Registers a user-defined formatter for a specific typeid
 //
