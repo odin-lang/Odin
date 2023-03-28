@@ -9,14 +9,14 @@ Converts invalid UTF-8 sequences in the input string `s` to the `replacement` st
 
 *Allocates Using Provided Allocator*
 
-Inputs:
+**Inputs**
 - s: Input string that may contain invalid UTF-8 sequences.
 - replacement: String to replace invalid UTF-8 sequences with.
 - allocator: (default: context.allocator).
 
 WARNING: Allocation does not occur when len(s) == 0
 
-Returns: A valid UTF-8 string with invalid sequences replaced by `replacement`.
+**Returns** A valid UTF-8 string with invalid sequences replaced by `replacement`.
 */
 to_valid_utf8 :: proc(s, replacement: string, allocator := context.allocator) -> string {
 	if len(s) == 0 {
@@ -76,15 +76,24 @@ Converts the input string `s` to all lowercase characters.
 
 *Allocates Using Provided Allocator*
 
-Inputs:
+**Inputs**
 - s: Input string to be converted.
 - allocator: (default: context.allocator).
 
 Example:
-```odin
-	strings.to_lower("TeST") -> test
-```
-Returns: A new string with all characters converted to lowercase.
+
+	import "core:fmt"
+	import "core:strings"
+
+	strings_to_lower_example :: proc() {
+		fmt.println(strings.to_lower("TeST"))
+	}
+
+Output:
+
+	test
+
+**Returns** A new string with all characters converted to lowercase.
 */
 to_lower :: proc(s: string, allocator := context.allocator) -> string {
 	b: Builder
@@ -99,15 +108,24 @@ Converts the input string `s` to all uppercase characters.
 
 *Allocates Using Provided Allocator*
 
-Inputs:
+**Inputs**
 - s: Input string to be converted.
 - allocator: (default: context.allocator).
 
 Example:
-```odin
-	strings.to_upper("Test") -> TEST
-```
-Returns: A new string with all characters converted to uppercase.
+
+	import "core:fmt"
+	import "core:strings"
+
+	strings_to_upper_example :: proc() {
+		fmt.println(strings.to_upper("Test"))
+	}
+
+Output:
+
+	TEST
+
+**Returns** A new string with all characters converted to uppercase.
 */
 to_upper :: proc(s: string, allocator := context.allocator) -> string {
 	b: Builder
@@ -120,10 +138,10 @@ to_upper :: proc(s: string, allocator := context.allocator) -> string {
 /*
 Checks if the rune `c` is a delimiter (' ', '-', or '_').
 
-Inputs:
+**Inputs**
 - c: Rune to check for delimiter status.
 
-Returns: True if `c` is a delimiter, false otherwise.
+**Returns** True if `c` is a delimiter, false otherwise.
 */
 is_delimiter :: proc(c: rune) -> bool {
 	return c == '-' || c == '_' || is_space(c)
@@ -131,10 +149,10 @@ is_delimiter :: proc(c: rune) -> bool {
 /*
 Checks if the rune `r` is a non-alphanumeric or space character.
 
-Inputs:
+**Inputs**
 - r: Rune to check for separator status.
 
-Returns: True if `r` is a non-alpha or `unicode.is_space` rune.
+**Returns** True if `r` is a non-alpha or `unicode.is_space` rune.
 */
 is_separator :: proc(r: rune) -> bool {
 	if r <= 0x7f {
@@ -161,23 +179,37 @@ is_separator :: proc(r: rune) -> bool {
 /*
 Iterates over a string, calling a callback for each rune with the previous, current, and next runes as arguments.
 
-Inputs:
+**Inputs**
 - w: An io.Writer to be used by the callback for writing output.
 - s: The input string to be iterated over.
 - callback: A procedure to be called for each rune in the string, with arguments (w: io.Writer, prev, curr, next: rune).
 The callback can utilize the provided io.Writer to write output during the iteration.
 
 Example:
-```odin
-	my_callback :: proc(w: io.Writer, prev, curr, next: rune) {
-		fmt.println("my_callback", curr) // <-- Custom logic here
+
+	import "core:fmt"
+	import "core:strings"
+	import "core:io"
+
+	strings_string_case_iterator_example :: proc() {
+		my_callback :: proc(w: io.Writer, prev, curr, next: rune) {
+			fmt.println("my_callback", curr) // <-- Custom logic here
+		}
+		s := "hello world"
+		b: strings.Builder
+		strings.builder_init_len(&b, len(s))
+		w := strings.to_writer(&b)
+		strings.string_case_iterator(w, s, my_callback)
 	}
-	s := "hello world"
-	b: strings.Builder
-	strings.builder_init_len(&b, len(s))
-	w := strings.to_writer(&b)
-	strings.string_case_iterator(w, s, my_callback)
-```
+
+Output:
+
+	my_callback h
+	my_callback e
+	my_callback l
+	my_callback l
+	my_callback o
+
 */
 string_case_iterator :: proc(
 	w: io.Writer,
@@ -209,11 +241,11 @@ Converts the input string `s` to "lowerCamelCase".
 
 *Allocates Using Provided Allocator*
 
-Inputs:
+**Inputs**
 - s: Input string to be converted.
 - allocator: (default: context.allocator).
 
-Returns: A "lowerCamelCase" formatted string.
+**Returns** A "lowerCamelCase" formatted string.
 */
 to_camel_case :: proc(s: string, allocator := context.allocator) -> string {
 	s := s
@@ -243,11 +275,11 @@ Converts the input string `s` to "UpperCamelCase" (PascalCase).
 
 *Allocates Using Provided Allocator*
 
-Inputs:
+**Inputs**
 - s: Input string to be converted.
 - allocator: (default: context.allocator).
 
-Returns: A "PascalCase" formatted string.
+**Returns** A "PascalCase" formatted string.
 */
 to_pascal_case :: proc(s: string, allocator := context.allocator) -> string {
 	s := s
@@ -275,19 +307,30 @@ Returns a string converted to a delimiter-separated case with configurable casin
 
 *Allocates Using Provided Allocator*
 
-Inputs:
+**Inputs**
 - s: The input string to be converted
 - delimiter: The rune to be used as the delimiter between words
 - all_upper_case: A boolean indicating if the output should be all uppercased (true) or lowercased (false)
 - allocator: (default: context.allocator).
 
 Example:
-```odin
-	strings.to_delimiter_case("Hello World", '_', false) // -> "hello_world"
-	strings.to_delimiter_case("Hello World", ' ', true)  // -> "HELLO WORLD"
-	strings.to_delimiter_case("aBC", '_', false)         // -> "a_b_c"
-```
-Returns: The converted string
+
+	import "core:fmt"
+	import "core:strings"
+
+	strings_to_delimiter_case_example :: proc() {
+		fmt.println(strings.to_delimiter_case("Hello World", '_', false))
+		fmt.println(strings.to_delimiter_case("Hello World", ' ', true))
+		fmt.println(strings.to_delimiter_case("aBC", '_', false))
+	}
+
+Output:
+
+	hello_world
+	HELLO WORLD
+	a_b_c
+
+**Returns** The converted string
 */
 to_delimiter_case :: proc(
 	s: string,
@@ -337,16 +380,27 @@ Converts a string to "snake_case" with all runes lowercased
 
 *Allocates Using Provided Allocator*
 
-Inputs:
+**Inputs**
 - s: The input string to be converted
 - allocator: (default: context.allocator).
 
 Example:
-```odin
-	strings.to_snake_case("HelloWorld")  // -> "hello_world"
-	strings.to_snake_case("Hello World") // -> "hello_world"
+
+	import "core:fmt"
+	import "core:strings"
+
+	strings_to_snake_case_example :: proc() {
+		fmt.println(strings.to_snake_case("HelloWorld"))
+		fmt.println(strings.to_snake_case("Hello World"))
+	}
+
+Output:
+
+	hello_world
+	hello_world
+
 ```
-Returns: The converted string
+**Returns** The converted string
 */
 to_snake_case :: proc(s: string, allocator := context.allocator) -> string {
 	return to_delimiter_case(s, '_', false, allocator)
@@ -358,15 +412,24 @@ Converts a string to "SNAKE_CASE" with all runes uppercased
 
 *Allocates Using Provided Allocator*
 
-Inputs:
+**Inputs**
 - s: The input string to be converted
 - allocator: (default: context.allocator).
 
 Example:
-```odin
-	strings.to_upper_snake_case("HelloWorld") // -> "HELLO_WORLD"
-```
-Returns: The converted string
+
+	import "core:fmt"
+	import "core:strings"
+
+	strings_to_upper_snake_case_example :: proc() {
+		fmt.println(strings.to_upper_snake_case("HelloWorld"))
+	}
+
+Output:
+
+	HELLO_WORLD
+
+**Returns** The converted string
 */
 to_upper_snake_case :: proc(s: string, allocator := context.allocator) -> string {
 	return to_delimiter_case(s, '_', true, allocator)
@@ -376,15 +439,24 @@ Converts a string to "kebab-case" with all runes lowercased
 
 *Allocates Using Provided Allocator*
 
-Inputs:
+**Inputs**
 - s: The input string to be converted
 - allocator: (default: context.allocator).
 
 Example:
-```odin
-	strings.to_kebab_case("HelloWorld") // -> "hello-world"
-```
-Returns: The converted string
+
+	import "core:fmt"
+	import "core:strings"
+
+	strings_to_kebab_case_example :: proc() {
+		fmt.println(strings.to_kebab_case("HelloWorld"))
+	}
+
+Output:
+
+	hello-world
+
+**Returns** The converted string
 */
 to_kebab_case :: proc(s: string, allocator := context.allocator) -> string {
 	return to_delimiter_case(s, '-', false, allocator)
@@ -394,15 +466,24 @@ Converts a string to "KEBAB-CASE" with all runes uppercased
 
 *Allocates Using Provided Allocator*
 
-Inputs:
+**Inputs**
 - s: The input string to be converted
 - allocator: (default: context.allocator).
 
 Example:
-```odin
-	strings.to_upper_kebab_case("HelloWorld") // -> "HELLO-WORLD"
-```
-Returns: The converted string
+
+	import "core:fmt"
+	import "core:strings"
+
+	strings_to_upper_kebab_case_example :: proc() {
+		fmt.println(strings.to_upper_kebab_case("HelloWorld"))
+	}
+
+Output:
+
+	HELLO-WORLD
+
+**Returns** The converted string
 */
 to_upper_kebab_case :: proc(s: string, allocator := context.allocator) -> string {
 	return to_delimiter_case(s, '-', true, allocator)
@@ -412,15 +493,24 @@ Converts a string to "Ada_Case"
 
 *Allocates Using Provided Allocator*
 
-Inputs:
+**Inputs**
 - s: The input string to be converted
 - allocator: (default: context.allocator).
 
 Example:
-```odin
-	strings.to_ada_case("HelloWorld") // -> "Hello_World"
-```
-Returns: The converted string
+
+	import "core:fmt"
+	import "core:strings"
+
+	strings_to_upper_kebab_case_example :: proc() {
+		fmt.println(strings.to_ada_case("HelloWorld"))
+	}
+
+Output:
+
+	Hello_World
+
+**Returns** The converted string
 */
 to_ada_case :: proc(s: string, allocator := context.allocator) -> string {
 	s := s

@@ -7,10 +7,10 @@ import "core:io"
 /*
 Type definition for a procedure that flushes a Builder
 
-Inputs:
+**Inputs**
 - b: A pointer to the Builder
 
-Returns: A boolean indicating whether the Builder should be reset
+**Returns** A boolean indicating whether the Builder should be reset
 */
 Builder_Flush_Proc :: #type proc(b: ^Builder) -> (do_reset: bool)
 /*
@@ -26,10 +26,10 @@ Produces a Builder with a default length of 0 and cap of 16
 
 *Allocates Using Provided Allocator*
 
-Inputs:
+**Inputs**
 - allocator: (default is context.allocator)
 
-Returns: A new Builder
+**Returns** A new Builder
 */
 builder_make_none :: proc(allocator := context.allocator) -> Builder {
 	return Builder{buf=make([dynamic]byte, allocator)}
@@ -39,11 +39,11 @@ Produces a Builder with a specified length and cap of max(16,len) byte buffer
 
 *Allocates Using Provided Allocator*
 
-Inputs:
+**Inputs**
 - len: The desired length of the Builder's buffer
 - allocator: (default is context.allocator)
 
-Returns: A new Builder
+**Returns** A new Builder
 */
 builder_make_len :: proc(len: int, allocator := context.allocator) -> Builder {
 	return Builder{buf=make([dynamic]byte, len, allocator)}
@@ -53,12 +53,12 @@ Produces a Builder with a specified length and cap
 
 *Allocates Using Provided Allocator*
 
-Inputs:
+**Inputs**
 - len: The desired length of the Builder's buffer
 - cap: The desired capacity of the Builder's buffer, cap is max(cap, len)
 - allocator: (default is context.allocator)
 
-Returns: A new Builder
+**Returns** A new Builder
 */
 builder_make_len_cap :: proc(len, cap: int, allocator := context.allocator) -> Builder {
 	return Builder{buf=make([dynamic]byte, len, cap, allocator)}
@@ -75,11 +75,11 @@ It replaces the existing `buf`
 
 *Allocates Using Provided Allocator*
 
-Inputs:
+**Inputs**
 - b: A pointer to the Builder
 - allocator: (default is context.allocator)
 
-Returns: initialized ^Builder
+**Returns** initialized ^Builder
 */
 builder_init_none :: proc(b: ^Builder, allocator := context.allocator) -> ^Builder {
 	b.buf = make([dynamic]byte, allocator)
@@ -91,12 +91,12 @@ It replaces the existing `buf`
 
 *Allocates Using Provided Allocator*
 
-Inputs:
+**Inputs**
 - b: A pointer to the Builder
 - len: The desired length of the Builder's buffer
 - allocator: (default is context.allocator)
 
-Returns: Initialized ^Builder
+**Returns** Initialized ^Builder
 */
 builder_init_len :: proc(b: ^Builder, len: int, allocator := context.allocator) -> ^Builder {
 	b.buf = make([dynamic]byte, len, allocator)
@@ -106,19 +106,19 @@ builder_init_len :: proc(b: ^Builder, len: int, allocator := context.allocator) 
 Initializes a Builder with a specified length and cap
 It replaces the existing `buf`
 
-Inputs:
+**Inputs**
 - b: A pointer to the Builder
 - len: The desired length of the Builder's buffer
 - cap: The desired capacity of the Builder's buffer, actual max(len,cap)
 - allocator: (default is context.allocator)
 
-Returns: A pointer to the initialized Builder
+**Returns** A pointer to the initialized Builder
 */
 builder_init_len_cap :: proc(b: ^Builder, len, cap: int, allocator := context.allocator) -> ^Builder {
 	b.buf = make([dynamic]byte, len, cap, allocator)
 	return b
 }
-// overload simple `builder_init_*` with or without len / ap parameters
+// Overload simple `builder_init_*` with or without len / ap parameters
 builder_init :: proc{
 	builder_init_none,
 	builder_init_len,
@@ -159,10 +159,10 @@ _builder_stream_vtable := &_builder_stream_vtable_obj
 /*
 Returns an io.Stream from a Builder
 
-Inputs:
+**Inputs**
 - b: A pointer to the Builder
 
-Returns: An io.Stream
+**Returns** An io.Stream
 */
 to_stream :: proc(b: ^Builder) -> io.Stream {
 	return io.Stream{stream_vtable=_builder_stream_vtable, stream_data=b}
@@ -170,10 +170,10 @@ to_stream :: proc(b: ^Builder) -> io.Stream {
 /*
 Returns an io.Writer from a Builder
 
-Inputs:
+**Inputs**
 - b: A pointer to the Builder
 
-Returns: An io.Writer
+**Returns** An io.Writer
 */
 to_writer :: proc(b: ^Builder) -> io.Writer {
 	return io.to_writer(to_stream(b))
@@ -181,7 +181,7 @@ to_writer :: proc(b: ^Builder) -> io.Writer {
 /*
 Deletes and clears the Builder byte buffer content
 
-Inputs:
+**Inputs**
 - b: A pointer to the Builder
 */
 builder_destroy :: proc(b: ^Builder) {
@@ -191,7 +191,7 @@ builder_destroy :: proc(b: ^Builder) {
 /*
 Reserves the Builder byte buffer to a specific capacity, when it's higher than before
 
-Inputs:
+**Inputs**
 - b: A pointer to the Builder
 - cap: The desired capacity for the Builder's buffer
 */
@@ -201,7 +201,7 @@ builder_grow :: proc(b: ^Builder, cap: int) {
 /*
 Clears the Builder byte buffer content (sets len to zero)
 
-Inputs:
+**Inputs**
 - b: A pointer to the Builder
 */
 builder_reset :: proc(b: ^Builder) {
@@ -212,17 +212,26 @@ Creates a Builder from a slice of bytes with the same slice length as its capaci
 
 *Uses Nil Allocator - Does NOT allocate*
 
-Inputs:
+**Inputs**
 - backing: A slice of bytes to be used as the backing buffer
 
 Example:
-```odin
-	bytes: [8]byte // <-- gets filled
-	builder := strings.builder_from_bytes(bytes[:])
-	strings.write_byte(&builder, 'a') // -> "a"
-	strings.write_byte(&builder, 'b') // -> "ab"
-```
-Returns: A new Builder
+
+	import "core:fmt"
+	import "core:strings"
+	strings_builder_from_bytes_example :: proc() {
+		bytes: [8]byte // <-- gets filled
+		builder := strings.builder_from_bytes(bytes[:])
+		fmt.println(strings.write_byte(&builder, 'a')) // -> "a"
+		fmt.println(strings.write_byte(&builder, 'b')) // -> "ab"
+	}
+
+Output:
+
+	a
+	ab
+
+**Returns** A new Builder
 */
 builder_from_bytes :: proc(backing: []byte) -> Builder {
 	s := transmute(runtime.Raw_Slice)backing
@@ -241,10 +250,10 @@ builder_from_slice :: builder_from_bytes
 /*
 Casts the Builder byte buffer to a string and returns it
 
-Inputs:
+**Inputs**
 - b: A Builder
 
-Returns: The contents of the Builder's buffer, as a string
+**Returns** The contents of the Builder's buffer, as a string
 */
 to_string :: proc(b: Builder) -> string {
 	return string(b.buf[:])
@@ -252,10 +261,10 @@ to_string :: proc(b: Builder) -> string {
 /*
 Returns the length of the Builder's buffer, in bytes
 
-Inputs:
+**Inputs**
 - b: A Builder
 
-Returns: The length of the Builder's buffer
+**Returns** The length of the Builder's buffer
 */
 builder_len :: proc(b: Builder) -> int {
 	return len(b.buf)
@@ -263,10 +272,10 @@ builder_len :: proc(b: Builder) -> int {
 /*
 Returns the capacity of the Builder's buffer, in bytes
 
-Inputs:
+**Inputs**
 - b: A Builder
 
-Returns: The capacity of the Builder's buffer
+**Returns** The capacity of the Builder's buffer
 */
 builder_cap :: proc(b: Builder) -> int {
 	return cap(b.buf)
@@ -274,10 +283,10 @@ builder_cap :: proc(b: Builder) -> int {
 /*
 The free space left in the Builder's buffer, in bytes
 
-Inputs:
+**Inputs**
 - b: A Builder
 
-Returns: The available space left in the Builder's buffer
+**Returns** The available space left in the Builder's buffer
 */
 builder_space :: proc(b: Builder) -> int {
 	return cap(b.buf) - len(b.buf)
@@ -285,20 +294,29 @@ builder_space :: proc(b: Builder) -> int {
 /*
 Appends a byte to the Builder and returns the number of bytes appended
 
-Inputs:
+**Inputs**
 - b: A pointer to the Builder
 - x: The byte to be appended
 
 Example:
-```odin
-	builder := strings.builder_make()
-	strings.write_byte(&builder, 'a')        // 1
-	strings.write_byte(&builder, 'b')        // 1
-	fmt.println(strings.to_string(builder))  // -> ab
-```
+
+	import "core:fmt"
+	import "core:strings"
+
+	strings_write_byte_example :: proc() {
+		builder := strings.builder_make()
+		strings.write_byte(&builder, 'a')        // 1
+		strings.write_byte(&builder, 'b')        // 1
+		fmt.println(strings.to_string(builder))  // -> ab
+	}
+
+**Output**
+
+	ab
+
 NOTE: The backing dynamic array may be fixed in capacity or fail to resize, `n` states the number actually written.
 
-Returns: The number of bytes appended
+**Returns** The number of bytes appended
 */
 write_byte :: proc(b: ^Builder, x: byte) -> (n: int) {
 	n0 := len(b.buf)
@@ -309,20 +327,25 @@ write_byte :: proc(b: ^Builder, x: byte) -> (n: int) {
 /*
 Appends a slice of bytes to the Builder and returns the number of bytes appended
 
-Inputs:
+**Inputs**
 - b: A pointer to the Builder
 - x: The slice of bytes to be appended
 
 Example:
-```odin
-	builder := strings.builder_make()
-	bytes := [?]byte { 'a', 'b', 'c' }
-	strings.write_bytes(&builder, bytes[:]) // 3
-	fmt.println(strings.to_string(builder)) // -> abc
-```
+
+	import "core:fmt"
+	import "core:strings"
+
+	strings_write_bytes_example :: proc() {
+		builder := strings.builder_make()
+		bytes := [?]byte { 'a', 'b', 'c' }
+		strings.write_bytes(&builder, bytes[:]) // 3
+		fmt.println(strings.to_string(builder)) // -> abc
+	}
+
 NOTE: The backing dynamic array may be fixed in capacity or fail to resize, `n` states the number actually written.
 
-Returns: The number of bytes appended
+**Returns** The number of bytes appended
 */
 write_bytes :: proc(b: ^Builder, x: []byte) -> (n: int) {
 	n0 := len(b.buf)
@@ -333,20 +356,29 @@ write_bytes :: proc(b: ^Builder, x: []byte) -> (n: int) {
 /*
 Appends a single rune to the Builder and returns the number of bytes written and an `io.Error`
 
-Inputs:
+**Inputs**
 - b: A pointer to the Builder
 - r: The rune to be appended
 
 Example:
-```odin
-	builder := strings.builder_make()
-	strings.write_rune(&builder, 'ä')     // 2 None
-	strings.write_rune(&builder, 'b')       // 1 None
-	fmt.println(strings.to_string(builder)) // -> äb
-```
+
+	import "core:fmt"
+	import "core:strings"
+
+	strings_write_rune_example :: proc() {
+		builder := strings.builder_make()
+		strings.write_rune(&builder, 'ä')     // 2 None
+		strings.write_rune(&builder, 'b')       // 1 None
+		fmt.println(strings.to_string(builder)) // -> äb
+	}
+
+Output:
+
+	äb
+
 NOTE: The backing dynamic array may be fixed in capacity or fail to resize, `n` states the number actually written.
 
-Returns: The number of bytes written and an io.Error (if any)
+**Returns** The number of bytes written and an io.Error (if any)
 */
 write_rune :: proc(b: ^Builder, r: rune) -> (int, io.Error) {
 	return io.write_rune(to_writer(b), r)
@@ -354,21 +386,30 @@ write_rune :: proc(b: ^Builder, r: rune) -> (int, io.Error) {
 /*
 Appends a quoted rune to the Builder and returns the number of bytes written
 
-Inputs:
+**Inputs**
 - b: A pointer to the Builder
 - r: The rune to be appended
 
 Example:
-```odin
-	builder := strings.builder_make()
-	strings.write_string(&builder, "abc")      // 3
-	strings.write_quoted_rune(&builder, 'ä') // 4
-	strings.write_string(&builder, "abc")      // 3
-	fmt.println(strings.to_string(builder))    // -> abc'ä'abc
-```
+
+	import "core:fmt"
+	import "core:strings"
+
+	strings_write_quoted_rune_example :: proc() {
+		builder := strings.builder_make()
+		strings.write_string(&builder, "abc")      // 3
+		strings.write_quoted_rune(&builder, 'ä') // 4
+		strings.write_string(&builder, "abc")      // 3
+		fmt.println(strings.to_string(builder))    // -> abc'ä'abc
+	}
+
+Output:
+
+	abc'ä'abc
+
 NOTE: The backing dynamic array may be fixed in capacity or fail to resize, `n` states the number actually written.
 
-Returns: The number of bytes written
+**Returns** The number of bytes written
 */
 write_quoted_rune :: proc(b: ^Builder, r: rune) -> (n: int) {
 	return io.write_quoted_rune(to_writer(b), r)
@@ -376,20 +417,29 @@ write_quoted_rune :: proc(b: ^Builder, r: rune) -> (n: int) {
 /*
 Appends a string to the Builder and returns the number of bytes written
 
-Inputs:
+**Inputs**
 - b: A pointer to the Builder
 - s: The string to be appended
 
 Example:
-```odin
-	builder := strings.builder_make()
-	strings.write_string(&builder, "a")     // 1
-	strings.write_string(&builder, "bc")    // 2
-	fmt.println(strings.to_string(builder)) // -> abc
-```
+
+	import "core:fmt"
+	import "core:strings"
+
+	strings_write_string_example :: proc() {
+		builder := strings.builder_make()
+		strings.write_string(&builder, "a")     // 1
+		strings.write_string(&builder, "bc")    // 2
+		fmt.println(strings.to_string(builder)) // -> abc
+	}
+
+Output:
+
+	abc
+
 NOTE: The backing dynamic array may be fixed in capacity or fail to resize, `n` states the number actually written.
 
-Returns: The number of bytes written
+**Returns** The number of bytes written
 */
 write_string :: proc(b: ^Builder, s: string) -> (n: int) {
 	n0 := len(b.buf)
@@ -400,10 +450,10 @@ write_string :: proc(b: ^Builder, s: string) -> (n: int) {
 /*
 Pops and returns the last byte in the Builder or 0 when the Builder is empty
 
-Inputs:
+**Inputs**
 - b: A pointer to the Builder
 
-Returns: The last byte in the Builder or 0 if empty
+**Returns** The last byte in the Builder or 0 if empty
 */
 pop_byte :: proc(b: ^Builder) -> (r: byte) {
 	if len(b.buf) == 0 {
@@ -418,10 +468,10 @@ pop_byte :: proc(b: ^Builder) -> (r: byte) {
 /*
 Pops the last rune in the Builder and returns the popped rune and its rune width or (0, 0) if empty
 
-Inputs:
+**Inputs**
 - b: A pointer to the Builder
 
-Returns: The popped rune and its rune width or (0, 0) if empty
+**Returns** The popped rune and its rune width or (0, 0) if empty
 */
 pop_rune :: proc(b: ^Builder) -> (r: rune, width: int) {
 	if len(b.buf) == 0 {
@@ -436,22 +486,31 @@ pop_rune :: proc(b: ^Builder) -> (r: rune, width: int) {
 @(private)
 DIGITS_LOWER := "0123456789abcdefx"
 /*
-Inputs:
+**Inputs**
 - b: A pointer to the Builder
 - str: The string to be quoted and appended
 - quote: The optional quote character (default is double quotes)
 
 Example:
-```odin
-	builder := strings.builder_make()
-	strings.write_quoted_string(&builder, "a")        // 3
-	strings.write_quoted_string(&builder, "bc", '\'') // 4
-	strings.write_quoted_string(&builder, "xyz")      // 5
-	fmt.println(strings.to_string(builder))           // -> "a"'bc'xyz"
-```
+
+	import "core:fmt"
+	import "core:strings"
+
+	strings_write_quoted_string_example :: proc() {
+		builder := strings.builder_make()
+		strings.write_quoted_string(&builder, "a")        // 3
+		strings.write_quoted_string(&builder, "bc", '\'') // 4
+		strings.write_quoted_string(&builder, "xyz")      // 5
+		fmt.println(strings.to_string(builder))           // -> "a"'bc'xyz"
+	}
+
+Output:
+
+	"a"'bc'xyz"
+
 NOTE: The backing dynamic array may be fixed in capacity or fail to resize, `n` states the number actually written.
 
-Returns: The number of bytes written
+**Returns** The number of bytes written
 */
 write_quoted_string :: proc(b: ^Builder, str: string, quote: byte = '"') -> (n: int) {
 	n, _ = io.write_quoted_string(to_writer(b), str, quote)
@@ -460,14 +519,14 @@ write_quoted_string :: proc(b: ^Builder, str: string, quote: byte = '"') -> (n: 
 /*
 Appends an encoded rune to the Builder and returns the number of bytes written
 
-Inputs:
+**Inputs**
 - b: A pointer to the Builder
 - r: The rune to be appended
 - write_quote: Optional boolean flag to write the quote character (default is true)
 
 NOTE: The backing dynamic array may be fixed in capacity or fail to resize, `n` states the number actually written.
 
-Returns: The number of bytes written
+**Returns** The number of bytes written
 */
 write_encoded_rune :: proc(b: ^Builder, r: rune, write_quote := true) -> (n: int) {
 	n, _ = io.write_encoded_rune(to_writer(b), r, write_quote)
@@ -477,20 +536,20 @@ write_encoded_rune :: proc(b: ^Builder, r: rune, write_quote := true) -> (n: int
 /*
 Appends an escaped rune to the Builder and returns the number of bytes written
 
-Inputs:
+**Inputs**
 - b: A pointer to the Builder
 - r: The rune to be appended
 - quote: The quote character
 - html_safe: Optional boolean flag to encode '<', '>', '&' as digits (default is false)
 
-Examples:
+**Usage**
 - '\a' will be written as such
 - `r` and `quote` match and `quote` is `\\` - they will be written as two slashes
 - `html_safe` flag in case the runes '<', '>', '&' should be encoded as digits e.g. `\u0026`
 
 NOTE: The backing dynamic array may be fixed in capacity or fail to resize, `n` states the number actually written.
 
-Returns: The number of bytes written
+**Returns** The number of bytes written
 */
 write_escaped_rune :: proc(b: ^Builder, r: rune, quote: byte, html_safe := false) -> (n: int) {
 	n, _ = io.write_escaped_rune(to_writer(b), r, quote, html_safe)
@@ -499,7 +558,7 @@ write_escaped_rune :: proc(b: ^Builder, r: rune, quote: byte, html_safe := false
 /*
 Writes a f64 value to the Builder and returns the number of characters written
 
-Inputs:
+**Inputs**
 - b: A pointer to the Builder
 - f: The f64 value to be appended
 - fmt: The format byte
@@ -509,7 +568,7 @@ Inputs:
 
 NOTE: The backing dynamic array may be fixed in capacity or fail to resize, `n` states the number actually written.
 
-Returns: The number of characters written
+**Returns** The number of characters written
 */
 write_float :: proc(b: ^Builder, f: f64, fmt: byte, prec, bit_size: int, always_signed := false) -> (n: int) {
 	buf: [384]byte
@@ -524,7 +583,7 @@ write_float :: proc(b: ^Builder, f: f64, fmt: byte, prec, bit_size: int, always_
 /*
 Writes a f16 value to the Builder and returns the number of characters written
 
-Inputs:
+**Inputs**
 - b: A pointer to the Builder
 - f: The f16 value to be appended
 - fmt: The format byte
@@ -532,7 +591,7 @@ Inputs:
 
 NOTE: The backing dynamic array may be fixed in capacity or fail to resize, `n` states the number actually written.
 
-Returns: The number of characters written
+**Returns** The number of characters written
 */
 write_f16 :: proc(b: ^Builder, f: f16, fmt: byte, always_signed := false) -> (n: int) {
 	buf: [384]byte
@@ -545,23 +604,32 @@ write_f16 :: proc(b: ^Builder, f: f16, fmt: byte, always_signed := false) -> (n:
 /*
 Writes a f32 value to the Builder and returns the number of characters written
 
-Inputs:
+**Inputs**
 - b: A pointer to the Builder
 - f: The f32 value to be appended
 - fmt: The format byte
 - always_signed: Optional boolean flag to always include the sign
 
 Example:
-```odin
-	builder := strings.builder_make()
-	strings.write_f32(&builder, 3.14159, 'f') // 6
-	strings.write_string(&builder, " - ")     // 3
-	strings.write_f32(&builder, -0.123, 'e')  // 8
-	fmt.println(strings.to_string(builder))   // -> 3.14159012 - -1.23000003e-01
-```
+
+	import "core:fmt"
+	import "core:strings"
+
+	strings_write_f32_example :: proc() {
+		builder := strings.builder_make()
+		strings.write_f32(&builder, 3.14159, 'f') // 6
+		strings.write_string(&builder, " - ")     // 3
+		strings.write_f32(&builder, -0.123, 'e')  // 8
+		fmt.println(strings.to_string(builder))   // -> 3.14159012 - -1.23000003e-01
+	}
+
+Output:
+
+	3.14159012 - -1.23000003e-01
+
 NOTE: The backing dynamic array may be fixed in capacity or fail to resize, `n` states the number actually written.
 
-Returns: The number of characters written
+**Returns** The number of characters written
 */
 write_f32 :: proc(b: ^Builder, f: f32, fmt: byte, always_signed := false) -> (n: int) {
 	buf: [384]byte
@@ -574,7 +642,7 @@ write_f32 :: proc(b: ^Builder, f: f32, fmt: byte, always_signed := false) -> (n:
 /*
 Writes a f32 value to the Builder and returns the number of characters written
 
-Inputs:
+**Inputs**
 - b: A pointer to the Builder
 - f: The f32 value to be appended
 - fmt: The format byte
@@ -582,7 +650,7 @@ Inputs:
 
 NOTE: The backing dynamic array may be fixed in capacity or fail to resize, `n` states the number actually written.
 
-Returns: The number of characters written
+**Returns** The number of characters written
 */
 write_f64 :: proc(b: ^Builder, f: f64, fmt: byte, always_signed := false) -> (n: int) {
 	buf: [384]byte
@@ -595,14 +663,14 @@ write_f64 :: proc(b: ^Builder, f: f64, fmt: byte, always_signed := false) -> (n:
 /*
 Writes a u64 value to the Builder and returns the number of characters written
 
-Inputs:
+**Inputs**
 - b: A pointer to the Builder
 - i: The u64 value to be appended
 - base: The optional base for the numeric representation
 
 NOTE: The backing dynamic array may be fixed in capacity or fail to resize, `n` states the number actually written.
 
-Returns: The number of characters written
+**Returns** The number of characters written
 */
 write_u64 :: proc(b: ^Builder, i: u64, base: int = 10) -> (n: int) {
 	buf: [32]byte
@@ -612,14 +680,14 @@ write_u64 :: proc(b: ^Builder, i: u64, base: int = 10) -> (n: int) {
 /*
 Writes a i64 value to the Builder and returns the number of characters written
 
-Inputs:
+**Inputs**
 - b: A pointer to the Builder
 - i: The i64 value to be appended
 - base: The optional base for the numeric representation
 
 NOTE: The backing dynamic array may be fixed in capacity or fail to resize, `n` states the number actually written.
 
-Returns: The number of characters written
+**Returns** The number of characters written
 */
 write_i64 :: proc(b: ^Builder, i: i64, base: int = 10) -> (n: int) {
 	buf: [32]byte
@@ -629,14 +697,14 @@ write_i64 :: proc(b: ^Builder, i: i64, base: int = 10) -> (n: int) {
 /*
 Writes a uint value to the Builder and returns the number of characters written
 
-Inputs:
+**Inputs**
 - b: A pointer to the Builder
 - i: The uint value to be appended
 - base: The optional base for the numeric representation
 
 NOTE: The backing dynamic array may be fixed in capacity or fail to resize, `n` states the number actually written.
 
-Returns: The number of characters written
+**Returns** The number of characters written
 */
 write_uint :: proc(b: ^Builder, i: uint, base: int = 10) -> (n: int) {
 	return write_u64(b, u64(i), base)
@@ -644,14 +712,14 @@ write_uint :: proc(b: ^Builder, i: uint, base: int = 10) -> (n: int) {
 /*
 Writes a int value to the Builder and returns the number of characters written
 
-Inputs:
+**Inputs**
 - b: A pointer to the Builder
 - i: The int value to be appended
 - base: The optional base for the numeric representation
 
 NOTE: The backing dynamic array may be fixed in capacity or fail to resize, `n` states the number actually written.
 
-Returns: The number of characters written
+**Returns** The number of characters written
 */
 write_int :: proc(b: ^Builder, i: int, base: int = 10) -> (n: int) {
 	return write_i64(b, i64(i), base)

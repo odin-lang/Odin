@@ -16,7 +16,7 @@ Reader :: struct {
 /*
 Initializes a string Reader with the provided string
 
-Inputs:
+**Inputs**
 - r: A pointer to a Reader struct
 - s: The input string to be read
 */
@@ -28,10 +28,10 @@ reader_init :: proc(r: ^Reader, s: string) {
 /*
 Converts a Reader into an io.Stream
 
-Inputs:
+**Inputs**
 - r: A pointer to a Reader struct
 
-Returns: An io.Stream for the given Reader
+**Returns** An io.Stream for the given Reader
 */
 reader_to_stream :: proc(r: ^Reader) -> (s: io.Stream) {
 	s.stream_data = r
@@ -41,11 +41,11 @@ reader_to_stream :: proc(r: ^Reader) -> (s: io.Stream) {
 /*
 Initializes a string Reader and returns an io.Reader for the given string
 
-Inputs:
+**Inputs**
 - r: A pointer to a Reader struct
 - s: The input string to be read
 
-Returns: An io.Reader for the given string
+**Returns** An io.Reader for the given string
 */
 to_reader :: proc(r: ^Reader, s: string) -> io.Reader {
 	reader_init(r, s)
@@ -55,11 +55,11 @@ to_reader :: proc(r: ^Reader, s: string) -> io.Reader {
 /*
 Initializes a string Reader and returns an io.Reader_At for the given string
 
-Inputs:
+**Inputs**
 - r: A pointer to a Reader struct
 - s: The input string to be read
 
-Returns: An io.Reader_At for the given string
+**Returns** An io.Reader_At for the given string
 */
 to_reader_at :: proc(r: ^Reader, s: string) -> io.Reader_At {
 	reader_init(r, s)
@@ -69,10 +69,10 @@ to_reader_at :: proc(r: ^Reader, s: string) -> io.Reader_At {
 /*
 Returns the remaining length of the Reader
 
-Inputs:
+**Inputs**
 - r: A pointer to a Reader struct
 
-Returns: The remaining length of the Reader
+**Returns** The remaining length of the Reader
 */
 reader_length :: proc(r: ^Reader) -> int {
 	if r.i >= i64(len(r.s)) {
@@ -83,10 +83,10 @@ reader_length :: proc(r: ^Reader) -> int {
 /*
 Returns the length of the string stored in the Reader
 
-Inputs:
+**Inputs**
 - r: A pointer to a Reader struct
 
-Returns: The length of the string stored in the Reader
+**Returns** The length of the string stored in the Reader
 */
 reader_size :: proc(r: ^Reader) -> i64 {
 	return i64(len(r.s))
@@ -94,11 +94,11 @@ reader_size :: proc(r: ^Reader) -> i64 {
 /*
 Reads len(p) bytes from the Reader's string and copies into the provided slice.
 
-Inputs:
+**Inputs**
 - r: A pointer to a Reader struct
 - p: A byte slice to copy data into
 
-Returns:
+**Returns**
 - n: The number of bytes read
 - err: An io.Error if an error occurs while reading, including .EOF, otherwise nil denotes success.
 */
@@ -114,12 +114,12 @@ reader_read :: proc(r: ^Reader, p: []byte) -> (n: int, err: io.Error) {
 /*
 Reads len(p) bytes from the Reader's string and copies into the provided slice, at the specified offset from the current index.
 
-Inputs:
+**Inputs**
 - r: A pointer to a Reader struct
 - p: A byte slice to copy data into
 - off: The offset from which to read
 
-Returns:
+**Returns**
 - n: The number of bytes read
 - err: An io.Error if an error occurs while reading, including .EOF, otherwise nil denotes success.
 */
@@ -139,10 +139,10 @@ reader_read_at :: proc(r: ^Reader, p: []byte, off: i64) -> (n: int, err: io.Erro
 /*
 Reads and returns a single byte from the Reader's string
 
-Inputs:
+**Inputs**
 - r: A pointer to a Reader struct
 
-Returns:
+**Returns**
 - The byte read from the Reader
 - err: An io.Error if an error occurs while reading, including .EOF, otherwise nil denotes success.
 */
@@ -158,10 +158,10 @@ reader_read_byte :: proc(r: ^Reader) -> (byte, io.Error) {
 /*
 Decrements the Reader's index (i) by 1
 
-Inputs:
+**Inputs**
 - r: A pointer to a Reader struct
 
-Returns: An io.Error if `r.i <= 0` (.Invalid_Unread), otherwise nil denotes success.
+**Returns** An io.Error if `r.i <= 0` (.Invalid_Unread), otherwise nil denotes success.
 */
 reader_unread_byte :: proc(r: ^Reader) -> io.Error {
 	if r.i <= 0 {
@@ -174,10 +174,10 @@ reader_unread_byte :: proc(r: ^Reader) -> io.Error {
 /*
 Reads and returns a single rune and its size from the Reader's string
 
-Inputs:
+**Inputs**
 - r: A pointer to a Reader struct
 
-Returns:
+**Returns**
 - ch: The rune read from the Reader
 - size: The size of the rune in bytes
 - err: An io.Error if an error occurs while reading
@@ -199,12 +199,12 @@ reader_read_rune :: proc(r: ^Reader) -> (ch: rune, size: int, err: io.Error) {
 /*
 Decrements the Reader's index (i) by the size of the last read rune
 
-Inputs:
+**Inputs**
 - r: A pointer to a Reader struct
 
 WARNING: May only be used once and after a valid `read_rune` call
 
-Returns: An io.Error if an error occurs while unreading (.Invalid_Unread), else nil denotes success.
+**Returns** An io.Error if an error occurs while unreading (.Invalid_Unread), else nil denotes success.
 */
 reader_unread_rune :: proc(r: ^Reader) -> io.Error {
 	if r.i <= 0 {
@@ -220,12 +220,12 @@ reader_unread_rune :: proc(r: ^Reader) -> io.Error {
 /*
 Seeks the Reader's index to a new position
 
-Inputs:
+**Inputs**
 - r: A pointer to a Reader struct
 - offset: The new offset position
 - whence: The reference point for the new position (.Start, .Current, or .End)
 
-Returns:
+**Returns**
 - The absolute offset after seeking
 - err: An io.Error if an error occurs while seeking (.Invalid_Whence, .Invalid_Offset)
 */
@@ -252,13 +252,13 @@ reader_seek :: proc(r: ^Reader, offset: i64, whence: io.Seek_From) -> (i64, io.E
 /*
 Writes the remaining content of the Reader's string into the provided io.Writer
 
-Inputs:
+**Inputs**
 - r: A pointer to a Reader struct
 - w: The io.Writer to write the remaining content into
 
 WARNING: Panics if writer writes more bytes than remainig length of string.
 
-Returns:
+**Returns**
 - n: The number of bytes written
 - err: An io.Error if an error occurs while writing (.Short_Write)
 */
