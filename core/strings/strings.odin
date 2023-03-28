@@ -1,5 +1,4 @@
 // Procedures to manipulate UTF-8 encoded strings
-// Procedures to manipulate UTF-8 encoded strings
 package strings
 
 import "core:io"
@@ -7,154 +6,128 @@ import "core:mem"
 import "core:unicode"
 import "core:unicode/utf8"
 
-// Clones a string
-//
-// *Allocates Using Provided Allocator*
-//
-// Inputs:
-// - s: The string to be cloned
-// - allocator: (default: context.allocator)
-// - loc: The caller location for debugging purposes (default: #caller_location)
-//
-// Returns: A cloned string
+/*
+Clones a string
+
+*Allocates Using Provided Allocator*
+
+Inputs:
+- s: The string to be cloned
+- allocator: (default: context.allocator)
+- loc: The caller location for debugging purposes (default: #caller_location)
+
+Returns: A cloned string
+*/
 clone :: proc(s: string, allocator := context.allocator, loc := #caller_location) -> string {
 	c := make([]byte, len(s), allocator, loc)
 	copy(c, s)
 	return string(c[:len(s)])
 }
-// Clones a string safely (returns early with an allocation error on failure)
-//
-// *Allocates Using Provided Allocator*
-//
-// Inputs:
-// - s: The string to be cloned
-// - allocator: (default: context.allocator)
-// - loc: The caller location for debugging purposes (default: #caller_location)
-//
-// Returns:
-// - str: A cloned string
-// - err: A mem.Allocator_Error if an error occurs during allocation
+/*
+Clones a string safely (returns early with an allocation error on failure)
+
+*Allocates Using Provided Allocator*
+
+Inputs:
+- s: The string to be cloned
+- allocator: (default: context.allocator)
+- loc: The caller location for debugging purposes (default: #caller_location)
+
+Returns:
+- str: A cloned string
+- err: A mem.Allocator_Error if an error occurs during allocation
+*/
 clone_safe :: proc(s: string, allocator := context.allocator, loc := #caller_location) -> (str: string, err: mem.Allocator_Error) {
 	c := make([]byte, len(s), allocator, loc) or_return
 	copy(c, s)
 	return string(c[:len(s)]), nil
 }
-// Clones a string and appends a nul byte to make it a cstring
-//
-// *Allocates Using Provided Allocator*
-//
-// Inputs:
-// - s: The string to be cloned
-// - allocator: (default: context.allocator)
-// - loc: The caller location for debugging purposes (default: #caller_location)
-//
-// Returns: A cloned cstring with an appended nul byte
+/*
+Clones a string and appends a nul byte to make it a cstring
+
+*Allocates Using Provided Allocator*
+
+Inputs:
+- s: The string to be cloned
+- allocator: (default: context.allocator)
+- loc: The caller location for debugging purposes (default: #caller_location)
+
+Returns: A cloned cstring with an appended nul byte
+*/
 clone_to_cstring :: proc(s: string, allocator := context.allocator, loc := #caller_location) -> cstring {
 	c := make([]byte, len(s)+1, allocator, loc)
 	copy(c, s)
 	c[len(s)] = 0
 	return cstring(&c[0])
 }
-// Transmutes a raw pointer into a string. Non-allocating.
-//
-// Inputs:
-// - ptr: A pointer to the start of the byte sequence
-// - len: The length of the byte sequence
-//
-// NOTE: The created string is only valid as long as the pointer and length are valid.
-//
-// Returns: A string created from the byte pointer and length
-// Transmutes a raw pointer into a string. Non-allocating.
-//
-// Inputs:
-// - ptr: A pointer to the start of the byte sequence
-// - len: The length of the byte sequence
-//
-// NOTE: The created string is only valid as long as the pointer and length are valid.
-//
-// Returns: A string created from the byte pointer and length
+/*
+Transmutes a raw pointer into a string. Non-allocating.
+
+Inputs:
+- ptr: A pointer to the start of the byte sequence
+- len: The length of the byte sequence
+
+NOTE: The created string is only valid as long as the pointer and length are valid.
+
+Returns: A string created from the byte pointer and length
+*/
 string_from_ptr :: proc(ptr: ^byte, len: int) -> string {
 	return transmute(string)mem.Raw_String{ptr, len}
 }
-// Transmutes a raw pointer (nul-terminated) into a string. Non-allocating. Searches for a nul byte from 0..<len, otherwhise `len` will be the end size
-//
-// NOTE: The created string is only valid as long as the pointer and length are valid.
-//       The string is truncated at the first nul byte encountered.
-//
-// Inputs:
-// - ptr: A pointer to the start of the nul-terminated byte sequence
-// - len: The length of the byte sequence
-//
-// Returns: A string created from the nul-terminated byte pointer and length
-// Transmutes a raw pointer (nul-terminated) into a string. Non-allocating. Searches for a nul byte from 0..<len, otherwhise `len` will be the end size
-//
-// NOTE: The created string is only valid as long as the pointer and length are valid.
-//       The string is truncated at the first nul byte encountered.
-//
-// Inputs:
-// - ptr: A pointer to the start of the nul-terminated byte sequence
-// - len: The length of the byte sequence
-//
-// Returns: A string created from the nul-terminated byte pointer and length
+/*
+Transmutes a raw pointer (nul-terminated) into a string. Non-allocating. Searches for a nul byte from 0..<len, otherwhise `len` will be the end size
+
+NOTE: The created string is only valid as long as the pointer and length are valid.
+      The string is truncated at the first nul byte encountered.
+
+Inputs:
+- ptr: A pointer to the start of the nul-terminated byte sequence
+- len: The length of the byte sequence
+
+Returns: A string created from the nul-terminated byte pointer and length
+*/
 string_from_nul_terminated_ptr :: proc(ptr: ^byte, len: int) -> string {
 	s := transmute(string)mem.Raw_String{ptr, len}
 	s = truncate_to_byte(s, 0)
 	return s
 }
-// Gets the raw byte pointer for the start of a string `str`
-//
-// Inputs:
-// - str: The input string
-//
-// Returns: A pointer to the start of the string's bytes
-// Gets the raw byte pointer for the start of a string `str`
-//
-// Inputs:
-// - str: The input string
-//
-// Returns: A pointer to the start of the string's bytes
+/*
+Gets the raw byte pointer for the start of a string `str`
+
+Inputs:
+- str: The input string
+
+Returns: A pointer to the start of the string's bytes
+*/
 ptr_from_string :: proc(str: string) -> ^byte {
 	d := transmute(mem.Raw_String)str
 	return d.data
 }
-// Converts a string `str` to a cstring
-//
-// Inputs:
-// - str: The input string
-//
-// WARNING: This is unsafe because the original string may not contain a nul byte.
-//
-// Returns: The converted cstring
-// Converts a string `str` to a cstring
-//
-// Inputs:
-// - str: The input string
-//
-// WARNING: This is unsafe because the original string may not contain a nul byte.
-//
-// Returns: The converted cstring
+/*
+Converts a string `str` to a cstring
+
+Inputs:
+- str: The input string
+
+WARNING: This is unsafe because the original string may not contain a nul byte.
+
+Returns: The converted cstring
+*/
 unsafe_string_to_cstring :: proc(str: string) -> cstring {
 	d := transmute(mem.Raw_String)str
 	return cstring(d.data)
 }
-// Truncates a string `str` at the first occurrence of char/byte `b`
-//
-// Inputs:
-// - str: The input string
-// - b: The byte to truncate the string at
-//
-// NOTE: Failure to find the byte results in returning the entire string.
-//
-// Returns: The truncated string
-// Truncates a string `str` at the first occurrence of char/byte `b`
-//
-// Inputs:
-// - str: The input string
-// - b: The byte to truncate the string at
-//
-// NOTE: Failure to find the byte results in returning the entire string.
-//
-// Returns: The truncated string
+/*
+Truncates a string `str` at the first occurrence of char/byte `b`
+
+Inputs:
+- str: The input string
+- b: The byte to truncate the string at
+
+NOTE: Failure to find the byte results in returning the entire string.
+
+Returns: The truncated string
+*/
 truncate_to_byte :: proc(str: string, b: byte) -> string {
 	n := index_byte(str, b)
 	if n < 0 {
@@ -162,20 +135,15 @@ truncate_to_byte :: proc(str: string, b: byte) -> string {
 	}
 	return str[:n]
 }
-// Truncates a string str at the first occurrence of rune r as a slice of the original, entire string if not found
-//
-// Inputs:
-// - str: The input string
-// - r: The rune to truncate the string at
-//
-// Returns: The truncated string 
-// Truncates a string str at the first occurrence of rune r as a slice of the original, entire string if not found
-//
-// Inputs:
-// - str: The input string
-// - r: The rune to truncate the string at
-//
-// Returns: The truncated string 
+/*
+Truncates a string str at the first occurrence of rune r as a slice of the original, entire string if not found
+
+Inputs:
+- str: The input string
+- r: The rune to truncate the string at
+
+Returns: The truncated string 
+*/
 truncate_to_rune :: proc(str: string, r: rune) -> string {
 	n := index_rune(str, r)
 	if n < 0 {
@@ -183,53 +151,58 @@ truncate_to_rune :: proc(str: string, r: rune) -> string {
 	}
 	return str[:n]
 }
-// Clones a byte array s and appends a nul byte
-//
-// *Allocates Using Provided Allocator*
-//
-// Inputs:
-// - s: The byte array to be cloned
-// - allocator: (default: context.allocator)
-// - loc: The caller location for debugging purposes (default: #caller_location)
-//
-// Returns: A cloned string from the byte array with a nul byte
+/*
+Clones a byte array s and appends a nul byte
+
+*Allocates Using Provided Allocator*
+
+Inputs:
+- s: The byte array to be cloned
+- allocator: (default: context.allocator)
+- loc: The caller location for debugging purposes (default: #caller_location)
+
+Returns: A cloned string from the byte array with a nul byte
+*/
 clone_from_bytes :: proc(s: []byte, allocator := context.allocator, loc := #caller_location) -> string {
 	c := make([]byte, len(s)+1, allocator, loc)
 	copy(c, s)
 	c[len(s)] = 0
 	return string(c[:len(s)])
 }
-// Clones a cstring s as a string
-//
-// *Allocates Using Provided Allocator*
-//
-// Inputs:
-// - s: The cstring to be cloned
-// - allocator: (default: context.allocator)
-// - loc: The caller location for debugging purposes (default: #caller_location)
-//
-// Returns: A cloned string from the cstring
+/*
+Clones a cstring s as a string
+
+*Allocates Using Provided Allocator*
+
+Inputs:
+- s: The cstring to be cloned
+- allocator: (default: context.allocator)
+- loc: The caller location for debugging purposes (default: #caller_location)
+
+Returns: A cloned string from the cstring
+*/
 clone_from_cstring :: proc(s: cstring, allocator := context.allocator, loc := #caller_location) -> string {
 	return clone(string(s), allocator, loc)
 }
-// Clones a string from a byte pointer ptr and a byte length len
-//
-// *Allocates Using Provided Allocator*
-//
-// Inputs:
-// - ptr: A pointer to the start of the byte sequence
-// - len: The length of the byte sequence
-// - allocator: (default: context.allocator)
-// - loc: The caller location for debugging purposes (default: #caller_location)
-//
-// NOTE: Same as `string_from_ptr`, but perform an additional `clone` operation
-//
-// Returns: A cloned string from the byte pointer and length
+/*
+Clones a string from a byte pointer ptr and a byte length len
+
+*Allocates Using Provided Allocator*
+
+Inputs:
+- ptr: A pointer to the start of the byte sequence
+- len: The length of the byte sequence
+- allocator: (default: context.allocator)
+- loc: The caller location for debugging purposes (default: #caller_location)
+
+NOTE: Same as `string_from_ptr`, but perform an additional `clone` operation
+
+Returns: A cloned string from the byte pointer and length
+*/
 clone_from_ptr :: proc(ptr: ^byte, len: int, allocator := context.allocator, loc := #caller_location) -> string {
 	s := string_from_ptr(ptr, len)
 	return clone(s, allocator, loc)
 }
-// Overloaded procedure to clone from a string, []byte, cstring or a ^byte + length 
 // Overloaded procedure to clone from a string, []byte, cstring or a ^byte + length 
 clone_from :: proc{
 	clone,
@@ -237,57 +210,48 @@ clone_from :: proc{
 	clone_from_cstring,
 	clone_from_ptr,
 }
-// Clones a string from a nul-terminated cstring ptr and a byte length len
-//
-// *Allocates Using Provided Allocator*
-//
-// Inputs:
-// - ptr: A pointer to the start of the nul-terminated cstring
-// - len: The byte length of the cstring
-// - allocator: (default: context.allocator)
-// - loc: The caller location for debugging purposes (default: #caller_location)
-//
-// NOTE: Truncates at the first nul byte encountered or the byte length.
-//
-// Returns: A cloned string from the nul-terminated cstring and byte length
+/*
+Clones a string from a nul-terminated cstring ptr and a byte length len
+
+*Allocates Using Provided Allocator*
+
+Inputs:
+- ptr: A pointer to the start of the nul-terminated cstring
+- len: The byte length of the cstring
+- allocator: (default: context.allocator)
+- loc: The caller location for debugging purposes (default: #caller_location)
+
+NOTE: Truncates at the first nul byte encountered or the byte length.
+
+Returns: A cloned string from the nul-terminated cstring and byte length
+*/
 clone_from_cstring_bounded :: proc(ptr: cstring, len: int, allocator := context.allocator, loc := #caller_location) -> string {
 	s := string_from_ptr((^u8)(ptr), len)
 	s = truncate_to_byte(s, 0)
 	return clone(s, allocator, loc)
 }
-// Compares two strings, returning a value representing which one comes first lexicographically.
-// -1 for lhs; 1 for rhs, or 0 if they are equal.
-//
-// Inputs:
-// - lhs: First string for comparison
-// - rhs: Second string for comparison
-//
-// Returns: -1 if lhs comes first, 1 if rhs comes first, or 0 if they are equal
-// Compares two strings, returning a value representing which one comes first lexicographically.
-// -1 for lhs; 1 for rhs, or 0 if they are equal.
-//
-// Inputs:
-// - lhs: First string for comparison
-// - rhs: Second string for comparison
-//
-// Returns: -1 if lhs comes first, 1 if rhs comes first, or 0 if they are equal
+/*
+Compares two strings, returning a value representing which one comes first lexicographically.
+-1 for lhs; 1 for rhs, or 0 if they are equal.
+
+Inputs:
+- lhs: First string for comparison
+- rhs: Second string for comparison
+
+Returns: -1 if lhs comes first, 1 if rhs comes first, or 0 if they are equal
+*/
 compare :: proc(lhs, rhs: string) -> int {
 	return mem.compare(transmute([]byte)lhs, transmute([]byte)rhs)
 }
-// Returns the byte offset of the rune r in the string s, -1 when not found
-//
-// Inputs:
-// - s: The input string
-// - r: The rune to search for
-//
-// Returns: The byte offset of the rune r in the string s, or -1 if not found
-// Returns the byte offset of the rune r in the string s, -1 when not found
-//
-// Inputs:
-// - s: The input string
-// - r: The rune to search for
-//
-// Returns: The byte offset of the rune r in the string s, or -1 if not found
+/*
+Returns the byte offset of the rune r in the string s, -1 when not found
+
+Inputs:
+- s: The input string
+- r: The rune to search for
+
+Returns: The byte offset of the rune r in the string s, or -1 if not found
+*/
 contains_rune :: proc(s: string, r: rune) -> int {
 	for c, offset in s {
 		if c == r {
@@ -296,115 +260,80 @@ contains_rune :: proc(s: string, r: rune) -> int {
 	}
 	return -1
 }
-// Returns true when the string substr is contained inside the string s
-//
-// Inputs:
-// - s: The input string
-// - substr: The substring to search for
-//
-// Usage:
-// ```odin
-// strings.contains("testing", "test") // -> true
-// strings.contains("testing", "ing")  // -> true
-// strings.contains("testing", "text") // -> false
-// ```
-//
-// Returns: true if substr is contained inside the string s, false otherwise
+/*
+Returns true when the string substr is contained inside the string s
+
+Inputs:
+- s: The input string
+- substr: The substring to search for
+
+Example:
+```odin
+	strings.contains("testing", "test") // -> true
+	strings.contains("testing", "ing")  // -> true
+	strings.contains("testing", "text") // -> false
+```
+
+Returns: true if substr is contained inside the string s, false otherwise
+*/
 contains :: proc(s, substr: string) -> bool {
 	return index(s, substr) >= 0
 }
-// Returns true when the string s contains any of the characters inside the string chars
-//
-// Inputs:
-// - s: The input string
-// - chars: The characters to search for
-//
-// Usage:
-// ```odin
-// strings.contains_any("test", "test") -> true
-// strings.contains_any("test", "ts") -> true
-// strings.contains_any("test", "et") -> true
-// strings.contains_any("test", "a") -> false
-// ```
-//
-// Returns: True if the string s contains any of the characters in chars, false otherwise
-// Returns true when the string s contains any of the characters inside the string chars
-//
-// Inputs:
-// - s: The input string
-// - chars: The characters to search for
-//
-// Usage:
-// ```odin
-// strings.contains_any("test", "test") -> true
-// strings.contains_any("test", "ts") -> true
-// strings.contains_any("test", "et") -> true
-// strings.contains_any("test", "a") -> false
-// ```
-//
-// Returns: True if the string s contains any of the characters in chars, false otherwise
+/*
+Returns true when the string s contains any of the characters inside the string chars
+
+Inputs:
+- s: The input string
+- chars: The characters to search for
+
+Example:
+```odin
+	strings.contains_any("test", "test") // -> true
+	strings.contains_any("test", "ts")   // -> true
+	strings.contains_any("test", "et")   // -> true
+	strings.contains_any("test", "a")    // -> false
+```
+
+Returns: true if the string s contains any of the characters in chars, false otherwise
+*/
 contains_any :: proc(s, chars: string) -> bool {
 	return index_any(s, chars) >= 0
 }
-// Returns the UTF-8 rune count of the string s
-//
-// Inputs:
-// - s: The input string
-//
-// Usage:
-// ```odin
-// strings.rune_count("test")     // -> 4
-// strings.rune_count("testö") // -> 5, where len("testö") -> 6
-// ```
-//
-// Returns: The UTF-8 rune count of the string s
-// Returns the UTF-8 rune count of the string s
-//
-// Inputs:
-// - s: The input string
-//
-// Usage:
-// ```odin
-// strings.rune_count("test")     // -> 4
-// strings.rune_count("testö") // -> 5, where len("testö") -> 6
-// ```
-//
-// Returns: The UTF-8 rune count of the string s
+/*
+Returns the UTF-8 rune count of the string s
+
+Inputs:
+- s: The input string
+
+Example:
+```odin
+	strings.rune_count("test")     // -> 4
+	strings.rune_count("testö") // -> 5, where len("testö") -> 6
+```
+
+Returns: The UTF-8 rune count of the string s
+*/
 rune_count :: proc(s: string) -> int {
 	return utf8.rune_count_in_string(s)
 }
-// Returns whether the strings u and v are the same alpha characters, ignoring different casings
-// Works with UTF-8 string content
-//
-// Inputs:
-// - u: The first string for comparison
-// - v: The second string for comparison
-//
-// Usage:
-// ```odin
-// strings.equal_fold("test", "test") // -> true
-// strings.equal_fold("Test", "test") // -> true
-// strings.equal_fold("Test", "tEsT") // -> true
-// strings.equal_fold("test", "tes")  // -> false
-// ```
-//
-// Returns: True if the strings u and v are the same alpha characters (ignoring case), false 
-// Returns whether the strings u and v are the same alpha characters, ignoring different casings
-// Works with UTF-8 string content
-//
-// Inputs:
-// - u: The first string for comparison
-// - v: The second string for comparison
-//
-// Usage:
-// ```odin
-// strings.equal_fold("test", "test") // -> true
-// strings.equal_fold("Test", "test") // -> true
-// strings.equal_fold("Test", "tEsT") // -> true
-// strings.equal_fold("test", "tes")  // -> false
-// ```
-//
-// Returns: True if the strings u and v are the same alpha characters (ignoring case), false 
+/*
+Returns whether the strings u and v are the same alpha characters, ignoring different casings
+Works with UTF-8 string content
+
+Inputs:
+- u: The first string for comparison
+- v: The second string for comparison
+
+Example:
+```odin
+	strings.equal_fold("test", "test") // -> true
+	strings.equal_fold("Test", "test") // -> true
+	strings.equal_fold("Test", "tEsT") // -> true
+	strings.equal_fold("test", "tes")  // -> false
+```
+
+Returns: True if the strings u and v are the same alpha characters (ignoring case), false
+*/
 equal_fold :: proc(u, v: string) -> bool {
 	s, t := u, v
 	loop: for s != "" && t != "" {
@@ -447,36 +376,23 @@ equal_fold :: proc(u, v: string) -> bool {
 
 	return s == t
 }
-// Returns the prefix length common between strings a and b
-//
-// Inputs:
-// - a: The first input string
-// - b: The second input string
-//
-// Usage:
-// ```odin
-// strings.prefix_length("testing", "test") // -> 4
-// strings.prefix_length("testing", "te")   // -> 2
-// strings.prefix_length("telephone", "te") // -> 2
-// strings.prefix_length("testing", "est")  // -> 0
-// ```
-//
-// Returns: The prefix length common between strings a and b
-// Returns the prefix length common between strings a and b
-//
-// Inputs:
-// - a: The first input string
-// - b: The second input string
-//
-// Usage:
-// ```odin
-// strings.prefix_length("testing", "test") // -> 4
-// strings.prefix_length("testing", "te")   // -> 2
-// strings.prefix_length("telephone", "te") // -> 2
-// strings.prefix_length("testing", "est")  // -> 0
-// ```
-//
-// Returns: The prefix length common between strings a and b
+/*
+Returns the prefix length common between strings a and b
+
+Inputs:
+- a: The first input string
+- b: The second input string
+
+Example:
+```odin
+	strings.prefix_length("testing", "test") // -> 4
+	strings.prefix_length("testing", "te")   // -> 2
+	strings.prefix_length("telephone", "te") // -> 2
+	strings.prefix_length("testing", "est")  // -> 0
+```
+
+Returns: The prefix length common between strings a and b
+*/
 prefix_length :: proc(a, b: string) -> (n: int) {
 	_len := min(len(a), len(b))
 
@@ -500,83 +416,62 @@ prefix_length :: proc(a, b: string) -> (n: int) {
 	}
 	return
 }
-// Determines if a string s starts with a given prefix
-//
-// Usage:
-// ```odin
-// strings.has_prefix("testing", "test") -> true
-// strings.has_prefix("testing", "te") -> true
-// strings.has_prefix("telephone", "te") -> true
-// strings.has_prefix("testing", "est") -> false
-// ```
-// Inputs:
-// - s: The string to check for the prefix
-// - prefix: The prefix to look for
-//
-// Returns: true if the string s starts with the prefix, otherwise false
-// Determines if a string s starts with a given prefix
-//
-// Usage:
-// ```odin
-// strings.has_prefix("testing", "test") -> true
-// strings.has_prefix("testing", "te") -> true
-// strings.has_prefix("telephone", "te") -> true
-// strings.has_prefix("testing", "est") -> false
-// ```
-// Inputs:
-// - s: The string to check for the prefix
-// - prefix: The prefix to look for
-//
-// Returns: true if the string s starts with the prefix, otherwise false
+/*
+Determines if a string s starts with a given prefix
+
+Example:
+```odin
+	strings.has_prefix("testing", "test") // -> true
+	strings.has_prefix("testing", "te")   // -> true
+	strings.has_prefix("telephone", "te") // -> true
+	strings.has_prefix("testing", "est")  // -> false
+```
+Inputs:
+- s: The string to check for the prefix
+- prefix: The prefix to look for
+
+Returns: true if the string s starts with the prefix, otherwise false
+*/
 has_prefix :: proc(s, prefix: string) -> bool {
 	return len(s) >= len(prefix) && s[0:len(prefix)] == prefix
 }
-// Determines if a string s ends with a given suffix
-//
-// Usage:
-// ```odin
-// strings.has_suffix("todo.txt", ".txt") -> true
-// strings.has_suffix("todo.doc", ".txt") -> false
-// strings.has_suffix("todo.doc.txt", ".txt") -> true
-// ```
-// Inputs:
-// - s: The string to check for the suffix
-// - suffix: The suffix to look for
-//
-// Returns: true if the string s ends with the suffix, otherwise false
-// Determines if a string s ends with a given suffix
-//
-// Usage:
-// ```odin
-// strings.has_suffix("todo.txt", ".txt") -> true
-// strings.has_suffix("todo.doc", ".txt") -> false
-// strings.has_suffix("todo.doc.txt", ".txt") -> true
-// ```
-// Inputs:
-// - s: The string to check for the suffix
-// - suffix: The suffix to look for
-//
-// Returns: true if the string s ends with the suffix, otherwise false
+/*
+Determines if a string s ends with a given suffix
+
+Example:
+```odin
+	strings.has_suffix("todo.txt", ".txt")     // -> true
+	strings.has_suffix("todo.doc", ".txt")     // -> false
+	strings.has_suffix("todo.doc.txt", ".txt") // -> true
+```
+Inputs:
+- s: The string to check for the suffix
+- suffix: The suffix to look for
+
+Returns: true if the string s ends with the suffix, otherwise false
+*/
 has_suffix :: proc(s, suffix: string) -> bool {
 	return len(s) >= len(suffix) && s[len(s)-len(suffix):] == suffix
 }
-// Joins a slice of strings a with a sep string
-//
-// *Allocates Using Provided Allocator*
-//
-// Usage:
-// ```odin
-// a := [?]string { "a", "b", "c" }
-// b := strings.join(a[:], " ")   // -> "a b c"
-// c := strings.join(a[:], "-")   // -> "a-b-c"
-// d := strings.join(a[:], "...") // -> "a...b...c"
-// ```
-// Inputs:
-// - a: A slice of strings to join
-// - sep: The separator string
-// - allocator: (default is context.allocator)
-//
-// Returns: A combined string from the slice of strings a separated with the sep string
+/*
+Joins a slice of strings a with a sep string
+
+*Allocates Using Provided Allocator*
+
+Example:
+```odin
+	a := [?]string { "a", "b", "c" }
+	b := strings.join(a[:], " ")   // -> "a b c"
+	c := strings.join(a[:], "-")   // -> "a-b-c"
+	d := strings.join(a[:], "...") // -> "a...b...c"
+```
+Inputs:
+- a: A slice of strings to join
+- sep: The separator string
+- allocator: (default is context.allocator)
+
+Returns: A combined string from the slice of strings a separated with the sep string
+*/
 join :: proc(a: []string, sep: string, allocator := context.allocator) -> string {
 	if len(a) == 0 {
 		return ""
@@ -595,18 +490,20 @@ join :: proc(a: []string, sep: string, allocator := context.allocator) -> string
 	}
 	return string(b)
 }
-// Joins a slice of strings a with a sep string, returns an error on allocation failure
-//
-// *Allocates Using Provided Allocator*
-//
-// Inputs:
-// - a: A slice of strings to join
-// - sep: The separator string
-// - allocator: (default is context.allocator)
-//
-// Returns:
-// - str: A combined string from the slice of strings a separated with the sep string
-// - err: An error if allocation failed, otherwise nil
+/*
+Joins a slice of strings a with a sep string, returns an error on allocation failure
+
+*Allocates Using Provided Allocator*
+
+Inputs:
+- a: A slice of strings to join
+- sep: The separator string
+- allocator: (default is context.allocator)
+
+Returns:
+- str: A combined string from the slice of strings a separated with the sep string
+- err: An error if allocation failed, otherwise nil
+*/
 join_safe :: proc(a: []string, sep: string, allocator := context.allocator) -> (str: string, err: mem.Allocator_Error) {
 	if len(a) == 0 {
 		return "", nil
@@ -625,34 +522,22 @@ join_safe :: proc(a: []string, sep: string, allocator := context.allocator) -> (
 	}
 	return string(b), nil
 }
-// Returns a combined string from the slice of strings `a` without a separator
-//
-// *Allocates Using Provided Allocator*
-//
-// Inputs:
-// - a: A slice of strings to concatenate
-// - allocator: An optional custom allocator (default is context.allocator)
-//
-// Usage:
-// ```odin
-// a := [?]string { "a", "b", "c" }
-// b := strings.concatenate(a[:]) // -> "abc"
-// ```
-// Returns: The concatenated string
-// Returns a combined string from the slice of strings `a` without a separator
-//
-// *Allocates Using Provided Allocator*
-//
-// Inputs:
-// - a: A slice of strings to concatenate
-// - allocator: An optional custom allocator (default is context.allocator)
-//
-// Usage:
-// ```odin
-// a := [?]string { "a", "b", "c" }
-// b := strings.concatenate(a[:]) // -> "abc"
-// ```
-// Returns: The concatenated string
+/*
+Returns a combined string from the slice of strings `a` without a separator
+
+*Allocates Using Provided Allocator*
+
+Inputs:
+- a: A slice of strings to concatenate
+- allocator: An optional custom allocator (default is context.allocator)
+
+Example:
+```odin
+	a := [?]string { "a", "b", "c" }
+	b := strings.concatenate(a[:]) // -> "abc"
+```
+Returns: The concatenated string
+*/
 concatenate :: proc(a: []string, allocator := context.allocator) -> string {
 	if len(a) == 0 {
 		return ""
@@ -669,24 +554,17 @@ concatenate :: proc(a: []string, allocator := context.allocator) -> string {
 	}
 	return string(b)
 }
-// Returns a combined string from the slice of strings `a` without a separator, or an error if allocation fails
-//
-// *Allocates Using Provided Allocator*
-//
-// Inputs:
-// - a: A slice of strings to concatenate
-// - allocator: An optional custom allocator (default is context.allocator)
-//
-// Returns: The concatenated string, and an error if allocation fails
-// Returns a combined string from the slice of strings `a` without a separator, or an error if allocation fails
-//
-// *Allocates Using Provided Allocator*
-//
-// Inputs:
-// - a: A slice of strings to concatenate
-// - allocator: An optional custom allocator (default is context.allocator)
-//
-// Returns: The concatenated string, and an error if allocation fails
+/*
+Returns a combined string from the slice of strings `a` without a separator, or an error if allocation fails
+
+*Allocates Using Provided Allocator*
+
+Inputs:
+- a: A slice of strings to concatenate
+- allocator: An optional custom allocator (default is context.allocator)
+
+Returns: The concatenated string, and an error if allocation fails
+*/
 concatenate_safe :: proc(a: []string, allocator := context.allocator) -> (res: string, err: mem.Allocator_Error) {
 	if len(a) == 0 {
 		return "", nil
@@ -703,40 +581,25 @@ concatenate_safe :: proc(a: []string, allocator := context.allocator) -> (res: s
 	}
 	return string(b), nil
 }
-// Returns a substring of the input string `s` with the specified rune offset and length
-//
-// *Allocates Using Provided Allocator*
-//
-// Inputs:
-// - s: The input string to cut
-// - rune_offset: The starting rune index (default is 0). In runes, not bytes.
-// - rune_length: The number of runes to include in the substring (default is 0, which returns the remainder of the string).  In runes, not bytes.
-// - allocator: An optional custom allocator (default is context.allocator)
-//
-// Usage:
-// ```odin
-// strings.cut("some example text", 0, 4) -> "some"
-// strings.cut("some example text", 2, 2) -> "me"
-// strings.cut("some example text", 5, 7) -> "example"
-// ```
-// Returns: The substring
-// Returns a substring of the input string `s` with the specified rune offset and length
-//
-// *Allocates Using Provided Allocator*
-//
-// Inputs:
-// - s: The input string to cut
-// - rune_offset: The starting rune index (default is 0). In runes, not bytes.
-// - rune_length: The number of runes to include in the substring (default is 0, which returns the remainder of the string).  In runes, not bytes.
-// - allocator: An optional custom allocator (default is context.allocator)
-//
-// Usage:
-// ```odin
-// strings.cut("some example text", 0, 4) -> "some"
-// strings.cut("some example text", 2, 2) -> "me"
-// strings.cut("some example text", 5, 7) -> "example"
-// ```
-// Returns: The substring
+/*
+Returns a substring of the input string `s` with the specified rune offset and length
+
+*Allocates Using Provided Allocator*
+
+Inputs:
+- s: The input string to cut
+- rune_offset: The starting rune index (default is 0). In runes, not bytes.
+- rune_length: The number of runes to include in the substring (default is 0, which returns the remainder of the string).  In runes, not bytes.
+- allocator: An optional custom allocator (default is context.allocator)
+
+Example:
+```odin
+	strings.cut("some example text", 0, 4) // -> "some"
+	strings.cut("some example text", 2, 2) // -> "me"
+	strings.cut("some example text", 5, 7) // -> "example"
+```
+Returns: The substring
+*/
 cut :: proc(s: string, rune_offset := int(0), rune_length := int(0), allocator := context.allocator) -> (res: string) {
 	s := s; rune_length := rune_length
 	context.allocator = allocator
@@ -788,30 +651,20 @@ cut :: proc(s: string, rune_offset := int(0), rune_length := int(0), allocator :
 	}
 	return string(buf[:byte_offset])
 }
-// Splits the input string `s` into a slice of substrings separated by the specified `sep` string
-//
-// *Allocates Using Provided Allocator*
-//
-// Inputs:
-// - s: The input string to split
-// - sep: The separator string
-// - sep_save: A flag determining if the separator should be saved in the resulting substrings
-// - n: The maximum number of substrings to return, returns nil without alloc when n=0
-// - allocator: An optional custom allocator (default is context.allocator)
-//
-// Returns: A slice of substrings
-// Splits the input string `s` into a slice of substrings separated by the specified `sep` string
-//
-// *Allocates Using Provided Allocator*
-//
-// Inputs:
-// - s: The input string to split
-// - sep: The separator string
-// - sep_save: A flag determining if the separator should be saved in the resulting substrings
-// - n: The maximum number of substrings to return, returns nil without alloc when n=0
-// - allocator: An optional custom allocator (default is context.allocator)
-//
-// Returns: A slice of substrings
+/*
+Splits the input string `s` into a slice of substrings separated by the specified `sep` string
+
+*Allocates Using Provided Allocator*
+
+Inputs:
+- s: The input string to split
+- sep: The separator string
+- sep_save: A flag determining if the separator should be saved in the resulting substrings
+- n: The maximum number of substrings to return, returns nil without alloc when n=0
+- allocator: An optional custom allocator (default is context.allocator)
+
+Returns: A slice of substrings
+*/
 @private
 _split :: proc(s_, sep: string, sep_save, n_: int, allocator := context.allocator) -> []string {
 	s, n := s_, n_
@@ -859,182 +712,110 @@ _split :: proc(s_, sep: string, sep_save, n_: int, allocator := context.allocato
 
 	return res[:i+1]
 }
-// Splits a string into parts based on a separator.
-//
-// *Allocates Using Provided Allocator*
-//
-// Inputs:
-// - s: The string to split.
-// - sep: The separator string used to split the input string.
-// - allocator: (default is context.allocator).
-//
-// Usage:
-// ```odin
-// s := "aaa.bbb.ccc.ddd.eee"    // 5 parts
-// ss := strings.split(s, ".")
-// fmt.println(ss)               // [aaa, bbb, ccc, ddd, eee]
-// ```
-//
-// Returns: A slice of strings, each representing a part of the split string.
-// Splits a string into parts based on a separator.
-//
-// *Allocates Using Provided Allocator*
-//
-// Inputs:
-// - s: The string to split.
-// - sep: The separator string used to split the input string.
-// - allocator: (default is context.allocator).
-//
-// Usage:
-// ```odin
-// s := "aaa.bbb.ccc.ddd.eee"    // 5 parts
-// ss := strings.split(s, ".")
-// fmt.println(ss)               // [aaa, bbb, ccc, ddd, eee]
-// ```
-//
-// Returns: A slice of strings, each representing a part of the split string.
+/*
+Splits a string into parts based on a separator.
+
+*Allocates Using Provided Allocator*
+
+Inputs:
+- s: The string to split.
+- sep: The separator string used to split the input string.
+- allocator: (default is context.allocator).
+
+Example:
+```odin
+	s := "aaa.bbb.ccc.ddd.eee"    // 5 parts
+	ss := strings.split(s, ".")
+	fmt.println(ss)               // [aaa, bbb, ccc, ddd, eee]
+```
+
+Returns: A slice of strings, each representing a part of the split string.
+*/
 split :: proc(s, sep: string, allocator := context.allocator) -> []string {
 	return _split(s, sep, 0, -1, allocator)
 }
-// Splits a string into parts based on a separator. if n < count of seperators, the remainder of the string is returned in the last entry.
-//
-// *Allocates Using Provided Allocator*
-//
-// Inputs:
-// - s: The string to split.
-// - sep: The separator string used to split the input string.
-// - allocator: (default is context.allocator)
-//
-// Usage:
-// ```odin
-// s := "aaa.bbb.ccc.ddd.eee"  // 5 parts present
-// ss := strings.split(s, ".") // total of 3 wanted
-// fmt.println(ss)             // [aaa, bbb, ccc.ddd.eee]
-// ```
-//
-// Returns: A slice of strings, each representing a part of the split string.
-// Splits a string into parts based on a separator. if n < count of seperators, the remainder of the string is returned in the last entry.
-//
-// *Allocates Using Provided Allocator*
-//
-// Inputs:
-// - s: The string to split.
-// - sep: The separator string used to split the input string.
-// - allocator: (default is context.allocator)
-//
-// Usage:
-// ```odin
-// s := "aaa.bbb.ccc.ddd.eee"  // 5 parts present
-// ss := strings.split(s, ".") // total of 3 wanted
-// fmt.println(ss)             // [aaa, bbb, ccc.ddd.eee]
-// ```
-//
-// Returns: A slice of strings, each representing a part of the split string.
+/*
+Splits a string into parts based on a separator. if n < count of seperators, the remainder of the string is returned in the last entry.
+
+*Allocates Using Provided Allocator*
+
+Inputs:
+- s: The string to split.
+- sep: The separator string used to split the input string.
+- allocator: (default is context.allocator)
+
+Example:
+```odin
+	s := "aaa.bbb.ccc.ddd.eee"  // 5 parts present
+	ss := strings.split(s, ".") // total of 3 wanted
+	fmt.println(ss)             // [aaa, bbb, ccc.ddd.eee]
+```
+
+Returns: A slice of strings, each representing a part of the split string.
+*/
 split_n :: proc(s, sep: string, n: int, allocator := context.allocator) -> []string {
 	return _split(s, sep, 0, n, allocator)
 }
-// Splits a string into parts after the separator, retaining it in the substrings.
-//
-// *Allocates Using Provided Allocator*
-//
-// Inputs:
-// - s: The string to split.
-// - sep: The separator string used to split the input string.
-// - allocator: (Optional) The allocator used for allocation (default is context.allocator).
-//
-// Usage:
-// ```odin
-// a := "aaa.bbb.ccc.ddd.eee"         // 5 parts
-// aa := strings.split_after(a, ".")
-// fmt.println(aa)                    // [aaa., bbb., ccc., ddd., eee]
-// ```
-//
-// Returns: A slice of strings, each representing a part of the split string after the separator.
-// Splits a string into parts after the separator, retaining it in the substrings.
-//
-// *Allocates Using Provided Allocator*
-//
-// Inputs:
-// - s: The string to split.
-// - sep: The separator string used to split the input string.
-// - allocator: (Optional) The allocator used for allocation (default is context.allocator).
-//
-// Usage:
-// ```odin
-// a := "aaa.bbb.ccc.ddd.eee"         // 5 parts
-// aa := strings.split_after(a, ".")
-// fmt.println(aa)                    // [aaa., bbb., ccc., ddd., eee]
-// ```
-//
-// Returns: A slice of strings, each representing a part of the split string after the separator.
+/*
+Splits a string into parts after the separator, retaining it in the substrings.
+
+*Allocates Using Provided Allocator*
+
+Inputs:
+- s: The string to split.
+- sep: The separator string used to split the input string.
+- allocator: (Optional) The allocator used for allocation (default is context.allocator).
+
+Example:
+```odin
+	a := "aaa.bbb.ccc.ddd.eee"         // 5 parts
+	aa := strings.split_after(a, ".")
+	fmt.println(aa)                    // [aaa., bbb., ccc., ddd., eee]
+```
+
+Returns: A slice of strings, each representing a part of the split string after the separator.
+*/
 split_after :: proc(s, sep: string, allocator := context.allocator) -> []string {
 	return _split(s, sep, len(sep), -1, allocator)
 }
-// Splits a string into a total of 'n' parts after the separator.
-//
-// *Allocates Using Provided Allocator*
-//
-// Inputs:
-// - s: The string to split.
-// - sep: The separator string used to split the input string.
-// - n: The maximum number of parts to split the string into.
-// - allocator: (default is context.allocator)
-//
-// Usage:
-// ```odin
-// a := "aaa.bbb.ccc.ddd.eee"
-// aa := strings.split_after_n(a, ".", 3)
-// fmt.println(aa)                         // [aaa., bbb., ccc.ddd.eee]
-// ```
-//
-// Returns: A slice of strings with 'n' parts or fewer if there weren't
-// Splits a string into a total of 'n' parts after the separator.
-//
-// *Allocates Using Provided Allocator*
-//
-// Inputs:
-// - s: The string to split.
-// - sep: The separator string used to split the input string.
-// - n: The maximum number of parts to split the string into.
-// - allocator: (default is context.allocator)
-//
-// Usage:
-// ```odin
-// a := "aaa.bbb.ccc.ddd.eee"
-// aa := strings.split_after_n(a, ".", 3)
-// fmt.println(aa)                         // [aaa., bbb., ccc.ddd.eee]
-// ```
-//
-// Returns: A slice of strings with 'n' parts or fewer if there weren't
+/*
+Splits a string into a total of 'n' parts after the separator.
+
+*Allocates Using Provided Allocator*
+
+Inputs:
+- s: The string to split.
+- sep: The separator string used to split the input string.
+- n: The maximum number of parts to split the string into.
+- allocator: (default is context.allocator)
+
+Example:
+```odin
+	a := "aaa.bbb.ccc.ddd.eee"
+	aa := strings.split_after_n(a, ".", 3)
+	fmt.println(aa)                         // [aaa., bbb., ccc.ddd.eee]
+```
+
+Returns: A slice of strings with 'n' parts or fewer if there weren't
+*/
 split_after_n :: proc(s, sep: string, n: int, allocator := context.allocator) -> []string {
 	return _split(s, sep, len(sep), n, allocator)
 }
-// Searches for the first occurrence of 'sep' in the given string and returns the substring
-// up to (but not including) the separator, as well as a boolean indicating success.
-//
-// *Used Internally - Private Function*
-//
-// Inputs:
-// - s: Pointer to the input string, which is modified during the search.
-// - sep: The separator string to search for.
-// - sep_save: Number of characters from the separator to include in the result.
-//
-// NOTE: Destructively consumes the string
-//
-// Returns: A tuple containing the resulting substring and a boolean indicating success.
-// Searches for the first occurrence of 'sep' in the given string and returns the substring
-// up to (but not including) the separator, as well as a boolean indicating success.
-//
-// *Used Internally - Private Function*
-//
-// Inputs:
-// - s: Pointer to the input string, which is modified during the search.
-// - sep: The separator string to search for.
-// - sep_save: Number of characters from the separator to include in the result.
-//
-// NOTE: Destructively consumes the string
-//
-// Returns: A tuple containing the resulting substring and a boolean indicating success.
+/*
+Searches for the first occurrence of 'sep' in the given string and returns the substring
+up to (but not including) the separator, as well as a boolean indicating success.
+
+*Used Internally - Private Function*
+
+Inputs:
+- s: Pointer to the input string, which is modified during the search.
+- sep: The separator string to search for.
+- sep_save: Number of characters from the separator to include in the result.
+
+NOTE: Destructively consumes the string
+
+Returns: A tuple containing the resulting substring and a boolean indicating success.
+*/
 @private
 _split_iterator :: proc(s: ^string, sep: string, sep_save: int) -> (res: string, ok: bool) {
 	// stop once the string is empty or nil
@@ -1062,36 +843,23 @@ _split_iterator :: proc(s: ^string, sep: string, sep_save: int) -> (res: string,
 	}
 	return
 }
-// Splits the input string by the byte separator in an iterator fashion.
-// Destructively consumes the original string until the end.
-//
-// Inputs:
-// - s: Pointer to the input string, which is modified during the search.
-// - sep: The byte separator to search for.
-//
-// Usage:
-// ```odin
-// text := "a.b.c.d.e"
-// for str in strings.split_by_byte_iterator(&text, '.') {
-//     fmt.println(str) // every loop -> a b c d e
-// }
-// ```
-// Returns: A tuple containing the resulting substring and a boolean indicating success.
-// Splits the input string by the byte separator in an iterator fashion.
-// Destructively consumes the original string until the end.
-//
-// Inputs:
-// - s: Pointer to the input string, which is modified during the search.
-// - sep: The byte separator to search for.
-//
-// Usage:
-// ```odin
-// text := "a.b.c.d.e"
-// for str in strings.split_by_byte_iterator(&text, '.') {
-//     fmt.println(str) // every loop -> a b c d e
-// }
-// ```
-// Returns: A tuple containing the resulting substring and a boolean indicating success.
+/*
+Splits the input string by the byte separator in an iterator fashion.
+Destructively consumes the original string until the end.
+
+Inputs:
+- s: Pointer to the input string, which is modified during the search.
+- sep: The byte separator to search for.
+
+Example:
+```odin
+	text := "a.b.c.d.e"
+	for str in strings.split_by_byte_iterator(&text, '.') {
+		fmt.println(str) // every loop -> a b c d e
+	}
+```
+Returns: A tuple containing the resulting substring and a boolean indicating success.
+*/
 split_by_byte_iterator :: proc(s: ^string, sep: u8) -> (res: string, ok: bool) {
 	m := index_byte(s^, sep)
 	if m < 0 {
@@ -1106,88 +874,56 @@ split_by_byte_iterator :: proc(s: ^string, sep: u8) -> (res: string, ok: bool) {
 	}
 	return
 }
-// Splits the input string by the separator string in an iterator fashion.
-// Destructively consumes the original string until the end.
-//
-// Inputs:
-// - s: Pointer to the input string, which is modified during the search.
-// - sep: The separator string to search for.
-//
-// Usage:
-// ```odin
-// text := "a.b.c.d.e"
-// for str in strings.split_iterator(&text, ".") {
-//     fmt.println(str) // every loop -> a b c d e
-// }
-// ```
-// Returns: A tuple containing the resulting substring and a boolean indicating success.
-// Splits the input string by the separator string in an iterator fashion.
-// Destructively consumes the original string until the end.
-//
-// Inputs:
-// - s: Pointer to the input string, which is modified during the search.
-// - sep: The separator string to search for.
-//
-// Usage:
-// ```odin
-// text := "a.b.c.d.e"
-// for str in strings.split_iterator(&text, ".") {
-//     fmt.println(str) // every loop -> a b c d e
-// }
-// ```
-// Returns: A tuple containing the resulting substring and a boolean indicating success.
+/*
+Splits the input string by the separator string in an iterator fashion.
+Destructively consumes the original string until the end.
+
+Inputs:
+- s: Pointer to the input string, which is modified during the search.
+- sep: The separator string to search for.
+
+Example:
+```odin
+	text := "a.b.c.d.e"
+	for str in strings.split_iterator(&text, ".") {
+		fmt.println(str) // every loop -> a b c d e
+	}
+```
+Returns: A tuple containing the resulting substring and a boolean indicating success.
+*/
 split_iterator :: proc(s: ^string, sep: string) -> (string, bool) {
 	return _split_iterator(s, sep, 0)
 }
-// Splits the input string after every separator string in an iterator fashion.
-// Destructively consumes the original string until the end.
-//
-// Inputs:
-// - s: Pointer to the input string, which is modified during the search.
-// - sep: The separator string to search for.
-//
-// Usage:
-// ```odin
-// text := "a.b.c.d.e"
-// for str in strings.split_after_iterator(&text, ".") {
-//     fmt.println(str) // every loop -> a. b. c. d. e
-// }
-// ```
-// Returns: A tuple containing the resulting substring and a boolean indicating success.
-// Splits the input string after every separator string in an iterator fashion.
-// Destructively consumes the original string until the end.
-//
-// Inputs:
-// - s: Pointer to the input string, which is modified during the search.
-// - sep: The separator string to search for.
-//
-// Usage:
-// ```odin
-// text := "a.b.c.d.e"
-// for str in strings.split_after_iterator(&text, ".") {
-//     fmt.println(str) // every loop -> a. b. c. d. e
-// }
-// ```
-// Returns: A tuple containing the resulting substring and a boolean indicating success.
+/*
+Splits the input string after every separator string in an iterator fashion.
+Destructively consumes the original string until the end.
+
+Inputs:
+- s: Pointer to the input string, which is modified during the search.
+- sep: The separator string to search for.
+
+Example:
+```odin
+	text := "a.b.c.d.e"
+	for str in strings.split_after_iterator(&text, ".") {
+		fmt.println(str) // every loop -> a. b. c. d. e
+	}
+```
+Returns: A tuple containing the resulting substring and a boolean indicating success.
+*/
 split_after_iterator :: proc(s: ^string, sep: string) -> (string, bool) {
 	return _split_iterator(s, sep, len(sep))
 }
-// Trims the carriage return character from the end of the input string.
-//
-// *Used Internally - Private Function*
-//
-// Inputs:
-// - s: The input string to trim.
-//
-// Returns: The trimmed string as a slice.
-// Trims the carriage return character from the end of the input string.
-//
-// *Used Internally - Private Function*
-//
-// Inputs:
-// - s: The input string to trim.
-//
-// Returns: The trimmed string as a slice.
+/*
+Trims the carriage return character from the end of the input string.
+
+*Used Internally - Private Function*
+
+Inputs:
+- s: The input string to trim.
+
+Returns: The trimmed string as a slice.
+*/
 @(private)
 _trim_cr :: proc(s: string) -> string {
 	n := len(s)
@@ -1198,36 +934,23 @@ _trim_cr :: proc(s: string) -> string {
 	}
 	return s
 }
-// Splits the input string at every line break '\n'.
-//
-// *Allocates Using Provided Allocator*
-//
-// Inputs:
-// - s: The input string to split.
-// - allocator: (default is context.allocator)
-//
-// Usage:
-// ```odin
-// a := "a\nb\nc\nd\ne"
-// b := strings.split_lines(a)
-// fmt.eprintln(b) // [a, b, c, d, e]
-// ```
-// Returns: An allocated slice of strings split by line breaks.
-// Splits the input string at every line break '\n'.
-//
-// *Allocates Using Provided Allocator*
-//
-// Inputs:
-// - s: The input string to split.
-// - allocator: (default is context.allocator)
-//
-// Usage:
-// ```odin
-// a := "a\nb\nc\nd\ne"
-// b := strings.split_lines(a)
-// fmt.eprintln(b) // [a, b, c, d, e]
-// ```
-// Returns: An allocated slice of strings split by line breaks.
+/*
+Splits the input string at every line break '\n'.
+
+*Allocates Using Provided Allocator*
+
+Inputs:
+- s: The input string to split.
+- allocator: (default is context.allocator)
+
+Example:
+```odin
+	a := "a\nb\nc\nd\ne"
+	b := strings.split_lines(a)
+	fmt.eprintln(b) // [a, b, c, d, e]
+```
+Returns: An allocated slice of strings split by line breaks.
+*/
 split_lines :: proc(s: string, allocator := context.allocator) -> []string {
 	sep :: "\n"
 	lines := _split(s, sep, 0, -1, allocator)
@@ -1236,38 +959,24 @@ split_lines :: proc(s: string, allocator := context.allocator) -> []string {
 	}
 	return lines
 }
-// Splits the input string at every line break '\n' for n parts.
-//
-// *Allocates Using Provided Allocator*
-//
-// Inputs:
-// - s: The input string to split.
-// - n: The number of parts to split into.
-// - allocator: (default is context.allocator)
-//
-// Usage:
-// ```odin
-// a := "a\nb\nc\nd\ne"
-// b := strings.split_lines_n(a, 3)
-// fmt.println(b)                    // [a, b, c, d\ne\n]
-// ```
-// Returns: An allocated array of strings split by line breaks.
-// Splits the input string at every line break '\n' for n parts.
-//
-// *Allocates Using Provided Allocator*
-//
-// Inputs:
-// - s: The input string to split.
-// - n: The number of parts to split into.
-// - allocator: (default is context.allocator)
-//
-// Usage:
-// ```odin
-// a := "a\nb\nc\nd\ne"
-// b := strings.split_lines_n(a, 3)
-// fmt.println(b)                    // [a, b, c, d\ne\n]
-// ```
-// Returns: An allocated array of strings split by line breaks.
+/*
+Splits the input string at every line break '\n' for n parts.
+
+*Allocates Using Provided Allocator*
+
+Inputs:
+- s: The input string to split.
+- n: The number of parts to split into.
+- allocator: (default is context.allocator)
+
+Example:
+```odin
+	a := "a\nb\nc\nd\ne"
+	b := strings.split_lines_n(a, 3)
+	fmt.println(b)                    // [a, b, c, d\ne\n]
+```
+Returns: An allocated array of strings split by line breaks.
+*/
 split_lines_n :: proc(s: string, n: int, allocator := context.allocator) -> []string {
 	sep :: "\n"
 	lines := _split(s, sep, 0, n, allocator)
@@ -1276,36 +985,23 @@ split_lines_n :: proc(s: string, n: int, allocator := context.allocator) -> []st
 	}
 	return lines
 }
-// Splits the input string at every line break '\n' leaving the '\n' in the resulting strings.
-//
-// *Allocates Using Provided Allocator*
-//
-// Inputs:
-// - s: The input string to split.
-// - allocator: (default is context.allocator)
-//
-// Usage:
-// ```odin
-// a := "a\nb\nc\nd\ne"
-// b := strings.split_lines_after(a)
-// fmt.println(b) // [a\n, b\n, c\n, d\n, e\n]
-// ```
-// Returns: An allocated slice of strings split by line breaks with line breaks included.
-// Splits the input string at every line break '\n' leaving the '\n' in the resulting strings.
-//
-// *Allocates Using Provided Allocator*
-//
-// Inputs:
-// - s: The input string to split.
-// - allocator: (default is context.allocator)
-//
-// Usage:
-// ```odin
-// a := "a\nb\nc\nd\ne"
-// b := strings.split_lines_after(a)
-// fmt.println(b) // [a\n, b\n, c\n, d\n, e\n]
-// ```
-// Returns: An allocated slice of strings split by line breaks with line breaks included.
+/*
+Splits the input string at every line break '\n' leaving the '\n' in the resulting strings.
+
+*Allocates Using Provided Allocator*
+
+Inputs:
+- s: The input string to split.
+- allocator: (default is context.allocator)
+
+Example:
+```odin
+	a := "a\nb\nc\nd\ne"
+	b := strings.split_lines_after(a)
+	fmt.println(b) // [a\n, b\n, c\n, d\n, e\n]
+```
+Returns: An allocated slice of strings split by line breaks with line breaks included.
+*/
 split_lines_after :: proc(s: string, allocator := context.allocator) -> []string {
 	sep :: "\n"
 	lines := _split(s, sep, len(sep), -1, allocator)
@@ -1314,40 +1010,25 @@ split_lines_after :: proc(s: string, allocator := context.allocator) -> []string
 	}
 	return lines
 }
-// Splits the input string at every line break '\n' leaving the '\n' in the resulting strings.
-// Only runs for n parts.
-//
-// *Allocates Using Provided Allocator*
-//
-// Inputs:
-// - s: The input string to split.
-// - n: The number of parts to split into.
-// - allocator: (default is context.allocator)
-//
-// Usage:
-// ```odin
-// a := "a\nb\nc\nd\ne"
-// b := strings.split_lines_after_n(a, 3)
-// fmt.println(b)                          // [a\n, b\n, c\n, d\ne\n]
-// ```
-// Returns: An allocated slice of strings split by line breaks with line breaks included.
-// Splits the input string at every line break '\n' leaving the '\n' in the resulting strings.
-// Only runs for n parts.
-//
-// *Allocates Using Provided Allocator*
-//
-// Inputs:
-// - s: The input string to split.
-// - n: The number of parts to split into.
-// - allocator: (default is context.allocator)
-//
-// Usage:
-// ```odin
-// a := "a\nb\nc\nd\ne"
-// b := strings.split_lines_after_n(a, 3)
-// fmt.println(b)                          // [a\n, b\n, c\n, d\ne\n]
-// ```
-// Returns: An allocated slice of strings split by line breaks with line breaks included.
+/*
+Splits the input string at every line break '\n' leaving the '\n' in the resulting strings.
+Only runs for n parts.
+
+*Allocates Using Provided Allocator*
+
+Inputs:
+- s: The input string to split.
+- n: The number of parts to split into.
+- allocator: (default is context.allocator)
+
+Example:
+```odin
+	a := "a\nb\nc\nd\ne"
+	b := strings.split_lines_after_n(a, 3)
+	fmt.println(b)                          // [a\n, b\n, c\n, d\ne\n]
+```
+Returns: An allocated slice of strings split by line breaks with line breaks included.
+*/
 split_lines_after_n :: proc(s: string, n: int, allocator := context.allocator) -> []string {
 	sep :: "\n"
 	lines := _split(s, sep, len(sep), n, allocator)
@@ -1356,102 +1037,65 @@ split_lines_after_n :: proc(s: string, n: int, allocator := context.allocator) -
 	}
 	return lines
 }
-// Splits the input string at every line break '\n'.
-// Returns the current split string every iteration until the string is consumed.
-//
-// Inputs:
-// - s: Pointer to the input string, which is modified during the search.
-//
-// Usage:
-// ```odin
-// text := "a\nb\nc\nd\ne"
-// for str in strings.split_lines_iterator(&text) {
-//     fmt.println(str)    // every loop -> a b c d e
-// }
-// ```
-// Returns: A tuple containing the resulting substring and a boolean indicating success.
-// Splits the input string at every line break '\n'.
-// Returns the current split string every iteration until the string is consumed.
-//
-// Inputs:
-// - s: Pointer to the input string, which is modified during the search.
-//
-// Usage:
-// ```odin
-// text := "a\nb\nc\nd\ne"
-// for str in strings.split_lines_iterator(&text) {
-//     fmt.println(str)    // every loop -> a b c d e
-// }
-// ```
-// Returns: A tuple containing the resulting substring and a boolean indicating success.
+/*
+Splits the input string at every line break '\n'.
+Returns the current split string every iteration until the string is consumed.
+
+Inputs:
+- s: Pointer to the input string, which is modified during the search.
+
+Example:
+```odin
+	text := "a\nb\nc\nd\ne"
+	for str in strings.split_lines_iterator(&text) {
+		fmt.println(str)    // every loop -> a b c d e
+	}
+```
+Returns: A tuple containing the resulting substring and a boolean indicating success.
+*/
 split_lines_iterator :: proc(s: ^string) -> (line: string, ok: bool) {
 	sep :: "\n"
 	line = _split_iterator(s, sep, 0) or_return
 	return _trim_cr(line), true
 }
-// Splits the input string at every line break '\n'.
-// Returns the current split string with line breaks included every iteration until the string is consumed.
-//
-// Inputs:
-// - s: Pointer to the input string, which is modified during the search.
-//
-// Usage:
-// ```odin
-// text := "a\nb\nc\nd\ne"
-// for str in strings.split_lines_after_iterator(&text) {
-//     fmt.println(str) // every loop -> a\n b\n c\n d\n e\n
-// }
-// ```
-// Returns: A tuple containing the resulting substring with line breaks included and a boolean indicating success.
-// Splits the input string at every line break '\n'.
-// Returns the current split string with line breaks included every iteration until the string is consumed.
-//
-// Inputs:
-// - s: Pointer to the input string, which is modified during the search.
-//
-// Usage:
-// ```odin
-// text := "a\nb\nc\nd\ne"
-// for str in strings.split_lines_after_iterator(&text) {
-//     fmt.println(str) // every loop -> a\n b\n c\n d\n e\n
-// }
-// ```
-// Returns: A tuple containing the resulting substring with line breaks included and a boolean indicating success.
+/*
+Splits the input string at every line break '\n'.
+Returns the current split string with line breaks included every iteration until the string is consumed.
+
+Inputs:
+- s: Pointer to the input string, which is modified during the search.
+
+Example:
+```odin
+	text := "a\nb\nc\nd\ne"
+	for str in strings.split_lines_after_iterator(&text) {
+		fmt.println(str) // every loop -> a\n b\n c\n d\n e\n
+	}
+```
+Returns: A tuple containing the resulting substring with line breaks included and a boolean indicating success.
+*/
 split_lines_after_iterator :: proc(s: ^string) -> (line: string, ok: bool) {
 	sep :: "\n"
 	line = _split_iterator(s, sep, len(sep)) or_return
 	return _trim_cr(line), true
 }
-// Returns the byte offset of the first byte c in the string s it finds, -1 when not found.
-// NOTE: Can't find UTF-8 based runes.
-//
-// Inputs:
-// - s: The input string to search in.
-// - c: The byte to search for.
-//
-// Usage:
-// ```odin
-// strings.index_byte("test", 't')       // -> 0
-// strings.index_byte("test", 'e')       // -> 1
-// strings.index_byte("test", 'x')       // -> -1
-// strings.index_byte("teäst", 'ä') // -> -1
-// ```
-// Returns: The byte offset of the first occurrence of c in s, or -1 if not found.
-// Returns the byte offset of the first byte c in the string s it finds, -1 when not found.
-// NOTE: Can't find UTF-8 based runes.
-//
-// Inputs:
-// - s: The input string to search in.
-// - c: The byte to search for.
-//
-// Usage:
-// ```odin
-// strings.index_byte("test", 't')       // -> 0
-// strings.index_byte("test", 'e')       // -> 1
-// strings.index_byte("test", 'x')       // -> -1
-// strings.index_byte("teäst", 'ä') // -> -1
-// ```
-// Returns: The byte offset of the first occurrence of c in s, or -1 if not found.
+/*
+Returns the byte offset of the first byte c in the string s it finds, -1 when not found.
+NOTE: Can't find UTF-8 based runes.
+
+Inputs:
+- s: The input string to search in.
+- c: The byte to search for.
+
+Example:
+```odin
+	strings.index_byte("test", 't')       // -> 0
+	strings.index_byte("test", 'e')       // -> 1
+	strings.index_byte("test", 'x')       // -> -1
+	strings.index_byte("teäst", 'ä') // -> -1
+```
+Returns: The byte offset of the first occurrence of c in s, or -1 if not found.
+*/
 index_byte :: proc(s: string, c: byte) -> int {
 	for i := 0; i < len(s); i += 1 {
 		if s[i] == c {
@@ -1460,28 +1104,19 @@ index_byte :: proc(s: string, c: byte) -> int {
 	}
 	return -1
 }
-// Returns the byte offset of the last byte `c` in the string `s`, -1 when not found.
-// NOTE: Can't find UTF-8 based runes.
-//
-// Usage:
-// ```odin
-// strings.last_index_byte("test", 't')       // -> 3
-// strings.last_index_byte("test", 'e')       // -> 1
-// strings.last_index_byte("test", 'x')       // -> -1
-// strings.last_index_byte("teäst", 'ä') // -> -1
-// ```
-// Returns: The byte offset of the last occurrence of `c` in `s`, or -1 if not found.
-// Returns the byte offset of the last byte `c` in the string `s`, -1 when not found.
-// NOTE: Can't find UTF-8 based runes.
-//
-// Usage:
-// ```odin
-// strings.last_index_byte("test", 't')       // -> 3
-// strings.last_index_byte("test", 'e')       // -> 1
-// strings.last_index_byte("test", 'x')       // -> -1
-// strings.last_index_byte("teäst", 'ä') // -> -1
-// ```
-// Returns: The byte offset of the last occurrence of `c` in `s`, or -1 if not found.
+/*
+Returns the byte offset of the last byte `c` in the string `s`, -1 when not found.
+NOTE: Can't find UTF-8 based runes.
+
+Example:
+```odin
+	strings.last_index_byte("test", 't')       // -> 3
+	strings.last_index_byte("test", 'e')       // -> 1
+	strings.last_index_byte("test", 'x')       // -> -1
+	strings.last_index_byte("teäst", 'ä') // -> -1
+```
+Returns: The byte offset of the last occurrence of `c` in `s`, or -1 if not found.
+*/
 last_index_byte :: proc(s: string, c: byte) -> int {
 	for i := len(s)-1; i >= 0; i -= 1 {
 		if s[i] == c {
@@ -1490,36 +1125,23 @@ last_index_byte :: proc(s: string, c: byte) -> int {
 	}
 	return -1
 }
-// Returns the byte offset of the first rune `r` in the string `s` it finds, -1 when not found.
-// Invalid runes return -1
-//
-// Usage:
-// ```odin
-// strings.index_rune("abcädef", 'x')   // -> -1
-// strings.index_rune("abcädef", 'a')   // -> 0
-// strings.index_rune("abcädef", 'b')   // -> 1
-// strings.index_rune("abcädef", 'c')   // -> 2
-// strings.index_rune("abcädef", 'ä') // -> 3
-// strings.index_rune("abcädef", 'd')   // -> 5
-// strings.index_rune("abcädef", 'e')   // -> 6
-// strings.index_rune("abcädef", 'f')   // -> 7
-// ```
-// Returns: The byte offset of the first occurrence of `r` in `s`, or -1 if not found.
-// Returns the byte offset of the first rune `r` in the string `s` it finds, -1 when not found.
-// Invalid runes return -1
-//
-// Usage:
-// ```odin
-// strings.index_rune("abcädef", 'x')   // -> -1
-// strings.index_rune("abcädef", 'a')   // -> 0
-// strings.index_rune("abcädef", 'b')   // -> 1
-// strings.index_rune("abcädef", 'c')   // -> 2
-// strings.index_rune("abcädef", 'ä') // -> 3
-// strings.index_rune("abcädef", 'd')   // -> 5
-// strings.index_rune("abcädef", 'e')   // -> 6
-// strings.index_rune("abcädef", 'f')   // -> 7
-// ```
-// Returns: The byte offset of the first occurrence of `r` in `s`, or -1 if not found.
+/*
+Returns the byte offset of the first rune `r` in the string `s` it finds, -1 when not found.
+Invalid runes return -1
+
+Example:
+```odin
+	strings.index_rune("abcädef", 'x')   // -> -1
+	strings.index_rune("abcädef", 'a')   // -> 0
+	strings.index_rune("abcädef", 'b')   // -> 1
+	strings.index_rune("abcädef", 'c')   // -> 2
+	strings.index_rune("abcädef", 'ä') // -> 3
+	strings.index_rune("abcädef", 'd')   // -> 5
+	strings.index_rune("abcädef", 'e')   // -> 6
+	strings.index_rune("abcädef", 'f')   // -> 7
+```
+Returns: The byte offset of the first occurrence of `r` in `s`, or -1 if not found.
+*/
 index_rune :: proc(s: string, r: rune) -> int {
 	switch {
 	case u32(r) < utf8.RUNE_SELF:
@@ -1542,26 +1164,18 @@ index_rune :: proc(s: string, r: rune) -> int {
 }
 
 @private PRIME_RABIN_KARP :: 16777619
-// Returns the byte offset of the string `substr` in the string `s`, -1 when not found.
-//
-// Usage:
-// ```odin
-// strings.index("test", "t")  // -> 0
-// strings.index("test", "te") // -> 0
-// strings.index("test", "st") // -> 2
-// strings.index("test", "tt") // -> -1
-// ```
-// Returns: The byte offset of the first occurrence of `substr` in `s`, or -1 if not found.
-// Returns the byte offset of the string `substr` in the string `s`, -1 when not found.
-//
-// Usage:
-// ```odin
-// strings.index("test", "t")  // -> 0
-// strings.index("test", "te") // -> 0
-// strings.index("test", "st") // -> 2
-// strings.index("test", "tt") // -> -1
-// ```
-// Returns: The byte offset of the first occurrence of `substr` in `s`, or -1 if not found.
+/*
+Returns the byte offset of the string `substr` in the string `s`, -1 when not found.
+
+Example:
+```odin
+	strings.index("test", "t")  // -> 0
+	strings.index("test", "te") // -> 0
+	strings.index("test", "st") // -> 2
+	strings.index("test", "tt") // -> -1
+```
+Returns: The byte offset of the first occurrence of `substr` in `s`, or -1 if not found.
+*/
 index :: proc(s, substr: string) -> int {
 	hash_str_rabin_karp :: proc(s: string) -> (hash: u32 = 0, pow: u32 = 1) {
 		for i := 0; i < len(s); i += 1 {
@@ -1611,26 +1225,18 @@ index :: proc(s, substr: string) -> int {
 	}
 	return -1
 }
-// Returns the last byte offset of the string `substr` in the string `s`, -1 when not found.
-//
-// Usage:
-// ```odin
-// strings.last_index("test", "t")  // -> 3
-// strings.last_index("test", "te") // -> 0
-// strings.last_index("test", "st") // -> 2
-// strings.last_index("test", "tt") // -> -1
-// ```
-// Returns: The byte offset of the last occurrence of `substr` in `s`, or -1 if not found.
-// Returns the last byte offset of the string `substr` in the string `s`, -1 when not found.
-//
-// Usage:
-// ```odin
-// strings.last_index("test", "t")  // -> 3
-// strings.last_index("test", "te") // -> 0
-// strings.last_index("test", "st") // -> 2
-// strings.last_index("test", "tt") // -> -1
-// ```
-// Returns: The byte offset of the last occurrence of `substr` in `s`, or -1 if not found.
+/*
+Returns the last byte offset of the string `substr` in the string `s`, -1 when not found.
+
+Example:
+```odin
+	strings.last_index("test", "t")  // -> 3
+	strings.last_index("test", "te") // -> 0
+	strings.last_index("test", "st") // -> 2
+	strings.last_index("test", "tt") // -> -1
+```
+Returns: The byte offset of the last occurrence of `substr` in `s`, or -1 if not found.
+*/
 last_index :: proc(s, substr: string) -> int {
 	hash_str_rabin_karp_reverse :: proc(s: string) -> (hash: u32 = 0, pow: u32 = 1) {
 		for i := len(s) - 1; i >= 0; i -= 1 {
@@ -1678,28 +1284,19 @@ last_index :: proc(s, substr: string) -> int {
 	}
 	return -1
 }
-// Returns the index of any first char of `chars` found in `s`, -1 if not found.
-//
-// Usage:
-// ```odin
-// strings.index_any("test", "s")   // -> 2
-// strings.index_any("test", "se")  // -> 1
-// strings.index_any("test", "et")  // -> 0
-// strings.index_any("test", "set") // -> 0
-// strings.index_any("test", "x")   // -> -1
-// ```
-// Returns: The index of the first character of `chars` found in `s`, or -1 if not found.
-// Returns the index of any first char of `chars` found in `s`, -1 if not found.
-//
-// Usage:
-// ```odin
-// strings.index_any("test", "s")   // -> 2
-// strings.index_any("test", "se")  // -> 1
-// strings.index_any("test", "et")  // -> 0
-// strings.index_any("test", "set") // -> 0
-// strings.index_any("test", "x")   // -> -1
-// ```
-// Returns: The index of the first character of `chars` found in `s`, or -1 if not found.
+/*
+Returns the index of any first char of `chars` found in `s`, -1 if not found.
+
+Example:
+```odin
+	strings.index_any("test", "s")   // -> 2
+	strings.index_any("test", "se")  // -> 1
+	strings.index_any("test", "et")  // -> 0
+	strings.index_any("test", "set") // -> 0
+	strings.index_any("test", "x")   // -> -1
+```
+Returns: The index of the first character of `chars` found in `s`, or -1 if not found.
+*/
 index_any :: proc(s, chars: string) -> int {
 	if chars == "" {
 		return -1
@@ -1731,36 +1328,23 @@ index_any :: proc(s, chars: string) -> int {
 	}
 	return -1
 }
-// Finds the last occurrence of any character in 'chars' within 's'. Iterates in reverse.
-//
-// Inputs:
-// - s: The string to search in
-// - chars: The characters to look for
-//
-// Usage:
-// ```odin
-// strings.last_index_any("test", "s")   // -> 2
-// strings.last_index_any("test", "se")  // -> 2
-// strings.last_index_any("test", "et")  // -> 3
-// strings.last_index_any("test", "set") // -> 3
-// strings.last_index_any("test", "x")   // -> -1
-// ```
-// Returns: The index of the last matching character, or -1 if not found
-// Finds the last occurrence of any character in 'chars' within 's'. Iterates in reverse.
-//
-// Inputs:
-// - s: The string to search in
-// - chars: The characters to look for
-//
-// Usage:
-// ```odin
-// strings.last_index_any("test", "s")   // -> 2
-// strings.last_index_any("test", "se")  // -> 2
-// strings.last_index_any("test", "et")  // -> 3
-// strings.last_index_any("test", "set") // -> 3
-// strings.last_index_any("test", "x")   // -> -1
-// ```
-// Returns: The index of the last matching character, or -1 if not found
+/*
+Finds the last occurrence of any character in 'chars' within 's'. Iterates in reverse.
+
+Inputs:
+- s: The string to search in
+- chars: The characters to look for
+
+Example:
+```odin
+	strings.last_index_any("test", "s")   // -> 2
+	strings.last_index_any("test", "se")  // -> 2
+	strings.last_index_any("test", "et")  // -> 3
+	strings.last_index_any("test", "set") // -> 3
+	strings.last_index_any("test", "x")   // -> -1
+```
+Returns: The index of the last matching character, or -1 if not found
+*/
 last_index_any :: proc(s, chars: string) -> int {
 	if chars == "" {
 		return -1
@@ -1809,20 +1393,15 @@ last_index_any :: proc(s, chars: string) -> int {
 	}
 	return -1
 }
-// Finds the first occurrence of any substring in 'substrs' within 's'
-//
-// Inputs:
-// - s: The string to search in
-// - substrs: The substrings to look for
-//
-// Returns: A tuple containing the index of the first matching substring, and its length (width)
-// Finds the first occurrence of any substring in 'substrs' within 's'
-//
-// Inputs:
-// - s: The string to search in
-// - substrs: The substrings to look for
-//
-// Returns: A tuple containing the index of the first matching substring, and its length (width)
+/*
+Finds the first occurrence of any substring in 'substrs' within 's'
+
+Inputs:
+- s: The string to search in
+- substrs: The substrings to look for
+
+Returns: A tuple containing the index of the first matching substring, and its length (width)
+*/
 index_multi :: proc(s: string, substrs: []string) -> (idx: int, width: int) {
 	idx = -1
 	if s == "" || len(substrs) <= 0 {
@@ -1852,36 +1431,23 @@ index_multi :: proc(s: string, substrs: []string) -> (idx: int, width: int) {
 	}
 	return
 }
-// Counts the number of non-overlapping occurrences of 'substr' in 's'
-//
-// Inputs:
-// - s: The string to search in
-// - substr: The substring to count
-//
-// Usage:
-// ```odin
-// strings.count("abbccc", "a")  // -> 1
-// strings.count("abbccc", "b")  // -> 2
-// strings.count("abbccc", "c")  // -> 3
-// strings.count("abbccc", "ab") // -> 1
-// strings.count("abbccc", " ")  // -> 0
-// ```
-// Returns: The number of occurrences of 'substr' in 's', returns the rune_count + 1 of the string `s` on empty `substr`
-// Counts the number of non-overlapping occurrences of 'substr' in 's'
-//
-// Inputs:
-// - s: The string to search in
-// - substr: The substring to count
-//
-// Usage:
-// ```odin
-// strings.count("abbccc", "a")  // -> 1
-// strings.count("abbccc", "b")  // -> 2
-// strings.count("abbccc", "c")  // -> 3
-// strings.count("abbccc", "ab") // -> 1
-// strings.count("abbccc", " ")  // -> 0
-// ```
-// Returns: The number of occurrences of 'substr' in 's', returns the rune_count + 1 of the string `s` on empty `substr`
+/*
+Counts the number of non-overlapping occurrences of 'substr' in 's'
+
+Inputs:
+- s: The string to search in
+- substr: The substring to count
+
+Example:
+```odin
+	strings.count("abbccc", "a")  // -> 1
+	strings.count("abbccc", "b")  // -> 2
+	strings.count("abbccc", "c")  // -> 3
+	strings.count("abbccc", "ab") // -> 1
+	strings.count("abbccc", " ")  // -> 0
+```
+Returns: The number of occurrences of 'substr' in 's', returns the rune_count + 1 of the string `s` on empty `substr`
+*/
 count :: proc(s, substr: string) -> int {
 	if len(substr) == 0 { // special case
 		return rune_count(s) + 1
@@ -1916,38 +1482,24 @@ count :: proc(s, substr: string) -> int {
 	}
 	return n
 }
-// Repeats the string 's' 'count' times, concatenating the result
-//
-// *Allocates Using Provided Allocator*
-//
-// Inputs:
-// - s: The string to repeat
-// - count: The number of times to repeat 's'
-// - allocator: (default is context.allocator)
-//
-// WARNING: Panics if count < 0
-//
-// Usage:
-// ```odin
-// strings.repeat("abc", 2) // -> "abcabc"
-// ```
-// Returns: The concatenated repeated string
-// Repeats the string 's' 'count' times, concatenating the result
-//
-// *Allocates Using Provided Allocator*
-//
-// Inputs:
-// - s: The string to repeat
-// - count: The number of times to repeat 's'
-// - allocator: (default is context.allocator)
-//
-// WARNING: Panics if count < 0
-//
-// Usage:
-// ```odin
-// strings.repeat("abc", 2) // -> "abcabc"
-// ```
-// Returns: The concatenated repeated string
+/*
+Repeats the string 's' 'count' times, concatenating the result
+
+*Allocates Using Provided Allocator*
+
+Inputs:
+- s: The string to repeat
+- count: The number of times to repeat 's'
+- allocator: (default is context.allocator)
+
+WARNING: Panics if count < 0
+
+Example:
+```odin
+	strings.repeat("abc", 2) // -> "abcabc"
+```
+Returns: The concatenated repeated string
+*/
 repeat :: proc(s: string, count: int, allocator := context.allocator) -> string {
 	if count < 0 {
 		panic("strings: negative repeat count")
@@ -1963,81 +1515,49 @@ repeat :: proc(s: string, count: int, allocator := context.allocator) -> string 
 	}
 	return string(b)
 }
-// Replaces all occurrences of 'old' in 's' with 'new'
-//
-// *Allocates Using Provided Allocator*
-//
-// Inputs:
-// - s: The string to modify
-// - old: The substring to replace
-// - new: The substring to replace 'old' with
-// - allocator: The allocator to use for the new string (default is context.allocator)
-//
-// Usage:
-// ```odin
-// strings.replace_all("xyzxyz", "xyz", "abc") // -> "abcabc", true
-// strings.replace_all("xyzxyz", "abc", "xyz") // -> "xyzxyz", false
-// strings.replace_all("xyzxyz", "xy", "z")    // -> "zzzz", true
-// ```
-// Returns: A tuple containing the modified string and a boolean indicating if an allocation occurred during the replacement
-// Replaces all occurrences of 'old' in 's' with 'new'
-//
-// *Allocates Using Provided Allocator*
-//
-// Inputs:
-// - s: The string to modify
-// - old: The substring to replace
-// - new: The substring to replace 'old' with
-// - allocator: The allocator to use for the new string (default is context.allocator)
-//
-// Usage:
-// ```odin
-// strings.replace_all("xyzxyz", "xyz", "abc") // -> "abcabc", true
-// strings.replace_all("xyzxyz", "abc", "xyz") // -> "xyzxyz", false
-// strings.replace_all("xyzxyz", "xy", "z")    // -> "zzzz", true
-// ```
-// Returns: A tuple containing the modified string and a boolean indicating if an allocation occurred during the replacement
+/*
+Replaces all occurrences of 'old' in 's' with 'new'
+
+*Allocates Using Provided Allocator*
+
+Inputs:
+- s: The string to modify
+- old: The substring to replace
+- new: The substring to replace 'old' with
+- allocator: The allocator to use for the new string (default is context.allocator)
+
+Example:
+```odin
+	strings.replace_all("xyzxyz", "xyz", "abc") // -> "abcabc", true
+	strings.replace_all("xyzxyz", "abc", "xyz") // -> "xyzxyz", false
+	strings.replace_all("xyzxyz", "xy", "z")    // -> "zzzz", true
+```
+Returns: A tuple containing the modified string and a boolean indicating if an allocation occurred during the replacement
+*/
 replace_all :: proc(s, old, new: string, allocator := context.allocator) -> (output: string, was_allocation: bool) {
 	return replace(s, old, new, -1, allocator)
 }
-// Replaces n instances of old in the string s with the new string
-//
-// *Allocates Using Provided Allocator*
-//
-// Inputs:
-// - s: The input string
-// - old: The substring to be replaced
-// - new: The replacement string
-// - n: The number of instances to replace (if n < 0, no limit on the number of replacements)
-// - allocator: (default: context.allocator)
-//
-// Usage:
-// ```odin
-// strings.replace("xyzxyz", "xyz", "abc", 2)  // -> "abcabc", true
-// strings.replace("xyzxyz", "xyz", "abc", 1)  // -> "abcxyz", true
-// strings.replace("xyzxyz", "abc", "xyz", -1) // -> "xyzxyz", false
-// strings.replace("xyzxyz", "xy", "z", -1)    // -> "zzzz", true
-// ```
-// Returns: A tuple containing the modified string and a boolean indicating if an allocation occurred during the replacement
-// Replaces n instances of old in the string s with the new string
-//
-// *Allocates Using Provided Allocator*
-//
-// Inputs:
-// - s: The input string
-// - old: The substring to be replaced
-// - new: The replacement string
-// - n: The number of instances to replace (if n < 0, no limit on the number of replacements)
-// - allocator: (default: context.allocator)
-//
-// Usage:
-// ```odin
-// strings.replace("xyzxyz", "xyz", "abc", 2)  // -> "abcabc", true
-// strings.replace("xyzxyz", "xyz", "abc", 1)  // -> "abcxyz", true
-// strings.replace("xyzxyz", "abc", "xyz", -1) // -> "xyzxyz", false
-// strings.replace("xyzxyz", "xy", "z", -1)    // -> "zzzz", true
-// ```
-// Returns: A tuple containing the modified string and a boolean indicating if an allocation occurred during the replacement
+/*
+Replaces n instances of old in the string s with the new string
+
+*Allocates Using Provided Allocator*
+
+Inputs:
+- s: The input string
+- old: The substring to be replaced
+- new: The replacement string
+- n: The number of instances to replace (if n < 0, no limit on the number of replacements)
+- allocator: (default: context.allocator)
+
+Example:
+```odin
+	strings.replace("xyzxyz", "xyz", "abc", 2)  // -> "abcabc", true
+	strings.replace("xyzxyz", "xyz", "abc", 1)  // -> "abcxyz", true
+	strings.replace("xyzxyz", "abc", "xyz", -1) // -> "xyzxyz", false
+	strings.replace("xyzxyz", "xy", "z", -1)    // -> "zzzz", true
+```
+Returns: A tuple containing the modified string and a boolean indicating if an allocation occurred during the replacement
+*/
 replace :: proc(s, old, new: string, n: int, allocator := context.allocator) -> (output: string, was_allocation: bool) {
 	if old == new || n == 0 {
 		was_allocation = false
@@ -2077,85 +1597,53 @@ replace :: proc(s, old, new: string, n: int, allocator := context.allocator) -> 
 	output = string(t[0:w])
 	return
 }
-// Removes the key string n times from the s string
-//
-// *Allocates Using Provided Allocator*
-//
-// Inputs:
-// - s: The input string
-// - key: The substring to be removed
-// - n: The number of instances to remove (if n < 0, no limit on the number of removes)
-// - allocator: (default: context.allocator)
-//
-// Usage:
-// ```odin
-// strings.remove("abcabc", "abc", 1)  // -> "abc", true
-// strings.remove("abcabc", "abc", -1) // -> "", true
-// strings.remove("abcabc", "a", -1)   // -> "bcbc", true
-// strings.remove("abcabc", "x", -1)   // -> "abcabc", false
-// ```
-// Returns: A tuple containing the modified string and a boolean indicating if an allocation occurred during the removal
-// Removes the key string n times from the s string
-//
-// *Allocates Using Provided Allocator*
-//
-// Inputs:
-// - s: The input string
-// - key: The substring to be removed
-// - n: The number of instances to remove (if n < 0, no limit on the number of removes)
-// - allocator: (default: context.allocator)
-//
-// Usage:
-// ```odin
-// strings.remove("abcabc", "abc", 1)  // -> "abc", true
-// strings.remove("abcabc", "abc", -1) // -> "", true
-// strings.remove("abcabc", "a", -1)   // -> "bcbc", true
-// strings.remove("abcabc", "x", -1)   // -> "abcabc", false
-// ```
-// Returns: A tuple containing the modified string and a boolean indicating if an allocation occurred during the removal
+/*
+Removes the key string n times from the s string
+
+*Allocates Using Provided Allocator*
+
+Inputs:
+- s: The input string
+- key: The substring to be removed
+- n: The number of instances to remove (if n < 0, no limit on the number of removes)
+- allocator: (default: context.allocator)
+
+Example:
+```odin
+	strings.remove("abcabc", "abc", 1)  // -> "abc", true
+	strings.remove("abcabc", "abc", -1) // -> "", true
+	strings.remove("abcabc", "a", -1)   // -> "bcbc", true
+	strings.remove("abcabc", "x", -1)   // -> "abcabc", false
+```
+Returns: A tuple containing the modified string and a boolean indicating if an allocation occurred during the removal
+*/
 remove :: proc(s, key: string, n: int, allocator := context.allocator) -> (output: string, was_allocation: bool) {
 	return replace(s, key, "", n, allocator)
 }
-// Removes all the key string instances from the s string
-//
-// *Allocates Using Provided Allocator*
-//
-// Inputs:
-// - s: The input string
-// - key: The substring to be removed
-// - allocator: (default: context.allocator)
-//
-// Usage:
-// ```odin
-// strings.remove_all("abcabc", "abc") // -> "", true
-// strings.remove_all("abcabc", "a")   // -> "bcbc", true
-// strings.remove_all("abcabc", "x")   // -> "abcabc", false
-// ```
-// Returns: A tuple containing the modified string and a boolean indicating if an allocation occurred during the removal
-// Removes all the key string instances from the s string
-//
-// *Allocates Using Provided Allocator*
-//
-// Inputs:
-// - s: The input string
-// - key: The substring to be removed
-// - allocator: (default: context.allocator)
-//
-// Usage:
-// ```odin
-// strings.remove_all("abcabc", "abc") // -> "", true
-// strings.remove_all("abcabc", "a")   // -> "bcbc", true
-// strings.remove_all("abcabc", "x")   // -> "abcabc", false
-// ```
-// Returns: A tuple containing the modified string and a boolean indicating if an allocation occurred during the removal
+/*
+Removes all the key string instances from the s string
+
+*Allocates Using Provided Allocator*
+
+Inputs:
+- s: The input string
+- key: The substring to be removed
+- allocator: (default: context.allocator)
+
+Example:
+```odin
+	strings.remove_all("abcabc", "abc") // -> "", true
+	strings.remove_all("abcabc", "a")   // -> "bcbc", true
+	strings.remove_all("abcabc", "x")   // -> "abcabc", false
+```
+Returns: A tuple containing the modified string and a boolean indicating if an allocation occurred during the removal
+*/
 remove_all :: proc(s, key: string, allocator := context.allocator) -> (output: string, was_allocation: bool) {
 	return remove(s, key, -1, allocator)
 }
 // Returns true if the r rune is an ASCII space character ('\t', '\n', '\v', '\f', '\r', ' ')
-// Returns true if the r rune is an ASCII space character ('\t', '\n', '\v', '\f', '\r', ' ')
 @(private) _ascii_space := [256]bool{'\t' = true, '\n' = true, '\v' = true, '\f' = true, '\r' = true, ' ' = true}
 
-// Returns true when the `r` rune is '\t', '\n', '\v', '\f', '\r' or ' '
 // Returns true when the `r` rune is '\t', '\n', '\v', '\f', '\r' or ' '
 is_ascii_space :: proc(r: rune) -> bool {
 	if r < utf8.RUNE_SELF {
@@ -2163,7 +1651,6 @@ is_ascii_space :: proc(r: rune) -> bool {
 	}
 	return false
 }
-// Returns true if the r rune is any ASCII or UTF-8 based whitespace character
 // Returns true if the r rune is any ASCII or UTF-8 based whitespace character
 is_space :: proc(r: rune) -> bool {
 	if r < 0x2000 {
@@ -2183,48 +1670,30 @@ is_space :: proc(r: rune) -> bool {
 	return false
 }
 // Returns true if the `r` rune is a null byte (0x0)
-// Returns true if the `r` rune is a null byte (0x0)
 is_null :: proc(r: rune) -> bool {
 	return r == 0x0000
 }
-// Finds the index of the first rune in the string s for which the procedure p returns the same value as truth
-//
-// Inputs:
-// - s: The input string
-// - p: A procedure that takes a rune and returns a boolean
-// - truth: The boolean value to be matched (default: true)
-//
-// Usage:
-// ```odin
-// call :: proc(r: rune) -> bool {
-//     return r == 'a'
-// }
-// strings.index_proc("abcabc", call)        // -> 0
-// strings.index_proc("cbacba", call)        // -> 2
-// strings.index_proc("cbacba", call, false) // -> 0
-// strings.index_proc("abcabc", call, false) // -> 1
-// strings.index_proc("xyz", call)           // -> -1
-// ```
-// Returns: The index of the first matching rune, or -1 if no match was found
-// Finds the index of the first rune in the string s for which the procedure p returns the same value as truth
-//
-// Inputs:
-// - s: The input string
-// - p: A procedure that takes a rune and returns a boolean
-// - truth: The boolean value to be matched (default: true)
-//
-// Usage:
-// ```odin
-// call :: proc(r: rune) -> bool {
-//     return r == 'a'
-// }
-// strings.index_proc("abcabc", call)        // -> 0
-// strings.index_proc("cbacba", call)        // -> 2
-// strings.index_proc("cbacba", call, false) // -> 0
-// strings.index_proc("abcabc", call, false) // -> 1
-// strings.index_proc("xyz", call)           // -> -1
-// ```
-// Returns: The index of the first matching rune, or -1 if no match was found
+/*
+Finds the index of the first rune in the string s for which the procedure p returns the same value as truth
+
+Inputs:
+- s: The input string
+- p: A procedure that takes a rune and returns a boolean
+- truth: The boolean value to be matched (default: true)
+
+Example:
+```odin
+	call :: proc(r: rune) -> bool {
+		return r == 'a'
+	}
+	strings.index_proc("abcabc", call)        // -> 0
+	strings.index_proc("cbacba", call)        // -> 2
+	strings.index_proc("cbacba", call, false) // -> 0
+	strings.index_proc("abcabc", call, false) // -> 1
+	strings.index_proc("xyz", call)           // -> -1
+```
+Returns: The index of the first matching rune, or -1 if no match was found
+*/
 index_proc :: proc(s: string, p: proc(rune) -> bool, truth := true) -> int {
 	for r, i in s {
 		if p(r) == truth {
@@ -2234,7 +1703,6 @@ index_proc :: proc(s: string, p: proc(rune) -> bool, truth := true) -> int {
 	return -1
 }
 // Same as `index_proc`, but the procedure p takes a raw pointer for state
-// Same as `index_proc`, but the procedure p takes a raw pointer for state
 index_proc_with_state :: proc(s: string, p: proc(rawptr, rune) -> bool, state: rawptr, truth := true) -> int {
 	for r, i in s {
 		if p(state, r) == truth {
@@ -2243,7 +1711,6 @@ index_proc_with_state :: proc(s: string, p: proc(rawptr, rune) -> bool, state: r
 	}
 	return -1
 }
-// Finds the index of the *last* rune in the string s for which the procedure p returns the same value as truth
 // Finds the index of the *last* rune in the string s for which the procedure p returns the same value as truth
 last_index_proc :: proc(s: string, p: proc(rune) -> bool, truth := true) -> int {
 	// TODO(bill): Probably use Rabin-Karp Search
@@ -2256,8 +1723,6 @@ last_index_proc :: proc(s: string, p: proc(rune) -> bool, truth := true) -> int 
 	}
 	return -1
 }
-
-// Same as `index_proc_with_state`, runs through the string in reverse
 // Same as `index_proc_with_state`, runs through the string in reverse
 last_index_proc_with_state :: proc(s: string, p: proc(rawptr, rune) -> bool, state: rawptr, truth := true) -> int {
 	// TODO(bill): Probably use Rabin-Karp Search
@@ -2270,34 +1735,22 @@ last_index_proc_with_state :: proc(s: string, p: proc(rawptr, rune) -> bool, sta
 	}
 	return -1
 }
-// Trims the input string s from the left until the procedure p returns false
-//
-// Inputs:
-// - s: The input string
-// - p: A procedure that takes a rune and returns a boolean
-//
-// Usage:
-// ```odin
-// find :: proc(r: rune) -> bool {
-//     return r != 'i'
-// }
-// strings.trim_left_proc("testing", find) // -> "ing"
-// ```
-// Returns: The trimmed string as a slice of the original
-// Trims the input string s from the left until the procedure p returns false
-//
-// Inputs:
-// - s: The input string
-// - p: A procedure that takes a rune and returns a boolean
-//
-// Usage:
-// ```odin
-// find :: proc(r: rune) -> bool {
-//     return r != 'i'
-// }
-// strings.trim_left_proc("testing", find) // -> "ing"
-// ```
-// Returns: The trimmed string as a slice of the original
+/*
+Trims the input string s from the left until the procedure p returns false
+
+Inputs:
+- s: The input string
+- p: A procedure that takes a rune and returns a boolean
+
+Example:
+```odin
+	find :: proc(r: rune) -> bool {
+		return r != 'i'
+	}
+	strings.trim_left_proc("testing", find) // -> "ing"
+```
+Returns: The trimmed string as a slice of the original
+*/
 trim_left_proc :: proc(s: string, p: proc(rune) -> bool) -> string {
 	i := index_proc(s, p, false)
 	if i == -1 {
@@ -2305,22 +1758,16 @@ trim_left_proc :: proc(s: string, p: proc(rune) -> bool) -> string {
 	}
 	return s[i:]
 }
-// Trims the input string s from the left until the procedure p with state returns false
-//
-// Inputs:
-// - s: The input string
-// - p: A procedure that takes a raw pointer and a rune and returns a boolean
-// - state: The raw pointer to be passed to the procedure p
-//
-// Returns: The trimmed string as a slice of the original
-// Trims the input string s from the left until the procedure p with state returns false
-//
-// Inputs:
-// - s: The input string
-// - p: A procedure that takes a raw pointer and a rune and returns a boolean
-// - state: The raw pointer to be passed to the procedure p
-//
-// Returns: The trimmed string as a slice of the original
+/*
+Trims the input string s from the left until the procedure p with state returns false
+
+Inputs:
+- s: The input string
+- p: A procedure that takes a raw pointer and a rune and returns a boolean
+- state: The raw pointer to be passed to the procedure p
+
+Returns: The trimmed string as a slice of the original
+*/
 trim_left_proc_with_state :: proc(s: string, p: proc(rawptr, rune) -> bool, state: rawptr) -> string {
 	i := index_proc_with_state(s, p, state, false)
 	if i == -1 {
@@ -2328,34 +1775,22 @@ trim_left_proc_with_state :: proc(s: string, p: proc(rawptr, rune) -> bool, stat
 	}
 	return s[i:]
 }
-// Trims the input string s from the right until the procedure p returns false
-//
-// Inputs:
-// - s: The input string
-// - p: A procedure that takes a rune and returns a boolean
-//
-// Usage:
-// ```odin
-// find :: proc(r: rune) -> bool {
-//     return r != 't'
-// }
-// strings.trim_right_proc("testing", find) -> "test"
-// ```
-// Returns: The trimmed string as a slice of the original
-// Trims the input string s from the right until the procedure p returns false
-//
-// Inputs:
-// - s: The input string
-// - p: A procedure that takes a rune and returns a boolean
-//
-// Usage:
-// ```odin
-// find :: proc(r: rune) -> bool {
-//     return r != 't'
-// }
-// strings.trim_right_proc("testing", find) -> "test"
-// ```
-// Returns: The trimmed string as a slice of the original
+/*
+Trims the input string s from the right until the procedure p returns false
+
+Inputs:
+- s: The input string
+- p: A procedure that takes a rune and returns a boolean
+
+Example:
+```odin
+	find :: proc(r: rune) -> bool {
+		return r != 't'
+	}
+	strings.trim_right_proc("testing", find) -> "test"
+```
+Returns: The trimmed string as a slice of the original
+*/
 trim_right_proc :: proc(s: string, p: proc(rune) -> bool) -> string {
 	i := last_index_proc(s, p, false)
 	if i >= 0 && s[i] >= utf8.RUNE_SELF {
@@ -2366,22 +1801,16 @@ trim_right_proc :: proc(s: string, p: proc(rune) -> bool) -> string {
 	}
 	return s[0:i]
 }
-// Trims the input string s from the right until the procedure p with state returns false
-//
-// Inputs:
-// - s: The input string
-// - p: A procedure that takes a raw pointer and a rune and returns a boolean
-// - state: The raw pointer to be passed to the procedure p
-//
-// Returns: The trimmed string as a slice of the original, empty when no match
-// Trims the input string s from the right until the procedure p with state returns false
-//
-// Inputs:
-// - s: The input string
-// - p: A procedure that takes a raw pointer and a rune and returns a boolean
-// - state: The raw pointer to be passed to the procedure p
-//
-// Returns: The trimmed string as a slice of the original, empty when no match
+/*
+Trims the input string s from the right until the procedure p with state returns false
+
+Inputs:
+- s: The input string
+- p: A procedure that takes a raw pointer and a rune and returns a boolean
+- state: The raw pointer to be passed to the procedure p
+
+Returns: The trimmed string as a slice of the original, empty when no match
+*/
 trim_right_proc_with_state :: proc(s: string, p: proc(rawptr, rune) -> bool, state: rawptr) -> string {
 	i := last_index_proc_with_state(s, p, state, false)
 	if i >= 0 && s[i] >= utf8.RUNE_SELF {
@@ -2392,7 +1821,6 @@ trim_right_proc_with_state :: proc(s: string, p: proc(rawptr, rune) -> bool, sta
 	}
 	return s[0:i]
 }
-// Procedure for `trim_*_proc` variants, which has a string rawptr cast + rune comparison
 // Procedure for `trim_*_proc` variants, which has a string rawptr cast + rune comparison
 is_in_cutset :: proc(state: rawptr, r: rune) -> bool {
 	if state == nil {
@@ -2406,20 +1834,15 @@ is_in_cutset :: proc(state: rawptr, r: rune) -> bool {
 	}
 	return false
 }
-// Trims the cutset string from the s string
-//
-// Inputs:
-// - s: The input string
-// - cutset: The set of characters to be trimmed from the left of the input string
-//
-// Returns: The trimmed string as a slice of the original
-// Trims the cutset string from the s string
-//
-// Inputs:
-// - s: The input string
-// - cutset: The set of characters to be trimmed from the left of the input string
-//
-// Returns: The trimmed string as a slice of the original
+/*
+Trims the cutset string from the s string
+
+Inputs:
+- s: The input string
+- cutset: The set of characters to be trimmed from the left of the input string
+
+Returns: The trimmed string as a slice of the original
+*/
 trim_left :: proc(s: string, cutset: string) -> string {
 	if s == "" || cutset == "" {
 		return s
@@ -2427,20 +1850,15 @@ trim_left :: proc(s: string, cutset: string) -> string {
 	state := cutset
 	return trim_left_proc_with_state(s, is_in_cutset, &state)
 }
-// Trims the cutset string from the s string from the right
-//
-// Inputs:
-// - s: The input string
-// - cutset: The set of characters to be trimmed from the right of the input string
-//
-// Returns: The trimmed string as a slice of the original
-// Trims the cutset string from the s string from the right
-//
-// Inputs:
-// - s: The input string
-// - cutset: The set of characters to be trimmed from the right of the input string
-//
-// Returns: The trimmed string as a slice of the original
+/*
+Trims the cutset string from the s string from the right
+
+Inputs:
+- s: The input string
+- cutset: The set of characters to be trimmed from the right of the input string
+
+Returns: The trimmed string as a slice of the original
+*/
 trim_right :: proc(s: string, cutset: string) -> string {
 	if s == "" || cutset == "" {
 		return s
@@ -2448,207 +1866,143 @@ trim_right :: proc(s: string, cutset: string) -> string {
 	state := cutset
 	return trim_right_proc_with_state(s, is_in_cutset, &state)
 }
-// Trims the cutset string from the s string, both from left and right
-//
-// Inputs:
-// - s: The input string
-// - cutset: The set of characters to be trimmed from both sides of the input string
-//
-// Returns: The trimmed string as a slice of the original
-// Trims the cutset string from the s string, both from left and right
-//
-// Inputs:
-// - s: The input string
-// - cutset: The set of characters to be trimmed from both sides of the input string
-//
-// Returns: The trimmed string as a slice of the original
+/*
+Trims the cutset string from the s string, both from left and right
+
+Inputs:
+- s: The input string
+- cutset: The set of characters to be trimmed from both sides of the input string
+
+Returns: The trimmed string as a slice of the original
+*/
 trim :: proc(s: string, cutset: string) -> string {
 	return trim_right(trim_left(s, cutset), cutset)
 }
-// Trims until a valid non-space rune from the left, "\t\txyz\t\t" -> "xyz\t\t"
-//
-// Inputs:
-// - s: The input string
-//
-// Returns: The trimmed string as a slice of the original
-// Trims until a valid non-space rune from the left, "\t\txyz\t\t" -> "xyz\t\t"
-//
-// Inputs:
-// - s: The input string
-//
-// Returns: The trimmed string as a slice of the original
+/*
+Trims until a valid non-space rune from the left, "\t\txyz\t\t" -> "xyz\t\t"
+
+Inputs:
+- s: The input string
+
+Returns: The trimmed string as a slice of the original
+*/
 trim_left_space :: proc(s: string) -> string {
 	return trim_left_proc(s, is_space)
 }
-// Trims from the right until a valid non-space rune, "\t\txyz\t\t" -> "\t\txyz"
-//
-// Inputs:
-// - s: The input string
-//
-// Returns: The trimmed string as a slice of the original
-// Trims from the right until a valid non-space rune, "\t\txyz\t\t" -> "\t\txyz"
-//
-// Inputs:
-// - s: The input string
-//
-// Returns: The trimmed string as a slice of the original
+/*
+Trims from the right until a valid non-space rune, "\t\txyz\t\t" -> "\t\txyz"
+
+Inputs:
+- s: The input string
+
+Returns: The trimmed string as a slice of the original
+*/
 trim_right_space :: proc(s: string) -> string {
 	return trim_right_proc(s, is_space)
 }
-// Trims from both sides until a valid non-space rune, "\t\txyz\t\t" -> "xyz"
-//
-// Inputs:
-// - s: The input string
-//
-// Returns: The trimmed string as a slice of the original
-// Trims from both sides until a valid non-space rune, "\t\txyz\t\t" -> "xyz"
-//
-// Inputs:
-// - s: The input string
-//
-// Returns: The trimmed string as a slice of the original
+/*
+Trims from both sides until a valid non-space rune, "\t\txyz\t\t" -> "xyz"
+
+Inputs:
+- s: The input string
+
+Returns: The trimmed string as a slice of the original
+*/
 trim_space :: proc(s: string) -> string {
 	return trim_right_space(trim_left_space(s))
 }
-// Trims null runes from the left, "\x00\x00testing\x00\x00" -> "testing\x00\x00"
-//
-// Inputs:
-// - s: The input string
-//
-// Returns: The trimmed string as a slice of the original
-// Trims null runes from the left, "\x00\x00testing\x00\x00" -> "testing\x00\x00"
-//
-// Inputs:
-// - s: The input string
-//
-// Returns: The trimmed string as a slice of the original
+/*
+Trims null runes from the left, "\x00\x00testing\x00\x00" -> "testing\x00\x00"
+
+Inputs:
+- s: The input string
+
+Returns: The trimmed string as a slice of the original
+*/
 trim_left_null :: proc(s: string) -> string {
 	return trim_left_proc(s, is_null)
 }
-// Trims null runes from the right, "\x00\x00testing\x00\x00" -> "\x00\x00testing"
-//
-// Inputs:
-// - s: The input string
-//
-// Returns: The trimmed string as a slice of the original
-// Trims null runes from the right, "\x00\x00testing\x00\x00" -> "\x00\x00testing"
-//
-// Inputs:
-// - s: The input string
-//
-// Returns: The trimmed string as a slice of the original
+/*
+Trims null runes from the right, "\x00\x00testing\x00\x00" -> "\x00\x00testing"
+
+Inputs:
+- s: The input string
+
+Returns: The trimmed string as a slice of the original
+*/
 trim_right_null :: proc(s: string) -> string {
 	return trim_right_proc(s, is_null)
 }
-// Trims null runes from both sides, "\x00\x00testing\x00\x00" -> "testing"
-//
-// Inputs:
-// - s: The input string
-// Returns: The trimmed string as a slice of the original
-// Trims null runes from both sides, "\x00\x00testing\x00\x00" -> "testing"
-//
-// Inputs:
-// - s: The input string
-// Returns: The trimmed string as a slice of the original
+/*
+Trims null runes from both sides, "\x00\x00testing\x00\x00" -> "testing"
+
+Inputs:
+- s: The input string
+Returns: The trimmed string as a slice of the original
+*/
 trim_null :: proc(s: string) -> string {
 	return trim_right_null(trim_left_null(s))
 }
-// Trims a prefix string from the start of the s string and returns the trimmed string
-//
-// Inputs:
-// - s: The input string
-// - prefix: The prefix string to be removed
-//
-// Usage:
-// ```odin
-// strings.trim_prefix("testing", "test") // -> "ing"
-// strings.trim_prefix("testing", "abc")  // -> "testing"
-// ```
-// Returns: The trimmed string as a slice of original, or the input string if no prefix was found
-// Trims a prefix string from the start of the s string and returns the trimmed string
-//
-// Inputs:
-// - s: The input string
-// - prefix: The prefix string to be removed
-//
-// Usage:
-// ```odin
-// strings.trim_prefix("testing", "test") // -> "ing"
-// strings.trim_prefix("testing", "abc")  // -> "testing"
-// ```
-// Returns: The trimmed string as a slice of original, or the input string if no prefix was found
+/*
+Trims a prefix string from the start of the s string and returns the trimmed string
+
+Inputs:
+- s: The input string
+- prefix: The prefix string to be removed
+
+Example:
+```odin
+	strings.trim_prefix("testing", "test") // -> "ing"
+	strings.trim_prefix("testing", "abc")  // -> "testing"
+```
+Returns: The trimmed string as a slice of original, or the input string if no prefix was found
+*/
 trim_prefix :: proc(s, prefix: string) -> string {
 	if has_prefix(s, prefix) {
 		return s[len(prefix):]
 	}
 	return s
 }
-// Trims a suffix string from the end of the s string and returns the trimmed string
-//
-// Inputs:
-// - s: The input string
-// - suffix: The suffix string to be removed
-//
-// Usage:
-// ```odin
-// strings.trim_suffix("todo.txt", ".txt") // -> "todo"
-// strings.trim_suffix("todo.doc", ".txt") // -> "todo.doc"
-// ```
-// Returns: The trimmed string as a slice of original, or the input string if no suffix was found
-// Trims a suffix string from the end of the s string and returns the trimmed string
-//
-// Inputs:
-// - s: The input string
-// - suffix: The suffix string to be removed
-//
-// Usage:
-// ```odin
-// strings.trim_suffix("todo.txt", ".txt") // -> "todo"
-// strings.trim_suffix("todo.doc", ".txt") // -> "todo.doc"
-// ```
-// Returns: The trimmed string as a slice of original, or the input string if no suffix was found
+/*
+Trims a suffix string from the end of the s string and returns the trimmed string
+
+Inputs:
+- s: The input string
+- suffix: The suffix string to be removed
+
+Example:
+```odin
+	strings.trim_suffix("todo.txt", ".txt") // -> "todo"
+	strings.trim_suffix("todo.doc", ".txt") // -> "todo.doc"
+```
+Returns: The trimmed string as a slice of original, or the input string if no suffix was found
+*/
 trim_suffix :: proc(s, suffix: string) -> string {
 	if has_suffix(s, suffix) {
 		return s[:len(s)-len(suffix)]
 	}
 	return s
 }
-// Splits the input string s by all possible substrs and returns an allocated array of strings
-//
-// *Allocates Using Provided Allocator*
-//
-// Inputs:
-// - s: The input string
-// - substrs: An array of substrings used for splitting
-// - allocator: (default is context.allocator)
-//
-// NOTE: Allocation occurs for the array, the splits are all slices of the original string.
-//
-// Usage:
-// ```odin
-// splits := [?]string { "---", "~~~", ".", "_", "," }
-// res := strings.split_multi("testing,this.out_nice---done~~~last", splits[:])
-// fmt.println(res) // -> [testing, this, out, nice, done, last]
-// ```
-// Returns: An array of strings, or nil on empty substring or no matches
-// Splits the input string s by all possible substrs and returns an allocated array of strings
-//
-// *Allocates Using Provided Allocator*
-//
-// Inputs:
-// - s: The input string
-// - substrs: An array of substrings used for splitting
-// - allocator: (default is context.allocator)
-//
-// NOTE: Allocation occurs for the array, the splits are all slices of the original string.
-//
-// Usage:
-// ```odin
-// splits := [?]string { "---", "~~~", ".", "_", "," }
-// res := strings.split_multi("testing,this.out_nice---done~~~last", splits[:])
-// fmt.println(res) // -> [testing, this, out, nice, done, last]
-// ```
-// Returns: An array of strings, or nil on empty substring or no matches
+/*
+Splits the input string s by all possible substrs and returns an allocated array of strings
+
+*Allocates Using Provided Allocator*
+
+Inputs:
+- s: The input string
+- substrs: An array of substrings used for splitting
+- allocator: (default is context.allocator)
+
+NOTE: Allocation occurs for the array, the splits are all slices of the original string.
+
+Example:
+```odin
+	splits := [?]string { "---", "~~~", ".", "_", "," }
+	res := strings.split_multi("testing,this.out_nice---done~~~last", splits[:])
+	fmt.println(res) // -> [testing, this, out, nice, done, last]
+```
+Returns: An array of strings, or nil on empty substring or no matches
+*/
 split_multi :: proc(s: string, substrs: []string, allocator := context.allocator) -> []string #no_bounds_check {
 	if s == "" || len(substrs) <= 0 {
 		return nil
@@ -2689,34 +2043,22 @@ split_multi :: proc(s: string, substrs: []string, allocator := context.allocator
 	assert(len(results) == n)
 	return results[:]
 }
-// Splits the input string s by all possible substrs in an iterator fashion. The full string is returned if no match.
-//
-// Inputs:
-// - it: A pointer to the input string
-// - substrs: An array of substrings used for splitting
-//
-// Usage:
-// ```odin
-// it := "testing,this.out_nice---done~~~last"
-// for str in strings.split_multi_iterate(&it, splits[:]) {
-//     fmt.println(str) // every iteration // -> [testing, this, out, nice, done, last]
-// }
-// ```
-// Returns: A tuple containing the split string and a boolean indicating success or failure
-// Splits the input string s by all possible substrs in an iterator fashion. The full string is returned if no match.
-//
-// Inputs:
-// - it: A pointer to the input string
-// - substrs: An array of substrings used for splitting
-//
-// Usage:
-// ```odin
-// it := "testing,this.out_nice---done~~~last"
-// for str in strings.split_multi_iterate(&it, splits[:]) {
-//     fmt.println(str) // every iteration // -> [testing, this, out, nice, done, last]
-// }
-// ```
-// Returns: A tuple containing the split string and a boolean indicating success or failure
+/*
+Splits the input string s by all possible substrs in an iterator fashion. The full string is returned if no match.
+
+Inputs:
+- it: A pointer to the input string
+- substrs: An array of substrings used for splitting
+
+Example:
+```odin
+	it := "testing,this.out_nice---done~~~last"
+	for str in strings.split_multi_iterate(&it, splits[:]) {
+		fmt.println(str) // every iteration // -> [testing, this, out, nice, done, last]
+	}
+```
+Returns: A tuple containing the split string and a boolean indicating success or failure
+*/
 split_multi_iterate :: proc(it: ^string, substrs: []string) -> (res: string, ok: bool) #no_bounds_check {
 	if it == nil || len(it) == 0 || len(substrs) <= 0 {
 		return
@@ -2742,38 +2084,24 @@ split_multi_iterate :: proc(it: ^string, substrs: []string) -> (res: string, ok:
 	ok = true
 	return
 }
-// Replaces invalid UTF-8 characters in the input string with a specified replacement string. Adjacent invalid bytes are only replaced once.
-//
-// *Allocates Using Provided Allocator*
-//
-// Inputs:
-// - s: The input string
-// - replacement: The string used to replace invalid UTF-8 characters
-// - allocator: (default is context.allocator)
-//
-// Usage:
-// ```odin
-// text := "Hello\xC0\x80World"
-// result := strings.scrub(text, "?")
-// fmt.println(result) // -> "Hello?World"
-// ```
-// Returns: A new string with invalid UTF-8 characters replaced
-// Replaces invalid UTF-8 characters in the input string with a specified replacement string. Adjacent invalid bytes are only replaced once.
-//
-// *Allocates Using Provided Allocator*
-//
-// Inputs:
-// - s: The input string
-// - replacement: The string used to replace invalid UTF-8 characters
-// - allocator: (default is context.allocator)
-//
-// Usage:
-// ```odin
-// text := "Hello\xC0\x80World"
-// result := strings.scrub(text, "?")
-// fmt.println(result) // -> "Hello?World"
-// ```
-// Returns: A new string with invalid UTF-8 characters replaced
+/*
+Replaces invalid UTF-8 characters in the input string with a specified replacement string. Adjacent invalid bytes are only replaced once.
+
+*Allocates Using Provided Allocator*
+
+Inputs:
+- s: The input string
+- replacement: The string used to replace invalid UTF-8 characters
+- allocator: (default is context.allocator)
+
+Example:
+```odin
+	text := "Hello\xC0\x80World"
+	result := strings.scrub(text, "?")
+	fmt.println(result) // -> "Hello?World"
+```
+Returns: A new string with invalid UTF-8 characters replaced
+*/
 scrub :: proc(s: string, replacement: string, allocator := context.allocator) -> string {
 	str := s
 	b: Builder
@@ -2805,36 +2133,23 @@ scrub :: proc(s: string, replacement: string, allocator := context.allocator) ->
 
 	return to_string(b)
 }
-// Reverses the input string s
-//
-// *Allocates Using Provided Allocator*
-//
-// Inputs:
-// - s: The input string
-// - allocator: (default is context.allocator)
-//
-// Usage:
-// ```odin
-// a := "abcxyz"
-// b := strings.reverse(a)
-// fmt.println(a, b) // -> abcxyz zyxcba
-// ```
-// Returns: A reversed version of the input string
-// Reverses the input string s
-//
-// *Allocates Using Provided Allocator*
-//
-// Inputs:
-// - s: The input string
-// - allocator: (default is context.allocator)
-//
-// Usage:
-// ```odin
-// a := "abcxyz"
-// b := strings.reverse(a)
-// fmt.println(a, b) // -> abcxyz zyxcba
-// ```
-// Returns: A reversed version of the input string
+/*
+Reverses the input string s
+
+*Allocates Using Provided Allocator*
+
+Inputs:
+- s: The input string
+- allocator: (default is context.allocator)
+
+Example:
+```odin
+	a := "abcxyz"
+	b := strings.reverse(a)
+	fmt.println(a, b) // -> abcxyz zyxcba
+```
+Returns: A reversed version of the input string
+*/
 reverse :: proc(s: string, allocator := context.allocator) -> string {
 	str := s
 	n := len(str)
@@ -2849,42 +2164,26 @@ reverse :: proc(s: string, allocator := context.allocator) -> string {
 	}
 	return string(buf)
 }
-// Expands the input string by replacing tab characters with spaces to align to a specified tab size
-//
-// *Allocates Using Provided Allocator*
-//
-// Inputs:
-// - s: The input string
-// - tab_size: The number of spaces to use for each tab character
-// - allocator: (default is context.allocator)
-//
-// Usage:
-// ```odin
-// text := "abc1\tabc2\tabc3"
-// result := strings.expand_tabs(text, 4)
-// fmt.println(result) // -> "abc1    abc2    abc3"
-// ```
-// WARNING: Panics if tab_size <= 0
-//
-// Returns: A new string with tab characters expanded to the specified tab size
-// Expands the input string by replacing tab characters with spaces to align to a specified tab size
-//
-// *Allocates Using Provided Allocator*
-//
-// Inputs:
-// - s: The input string
-// - tab_size: The number of spaces to use for each tab character
-// - allocator: (default is context.allocator)
-//
-// Usage:
-// ```odin
-// text := "abc1\tabc2\tabc3"
-// result := strings.expand_tabs(text, 4)
-// fmt.println(result) // -> "abc1    abc2    abc3"
-// ```
-// WARNING: Panics if tab_size <= 0
-//
-// Returns: A new string with tab characters expanded to the specified tab size
+/*
+Expands the input string by replacing tab characters with spaces to align to a specified tab size
+
+*Allocates Using Provided Allocator*
+
+Inputs:
+- s: The input string
+- tab_size: The number of spaces to use for each tab character
+- allocator: (default is context.allocator)
+
+Example:
+```odin
+	text := "abc1\tabc2\tabc3"
+	result := strings.expand_tabs(text, 4)
+	fmt.println(result) // -> "abc1    abc2    abc3"
+```
+WARNING: Panics if tab_size <= 0
+
+Returns: A new string with tab characters expanded to the specified tab size
+*/
 expand_tabs :: proc(s: string, tab_size: int, allocator := context.allocator) -> string {
 	if tab_size <= 0 {
 		panic("tab size must be positive")
@@ -2926,34 +2225,22 @@ expand_tabs :: proc(s: string, tab_size: int, allocator := context.allocator) ->
 
 	return to_string(b)
 }
-// Splits the input string str by the separator sep string and returns 3 parts. The values are slices of the original string.
-//
-// Inputs:
-// - str: The input string
-// - sep: The separator string
-//
-// Usage:
-// ```odin
-// text := "testing this out"
-// strings.partition(text, " this ") // -> head: "testing", match: " this ", tail: "out"
-// strings.partition(text, "hi")     // -> head: "testing t", match: "hi", tail: "s out"
-// strings.partition(text, "xyz")    // -> head: "testing this out", match: "", tail: ""
-// ```
-// Returns: A tuple with head (before the split), match (the separator), and tail (the end of the split) strings
-// Splits the input string str by the separator sep string and returns 3 parts. The values are slices of the original string.
-//
-// Inputs:
-// - str: The input string
-// - sep: The separator string
-//
-// Usage:
-// ```odin
-// text := "testing this out"
-// strings.partition(text, " this ") // -> head: "testing", match: " this ", tail: "out"
-// strings.partition(text, "hi")     // -> head: "testing t", match: "hi", tail: "s out"
-// strings.partition(text, "xyz")    // -> head: "testing this out", match: "", tail: ""
-// ```
-// Returns: A tuple with head (before the split), match (the separator), and tail (the end of the split) strings
+/*
+Splits the input string str by the separator sep string and returns 3 parts. The values are slices of the original string.
+
+Inputs:
+- str: The input string
+- sep: The separator string
+
+Example:
+```odin
+	text := "testing this out"
+	strings.partition(text, " this ") // -> head: "testing", match: " this ", tail: "out"
+	strings.partition(text, "hi")     // -> head: "testing t", match: "hi", tail: "s out"
+	strings.partition(text, "xyz")    // -> head: "testing this out", match: "", tail: ""
+```
+Returns: A tuple with head (before the split), match (the separator), and tail (the end of the split) strings
+*/
 partition :: proc(str, sep: string) -> (head, match, tail: string) {
 	i := index(str, sep)
 	if i == -1 {
@@ -2967,30 +2254,20 @@ partition :: proc(str, sep: string) -> (head, match, tail: string) {
 	return
 }
 // Alias for centre_justify
-// Alias for centre_justify
 center_justify :: centre_justify // NOTE(bill): Because Americans exist
-// Centers the input string within a field of specified length by adding pad string on both sides, if its length is less than the target length.
-//
-// *Allocates Using Provided Allocator*
-//
-// Inputs:
-// - str: The input string
-// - length: The desired length of the centered string
-// - pad: The string used for padding on both sides
-// - allocator: (default is context.allocator)
-//
-// Returns: A new string centered within a field of the specified length
-// Centers the input string within a field of specified length by adding pad string on both sides, if its length is less than the target length.
-//
-// *Allocates Using Provided Allocator*
-//
-// Inputs:
-// - str: The input string
-// - length: The desired length of the centered string
-// - pad: The string used for padding on both sides
-// - allocator: (default is context.allocator)
-//
-// Returns: A new string centered within a field of the specified length
+/*
+Centers the input string within a field of specified length by adding pad string on both sides, if its length is less than the target length.
+
+*Allocates Using Provided Allocator*
+
+Inputs:
+- str: The input string
+- length: The desired length of the centered string
+- pad: The string used for padding on both sides
+- allocator: (default is context.allocator)
+
+Returns: A new string centered within a field of the specified length
+*/
 centre_justify :: proc(str: string, length: int, pad: string, allocator := context.allocator) -> string {
 	n := rune_count(str)
 	if n >= length || pad == "" {
@@ -3012,28 +2289,19 @@ centre_justify :: proc(str: string, length: int, pad: string, allocator := conte
 
 	return to_string(b)
 }
-// Left-justifies the input string within a field of specified length by adding pad string on the right side, if its length is less than the target length.
-//
-// *Allocates Using Provided Allocator*
-//
-// Inputs:
-// - str: The input string
-// - length: The desired length of the left-justified string
-// - pad: The string used for padding on the right side
-// - allocator: (default is context.allocator)
-//
-// Returns: A new string left-justified within a field of the specified length
-// Left-justifies the input string within a field of specified length by adding pad string on the right side, if its length is less than the target length.
-//
-// *Allocates Using Provided Allocator*
-//
-// Inputs:
-// - str: The input string
-// - length: The desired length of the left-justified string
-// - pad: The string used for padding on the right side
-// - allocator: (default is context.allocator)
-//
-// Returns: A new string left-justified within a field of the specified length
+/*
+Left-justifies the input string within a field of specified length by adding pad string on the right side, if its length is less than the target length.
+
+*Allocates Using Provided Allocator*
+
+Inputs:
+- str: The input string
+- length: The desired length of the left-justified string
+- pad: The string used for padding on the right side
+- allocator: (default is context.allocator)
+
+Returns: A new string left-justified within a field of the specified length
+*/
 left_justify :: proc(str: string, length: int, pad: string, allocator := context.allocator) -> string {
 	n := rune_count(str)
 	if n >= length || pad == "" {
@@ -3054,28 +2322,19 @@ left_justify :: proc(str: string, length: int, pad: string, allocator := context
 
 	return to_string(b)
 }
-// Right-justifies the input string within a field of specified length by adding pad string on the left side, if its length is less than the target length.
-//
-// *Allocates Using Provided Allocator*
-//
-// Inputs:
-// - str: The input string
-// - length: The desired length of the right-justified string
-// - pad: The string used for padding on the left side
-// - allocator: (default is context.allocator)
-//
-// Returns: A new string right-justified within a field of the specified length
-// Right-justifies the input string within a field of specified length by adding pad string on the left side, if its length is less than the target length.
-//
-// *Allocates Using Provided Allocator*
-//
-// Inputs:
-// - str: The input string
-// - length: The desired length of the right-justified string
-// - pad: The string used for padding on the left side
-// - allocator: (default is context.allocator)
-//
-// Returns: A new string right-justified within a field of the specified length
+/*
+Right-justifies the input string within a field of specified length by adding pad string on the left side, if its length is less than the target length.
+
+*Allocates Using Provided Allocator*
+
+Inputs:
+- str: The input string
+- length: The desired length of the right-justified string
+- pad: The string used for padding on the left side
+- allocator: (default is context.allocator)
+
+Returns: A new string right-justified within a field of the specified length
+*/
 right_justify :: proc(str: string, length: int, pad: string, allocator := context.allocator) -> string {
 	n := rune_count(str)
 	if n >= length || pad == "" {
@@ -3096,20 +2355,15 @@ right_justify :: proc(str: string, length: int, pad: string, allocator := contex
 
 	return to_string(b)
 }
-// Writes a given pad string a specified number of times to an io.Writer
-//
-// Inputs:
-// - w: The io.Writer to write the pad string to
-// - pad: The pad string to be written
-// - pad_len: The length of the pad string
-// - remains: The number of times to write the pad string
-// Writes a given pad string a specified number of times to an io.Writer
-//
-// Inputs:
-// - w: The io.Writer to write the pad string to
-// - pad: The pad string to be written
-// - pad_len: The length of the pad string
-// - remains: The number of times to write the pad string
+/*
+Writes a given pad string a specified number of times to an io.Writer
+
+Inputs:
+- w: The io.Writer to write the pad string to
+- pad: The pad string to be written
+- pad_len: The length of the pad string
+- remains: The number of times to write the pad string
+*/
 @private
 write_pad_string :: proc(w: io.Writer, pad: string, pad_len, remains: int) {
 	repeats := remains / pad_len
@@ -3127,24 +2381,17 @@ write_pad_string :: proc(w: io.Writer, pad: string, pad_len, remains: int) {
 		p = p[width:]
 	}
 }
-// Splits a string into a slice of substrings at each instance of one or more consecutive white space characters, as defined by unicode.is_space
-//
-// *Allocates Using Provided Allocator*
-//
-// Inputs:
-// - s: The input string
-// - allocator: (default is context.allocator)
-//
-// Returns: A slice of substrings of the input string, or an empty slice if the input string only contains white space
-// Splits a string into a slice of substrings at each instance of one or more consecutive white space characters, as defined by unicode.is_space
-//
-// *Allocates Using Provided Allocator*
-//
-// Inputs:
-// - s: The input string
-// - allocator: (default is context.allocator)
-//
-// Returns: A slice of substrings of the input string, or an empty slice if the input string only contains white space
+/*
+Splits a string into a slice of substrings at each instance of one or more consecutive white space characters, as defined by unicode.is_space
+
+*Allocates Using Provided Allocator*
+
+Inputs:
+- s: The input string
+- allocator: (default is context.allocator)
+
+Returns: A slice of substrings of the input string, or an empty slice if the input string only contains white space
+*/
 fields :: proc(s: string, allocator := context.allocator) -> []string #no_bounds_check {
 	n := 0
 	was_space := 1
@@ -3193,29 +2440,20 @@ fields :: proc(s: string, allocator := context.allocator) -> []string #no_bounds
 	}
 	return a
 }
-// Splits a string into a slice of substrings at each run of unicode code points `ch` satisfying the predicate f(ch)
-// Splits a string into a slice of substrings at each run of unicode code points `ch` satisfying the predicate f(ch)
-//
-// *Allocates Using Provided Allocator*
-//
-// Inputs:
-// - s: The input string
-// - f: A predicate function to determine the split points
-// - allocator: (default is context.allocator)
-//
-// NOTE: fields_proc makes no guarantee about the order in which it calls f(ch), it assumes that `f` always returns the same value for a given ch
-//
-// Returns: A slice of substrings of the input string, or an empty slice if all code points in the input string satisfy the predicate or if the input string is empty
-// *Allocates Using Provided Allocator*
-//
-// Inputs:
-// - s: The input string
-// - f: A predicate function to determine the split points
-// - allocator: (default is context.allocator)
-//
-// NOTE: fields_proc makes no guarantee about the order in which it calls f(ch), it assumes that `f` always returns the same value for a given ch
-//
-// Returns: A slice of substrings of the input string, or an empty slice if all code points in the input string satisfy the predicate or if the input string is empty
+/*
+Splits a string into a slice of substrings at each run of unicode code points `ch` satisfying the predicate f(ch)
+
+*Allocates Using Provided Allocator*
+
+Inputs:
+- s: The input string
+- f: A predicate function to determine the split points
+- allocator: (default is context.allocator)
+
+NOTE: fields_proc makes no guarantee about the order in which it calls f(ch), it assumes that `f` always returns the same value for a given ch
+
+Returns: A slice of substrings of the input string, or an empty slice if all code points in the input string satisfy the predicate or if the input string is empty
+*/
 fields_proc :: proc(s: string, f: proc(rune) -> bool, allocator := context.allocator) -> []string #no_bounds_check {
 	substrings := make([dynamic]string, 0, 32, allocator)
 
@@ -3242,22 +2480,16 @@ fields_proc :: proc(s: string, f: proc(rune) -> bool, allocator := context.alloc
 
 	return substrings[:]
 }
-// Retrieves the first non-space substring from a mutable string reference and advances the reference. s is advanced from any space after the substring, or be an empty string if the substring was the remaining characters
-//
-// Inputs:
-// - s: A mutable string reference to be iterated
-//
-// Returns:
-// - field: The first non-space substring found
-// - ok: A boolean indicating if a non-space substring was found
-// Retrieves the first non-space substring from a mutable string reference and advances the reference. s is advanced from any space after the substring, or be an empty string if the substring was the remaining characters
-//
-// Inputs:
-// - s: A mutable string reference to be iterated
-//
-// Returns:
-// - field: The first non-space substring found
-// - ok: A boolean indicating if a non-space substring was found
+/*
+Retrieves the first non-space substring from a mutable string reference and advances the reference. s is advanced from any space after the substring, or be an empty string if the substring was the remaining characters
+
+Inputs:
+- s: A mutable string reference to be iterated
+
+Returns:
+- field: The first non-space substring found
+- ok: A boolean indicating if a non-space substring was found
+*/
 fields_iterator :: proc(s: ^string) -> (field: string, ok: bool) {
 	start, end := -1, -1
 	for r, offset in s {
@@ -3286,32 +2518,21 @@ fields_iterator :: proc(s: ^string) -> (field: string, ok: bool) {
 	s^ = s[len(s):]
 	return
 }
-// Computes the Levenshtein edit distance between two strings
-//
-// *Allocates Using Provided Allocator (deletion occurs internal to proc)*
-//
-// NOTE: Does not perform internal allocation if Length of String b in Runes is Smaller Than 64
-//
-// Inputs:
-// - a, b: The two strings to compare
-// - allocator: (default is context.allocator)
-//
-// Returns: The Levenshtein edit distance between the two strings
-//
-// NOTE: This implementation is a single-row-version of the Wagner–Fischer algorithm, based on C code by Martin Ettl.
-// Computes the Levenshtein edit distance between two strings
-//
-// *Allocates Using Provided Allocator (deletion occurs internal to proc)*
-//
-// NOTE: Does not perform internal allocation if Length of String b in Runes is Smaller Than 64
-//
-// Inputs:
-// - a, b: The two strings to compare
-// - allocator: (default is context.allocator)
-//
-// Returns: The Levenshtein edit distance between the two strings
-//
-// NOTE: This implementation is a single-row-version of the Wagner–Fischer algorithm, based on C code by Martin Ettl.
+/*
+Computes the Levenshtein edit distance between two strings
+
+*Allocates Using Provided Allocator (deletion occurs internal to proc)*
+
+NOTE: Does not perform internal allocation if Length of String b in Runes is Smaller Than 64
+
+Inputs:
+- a, b: The two strings to compare
+- allocator: (default is context.allocator)
+
+Returns: The Levenshtein edit distance between the two strings
+
+NOTE: This implementation is a single-row-version of the Wagner–Fischer algorithm, based on C code by Martin Ettl.
+*/
 levenshtein_distance :: proc(a, b: string, allocator := context.allocator) -> int {
 	LEVENSHTEIN_DEFAULT_COSTS: []int : {
 		0,   1,   2,   3,   4,   5,   6,   7,   8,   9,
