@@ -4,59 +4,104 @@ import "core:io"
 import "core:unicode/utf8"
 
 /*
-	io stream data for a string reader that can read based on bytes or runes
-	implements the vtable when using the io.Reader variants
-	"read" calls advance the current reading offset `i`
+io stream data for a string reader that can read based on bytes or runes
+implements the vtable when using the io.Reader variants
+"read" calls advance the current reading offset `i`
 */
 Reader :: struct {
 	s:         string, // read-only buffer
 	i:         i64,    // current reading index
 	prev_rune: int,    // previous reading index of rune or < 0
 }
+/*
+Initializes a string Reader with the provided string
 
-// init the reader to the string `s` 
+Inputs:
+- r: A pointer to a Reader struct
+- s: The input string to be read
+*/
 reader_init :: proc(r: ^Reader, s: string) {
 	r.s = s
 	r.i = 0
 	r.prev_rune = -1
 }
+/*
+Converts a Reader into an io.Stream
 
-// returns a stream from the reader data
+Inputs:
+- r: A pointer to a Reader struct
+
+Returns: An io.Stream for the given Reader
+*/
 reader_to_stream :: proc(r: ^Reader) -> (s: io.Stream) {
 	s.stream_data = r
 	s.stream_vtable = &_reader_vtable
 	return
 }
+/*
+Initializes a string Reader and returns an io.Reader for the given string
 
-// init a reader to the string `s` and return an io.Reader
+Inputs:
+- r: A pointer to a Reader struct
+- s: The input string to be read
+
+Returns: An io.Reader for the given string
+*/
 to_reader :: proc(r: ^Reader, s: string) -> io.Reader {
 	reader_init(r, s)
 	rr, _ := io.to_reader(reader_to_stream(r))
 	return rr
 }
+/*
+Initializes a string Reader and returns an io.Reader_At for the given string
 
-// init a reader to the string `s` and return an io.Reader_At
+Inputs:
+- r: A pointer to a Reader struct
+- s: The input string to be read
+
+Returns: An io.Reader_At for the given string
+*/
 to_reader_at :: proc(r: ^Reader, s: string) -> io.Reader_At {
 	reader_init(r, s)
 	rr, _ := io.to_reader_at(reader_to_stream(r))
 	return rr
 }
+/*
+Returns the remaining length of the Reader
 
-// remaining length of the reader 
+Inputs:
+- r: A pointer to a Reader struct
+
+Returns: The remaining length of the Reader
+*/
 reader_length :: proc(r: ^Reader) -> int {
 	if r.i >= i64(len(r.s)) {
 		return 0
 	}
 	return int(i64(len(r.s)) - r.i)
 }
+/*
+Returns the length of the string stored in the Reader
 
-// returns the string length stored by the reader
+Inputs:
+- r: A pointer to a Reader struct
+
+Returns: The length of the string stored in the Reader
+*/
 reader_size :: proc(r: ^Reader) -> i64 {
 	return i64(len(r.s))
 }
+/*
+Reads len(p) bytes from the Reader's string and copies into the provided slice.
 
-// reads len(p) bytes into the slice from the string in the reader
-// returns `n` amount of read bytes and an io.Error
+Inputs:
+- r: A pointer to a Reader struct
+- p: A byte slice to copy data into
+
+Returns:
+- n: The number of bytes read
+- err: An io.Error if an error occurs while reading, including .EOF, otherwise nil denotes success.
+*/
 reader_read :: proc(r: ^Reader, p: []byte) -> (n: int, err: io.Error) {
 	if r.i >= i64(len(r.s)) {
 		return 0, .EOF
@@ -66,9 +111,18 @@ reader_read :: proc(r: ^Reader, p: []byte) -> (n: int, err: io.Error) {
 	r.i += i64(n)
 	return
 }
+/*
+Reads len(p) bytes from the Reader's string and copies into the provided slice, at the specified offset from the current index.
 
-// reads len(p) bytes into the slice from the string in the reader at an offset
-// returns `n` amount of read bytes and an io.Error
+Inputs:
+- r: A pointer to a Reader struct
+- p: A byte slice to copy data into
+- off: The offset from which to read
+
+Returns:
+- n: The number of bytes read
+- err: An io.Error if an error occurs while reading, including .EOF, otherwise nil denotes success.
+*/
 reader_read_at :: proc(r: ^Reader, p: []byte, off: i64) -> (n: int, err: io.Error) {
 	if off < 0 {
 		return 0, .Invalid_Offset
@@ -82,8 +136,16 @@ reader_read_at :: proc(r: ^Reader, p: []byte, off: i64) -> (n: int, err: io.Erro
 	}
 	return
 }
+/*
+Reads and returns a single byte from the Reader's string
 
-// reads and returns a single byte - error when out of bounds
+Inputs:
+- r: A pointer to a Reader struct
+
+Returns:
+- The byte read from the Reader
+- err: An io.Error if an error occurs while reading, including .EOF, otherwise nil denotes success.
+*/
 reader_read_byte :: proc(r: ^Reader) -> (byte, io.Error) {
 	r.prev_rune = -1
 	if r.i >= i64(len(r.s)) {
@@ -93,8 +155,14 @@ reader_read_byte :: proc(r: ^Reader) -> (byte, io.Error) {
 	r.i += 1
 	return b, nil
 }
+/*
+Decrements the Reader's index (i) by 1
 
-// decreases the reader offset - error when below 0
+Inputs:
+- r: A pointer to a Reader struct
+
+Returns: An io.Error if `r.i <= 0` (.Invalid_Unread), otherwise nil denotes success.
+*/
 reader_unread_byte :: proc(r: ^Reader) -> io.Error {
 	if r.i <= 0 {
 		return .Invalid_Unread
@@ -103,8 +171,17 @@ reader_unread_byte :: proc(r: ^Reader) -> io.Error {
 	r.i -= 1
 	return nil
 }
+/*
+Reads and returns a single rune and its size from the Reader's string
 
-// reads and returns a single rune and the rune size - error when out bounds
+Inputs:
+- r: A pointer to a Reader struct
+
+Returns:
+- ch: The rune read from the Reader
+- size: The size of the rune in bytes
+- err: An io.Error if an error occurs while reading
+*/
 reader_read_rune :: proc(r: ^Reader) -> (ch: rune, size: int, err: io.Error) {
 	if r.i >= i64(len(r.s)) {
 		r.prev_rune = -1
@@ -119,9 +196,16 @@ reader_read_rune :: proc(r: ^Reader) -> (ch: rune, size: int, err: io.Error) {
 	r.i += i64(size)
 	return
 }
+/*
+Decrements the Reader's index (i) by the size of the last read rune
 
-// decreases the reader offset by the last rune
-// can only be used once and after a valid read_rune call
+Inputs:
+- r: A pointer to a Reader struct
+
+WARNING: May only be used once and after a valid `read_rune` call
+
+Returns: An io.Error if an error occurs while unreading (.Invalid_Unread), else nil denotes success.
+*/
 reader_unread_rune :: proc(r: ^Reader) -> io.Error {
 	if r.i <= 0 {
 		return .Invalid_Unread
@@ -133,8 +217,18 @@ reader_unread_rune :: proc(r: ^Reader) -> io.Error {
 	r.prev_rune = -1
 	return nil
 }
+/*
+Seeks the Reader's index to a new position
 
-// seeks the reader offset to a wanted offset 
+Inputs:
+- r: A pointer to a Reader struct
+- offset: The new offset position
+- whence: The reference point for the new position (.Start, .Current, or .End)
+
+Returns:
+- The absolute offset after seeking
+- err: An io.Error if an error occurs while seeking (.Invalid_Whence, .Invalid_Offset)
+*/
 reader_seek :: proc(r: ^Reader, offset: i64, whence: io.Seek_From) -> (i64, io.Error) {
 	r.prev_rune = -1
 	abs: i64
@@ -155,8 +249,19 @@ reader_seek :: proc(r: ^Reader, offset: i64, whence: io.Seek_From) -> (i64, io.E
 	r.i = abs
 	return abs, nil
 }
+/*
+Writes the remaining content of the Reader's string into the provided io.Writer
 
-// writes the string content left to read into the io.Writer `w`
+Inputs:
+- r: A pointer to a Reader struct
+- w: The io.Writer to write the remaining content into
+
+WARNING: Panics if writer writes more bytes than remainig length of string.
+
+Returns:
+- n: The number of bytes written
+- err: An io.Error if an error occurs while writing (.Short_Write)
+*/
 reader_write_to :: proc(r: ^Reader, w: io.Writer) -> (n: i64, err: io.Error) {
 	r.prev_rune = -1
 	if r.i >= i64(len(r.s)) {
@@ -175,7 +280,12 @@ reader_write_to :: proc(r: ^Reader, w: io.Writer) -> (n: i64, err: io.Error) {
 	}
 	return
 }
+/*
+VTable containing implementations for various io.Stream methods
 
+This VTable is used by the Reader struct to provide its functionality
+as an io.Stream.
+*/
 @(private)
 _reader_vtable := io.Stream_VTable{
 	impl_size = proc(s: io.Stream) -> i64 {
