@@ -47,9 +47,9 @@ intern_destroy :: proc(m: ^Intern) {
 	delete(m.entries)
 }
 /*
-Returns the interned string for the given text, is set in the map if it didnt exist yet.
+Returns an interned copy of the given text, adding it to the map if not already present.
 
-*MAY Allocate using the Intern's Allocator*
+*Allocate using the Intern's Allocator (First time string is seen only)*
 
 **Inputs**  
 - m: A pointer to the Intern struct
@@ -64,17 +64,17 @@ intern_get :: proc(m: ^Intern, text: string) -> (str: string, err: runtime.Alloc
 	#no_bounds_check return string(entry.str[:entry.len]), nil
 }
 /*
-Returns the interned C-String for the given text, is set in the map if it didnt exist yet.
+Returns an interned copy of the given text as a cstring, adding it to the map if not already present.
 
-*MAY Allocate using the Intern's Allocator*
+*Allocate using the Intern's Allocator  (First time string is seen only)*
 
 **Inputs**  
 - m: A pointer to the Intern struct
 - text: The string to be interned
 
-NOTE: The returned C-String lives as long as the map entry lives
+NOTE: The returned cstring lives as long as the map entry lives
 
-**Returns**  The interned C-String and an allocator error if any
+**Returns**  The interned cstring and an allocator error if any
 */
 intern_get_cstring :: proc(m: ^Intern, text: string) -> (str: cstring, err: runtime.Allocator_Error) {
 	entry := _intern_get_entry(m, text) or_return
@@ -84,7 +84,7 @@ intern_get_cstring :: proc(m: ^Intern, text: string) -> (str: cstring, err: runt
 Internal function to lookup whether the text string exists in the map, returns the entry
 Sets and allocates the entry if it wasn't set yet
 
-*MAY Allocate using the Intern's Allocator*
+*Allocate using the Intern's Allocator  (First time string is seen only)*
 
 **Inputs**  
 - m: A pointer to the Intern struct

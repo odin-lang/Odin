@@ -136,15 +136,15 @@ to_upper :: proc(s: string, allocator := context.allocator) -> string {
 	return to_string(b)
 }
 /*
-Checks if the rune `c` is a delimiter (' ', '-', or '_').
+Checks if the rune `r` is a delimiter (' ', '-', or '_').
 
 **Inputs**  
-- c: Rune to check for delimiter status.
+- r: Rune to check for delimiter status.
 
-**Returns**  True if `c` is a delimiter, false otherwise.
+**Returns**  True if `r` is a delimiter, false otherwise.
 */
-is_delimiter :: proc(c: rune) -> bool {
-	return c == '-' || c == '_' || is_space(c)
+is_delimiter :: proc(r: rune) -> bool {
+	return r == '-' || r == '_' || is_space(r)
 }
 /*
 Checks if the rune `r` is a non-alphanumeric or space character.
@@ -195,7 +195,7 @@ Example:
 		my_callback :: proc(w: io.Writer, prev, curr, next: rune) {
 			fmt.println("my_callback", curr) // <-- Custom logic here
 		}
-		s := "hello world"
+		s := "hello"
 		b: strings.Builder
 		strings.builder_init_len(&b, len(s))
 		w := strings.to_writer(&b)
@@ -521,9 +521,7 @@ to_ada_case :: proc(s: string, allocator := context.allocator) -> string {
 
 	string_case_iterator(w, s, proc(w: io.Writer, prev, curr, next: rune) {
 		if !is_delimiter(curr) {
-			if is_delimiter(prev) ||
-			   prev == 0 ||
-			   (unicode.is_lower(prev) && unicode.is_upper(curr)) {
+			if is_delimiter(prev) || prev == 0 || (unicode.is_lower(prev) && unicode.is_upper(curr)) {
 				if prev != 0 {
 					io.write_rune(w, '_')
 				}

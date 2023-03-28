@@ -5,7 +5,7 @@ import "core:unicode/utf8"
 
 /*
 io stream data for a string reader that can read based on bytes or runes
-implements the vtable when using the io.Reader variants
+implements the vtable when using the `io.Reader` variants
 "read" calls advance the current reading offset `i`
 */
 Reader :: struct {
@@ -26,7 +26,7 @@ reader_init :: proc(r: ^Reader, s: string) {
 	r.prev_rune = -1
 }
 /*
-Converts a Reader into an io.Stream
+Converts a Reader into an `io.Stream`
 
 **Inputs**  
 - r: A pointer to a Reader struct
@@ -39,7 +39,7 @@ reader_to_stream :: proc(r: ^Reader) -> (s: io.Stream) {
 	return
 }
 /*
-Initializes a string Reader and returns an io.Reader for the given string
+Initializes a string Reader and returns an `io.Reader` for the given string
 
 **Inputs**  
 - r: A pointer to a Reader struct
@@ -53,13 +53,13 @@ to_reader :: proc(r: ^Reader, s: string) -> io.Reader {
 	return rr
 }
 /*
-Initializes a string Reader and returns an io.Reader_At for the given string
+Initializes a string Reader and returns an `io.Reader_At` for the given string
 
 **Inputs**  
 - r: A pointer to a Reader struct
 - s: The input string to be read
 
-**Returns**  An io.Reader_At for the given string
+**Returns**  An `io.Reader_At` for the given string
 */
 to_reader_at :: proc(r: ^Reader, s: string) -> io.Reader_At {
 	reader_init(r, s)
@@ -100,7 +100,7 @@ Reads len(p) bytes from the Reader's string and copies into the provided slice.
 
 **Returns**  
 - n: The number of bytes read
-- err: An io.Error if an error occurs while reading, including .EOF, otherwise nil denotes success.
+- err: An `io.Error` if an error occurs while reading, including `.EOF`, otherwise `nil` denotes success.
 */
 reader_read :: proc(r: ^Reader, p: []byte) -> (n: int, err: io.Error) {
 	if r.i >= i64(len(r.s)) {
@@ -121,7 +121,7 @@ Reads len(p) bytes from the Reader's string and copies into the provided slice, 
 
 **Returns**  
 - n: The number of bytes read
-- err: An io.Error if an error occurs while reading, including .EOF, otherwise nil denotes success.
+- err: An `io.Error` if an error occurs while reading, including `.EOF`, otherwise `nil` denotes success.
 */
 reader_read_at :: proc(r: ^Reader, p: []byte, off: i64) -> (n: int, err: io.Error) {
 	if off < 0 {
@@ -144,7 +144,7 @@ Reads and returns a single byte from the Reader's string
 
 **Returns**  
 - The byte read from the Reader
-- err: An io.Error if an error occurs while reading, including .EOF, otherwise nil denotes success.
+- err: An `io.Error` if an error occurs while reading, including `.EOF`, otherwise `nil` denotes success.
 */
 reader_read_byte :: proc(r: ^Reader) -> (byte, io.Error) {
 	r.prev_rune = -1
@@ -161,7 +161,7 @@ Decrements the Reader's index (i) by 1
 **Inputs**  
 - r: A pointer to a Reader struct
 
-**Returns**  An io.Error if `r.i <= 0` (.Invalid_Unread), otherwise nil denotes success.
+**Returns**  An `io.Error` if `r.i <= 0` (`.Invalid_Unread`), otherwise `nil` denotes success.
 */
 reader_unread_byte :: proc(r: ^Reader) -> io.Error {
 	if r.i <= 0 {
@@ -172,17 +172,17 @@ reader_unread_byte :: proc(r: ^Reader) -> io.Error {
 	return nil
 }
 /*
-Reads and returns a single rune and its size from the Reader's string
+Reads and returns a single rune and its `size` from the Reader's string
 
 **Inputs**  
 - r: A pointer to a Reader struct
 
 **Returns**  
-- ch: The rune read from the Reader
+- r: The rune read from the Reader
 - size: The size of the rune in bytes
-- err: An io.Error if an error occurs while reading
+- err: An `io.Error` if an error occurs while reading
 */
-reader_read_rune :: proc(r: ^Reader) -> (ch: rune, size: int, err: io.Error) {
+reader_read_rune :: proc(r: ^Reader) -> (rn: rune, size: int, err: io.Error) {
 	if r.i >= i64(len(r.s)) {
 		r.prev_rune = -1
 		return 0, 0, .EOF
@@ -192,7 +192,7 @@ reader_read_rune :: proc(r: ^Reader) -> (ch: rune, size: int, err: io.Error) {
 		r.i += 1
 		return rune(c), 1, nil
 	}
-	ch, size = utf8.decode_rune_in_string(r.s[r.i:])
+	rn, size = utf8.decode_rune_in_string(r.s[r.i:])
 	r.i += i64(size)
 	return
 }
@@ -204,7 +204,7 @@ Decrements the Reader's index (i) by the size of the last read rune
 
 WARNING: May only be used once and after a valid `read_rune` call
 
-**Returns**  An io.Error if an error occurs while unreading (.Invalid_Unread), else nil denotes success.
+**Returns**  An `io.Error` if an error occurs while unreading (`.Invalid_Unread`), else `nil` denotes success.
 */
 reader_unread_rune :: proc(r: ^Reader) -> io.Error {
 	if r.i <= 0 {
@@ -223,11 +223,11 @@ Seeks the Reader's index to a new position
 **Inputs**  
 - r: A pointer to a Reader struct
 - offset: The new offset position
-- whence: The reference point for the new position (.Start, .Current, or .End)
+- whence: The reference point for the new position (`.Start`, `.Current`, or `.End`)
 
 **Returns**  
 - The absolute offset after seeking
-- err: An io.Error if an error occurs while seeking (.Invalid_Whence, .Invalid_Offset)
+- err: An `io.Error` if an error occurs while seeking (`.Invalid_Whence`, `.Invalid_Offset`)
 */
 reader_seek :: proc(r: ^Reader, offset: i64, whence: io.Seek_From) -> (i64, io.Error) {
 	r.prev_rune = -1
@@ -250,7 +250,7 @@ reader_seek :: proc(r: ^Reader, offset: i64, whence: io.Seek_From) -> (i64, io.E
 	return abs, nil
 }
 /*
-Writes the remaining content of the Reader's string into the provided io.Writer
+Writes the remaining content of the Reader's string into the provided `io.Writer`
 
 **Inputs**  
 - r: A pointer to a Reader struct
@@ -260,7 +260,7 @@ WARNING: Panics if writer writes more bytes than remainig length of string.
 
 **Returns**  
 - n: The number of bytes written
-- err: An io.Error if an error occurs while writing (.Short_Write)
+- err: An io.Error if an error occurs while writing (`.Short_Write`)
 */
 reader_write_to :: proc(r: ^Reader, w: io.Writer) -> (n: i64, err: io.Error) {
 	r.prev_rune = -1
@@ -281,10 +281,10 @@ reader_write_to :: proc(r: ^Reader, w: io.Writer) -> (n: i64, err: io.Error) {
 	return
 }
 /*
-VTable containing implementations for various io.Stream methods
+VTable containing implementations for various `io.Stream` methods
 
 This VTable is used by the Reader struct to provide its functionality
-as an io.Stream.
+as an `io.Stream`.
 */
 @(private)
 _reader_vtable := io.Stream_VTable{
