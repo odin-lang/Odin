@@ -86,7 +86,7 @@ NOTE: The created string is only valid as long as the pointer and length are val
 
 **Returns**  A string created from the null-terminated byte pointer and length
 */
-string_from_zero_terminated_ptr :: proc(ptr: ^byte, len: int) -> string {
+string_from_null_terminated_ptr :: proc(ptr: ^byte, len: int) -> string {
 	s := transmute(string)mem.Raw_String{ptr, len}
 	s = truncate_to_byte(s, 0)
 	return s
