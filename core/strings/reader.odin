@@ -178,11 +178,11 @@ Reads and returns a single rune and its `size` from the Reader's string
 - r: A pointer to a Reader struct
 
 **Returns**  
-- r: The rune read from the Reader
+- rr: The rune read from the Reader
 - size: The size of the rune in bytes
 - err: An `io.Error` if an error occurs while reading
 */
-reader_read_rune :: proc(r: ^Reader) -> (rn: rune, size: int, err: io.Error) {
+reader_read_rune :: proc(r: ^Reader) -> (rr: rune, size: int, err: io.Error) {
 	if r.i >= i64(len(r.s)) {
 		r.prev_rune = -1
 		return 0, 0, .EOF
@@ -192,7 +192,7 @@ reader_read_rune :: proc(r: ^Reader) -> (rn: rune, size: int, err: io.Error) {
 		r.i += 1
 		return rune(c), 1, nil
 	}
-	rn, size = utf8.decode_rune_in_string(r.s[r.i:])
+	rr, size = utf8.decode_rune_in_string(r.s[r.i:])
 	r.i += i64(size)
 	return
 }

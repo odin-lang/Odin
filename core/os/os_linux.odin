@@ -913,7 +913,7 @@ get_current_directory :: proc() -> string {
 		#no_bounds_check res := unix.sys_getcwd(&buf[0], uint(len(buf)))
 
 		if res >= 0 {
-			return strings.string_from_nul_terminated_ptr(&buf[0], len(buf))
+			return strings.string_from_zero_terminated_ptr(&buf[0], len(buf))
 		}
 		if _get_errno(res) != ERANGE {
 			delete(buf)

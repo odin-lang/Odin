@@ -43,7 +43,7 @@ clone_safe :: proc(s: string, allocator := context.allocator, loc := #caller_loc
 	return string(c[:len(s)]), nil
 }
 /*
-Clones a string and appends a `nul` byte to make it a cstring
+Clones a string and appends a null-byte to make it a cstring
 
 *Allocates Using Provided Allocator*
 
@@ -52,7 +52,7 @@ Clones a string and appends a `nul` byte to make it a cstring
 - allocator: (default: context.allocator)
 - loc: The caller location for debugging purposes (default: #caller_location)
 
-**Returns**  A cloned cstring with an appended `nul` byte
+**Returns**  A cloned cstring with an appended null-byte
 */
 clone_to_cstring :: proc(s: string, allocator := context.allocator, loc := #caller_location) -> cstring {
 	c := make([]byte, len(s)+1, allocator, loc)
@@ -75,18 +75,18 @@ string_from_ptr :: proc(ptr: ^byte, len: int) -> string {
 	return transmute(string)mem.Raw_String{ptr, len}
 }
 /*
-Transmutes a raw pointer (nul-terminated) into a string. Non-allocating. Searches for a nul byte from `0..<len`, otherwhise `len` will be the end size
+Transmutes a raw pointer (null-terminated) into a string. Non-allocating. Searches for a null-byte from `0..<len`, otherwhise `len` will be the end size
 
 NOTE: The created string is only valid as long as the pointer and length are valid.
-      The string is truncated at the first nul byte encountered.
+      The string is truncated at the first null-byte encountered.
 
 **Inputs**  
-- ptr: A pointer to the start of the nul-terminated byte sequence
+- ptr: A pointer to the start of the null-terminated byte sequence
 - len: The length of the byte sequence
 
-**Returns**  A string created from the nul-terminated byte pointer and length
+**Returns**  A string created from the null-terminated byte pointer and length
 */
-string_from_nul_terminated_ptr :: proc(ptr: ^byte, len: int) -> string {
+string_from_zero_terminated_ptr :: proc(ptr: ^byte, len: int) -> string {
 	s := transmute(string)mem.Raw_String{ptr, len}
 	s = truncate_to_byte(s, 0)
 	return s
@@ -109,7 +109,7 @@ Converts a string `str` to a cstring
 **Inputs**  
 - str: The input string
 
-WARNING: This is unsafe because the original string may not contain a `nul` byte.
+WARNING: This is unsafe because the original string may not contain a null-byte.
 
 **Returns**  The converted cstring
 */
@@ -152,7 +152,7 @@ truncate_to_rune :: proc(str: string, r: rune) -> string {
 	return str[:n]
 }
 /*
-Clones a byte array `s` and appends a `nul` byte
+Clones a byte array `s` and appends a null-byte
 
 *Allocates Using Provided Allocator*
 
@@ -161,7 +161,7 @@ Clones a byte array `s` and appends a `nul` byte
 - allocator: (default: context.allocator)
 - loc: The caller location for debugging purposes (default: `#caller_location`)
 
-**Returns**  A cloned string from the byte array with a `nul` byte
+**Returns**  A cloned string from the byte array with a null-byte
 */
 clone_from_bytes :: proc(s: []byte, allocator := context.allocator, loc := #caller_location) -> string {
 	c := make([]byte, len(s)+1, allocator, loc)
@@ -211,19 +211,19 @@ clone_from :: proc{
 	clone_from_ptr,
 }
 /*
-Clones a string from a nul-terminated cstring `ptr` and a byte length `len`
+Clones a string from a null-terminated cstring `ptr` and a byte length `len`
 
 *Allocates Using Provided Allocator*
 
 **Inputs**  
-- ptr: A pointer to the start of the nul-terminated cstring
+- ptr: A pointer to the start of the null-terminated cstring
 - len: The byte length of the cstring
 - allocator: (default: context.allocator)
 - loc: The caller location for debugging purposes (default: `#caller_location`)
 
-NOTE: Truncates at the first nul byte encountered or the byte length.
+NOTE: Truncates at the first null-byte encountered or the byte length.
 
-**Returns**  A cloned string from the nul-terminated cstring and byte length
+**Returns**  A cloned string from the null-terminated cstring and byte length
 */
 clone_from_cstring_bounded :: proc(ptr: cstring, len: int, allocator := context.allocator, loc := #caller_location) -> string {
 	s := string_from_ptr((^u8)(ptr), len)
@@ -268,18 +268,6 @@ Returns true when the string `substr` is contained inside the string `s`
 - substr: The substring to search for
 
 Example:
-Example:
-```odin
-	strings.contains("testing", "test") // -> true
-	strings.contains("testing", "ing")  // -> true
-	strings.contains("testing", "text") // -> false
-```
-	Example:
-```odin
-	strings.contains("testing", "test") // -> true
-	strings.contains("testing", "ing")  // -> true
-	strings.contains("testing", "text") // -> false
-```
 
 	import "core:fmt"
 	import "core:strings"
@@ -627,7 +615,7 @@ Returns a combined string from the slice of strings `a` without a separator
 
 **Inputs**  
 - a: A slice of strings to concatenate
-- allocator: An optional custom allocator (default is context.allocator)
+- allocator: (default is context.allocator)
 
 Example:
 
@@ -668,7 +656,7 @@ Returns a combined string from the slice of strings `a` without a separator, or 
 
 **Inputs**  
 - a: A slice of strings to concatenate
-- allocator: An optional custom allocator (default is context.allocator)
+- allocator: (default is context.allocator)
 
 **Returns**  The concatenated string, and an error if allocation fails
 */
@@ -697,7 +685,7 @@ Returns a substring of the input string `s` with the specified rune offset and l
 - s: The input string to cut
 - rune_offset: The starting rune index (default is 0). In runes, not bytes.
 - rune_length: The number of runes to include in the substring (default is 0, which returns the remainder of the string).  In runes, not bytes.
-- allocator: An optional custom allocator (default is context.allocator)
+- allocator: (default is context.allocator)
 
 Example:
 
@@ -774,12 +762,16 @@ Splits the input string `s` into a slice of substrings separated by the specifie
 
 *Allocates Using Provided Allocator*
 
+*Used Internally - Private Function*
+
 **Inputs**  
 - s: The input string to split
 - sep: The separator string
 - sep_save: A flag determining if the separator should be saved in the resulting substrings
 - n: The maximum number of substrings to return, returns `nil` without alloc when `n=0`
-- allocator: An optional custom allocator (default is context.allocator)
+- allocator: (default is context.allocator)
+
+NOTE: Allocation occurs for the array, the splits are all views of the original string.
 
 **Returns**  A slice of substrings
 */
@@ -855,6 +847,8 @@ Output:
 
 	["aaa", "bbb", "ccc", "ddd", "eee"]
 
+NOTE: Allocation occurs for the array, the splits are all views of the original string.
+
 **Returns**  A slice of strings, each representing a part of the split string.
 */
 split :: proc(s, sep: string, allocator := context.allocator) -> []string {
@@ -885,6 +879,8 @@ Output:
 
 	["aaa", "bbb", "ccc.ddd.eee"]
 
+NOTE: Allocation occurs for the array, the splits are all views of the original string.
+
 **Returns**  A slice of strings, each representing a part of the split string.
 */
 split_n :: proc(s, sep: string, n: int, allocator := context.allocator) -> []string {
@@ -898,7 +894,7 @@ Splits a string into parts after the separator, retaining it in the substrings.
 **Inputs**  
 - s: The string to split.
 - sep: The separator string used to split the input string.
-- allocator: (Optional) The allocator used for allocation (default is context.allocator).
+- allocator: (default is context.allocator).
 
 Example:
 
@@ -914,6 +910,8 @@ Example:
 Output:
 
 	["aaa.", "bbb.", "ccc.", "ddd.", "eee"]
+
+NOTE: Allocation occurs for the array, the splits are all views of the original string.
 
 **Returns**  A slice of strings, each representing a part of the split string after the separator.
 */
@@ -946,6 +944,8 @@ Output:
 
 	["aaa.", "bbb.", "ccc.ddd.eee"]
 
+NOTE: Allocation occurs for the array, the splits are all views of the original string.
+
 **Returns**  A slice of strings with `n` parts or fewer if there weren't
 */
 split_after_n :: proc(s, sep: string, n: int, allocator := context.allocator) -> []string {
@@ -961,8 +961,6 @@ up to (but not including) the separator, as well as a boolean indicating success
 - s: Pointer to the input string, which is modified during the search.
 - sep: The separator string to search for.
 - sep_save: Number of characters from the separator to include in the result.
-
-NOTE: Destructively consumes the string
 
 **Returns**  A tuple containing the resulting substring and a boolean indicating success.
 */
@@ -995,7 +993,6 @@ _split_iterator :: proc(s: ^string, sep: string, sep_save: int) -> (res: string,
 }
 /*
 Splits the input string by the byte separator in an iterator fashion.
-Destructively consumes the original string until the end.
 
 **Inputs**  
 - s: Pointer to the input string, which is modified during the search.
@@ -1111,7 +1108,7 @@ Trims the carriage return character from the end of the input string.
 **Inputs**  
 - s: The input string to trim.
 
-**Returns**  The trimmed string as a slice.
+**Returns**  The trimmed string as a slice of the original.
 */
 @(private)
 _trim_cr :: proc(s: string) -> string {
@@ -1147,7 +1144,7 @@ Output:
 
 	["a", "b", "c", "d", "e"]
 
-**Returns**  An allocated slice of strings split by line breaks.
+**Returns**  A slice (allocated) of the split string (slices into original string)
 */
 split_lines :: proc(s: string, allocator := context.allocator) -> []string {
 	sep :: "\n"
@@ -1182,7 +1179,9 @@ Output:
 
 	["a", "b", "c\nd\ne"]
 
-**Returns**  An allocated array of strings split by line breaks.
+NOTE: Allocation occurs for the array, the splits are all views of the original string.
+
+**Returns**  A slice (allocated) of the split string (slices into original string)
 */
 split_lines_n :: proc(s: string, n: int, allocator := context.allocator) -> []string {
 	sep :: "\n"
@@ -1216,7 +1215,9 @@ Output:
 
 	["a\n", "b\n", "c\n", "d\n", "e"]
 
-**Returns**  An allocated slice of strings split by line breaks with line breaks included.
+NOTE: Allocation occurs for the array, the splits are all views of the original string.
+
+**Returns**  A slice (allocated) of the split string (slices into original string), with `\n` included.
 */
 split_lines_after :: proc(s: string, allocator := context.allocator) -> []string {
 	sep :: "\n"
@@ -1252,7 +1253,9 @@ Output:
 
 	["a\n", "b\n", "c\nd\ne"]
 
-**Returns**  An allocated slice of strings split by line breaks with line breaks included.
+NOTE: Allocation occurs for the array, the splits are all views of the original string.
+
+**Returns**  A slice (allocated) of the split string (slices into original string), with `\n` included.
 */
 split_lines_after_n :: proc(s: string, n: int, allocator := context.allocator) -> []string {
 	sep :: "\n"
@@ -2073,7 +2076,7 @@ is_space :: proc(r: rune) -> bool {
 	}
 	return false
 }
-// Returns true if the `r` rune is a null byte (`0x0`)
+// Returns true if the `r` rune is a null-byte (`0x0`)
 is_null :: proc(r: rune) -> bool {
 	return r == 0x0000
 }
@@ -2448,7 +2451,7 @@ Splits the input string `s` by all possible `substrs` and returns an allocated a
 - substrs: An array of substrings used for splitting
 - allocator: (default is context.allocator)
 
-NOTE: Allocation occurs for the array, the splits are all slices of the original string.
+NOTE: Allocation occurs for the array, the splits are all views of the original string.
 
 Example:
 
