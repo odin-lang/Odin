@@ -2078,7 +2078,7 @@ is_null :: proc(r: rune) -> bool {
 	return r == 0x0000
 }
 /*
-Finds the index of the first rune in the string s for which the procedure p returns the same value as truth
+Find the index of the first rune r in string s for which procedure p returns the same as truth, or -1 if no such rune appears.
 
 **Inputs**  
 - s: The input string
@@ -2777,7 +2777,7 @@ Centers the input string within a field of specified length by adding pad string
 
 **Inputs**  
 - str: The input string
-- length: The desired length of the centered string
+- length: The desired length of the centered string, in runes
 - pad: The string used for padding on both sides
 - allocator: (default is context.allocator)
 
@@ -2876,8 +2876,8 @@ Writes a given pad string a specified number of times to an io.Writer
 **Inputs**  
 - w: The io.Writer to write the pad string to
 - pad: The pad string to be written
-- pad_len: The length of the pad string
-- remains: The number of times to write the pad string
+- pad_len: The length of the pad string, in runes
+- remains: The number of times to write the pad string, in runes
 */
 @private
 write_pad_string :: proc(w: io.Writer, pad: string, pad_len, remains: int) {
@@ -2956,7 +2956,7 @@ fields :: proc(s: string, allocator := context.allocator) -> []string #no_bounds
 	return a
 }
 /*
-Splits a string into a slice of substrings at each run of unicode code points `ch` satisfying the predicate f(ch)
+Splits a string into a slice of substrings at each run of unicode code points `r` satisfying the predicate f(r)
 
 *Allocates Using Provided Allocator*
 

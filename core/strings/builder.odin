@@ -148,8 +148,7 @@ _builder_stream_vtable_obj := io.Stream_VTable{
 	},
 	impl_destroy = proc(s: io.Stream) -> io.Error {
 		b := (^Builder)(s.stream_data)
-		delete(b.buf)
-		b.buf=nil
+		builder_destroy(b)
 		return .None
 	},
 }
@@ -179,7 +178,7 @@ to_writer :: proc(b: ^Builder) -> io.Writer {
 	return io.to_writer(to_stream(b))
 }
 /*
-Deletes and clears the Builder byte buffer content
+Deletes the Builder byte buffer content
 
 **Inputs**  
 - b: A pointer to the Builder
@@ -501,12 +500,12 @@ Example:
 		strings.write_quoted_string(&builder, "a")        // 3
 		strings.write_quoted_string(&builder, "bc", '\'') // 4
 		strings.write_quoted_string(&builder, "xyz")      // 5
-		fmt.println(strings.to_string(builder))           // -> "a"'bc'xyz"
+		fmt.println(strings.to_string(builder))
 	}
 
 Output:
 
-	"a"'bc'xyz"
+	"a"'bc'"xyz"
 
 NOTE: The backing dynamic array may be fixed in capacity or fail to resize, `n` states the number actually written.
 
@@ -517,12 +516,29 @@ write_quoted_string :: proc(b: ^Builder, str: string, quote: byte = '"') -> (n: 
 	return
 }
 /*
-Appends an encoded rune to the Builder and returns the number of bytes written
+Appends a rune to the Builder and returns the number of bytes written
 
 **Inputs**  
 - b: A pointer to the Builder
 - r: The rune to be appended
-- write_quote: Optional boolean flag to write the quote character (default is true)
+- write_quote: Optional boolean flag to wrap in single-quotes (') (default is true)
+
+Example:
+
+	import "core:fmt"
+	import "core:strings"
+
+	write_encoded_rune_example :: proc() {
+		builder := strings.builder_make()
+		strings.write_encoded_rune(&builder, 'a', false) // 1
+		strings.write_encoded_rune(&builder, '\"', true) // 3
+		strings.write_encoded_rune(&builder, 'x', false) // 1
+		fmt.println(strings.to_string(builder))
+	}
+
+Output:
+
+	a'"'x
 
 NOTE: The backing dynamic array may be fixed in capacity or fail to resize, `n` states the number actually written.
 
