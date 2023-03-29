@@ -1167,3 +1167,37 @@ fields_proc :: proc(s: []byte, f: proc(rune) -> bool, allocator := context.alloc
 
 	return subslices[:]
 }
+
+to_lower :: proc(s: []byte) -> []byte {
+    s, i, n := s, 0, len(s)
+
+    for i < n {
+        ch, ch_size := utf8.decode_rune(s[i:])
+        i += ch_size
+
+        lower_ch := unicode.to_lower(ch)
+        if ch != lower_ch {
+            lower_bytes := transmute([4]byte)lower_ch
+            copy(s[i-1:], lower_bytes[:ch_size])
+        }
+    }
+
+    return s
+}
+
+to_upper :: proc(s: []byte) -> []byte {
+    s, i, n := s, 0, len(s)
+
+    for i < n {
+        ch, ch_size := utf8.decode_rune(s[i:])
+        i += ch_size
+
+        upper_ch := unicode.to_upper(ch)
+        if ch != upper_ch {
+            upper_bytes := transmute([4]byte)upper_ch
+            copy(s[i-1:], upper_bytes[:ch_size])
+        }
+    }
+
+    return s
+}
