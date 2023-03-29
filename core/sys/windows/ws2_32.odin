@@ -3,11 +3,22 @@ package sys_windows
 
 foreign import ws2_32 "system:Ws2_32.lib"
 
+POLLRDNORM :: 0x0100
+POLLRDBAND :: 0x0200
+POLLIN     :: (POLLRDNORM | POLLRDBAND)
+POLLPRI    :: 0x0400
+WSA_POLLFD::struct{
+	fd:SOCKET,
+	events:c_short,
+	revents:c_short,
+}
+
 @(default_calling_convention="stdcall")
 foreign ws2_32 {
 	WSAStartup :: proc(wVersionRequested: WORD, lpWSAData: LPWSADATA) -> c_int ---
 	WSACleanup :: proc() -> c_int ---
 	WSAGetLastError :: proc() -> c_int ---
+	WSAPoll :: proc(fdArray: ^WSA_POLLFD, fds: c_ulong, timeout: c_int) -> c_int ---
 	WSADuplicateSocketW :: proc(
 		s: SOCKET,
 		dwProcessId: DWORD,
