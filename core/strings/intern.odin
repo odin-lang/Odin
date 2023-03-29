@@ -57,7 +57,8 @@ Returns an interned copy of the given text, adding it to the map if not already 
 
 NOTE: The returned string lives as long as the map entry lives.
 
-**Returns**  The interned string and an allocator error if any
+**Returns**  
+The interned string and an allocator error if any
 */
 intern_get :: proc(m: ^Intern, text: string) -> (str: string, err: runtime.Allocator_Error) {
 	entry := _intern_get_entry(m, text) or_return
@@ -74,7 +75,8 @@ Returns an interned copy of the given text as a cstring, adding it to the map if
 
 NOTE: The returned cstring lives as long as the map entry lives
 
-**Returns**  The interned cstring and an allocator error if any
+**Returns**  
+The interned cstring and an allocator error if any
 */
 intern_get_cstring :: proc(m: ^Intern, text: string) -> (str: cstring, err: runtime.Allocator_Error) {
 	entry := _intern_get_entry(m, text) or_return
@@ -90,7 +92,8 @@ Sets and allocates the entry if it wasn't set yet
 - m: A pointer to the Intern struct
 - text: The string to be looked up or interned
 
-**Returns**  The new or existing interned entry and an allocator error if any
+**Returns**  
+The new or existing interned entry and an allocator error if any
 */
 _intern_get_entry :: proc(m: ^Intern, text: string) -> (new_entry: ^Intern_Entry, err: runtime.Allocator_Error) #no_bounds_check {
 	if prev, ok := m.entries[text]; ok {

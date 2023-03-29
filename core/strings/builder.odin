@@ -10,7 +10,8 @@ Type definition for a procedure that flushes a Builder
 **Inputs**  
 - b: A pointer to the Builder
 
-**Returns**  A boolean indicating whether the Builder should be reset
+**Returns**  
+A boolean indicating whether the Builder should be reset
 */
 Builder_Flush_Proc :: #type proc(b: ^Builder) -> (do_reset: bool)
 /*
@@ -29,7 +30,8 @@ Produces a Builder with a default length of 0 and cap of 16
 **Inputs**  
 - allocator: (default is context.allocator)
 
-**Returns**  A new Builder
+**Returns**  
+A new Builder
 */
 builder_make_none :: proc(allocator := context.allocator) -> Builder {
 	return Builder{buf=make([dynamic]byte, allocator)}
@@ -43,7 +45,8 @@ Produces a Builder with a specified length and cap of max(16,len) byte buffer
 - len: The desired length of the Builder's buffer
 - allocator: (default is context.allocator)
 
-**Returns**  A new Builder
+**Returns**  
+A new Builder
 */
 builder_make_len :: proc(len: int, allocator := context.allocator) -> Builder {
 	return Builder{buf=make([dynamic]byte, len, allocator)}
@@ -58,7 +61,8 @@ Produces a Builder with a specified length and cap
 - cap: The desired capacity of the Builder's buffer, cap is max(cap, len)
 - allocator: (default is context.allocator)
 
-**Returns**  A new Builder
+**Returns**  
+A new Builder
 */
 builder_make_len_cap :: proc(len, cap: int, allocator := context.allocator) -> Builder {
 	return Builder{buf=make([dynamic]byte, len, cap, allocator)}
@@ -79,7 +83,8 @@ It replaces the existing `buf`
 - b: A pointer to the Builder
 - allocator: (default is context.allocator)
 
-**Returns**  initialized ^Builder
+**Returns**  
+initialized ^Builder
 */
 builder_init_none :: proc(b: ^Builder, allocator := context.allocator) -> ^Builder {
 	b.buf = make([dynamic]byte, allocator)
@@ -96,7 +101,8 @@ It replaces the existing `buf`
 - len: The desired length of the Builder's buffer
 - allocator: (default is context.allocator)
 
-**Returns**  Initialized ^Builder
+**Returns**  
+Initialized ^Builder
 */
 builder_init_len :: proc(b: ^Builder, len: int, allocator := context.allocator) -> ^Builder {
 	b.buf = make([dynamic]byte, len, allocator)
@@ -112,7 +118,8 @@ It replaces the existing `buf`
 - cap: The desired capacity of the Builder's buffer, actual max(len,cap)
 - allocator: (default is context.allocator)
 
-**Returns**  A pointer to the initialized Builder
+**Returns**  
+A pointer to the initialized Builder
 */
 builder_init_len_cap :: proc(b: ^Builder, len, cap: int, allocator := context.allocator) -> ^Builder {
 	b.buf = make([dynamic]byte, len, cap, allocator)
@@ -161,7 +168,8 @@ Returns an io.Stream from a Builder
 **Inputs**  
 - b: A pointer to the Builder
 
-**Returns**  An io.Stream
+**Returns**  
+An io.Stream
 */
 to_stream :: proc(b: ^Builder) -> io.Stream {
 	return io.Stream{stream_vtable=_builder_stream_vtable, stream_data=b}
@@ -172,7 +180,8 @@ Returns an io.Writer from a Builder
 **Inputs**  
 - b: A pointer to the Builder
 
-**Returns**   An io.Writer
+**Returns**   
+An io.Writer
 */
 to_writer :: proc(b: ^Builder) -> io.Writer {
 	return io.to_writer(to_stream(b))
@@ -221,8 +230,10 @@ Example:
 	strings_builder_from_bytes_example :: proc() {
 		bytes: [8]byte // <-- gets filled
 		builder := strings.builder_from_bytes(bytes[:])
-		fmt.println(strings.write_byte(&builder, 'a')) // -> "a"
-		fmt.println(strings.write_byte(&builder, 'b')) // -> "ab"
+		strings.write_byte(&builder, 'a')
+		fmt.println(strings.to_string(builder)) // -> "a"
+		strings.write_byte(&builder, 'b')
+		fmt.println(strings.to_string(builder)) // -> "ab"
 	}
 
 Output:
@@ -230,7 +241,8 @@ Output:
 	a
 	ab
 
-**Returns**  A new Builder
+**Returns**  
+A new Builder
 */
 builder_from_bytes :: proc(backing: []byte) -> Builder {
 	s := transmute(runtime.Raw_Slice)backing
@@ -252,7 +264,8 @@ Casts the Builder byte buffer to a string and returns it
 **Inputs**  
 - b: A Builder
 
-**Returns**  The contents of the Builder's buffer, as a string
+**Returns**  
+The contents of the Builder's buffer, as a string
 */
 to_string :: proc(b: Builder) -> string {
 	return string(b.buf[:])
@@ -263,7 +276,8 @@ Returns the length of the Builder's buffer, in bytes
 **Inputs**  
 - b: A Builder
 
-**Returns**  The length of the Builder's buffer
+**Returns**  
+The length of the Builder's buffer
 */
 builder_len :: proc(b: Builder) -> int {
 	return len(b.buf)
@@ -274,7 +288,8 @@ Returns the capacity of the Builder's buffer, in bytes
 **Inputs**  
 - b: A Builder
 
-**Returns**  The capacity of the Builder's buffer
+**Returns**  
+The capacity of the Builder's buffer
 */
 builder_cap :: proc(b: Builder) -> int {
 	return cap(b.buf)
@@ -285,7 +300,8 @@ The free space left in the Builder's buffer, in bytes
 **Inputs**  
 - b: A Builder
 
-**Returns**  The available space left in the Builder's buffer
+**Returns**  
+The available space left in the Builder's buffer
 */
 builder_space :: proc(b: Builder) -> int {
 	return cap(b.buf) - len(b.buf)
@@ -315,7 +331,8 @@ Output:
 
 NOTE: The backing dynamic array may be fixed in capacity or fail to resize, `n` states the number actually written.
 
-**Returns**  The number of bytes appended
+**Returns**  
+The number of bytes appended
 */
 write_byte :: proc(b: ^Builder, x: byte) -> (n: int) {
 	n0 := len(b.buf)
@@ -344,7 +361,8 @@ Example:
 
 NOTE: The backing dynamic array may be fixed in capacity or fail to resize, `n` states the number actually written.
 
-**Returns**  The number of bytes appended
+**Returns**  
+The number of bytes appended
 */
 write_bytes :: proc(b: ^Builder, x: []byte) -> (n: int) {
 	n0 := len(b.buf)
@@ -377,7 +395,8 @@ Output:
 
 NOTE: The backing dynamic array may be fixed in capacity or fail to resize, `n` states the number actually written.
 
-**Returns**  The number of bytes written and an io.Error (if any)
+**Returns**  
+The number of bytes written and an io.Error (if any)
 */
 write_rune :: proc(b: ^Builder, r: rune) -> (int, io.Error) {
 	return io.write_rune(to_writer(b), r)
@@ -408,7 +427,8 @@ Output:
 
 NOTE: The backing dynamic array may be fixed in capacity or fail to resize, `n` states the number actually written.
 
-**Returns**  The number of bytes written
+**Returns**  
+The number of bytes written
 */
 write_quoted_rune :: proc(b: ^Builder, r: rune) -> (n: int) {
 	return io.write_quoted_rune(to_writer(b), r)
@@ -438,7 +458,8 @@ Output:
 
 NOTE: The backing dynamic array may be fixed in capacity or fail to resize, `n` states the number actually written.
 
-**Returns**  The number of bytes written
+**Returns**  
+The number of bytes written
 */
 write_string :: proc(b: ^Builder, s: string) -> (n: int) {
 	n0 := len(b.buf)
@@ -452,7 +473,8 @@ Pops and returns the last byte in the Builder or 0 when the Builder is empty
 **Inputs**  
 - b: A pointer to the Builder
 
-**Returns**  The last byte in the Builder or 0 if empty
+**Returns**  
+The last byte in the Builder or 0 if empty
 */
 pop_byte :: proc(b: ^Builder) -> (r: byte) {
 	if len(b.buf) == 0 {
@@ -470,7 +492,8 @@ Pops the last rune in the Builder and returns the popped rune and its rune width
 **Inputs**  
 - b: A pointer to the Builder
 
-**Returns**  The popped rune and its rune width or (0, 0) if empty
+**Returns**  
+The popped rune and its rune width or (0, 0) if empty
 */
 pop_rune :: proc(b: ^Builder) -> (r: rune, width: int) {
 	if len(b.buf) == 0 {
@@ -509,7 +532,8 @@ Output:
 
 NOTE: The backing dynamic array may be fixed in capacity or fail to resize, `n` states the number actually written.
 
-**Returns**  The number of bytes written
+**Returns**  
+The number of bytes written
 */
 write_quoted_string :: proc(b: ^Builder, str: string, quote: byte = '"') -> (n: int) {
 	n, _ = io.write_quoted_string(to_writer(b), str, quote)
@@ -542,7 +566,8 @@ Output:
 
 NOTE: The backing dynamic array may be fixed in capacity or fail to resize, `n` states the number actually written.
 
-**Returns**  The number of bytes written
+**Returns**  
+The number of bytes written
 */
 write_encoded_rune :: proc(b: ^Builder, r: rune, write_quote := true) -> (n: int) {
 	n, _ = io.write_encoded_rune(to_writer(b), r, write_quote)
@@ -565,7 +590,8 @@ Appends an escaped rune to the Builder and returns the number of bytes written
 
 NOTE: The backing dynamic array may be fixed in capacity or fail to resize, `n` states the number actually written.
 
-**Returns**  The number of bytes written
+**Returns**  
+The number of bytes written
 */
 write_escaped_rune :: proc(b: ^Builder, r: rune, quote: byte, html_safe := false) -> (n: int) {
 	n, _ = io.write_escaped_rune(to_writer(b), r, quote, html_safe)
@@ -584,7 +610,8 @@ Writes a f64 value to the Builder and returns the number of characters written
 
 NOTE: The backing dynamic array may be fixed in capacity or fail to resize, `n` states the number actually written.
 
-**Returns**  The number of characters written
+**Returns**  
+The number of characters written
 */
 write_float :: proc(b: ^Builder, f: f64, fmt: byte, prec, bit_size: int, always_signed := false) -> (n: int) {
 	buf: [384]byte
@@ -607,7 +634,8 @@ Writes a f16 value to the Builder and returns the number of characters written
 
 NOTE: The backing dynamic array may be fixed in capacity or fail to resize, `n` states the number actually written.
 
-**Returns**  The number of characters written
+**Returns**  
+The number of characters written
 */
 write_f16 :: proc(b: ^Builder, f: f16, fmt: byte, always_signed := false) -> (n: int) {
 	buf: [384]byte
@@ -645,7 +673,8 @@ Output:
 
 NOTE: The backing dynamic array may be fixed in capacity or fail to resize, `n` states the number actually written.
 
-**Returns**  The number of characters written
+**Returns**  
+The number of characters written
 */
 write_f32 :: proc(b: ^Builder, f: f32, fmt: byte, always_signed := false) -> (n: int) {
 	buf: [384]byte
@@ -666,7 +695,8 @@ Writes a f32 value to the Builder and returns the number of characters written
 
 NOTE: The backing dynamic array may be fixed in capacity or fail to resize, `n` states the number actually written.
 
-**Returns**  The number of characters written
+**Returns**  
+The number of characters written
 */
 write_f64 :: proc(b: ^Builder, f: f64, fmt: byte, always_signed := false) -> (n: int) {
 	buf: [384]byte
@@ -686,7 +716,8 @@ Writes a u64 value to the Builder and returns the number of characters written
 
 NOTE: The backing dynamic array may be fixed in capacity or fail to resize, `n` states the number actually written.
 
-**Returns**  The number of characters written
+**Returns**  
+The number of characters written
 */
 write_u64 :: proc(b: ^Builder, i: u64, base: int = 10) -> (n: int) {
 	buf: [32]byte
@@ -703,7 +734,8 @@ Writes a i64 value to the Builder and returns the number of characters written
 
 NOTE: The backing dynamic array may be fixed in capacity or fail to resize, `n` states the number actually written.
 
-**Returns**  The number of characters written
+**Returns**  
+The number of characters written
 */
 write_i64 :: proc(b: ^Builder, i: i64, base: int = 10) -> (n: int) {
 	buf: [32]byte
@@ -720,7 +752,8 @@ Writes a uint value to the Builder and returns the number of characters written
 
 NOTE: The backing dynamic array may be fixed in capacity or fail to resize, `n` states the number actually written.
 
-**Returns**  The number of characters written
+**Returns**  
+The number of characters written
 */
 write_uint :: proc(b: ^Builder, i: uint, base: int = 10) -> (n: int) {
 	return write_u64(b, u64(i), base)
@@ -735,7 +768,8 @@ Writes a int value to the Builder and returns the number of characters written
 
 NOTE: The backing dynamic array may be fixed in capacity or fail to resize, `n` states the number actually written.
 
-**Returns**  The number of characters written
+**Returns**  
+The number of characters written
 */
 write_int :: proc(b: ^Builder, i: int, base: int = 10) -> (n: int) {
 	return write_i64(b, i64(i), base)

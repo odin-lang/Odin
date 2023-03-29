@@ -31,7 +31,8 @@ Converts a Reader into an `io.Stream`
 **Inputs**  
 - r: A pointer to a Reader struct
 
-**Returns**  An io.Stream for the given Reader
+**Returns**  
+An io.Stream for the given Reader
 */
 reader_to_stream :: proc(r: ^Reader) -> (s: io.Stream) {
 	s.stream_data = r
@@ -45,7 +46,8 @@ Initializes a string Reader and returns an `io.Reader` for the given string
 - r: A pointer to a Reader struct
 - s: The input string to be read
 
-**Returns**  An io.Reader for the given string
+**Returns**  
+An io.Reader for the given string
 */
 to_reader :: proc(r: ^Reader, s: string) -> io.Reader {
 	reader_init(r, s)
@@ -59,7 +61,8 @@ Initializes a string Reader and returns an `io.Reader_At` for the given string
 - r: A pointer to a Reader struct
 - s: The input string to be read
 
-**Returns**  An `io.Reader_At` for the given string
+**Returns**  
+An `io.Reader_At` for the given string
 */
 to_reader_at :: proc(r: ^Reader, s: string) -> io.Reader_At {
 	reader_init(r, s)
@@ -72,7 +75,8 @@ Returns the remaining length of the Reader
 **Inputs**  
 - r: A pointer to a Reader struct
 
-**Returns**  The remaining length of the Reader
+**Returns**  
+The remaining length of the Reader
 */
 reader_length :: proc(r: ^Reader) -> int {
 	if r.i >= i64(len(r.s)) {
@@ -86,7 +90,8 @@ Returns the length of the string stored in the Reader
 **Inputs**  
 - r: A pointer to a Reader struct
 
-**Returns**  The length of the string stored in the Reader
+**Returns**  
+The length of the string stored in the Reader
 */
 reader_size :: proc(r: ^Reader) -> i64 {
 	return i64(len(r.s))
@@ -161,7 +166,8 @@ Decrements the Reader's index (i) by 1
 **Inputs**  
 - r: A pointer to a Reader struct
 
-**Returns**  An `io.Error` if `r.i <= 0` (`.Invalid_Unread`), otherwise `nil` denotes success.
+**Returns**  
+An `io.Error` if `r.i <= 0` (`.Invalid_Unread`), otherwise `nil` denotes success.
 */
 reader_unread_byte :: proc(r: ^Reader) -> io.Error {
 	if r.i <= 0 {
@@ -204,7 +210,8 @@ Decrements the Reader's index (i) by the size of the last read rune
 
 WARNING: May only be used once and after a valid `read_rune` call
 
-**Returns**  An `io.Error` if an error occurs while unreading (`.Invalid_Unread`), else `nil` denotes success.
+**Returns**  
+An `io.Error` if an error occurs while unreading (`.Invalid_Unread`), else `nil` denotes success.
 */
 reader_unread_rune :: proc(r: ^Reader) -> io.Error {
 	if r.i <= 0 {

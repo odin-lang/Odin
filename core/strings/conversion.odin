@@ -16,7 +16,8 @@ Converts invalid UTF-8 sequences in the input string `s` to the `replacement` st
 
 WARNING: Allocation does not occur when len(s) == 0
 
-**Returns**  A valid UTF-8 string with invalid sequences replaced by `replacement`.
+**Returns**  
+A valid UTF-8 string with invalid sequences replaced by `replacement`.
 */
 to_valid_utf8 :: proc(s, replacement: string, allocator := context.allocator) -> string {
 	if len(s) == 0 {
@@ -93,7 +94,8 @@ Output:
 
 	test
 
-**Returns**  A new string with all characters converted to lowercase.
+**Returns**  
+A new string with all characters converted to lowercase.
 */
 to_lower :: proc(s: string, allocator := context.allocator) -> string {
 	b: Builder
@@ -125,7 +127,8 @@ Output:
 
 	TEST
 
-**Returns**  A new string with all characters converted to uppercase.
+**Returns**  
+A new string with all characters converted to uppercase.
 */
 to_upper :: proc(s: string, allocator := context.allocator) -> string {
 	b: Builder
@@ -141,7 +144,8 @@ Checks if the rune `r` is a delimiter (' ', '-', or '_').
 **Inputs**  
 - r: Rune to check for delimiter status.
 
-**Returns**  True if `r` is a delimiter, false otherwise.
+**Returns**  
+True if `r` is a delimiter, false otherwise.
 */
 is_delimiter :: proc(r: rune) -> bool {
 	return r == '-' || r == '_' || is_space(r)
@@ -152,7 +156,8 @@ Checks if the rune `r` is a non-alphanumeric or space character.
 **Inputs**  
 - r: Rune to check for separator status.
 
-**Returns**  True if `r` is a non-alpha or `unicode.is_space` rune.
+**Returns**  
+True if `r` is a non-alpha or `unicode.is_space` rune.
 */
 is_separator :: proc(r: rune) -> bool {
 	if r <= 0x7f {
@@ -245,7 +250,8 @@ Converts the input string `s` to "lowerCamelCase".
 - s: Input string to be converted.
 - allocator: (default: context.allocator).
 
-**Returns**  A "lowerCamelCase" formatted string.
+**Returns**  
+A "lowerCamelCase" formatted string.
 */
 to_camel_case :: proc(s: string, allocator := context.allocator) -> string {
 	s := s
@@ -279,7 +285,8 @@ Converts the input string `s` to "UpperCamelCase" (PascalCase).
 - s: Input string to be converted.
 - allocator: (default: context.allocator).
 
-**Returns**  A "PascalCase" formatted string.
+**Returns**  
+A "PascalCase" formatted string.
 */
 to_pascal_case :: proc(s: string, allocator := context.allocator) -> string {
 	s := s
@@ -328,9 +335,10 @@ Output:
 
 	hello_world
 	HELLO WORLD
-	a_b_c
+	a_bc
 
-**Returns**  The converted string
+**Returns**  
+The converted string
 */
 to_delimiter_case :: proc(
 	s: string,
@@ -400,7 +408,8 @@ Output:
 	hello_world
 
 ```
-**Returns**  The converted string
+**Returns**  
+The converted string
 */
 to_snake_case :: proc(s: string, allocator := context.allocator) -> string {
 	return to_delimiter_case(s, '_', false, allocator)
@@ -429,7 +438,8 @@ Output:
 
 	HELLO_WORLD
 
-**Returns**  The converted string
+**Returns**  
+The converted string
 */
 to_upper_snake_case :: proc(s: string, allocator := context.allocator) -> string {
 	return to_delimiter_case(s, '_', true, allocator)
@@ -456,7 +466,8 @@ Output:
 
 	hello-world
 
-**Returns**  The converted string
+**Returns**  
+The converted string
 */
 to_kebab_case :: proc(s: string, allocator := context.allocator) -> string {
 	return to_delimiter_case(s, '-', false, allocator)
@@ -483,7 +494,8 @@ Output:
 
 	HELLO-WORLD
 
-**Returns**  The converted string
+**Returns**  
+The converted string
 */
 to_upper_kebab_case :: proc(s: string, allocator := context.allocator) -> string {
 	return to_delimiter_case(s, '-', true, allocator)
@@ -502,7 +514,7 @@ Example:
 	import "core:fmt"
 	import "core:strings"
 
-	strings_to_upper_kebab_case_example :: proc() {
+	strings_to_ada_case_example :: proc() {
 		fmt.println(strings.to_ada_case("HelloWorld"))
 	}
 
@@ -510,7 +522,8 @@ Output:
 
 	Hello_World
 
-**Returns**  The converted string
+**Returns**  
+The converted string
 */
 to_ada_case :: proc(s: string, allocator := context.allocator) -> string {
 	s := s

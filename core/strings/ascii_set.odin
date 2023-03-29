@@ -37,7 +37,8 @@ Determines if a given char is contained within an Ascii_Set.
 - as: The Ascii_Set to search.
 - c: The char to check for in the Ascii_Set.
 
-**Returns**  A boolean indicating if the byte is contained in the Ascii_Set (true) or not (false).
+**Returns**  
+A boolean indicating if the byte is contained in the Ascii_Set (true) or not (false).
 */
 ascii_set_contains :: proc(as: Ascii_Set, c: byte) -> bool #no_bounds_check {
 	return as[c>>5] & (1<<(c&31)) != 0
