@@ -86,7 +86,7 @@ Example:
 	import "core:fmt"
 	import "core:strings"
 
-	strings_to_lower_example :: proc() {
+	to_lower_example :: proc() {
 		fmt.println(strings.to_lower("TeST"))
 	}
 
@@ -119,7 +119,7 @@ Example:
 	import "core:fmt"
 	import "core:strings"
 
-	strings_to_upper_example :: proc() {
+	to_upper_example :: proc() {
 		fmt.println(strings.to_upper("Test"))
 	}
 
@@ -196,7 +196,7 @@ Example:
 	import "core:strings"
 	import "core:io"
 
-	strings_string_case_iterator_example :: proc() {
+	string_case_iterator_example :: proc() {
 		my_callback :: proc(w: io.Writer, prev, curr, next: rune) {
 			fmt.println("my_callback", curr) // <-- Custom logic here
 		}
@@ -325,7 +325,7 @@ Example:
 	import "core:fmt"
 	import "core:strings"
 
-	strings_to_delimiter_case_example :: proc() {
+	to_delimiter_case_example :: proc() {
 		fmt.println(strings.to_delimiter_case("Hello World", '_', false))
 		fmt.println(strings.to_delimiter_case("Hello World", ' ', true))
 		fmt.println(strings.to_delimiter_case("aBC", '_', false))
@@ -397,7 +397,7 @@ Example:
 	import "core:fmt"
 	import "core:strings"
 
-	strings_to_snake_case_example :: proc() {
+	to_snake_case_example :: proc() {
 		fmt.println(strings.to_snake_case("HelloWorld"))
 		fmt.println(strings.to_snake_case("Hello World"))
 	}
@@ -430,7 +430,7 @@ Example:
 	import "core:fmt"
 	import "core:strings"
 
-	strings_to_upper_snake_case_example :: proc() {
+	to_upper_snake_case_example :: proc() {
 		fmt.println(strings.to_upper_snake_case("HelloWorld"))
 	}
 
@@ -458,7 +458,7 @@ Example:
 	import "core:fmt"
 	import "core:strings"
 
-	strings_to_kebab_case_example :: proc() {
+	to_kebab_case_example :: proc() {
 		fmt.println(strings.to_kebab_case("HelloWorld"))
 	}
 
@@ -486,7 +486,7 @@ Example:
 	import "core:fmt"
 	import "core:strings"
 
-	strings_to_upper_kebab_case_example :: proc() {
+	to_upper_kebab_case_example :: proc() {
 		fmt.println(strings.to_upper_kebab_case("HelloWorld"))
 	}
 
@@ -514,7 +514,7 @@ Example:
 	import "core:fmt"
 	import "core:strings"
 
-	strings_to_ada_case_example :: proc() {
+	to_ada_case_example :: proc() {
 		fmt.println(strings.to_ada_case("HelloWorld"))
 	}
 
