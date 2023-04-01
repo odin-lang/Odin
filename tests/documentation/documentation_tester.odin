@@ -1,6 +1,7 @@
 package documentation_tester
 
 import "core:os"
+import "core:io"
 import "core:fmt"
 import "core:strings"
 import "core:odin/ast"
@@ -9,7 +10,8 @@ import "core:c/libc"
 import doc "core:odin/doc-format"
 
 Example_Test :: struct {
-	name: string,
+	entity_name: string,
+	package_name: string,
 	example_code: []string,
 	expected_output: []string,
 }
@@ -59,7 +61,7 @@ main :: proc() {
 	if len(os.args) != 2 {
 		errorf("expected path to odin executable")
 	}
-    g_path_to_odin = os.args[1]
+	g_path_to_odin = os.args[1]
 	data, ok := os.read_entire_file("all.odin-doc")
 	if !ok {
 		errorf("unable to read file: all.odin-doc")
@@ -80,37 +82,41 @@ main :: proc() {
 	pkgs     := array(g_header.pkgs)
 	entities := array(g_header.entities)
 
-    path_prefix: string
-    {
-        fullpaths: [dynamic]string
-        defer delete(fullpaths)
+	path_prefix: string
+	{
+		fullpaths: [dynamic]string
+		defer delete(fullpaths)
 
-        for pkg in pkgs[1:] {
-            append(&fullpaths, str(pkg.fullpath))
-        }
-        path_prefix = common_prefix(fullpaths[:])
-    }
+		for pkg in pkgs[1:] {
+			append(&fullpaths, str(pkg.fullpath))
+		}
+		path_prefix = common_prefix(fullpaths[:])
+	}
 
-    for pkg in pkgs[1:] {
-        entries_array := array(pkg.entries)
-        fullpath := str(pkg.fullpath)
-        path := strings.trim_prefix(fullpath, path_prefix)
-        if ! strings.has_prefix(path, "core/") {
-            continue
-        }
-        trimmed_path := strings.trim_prefix(path, "core/")
-        if strings.has_prefix(trimmed_path, "sys") {
-            continue
-        }
-        if strings.contains(trimmed_path, "/_") {
-            continue
-        }
-        for entry in entries_array {
-            entity := entities[entry.entity]
-            find_and_add_examples(str(entity.docs), fmt.aprintf("%v.%v", str(pkg.name), str(entity.name)))
-        }
-    }
-    write_test_suite(g_examples_to_verify[:])
+	for pkg in pkgs[1:] {
+		entries_array := array(pkg.entries)
+		fullpath := str(pkg.fullpath)
+		path := strings.trim_prefix(fullpath, path_prefix)
+		if ! strings.has_prefix(path, "core/") {
+			continue
+		}
+		trimmed_path := strings.trim_prefix(path, "core/")
+		if strings.has_prefix(trimmed_path, "sys") {
+			continue
+		}
+		if strings.contains(trimmed_path, "/_") {
+			continue
+		}
+		for entry in entries_array {
+			entity := entities[entry.entity]
+			find_and_add_examples(
+				docs = str(entity.docs),
+				package_name = str(pkg.name),
+				entity_name = str(entity.name),
+			)
+		}
+	}
+	write_test_suite(g_examples_to_verify[:])
 	if g_bad_doc {
 		errorf("We created bad documentation!")
 	}
@@ -118,11 +124,11 @@ main :: proc() {
 	if ! run_test_suite() {
 		errorf("Test suite failed!")
 	}
-    fmt.println("Examples verified")
+	fmt.println("Examples verified")
 }
 
 // NOTE: this is a pretty close copy paste from the website pkg documentation on parsing the docs
-find_and_add_examples :: proc(docs: string, name: string = "") {
+find_and_add_examples :: proc(docs: string, package_name: string, entity_name: string) {
 	if docs == "" {
 		return
 	}
@@ -186,31 +192,31 @@ find_and_add_examples :: proc(docs: string, name: string = "") {
 		}
 
 		if i-start > 0 && (curr_block_kind != next_block_kind) {
-			insert_block(Block{curr_block_kind, lines[start:i]}, &example_block, &output_block, name)
+			insert_block(Block{curr_block_kind, lines[start:i]}, &example_block, &output_block, entity_name)
 			curr_block_kind, start = next_block_kind, i
 		}
 	}
 
 	if start < len(lines) {
-		insert_block(Block{curr_block_kind, lines[start:]}, &example_block, &output_block, name)
+		insert_block(Block{curr_block_kind, lines[start:]}, &example_block, &output_block, entity_name)
 	}
 
 	if output_block.kind == .Output && example_block.kind != .Example {
-		fmt.eprintf("The documentation for %q has an output block but no example\n", name)
+		fmt.eprintf("The documentation for %q has an output block but no example\n", entity_name)
 		g_bad_doc = true
 	}
 
 	// Write example and output block if they're both present
 	if example_block.kind == .Example && output_block.kind == .Output {
-        {
-            // Example block starts with
-            // `Example:` and a number of white spaces,
-            lines := &example_block.lines
-            for len(lines) > 0 && (strings.trim_space(lines[0]) == "" || strings.has_prefix(lines[0], "Example:")) {
-                lines^ = lines[1:]
-            }
-        }
-        {
+		{
+			// Example block starts with
+			// `Example:` and a number of white spaces,
+			lines := &example_block.lines
+			for len(lines) > 0 && (strings.trim_space(lines[0]) == "" || strings.has_prefix(lines[0], "Example:")) {
+				lines^ = lines[1:]
+			}
+		}
+		{
 			// Output block starts with
 			// `Output:` and a number of white spaces,
 			lines := &output_block.lines
@@ -221,21 +227,26 @@ find_and_add_examples :: proc(docs: string, name: string = "") {
 			for len(lines) > 0 && (strings.trim_space(lines[len(lines) - 1]) == "") {
 				lines^ = lines[:len(lines) - 1]
 			}
-        }
-        // Remove first layer of tabs which are always present
-        for line in &example_block.lines {
-            line = strings.trim_prefix(line, "\t")
-        }
-        for line in &output_block.lines {
-            line = strings.trim_prefix(line, "\t")
-        }
-        append(&g_examples_to_verify, Example_Test { name = name, example_code = example_block.lines, expected_output = output_block.lines })
+		}
+		// Remove first layer of tabs which are always present
+		for line in &example_block.lines {
+			line = strings.trim_prefix(line, "\t")
+		}
+		for line in &output_block.lines {
+			line = strings.trim_prefix(line, "\t")
+		}
+		append(&g_examples_to_verify, Example_Test {
+			entity_name = entity_name,
+			package_name = package_name,
+			example_code = example_block.lines,
+			expected_output = output_block.lines,
+		})
 	}
 }
 
 
 write_test_suite :: proc(example_tests: []Example_Test) {
-    TEST_SUITE_DIRECTORY :: "verify"
+	TEST_SUITE_DIRECTORY :: "verify"
 	os.remove_directory(TEST_SUITE_DIRECTORY)
 	os.make_directory(TEST_SUITE_DIRECTORY)
 
@@ -325,7 +336,6 @@ main :: proc() {
 		}
 
 		code_string := strings.to_string(example_build)
-		code_test_name: string
 
 		example_ast := ast.File { src = code_string }
 		odin_parser := parser.default_parser()
@@ -335,10 +345,14 @@ main :: proc() {
 			continue
 		}
 		if odin_parser.error_count > 0 {
-			fmt.eprintf("Errors on the following code generated for %q:\n%v\n", test.name, code_string)
+			fmt.eprintf("Errors on the following code generated for %q:\n%v\n", test.entity_name, code_string)
 			g_bad_doc = true
 			continue
 		}
+
+		enforced_name := fmt.tprintf("%v_example", test.entity_name)
+		index_of_proc_name: int
+		code_test_name: string
 
 		for d in example_ast.decls {
 			value_decl, is_value := d.derived.(^ast.Value_Decl); if ! is_value {
@@ -353,34 +367,48 @@ main :: proc() {
 			if len(proc_lit.type.params.list) > 0 {
 				continue
 			}
-			code_test_name = code_string[value_decl.names[0].pos.offset:value_decl.names[0].end.offset]
+			this_procedure_name := code_string[value_decl.names[0].pos.offset:value_decl.names[0].end.offset]
+			if this_procedure_name != enforced_name {
+				continue
+			}
+			index_of_proc_name = value_decl.names[0].pos.offset
+			code_test_name = this_procedure_name
 			break
 		}
 
 		if code_test_name == "" {
-			fmt.eprintf("We could not any find procedure literals with no arguments in the example for %q\n", test.name)
+			fmt.eprintf("We could not any find procedure literals with no arguments with the identifier %q for the example for %q\n", enforced_name, test.entity_name)
 			g_bad_doc = true
 			continue
 		}
 
-		strings.write_string(&test_runner, "\t")
-		strings.write_string(&test_runner, code_test_name)
-		strings.write_string(&test_runner, "()\n")
+		fmt.sbprintf(&test_runner, "\t%v_%v()\n", test.package_name, code_test_name)
 		fmt.sbprintf(&test_runner, "\t_check(%q, `", code_test_name)
 		for line in test.expected_output {
 			strings.write_string(&test_runner, line)
 			strings.write_string(&test_runner, "\n")
 		}
 		strings.write_string(&test_runner, "`)\n")
-		save_path := fmt.tprintf("verify/test_%s.odin", code_test_name)
-		if ! os.write_entire_file(save_path, transmute([]byte)code_string) {
-			fmt.eprintf("We could not save the file to the path %q\n", save_path)
+		save_path := fmt.tprintf("verify/test_%v_%v.odin", test.package_name, code_test_name)
+
+		test_file_handle, err := os.open(save_path, os.O_WRONLY | os.O_CREATE); if err != 0 {
+			fmt.eprintf("We could not open the file to the path %q for writing\n", save_path)
 			g_bad_doc = true
+			continue
 		}
+		defer os.close(test_file_handle)
+		stream := os.stream_from_handle(test_file_handle)
+		writer, ok := io.to_writer(stream); if ! ok {
+			fmt.eprintf("We could not make the writer for the path %q\n", save_path)
+			g_bad_doc = true
+			continue
+		}
+		fmt.wprintf(writer, "%v%v_%v", code_string[:index_of_proc_name], test.package_name, code_string[index_of_proc_name:])
 	}
 
 	strings.write_string(&test_runner,
-`   if _bad_test_found {
+`
+	if _bad_test_found {
 		fmt.eprintln("One or more tests failed")
 		os.exit(1)
 	}
@@ -389,6 +417,5 @@ main :: proc() {
 }
 
 run_test_suite :: proc() -> bool {
-    cmd := fmt.tprintf("%v run verify", g_path_to_odin)
-	return libc.system(strings.clone_to_cstring(cmd)) == 0
+	return libc.system(fmt.caprintf("%v run verify", g_path_to_odin)) == 0
 }

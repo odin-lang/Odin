@@ -286,7 +286,7 @@ Example:
 	import "core:fmt"
 	import "core:strings"
 
-	strings_contains_example :: proc() {
+	contains_example :: proc() {
 		fmt.println(strings.contains("testing", "test"))
 		fmt.println(strings.contains("testing", "ing"))
 		fmt.println(strings.contains("testing", "text"))
@@ -316,7 +316,7 @@ Example:
 	import "core:fmt"
 	import "core:strings"
 
-	strings_contains_any_example :: proc() {
+	contains_any_example :: proc() {
 		fmt.println(strings.contains_any("test", "test"))
 		fmt.println(strings.contains_any("test", "ts"))
 		fmt.println(strings.contains_any("test", "et"))
@@ -347,7 +347,7 @@ Example:
 	import "core:fmt"
 	import "core:strings"
 
-	strings_rune_count_example :: proc() {
+	rune_count_example :: proc() {
 		fmt.println(strings.rune_count("test"))
 		fmt.println(strings.rune_count("testö")) // where len("testö") == 6
 	}
@@ -376,7 +376,7 @@ Example:
 	import "core:fmt"
 	import "core:strings"
 
-	strings_equal_fold_example :: proc() {
+	equal_fold_example :: proc() {
 		fmt.println(strings.equal_fold("test", "test"))
 		fmt.println(strings.equal_fold("Test", "test"))
 		fmt.println(strings.equal_fold("Test", "tEsT"))
@@ -447,7 +447,7 @@ Example:
 	import "core:fmt"
 	import "core:strings"
 
-	strings_prefix_length_example :: proc() {
+	prefix_length_example :: proc() {
 		fmt.println(strings.prefix_length("testing", "test"))
 		fmt.println(strings.prefix_length("testing", "te"))
 		fmt.println(strings.prefix_length("telephone", "te"))
@@ -499,7 +499,7 @@ Example:
 	import "core:fmt"
 	import "core:strings"
 
-	strings_has_prefix_example :: proc() {
+	has_prefix_example :: proc() {
 		fmt.println(strings.has_prefix("testing", "test"))
 		fmt.println(strings.has_prefix("testing", "te"))
 		fmt.println(strings.has_prefix("telephone", "te"))
@@ -527,7 +527,7 @@ Example:
 	import "core:fmt"
 	import "core:strings"
 
-	strings_has_suffix_example :: proc() {
+	has_suffix_example :: proc() {
 		fmt.println(strings.has_suffix("todo.txt", ".txt"))
 		fmt.println(strings.has_suffix("todo.doc", ".txt"))
 		fmt.println(strings.has_suffix("todo.doc.txt", ".txt"))
@@ -559,7 +559,7 @@ Example:
 	import "core:fmt"
 	import "core:strings"
 
-	strings_join_example :: proc() {
+	join_example :: proc() {
 		a := [?]string { "a", "b", "c" }
 		fmt.println(strings.join(a[:], " "))
 		fmt.println(strings.join(a[:], "-"))
@@ -644,7 +644,7 @@ Example:
 	import "core:fmt"
 	import "core:strings"
 
-	strings_concatenate_example :: proc() {
+	concatenate_example :: proc() {
 		a := [?]string { "a", "b", "c" }
 		fmt.println(strings.concatenate(a[:]))
 	}
@@ -716,7 +716,7 @@ Example:
 	import "core:fmt"
 	import "core:strings"
 
-	strings_cut_example :: proc() {
+	cut_example :: proc() {
 		fmt.println(strings.cut("some example text", 0, 4)) // -> "some"
 		fmt.println(strings.cut("some example text", 2, 2)) // -> "me"
 		fmt.println(strings.cut("some example text", 5, 7)) // -> "example"
@@ -863,7 +863,7 @@ Example:
 	import "core:fmt"
 	import "core:strings"
 
-	strings_split_example :: proc() {
+	split_example :: proc() {
 		s := "aaa.bbb.ccc.ddd.eee"    // 5 parts
 		ss := strings.split(s, ".")
 		fmt.println(ss)
@@ -895,7 +895,7 @@ Example:
 	import "core:fmt"
 	import "core:strings"
 
-	strings_split_n_example :: proc() {
+	split_n_example :: proc() {
 		s := "aaa.bbb.ccc.ddd.eee"  // 5 parts present
 		ss := strings.split_n(s, ".",3) // total of 3 wanted
 		fmt.println(ss)
@@ -927,7 +927,7 @@ Example:
 	import "core:fmt"
 	import "core:strings"
 
-	strings_split_after_example :: proc() {
+	split_after_example :: proc() {
 		a := "aaa.bbb.ccc.ddd.eee"         // 5 parts
 		aa := strings.split_after(a, ".")
 		fmt.println(aa)
@@ -961,7 +961,7 @@ Example:
 	import "core:fmt"
 	import "core:strings"
 
-	strings_split_after_n_example :: proc() {
+	split_after_n_example :: proc() {
 		a := "aaa.bbb.ccc.ddd.eee"
 		aa := strings.split_after_n(a, ".", 3)
 		fmt.println(aa)
@@ -1032,7 +1032,7 @@ Example:
 	import "core:fmt"
 	import "core:strings"
 
-	strings_split_by_byte_iterator_example :: proc() {
+	split_by_byte_iterator_example :: proc() {
 		text := "a.b.c.d.e"
 		for str in strings.split_by_byte_iterator(&text, '.') {
 			fmt.println(str) // every loop -> a b c d e
@@ -1077,7 +1077,7 @@ Example:
 	import "core:fmt"
 	import "core:strings"
 
-	strings_split_iterator_example :: proc() {
+	split_iterator_example :: proc() {
 		text := "a.b.c.d.e"
 		for str in strings.split_iterator(&text, ".") {
 			fmt.println(str)
@@ -1111,7 +1111,7 @@ Example:
 	import "core:fmt"
 	import "core:strings"
 
-	strings_split_after_iterator_example :: proc() {
+	split_after_iterator_example :: proc() {
 		text := "a.b.c.d.e"
 		for str in strings.split_after_iterator(&text, ".") {
 			fmt.println(str)
@@ -1167,7 +1167,7 @@ Example:
 	import "core:fmt"
 	import "core:strings"
 
-	strings_split_lines_example :: proc() {
+	split_lines_example :: proc() {
 		a := "a\nb\nc\nd\ne"
 		b := strings.split_lines(a)
 		fmt.println(b)
@@ -1203,7 +1203,7 @@ Example:
 	import "core:fmt"
 	import "core:strings"
 
-	strings_split_lines_n_example :: proc() {
+	split_lines_n_example :: proc() {
 		a := "a\nb\nc\nd\ne"
 		b := strings.split_lines_n(a, 3)
 		fmt.println(b)
@@ -1240,7 +1240,7 @@ Example:
 	import "core:fmt"
 	import "core:strings"
 
-	strings_split_lines_after_example :: proc() {
+	split_lines_after_example :: proc() {
 		a := "a\nb\nc\nd\ne"
 		b := strings.split_lines_after(a)
 		fmt.println(b)
@@ -1279,7 +1279,7 @@ Example:
 	import "core:fmt"
 	import "core:strings"
 
-	strings_split_lines_after_n_example :: proc() {
+	split_lines_after_n_example :: proc() {
 		a := "a\nb\nc\nd\ne"
 		b := strings.split_lines_after_n(a, 3)
 		fmt.println(b)
@@ -1314,7 +1314,7 @@ Example:
 	import "core:fmt"
 	import "core:strings"
 
-	strings_split_lines_iterator_example :: proc() {
+	split_lines_iterator_example :: proc() {
 		text := "a\nb\nc\nd\ne"
 		for str in strings.split_lines_iterator(&text) {
 			fmt.print(str)    // every loop -> a b c d e
@@ -1346,7 +1346,7 @@ Example:
 	import "core:fmt"
 	import "core:strings"
 
-	strings_split_lines_after_iterator_example :: proc() {
+	split_lines_after_iterator_example :: proc() {
 		text := "a\nb\nc\nd\ne\n"
 		for str in strings.split_lines_after_iterator(&text) {
 			fmt.print(str) // every loop -> a\n b\n c\n d\n e\n
@@ -1382,7 +1382,7 @@ Example:
 	import "core:fmt"
 	import "core:strings"
 
-	strings_index_byte_example :: proc() {
+	index_byte_example :: proc() {
 		fmt.println(strings.index_byte("test", 't'))
 		fmt.println(strings.index_byte("test", 'e'))
 		fmt.println(strings.index_byte("test", 'x'))
@@ -1416,7 +1416,7 @@ Example:
 	import "core:fmt"
 	import "core:strings"
 
-	strings_last_index_byte_example :: proc() {
+	last_index_byte_example :: proc() {
 		fmt.println(strings.last_index_byte("test", 't'))
 		fmt.println(strings.last_index_byte("test", 'e'))
 		fmt.println(strings.last_index_byte("test", 'x'))
@@ -1450,7 +1450,7 @@ Example:
 	import "core:fmt"
 	import "core:strings"
 
-	strings_index_rune_example :: proc() {
+	index_rune_example :: proc() {
 		fmt.println(strings.index_rune("abcädef", 'x'))
 		fmt.println(strings.index_rune("abcädef", 'a'))
 		fmt.println(strings.index_rune("abcädef", 'b'))
@@ -1505,7 +1505,7 @@ Example:
 	import "core:fmt"
 	import "core:strings"
 
-	strings_index_example :: proc() {
+	index_example :: proc() {
 		fmt.println(strings.index("test", "t"))
 		fmt.println(strings.index("test", "te"))
 		fmt.println(strings.index("test", "st"))
@@ -1579,7 +1579,7 @@ Example:
 	import "core:fmt"
 	import "core:strings"
 
-	strings_last_index_example :: proc() {
+	last_index_example :: proc() {
 		fmt.println(strings.last_index("test", "t"))
 		fmt.println(strings.last_index("test", "te"))
 		fmt.println(strings.last_index("test", "st"))
@@ -1651,7 +1651,7 @@ Example:
 	import "core:fmt"
 	import "core:strings"
 
-	strings_index_any_example :: proc() {
+	index_any_example :: proc() {
 		fmt.println(strings.index_any("test", "s"))
 		fmt.println(strings.index_any("test", "se"))
 		fmt.println(strings.index_any("test", "et"))
@@ -1713,7 +1713,7 @@ Example:
 	import "core:fmt"
 	import "core:strings"
 
-	strings_last_index_any_example :: proc() {
+	last_index_any_example :: proc() {
 		fmt.println(strings.last_index_any("test", "s"))
 		fmt.println(strings.last_index_any("test", "se"))
 		fmt.println(strings.last_index_any("test", "et"))
@@ -1831,7 +1831,7 @@ Example:
 	import "core:fmt"
 	import "core:strings"
 
-	strings_count_example :: proc() {
+	count_example :: proc() {
 		fmt.println(strings.count("abbccc", "a"))
 		fmt.println(strings.count("abbccc", "b"))
 		fmt.println(strings.count("abbccc", "c"))
@@ -1901,7 +1901,7 @@ Example:
 	import "core:fmt"
 	import "core:strings"
 
-	strings_repeat_example :: proc() {
+	repeat_example :: proc() {
 		fmt.println(strings.repeat("abc", 2))
 	}
 
@@ -1943,7 +1943,7 @@ Example:
 	import "core:fmt"
 	import "core:strings"
 
-	strings_replace_all_example :: proc() {
+	replace_all_example :: proc() {
 		fmt.println(strings.replace_all("xyzxyz", "xyz", "abc"))
 		fmt.println(strings.replace_all("xyzxyz", "abc", "xyz"))
 		fmt.println(strings.replace_all("xyzxyz", "xy", "z"))
@@ -1978,7 +1978,7 @@ Example:
 	import "core:fmt"
 	import "core:strings"
 
-	strings_replace_example :: proc() {
+	replace_example :: proc() {
 		fmt.println(strings.replace("xyzxyz", "xyz", "abc", 2))
 		fmt.println(strings.replace("xyzxyz", "xyz", "abc", 1))
 		fmt.println(strings.replace("xyzxyz", "abc", "xyz", -1))
@@ -2050,7 +2050,7 @@ Example:
 	import "core:fmt"
 	import "core:strings"
 
-	strings_remove_example :: proc() {
+	remove_example :: proc() {
 		fmt.println(strings.remove("abcabc", "abc", 1))
 		fmt.println(strings.remove("abcabc", "abc", -1))
 		fmt.println(strings.remove("abcabc", "a", -1))
@@ -2085,7 +2085,7 @@ Example:
 	import "core:fmt"
 	import "core:strings"
 
-	strings_remove_all_example :: proc() {
+	remove_all_example :: proc() {
 		fmt.println(strings.remove_all("abcabc", "abc"))
 		fmt.println(strings.remove_all("abcabc", "a"))
 		fmt.println(strings.remove_all("abcabc", "x"))
@@ -2148,7 +2148,7 @@ Example:
 	import "core:fmt"
 	import "core:strings"
 
-	strings_index_proc_example :: proc() {
+	index_proc_example :: proc() {
 		call :: proc(r: rune) -> bool {
 			return r == 'a'
 		}
@@ -2223,7 +2223,7 @@ Example:
 	import "core:fmt"
 	import "core:strings"
 
-	strings_trim_left_proc_example :: proc() {
+	trim_left_proc_example :: proc() {
 		find :: proc(r: rune) -> bool {
 			return r == 'x'
 		}
@@ -2274,7 +2274,7 @@ Example:
 	import "core:fmt"
 	import "core:strings"
 
-	strings_trim_right_proc_example :: proc() {
+	trim_right_proc_example :: proc() {
 		find :: proc(r: rune) -> bool {
 			return r != 't'
 		}
@@ -2462,7 +2462,7 @@ Example:
 	import "core:fmt"
 	import "core:strings"
 
-	strings_trim_prefix_example :: proc() {
+	trim_prefix_example :: proc() {
 		fmt.println(strings.trim_prefix("testing", "test"))
 		fmt.println(strings.trim_prefix("testing", "abc"))
 	}
@@ -2493,7 +2493,7 @@ Example:
 	import "core:fmt"
 	import "core:strings"
 
-	strings_trim_suffix_example :: proc() {
+	trim_suffix_example :: proc() {
 		fmt.println(strings.trim_suffix("todo.txt", ".txt"))
 		fmt.println(strings.trim_suffix("todo.doc", ".txt"))
 	}
@@ -2529,7 +2529,7 @@ Example:
 	import "core:fmt"
 	import "core:strings"
 
-	strings_split_multi_example :: proc() {
+	split_multi_example :: proc() {
 		splits := [?]string { "---", "~~~", ".", "_", "," }
 		res := strings.split_multi("testing,this.out_nice---done~~~last", splits[:])
 		fmt.println(res) // -> [testing, this, out, nice, done, last]
@@ -2594,7 +2594,7 @@ Example:
 	import "core:fmt"
 	import "core:strings"
 
-	strings_split_multi_iterate_example :: proc() {
+	split_multi_iterate_example :: proc() {
 		it := "testing,this.out_nice---done~~~last"
 		splits := [?]string { "---", "~~~", ".", "_", "," }
 		for str in strings.split_multi_iterate(&it, splits[:]) {
@@ -2654,7 +2654,7 @@ Example:
 	import "core:fmt"
 	import "core:strings"
 
-	strings_scrub_example :: proc() {
+	scrub_example :: proc() {
 		text := "Hello\xC0\x80World"
 		fmt.println(strings.scrub(text, "?")) // -> "Hello?World"
 	}
@@ -2711,7 +2711,7 @@ Example:
 	import "core:fmt"
 	import "core:strings"
 
-	strings_reverse_example :: proc() {
+	reverse_example :: proc() {
 		a := "abcxyz"
 		b := strings.reverse(a)
 		fmt.println(a, b)
@@ -2753,7 +2753,7 @@ Example:
 	import "core:fmt"
 	import "core:strings"
 
-	strings_expand_tabs_example :: proc() {
+	expand_tabs_example :: proc() {
 		text := "abc1\tabc2\tabc3"
 		fmt.println(strings.expand_tabs(text, 4))
 	}
@@ -2820,7 +2820,7 @@ Example:
 	import "core:fmt"
 	import "core:strings"
 
-	strings_partition_example :: proc() {
+	partition_example :: proc() {
 		text := "testing this out"
 		head, match, tail := strings.partition(text, " this ") // -> head: "testing", match: " this ", tail: "out"
 		fmt.println(head, match, tail)

@@ -227,7 +227,7 @@ Example:
 
 	import "core:fmt"
 	import "core:strings"
-	strings_builder_from_bytes_example :: proc() {
+	builder_from_bytes_example :: proc() {
 		bytes: [8]byte // <-- gets filled
 		builder := strings.builder_from_bytes(bytes[:])
 		strings.write_byte(&builder, 'a')
@@ -318,7 +318,7 @@ Example:
 	import "core:fmt"
 	import "core:strings"
 
-	strings_write_byte_example :: proc() {
+	write_byte_example :: proc() {
 		builder := strings.builder_make()
 		strings.write_byte(&builder, 'a')        // 1
 		strings.write_byte(&builder, 'b')        // 1
@@ -352,7 +352,7 @@ Example:
 	import "core:fmt"
 	import "core:strings"
 
-	strings_write_bytes_example :: proc() {
+	write_bytes_example :: proc() {
 		builder := strings.builder_make()
 		bytes := [?]byte { 'a', 'b', 'c' }
 		strings.write_bytes(&builder, bytes[:]) // 3
@@ -382,7 +382,7 @@ Example:
 	import "core:fmt"
 	import "core:strings"
 
-	strings_write_rune_example :: proc() {
+	write_rune_example :: proc() {
 		builder := strings.builder_make()
 		strings.write_rune(&builder, 'ä')     // 2 None
 		strings.write_rune(&builder, 'b')       // 1 None
@@ -413,7 +413,7 @@ Example:
 	import "core:fmt"
 	import "core:strings"
 
-	strings_write_quoted_rune_example :: proc() {
+	write_quoted_rune_example :: proc() {
 		builder := strings.builder_make()
 		strings.write_string(&builder, "abc")      // 3
 		strings.write_quoted_rune(&builder, 'ä') // 4
@@ -445,7 +445,7 @@ Example:
 	import "core:fmt"
 	import "core:strings"
 
-	strings_write_string_example :: proc() {
+	write_string_example :: proc() {
 		builder := strings.builder_make()
 		strings.write_string(&builder, "a")     // 1
 		strings.write_string(&builder, "bc")    // 2
@@ -518,7 +518,7 @@ Example:
 	import "core:fmt"
 	import "core:strings"
 
-	strings_write_quoted_string_example :: proc() {
+	write_quoted_string_example :: proc() {
 		builder := strings.builder_make()
 		strings.write_quoted_string(&builder, "a")        // 3
 		strings.write_quoted_string(&builder, "bc", '\'') // 4
@@ -659,7 +659,7 @@ Example:
 	import "core:fmt"
 	import "core:strings"
 
-	strings_write_f32_example :: proc() {
+	write_f32_example :: proc() {
 		builder := strings.builder_make()
 		strings.write_f32(&builder, 3.14159, 'f') // 6
 		strings.write_string(&builder, " - ")     // 3
