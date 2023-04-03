@@ -2683,7 +2683,7 @@ gb_internal bool are_types_identical_internal(Type *x, Type *y, bool check_tuple
 					return false;
 				}
 			}
-			return true;
+			return are_types_identical(x->Struct.polymorphic_params, y->Struct.polymorphic_params);
 		}
 		break;
 
