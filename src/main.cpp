@@ -278,6 +278,13 @@ gb_internal i32 linker_stage(lbGenerator *gen) {
 				}
 			}
 
+			for (Entity *e : gen->foreign_libraries) {
+				GB_ASSERT(e->kind == Entity_LibraryName);
+				if (e->LibraryName.extra_linker_flags.len != 0) {
+					lib_str = gb_string_append_fmt(lib_str, " %.*s", LIT(e->LibraryName.extra_linker_flags));
+				}
+			}
+
 			if (build_context.build_mode == BuildMode_DynamicLibrary) {
 				link_settings = gb_string_append_fmt(link_settings, " /DLL");
 			} else {
@@ -449,6 +456,12 @@ gb_internal i32 linker_stage(lbGenerator *gen) {
 				}
 			}
 
+			for (Entity *e : gen->foreign_libraries) {
+				GB_ASSERT(e->kind == Entity_LibraryName);
+				if (e->LibraryName.extra_linker_flags.len != 0) {
+					lib_str = gb_string_append_fmt(lib_str, " %.*s", LIT(e->LibraryName.extra_linker_flags));
+				}
+			}
 
 			gbString object_files = gb_string_make(heap_allocator(), "");
 			defer (gb_string_free(object_files));
@@ -581,13 +594,13 @@ gb_internal Array<String> setup_args(int argc, char const **argv) {
 
 gb_internal void print_usage_line(i32 indent, char const *fmt, ...) {
 	while (indent --> 0) {
-		gb_printf_err("\t");
+		gb_printf("\t");
 	}
 	va_list va;
 	va_start(va, fmt);
-	gb_printf_err_va(fmt, va);
+	gb_printf_va(fmt, va);
 	va_end(va);
-	gb_printf_err("\n");
+	gb_printf("\n");
 }
 
 gb_internal void usage(String argv0) {

@@ -1,9 +1,9 @@
 package runtime
 
 DEFAULT_TEMP_ALLOCATOR_BACKING_SIZE: int : #config(DEFAULT_TEMP_ALLOCATOR_BACKING_SIZE, 4 * Megabyte)
+NO_DEFAULT_TEMP_ALLOCATOR: bool : ODIN_OS == .Freestanding || ODIN_OS == .JS || ODIN_DEFAULT_TO_NIL_ALLOCATOR
 
-
-when ODIN_OS == .Freestanding || ODIN_OS == .JS || ODIN_DEFAULT_TO_NIL_ALLOCATOR {
+when NO_DEFAULT_TEMP_ALLOCATOR {
 	Default_Temp_Allocator :: struct {}
 	
 	default_temp_allocator_init :: proc(s: ^Default_Temp_Allocator, size: int, backing_allocator := context.allocator) {}
@@ -54,6 +54,11 @@ when ODIN_OS == .Freestanding || ODIN_OS == .JS || ODIN_DEFAULT_TO_NIL_ALLOCATOR
 	default_temp_allocator_temp_end :: proc(temp: Arena_Temp, loc := #caller_location) {
 		arena_temp_end(temp, loc)
 	}
+
+	@(fini, private)
+	_destroy_temp_allocator_fini :: proc() {
+		default_temp_allocator_destroy(&global_default_temp_allocator_data)
+	}
 }
 
 @(deferred_out=default_temp_allocator_temp_end)
@@ -71,9 +76,4 @@ default_temp_allocator :: proc(allocator: ^Default_Temp_Allocator) -> Allocator 
 		procedure = default_temp_allocator_proc,
 		data      = allocator,
 	}
-}
-
-@(fini, private)
-_destroy_temp_allocator_fini :: proc() {
-	default_temp_allocator_destroy(&global_default_temp_allocator_data)
 }
