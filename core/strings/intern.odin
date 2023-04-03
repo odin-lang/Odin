@@ -25,7 +25,7 @@ Initializes the entries map and sets the allocator for the string entries
 
 *Allocates Using Provided Allocators*
 
-**Inputs**  
+Inputs:
 - m: A pointer to the Intern struct to be initialized
 - allocator: The allocator for the Intern_Entry strings (Default: context.allocator)
 - map_allocator: The allocator for the map of entries (Default: context.allocator)
@@ -37,7 +37,7 @@ intern_init :: proc(m: ^Intern, allocator := context.allocator, map_allocator :=
 /*
 Frees the map and all its content allocated using the `.allocator`.
 
-**Inputs**  
+Inputs:
 - m: A pointer to the Intern struct to be destroyed
 */
 intern_destroy :: proc(m: ^Intern) {
@@ -51,13 +51,13 @@ Returns an interned copy of the given text, adding it to the map if not already 
 
 *Allocate using the Intern's Allocator (First time string is seen only)*
 
-**Inputs**  
+Inputs:
 - m: A pointer to the Intern struct
 - text: The string to be interned
 
 NOTE: The returned string lives as long as the map entry lives.
 
-**Returns**  
+Returns:
 The interned string and an allocator error if any
 */
 intern_get :: proc(m: ^Intern, text: string) -> (str: string, err: runtime.Allocator_Error) {
@@ -69,13 +69,13 @@ Returns an interned copy of the given text as a cstring, adding it to the map if
 
 *Allocate using the Intern's Allocator  (First time string is seen only)*
 
-**Inputs**  
+Inputs:
 - m: A pointer to the Intern struct
 - text: The string to be interned
 
 NOTE: The returned cstring lives as long as the map entry lives
 
-**Returns**  
+Returns:
 The interned cstring and an allocator error if any
 */
 intern_get_cstring :: proc(m: ^Intern, text: string) -> (str: cstring, err: runtime.Allocator_Error) {
@@ -88,11 +88,11 @@ Sets and allocates the entry if it wasn't set yet
 
 *Allocate using the Intern's Allocator  (First time string is seen only)*
 
-**Inputs**  
+Inputs:
 - m: A pointer to the Intern struct
 - text: The string to be looked up or interned
 
-**Returns**  
+Returns:
 The new or existing interned entry and an allocator error if any
 */
 _intern_get_entry :: proc(m: ^Intern, text: string) -> (new_entry: ^Intern_Entry, err: runtime.Allocator_Error) #no_bounds_check {
