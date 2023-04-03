@@ -1425,7 +1425,7 @@ parse_stmt :: proc(p: ^Parser) -> ^ast.Stmt {
 			return es
 
 		case "force_inline", "force_no_inline":
-			expr := parse_inlining_operand(p, true, tok)
+			expr := parse_inlining_operand(p, true, tag)
 			es := ast.new(ast.Expr_Stmt, expr.pos, expr.end)
 			es.expr = expr
 			return es

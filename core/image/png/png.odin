@@ -17,7 +17,6 @@ import "core:compress"
 import "core:compress/zlib"
 import "core:image"
 
-import "core:os"
 import "core:hash"
 import "core:bytes"
 import "core:io"
@@ -334,19 +333,6 @@ load_from_bytes :: proc(data: []byte, options := Options{}, allocator := context
 	img, err = load_from_context(ctx, options, allocator)
 
 	return img, err
-}
-
-load_from_file :: proc(filename: string, options := Options{}, allocator := context.allocator) -> (img: ^Image, err: Error) {
-	context.allocator = allocator
-
-	data, ok := os.read_entire_file(filename)
-	defer delete(data)
-
-	if ok {
-		return load_from_bytes(data, options)
-	} else {
-		return nil, .Unable_To_Read_File
-	}
 }
 
 load_from_context :: proc(ctx: ^$C, options := Options{}, allocator := context.allocator) -> (img: ^Image, err: Error) {
@@ -1640,8 +1626,6 @@ defilter :: proc(img: ^Image, filter_bytes: ^bytes.Buffer, header: ^image.PNG_IH
 
 	return nil
 }
-
-load :: proc{load_from_file, load_from_bytes, load_from_context}
 
 
 @(init, private)

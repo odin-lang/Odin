@@ -68,7 +68,7 @@ A period with no following number specifies a precision of 0.
 Examples:
 	%f     default width, default precision
 	%8f    width 8, default precision
-	%.3f   default width, precision 2
+	%.2f   default width, precision 2
 	%8.3f  width 8, precision 3
 	%8.f   width 8, precision 0
 
