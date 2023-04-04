@@ -1,29 +1,103 @@
 // +build windows
 package sys_windows
 
-foreign import ws2_32 "system:Ws2_32.lib"
+// Define flags to be used with the WSAAsyncSelect() call.
+FD_READ :: 0x01
+FD_WRITE :: 0x02
+FD_OOB :: 0x04
+FD_ACCEPT :: 0x08
+FD_CONNECT :: 0x10
+FD_CLOSE :: 0x20
+FD_MAX_EVENTS :: 10
 
+INADDR_LOOPBACK :: 0x7f000001
+
+// Event flag definitions for WSAPoll().
 POLLRDNORM :: 0x0100
 POLLRDBAND :: 0x0200
 POLLIN     :: (POLLRDNORM | POLLRDBAND)
 POLLPRI    :: 0x0400
+POLLWRNORM :: 0x0010
+POLLOUT    :: (POLLWRNORM)
+POLLWRBAND :: 0x0020
+POLLERR    :: 0x0001
+POLLHUP    :: 0x0002
+POLLNVAL   :: 0x0004
+
 WSA_POLLFD::struct{
 	fd:SOCKET,
 	events:c_short,
 	revents:c_short,
 }
 
+WSANETWORKEVENTS :: struct {
+	lNetworkEvents: c_long,
+	iErrorCode:     [FD_MAX_EVENTS]c_int,
+}
+
+WSAEVENT :: HANDLE
+WSAOVERLAPPED_COMPLETION_ROUTINE :: proc(dwError: DWORD, cbTransferred: DWORD, lpOverlapped: ^OVERLAPPED, dwFlags: DWORD)
+
+WSAID_ACCEPTEX :: GUID{0xb5367df1, 0xcbac, 0x11cf, {0x95, 0xca, 0x00, 0x80, 0x5f, 0x48, 0xa1, 0x92}}
+WSAID_GETACCEPTEXSOCKADDRS :: GUID{0xb5367df2, 0xcbac, 0x11cf, {0x95, 0xca, 0x00, 0x80, 0x5f, 0x48, 0xa1, 0x92}}
+SIO_GET_EXTENSION_FUNCTION_POINTER :: IOC_INOUT | IOC_WS2 | 6
+IOC_OUT :: 0x40000000
+IOC_IN :: 0x80000000
+IOC_INOUT :: (IOC_IN | IOC_OUT)
+IOC_WS2 :: 0x08000000
+/*
+Example Load:
+	load_accept_ex :: proc(listener: SOCKET, fn_acceptex: rawptr) {
+		bytes: u32
+		guid_accept_ex := WSAID_ACCEPTEX
+		rc := WSAIoctl(listener, SIO_GET_EXTENSION_FUNCTION_POINTER, &guid_accept_ex, size_of(guid_accept_ex),
+			fn_acceptex, size_of(fn_acceptex), &bytes, nil,	nil,)
+		assert(rc != windows.SOCKET_ERROR)
+	}
+*/
+// NOTE: AcceptEx should be loaded at runtime per MS-Docs
+//[MS-Docs](https://learn.microsoft.com/en-us/windows/win32/api/mswsock/nf-mswsock-acceptex)
+AcceptEx :: proc(
+	sListenSocket: SOCKET,
+	sAcceptSocket: SOCKET,
+	lpOutputBuffer: rawptr,
+	dwReceiveDataLength: u32,
+	dwLocalAddressLength: u32,
+	dwRemoteAddressLength: u32,
+	lpdwBytesReceived: ^u32,
+	lpOverlapped: ^OVERLAPPED,
+) -> b32
+// NOTE: GetAcceptExSockaddrs should be loaded at runtime per MS-Docs
+//[MS-Docs](https://learn.microsoft.com/en-us/windows/win32/api/mswsock/nf-mswsock-getacceptexsockaddrs) 
+GetAcceptExSockaddrs :: proc(
+	lpOutputBuffer: rawptr,
+	dwReceiveDataLength: u32,
+	dwLocalAddressLength: u32,
+	dwRemoteAddressLength: u32,
+	LocalSockaddr: ^^sockaddr,
+	LocalSockaddrLength: ^i32,
+	RemoteSockaddr: ^^sockaddr,
+	RemoteSockaddrLength: ^i32,
+)
+
+foreign import ws2_32 "system:Ws2_32.lib"
 @(default_calling_convention="stdcall")
 foreign ws2_32 {
+	// [MS-Docs](https://learn.microsoft.com/en-us/windows/win32/api/winsock2/nf-winsock2-wsastartup)
 	WSAStartup :: proc(wVersionRequested: WORD, lpWSAData: LPWSADATA) -> c_int ---
+	// [MS-Docs](https://learn.microsoft.com/en-us/windows/win32/api/winsock2/nf-winsock2-wsacleanup)
 	WSACleanup :: proc() -> c_int ---
+	// [MS-Docs](https://learn.microsoft.com/en-us/windows/win32/api/winsock2/nf-winsock2-wsagetlasterror)
 	WSAGetLastError :: proc() -> c_int ---
+	// [MS-Docs](https://learn.microsoft.com/en-us/windows/win32/api/winsock2/nf-winsock2-wsapoll)
 	WSAPoll :: proc(fdArray: ^WSA_POLLFD, fds: c_ulong, timeout: c_int) -> c_int ---
+	// [MS-Docs](https://learn.microsoft.com/en-us/windows/win32/api/winsock2/nf-winsock2-wsaduplicatesocketw)
 	WSADuplicateSocketW :: proc(
 		s: SOCKET,
 		dwProcessId: DWORD,
 		lpProtocolInfo: LPWSAPROTOCOL_INFO,
 	) -> c_int ---
+	// [MS-Docs](https://learn.microsoft.com/en-us/windows/win32/api/winsock2/nf-winsock2-wsasend)
 	WSASend :: proc(
 		s: SOCKET,
 		lpBuffers: LPWSABUF,
@@ -33,6 +107,7 @@ foreign ws2_32 {
 		lpOverlapped: LPWSAOVERLAPPED,
 		lpCompletionRoutine: LPWSAOVERLAPPED_COMPLETION_ROUTINE,
 	) -> c_int ---
+	// [MS-Docs](https://learn.microsoft.com/en-us/windows/win32/api/winsock2/nf-winsock2-wsarecv)
 	WSARecv :: proc(
 		s: SOCKET,
 		lpBuffers: LPWSABUF,
@@ -42,6 +117,7 @@ foreign ws2_32 {
 		lpOverlapped: LPWSAOVERLAPPED,
 		lpCompletionRoutine: LPWSAOVERLAPPED_COMPLETION_ROUTINE,
 	) -> c_int ---
+	// [MS-Docs](https://learn.microsoft.com/en-us/windows/win32/api/winsock2/nf-winsock2-wsasocketw)
 	WSASocketW :: proc(
 		af: c_int,
 		kind: c_int,
@@ -50,16 +126,32 @@ foreign ws2_32 {
 		g: GROUP,
 		dwFlags: DWORD,
 	) -> SOCKET ---
+	// [MS-Docs](https://learn.microsoft.com/en-us/windows/win32/api/winsock2/nf-winsock2-wsaioctl)
+	WSAIoctl :: proc(s: SOCKET, dwIoControlCode: DWORD, lpvInBuffer: rawptr, cbInBuffer: DWORD, lpvOutBuffer: rawptr, cbOutBuffer: DWORD, lpcbBytesReturned: ^DWORD, lpOverlapped: ^OVERLAPPED, lpCompletionRoutine: ^WSAOVERLAPPED_COMPLETION_ROUTINE) -> c_int ---
+	// [MS-Docs](https://learn.microsoft.com/en-us/windows/win32/api/winsock2/nf-winsock2-wsaeventselect)
+	WSAEventSelect :: proc(s: SOCKET, hEventObject: WSAEVENT, lNetworkEvents: i32) -> c_int ---
+	// [MS-Docs](https://learn.microsoft.com/en-us/windows/win32/api/winsock2/nf-winsock2-wsawaitformultipleevents)
+	WSAWaitForMultipleEvents :: proc(cEvents: DWORD, lphEvents: ^WSAEVENT, fWaitAll: BOOL, dwTimeout: DWORD, fAlertable: BOOL) -> DWORD ---
+	// [MS-Docs](https://learn.microsoft.com/en-us/windows/win32/api/winsock2/nf-winsock2-wsaenumnetworkevents)
+	WSAEnumNetworkEvents :: proc(s: SOCKET, hEventObject: WSAEVENT, lpNetworkEvents: ^WSANETWORKEVENTS) -> c_int ---
+	//[MS-Docs](https://learn.microsoft.com/en-us/windows/win32/api/winsock2/nf-winsock2-wsagetoverlappedresult)
+	WSAGetOverlappedResult :: proc(s: SOCKET, lpOverlapped: ^OVERLAPPED, lpcbTransfer: ^DWORD, fWait: BOOL, lpdwFlags: ^DWORD) -> BOOL ---
+	// [MS-Docs](https://learn.microsoft.com/en-us/windows/win32/api/winsock2/nf-winsock2-socket)
 	socket :: proc(
 		af: c_int,
 		type: c_int,
 		protocol: c_int,
 	) -> SOCKET ---
 
+	// [MS-Docs](https://learn.microsoft.com/en-us/windows/win32/api/winsock2/nf-winsock2-ioctlsocket)
 	ioctlsocket :: proc(s: SOCKET, cmd: c_long, argp: ^c_ulong) -> c_int ---
+	// [MS-Docs](https://learn.microsoft.com/en-us/windows/win32/api/winsock2/nf-winsock2-closesocket)
 	closesocket :: proc(socket: SOCKET) -> c_int ---
+	// [MS-Docs](https://learn.microsoft.com/en-us/windows/win32/api/winsock/nf-winsock-recv)
 	recv :: proc(socket: SOCKET, buf: rawptr, len: c_int, flags: c_int) -> c_int ---
+	// [MS-Docs](https://learn.microsoft.com/en-us/windows/win32/api/winsock2/nf-winsock2-send)
 	send :: proc(socket: SOCKET, buf: rawptr, len: c_int, flags: c_int) -> c_int ---
+	// [MS-Docs](https://learn.microsoft.com/en-us/windows/win32/api/winsock2/nf-winsock2-recvfrom)
 	recvfrom :: proc(
 		socket: SOCKET,
 		buf: rawptr,
@@ -68,6 +160,7 @@ foreign ws2_32 {
 		addr: ^SOCKADDR_STORAGE_LH,
 		addrlen: ^c_int,
 	) -> c_int ---
+	// [MS-Docs](https://learn.microsoft.com/en-us/windows/win32/api/winsock2/nf-winsock2-sendto)
 	sendto :: proc(
 		socket: SOCKET,
 		buf: rawptr,
@@ -76,9 +169,12 @@ foreign ws2_32 {
 		addr: ^SOCKADDR_STORAGE_LH,
 		addrlen: c_int,
 	) -> c_int ---
+	// [MS-Docs](https://learn.microsoft.com/en-us/windows/win32/api/winsock2/nf-winsock2-shutdown)
 	shutdown :: proc(socket: SOCKET, how: c_int) -> c_int ---
+	// [MS-Docs](https://learn.microsoft.com/en-us/windows/win32/api/winsock2/nf-winsock2-accept)
 	accept :: proc(socket: SOCKET, address: ^SOCKADDR_STORAGE_LH, address_len: ^c_int) -> SOCKET ---
 
+	// [MS-Docs](https://learn.microsoft.com/en-us/windows/win32/api/winsock2/nf-winsock2-setsockopt)
 	setsockopt :: proc(
 		s: SOCKET,
 		level: c_int,
@@ -86,19 +182,28 @@ foreign ws2_32 {
 		optval: rawptr,
 		optlen: c_int,
 	) -> c_int ---
+	// [MS-Docs](https://learn.microsoft.com/en-us/windows/win32/api/winsock2/nf-winsock2-getsockname)
 	getsockname :: proc(socket: SOCKET, address: ^SOCKADDR_STORAGE_LH, address_len: ^c_int) -> c_int ---
+	// [MS-Docs](https://learn.microsoft.com/en-us/windows/win32/api/winsock2/nf-winsock2-getpeername)
 	getpeername :: proc(socket: SOCKET, address: ^SOCKADDR_STORAGE_LH, address_len: ^c_int) -> c_int ---
+	// [MS-Docs](https://learn.microsoft.com/en-us/windows/win32/api/winsock2/nf-winsock2-bind)
 	bind :: proc(socket: SOCKET, address: ^SOCKADDR_STORAGE_LH, address_len: socklen_t) -> c_int ---
+	// [MS-Docs](https://learn.microsoft.com/en-us/windows/win32/api/winsock2/nf-winsock2-listen)
 	listen :: proc(socket: SOCKET, backlog: c_int) -> c_int ---
+	// [MS-Docs](https://learn.microsoft.com/en-us/windows/win32/api/winsock2/nf-winsock2-connect)
 	connect :: proc(socket: SOCKET, address: ^SOCKADDR_STORAGE_LH, len: c_int) -> c_int ---
+	// [MS-Docs](https://learn.microsoft.com/en-us/windows/win32/api/ws2tcpip/nf-ws2tcpip-getaddrinfo)
 	getaddrinfo :: proc(
 		node: cstring,
 		service: cstring,
 		hints: ^ADDRINFOA,
 		res: ^^ADDRINFOA,
 	) -> c_int ---
+	// [MS-Docs](https://learn.microsoft.com/en-us/windows/win32/api/ws2tcpip/nf-ws2tcpip-freeaddrinfo)
 	freeaddrinfo :: proc(res: ^ADDRINFOA) ---
+	// [MS-Docs](https://learn.microsoft.com/en-us/windows/win32/api/ws2tcpip/nf-ws2tcpip-freeaddrinfoexw)
 	FreeAddrInfoExW :: proc(pAddrInfoEx: PADDRINFOEXW) ---
+	// [MS-Docs](https://learn.microsoft.com/en-us/windows/win32/api/ws2tcpip/nf-ws2tcpip-getaddrinfoexw)
 	GetAddrInfoExW :: proc(
 		pName:               PCWSTR,
 		pServiceName:        PCWSTR,
@@ -110,7 +215,7 @@ foreign ws2_32 {
 		lpOverlapped:        LPOVERLAPPED,
 		lpCompletionRoutine: LPLOOKUPSERVICE_COMPLETION_ROUTINE,
 		lpHandle:            LPHANDLE) -> INT ---
-
+	// [MS-Docs](https://learn.microsoft.com/en-us/windows/win32/api/winsock2/nf-winsock2-select)
 	select :: proc(
 		nfds: c_int,
 		readfds: ^fd_set,
@@ -118,6 +223,7 @@ foreign ws2_32 {
 		exceptfds: ^fd_set,
 		timeout: ^timeval,
 	) -> c_int ---
+	// [MS-Docs](https://learn.microsoft.com/en-us/windows/win32/api/winsock2/nf-winsock2-getsockopt)
 	getsockopt :: proc(
 		s: SOCKET,
 		level: c_int,
@@ -125,5 +231,4 @@ foreign ws2_32 {
 		optval: ^c_char,
 		optlen: ^c_int,
 	) -> c_int ---
-
 }
