@@ -193,9 +193,10 @@ foreign kernel32 {
 		dwCreationFlags: DWORD,
 		lpEnvironment: LPVOID,
 		lpCurrentDirectory: LPCWSTR,
-		lpStartupInfo: LPSTARTUPINFO,
+		lpStartupInfo: LPSTARTUPINFOW,
 		lpProcessInformation: LPPROCESS_INFORMATION,
 	) -> BOOL ---
+	GetStartupInfoW :: proc(lpStartupInfo: LPSTARTUPINFOW) ---
 	GetEnvironmentVariableW :: proc(n: LPCWSTR, v: LPWSTR, nsize: DWORD) -> DWORD ---
 	SetEnvironmentVariableW :: proc(n: LPCWSTR, v: LPCWSTR) -> BOOL ---
 	GetEnvironmentStringsW :: proc() -> LPWCH ---
