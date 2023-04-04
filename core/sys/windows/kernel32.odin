@@ -415,8 +415,6 @@ foreign kernel32 {
 	PostQueuedCompletionStatus :: proc(CompletionPort: HANDLE, dwNumberOfBytesTransferred: DWORD, dwCompletionKey: c_ulong, lpOverlapped: ^OVERLAPPED) -> BOOL ---
 	// [MS-Docs] (https://learn.microsoft.com/en-us/windows/win32/api/sysinfoapi/nf-sysinfoapi-gettickcount64)
 	GetTickCount64 :: proc() -> u64 ---
-	// [MS-Docs](https://github.com/mic101/windows/blob/master/WRK-v1.2/base/ntos/ex/keyedevent.c)
-	NtCreateKeyedEvent :: proc(KeyedEventHandle: ^HANDLE, DesiredAccess: ACCESS_MASK, ObjectAttributes: OBJECT_ATTRIBUTES, Flags: u32) -> NTSTATUS ---
 	// [MS-Docs](https://learn.microsoft.com/en-us/windows/win32/api/handleapi/nf-handleapi-gethandleinformation)
 	GetHandleInformation :: proc(hObject: HANDLE, lpdwFlags: ^DWORD) -> BOOL ---
 	//[MS-Docs](https://learn.microsoft.com/en-us/windows/win32/api/ioapiset/nf-ioapiset-getqueuedcompletionstatus)
