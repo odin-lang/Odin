@@ -3693,9 +3693,11 @@ gb_internal bool allow_field_separator(AstFile *f) {
 	if (allow_token(f, Token_Comma)) {
 		return true;
 	}
-	if (ALLOW_NEWLINE && token.kind == Token_Semicolon && !token_is_newline(token)) {
-		String p = token_to_string(token);
-		syntax_error(token_end_of_line(f, f->prev_token), "Expected a comma, got a %.*s", LIT(p));
+	if (ALLOW_NEWLINE && token.kind == Token_Semicolon) {
+		if (!token_is_newline(token)) {
+			String p = token_to_string(token);
+			syntax_error(token_end_of_line(f, f->prev_token), "Expected a comma, got a %.*s", LIT(p));
+		}
 		advance_token(f);
 		return true;
 	}
