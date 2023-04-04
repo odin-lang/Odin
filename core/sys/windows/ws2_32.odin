@@ -36,7 +36,6 @@ WSANETWORKEVENTS :: struct {
 }
 
 WSAEVENT :: HANDLE
-WSAOVERLAPPED_COMPLETION_ROUTINE :: proc(dwError: DWORD, cbTransferred: DWORD, lpOverlapped: ^OVERLAPPED, dwFlags: DWORD)
 
 WSAID_ACCEPTEX :: GUID{0xb5367df1, 0xcbac, 0x11cf, {0x95, 0xca, 0x00, 0x80, 0x5f, 0x48, 0xa1, 0x92}}
 WSAID_GETACCEPTEXSOCKADDRS :: GUID{0xb5367df2, 0xcbac, 0x11cf, {0x95, 0xca, 0x00, 0x80, 0x5f, 0x48, 0xa1, 0x92}}
@@ -127,7 +126,7 @@ foreign ws2_32 {
 		dwFlags: DWORD,
 	) -> SOCKET ---
 	// [MS-Docs](https://learn.microsoft.com/en-us/windows/win32/api/winsock2/nf-winsock2-wsaioctl)
-	WSAIoctl :: proc(s: SOCKET, dwIoControlCode: DWORD, lpvInBuffer: rawptr, cbInBuffer: DWORD, lpvOutBuffer: rawptr, cbOutBuffer: DWORD, lpcbBytesReturned: ^DWORD, lpOverlapped: ^OVERLAPPED, lpCompletionRoutine: ^WSAOVERLAPPED_COMPLETION_ROUTINE) -> c_int ---
+	WSAIoctl :: proc(s: SOCKET, dwIoControlCode: DWORD, lpvInBuffer: rawptr, cbInBuffer: DWORD, lpvOutBuffer: rawptr, cbOutBuffer: DWORD, lpcbBytesReturned: ^DWORD, lpOverlapped: ^OVERLAPPED, lpCompletionRoutine: LPWSAOVERLAPPED_COMPLETION_ROUTINE) -> c_int ---
 	// [MS-Docs](https://learn.microsoft.com/en-us/windows/win32/api/winsock2/nf-winsock2-wsaeventselect)
 	WSAEventSelect :: proc(s: SOCKET, hEventObject: WSAEVENT, lNetworkEvents: i32) -> c_int ---
 	// [MS-Docs](https://learn.microsoft.com/en-us/windows/win32/api/winsock2/nf-winsock2-wsawaitformultipleevents)
