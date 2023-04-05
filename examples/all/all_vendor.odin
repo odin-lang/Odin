@@ -2,7 +2,7 @@ package all
 
 import botan      "vendor:botan"
 import cgltf      "vendor:cgltf"
-import commonmark "vendor:commonmark"
+// import commonmark "vendor:commonmark"
 import ENet       "vendor:ENet"
 import exr        "vendor:OpenEXRCore"
 import ggpo       "vendor:ggpo"
@@ -31,7 +31,7 @@ import lua_5_4    "vendor:lua/5.4"
 
 _ :: botan
 _ :: cgltf
-_ :: commonmark
+// _ :: commonmark
 _ :: ENet
 _ :: exr
 _ :: ggpo
