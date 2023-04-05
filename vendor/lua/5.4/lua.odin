@@ -12,7 +12,7 @@ when ODIN_OS == .Windows {
 } else when ODIN_OS == .Linux {
 	foreign import lib "linux/liblua54.a"
 } else {
-	#panic(`Unsupported platform of "vendor:lua/5.4"`)
+	foreign import lib "system:liblua54.a"
 }
 
 VERSION_MAJOR       :: "5"
