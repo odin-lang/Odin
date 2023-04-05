@@ -35,15 +35,18 @@ case $OS in
 		remove_macos_libraries
 		;;
 	Darwin)
+		assert_vendor
 		remove_windows_libraries
 		remove_linux_libraries
 		;;
 	OpenBSD)
+		assert_vendor
 		remove_windows_libraries
 		remove_macos_libraries
 		remove_linux_libraries
 		;;
 	FreeBSD)
+		assert_vendor
 		remove_windows_libraries
 		remove_macos_libraries
 		remove_linux_libraries
