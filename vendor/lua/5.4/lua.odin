@@ -9,6 +9,10 @@ import c "core:c/libc"
 
 when ODIN_OS == .Windows {
 	foreign import lib "windows/lua54dll.lib"
+} else when ODIN_OS == .Linux {
+	foreign import lib "linux/liblua54.a"
+} else {
+	#panic(`Unsupported platform of "vendor:lua/5.4"`)
 }
 
 VERSION_MAJOR       :: "5"
