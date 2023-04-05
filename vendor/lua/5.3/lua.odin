@@ -343,9 +343,9 @@ foreign lib {
 	typename    :: proc(L: ^State, tp: Type) -> cstring ---
 
 	@(link_name="lua_tonumberx")
-	tonumber    :: proc(L: ^State, idx: c.int, isnum: ^c.int = nil) -> Number ---
+	tonumber    :: proc(L: ^State, idx: c.int, isnum: ^b32 = nil) -> Number ---
 	@(link_name="lua_tointegerx")
-	tointeger   :: proc(L: ^State, idx: c.int, isnum: ^c.int = nil) -> Integer ---
+	tointeger   :: proc(L: ^State, idx: c.int, isnum: ^b32 = nil) -> Integer ---
 	toboolean   :: proc(L: ^State, idx: c.int) -> b32 ---
 	tolstring   :: proc(L: ^State, idx: c.int, len: ^c.size_t) -> cstring ---
 	rawlen      :: proc(L: ^State, idx: c.int) -> c.size_t ---
@@ -369,7 +369,7 @@ foreign lib {
 	pushnil      :: proc(L: ^State) ---
 	pushnumber   :: proc(L: ^State, n: Number) ---
 	pushinteger  :: proc(L: ^State, n: Integer) ---
-	pushlstring  :: proc(L: ^State, s: cstring, len: cstring) -> cstring ---
+	pushlstring  :: proc(L: ^State, s: cstring, len: c.size_t) -> cstring ---
 	pushstring   :: proc(L: ^State, s: cstring) -> cstring ---
 	pushvfstring :: proc(L: ^State, fmt: cstring, argp: c.va_list) -> cstring ---
 	pushfstring       :: proc(L: ^State, fmt: cstring, #c_vararg args: ..any) -> cstring ---
