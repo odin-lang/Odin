@@ -2445,6 +2445,20 @@ FILETIME_as_unix_nanoseconds :: proc "contextless" (ft: FILETIME) -> i64 {
 	return (t - 116444736000000000) * 100
 }
 
+OBJECT_ATTRIBUTES :: struct {
+	Length:                   c_ulong,
+	RootDirectory:            HANDLE,
+	ObjectName:               ^UNICODE_STRING,
+	Attributes:               c_ulong,
+	SecurityDescriptor:       rawptr,
+	SecurityQualityOfService: rawptr,
+}
+
+UNICODE_STRING :: struct {
+	Length:        u16,
+	MaximumLength: u16,
+	Buffer:        ^u16,
+}
 
 OVERLAPPED :: struct {
 	Internal: ^c_ulong,
@@ -2452,6 +2466,13 @@ OVERLAPPED :: struct {
 	Offset: DWORD,
 	OffsetHigh: DWORD,
 	hEvent: HANDLE,
+}
+
+OVERLAPPED_ENTRY :: struct {
+	lpCompletionKey:            c_ulong,
+	lpOverlapped:               ^OVERLAPPED,
+	Internal:                   c_ulong,
+	dwNumberOfBytesTransferred: DWORD,
 }
 
 LPOVERLAPPED_COMPLETION_ROUTINE :: #type proc "stdcall" (

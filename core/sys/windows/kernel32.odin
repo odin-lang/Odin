@@ -405,6 +405,19 @@ foreign kernel32 {
 	) -> BOOL ---
 
 	GetLogicalProcessorInformation :: proc(buffer: ^SYSTEM_LOGICAL_PROCESSOR_INFORMATION, returnedLength: PDWORD) -> BOOL ---
+
+	// [MS-Docs](https://learn.microsoft.com/en-us/windows/win32/api/winbase/nf-winbase-setfilecompletionnotificationmodes)
+	SetFileCompletionNotificationModes :: proc(FileHandle: HANDLE, Flags: u8) -> BOOL ---
+	// [MS-Docs](https://learn.microsoft.com/en-us/windows/win32/api/ioapiset/nf-ioapiset-createiocompletionport)
+	CreateIoCompletionPort :: proc(FileHandle: HANDLE, ExistingCompletionPort: HANDLE, CompletionKey: uintptr, NumberOfConcurrentThreads: DWORD) -> HANDLE ---
+	//[MS-Docs](https://learn.microsoft.com/en-us/windows/win32/api/ioapiset/nf-ioapiset-getqueuedcompletionstatus)
+	GetQueuedCompletionStatus :: proc(CompletionPort: HANDLE, lpNumberOfBytesTransferred: ^DWORD, lpCompletionKey: uintptr, lpOverlapped: ^^OVERLAPPED, dwMilliseconds: DWORD) -> BOOL ---
+	// [MS-Docs](https://learn.microsoft.com/en-us/windows/win32/api/ioapiset/nf-ioapiset-getqueuedcompletionstatusex)
+	GetQueuedCompletionStatusEx :: proc(CompletionPort: HANDLE, lpCompletionPortEntries: ^OVERLAPPED_ENTRY, ulCount: c_ulong, ulNumEntriesRemoved: ^c_ulong, dwMilliseconds: DWORD, fAlertable: BOOL) -> BOOL ---
+	// [MS-Docs](https://learn.microsoft.com/en-us/windows/win32/api/ioapiset/nf-ioapiset-postqueuedcompletionstatus)
+	PostQueuedCompletionStatus :: proc(CompletionPort: HANDLE, dwNumberOfBytesTransferred: DWORD, dwCompletionKey: c_ulong, lpOverlapped: ^OVERLAPPED) -> BOOL ---
+	// [MS-Docs](https://learn.microsoft.com/en-us/windows/win32/api/handleapi/nf-handleapi-gethandleinformation)
+	GetHandleInformation :: proc(hObject: HANDLE, lpdwFlags: ^DWORD) -> BOOL ---
 }
 
 DEBUG_PROCESS                    :: 0x00000001
