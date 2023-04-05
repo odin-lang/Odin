@@ -542,7 +542,7 @@ foreign lib {
 
 	/* open all previous libraries */
 
-	openlibs :: proc(L: ^State) ---
+	L_openlibs :: proc(L: ^State) ---
 }
 
 
