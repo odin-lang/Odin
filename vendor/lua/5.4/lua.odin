@@ -617,7 +617,7 @@ foreign lib {
 	L_loadfile :: proc (L: ^State, filename: cstring, mode: cstring = nil) -> Status ---
 
 	@(link_name="luaL_loadbufferx")
-	L_loadbuffer :: proc(L: ^State, buff: cstring, sz: c.size_t, name: cstring, mode: cstring = nil) -> Status ---
+	L_loadbuffer :: proc(L: ^State, buff: [^]byte, sz: c.size_t, name: cstring, mode: cstring = nil) -> Status ---
 	L_loadstring  :: proc(L: ^State, s: cstring) -> Status ---
 
 	L_newstate :: proc() -> ^State ---
