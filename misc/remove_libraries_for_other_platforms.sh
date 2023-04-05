@@ -6,6 +6,12 @@ panic() {
 	exit 1
 }
 
+assert_vendor() {
+	if [ $(basename $(pwd)) != 'vendor' ]; then
+		panic "Not in vendor directory!"
+	fi
+}
+
 remove_windows_libraries() {
 	find . -type f -name '*.dll' | xargs rm -f 
 	find . -type f -name '*.lib' | xargs rm -f
@@ -24,6 +30,7 @@ remove_linux_libraries() {
 
 case $OS in
 	Linux)
+		assert_vendor
 		remove_windows_libraries
 		remove_macos_libraries
 		;;
