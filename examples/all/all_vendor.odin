@@ -26,6 +26,7 @@ import NS         "vendor:darwin/Foundation"
 import MTL        "vendor:darwin/Metal"
 import CA         "vendor:darwin/QuartzCore"
 
+// NOTE(bill): only one can be checked at a time
 import lua_5_4    "vendor:lua/5.4"
 
 _ :: botan

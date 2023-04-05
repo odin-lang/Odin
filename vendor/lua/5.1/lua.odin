@@ -1,4 +1,4 @@
-package lua_5_2
+package lua_5_1
 
 import "core:intrinsics"
 import "core:builtin"
@@ -8,23 +8,18 @@ import c "core:c/libc"
 #assert(size_of(c.int) == size_of(b32))
 
 when ODIN_OS == .Windows {
-	foreign import lib "windows/lua52dll.lib"
+	foreign import lib "windows/lua5.1.dll.lib"
 } else when ODIN_OS == .Linux {
-	foreign import lib "linux/liblua52.a"
+	foreign import lib "linux/liblua5.1.a"
 } else {
-	#panic(`Unsupported platform of "vendor:lua/5.2"`)
+	#panic(`Unsupported platform of "vendor:lua/5.1"`)
 }
 
-VERSION_MAJOR       :: "5"
-VERSION_MINOR       :: "2"
-VERSION_NUM         :: 502
-VERSION_RELEASE     :: "4"
-
-VERSION             :: "Lua " + VERSION_MAJOR + "." + VERSION_MINOR
-RELEASE             :: VERSION + "." + VERSION_RELEASE
-COPYRIGHT           :: RELEASE + "  Copyright (C) 1994-2015 Lua.org, PUC-Rio"
-AUTHORS             :: "R. Ierusalimschy, L. H. de Figueiredo, W. Celes"
-
+VERSION	        :: "Lua 5.1"
+RELEASE	        :: "Lua 5.1.5"
+VERSION_NUM	:: 501
+COPYRIGHT	:: "Copyright (C) 1994-2012 Lua.org, PUC-Rio"
+AUTHORS         :: "R. Ierusalimschy, L. H. de Figueiredo & W. Celes"
 
 /* mark for precompiled code ('<esc>Lua') */
 SIGNATURE :: "\x1bLua"
@@ -32,10 +27,9 @@ SIGNATURE :: "\x1bLua"
 /* option for multiple returns in 'lua_pcall' and 'lua_call' */
 MULTRET :: -1
 
-FIRSTPSEUDOIDX :: -MAXSTACK - 1000
-
-REGISTRYINDEX :: -FIRSTPSEUDOIDX
-
+REGISTRYINDEX :: -10000
+ENVIRONINDEX  :: -10001
+GLOBALSINDEX  :: -10002
 
 /*
 @@ LUAI_MAXSTACK limits the size of the Lua stack.
@@ -80,8 +74,7 @@ Status :: enum c.int {
 	ERRSYNTAX = 3,
 	ERRMEM    = 4,
 	ERRERR    = 5,
-	ERRGCMM   = 6,
-	ERRFILE   = 7,
+	ERRFILE   = 6,
 }
 
 /* thread status */
@@ -125,30 +118,11 @@ TTHREAD        :: Type.THREAD
 NUMTYPES :: 9
 
 
-
-ArithOp :: enum c.int {
-	ADD  = 0,	/* ORDER TM, ORDER OP */
-	SUB  = 1,
-	MUL  = 2,
-	DIV  = 3,
-	MOD  = 4,
-	POW  = 5,
-	UNM  = 6,
-}
-
 CompareOp :: enum c.int {
 	EQ = 0,
 	LT = 1,
 	LE = 2,
 }
-
-OPADD :: ArithOp.ADD
-OPSUB :: ArithOp.SUB
-OPMUL :: ArithOp.MUL
-OPDIV :: ArithOp.DIV
-OPMOD :: ArithOp.MOD
-OPPOW :: ArithOp.POW
-OPUNM :: ArithOp.UNM
 
 OPEQ :: CompareOp.EQ
 OPLT :: CompareOp.LT
@@ -159,21 +133,12 @@ OPLE :: CompareOp.LE
 MINSTACK :: 20
 
 
-/* predefined values in the registry */
-RIDX_MAINTHREAD :: 1
-RIDX_GLOBALS    :: 2
-RIDX_LAST       :: RIDX_GLOBALS
-
-
 /* type of numbers in Lua */
 Number :: distinct (f32 when size_of(uintptr) == 4 else f64)
 
 
 /* type for integer functions */
 Integer :: distinct (i32 when size_of(uintptr) == 4 else i64)
-
-/* unsigned integer type */
-Unsigned :: distinct (u32 when size_of(uintptr) == 4 else u64)
 
 
 /*
@@ -205,10 +170,6 @@ GCWhat :: enum c.int {
 	STEP        = 5,
 	SETPAUSE    = 6,
 	SETSTEPMUL  = 7,
-	SETMAJORINC = 8,
-	ISRUNNING   = 9,
-	GEN         = 10,
-	INC         = 11,
 }
 GCSTOP        :: GCWhat.STOP
 GCRESTART     :: GCWhat.RESTART
@@ -218,11 +179,6 @@ GCCOUNTB      :: GCWhat.COUNTB
 GCSTEP        :: GCWhat.STEP
 GCSETPAUSE    :: GCWhat.SETPAUSE
 GCSETSTEPMUL  :: GCWhat.SETSTEPMUL
-GCSETMAJORINC :: GCWhat.SETMAJORINC
-GCISRUNNING   :: GCWhat.ISRUNNING
-GCGEN         :: GCWhat.GEN
-GCINC         :: GCWhat.INC
-
 
 
 /*
@@ -234,13 +190,13 @@ HookEvent :: enum c.int {
 	RET      = 1,
 	LINE     = 2,
 	COUNT    = 3,
-	TAILCALL = 4,
+	TAILRET  = 4,
 }
-HOOKCALL     :: HookEvent.CALL
-HOOKRET      :: HookEvent.RET
-HOOKLINE     :: HookEvent.LINE
-HOOKCOUNT    :: HookEvent.COUNT
-HOOKTAILCALL :: HookEvent.TAILCALL
+HOOKCALL    :: HookEvent.CALL
+HOOKRET     :: HookEvent.RET
+HOOKLINE    :: HookEvent.LINE
+HOOKCOUNT   :: HookEvent.COUNT
+HOOKTAILRET :: HookEvent.TAILRET
 
 
 /*
@@ -255,20 +211,17 @@ MASKCOUNT :: HookMask{.COUNT}
 /* activation record */
 Debug :: struct {
 	event:           HookEvent,
-	name:            cstring,                  /* (n) */
-	namewhat:        cstring,                  /* (n) 'global', 'local', 'field', 'method' */
-	what:            cstring,                  /* (S) 'Lua', 'C', 'main', 'tail' */
-	source:          cstring,                  /* (S) */
-	currentline:     c.int,                    /* (l) */
-	linedefined:     c.int,                    /* (S) */
-	lastlinedefined: c.int,                    /* (S) */
-	nups:            u8,                       /* (u) number of upvalues */
-	nparams:         u8,                       /* (u) number of parameters */
-	isvararg:        bool,                     /* (u) */
-	istailcall:      bool,                     /* (t) */
+	name:            cstring,              /* (n) */
+	namewhat:        cstring,              /* (n) 'global', 'local', 'field', 'method' */
+	what:            cstring,              /* (S) 'Lua', 'C', 'main', 'tail' */
+	source:          cstring,              /* (S) */
+	currentline:     c.int,                /* (l) */
+	nups:            c.int,                /* (u) number of upvalues */
+	linedefined:     c.int,                /* (S) */
+	lastlinedefined: c.int,                /* (S) */
 	short_src:       [IDSIZE]u8 `fmt:"s"`, /* (S) */
 	/* private part */
-	i_ci:            rawptr,                   /* active function */
+	i_ci:            c.int,                /* active function */
 }
 
 
@@ -299,21 +252,17 @@ foreign lib {
 
 	atpanic :: proc(L: ^State, panicf: CFunction) -> CFunction ---
 
-	version :: proc(L: ^State) -> ^Number ---
-
 
 	/*
 	** basic stack manipulation
 	*/
 
-	absindex   :: proc (L: ^State, idx: c.int) -> c.int ---
 	gettop     :: proc (L: ^State) -> c.int ---
 	settop     :: proc (L: ^State, idx: c.int) ---
 	pushvalue  :: proc (L: ^State, idx: c.int) ---
 	remove     :: proc (L: ^State, idx: c.int) ---
 	insert     :: proc (L: ^State, idx: c.int) ---
 	replace    :: proc (L: ^State, idx: c.int) ---
-	copy       :: proc (L: ^State, fromidx, toidx: c.int) ---
 	checkstack :: proc (L: ^State, sz: c.int) -> c.int ---
 
 	xmove :: proc(from, to: ^State, n: c.int) ---
@@ -331,27 +280,17 @@ foreign lib {
 	type        :: proc(L: ^State, idx: c.int) -> Type ---
 	typename    :: proc(L: ^State, tp: Type) -> cstring ---
 
-	@(link_name="lua_tonumberx")
-	tonumber    :: proc(L: ^State, idx: c.int, isnum: ^b32 = nil) -> Number ---
-	@(link_name="lua_tointegerx")
-	tointeger   :: proc(L: ^State, idx: c.int, isnum: ^b32 = nil) -> Integer ---
-	@(link_name="lua_tounsignedx")
-	tounsigned  :: proc(L: ^State, idx: c.int, isnum: ^b32 = nil) -> Unsigned ---
+	equal    :: proc(L: ^State, idx1, idx2: c.int) -> b32 ---
+	rawequal :: proc(L: ^State, idx1, idx2: c.int) -> b32 ---
+	lessthan :: proc(L: ^State, idx1, idx2: c.int) -> b32 ---
+
 	toboolean   :: proc(L: ^State, idx: c.int) -> b32 ---
 	tolstring   :: proc(L: ^State, idx: c.int, len: ^c.size_t) -> cstring ---
-	rawlen      :: proc(L: ^State, idx: c.int) -> c.size_t ---
+	objlen      :: proc(L: ^State, idx: c.int) -> c.size_t ---
 	tocfunction :: proc(L: ^State, idx: c.int) -> CFunction ---
 	touserdata  :: proc(L: ^State, idx: c.int) -> rawptr ---
 	tothread    :: proc(L: ^State, idx: c.int) -> ^State ---
 	topointer   :: proc(L: ^State, idx: c.int) -> rawptr ---
-
-	/*
-	** Comparison and arithmetic functions
-	*/
-
-	arith    :: proc(L: ^State, op: ArithOp) ---
-	rawequal :: proc(L: ^State, idx1, idx2: c.int) -> b32 ---
-	compare  :: proc(L: ^State, idx1, idx2: c.int, op: CompareOp) -> b32 ---
 
 	/*
 	** push functions (C -> stack)
@@ -360,9 +299,8 @@ foreign lib {
 	pushnil      :: proc(L: ^State) ---
 	pushnumber   :: proc(L: ^State, n: Number) ---
 	pushinteger  :: proc(L: ^State, n: Integer) ---
-	pushunsigned :: proc(L: ^State, n: Unsigned) ---
-	pushlstring  :: proc(L: ^State, s: cstring, l: c.size_t) -> cstring ---
-	pushstring   :: proc(L: ^State, s: cstring) -> cstring ---
+	pushlstring  :: proc(L: ^State, s: cstring, l: c.size_t) ---
+	pushstring   :: proc(L: ^State, s: cstring) ---
 	pushvfstring :: proc(L: ^State, fmt: cstring, argp: c.va_list) -> cstring ---
 	pushfstring       :: proc(L: ^State, fmt: cstring, #c_vararg args: ..any) -> cstring ---
 	pushcclosure      :: proc(L: ^State, fn: CFunction, n: c.int) ---
@@ -374,7 +312,6 @@ foreign lib {
 	** get functions (Lua -> stack)
 	*/
 
-	getglobal :: proc(L: ^State, name: cstring) ---
 	gettable  :: proc(L: ^State, idx: c.int) ---
 	getfield  :: proc(L: ^State, idx: c.int, k: cstring) ---
 	geti      :: proc(L: ^State, idx: c.int, n: Integer) ---
@@ -385,39 +322,35 @@ foreign lib {
 	createtable  :: proc(L: ^State, narr, nrec: c.int) ---
 	newuserdata  :: proc(L: ^State, sz: c.size_t) -> rawptr ---
 	getmetatable :: proc(L: ^State, objindex: c.int) -> c.int ---
-	getuservalue :: proc(L: ^State, idx: c.int) ---
+	getfenv      :: proc(L: ^State, idx: c.int) ---
 
 
 	/*
 	** set functions (stack -> Lua)
 	*/
 
-	setglobal    :: proc(L: ^State, var: cstring) ---
 	settable     :: proc(L: ^State, idx: c.int) ---
 	setfield     :: proc(L: ^State, idx: c.int, k: cstring) ---
 	rawset       :: proc(L: ^State, idx: c.int) ---
 	rawseti      :: proc(L: ^State, idx: c.int, n: c.int) ---
 	rawsetp      :: proc(L: ^State, idx: c.int, p: rawptr) ---
 	setmetatable :: proc(L: ^State, objindex: c.int) -> c.int ---
-	setuservalue :: proc(L: ^State, idx: c.int) -> c.int ---
+	setfenv      :: proc(L: ^State, idx: c.int) -> c.int ---
 
 
 	/*
 	** 'load' and 'call' functions (load and run Lua code)
 	*/
 
-	@(link_name="lua_callk")
-	call :: proc(L: ^State, nargs, nresults: c.int, ctx: c.int = 0,
-	             k: CFunction = nil) ---
+	call :: proc(L: ^State, nargs, nresults: c.int) ---
 
 	getctx :: proc(L: ^State, ctx: ^c.int) -> c.int ---
 
-	@(link_name="lua_pcallk")
-	pcall :: proc(L: ^State, nargs, nresults: c.int, errfunc: c.int,
-	              ctx: c.int = 0, k: CFunction = nil) -> c.int ---
+	pcall :: proc(L: ^State, nargs, nresults: c.int, errfunc: c.int) -> c.int ---
+	cpcall :: proc(L: ^State, func: CFunction, ud: rawptr) -> c.int ---
 
 	load :: proc(L: ^State, reader: Reader, dt: rawptr,
-	             chunkname, mode: cstring) -> Status ---
+	             chunkname: cstring) -> Status ---
 
 	dump :: proc(L: ^State, writer: Writer, data: rawptr) -> Status ---
 
@@ -426,9 +359,8 @@ foreign lib {
 	** coroutine functions
 	*/
 
-	@(link_name="lua_yieldk")
-	yield       :: proc(L: ^State, nresults: c.int, ctx: c.int = 0, k: CFunction = nil) -> Status ---
-	resume      :: proc(L: ^State, from: ^State, narg: c.int) -> Status ---
+	yield       :: proc(L: ^State, nresults: c.int) -> Status ---
+	resume      :: proc(L: ^State, narg: c.int) -> Status ---
 	status      :: proc(L: ^State) -> Status ---
 
 
@@ -468,9 +400,6 @@ foreign lib {
 	getupvalue :: proc(L: ^State, funcindex: c.int, n: c.int) -> cstring ---
 	setupvalue :: proc(L: ^State, funcindex: c.int, n: c.int) -> cstring ---
 
-	upvalueid   :: proc(L: ^State, fidx, n: c.int) -> rawptr ---
-	upvaluejoin :: proc(L: ^State, fidx1, n1, fidx2, n2: c.int) ---
-
 	sethook :: proc(L: ^State, func: Hook, mask: HookMask, count: c.int) -> c.int ---
 	gethook :: proc(L: ^State) -> Hook ---
 	gethookmask  :: proc(L: ^State) -> HookMask ---
@@ -481,16 +410,12 @@ foreign lib {
 
 
 
-/* version suffix for environment variable names */
-VERSUFFIX :: "_" + VERSION_MAJOR + "_" + VERSION_MINOR
-
 COLIBNAME   :: "coroutine"
 TABLIBNAME  :: "table"
 IOLIBNAME   :: "io"
 OSLIBNAME   :: "os"
 STRLIBNAME  :: "string"
 UTF8LIBNAME :: "utf8"
-BITLIBNAME  :: "bit32"
 MATHLIBNAME :: "math"
 DBLIBNAME   :: "debug"
 LOADLIBNAME :: "package"
@@ -499,13 +424,11 @@ LOADLIBNAME :: "package"
 @(default_calling_convention="c")
 foreign lib {
 	open_base      :: proc(L: ^State) -> c.int ---
-	open_coroutine :: proc(L: ^State) -> c.int ---
 	open_table     :: proc(L: ^State) -> c.int ---
 	open_io        :: proc(L: ^State) -> c.int ---
 	open_os        :: proc(L: ^State) -> c.int ---
 	open_string    :: proc(L: ^State) -> c.int ---
 	open_utf8      :: proc(L: ^State) -> c.int ---
-	open_bit32     :: proc(L: ^State) -> c.int ---
 	open_math      :: proc(L: ^State) -> c.int ---
 	open_debug     :: proc(L: ^State) -> c.int ---
 	open_package   :: proc(L: ^State) -> c.int ---
@@ -524,23 +447,18 @@ L_Reg :: struct {
   	func: CFunction,
 }
 
-
 /* predefined references */
 NOREF  :: -2
 REFNIL :: -1
 
-
 @(link_prefix="lua")
 @(default_calling_convention="c")
 foreign lib {
-	@(link_name="luaL_checkversion_")
-	L_checkversion :: proc(L: ^State, ver: Number = VERSION_NUM) ---
-
-
+	L_openlib      :: proc(L: ^State, libname: cstring, l: [^]L_Reg, nup: c.int) ---
+	L_register     :: proc(L: ^State, libname: cstring, l: ^L_Reg) ---
 	L_getmetafield :: proc(L: ^State, obj: c.int, e: cstring) -> c.int ---
 	L_callmeta     :: proc(L: ^State, obj: c.int, e: cstring) -> c.int ---
-	@(link_name="luaL_tolstring")
-	L_tostring     :: proc(L: ^State, idx: c.int, len: ^c.size_t = nil) -> cstring ---
+	L_typeerror    :: proc(L: ^State, narg: c.int, tname: cstring) -> c.int ---
 	L_argerror     :: proc(L: ^State, numarg: c.int, extramsg: cstring) -> c.int ---
 	@(link_name="luaL_checklstring")
 	L_checkstring  :: proc(L: ^State, numArg: c.int, l: ^c.size_t = nil) -> cstring ---
@@ -551,8 +469,6 @@ foreign lib {
 
 	L_checkinteger  :: proc(L: ^State, numArg: c.int) -> Integer ---
 	L_optinteger    :: proc(L: ^State, nArg: c.int, def: Integer) -> Integer ---
-	L_checkunsigned :: proc(L: ^State, numArg: c.int) -> Unsigned ---
-	L_optunsigned   :: proc(L: ^State, nArg: c.int, def: Unsigned) -> Unsigned ---
 
 
 	L_checkstack :: proc(L: ^State, sz: c.int, msg: cstring) ---
@@ -560,8 +476,6 @@ foreign lib {
 	L_checkany   :: proc(L: ^State, narg: c.int) ---
 
 	L_newmetatable :: proc(L: ^State, tname: cstring) -> c.int ---
-	L_setmetatable :: proc(L: ^State, tname: cstring) ---
-	L_testudata    :: proc(L: ^State, ud: c.int, tname: cstring) -> rawptr ---
 	L_checkudata   :: proc(L: ^State, ud: c.int, tname: cstring) -> rawptr ---
 
 	L_where :: proc(L: ^State, lvl: c.int) ---
@@ -569,34 +483,20 @@ foreign lib {
 
 	L_checkoption :: proc(L: ^State, narg: c.int, def: cstring, lst: [^]cstring) -> c.int ---
 
-	L_fileresult :: proc(L: ^State, stat: c.int, fname: cstring) -> c.int ---
-	L_execresult :: proc(L: ^State, stat: c.int) -> c.int ---
-
 
 	L_ref   :: proc(L: ^State, t: c.int) -> c.int ---
 	L_unref :: proc(L: ^State, t: c.int, ref: c.int) ---
 
-	@(link_name="luaL_loadfilex")
-	L_loadfile :: proc (L: ^State, filename: cstring, mode: cstring = nil) -> Status ---
+	L_loadfile :: proc (L: ^State, filename: cstring) -> Status ---
 
-	@(link_name="luaL_loadbufferx")
-	L_loadbuffer :: proc(L: ^State, buff: [^]byte, sz: c.size_t, name: cstring, mode: cstring = nil) -> Status ---
+	L_loadbuffer :: proc(L: ^State, buff: [^]byte, sz: c.size_t, name: cstring) -> Status ---
 	L_loadstring  :: proc(L: ^State, s: cstring) -> Status ---
 
 	L_newstate :: proc() -> ^State ---
 
-	L_len :: proc(L: ^State, idx: c.int) -> c.int ---
-
 	L_gsub :: proc(L: ^State, s, p, r: cstring) -> cstring ---
 
-	L_setfuncs :: proc(L: ^State, l: [^]L_Reg, nup: c.int) ---
-
-	L_getsubtable :: proc(L: ^State, idx: c.int, fname: cstring) -> c.int ---
-
-	L_traceback   :: proc(L: ^State, L1: ^State, msg: cstring, level: c.int) ---
-
-	L_requiref    :: proc(L: ^State, modname: cstring, openf: CFunction, glb: c.int) ---
-
+	L_findtable :: proc(L: ^State, idx: c.int, fname: cstring, szhint: c.int) -> cstring ---
 }
 /*
 ** {======================================================
@@ -606,28 +506,25 @@ foreign lib {
 
 
 L_Buffer :: struct {
-	b:    [^]byte,  /* buffer address */
-	size: c.size_t, /* buffer size */
-	n:    c.size_t, /* number of characters in buffer */
+	p:    [^]byte,  /* buffer address */
+	lvl:  c.int,    /* number of strings in the stack (level) */
 	L:    ^State,
-	initb: [L_BUFFERSIZE]byte,  /* initial buffer */
+	buffer: [L_BUFFERSIZE]byte,  /* initial buffer */
 }
 
 L_addchar :: #force_inline proc "c" (B: ^L_Buffer, c: byte) {
-	if B.n < B.size {
-		L_prepbuffsize(B, 1)
+	end := ([^]byte)(&B.buffer)[L_BUFFERSIZE:]
+	if B.p < end {
+		L_prepbuffer(B)
 	}
-	B.b[B.n] = c
-	B.n += 1
+	B.p[0] = c
+	B.p = B.p[1:]
 }
+L_putchar :: L_addchar
 
-L_addsize :: #force_inline proc "c" (B: ^L_Buffer, s: c.size_t) -> c.size_t {
-	B.n += s
-	return B.n
-}
-
-L_prepbuffer :: #force_inline proc "c" (B: ^L_Buffer) -> [^]byte {
-	return L_prepbuffsize(B, c.size_t(L_BUFFERSIZE))
+L_addsize :: #force_inline proc "c" (B: ^L_Buffer, s: c.size_t) -> [^]byte {
+	B.p = B.p[s:]
+	return B.p
 }
 
 
@@ -635,13 +532,20 @@ L_prepbuffer :: #force_inline proc "c" (B: ^L_Buffer) -> [^]byte {
 @(default_calling_convention="c")
 foreign lib {
 	L_buffinit       :: proc(L: ^State, B: ^L_Buffer) ---
-	L_prepbuffsize   :: proc(B: ^L_Buffer, sz: c.size_t) -> [^]byte ---
+	L_prepbuffer     :: proc(B: ^L_Buffer) -> [^]byte ---
 	L_addlstring     :: proc(B: ^L_Buffer, s: cstring, l: c.size_t) ---
 	L_addstring      :: proc(B: ^L_Buffer, s: cstring) ---
 	L_addvalue       :: proc(B: ^L_Buffer) ---
 	L_pushresult     :: proc(B: ^L_Buffer) ---
 	L_pushresultsize :: proc(B: ^L_Buffer, sz: c.size_t) ---
 	L_buffinitsize   :: proc(L: ^State, B: ^L_Buffer, sz: c.size_t) -> [^]byte ---
+}
+
+@(link_prefix="lua_")
+@(default_calling_convention="c")
+foreign lib {
+	/* hack */
+	setlevel :: proc(from, to: ^State) ---
 }
 
 
@@ -671,6 +575,10 @@ pushcfunction :: #force_inline proc "c" (L: ^State, f: CFunction) {
 	pushcclosure(L, f, 0)
 }
 
+strlen :: #force_inline proc "c" (L: ^State, i: c.int) -> c.size_t {
+	return objlen(L, i)
+}
+
 
 isfunction      :: #force_inline proc "c" (L: ^State, n: c.int) -> bool { return type(L, n) == .FUNCTION      }
 istable         :: #force_inline proc "c" (L: ^State, n: c.int) -> bool { return type(L, n) == .TABLE         }
@@ -683,21 +591,28 @@ isnoneornil     :: #force_inline proc "c" (L: ^State, n: c.int) -> bool { return
 
 
 pushliteral :: pushstring
-pushglobaltable :: #force_inline proc "c" (L: ^State) {
-	rawgeti(L, REGISTRYINDEX, RIDX_GLOBALS)
+setglobal :: #force_inline proc "c" (L: ^State, s: cstring) {
+	setfield(L, GLOBALSINDEX, s)
+}
+getglobal :: #force_inline proc "c" (L: ^State, s: cstring) {
+	getfield(L, GLOBALSINDEX, s)
 }
 tostring :: #force_inline proc "c" (L: ^State, i: c.int) -> cstring {
 	return tolstring(L, i, nil)
 }
 
-L_newlibtable :: #force_inline proc "c" (L: ^State, l: []L_Reg) {
-	createtable(L, 0, c.int(builtin.len(l) - 1))
+open :: newstate
+getregistry :: #force_inline proc "c" (L: ^State) {
+	pushvalue(L, REGISTRYINDEX)
 }
 
-L_newlib :: proc(L: ^State, l: []L_Reg) {
-	L_newlibtable(L, l)
-	L_setfuncs(L, raw_data(l), 0)
+getgccount :: #force_inline proc "c" (L: ^State) -> c.int {
+	return gc(L, .COUNT, 0)
 }
+
+Chunkreader :: Reader
+Chunkwriter :: Writer
+
 
 L_argcheck :: #force_inline proc "c" (L: ^State, cond: bool, numarg: c.int, extramsg: cstring) {
 	if cond {
@@ -723,6 +638,22 @@ L_opt :: #force_inline proc "c" (L: ^State, f: $F, n: c.int, d: $T) -> T where i
 	return d if isnoneornil(L, n) else f(L, n)
 }
 
+
+
+ref :: #force_inline proc "c" (L: ^State, lock: bool) -> c.int {
+	if lock {
+		return L_ref(L, REGISTRYINDEX)
+	}
+	pushstring(L, "unlocked references are obsolete")
+	error(L)
+	return 0
+}
+unref :: #force_inline proc "c" (L: ^State, ref: c.int) {
+	L_unref(L,REGISTRYINDEX, ref)
+}
+getref :: #force_inline proc "c" (L: ^State, ref: Integer) {
+	rawgeti(L, REGISTRYINDEX, ref)
+}
 
 
 /* }============================================================== */
