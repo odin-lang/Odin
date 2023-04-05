@@ -44,40 +44,7 @@ IOC_OUT :: 0x40000000
 IOC_IN :: 0x80000000
 IOC_INOUT :: (IOC_IN | IOC_OUT)
 IOC_WS2 :: 0x08000000
-/*
-Example Load:
-	load_accept_ex :: proc(listener: SOCKET, fn_acceptex: rawptr) {
-		bytes: u32
-		guid_accept_ex := WSAID_ACCEPTEX
-		rc := WSAIoctl(listener, SIO_GET_EXTENSION_FUNCTION_POINTER, &guid_accept_ex, size_of(guid_accept_ex),
-			fn_acceptex, size_of(fn_acceptex), &bytes, nil,	nil,)
-		assert(rc != windows.SOCKET_ERROR)
-	}
-*/
-// NOTE: AcceptEx should be loaded at runtime per MS-Docs
-//[MS-Docs](https://learn.microsoft.com/en-us/windows/win32/api/mswsock/nf-mswsock-acceptex)
-AcceptEx :: proc(
-	sListenSocket: SOCKET,
-	sAcceptSocket: SOCKET,
-	lpOutputBuffer: rawptr,
-	dwReceiveDataLength: u32,
-	dwLocalAddressLength: u32,
-	dwRemoteAddressLength: u32,
-	lpdwBytesReceived: ^u32,
-	lpOverlapped: ^OVERLAPPED,
-) -> b32
-// NOTE: GetAcceptExSockaddrs should be loaded at runtime per MS-Docs
-//[MS-Docs](https://learn.microsoft.com/en-us/windows/win32/api/mswsock/nf-mswsock-getacceptexsockaddrs) 
-GetAcceptExSockaddrs :: proc(
-	lpOutputBuffer: rawptr,
-	dwReceiveDataLength: u32,
-	dwLocalAddressLength: u32,
-	dwRemoteAddressLength: u32,
-	LocalSockaddr: ^^sockaddr,
-	LocalSockaddrLength: ^i32,
-	RemoteSockaddr: ^^sockaddr,
-	RemoteSockaddrLength: ^i32,
-)
+
 
 foreign import ws2_32 "system:Ws2_32.lib"
 @(default_calling_convention="stdcall")
