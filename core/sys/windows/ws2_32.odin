@@ -44,7 +44,16 @@ IOC_OUT :: 0x40000000
 IOC_IN :: 0x80000000
 IOC_INOUT :: (IOC_IN | IOC_OUT)
 IOC_WS2 :: 0x08000000
-
+/*
+Example Load:
+	load_accept_ex :: proc(listener: SOCKET, fn_acceptex: rawptr) {
+		bytes: u32
+		guid_accept_ex := WSAID_ACCEPTEX
+		rc := WSAIoctl(listener, SIO_GET_EXTENSION_FUNCTION_POINTER, &guid_accept_ex, size_of(guid_accept_ex),
+			fn_acceptex, size_of(fn_acceptex), &bytes, nil,	nil,)
+		assert(rc != windows.SOCKET_ERROR)
+	}
+*/
 
 foreign import ws2_32 "system:Ws2_32.lib"
 @(default_calling_convention="stdcall")
