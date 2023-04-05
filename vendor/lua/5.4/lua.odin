@@ -319,9 +319,9 @@ foreign lib {
 	** state manipulation
 	*/
 
-	newstate :: proc(f: Alloc, ud: rawptr) -> ^State ---
-	close :: proc(L: ^State) ---
-	newthread :: proc(L: ^State) -> ^State ---
+	newstate    :: proc(f: Alloc, ud: rawptr) -> ^State ---
+	close       :: proc(L: ^State) ---
+	newthread   :: proc(L: ^State) -> ^State ---
 	resetthread :: proc(L: ^State) -> Status ---
 
 	atpanic :: proc(L: ^State, panicf: CFunction) -> CFunction ---
