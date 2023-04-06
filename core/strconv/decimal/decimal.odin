@@ -501,7 +501,7 @@ Example:
 
 	import "core:fmt"
 	import "core:strconv"
-	strconv_round_down_example :: proc() {
+	round_down_example :: proc() {
 		d: decimal.Decimal
 		str := [64]u8{}
 		ok := decimal.set(&d, "123.456")
@@ -532,9 +532,9 @@ WARNING: There are no guarantees about overflow.
 Example:
 
 	import "core:fmt"
-	import "core:strconv"
-	strconv_rounded_integer_example :: proc() {
-    	d: decimal.Decimal
+	import "core:strconv/decimal"
+	rounded_integer_example :: proc() {
+		d: decimal.Decimal
 		ok := decimal.set(&d, "123.456")
 		fmt.println(decimal.rounded_integer(&d))
 	}
