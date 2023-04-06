@@ -6,7 +6,7 @@ import "decimal"
 Parses a boolean value from the input string
 
 **Inputs**  
-- s: The input string,
+- s: The input string  
   - true: "1", "t", "T", "true", "TRUE", "True"
   - false: "0", "f", "F", "false", "FALSE", "False"
 - n: An optional pointer to an int to store the length of the parsed substring (default: nil)
@@ -27,12 +27,12 @@ parse_bool :: proc(s: string, n: ^int = nil) -> (result: bool = false, ok: bool)
 	return
 }
 /*
-Finds the numerical value of the given rune
+Finds the integer value of the given rune
 
 **Inputs**  
-- r: The input rune to find the numerical value of
+- r: The input rune to find the integer value of
 
-**Returns**   The numerical value of the given rune
+**Returns**   The integer value of the given rune
 */
 _digit_value :: proc(r: rune) -> int {
 	ri := int(r)
@@ -52,25 +52,21 @@ Parses an integer value from the input string in the given base, without a prefi
 - base: The base of the integer value to be parsed (must be between 1 and 16)
 - n: An optional pointer to an int to store the length of the parsed substring (default: nil)
 
-**Returns**  
-- value: The parsed integer value
-- ok: A boolean indicating whether the parsing was successful
-
 Example:
 
-	n, ok := strconv.parse_i64_of_base("-1234eeee", 10)
-	assert(n == -1234 && ok)
+	parse_i64_of_base_example::proc {
+		n, ok := strconv.parse_i64_of_base("-1234e3", 10)
+		fmt.println(n, ok)
+	}
 
+Output:
+
+	-1234 false
+
+**Returns**  
+- value: Parses an integer value from a string, in the given base, without a prefix.
+- ok: ok=false if no numeric value of the appropriate base could be found, or if the input string contained more than just the number.
 */
-// Parses an integer value from a string, in the given base, without a prefix.
-//
-// Returns ok=false if no numeric value of the appropriate base could be found,
-// or if the input string contained more than just the number.
-//
-// ```
-// n, ok := strconv.parse_i64_of_base("-1234eeee", 10);
-// assert(n == -1234 && ok);
-// ```
 parse_i64_of_base :: proc(str: string, base: int, n: ^int = nil) -> (value: i64, ok: bool) {
 	assert(base <= 16, "base must be 1-16")
 
@@ -119,37 +115,29 @@ parse_i64_of_base :: proc(str: string, base: int, n: ^int = nil) -> (value: i64,
 /*
 Parses an integer value from the input string in base 10, unless there's a prefix
 
-*Does NOT allocate*
-
 **Inputs**  
 - str: The input string to parse the integer value from
 - n: An optional pointer to an int to store the length of the parsed substring (default: nil)
 
+Example:
+	
+	parse_i64_maybe_prefixed_example :: proc {
+		n, ok := strconv.parse_i64_maybe_prefixed("1234")
+		fmt.println(n,ok)
+
+		n, ok = strconv.parse_i64_maybe_prefixed("0xeeee")
+		fmt.println(n,ok)
+	}
+	
+Output:
+
+	1234 true  
+	61166 true  
+
 **Returns**  
 - value: The parsed integer value
-- ok: A boolean indicating whether the parsing was successful
-
-Example:
-
-	n, ok := strconv.parse_i64_maybe_prefixed("1234")
-	assert(n == 1234 && ok)
-
-	n, ok = strconv.parse_i64_maybe_prefixed("0xeeee")
-	assert(n == 0xeeee && ok)
-
+- ok: ok=false if a valid integer could not be found, or if the input string contained more than just the number.
 */
-// Parses a integer value from a string, in base 10, unless there's a prefix.
-//
-// Returns ok=false if a valid integer could not be found,
-// or if the input string contained more than just the number.
-//
-// ```
-// n, ok := strconv.parse_i64_maybe_prefixed("1234");
-// assert(n == 1234 && ok);
-//
-// n, ok = strconv.parse_i64_maybe_prefixed("0xeeee");
-// assert(n == 0xeeee && ok);
-// ```
 parse_i64_maybe_prefixed :: proc(str: string, n: ^int = nil) -> (value: i64, ok: bool) {
 	s := str
 	defer if n != nil { n^ = len(str)-len(s) }
@@ -203,35 +191,36 @@ parse_i64_maybe_prefixed :: proc(str: string, n: ^int = nil) -> (value: i64, ok:
 	ok = len(s) == 0
 	return
 }
-
+//
 parse_i64 :: proc{parse_i64_maybe_prefixed, parse_i64_of_base}
 /*
 Parses an unsigned 64-bit integer value from the input string without a prefix, using the specified base
-
-*Implicitly allocates using context.temp_allocator*
 
 **Inputs**  
 - str: The input string to parse
 - base: The base of the number system to use for parsing
   - Must be between 1 and 16 (inclusive)
+- n: An optional pointer to an int to store the length of the parsed substring (default: nil)
+
+Example:
+	
+	parse_u64_of_base_example :: proc {
+		n, ok := strconv.parse_u64_of_base("1234e3", 10)
+		fmt.println(n,ok)
+
+		n, ok = strconv.parse_u64_of_base("5678eee",16)
+		fmt.println(n,ok)
+	}
+	
+Output:
+
+	1234 false  
+	90672878 true  
 
 **Returns**  
 - value: The parsed uint64 value
 - ok: A boolean indicating whether the parsing was successful
 */
-// Parses an unsigned integer value from a string, in the given base, and
-// without a prefix.
-//
-// Returns ok=false if no numeric value of the appropriate base could be found,
-// or if the input string contained more than just the number.
-//
-// ```
-// n, ok := strconv.parse_u64_of_base("1234eeee", 10);
-// assert(n == 1234 && ok);
-//
-// n, ok = strconv.parse_u64_of_base("5678eeee", 16);
-// assert(n == 0x5678eeee && ok);
-// ```
 parse_u64_of_base :: proc(str: string, base: int, n: ^int = nil) -> (value: u64, ok: bool) {
 	assert(base <= 16, "base must be 1-16")
 	s := str
@@ -266,30 +255,32 @@ parse_u64_of_base :: proc(str: string, base: int, n: ^int = nil) -> (value: u64,
 /*
 Parses an unsigned 64-bit integer value from the input string, using the specified base or inferring the base from a prefix
 
-*Implicitly allocates using context.temp_allocator*
-
 **Inputs**  
 - str: The input string to parse
 - base: The base of the number system to use for parsing (default: 0)
   - If base is 0, it will be inferred based on the prefix in the input string (e.g. '0x' for hexadecimal)
   - If base is not 0, it will be used for parsing regardless of any prefix in the input string
+- n: An optional pointer to an int to store the length of the parsed substring (default: nil)
+
+Example:
+	
+	parse_u64_maybe_prefixed_example :: proc {
+		n, ok := strconv.parse_u64_maybe_prefixed("1234")
+		fmt.println(n,ok)
+
+		n, ok = strconv.parse_u64_maybe_prefixed("0xee")
+		fmt.println(n,ok)
+	}
+	
+Output:
+
+	1234 true  
+	238 true  
 
 **Returns**  
 - value: The parsed uint64 value
-- ok: A boolean indicating whether the parsing was successful
+- ok: ok=false if a valid integer could not be found, if the value was negative, or if the input string contained more than just the number.
 */
-// Parses an unsigned integer value from a string in base 10, unless there's a prefix.
-//
-// Returns ok=false if a valid integer could not be found, if the value was negative,
-// or if the input string contained more than just the number.
-//
-// ```
-// n, ok := strconv.parse_u64_maybe_prefixed("1234");
-// assert(n == 1234 && ok);
-//
-// n, ok = strconv.parse_u64_maybe_prefixed("0xeeee");
-// assert(n == 0xeeee && ok);
-// ```
 parse_u64_maybe_prefixed :: proc(str: string, n: ^int = nil) -> (value: u64, ok: bool) {
 	s := str
 	defer if n != nil { n^ = len(str)-len(s) }
@@ -332,12 +323,10 @@ parse_u64_maybe_prefixed :: proc(str: string, n: ^int = nil) -> (value: u64, ok:
 	ok = len(s) == 0
 	return
 }
-
+//
 parse_u64 :: proc{parse_u64_maybe_prefixed, parse_u64_of_base}
 /*
 Parses a signed integer value from the input string, using the specified base or inferring the base from a prefix
-
-*Implicitly allocates using context.temp_allocator*
 
 **Inputs**  
 - s: The input string to parse
@@ -345,27 +334,29 @@ Parses a signed integer value from the input string, using the specified base or
   - If base is 0, it will be inferred based on the prefix in the input string (e.g. '0x' for hexadecimal)
   - If base is not 0, it will be used for parsing regardless of any prefix in the input string
 
+Example:
+	
+	parse_int_example :: proc {
+		n, ok := strconv.parse_int("1234") // without prefix, inferred base 10
+		fmt.println(n,ok)
+
+		n, ok = strconv.parse_int("ffff", 16) // without prefix, explicit base
+		fmt.println(n,ok)
+
+		n, ok = strconv.parse_int("0xffff") // with prefix and inferred base
+		fmt.println(n,ok)
+	}
+	
+Output:
+
+	1234 true  
+	65535 true  
+	65535 true  
+
 **Returns**  
 - value: The parsed int value
-- ok: A boolean indicating whether the parsing was successful
+- ok: `false` if no appropriate value could be found, or if the input string contained more than just the number.
 */
-// Parses an integer value from a string in the given base, or
-// - if the string has a prefix (e.g: '0x') then that will determine the base;
-// - otherwise, assumes base 10.
-//
-// Returns ok=false if no appropriate value could be found, or if the input string
-// contained more than just the number.
-//
-// ```
-// n, ok := strconv.parse_int("1234"); // without prefix, inferred base 10
-// assert(n == 1234 && ok);
-//
-// n, ok = strconv.parse_int("ffff", 16); // without prefix, explicit base
-// assert(n == 0xffff && ok);
-//
-// n, ok = strconv.parse_int("0xffff"); // with prefix and inferred base
-// assert(n == 0xffff && ok);
-// ```
 parse_int :: proc(s: string, base := 0, n: ^int = nil) -> (value: int, ok: bool) {
 	v: i64 = ---
 	switch base {
@@ -378,39 +369,36 @@ parse_int :: proc(s: string, base := 0, n: ^int = nil) -> (value: int, ok: bool)
 /*
 Parses an unsigned integer value from the input string, using the specified base or inferring the base from a prefix
 
-*Implicitly allocates using context.temp_allocator*
-
 **Inputs**  
 - s: The input string to parse
-- base: The base of the number system to use for parsing (default: 0)
+- base: The base of the number system to use for parsing (default: 0, inferred)
   - If base is 0, it will be inferred based on the prefix in the input string (e.g. '0x' for hexadecimal)
   - If base is not 0, it will be used for parsing regardless of any prefix in the input string
+
+Example:
+	
+	parse_uint_example :: proc {
+		n, ok := strconv.parse_uint("1234") // without prefix, inferred base 10
+		fmt.println(n,ok)
+
+		n, ok = strconv.parse_uint("ffff", 16) // without prefix, explicit base
+		fmt.println(n,ok)
+
+		n, ok = strconv.parse_uint("0xffff") // with prefix and inferred base
+		fmt.println(n,ok)
+	}
+	
+Output:
+
+	1234 true  
+	65535 true  
+	65535 true  
 
 **Returns**  
 
 value: The parsed uint value
-ok: A boolean indicating whether the parsing was successful
+ok: `false` if no appropriate value could be found; the value was negative; he input string contained more than just the number
 */
-
-// Parses an unsigned integer value from a string in the given base, or
-// - if the string has a prefix (e.g: '0x') then that will determine the base;
-// - otherwise, assumes base 10.
-//
-// Returns ok=false if:
-// - no appropriate value could be found; or
-// - the value was negative.
-// - the input string contained more than just the number.
-//
-// ```
-// n, ok := strconv.parse_uint("1234"); // without prefix, inferred base 10
-// assert(n == 1234 && ok);
-//
-// n, ok = strconv.parse_uint("ffff", 16); // without prefix, explicit base
-// assert(n == 0xffff && ok);
-//
-// n, ok = strconv.parse_uint("0xffff"); // with prefix and inferred base
-// assert(n == 0xffff && ok);
-// ```
 parse_uint :: proc(s: string, base := 0, n: ^int = nil) -> (value: uint, ok: bool) {
 	v: u64 = ---
 	switch base {
@@ -423,33 +411,26 @@ parse_uint :: proc(s: string, base := 0, n: ^int = nil) -> (value: uint, ok: boo
 /*
 Parses an integer value from a string in the given base, without any prefix
 
-*WARNING: base must be 1-16*
-
 **Inputs**  
 - str: The input string containing the integer value
 - base: The base (radix) to use for parsing the integer (1-16)
 - n: An optional pointer to an int to store the length of the parsed substring (default: nil)
 
-**Returns**  
-- value: The parsed i128 value
-- ok: A boolean indicating whether the parsing was successful
-
 Example:
 
-	n, ok := strconv.parse_i128_of_base("-1234eeee", 10);
-	assert(n == -1234 && ok);
+	parse_i128_of_base_example :: proc {
+		n, ok := strconv.parse_i128_of_base("-1234eeee", 10)
+		fmt.println(n,ok)
+	}
+	
+Output:
 
+	-1234 false  
+
+**Returns**  
+- value: The parsed i128 value
+- ok: false if no numeric value of the appropriate base could be found, or if the input string contained more than just the number.
 */
-
-// Parses an integer value from a string, in the given base, without a prefix.
-//
-// Returns ok=false if no numeric value of the appropriate base could be found,
-// or if the input string contained more than just the number.
-//
-// ```
-// n, ok := strconv.parse_i128_of_base("-1234eeee", 10);
-// assert(n == -1234 && ok);
-// ```
 parse_i128_of_base :: proc(str: string, base: int, n: ^int = nil) -> (value: i128, ok: bool) {
 	assert(base <= 16, "base must be 1-16")
 
@@ -496,37 +477,29 @@ parse_i128_of_base :: proc(str: string, base: int, n: ^int = nil) -> (value: i12
 /*
 Parses an integer value from a string in base 10, unless there's a prefix
 
-*WARNING: base must be 1-16*
-
 **Inputs**  
 - str: The input string containing the integer value
 - n: An optional pointer to an int to store the length of the parsed substring (default: nil)
 
-**Returns**  
-- value: The parsed i128 value
-- ok: A boolean indicating whether the parsing was successful
-
 Example:
 
-	n, ok := strconv.parse_i128_maybe_prefixed("1234");
-	assert(n == 1234 && ok);
+	parse_i128_maybe_prefixed_example :: proc {
+		n, ok := strconv.parse_i128_maybe_prefixed("1234")
+		fmt.println(n, ok)
 
-	n, ok = strconv.parse_i128_maybe_prefixed("0xeeee");
-	assert(n == 0xeeee && ok);
+		n, ok = strconv.parse_i128_maybe_prefixed("0xeeee")
+		fmt.println(n, ok)
+	}
+	
+Output:
 
+	1234 true  
+	61166 true  
+	
+**Returns**  
+- value: The parsed i128 value
+- ok: `false` if a valid integer could not be found, or if the input string contained more than just the number.
 */
-// Parses a integer value from a string, in base 10, unless there's a prefix.
-//
-// Returns ok=false if a valid integer could not be found,
-// or if the input string contained more than just the number.
-//
-// ```
-// n, ok := strconv.parse_i128_maybe_prefixed("1234");
-// assert(n == 1234 && ok);
-//
-// n, ok = strconv.parse_i128_maybe_prefixed("0xeeee");
-// assert(n == 0xeeee && ok);
-// ```
 parse_i128_maybe_prefixed :: proc(str: string, n: ^int = nil) -> (value: i128, ok: bool) {
 	s := str
 	defer if n != nil { n^ = len(str)-len(s) }
@@ -580,44 +553,35 @@ parse_i128_maybe_prefixed :: proc(str: string, n: ^int = nil) -> (value: i128, o
 	ok = len(s) == 0
 	return
 }
-
+//
 parse_i128 :: proc{parse_i128_maybe_prefixed, parse_i128_of_base}
 /*
 Parses an unsigned integer value from a string in the given base, without any prefix
-
-*WARNING: base must be 1-16*
 
 **Inputs**  
 - str: The input string containing the integer value
 - base: The base (radix) to use for parsing the integer (1-16)
 - n: An optional pointer to an int to store the length of the parsed substring (default: nil)
 
-**Returns**  
-- value: The parsed u128 value
-- ok: A boolean indicating whether the parsing was successful
-
 Example:
 
-	n, ok := strconv.parse_u128_of_base("1234eeee", 10);
-	assert(n == 1234 && ok);
+	parse_u128_of_base_example :: proc {
+		n, ok := strconv.parse_u128_of_base("1234eeee", 10)
+		fmt.println(n, ok)
 
-	n, ok = strconv.parse_u128_of_base("5678eeee", 16);
-	assert(n == 0x5678eeee && ok);
+		n, ok = strconv.parse_u128_of_base("5678eeee", 16)
+		fmt.println(n, ok)
+	}
+	
+Output:
 
+	1234 false
+	1450766062 true
+	
+**Returns**  
+- value: The parsed u128 value
+- ok: `false` if no numeric value of the appropriate base could be found, or if the input string contained more than just the number.
 */
-// Parses an unsigned integer value from a string, in the given base, and
-// without a prefix.
-//
-// Returns ok=false if no numeric value of the appropriate base could be found,
-// or if the input string contained more than just the number.
-//
-// ```
-// n, ok := strconv.parse_u128_of_base("1234eeee", 10);
-// assert(n == 1234 && ok);
-//
-// n, ok = strconv.parse_u128_of_base("5678eeee", 16);
-// assert(n == 0x5678eeee && ok);
-// ```
 parse_u128_of_base :: proc(str: string, base: int, n: ^int = nil) -> (value: u128, ok: bool) {
 	assert(base <= 16, "base must be 1-16")
 	s := str
@@ -652,37 +616,29 @@ parse_u128_of_base :: proc(str: string, base: int, n: ^int = nil) -> (value: u12
 /*
 Parses an unsigned integer value from a string in base 10, unless there's a prefix
 
-*WARNING: base must be 1-16*
-
 **Inputs**  
 - str: The input string containing the integer value
 - n: An optional pointer to an int to store the length of the parsed substring (default: nil)
 
-**Returns**  
-- value: The parsed u128 value
-- ok: A boolean indicating whether the parsing was successful
-
 Example:
 
-n, ok := strconv.parse_u128_maybe_prefixed("1234");
-assert(n == 1234 && ok);
+	parse_u128_maybe_prefixed_example :: proc {
+		n, ok := strconv.parse_u128_maybe_prefixed("1234")
+		fmt.println(n, ok)
 
-n, ok = strconv.parse_u128_maybe_prefixed("0xeeee");
-assert(n == 0xeeee && ok);
+		n, ok = strconv.parse_u128_maybe_prefixed("5678eeee")
+		fmt.println(n, ok)
+	}
+	
+Output:
 
+	1234 true
+	5678 false
+	
+**Returns**  
+- value: The parsed u128 value
+- ok: false if a valid integer could not be found, if the value was negative, or if the input string contained more than just the number.
 */
-// Parses an unsigned integer value from a string in base 10, unless there's a prefix.
-//
-// Returns ok=false if a valid integer could not be found, if the value was negative,
-// or if the input string contained more than just the number.
-//
-// ```
-// n, ok := strconv.parse_u128_maybe_prefixed("1234");
-// assert(n == 1234 && ok);
-//
-// n, ok = strconv.parse_u128_maybe_prefixed("0xeeee");
-// assert(n == 0xeeee && ok);
-// ```
 parse_u128_maybe_prefixed :: proc(str: string, n: ^int = nil) -> (value: u128, ok: bool) {
 	s := str
 	defer if n != nil { n^ = len(str)-len(s) }
@@ -725,17 +681,16 @@ parse_u128_maybe_prefixed :: proc(str: string, n: ^int = nil) -> (value: u128, o
 	ok = len(s) == 0
 	return
 }
-
+//
 parse_u128 :: proc{parse_u128_maybe_prefixed, parse_u128_of_base}
-
-
 /*
 Converts a byte to lowercase
 
 **Inputs**  
 - ch: A byte character to be converted to lowercase.
 
-**Returns**   A lowercase byte character.
+**Returns**  
+- A lowercase byte character.
 */
 @(private)
 lower :: #force_inline proc "contextless" (ch: byte) -> byte { return ('a' - 'A') | ch }
@@ -746,22 +701,25 @@ Parses a 32-bit floating point number from a string
 - s: The input string containing a 32-bit floating point number.
 - n: An optional pointer to an int to store the length of the parsed substring (default: nil).
 
+Example:
+
+	parse_f32_example :: proc {
+		n, ok := strconv.parse_f32("1234eee")
+		fmt.println(n, ok)
+
+		n, ok = strconv.parse_f32("5678e2")
+		fmt.println(n, ok)
+	}
+	
+Output:
+
+	0.000 false
+	567800.000 true
+	
 **Returns**  
 - value: The parsed 32-bit floating point number.
-- ok: A boolean indicating whether the parsing was successful.
+- ok: `false` if a base 10 float could not be found, or if the input string contained more than just the number.
 */
-// Parses a 32-bit floating point number from a string.
-//
-// Returns ok=false if a base 10 float could not be found,
-// or if the input string contained more than just the number.
-//
-// ```
-// n, ok := strconv.parse_f32("12.34eee");
-// assert(n == 12.34 && ok);
-//
-// n, ok = strconv.parse_f32("12.34");
-// assert(n == 12.34 && ok);
-// ```
 parse_f32 :: proc(s: string, n: ^int = nil) -> (value: f32, ok: bool) {
 	v: f64 = ---
 	v, ok = parse_f64(s, n)
@@ -770,15 +728,28 @@ parse_f32 :: proc(s: string, n: ^int = nil) -> (value: f32, ok: bool) {
 /*
 Parses a 64-bit floating point number from a string
 
-Does NOT allocate
-
 **Inputs**  
 - str: The input string containing a 64-bit floating point number.
 - n: An optional pointer to an int to store the length of the parsed substring (default: nil).
 
+Example:
+
+	parse_f64_example :: proc {
+		n, ok := strconv.parse_f64("1234eee")
+		fmt.println(n, ok)
+
+		n, ok = strconv.parse_f64("5678e2")
+		fmt.println(n, ok)
+	}
+	
+Output:
+
+	0.000 false
+	567800.000 true
+	
 **Returns**  
 - value: The parsed 64-bit floating point number.
-- ok: A boolean indicating whether the parsing was successful.
+- ok: `false` if a base 10 float could not be found, or if the input string contained more than just the number.
 */
 parse_f64 :: proc(str: string, n: ^int = nil) -> (value: f64, ok: bool) {
 	nr: int
@@ -792,28 +763,30 @@ parse_f64 :: proc(str: string, n: ^int = nil) -> (value: f64, ok: bool) {
 /*
 Parses a 32-bit floating point number from a string and returns the parsed number, the length of the parsed substring, and a boolean indicating whether the parsing was successful
 
-Does NOT allocate
-
 **Inputs**  
 - str: The input string containing a 32-bit floating point number.
+
+Example:
+
+	parse_f32_prefix_example :: proc {
+		n, _, ok := strconv.parse_f32_prefix("1234eee")
+		fmt.println(n, ok)
+
+		n, _, ok = strconv.parse_f32_prefix("5678e2")
+		fmt.println(n, ok)
+	}
+	
+Output:
+
+	0.000 false
+	567800.000 true
+	
+
 **Returns**  
 - value: The parsed 32-bit floating point number.
 - nr: The length of the parsed substring.
 - ok: A boolean indicating whether the parsing was successful.
 */
-
-// Parses a 32-bit floating point number from a string.
-//
-// Returns ok=false if a base 10 float could not be found,
-// or if the input string contained more than just the number.
-//
-// ```
-// n, _, ok := strconv.parse_f32("12.34eee");
-// assert(n == 12.34 && ok);
-//
-// n, _, ok = strconv.parse_f32("12.34");
-// assert(n == 12.34 && ok);
-// ```
 parse_f32_prefix :: proc(str: string) -> (value: f32, nr: int, ok: bool) {
 	f: f64
 	f, nr, ok = parse_f64_prefix(str)
@@ -823,29 +796,29 @@ parse_f32_prefix :: proc(str: string) -> (value: f32, nr: int, ok: bool) {
 /*
 Parses a 64-bit floating point number from a string and returns the parsed number, the length of the parsed substring, and a boolean indicating whether the parsing was successful
 
-Does NOT allocate
-
 **Inputs**  
 - str: The input string containing a 64-bit floating point number.
+
+Example:
+
+    parse_f64_prefix_example :: proc() {
+		n, _, ok := strconv.parse_f64_prefix("12.34eee")
+		fmt.println(n, ok)
+
+		n, _, ok = strconv.parse_f64_prefix("12.34e2")
+		fmt.println(n, ok)
+	}
+
+Output:
+
+	0.000 false
+	1234.000 true
 
 **Returns**  
 - value: The parsed 64-bit floating point number.
 - nr: The length of the parsed substring.
-- ok: A boolean indicating whether the parsing was successful.
+- ok: `false` if a base 10 float could not be found, or if the input string contained more than just the number.
 */
-
-// Parses a 64-bit floating point number from a string.
-//
-// Returns ok=false if a base 10 float could not be found,
-// or if the input string contained more than just the number.
-//
-// ```
-// n, _, ok := strconv.parse_f32("12.34eee");
-// assert(n == 12.34 && ok);
-//
-// n, _, ok = strconv.parse_f32("12.34");
-// assert(n == 12.34 && ok);
-// ```
 parse_f64_prefix :: proc(str: string) -> (value: f64, nr: int, ok: bool) {
 	common_prefix_len_ignore_case :: proc "contextless" (s, prefix: string) -> int {
 		n := len(prefix)
@@ -1132,11 +1105,18 @@ Appends a boolean value as a string to the given buffer
 
 Example:
 
-    buf: [8]byte
-    result := append_bool(buf[:], true)
-    fmt.println(result) // "true"
+    append_bool_example :: proc() {
+		buf: [4]byte
+		result := strconv.append_bool(buf[:], true)
+		fmt.println(result, buf)
+	}
 
-**Returns**   The resulting string after appending the boolean value
+Output:
+
+	true [116, 114, 117, 101, 0, 0]
+
+**Returns**  
+- The resulting string after appending the boolean value
 */
 append_bool :: proc(buf: []byte, b: bool) -> string {
 	n := 0
@@ -1157,11 +1137,18 @@ Appends an unsigned integer value as a string to the given buffer with the speci
 
 Example:
 
-    buf: [32]byte
-    result := append_uint(buf[:], 42, 16)
-    fmt.println(result) // "2A"
+    append_uint_example :: proc() {
+		buf: [4]byte
+		result := strconv.append_uint(buf[:], 42, 16)
+		fmt.println(result, buf)
+	}
 
-**Returns**   The resulting string after appending the unsigned integer value
+Output:
+
+	2a [50, 97, 0, 0]
+
+**Returns**  
+- The resulting string after appending the unsigned integer value
 */
 append_uint :: proc(buf: []byte, u: u64, base: int) -> string {
 	return append_bits(buf, u, base, false, 8*size_of(uint), digits, nil)
@@ -1176,11 +1163,18 @@ Appends a signed integer value as a string to the given buffer with the specifie
 
 Example:
 
-    buf: [32]byte
-    result := append_int(buf[:], -42, 10)
-    fmt.println(result) // "-42"
+    append_int_example :: proc() {
+		buf: [4]byte
+		result := strconv.append_int(buf[:], -42, 10)
+		fmt.println(result, buf)
+	}
 
-**Returns**   The resulting string after appending the signed integer value
+Output:
+
+	-42 [45, 52, 50, 0]
+
+**Returns**  
+- The resulting string after appending the signed integer value
 */
 append_int :: proc(buf: []byte, i: i64, base: int) -> string {
 	return append_bits(buf, u64(i), base, true, 8*size_of(int), digits, nil)
@@ -1194,16 +1188,23 @@ Converts an integer value to a string and stores it in the given buffer
 
 Example:
 
-    buf: [16]byte
-    result := itoa(buf[:], 42)
-    fmt.println(result) // "42"
+    itoa_example :: proc() {
+		buf: [4]byte
+		result := strconv.itoa(buf[:], 42)
+		fmt.println(result, buf) // "42"
+	}
 
-**Returns**   The resulting string after converting the integer value
+Output:
+
+	42 [52, 50, 0, 0]
+
+**Returns**  
+- The resulting string after converting the integer value
 */
 itoa :: proc(buf: []byte, i: int) -> string {
 	return append_int(buf, i64(i), 10)
 }
-/* 
+/*
 Converts a string to an integer value
 
 **Inputs**  
@@ -1211,10 +1212,16 @@ Converts a string to an integer value
 
 Example:
 
-    value := atoi("42")
-    fmt.println(value) // 42
+	atoi_example :: proc() {
+		fmt.println(strconv.atoi("42"))
+	}
 
-**Returns**   The resulting integer value after converting the string
+Output:
+
+	42
+
+**Returns**  
+- The resulting integer value
 */
 atoi :: proc(s: string) -> int {
 	v, _ := parse_int(s)
@@ -1228,10 +1235,16 @@ Converts a string to a float64 value
 
 Example:
 
-    value := atof("3.14")
-    fmt.println(value) // 3.14
+	atof_example :: proc() {
+		fmt.println(strconv.atof("3.14"))
+	}
 
-**Returns**   The resulting float64 value after converting the string
+Output:
+
+	3.140
+
+**Returns**  
+- The resulting float64 value after converting the string
 */
 atof :: proc(s: string) -> f64 {
 	v, _  := parse_f64(s)
@@ -1251,11 +1264,18 @@ Appends a float64 value as a string to the given buffer with the specified forma
 
 Example:
 
-    buf: [32]byte
-    result := append_float(buf[:], 3.14159, 'f', 2, 64)
-    fmt.println(result) // "3.14"
+	append_float_example :: proc() {
+		buf: [8]byte
+		result := strconv.append_float(buf[:], 3.14159, 'f', 2, 64)
+		fmt.println(result, buf)
+	}
 
-**Returns**   The resulting string after appending the float64 value
+Output:
+
+	+3.14 [43, 51, 46, 49, 52, 0, 0, 0]
+
+**Returns**  
+- The resulting string after appending the float
 */
 append_float :: proc(buf: []byte, f: f64, fmt: byte, prec, bit_size: int) -> string {
 	return string(generic_ftoa(buf, f, fmt, prec, bit_size))
@@ -1269,10 +1289,19 @@ Appends a quoted string representation of the input string to a given byte slice
 
 Example:
 
-    buf: [20]byte
-    result := quote(buf[:], "hello") // "\"hello\""
+	quote_example :: proc() {
+		buf: [20]byte
+		result := strconv.quote(buf[:], "hello")
+		fmt.println(result, buf)
+	}
 
-**Returns**   The resulting string after appending the quoted string representation
+Output:
+
+	!! ISSUE !! NOT EXPECTED -- "\"hello\"" was expected  
+	"'h''e''l''l''o'" [34, 39, 104, 39, 39, 101, 39, 39, 108, 39, 39, 108, 39, 39, 111, 39, 34, 0, 0, 0]  
+
+**Returns**  
+- The resulting string after appending the quoted string representation
 */
 quote :: proc(buf: []byte, str: string) -> string {
 	write_byte :: proc(buf: []byte, i: ^int, bytes: ..byte) {
@@ -1320,10 +1349,18 @@ Appends a quoted rune representation of the input rune to a given byte slice and
 
 Example:
 
-    buf: [10]byte
-    result := quote_rune(buf[:], 'A') // "'A'"
+	quote_rune_example :: proc() {
+		buf: [4]byte
+		result := strconv.quote_rune(buf[:], 'A')
+		fmt.println(result, buf)
+	}
 
-**Returns**   The resulting string after appending the quoted rune representation
+Output:
+
+	'A' [39, 65, 39, 0]
+
+**Returns**  
+- The resulting string after appending the quoted rune representation
 */
 quote_rune :: proc(buf: []byte, r: rune) -> string {
 	write_byte :: proc(buf: []byte, i: ^int, bytes: ..byte) {
@@ -1386,6 +1423,20 @@ Unquotes a single character from the input string, considering the given quote c
 **Inputs**  
 - str: The input string containing the character to unquote
 - quote: The quote character to consider (e.g., '"')
+
+Example:  
+
+	unquote_char_example :: proc() {
+		src:="\'The\' raven"
+		r, multiple_bytes, tail_string, success  := strconv.unquote_char(src,'\'')
+		fmt.println("Source:", src)
+		fmt.printf("r: <%v>, multiple_bytes:%v, tail_string:<%s>, success:%v\n",r, multiple_bytes, tail_string, success)
+	}
+
+Output:  
+
+	Source: 'The' raven
+	r: <'>, multiple_bytes:false, tail_string:<The' raven>, success:true
 
 **Returns**  
 - r: The unquoted rune
@@ -1492,7 +1543,39 @@ Unquotes the input string considering any type of quote character and returns th
 
 **Inputs**  
 - lit: The input string to unquote
-- allocator: The memory allocator to use (default: context.allocator)
+- allocator: (default: context.allocator)
+
+WARNING: This procedure gives unexpected results if the quotes are not the first and last characters.
+
+Example:  
+
+	unquote_string_example :: proc() {
+		src:="\"The raven Huginn is black.\""
+		s, allocated, ok := strconv.unquote_string(src)
+		fmt.println(src)
+		fmt.printf("Unquoted: <%s>, alloc:%v, ok:%v\n\n", s, allocated, ok)
+		
+		src="\'The raven Huginn\' is black."
+		s, allocated, ok = strconv.unquote_string(src)
+		fmt.println(src)
+		fmt.printf("Unquoted: <%s>, alloc:%v, ok:%v\n\n", s, allocated, ok)
+
+		src="The raven \"Huginn\" is black."
+		s, allocated, ok = strconv.unquote_string(src) // Will produce undesireable results
+		fmt.println(src)
+		fmt.printf("Unquoted: <%s>, alloc:%v, ok:%v\n", s, allocated, ok) 
+	}
+
+Output:  
+
+	"The raven Huginn is black."
+	Unquoted: <The raven Huginn is black.>, alloc:false, ok:true
+
+	'The raven Huginn' is black.
+	Unquoted: <The raven Huginn' is black>, alloc:false, ok:true
+
+	Source: The raven `Huginn` is black.
+	Unquoted: <he raven `Huginn` is black>, alloc:false, ok:true
 
 **Returns**  
 - res: The resulting unquoted string
