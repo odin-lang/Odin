@@ -54,7 +54,7 @@ Parses an integer value from the input string in the given base, without a prefi
 
 Example:
 
-	parse_i64_of_base_example::proc {
+	parse_i64_of_base_example() :: proc {
 		n, ok := strconv.parse_i64_of_base("-1234e3", 10)
 		fmt.println(n, ok)
 	}
@@ -121,7 +121,7 @@ Parses an integer value from the input string in base 10, unless there's a prefi
 
 Example:
 	
-	parse_i64_maybe_prefixed_example :: proc {
+	parse_i64_maybe_prefixed_example() :: proc {
 		n, ok := strconv.parse_i64_maybe_prefixed("1234")
 		fmt.println(n,ok)
 
@@ -204,7 +204,7 @@ Parses an unsigned 64-bit integer value from the input string without a prefix, 
 
 Example:
 	
-	parse_u64_of_base_example :: proc {
+	parse_u64_of_base_example() :: proc {
 		n, ok := strconv.parse_u64_of_base("1234e3", 10)
 		fmt.println(n,ok)
 
@@ -264,7 +264,7 @@ Parses an unsigned 64-bit integer value from the input string, using the specifi
 
 Example:
 	
-	parse_u64_maybe_prefixed_example :: proc {
+	parse_u64_maybe_prefixed_example() :: proc {
 		n, ok := strconv.parse_u64_maybe_prefixed("1234")
 		fmt.println(n,ok)
 
@@ -336,7 +336,7 @@ Parses a signed integer value from the input string, using the specified base or
 
 Example:
 	
-	parse_int_example :: proc {
+	parse_int_example() :: proc {
 		n, ok := strconv.parse_int("1234") // without prefix, inferred base 10
 		fmt.println(n,ok)
 
@@ -377,7 +377,7 @@ Parses an unsigned integer value from the input string, using the specified base
 
 Example:
 	
-	parse_uint_example :: proc {
+	parse_uint_example() :: proc {
 		n, ok := strconv.parse_uint("1234") // without prefix, inferred base 10
 		fmt.println(n,ok)
 
@@ -418,7 +418,7 @@ Parses an integer value from a string in the given base, without any prefix
 
 Example:
 
-	parse_i128_of_base_example :: proc {
+	parse_i128_of_base_example() :: proc {
 		n, ok := strconv.parse_i128_of_base("-1234eeee", 10)
 		fmt.println(n,ok)
 	}
@@ -483,7 +483,7 @@ Parses an integer value from a string in base 10, unless there's a prefix
 
 Example:
 
-	parse_i128_maybe_prefixed_example :: proc {
+	parse_i128_maybe_prefixed_example() :: proc {
 		n, ok := strconv.parse_i128_maybe_prefixed("1234")
 		fmt.println(n, ok)
 
@@ -565,7 +565,7 @@ Parses an unsigned integer value from a string in the given base, without any pr
 
 Example:
 
-	parse_u128_of_base_example :: proc {
+	parse_u128_of_base_example() :: proc {
 		n, ok := strconv.parse_u128_of_base("1234eeee", 10)
 		fmt.println(n, ok)
 
@@ -622,7 +622,7 @@ Parses an unsigned integer value from a string in base 10, unless there's a pref
 
 Example:
 
-	parse_u128_maybe_prefixed_example :: proc {
+	parse_u128_maybe_prefixed_example() :: proc {
 		n, ok := strconv.parse_u128_maybe_prefixed("1234")
 		fmt.println(n, ok)
 
@@ -703,7 +703,7 @@ Parses a 32-bit floating point number from a string
 
 Example:
 
-	parse_f32_example :: proc {
+	parse_f32_example() :: proc {
 		n, ok := strconv.parse_f32("1234eee")
 		fmt.println(n, ok)
 
@@ -734,7 +734,7 @@ Parses a 64-bit floating point number from a string
 
 Example:
 
-	parse_f64_example :: proc {
+	parse_f64_example() :: proc {
 		n, ok := strconv.parse_f64("1234eee")
 		fmt.println(n, ok)
 
@@ -768,7 +768,7 @@ Parses a 32-bit floating point number from a string and returns the parsed numbe
 
 Example:
 
-	parse_f32_prefix_example :: proc {
+	parse_f32_prefix_example() :: proc {
 		n, _, ok := strconv.parse_f32_prefix("1234eee")
 		fmt.println(n, ok)
 
@@ -801,7 +801,7 @@ Parses a 64-bit floating point number from a string and returns the parsed numbe
 
 Example:
 
-    parse_f64_prefix_example :: proc() {
+    parse_f64_prefix_example() :: proc() {
 		n, _, ok := strconv.parse_f64_prefix("12.34eee")
 		fmt.println(n, ok)
 
@@ -1105,7 +1105,7 @@ Appends a boolean value as a string to the given buffer
 
 Example:
 
-    append_bool_example :: proc() {
+    append_bool_example() :: proc() {
 		buf: [4]byte
 		result := strconv.append_bool(buf[:], true)
 		fmt.println(result, buf)
@@ -1137,7 +1137,7 @@ Appends an unsigned integer value as a string to the given buffer with the speci
 
 Example:
 
-    append_uint_example :: proc() {
+    append_uint_example() :: proc() {
 		buf: [4]byte
 		result := strconv.append_uint(buf[:], 42, 16)
 		fmt.println(result, buf)
@@ -1163,7 +1163,7 @@ Appends a signed integer value as a string to the given buffer with the specifie
 
 Example:
 
-    append_int_example :: proc() {
+    append_int_example() :: proc() {
 		buf: [4]byte
 		result := strconv.append_int(buf[:], -42, 10)
 		fmt.println(result, buf)
@@ -1188,7 +1188,7 @@ Converts an integer value to a string and stores it in the given buffer
 
 Example:
 
-    itoa_example :: proc() {
+    itoa_example() :: proc() {
 		buf: [4]byte
 		result := strconv.itoa(buf[:], 42)
 		fmt.println(result, buf) // "42"
@@ -1212,7 +1212,7 @@ Converts a string to an integer value
 
 Example:
 
-	atoi_example :: proc() {
+	atoi_example() :: proc() {
 		fmt.println(strconv.atoi("42"))
 	}
 
@@ -1235,7 +1235,7 @@ Converts a string to a float64 value
 
 Example:
 
-	atof_example :: proc() {
+	atof_example() :: proc() {
 		fmt.println(strconv.atof("3.14"))
 	}
 
@@ -1264,7 +1264,7 @@ Appends a float64 value as a string to the given buffer with the specified forma
 
 Example:
 
-	append_float_example :: proc() {
+	append_float_example() :: proc() {
 		buf: [8]byte
 		result := strconv.append_float(buf[:], 3.14159, 'f', 2, 64)
 		fmt.println(result, buf)
@@ -1289,7 +1289,7 @@ Appends a quoted string representation of the input string to a given byte slice
 
 Example:
 
-	quote_example :: proc() {
+	quote_example() :: proc() {
 		buf: [20]byte
 		result := strconv.quote(buf[:], "hello")
 		fmt.println(result, buf)
@@ -1349,7 +1349,7 @@ Appends a quoted rune representation of the input rune to a given byte slice and
 
 Example:
 
-	quote_rune_example :: proc() {
+	quote_rune_example() :: proc() {
 		buf: [4]byte
 		result := strconv.quote_rune(buf[:], 'A')
 		fmt.println(result, buf)
@@ -1426,7 +1426,7 @@ Unquotes a single character from the input string, considering the given quote c
 
 Example:  
 
-	unquote_char_example :: proc() {
+	unquote_char_example() :: proc() {
 		src:="\'The\' raven"
 		r, multiple_bytes, tail_string, success  := strconv.unquote_char(src,'\'')
 		fmt.println("Source:", src)
@@ -1549,7 +1549,7 @@ WARNING: This procedure gives unexpected results if the quotes are not the first
 
 Example:  
 
-	unquote_string_example :: proc() {
+	unquote_string_example() :: proc() {
 		src:="\"The raven Huginn is black.\""
 		s, allocated, ok := strconv.unquote_string(src)
 		fmt.println(src)
