@@ -193,9 +193,10 @@ foreign kernel32 {
 		dwCreationFlags: DWORD,
 		lpEnvironment: LPVOID,
 		lpCurrentDirectory: LPCWSTR,
-		lpStartupInfo: LPSTARTUPINFO,
+		lpStartupInfo: LPSTARTUPINFOW,
 		lpProcessInformation: LPPROCESS_INFORMATION,
 	) -> BOOL ---
+	GetStartupInfoW :: proc(lpStartupInfo: LPSTARTUPINFOW) ---
 	GetEnvironmentVariableW :: proc(n: LPCWSTR, v: LPWSTR, nsize: DWORD) -> DWORD ---
 	SetEnvironmentVariableW :: proc(n: LPCWSTR, v: LPCWSTR) -> BOOL ---
 	GetEnvironmentStringsW :: proc() -> LPWCH ---
@@ -404,8 +405,87 @@ foreign kernel32 {
 	) -> BOOL ---
 
 	GetLogicalProcessorInformation :: proc(buffer: ^SYSTEM_LOGICAL_PROCESSOR_INFORMATION, returnedLength: PDWORD) -> BOOL ---
+
+	// [MS-Docs](https://learn.microsoft.com/en-us/windows/win32/api/winbase/nf-winbase-setfilecompletionnotificationmodes)
+	SetFileCompletionNotificationModes :: proc(FileHandle: HANDLE, Flags: u8) -> BOOL ---
+	// [MS-Docs](https://learn.microsoft.com/en-us/windows/win32/api/ioapiset/nf-ioapiset-createiocompletionport)
+	CreateIoCompletionPort :: proc(FileHandle: HANDLE, ExistingCompletionPort: HANDLE, CompletionKey: uintptr, NumberOfConcurrentThreads: DWORD) -> HANDLE ---
+	//[MS-Docs](https://learn.microsoft.com/en-us/windows/win32/api/ioapiset/nf-ioapiset-getqueuedcompletionstatus)
+	GetQueuedCompletionStatus :: proc(CompletionPort: HANDLE, lpNumberOfBytesTransferred: ^DWORD, lpCompletionKey: uintptr, lpOverlapped: ^^OVERLAPPED, dwMilliseconds: DWORD) -> BOOL ---
+	// [MS-Docs](https://learn.microsoft.com/en-us/windows/win32/api/ioapiset/nf-ioapiset-getqueuedcompletionstatusex)
+	GetQueuedCompletionStatusEx :: proc(CompletionPort: HANDLE, lpCompletionPortEntries: ^OVERLAPPED_ENTRY, ulCount: c_ulong, ulNumEntriesRemoved: ^c_ulong, dwMilliseconds: DWORD, fAlertable: BOOL) -> BOOL ---
+	// [MS-Docs](https://learn.microsoft.com/en-us/windows/win32/api/ioapiset/nf-ioapiset-postqueuedcompletionstatus)
+	PostQueuedCompletionStatus :: proc(CompletionPort: HANDLE, dwNumberOfBytesTransferred: DWORD, dwCompletionKey: c_ulong, lpOverlapped: ^OVERLAPPED) -> BOOL ---
+	// [MS-Docs](https://learn.microsoft.com/en-us/windows/win32/api/handleapi/nf-handleapi-gethandleinformation)
+	GetHandleInformation :: proc(hObject: HANDLE, lpdwFlags: ^DWORD) -> BOOL ---
 }
 
+DEBUG_PROCESS                    :: 0x00000001
+DEBUG_ONLY_THIS_PROCESS          :: 0x00000002
+CREATE_SUSPENDED                 :: 0x00000004
+DETACHED_PROCESS                 :: 0x00000008
+CREATE_NEW_CONSOLE               :: 0x00000010
+NORMAL_PRIORITY_CLASS            :: 0x00000020
+IDLE_PRIORITY_CLASS              :: 0x00000040
+HIGH_PRIORITY_CLASS              :: 0x00000080
+REALTIME_PRIORITY_CLASS          :: 0x00000100
+CREATE_NEW_PROCESS_GROUP         :: 0x00000200
+CREATE_UNICODE_ENVIRONMENT       :: 0x00000400
+CREATE_SEPARATE_WOW_VDM          :: 0x00000800
+CREATE_SHARED_WOW_VDM            :: 0x00001000
+CREATE_FORCEDOS                  :: 0x00002000
+BELOW_NORMAL_PRIORITY_CLASS      :: 0x00004000
+ABOVE_NORMAL_PRIORITY_CLASS      :: 0x00008000
+INHERIT_PARENT_AFFINITY          :: 0x00010000
+INHERIT_CALLER_PRIORITY          :: 0x00020000    // Deprecated
+CREATE_PROTECTED_PROCESS         :: 0x00040000
+EXTENDED_STARTUPINFO_PRESENT     :: 0x00080000
+PROCESS_MODE_BACKGROUND_BEGIN    :: 0x00100000
+PROCESS_MODE_BACKGROUND_END      :: 0x00200000
+CREATE_SECURE_PROCESS            :: 0x00400000
+CREATE_BREAKAWAY_FROM_JOB        :: 0x01000000
+CREATE_PRESERVE_CODE_AUTHZ_LEVEL :: 0x02000000
+CREATE_DEFAULT_ERROR_MODE        :: 0x04000000
+CREATE_NO_WINDOW                 :: 0x08000000
+PROFILE_USER                     :: 0x10000000
+PROFILE_KERNEL                   :: 0x20000000
+PROFILE_SERVER                   :: 0x40000000
+CREATE_IGNORE_SYSTEM_DEFAULT     :: 0x80000000
+
+THREAD_BASE_PRIORITY_LOWRT :: 15    // value that gets a thread to LowRealtime-1
+THREAD_BASE_PRIORITY_MAX   :: 2     // maximum thread base priority boost
+THREAD_BASE_PRIORITY_MIN   :: (-2)  // minimum thread base priority boost
+THREAD_BASE_PRIORITY_IDLE  :: (-15) // value that gets a thread to idle
+
+THREAD_PRIORITY_LOWEST        :: THREAD_BASE_PRIORITY_MIN
+THREAD_PRIORITY_BELOW_NORMAL  :: (THREAD_PRIORITY_LOWEST+1)
+THREAD_PRIORITY_NORMAL        :: 0
+THREAD_PRIORITY_HIGHEST       :: THREAD_BASE_PRIORITY_MAX
+THREAD_PRIORITY_ABOVE_NORMAL  :: (THREAD_PRIORITY_HIGHEST-1)
+THREAD_PRIORITY_ERROR_RETURN  :: (MAXLONG)
+THREAD_PRIORITY_TIME_CRITICAL :: THREAD_BASE_PRIORITY_LOWRT
+THREAD_PRIORITY_IDLE          :: THREAD_BASE_PRIORITY_IDLE
+THREAD_MODE_BACKGROUND_BEGIN  :: 0x00010000
+THREAD_MODE_BACKGROUND_END    :: 0x00020000
+
+COPY_FILE_FAIL_IF_EXISTS              :: 0x00000001
+COPY_FILE_RESTARTABLE                 :: 0x00000002
+COPY_FILE_OPEN_SOURCE_FOR_WRITE       :: 0x00000004
+COPY_FILE_ALLOW_DECRYPTED_DESTINATION :: 0x00000008
+COPY_FILE_COPY_SYMLINK                :: 0x00000800
+COPY_FILE_NO_BUFFERING                :: 0x00001000
+COPY_FILE_REQUEST_SECURITY_PRIVILEGES :: 0x00002000
+COPY_FILE_RESUME_FROM_PAUSE           :: 0x00004000
+COPY_FILE_NO_OFFLOAD                  :: 0x00040000
+COPY_FILE_IGNORE_EDP_BLOCK            :: 0x00400000
+COPY_FILE_IGNORE_SOURCE_ENCRYPTION    :: 0x00800000
+COPY_FILE_DONT_REQUEST_DEST_WRITE_DAC :: 0x02000000
+COPY_FILE_REQUEST_COMPRESSED_TRAFFIC  :: 0x10000000
+COPY_FILE_OPEN_AND_COPY_REPARSE_POINT :: 0x00200000
+COPY_FILE_DIRECTORY                   :: 0x00000080
+COPY_FILE_SKIP_ALTERNATE_STREAMS      :: 0x00008000
+COPY_FILE_DISABLE_PRE_ALLOCATION      :: 0x04000000
+COPY_FILE_ENABLE_LOW_FREE_SPACE_MODE  :: 0x08000000
 
 SECTION_QUERY                :: DWORD(0x0001)
 SECTION_MAP_WRITE            :: DWORD(0x0002)

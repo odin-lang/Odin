@@ -163,8 +163,9 @@ get_token :: proc(t: ^Tokenizer) -> (token: Token, err: Error) {
 
 	skip_alphanum :: proc(t: ^Tokenizer) {
 		for t.offset < len(t.data) {
-			switch next_rune(t) {
+			switch t.r {
 			case 'A'..='Z', 'a'..='z', '0'..='9', '_':
+				next_rune(t)
 				continue
 			}
 
