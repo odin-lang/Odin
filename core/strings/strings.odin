@@ -1081,7 +1081,6 @@ split_by_byte_iterator :: proc(s: ^string, sep: u8) -> (res: string, ok: bool) {
 }
 /*
 Splits the input string by the separator string in an iterator fashion.
-Destructively consumes the original string until the end.
 
 Inputs:
 - s: Pointer to the input string, which is modified during the search.
@@ -1116,7 +1115,6 @@ split_iterator :: proc(s: ^string, sep: string) -> (string, bool) {
 }
 /*
 Splits the input string after every separator string in an iterator fashion.
-Destructively consumes the original string until the end.
 
 Inputs:
 - s: Pointer to the input string, which is modified during the search.
