@@ -501,8 +501,7 @@ Example:
 
 	import "core:fmt"
 	import "core:strconv"
-
-	strconv_round_down_example :: proc {
+	strconv_round_down_example :: proc() {
 		d: decimal.Decimal
 		str := [64]u8{}
 		ok := decimal.set(&d, "123.456")
@@ -534,8 +533,7 @@ Example:
 
 	import "core:fmt"
 	import "core:strconv"
-
-	strconv_rounded_integer_example :: proc {
+	strconv_rounded_integer_example :: proc() {
     	d: decimal.Decimal
 		ok := decimal.set(&d, "123.456")
 		fmt.println(decimal.rounded_integer(&d))
