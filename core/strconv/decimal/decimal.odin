@@ -500,7 +500,7 @@ Rounds down the decimal value to the specified number of decimal places
 Example:
 
 	import "core:fmt"
-	import "core:strconv"
+	import "core:strconv/decimal"
 	round_down_example :: proc() {
 		d: decimal.Decimal
 		str := [64]u8{}

@@ -135,8 +135,8 @@ Example:
 	
 Output:
 
-	1234 true  
-	61166 true  
+	1234 true
+	61166 true
 
 **Returns**  
 - value: The parsed integer value
@@ -220,8 +220,8 @@ Example:
 	
 Output:
 
-	1234 false  
-	90672878 true  
+	1234 false
+	90672878 true
 
 **Returns**  
 - value: The parsed uint64 value
@@ -282,8 +282,8 @@ Example:
 	
 Output:
 
-	1234 true  
-	238 true  
+	1234 true
+	238 true
 
 **Returns**  
 - value: The parsed uint64 value
@@ -359,9 +359,9 @@ Example:
 	
 Output:
 
-	1234 true  
-	65535 true  
-	65535 true  
+	1234 true
+	65535 true
+	65535 true
 
 **Returns**  
 - value: The parsed int value
@@ -402,9 +402,9 @@ Example:
 	
 Output:
 
-	1234 true  
-	65535 true  
-	65535 true  
+	1234 true
+	65535 true
+	65535 true
 
 **Returns**  
 
@@ -439,7 +439,7 @@ Example:
 	
 Output:
 
-	-1234 false  
+	-1234 false
 
 **Returns**  
 - value: The parsed i128 value
@@ -509,8 +509,8 @@ Example:
 	
 Output:
 
-	1234 true  
-	61166 true  
+	1234 true
+	61166 true
 	
 **Returns**  
 - value: The parsed i128 value
@@ -829,7 +829,7 @@ Example:
 
 	import "core:fmt"
 	import "core:strconv"
-    parse_f64_prefix_example :: proc() {
+	parse_f64_prefix_example :: proc() {
 		n, _, ok := strconv.parse_f64_prefix("12.34eee")
 		fmt.println(n, ok)
 
@@ -1135,8 +1135,8 @@ Example:
 
 	import "core:fmt"
 	import "core:strconv"
-    append_bool_example :: proc() {
-		buf: [4]byte
+	append_bool_example :: proc() {
+		buf: [6]byte
 		result := strconv.append_bool(buf[:], true)
 		fmt.println(result, buf)
 	}
@@ -1169,7 +1169,7 @@ Example:
 
 	import "core:fmt"
 	import "core:strconv"
-    append_uint_example :: proc() {
+	append_uint_example :: proc() {
 		buf: [4]byte
 		result := strconv.append_uint(buf[:], 42, 16)
 		fmt.println(result, buf)
@@ -1197,7 +1197,7 @@ Example:
 
 	import "core:fmt"
 	import "core:strconv"
-    append_int_example :: proc() {
+	append_int_example :: proc() {
 		buf: [4]byte
 		result := strconv.append_int(buf[:], -42, 10)
 		fmt.println(result, buf)
@@ -1224,7 +1224,7 @@ Example:
 
 	import "core:fmt"
 	import "core:strconv"
-    itoa_example :: proc() {
+	itoa_example :: proc() {
 		buf: [4]byte
 		result := strconv.itoa(buf[:], 42)
 		fmt.println(result, buf) // "42"
@@ -1329,6 +1329,8 @@ Appends a quoted string representation of the input string to a given byte slice
 - buf: The byte slice to which the quoted string will be appended
 - str: The input string to be quoted
 
+!! ISSUE !! NOT EXPECTED -- "\"hello\"" was expected  
+
 Example:
 
 	import "core:fmt"
@@ -1341,8 +1343,7 @@ Example:
 
 Output:
 
-	!! ISSUE !! NOT EXPECTED -- "\"hello\"" was expected  
-	"'h''e''l''l''o'" [34, 39, 104, 39, 39, 101, 39, 39, 108, 39, 39, 108, 39, 39, 111, 39, 34, 0, 0, 0]  
+	"'h''e''l''l''o'" [34, 39, 104, 39, 39, 101, 39, 39, 108, 39, 39, 108, 39, 39, 111, 39, 34, 0, 0, 0]
 
 **Returns**  
 - The resulting string after appending the quoted string representation
@@ -1610,7 +1611,7 @@ Example:
 		fmt.println(src)
 		fmt.printf("Unquoted: <%s>, alloc:%v, ok:%v\n\n", s, allocated, ok)
 
-		src="The raven \"Huginn\" is black."
+		src="The raven \'Huginn\' is black."
 		s, allocated, ok = strconv.unquote_string(src) // Will produce undesireable results
 		fmt.println(src)
 		fmt.printf("Unquoted: <%s>, alloc:%v, ok:%v\n", s, allocated, ok) 
@@ -1624,8 +1625,8 @@ Output:
 	'The raven Huginn' is black.
 	Unquoted: <The raven Huginn' is black>, alloc:false, ok:true
 
-	Source: The raven `Huginn` is black.
-	Unquoted: <he raven `Huginn` is black>, alloc:false, ok:true
+	The raven 'Huginn' is black.
+	Unquoted: <he raven 'Huginn' is black>, alloc:false, ok:true
 
 **Returns**  
 - res: The resulting unquoted string
