@@ -411,7 +411,7 @@ main :: proc() {
 			// NOTE: this will escape the multiline string. Even with a backslash it still escapes due to the semantics of `
 			// I don't think any examples would really need this specific character so let's just make it forbidden and change
 			// in the future if we really need to
-			if strings.contains_rune(line, '`') >= 0 {
+			if strings.contains_rune(line, '`') {
 				fmt.eprintf("The line %q in the output for \"%s.%s\" contains a ` which is not allowed\n", line, test.package_name, test.entity_name)
 				g_bad_doc = true
 				had_line_error = true

@@ -1,6 +1,7 @@
 package strings
 
 import "core:runtime"
+import "core:mem"
 
 // Custom string entry struct
 Intern_Entry :: struct {
@@ -29,10 +30,14 @@ Inputs:
 - m: A pointer to the Intern struct to be initialized
 - allocator: The allocator for the Intern_Entry strings (Default: context.allocator)
 - map_allocator: The allocator for the map of entries (Default: context.allocator)
+
+Returns:
+- err: An allocator error if one occured, `nil` otherwise
 */
-intern_init :: proc(m: ^Intern, allocator := context.allocator, map_allocator := context.allocator) {
+intern_init :: proc(m: ^Intern, allocator := context.allocator, map_allocator := context.allocator) -> (err: mem.Allocator_Error) {
 	m.allocator = allocator
-	m.entries = make(map[string]^Intern_Entry, 16, map_allocator)
+	m.entries = make(map[string]^Intern_Entry, 16, map_allocator) or_return
+    return nil
 }
 /*
 Frees the map and all its content allocated using the `.allocator`.
@@ -58,7 +63,8 @@ Inputs:
 NOTE: The returned string lives as long as the map entry lives.
 
 Returns:
-The interned string and an allocator error if any
+- str: The interned string
+- err: An allocator error if one occured, `nil` otherwise
 */
 intern_get :: proc(m: ^Intern, text: string) -> (str: string, err: runtime.Allocator_Error) {
 	entry := _intern_get_entry(m, text) or_return
@@ -76,7 +82,8 @@ Inputs:
 NOTE: The returned cstring lives as long as the map entry lives
 
 Returns:
-The interned cstring and an allocator error if any
+- str: The interned cstring
+- err: An allocator error if one occured, `nil` otherwise
 */
 intern_get_cstring :: proc(m: ^Intern, text: string) -> (str: cstring, err: runtime.Allocator_Error) {
 	entry := _intern_get_entry(m, text) or_return
@@ -93,7 +100,8 @@ Inputs:
 - text: The string to be looked up or interned
 
 Returns:
-The new or existing interned entry and an allocator error if any
+- new_entry: The interned cstring
+- err: An allocator error if one occured, `nil` otherwise
 */
 _intern_get_entry :: proc(m: ^Intern, text: string) -> (new_entry: ^Intern_Entry, err: runtime.Allocator_Error) #no_bounds_check {
 	if prev, ok := m.entries[text]; ok {
