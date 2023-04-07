@@ -54,6 +54,8 @@ Parses an integer value from the input string in the given base, without a prefi
 
 Example:
 
+	import "core:fmt"
+	import "core:strconv"
 	parse_i64_of_base_example :: proc() {
 		n, ok := strconv.parse_i64_of_base("-1234e3", 10)
 		fmt.println(n, ok)
@@ -121,6 +123,8 @@ Parses an integer value from the input string in base 10, unless there's a prefi
 
 Example:
 	
+	import "core:fmt"
+	import "core:strconv"
 	parse_i64_maybe_prefixed_example :: proc() {
 		n, ok := strconv.parse_i64_maybe_prefixed("1234")
 		fmt.println(n,ok)
@@ -131,8 +135,8 @@ Example:
 	
 Output:
 
-	1234 true  
-	61166 true  
+	1234 true
+	61166 true
 
 **Returns**  
 - value: The parsed integer value
@@ -204,6 +208,8 @@ Parses an unsigned 64-bit integer value from the input string without a prefix, 
 
 Example:
 	
+	import "core:fmt"
+	import "core:strconv"
 	parse_u64_of_base_example :: proc() {
 		n, ok := strconv.parse_u64_of_base("1234e3", 10)
 		fmt.println(n,ok)
@@ -214,8 +220,8 @@ Example:
 	
 Output:
 
-	1234 false  
-	90672878 true  
+	1234 false
+	90672878 true
 
 **Returns**  
 - value: The parsed uint64 value
@@ -264,6 +270,8 @@ Parses an unsigned 64-bit integer value from the input string, using the specifi
 
 Example:
 	
+	import "core:fmt"
+	import "core:strconv"
 	parse_u64_maybe_prefixed_example :: proc() {
 		n, ok := strconv.parse_u64_maybe_prefixed("1234")
 		fmt.println(n,ok)
@@ -274,8 +282,8 @@ Example:
 	
 Output:
 
-	1234 true  
-	238 true  
+	1234 true
+	238 true
 
 **Returns**  
 - value: The parsed uint64 value
@@ -336,6 +344,8 @@ Parses a signed integer value from the input string, using the specified base or
 
 Example:
 	
+	import "core:fmt"
+	import "core:strconv"
 	parse_int_example :: proc() {
 		n, ok := strconv.parse_int("1234") // without prefix, inferred base 10
 		fmt.println(n,ok)
@@ -349,9 +359,9 @@ Example:
 	
 Output:
 
-	1234 true  
-	65535 true  
-	65535 true  
+	1234 true
+	65535 true
+	65535 true
 
 **Returns**  
 - value: The parsed int value
@@ -377,6 +387,8 @@ Parses an unsigned integer value from the input string, using the specified base
 
 Example:
 	
+	import "core:fmt"
+	import "core:strconv"
 	parse_uint_example :: proc() {
 		n, ok := strconv.parse_uint("1234") // without prefix, inferred base 10
 		fmt.println(n,ok)
@@ -390,9 +402,9 @@ Example:
 	
 Output:
 
-	1234 true  
-	65535 true  
-	65535 true  
+	1234 true
+	65535 true
+	65535 true
 
 **Returns**  
 
@@ -418,6 +430,8 @@ Parses an integer value from a string in the given base, without any prefix
 
 Example:
 
+	import "core:fmt"
+	import "core:strconv"
 	parse_i128_of_base_example :: proc() {
 		n, ok := strconv.parse_i128_of_base("-1234eeee", 10)
 		fmt.println(n,ok)
@@ -425,7 +439,7 @@ Example:
 	
 Output:
 
-	-1234 false  
+	-1234 false
 
 **Returns**  
 - value: The parsed i128 value
@@ -483,6 +497,8 @@ Parses an integer value from a string in base 10, unless there's a prefix
 
 Example:
 
+	import "core:fmt"
+	import "core:strconv"
 	parse_i128_maybe_prefixed_example :: proc() {
 		n, ok := strconv.parse_i128_maybe_prefixed("1234")
 		fmt.println(n, ok)
@@ -493,8 +509,8 @@ Example:
 	
 Output:
 
-	1234 true  
-	61166 true  
+	1234 true
+	61166 true
 	
 **Returns**  
 - value: The parsed i128 value
@@ -565,6 +581,8 @@ Parses an unsigned integer value from a string in the given base, without any pr
 
 Example:
 
+	import "core:fmt"
+	import "core:strconv"
 	parse_u128_of_base_example :: proc() {
 		n, ok := strconv.parse_u128_of_base("1234eeee", 10)
 		fmt.println(n, ok)
@@ -622,6 +640,8 @@ Parses an unsigned integer value from a string in base 10, unless there's a pref
 
 Example:
 
+	import "core:fmt"
+	import "core:strconv"
 	parse_u128_maybe_prefixed_example :: proc() {
 		n, ok := strconv.parse_u128_maybe_prefixed("1234")
 		fmt.println(n, ok)
@@ -703,6 +723,8 @@ Parses a 32-bit floating point number from a string
 
 Example:
 
+	import "core:fmt"
+	import "core:strconv"
 	parse_f32_example :: proc() {
 		n, ok := strconv.parse_f32("1234eee")
 		fmt.println(n, ok)
@@ -734,6 +756,8 @@ Parses a 64-bit floating point number from a string
 
 Example:
 
+	import "core:fmt"
+	import "core:strconv"
 	parse_f64_example :: proc() {
 		n, ok := strconv.parse_f64("1234eee")
 		fmt.println(n, ok)
@@ -768,6 +792,8 @@ Parses a 32-bit floating point number from a string and returns the parsed numbe
 
 Example:
 
+	import "core:fmt"
+	import "core:strconv"
 	parse_f32_prefix_example :: proc() {
 		n, _, ok := strconv.parse_f32_prefix("1234eee")
 		fmt.println(n, ok)
@@ -801,7 +827,9 @@ Parses a 64-bit floating point number from a string and returns the parsed numbe
 
 Example:
 
-    parse_f64_prefix_example :: proc() {
+	import "core:fmt"
+	import "core:strconv"
+	parse_f64_prefix_example :: proc() {
 		n, _, ok := strconv.parse_f64_prefix("12.34eee")
 		fmt.println(n, ok)
 
@@ -1105,8 +1133,10 @@ Appends a boolean value as a string to the given buffer
 
 Example:
 
-    append_bool_example :: proc() {
-		buf: [4]byte
+	import "core:fmt"
+	import "core:strconv"
+	append_bool_example :: proc() {
+		buf: [6]byte
 		result := strconv.append_bool(buf[:], true)
 		fmt.println(result, buf)
 	}
@@ -1137,7 +1167,9 @@ Appends an unsigned integer value as a string to the given buffer with the speci
 
 Example:
 
-    append_uint_example :: proc() {
+	import "core:fmt"
+	import "core:strconv"
+	append_uint_example :: proc() {
 		buf: [4]byte
 		result := strconv.append_uint(buf[:], 42, 16)
 		fmt.println(result, buf)
@@ -1163,7 +1195,9 @@ Appends a signed integer value as a string to the given buffer with the specifie
 
 Example:
 
-    append_int_example :: proc() {
+	import "core:fmt"
+	import "core:strconv"
+	append_int_example :: proc() {
 		buf: [4]byte
 		result := strconv.append_int(buf[:], -42, 10)
 		fmt.println(result, buf)
@@ -1188,7 +1222,9 @@ Converts an integer value to a string and stores it in the given buffer
 
 Example:
 
-    itoa_example :: proc() {
+	import "core:fmt"
+	import "core:strconv"
+	itoa_example :: proc() {
 		buf: [4]byte
 		result := strconv.itoa(buf[:], 42)
 		fmt.println(result, buf) // "42"
@@ -1212,6 +1248,8 @@ Converts a string to an integer value
 
 Example:
 
+	import "core:fmt"
+	import "core:strconv"
 	atoi_example :: proc() {
 		fmt.println(strconv.atoi("42"))
 	}
@@ -1235,6 +1273,8 @@ Converts a string to a float64 value
 
 Example:
 
+	import "core:fmt"
+	import "core:strconv"
 	atof_example :: proc() {
 		fmt.println(strconv.atof("3.14"))
 	}
@@ -1264,6 +1304,8 @@ Appends a float64 value as a string to the given buffer with the specified forma
 
 Example:
 
+	import "core:fmt"
+	import "core:strconv"
 	append_float_example :: proc() {
 		buf: [8]byte
 		result := strconv.append_float(buf[:], 3.14159, 'f', 2, 64)
@@ -1287,8 +1329,12 @@ Appends a quoted string representation of the input string to a given byte slice
 - buf: The byte slice to which the quoted string will be appended
 - str: The input string to be quoted
 
+!! ISSUE !! NOT EXPECTED -- "\"hello\"" was expected  
+
 Example:
 
+	import "core:fmt"
+	import "core:strconv"
 	quote_example :: proc() {
 		buf: [20]byte
 		result := strconv.quote(buf[:], "hello")
@@ -1297,8 +1343,7 @@ Example:
 
 Output:
 
-	!! ISSUE !! NOT EXPECTED -- "\"hello\"" was expected  
-	"'h''e''l''l''o'" [34, 39, 104, 39, 39, 101, 39, 39, 108, 39, 39, 108, 39, 39, 111, 39, 34, 0, 0, 0]  
+	"'h''e''l''l''o'" [34, 39, 104, 39, 39, 101, 39, 39, 108, 39, 39, 108, 39, 39, 111, 39, 34, 0, 0, 0]
 
 **Returns**  
 - The resulting string after appending the quoted string representation
@@ -1349,6 +1394,8 @@ Appends a quoted rune representation of the input rune to a given byte slice and
 
 Example:
 
+	import "core:fmt"
+	import "core:strconv"
 	quote_rune_example :: proc() {
 		buf: [4]byte
 		result := strconv.quote_rune(buf[:], 'A')
@@ -1426,6 +1473,8 @@ Unquotes a single character from the input string, considering the given quote c
 
 Example:  
 
+	import "core:fmt"
+	import "core:strconv"
 	unquote_char_example :: proc() {
 		src:="\'The\' raven"
 		r, multiple_bytes, tail_string, success  := strconv.unquote_char(src,'\'')
@@ -1549,18 +1598,20 @@ WARNING: This procedure gives unexpected results if the quotes are not the first
 
 Example:  
 
+	import "core:fmt"
+	import "core:strconv"
 	unquote_string_example :: proc() {
 		src:="\"The raven Huginn is black.\""
 		s, allocated, ok := strconv.unquote_string(src)
 		fmt.println(src)
 		fmt.printf("Unquoted: <%s>, alloc:%v, ok:%v\n\n", s, allocated, ok)
-		
+
 		src="\'The raven Huginn\' is black."
 		s, allocated, ok = strconv.unquote_string(src)
 		fmt.println(src)
 		fmt.printf("Unquoted: <%s>, alloc:%v, ok:%v\n\n", s, allocated, ok)
 
-		src="The raven \"Huginn\" is black."
+		src="The raven \'Huginn\' is black."
 		s, allocated, ok = strconv.unquote_string(src) // Will produce undesireable results
 		fmt.println(src)
 		fmt.printf("Unquoted: <%s>, alloc:%v, ok:%v\n", s, allocated, ok) 
@@ -1574,8 +1625,8 @@ Output:
 	'The raven Huginn' is black.
 	Unquoted: <The raven Huginn' is black>, alloc:false, ok:true
 
-	Source: The raven `Huginn` is black.
-	Unquoted: <he raven `Huginn` is black>, alloc:false, ok:true
+	The raven 'Huginn' is black.
+	Unquoted: <he raven 'Huginn' is black>, alloc:false, ok:true
 
 **Returns**  
 - res: The resulting unquoted string
