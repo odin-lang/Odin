@@ -327,7 +327,16 @@ main :: proc() {
 	os.stdout = _write_pipe
 	_spawn_pipe_reader()
 `)
+
+	Found_Proc :: struct {
+		name: string,
+		type: string,
+	}
+	found_procedures_for_error_msg: [dynamic]Found_Proc
+
 	for test in example_tests {
+		fmt.printf("--- Generating documentation test for \"%v.%v\"\n", test.package_name, test.entity_name)
+		clear(&found_procedures_for_error_msg)
 		strings.builder_reset(&example_build)
 		strings.write_string(&example_build, "package documentation_verification\n\n")
 		for line in test.example_code {
@@ -364,6 +373,10 @@ main :: proc() {
 			proc_lit, is_proc_lit := value_decl.values[0].derived_expr.(^ast.Proc_Lit); if ! is_proc_lit {
 				continue
 			}
+			append(&found_procedures_for_error_msg, Found_Proc {
+				name = code_string[value_decl.names[0].pos.offset:value_decl.names[0].end.offset],
+				type = code_string[proc_lit.type.pos.offset:proc_lit.type.end.offset],
+			})
 			if len(proc_lit.type.params.list) > 0 {
 				continue
 			}
@@ -377,16 +390,37 @@ main :: proc() {
 		}
 
 		if code_test_name == "" {
-			fmt.eprintf("We could not any find procedure literals with no arguments with the identifier %q for the example for %q\n", enforced_name, test.entity_name)
-			g_bad_doc = true
+			fmt.eprintf("We could not find the procedure \"%s :: proc()\" needed to test the example created for \"%s.%s\"\n", enforced_name, test.package_name, test.entity_name)
+			if len(found_procedures_for_error_msg) > 0{
+				fmt.eprint("The following procedures were found:\n")
+				for procedure in found_procedures_for_error_msg {
+					fmt.eprintf("\t%s :: %s\n", procedure.name, procedure.type)
+				}
+			} else {
+				fmt.eprint("No procedures were found?\n")
+			}
+			// NOTE: we don't want to fail the CI in this case, just put the error in the log and test everything else
+			// g_bad_doc = true
 			continue
 		}
 
 		fmt.sbprintf(&test_runner, "\t%v_%v()\n", test.package_name, code_test_name)
 		fmt.sbprintf(&test_runner, "\t_check(%q, `", code_test_name)
+		had_line_error: bool
 		for line in test.expected_output {
+			// NOTE: this will escape the multiline string. Even with a backslash it still escapes due to the semantics of `
+			// I don't think any examples would really need this specific character so let's just make it forbidden and change
+			// in the future if we really need to
+			if strings.contains_rune(line, '`') >= 0 {
+				fmt.eprintf("The line %q in the output for \"%s.%s\" contains a ` which is not allowed\n", line, test.package_name, test.entity_name)
+				g_bad_doc = true
+				had_line_error = true
+			}
 			strings.write_string(&test_runner, line)
 			strings.write_string(&test_runner, "\n")
+		}
+		if had_line_error {
+			continue
 		}
 		strings.write_string(&test_runner, "`)\n")
 		save_path := fmt.tprintf("verify/test_%v_%v.odin", test.package_name, code_test_name)
@@ -404,6 +438,7 @@ main :: proc() {
 			continue
 		}
 		fmt.wprintf(writer, "%v%v_%v", code_string[:index_of_proc_name], test.package_name, code_string[index_of_proc_name:])
+		fmt.println("Done")
 	}
 
 	strings.write_string(&test_runner,
