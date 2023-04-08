@@ -305,7 +305,8 @@ fe_opp :: proc "contextless" (out1: ^Loose_Field_Element, arg1: ^Tight_Field_Ele
 	out1[4] = x5
 }
 
-fe_cond_assign :: proc "contextless" (out1, arg1: ^Tight_Field_Element, arg2: int) {
+@(optimization_mode="none")
+fe_cond_assign :: #force_no_inline proc "contextless" (out1, arg1: ^Tight_Field_Element, arg2: int) {
 	x1 := fiat.cmovznz_u64(fiat.u1(arg2), out1[0], arg1[0])
 	x2 := fiat.cmovznz_u64(fiat.u1(arg2), out1[1], arg1[1])
 	x3 := fiat.cmovznz_u64(fiat.u1(arg2), out1[2], arg1[2])
@@ -596,7 +597,8 @@ fe_set :: proc "contextless" (out1, arg1: ^Tight_Field_Element) {
 	out1[4] = x5
 }
 
-fe_cond_swap :: proc "contextless" (out1, out2: ^Tight_Field_Element, arg1: int) {
+@(optimization_mode="none")
+fe_cond_swap :: #force_no_inline proc "contextless" (out1, out2: ^Tight_Field_Element, arg1: int) {
 	mask := -u64(arg1)
 	x := (out1[0] ~ out2[0]) & mask
 	x1, y1 := out1[0] ~ x, out2[0] ~ x

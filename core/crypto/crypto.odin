@@ -26,6 +26,7 @@ compare_constant_time :: proc "contextless" (a, b: []byte) -> int {
 //
 // The execution time of this routine is constant regardless of the
 // contents of the memory being compared.
+@(optimization_mode="none")
 compare_byte_ptrs_constant_time :: proc "contextless" (a, b: ^byte, n: int) -> int {
 	x := mem.slice_ptr(a, n)
 	y := mem.slice_ptr(b, n)
