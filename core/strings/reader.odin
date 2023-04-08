@@ -32,7 +32,7 @@ Inputs:
 - r: A pointer to a Reader struct
 
 Returns:
-An io.Stream for the given Reader
+- s: An io.Stream for the given Reader
 */
 reader_to_stream :: proc(r: ^Reader) -> (s: io.Stream) {
 	s.stream_data = r
@@ -47,9 +47,9 @@ Inputs:
 - s: The input string to be read
 
 Returns:
-An io.Reader for the given string
+- res: An io.Reader for the given string
 */
-to_reader :: proc(r: ^Reader, s: string) -> io.Reader {
+to_reader :: proc(r: ^Reader, s: string) -> (res: io.Reader) {
 	reader_init(r, s)
 	rr, _ := io.to_reader(reader_to_stream(r))
 	return rr
@@ -62,9 +62,9 @@ Inputs:
 - s: The input string to be read
 
 Returns:
-An `io.Reader_At` for the given string
+- res: An `io.Reader_At` for the given string
 */
-to_reader_at :: proc(r: ^Reader, s: string) -> io.Reader_At {
+to_reader_at :: proc(r: ^Reader, s: string) -> (res: io.Reader_At) {
 	reader_init(r, s)
 	rr, _ := io.to_reader_at(reader_to_stream(r))
 	return rr
@@ -76,9 +76,9 @@ Inputs:
 - r: A pointer to a Reader struct
 
 Returns:
-The remaining length of the Reader
+- res: The remaining length of the Reader
 */
-reader_length :: proc(r: ^Reader) -> int {
+reader_length :: proc(r: ^Reader) -> (res: int) {
 	if r.i >= i64(len(r.s)) {
 		return 0
 	}
@@ -91,9 +91,9 @@ Inputs:
 - r: A pointer to a Reader struct
 
 Returns:
-The length of the string stored in the Reader
+- res: The length of the string stored in the Reader
 */
-reader_size :: proc(r: ^Reader) -> i64 {
+reader_size :: proc(r: ^Reader) -> (res: i64) {
 	return i64(len(r.s))
 }
 /*
@@ -151,7 +151,7 @@ Returns:
 - The byte read from the Reader
 - err: An `io.Error` if an error occurs while reading, including `.EOF`, otherwise `nil` denotes success.
 */
-reader_read_byte :: proc(r: ^Reader) -> (byte, io.Error) {
+reader_read_byte :: proc(r: ^Reader) -> (res: byte, err: io.Error) {
 	r.prev_rune = -1
 	if r.i >= i64(len(r.s)) {
 		return 0, .EOF
@@ -167,9 +167,9 @@ Inputs:
 - r: A pointer to a Reader struct
 
 Returns:
-An `io.Error` if `r.i <= 0` (`.Invalid_Unread`), otherwise `nil` denotes success.
+- err: An `io.Error` if `r.i <= 0` (`.Invalid_Unread`), otherwise `nil` denotes success.
 */
-reader_unread_byte :: proc(r: ^Reader) -> io.Error {
+reader_unread_byte :: proc(r: ^Reader) -> (err: io.Error) {
 	if r.i <= 0 {
 		return .Invalid_Unread
 	}
@@ -211,9 +211,9 @@ Inputs:
 WARNING: May only be used once and after a valid `read_rune` call
 
 Returns:
-An `io.Error` if an error occurs while unreading (`.Invalid_Unread`), else `nil` denotes success.
+- err: An `io.Error` if an error occurs while unreading (`.Invalid_Unread`), else `nil` denotes success.
 */
-reader_unread_rune :: proc(r: ^Reader) -> io.Error {
+reader_unread_rune :: proc(r: ^Reader) -> (err: io.Error) {
 	if r.i <= 0 {
 		return .Invalid_Unread
 	}
@@ -236,7 +236,7 @@ Returns:
 - The absolute offset after seeking
 - err: An `io.Error` if an error occurs while seeking (`.Invalid_Whence`, `.Invalid_Offset`)
 */
-reader_seek :: proc(r: ^Reader, offset: i64, whence: io.Seek_From) -> (i64, io.Error) {
+reader_seek :: proc(r: ^Reader, offset: i64, whence: io.Seek_From) -> (res: i64, err: io.Error) {
 	r.prev_rune = -1
 	abs: i64
 	switch whence {
