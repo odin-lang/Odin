@@ -7,14 +7,15 @@ import os.path
 import math
 
 file_and_urls = [
-    ("vk_platform.h",  'https://raw.githubusercontent.com/KhronosGroup/Vulkan-Headers/main/include/vulkan/vk_platform.h',  True),
-    ("vulkan_core.h",  'https://raw.githubusercontent.com/KhronosGroup/Vulkan-Headers/main/include/vulkan/vulkan_core.h',  False),
-    ("vk_layer.h",     'https://raw.githubusercontent.com/KhronosGroup/Vulkan-Headers/main/include/vulkan/vk_layer.h',     True),
-    ("vk_icd.h",       'https://raw.githubusercontent.com/KhronosGroup/Vulkan-Headers/main/include/vulkan/vk_icd.h',       True),
-    ("vulkan_win32.h", 'https://raw.githubusercontent.com/KhronosGroup/Vulkan-Headers/main/include/vulkan/vulkan_win32.h', False),
-    ("vulkan_metal.h", 'https://raw.githubusercontent.com/KhronosGroup/Vulkan-Headers/main/include/vulkan/vulkan_metal.h', False),
-    ("vulkan_macos.h", 'https://raw.githubusercontent.com/KhronosGroup/Vulkan-Headers/main/include/vulkan/vulkan_macos.h', False),
-    ("vulkan_ios.h",   'https://raw.githubusercontent.com/KhronosGroup/Vulkan-Headers/main/include/vulkan/vulkan_ios.h',   False),
+    ("vk_platform.h",    'https://raw.githubusercontent.com/KhronosGroup/Vulkan-Headers/main/include/vulkan/vk_platform.h',    True),
+    ("vulkan_core.h",    'https://raw.githubusercontent.com/KhronosGroup/Vulkan-Headers/main/include/vulkan/vulkan_core.h',    False),
+    ("vk_layer.h",       'https://raw.githubusercontent.com/KhronosGroup/Vulkan-Headers/main/include/vulkan/vk_layer.h',       True),
+    ("vk_icd.h",         'https://raw.githubusercontent.com/KhronosGroup/Vulkan-Headers/main/include/vulkan/vk_icd.h',         True),
+    ("vulkan_win32.h",   'https://raw.githubusercontent.com/KhronosGroup/Vulkan-Headers/main/include/vulkan/vulkan_win32.h',   False),
+    ("vulkan_metal.h",   'https://raw.githubusercontent.com/KhronosGroup/Vulkan-Headers/main/include/vulkan/vulkan_metal.h',   False),
+    ("vulkan_macos.h",   'https://raw.githubusercontent.com/KhronosGroup/Vulkan-Headers/main/include/vulkan/vulkan_macos.h',   False),
+    ("vulkan_ios.h",     'https://raw.githubusercontent.com/KhronosGroup/Vulkan-Headers/main/include/vulkan/vulkan_ios.h',     False),
+    ("vulkan_wayland.h", 'https://raw.githubusercontent.com/KhronosGroup/Vulkan-Headers/main/include/vulkan/vulkan_wayland.h', False),
 ]
 
 for file, url, _ in file_and_urls:
@@ -37,6 +38,11 @@ def no_vk(t):
     t = t.replace('PFN_', 'Proc')
     t = t.replace('VK_', '')
     return t
+
+OPAQUE_STRUCTS = """
+wl_surface :: struct {} // Opaque struct defined by Wayland
+wl_display :: struct {} // Opaque struct defined by Wayland
+""" 
 
 def convert_type(t, prev_name, curr_name):
     table = {
@@ -66,8 +72,10 @@ def convert_type(t, prev_name, curr_name):
         "const AccelerationStructureBuildRangeInfoKHR* const*": "^[^]AccelerationStructureBuildRangeInfoKHR",
         "struct BaseOutStructure": "BaseOutStructure",
         "struct BaseInStructure":  "BaseInStructure",
+        "struct wl_display": "wl_display",
+        "struct wl_surface": "wl_surface",
         'v': '',
-     }
+    }
 
     if t in table.keys():
         return table[t]
@@ -431,6 +439,8 @@ def parse_structs(f):
 
         f.write("}\n\n")
 
+    f.write("// Opaque structs\n")
+    f.write(OPAQUE_STRUCTS)
 
     f.write("// Aliases\n")
     data = re.findall(r"typedef Vk(\w+?) Vk(\w+?);", src, re.S)

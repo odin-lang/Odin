@@ -5613,6 +5613,18 @@ IOSSurfaceCreateInfoMVK :: struct {
 	pView: rawptr,
 }
 
+WaylandSurfaceCreateInfoKHR :: struct {
+	sType:   StructureType,
+	pNext:   rawptr,
+	flags:   WaylandSurfaceCreateFlagsKHR,
+	display: ^wl_display,
+	surface: ^wl_surface,
+}
+
+// Opaque structs
+
+wl_surface :: struct {} // Opaque struct defined by Wayland
+wl_display :: struct {} // Opaque struct defined by Wayland
 // Aliases
 PhysicalDeviceVariablePointerFeatures                   :: PhysicalDeviceVariablePointersFeatures
 PhysicalDeviceShaderDrawParameterFeatures               :: PhysicalDeviceShaderDrawParametersFeatures
