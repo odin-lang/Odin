@@ -8,15 +8,23 @@ KEY_SIZE :: 32
 NONCE_SIZE :: 12
 XNONCE_SIZE :: 24
 
+@(private)
 _MAX_CTR_IETF :: 0xffffffff
 
+@(private)
 _BLOCK_SIZE :: 64
+@(private)
 _STATE_SIZE_U32 :: 16
+@(private)
 _ROUNDS :: 20
 
+@(private)
 _SIGMA_0 : u32 : 0x61707865
+@(private)
 _SIGMA_1 : u32 : 0x3320646e
+@(private)
 _SIGMA_2 : u32 : 0x79622d32
+@(private)
 _SIGMA_3 : u32 : 0x6b206574
 
 Context :: struct {
@@ -179,6 +187,7 @@ reset :: proc (ctx: ^Context) {
 	ctx._is_initialized = false
 }
 
+@(private)
 _do_blocks :: proc (ctx: ^Context, dst, src: []byte, nr_blocks: int) {
 	// Enforce the maximum consumed keystream per nonce.
 	//
@@ -441,6 +450,7 @@ _do_blocks :: proc (ctx: ^Context, dst, src: []byte, nr_blocks: int) {
 	}
 }
 
+@(private)
 _hchacha20 :: proc (dst, key, nonce: []byte) {
 	x0, x1, x2, x3 := _SIGMA_0, _SIGMA_1, _SIGMA_2, _SIGMA_3
 	x4 := util.U32_LE(key[0:4])
