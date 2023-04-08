@@ -786,9 +786,6 @@ EXT_FULL_SCREEN_EXCLUSIVE_EXTENSION_NAME                :: "VK_EXT_full_screen_e
 EXT_metal_surface                                       :: 1
 EXT_METAL_SURFACE_SPEC_VERSION                          :: 1
 EXT_METAL_SURFACE_EXTENSION_NAME                        :: "VK_EXT_metal_surface"
-KHR_wayland_surface                                     :: 1
-KHR_WAYLAND_SURFACE_SPEC_VERSION                        :: 6
-KHR_WAYLAND_SURFACE_EXTENSION_NAME                      :: "VK_KHR_wayland_surface"
 
 // Handles types
 Instance       :: distinct Handle

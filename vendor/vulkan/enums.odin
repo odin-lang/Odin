@@ -3173,8 +3173,6 @@ ShaderModuleCreateFlags                              :: distinct bit_set[ShaderM
 ShaderModuleCreateFlag                               :: enum u32 {}
 ValidationCacheCreateFlagsEXT                        :: distinct bit_set[ValidationCacheCreateFlagEXT; Flags]
 ValidationCacheCreateFlagEXT                         :: enum u32 {}
-WaylandSurfaceCreateFlagsKHR                         :: distinct bit_set[WaylandSurfaceCreateFlagKHR; Flags]
-WaylandSurfaceCreateFlagKHR                          :: enum u32 {}
 Win32SurfaceCreateFlagsKHR                           :: distinct bit_set[Win32SurfaceCreateFlagKHR; Flags]
 Win32SurfaceCreateFlagKHR                            :: enum u32 {}
 

@@ -34,7 +34,6 @@ ProcCreateHeadlessSurfaceEXT                                        :: #type pro
 ProcCreateIOSSurfaceMVK                                             :: #type proc "system" (instance: Instance, pCreateInfo: ^IOSSurfaceCreateInfoMVK, pAllocator: ^AllocationCallbacks, pSurface: ^SurfaceKHR) -> Result
 ProcCreateMacOSSurfaceMVK                                           :: #type proc "system" (instance: Instance, pCreateInfo: ^MacOSSurfaceCreateInfoMVK, pAllocator: ^AllocationCallbacks, pSurface: ^SurfaceKHR) -> Result
 ProcCreateMetalSurfaceEXT                                           :: #type proc "system" (instance: Instance, pCreateInfo: ^MetalSurfaceCreateInfoEXT, pAllocator: ^AllocationCallbacks, pSurface: ^SurfaceKHR) -> Result
-ProcCreateWaylandSurfaceKHR                                         :: #type proc "system" (instance: Instance, pCreateInfo: ^WaylandSurfaceCreateInfoKHR, pAllocator: ^AllocationCallbacks, pSurface: ^SurfaceKHR) -> Result
 ProcCreateWin32SurfaceKHR                                           :: #type proc "system" (instance: Instance, pCreateInfo: ^Win32SurfaceCreateInfoKHR, pAllocator: ^AllocationCallbacks, pSurface: ^SurfaceKHR) -> Result
 ProcDebugReportMessageEXT                                           :: #type proc "system" (instance: Instance, flags: DebugReportFlagsEXT, objectType: DebugReportObjectTypeEXT, object: u64, location: int, messageCode: i32, pLayerPrefix: cstring, pMessage: cstring)
 ProcDestroyDebugReportCallbackEXT                                   :: #type proc "system" (instance: Instance, callback: DebugReportCallbackEXT, pAllocator: ^AllocationCallbacks)
@@ -103,7 +102,6 @@ ProcGetPhysicalDeviceSurfacePresentModesKHR                         :: #type pro
 ProcGetPhysicalDeviceSurfaceSupportKHR                              :: #type proc "system" (physicalDevice: PhysicalDevice, queueFamilyIndex: u32, surface: SurfaceKHR, pSupported: ^b32) -> Result
 ProcGetPhysicalDeviceToolProperties                                 :: #type proc "system" (physicalDevice: PhysicalDevice, pToolCount: ^u32, pToolProperties: [^]PhysicalDeviceToolProperties) -> Result
 ProcGetPhysicalDeviceToolPropertiesEXT                              :: #type proc "system" (physicalDevice: PhysicalDevice, pToolCount: ^u32, pToolProperties: [^]PhysicalDeviceToolProperties) -> Result
-ProcGetPhysicalDeviceWaylandPresentationSupportKHR                  :: #type proc "system" (physicalDevice: PhysicalDevice, queueFamilyIndex: u32, display: ^struct wl_display) -> b32
 ProcGetPhysicalDeviceWin32PresentationSupportKHR                    :: #type proc "system" (physicalDevice: PhysicalDevice, queueFamilyIndex: u32) -> b32
 ProcGetWinrtDisplayNV                                               :: #type proc "system" (physicalDevice: PhysicalDevice, deviceRelativeId: u32, pDisplay: ^DisplayKHR) -> Result
 ProcReleaseDisplayEXT                                               :: #type proc "system" (physicalDevice: PhysicalDevice, display: DisplayKHR) -> Result
@@ -549,7 +547,6 @@ CreateHeadlessSurfaceEXT:                                        ProcCreateHeadl
 CreateIOSSurfaceMVK:                                             ProcCreateIOSSurfaceMVK
 CreateMacOSSurfaceMVK:                                           ProcCreateMacOSSurfaceMVK
 CreateMetalSurfaceEXT:                                           ProcCreateMetalSurfaceEXT
-CreateWaylandSurfaceKHR:                                         ProcCreateWaylandSurfaceKHR
 CreateWin32SurfaceKHR:                                           ProcCreateWin32SurfaceKHR
 DebugReportMessageEXT:                                           ProcDebugReportMessageEXT
 DestroyDebugReportCallbackEXT:                                   ProcDestroyDebugReportCallbackEXT
@@ -617,7 +614,6 @@ GetPhysicalDeviceSurfacePresentModesKHR:                         ProcGetPhysical
 GetPhysicalDeviceSurfaceSupportKHR:                              ProcGetPhysicalDeviceSurfaceSupportKHR
 GetPhysicalDeviceToolProperties:                                 ProcGetPhysicalDeviceToolProperties
 GetPhysicalDeviceToolPropertiesEXT:                              ProcGetPhysicalDeviceToolPropertiesEXT
-GetPhysicalDeviceWaylandPresentationSupportKHR:                  ProcGetPhysicalDeviceWaylandPresentationSupportKHR
 GetPhysicalDeviceWin32PresentationSupportKHR:                    ProcGetPhysicalDeviceWin32PresentationSupportKHR
 GetWinrtDisplayNV:                                               ProcGetWinrtDisplayNV
 ReleaseDisplayEXT:                                               ProcReleaseDisplayEXT
@@ -1063,7 +1059,6 @@ load_proc_addresses_custom :: proc(set_proc_address: SetProcAddressType) {
 	set_proc_address(&CreateIOSSurfaceMVK,                                             "vkCreateIOSSurfaceMVK")
 	set_proc_address(&CreateMacOSSurfaceMVK,                                           "vkCreateMacOSSurfaceMVK")
 	set_proc_address(&CreateMetalSurfaceEXT,                                           "vkCreateMetalSurfaceEXT")
-	set_proc_address(&CreateWaylandSurfaceKHR,                                         "vkCreateWaylandSurfaceKHR")
 	set_proc_address(&CreateWin32SurfaceKHR,                                           "vkCreateWin32SurfaceKHR")
 	set_proc_address(&DebugReportMessageEXT,                                           "vkDebugReportMessageEXT")
 	set_proc_address(&DestroyDebugReportCallbackEXT,                                   "vkDestroyDebugReportCallbackEXT")
@@ -1131,7 +1126,6 @@ load_proc_addresses_custom :: proc(set_proc_address: SetProcAddressType) {
 	set_proc_address(&GetPhysicalDeviceSurfaceSupportKHR,                              "vkGetPhysicalDeviceSurfaceSupportKHR")
 	set_proc_address(&GetPhysicalDeviceToolProperties,                                 "vkGetPhysicalDeviceToolProperties")
 	set_proc_address(&GetPhysicalDeviceToolPropertiesEXT,                              "vkGetPhysicalDeviceToolPropertiesEXT")
-	set_proc_address(&GetPhysicalDeviceWaylandPresentationSupportKHR,                  "vkGetPhysicalDeviceWaylandPresentationSupportKHR")
 	set_proc_address(&GetPhysicalDeviceWin32PresentationSupportKHR,                    "vkGetPhysicalDeviceWin32PresentationSupportKHR")
 	set_proc_address(&GetWinrtDisplayNV,                                               "vkGetWinrtDisplayNV")
 	set_proc_address(&ReleaseDisplayEXT,                                               "vkReleaseDisplayEXT")
@@ -2827,7 +2821,6 @@ load_proc_addresses_instance :: proc(instance: Instance) {
 	CreateIOSSurfaceMVK                                             = auto_cast GetInstanceProcAddr(instance, "vkCreateIOSSurfaceMVK")
 	CreateMacOSSurfaceMVK                                           = auto_cast GetInstanceProcAddr(instance, "vkCreateMacOSSurfaceMVK")
 	CreateMetalSurfaceEXT                                           = auto_cast GetInstanceProcAddr(instance, "vkCreateMetalSurfaceEXT")
-	CreateWaylandSurfaceKHR                                         = auto_cast GetInstanceProcAddr(instance, "vkCreateWaylandSurfaceKHR")
 	CreateWin32SurfaceKHR                                           = auto_cast GetInstanceProcAddr(instance, "vkCreateWin32SurfaceKHR")
 	DebugReportMessageEXT                                           = auto_cast GetInstanceProcAddr(instance, "vkDebugReportMessageEXT")
 	DestroyDebugReportCallbackEXT                                   = auto_cast GetInstanceProcAddr(instance, "vkDestroyDebugReportCallbackEXT")
@@ -2895,7 +2888,6 @@ load_proc_addresses_instance :: proc(instance: Instance) {
 	GetPhysicalDeviceSurfaceSupportKHR                              = auto_cast GetInstanceProcAddr(instance, "vkGetPhysicalDeviceSurfaceSupportKHR")
 	GetPhysicalDeviceToolProperties                                 = auto_cast GetInstanceProcAddr(instance, "vkGetPhysicalDeviceToolProperties")
 	GetPhysicalDeviceToolPropertiesEXT                              = auto_cast GetInstanceProcAddr(instance, "vkGetPhysicalDeviceToolPropertiesEXT")
-	GetPhysicalDeviceWaylandPresentationSupportKHR                  = auto_cast GetInstanceProcAddr(instance, "vkGetPhysicalDeviceWaylandPresentationSupportKHR")
 	GetPhysicalDeviceWin32PresentationSupportKHR                    = auto_cast GetInstanceProcAddr(instance, "vkGetPhysicalDeviceWin32PresentationSupportKHR")
 	GetWinrtDisplayNV                                               = auto_cast GetInstanceProcAddr(instance, "vkGetWinrtDisplayNV")
 	ReleaseDisplayEXT                                               = auto_cast GetInstanceProcAddr(instance, "vkReleaseDisplayEXT")

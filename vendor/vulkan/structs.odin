@@ -5613,14 +5613,6 @@ IOSSurfaceCreateInfoMVK :: struct {
 	pView: rawptr,
 }
 
-WaylandSurfaceCreateInfoKHR :: struct {
-	sType:   StructureType,
-	pNext:   rawptr,
-	flags:   WaylandSurfaceCreateFlagsKHR,
-	display: ^struct wl_display,
-	surface: ^struct wl_surface,
-}
-
 // Aliases
 PhysicalDeviceVariablePointerFeatures                   :: PhysicalDeviceVariablePointersFeatures
 PhysicalDeviceShaderDrawParameterFeatures               :: PhysicalDeviceShaderDrawParametersFeatures
