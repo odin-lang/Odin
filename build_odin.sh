@@ -6,13 +6,18 @@ set -eu
 : ${CXXFLAGS=}
 : ${LDFLAGS=}
 : ${ODIN_VERSION=dev-$(date +"%Y-%m")}
+: ${GIT_SHA=}
 
 CPPFLAGS="$CPPFLAGS -DODIN_VERSION_RAW=\"$ODIN_VERSION\""
 CXXFLAGS="$CXXFLAGS -std=c++14"
 LDFLAGS="$LDFLAGS -pthread -lm -lstdc++"
 
-GIT_SHA=$(git rev-parse --short HEAD || :)
-if [ "$GIT_SHA" ]; then CPPFLAGS="$CPPFLAGS -DGIT_SHA=\"$GIT_SHA\""; fi
+if [ -d ".git" ]; then
+	GIT_SHA=$(git rev-parse --short HEAD || :)
+	if [ "$GIT_SHA" ]; then
+		CPPFLAGS="$CPPFLAGS -DGIT_SHA=\"$GIT_SHA\""
+	fi
+fi
 
 DISABLED_WARNINGS="-Wno-switch -Wno-macro-redefined -Wno-unused-value"
 OS=$(uname)
