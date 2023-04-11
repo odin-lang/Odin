@@ -97,6 +97,8 @@ config_linux() {
 			LLVM_CONFIG=llvm-config-11
 		elif [ -x "$(command -v llvm-config-11-16)" ]; then
 			LLVM_CONFIG=llvm-config-11-64
+		elif [ -x "$(command -v llvm-config-14)" ]; then
+			LLVM_CONFIG=llvm-config-14
 		else
 			panic "Unable to find LLVM-config"
 		fi
