@@ -2,7 +2,20 @@ package http
 import "core:strings"
 
 // NOTE: This file may want to move to "core:encoding/octet" (?)
-
+/*
+Sample:
+    main :: proc() {
+        input := "This is\tan {}\\/~`<>\"'$-_.+!*'(),@example: äöü"
+        encoded := uri_encode(input)
+        decoded, ok := octet_decode(encoded)
+        fmt.println("Original :", input)
+        fmt.println("URI-Encoded  :", encoded)
+        fmt.println("URI-Decoded  :", decoded)
+        bad_input := "%AZ"
+        d2, ok2 := octet_decode(bad_input)
+        fmt.println(ok2, d2)
+    }
+*/
 // Decodes Octet Encoded string
 decode_octet :: proc(s: string, allocator := context.allocator) -> (str: string, ok: bool) {
 	sb := strings.builder_make_len_cap(0, len(s) / 2, allocator)
