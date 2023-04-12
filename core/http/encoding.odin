@@ -3,47 +3,65 @@ import "core:strings"
 
 // NOTE: This file may want to move to "core:encoding/octet" (?)
 /*
-Sample:
-    main :: proc() {
-        input := "This is\tan {}\\/~`<>\"'$-_.+!*'(),@example: äöü"
-        encoded := uri_encode(input)
-        decoded, ok := octet_decode(encoded)
-        fmt.println("Original :", input)
-        fmt.println("URI-Encoded  :", encoded)
-        fmt.println("URI-Decoded  :", decoded)
-        bad_input := "%AZ"
-        d2, ok2 := octet_decode(bad_input)
-        fmt.println(ok2, d2)
-    }
+Decodes a `%octet` (eg `%2A -> '*'`) string. Invalid octets (eg not hex digits) are passed through unaltered.  
+[URL-Spec](https://url.spec.whatwg.org/#percent-decode)  
+
+**Allocates returned string**
+
+Inputs:  
+- `s`: A Percent-Encoded String
+- `allocator`: (defaults to context)
+
+Returns:  
+- Copy of string with all valid `%octets` decoded
+
+Example:  
+
+	import "core:http"
+	import "core:fmt"
+	example_percent_decode :: proc() {
+		str := "%2A_%FQ_%9" // One valid encoded item followed by two invalid encodings
+		dec := http.percent_decode(str)
+		fmt.println(dec)
+	}
+
+Output:  
+
+	*_%FQ_%9
+
 */
-// Decodes Octet Encoded string
-decode_octet :: proc(s: string, allocator := context.allocator) -> (str: string, ok: bool) {
-	sb := strings.builder_make_len_cap(0, len(s) / 2, allocator)
-	last_write := 0
+percent_decode :: proc(sb:^strings.Builder, s: string) -> (str:string,n_written:int) {
+	using strings
+	n_written=0
+	starts_at:=len(sb.buf)
 	for i := 0; i < len(s); i += 1 {
 		c := s[i]
 		if c != '%' {
-			continue
+			n_written+=write_byte(sb, c)
 		} else {
-			strings.write_string(&sb, s[last_write:i])
-			last_write = i + 3
-			remaining_chars := len(s) - i
-			if remaining_chars >= 2 {
-				char, ok := _decode_octet(s[i + 1:1])
-				if !ok {
-					strings.builder_destroy(&sb)
-					return "", false
+			if (i + 2) < len(s) {
+				high_nibble := s[i + 1]
+				low_nibble := s[i + 2]
+				if !is_hex_digit(high_nibble) || !is_hex_digit(low_nibble) {
+					// invalid octet, write and move on
+					n_written+=write_byte(sb, c)
+				} else {
+					value := hex_digit(high_nibble) << 4 | hex_digit(low_nibble)
+					n_written+=write_byte(sb, value)
+
+					i += 2
 				}
-				strings.write_byte(&sb, char)
+			} else {
+				// insufficient length to have an octet, write out as-is:
+				n_written+=write_byte(sb, c)
 			}
 		}
 	}
-	strings.write_string(&sb, s[last_write:len(s)])
-
-	return strings.to_string(sb), true
+	str = string(sb.buf[starts_at:starts_at+n_written])
+	return
 }
 // Encode per [RFC 3986](https://datatracker.ietf.org/doc/html/rfc3986)
-encode_uri :: proc(s: string, allocator := context.allocator) -> string {
+percent_encode :: proc(s: string, allocator := context.allocator) -> string {
 	encoded := strings.builder_make_len_cap(0, len(s), allocator)
 	last_write := 0
 	for i := 0; i < len(s); i += 1 {
@@ -53,7 +71,11 @@ encode_uri :: proc(s: string, allocator := context.allocator) -> string {
 		} else {
 			strings.write_string(&encoded, s[last_write:i])
 			last_write = i + 1
-			_encode_octet(&encoded, c)
+			strings.write_byte(&encoded, '%')
+			h1, _ := hex_char(c >> 4) // Shift & mask; cannot fail on u8
+			h2, _ := hex_char(c & 0xF)
+			strings.write_byte(&encoded, h1)
+			strings.write_byte(&encoded, h2)
 		}
 	}
 	strings.write_string(&encoded, s[last_write:len(s)])
@@ -71,25 +93,6 @@ is_alpha :: proc(c: u8) -> bool {
 	is_upper := 'A' <= c && c <= 'Z'
 	return is_lower || is_upper
 }
-// Appends 3 bytes to sb: `%XX`
-_encode_octet :: proc(sb: ^strings.Builder, c: u8) {
-	strings.write_byte(sb, '%')
-	h1, _ := hex_char(c >> 4) // Shift & mask; cannot fail on u8
-	h2, _ := hex_char(c & 0xF)
-	strings.write_byte(sb, h1)
-	strings.write_byte(sb, h2)
-}
-// Expects the `len(s)==2`, the two characters in the octet. Do *not* include the `%`
-_decode_octet :: proc(s: string) -> (char: u8, ok: bool) {
-	assert(len(s) == 2)
-	d1, d1ok := hex_digit(s[0])
-	d2, d2ok := hex_digit(s[1])
-	if !(d1ok && d2ok) {
-		return 0, false
-	}
-	char = d1 << 4 | d2
-	return char, true
-}
 // Convert a Number `0..=15` to a Char `[0..=9|A..=F]`
 hex_char :: proc(n: u8) -> (char: u8, ok: bool = true) {
 	if 0 <= n && n <= 9 {
@@ -101,8 +104,15 @@ hex_char :: proc(n: u8) -> (char: u8, ok: bool = true) {
 	}
 	return
 }
-// Convert a Hex Char `[0..=9|a..=f|A..=F]` into a Number: `0..=15`
-hex_digit :: proc(c: u8) -> (n: u8, ok: bool = true) {
+is_hex_digit :: proc(c: u8) -> bool {
+	if '0' <= c && c <= '9'  || 'a' <= c && c <= 'f' || 'A' <= c && c <= 'F'{
+		return true
+	}
+	return false
+}
+
+// Convert a Hex Char `[0..=9|a..=f|A..=F]` into a Number: `0..=15`. Failure returns 255
+hex_digit :: proc(c: u8) -> (n: u8) {
 	if '0' <= c && c <= '9' {
 		n = u8(c - '0')
 	} else if 'a' <= c && c <= 'f' {
@@ -110,6 +120,13 @@ hex_digit :: proc(c: u8) -> (n: u8, ok: bool = true) {
 	} else if 'A' <= c && c <= 'F' {
 		n = u8(c - 'A' + 10)
 	} else {
+		n = 255
+	}
+	return
+}
+hex_digit_safe :: proc(c: u8) -> (n: u8, ok: bool = true) {
+	n=hex_digit(c)
+	if n == 255 {
 		ok = false
 	}
 	return

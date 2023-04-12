@@ -6,7 +6,8 @@ import "core:fmt"
 import "core:runtime"
 
 Uri :: struct {
-	scheme:    Scheme,
+    _buf:      [dynamic]u8,
+	scheme:    string,
 	authority: Authority,
 	path:      Path,
 	query:     Query,
@@ -15,90 +16,112 @@ Uri :: struct {
 Authority :: struct {
     userinfo: string,
     host: string,
-    port: Maybe(int), // string (?)
+    port: string, // Maybe(int) (?)
 }
 
 Path :: []string // TODO: is Path::[dynamic]string better for collapsing relative paths & inserting in req,res?
 
 Query :: map[string]string
 
-Scheme :: enum {
-    Invalid,
-	HTTP,
-	FTP,
-	// FILE,
-	// ...
+encode_uri :: proc(uri: ^Uri, allocator := context.allocator) -> string {
+    using strings
+    sb:= builder_make_len_cap(0, len(uri._buf), allocator)
+
+    write_string(&sb,uri.scheme)
+    write_string(&sb,"://")
+
+    if len(uri.authority.userinfo) > 0 {
+        write_string(&sb,uri.authority.userinfo)
+        write_string(&sb,"@")
+    }
+    write_string(&sb,uri.authority.host)
+    if len(uri.authority.port) > 0 {
+        write_string(&sb, ":")
+        write_string(&sb, uri.authority.port)
+    }
+    // write_string(&sb, "/")
+
+    for p in uri.path {
+        write_string(&sb, "/")
+        write_string(&sb, p)
+    }
+
+    if uri.query != nil { write_string(&sb, "?") }
+    i:=0
+    for k, v in uri.query {
+        if i > 0 { write_string(&sb, "&") }
+        write_string(&sb, k)
+        write_string(&sb, "=")
+        write_string(&sb, v)
+        i+=1
+    }
+
+    if len(uri.fragment) > 0 {
+        write_string(&sb, "#")
+        write_string(&sb, uri.fragment) 
+    }
+
+    return to_string(sb)
 }
 
+destroy_uri::proc(uri: ^Uri) {
+    delete(uri._buf)
+    delete(uri.path)
+    delete_map(uri.query)
+}
 
-// TODO: the delete-unwind seems unwieldy, probably should revisit design of how to allocate.
-// TODO: need a means of cleaning up & tracking who needs deleted
 parse_uri :: proc(str: string, allocator := context.allocator) -> (uri: Uri, ok: bool = true) {
 	context.allocator=allocator
+    using strings
     _uri := _parse_uri_to_parts(str)
 	uri = {}
+    sb:= builder_make_len_cap(0, len(str), allocator)
+    defer if !ok { builder_destroy(&sb) }
 
-	scheme, sok := _parse_scheme(_uri.str[_uri.scheme.from:_uri.scheme.til])
-	if !sok {return uri, false}
-	uri.scheme = scheme
+    write_string(&sb, _uri.str[_uri.scheme.from:_uri.scheme.til])
+	uri.scheme = string(sb.buf[:]) // First string in buf so can just write it
 
 	auth, aok := _parse_authority(_uri.str[_uri.authority.from:_uri.authority.til])
-	if !aok {return uri, false}
+	if !aok {ok = false; return}
 	uri.authority = auth
-    userinfo,uok:=decode_octet(uri.authority.userinfo)
-	if !uok {
-        if len(userinfo)>0 {delete(userinfo)}
-        return uri, false
-
-    }
-    host,hok:=decode_octet(uri.authority.host)
-	if !hok {
-        if len(userinfo)>0 {delete(userinfo)}
-        if len(host)>0 {delete(host)}
-        return uri, false
-    }
-    uri.authority.userinfo = userinfo
+    ui, _ := percent_decode(&sb, uri.authority.userinfo)
+    uri.authority.userinfo = ui
+    host, _ := percent_decode(&sb, uri.authority.host)
     uri.authority.host = host
 
-	path := _parse_path(_uri.str[_uri.path.from:_uri.path.til])
+	path := _parse_path(_uri.str[_uri.path.from:_uri.path.til], allocator)
+    defer if !ok { delete(uri._buf) }
 	uri.path = path
-    for pe,i in &uri.path {
-        pd, pok:=decode_octet(pe)
-        assert(pok) // TODO: definitely work out better deallocation strategy
-        uri.path[i]=pd
+    for pe, i in &uri.path {
+        pd, _ := percent_decode(&sb, pe)
+        uri.path[i] = pd
     }
 
-	query, qok := _parse_query(_uri.str[_uri.query.from:_uri.query.til])
-	if !qok {
-		if query != nil {delete_map(query)}
-		if path != nil {delete(path)}
-		return uri, false
-	}
+	query, qok := _parse_query(_uri.str[_uri.query.from:_uri.query.til], allocator)
+    defer if !ok { delete(uri._buf) }
+	if !qok { ok = false; return	}
 	uri.query = query
 
-    for k,v in &uri.query{
-        key, kok := decode_octet(k)
-        value, vok := decode_octet(v)
-        assert(kok&&vok)
-        delete_key(&uri.query,k)
-        uri.query[key]=value
+    for k, v in &uri.query {
+        key, _ := percent_decode(&sb, k)
+        value, _ := percent_decode(&sb, v)
+        delete_key(&uri.query, k)
+        uri.query[key] = value
     }
 
-    frag, fok := decode_octet(_uri.str[_uri.fragment.from:_uri.fragment.til])
-    assert(fok)
+    frag, _ := percent_decode(&sb, _uri.str[_uri.fragment.from:_uri.fragment.til])
 	uri.fragment = frag
 
+    uri._buf = sb.buf
 	return
 }
 
 //
-// @(private)
 Span :: struct {
 	from: int,
 	til:  int,
 }
-// @(private)
-_URI :: struct {
+_uri :: struct {
 	str:       string,
 	scheme:    Span,
 	authority: Span,
@@ -106,10 +129,9 @@ _URI :: struct {
 	query:     Span,
 	fragment:  Span,
 }
-// @(private)
 // Parses an Encoded URI into its major parts, does not subdivide into subparts (eg port on Authority)  
 // Expects the uri to be octet encoded at this stage
-_parse_uri_to_parts :: proc(uri: string) -> _URI {
+_parse_uri_to_parts :: proc(uri: string) -> _uri {
 	UriParseState :: enum {
         Scheme,
         Authority,
@@ -118,7 +140,7 @@ _parse_uri_to_parts :: proc(uri: string) -> _URI {
         Fragment,
     }
     state := UriParseState.Scheme
-	uri_parts := _URI{}
+	uri_parts := _uri{}
 	uri_parts.str = uri
 	part_start := 0
 
@@ -220,19 +242,11 @@ _parse_authority :: proc(auth_str: string) -> (auth: Authority, ok: bool = true)
 		case .Host:
 			auth.host = auth_str[part_start:]
 		case .Port:
-			auth.port, ok = strconv.parse_int(auth_str[part_start:])
+			auth.port = auth_str[part_start:]
 		}
 	}
 
 	return auth, ok
-}
-// TODO: this is wasteful, enums could all be lowercase, or make case invarint version of enum_to_str
-// fails on bad parse, or unsupported Scheme
-_parse_scheme :: proc(str: string) -> (scheme: Scheme, ok: bool = true) {
-	upper_str := strings.to_upper(str)
-	scheme, ok = fmt.string_to_enum_value(Scheme, upper_str)
-	if !ok {scheme = .Invalid}
-	return
 }
 // Allocates the array containing the str.
 _parse_path :: proc(str: string, allocator := context.allocator) -> (path: Path) {
@@ -246,7 +260,7 @@ _parse_query :: proc(str: string, allocator := context.allocator) -> (query: Que
 	on_key := true
 	part_start := 0
     alloc_ok:runtime.Allocator_Error
-	query,alloc_ok = make_map(map[string]string, 8, allocator)
+	query,alloc_ok = make_map(map[string]string, 4, allocator)
     if alloc_ok != .None {ok=false;return}
 	for i := 0; i < len(str); i += 1 {
 		c := str[i]
@@ -273,23 +287,21 @@ _parse_query :: proc(str: string, allocator := context.allocator) -> (query: Que
 ///
 
 import "core:testing"
+import "core:net"
 @(test)
 test_parse_uri_to_parts :: proc(t: ^testing.T) {
+    fmt.println("Baseline Example:")
     example_uri := "http://user:deprecated@example.com:4242/path/to/the/../resource?query=value#fragment"
-	uri := _parse_uri_to_parts(example_uri)
-    fmt.println("Original URI:", example_uri)
-	fmt.println("Scheme      :", uri.str[uri.scheme.from:uri.scheme.til])
-	fmt.println("Authority   :", uri.str[uri.authority.from:uri.authority.til])
-	fmt.println("Path        :", uri.str[uri.path.from:uri.path.til])
-	fmt.println("Query       :", uri.str[uri.query.from:uri.query.til])
-	fmt.println("Fragment    :", uri.str[uri.fragment.from:uri.fragment.til])
-
+    uri, ok := parse_uri(example_uri)
+    euri:=encode_uri(&uri)
+    fmt.println("parsed: ",uri.scheme, uri.authority.userinfo,uri.authority.host,uri.authority.port, uri.path, uri.query, uri.fragment)
+    fmt.println("core:net", net.split_url(example_uri))
+    fmt.println("encode: ", euri)
+    fmt.println("RFC Example:")
     example_uri =  "ftp://cnn.example.com&story=breaking_news@10.0.0.1/top_story.htm?foo=3#bar"
-	uri = _parse_uri_to_parts(example_uri)
-    fmt.println("Original URI:", example_uri)
-	fmt.println("Scheme      :", uri.str[uri.scheme.from:uri.scheme.til])
-	fmt.println("Authority   :", uri.str[uri.authority.from:uri.authority.til])
-	fmt.println("Path        :", uri.str[uri.path.from:uri.path.til])
-	fmt.println("Query       :", uri.str[uri.query.from:uri.query.til])
-	fmt.println("Fragment    :", uri.str[uri.fragment.from:uri.fragment.til])
+    uri, ok = parse_uri(example_uri)
+    euri = encode_uri(&uri)
+    fmt.println("parsed: ",uri.scheme, uri.authority.userinfo,uri.authority.host,uri.authority.port, uri.path, uri.query, uri.fragment)
+    fmt.println("core:net", net.split_url(example_uri))
+    fmt.println("encode: ", euri)
 }
