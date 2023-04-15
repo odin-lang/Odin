@@ -5050,7 +5050,7 @@ gb_internal bool check_no_copy_assignment(Operand const &o, String const &contex
 			if (expr->kind == Ast_CallExpr) {
 				// Okay
 			} else {
-				error(o.expr, "Invalid use a #no_copy value in %.*s", LIT(context));
+				error(o.expr, "Invalid use of #no_copy value in %.*s", LIT(context));
 				return true;
 			}
 		}
