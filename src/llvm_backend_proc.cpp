@@ -1169,17 +1169,27 @@ gb_internal lbValue lb_emit_call(lbProcedure *p, lbValue value, Array<lbValue> c
 			lbValue deferred = lb_find_procedure_value_from_entity(p->module, deferred_entity);
 
 
+			bool by_ptr = false;
 			auto in_args = args;
 			Array<lbValue> result_as_args = {};
 			switch (kind) {
 			case DeferredProcedure_none:
 				break;
+			case DeferredProcedure_in_by_ptr:
+				by_ptr = true;
+				/*fallthrough*/
 			case DeferredProcedure_in:
 				result_as_args = array_clone(heap_allocator(), in_args);
 				break;
+			case DeferredProcedure_out_by_ptr:
+				by_ptr = true;
+				/*fallthrough*/
 			case DeferredProcedure_out:
 				result_as_args = lb_value_to_array(p, heap_allocator(), result);
 				break;
+			case DeferredProcedure_in_out_by_ptr:
+				by_ptr = true;
+				/*fallthrough*/
 			case DeferredProcedure_in_out:
 				{
 					auto out_args = lb_value_to_array(p, heap_allocator(), result);
@@ -1188,6 +1198,12 @@ gb_internal lbValue lb_emit_call(lbProcedure *p, lbValue value, Array<lbValue> c
 					array_copy(&result_as_args, out_args, in_args.count);
 				}
 				break;
+			}
+			if (by_ptr) {
+				for_array(i, result_as_args) {
+					lbValue arg_ptr = lb_address_from_load_or_generate_local(p, result_as_args[i]);
+					result_as_args[i] = arg_ptr;
+				}
 			}
 
 			lb_add_defer_proc(p, p->scope_index, deferred, result_as_args);
