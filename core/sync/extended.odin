@@ -7,7 +7,7 @@ _ :: vg
 // A Wait_Group waits for a collection of threads to finish
 //
 // A Wait_Group must not be copied after first use
-Wait_Group :: struct {
+Wait_Group :: struct #no_copy {
 	counter: int,
 	mutex:   Mutex,
 	cond:    Cond,
@@ -101,7 +101,7 @@ Example:
 		fmt.println("Finished")
 	}
 */
-Barrier :: struct {
+Barrier :: struct #no_copy {
 	mutex: Mutex,
 	cond:  Cond,
 	index:         int,
@@ -141,7 +141,7 @@ barrier_wait :: proc "contextless" (b: ^Barrier) -> (is_leader: bool) {
 }
 
 
-Auto_Reset_Event :: struct {
+Auto_Reset_Event :: struct #no_copy {
 	// status ==  0: Event is reset and no threads are waiting
 	// status ==  1: Event is signaled
 	// status == -N: Event is reset and N threads are waiting
@@ -172,7 +172,7 @@ auto_reset_event_wait :: proc "contextless" (e: ^Auto_Reset_Event) {
 
 
 
-Ticket_Mutex :: struct {
+Ticket_Mutex :: struct #no_copy {
 	ticket:  uint,
 	serving: uint,
 }
@@ -194,7 +194,7 @@ ticket_mutex_guard :: proc "contextless" (m: ^Ticket_Mutex) -> bool {
 }
 
 
-Benaphore :: struct {
+Benaphore :: struct #no_copy {
 	counter: i32,
 	sema:    Sema,
 }
@@ -222,7 +222,7 @@ benaphore_guard :: proc "contextless" (m: ^Benaphore) -> bool {
 	return true
 }
 
-Recursive_Benaphore :: struct {
+Recursive_Benaphore :: struct #no_copy {
 	counter:   int,
 	owner:     int,
 	recursion: i32,
@@ -284,7 +284,7 @@ recursive_benaphore_guard :: proc "contextless" (m: ^Recursive_Benaphore) -> boo
 // Once is a data value that will perform exactly on action.
 // 
 // A Once must not be copied after first use.
-Once :: struct {
+Once :: struct #no_copy {
 	m:    Mutex,
 	done: bool,
 }
@@ -372,7 +372,7 @@ once_do_with_data_contextless :: proc "contextless" (o: ^Once, fn: proc "context
 //       blocks for the specified duration.
 //     * The `unpark` procedure automatically makes the token available if it
 //       was not already.
-Parker :: struct {
+Parker :: struct #no_copy {
 	state: Futex,
 }
 
