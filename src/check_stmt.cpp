@@ -326,7 +326,6 @@ gb_internal bool check_is_terminating(Ast *node, String const &label) {
 
 
 
-
 gb_internal Type *check_assignment_variable(CheckerContext *ctx, Operand *lhs, Operand *rhs) {
 	if (rhs->mode == Addressing_Invalid) {
 		return nullptr;
@@ -338,6 +337,8 @@ gb_internal Type *check_assignment_variable(CheckerContext *ctx, Operand *lhs, O
 	}
 
 	Ast *node = unparen_expr(lhs->expr);
+
+	check_no_copy_assignment(*rhs, str_lit("assignment"));
 
 	// NOTE(bill): Ignore assignments to '_'
 	if (is_blank_ident(node)) {
@@ -400,6 +401,7 @@ gb_internal Type *check_assignment_variable(CheckerContext *ctx, Operand *lhs, O
 	}
 
 	Type *assignment_type = lhs->type;
+
 	switch (lhs->mode) {
 	case Addressing_Invalid:
 		return nullptr;
