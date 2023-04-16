@@ -2363,9 +2363,15 @@ gb_internal lbValue lb_build_builtin_proc(lbProcedure *p, Ast *expr, TypeAndValu
 		{
 			lbValue dst = lb_build_expr(p, ce->args[0]);
 			lbValue src = lb_build_expr(p, ce->args[1]);
-			src = lb_address_from_load_or_generate_local(p, src);
 			Type *t = type_deref(dst.type);
-			lb_mem_copy_non_overlapping(p, dst, src, lb_const_int(p->module, t_int, type_size_of(t)), false);
+
+			if (is_type_simd_vector(t)) {
+				LLVMValueRef store = LLVMBuildStore(p->builder, src.value, dst.value);
+				LLVMSetAlignment(store, 1);
+			} else {
+				src = lb_address_from_load_or_generate_local(p, src);
+				lb_mem_copy_non_overlapping(p, dst, src, lb_const_int(p->module, t_int, type_size_of(t)), false);
+			}
 			return {};
 		}
 
@@ -2373,9 +2379,17 @@ gb_internal lbValue lb_build_builtin_proc(lbProcedure *p, Ast *expr, TypeAndValu
 		{
 			lbValue src = lb_build_expr(p, ce->args[0]);
 			Type *t = type_deref(src.type);
-			lbAddr dst = lb_add_local_generated(p, t, false);
-			lb_mem_copy_non_overlapping(p, dst.addr, src, lb_const_int(p->module, t_int, type_size_of(t)), false);
-			return lb_addr_load(p, dst);
+			if (is_type_simd_vector(t)) {
+				lbValue res = {};
+				res.type = t;
+				res.value = LLVMBuildLoad2(p->builder, lb_type(p->module, t), src.value, "");
+				LLVMSetAlignment(res.value, 1);
+				return res;
+			} else {
+				lbAddr dst = lb_add_local_generated(p, t, false);
+				lb_mem_copy_non_overlapping(p, dst.addr, src, lb_const_int(p->module, t_int, type_size_of(t)), false);
+				return lb_addr_load(p, dst);
+			}
 		}
 
 	case BuiltinProc_atomic_add:
