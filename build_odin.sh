@@ -93,14 +93,14 @@ config_linux() {
 	: ${LLVM_CONFIG=}
 
 	if [ ! "$LLVM_CONFIG" ]; then
-		if [ -x "$(command -v llvm-config)" ]; then
-			LLVM_CONFIG=llvm-config
-		elif [ -x "$(command -v llvm-config-11)" ]; then
-			LLVM_CONFIG=llvm-config-11
+		if [ -x "$(command -v llvm-config-14)" ]; then
+			LLVM_CONFIG=llvm-config-14
 		elif [ -x "$(command -v llvm-config-11-64)" ]; then
 			LLVM_CONFIG=llvm-config-11-64
-		elif [ -x "$(command -v llvm-config-14)" ]; then
-			LLVM_CONFIG=llvm-config-14
+		elif [ -x "$(command -v llvm-config-11)" ]; then
+			LLVM_CONFIG=llvm-config-11
+		elif [ -x "$(command -v llvm-config)" ]; then
+			LLVM_CONFIG=llvm-config
 		else
 			panic "Unable to find LLVM-config"
 		fi
