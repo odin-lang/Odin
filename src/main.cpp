@@ -27,6 +27,21 @@ gb_internal void thread_pool_wait(void) {
 }
 
 
+gb_internal i64 PRINT_PEAK_USAGE(void) {
+	if (build_context.show_more_timings) {
+	#if defined(GB_SYSTEM_WINDOWS)
+		PROCESS_MEMORY_COUNTERS p = {sizeof(p)};
+		if (GetProcessMemoryInfo(GetCurrentProcess(), &p, sizeof(p))) {
+			gb_printf("\n");
+			gb_printf("Peak Memory Size: %.3f MiB\n", (cast(f64)p.PeakWorkingSetSize) / cast(f64)(1024ull * 1024ull));
+			return cast(i64)p.PeakWorkingSetSize;
+		}
+	#endif
+	}
+	return 0;
+}
+
+
 gb_global BlockingMutex debugf_mutex;
 
 gb_internal void debugf(char const *fmt, ...) {
@@ -263,6 +278,13 @@ gb_internal i32 linker_stage(lbGenerator *gen) {
 				}
 			}
 
+			for (Entity *e : gen->foreign_libraries) {
+				GB_ASSERT(e->kind == Entity_LibraryName);
+				if (e->LibraryName.extra_linker_flags.len != 0) {
+					lib_str = gb_string_append_fmt(lib_str, " %.*s", LIT(e->LibraryName.extra_linker_flags));
+				}
+			}
+
 			if (build_context.build_mode == BuildMode_DynamicLibrary) {
 				link_settings = gb_string_append_fmt(link_settings, " /DLL");
 			} else {
@@ -434,6 +456,12 @@ gb_internal i32 linker_stage(lbGenerator *gen) {
 				}
 			}
 
+			for (Entity *e : gen->foreign_libraries) {
+				GB_ASSERT(e->kind == Entity_LibraryName);
+				if (e->LibraryName.extra_linker_flags.len != 0) {
+					lib_str = gb_string_append_fmt(lib_str, " %.*s", LIT(e->LibraryName.extra_linker_flags));
+				}
+			}
 
 			gbString object_files = gb_string_make(heap_allocator(), "");
 			defer (gb_string_free(object_files));
@@ -566,13 +594,13 @@ gb_internal Array<String> setup_args(int argc, char const **argv) {
 
 gb_internal void print_usage_line(i32 indent, char const *fmt, ...) {
 	while (indent --> 0) {
-		gb_printf_err("\t");
+		gb_printf("\t");
 	}
 	va_list va;
 	va_start(va, fmt);
-	gb_printf_err_va(fmt, va);
+	gb_printf_va(fmt, va);
 	va_end(va);
-	gb_printf_err("\n");
+	gb_printf("\n");
 }
 
 gb_internal void usage(String argv0) {
@@ -634,6 +662,7 @@ enum BuildFlagKind {
 	BuildFlag_Microarch,
 	BuildFlag_TargetFeatures,
 	BuildFlag_MinimumOSVersion,
+	BuildFlag_NoThreadLocal,
 
 	BuildFlag_RelocMode,
 	BuildFlag_DisableRedZone,
@@ -662,6 +691,7 @@ enum BuildFlagKind {
 	BuildFlag_TerseErrors,
 	BuildFlag_VerboseErrors,
 	BuildFlag_ErrorPosStyle,
+	BuildFlag_MaxErrorCount,
 
 	// internal use only
 	BuildFlag_InternalIgnoreLazy,
@@ -794,6 +824,7 @@ gb_internal bool parse_build_flags(Array<String> args) {
 	add_flag(&build_flags, BuildFlag_Debug,                   str_lit("debug"),                     BuildFlagParam_None,    Command__does_check);
 	add_flag(&build_flags, BuildFlag_DisableAssert,           str_lit("disable-assert"),            BuildFlagParam_None,    Command__does_check);
 	add_flag(&build_flags, BuildFlag_NoBoundsCheck,           str_lit("no-bounds-check"),           BuildFlagParam_None,    Command__does_check);
+	add_flag(&build_flags, BuildFlag_NoThreadLocal,           str_lit("no-thread-local"),           BuildFlagParam_None,    Command__does_check);
 	add_flag(&build_flags, BuildFlag_NoDynamicLiterals,       str_lit("no-dynamic-literals"),       BuildFlagParam_None,    Command__does_check);
 	add_flag(&build_flags, BuildFlag_NoCRT,                   str_lit("no-crt"),                    BuildFlagParam_None,    Command__does_build);
 	add_flag(&build_flags, BuildFlag_NoEntryPoint,            str_lit("no-entry-point"),            BuildFlagParam_None,    Command__does_check &~ Command_test);
@@ -836,6 +867,7 @@ gb_internal bool parse_build_flags(Array<String> args) {
 	add_flag(&build_flags, BuildFlag_TerseErrors,             str_lit("terse-errors"),              BuildFlagParam_None,    Command_all);
 	add_flag(&build_flags, BuildFlag_VerboseErrors,           str_lit("verbose-errors"),            BuildFlagParam_None,    Command_all);
 	add_flag(&build_flags, BuildFlag_ErrorPosStyle,           str_lit("error-pos-style"),           BuildFlagParam_String,  Command_all);
+	add_flag(&build_flags, BuildFlag_MaxErrorCount,           str_lit("max-error-count"),           BuildFlagParam_Integer, Command_all);
 
 	add_flag(&build_flags, BuildFlag_InternalIgnoreLazy,      str_lit("internal-ignore-lazy"),      BuildFlagParam_None,    Command_all);
 	add_flag(&build_flags, BuildFlag_InternalIgnoreLLVMBuild, str_lit("internal-ignore-llvm-build"),BuildFlagParam_None,    Command_all);
@@ -1002,7 +1034,9 @@ gb_internal bool parse_build_flags(Array<String> args) {
 						}
 						case BuildFlag_OptimizationMode: {
 							GB_ASSERT(value.kind == ExactValue_String);
-							if (value.value_string == "minimal") {
+							if (value.value_string == "none") {
+								build_context.optimization_level = -1;
+							} else if (value.value_string == "minimal") {
 								build_context.optimization_level = 0;
 							} else if (value.value_string == "size") {
 								build_context.optimization_level = 1;
@@ -1014,6 +1048,7 @@ gb_internal bool parse_build_flags(Array<String> args) {
 								gb_printf_err("\tminimal\n");
 								gb_printf_err("\tsize\n");
 								gb_printf_err("\tspeed\n");
+								gb_printf_err("\tnone (useful for -debug builds)\n");
 								bad_flags = true;
 							}
 							break;
@@ -1309,6 +1344,9 @@ gb_internal bool parse_build_flags(Array<String> args) {
 						case BuildFlag_NoEntryPoint:
 							build_context.no_entry_point = true;
 							break;
+						case BuildFlag_NoThreadLocal:
+							build_context.no_thread_local = true;
+							break;
 						case BuildFlag_UseLLD:
 							build_context.use_lld = true;
 							break;
@@ -1485,6 +1523,17 @@ gb_internal bool parse_build_flags(Array<String> args) {
 								bad_flags = true;
 							}
 							break;
+
+						case BuildFlag_MaxErrorCount: {
+							i64 count = big_int_to_i64(&value.value_integer);
+							if (count <= 0) {
+								gb_printf_err("-%.*s must be greater than 0", LIT(bf.name));
+								bad_flags = true;
+							} else {
+								build_context.max_error_count = cast(isize)count;
+							}
+							break;
+						}
 
 						case BuildFlag_InternalIgnoreLazy:
 							build_context.ignore_lazy = true;
@@ -1723,15 +1772,7 @@ gb_internal void show_timings(Checker *c, Timings *t) {
 
 	timings_print_all(t);
 
-	if (build_context.show_more_timings) {
-	#if defined(GB_SYSTEM_WINDOWS)
-		PROCESS_MEMORY_COUNTERS p = {sizeof(p)};
-		if (GetProcessMemoryInfo(GetCurrentProcess(), &p, sizeof(p))) {
-			gb_printf("\n");
-			gb_printf("Peak Memory Size: %.3f MiB\n", (cast(f64)p.PeakWorkingSetSize) / cast(f64)(1024ull * 1024ull));
-		}
-	#endif
-	}
+	PRINT_PEAK_USAGE();
 
 	if (!(build_context.export_timings_format == TimingsExportUnspecified)) {
 		timings_export_all(t, c, true);
@@ -1955,7 +1996,7 @@ gb_internal void print_show_help(String const arg0, String const &command) {
 
 		print_usage_line(1, "-o:<string>");
 		print_usage_line(2, "Set the optimization mode for compilation");
-		print_usage_line(2, "Accepted values: minimal, size, speed");
+		print_usage_line(2, "Accepted values: minimal, size, speed, none");
 		print_usage_line(2, "Example: -o:speed");
 		print_usage_line(0, "");
 	}
@@ -2059,6 +2100,10 @@ gb_internal void print_show_help(String const arg0, String const &command) {
 
 		print_usage_line(1, "-no-crt");
 		print_usage_line(2, "Disables automatic linking with the C Run Time");
+		print_usage_line(0, "");
+
+		print_usage_line(1, "-no-thread-local");
+		print_usage_line(2, "Ignore @thread_local attribute, effectively treating the program as if it is single-threaded");
 		print_usage_line(0, "");
 
 		print_usage_line(1, "-lld");
@@ -2180,8 +2225,21 @@ gb_internal void print_show_help(String const arg0, String const &command) {
 		print_usage_line(2, "Treats warning messages as error messages");
 		print_usage_line(0, "");
 
-		print_usage_line(1, "-verbose-errors");
-		print_usage_line(2, "Prints verbose error messages showing the code on that line and the location in that line");
+		print_usage_line(1, "-terse-errors");
+		print_usage_line(2, "Prints a terse error message without showing the code on that line and the location in that line");
+		print_usage_line(0, "");
+
+		print_usage_line(1, "-error-pos-style:<string>");
+		print_usage_line(2, "Options are 'unix', 'odin' and 'default' (odin)");
+		print_usage_line(2, "'odin'    file/path(45:3)");
+		print_usage_line(2, "'unix'    file/path:45:3:");
+		print_usage_line(0, "");
+
+
+		print_usage_line(1, "-max-error-count:<integer>");
+		print_usage_line(2, "Set the maximum number of errors that can be displayed before the compiler terminates");
+		print_usage_line(2, "Must be an integer >0");
+		print_usage_line(2, "If not set, the default max error count is %d", DEFAULT_MAX_ERROR_COLLECTOR_COUNT);
 		print_usage_line(0, "");
 
 		print_usage_line(1, "-foreign-error-procedures");

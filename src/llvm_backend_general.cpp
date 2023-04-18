@@ -63,7 +63,6 @@ gb_internal void lb_init_module(lbModule *m, Checker *c) {
 	map_init(&m->values);
 	map_init(&m->soa_values);
 	string_map_init(&m->members);
-	map_init(&m->procedure_values);
 	string_map_init(&m->procedures);
 	string_map_init(&m->const_strings);
 	map_init(&m->function_type_map);
@@ -71,7 +70,13 @@ gb_internal void lb_init_module(lbModule *m, Checker *c) {
 	map_init(&m->hasher_procs);
 	map_init(&m->map_get_procs);
 	map_init(&m->map_set_procs);
-	array_init(&m->procedures_to_generate, a, 0, 1024);
+	if (build_context.use_separate_modules) {
+		array_init(&m->procedures_to_generate, a, 0, 1<<10);
+		map_init(&m->procedure_values,               1<<11);
+	} else {
+		array_init(&m->procedures_to_generate, a, 0, c->info.all_procedures.count);
+		map_init(&m->procedure_values,               c->info.all_procedures.count*2);
+	}
 	array_init(&m->global_procedures_and_types_to_create, a, 0, 1024);
 	array_init(&m->missing_procedures_to_check, a, 0, 16);
 	map_init(&m->debug_values);
@@ -491,6 +496,8 @@ gb_internal void lb_emit_bounds_check(lbProcedure *p, Token token, lbValue index
 		return;
 	}
 
+	TEMPORARY_ALLOCATOR_GUARD();
+
 	index = lb_emit_conv(p, index, t_int);
 	len = lb_emit_conv(p, len, t_int);
 
@@ -498,7 +505,7 @@ gb_internal void lb_emit_bounds_check(lbProcedure *p, Token token, lbValue index
 	lbValue line = lb_const_int(p->module, t_i32, token.pos.line);
 	lbValue column = lb_const_int(p->module, t_i32, token.pos.column);
 
-	auto args = array_make<lbValue>(permanent_allocator(), 5);
+	auto args = array_make<lbValue>(temporary_allocator(), 5);
 	args[0] = file;
 	args[1] = line;
 	args[2] = column;
@@ -516,6 +523,8 @@ gb_internal void lb_emit_matrix_bounds_check(lbProcedure *p, Token token, lbValu
 		return;
 	}
 
+	TEMPORARY_ALLOCATOR_GUARD();
+
 	row_index = lb_emit_conv(p, row_index, t_int);
 	column_index = lb_emit_conv(p, column_index, t_int);
 	row_count = lb_emit_conv(p, row_count, t_int);
@@ -525,7 +534,7 @@ gb_internal void lb_emit_matrix_bounds_check(lbProcedure *p, Token token, lbValu
 	lbValue line = lb_const_int(p->module, t_i32, token.pos.line);
 	lbValue column = lb_const_int(p->module, t_i32, token.pos.column);
 
-	auto args = array_make<lbValue>(permanent_allocator(), 7);
+	auto args = array_make<lbValue>(temporary_allocator(), 7);
 	args[0] = file;
 	args[1] = line;
 	args[2] = column;
@@ -1331,6 +1340,7 @@ gb_internal void lb_emit_store_union_variant(lbProcedure *p, lbValue parent, lbV
 
 
 gb_internal void lb_clone_struct_type(LLVMTypeRef dst, LLVMTypeRef src) {
+	TEMPORARY_ALLOCATOR_GUARD();
 	unsigned field_count = LLVMCountStructElementTypes(src);
 	LLVMTypeRef *fields = gb_alloc_array(temporary_allocator(), LLVMTypeRef, field_count);
 	LLVMGetStructElementTypes(src, fields);

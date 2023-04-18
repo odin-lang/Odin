@@ -791,15 +791,6 @@ gb_internal void lb_build_range_stmt(lbProcedure *p, AstRangeStmt *rs, Scope *sc
 		val1_type = type_of_expr(rs->vals[1]);
 	}
 
-	if (val0_type != nullptr) {
-		Entity *e = entity_of_node(rs->vals[0]);
-		lb_add_local(p, e->type, e, true);
-	}
-	if (val1_type != nullptr) {
-		Entity *e = entity_of_node(rs->vals[1]);
-		lb_add_local(p, e->type, e, true);
-	}
-
 	lbValue val = {};
 	lbValue key = {};
 	lbBlock *loop = nullptr;
@@ -1308,6 +1299,7 @@ gb_internal lbAddr lb_store_range_stmt_val(lbProcedure *p, Ast *stmt_val, lbValu
 		if (LLVMIsALoadInst(value.value)) {
 			lbValue ptr = lb_address_from_load_or_generate_local(p, value);
 			lb_add_entity(p->module, e, ptr);
+			lb_add_debug_local_variable(p, ptr.value, e->type, e->token);
 			return lb_addr(ptr);
 		}
 	}
@@ -1431,9 +1423,11 @@ gb_internal void lb_build_type_switch_stmt(lbProcedure *p, AstTypeSwitchStmt *ss
 				continue;
 			}
 			Entity *case_entity = implicit_entity_of_node(clause);
-			max_size = gb_max(max_size, type_size_of(case_entity->type));
-			max_align = gb_max(max_align, type_align_of(case_entity->type));
-			variants_found = true;
+			if (!is_type_untyped_nil(case_entity->type)) {
+				max_size = gb_max(max_size, type_size_of(case_entity->type));
+				max_align = gb_max(max_align, type_align_of(case_entity->type));
+				variants_found = true;
+			}
 		}
 		if (variants_found) {
 			Type *t = alloc_type_array(t_u8, max_size);
@@ -1457,6 +1451,8 @@ gb_internal void lb_build_type_switch_stmt(lbProcedure *p, AstTypeSwitchStmt *ss
 		if (p->debug_info != nullptr) {
 			LLVMSetCurrentDebugLocation2(p->builder, lb_debug_location_from_ast(p, clause));
 		}
+
+		bool saw_nil = false;
 		for (Ast *type_expr : cc->list) {
 			Type *case_type = type_of_expr(type_expr);
 			lbValue on_val = {};
@@ -1465,7 +1461,12 @@ gb_internal void lb_build_type_switch_stmt(lbProcedure *p, AstTypeSwitchStmt *ss
 				on_val = lb_const_union_tag(m, ut, case_type);
 
 			} else if (switch_kind == TypeSwitch_Any) {
-				on_val = lb_typeid(m, case_type);
+				if (is_type_untyped_nil(case_type)) {
+					saw_nil = true;
+					on_val = lb_const_nil(m, t_typeid);
+				} else {
+					on_val = lb_typeid(m, case_type);
+				}
 			}
 			GB_ASSERT(on_val.value != nullptr);
 			LLVMAddCase(switch_instr, on_val.value, body->block);
@@ -1477,7 +1478,7 @@ gb_internal void lb_build_type_switch_stmt(lbProcedure *p, AstTypeSwitchStmt *ss
 
 		bool by_reference = (case_entity->flags & EntityFlag_Value) == 0;
 
-		if (cc->list.count == 1) {
+		if (cc->list.count == 1 && !saw_nil) {
 			lbValue data = {};
 			if (switch_kind == TypeSwitch_Union) {
 				data = union_data;
@@ -2268,45 +2269,56 @@ gb_internal void lb_build_stmt(lbProcedure *p, Ast *node) {
 			return;
 		}
 
-		auto lvals = array_make<lbAddr>(permanent_allocator(), 0, vd->names.count);
-
-		for (Ast *name : vd->names) {
-			lbAddr lval = {};
-			if (!is_blank_ident(name)) {
-				Entity *e = entity_of_node(name);
-				// bool zero_init = true; // Always do it
-				bool zero_init = vd->values.count == 0;
-				lval = lb_add_local(p, e->type, e, zero_init);
-			}
-			array_add(&lvals, lval);
-		}
+		TEMPORARY_ALLOCATOR_GUARD();
 
 		auto const &values = vd->values;
-		if (values.count > 0) {
-			auto inits = array_make<lbValue>(permanent_allocator(), 0, lvals.count);
+		if (values.count == 0) {
+			auto lvals = slice_make<lbAddr>(temporary_allocator(), vd->names.count);
+			for_array(i, vd->names) {
+				Ast *name = vd->names[i];
+				if (!is_blank_ident(name)) {
+					Entity *e = entity_of_node(name);
+					// bool zero_init = true; // Always do it
+					bool zero_init = values.count == 0;
+					lvals[i] = lb_add_local(p, e->type, e, zero_init);
+				}
+			}
+		} else {
+			auto lvals_preused = slice_make<bool>(temporary_allocator(), vd->names.count);
+			auto lvals = slice_make<lbAddr>(temporary_allocator(), vd->names.count);
+			auto inits = array_make<lbValue>(temporary_allocator(), 0, lvals.count);
 
 			isize lval_index = 0;
 			for (Ast *rhs : values) {
 				rhs = unparen_expr(rhs);
 				lbValue init = lb_build_expr(p, rhs);
-			#if 1
-				// NOTE(bill, 2023-02-17): lb_const_value might produce a stack local variable for the
-				// compound literal, so reusing that variable should minimize the stack wastage
+
 				if (rhs->kind == Ast_CompoundLit) {
+					// NOTE(bill, 2023-02-17): lb_const_value might produce a stack local variable for the
+					// compound literal, so reusing that variable should minimize the stack wastage
 					lbAddr *comp_lit_addr = map_get(&p->module->exact_value_compound_literal_addr_map, rhs);
 					if (comp_lit_addr) {
-						Entity *e = entity_of_node(vd->names[lval_index]);
-						if (e) {
-							lb_add_entity(p->module, e, comp_lit_addr->addr);
-							lvals[lval_index] = {}; // do nothing so that nothing will assign to it
+						if (Entity *e = entity_of_node(vd->names[lval_index])) {
+							lbValue val = comp_lit_addr->addr;
+							lb_add_entity(p->module, e, val);
+							lb_add_debug_local_variable(p, val.value, e->type, e->token);
+							lvals_preused[lval_index] = true;
 						}
 					}
 				}
-			#endif
 
 				lval_index += lb_append_tuple_values(p, &inits, init);
 			}
 			GB_ASSERT(lval_index == lvals.count);
+
+			for_array(i, vd->names) {
+				Ast *name = vd->names[i];
+				if (!is_blank_ident(name) && !lvals_preused[i]) {
+					Entity *e = entity_of_node(name);
+					bool zero_init = values.count == 0;
+					lvals[i] = lb_add_local(p, e->type, e, zero_init);
+				}
+			}
 
 			GB_ASSERT(lvals.count == inits.count);
 			for_array(i, inits) {

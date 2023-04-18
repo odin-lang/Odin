@@ -1,4 +1,4 @@
-package prof_spall
+package spall
 
 import "core:os"
 import "core:time"
@@ -95,7 +95,7 @@ context_destroy :: proc(ctx: ^Context) {
 }
 
 buffer_create :: proc(data: []byte, tid: u32 = 0, pid: u32 = 0) -> (buffer: Buffer, ok: bool) #optional_ok {
-	assert(len(data) > 0)
+	assert(len(data) >= 1024)
 	buffer.data = data
 	buffer.tid  = tid
 	buffer.pid  = pid
@@ -105,8 +105,13 @@ buffer_create :: proc(data: []byte, tid: u32 = 0, pid: u32 = 0) -> (buffer: Buff
 }
 
 buffer_flush :: proc(ctx: ^Context, buffer: ^Buffer) {
+	start := _trace_now(ctx)
 	os.write(ctx.fd, buffer.data[:buffer.head])
 	buffer.head = 0
+	end := _trace_now(ctx)
+
+	buffer.head += _build_begin(buffer.data[buffer.head:], "Spall Trace Buffer Flush", "", start, buffer.tid, buffer.pid)
+	buffer.head += _build_end(buffer.data[buffer.head:], end, buffer.tid, buffer.pid)
 }
 
 buffer_destroy :: proc(ctx: ^Context, buffer: ^Buffer) {
@@ -171,10 +176,11 @@ _build_begin :: proc "contextless" (buffer: []u8, name: string, args: string, ts
 	mem.copy(raw_data(buffer[size_of(Begin_Event):]), raw_data(name), name_len)
 	mem.copy(raw_data(buffer[size_of(Begin_Event)+name_len:]), raw_data(args), args_len)
 	ok = true
+
 	return
 }
 
-_build_end :: proc(buffer: []u8, ts: f64, tid: u32, pid: u32) -> (event_size: int, ok: bool) #optional_ok {
+_build_end :: proc "contextless" (buffer: []u8, ts: f64, tid: u32, pid: u32) -> (event_size: int, ok: bool) #optional_ok {
 	ev := (^End_Event)(raw_data(buffer))
 	event_size = size_of(End_Event)
 	if event_size > len(buffer) {
@@ -186,6 +192,7 @@ _build_end :: proc(buffer: []u8, ts: f64, tid: u32, pid: u32) -> (event_size: in
 	ev.tid  = u32le(tid)
 	ev.ts   = f64le(ts)
 	ok = true
+
 	return
 }
 

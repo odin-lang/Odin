@@ -1,4 +1,5 @@
 #include <math.h>
+#include <stdlib.h>
 
 gb_global BlockingMutex hash_exact_value_mutex;
 
@@ -174,7 +175,36 @@ gb_internal ExactValue exact_value_integer_from_string(String const &string) {
 
 
 
-gb_internal f64 float_from_string(String string) {
+gb_internal f64 float_from_string(String const &string) {
+	if (string.len < 128) {
+		char buf[128] = {};
+		isize n = 0;
+		for (isize i = 0; i < string.len; i++) {
+			u8 c = string.text[i];
+			if (c == '_') {
+				continue;
+			}
+			if (c == 'E') { c = 'e'; }
+			buf[n++] = cast(char)c;
+		}
+		buf[n] = 0;
+		return atof(buf);
+	} else {
+		TEMPORARY_ALLOCATOR_GUARD();
+		char *buf = gb_alloc_array(temporary_allocator(), char, string.len+1);
+		isize n = 0;
+		for (isize i = 0; i < string.len; i++) {
+			u8 c = string.text[i];
+			if (c == '_') {
+				continue;
+			}
+			if (c == 'E') { c = 'e'; }
+			buf[n++] = cast(char)c;
+		}
+		buf[n] = 0;
+		return atof(buf);
+	}
+/*
 	isize i = 0;
 	u8 *str = string.text;
 	isize len = string.len;
@@ -250,6 +280,7 @@ gb_internal f64 float_from_string(String string) {
 	}
 
 	return sign * (frac ? (value / scale) : (value * scale));
+*/
 }
 
 gb_internal ExactValue exact_value_float_from_string(String string) {

@@ -7,6 +7,8 @@
 // #define DEFAULT_TO_THREADED_CHECKER
 // #endif
 
+#define DEFAULT_MAX_ERROR_COLLECTOR_COUNT (36)
+
 enum TargetOsKind : u16 {
 	TargetOs_Invalid,
 
@@ -275,6 +277,7 @@ struct BuildContext {
 	bool   no_output_files;
 	bool   no_crt;
 	bool   no_entry_point;
+	bool   no_thread_local;
 	bool   use_lld;
 	bool   vet;
 	bool   vet_extra;
@@ -312,6 +315,8 @@ struct BuildContext {
 	RelocMode reloc_mode;
 	bool   disable_red_zone;
 
+	isize max_error_count;
+
 
 	u32 cmd_doc_flags;
 	Array<String> extra_packages;
@@ -342,6 +347,14 @@ gb_internal bool global_warnings_as_errors(void) {
 gb_internal bool global_ignore_warnings(void) {
 	return build_context.ignore_warnings;
 }
+
+gb_internal isize MAX_ERROR_COLLECTOR_COUNT(void) {
+	if (build_context.max_error_count <= 0) {
+		return DEFAULT_MAX_ERROR_COLLECTOR_COUNT;
+	}
+	return build_context.max_error_count;
+}
+
 
 
 gb_global TargetMetrics target_windows_i386 = {
@@ -1080,6 +1093,10 @@ gb_internal void init_build_context(TargetMetrics *cross_target) {
 	bc->ODIN_VERSION = ODIN_VERSION;
 	bc->ODIN_ROOT    = odin_root_dir();
 
+	if (bc->max_error_count <= 0) {
+		bc->max_error_count = DEFAULT_MAX_ERROR_COLLECTOR_COUNT;
+	}
+
 	{
 		char const *found = gb_get_env("ODIN_ERROR_POS_STYLE", permanent_allocator());
 		if (found) {
@@ -1255,7 +1272,7 @@ gb_internal void init_build_context(TargetMetrics *cross_target) {
 		gb_exit(1);
 	}
 
-	bc->optimization_level = gb_clamp(bc->optimization_level, 0, 3);
+	bc->optimization_level = gb_clamp(bc->optimization_level, -1, 2);
 
 	// ENFORCE DYNAMIC MAP CALLS
 	bc->dynamic_map_calls = true;
@@ -1369,6 +1386,7 @@ gb_internal char const *target_features_set_to_cstring(gbAllocator allocator, bo
 		gb_memmove(features + len, feature.text, feature.len);
 		len += feature.len;
 		if (with_quotes) features[len++] = '"';
+		i += 1;
 	}
 	features[len++] = 0;
 

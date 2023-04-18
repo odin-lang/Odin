@@ -92,6 +92,10 @@ enum DeferredProcedureKind {
 	DeferredProcedure_in,
 	DeferredProcedure_out,
 	DeferredProcedure_in_out,
+
+	DeferredProcedure_in_by_ptr,
+	DeferredProcedure_out_by_ptr,
+	DeferredProcedure_in_out_by_ptr,
 };
 struct DeferredProcedure {
 	DeferredProcedureKind kind;
@@ -121,6 +125,7 @@ struct AttributeContext {
 	bool    set_cold            : 1;
 	u32 optimization_mode; // ProcedureOptimizationMode
 	i64 foreign_import_priority_index;
+	String extra_linker_flags;
 
 	String  objc_class;
 	String  objc_name;

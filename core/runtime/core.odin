@@ -119,6 +119,7 @@ Type_Info_Struct :: struct {
 	tags:         []string,
 	is_packed:    bool,
 	is_raw_union: bool,
+	is_no_copy:   bool,
 	custom_align: bool,
 
 	equal: Equal_Proc, // set only when the struct has .Comparable set but does not have .Simple_Compare set
@@ -621,7 +622,9 @@ __init_context :: proc "contextless" (c: ^Context) {
 	c.allocator.data = nil
 
 	c.temp_allocator.procedure = default_temp_allocator_proc
-	c.temp_allocator.data = &global_default_temp_allocator_data
+	when !NO_DEFAULT_TEMP_ALLOCATOR {
+		c.temp_allocator.data = &global_default_temp_allocator_data
+	}
 	
 	when !ODIN_DISABLE_ASSERT {
 		c.assertion_failure_proc = default_assertion_failure_proc

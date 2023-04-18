@@ -60,7 +60,6 @@ gb_internal void virtual_memory_dealloc(MemoryBlock *block);
 gb_internal void *arena_alloc(Arena *arena, isize min_size, isize alignment);
 gb_internal void arena_free_all(Arena *arena);
 
-
 gb_internal isize arena_align_forward_offset(Arena *arena, isize alignment) {
 	isize alignment_offset = 0;
 	isize ptr = cast(isize)(arena->curr_block->base + arena->curr_block->used);
@@ -75,7 +74,7 @@ gb_internal void *arena_alloc(Arena *arena, isize min_size, isize alignment) {
 	GB_ASSERT(gb_is_power_of_two(alignment));
 	
 	mutex_lock(&arena->mutex);
-	
+
 	isize size = 0;
 	if (arena->curr_block != nullptr) {
 		size = min_size + arena_align_forward_offset(arena, alignment);
@@ -390,15 +389,11 @@ gb_internal bool IS_ODIN_DEBUG(void);
 gb_internal GB_ALLOCATOR_PROC(heap_allocator_proc);
 
 
-gb_global gb_thread_local Arena heap_arena = {nullptr, DEFAULT_MINIMUM_BLOCK_SIZE};
 gb_internal gbAllocator heap_allocator(void) {
-	if (IS_ODIN_DEBUG()) {
-		gbAllocator a;
-		a.proc = heap_allocator_proc;
-		a.data = nullptr;
-		return a;
-	}
-	return arena_allocator(&heap_arena);
+	gbAllocator a;
+	a.proc = heap_allocator_proc;
+	a.data = nullptr;
+	return a;
 }
 
 

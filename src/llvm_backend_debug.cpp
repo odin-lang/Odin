@@ -989,7 +989,6 @@ gb_internal void lb_add_debug_local_variable(lbProcedure *p, LLVMValueRef ptr, T
 		return;
 	}
 
-
 	AstFile *file = p->body->file();
 
 	LLVMMetadataRef llvm_scope = lb_get_current_debug_scope(p);

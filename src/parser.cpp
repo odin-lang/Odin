@@ -1047,7 +1047,7 @@ gb_internal Ast *ast_dynamic_array_type(AstFile *f, Token token, Ast *elem) {
 }
 
 gb_internal Ast *ast_struct_type(AstFile *f, Token token, Slice<Ast *> fields, isize field_count,
-                     Ast *polymorphic_params, bool is_packed, bool is_raw_union,
+                     Ast *polymorphic_params, bool is_packed, bool is_raw_union, bool is_no_copy,
                      Ast *align,
                      Token where_token, Array<Ast *> const &where_clauses) {
 	Ast *result = alloc_ast_node(f, Ast_StructType);
@@ -1057,6 +1057,7 @@ gb_internal Ast *ast_struct_type(AstFile *f, Token token, Slice<Ast *> fields, i
 	result->StructType.polymorphic_params = polymorphic_params;
 	result->StructType.is_packed          = is_packed;
 	result->StructType.is_raw_union       = is_raw_union;
+	result->StructType.is_no_copy         = is_no_copy;
 	result->StructType.align              = align;
 	result->StructType.where_token        = where_token;
 	result->StructType.where_clauses      = slice_from_array(where_clauses);
@@ -1411,7 +1412,7 @@ gb_internal Token expect_operator(AstFile *f) {
 		             LIT(p));
 	}
 	if (f->curr_token.kind == Token_Ellipsis) {
-		syntax_warning(f->curr_token, "'..' for ranges has now be deprecated, prefer '..='");
+		syntax_warning(f->curr_token, "'..' for ranges has now been deprecated, prefer '..='");
 		f->tokens[f->curr_token_index].flags |= TokenFlag_Replace;
 	}
 	
@@ -1434,7 +1435,7 @@ gb_internal Token expect_closing_brace_of_field_list(AstFile *f) {
 		return token;
 	}
 	bool ok = true;
-	if (!f->allow_newline) {
+	if (f->allow_newline) {
 		ok = !skip_possible_newline(f);
 	}
 	if (ok && allow_token(f, Token_Semicolon)) {
@@ -2392,6 +2393,7 @@ gb_internal Ast *parse_operand(AstFile *f, bool lhs) {
 		Ast *polymorphic_params = nullptr;
 		bool is_packed          = false;
 		bool is_raw_union       = false;
+		bool no_copy            = false;
 		Ast *align              = nullptr;
 
 		if (allow_token(f, Token_OpenParen)) {
@@ -2427,6 +2429,11 @@ gb_internal Ast *parse_operand(AstFile *f, bool lhs) {
 					syntax_error(tag, "Duplicate struct tag '#%.*s'", LIT(tag.string));
 				}
 				is_raw_union = true;
+			} else if (tag.string == "no_copy") {
+				if (is_packed) {
+					syntax_error(tag, "Duplicate struct tag '#%.*s'", LIT(tag.string));
+				}
+				no_copy = true;
 			} else {
 				syntax_error(tag, "Invalid struct tag '#%.*s'", LIT(tag.string));
 			}
@@ -2465,7 +2472,7 @@ gb_internal Ast *parse_operand(AstFile *f, bool lhs) {
 			decls = fields->FieldList.list;
 		}
 
-		return ast_struct_type(f, token, decls, name_count, polymorphic_params, is_packed, is_raw_union, align, where_token, where_clauses);
+		return ast_struct_type(f, token, decls, name_count, polymorphic_params, is_packed, is_raw_union, no_copy, align, where_token, where_clauses);
 	} break;
 
 	case Token_union: {
@@ -3191,6 +3198,15 @@ gb_internal Ast *parse_foreign_block(AstFile *f, Token token) {
 	return decl;
 }
 
+gb_internal void print_comment_group(CommentGroup *group) {
+	if (group) {
+		for (Token const &token : group->list) {
+			gb_printf_err("%.*s\n", LIT(token.string));
+		}
+		gb_printf_err("\n");
+	}
+}
+
 gb_internal Ast *parse_value_decl(AstFile *f, Array<Ast *> names, CommentGroup *docs) {
 	bool is_mutable = true;
 
@@ -3232,6 +3248,8 @@ gb_internal Ast *parse_value_decl(AstFile *f, Array<Ast *> names, CommentGroup *
 		values.allocator = heap_allocator();
 	}
 
+	CommentGroup *end_comment = f->lead_comment;
+
 	if (f->expr_level >= 0) {
 		if (f->curr_token.kind == Token_CloseBrace &&
 		    f->curr_token.pos.line == f->prev_token.pos.line) {
@@ -3252,7 +3270,7 @@ gb_internal Ast *parse_value_decl(AstFile *f, Array<Ast *> names, CommentGroup *
 		}
 	}
 
-	return ast_value_decl(f, names, type, values, is_mutable, docs, f->line_comment);
+	return ast_value_decl(f, names, type, values, is_mutable, docs, end_comment);
 }
 
 gb_internal Ast *parse_simple_stmt(AstFile *f, u32 flags) {
@@ -3682,9 +3700,11 @@ gb_internal bool allow_field_separator(AstFile *f) {
 	if (allow_token(f, Token_Comma)) {
 		return true;
 	}
-	if (ALLOW_NEWLINE && token.kind == Token_Semicolon && !token_is_newline(token)) {
-		String p = token_to_string(token);
-		syntax_error(token_end_of_line(f, f->prev_token), "Expected a comma, got a %.*s", LIT(p));
+	if (ALLOW_NEWLINE && token.kind == Token_Semicolon) {
+		if (!token_is_newline(token)) {
+			String p = token_to_string(token);
+			syntax_error(token_end_of_line(f, f->prev_token), "Expected a comma, got a %.*s", LIT(p));
+		}
 		advance_token(f);
 		return true;
 	}

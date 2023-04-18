@@ -693,6 +693,7 @@ AST_KIND(_TypeBegin, "", bool) \
 		Slice<Ast *> where_clauses; \
 		bool is_packed;             \
 		bool is_raw_union;          \
+		bool is_no_copy;            \
 	}) \
 	AST_KIND(UnionType, "union type", struct { \
 		Scope *scope; \

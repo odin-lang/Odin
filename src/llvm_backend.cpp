@@ -96,10 +96,12 @@ gb_internal void lb_set_entity_from_other_modules_linkage_correctly(lbModule *ot
 }
 
 gb_internal void lb_emit_init_context(lbProcedure *p, lbAddr addr) {
+	TEMPORARY_ALLOCATOR_GUARD();
+
 	GB_ASSERT(addr.kind == lbAddr_Context);
 	GB_ASSERT(addr.ctx.sel.index.count == 0);
 
-	auto args = array_make<lbValue>(permanent_allocator(), 1);
+	auto args = array_make<lbValue>(temporary_allocator(), 1);
 	args[0] = addr.addr;
 	lb_emit_runtime_call(p, "__init_context", args);
 }
@@ -279,9 +281,11 @@ gb_internal lbValue lb_equal_proc_for_type(lbModule *m, Type *type) {
 }
 
 gb_internal lbValue lb_simple_compare_hash(lbProcedure *p, Type *type, lbValue data, lbValue seed) {
+	TEMPORARY_ALLOCATOR_GUARD();
+
 	GB_ASSERT_MSG(is_type_simple_compare(type), "%s", type_to_string(type));
 
-	auto args = array_make<lbValue>(permanent_allocator(), 3);
+	auto args = array_make<lbValue>(temporary_allocator(), 3);
 	args[0] = data;
 	args[1] = seed;
 	args[2] = lb_const_int(p->module, t_int, type_size_of(type));
@@ -334,11 +338,13 @@ gb_internal lbValue lb_hasher_proc_for_type(lbModule *m, Type *type) {
 		return {p->value, p->type};
 	}
 
+	TEMPORARY_ALLOCATOR_GUARD();
+
 	if (type->kind == Type_Struct)  {
 		type_set_offsets(type);
 		data = lb_emit_conv(p, data, t_u8_ptr);
 
-		auto args = array_make<lbValue>(permanent_allocator(), 2);
+		auto args = array_make<lbValue>(temporary_allocator(), 2);
 		for_array(i, type->Struct.fields) {
 			GB_ASSERT(type->Struct.offsets != nullptr);
 			i64 offset = type->Struct.offsets[i];
@@ -352,7 +358,7 @@ gb_internal lbValue lb_hasher_proc_for_type(lbModule *m, Type *type) {
 		}
 		LLVMBuildRet(p->builder, seed.value);
 	} else if (type->kind == Type_Union)  {
-		auto args = array_make<lbValue>(permanent_allocator(), 2);
+		auto args = array_make<lbValue>(temporary_allocator(), 2);
 
 		if (is_type_union_maybe_pointer(type)) {
 			Type *v = type->Union.variants[0];
@@ -396,7 +402,7 @@ gb_internal lbValue lb_hasher_proc_for_type(lbModule *m, Type *type) {
 		lbAddr pres = lb_add_local_generated(p, t_uintptr, false);
 		lb_addr_store(p, pres, seed);
 
-		auto args = array_make<lbValue>(permanent_allocator(), 2);
+		auto args = array_make<lbValue>(temporary_allocator(), 2);
 		lbValue elem_hasher = lb_hasher_proc_for_type(m, type->Array.elem);
 
 		auto loop_data = lb_loop_start(p, cast(isize)type->Array.count, t_i32);
@@ -417,7 +423,7 @@ gb_internal lbValue lb_hasher_proc_for_type(lbModule *m, Type *type) {
 		lbAddr res = lb_add_local_generated(p, t_uintptr, false);
 		lb_addr_store(p, res, seed);
 
-		auto args = array_make<lbValue>(permanent_allocator(), 2);
+		auto args = array_make<lbValue>(temporary_allocator(), 2);
 		lbValue elem_hasher = lb_hasher_proc_for_type(m, type->EnumeratedArray.elem);
 
 		auto loop_data = lb_loop_start(p, cast(isize)type->EnumeratedArray.count, t_i32);
@@ -435,14 +441,14 @@ gb_internal lbValue lb_hasher_proc_for_type(lbModule *m, Type *type) {
 		lbValue vres = lb_addr_load(p, res);
 		LLVMBuildRet(p->builder, vres.value);
 	} else if (is_type_cstring(type)) {
-		auto args = array_make<lbValue>(permanent_allocator(), 2);
+		auto args = array_make<lbValue>(temporary_allocator(), 2);
 		args[0] = data;
 		args[1] = seed;
 		lbValue res = lb_emit_runtime_call(p, "default_hasher_cstring", args);
 		lb_add_callsite_force_inline(p, res);
 		LLVMBuildRet(p->builder, res.value);
 	} else if (is_type_string(type)) {
-		auto args = array_make<lbValue>(permanent_allocator(), 2);
+		auto args = array_make<lbValue>(temporary_allocator(), 2);
 		args[0] = data;
 		args[1] = seed;
 		lbValue res = lb_emit_runtime_call(p, "default_hasher_string", args);
@@ -455,6 +461,8 @@ gb_internal lbValue lb_hasher_proc_for_type(lbModule *m, Type *type) {
 	return {p->value, p->type};
 }
 
+
+#define LLVM_SET_VALUE_NAME(value, name) LLVMSetValueName2((value), (name), gb_count_of((name))-1);
 
 gb_internal lbValue lb_map_get_proc_for_type(lbModule *m, Type *type) {
 	GB_ASSERT(!build_context.dynamic_map_calls);
@@ -480,7 +488,6 @@ gb_internal lbValue lb_map_get_proc_for_type(lbModule *m, Type *type) {
 	defer (lb_end_procedure_body(p));
 
 	LLVMSetLinkage(p->value, LLVMInternalLinkage);
-	// lb_add_attribute_to_proc(m, p->value, "readonly");
 	lb_add_attribute_to_proc(m, p->value, "nounwind");
 	// if (build_context.ODIN_DEBUG) {
 		lb_add_attribute_to_proc(m, p->value, "noinline");
@@ -493,44 +500,56 @@ gb_internal lbValue lb_map_get_proc_for_type(lbModule *m, Type *type) {
 	lbValue h       = {y, t_uintptr};
 	lbValue key_ptr = {z, t_rawptr};
 
+	LLVM_SET_VALUE_NAME(h.value, "hash");
+
 	lb_add_proc_attribute_at_index(p, 1+0, "nonnull");
-	lb_add_proc_attribute_at_index(p, 1+0, "noalias");
 	lb_add_proc_attribute_at_index(p, 1+0, "readonly");
 
 	lb_add_proc_attribute_at_index(p, 1+2, "nonnull");
-	lb_add_proc_attribute_at_index(p, 1+2, "noalias");
 	lb_add_proc_attribute_at_index(p, 1+2, "readonly");
 
-	lbBlock *loop_block = lb_create_block(p, "loop");
-	lbBlock *hash_block = lb_create_block(p, "hash");
-	lbBlock *probe_block = lb_create_block(p, "probe");
-	lbBlock *increment_block = lb_create_block(p, "increment");
+	lbBlock *loop_block         = lb_create_block(p, "loop");
+	lbBlock *hash_block         = lb_create_block(p, "hash");
+	lbBlock *probe_block        = lb_create_block(p, "probe");
+	lbBlock *increment_block    = lb_create_block(p, "increment");
 	lbBlock *hash_compare_block = lb_create_block(p, "hash_compare");
-	lbBlock *key_compare_block = lb_create_block(p, "key_compare");
-	lbBlock *value_block = lb_create_block(p, "value");
-	lbBlock *nil_block = lb_create_block(p, "nil");
+	lbBlock *key_compare_block  = lb_create_block(p, "key_compare");
+	lbBlock *value_block        = lb_create_block(p, "value");
+	lbBlock *nil_block          = lb_create_block(p, "nil");
 
 	map_ptr = lb_emit_conv(p, map_ptr, t_raw_map_ptr);
+	LLVM_SET_VALUE_NAME(map_ptr.value, "map_ptr");
+
 	lbValue map = lb_emit_load(p, map_ptr);
+	LLVM_SET_VALUE_NAME(map.value, "map");
 
 	lbValue length = lb_map_len(p, map);
+	LLVM_SET_VALUE_NAME(length.value, "length");
 
 	lb_emit_if(p, lb_emit_comp(p, Token_CmpEq, length, lb_const_nil(m, t_int)), nil_block, hash_block);
 	lb_start_block(p, hash_block);
 
 	key_ptr = lb_emit_conv(p, key_ptr, alloc_type_pointer(type->Map.key));
+	LLVM_SET_VALUE_NAME(key_ptr.value, "key_ptr");
 	lbValue key = lb_emit_load(p, key_ptr);
+	LLVM_SET_VALUE_NAME(key.value, "key");
 
 	lbAddr pos = lb_add_local_generated(p, t_uintptr, false);
 	lbAddr distance = lb_add_local_generated(p, t_uintptr, true);
+	LLVM_SET_VALUE_NAME(pos.addr.value, "pos");
+	LLVM_SET_VALUE_NAME(distance.addr.value, "distance");
+
 	lbValue capacity = lb_map_cap(p, map);
-	lbValue mask = lb_emit_conv(p, lb_emit_arith(p, Token_Sub, capacity, lb_const_int(m, t_int, 1), t_int), t_uintptr);
+	LLVM_SET_VALUE_NAME(capacity.value, "capacity");
+	lbValue cap_minus_1 = lb_emit_arith(p, Token_Sub, capacity, lb_const_int(m, t_int, 1), t_int);
+	lbValue mask = lb_emit_conv(p, cap_minus_1, t_uintptr);
+	LLVM_SET_VALUE_NAME(mask.value, "mask");
 
 	{
-		auto args = array_make<lbValue>(heap_allocator(), 2);
-		args[0] = map;
-		args[1] = h;
-		lb_addr_store(p, pos, lb_emit_runtime_call(p, "map_desired_position", args));
+		// map_desired_position inlined
+		lbValue the_pos = lb_emit_arith(p, Token_And, h, mask, t_uintptr);
+		the_pos = lb_emit_conv(p, the_pos, t_uintptr);
+		lb_addr_store(p, pos, the_pos);
 	}
 	lbValue zero_uintptr = lb_const_int(m, t_uintptr, 0);
 	lbValue one_uintptr = lb_const_int(m, t_uintptr, 1);
@@ -543,10 +562,16 @@ gb_internal lbValue lb_map_get_proc_for_type(lbModule *m, Type *type) {
 	vs = lb_emit_conv(p, vs, alloc_type_pointer(type->Map.value));
 	hs = lb_emit_conv(p, hs, alloc_type_pointer(t_uintptr));
 
+	LLVM_SET_VALUE_NAME(ks.value, "ks");
+	LLVM_SET_VALUE_NAME(vs.value, "vs");
+	LLVM_SET_VALUE_NAME(hs.value, "hs");
+
 	lb_emit_jump(p, loop_block);
 	lb_start_block(p, loop_block);
 
 	lbValue element_hash = lb_emit_load(p, lb_emit_ptr_offset(p, hs, lb_addr_load(p, pos)));
+	LLVM_SET_VALUE_NAME(element_hash.value, "element_hash");
+
 	{
 		// if element_hash == 0 { return nil }
 		lb_emit_if(p, lb_emit_comp(p, Token_CmpEq, element_hash, zero_uintptr), nil_block, probe_block);
@@ -554,11 +579,16 @@ gb_internal lbValue lb_map_get_proc_for_type(lbModule *m, Type *type) {
 
 	lb_start_block(p, probe_block);
 	{
-		auto args = array_make<lbValue>(heap_allocator(), 3);
-		args[0] = map;
-		args[1] = element_hash;
-		args[2] = lb_addr_load(p, pos);
-		lbValue probe_distance = lb_emit_runtime_call(p, "map_probe_distance", args);
+		// map_probe_distance inlined
+		lbValue probe_distance = lb_emit_arith(p, Token_And, h, mask, t_uintptr);
+		probe_distance = lb_emit_conv(p, probe_distance, t_uintptr);
+
+		lbValue cap = lb_emit_conv(p, capacity, t_uintptr);
+		lbValue base = lb_emit_arith(p, Token_Add, lb_addr_load(p, pos), cap, t_uintptr);
+		probe_distance = lb_emit_arith(p, Token_Sub, base, probe_distance, t_uintptr);
+		probe_distance = lb_emit_arith(p, Token_And, probe_distance, mask, t_uintptr);
+		LLVM_SET_VALUE_NAME(probe_distance.value, "probe_distance");
+
 		lbValue cond = lb_emit_comp(p, Token_Gt, lb_addr_load(p, distance), probe_distance);
 		lb_emit_if(p, cond, nil_block, hash_compare_block);
 	}
@@ -572,6 +602,8 @@ gb_internal lbValue lb_map_get_proc_for_type(lbModule *m, Type *type) {
 	{
 		lbValue element_key = lb_map_cell_index_static(p, type->Map.key, ks, lb_addr_load(p, pos));
 		element_key = lb_emit_conv(p, element_key, ks.type);
+
+		LLVM_SET_VALUE_NAME(element_key.value, "element_key_ptr");
 		lbValue cond = lb_emit_comp(p, Token_CmpEq, lb_emit_load(p, element_key), key);
 		lb_emit_if(p, cond, value_block, increment_block);
 	}
@@ -579,6 +611,7 @@ gb_internal lbValue lb_map_get_proc_for_type(lbModule *m, Type *type) {
 	lb_start_block(p, value_block);
 	{
 		lbValue element_value = lb_map_cell_index_static(p, type->Map.value, vs, lb_addr_load(p, pos));
+		LLVM_SET_VALUE_NAME(element_value.value, "element_value_ptr");
 		element_value = lb_emit_conv(p, element_value, t_rawptr);
 		LLVMBuildRet(p->builder, element_value.value);
 	}
@@ -599,8 +632,7 @@ gb_internal lbValue lb_map_get_proc_for_type(lbModule *m, Type *type) {
 		LLVMBuildRet(p->builder, res.value);
 	}
 
-	gb_printf_err("%s\n", LLVMPrintValueToString(p->value));
-
+	// gb_printf_err("%s\n", LLVMPrintValueToString(p->value));
 
 	return {p->value, p->type};
 }
@@ -612,6 +644,8 @@ gb_internal lbValue lb_map_get_proc_for_type(lbModule *m, Type *type) {
 // }
 
 gb_internal lbValue lb_map_set_proc_for_type(lbModule *m, Type *type) {
+	TEMPORARY_ALLOCATOR_GUARD();
+
 	GB_ASSERT(!build_context.dynamic_map_calls);
 	type = base_type(type);
 	GB_ASSERT(type->kind == Type_Map);
@@ -673,7 +707,7 @@ gb_internal lbValue lb_map_set_proc_for_type(lbModule *m, Type *type) {
 	{
 		lbValue map_get_proc = lb_map_get_proc_for_type(m, type);
 
-		auto args = array_make<lbValue>(permanent_allocator(), 3);
+		auto args = array_make<lbValue>(temporary_allocator(), 3);
 		args[0] = lb_emit_conv(p, map_ptr, t_rawptr);
 		args[1] = hash;
 		args[2] = key_ptr;
@@ -699,7 +733,7 @@ gb_internal lbValue lb_map_set_proc_for_type(lbModule *m, Type *type) {
 	lbValue map_info = lb_gen_map_info_ptr(p->module, type);
 
 	{
-		auto args = array_make<lbValue>(permanent_allocator(), 3);
+		auto args = array_make<lbValue>(temporary_allocator(), 3);
 		args[0] = lb_emit_conv(p, map_ptr, t_rawptr);
 		args[1] = map_info;
 		args[2] = lb_emit_load(p, location_ptr);
@@ -713,7 +747,7 @@ gb_internal lbValue lb_map_set_proc_for_type(lbModule *m, Type *type) {
 
 	lb_start_block(p, insert_block);
 	{
-		auto args = array_make<lbValue>(permanent_allocator(), 5);
+		auto args = array_make<lbValue>(temporary_allocator(), 5);
 		args[0] = lb_emit_conv(p, map_ptr, t_rawptr);
 		args[1] = map_info;
 		args[2] = hash;
@@ -883,6 +917,8 @@ gb_internal lbValue lb_const_hash(lbModule *m, lbValue key, Type *key_type) {
 }
 
 gb_internal lbValue lb_gen_map_key_hash(lbProcedure *p, lbValue key, Type *key_type, lbValue *key_ptr_) {
+	TEMPORARY_ALLOCATOR_GUARD();
+
 	lbValue key_ptr = lb_address_from_load_or_generate_local(p, key);
 	key_ptr = lb_emit_conv(p, key_ptr, t_rawptr);
 
@@ -892,7 +928,7 @@ gb_internal lbValue lb_gen_map_key_hash(lbProcedure *p, lbValue key, Type *key_t
 	if (hashed_key.value == nullptr) {
 		lbValue hasher = lb_hasher_proc_for_type(p->module, key_type);
 
-		auto args = array_make<lbValue>(permanent_allocator(), 2);
+		auto args = array_make<lbValue>(temporary_allocator(), 2);
 		args[0] = key_ptr;
 		args[1] = lb_const_int(p->module, t_uintptr, 0);
 		hashed_key = lb_emit_call(p, hasher, args);
@@ -902,6 +938,8 @@ gb_internal lbValue lb_gen_map_key_hash(lbProcedure *p, lbValue key, Type *key_t
 }
 
 gb_internal lbValue lb_internal_dynamic_map_get_ptr(lbProcedure *p, lbValue const &map_ptr, lbValue const &key) {
+	TEMPORARY_ALLOCATOR_GUARD();
+
 	Type *map_type = base_type(type_deref(map_ptr.type));
 	GB_ASSERT(map_type->kind == Type_Map);
 
@@ -910,7 +948,7 @@ gb_internal lbValue lb_internal_dynamic_map_get_ptr(lbProcedure *p, lbValue cons
 	lbValue hash = lb_gen_map_key_hash(p, key, map_type->Map.key, &key_ptr);
 
 	if (build_context.dynamic_map_calls) {
-		auto args = array_make<lbValue>(permanent_allocator(), 4);
+		auto args = array_make<lbValue>(temporary_allocator(), 4);
 		args[0] = lb_emit_transmute(p, map_ptr, t_raw_map_ptr);
 		args[1] = lb_gen_map_info_ptr(p->module, map_type);
 		args[2] = hash;
@@ -920,7 +958,7 @@ gb_internal lbValue lb_internal_dynamic_map_get_ptr(lbProcedure *p, lbValue cons
 	} else {
 		lbValue map_get_proc = lb_map_get_proc_for_type(p->module, map_type);
 
-		auto args = array_make<lbValue>(permanent_allocator(), 3);
+		auto args = array_make<lbValue>(temporary_allocator(), 3);
 		args[0] = lb_emit_conv(p, map_ptr, t_rawptr);
 		args[1] = hash;
 		args[2] = key_ptr;
@@ -932,6 +970,8 @@ gb_internal lbValue lb_internal_dynamic_map_get_ptr(lbProcedure *p, lbValue cons
 
 gb_internal void lb_internal_dynamic_map_set(lbProcedure *p, lbValue const &map_ptr, Type *map_type,
                                              lbValue const &map_key, lbValue const &map_value, Ast *node) {
+	TEMPORARY_ALLOCATOR_GUARD();
+
 	map_type = base_type(map_type);
 	GB_ASSERT(map_type->kind == Type_Map);
 
@@ -942,7 +982,7 @@ gb_internal void lb_internal_dynamic_map_set(lbProcedure *p, lbValue const &map_
 	lbValue value_ptr = lb_address_from_load_or_generate_local(p, v);
 
 	if (build_context.dynamic_map_calls) {
-		auto args = array_make<lbValue>(permanent_allocator(), 6);
+		auto args = array_make<lbValue>(temporary_allocator(), 6);
 		args[0] = lb_emit_conv(p, map_ptr, t_raw_map_ptr);
 		args[1] = lb_gen_map_info_ptr(p->module, map_type);
 		args[2] = hash;
@@ -953,7 +993,7 @@ gb_internal void lb_internal_dynamic_map_set(lbProcedure *p, lbValue const &map_
 	} else {
 		lbValue map_set_proc = lb_map_set_proc_for_type(p->module, map_type);
 
-		auto args = array_make<lbValue>(permanent_allocator(), 5);
+		auto args = array_make<lbValue>(temporary_allocator(), 5);
 		args[0] = lb_emit_conv(p, map_ptr, t_rawptr);
 		args[1] = hash;
 		args[2] = lb_emit_conv(p, key_ptr, t_rawptr);
@@ -967,12 +1007,14 @@ gb_internal void lb_internal_dynamic_map_set(lbProcedure *p, lbValue const &map_
 gb_internal lbValue lb_dynamic_map_reserve(lbProcedure *p, lbValue const &map_ptr, isize const capacity, TokenPos const &pos) {
 	GB_ASSERT(!build_context.no_dynamic_literals);
 
+	TEMPORARY_ALLOCATOR_GUARD();
+
 	String proc_name = {};
 	if (p->entity) {
 		proc_name = p->entity->token.string;
 	}
 
-	auto args = array_make<lbValue>(permanent_allocator(), 4);
+	auto args = array_make<lbValue>(temporary_allocator(), 4);
 	args[0] = lb_emit_conv(p, map_ptr, t_rawptr);
 	args[1] = lb_gen_map_info_ptr(p->module, type_deref(map_ptr.type));
 	args[2] = lb_const_int(p->module, t_uint, capacity);
@@ -1032,7 +1074,9 @@ gb_internal void lb_finalize_objc_names(lbProcedure *p) {
 	}
 	lbModule *m = p->module;
 
-	auto args = array_make<lbValue>(permanent_allocator(), 1);
+	TEMPORARY_ALLOCATOR_GUARD();
+
+	auto args = array_make<lbValue>(temporary_allocator(), 1);
 
 	LLVMSetLinkage(p->value, LLVMInternalLinkage);
 	lb_begin_procedure_body(p);
@@ -1192,15 +1236,16 @@ gb_internal lbProcedure *lb_create_cleanup_runtime(lbModule *main_module) { // C
 gb_internal WORKER_TASK_PROC(lb_generate_procedures_and_types_per_module) {
 	lbModule *m = cast(lbModule *)data;
 	for (Entity *e : m->global_procedures_and_types_to_create) {
-		String mangled_name = lb_get_entity_name(m, e);
-
-		switch (e->kind) {
-		case Entity_TypeName:
+		if (e->kind == Entity_TypeName) {
+			(void)lb_get_entity_name(m, e);
 			lb_type(m, e->type);
-			break;
-		case Entity_Procedure:
+		}
+	}
+
+	for (Entity *e : m->global_procedures_and_types_to_create) {
+		if (e->kind == Entity_Procedure) {
+			(void)lb_get_entity_name(m, e);
 			array_add(&m->procedures_to_generate, lb_create_procedure(m, e));
-			break;
 		}
 	}
 	return 0;
@@ -1330,24 +1375,28 @@ gb_internal WORKER_TASK_PROC(lb_llvm_function_pass_per_module) {
 
 		m->function_pass_managers[lbFunctionPassManager_default]                = LLVMCreateFunctionPassManagerForModule(m->mod);
 		m->function_pass_managers[lbFunctionPassManager_default_without_memcpy] = LLVMCreateFunctionPassManagerForModule(m->mod);
+		m->function_pass_managers[lbFunctionPassManager_none]                   = LLVMCreateFunctionPassManagerForModule(m->mod);
 		m->function_pass_managers[lbFunctionPassManager_minimal]                = LLVMCreateFunctionPassManagerForModule(m->mod);
 		m->function_pass_managers[lbFunctionPassManager_size]                   = LLVMCreateFunctionPassManagerForModule(m->mod);
 		m->function_pass_managers[lbFunctionPassManager_speed]                  = LLVMCreateFunctionPassManagerForModule(m->mod);
 
 		LLVMInitializeFunctionPassManager(m->function_pass_managers[lbFunctionPassManager_default]);
 		LLVMInitializeFunctionPassManager(m->function_pass_managers[lbFunctionPassManager_default_without_memcpy]);
+		LLVMInitializeFunctionPassManager(m->function_pass_managers[lbFunctionPassManager_none]);
 		LLVMInitializeFunctionPassManager(m->function_pass_managers[lbFunctionPassManager_minimal]);
 		LLVMInitializeFunctionPassManager(m->function_pass_managers[lbFunctionPassManager_size]);
 		LLVMInitializeFunctionPassManager(m->function_pass_managers[lbFunctionPassManager_speed]);
 
 		lb_populate_function_pass_manager(m, m->function_pass_managers[lbFunctionPassManager_default],                false, build_context.optimization_level);
 		lb_populate_function_pass_manager(m, m->function_pass_managers[lbFunctionPassManager_default_without_memcpy], true,  build_context.optimization_level);
+		lb_populate_function_pass_manager_specific(m, m->function_pass_managers[lbFunctionPassManager_none],   -1);
 		lb_populate_function_pass_manager_specific(m, m->function_pass_managers[lbFunctionPassManager_minimal], 0);
 		lb_populate_function_pass_manager_specific(m, m->function_pass_managers[lbFunctionPassManager_size],    1);
 		lb_populate_function_pass_manager_specific(m, m->function_pass_managers[lbFunctionPassManager_speed],   2);
 
 		LLVMFinalizeFunctionPassManager(m->function_pass_managers[lbFunctionPassManager_default]);
 		LLVMFinalizeFunctionPassManager(m->function_pass_managers[lbFunctionPassManager_default_without_memcpy]);
+		LLVMFinalizeFunctionPassManager(m->function_pass_managers[lbFunctionPassManager_none]);
 		LLVMFinalizeFunctionPassManager(m->function_pass_managers[lbFunctionPassManager_minimal]);
 		LLVMFinalizeFunctionPassManager(m->function_pass_managers[lbFunctionPassManager_size]);
 		LLVMFinalizeFunctionPassManager(m->function_pass_managers[lbFunctionPassManager_speed]);
@@ -1396,11 +1445,11 @@ gb_internal WORKER_TASK_PROC(lb_llvm_function_pass_per_module) {
 	}
 	for (auto const &entry : m->map_get_procs) {
 		lbProcedure *p = entry.value;
-		lb_llvm_function_pass_per_function_internal(m, p);
+		lb_llvm_function_pass_per_function_internal(m, p, lbFunctionPassManager_none);
 	}
 	for (auto const &entry : m->map_set_procs) {
 		lbProcedure *p = entry.value;
-		lb_llvm_function_pass_per_function_internal(m, p);
+		lb_llvm_function_pass_per_function_internal(m, p, lbFunctionPassManager_none);
 	}
 
 	return 0;
@@ -1810,7 +1859,8 @@ gb_internal lbProcedure *lb_create_main_procedure(lbModule *m, lbProcedure *star
 
 		lbValue runner = lb_find_package_value(m, str_lit("testing"), str_lit("runner"));
 
-		auto args = array_make<lbValue>(permanent_allocator(), 1);
+		TEMPORARY_ALLOCATOR_GUARD();
+		auto args = array_make<lbValue>(temporary_allocator(), 1);
 		args[0] = lb_addr_load(p, all_tests_slice);
 		lb_emit_call(p, runner, args);
 	} else {

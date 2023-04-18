@@ -6,7 +6,7 @@ _INTEGER_DIGITS :: "0123456789abcdefghijklmnopqrstuvwxyz"
 _INTEGER_DIGITS_VAR := _INTEGER_DIGITS
 
 when !ODIN_DISALLOW_RTTI {
-	print_any_single :: proc(arg: any) {
+	print_any_single :: proc "contextless" (arg: any) {
 		x := arg
 		if loc, ok := x.(Source_Code_Location); ok {
 			print_caller_location(loc)
@@ -49,6 +49,12 @@ when !ODIN_DISALLOW_RTTI {
 		case uint:    print_uint(v)
 		case uintptr: print_uintptr(v)
 
+		case bool: print_string("true" if v else "false")
+		case b8:   print_string("true" if v else "false")
+		case b16:  print_string("true" if v else "false")
+		case b32:  print_string("true" if v else "false")
+		case b64:  print_string("true" if v else "false")
+
 		case:
 			ti := type_info_of(x.id)
 			#partial switch v in ti.variant {
@@ -60,7 +66,7 @@ when !ODIN_DISALLOW_RTTI {
 			print_string("<invalid-value>")
 		}
 	}
-	println_any :: proc(args: ..any) {
+	println_any :: proc "contextless" (args: ..any) {
 		loop: for arg, i in args {
 			if i != 0 {
 				print_string(" ")

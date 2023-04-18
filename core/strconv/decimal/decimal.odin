@@ -8,7 +8,17 @@ Decimal :: struct {
 	decimal_point: int,
 	neg, trunc:    bool,
 }
+/*
+Sets a Decimal from a given string `s`. The string is expected to represent a float. Stores parsed number in the given Decimal structure.
+If parsing fails, the Decimal will be left in an undefined state.
 
+**Inputs**  
+- d: Pointer to a Decimal struct where the parsed result will be stored
+- s: The input string representing the floating-point number
+
+**Returns**  
+- ok: A boolean indicating whether the parsing was successful
+*/
 set :: proc(d: ^Decimal, s: string) -> (ok: bool) {
 	d^ = {}
 
@@ -91,7 +101,16 @@ set :: proc(d: ^Decimal, s: string) -> (ok: bool) {
 
 	return i == len(s)
 }
+/*
+Converts a Decimal to a string representation, using the provided buffer as storage.
 
+**Inputs**  
+- buf: A byte slice buffer to hold the resulting string
+- a: The struct to be converted to a string
+
+**Returns**  
+- A string representation of the Decimal
+*/
 decimal_to_string :: proc(buf: []byte, a: ^Decimal) -> string {
 	digit_zero :: proc(buf: []byte) -> int {
 		for _, i in buf {
@@ -99,7 +118,6 @@ decimal_to_string :: proc(buf: []byte, a: ^Decimal) -> string {
 		}
 		return len(buf)
 	}
-
 
 	n := 10 + a.count + abs(a.decimal_point)
 
@@ -129,8 +147,12 @@ decimal_to_string :: proc(buf: []byte, a: ^Decimal) -> string {
 
 	return string(b[0:w])
 }
+/*
+Trims trailing zeros in the given Decimal, updating the count and decimal_point values as needed.
 
-// trim trailing zeros
+**Inputs**  
+- a: Pointer to the Decimal struct to be trimmed
+*/
 trim :: proc(a: ^Decimal) {
 	for a.count > 0 && a.digits[a.count-1] == '0' {
 		a.count -= 1
@@ -139,8 +161,15 @@ trim :: proc(a: ^Decimal) {
 		a.decimal_point = 0
 	}
 }
+/*
+Converts a given u64 integer `idx` to its Decimal representation in the provided Decimal struct.
 
+**Used for internal Decimal Operations.**
 
+**Inputs**  
+- a: Where the result will be stored
+- idx: The value to be assigned to the Decimal
+*/
 assign :: proc(a: ^Decimal, idx: u64) {
 	buf: [64]byte
 	n := 0
@@ -160,9 +189,15 @@ assign :: proc(a: ^Decimal, idx: u64) {
 	a.decimal_point = a.count
 	trim(a)
 }
+/*
+Shifts the Decimal value to the right by k positions. 
 
+**Used for internal Decimal Operations.**
 
-
+**Inputs**  
+- a: The Decimal struct to be shifted
+- k: The number of positions to shift right
+*/
 shift_right :: proc(a: ^Decimal, k: uint) {
 	r := 0 // read index
 	w := 0 // write index
@@ -304,7 +339,15 @@ _shift_left_offsets := [?]struct{delta: int, cutoff: string}{
 	{18, "173472347597680709441192448139190673828125"},
 	{19, "867361737988403547205962240695953369140625"},
 }
+/*
+Shifts the decimal of the input value to the left by `k` places
 
+WARNING: asserts `k < 61`
+
+**Inputs**  
+- a: The Decimal to be modified
+- k: The number of places to shift the decimal to the left
+*/
 shift_left :: proc(a: ^Decimal, k: uint) #no_bounds_check {
 	prefix_less :: #force_inline proc "contextless" (b: []byte, s: string) -> bool #no_bounds_check {
 		for i in 0..<len(s) {
@@ -359,7 +402,13 @@ shift_left :: proc(a: ^Decimal, k: uint) #no_bounds_check {
 	a.count = clamp(a.count, 0, len(a.digits))
 	trim(a)
 }
+/*
+Shifts the decimal of the input value by the specified number of places
 
+**Inputs**  
+- a: The Decimal to be modified
+- i: The number of places to shift the decimal (positive for left shift, negative for right shift)
+*/
 shift :: proc(a: ^Decimal, i: int) {
 	uint_size :: 8*size_of(uint)
 	max_shift :: uint_size-4
@@ -383,7 +432,15 @@ shift :: proc(a: ^Decimal, i: int) {
 		shift_right(a, uint(-k))
 	}
 }
+/*
+Determines if the Decimal can be rounded up at the given digit index
 
+**Inputs**  
+- a: The Decimal to check
+- nd: The digit index to consider for rounding up
+
+**Returns**   Boolean if can be rounded up at the given index (>=5)
+*/
 can_round_up :: proc(a: ^Decimal, nd: int) -> bool {
 	if nd < 0 || nd >= a.count { return false  }
 	if a.digits[nd] == '5' && nd+1 == a.count {
@@ -395,7 +452,13 @@ can_round_up :: proc(a: ^Decimal, nd: int) -> bool {
 
 	return a.digits[nd] >= '5'
 }
+/*
+Rounds the Decimal at the given digit index
 
+**Inputs**  
+- a: The Decimal to be modified
+- nd: The digit index to round
+*/
 round :: proc(a: ^Decimal, nd: int) {
 	if nd < 0 || nd >= a.count { return }
 	if can_round_up(a, nd) {
@@ -404,7 +467,13 @@ round :: proc(a: ^Decimal, nd: int) {
 		round_down(a, nd)
 	}
 }
+/*
+Rounds the Decimal up at the given digit index
 
+**Inputs**  
+- a: The Decimal to be modified
+- nd: The digit index to round up
+*/
 round_up :: proc(a: ^Decimal, nd: int) {
 	if nd < 0 || nd >= a.count { return }
 
@@ -421,15 +490,60 @@ round_up :: proc(a: ^Decimal, nd: int) {
 	a.count = 1
 	a.decimal_point += 1
 }
+/*
+Rounds down the decimal value to the specified number of decimal places
 
+**Inputs**  
+- a: The Decimal value to be rounded down
+- nd: The number of decimal places to round down to
+
+Example:
+
+	import "core:fmt"
+	import "core:strconv/decimal"
+	round_down_example :: proc() {
+		d: decimal.Decimal
+		str := [64]u8{}
+		ok := decimal.set(&d, "123.456")
+		decimal.round_down(&d, 5)
+		fmt.println(decimal.decimal_to_string(str[:], &d))
+	}
+
+Output:
+
+	123.45
+
+*/
 round_down :: proc(a: ^Decimal, nd: int) {
 	if nd < 0 || nd >= a.count { return }
 	a.count = nd
 	trim(a)
 }
+/*
+Extracts the rounded integer part of a decimal value
 
+**Inputs**  
+- a: A pointer to the Decimal value to extract the rounded integer part from
 
-// Extract integer part, rounded appropriately. There are no guarantees about overflow.
+WARNING: There are no guarantees about overflow.
+
+**Returns**   The rounded integer part of the input decimal value
+
+Example:
+
+	import "core:fmt"
+	import "core:strconv/decimal"
+	rounded_integer_example :: proc() {
+		d: decimal.Decimal
+		ok := decimal.set(&d, "123.456")
+		fmt.println(decimal.rounded_integer(&d))
+	}
+
+Output:
+
+	123
+
+*/
 rounded_integer :: proc(a: ^Decimal) -> u64 {
 	if a.decimal_point > 20 {
 		return 0xffff_ffff_ffff_ffff

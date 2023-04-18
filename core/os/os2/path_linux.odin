@@ -211,7 +211,7 @@ _getwd :: proc(allocator: runtime.Allocator) -> (string, Error) {
 		#no_bounds_check res := unix.sys_getcwd(&buf[0], uint(len(buf)))
 
 		if res >= 0 {
-			return strings.string_from_nul_terminated_ptr(&buf[0], len(buf)), nil
+			return strings.string_from_null_terminated_ptr(&buf[0], len(buf)), nil
 		}
 		if res != -ERANGE {
 			return "", _get_platform_error(res)

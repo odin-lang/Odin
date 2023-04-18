@@ -449,7 +449,14 @@ struct_field_value_by_name :: proc(a: any, field: string, allow_using := false) 
 	return nil
 }
 
-
+@(require_results)
+struct_field_value :: proc(a: any, field: Struct_Field) -> any {
+	if a == nil { return nil }
+	return any {
+		rawptr(uintptr(a.data) + field.offset),
+		field.type.id,
+	}
+}
 
 @(require_results)
 struct_field_names :: proc(T: typeid) -> []string {

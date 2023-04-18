@@ -484,6 +484,7 @@ gb_internal lbValue lb_const_value(lbModule *m, Type *type, ExactValue value, bo
 					LLVMValueRef indices[2] = {llvm_zero(m), llvm_zero(m)};
 					LLVMValueRef ptr = LLVMBuildInBoundsGEP2(p->builder, llvm_type, array_data, indices, 2, "");
 					LLVMValueRef len = LLVMConstInt(lb_type(m, t_int), count, true);
+
 					lbAddr slice = lb_add_local_generated(p, type, false);
 					map_set(&m->exact_value_compound_literal_addr_map, value.value_compound, slice);
 

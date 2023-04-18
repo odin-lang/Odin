@@ -121,18 +121,21 @@ gb_internal lbProcedure *lb_create_procedure(lbModule *m, Entity *entity, bool i
 	p->branch_blocks.allocator = a;
 	p->context_stack.allocator = a;
 	p->scope_stack.allocator   = a;
-	map_init(&p->selector_values,  0);
-	map_init(&p->selector_addr,    0);
-	map_init(&p->tuple_fix_map,    0);
+	// map_init(&p->selector_values,  0);
+	// map_init(&p->selector_addr,    0);
+	// map_init(&p->tuple_fix_map,    0);
 
 	if (p->is_foreign) {
 		lb_add_foreign_library_path(p->module, entity->Procedure.foreign_library);
 	}
 
-	char *c_link_name = alloc_cstring(permanent_allocator(), p->name);
 	LLVMTypeRef func_type = lb_get_procedure_raw_type(m, p->type);
 
-	p->value = LLVMAddFunction(m->mod, c_link_name, func_type);
+	{
+		TEMPORARY_ALLOCATOR_GUARD();
+		char *c_link_name = alloc_cstring(temporary_allocator(), p->name);
+		p->value = LLVMAddFunction(m->mod, c_link_name, func_type);
+	}
 
 	lb_ensure_abi_function_type(m, p);
 	lb_add_function_type_attributes(p->value, p->abi_function_type, p->abi_function_type->calling_convention);
@@ -773,16 +776,16 @@ gb_internal void lb_build_nested_proc(lbProcedure *p, AstProcLit *pd, Entity *e)
 
 
 
-gb_internal Array<lbValue> lb_value_to_array(lbProcedure *p, lbValue value) {
+gb_internal Array<lbValue> lb_value_to_array(lbProcedure *p, gbAllocator const &allocator, lbValue value) {
 	Array<lbValue> array = {};
 	Type *t = base_type(value.type);
 	if (t == nullptr) {
 		// Do nothing
 	} else if (is_type_tuple(t)) {
-		array = array_make<lbValue>(permanent_allocator(), 0, t->Tuple.variables.count);
+		array = array_make<lbValue>(allocator, 0, t->Tuple.variables.count);
 		lb_append_tuple_values(p, &array, value);
 	} else {
-		array = array_make<lbValue>(permanent_allocator(), 1);
+		array = array_make<lbValue>(allocator, 1);
 		array[0] = value;
 	}
 	return array;
@@ -1166,25 +1169,41 @@ gb_internal lbValue lb_emit_call(lbProcedure *p, lbValue value, Array<lbValue> c
 			lbValue deferred = lb_find_procedure_value_from_entity(p->module, deferred_entity);
 
 
+			bool by_ptr = false;
 			auto in_args = args;
 			Array<lbValue> result_as_args = {};
 			switch (kind) {
 			case DeferredProcedure_none:
 				break;
+			case DeferredProcedure_in_by_ptr:
+				by_ptr = true;
+				/*fallthrough*/
 			case DeferredProcedure_in:
-				result_as_args = in_args;
+				result_as_args = array_clone(heap_allocator(), in_args);
 				break;
+			case DeferredProcedure_out_by_ptr:
+				by_ptr = true;
+				/*fallthrough*/
 			case DeferredProcedure_out:
-				result_as_args = lb_value_to_array(p, result);
+				result_as_args = lb_value_to_array(p, heap_allocator(), result);
 				break;
+			case DeferredProcedure_in_out_by_ptr:
+				by_ptr = true;
+				/*fallthrough*/
 			case DeferredProcedure_in_out:
 				{
-					auto out_args = lb_value_to_array(p, result);
-					array_init(&result_as_args, permanent_allocator(), in_args.count + out_args.count);
+					auto out_args = lb_value_to_array(p, heap_allocator(), result);
+					array_init(&result_as_args, heap_allocator(), in_args.count + out_args.count);
 					array_copy(&result_as_args, in_args, 0);
 					array_copy(&result_as_args, out_args, in_args.count);
 				}
 				break;
+			}
+			if (by_ptr) {
+				for_array(i, result_as_args) {
+					lbValue arg_ptr = lb_address_from_load_or_generate_local(p, result_as_args[i]);
+					result_as_args[i] = arg_ptr;
+				}
 			}
 
 			lb_add_defer_proc(p, p->scope_index, deferred, result_as_args);

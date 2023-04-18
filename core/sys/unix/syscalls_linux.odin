@@ -1518,6 +1518,7 @@ when ODIN_ARCH == .amd64 {
 	#panic("Unsupported architecture")
 }
 
+
 // syscall related constants
 AT_FDCWD            :: ~uintptr(99)
 AT_REMOVEDIR        :: uintptr(0x200)
@@ -2008,12 +2009,52 @@ sys_utimensat :: proc "contextless" (dfd: int, path: cstring, times: rawptr, fla
 	return int(intrinsics.syscall(SYS_utimensat, uintptr(dfd), uintptr(rawptr(path)), uintptr(times), uintptr(flags)))
 }
 
+sys_socket :: proc "contextless" (domain: int, type: int, protocol: int) -> int {
+	return int(intrinsics.syscall(SYS_socket, uintptr(domain), uintptr(type), uintptr(protocol)))
+}
+
+sys_connect :: proc "contextless" (sd: int, addr: rawptr, len: i32) -> int {
+	return int(intrinsics.syscall(SYS_connect, uintptr(sd), uintptr(addr), uintptr(len)))
+}
+
+sys_accept :: proc "contextless" (sd: int, addr: rawptr, len: rawptr) -> int {
+	return int(intrinsics.syscall(SYS_accept4, uintptr(sd), uintptr(addr), uintptr(len), uintptr(0)))
+}
+
+sys_listen :: proc "contextless" (sd: int, backlog: int) -> int {
+	return int(intrinsics.syscall(SYS_listen, uintptr(sd), uintptr(backlog)))
+}
+
+sys_bind :: proc "contextless" (sd: int, addr: rawptr, len: i32) -> int {
+	return int(intrinsics.syscall(SYS_bind, uintptr(sd), uintptr(addr), uintptr(len)))
+}
+
+sys_setsockopt :: proc "contextless" (sd: int, level: int, optname: int, optval: rawptr, optlen: i32) -> int {
+	return int(intrinsics.syscall(SYS_setsockopt, uintptr(sd), uintptr(level), uintptr(optname), uintptr(optval), uintptr(optlen)))
+}
+
+sys_recvfrom :: proc "contextless" (sd: int, buf: rawptr, len: uint, flags: int, addr: rawptr, alen: uintptr) -> i64 {
+	return i64(intrinsics.syscall(SYS_recvfrom, uintptr(sd), uintptr(buf), uintptr(len), uintptr(flags), uintptr(addr), uintptr(alen)))
+}
+
+sys_sendto :: proc "contextless" (sd: int, buf: rawptr, len: uint, flags: int, addr: rawptr, alen: i32) -> i64 {
+	return i64(intrinsics.syscall(SYS_sendto, uintptr(sd), uintptr(buf), uintptr(len), uintptr(flags), uintptr(addr), uintptr(alen)))
+}
+
+sys_shutdown :: proc "contextless" (sd: int, how: int) -> int {
+	return int(intrinsics.syscall(SYS_shutdown, uintptr(sd), uintptr(how)))
+}
+
 sys_perf_event_open :: proc "contextless" (event_attr: rawptr, pid: i32, cpu: i32, group_fd: i32, flags: u32) -> int {
 	return int(intrinsics.syscall(SYS_perf_event_open, uintptr(event_attr), uintptr(pid), uintptr(cpu), uintptr(group_fd), uintptr(flags)))
 }
 
 sys_personality :: proc(persona: u64) -> int {
 	return int(intrinsics.syscall(SYS_personality, uintptr(persona)))
+}
+
+sys_fcntl :: proc "contextless" (fd: int, cmd: int, arg: int) -> int {
+	return int(intrinsics.syscall(SYS_fcntl, uintptr(fd), uintptr(cmd), uintptr(arg)))
 }
 
 get_errno :: proc "contextless" (res: int) -> i32 {
