@@ -120,6 +120,7 @@ typedef Slice<i32> lbStructFieldRemapping;
 enum lbFunctionPassManagerKind {
 	lbFunctionPassManager_default,
 	lbFunctionPassManager_default_without_memcpy,
+	lbFunctionPassManager_none,
 	lbFunctionPassManager_minimal,
 	lbFunctionPassManager_size,
 	lbFunctionPassManager_speed,
