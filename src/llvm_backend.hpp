@@ -139,9 +139,11 @@ struct lbModule {
 	AstPackage *pkg; // possibly associated
 	AstFile *file;   // possibly associated
 
-	PtrMap<Type *, LLVMTypeRef> types;
-	PtrMap<Type *, LLVMTypeRef> func_raw_types;
-	PtrMap<void *, lbStructFieldRemapping> struct_field_remapping; // Key: LLVMTypeRef or Type *
+	PtrMap<Type *, LLVMTypeRef> types;                             // mutex: types_mutex
+	PtrMap<void *, lbStructFieldRemapping> struct_field_remapping; // Key: LLVMTypeRef or Type *, mutex: types_mutex
+	PtrMap<Type *, LLVMTypeRef> func_raw_types;                    // mutex: func_raw_types_mutex
+	RecursiveMutex              types_mutex;
+	RecursiveMutex              func_raw_types_mutex;
 	i32 internal_type_level;
 
 	RwMutex values_mutex;
