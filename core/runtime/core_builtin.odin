@@ -15,11 +15,15 @@ container_of :: #force_inline proc "contextless" (ptr: $P/^$Field_Type, $T: type
 }
 
 
-@thread_local global_default_temp_allocator_data: Default_Temp_Allocator
+when !NO_DEFAULT_TEMP_ALLOCATOR {
+	@thread_local global_default_temp_allocator_data: Default_Temp_Allocator
+}
 
-@builtin
+@(builtin, disabled=NO_DEFAULT_TEMP_ALLOCATOR)
 init_global_temporary_allocator :: proc(size: int, backup_allocator := context.allocator) {
-	default_temp_allocator_init(&global_default_temp_allocator_data, size, backup_allocator)
+	when !NO_DEFAULT_TEMP_ALLOCATOR {
+		default_temp_allocator_init(&global_default_temp_allocator_data, size, backup_allocator)
+	}
 }
 
 
@@ -159,20 +163,7 @@ delete_slice :: proc(array: $T/[]$E, allocator := context.allocator, loc := #cal
 }
 @builtin
 delete_map :: proc(m: $T/map[$K]$V, loc := #caller_location) -> Allocator_Error {
-	Entry :: struct {
-		hash:  uintptr,
-		next:  int,
-		key:   K,
-		value: V,
-	}
-
-	raw := transmute(Raw_Map)m
-	err := delete_slice(raw.hashes, raw.entries.allocator, loc)
-	err1 := mem_free_with_size(raw.entries.data, raw.entries.cap*size_of(Entry), raw.entries.allocator, loc)
-	if err == nil {
-		err = err1
-	}
-	return err
+	return map_free_dynamic(transmute(Raw_Map)m, map_info(T), loc)
 }
 
 
@@ -244,13 +235,12 @@ make_dynamic_array_len_cap :: proc($T: typeid/[dynamic]$E, #any_int len: int, #a
 	return
 }
 @(builtin)
-make_map :: proc($T: typeid/map[$K]$E, #any_int cap: int = DEFAULT_RESERVE_CAPACITY, allocator := context.allocator, loc := #caller_location) -> T {
-	make_map_expr_error_loc(loc, cap)
+make_map :: proc($T: typeid/map[$K]$E, #any_int capacity: int = 1<<MAP_MIN_LOG2_CAPACITY, allocator := context.allocator, loc := #caller_location) -> (m: T, err: Allocator_Error) #optional_allocator_error {
+	make_map_expr_error_loc(loc, capacity)
 	context.allocator = allocator
 
-	m: T
-	reserve_map(&m, cap)
-	return m
+	err = reserve_map(&m, capacity, loc)
+	return
 }
 @(builtin)
 make_multi_pointer :: proc($T: typeid/[^]$E, #any_int len: int, allocator := context.allocator, loc := #caller_location) -> (mp: T, err: Allocator_Error) #optional_allocator_error {
@@ -285,36 +275,22 @@ clear_map :: proc "contextless" (m: ^$T/map[$K]$V) {
 	if m == nil {
 		return
 	}
-	raw_map := (^Raw_Map)(m)
-	entries := (^Raw_Dynamic_Array)(&raw_map.entries)
-	entries.len = 0
-	for _, i in raw_map.hashes {
-		raw_map.hashes[i] = MAP_SENTINEL
-	}
+	map_clear_dynamic((^Raw_Map)(m), map_info(T))
 }
 
 @builtin
-reserve_map :: proc(m: ^$T/map[$K]$V, capacity: int, loc := #caller_location) {
-	if m != nil {
-		h := __get_map_header_table(T)
-		__dynamic_map_reserve(m, h, uint(capacity), loc)
-	}
+reserve_map :: proc(m: ^$T/map[$K]$V, capacity: int, loc := #caller_location) -> Allocator_Error {
+	return __dynamic_map_reserve((^Raw_Map)(m), map_info(T), uint(capacity), loc) if m != nil else nil
 }
 
 /*
-	Shrinks the capacity of a map down to the current length, or the given capacity.
-
-	If `new_cap` is negative, then `len(m)` is used.
-
-	Returns false if `cap(m) < new_cap`, or the allocator report failure.
-
-	If `len(m) < new_cap`, then `len(m)` will be left unchanged.
+	Shrinks the capacity of a map down to the current length.
 */
 @builtin
-shrink_map :: proc(m: ^$T/map[$K]$V, new_cap := -1, loc := #caller_location) -> (did_shrink: bool) {
+shrink_map :: proc(m: ^$T/map[$K]$V, loc := #caller_location) -> (did_shrink: bool) {
 	if m != nil {
-		new_cap := new_cap if new_cap >= 0 else len(m)
-		return __dynamic_map_shrink(__get_map_header(m), new_cap, loc)
+		err := map_shrink_dynamic((^Raw_Map)(m), map_info(T), loc)
+		did_shrink = err == nil
 	}
 	return
 }
@@ -325,14 +301,10 @@ shrink_map :: proc(m: ^$T/map[$K]$V, new_cap := -1, loc := #caller_location) -> 
 delete_key :: proc(m: ^$T/map[$K]$V, key: K) -> (deleted_key: K, deleted_value: V) {
 	if m != nil {
 		key := key
-		h := __get_map_header(m)
-		fr := __map_find(h, &key)
-		if fr.entry_index != MAP_SENTINEL {
-			entry := __dynamic_map_get_entry(h, fr.entry_index)
-			deleted_key   = (^K)(uintptr(entry)+h.key_offset)^
-			deleted_value = (^V)(uintptr(entry)+h.value_offset)^
-
-			__dynamic_map_erase(h, fr)
+		old_k, old_v, ok := map_erase_dynamic((^Raw_Map)(m), map_info(T), uintptr(&key))
+		if ok {
+			deleted_key   = (^K)(old_k)^
+			deleted_value = (^V)(old_v)^
 		}
 	}
 	return
@@ -346,6 +318,7 @@ append_elem :: proc(array: ^$T/[dynamic]$E, arg: E, loc := #caller_location) -> 
 		return 0
 	}
 	when size_of(E) == 0 {
+		array := (^Raw_Dynamic_Array)(array)
 		array.len += 1
 		return 1
 	} else {
@@ -379,6 +352,7 @@ append_elems :: proc(array: ^$T/[dynamic]$E, args: ..E, loc := #caller_location)
 	}
 
 	when size_of(E) == 0 {
+		array := (^Raw_Dynamic_Array)(array)
 		array.len += arg_len
 		return arg_len
 	} else {
@@ -573,10 +547,7 @@ reserve_dynamic_array :: proc(array: ^$T/[dynamic]$E, capacity: int, loc := #cal
 	new_size  := capacity * size_of(E)
 	allocator := a.allocator
 
-	new_data, err := allocator.procedure(
-		allocator.data, .Resize, new_size, align_of(E),
-		a.data, old_size, loc,
-	)
+	new_data, err := mem_resize(a.data, old_size, new_size, align_of(E), allocator, loc)
 	if new_data == nil || err != nil {
 		return false
 	}
@@ -607,10 +578,7 @@ resize_dynamic_array :: proc(array: ^$T/[dynamic]$E, length: int, loc := #caller
 	new_size  := length * size_of(E)
 	allocator := a.allocator
 
-	new_data, err := allocator.procedure(
-		allocator.data, .Resize, new_size, align_of(E),
-		a.data, old_size, loc,
-	)
+	new_data, err := mem_resize(a.data, old_size, new_size, align_of(E), allocator, loc)
 	if new_data == nil || err != nil {
 		return false
 	}
@@ -650,15 +618,7 @@ shrink_dynamic_array :: proc(array: ^$T/[dynamic]$E, new_cap := -1, loc := #call
 	old_size := a.cap * size_of(E)
 	new_size := new_cap * size_of(E)
 
-	new_data, err := a.allocator.procedure(
-		a.allocator.data,
-		.Resize,
-		new_size,
-		align_of(E),
-		a.data,
-		old_size,
-		loc,
-	)
+	new_data, err := mem_resize(a.data, old_size, new_size, align_of(E), a.allocator, loc)
 	if err != nil {
 		return
 	}
@@ -672,10 +632,7 @@ shrink_dynamic_array :: proc(array: ^$T/[dynamic]$E, new_cap := -1, loc := #call
 @builtin
 map_insert :: proc(m: ^$T/map[$K]$V, key: K, value: V, loc := #caller_location) -> (ptr: ^V) {
 	key, value := key, value
-	h := __get_map_header_table(T)
-
-	e := __dynamic_map_set(m, h, __get_map_key_hash(&key), &key, &value, loc)
-	return (^V)(uintptr(e) + h.value_offset)
+	return (^V)(__dynamic_map_set_without_hash((^Raw_Map)(m), map_info(T), rawptr(&key), rawptr(&value), loc))
 }
 
 

@@ -294,7 +294,7 @@ WindowShapeModeEnum :: enum c.int {
 	ColorKey,
 }
 
-SDL_SHAPEMODEALPHA :: #force_inline proc "c" (mode: WindowShapeModeEnum) -> bool {
+SHAPEMODEALPHA :: #force_inline proc "c" (mode: WindowShapeModeEnum) -> bool {
 	return bool(mode == .Default || mode == .BinarizeAlpha || mode == .ReverseBinarizeAlpha)
 }
 

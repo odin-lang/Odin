@@ -1,4 +1,4 @@
-Token ast_token(Ast *node) {
+gb_internal Token ast_token(Ast *node) {
 	switch (node->kind) {
 	case Ast_Ident:          return node->Ident.token;
 	case Ast_Implicit:       return node->Implicit;
@@ -20,6 +20,9 @@ Token ast_token(Ast *node) {
 	case Ast_ParenExpr:     return node->ParenExpr.open;
 	case Ast_CallExpr:      return ast_token(node->CallExpr.proc);
 	case Ast_SelectorExpr:
+		if (node->SelectorExpr.expr != nullptr) {
+			return ast_token(node->SelectorExpr.expr);
+		}
 		if (node->SelectorExpr.selector != nullptr) {
 			return ast_token(node->SelectorExpr.selector);
 		}
@@ -53,7 +56,6 @@ Token ast_token(Ast *node) {
 	case Ast_BadStmt:            return node->BadStmt.begin;
 	case Ast_EmptyStmt:          return node->EmptyStmt.token;
 	case Ast_ExprStmt:           return ast_token(node->ExprStmt.expr);
-	case Ast_TagStmt:            return node->TagStmt.token;
 	case Ast_AssignStmt:         return node->AssignStmt.op;
 	case Ast_BlockStmt:          return node->BlockStmt.open;
 	case Ast_IfStmt:             return node->IfStmt.token;
@@ -197,7 +199,6 @@ Token ast_end_token(Ast *node) {
 	case Ast_BadStmt:            return node->BadStmt.end;
 	case Ast_EmptyStmt:          return node->EmptyStmt.token;
 	case Ast_ExprStmt:           return ast_end_token(node->ExprStmt.expr);
-	case Ast_TagStmt:            return ast_end_token(node->TagStmt.stmt);
 	case Ast_AssignStmt:
 		if (node->AssignStmt.rhs.count > 0) {
 			return ast_end_token(node->AssignStmt.rhs[node->AssignStmt.rhs.count-1]);
@@ -360,6 +361,6 @@ Token ast_end_token(Ast *node) {
 	return empty_token;
 }
 
-TokenPos ast_end_pos(Ast *node) {
+gb_internal TokenPos ast_end_pos(Ast *node) {
 	return token_pos_end(ast_end_token(node));
 }

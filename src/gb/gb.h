@@ -465,8 +465,6 @@ typedef i32 b32; // NOTE(bill): Prefer this!!!
 #if !defined(gb_thread_local)
 	#if defined(_MSC_VER) && _MSC_VER >= 1300
 		#define gb_thread_local __declspec(thread)
-	#elif defined(__GNUC__)
-		#define gb_thread_local __thread
 	#else
 		#define gb_thread_local thread_local
 	#endif

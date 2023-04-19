@@ -20,7 +20,29 @@ _f16_info := Float_Info{10, 5,   -15}
 _f32_info := Float_Info{23, 8,  -127}
 _f64_info := Float_Info{52, 11, -1023}
 
+/*
+Converts a floating-point number to a string with the specified format and precision.
 
+**Inputs**  
+
+buf: A byte slice to store the resulting string
+val: The floating-point value to be converted
+fmt: The formatting byte, accepted values are 'e', 'E', 'f', 'F', 'g', 'G'
+precision: The number of decimal places to round to
+bit_size: The size of the floating-point number in bits, valid values are 16, 32, 64
+
+Example:
+
+	buf: [32]byte
+	val := 3.141592
+	fmt := 'f'
+	precision := 2
+	bit_size := 64
+	result := strconv.generic_ftoa(buf[:], val, fmt, precision, bit_size) -> "3.14"
+
+**Returns**  
+- A byte slice containing the formatted string
+*/
 generic_ftoa :: proc(buf: []byte, val: f64, fmt: byte, precision, bit_size: int) -> []byte {
 	bits: u64
 	flt: ^Float_Info
@@ -95,8 +117,20 @@ generic_ftoa :: proc(buf: []byte, val: f64, fmt: byte, precision, bit_size: int)
 	return format_digits(buf, shortest, neg, digs, prec, fmt)
 }
 
+/*
+Converts a decimal floating-point number into a byte buffer with the given format
 
+**Inputs**  
+- buf: The byte buffer to store the formatted number
+- shortest: If true, generates the shortest representation of the number
+- neg: If true, the number is negative
+- digs: The decimal number to be formatted
+- precision: The number of digits after the decimal point
+- fmt: The format specifier (accepted values: 'f', 'F', 'e', 'E', 'g', 'G')
 
+**Returns**  
+- A byte slice containing the formatted decimal floating-point number
+*/
 format_digits :: proc(buf: []byte, shortest: bool, neg: bool, digs: Decimal_Slice, precision: int, fmt: byte) -> []byte {
 	Buffer :: struct {
 		b: []byte,
@@ -217,7 +251,15 @@ format_digits :: proc(buf: []byte, shortest: bool, neg: bool, digs: Decimal_Slic
 
 
 }
+/*
+Rounds the given decimal number to its shortest representation, considering the provided floating-point format
 
+**Inputs**  
+- d: The decimal number to round
+- mant: The mantissa of the floating-point number
+- exp: The exponent of the floating-point number
+- flt: Pointer to the Float_Info structure containing information about the floating-point format
+*/
 round_shortest :: proc(d: ^decimal.Decimal, mant: u64, exp: int, flt: ^Float_Info) {
 	if mant == 0 { // If mantissa is zero, the number is zero
 		d.count = 0
@@ -283,4 +325,100 @@ round_shortest :: proc(d: ^decimal.Decimal, mant: u64, exp: int, flt: ^Float_Inf
 		}
 	}
 
+}
+/*
+Converts a decimal number to its floating-point representation with the given format and returns the resulting bits
+
+**Inputs**  
+- d: Pointer to the decimal number to convert
+- info: Pointer to the Float_Info structure containing information about the floating-point format
+
+**Returns**  
+- b: The bits representing the floating-point number
+- overflow: A boolean indicating whether an overflow occurred during conversion
+*/
+@(private)
+decimal_to_float_bits :: proc(d: ^decimal.Decimal, info: ^Float_Info) -> (b: u64, overflow: bool) {
+	end :: proc "contextless" (d: ^decimal.Decimal, mant: u64, exp: int, info: ^Float_Info) -> (bits: u64) {
+		bits = mant & (u64(1)<<info.mantbits - 1)
+		bits |= u64((exp-info.bias) & (1<<info.expbits - 1)) << info.mantbits
+		if d.neg {
+			bits |= 1<< info.mantbits << info.expbits
+		}
+		return
+	}
+	set_overflow :: proc "contextless" (mant: ^u64, exp: ^int, info: ^Float_Info) -> bool {
+		mant^ = 0
+		exp^ = 1<<info.expbits - 1 + info.bias
+		return true
+	}
+
+	mant: u64
+	exp: int
+	if d.count == 0 {
+		mant = 0
+		exp = info.bias
+		b = end(d, mant, exp, info)
+		return
+	}
+
+	if d.decimal_point > 310 {
+		set_overflow(&mant, &exp, info)
+		b = end(d, mant, exp, info)
+		return
+	} else if d.decimal_point < -330 {
+		mant = 0
+		exp = info.bias
+		b = end(d, mant, exp, info)
+		return
+	}
+
+	@static power_table := [?]int{1, 3, 6, 9, 13, 16, 19, 23, 26}
+
+	exp = 0
+	for d.decimal_point > 0 {
+		n := 27 if d.decimal_point >= len(power_table) else power_table[d.decimal_point]
+		decimal.shift(d, -n)
+		exp += n
+	}
+	for d.decimal_point < 0 || d.decimal_point == 0 && d.digits[0] < '5' {
+		n := 27 if -d.decimal_point >= len(power_table) else power_table[-d.decimal_point]
+		decimal.shift(d, n)
+		exp -= n
+	}
+
+	// go from [0.5, 1) to [1, 2)
+	exp -= 1
+
+	if exp < info.bias + 1 {
+		n := info.bias + 1 - exp
+		decimal.shift(d, n)
+		exp += n
+	}
+
+	if (exp-info.bias) >= (1<<info.expbits - 1) {
+		set_overflow(&mant, &exp, info)
+		b = end(d, mant, exp, info)
+		return
+	}
+
+	decimal.shift(d, int(1 + info.mantbits))
+	mant = decimal.rounded_integer(d)
+
+	if mant == 2<<info.mantbits {
+		mant >>= 1
+		exp += 1
+		if (exp-info.bias) >= (1<<info.expbits - 1) {
+			set_overflow(&mant, &exp, info)
+			b = end(d, mant, exp, info)
+			return
+		}
+	}
+
+	if mant & (1<<info.mantbits) == 0 {
+		exp = info.bias
+	}
+
+	b = end(d, mant, exp, info)
+	return
 }

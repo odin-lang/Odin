@@ -17,7 +17,7 @@ foreign libc {
 	__error :: proc "c" () -> ^c.int ---
 }
 
-_futex_wait :: proc(f: ^Futex, expected: u32) -> bool {
+_futex_wait :: proc "contextless" (f: ^Futex, expected: u32) -> bool {
 	timeout := [2]i64{14400, 0} // 4 hours
 	for {
 		res := _umtx_op(f, UMTX_OP_WAIT, c.ulong(expected), nil, &timeout)
@@ -30,12 +30,12 @@ _futex_wait :: proc(f: ^Futex, expected: u32) -> bool {
 			continue
 		}
 
-		panic("_futex_wait failure")
+		_panic("_futex_wait failure")
 	}
 	unreachable()
 }
 
-_futex_wait_with_timeout :: proc(f: ^Futex, expected: u32, duration: time.Duration) -> bool {
+_futex_wait_with_timeout :: proc "contextless" (f: ^Futex, expected: u32, duration: time.Duration) -> bool {
 	if duration <= 0 {
 		return false
 	}
@@ -51,21 +51,21 @@ _futex_wait_with_timeout :: proc(f: ^Futex, expected: u32, duration: time.Durati
 		return false
 	}
 
-	panic("_futex_wait_with_timeout failure")
+	_panic("_futex_wait_with_timeout failure")
 }
 
-_futex_signal :: proc(f: ^Futex) {
+_futex_signal :: proc "contextless" (f: ^Futex) {
 	res := _umtx_op(f, UMTX_OP_WAKE, 1, nil, nil)
 
 	if res == -1 {
-		panic("_futex_signal failure")
+		_panic("_futex_signal failure")
 	}
 }
 
-_futex_broadcast :: proc(f: ^Futex)  {
+_futex_broadcast :: proc "contextless" (f: ^Futex)  {
 	res := _umtx_op(f, UMTX_OP_WAKE, c.ulong(max(i32)), nil, nil)
 
 	if res == -1 {
-		panic("_futex_broadcast failure")
+		_panic("_futex_broadcast failure")
 	}
 }

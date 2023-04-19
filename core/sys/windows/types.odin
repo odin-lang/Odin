@@ -38,6 +38,7 @@ HHOOK :: distinct HANDLE
 HKEY :: distinct HANDLE
 HDESK :: distinct HANDLE
 HFONT :: distinct HANDLE
+HRGN :: distinct HANDLE
 BOOL :: distinct b32
 BYTE :: distinct u8
 BOOLEAN :: distinct b8
@@ -110,7 +111,7 @@ LPOVERLAPPED :: ^OVERLAPPED
 LPPROCESS_INFORMATION :: ^PROCESS_INFORMATION
 PSECURITY_ATTRIBUTES :: ^SECURITY_ATTRIBUTES
 LPSECURITY_ATTRIBUTES :: ^SECURITY_ATTRIBUTES
-LPSTARTUPINFO :: ^STARTUPINFO
+LPSTARTUPINFOW :: ^STARTUPINFOW
 LPTRACKMOUSEEVENT :: ^TRACKMOUSEEVENT
 VOID :: rawptr
 PVOID :: rawptr
@@ -144,11 +145,12 @@ PCONDITION_VARIABLE :: ^CONDITION_VARIABLE
 PLARGE_INTEGER :: ^LARGE_INTEGER
 PSRWLOCK :: ^SRWLOCK
 
-MMRESULT :: UINT
+CREATE_WAITABLE_TIMER_MANUAL_RESET    :: 0x00000001
+CREATE_WAITABLE_TIMER_HIGH_RESOLUTION :: 0x00000002
 
-SOCKET :: distinct uintptr // TODO
-socklen_t :: c_int
-ADDRESS_FAMILY :: USHORT
+TIMER_QUERY_STATE  :: 0x0001
+TIMER_MODIFY_STATE :: 0x0002
+TIMER_ALL_ACCESS   :: STANDARD_RIGHTS_REQUIRED | SYNCHRONIZE | TIMER_QUERY_STATE | TIMER_MODIFY_STATE
 
 TRUE  :: BOOL(true)
 FALSE :: BOOL(false)
@@ -159,6 +161,8 @@ SIZE :: struct {
 }
 PSIZE  :: ^SIZE
 LPSIZE :: ^SIZE
+
+MAXLONG :: 0x7fffffff
 
 FILE_ATTRIBUTE_READONLY: DWORD : 0x00000001
 FILE_ATTRIBUTE_HIDDEN: DWORD : 0x00000002
@@ -257,26 +261,6 @@ GET_FILEEX_INFO_LEVELS :: distinct i32
 GetFileExInfoStandard: GET_FILEEX_INFO_LEVELS : 0
 GetFileExMaxInfoLevel: GET_FILEEX_INFO_LEVELS : 1
 
-// String resource number bases (internal use)
-
-MMSYSERR_BASE :: 0
-WAVERR_BASE   :: 32
-MIDIERR_BASE  :: 64
-TIMERR_BASE   :: 96
-JOYERR_BASE   :: 160
-MCIERR_BASE   :: 256
-MIXERR_BASE   :: 1024
-
-MCI_STRING_OFFSET :: 512
-MCI_VD_OFFSET     :: 1024
-MCI_CD_OFFSET     :: 1088
-MCI_WAVE_OFFSET   :: 1152
-MCI_SEQ_OFFSET    :: 1216
-
-// timer error return values
-TIMERR_NOERROR :: 0                // no error
-TIMERR_NOCANDO :: TIMERR_BASE + 1  // request not completed
-TIMERR_STRUCT  :: TIMERR_BASE + 33 // time struct size
 
 DIAGNOSTIC_REASON_VERSION :: 0
 
@@ -720,6 +704,14 @@ CWPRETSTRUCT :: struct {
 	hwnd: HWND,
 }
 
+MSLLHOOKSTRUCT :: struct {
+	pt: POINT,
+	mouseData: DWORD,
+	flags: DWORD,
+	time: DWORD,
+	dwExtraInfo: ULONG_PTR,
+}
+
 KBDLLHOOKSTRUCT :: struct {
 	vkCode: DWORD,
 	scanCode: DWORD,
@@ -727,6 +719,59 @@ KBDLLHOOKSTRUCT :: struct {
 	time: DWORD,
 	dwExtraInfo: ULONG_PTR,
 }
+
+MOUSEINPUT :: struct {
+	dx: LONG,
+	dy: LONG,
+	mouseData: DWORD,
+	dwFlags: DWORD,
+	time: DWORD,
+	dwExtraInfo: ULONG_PTR,
+}
+
+KEYBDINPUT :: struct {
+	wVk: WORD,
+	wScan: WORD,
+	dwFlags: DWORD,
+	time: DWORD,
+	dwExtraInfo: ULONG_PTR,
+}
+
+HARDWAREINPUT :: struct {
+	uMsg: DWORD,
+	wParamL: WORD,
+	wParamH: WORD,
+}
+
+INPUT_TYPE :: enum DWORD {
+	MOUSE = 0,
+	KEYBOARD = 1,
+	HARDWARE = 2,
+}
+
+INPUT :: struct {
+	type: INPUT_TYPE,
+	using _: struct #raw_union {
+		mi: MOUSEINPUT,
+		ki: KEYBDINPUT,
+		hi: HARDWAREINPUT,
+	},
+}
+
+MOUSEEVENTF_MOVE :: 0x0001
+MOUSEEVENTF_LEFTDOWN :: 0x0002
+MOUSEEVENTF_LEFTUP :: 0x0004
+MOUSEEVENTF_RIGHTDOWN :: 0x0008
+MOUSEEVENTF_RIGHTUP :: 0x0010
+MOUSEEVENTF_MIDDLEDOWN :: 0x0020
+MOUSEEVENTF_MIDDLEUP :: 0x0040
+MOUSEEVENTF_XDOWN :: 0x0080
+MOUSEEVENTF_XUP :: 0x0100
+MOUSEEVENTF_WHEEL :: 0x0800
+MOUSEEVENTF_HWHEEL :: 0x1000
+MOUSEEVENTF_MOVE_NOCOALESCE :: 0x2000
+MOUSEEVENTF_VIRTUALDESK :: 0x4000
+MOUSEEVENTF_ABSOLUTE :: 0x8000
 
 WNDCLASSA :: struct {
 	style: UINT,
@@ -794,6 +839,135 @@ MSG :: struct {
 }
 
 LPMSG :: ^MSG
+
+NOTIFYICONDATAW :: struct {
+	cbSize: DWORD,
+	hWnd: HWND,
+	uID: UINT,
+	uFlags: UINT,
+	uCallbackMessage: UINT,
+	hIcon: HICON,
+	szTip: [128]WCHAR,
+	dwState: DWORD,
+	dwStateMask: DWORD,
+	szInfo: [256]WCHAR,
+	using _: struct #raw_union {
+		uTimeout: UINT,
+		uVersion: UINT,
+	},
+	szInfoTitle: [64]WCHAR,
+	dwInfoFlags: DWORD,
+	guidItem: GUID,
+	hBalloonIcon: HICON,
+}
+
+NIF_MESSAGE :: 0x00000001
+NIF_ICON :: 0x00000002
+NIF_TIP :: 0x00000004
+NIF_STATE :: 0x00000008
+NIF_INFO :: 0x00000010
+NIF_GUID :: 0x00000020
+NIF_REALTIME :: 0x00000040
+NIF_SHOWTIP :: 0x00000080
+
+NIM_ADD :: 0x00000000
+NIM_MODIFY :: 0x00000001
+NIM_DELETE :: 0x00000002
+NIM_SETFOCUS :: 0x00000003
+NIM_SETVERSION :: 0x00000004
+
+// Menu flags for Add/Check/EnableMenuItem()
+MF_INSERT :: 0x00000000
+MF_CHANGE :: 0x00000080
+MF_APPEND :: 0x00000100
+MF_DELETE :: 0x00000200
+MF_REMOVE :: 0x00001000
+
+MF_BYCOMMAND :: 0x00000000
+MF_BYPOSITION :: 0x00000400
+
+MF_SEPARATOR :: 0x00000800
+
+MF_ENABLED :: 0x00000000
+MF_GRAYED :: 0x00000001
+MF_DISABLED :: 0x00000002
+
+MF_UNCHECKED :: 0x00000000
+MF_CHECKED :: 0x00000008
+MF_USECHECKBITMAPS :: 0x00000200
+
+MF_STRING :: 0x00000000
+MF_BITMAP :: 0x00000004
+MF_OWNERDRAW :: 0x00000100
+
+MF_POPUP :: 0x00000010
+MF_MENUBARBREAK :: 0x00000020
+MF_MENUBREAK :: 0x00000040
+
+MF_UNHILITE :: 0x00000000
+MF_HILITE :: 0x00000080
+
+MF_DEFAULT :: 0x00001000
+MF_SYSMENU :: 0x00002000
+MF_HELP :: 0x00004000
+MF_RIGHTJUSTIFY :: 0x00004000
+
+MF_MOUSESELECT :: 0x00008000
+MF_END :: 0x00000080  // Obsolete -- only used by old RES files
+
+// Flags for TrackPopupMenu
+TPM_LEFTBUTTON :: 0x0000
+TPM_RIGHTBUTTON :: 0x0002
+TPM_LEFTALIGN :: 0x0000
+TPM_CENTERALIGN :: 0x0004
+TPM_RIGHTALIGN :: 0x0008
+TPM_TOPALIGN :: 0x0000
+TPM_VCENTERALIGN :: 0x0010
+TPM_BOTTOMALIGN :: 0x0020
+
+TPM_HORIZONTAL :: 0x0000     /* Horz alignment matters more */
+TPM_VERTICAL :: 0x0040     /* Vert alignment matters more */
+TPM_NONOTIFY :: 0x0080     /* Don't send any notification msgs */
+TPM_RETURNCMD :: 0x0100
+TPM_RECURSE :: 0x0001
+TPM_HORPOSANIMATION :: 0x0400
+TPM_HORNEGANIMATION :: 0x0800
+TPM_VERPOSANIMATION :: 0x1000
+TPM_VERNEGANIMATION :: 0x2000
+TPM_NOANIMATION :: 0x4000
+TPM_LAYOUTRTL :: 0x8000
+TPM_WORKAREA :: 0x10000
+
+// WM_NCHITTEST and MOUSEHOOKSTRUCT Mouse Position Codes
+HTERROR       :: -2
+HTTRANSPARENT :: -1
+HTNOWHERE     :: 0
+HTCLIENT      :: 1
+HTCAPTION     :: 2
+HTSYSMENU     :: 3
+HTGROWBOX     :: 4
+HTSIZE        :: HTGROWBOX
+HTMENU        :: 5
+HTHSCROLL     :: 6
+HTVSCROLL     :: 7
+HTMINBUTTON   :: 8
+HTMAXBUTTON   :: 9
+HTLEFT        :: 10
+HTRIGHT       :: 11
+HTTOP         :: 12
+HTTOPLEFT     :: 13
+HTTOPRIGHT    :: 14
+HTBOTTOM      :: 15
+HTBOTTOMLEFT  :: 16
+HTBOTTOMRIGHT :: 17
+HTBORDER      :: 18
+HTREDUCE      :: HTMINBUTTON
+HTZOOM        :: HTMAXBUTTON
+HTSIZEFIRST   :: HTLEFT
+HTSIZELAST    :: HTBOTTOMRIGHT
+HTOBJECT      :: 19
+HTCLOSE       :: 20
+HTHELP        :: 21
 
 TEXTMETRICW :: struct {
 	tmHeight: LONG,
@@ -1221,6 +1395,10 @@ SWP_NOREPOSITION :: SWP_NOOWNERZORDER
 SWP_DEFERERASE     :: 0x2000 // same as SWP_DEFERDRAWING
 SWP_ASYNCWINDOWPOS :: 0x4000 // same as SWP_CREATESPB
 
+CSIDL_APPDATA        :: 0x001a // <user name>\Application Data
+CSIDL_COMMON_APPDATA :: 0x0023 // All Users\Application Data
+CSIDL_PROFILE 		 :: 0x0028 // <user name>\
+
 HWND_TOP       :: HWND( uintptr(0))     //  0
 HWND_BOTTOM    :: HWND( uintptr(1))     //  1
 HWND_TOPMOST   :: HWND(~uintptr(0))     // -1
@@ -1419,6 +1597,58 @@ WMSZ_BOTTOM      :: 6
 WMSZ_BOTTOMLEFT  :: 7
 WMSZ_BOTTOMRIGHT :: 8
 
+// Note CLASSKEY overrides CLASSNAME
+SEE_MASK_DEFAULT   :: 0x00000000
+SEE_MASK_CLASSNAME :: 0x00000001   // SHELLEXECUTEINFO.lpClass is valid
+SEE_MASK_CLASSKEY  :: 0x00000003   // SHELLEXECUTEINFO.hkeyClass is valid
+// Note SEE_MASK_INVOKEIDLIST(0xC) implies SEE_MASK_IDLIST(0x04)
+SEE_MASK_IDLIST            :: 0x00000004   // SHELLEXECUTEINFO.lpIDList is valid
+SEE_MASK_INVOKEIDLIST      :: 0x0000000c   // enable IContextMenu based verbs
+SEE_MASK_ICON              :: 0x00000010   // not used
+SEE_MASK_HOTKEY            :: 0x00000020   // SHELLEXECUTEINFO.dwHotKey is valid
+SEE_MASK_NOCLOSEPROCESS    :: 0x00000040   // SHELLEXECUTEINFO.hProcess
+SEE_MASK_CONNECTNETDRV     :: 0x00000080   // enables re-connecting disconnected network drives
+SEE_MASK_NOASYNC           :: 0x00000100   // block on the call until the invoke has completed, use for callers that exit after calling ShellExecuteEx()
+SEE_MASK_FLAG_DDEWAIT      :: SEE_MASK_NOASYNC // Use SEE_MASK_NOASYNC instead of SEE_MASK_FLAG_DDEWAIT as it more accuratly describes the behavior
+SEE_MASK_DOENVSUBST        :: 0x00000200   // indicates that SHELLEXECUTEINFO.lpFile contains env vars that should be expanded
+SEE_MASK_FLAG_NO_UI        :: 0x00000400   // disable UI including error messages
+SEE_MASK_UNICODE           :: 0x00004000
+SEE_MASK_NO_CONSOLE        :: 0x00008000
+SEE_MASK_ASYNCOK           :: 0x00100000
+SEE_MASK_HMONITOR          :: 0x00200000   // SHELLEXECUTEINFO.hMonitor
+SEE_MASK_NOZONECHECKS      :: 0x00800000
+SEE_MASK_NOQUERYCLASSSTORE :: 0x01000000
+SEE_MASK_WAITFORINPUTIDLE  :: 0x02000000
+SEE_MASK_FLAG_LOG_USAGE    :: 0x04000000
+
+// When SEE_MASK_FLAG_HINST_IS_SITE is specified SHELLEXECUTEINFO.hInstApp is used as an
+// _In_ parameter and specifies a IUnknown* to be used as a site pointer. The site pointer
+// is used to provide services to shell execute, the handler binding process and the verb handlers
+// once they are invoked.
+SEE_MASK_FLAG_HINST_IS_SITE :: 0x08000000
+
+SHELLEXECUTEINFOW :: struct {
+	cbSize: DWORD,               // in, required, sizeof of this structure
+	fMask: ULONG,                // in, SEE_MASK_XXX values
+	hwnd: HWND,                  // in, optional
+	lpVerb: LPCWSTR,            // in, optional when unspecified the default verb is choosen
+	lpFile: LPCWSTR,            // in, either this value or lpIDList must be specified
+	lpParameters: LPCWSTR,      // in, optional
+	lpDirectory: LPCWSTR,       // in, optional
+	nShow: c.int,                  // in, required
+	hInstApp: HINSTANCE,         // out when SEE_MASK_NOCLOSEPROCESS is specified
+	lpIDList: rawptr,             // in, valid when SEE_MASK_IDLIST is specified, PCIDLIST_ABSOLUTE, for use with SEE_MASK_IDLIST & SEE_MASK_INVOKEIDLIST
+	lpClass: LPCWSTR,           // in, valid when SEE_MASK_CLASSNAME is specified
+	hkeyClass: HKEY,             // in, valid when SEE_MASK_CLASSKEY is specified
+	dwHotKey: DWORD,             // in, valid when SEE_MASK_HOTKEY is specified
+	DUMMYUNIONNAME: struct #raw_union {
+		hIcon: HANDLE,           // not used
+		hMonitor: HANDLE,        // in, valid when SEE_MASK_HMONITOR specified
+	},
+	hProcess: HANDLE,            // out, valid when SEE_MASK_NOCLOSEPROCESS specified
+}
+LPSHELLEXECUTEINFOW :: ^SHELLEXECUTEINFOW
+
 // Key State Masks for Mouse Messages
 MK_LBUTTON  :: 0x0001
 MK_RBUTTON  :: 0x0002
@@ -1459,6 +1689,25 @@ USER_TIMER_MINIMUM :: 0x0000000A
 WA_INACTIVE    :: 0
 WA_ACTIVE      :: 1
 WA_CLICKACTIVE :: 2
+
+// Struct pointed to by WM_GETMINMAXINFO lParam
+MINMAXINFO :: struct {
+	ptReserved: POINT,
+	ptMaxSize: POINT,
+	ptMaxPosition: POINT,
+	ptMinTrackSize: POINT,
+	ptMaxTrackSize: POINT,
+}
+PMINMAXINFO  :: ^MINMAXINFO
+LPMINMAXINFO :: PMINMAXINFO
+
+MONITORINFO :: struct {
+	cbSize: DWORD,
+	rcMonitor: RECT,
+	rcWork: RECT,
+	dwFlags: DWORD,
+}
+LPMONITORINFO :: ^MONITORINFO
 
 // SetWindowsHook() codes
 WH_MIN             :: -1
@@ -1754,30 +2003,6 @@ BI_BITFIELDS :: 3
 BI_JPEG      :: 4
 BI_PNG       :: 5
 
-WSA_FLAG_OVERLAPPED: DWORD : 0x01
-WSA_FLAG_NO_HANDLE_INHERIT: DWORD : 0x80
-
-WSADESCRIPTION_LEN :: 256
-WSASYS_STATUS_LEN :: 128
-WSAPROTOCOL_LEN: DWORD : 255
-INVALID_SOCKET :: ~SOCKET(0)
-
-WSAEACCES: c_int : 10013
-WSAEINVAL: c_int : 10022
-WSAEWOULDBLOCK: c_int : 10035
-WSAEPROTOTYPE: c_int : 10041
-WSAEADDRINUSE: c_int : 10048
-WSAEADDRNOTAVAIL: c_int : 10049
-WSAECONNABORTED: c_int : 10053
-WSAECONNRESET: c_int : 10054
-WSAENOTCONN: c_int : 10057
-WSAESHUTDOWN: c_int : 10058
-WSAETIMEDOUT: c_int : 10060
-WSAECONNREFUSED: c_int : 10061
-WSATRY_AGAIN: c_int : 11002
-
-MAX_PROTOCOL_CHAIN: DWORD : 7
-
 MAXIMUM_REPARSE_DATA_BUFFER_SIZE :: 16 * 1024
 FSCTL_GET_REPARSE_POINT: DWORD : 0x900a8
 IO_REPARSE_TAG_SYMLINK: DWORD : 0xa000000c
@@ -1819,7 +2044,6 @@ TLS_OUT_OF_INDEXES: DWORD : 0xFFFFFFFF
 
 DLL_THREAD_DETACH: DWORD : 3
 DLL_PROCESS_DETACH: DWORD : 0
-CREATE_SUSPENDED :: DWORD(0x00000004)
 
 INFINITE :: ~DWORD(0)
 
@@ -1828,50 +2052,7 @@ DUPLICATE_SAME_ACCESS: DWORD : 0x00000002
 CONDITION_VARIABLE_INIT :: CONDITION_VARIABLE{}
 SRWLOCK_INIT :: SRWLOCK{}
 
-DETACHED_PROCESS: DWORD : 0x00000008
-CREATE_NEW_CONSOLE: DWORD : 0x00000010
-CREATE_NO_WINDOW: DWORD : 0x08000000
-CREATE_NEW_PROCESS_GROUP: DWORD : 0x00000200
-CREATE_UNICODE_ENVIRONMENT: DWORD : 0x00000400
 STARTF_USESTDHANDLES: DWORD : 0x00000100
-
-AF_INET: c_int : 2
-AF_INET6: c_int : 23
-SD_BOTH: c_int : 2
-SD_RECEIVE: c_int : 0
-SD_SEND: c_int : 1
-SOCK_DGRAM: c_int : 2
-SOCK_STREAM: c_int : 1
-SOL_SOCKET: c_int : 0xffff
-SO_RCVTIMEO: c_int : 0x1006
-SO_SNDTIMEO: c_int : 0x1005
-SO_REUSEADDR: c_int : 0x0004
-IPPROTO_IP: c_int : 0
-IPPROTO_TCP: c_int : 6
-IPPROTO_IPV6: c_int : 41
-TCP_NODELAY: c_int : 0x0001
-IP_TTL: c_int : 4
-IPV6_V6ONLY: c_int : 27
-SO_ERROR: c_int : 0x1007
-SO_BROADCAST: c_int : 0x0020
-IP_MULTICAST_LOOP: c_int : 11
-IPV6_MULTICAST_LOOP: c_int : 11
-IP_MULTICAST_TTL: c_int : 10
-IP_ADD_MEMBERSHIP: c_int : 12
-IP_DROP_MEMBERSHIP: c_int : 13
-IPV6_ADD_MEMBERSHIP: c_int : 12
-IPV6_DROP_MEMBERSHIP: c_int : 13
-MSG_PEEK: c_int : 0x2
-
-ip_mreq :: struct {
-	imr_multiaddr: in_addr,
-	imr_interface: in_addr,
-}
-
-ipv6_mreq :: struct {
-	ipv6mr_multiaddr: in6_addr,
-	ipv6mr_interface: c_uint,
-}
 
 VOLUME_NAME_DOS: DWORD : 0x0
 MOVEFILE_REPLACE_EXISTING: DWORD : 1
@@ -2233,8 +2414,7 @@ PROCESS_INFORMATION :: struct {
 	dwThreadId: DWORD,
 }
 
-// FYI: This is STARTUPINFOW, not STARTUPINFOA
-STARTUPINFO :: struct {
+STARTUPINFOW :: struct {
 	cb: DWORD,
 	lpReserved: LPWSTR,
 	lpDesktop: LPWSTR,
@@ -2255,11 +2435,6 @@ STARTUPINFO :: struct {
 	hStdError: HANDLE,
 }
 
-SOCKADDR :: struct {
-	sa_family: ADDRESS_FAMILY,
-	sa_data: [14]CHAR,
-}
-
 FILETIME :: struct {
 	dwLowDateTime: DWORD,
 	dwHighDateTime: DWORD,
@@ -2270,6 +2445,20 @@ FILETIME_as_unix_nanoseconds :: proc "contextless" (ft: FILETIME) -> i64 {
 	return (t - 116444736000000000) * 100
 }
 
+OBJECT_ATTRIBUTES :: struct {
+	Length:                   c_ulong,
+	RootDirectory:            HANDLE,
+	ObjectName:               ^UNICODE_STRING,
+	Attributes:               c_ulong,
+	SecurityDescriptor:       rawptr,
+	SecurityQualityOfService: rawptr,
+}
+
+UNICODE_STRING :: struct {
+	Length:        u16,
+	MaximumLength: u16,
+	Buffer:        ^u16,
+}
 
 OVERLAPPED :: struct {
 	Internal: ^c_ulong,
@@ -2277,6 +2466,13 @@ OVERLAPPED :: struct {
 	Offset: DWORD,
 	OffsetHigh: DWORD,
 	hEvent: HANDLE,
+}
+
+OVERLAPPED_ENTRY :: struct {
+	lpCompletionKey:            c_ulong,
+	lpOverlapped:               ^OVERLAPPED,
+	Internal:                   c_ulong,
+	dwNumberOfBytesTransferred: DWORD,
 }
 
 LPOVERLAPPED_COMPLETION_ROUTINE :: #type proc "stdcall" (
@@ -2290,74 +2486,6 @@ ADDRESS_MODE :: enum c_int {
 	AddrMode1632,
 	AddrModeReal,
 	AddrModeFlat,
-}
-
-SOCKADDR_STORAGE_LH :: struct {
-	ss_family: ADDRESS_FAMILY,
-	__ss_pad1: [6]CHAR,
-	__ss_align: i64,
-	__ss_pad2: [112]CHAR,
-}
-
-ADDRINFOA :: struct {
-	ai_flags: c_int,
-	ai_family: c_int,
-	ai_socktype: c_int,
-	ai_protocol: c_int,
-	ai_addrlen: size_t,
-	ai_canonname: ^c_char,
-	ai_addr: ^SOCKADDR,
-	ai_next: ^ADDRINFOA,
-}
-
-PADDRINFOEXW  :: ^ADDRINFOEXW
-LPADDRINFOEXW :: ^ADDRINFOEXW
-ADDRINFOEXW :: struct {
-	ai_flags:     c_int,
-	ai_family:    c_int,
-	ai_socktype:  c_int,
-	ai_protocol:  c_int,
-	ai_addrlen:   size_t,
-	ai_canonname: wstring,
-	ai_addr:      ^sockaddr,
-	ai_blob:      rawptr,
-	ai_bloblen:   size_t,
-	ai_provider:  LPGUID,
-	ai_next:      ^ADDRINFOEXW,
-}
-
-LPLOOKUPSERVICE_COMPLETION_ROUTINE :: #type proc "stdcall" (
-	dwErrorCode: DWORD,
-	dwNumberOfBytesTransfered: DWORD,
-	lpOverlapped: LPOVERLAPPED,
-)
-
-sockaddr  :: struct {
-	sa_family: USHORT,
-	sa_data:   [14]byte,
-}
-
-sockaddr_in :: struct {
-	sin_family: ADDRESS_FAMILY,
-	sin_port: USHORT,
-	sin_addr: in_addr,
-	sin_zero: [8]CHAR,
-}
-
-sockaddr_in6 :: struct {
-	sin6_family: ADDRESS_FAMILY,
-	sin6_port: USHORT,
-	sin6_flowinfo: c_ulong,
-	sin6_addr: in6_addr,
-	sin6_scope_id: c_ulong,
-}
-
-in_addr :: struct {
-	s_addr: u32,
-}
-
-in6_addr :: struct {
-	s6_addr: [16]u8,
 }
 
 EXCEPTION_DISPOSITION :: enum c_int {
@@ -2450,6 +2578,27 @@ FILE_ATTRIBUTE_TAG_INFO :: struct {
 	ReparseTag: DWORD,
 }
 
+PADDRINFOEXW :: ^ADDRINFOEXW
+LPADDRINFOEXW :: ^ADDRINFOEXW
+ADDRINFOEXW :: struct {
+	ai_flags:     c_int,
+	ai_family:    c_int,
+	ai_socktype:  c_int,
+	ai_protocol:  c_int,
+	ai_addrlen:   size_t,
+	ai_canonname: wstring,
+	ai_addr:      ^sockaddr,
+	ai_blob:      rawptr,
+	ai_bloblen:   size_t,
+	ai_provider:  LPGUID,
+	ai_next:      ^ADDRINFOEXW,
+}
+
+LPLOOKUPSERVICE_COMPLETION_ROUTINE :: #type proc "stdcall" (
+	dwErrorCode: DWORD,
+	dwNumberOfBytesTransfered: DWORD,
+	lpOverlapped: LPOVERLAPPED,
+)
 
 
 // https://docs.microsoft.com/en-gb/windows/win32/api/sysinfoapi/ns-sysinfoapi-system_info
@@ -3769,4 +3918,263 @@ CTRL_SHUTDOWN_EVENT : DWORD : 6
 COORD :: struct {
 	X: SHORT,
 	Y: SHORT,
+}
+
+SMALL_RECT :: struct {
+	Left: SHORT,
+	Top: SHORT,
+	Right: SHORT,
+	Bottom: SHORT,
+}
+
+CONSOLE_SCREEN_BUFFER_INFO :: struct {
+	dwSize: COORD,
+	dwCursorPosition: COORD,
+	wAttributes: WORD,
+	srWindow: SMALL_RECT,
+	dwMaximumWindowSize: COORD,
+}
+
+CONSOLE_CURSOR_INFO :: struct {
+	dwSize: DWORD,
+	bVisible: BOOL,
+}
+
+
+PCONSOLE_SCREEN_BUFFER_INFO :: ^CONSOLE_SCREEN_BUFFER_INFO
+PCONSOLE_CURSOR_INFO :: ^CONSOLE_CURSOR_INFO
+
+//
+// Networking
+//
+WSA_FLAG_OVERLAPPED             :: 1
+WSA_FLAG_MULTIPOINT_C_ROOT      :: 2
+WSA_FLAG_MULTIPOINT_C_LEAF      :: 4
+WSA_FLAG_MULTIPOINT_D_ROOT      :: 8
+WSA_FLAG_MULTIPOINT_D_LEAF      :: 16
+WSA_FLAG_ACCESS_SYSTEM_SECURITY :: 32
+WSA_FLAG_NO_HANDLE_INHERIT      :: 128
+WSADESCRIPTION_LEN :: 256
+WSASYS_STATUS_LEN  :: 128
+WSAPROTOCOL_LEN    :: 255
+INVALID_SOCKET :: ~SOCKET(0)
+SOMAXCONN    :: 128 // The number of messages that can be queued in memory after being received; use 2-4 for Bluetooth.
+                    // This is for the 'backlog' parameter to listen().
+SOCKET_ERROR :: -1
+
+// Networking errors
+WSAEINTR               :: 10004 // Call interrupted. CancelBlockingCall was called. (This is different on Linux.)
+WSAEACCES              :: 10013 // If you try to bind a Udp socket to the broadcast address without the socket option set.
+WSAEFAULT              :: 10014 // A pointer that was passed to a WSA function is invalid, such as a buffer size is smaller than you said it was
+WSAEINVAL              :: 10022 // Invalid argument supplied
+WSAEMFILE              :: 10024 // SOCKET handles exhausted
+WSAEWOULDBLOCK         :: 10035 // No data is ready yet
+WSAENOTSOCK            :: 10038 // Not a socket.
+WSAEINPROGRESS         :: 10036 // WS1.1 call is in progress or callback function is still being processed
+WSAEALREADY            :: 10037 // Already connecting in parallel.
+WSAEMSGSIZE            :: 10040 // Message was truncated because it exceeded max datagram size.
+WSAEPROTOTYPE          :: 10041 // Wrong protocol for the provided socket
+WSAENOPROTOOPT         :: 10042 // TODO
+WSAEPROTONOSUPPORT     :: 10043 // Protocol not supported
+WSAESOCKTNOSUPPORT     :: 10044 // Socket type not supported in the given address family
+WSAEAFNOSUPPORT        :: 10047 // Address family not supported
+WSAEOPNOTSUPP          :: 10045 // Attempt to accept on non-stream socket, etc.
+WSAEADDRINUSE          :: 10048 // Endpoint being bound is in use by another socket.
+WSAEADDRNOTAVAIL       :: 10049 // Not a valid local IP address on this computer.
+WSAENETDOWN            :: 10050 // Network subsystem failure on the local machine.
+WSAENETUNREACH         :: 10051 // The local machine is not connected to the network.
+WSAENETRESET           :: 10052 // Keepalive failure detected, or TTL exceeded when receiving UDP packets.
+WSAECONNABORTED        :: 10053 // Connection has been aborted by software in the host machine.
+WSAECONNRESET          :: 10054 // The connection was reset while trying to accept, read or write.
+WSAENOBUFS             :: 10055 // No buffer space is available. The outgoing queue may be full in which case you should probably try again after a pause.
+WSAEISCONN             :: 10056 // The socket is already connected.
+WSAENOTCONN            :: 10057 // The socket is not connected yet, or no address was supplied to sendto.
+WSAESHUTDOWN           :: 10058 // The socket has been shutdown in the direction required.
+WSAETIMEDOUT           :: 10060 // The timeout duration was reached before any data was received / before all data was sent.
+WSAECONNREFUSED        :: 10061 // The remote machine is not listening on that endpoint.
+WSAEHOSTDOWN           :: 10064 // Destination host was down.
+WSAEHOSTUNREACH        :: 10065 // The remote machine is not connected to the network.
+WSAENOTINITIALISED     :: 10093 // Needs WSAStartup call
+WSAEINVALIDPROCTABLE   :: 10104 // Invalid or incomplete procedure table was returned
+WSAEINVALIDPROVIDER    :: 10105 // Service provider version is not 2.2
+WSAEPROVIDERFAILEDINIT :: 10106 // Service provider failed to initialize
+
+// Address families
+AF_UNSPEC : c_int : 0  // Unspecified
+AF_INET   : c_int : 2  // IPv4
+AF_INET6  : c_int : 23 // IPv6
+AF_IRDA   : c_int : 26 // Infrared
+AF_BTH    : c_int : 32 // Bluetooth
+
+// Socket types
+SOCK_STREAM    : c_int : 1 // TCP
+SOCK_DGRAM     : c_int : 2 // UDP
+SOCK_RAW       : c_int : 3 // Requires options IP_HDRINCL for v4, IPV6_HDRINCL for v6, on the socket
+SOCK_RDM       : c_int : 4 // Requires "Reliable Multicast Protocol" to be installed - see WSAEnumProtocols
+SOCK_SEQPACKET : c_int : 5 // Provides psuedo-stream packet based on DGRAMs.
+
+// Protocols
+IPPROTO_IP      : c_int : 0
+IPPROTO_ICMP    : c_int : 1   // (AF_UNSPEC, AF_INET, AF_INET6) + SOCK_RAW | not specified
+IPPROTO_IGMP    : c_int : 2   // (AF_UNSPEC, AF_INET, AF_INET6) + SOCK_RAW | not specified
+BTHPROTO_RFCOMM : c_int : 3   // Bluetooth: AF_BTH + SOCK_STREAM
+IPPROTO_TCP     : c_int : 6   // (AF_INET, AF_INET6) + SOCK_STREAM
+IPPROTO_UDP     : c_int : 17  // (AF_INET, AF_INET6) + SOCK_DGRAM
+IPPROTO_ICMPV6  : c_int : 58  // (AF_UNSPEC, AF_INET, AF_INET6) + SOCK_RAW
+IPPROTO_RM      : c_int : 113 // AF_INET + SOCK_RDM [requires "Reliable Multicast Protocol" to be installed - see WSAEnumProtocols]
+
+// Shutdown manners
+SD_RECEIVE : c_int : 0
+SD_SEND    : c_int : 1
+SD_BOTH    : c_int : 2
+
+// Socket 'levels'
+SOL_SOCKET   : c_int : 0xffff // Socket options for any socket.
+IPPROTO_IPV6 : c_int : 41     // Socket options for IPV6.
+
+// Options for any sockets
+SO_ACCEPTCONN         : c_int : 0x0002
+SO_REUSEADDR          : c_int : 0x0004
+SO_KEEPALIVE          : c_int : 0x0008
+SO_SNDTIMEO           : c_int : 0x1005
+SO_RCVTIMEO           : c_int : 0x1006
+SO_EXCLUSIVEADDRUSE   : c_int : ~SO_REUSEADDR
+SO_CONDITIONAL_ACCEPT : c_int : 0x3002
+SO_DONTLINGER         : c_int : ~SO_LINGER
+SO_OOBINLINE          : c_int : 0x0100
+SO_LINGER             : c_int : 0x0080
+SO_RCVBUF             : c_int : 0x1002
+SO_SNDBUF             : c_int : 0x1001
+SO_ERROR              : c_int : 0x1007
+SO_BROADCAST          : c_int : 0x0020
+
+TCP_NODELAY: c_int : 0x0001
+IP_TTL: c_int : 4
+IPV6_V6ONLY: c_int : 27
+IP_MULTICAST_LOOP: c_int : 11
+IPV6_MULTICAST_LOOP: c_int : 11
+IP_MULTICAST_TTL: c_int : 10
+IP_ADD_MEMBERSHIP: c_int : 12
+
+IPV6_ADD_MEMBERSHIP: c_int : 12
+IPV6_DROP_MEMBERSHIP: c_int : 13
+
+MAX_PROTOCOL_CHAIN: DWORD : 7
+
+// Used with the SO_LINGER socket option to setsockopt().
+LINGER :: struct {
+	l_onoff: c.ushort,
+	l_linger: c.ushort,
+}
+// Send/Receive flags.
+MSG_OOB  : c_int : 1 // `send`/`recv` should process out-of-band data.
+MSG_PEEK : c_int : 2 // `recv` should not remove the data from the buffer. Only valid for non-overlapped operations.
+
+
+SOCKET :: distinct uintptr // TODO
+socklen_t :: c_int
+ADDRESS_FAMILY :: USHORT
+
+ip_mreq :: struct {
+	imr_multiaddr: in_addr,
+	imr_interface: in_addr,
+}
+
+ipv6_mreq :: struct {
+	ipv6mr_multiaddr: in6_addr,
+	ipv6mr_interface: c_uint,
+}
+
+SOCKADDR_STORAGE_LH :: struct {
+	ss_family:  ADDRESS_FAMILY,
+	__ss_pad1:  [6]CHAR,
+	__ss_align: i64,
+	__ss_pad2:  [112]CHAR,
+}
+
+ADDRINFOA :: struct {
+	ai_flags:     c_int,
+	ai_family:    c_int,
+	ai_socktype:  c_int,
+	ai_protocol:  c_int,
+	ai_addrlen:   size_t,
+	ai_canonname: ^c_char,
+	ai_addr:      ^SOCKADDR,
+	ai_next:      ^ADDRINFOA,
+}
+
+sockaddr :: struct {
+	sa_family: USHORT,
+	sa_data:   [14]byte,
+}
+
+sockaddr_in :: struct {
+	sin_family: ADDRESS_FAMILY,
+	sin_port:   u16be,
+	sin_addr:   in_addr,
+	sin_zero:   [8]CHAR,
+}
+sockaddr_in6 :: struct {
+	sin6_family:   ADDRESS_FAMILY,
+	sin6_port:     u16be,
+	sin6_flowinfo: c_ulong,
+	sin6_addr:     in6_addr,
+	sin6_scope_id: c_ulong,
+}
+
+in_addr :: struct {
+	s_addr: u32,
+}
+
+in6_addr :: struct {
+	s6_addr: [16]u8,
+}
+
+
+DNS_STATUS :: distinct DWORD // zero is success
+DNS_INFO_NO_RECORDS :: 9501
+DNS_QUERY_NO_RECURSION :: 0x00000004
+
+DNS_RECORD :: struct {
+    pNext: ^DNS_RECORD,
+    pName: cstring,
+    wType: WORD,
+    wDataLength: USHORT,
+    Flags: DWORD,
+    dwTtl: DWORD,
+    _: DWORD,
+    Data: struct #raw_union {
+        CNAME: DNS_PTR_DATAA,
+        A:     u32be,  // Ipv4 Address
+        AAAA:  u128be, // Ipv6 Address
+        TXT:   DNS_TXT_DATAA,
+        NS:    DNS_PTR_DATAA,
+        MX:    DNS_MX_DATAA,
+        SRV:   DNS_SRV_DATAA,
+    },
+}
+
+DNS_TXT_DATAA :: struct {
+    dwStringCount: DWORD,
+    pStringArray:  cstring,
+}
+
+DNS_PTR_DATAA :: cstring
+
+DNS_MX_DATAA :: struct {
+    pNameExchange: cstring, // the hostname
+    wPreference: WORD,      // lower values preferred
+    _: WORD,                // padding.
+}
+DNS_SRV_DATAA :: struct {
+	pNameTarget: cstring,
+	wPriority:   u16,
+	wWeight:     u16,
+	wPort:       u16,
+	_:           WORD, // padding
+}
+
+SOCKADDR :: struct {
+	sa_family: ADDRESS_FAMILY,
+	sa_data:   [14]CHAR,
 }

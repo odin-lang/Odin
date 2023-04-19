@@ -52,7 +52,7 @@ foreign advapi32 {
 		dwCreationFlags: DWORD,
 		lpEnvironment: LPVOID,
 		lpCurrentDirectory: wstring,
-		lpStartupInfo: LPSTARTUPINFO,
+		lpStartupInfo: LPSTARTUPINFOW,
 		lpProcessInformation: LPPROCESS_INFORMATION,
 	) -> BOOL ---
 
@@ -67,7 +67,7 @@ foreign advapi32 {
 		dwCreationFlags: DWORD,
 		lpEnvironment: LPVOID,
 		lpCurrentDirectory: wstring,
-		lpStartupInfo: LPSTARTUPINFO,
+		lpStartupInfo: LPSTARTUPINFOW,
 		lpProcessInformation: LPPROCESS_INFORMATION,
 	) -> BOOL ---
 

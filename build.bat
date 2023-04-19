@@ -2,6 +2,21 @@
 
 setlocal EnableDelayedExpansion
 
+where /Q cl.exe || (
+  set __VSCMD_ARG_NO_LOGO=1
+  for /f "tokens=*" %%i in ('"C:\Program Files (x86)\Microsoft Visual Studio\Installer\vswhere.exe" -latest -requires Microsoft.VisualStudio.Workload.NativeDesktop -property installationPath') do set VS=%%i
+  if "!VS!" equ "" (
+    echo ERROR: Visual Studio installation not found
+    exit /b 1
+  )  
+  call "!VS!\VC\Auxiliary\Build\vcvarsall.bat" amd64 || exit /b 1
+)
+
+if "%VSCMD_ARG_TGT_ARCH%" neq "x64" (
+  echo ERROR: please run this from MSVC x64 native tools command prompt, 32-bit target is not supported!
+  exit /b 1
+)
+
 for /f "usebackq tokens=1,2 delims=,=- " %%i in (`wmic os get LocalDateTime /value`) do @if %%i==LocalDateTime (
 	set CURR_DATE_TIME=%%j
 )
@@ -33,8 +48,11 @@ set odin_version_raw="dev-%curr_year%-%curr_month%"
 set compiler_flags= -nologo -Oi -TP -fp:precise -Gm- -MP -FC -EHsc- -GR- -GF
 set compiler_defines= -DODIN_VERSION_RAW=\"%odin_version_raw%\"
 
+if not exist .git\ goto skip_git_hash
 for /f %%i in ('git rev-parse --short HEAD') do set GIT_SHA=%%i
 if %ERRORLEVEL% equ 0 set compiler_defines=%compiler_defines% -DGIT_SHA=\"%GIT_SHA%\"
+:skip_git_hash
+
 if %nightly% equ 1 set compiler_defines=%compiler_defines% -DNIGHTLY
 
 if %release_mode% EQU 0 ( rem Debug
@@ -47,12 +65,14 @@ if %release_mode% EQU 0 ( rem Debug
 set compiler_warnings= ^
 	-W4 -WX ^
 	-wd4100 -wd4101 -wd4127 -wd4146 ^
+	-wd4505 ^
 	-wd4456 -wd4457
 
 set compiler_includes= ^
 	/Isrc\
 set libs= ^
 	kernel32.lib ^
+	Synchronization.lib ^
 	bin\llvm\windows\LLVM-C.lib
 
 set linker_flags= -incremental:no -opt:ref -subsystem:console

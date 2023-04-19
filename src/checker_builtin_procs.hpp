@@ -25,7 +25,7 @@ enum BuiltinProcId {
 	BuiltinProc_kmag,
 	BuiltinProc_conj,
 
-	BuiltinProc_expand_to_tuple,
+	BuiltinProc_expand_values,
 
 	BuiltinProc_min,
 	BuiltinProc_max,
@@ -277,6 +277,8 @@ BuiltinProc__type_simple_boolean_end,
 
 	BuiltinProc_type_equal_proc,
 	BuiltinProc_type_hasher_proc,
+	BuiltinProc_type_map_info,
+	BuiltinProc_type_map_cell_info,
 
 BuiltinProc__type_end,
 
@@ -323,7 +325,7 @@ gb_global BuiltinProc builtin_procs[BuiltinProc_COUNT] = {
 	{STR_LIT("kmag"),             1, false, Expr_Expr, BuiltinProcPkg_builtin},
 	{STR_LIT("conj"),             1, false, Expr_Expr, BuiltinProcPkg_builtin},
 
-	{STR_LIT("expand_to_tuple"),  1, false, Expr_Expr, BuiltinProcPkg_builtin},
+	{STR_LIT("expand_values"),    1, false, Expr_Expr, BuiltinProcPkg_builtin},
 
 	{STR_LIT("min"),              1, true,  Expr_Expr, BuiltinProcPkg_builtin},
 	{STR_LIT("max"),              1, true,  Expr_Expr, BuiltinProcPkg_builtin},
@@ -570,8 +572,10 @@ gb_global BuiltinProc builtin_procs[BuiltinProc_COUNT] = {
 
 	{STR_LIT("type_field_index_of"), 2, false, Expr_Expr, BuiltinProcPkg_intrinsics},
 
-	{STR_LIT("type_equal_proc"),  1, false, Expr_Expr, BuiltinProcPkg_intrinsics},
-	{STR_LIT("type_hasher_proc"), 1, false, Expr_Expr, BuiltinProcPkg_intrinsics},
+	{STR_LIT("type_equal_proc"),    1, false, Expr_Expr, BuiltinProcPkg_intrinsics},
+	{STR_LIT("type_hasher_proc"),   1, false, Expr_Expr, BuiltinProcPkg_intrinsics},
+	{STR_LIT("type_map_info"),      1, false, Expr_Expr, BuiltinProcPkg_intrinsics},
+	{STR_LIT("type_map_cell_info"), 1, false, Expr_Expr, BuiltinProcPkg_intrinsics},
 
 
 	{STR_LIT(""), 0, false, Expr_Stmt, BuiltinProcPkg_intrinsics},

@@ -740,6 +740,7 @@ Struct_Type :: struct {
 	where_clauses: []^Expr,
 	is_packed:     bool,
 	is_raw_union:  bool,
+	is_no_copy:    bool,
 	fields:        ^Field_List,
 	name_count:    int,
 }

@@ -1,5 +1,6 @@
 package sync
 
+import "core:runtime"
 import "core:time"
 
 current_thread_id :: proc "contextless" () -> int {
@@ -10,22 +11,22 @@ current_thread_id :: proc "contextless" () -> int {
 // The zero value for a Mutex is an unlocked mutex
 //
 // A Mutex must not be copied after first use
-Mutex :: struct {
+Mutex :: struct #no_copy {
 	impl: _Mutex,
 }
 
 // mutex_lock locks m
-mutex_lock :: proc(m: ^Mutex) {
+mutex_lock :: proc "contextless" (m: ^Mutex) {
 	_mutex_lock(m)
 }
 
 // mutex_unlock unlocks m
-mutex_unlock :: proc(m: ^Mutex) {
+mutex_unlock :: proc "contextless" (m: ^Mutex) {
 	_mutex_unlock(m)
 }
 
 // mutex_try_lock tries to lock m, will return true on success, and false on failure
-mutex_try_lock :: proc(m: ^Mutex) -> bool {
+mutex_try_lock :: proc "contextless" (m: ^Mutex) -> bool {
 	return _mutex_try_lock(m)
 }
 
@@ -36,7 +37,7 @@ Example:
 	}
 */
 @(deferred_in=mutex_unlock)
-mutex_guard :: proc(m: ^Mutex) -> bool {
+mutex_guard :: proc "contextless" (m: ^Mutex) -> bool {
 	mutex_lock(m)
 	return true
 }
@@ -46,38 +47,38 @@ mutex_guard :: proc(m: ^Mutex) -> bool {
 // The zero value for a RW_Mutex is an unlocked mutex
 //
 // A RW_Mutex must not be copied after first use
-RW_Mutex :: struct {
+RW_Mutex :: struct #no_copy {
 	impl: _RW_Mutex,
 }
 
 // rw_mutex_lock locks rw for writing (with a single writer)
 // If the mutex is already locked for reading or writing, the mutex blocks until the mutex is available.
-rw_mutex_lock :: proc(rw: ^RW_Mutex) {
+rw_mutex_lock :: proc "contextless" (rw: ^RW_Mutex) {
 	_rw_mutex_lock(rw)
 }
 
 // rw_mutex_unlock unlocks rw for writing (with a single writer)
-rw_mutex_unlock :: proc(rw: ^RW_Mutex) {
+rw_mutex_unlock :: proc "contextless" (rw: ^RW_Mutex) {
 	_rw_mutex_unlock(rw)
 }
 
 // rw_mutex_try_lock tries to lock rw for writing (with a single writer)
-rw_mutex_try_lock :: proc(rw: ^RW_Mutex) -> bool {
+rw_mutex_try_lock :: proc "contextless" (rw: ^RW_Mutex) -> bool {
 	return _rw_mutex_try_lock(rw)
 }
 
 // rw_mutex_shared_lock locks rw for reading (with arbitrary number of readers)
-rw_mutex_shared_lock :: proc(rw: ^RW_Mutex) {
+rw_mutex_shared_lock :: proc "contextless" (rw: ^RW_Mutex) {
 	_rw_mutex_shared_lock(rw)
 }
 
 // rw_mutex_shared_unlock unlocks rw for reading (with arbitrary number of readers)
-rw_mutex_shared_unlock :: proc(rw: ^RW_Mutex) {
+rw_mutex_shared_unlock :: proc "contextless" (rw: ^RW_Mutex) {
 	_rw_mutex_shared_unlock(rw)
 }
 
 // rw_mutex_try_shared_lock tries to lock rw for reading (with arbitrary number of readers)
-rw_mutex_try_shared_lock :: proc(rw: ^RW_Mutex) -> bool {
+rw_mutex_try_shared_lock :: proc "contextless" (rw: ^RW_Mutex) -> bool {
 	return _rw_mutex_try_shared_lock(rw)
 }
 /*
@@ -87,7 +88,7 @@ Example:
 	}
 */
 @(deferred_in=rw_mutex_unlock)
-rw_mutex_guard :: proc(m: ^RW_Mutex) -> bool {
+rw_mutex_guard :: proc "contextless" (m: ^RW_Mutex) -> bool {
 	rw_mutex_lock(m)
 	return true
 }
@@ -99,7 +100,7 @@ Example:
 	}
 */
 @(deferred_in=rw_mutex_shared_unlock)
-rw_mutex_shared_guard :: proc(m: ^RW_Mutex) -> bool {
+rw_mutex_shared_guard :: proc "contextless" (m: ^RW_Mutex) -> bool {
 	rw_mutex_shared_lock(m)
 	return true
 }
@@ -110,19 +111,19 @@ rw_mutex_shared_guard :: proc(m: ^RW_Mutex) -> bool {
 // The zero value for a Recursive_Mutex is an unlocked mutex
 //
 // A Recursive_Mutex must not be copied after first use
-Recursive_Mutex :: struct {
+Recursive_Mutex :: struct #no_copy {
 	impl: _Recursive_Mutex,
 }
 
-recursive_mutex_lock :: proc(m: ^Recursive_Mutex) {
+recursive_mutex_lock :: proc "contextless" (m: ^Recursive_Mutex) {
 	_recursive_mutex_lock(m)
 }
 
-recursive_mutex_unlock :: proc(m: ^Recursive_Mutex) {
+recursive_mutex_unlock :: proc "contextless" (m: ^Recursive_Mutex) {
 	_recursive_mutex_unlock(m)
 }
 
-recursive_mutex_try_lock :: proc(m: ^Recursive_Mutex) -> bool {
+recursive_mutex_try_lock :: proc "contextless" (m: ^Recursive_Mutex) -> bool {
 	return _recursive_mutex_try_lock(m)
 }
 
@@ -133,7 +134,7 @@ Example:
 	}
 */
 @(deferred_in=recursive_mutex_unlock)
-recursive_mutex_guard :: proc(m: ^Recursive_Mutex) -> bool {
+recursive_mutex_guard :: proc "contextless" (m: ^Recursive_Mutex) -> bool {
 	recursive_mutex_lock(m)
 	return true
 }
@@ -143,26 +144,26 @@ recursive_mutex_guard :: proc(m: ^Recursive_Mutex) -> bool {
 // waiting for signalling the occurence of an event
 //
 // A Cond must not be copied after first use
-Cond :: struct {
+Cond :: struct #no_copy {
 	impl: _Cond,
 }
 
-cond_wait :: proc(c: ^Cond, m: ^Mutex) {
+cond_wait :: proc "contextless" (c: ^Cond, m: ^Mutex) {
 	_cond_wait(c, m)
 }
 
-cond_wait_with_timeout :: proc(c: ^Cond, m: ^Mutex, duration: time.Duration) -> bool {
+cond_wait_with_timeout :: proc "contextless" (c: ^Cond, m: ^Mutex, duration: time.Duration) -> bool {
 	if duration <= 0 {
 		return false
 	}
 	return _cond_wait_with_timeout(c, m, duration)
 }
 
-cond_signal :: proc(c: ^Cond) {
+cond_signal :: proc "contextless" (c: ^Cond) {
 	_cond_signal(c)
 }
 
-cond_broadcast :: proc(c: ^Cond) {
+cond_broadcast :: proc "contextless" (c: ^Cond) {
 	_cond_broadcast(c)
 }
 
@@ -171,19 +172,19 @@ cond_broadcast :: proc(c: ^Cond) {
 // Posting to the semaphore increases the count by one, or the provided amount.
 //
 // A Sema must not be copied after first use
-Sema :: struct {
+Sema :: struct #no_copy {
 	impl: _Sema,
 }
 
-sema_post :: proc(s: ^Sema, count := 1) {
+sema_post :: proc "contextless" (s: ^Sema, count := 1) {
 	_sema_post(s, count)
 }
 
-sema_wait :: proc(s: ^Sema) {
+sema_wait :: proc "contextless" (s: ^Sema) {
 	_sema_wait(s)
 }
 
-sema_wait_with_timeout :: proc(s: ^Sema, duration: time.Duration) -> bool {
+sema_wait_with_timeout :: proc "contextless" (s: ^Sema, duration: time.Duration) -> bool {
 	return _sema_wait_with_timeout(s, duration)
 }
 
@@ -194,16 +195,16 @@ sema_wait_with_timeout :: proc(s: ^Sema, duration: time.Duration) -> bool {
 // An Futex must not be copied after first use
 Futex :: distinct u32
 
-futex_wait :: proc(f: ^Futex, expected: u32) {
+futex_wait :: proc "contextless" (f: ^Futex, expected: u32) {
 	if u32(atomic_load_explicit(f, .Acquire)) != expected {
 		return
 	}
 	
-	assert(_futex_wait(f, expected), "futex_wait failure")
+	_assert(_futex_wait(f, expected), "futex_wait failure")
 }
 
 // returns true if the wait happened within the duration, false if it exceeded the time duration
-futex_wait_with_timeout :: proc(f: ^Futex, expected: u32, duration: time.Duration) -> bool {
+futex_wait_with_timeout :: proc "contextless" (f: ^Futex, expected: u32, duration: time.Duration) -> bool {
 	if u32(atomic_load_explicit(f, .Acquire)) != expected {
 		return true
 	}
@@ -214,10 +215,25 @@ futex_wait_with_timeout :: proc(f: ^Futex, expected: u32, duration: time.Duratio
 	return _futex_wait_with_timeout(f, expected, duration)
 }
 
-futex_signal :: proc(f: ^Futex) {
+futex_signal :: proc "contextless" (f: ^Futex) {
 	_futex_signal(f)
 }
 
-futex_broadcast :: proc(f: ^Futex) {
+futex_broadcast :: proc "contextless" (f: ^Futex) {
 	_futex_broadcast(f)
+}
+
+
+@(private)
+_assert :: proc "contextless" (cond: bool, msg: string) {
+	if !cond {
+		_panic(msg)
+	}
+}
+
+@(private)
+_panic :: proc "contextless" (msg: string) -> ! {
+	runtime.print_string(msg)
+	runtime.print_byte('\n')
+	runtime.trap()
 }

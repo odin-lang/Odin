@@ -181,7 +181,7 @@ reverse_sort :: proc(data: $T/[]$E) where ORD(E) {
 }
 
 
-reverse_sort_by :: proc(data: $T/[]$E, less: proc(i, j: E) -> bool) where ORD(E) {
+reverse_sort_by :: proc(data: $T/[]$E, less: proc(i, j: E) -> bool) {
 	context._internal = rawptr(less)
 	sort_by(data, proc(i, j: E) -> bool {
 		k := (proc(i, j: E) -> bool)(context._internal)
@@ -189,7 +189,7 @@ reverse_sort_by :: proc(data: $T/[]$E, less: proc(i, j: E) -> bool) where ORD(E)
 	})
 }
 
-reverse_sort_by_cmp :: proc(data: $T/[]$E, cmp: proc(i, j: E) -> Ordering) where ORD(E) {
+reverse_sort_by_cmp :: proc(data: $T/[]$E, cmp: proc(i, j: E) -> Ordering) {
 	context._internal = rawptr(cmp)
 	sort_by_cmp(data, proc(i, j: E) -> Ordering {
 		k := (proc(i, j: E) -> Ordering)(context._internal)

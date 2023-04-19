@@ -343,58 +343,58 @@ foreign ENet {
 	deinitialize                   :: proc() ---
 	linked_version                 :: proc() -> Version ---
 	time_get                       :: proc() -> u32 ---
-	time_set                       :: proc(u32) ---
+	time_set                       :: proc(newTimeBase: u32) ---
 
 	socket_create                  :: proc(SocketType) -> Socket ---
-	socket_bind                    :: proc(Socket, ^Address) -> i32 ---
-	socket_get_address             :: proc(Socket, ^Address) -> i32 ---
-	socket_listen                  :: proc(Socket, i32) -> i32 ---
-	socket_accept                  :: proc(Socket, ^Address) -> Socket ---
-	socket_connect                 :: proc(Socket, ^Address) -> i32 ---
-	socket_send                    :: proc(Socket, ^Address, ^Buffer, uint) -> i32 ---
-	socket_receive                 :: proc(Socket, ^Address, ^Buffer, uint) -> i32 ---
-	socket_wait                    :: proc(Socket, ^u32, u32) -> i32 ---
-	socket_set_option              :: proc(Socket, SocketOption, i32) -> i32 ---
-	socket_get_option              :: proc(Socket, SocketOption, ^i32) -> i32 ---
-	socket_shutdown                :: proc(Socket, SocketShutdown) -> i32 ---
-	socket_destroy                 :: proc(Socket) ---
-	socketset_select               :: proc(Socket, ^SocketSet, ^SocketSet, u32) -> i32 ---
+	socket_bind                    :: proc(socket: Socket, address: ^Address) -> i32 ---
+	socket_get_address             :: proc(socket: Socket, address: ^Address) -> i32 ---
+	socket_listen                  :: proc(socket: Socket, backlog: i32) -> i32 ---
+	socket_accept                  :: proc(socket: Socket, address: ^Address) -> Socket ---
+	socket_connect                 :: proc(socket: Socket, address: ^Address) -> i32 ---
+	socket_send                    :: proc(socket: Socket, address: ^Address, buffers: [^]Buffer, bufferCount: uint) -> i32 ---
+	socket_receive                 :: proc(socket: Socket, address: ^Address, buffers: [^]Buffer, bufferCount: uint) -> i32 ---
+	socket_wait                    :: proc(socket: Socket, condition: ^u32, timeout: u32) -> i32 ---
+	socket_set_option              :: proc(socket: Socket, option: SocketOption, value: i32) -> i32 ---
+	socket_get_option              :: proc(socket: Socket, option: SocketOption, value: ^i32) -> i32 ---
+	socket_shutdown                :: proc(socket: Socket, how: SocketShutdown) -> i32 ---
+	socket_destroy                 :: proc(socket: Socket) ---
+	socketset_select               :: proc(socket: Socket, readSet: ^SocketSet, writeSet: ^SocketSet, timeout: u32) -> i32 ---
 
 	address_set_host_ip            :: proc(address: ^Address, hostName: cstring) -> i32 ---
 	address_set_host               :: proc(address: ^Address, hostName: cstring) -> i32 ---
 	address_get_host_ip            :: proc(address: ^Address, hostName: [^]u8, nameLength: uint) -> i32 ---
 	address_get_host               :: proc(address: ^Address, hostName: [^]u8, nameLength: uint) -> i32 ---
 
-	packet_create                  :: proc(rawptr, uint, u32) -> ^Packet ---
-	packet_destroy                 :: proc(^Packet) ---
-	packet_resize                  :: proc(^Packet, uint) -> i32 ---
-	crc32                          :: proc(^Buffer, uint) -> u32 ---
+	packet_create                  :: proc(data: rawptr, dataLength: uint, flags: PacketFlag) -> ^Packet ---
+	packet_destroy                 :: proc(packet: ^Packet) ---
+	packet_resize                  :: proc(packet: ^Packet, dataLength: uint) -> i32 ---
+	crc32                          :: proc(buffers: [^]Buffer, bufferCount: uint) -> u32 ---
 
-	host_create                    :: proc(^Address, uint, uint, u32, u32) -> ^Host ---
-	host_destroy                   :: proc(^Host) ---
-	host_connect                   :: proc(^Host, ^Address, uint, u32) -> ^Peer ---
-	host_check_events              :: proc(^Host, ^Event) -> i32 ---
-	host_service                   :: proc(^Host, ^Event, u32) -> i32 ---
-	host_flush                     :: proc(^Host) ---
-	host_broadcast                 :: proc(^Host, u8, ^Packet) ---
-	host_compress                  :: proc(^Host, ^Compressor) ---
-	host_compress_with_range_coder :: proc(^Host) -> i32 ---
-	host_channel_limit             :: proc(^Host, uint) ---
-	host_bandwidth_limit           :: proc(^Host, u32, u32) ---
+	host_create                    :: proc(address: ^Address, peerCount: uint, channelLimit: uint, incomingBandwidth: u32, outgoingBandwidth: u32) -> ^Host ---
+	host_destroy                   :: proc(host: ^Host) ---
+	host_connect                   :: proc(host: ^Host, address: ^Address, channelCount: uint, data: u32) -> ^Peer ---
+	host_check_events              :: proc(host: ^Host, event: ^Event) -> i32 ---
+	host_service                   :: proc(host: ^Host, event: ^Event, timeout: u32) -> i32 ---
+	host_flush                     :: proc(host: ^Host) ---
+	host_broadcast                 :: proc(host: ^Host, channelID: u8, packet: ^Packet) ---
+	host_compress                  :: proc(host: ^Host, compressor: ^Compressor) ---
+	host_compress_with_range_coder :: proc(host: ^Host) -> i32 ---
+	host_channel_limit             :: proc(host: ^Host, channelLimit: uint) ---
+	host_bandwidth_limit           :: proc(host: ^Host, incomingBandwidth: u32, outgoingBandwidth: u32) ---
 
-	peer_send                      :: proc(^Peer, u8, ^Packet) -> i32 ---
-	peer_receive                   :: proc(^Peer, ^u8) -> ^Packet ---
-	peer_ping                      :: proc(^Peer) ---
-	peer_ping_interval             :: proc(^Peer, u32) ---
-	peer_timeout                   :: proc(^Peer, u32, u32, u32) ---
-	peer_reset                     :: proc(^Peer) ---
-	peer_disconnect                :: proc(^Peer, u32) ---
-	peer_disconnect_now            :: proc(^Peer, u32) ---
-	peer_disconnect_later          :: proc(^Peer, u32) ---
-	peer_throttle_configure        :: proc(^Peer, u32, u32, u32) ---
+	peer_send                      :: proc(peer: ^Peer, channelID: u8, packet: ^Packet) -> i32 ---
+	peer_receive                   :: proc(peer: ^Peer, channelID: ^u8) -> ^Packet ---
+	peer_ping                      :: proc(peer: ^Peer) ---
+	peer_ping_interval             :: proc(peer: ^Peer, pingInterval: u32) ---
+	peer_timeout                   :: proc(peer: ^Peer, timoutLimit: u32, timeoutMinimum: u32, timeoutMaximum: u32) ---
+	peer_reset                     :: proc(peer: ^Peer) ---
+	peer_disconnect                :: proc(peer: ^Peer, data: u32) ---
+	peer_disconnect_now            :: proc(peer: ^Peer, data: u32) ---
+	peer_disconnect_later          :: proc(peer: ^Peer, data: u32) ---
+	peer_throttle_configure        :: proc(peer: ^Peer, interval: u32, acceleration: u32, deceleration: u32) ---
 
 	range_coder_create             :: proc() -> rawptr ---
-	range_coder_destroy            :: proc(rawptr) ---
-	range_coder_compress           :: proc(rawptr, [^]Buffer, uint, uint, [^]u8, uint) -> uint ---
-	range_coder_decompress         :: proc(rawptr, [^]u8, uint, [^]u8, uint) -> uint ---
+	range_coder_destroy            :: proc(ctx: rawptr) ---
+	range_coder_compress           :: proc(ctx: rawptr, inBuffers: [^]Buffer, inBufferCount: uint, inLimit: uint, outData: [^]u8, outLimit: uint) -> uint ---
+	range_coder_decompress         :: proc(ctx: rawptr, inData: [^]u8, inLimit: uint, outData: [^]u8, outLimit: uint) -> uint ---
 }

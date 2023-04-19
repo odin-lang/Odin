@@ -1,11 +1,11 @@
 package time
 
 import "core:runtime"
+import "core:intrinsics"
 
 Tick :: struct {
 	_nsec: i64, // relative amount
 }
-
 tick_now :: proc "contextless" () -> Tick {
 	return _tick_now()
 }
@@ -38,6 +38,59 @@ SCOPED_TICK_DURATION :: proc "contextless" (d: ^Duration) -> Tick {
 
 _tick_duration_end :: proc "contextless" (d: ^Duration, t: Tick) {
 	d^ = tick_since(t)
+}
+
+when ODIN_ARCH == .amd64 {
+	@(private)
+	x86_has_invariant_tsc :: proc "contextless" () -> bool {
+		eax, _, _, _ := intrinsics.x86_cpuid(0x80_000_000, 0)
+
+		// Is this processor *really* ancient?
+		if eax < 0x80_000_007 {
+			return false
+		}
+
+		// check if the invariant TSC bit is set
+		_, _, _, edx := intrinsics.x86_cpuid(0x80_000_007, 0)
+		return (edx & (1 << 8)) != 0
+	}
+}
+
+when ODIN_OS != .Darwin && ODIN_OS != .Linux && ODIN_OS != .FreeBSD {
+	_get_tsc_frequency :: proc "contextless" () -> (u64, bool) {
+		return 0, false
+	}
+}
+
+has_invariant_tsc :: proc "contextless" () -> bool {
+	when ODIN_ARCH == .amd64 {
+		return x86_has_invariant_tsc()
+	}
+
+	return false
+}
+
+tsc_frequency :: proc "contextless" () -> (u64, bool) {
+	if !has_invariant_tsc() {
+		return 0, false
+	}
+
+	hz, ok := _get_tsc_frequency()
+	if !ok {
+		// fallback to approximate TSC
+		tsc_begin := intrinsics.read_cycle_counter()
+		tick_begin := tick_now()
+
+		sleep(2 * Second)
+
+		tsc_end := intrinsics.read_cycle_counter()
+		tick_end := tick_now()
+
+		time_diff := u128(duration_nanoseconds(tick_diff(tick_begin, tick_end)))
+		hz = u64((u128(tsc_end - tsc_begin) * 1_000_000_000) / time_diff)
+	}
+
+	return hz, true
 }
 
 /*

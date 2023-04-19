@@ -83,8 +83,8 @@ Type_Info_Multi_Pointer :: struct {
 	elem: ^Type_Info,
 }
 Type_Info_Procedure :: struct {
-	params:     ^Type_Info, // Type_Info_Tuple
-	results:    ^Type_Info, // Type_Info_Tuple
+	params:     ^Type_Info, // Type_Info_Parameters
+	results:    ^Type_Info, // Type_Info_Parameters
 	variadic:   bool,
 	convention: Calling_Convention,
 }
@@ -104,10 +104,12 @@ Type_Info_Enumerated_Array :: struct {
 }
 Type_Info_Dynamic_Array :: struct {elem: ^Type_Info, elem_size: int}
 Type_Info_Slice         :: struct {elem: ^Type_Info, elem_size: int}
-Type_Info_Tuple :: struct { // Only used for procedures parameters and results
+
+Type_Info_Parameters :: struct { // Only used for procedures parameters and results
 	types:        []^Type_Info,
 	names:        []string,
 }
+Type_Info_Tuple :: Type_Info_Parameters // Will be removed eventually
 
 Type_Info_Struct :: struct {
 	types:        []^Type_Info,
@@ -117,6 +119,7 @@ Type_Info_Struct :: struct {
 	tags:         []string,
 	is_packed:    bool,
 	is_raw_union: bool,
+	is_no_copy:   bool,
 	custom_align: bool,
 
 	equal: Equal_Proc, // set only when the struct has .Comparable set but does not have .Simple_Compare set
@@ -143,11 +146,9 @@ Type_Info_Enum :: struct {
 	values:    []Type_Info_Enum_Value,
 }
 Type_Info_Map :: struct {
-	key:              ^Type_Info,
-	value:            ^Type_Info,
-	generated_struct: ^Type_Info,
-	key_equal:        Equal_Proc,
-	key_hasher:       Hasher_Proc,
+	key:      ^Type_Info,
+	value:    ^Type_Info,
+	map_info: ^Map_Info,
 }
 Type_Info_Bit_Set :: struct {
 	elem:       ^Type_Info,
@@ -210,7 +211,7 @@ Type_Info :: struct {
 		Type_Info_Enumerated_Array,
 		Type_Info_Dynamic_Array,
 		Type_Info_Slice,
-		Type_Info_Tuple,
+		Type_Info_Parameters,
 		Type_Info_Struct,
 		Type_Info_Union,
 		Type_Info_Enum,
@@ -331,6 +332,12 @@ Allocator :: struct {
 	data:      rawptr,
 }
 
+Byte     :: 1
+Kilobyte :: 1024 * Byte
+Megabyte :: 1024 * Kilobyte
+Gigabyte :: 1024 * Megabyte
+Terabyte :: 1024 * Gigabyte
+
 // Logging stuff
 
 Logger_Level :: enum uint {
@@ -394,9 +401,32 @@ Raw_Dynamic_Array :: struct {
 	allocator: Allocator,
 }
 
+// The raw, type-erased representation of a map.
+//
+// 32-bytes on 64-bit
+// 16-bytes on 32-bit
 Raw_Map :: struct {
-	hashes:  []Map_Index,
-	entries: Raw_Dynamic_Array,
+	// A single allocation spanning all keys, values, and hashes.
+	// {
+	//   k: Map_Cell(K) * (capacity / ks_per_cell)
+	//   v: Map_Cell(V) * (capacity / vs_per_cell)
+	//   h: Map_Cell(H) * (capacity / hs_per_cell)
+	// }
+	//
+	// The data is allocated assuming 64-byte alignment, meaning the address is
+	// always a multiple of 64. This means we have 6 bits of zeros in the pointer
+	// to store the capacity. We can store a value as large as 2^6-1 or 63 in
+	// there. This conveniently is the maximum log2 capacity we can have for a map
+	// as Odin uses signed integers to represent capacity.
+	//
+	// Since the hashes are backed by Map_Hash, which is just a 64-bit unsigned
+	// integer, the cell structure for hashes is unnecessary because 64/8 is 8 and
+	// requires no padding, meaning it can be indexed as a regular array of
+	// Map_Hash directly, though for consistency sake it's written as if it were
+	// an array of Map_Cell(Map_Hash).
+	data:      uintptr,   // 8-bytes on 64-bits, 4-bytes on 32-bits
+	len:       int,       // 8-bytes on 64-bits, 4-bytes on 32-bits
+	allocator: Allocator, // 16-bytes on 64-bits, 8-bytes on 32-bits
 }
 
 Raw_Any :: struct {
@@ -478,11 +508,8 @@ Odin_Endian_Type :: type_of(ODIN_ENDIAN)
 foreign {
 	@(link_name="__$startup_runtime")
 	_startup_runtime :: proc "odin" () ---
-}
-
-@(link_name="__$cleanup_runtime")
-_cleanup_runtime :: proc() {
-	default_temp_allocator_destroy(&global_default_temp_allocator_data)
+	@(link_name="__$cleanup_runtime")
+	_cleanup_runtime :: proc "odin" () ---
 }
 
 _cleanup_runtime_contextless :: proc "contextless" () {
@@ -595,7 +622,9 @@ __init_context :: proc "contextless" (c: ^Context) {
 	c.allocator.data = nil
 
 	c.temp_allocator.procedure = default_temp_allocator_proc
-	c.temp_allocator.data = &global_default_temp_allocator_data
+	when !NO_DEFAULT_TEMP_ALLOCATOR {
+		c.temp_allocator.data = &global_default_temp_allocator_data
+	}
 	
 	when !ODIN_DISABLE_ASSERT {
 		c.assertion_failure_proc = default_assertion_failure_proc

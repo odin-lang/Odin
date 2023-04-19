@@ -17,12 +17,12 @@ import "core:compress"
 import "core:compress/zlib"
 import "core:image"
 
-import "core:os"
 import "core:hash"
 import "core:bytes"
 import "core:io"
 import "core:mem"
 import "core:intrinsics"
+import "core:runtime"
 
 // Limit chunk sizes.
 // By default: IDAT = 8k x 8k x 16-bits + 8k filter bytes.
@@ -333,19 +333,6 @@ load_from_bytes :: proc(data: []byte, options := Options{}, allocator := context
 	img, err = load_from_context(ctx, options, allocator)
 
 	return img, err
-}
-
-load_from_file :: proc(filename: string, options := Options{}, allocator := context.allocator) -> (img: ^Image, err: Error) {
-	context.allocator = allocator
-
-	data, ok := os.read_entire_file(filename)
-	defer delete(data)
-
-	if ok {
-		return load_from_bytes(data, options)
-	} else {
-		return nil, .Unable_To_Read_File
-	}
 }
 
 load_from_context :: proc(ctx: ^$C, options := Options{}, allocator := context.allocator) -> (img: ^Image, err: Error) {
@@ -1247,6 +1234,8 @@ defilter_8 :: proc(params: ^Filter_Params) -> (ok: bool) {
 
 	// TODO: See about doing a Duff's #unroll where practicable
 
+	runtime.DEFAULT_TEMP_ALLOCATOR_TEMP_GUARD()
+
 	// Apron so we don't need to special case first rows.
 	up := make([]u8, row_stride, context.temp_allocator)
 	ok = true
@@ -1299,10 +1288,9 @@ defilter_8 :: proc(params: ^Filter_Params) -> (ok: bool) {
 }
 
 // @(optimization_mode="speed")
-defilter_less_than_8 :: proc(params: ^Filter_Params) -> (ok: bool) #no_bounds_check {
+defilter_less_than_8 :: proc(params: ^Filter_Params) -> bool #no_bounds_check {
 
 	using params
-	ok = true
 
 	row_stride_in  := ((channels * width * depth) + 7) >> 3
 	row_stride_out := channels * width
@@ -1313,6 +1301,8 @@ defilter_less_than_8 :: proc(params: ^Filter_Params) -> (ok: bool) #no_bounds_ch
 	orig_dest := dest
 
 	// TODO: See about doing a Duff's #unroll where practicable
+
+	runtime.DEFAULT_TEMP_ALLOCATOR_TEMP_GUARD()
 
 	// Apron so we don't need to special case first rows.
 	up := make([]u8, row_stride_out, context.temp_allocator)
@@ -1457,17 +1447,17 @@ defilter_less_than_8 :: proc(params: ^Filter_Params) -> (ok: bool) #no_bounds_ch
 		}
 	}
 
-	return
+	return true
 }
 
 // @(optimization_mode="speed")
-defilter_16 :: proc(params: ^Filter_Params) -> (ok: bool) {
-
+defilter_16 :: proc(params: ^Filter_Params) -> bool {
 	using params
-	ok = true
 
 	stride := channels * 2
 	row_stride := width * stride
+
+	runtime.DEFAULT_TEMP_ALLOCATOR_TEMP_GUARD()
 
 	// TODO: See about doing a Duff's #unroll where practicable
 	// Apron so we don't need to special case first rows.
@@ -1518,7 +1508,7 @@ defilter_16 :: proc(params: ^Filter_Params) -> (ok: bool) {
 		dest    = dest[row_stride:]
 	}
 
-	return
+	return true
 }
 
 defilter :: proc(img: ^Image, filter_bytes: ^bytes.Buffer, header: ^image.PNG_IHDR, options: Options) -> (err: Error) {
@@ -1636,8 +1626,6 @@ defilter :: proc(img: ^Image, filter_bytes: ^bytes.Buffer, header: ^image.PNG_IH
 
 	return nil
 }
-
-load :: proc{load_from_file, load_from_bytes, load_from_context}
 
 
 @(init, private)

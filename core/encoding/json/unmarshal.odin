@@ -346,6 +346,8 @@ unmarshal_object :: proc(p: ^Parser, v: any, end_token: Token_Kind) -> (err: Unm
 			
 			fields := reflect.struct_fields_zipped(ti.id)
 			
+			runtime.DEFAULT_TEMP_ALLOCATOR_TEMP_GUARD(ignore = context.temp_allocator == context.allocator)
+
 			field_used := make([]bool, len(fields), context.temp_allocator)
 			
 			use_field_idx := -1
@@ -399,11 +401,9 @@ unmarshal_object :: proc(p: ^Parser, v: any, end_token: Token_Kind) -> (err: Unm
 			return UNSUPPORTED_TYPE
 		}
 		raw_map := (^mem.Raw_Map)(v.data)
-		if raw_map.entries.allocator.procedure == nil {
-			raw_map.entries.allocator = p.allocator
+		if raw_map.allocator.procedure == nil {
+			raw_map.allocator = p.allocator
 		}
-		
-		header := runtime.__get_map_header_table_runtime(t)
 		
 		elem_backing := bytes_make(t.value.size, t.value.align, p.allocator) or_return
 		defer delete(elem_backing, p.allocator)
@@ -421,7 +421,6 @@ unmarshal_object :: proc(p: ^Parser, v: any, end_token: Token_Kind) -> (err: Unm
 				return err
 			}
 
-			key_hash := runtime.default_hasher_string(&key, 0)
 			key_ptr := rawptr(&key)
 
 			key_cstr: cstring
@@ -430,7 +429,7 @@ unmarshal_object :: proc(p: ^Parser, v: any, end_token: Token_Kind) -> (err: Unm
 				key_ptr = &key_cstr
 			}
 			
-			set_ptr := runtime.__dynamic_map_set(raw_map, header, key_hash, key_ptr, map_backing_value.data)
+			set_ptr := runtime.__dynamic_map_set_without_hash(raw_map, t.map_info, key_ptr, map_backing_value.data)
 			if set_ptr == nil {
 				delete(key, p.allocator)
 			} 

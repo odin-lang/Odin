@@ -457,8 +457,8 @@ run_as_user :: proc(username, password, application, commandline: string, pi: ^P
 		// err := GetLastError();
 		// fmt.printf("GetLastError: %v\n", err);
 	}
-	si := STARTUPINFO{}
-	si.cb = size_of(STARTUPINFO)
+	si := STARTUPINFOW{}
+	si.cb = size_of(STARTUPINFOW)
 	pi := pi
 
 	ok = bool(CreateProcessAsUserW(
@@ -484,4 +484,25 @@ run_as_user :: proc(username, password, application, commandline: string, pi: ^P
 	} else {
 		return false
 	}
+}
+
+ensure_winsock_initialized :: proc() {
+	@static gate := false
+	@static initted := false
+
+	if initted {
+		return
+	}
+
+	for intrinsics.atomic_compare_exchange_strong(&gate, false, true) {
+		intrinsics.cpu_relax()
+	}
+	defer intrinsics.atomic_store(&gate, false)
+
+	unused_info: WSADATA
+	version_requested := WORD(2) << 8 | 2
+	res := WSAStartup(version_requested, &unused_info)
+	assert(res == 0, "unable to initialized Winsock2")
+
+	initted = true
 }

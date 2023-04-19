@@ -7,6 +7,7 @@ import "core:strings"
 import "core:unicode/utf16"
 
 import "core:fmt"
+import "core:runtime"
 
 @(private)
 version_string_buf: [1024]u8
@@ -222,11 +223,10 @@ init_os_version :: proc () {
 
 	// Grab Windows DisplayVersion (like 20H02)
 	format_display_version :: proc (b: ^strings.Builder) -> (version: string) {
-		dv, ok := read_reg(
+		dv, ok := read_reg_string(
 			sys.HKEY_LOCAL_MACHINE,
 			"SOFTWARE\\Microsoft\\Windows NT\\CurrentVersion",
 			"DisplayVersion",
-			string,
 		)
 		defer delete(dv) // It'll be interned into `version_string_buf`
 
@@ -242,11 +242,10 @@ init_os_version :: proc () {
 
 	// Grab build number and UBR
 	format_build_number :: proc (b: ^strings.Builder, major_build: int) -> (ubr: int) {
-		res, ok := read_reg(
+		res, ok := read_reg_i32(
 			sys.HKEY_LOCAL_MACHINE,
 			"SOFTWARE\\Microsoft\\Windows NT\\CurrentVersion",
 			"UBR",
-			i32,
 		)
 
 		if ok {
@@ -288,17 +287,17 @@ init_gpu_info :: proc() {
 	for {
 		key := fmt.tprintf("%v\\%04d", GPU_INFO_BASE, gpu_index)
 
-		if vendor, ok := read_reg(sys.HKEY_LOCAL_MACHINE, key, "ProviderName", string); ok {
+		if vendor, ok := read_reg_string(sys.HKEY_LOCAL_MACHINE, key, "ProviderName"); ok {
 			append(&gpu_list, GPU{vendor_name = vendor})
 		} else {
 			break
 		}
 
-		if desc, ok := read_reg(sys.HKEY_LOCAL_MACHINE, key, "DriverDesc", string); ok {
+		if desc, ok := read_reg_string(sys.HKEY_LOCAL_MACHINE, key, "DriverDesc"); ok {
 			gpu_list[gpu_index].model_name = desc
 		}
 
-		if vram, ok := read_reg(sys.HKEY_LOCAL_MACHINE, key, "HardwareInformation.qwMemorySize", i64); ok {
+		if vram, ok := read_reg_i64(sys.HKEY_LOCAL_MACHINE, key, "HardwareInformation.qwMemorySize"); ok {
 			gpu_list[gpu_index].total_ram = int(vram)
 		}
 		gpu_index += 1
@@ -307,69 +306,93 @@ init_gpu_info :: proc() {
 }
 
 @(private)
-read_reg :: proc(hkey: sys.HKEY, subkey, val: string, $T: typeid) -> (res: T, ok: bool) {
-	BUF_SIZE :: 1024
-
+read_reg_string :: proc(hkey: sys.HKEY, subkey, val: string) -> (res: string, ok: bool) {
 	if len(subkey) == 0 || len(val) == 0 {
-		return {}, false
+		return
 	}
 
+	runtime.DEFAULT_TEMP_ALLOCATOR_TEMP_GUARD()
+
+	BUF_SIZE :: 1024
 	key_name_wide := make([]u16, BUF_SIZE, context.temp_allocator)
 	val_name_wide := make([]u16, BUF_SIZE, context.temp_allocator)
 
 	utf16.encode_string(key_name_wide, subkey)
 	utf16.encode_string(val_name_wide, val)
 
-	when T == string {
-		result_wide := make([]u16, BUF_SIZE, context.temp_allocator)
-		result_size := sys.DWORD(BUF_SIZE * size_of(u16))
+	result_wide := make([]u16, BUF_SIZE, context.temp_allocator)
+	result_size := sys.DWORD(BUF_SIZE * size_of(u16))
 
-		status := sys.RegGetValueW(
-			hkey,
-			&key_name_wide[0],
-			&val_name_wide[0],
-			sys.RRF_RT_REG_SZ,
-			nil,
-			raw_data(result_wide[:]),
-			&result_size,
-		)
-		if status != 0 {
-			// Couldn't retrieve string
-			return
-		}
-
-		// Result string will be allocated for the caller.
-		result_utf8 := make([]u8, BUF_SIZE * 4, context.temp_allocator)
-		utf16.decode_to_utf8(result_utf8, result_wide[:result_size])
-		return strings.clone_from_cstring(cstring(raw_data(result_utf8))), true
-
-	} else when T == i32 {
-		result_size := sys.DWORD(size_of(i32))
-		status := sys.RegGetValueW(
-			hkey,
-			&key_name_wide[0],
-			&val_name_wide[0],
-			sys.RRF_RT_REG_DWORD,
-			nil,
-			&res,
-			&result_size,
-		)
-		return res, status == 0
-
-	} else when T == i64 {
-		result_size := sys.DWORD(size_of(i64))
-		status := sys.RegGetValueW(
-			hkey,
-			&key_name_wide[0],
-			&val_name_wide[0],
-			sys.RRF_RT_REG_QWORD,
-			nil,
-			&res,
-			&result_size,
-		)
-		return res, status == 0
-	} else {
-		#assert(false, "Unhandled type for read_reg")
+	status := sys.RegGetValueW(
+		hkey,
+		&key_name_wide[0],
+		&val_name_wide[0],
+		sys.RRF_RT_REG_SZ,
+		nil,
+		raw_data(result_wide[:]),
+		&result_size,
+	)
+	if status != 0 {
+		// Couldn't retrieve string
+		return
 	}
-	return
+
+	// Result string will be allocated for the caller.
+	result_utf8 := make([]u8, BUF_SIZE * 4, context.temp_allocator)
+	utf16.decode_to_utf8(result_utf8, result_wide[:result_size])
+	return strings.clone_from_cstring(cstring(raw_data(result_utf8))), true
+}
+@(private)
+read_reg_i32 :: proc(hkey: sys.HKEY, subkey, val: string) -> (res: i32, ok: bool) {
+	if len(subkey) == 0 || len(val) == 0 {
+		return
+	}
+
+	runtime.DEFAULT_TEMP_ALLOCATOR_TEMP_GUARD()
+
+	BUF_SIZE :: 1024
+	key_name_wide := make([]u16, BUF_SIZE, context.temp_allocator)
+	val_name_wide := make([]u16, BUF_SIZE, context.temp_allocator)
+
+	utf16.encode_string(key_name_wide, subkey)
+	utf16.encode_string(val_name_wide, val)
+
+	result_size := sys.DWORD(size_of(i32))
+	status := sys.RegGetValueW(
+		hkey,
+		&key_name_wide[0],
+		&val_name_wide[0],
+		sys.RRF_RT_REG_DWORD,
+		nil,
+		&res,
+		&result_size,
+	)
+	return res, status == 0
+}
+@(private)
+read_reg_i64 :: proc(hkey: sys.HKEY, subkey, val: string) -> (res: i64, ok: bool) {
+	if len(subkey) == 0 || len(val) == 0 {
+		return
+	}
+
+	runtime.DEFAULT_TEMP_ALLOCATOR_TEMP_GUARD()
+
+	BUF_SIZE :: 1024
+	key_name_wide := make([]u16, BUF_SIZE, context.temp_allocator)
+	val_name_wide := make([]u16, BUF_SIZE, context.temp_allocator)
+
+	utf16.encode_string(key_name_wide, subkey)
+	utf16.encode_string(val_name_wide, val)
+
+	result_size := sys.DWORD(size_of(i64))
+	status := sys.RegGetValueW(
+		hkey,
+		&key_name_wide[0],
+		&val_name_wide[0],
+		sys.RRF_RT_REG_QWORD,
+		nil,
+		&res,
+		&result_size,
+	)
+	return res, status == 0
 }

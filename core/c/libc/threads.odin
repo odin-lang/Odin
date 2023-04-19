@@ -44,7 +44,7 @@ when ODIN_OS == .Windows {
 		@(link_name="_Cnd_destroy")   cnd_destroy   :: proc(cond: ^cnd_t) ---
 		@(link_name="_Cnd_init")      cnd_init      :: proc(cond: ^cnd_t) -> int ---
 		@(link_name="_Cnd_signal")    cnd_signal    :: proc(cond: ^cnd_t) -> int ---
-		@(link_name="_Cnd_timedwait") cnd_timedwait :: proc(cond: ^cnd_t, ts: ^timespec) -> int ---
+		@(link_name="_Cnd_timedwait") cnd_timedwait :: proc(cond: ^cnd_t, mtx: ^mtx_t, ts: ^timespec) -> int ---
 		@(link_name="_Cnd_wait")      cnd_wait      :: proc(cond: ^cnd_t, mtx: ^mtx_t) -> int ---
 		
 		// 7.26.4 Mutex functions
@@ -108,7 +108,7 @@ when ODIN_OS == .Linux {
 		cnd_destroy   :: proc(cond: ^cnd_t) ---
 		cnd_init      :: proc(cond: ^cnd_t) -> int ---
 		cnd_signal    :: proc(cond: ^cnd_t) -> int ---
-		cnd_timedwait :: proc(cond: ^cnd_t, ts: ^timespec) -> int ---
+		cnd_timedwait :: proc(cond: ^cnd_t, mtx: ^mtx_t, ts: ^timespec) -> int ---
 		cnd_wait      :: proc(cond: ^cnd_t, mtx: ^mtx_t) -> int ---
 		
 		// 7.26.4 Mutex functions

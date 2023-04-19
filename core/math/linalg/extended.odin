@@ -429,11 +429,11 @@ reflect :: proc(I, N: $T) -> (out: T) where IS_ARRAY(T), IS_FLOAT(ELEM_TYPE(T)) 
 	b := N * (2 * dot(N, I))
 	return I - b
 }
-refract :: proc(I, N: $T) -> (out: T) where IS_ARRAY(T), IS_FLOAT(ELEM_TYPE(T)) {
-	dv := dot(N, I)
-	k := 1 - eta*eta - (1 - dv*dv)
+refract :: proc(I, Normal: $V/[$N]$E, eta: E) -> (out: V) where IS_ARRAY(V), IS_FLOAT(ELEM_TYPE(V)) {
+	dv := dot(Normal, I)
+	k := 1 - eta*eta * (1 - dv*dv)
 	a := I * eta
-	b := N * eta*dv*math.sqrt(k)
+	b := Normal * (eta*dv+math.sqrt(k))
 	return (a - b) * E(int(k >= 0))
 }
 
@@ -531,7 +531,7 @@ not_equal          :: proc{not_equal_single, not_equal_array}
 
 any :: proc(x: $A/[$N]bool) -> (out: bool) {
 	for e in x {
-		if x {
+		if e {
 			return true
 		}
 	}

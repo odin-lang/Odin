@@ -4,6 +4,7 @@ package sysinfo
 import "core:c"
 import sys "core:sys/unix"
 import "core:intrinsics"
+import "core:runtime"
 import "core:os"
 import "core:strings"
 import "core:strconv"
@@ -68,6 +69,8 @@ init_os_version :: proc () {
 
 	l := strings.builder_len(b)
 	strings.write_string(&b, string(cstring(&uts.release[0])))
+
+	runtime.DEFAULT_TEMP_ALLOCATOR_TEMP_GUARD()
 
 	// Parse kernel version, as substrings of the version info in `version_string_buf`
 	version_bits := strings.split_n(strings.to_string(b)[l:], "-", 2, context.temp_allocator)

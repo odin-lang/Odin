@@ -4,6 +4,7 @@ package sysinfo
 import sys "core:sys/unix"
 import "core:strconv"
 import "core:strings"
+import "core:runtime"
 
 @(private)
 version_string_buf: [1024]u8
@@ -41,6 +42,8 @@ init_os_version :: proc () {
 
 		major_ok, minor_ok, patch_ok: bool
 
+		tmp := runtime.default_temp_allocator_temp_begin()
+
 		triplet := strings.split(string(cstring(&version_bits[0])), ".", context.temp_allocator)
 		if len(triplet) != 3 {
 			have_kernel_version = false
@@ -53,6 +56,8 @@ init_os_version :: proc () {
 				have_kernel_version = false
 			}
 		}
+
+		runtime.default_temp_allocator_temp_end(tmp)
 
 		if !have_kernel_version {
 			// We don't know the kernel version, but we do know the build

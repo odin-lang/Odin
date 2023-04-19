@@ -42,7 +42,7 @@ write :: proc(w: ^Writer, record: []string) -> io.Error {
 				}
 			}
 		case:
-			if strings.contains_rune(field, w.comma) >= 0 {
+			if strings.contains_rune(field, w.comma) {
 				return true
 			}
 			if strings.contains_any(field, CHAR_SET) {

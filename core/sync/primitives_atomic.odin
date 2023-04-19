@@ -13,14 +13,14 @@ Atomic_Mutex_State :: enum Futex {
 // The zero value for a Atomic_Mutex is an unlocked mutex
 //
 // An Atomic_Mutex must not be copied after first use
-Atomic_Mutex :: struct {
+Atomic_Mutex :: struct #no_copy {
 	state: Atomic_Mutex_State,
 }
 
 // atomic_mutex_lock locks m
-atomic_mutex_lock :: proc(m: ^Atomic_Mutex) {
+atomic_mutex_lock :: proc "contextless" (m: ^Atomic_Mutex) {
 	@(cold)
-	lock_slow :: proc(m: ^Atomic_Mutex, curr_state: Atomic_Mutex_State) {
+	lock_slow :: proc "contextless" (m: ^Atomic_Mutex, curr_state: Atomic_Mutex_State) {
 		new_state := curr_state // Make a copy of it
 
 		spin_lock: for spin in 0..<i32(100) {
@@ -58,9 +58,9 @@ atomic_mutex_lock :: proc(m: ^Atomic_Mutex) {
 }
 
 // atomic_mutex_unlock unlocks m
-atomic_mutex_unlock :: proc(m: ^Atomic_Mutex) {
+atomic_mutex_unlock :: proc "contextless" (m: ^Atomic_Mutex) {
 	@(cold)
-	unlock_slow :: proc(m: ^Atomic_Mutex) {
+	unlock_slow :: proc "contextless" (m: ^Atomic_Mutex) {
 		futex_signal((^Futex)(&m.state))
 	}
 
@@ -76,7 +76,7 @@ atomic_mutex_unlock :: proc(m: ^Atomic_Mutex) {
 }
 
 // atomic_mutex_try_lock tries to lock m, will return true on success, and false on failure
-atomic_mutex_try_lock :: proc(m: ^Atomic_Mutex) -> bool {
+atomic_mutex_try_lock :: proc "contextless" (m: ^Atomic_Mutex) -> bool {
 	_, ok := atomic_compare_exchange_strong_explicit(&m.state, .Unlocked, .Locked, .Acquire, .Consume)
 	return ok
 }
@@ -88,7 +88,7 @@ Example:
 	}
 */
 @(deferred_in=atomic_mutex_unlock)
-atomic_mutex_guard :: proc(m: ^Atomic_Mutex) -> bool {
+atomic_mutex_guard :: proc "contextless" (m: ^Atomic_Mutex) -> bool {
 	atomic_mutex_lock(m)
 	return true
 }
@@ -109,7 +109,7 @@ Atomic_RW_Mutex_State_Reader_Mask :: Atomic_RW_Mutex_State(1<<(Atomic_RW_Mutex_S
 // The zero value for an Atomic_RW_Mutex is an unlocked mutex
 //
 // An Atomic_RW_Mutex must not be copied after first use
-Atomic_RW_Mutex :: struct {
+Atomic_RW_Mutex :: struct #no_copy {
 	state: Atomic_RW_Mutex_State,
 	mutex: Atomic_Mutex,
 	sema:  Atomic_Sema,
@@ -117,7 +117,7 @@ Atomic_RW_Mutex :: struct {
 
 // atomic_rw_mutex_lock locks rw for writing (with a single writer)
 // If the mutex is already locked for reading or writing, the mutex blocks until the mutex is available.
-atomic_rw_mutex_lock :: proc(rw: ^Atomic_RW_Mutex) {
+atomic_rw_mutex_lock :: proc "contextless" (rw: ^Atomic_RW_Mutex) {
 	_ = atomic_add(&rw.state, Atomic_RW_Mutex_State_Writer)
 	atomic_mutex_lock(&rw.mutex)
 
@@ -128,13 +128,13 @@ atomic_rw_mutex_lock :: proc(rw: ^Atomic_RW_Mutex) {
 }
 
 // atomic_rw_mutex_unlock unlocks rw for writing (with a single writer)
-atomic_rw_mutex_unlock :: proc(rw: ^Atomic_RW_Mutex) {
+atomic_rw_mutex_unlock :: proc "contextless" (rw: ^Atomic_RW_Mutex) {
 	_ = atomic_and(&rw.state, ~Atomic_RW_Mutex_State_Is_Writing)
 	atomic_mutex_unlock(&rw.mutex)
 }
 
 // atomic_rw_mutex_try_lock tries to lock rw for writing (with a single writer)
-atomic_rw_mutex_try_lock :: proc(rw: ^Atomic_RW_Mutex) -> bool {
+atomic_rw_mutex_try_lock :: proc "contextless" (rw: ^Atomic_RW_Mutex) -> bool {
 	if atomic_mutex_try_lock(&rw.mutex) {
 		state := atomic_load(&rw.state)
 		if state & Atomic_RW_Mutex_State_Reader_Mask == 0 {
@@ -148,7 +148,7 @@ atomic_rw_mutex_try_lock :: proc(rw: ^Atomic_RW_Mutex) -> bool {
 }
 
 // atomic_rw_mutex_shared_lock locks rw for reading (with arbitrary number of readers)
-atomic_rw_mutex_shared_lock :: proc(rw: ^Atomic_RW_Mutex) {
+atomic_rw_mutex_shared_lock :: proc "contextless" (rw: ^Atomic_RW_Mutex) {
 	state := atomic_load(&rw.state)
 	for state & (Atomic_RW_Mutex_State_Is_Writing|Atomic_RW_Mutex_State_Writer_Mask) == 0 {
 		ok: bool
@@ -164,7 +164,7 @@ atomic_rw_mutex_shared_lock :: proc(rw: ^Atomic_RW_Mutex) {
 }
 
 // atomic_rw_mutex_shared_unlock unlocks rw for reading (with arbitrary number of readers)
-atomic_rw_mutex_shared_unlock :: proc(rw: ^Atomic_RW_Mutex) {
+atomic_rw_mutex_shared_unlock :: proc "contextless" (rw: ^Atomic_RW_Mutex) {
 	state := atomic_sub(&rw.state, Atomic_RW_Mutex_State_Reader)
 
 	if (state & Atomic_RW_Mutex_State_Reader_Mask == Atomic_RW_Mutex_State_Reader) &&
@@ -174,7 +174,7 @@ atomic_rw_mutex_shared_unlock :: proc(rw: ^Atomic_RW_Mutex) {
 }
 
 // atomic_rw_mutex_try_shared_lock tries to lock rw for reading (with arbitrary number of readers)
-atomic_rw_mutex_try_shared_lock :: proc(rw: ^Atomic_RW_Mutex) -> bool {
+atomic_rw_mutex_try_shared_lock :: proc "contextless" (rw: ^Atomic_RW_Mutex) -> bool {
 	state := atomic_load(&rw.state)
 	if state & (Atomic_RW_Mutex_State_Is_Writing|Atomic_RW_Mutex_State_Writer_Mask) == 0 {
 		_, ok := atomic_compare_exchange_strong(&rw.state, state, state + Atomic_RW_Mutex_State_Reader)
@@ -198,7 +198,7 @@ Example:
 	}
 */
 @(deferred_in=atomic_rw_mutex_unlock)
-atomic_rw_mutex_guard :: proc(m: ^Atomic_RW_Mutex) -> bool {
+atomic_rw_mutex_guard :: proc "contextless" (m: ^Atomic_RW_Mutex) -> bool {
 	atomic_rw_mutex_lock(m)
 	return true
 }
@@ -210,7 +210,7 @@ Example:
 	}
 */
 @(deferred_in=atomic_rw_mutex_shared_unlock)
-atomic_rw_mutex_shared_guard :: proc(m: ^Atomic_RW_Mutex) -> bool {
+atomic_rw_mutex_shared_guard :: proc "contextless" (m: ^Atomic_RW_Mutex) -> bool {
 	atomic_rw_mutex_shared_lock(m)
 	return true
 }
@@ -222,13 +222,13 @@ atomic_rw_mutex_shared_guard :: proc(m: ^Atomic_RW_Mutex) -> bool {
 // The zero value for a Recursive_Mutex is an unlocked mutex
 //
 // An Atomic_Recursive_Mutex must not be copied after first use
-Atomic_Recursive_Mutex :: struct {
+Atomic_Recursive_Mutex :: struct #no_copy {
 	owner:     int,
 	recursion: int,
 	mutex: Mutex,
 }
 
-atomic_recursive_mutex_lock :: proc(m: ^Atomic_Recursive_Mutex) {
+atomic_recursive_mutex_lock :: proc "contextless" (m: ^Atomic_Recursive_Mutex) {
 	tid := current_thread_id()
 	if tid != m.owner {
 		mutex_lock(&m.mutex)
@@ -238,9 +238,9 @@ atomic_recursive_mutex_lock :: proc(m: ^Atomic_Recursive_Mutex) {
 	m.recursion += 1
 }
 
-atomic_recursive_mutex_unlock :: proc(m: ^Atomic_Recursive_Mutex) {
+atomic_recursive_mutex_unlock :: proc "contextless" (m: ^Atomic_Recursive_Mutex) {
 	tid := current_thread_id()
-	assert(tid == m.owner)
+	_assert(tid == m.owner, "tid != m.owner")
 	m.recursion -= 1
 	recursion := m.recursion
 	if recursion == 0 {
@@ -253,7 +253,7 @@ atomic_recursive_mutex_unlock :: proc(m: ^Atomic_Recursive_Mutex) {
 
 }
 
-atomic_recursive_mutex_try_lock :: proc(m: ^Atomic_Recursive_Mutex) -> bool {
+atomic_recursive_mutex_try_lock :: proc "contextless" (m: ^Atomic_Recursive_Mutex) -> bool {
 	tid := current_thread_id()
 	if m.owner == tid {
 		return mutex_try_lock(&m.mutex)
@@ -274,7 +274,7 @@ Example:
 	}
 */
 @(deferred_in=atomic_recursive_mutex_unlock)
-atomic_recursive_mutex_guard :: proc(m: ^Atomic_Recursive_Mutex) -> bool {
+atomic_recursive_mutex_guard :: proc "contextless" (m: ^Atomic_Recursive_Mutex) -> bool {
 	atomic_recursive_mutex_lock(m)
 	return true
 }
@@ -285,11 +285,11 @@ atomic_recursive_mutex_guard :: proc(m: ^Atomic_Recursive_Mutex) -> bool {
 // waiting for signalling the occurence of an event
 //
 // An Atomic_Cond must not be copied after first use
-Atomic_Cond :: struct {
+Atomic_Cond :: struct #no_copy {
 	state: Futex,
 }
 
-atomic_cond_wait :: proc(c: ^Atomic_Cond, m: ^Atomic_Mutex) {
+atomic_cond_wait :: proc "contextless" (c: ^Atomic_Cond, m: ^Atomic_Mutex) {
 	state := u32(atomic_load_explicit(&c.state, .Relaxed))
 	unlock(m)
 	futex_wait(&c.state, state)
@@ -297,7 +297,7 @@ atomic_cond_wait :: proc(c: ^Atomic_Cond, m: ^Atomic_Mutex) {
 
 }
 
-atomic_cond_wait_with_timeout :: proc(c: ^Atomic_Cond, m: ^Atomic_Mutex, duration: time.Duration) -> (ok: bool) {
+atomic_cond_wait_with_timeout :: proc "contextless" (c: ^Atomic_Cond, m: ^Atomic_Mutex, duration: time.Duration) -> (ok: bool) {
 	state := u32(atomic_load_explicit(&c.state, .Relaxed))
 	unlock(m)
 	ok = futex_wait_with_timeout(&c.state, state, duration)
@@ -306,12 +306,12 @@ atomic_cond_wait_with_timeout :: proc(c: ^Atomic_Cond, m: ^Atomic_Mutex, duratio
 }
 
 
-atomic_cond_signal :: proc(c: ^Atomic_Cond) {
+atomic_cond_signal :: proc "contextless" (c: ^Atomic_Cond) {
 	atomic_add_explicit(&c.state, 1, .Release)
 	futex_signal(&c.state)
 }
 
-atomic_cond_broadcast :: proc(c: ^Atomic_Cond) {
+atomic_cond_broadcast :: proc "contextless" (c: ^Atomic_Cond) {
 	atomic_add_explicit(&c.state, 1, .Release)
 	futex_broadcast(&c.state)
 }
@@ -320,11 +320,11 @@ atomic_cond_broadcast :: proc(c: ^Atomic_Cond) {
 // Posting to the semaphore increases the count by one, or the provided amount.
 //
 // An Atomic_Sema must not be copied after first use
-Atomic_Sema :: struct {
+Atomic_Sema :: struct #no_copy {
 	count: Futex,
 }
 
-atomic_sema_post :: proc(s: ^Atomic_Sema, count := 1) {
+atomic_sema_post :: proc "contextless" (s: ^Atomic_Sema, count := 1) {
 	atomic_add_explicit(&s.count, Futex(count), .Release)
 	if count == 1 {
 		futex_signal(&s.count)
@@ -333,7 +333,7 @@ atomic_sema_post :: proc(s: ^Atomic_Sema, count := 1) {
 	}
 }
 
-atomic_sema_wait :: proc(s: ^Atomic_Sema) {
+atomic_sema_wait :: proc "contextless" (s: ^Atomic_Sema) {
 	for {
 		original_count := atomic_load_explicit(&s.count, .Relaxed)
 		for original_count == 0 {
@@ -346,7 +346,7 @@ atomic_sema_wait :: proc(s: ^Atomic_Sema) {
 	}
 }
 
-atomic_sema_wait_with_timeout :: proc(s: ^Atomic_Sema, duration: time.Duration) -> bool {
+atomic_sema_wait_with_timeout :: proc "contextless" (s: ^Atomic_Sema, duration: time.Duration) -> bool {
 	if duration <= 0 {
 		return false
 	}

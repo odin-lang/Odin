@@ -39,10 +39,8 @@ _file_allocator :: proc() -> runtime.Allocator {
 }
 
 _open :: proc(name: string, flags: File_Flags, perm: File_Mode) -> (^File, Error) {
-	name_cstr, allocated := _name_to_cstring(name)
-	defer if allocated {
-		delete(name_cstr)
-	}
+	runtime.DEFAULT_TEMP_ALLOCATOR_TEMP_GUARD()
+	name_cstr := _name_to_cstring(name)
 
 	flags_i: int
 	switch flags & O_RDONLY|O_WRONLY|O_RDWR {
@@ -254,7 +252,7 @@ _symlink :: proc(old_name, new_name: string) -> Error {
 	return _ok_or_error(unix.sys_symlink(old_name_cstr, new_name_cstr))
 }
 
-_read_link_cstr :: proc(name_cstr: cstring, allocator := context.allocator) -> (string, Error) {
+_read_link_cstr :: proc(name_cstr: cstring, allocator: runtime.Allocator) -> (string, Error) {
 	bufsz : uint = 256
 	buf := make([]byte, bufsz, allocator)
 	for {
@@ -272,7 +270,7 @@ _read_link_cstr :: proc(name_cstr: cstring, allocator := context.allocator) -> (
 	}
 }
 
-_read_link :: proc(name: string, allocator := context.allocator) -> (string, Error) {
+_read_link :: proc(name: string, allocator: runtime.Allocator) -> (string, Error) {
 	name_cstr, allocated := _name_to_cstring(name)
 	defer if allocated {
 		delete(name_cstr)
@@ -411,12 +409,7 @@ _is_dir_fd :: proc(fd: int) -> bool {
 // defined as 512, however, it is well known that paths can exceed that limit.
 // So, in theory you could have a path larger than the entire temp_allocator's
 // buffer. Therefor, any large paths will use context.allocator.
-_name_to_cstring :: proc(name: string) -> (cname: cstring, allocated: bool) {
-	if len(name) > _CSTRING_NAME_HEAP_THRESHOLD {
-		cname = strings.clone_to_cstring(name)
-		allocated = true
-		return
-	}
-	cname = strings.clone_to_cstring(name, context.temp_allocator)
-	return
+@(private="file")
+_temp_name_to_cstring :: proc(name: string) -> (cname: cstring) {
+	return strings.clone_to_cstring(name, context.temp_allocator)
 }

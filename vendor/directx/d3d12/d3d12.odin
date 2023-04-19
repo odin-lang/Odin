@@ -1226,7 +1226,7 @@ HEAP_FLAG :: enum u32 {
 }
 
 HEAP_FLAG_ALLOW_ALL_BUFFERS_AND_TEXTURES :: HEAP_FLAGS{}
-HEAP_FLAG_ALLOW_ONLY_BUFFERS             :: HEAP_FLAGS{.DENY_BUFFERS, .ALLOW_DISPLAY}
+HEAP_FLAG_ALLOW_ONLY_BUFFERS             :: HEAP_FLAGS{.DENY_RT_DS_TEXTURES, .DENY_NON_RT_DS_TEXTURES}
 HEAP_FLAG_ALLOW_ONLY_NON_RT_DS_TEXTURES  :: HEAP_FLAGS{.DENY_BUFFERS, .DENY_RT_DS_TEXTURES}
 HEAP_FLAG_ALLOW_ONLY_RT_DS_TEXTURES      :: HEAP_FLAGS{.DENY_BUFFERS, .DENY_NON_RT_DS_TEXTURES}
 
@@ -2543,7 +2543,7 @@ IDevice_VTable :: struct {
 	CreateSampler:                    proc "stdcall" (this: ^IDevice, pDesc: ^SAMPLER_DESC, DestDescriptor: CPU_DESCRIPTOR_HANDLE),
 	CopyDescriptors:                  proc "stdcall" (this: ^IDevice, NumDestDescriptorRanges: u32, pDestDescriptorRangeStarts: ^CPU_DESCRIPTOR_HANDLE, pDestDescriptorRangeSizes: ^u32, NumSrcDescriptorRanges: u32, pSrcDescriptorRangeStarts: ^CPU_DESCRIPTOR_HANDLE, pSrcDescriptorRangeSizes: ^u32, DescriptorHeapsType: DESCRIPTOR_HEAP_TYPE),
 	CopyDescriptorsSimple:            proc "stdcall" (this: ^IDevice, NumDescriptors: u32, DestDescriptorRangeStart: CPU_DESCRIPTOR_HANDLE, SrcDescriptorRangeStart: CPU_DESCRIPTOR_HANDLE, DescriptorHeapsType: DESCRIPTOR_HEAP_TYPE),
-	GetResourceAllocationInfo:        proc "stdcall" (this: ^IDevice, visibleMask: u32, numResourceDescs: u32, pResourceDescs: ^RESOURCE_DESC) -> RESOURCE_ALLOCATION_INFO,
+	GetResourceAllocationInfo:        proc "stdcall" (this: ^IDevice, RetVal: ^RESOURCE_ALLOCATION_INFO, visibleMask: u32, numResourceDescs: u32, pResourceDescs: ^RESOURCE_DESC),
 	GetCustomHeapProperties:          proc "stdcall" (this: ^IDevice, nodeMask: u32, heapType: HEAP_TYPE) -> HEAP_PROPERTIES,
 	CreateCommittedResource:          proc "stdcall" (this: ^IDevice, pHeapProperties: ^HEAP_PROPERTIES, HeapFlags: HEAP_FLAGS, pDesc: ^RESOURCE_DESC, InitialResourceState: RESOURCE_STATES, pOptimizedClearValue: ^CLEAR_VALUE, riidResource: ^IID, ppvResource: ^rawptr) -> HRESULT,
 	CreateHeap:                       proc "stdcall" (this: ^IDevice, pDesc: ^HEAP_DESC, riid: ^IID, ppvHeap: ^rawptr) -> HRESULT,
@@ -2728,7 +2728,7 @@ IDevice4_VTable :: struct {
 	CreateCommittedResource1:       proc "stdcall" (this: ^IDevice4, pHeapProperties: ^HEAP_PROPERTIES, HeapFlags: HEAP_FLAGS, pDesc: ^RESOURCE_DESC, InitialResourceState: RESOURCE_STATES, pOptimizedClearValue: ^CLEAR_VALUE, pProtectedSession: ^IProtectedResourceSession, riidResource: ^IID, ppvResource: ^rawptr) -> HRESULT,
 	CreateHeap1:                    proc "stdcall" (this: ^IDevice4, pDesc: ^HEAP_DESC, pProtectedSession: ^IProtectedResourceSession, riid: ^IID, ppvHeap: ^rawptr) -> HRESULT,
 	CreateReservedResource1:        proc "stdcall" (this: ^IDevice4, pDesc: ^RESOURCE_DESC, InitialState: RESOURCE_STATES, pOptimizedClearValue: ^CLEAR_VALUE, pProtectedSession: ^IProtectedResourceSession, riid: ^IID, ppvResource: ^rawptr) -> HRESULT,
-	GetResourceAllocationInfo1:     proc "stdcall" (this: ^IDevice4, visibleMask: u32, numResourceDescs: u32, pResourceDescs: ^RESOURCE_DESC, pResourceAllocationInfo1: ^RESOURCE_ALLOCATION_INFO1) -> RESOURCE_ALLOCATION_INFO,
+	GetResourceAllocationInfo1:     proc "stdcall" (this: ^IDevice4, RetVal: ^RESOURCE_ALLOCATION_INFO, visibleMask: u32, numResourceDescs: u32, pResourceDescs: ^RESOURCE_DESC, pResourceAllocationInfo1: ^RESOURCE_ALLOCATION_INFO1),
 }
 
 LIFETIME_STATE :: enum i32 {
@@ -3516,7 +3516,7 @@ IDevice8 :: struct #raw_union {
 }
 IDevice8_VTable :: struct {
 	using id3d12device7_vtable: IDevice7_VTable,
-	GetResourceAllocationInfo2:               proc "stdcall" (this: ^IDevice8, visibleMask: u32, numResourceDescs: u32, pResourceDescs: ^RESOURCE_DESC1, pResourceAllocationInfo1: ^RESOURCE_ALLOCATION_INFO1) -> RESOURCE_ALLOCATION_INFO,
+	GetResourceAllocationInfo2:               proc "stdcall" (this: ^IDevice8, RetVal: ^RESOURCE_ALLOCATION_INFO, visibleMask: u32, numResourceDescs: u32, pResourceDescs: ^RESOURCE_DESC1, pResourceAllocationInfo1: ^RESOURCE_ALLOCATION_INFO1),
 	CreateCommittedResource2:                 proc "stdcall" (this: ^IDevice8, pHeapProperties: ^HEAP_PROPERTIES, HeapFlags: HEAP_FLAGS, pDesc: ^RESOURCE_DESC1, InitialResourceState: RESOURCE_STATES, pOptimizedClearValue: ^CLEAR_VALUE, pProtectedSession: ^IProtectedResourceSession, riidResource: ^IID, ppvResource: ^rawptr) -> HRESULT,
 	CreatePlacedResource1:                    proc "stdcall" (this: ^IDevice8, pHeap: ^IHeap, HeapOffset: u64, pDesc: ^RESOURCE_DESC1, InitialState: RESOURCE_STATES, pOptimizedClearValue: ^CLEAR_VALUE, riid: ^IID, ppvResource: ^rawptr) -> HRESULT,
 	CreateSamplerFeedbackUnorderedAccessView: proc "stdcall" (this: ^IDevice8, pTargetedResource: ^IResource, pFeedbackResource: ^IResource, DestDescriptor: CPU_DESCRIPTOR_HANDLE),
@@ -4870,6 +4870,25 @@ IInfoQueue_VTable :: struct {
 	GetMuteDebugOutput:                           proc "stdcall" (this: ^IInfoQueue) -> BOOL,
 }
 
+MESSAGE_CALLBACK_FLAGS :: distinct bit_set[MESSAGE_CALLBACK_FLAG; u32]
+MESSAGE_CALLBACK_FLAG :: enum {
+	IGNORE_FILTERS = 0,
+}
+
+PFN_MESSAGE_CALLBACK :: #type proc "c" (Category: MESSAGE_CATEGORY, Severity: MESSAGE_SEVERITY, ID: MESSAGE_ID, pDescription: cstring, pContext: rawptr)
+
+IInfoQueue1_UUID_STRING :: "2852dd88-b484-4c0c-b6b1-67168500e600"
+IInfoQueue1_UUID := &IID{0x2852dd88, 0xb484, 0x4c0c, {0xb6, 0xb1, 0x67, 0x16, 0x85, 0x00, 0xe6, 0x00}}
+IInfoQueue1 :: struct #raw_union {
+	#subtype iinfo_queue: IInfoQueue,
+	using idxgiinfoqueue1_vtable: ^IInfoQueue1_VTable,
+}
+IInfoQueue1_VTable :: struct {
+	using idxgiinfoqueue_vtable: IInfoQueue_VTable,
+	RegisterMessageCallback: proc "stdcall" (this: ^IInfoQueue1, CallbackFunc: PFN_MESSAGE_CALLBACK, CallbackFilterFlags: MESSAGE_CALLBACK_FLAGS, pContext: rawptr, pCallbackCookie: ^u32) -> HRESULT,
+	UnregisterMessageCallback: proc "stdcall" (this: ^IInfoQueue1, pCallbackCookie: u32) -> HRESULT,
+}
+
 PFN_CREATE_DEVICE :: #type proc "c" (a0: ^IUnknown, a1: FEATURE_LEVEL, a2: ^IID, a3: ^rawptr) -> HRESULT
 PFN_GET_DEBUG_INTERFACE :: #type proc "c" (a0: ^IID, a1: ^rawptr) -> HRESULT
 
@@ -4928,16 +4947,40 @@ IGraphicsCommandList6_VTable :: struct {
 	DispatchMesh: proc "stdcall" (this: ^IGraphicsCommandList6, ThreadGroupCountX: u32, ThreadGroupCountY: u32, ThreadGroupCountZ: u32),
 }
 
-SHADER_VERSION_TYPE :: enum i32 {
-	PIXEL_SHADER    = 0,
-	VERTEX_SHADER   = 1,
-	GEOMETRY_SHADER = 2,
+SHADER_VERSION_TYPE :: enum u32 {
+	PIXEL_SHADER          = 0,
+	VERTEX_SHADER         = 1,
+	GEOMETRY_SHADER       = 2,    
 
-	HULL_SHADER     = 3,
-	DOMAIN_SHADER   = 4,
-	COMPUTE_SHADER  = 5,
+	HULL_SHADER           = 3,
+	DOMAIN_SHADER         = 4,
+	COMPUTE_SHADER        = 5,
 
-	RESERVED0       = 65520,
+	LIBRARY               = 6,
+
+	RAY_GENERATION_SHADER = 7,
+	INTERSECTION_SHADER   = 8,
+	ANY_HIT_SHADER        = 9,
+	CLOSEST_HIT_SHADER    = 10,
+	MISS_SHADER           = 11,
+	CALLABLE_SHADER       = 12,
+
+	MESH_SHADER           = 13,
+	AMPLIFICATION_SHADER  = 14,
+
+	RESERVED0             = 0xFFF0,
+}
+
+shver_get_type :: proc "contextless" (version: u32) -> SHADER_VERSION_TYPE {
+	return SHADER_VERSION_TYPE((version >> 16) & 0xffff)
+}
+
+shver_get_major :: proc "contextless" (version: u32) -> u8 {
+	return u8((version >> 4) & 0xf)
+}
+
+shver_get_minor :: proc "contextless" (version: u32) -> u8 {
+	return u8((version >> 0) & 0xf)
 }
 
 SIGNATURE_PARAMETER_DESC :: struct {
@@ -4984,6 +5027,7 @@ SHADER_TYPE_DESC :: struct {
 	Offset:   u32,
 	Name:     cstring,
 }
+
 SHADER_DESC :: struct {
 	Version:                     u32,
 	Creator:                     cstring,
@@ -5040,6 +5084,39 @@ SHADER_INPUT_BIND_DESC :: struct {
 	NumSamples: u32,
 	Space:      u32,
 	uID:        u32,
+}
+
+SHADER_REQUIRES_FLAGS :: distinct bit_set[SHADER_REQUIRES; u64]
+SHADER_REQUIRES :: enum u64 {
+	DOUBLES                                                        = 0,
+	EARLY_DEPTH_STENCIL                                            = 1,
+	UAVS_AT_EVERY_STAGE                                            = 2,
+	_64_UAVS                                                       = 3,
+	MINIMUM_PRECISION                                              = 4,
+	_11_1_DOUBLE_EXTENSIONS                                        = 5,
+	_11_1_SHADER_EXTENSIONS                                        = 6,
+	LEVEL_9_COMPARISON_FILTERING                                   = 7,
+	TILED_RESOURCES                                                = 8,
+	STENCIL_REF                                                    = 9,
+	INNER_COVERAGE                                                 = 10,
+	TYPED_UAV_LOAD_ADDITIONAL_FORMATS                              = 11,
+	ROVS                                                           = 12,
+	VIEWPORT_AND_RT_ARRAY_INDEX_FROM_ANY_SHADER_FEEDING_RASTERIZER = 13,
+	WAVE_OPS                                                       = 14,
+	INT64_OPS                                                      = 15,
+	VIEW_ID                                                        = 16,
+	BARYCENTRICS                                                   = 17,
+	NATIVE_16BIT_OPS                                               = 18,
+	SHADING_RATE                                                   = 19,
+	RAYTRACING_TIER_1_1                                            = 20,
+	SAMPLER_FEEDBACK                                               = 21,
+	ATOMIC_INT64_ON_TYPED_RESOURCE                                 = 22,
+	ATOMIC_INT64_ON_GROUP_SHARED                                   = 23,
+	DERIVATIVES_IN_MESH_AND_AMPLIFICATION_SHADERS                  = 24,
+	RESOURCE_DESCRIPTOR_HEAP_INDEXING                              = 25,
+	SAMPLER_DESCRIPTOR_HEAP_INDEXING                               = 26,
+	WAVE_MMA                                                       = 27,
+	ATOMIC_INT64_ON_DESCRIPTOR_HEAP_RESOURCE                       = 28,
 }
 
 LIBRARY_DESC :: struct {
@@ -5103,8 +5180,10 @@ PARAMETER_DESC :: struct {
 	FirstOutComponent: u32,
 }
 
+IShaderReflectionType_UUID_STRING :: "E913C351-783D-48CA-A1D1-4F306284AD56"
+IShaderReflectionType_UUID := &IID{0xE913C351, 0x783D, 0x48CA, {0xA1, 0xD1, 0x4F, 0x30, 0x62, 0x84, 0xAD, 0x56}}
 IShaderReflectionType :: struct {
-	vtable: ^IShaderReflectionType_VTable,
+	using id3d12shaderreflectiontype_vtable: ^IShaderReflectionType_VTable,
 }
 IShaderReflectionType_VTable :: struct {
 	GetDesc:              proc "stdcall" (this: ^IShaderReflectionType, pDesc: ^SHADER_TYPE_DESC) -> HRESULT,
@@ -5120,8 +5199,10 @@ IShaderReflectionType_VTable :: struct {
 	ImplementsInterface:  proc "stdcall" (this: ^IShaderReflectionType, pBase: ^IShaderReflectionType) -> HRESULT,
 }
 
+IShaderReflectionVariable_UUID_STRING :: "8337A8A6-A216-444A-B2F4-314733A73AEA"
+IShaderReflectionVariable_UUID := &IID{0x8337A8A6, 0xA216, 0x444A, {0xB2, 0xF4, 0x31, 0x47, 0x33, 0xA7, 0x3A, 0xEA}}
 IShaderReflectionVariable :: struct {
-	vtable: ^IShaderReflectionVariable_VTable,
+	using id3d12shaderreflectionvariable_vtable: ^IShaderReflectionVariable_VTable,
 }
 IShaderReflectionVariable_VTable :: struct {
 	GetDesc:          proc "stdcall" (this: ^IShaderReflectionVariable, pDesc: ^SHADER_VARIABLE_DESC) -> HRESULT,
@@ -5130,8 +5211,10 @@ IShaderReflectionVariable_VTable :: struct {
 	GetInterfaceSlot: proc "stdcall" (this: ^IShaderReflectionVariable, uArrayIndex: u32) -> u32,
 }
 
+IShaderReflectionConstantBuffer_UUID_STRING :: "C59598B4-48B3-4869-B9B1-B1618B14A8B7"
+IShaderReflectionConstantBuffer_UUID := &IID{0xC59598B4, 0x48B3, 0x4869, {0xB9, 0xB1, 0xB1, 0x61, 0x8B, 0x14, 0xA8, 0xB7}}
 IShaderReflectionConstantBuffer :: struct {
-	vtable: ^IShaderReflectionConstantBuffer_VTable,
+	using id3d12shaderreflectionconstantbuffer_vtable: ^IShaderReflectionConstantBuffer_VTable,
 }
 IShaderReflectionConstantBuffer_VTable :: struct {
 	GetDesc:            proc "stdcall" (this: ^IShaderReflectionConstantBuffer, pDesc: ^SHADER_BUFFER_DESC) -> HRESULT,
@@ -5139,6 +5222,8 @@ IShaderReflectionConstantBuffer_VTable :: struct {
 	GetVariableByName:  proc "stdcall" (this: ^IShaderReflectionConstantBuffer, Name: cstring) -> ^IShaderReflectionVariable,
 }
 
+IShaderReflection_UUID_STRING :: "5A58797D-A72C-478D-8BA2-EFC6B0EFE88E"
+IShaderReflection_UUID := &IID{0x5A58797D, 0xA72C, 0x478D, {0x8B, 0xA2, 0xEF, 0xC6, 0xB0, 0xEF, 0xE8, 0x8E}}
 IShaderReflection :: struct #raw_union {
 	#subtype iunknown: IUnknown,
 	using id3d12shaderreflection_vtable: ^IShaderReflection_VTable,
@@ -5163,9 +5248,11 @@ IShaderReflection_VTable :: struct {
 	GetNumInterfaceSlots:          proc "stdcall" (this: ^IShaderReflection) -> u32,
 	GetMinFeatureLevel:            proc "stdcall" (this: ^IShaderReflection, pLevel: ^FEATURE_LEVEL) -> HRESULT,
 	GetThreadGroupSize:            proc "stdcall" (this: ^IShaderReflection, pSizeX: ^u32, pSizeY: ^u32, pSizeZ: ^u32) -> u32,
-	GetRequiresFlags:              proc "stdcall" (this: ^IShaderReflection) -> u64,
+	GetRequiresFlags:              proc "stdcall" (this: ^IShaderReflection) -> SHADER_REQUIRES_FLAGS,
 }
 
+ILibraryReflection_UUID_STRING :: "8E349D19-54DB-4A56-9DC9-119D87BDB804"
+ILibraryReflection_UUID := &IID{0x8E349D19, 0x54DB, 0x4A56, {0x9D, 0xC9, 0x11, 0x9D, 0x87, 0xBD, 0xB8, 0x04}}
 ILibraryReflection :: struct #raw_union {
 	#subtype iunknown: IUnknown,
 	using id3d12libraryreflection_vtable: ^ILibraryReflection_VTable,
@@ -5176,8 +5263,10 @@ ILibraryReflection_VTable :: struct {
 	GetFunctionByIndex: proc "stdcall" (this: ^ILibraryReflection, FunctionIndex: i32) -> ^IFunctionReflection,
 }
 
+IFunctionReflection_UUID_STRING :: "1108795C-2772-4BA9-B2A8-D464DC7E2799"
+IFunctionReflection_UUID := &IID{0x1108795C, 0x2772, 0x4BA9, {0xB2, 0xA8, 0xD4, 0x64, 0xDC, 0x7E, 0x27, 0x99}}
 IFunctionReflection :: struct {
-	vtable: ^IFunctionReflection_VTable,
+	using id3d12functionreflection_vtable: ^IFunctionReflection_VTable,
 }
 IFunctionReflection_VTable :: struct {
 	GetDesc:                      proc "stdcall" (this: ^IFunctionReflection, pDesc: ^FUNCTION_DESC) -> HRESULT,
@@ -5189,8 +5278,10 @@ IFunctionReflection_VTable :: struct {
 	GetFunctionParameter:         proc "stdcall" (this: ^IFunctionReflection, ParameterIndex: i32) -> ^IFunctionParameterReflection,
 }
 
+IFunctionParameterReflection_UUID_STRING :: "EC25F42D-7006-4F2B-B33E-02CC3375733F"
+IFunctionParameterReflection_UUID := &IID{0xEC25F42D, 0x7006, 0x4F2B, {0xB3, 0x3E, 0x2, 0xCC, 0x33, 0x75, 0x73, 0x3F}}
 IFunctionParameterReflection :: struct {
-	vtable: ^IFunctionParameterReflection_VTable,
+	using id3d12functionparameterreflection_vtable: ^IFunctionParameterReflection_VTable,
 }
 IFunctionParameterReflection_VTable :: struct {
 	GetDesc: proc "stdcall" (this: ^IFunctionParameterReflection, pDesc: ^PARAMETER_DESC) -> HRESULT,

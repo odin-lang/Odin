@@ -188,6 +188,9 @@ type_field_index_of :: proc($T: typeid, $name: string) -> uintptr ---
 type_equal_proc  :: proc($T: typeid) -> (equal:  proc "contextless" (rawptr, rawptr) -> bool)                 where type_is_comparable(T) ---
 type_hasher_proc :: proc($T: typeid) -> (hasher: proc "contextless" (data: rawptr, seed: uintptr) -> uintptr) where type_is_comparable(T) ---
 
+type_map_info      :: proc($T: typeid/map[$K]$V) -> ^runtime.Map_Info ---
+type_map_cell_info :: proc($T: typeid)           -> ^runtime.Map_Cell_Info ---
+
 type_convert_variants_to_pointers :: proc($T: typeid) -> typeid where type_is_union(T) ---
 
 constant_utf16_cstring :: proc($literal: string) -> [^]u16 ---
@@ -280,7 +283,7 @@ wasm_memory_atomic_wait32   :: proc(ptr: ^u32, expected: u32, timeout_ns: i64) -
 wasm_memory_atomic_notify32 :: proc(ptr: ^u32, waiters: u32) -> (waiters_woken_up: u32) ---
 
 // x86 Targets (i386, amd64)
-x86_cpuid  :: proc(ax, cx: u32) -> (eax, ebc, ecx, edx: u32) ---
+x86_cpuid  :: proc(ax, cx: u32) -> (eax, ebx, ecx, edx: u32) ---
 x86_xgetbv :: proc(cx: u32) -> (eax, edx: u32) ---
 
 

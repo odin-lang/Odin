@@ -1,10 +1,11 @@
-isize lb_type_info_index(CheckerInfo *info, Type *type, bool err_on_not_found=true) {
+gb_internal isize lb_type_info_index(CheckerInfo *info, Type *type, bool err_on_not_found=true) {
 	auto *set = &info->minimum_dependency_type_info_set;
 	isize index = type_info_index(info, type, err_on_not_found);
 	if (index >= 0) {
-		isize i = ptr_entry_index(set, index);
-		if (i >= 0) {
-			return i+1;
+		auto *found = map_get(set, index);
+		if (found) {
+			GB_ASSERT(*found >= 0);
+			return *found + 1;
 		}
 	}
 	if (err_on_not_found) {
@@ -13,7 +14,7 @@ isize lb_type_info_index(CheckerInfo *info, Type *type, bool err_on_not_found=tr
 	return -1;
 }
 
-lbValue lb_typeid(lbModule *m, Type *type) {
+gb_internal lbValue lb_typeid(lbModule *m, Type *type) {
 	GB_ASSERT(!build_context.disallow_rtti);
 
 	type = default_type(type);
@@ -90,7 +91,7 @@ lbValue lb_typeid(lbModule *m, Type *type) {
 	return res;
 }
 
-lbValue lb_type_info(lbModule *m, Type *type) {
+gb_internal lbValue lb_type_info(lbModule *m, Type *type) {
 	GB_ASSERT(!build_context.disallow_rtti);
 
 	type = default_type(type);
@@ -102,36 +103,36 @@ lbValue lb_type_info(lbModule *m, Type *type) {
 	return lb_emit_array_epi(m, data, index);
 }
 
-LLVMTypeRef lb_get_procedure_raw_type(lbModule *m, Type *type) {
+gb_internal LLVMTypeRef lb_get_procedure_raw_type(lbModule *m, Type *type) {
 	return lb_type_internal_for_procedures_raw(m, type);
 }
 
 
-lbValue lb_type_info_member_types_offset(lbProcedure *p, isize count) {
+gb_internal lbValue lb_type_info_member_types_offset(lbProcedure *p, isize count) {
 	GB_ASSERT(p->module == &p->module->gen->default_module);
 	lbValue offset = lb_emit_array_epi(p, lb_global_type_info_member_types.addr, lb_global_type_info_member_types_index);
 	lb_global_type_info_member_types_index += cast(i32)count;
 	return offset;
 }
-lbValue lb_type_info_member_names_offset(lbProcedure *p, isize count) {
+gb_internal lbValue lb_type_info_member_names_offset(lbProcedure *p, isize count) {
 	GB_ASSERT(p->module == &p->module->gen->default_module);
 	lbValue offset = lb_emit_array_epi(p, lb_global_type_info_member_names.addr, lb_global_type_info_member_names_index);
 	lb_global_type_info_member_names_index += cast(i32)count;
 	return offset;
 }
-lbValue lb_type_info_member_offsets_offset(lbProcedure *p, isize count) {
+gb_internal lbValue lb_type_info_member_offsets_offset(lbProcedure *p, isize count) {
 	GB_ASSERT(p->module == &p->module->gen->default_module);
 	lbValue offset = lb_emit_array_epi(p, lb_global_type_info_member_offsets.addr, lb_global_type_info_member_offsets_index);
 	lb_global_type_info_member_offsets_index += cast(i32)count;
 	return offset;
 }
-lbValue lb_type_info_member_usings_offset(lbProcedure *p, isize count) {
+gb_internal lbValue lb_type_info_member_usings_offset(lbProcedure *p, isize count) {
 	GB_ASSERT(p->module == &p->module->gen->default_module);
 	lbValue offset = lb_emit_array_epi(p, lb_global_type_info_member_usings.addr, lb_global_type_info_member_usings_index);
 	lb_global_type_info_member_usings_index += cast(i32)count;
 	return offset;
 }
-lbValue lb_type_info_member_tags_offset(lbProcedure *p, isize count) {
+gb_internal lbValue lb_type_info_member_tags_offset(lbProcedure *p, isize count) {
 	GB_ASSERT(p->module == &p->module->gen->default_module);
 	lbValue offset = lb_emit_array_epi(p, lb_global_type_info_member_tags.addr, lb_global_type_info_member_tags_index);
 	lb_global_type_info_member_tags_index += cast(i32)count;
@@ -139,7 +140,7 @@ lbValue lb_type_info_member_tags_offset(lbProcedure *p, isize count) {
 }
 
 
-void lb_setup_type_info_data(lbProcedure *p) { // NOTE(bill): Setup type_info data
+gb_internal void lb_setup_type_info_data(lbProcedure *p) { // NOTE(bill): Setup type_info data
 	if (build_context.disallow_rtti) {
 		return;
 	}
@@ -185,7 +186,7 @@ void lb_setup_type_info_data(lbProcedure *p) { // NOTE(bill): Setup type_info da
 		if (entry_index <= 0) {
 			continue;
 		}
-		
+
 		if (entries_handled[entry_index]) {
 			continue;
 		}
@@ -540,8 +541,7 @@ void lb_setup_type_info_data(lbProcedure *p) { // NOTE(bill): Setup type_info da
 			break;
 		}
 		case Type_Tuple: {
-			tag = lb_const_ptr_cast(m, variant_ptr, t_type_info_tuple_ptr);
-
+			tag = lb_const_ptr_cast(m, variant_ptr, t_type_info_parameters_ptr);
 
 			lbValue memory_types = lb_type_info_member_types_offset(p, t->Tuple.variables.count);
 			lbValue memory_names = lb_type_info_member_names_offset(p, t->Tuple.variables.count);
@@ -666,7 +666,7 @@ void lb_setup_type_info_data(lbProcedure *p) { // NOTE(bill): Setup type_info da
 				}
 
 				if (is_type_comparable(t) && !is_type_simple_compare(t)) {
-					vals[3] = lb_get_equal_proc_for_type(m, t).value;
+					vals[3] = lb_equal_proc_for_type(m, t).value;
 				}
 
 				vals[4] = lb_const_bool(m, t_bool, t->Union.custom_align != 0).value;
@@ -691,32 +691,34 @@ void lb_setup_type_info_data(lbProcedure *p) { // NOTE(bill): Setup type_info da
 		case Type_Struct: {
 			tag = lb_const_ptr_cast(m, variant_ptr, t_type_info_struct_ptr);
 
-			LLVMValueRef vals[12] = {};
+			LLVMValueRef vals[13] = {};
 
 
 			{
 				lbValue is_packed       = lb_const_bool(m, t_bool, t->Struct.is_packed);
 				lbValue is_raw_union    = lb_const_bool(m, t_bool, t->Struct.is_raw_union);
+				lbValue is_no_copy      = lb_const_bool(m, t_bool, t->Struct.is_no_copy);
 				lbValue is_custom_align = lb_const_bool(m, t_bool, t->Struct.custom_align != 0);
 				vals[5] = is_packed.value;
 				vals[6] = is_raw_union.value;
-				vals[7] = is_custom_align.value;
+				vals[7] = is_no_copy.value;
+				vals[8] = is_custom_align.value;
 				if (is_type_comparable(t) && !is_type_simple_compare(t)) {
-					vals[8] = lb_get_equal_proc_for_type(m, t).value;
+					vals[9] = lb_equal_proc_for_type(m, t).value;
 				}
 
 
 				if (t->Struct.soa_kind != StructSoa_None) {
-					lbValue kind = lb_emit_struct_ep(p, tag, 9);
+					lbValue kind = lb_emit_struct_ep(p, tag, 10);
 					Type *kind_type = type_deref(kind.type);
 
 					lbValue soa_kind = lb_const_value(m, kind_type, exact_value_i64(t->Struct.soa_kind));
 					lbValue soa_type = lb_type_info(m, t->Struct.soa_elem);
 					lbValue soa_len = lb_const_int(m, t_int, t->Struct.soa_count);
 
-					vals[9]  = soa_kind.value;
-					vals[10] = soa_type.value;
-					vals[11] = soa_len.value;
+					vals[10] = soa_kind.value;
+					vals[11] = soa_type.value;
+					vals[12] = soa_len.value;
 				}
 			}
 			
@@ -788,15 +790,11 @@ void lb_setup_type_info_data(lbProcedure *p) { // NOTE(bill): Setup type_info da
 		case Type_Map: {
 			tag = lb_const_ptr_cast(m, variant_ptr, t_type_info_map_ptr);
 			init_map_internal_types(t);
-			
-			lbValue gst = lb_type_info(m, t->Map.internal_type);
 
-			LLVMValueRef vals[5] = {
+			LLVMValueRef vals[3] = {
 				lb_type_info(m, t->Map.key).value,
 				lb_type_info(m, t->Map.value).value,
-				gst.value,
-				lb_get_equal_proc_for_type(m, t->Map.key).value,
-				lb_get_hasher_proc_for_type(m, t->Map.key).value
+				lb_gen_map_info_ptr(p->module, t).value
 			};
 
 			lbValue res = {};
