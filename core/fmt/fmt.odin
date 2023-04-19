@@ -44,32 +44,49 @@ Info :: struct {
 // Custom formatter signature. It returns true if the formatting was successful and false when it could not be done
 User_Formatter :: #type proc(fi: ^Info, arg: any, verb: rune) -> bool
 
-Register_User_Formatter_Error :: enum {
-	None,
-	No_User_Formatter,
-	Formatter_Previously_Found,
-}
-
-// NOTE(bill): This is a pointer to prevent accidental additions
+// NOTE(xzores): This is not a pointer because we want user to add the map at their own will, by allowing multiable calls to set_user_formatters
 // it is prefixed with `_` rather than marked with a private attribute so that users can access it if necessary
-_user_formatters: ^map[typeid]User_Formatter
+_user_formatters : map[typeid]User_Formatter
 
-// set_user_formatters assigns m to a global value allowing the user have custom print formatting for specific
-// types
-set_user_formatters :: proc(m: ^map[typeid]User_Formatter) {
-	_user_formatters = m
-}
-// register_user_formatter assigns a formatter to a specific typeid. set_user_formatters must be called
-// before any use of this procedure.
-register_user_formatter :: proc(id: typeid, formatter: User_Formatter) -> Register_User_Formatter_Error {
+// Sets user-defined formatters for custom print formatting of specific types
+//
+// Inputs:
+// - m: A map of typeids to User_Formatter structs, the values will be copied and the user can delete the map at their own will.
+// Alternatively just use register_user_formatter
+set_user_formatters :: proc(m : map[typeid]User_Formatter) {
 	if _user_formatters == nil {
-		return .No_User_Formatter
+		_user_formatters = make(map[typeid]User_Formatter)
 	}
-	if prev, found := _user_formatters[id]; found && prev != nil {
-		return .Formatter_Previously_Found
+	for type_id, formatter in m {
+		_user_formatters[type_id] = formatter;
+	}
+}
+
+// Registers a user-defined formatter for a specific typeid
+//
+// Inputs:
+// - id: The typeid of the custom type.
+// - formatter: The User_Formatter function for the custom type.
+//
+// Info: set_user_formatters can be called anytime.
+// Calling this multiable times will overwrite previous formatter!
+//		Why: Because a user might have a library that set it's own user formatter in some mandatory init function.
+//			 But the user might want to set their own. Also It allows the user to swap the formatter based on some logic.
+//
+register_user_formatter :: proc(id: typeid, formatter: User_Formatter) {
+	if _user_formatters == nil {
+		_user_formatters = make(map[typeid]User_Formatter)
 	}
 	_user_formatters[id] = formatter
-	return .None
+}
+
+// Returns true if a user formatter is already set and false otherwire.
+//
+// Inputs:
+// - id: The typeid of the custom type.
+//
+user_formatter_exists :: proc(id: typeid) -> bool {
+	return id in _user_formatters;
 }
 
 
