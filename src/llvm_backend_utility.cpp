@@ -929,7 +929,33 @@ gb_internal lbStructFieldRemapping lb_get_struct_remapping(lbModule *m, Type *t)
 gb_internal i32 lb_convert_struct_index(lbModule *m, Type *t, i32 index) {
 	if (t->kind == Type_Struct) {
 		auto field_remapping = lb_get_struct_remapping(m, t);
-		index = field_remapping[index];
+		return field_remapping[index];
+	} else if (build_context.word_size != build_context.int_size) {
+		switch (t->kind) {
+		case Type_Slice:
+			GB_ASSERT(build_context.word_size*2 == build_context.int_size);
+			switch (index) {
+			case 0: return 0; // data
+			case 1: return 2; // len
+			}
+			break;
+		case Type_DynamicArray:
+			GB_ASSERT(build_context.word_size*2 == build_context.int_size);
+			switch (index) {
+			case 0: return 0; // data
+			case 1: return 2; // len
+			case 2: return 3; // cap
+			case 3: return 4; // allocator
+			}
+			break;
+		case Type_SoaPointer:
+			GB_ASSERT(build_context.word_size*2 == build_context.int_size);
+			switch (index) {
+			case 0: return 0; // data
+			case 1: return 2; // offset
+			}
+			break;
+		}
 	}
 	return index;
 }
