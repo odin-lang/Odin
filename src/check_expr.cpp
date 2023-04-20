@@ -1631,7 +1631,9 @@ gb_internal Entity *check_ident(CheckerContext *c, Operand *o, Ast *n, Type *nam
 		}
 		return e;
 	case Entity_LibraryName:
-		error(n, "Use of library '%.*s' not in foreign block", LIT(name));
+		if (!allow_import_name) {
+			error(n, "Use of library '%.*s' not in foreign block", LIT(name));
+		}
 		return e;
 
 	case Entity_Label:
