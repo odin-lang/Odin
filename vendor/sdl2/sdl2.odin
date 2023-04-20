@@ -26,10 +26,12 @@ import "core:c"
 import "core:intrinsics"
 
 when ODIN_OS == .Windows {
-	foreign import lib "SDL2.lib"
+	foreign import _lib "SDL2.lib"
 } else {
-	foreign import lib "system:SDL2"
+	foreign import _lib "system:SDL2"
 }
+
+lib :: _lib
 
 version :: struct {
 	major: u8,        /**< major version */
@@ -45,7 +47,6 @@ PATCHLEVEL      :: 16
 foreign lib {
 	GetVersion  :: proc(ver: ^version) ---
 	GetRevision :: proc() -> cstring ---
-
 }
 
 InitFlag :: enum u32 {

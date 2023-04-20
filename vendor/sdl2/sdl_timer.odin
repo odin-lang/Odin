@@ -2,12 +2,6 @@ package sdl2
 
 import "core:c"
 
-when ODIN_OS == .Windows {
-	foreign import lib "SDL2.lib"
-} else {
-	foreign import lib "system:SDL2"
-}
-
 TimerCallback :: proc "c" (interval: u32, param: rawptr) -> u32
 TimerID :: distinct c.int
 
