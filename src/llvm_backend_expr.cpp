@@ -528,7 +528,7 @@ gb_internal bool lb_is_matrix_simdable(Type *t) {
 				return true;
 			case TargetArch_i386:
 			case TargetArch_wasm32:
-			case TargetArch_wasm64:
+			case TargetArch_wasm64p32:
 				return false;
 			}
 		}

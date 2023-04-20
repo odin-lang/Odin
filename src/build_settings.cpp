@@ -35,7 +35,7 @@ enum TargetArchKind : u16 {
 	TargetArch_arm32,
 	TargetArch_arm64,
 	TargetArch_wasm32,
-	TargetArch_wasm64,
+	TargetArch_wasm64p32,
 
 	TargetArch_COUNT,
 };
@@ -81,7 +81,7 @@ gb_global String target_arch_names[TargetArch_COUNT] = {
 	str_lit("arm32"),
 	str_lit("arm64"),
 	str_lit("wasm32"),
-	str_lit("wasm64"),
+	str_lit("wasm64p32"),
 };
 
 gb_global String target_endian_names[TargetEndian_COUNT] = {
@@ -475,13 +475,31 @@ gb_global TargetMetrics target_wasi_wasm32 = {
 };
 
 
-gb_global TargetMetrics target_js_wasm64 = {
-	TargetOs_js,
-	TargetArch_wasm64,
-	8, 8, 8, 16,
-	str_lit("wasm64-js-js"),
-	str_lit(""),
+gb_global TargetMetrics target_freestanding_wasm64p32 = {
+	TargetOs_freestanding,
+	TargetArch_wasm64p32,
+	4, 8, 8, 16,
+	str_lit("wasm32-freestanding-js"),
+	str_lit("e-m:e-p:32:32-i64:64-n32:64-S128"),
 };
+
+gb_global TargetMetrics target_js_wasm64p32 = {
+	TargetOs_js,
+	TargetArch_wasm64p32,
+	4, 8, 8, 16,
+	str_lit("wasm32-js-js"),
+	str_lit("e-m:e-p:32:32-i64:64-n32:64-S128"),
+};
+
+gb_global TargetMetrics target_wasi_wasm64p32 = {
+	TargetOs_wasi,
+	TargetArch_wasm32,
+	4, 8, 8, 16,
+	str_lit("wasm32-wasi-js"),
+	str_lit("e-m:e-p:32:32-i64:64-n32:64-S128"),
+};
+
+
 
 gb_global TargetMetrics target_freestanding_amd64_sysv = {
 	TargetOs_freestanding,
@@ -502,20 +520,29 @@ struct NamedTargetMetrics {
 gb_global NamedTargetMetrics named_targets[] = {
 	{ str_lit("darwin_amd64"),        &target_darwin_amd64   },
 	{ str_lit("darwin_arm64"),        &target_darwin_arm64   },
+
 	{ str_lit("essence_amd64"),       &target_essence_amd64  },
+
 	{ str_lit("linux_i386"),          &target_linux_i386     },
 	{ str_lit("linux_amd64"),         &target_linux_amd64    },
 	{ str_lit("linux_arm64"),         &target_linux_arm64    },
 	{ str_lit("linux_arm32"),         &target_linux_arm32    },
+
 	{ str_lit("windows_i386"),        &target_windows_i386   },
 	{ str_lit("windows_amd64"),       &target_windows_amd64  },
+
 	{ str_lit("freebsd_i386"),        &target_freebsd_i386   },
 	{ str_lit("freebsd_amd64"),       &target_freebsd_amd64  },
+
 	{ str_lit("openbsd_amd64"),       &target_openbsd_amd64  },
+
 	{ str_lit("freestanding_wasm32"), &target_freestanding_wasm32 },
 	{ str_lit("wasi_wasm32"),         &target_wasi_wasm32 },
 	{ str_lit("js_wasm32"),           &target_js_wasm32 },
-	// { str_lit("js_wasm64"),           &target_js_wasm64 },
+
+	{ str_lit("freestanding_wasm64p32"), &target_freestanding_wasm64p32 },
+	{ str_lit("js_wasm64p32"),           &target_js_wasm64p32 },
+	{ str_lit("wasi_wasm64p32"),         &target_wasi_wasm64p32 },
 
 	{ str_lit("freestanding_amd64_sysv"), &target_freestanding_amd64_sysv },
 };
@@ -624,7 +651,7 @@ gb_internal bool find_library_collection_path(String name, String *path) {
 gb_internal bool is_arch_wasm(void) {
 	switch (build_context.metrics.arch) {
 	case TargetArch_wasm32:
-	case TargetArch_wasm64:
+	case TargetArch_wasm64p32:
 		return true;
 	}
 	return false;
@@ -642,7 +669,7 @@ gb_internal bool is_arch_x86(void) {
 gb_internal bool allow_check_foreign_filepath(void) {
 	switch (build_context.metrics.arch) {
 	case TargetArch_wasm32:
-	case TargetArch_wasm64:
+	case TargetArch_wasm64p32:
 		return false;
 	}
 	return true;
@@ -1266,9 +1293,9 @@ gb_internal void init_build_context(TargetMetrics *cross_target) {
 		// link_flags = gb_string_appendc(link_flags, "--export-all ");
 		// link_flags = gb_string_appendc(link_flags, "--export-table ");
 		link_flags = gb_string_appendc(link_flags, "--allow-undefined ");
-		if (bc->metrics.arch == TargetArch_wasm64) {
-			link_flags = gb_string_appendc(link_flags, "-mwasm64 ");
-		}
+		// if (bc->metrics.arch == TargetArch_wasm64) {
+		// 	link_flags = gb_string_appendc(link_flags, "-mwasm64 ");
+		// }
 		if (bc->no_entry_point) {
 			link_flags = gb_string_appendc(link_flags, "--no-entry ");
 		}

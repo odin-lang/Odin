@@ -471,7 +471,7 @@ Odin_OS_Type :: type_of(ODIN_OS)
 		arm32,
 		arm64,
 		wasm32,
-		wasm64,
+		wasm64p32,
 	}
 */
 Odin_Arch_Type :: type_of(ODIN_ARCH)

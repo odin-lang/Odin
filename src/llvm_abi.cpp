@@ -1467,7 +1467,7 @@ gb_internal LB_ABI_INFO(lb_get_abi_info_internal) {
 	case TargetArch_arm64:
 		return lbAbiArm64::abi_info(c, arg_types, arg_count, return_type, return_is_defined, return_is_tuple, calling_convention);
 	case TargetArch_wasm32:
-	case TargetArch_wasm64:
+	case TargetArch_wasm64p32:
 		return lbAbiWasm::abi_info(c, arg_types, arg_count, return_type, return_is_defined, return_is_tuple, calling_convention);
 	}
 
