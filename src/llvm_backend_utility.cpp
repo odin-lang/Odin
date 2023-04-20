@@ -910,11 +910,18 @@ gb_internal lbValue lb_address_from_load_if_readonly_parameter(lbProcedure *p, l
 
 gb_internal lbStructFieldRemapping lb_get_struct_remapping(lbModule *m, Type *t) {
 	t = base_type(t);
+
 	LLVMTypeRef struct_type = lb_type(m, t);
+
+	mutex_lock(&m->types_mutex);
+
 	auto *field_remapping = map_get(&m->struct_field_remapping, cast(void *)struct_type);
 	if (field_remapping == nullptr) {
 		field_remapping = map_get(&m->struct_field_remapping, cast(void *)t);
 	}
+
+	mutex_unlock(&m->types_mutex);
+
 	GB_ASSERT_MSG(field_remapping != nullptr, "%s", type_to_string(t));
 	return *field_remapping;
 }

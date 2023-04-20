@@ -2,8 +2,13 @@ package vendor_zlib
 
 import "core:c"
 
-when ODIN_OS == .Windows { foreign import zlib "libz.lib" }
-when ODIN_OS == .Linux   { foreign import zlib "system:z" }
+when ODIN_OS == .Windows {
+	foreign import zlib "libz.lib"
+} else when ODIN_OS == .Linux {
+	foreign import zlib "system:z"
+} else {
+	foreign import zlib "system:z"
+}
 
 VERSION         :: "1.2.12"
 VERNUM          :: 0x12c0
@@ -41,39 +46,39 @@ gzFile_s :: struct {
 gzFile :: ^gzFile_s
 
 z_stream_s :: struct {
-    next_in:   ^Bytef,
-    avail_in:  uInt,
-    total_in:  uLong,
-    next_out:  ^Bytef,
-    avail_out: uInt,
-    total_out: uLong,
-    msg:       [^]c.char,
-    state:     rawptr,
-    zalloc:    alloc_func,
-    zfree:     free_func,
-    opaque:    voidpf,
-    data_type: c.int,
-    adler:     uLong,
-    reserved:  uLong,
+	next_in:   ^Bytef,
+	avail_in:  uInt,
+	total_in:  uLong,
+	next_out:  ^Bytef,
+	avail_out: uInt,
+	total_out: uLong,
+	msg:       [^]c.char,
+	state:     rawptr,
+	zalloc:    alloc_func,
+	zfree:     free_func,
+	opaque:    voidpf,
+	data_type: c.int,
+	adler:     uLong,
+	reserved:  uLong,
 }
 
 z_stream  :: z_stream_s
 z_streamp :: ^z_stream
 
 gz_header_s :: struct {
-    text:      c.int,
-    time:      uLong,
-    xflags:    c.int,
-    os:        c.int,
-    extra:     [^]Bytef,
-    extra_len: uInt,
-    extra_max: uInt,
-    name:      [^]Bytef,
-    name_max:  uInt,
-    comment:   [^]Bytef,
-    comm_max:  uInt,
-    hcrc:      c.int,
-    done:      c.int,
+	text:      c.int,
+	time:      uLong,
+	xflags:    c.int,
+	os:        c.int,
+	extra:     [^]Bytef,
+	extra_len: uInt,
+	extra_max: uInt,
+	name:      [^]Bytef,
+	name_max:  uInt,
+	comment:   [^]Bytef,
+	comm_max:  uInt,
+	hcrc:      c.int,
+	done:      c.int,
 }
 
 gz_header  :: gz_header_s

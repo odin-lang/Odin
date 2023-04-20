@@ -1498,6 +1498,9 @@ gb_internal LLVMTypeRef lb_type_internal_for_procedures_raw(lbModule *m, Type *t
 	type = base_type(original_type);
 	GB_ASSERT(type->kind == Type_Proc);
 
+	mutex_lock(&m->func_raw_types_mutex);
+	defer (mutex_unlock(&m->func_raw_types_mutex));
+
 	LLVMTypeRef *found = map_get(&m->func_raw_types, type);
 	if (found) {
 		return *found;
@@ -2156,6 +2159,9 @@ gb_internal LLVMTypeRef lb_type_internal(lbModule *m, Type *type) {
 
 gb_internal LLVMTypeRef lb_type(lbModule *m, Type *type) {
 	type = default_type(type);
+
+	mutex_lock(&m->types_mutex);
+	defer (mutex_unlock(&m->types_mutex));
 
 	LLVMTypeRef *found = map_get(&m->types, type);
 	if (found) {

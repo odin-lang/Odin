@@ -11,7 +11,7 @@ current_thread_id :: proc "contextless" () -> int {
 // The zero value for a Mutex is an unlocked mutex
 //
 // A Mutex must not be copied after first use
-Mutex :: struct {
+Mutex :: struct #no_copy {
 	impl: _Mutex,
 }
 
@@ -47,7 +47,7 @@ mutex_guard :: proc "contextless" (m: ^Mutex) -> bool {
 // The zero value for a RW_Mutex is an unlocked mutex
 //
 // A RW_Mutex must not be copied after first use
-RW_Mutex :: struct {
+RW_Mutex :: struct #no_copy {
 	impl: _RW_Mutex,
 }
 
@@ -111,7 +111,7 @@ rw_mutex_shared_guard :: proc "contextless" (m: ^RW_Mutex) -> bool {
 // The zero value for a Recursive_Mutex is an unlocked mutex
 //
 // A Recursive_Mutex must not be copied after first use
-Recursive_Mutex :: struct {
+Recursive_Mutex :: struct #no_copy {
 	impl: _Recursive_Mutex,
 }
 
@@ -144,7 +144,7 @@ recursive_mutex_guard :: proc "contextless" (m: ^Recursive_Mutex) -> bool {
 // waiting for signalling the occurence of an event
 //
 // A Cond must not be copied after first use
-Cond :: struct {
+Cond :: struct #no_copy {
 	impl: _Cond,
 }
 
@@ -172,7 +172,7 @@ cond_broadcast :: proc "contextless" (c: ^Cond) {
 // Posting to the semaphore increases the count by one, or the provided amount.
 //
 // A Sema must not be copied after first use
-Sema :: struct {
+Sema :: struct #no_copy {
 	impl: _Sema,
 }
 

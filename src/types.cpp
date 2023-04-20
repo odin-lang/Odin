@@ -149,6 +149,7 @@ struct TypeStruct {
 	bool            are_offsets_being_processed : 1;
 	bool            is_packed                   : 1;
 	bool            is_raw_union                : 1;
+	bool            is_no_copy                  : 1;
 	bool            is_poly_specialized         : 1;
 };
 
@@ -1670,6 +1671,10 @@ gb_internal bool is_type_raw_union(Type *t) {
 	t = base_type(t);
 	return (t->kind == Type_Struct && t->Struct.is_raw_union);
 }
+gb_internal bool is_type_no_copy(Type *t) {
+	t = base_type(t);
+	return (t->kind == Type_Struct && t->Struct.is_no_copy);
+}
 gb_internal bool is_type_enum(Type *t) {
 	t = base_type(t);
 	return (t->kind == Type_Enum);
@@ -2655,6 +2660,7 @@ gb_internal bool are_types_identical_internal(Type *x, Type *y, bool check_tuple
 
 	case Type_Struct:
 		if (x->Struct.is_raw_union == y->Struct.is_raw_union &&
+		    x->Struct.is_no_copy   == y->Struct.is_no_copy &&
 		    x->Struct.fields.count == y->Struct.fields.count &&
 		    x->Struct.is_packed    == y->Struct.is_packed &&
 		    x->Struct.custom_align == y->Struct.custom_align &&
@@ -2683,7 +2689,7 @@ gb_internal bool are_types_identical_internal(Type *x, Type *y, bool check_tuple
 					return false;
 				}
 			}
-			return true;
+			return are_types_identical(x->Struct.polymorphic_params, y->Struct.polymorphic_params);
 		}
 		break;
 
@@ -4207,6 +4213,7 @@ gb_internal gbString write_type_to_string(gbString str, Type *type, bool shortha
 		str = gb_string_appendc(str, "struct");
 		if (type->Struct.is_packed)    str = gb_string_appendc(str, " #packed");
 		if (type->Struct.is_raw_union) str = gb_string_appendc(str, " #raw_union");
+		if (type->Struct.is_no_copy)   str = gb_string_appendc(str, " #no_copy");
 		if (type->Struct.custom_align != 0) str = gb_string_append_fmt(str, " #align %d", cast(int)type->Struct.custom_align);
 		str = gb_string_appendc(str, " {");
 

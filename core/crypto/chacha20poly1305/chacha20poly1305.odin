@@ -10,8 +10,10 @@ KEY_SIZE :: chacha20.KEY_SIZE
 NONCE_SIZE :: chacha20.NONCE_SIZE
 TAG_SIZE :: poly1305.TAG_SIZE
 
+@(private)
 _P_MAX :: 64 * 0xffffffff // 64 * (2^32-1)
 
+@(private)
 _validate_common_slice_sizes :: proc (tag, key, nonce, aad, text: []byte) {
 	if len(tag) != TAG_SIZE {
 		panic("crypto/chacha20poly1305: invalid destination tag size")
@@ -37,7 +39,10 @@ _validate_common_slice_sizes :: proc (tag, key, nonce, aad, text: []byte) {
 	}
 }
 
+@(private)
 _PAD: [16]byte
+
+@(private)
 _update_mac_pad16 :: #force_inline proc (ctx: ^poly1305.Context, x_len: int) {
 	if pad_len := 16 - (x_len & (16-1)); pad_len != 16 {
 		poly1305.update(ctx, _PAD[:pad_len])

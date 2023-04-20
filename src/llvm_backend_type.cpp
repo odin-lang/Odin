@@ -691,32 +691,34 @@ gb_internal void lb_setup_type_info_data(lbProcedure *p) { // NOTE(bill): Setup 
 		case Type_Struct: {
 			tag = lb_const_ptr_cast(m, variant_ptr, t_type_info_struct_ptr);
 
-			LLVMValueRef vals[12] = {};
+			LLVMValueRef vals[13] = {};
 
 
 			{
 				lbValue is_packed       = lb_const_bool(m, t_bool, t->Struct.is_packed);
 				lbValue is_raw_union    = lb_const_bool(m, t_bool, t->Struct.is_raw_union);
+				lbValue is_no_copy      = lb_const_bool(m, t_bool, t->Struct.is_no_copy);
 				lbValue is_custom_align = lb_const_bool(m, t_bool, t->Struct.custom_align != 0);
 				vals[5] = is_packed.value;
 				vals[6] = is_raw_union.value;
-				vals[7] = is_custom_align.value;
+				vals[7] = is_no_copy.value;
+				vals[8] = is_custom_align.value;
 				if (is_type_comparable(t) && !is_type_simple_compare(t)) {
-					vals[8] = lb_equal_proc_for_type(m, t).value;
+					vals[9] = lb_equal_proc_for_type(m, t).value;
 				}
 
 
 				if (t->Struct.soa_kind != StructSoa_None) {
-					lbValue kind = lb_emit_struct_ep(p, tag, 9);
+					lbValue kind = lb_emit_struct_ep(p, tag, 10);
 					Type *kind_type = type_deref(kind.type);
 
 					lbValue soa_kind = lb_const_value(m, kind_type, exact_value_i64(t->Struct.soa_kind));
 					lbValue soa_type = lb_type_info(m, t->Struct.soa_elem);
 					lbValue soa_len = lb_const_int(m, t_int, t->Struct.soa_count);
 
-					vals[9]  = soa_kind.value;
-					vals[10] = soa_type.value;
-					vals[11] = soa_len.value;
+					vals[10] = soa_kind.value;
+					vals[11] = soa_type.value;
+					vals[12] = soa_len.value;
 				}
 			}
 			

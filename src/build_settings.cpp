@@ -7,6 +7,8 @@
 // #define DEFAULT_TO_THREADED_CHECKER
 // #endif
 
+#define DEFAULT_MAX_ERROR_COLLECTOR_COUNT (36)
+
 enum TargetOsKind : u16 {
 	TargetOs_Invalid,
 
@@ -313,6 +315,8 @@ struct BuildContext {
 	RelocMode reloc_mode;
 	bool   disable_red_zone;
 
+	isize max_error_count;
+
 
 	u32 cmd_doc_flags;
 	Array<String> extra_packages;
@@ -343,6 +347,14 @@ gb_internal bool global_warnings_as_errors(void) {
 gb_internal bool global_ignore_warnings(void) {
 	return build_context.ignore_warnings;
 }
+
+gb_internal isize MAX_ERROR_COLLECTOR_COUNT(void) {
+	if (build_context.max_error_count <= 0) {
+		return DEFAULT_MAX_ERROR_COLLECTOR_COUNT;
+	}
+	return build_context.max_error_count;
+}
+
 
 
 gb_global TargetMetrics target_windows_i386 = {
@@ -1080,6 +1092,10 @@ gb_internal void init_build_context(TargetMetrics *cross_target) {
 	bc->ODIN_VENDOR  = str_lit("odin");
 	bc->ODIN_VERSION = ODIN_VERSION;
 	bc->ODIN_ROOT    = odin_root_dir();
+
+	if (bc->max_error_count <= 0) {
+		bc->max_error_count = DEFAULT_MAX_ERROR_COLLECTOR_COUNT;
+	}
 
 	{
 		char const *found = gb_get_env("ODIN_ERROR_POS_STYLE", permanent_allocator());

@@ -691,6 +691,7 @@ enum BuildFlagKind {
 	BuildFlag_TerseErrors,
 	BuildFlag_VerboseErrors,
 	BuildFlag_ErrorPosStyle,
+	BuildFlag_MaxErrorCount,
 
 	// internal use only
 	BuildFlag_InternalIgnoreLazy,
@@ -866,6 +867,7 @@ gb_internal bool parse_build_flags(Array<String> args) {
 	add_flag(&build_flags, BuildFlag_TerseErrors,             str_lit("terse-errors"),              BuildFlagParam_None,    Command_all);
 	add_flag(&build_flags, BuildFlag_VerboseErrors,           str_lit("verbose-errors"),            BuildFlagParam_None,    Command_all);
 	add_flag(&build_flags, BuildFlag_ErrorPosStyle,           str_lit("error-pos-style"),           BuildFlagParam_String,  Command_all);
+	add_flag(&build_flags, BuildFlag_MaxErrorCount,           str_lit("max-error-count"),           BuildFlagParam_Integer, Command_all);
 
 	add_flag(&build_flags, BuildFlag_InternalIgnoreLazy,      str_lit("internal-ignore-lazy"),      BuildFlagParam_None,    Command_all);
 	add_flag(&build_flags, BuildFlag_InternalIgnoreLLVMBuild, str_lit("internal-ignore-llvm-build"),BuildFlagParam_None,    Command_all);
@@ -1521,6 +1523,17 @@ gb_internal bool parse_build_flags(Array<String> args) {
 								bad_flags = true;
 							}
 							break;
+
+						case BuildFlag_MaxErrorCount: {
+							i64 count = big_int_to_i64(&value.value_integer);
+							if (count <= 0) {
+								gb_printf_err("-%.*s must be greater than 0", LIT(bf.name));
+								bad_flags = true;
+							} else {
+								build_context.max_error_count = cast(isize)count;
+							}
+							break;
+						}
 
 						case BuildFlag_InternalIgnoreLazy:
 							build_context.ignore_lazy = true;
@@ -2212,8 +2225,21 @@ gb_internal void print_show_help(String const arg0, String const &command) {
 		print_usage_line(2, "Treats warning messages as error messages");
 		print_usage_line(0, "");
 
-		print_usage_line(1, "-verbose-errors");
-		print_usage_line(2, "Prints verbose error messages showing the code on that line and the location in that line");
+		print_usage_line(1, "-terse-errors");
+		print_usage_line(2, "Prints a terse error message without showing the code on that line and the location in that line");
+		print_usage_line(0, "");
+
+		print_usage_line(1, "-error-pos-style:<string>");
+		print_usage_line(2, "Options are 'unix', 'odin' and 'default' (odin)");
+		print_usage_line(2, "'odin'    file/path(45:3)");
+		print_usage_line(2, "'unix'    file/path:45:3:");
+		print_usage_line(0, "");
+
+
+		print_usage_line(1, "-max-error-count:<integer>");
+		print_usage_line(2, "Set the maximum number of errors that can be displayed before the compiler terminates");
+		print_usage_line(2, "Must be an integer >0");
+		print_usage_line(2, "If not set, the default max error count is %d", DEFAULT_MAX_ERROR_COLLECTOR_COUNT);
 		print_usage_line(0, "");
 
 		print_usage_line(1, "-foreign-error-procedures");

@@ -2,12 +2,6 @@ package sdl2
 
 import "core:c"
 
-when ODIN_OS == .Windows {
-	foreign import lib "SDL2.lib"
-} else {
-	foreign import lib "system:SDL2"
-}
-
 Cursor :: struct {}
 
 BUTTON :: #force_inline proc "c" (X: c.int) -> c.int { return 1 << u32(X-1) }

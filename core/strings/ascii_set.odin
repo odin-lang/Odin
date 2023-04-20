@@ -38,8 +38,8 @@ Inputs:
 - c: The char to check for in the Ascii_Set.
 
 Returns:
-A boolean indicating if the byte is contained in the Ascii_Set (true) or not (false).
+- res: A boolean indicating if the byte is contained in the Ascii_Set (true) or not (false).
 */
-ascii_set_contains :: proc(as: Ascii_Set, c: byte) -> bool #no_bounds_check {
+ascii_set_contains :: proc(as: Ascii_Set, c: byte) -> (res: bool) #no_bounds_check {
 	return as[c>>5] & (1<<(c&31)) != 0
 }

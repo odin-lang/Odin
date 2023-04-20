@@ -1047,7 +1047,7 @@ gb_internal Ast *ast_dynamic_array_type(AstFile *f, Token token, Ast *elem) {
 }
 
 gb_internal Ast *ast_struct_type(AstFile *f, Token token, Slice<Ast *> fields, isize field_count,
-                     Ast *polymorphic_params, bool is_packed, bool is_raw_union,
+                     Ast *polymorphic_params, bool is_packed, bool is_raw_union, bool is_no_copy,
                      Ast *align,
                      Token where_token, Array<Ast *> const &where_clauses) {
 	Ast *result = alloc_ast_node(f, Ast_StructType);
@@ -1057,6 +1057,7 @@ gb_internal Ast *ast_struct_type(AstFile *f, Token token, Slice<Ast *> fields, i
 	result->StructType.polymorphic_params = polymorphic_params;
 	result->StructType.is_packed          = is_packed;
 	result->StructType.is_raw_union       = is_raw_union;
+	result->StructType.is_no_copy         = is_no_copy;
 	result->StructType.align              = align;
 	result->StructType.where_token        = where_token;
 	result->StructType.where_clauses      = slice_from_array(where_clauses);
@@ -2392,6 +2393,7 @@ gb_internal Ast *parse_operand(AstFile *f, bool lhs) {
 		Ast *polymorphic_params = nullptr;
 		bool is_packed          = false;
 		bool is_raw_union       = false;
+		bool no_copy            = false;
 		Ast *align              = nullptr;
 
 		if (allow_token(f, Token_OpenParen)) {
@@ -2427,6 +2429,11 @@ gb_internal Ast *parse_operand(AstFile *f, bool lhs) {
 					syntax_error(tag, "Duplicate struct tag '#%.*s'", LIT(tag.string));
 				}
 				is_raw_union = true;
+			} else if (tag.string == "no_copy") {
+				if (is_packed) {
+					syntax_error(tag, "Duplicate struct tag '#%.*s'", LIT(tag.string));
+				}
+				no_copy = true;
 			} else {
 				syntax_error(tag, "Invalid struct tag '#%.*s'", LIT(tag.string));
 			}
@@ -2465,7 +2472,7 @@ gb_internal Ast *parse_operand(AstFile *f, bool lhs) {
 			decls = fields->FieldList.list;
 		}
 
-		return ast_struct_type(f, token, decls, name_count, polymorphic_params, is_packed, is_raw_union, align, where_token, where_clauses);
+		return ast_struct_type(f, token, decls, name_count, polymorphic_params, is_packed, is_raw_union, no_copy, align, where_token, where_clauses);
 	} break;
 
 	case Token_union: {
