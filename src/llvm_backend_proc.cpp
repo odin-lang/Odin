@@ -2058,7 +2058,7 @@ gb_internal lbValue lb_build_builtin_proc(lbProcedure *p, Ast *expr, TypeAndValu
 			i64 al = exact_value_to_i64(type_and_value_of_expr(ce->args[1]).value);
 
 			lbValue res = {};
-			res.type = t_u8_ptr;
+			res.type = alloc_type_multi_pointer(t_u8);
 			res.value = LLVMBuildArrayAlloca(p->builder, lb_type(p->module, t_u8), sz.value, "");
 			LLVMSetAlignment(res.value, cast(unsigned)al);
 			return res;
