@@ -1626,7 +1626,7 @@ gb_internal LLVMTypeRef lb_type_internal(lbModule *m, Type *type) {
 
 	GB_ASSERT(type != t_invalid);
 
-	bool bigger_int = build_context.word_size != build_context.int_size;
+	bool bigger_int = build_context.ptr_size != build_context.int_size;
 
 	switch (type->kind) {
 	case Type_Basic:
@@ -1765,7 +1765,7 @@ gb_internal LLVMTypeRef lb_type_internal(lbModule *m, Type *type) {
 		case Basic_int:  return LLVMIntTypeInContext(ctx, 8*cast(unsigned)build_context.int_size);
 		case Basic_uint: return LLVMIntTypeInContext(ctx, 8*cast(unsigned)build_context.int_size);
 
-		case Basic_uintptr: return LLVMIntTypeInContext(ctx, 8*cast(unsigned)build_context.word_size);
+		case Basic_uintptr: return LLVMIntTypeInContext(ctx, 8*cast(unsigned)build_context.ptr_size);
 
 		case Basic_rawptr: return LLVMPointerType(LLVMInt8TypeInContext(ctx), 0);
 		case Basic_string:
@@ -1800,7 +1800,7 @@ gb_internal LLVMTypeRef lb_type_internal(lbModule *m, Type *type) {
 				return type;
 			}
 
-		case Basic_typeid: return LLVMIntTypeInContext(m->ctx, 8*cast(unsigned)build_context.word_size);
+		case Basic_typeid: return LLVMIntTypeInContext(m->ctx, 8*cast(unsigned)build_context.ptr_size);
 
 		// Endian Specific Types
 		case Basic_i16le:  return LLVMInt16TypeInContext(ctx);
@@ -1927,7 +1927,7 @@ gb_internal LLVMTypeRef lb_type_internal(lbModule *m, Type *type) {
 			if (bigger_int) {
 				LLVMTypeRef fields[3] = {
 					LLVMPointerType(lb_type(m, type->Slice.elem), 0), // data
-					lb_type_padding_filler(m, build_context.word_size, build_context.word_size), // padding
+					lb_type_padding_filler(m, build_context.ptr_size, build_context.ptr_size), // padding
 					lb_type(m, t_int), // len
 				};
 				return LLVMStructTypeInContext(ctx, fields, gb_count_of(fields), false);
@@ -1946,7 +1946,7 @@ gb_internal LLVMTypeRef lb_type_internal(lbModule *m, Type *type) {
 			if (bigger_int) {
 				LLVMTypeRef fields[5] = {
 					LLVMPointerType(lb_type(m, type->DynamicArray.elem), 0), // data
-					lb_type_padding_filler(m, build_context.word_size, build_context.word_size), // padding
+					lb_type_padding_filler(m, build_context.ptr_size, build_context.ptr_size), // padding
 					lb_type(m, t_int), // len
 					lb_type(m, t_int), // cap
 					lb_type(m, t_allocator), // allocator
@@ -2173,7 +2173,7 @@ gb_internal LLVMTypeRef lb_type_internal(lbModule *m, Type *type) {
 			LLVMTypeRef *fields = gb_alloc_array(permanent_allocator(), LLVMTypeRef, field_count);
 			fields[0] = LLVMPointerType(lb_type(m, type->Pointer.elem), 0);
 			if (bigger_int) {
-				fields[1] = lb_type_padding_filler(m, build_context.word_size, build_context.word_size);
+				fields[1] = lb_type_padding_filler(m, build_context.ptr_size, build_context.ptr_size);
 				fields[2] = LLVMIntTypeInContext(ctx, 8*cast(unsigned)build_context.int_size);
 			} else {
 				fields[1] = LLVMIntTypeInContext(ctx, 8*cast(unsigned)build_context.int_size);

@@ -68,7 +68,7 @@ gb_internal lbValue lb_typeid(lbModule *m, Type *type) {
 	}
 
 	u64 data = 0;
-	if (build_context.word_size == 4) {
+	if (build_context.ptr_size == 4) {
 		GB_ASSERT(id <= (1u<<24u));
 		data |= (id       &~ (1u<<24)) << 0u;  // index
 		data |= (kind     &~ (1u<<5))  << 24u; // kind
@@ -76,7 +76,7 @@ gb_internal lbValue lb_typeid(lbModule *m, Type *type) {
 		data |= (special  &~ (1u<<1))  << 30u; // kind
 		data |= (reserved &~ (1u<<1))  << 31u; // kind
 	} else {
-		GB_ASSERT(build_context.word_size == 8);
+		GB_ASSERT(build_context.ptr_size == 8);
 		GB_ASSERT(id <= (1ull<<56u));
 		data |= (id       &~ (1ull<<56)) << 0ul;  // index
 		data |= (kind     &~ (1ull<<5))  << 56ull; // kind

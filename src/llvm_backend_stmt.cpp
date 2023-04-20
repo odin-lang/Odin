@@ -1652,7 +1652,7 @@ gb_internal void lb_build_return_stmt_internal(lbProcedure *p, lbValue res) {
 		if (res.value != nullptr) {
 			LLVMValueRef res_val = res.value;
 			i64 sz = type_size_of(res.type);
-			if (LLVMIsALoadInst(res_val) && sz > build_context.word_size) {
+			if (LLVMIsALoadInst(res_val) && sz > build_context.int_size) {
 				lbValue ptr = lb_address_from_load_or_generate_local(p, res);
 				lb_mem_copy_non_overlapping(p, p->return_ptr.addr, ptr, lb_const_int(p->module, t_int, sz));
 			} else {

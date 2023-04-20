@@ -116,7 +116,7 @@ gb_global String const ODIN_VERSION = str_lit(ODIN_VERSION_RAW);
 struct TargetMetrics {
 	TargetOsKind   os;
 	TargetArchKind arch;
-	isize          word_size;
+	isize          ptr_size;
 	isize          int_size;
 	isize          max_align;
 	isize          max_simd_align;
@@ -238,10 +238,10 @@ struct BuildContext {
 	TargetEndianKind endian_kind;
 
 	// In bytes
-	i64    word_size;      // Size of a pointer, must be >= 4
+	i64    ptr_size;       // Size of a pointer, must be >= 4
 	i64    int_size;       // Size of a int/uint, must be >= 4
-	i64    max_align;      // max alignment, must be >= 1 (and typically >= word_size)
-	i64    max_simd_align; // max alignment, must be >= 1 (and typically >= word_size)
+	i64    max_align;      // max alignment, must be >= 1 (and typically >= ptr_size)
+	i64    max_simd_align; // max alignment, must be >= 1 (and typically >= ptr_size)
 
 	CommandKind command_kind;
 	String command;
@@ -1192,14 +1192,14 @@ gb_internal void init_build_context(TargetMetrics *cross_target) {
 
 	GB_ASSERT(metrics->os != TargetOs_Invalid);
 	GB_ASSERT(metrics->arch != TargetArch_Invalid);
-	GB_ASSERT(metrics->word_size > 1);
+	GB_ASSERT(metrics->ptr_size > 1);
 	GB_ASSERT(metrics->int_size  > 1);
 	GB_ASSERT(metrics->max_align > 1);
 	GB_ASSERT(metrics->max_simd_align > 1);
 
-	GB_ASSERT(metrics->int_size >= metrics->word_size);
-	if (metrics->int_size > metrics->word_size) {
-		GB_ASSERT(metrics->int_size == 2*metrics->word_size);
+	GB_ASSERT(metrics->int_size >= metrics->ptr_size);
+	if (metrics->int_size > metrics->ptr_size) {
+		GB_ASSERT(metrics->int_size == 2*metrics->ptr_size);
 	}
 
 
@@ -1208,7 +1208,7 @@ gb_internal void init_build_context(TargetMetrics *cross_target) {
 	bc->ODIN_OS        = target_os_names[metrics->os];
 	bc->ODIN_ARCH      = target_arch_names[metrics->arch];
 	bc->endian_kind    = target_endians[metrics->arch];
-	bc->word_size      = metrics->word_size;
+	bc->ptr_size       = metrics->ptr_size;
 	bc->int_size       = metrics->int_size;
 	bc->max_align      = metrics->max_align;
 	bc->max_simd_align = metrics->max_simd_align;

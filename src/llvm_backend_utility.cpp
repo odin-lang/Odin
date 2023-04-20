@@ -930,17 +930,17 @@ gb_internal i32 lb_convert_struct_index(lbModule *m, Type *t, i32 index) {
 	if (t->kind == Type_Struct) {
 		auto field_remapping = lb_get_struct_remapping(m, t);
 		return field_remapping[index];
-	} else if (build_context.word_size != build_context.int_size) {
+	} else if (build_context.ptr_size != build_context.int_size) {
 		switch (t->kind) {
 		case Type_Slice:
-			GB_ASSERT(build_context.word_size*2 == build_context.int_size);
+			GB_ASSERT(build_context.ptr_size*2 == build_context.int_size);
 			switch (index) {
 			case 0: return 0; // data
 			case 1: return 2; // len
 			}
 			break;
 		case Type_DynamicArray:
-			GB_ASSERT(build_context.word_size*2 == build_context.int_size);
+			GB_ASSERT(build_context.ptr_size*2 == build_context.int_size);
 			switch (index) {
 			case 0: return 0; // data
 			case 1: return 2; // len
@@ -949,7 +949,7 @@ gb_internal i32 lb_convert_struct_index(lbModule *m, Type *t, i32 index) {
 			}
 			break;
 		case Type_SoaPointer:
-			GB_ASSERT(build_context.word_size*2 == build_context.int_size);
+			GB_ASSERT(build_context.ptr_size*2 == build_context.int_size);
 			switch (index) {
 			case 0: return 0; // data
 			case 1: return 2; // offset
@@ -1589,7 +1589,7 @@ gb_internal lbValue lb_map_data_uintptr(lbProcedure *p, lbValue value) {
 	GB_ASSERT(is_type_map(value.type) || are_types_identical(value.type, t_raw_map));
 	lbValue data = lb_emit_struct_ev(p, value, 0);
 	u64 mask_value = 0;
-	if (build_context.word_size == 4) {
+	if (build_context.ptr_size == 4) {
 		mask_value = 0xfffffffful & ~(MAP_CACHE_LINE_SIZE-1);
 	} else {
 		mask_value = 0xffffffffffffffffull & ~(MAP_CACHE_LINE_SIZE-1);

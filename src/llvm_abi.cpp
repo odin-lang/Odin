@@ -218,7 +218,7 @@ gb_internal i64 lb_sizeof(LLVMTypeRef type) {
 	case LLVMDoubleTypeKind:
 		return 8;
 	case LLVMPointerTypeKind:
-		return build_context.word_size;
+		return build_context.ptr_size;
 	case LLVMStructTypeKind:
 		{
 			unsigned field_count = LLVMCountStructElementTypes(type);
@@ -275,7 +275,7 @@ gb_internal i64 lb_alignof(LLVMTypeRef type) {
 	case LLVMIntegerTypeKind:
 		{
 			unsigned w = LLVMGetIntTypeWidth(type);
-			return gb_clamp((w + 7)/8, 1, build_context.word_size);
+			return gb_clamp((w + 7)/8, 1, build_context.ptr_size);
 		}
 	case LLVMHalfTypeKind:
 		return 2;
@@ -284,7 +284,7 @@ gb_internal i64 lb_alignof(LLVMTypeRef type) {
 	case LLVMDoubleTypeKind:
 		return 8;
 	case LLVMPointerTypeKind:
-		return build_context.word_size;
+		return build_context.ptr_size;
 	case LLVMStructTypeKind:
 		{
 			if (LLVMIsPackedStruct(type)) {
@@ -388,7 +388,7 @@ namespace lbAbi386 {
 		}
 
 		if (build_context.metrics.os == TargetOs_windows &&
-		    build_context.word_size == 8 &&
+		    build_context.ptr_size == 8 &&
 		    lb_is_type_kind(type, LLVMIntegerTypeKind) &&
 		    type == LLVMIntTypeInContext(c, 128)) {
 		    	// NOTE(bill): Because Windows AMD64 is weird
