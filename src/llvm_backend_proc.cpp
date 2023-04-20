@@ -1169,17 +1169,27 @@ gb_internal lbValue lb_emit_call(lbProcedure *p, lbValue value, Array<lbValue> c
 			lbValue deferred = lb_find_procedure_value_from_entity(p->module, deferred_entity);
 
 
+			bool by_ptr = false;
 			auto in_args = args;
 			Array<lbValue> result_as_args = {};
 			switch (kind) {
 			case DeferredProcedure_none:
 				break;
+			case DeferredProcedure_in_by_ptr:
+				by_ptr = true;
+				/*fallthrough*/
 			case DeferredProcedure_in:
 				result_as_args = array_clone(heap_allocator(), in_args);
 				break;
+			case DeferredProcedure_out_by_ptr:
+				by_ptr = true;
+				/*fallthrough*/
 			case DeferredProcedure_out:
 				result_as_args = lb_value_to_array(p, heap_allocator(), result);
 				break;
+			case DeferredProcedure_in_out_by_ptr:
+				by_ptr = true;
+				/*fallthrough*/
 			case DeferredProcedure_in_out:
 				{
 					auto out_args = lb_value_to_array(p, heap_allocator(), result);
@@ -1188,6 +1198,12 @@ gb_internal lbValue lb_emit_call(lbProcedure *p, lbValue value, Array<lbValue> c
 					array_copy(&result_as_args, out_args, in_args.count);
 				}
 				break;
+			}
+			if (by_ptr) {
+				for_array(i, result_as_args) {
+					lbValue arg_ptr = lb_address_from_load_or_generate_local(p, result_as_args[i]);
+					result_as_args[i] = arg_ptr;
+				}
 			}
 
 			lb_add_defer_proc(p, p->scope_index, deferred, result_as_args);
@@ -2042,7 +2058,7 @@ gb_internal lbValue lb_build_builtin_proc(lbProcedure *p, Ast *expr, TypeAndValu
 			i64 al = exact_value_to_i64(type_and_value_of_expr(ce->args[1]).value);
 
 			lbValue res = {};
-			res.type = t_u8_ptr;
+			res.type = alloc_type_multi_pointer(t_u8);
 			res.value = LLVMBuildArrayAlloca(p->builder, lb_type(p->module, t_u8), sz.value, "");
 			LLVMSetAlignment(res.value, cast(unsigned)al);
 			return res;
@@ -2363,9 +2379,15 @@ gb_internal lbValue lb_build_builtin_proc(lbProcedure *p, Ast *expr, TypeAndValu
 		{
 			lbValue dst = lb_build_expr(p, ce->args[0]);
 			lbValue src = lb_build_expr(p, ce->args[1]);
-			src = lb_address_from_load_or_generate_local(p, src);
 			Type *t = type_deref(dst.type);
-			lb_mem_copy_non_overlapping(p, dst, src, lb_const_int(p->module, t_int, type_size_of(t)), false);
+
+			if (is_type_simd_vector(t)) {
+				LLVMValueRef store = LLVMBuildStore(p->builder, src.value, dst.value);
+				LLVMSetAlignment(store, 1);
+			} else {
+				src = lb_address_from_load_or_generate_local(p, src);
+				lb_mem_copy_non_overlapping(p, dst, src, lb_const_int(p->module, t_int, type_size_of(t)), false);
+			}
 			return {};
 		}
 
@@ -2373,9 +2395,17 @@ gb_internal lbValue lb_build_builtin_proc(lbProcedure *p, Ast *expr, TypeAndValu
 		{
 			lbValue src = lb_build_expr(p, ce->args[0]);
 			Type *t = type_deref(src.type);
-			lbAddr dst = lb_add_local_generated(p, t, false);
-			lb_mem_copy_non_overlapping(p, dst.addr, src, lb_const_int(p->module, t_int, type_size_of(t)), false);
-			return lb_addr_load(p, dst);
+			if (is_type_simd_vector(t)) {
+				lbValue res = {};
+				res.type = t;
+				res.value = LLVMBuildLoad2(p->builder, lb_type(p->module, t), src.value, "");
+				LLVMSetAlignment(res.value, 1);
+				return res;
+			} else {
+				lbAddr dst = lb_add_local_generated(p, t, false);
+				lb_mem_copy_non_overlapping(p, dst.addr, src, lb_const_int(p->module, t_int, type_size_of(t)), false);
+				return lb_addr_load(p, dst);
+			}
 		}
 
 	case BuiltinProc_atomic_add:

@@ -2,12 +2,6 @@ package sdl2
 
 import "core:c"
 
-when ODIN_OS == .Windows {
-	foreign import lib "SDL2.lib"
-} else {
-	foreign import lib "system:SDL2"
-}
-
 /* This is a guess for the cacheline size used for padding.
  * Most x86 processors have a 64 byte cache line.
  * The 64-bit PowerPC processors have a 128 byte cache line.

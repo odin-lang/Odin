@@ -215,6 +215,12 @@ unmarshal_value :: proc(p: ^Parser, v: any) -> (err: Unmarshal_Error) {
 		}
 	}
 	
+	switch dst in &v {
+	// Handle json.Value as an unknown type
+	case Value:
+		dst = parse_value(p) or_return
+		return
+	}
 	
 	#partial switch token.kind {
 	case .Null:

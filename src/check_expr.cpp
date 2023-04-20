@@ -1631,7 +1631,9 @@ gb_internal Entity *check_ident(CheckerContext *c, Operand *o, Ast *n, Type *nam
 		}
 		return e;
 	case Entity_LibraryName:
-		error(n, "Use of library '%.*s' not in foreign block", LIT(name));
+		if (!allow_import_name) {
+			error(n, "Use of library '%.*s' not in foreign block", LIT(name));
+		}
 		return e;
 
 	case Entity_Label:
@@ -5043,6 +5045,21 @@ gb_internal isize add_dependencies_from_unpacking(CheckerContext *c, Entity **lh
 	return tuple_count;
 }
 
+gb_internal bool check_no_copy_assignment(Operand const &o, String const &context) {
+	if (o.type && is_type_no_copy(o.type)) {
+		Ast *expr = unparen_expr(o.expr);
+		if (expr && o.mode != Addressing_Constant) {
+			if (expr->kind == Ast_CallExpr) {
+				// Okay
+			} else {
+				error(o.expr, "Invalid use of #no_copy value in %.*s", LIT(context));
+				return true;
+			}
+		}
+	}
+	return false;
+}
+
 
 gb_internal bool check_assignment_arguments(CheckerContext *ctx, Array<Operand> const &lhs, Array<Operand> *operands, Slice<Ast *> const &rhs) {
 	bool optional_ok = false;
@@ -5114,6 +5131,7 @@ gb_internal bool check_assignment_arguments(CheckerContext *ctx, Array<Operand> 
 			for (Entity *e : tuple->variables) {
 				o.type = e->type;
 				array_add(operands, o);
+				check_no_copy_assignment(o, str_lit("assignment"));
 			}
 
 			tuple_index += tuple->variables.count;
@@ -5950,6 +5968,10 @@ gb_internal CallArgumentData check_call_arguments(CheckerContext *c, Operand *op
 		if (operand->mode != Addressing_ProcGroup) {
 			check_unpack_arguments(c, lhs, lhs_count, &operands, args, false, is_variadic);
 		}
+	}
+
+	for (Operand const &o : operands) {
+		check_no_copy_assignment(o, str_lit("call expression"));
 	}
 
 	if (operand->mode == Addressing_ProcGroup) {

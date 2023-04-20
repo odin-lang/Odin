@@ -119,6 +119,7 @@ Type_Info_Struct :: struct {
 	tags:         []string,
 	is_packed:    bool,
 	is_raw_union: bool,
+	is_no_copy:   bool,
 	custom_align: bool,
 
 	equal: Equal_Proc, // set only when the struct has .Comparable set but does not have .Simple_Compare set

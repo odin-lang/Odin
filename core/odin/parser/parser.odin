@@ -2527,6 +2527,7 @@ parse_operand :: proc(p: ^Parser, lhs: bool) -> ^ast.Expr {
 		align:        ^ast.Expr
 		is_packed:    bool
 		is_raw_union: bool
+		is_no_copy:   bool
 		fields:       ^ast.Field_List
 		name_count:   int
 
@@ -2560,6 +2561,11 @@ parse_operand :: proc(p: ^Parser, lhs: bool) -> ^ast.Expr {
 					error(p, tag.pos, "duplicate struct tag '#%s'", tag.text)
 				}
 				is_raw_union = true
+			case "no_copy":
+				if is_no_copy {
+					error(p, tag.pos, "duplicate struct tag '#%s'", tag.text)
+				}
+				is_no_copy = true
 			case:
 				error(p, tag.pos, "invalid struct tag '#%s", tag.text)
 			}
@@ -2594,6 +2600,7 @@ parse_operand :: proc(p: ^Parser, lhs: bool) -> ^ast.Expr {
 		st.align         = align
 		st.is_packed     = is_packed
 		st.is_raw_union  = is_raw_union
+		st.is_no_copy    = is_no_copy
 		st.fields        = fields
 		st.name_count    = name_count
 		st.where_token   = where_token

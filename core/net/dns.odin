@@ -22,7 +22,6 @@ import "core:mem"
 import "core:strings"
 import "core:time"
 import "core:os"
-
 /*
 	Default configuration for DNS resolution.
 */
@@ -108,6 +107,8 @@ resolve :: proc(hostname_and_maybe_port: string) -> (ep4, ep6: Endpoint, err: Ne
 		err4, err6: Network_Error = ---, ---
 		ep4, err4 = resolve_ip4(t.hostname)
 		ep6, err6 = resolve_ip6(t.hostname)
+		ep4.port  = t.port if err4 == nil else 0
+		ep6.port  = t.port if err6 == nil else 0
 		if err4 != nil && err6 != nil {
 			err = err4
 		}

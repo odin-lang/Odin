@@ -8,6 +8,7 @@ import "core:mem"
 KEY_SIZE :: 32
 TAG_SIZE :: 16
 
+@(private)
 _BLOCK_SIZE :: 16
 
 sum :: proc (dst, msg, key: []byte) {
@@ -141,6 +142,7 @@ reset :: proc (ctx: ^Context) {
 	ctx._is_initialized = false
 }
 
+@(private)
 _blocks :: proc (ctx: ^Context, msg: []byte, final := false) {
 	n: field.Tight_Field_Element = ---
 	final_byte := byte(!final)

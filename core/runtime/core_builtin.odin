@@ -318,6 +318,7 @@ append_elem :: proc(array: ^$T/[dynamic]$E, arg: E, loc := #caller_location) -> 
 		return 0
 	}
 	when size_of(E) == 0 {
+		array := (^Raw_Dynamic_Array)(array)
 		array.len += 1
 		return 1
 	} else {
@@ -351,6 +352,7 @@ append_elems :: proc(array: ^$T/[dynamic]$E, args: ..E, loc := #caller_location)
 	}
 
 	when size_of(E) == 0 {
+		array := (^Raw_Dynamic_Array)(array)
 		array.len += arg_len
 		return arg_len
 	} else {
