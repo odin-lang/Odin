@@ -132,6 +132,7 @@ gb_internal LLVMMetadataRef lb_debug_type_internal(lbModule *m, Type *type) {
 	GB_ASSERT(type != t_invalid);
 
 	/* unsigned const word_size = cast(unsigned)build_context.word_size; */
+	unsigned const int_bits  = cast(unsigned)(8*build_context.int_size);
 	unsigned const word_bits = cast(unsigned)(8*build_context.word_size);
 
 	switch (type->kind) {
@@ -162,8 +163,8 @@ gb_internal LLVMMetadataRef lb_debug_type_internal(lbModule *m, Type *type) {
 		case Basic_f32: return lb_debug_type_basic_type(m, str_lit("f32"), 32, LLVMDWARFTypeEncoding_Float);
 		case Basic_f64: return lb_debug_type_basic_type(m, str_lit("f64"), 64, LLVMDWARFTypeEncoding_Float);
 
-		case Basic_int:  return lb_debug_type_basic_type(m,    str_lit("int"),     word_bits, LLVMDWARFTypeEncoding_Signed);
-		case Basic_uint: return lb_debug_type_basic_type(m,    str_lit("uint"),    word_bits, LLVMDWARFTypeEncoding_Unsigned);
+		case Basic_int:  return lb_debug_type_basic_type(m,    str_lit("int"),     int_bits, LLVMDWARFTypeEncoding_Signed);
+		case Basic_uint: return lb_debug_type_basic_type(m,    str_lit("uint"),    int_bits, LLVMDWARFTypeEncoding_Unsigned);
 		case Basic_uintptr: return lb_debug_type_basic_type(m, str_lit("uintptr"), word_bits, LLVMDWARFTypeEncoding_Unsigned);
 
 		case Basic_typeid:
@@ -257,8 +258,8 @@ gb_internal LLVMMetadataRef lb_debug_type_internal(lbModule *m, Type *type) {
 			{
 				LLVMMetadataRef elements[2] = {};
 				elements[0] = lb_debug_struct_field(m, str_lit("data"), t_u8_ptr, 0);
-				elements[1] = lb_debug_struct_field(m, str_lit("len"),  t_int, word_bits);
-				return lb_debug_basic_struct(m, str_lit("string"), 2*word_bits, word_bits, elements, gb_count_of(elements));
+				elements[1] = lb_debug_struct_field(m, str_lit("len"),  t_int, int_bits);
+				return lb_debug_basic_struct(m, str_lit("string"), 2*int_bits, int_bits, elements, gb_count_of(elements));
 			}
 		case Basic_cstring:
 			{
@@ -292,7 +293,7 @@ gb_internal LLVMMetadataRef lb_debug_type_internal(lbModule *m, Type *type) {
 		GB_PANIC("Type_Named should be handled in lb_debug_type separately");
 
 	case Type_SoaPointer:
-		return LLVMDIBuilderCreatePointerType(m->debug_builder, lb_debug_type(m, type->SoaPointer.elem), word_bits, word_bits, 0, nullptr, 0);
+		return LLVMDIBuilderCreatePointerType(m->debug_builder, lb_debug_type(m, type->SoaPointer.elem), int_bits, int_bits, 0, nullptr, 0);
 	case Type_Pointer:
 		return LLVMDIBuilderCreatePointerType(m->debug_builder, lb_debug_type(m, type->Pointer.elem), word_bits, word_bits, 0, nullptr, 0);
 	case Type_MultiPointer:
@@ -447,10 +448,11 @@ gb_internal LLVMMetadataRef lb_debug_type_internal(lbModule *m, Type *type) {
 			unsigned element_count = 0;
 			LLVMMetadataRef elements[2] = {};
 			Type *base_integer = type->RelativeSlice.base_integer;
+			unsigned base_bits = cast(unsigned)(8*type_size_of(base_integer));
 			elements[0] = lb_debug_struct_field(m, str_lit("data_offset"), base_integer, 0);
-			elements[1] = lb_debug_struct_field(m, str_lit("len"), base_integer, 8*type_size_of(base_integer));
+			elements[1] = lb_debug_struct_field(m, str_lit("len"), base_integer, base_bits);
 			gbString name = type_to_string(type, temporary_allocator());
-			return LLVMDIBuilderCreateStructType(m->debug_builder, nullptr, name, gb_string_length(name), nullptr, 0, 2*word_bits, word_bits, LLVMDIFlagZero, nullptr, elements, element_count, 0, nullptr, "", 0);
+			return LLVMDIBuilderCreateStructType(m->debug_builder, nullptr, name, gb_string_length(name), nullptr, 0, 2*base_bits, base_bits, LLVMDIFlagZero, nullptr, elements, element_count, 0, nullptr, "", 0);
 		}
 		
 	case Type_Matrix: {
@@ -618,6 +620,7 @@ gb_internal LLVMMetadataRef lb_debug_type(lbModule *m, Type *type) {
 gb_internal void lb_debug_complete_types(lbModule *m) {
 	/* unsigned const word_size = cast(unsigned)build_context.word_size; */
 	unsigned const word_bits = cast(unsigned)(8*build_context.word_size);
+	unsigned const int_bits  = cast(unsigned)(8*build_context.int_size);
 
 	for_array(debug_incomplete_type_index, m->debug_incomplete_types) {
 		TEMPORARY_ALLOCATOR_GUARD();
@@ -691,27 +694,27 @@ gb_internal void lb_debug_complete_types(lbModule *m) {
 				element_count = 2;
 				elements = gb_alloc_array(temporary_allocator(), LLVMMetadataRef, element_count);
 				#if defined(GB_SYSTEM_WINDOWS)
-					elements[0] = lb_debug_struct_field(m, str_lit("data"), alloc_type_pointer(bt->Slice.elem), 0*word_bits);
+					elements[0] = lb_debug_struct_field(m, str_lit("data"), alloc_type_pointer(bt->Slice.elem), 0*int_bits);
 				#else
 					// FIX HACK TODO(bill): For some reason this causes a crash in *nix systems due to the reference counting
 					// of the debug type information
-					elements[0] = lb_debug_struct_field(m, str_lit("data"), t_rawptr, 0*word_bits);
+					elements[0] = lb_debug_struct_field(m, str_lit("data"), t_rawptr, 0*int_bits);
 				#endif
-				elements[1] = lb_debug_struct_field(m, str_lit("len"),  t_int,                              1*word_bits);
+				elements[1] = lb_debug_struct_field(m, str_lit("len"),  t_int,                              1*int_bits);
 				break;
 			case Type_DynamicArray:
 				element_count = 4;
 				elements = gb_alloc_array(temporary_allocator(), LLVMMetadataRef, element_count);
 				#if defined(GB_SYSTEM_WINDOWS)
-					elements[0] = lb_debug_struct_field(m, str_lit("data"), alloc_type_pointer(bt->DynamicArray.elem), 0*word_bits);
+					elements[0] = lb_debug_struct_field(m, str_lit("data"), alloc_type_pointer(bt->DynamicArray.elem), 0*int_bits);
 				#else
 					// FIX HACK TODO(bill): For some reason this causes a crash in *nix systems due to the reference counting
 					// of the debug type information
-					elements[0] = lb_debug_struct_field(m, str_lit("data"), t_rawptr, 0*word_bits);
+					elements[0] = lb_debug_struct_field(m, str_lit("data"), t_rawptr, 0*int_bits);
 				#endif
-				elements[1] = lb_debug_struct_field(m, str_lit("len"),       t_int,                                     1*word_bits);
-				elements[2] = lb_debug_struct_field(m, str_lit("cap"),       t_int,                                     2*word_bits);
-				elements[3] = lb_debug_struct_field(m, str_lit("allocator"), t_allocator,                               3*word_bits);
+				elements[1] = lb_debug_struct_field(m, str_lit("len"),       t_int,                                     1*int_bits);
+				elements[2] = lb_debug_struct_field(m, str_lit("cap"),       t_int,                                     2*int_bits);
+				elements[3] = lb_debug_struct_field(m, str_lit("allocator"), t_allocator,                               3*int_bits);
 				break;
 
 			case Type_Map:
@@ -737,7 +740,7 @@ gb_internal void lb_debug_complete_types(lbModule *m) {
 					element_count = cast(unsigned)(bt->Struct.fields.count + element_offset);
 					elements = gb_alloc_array(temporary_allocator(), LLVMMetadataRef, element_count);
 					
-					isize field_size_bits = 8*type_size_of(bt) - element_offset*word_bits;
+					isize field_size_bits = 8*type_size_of(bt) - element_offset*int_bits;
 					
 					switch (bt->Struct.soa_kind) {
 					case StructSoa_Slice:
@@ -756,7 +759,7 @@ gb_internal void lb_debug_complete_types(lbModule *m) {
 							".len", 4,
 							file, 0,
 							8*cast(u64)type_size_of(t_int), 8*cast(u32)type_align_of(t_int),
-							field_size_bits + 0*word_bits,
+							field_size_bits + 0*int_bits,
 							LLVMDIFlagZero, lb_debug_type(m, t_int)
 						);
 						elements[1] = LLVMDIBuilderCreateMemberType(
@@ -764,7 +767,7 @@ gb_internal void lb_debug_complete_types(lbModule *m) {
 							".cap", 4,
 							file, 0,
 							8*cast(u64)type_size_of(t_int), 8*cast(u32)type_align_of(t_int),
-							field_size_bits + 1*word_bits,
+							field_size_bits + 1*int_bits,
 							LLVMDIFlagZero, lb_debug_type(m, t_int)
 						);
 						elements[2] = LLVMDIBuilderCreateMemberType(
@@ -772,7 +775,7 @@ gb_internal void lb_debug_complete_types(lbModule *m) {
 							".allocator", 10,
 							file, 0,
 							8*cast(u64)type_size_of(t_int), 8*cast(u32)type_align_of(t_int),
-							field_size_bits + 2*word_bits,
+							field_size_bits + 2*int_bits,
 							LLVMDIFlagZero, lb_debug_type(m, t_allocator)
 						);
 						break;

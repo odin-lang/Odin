@@ -117,6 +117,7 @@ struct TargetMetrics {
 	TargetOsKind   os;
 	TargetArchKind arch;
 	isize          word_size;
+	isize          int_size;
 	isize          max_align;
 	isize          max_simd_align;
 	String         target_triplet;
@@ -238,6 +239,7 @@ struct BuildContext {
 
 	// In bytes
 	i64    word_size;      // Size of a pointer, must be >= 4
+	i64    int_size;       // Size of a int/uint, must be >= 4
 	i64    max_align;      // max alignment, must be >= 1 (and typically >= word_size)
 	i64    max_simd_align; // max alignment, must be >= 1 (and typically >= word_size)
 
@@ -360,13 +362,13 @@ gb_internal isize MAX_ERROR_COLLECTOR_COUNT(void) {
 gb_global TargetMetrics target_windows_i386 = {
 	TargetOs_windows,
 	TargetArch_i386,
-	4, 4, 8,
+	4, 4, 4, 8,
 	str_lit("i386-pc-windows-msvc"),
 };
 gb_global TargetMetrics target_windows_amd64 = {
 	TargetOs_windows,
 	TargetArch_amd64,
-	8, 8, 16,
+	8, 8, 8, 16,
 	str_lit("x86_64-pc-windows-msvc"),
 	str_lit("e-m:w-i64:64-f80:128-n8:16:32:64-S128"),
 };
@@ -374,21 +376,21 @@ gb_global TargetMetrics target_windows_amd64 = {
 gb_global TargetMetrics target_linux_i386 = {
 	TargetOs_linux,
 	TargetArch_i386,
-	4, 4, 8,
+	4, 4, 4, 8,
 	str_lit("i386-pc-linux-gnu"),
 
 };
 gb_global TargetMetrics target_linux_amd64 = {
 	TargetOs_linux,
 	TargetArch_amd64,
-	8, 8, 16,
+	8, 8, 8, 16,
 	str_lit("x86_64-pc-linux-gnu"),
 	str_lit("e-m:w-i64:64-f80:128-n8:16:32:64-S128"),
 };
 gb_global TargetMetrics target_linux_arm64 = {
 	TargetOs_linux,
 	TargetArch_arm64,
-	8, 8, 16,
+	8, 8, 8, 16,
 	str_lit("aarch64-linux-elf"),
 	str_lit("e-m:o-p:32:32-Fi8-i64:64-v128:64:128-a:0:32-n32-S64"),
 };
@@ -396,7 +398,7 @@ gb_global TargetMetrics target_linux_arm64 = {
 gb_global TargetMetrics target_linux_arm32 = {
 	TargetOs_linux,
 	TargetArch_arm32,
-	4, 4, 8,
+	4, 4, 4, 8,
 	str_lit("arm-linux-gnu"),
 	str_lit("e-m:o-p:32:32-Fi8-i64:64-v128:64:128-a:0:32-n32-S64"),
 };
@@ -404,7 +406,7 @@ gb_global TargetMetrics target_linux_arm32 = {
 gb_global TargetMetrics target_darwin_amd64 = {
 	TargetOs_darwin,
 	TargetArch_amd64,
-	8, 8, 16,
+	8, 8, 8, 16,
 	str_lit("x86_64-apple-darwin"),
 	str_lit("e-m:o-i64:64-f80:128-n8:16:32:64-S128"),
 };
@@ -412,7 +414,7 @@ gb_global TargetMetrics target_darwin_amd64 = {
 gb_global TargetMetrics target_darwin_arm64 = {
 	TargetOs_darwin,
 	TargetArch_arm64,
-	8, 8, 16,
+	8, 8, 8, 16,
 	str_lit("arm64-apple-macosx11.0.0"),
 	str_lit("e-m:o-i64:64-i128:128-n32:64-S128"),
 };
@@ -420,14 +422,14 @@ gb_global TargetMetrics target_darwin_arm64 = {
 gb_global TargetMetrics target_freebsd_i386 = {
 	TargetOs_freebsd,
 	TargetArch_i386,
-	4, 4, 8,
+	4, 4, 4, 8,
 	str_lit("i386-unknown-freebsd-elf"),
 };
 
 gb_global TargetMetrics target_freebsd_amd64 = {
 	TargetOs_freebsd,
 	TargetArch_amd64,
-	8, 8, 16,
+	8, 8, 8, 16,
 	str_lit("x86_64-unknown-freebsd-elf"),
 	str_lit("e-m:w-i64:64-f80:128-n8:16:32:64-S128"),
 };
@@ -435,7 +437,7 @@ gb_global TargetMetrics target_freebsd_amd64 = {
 gb_global TargetMetrics target_openbsd_amd64 = {
 	TargetOs_openbsd,
 	TargetArch_amd64,
-	8, 8, 16,
+	8, 8, 8, 16,
 	str_lit("x86_64-unknown-openbsd-elf"),
 	str_lit("e-m:e-p270:32:32-p271:32:32-p272:64:64-i64:64-f80:128-n8:16:32:64-S128"),
 };
@@ -443,7 +445,7 @@ gb_global TargetMetrics target_openbsd_amd64 = {
 gb_global TargetMetrics target_essence_amd64 = {
 	TargetOs_essence,
 	TargetArch_amd64,
-	8, 8, 16,
+	8, 8, 8, 16,
 	str_lit("x86_64-pc-none-elf"),
 };
 
@@ -451,7 +453,7 @@ gb_global TargetMetrics target_essence_amd64 = {
 gb_global TargetMetrics target_freestanding_wasm32 = {
 	TargetOs_freestanding,
 	TargetArch_wasm32,
-	4, 8, 16,
+	4, 4, 8, 16,
 	str_lit("wasm32-freestanding-js"),
 	str_lit("e-m:e-p:32:32-i64:64-n32:64-S128"),
 };
@@ -459,7 +461,7 @@ gb_global TargetMetrics target_freestanding_wasm32 = {
 gb_global TargetMetrics target_js_wasm32 = {
 	TargetOs_js,
 	TargetArch_wasm32,
-	4, 8, 16,
+	4, 4, 8, 16,
 	str_lit("wasm32-js-js"),
 	str_lit("e-m:e-p:32:32-i64:64-n32:64-S128"),
 };
@@ -467,7 +469,7 @@ gb_global TargetMetrics target_js_wasm32 = {
 gb_global TargetMetrics target_wasi_wasm32 = {
 	TargetOs_wasi,
 	TargetArch_wasm32,
-	4, 8, 16,
+	4, 4, 8, 16,
 	str_lit("wasm32-wasi-js"),
 	str_lit("e-m:e-p:32:32-i64:64-n32:64-S128"),
 };
@@ -476,7 +478,7 @@ gb_global TargetMetrics target_wasi_wasm32 = {
 gb_global TargetMetrics target_js_wasm64 = {
 	TargetOs_js,
 	TargetArch_wasm64,
-	8, 8, 16,
+	8, 8, 8, 16,
 	str_lit("wasm64-js-js"),
 	str_lit(""),
 };
@@ -484,7 +486,7 @@ gb_global TargetMetrics target_js_wasm64 = {
 gb_global TargetMetrics target_freestanding_amd64_sysv = {
 	TargetOs_freestanding,
 	TargetArch_amd64,
-	8, 8, 16,
+	8, 8, 8, 16,
 	str_lit("x86_64-pc-none-gnu"),
 	str_lit("e-m:w-i64:64-f80:128-n8:16:32:64-S128"),
 	TargetABI_SysV,
@@ -1164,8 +1166,15 @@ gb_internal void init_build_context(TargetMetrics *cross_target) {
 	GB_ASSERT(metrics->os != TargetOs_Invalid);
 	GB_ASSERT(metrics->arch != TargetArch_Invalid);
 	GB_ASSERT(metrics->word_size > 1);
+	GB_ASSERT(metrics->int_size  > 1);
 	GB_ASSERT(metrics->max_align > 1);
 	GB_ASSERT(metrics->max_simd_align > 1);
+
+	GB_ASSERT(metrics->int_size >= metrics->word_size);
+	if (metrics->int_size > metrics->word_size) {
+		GB_ASSERT(metrics->int_size == 2*metrics->word_size);
+	}
+
 
 
 	bc->metrics = *metrics;
@@ -1173,6 +1182,7 @@ gb_internal void init_build_context(TargetMetrics *cross_target) {
 	bc->ODIN_ARCH      = target_arch_names[metrics->arch];
 	bc->endian_kind    = target_endians[metrics->arch];
 	bc->word_size      = metrics->word_size;
+	bc->int_size       = metrics->int_size;
 	bc->max_align      = metrics->max_align;
 	bc->max_simd_align = metrics->max_simd_align;
 	bc->link_flags  = str_lit(" ");
