@@ -114,7 +114,9 @@ gb_internal MapIndex map__add_entry(PtrMap<K, V> *h, K key) {
 	PtrMapEntry<K, V> e = {};
 	e.key = key;
 	e.next = MAP_SENTINEL;
-	map__reserve_entries(h, h->count+1);
+	if (h->count+1 >= h->entries_capacity) {
+		map__reserve_entries(h, gb_max(h->entries_capacity*2, 4));
+	}
 	h->entries[h->count++] = e;
 	return cast(MapIndex)(h->count-1);
 }
