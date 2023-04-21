@@ -1,4 +1,6 @@
+#if defined(GB_SYSTEM_LINUX)
 #include <malloc.h>
+#endif
 
 gb_internal gb_inline void zero_size(void *ptr, isize len) {
 	memset(ptr, 0, len);
