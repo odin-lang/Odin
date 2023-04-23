@@ -1497,13 +1497,11 @@ gb_internal bool init_build_paths(String init_filename) {
 	} else if (is_arch_wasm()) {
 		output_extension = STR_LIT("wasm");
 	} else if (build_context.build_mode == BuildMode_Executable) {
-		// By default use a .bin executable extension.
-		output_extension = STR_LIT("bin");
+		// By default use no executable extension.
+		output_extension = make_string(nullptr, 0);
 
 		if (build_context.metrics.os == TargetOs_windows) {
 			output_extension = STR_LIT("exe");
-		} else if (build_context.cross_compiling && selected_target_metrics->metrics == &target_essence_amd64) {
-			output_extension = make_string(nullptr, 0);
 		}
 	} else if (build_context.build_mode == BuildMode_DynamicLibrary) {
 		// By default use a .so shared library extension.
