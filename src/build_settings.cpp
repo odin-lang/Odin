@@ -1502,6 +1502,10 @@ gb_internal bool init_build_paths(String init_filename) {
 
 		if (build_context.metrics.os == TargetOs_windows) {
 			output_extension = STR_LIT("exe");
+		} else if (!str_eq(init_filename, str_lit(".")) && path_is_directory(init_filename)) {
+			// Add .bin extension to avoid collision
+			// with package directory name
+			output_extension = STR_LIT("bin");
 		}
 	} else if (build_context.build_mode == BuildMode_DynamicLibrary) {
 		// By default use a .so shared library extension.
