@@ -1,6 +1,8 @@
 /*
 	Path handling utilities.
 */
+#include<unistd.h>
+
 gb_internal String remove_extension_from_path(String const &s) {
 	if (s.len != 0 && s.text[s.len-1] == '.') {
 		return s;
@@ -23,6 +25,16 @@ gb_internal String remove_directory_from_path(String const &s) {
 		len += 1;
 	}
 	return substring(s, s.len-len, s.len);
+}
+
+// NOTE(Mark Naughton): getcwd as String
+gb_internal String get_current_directory(void) {
+	gbAllocator a = heap_allocator();
+
+	char cwd[256];
+	getcwd(cwd, 256);
+
+	return make_string_c(cwd);
 }
 
 gb_internal bool path_is_directory(String path);
