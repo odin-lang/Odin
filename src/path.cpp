@@ -1,7 +1,9 @@
 /*
 	Path handling utilities.
 */
+#if !defined(GB_SYSTEM_WINDOWS)
 #include<unistd.h>
+#endif
 
 gb_internal String remove_extension_from_path(String const &s) {
 	if (s.len != 0 && s.text[s.len-1] == '.') {
@@ -27,7 +29,9 @@ gb_internal String remove_directory_from_path(String const &s) {
 	return substring(s, s.len-len, s.len);
 }
 
+
 // NOTE(Mark Naughton): getcwd as String
+#if !defined(GB_SYSTEM_WINDOWS)
 gb_internal String get_current_directory(void) {
 	gbAllocator a = heap_allocator();
 
@@ -36,6 +40,17 @@ gb_internal String get_current_directory(void) {
 
 	return make_string_c(cwd);
 }
+
+#else
+gb_internal String get_current_directory(void) {
+	gbAllocator a = heap_allocator();
+
+	wchar_t cwd[256];
+	GetCurrentDirectoryW(256, cwd);
+
+	return make_string_c(cwd);
+}
+#endif
 
 gb_internal bool path_is_directory(String path);
 
