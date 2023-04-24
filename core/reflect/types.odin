@@ -563,7 +563,7 @@ write_type_writer :: proc(w: io.Writer, ti: ^Type_Info, n_written: ^int = nil) -
 		case .None: // Ignore
 		case .Fixed:
 			io.write_string(w, "#soa[",           &n) or_return
-			io.write_i64(w, i64(info.soa_len), 10 &n) or_return
+			io.write_i64(w, i64(info.soa_len),    10) or_return
 			io.write_byte(w, ']',                 &n) or_return
 			write_type(w, info.soa_base_type,     &n) or_return
 			return
