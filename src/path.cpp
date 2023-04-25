@@ -33,8 +33,6 @@ gb_internal String remove_directory_from_path(String const &s) {
 // NOTE(Mark Naughton): getcwd as String
 #if !defined(GB_SYSTEM_WINDOWS)
 gb_internal String get_current_directory(void) {
-	gbAllocator a = heap_allocator();
-
 	char cwd[256];
 	getcwd(cwd, 256);
 
@@ -48,7 +46,9 @@ gb_internal String get_current_directory(void) {
 	wchar_t cwd[256];
 	GetCurrentDirectoryW(256, cwd);
 
-	return make_string_c(cwd);
+	String16 wstr = make_string16_c(cwd);
+
+	return string16_to_string(a, wstr);
 }
 #endif
 
