@@ -22,7 +22,7 @@
 # The Odin Programming Language
 
 
-Odin is a general-purpose programming language with distinct typing, built for high performance, modern systems, and built-in data-oriented data types. The Odin Programming Language, the C alternative for the joy of programming.
+Odin is a general-purpose programming language with distinct typing, designed for high performance and modern systems. It comes with built-in data-oriented data types, making it a great alternative to C for the joy of programming.
 
 Website: [https://odin-lang.org/](https://odin-lang.org/)
 
@@ -42,7 +42,7 @@ main :: proc() {
 		case '*': accumulator *= 2
 		case '/': accumulator /= 2
 		case '😃': accumulator *= accumulator
-		case: // Ignore everything else
+		case : // Ignore everything else
 		}
 	}
 
@@ -66,7 +66,7 @@ Get the latest nightly builds of Odin.
 
 #### [Overview of Odin](https://odin-lang.org/docs/overview)
 
-An overview of the Odin programming language.
+An introduction to the Odin programming language.
 
 #### [Frequently Asked Questions (FAQ)](https://odin-lang.org/docs/faq)
 
