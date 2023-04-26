@@ -1511,7 +1511,7 @@ gb_internal bool init_build_paths(String init_filename) {
 				output_extension = STR_LIT("bin");
 			}
 		// Path could be absolute or relative
-		} else if (path_is_directory(last_path_element(init_filename)) || path_is_directory(init_filename)) {
+		} else if (path_is_directory(last_path_element(bc->build_paths[BuildPath_Main_Package].basename))) {
 			output_extension = STR_LIT("bin");
 		}
 	} else if (build_context.build_mode == BuildMode_DynamicLibrary) {
