@@ -1502,16 +1502,9 @@ gb_internal bool init_build_paths(String init_filename) {
 
 		if (build_context.metrics.os == TargetOs_windows) {
 			output_extension = STR_LIT("exe");
-		} else if (str_eq(init_filename, str_lit("."))) {
-			// Avoid conflict in edge case where directory to be compiled is
-			// the same as the current directory's name
-			if (path_is_directory(last_path_element(get_current_directory()))) {
-				// Add .bin extension to avoid collision
-				// with package directory name
-				output_extension = STR_LIT("bin");
-			}
-		// Path could be absolute or relative
 		} else if (path_is_directory(last_path_element(bc->build_paths[BuildPath_Main_Package].basename))) {
+			// Add .bin extension to avoid collision
+			// with package directory name
 			output_extension = STR_LIT("bin");
 		}
 	} else if (build_context.build_mode == BuildMode_DynamicLibrary) {
