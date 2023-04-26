@@ -56,6 +56,17 @@ MetalLayer_setFramebufferOnly :: proc(self: ^MetalLayer, ok: NS.BOOL) {
 	msgSend(nil, self, "setFramebufferOnly:", ok)
 }
 
+
+@(objc_type=MetalLayer, objc_name="drawableSize")
+MetalLayer_drawableSize :: proc(self: ^MetalLayer) -> NS.Size {
+	return msgSend(NS.Size, self, "drawableSize")
+}
+@(objc_type=MetalLayer, objc_name="setDrawableSize")
+MetalLayer_setDrawableSize :: proc(self: ^MetalLayer, drawableSize: NS.Size) {
+	msgSend(nil, self, "setDrawableSize:", drawableSize)
+}
+
+
 @(objc_type=MetalLayer, objc_name="frame")
 MetalLayer_frame :: proc(self: ^MetalLayer) -> NS.Rect {
 	return msgSend(NS.Rect, self, "frame")
