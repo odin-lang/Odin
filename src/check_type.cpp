@@ -378,6 +378,17 @@ gb_internal void add_polymorphic_record_entity(CheckerContext *ctx, Ast *node, T
 	rw_mutex_unlock(&ctx->info->gen_types_mutex);
 }
 
+
+bool check_constant_parameter_value(Type *type, Ast *expr) {
+	if (!is_type_constant_type(type)) {
+		gbString str = type_to_string(type);
+		defer (gb_string_free(str));
+		error(expr, "A parameter must be a valid constant type, got %s", str);
+		return true;
+	}
+	return false;
+}
+
 gb_internal Type *check_record_polymorphic_params(CheckerContext *ctx, Ast *polymorphic_params,
                                                   bool *is_polymorphic_,
                                                   Ast *node, Array<Operand> *poly_operands) {
@@ -477,10 +488,8 @@ gb_internal Type *check_record_polymorphic_params(CheckerContext *ctx, Ast *poly
 				type = t_invalid;
 			}
 
-			if (!is_type_param && !is_type_constant_type(type)) {
-				gbString str = type_to_string(type);
-				error(params[i], "A parameter must be a valid constant type, got %s", str);
-				gb_string_free(str);
+			if (!is_type_param && check_constant_parameter_value(type, params[i])) {
+				// failed
 			}
 
 			Scope *scope = ctx->scope;
@@ -1757,10 +1766,8 @@ gb_internal Type *check_get_params(CheckerContext *ctx, Scope *scope, Ast *_para
 						p->flags &= ~FieldFlag_by_ptr;
 					}
 
-					if (!is_type_constant_type(type) && !is_type_polymorphic(type)) {
-						gbString str = type_to_string(type);
-						error(params[i], "A parameter must be a valid constant type, got %s", str);
-						gb_string_free(str);
+					if (!is_type_polymorphic(type) && check_constant_parameter_value(type, params[i])) {
+						// failed
 					}
 
 					param = alloc_entity_const_param(scope, name->Ident.token, type, poly_const, is_type_polymorphic(type));
