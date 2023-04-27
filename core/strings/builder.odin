@@ -81,13 +81,12 @@ Example:
 	import "core:fmt"
 	import "core:strings"
 	builder_make_example :: proc() {
-		sb := strings.builder_make() // Can also use the len, len/cap versions here
+		sb := strings.builder_make()
 		strings.write_byte(&sb, 'a')
-		strings.write_rune(&sb, ' ')
-		strings.write_string(&sb, "slice of ")
-		strings.write_f64(&sb, 3.14) // Also _float, _f32 etc
-		strings.write_string(&sb, "is ")
-		strings.write_int(&sb, 180) // Also _uint, _u64 etc
+		strings.write_string(&sb, " slice of ")
+		strings.write_f64(&sb, 3.14,'g',true) // See `fmt.fmt_float` byte codes
+		strings.write_string(&sb, " is ")
+		strings.write_int(&sb, 180)
 		strings.write_rune(&sb,'°')
 		the_string :=strings.to_string(sb)
 		fmt.println(the_string)
