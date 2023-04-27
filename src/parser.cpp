@@ -516,7 +516,7 @@ gb_internal Ast *ast_tag_expr(AstFile *f, Token token, Token name, Ast *expr) {
 gb_internal Ast *ast_unary_expr(AstFile *f, Token op, Ast *expr) {
 	Ast *result = alloc_ast_node(f, Ast_UnaryExpr);
 
-	if (expr->kind == Ast_OrReturnExpr) {
+	if (expr && expr->kind == Ast_OrReturnExpr) {
 		syntax_error_with_verbose(expr, "'or_return' within an unary expression not wrapped in parentheses (...)");
 	}
 
