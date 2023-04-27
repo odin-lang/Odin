@@ -514,6 +514,9 @@ gb_internal bool lb_is_matrix_simdable(Type *t) {
 		// it's not aligned well enough to use the vector instructions
 		return false;
 	}
+	if ((mt->Matrix.row_count & 1) ^ (mt->Matrix.column_count & 1)) {
+		return false;
+	}
 	
 	if (elem->kind == Type_Basic) {
 		switch (elem->Basic.kind) {
