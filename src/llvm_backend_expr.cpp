@@ -2836,7 +2836,7 @@ gb_internal lbValue lb_make_soa_pointer(lbProcedure *p, Type *type, lbValue cons
 	lbValue ptr = lb_emit_struct_ep(p, v.addr, 0);
 	lbValue idx = lb_emit_struct_ep(p, v.addr, 1);
 	lb_emit_store(p, ptr, addr);
-	lb_emit_store(p, idx, index);
+	lb_emit_store(p, idx, lb_emit_conv(p, index, t_int));
 
 	return lb_addr_load(p, v);
 }
