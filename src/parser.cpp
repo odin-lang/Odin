@@ -418,6 +418,25 @@ gb_internal void error(Ast *node, char const *fmt, ...) {
 	}
 }
 
+gb_internal void syntax_error_with_verbose(Ast *node, char const *fmt, ...) {
+	Token token = {};
+	TokenPos end_pos = {};
+	if (node != nullptr) {
+		token = ast_token(node);
+		end_pos = ast_end_pos(node);
+	}
+
+	va_list va;
+	va_start(va, fmt);
+	syntax_error_with_verbose_va(token.pos, end_pos, fmt, va);
+	va_end(va);
+	if (node != nullptr && node->file_id != 0) {
+		AstFile *f = node->thread_safe_file();
+		f->error_count += 1;
+	}
+}
+
+
 gb_internal void error_no_newline(Ast *node, char const *fmt, ...) {
 	Token token = {};
 	if (node != nullptr) {
@@ -496,10 +515,16 @@ gb_internal Ast *ast_tag_expr(AstFile *f, Token token, Token name, Ast *expr) {
 
 gb_internal Ast *ast_unary_expr(AstFile *f, Token op, Ast *expr) {
 	Ast *result = alloc_ast_node(f, Ast_UnaryExpr);
+
+	if (expr->kind == Ast_OrReturnExpr) {
+		syntax_error_with_verbose(expr, "'or_return' within an unary expression not wrapped in parentheses (...)");
+	}
+
 	result->UnaryExpr.op = op;
 	result->UnaryExpr.expr = expr;
 	return result;
 }
+
 
 gb_internal Ast *ast_binary_expr(AstFile *f, Token op, Ast *left, Ast *right) {
 	Ast *result = alloc_ast_node(f, Ast_BinaryExpr);
@@ -511,6 +536,13 @@ gb_internal Ast *ast_binary_expr(AstFile *f, Token op, Ast *left, Ast *right) {
 	if (right == nullptr) {
 		syntax_error(op, "No rhs expression for binary expression '%.*s'", LIT(op.string));
 		right = ast_bad_expr(f, op, op);
+	}
+
+	if (left->kind == Ast_OrReturnExpr) {
+		syntax_error_with_verbose(left, "'or_return' within a binary expression not wrapped in parentheses (...)");
+	}
+	if (right->kind == Ast_OrReturnExpr) {
+		syntax_error_with_verbose(right, "'or_return' within a binary expression not wrapped in parentheses (...)");
 	}
 
 	result->BinaryExpr.op = op;
@@ -2765,6 +2797,12 @@ gb_internal Ast *parse_call_expr(AstFile *f, Ast *operand) {
 	return call;
 }
 
+gb_internal void parse_check_or_return(Ast *operand, char const *msg) {
+	if (operand && operand->kind == Ast_OrReturnExpr) {
+		syntax_error_with_verbose(operand, "'or_return' use within %s is not wrapped in parentheses (...)", msg);
+	}
+}
+
 gb_internal Ast *parse_atom_expr(AstFile *f, Ast *operand, bool lhs) {
 	if (operand == nullptr) {
 		if (f->allow_type) return nullptr;
@@ -2778,6 +2816,7 @@ gb_internal Ast *parse_atom_expr(AstFile *f, Ast *operand, bool lhs) {
 	while (loop) {
 		switch (f->curr_token.kind) {
 		case Token_OpenParen:
+			parse_check_or_return(operand, "call expression");
 			operand = parse_call_expr(f, operand);
 			break;
 
@@ -2785,12 +2824,11 @@ gb_internal Ast *parse_atom_expr(AstFile *f, Ast *operand, bool lhs) {
 			Token token = advance_token(f);
 			switch (f->curr_token.kind) {
 			case Token_Ident:
+				parse_check_or_return(operand, "selector expression");
 				operand = ast_selector_expr(f, token, operand, parse_ident(f));
 				break;
-			// case Token_Integer:
-				// operand = ast_selector_expr(f, token, operand, parse_expr(f, lhs));
-				// break;
 			case Token_OpenParen: {
+				parse_check_or_return(operand, "type assertion");
 				Token open = expect_token(f, Token_OpenParen);
 				Ast *type = parse_type(f);
 				Token close = expect_token(f, Token_CloseParen);
@@ -2798,6 +2836,7 @@ gb_internal Ast *parse_atom_expr(AstFile *f, Ast *operand, bool lhs) {
 			} break;
 
 			case Token_Question: {
+				parse_check_or_return(operand, ".? based type assertion");
 				Token question = expect_token(f, Token_Question);
 				Ast *type = ast_unary_expr(f, question, nullptr);
 				operand = ast_type_assertion(f, operand, token, type);
@@ -2813,6 +2852,7 @@ gb_internal Ast *parse_atom_expr(AstFile *f, Ast *operand, bool lhs) {
 		} break;
 
 		case Token_ArrowRight: {
+			parse_check_or_return(operand, "-> based call expression");
 			Token token = advance_token(f);
 
 			operand = ast_selector_expr(f, token, operand, parse_ident(f));
@@ -2870,11 +2910,14 @@ gb_internal Ast *parse_atom_expr(AstFile *f, Ast *operand, bool lhs) {
 					if (indices[0] == nullptr || indices[1] == nullptr) {
 						syntax_error(open, "Matrix index expressions require both row and column indices");
 					}
+					parse_check_or_return(operand, "matrix index expression");
 					operand = ast_matrix_index_expr(f, operand, open, close, interval, indices[0], indices[1]);
 				} else {
+					parse_check_or_return(operand, "slice expression");
 					operand = ast_slice_expr(f, operand, open, close, interval, indices[0], indices[1]);
 				}
 			} else {
+				parse_check_or_return(operand, "index expression");
 				operand = ast_index_expr(f, operand, indices[0], open, close);
 			}
 
@@ -2882,6 +2925,7 @@ gb_internal Ast *parse_atom_expr(AstFile *f, Ast *operand, bool lhs) {
 		} break;
 
 		case Token_Pointer: // Deference
+			parse_check_or_return(operand, "dereference");
 			operand = ast_deref_expr(f, operand, expect_token(f, Token_Pointer));
 			break;
 
