@@ -36,9 +36,9 @@ foreign lib {
 	free     :: proc(mem: rawptr) ---
 
 	GetOriginalMemoryFunctions :: proc(malloc_func:  ^malloc_func,
-									   calloc_func:  ^calloc_func,
-									   realloc_func: ^realloc_func,
-									   free_func:    ^free_func) ---
+	                                   calloc_func:  ^calloc_func,
+	                                   realloc_func: ^realloc_func,
+	                                   free_func:    ^free_func) ---
 
 	GetMemoryFunctions :: proc(malloc_func:  ^malloc_func,
 	                           calloc_func:  ^calloc_func,

@@ -58,8 +58,8 @@ foreign lib {
 	UnionRect             :: proc(A, B: ^Rect, result: ^Rect) ---
 	EnclosePoints         :: proc(points: [^]Point, count: c.int, clip: ^Rect, result: ^Rect) -> bool ---
 	IntersectRectAndLine  :: proc(rect: ^Rect, X1, Y1, X2, Y2: ^c.int) -> bool ---
-	IntersectFRect		  :: proc(A,B: ^FRect, result: ^FRect) -> bool ---
-	UnionFRect		 	  :: proc(A,B: ^FRect, result: ^FRect) -> bool ---
-	EncloseFPoints		  :: proc(points: ^FPoint, count: c.int, clip: ^FRect, result: ^FRect) -> bool ---
+	IntersectFRect        :: proc(A,B: ^FRect, result: ^FRect) -> bool ---
+	UnionFRect            :: proc(A,B: ^FRect, result: ^FRect) -> bool ---
+	EncloseFPoints        :: proc(points: ^FPoint, count: c.int, clip: ^FRect, result: ^FRect) -> bool ---
 	IntersectFRectAndLine :: proc(rect: ^FRect, X1, Y1, X2, Y2: ^f32) -> bool ---
 }

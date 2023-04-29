@@ -97,7 +97,7 @@ foreign lib {
 	AtomicUnlock                 :: proc(lock: ^SpinLock) ---
 	MemoryBarrierReleaseFunction :: proc() ---
 	MemoryBarrierAcquireFunction :: proc() ---
-	CPUPauseInstruction			 :: proc() ---
+	CPUPauseInstruction          :: proc() ---
 	AtomicCAS                    :: proc(a: ^atomic_t, oldval, newval: c.int) -> bool ---
 	AtomicSet                    :: proc(a: ^atomic_t, v: c.int) -> c.int ---
 	AtomicGet                    :: proc(a: ^atomic_t) -> c.int ---
@@ -277,7 +277,7 @@ foreign lib {
 	SensorGetNonPortableType       :: proc(sensor: ^Sensor) -> c.int ---
 	SensorGetInstanceID            :: proc(sensor: ^Sensor) -> SensorID ---
 	SensorGetData                  :: proc(sensor: ^Sensor, data: [^]f32, num_values: c.int) -> c.int ---
-	SensorGetDataWithTimestamp	   :: proc(sensor: ^Sensor, timestamp: ^u64, data: [^]f32, num_values: c.int) -> c.int ---
+	SensorGetDataWithTimestamp     :: proc(sensor: ^Sensor, timestamp: ^u64, data: [^]f32, num_values: c.int) -> c.int ---
 	SensorClose                    :: proc(sensor: ^Sensor) ---
 	SensorUpdate                   :: proc() ---
 }
