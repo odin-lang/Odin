@@ -25,6 +25,12 @@ RendererInfo :: struct {
 	max_texture_height:  c.int,         /**< The maximum texture height */
 }
 
+Vertex :: struct {
+	position:	FPoint,
+	color:		Color,
+	texCoord:	FPoint,
+}
+
 /**
  * The scaling mode for a texture.
  */
@@ -65,9 +71,10 @@ foreign lib {
 	GetNumRenderDrivers          :: proc() -> c.int ---
 	GetRenderDriverInfo          :: proc(index: c.int, info: ^RendererInfo) -> c.int ---
 	CreateWindowAndRenderer      :: proc(width, height: c.int, window_flags: WindowFlags, window: ^^Window, renderer: ^^Renderer) -> c.int ---
-	CreateRenderer               :: proc(window:  ^Window, index: c.int, flags: RendererFlags) -> ^Renderer ---
+	CreateRenderer               :: proc(window:   ^Window, index: c.int, flags: RendererFlags) -> ^Renderer ---
 	CreateSoftwareRenderer       :: proc(surface:  ^Surface) -> ^Renderer ---
 	GetRenderer                  :: proc(window:   ^Window) -> ^Renderer ---
+	RenderGetWindow				 :: proc(renderer: ^Renderer) -> ^Window ---
 	GetRendererInfo              :: proc(renderer: ^Renderer, info: ^RendererInfo) -> c.int ---
 	GetRendererOutputSize        :: proc(renderer: ^Renderer, w, h: ^c.int) -> c.int ---
 	CreateTexture                :: proc(renderer: ^Renderer, format: u32, access: TextureAccess, w, h: c.int) -> ^Texture ---
@@ -81,6 +88,8 @@ foreign lib {
 	GetTextureBlendMode          :: proc(texture:  ^Texture, blendMode: ^BlendMode) -> c.int ---
 	SetTextureScaleMode          :: proc(texture:  ^Texture, scaleMode: ScaleMode) -> c.int ---
 	GetTextureScaleMode          :: proc(texture:  ^Texture, scaleMode: ^ScaleMode) -> c.int ---
+	SetTextureUserData			 :: proc(texture:  ^Texture, userData: rawptr) -> c.int ---
+	GetTextureUserData			 :: proc(texture:  ^Texture) -> rawptr ---
 	UpdateTexture                :: proc(texture:  ^Texture, rect: ^Rect, pixels: rawptr, pitch: c.int) -> c.int ---
 	UpdateYUVTexture             :: proc(texture:  ^Texture, rect: ^Rect, Yplane: ^u8, Ypitch: c.int, Uplane: ^u8, Upitch: c.int, Vplane: ^u8, Vpitch: c.int) -> c.int ---
 	UpdateNVTexture              :: proc(texture:  ^Texture, rect: ^Rect, Yplane: ^u8, Ypitch: c.int, UVplane: ^u8, UVpitch: c.int) -> c.int ---
@@ -101,6 +110,8 @@ foreign lib {
 	RenderIsClipEnabled          :: proc(renderer: ^Renderer) -> bool ---
 	RenderSetScale               :: proc(renderer: ^Renderer, scaleX, scaleY: f32) -> c.int ---
 	RenderGetScale               :: proc(renderer: ^Renderer, scaleX, scaleY: ^f32) ---
+	RenderWindowToLogical		 :: proc(renderer: ^Renderer, windowX, windowY : c.int, logicalX: ^f32, logicalY: ^f32) ---
+	RenderLogicalToWindow		 :: proc(renderer: ^Renderer, logicalX, logicalY: f32, windowX: ^c.int, windowY: ^c.int) ---
 	SetRenderDrawColor           :: proc(renderer: ^Renderer, r, g, b, a: u8) -> c.int ---
 	GetRenderDrawColor           :: proc(renderer: ^Renderer, r, g, b, a: ^u8) -> c.int ---
 	SetRenderDrawBlendMode       :: proc(renderer: ^Renderer, blendMode: BlendMode) -> c.int ---
@@ -126,6 +137,8 @@ foreign lib {
 	RenderFillRectsF             :: proc(renderer: ^Renderer, rects: [^]FRect, count: c.int) -> c.int ---
 	RenderCopyF                  :: proc(renderer: ^Renderer, texture: ^Texture, srcrect: ^Rect, dstrect: ^FRect) -> c.int ---
 	RenderCopyExF                :: proc(renderer: ^Renderer, texture: ^Texture, srcrect: ^Rect, dstrect: ^FRect, angle: f64, center: ^FPoint, flip: RendererFlip) -> c.int ---
+	RenderGeometry				 :: proc(renderer: ^Renderer, texture: ^Texture, vertex: ^Vertex, numVertices: c.int, indices: ^c.int, numIndices: c.int) -> c.int ---
+	RenderGeometryRaw			 :: proc(renderer: ^Renderer, texture: ^Texture, vertex: ^Vertex, xy: ^f32, xyStride: c.int, color: ^Color, colorStride: c.int, uv: ^f32, uvStride: c.int, numVertices: c.int, indices: rawptr, numIndices: ^c.int, sizeIndices: c.int) -> c.int ---
 	RenderReadPixels             :: proc(renderer: ^Renderer, rect: ^Rect, format: u32, pixels: rawptr, pitch: c.int) -> c.int ---
 	RenderPresent                :: proc(renderer: ^Renderer) ---
 	DestroyTexture               :: proc(texture:  ^Texture) ---
@@ -135,4 +148,5 @@ foreign lib {
 	GL_UnbindTexture             :: proc(texture:  ^Texture) -> c.int ---
 	RenderGetMetalLayer          :: proc(renderer: ^Renderer) -> rawptr ---
 	RenderGetMetalCommandEncoder :: proc(renderer: ^Renderer) -> rawptr ---
+	RenderSetVSync				 :: proc(renderer: ^Renderer, vsync : c.int) -> c.int ---
 }

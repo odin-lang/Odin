@@ -108,6 +108,8 @@ WindowEventID :: enum u8 {
 	CLOSE,          /**< The window manager requests that the window be closed */
 	TAKE_FOCUS,     /**< Window is being offered a focus (should SetWindowInputFocus() on itself or a subwindow, or ignore) */
 	HIT_TEST,       /**< Window had a hit test that wasn't SDL_HITTEST_NORMAL. */
+	ICCPROF_CHANGED, /**< The ICC profile of the window's display has changed. */
+	DISPLAY_CHANGED, /**< Window has been moved to display data1. */	
 }
 
 DisplayEventID :: enum u8 {
@@ -161,6 +163,7 @@ GLattr :: enum c.int {
 	CONTEXT_RELEASE_BEHAVIOR,
 	CONTEXT_RESET_NOTIFICATION,
 	CONTEXT_NO_ERROR,
+	FLOATBUFFERS,
 }
 
 GLprofile :: enum c.int {
@@ -221,9 +224,12 @@ foreign lib {
 	GetDesktopDisplayMode    :: proc(displayIndex: c.int, mode: ^DisplayMode) -> c.int ---
 	GetCurrentDisplayMode    :: proc(displayIndex: c.int, mode: ^DisplayMode) -> c.int ---
 	GetClosestDisplayMode    :: proc(displayIndex: c.int, mode, closest: ^DisplayMode) -> ^DisplayMode ---
+	GetPointDisplayIndex	 :: proc(point: ^Point) -> c.int ---
+	GetRectDisplayIndex		 :: proc(rect: ^Rect) -> c.int ---
 	GetWindowDisplayIndex    :: proc(window: ^Window) -> c.int ---
 	SetWindowDisplayMode     :: proc(window: ^Window, mode: ^DisplayMode) -> c.int ---
 	GetWindowDisplayMode     :: proc(window: ^Window, mode: ^DisplayMode) -> c.int ---
+	GetWindowICCProfile		 :: proc(window: ^Window, size: ^c.size_t) -> rawptr ---
 	GetWindowPixelFormat     :: proc(window: ^Window) -> u32 ---
 	CreateWindow             :: proc(title: cstring, x, y, w, h: c.int, flags: WindowFlags) -> ^Window ---
 	CreateWindowFrom         :: proc(data: rawptr) -> ^Window ---
@@ -240,6 +246,7 @@ foreign lib {
 	SetWindowSize            :: proc(window: ^Window, w, h: c.int) ---
 	GetWindowSize            :: proc(window: ^Window, w, h: ^c.int) ---
 	GetWindowBordersSize     :: proc(window: ^Window, top, left, bottom, right: ^c.int) -> c.int ---
+	GetWindowSizeInPixels	 :: proc(window: ^Window, w,h: ^c.int) ---
 	SetWindowMinimumSize     :: proc(window: ^Window, min_w, min_h: c.int) ---
 	GetWindowMinimumSize     :: proc(window: ^Window, w, h: ^c.int) ---
 	SetWindowMaximumSize     :: proc(window: ^Window, max_w, max_h: c.int) ---
@@ -264,6 +271,8 @@ foreign lib {
 	GetWindowKeyboardGrab    :: proc(window: ^Window) -> bool ---
 	GetWindowMouseGrab       :: proc(window: ^Window) -> bool ---
 	GetGrabbedWindow         :: proc() -> ^Window ---
+	SetWindowMouseRect		 :: proc(window: ^Window, rect: ^Rect) -> c.int ---
+	GetWindowMouseRect		 :: proc(window: ^Window) -> ^Rect ---
 	SetWindowBrightness      :: proc(window: ^Window, brightness: f32) -> c.int ---
 	GetWindowBrightness      :: proc(window: ^Window) -> f32 ---
 	SetWindowOpacity         :: proc(window: ^Window, opacity: f32) -> c.int ---

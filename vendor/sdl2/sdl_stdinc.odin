@@ -35,6 +35,11 @@ foreign lib {
 	realloc  :: proc(mem: rawptr, size: c.size_t) -> rawptr ---
 	free     :: proc(mem: rawptr) ---
 
+	GetOriginalMemoryFunctions :: proc(malloc_func:  ^malloc_func,
+									   calloc_func:  ^calloc_func,
+									   realloc_func: ^realloc_func,
+									   free_func:    ^free_func) ---
+
 	GetMemoryFunctions :: proc(malloc_func:  ^malloc_func,
 	                           calloc_func:  ^calloc_func,
 	                           realloc_func: ^realloc_func,
@@ -72,6 +77,7 @@ foreign lib {
 	toupper  :: proc(x: rune) -> bool ---
 	tolower  :: proc(x: rune) -> bool ---
 
+	crc16 :: proc(crc: u16, data: rawptr, len: c.size_t) -> u16 ---
 	crc32 :: proc(crc: u32, data: rawptr, len: c.size_t) -> u32 ---
 }
 

@@ -40,8 +40,8 @@ version :: struct {
 }
 
 MAJOR_VERSION   :: 2
-MINOR_VERSION   :: 0
-PATCHLEVEL      :: 16
+MINOR_VERSION   :: 26
+PATCHLEVEL      :: 5
 
 @(default_calling_convention="c", link_prefix="SDL_")
 foreign lib {
@@ -97,6 +97,7 @@ foreign lib {
 	AtomicUnlock                 :: proc(lock: ^SpinLock) ---
 	MemoryBarrierReleaseFunction :: proc() ---
 	MemoryBarrierAcquireFunction :: proc() ---
+	CPUPauseInstruction			 :: proc() ---
 	AtomicCAS                    :: proc(a: ^atomic_t, oldval, newval: c.int) -> bool ---
 	AtomicSet                    :: proc(a: ^atomic_t, v: c.int) -> c.int ---
 	AtomicGet                    :: proc(a: ^atomic_t) -> c.int ---
@@ -123,6 +124,9 @@ foreign lib {
 	SetClipboardText :: proc(text: cstring) -> c.int ---
 	GetClipboardText :: proc() -> cstring ---
 	HasClipboardText :: proc() -> bool ---
+	SetPrimarySelectionText :: proc(text: cstring) -> c.int ---
+	GetPrimarySelectionText :: proc() -> cstring ---
+	HasPrimarySelectionText :: proc() -> bool ---
 }
 
 
@@ -273,6 +277,7 @@ foreign lib {
 	SensorGetNonPortableType       :: proc(sensor: ^Sensor) -> c.int ---
 	SensorGetInstanceID            :: proc(sensor: ^Sensor) -> SensorID ---
 	SensorGetData                  :: proc(sensor: ^Sensor, data: [^]f32, num_values: c.int) -> c.int ---
+	SensorGetDataWithTimestamp	   :: proc(sensor: ^Sensor, timestamp: ^u64, data: [^]f32, num_values: c.int) -> c.int ---
 	SensorClose                    :: proc(sensor: ^Sensor) ---
 	SensorUpdate                   :: proc() ---
 }

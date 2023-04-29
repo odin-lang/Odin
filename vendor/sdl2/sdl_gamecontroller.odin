@@ -81,56 +81,64 @@ GameControllerAddMappingsFromFile :: #force_inline proc "c" (file: cstring) -> c
 
 @(default_calling_convention="c", link_prefix="SDL_")
 foreign lib {
-	GameControllerAddMappingsFromRW     :: proc(rw: ^RWops, freerw: bool) -> c.int ---
-
-	GameControllerAddMapping            :: proc(mappingString: cstring) -> c.int ---
-	GameControllerNumMappings           :: proc() -> c.int ---
-	GameControllerMappingForIndex       :: proc(mapping_index: c.int) -> cstring  ---
-	GameControllerMappingForGUID        :: proc(guid: JoystickGUID) -> cstring  ---
-	GameControllerMapping               :: proc(gamecontroller: ^GameController) -> cstring  ---
-	IsGameController                    :: proc(joystick_index: c.int) -> bool ---
-	GameControllerNameForIndex          :: proc(joystick_index: c.int) -> cstring ---
-	GameControllerTypeForIndex          :: proc(joystick_index: c.int) -> GameControllerType ---
-	GameControllerMappingForDeviceIndex :: proc(joystick_index: c.int) -> cstring ---
-	GameControllerOpen                  :: proc(joystick_index: c.int) -> ^GameController ---
-	GameControllerFromInstanceID        :: proc(joyid: JoystickID)     -> ^GameController ---
-	GameControllerFromPlayerIndex       :: proc(player_index: c.int)   -> ^GameController ---
-	GameControllerName                  :: proc(gamecontroller: ^GameController) -> cstring  ---
-	GameControllerGetType               :: proc(gamecontroller: ^GameController) -> GameControllerType ---
-	GameControllerGetPlayerIndex        :: proc(gamecontroller: ^GameController) -> c.int ---
-	GameControllerSetPlayerIndex        :: proc(gamecontroller: ^GameController, player_index: c.int) ---
-	GameControllerGetVendor             :: proc(gamecontroller: ^GameController) -> u16 ---
-	GameControllerGetProduct            :: proc(gamecontroller: ^GameController) -> u16 ---
-	GameControllerGetProductVersion     :: proc(gamecontroller: ^GameController) -> u16 ---
-	GameControllerGetSerial             :: proc(gamecontroller: ^GameController) -> cstring ---
-	GameControllerGetAttached           :: proc(gamecontroller: ^GameController) -> bool ---
-	GameControllerGetJoystick           :: proc(gamecontroller: ^GameController) -> ^Joystick ---
-	GameControllerEventState            :: proc(state: c.int) -> c.int ---
-	GameControllerUpdate                :: proc() ---
-
-	GameControllerGetAxisFromString     :: proc(str: cstring) -> GameControllerAxis ---
-	GameControllerGetStringForAxis      :: proc(axis: GameControllerAxis) -> cstring ---
-	GameControllerGetBindForAxis        :: proc(gamecontroller: ^GameController, axis: GameControllerAxis)  -> GameControllerButtonBind---
-	GameControllerHasAxis               :: proc(gamecontroller: ^GameController, axis: GameControllerAxis) -> bool ---
-	GameControllerGetAxis               :: proc(gamecontroller: ^GameController, axis: GameControllerAxis) -> i16 ---
-
-	GameControllerGetButtonFromString   :: proc(str: cstring) -> GameControllerButton ---
-	GameControllerGetStringForButton    :: proc(button: GameControllerButton) -> cstring ---
-	GameControllerGetBindForButton      :: proc(gamecontroller: ^GameController, button: GameControllerButton) -> GameControllerButtonBind ---
-	GameControllerHasButton             :: proc(gamecontroller: ^GameController, button: GameControllerButton) -> bool ---
-	GameControllerGetButton             :: proc(gamecontroller: ^GameController, button: GameControllerButton) -> u8 ---
-	GameControllerGetNumTouchpads       :: proc(gamecontroller: ^GameController) -> c.int ---
-	GameControllerGetNumTouchpadFingers :: proc(gamecontroller: ^GameController, touchpad: c.int) -> c.int ---
-	GameControllerGetTouchpadFinger     :: proc(gamecontroller: ^GameController, touchpad: c.int, finger: c.int, state: ^u8, x, y: ^f32, pressure: ^f32) -> c.int ---
-	GameControllerHasSensor             :: proc(gamecontroller: ^GameController, type: SensorType) -> bool ---
-	GameControllerSetSensorEnabled      :: proc(gamecontroller: ^GameController, type: SensorType, enabled: bool) -> c.int ---
-	GameControllerIsSensorEnabled       :: proc(gamecontroller: ^GameController, type: SensorType) -> bool ---
-	GameControllerGetSensorDataRate     :: proc(gamecontroller: ^GameController, type: SensorType) -> f32 ---
-	GameControllerGetSensorData         :: proc(gamecontroller: ^GameController, type: SensorType, data: [^]f32, num_values: c.int) -> c.int ---
-	GameControllerRumble                :: proc(gamecontroller: ^GameController, low_frequency_rumble, high_frequency_rumble: u16, duration_ms: u32) -> c.int ---
-	GameControllerRumbleTriggers        :: proc(gamecontroller: ^GameController, left_rumble, right_rumble: u16, duration_ms: u32) -> c.int ---
-	GameControllerHasLED                :: proc(gamecontroller: ^GameController) -> bool ---
-	GameControllerSetLED                :: proc(gamecontroller: ^GameController, red, green, blue: u8) -> c.int ---
-	GameControllerSendEffect            :: proc(gamecontroller: ^GameController, data: rawptr, size: c.int) -> c.int ---
-	GameControllerClose                 :: proc(gamecontroller: ^GameController) ---
+	GameControllerAddMappingsFromRW     		 :: proc(rw: ^RWops, freerw: bool) -> c.int ---
+		 
+	GameControllerAddMapping            		 :: proc(mappingString: cstring) -> c.int ---
+	GameControllerNumMappings           		 :: proc() -> c.int ---
+	GameControllerMappingForIndex       		 :: proc(mapping_index: c.int) -> cstring  ---
+	GameControllerMappingForGUID        		 :: proc(guid: JoystickGUID) -> cstring  ---
+	GameControllerMapping               		 :: proc(gamecontroller: ^GameController) -> cstring  ---
+	IsGameController                    		 :: proc(joystick_index: c.int) -> bool ---
+	GameControllerNameForIndex          		 :: proc(joystick_index: c.int) -> cstring ---
+	GameControllerPathForIndex					 :: proc(joystick_index: c.int) -> cstring ---
+	GameControllerTypeForIndex          		 :: proc(joystick_index: c.int) -> GameControllerType ---
+	GameControllerMappingForDeviceIndex 		 :: proc(joystick_index: c.int) -> cstring ---
+	GameControllerOpen                  		 :: proc(joystick_index: c.int) -> ^GameController ---
+	GameControllerFromInstanceID        		 :: proc(joyid: JoystickID)     -> ^GameController ---
+	GameControllerFromPlayerIndex       		 :: proc(player_index: c.int)   -> ^GameController ---
+	GameControllerName                  		 :: proc(gamecontroller: ^GameController) -> cstring  ---
+	GameControllerPath							 :: proc(gamecontroller: ^GameController) -> cstring ---
+	GameControllerGetType               		 :: proc(gamecontroller: ^GameController) -> GameControllerType ---
+	GameControllerGetPlayerIndex        		 :: proc(gamecontroller: ^GameController) -> c.int ---
+	GameControllerSetPlayerIndex        		 :: proc(gamecontroller: ^GameController, player_index: c.int) ---
+	GameControllerGetVendor             		 :: proc(gamecontroller: ^GameController) -> u16 ---
+	GameControllerGetProduct            		 :: proc(gamecontroller: ^GameController) -> u16 ---
+	GameControllerGetProductVersion     		 :: proc(gamecontroller: ^GameController) -> u16 ---
+	GameControllerGetFirmwareVersion			 :: proc(gamecontroller: ^GameController) -> u16 ---
+	GameControllerGetSerial             		 :: proc(gamecontroller: ^GameController) -> cstring ---
+	GameControllerGetAttached           		 :: proc(gamecontroller: ^GameController) -> bool ---
+	GameControllerGetJoystick           		 :: proc(gamecontroller: ^GameController) -> ^Joystick ---
+	GameControllerEventState            		 :: proc(state: c.int) -> c.int ---
+	GameControllerUpdate                		 :: proc() ---
+		 
+	GameControllerGetAxisFromString     		 :: proc(str: cstring) -> GameControllerAxis ---
+	GameControllerGetStringForAxis      		 :: proc(axis: GameControllerAxis) -> cstring ---
+	GameControllerGetBindForAxis        		 :: proc(gamecontroller: ^GameController, axis: GameControllerAxis)  -> GameControllerButtonBind---
+	GameControllerHasAxis               		 :: proc(gamecontroller: ^GameController, axis: GameControllerAxis) -> bool ---
+	GameControllerGetAxis               		 :: proc(gamecontroller: ^GameController, axis: GameControllerAxis) -> i16 ---
+		 
+	GameControllerGetButtonFromString   		 :: proc(str: cstring) -> GameControllerButton ---
+	GameControllerGetStringForButton    		 :: proc(button: GameControllerButton) -> cstring ---
+	GameControllerGetBindForButton      		 :: proc(gamecontroller: ^GameController, button: GameControllerButton) -> GameControllerButtonBind ---
+	GameControllerHasButton             		 :: proc(gamecontroller: ^GameController, button: GameControllerButton) -> bool ---
+	GameControllerGetButton             		 :: proc(gamecontroller: ^GameController, button: GameControllerButton) -> u8 ---
+	GameControllerGetNumTouchpads       		 :: proc(gamecontroller: ^GameController) -> c.int ---
+	GameControllerGetNumTouchpadFingers 		 :: proc(gamecontroller: ^GameController, touchpad: c.int) -> c.int ---
+	GameControllerGetTouchpadFinger     		 :: proc(gamecontroller: ^GameController, touchpad: c.int, finger: c.int, state: ^u8, x, y: ^f32, pressure: ^f32) -> c.int ---
+	GameControllerHasSensor             		 :: proc(gamecontroller: ^GameController, type: SensorType) -> bool ---
+	GameControllerSetSensorEnabled      		 :: proc(gamecontroller: ^GameController, type: SensorType, enabled: bool) -> c.int ---
+	GameControllerIsSensorEnabled       		 :: proc(gamecontroller: ^GameController, type: SensorType) -> bool ---
+	GameControllerGetSensorDataRate     		 :: proc(gamecontroller: ^GameController, type: SensorType) -> f32 ---
+	GameControllerGetSensorData         		 :: proc(gamecontroller: ^GameController, type: SensorType, data: [^]f32, num_values: c.int) -> c.int ---
+	GameControllerGetSensorDataWithTimestamp	 :: proc(gamecontroller: ^GameController, type: SensorType, timestamp: ^u64, data: [^]f32, num_values: c.int) -> c.int ---
+	GameControllerRumble                		 :: proc(gamecontroller: ^GameController, low_frequency_rumble, high_frequency_rumble: u16, duration_ms: u32) -> c.int ---
+	GameControllerRumbleTriggers        		 :: proc(gamecontroller: ^GameController, left_rumble, right_rumble: u16, duration_ms: u32) -> c.int ---
+	GameControllerHasLED                		 :: proc(gamecontroller: ^GameController) -> bool ---
+	GameControllerHasRumble						 :: proc(gamecontroller: ^GameController) -> bool ---
+	GameControllerHasRumbleTriggers				 :: proc(gamecontroller: ^GameController) -> bool ---
+	GameControllerSetLED                		 :: proc(gamecontroller: ^GameController, red, green, blue: u8) -> c.int ---
+	GameControllerSendEffect            		 :: proc(gamecontroller: ^GameController, data: rawptr, size: c.int) -> c.int ---
+	GameControllerClose                 		 :: proc(gamecontroller: ^GameController) ---
+	GameControllerGetAppleSFSymbolsNameForButton :: proc(gamecontroller: ^GameController, button: GameControllerButton) -> cstring ---
+	GameControllerGetAppleSFSymbolsNameForAxis	 :: proc(gamecontroller: ^GameController, axis: GameControllerAxis) -> cstring ---
 }

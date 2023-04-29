@@ -25,6 +25,7 @@ WindowsMessageHook :: proc "c" (userdata: rawptr, hWnd: rawptr, message: c.uint,
 
 IDirect3DDevice9 :: struct {}
 ID3D11Device     :: struct {}
+ID3D12Device     :: struct {}
 
 @(default_calling_convention="c", link_prefix="SDL_")
 foreign lib {
@@ -32,6 +33,7 @@ foreign lib {
 	Direct3D9GetAdapterIndex :: proc(displayIndex: c.int) -> c.int ---
 	RenderGetD3D9Device      :: proc(renderer: ^Renderer) -> ^IDirect3DDevice9 ---
 	RenderGetD3D11Device     :: proc(renderer: ^Renderer) -> ^ID3D11Device ---
+	RenderGetD3D12Device	 :: proc(renderer: ^Renderer) -> ^ID3D12Device ---
 	DXGIGetOutputInfo        :: proc(displayIndex: c.int, adapterIndex: ^c.int, outputIndex: ^c.int) -> bool ---
 }
 
@@ -82,6 +84,7 @@ foreign lib {
 @(default_calling_convention="c", link_prefix="SDL_")
 foreign lib {
 	LinuxSetThreadPriority :: proc(threadID: i64, priority: c.int) -> c.int ---
+	LinuxSetThreadPriorityAndPolicy :: proc(threadID: i64, priority, schedPolicy: c.int) -> c.int ---
 }
 
 
@@ -117,4 +120,5 @@ foreign lib {
 	AndroidGetExternalStoragePath  :: proc() -> cstring ---
 	AndroidRequestPermission       :: proc(permission: cstring) -> bool ---
 	AndroidShowToast               :: proc(message: cstring, duration, gravity, xoffset, yoffset: c.int) -> c.int ---
+	AndroidSendMessage             :: proc(command: u32, param: c.int) -> c.int ---
 }

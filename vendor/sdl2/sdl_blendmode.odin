@@ -32,8 +32,8 @@ BlendOperation :: enum c.int {
 	ADD              = 0x1,  /**< dst + src: supported by all renderers */
 	SUBTRACT         = 0x2,  /**< dst - src : supported by D3D9, D3D11, OpenGL, OpenGLES */
 	REV_SUBTRACT     = 0x3,  /**< src - dst : supported by D3D9, D3D11, OpenGL, OpenGLES */
-	MINIMUM          = 0x4,  /**< min(dst, src) : supported by D3D11 */
-	MAXIMUM          = 0x5,  /**< max(dst, src) : supported by D3D11 */
+	MINIMUM          = 0x4,  /**< min(dst, src) : supported by D3D9, D3D11 */
+	MAXIMUM          = 0x5,  /**< max(dst, src) : supported by D3D9, D3D11 */
 }
 
 /**

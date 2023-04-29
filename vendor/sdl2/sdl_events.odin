@@ -54,6 +54,7 @@ EventType :: enum u32 {
 	KEYMAPCHANGED,          /**< Keymap changed due to a system event such as an
 	                             input language or keyboard layout change.
 	                        */
+	TEXTEDITING_EXT,       /**< Extended keyboard text editing (composition) */
 
 	/* Mouse events */
 	MOUSEMOTION    = 0x400, /**< Mouse moved */
@@ -69,6 +70,7 @@ EventType :: enum u32 {
 	JOYBUTTONUP,            /**< Joystick button released */
 	JOYDEVICEADDED,         /**< A new joystick has been inserted into the system */
 	JOYDEVICEREMOVED,       /**< An opened joystick has been removed */
+	JOYBATTERYUPDATED,      /**< Joystick battery level change */
 
 	/* Game controller events */
 	CONTROLLERAXISMOTION  = 0x650, /**< Game controller axis motion */
@@ -214,6 +216,10 @@ MouseWheelEvent :: struct {
 	x: i32,           /**< The amount scrolled horizontally, positive to the right and negative to the left */
 	y: i32,           /**< The amount scrolled vertically, positive away from the user and negative toward the user */
 	direction: u32,   /**< Set to one of the SDL_MOUSEWHEEL_* defines. When FLIPPED the values in X and Y will be opposite. Multiply by -1 to change them back */
+	preciseX: f32,
+	preciseY: f32,
+	mouseX: i32,
+	mouseY: i32,
 }
 
 JoyAxisEvent :: struct {
@@ -272,6 +278,12 @@ JoyDeviceEvent :: struct {
 	which: i32,       /**< The joystick device index for the ADDED event, instance id for the REMOVED event */
 }
 
+JoyBatteryEvent :: struct {
+	type: u32, 		/**< ::SDL_JOYBATTERYUPDATED */
+	timestamp: u32, /**< In milliseconds, populated using SDL_GetTicks() */
+	which: JoystickID, /**< The joystick instance id */
+	level: JoystickPowerLevel, /**< The joystick battery level */
+}
 
 ControllerAxisEvent :: struct {
 	type: EventType,        /**< ::SDL_CONTROLLERAXISMOTION */
@@ -320,6 +332,7 @@ ControllerSensorEvent :: struct {
 	which:     JoystickID, /**< The joystick instance id */
 	sensor:    i32,      /**< The type of the sensor, one of the values of ::SDL_SensorType */
 	data:      [3]f32,      /**< Up to 3 values from the sensor, as defined in SDL_sensor.h */
+	timestamp_us: u64, /**< The timestamp of the sensor reading in microseconds, if the hardware provides this information. */
 }
 
 AudioDeviceEvent :: struct {
@@ -388,6 +401,7 @@ SensorEvent :: struct {
 	timestamp: u32,   /**< In milliseconds, populated using SDL_GetTicks() */
 	which:     i32,       /**< The instance ID of the sensor */
 	data:      [6]f32,      /**< Up to 6 values from the sensor - additional values can be queried using SDL_SensorGetData() */
+	timestamp_us: u64, /**< The timestamp of the sensor reading in microseconds, if the hardware provides this information. */
 }
 
 QuitEvent :: struct {
@@ -432,6 +446,7 @@ Event :: struct #raw_union {
 	jhat:      JoyHatEvent,             /**< Joystick hat event data */
 	jbutton:   JoyButtonEvent,          /**< Joystick button event data */
 	jdevice:   JoyDeviceEvent,          /**< Joystick device change event data */
+	jbattery:  JoyBatteryEvent,			/**< Joystick battery event data */
 	caxis:     ControllerAxisEvent,     /**< Game Controller axis event data */
 	cbutton:   ControllerButtonEvent,   /**< Game Controller button event data */
 	cdevice:   ControllerDeviceEvent,   /**< Game Controller device event data */
