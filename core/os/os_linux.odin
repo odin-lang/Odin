@@ -43,6 +43,7 @@ ENOSPC:         Errno : 28
 ESPIPE:         Errno : 29
 EROFS:          Errno : 30
 EPIPE:          Errno : 32
+EDOM:           Errno : 33
 
 ERANGE:         Errno : 34 /* Result too large */
 EDEADLK:        Errno : 35 /* Resource deadlock would occur */
@@ -242,6 +243,11 @@ socklen_t :: c.int
 Timeval :: struct {
 	seconds: i64,
 	nanoseconds: int,
+}
+
+Timeval_Microseconds :: struct {
+	seconds: i64,
+	microseconds: int,
 }
 
 // "Argv" arguments converted to Odin strings

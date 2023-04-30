@@ -246,7 +246,7 @@ _set_option :: proc(s: Any_Socket, option: Socket_Option, value: any, loc := #ca
 	//  I haven't tested if you can give more than that.
 	bool_value: b32
 	int_value: i32
-	timeval_value: os.Timeval
+	timeval_value: os.Timeval_Microseconds
 
 	ptr: rawptr
 	len: os.socklen_t
@@ -284,8 +284,9 @@ _set_option :: proc(s: Any_Socket, option: Socket_Option, value: any, loc := #ca
 			if !ok do panic("set_option() value must be a time.Duration here", loc)
 
 			nanos := time.duration_nanoseconds(t)
-			timeval_value.nanoseconds = int(nanos % 1e9)
-			timeval_value.seconds = (nanos - i64(timeval_value.nanoseconds)) / 1e9
+			micros := nanos/1000
+			timeval_value.microseconds = int(micros % 1e6)
+			timeval_value.seconds = (micros - i64(timeval_value.microseconds)) / 1e6
 
 			ptr = &timeval_value
 			len = size_of(timeval_value)
