@@ -262,6 +262,7 @@ struct BuildContext {
 	String microarch;
 	BuildModeKind build_mode;
 	bool   generate_docs;
+	bool   custom_optimization_level;
 	i32    optimization_level;
 	bool   show_timings;
 	TimingsExportFormat export_timings_format;
@@ -1272,6 +1273,12 @@ gb_internal void init_build_context(TargetMetrics *cross_target) {
 		gb_exit(1);
 	}
 
+	if (bc->ODIN_DEBUG && !bc->custom_optimization_level) {
+		// NOTE(bill): when building with `-debug` but not specifying an optimization level
+		// default to `-o:none` to improve the debug symbol generation by default
+		bc->optimization_level = -1; // -o:none
+	}
+
 	bc->optimization_level = gb_clamp(bc->optimization_level, -1, 2);
 
 	// ENFORCE DYNAMIC MAP CALLS
@@ -1285,9 +1292,6 @@ gb_internal void init_build_context(TargetMetrics *cross_target) {
 			break;
 		}
 	}
-
-	#undef LINK_FLAG_X64
-	#undef LINK_FLAG_386
 }
 
 #if defined(GB_SYSTEM_WINDOWS)
