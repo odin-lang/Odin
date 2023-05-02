@@ -4,29 +4,59 @@ package fmt
 import "core:runtime"
 import "core:os"
 import "core:io"
+import "core:bufio"
 
 // fprint formats using the default print settings and writes to fd
 fprint :: proc(fd: os.Handle, args: ..any, sep := " ") -> int {
-	w := io.to_writer(os.stream_from_handle(fd))
+	buf: [1024]byte
+	b: bufio.Writer
+	defer bufio.writer_flush(&b)
+
+	bufio.writer_init_with_buf(&b, {os.stream_from_handle(fd)}, buf[:])
+	w := bufio.writer_to_writer(&b)
 	return wprint(w=w, args=args, sep=sep)
 }
 
 // fprintln formats using the default print settings and writes to fd
 fprintln :: proc(fd: os.Handle, args: ..any, sep := " ") -> int {
-	w := io.to_writer(os.stream_from_handle(fd))
+	buf: [1024]byte
+	b: bufio.Writer
+	defer bufio.writer_flush(&b)
+
+	bufio.writer_init_with_buf(&b, {os.stream_from_handle(fd)}, buf[:])
+
+	w := bufio.writer_to_writer(&b)
 	return wprintln(w=w, args=args, sep=sep)
 }
 // fprintf formats according to the specified format string and writes to fd
 fprintf :: proc(fd: os.Handle, fmt: string, args: ..any) -> int {
-	w := io.to_writer(os.stream_from_handle(fd))
+	buf: [1024]byte
+	b: bufio.Writer
+	defer bufio.writer_flush(&b)
+
+	bufio.writer_init_with_buf(&b, {os.stream_from_handle(fd)}, buf[:])
+
+	w := bufio.writer_to_writer(&b)
 	return wprintf(w, fmt, ..args)
 }
 fprint_type :: proc(fd: os.Handle, info: ^runtime.Type_Info) -> (n: int, err: io.Error) {
-	w := io.to_writer(os.stream_from_handle(fd))
+	buf: [1024]byte
+	b: bufio.Writer
+	defer bufio.writer_flush(&b)
+
+	bufio.writer_init_with_buf(&b, {os.stream_from_handle(fd)}, buf[:])
+
+	w := bufio.writer_to_writer(&b)
 	return wprint_type(w, info)
 }
 fprint_typeid :: proc(fd: os.Handle, id: typeid) -> (n: int, err: io.Error) {
-	w := io.to_writer(os.stream_from_handle(fd))
+	buf: [1024]byte
+	b: bufio.Writer
+	defer bufio.writer_flush(&b)
+
+	bufio.writer_init_with_buf(&b, {os.stream_from_handle(fd)}, buf[:])
+
+	w := bufio.writer_to_writer(&b)
 	return wprint_typeid(w, id)
 }
 

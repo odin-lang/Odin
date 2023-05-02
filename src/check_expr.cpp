@@ -1688,6 +1688,8 @@ gb_internal bool check_unary_op(CheckerContext *c, Operand *o, Token op) {
 			if (is_type_integer(type)) {
 				error_line("\tSuggestion: Did you mean to use the bitwise not operator '~'?\n");
 			}
+		} else {
+			o->type = t_untyped_bool;
 		}
 		break;
 

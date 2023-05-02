@@ -71,7 +71,32 @@ Returns:
 builder_make_len_cap :: proc(len, cap: int, allocator := context.allocator) -> (res: Builder, err: mem.Allocator_Error) #optional_allocator_error {
 	return Builder{buf=make([dynamic]byte, len, cap, allocator) or_return }, nil
 }
-// overload simple `builder_make_*` with or without len / cap parameters
+/*
+Produces a String Builder
+
+*Allocates Using Provided Allocator*
+
+Example:
+
+	import "core:fmt"
+	import "core:strings"
+	builder_make_example :: proc() {
+		sb := strings.builder_make()
+		strings.write_byte(&sb, 'a')
+		strings.write_string(&sb, " slice of ")
+		strings.write_f64(&sb, 3.14,'g',true) // See `fmt.fmt_float` byte codes
+		strings.write_string(&sb, " is ")
+		strings.write_int(&sb, 180)
+		strings.write_rune(&sb,'°')
+		the_string :=strings.to_string(sb)
+		fmt.println(the_string)
+	}
+
+Output:
+
+	a slice of +3.14 is 180°
+
+*/
 builder_make :: proc{
 	builder_make_none,
 	builder_make_len,

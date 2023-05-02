@@ -263,7 +263,7 @@ compare :: proc(lhs, rhs: string) -> (result: int) {
 	return mem.compare(transmute([]byte)lhs, transmute([]byte)rhs)
 }
 /*
-Returns the byte offset of the rune `r` in the string `s`, -1 when not found
+Checks if rune `r` in the string `s`
 
 Inputs:
 - s: The input string

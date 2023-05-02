@@ -17,6 +17,14 @@ AccelerationStructureInstanceOption :: enum u32 {
 	NonOpaque                                  = 3,
 }
 
+
+AccelerationStructureRefitOptions :: distinct bit_set[AccelerationStructureRefitOption; NS.UInteger]
+AccelerationStructureRefitOption :: enum NS.UInteger {
+	VertexData       = 0,
+	PerPrimitiveData = 1,
+}
+
+
 MotionBorderMode :: enum u32 {
 	Clamp  = 0,
 	Vanish = 1,
@@ -148,6 +156,21 @@ BinaryArchiveError :: enum NS.UInteger {
 	InvalidFile        = 1,
 	UnexpectedElement  = 2,
 	CompilationFailure = 3,
+	InternalError      = 4,
+}
+
+BindingType :: enum NS.Integer {
+	Buffer                         = 0,
+	ThreadgroupMemory              = 1,
+	Texture                        = 2,
+	Sampler                        = 3,
+	ImageblockData                 = 16,
+	Imageblock                     = 17,
+	VisibleFunctionTable           = 24,
+	PrimitiveAccelerationStructure = 25,
+	InstanceAccelerationStructure  = 26,
+	IntersectionFunctionTable      = 27,
+	ObjectPayload                  = 34,
 }
 
 BlitOptionFlag :: enum NS.UInteger {
@@ -171,15 +194,16 @@ CaptureDestination :: enum NS.Integer {
 
 CommandBufferStatus :: enum NS.UInteger {
 	NotEnqueued = 0,
-	Enqueued = 1,
-	Committed = 2,
-	Scheduled = 3,
-	Completed = 4,
-	Error = 5,
+	Enqueued    = 1,
+	Committed   = 2,
+	Scheduled   = 3,
+	Completed   = 4,
+	Error       = 5,
 }
 
 CommandBufferError :: enum NS.UInteger {
 	None            = 0,
+	Internal        = 1,
 	Timeout         = 2,
 	PageFault       = 3,
 	AccessRevoked   = 4,
@@ -232,6 +256,7 @@ BarrierScope :: distinct bit_set[BarrierScopeFlag; NS.UInteger]
 CounterSampleBufferError :: enum NS.Integer {
 	OutOfMemory = 0,
 	Invalid     = 1,
+	Internal    = 2,
 }
 
 CompareFunction :: enum NS.UInteger {
@@ -312,6 +337,13 @@ GPUFamily :: enum NS.Integer {
 	Common3      = 3003,
 	MacCatalyst1 = 4001,
 	MacCatalyst2 = 4002,
+	Metal3       = 5001,
+}
+
+SparsePageSize :: enum NS.Integer {
+	Size16  = 101,
+	Size64  = 102,
+	Size256 = 103,
 }
 
 DeviceLocation :: enum NS.UInteger {
@@ -409,6 +441,9 @@ FunctionType :: enum NS.UInteger {
 	Kernel       = 3,
 	Visible      = 5,
 	Intersection = 6,
+	Mesh         = 7,
+	Object       = 8,
+
 }
 
 
@@ -421,15 +456,22 @@ LanguageVersion :: enum NS.UInteger {
 	Version2_2 = 131074,
 	Version2_3 = 131075,
 	Version2_4 = 131076,
+	Version3_0 = 196608,
 }
 
 LibraryType :: enum NS.Integer {
 	Executable = 0,
-	Dynamic = 1,
+	Dynamic    = 1,
+}
+
+LibraryOptimizationLevel :: enum NS.Integer {
+	Default = 0,
+	Size    = 1,
 }
 
 LibraryError :: enum NS.UInteger {
 	Unsupported      = 1,
+	Internal         = 2,
 	CompileFailure   = 3,
 	CompileWarning   = 4,
 	FunctionNotFound = 5,
@@ -624,6 +666,8 @@ RenderStage :: enum NS.UInteger {
 	Vertex   = 0,
 	Fragment = 1,
 	Tile     = 2,
+	Object   = 3,
+	Mesh     = 4,
 }
 RenderStages :: distinct bit_set[RenderStage; NS.UInteger]
 
@@ -859,6 +903,42 @@ AttributeFormat :: enum NS.UInteger {
 IndexType :: enum NS.UInteger {
 	UInt16 = 0,
 	UInt32 = 1,
+}
+
+IOPriority :: enum NS.Integer {
+	High   = 0,
+	Normal = 1,
+	Low    = 2,
+}
+
+IOCommandQueueType :: enum NS.Integer {
+	Concurrent = 0,
+	Serial     = 1,
+}
+
+IOError :: enum NS.Integer {
+	URLInvalid = 1,
+	Internal   = 2,
+}
+
+IOStatus :: enum NS.Integer {
+	Pending   = 0,
+	Cancelled = 1,
+	Error     = 2,
+	Complete  = 3,
+}
+
+IOCompressionMethod :: enum NS.Integer {
+	Zlib     = 0,
+	LZFSE    = 1,
+	LZ4      = 2,
+	LZMA     = 3,
+	LZBitmap = 4,
+}
+
+IOCompressionStatus :: enum NS.Integer {
+	Complete = 0,
+	Error    = 1,
 }
 
 StepFunction :: enum NS.UInteger {
