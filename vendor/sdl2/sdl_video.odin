@@ -2,6 +2,12 @@ package sdl2
 
 import "core:c"
 
+when ODIN_OS == .Windows {
+	foreign import lib "SDL2.lib"
+} else {
+	foreign import lib "system:SDL2"
+}
+
 DisplayMode :: struct {
 	format:       u32,    /**< pixel format */
 	w:            c.int,  /**< width, in screen coordinates */
