@@ -2,6 +2,12 @@ package sdl2
 
 import "core:c"
 
+when ODIN_OS == .Windows {
+	foreign import lib "SDL2.lib"
+} else {
+	foreign import lib "system:SDL2"
+}
+
 /* RWops Types */
 RWOPS_UNKNOWN   :: 0 /**< Unknown stream type */
 RWOPS_WINFILE   :: 1 /**< Win32 file */
