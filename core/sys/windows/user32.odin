@@ -38,6 +38,7 @@ foreign user32 {
 	DestroyWindow :: proc(hWnd: HWND) -> BOOL ---
 
 	ShowWindow :: proc(hWnd: HWND, nCmdShow: c_int) -> BOOL ---
+	IsWindow :: proc(hWnd: HWND) -> BOOL ---
 	BringWindowToTop :: proc(hWnd: HWND) -> BOOL ---
 	GetTopWindow :: proc(hWnd: HWND) -> HWND ---
 	SetForegroundWindow :: proc(hWnd: HWND) -> BOOL ---

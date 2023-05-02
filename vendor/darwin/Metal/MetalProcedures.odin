@@ -1,6 +1,7 @@
 package objc_Metal
 
 import NS "vendor:darwin/Foundation"
+import "core:c"
 
 @(require)
 foreign import "system:Metal.framework"
@@ -11,6 +12,12 @@ foreign Metal {
 	CopyAllDevicesWithObserver :: proc(observer: ^id, handler: DeviceNotificationHandler) -> ^NS.Array ---
 	CreateSystemDefaultDevice  :: proc() -> ^Device ---
 	RemoveDeviceObserver       :: proc(observer: id) ---
+
+
+	IOCompressionContextDefaultChunkSize :: proc() -> c.size_t ---
+	IOCreateCompressionContext           :: proc(path: cstring, type: IOCompressionMethod, chuckSize: c.size_t) -> rawptr ---
+	IOCompressionContextAppendData       :: proc(ctx: rawptr, data: rawptr, size: c.size_t) ---
+	IOFlushAndDestroyCompressionContext  :: proc(ctx: rawptr) -> IOCompressionStatus ---
 }
 
 

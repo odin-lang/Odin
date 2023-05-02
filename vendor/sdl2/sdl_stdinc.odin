@@ -5,6 +5,12 @@ import "core:intrinsics"
 import "core:runtime"
 _, _ :: intrinsics, runtime
 
+when ODIN_OS == .Windows {
+	foreign import lib "SDL2.lib"
+} else {
+	foreign import lib "system:SDL2"
+}
+
 bool :: distinct b32
 #assert(size_of(bool) == size_of(c.int))
 

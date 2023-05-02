@@ -514,6 +514,9 @@ gb_internal bool lb_is_matrix_simdable(Type *t) {
 		// it's not aligned well enough to use the vector instructions
 		return false;
 	}
+	if ((mt->Matrix.row_count & 1) ^ (mt->Matrix.column_count & 1)) {
+		return false;
+	}
 	
 	if (elem->kind == Type_Basic) {
 		switch (elem->Basic.kind) {
@@ -2833,7 +2836,7 @@ gb_internal lbValue lb_make_soa_pointer(lbProcedure *p, Type *type, lbValue cons
 	lbValue ptr = lb_emit_struct_ep(p, v.addr, 0);
 	lbValue idx = lb_emit_struct_ep(p, v.addr, 1);
 	lb_emit_store(p, ptr, addr);
-	lb_emit_store(p, idx, index);
+	lb_emit_store(p, idx, lb_emit_conv(p, index, t_int));
 
 	return lb_addr_load(p, v);
 }
