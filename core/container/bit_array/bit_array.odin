@@ -40,7 +40,7 @@ make_iterator :: proc (ba: ^Bit_Array) -> (it: Bit_Array_Iterator) {
 	return Bit_Array_Iterator { array = ba }
 }
 /*
-Returns the next bit,including its set-state. ok=false once exhausted
+Returns the next bit, including its set-state. ok=false once exhausted
 
 Inputs:
 - it: The iterator that holds the state.
@@ -66,7 +66,7 @@ iterate_by_all :: proc (it: ^Bit_Array_Iterator) -> (set: bool, index: int, ok: 
 	return set, index, true
 }
 /*
-Returns the next Set Bit, for example if `0b1010`, then the iterator will return index={1,3} over two calls.
+Returns the next Set Bit, for example if `0b1010`, then the iterator will return index={1, 3} over two calls.
 
 Inputs:
 - it: The iterator that holds the state.
@@ -79,7 +79,7 @@ iterate_by_set :: proc (it: ^Bit_Array_Iterator) -> (index: int, ok: bool) {
 	return iterate_internal_(it, true)
 }
 /*
-Returns the next Unset Bit, for example if `0b1010`, then the iterator will return index={0,2} over two calls.
+Returns the next Unset Bit, for example if `0b1010`, then the iterator will return index={0, 2} over two calls.
 
 Inputs:
 - it: The iterator that holds the state.
@@ -190,12 +190,13 @@ Sets the state of a bit in the bit-array
 Inputs:
 - ba: Pointer to the Bit_Array
 - index: Which bit in the array
+- set_to: `true` sets the bit on, `false` to turn it off
 - allocator: (default is context.allocator)
 
 Returns:
 - ok: Whether the set was successful, `false` on allocation failure or bad index
 */
-set :: proc(ba: ^Bit_Array, #any_int index: uint, allocator := context.allocator) -> (ok: bool) {
+set :: proc(ba: ^Bit_Array, #any_int index: uint, set_to: bool = true, allocator := context.allocator) -> (ok: bool) {
 
 	idx := int(index) - ba.bias
 
@@ -208,7 +209,10 @@ set :: proc(ba: ^Bit_Array, #any_int index: uint, allocator := context.allocator
 	resize_if_needed(ba, leg_index) or_return
 
 	ba.max_index = max(idx, ba.max_index)
-	ba.bits[leg_index] |= 1 << uint(bit_index)
+
+	if set_to{ ba.bits[leg_index] |= 1 << uint(bit_index) }
+	else { ba.bits[leg_index] &= ~(1 << uint(bit_index)) }
+
 	return true
 }
 /*
@@ -224,7 +228,7 @@ unsafe_set :: proc(ba: ^Bit_Array, bit: int) #no_bounds_check {
 	ba.bits[bit >> INDEX_SHIFT] |= 1 << uint(bit & INDEX_MASK)
 }
 /*
-Unsets the state of a bit in the bit-array
+Unsets the state of a bit in the bit-array. (Convienence wrapper for `set`)
 
 *Conditionally Allocates (Resizes backing data when `index > len(ba.bits)`)*
 
@@ -236,21 +240,8 @@ Inputs:
 Returns:
 - ok: Whether the unset was successful, `false` on allocation failure or bad index
 */
-unset :: proc(ba: ^Bit_Array, #any_int index: uint, allocator := context.allocator) -> (ok: bool) {
-
-	idx := int(index) - ba.bias
-
-	if ba == nil || int(index) < ba.bias { return false }
-	context.allocator = allocator
-
-	leg_index := idx >> INDEX_SHIFT
-	bit_index := idx &  INDEX_MASK
-
-	resize_if_needed(ba, leg_index) or_return
-
-	ba.max_index = max(idx, ba.max_index)
-	ba.bits[leg_index] &= ~(1 << uint(bit_index))
-	return true
+unset :: #force_inline proc(ba: ^Bit_Array, #any_int index: uint, allocator := context.allocator) -> (ok: bool) {
+	return set(ba, index, false, allocator)
 }
 /*
 Unsets the state of a bit in the bit-array
@@ -285,12 +276,14 @@ create :: proc(max_index: int, min_index: int = 0, allocator := context.allocato
 
 	legs := size_in_bits >> INDEX_SHIFT
 	if size_in_bits & INDEX_MASK > 0 {legs+=1}
-
+	bits, err := make([dynamic]u64, legs)
+	ok = err == mem.Allocator_Error.None
 	res = new(Bit_Array)
+	res.bits         = bits
 	res.bias         = min_index
 	res.max_index    = max_index
 	res.free_pointer = true
-	return res, resize_if_needed(res, legs)
+	return
 }
 /*
 Sets all values in the Bit_Array to zero.
@@ -316,7 +309,7 @@ destroy :: proc(ba: ^Bit_Array) {
 	}
 }
 /*
-	Resizes the Bit Array. For internal use.
+	Resizes the Bit Array. For internal use. Provisions needed capacity+1
 	If you want to reserve the memory for a given-sized Bit Array up front, you can use `create`.
 */
 @(private="file")
