@@ -41,7 +41,7 @@ Returns:
 */
 @(deprecated="Prefer clone. It now returns an optional allocator error")
 clone_safe :: proc(s: string, allocator := context.allocator, loc := #caller_location) -> (res: string, err: mem.Allocator_Error) {
-    return clone(s, allocator, loc)
+	return clone(s, allocator, loc)
 }
 /*
 Clones a string and appends a null-byte to make it a cstring
@@ -629,7 +629,7 @@ Returns:
 */
 @(deprecated="Prefer join. It now returns an optional allocator error")
 join_safe :: proc(a: []string, sep: string, allocator := context.allocator) -> (res: string, err: mem.Allocator_Error) {
-    return join(a, sep, allocator)
+	return join(a, sep, allocator)
 }
 /*
 Returns a combined string from the slice of strings `a` without a separator
@@ -689,7 +689,7 @@ The concatenated string, and an error if allocation fails
 */
 @(deprecated="Prefer concatenate. It now returns an optional allocator error")
 concatenate_safe :: proc(a: []string, allocator := context.allocator) -> (res: string, err: mem.Allocator_Error) {
-    return concatenate(a, allocator)
+	return concatenate(a, allocator)
 }
 /*
 Returns a substring of the input string `s` with the specified rune offset and length
