@@ -105,7 +105,7 @@ PRESENT_FLAG :: enum u32 {
 	ALLOW_TEARING         = 9,
 }
 
-MWA_FLAGS :: distinct bit_set[MWA_FLAG; u32]
+MWA :: distinct bit_set[MWA_FLAG; u32]
 MWA_FLAG :: enum u32 {
 	NO_WINDOW_CHANGES = 0,
 	NO_ALT_ENTER      = 1,
@@ -417,9 +417,8 @@ SWAP_EFFECT :: enum i32 {
 	FLIP_SEQUENTIAL = 3,
 	FLIP_DISCARD    = 4,
 }
-
-SWAP_CHAIN_FLAGS :: distinct bit_set[SWAP_CHAIN_FLAG; u32]
-SWAP_CHAIN_FLAG :: enum u32 { // TODO: convert to bit_set
+// NOTE: Not convertable to bit_set because exceeds range of u32. Also API prohibits the usage of all flags at once.
+SWAP_CHAIN_FLAG :: enum u32 { 
 	NONPREROTATED                          = 0x1,
 	ALLOW_MODE_SWITCH                      = 0x2,
 	GDI_COMPATIBLE                         = 0x4,
@@ -443,7 +442,7 @@ SWAP_CHAIN_DESC :: struct {
 	OutputWindow: HWND,
 	Windowed:     BOOL,
 	SwapEffect:   SWAP_EFFECT,
-	Flags:        SWAP_CHAIN_FLAGS,
+	Flags:        SWAP_CHAIN_FLAG,
 }
 
 
@@ -587,7 +586,7 @@ IFactory :: struct #raw_union {
 IFactory_VTable :: struct {
 	using idxgiobject_vtable: IObject_VTable,
 	EnumAdapters:          proc "stdcall" (this: ^IFactory, Adapter: u32, ppAdapter: ^^IAdapter) -> HRESULT,
-	MakeWindowAssociation: proc "stdcall" (this: ^IFactory, WindowHandle: HWND, Flags: MWA_FLAGS) -> HRESULT,
+	MakeWindowAssociation: proc "stdcall" (this: ^IFactory, WindowHandle: HWND, Flags: MWA) -> HRESULT,
 	GetWindowAssociation:  proc "stdcall" (this: ^IFactory, pWindowHandle: ^HWND) -> HRESULT,
 	CreateSwapChain:       proc "stdcall" (this: ^IFactory, pDevice: ^IUnknown, pDesc: ^SWAP_CHAIN_DESC, ppSwapChain: ^^ISwapChain) -> HRESULT,
 	CreateSoftwareAdapter: proc "stdcall" (this: ^IFactory, Module: HMODULE, ppAdapter: ^^IAdapter) -> HRESULT,
@@ -814,7 +813,7 @@ SWAP_CHAIN_DESC1 :: struct {
 	Scaling:     SCALING,
 	SwapEffect:  SWAP_EFFECT,
 	AlphaMode:   ALPHA_MODE,
-	Flags:       SWAP_CHAIN_FLAGS,
+	Flags:       SWAP_CHAIN_FLAG,
 }
 
 SWAP_CHAIN_FULLSCREEN_DESC :: struct {
