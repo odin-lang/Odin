@@ -48,3 +48,4 @@ ERROR_PIPE_BUSY              : DWORD : 231
 E_NOTIMPL :: HRESULT(-0x7fff_bfff) // 0x8000_4001
 
 SUCCEEDED :: #force_inline proc(#any_int result: int) -> bool { return result >= 0 }
+FAILED    :: #force_inline proc(#any_int result: int) -> bool { return !SUCCEEDED(result) }
