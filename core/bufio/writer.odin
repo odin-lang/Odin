@@ -227,6 +227,14 @@ writer_to_stream :: proc(b: ^Writer) -> (s: io.Stream) {
 	return
 }
 
+// writer_to_stream converts a Writer into an io.Stream
+writer_to_writer :: proc(b: ^Writer) -> (s: io.Writer) {
+	s.stream_data = b
+	s.stream_vtable = &_writer_vtable
+	return
+}
+
+
 
 
 @(private)

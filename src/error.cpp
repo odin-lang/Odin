@@ -436,6 +436,32 @@ gb_internal void syntax_error_va(TokenPos const &pos, TokenPos end, char const *
 	}
 }
 
+gb_internal void syntax_error_with_verbose_va(TokenPos const &pos, TokenPos end, char const *fmt, va_list va) {
+	global_error_collector.count.fetch_add(1);
+
+	mutex_lock(&global_error_collector.mutex);
+	// NOTE(bill): Duplicate error, skip it
+	if (pos.line == 0) {
+		error_out_coloured("Syntax_Error: ", TerminalStyle_Normal, TerminalColour_Red);
+		error_out_va(fmt, va);
+		error_out("\n");
+	} else if (global_error_collector.prev != pos) {
+		global_error_collector.prev = pos;
+		error_out_pos(pos);
+		if (has_ansi_terminal_colours()) {
+			error_out_coloured("Syntax_Error: ", TerminalStyle_Normal, TerminalColour_Red);
+		}
+		error_out_va(fmt, va);
+		error_out("\n");
+		show_error_on_line(pos, end);
+	}
+	mutex_unlock(&global_error_collector.mutex);
+	if (global_error_collector.count > MAX_ERROR_COLLECTOR_COUNT()) {
+		gb_exit(1);
+	}
+}
+
+
 gb_internal void syntax_warning_va(TokenPos const &pos, TokenPos end, char const *fmt, va_list va) {
 	if (global_warnings_as_errors()) {
 		syntax_error_va(pos, end, fmt, va);
@@ -514,6 +540,14 @@ gb_internal void syntax_warning(Token const &token, char const *fmt, ...) {
 	syntax_warning_va(token.pos, {}, fmt, va);
 	va_end(va);
 }
+
+gb_internal void syntax_error_with_verbose(TokenPos pos, TokenPos end, char const *fmt, ...) {
+	va_list va;
+	va_start(va, fmt);
+	syntax_error_with_verbose_va(pos, end, fmt, va);
+	va_end(va);
+}
+
 
 
 gb_internal void compiler_error(char const *fmt, ...) {

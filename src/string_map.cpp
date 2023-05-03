@@ -96,7 +96,9 @@ gb_internal MapIndex string_map__add_entry(StringMap<T> *h, u32 hash, String con
 	e.key = key;
 	e.hash = hash;
 	e.next = MAP_SENTINEL;
-	string_map__reserve_entries(h, h->count+1);
+	if (h->count+1 >= h->entries_capacity) {
+		string_map__reserve_entries(h, gb_max(h->entries_capacity*2, 4));
+	}
 	h->entries[h->count++] = e;
 	return cast(MapIndex)(h->count-1);
 }

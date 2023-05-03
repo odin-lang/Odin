@@ -2,6 +2,12 @@ package sdl2
 
 import "core:c"
 
+when ODIN_OS == .Windows {
+	foreign import lib "SDL2.lib"
+} else {
+	foreign import lib "system:SDL2"
+}
+
 Keysym :: struct {
 	scancode: Scancode, /**< SDL physical key code - see ::SDL_Scancode for details */
 	sym:      Keycode,  /**< SDL virtual key code - see ::SDL_Keycode for details */

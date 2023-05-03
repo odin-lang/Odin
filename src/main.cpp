@@ -1035,12 +1035,16 @@ gb_internal bool parse_build_flags(Array<String> args) {
 						case BuildFlag_OptimizationMode: {
 							GB_ASSERT(value.kind == ExactValue_String);
 							if (value.value_string == "none") {
+								build_context.custom_optimization_level = true;
 								build_context.optimization_level = -1;
 							} else if (value.value_string == "minimal") {
+								build_context.custom_optimization_level = true;
 								build_context.optimization_level = 0;
 							} else if (value.value_string == "size") {
+								build_context.custom_optimization_level = true;
 								build_context.optimization_level = 1;
 							} else if (value.value_string == "speed") {
+								build_context.custom_optimization_level = true;
 								build_context.optimization_level = 2;
 							} else {
 								gb_printf_err("Invalid optimization mode for -o:<string>, got %.*s\n", LIT(value.value_string));

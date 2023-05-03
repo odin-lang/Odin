@@ -133,6 +133,8 @@ Region :: struct {
 
 SamplePosition :: distinct [2]f32
 
+ResourceID :: distinct u64
+
 ScissorRect :: struct {
 	x:      NS.Integer,
 	y:      NS.Integer,

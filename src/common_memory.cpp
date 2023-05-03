@@ -1,3 +1,6 @@
+#if defined(GB_SYSTEM_LINUX)
+#include <malloc.h>
+#endif
 
 gb_internal gb_inline void zero_size(void *ptr, isize len) {
 	memset(ptr, 0, len);
@@ -121,7 +124,6 @@ struct PlatformMemoryBlock {
 	PlatformMemoryBlock *prev, *next;
 };
 
-
 gb_global std::atomic<isize> global_platform_memory_total_usage;
 gb_global PlatformMemoryBlock global_platform_memory_block_sentinel;
 
@@ -177,12 +179,12 @@ gb_internal void platform_virtual_memory_protect(void *memory, isize size);
 			gb_printf_err("Total Usage: %lld bytes\n", cast(long long)global_platform_memory_total_usage);
 			GB_ASSERT_MSG(pmblock != nullptr, "Out of Virtual Memory, oh no...");
 		}
-		global_platform_memory_total_usage += total_size;
+		global_platform_memory_total_usage.fetch_add(total_size);
 		return pmblock;
 	}
 	gb_internal void platform_virtual_memory_free(PlatformMemoryBlock *block) {
 		isize size = block->total_size;
-		global_platform_memory_total_usage -= size;
+		global_platform_memory_total_usage.fetch_sub(size);
 		munmap(block, size);
 	}
 	gb_internal void platform_virtual_memory_protect(void *memory, isize size) {
@@ -396,12 +398,13 @@ gb_internal gbAllocator heap_allocator(void) {
 	return a;
 }
 
+gb_internal std::atomic<isize> total_heap_memory_allocated;
+
 
 gb_internal GB_ALLOCATOR_PROC(heap_allocator_proc) {
 	void *ptr = nullptr;
 	gb_unused(allocator_data);
 	gb_unused(old_size);
-
 
 
 // TODO(bill): Throughly test!
@@ -436,28 +439,34 @@ gb_internal GB_ALLOCATOR_PROC(heap_allocator_proc) {
 #elif defined(GB_SYSTEM_LINUX)
 	// TODO(bill): *nix version that's decent
 	case gbAllocation_Alloc: {
-		ptr = aligned_alloc(alignment, (size + alignment - 1) & ~(alignment - 1));
+		isize total_size = (size + alignment - 1) & ~(alignment - 1);
+		total_heap_memory_allocated.fetch_add(total_size);
+		ptr = aligned_alloc(alignment, total_size);
 		gb_zero_size(ptr, size);
 	} break;
 
 	case gbAllocation_Free:
 		if (old_memory != nullptr) {
+			total_heap_memory_allocated.fetch_sub(malloc_usable_size(old_memory));
 			free(old_memory);
 		}
 		break;
 
-	case gbAllocation_Resize:
+	case gbAllocation_Resize: {
 		if (size == 0) {
 			if (old_memory != nullptr) {
+				total_heap_memory_allocated.fetch_sub(malloc_usable_size(old_memory));
 				free(old_memory);
 			}
 			break;
 		}
-		
+
 		alignment = gb_max(alignment, gb_align_of(max_align_t));
-		
+
 		if (old_memory == nullptr) {
-			ptr = aligned_alloc(alignment, (size + alignment - 1) & ~(alignment - 1));
+			isize total_size = (size + alignment - 1) & ~(alignment - 1);
+			total_heap_memory_allocated.fetch_add(total_size);
+			ptr = aligned_alloc(alignment, total_size);
 			gb_zero_size(ptr, size);
 			break;
 		}
@@ -466,11 +475,19 @@ gb_internal GB_ALLOCATOR_PROC(heap_allocator_proc) {
 			break;
 		}
 
-		ptr = aligned_alloc(alignment, (size + alignment - 1) & ~(alignment - 1));
+		size_t actual_old_size = malloc_usable_size(old_memory);
+		if (size <= actual_old_size) {
+			ptr = old_memory;
+			break;
+		}
+
+		isize total_size = (size + alignment - 1) & ~(alignment - 1);
+		total_heap_memory_allocated.fetch_add(total_size);
+		ptr = aligned_alloc(alignment, total_size);
 		gb_memmove(ptr, old_memory, old_size);
 		free(old_memory);
 		gb_zero_size(cast(u8 *)ptr + old_size, gb_max(size-old_size, 0));
-		break;
+	} break;
 #else
 	// TODO(bill): *nix version that's decent
 	case gbAllocation_Alloc: {

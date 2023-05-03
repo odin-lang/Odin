@@ -353,14 +353,14 @@ internal_int_is_prime :: proc(a: ^Int, miller_rabin_trials := int(-1), miller_ra
 
 	// Run the Miller-Rabin test with base 2 for the BPSW test.
 	internal_set(b, 2) or_return
-	if !internal_int_prime_miller_rabin(a, b) or_return { return }
+	if !(internal_int_prime_miller_rabin(a, b) or_return) { return }
 
 	// Rumours have it that Mathematica does a second M-R test with base 3.
 	// Other rumours have it that their strong L-S test is slightly different.
 	// It does not hurt, though, beside a bit of extra runtime.
 
 	b.digit[0] += 1
-	if !internal_int_prime_miller_rabin(a, b) or_return { return }
+	if !(internal_int_prime_miller_rabin(a, b) or_return) { return }
 
 	// Both, the Frobenius-Underwood test and the the Lucas-Selfridge test are quite
 	// slow so if speed is an issue, set `USE_MILLER_RABIN_ONLY` to use M-R tests with
@@ -369,9 +369,9 @@ internal_int_is_prime :: proc(a: ^Int, miller_rabin_trials := int(-1), miller_ra
 	if !miller_rabin_only {
 		if miller_rabin_trials >= 0 {
 			when MATH_BIG_USE_FROBENIUS_TEST {
-				if !internal_int_prime_frobenius_underwood(a) or_return { return }
+				if !(internal_int_prime_frobenius_underwood(a) or_return) { return }
 			} else {
-				if !internal_int_prime_strong_lucas_selfridge(a) or_return { return }
+				if !(internal_int_prime_strong_lucas_selfridge(a) or_return) { return }
 			}
 		}
 	}
@@ -410,7 +410,7 @@ internal_int_is_prime :: proc(a: ^Int, miller_rabin_trials := int(-1), miller_ra
 		// We did bases 2 and 3  already, skip them
 		for ix := 2; ix < p_max; ix += 1 {
 			internal_set(b, _private_prime_table[ix])
-			if !internal_int_prime_miller_rabin(a, b) or_return { return }
+			if !(internal_int_prime_miller_rabin(a, b) or_return) { return }
 		}
 	} else if miller_rabin_trials > 0 {
 		// Perform `miller_rabin_trials` M-R tests with random bases between 3 and "a".
@@ -490,7 +490,7 @@ internal_int_is_prime :: proc(a: ^Int, miller_rabin_trials := int(-1), miller_ra
 				ix -= 1
 				continue
 			}
-			if !internal_int_prime_miller_rabin(a, b) or_return { return }
+			if !(internal_int_prime_miller_rabin(a, b) or_return) { return }
 		}
 	}
 

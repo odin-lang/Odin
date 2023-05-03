@@ -56,9 +56,9 @@ jobs:
     runs-on: macos-latest
     steps:
       - uses: actions/checkout@v1
-      - name: Download LLVM, botan and setup PATH
+      - name: Download LLVM and setup PATH
         run: |
-          brew install llvm@11 botan
+          brew install llvm@11
           echo "/usr/local/opt/llvm@11/bin" >> $GITHUB_PATH
           TMP_PATH=$(xcrun --show-sdk-path)/user/include
           echo "CPATH=$TMP_PATH" >> $GITHUB_ENV
@@ -85,11 +85,6 @@ jobs:
       - name: Core library tests
         run: |
           cd tests/core
-          make
-        timeout-minutes: 10
-      - name: Vendor library tests
-        run: |
-          cd tests/vendor
           make
         timeout-minutes: 10
       - name: Odin internals tests

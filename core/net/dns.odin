@@ -373,18 +373,20 @@ load_resolv_conf :: proc(resolv_conf_path: string, allocator := context.allocato
 	defer delete(res)
 	resolv_str := string(res)
 
+	id_str := "nameserver"
+	id_len := len(id_str)
+
 	_name_servers := make([dynamic]Endpoint, 0, allocator)
 	for line in strings.split_lines_iterator(&resolv_str) {
 		if len(line) == 0 || line[0] == '#' {
 			continue
 		}
 
-		id_str := "nameserver"
-		if strings.compare(line[:len(id_str)], id_str) != 0 {
+		if len(line) < id_len || strings.compare(line[:id_len], id_str) != 0 {
 			continue
 		}
 
-		server_ip_str := strings.trim_left_space(line[len(id_str):])
+		server_ip_str := strings.trim_left_space(line[id_len:])
 		if len(server_ip_str) == 0 {
 			continue
 		}

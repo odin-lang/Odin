@@ -157,7 +157,7 @@ run_demo() {
 }
 
 have_which() {
-	if ! [ -x "$(command -v which)" ]; then
+	if ! command -v which > /dev/null 2>&1 ; then
 		panic "Could not find \`which\`"
 	fi
 }
