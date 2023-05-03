@@ -62,7 +62,7 @@ CRL_SIGN                  :: x509_cert_key_constraints(512)
 ENCIPHER_ONLY             :: x509_cert_key_constraints(256)
 DECIPHER_ONLY             :: x509_cert_key_constraints(128)
 
-HASH_SHA1           :: "SHA1"
+HASH_SHA1           :: "SHA-1"
 HASH_SHA_224        :: "SHA-224"
 HASH_SHA_256        :: "SHA-256"
 HASH_SHA_384        :: "SHA-384"
@@ -143,7 +143,7 @@ fpe_t                :: ^fpe_struct
 when ODIN_OS == .Windows {
     foreign import botan_lib "botan.lib"
 } else {
-    foreign import botan_lib "system:botan-2"
+    foreign import botan_lib "system:botan-3"
 }
 
 @(default_calling_convention="c")
