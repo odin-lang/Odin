@@ -9,19 +9,20 @@ import "core:sys/unix"
 
 INVALID_HANDLE :: -1
 
-_O_RDONLY    :: 0o0
-_O_WRONLY    :: 0o1
-_O_RDWR      :: 0o2
-_O_CREAT     :: 0o100
-_O_EXCL      :: 0o200
-_O_TRUNC     :: 0o1000
-_O_APPEND    :: 0o2000
-_O_NONBLOCK  :: 0o4000
-_O_LARGEFILE :: 0o100000
-_O_DIRECTORY :: 0o200000
-_O_NOFOLLOW  :: 0o400000
-_O_SYNC      :: 0o4010000
-_O_CLOEXEC   :: 0o2000000
+_O_RDONLY    :: 0o00000000
+_O_WRONLY    :: 0o00000001
+_O_RDWR      :: 0o00000002
+_O_CREAT     :: 0o00000100
+_O_EXCL      :: 0o00000200
+_O_NOCTTY    :: 0o00000400
+_O_TRUNC     :: 0o00001000
+_O_APPEND    :: 0o00002000
+_O_NONBLOCK  :: 0o00004000
+_O_LARGEFILE :: 0o00100000
+_O_DIRECTORY :: 0o00200000
+_O_NOFOLLOW  :: 0o00400000
+_O_SYNC      :: 0o04010000
+_O_CLOEXEC   :: 0o02000000
 _O_PATH      :: 0o10000000
 
 _AT_FDCWD :: -100
@@ -42,7 +43,10 @@ _open :: proc(name: string, flags: File_Flags, perm: File_Mode) -> (^File, Error
 	runtime.DEFAULT_TEMP_ALLOCATOR_TEMP_GUARD()
 	name_cstr := strings.clone_to_cstring(name, context.temp_allocator)
 
-	flags_i: int
+	// Just default to using O_NOCTTY because needing to open a controlling
+	// terminal would be incredibly rare. This has no effect on files while
+	// allowing us to open serial devices.
+	flags_i: int = _O_NOCTTY
 	switch flags & O_RDONLY|O_WRONLY|O_RDWR {
 	case O_RDONLY: flags_i = _O_RDONLY
 	case O_WRONLY: flags_i = _O_WRONLY
