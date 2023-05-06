@@ -170,6 +170,12 @@ day :: proc "contextless" (t: Time) -> (day: int) {
 	return
 }
 
+weekday :: proc "contextless" (t: Time) -> (weekday: Weekday) {
+    abs := _time_abs(t)
+    sec := (abs + u64(Weekday.Monday) * SECONDS_PER_DAY) % SECONDS_PER_WEEK
+    return Weekday(int(sec) / SECONDS_PER_DAY)
+}
+
 clock :: proc { clock_from_time, clock_from_duration, clock_from_stopwatch }
 
 clock_from_time :: proc "contextless" (t: Time) -> (hour, min, sec: int) {
