@@ -239,6 +239,7 @@ pread :: proc(fd: Handle, data: []byte, offset: i64) -> (int, Errno) {
 
 	h := win32.HANDLE(fd)
 	done: win32.DWORD
+	e: Errno
 	if !win32.ReadFile(h, raw_data(buf), u32(len(buf)), &done, &o) {
 		e = Errno(win32.GetLastError())
 		done = 0
@@ -265,6 +266,7 @@ pwrite :: proc(fd: Handle, data: []byte, offset: i64) -> (int, Errno) {
 
 	h := win32.HANDLE(fd)
 	done: win32.DWORD
+	e: Errno
 	if !win32.WriteFile(h, raw_data(buf), u32(len(buf)), &done, &o) {
 		e = Errno(win32.GetLastError())
 		done = 0
