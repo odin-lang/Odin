@@ -243,11 +243,6 @@ pread :: proc(fd: Handle, data: []byte, offset: i64) -> (int, Errno) {
 	if !win32.ReadFile(h, raw_data(buf), u32(len(buf)), &done, &o) {
 		e = Errno(win32.GetLastError())
 		done = 0
-
-		// this makes behavior between *nix and windows consistent when EOF is hit
-		if e == ERROR_EOF {
-			e = 0
-		}
 	}
 	return int(done), e
 }
@@ -292,6 +287,10 @@ read_at :: proc(fd: Handle, data: []byte, offset: i64) -> (n: int, err: Errno) {
 	b, offset := data, offset
 	for len(b) > 0 {
 		m, e := pread(fd, b, offset)
+		if e == ERROR_EOF {
+			err = 0
+			break
+		}
 		if e != 0 {
 			err = e
 			break
