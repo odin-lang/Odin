@@ -2,6 +2,12 @@ package sdl2
 
 import "core:c"
 
+when ODIN_OS == .Windows {
+	foreign import lib "SDL2.lib"
+} else {
+	foreign import lib "system:SDL2"
+}
+
 HINT_ACCELEROMETER_AS_JOYSTICK                :: "SDL_ACCELEROMETER_AS_JOYSTICK"
 HINT_ALLOW_ALT_TAB_WHILE_GRABBED              :: "SDL_ALLOW_ALT_TAB_WHILE_GRABBED"
 HINT_ALLOW_TOPMOST                            :: "SDL_ALLOW_TOPMOST"

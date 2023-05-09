@@ -219,7 +219,7 @@ selection_delete :: proc(s: ^State) {
 
 translate_position :: proc(s: ^State, pos: int, t: Translation) -> int {
 	is_continuation_byte :: proc(b: byte) -> bool {
-		return b <= 0x80 && b < 0xc0
+		return b >= 0x80 && b < 0xc0
 	}
 	is_space :: proc(b: byte) -> bool {
 		return b == ' ' || b == '\t' || b == '\n'

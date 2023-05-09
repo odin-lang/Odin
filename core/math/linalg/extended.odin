@@ -3,20 +3,21 @@ package linalg
 import "core:builtin"
 import "core:math"
 
-radians :: proc(degrees: $T) -> (out: T) where IS_NUMERIC(ELEM_TYPE(T)) {
+to_radians :: proc(degrees: $T) -> (out: T) where IS_NUMERIC(ELEM_TYPE(T)) {
 	when IS_ARRAY(T) {
 		for i in 0..<len(T) {
-			out[i] = degrees * RAD_PER_DEG
+			out[i] = degrees[i] * RAD_PER_DEG
 		}
 	} else {
 		out = degrees * RAD_PER_DEG
 	}
 	return
 }
-degrees :: proc(radians: $T) -> (out: T) where IS_NUMERIC(ELEM_TYPE(T)) {
+
+to_degrees :: proc(radians: $T) -> (out: T) where IS_NUMERIC(ELEM_TYPE(T)) {
 	when IS_ARRAY(T) {
 		for i in 0..<len(T) {
-			out[i] = radians * DEG_PER_RAD
+			out[i] = radians[i] * DEG_PER_RAD
 		}
 	} else {
 		out = radians * DEG_PER_RAD
