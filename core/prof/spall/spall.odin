@@ -67,16 +67,15 @@ Buffer :: struct {
 BUFFER_DEFAULT_SIZE :: 0x10_0000
 
 
-context_create :: proc(filename: string) -> (ctx: Context, ok: bool) #optional_ok {
+context_create_with_scale :: proc(filename: string, precise_time: bool, timestamp_scale: f64) -> (ctx: Context, ok: bool) #optional_ok {
 	fd, err := os.open(filename, os.O_WRONLY | os.O_APPEND | os.O_CREATE | os.O_TRUNC, 0o600)
 	if err != os.ERROR_NONE {
 		return
 	}
-	ctx.fd = fd
 
-	freq, freq_ok := time.tsc_frequency()
-	ctx.precise_time = freq_ok
-	ctx.timestamp_scale = ((1 / f64(freq)) * 1_000_000) if freq_ok else 1
+	ctx.fd = fd
+	ctx.precise_time = precise_time
+	ctx.timestamp_scale = timestamp_scale
 
 	temp := [size_of(Manual_Header)]u8{}
 	_build_header(temp[:], ctx.timestamp_scale)
@@ -84,6 +83,14 @@ context_create :: proc(filename: string) -> (ctx: Context, ok: bool) #optional_o
 	ok = true
 	return
 }
+
+context_create_with_sleep :: proc(filename: string, sleep := 2 * time.Second) -> (ctx: Context, ok: bool) #optional_ok {
+	freq, freq_ok := time.tsc_frequency(sleep)
+	timestamp_scale: f64 = ((1 / f64(freq)) * 1_000_000) if freq_ok else 1
+	return context_create_with_scale(filename, freq_ok, timestamp_scale)
+}
+
+context_create :: proc{context_create_with_scale, context_create_with_sleep}
 
 context_destroy :: proc(ctx: ^Context) {
 	if ctx == nil {
