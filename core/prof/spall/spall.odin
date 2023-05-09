@@ -67,14 +67,14 @@ Buffer :: struct {
 BUFFER_DEFAULT_SIZE :: 0x10_0000
 
 
-context_create :: proc(filename: string) -> (ctx: Context, ok: bool) #optional_ok {
+context_create :: proc(filename: string, freq_fallback_sleep := 2 * time.Second) -> (ctx: Context, ok: bool) #optional_ok {
 	fd, err := os.open(filename, os.O_WRONLY | os.O_APPEND | os.O_CREATE | os.O_TRUNC, 0o600)
 	if err != os.ERROR_NONE {
 		return
 	}
 	ctx.fd = fd
 
-	freq, freq_ok := time.tsc_frequency()
+	freq, freq_ok := time.tsc_frequency(freq_fallback_sleep)
 	ctx.precise_time = freq_ok
 	ctx.timestamp_scale = ((1 / f64(freq)) * 1_000_000) if freq_ok else 1
 
