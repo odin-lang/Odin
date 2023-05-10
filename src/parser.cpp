@@ -2462,7 +2462,7 @@ gb_internal Ast *parse_operand(AstFile *f, bool lhs) {
 				}
 				is_raw_union = true;
 			} else if (tag.string == "no_copy") {
-				if (is_packed) {
+				if (no_copy) {
 					syntax_error(tag, "Duplicate struct tag '#%.*s'", LIT(tag.string));
 				}
 				no_copy = true;
