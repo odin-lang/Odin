@@ -19,7 +19,7 @@ package net
 import "core:strings"
 import "core:strconv"
 import "core:unicode/utf8"
-import "core:mem"
+import "core:encoding/hex"
 
 split_url :: proc(url: string, allocator := context.allocator) -> (scheme, host, path: string, queries: map[string]string) {
 	s := url
@@ -121,12 +121,10 @@ percent_decode :: proc(encoded_string: string, allocator := context.allocator) -
 	builder_grow(&b, len(encoded_string))
 	defer if !ok do builder_destroy(&b)
 
-	stack_buf: [4]u8
-	pending := mem.buffer_from_slice(stack_buf[:])
 	s := encoded_string
 
 	for len(s) > 0 {
-		i := index_rune(s, '%')
+		i := index_byte(s, '%')
 		if i == -1 {
 			write_string(&b, s) // no '%'s; the string is already decoded
 			break
@@ -139,47 +137,15 @@ percent_decode :: proc(encoded_string: string, allocator := context.allocator) -
 		s = s[1:]
 
 		if s[0] == '%' {
-			write_rune(&b, '%')
+			write_byte(&b, '%')
 			s = s[1:]
 			continue
 		}
 
 		if len(s) < 2 do return // percent without encoded value
 
-		n: int
-		n, _ = strconv.parse_int(s[:2], 16)
-		switch n {
-		case 0x20:  write_rune(&b, ' ')
-		case 0x21:  write_rune(&b, '!')
-		case 0x23:  write_rune(&b, '#')
-		case 0x24:  write_rune(&b, '$')
-		case 0x25:  write_rune(&b, '%')
-		case 0x26:  write_rune(&b, '&')
-		case 0x27:  write_rune(&b, '\'')
-		case 0x28:  write_rune(&b, '(')
-		case 0x29:  write_rune(&b, ')')
-		case 0x2A:  write_rune(&b, '*')
-		case 0x2B:  write_rune(&b, '+')
-		case 0x2C:  write_rune(&b, ',')
-		case 0x2F:  write_rune(&b, '/')
-		case 0x3A:  write_rune(&b, ':')
-		case 0x3B:  write_rune(&b, ';')
-		case 0x3D:  write_rune(&b, '=')
-		case 0x3F:  write_rune(&b, '?')
-		case 0x40:  write_rune(&b, '@')
-		case 0x5B:  write_rune(&b, '[')
-		case 0x5D:  write_rune(&b, ']')
-		case:
-			// utf-8 bytes
-			// TODO(tetra): Audit this - 4 bytes???
-			append(&pending, s[0])
-			append(&pending, s[1])
-			if len(pending) == 4 {
-				r, _ := utf8.decode_rune(pending[:])
-				write_rune(&b, r)
-				clear(&pending)
-			}
-		}
+		val := hex.decode_sequence(s[:2]) or_return
+		write_byte(&b, val)
 		s = s[2:]
 	}
 
