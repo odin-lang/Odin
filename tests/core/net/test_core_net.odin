@@ -67,6 +67,8 @@ main :: proc() {
 		tcp_tests(t)
 	}
 
+	join_url_test(t)
+
 	fmt.printf("%v/%v tests successful.\n", TEST_count - TEST_fail, TEST_count)
 
 	print_tracking_allocator_report()
@@ -508,4 +510,36 @@ client_sends_server_data :: proc(t: ^testing.T) {
 	okay  = received == CONTENT
 	msg   = fmt.tprintf("Expected client to send \"{}\", got \"{}\"", CONTENT, received)
 	expect(t, okay, msg)
+}
+
+@test
+join_url_test :: proc(t: ^testing.T) {
+	URL_Join_Test :: struct {
+		scheme, host, path: string,
+		queries: map[string]string,
+		expected: string,
+	}
+	test_cases := []URL_Join_Test{
+		{ "http", "example.com", "", {}, "http://example.com" },
+		{ "https", "odin-lang.org", "", {}, "https://odin-lang.org" },
+		{ "https", "odin-lang.org", "docs/", {}, "https://odin-lang.org/docs/" },
+		{ "https", "odin-lang.org", "/docs/overview", {}, "https://odin-lang.org/docs/overview" },
+		{ "http", "example.com", "", {"a" = "b"}, "http://example.com?a=b" },
+		{ "http", "example.com", "", {"a" = ""}, "http://example.com?a" },
+		{ "http", "example.com", "", {"a" = "b", "c" = "d"}, "http://example.com?a=b&c=d" },
+		{ "http", "example.com", "", {"a" = "", "c" = "d"}, "http://example.com?a&c=d" },
+		{ "http", "example.com", "example", {"a" = "", "b" = ""}, "http://example.com/example?a&b" },
+	}
+
+	for test in test_cases {
+		url := net.join_url(test.scheme, test.host, test.path, test.queries)
+		defer {
+			delete(test.queries)
+			delete(url)
+		}
+
+		okay := url == test.expected
+		msg := fmt.tprintf("Expected `net.join_url` to return %s, got %s", test.expected, url)
+		expect(t, okay, msg)
+	}
 }

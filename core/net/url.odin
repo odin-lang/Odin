@@ -78,13 +78,19 @@ join_url :: proc(scheme, host, path: string, queries: map[string]string, allocat
 	}
 
 
-	if len(queries) > 0 do write_string(&b, "?")
+	query_length := len(queries)
+	if query_length > 0 do write_string(&b, "?")
+	i := 0
 	for query_name, query_value in queries {
 		write_string(&b, query_name)
 		if query_value != "" {
 			write_string(&b, "=")
 			write_string(&b, query_value)
 		}
+		if i < query_length - 1 {
+			write_string(&b, "&")
+		}
+		i += 1
 	}
 
 	return to_string(b)
