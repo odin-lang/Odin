@@ -4,11 +4,11 @@ import "core:strings"
 
 encode :: proc(src: []byte, allocator := context.allocator) -> []byte #no_bounds_check {
 	dst := make([]byte, len(src) * 2, allocator)
-	for i := 0; i < len(src); i += 1 {
+	for i, j := 0, 0; i < len(src); i += 1 {
 		v := src[i]
-		dst[i]   = HEXTABLE[v>>4]
-		dst[i+1] = HEXTABLE[v&0x0f]
-		i += 2
+		dst[j]   = HEXTABLE[v>>4]
+		dst[j+1] = HEXTABLE[v&0x0f]
+		j += 2
 	}
 
 	return dst
