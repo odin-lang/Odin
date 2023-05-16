@@ -74,8 +74,15 @@ init_cpu_features :: proc "c" () {
 		return
 	}
 
+	// In certain rare cases (reason unknown), XGETBV generates an
+	// illegal instruction, even if OSXSAVE is set per CPUID.
+	//
+	// When Chrome ran into this problem, the problem went away
+	// after they started checking both OSXSAVE and XSAVE.
+	//
+	// See: crbug.com/375968
 	os_supports_avx := false
-	if .os_xsave in set {
+	if .os_xsave in set && is_set(26, ecx1) {
 		eax, _ := xgetbv(0)
 		os_supports_avx = is_set(1, eax) && is_set(2, eax)
 	}
