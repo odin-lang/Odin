@@ -394,32 +394,71 @@ map_insert_hash_dynamic :: proc "odin" (#no_alias m: ^Raw_Map, #no_alias info: ^
 	tk := map_cell_index_dynamic(sk, info.ks, 1)
 	tv := map_cell_index_dynamic(sv, info.vs, 1)
 
-
 	for {
 		hp := &hs[pos]
 		element_hash := hp^
 
 		if map_hash_is_empty(element_hash) {
-			k_dst := map_cell_index_dynamic(ks, info.ks, pos)
-			v_dst := map_cell_index_dynamic(vs, info.vs, pos)
-			intrinsics.mem_copy_non_overlapping(rawptr(k_dst), rawptr(k), size_of_k)
-			intrinsics.mem_copy_non_overlapping(rawptr(v_dst), rawptr(v), size_of_v)
+			kp := map_cell_index_dynamic(ks, info.ks, pos)
+			vp := map_cell_index_dynamic(vs, info.vs, pos)
+			intrinsics.mem_copy_non_overlapping(rawptr(kp), rawptr(k), size_of_k)
+			intrinsics.mem_copy_non_overlapping(rawptr(vp), rawptr(v), size_of_v)
 			hp^ = h
 
-			return result if result != 0 else v_dst
+			return result if result != 0 else vp
+		}
+
+		if map_hash_is_deleted(element_hash) {
+			next_pos := (pos + 1) & mask
+
+			// backward shift
+			for !map_hash_is_empty(hs[next_pos]) {
+				probe_distance := map_probe_distance(m^, hs[next_pos], next_pos)
+				if probe_distance == 0 {
+					break
+				}
+				probe_distance -= 1
+
+				kp := map_cell_index_dynamic(ks, info.ks, pos)
+				vp := map_cell_index_dynamic(vs, info.vs, pos)
+				kn := map_cell_index_dynamic(ks, info.ks, next_pos)
+				vn := map_cell_index_dynamic(vs, info.vs, next_pos)
+
+				if distance > probe_distance {
+					if result == 0 {
+						result = vp
+					}
+					// move stored into pos; store next
+					intrinsics.mem_copy_non_overlapping(rawptr(kp), rawptr(k), size_of_k)
+					intrinsics.mem_copy_non_overlapping(rawptr(vp), rawptr(v), size_of_v)
+					hs[pos] = h
+
+					intrinsics.mem_copy_non_overlapping(rawptr(k), rawptr(kn), size_of_k)
+					intrinsics.mem_copy_non_overlapping(rawptr(v), rawptr(vn), size_of_v)
+					h = hs[next_pos]
+				} else {
+					// move next back 1
+					intrinsics.mem_copy_non_overlapping(rawptr(kp), rawptr(kn), size_of_k)
+					intrinsics.mem_copy_non_overlapping(rawptr(vp), rawptr(vn), size_of_v)
+					hs[pos] = hs[next_pos]
+					distance = probe_distance
+				}
+				hs[next_pos] = 0
+				pos = (pos + 1) & mask
+				next_pos = (next_pos + 1) & mask
+				distance += 1
+			}
+
+			kp := map_cell_index_dynamic(ks, info.ks, pos)
+			vp := map_cell_index_dynamic(vs, info.vs, pos)
+			intrinsics.mem_copy_non_overlapping(rawptr(kp), rawptr(k), size_of_k)
+			intrinsics.mem_copy_non_overlapping(rawptr(vp), rawptr(v), size_of_v)
+			hs[pos] = h
+
+			return result if result != 0 else vp
 		}
 
 		if probe_distance := map_probe_distance(m^, element_hash, pos); distance > probe_distance {
-			if map_hash_is_deleted(element_hash) {
-				k_dst := map_cell_index_dynamic(ks, info.ks, pos)
-				v_dst := map_cell_index_dynamic(vs, info.vs, pos)
-				intrinsics.mem_copy_non_overlapping(rawptr(k_dst), rawptr(k), size_of_k)
-				intrinsics.mem_copy_non_overlapping(rawptr(v_dst), rawptr(v), size_of_v)
-				hp^ = h
-
-				return result if result != 0 else v_dst
-			}
-
 			if result == 0 {
 				result = map_cell_index_dynamic(vs, info.vs, pos)
 			}
@@ -637,7 +676,6 @@ map_erase_dynamic :: #force_inline proc "contextless" (#no_alias m: ^Raw_Map, #n
 
 	{ // coalesce tombstones
 		// HACK NOTE(bill): This is an ugly bodge but it is coalescing the tombstone slots
-		// TODO(bill): we should do backward shift deletion and not rely on tombstone slots
 		mask := (uintptr(1)<<map_log2_cap(m^)) - 1
 		curr_index := uintptr(index)
 
