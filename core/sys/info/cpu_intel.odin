@@ -38,7 +38,7 @@ cpu_name:     Maybe(string)
 @(init, private)
 init_cpu_features :: proc "c" () {
 	is_set :: #force_inline proc "c" (hwc: u32, value: u32) -> bool {
-		return hwc&value != 0
+		return hwc&(1 << value) != 0
 	}
 	try_set :: #force_inline proc "c" (set: ^CPU_Features, feature: CPU_Feature, hwc: u32, value: u32) {
 		if is_set(hwc, value) {
