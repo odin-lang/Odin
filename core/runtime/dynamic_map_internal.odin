@@ -251,6 +251,26 @@ map_hash_is_valid :: #force_inline proc "contextless" (hash: Map_Hash) -> bool {
 	return (hash != 0) & (hash & TOMBSTONE_MASK == 0)
 }
 
+@(require_results)
+map_seed :: #force_inline proc "contextless" (m: Raw_Map) -> uintptr {
+	return map_seed_from_map_data(map_data(m))
+}
+
+// splitmix for uintptr
+@(require_results)
+map_seed_from_map_data :: #force_inline proc "contextless" (data: uintptr) -> uintptr {
+	when size_of(uintptr) == size_of(u64) {
+		mix := data + 0x9e3779b97f4a7c15
+		mix = (mix ~ (mix >> 30)) * 0xbf58476d1ce4e5b9
+		mix = (mix ~ (mix >> 27)) * 0x94d049bb133111eb
+		return mix ~ (mix >> 31)
+	} else {
+		mix := data + 0x9e3779b9
+		mix = (mix ~ (mix >> 16)) * 0x21f0aaad
+		mix = (mix ~ (mix >> 15)) * 0x735a2d97
+		return mix ~ (mix >> 15)
+	}
+}
 
 // Computes the desired position in the array. This is just index % capacity,
 // but a procedure as there's some math involved here to recover the capacity.
@@ -542,6 +562,7 @@ map_reserve_dynamic :: proc "odin" (#no_alias m: ^Raw_Map, #no_alias info: ^Map_
 		}
 		k := map_cell_index_dynamic(ks, info.ks, i)
 		v := map_cell_index_dynamic(vs, info.vs, i)
+		hash = info.key_hasher(rawptr(k), map_seed(resized))
 		_ = map_insert_hash_dynamic(&resized, info, hash, k, v)
 		// Only need to do this comparison on each actually added pair, so do not
 		// fold it into the for loop comparator as a micro-optimization.
@@ -620,7 +641,7 @@ map_lookup_dynamic :: proc "contextless" (m: Raw_Map, #no_alias info: ^Map_Info,
 	if map_len(m) == 0 {
 		return 0, false
 	}
-	h := info.key_hasher(rawptr(k), 0)
+	h := info.key_hasher(rawptr(k), map_seed(m))
 	p := map_desired_position(m, h)
 	d := uintptr(0)
 	c := (uintptr(1) << map_log2_cap(m)) - 1
@@ -643,7 +664,7 @@ map_exists_dynamic :: proc "contextless" (m: Raw_Map, #no_alias info: ^Map_Info,
 	if map_len(m) == 0 {
 		return false
 	}
-	h := info.key_hasher(rawptr(k), 0)
+	h := info.key_hasher(rawptr(k), map_seed(m))
 	p := map_desired_position(m, h)
 	d := uintptr(0)
 	c := (uintptr(1) << map_log2_cap(m)) - 1
@@ -749,7 +770,7 @@ map_get :: proc "contextless" (m: $T/map[$K]$V, key: K) -> (stored_key: K, store
 	info := intrinsics.type_map_info(T)
 	key := key
 
-	h := info.key_hasher(&key, 0)
+	h := info.key_hasher(&key, map_seed(m))
 	pos := map_desired_position(rm, h)
 	distance := uintptr(0)
 	mask := (uintptr(1) << map_log2_cap(rm)) - 1
@@ -800,15 +821,15 @@ __dynamic_map_get :: proc "contextless" (#no_alias m: ^Raw_Map, #no_alias info: 
 }
 
 // IMPORTANT: USED WITHIN THE COMPILER
-__dynamic_map_check_grow :: proc "odin" (#no_alias m: ^Raw_Map, #no_alias info: ^Map_Info, loc := #caller_location) -> Allocator_Error {
+__dynamic_map_check_grow :: proc "odin" (#no_alias m: ^Raw_Map, #no_alias info: ^Map_Info, loc := #caller_location) -> (err: Allocator_Error, has_grown: bool) {
 	if m.len >= map_resize_threshold(m^) {
-		return map_grow_dynamic(m, info, loc)
+		return map_grow_dynamic(m, info, loc), true
 	}
-	return nil
+	return nil, false
 }
 
 __dynamic_map_set_without_hash :: proc "odin" (#no_alias m: ^Raw_Map, #no_alias info: ^Map_Info, key, value: rawptr, loc := #caller_location) -> rawptr {
-	return __dynamic_map_set(m, info, info.key_hasher(key, 0), key, value, loc)
+	return __dynamic_map_set(m, info, info.key_hasher(key, map_seed(m^)), key, value, loc)
 }
 
 
@@ -819,8 +840,13 @@ __dynamic_map_set :: proc "odin" (#no_alias m: ^Raw_Map, #no_alias info: ^Map_In
 		return found
 	}
 
-	if __dynamic_map_check_grow(m, info, loc) != nil {
+	hash := hash
+	err, has_grown := __dynamic_map_check_grow(m, info, loc)
+	if err != nil {
 		return nil
+	}
+	if has_grown {
+		hash = info.key_hasher(key, map_seed(m^))
 	}
 
 	result := map_insert_hash_dynamic(m, info, hash, uintptr(key), uintptr(value))
