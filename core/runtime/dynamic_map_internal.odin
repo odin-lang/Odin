@@ -610,6 +610,7 @@ map_shrink_dynamic :: proc "odin" (#no_alias m: ^Raw_Map, #no_alias info: ^Map_I
 
 		k := map_cell_index_dynamic(ks, info.ks, i)
 		v := map_cell_index_dynamic(vs, info.vs, i)
+		hash = info.key_hasher(rawptr(k), map_seed(shrunk))
 		_ = map_insert_hash_dynamic(&shrunk, info, hash, k, v)
 		// Only need to do this comparison on each actually added pair, so do not
 		// fold it into the for loop comparator as a micro-optimization.
