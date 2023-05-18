@@ -618,8 +618,6 @@ gb_internal LLVMMetadataRef lb_debug_type(lbModule *m, Type *type) {
 }
 
 gb_internal void lb_debug_complete_types(lbModule *m) {
-	/* unsigned const ptr_size = cast(unsigned)build_context.ptr_size; */
-	unsigned const ptr_bits = cast(unsigned)(8*build_context.ptr_size);
 	unsigned const int_bits  = cast(unsigned)(8*build_context.int_size);
 
 	for_array(debug_incomplete_type_index, m->debug_incomplete_types) {
