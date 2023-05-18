@@ -43,14 +43,20 @@ gb_internal Type *check_init_variable(CheckerContext *ctx, Entity *e, Operand *o
 	}
 
 	if (operand->mode == Addressing_Type) {
-		if (e->type != nullptr && is_type_typeid(e->type)) {
+		if (e->type != nullptr && is_type_typeid(e->type) && !is_type_polymorphic(operand->type)) {
 			add_type_info_type(ctx, operand->type);
 			add_type_and_value(ctx, operand->expr, Addressing_Value, e->type, exact_value_typeid(operand->type));
 			return e->type;
 		} else {
+			ERROR_BLOCK();
+
 			gbString t = type_to_string(operand->type);
 			defer (gb_string_free(t));
-			error(operand->expr, "Cannot assign a type '%s' to variable '%.*s'", t, LIT(e->token.string));
+			if (is_type_polymorphic(operand->type)) {
+				error(operand->expr, "Cannot assign a non-specialized polymorphic type '%s' to variable '%.*s'", t, LIT(e->token.string));
+			} else {
+				error(operand->expr, "Cannot assign a type '%s' to variable '%.*s'", t, LIT(e->token.string));
+			}
 			if (e->type == nullptr) {
 				error_line("\tThe type of the variable '%.*s' cannot be inferred as a type does not have a default type\n", LIT(e->token.string));
 			}
@@ -58,8 +64,6 @@ gb_internal Type *check_init_variable(CheckerContext *ctx, Entity *e, Operand *o
 			return nullptr;
 		}
 	}
-
-
 
 	if (e->type == nullptr) {
 

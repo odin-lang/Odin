@@ -402,6 +402,12 @@ gb_internal Type *check_assignment_variable(CheckerContext *ctx, Operand *lhs, O
 
 	Type *assignment_type = lhs->type;
 
+	if (rhs->mode == Addressing_Type && is_type_polymorphic(rhs->type)) {
+		gbString t = type_to_string(rhs->type);
+		error(rhs->expr, "Invalid use of a non-specialized polymorphic type '%s'", t);
+		gb_string_free(t);
+	}
+
 	switch (lhs->mode) {
 	case Addressing_Invalid:
 		return nullptr;
