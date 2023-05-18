@@ -7887,8 +7887,11 @@ gb_internal ExprKind check_or_return_expr(CheckerContext *c, Operand *o, Ast *no
 			rhs.type = right_type;
 			rhs.mode = Addressing_Value;
 
-			// TODO(bill): better error message
-			if (!check_is_assignable_to(c, &rhs, end_type)) {
+			if (is_type_boolean(right_type) && is_type_boolean(end_type)) {
+				// NOTE(bill): allow implicit conversion between boolean types
+				// within 'or_return' to improve the experience using third-party code
+			} else if (!check_is_assignable_to(c, &rhs, end_type)) {
+				// TODO(bill): better error message
 				gbString a = type_to_string(right_type);
 				gbString b = type_to_string(end_type);
 				gbString ret_type = type_to_string(result_type);
