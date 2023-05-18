@@ -47,7 +47,7 @@ gb_internal gb_inline u32 ptr_map_hash_key(uintptr key) {
 	key = key ^ (key << 28);
 	res = cast(u32)key;
 #elif defined(GB_ARCH_32_BIT)
-	u32 state = ((u32)key) * 747796405u + 2891336453u;
+	u32 state = (cast(u32)key) * 747796405u + 2891336453u;
 	u32 word = ((state >> ((state >> 28u) + 4u)) ^ state) * 277803737u;
 	res = (word >> 22u) ^ word;
 #endif
