@@ -2769,13 +2769,23 @@ gb_internal Type *default_type(Type *type) {
 	return type;
 }
 
+gb_internal bool union_variant_index_types_equal(Type *v, Type *vt) {
+	if (are_types_identical(v, vt)) {
+		return true;
+	}
+	if (is_type_proc(v) && is_type_proc(vt)) {
+		return are_types_identical(base_type(v), base_type(vt));
+	}
+	return false;
+}
+
 gb_internal i64 union_variant_index(Type *u, Type *v) {
 	u = base_type(u);
 	GB_ASSERT(u->kind == Type_Union);
 
 	for_array(i, u->Union.variants) {
 		Type *vt = u->Union.variants[i];
-		if (are_types_identical(v, vt)) {
+		if (union_variant_index_types_equal(v, vt)) {
 			if (u->Union.kind == UnionType_no_nil) {
 				return cast(i64)(i+0);
 			} else {
