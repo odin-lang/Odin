@@ -220,6 +220,7 @@ file_size :: proc(fd: Handle) -> (i64, Errno) {
 
 @(private)
 MAX_RW :: 1<<30
+ERROR_EOF :: 38
 
 @(private)
 pread :: proc(fd: Handle, data: []byte, offset: i64) -> (int, Errno) {
@@ -228,11 +229,6 @@ pread :: proc(fd: Handle, data: []byte, offset: i64) -> (int, Errno) {
 		buf = buf[:MAX_RW]
 
 	}
-	curr_offset, e := seek(fd, offset, 1)
-	if e != 0 {
-		return 0, e
-	}
-	defer seek(fd, curr_offset, 0)
 
 	o := win32.OVERLAPPED{
 		OffsetHigh = u32(offset>>32),
@@ -243,6 +239,7 @@ pread :: proc(fd: Handle, data: []byte, offset: i64) -> (int, Errno) {
 
 	h := win32.HANDLE(fd)
 	done: win32.DWORD
+	e: Errno
 	if !win32.ReadFile(h, raw_data(buf), u32(len(buf)), &done, &o) {
 		e = Errno(win32.GetLastError())
 		done = 0
@@ -256,11 +253,6 @@ pwrite :: proc(fd: Handle, data: []byte, offset: i64) -> (int, Errno) {
 		buf = buf[:MAX_RW]
 
 	}
-	curr_offset, e := seek(fd, offset, 1)
-	if e != 0 {
-		return 0, e
-	}
-	defer seek(fd, curr_offset, 0)
 
 	o := win32.OVERLAPPED{
 		OffsetHigh = u32(offset>>32),
@@ -269,6 +261,7 @@ pwrite :: proc(fd: Handle, data: []byte, offset: i64) -> (int, Errno) {
 
 	h := win32.HANDLE(fd)
 	done: win32.DWORD
+	e: Errno
 	if !win32.WriteFile(h, raw_data(buf), u32(len(buf)), &done, &o) {
 		e = Errno(win32.GetLastError())
 		done = 0
@@ -276,6 +269,16 @@ pwrite :: proc(fd: Handle, data: []byte, offset: i64) -> (int, Errno) {
 	return int(done), e
 }
 
+/*
+read_at returns n: 0, err: 0 on EOF
+on Windows, read_at changes the position of the file cursor, on *nix, it does not.
+
+	bytes: [8]u8{}
+	read_at(fd, bytes, 0)
+	read(fd, bytes)
+
+will read from the location twice on *nix, and from two different locations on Windows
+*/
 read_at :: proc(fd: Handle, data: []byte, offset: i64) -> (n: int, err: Errno) {
 	if offset < 0 {
 		return 0, ERROR_NEGATIVE_OFFSET
@@ -284,6 +287,10 @@ read_at :: proc(fd: Handle, data: []byte, offset: i64) -> (n: int, err: Errno) {
 	b, offset := data, offset
 	for len(b) > 0 {
 		m, e := pread(fd, b, offset)
+		if e == ERROR_EOF {
+			err = 0
+			break
+		}
 		if e != 0 {
 			err = e
 			break
@@ -294,6 +301,16 @@ read_at :: proc(fd: Handle, data: []byte, offset: i64) -> (n: int, err: Errno) {
 	}
 	return
 }
+
+/*
+on Windows, write_at changes the position of the file cursor, on *nix, it does not.
+
+	bytes: [8]u8{}
+	write_at(fd, bytes, 0)
+	write(fd, bytes)
+
+will write to the location twice on *nix, and to two different locations on Windows
+*/
 write_at :: proc(fd: Handle, data: []byte, offset: i64) -> (n: int, err: Errno) {
 	if offset < 0 {
 		return 0, ERROR_NEGATIVE_OFFSET

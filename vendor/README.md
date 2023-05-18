@@ -143,7 +143,7 @@ Includes full bindings as well as wrappers to match the `core:crypto` API.
 See also LICENSE in the `commonmark` directory itself.
 Includes full bindings and Windows `.lib` and `.dll`.
 
-## CommonMark
+## zlib
 
 [zlib](https://github.com/madler/zlib) data compression library
 
@@ -158,4 +158,4 @@ Includes full bindings.
 
 Used in: [bgfx](https://github.com/bkaradzic/bgfx), [Filament](https://github.com/google/filament), [gltfpack](https://github.com/zeux/meshoptimizer/tree/master/gltf), [raylib](https://github.com/raysan5/raylib), [Unigine](https://developer.unigine.com/en/docs/2.14.1/third_party?rlang=cpp#cgltf), and more!
 
-Se also LICENCE in `cgltf` directory itself.
+See also LICENCE in `cgltf` directory itself.

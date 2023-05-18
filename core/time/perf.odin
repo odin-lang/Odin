@@ -70,7 +70,7 @@ has_invariant_tsc :: proc "contextless" () -> bool {
 	return false
 }
 
-tsc_frequency :: proc "contextless" () -> (u64, bool) {
+tsc_frequency :: proc "contextless" (fallback_sleep := 2 * Second) -> (u64, bool) {
 	if !has_invariant_tsc() {
 		return 0, false
 	}
@@ -81,7 +81,7 @@ tsc_frequency :: proc "contextless" () -> (u64, bool) {
 		tsc_begin := intrinsics.read_cycle_counter()
 		tick_begin := tick_now()
 
-		sleep(2 * Second)
+		sleep(fallback_sleep)
 
 		tsc_end := intrinsics.read_cycle_counter()
 		tick_end := tick_now()

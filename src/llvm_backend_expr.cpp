@@ -2083,10 +2083,12 @@ gb_internal lbValue lb_emit_conv(lbProcedure *p, lbValue value, Type *t) {
 		Type *elem = base_array_type(dst);
 		lbValue e = lb_emit_conv(p, value, elem);
 		lbAddr v = lb_add_local_generated(p, t, false);
-		for (i64 i = 0; i < dst->Matrix.row_count; i++) {
-			isize j = cast(isize)i;
-			lbValue ptr = lb_emit_matrix_epi(p, v.addr, j, j);
-			lb_emit_store(p, ptr, e);
+		lbValue zero = lb_const_value(p->module, elem, exact_value_i64(0), true);
+		for (i64 j = 0; j < dst->Matrix.column_count; j++) {
+			for (i64 i = 0; i < dst->Matrix.row_count; i++) {
+				lbValue ptr = lb_emit_matrix_epi(p, v.addr, i, j);
+				lb_emit_store(p, ptr, i == j ? e : zero);
+			}
 		}
 
 

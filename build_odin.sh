@@ -4,14 +4,12 @@ set -eu
 : ${CXX=clang++}
 : ${CPPFLAGS=}
 : ${CXXFLAGS=}
-: ${INCLUDE_DIRECTORIES=}
 : ${LDFLAGS=}
 : ${ODIN_VERSION=dev-$(date +"%Y-%m")}
 : ${GIT_SHA=}
 
 CPPFLAGS="$CPPFLAGS -DODIN_VERSION_RAW=\"$ODIN_VERSION\""
 CXXFLAGS="$CXXFLAGS -std=c++14"
-INCLUDE_DIRECTORIES="$INCLUDE_DIRECTORIES -Isrc/"
 LDFLAGS="$LDFLAGS -pthread -lm -lstdc++"
 
 if [ -d ".git" ]; then
@@ -148,7 +146,7 @@ build_odin() {
 	esac
 
 	set -x
-	$CXX src/main.cpp src/libtommath.cpp $DISABLED_WARNINGS $CPPFLAGS $CXXFLAGS $INCLUDE_DIRECTORIES $EXTRAFLAGS $LDFLAGS -o odin
+	$CXX src/main.cpp src/libtommath.cpp $DISABLED_WARNINGS $CPPFLAGS $CXXFLAGS $EXTRAFLAGS $LDFLAGS -o odin
 	set +x
 }
 
