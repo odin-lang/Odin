@@ -762,10 +762,10 @@ lerp_f32  :: proc "c" (x, y, t: f32) -> f32   { return x*(1-t) + y*t }
 lerp_f64  :: proc "c" (x, y, t: f64) -> f64   { return x*(1-t) + y*t }
 lerp_vec2 :: proc "c" (x, y, t: vec2) -> vec2 { return {lerp(x.x, y.x, t.x), lerp(x.y, y.y, t.y)} }
 lerp_vec3 :: proc "c" (x, y, t: vec3) -> vec3 { return {lerp(x.x, y.x, t.x), lerp(x.y, y.y, t.y), lerp(x.z, y.z, t.z)} }
-lerp_vec4 :: proc "c" (x, y, t: vec4) -> vec4 { return {lerp(x.x, y.x, t.x), lerp(x.y, y.y, y.y), lerp(x.z, y.z, t.z), lerp(x.w, y.w, t.w)} }
+lerp_vec4 :: proc "c" (x, y, t: vec4) -> vec4 { return {lerp(x.x, y.x, t.x), lerp(x.y, y.y, t.y), lerp(x.z, y.z, t.z), lerp(x.w, y.w, t.w)} }
 lerp_dvec2 :: proc "c" (x, y, t: dvec2) -> dvec2 { return {lerp(x.x, y.x, t.x), lerp(x.y, y.y, t.y)} }
 lerp_dvec3 :: proc "c" (x, y, t: dvec3) -> dvec3 { return {lerp(x.x, y.x, t.x), lerp(x.y, y.y, t.y), lerp(x.z, y.z, t.z)} }
-lerp_dvec4 :: proc "c" (x, y, t: dvec4) -> dvec4 { return {lerp(x.x, y.x, t.x), lerp(x.y, y.y, y.y), lerp(x.z, y.z, t.z), lerp(x.w, y.w, t.w)} }
+lerp_dvec4 :: proc "c" (x, y, t: dvec4) -> dvec4 { return {lerp(x.x, y.x, t.x), lerp(x.y, y.y, t.y), lerp(x.z, y.z, t.z), lerp(x.w, y.w, t.w)} }
 
 
 step :: proc{
