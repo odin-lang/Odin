@@ -401,7 +401,7 @@ append_nothing :: proc(array: ^$T/[dynamic]$E, loc := #caller_location) -> int {
 		return 0
 	}
 	prev_len := len(array)
-	resize(array, len(array)+1)
+	resize(array, len(array)+1, loc)
 	return len(array)-prev_len
 }
 
