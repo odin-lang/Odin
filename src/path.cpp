@@ -2,7 +2,7 @@
 	Path handling utilities.
 */
 #if !defined(GB_SYSTEM_WINDOWS)
-#include<unistd.h>
+#include <unistd.h>
 #endif
 
 gb_internal String remove_extension_from_path(String const &s) {

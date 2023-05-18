@@ -1499,12 +1499,19 @@ gb_internal bool init_build_paths(String init_filename) {
 	} else if (build_context.build_mode == BuildMode_Executable) {
 		// By default use no executable extension.
 		output_extension = make_string(nullptr, 0);
+		String const single_file_extension = str_lit(".odin");
 
 		if (build_context.metrics.os == TargetOs_windows) {
 			output_extension = STR_LIT("exe");
+		} else if (build_context.cross_compiling && selected_target_metrics->metrics == &target_essence_amd64) {
+			output_extension = make_string(nullptr, 0);
 		} else if (path_is_directory(last_path_element(bc->build_paths[BuildPath_Main_Package].basename))) {
 			// Add .bin extension to avoid collision
 			// with package directory name
+			output_extension = STR_LIT("bin");
+		} else if (string_ends_with(init_filename, single_file_extension) && path_is_directory(remove_extension_from_path(init_filename))) {
+			// Add bin extension if compiling single-file package
+			// with same output name as a directory
 			output_extension = STR_LIT("bin");
 		}
 	} else if (build_context.build_mode == BuildMode_DynamicLibrary) {
