@@ -3783,6 +3783,7 @@ gb_internal lbAddr lb_build_addr_index_expr(lbProcedure *p, Ast *expr) {
 			multi_ptr = lb_emit_load(p, multi_ptr);
 		}
 		lbValue index = lb_build_expr(p, ie->index);
+		index = lb_emit_conv(p, index, t_int);
 		lbValue v = {};
 
 		LLVMValueRef indices[1] = {index.value};
