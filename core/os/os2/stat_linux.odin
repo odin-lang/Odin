@@ -113,6 +113,7 @@ _fstat_internal :: proc(fd: int, allocator: runtime.Allocator) -> (File_Info, Er
 
 // NOTE: _stat and _lstat are using _fstat to avoid a race condition when populating fullpath
 _stat :: proc(name: string, allocator: runtime.Allocator) -> (File_Info, Error) {
+	runtime.DEFAULT_TEMP_ALLOCATOR_TEMP_GUARD()
 	name_cstr := strings.clone_to_cstring(name, context.temp_allocator)
 
 	fd := unix.sys_open(name_cstr, _O_RDONLY)
@@ -124,6 +125,7 @@ _stat :: proc(name: string, allocator: runtime.Allocator) -> (File_Info, Error) 
 }
 
 _lstat :: proc(name: string, allocator: runtime.Allocator) -> (File_Info, Error) {
+	runtime.DEFAULT_TEMP_ALLOCATOR_TEMP_GUARD()
 	name_cstr := strings.clone_to_cstring(name, context.temp_allocator)
 
 	fd := unix.sys_open(name_cstr, _O_RDONLY | _O_PATH | _O_NOFOLLOW)
@@ -136,10 +138,4 @@ _lstat :: proc(name: string, allocator: runtime.Allocator) -> (File_Info, Error)
 
 _same_file :: proc(fi1, fi2: File_Info) -> bool {
 	return fi1.fullpath == fi2.fullpath
-}
-
-_stat_internal :: proc(name: string) -> (s: _Stat, res: int) {
-	name_cstr := strings.clone_to_cstring(name, context.temp_allocator)
-	res = unix.sys_stat(name_cstr, &s)
-	return
 }

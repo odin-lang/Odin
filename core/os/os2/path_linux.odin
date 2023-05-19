@@ -25,7 +25,8 @@ _is_path_separator :: proc(c: byte) -> bool {
 }
 
 _mkdir :: proc(path: string, perm: File_Mode) -> Error {
-	// NOTE: These modes would require sys_mknod, however, that would require
+	runtime.DEFAULT_TEMP_ALLOCATOR_TEMP_GUARD()
+	// TODO: These modes would require sys_mknod, however, that would require
 	//       additional arguments to this function.
 	if perm & (File_Mode_Named_Pipe | File_Mode_Device | File_Mode_Char_Device | File_Mode_Sym_Link) != 0 {
 		return .Invalid_Argument
@@ -36,6 +37,7 @@ _mkdir :: proc(path: string, perm: File_Mode) -> Error {
 }
 
 _mkdir_all :: proc(path: string, perm: File_Mode) -> Error {
+	runtime.DEFAULT_TEMP_ALLOCATOR_TEMP_GUARD()
 	_mkdirat :: proc(dfd: int, path: []u8, perm: int, has_created: ^bool) -> Error {
 		if len(path) == 0 {
 			return _ok_or_error(unix.sys_close(dfd))
@@ -67,6 +69,7 @@ _mkdir_all :: proc(path: string, perm: File_Mode) -> Error {
 		unreachable()
 	}
 
+	// TODO
 	if perm & (File_Mode_Named_Pipe | File_Mode_Device | File_Mode_Char_Device | File_Mode_Sym_Link) != 0 {
 		return .Invalid_Argument
 	}
@@ -74,7 +77,7 @@ _mkdir_all :: proc(path: string, perm: File_Mode) -> Error {
 	// need something we can edit, and use to generate cstrings
 	path_bytes := make([]u8, len(path) + 1, context.temp_allocator)
 
-	// NULL terminate the byte slice to make it a valid cstring
+	// zero terminate the byte slice to make it a valid cstring
 	copy(path_bytes, path)
 	path_bytes[len(path)] = 0
 
