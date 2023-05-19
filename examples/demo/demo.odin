@@ -2145,10 +2145,8 @@ or_return_operator :: proc() {
 			return -345 * z, zerr
 		}
 
-		// If the other return values need to be set depending on what the end value is,
-		// the 'defer if' idiom is can be used
 		defer if err != nil {
-			n = -1
+			fmt.println("Error in", #procedure, ":" , err)
 		}
 
 		n = 123
