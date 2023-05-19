@@ -4902,10 +4902,24 @@ gb_internal bool check_builtin_procedure(CheckerContext *c, Operand *operand, As
 			merged_union->Union.kind = ux->Union.kind;
 			merged_union->Union.custom_align = custom_align;
 
-			auto variants = slice_make<Type *>(permanent_allocator(), ux->Union.variants.count+uy->Union.variants.count);
-			slice_copy(&variants, ux->Union.variants, 0);
-			slice_copy(&variants, uy->Union.variants, ux->Union.variants.count);
-			merged_union->Union.variants = variants;
+			auto variants = array_make<Type *>(permanent_allocator(), 0, ux->Union.variants.count+uy->Union.variants.count);
+			for (Type *t : ux->Union.variants) {
+				array_add(&variants, t);
+			}
+			for (Type *t : uy->Union.variants) {
+				bool ok = true;
+				for (Type *other_t : ux->Union.variants) {
+					if (are_types_identical(other_t, t)) {
+						ok = false;
+						break;
+					}
+				}
+				if (ok) {
+					array_add(&variants, t);
+				}
+
+			}
+			merged_union->Union.variants = slice_from_array(variants);
 
 			operand->mode = Addressing_Type;
 			operand->type = merged_union;
