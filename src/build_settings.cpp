@@ -1504,7 +1504,8 @@ gb_internal bool init_build_paths(String init_filename) {
 		if (build_context.metrics.os == TargetOs_windows) {
 			output_extension = STR_LIT("exe");
 		} else if (build_context.cross_compiling && selected_target_metrics->metrics == &target_essence_amd64) {
-			output_extension = make_string(nullptr, 0);
+			// Do nothing: we don't want the .bin extension
+			// when cross compiling
 		} else if (path_is_directory(last_path_element(bc->build_paths[BuildPath_Main_Package].basename))) {
 			// Add .bin extension to avoid collision
 			// with package directory name
@@ -1623,6 +1624,22 @@ gb_internal bool init_build_paths(String init_filename) {
 		gb_printf_err("Output path %.*s is a directory.\n", LIT(output_file));
 		return false;
 	}
+
+	if (path_is_directory(bc->build_paths[BuildPath_Output])) {
+		String output_file = path_to_string(ha, bc->build_paths[BuildPath_Output]);
+		defer (gb_free(ha, output_file.text));
+		gb_printf_err("Output path %.*s is a directory.\n", LIT(output_file));
+		return false;
+	}
+	//nocheckin char const *pathname = (char *)bc->build_paths[BuildPath_Output].basename.text;
+
+	if (!write_directory(bc->build_paths[BuildPath_Output].basename)) {
+		String output_file = path_to_string(ha, bc->build_paths[BuildPath_Output]);
+		defer (gb_free(ha, output_file.text));
+		gb_printf_err("No write permissions for output path: %.*s\n", LIT(output_file));
+		return false;
+	}
+
 
 	if (bc->target_features_string.len != 0) {
 		enable_target_feature({}, bc->target_features_string);

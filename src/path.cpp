@@ -419,7 +419,43 @@ gb_internal ReadDirectoryError read_directory(String path, Array<FileInfo> *fi) 
 
 	return ReadDirectory_None;
 }
+
+
 #else
 #error Implement read_directory
 #endif
 
+#if !defined(GB_SYSTEM_WINDOWS)
+gb_internal bool write_directory(String path) {
+	char const *pathname = (char *) path.text;
+
+	if (access(pathname, W_OK) < 0) {
+		return false;
+	}
+
+	return true;
+}
+#else
+gb_internal bool write_directory(String path) {
+	String16wstr = string_to_string16(heap_allocator(), path);
+	LPCWSTR wdirectory_name = wstr.text;
+
+	HANDLE directory = CreateFileW(wdirectory_name,
+			GENERIC_WRITE,
+			0,
+			NULL,
+			OPEN_EXISTING,
+			FILE_FLAG_BACKUP_SEMANTICS,
+			NULL);
+
+	if (directory == INVALID_HANDLE_VALUE) {
+		DWORD error_code = GetLastError();
+		if (error_code == ERROR_ACCESS_DENIED) {
+			return false;
+		}
+	}
+
+	CloseHandle(directory);
+	return true;
+}
+#endif
