@@ -1625,14 +1625,6 @@ gb_internal bool init_build_paths(String init_filename) {
 		return false;
 	}
 
-	if (path_is_directory(bc->build_paths[BuildPath_Output])) {
-		String output_file = path_to_string(ha, bc->build_paths[BuildPath_Output]);
-		defer (gb_free(ha, output_file.text));
-		gb_printf_err("Output path %.*s is a directory.\n", LIT(output_file));
-		return false;
-	}
-	//nocheckin char const *pathname = (char *)bc->build_paths[BuildPath_Output].basename.text;
-
 	if (!write_directory(bc->build_paths[BuildPath_Output].basename)) {
 		String output_file = path_to_string(ha, bc->build_paths[BuildPath_Output]);
 		defer (gb_free(ha, output_file.text));
