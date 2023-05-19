@@ -356,6 +356,15 @@ enum UnionTypeKind : u8 {
 	UnionType_Normal     = 0,
 	UnionType_no_nil     = 2,
 	UnionType_shared_nil = 3,
+
+	UnionType_COUNT
+};
+
+gb_global char const *union_type_kind_strings[UnionType_COUNT] = {
+	"(normal)",
+	"#maybe",
+	"#no_nil",
+	"#shared_nil",
 };
 
 #define AST_KINDS \

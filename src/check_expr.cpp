@@ -1067,7 +1067,7 @@ gb_internal void check_assignment(CheckerContext *c, Operand *operand, Type *typ
 
 	if (check_is_assignable_to(c, operand, type)) {
 		if (operand->mode == Addressing_Type && is_type_typeid(type)) {
-			add_type_info_type(c, operand->type);
+		 	add_type_info_type(c, operand->type);
 			add_type_and_value(c, operand->expr, Addressing_Value, type, exact_value_typeid(operand->type));
 		}
 	} else {
