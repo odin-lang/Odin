@@ -3,130 +3,143 @@ package os2
 
 import "core:sys/unix"
 
-EPERM          :: 1
-ENOENT         :: 2
-ESRCH          :: 3
-EINTR          :: 4
-EIO            :: 5
-ENXIO          :: 6
-EBADF          :: 9
-EAGAIN         :: 11
-ENOMEM         :: 12
-EACCES         :: 13
-EFAULT         :: 14
-EEXIST         :: 17
-ENODEV         :: 19
-ENOTDIR        :: 20
-EISDIR         :: 21
-EINVAL         :: 22
-ENFILE         :: 23
-EMFILE         :: 24
-ETXTBSY        :: 26
-EFBIG          :: 27
-ENOSPC         :: 28
-ESPIPE         :: 29
-EROFS          :: 30
-EPIPE          :: 32
-ERANGE         :: 34   /* Result too large */
-EDEADLK        :: 35   /* Resource deadlock would occur */
-ENAMETOOLONG   :: 36   /* File name too long */
-ENOLCK         :: 37   /* No record locks available */
-ENOSYS         :: 38   /* Invalid system call number */
-ENOTEMPTY      :: 39   /* Directory not empty */
-ELOOP          :: 40   /* Too many symbolic links encountered */
-EWOULDBLOCK    :: EAGAIN /* Operation would block */
-ENOMSG         :: 42   /* No message of desired type */
-EIDRM          :: 43   /* Identifier removed */
-ECHRNG         :: 44   /* Channel number out of range */
-EL2NSYNC       :: 45   /* Level 2 not synchronized */
-EL3HLT         :: 46   /* Level 3 halted */
-EL3RST         :: 47   /* Level 3 reset */
-ELNRNG         :: 48   /* Link number out of range */
-EUNATCH        :: 49   /* Protocol driver not attached */
-ENOCSI         :: 50   /* No CSI structure available */
-EL2HLT         :: 51   /* Level 2 halted */
-EBADE          :: 52   /* Invalid exchange */
-EBADR          :: 53   /* Invalid request descriptor */
-EXFULL         :: 54   /* Exchange full */
-ENOANO         :: 55   /* No anode */
-EBADRQC        :: 56   /* Invalid request code */
-EBADSLT        :: 57   /* Invalid slot */
-EDEADLOCK      :: EDEADLK
-EBFONT         :: 59   /* Bad font file format */
-ENOSTR         :: 60   /* Device not a stream */
-ENODATA        :: 61   /* No data available */
-ETIME          :: 62   /* Timer expired */
-ENOSR          :: 63   /* Out of streams resources */
-ENONET         :: 64   /* Machine is not on the network */
-ENOPKG         :: 65   /* Package not installed */
-EREMOTE        :: 66   /* Object is remote */
-ENOLINK        :: 67   /* Link has been severed */
-EADV           :: 68   /* Advertise error */
-ESRMNT         :: 69   /* Srmount error */
-ECOMM          :: 70   /* Communication error on send */
-EPROTO         :: 71   /* Protocol error */
-EMULTIHOP      :: 72   /* Multihop attempted */
-EDOTDOT        :: 73   /* RFS specific error */
-EBADMSG        :: 74   /* Not a data message */
-EOVERFLOW      :: 75   /* Value too large for defined data type */
-ENOTUNIQ       :: 76   /* Name not unique on network */
-EBADFD         :: 77   /* File descriptor in bad state */
-EREMCHG        :: 78   /* Remote address changed */
-ELIBACC        :: 79   /* Can not access a needed shared library */
-ELIBBAD        :: 80   /* Accessing a corrupted shared library */
-ELIBSCN        :: 81   /* .lib section in a.out corrupted */
-ELIBMAX        :: 82   /* Attempting to link in too many shared libraries */
-ELIBEXEC       :: 83   /* Cannot exec a shared library directly */
-EILSEQ         :: 84   /* Illegal byte sequence */
-ERESTART       :: 85   /* Interrupted system call should be restarted */
-ESTRPIPE       :: 86   /* Streams pipe error */
-EUSERS         :: 87   /* Too many users */
-ENOTSOCK       :: 88   /* Socket operation on non-socket */
-EDESTADDRREQ   :: 89   /* Destination address required */
-EMSGSIZE       :: 90   /* Message too long */
-EPROTOTYPE     :: 91   /* Protocol wrong type for socket */
-ENOPROTOOPT    :: 92   /* Protocol not available */
-EPROTONOSUPPORT:: 93   /* Protocol not supported */
-ESOCKTNOSUPPORT:: 94   /* Socket type not supported */
-EOPNOTSUPP     :: 95   /* Operation not supported on transport endpoint */
-EPFNOSUPPORT   :: 96   /* Protocol family not supported */
-EAFNOSUPPORT   :: 97   /* Address family not supported by protocol */
-EADDRINUSE     :: 98   /* Address already in use */
-EADDRNOTAVAIL  :: 99   /* Cannot assign requested address */
-ENETDOWN       :: 100  /* Network is down */
-ENETUNREACH    :: 101  /* Network is unreachable */
-ENETRESET      :: 102  /* Network dropped connection because of reset */
-ECONNABORTED   :: 103  /* Software caused connection abort */
-ECONNRESET     :: 104  /* Connection reset by peer */
-ENOBUFS        :: 105  /* No buffer space available */
-EISCONN        :: 106  /* Transport endpoint is already connected */
-ENOTCONN       :: 107  /* Transport endpoint is not connected */
-ESHUTDOWN      :: 108  /* Cannot send after transport endpoint shutdown */
-ETOOMANYREFS   :: 109  /* Too many references: cannot splice */
-ETIMEDOUT      :: 110  /* Connection timed out */
-ECONNREFUSED   :: 111  /* Connection refused */
-EHOSTDOWN      :: 112  /* Host is down */
-EHOSTUNREACH   :: 113  /* No route to host */
-EALREADY       :: 114  /* Operation already in progress */
-EINPROGRESS    :: 115  /* Operation now in progress */
-ESTALE         :: 116  /* Stale file handle */
-EUCLEAN        :: 117  /* Structure needs cleaning */
-ENOTNAM        :: 118  /* Not a XENIX named type file */
-ENAVAIL        :: 119  /* No XENIX semaphores available */
-EISNAM         :: 120  /* Is a named type file */
-EREMOTEIO      :: 121  /* Remote I/O error */
-EDQUOT         :: 122  /* Quota exceeded */
-ENOMEDIUM      :: 123  /* No medium found */
-EMEDIUMTYPE    :: 124  /* Wrong medium type */
-ECANCELED      :: 125  /* Operation Canceled */
-ENOKEY         :: 126  /* Required key not available */
-EKEYEXPIRED    :: 127  /* Key has expired */
-EKEYREVOKED    :: 128  /* Key has been revoked */
-EKEYREJECTED   :: 129  /* Key was rejected by service */
-EOWNERDEAD     :: 130  /* Owner died */
-ENOTRECOVERABLE:: 131  /* State not recoverable */
-ERFKILL        :: 132  /* Operation not possible due to RF-kill */
-EHWPOISON      :: 133  /* Memory page has hardware error */
+_errno_strings : [unix.ERRNO_COUNT]string = {
+	unix.SUCCESS         = "Success",
+	unix.EPERM           = "Operation not permitted",
+	unix.ENOENT          = "No such file or directory",
+	unix.ESRCH           = "No such process",
+	unix.EINTR           = "Interrupted system call",
+	unix.EIO             = "Input/output error",
+	unix.ENXIO           = "No such device or address",
+	unix.E2BIG           = "Argument list too long",
+	unix.ENOEXEC         = "Exec format error",
+	unix.EBADF           = "Bad file descriptor",
+	unix.ECHILD          = "No child processes",
+	unix.EAGAIN          = "Resource temporarily unavailable",
+	unix.ENOMEM          = "Cannot allocate memory",
+	unix.EACCES          = "Permission denied",
+	unix.EFAULT          = "Bad address",
+	unix.ENOTBLK         = "Block device required",
+	unix.EBUSY           = "Device or resource busy",
+	unix.EEXIST          = "File exists",
+	unix.EXDEV           = "Invalid cross-device link",
+	unix.ENODEV          = "No such device",
+	unix.ENOTDIR         = "Not a directory",
+	unix.EISDIR          = "Is a directory",
+	unix.EINVAL          = "Invalid argument",
+	unix.ENFILE          = "Too many open files in system",
+	unix.EMFILE          = "Too many open files",
+	unix.ENOTTY          = "Inappropriate ioctl for device",
+	unix.ETXTBSY         = "Text file busy",
+	unix.EFBIG           = "File too large",
+	unix.ENOSPC          = "No space left on device",
+	unix.ESPIPE          = "Illegal seek",
+	unix.EROFS           = "Read-only file system",
+	unix.EMLINK          = "Too many links",
+	unix.EPIPE           = "Broken pipe",
+	unix.EDOM            = "Numerical argument out of domain",
+	unix.ERANGE          = "Numerical result out of range",
+	unix.EDEADLK         = "Resource deadlock avoided",
+	unix.ENAMETOOLONG    = "File name too long",
+	unix.ENOLCK          = "No locks available",
+	unix.ENOSYS          = "Function not implemented",
+	unix.ENOTEMPTY       = "Directory not empty",
+	unix.ELOOP           = "Too many levels of symbolic links",
+	41                   = "Unknown Error",
+	unix.ENOMSG          = "No message of desired type",
+	unix.EIDRM           = "Identifier removed",
+	unix.ECHRNG          = "Channel number out of range",
+	unix.EL2NSYNC        = "Level 2 not synchronized",
+	unix.EL3HLT          = "Level 3 halted",
+	unix.EL3RST          = "Level 3 reset",
+	unix.ELNRNG          = "Link number out of range",
+	unix.EUNATCH         = "Protocol driver not attached",
+	unix.ENOCSI          = "No CSI structure available",
+	unix.EL2HLT          = "Level 2 halted",
+	unix.EBADE           = "Invalid exchange",
+	unix.EBADR           = "Invalid request descriptor",
+	unix.EXFULL          = "Exchange full",
+	unix.ENOANO          = "No anode",
+	unix.EBADRQC         = "Invalid request code",
+	unix.EBADSLT         = "Invalid slot",
+	58                   = "Unknown Error",
+	unix.EBFONT          = "Bad font file format",
+	unix.ENOSTR          = "Device not a stream",
+	unix.ENODATA         = "No data available",
+	unix.ETIME           = "Timer expired",
+	unix.ENOSR           = "Out of streams resources",
+	unix.ENONET          = "Machine is not on the network",
+	unix.ENOPKG          = "Package not installed",
+	unix.EREMOTE         = "Object is remote",
+	unix.ENOLINK         = "Link has been severed",
+	unix.EADV            = "Advertise error",
+	unix.ESRMNT          = "Srmount error",
+	unix.ECOMM           = "Communication error on send",
+	unix.EPROTO          = "Protocol error",
+	unix.EMULTIHOP       = "Multihop attempted",
+	unix.EDOTDOT         = "RFS specific error",
+	unix.EBADMSG         = "Bad message",
+	unix.EOVERFLOW       = "Value too large for defined data type",
+	unix.ENOTUNIQ        = "Name not unique on network",
+	unix.EBADFD          = "File descriptor in bad state",
+	unix.EREMCHG         = "Remote address changed",
+	unix.ELIBACC         = "Can not access a needed shared library",
+	unix.ELIBBAD         = "Accessing a corrupted shared library",
+	unix.ELIBSCN         = ".lib section in a.out corrupted",
+	unix.ELIBMAX         = "Attempting to link in too many shared libraries",
+	unix.ELIBEXEC        = "Cannot exec a shared library directly",
+	unix.EILSEQ          = "Invalid or incomplete multibyte or wide character",
+	unix.ERESTART        = "Interrupted system call should be restarted",
+	unix.ESTRPIPE        = "Streams pipe error",
+	unix.EUSERS          = "Too many users",
+	unix.ENOTSOCK        = "Socket operation on non-socket",
+	unix.EDESTADDRREQ    = "Destination address required",
+	unix.EMSGSIZE        = "Message too long",
+	unix.EPROTOTYPE      = "Protocol wrong type for socket",
+	unix.ENOPROTOOPT     = "Protocol not available",
+	unix.EPROTONOSUPPORT = "Protocol not supported",
+	unix.ESOCKTNOSUPPORT = "Socket type not supported",
+	unix.EOPNOTSUPP      = "Operation not supported",
+	unix.EPFNOSUPPORT    = "Protocol family not supported",
+	unix.EAFNOSUPPORT    = "Address family not supported by protocol",
+	unix.EADDRINUSE      = "Address already in use",
+	unix.EADDRNOTAVAIL   = "Cannot assign requested address",
+	unix.ENETDOWN        = "Network is down",
+	unix.ENETUNREACH     = "Network is unreachable",
+	unix.ENETRESET       = "Network dropped connection on reset",
+	unix.ECONNABORTED    = "Software caused connection abort",
+	unix.ECONNRESET      = "Connection reset by peer",
+	unix.ENOBUFS         = "No buffer space available",
+	unix.EISCONN         = "Transport endpoint is already connected",
+	unix.ENOTCONN        = "Transport endpoint is not connected",
+	unix.ESHUTDOWN       = "Cannot send after transport endpoint shutdown",
+	unix.ETOOMANYREFS    = "Too many references: cannot splice",
+	unix.ETIMEDOUT       = "Connection timed out",
+	unix.ECONNREFUSED    = "Connection refused",
+	unix.EHOSTDOWN       = "Host is down",
+	unix.EHOSTUNREACH    = "No route to host",
+	unix.EALREADY        = "Operation already in progress",
+	unix.EINPROGRESS     = "Operation now in progress",
+	unix.ESTALE          = "Stale file handle",
+	unix.EUCLEAN         = "Structure needs cleaning",
+	unix.ENOTNAM         = "Not a XENIX named type file",
+	unix.ENAVAIL         = "No XENIX semaphores available",
+	unix.EISNAM          = "Is a named type file",
+	unix.EREMOTEIO       = "Remote I/O error",
+	unix.EDQUOT          = "Disk quota exceeded",
+	unix.ENOMEDIUM       = "No medium found",
+	unix.EMEDIUMTYPE     = "Wrong medium type",
+	unix.ECANCELED       = "Operation canceled",
+	unix.ENOKEY          = "Required key not available",
+	unix.EKEYEXPIRED     = "Key has expired",
+	unix.EKEYREVOKED     = "Key has been revoked",
+	unix.EKEYREJECTED    = "Key was rejected by service",
+	unix.EOWNERDEAD      = "Owner died",
+	unix.ENOTRECOVERABLE = "State not recoverable",
+	unix.ERFKILL         = "Operation not possible due to RF-kill",
+	unix.EHWPOISON       = "Memory page has hardware error",
+}
+
 
 _get_platform_error :: proc(res: int) -> Error {
 	errno := unix.get_errno(res)
@@ -138,8 +151,8 @@ _ok_or_error :: proc(res: int) -> Error {
 }
 
 _error_string :: proc(errno: i32) -> string {
-	if errno == 0 {
-		return ""
+	if errno >= 0 && errno <= unix.ERRNO_COUNT {
+		return _errno_strings[errno]
 	}
-	return "Error"
+	return "Unknown Error"
 }

@@ -45,7 +45,7 @@ _mkdir_all :: proc(path: string, perm: File_Mode) -> Error {
 		path[i] = 0
 		new_dfd := unix.sys_openat(dfd, cstring(&path[0]), _OPENDIR_FLAGS)
 		switch new_dfd {
-		case -ENOENT:
+		case -unix.ENOENT:
 			if res := unix.sys_mkdirat(dfd, cstring(&path[0]), uint(perm)); res < 0 {
 				return _get_platform_error(res)
 			}
@@ -72,14 +72,7 @@ _mkdir_all :: proc(path: string, perm: File_Mode) -> Error {
 	}
 
 	// need something we can edit, and use to generate cstrings
-	allocated: bool
-	path_bytes: []u8
-	if len(path) > _CSTRING_NAME_HEAP_THRESHOLD {
-		allocated = true
-		path_bytes = make([]u8, len(path) + 1)
-	} else {
-		path_bytes = make([]u8, len(path) + 1, context.temp_allocator)
-	}
+	path_bytes := make([]u8, len(path) + 1, context.temp_allocator)
 
 	// NULL terminate the byte slice to make it a valid cstring
 	copy(path_bytes, path)
@@ -124,7 +117,7 @@ _remove_all :: proc(path: string) -> Error {
 		loop: for {
 			getdents_res := unix.sys_getdents64(dfd, &buf[0], n)
 			switch getdents_res {
-			case -EINVAL:
+			case -unix.EINVAL:
 				delete(buf)
 				n *= 2
 				buf = make([]u8, n)
@@ -180,7 +173,7 @@ _remove_all :: proc(path: string) -> Error {
 
 	fd := unix.sys_open(path_cstr, _OPENDIR_FLAGS)
 	switch fd {
-	case -ENOTDIR:
+	case -unix.ENOTDIR:
 		return _ok_or_error(unix.sys_unlink(path_cstr))
 	case -4096..<0:
 		return _get_platform_error(fd)
@@ -204,7 +197,7 @@ _getwd :: proc(allocator: runtime.Allocator) -> (string, Error) {
 		if res >= 0 {
 			return strings.string_from_null_terminated_ptr(&buf[0], len(buf)), nil
 		}
-		if res != -ERANGE {
+		if res != -unix.ERANGE {
 			return "", _get_platform_error(res)
 		}
 		resize(&buf, len(buf)+PATH_MAX)

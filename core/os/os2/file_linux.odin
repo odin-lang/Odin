@@ -27,8 +27,6 @@ _O_PATH      :: 0o10000000
 
 _AT_FDCWD :: -100
 
-_CSTRING_NAME_HEAP_THRESHOLD :: 512
-
 _File :: struct {
 	name: string,
 	fd: int,
