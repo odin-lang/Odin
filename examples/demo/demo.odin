@@ -2145,6 +2145,10 @@ or_return_operator :: proc() {
 			return -345 * z, zerr
 		}
 
+		defer if err != nil {
+			fmt.println("Error in", #procedure, ":" , err)
+		}
+
 		n = 123
 		return
 	}
