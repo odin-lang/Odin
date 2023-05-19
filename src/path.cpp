@@ -437,7 +437,7 @@ gb_internal bool write_directory(String path) {
 }
 #else
 gb_internal bool write_directory(String path) {
-	String16wstr = string_to_string16(heap_allocator(), path);
+	String16 wstr = string_to_string16(heap_allocator(), path);
 	LPCWSTR wdirectory_name = wstr.text;
 
 	HANDLE directory = CreateFileW(wdirectory_name,
