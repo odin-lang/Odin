@@ -397,7 +397,16 @@ def parse_enums(f):
                         used_flags.append('.'+flags[i])
                     else:
                         used_flags.append('{}({})'.format(enum_name, i))
-            s = "{enum_name}s_{n} :: {enum_name}s{{".format(enum_name=enum_name, n=n)
+            # Make sure the 's' is after Flags and not the extension name.
+            ext_suffix = ''
+            for suffix in ext_suffixes:
+                if not enum_name.endswith(suffix):
+                    continue
+
+                ext_suffix = suffix
+                enum_name = remove_suffix(enum_name, ext_suffix)
+                break
+            s = "{enum_name}s{ext_suffix}_{n} :: {enum_name}s{ext_suffix}{{".format(enum_name=enum_name, ext_suffix=ext_suffix, n=n)
             s += ', '.join(used_flags)
             s += "}\n"
             f.write(s)
