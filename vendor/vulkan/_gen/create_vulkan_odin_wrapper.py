@@ -271,13 +271,17 @@ def parse_constants(f):
     for name, value in allowed_data:
         f.write("{}{} :: {}\n".format(name, "".rjust(max_len-len(name)), value))
 
+    f.write("\n// Vulkan Video Constants\n")
+    vulkan_video_data = re.findall(r"#define STD_(\w+)\s*(.*?)U?\n", src, re.S)
+    max_len = max(len(name) for name, value in vulkan_video_data)
+    for name, value in vulkan_video_data:
+        f.write("{}{} :: {}\n".format(name, "".rjust(max_len-len(name)), value))
+
     f.write("\n// Vendor Constants\n")
     fixes = '|'.join(ext_suffixes)
     inner = r"((?:(?:" + fixes + r")\w+)|(?:\w+" + fixes + r"))"
     pattern = r"#define\s+VK_" + inner + r"\s*(.*?)\n"
     data = re.findall(pattern, src, re.S)
-    vulkan_video_find_pattern = r"#define\s+STD_" + inner + r"\s*(.*?)\n"
-    data += re.findall(vulkan_video_find_pattern, src, re.S)
 
     number_suffix_re = re.compile(r"(\d+)[UuLlFf]")
 
@@ -695,27 +699,28 @@ SetProcAddressType :: #type proc(p: rawptr, name: cstring)
 RemoteAddressNV :: distinct rawptr // Declared inline before MemoryGetRemoteAddressInfoNV
 
 // Base constants
-LOD_CLAMP_NONE                :: 1000.0
-REMAINING_MIP_LEVELS          :: ~u32(0)
-REMAINING_ARRAY_LAYERS        :: ~u32(0)
-WHOLE_SIZE                    :: ~u64(0)
-ATTACHMENT_UNUSED             :: ~u32(0)
-TRUE                          :: 1
-FALSE                         :: 0
-QUEUE_FAMILY_IGNORED          :: ~u32(0)
-SUBPASS_EXTERNAL              :: ~u32(0)
-MAX_PHYSICAL_DEVICE_NAME_SIZE :: 256
-UUID_SIZE                     :: 16
-MAX_MEMORY_TYPES              :: 32
-MAX_MEMORY_HEAPS              :: 16
-MAX_EXTENSION_NAME_SIZE       :: 256
-MAX_DESCRIPTION_SIZE          :: 256
-MAX_DEVICE_GROUP_SIZE         :: 32
-LUID_SIZE_KHX                 :: 8
-LUID_SIZE                     :: 8
-MAX_QUEUE_FAMILY_EXTERNAL     :: ~u32(1)
-MAX_GLOBAL_PRIORITY_SIZE_EXT  :: 16
-QUEUE_FAMILY_EXTERNAL         :: MAX_QUEUE_FAMILY_EXTERNAL
+LOD_CLAMP_NONE                        :: 1000.0
+REMAINING_MIP_LEVELS                  :: ~u32(0)
+REMAINING_ARRAY_LAYERS                :: ~u32(0)
+WHOLE_SIZE                            :: ~u64(0)
+ATTACHMENT_UNUSED                     :: ~u32(0)
+TRUE                                  :: 1
+FALSE                                 :: 0
+QUEUE_FAMILY_IGNORED                  :: ~u32(0)
+SUBPASS_EXTERNAL                      :: ~u32(0)
+MAX_PHYSICAL_DEVICE_NAME_SIZE         :: 256
+MAX_SHADER_MODULE_IDENTIFIER_SIZE_EXT :: 32
+UUID_SIZE                             :: 16
+MAX_MEMORY_TYPES                      :: 32
+MAX_MEMORY_HEAPS                      :: 16
+MAX_EXTENSION_NAME_SIZE               :: 256
+MAX_DESCRIPTION_SIZE                  :: 256
+MAX_DEVICE_GROUP_SIZE                 :: 32
+LUID_SIZE_KHX                         :: 8
+LUID_SIZE                             :: 8
+MAX_QUEUE_FAMILY_EXTERNAL             :: ~u32(1)
+MAX_GLOBAL_PRIORITY_SIZE_EXT          :: 16
+QUEUE_FAMILY_EXTERNAL                 :: MAX_QUEUE_FAMILY_EXTERNAL
 
 """[1::])
     parse_constants(f)
