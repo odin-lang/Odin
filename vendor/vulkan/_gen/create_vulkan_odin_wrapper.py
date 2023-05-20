@@ -16,6 +16,11 @@ file_and_urls = [
     ("vulkan_macos.h",   'https://raw.githubusercontent.com/KhronosGroup/Vulkan-Headers/main/include/vulkan/vulkan_macos.h',   False),
     ("vulkan_ios.h",     'https://raw.githubusercontent.com/KhronosGroup/Vulkan-Headers/main/include/vulkan/vulkan_ios.h',     False),
     ("vulkan_wayland.h", 'https://raw.githubusercontent.com/KhronosGroup/Vulkan-Headers/main/include/vulkan/vulkan_wayland.h', False),
+    # Vulkan Video
+    ("vulkan_video_codec_h264std.h", 'https://raw.githubusercontent.com/KhronosGroup/Vulkan-Headers/main/include/vk_video/vulkan_video_codec_h264std.h', False),
+    ("vulkan_video_codec_h265std.h", 'https://raw.githubusercontent.com/KhronosGroup/Vulkan-Headers/main/include/vk_video/vulkan_video_codec_h265std.h', False),
+    ("vulkan_video_codec_h264std_decode.h", 'https://raw.githubusercontent.com/KhronosGroup/Vulkan-Headers/main/include/vk_video/vulkan_video_codec_h264std_decode.h', False),
+    ("vulkan_video_codec_h265std_decode.h", 'https://raw.githubusercontent.com/KhronosGroup/Vulkan-Headers/main/include/vk_video/vulkan_video_codec_h265std_decode.h', False),
 ]
 
 for file, url, _ in file_and_urls:
@@ -37,6 +42,9 @@ def no_vk(t):
     t = t.replace('PFN_', 'Proc')
     t = t.replace('PFN_', 'Proc')
     t = t.replace('VK_', '')
+    # Vulkan Video
+    t = t.replace('STD_', '')
+    t = t.replace('Std', '')
     return t
 
 OPAQUE_STRUCTS = """
@@ -267,6 +275,8 @@ def parse_constants(f):
     inner = r"((?:(?:" + fixes + r")\w+)|(?:\w+" + fixes + r"))"
     pattern = r"#define\s+VK_" + inner + r"\s*(.*?)\n"
     data = re.findall(pattern, src, re.S)
+    vulkan_video_find_pattern = r"#define\s+STD_" + inner + r"\s*(.*?)\n"
+    data += re.findall(vulkan_video_find_pattern, src, re.S)
 
     number_suffix_re = re.compile(r"(\d+)[UuLlFf]")
 
@@ -285,6 +295,7 @@ def parse_enums(f):
     f.write("// Enums\n")
 
     data = re.findall(r"typedef enum Vk(\w+) {(.+?)} \w+;", src, re.S)
+    data += re.findall(r"typedef enum Std(\w+) {(.+?)} \w+;", src, re.S)
 
     data.sort(key=lambda x: x[0])
 
@@ -407,6 +418,7 @@ def parse_enums(f):
 
 def parse_structs(f):
     data = re.findall(r"typedef (struct|union) Vk(\w+?) {(.+?)} \w+?;", src, re.S)
+    data += re.findall(r"typedef (struct|union) Std(\w+?) {(.+?)} \w+?;", src, re.S)
 
     for _type, name, fields in data:
         fields = re.findall(r"\s+(.+?)\s+([_a-zA-Z0-9[\]]+);", fields)
