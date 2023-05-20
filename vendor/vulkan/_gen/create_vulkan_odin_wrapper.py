@@ -70,6 +70,7 @@ def convert_type(t, prev_name, curr_name):
         "const void* const *": "[^]rawptr",
         "const AccelerationStructureGeometryKHR* const*": "^[^]AccelerationStructureGeometryKHR",
         "const AccelerationStructureBuildRangeInfoKHR* const*": "^[^]AccelerationStructureBuildRangeInfoKHR",
+        "const MicromapUsageEXT* const*": "^[^]MicromapUsageEXT",
         "struct BaseOutStructure": "BaseOutStructure",
         "struct BaseInStructure":  "BaseInStructure",
         "struct wl_display": "wl_display",
