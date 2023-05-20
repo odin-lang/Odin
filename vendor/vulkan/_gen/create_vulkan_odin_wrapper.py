@@ -64,6 +64,7 @@ def convert_type(t, prev_name, curr_name):
         'int64_t':     'i64',
         'int':         'c.int',
         'uint8_t':     'u8',
+        'int8_t':     'i8',
         "uint16_t":    'u16',
         "char":        "byte",
         "void":        "void",
@@ -430,6 +431,18 @@ def parse_structs(f):
         prev_name = ""
         ffields = []
         for type_, fname in fields:
+
+            # If the typename has a colon in it, then it is a C bit field.
+            if ":" in type_:
+                bit_field = type_.split(' ')
+                # Get rid of empty spaces
+                bit_field = list(filter(bool, bit_field))
+                # [type, typename, :] 
+                assert len(bit_field) == 3, "Failed to parse the bit field!"
+                bit_field_type = do_type(bit_field[0], prev_name, fname)
+                f.write("\tbit_field: {},{}\n".format(bit_field_type, comment or ""))
+                break
+
             if '[' in fname:
                 fname, type_ = parse_array(fname, type_)
             comment = None
@@ -443,7 +456,7 @@ def parse_structs(f):
             ffields.append(tuple([n, t, comment]))
             prev_name = fname
 
-        max_len = max(len(n) for n, _, _ in ffields)
+        max_len = max([len(n) for n, _, _ in ffields], default=0)
 
         for n, t, comment in ffields:
             k = max_len-len(n)+len(t)
