@@ -48,8 +48,9 @@ def no_vk(t):
     return t
 
 OPAQUE_STRUCTS = """
-wl_surface :: struct {} // Opaque struct defined by Wayland
-wl_display :: struct {} // Opaque struct defined by Wayland
+wl_surface   :: struct {} // Opaque struct defined by Wayland
+wl_display   :: struct {} // Opaque struct defined by Wayland
+IOSurfaceRef :: struct {} // Opaque struct defined by Apple’s CoreGraphics framework
 """ 
 
 def convert_type(t, prev_name, curr_name):
@@ -765,6 +766,12 @@ when ODIN_OS == .Windows {
 }
 
 CAMetalLayer :: struct {}
+
+MTLBuffer_id       :: rawptr
+MTLTexture_id      :: rawptr
+MTLSharedEvent_id  :: rawptr
+MTLDevice_id       :: rawptr
+MTLCommandQueue_id :: rawptr
 
 /********************************/
 """)
