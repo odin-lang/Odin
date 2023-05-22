@@ -1486,11 +1486,11 @@ gb_internal lbValue lb_emit_conv(lbProcedure *p, lbValue value, Type *t) {
 	GB_ASSERT(src != nullptr);
 	GB_ASSERT(dst != nullptr);
 
+	if (is_type_untyped_uninit(src)) {
+		return lb_const_undef(m, t);
+	}
 	if (is_type_untyped_nil(src)) {
 		return lb_const_nil(m, t);
-	}
-	if (is_type_untyped_undef(src)) {
-		return lb_const_undef(m, t);
 	}
 
 	if (LLVMIsConstant(value.value)) {
@@ -2132,11 +2132,11 @@ gb_internal lbValue lb_emit_conv(lbProcedure *p, lbValue value, Type *t) {
 
 
 	if (is_type_any(dst)) {
+		if (is_type_untyped_uninit(src)) {
+			return lb_const_undef(p->module, t);
+		}
 		if (is_type_untyped_nil(src)) {
 			return lb_const_nil(p->module, t);
-		}
-		if (is_type_untyped_undef(src)) {
-			return lb_const_undef(p->module, t);
 		}
 
 		lbAddr result = lb_add_local_generated(p, t, true);
@@ -3136,11 +3136,11 @@ gb_internal lbValue lb_build_expr_internal(lbProcedure *p, Ast *expr) {
 		return lb_addr_load(p, lb_build_addr(p, expr));
 	case_end;
 
-	case_ast_node(u, Undef, expr)
+	case_ast_node(u, Uninit, expr)
 		lbValue res = {};
 		if (is_type_untyped(type)) {
 			res.value = nullptr;
-			res.type  = t_untyped_undef;
+			res.type  = t_untyped_uninit;
 		} else {
 			res.value = LLVMGetUndef(lb_type(m, type));
 			res.type  = type;

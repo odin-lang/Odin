@@ -373,7 +373,7 @@ gb_global char const *union_type_kind_strings[UnionType_COUNT] = {
 		Entity *entity; \
 	}) \
 	AST_KIND(Implicit,       "implicit",        Token) \
-	AST_KIND(Undef,          "undef",           Token) \
+	AST_KIND(Uninit,         "uninitialized value", Token) \
 	AST_KIND(BasicLit,       "basic literal",   struct { \
 		Token token; \
 	}) \

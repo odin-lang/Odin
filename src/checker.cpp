@@ -27,8 +27,8 @@ gb_internal bool is_operand_value(Operand o) {
 gb_internal bool is_operand_nil(Operand o) {
 	return o.mode == Addressing_Value && o.type == t_untyped_nil;
 }
-gb_internal bool is_operand_undef(Operand o) {
-	return o.mode == Addressing_Value && o.type == t_untyped_undef;
+gb_internal bool is_operand_uninit(Operand o) {
+	return o.mode == Addressing_Value && o.type == t_untyped_uninit;
 }
 
 gb_internal bool check_rtti_type_disallowed(Token const &token, Type *type, char const *format) {

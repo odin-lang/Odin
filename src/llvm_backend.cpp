@@ -1129,12 +1129,7 @@ gb_internal lbProcedure *lb_create_startup_runtime(lbModule *main_module, lbProc
 			lbValue init = lb_build_expr(p, init_expr);
 			if (init.value == nullptr) {
 				LLVMTypeRef global_type = llvm_addr_type(p->module, var.var);
-				if (is_type_untyped_undef(init.type)) {
-					// LLVMSetInitializer(var.var.value, LLVMGetUndef(global_type));
-					LLVMSetInitializer(var.var.value, LLVMConstNull(global_type));
-					var.is_initialized = true;
-					continue;
-				} else if (is_type_untyped_nil(init.type)) {
+				if (is_type_untyped_nil(init.type)) {
 					LLVMSetInitializer(var.var.value, LLVMConstNull(global_type));
 					var.is_initialized = true;
 					continue;
@@ -2363,8 +2358,7 @@ gb_internal bool lb_generate_code(lbGenerator *gen) {
 					}
 				}
 			}
-			if (!var.is_initialized &&
-			    (is_type_untyped_nil(tav.type) || is_type_untyped_undef(tav.type))) {
+			if (!var.is_initialized && is_type_untyped_nil(tav.type)) {
 				var.is_initialized = true;
 			}
 		}

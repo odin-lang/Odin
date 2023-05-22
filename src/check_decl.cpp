@@ -70,13 +70,12 @@ gb_internal Type *check_init_variable(CheckerContext *ctx, Entity *e, Operand *o
 		// NOTE(bill): Use the type of the operand
 		Type *t = operand->type;
 		if (is_type_untyped(t)) {
-			if (t == t_invalid || is_type_untyped_nil(t)) {
-				error(e->token, "Invalid use of untyped nil in %.*s", LIT(context_name));
+			if (is_type_untyped_uninit(t)) {
+				error(e->token, "Invalid use of --- in %.*s", LIT(context_name));
 				e->type = t_invalid;
 				return nullptr;
-			}
-			if (t == t_invalid || is_type_untyped_undef(t)) {
-				error(e->token, "Invalid use of --- in %.*s", LIT(context_name));
+			} else if (t == t_invalid || is_type_untyped_nil(t)) {
+				error(e->token, "Invalid use of untyped nil in %.*s", LIT(context_name));
 				e->type = t_invalid;
 				return nullptr;
 			}

@@ -646,11 +646,8 @@ gb_internal i64 check_distance_between_types(CheckerContext *c, Operand *operand
 	Type *src = base_type(s);
 	Type *dst = base_type(type);
 
-	if (is_type_untyped_undef(src)) {
-		if (type_has_undef(dst)) {
-			return 1;
-		}
-		return -1;
+	if (is_type_untyped_uninit(src)) {
+		return 1;
 	}
 
 	if (is_type_untyped_nil(src)) {
@@ -993,13 +990,13 @@ gb_internal void check_assignment(CheckerContext *c, Operand *operand, Type *typ
 	if (is_type_untyped(operand->type)) {
 		Type *target_type = type;
 		if (type == nullptr || is_type_any(type)) {
-			if (type == nullptr && is_type_untyped_nil(operand->type)) {
-				error(operand->expr, "Use of untyped nil in %.*s", LIT(context_name));
+			if (type == nullptr && is_type_untyped_uninit(operand->type)) {
+				error(operand->expr, "Use of --- in %.*s", LIT(context_name));
 				operand->mode = Addressing_Invalid;
 				return;
 			}
-			if (type == nullptr && is_type_untyped_undef(operand->type)) {
-				error(operand->expr, "Use of --- in %.*s", LIT(context_name));
+			if (type == nullptr && is_type_untyped_nil(operand->type)) {
+				error(operand->expr, "Use of untyped nil in %.*s", LIT(context_name));
 				operand->mode = Addressing_Invalid;
 				return;
 			}
@@ -3969,7 +3966,7 @@ gb_internal void convert_to_typed(CheckerContext *c, Operand *operand, Type *tar
 		
 
 	case Type_Union:
-		if (!is_operand_nil(*operand) && !is_operand_undef(*operand)) {
+		if (!is_operand_nil(*operand) && !is_operand_uninit(*operand)) {
 			TEMPORARY_ALLOCATOR_GUARD();
 
 			isize count = t->Union.variants.count;
@@ -4036,8 +4033,8 @@ gb_internal void convert_to_typed(CheckerContext *c, Operand *operand, Type *tar
 				error_line("\n\n");
 
 				return;
-			} else if (is_type_untyped_undef(operand->type) && type_has_undef(target_type)) {
-				target_type = t_untyped_undef;
+			} else if (is_type_untyped_uninit(operand->type)) {
+				target_type = t_untyped_uninit;
 			} else if (!is_type_untyped_nil(operand->type) || !type_has_nil(target_type)) {
 				begin_error_block();
 				defer (end_error_block());
@@ -4070,8 +4067,8 @@ gb_internal void convert_to_typed(CheckerContext *c, Operand *operand, Type *tar
 
 
 	default:
-		if (is_type_untyped_undef(operand->type) && type_has_undef(target_type)) {
-			target_type = t_untyped_undef;
+		if (is_type_untyped_uninit(operand->type)) {
+			target_type = t_untyped_uninit;
 		} else if (is_type_untyped_nil(operand->type) && type_has_nil(target_type)) {
 			target_type = t_untyped_nil;
 		} else {
@@ -4083,8 +4080,8 @@ gb_internal void convert_to_typed(CheckerContext *c, Operand *operand, Type *tar
 	}
 	
 	if (is_type_any(target_type) && is_type_untyped(operand->type)) {
-		if (is_type_untyped_nil(operand->type) && is_type_untyped_undef(operand->type)) {
-				
+		if (is_type_untyped_nil(operand->type) && is_type_untyped_uninit(operand->type)) {
+
 		} else {
 			target_type = default_type(operand->type);
 		}
@@ -5197,9 +5194,9 @@ gb_internal bool check_unpack_arguments(CheckerContext *ctx, Entity **lhs, isize
 		}
 
 		Ast *rhs_expr = unparen_expr(rhs[i]);
-		if (allow_undef && rhs_expr != nullptr && rhs_expr->kind == Ast_Undef) {
+		if (allow_undef && rhs_expr != nullptr && rhs_expr->kind == Ast_Uninit) {
 			// NOTE(bill): Just handle this very specific logic here
-			o.type = t_untyped_undef;
+			o.type = t_untyped_uninit;
 			o.mode = Addressing_Value;
 			o.expr = rhs[i];
 			add_type_and_value(c, rhs[i], o.mode, o.type, o.value);
@@ -7167,11 +7164,11 @@ gb_internal bool check_set_index_data(Operand *o, Type *t, bool indirection, i64
 }
 
 gb_internal bool ternary_compare_types(Type *x, Type *y) {
-	if (is_type_untyped_undef(x) && type_has_undef(y)) {
+	if (is_type_untyped_uninit(x)) {
 		return true;
 	} else if (is_type_untyped_nil(x) && type_has_nil(y)) {
 		return true;
-	} else if (is_type_untyped_undef(y) && type_has_undef(x)) {
+	} else if (is_type_untyped_uninit(y)) {
 		return true;
 	} else if (is_type_untyped_nil(y) && type_has_nil(x)) {
 		return true;
@@ -7708,7 +7705,7 @@ gb_internal ExprKind check_ternary_if_expr(CheckerContext *c, Operand *o, Ast *n
 	}
 
 	o->type = x.type;
-	if (is_type_untyped_nil(o->type) || is_type_untyped_undef(o->type)) {
+	if (is_type_untyped_nil(o->type) || is_type_untyped_uninit(o->type)) {
 		o->type = y.type;
 	}
 
@@ -9601,9 +9598,9 @@ gb_internal ExprKind check_expr_base_internal(CheckerContext *c, Operand *o, Ast
 		check_ident(c, o, node, nullptr, type_hint, false);
 	case_end;
 
-	case_ast_node(u, Undef, node);
+	case_ast_node(u, Uninit, node);
 		o->mode = Addressing_Value;
-		o->type = t_untyped_undef;
+		o->type = t_untyped_uninit;
 		error(node, "Use of --- outside of variable declaration");
 	case_end;
 
@@ -10167,7 +10164,7 @@ gb_internal gbString write_expr_to_string(gbString str, Ast *node, bool shorthan
 		str = string_append_string(str, bd->name.string);
 	case_end;
 
-	case_ast_node(ud, Undef, node);
+	case_ast_node(ud, Uninit, node);
 		str = gb_string_appendc(str, "---");
 	case_end;
 

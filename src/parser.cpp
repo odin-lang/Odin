@@ -115,7 +115,7 @@ gb_internal Ast *clone_ast(Ast *node, AstFile *f) {
 		n->Ident.entity = nullptr;
 		break;
 	case Ast_Implicit:       break;
-	case Ast_Undef:          break;
+	case Ast_Uninit:         break;
 	case Ast_BasicLit:       break;
 	case Ast_BasicDirective: break;
 
@@ -646,9 +646,9 @@ gb_internal Ast *ast_implicit(AstFile *f, Token token) {
 	result->Implicit = token;
 	return result;
 }
-gb_internal Ast *ast_undef(AstFile *f, Token token) {
-	Ast *result = alloc_ast_node(f, Ast_Undef);
-	result->Undef = token;
+gb_internal Ast *ast_uninit(AstFile *f, Token token) {
+	Ast *result = alloc_ast_node(f, Ast_Uninit);
+	result->Uninit = token;
 	return result;
 }
 
@@ -2092,8 +2092,8 @@ gb_internal Ast *parse_operand(AstFile *f, bool lhs) {
 	case Token_Ident:
 		return parse_ident(f);
 
-	case Token_Undef:
-		return ast_undef(f, expect_token(f, Token_Undef));
+	case Token_Uninit:
+		return ast_uninit(f, expect_token(f, Token_Uninit));
 
 	case Token_context:
 		return ast_implicit(f, expect_token(f, Token_context));
@@ -2292,7 +2292,7 @@ gb_internal Ast *parse_operand(AstFile *f, bool lhs) {
 
 		skip_possible_newline_for_literal(f);
 
-		if (allow_token(f, Token_Undef)) {
+		if (allow_token(f, Token_Uninit)) {
 			if (where_token.kind != Token_Invalid) {
 				syntax_error(where_token, "'where' clauses are not allowed on procedure literals without a defined body (replaced with ---)");
 			}
