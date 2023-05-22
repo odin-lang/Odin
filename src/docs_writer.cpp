@@ -471,6 +471,8 @@ gb_internal OdinDocArray<OdinDocEntityIndex> odin_doc_add_entity_as_slice(OdinDo
 	return odin_write_item_as_slice(w, index);
 }
 
+
+
 gb_internal OdinDocTypeIndex odin_doc_type(OdinDocWriter *w, Type *type) {
 	if (type == nullptr) {
 		return 0;
@@ -481,12 +483,41 @@ gb_internal OdinDocTypeIndex odin_doc_type(OdinDocWriter *w, Type *type) {
 	}
 	for (auto const &entry : w->type_cache) {
 		// NOTE(bill): THIS IS SLOW
-		Type *other = entry.key;
-		if (are_types_identical_unique_tuples(type, other)) {
-			OdinDocTypeIndex index = entry.value;
-			map_set(&w->type_cache, type, index);
-			return index;
+		Type *x = type;
+		Type *y = entry.key;
+
+		if (x == y) {
+			goto do_set;
 		}
+
+		if (!x | !y) {
+			continue;
+		}
+
+		if (x->kind == Type_Named) {
+			Entity *e = x->Named.type_name;
+			if (e->TypeName.is_type_alias) {
+				x = x->Named.base;
+			}
+		}
+		if (y->kind == Type_Named) {
+			Entity *e = y->Named.type_name;
+			if (e->TypeName.is_type_alias) {
+				y = y->Named.base;
+			}
+		}
+		if (x->kind != y->kind) {
+			continue;
+		}
+
+		if (!are_types_identical_internal(x, y, true)) {
+			continue;
+		}
+
+	do_set:
+		OdinDocTypeIndex index = entry.value;
+		map_set(&w->type_cache, type, index);
+		return index;
 	}
 
 
