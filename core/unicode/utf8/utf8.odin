@@ -10,6 +10,11 @@ UTF_MAX    :: 4
 SURROGATE_MIN :: 0xd800
 SURROGATE_MAX :: 0xdfff
 
+// A high/leading surrogate is in range SURROGATE_MIN..SURROGATE_HIGH_MAX,
+// A low/trailing surrogate is in range SURROGATE_LOW_MIN..SURROGATE_MAX.
+SURROGATE_HIGH_MAX :: 0xdbff
+SURROGATE_LOW_MIN  :: 0xdc00
+
 T1 :: 0b0000_0000
 TX :: 0b1000_0000
 T2 :: 0b1100_0000
