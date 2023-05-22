@@ -90,6 +90,7 @@ Number_init :: proc "c" (self: ^Number) -> ^Number {
 @(objc_type=Number, objc_name="numberWithF64",  objc_is_class_method=true) Number_numberWithF64  :: proc "c" (value: f64)  -> ^Number { return msgSend(^Number, Number, "numberWithDouble:",           value) }
 @(objc_type=Number, objc_name="numberWithBool", objc_is_class_method=true) Number_numberWithBool :: proc "c" (value: BOOL) -> ^Number { return msgSend(^Number, Number, "numberWithBool:",             value) }
 
+@(objc_type=Number, objc_name="number", objc_is_class_method=true)
 Number_number :: proc{
 	Number_numberWithI8,
 	Number_numberWithU8,
