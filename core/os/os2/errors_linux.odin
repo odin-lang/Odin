@@ -4,7 +4,7 @@ package os2
 import "core:sys/unix"
 
 _errno_strings : [unix.ERRNO_COUNT]string = {
-	unix.SUCCESS         = "Success",
+	unix.ESUCCESS        = "Success",
 	unix.EPERM           = "Operation not permitted",
 	unix.ENOENT          = "No such file or directory",
 	unix.ESRCH           = "No such process",

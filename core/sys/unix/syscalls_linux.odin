@@ -1519,7 +1519,7 @@ when ODIN_ARCH == .amd64 {
 }
 
 // errnos
-SUCCESS         :: 0
+ESUCCESS        :: 0
 EPERM           :: 1
 ENOENT          :: 2
 ESRCH           :: 3
@@ -2103,6 +2103,10 @@ sys_getdents64 :: proc "contextless" (fd: int, dirent: rawptr, count: int) -> in
 	return int(intrinsics.syscall(SYS_getdents64, uintptr(fd), uintptr(dirent), uintptr(count)))
 }
 
+sys_execve :: proc "contextless" (filename: cstring, argv, envp: [^]cstring) -> int {
+	return int(intrinsics.syscall(SYS_execve, uintptr(rawptr(filename)), uintptr(argv), uintptr(envp)))
+}
+
 sys_fork :: proc "contextless" () -> int {
 	when ODIN_ARCH != .arm64 {
 		return int(intrinsics.syscall(SYS_fork))
@@ -2110,9 +2114,11 @@ sys_fork :: proc "contextless" () -> int {
 		return int(intrinsics.syscall(SYS_clone, SIGCHLD))
 	}
 }
+
 sys_pipe2 :: proc "contextless" (fds: rawptr, flags: int) -> int {
 	return int(intrinsics.syscall(SYS_pipe2, uintptr(fds), uintptr(flags)))
 }
+
 sys_dup2 :: proc "contextless" (oldfd: int, newfd: int) -> int {
 	when ODIN_ARCH != .arm64 {
 		return int(intrinsics.syscall(SYS_dup2, uintptr(oldfd), uintptr(newfd)))
@@ -2200,5 +2206,5 @@ get_errno :: proc "contextless" (res: int) -> i32 {
 	if res < 0 && res > -4096 {
 		return i32(-res)
 	}
-	return SUCCESS
+	return ESUCCESS
 }
