@@ -481,10 +481,10 @@ gb_internal OdinDocTypeIndex odin_doc_type(OdinDocWriter *w, Type *type) {
 		return 0;
 	}
 
-	Type **mapped_type = map_get(&w->stable_type_cache, type); // may map to itself
-	if (mapped_type && *mapped_type) {
-		type = *mapped_type;
-	}
+	// Type **mapped_type = map_get(&w->stable_type_cache, type); // may map to itself
+	// if (mapped_type && *mapped_type) {
+	// 	type = *mapped_type;
+	// }
 
 	OdinDocTypeIndex *found = map_get(&w->type_cache, type);
 	if (found) {
