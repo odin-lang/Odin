@@ -6962,7 +6962,6 @@ Device_newBufferWithBytes :: #force_inline proc(self: ^Device, bytes: []byte, op
 Device_newBufferWithBytesNoCopy :: #force_inline proc(self: ^Device, bytes: []byte, options: ResourceOptions, deallocator: rawptr) -> ^Buffer {
 	return msgSend(^Buffer, self, "newBufferWithBytesNoCopy:length:options:deallocator:", raw_data(bytes), NS.UInteger(len(bytes)), options, deallocator)
 }
-
 @(objc_type=Device, objc_name="newBufferWithSlice")
 Device_newBufferWithSlice :: #force_inline proc(self: ^Device, slice: $S/[]$E, options: ResourceOptions) -> ^Buffer {
 	return Device_newBufferWithBytes(self, mem.slice_to_bytes(slice), options)
@@ -6971,11 +6970,20 @@ Device_newBufferWithSlice :: #force_inline proc(self: ^Device, slice: $S/[]$E, o
 Device_newBufferWithSliceNoCopy :: #force_inline proc(self: ^Device, slice: $S/[]$E, options: ResourceOptions, deallocator: rawptr) -> ^Buffer {
 	return Device_newBufferWithBytesNotCopy(self, mem.slice_to_bytes(slice), options, deallocator)
 }
-
-@(objc_type=Device, objc_name="newBuffer")
-Device_newBuffer :: #force_inline proc(self: ^Device, length: NS.UInteger, options: ResourceOptions) -> ^Buffer {
+@(objc_type=Device, objc_name="newBufferWithLength")
+Device_newBufferWithLength :: #force_inline proc(self: ^Device, length: NS.UInteger, options: ResourceOptions) -> ^Buffer {
 	return msgSend(^Buffer, self, "newBufferWithLength:options:", length, options)
 }
+
+@(objc_type=Device, objc_name="newBuffer")
+Device_newBuffer :: proc{
+	Device_newBufferWithBytes,
+	Device_newBufferWithBytesNoCopy,
+	Device_newBufferWithSlice,
+	Device_newBufferWithSliceNoCopy,
+	Device_newBufferWithLength,
+}
+
 @(objc_type=Device, objc_name="newCommandQueue")
 Device_newCommandQueue :: #force_inline proc(self: ^Device) -> ^CommandQueue {
 	return msgSend(^CommandQueue, self, "newCommandQueue")
@@ -9323,8 +9331,9 @@ Texture_newRemoteTextureViewForDevice :: #force_inline proc(self: ^Texture, devi
 Texture_newSharedTextureHandle :: #force_inline proc(self: ^Texture) -> ^SharedTextureHandle {
 	return msgSend(^SharedTextureHandle, self, "newSharedTextureHandle")
 }
-@(objc_type=Texture, objc_name="newTextureView")
-Texture_newTextureView :: #force_inline proc(self: ^Texture, pixelFormat: PixelFormat) -> ^Texture {
+
+@(objc_type=Texture, objc_name="newTextureViewWithPixelFormat")
+Texture_newTextureViewWithPixelFormat :: #force_inline proc(self: ^Texture, pixelFormat: PixelFormat) -> ^Texture {
 	return msgSend(^Texture, self, "newTextureViewWithPixelFormat:", pixelFormat)
 }
 @(objc_type=Texture, objc_name="newTextureViewWithLevels")
@@ -9335,6 +9344,13 @@ Texture_newTextureViewWithLevels :: #force_inline proc(self: ^Texture, pixelForm
 Texture_newTextureViewWithLevelsAndSwizzle :: #force_inline proc(self: ^Texture, pixelFormat: PixelFormat, textureType: TextureType, levelRange: NS.Range, sliceRange: NS.Range, swizzle: TextureSwizzleChannels) -> ^Texture {
 	return msgSend(^Texture, self, "newTextureViewWithPixelFormat:textureType:levels:slices:swizzle:", pixelFormat, textureType, levelRange, sliceRange, swizzle)
 }
+@(objc_type=Texture, objc_name="newTextureView")
+Texture_newTextureView :: proc{
+	Texture_newTextureViewWithPixelFormat,
+	Texture_newTextureViewWithLevels,
+	Texture_newTextureViewWithLevelsAndSwizzle,
+}
+
 @(objc_type=Texture, objc_name="parentRelativeLevel")
 Texture_parentRelativeLevel :: #force_inline proc(self: ^Texture) -> NS.UInteger {
 	return msgSend(NS.UInteger, self, "parentRelativeLevel")
