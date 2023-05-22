@@ -52,6 +52,7 @@ gb_internal void odin_doc_writer_item_tracker_init(OdinDocWriterItemTracker<T> *
 
 
 gb_internal void odin_doc_writer_prepare(OdinDocWriter *w) {
+	debugf("odin_doc_writer_prepare\n");
 	w->state = OdinDocWriterState_Preparing;
 
 	string_map_init(&w->string_cache);
@@ -72,6 +73,7 @@ gb_internal void odin_doc_writer_prepare(OdinDocWriter *w) {
 
 
 gb_internal void odin_doc_writer_destroy(OdinDocWriter *w) {
+	debugf("odin_doc_writer_destroy\n");
 	gb_free(heap_allocator(), w->data);
 
 	string_map_destroy(&w->string_cache);
@@ -105,6 +107,7 @@ gb_internal isize odin_doc_writer_calc_total_size(OdinDocWriter *w) {
 }
 
 gb_internal void odin_doc_writer_start_writing(OdinDocWriter *w) {
+	debugf("odin_doc_writer_start_writing\n");
 	w->state = OdinDocWriterState_Writing;
 
 	string_map_clear(&w->string_cache);
@@ -141,6 +144,7 @@ gb_internal void odin_doc_writer_assign_tracker(OdinDocArray<T> *array, OdinDocW
 
 
 gb_internal void odin_doc_writer_end_writing(OdinDocWriter *w) {
+	debugf("odin_doc_writer_end_writing\n");
 	OdinDocHeader *h = w->header;
 
 	gb_memmove(h->base.magic, OdinDocHeader_MagicString, gb_strlen(OdinDocHeader_MagicString));
@@ -951,6 +955,8 @@ gb_internal OdinDocEntityIndex odin_doc_add_entity(OdinDocWriter *w, Entity *e) 
 }
 
 gb_internal void odin_doc_update_entities(OdinDocWriter *w) {
+	debugf("odin_doc_update_entities %s\n", w->state ? "preparing" : "writing");
+
 	{
 		// NOTE(bill): Double pass, just in case entities are created on odin_doc_type
 		auto entities = array_make<Entity *>(heap_allocator(), 0, w->entity_cache.count);
@@ -1015,6 +1021,8 @@ gb_internal OdinDocArray<OdinDocScopeEntry> odin_doc_add_pkg_entries(OdinDocWrit
 		return {};
 	}
 
+	debugf("odin_doc_add_pkg_entries %s -> package %.*s\n", w->state ? "preparing" : "writing", LIT(pkg->name));
+
 	auto entries = array_make<OdinDocScopeEntry>(heap_allocator(), 0, w->entity_cache.count);
 	defer (array_free(&entries));
 
@@ -1058,6 +1066,8 @@ gb_internal OdinDocArray<OdinDocScopeEntry> odin_doc_add_pkg_entries(OdinDocWrit
 
 
 gb_internal void odin_doc_write_docs(OdinDocWriter *w) {
+	debugf("odin_doc_write_docs %s", w->state ? "preparing" : "writing");
+
 	auto pkgs = array_make<AstPackage *>(heap_allocator(), 0, w->info->packages.count);
 	defer (array_free(&pkgs));
 	for (auto const &entry : w->info->packages) {
@@ -1073,6 +1083,7 @@ gb_internal void odin_doc_write_docs(OdinDocWriter *w) {
 		}
 	}
 
+	debugf("odin_doc_update_entities sort pkgs %s\n", w->state ? "preparing" : "writing");
 	gb_sort_array(pkgs.data, pkgs.count, cmp_ast_package_by_name);
 
 	for_array(i, pkgs) {
@@ -1133,6 +1144,7 @@ gb_internal void odin_doc_write_docs(OdinDocWriter *w) {
 
 
 gb_internal void odin_doc_write_to_file(OdinDocWriter *w, char const *filename) {
+	debugf("odin_doc_write_to_file %s\n", filename);
 	gbFile f = {};
 	gbFileError err = gb_file_open_mode(&f, gbFileMode_Write, filename);
 	if (err != gbFileError_None) {
@@ -1143,6 +1155,7 @@ gb_internal void odin_doc_write_to_file(OdinDocWriter *w, char const *filename) 
 	defer (gb_file_close(&f));
 	if (gb_file_write(&f, w->data, w->data_len)) {
 		err = gb_file_truncate(&f, w->data_len);
+		debugf("Wrote .odin-doc file to: %s\n", filename);
 		gb_printf("Wrote .odin-doc file to: %s\n", filename);
 	}
 }
@@ -1152,6 +1165,8 @@ gb_internal void odin_doc_write(CheckerInfo *info, char const *filename) {
 	OdinDocWriter *w = &w_;
 	defer (odin_doc_writer_destroy(w));
 	w->info = info;
+
+	debugf("odin_doc_write %s\n", filename);
 
 	odin_doc_writer_prepare(w);
 	odin_doc_write_docs(w);
