@@ -30,6 +30,7 @@ struct OdinDocWriter {
 	PtrMap<AstPackage *, OdinDocPkgIndex>    pkg_cache;
 	PtrMap<Entity *,     OdinDocEntityIndex> entity_cache;
 	PtrMap<Type *,       OdinDocTypeIndex>   type_cache;
+	PtrMap<Type *,       Type *>             stable_type_cache;
 
 	OdinDocWriterItemTracker<OdinDocFile>   files;
 	OdinDocWriterItemTracker<OdinDocPkg>    pkgs;
@@ -59,6 +60,7 @@ gb_internal void odin_doc_writer_prepare(OdinDocWriter *w) {
 	map_init(&w->pkg_cache);
 	map_init(&w->entity_cache);
 	map_init(&w->type_cache);
+	map_init(&w->stable_type_cache);
 
 	odin_doc_writer_item_tracker_init(&w->files,    1);
 	odin_doc_writer_item_tracker_init(&w->pkgs,     1);
@@ -77,6 +79,7 @@ gb_internal void odin_doc_writer_destroy(OdinDocWriter *w) {
 	map_destroy(&w->pkg_cache);
 	map_destroy(&w->entity_cache);
 	map_destroy(&w->type_cache);
+	map_destroy(&w->stable_type_cache);
 }
 
 
@@ -477,6 +480,12 @@ gb_internal OdinDocTypeIndex odin_doc_type(OdinDocWriter *w, Type *type) {
 	if (type == nullptr) {
 		return 0;
 	}
+
+	Type **mapped_type = map_get(&w->stable_type_cache, type); // may map to itself
+	if (mapped_type && *mapped_type) {
+		type = *mapped_type;
+	}
+
 	OdinDocTypeIndex *found = map_get(&w->type_cache, type);
 	if (found) {
 		return *found;
@@ -517,6 +526,7 @@ gb_internal OdinDocTypeIndex odin_doc_type(OdinDocWriter *w, Type *type) {
 	do_set:
 		OdinDocTypeIndex index = entry.value;
 		map_set(&w->type_cache, type, index);
+		map_set(&w->stable_type_cache, type, entry.key);
 		return index;
 	}
 
@@ -526,6 +536,7 @@ gb_internal OdinDocTypeIndex odin_doc_type(OdinDocWriter *w, Type *type) {
 	OdinDocTypeIndex type_index = 0;
 	type_index = odin_doc_write_item(w, &w->types, &doc_type, &dst);
 	map_set(&w->type_cache, type, type_index);
+	map_set(&w->stable_type_cache, type, type);
 
 	switch (type->kind) {
 	case Type_Basic:
