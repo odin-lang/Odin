@@ -21,67 +21,67 @@ Object :: struct {using _: intrinsics.objc_object}
 @(objc_class="NSObject")
 Copying :: struct($T: typeid) {using _: Object}
 
-alloc :: proc($T: typeid) -> ^T where intrinsics.type_is_subtype_of(T, Object) {
+alloc :: proc "c" ($T: typeid) -> ^T where intrinsics.type_is_subtype_of(T, Object) {
 	return msgSend(^T, T, "alloc")
 }
 @(objc_type=Object, objc_name="init")
-init :: proc(self: ^$T) -> ^T where intrinsics.type_is_subtype_of(T, Object) {
+init :: proc "c" (self: ^$T) -> ^T where intrinsics.type_is_subtype_of(T, Object) {
 	return msgSend(^T, self, "init")
 }
 @(objc_type=Object, objc_name="copy")
-copy :: proc(self: ^Copying($T)) -> ^T where intrinsics.type_is_subtype_of(T, Object) {
+copy :: proc "c" (self: ^Copying($T)) -> ^T where intrinsics.type_is_subtype_of(T, Object) {
 	return msgSend(^T, self, "copy")
 }
 
-new :: proc($T: typeid) -> ^T where intrinsics.type_is_subtype_of(T, Object) {
+new :: proc "c" ($T: typeid) -> ^T where intrinsics.type_is_subtype_of(T, Object) {
 	return init(alloc(T))
 }
 
 @(objc_type=Object, objc_name="retain")
-retain :: proc(self: ^Object) {
+retain :: proc "c" (self: ^Object) {
 	_ = msgSend(^Object, self, "retain")
 }
 @(objc_type=Object, objc_name="release")
-release :: proc(self: ^Object) {
+release :: proc "c" (self: ^Object) {
 	msgSend(nil, self, "release")
 }
 @(objc_type=Object, objc_name="autorelease")
-autorelease :: proc(self: ^Object) {
+autorelease :: proc "c" (self: ^Object) {
 	msgSend(nil, self, "autorelease")
 }
 @(objc_type=Object, objc_name="retainCount")
-retainCount :: proc(self: ^Object) -> UInteger {
+retainCount :: proc "c" (self: ^Object) -> UInteger {
 	return msgSend(UInteger, self, "retainCount")
 }
 @(objc_type=Object, objc_name="class")
-class :: proc(self: ^Object) -> Class {
+class :: proc "c" (self: ^Object) -> Class {
 	return msgSend(Class, self, "class")
 }
 
 @(objc_type=Object, objc_name="hash")
-hash :: proc(self: ^Object) -> UInteger {
+hash :: proc "c" (self: ^Object) -> UInteger {
 	return msgSend(UInteger, self, "hash")
 }
 
 @(objc_type=Object, objc_name="isEqual")
-isEqual :: proc(self, pObject: ^Object) -> BOOL {
+isEqual :: proc "c" (self, pObject: ^Object) -> BOOL {
 	return msgSend(BOOL, self, "isEqual:", pObject)
 }
 
 @(objc_type=Object, objc_name="description")
-description :: proc(self: ^Object) -> ^String {
+description :: proc "c" (self: ^Object) -> ^String {
 	return msgSend(^String, self, "description")
 }
 
 @(objc_type=Object, objc_name="debugDescription")
-debugDescription :: proc(self: ^Object) -> ^String {
+debugDescription :: proc "c" (self: ^Object) -> ^String {
 	if msgSendSafeCheck(self, intrinsics.objc_find_selector("debugDescription")) {
 		return msgSend(^String, self, "debugDescription")
 	}
 	return nil
 }
 
-bridgingCast :: proc($T: typeid, obj: ^Object) where intrinsics.type_is_pointer(T), intrinsics.type_is_subtype_of(T, ^Object) {
+bridgingCast :: proc "c" ($T: typeid, obj: ^Object) where intrinsics.type_is_pointer(T), intrinsics.type_is_subtype_of(T, ^Object) {
 	return (T)(obj)
 }
 
