@@ -2,6 +2,7 @@ package linalg
 
 import "core:math"
 
+@(require_results)
 euler_angles_from_matrix3_f32 :: proc(m: Matrix3f32, order: Euler_Angle_Order) -> (t1, t2, t3: f32) {
 	switch order {
 	case .XYZ: t1, t2, t3 = euler_angles_xyz_from_matrix3(m)
@@ -19,6 +20,7 @@ euler_angles_from_matrix3_f32 :: proc(m: Matrix3f32, order: Euler_Angle_Order) -
 	}
 	return
 }
+@(require_results)
 euler_angles_from_matrix4_f32 :: proc(m: Matrix4f32, order: Euler_Angle_Order) -> (t1, t2, t3: f32) {
 	switch order {
 	case .XYZ: t1, t2, t3 = euler_angles_xyz_from_matrix4(m)
@@ -36,6 +38,7 @@ euler_angles_from_matrix4_f32 :: proc(m: Matrix4f32, order: Euler_Angle_Order) -
 	}
 	return
 }
+@(require_results)
 euler_angles_from_quaternion_f32 :: proc(m: Quaternionf32, order: Euler_Angle_Order) -> (t1, t2, t3: f32) {
 	switch order {
 	case .XYZ: t1, t2, t3 = euler_angles_xyz_from_quaternion(m)
@@ -54,6 +57,7 @@ euler_angles_from_quaternion_f32 :: proc(m: Quaternionf32, order: Euler_Angle_Or
 	return
 }
 
+@(require_results)
 matrix3_from_euler_angles_f32 :: proc(t1, t2, t3: f32, order: Euler_Angle_Order) -> (m: Matrix3f32) {
 	switch order {
 	case .XYZ: return matrix3_from_euler_angles_xyz(t1, t2, t3) // m1, m2, m3 = X(t1), Y(t2), Z(t3);
@@ -71,6 +75,7 @@ matrix3_from_euler_angles_f32 :: proc(t1, t2, t3: f32, order: Euler_Angle_Order)
 	}
 	return
 }
+@(require_results)
 matrix4_from_euler_angles_f32 :: proc(t1, t2, t3: f32, order: Euler_Angle_Order) -> (m: Matrix4f32) {
 	switch order {
 	case .XYZ: return matrix4_from_euler_angles_xyz(t1, t2, t3) // m1, m2, m3 = X(t1), Y(t2), Z(t3);
@@ -89,6 +94,7 @@ matrix4_from_euler_angles_f32 :: proc(t1, t2, t3: f32, order: Euler_Angle_Order)
 	return
 }
 
+@(require_results)
 quaternion_from_euler_angles_f32 :: proc(t1, t2, t3: f32, order: Euler_Angle_Order) -> Quaternionf32 {
 	X :: quaternion_from_euler_angle_x
 	Y :: quaternion_from_euler_angle_y
@@ -117,16 +123,20 @@ quaternion_from_euler_angles_f32 :: proc(t1, t2, t3: f32, order: Euler_Angle_Ord
 
 // Quaternionf32s
 
+@(require_results)
 quaternion_from_euler_angle_x_f32 :: proc(angle_x: f32) -> (q: Quaternionf32) {
 	return quaternion_angle_axis_f32(angle_x, {1, 0, 0})
 }
+@(require_results)
 quaternion_from_euler_angle_y_f32 :: proc(angle_y: f32) -> (q: Quaternionf32) {
 	return quaternion_angle_axis_f32(angle_y, {0, 1, 0})
 }
+@(require_results)
 quaternion_from_euler_angle_z_f32 :: proc(angle_z: f32) -> (q: Quaternionf32) {
 	return quaternion_angle_axis_f32(angle_z, {0, 0, 1})
 }
 
+@(require_results)
 quaternion_from_pitch_yaw_roll_f32 :: proc(pitch, yaw, roll: f32) -> Quaternionf32 {
 	a, b, c := pitch, yaw, roll
 
@@ -142,10 +152,12 @@ quaternion_from_pitch_yaw_roll_f32 :: proc(pitch, yaw, roll: f32) -> Quaternionf
 	return q
 }
 
+@(require_results)
 roll_from_quaternion_f32 :: proc(q: Quaternionf32) -> f32 {
 	return math.atan2(2 * q.x*q.y + q.w*q.z, q.w*q.w + q.x*q.x - q.y*q.y - q.z*q.z)
 }
 
+@(require_results)
 pitch_from_quaternion_f32 :: proc(q: Quaternionf32) -> f32 {
 	y := 2 * (q.y*q.z + q.w*q.w)
 	x := q.w*q.w - q.x*q.x - q.y*q.y + q.z*q.z
@@ -157,11 +169,13 @@ pitch_from_quaternion_f32 :: proc(q: Quaternionf32) -> f32 {
 	return math.atan2(y, x)
 }
 
+@(require_results)
 yaw_from_quaternion_f32 :: proc(q: Quaternionf32) -> f32 {
 	return math.asin(clamp(-2 * (q.x*q.z - q.w*q.y), -1, 1))
 }
 
 
+@(require_results)
 pitch_yaw_roll_from_quaternion_f32 :: proc(q: Quaternionf32) -> (pitch, yaw, roll: f32) {
 	pitch = pitch_from_quaternion(q)
 	yaw = yaw_from_quaternion(q)
@@ -169,39 +183,51 @@ pitch_yaw_roll_from_quaternion_f32 :: proc(q: Quaternionf32) -> (pitch, yaw, rol
 	return
 }
 
+@(require_results)
 euler_angles_xyz_from_quaternion_f32 :: proc(q: Quaternionf32) -> (t1, t2, t3: f32) {
 	return euler_angles_xyz_from_matrix4(matrix4_from_quaternion(q))
 }
+@(require_results)
 euler_angles_yxz_from_quaternion_f32 :: proc(q: Quaternionf32) -> (t1, t2, t3: f32) {
 	return euler_angles_yxz_from_matrix4(matrix4_from_quaternion(q))
 }
+@(require_results)
 euler_angles_xzx_from_quaternion_f32 :: proc(q: Quaternionf32) -> (t1, t2, t3: f32) {
 	return euler_angles_xzx_from_matrix4(matrix4_from_quaternion(q))
 }
+@(require_results)
 euler_angles_xyx_from_quaternion_f32 :: proc(q: Quaternionf32) -> (t1, t2, t3: f32) {
 	return euler_angles_xyx_from_matrix4(matrix4_from_quaternion(q))
 }
+@(require_results)
 euler_angles_yxy_from_quaternion_f32 :: proc(q: Quaternionf32) -> (t1, t2, t3: f32) {
 	return euler_angles_yxy_from_matrix4(matrix4_from_quaternion(q))
 }
+@(require_results)
 euler_angles_yzy_from_quaternion_f32 :: proc(q: Quaternionf32) -> (t1, t2, t3: f32) {
 	return euler_angles_yzy_from_matrix4(matrix4_from_quaternion(q))
 }
+@(require_results)
 euler_angles_zyz_from_quaternion_f32 :: proc(q: Quaternionf32) -> (t1, t2, t3: f32) {
 	return euler_angles_zyz_from_matrix4(matrix4_from_quaternion(q))
 }
+@(require_results)
 euler_angles_zxz_from_quaternion_f32 :: proc(q: Quaternionf32) -> (t1, t2, t3: f32) {
 	return euler_angles_zxz_from_matrix4(matrix4_from_quaternion(q))
 }
+@(require_results)
 euler_angles_xzy_from_quaternion_f32 :: proc(q: Quaternionf32) -> (t1, t2, t3: f32) {
 	return euler_angles_xzy_from_matrix4(matrix4_from_quaternion(q))
 }
+@(require_results)
 euler_angles_yzx_from_quaternion_f32 :: proc(q: Quaternionf32) -> (t1, t2, t3: f32) {
 	return euler_angles_yzx_from_matrix4(matrix4_from_quaternion(q))
 }
+@(require_results)
 euler_angles_zyx_from_quaternion_f32 :: proc(q: Quaternionf32) -> (t1, t2, t3: f32) {
 	return euler_angles_zyx_from_matrix4(matrix4_from_quaternion(q))
 }
+@(require_results)
 euler_angles_zxy_from_quaternion_f32 :: proc(q: Quaternionf32) -> (t1, t2, t3: f32) {
 	return euler_angles_zxy_from_matrix4(matrix4_from_quaternion(q))
 }
@@ -210,6 +236,7 @@ euler_angles_zxy_from_quaternion_f32 :: proc(q: Quaternionf32) -> (t1, t2, t3: f
 // Matrix3
 
 
+@(require_results)
 matrix3_from_euler_angle_x_f32 :: proc(angle_x: f32) -> (m: Matrix3f32) {
 	cos_x, sin_x := math.cos(angle_x), math.sin(angle_x)
 	m[0, 0] = 1
@@ -219,6 +246,7 @@ matrix3_from_euler_angle_x_f32 :: proc(angle_x: f32) -> (m: Matrix3f32) {
 	m[2, 2] = +cos_x
 	return
 }
+@(require_results)
 matrix3_from_euler_angle_y_f32 :: proc(angle_y: f32) -> (m: Matrix3f32) {
 	cos_y, sin_y := math.cos(angle_y), math.sin(angle_y)
 	m[0, 0] = +cos_y
@@ -228,6 +256,7 @@ matrix3_from_euler_angle_y_f32 :: proc(angle_y: f32) -> (m: Matrix3f32) {
 	m[2, 2] = +cos_y
 	return
 }
+@(require_results)
 matrix3_from_euler_angle_z_f32 :: proc(angle_z: f32) -> (m: Matrix3f32) {
 	cos_z, sin_z := math.cos(angle_z), math.sin(angle_z)
 	m[0, 0] = +cos_z
@@ -239,6 +268,7 @@ matrix3_from_euler_angle_z_f32 :: proc(angle_z: f32) -> (m: Matrix3f32) {
 }
 
 
+@(require_results)
 matrix3_from_derived_euler_angle_x_f32 :: proc(angle_x: f32, angular_velocity_x: f32) -> (m: Matrix3f32) {
 	cos_x := math.cos(angle_x) * angular_velocity_x
 	sin_x := math.sin(angle_x) * angular_velocity_x
@@ -249,6 +279,7 @@ matrix3_from_derived_euler_angle_x_f32 :: proc(angle_x: f32, angular_velocity_x:
 	m[2, 2] = +cos_x
 	return
 }
+@(require_results)
 matrix3_from_derived_euler_angle_y_f32 :: proc(angle_y: f32, angular_velocity_y: f32) -> (m: Matrix3f32) {
 	cos_y := math.cos(angle_y) * angular_velocity_y
 	sin_y := math.sin(angle_y) * angular_velocity_y
@@ -259,6 +290,7 @@ matrix3_from_derived_euler_angle_y_f32 :: proc(angle_y: f32, angular_velocity_y:
 	m[2, 2] = +cos_y
 	return
 }
+@(require_results)
 matrix3_from_derived_euler_angle_z_f32 :: proc(angle_z: f32, angular_velocity_z: f32) -> (m: Matrix3f32) {
 	cos_z := math.cos(angle_z) * angular_velocity_z
 	sin_z := math.sin(angle_z) * angular_velocity_z
@@ -271,6 +303,7 @@ matrix3_from_derived_euler_angle_z_f32 :: proc(angle_z: f32, angular_velocity_z:
 }
 
 
+@(require_results)
 matrix3_from_euler_angles_xy_f32 :: proc(angle_x, angle_y: f32) -> (m: Matrix3f32) {
 	cos_x, sin_x := math.cos(angle_x), math.sin(angle_x)
 	cos_y, sin_y := math.cos(angle_y), math.sin(angle_y)
@@ -286,6 +319,7 @@ matrix3_from_euler_angles_xy_f32 :: proc(angle_x, angle_y: f32) -> (m: Matrix3f3
 }
 
 
+@(require_results)
 matrix3_from_euler_angles_yx_f32 :: proc(angle_y, angle_x: f32) -> (m: Matrix3f32) {
 	cos_x, sin_x := math.cos(angle_x), math.sin(angle_x)
 	cos_y, sin_y := math.cos(angle_y), math.sin(angle_y)
@@ -300,20 +334,25 @@ matrix3_from_euler_angles_yx_f32 :: proc(angle_y, angle_x: f32) -> (m: Matrix3f3
 	return
 }
 
+@(require_results)
 matrix3_from_euler_angles_xz_f32 :: proc(angle_x, angle_z: f32) -> (m: Matrix3f32) {
 	return mul(matrix3_from_euler_angle_x(angle_x), matrix3_from_euler_angle_z(angle_z))
 }
+@(require_results)
 matrix3_from_euler_angles_zx_f32 :: proc(angle_z, angle_x: f32) -> (m: Matrix3f32) {
 	return mul(matrix3_from_euler_angle_z(angle_z), matrix3_from_euler_angle_x(angle_x))
 }
+@(require_results)
 matrix3_from_euler_angles_yz_f32 :: proc(angle_y, angle_z: f32) -> (m: Matrix3f32) {
 	return mul(matrix3_from_euler_angle_y(angle_y), matrix3_from_euler_angle_z(angle_z))
 }
+@(require_results)
 matrix3_from_euler_angles_zy_f32 :: proc(angle_z, angle_y: f32) -> (m: Matrix3f32) {
 	return mul(matrix3_from_euler_angle_z(angle_z), matrix3_from_euler_angle_y(angle_y))
 }
 
 
+@(require_results)
 matrix3_from_euler_angles_xyz_f32 :: proc(t1, t2, t3: f32) -> (m: Matrix3f32) {
 	c1 := math.cos(-t1)
 	c2 := math.cos(-t2)
@@ -334,6 +373,7 @@ matrix3_from_euler_angles_xyz_f32 :: proc(t1, t2, t3: f32) -> (m: Matrix3f32) {
 	return
 }
 
+@(require_results)
 matrix3_from_euler_angles_yxz_f32 :: proc(yaw, pitch, roll: f32) -> (m: Matrix3f32) {
 	ch := math.cos(yaw)
 	sh := math.sin(yaw)
@@ -354,6 +394,7 @@ matrix3_from_euler_angles_yxz_f32 :: proc(yaw, pitch, roll: f32) -> (m: Matrix3f
 	return
 }
 
+@(require_results)
 matrix3_from_euler_angles_xzx_f32 :: proc(t1, t2, t3: f32) -> (m: Matrix3f32) {
 	c1 := math.cos(t1)
 	s1 := math.sin(t1)
@@ -374,6 +415,7 @@ matrix3_from_euler_angles_xzx_f32 :: proc(t1, t2, t3: f32) -> (m: Matrix3f32) {
 	return
 }
 
+@(require_results)
 matrix3_from_euler_angles_xyx_f32 :: proc(t1, t2, t3: f32) -> (m: Matrix3f32) {
 	c1 := math.cos(t1)
 	s1 := math.sin(t1)
@@ -394,6 +436,7 @@ matrix3_from_euler_angles_xyx_f32 :: proc(t1, t2, t3: f32) -> (m: Matrix3f32) {
 	return
 }
 
+@(require_results)
 matrix3_from_euler_angles_yxy_f32 :: proc(t1, t2, t3: f32) -> (m: Matrix3f32) {
 	c1 := math.cos(t1)
 	s1 := math.sin(t1)
@@ -414,6 +457,7 @@ matrix3_from_euler_angles_yxy_f32 :: proc(t1, t2, t3: f32) -> (m: Matrix3f32) {
 	return
 }
 
+@(require_results)
 matrix3_from_euler_angles_yzy_f32 :: proc(t1, t2, t3: f32) -> (m: Matrix3f32) {
 	c1 := math.cos(t1)
 	s1 := math.sin(t1)
@@ -434,6 +478,7 @@ matrix3_from_euler_angles_yzy_f32 :: proc(t1, t2, t3: f32) -> (m: Matrix3f32) {
 	return
 }
 
+@(require_results)
 matrix3_from_euler_angles_zyz_f32 :: proc(t1, t2, t3: f32) -> (m: Matrix3f32) {
 	c1 := math.cos(t1)
 	s1 := math.sin(t1)
@@ -454,6 +499,7 @@ matrix3_from_euler_angles_zyz_f32 :: proc(t1, t2, t3: f32) -> (m: Matrix3f32) {
 	return
 }
 
+@(require_results)
 matrix3_from_euler_angles_zxz_f32 :: proc(t1, t2, t3: f32) -> (m: Matrix3f32) {
 	c1 := math.cos(t1)
 	s1 := math.sin(t1)
@@ -475,6 +521,7 @@ matrix3_from_euler_angles_zxz_f32 :: proc(t1, t2, t3: f32) -> (m: Matrix3f32) {
 }
 
 
+@(require_results)
 matrix3_from_euler_angles_xzy_f32 :: proc(t1, t2, t3: f32) -> (m: Matrix3f32) {
 	c1 := math.cos(t1)
 	s1 := math.sin(t1)
@@ -495,6 +542,7 @@ matrix3_from_euler_angles_xzy_f32 :: proc(t1, t2, t3: f32) -> (m: Matrix3f32) {
 	return
 }
 
+@(require_results)
 matrix3_from_euler_angles_yzx_f32 :: proc(t1, t2, t3: f32) -> (m: Matrix3f32) {
 	c1 := math.cos(t1)
 	s1 := math.sin(t1)
@@ -515,6 +563,7 @@ matrix3_from_euler_angles_yzx_f32 :: proc(t1, t2, t3: f32) -> (m: Matrix3f32) {
 	return
 }
 
+@(require_results)
 matrix3_from_euler_angles_zyx_f32 :: proc(t1, t2, t3: f32) -> (m: Matrix3f32) {
 	c1 := math.cos(t1)
 	s1 := math.sin(t1)
@@ -535,6 +584,7 @@ matrix3_from_euler_angles_zyx_f32 :: proc(t1, t2, t3: f32) -> (m: Matrix3f32) {
 	return
 }
 
+@(require_results)
 matrix3_from_euler_angles_zxy_f32 :: proc(t1, t2, t3: f32) -> (m: Matrix3f32) {
 	c1 := math.cos(t1)
 	s1 := math.sin(t1)
@@ -556,6 +606,7 @@ matrix3_from_euler_angles_zxy_f32 :: proc(t1, t2, t3: f32) -> (m: Matrix3f32) {
 }
 
 
+@(require_results)
 matrix3_from_yaw_pitch_roll_f32 :: proc(yaw, pitch, roll: f32) -> (m: Matrix3f32) {
 	ch := math.cos(yaw)
 	sh := math.sin(yaw)
@@ -576,6 +627,7 @@ matrix3_from_yaw_pitch_roll_f32 :: proc(yaw, pitch, roll: f32) -> (m: Matrix3f32
 	return m
 }
 
+@(require_results)
 euler_angles_xyz_from_matrix3_f32 :: proc(m: Matrix3f32) -> (t1, t2, t3: f32) {
 	T1 := math.atan2(m[1, 2], m[2, 2])
 	C2 := math.sqrt(m[0, 0]*m[0, 0] + m[0, 1]*m[0, 1])
@@ -589,6 +641,7 @@ euler_angles_xyz_from_matrix3_f32 :: proc(m: Matrix3f32) -> (t1, t2, t3: f32) {
 	return
 }
 
+@(require_results)
 euler_angles_yxz_from_matrix3_f32 :: proc(m: Matrix3f32) -> (t1, t2, t3: f32) {
 	T1 := math.atan2(m[0, 2], m[2, 2])
 	C2 := math.sqrt(m[1, 0]*m[1, 0] + m[1, 1]*m[1, 1])
@@ -602,6 +655,7 @@ euler_angles_yxz_from_matrix3_f32 :: proc(m: Matrix3f32) -> (t1, t2, t3: f32) {
 	return
 }
 
+@(require_results)
 euler_angles_xzx_from_matrix3_f32 :: proc(m: Matrix3f32) -> (t1, t2, t3: f32) {
 	T1 := math.atan2(m[2, 0], m[1, 0])
 	S2 := math.sqrt(m[0, 1]*m[0, 1] + m[0, 2]*m[0, 2])
@@ -615,6 +669,7 @@ euler_angles_xzx_from_matrix3_f32 :: proc(m: Matrix3f32) -> (t1, t2, t3: f32) {
 	return
 }
 
+@(require_results)
 euler_angles_xyx_from_matrix3_f32 :: proc(m: Matrix3f32) -> (t1, t2, t3: f32) {
 	T1 := math.atan2(m[1, 0], -m[2, 0])
 	S2 := math.sqrt(m[0, 1]*m[0, 1] + m[0, 2]*m[0, 2])
@@ -628,6 +683,7 @@ euler_angles_xyx_from_matrix3_f32 :: proc(m: Matrix3f32) -> (t1, t2, t3: f32) {
 	return
 }
 
+@(require_results)
 euler_angles_yxy_from_matrix3_f32 :: proc(m: Matrix3f32) -> (t1, t2, t3: f32) {
 	T1 := math.atan2(m[0, 1], m[2, 1])
 	S2 := math.sqrt(m[1, 0]*m[1, 0] + m[1, 2]*m[1, 2])
@@ -641,6 +697,7 @@ euler_angles_yxy_from_matrix3_f32 :: proc(m: Matrix3f32) -> (t1, t2, t3: f32) {
 	return
 }
 
+@(require_results)
 euler_angles_yzy_from_matrix3_f32 :: proc(m: Matrix3f32) -> (t1, t2, t3: f32) {
 	T1 := math.atan2(m[2, 1], -m[0, 1])
 	S2 := math.sqrt(m[1, 0]*m[1, 0] + m[1, 2]*m[1, 2])
@@ -653,6 +710,7 @@ euler_angles_yzy_from_matrix3_f32 :: proc(m: Matrix3f32) -> (t1, t2, t3: f32) {
 	t3 = T3
 	return
 }
+@(require_results)
 euler_angles_zyz_from_matrix3_f32 :: proc(m: Matrix3f32) -> (t1, t2, t3: f32) {
 	T1 := math.atan2(m[1, 2], m[0, 2])
 	S2 := math.sqrt(m[2, 0]*m[2, 0] + m[2, 1]*m[2, 1])
@@ -666,6 +724,7 @@ euler_angles_zyz_from_matrix3_f32 :: proc(m: Matrix3f32) -> (t1, t2, t3: f32) {
 	return
 }
 
+@(require_results)
 euler_angles_zxz_from_matrix3_f32 :: proc(m: Matrix3f32) -> (t1, t2, t3: f32) {
 	T1 := math.atan2(m[0, 2], -m[1, 2])
 	S2 := math.sqrt(m[2, 0]*m[2, 0] + m[2, 1]*m[2, 1])
@@ -679,6 +738,7 @@ euler_angles_zxz_from_matrix3_f32 :: proc(m: Matrix3f32) -> (t1, t2, t3: f32) {
 	return
 }
 
+@(require_results)
 euler_angles_xzy_from_matrix3_f32 :: proc(m: Matrix3f32) -> (t1, t2, t3: f32) {
 	T1 := math.atan2(m[2, 1], m[1, 1])
 	C2 := math.sqrt(m[0, 0]*m[0, 0] + m[0, 2]*m[0, 2])
@@ -692,6 +752,7 @@ euler_angles_xzy_from_matrix3_f32 :: proc(m: Matrix3f32) -> (t1, t2, t3: f32) {
 	return
 }
 
+@(require_results)
 euler_angles_yzx_from_matrix3_f32 :: proc(m: Matrix3f32) -> (t1, t2, t3: f32) {
 	T1 := math.atan2(-m[2, 0], m[0, 0])
 	C2 := math.sqrt(m[1, 1]*m[1, 1] + m[1, 2]*m[1, 2])
@@ -705,6 +766,7 @@ euler_angles_yzx_from_matrix3_f32 :: proc(m: Matrix3f32) -> (t1, t2, t3: f32) {
 	return
 }
 
+@(require_results)
 euler_angles_zyx_from_matrix3_f32 :: proc(m: Matrix3f32) -> (t1, t2, t3: f32) {
 	T1 := math.atan2(m[1, 0], m[0, 0])
 	C2 := math.sqrt(m[2, 1]*m[2, 1] + m[2, 2]*m[2, 2])
@@ -718,6 +780,7 @@ euler_angles_zyx_from_matrix3_f32 :: proc(m: Matrix3f32) -> (t1, t2, t3: f32) {
 	return
 }
 
+@(require_results)
 euler_angles_zxy_from_matrix3_f32 :: proc(m: Matrix3f32) -> (t1, t2, t3: f32) {
 	T1 := math.atan2(-m[0, 1], m[1, 1])
 	C2 := math.sqrt(m[2, 0]*m[2, 0] + m[2, 2]*m[2, 2])
@@ -735,6 +798,7 @@ euler_angles_zxy_from_matrix3_f32 :: proc(m: Matrix3f32) -> (t1, t2, t3: f32) {
 // Matrix4
 
 
+@(require_results)
 matrix4_from_euler_angle_x_f32 :: proc(angle_x: f32) -> (m: Matrix4f32) {
 	cos_x, sin_x := math.cos(angle_x), math.sin(angle_x)
 	m[0, 0] = 1
@@ -745,6 +809,7 @@ matrix4_from_euler_angle_x_f32 :: proc(angle_x: f32) -> (m: Matrix4f32) {
 	m[3, 3] = 1
 	return
 }
+@(require_results)
 matrix4_from_euler_angle_y_f32 :: proc(angle_y: f32) -> (m: Matrix4f32) {
 	cos_y, sin_y := math.cos(angle_y), math.sin(angle_y)
 	m[0, 0] = +cos_y
@@ -755,6 +820,7 @@ matrix4_from_euler_angle_y_f32 :: proc(angle_y: f32) -> (m: Matrix4f32) {
 	m[3, 3] = 1
 	return
 }
+@(require_results)
 matrix4_from_euler_angle_z_f32 :: proc(angle_z: f32) -> (m: Matrix4f32) {
 	cos_z, sin_z := math.cos(angle_z), math.sin(angle_z)
 	m[0, 0] = +cos_z
@@ -767,6 +833,7 @@ matrix4_from_euler_angle_z_f32 :: proc(angle_z: f32) -> (m: Matrix4f32) {
 }
 
 
+@(require_results)
 matrix4_from_derived_euler_angle_x_f32 :: proc(angle_x: f32, angular_velocity_x: f32) -> (m: Matrix4f32) {
 	cos_x := math.cos(angle_x) * angular_velocity_x
 	sin_x := math.sin(angle_x) * angular_velocity_x
@@ -778,6 +845,7 @@ matrix4_from_derived_euler_angle_x_f32 :: proc(angle_x: f32, angular_velocity_x:
 	m[3, 3] = 1
 	return
 }
+@(require_results)
 matrix4_from_derived_euler_angle_y_f32 :: proc(angle_y: f32, angular_velocity_y: f32) -> (m: Matrix4f32) {
 	cos_y := math.cos(angle_y) * angular_velocity_y
 	sin_y := math.sin(angle_y) * angular_velocity_y
@@ -789,6 +857,7 @@ matrix4_from_derived_euler_angle_y_f32 :: proc(angle_y: f32, angular_velocity_y:
 	m[3, 3] = 1
 	return
 }
+@(require_results)
 matrix4_from_derived_euler_angle_z_f32 :: proc(angle_z: f32, angular_velocity_z: f32) -> (m: Matrix4f32) {
 	cos_z := math.cos(angle_z) * angular_velocity_z
 	sin_z := math.sin(angle_z) * angular_velocity_z
@@ -802,6 +871,7 @@ matrix4_from_derived_euler_angle_z_f32 :: proc(angle_z: f32, angular_velocity_z:
 }
 
 
+@(require_results)
 matrix4_from_euler_angles_xy_f32 :: proc(angle_x, angle_y: f32) -> (m: Matrix4f32) {
 	cos_x, sin_x := math.cos(angle_x), math.sin(angle_x)
 	cos_y, sin_y := math.cos(angle_y), math.sin(angle_y)
@@ -818,6 +888,7 @@ matrix4_from_euler_angles_xy_f32 :: proc(angle_x, angle_y: f32) -> (m: Matrix4f3
 }
 
 
+@(require_results)
 matrix4_from_euler_angles_yx_f32 :: proc(angle_y, angle_x: f32) -> (m: Matrix4f32) {
 	cos_x, sin_x := math.cos(angle_x), math.sin(angle_x)
 	cos_y, sin_y := math.cos(angle_y), math.sin(angle_y)
@@ -833,20 +904,25 @@ matrix4_from_euler_angles_yx_f32 :: proc(angle_y, angle_x: f32) -> (m: Matrix4f3
 	return
 }
 
+@(require_results)
 matrix4_from_euler_angles_xz_f32 :: proc(angle_x, angle_z: f32) -> (m: Matrix4f32) {
 	return mul(matrix4_from_euler_angle_x(angle_x), matrix4_from_euler_angle_z(angle_z))
 }
+@(require_results)
 matrix4_from_euler_angles_zx_f32 :: proc(angle_z, angle_x: f32) -> (m: Matrix4f32) {
 	return mul(matrix4_from_euler_angle_z(angle_z), matrix4_from_euler_angle_x(angle_x))
 }
+@(require_results)
 matrix4_from_euler_angles_yz_f32 :: proc(angle_y, angle_z: f32) -> (m: Matrix4f32) {
 	return mul(matrix4_from_euler_angle_y(angle_y), matrix4_from_euler_angle_z(angle_z))
 }
+@(require_results)
 matrix4_from_euler_angles_zy_f32 :: proc(angle_z, angle_y: f32) -> (m: Matrix4f32) {
 	return mul(matrix4_from_euler_angle_z(angle_z), matrix4_from_euler_angle_y(angle_y))
 }
 
 
+@(require_results)
 matrix4_from_euler_angles_xyz_f32 :: proc(t1, t2, t3: f32) -> (m: Matrix4f32) {
 	c1 := math.cos(-t1)
 	c2 := math.cos(-t2)
@@ -874,6 +950,7 @@ matrix4_from_euler_angles_xyz_f32 :: proc(t1, t2, t3: f32) -> (m: Matrix4f32) {
 	return
 }
 
+@(require_results)
 matrix4_from_euler_angles_yxz_f32 :: proc(yaw, pitch, roll: f32) -> (m: Matrix4f32) {
 	ch := math.cos(yaw)
 	sh := math.sin(yaw)
@@ -901,6 +978,7 @@ matrix4_from_euler_angles_yxz_f32 :: proc(yaw, pitch, roll: f32) -> (m: Matrix4f
 	return
 }
 
+@(require_results)
 matrix4_from_euler_angles_xzx_f32 :: proc(t1, t2, t3: f32) -> (m: Matrix4f32) {
 	c1 := math.cos(t1)
 	s1 := math.sin(t1)
@@ -928,6 +1006,7 @@ matrix4_from_euler_angles_xzx_f32 :: proc(t1, t2, t3: f32) -> (m: Matrix4f32) {
 	return
 }
 
+@(require_results)
 matrix4_from_euler_angles_xyx_f32 :: proc(t1, t2, t3: f32) -> (m: Matrix4f32) {
 	c1 := math.cos(t1)
 	s1 := math.sin(t1)
@@ -955,6 +1034,7 @@ matrix4_from_euler_angles_xyx_f32 :: proc(t1, t2, t3: f32) -> (m: Matrix4f32) {
 	return
 }
 
+@(require_results)
 matrix4_from_euler_angles_yxy_f32 :: proc(t1, t2, t3: f32) -> (m: Matrix4f32) {
 	c1 := math.cos(t1)
 	s1 := math.sin(t1)
@@ -982,6 +1062,7 @@ matrix4_from_euler_angles_yxy_f32 :: proc(t1, t2, t3: f32) -> (m: Matrix4f32) {
 	return
 }
 
+@(require_results)
 matrix4_from_euler_angles_yzy_f32 :: proc(t1, t2, t3: f32) -> (m: Matrix4f32) {
 	c1 := math.cos(t1)
 	s1 := math.sin(t1)
@@ -1009,6 +1090,7 @@ matrix4_from_euler_angles_yzy_f32 :: proc(t1, t2, t3: f32) -> (m: Matrix4f32) {
 	return
 }
 
+@(require_results)
 matrix4_from_euler_angles_zyz_f32 :: proc(t1, t2, t3: f32) -> (m: Matrix4f32) {
 	c1 := math.cos(t1)
 	s1 := math.sin(t1)
@@ -1036,6 +1118,7 @@ matrix4_from_euler_angles_zyz_f32 :: proc(t1, t2, t3: f32) -> (m: Matrix4f32) {
 	return
 }
 
+@(require_results)
 matrix4_from_euler_angles_zxz_f32 :: proc(t1, t2, t3: f32) -> (m: Matrix4f32) {
 	c1 := math.cos(t1)
 	s1 := math.sin(t1)
@@ -1064,6 +1147,7 @@ matrix4_from_euler_angles_zxz_f32 :: proc(t1, t2, t3: f32) -> (m: Matrix4f32) {
 }
 
 
+@(require_results)
 matrix4_from_euler_angles_xzy_f32 :: proc(t1, t2, t3: f32) -> (m: Matrix4f32) {
 	c1 := math.cos(t1)
 	s1 := math.sin(t1)
@@ -1091,6 +1175,7 @@ matrix4_from_euler_angles_xzy_f32 :: proc(t1, t2, t3: f32) -> (m: Matrix4f32) {
 	return
 }
 
+@(require_results)
 matrix4_from_euler_angles_yzx_f32 :: proc(t1, t2, t3: f32) -> (m: Matrix4f32) {
 	c1 := math.cos(t1)
 	s1 := math.sin(t1)
@@ -1118,6 +1203,7 @@ matrix4_from_euler_angles_yzx_f32 :: proc(t1, t2, t3: f32) -> (m: Matrix4f32) {
 	return
 }
 
+@(require_results)
 matrix4_from_euler_angles_zyx_f32 :: proc(t1, t2, t3: f32) -> (m: Matrix4f32) {
 	c1 := math.cos(t1)
 	s1 := math.sin(t1)
@@ -1145,6 +1231,7 @@ matrix4_from_euler_angles_zyx_f32 :: proc(t1, t2, t3: f32) -> (m: Matrix4f32) {
 	return
 }
 
+@(require_results)
 matrix4_from_euler_angles_zxy_f32 :: proc(t1, t2, t3: f32) -> (m: Matrix4f32) {
 	c1 := math.cos(t1)
 	s1 := math.sin(t1)
@@ -1173,6 +1260,7 @@ matrix4_from_euler_angles_zxy_f32 :: proc(t1, t2, t3: f32) -> (m: Matrix4f32) {
 }
 
 
+@(require_results)
 matrix4_from_yaw_pitch_roll_f32 :: proc(yaw, pitch, roll: f32) -> (m: Matrix4f32) {
 	ch := math.cos(yaw)
 	sh := math.sin(yaw)
@@ -1200,6 +1288,7 @@ matrix4_from_yaw_pitch_roll_f32 :: proc(yaw, pitch, roll: f32) -> (m: Matrix4f32
 	return m
 }
 
+@(require_results)
 euler_angles_xyz_from_matrix4_f32 :: proc(m: Matrix4f32) -> (t1, t2, t3: f32) {
 	T1 := math.atan2(m[1, 2], m[2, 2])
 	C2 := math.sqrt(m[0, 0]*m[0, 0] + m[0, 1]*m[0, 1])
@@ -1213,6 +1302,7 @@ euler_angles_xyz_from_matrix4_f32 :: proc(m: Matrix4f32) -> (t1, t2, t3: f32) {
 	return
 }
 
+@(require_results)
 euler_angles_yxz_from_matrix4_f32 :: proc(m: Matrix4f32) -> (t1, t2, t3: f32) {
 	T1 := math.atan2(m[0, 2], m[2, 2])
 	C2 := math.sqrt(m[1, 0]*m[1, 0] + m[1, 1]*m[1, 1])
@@ -1226,6 +1316,7 @@ euler_angles_yxz_from_matrix4_f32 :: proc(m: Matrix4f32) -> (t1, t2, t3: f32) {
 	return
 }
 
+@(require_results)
 euler_angles_xzx_from_matrix4_f32 :: proc(m: Matrix4f32) -> (t1, t2, t3: f32) {
 	T1 := math.atan2(m[2, 0], m[1, 0])
 	S2 := math.sqrt(m[0, 1]*m[0, 1] + m[0, 2]*m[0, 2])
@@ -1239,6 +1330,7 @@ euler_angles_xzx_from_matrix4_f32 :: proc(m: Matrix4f32) -> (t1, t2, t3: f32) {
 	return
 }
 
+@(require_results)
 euler_angles_xyx_from_matrix4_f32 :: proc(m: Matrix4f32) -> (t1, t2, t3: f32) {
 	T1 := math.atan2(m[1, 0], -m[2, 0])
 	S2 := math.sqrt(m[0, 1]*m[0, 1] + m[0, 2]*m[0, 2])
@@ -1252,6 +1344,7 @@ euler_angles_xyx_from_matrix4_f32 :: proc(m: Matrix4f32) -> (t1, t2, t3: f32) {
 	return
 }
 
+@(require_results)
 euler_angles_yxy_from_matrix4_f32 :: proc(m: Matrix4f32) -> (t1, t2, t3: f32) {
 	T1 := math.atan2(m[0, 1], m[2, 1])
 	S2 := math.sqrt(m[1, 0]*m[1, 0] + m[1, 2]*m[1, 2])
@@ -1265,6 +1358,7 @@ euler_angles_yxy_from_matrix4_f32 :: proc(m: Matrix4f32) -> (t1, t2, t3: f32) {
 	return
 }
 
+@(require_results)
 euler_angles_yzy_from_matrix4_f32 :: proc(m: Matrix4f32) -> (t1, t2, t3: f32) {
 	T1 := math.atan2(m[2, 1], -m[0, 1])
 	S2 := math.sqrt(m[1, 0]*m[1, 0] + m[1, 2]*m[1, 2])
@@ -1277,6 +1371,7 @@ euler_angles_yzy_from_matrix4_f32 :: proc(m: Matrix4f32) -> (t1, t2, t3: f32) {
 	t3 = T3
 	return
 }
+@(require_results)
 euler_angles_zyz_from_matrix4_f32 :: proc(m: Matrix4f32) -> (t1, t2, t3: f32) {
 	T1 := math.atan2(m[1, 2], m[0, 2])
 	S2 := math.sqrt(m[2, 0]*m[2, 0] + m[2, 1]*m[2, 1])
@@ -1290,6 +1385,7 @@ euler_angles_zyz_from_matrix4_f32 :: proc(m: Matrix4f32) -> (t1, t2, t3: f32) {
 	return
 }
 
+@(require_results)
 euler_angles_zxz_from_matrix4_f32 :: proc(m: Matrix4f32) -> (t1, t2, t3: f32) {
 	T1 := math.atan2(m[0, 2], -m[1, 2])
 	S2 := math.sqrt(m[2, 0]*m[2, 0] + m[2, 1]*m[2, 1])
@@ -1303,6 +1399,7 @@ euler_angles_zxz_from_matrix4_f32 :: proc(m: Matrix4f32) -> (t1, t2, t3: f32) {
 	return
 }
 
+@(require_results)
 euler_angles_xzy_from_matrix4_f32 :: proc(m: Matrix4f32) -> (t1, t2, t3: f32) {
 	T1 := math.atan2(m[2, 1], m[1, 1])
 	C2 := math.sqrt(m[0, 0]*m[0, 0] + m[0, 2]*m[0, 2])
@@ -1316,6 +1413,7 @@ euler_angles_xzy_from_matrix4_f32 :: proc(m: Matrix4f32) -> (t1, t2, t3: f32) {
 	return
 }
 
+@(require_results)
 euler_angles_yzx_from_matrix4_f32 :: proc(m: Matrix4f32) -> (t1, t2, t3: f32) {
 	T1 := math.atan2(-m[2, 0], m[0, 0])
 	C2 := math.sqrt(m[1, 1]*m[1, 1] + m[1, 2]*m[1, 2])
@@ -1329,6 +1427,7 @@ euler_angles_yzx_from_matrix4_f32 :: proc(m: Matrix4f32) -> (t1, t2, t3: f32) {
 	return
 }
 
+@(require_results)
 euler_angles_zyx_from_matrix4_f32 :: proc(m: Matrix4f32) -> (t1, t2, t3: f32) {
 	T1 := math.atan2(m[1, 0], m[0, 0])
 	C2 := math.sqrt(m[2, 1]*m[2, 1] + m[2, 2]*m[2, 2])
@@ -1342,6 +1441,7 @@ euler_angles_zyx_from_matrix4_f32 :: proc(m: Matrix4f32) -> (t1, t2, t3: f32) {
 	return
 }
 
+@(require_results)
 euler_angles_zxy_from_matrix4_f32 :: proc(m: Matrix4f32) -> (t1, t2, t3: f32) {
 	T1 := math.atan2(-m[0, 1], m[1, 1])
 	C2 := math.sqrt(m[2, 0]*m[2, 0] + m[2, 2]*m[2, 2])
