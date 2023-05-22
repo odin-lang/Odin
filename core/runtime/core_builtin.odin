@@ -6,7 +6,7 @@ import "core:intrinsics"
 Maybe :: union($T: typeid) {T}
 
 
-@builtin
+@(builtin, require_results)
 container_of :: #force_inline proc "contextless" (ptr: $P/^$Field_Type, $T: typeid, $field_name: string) -> ^T
 	where intrinsics.type_has_field(T, field_name),
 	      intrinsics.type_field_type(T, field_name) == Field_Type {
@@ -179,17 +179,18 @@ delete :: proc{
 
 // The new built-in procedure allocates memory. The first argument is a type, not a value, and the value
 // return is a pointer to a newly allocated value of that type using the specified allocator, default is context.allocator
-@builtin
+@(builtin, require_results)
 new :: proc($T: typeid, allocator := context.allocator, loc := #caller_location) -> (^T, Allocator_Error) #optional_allocator_error {
 	return new_aligned(T, align_of(T), allocator, loc)
 }
+@(require_results)
 new_aligned :: proc($T: typeid, alignment: int, allocator := context.allocator, loc := #caller_location) -> (t: ^T, err: Allocator_Error) {
 	data := mem_alloc_bytes(size_of(T), alignment, allocator, loc) or_return
 	t = (^T)(raw_data(data))
 	return
 }
 
-@builtin
+@(builtin, require_results)
 new_clone :: proc(data: $T, allocator := context.allocator, loc := #caller_location) -> (t: ^T, err: Allocator_Error) #optional_allocator_error {
 	t_data := mem_alloc_bytes(size_of(T), align_of(T), allocator, loc) or_return
 	t = (^T)(raw_data(t_data))
@@ -201,6 +202,7 @@ new_clone :: proc(data: $T, allocator := context.allocator, loc := #caller_locat
 
 DEFAULT_RESERVE_CAPACITY :: 16
 
+@(require_results)
 make_aligned :: proc($T: typeid/[]$E, #any_int len: int, alignment: int, allocator := context.allocator, loc := #caller_location) -> (T, Allocator_Error) #optional_allocator_error {
 	make_slice_error_loc(loc, len)
 	data, err := mem_alloc_bytes(size_of(E)*len, alignment, allocator, loc)
@@ -211,19 +213,19 @@ make_aligned :: proc($T: typeid/[]$E, #any_int len: int, alignment: int, allocat
 	return transmute(T)s, err
 }
 
-@(builtin)
+@(builtin, require_results)
 make_slice :: proc($T: typeid/[]$E, #any_int len: int, allocator := context.allocator, loc := #caller_location) -> (T, Allocator_Error) #optional_allocator_error {
 	return make_aligned(T, len, align_of(E), allocator, loc)
 }
-@(builtin)
+@(builtin, require_results)
 make_dynamic_array :: proc($T: typeid/[dynamic]$E, allocator := context.allocator, loc := #caller_location) -> (T, Allocator_Error) #optional_allocator_error {
 	return make_dynamic_array_len_cap(T, 0, DEFAULT_RESERVE_CAPACITY, allocator, loc)
 }
-@(builtin)
+@(builtin, require_results)
 make_dynamic_array_len :: proc($T: typeid/[dynamic]$E, #any_int len: int, allocator := context.allocator, loc := #caller_location) -> (T, Allocator_Error) #optional_allocator_error {
 	return make_dynamic_array_len_cap(T, len, len, allocator, loc)
 }
-@(builtin)
+@(builtin, require_results)
 make_dynamic_array_len_cap :: proc($T: typeid/[dynamic]$E, #any_int len: int, #any_int cap: int, allocator := context.allocator, loc := #caller_location) -> (array: T, err: Allocator_Error) #optional_allocator_error {
 	make_dynamic_array_error_loc(loc, len, cap)
 	data := mem_alloc_bytes(size_of(E)*cap, align_of(E), allocator, loc) or_return
@@ -234,7 +236,7 @@ make_dynamic_array_len_cap :: proc($T: typeid/[dynamic]$E, #any_int len: int, #a
 	array = transmute(T)s
 	return
 }
-@(builtin)
+@(builtin, require_results)
 make_map :: proc($T: typeid/map[$K]$E, #any_int capacity: int = 1<<MAP_MIN_LOG2_CAPACITY, allocator := context.allocator, loc := #caller_location) -> (m: T, err: Allocator_Error) #optional_allocator_error {
 	make_map_expr_error_loc(loc, capacity)
 	context.allocator = allocator
@@ -242,7 +244,7 @@ make_map :: proc($T: typeid/map[$K]$E, #any_int capacity: int = 1<<MAP_MIN_LOG2_
 	err = reserve_map(&m, capacity, loc)
 	return
 }
-@(builtin)
+@(builtin, require_results)
 make_multi_pointer :: proc($T: typeid/[^]$E, #any_int len: int, allocator := context.allocator, loc := #caller_location) -> (mp: T, err: Allocator_Error) #optional_allocator_error {
 	make_slice_error_loc(loc, len)
 	data := mem_alloc_bytes(size_of(E)*len, align_of(E), allocator, loc) or_return
