@@ -5196,10 +5196,13 @@ gb_internal bool check_unpack_arguments(CheckerContext *ctx, Entity **lhs, isize
 			}
 		}
 
-		if (allow_undef && rhs[i] != nullptr && rhs[i]->kind == Ast_Undef) {
+		Ast *rhs_expr = unparen_expr(rhs[i]);
+		if (allow_undef && rhs_expr != nullptr && rhs_expr->kind == Ast_Undef) {
+			// NOTE(bill): Just handle this very specific logic here
 			o.type = t_untyped_undef;
 			o.mode = Addressing_Value;
 			o.expr = rhs[i];
+			add_type_and_value(c, rhs[i], o.mode, o.type, o.value);
 		} else {
 			check_expr_base(c, &o, rhs[i], type_hint);
 		}
