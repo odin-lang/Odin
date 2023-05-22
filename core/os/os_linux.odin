@@ -484,15 +484,12 @@ get_last_error :: proc "contextless" () -> int {
 
 personality :: proc(persona: u64) -> (Errno) {
 	res := unix.sys_personality(persona)
-	if res == -1 {
-		return _get_errno(res)
-	}
-	return ERROR_NONE
+	return _get_errno(res)
 }
 
 fork :: proc() -> (Pid, Errno) {
 	pid := unix.sys_fork()
-	if pid == -1 {
+	if pid < 0 {
 		return -1, _get_errno(pid)
 	}
 	return Pid(pid), ERROR_NONE
