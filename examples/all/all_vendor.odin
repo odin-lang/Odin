@@ -24,6 +24,7 @@ import vk         "vendor:vulkan"
 
 import NS         "vendor:darwin/Foundation"
 import MTL        "vendor:darwin/Metal"
+import MTK        "vendor:darwin/MetalKit"
 import CA         "vendor:darwin/QuartzCore"
 
 // NOTE(bill): only one can be checked at a time
