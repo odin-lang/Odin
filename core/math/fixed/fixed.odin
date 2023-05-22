@@ -50,39 +50,48 @@ to_f64 :: proc(x: $T/Fixed($Backing, $Fraction_Width)) -> f64 {
 }
 
 
+@(require_results)
 add :: proc(x, y: $T/Fixed) -> T {
 	return {x.i + y.i}
 }
+@(require_results)
 sub :: proc(x, y: $T/Fixed) -> T {
 	return {x.i - y.i}
 }
 
+@(require_results)
 mul :: proc(x, y: $T/Fixed($Backing, $Fraction_Width)) -> (z: T) {
 	z.i = intrinsics.fixed_point_mul(x.i, y.i, Fraction_Width)
 	return
 }
+@(require_results)
 mul_sat :: proc(x, y: $T/Fixed($Backing, $Fraction_Width)) -> (z: T) {
 	z.i = intrinsics.fixed_point_mul_sat(x.i, y.i, Fraction_Width)
 	return
 }
 
+@(require_results)
 div :: proc(x, y: $T/Fixed($Backing, $Fraction_Width)) -> (z: T) {
 	z.i = intrinsics.fixed_point_div(x.i, y.i, Fraction_Width)
 	return
 }
+@(require_results)
 div_sat :: proc(x, y: $T/Fixed($Backing, $Fraction_Width)) -> (z: T) {
 	z.i = intrinsics.fixed_point_div_sat(x.i, y.i, Fraction_Width)
 	return
 }
 
 
+@(require_results)
 floor :: proc(x: $T/Fixed($Backing, $Fraction_Width)) -> Backing {
 	return x.i >> Fraction_Width
 }
+@(require_results)
 ceil :: proc(x: $T/Fixed($Backing, $Fraction_Width)) -> Backing {
 	Integer :: 8*size_of(Backing) - Fraction_Width
 	return (x.i + (1 << Integer-1)) >> Fraction_Width
 }
+@(require_results)
 round :: proc(x: $T/Fixed($Backing, $Fraction_Width)) -> Backing {
 	Integer :: 8*size_of(Backing) - Fraction_Width
 	return (x.i + (1 << (Integer - 1))) >> Fraction_Width
@@ -90,6 +99,7 @@ round :: proc(x: $T/Fixed($Backing, $Fraction_Width)) -> Backing {
 
 
 
+@(require_results)
 append :: proc(dst: []byte, x: $T/Fixed($Backing, $Fraction_Width)) -> string {
 	x := x
 	buf: [48]byte
@@ -123,6 +133,7 @@ append :: proc(dst: []byte, x: $T/Fixed($Backing, $Fraction_Width)) -> string {
 }
 
 
+@(require_results)
 to_string :: proc(x: $T/Fixed($Backing, $Fraction_Width), allocator := context.allocator) -> string {
 	buf: [48]byte
 	s := append(buf[:], x)
