@@ -4,7 +4,7 @@ import "core:builtin"
 import "core:math"
 
 @(require_results)
-to_radians :: proc(degrees: $T) -> (out: T) where IS_NUMERIC(ELEM_TYPE(T)) {
+to_radians :: proc "contextless" (degrees: $T) -> (out: T) where IS_NUMERIC(ELEM_TYPE(T)) {
 	when IS_ARRAY(T) {
 		for i in 0..<len(T) {
 			out[i] = degrees[i] * RAD_PER_DEG
@@ -16,7 +16,7 @@ to_radians :: proc(degrees: $T) -> (out: T) where IS_NUMERIC(ELEM_TYPE(T)) {
 }
 
 @(require_results)
-to_degrees :: proc(radians: $T) -> (out: T) where IS_NUMERIC(ELEM_TYPE(T)) {
+to_degrees :: proc "contextless" (radians: $T) -> (out: T) where IS_NUMERIC(ELEM_TYPE(T)) {
 	when IS_ARRAY(T) {
 		for i in 0..<len(T) {
 			out[i] = radians[i] * DEG_PER_RAD
@@ -28,7 +28,7 @@ to_degrees :: proc(radians: $T) -> (out: T) where IS_NUMERIC(ELEM_TYPE(T)) {
 }
 
 @(require_results)
-min_double :: proc(a, b: $T) -> (out: T) where IS_NUMERIC(ELEM_TYPE(T)) {
+min_double :: proc "contextless" (a, b: $T) -> (out: T) where IS_NUMERIC(ELEM_TYPE(T)) {
 	when IS_ARRAY(T) {
 		for i in 0..<len(T) {
 			out[i] = builtin.min(a[i], b[i])
@@ -40,7 +40,7 @@ min_double :: proc(a, b: $T) -> (out: T) where IS_NUMERIC(ELEM_TYPE(T)) {
 }
 
 @(require_results)
-min_single :: proc(a: $T) -> (out: ELEM_TYPE(T)) where IS_NUMERIC(ELEM_TYPE(T)) {
+min_single :: proc "contextless" (a: $T) -> (out: ELEM_TYPE(T)) where IS_NUMERIC(ELEM_TYPE(T)) {
 	when IS_ARRAY(T) {
 		N :: len(T)
 
@@ -61,14 +61,14 @@ min_single :: proc(a: $T) -> (out: ELEM_TYPE(T)) where IS_NUMERIC(ELEM_TYPE(T)) 
 }
 
 @(require_results)
-min_triple :: proc(a, b, c: $T) -> T where IS_NUMERIC(ELEM_TYPE(T)) {
+min_triple :: proc "contextless" (a, b, c: $T) -> T where IS_NUMERIC(ELEM_TYPE(T)) {
 	return min_double(a, min_double(b, c))
 }
 
 min :: proc{min_single, min_double, min_triple}
 
 @(require_results)
-max_double :: proc(a, b: $T) -> (out: T) where IS_NUMERIC(ELEM_TYPE(T)) {
+max_double :: proc "contextless" (a, b: $T) -> (out: T) where IS_NUMERIC(ELEM_TYPE(T)) {
 	when IS_ARRAY(T) {
 		for i in 0..<len(T) {
 			out[i] = builtin.max(a[i], b[i])
@@ -80,7 +80,7 @@ max_double :: proc(a, b: $T) -> (out: T) where IS_NUMERIC(ELEM_TYPE(T)) {
 }
 
 @(require_results)
-max_single :: proc(a: $T) -> (out: ELEM_TYPE(T)) where IS_NUMERIC(ELEM_TYPE(T)) {
+max_single :: proc "contextless" (a: $T) -> (out: ELEM_TYPE(T)) where IS_NUMERIC(ELEM_TYPE(T)) {
 	when IS_ARRAY(T) {
 		N :: len(T)
 
@@ -103,14 +103,14 @@ max_single :: proc(a: $T) -> (out: ELEM_TYPE(T)) where IS_NUMERIC(ELEM_TYPE(T)) 
 }
 
 @(require_results)
-max_triple :: proc(a, b, c: $T) -> T where IS_NUMERIC(ELEM_TYPE(T)) {
+max_triple :: proc "contextless" (a, b, c: $T) -> T where IS_NUMERIC(ELEM_TYPE(T)) {
 	return max_double(a, max_double(b, c))
 }
 
 max :: proc{max_single, max_double, max_triple}
 
 @(require_results)
-abs :: proc(a: $T) -> (out: T) where IS_NUMERIC(ELEM_TYPE(T)) {
+abs :: proc "contextless" (a: $T) -> (out: T) where IS_NUMERIC(ELEM_TYPE(T)) {
 	when IS_ARRAY(T) {
 		for i in 0..<len(T) {
 			out[i] = auto_cast builtin.abs(a[i])
@@ -122,7 +122,7 @@ abs :: proc(a: $T) -> (out: T) where IS_NUMERIC(ELEM_TYPE(T)) {
 }
 
 @(require_results)
-sign :: proc(a: $T) -> (out: T) where IS_NUMERIC(ELEM_TYPE(T)) {
+sign :: proc "contextless" (a: $T) -> (out: T) where IS_NUMERIC(ELEM_TYPE(T)) {
 	when IS_ARRAY(T) {
 		for i in 0..<len(T) {
 			out[i] = #force_inline math.sign(a[i])
@@ -134,7 +134,7 @@ sign :: proc(a: $T) -> (out: T) where IS_NUMERIC(ELEM_TYPE(T)) {
 }
 
 @(require_results)
-clamp :: proc(x, a, b: $T) -> (out: T) where IS_NUMERIC(ELEM_TYPE(T)) {
+clamp :: proc "contextless" (x, a, b: $T) -> (out: T) where IS_NUMERIC(ELEM_TYPE(T)) {
 	when IS_ARRAY(T) {
 		for i in 0..<len(T) {
 			out[i] = builtin.clamp(x[i], a[i], b[i])
@@ -147,12 +147,12 @@ clamp :: proc(x, a, b: $T) -> (out: T) where IS_NUMERIC(ELEM_TYPE(T)) {
 
 
 @(require_results)
-saturate :: proc(x: $T) -> T where IS_FLOAT(ELEM_TYPE(T)) {
+saturate :: proc "contextless" (x: $T) -> T where IS_FLOAT(ELEM_TYPE(T)) {
 	return clamp(x, 0.0, 1.0)
 }
 
 @(require_results)
-lerp :: proc(a, b, t: $T) -> (out: T) where IS_FLOAT(ELEM_TYPE(T)) {
+lerp :: proc "contextless" (a, b, t: $T) -> (out: T) where IS_FLOAT(ELEM_TYPE(T)) {
 	when IS_ARRAY(T) {
 		for i in 0..<len(T) {
 			out[i] = a[i]*(1-t[i]) + b[i]*t[i]
@@ -163,7 +163,7 @@ lerp :: proc(a, b, t: $T) -> (out: T) where IS_FLOAT(ELEM_TYPE(T)) {
 	return
 }
 @(require_results)
-mix :: proc(a, b, t: $T) -> (out: T) where IS_FLOAT(ELEM_TYPE(T)) {
+mix :: proc "contextless" (a, b, t: $T) -> (out: T) where IS_FLOAT(ELEM_TYPE(T)) {
 	when IS_ARRAY(T) {
 		for i in 0..<len(T) {
 			out[i] = a[i]*(1-t[i]) + b[i]*t[i]
@@ -175,12 +175,12 @@ mix :: proc(a, b, t: $T) -> (out: T) where IS_FLOAT(ELEM_TYPE(T)) {
 }
 
 @(require_results)
-unlerp :: proc(a, b, x: $T) -> T where IS_FLOAT(ELEM_TYPE(T)) {
+unlerp :: proc "contextless" (a, b, x: $T) -> T where IS_FLOAT(ELEM_TYPE(T)) {
 	return (x - a) / (b - a)
 }
 
 @(require_results)
-step :: proc(e, x: $T) -> (out: T) where IS_FLOAT(ELEM_TYPE(T)) {
+step :: proc "contextless" (e, x: $T) -> (out: T) where IS_FLOAT(ELEM_TYPE(T)) {
 	when IS_ARRAY(T) {
 		for i in 0..<len(T) {
 			out[i] = x[i] < e[i] ? 0.0 : 1.0
@@ -192,20 +192,20 @@ step :: proc(e, x: $T) -> (out: T) where IS_FLOAT(ELEM_TYPE(T)) {
 }
 
 @(require_results)
-smoothstep :: proc(e0, e1, x: $T) -> T where IS_FLOAT(ELEM_TYPE(T)) {
+smoothstep :: proc "contextless" (e0, e1, x: $T) -> T where IS_FLOAT(ELEM_TYPE(T)) {
 	t := saturate(unlerp(e0, e1, x))
 	return t * t * (3.0 - 2.0 * t)
 }
 
 @(require_results)
-smootherstep :: proc(e0, e1, x: $T) -> T where IS_FLOAT(ELEM_TYPE(T)) {
+smootherstep :: proc "contextless" (e0, e1, x: $T) -> T where IS_FLOAT(ELEM_TYPE(T)) {
 	t := saturate(unlerp(e0, e1, x))
 	return t * t * t * (t * (6*t - 15) + 10)
 }
 
 
 @(require_results)
-sqrt :: proc(x: $T) -> (out: T) where IS_FLOAT(ELEM_TYPE(T)) {
+sqrt :: proc "contextless" (x: $T) -> (out: T) where IS_FLOAT(ELEM_TYPE(T)) {
 	when IS_ARRAY(T) {
 		for i in 0..<len(T) {
 			out[i] = math.sqrt(x[i])
@@ -217,7 +217,7 @@ sqrt :: proc(x: $T) -> (out: T) where IS_FLOAT(ELEM_TYPE(T)) {
 }
 
 @(require_results)
-inverse_sqrt :: proc(x: $T) -> (out: T) where IS_FLOAT(ELEM_TYPE(T)) {
+inverse_sqrt :: proc "contextless" (x: $T) -> (out: T) where IS_FLOAT(ELEM_TYPE(T)) {
 	when IS_ARRAY(T) {
 		for i in 0..<len(T) {
 			out[i] = 1.0/math.sqrt(x[i])
@@ -229,7 +229,7 @@ inverse_sqrt :: proc(x: $T) -> (out: T) where IS_FLOAT(ELEM_TYPE(T)) {
 }
 
 @(require_results)
-cos :: proc(x: $T) -> (out: T) where IS_FLOAT(ELEM_TYPE(T)) {
+cos :: proc "contextless" (x: $T) -> (out: T) where IS_FLOAT(ELEM_TYPE(T)) {
 	when IS_ARRAY(T) {
 		for i in 0..<len(T) {
 			out[i] = math.cos(x[i])
@@ -241,7 +241,7 @@ cos :: proc(x: $T) -> (out: T) where IS_FLOAT(ELEM_TYPE(T)) {
 }
 
 @(require_results)
-sin :: proc(x: $T) -> (out: T) where IS_FLOAT(ELEM_TYPE(T)) {
+sin :: proc "contextless" (x: $T) -> (out: T) where IS_FLOAT(ELEM_TYPE(T)) {
 	when IS_ARRAY(T) {
 		for i in 0..<len(T) {
 			out[i] = math.sin(x[i])
@@ -253,7 +253,7 @@ sin :: proc(x: $T) -> (out: T) where IS_FLOAT(ELEM_TYPE(T)) {
 }
 
 @(require_results)
-tan :: proc(x: $T) -> (out: T) where IS_FLOAT(ELEM_TYPE(T)) {
+tan :: proc "contextless" (x: $T) -> (out: T) where IS_FLOAT(ELEM_TYPE(T)) {
 	when IS_ARRAY(T) {
 		for i in 0..<len(T) {
 			out[i] = math.tan(x[i])
@@ -265,7 +265,7 @@ tan :: proc(x: $T) -> (out: T) where IS_FLOAT(ELEM_TYPE(T)) {
 }
 
 @(require_results)
-acos :: proc(x: $T) -> (out: T) where IS_FLOAT(ELEM_TYPE(T)) {
+acos :: proc "contextless" (x: $T) -> (out: T) where IS_FLOAT(ELEM_TYPE(T)) {
 	when IS_ARRAY(T) {
 		for i in 0..<len(T) {
 			out[i] = math.acos(x[i])
@@ -277,7 +277,7 @@ acos :: proc(x: $T) -> (out: T) where IS_FLOAT(ELEM_TYPE(T)) {
 }
 
 @(require_results)
-asin :: proc(x: $T) -> (out: T) where IS_FLOAT(ELEM_TYPE(T)) {
+asin :: proc "contextless" (x: $T) -> (out: T) where IS_FLOAT(ELEM_TYPE(T)) {
 	when IS_ARRAY(T) {
 		for i in 0..<len(T) {
 			out[i] = math.asin(x[i])
@@ -289,7 +289,7 @@ asin :: proc(x: $T) -> (out: T) where IS_FLOAT(ELEM_TYPE(T)) {
 }
 
 @(require_results)
-atan :: proc(x: $T) -> (out: T) where IS_FLOAT(ELEM_TYPE(T)) {
+atan :: proc "contextless" (x: $T) -> (out: T) where IS_FLOAT(ELEM_TYPE(T)) {
 	when IS_ARRAY(T) {
 		for i in 0..<len(T) {
 			out[i] = math.atan(x[i])
@@ -300,7 +300,7 @@ atan :: proc(x: $T) -> (out: T) where IS_FLOAT(ELEM_TYPE(T)) {
 	return
 }
 @(require_results)
-atan2 :: proc(y, x: $T) -> (out: T) where IS_FLOAT(ELEM_TYPE(T)) {
+atan2 :: proc "contextless" (y, x: $T) -> (out: T) where IS_FLOAT(ELEM_TYPE(T)) {
 	when IS_ARRAY(T) {
 		for i in 0..<len(T) {
 			out[i] = math.atan2(y[i], x[i])
@@ -313,7 +313,7 @@ atan2 :: proc(y, x: $T) -> (out: T) where IS_FLOAT(ELEM_TYPE(T)) {
 
 
 @(require_results)
-ln :: proc(x: $T) -> (out: T) where IS_FLOAT(ELEM_TYPE(T)) {
+ln :: proc "contextless" (x: $T) -> (out: T) where IS_FLOAT(ELEM_TYPE(T)) {
 	when IS_ARRAY(T) {
 		for i in 0..<len(T) {
 			out[i] = math.ln(x[i])
@@ -325,7 +325,7 @@ ln :: proc(x: $T) -> (out: T) where IS_FLOAT(ELEM_TYPE(T)) {
 }
 
 @(require_results)
-log2 :: proc(x: $T) -> (out: T) where IS_FLOAT(ELEM_TYPE(T)) {
+log2 :: proc "contextless" (x: $T) -> (out: T) where IS_FLOAT(ELEM_TYPE(T)) {
 	when IS_ARRAY(T) {
 		for i in 0..<len(T) {
 			out[i] = INVLN2 * math.ln(x[i])
@@ -337,7 +337,7 @@ log2 :: proc(x: $T) -> (out: T) where IS_FLOAT(ELEM_TYPE(T)) {
 }
 
 @(require_results)
-log10 :: proc(x: $T) -> (out: T) where IS_FLOAT(ELEM_TYPE(T)) {
+log10 :: proc "contextless" (x: $T) -> (out: T) where IS_FLOAT(ELEM_TYPE(T)) {
 	when IS_ARRAY(T) {
 		for i in 0..<len(T) {
 			out[i] = INVLN10 * math.ln(x[i])
@@ -349,7 +349,7 @@ log10 :: proc(x: $T) -> (out: T) where IS_FLOAT(ELEM_TYPE(T)) {
 }
 
 @(require_results)
-log :: proc(x, b: $T) -> (out: T) where IS_FLOAT(ELEM_TYPE(T)) {
+log :: proc "contextless" (x, b: $T) -> (out: T) where IS_FLOAT(ELEM_TYPE(T)) {
 	when IS_ARRAY(T) {
 		for i in 0..<len(T) {
 			out[i] = math.ln(x[i]) / math.ln(cast(ELEM_TYPE(T))b[i])
@@ -361,7 +361,7 @@ log :: proc(x, b: $T) -> (out: T) where IS_FLOAT(ELEM_TYPE(T)) {
 }
 
 @(require_results)
-exp :: proc(x: $T) -> (out: T) where IS_FLOAT(ELEM_TYPE(T)) {
+exp :: proc "contextless" (x: $T) -> (out: T) where IS_FLOAT(ELEM_TYPE(T)) {
 	when IS_ARRAY(T) {
 		for i in 0..<len(T) {
 			out[i] = math.exp(x[i])
@@ -373,7 +373,7 @@ exp :: proc(x: $T) -> (out: T) where IS_FLOAT(ELEM_TYPE(T)) {
 }
 
 @(require_results)
-exp2 :: proc(x: $T) -> (out: T) where IS_FLOAT(ELEM_TYPE(T)) {
+exp2 :: proc "contextless" (x: $T) -> (out: T) where IS_FLOAT(ELEM_TYPE(T)) {
 	when IS_ARRAY(T) {
 		for i in 0..<len(T) {
 			out[i] = math.exp(LN2 * x[i])
@@ -385,7 +385,7 @@ exp2 :: proc(x: $T) -> (out: T) where IS_FLOAT(ELEM_TYPE(T)) {
 }
 
 @(require_results)
-exp10 :: proc(x: $T) -> (out: T) where IS_FLOAT(ELEM_TYPE(T)) {
+exp10 :: proc "contextless" (x: $T) -> (out: T) where IS_FLOAT(ELEM_TYPE(T)) {
 	when IS_ARRAY(T) {
 		for i in 0..<len(T) {
 			out[i] = math.exp(LN10 * x[i])
@@ -397,7 +397,7 @@ exp10 :: proc(x: $T) -> (out: T) where IS_FLOAT(ELEM_TYPE(T)) {
 }
 
 @(require_results)
-pow :: proc(x, e: $T) -> (out: T) where IS_FLOAT(ELEM_TYPE(T)) {
+pow :: proc "contextless" (x, e: $T) -> (out: T) where IS_FLOAT(ELEM_TYPE(T)) {
 	when IS_ARRAY(T) {
 		for i in 0..<len(T) {
 			out[i] = math.pow(x[i], e[i])
@@ -410,7 +410,7 @@ pow :: proc(x, e: $T) -> (out: T) where IS_FLOAT(ELEM_TYPE(T)) {
 
 
 @(require_results)
-ceil :: proc(x: $T) -> (out: T) where IS_FLOAT(ELEM_TYPE(T)) {
+ceil :: proc "contextless" (x: $T) -> (out: T) where IS_FLOAT(ELEM_TYPE(T)) {
 	when IS_ARRAY(T) {
 		for i in 0..<len(T) {
 			out[i] = #force_inline math.ceil(x[i])
@@ -422,7 +422,7 @@ ceil :: proc(x: $T) -> (out: T) where IS_FLOAT(ELEM_TYPE(T)) {
 }
 
 @(require_results)
-floor :: proc(x: $T) -> (out: T) where IS_FLOAT(ELEM_TYPE(T)) {
+floor :: proc "contextless" (x: $T) -> (out: T) where IS_FLOAT(ELEM_TYPE(T)) {
 	when IS_ARRAY(T) {
 		for i in 0..<len(T) {
 			out[i] = #force_inline math.floor(x[i])
@@ -434,7 +434,7 @@ floor :: proc(x: $T) -> (out: T) where IS_FLOAT(ELEM_TYPE(T)) {
 }
 
 @(require_results)
-round :: proc(x: $T) -> (out: T) where IS_FLOAT(ELEM_TYPE(T)) {
+round :: proc "contextless" (x: $T) -> (out: T) where IS_FLOAT(ELEM_TYPE(T)) {
 	when IS_ARRAY(T) {
 		for i in 0..<len(T) {
 			out[i] = #force_inline math.round(x[i])
@@ -446,35 +446,35 @@ round :: proc(x: $T) -> (out: T) where IS_FLOAT(ELEM_TYPE(T)) {
 }
 
 @(require_results)
-fract :: proc(x: $T) -> T where IS_FLOAT(ELEM_TYPE(T)) {
+fract :: proc "contextless" (x: $T) -> T where IS_FLOAT(ELEM_TYPE(T)) {
 	f := #force_inline floor(x)
 	return x - f
 }
 
 @(require_results)
-mod :: proc(x, m: $T) -> T where IS_FLOAT(ELEM_TYPE(T)) {
+mod :: proc "contextless" (x, m: $T) -> T where IS_FLOAT(ELEM_TYPE(T)) {
 	f := #force_inline floor(x / m)
 	return x - f * m
 }
 
 
 @(require_results)
-face_forward :: proc(N, I, N_ref: $T) -> (out: T) where IS_ARRAY(T), IS_FLOAT(ELEM_TYPE(T)) {
+face_forward :: proc "contextless" (N, I, N_ref: $T) -> (out: T) where IS_ARRAY(T), IS_FLOAT(ELEM_TYPE(T)) {
 	return dot(N_ref, I) < 0 ? N : -N
 }
 
 @(require_results)
-distance :: proc(p0, p1: $V/[$N]$E) -> E where IS_NUMERIC(E) {
+distance :: proc "contextless" (p0, p1: $V/[$N]$E) -> E where IS_NUMERIC(E) {
 	return length(p1 - p0)
 }
 
 @(require_results)
-reflect :: proc(I, N: $T) -> (out: T) where IS_ARRAY(T), IS_FLOAT(ELEM_TYPE(T)) {
+reflect :: proc "contextless" (I, N: $T) -> (out: T) where IS_ARRAY(T), IS_FLOAT(ELEM_TYPE(T)) {
 	b := N * (2 * dot(N, I))
 	return I - b
 }
 @(require_results)
-refract :: proc(I, Normal: $V/[$N]$E, eta: E) -> (out: V) where IS_ARRAY(V), IS_FLOAT(ELEM_TYPE(V)) {
+refract :: proc "contextless" (I, Normal: $V/[$N]$E, eta: E) -> (out: V) where IS_ARRAY(V), IS_FLOAT(ELEM_TYPE(V)) {
 	dv := dot(Normal, I)
 	k := 1 - eta*eta * (1 - dv*dv)
 	a := I * eta
@@ -486,12 +486,12 @@ refract :: proc(I, Normal: $V/[$N]$E, eta: E) -> (out: V) where IS_ARRAY(V), IS_
 
 
 @(require_results)
-is_nan_single :: proc(x: $T) -> bool where IS_FLOAT(T) {
+is_nan_single :: proc "contextless" (x: $T) -> bool where IS_FLOAT(T) {
 	return #force_inline math.is_nan(x)
 }
 
 @(require_results)
-is_nan_array :: proc(x: $A/[$N]$T) -> (out: [N]bool) where IS_FLOAT(T) {
+is_nan_array :: proc "contextless" (x: $A/[$N]$T) -> (out: [N]bool) where IS_FLOAT(T) {
 	for i in 0..<N {
 		out[i] = #force_inline is_nan(x[i])
 	}
@@ -499,12 +499,12 @@ is_nan_array :: proc(x: $A/[$N]$T) -> (out: [N]bool) where IS_FLOAT(T) {
 }
 
 @(require_results)
-is_inf_single :: proc(x: $T) -> bool where IS_FLOAT(T) {
+is_inf_single :: proc "contextless" (x: $T) -> bool where IS_FLOAT(T) {
 	return #force_inline math.is_inf(x)
 }
 
 @(require_results)
-is_inf_array :: proc(x: $A/[$N]$T) -> (out: [N]bool) where IS_FLOAT(T) {
+is_inf_array :: proc "contextless" (x: $A/[$N]$T) -> (out: [N]bool) where IS_FLOAT(T) {
 	for i in 0..<N {
 		out[i] = #force_inline is_inf(x[i])
 	}
@@ -512,12 +512,12 @@ is_inf_array :: proc(x: $A/[$N]$T) -> (out: [N]bool) where IS_FLOAT(T) {
 }
 
 @(require_results)
-classify_single :: proc(x: $T) -> math.Float_Class where IS_FLOAT(T) {
+classify_single :: proc "contextless" (x: $T) -> math.Float_Class where IS_FLOAT(T) {
 	return #force_inline math.classify(x)
 }
 
 @(require_results)
-classify_array :: proc(x: $A/[$N]$T) -> (out: [N]math.Float_Class) where IS_FLOAT(T) {
+classify_array :: proc "contextless" (x: $A/[$N]$T) -> (out: [N]math.Float_Class) where IS_FLOAT(T) {
 	for i in 0..<N {
 		out[i] = #force_inline classify_single(x[i])
 	}
@@ -529,50 +529,50 @@ is_inf :: proc{is_inf_single, is_inf_array}
 classify :: proc{classify_single, classify_array}
 
 
-@(require_results) less_than_single          :: proc(x, y: $T) -> (out: bool) where !IS_ARRAY(T), IS_FLOAT(T) { return x < y }
-@(require_results) less_than_equal_single    :: proc(x, y: $T) -> (out: bool) where !IS_ARRAY(T), IS_FLOAT(T) { return x <= y }
-@(require_results) greater_than_single       :: proc(x, y: $T) -> (out: bool) where !IS_ARRAY(T), IS_FLOAT(T) { return x > y }
-@(require_results) greater_than_equal_single :: proc(x, y: $T) -> (out: bool) where !IS_ARRAY(T), IS_FLOAT(T) { return x >= y }
-@(require_results) equal_single              :: proc(x, y: $T) -> (out: bool) where !IS_ARRAY(T), IS_FLOAT(T) { return x == y }
-@(require_results) not_equal_single          :: proc(x, y: $T) -> (out: bool) where !IS_ARRAY(T), IS_FLOAT(T) { return x != y }
+@(require_results) less_than_single          :: proc "contextless" (x, y: $T) -> (out: bool) where !IS_ARRAY(T), IS_FLOAT(T) { return x < y }
+@(require_results) less_than_equal_single    :: proc "contextless" (x, y: $T) -> (out: bool) where !IS_ARRAY(T), IS_FLOAT(T) { return x <= y }
+@(require_results) greater_than_single       :: proc "contextless" (x, y: $T) -> (out: bool) where !IS_ARRAY(T), IS_FLOAT(T) { return x > y }
+@(require_results) greater_than_equal_single :: proc "contextless" (x, y: $T) -> (out: bool) where !IS_ARRAY(T), IS_FLOAT(T) { return x >= y }
+@(require_results) equal_single              :: proc "contextless" (x, y: $T) -> (out: bool) where !IS_ARRAY(T), IS_FLOAT(T) { return x == y }
+@(require_results) not_equal_single          :: proc "contextless" (x, y: $T) -> (out: bool) where !IS_ARRAY(T), IS_FLOAT(T) { return x != y }
 
 @(require_results)
-less_than_array :: proc(x, y: $A/[$N]$T) -> (out: [N]bool) where IS_ARRAY(A), IS_FLOAT(ELEM_TYPE(A)) {
+less_than_array :: proc "contextless" (x, y: $A/[$N]$T) -> (out: [N]bool) where IS_ARRAY(A), IS_FLOAT(ELEM_TYPE(A)) {
 	for i in 0..<N {
 		out[i] = x[i] < y[i]
 	}
 	return
 }
 @(require_results)
-less_than_equal_array :: proc(x, y: $A/[$N]$T) -> (out: [N]bool) where IS_ARRAY(A), IS_FLOAT(ELEM_TYPE(A)) {
+less_than_equal_array :: proc "contextless" (x, y: $A/[$N]$T) -> (out: [N]bool) where IS_ARRAY(A), IS_FLOAT(ELEM_TYPE(A)) {
 	for i in 0..<N {
 		out[i] = x[i] <= y[i]
 	}
 	return
 }
 @(require_results)
-greater_than_array :: proc(x, y: $A/[$N]$T) -> (out: [N]bool) where IS_ARRAY(A), IS_FLOAT(ELEM_TYPE(A)) {
+greater_than_array :: proc "contextless" (x, y: $A/[$N]$T) -> (out: [N]bool) where IS_ARRAY(A), IS_FLOAT(ELEM_TYPE(A)) {
 	for i in 0..<N {
 		out[i] = x[i] > y[i]
 	}
 	return
 }
 @(require_results)
-greater_than_equal_array :: proc(x, y: $A/[$N]$T) -> (out: [N]bool) where IS_ARRAY(A), IS_FLOAT(ELEM_TYPE(A)) {
+greater_than_equal_array :: proc "contextless" (x, y: $A/[$N]$T) -> (out: [N]bool) where IS_ARRAY(A), IS_FLOAT(ELEM_TYPE(A)) {
 	for i in 0..<N {
 		out[i] = x[i] >= y[i]
 	}
 	return
 }
 @(require_results)
-equal_array :: proc(x, y: $A/[$N]$T) -> (out: [N]bool) where IS_ARRAY(A), IS_FLOAT(ELEM_TYPE(A)) {
+equal_array :: proc "contextless" (x, y: $A/[$N]$T) -> (out: [N]bool) where IS_ARRAY(A), IS_FLOAT(ELEM_TYPE(A)) {
 	for i in 0..<N {
 		out[i] = x[i] == y[i]
 	}
 	return
 }
 @(require_results)
-not_equal_array :: proc(x, y: $A/[$N]$T) -> (out: [N]bool) where IS_ARRAY(A), IS_FLOAT(ELEM_TYPE(A)) {
+not_equal_array :: proc "contextless" (x, y: $A/[$N]$T) -> (out: [N]bool) where IS_ARRAY(A), IS_FLOAT(ELEM_TYPE(A)) {
 	for i in 0..<N {
 		out[i] = x[i] != y[i]
 	}
@@ -587,7 +587,7 @@ equal              :: proc{equal_single, equal_array}
 not_equal          :: proc{not_equal_single, not_equal_array}
 
 @(require_results)
-any :: proc(x: $A/[$N]bool) -> (out: bool) {
+any :: proc "contextless" (x: $A/[$N]bool) -> (out: bool) {
 	for e in x {
 		if e {
 			return true
@@ -596,7 +596,7 @@ any :: proc(x: $A/[$N]bool) -> (out: bool) {
 	return false
 }
 @(require_results)
-all :: proc(x: $A/[$N]bool) -> (out: bool) {
+all :: proc "contextless" (x: $A/[$N]bool) -> (out: bool) {
 	for e in x {
 		if !e {
 			return false
@@ -605,7 +605,7 @@ all :: proc(x: $A/[$N]bool) -> (out: bool) {
 	return true
 }
 @(require_results)
-not :: proc(x: $A/[$N]bool) -> (out: A) {
+not :: proc "contextless" (x: $A/[$N]bool) -> (out: A) {
 	for e, i in x {
 		out[i] = !e
 	}

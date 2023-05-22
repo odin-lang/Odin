@@ -39,27 +39,27 @@ DEG_PER_RAD :: 360.0/TAU
 
 
 @(require_results)
-scalar_dot :: proc(a, b: $T) -> T where IS_FLOAT(T), !IS_ARRAY(T) {
+scalar_dot :: proc "contextless" (a, b: $T) -> T where IS_FLOAT(T), !IS_ARRAY(T) {
 	return a * b
 }
 
 @(require_results)
-vector_dot :: proc(a, b: $T/[$N]$E) -> (c: E) where IS_NUMERIC(E) #no_bounds_check {
+vector_dot :: proc "contextless" (a, b: $T/[$N]$E) -> (c: E) where IS_NUMERIC(E) #no_bounds_check {
 	for i in 0..<N {
 		c += a[i] * b[i]
 	}
 	return
 }
 @(require_results)
-quaternion64_dot :: proc(a, b: $T/quaternion64) -> (c: f16) {
+quaternion64_dot :: proc "contextless" (a, b: $T/quaternion64) -> (c: f16) {
 	return a.w*a.w + a.x*b.x + a.y*b.y + a.z*b.z
 }
 @(require_results)
-quaternion128_dot :: proc(a, b: $T/quaternion128) -> (c: f32) {
+quaternion128_dot :: proc "contextless" (a, b: $T/quaternion128) -> (c: f32) {
 	return a.w*a.w + a.x*b.x + a.y*b.y + a.z*b.z
 }
 @(require_results)
-quaternion256_dot :: proc(a, b: $T/quaternion256) -> (c: f64) {
+quaternion256_dot :: proc "contextless" (a, b: $T/quaternion256) -> (c: f64) {
 	return a.w*a.w + a.x*b.x + a.y*b.y + a.z*b.z
 }
 
@@ -69,23 +69,23 @@ inner_product :: dot
 outer_product :: builtin.outer_product
 
 @(require_results)
-quaternion_inverse :: proc(q: $Q) -> Q where IS_QUATERNION(Q) {
+quaternion_inverse :: proc "contextless" (q: $Q) -> Q where IS_QUATERNION(Q) {
 	return conj(q) * quaternion(1.0/dot(q, q), 0, 0, 0)
 }
 
 
 @(require_results)
-scalar_cross :: proc(a, b: $T) -> T where IS_FLOAT(T), !IS_ARRAY(T) {
+scalar_cross :: proc "contextless" (a, b: $T) -> T where IS_FLOAT(T), !IS_ARRAY(T) {
 	return a * b
 }
 
 @(require_results)
-vector_cross2 :: proc(a, b: $T/[2]$E) -> E where IS_NUMERIC(E) {
+vector_cross2 :: proc "contextless" (a, b: $T/[2]$E) -> E where IS_NUMERIC(E) {
 	return a[0]*b[1] - b[0]*a[1]
 }
 
 @(require_results)
-vector_cross3 :: proc(a, b: $T/[3]$E) -> (c: T) where IS_NUMERIC(E) {
+vector_cross3 :: proc "contextless" (a, b: $T/[3]$E) -> (c: T) where IS_NUMERIC(E) {
 	c[0] = a[1]*b[2] - b[1]*a[2]
 	c[1] = a[2]*b[0] - b[2]*a[0]
 	c[2] = a[0]*b[1] - b[0]*a[1]
@@ -93,7 +93,7 @@ vector_cross3 :: proc(a, b: $T/[3]$E) -> (c: T) where IS_NUMERIC(E) {
 }
 
 @(require_results)
-quaternion_cross :: proc(q1, q2: $Q) -> (q3: Q) where IS_QUATERNION(Q) {
+quaternion_cross :: proc "contextless" (q1, q2: $Q) -> (q3: Q) where IS_QUATERNION(Q) {
 	q3.x = q1.w * q2.x + q1.x * q2.w + q1.y * q2.z - q1.z * q2.y
 	q3.y = q1.w * q2.y + q1.y * q2.w + q1.z * q2.x - q1.x * q2.z
 	q3.z = q1.w * q2.z + q1.z * q2.w + q1.x * q2.y - q1.y * q2.x
@@ -105,22 +105,22 @@ vector_cross :: proc{scalar_cross, vector_cross2, vector_cross3}
 cross :: proc{scalar_cross, vector_cross2, vector_cross3, quaternion_cross}
 
 @(require_results)
-vector_normalize :: proc(v: $T/[$N]$E) -> T where IS_FLOAT(E) {
+vector_normalize :: proc "contextless" (v: $T/[$N]$E) -> T where IS_FLOAT(E) {
 	return v / length(v)
 }
 @(require_results)
-quaternion_normalize :: proc(q: $Q) -> Q where IS_QUATERNION(Q) {
+quaternion_normalize :: proc "contextless" (q: $Q) -> Q where IS_QUATERNION(Q) {
 	return q/abs(q)
 }
 normalize :: proc{vector_normalize, quaternion_normalize}
 
 @(require_results)
-vector_normalize0 :: proc(v: $T/[$N]$E) -> T where IS_FLOAT(E) {
+vector_normalize0 :: proc "contextless" (v: $T/[$N]$E) -> T where IS_FLOAT(E) {
 	m := length(v)
 	return 0 if m == 0 else v/m
 }
 @(require_results)
-quaternion_normalize0 :: proc(q: $Q) -> Q  where IS_QUATERNION(Q) {
+quaternion_normalize0 :: proc "contextless" (q: $Q) -> Q  where IS_QUATERNION(Q) {
 	m := abs(q)
 	return 0 if m == 0 else q/m
 }
@@ -128,27 +128,27 @@ normalize0 :: proc{vector_normalize0, quaternion_normalize0}
 
 
 @(require_results)
-vector_length :: proc(v: $T/[$N]$E) -> E where IS_FLOAT(E) {
+vector_length :: proc "contextless" (v: $T/[$N]$E) -> E where IS_FLOAT(E) {
 	return math.sqrt(dot(v, v))
 }
 
 @(require_results)
-vector_length2 :: proc(v: $T/[$N]$E) -> E where IS_NUMERIC(E) {
+vector_length2 :: proc "contextless" (v: $T/[$N]$E) -> E where IS_NUMERIC(E) {
 	return dot(v, v)
 }
 
 @(require_results)
-quaternion_length :: proc(q: $Q) -> Q where IS_QUATERNION(Q) {
+quaternion_length :: proc "contextless" (q: $Q) -> Q where IS_QUATERNION(Q) {
 	return abs(q)
 }
 
 @(require_results)
-quaternion_length2 :: proc(q: $Q) -> Q where IS_QUATERNION(Q) {
+quaternion_length2 :: proc "contextless" (q: $Q) -> Q where IS_QUATERNION(Q) {
 	return dot(q, q)
 }
 
 @(require_results)
-scalar_triple_product :: proc(a, b, c: $T/[$N]$E) -> E where IS_NUMERIC(E) {
+scalar_triple_product :: proc "contextless" (a, b, c: $T/[$N]$E) -> E where IS_NUMERIC(E) {
 	// a . (b x c)
 	// b . (c x a)
 	// c . (a x b)
@@ -156,7 +156,7 @@ scalar_triple_product :: proc(a, b, c: $T/[$N]$E) -> E where IS_NUMERIC(E) {
 }
 
 @(require_results)
-vector_triple_product :: proc(a, b, c: $T/[$N]$E) -> T where IS_NUMERIC(E) {
+vector_triple_product :: proc "contextless" (a, b, c: $T/[$N]$E) -> T where IS_NUMERIC(E) {
 	// a x (b x c)
 	// (a . c)b - (a . b)c
 	return cross(a, cross(b, c))
@@ -167,12 +167,12 @@ length :: proc{vector_length, quaternion_length}
 length2 :: proc{vector_length2, quaternion_length2}
 
 @(require_results)
-projection :: proc(x, normal: $T/[$N]$E) -> T where IS_NUMERIC(E) {
+projection :: proc "contextless" (x, normal: $T/[$N]$E) -> T where IS_NUMERIC(E) {
 	return dot(x, normal) / dot(normal, normal) * normal
 }
 
 @(require_results)
-identity :: proc($T: typeid/[$N][N]$E) -> (m: T) #no_bounds_check {
+identity :: proc "contextless" ($T: typeid/[$N][N]$E) -> (m: T) #no_bounds_check {
 	for i in 0..<N {
 		m[i][i] = E(1)
 	}
@@ -183,37 +183,37 @@ trace :: builtin.matrix_trace
 transpose :: builtin.transpose
 
 @(require_results)
-matrix_mul :: proc(a, b: $M/matrix[$N, N]$E) -> (c: M)
+matrix_mul :: proc "contextless" (a, b: $M/matrix[$N, N]$E) -> (c: M)
 	where !IS_ARRAY(E), IS_NUMERIC(E) #no_bounds_check {
 	return a * b
 }
 
 @(require_results)
-matrix_comp_mul :: proc(a, b: $M/matrix[$I, $J]$E) -> (c: M)
+matrix_comp_mul :: proc "contextless" (a, b: $M/matrix[$I, $J]$E) -> (c: M)
 	where !IS_ARRAY(E), IS_NUMERIC(E) #no_bounds_check {
 	return hadamard_product(a, b)
 }
 
 @(require_results)
-matrix_mul_differ :: proc(a: $A/matrix[$I, $J]$E, b: $B/matrix[J, $K]E) -> (c: matrix[I, K]E)
+matrix_mul_differ :: proc "contextless" (a: $A/matrix[$I, $J]$E, b: $B/matrix[J, $K]E) -> (c: matrix[I, K]E)
 	where !IS_ARRAY(E), IS_NUMERIC(E), I != K #no_bounds_check {
 	return a * b
 }
 
 
 @(require_results)
-matrix_mul_vector :: proc(a: $A/matrix[$I, $J]$E, b: $B/[J]E) -> (c: B)
+matrix_mul_vector :: proc "contextless" (a: $A/matrix[$I, $J]$E, b: $B/[J]E) -> (c: B)
 	where !IS_ARRAY(E), IS_NUMERIC(E) #no_bounds_check {
 	return a * b
 }
 
 @(require_results)
-quaternion_mul_quaternion :: proc(q1, q2: $Q) -> Q where IS_QUATERNION(Q) {
+quaternion_mul_quaternion :: proc "contextless" (q1, q2: $Q) -> Q where IS_QUATERNION(Q) {
 	return q1 * q2
 }
 
 @(require_results)
-quaternion64_mul_vector3 :: proc(q: $Q/quaternion64, v: $V/[3]$F/f16) -> V {
+quaternion64_mul_vector3 :: proc "contextless" (q: $Q/quaternion64, v: $V/[3]$F/f16) -> V {
 	Raw_Quaternion :: struct {xyz: [3]f16, r: f16}
 
 	q := transmute(Raw_Quaternion)q
@@ -223,7 +223,7 @@ quaternion64_mul_vector3 :: proc(q: $Q/quaternion64, v: $V/[3]$F/f16) -> V {
 	return V(v + q.r*t + cross(q.xyz, t))
 }
 @(require_results)
-quaternion128_mul_vector3 :: proc(q: $Q/quaternion128, v: $V/[3]$F/f32) -> V {
+quaternion128_mul_vector3 :: proc "contextless" (q: $Q/quaternion128, v: $V/[3]$F/f32) -> V {
 	Raw_Quaternion :: struct {xyz: [3]f32, r: f32}
 
 	q := transmute(Raw_Quaternion)q
@@ -233,7 +233,7 @@ quaternion128_mul_vector3 :: proc(q: $Q/quaternion128, v: $V/[3]$F/f32) -> V {
 	return V(v + q.r*t + cross(q.xyz, t))
 }
 @(require_results)
-quaternion256_mul_vector3 :: proc(q: $Q/quaternion256, v: $V/[3]$F/f64) -> V {
+quaternion256_mul_vector3 :: proc "contextless" (q: $Q/quaternion256, v: $V/[3]$F/f64) -> V {
 	Raw_Quaternion :: struct {xyz: [3]f64, r: f64}
 
 	q := transmute(Raw_Quaternion)q
@@ -255,11 +255,11 @@ mul :: proc{
 }
 
 @(require_results)
-vector_to_ptr :: proc(v: ^$V/[$N]$E) -> ^E where IS_NUMERIC(E), N > 0 #no_bounds_check {
+vector_to_ptr :: proc "contextless" (v: ^$V/[$N]$E) -> ^E where IS_NUMERIC(E), N > 0 #no_bounds_check {
 	return &v[0]
 }
 @(require_results)
-matrix_to_ptr :: proc(m: ^$A/matrix[$I, $J]$E) -> ^E where IS_NUMERIC(E), I > 0, J > 0 #no_bounds_check {
+matrix_to_ptr :: proc "contextless" (m: ^$A/matrix[$I, $J]$E) -> ^E where IS_NUMERIC(E), I > 0, J > 0 #no_bounds_check {
 	return &m[0, 0]
 }
 
@@ -272,7 +272,7 @@ to_ptr :: proc{vector_to_ptr, matrix_to_ptr}
 // Splines
 
 @(require_results)
-vector_slerp :: proc(x, y: $T/[$N]$E, a: E) -> T {
+vector_slerp :: proc "contextless" (x, y: $T/[$N]$E, a: E) -> T {
 	cos_alpha := dot(x, y)
 	alpha := math.acos(cos_alpha)
 	sin_alpha := math.sin(alpha)
@@ -284,7 +284,7 @@ vector_slerp :: proc(x, y: $T/[$N]$E, a: E) -> T {
 }
 
 @(require_results)
-catmull_rom :: proc(v1, v2, v3, v4: $T/[$N]$E, s: E) -> T {
+catmull_rom :: proc "contextless" (v1, v2, v3, v4: $T/[$N]$E, s: E) -> T {
 	s2 := s*s
 	s3 := s2*s
 
@@ -297,7 +297,7 @@ catmull_rom :: proc(v1, v2, v3, v4: $T/[$N]$E, s: E) -> T {
 }
 
 @(require_results)
-hermite :: proc(v1, t1, v2, t2: $T/[$N]$E, s: E) -> T {
+hermite :: proc "contextless" (v1, t1, v2, t2: $T/[$N]$E, s: E) -> T {
 	s2 := s*s
 	s3 := s2*s
 
@@ -310,14 +310,14 @@ hermite :: proc(v1, t1, v2, t2: $T/[$N]$E, s: E) -> T {
 }
 
 @(require_results)
-cubic :: proc(v1, v2, v3, v4: $T/[$N]$E, s: E) -> T {
+cubic :: proc "contextless" (v1, v2, v3, v4: $T/[$N]$E, s: E) -> T {
 	return ((v1 * s + v2) * s + v3) * s + v4
 }
 
 
 
 @(require_results)
-array_cast :: proc(v: $A/[$N]$T, $Elem_Type: typeid) -> (w: [N]Elem_Type) #no_bounds_check {
+array_cast :: proc "contextless" (v: $A/[$N]$T, $Elem_Type: typeid) -> (w: [N]Elem_Type) #no_bounds_check {
 	for i in 0..<N {
 		w[i] = Elem_Type(v[i])
 	}
@@ -325,7 +325,7 @@ array_cast :: proc(v: $A/[$N]$T, $Elem_Type: typeid) -> (w: [N]Elem_Type) #no_bo
 }
 
 @(require_results)
-matrix_cast :: proc(v: $A/matrix[$M, $N]$T, $Elem_Type: typeid) -> (w: matrix[M, N]Elem_Type) #no_bounds_check {
+matrix_cast :: proc "contextless" (v: $A/matrix[$M, $N]$T, $Elem_Type: typeid) -> (w: matrix[M, N]Elem_Type) #no_bounds_check {
 	for j in 0..<N {
 		for i in 0..<M {
 			w[i, j] = Elem_Type(v[i, j])
