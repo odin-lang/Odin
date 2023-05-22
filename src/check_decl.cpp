@@ -123,7 +123,7 @@ gb_internal void check_init_variables(CheckerContext *ctx, Entity **lhs, isize l
 	// an extra allocation
 	TEMPORARY_ALLOCATOR_GUARD();
 	auto operands = array_make<Operand>(temporary_allocator(), 0, 2*lhs_count);
-	check_unpack_arguments(ctx, lhs, lhs_count, &operands, inits, true, false);
+	check_unpack_arguments(ctx, lhs, lhs_count, &operands, inits, UnpackFlag_AllowOk|UnpackFlag_AllowUndef);
 
 	isize rhs_count = operands.count;
 	isize max = gb_min(lhs_count, rhs_count);

@@ -5144,8 +5144,20 @@ gb_internal bool check_assignment_arguments(CheckerContext *ctx, Array<Operand> 
 }
 
 
+typedef u32 UnpackFlags;
+enum UnpackFlag : u32 {
+	UnpackFlag_None       = 0,
+	UnpackFlag_AllowOk    = 1<<0,
+	UnpackFlag_IsVariadic = 1<<1,
+	UnpackFlag_AllowUndef = 1<<2,
+};
 
-gb_internal bool check_unpack_arguments(CheckerContext *ctx, Entity **lhs, isize lhs_count, Array<Operand> *operands, Slice<Ast *> const &rhs, bool allow_ok, bool is_variadic) {
+
+gb_internal bool check_unpack_arguments(CheckerContext *ctx, Entity **lhs, isize lhs_count, Array<Operand> *operands, Slice<Ast *> const &rhs, UnpackFlags flags) {
+	bool allow_ok    = (flags & UnpackFlag_AllowOk) != 0;
+	bool is_variadic = (flags & UnpackFlag_IsVariadic) != 0;
+	bool allow_undef = (flags & UnpackFlag_AllowUndef) != 0;
+
 	bool optional_ok = false;
 	isize tuple_index = 0;
 	for_array(i, rhs) {
@@ -5184,7 +5196,13 @@ gb_internal bool check_unpack_arguments(CheckerContext *ctx, Entity **lhs, isize
 			}
 		}
 
-		check_expr_base(c, &o, rhs[i], type_hint);
+		if (allow_undef && rhs[i] != nullptr && rhs[i]->kind == Ast_Undef) {
+			o.type = t_untyped_undef;
+			o.mode = Addressing_Value;
+			o.expr = rhs[i];
+		} else {
+			check_expr_base(c, &o, rhs[i], type_hint);
+		}
 		if (o.mode == Addressing_NoValue) {
 			error_operand_no_value(&o);
 			o.mode = Addressing_Invalid;
@@ -5968,7 +5986,7 @@ gb_internal CallArgumentData check_call_arguments(CheckerContext *c, Operand *op
 			lhs = populate_proc_parameter_list(c, proc_type, &lhs_count, &is_variadic);
 		}
 		if (operand->mode != Addressing_ProcGroup) {
-			check_unpack_arguments(c, lhs, lhs_count, &operands, args, false, is_variadic);
+			check_unpack_arguments(c, lhs, lhs_count, &operands, args, is_variadic ? UnpackFlag_IsVariadic : UnpackFlag_None);
 		}
 	}
 
@@ -6025,7 +6043,7 @@ gb_internal CallArgumentData check_call_arguments(CheckerContext *c, Operand *op
 			isize lhs_count = -1;
 			bool is_variadic = false;
 			lhs = populate_proc_parameter_list(c, e->type, &lhs_count, &is_variadic);
-			check_unpack_arguments(c, lhs, lhs_count, &operands, args, false, is_variadic);
+			check_unpack_arguments(c, lhs, lhs_count, &operands, args, is_variadic ? UnpackFlag_IsVariadic : UnpackFlag_None);
 
 			CallArgumentData data = {};
 			CallArgumentError err = call_checker(c, call, e->type, e, operands, CallArgumentMode_ShowErrors, &data);
@@ -6101,7 +6119,7 @@ gb_internal CallArgumentData check_call_arguments(CheckerContext *c, Operand *op
 		}
 
 
-		check_unpack_arguments(c, lhs, lhs_count, &operands, args, false, false);
+		check_unpack_arguments(c, lhs, lhs_count, &operands, args, UnpackFlag_None);
 
 		if (lhs != nullptr) {
 			gb_free(heap_allocator(), lhs);
@@ -6462,7 +6480,7 @@ gb_internal CallArgumentError check_polymorphic_record_type(CheckerContext *c, O
 				lhs_count = params->variables.count;
 			}
 
-			check_unpack_arguments(c, lhs, lhs_count, &operands, ce->args, false, false);
+			check_unpack_arguments(c, lhs, lhs_count, &operands, ce->args, UnpackFlag_None);
 		}
 
 	}
@@ -9583,6 +9601,7 @@ gb_internal ExprKind check_expr_base_internal(CheckerContext *c, Operand *o, Ast
 	case_ast_node(u, Undef, node);
 		o->mode = Addressing_Value;
 		o->type = t_untyped_undef;
+		error(node, "Use of --- outside of variable declaration");
 	case_end;
 
 
