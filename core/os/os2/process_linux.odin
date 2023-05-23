@@ -5,6 +5,18 @@ import "core:runtime"
 import "core:strings"
 import "core:sys/unix"
 
+_alloc_command_line_arguments :: proc() -> []string {
+	res := make([]string, len(runtime.args__), heap_allocator())
+	for arg, i in runtime.args__ {
+		res[i] = string(arg)
+	}
+	return res
+}
+
+_exit :: proc "contextless" (code: int) {
+	unix.sys_exit_group(code)
+}
+
 _get_uid :: proc() -> int {
 	return unix.sys_getuid()
 }
@@ -34,8 +46,10 @@ _find_process :: proc(pid: int) -> (^Process, Error) {
 }
 
 Process_Attributes_OS_Specific :: struct {
-	search_path: bool // not implemented
-	replace_current_process: bool
+	//TODO: bit_set
+	search_path: bool, // not implemented
+	run_in_background: bool, // not implemented
+	replace_current_process: bool,
 }
 
 _process_start :: proc(name: string, argv: []string, attr: ^Process_Attributes) -> (Process, Error) {
@@ -82,7 +96,7 @@ _process_start :: proc(name: string, argv: []string, attr: ^Process_Attributes) 
 	if res == 0 {
 		// in child process now (or replacing original)
 		if res = unix.sys_execve(path, &cargs[0], env); res < 0 {
-			// TODO: add print_error
+			print_error(_get_platform_error(res), string(path))
 			exit(1)
 		}
 	}

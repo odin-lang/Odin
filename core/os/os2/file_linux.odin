@@ -9,28 +9,32 @@ import "core:sys/unix"
 
 INVALID_HANDLE :: -1
 
-_O_RDONLY    :: 0o00000000
-_O_WRONLY    :: 0o00000001
-_O_RDWR      :: 0o00000002
-_O_CREAT     :: 0o00000100
-_O_EXCL      :: 0o00000200
-_O_NOCTTY    :: 0o00000400
-_O_TRUNC     :: 0o00001000
-_O_APPEND    :: 0o00002000
-_O_NONBLOCK  :: 0o00004000
-_O_LARGEFILE :: 0o00100000
-_O_DIRECTORY :: 0o00200000
-_O_NOFOLLOW  :: 0o00400000
-_O_SYNC      :: 0o04010000
-_O_CLOEXEC   :: 0o02000000
-_O_PATH      :: 0o10000000
-
-_AT_FDCWD :: -100
-
 _File :: struct {
 	name: string,
 	fd: int,
 	allocator: runtime.Allocator,
+}
+
+_stdin : File = {
+	impl = {
+		name = "/proc/self/fd/0",
+		fd = 0,
+		allocator = _file_allocator(),
+	}
+}
+_stdout : File = {
+	impl = {
+		name = "/proc/self/fd/1",
+		fd = 1,
+		allocator = _file_allocator(),
+	}
+}
+_stderr : File = {
+	impl = {
+		name = "/proc/self/fd/2",
+		fd = 2,
+		allocator = _file_allocator(),
+	}
 }
 
 _file_allocator :: proc() -> runtime.Allocator {
@@ -44,19 +48,19 @@ _open :: proc(name: string, flags: File_Flags, perm: File_Mode) -> (^File, Error
 	// Just default to using O_NOCTTY because needing to open a controlling
 	// terminal would be incredibly rare. This has no effect on files while
 	// allowing us to open serial devices.
-	flags_i: int = _O_NOCTTY
+	flags_i: int = unix.O_NOCTTY
 	switch flags & O_RDONLY|O_WRONLY|O_RDWR {
-	case O_RDONLY: flags_i = _O_RDONLY
-	case O_WRONLY: flags_i = _O_WRONLY
-	case O_RDWR:   flags_i = _O_RDWR
+	case O_RDONLY: flags_i = unix.O_RDONLY
+	case O_WRONLY: flags_i = unix.O_WRONLY
+	case O_RDWR:   flags_i = unix.O_RDWR
 	}
 
-	flags_i |= (_O_APPEND * int(.Append in flags))
-	flags_i |= (_O_CREAT * int(.Create in flags))
-	flags_i |= (_O_EXCL * int(.Excl in flags))
-	flags_i |= (_O_SYNC * int(.Sync in flags))
-	flags_i |= (_O_TRUNC * int(.Trunc in flags))
-	flags_i |= (_O_CLOEXEC * int(.Close_On_Exec in flags))
+	flags_i |= (unix.O_APPEND * int(.Append in flags))
+	flags_i |= (unix.O_CREAT * int(.Create in flags))
+	flags_i |= (unix.O_EXCL * int(.Excl in flags))
+	flags_i |= (unix.O_SYNC * int(.Sync in flags))
+	flags_i |= (unix.O_TRUNC * int(.Trunc in flags))
+	flags_i |= (unix.O_CLOEXEC * int(.Close_On_Exec in flags))
 
 	fd := unix.sys_open(name_cstr, flags_i, uint(perm))
 	if fd < 0 {
@@ -177,7 +181,7 @@ _write_to :: proc(f: ^File, w: io.Writer) -> (n: i64, err: Error) {
 }
 
 _file_size :: proc(f: ^File) -> (n: i64, err: Error) {
-	s: _Stat = ---
+	s: unix.Stat = ---
 	res := unix.sys_fstat(f.impl.fd, &s)
 	if res < 0 {
 		return -1, _get_platform_error(res)
@@ -309,15 +313,15 @@ _fchown :: proc(f: ^File, uid, gid: int) -> Error {
 _chtimes :: proc(name: string, atime, mtime: time.Time) -> Error {
 	runtime.DEFAULT_TEMP_ALLOCATOR_TEMP_GUARD()
 	name_cstr := strings.clone_to_cstring(name, context.temp_allocator)
-	times := [2]Unix_File_Time {
+	times := [2]unix.File_Time {
 		{ atime._nsec, 0 },
 		{ mtime._nsec, 0 },
 	}
-	return _ok_or_error(unix.sys_utimensat(_AT_FDCWD, name_cstr, &times, 0))
+	return _ok_or_error(unix.sys_utimensat(transmute(int)(unix.AT_FDCWD), name_cstr, &times, 0))
 }
 
 _fchtimes :: proc(f: ^File, atime, mtime: time.Time) -> Error {
-	times := [2]Unix_File_Time {
+	times := [2]unix.File_Time {
 		{ atime._nsec, 0 },
 		{ mtime._nsec, 0 },
 	}
@@ -327,45 +331,45 @@ _fchtimes :: proc(f: ^File, atime, mtime: time.Time) -> Error {
 _exists :: proc(name: string) -> bool {
 	runtime.DEFAULT_TEMP_ALLOCATOR_TEMP_GUARD()
 	name_cstr := strings.clone_to_cstring(name, context.temp_allocator)
-	return unix.sys_access(name_cstr, F_OK) == 0
+	return unix.sys_access(name_cstr, unix.F_OK) == 0
 }
 
 _is_file :: proc(name: string) -> bool {
 	runtime.DEFAULT_TEMP_ALLOCATOR_TEMP_GUARD()
 	name_cstr := strings.clone_to_cstring(name, context.temp_allocator)
-	s: _Stat
+	s: unix.Stat
 	res := unix.sys_stat(name_cstr, &s)
 	if res < 0 {
 		return false
 	}
-	return S_ISREG(s.mode)
+	return unix.S_ISREG(s.mode)
 }
 
 _is_file_fd :: proc(fd: int) -> bool {
-	s: _Stat
+	s: unix.Stat
 	res := unix.sys_fstat(fd, &s)
 	if res < 0 { // error
 		return false
 	}
-	return S_ISREG(s.mode)
+	return unix.S_ISREG(s.mode)
 }
 
 _is_dir :: proc(name: string) -> bool {
 	runtime.DEFAULT_TEMP_ALLOCATOR_TEMP_GUARD()
 	name_cstr := strings.clone_to_cstring(name, context.temp_allocator)
-	s: _Stat
+	s: unix.Stat
 	res := unix.sys_stat(name_cstr, &s)
 	if res < 0 {
 		return false
 	}
-	return S_ISDIR(s.mode)
+	return unix.S_ISDIR(s.mode)
 }
 
 _is_dir_fd :: proc(fd: int) -> bool {
-	s: _Stat
+	s: unix.Stat
 	res := unix.sys_fstat(fd, &s)
 	if res < 0 { // error
 		return false
 	}
-	return S_ISDIR(s.mode)
+	return unix.S_ISDIR(s.mode)
 }

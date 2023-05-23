@@ -2,12 +2,11 @@ package os2
 
 import "core:sync"
 import "core:time"
-import "core:runtime"
 
-args: []string
+args: []string = _alloc_command_line_arguments()
 
-exit :: proc "contextless" (code: int) -> ! {
-	runtime.trap()
+exit :: proc "contextless" (code: int) {
+	_exit(code)
 }
 
 get_uid :: proc() -> int {

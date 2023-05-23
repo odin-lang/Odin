@@ -9,16 +9,7 @@ import "core:sys/unix"
 _Path_Separator      :: '/'
 _Path_List_Separator :: ':'
 
-_S_IFMT   :: 0o170000 // Type of file mask
-_S_IFIFO  :: 0o010000 // Named pipe (fifo)
-_S_IFCHR  :: 0o020000 // Character special
-_S_IFDIR  :: 0o040000 // Directory
-_S_IFBLK  :: 0o060000 // Block special
-_S_IFREG  :: 0o100000 // Regular
-_S_IFLNK  :: 0o120000 // Symbolic link
-_S_IFSOCK :: 0o140000 // Socket
-
-_OPENDIR_FLAGS :: _O_RDONLY|_O_NONBLOCK|_O_DIRECTORY|_O_LARGEFILE|_O_CLOEXEC
+_OPENDIR_FLAGS :: unix.O_RDONLY|unix.O_NONBLOCK|unix.O_DIRECTORY|unix.O_LARGEFILE|unix.O_CLOEXEC
 
 _is_path_separator :: proc(c: byte) -> bool {
 	return c == '/'

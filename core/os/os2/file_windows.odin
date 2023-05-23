@@ -16,6 +16,10 @@ S_IWRITE :: 0o200
 _ERROR_BAD_NETPATH :: 53
 MAX_RW :: 1<<30
 
+_stdin:  File = {}
+_stdout: File = {}
+_stderr: File = {}
+
 _file_allocator :: proc() -> runtime.Allocator {
 	return heap_allocator()
 }

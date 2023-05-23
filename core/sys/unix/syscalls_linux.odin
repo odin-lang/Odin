@@ -1658,11 +1658,101 @@ ERFKILL         :: 132
 EHWPOISON       :: 133
 ERRNO_COUNT     :: 134
 
-// syscall related constants
+// *at constants
 AT_FDCWD            :: ~uintptr(99)
 AT_REMOVEDIR        :: uintptr(0x200)
 AT_SYMLINK_FOLLOW   :: uintptr(0x400)
 AT_SYMLINK_NOFOLLOW :: uintptr(0x100)
+
+// open flags
+O_RDONLY    :: 0o00000000
+O_WRONLY    :: 0o00000001
+O_RDWR      :: 0o00000002
+O_CREAT     :: 0o00000100
+O_EXCL      :: 0o00000200
+O_NOCTTY    :: 0o00000400
+O_TRUNC     :: 0o00001000
+O_APPEND    :: 0o00002000
+O_NONBLOCK  :: 0o00004000
+O_LARGEFILE :: 0o00100000
+O_DIRECTORY :: 0o00200000
+O_NOFOLLOW  :: 0o00400000
+O_SYNC      :: 0o04010000
+O_CLOEXEC   :: 0o02000000
+O_PATH      :: 0o10000000
+
+// File type
+S_IFMT   :: 0o170000 // Type of file mask
+S_IFIFO  :: 0o010000 // Named pipe (fifo)
+S_IFCHR  :: 0o020000 // Character special
+S_IFDIR  :: 0o040000 // Directory
+S_IFBLK  :: 0o060000 // Block special
+S_IFREG  :: 0o100000 // Regular
+S_IFLNK  :: 0o120000 // Symbolic link
+S_IFSOCK :: 0o140000 // Socket
+
+// File mode
+S_IRWXU :: 0o0700 // RWX mask for owner
+S_IRUSR :: 0o0400 // R for owner
+S_IWUSR :: 0o0200 // W for owner
+S_IXUSR :: 0o0100 // X for owner
+
+// Read, write, execute/search by group
+S_IRWXG :: 0o0070 // RWX mask for group
+S_IRGRP :: 0o0040 // R for group
+S_IWGRP :: 0o0020 // W for group
+S_IXGRP :: 0o0010 // X for group
+
+// Read, write, execute/search by others
+S_IRWXO :: 0o0007 // RWX mask for other
+S_IROTH :: 0o0004 // R for other
+S_IWOTH :: 0o0002 // W for other
+S_IXOTH :: 0o0001 // X for other
+
+S_ISUID :: 0o4000 // Set user id on execution
+S_ISGID :: 0o2000 // Set group id on execution
+S_ISVTX :: 0o1000 // Directory restircted delete
+
+S_ISLNK  :: #force_inline proc(m: u32) -> bool { return (m & S_IFMT) == S_IFLNK  }
+S_ISREG  :: #force_inline proc(m: u32) -> bool { return (m & S_IFMT) == S_IFREG  }
+S_ISDIR  :: #force_inline proc(m: u32) -> bool { return (m & S_IFMT) == S_IFDIR  }
+S_ISCHR  :: #force_inline proc(m: u32) -> bool { return (m & S_IFMT) == S_IFCHR  }
+S_ISBLK  :: #force_inline proc(m: u32) -> bool { return (m & S_IFMT) == S_IFBLK  }
+S_ISFIFO :: #force_inline proc(m: u32) -> bool { return (m & S_IFMT) == S_IFIFO  }
+S_ISSOCK :: #force_inline proc(m: u32) -> bool { return (m & S_IFMT) == S_IFSOCK }
+
+// access flags
+F_OK :: 0 // Test for file existance
+X_OK :: 1 // Test for execute permission
+W_OK :: 2 // Test for write permission
+R_OK :: 4 // Test for read permission
+
+File_Time :: struct {
+	seconds:     i64,
+	nanoseconds: i64,
+}
+
+Stat :: struct {
+	device_id:     u64, // ID of device containing file
+	serial:        u64, // File serial number
+	nlink:         u64, // Number of hard links
+	mode:          u32, // Mode of the file
+	uid:           u32, // User ID of the file's owner
+	gid:           u32, // Group ID of the file's group
+	_padding:      i32, // 32 bits of padding
+	rdev:          u64, // Device ID, if device
+	size:          i64, // Size of the file, in bytes
+	block_size:    i64, // Optimal bllocksize for I/O
+	blocks:        i64, // Number of 512-byte blocks allocated
+
+	last_access:   File_Time, // Time of last access
+	modified:      File_Time, // Time of last modification
+	status_change: File_Time, // Time of last status change
+
+	_reserve1,
+	_reserve2,
+	_reserve3:     i64,
+}
 
 // mmap flags
 PROT_NONE      :: 0x0
@@ -1703,8 +1793,6 @@ MADV_WIPEONFORK  :: 18
 MADV_KEEPONFORK  :: 19
 MADV_HWPOISON    :: 100
 
-// pipe2 flags
-O_CLOEXEC :: 0o2000000
 
 // perf event data
 Perf_Sample :: struct #raw_union {
@@ -1853,6 +1941,14 @@ Perf_Flag :: enum u64 {
 	Inherit_Thread = 35,
 	Remove_On_Exec = 36,
 	Sigtrap        = 37,
+}
+
+sys_exit :: proc "contextless" (exit_code: int) {
+	intrinsics.syscall(SYS_exit, uintptr(exit_code))
+}
+
+sys_exit_group :: proc "contextless" (exit_code: int) {
+	intrinsics.syscall(SYS_exit_group, uintptr(exit_code))
 }
 
 sys_getuid :: proc "contextless" () -> int {
@@ -2149,6 +2245,10 @@ sys_dup2 :: proc "contextless" (oldfd: int, newfd: int) -> int {
 	} else {
 		return int(intrinsics.syscall(SYS_dup3, uintptr(oldfd), uintptr(newfd), 0))
 	}
+}
+
+sys_ioctl :: proc "contextless" (fd, cmd, arg: uint) -> int {
+	return int(intrinsics.syscall(SYS_ioctl, uintptr(fd), uintptr(cmd), uintptr(arg)))
 }
 
 sys_mmap :: proc "contextless" (addr: rawptr, length: uint, prot, flags, fd: int, offset: uintptr) -> int {

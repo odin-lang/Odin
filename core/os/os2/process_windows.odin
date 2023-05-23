@@ -1,6 +1,17 @@
 //+private
 package os2
 
+import "core:runtime"
+
+
+_alloc_command_line_arguments :: proc() -> []string {
+	return nil
+}
+
+_exit :: proc() -> ! {
+	runtime.trap()
+}
+
 _get_uid :: proc() -> int {
 	return -1
 }
