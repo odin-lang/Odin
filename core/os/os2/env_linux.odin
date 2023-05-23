@@ -1,13 +1,12 @@
 //+private
 package os2
 
+import "core:slice"
 import "core:runtime"
 import "core:strings"
-import "core:sys/unix"
 import "core:intrinsics"
 
 // the environment is a 0 delimited list of <key>=<value> strings
-
 _env_map: map[string]string
 
 // Need to be able to figure out if the environment variable
@@ -134,6 +133,29 @@ _environ :: proc(allocator: runtime.Allocator) -> []string {
 	return env
 }
 
+// The entire environment is stored as 0 terminated strings,
+// so there is no need to clone/free individual variables
+export_cstring_environment :: proc(allocator: runtime.Allocator) -> []cstring {
+	if _org_env_begin == 0 {
+		// The environment has not been modified, so we can just
+		// send the original environment
+		org_env := _get_original_env()
+		n: int
+		for ; org_env[n] != nil; n += 1 {}
+		return slice.clone(org_env[:n + 1], allocator)
+	}
+	env := make([]cstring, len(_env_map) + 1, allocator)
+
+	i: int
+	for k, _ in _env_map {
+		env[i] = cstring(raw_data(k))
+		i += 1
+	}
+	// NOTE: already terminated by nil pointer
+
+	return env
+}
+
 _build_env_map :: proc() {
 	// Use heap allocator since context.allocator isn't safe here
 	_env_map = make(type_of(_env_map), 64, heap_allocator())
@@ -151,8 +173,8 @@ _build_env_map :: proc() {
 		k := kv
 		switch n = strings.index_byte(k, '='); n {
 		case 0: case -1:
-			// no value
-			_env_map[k] = ""
+			// zero length slice that can still find key
+			_env_map[k] = k[len(k) + 1:len(k) + 1]
 			continue
 		}
 		k = k[:n]

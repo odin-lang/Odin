@@ -1855,6 +1855,30 @@ Perf_Flag :: enum u64 {
 	Sigtrap        = 37,
 }
 
+sys_getuid :: proc "contextless" () -> int {
+	return int(intrinsics.syscall(SYS_getuid))
+}
+
+sys_geteuid :: proc "contextless" () -> int {
+	return int(intrinsics.syscall(SYS_geteuid))
+}
+
+sys_getgid :: proc "contextless" () -> int {
+	return int(intrinsics.syscall(SYS_getgid))
+}
+
+sys_getegid :: proc "contextless" () -> int {
+	return int(intrinsics.syscall(SYS_getegid))
+}
+
+sys_getpid :: proc "contextless" () -> int {
+	return int(intrinsics.syscall(SYS_getpid))
+}
+
+sys_getppid :: proc "contextless" () -> int {
+	return int(intrinsics.syscall(SYS_getppid))
+}
+
 sys_gettid :: proc "contextless" () -> int {
 	return int(intrinsics.syscall(SYS_gettid))
 }
