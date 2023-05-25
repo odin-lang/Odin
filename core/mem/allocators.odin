@@ -2,6 +2,7 @@ package mem
 
 import "core:intrinsics"
 import "core:runtime"
+import "core:sync"
 
 nil_allocator_proc :: proc(allocator_data: rawptr, mode: Allocator_Mode,
                            size, alignment: int,
@@ -868,6 +869,7 @@ Tracking_Allocator :: struct {
 	backing:           Allocator,
 	allocation_map:    map[rawptr]Tracking_Allocator_Entry,
 	bad_free_array:    [dynamic]Tracking_Allocator_Bad_Free_Entry,
+	mutex:             sync.Mutex,
 	clear_on_free_all: bool,
 }
 
@@ -888,8 +890,10 @@ tracking_allocator_destroy :: proc(t: ^Tracking_Allocator) {
 
 
 tracking_allocator_clear :: proc(t: ^Tracking_Allocator) {
+	sync.mutex_lock(&t.mutex)
 	clear(&t.allocation_map)
 	clear(&t.bad_free_array)
+	sync.mutex_unlock(&t.mutex)
 }
 
 
@@ -905,6 +909,9 @@ tracking_allocator_proc :: proc(allocator_data: rawptr, mode: Allocator_Mode,
                                 size, alignment: int,
                                 old_memory: rawptr, old_size: int, loc := #caller_location) -> (result: []byte, err: Allocator_Error) {
 	data := (^Tracking_Allocator)(allocator_data)
+
+	sync.mutex_guard(&data.mutex)
+
 	if mode == .Query_Info {
 		info := (^Allocator_Query_Info)(old_memory)
 		if info != nil && info.pointer != nil {
