@@ -56,7 +56,7 @@ to_bytes :: proc "contextless" (s: []$T) -> []byte {
 */
 @(require_results)
 reinterpret :: proc "contextless" ($T: typeid/[]$U, s: []$V) -> []U {
-	when size_of(U) == 0 || size_of(B) == 0 {
+	when size_of(U) == 0 || size_of(V) == 0 {
 		return nil
 	} else {
 		bytes := to_bytes(s)
