@@ -52,6 +52,8 @@ foreign user32 {
 	TranslateMessage :: proc(lpMsg: ^MSG) -> BOOL ---
 	DispatchMessageW :: proc(lpMsg: ^MSG) -> LRESULT ---
 
+	WaitMessage :: proc() -> BOOL ---
+
 	PeekMessageA :: proc(lpMsg: ^MSG, hWnd: HWND, wMsgFilterMin: UINT, wMsgFilterMax: UINT, wRemoveMsg: UINT) -> BOOL ---
 	PeekMessageW :: proc(lpMsg: ^MSG, hWnd: HWND, wMsgFilterMin: UINT, wMsgFilterMax: UINT, wRemoveMsg: UINT) -> BOOL ---
 
@@ -222,6 +224,7 @@ foreign user32 {
 
 	GetWindowInfo :: proc(hwnd: HWND, pwi: PWINDOWINFO) -> BOOL ---
 	GetWindowPlacement :: proc(hWnd: HWND, lpwndpl: ^WINDOWPLACEMENT) -> BOOL ---
+	SetWindowPlacement :: proc(hwnd: HWND, lpwndpl: ^WINDOWPLACEMENT) -> BOOL ---
 	SetWindowRgn :: proc(hWnd: HWND, hRgn: HRGN, bRedraw: BOOL) -> int ---
 	CreateRectRgnIndirect :: proc(lprect: ^RECT) -> HRGN ---
 	GetSystemMetricsForDpi :: proc(nIndex: int, dpi: UINT) -> int ---
@@ -463,7 +466,6 @@ WINDOWPLACEMENT :: struct {
 	ptMinPosition: POINT,
   	ptMaxPosition: POINT,
   	rcNormalPosition: RECT,
-  	rcDevice: RECT,
 }
 
 WINDOWINFO :: struct {
