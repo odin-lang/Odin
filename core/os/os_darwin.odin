@@ -413,7 +413,7 @@ F_OK :: 0 // Test for file existance
 F_GETPATH :: 50 // return the full path of the fd
 
 foreign libc {
-	@(link_name="__error") __error :: proc() -> ^int ---
+	@(link_name="__error") __error :: proc() -> ^c.int ---
 
 	@(link_name="open")             _unix_open          :: proc(path: cstring, flags: i32, mode: u16) -> Handle ---
 	@(link_name="close")            _unix_close         :: proc(handle: Handle) -> c.int ---
@@ -489,7 +489,7 @@ foreign dl {
 }
 
 get_last_error :: proc "contextless" () -> int {
-	return __error()^
+	return int(__error()^)
 }
 
 get_last_error_string :: proc() -> string {
