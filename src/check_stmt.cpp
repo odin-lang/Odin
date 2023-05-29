@@ -1509,10 +1509,11 @@ gb_internal void check_range_stmt(CheckerContext *ctx, Ast *node, u32 mod_flags)
 				if (is_type_string(t) && t->Basic.kind != Basic_cstring) {
 					array_add(&vals, t_rune);
 					array_add(&vals, t_int);
-					add_package_dependency(ctx, "runtime", "string_decode_rune");
-				}
-				if (is_reverse) {
-					error(node, "#reverse for is not supported for string types");
+					if (is_reverse) {
+						add_package_dependency(ctx, "runtime", "string_decode_last_rune");
+					} else {
+						add_package_dependency(ctx, "runtime", "string_decode_rune");
+					}
 				}
 				break;
 
