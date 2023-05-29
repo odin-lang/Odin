@@ -477,7 +477,7 @@ gb_internal String lb_get_const_string(lbModule *m, lbValue value);
 
 gb_internal lbValue lb_generate_local_array(lbProcedure *p, Type *elem_type, i64 count, bool zero_init=true);
 gb_internal lbValue lb_generate_global_array(lbModule *m, Type *elem_type, i64 count, String prefix, i64 id);
-gb_internal lbValue lb_gen_map_key_hash(lbProcedure *p, lbValue key, Type *key_type, lbValue *key_ptr_);
+gb_internal lbValue lb_gen_map_key_hash(lbProcedure *p, lbValue const &map_ptr, lbValue key, lbValue *key_ptr_);
 gb_internal lbValue lb_gen_map_cell_info_ptr(lbModule *m, Type *type);
 gb_internal lbValue lb_gen_map_info_ptr(lbModule *m, Type *map_type);
 
