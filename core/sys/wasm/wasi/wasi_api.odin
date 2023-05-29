@@ -968,7 +968,7 @@ prestat_t :: struct {
 	},
 }
 
-@(default_calling_convention="c")
+@(default_calling_convention="contextless")
 foreign wasi {
 	/**
 	 * Read command-line argument data.
@@ -1306,7 +1306,7 @@ foreign wasi {
  * Returns the number of arguments and the size of the argument string
  * data, or an error.
  */
-args_sizes_get :: proc "c" () -> (num_args, size_of_args: size_t, err: errno_t) {
+args_sizes_get :: proc "contextless" () -> (num_args, size_of_args: size_t, err: errno_t) {
 	err = wasi_args_sizes_get(&num_args, &size_of_args)
 	return
 }
@@ -1316,7 +1316,7 @@ args_sizes_get :: proc "c" () -> (num_args, size_of_args: size_t, err: errno_t) 
  * Returns the number of environment variable arguments and the size of the
  * environment variable data.
  */
-environ_sizes_get :: proc "c" () -> (num_envs, size_of_envs: size_t, err: errno_t) {
+environ_sizes_get :: proc "contextless" () -> (num_envs, size_of_envs: size_t, err: errno_t) {
 	err = wasi_environ_sizes_get(&num_envs, &size_of_envs)
 	return
 }
@@ -1328,7 +1328,7 @@ environ_sizes_get :: proc "c" () -> (num_envs, size_of_envs: size_t, err: errno_
  * @return
  * The resolution of the clock, or an error if one happened.
  */
-clock_res_get :: proc "c" (
+clock_res_get :: proc "contextless" (
 	/**
 	 * The clock for which to return the resolution.
 	 */
@@ -1343,7 +1343,7 @@ clock_res_get :: proc "c" (
  * @return
  * The time value of the clock.
  */
-clock_time_get :: proc "c" (
+clock_time_get :: proc "contextless" (
 	/**
 	 * The clock for which to return the time.
 	 */
@@ -1362,7 +1362,7 @@ clock_time_get :: proc "c" (
  * @return
  * The buffer where the file descriptor's attributes are stored.
  */
-fd_fdstat_get :: proc "c" (
+fd_fdstat_get :: proc "contextless" (
 	fd: fd_t,
 ) -> (stat: fdstat_t, err: errno_t) {
 	err = wasi_fd_fdstat_get(fd, &stat)
@@ -1373,7 +1373,7 @@ fd_fdstat_get :: proc "c" (
  * @return
  * The buffer where the file's attributes are stored.
  */
-fd_filestat_get :: proc "c" (
+fd_filestat_get :: proc "contextless" (
 	fd: fd_t,
 ) -> (stat: filestat_t, err: errno_t) {
 	err = wasi_fd_filestat_get(fd, &stat)
@@ -1389,7 +1389,7 @@ fd_filestat_get :: proc "c" (
  * @return
  * The number of bytes read.
  */
-fd_pread :: proc "c" (
+fd_pread :: proc "contextless" (
 	fd: fd_t,
 	/**
 	 * List of scatter/gather vectors in which to store data.
@@ -1408,7 +1408,7 @@ fd_pread :: proc "c" (
  * @return
  * The buffer where the description is stored.
  */
-fd_prestat_get :: proc "c" (
+fd_prestat_get :: proc "contextless" (
 	fd: fd_t,
 ) -> (desc: prestat_t, err: errno_t) {
 	err = wasi_fd_prestat_get(fd, &desc)
@@ -1420,7 +1420,7 @@ fd_prestat_get :: proc "c" (
  * @return
  * The number of bytes written.
  */
-fd_pwrite :: proc "c" (
+fd_pwrite :: proc "contextless" (
 	fd: fd_t,
 	/**
 	 * List of scatter/gather vectors from which to retrieve data.
@@ -1440,7 +1440,7 @@ fd_pwrite :: proc "c" (
  * @return
  * The number of bytes read.
  */
-fd_read :: proc "c" (
+fd_read :: proc "contextless" (
 	fd: fd_t,
 	/**
 	 * List of scatter/gather vectors to which to store data.
@@ -1463,7 +1463,7 @@ fd_read :: proc "c" (
  * @return
  * The number of bytes stored in the read buffer. If less than the size of the read buffer, the end of the directory has been reached.
  */
-fd_readdir :: proc "c" (
+fd_readdir :: proc "contextless" (
 	fd: fd_t,
 	/**
 	 * The buffer where directory entries are stored
@@ -1483,7 +1483,7 @@ fd_readdir :: proc "c" (
  * @return
  * The new offset of the file descriptor, relative to the start of the file.
  */
-fd_seek :: proc "c" (
+fd_seek :: proc "contextless" (
 	fd: fd_t,
 	/**
 	 * The number of bytes to move.
@@ -1503,7 +1503,7 @@ fd_seek :: proc "c" (
  * @return
  * The current offset of the file descriptor, relative to the start of the file.
  */
-fd_tell :: proc "c" (
+fd_tell :: proc "contextless" (
 	fd: fd_t,
 ) -> (offset: filesize_t, err: errno_t) {
 	err = wasi_fd_tell(fd, &offset)
@@ -1513,7 +1513,7 @@ fd_tell :: proc "c" (
  * Write to a file descriptor.
  * Note: This is similar to `writev` in POSIX.
  */
-fd_write :: proc "c" (
+fd_write :: proc "contextless" (
 	fd: fd_t,
 	/**
 	 * List of scatter/gather vectors from which to retrieve data.
@@ -1529,7 +1529,7 @@ fd_write :: proc "c" (
  * @return
  * The buffer where the file's attributes are stored.
  */
-path_filestat_get :: proc "c" (
+path_filestat_get :: proc "contextless" (
 	fd: fd_t,
 	/**
 	 * Flags determining the method of how the path is resolved.
@@ -1554,7 +1554,7 @@ path_filestat_get :: proc "c" (
  * @return
  * The file descriptor of the file that has been opened.
  */
-path_open :: proc "c" (
+path_open :: proc "contextless" (
 	fd: fd_t,
 	/**
 	 * Flags determining the method of how the path is resolved.
@@ -1591,7 +1591,7 @@ path_open :: proc "c" (
  * @return
  * The number of bytes placed in the buffer.
  */
-path_readlink :: proc "c" (
+path_readlink :: proc "contextless" (
 	fd: fd_t,
 	/**
 	 * The path of the symbolic link from which to read.
@@ -1610,7 +1610,7 @@ path_readlink :: proc "c" (
  * @return
  * The number of events stored.
  */
-poll_oneoff :: proc "c" (
+poll_oneoff :: proc "contextless" (
 	/**
 	 * The events to which to subscribe.
 	 */
@@ -1634,7 +1634,7 @@ poll_oneoff :: proc "c" (
  * @return
  * Number of bytes stored in ri_data and message flags.
  */
-sock_recv :: proc "c" (
+sock_recv :: proc "contextless" (
 	fd: fd_t,
 	/**
 	 * List of scatter/gather vectors to which to store data.
@@ -1655,7 +1655,7 @@ sock_recv :: proc "c" (
  * @return
  * Number of bytes transmitted.
  */
-sock_send :: proc "c" (
+sock_send :: proc "contextless" (
 	fd: fd_t,
 	/**
 	 * List of scatter/gather vectors to which to retrieve data
@@ -1675,7 +1675,7 @@ sock_send :: proc "c" (
 
 
 
-@(default_calling_convention="c")
+@(default_calling_convention="contextless")
 foreign wasi {
 	@(link_name="args_sizes_get")
 	wasi_args_sizes_get :: proc(
