@@ -267,32 +267,61 @@ gb_internal void lb_build_range_indexed(lbProcedure *p, lbValue expr, Type *val_
 	lbBlock *done = nullptr;
 	lbBlock *body = nullptr;
 
+	loop = lb_create_block(p, "for.index.loop");
+	body = lb_create_block(p, "for.index.body");
+	done = lb_create_block(p, "for.index.done");
 
-	lbAddr  index = {};
-	lbValue incr = {};
-	lbValue cond = {};
-
-	index = lb_add_local_generated(p, t_int, false);
+	lbAddr index = lb_add_local_generated(p, t_int, false);
 
 	if (!is_reverse) {
+		/*
+			for x, i in array {
+				...
+			}
+
+			i := -1
+			for {
+				i += 1
+				if !(i < len(array)) {
+					break
+				}
+				#no_bounds_check x := array[i]
+				...
+			}
+		*/
+
 		lb_addr_store(p, index, lb_const_int(m, t_int, cast(u64)-1));
 
-		loop = lb_create_block(p, "for.index.loop");
 		lb_emit_jump(p, loop);
 		lb_start_block(p, loop);
 
-		incr = lb_emit_arith(p, Token_Add, lb_addr_load(p, index), lb_const_int(m, t_int, 1), t_int);
+		lbValue incr = lb_emit_arith(p, Token_Add, lb_addr_load(p, index), lb_const_int(m, t_int, 1), t_int);
 		lb_addr_store(p, index, incr);
 
-		body = lb_create_block(p, "for.index.body");
-		done = lb_create_block(p, "for.index.done");
 		if (count.value == nullptr) {
 			GB_ASSERT(count_ptr.value != nullptr);
 			count = lb_emit_load(p, count_ptr);
 		}
-		cond = lb_emit_comp(p, Token_Lt, incr, count);
+		lbValue cond = lb_emit_comp(p, Token_Lt, incr, count);
+		lb_emit_if(p, cond, body, done);
 	} else {
 		// NOTE(bill): REVERSED LOGIC
+		/*
+			#reverse for x, i in array {
+				...
+			}
+
+			i := len(array)
+			for {
+				i -= 1
+				if i < 0 {
+					break
+				}
+				#no_bounds_check x := array[i]
+				...
+			}
+		*/
+
 		if (count.value == nullptr) {
 			GB_ASSERT(count_ptr.value != nullptr);
 			count = lb_emit_load(p, count_ptr);
@@ -300,19 +329,16 @@ gb_internal void lb_build_range_indexed(lbProcedure *p, lbValue expr, Type *val_
 		count = lb_emit_conv(p, count, t_int);
 		lb_addr_store(p, index, count);
 
-		loop = lb_create_block(p, "for.index.loop");
 		lb_emit_jump(p, loop);
 		lb_start_block(p, loop);
 
-		incr = lb_emit_arith(p, Token_Sub, lb_addr_load(p, index), lb_const_int(m, t_int, 1), t_int);
+		lbValue incr = lb_emit_arith(p, Token_Sub, lb_addr_load(p, index), lb_const_int(m, t_int, 1), t_int);
 		lb_addr_store(p, index, incr);
 
-		body = lb_create_block(p, "for.index.body");
-		done = lb_create_block(p, "for.index.done");
-		cond = lb_emit_comp(p, Token_GtEq, incr, lb_const_int(m, t_int, 0));
+		lbValue anti_cond = lb_emit_comp(p, Token_Lt, incr, lb_const_int(m, t_int, 0));
+		lb_emit_if(p, anti_cond, done, body);
 	}
 
-	lb_emit_if(p, cond, body, done);
 	lb_start_block(p, body);
 
 	idx = lb_addr_load(p, index);
@@ -509,6 +535,18 @@ gb_internal void lb_build_range_string(lbProcedure *p, lbValue expr, Type *val_t
 	lbValue cond = {};
 
 	if (!is_reverse) {
+		/*
+			for c, offset in str {
+				...
+			}
+
+			offset := 0
+			for offset < len(str) {
+				c, _w := string_decode_rune(str[offset:])
+				...
+				offset += _w
+			}
+		*/
 		lb_addr_store(p, offset_, lb_const_int(m, t_int, 0));
 
 		lb_emit_jump(p, loop);
@@ -519,6 +557,18 @@ gb_internal void lb_build_range_string(lbProcedure *p, lbValue expr, Type *val_t
 		cond = lb_emit_comp(p, Token_Lt, offset, count);
 	} else {
 		// NOTE(bill): REVERSED LOGIC
+		/*
+			#reverse for c, offset in str {
+				...
+			}
+
+			offset := len(str)
+			for offset > 0 {
+				c, _w := string_decode_last_rune(str[:offset])
+				offset -= _w
+				...
+			}
+		*/
 		lb_addr_store(p, offset_, count);
 
 		lb_emit_jump(p, loop);
@@ -784,40 +834,69 @@ gb_internal void lb_build_range_stmt_struct_soa(lbProcedure *p, AstRangeStmt *rs
 
 	lbAddr index = lb_add_local_generated(p, t_int, false);
 
-	lbValue incr = {};
-	lbValue cond = {};
-
 	if (!is_reverse) {
+		/*
+			for x, i in array {
+				...
+			}
+
+			i := -1
+			for {
+				i += 1
+				if !(i < len(array)) {
+					break
+				}
+				x := array[i] // but #soa-ified
+				...
+			}
+		*/
+
 		lb_addr_store(p, index, lb_const_int(p->module, t_int, cast(u64)-1));
 
 		loop = lb_create_block(p, "for.soa.loop");
 		lb_emit_jump(p, loop);
 		lb_start_block(p, loop);
 
-		incr = lb_emit_arith(p, Token_Add, lb_addr_load(p, index), lb_const_int(p->module, t_int, 1), t_int);
+		lbValue incr = lb_emit_arith(p, Token_Add, lb_addr_load(p, index), lb_const_int(p->module, t_int, 1), t_int);
 		lb_addr_store(p, index, incr);
 
 		body = lb_create_block(p, "for.soa.body");
 		done = lb_create_block(p, "for.soa.done");
 
-		cond = lb_emit_comp(p, Token_Lt, incr, count);
+		lbValue cond = lb_emit_comp(p, Token_Lt, incr, count);
+		lb_emit_if(p, cond, body, done);
 	} else {
 		// NOTE(bill): REVERSED LOGIC
+		/*
+			#reverse for x, i in array {
+				...
+			}
+
+			i := len(array)
+			for {
+				i -= 1
+				if i < 0 {
+					break
+				}
+				#no_bounds_check x := array[i] // but #soa-ified
+				...
+			}
+		*/
 		lb_addr_store(p, index, count);
 
 		loop = lb_create_block(p, "for.soa.loop");
 		lb_emit_jump(p, loop);
 		lb_start_block(p, loop);
 
-		incr = lb_emit_arith(p, Token_Sub, lb_addr_load(p, index), lb_const_int(p->module, t_int, 1), t_int);
+		lbValue incr = lb_emit_arith(p, Token_Sub, lb_addr_load(p, index), lb_const_int(p->module, t_int, 1), t_int);
 		lb_addr_store(p, index, incr);
 
 		body = lb_create_block(p, "for.soa.body");
 		done = lb_create_block(p, "for.soa.done");
 
-		cond = lb_emit_comp(p, Token_GtEq, incr, lb_const_int(p->module, t_int, 0));
+		lbValue cond = lb_emit_comp(p, Token_Lt, incr, lb_const_int(p->module, t_int, 0));
+		lb_emit_if(p, cond, done, body);
 	}
-	lb_emit_if(p, cond, body, done);
 	lb_start_block(p, body);
 
 
