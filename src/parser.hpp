@@ -529,6 +529,7 @@ AST_KIND(_ComplexStmtBegin, "", bool) \
 		Token in_token; \
 		Ast *expr; \
 		Ast *body; \
+		bool reverse; \
 	}) \
 	AST_KIND(UnrollRangeStmt, "#unroll range statement", struct { \
 		Scope *scope; \

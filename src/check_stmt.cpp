@@ -1461,6 +1461,7 @@ gb_internal void check_range_stmt(CheckerContext *ctx, Ast *node, u32 mod_flags)
 	bool is_map = false;
 	bool use_by_reference_for_value = false;
 	bool is_soa = false;
+	bool is_reverse = rs->reverse;
 
 	Ast *expr = unparen_expr(rs->expr);
 
@@ -1476,6 +1477,10 @@ gb_internal void check_range_stmt(CheckerContext *ctx, Ast *node, u32 mod_flags)
 		}
 		array_add(&vals, x.type);
 		array_add(&vals, t_int);
+
+		if (is_reverse) {
+			error(node, "#reverse for is not yet supported with ranges");
+		}
 	} else {
 		Operand operand = {Addressing_Invalid};
 		check_expr_base(ctx, &operand, expr, nullptr);
@@ -1488,6 +1493,9 @@ gb_internal void check_range_stmt(CheckerContext *ctx, Ast *node, u32 mod_flags)
 				gb_string_free(t);
 				goto skip_expr_range_stmt;
 			} else {
+				if (is_reverse) {
+					error(node, "#reverse for is not supported for enum types");
+				}
 				array_add(&vals, operand.type);
 				array_add(&vals, t_int);
 				add_type_info_type(ctx, operand.type);
@@ -1502,6 +1510,9 @@ gb_internal void check_range_stmt(CheckerContext *ctx, Ast *node, u32 mod_flags)
 					array_add(&vals, t_rune);
 					array_add(&vals, t_int);
 					add_package_dependency(ctx, "runtime", "string_decode_rune");
+				}
+				if (is_reverse) {
+					error(node, "#reverse for is not supported for string types");
 				}
 				break;
 
@@ -1534,6 +1545,9 @@ gb_internal void check_range_stmt(CheckerContext *ctx, Ast *node, u32 mod_flags)
 				is_map = true;
 				array_add(&vals, t->Map.key);
 				array_add(&vals, t->Map.value);
+				if (is_reverse) {
+					error(node, "#reverse for is not supported for map types");
+				}
 				break;
 
 			case Type_Tuple:
@@ -1570,6 +1584,9 @@ gb_internal void check_range_stmt(CheckerContext *ctx, Ast *node, u32 mod_flags)
 						break;
 					}
 
+					if (is_reverse) {
+						error(node, "#reverse for is not supported for multiple return valued parameters");
+					}
 				}
 				break;
 
@@ -1579,6 +1596,10 @@ gb_internal void check_range_stmt(CheckerContext *ctx, Ast *node, u32 mod_flags)
 					if (is_ptr) use_by_reference_for_value = true;
 					array_add(&vals, t->Struct.soa_elem);
 					array_add(&vals, t_int);
+
+					if (is_reverse) {
+						error(node, "#reverse for is not yet supported for #soa types");
+					}
 				}
 				break;
 			}

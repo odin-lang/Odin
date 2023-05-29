@@ -249,7 +249,8 @@ gb_internal void lb_build_when_stmt(lbProcedure *p, AstWhenStmt *ws) {
 
 
 gb_internal void lb_build_range_indexed(lbProcedure *p, lbValue expr, Type *val_type, lbValue count_ptr,
-                                        lbValue *val_, lbValue *idx_, lbBlock **loop_, lbBlock **done_) {
+                                        lbValue *val_, lbValue *idx_, lbBlock **loop_, lbBlock **done_,
+                                        bool is_reverse) {
 	lbModule *m = p->module;
 
 	lbValue count = {};
@@ -267,23 +268,50 @@ gb_internal void lb_build_range_indexed(lbProcedure *p, lbValue expr, Type *val_
 	lbBlock *body = nullptr;
 
 
-	lbAddr index = lb_add_local_generated(p, t_int, false);
-	lb_addr_store(p, index, lb_const_int(m, t_int, cast(u64)-1));
+	lbAddr  index = {};
+	lbValue incr = {};
+	lbValue cond = {};
 
-	loop = lb_create_block(p, "for.index.loop");
-	lb_emit_jump(p, loop);
-	lb_start_block(p, loop);
+	index = lb_add_local_generated(p, t_int, false);
 
-	lbValue incr = lb_emit_arith(p, Token_Add, lb_addr_load(p, index), lb_const_int(m, t_int, 1), t_int);
-	lb_addr_store(p, index, incr);
+	if (!is_reverse) {
+		lb_addr_store(p, index, lb_const_int(m, t_int, cast(u64)-1));
 
-	body = lb_create_block(p, "for.index.body");
-	done = lb_create_block(p, "for.index.done");
-	if (count.value == nullptr) {
-		GB_ASSERT(count_ptr.value != nullptr);
-		count = lb_emit_load(p, count_ptr);
+		loop = lb_create_block(p, "for.index.loop");
+		lb_emit_jump(p, loop);
+		lb_start_block(p, loop);
+
+		incr = lb_emit_arith(p, Token_Add, lb_addr_load(p, index), lb_const_int(m, t_int, 1), t_int);
+		lb_addr_store(p, index, incr);
+
+		body = lb_create_block(p, "for.index.body");
+		done = lb_create_block(p, "for.index.done");
+		if (count.value == nullptr) {
+			GB_ASSERT(count_ptr.value != nullptr);
+			count = lb_emit_load(p, count_ptr);
+		}
+		cond = lb_emit_comp(p, Token_Lt, incr, count);
+	} else {
+		// NOTE(bill): REVERSED LOGIC
+		if (count.value == nullptr) {
+			GB_ASSERT(count_ptr.value != nullptr);
+			count = lb_emit_load(p, count_ptr);
+		}
+		count = lb_emit_conv(p, count, t_int);
+		lb_addr_store(p, index, count);
+
+		loop = lb_create_block(p, "for.index.loop");
+		lb_emit_jump(p, loop);
+		lb_start_block(p, loop);
+
+		incr = lb_emit_arith(p, Token_Sub, lb_addr_load(p, index), lb_const_int(m, t_int, 1), t_int);
+		lb_addr_store(p, index, incr);
+
+		body = lb_create_block(p, "for.index.body");
+		done = lb_create_block(p, "for.index.done");
+		cond = lb_emit_comp(p, Token_GtEq, incr, lb_const_int(m, t_int, 0));
 	}
-	lbValue cond = lb_emit_comp(p, Token_Lt, incr, count);
+
 	lb_emit_if(p, cond, body, done);
 	lb_start_block(p, body);
 
@@ -820,7 +848,7 @@ gb_internal void lb_build_range_stmt(lbProcedure *p, AstRangeStmt *rs, Scope *sc
 			}
 			lbAddr count_ptr = lb_add_local_generated(p, t_int, false);
 			lb_addr_store(p, count_ptr, lb_const_int(p->module, t_int, et->Array.count));
-			lb_build_range_indexed(p, array, val0_type, count_ptr.addr, &val, &key, &loop, &done);
+			lb_build_range_indexed(p, array, val0_type, count_ptr.addr, &val, &key, &loop, &done, rs->reverse);
 			break;
 		}
 		case Type_EnumeratedArray: {
@@ -830,7 +858,7 @@ gb_internal void lb_build_range_stmt(lbProcedure *p, AstRangeStmt *rs, Scope *sc
 			}
 			lbAddr count_ptr = lb_add_local_generated(p, t_int, false);
 			lb_addr_store(p, count_ptr, lb_const_int(p->module, t_int, et->EnumeratedArray.count));
-			lb_build_range_indexed(p, array, val0_type, count_ptr.addr, &val, &key, &loop, &done);
+			lb_build_range_indexed(p, array, val0_type, count_ptr.addr, &val, &key, &loop, &done, rs->reverse);
 			break;
 		}
 		case Type_DynamicArray: {
@@ -840,7 +868,7 @@ gb_internal void lb_build_range_stmt(lbProcedure *p, AstRangeStmt *rs, Scope *sc
 				array = lb_emit_load(p, array);
 			}
 			count_ptr = lb_emit_struct_ep(p, array, 1);
-			lb_build_range_indexed(p, array, val0_type, count_ptr, &val, &key, &loop, &done);
+			lb_build_range_indexed(p, array, val0_type, count_ptr, &val, &key, &loop, &done, rs->reverse);
 			break;
 		}
 		case Type_Slice: {
@@ -853,7 +881,7 @@ gb_internal void lb_build_range_stmt(lbProcedure *p, AstRangeStmt *rs, Scope *sc
 				count_ptr = lb_add_local_generated(p, t_int, false).addr;
 				lb_emit_store(p, count_ptr, lb_slice_len(p, slice));
 			}
-			lb_build_range_indexed(p, slice, val0_type, count_ptr, &val, &key, &loop, &done);
+			lb_build_range_indexed(p, slice, val0_type, count_ptr, &val, &key, &loop, &done, rs->reverse);
 			break;
 		}
 		case Type_Basic: {

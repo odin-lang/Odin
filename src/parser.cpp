@@ -4759,6 +4759,17 @@ gb_internal Ast *parse_stmt(AstFile *f) {
 			return stmt;
 		} else if (tag == "unroll") {
 			return parse_unrolled_for_loop(f, name);
+		} else if (tag == "reverse") {
+			Ast *for_stmt = parse_for_stmt(f);
+			if (for_stmt->kind == Ast_RangeStmt) {
+				if (for_stmt->RangeStmt.reverse) {
+					syntax_error(token, "#reverse already applied to a 'for in' statement");
+				}
+				for_stmt->RangeStmt.reverse = true;
+			} else {
+				syntax_error(token, "#reverse can only be applied to a 'for in' statement");
+			}
+			return for_stmt;
 		} else if (tag == "include") {
 			syntax_error(token, "#include is not a valid import declaration kind. Did you mean 'import'?");
 			s = ast_bad_stmt(f, token, f->curr_token);
