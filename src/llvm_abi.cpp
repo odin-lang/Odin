@@ -1179,7 +1179,11 @@ namespace lbAbiArm64 {
 			if (is_register(type)) {
 				args[i] = non_struct(c, type);
 			} else if (is_homogenous_aggregate(c, type, &homo_base_type, &homo_member_count)) {
-				args[i] = lb_arg_type_direct(type, LLVMArrayType(homo_base_type, homo_member_count), nullptr, nullptr);
+				if (is_homogenous_aggregate_small_enough(homo_base_type, homo_member_count)) {
+					args[i] = lb_arg_type_direct(type, LLVMArrayType(homo_base_type, homo_member_count), nullptr, nullptr);
+				} else {
+					args[i] = lb_arg_type_indirect(type, nullptr);;
+				}
 			} else {
 				i64 size = lb_sizeof(type);
 				if (size <= 16) {
