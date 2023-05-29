@@ -3744,8 +3744,18 @@ gb_internal bool allow_field_separator(AstFile *f) {
 	if (allow_token(f, Token_Comma)) {
 		return true;
 	}
-	if (ALLOW_NEWLINE && token.kind == Token_Semicolon) {
-		if (!token_is_newline(token)) {
+	if (token.kind == Token_Semicolon) {
+		bool ok = false;
+		if (ALLOW_NEWLINE && token_is_newline(token)) {
+			TokenKind next = peek_token(f).kind;
+			switch (next) {
+			case Token_CloseBrace:
+			case Token_CloseParen:
+				ok = true;
+				break;
+			}
+		}
+		if (!ok) {
 			String p = token_to_string(token);
 			syntax_error(token_end_of_line(f, f->prev_token), "Expected a comma, got a %.*s", LIT(p));
 		}
