@@ -1377,7 +1377,7 @@ gb_internal WORKER_TASK_PROC(lb_llvm_emit_worker_proc) {
 
 gb_internal void lb_llvm_function_pass_per_function_internal(lbModule *module, lbProcedure *p, lbFunctionPassManagerKind pass_manager_kind = lbFunctionPassManager_default) {
 	LLVMPassManagerRef pass_manager = module->function_pass_managers[pass_manager_kind];
-	lb_run_function_pass_manager(pass_manager, p);
+	lb_run_function_pass_manager(pass_manager, p, pass_manager_kind);
 }
 
 gb_internal WORKER_TASK_PROC(lb_llvm_function_pass_per_module) {
@@ -1911,7 +1911,7 @@ gb_internal lbProcedure *lb_create_main_procedure(lbModule *m, lbProcedure *star
 		LLVMVerifyFunction(p->value, LLVMAbortProcessAction);
 	}
 
-	lb_run_function_pass_manager(default_function_pass_manager, p);
+	lb_run_function_pass_manager(default_function_pass_manager, p, lbFunctionPassManager_default);
 	return p;
 }
 
