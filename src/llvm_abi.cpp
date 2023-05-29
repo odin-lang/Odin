@@ -1213,7 +1213,7 @@ namespace lbAbiWasm {
 		            The approach taken optimizes for passing things in multiple
 		            registers/arguments if possible rather than by pointer.
 	*/
-	gb_internal Array<lbArgType> compute_arg_types(LLVMContextRef c, LLVMTypeRef *arg_types, unsigned arg_count);
+	gb_internal Array<lbArgType> compute_arg_types(LLVMContextRef c, LLVMTypeRef *arg_types, unsigned arg_count, ProcCallingConvention calling_convention);
 	gb_internal LB_ABI_COMPUTE_RETURN_TYPE(compute_return_type);
 
 	enum {MAX_DIRECT_STRUCT_SIZE = 32};
@@ -1221,7 +1221,7 @@ namespace lbAbiWasm {
 	gb_internal LB_ABI_INFO(abi_info) {
 		lbFunctionType *ft = gb_alloc_item(permanent_allocator(), lbFunctionType);
 		ft->ctx = c;
-		ft->args = compute_arg_types(c, arg_types, arg_count);
+		ft->args = compute_arg_types(c, arg_types, arg_count, calling_convention);
 		ft->ret = compute_return_type(ft, c, return_type, return_is_defined, return_is_tuple);
 		ft->calling_convention = calling_convention;
 		return ft;
@@ -1258,13 +1258,26 @@ namespace lbAbiWasm {
 		return false;
 	}
 
-	gb_internal bool type_can_be_direct(LLVMTypeRef type) {
+	gb_internal bool type_can_be_direct(LLVMTypeRef type, ProcCallingConvention calling_convention) {
 		LLVMTypeKind kind = LLVMGetTypeKind(type);
 		i64 sz = lb_sizeof(type);
 		if (sz == 0) {
 			return false;
 		}
-		if (sz <= MAX_DIRECT_STRUCT_SIZE) {
+		if (calling_convention == ProcCC_CDecl) {
+			// WASM Basic C ABI:
+			// https://github.com/WebAssembly/tool-conventions/blob/main/BasicCABI.md#function-signatures
+			if (kind == LLVMArrayTypeKind) {
+				return false;
+			} else if (kind == LLVMStructTypeKind) {
+				unsigned count = LLVMCountStructElementTypes(type);
+				if (count == 1) {
+					return type_can_be_direct(LLVMStructGetTypeAtIndex(type, 0), calling_convention);
+				}
+			} else if (is_basic_register_type(type)) {
+				return true;
+			}
+		} else if (sz <= MAX_DIRECT_STRUCT_SIZE) {
 			if (kind == LLVMArrayTypeKind) {
 				if (is_basic_register_type(OdinLLVMGetArrayElementType(type))) {
 					return true;
@@ -1284,7 +1297,7 @@ namespace lbAbiWasm {
 		return false;
 	}
 
-	gb_internal lbArgType is_struct(LLVMContextRef c, LLVMTypeRef type) {
+	gb_internal lbArgType is_struct(LLVMContextRef c, LLVMTypeRef type, ProcCallingConvention calling_convention) {
 		LLVMTypeKind kind = LLVMGetTypeKind(type);
 		GB_ASSERT(kind == LLVMArrayTypeKind || kind == LLVMStructTypeKind);
 		
@@ -1292,21 +1305,21 @@ namespace lbAbiWasm {
 		if (sz == 0) {
 			return lb_arg_type_ignore(type);
 		}
-		if (type_can_be_direct(type)) {
+		if (type_can_be_direct(type, calling_convention)) {
 			return lb_arg_type_direct(type);
 		}
 		return lb_arg_type_indirect(type, nullptr);
 	}
 	
 
-	gb_internal Array<lbArgType> compute_arg_types(LLVMContextRef c, LLVMTypeRef *arg_types, unsigned arg_count) {
+	gb_internal Array<lbArgType> compute_arg_types(LLVMContextRef c, LLVMTypeRef *arg_types, unsigned arg_count, ProcCallingConvention calling_convention) {
 		auto args = array_make<lbArgType>(lb_function_type_args_allocator(), arg_count);
 
 		for (unsigned i = 0; i < arg_count; i++) {
 			LLVMTypeRef t = arg_types[i];
 			LLVMTypeKind kind = LLVMGetTypeKind(t);
 			if (kind == LLVMStructTypeKind || kind == LLVMArrayTypeKind) {
-				args[i] = is_struct(c, t);
+				args[i] = is_struct(c, t, calling_convention);
 			} else {
 				args[i] = non_struct(c, t, false);
 			}
@@ -1318,7 +1331,7 @@ namespace lbAbiWasm {
 		if (!return_is_defined) {
 			return lb_arg_type_direct(LLVMVoidTypeInContext(c));
 		} else if (lb_is_type_kind(return_type, LLVMStructTypeKind) || lb_is_type_kind(return_type, LLVMArrayTypeKind)) {
-			if (type_can_be_direct(return_type)) {
+			if (type_can_be_direct(return_type, ft->calling_convention)) {
 				return lb_arg_type_direct(return_type);
 			}
 
