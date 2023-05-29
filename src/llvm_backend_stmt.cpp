@@ -730,6 +730,8 @@ gb_internal void lb_build_range_stmt_struct_soa(lbProcedure *p, AstRangeStmt *rs
 	lbBlock *body = nullptr;
 	lbBlock *done = nullptr;
 
+	bool is_reverse = rs->reverse;
+
 	lb_open_scope(p, scope);
 
 
@@ -751,19 +753,40 @@ gb_internal void lb_build_range_stmt_struct_soa(lbProcedure *p, AstRangeStmt *rs
 
 
 	lbAddr index = lb_add_local_generated(p, t_int, false);
-	lb_addr_store(p, index, lb_const_int(p->module, t_int, cast(u64)-1));
 
-	loop = lb_create_block(p, "for.soa.loop");
-	lb_emit_jump(p, loop);
-	lb_start_block(p, loop);
+	lbValue incr = {};
+	lbValue cond = {};
 
-	lbValue incr = lb_emit_arith(p, Token_Add, lb_addr_load(p, index), lb_const_int(p->module, t_int, 1), t_int);
-	lb_addr_store(p, index, incr);
+	if (!is_reverse) {
+		lb_addr_store(p, index, lb_const_int(p->module, t_int, cast(u64)-1));
 
-	body = lb_create_block(p, "for.soa.body");
-	done = lb_create_block(p, "for.soa.done");
+		loop = lb_create_block(p, "for.soa.loop");
+		lb_emit_jump(p, loop);
+		lb_start_block(p, loop);
 
-	lbValue cond = lb_emit_comp(p, Token_Lt, incr, count);
+		incr = lb_emit_arith(p, Token_Add, lb_addr_load(p, index), lb_const_int(p->module, t_int, 1), t_int);
+		lb_addr_store(p, index, incr);
+
+		body = lb_create_block(p, "for.soa.body");
+		done = lb_create_block(p, "for.soa.done");
+
+		cond = lb_emit_comp(p, Token_Lt, incr, count);
+	} else {
+		// NOTE(bill): REVERSED LOGIC
+		lb_addr_store(p, index, count);
+
+		loop = lb_create_block(p, "for.soa.loop");
+		lb_emit_jump(p, loop);
+		lb_start_block(p, loop);
+
+		incr = lb_emit_arith(p, Token_Sub, lb_addr_load(p, index), lb_const_int(p->module, t_int, 1), t_int);
+		lb_addr_store(p, index, incr);
+
+		body = lb_create_block(p, "for.soa.body");
+		done = lb_create_block(p, "for.soa.done");
+
+		cond = lb_emit_comp(p, Token_GtEq, incr, lb_const_int(p->module, t_int, 0));
+	}
 	lb_emit_if(p, cond, body, done);
 	lb_start_block(p, body);
 

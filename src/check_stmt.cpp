@@ -1596,10 +1596,6 @@ gb_internal void check_range_stmt(CheckerContext *ctx, Ast *node, u32 mod_flags)
 					if (is_ptr) use_by_reference_for_value = true;
 					array_add(&vals, t->Struct.soa_elem);
 					array_add(&vals, t_int);
-
-					if (is_reverse) {
-						error(node, "#reverse for is not yet supported for #soa types");
-					}
 				}
 				break;
 			}
