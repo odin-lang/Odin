@@ -950,6 +950,7 @@ gb_internal void check_proc_decl(CheckerContext *ctx, Entity *e, DeclInfo *d) {
 
 	if (ac.require_declaration) {
 		e->flags |= EntityFlag_Require;
+		pl->inlining = ProcInlining_no_inline;
 	}
 
 
