@@ -1479,7 +1479,7 @@ gb_internal void check_range_stmt(CheckerContext *ctx, Ast *node, u32 mod_flags)
 		array_add(&vals, t_int);
 
 		if (is_reverse) {
-			error(node, "#reverse for is not yet supported with ranges");
+			error(node, "#reverse for is not supported with ranges, prefer an explicit for loop with init, condition, and post arguments");
 		}
 	} else {
 		Operand operand = {Addressing_Invalid};
@@ -1546,7 +1546,7 @@ gb_internal void check_range_stmt(CheckerContext *ctx, Ast *node, u32 mod_flags)
 				array_add(&vals, t->Map.key);
 				array_add(&vals, t->Map.value);
 				if (is_reverse) {
-					error(node, "#reverse for is not supported for map types");
+					error(node, "#reverse for is not supported for map types, as maps are unordered");
 				}
 				break;
 
