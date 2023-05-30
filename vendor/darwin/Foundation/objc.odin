@@ -13,12 +13,12 @@ foreign Foundation {
 	objc_allocateClassPair :: proc "c" (superclass : Class, name : cstring, extraBytes : c.size_t) -> Class ---
 	objc_registerClassPair :: proc "c" (cls : Class) ---
 
-	class_addMethod :: proc "c" (cls: Class, name: SEL, imp: IMP, types: cstring) -> BOOL ---
+	class_addMethod         :: proc "c" (cls: Class, name: SEL, imp: IMP, types: cstring) -> BOOL ---
 	class_getInstanceMethod :: proc "c" (cls: Class, name: SEL) -> Method ---
-	class_createInstance :: proc "c" (cls: Class, extraBytes: c.size_t) -> id ---
+	class_createInstance    :: proc "c" (cls: Class, extraBytes: c.size_t) -> id ---
 
 	method_setImplementation :: proc "c" (method: Method, imp: IMP) ---
-	object_getIndexedIvars :: proc(obj: id) -> rawptr ---
+	object_getIndexedIvars   :: proc(obj: id) -> rawptr ---
 }
 
 

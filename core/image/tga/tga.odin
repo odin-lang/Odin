@@ -57,7 +57,7 @@ save_to_buffer  :: proc(output: ^bytes.Buffer, img: ^Image, options := Options{}
 	// Calculate and allocate necessary space.
 	necessary := pixels * img.channels + size_of(image.TGA_Header)
 
-	if !resize(&output.buf, necessary) {
+	if resize(&output.buf, necessary) != nil {
 		return .Unable_To_Allocate_Or_Resize
 	}
 
@@ -292,7 +292,7 @@ load_from_context :: proc(ctx: ^$C, options := Options{}, allocator := context.a
 		return img, nil
 	}
 
-	if !resize(&img.pixels.buf, dest_channels * img.width * img.height) {
+	if resize(&img.pixels.buf, dest_channels * img.width * img.height) != nil {
 		return img, .Unable_To_Allocate_Or_Resize
 	}
 

@@ -166,7 +166,7 @@ _heap_allocator_proc :: proc(allocator_data: rawptr, mode: mem.Allocator_Mode,
 		ptr := uintptr(aligned_mem)
 		aligned_ptr := (ptr - 1 + uintptr(a)) & -uintptr(a)
 		diff := int(aligned_ptr - ptr)
-		if (size + diff) > space {
+		if (size + diff) > space || allocated_mem == nil {
 			return nil, .Out_Of_Memory
 		}
 

@@ -7,6 +7,7 @@ float32_uniform :: float32_range
 
 // Triangular Distribution
 // See: http://wikipedia.org/wiki/Triangular_distribution
+@(require_results)
 float64_triangular :: proc(lo, hi: f64, mode: Maybe(f64), r: ^Rand = nil) -> f64 {
 	if hi-lo == 0 {
 		return lo
@@ -24,6 +25,7 @@ float64_triangular :: proc(lo, hi: f64, mode: Maybe(f64), r: ^Rand = nil) -> f64
 }
 // Triangular Distribution
 // See: http://wikipedia.org/wiki/Triangular_distribution
+@(require_results)
 float32_triangular :: proc(lo, hi: f32, mode: Maybe(f32), r: ^Rand = nil) -> f32 {
 	if hi-lo == 0 {
 		return lo
@@ -41,20 +43,24 @@ float32_triangular :: proc(lo, hi: f32, mode: Maybe(f32), r: ^Rand = nil) -> f32
 
 
 // Normal/Gaussian Distribution
+@(require_results)
 float64_normal :: proc(mean, stddev: f64, r: ^Rand = nil) -> f64 {
 	return norm_float64(r) * stddev + mean
 }
 // Normal/Gaussian Distribution
+@(require_results)
 float32_normal :: proc(mean, stddev: f32, r: ^Rand = nil) -> f32 {
 	return f32(float64_normal(f64(mean), f64(stddev), r))
 }
 
 
 // Log Normal Distribution
+@(require_results)
 float64_log_normal :: proc(mean, stddev: f64, r: ^Rand = nil) -> f64 {
 	return math.exp(float64_normal(mean, stddev, r))
 }
 // Log Normal Distribution
+@(require_results)
 float32_log_normal :: proc(mean, stddev: f32, r: ^Rand = nil) -> f32 {
 	return f32(float64_log_normal(f64(mean), f64(stddev), r))
 }
@@ -65,6 +71,7 @@ float32_log_normal :: proc(mean, stddev: f32, r: ^Rand = nil) -> f32 {
 // Return values range from
 //     0 to positive infinity if lambda >  0
 //     negative infinity to 0 if lambda <= 0
+@(require_results)
 float64_exponential :: proc(lambda: f64, r: ^Rand = nil) -> f64 {
 	return - math.ln(1 - float64(r)) / lambda
 }
@@ -73,6 +80,7 @@ float64_exponential :: proc(lambda: f64, r: ^Rand = nil) -> f64 {
 // Return values range from
 //     0 to positive infinity if lambda >  0
 //     negative infinity to 0 if lambda <= 0
+@(require_results)
 float32_exponential :: proc(lambda: f32, r: ^Rand = nil) -> f32 {
 	return f32(float64_exponential(f64(lambda), r))
 }
@@ -87,6 +95,7 @@ float32_exponential :: proc(lambda: f32, r: ^Rand = nil) -> f32 {
 //              math.gamma(alpha) * math.pow(beta, alpha)
 //
 // mean is alpha*beta, variance is math.pow(alpha*beta, 2)
+@(require_results)
 float64_gamma :: proc(alpha, beta: f64, r: ^Rand = nil) -> f64 {
 	if alpha <= 0 || beta <= 0 {
 		panic(#procedure + ": alpha and beta must be > 0.0")
@@ -152,6 +161,7 @@ float64_gamma :: proc(alpha, beta: f64, r: ^Rand = nil) -> f64 {
 //              math.gamma(alpha) * math.pow(beta, alpha)
 //
 // mean is alpha*beta, variance is math.pow(alpha*beta, 2)
+@(require_results)
 float32_gamma :: proc(alpha, beta: f32, r: ^Rand = nil) -> f32 {
 	return f32(float64_gamma(f64(alpha), f64(beta), r))
 }
@@ -162,6 +172,7 @@ float32_gamma :: proc(alpha, beta: f32, r: ^Rand = nil) -> f32 {
 // Required: alpha > 0 and beta > 0
 //
 // Return values range between 0 and 1
+@(require_results)
 float64_beta :: proc(alpha, beta: f64, r: ^Rand = nil) -> f64 {
 	if alpha <= 0 || beta <= 0 {
 		panic(#procedure + ": alpha and beta must be > 0.0")
@@ -178,6 +189,7 @@ float64_beta :: proc(alpha, beta: f64, r: ^Rand = nil) -> f64 {
 // Required: alpha > 0 and beta > 0
 //
 // Return values range between 0 and 1
+@(require_results)
 float32_beta :: proc(alpha, beta: f32, r: ^Rand = nil) -> f32 {
 	return f32(float64_beta(f64(alpha), f64(beta), r))
 }
@@ -185,22 +197,26 @@ float32_beta :: proc(alpha, beta: f32, r: ^Rand = nil) -> f32 {
 
 // Pareto distribution, `alpha` is the shape parameter.
 // https://wikipedia.org/wiki/Pareto_distribution
+@(require_results)
 float64_pareto :: proc(alpha: f64, r: ^Rand = nil) -> f64 {
 	return math.pow(1 - float64(r), -1.0 / alpha)
 }
 // Pareto distribution, `alpha` is the shape parameter.
 // https://wikipedia.org/wiki/Pareto_distribution
+@(require_results)
 float32_pareto :: proc(alpha, beta: f32, r: ^Rand = nil) -> f32 {
 	return f32(float64_pareto(f64(alpha), r))
 }
 
 
 // Weibull distribution, `alpha` is the scale parameter, `beta` is the shape parameter.
+@(require_results)
 float64_weibull :: proc(alpha, beta: f64, r: ^Rand = nil) -> f64 {
 	u := 1 - float64(r)
 	return alpha * math.pow(-math.ln(u), 1.0/beta)
 }
 // Weibull distribution, `alpha` is the scale parameter, `beta` is the shape parameter.
+@(require_results)
 float32_weibull :: proc(alpha, beta: f32, r: ^Rand = nil) -> f32 {
 	return f32(float64_weibull(f64(alpha), f64(beta), r))
 }
@@ -210,6 +226,7 @@ float32_weibull :: proc(alpha, beta: f32, r: ^Rand = nil) -> f32 {
 // `mean_angle` is the in mean angle between 0 and 2pi radians
 // `kappa` is the concentration parameter which must be >= 0
 // When `kappa` is zero, the Distribution is a uniform Distribution over the range 0 to 2pi
+@(require_results)
 float64_von_mises :: proc(mean_angle, kappa: f64, r: ^Rand = nil) -> f64 {
 	// Fisher, N.I., "Statistical Analysis of Circular Data", Cambridge University Press, 1993.
 
@@ -245,6 +262,7 @@ float64_von_mises :: proc(mean_angle, kappa: f64, r: ^Rand = nil) -> f64 {
 // `mean_angle` is the in mean angle between 0 and 2pi radians
 // `kappa` is the concentration parameter which must be >= 0
 // When `kappa` is zero, the Distribution is a uniform Distribution over the range 0 to 2pi
+@(require_results)
 float32_von_mises :: proc(mean_angle, kappa: f32, r: ^Rand = nil) -> f32 {
 	return f32(float64_von_mises(f64(mean_angle), f64(kappa), r))
 }
@@ -252,6 +270,7 @@ float32_von_mises :: proc(mean_angle, kappa: f32, r: ^Rand = nil) -> f32 {
 
 // Cauchy-Lorentz Distribution
 // `x_0` is the location, `gamma` is the scale where `gamma` > 0
+@(require_results)
 float64_cauchy_lorentz :: proc(x_0, gamma: f64, r: ^Rand = nil) -> f64 {
 	assert(gamma > 0)
 
@@ -261,6 +280,7 @@ float64_cauchy_lorentz :: proc(x_0, gamma: f64, r: ^Rand = nil) -> f64 {
 }
 // Cauchy-Lorentz Distribution
 // `x_0` is the location, `gamma` is the scale where `gamma` > 0
+@(require_results)
 float32_cauchy_lorentz :: proc(x_0, gamma: f32, r: ^Rand = nil) -> f32 {
 	return f32(float64_cauchy_lorentz(f64(x_0), f64(gamma), r))
 }
@@ -268,12 +288,14 @@ float32_cauchy_lorentz :: proc(x_0, gamma: f32, r: ^Rand = nil) -> f32 {
 
 // Log Cauchy-Lorentz Distribution
 // `x_0` is the location, `gamma` is the scale where `gamma` > 0
+@(require_results)
 float64_log_cauchy_lorentz :: proc(x_0, gamma: f64, r: ^Rand = nil) -> f64 {
 	assert(gamma > 0)
 	return math.exp(math.tan(math.PI * (float64(r) - 0.5))*gamma + x_0)
 }
 // Log Cauchy-Lorentz Distribution
 // `x_0` is the location, `gamma` is the scale where `gamma` > 0
+@(require_results)
 float32_log_cauchy_lorentz :: proc(x_0, gamma: f32, r: ^Rand = nil) -> f32 {
 	return f32(float64_log_cauchy_lorentz(f64(x_0), f64(gamma), r))
 }
@@ -281,6 +303,7 @@ float32_log_cauchy_lorentz :: proc(x_0, gamma: f32, r: ^Rand = nil) -> f32 {
 
 // Laplace Distribution
 // `b` is the scale where `b` > 0
+@(require_results)
 float64_laplace :: proc(mean, b: f64, r: ^Rand = nil) -> f64 {
 	assert(b > 0)
 	p := float64(r)-0.5
@@ -288,6 +311,7 @@ float64_laplace :: proc(mean, b: f64, r: ^Rand = nil) -> f64 {
 }
 // Laplace Distribution
 // `b` is the scale where `b` > 0
+@(require_results)
 float32_laplace :: proc(mean, b: f32, r: ^Rand = nil) -> f32 {
 	return f32(float64_laplace(f64(mean), f64(b), r))
 }
@@ -296,6 +320,7 @@ float32_laplace :: proc(mean, b: f32, r: ^Rand = nil) -> f32 {
 // Gompertz Distribution
 // `eta` is the shape, `b` is the scale
 // Both `eta` and `b` must be > 0
+@(require_results)
 float64_gompertz :: proc(eta, b: f64, r: ^Rand = nil) -> f64 {
 	if eta <= 0 || b <= 0 {
 		panic(#procedure + ": eta and b must be > 0.0")
@@ -307,6 +332,7 @@ float64_gompertz :: proc(eta, b: f64, r: ^Rand = nil) -> f64 {
 // Gompertz Distribution
 // `eta` is the shape, `b` is the scale
 // Both `eta` and `b` must be > 0
+@(require_results)
 float32_gompertz :: proc(eta, b: f32, r: ^Rand = nil) -> f32 {
 	return f32(float64_gompertz(f64(eta), f64(b), r))
 }

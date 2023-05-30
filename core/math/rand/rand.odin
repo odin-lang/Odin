@@ -16,6 +16,7 @@ set_global_seed :: proc(seed: u64) {
 	init(&global_rand, seed)
 }
 
+@(require_results)
 create :: proc(seed: u64) -> Rand {
 	r: Rand
 	init(&r, seed)
@@ -60,14 +61,17 @@ _random :: proc(r: ^Rand) -> u32 {
 	return (xor_shifted >> rot) | (xor_shifted << ((-rot) & 31))
 }
 
+@(require_results)
 uint32 :: proc(r: ^Rand = nil) -> u32 { return _random(r) }
 
+@(require_results)
 uint64 :: proc(r: ^Rand = nil) -> u64 {
 	a := u64(_random(r))
 	b := u64(_random(r))
 	return (a<<32) | b
 }
 
+@(require_results)
 uint128 :: proc(r: ^Rand = nil) -> u128 {
 	a := u128(_random(r))
 	b := u128(_random(r))
@@ -76,10 +80,11 @@ uint128 :: proc(r: ^Rand = nil) -> u128 {
 	return (a<<96) | (b<<64) | (c<<32) | d
 }
 
-int31  :: proc(r: ^Rand = nil) -> i32  { return i32(uint32(r) << 1 >> 1) }
-int63  :: proc(r: ^Rand = nil) -> i64  { return i64(uint64(r) << 1 >> 1) }
-int127 :: proc(r: ^Rand = nil) -> i128 { return i128(uint128(r) << 1 >> 1) }
+@(require_results) int31  :: proc(r: ^Rand = nil) -> i32  { return i32(uint32(r) << 1 >> 1) }
+@(require_results) int63  :: proc(r: ^Rand = nil) -> i64  { return i64(uint64(r) << 1 >> 1) }
+@(require_results) int127 :: proc(r: ^Rand = nil) -> i128 { return i128(uint128(r) << 1 >> 1) }
 
+@(require_results)
 int31_max :: proc(n: i32, r: ^Rand = nil) -> i32 {
 	if n <= 0 {
 		panic("Invalid argument to int31_max")
@@ -95,6 +100,7 @@ int31_max :: proc(n: i32, r: ^Rand = nil) -> i32 {
 	return v % n
 }
 
+@(require_results)
 int63_max :: proc(n: i64, r: ^Rand = nil) -> i64 {
 	if n <= 0 {
 		panic("Invalid argument to int63_max")
@@ -110,6 +116,7 @@ int63_max :: proc(n: i64, r: ^Rand = nil) -> i64 {
 	return v % n
 }
 
+@(require_results)
 int127_max :: proc(n: i128, r: ^Rand = nil) -> i128 {
 	if n <= 0 {
 		panic("Invalid argument to int127_max")
@@ -125,6 +132,7 @@ int127_max :: proc(n: i128, r: ^Rand = nil) -> i128 {
 	return v % n
 }
 
+@(require_results)
 int_max :: proc(n: int, r: ^Rand = nil) -> int {
 	if n <= 0 {
 		panic("Invalid argument to int_max")
@@ -137,13 +145,14 @@ int_max :: proc(n: int, r: ^Rand = nil) -> int {
 }
 
 // Uniform random distribution [0, 1)
-float64 :: proc(r: ^Rand = nil) -> f64 { return f64(int63_max(1<<53, r)) / (1 << 53) }
+@(require_results) float64 :: proc(r: ^Rand = nil) -> f64 { return f64(int63_max(1<<53, r)) / (1 << 53) }
 // Uniform random distribution [0, 1)
-float32 :: proc(r: ^Rand = nil) -> f32 { return f32(float64(r)) }
+@(require_results) float32 :: proc(r: ^Rand = nil) -> f32 { return f32(float64(r)) }
 
-float64_range :: proc(lo, hi: f64, r: ^Rand = nil) -> f64 { return (hi-lo)*float64(r) + lo }
-float32_range :: proc(lo, hi: f32, r: ^Rand = nil) -> f32 { return (hi-lo)*float32(r) + lo }
+@(require_results) float64_range :: proc(lo, hi: f64, r: ^Rand = nil) -> f64 { return (hi-lo)*float64(r) + lo }
+@(require_results) float32_range :: proc(lo, hi: f32, r: ^Rand = nil) -> f32 { return (hi-lo)*float32(r) + lo }
 
+@(require_results)
 read :: proc(p: []byte, r: ^Rand = nil) -> (n: int) {
 	pos := i8(0)
 	val := i64(0)
@@ -160,6 +169,7 @@ read :: proc(p: []byte, r: ^Rand = nil) -> (n: int) {
 }
 
 // perm returns a slice of n ints in a pseudo-random permutation of integers in the range [0, n)
+@(require_results)
 perm :: proc(n: int, r: ^Rand = nil, allocator := context.allocator) -> []int {
 	m := make([]int, n, allocator)
 	for i := 0; i < n; i += 1 {
@@ -184,6 +194,7 @@ shuffle :: proc(array: $T/[]$E, r: ^Rand = nil) {
 }
 
 // Returns a random element from the given slice
+@(require_results)
 choice :: proc(array: $T/[]$E, r: ^Rand = nil) -> (res: E) {
 	n := i64(len(array))
 	if n < 1 {

@@ -31,11 +31,8 @@ _mkdir :: proc(path: string, perm: File_Mode) -> Error {
 		return .Invalid_Argument
 	}
 
-	path_cstr, allocated := _name_to_cstring(path)
-	defer if allocated {
-		delete(path_cstr)
-	}
-	return _ok_or_error(unix.sys_mkdir(path_cstr, int(perm & 0o777)))
+	path_cstr := strings.clone_to_cstring(path, context.temp_allocator)
+	return _ok_or_error(unix.sys_mkdir(path_cstr, uint(perm & 0o777)))
 }
 
 _mkdir_all :: proc(path: string, perm: File_Mode) -> Error {
@@ -49,7 +46,7 @@ _mkdir_all :: proc(path: string, perm: File_Mode) -> Error {
 		new_dfd := unix.sys_openat(dfd, cstring(&path[0]), _OPENDIR_FLAGS)
 		switch new_dfd {
 		case -ENOENT:
-			if res := unix.sys_mkdirat(dfd, cstring(&path[0]), perm); res < 0 {
+			if res := unix.sys_mkdirat(dfd, cstring(&path[0]), uint(perm)); res < 0 {
 				return _get_platform_error(res)
 			}
 			has_created^ = true
@@ -82,9 +79,6 @@ _mkdir_all :: proc(path: string, perm: File_Mode) -> Error {
 		path_bytes = make([]u8, len(path) + 1)
 	} else {
 		path_bytes = make([]u8, len(path) + 1, context.temp_allocator)
-	}
-	defer if allocated {
-		delete(path_bytes)
 	}
 
 	// NULL terminate the byte slice to make it a valid cstring
@@ -182,10 +176,7 @@ _remove_all :: proc(path: string) -> Error {
 		return nil
 	}
 
-	path_cstr, allocated := _name_to_cstring(path)
-	defer if allocated {
-		delete(path_cstr)
-	}
+	path_cstr := strings.clone_to_cstring(path, context.temp_allocator)
 
 	fd := unix.sys_open(path_cstr, _OPENDIR_FLAGS)
 	switch fd {
@@ -222,10 +213,7 @@ _getwd :: proc(allocator: runtime.Allocator) -> (string, Error) {
 }
 
 _setwd :: proc(dir: string) -> Error {
-	dir_cstr, allocated := _name_to_cstring(dir)
-	defer if allocated {
-		delete(dir_cstr)
-	}
+	dir_cstr := strings.clone_to_cstring(dir, context.temp_allocator)
 	return _ok_or_error(unix.sys_chdir(dir_cstr))
 }
 

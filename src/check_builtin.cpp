@@ -4843,6 +4843,89 @@ gb_internal bool check_builtin_procedure(CheckerContext *c, Operand *operand, As
 		}
 		operand->mode = Addressing_Type;
 		break;
+	case BuiltinProc_type_merge:
+		{
+			operand->mode = Addressing_Type;
+			operand->type = t_invalid;
+
+			Operand x = {};
+			Operand y = {};
+			check_expr_or_type(c, &x, ce->args[0]);
+			check_expr_or_type(c, &y, ce->args[1]);
+			if (x.mode != Addressing_Type) {
+				error(x.expr, "Expected a type for '%.*s'", LIT(builtin_name));
+				return false;
+			}
+			if (y.mode != Addressing_Type) {
+				error(y.expr, "Expected a type for '%.*s'", LIT(builtin_name));
+				return false;
+			}
+
+			if (is_type_polymorphic(x.type)) {
+				gbString t = type_to_string(x.type);
+				error(x.expr, "Expected a non-polymorphic type for '%.*s', got %s", LIT(builtin_name), t);
+				gb_string_free(t);
+				return false;
+			}
+			if (is_type_polymorphic(y.type)) {
+				gbString t = type_to_string(y.type);
+				error(y.expr, "Expected a non-polymorphic type for '%.*s', got %s", LIT(builtin_name), t);
+				gb_string_free(t);
+				return false;
+			}
+			if (!is_type_union(x.type)) {
+				gbString t = type_to_string(x.type);
+				error(x.expr, "Expected a union type for '%.*s', got %s", LIT(builtin_name), t);
+				gb_string_free(t);
+				return false;
+			}
+			if (!is_type_union(y.type)) {
+				gbString t = type_to_string(y.type);
+				error(x.expr, "Expected a union type for '%.*s', got %s", LIT(builtin_name), t);
+				gb_string_free(t);
+				return false;
+			}
+			Type *ux = base_type(x.type);
+			Type *uy = base_type(y.type);
+			GB_ASSERT(ux->kind == Type_Union);
+			GB_ASSERT(uy->kind == Type_Union);
+
+			i64 custom_align = gb_max(ux->Union.custom_align, uy->Union.custom_align);
+			if (ux->Union.kind != uy->Union.kind) {
+				error(x.expr, "Union kinds must match, got %s vs %s", union_type_kind_strings[ux->Union.kind], union_type_kind_strings[uy->Union.kind]);
+			}
+
+			Type *merged_union = alloc_type_union();
+
+			merged_union->Union.node = call;
+			merged_union->Union.scope = create_scope(c->info, c->scope);
+			merged_union->Union.kind = ux->Union.kind;
+			merged_union->Union.custom_align = custom_align;
+
+			auto variants = array_make<Type *>(permanent_allocator(), 0, ux->Union.variants.count+uy->Union.variants.count);
+			for (Type *t : ux->Union.variants) {
+				array_add(&variants, t);
+			}
+			for (Type *t : uy->Union.variants) {
+				bool ok = true;
+				for (Type *other_t : ux->Union.variants) {
+					if (are_types_identical(other_t, t)) {
+						ok = false;
+						break;
+					}
+				}
+				if (ok) {
+					array_add(&variants, t);
+				}
+
+			}
+			merged_union->Union.variants = slice_from_array(variants);
+
+			operand->mode = Addressing_Type;
+			operand->type = merged_union;
+		}
+		break;
+
 
 	case BuiltinProc_type_is_boolean:
 	case BuiltinProc_type_is_integer:

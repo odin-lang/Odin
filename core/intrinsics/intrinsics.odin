@@ -192,6 +192,7 @@ type_map_info      :: proc($T: typeid/map[$K]$V) -> ^runtime.Map_Info ---
 type_map_cell_info :: proc($T: typeid)           -> ^runtime.Map_Cell_Info ---
 
 type_convert_variants_to_pointers :: proc($T: typeid) -> typeid where type_is_union(T) ---
+type_merge :: proc($U, $V: typeid) -> typeid where type_is_union(U), type_is_union(V) ---
 
 constant_utf16_cstring :: proc($literal: string) -> [^]u16 ---
 

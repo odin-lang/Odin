@@ -54,7 +54,7 @@ TOKEN_KIND(Token__AssignOpEnd, ""), \
 	TOKEN_KIND(Token_Increment, "++"), \
 	TOKEN_KIND(Token_Decrement, "--"), \
 	TOKEN_KIND(Token_ArrowRight,"->"), \
-	TOKEN_KIND(Token_Undef,     "---"), \
+	TOKEN_KIND(Token_Uninit,    "---"), \
 \
 TOKEN_KIND(Token__ComparisonBegin, ""), \
 	TOKEN_KIND(Token_CmpEq, "=="), \
@@ -917,7 +917,7 @@ gb_internal void tokenizer_get_token(Tokenizer *t, Token *token, int repeat=0) {
 				token->kind = Token_Decrement;
 				if (t->curr_rune == '-') {
 					advance_to_next_rune(t);
-					token->kind = Token_Undef;
+					token->kind = Token_Uninit;
 				}
 				break;
 			case '>':
@@ -1078,7 +1078,7 @@ semicolon_check:;
 	case Token_Imag:
 	case Token_Rune:
 	case Token_String:
-	case Token_Undef:
+	case Token_Uninit:
 		/*fallthrough*/
 	case Token_Question:
 	case Token_Pointer:

@@ -58,38 +58,38 @@ ApplicationPresentationOptionsDisableCursorLocationAssistance :: ApplicationPres
 Application :: struct {using _: Object}
 
 @(objc_type=Application, objc_name="sharedApplication", objc_is_class_method=true)
-Application_sharedApplication :: proc() -> ^Application {
+Application_sharedApplication :: proc "c" () -> ^Application {
 	return msgSend(^Application, Application, "sharedApplication")
 }
 
 @(objc_type=Application, objc_name="setActivationPolicy")
-Application_setActivationPolicy :: proc(self: ^Application, activationPolicy: ActivationPolicy) -> BOOL {
+Application_setActivationPolicy :: proc "c" (self: ^Application, activationPolicy: ActivationPolicy) -> BOOL {
 	return msgSend(BOOL, self, "setActivationPolicy:", activationPolicy)
 }
 
 @(objc_type=Application, objc_name="activateIgnoringOtherApps")
-Application_activateIgnoringOtherApps :: proc(self: ^Application, ignoreOtherApps: BOOL) {
+Application_activateIgnoringOtherApps :: proc "c" (self: ^Application, ignoreOtherApps: BOOL) {
 	msgSend(nil, self, "activateIgnoringOtherApps:", ignoreOtherApps)
 }
 
 @(objc_type=Application, objc_name="setMainMenu")
-Application_setMainMenu :: proc(self: ^Application, menu: ^Menu) {
+Application_setMainMenu :: proc "c" (self: ^Application, menu: ^Menu) {
 	msgSend(nil, self, "setMainMenu:", menu)
 }
 
 @(objc_type=Application, objc_name="windows")
-Application_windows :: proc(self: ^Application) -> ^Array {
+Application_windows :: proc "c" (self: ^Application) -> ^Array {
 	return msgSend(^Array, self, "windows")
 }
 
 @(objc_type=Application, objc_name="run")
-Application_run :: proc(self: ^Application) {
+Application_run :: proc "c" (self: ^Application) {
 	msgSend(nil, self, "run")
 }
 
 
 @(objc_type=Application, objc_name="terminate")
-Application_terminate :: proc(self: ^Application, sender: ^Object) {
+Application_terminate :: proc "c" (self: ^Application, sender: ^Object) {
 	msgSend(nil, self, "terminate:", sender)
 }
 
@@ -99,81 +99,81 @@ Application_terminate :: proc(self: ^Application, sender: ^Object) {
 RunningApplication :: struct {using _: Object}
 
 @(objc_type=RunningApplication, objc_name="currentApplication", objc_is_class_method=true)
-RunningApplication_currentApplication :: proc() -> ^RunningApplication {
+RunningApplication_currentApplication :: proc "c" () -> ^RunningApplication {
 	return msgSend(^RunningApplication, RunningApplication, "currentApplication")
 }
 
 @(objc_type=RunningApplication, objc_name="localizedName")
-RunningApplication_localizedName :: proc(self: ^RunningApplication) -> ^String {
+RunningApplication_localizedName :: proc "c" (self: ^RunningApplication) -> ^String {
 	return msgSend(^String, self, "localizedName")
 }
 
 ApplicationDelegateTemplate :: struct {
 	// Launching Applications
-	applicationWillFinishLaunching: proc(notification: ^Notification),
-	applicationDidFinishLaunching: proc(notification: ^Notification),
+	applicationWillFinishLaunching:                              proc(notification: ^Notification),
+	applicationDidFinishLaunching:                               proc(notification: ^Notification),
 	// Managing Active Status
-	applicationWillBecomeActive: proc(notification: ^Notification),
-	applicationDidBecomeActive: proc(notification: ^Notification),
-	applicationWillResignActive: proc(notification: ^Notification),
-	applicationDidResignActive: proc(notification: ^Notification),
+	applicationWillBecomeActive:                                 proc(notification: ^Notification),
+	applicationDidBecomeActive:                                  proc(notification: ^Notification),
+	applicationWillResignActive:                                 proc(notification: ^Notification),
+	applicationDidResignActive:                                  proc(notification: ^Notification),
 	// Terminating Applications
-	applicationShouldTerminate: proc(sender: ^Application) -> ApplicationTerminateReply,
-	applicationShouldTerminateAfterLastWindowClosed: proc(sender: ^Application) -> BOOL,
-	applicationWillTerminate: proc(notification: ^Notification),
+	applicationShouldTerminate:                                  proc(sender: ^Application) -> ApplicationTerminateReply,
+	applicationShouldTerminateAfterLastWindowClosed:             proc(sender: ^Application) -> BOOL,
+	applicationWillTerminate:                                    proc(notification: ^Notification),
 	// Hiding Applications
-	applicationWillHide: proc(notification: ^Notification),
-	applicationDidHide: proc(notification: ^Notification),
-	applicationWillUnhide: proc(notification: ^Notification),
-	applicationDidUnhide: proc(notification: ^Notification),
+	applicationWillHide:                                         proc(notification: ^Notification),
+	applicationDidHide:                                          proc(notification: ^Notification),
+	applicationWillUnhide:                                       proc(notification: ^Notification),
+	applicationDidUnhide:                                        proc(notification: ^Notification),
 	// Managing Windows
-	applicationWillUpdate: proc(notification: ^Notification),
-	applicationDidUpdate: proc(notification: ^Notification),
-	applicationShouldHandleReopenHasVisibleWindows: proc(sender: ^Application, flag: BOOL) -> BOOL,
+	applicationWillUpdate:                                       proc(notification: ^Notification),
+	applicationDidUpdate:                                        proc(notification: ^Notification),
+	applicationShouldHandleReopenHasVisibleWindows:              proc(sender: ^Application, flag: BOOL) -> BOOL,
 	// Managing the Dock Menu
-	applicationDockMenu: proc(sender: ^Application) -> ^Menu,
+	applicationDockMenu:                                         proc(sender: ^Application) -> ^Menu,
 	// Localizing Keyboard Shortcuts
-	applicationShouldAutomaticallyLocalizeKeyEquivalents: proc(application: ^Application) -> BOOL,
+	applicationShouldAutomaticallyLocalizeKeyEquivalents:        proc(application: ^Application) -> BOOL,
 	// Displaying Errors
-	applicationWillPresentError: proc(application: ^Application, error: ^Error) -> ^Error,
+	applicationWillPresentError:                                 proc(application: ^Application, error: ^Error) -> ^Error,
 	// Managing the Screen
-	applicationDidChangeScreenParameters: proc(notification: ^Notification),
+	applicationDidChangeScreenParameters:                        proc(notification: ^Notification),
 	// Continuing User Activities
-	applicationWillContinueUserActivityWithType: proc(application: ^Application, userActivityType: ^String) -> BOOL,
-	applicationContinueUserActivityRestorationHandler: proc(application: ^Application, userActivity: ^UserActivity, restorationHandler: ^Block) -> BOOL,
-	applicationDidFailToContinueUserActivityWithTypeError: proc(application: ^Application, userActivityType: ^String, error: ^Error),
-	applicationDidUpdateUserActivity: proc(application: ^Application, userActivity: ^UserActivity),
+	applicationWillContinueUserActivityWithType:                 proc(application: ^Application, userActivityType: ^String) -> BOOL,
+	applicationContinueUserActivityRestorationHandler:           proc(application: ^Application, userActivity: ^UserActivity, restorationHandler: ^Block) -> BOOL,
+	applicationDidFailToContinueUserActivityWithTypeError:       proc(application: ^Application, userActivityType: ^String, error: ^Error),
+	applicationDidUpdateUserActivity:                            proc(application: ^Application, userActivity: ^UserActivity),
 	// Handling Push Notifications
 	applicationDidRegisterForRemoteNotificationsWithDeviceToken: proc(application: ^Application, deviceToken: ^Data),
 	applicationDidFailToRegisterForRemoteNotificationsWithError: proc(application: ^Application, error: ^Error),
-	applicationDidReceiveRemoteNotification: proc(application: ^Application, userInfo: ^Dictionary),
+	applicationDidReceiveRemoteNotification:                     proc(application: ^Application, userInfo: ^Dictionary),
 	// Handling CloudKit Invitations
 	// TODO: if/when we have cloud kit bindings implement
-	// applicationUserDidAcceptCloudKitShareWithMetadata: proc(application: ^Application, metadata: ^CKShareMetadata),
+	// applicationUserDidAcceptCloudKitShareWithMetadata:        proc(application: ^Application, metadata: ^CKShareMetadata),
 	// Handling SiriKit Intents
 	// TODO: if/when we have siri kit bindings implement
-	// applicationHandlerForIntent: proc(application: ^Application, intent: ^INIntent) -> id,
+	// applicationHandlerForIntent:                              proc(application: ^Application, intent: ^INIntent) -> id,
 	// Opening Files
-	applicationOpenURLs: proc(application: ^Application, urls: ^Array),
-	applicationOpenFile: proc(sender: ^Application, filename: ^String) -> BOOL,
-	applicationOpenFileWithoutUI: proc(sender: id, filename: ^String) -> BOOL,
-	applicationOpenTempFile: proc(sender: ^Application, filename: ^String) -> BOOL,
-	applicationOpenFiles: proc(sender: ^Application, filenames: ^Array),
-	applicationShouldOpenUntitledFile: proc(sender: ^Application) -> BOOL,
-	applicationOpenUntitledFile: proc(sender: ^Application) -> BOOL,
+	applicationOpenURLs:                                         proc(application: ^Application, urls: ^Array),
+	applicationOpenFile:                                         proc(sender: ^Application, filename: ^String) -> BOOL,
+	applicationOpenFileWithoutUI:                                proc(sender: id, filename: ^String) -> BOOL,
+	applicationOpenTempFile:                                     proc(sender: ^Application, filename: ^String) -> BOOL,
+	applicationOpenFiles:                                        proc(sender: ^Application, filenames: ^Array),
+	applicationShouldOpenUntitledFile:                           proc(sender: ^Application) -> BOOL,
+	applicationOpenUntitledFile:                                 proc(sender: ^Application) -> BOOL,
 	// Printing
-	applicationPrintFile: proc(sender: ^Application, filename: ^String) -> BOOL,
-	applicationPrintFilesWithSettingsShowPrintPanels: proc(application: ^Application, fileNames: ^Array, printSettings: ^Dictionary, showPrintPanels: BOOL) -> ApplicationPrintReply,
+	applicationPrintFile:                                        proc(sender: ^Application, filename: ^String) -> BOOL,
+	applicationPrintFilesWithSettingsShowPrintPanels:            proc(application: ^Application, fileNames: ^Array, printSettings: ^Dictionary, showPrintPanels: BOOL) -> ApplicationPrintReply,
 	// Restoring Application State
-	applicationSupportsSecureRestorableState: proc(app: ^Application) -> BOOL,
-	applicationProtectedDataDidBecomeAvailable: proc(notification: ^Notification),
-	applicationProtectedDataWillBecomeUnavailable: proc(notification: ^Notification),
-	applicationWillEncodeRestorableState: proc(app: ^Application, coder: ^Coder),
-	applicationDidDecodeRestorableState: proc(app: ^Application, coder: ^Coder),
+	applicationSupportsSecureRestorableState:                    proc(app: ^Application) -> BOOL,
+	applicationProtectedDataDidBecomeAvailable:                  proc(notification: ^Notification),
+	applicationProtectedDataWillBecomeUnavailable:               proc(notification: ^Notification),
+	applicationWillEncodeRestorableState:                        proc(app: ^Application, coder: ^Coder),
+	applicationDidDecodeRestorableState:                         proc(app: ^Application, coder: ^Coder),
 	// Handling Changes to the Occlusion State
-	applicationDidChangeOcclusionState: proc(notification: ^Notification),
+	applicationDidChangeOcclusionState:                          proc(notification: ^Notification),
 	// Scripting Your App
-	applicationDelegateHandlesKey: proc(sender: ^Application, key: ^String) -> BOOL,
+	applicationDelegateHandlesKey:                               proc(sender: ^Application, key: ^String) -> BOOL,
 }
 
 ApplicationDelegate :: struct { using _: Object }
@@ -559,6 +559,6 @@ application_delegate_register_and_alloc :: proc(template: ApplicationDelegateTem
 }
 
 @(objc_type=Application, objc_name="setDelegate")
-Application_setDelegate :: proc(self: ^Application, delegate: ^ApplicationDelegate) {
+Application_setDelegate :: proc "c" (self: ^Application, delegate: ^ApplicationDelegate) {
 	msgSend(nil, self, "setDelegate:", delegate)
 }

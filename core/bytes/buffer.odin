@@ -38,6 +38,11 @@ buffer_init_string :: proc(b: ^Buffer, s: string) {
 }
 
 buffer_init_allocator :: proc(b: ^Buffer, len, cap: int, allocator := context.allocator) {
+	if b.buf == nil {
+		b.buf = make([dynamic]byte, len, cap, allocator)
+		return
+	}
+
 	b.buf.allocator = allocator
 	reserve(&b.buf, cap)
 	resize(&b.buf, len)

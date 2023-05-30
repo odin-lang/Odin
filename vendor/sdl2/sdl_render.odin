@@ -2,6 +2,12 @@ package sdl2
 
 import "core:c"
 
+when ODIN_OS == .Windows {
+	foreign import lib "SDL2.lib"
+} else {
+	foreign import lib "system:SDL2"
+}
+
 RendererFlag :: enum u32 {
 	SOFTWARE      = 0, /**< The renderer is a software fallback */
 	ACCELERATED   = 1, /**< The renderer uses hardware acceleration */
