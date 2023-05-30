@@ -3469,7 +3469,18 @@ gb_internal void check_decl_attributes(CheckerContext *c, Array<Ast *> const &at
 	StringSet set = {};
 	defer (string_set_destroy(&set));
 
-	bool is_runtime = ((c->scope->parent->flags&(ScopeFlag_File|ScopeFlag_Pkg)) != 0 && c->scope->file->pkg->kind == Package_Runtime);
+	bool is_runtime = false;
+	if (c->scope && c->scope->file && (c->scope->flags & ScopeFlag_File) &&
+	    c->scope->file->pkg &&
+	    c->scope->file->pkg->kind == Package_Runtime) {
+		is_runtime = true;
+	} else if (c->scope && c->scope->parent &&
+		(c->scope->flags & ScopeFlag_Proc) &&
+		(c->scope->parent->flags & ScopeFlag_File) &&
+		c->scope->parent->file->pkg &&
+		c->scope->parent->file->pkg->kind == Package_Runtime) {
+		is_runtime = true;
+	}
 
 	for_array(i, attributes) {
 		Ast *attr = attributes[i];
