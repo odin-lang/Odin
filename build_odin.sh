@@ -135,7 +135,14 @@ build_odin() {
 		EXTRAFLAGS="-O3"
 		;;
 	release-native)
-		EXTRAFLAGS="-O3 -march=native"
+		local ARCH=$(uname -m)
+        	if [ "${ARCH}" == "arm64" ]; then
+            		# Use preferred flag for Arm (ie arm64 / aarch64 / etc)
+            		EXTRAFLAGS="-O3 -mcpu=native"
+        	else
+            		# Use preferred flag for x86 / amd64
+            		EXTRAFLAGS="-O3 -march=native"
+        	fi
 		;;
 	nightly)
 		EXTRAFLAGS="-DNIGHTLY -O3"
