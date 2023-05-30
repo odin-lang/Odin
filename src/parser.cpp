@@ -4519,7 +4519,7 @@ gb_internal Ast *parse_foreign_decl(AstFile *f) {
 	return ast_bad_decl(f, token, f->curr_token);
 }
 
-gb_internal Ast *parse_attribute(AstFile *f, Token token, TokenKind open_kind, TokenKind close_kind) {
+gb_internal Ast *parse_attribute(AstFile *f, Token token, TokenKind open_kind, TokenKind close_kind, CommentGroup *docs) {
 	Array<Ast *> elems = {};
 	Token open = {};
 	Token close = {};
@@ -4560,6 +4560,9 @@ gb_internal Ast *parse_attribute(AstFile *f, Token token, TokenKind open_kind, T
 
 	Ast *decl = parse_stmt(f);
 	if (decl->kind == Ast_ValueDecl) {
+		if (decl->ValueDecl.docs == nullptr && docs != nullptr) {
+			decl->ValueDecl.docs = docs;
+		}
 		array_add(&decl->ValueDecl.attributes, attribute);
 	} else if (decl->kind == Ast_ForeignBlockDecl) {
 		array_add(&decl->ForeignBlockDecl.attributes, attribute);
@@ -4708,8 +4711,9 @@ gb_internal Ast *parse_stmt(AstFile *f) {
 	} break;
 
 	case Token_At: {
+		CommentGroup *docs = f->lead_comment;
 		Token token = expect_token(f, Token_At);
-		return parse_attribute(f, token, Token_OpenParen, Token_CloseParen);
+		return parse_attribute(f, token, Token_OpenParen, Token_CloseParen, docs);
 	}
 
 	case Token_Hash: {
