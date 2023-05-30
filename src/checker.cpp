@@ -3469,6 +3469,8 @@ gb_internal void check_decl_attributes(CheckerContext *c, Array<Ast *> const &at
 	StringSet set = {};
 	defer (string_set_destroy(&set));
 
+	bool is_runtime = ((c->scope->parent->flags&(ScopeFlag_File|ScopeFlag_Pkg)) != 0 && c->scope->file->pkg->kind == Package_Runtime);
+
 	for_array(i, attributes) {
 		Ast *attr = attributes[i];
 		if (attr->kind != Ast_Attribute) continue;
@@ -3501,6 +3503,10 @@ gb_internal void check_decl_attributes(CheckerContext *c, Array<Ast *> const &at
 
 			if (string_set_update(&set, name)) {
 				error(elem, "Previous declaration of '%.*s'", LIT(name));
+				continue;
+			}
+
+			if (name == "builtin" && is_runtime) {
 				continue;
 			}
 
@@ -3663,9 +3669,9 @@ gb_internal void check_builtin_attributes(CheckerContext *ctx, Entity *e, Array<
 					error(value, "'builtin' cannot have a field value");
 				}
 				// Remove the builtin tag
-				attr->Attribute.elems[k] = attr->Attribute.elems[attr->Attribute.elems.count-1];
-				attr->Attribute.elems.count -= 1;
-				k--;
+				// attr->Attribute.elems[k] = attr->Attribute.elems[attr->Attribute.elems.count-1];
+				// attr->Attribute.elems.count -= 1;
+				// k--;
 
 				mutex_unlock(&ctx->info->builtin_mutex);
 			}
