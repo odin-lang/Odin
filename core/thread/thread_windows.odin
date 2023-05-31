@@ -62,7 +62,6 @@ _create :: proc(procedure: Thread_Proc, priority := Thread_Priority.Normal) -> ^
 	thread.procedure       = procedure
 	thread.win32_thread    = win32_thread
 	thread.win32_thread_id = win32_thread_id
-	thread.init_context = context
 
 	ok := win32.SetThreadPriority(win32_thread, _thread_priority_map[priority])
 	assert(ok == true)
