@@ -3,7 +3,7 @@ package os2
 
 import "core:runtime"
 
-_get_env :: proc(key: string, allocator: runtime.Allocator) -> (value: string, found: bool) {
+_lookup_env :: proc(key: string, allocator: runtime.Allocator) -> (value: string, found: bool) {
 	//TODO
 	return
 }

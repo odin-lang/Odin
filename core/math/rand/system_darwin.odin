@@ -2,6 +2,7 @@ package rand
 
 import "core:sys/darwin"
 
+@(require_results)
 _system_random :: proc() -> u32 {
 	for {
 		value: u32

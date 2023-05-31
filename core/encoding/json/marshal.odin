@@ -153,7 +153,7 @@ marshal_to_writer :: proc(w: io.Writer, v: any, opt: ^Marshal_Options) -> (err: 
 		case complex128: r, i = f64(real(z)), f64(imag(z))
 		case: return .Unsupported_Type
 		}
-	
+
 		io.write_byte(w, '[')    or_return
 		io.write_f64(w, r)       or_return
 		io.write_string(w, ", ") or_return
@@ -165,8 +165,8 @@ marshal_to_writer :: proc(w: io.Writer, v: any, opt: ^Marshal_Options) -> (err: 
 
 	case runtime.Type_Info_String:
 		switch s in a {
-		case string:  io.write_quoted_string(w, s)         or_return
-		case cstring: io.write_quoted_string(w, string(s)) or_return
+		case string:  io.write_quoted_string(w, s, '"', nil, true)         or_return
+		case cstring: io.write_quoted_string(w, string(s), '"', nil, true) or_return
 		}
 
 	case runtime.Type_Info_Boolean:

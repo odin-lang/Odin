@@ -262,6 +262,7 @@ struct BuildContext {
 	String microarch;
 	BuildModeKind build_mode;
 	bool   generate_docs;
+	bool   custom_optimization_level;
 	i32    optimization_level;
 	bool   show_timings;
 	TimingsExportFormat export_timings_format;
@@ -1272,6 +1273,12 @@ gb_internal void init_build_context(TargetMetrics *cross_target) {
 		gb_exit(1);
 	}
 
+	if (bc->ODIN_DEBUG && !bc->custom_optimization_level) {
+		// NOTE(bill): when building with `-debug` but not specifying an optimization level
+		// default to `-o:none` to improve the debug symbol generation by default
+		bc->optimization_level = -1; // -o:none
+	}
+
 	bc->optimization_level = gb_clamp(bc->optimization_level, -1, 2);
 
 	// ENFORCE DYNAMIC MAP CALLS
@@ -1285,9 +1292,6 @@ gb_internal void init_build_context(TargetMetrics *cross_target) {
 			break;
 		}
 	}
-
-	#undef LINK_FLAG_X64
-	#undef LINK_FLAG_386
 }
 
 #if defined(GB_SYSTEM_WINDOWS)
@@ -1497,13 +1501,23 @@ gb_internal bool init_build_paths(String init_filename) {
 	} else if (is_arch_wasm()) {
 		output_extension = STR_LIT("wasm");
 	} else if (build_context.build_mode == BuildMode_Executable) {
-		// By default use a .bin executable extension.
-		output_extension = STR_LIT("bin");
+		// By default use no executable extension.
+		output_extension = make_string(nullptr, 0);
+		String const single_file_extension = str_lit(".odin");
 
 		if (build_context.metrics.os == TargetOs_windows) {
 			output_extension = STR_LIT("exe");
 		} else if (build_context.cross_compiling && selected_target_metrics->metrics == &target_essence_amd64) {
-			output_extension = make_string(nullptr, 0);
+			// Do nothing: we don't want the .bin extension
+			// when cross compiling
+		} else if (path_is_directory(last_path_element(bc->build_paths[BuildPath_Main_Package].basename))) {
+			// Add .bin extension to avoid collision
+			// with package directory name
+			output_extension = STR_LIT("bin");
+		} else if (string_ends_with(init_filename, single_file_extension) && path_is_directory(remove_extension_from_path(init_filename))) {
+			// Add bin extension if compiling single-file package
+			// with same output name as a directory
+			output_extension = STR_LIT("bin");
 		}
 	} else if (build_context.build_mode == BuildMode_DynamicLibrary) {
 		// By default use a .so shared library extension.
@@ -1614,6 +1628,14 @@ gb_internal bool init_build_paths(String init_filename) {
 		gb_printf_err("Output path %.*s is a directory.\n", LIT(output_file));
 		return false;
 	}
+
+	if (!write_directory(bc->build_paths[BuildPath_Output].basename)) {
+		String output_file = path_to_string(ha, bc->build_paths[BuildPath_Output]);
+		defer (gb_free(ha, output_file.text));
+		gb_printf_err("No write permissions for output path: %.*s\n", LIT(output_file));
+		return false;
+	}
+
 
 	if (bc->target_features_string.len != 0) {
 		enable_target_feature({}, bc->target_features_string);

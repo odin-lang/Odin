@@ -32,6 +32,7 @@ main :: proc() {
 	parse_json(&t)
 	marshal_json(&t)
 	unmarshal_json(&t)
+	surrogate(&t)
 
 	fmt.printf("%v/%v tests successful.\n", TEST_count - TEST_fail, TEST_count)
 	if TEST_fail > 0 {
@@ -344,4 +345,17 @@ unmarshal_json :: proc(t: ^testing.T) {
 	for p, i in g.products {
 		expect(t, p == original_data.products[i], "Producted unmarshaled improperly")
 	}
+}
+
+@test
+surrogate :: proc(t: ^testing.T) {
+	input := `+ + * 😃 - /`
+
+	out, err := json.marshal(input)
+	expect(t, err == nil, fmt.tprintf("Expected `json.marshal(%q)` to return a nil error, got %v", input, err))
+
+	back: string
+	uerr := json.unmarshal(out, &back)
+	expect(t, uerr == nil, fmt.tprintf("Expected `json.unmarshal(%q)` to return a nil error, got %v", string(out), uerr))
+	expect(t, back == input, fmt.tprintf("Expected `json.unmarshal(%q)` to return %q, got %v", string(out), input, uerr))
 }

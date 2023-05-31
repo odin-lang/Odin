@@ -53,75 +53,75 @@ BackingStoreType :: enum NS.UInteger {
 
 WindowDelegateTemplate :: struct {
 	// Managing Sheets
-	windowWillPositionSheetUsingRect: proc(window: ^Window, sheet: ^Window, rect: Rect) -> Rect,
-	windowWillBeginSheet: proc(notification: ^Notification),
-	windowDidEndSheet: proc(notification: ^Notification),
+	windowWillPositionSheetUsingRect:                                    proc(window: ^Window, sheet: ^Window, rect: Rect) -> Rect,
+	windowWillBeginSheet:                                                proc(notification: ^Notification),
+	windowDidEndSheet:                                                   proc(notification: ^Notification),
 	// Sizing Windows
-	windowWillResizeToSize: proc(sender: ^Window, frameSize: Size) -> Size,
-	windowDidResize: proc(notification: ^Notification),
-	windowWillStartLiveResize: proc(noitifcation: ^Notification),
-	windowDidEndLiveResize: proc(notification: ^Notification),
+	windowWillResizeToSize:                                              proc(sender: ^Window, frameSize: Size) -> Size,
+	windowDidResize:                                                     proc(notification: ^Notification),
+	windowWillStartLiveResize:                                           proc(noitifcation: ^Notification),
+	windowDidEndLiveResize:                                              proc(notification: ^Notification),
 	// Minimizing Windows
-	windowWillMiniaturize: proc(notification: ^Notification),
-	windowDidMiniaturize: proc(notification: ^Notification),
-	windowDidDeminiaturize: proc(notification: ^Notification),
+	windowWillMiniaturize:                                               proc(notification: ^Notification),
+	windowDidMiniaturize:                                                proc(notification: ^Notification),
+	windowDidDeminiaturize:                                              proc(notification: ^Notification),
 	// Zooming window
-	windowWillUseStandardFrameDefaultFrame: proc(window: ^Window, newFrame: Rect) -> Rect,
-	windowShouldZoomToFrame: proc(window: ^Window, newFrame: Rect) -> BOOL,
+	windowWillUseStandardFrameDefaultFrame:                              proc(window: ^Window, newFrame: Rect) -> Rect,
+	windowShouldZoomToFrame:                                             proc(window: ^Window, newFrame: Rect) -> BOOL,
 	// Managing Full-Screen Presentation
-	windowWillUseFullScreenContentSize: proc(window: ^Window, proposedSize: Size) -> Size,
-	windowWillUseFullScreenPresentationOptions: proc(window: ^Window, proposedOptions: ApplicationPresentationOptions) -> ApplicationPresentationOptions,
-	windowWillEnterFullScreen: proc(notification: ^Notification),
-	windowDidEnterFullScreen: proc(notification: ^Notification),
-	windowWillExitFullScreen: proc(notification: ^Notification),
-	windowDidExitFullScreen: proc(notification: ^Notification),
+	windowWillUseFullScreenContentSize:                                  proc(window: ^Window, proposedSize: Size) -> Size,
+	windowWillUseFullScreenPresentationOptions:                          proc(window: ^Window, proposedOptions: ApplicationPresentationOptions) -> ApplicationPresentationOptions,
+	windowWillEnterFullScreen:                                           proc(notification: ^Notification),
+	windowDidEnterFullScreen:                                            proc(notification: ^Notification),
+	windowWillExitFullScreen:                                            proc(notification: ^Notification),
+	windowDidExitFullScreen:                                             proc(notification: ^Notification),
 	// Custom Full-Screen Presentation Animations
-	customWindowsToEnterFullScreenForWindow: proc(window: ^Window) -> ^Array,
-	customWindowsToEnterFullScreenForWindowOnScreen: proc(window: ^Window, screen: ^Screen) -> ^Array,
-	windowStartCustomAnimationToEnterFullScreenWithDuration: proc(window: ^Window, duration: TimeInterval),
-	windowStartCustomAnimationToEnterFullScreenOnScreenWithDuration: proc(window: ^Window, screen: ^Screen, duration: TimeInterval),
-	windowDidFailToEnterFullScreen: proc(window: ^Window),
-	customWindowsToExitFullScreenForWindow: proc(window: ^Window) -> ^Array,
-	windowStartCustomAnimationToExitFullScreenWithDuration: proc(window: ^Window, duration: TimeInterval),
-	windowDidFailToExitFullScreen: proc(window: ^Window),
+	customWindowsToEnterFullScreenForWindow:                             proc(window: ^Window) -> ^Array,
+	customWindowsToEnterFullScreenForWindowOnScreen:                     proc(window: ^Window, screen: ^Screen) -> ^Array,
+	windowStartCustomAnimationToEnterFullScreenWithDuration:             proc(window: ^Window, duration: TimeInterval),
+	windowStartCustomAnimationToEnterFullScreenOnScreenWithDuration:     proc(window: ^Window, screen: ^Screen, duration: TimeInterval),
+	windowDidFailToEnterFullScreen:                                      proc(window: ^Window),
+	customWindowsToExitFullScreenForWindow:                              proc(window: ^Window) -> ^Array,
+	windowStartCustomAnimationToExitFullScreenWithDuration:              proc(window: ^Window, duration: TimeInterval),
+	windowDidFailToExitFullScreen:                                       proc(window: ^Window),
 	// Moving Windows
-	windowWillMove: proc(notification: ^Notification),
-	windowDidMove: proc(notification: ^Notification),
-	windowDidChangeScreen: proc(notification: ^Notification),
-	windowDidChangeScreenProfile: proc(notification: ^Notification),
-	windowDidChangeBackingProperties: proc(notification: ^Notification),
+	windowWillMove:                                                      proc(notification: ^Notification),
+	windowDidMove:                                                       proc(notification: ^Notification),
+	windowDidChangeScreen:                                               proc(notification: ^Notification),
+	windowDidChangeScreenProfile:                                        proc(notification: ^Notification),
+	windowDidChangeBackingProperties:                                    proc(notification: ^Notification),
 	// Closing Windows
-	windowShouldClose: proc(sender: ^Window) -> BOOL,
-	windowWillClose: proc(notification: ^Notification),
+	windowShouldClose:                                                   proc(sender: ^Window) -> BOOL,
+	windowWillClose:                                                     proc(notification: ^Notification),
 	// Managing Key Status
-	windowDidBecomeKey: proc(notification: ^Notification),
-	windowDidResignKey: proc(notification: ^Notification),
+	windowDidBecomeKey:                                                  proc(notification: ^Notification),
+	windowDidResignKey:                                                  proc(notification: ^Notification),
 	// Managing Main Status
-	windowDidBecomeMain: proc(notification: ^Notification),
-	windowDidResignMain: proc(notification: ^Notification),
+	windowDidBecomeMain:                                                 proc(notification: ^Notification),
+	windowDidResignMain:                                                 proc(notification: ^Notification),
 	// Managing Field Editors
-	windowWillReturnFieldEditorToObject: proc(sender: ^Window, client: id) -> id,
+	windowWillReturnFieldEditorToObject:                                 proc(sender: ^Window, client: id) -> id,
 	// Updating Windows
-	windowDidUpdate: proc (notification: ^Notification),
+	windowDidUpdate:                                                     proc (notification: ^Notification),
 	// Exposing Windows
-	windowDidExpose: proc (notification: ^Notification),
+	windowDidExpose:                                                     proc (notification: ^Notification),
 	// Managing Occlusion State
-	windowDidChangeOcclusionState: proc(notification: ^Notification),
+	windowDidChangeOcclusionState:                                       proc(notification: ^Notification),
 	// Dragging Windows
-	windowShouldDragDocumentWithEventFromWithPasteboard: proc(window: ^Window, event: ^Event, dragImageLocation: Point, pasteboard: ^Pasteboard) -> BOOL,
+	windowShouldDragDocumentWithEventFromWithPasteboard:                 proc(window: ^Window, event: ^Event, dragImageLocation: Point, pasteboard: ^Pasteboard) -> BOOL,
 	// Getting the Undo Manager
-	windowWillReturnUndoManager: proc(window: ^Window) -> ^UndoManager,
+	windowWillReturnUndoManager:                                         proc(window: ^Window) -> ^UndoManager,
 	// Managing Titles
-	windowShouldPopUpDocumentPathMenu: proc(window: ^Window, menu: ^Menu) -> BOOL,
+	windowShouldPopUpDocumentPathMenu:                                   proc(window: ^Window, menu: ^Menu) -> BOOL,
 	// Managing Restorable State
-	windowWillEncodeRestorableState: proc(window: ^Window, state: ^Coder),
-	windowDidEncodeRestorableState: proc(window: ^Window, state: ^Coder),
+	windowWillEncodeRestorableState:                                     proc(window: ^Window, state: ^Coder),
+	windowDidEncodeRestorableState:                                      proc(window: ^Window, state: ^Coder),
 	// Managing Presentation in Version Browsers
 	windowWillResizeForVersionBrowserWithMaxPreferredSizeMaxAllowedSize: proc(window: ^Window, maxPreferredFrameSize: Size, maxAllowedFrameSize: Size) -> Size,
-	windowWillEnterVersionBrowser: proc(notification: ^Notification),
-	windowDidEnterVersionBrowser: proc(notification: ^Notification),
-	windowWillExitVersionBrowser: proc(notification: ^Notification),
-	windowDidExitVersionBrowser: proc(notification: ^Notification),
+	windowWillEnterVersionBrowser:                                       proc(notification: ^Notification),
+	windowDidEnterVersionBrowser:                                        proc(notification: ^Notification),
+	windowWillExitVersionBrowser:                                        proc(notification: ^Notification),
+	windowDidExitVersionBrowser:                                         proc(notification: ^Notification),
 }
 
 WindowDelegate :: struct { using _: Object }
@@ -562,19 +562,19 @@ Color :: struct {using _: Object}
 Layer :: struct { using _: NS.Object }
 
 @(objc_type=Layer, objc_name="contentsScale")
-Layer_contentsScale :: proc(self: ^Layer) -> Float {
+Layer_contentsScale :: proc "c" (self: ^Layer) -> Float {
 	return msgSend(Float, self, "contentsScale")
 }
 @(objc_type=Layer, objc_name="setContentsScale")
-Layer_setContentsScale :: proc(self: ^Layer, scale: Float) {
+Layer_setContentsScale :: proc "c" (self: ^Layer, scale: Float) {
 	msgSend(nil, self, "setContentsScale:", scale)
 }
 @(objc_type=Layer, objc_name="frame")
-Layer_frame :: proc(self: ^Layer) -> Rect {
+Layer_frame :: proc "c" (self: ^Layer) -> Rect {
 	return msgSend(Rect, self, "frame")
 }
 @(objc_type=Layer, objc_name="addSublayer")
-Layer_addSublayer :: proc(self: ^Layer, layer: ^Layer) {
+Layer_addSublayer :: proc "c" (self: ^Layer, layer: ^Layer) {
 	msgSend(nil, self, "addSublayer:", layer)
 }
 
@@ -586,23 +586,23 @@ View :: struct {using _: Responder}
 
 
 @(objc_type=View, objc_name="initWithFrame")
-View_initWithFrame :: proc(self: ^View, frame: Rect) -> ^View {
+View_initWithFrame :: proc "c" (self: ^View, frame: Rect) -> ^View {
 	return msgSend(^View, self, "initWithFrame:", frame)
 }
 @(objc_type=View, objc_name="layer")
-View_layer :: proc(self: ^View) -> ^Layer {
+View_layer :: proc "c" (self: ^View) -> ^Layer {
 	return msgSend(^Layer, self, "layer")
 }
 @(objc_type=View, objc_name="setLayer")
-View_setLayer :: proc(self: ^View, layer: ^Layer) {
+View_setLayer :: proc "c" (self: ^View, layer: ^Layer) {
 	msgSend(nil, self, "setLayer:", layer)
 }
 @(objc_type=View, objc_name="wantsLayer")
-View_wantsLayer :: proc(self: ^View) -> BOOL {
+View_wantsLayer :: proc "c" (self: ^View) -> BOOL {
 	return msgSend(BOOL, self, "wantsLayer")
 }
 @(objc_type=View, objc_name="setWantsLayer")
-View_setWantsLayer :: proc(self: ^View, wantsLayer: BOOL) {
+View_setWantsLayer :: proc "c" (self: ^View, wantsLayer: BOOL) {
 	msgSend(nil, self, "setWantsLayer:", wantsLayer)
 }
 
@@ -610,7 +610,7 @@ View_setWantsLayer :: proc(self: ^View, wantsLayer: BOOL) {
 Window :: struct {using _: Responder}
 
 @(objc_type=Window, objc_name="alloc", objc_is_class_method=true)
-Window_alloc :: proc() -> ^Window {
+Window_alloc :: proc "c" () -> ^Window {
 	return msgSend(^Window, Window, "alloc")
 }
 
@@ -630,70 +630,70 @@ Window_initWithContentRect :: proc (self: ^Window, contentRect: Rect, styleMask:
 	return self
 }
 @(objc_type=Window, objc_name="contentView")
-Window_contentView :: proc(self: ^Window) -> ^View {
+Window_contentView :: proc "c" (self: ^Window) -> ^View {
 	return msgSend(^View, self, "contentView")
 }
 @(objc_type=Window, objc_name="setContentView")
-Window_setContentView :: proc(self: ^Window, content_view: ^View) {
+Window_setContentView :: proc "c" (self: ^Window, content_view: ^View) {
 	msgSend(nil, self, "setContentView:", content_view)
 }
 @(objc_type=Window, objc_name="contentLayoutRect")
-Window_contentLayoutRect :: proc(self: ^Window) -> Rect {
+Window_contentLayoutRect :: proc "c" (self: ^Window) -> Rect {
 	return msgSend(Rect, self, "contentLayoutRect")
 }
 @(objc_type=Window, objc_name="frame")
-Window_frame :: proc(self: ^Window) -> Rect {
+Window_frame :: proc "c" (self: ^Window) -> Rect {
 	return msgSend(Rect, self, "frame")
 }
 @(objc_type=Window, objc_name="setFrame")
-Window_setFrame :: proc(self: ^Window, frame: Rect) {
+Window_setFrame :: proc "c" (self: ^Window, frame: Rect) {
 	msgSend(nil, self, "setFrame:", frame)
 }
 @(objc_type=Window, objc_name="opaque")
-Window_opaque :: proc(self: ^Window) -> NS.BOOL {
+Window_opaque :: proc "c" (self: ^Window) -> NS.BOOL {
 	return msgSend(NS.BOOL, self, "opaque")
 }
 @(objc_type=Window, objc_name="setOpaque")
-Window_setOpaque :: proc(self: ^Window, ok: NS.BOOL) {
+Window_setOpaque :: proc "c" (self: ^Window, ok: NS.BOOL) {
 	msgSend(nil, self, "setOpaque:", ok)
 }
 @(objc_type=Window, objc_name="backgroundColor")
-Window_backgroundColor :: proc(self: ^Window) -> ^NS.Color {
+Window_backgroundColor :: proc "c" (self: ^Window) -> ^NS.Color {
 	return msgSend(^NS.Color, self, "backgroundColor")
 }
 @(objc_type=Window, objc_name="setBackgroundColor")
-Window_setBackgroundColor :: proc(self: ^Window, color: ^NS.Color) {
+Window_setBackgroundColor :: proc "c" (self: ^Window, color: ^NS.Color) {
 	msgSend(nil, self, "setBackgroundColor:", color)
 }
 @(objc_type=Window, objc_name="makeKeyAndOrderFront")
-Window_makeKeyAndOrderFront :: proc(self: ^Window, key: ^NS.Object) {
+Window_makeKeyAndOrderFront :: proc "c" (self: ^Window, key: ^NS.Object) {
 	msgSend(nil, self, "makeKeyAndOrderFront:", key)
 }
 @(objc_type=Window, objc_name="setTitle")
-Window_setTitle :: proc(self: ^Window, title: ^NS.String) {
+Window_setTitle :: proc "c" (self: ^Window, title: ^NS.String) {
 	msgSend(nil, self, "setTitle:", title)
 }
 @(objc_type=Window, objc_name="setTitlebarAppearsTransparent")
-Window_setTitlebarAppearsTransparent :: proc(self: ^Window, ok: NS.BOOL) {
+Window_setTitlebarAppearsTransparent :: proc "c" (self: ^Window, ok: NS.BOOL) {
 	msgSend(nil, self, "setTitlebarAppearsTransparent:", ok)
 }
 @(objc_type=Window, objc_name="setMovable")
-Window_setMovable :: proc(self: ^Window, ok: NS.BOOL) {
+Window_setMovable :: proc "c" (self: ^Window, ok: NS.BOOL) {
 	msgSend(nil, self, "setMovable:", ok)
 }
 @(objc_type=Window, objc_name="setMovableByWindowBackground")
-Window_setMovableByWindowBackground :: proc(self: ^Window, ok: NS.BOOL) {
+Window_setMovableByWindowBackground :: proc "c" (self: ^Window, ok: NS.BOOL) {
 	msgSend(nil, self, "setMovableByWindowBackground:", ok)
 }
 @(objc_type=Window, objc_name="setStyleMask")
-Window_setStyleMask :: proc(self: ^Window, style_mask: WindowStyleMask) {
+Window_setStyleMask :: proc "c" (self: ^Window, style_mask: WindowStyleMask) {
 	msgSend(nil, self, "setStyleMask:", style_mask)
 }
 @(objc_type=Window, objc_name="close")
-Window_close :: proc(self: ^Window) {
+Window_close :: proc "c" (self: ^Window) {
 	msgSend(nil, self, "close")
 }
 @(objc_type=Window, objc_name="setDelegate")
-Window_setDelegate :: proc(self: ^Window, delegate: ^WindowDelegate) {
+Window_setDelegate :: proc "c" (self: ^Window, delegate: ^WindowDelegate) {
 	msgSend(nil, self, "setDelegate:", delegate)
 }

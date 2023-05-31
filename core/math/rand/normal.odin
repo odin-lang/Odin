@@ -17,6 +17,7 @@ import "core:math"
 //    https://www.jstatsoft.org/index.php/jss/article/view/v005i08/ziggurat.pdf [pdf]
 //    https://www.jstatsoft.org/article/view/v005i08 [web page]
 //
+@(require_results)
 norm_float64 :: proc(r: ^Rand = nil) -> f64 {
 	rn :: 3.442619855899
 
