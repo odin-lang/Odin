@@ -25,20 +25,20 @@ alloca             :: proc(size, align: int) -> [^]u8 ---
 cpu_relax          :: proc() ---
 read_cycle_counter :: proc() -> i64 ---
 
-count_ones           :: proc(x: $T) -> T where type_is_integer(T) || type_is_simd_vector(T) ---
-count_zeros          :: proc(x: $T) -> T where type_is_integer(T) || type_is_simd_vector(T) ---
-count_trailing_zeros :: proc(x: $T) -> T where type_is_integer(T) || type_is_simd_vector(T) ---
-count_leading_zeros  :: proc(x: $T) -> T where type_is_integer(T) || type_is_simd_vector(T) ---
-reverse_bits         :: proc(x: $T) -> T where type_is_integer(T) || type_is_simd_vector(T) ---
-byte_swap            :: proc(x: $T) -> T where type_is_integer(T) || type_is_float(T) ---
+count_ones           :: proc(x: $T) -> T /*where type_is_integer(T) || type_is_simd_vector(T)*/ ---
+count_zeros          :: proc(x: $T) -> T /*where type_is_integer(T) || type_is_simd_vector(T)*/ ---
+count_trailing_zeros :: proc(x: $T) -> T /*where type_is_integer(T) || type_is_simd_vector(T)*/ ---
+count_leading_zeros  :: proc(x: $T) -> T /*where type_is_integer(T) || type_is_simd_vector(T)*/ ---
+reverse_bits         :: proc(x: $T) -> T /*where type_is_integer(T) || type_is_simd_vector(T)*/ ---
+byte_swap            :: proc(x: $T) -> T /*where type_is_integer(T) || type_is_float(T)*/ ---
 
 overflow_add :: proc(lhs, rhs: $T) -> (T, bool) #optional_ok ---
 overflow_sub :: proc(lhs, rhs: $T) -> (T, bool) #optional_ok ---
 overflow_mul :: proc(lhs, rhs: $T) -> (T, bool) #optional_ok ---
 
-sqrt :: proc(x: $T) -> T where type_is_float(T) || (type_is_simd_vector(T) && type_is_float(type_elem_type(T))) ---
+sqrt :: proc(x: $T) -> T /*where type_is_float(T) || (type_is_simd_vector(T) && type_is_float(type_elem_type(T)))*/ ---
 
-fused_mul_add :: proc(a, b, c: $T) -> T where type_is_float(T) || (type_is_simd_vector(T) && type_is_float(type_elem_type(T))) ---
+fused_mul_add :: proc(a, b, c: $T) -> T /*where type_is_float(T) || (type_is_simd_vector(T) && type_is_float(type_elem_type(T)))*/ ---
 
 mem_copy                 :: proc(dst, src: rawptr, len: int) ---
 mem_copy_non_overlapping :: proc(dst, src: rawptr, len: int) ---
@@ -52,15 +52,15 @@ ptr_sub    :: proc(a, b: ^$T) -> int ---
 unaligned_load           :: proc(src: ^$T) -> T ---
 unaligned_store          :: proc(dst: ^$T, val: T) -> T ---
 
-fixed_point_mul     :: proc(lhs, rhs: $T, #const scale: uint) -> T where type_is_integer(T) ---
-fixed_point_div     :: proc(lhs, rhs: $T, #const scale: uint) -> T where type_is_integer(T) ---
-fixed_point_mul_sat :: proc(lhs, rhs: $T, #const scale: uint) -> T where type_is_integer(T) ---
-fixed_point_div_sat :: proc(lhs, rhs: $T, #const scale: uint) -> T where type_is_integer(T) ---
+fixed_point_mul     :: proc(lhs, rhs: $T, /*#const*/ scale: uint) -> T /*where type_is_integer(T)*/ ---
+fixed_point_div     :: proc(lhs, rhs: $T, /*#const*/ scale: uint) -> T /*where type_is_integer(T)*/ ---
+fixed_point_mul_sat :: proc(lhs, rhs: $T, /*#const*/ scale: uint) -> T /*where type_is_integer(T)*/ ---
+fixed_point_div_sat :: proc(lhs, rhs: $T, /*#const*/ scale: uint) -> T /*where type_is_integer(T)*/ ---
 
-prefetch_read_instruction  :: proc(address: rawptr, #const locality: i32 /* 0..=3 */) ---
-prefetch_read_data         :: proc(address: rawptr, #const locality: i32 /* 0..=3 */) ---
-prefetch_write_instruction :: proc(address: rawptr, #const locality: i32 /* 0..=3 */) ---
-prefetch_write_data        :: proc(address: rawptr, #const locality: i32 /* 0..=3 */) ---
+prefetch_read_instruction  :: proc(address: rawptr, /*#const*/ locality: i32 /* 0..=3 */) ---
+prefetch_read_data         :: proc(address: rawptr, /*#const*/ locality: i32 /* 0..=3 */) ---
+prefetch_write_instruction :: proc(address: rawptr, /*#const*/ locality: i32 /* 0..=3 */) ---
+prefetch_write_data        :: proc(address: rawptr, /*#const*/ locality: i32 /* 0..=3 */) ---
 
 // Compiler Hints
 expect :: proc(val, expected_val: T) -> T ---
@@ -162,18 +162,18 @@ type_is_matrix           :: proc($T: typeid) -> bool ---
 type_has_nil :: proc($T: typeid) -> bool ---
 
 type_is_specialization_of :: proc($T, $S: typeid) -> bool ---
-type_is_variant_of :: proc($U, $V: typeid) -> bool where type_is_union(U) ---
+type_is_variant_of :: proc($U, $V: typeid) -> bool /*where type_is_union(U)*/ ---
 
 type_has_field :: proc($T: typeid, $name: string) -> bool ---
 type_field_type :: proc($T: typeid, $name: string) -> typeid ---
 
-type_proc_parameter_count :: proc($T: typeid) -> int where type_is_proc(T) ---
-type_proc_return_count    :: proc($T: typeid) -> int where type_is_proc(T) ---
+type_proc_parameter_count :: proc($T: typeid) -> int /*where type_is_proc(T)*/ ---
+type_proc_return_count    :: proc($T: typeid) -> int /*where type_is_proc(T)*/ ---
 
-type_proc_parameter_type  :: proc($T: typeid, index: int) -> typeid where type_is_proc(T) ---
-type_proc_return_type     :: proc($T: typeid, index: int) -> typeid where type_is_proc(T) ---
+type_proc_parameter_type  :: proc($T: typeid, index: int) -> typeid /*where type_is_proc(T)*/ ---
+type_proc_return_type     :: proc($T: typeid, index: int) -> typeid /*where type_is_proc(T)*/ ---
 
-type_struct_field_count :: proc($T: typeid) -> int where type_is_struct(T) ---
+type_struct_field_count :: proc($T: typeid) -> int /*where type_is_struct(T)*/ ---
 
 type_polymorphic_record_parameter_count :: proc($T: typeid) -> typeid ---
 type_polymorphic_record_parameter_value :: proc($T: typeid, index: int) -> $V ---
@@ -185,14 +185,14 @@ type_is_subtype_of :: proc($T, $U: typeid) -> bool ---
 
 type_field_index_of :: proc($T: typeid, $name: string) -> uintptr ---
 
-type_equal_proc  :: proc($T: typeid) -> (equal:  proc "contextless" (rawptr, rawptr) -> bool)                 where type_is_comparable(T) ---
-type_hasher_proc :: proc($T: typeid) -> (hasher: proc "contextless" (data: rawptr, seed: uintptr) -> uintptr) where type_is_comparable(T) ---
+type_equal_proc  :: proc($T: typeid) -> (equal:  proc "contextless" (rawptr, rawptr) -> bool)                 /*where type_is_comparable(T)*/ ---
+type_hasher_proc :: proc($T: typeid) -> (hasher: proc "contextless" (data: rawptr, seed: uintptr) -> uintptr) /*where type_is_comparable(T)*/ ---
 
 type_map_info      :: proc($T: typeid/map[$K]$V) -> ^runtime.Map_Info ---
 type_map_cell_info :: proc($T: typeid)           -> ^runtime.Map_Cell_Info ---
 
-type_convert_variants_to_pointers :: proc($T: typeid) -> typeid where type_is_union(T) ---
-type_merge :: proc($U, $V: typeid) -> typeid where type_is_union(U), type_is_union(V) ---
+type_convert_variants_to_pointers :: proc($T: typeid) -> typeid /*where type_is_union(T)*/ ---
+type_merge :: proc($U, $V: typeid) -> typeid /*where type_is_union(U), type_is_union(V)*/ ---
 
 constant_utf16_cstring :: proc($literal: string) -> [^]u16 ---
 
@@ -200,7 +200,7 @@ constant_utf16_cstring :: proc($literal: string) -> [^]u16 ---
 simd_add  :: proc(a, b: #simd[N]T) -> #simd[N]T ---
 simd_sub  :: proc(a, b: #simd[N]T) -> #simd[N]T ---
 simd_mul  :: proc(a, b: #simd[N]T) -> #simd[N]T ---
-simd_div  :: proc(a, b: #simd[N]T) -> #simd[N]T where type_is_float(T) ---
+simd_div  :: proc(a, b: #simd[N]T) -> #simd[N]T /*where type_is_float(T)*/ ---
 
 // Keeps Odin's Behaviour
 // (x << y) if y <= mask else 0
@@ -261,7 +261,7 @@ simd_trunc   :: proc(a: #simd[N]any_float) -> #simd[N]any_float ---
 // rounding to the nearest integral value; if two values are equally near, rounds to the even one
 simd_nearest :: proc(a: #simd[N]any_float) -> #simd[N]any_float ---
 
-simd_to_bits :: proc(v: #simd[N]T) -> #simd[N]Integer where size_of(T) == size_of(Integer), type_is_unsigned(Integer) ---
+simd_to_bits :: proc(v: #simd[N]T) -> #simd[N]Integer /*where size_of(T) == size_of(Integer), type_is_unsigned(Integer)*/ ---
 
 // equivalent a swizzle with descending indices, e.g. reserve(a, 3, 2, 1, 0)
 simd_reverse :: proc(a: #simd[N]T) -> #simd[N]T ---
