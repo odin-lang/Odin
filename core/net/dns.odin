@@ -392,6 +392,10 @@ load_resolv_conf :: proc(resolv_conf_path: string, allocator := context.allocato
 		}
 
 		addr := parse_address(server_ip_str)
+		if addr == nil {
+			continue
+		}
+
 		endpoint := Endpoint{
 			addr,
 			53,

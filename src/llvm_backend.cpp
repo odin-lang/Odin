@@ -720,6 +720,7 @@ gb_internal lbValue lb_map_set_proc_for_type(lbModule *m, Type *type) {
 	lbBlock *check_grow_block = lb_create_block(p, "check-grow");
 	lbBlock *grow_fail_block  = lb_create_block(p, "grow-fail");
 	lbBlock *insert_block     = lb_create_block(p, "insert");
+	lbBlock *rehash_block     = lb_create_block(p, "rehash");
 
 	lb_emit_if(p, lb_emit_comp_against_nil(p, Token_NotEq, found_ptr), found_block, check_grow_block);
 	lb_start_block(p, found_block);
@@ -737,12 +738,19 @@ gb_internal lbValue lb_map_set_proc_for_type(lbModule *m, Type *type) {
 		args[0] = lb_emit_conv(p, map_ptr, t_rawptr);
 		args[1] = map_info;
 		args[2] = lb_emit_load(p, location_ptr);
-		lbValue grow_err = lb_emit_runtime_call(p, "__dynamic_map_check_grow", args);
+		lbValue grow_err_and_has_grown = lb_emit_runtime_call(p, "__dynamic_map_check_grow", args);
+		lbValue grow_err = lb_emit_struct_ev(p, grow_err_and_has_grown, 0);
+		lbValue has_grown = lb_emit_struct_ev(p, grow_err_and_has_grown, 1);
 
 		lb_emit_if(p, lb_emit_comp_against_nil(p, Token_NotEq, grow_err), grow_fail_block, insert_block);
 
 		lb_start_block(p, grow_fail_block);
 		LLVMBuildRet(p->builder, LLVMConstNull(lb_type(m, t_rawptr)));
+
+		lb_emit_if(p, has_grown, grow_fail_block, rehash_block);
+		lb_start_block(p, rehash_block);
+		lbValue key = lb_emit_load(p, key_ptr);
+		hash = lb_gen_map_key_hash(p, map_ptr, key, nullptr);
 	}
 
 	lb_start_block(p, insert_block);
@@ -916,7 +924,7 @@ gb_internal lbValue lb_const_hash(lbModule *m, lbValue key, Type *key_type) {
 	return hashed_key;
 }
 
-gb_internal lbValue lb_gen_map_key_hash(lbProcedure *p, lbValue key, Type *key_type, lbValue *key_ptr_) {
+gb_internal lbValue lb_gen_map_key_hash(lbProcedure *p, lbValue const &map_ptr, lbValue key, lbValue *key_ptr_) {
 	TEMPORARY_ALLOCATOR_GUARD();
 
 	lbValue key_ptr = lb_address_from_load_or_generate_local(p, key);
@@ -924,13 +932,22 @@ gb_internal lbValue lb_gen_map_key_hash(lbProcedure *p, lbValue key, Type *key_t
 
 	if (key_ptr_) *key_ptr_ = key_ptr;
 
+	Type* key_type = base_type(type_deref(map_ptr.type))->Map.key;
+
 	lbValue hashed_key = lb_const_hash(p->module, key, key_type);
 	if (hashed_key.value == nullptr) {
 		lbValue hasher = lb_hasher_proc_for_type(p->module, key_type);
 
+		lbValue seed = {};
+		{
+			auto args = array_make<lbValue>(temporary_allocator(), 1);
+			args[0] = lb_map_data_uintptr(p, lb_emit_load(p, map_ptr));
+			seed = lb_emit_runtime_call(p, "map_seed_from_map_data", args);
+		}
+
 		auto args = array_make<lbValue>(temporary_allocator(), 2);
 		args[0] = key_ptr;
-		args[1] = lb_const_int(p->module, t_uintptr, 0);
+		args[1] = seed;
 		hashed_key = lb_emit_call(p, hasher, args);
 	}
 
@@ -945,7 +962,7 @@ gb_internal lbValue lb_internal_dynamic_map_get_ptr(lbProcedure *p, lbValue cons
 
 	lbValue ptr = {};
 	lbValue key_ptr = {};
-	lbValue hash = lb_gen_map_key_hash(p, key, map_type->Map.key, &key_ptr);
+	lbValue hash = lb_gen_map_key_hash(p, map_ptr, key, &key_ptr);
 
 	if (build_context.dynamic_map_calls) {
 		auto args = array_make<lbValue>(temporary_allocator(), 4);
@@ -976,7 +993,7 @@ gb_internal void lb_internal_dynamic_map_set(lbProcedure *p, lbValue const &map_
 	GB_ASSERT(map_type->kind == Type_Map);
 
 	lbValue key_ptr = {};
-	lbValue hash = lb_gen_map_key_hash(p, map_key, map_type->Map.key, &key_ptr);
+	lbValue hash = lb_gen_map_key_hash(p, map_ptr, map_key, &key_ptr);
 
 	lbValue v = lb_emit_conv(p, map_value, map_type->Map.value);
 	lbValue value_ptr = lb_address_from_load_or_generate_local(p, v);
@@ -1129,12 +1146,7 @@ gb_internal lbProcedure *lb_create_startup_runtime(lbModule *main_module, lbProc
 			lbValue init = lb_build_expr(p, init_expr);
 			if (init.value == nullptr) {
 				LLVMTypeRef global_type = llvm_addr_type(p->module, var.var);
-				if (is_type_untyped_undef(init.type)) {
-					// LLVMSetInitializer(var.var.value, LLVMGetUndef(global_type));
-					LLVMSetInitializer(var.var.value, LLVMConstNull(global_type));
-					var.is_initialized = true;
-					continue;
-				} else if (is_type_untyped_nil(init.type)) {
+				if (is_type_untyped_nil(init.type)) {
 					LLVMSetInitializer(var.var.value, LLVMConstNull(global_type));
 					var.is_initialized = true;
 					continue;
@@ -1365,7 +1377,7 @@ gb_internal WORKER_TASK_PROC(lb_llvm_emit_worker_proc) {
 
 gb_internal void lb_llvm_function_pass_per_function_internal(lbModule *module, lbProcedure *p, lbFunctionPassManagerKind pass_manager_kind = lbFunctionPassManager_default) {
 	LLVMPassManagerRef pass_manager = module->function_pass_managers[pass_manager_kind];
-	lb_run_function_pass_manager(pass_manager, p);
+	lb_run_function_pass_manager(pass_manager, p, pass_manager_kind);
 }
 
 gb_internal WORKER_TASK_PROC(lb_llvm_function_pass_per_module) {
@@ -1899,7 +1911,7 @@ gb_internal lbProcedure *lb_create_main_procedure(lbModule *m, lbProcedure *star
 		LLVMVerifyFunction(p->value, LLVMAbortProcessAction);
 	}
 
-	lb_run_function_pass_manager(default_function_pass_manager, p);
+	lb_run_function_pass_manager(default_function_pass_manager, p, lbFunctionPassManager_default);
 	return p;
 }
 
@@ -2363,8 +2375,7 @@ gb_internal bool lb_generate_code(lbGenerator *gen) {
 					}
 				}
 			}
-			if (!var.is_initialized &&
-			    (is_type_untyped_nil(tav.type) || is_type_untyped_undef(tav.type))) {
+			if (!var.is_initialized && is_type_untyped_nil(tav.type)) {
 				var.is_initialized = true;
 			}
 		}

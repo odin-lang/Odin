@@ -2647,18 +2647,10 @@ fmt_arg :: proc(fi: ^Info, arg: any, verb: rune) {
 		}
 	}
 
-
-	custom_types: switch a in arg {
-	case runtime.Source_Code_Location:
-		if fi.hash && verb == 'v' {
-			io.write_string(fi.writer, a.file_path,    &fi.n)
-			io.write_byte(fi.writer, '(',              &fi.n)
-			io.write_i64(fi.writer, i64(a.line), 10,   &fi.n)
-			io.write_byte(fi.writer, ':',              &fi.n)
-			io.write_i64(fi.writer, i64(a.column), 10, &fi.n)
-			io.write_byte(fi.writer, ')',              &fi.n)
-			return
-		}
+	arg_info := type_info_of(arg.id)
+	if info, ok := arg_info.variant.(runtime.Type_Info_Named); ok {
+		fmt_named(fi, arg, verb, info)
+		return
 	}
 
 	base_arg := arg

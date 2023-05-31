@@ -43,14 +43,20 @@ gb_internal Type *check_init_variable(CheckerContext *ctx, Entity *e, Operand *o
 	}
 
 	if (operand->mode == Addressing_Type) {
-		if (e->type != nullptr && is_type_typeid(e->type)) {
+		if (e->type != nullptr && is_type_typeid(e->type) && !is_type_polymorphic(operand->type)) {
 			add_type_info_type(ctx, operand->type);
 			add_type_and_value(ctx, operand->expr, Addressing_Value, e->type, exact_value_typeid(operand->type));
 			return e->type;
 		} else {
+			ERROR_BLOCK();
+
 			gbString t = type_to_string(operand->type);
 			defer (gb_string_free(t));
-			error(operand->expr, "Cannot assign a type '%s' to variable '%.*s'", t, LIT(e->token.string));
+			if (is_type_polymorphic(operand->type)) {
+				error(operand->expr, "Cannot assign a non-specialized polymorphic type '%s' to variable '%.*s'", t, LIT(e->token.string));
+			} else {
+				error(operand->expr, "Cannot assign a type '%s' to variable '%.*s'", t, LIT(e->token.string));
+			}
 			if (e->type == nullptr) {
 				error_line("\tThe type of the variable '%.*s' cannot be inferred as a type does not have a default type\n", LIT(e->token.string));
 			}
@@ -59,20 +65,17 @@ gb_internal Type *check_init_variable(CheckerContext *ctx, Entity *e, Operand *o
 		}
 	}
 
-
-
 	if (e->type == nullptr) {
 
 		// NOTE(bill): Use the type of the operand
 		Type *t = operand->type;
 		if (is_type_untyped(t)) {
-			if (t == t_invalid || is_type_untyped_nil(t)) {
-				error(e->token, "Invalid use of untyped nil in %.*s", LIT(context_name));
+			if (is_type_untyped_uninit(t)) {
+				error(e->token, "Invalid use of --- in %.*s", LIT(context_name));
 				e->type = t_invalid;
 				return nullptr;
-			}
-			if (t == t_invalid || is_type_untyped_undef(t)) {
-				error(e->token, "Invalid use of --- in %.*s", LIT(context_name));
+			} else if (t == t_invalid || is_type_untyped_nil(t)) {
+				error(e->token, "Invalid use of untyped nil in %.*s", LIT(context_name));
 				e->type = t_invalid;
 				return nullptr;
 			}
@@ -119,7 +122,7 @@ gb_internal void check_init_variables(CheckerContext *ctx, Entity **lhs, isize l
 	// an extra allocation
 	TEMPORARY_ALLOCATOR_GUARD();
 	auto operands = array_make<Operand>(temporary_allocator(), 0, 2*lhs_count);
-	check_unpack_arguments(ctx, lhs, lhs_count, &operands, inits, true, false);
+	check_unpack_arguments(ctx, lhs, lhs_count, &operands, inits, UnpackFlag_AllowOk|UnpackFlag_AllowUndef);
 
 	isize rhs_count = operands.count;
 	isize max = gb_min(lhs_count, rhs_count);
@@ -947,6 +950,7 @@ gb_internal void check_proc_decl(CheckerContext *ctx, Entity *e, DeclInfo *d) {
 
 	if (ac.require_declaration) {
 		e->flags |= EntityFlag_Require;
+		pl->inlining = ProcInlining_no_inline;
 	}
 
 

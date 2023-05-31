@@ -3,7 +3,6 @@
 package sync
 
 import "core:c"
-import "core:os"
 import "core:time"
 
 FUTEX_WAIT :: 1
@@ -14,11 +13,16 @@ FUTEX_PRIVATE_FLAG :: 128
 FUTEX_WAIT_PRIVATE :: (FUTEX_WAIT | FUTEX_PRIVATE_FLAG)
 FUTEX_WAKE_PRIVATE :: (FUTEX_WAKE | FUTEX_PRIVATE_FLAG)
 
+ETIMEDOUT :: 60
+
+
 foreign import libc "system:c"
 
 foreign libc {
 	@(link_name="futex")
 	_unix_futex :: proc "c" (f: ^Futex, op: c.int, val: u32, timeout: rawptr) -> c.int ---
+
+	@(link_name="__errno")	__errno :: proc() -> ^int ---
 }
 
 _futex_wait :: proc "contextless" (f: ^Futex, expected: u32) -> bool {
@@ -28,7 +32,7 @@ _futex_wait :: proc "contextless" (f: ^Futex, expected: u32) -> bool {
 		return true
 	}
 
-	if os.Errno(os.get_last_error()) == os.ETIMEDOUT {
+	if __errno()^ == ETIMEDOUT {
 		return false
 	}
 
@@ -54,7 +58,7 @@ _futex_wait_with_timeout :: proc "contextless" (f: ^Futex, expected: u32, durati
 		return true
 	}
 
-	if os.Errno(os.get_last_error()) == os.ETIMEDOUT {
+	if __errno()^ == ETIMEDOUT {
 		return false
 	}
 

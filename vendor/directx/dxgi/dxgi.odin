@@ -375,7 +375,7 @@ MAPPED_RECT :: struct {
 }
 
 ADAPTER_DESC :: struct {
-	Description:           [128]i16,
+	Description:           [128]u16 `fmt:"s,0"`,
 	VendorId:              u32,
 	DeviceId:              u32,
 	SubSysId:              u32,
@@ -387,7 +387,7 @@ ADAPTER_DESC :: struct {
 }
 
 OUTPUT_DESC :: struct {
-	DeviceName:         [32]i16,
+	DeviceName:         [32]u16 `fmt:"s,0"`,
 	DesktopCoordinates: RECT,
 	AttachedToDesktop:  BOOL,
 	Rotation:           MODE_ROTATION,
@@ -613,7 +613,7 @@ ADAPTER_FLAG :: enum u32 { // TODO: convert to bit_set
 }
 
 ADAPTER_DESC1 :: struct {
-	Description:           [128]i16,
+	Description:           [128]u16 `fmt:"s,0"`,
 	VendorId:              u32,
 	DeviceId:              u32,
 	SubSysId:              u32,
@@ -890,7 +890,7 @@ COMPUTE_PREEMPTION_GRANULARITY :: enum i32 {
 }
 
 ADAPTER_DESC2 :: struct {
-	Description:                   [128]i16,
+	Description:                   [128]u16 `fmt:"s,0"`,
 	VendorId:                      u32,
 	DeviceId:                      u32,
 	SubSysId:                      u32,

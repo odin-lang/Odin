@@ -33,56 +33,56 @@ Error :: struct { using _: Copying(Error) }
 
 
 @(objc_type=Error, objc_name="alloc", objc_is_class_method=true)
-Error_alloc :: proc() -> ^Error {
+Error_alloc :: proc "c" () -> ^Error {
 	return msgSend(^Error, Error, "alloc")
 }
 
 @(objc_type=Error, objc_name="init")
-Error_init :: proc(self: ^Error) -> ^Error {
+Error_init :: proc "c" (self: ^Error) -> ^Error {
 	return msgSend(^Error, self, "init")
 }
 
 @(objc_type=Error, objc_name="errorWithDomain", objc_is_class_method=true)
-Error_errorWithDomain :: proc(domain: ErrorDomain, code: Integer, userInfo: ^Dictionary) -> ^Error {
+Error_errorWithDomain :: proc "c" (domain: ErrorDomain, code: Integer, userInfo: ^Dictionary) -> ^Error {
 	return msgSend(^Error, Error, "errorWithDomain:code:userInfo:", domain, code, userInfo)
 }
 
 @(objc_type=Error, objc_name="initWithDomain")
-Error_initWithDomain :: proc(self: ^Error, domain: ErrorDomain, code: Integer, userInfo: ^Dictionary) -> ^Error {
+Error_initWithDomain :: proc "c" (self: ^Error, domain: ErrorDomain, code: Integer, userInfo: ^Dictionary) -> ^Error {
 	return msgSend(^Error, self, "initWithDomain:code:userInfo:", domain, code, userInfo)
 }
 
 @(objc_type=Error, objc_name="code")
-Error_code :: proc(self: ^Error) -> Integer {
+Error_code :: proc "c" (self: ^Error) -> Integer {
 	return msgSend(Integer, self, "code")
 }
 
 @(objc_type=Error, objc_name="domain")
-Error_domain :: proc(self: ^Error) -> ErrorDomain {
+Error_domain :: proc "c" (self: ^Error) -> ErrorDomain {
 	return msgSend(ErrorDomain, self, "domain")
 }
 
 @(objc_type=Error, objc_name="userInfo")
-Error_userInfo :: proc(self: ^Error) -> ^Dictionary {
+Error_userInfo :: proc "c" (self: ^Error) -> ^Dictionary {
 	return msgSend(^Dictionary, self, "userInfo")
 }
 
 @(objc_type=Error, objc_name="localizedDescription")
-Error_localizedDescription :: proc(self: ^Error) -> ^String {
+Error_localizedDescription :: proc "c" (self: ^Error) -> ^String {
 	return msgSend(^String, self, "localizedDescription")
 }
 
 @(objc_type=Error, objc_name="localizedRecoveryOptions")
-Error_localizedRecoveryOptions :: proc(self: ^Error) -> (options: ^Array) {
+Error_localizedRecoveryOptions :: proc "c" (self: ^Error) -> (options: ^Array) {
 	return msgSend(type_of(options), self, "localizedRecoveryOptions")
 }
 
 @(objc_type=Error, objc_name="localizedRecoverySuggestion")
-Error_localizedRecoverySuggestion :: proc(self: ^Error) -> ^String {
+Error_localizedRecoverySuggestion :: proc "c" (self: ^Error) -> ^String {
 	return msgSend(^String, self, "localizedRecoverySuggestion")
 }
 
 @(objc_type=Error, objc_name="localizedFailureReason")
-Error_localizedFailureReason :: proc(self: ^Error) -> ^String {
+Error_localizedFailureReason :: proc "c" (self: ^Error) -> ^String {
 	return msgSend(^String, self, "localizedFailureReason")
 }

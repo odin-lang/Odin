@@ -282,7 +282,7 @@ gb_internal LLVMMetadataRef lb_debug_type_internal(lbModule *m, Type *type) {
 		case Basic_UntypedString:     GB_PANIC("Basic_UntypedString");     break;
 		case Basic_UntypedRune:       GB_PANIC("Basic_UntypedRune");       break;
 		case Basic_UntypedNil:        GB_PANIC("Basic_UntypedNil");        break;
-		case Basic_UntypedUndef:      GB_PANIC("Basic_UntypedUndef");      break;
+		case Basic_UntypedUninit:     GB_PANIC("Basic_UntypedUninit");     break;
 
 		default: GB_PANIC("Basic Unhandled"); break;
 		}

@@ -115,7 +115,7 @@ gb_internal Ast *clone_ast(Ast *node, AstFile *f) {
 		n->Ident.entity = nullptr;
 		break;
 	case Ast_Implicit:       break;
-	case Ast_Undef:          break;
+	case Ast_Uninit:         break;
 	case Ast_BasicLit:       break;
 	case Ast_BasicDirective: break;
 
@@ -646,9 +646,9 @@ gb_internal Ast *ast_implicit(AstFile *f, Token token) {
 	result->Implicit = token;
 	return result;
 }
-gb_internal Ast *ast_undef(AstFile *f, Token token) {
-	Ast *result = alloc_ast_node(f, Ast_Undef);
-	result->Undef = token;
+gb_internal Ast *ast_uninit(AstFile *f, Token token) {
+	Ast *result = alloc_ast_node(f, Ast_Uninit);
+	result->Uninit = token;
 	return result;
 }
 
@@ -2092,8 +2092,8 @@ gb_internal Ast *parse_operand(AstFile *f, bool lhs) {
 	case Token_Ident:
 		return parse_ident(f);
 
-	case Token_Undef:
-		return ast_undef(f, expect_token(f, Token_Undef));
+	case Token_Uninit:
+		return ast_uninit(f, expect_token(f, Token_Uninit));
 
 	case Token_context:
 		return ast_implicit(f, expect_token(f, Token_context));
@@ -2292,7 +2292,7 @@ gb_internal Ast *parse_operand(AstFile *f, bool lhs) {
 
 		skip_possible_newline_for_literal(f);
 
-		if (allow_token(f, Token_Undef)) {
+		if (allow_token(f, Token_Uninit)) {
 			if (where_token.kind != Token_Invalid) {
 				syntax_error(where_token, "'where' clauses are not allowed on procedure literals without a defined body (replaced with ---)");
 			}
@@ -2462,7 +2462,7 @@ gb_internal Ast *parse_operand(AstFile *f, bool lhs) {
 				}
 				is_raw_union = true;
 			} else if (tag.string == "no_copy") {
-				if (is_packed) {
+				if (no_copy) {
 					syntax_error(tag, "Duplicate struct tag '#%.*s'", LIT(tag.string));
 				}
 				no_copy = true;
@@ -3744,8 +3744,18 @@ gb_internal bool allow_field_separator(AstFile *f) {
 	if (allow_token(f, Token_Comma)) {
 		return true;
 	}
-	if (ALLOW_NEWLINE && token.kind == Token_Semicolon) {
-		if (!token_is_newline(token)) {
+	if (token.kind == Token_Semicolon) {
+		bool ok = false;
+		if (ALLOW_NEWLINE && token_is_newline(token)) {
+			TokenKind next = peek_token(f).kind;
+			switch (next) {
+			case Token_CloseBrace:
+			case Token_CloseParen:
+				ok = true;
+				break;
+			}
+		}
+		if (!ok) {
 			String p = token_to_string(token);
 			syntax_error(token_end_of_line(f, f->prev_token), "Expected a comma, got a %.*s", LIT(p));
 		}
@@ -4509,7 +4519,7 @@ gb_internal Ast *parse_foreign_decl(AstFile *f) {
 	return ast_bad_decl(f, token, f->curr_token);
 }
 
-gb_internal Ast *parse_attribute(AstFile *f, Token token, TokenKind open_kind, TokenKind close_kind) {
+gb_internal Ast *parse_attribute(AstFile *f, Token token, TokenKind open_kind, TokenKind close_kind, CommentGroup *docs) {
 	Array<Ast *> elems = {};
 	Token open = {};
 	Token close = {};
@@ -4550,6 +4560,9 @@ gb_internal Ast *parse_attribute(AstFile *f, Token token, TokenKind open_kind, T
 
 	Ast *decl = parse_stmt(f);
 	if (decl->kind == Ast_ValueDecl) {
+		if (decl->ValueDecl.docs == nullptr && docs != nullptr) {
+			decl->ValueDecl.docs = docs;
+		}
 		array_add(&decl->ValueDecl.attributes, attribute);
 	} else if (decl->kind == Ast_ForeignBlockDecl) {
 		array_add(&decl->ForeignBlockDecl.attributes, attribute);
@@ -4698,8 +4711,9 @@ gb_internal Ast *parse_stmt(AstFile *f) {
 	} break;
 
 	case Token_At: {
+		CommentGroup *docs = f->lead_comment;
 		Token token = expect_token(f, Token_At);
-		return parse_attribute(f, token, Token_OpenParen, Token_CloseParen);
+		return parse_attribute(f, token, Token_OpenParen, Token_CloseParen, docs);
 	}
 
 	case Token_Hash: {
@@ -4749,6 +4763,17 @@ gb_internal Ast *parse_stmt(AstFile *f) {
 			return stmt;
 		} else if (tag == "unroll") {
 			return parse_unrolled_for_loop(f, name);
+		} else if (tag == "reverse") {
+			Ast *for_stmt = parse_for_stmt(f);
+			if (for_stmt->kind == Ast_RangeStmt) {
+				if (for_stmt->RangeStmt.reverse) {
+					syntax_error(token, "#reverse already applied to a 'for in' statement");
+				}
+				for_stmt->RangeStmt.reverse = true;
+			} else {
+				syntax_error(token, "#reverse can only be applied to a 'for in' statement");
+			}
+			return for_stmt;
 		} else if (tag == "include") {
 			syntax_error(token, "#include is not a valid import declaration kind. Did you mean 'import'?");
 			s = ast_bad_stmt(f, token, f->curr_token);

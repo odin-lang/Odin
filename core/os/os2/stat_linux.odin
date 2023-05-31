@@ -3,6 +3,7 @@ package os2
 
 import "core:time"
 import "core:runtime"
+import "core:strings"
 import "core:sys/unix"
 import "core:path/filepath"
 
@@ -112,10 +113,7 @@ _fstat_internal :: proc(fd: int, allocator: runtime.Allocator) -> (File_Info, Er
 
 // NOTE: _stat and _lstat are using _fstat to avoid a race condition when populating fullpath
 _stat :: proc(name: string, allocator: runtime.Allocator) -> (File_Info, Error) {
-	name_cstr, allocated := _name_to_cstring(name)
-	defer if allocated {
-		delete(name_cstr)
-	}
+	name_cstr := strings.clone_to_cstring(name, context.temp_allocator)
 
 	fd := unix.sys_open(name_cstr, _O_RDONLY)
 	if fd < 0 {
@@ -126,10 +124,8 @@ _stat :: proc(name: string, allocator: runtime.Allocator) -> (File_Info, Error) 
 }
 
 _lstat :: proc(name: string, allocator: runtime.Allocator) -> (File_Info, Error) {
-	name_cstr, allocated := _name_to_cstring(name)
-	defer if allocated {
-		delete(name_cstr)
-	}
+	name_cstr := strings.clone_to_cstring(name, context.temp_allocator)
+
 	fd := unix.sys_open(name_cstr, _O_RDONLY | _O_PATH | _O_NOFOLLOW)
 	if fd < 0 {
 		return {}, _get_platform_error(fd)
@@ -143,10 +139,7 @@ _same_file :: proc(fi1, fi2: File_Info) -> bool {
 }
 
 _stat_internal :: proc(name: string) -> (s: _Stat, res: int) {
-	name_cstr, allocated := _name_to_cstring(name)
-	defer if allocated {
-		delete(name_cstr)
-	}
+	name_cstr := strings.clone_to_cstring(name, context.temp_allocator)
 	res = unix.sys_stat(name_cstr, &s)
 	return
 }

@@ -135,7 +135,7 @@ gb_internal void check_struct_fields(CheckerContext *ctx, Ast *node, Slice<Entit
 			type = t_invalid;
 		}
 		if (is_type_untyped(type)) {
-			if (is_type_untyped_undef(type)) {
+			if (is_type_untyped_uninit(type)) {
 				error(params[i], "Cannot determine parameter type from ---");
 			} else {
 				error(params[i], "Cannot determine parameter type from a nil");
@@ -473,7 +473,7 @@ gb_internal Type *check_record_polymorphic_params(CheckerContext *ctx, Ast *poly
 				type = t_invalid;
 			}
 			if (is_type_untyped(type)) {
-				if (is_type_untyped_undef(type)) {
+				if (is_type_untyped_uninit(type)) {
 					error(params[i], "Cannot determine parameter type from ---");
 				} else {
 					error(params[i], "Cannot determine parameter type from a nil");
@@ -1528,7 +1528,7 @@ gb_internal Type *check_get_params(CheckerContext *ctx, Scope *scope, Ast *_para
 			type = t_invalid;
 		}
 		if (is_type_untyped(type)) {
-			if (is_type_untyped_undef(type)) {
+			if (is_type_untyped_uninit(type)) {
 				error(param, "Cannot determine parameter type from ---");
 			} else {
 				error(param, "Cannot determine parameter type from a nil");

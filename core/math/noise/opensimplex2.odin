@@ -20,6 +20,7 @@ Vec4 :: [4]f64
 /*
 	2D Simplex noise, standard lattice orientation.
 */
+@(require_results)
 noise_2d :: proc(seed: i64, coord: Vec2) -> (value: f32) {
 	// Get points for A2* lattice
 	skew   := SKEW_2D * (coord.x + coord.y)
@@ -35,6 +36,7 @@ noise_2d :: proc(seed: i64, coord: Vec2) -> (value: f32) {
 	unless your map is centered around an equator. It's a subtle
 	difference, but the option is here to make it an easy choice.
 */
+@(require_results)
 noise_2d_improve_x :: proc(seed: i64, coord: Vec2) -> (value: f32) {
 	// Skew transform and rotation baked into one.
 	xx := coord.x * ROOT_2_OVER_2
@@ -51,6 +53,7 @@ noise_2d_improve_x :: proc(seed: i64, coord: Vec2) -> (value: f32) {
 	If Z is vertical in world coordinates, call `noise_3d_improve_xz(x, y, Z)`.
 	For a time varied animation, call `noise_3d_improve_xz(x, y, T)`.
 */
+@(require_results)
 noise_3d_improve_xy :: proc(seed: i64, coord: Vec3) -> (value: f32) {
 	/*
 		Re-orient the cubic lattices without skewing, so Z points up the main lattice diagonal,
@@ -75,6 +78,7 @@ noise_3d_improve_xy :: proc(seed: i64, coord: Vec3) -> (value: f32) {
 	If Z is vertical in world coordinates, call `noise_3d_improve_xz(x, Z, y)` or use `noise_3d_improve_xy`.
 	For a time varied animation, call `noise_3d_improve_xz(x, T, y)` or use `noise_3d_improve_xy`.
 */
+@(require_results)
 noise_3d_improve_xz :: proc(seed: i64, coord: Vec3) -> (value: f32) {
 	/*
 		Re-orient the cubic lattices without skewing, so Y points up the main lattice diagonal,
@@ -96,6 +100,7 @@ noise_3d_improve_xz :: proc(seed: i64, coord: Vec3) -> (value: f32) {
 	Use `noise_3d_improve_xy` or `noise_3d_improve_xz` instead, wherever appropriate.
 	They have less diagonal bias. This function's best use is as a fallback.
 */
+@(require_results)
 noise_3d_fallback :: proc(seed: i64, coord: Vec3) -> (value: f32) {
 	/*
 		Re-orient the cubic lattices via rotation, to produce a familiar look.
@@ -114,6 +119,7 @@ noise_3d_fallback :: proc(seed: i64, coord: Vec3) -> (value: f32) {
 	Recommended for time-varied animations which texture a 3D object (W=time)
 	in a space where Z is vertical.
 */
+@(require_results)
 noise_4d_improve_xyz_improve_xy :: proc(seed: i64, coord: Vec4) -> (value: f32) {
 	xy := coord.x + coord.y
 	s2 := xy * -0.21132486540518699998
@@ -133,6 +139,7 @@ noise_4d_improve_xyz_improve_xy :: proc(seed: i64, coord: Vec4) -> (value: f32) 
 	Recommended for time-varied animations which texture a 3D object (W=time)
 	in a space where Y is vertical.
 */
+@(require_results)
 noise_4d_improve_xyz_improve_xz :: proc(seed: i64, coord: Vec4) -> (value: f32) {
 	xz := coord.x + coord.z
 	s2 := xz * -0.21132486540518699998
@@ -152,6 +159,7 @@ noise_4d_improve_xyz_improve_xz :: proc(seed: i64, coord: Vec4) -> (value: f32) 
 	Recommended for time-varied animations which texture a 3D object (W=time)
 	where there isn't a clear distinction between horizontal and vertical
 */
+@(require_results)
 noise_4d_improve_xyz :: proc(seed: i64, coord: Vec4) -> (value: f32) {
 	xyz := coord.x + coord.y + coord.z
 	ww  := coord.w * 0.2236067977499788
@@ -164,6 +172,7 @@ noise_4d_improve_xyz :: proc(seed: i64, coord: Vec4) -> (value: f32) {
 /*
 	4D OpenSimplex2 noise, fallback lattice orientation.
 */
+@(require_results)
 noise_4d_fallback :: proc(seed: i64, coord: Vec4) -> (value: f32) {
 	// Get points for A4 lattice
 	skew := f64(SKEW_4D) * (coord.x + coord.y + coord.z + coord.w)

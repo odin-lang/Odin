@@ -303,8 +303,25 @@ _set_option :: proc(s: Any_Socket, option: Socket_Option, value: any, loc := #ca
 
 @(private)
 _set_blocking :: proc(socket: Any_Socket, should_block: bool) -> (err: Network_Error) {
-	// TODO: Implement
-	unimplemented()
+	socket := any_socket_to_socket(socket)
+
+	flags, getfl_err := os.fcntl(int(socket), os.F_GETFL, 0)
+	if getfl_err != os.ERROR_NONE {
+		return Set_Blocking_Error(getfl_err)
+	}
+
+	if should_block {
+		flags &= ~int(os.O_NONBLOCK)
+	} else {
+		flags |= int(os.O_NONBLOCK)
+	}
+
+	_, setfl_err := os.fcntl(int(socket), os.F_SETFL, flags)
+	if setfl_err != os.ERROR_NONE {
+		return Set_Blocking_Error(setfl_err)
+	}
+
+	return nil
 }
 
 @private

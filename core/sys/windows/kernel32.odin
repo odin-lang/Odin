@@ -2,6 +2,7 @@
 package sys_windows
 
 foreign import kernel32 "system:Kernel32.lib"
+foreign import one_core "system:OneCore.lib"
 
 FOREGROUND_BLUE            :: WORD(0x0001)
 FOREGROUND_GREEN           :: WORD(0x0002)
@@ -891,7 +892,7 @@ WIN32_MEMORY_REGION_INFORMATION_u_s_Bitfield :: distinct ULONG
 }*/
 
 @(default_calling_convention="stdcall")
-foreign kernel32 {
+foreign one_core {
 	QueryVirtualMemoryInformation :: proc(
 		Process: HANDLE,
 		VirtualAddress: PVOID,

@@ -2,6 +2,7 @@ package io
 
 import "core:strconv"
 import "core:unicode/utf8"
+import "core:unicode/utf16"
 
 read_ptr :: proc(r: Reader, p: rawptr, byte_size: int, n_read: ^int = nil) -> (n: int, err: Error) {
 	return read(r, ([^]byte)(p)[:byte_size], n_read)
@@ -146,7 +147,7 @@ write_encoded_rune :: proc(w: Writer, r: rune, write_quote := true, n_written: ^
 	return
 }
 
-write_escaped_rune :: proc(w: Writer, r: rune, quote: byte, html_safe := false, n_written: ^int = nil) -> (n: int, err: Error) {
+write_escaped_rune :: proc(w: Writer, r: rune, quote: byte, html_safe := false, n_written: ^int = nil, for_json := false) -> (n: int, err: Error) {
 	is_printable :: proc(r: rune) -> bool {
 		if r <= 0xff {
 			switch r {
@@ -163,7 +164,7 @@ write_escaped_rune :: proc(w: Writer, r: rune, quote: byte, html_safe := false, 
 	defer if n_written != nil {
 		n_written^ += n
 	}
-	
+
 	if html_safe {
 		switch r {
 		case '<', '>', '&':
@@ -211,17 +212,29 @@ write_escaped_rune :: proc(w: Writer, r: rune, quote: byte, html_safe := false, 
 				write_byte(w, DIGITS_LOWER[c>>uint(s) & 0xf], &n) or_return
 			}
 		case:
-			write_byte(w, '\\', &n) or_return
-			write_byte(w, 'U', &n)  or_return
-			for s := 28; s >= 0; s -= 4 {
-				write_byte(w, DIGITS_LOWER[c>>uint(s) & 0xf], &n) or_return
+			if for_json {
+				buf: [2]u16
+				utf16.encode(buf[:], []rune{c})
+				for bc in buf {
+					write_byte(w, '\\', &n) or_return
+					write_byte(w, 'u', &n)  or_return
+					for s := 12; s >= 0; s -= 4 {
+						write_byte(w, DIGITS_LOWER[bc>>uint(s) & 0xf], &n) or_return
+					}
+				}
+			} else {
+				write_byte(w, '\\', &n) or_return
+				write_byte(w, 'U', &n)  or_return
+				for s := 24; s >= 0; s -= 4 {
+					write_byte(w, DIGITS_LOWER[c>>uint(s) & 0xf], &n) or_return
+				}
 			}
 		}
 	}
 	return
 }
 
-write_quoted_string :: proc(w: Writer, str: string, quote: byte = '"', n_written: ^int = nil) -> (n: int, err: Error) {
+write_quoted_string :: proc(w: Writer, str: string, quote: byte = '"', n_written: ^int = nil, for_json := false) -> (n: int, err: Error) {
 	defer if n_written != nil {
 		n_written^ += n
 	}
@@ -240,7 +253,7 @@ write_quoted_string :: proc(w: Writer, str: string, quote: byte = '"', n_written
 			continue
 		}
 
-		n_wrapper(write_escaped_rune(w, r, quote), &n) or_return
+		n_wrapper(write_escaped_rune(w, r, quote, false, nil, for_json), &n) or_return
 
 	}
 	write_byte(w, quote, &n) or_return

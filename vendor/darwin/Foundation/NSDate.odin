@@ -4,16 +4,16 @@ package objc_Foundation
 Date :: struct {using _: Copying(Date)}
 
 @(objc_type=Date, objc_name="alloc", objc_is_class_method=true)
-Date_alloc :: proc() -> ^Date {
+Date_alloc :: proc "c" () -> ^Date {
 	return msgSend(^Date, Date, "alloc")
 }
 
 @(objc_type=Date, objc_name="init")
-Date_init :: proc(self: ^Date) -> ^Date {
+Date_init :: proc "c" (self: ^Date) -> ^Date {
 	return msgSend(^Date, self, "init")
 }
 
 @(objc_type=Date, objc_name="dateWithTimeIntervalSinceNow")
-Date_dateWithTimeIntervalSinceNow :: proc(secs: TimeInterval) -> ^Date {
+Date_dateWithTimeIntervalSinceNow :: proc "c" (secs: TimeInterval) -> ^Date {
 	return msgSend(^Date, Date, "dateWithTimeIntervalSinceNow:", secs)
 }
