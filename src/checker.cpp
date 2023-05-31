@@ -3524,6 +3524,7 @@ gb_internal void check_decl_attributes(CheckerContext *c, Array<Ast *> const &at
 			if (!proc(c, elem, name, value, ac)) {
 				if (!build_context.ignore_unknown_attributes) {
 					error(elem, "Unknown attribute element name '%.*s'", LIT(name));
+					error_line("\tDid you forget to use build flag '-ignore-unknown-attributes'?\n");
 				}
 			}
 		}
