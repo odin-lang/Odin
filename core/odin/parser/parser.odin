@@ -10,6 +10,7 @@ Error_Handler   :: #type proc(pos: tokenizer.Pos, fmt: string, args: ..any)
 
 Flag :: enum u32 {
 	Optional_Semicolons,
+	Allow_Reserved_Package_Name,
 }
 
 Flags :: distinct bit_set[Flag; u32]
@@ -172,7 +173,9 @@ parse_file :: proc(p: ^Parser, file: ^ast.File) -> bool {
 		case is_blank_ident(name):
 			error(p, pkg_name.pos, "invalid package name '_'")
 		case is_package_name_reserved(name), file.pkg != nil && file.pkg.kind != .Runtime && name == "runtime":
-			error(p, pkg_name.pos, "use of reserved package name '%s'", name)
+			if .Allow_Reserved_Package_Name not_in p.flags {
+				error(p, pkg_name.pos, "use of reserved package name '%s'", name)
+			}
 		}
 	}
 	p.file.pkg_name = pkg_name.text
