@@ -75,7 +75,11 @@ yield :: proc() {
 
 
 run :: proc(fn: proc(), init_context: Maybe(runtime.Context) = nil, priority := Thread_Priority.Normal, auto_cleanup := true) -> ^Thread {
-	t := create(fn, priority)
+	thread_proc :: proc(t: ^Thread) {
+		fn := cast(proc())t.data
+		fn()
+	}
+	t := create(thread_proc, priority)
 	t.init_context = init_context
 	if auto_cleanup {
 		t.flags += {.Auto_Cleanup}
