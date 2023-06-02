@@ -5,12 +5,6 @@ import "core:intrinsics"
 import "core:sync"
 import "core:mem"
 
-Thread_State :: enum u8 {
-	Started,
-	Joined,
-	Done,
-}
-
 Thread_Os_Specific :: struct {
 	flags:       bit_set[Thread_State; u8],
 }

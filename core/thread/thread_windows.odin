@@ -7,17 +7,10 @@ import "core:intrinsics"
 import "core:sync"
 import win32 "core:sys/windows"
 
-Thread_State :: enum u8 {
-	Started,
-	Joined,
-	Done,
-}
-
 Thread_Os_Specific :: struct {
 	win32_thread:    win32.HANDLE,
 	win32_thread_id: win32.DWORD,
 	mutex:           sync.Mutex,
-	flags:           bit_set[Thread_State; u8],
 }
 
 _thread_priority_map := [Thread_Priority]i32{
@@ -44,6 +37,11 @@ _create :: proc(procedure: Thread_Proc, priority := Thread_Priority.Normal) -> ^
 				runtime.default_temp_allocator_destroy(auto_cast context.temp_allocator.data)
 			}
 		}
+
+		if .Auto_Cleanup in t.flags {
+			free(t, t.creation_allocator)
+		}
+
 		return 0
 	}
 

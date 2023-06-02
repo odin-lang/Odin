@@ -10,6 +10,13 @@ Thread_Proc :: #type proc(^Thread)
 
 MAX_USER_ARGUMENTS :: 8
 
+Thread_State :: enum u8 {
+	Started,
+	Joined,
+	Done,
+	Auto_Cleanup,
+}
+
 Thread :: struct {
 	using specific: Thread_Os_Specific,
 	id:             int,
@@ -20,7 +27,7 @@ Thread :: struct {
 
 	init_context: Maybe(runtime.Context),
 
-
+	flags: bit_set[Thread_State; u8],
 	creation_allocator: mem.Allocator,
 }
 
@@ -71,10 +78,10 @@ run :: proc(fn: proc(), init_context: Maybe(runtime.Context) = nil, priority := 
 	thread_proc :: proc(t: ^Thread) {
 		fn := cast(proc())t.data
 		fn()
-		destroy(t)
 	}
 	t := create(thread_proc, priority)
 	t.data = rawptr(fn)
+	t.flags += {.Auto_Cleanup}
 	t.init_context = init_context
 	start(t)
 }
@@ -85,10 +92,10 @@ run_with_data :: proc(data: rawptr, fn: proc(data: rawptr), init_context: Maybe(
 		assert(t.user_index >= 1)
 		data := t.user_args[0]
 		fn(data)
-		destroy(t)
 	}
 	t := create(thread_proc, priority)
 	t.data = rawptr(fn)
+	t.flags += {.Auto_Cleanup}
 	t.user_index = 1
 	t.user_args = data
 	t.init_context = init_context
@@ -102,10 +109,10 @@ run_with_poly_data :: proc(data: $T, fn: proc(data: T), init_context: Maybe(runt
 		assert(t.user_index >= 1)
 		data := (^T)(&t.user_args[0])^
 		fn(data)
-		destroy(t)
 	}
 	t := create(thread_proc, priority)
 	t.data = rawptr(fn)
+	t.flags += {.Auto_Cleanup}
 	t.user_index = 1
 	data := data
 	mem.copy(&t.user_args[0], &data, size_of(data))
@@ -122,10 +129,10 @@ run_with_poly_data2 :: proc(arg1: $T1, arg2: $T2, fn: proc(T1, T2), init_context
 		arg1 := (^T1)(&t.user_args[0])^
 		arg2 := (^T2)(&t.user_args[1])^
 		fn(arg1, arg2)
-		destroy(t)
 	}
 	t := create(thread_proc, priority)
 	t.data = rawptr(fn)
+	t.flags += {.Auto_Cleanup}
 	t.user_index = 2
 	arg1, arg2 := arg1, arg2
 	mem.copy(&t.user_args[0], &arg1, size_of(arg1))
@@ -145,10 +152,10 @@ run_with_poly_data3 :: proc(arg1: $T1, arg2: $T2, arg3: $T3, fn: proc(arg1: T1, 
 		arg2 := (^T2)(&t.user_args[1])^
 		arg3 := (^T3)(&t.user_args[2])^
 		fn(arg1, arg2, arg3)
-		destroy(t)
 	}
 	t := create(thread_proc, priority)
 	t.data = rawptr(fn)
+	t.flags += {.Auto_Cleanup}
 	t.user_index = 3
 	arg1, arg2, arg3 := arg1, arg2, arg3
 	mem.copy(&t.user_args[0], &arg1, size_of(arg1))
@@ -169,10 +176,10 @@ run_with_poly_data4 :: proc(arg1: $T1, arg2: $T2, arg3: $T3, arg4: $T4, fn: proc
 		arg3 := (^T3)(&t.user_args[2])^
 		arg4 := (^T4)(&t.user_args[3])^
 		fn(arg1, arg2, arg3, arg4)
-		destroy(t)
 	}
 	t := create(thread_proc, priority)
 	t.data = rawptr(fn)
+	t.flags += {.Auto_Cleanup}
 	t.user_index = 4
 	arg1, arg2, arg3, arg4 := arg1, arg2, arg3, arg4
 	mem.copy(&t.user_args[0], &arg1, size_of(arg1))
