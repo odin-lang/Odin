@@ -80,6 +80,7 @@ run :: proc(fn: proc(), init_context: Maybe(runtime.Context) = nil, priority := 
 		fn()
 	}
 	t := create(thread_proc, priority)
+	t.data = rawptr(fn)
 	t.init_context = init_context
 	if auto_cleanup {
 		t.flags += {.Auto_Cleanup}
