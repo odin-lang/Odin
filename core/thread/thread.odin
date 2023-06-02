@@ -207,3 +207,24 @@ run_with_poly_data4 :: proc(arg1: $T1, arg2: $T2, arg3: $T3, arg4: $T4, fn: proc
 	start(t)
 	return t
 }
+
+// NOTE(ftphikari): Keeping these here for backwards compatibility for a while.
+create_and_start_with_data :: proc(data: rawptr, fn: proc(data: rawptr), init_context: Maybe(runtime.Context) = nil, priority := Thread_Priority.Normal) -> ^Thread {
+	return run_with_data(data, fn, init_context, priority, false)
+}
+
+create_and_start_with_poly_data :: proc(data: $T, fn: proc(data: T), init_context: Maybe(runtime.Context) = nil, priority := Thread_Priority.Normal) -> ^Thread {
+	return run_with_poly_data(data, fn, init_context, priority, false)
+}
+
+create_and_start_with_poly_data2 :: proc(arg1: $T1, arg2: $T2, fn: proc(T1, T2), init_context: Maybe(runtime.Context) = nil, priority := Thread_Priority.Normal) -> ^Thread {
+	return run_with_poly_data2(arg1, arg2, fn, init_context, priority, false)
+}
+
+create_and_start_with_poly_data3 :: proc(arg1: $T1, arg2: $T2, arg3: $T3, fn: proc(arg1: T1, arg2: T2, arg3: T3), init_context: Maybe(runtime.Context) = nil, priority := Thread_Priority.Normal) -> ^Thread {
+	return run_with_poly_data3(arg1, arg2, arg3, fn, init_context, priority, false)
+}
+
+create_and_start_with_poly_data4 :: proc(arg1: $T1, arg2: $T2, arg3: $T3, arg4: $T4, fn: proc(arg1: T1, arg2: T2, arg3: T3, arg4: T4), init_context: Maybe(runtime.Context) = nil, priority := Thread_Priority.Normal, auto_cleanup := true) -> ^Thread {
+	return run_with_poly_data4(arg1, arg2, arg3, arg4, fn, init_context, priority, false)
+}
