@@ -272,7 +272,7 @@ test_x25519 :: proc(t: ^testing.T) {
 	// Local copy of this so that the base point doesn't need to be exported.
 	_BASE_POINT: [32]byte = {
 		9, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-		0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0
+		0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
 	}
 
 	test_vectors := [?]TestECDH {

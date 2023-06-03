@@ -38,7 +38,7 @@ GLOBALSINDEX  :: -10002
 ** space (and to reserve some numbers for pseudo-indices).
 ** (It must fit into max(size_t)/32.)
 */
-MAXSTACK :: 1000000 when size_of(rawptr) == 4 else 15000
+MAXSTACK :: 1000000
 
 
 /*

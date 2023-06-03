@@ -6,6 +6,7 @@ Ordering :: enum {
 	Greater = +1,
 }
 
+@(require_results)
 cmp :: proc(a, b: $E) -> Ordering where ORD(E) {
 	switch {
 	case a < b:
@@ -16,6 +17,7 @@ cmp :: proc(a, b: $E) -> Ordering where ORD(E) {
 	return .Equal
 }
 
+@(require_results)
 cmp_proc :: proc($E: typeid) -> (proc(E, E) -> Ordering) where ORD(E) {
 	return proc(a, b: E) -> Ordering {
 		switch {
@@ -144,6 +146,7 @@ stable_sort_by_cmp :: proc(data: $T/[]$E, cmp: proc(i, j: E) -> Ordering) {
 	}
 }
 
+@(require_results)
 is_sorted :: proc(array: $T/[]$E) -> bool where ORD(E) {
 	for i := len(array)-1; i > 0; i -= 1 {
 		if array[i] < array[i-1] {
@@ -153,6 +156,7 @@ is_sorted :: proc(array: $T/[]$E) -> bool where ORD(E) {
 	return true
 }
 
+@(require_results)
 is_sorted_by :: proc(array: $T/[]$E, less: proc(i, j: E) -> bool) -> bool {
 	for i := len(array)-1; i > 0; i -= 1 {
 		if less(array[i], array[i-1]) {
@@ -163,6 +167,8 @@ is_sorted_by :: proc(array: $T/[]$E, less: proc(i, j: E) -> bool) -> bool {
 }
 
 is_sorted_by_cmp :: is_sorted_cmp
+
+@(require_results)
 is_sorted_cmp :: proc(array: $T/[]$E, cmp: proc(i, j: E) -> Ordering) -> bool {
 	for i := len(array)-1; i > 0; i -= 1 {
 		if cmp(array[i], array[i-1]) == .Less {
@@ -215,6 +221,7 @@ reverse_sort_by_key :: proc(data: $T/[]$E, key: proc(E) -> $K) where ORD(K) {
 	})
 }
 
+@(require_results)
 is_sorted_by_key :: proc(array: $T/[]$E, key: proc(E) -> $K) -> bool where ORD(K) {
 	for i := len(array)-1; i > 0; i -= 1 {
 		if key(array[i]) < key(array[i-1]) {
@@ -224,7 +231,7 @@ is_sorted_by_key :: proc(array: $T/[]$E, key: proc(E) -> $K) -> bool where ORD(K
 	return true
 }
 
-@(private)
+@(private, require_results)
 _max_depth :: proc(n: int) -> (depth: int) { // 2*ceil(log2(n+1))
 	for i := n; i > 0; i >>= 1 {
 		depth += 1

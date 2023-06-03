@@ -38,23 +38,28 @@ DEG_PER_RAD :: 360.0/TAU
 @private ELEM_TYPE :: intrinsics.type_elem_type
 
 
-scalar_dot :: proc(a, b: $T) -> T where IS_FLOAT(T), !IS_ARRAY(T) {
+@(require_results)
+scalar_dot :: proc "contextless" (a, b: $T) -> T where IS_FLOAT(T), !IS_ARRAY(T) {
 	return a * b
 }
 
-vector_dot :: proc(a, b: $T/[$N]$E) -> (c: E) where IS_NUMERIC(E) #no_bounds_check {
+@(require_results)
+vector_dot :: proc "contextless" (a, b: $T/[$N]$E) -> (c: E) where IS_NUMERIC(E) #no_bounds_check {
 	for i in 0..<N {
 		c += a[i] * b[i]
 	}
 	return
 }
-quaternion64_dot :: proc(a, b: $T/quaternion64) -> (c: f16) {
+@(require_results)
+quaternion64_dot :: proc "contextless" (a, b: $T/quaternion64) -> (c: f16) {
 	return a.w*a.w + a.x*b.x + a.y*b.y + a.z*b.z
 }
-quaternion128_dot :: proc(a, b: $T/quaternion128) -> (c: f32) {
+@(require_results)
+quaternion128_dot :: proc "contextless" (a, b: $T/quaternion128) -> (c: f32) {
 	return a.w*a.w + a.x*b.x + a.y*b.y + a.z*b.z
 }
-quaternion256_dot :: proc(a, b: $T/quaternion256) -> (c: f64) {
+@(require_results)
+quaternion256_dot :: proc "contextless" (a, b: $T/quaternion256) -> (c: f64) {
 	return a.w*a.w + a.x*b.x + a.y*b.y + a.z*b.z
 }
 
@@ -63,27 +68,32 @@ dot :: proc{scalar_dot, vector_dot, quaternion64_dot, quaternion128_dot, quatern
 inner_product :: dot
 outer_product :: builtin.outer_product
 
-quaternion_inverse :: proc(q: $Q) -> Q where IS_QUATERNION(Q) {
+@(require_results)
+quaternion_inverse :: proc "contextless" (q: $Q) -> Q where IS_QUATERNION(Q) {
 	return conj(q) * quaternion(1.0/dot(q, q), 0, 0, 0)
 }
 
 
-scalar_cross :: proc(a, b: $T) -> T where IS_FLOAT(T), !IS_ARRAY(T) {
+@(require_results)
+scalar_cross :: proc "contextless" (a, b: $T) -> T where IS_FLOAT(T), !IS_ARRAY(T) {
 	return a * b
 }
 
-vector_cross2 :: proc(a, b: $T/[2]$E) -> E where IS_NUMERIC(E) {
+@(require_results)
+vector_cross2 :: proc "contextless" (a, b: $T/[2]$E) -> E where IS_NUMERIC(E) {
 	return a[0]*b[1] - b[0]*a[1]
 }
 
-vector_cross3 :: proc(a, b: $T/[3]$E) -> (c: T) where IS_NUMERIC(E) {
+@(require_results)
+vector_cross3 :: proc "contextless" (a, b: $T/[3]$E) -> (c: T) where IS_NUMERIC(E) {
 	c[0] = a[1]*b[2] - b[1]*a[2]
 	c[1] = a[2]*b[0] - b[2]*a[0]
 	c[2] = a[0]*b[1] - b[0]*a[1]
 	return
 }
 
-quaternion_cross :: proc(q1, q2: $Q) -> (q3: Q) where IS_QUATERNION(Q) {
+@(require_results)
+quaternion_cross :: proc "contextless" (q1, q2: $Q) -> (q3: Q) where IS_QUATERNION(Q) {
 	q3.x = q1.w * q2.x + q1.x * q2.w + q1.y * q2.z - q1.z * q2.y
 	q3.y = q1.w * q2.y + q1.y * q2.w + q1.z * q2.x - q1.x * q2.z
 	q3.z = q1.w * q2.z + q1.z * q2.w + q1.x * q2.y - q1.y * q2.x
@@ -94,49 +104,59 @@ quaternion_cross :: proc(q1, q2: $Q) -> (q3: Q) where IS_QUATERNION(Q) {
 vector_cross :: proc{scalar_cross, vector_cross2, vector_cross3}
 cross :: proc{scalar_cross, vector_cross2, vector_cross3, quaternion_cross}
 
-vector_normalize :: proc(v: $T/[$N]$E) -> T where IS_FLOAT(E) {
+@(require_results)
+vector_normalize :: proc "contextless" (v: $T/[$N]$E) -> T where IS_FLOAT(E) {
 	return v / length(v)
 }
-quaternion_normalize :: proc(q: $Q) -> Q where IS_QUATERNION(Q) {
+@(require_results)
+quaternion_normalize :: proc "contextless" (q: $Q) -> Q where IS_QUATERNION(Q) {
 	return q/abs(q)
 }
 normalize :: proc{vector_normalize, quaternion_normalize}
 
-vector_normalize0 :: proc(v: $T/[$N]$E) -> T where IS_FLOAT(E) {
+@(require_results)
+vector_normalize0 :: proc "contextless" (v: $T/[$N]$E) -> T where IS_FLOAT(E) {
 	m := length(v)
 	return 0 if m == 0 else v/m
 }
-quaternion_normalize0 :: proc(q: $Q) -> Q  where IS_QUATERNION(Q) {
+@(require_results)
+quaternion_normalize0 :: proc "contextless" (q: $Q) -> Q  where IS_QUATERNION(Q) {
 	m := abs(q)
 	return 0 if m == 0 else q/m
 }
 normalize0 :: proc{vector_normalize0, quaternion_normalize0}
 
 
-vector_length :: proc(v: $T/[$N]$E) -> E where IS_FLOAT(E) {
+@(require_results)
+vector_length :: proc "contextless" (v: $T/[$N]$E) -> E where IS_FLOAT(E) {
 	return math.sqrt(dot(v, v))
 }
 
-vector_length2 :: proc(v: $T/[$N]$E) -> E where IS_NUMERIC(E) {
+@(require_results)
+vector_length2 :: proc "contextless" (v: $T/[$N]$E) -> E where IS_NUMERIC(E) {
 	return dot(v, v)
 }
 
-quaternion_length :: proc(q: $Q) -> Q where IS_QUATERNION(Q) {
+@(require_results)
+quaternion_length :: proc "contextless" (q: $Q) -> Q where IS_QUATERNION(Q) {
 	return abs(q)
 }
 
-quaternion_length2 :: proc(q: $Q) -> Q where IS_QUATERNION(Q) {
+@(require_results)
+quaternion_length2 :: proc "contextless" (q: $Q) -> Q where IS_QUATERNION(Q) {
 	return dot(q, q)
 }
 
-scalar_triple_product :: proc(a, b, c: $T/[$N]$E) -> E where IS_NUMERIC(E) {
+@(require_results)
+scalar_triple_product :: proc "contextless" (a, b, c: $T/[$N]$E) -> E where IS_NUMERIC(E) {
 	// a . (b x c)
 	// b . (c x a)
 	// c . (a x b)
 	return dot(a, cross(b, c))
 }
 
-vector_triple_product :: proc(a, b, c: $T/[$N]$E) -> T where IS_NUMERIC(E) {
+@(require_results)
+vector_triple_product :: proc "contextless" (a, b, c: $T/[$N]$E) -> T where IS_NUMERIC(E) {
 	// a x (b x c)
 	// (a . c)b - (a . b)c
 	return cross(a, cross(b, c))
@@ -146,11 +166,13 @@ vector_triple_product :: proc(a, b, c: $T/[$N]$E) -> T where IS_NUMERIC(E) {
 length :: proc{vector_length, quaternion_length}
 length2 :: proc{vector_length2, quaternion_length2}
 
-projection :: proc(x, normal: $T/[$N]$E) -> T where IS_NUMERIC(E) {
+@(require_results)
+projection :: proc "contextless" (x, normal: $T/[$N]$E) -> T where IS_NUMERIC(E) {
 	return dot(x, normal) / dot(normal, normal) * normal
 }
 
-identity :: proc($T: typeid/[$N][N]$E) -> (m: T) #no_bounds_check {
+@(require_results)
+identity :: proc "contextless" ($T: typeid/[$N][N]$E) -> (m: T) #no_bounds_check {
 	for i in 0..<N {
 		m[i][i] = E(1)
 	}
@@ -160,32 +182,38 @@ identity :: proc($T: typeid/[$N][N]$E) -> (m: T) #no_bounds_check {
 trace :: builtin.matrix_trace
 transpose :: builtin.transpose
 
-matrix_mul :: proc(a, b: $M/matrix[$N, N]$E) -> (c: M)
+@(require_results)
+matrix_mul :: proc "contextless" (a, b: $M/matrix[$N, N]$E) -> (c: M)
 	where !IS_ARRAY(E), IS_NUMERIC(E) #no_bounds_check {
 	return a * b
 }
 
-matrix_comp_mul :: proc(a, b: $M/matrix[$I, $J]$E) -> (c: M)
+@(require_results)
+matrix_comp_mul :: proc "contextless" (a, b: $M/matrix[$I, $J]$E) -> (c: M)
 	where !IS_ARRAY(E), IS_NUMERIC(E) #no_bounds_check {
 	return hadamard_product(a, b)
 }
 
-matrix_mul_differ :: proc(a: $A/matrix[$I, $J]$E, b: $B/matrix[J, $K]E) -> (c: matrix[I, K]E)
+@(require_results)
+matrix_mul_differ :: proc "contextless" (a: $A/matrix[$I, $J]$E, b: $B/matrix[J, $K]E) -> (c: matrix[I, K]E)
 	where !IS_ARRAY(E), IS_NUMERIC(E), I != K #no_bounds_check {
 	return a * b
 }
 
 
-matrix_mul_vector :: proc(a: $A/matrix[$I, $J]$E, b: $B/[J]E) -> (c: B)
+@(require_results)
+matrix_mul_vector :: proc "contextless" (a: $A/matrix[$I, $J]$E, b: $B/[J]E) -> (c: B)
 	where !IS_ARRAY(E), IS_NUMERIC(E) #no_bounds_check {
 	return a * b
 }
 
-quaternion_mul_quaternion :: proc(q1, q2: $Q) -> Q where IS_QUATERNION(Q) {
+@(require_results)
+quaternion_mul_quaternion :: proc "contextless" (q1, q2: $Q) -> Q where IS_QUATERNION(Q) {
 	return q1 * q2
 }
 
-quaternion64_mul_vector3 :: proc(q: $Q/quaternion64, v: $V/[3]$F/f16) -> V {
+@(require_results)
+quaternion64_mul_vector3 :: proc "contextless" (q: $Q/quaternion64, v: $V/[3]$F/f16) -> V {
 	Raw_Quaternion :: struct {xyz: [3]f16, r: f16}
 
 	q := transmute(Raw_Quaternion)q
@@ -194,7 +222,8 @@ quaternion64_mul_vector3 :: proc(q: $Q/quaternion64, v: $V/[3]$F/f16) -> V {
 	t := cross(2*q.xyz, v)
 	return V(v + q.r*t + cross(q.xyz, t))
 }
-quaternion128_mul_vector3 :: proc(q: $Q/quaternion128, v: $V/[3]$F/f32) -> V {
+@(require_results)
+quaternion128_mul_vector3 :: proc "contextless" (q: $Q/quaternion128, v: $V/[3]$F/f32) -> V {
 	Raw_Quaternion :: struct {xyz: [3]f32, r: f32}
 
 	q := transmute(Raw_Quaternion)q
@@ -203,7 +232,8 @@ quaternion128_mul_vector3 :: proc(q: $Q/quaternion128, v: $V/[3]$F/f32) -> V {
 	t := cross(2*q.xyz, v)
 	return V(v + q.r*t + cross(q.xyz, t))
 }
-quaternion256_mul_vector3 :: proc(q: $Q/quaternion256, v: $V/[3]$F/f64) -> V {
+@(require_results)
+quaternion256_mul_vector3 :: proc "contextless" (q: $Q/quaternion256, v: $V/[3]$F/f64) -> V {
 	Raw_Quaternion :: struct {xyz: [3]f64, r: f64}
 
 	q := transmute(Raw_Quaternion)q
@@ -224,10 +254,12 @@ mul :: proc{
 	quaternion_mul_quaternion,
 }
 
-vector_to_ptr :: proc(v: ^$V/[$N]$E) -> ^E where IS_NUMERIC(E), N > 0 #no_bounds_check {
+@(require_results)
+vector_to_ptr :: proc "contextless" (v: ^$V/[$N]$E) -> ^E where IS_NUMERIC(E), N > 0 #no_bounds_check {
 	return &v[0]
 }
-matrix_to_ptr :: proc(m: ^$A/matrix[$I, $J]$E) -> ^E where IS_NUMERIC(E), I > 0, J > 0 #no_bounds_check {
+@(require_results)
+matrix_to_ptr :: proc "contextless" (m: ^$A/matrix[$I, $J]$E) -> ^E where IS_NUMERIC(E), I > 0, J > 0 #no_bounds_check {
 	return &m[0, 0]
 }
 
@@ -239,7 +271,8 @@ to_ptr :: proc{vector_to_ptr, matrix_to_ptr}
 
 // Splines
 
-vector_slerp :: proc(x, y: $T/[$N]$E, a: E) -> T {
+@(require_results)
+vector_slerp :: proc "contextless" (x, y: $T/[$N]$E, a: E) -> T {
 	cos_alpha := dot(x, y)
 	alpha := math.acos(cos_alpha)
 	sin_alpha := math.sin(alpha)
@@ -250,7 +283,8 @@ vector_slerp :: proc(x, y: $T/[$N]$E, a: E) -> T {
 	return x * t1 + y * t2
 }
 
-catmull_rom :: proc(v1, v2, v3, v4: $T/[$N]$E, s: E) -> T {
+@(require_results)
+catmull_rom :: proc "contextless" (v1, v2, v3, v4: $T/[$N]$E, s: E) -> T {
 	s2 := s*s
 	s3 := s2*s
 
@@ -262,7 +296,8 @@ catmull_rom :: proc(v1, v2, v3, v4: $T/[$N]$E, s: E) -> T {
 	return (f1 * v1 + f2 * v2 + f3 * v3 + f4 * v4) * 0.5
 }
 
-hermite :: proc(v1, t1, v2, t2: $T/[$N]$E, s: E) -> T {
+@(require_results)
+hermite :: proc "contextless" (v1, t1, v2, t2: $T/[$N]$E, s: E) -> T {
 	s2 := s*s
 	s3 := s2*s
 
@@ -274,20 +309,23 @@ hermite :: proc(v1, t1, v2, t2: $T/[$N]$E, s: E) -> T {
 	return f1 * v1 + f2 * v2 + f3 * t1 + f4 * t2
 }
 
-cubic :: proc(v1, v2, v3, v4: $T/[$N]$E, s: E) -> T {
+@(require_results)
+cubic :: proc "contextless" (v1, v2, v3, v4: $T/[$N]$E, s: E) -> T {
 	return ((v1 * s + v2) * s + v3) * s + v4
 }
 
 
 
-array_cast :: proc(v: $A/[$N]$T, $Elem_Type: typeid) -> (w: [N]Elem_Type) #no_bounds_check {
+@(require_results)
+array_cast :: proc "contextless" (v: $A/[$N]$T, $Elem_Type: typeid) -> (w: [N]Elem_Type) #no_bounds_check {
 	for i in 0..<N {
 		w[i] = Elem_Type(v[i])
 	}
 	return
 }
 
-matrix_cast :: proc(v: $A/matrix[$M, $N]$T, $Elem_Type: typeid) -> (w: matrix[M, N]Elem_Type) #no_bounds_check {
+@(require_results)
+matrix_cast :: proc "contextless" (v: $A/matrix[$M, $N]$T, $Elem_Type: typeid) -> (w: matrix[M, N]Elem_Type) #no_bounds_check {
 	for j in 0..<N {
 		for i in 0..<M {
 			w[i, j] = Elem_Type(v[i, j])
@@ -296,24 +334,24 @@ matrix_cast :: proc(v: $A/matrix[$M, $N]$T, $Elem_Type: typeid) -> (w: matrix[M,
 	return
 }
 
-to_f32  :: #force_inline proc(v: $A/[$N]$T) -> [N]f32  { return array_cast(v, f32)  }
-to_f64  :: #force_inline proc(v: $A/[$N]$T) -> [N]f64  { return array_cast(v, f64)  }
+@(require_results) to_f32  :: #force_inline proc(v: $A/[$N]$T) -> [N]f32  { return array_cast(v, f32)  }
+@(require_results) to_f64  :: #force_inline proc(v: $A/[$N]$T) -> [N]f64  { return array_cast(v, f64)  }
 
-to_i8   :: #force_inline proc(v: $A/[$N]$T) -> [N]i8   { return array_cast(v, i8)   }
-to_i16  :: #force_inline proc(v: $A/[$N]$T) -> [N]i16  { return array_cast(v, i16)  }
-to_i32  :: #force_inline proc(v: $A/[$N]$T) -> [N]i32  { return array_cast(v, i32)  }
-to_i64  :: #force_inline proc(v: $A/[$N]$T) -> [N]i64  { return array_cast(v, i64)  }
-to_int  :: #force_inline proc(v: $A/[$N]$T) -> [N]int  { return array_cast(v, int)  }
+@(require_results) to_i8   :: #force_inline proc(v: $A/[$N]$T) -> [N]i8   { return array_cast(v, i8)   }
+@(require_results) to_i16  :: #force_inline proc(v: $A/[$N]$T) -> [N]i16  { return array_cast(v, i16)  }
+@(require_results) to_i32  :: #force_inline proc(v: $A/[$N]$T) -> [N]i32  { return array_cast(v, i32)  }
+@(require_results) to_i64  :: #force_inline proc(v: $A/[$N]$T) -> [N]i64  { return array_cast(v, i64)  }
+@(require_results) to_int  :: #force_inline proc(v: $A/[$N]$T) -> [N]int  { return array_cast(v, int)  }
 
-to_u8   :: #force_inline proc(v: $A/[$N]$T) -> [N]u8   { return array_cast(v, u8)   }
-to_u16  :: #force_inline proc(v: $A/[$N]$T) -> [N]u16  { return array_cast(v, u16)  }
-to_u32  :: #force_inline proc(v: $A/[$N]$T) -> [N]u32  { return array_cast(v, u32)  }
-to_u64  :: #force_inline proc(v: $A/[$N]$T) -> [N]u64  { return array_cast(v, u64)  }
-to_uint :: #force_inline proc(v: $A/[$N]$T) -> [N]uint { return array_cast(v, uint) }
+@(require_results) to_u8   :: #force_inline proc(v: $A/[$N]$T) -> [N]u8   { return array_cast(v, u8)   }
+@(require_results) to_u16  :: #force_inline proc(v: $A/[$N]$T) -> [N]u16  { return array_cast(v, u16)  }
+@(require_results) to_u32  :: #force_inline proc(v: $A/[$N]$T) -> [N]u32  { return array_cast(v, u32)  }
+@(require_results) to_u64  :: #force_inline proc(v: $A/[$N]$T) -> [N]u64  { return array_cast(v, u64)  }
+@(require_results) to_uint :: #force_inline proc(v: $A/[$N]$T) -> [N]uint { return array_cast(v, uint) }
 
-to_complex32     :: #force_inline proc(v: $A/[$N]$T) -> [N]complex32     { return array_cast(v, complex32)     }
-to_complex64     :: #force_inline proc(v: $A/[$N]$T) -> [N]complex64     { return array_cast(v, complex64)     }
-to_complex128    :: #force_inline proc(v: $A/[$N]$T) -> [N]complex128    { return array_cast(v, complex128)    }
-to_quaternion64  :: #force_inline proc(v: $A/[$N]$T) -> [N]quaternion64  { return array_cast(v, quaternion64)  }
-to_quaternion128 :: #force_inline proc(v: $A/[$N]$T) -> [N]quaternion128 { return array_cast(v, quaternion128) }
-to_quaternion256 :: #force_inline proc(v: $A/[$N]$T) -> [N]quaternion256 { return array_cast(v, quaternion256) }
+@(require_results) to_complex32     :: #force_inline proc(v: $A/[$N]$T) -> [N]complex32     { return array_cast(v, complex32)     }
+@(require_results) to_complex64     :: #force_inline proc(v: $A/[$N]$T) -> [N]complex64     { return array_cast(v, complex64)     }
+@(require_results) to_complex128    :: #force_inline proc(v: $A/[$N]$T) -> [N]complex128    { return array_cast(v, complex128)    }
+@(require_results) to_quaternion64  :: #force_inline proc(v: $A/[$N]$T) -> [N]quaternion64  { return array_cast(v, quaternion64)  }
+@(require_results) to_quaternion128 :: #force_inline proc(v: $A/[$N]$T) -> [N]quaternion128 { return array_cast(v, quaternion128) }
+@(require_results) to_quaternion256 :: #force_inline proc(v: $A/[$N]$T) -> [N]quaternion256 { return array_cast(v, quaternion256) }

@@ -34,6 +34,12 @@ when ODIN_OS == .Windows {
 
 CAMetalLayer :: struct {}
 
+MTLBuffer_id       :: rawptr
+MTLTexture_id      :: rawptr
+MTLSharedEvent_id  :: rawptr
+MTLDevice_id       :: rawptr
+MTLCommandQueue_id :: rawptr
+
 /********************************/
 
 Extent2D :: struct {
@@ -2860,6 +2866,217 @@ DisplayPresentInfoKHR :: struct {
 	persistent: b32,
 }
 
+QueueFamilyQueryResultStatusPropertiesKHR :: struct {
+	sType:                    StructureType,
+	pNext:                    rawptr,
+	queryResultStatusSupport: b32,
+}
+
+QueueFamilyVideoPropertiesKHR :: struct {
+	sType:                StructureType,
+	pNext:                rawptr,
+	videoCodecOperations: VideoCodecOperationFlagsKHR,
+}
+
+VideoProfileInfoKHR :: struct {
+	sType:               StructureType,
+	pNext:               rawptr,
+	videoCodecOperation: VideoCodecOperationFlagsKHR,
+	chromaSubsampling:   VideoChromaSubsamplingFlagsKHR,
+	lumaBitDepth:        VideoComponentBitDepthFlagsKHR,
+	chromaBitDepth:      VideoComponentBitDepthFlagsKHR,
+}
+
+VideoProfileListInfoKHR :: struct {
+	sType:        StructureType,
+	pNext:        rawptr,
+	profileCount: u32,
+	pProfiles:    [^]VideoProfileInfoKHR,
+}
+
+VideoCapabilitiesKHR :: struct {
+	sType:                             StructureType,
+	pNext:                             rawptr,
+	flags:                             VideoCapabilityFlagsKHR,
+	minBitstreamBufferOffsetAlignment: DeviceSize,
+	minBitstreamBufferSizeAlignment:   DeviceSize,
+	pictureAccessGranularity:          Extent2D,
+	minCodedExtent:                    Extent2D,
+	maxCodedExtent:                    Extent2D,
+	maxDpbSlots:                       u32,
+	maxActiveReferencePictures:        u32,
+	stdHeaderVersion:                  ExtensionProperties,
+}
+
+PhysicalDeviceVideoFormatInfoKHR :: struct {
+	sType:      StructureType,
+	pNext:      rawptr,
+	imageUsage: ImageUsageFlags,
+}
+
+VideoFormatPropertiesKHR :: struct {
+	sType:            StructureType,
+	pNext:            rawptr,
+	format:           Format,
+	componentMapping: ComponentMapping,
+	imageCreateFlags: ImageCreateFlags,
+	imageType:        ImageType,
+	imageTiling:      ImageTiling,
+	imageUsageFlags:  ImageUsageFlags,
+}
+
+VideoPictureResourceInfoKHR :: struct {
+	sType:            StructureType,
+	pNext:            rawptr,
+	codedOffset:      Offset2D,
+	codedExtent:      Extent2D,
+	baseArrayLayer:   u32,
+	imageViewBinding: ImageView,
+}
+
+VideoReferenceSlotInfoKHR :: struct {
+	sType:            StructureType,
+	pNext:            rawptr,
+	slotIndex:        i32,
+	pPictureResource: ^VideoPictureResourceInfoKHR,
+}
+
+VideoSessionMemoryRequirementsKHR :: struct {
+	sType:              StructureType,
+	pNext:              rawptr,
+	memoryBindIndex:    u32,
+	memoryRequirements: MemoryRequirements,
+}
+
+BindVideoSessionMemoryInfoKHR :: struct {
+	sType:           StructureType,
+	pNext:           rawptr,
+	memoryBindIndex: u32,
+	memory:          DeviceMemory,
+	memoryOffset:    DeviceSize,
+	memorySize:      DeviceSize,
+}
+
+VideoSessionCreateInfoKHR :: struct {
+	sType:                      StructureType,
+	pNext:                      rawptr,
+	queueFamilyIndex:           u32,
+	flags:                      VideoSessionCreateFlagsKHR,
+	pVideoProfile:              ^VideoProfileInfoKHR,
+	pictureFormat:              Format,
+	maxCodedExtent:             Extent2D,
+	referencePictureFormat:     Format,
+	maxDpbSlots:                u32,
+	maxActiveReferencePictures: u32,
+	pStdHeaderVersion:          ^ExtensionProperties,
+}
+
+VideoSessionParametersCreateInfoKHR :: struct {
+	sType:                          StructureType,
+	pNext:                          rawptr,
+	flags:                          VideoSessionParametersCreateFlagsKHR,
+	videoSessionParametersTemplate: VideoSessionParametersKHR,
+	videoSession:                   VideoSessionKHR,
+}
+
+VideoSessionParametersUpdateInfoKHR :: struct {
+	sType:               StructureType,
+	pNext:               rawptr,
+	updateSequenceCount: u32,
+}
+
+VideoBeginCodingInfoKHR :: struct {
+	sType:                  StructureType,
+	pNext:                  rawptr,
+	flags:                  VideoBeginCodingFlagsKHR,
+	videoSession:           VideoSessionKHR,
+	videoSessionParameters: VideoSessionParametersKHR,
+	referenceSlotCount:     u32,
+	pReferenceSlots:        [^]VideoReferenceSlotInfoKHR,
+}
+
+VideoEndCodingInfoKHR :: struct {
+	sType: StructureType,
+	pNext: rawptr,
+	flags: VideoEndCodingFlagsKHR,
+}
+
+VideoCodingControlInfoKHR :: struct {
+	sType: StructureType,
+	pNext: rawptr,
+	flags: VideoCodingControlFlagsKHR,
+}
+
+VideoDecodeCapabilitiesKHR :: struct {
+	sType: StructureType,
+	pNext: rawptr,
+	flags: VideoDecodeCapabilityFlagsKHR,
+}
+
+VideoDecodeUsageInfoKHR :: struct {
+	sType:           StructureType,
+	pNext:           rawptr,
+	videoUsageHints: VideoDecodeUsageFlagsKHR,
+}
+
+VideoDecodeInfoKHR :: struct {
+	sType:               StructureType,
+	pNext:               rawptr,
+	flags:               VideoDecodeFlagsKHR,
+	srcBuffer:           Buffer,
+	srcBufferOffset:     DeviceSize,
+	srcBufferRange:      DeviceSize,
+	dstPictureResource:  VideoPictureResourceInfoKHR,
+	pSetupReferenceSlot: ^VideoReferenceSlotInfoKHR,
+	referenceSlotCount:  u32,
+	pReferenceSlots:     [^]VideoReferenceSlotInfoKHR,
+}
+
+VideoDecodeH264ProfileInfoKHR :: struct {
+	sType:         StructureType,
+	pNext:         rawptr,
+	stdProfileIdc: VideoH264ProfileIdc,
+	pictureLayout: VideoDecodeH264PictureLayoutFlagsKHR,
+}
+
+VideoDecodeH264CapabilitiesKHR :: struct {
+	sType:                  StructureType,
+	pNext:                  rawptr,
+	maxLevelIdc:            VideoH264LevelIdc,
+	fieldOffsetGranularity: Offset2D,
+}
+
+VideoDecodeH264SessionParametersAddInfoKHR :: struct {
+	sType:       StructureType,
+	pNext:       rawptr,
+	stdSPSCount: u32,
+	pStdSPSs:    [^]VideoH264SequenceParameterSet,
+	stdPPSCount: u32,
+	pStdPPSs:    [^]VideoH264PictureParameterSet,
+}
+
+VideoDecodeH264SessionParametersCreateInfoKHR :: struct {
+	sType:              StructureType,
+	pNext:              rawptr,
+	maxStdSPSCount:     u32,
+	maxStdPPSCount:     u32,
+	pParametersAddInfo: ^VideoDecodeH264SessionParametersAddInfoKHR,
+}
+
+VideoDecodeH264PictureInfoKHR :: struct {
+	sType:           StructureType,
+	pNext:           rawptr,
+	pStdPictureInfo: ^VideoDecodeH264PictureInfo,
+	sliceCount:      u32,
+	pSliceOffsets:   [^]u32,
+}
+
+VideoDecodeH264DpbSlotInfoKHR :: struct {
+	sType:             StructureType,
+	pNext:             rawptr,
+	pStdReferenceInfo: ^VideoDecodeH264ReferenceInfo,
+}
+
 RenderingFragmentShadingRateAttachmentInfoKHR :: struct {
 	sType:                          StructureType,
 	pNext:                          rawptr,
@@ -3089,6 +3306,52 @@ PhysicalDeviceShaderClockFeaturesKHR :: struct {
 	shaderDeviceClock:   b32,
 }
 
+VideoDecodeH265ProfileInfoKHR :: struct {
+	sType:         StructureType,
+	pNext:         rawptr,
+	stdProfileIdc: VideoH265ProfileIdc,
+}
+
+VideoDecodeH265CapabilitiesKHR :: struct {
+	sType:       StructureType,
+	pNext:       rawptr,
+	maxLevelIdc: VideoH265LevelIdc,
+}
+
+VideoDecodeH265SessionParametersAddInfoKHR :: struct {
+	sType:       StructureType,
+	pNext:       rawptr,
+	stdVPSCount: u32,
+	pStdVPSs:    [^]VideoH265VideoParameterSet,
+	stdSPSCount: u32,
+	pStdSPSs:    [^]VideoH265SequenceParameterSet,
+	stdPPSCount: u32,
+	pStdPPSs:    [^]VideoH265PictureParameterSet,
+}
+
+VideoDecodeH265SessionParametersCreateInfoKHR :: struct {
+	sType:              StructureType,
+	pNext:              rawptr,
+	maxStdVPSCount:     u32,
+	maxStdSPSCount:     u32,
+	maxStdPPSCount:     u32,
+	pParametersAddInfo: ^VideoDecodeH265SessionParametersAddInfoKHR,
+}
+
+VideoDecodeH265PictureInfoKHR :: struct {
+	sType:                StructureType,
+	pNext:                rawptr,
+	pStdPictureInfo:      ^VideoDecodeH265PictureInfo,
+	sliceSegmentCount:    u32,
+	pSliceSegmentOffsets: [^]u32,
+}
+
+VideoDecodeH265DpbSlotInfoKHR :: struct {
+	sType:             StructureType,
+	pNext:             rawptr,
+	pStdReferenceInfo: ^VideoDecodeH265ReferenceInfo,
+}
+
 DeviceQueueGlobalPriorityCreateInfoKHR :: struct {
 	sType:          StructureType,
 	pNext:          rawptr,
@@ -3225,6 +3488,22 @@ PipelineExecutableInternalRepresentationKHR :: struct {
 	pData:       rawptr,
 }
 
+MemoryMapInfoKHR :: struct {
+	sType:  StructureType,
+	pNext:  rawptr,
+	flags:  MemoryMapFlags,
+	memory: DeviceMemory,
+	offset: DeviceSize,
+	size:   DeviceSize,
+}
+
+MemoryUnmapInfoKHR :: struct {
+	sType:  StructureType,
+	pNext:  rawptr,
+	flags:  MemoryUnmapFlagsKHR,
+	memory: DeviceMemory,
+}
+
 PipelineLibraryCreateInfoKHR :: struct {
 	sType:        StructureType,
 	pNext:        rawptr,
@@ -3258,6 +3537,18 @@ CheckpointData2NV :: struct {
 	pCheckpointMarker: rawptr,
 }
 
+PhysicalDeviceFragmentShaderBarycentricFeaturesKHR :: struct {
+	sType:                     StructureType,
+	pNext:                     rawptr,
+	fragmentShaderBarycentric: b32,
+}
+
+PhysicalDeviceFragmentShaderBarycentricPropertiesKHR :: struct {
+	sType:                                           StructureType,
+	pNext:                                           rawptr,
+	triStripVertexOrderIndependentOfProvokingVertex: b32,
+}
+
 PhysicalDeviceShaderSubgroupUniformControlFlowFeaturesKHR :: struct {
 	sType:                            StructureType,
 	pNext:                            rawptr,
@@ -3271,6 +3562,36 @@ PhysicalDeviceWorkgroupMemoryExplicitLayoutFeaturesKHR :: struct {
 	workgroupMemoryExplicitLayoutScalarBlockLayout: b32,
 	workgroupMemoryExplicitLayout8BitAccess:        b32,
 	workgroupMemoryExplicitLayout16BitAccess:       b32,
+}
+
+PhysicalDeviceRayTracingMaintenance1FeaturesKHR :: struct {
+	sType:                                StructureType,
+	pNext:                                rawptr,
+	rayTracingMaintenance1:               b32,
+	rayTracingPipelineTraceRaysIndirect2: b32,
+}
+
+TraceRaysIndirectCommand2KHR :: struct {
+	raygenShaderRecordAddress:         DeviceAddress,
+	raygenShaderRecordSize:            DeviceSize,
+	missShaderBindingTableAddress:     DeviceAddress,
+	missShaderBindingTableSize:        DeviceSize,
+	missShaderBindingTableStride:      DeviceSize,
+	hitShaderBindingTableAddress:      DeviceAddress,
+	hitShaderBindingTableSize:         DeviceSize,
+	hitShaderBindingTableStride:       DeviceSize,
+	callableShaderBindingTableAddress: DeviceAddress,
+	callableShaderBindingTableSize:    DeviceSize,
+	callableShaderBindingTableStride:  DeviceSize,
+	width:                             u32,
+	height:                            u32,
+	depth:                             u32,
+}
+
+PhysicalDeviceRayTracingPositionFetchFeaturesKHR :: struct {
+	sType:                   StructureType,
+	pNext:                   rawptr,
+	rayTracingPositionFetch: b32,
 }
 
 DebugReportCallbackCreateInfoEXT :: struct {
@@ -3472,6 +3793,30 @@ PhysicalDeviceASTCDecodeFeaturesEXT :: struct {
 	sType:                    StructureType,
 	pNext:                    rawptr,
 	decodeModeSharedExponent: b32,
+}
+
+PhysicalDevicePipelineRobustnessFeaturesEXT :: struct {
+	sType:              StructureType,
+	pNext:              rawptr,
+	pipelineRobustness: b32,
+}
+
+PhysicalDevicePipelineRobustnessPropertiesEXT :: struct {
+	sType:                           StructureType,
+	pNext:                           rawptr,
+	defaultRobustnessStorageBuffers: PipelineRobustnessBufferBehaviorEXT,
+	defaultRobustnessUniformBuffers: PipelineRobustnessBufferBehaviorEXT,
+	defaultRobustnessVertexInputs:   PipelineRobustnessBufferBehaviorEXT,
+	defaultRobustnessImages:         PipelineRobustnessImageBehaviorEXT,
+}
+
+PipelineRobustnessCreateInfoEXT :: struct {
+	sType:          StructureType,
+	pNext:          rawptr,
+	storageBuffers: PipelineRobustnessBufferBehaviorEXT,
+	uniformBuffers: PipelineRobustnessBufferBehaviorEXT,
+	vertexInputs:   PipelineRobustnessBufferBehaviorEXT,
+	images:         PipelineRobustnessImageBehaviorEXT,
 }
 
 ConditionalRenderingBeginInfoEXT :: struct {
@@ -4219,12 +4564,6 @@ DrawMeshTasksIndirectCommandNV :: struct {
 	firstTask: u32,
 }
 
-PhysicalDeviceFragmentShaderBarycentricFeaturesNV :: struct {
-	sType:                     StructureType,
-	pNext:                     rawptr,
-	fragmentShaderBarycentric: b32,
-}
-
 PhysicalDeviceShaderImageFootprintFeaturesNV :: struct {
 	sType:          StructureType,
 	pNext:          rawptr,
@@ -4585,6 +4924,72 @@ PhysicalDeviceShaderAtomicFloat2FeaturesEXT :: struct {
 	sparseImageFloat32AtomicMinMax:  b32,
 }
 
+SurfacePresentModeEXT :: struct {
+	sType:       StructureType,
+	pNext:       rawptr,
+	presentMode: PresentModeKHR,
+}
+
+SurfacePresentScalingCapabilitiesEXT :: struct {
+	sType:                    StructureType,
+	pNext:                    rawptr,
+	supportedPresentScaling:  PresentScalingFlagsEXT,
+	supportedPresentGravityX: PresentGravityFlagsEXT,
+	supportedPresentGravityY: PresentGravityFlagsEXT,
+	minScaledImageExtent:     Extent2D,
+	maxScaledImageExtent:     Extent2D,
+}
+
+SurfacePresentModeCompatibilityEXT :: struct {
+	sType:            StructureType,
+	pNext:            rawptr,
+	presentModeCount: u32,
+	pPresentModes:    [^]PresentModeKHR,
+}
+
+PhysicalDeviceSwapchainMaintenance1FeaturesEXT :: struct {
+	sType:                 StructureType,
+	pNext:                 rawptr,
+	swapchainMaintenance1: b32,
+}
+
+SwapchainPresentFenceInfoEXT :: struct {
+	sType:          StructureType,
+	pNext:          rawptr,
+	swapchainCount: u32,
+	pFences:        [^]Fence,
+}
+
+SwapchainPresentModesCreateInfoEXT :: struct {
+	sType:            StructureType,
+	pNext:            rawptr,
+	presentModeCount: u32,
+	pPresentModes:    [^]PresentModeKHR,
+}
+
+SwapchainPresentModeInfoEXT :: struct {
+	sType:          StructureType,
+	pNext:          rawptr,
+	swapchainCount: u32,
+	pPresentModes:  [^]PresentModeKHR,
+}
+
+SwapchainPresentScalingCreateInfoEXT :: struct {
+	sType:           StructureType,
+	pNext:           rawptr,
+	scalingBehavior: PresentScalingFlagsEXT,
+	presentGravityX: PresentGravityFlagsEXT,
+	presentGravityY: PresentGravityFlagsEXT,
+}
+
+ReleaseSwapchainImagesInfoEXT :: struct {
+	sType:           StructureType,
+	pNext:           rawptr,
+	swapchain:       SwapchainKHR,
+	imageIndexCount: u32,
+	pImageIndices:   [^]u32,
+}
+
 PhysicalDeviceDeviceGeneratedCommandsPropertiesNV :: struct {
 	sType:                                    StructureType,
 	pNext:                                    rawptr,
@@ -4798,6 +5203,24 @@ PhysicalDeviceCustomBorderColorFeaturesEXT :: struct {
 	customBorderColorWithoutFormat: b32,
 }
 
+PhysicalDevicePresentBarrierFeaturesNV :: struct {
+	sType:          StructureType,
+	pNext:          rawptr,
+	presentBarrier: b32,
+}
+
+SurfaceCapabilitiesPresentBarrierNV :: struct {
+	sType:                   StructureType,
+	pNext:                   rawptr,
+	presentBarrierSupported: b32,
+}
+
+SwapchainPresentBarrierCreateInfoNV :: struct {
+	sType:                StructureType,
+	pNext:                rawptr,
+	presentBarrierEnable: b32,
+}
+
 PhysicalDeviceDiagnosticsConfigFeaturesNV :: struct {
 	sType:             StructureType,
 	pNext:             rawptr,
@@ -4808,6 +5231,143 @@ DeviceDiagnosticsConfigCreateInfoNV :: struct {
 	sType: StructureType,
 	pNext: rawptr,
 	flags: DeviceDiagnosticsConfigFlagsNV,
+}
+
+QueryLowLatencySupportNV :: struct {
+	sType:                  StructureType,
+	pNext:                  rawptr,
+	pQueriedLowLatencyData: rawptr,
+}
+
+PhysicalDeviceDescriptorBufferPropertiesEXT :: struct {
+	sType:                                                StructureType,
+	pNext:                                                rawptr,
+	combinedImageSamplerDescriptorSingleArray:            b32,
+	bufferlessPushDescriptors:                            b32,
+	allowSamplerImageViewPostSubmitCreation:              b32,
+	descriptorBufferOffsetAlignment:                      DeviceSize,
+	maxDescriptorBufferBindings:                          u32,
+	maxResourceDescriptorBufferBindings:                  u32,
+	maxSamplerDescriptorBufferBindings:                   u32,
+	maxEmbeddedImmutableSamplerBindings:                  u32,
+	maxEmbeddedImmutableSamplers:                         u32,
+	bufferCaptureReplayDescriptorDataSize:                int,
+	imageCaptureReplayDescriptorDataSize:                 int,
+	imageViewCaptureReplayDescriptorDataSize:             int,
+	samplerCaptureReplayDescriptorDataSize:               int,
+	accelerationStructureCaptureReplayDescriptorDataSize: int,
+	samplerDescriptorSize:                                int,
+	combinedImageSamplerDescriptorSize:                   int,
+	sampledImageDescriptorSize:                           int,
+	storageImageDescriptorSize:                           int,
+	uniformTexelBufferDescriptorSize:                     int,
+	robustUniformTexelBufferDescriptorSize:               int,
+	storageTexelBufferDescriptorSize:                     int,
+	robustStorageTexelBufferDescriptorSize:               int,
+	uniformBufferDescriptorSize:                          int,
+	robustUniformBufferDescriptorSize:                    int,
+	storageBufferDescriptorSize:                          int,
+	robustStorageBufferDescriptorSize:                    int,
+	inputAttachmentDescriptorSize:                        int,
+	accelerationStructureDescriptorSize:                  int,
+	maxSamplerDescriptorBufferRange:                      DeviceSize,
+	maxResourceDescriptorBufferRange:                     DeviceSize,
+	samplerDescriptorBufferAddressSpaceSize:              DeviceSize,
+	resourceDescriptorBufferAddressSpaceSize:             DeviceSize,
+	descriptorBufferAddressSpaceSize:                     DeviceSize,
+}
+
+PhysicalDeviceDescriptorBufferDensityMapPropertiesEXT :: struct {
+	sType:                                        StructureType,
+	pNext:                                        rawptr,
+	combinedImageSamplerDensityMapDescriptorSize: int,
+}
+
+PhysicalDeviceDescriptorBufferFeaturesEXT :: struct {
+	sType:                              StructureType,
+	pNext:                              rawptr,
+	descriptorBuffer:                   b32,
+	descriptorBufferCaptureReplay:      b32,
+	descriptorBufferImageLayoutIgnored: b32,
+	descriptorBufferPushDescriptors:    b32,
+}
+
+DescriptorAddressInfoEXT :: struct {
+	sType:   StructureType,
+	pNext:   rawptr,
+	address: DeviceAddress,
+	range:   DeviceSize,
+	format:  Format,
+}
+
+DescriptorBufferBindingInfoEXT :: struct {
+	sType:   StructureType,
+	pNext:   rawptr,
+	address: DeviceAddress,
+	usage:   BufferUsageFlags,
+}
+
+DescriptorBufferBindingPushDescriptorBufferHandleEXT :: struct {
+	sType:  StructureType,
+	pNext:  rawptr,
+	buffer: Buffer,
+}
+
+DescriptorDataEXT :: struct #raw_union {
+	pSampler:              ^Sampler,
+	pCombinedImageSampler: ^DescriptorImageInfo,
+	pInputAttachmentImage: ^DescriptorImageInfo,
+	pSampledImage:         ^DescriptorImageInfo,
+	pStorageImage:         ^DescriptorImageInfo,
+	pUniformTexelBuffer:   ^DescriptorAddressInfoEXT,
+	pStorageTexelBuffer:   ^DescriptorAddressInfoEXT,
+	pUniformBuffer:        ^DescriptorAddressInfoEXT,
+	pStorageBuffer:        ^DescriptorAddressInfoEXT,
+	accelerationStructure: DeviceAddress,
+}
+
+DescriptorGetInfoEXT :: struct {
+	sType: StructureType,
+	pNext: rawptr,
+	type:  DescriptorType,
+	data:  DescriptorDataEXT,
+}
+
+BufferCaptureDescriptorDataInfoEXT :: struct {
+	sType:  StructureType,
+	pNext:  rawptr,
+	buffer: Buffer,
+}
+
+ImageCaptureDescriptorDataInfoEXT :: struct {
+	sType: StructureType,
+	pNext: rawptr,
+	image: Image,
+}
+
+ImageViewCaptureDescriptorDataInfoEXT :: struct {
+	sType:     StructureType,
+	pNext:     rawptr,
+	imageView: ImageView,
+}
+
+SamplerCaptureDescriptorDataInfoEXT :: struct {
+	sType:   StructureType,
+	pNext:   rawptr,
+	sampler: Sampler,
+}
+
+OpaqueCaptureDescriptorDataCreateInfoEXT :: struct {
+	sType:                       StructureType,
+	pNext:                       rawptr,
+	opaqueCaptureDescriptorData: rawptr,
+}
+
+AccelerationStructureCaptureDescriptorDataInfoEXT :: struct {
+	sType:                   StructureType,
+	pNext:                   rawptr,
+	accelerationStructure:   AccelerationStructureKHR,
+	accelerationStructureNV: AccelerationStructureNV,
 }
 
 PhysicalDeviceGraphicsPipelineLibraryFeaturesEXT :: struct {
@@ -4827,6 +5387,12 @@ GraphicsPipelineLibraryCreateInfoEXT :: struct {
 	sType: StructureType,
 	pNext: rawptr,
 	flags: GraphicsPipelineLibraryFlagsEXT,
+}
+
+PhysicalDeviceShaderEarlyAndLateFragmentTestsFeaturesAMD :: struct {
+	sType:                           StructureType,
+	pNext:                           rawptr,
+	shaderEarlyAndLateFragmentTests: b32,
 }
 
 PhysicalDeviceFragmentShadingRateEnumsFeaturesNV :: struct {
@@ -4946,6 +5512,45 @@ CopyCommandTransformInfoQCOM :: struct {
 	transform: SurfaceTransformFlagsKHR,
 }
 
+PhysicalDeviceImageCompressionControlFeaturesEXT :: struct {
+	sType:                   StructureType,
+	pNext:                   rawptr,
+	imageCompressionControl: b32,
+}
+
+ImageCompressionControlEXT :: struct {
+	sType:                        StructureType,
+	pNext:                        rawptr,
+	flags:                        ImageCompressionFlagsEXT,
+	compressionControlPlaneCount: u32,
+	pFixedRateFlags:              [^]ImageCompressionFixedRateFlagsEXT,
+}
+
+SubresourceLayout2EXT :: struct {
+	sType:             StructureType,
+	pNext:             rawptr,
+	subresourceLayout: SubresourceLayout,
+}
+
+ImageSubresource2EXT :: struct {
+	sType:            StructureType,
+	pNext:            rawptr,
+	imageSubresource: ImageSubresource,
+}
+
+ImageCompressionPropertiesEXT :: struct {
+	sType:                          StructureType,
+	pNext:                          rawptr,
+	imageCompressionFlags:          ImageCompressionFlagsEXT,
+	imageCompressionFixedRateFlags: ImageCompressionFixedRateFlagsEXT,
+}
+
+PhysicalDeviceAttachmentFeedbackLoopLayoutFeaturesEXT :: struct {
+	sType:                        StructureType,
+	pNext:                        rawptr,
+	attachmentFeedbackLoopLayout: b32,
+}
+
 PhysicalDevice4444FormatsFeaturesEXT :: struct {
 	sType:          StructureType,
 	pNext:          rawptr,
@@ -4953,7 +5558,57 @@ PhysicalDevice4444FormatsFeaturesEXT :: struct {
 	formatA4B4G4R4: b32,
 }
 
-PhysicalDeviceRasterizationOrderAttachmentAccessFeaturesARM :: struct {
+PhysicalDeviceFaultFeaturesEXT :: struct {
+	sType:                   StructureType,
+	pNext:                   rawptr,
+	deviceFault:             b32,
+	deviceFaultVendorBinary: b32,
+}
+
+DeviceFaultCountsEXT :: struct {
+	sType:            StructureType,
+	pNext:            rawptr,
+	addressInfoCount: u32,
+	vendorInfoCount:  u32,
+	vendorBinarySize: DeviceSize,
+}
+
+DeviceFaultAddressInfoEXT :: struct {
+	addressType:      DeviceFaultAddressTypeEXT,
+	reportedAddress:  DeviceAddress,
+	addressPrecision: DeviceSize,
+}
+
+DeviceFaultVendorInfoEXT :: struct {
+	description:     [MAX_DESCRIPTION_SIZE]byte,
+	vendorFaultCode: u64,
+	vendorFaultData: u64,
+}
+
+DeviceFaultInfoEXT :: struct {
+	sType:             StructureType,
+	pNext:             rawptr,
+	description:       [MAX_DESCRIPTION_SIZE]byte,
+	pAddressInfos:     [^]DeviceFaultAddressInfoEXT,
+	pVendorInfos:      [^]DeviceFaultVendorInfoEXT,
+	pVendorBinaryData: rawptr,
+}
+
+DeviceFaultVendorBinaryHeaderVersionOneEXT :: struct {
+	headerSize:            u32,
+	headerVersion:         DeviceFaultVendorBinaryHeaderVersionEXT,
+	vendorID:              u32,
+	deviceID:              u32,
+	driverVersion:         u32,
+	pipelineCacheUUID:     [UUID_SIZE]u8,
+	applicationNameOffset: u32,
+	applicationVersion:    u32,
+	engineNameOffset:      u32,
+	engineVersion:         u32,
+	apiVersion:            u32,
+}
+
+PhysicalDeviceRasterizationOrderAttachmentAccessFeaturesEXT :: struct {
 	sType:                                     StructureType,
 	pNext:                                     rawptr,
 	rasterizationOrderColorAttachmentAccess:   b32,
@@ -4967,22 +5622,22 @@ PhysicalDeviceRGBA10X6FormatsFeaturesEXT :: struct {
 	formatRgba10x6WithoutYCbCrSampler: b32,
 }
 
-PhysicalDeviceMutableDescriptorTypeFeaturesVALVE :: struct {
+PhysicalDeviceMutableDescriptorTypeFeaturesEXT :: struct {
 	sType:                 StructureType,
 	pNext:                 rawptr,
 	mutableDescriptorType: b32,
 }
 
-MutableDescriptorTypeListVALVE :: struct {
+MutableDescriptorTypeListEXT :: struct {
 	descriptorTypeCount: u32,
 	pDescriptorTypes:    [^]DescriptorType,
 }
 
-MutableDescriptorTypeCreateInfoVALVE :: struct {
+MutableDescriptorTypeCreateInfoEXT :: struct {
 	sType:                          StructureType,
 	pNext:                          rawptr,
 	mutableDescriptorTypeListCount: u32,
-	pMutableDescriptorTypeLists:    [^]MutableDescriptorTypeListVALVE,
+	pMutableDescriptorTypeLists:    [^]MutableDescriptorTypeListEXT,
 }
 
 PhysicalDeviceVertexInputDynamicStateFeaturesEXT :: struct {
@@ -5018,6 +5673,21 @@ PhysicalDeviceDrmPropertiesEXT :: struct {
 	primaryMinor: i64,
 	renderMajor:  i64,
 	renderMinor:  i64,
+}
+
+PhysicalDeviceAddressBindingReportFeaturesEXT :: struct {
+	sType:                StructureType,
+	pNext:                rawptr,
+	reportAddressBinding: b32,
+}
+
+DeviceAddressBindingCallbackDataEXT :: struct {
+	sType:       StructureType,
+	pNext:       rawptr,
+	flags:       DeviceAddressBindingFlagsEXT,
+	baseAddress: DeviceAddress,
+	size:        DeviceSize,
+	bindingType: DeviceAddressBindingTypeEXT,
 }
 
 PhysicalDeviceDepthClipControlFeaturesEXT :: struct {
@@ -5075,6 +5745,37 @@ PhysicalDeviceExternalMemoryRDMAFeaturesNV :: struct {
 	sType:              StructureType,
 	pNext:              rawptr,
 	externalMemoryRDMA: b32,
+}
+
+PipelinePropertiesIdentifierEXT :: struct {
+	sType:              StructureType,
+	pNext:              rawptr,
+	pipelineIdentifier: [UUID_SIZE]u8,
+}
+
+PhysicalDevicePipelinePropertiesFeaturesEXT :: struct {
+	sType:                        StructureType,
+	pNext:                        rawptr,
+	pipelinePropertiesIdentifier: b32,
+}
+
+PhysicalDeviceMultisampledRenderToSingleSampledFeaturesEXT :: struct {
+	sType:                             StructureType,
+	pNext:                             rawptr,
+	multisampledRenderToSingleSampled: b32,
+}
+
+SubpassResolvePerformanceQueryEXT :: struct {
+	sType:   StructureType,
+	pNext:   rawptr,
+	optimal: b32,
+}
+
+MultisampledRenderToSingleSampledInfoEXT :: struct {
+	sType:                                   StructureType,
+	pNext:                                   rawptr,
+	multisampledRenderToSingleSampledEnable: b32,
+	rasterizationSamples:                    SampleCountFlags,
 }
 
 PhysicalDeviceExtendedDynamicState2FeaturesEXT :: struct {
@@ -5148,6 +5849,148 @@ PhysicalDeviceImage2DViewOf3DFeaturesEXT :: struct {
 	sampler2DViewOf3D: b32,
 }
 
+PhysicalDeviceShaderTileImageFeaturesEXT :: struct {
+	sType:                            StructureType,
+	pNext:                            rawptr,
+	shaderTileImageColorReadAccess:   b32,
+	shaderTileImageDepthReadAccess:   b32,
+	shaderTileImageStencilReadAccess: b32,
+}
+
+PhysicalDeviceShaderTileImagePropertiesEXT :: struct {
+	sType:                                            StructureType,
+	pNext:                                            rawptr,
+	shaderTileImageCoherentReadAccelerated:           b32,
+	shaderTileImageReadSampleFromPixelRateInvocation: b32,
+	shaderTileImageReadFromHelperInvocation:          b32,
+}
+
+MicromapUsageEXT :: struct {
+	count:            u32,
+	subdivisionLevel: u32,
+	format:           u32,
+}
+
+DeviceOrHostAddressKHR :: struct #raw_union {
+	deviceAddress: DeviceAddress,
+	hostAddress:   rawptr,
+}
+
+MicromapBuildInfoEXT :: struct {
+	sType:               StructureType,
+	pNext:               rawptr,
+	type:                MicromapTypeEXT,
+	flags:               BuildMicromapFlagsEXT,
+	mode:                BuildMicromapModeEXT,
+	dstMicromap:         MicromapEXT,
+	usageCountsCount:    u32,
+	pUsageCounts:        [^]MicromapUsageEXT,
+	ppUsageCounts:       ^[^]MicromapUsageEXT,
+	data:                DeviceOrHostAddressConstKHR,
+	scratchData:         DeviceOrHostAddressKHR,
+	triangleArray:       DeviceOrHostAddressConstKHR,
+	triangleArrayStride: DeviceSize,
+}
+
+MicromapCreateInfoEXT :: struct {
+	sType:         StructureType,
+	pNext:         rawptr,
+	createFlags:   MicromapCreateFlagsEXT,
+	buffer:        Buffer,
+	offset:        DeviceSize,
+	size:          DeviceSize,
+	type:          MicromapTypeEXT,
+	deviceAddress: DeviceAddress,
+}
+
+PhysicalDeviceOpacityMicromapFeaturesEXT :: struct {
+	sType:                 StructureType,
+	pNext:                 rawptr,
+	micromap:              b32,
+	micromapCaptureReplay: b32,
+	micromapHostCommands:  b32,
+}
+
+PhysicalDeviceOpacityMicromapPropertiesEXT :: struct {
+	sType:                            StructureType,
+	pNext:                            rawptr,
+	maxOpacity2StateSubdivisionLevel: u32,
+	maxOpacity4StateSubdivisionLevel: u32,
+}
+
+MicromapVersionInfoEXT :: struct {
+	sType:        StructureType,
+	pNext:        rawptr,
+	pVersionData: ^u8,
+}
+
+CopyMicromapToMemoryInfoEXT :: struct {
+	sType: StructureType,
+	pNext: rawptr,
+	src:   MicromapEXT,
+	dst:   DeviceOrHostAddressKHR,
+	mode:  CopyMicromapModeEXT,
+}
+
+CopyMemoryToMicromapInfoEXT :: struct {
+	sType: StructureType,
+	pNext: rawptr,
+	src:   DeviceOrHostAddressConstKHR,
+	dst:   MicromapEXT,
+	mode:  CopyMicromapModeEXT,
+}
+
+CopyMicromapInfoEXT :: struct {
+	sType: StructureType,
+	pNext: rawptr,
+	src:   MicromapEXT,
+	dst:   MicromapEXT,
+	mode:  CopyMicromapModeEXT,
+}
+
+MicromapBuildSizesInfoEXT :: struct {
+	sType:            StructureType,
+	pNext:            rawptr,
+	micromapSize:     DeviceSize,
+	buildScratchSize: DeviceSize,
+	discardable:      b32,
+}
+
+AccelerationStructureTrianglesOpacityMicromapEXT :: struct {
+	sType:            StructureType,
+	pNext:            rawptr,
+	indexType:        IndexType,
+	indexBuffer:      DeviceOrHostAddressConstKHR,
+	indexStride:      DeviceSize,
+	baseTriangle:     u32,
+	usageCountsCount: u32,
+	pUsageCounts:     [^]MicromapUsageEXT,
+	ppUsageCounts:    ^[^]MicromapUsageEXT,
+	micromap:         MicromapEXT,
+}
+
+MicromapTriangleEXT :: struct {
+	dataOffset:       u32,
+	subdivisionLevel: u16,
+	format:           u16,
+}
+
+PhysicalDeviceClusterCullingShaderFeaturesHUAWEI :: struct {
+	sType:                         StructureType,
+	pNext:                         rawptr,
+	clustercullingShader:          b32,
+	multiviewClusterCullingShader: b32,
+}
+
+PhysicalDeviceClusterCullingShaderPropertiesHUAWEI :: struct {
+	sType:                         StructureType,
+	pNext:                         rawptr,
+	maxWorkGroupCount:             [3]u32,
+	maxWorkGroupSize:              [3]u32,
+	maxOutputClusterCount:         u32,
+	indirectBufferOffsetAlignment: DeviceSize,
+}
+
 PhysicalDeviceBorderColorSwizzleFeaturesEXT :: struct {
 	sType:                       StructureType,
 	pNext:                       rawptr,
@@ -5166,6 +6009,27 @@ PhysicalDevicePageableDeviceLocalMemoryFeaturesEXT :: struct {
 	sType:                     StructureType,
 	pNext:                     rawptr,
 	pageableDeviceLocalMemory: b32,
+}
+
+PhysicalDeviceShaderCorePropertiesARM :: struct {
+	sType:     StructureType,
+	pNext:     rawptr,
+	pixelRate: u32,
+	texelRate: u32,
+	fmaRate:   u32,
+}
+
+PhysicalDeviceImageSlicedViewOf3DFeaturesEXT :: struct {
+	sType:               StructureType,
+	pNext:               rawptr,
+	imageSlicedViewOf3D: b32,
+}
+
+ImageViewSlicedCreateInfoEXT :: struct {
+	sType:       StructureType,
+	pNext:       rawptr,
+	sliceOffset: u32,
+	sliceCount:  u32,
 }
 
 PhysicalDeviceDescriptorSetHostMappingFeaturesVALVE :: struct {
@@ -5188,6 +6052,18 @@ DescriptorSetLayoutHostMappingInfoVALVE :: struct {
 	descriptorSize:   u32,
 }
 
+PhysicalDeviceDepthClampZeroOneFeaturesEXT :: struct {
+	sType:             StructureType,
+	pNext:             rawptr,
+	depthClampZeroOne: b32,
+}
+
+PhysicalDeviceNonSeamlessCubeMapFeaturesEXT :: struct {
+	sType:              StructureType,
+	pNext:              rawptr,
+	nonSeamlessCubeMap: b32,
+}
+
 PhysicalDeviceFragmentDensityMapOffsetFeaturesQCOM :: struct {
 	sType:                    StructureType,
 	pNext:                    rawptr,
@@ -5207,15 +6083,413 @@ SubpassFragmentDensityMapOffsetEndInfoQCOM :: struct {
 	pFragmentDensityOffsets:    [^]Offset2D,
 }
 
+CopyMemoryIndirectCommandNV :: struct {
+	srcAddress: DeviceAddress,
+	dstAddress: DeviceAddress,
+	size:       DeviceSize,
+}
+
+CopyMemoryToImageIndirectCommandNV :: struct {
+	srcAddress:        DeviceAddress,
+	bufferRowLength:   u32,
+	bufferImageHeight: u32,
+	imageSubresource:  ImageSubresourceLayers,
+	imageOffset:       Offset3D,
+	imageExtent:       Extent3D,
+}
+
+PhysicalDeviceCopyMemoryIndirectFeaturesNV :: struct {
+	sType:        StructureType,
+	pNext:        rawptr,
+	indirectCopy: b32,
+}
+
+PhysicalDeviceCopyMemoryIndirectPropertiesNV :: struct {
+	sType:           StructureType,
+	pNext:           rawptr,
+	supportedQueues: QueueFlags,
+}
+
+DecompressMemoryRegionNV :: struct {
+	srcAddress:          DeviceAddress,
+	dstAddress:          DeviceAddress,
+	compressedSize:      DeviceSize,
+	decompressedSize:    DeviceSize,
+	decompressionMethod: MemoryDecompressionMethodFlagsNV,
+}
+
+PhysicalDeviceMemoryDecompressionFeaturesNV :: struct {
+	sType:               StructureType,
+	pNext:               rawptr,
+	memoryDecompression: b32,
+}
+
+PhysicalDeviceMemoryDecompressionPropertiesNV :: struct {
+	sType:                         StructureType,
+	pNext:                         rawptr,
+	decompressionMethods:          MemoryDecompressionMethodFlagsNV,
+	maxDecompressionIndirectCount: u64,
+}
+
 PhysicalDeviceLinearColorAttachmentFeaturesNV :: struct {
 	sType:                 StructureType,
 	pNext:                 rawptr,
 	linearColorAttachment: b32,
 }
 
-DeviceOrHostAddressKHR :: struct #raw_union {
-	deviceAddress: DeviceAddress,
-	hostAddress:   rawptr,
+PhysicalDeviceImageCompressionControlSwapchainFeaturesEXT :: struct {
+	sType:                            StructureType,
+	pNext:                            rawptr,
+	imageCompressionControlSwapchain: b32,
+}
+
+ImageViewSampleWeightCreateInfoQCOM :: struct {
+	sType:        StructureType,
+	pNext:        rawptr,
+	filterCenter: Offset2D,
+	filterSize:   Extent2D,
+	numPhases:    u32,
+}
+
+PhysicalDeviceImageProcessingFeaturesQCOM :: struct {
+	sType:                 StructureType,
+	pNext:                 rawptr,
+	textureSampleWeighted: b32,
+	textureBoxFilter:      b32,
+	textureBlockMatch:     b32,
+}
+
+PhysicalDeviceImageProcessingPropertiesQCOM :: struct {
+	sType:                    StructureType,
+	pNext:                    rawptr,
+	maxWeightFilterPhases:    u32,
+	maxWeightFilterDimension: Extent2D,
+	maxBlockMatchRegion:      Extent2D,
+	maxBoxFilterBlockSize:    Extent2D,
+}
+
+PhysicalDeviceExtendedDynamicState3FeaturesEXT :: struct {
+	sType:                                                 StructureType,
+	pNext:                                                 rawptr,
+	extendedDynamicState3TessellationDomainOrigin:         b32,
+	extendedDynamicState3DepthClampEnable:                 b32,
+	extendedDynamicState3PolygonMode:                      b32,
+	extendedDynamicState3RasterizationSamples:             b32,
+	extendedDynamicState3SampleMask:                       b32,
+	extendedDynamicState3AlphaToCoverageEnable:            b32,
+	extendedDynamicState3AlphaToOneEnable:                 b32,
+	extendedDynamicState3LogicOpEnable:                    b32,
+	extendedDynamicState3ColorBlendEnable:                 b32,
+	extendedDynamicState3ColorBlendEquation:               b32,
+	extendedDynamicState3ColorWriteMask:                   b32,
+	extendedDynamicState3RasterizationStream:              b32,
+	extendedDynamicState3ConservativeRasterizationMode:    b32,
+	extendedDynamicState3ExtraPrimitiveOverestimationSize: b32,
+	extendedDynamicState3DepthClipEnable:                  b32,
+	extendedDynamicState3SampleLocationsEnable:            b32,
+	extendedDynamicState3ColorBlendAdvanced:               b32,
+	extendedDynamicState3ProvokingVertexMode:              b32,
+	extendedDynamicState3LineRasterizationMode:            b32,
+	extendedDynamicState3LineStippleEnable:                b32,
+	extendedDynamicState3DepthClipNegativeOneToOne:        b32,
+	extendedDynamicState3ViewportWScalingEnable:           b32,
+	extendedDynamicState3ViewportSwizzle:                  b32,
+	extendedDynamicState3CoverageToColorEnable:            b32,
+	extendedDynamicState3CoverageToColorLocation:          b32,
+	extendedDynamicState3CoverageModulationMode:           b32,
+	extendedDynamicState3CoverageModulationTableEnable:    b32,
+	extendedDynamicState3CoverageModulationTable:          b32,
+	extendedDynamicState3CoverageReductionMode:            b32,
+	extendedDynamicState3RepresentativeFragmentTestEnable: b32,
+	extendedDynamicState3ShadingRateImageEnable:           b32,
+}
+
+PhysicalDeviceExtendedDynamicState3PropertiesEXT :: struct {
+	sType:                                StructureType,
+	pNext:                                rawptr,
+	dynamicPrimitiveTopologyUnrestricted: b32,
+}
+
+ColorBlendEquationEXT :: struct {
+	srcColorBlendFactor: BlendFactor,
+	dstColorBlendFactor: BlendFactor,
+	colorBlendOp:        BlendOp,
+	srcAlphaBlendFactor: BlendFactor,
+	dstAlphaBlendFactor: BlendFactor,
+	alphaBlendOp:        BlendOp,
+}
+
+ColorBlendAdvancedEXT :: struct {
+	advancedBlendOp:  BlendOp,
+	srcPremultiplied: b32,
+	dstPremultiplied: b32,
+	blendOverlap:     BlendOverlapEXT,
+	clampResults:     b32,
+}
+
+PhysicalDeviceSubpassMergeFeedbackFeaturesEXT :: struct {
+	sType:                StructureType,
+	pNext:                rawptr,
+	subpassMergeFeedback: b32,
+}
+
+RenderPassCreationControlEXT :: struct {
+	sType:           StructureType,
+	pNext:           rawptr,
+	disallowMerging: b32,
+}
+
+RenderPassCreationFeedbackInfoEXT :: struct {
+	postMergeSubpassCount: u32,
+}
+
+RenderPassCreationFeedbackCreateInfoEXT :: struct {
+	sType:               StructureType,
+	pNext:               rawptr,
+	pRenderPassFeedback: ^RenderPassCreationFeedbackInfoEXT,
+}
+
+RenderPassSubpassFeedbackInfoEXT :: struct {
+	subpassMergeStatus: SubpassMergeStatusEXT,
+	description:        [MAX_DESCRIPTION_SIZE]byte,
+	postMergeIndex:     u32,
+}
+
+RenderPassSubpassFeedbackCreateInfoEXT :: struct {
+	sType:            StructureType,
+	pNext:            rawptr,
+	pSubpassFeedback: ^RenderPassSubpassFeedbackInfoEXT,
+}
+
+DirectDriverLoadingInfoLUNARG :: struct {
+	sType:                  StructureType,
+	pNext:                  rawptr,
+	flags:                  DirectDriverLoadingFlagsLUNARG,
+	pfnGetInstanceProcAddr: ProcGetInstanceProcAddrLUNARG,
+}
+
+DirectDriverLoadingListLUNARG :: struct {
+	sType:       StructureType,
+	pNext:       rawptr,
+	mode:        DirectDriverLoadingModeLUNARG,
+	driverCount: u32,
+	pDrivers:    [^]DirectDriverLoadingInfoLUNARG,
+}
+
+PhysicalDeviceShaderModuleIdentifierFeaturesEXT :: struct {
+	sType:                  StructureType,
+	pNext:                  rawptr,
+	shaderModuleIdentifier: b32,
+}
+
+PhysicalDeviceShaderModuleIdentifierPropertiesEXT :: struct {
+	sType:                               StructureType,
+	pNext:                               rawptr,
+	shaderModuleIdentifierAlgorithmUUID: [UUID_SIZE]u8,
+}
+
+PipelineShaderStageModuleIdentifierCreateInfoEXT :: struct {
+	sType:          StructureType,
+	pNext:          rawptr,
+	identifierSize: u32,
+	pIdentifier:    ^u8,
+}
+
+ShaderModuleIdentifierEXT :: struct {
+	sType:          StructureType,
+	pNext:          rawptr,
+	identifierSize: u32,
+	identifier:     [MAX_SHADER_MODULE_IDENTIFIER_SIZE_EXT]u8,
+}
+
+PhysicalDeviceOpticalFlowFeaturesNV :: struct {
+	sType:       StructureType,
+	pNext:       rawptr,
+	opticalFlow: b32,
+}
+
+PhysicalDeviceOpticalFlowPropertiesNV :: struct {
+	sType:                      StructureType,
+	pNext:                      rawptr,
+	supportedOutputGridSizes:   OpticalFlowGridSizeFlagsNV,
+	supportedHintGridSizes:     OpticalFlowGridSizeFlagsNV,
+	hintSupported:              b32,
+	costSupported:              b32,
+	bidirectionalFlowSupported: b32,
+	globalFlowSupported:        b32,
+	minWidth:                   u32,
+	minHeight:                  u32,
+	maxWidth:                   u32,
+	maxHeight:                  u32,
+	maxNumRegionsOfInterest:    u32,
+}
+
+OpticalFlowImageFormatInfoNV :: struct {
+	sType: StructureType,
+	pNext: rawptr,
+	usage: OpticalFlowUsageFlagsNV,
+}
+
+OpticalFlowImageFormatPropertiesNV :: struct {
+	sType:  StructureType,
+	pNext:  rawptr,
+	format: Format,
+}
+
+OpticalFlowSessionCreateInfoNV :: struct {
+	sType:            StructureType,
+	pNext:            rawptr,
+	width:            u32,
+	height:           u32,
+	imageFormat:      Format,
+	flowVectorFormat: Format,
+	costFormat:       Format,
+	outputGridSize:   OpticalFlowGridSizeFlagsNV,
+	hintGridSize:     OpticalFlowGridSizeFlagsNV,
+	performanceLevel: OpticalFlowPerformanceLevelNV,
+	flags:            OpticalFlowSessionCreateFlagsNV,
+}
+
+OpticalFlowSessionCreatePrivateDataInfoNV :: struct {
+	sType:        StructureType,
+	pNext:        rawptr,
+	id:           u32,
+	size:         u32,
+	pPrivateData: rawptr,
+}
+
+OpticalFlowExecuteInfoNV :: struct {
+	sType:       StructureType,
+	pNext:       rawptr,
+	flags:       OpticalFlowExecuteFlagsNV,
+	regionCount: u32,
+	pRegions:    [^]Rect2D,
+}
+
+PhysicalDeviceLegacyDitheringFeaturesEXT :: struct {
+	sType:           StructureType,
+	pNext:           rawptr,
+	legacyDithering: b32,
+}
+
+PhysicalDevicePipelineProtectedAccessFeaturesEXT :: struct {
+	sType:                   StructureType,
+	pNext:                   rawptr,
+	pipelineProtectedAccess: b32,
+}
+
+PhysicalDeviceShaderObjectFeaturesEXT :: struct {
+	sType:        StructureType,
+	pNext:        rawptr,
+	shaderObject: b32,
+}
+
+PhysicalDeviceShaderObjectPropertiesEXT :: struct {
+	sType:               StructureType,
+	pNext:               rawptr,
+	shaderBinaryUUID:    [UUID_SIZE]u8,
+	shaderBinaryVersion: u32,
+}
+
+ShaderCreateInfoEXT :: struct {
+	sType:                  StructureType,
+	pNext:                  rawptr,
+	flags:                  ShaderCreateFlagsEXT,
+	stage:                  ShaderStageFlags,
+	nextStage:              ShaderStageFlags,
+	codeType:               ShaderCodeTypeEXT,
+	codeSize:               int,
+	pCode:                  rawptr,
+	pName:                  cstring,
+	setLayoutCount:         u32,
+	pSetLayouts:            [^]DescriptorSetLayout,
+	pushConstantRangeCount: u32,
+	pPushConstantRanges:    [^]PushConstantRange,
+	pSpecializationInfo:    ^SpecializationInfo,
+}
+
+PhysicalDeviceTilePropertiesFeaturesQCOM :: struct {
+	sType:          StructureType,
+	pNext:          rawptr,
+	tileProperties: b32,
+}
+
+TilePropertiesQCOM :: struct {
+	sType:     StructureType,
+	pNext:     rawptr,
+	tileSize:  Extent3D,
+	apronSize: Extent2D,
+	origin:    Offset2D,
+}
+
+PhysicalDeviceAmigoProfilingFeaturesSEC :: struct {
+	sType:          StructureType,
+	pNext:          rawptr,
+	amigoProfiling: b32,
+}
+
+AmigoProfilingSubmitInfoSEC :: struct {
+	sType:               StructureType,
+	pNext:               rawptr,
+	firstDrawTimestamp:  u64,
+	swapBufferTimestamp: u64,
+}
+
+PhysicalDeviceMultiviewPerViewViewportsFeaturesQCOM :: struct {
+	sType:                     StructureType,
+	pNext:                     rawptr,
+	multiviewPerViewViewports: b32,
+}
+
+PhysicalDeviceRayTracingInvocationReorderPropertiesNV :: struct {
+	sType:                                     StructureType,
+	pNext:                                     rawptr,
+	rayTracingInvocationReorderReorderingHint: RayTracingInvocationReorderModeNV,
+}
+
+PhysicalDeviceRayTracingInvocationReorderFeaturesNV :: struct {
+	sType:                       StructureType,
+	pNext:                       rawptr,
+	rayTracingInvocationReorder: b32,
+}
+
+PhysicalDeviceShaderCoreBuiltinsFeaturesARM :: struct {
+	sType:              StructureType,
+	pNext:              rawptr,
+	shaderCoreBuiltins: b32,
+}
+
+PhysicalDeviceShaderCoreBuiltinsPropertiesARM :: struct {
+	sType:              StructureType,
+	pNext:              rawptr,
+	shaderCoreMask:     u64,
+	shaderCoreCount:    u32,
+	shaderWarpsPerCore: u32,
+}
+
+PhysicalDevicePipelineLibraryGroupHandlesFeaturesEXT :: struct {
+	sType:                       StructureType,
+	pNext:                       rawptr,
+	pipelineLibraryGroupHandles: b32,
+}
+
+PhysicalDeviceMultiviewPerViewRenderAreasFeaturesQCOM :: struct {
+	sType:                       StructureType,
+	pNext:                       rawptr,
+	multiviewPerViewRenderAreas: b32,
+}
+
+MultiviewPerViewRenderAreasRenderPassBeginInfoQCOM :: struct {
+	sType:                  StructureType,
+	pNext:                  rawptr,
+	perViewRenderAreaCount: u32,
+	pPerViewRenderAreas:    [^]Rect2D,
+}
+
+PhysicalDeviceAttachmentFeedbackLoopDynamicStateFeaturesEXT :: struct {
+	sType:                              StructureType,
+	pNext:                              rawptr,
+	attachmentFeedbackLoopDynamicState: b32,
 }
 
 AccelerationStructureBuildRangeInfoKHR :: struct {
@@ -5440,6 +6714,55 @@ PhysicalDeviceRayQueryFeaturesKHR :: struct {
 	rayQuery: b32,
 }
 
+PhysicalDeviceMeshShaderFeaturesEXT :: struct {
+	sType:                                  StructureType,
+	pNext:                                  rawptr,
+	taskShader:                             b32,
+	meshShader:                             b32,
+	multiviewMeshShader:                    b32,
+	primitiveFragmentShadingRateMeshShader: b32,
+	meshShaderQueries:                      b32,
+}
+
+PhysicalDeviceMeshShaderPropertiesEXT :: struct {
+	sType:                                 StructureType,
+	pNext:                                 rawptr,
+	maxTaskWorkGroupTotalCount:            u32,
+	maxTaskWorkGroupCount:                 [3]u32,
+	maxTaskWorkGroupInvocations:           u32,
+	maxTaskWorkGroupSize:                  [3]u32,
+	maxTaskPayloadSize:                    u32,
+	maxTaskSharedMemorySize:               u32,
+	maxTaskPayloadAndSharedMemorySize:     u32,
+	maxMeshWorkGroupTotalCount:            u32,
+	maxMeshWorkGroupCount:                 [3]u32,
+	maxMeshWorkGroupInvocations:           u32,
+	maxMeshWorkGroupSize:                  [3]u32,
+	maxMeshSharedMemorySize:               u32,
+	maxMeshPayloadAndSharedMemorySize:     u32,
+	maxMeshOutputMemorySize:               u32,
+	maxMeshPayloadAndOutputMemorySize:     u32,
+	maxMeshOutputComponents:               u32,
+	maxMeshOutputVertices:                 u32,
+	maxMeshOutputPrimitives:               u32,
+	maxMeshOutputLayers:                   u32,
+	maxMeshMultiviewViewCount:             u32,
+	meshOutputPerVertexGranularity:        u32,
+	meshOutputPerPrimitiveGranularity:     u32,
+	maxPreferredTaskWorkGroupInvocations:  u32,
+	maxPreferredMeshWorkGroupInvocations:  u32,
+	prefersLocalInvocationVertexOutput:    b32,
+	prefersLocalInvocationPrimitiveOutput: b32,
+	prefersCompactVertexOutput:            b32,
+	prefersCompactPrimitiveOutput:         b32,
+}
+
+DrawMeshTasksIndirectCommandEXT :: struct {
+	groupCountX: u32,
+	groupCountY: u32,
+	groupCountZ: u32,
+}
+
 Win32SurfaceCreateInfoKHR :: struct {
 	sType:     StructureType,
 	pNext:     rawptr,
@@ -5599,6 +6922,87 @@ MetalSurfaceCreateInfoEXT :: struct {
 	pLayer: ^CAMetalLayer,
 }
 
+ExportMetalObjectCreateInfoEXT :: struct {
+	sType:            StructureType,
+	pNext:            rawptr,
+	exportObjectType: ExportMetalObjectTypeFlagsEXT,
+}
+
+ExportMetalObjectsInfoEXT :: struct {
+	sType: StructureType,
+	pNext: rawptr,
+}
+
+ExportMetalDeviceInfoEXT :: struct {
+	sType:     StructureType,
+	pNext:     rawptr,
+	mtlDevice: MTLDevice_id,
+}
+
+ExportMetalCommandQueueInfoEXT :: struct {
+	sType:           StructureType,
+	pNext:           rawptr,
+	queue:           Queue,
+	mtlCommandQueue: MTLCommandQueue_id,
+}
+
+ExportMetalBufferInfoEXT :: struct {
+	sType:     StructureType,
+	pNext:     rawptr,
+	memory:    DeviceMemory,
+	mtlBuffer: MTLBuffer_id,
+}
+
+ImportMetalBufferInfoEXT :: struct {
+	sType:     StructureType,
+	pNext:     rawptr,
+	mtlBuffer: MTLBuffer_id,
+}
+
+ExportMetalTextureInfoEXT :: struct {
+	sType:      StructureType,
+	pNext:      rawptr,
+	image:      Image,
+	imageView:  ImageView,
+	bufferView: BufferView,
+	plane:      ImageAspectFlags,
+	mtlTexture: MTLTexture_id,
+}
+
+ImportMetalTextureInfoEXT :: struct {
+	sType:      StructureType,
+	pNext:      rawptr,
+	plane:      ImageAspectFlags,
+	mtlTexture: MTLTexture_id,
+}
+
+ExportMetalIOSurfaceInfoEXT :: struct {
+	sType:     StructureType,
+	pNext:     rawptr,
+	image:     Image,
+	ioSurface: IOSurfaceRef,
+}
+
+ImportMetalIOSurfaceInfoEXT :: struct {
+	sType:     StructureType,
+	pNext:     rawptr,
+	ioSurface: IOSurfaceRef,
+}
+
+ExportMetalSharedEventInfoEXT :: struct {
+	sType:          StructureType,
+	pNext:          rawptr,
+	semaphore:      Semaphore,
+	event:          Event,
+	mtlSharedEvent: MTLSharedEvent_id,
+}
+
+ImportMetalSharedEventInfoEXT :: struct {
+	sType:          StructureType,
+	pNext:          rawptr,
+	mtlSharedEvent: MTLSharedEvent_id,
+}
+
 MacOSSurfaceCreateInfoMVK :: struct {
 	sType: StructureType,
 	pNext: rawptr,
@@ -5621,257 +7025,640 @@ WaylandSurfaceCreateInfoKHR :: struct {
 	surface: ^wl_surface,
 }
 
+VideoH264SpsVuiFlags :: struct {
+	bit_field: u32,
+}
+
+VideoH264HrdParameters :: struct {
+	cpb_cnt_minus1:                          u8,
+	bit_rate_scale:                          u8,
+	cpb_size_scale:                          u8,
+	reserved1:                               u8,
+	bit_rate_value_minus1:                   [VIDEO_H264_CPB_CNT_LIST_SIZE]u32,
+	cpb_size_value_minus1:                   [VIDEO_H264_CPB_CNT_LIST_SIZE]u32,
+	cbr_flag:                                [VIDEO_H264_CPB_CNT_LIST_SIZE]u8,
+	initial_cpb_removal_delay_length_minus1: u32,
+	cpb_removal_delay_length_minus1:         u32,
+	dpb_output_delay_length_minus1:          u32,
+	time_offset_length:                      u32,
+}
+
+VideoH264SequenceParameterSetVui :: struct {
+	flags:                               VideoH264SpsVuiFlags,
+	aspect_ratio_idc:                    VideoH264AspectRatioIdc,
+	sar_width:                           u16,
+	sar_height:                          u16,
+	video_format:                        u8,
+	colour_primaries:                    u8,
+	transfer_characteristics:            u8,
+	matrix_coefficients:                 u8,
+	num_units_in_tick:                   u32,
+	time_scale:                          u32,
+	max_num_reorder_frames:              u8,
+	max_dec_frame_buffering:             u8,
+	chroma_sample_loc_type_top_field:    u8,
+	chroma_sample_loc_type_bottom_field: u8,
+	reserved1:                           u32,
+	pHrdParameters:                      [^]VideoH264HrdParameters,
+}
+
+VideoH264SpsFlags :: struct {
+	bit_field: u32,
+}
+
+VideoH264ScalingLists :: struct {
+	scaling_list_present_mask:       u16,
+	use_default_scaling_matrix_mask: u16,
+	ScalingList4x4:                  [VIDEO_H264_SCALING_LIST_4X4_NUM_LISTS][VIDEO_H264_SCALING_LIST_4X4_NUM_ELEMENTS]u8,
+	ScalingList8x8:                  [VIDEO_H264_SCALING_LIST_8X8_NUM_LISTS][VIDEO_H264_SCALING_LIST_8X8_NUM_ELEMENTS]u8,
+}
+
+VideoH264SequenceParameterSet :: struct {
+	flags:                                 VideoH264SpsFlags,
+	profile_idc:                           VideoH264ProfileIdc,
+	level_idc:                             VideoH264LevelIdc,
+	chroma_format_idc:                     VideoH264ChromaFormatIdc,
+	seq_parameter_set_id:                  u8,
+	bit_depth_luma_minus8:                 u8,
+	bit_depth_chroma_minus8:               u8,
+	log2_max_frame_num_minus4:             u8,
+	pic_order_cnt_type:                    VideoH264PocType,
+	offset_for_non_ref_pic:                i32,
+	offset_for_top_to_bottom_field:        i32,
+	log2_max_pic_order_cnt_lsb_minus4:     u8,
+	num_ref_frames_in_pic_order_cnt_cycle: u8,
+	max_num_ref_frames:                    u8,
+	reserved1:                             u8,
+	pic_width_in_mbs_minus1:               u32,
+	pic_height_in_map_units_minus1:        u32,
+	frame_crop_left_offset:                u32,
+	frame_crop_right_offset:               u32,
+	frame_crop_top_offset:                 u32,
+	frame_crop_bottom_offset:              u32,
+	reserved2:                             u32,
+	pOffsetForRefFrame:                    ^i32,
+	pScalingLists:                         [^]VideoH264ScalingLists,
+	pSequenceParameterSetVui:              ^VideoH264SequenceParameterSetVui,
+}
+
+VideoH264PpsFlags :: struct {
+	bit_field: u32,
+}
+
+VideoH264PictureParameterSet :: struct {
+	flags:                                VideoH264PpsFlags,
+	seq_parameter_set_id:                 u8,
+	pic_parameter_set_id:                 u8,
+	num_ref_idx_l0_default_active_minus1: u8,
+	num_ref_idx_l1_default_active_minus1: u8,
+	weighted_bipred_idc:                  VideoH264WeightedBipredIdc,
+	pic_init_qp_minus26:                  i8,
+	pic_init_qs_minus26:                  i8,
+	chroma_qp_index_offset:               i8,
+	second_chroma_qp_index_offset:        i8,
+	pScalingLists:                        [^]VideoH264ScalingLists,
+}
+
+VideoH265DecPicBufMgr :: struct {
+	max_latency_increase_plus1:   [VIDEO_H265_SUBLAYERS_LIST_SIZE]u32,
+	max_dec_pic_buffering_minus1: [VIDEO_H265_SUBLAYERS_LIST_SIZE]u8,
+	max_num_reorder_pics:         [VIDEO_H265_SUBLAYERS_LIST_SIZE]u8,
+}
+
+VideoH265SubLayerHrdParameters :: struct {
+	bit_rate_value_minus1:    [VIDEO_H265_CPB_CNT_LIST_SIZE]u32,
+	cpb_size_value_minus1:    [VIDEO_H265_CPB_CNT_LIST_SIZE]u32,
+	cpb_size_du_value_minus1: [VIDEO_H265_CPB_CNT_LIST_SIZE]u32,
+	bit_rate_du_value_minus1: [VIDEO_H265_CPB_CNT_LIST_SIZE]u32,
+	cbr_flag:                 u32,
+}
+
+VideoH265HrdFlags :: struct {
+	bit_field: u32,
+}
+
+VideoH265HrdParameters :: struct {
+	flags:                                        VideoH265HrdFlags,
+	tick_divisor_minus2:                          u8,
+	du_cpb_removal_delay_increment_length_minus1: u8,
+	dpb_output_delay_du_length_minus1:            u8,
+	bit_rate_scale:                               u8,
+	cpb_size_scale:                               u8,
+	cpb_size_du_scale:                            u8,
+	initial_cpb_removal_delay_length_minus1:      u8,
+	au_cpb_removal_delay_length_minus1:           u8,
+	dpb_output_delay_length_minus1:               u8,
+	cpb_cnt_minus1:                               [VIDEO_H265_SUBLAYERS_LIST_SIZE]u8,
+	elemental_duration_in_tc_minus1:              [VIDEO_H265_SUBLAYERS_LIST_SIZE]u16,
+	reserved:                                     [3]u16,
+	pSubLayerHrdParametersNal:                    ^VideoH265SubLayerHrdParameters,
+	pSubLayerHrdParametersVcl:                    ^VideoH265SubLayerHrdParameters,
+}
+
+VideoH265VpsFlags :: struct {
+	bit_field: u32,
+}
+
+VideoH265ProfileTierLevelFlags :: struct {
+	bit_field: u32,
+}
+
+VideoH265ProfileTierLevel :: struct {
+	flags:               VideoH265ProfileTierLevelFlags,
+	general_profile_idc: VideoH265ProfileIdc,
+	general_level_idc:   VideoH265LevelIdc,
+}
+
+VideoH265VideoParameterSet :: struct {
+	flags:                             VideoH265VpsFlags,
+	vps_video_parameter_set_id:        u8,
+	vps_max_sub_layers_minus1:         u8,
+	reserved1:                         u8,
+	reserved2:                         u8,
+	vps_num_units_in_tick:             u32,
+	vps_time_scale:                    u32,
+	vps_num_ticks_poc_diff_one_minus1: u32,
+	reserved3:                         u32,
+	pDecPicBufMgr:                     ^VideoH265DecPicBufMgr,
+	pHrdParameters:                    [^]VideoH265HrdParameters,
+	pProfileTierLevel:                 ^VideoH265ProfileTierLevel,
+}
+
+VideoH265ScalingLists :: struct {
+	ScalingList4x4:         [VIDEO_H265_SCALING_LIST_4X4_NUM_LISTS][VIDEO_H265_SCALING_LIST_4X4_NUM_ELEMENTS]u8,
+	ScalingList8x8:         [VIDEO_H265_SCALING_LIST_8X8_NUM_LISTS][VIDEO_H265_SCALING_LIST_8X8_NUM_ELEMENTS]u8,
+	ScalingList16x16:       [VIDEO_H265_SCALING_LIST_16X16_NUM_LISTS][VIDEO_H265_SCALING_LIST_16X16_NUM_ELEMENTS]u8,
+	ScalingList32x32:       [VIDEO_H265_SCALING_LIST_32X32_NUM_LISTS][VIDEO_H265_SCALING_LIST_32X32_NUM_ELEMENTS]u8,
+	ScalingListDCCoef16x16: [VIDEO_H265_SCALING_LIST_16X16_NUM_LISTS]u8,
+	ScalingListDCCoef32x32: [VIDEO_H265_SCALING_LIST_32X32_NUM_LISTS]u8,
+}
+
+VideoH265SpsVuiFlags :: struct {
+	bit_field: u32,
+}
+
+VideoH265SequenceParameterSetVui :: struct {
+	flags:                               VideoH265SpsVuiFlags,
+	aspect_ratio_idc:                    VideoH265AspectRatioIdc,
+	sar_width:                           u16,
+	sar_height:                          u16,
+	video_format:                        u8,
+	colour_primaries:                    u8,
+	transfer_characteristics:            u8,
+	matrix_coeffs:                       u8,
+	chroma_sample_loc_type_top_field:    u8,
+	chroma_sample_loc_type_bottom_field: u8,
+	reserved1:                           u8,
+	reserved2:                           u8,
+	def_disp_win_left_offset:            u16,
+	def_disp_win_right_offset:           u16,
+	def_disp_win_top_offset:             u16,
+	def_disp_win_bottom_offset:          u16,
+	vui_num_units_in_tick:               u32,
+	vui_time_scale:                      u32,
+	vui_num_ticks_poc_diff_one_minus1:   u32,
+	min_spatial_segmentation_idc:        u16,
+	reserved3:                           u16,
+	max_bytes_per_pic_denom:             u8,
+	max_bits_per_min_cu_denom:           u8,
+	log2_max_mv_length_horizontal:       u8,
+	log2_max_mv_length_vertical:         u8,
+	pHrdParameters:                      [^]VideoH265HrdParameters,
+}
+
+VideoH265PredictorPaletteEntries :: struct {
+	PredictorPaletteEntries: [VIDEO_H265_PREDICTOR_PALETTE_COMPONENTS_LIST_SIZE][VIDEO_H265_PREDICTOR_PALETTE_COMP_ENTRIES_LIST_SIZE]u16,
+}
+
+VideoH265SpsFlags :: struct {
+	bit_field: u32,
+}
+
+VideoH265ShortTermRefPicSetFlags :: struct {
+	bit_field: u32,
+}
+
+VideoH265ShortTermRefPicSet :: struct {
+	flags:                    VideoH265ShortTermRefPicSetFlags,
+	delta_idx_minus1:         u32,
+	use_delta_flag:           u16,
+	abs_delta_rps_minus1:     u16,
+	used_by_curr_pic_flag:    u16,
+	used_by_curr_pic_s0_flag: u16,
+	used_by_curr_pic_s1_flag: u16,
+	reserved1:                u16,
+	reserved2:                u8,
+	reserved3:                u8,
+	num_negative_pics:        u8,
+	num_positive_pics:        u8,
+	delta_poc_s0_minus1:      [VIDEO_H265_MAX_DPB_SIZE]u16,
+	delta_poc_s1_minus1:      [VIDEO_H265_MAX_DPB_SIZE]u16,
+}
+
+VideoH265LongTermRefPicsSps :: struct {
+	used_by_curr_pic_lt_sps_flag: u32,
+	lt_ref_pic_poc_lsb_sps:       [VIDEO_H265_MAX_LONG_TERM_REF_PICS_SPS]u32,
+}
+
+VideoH265SequenceParameterSet :: struct {
+	flags:                                         VideoH265SpsFlags,
+	chroma_format_idc:                             VideoH265ChromaFormatIdc,
+	pic_width_in_luma_samples:                     u32,
+	pic_height_in_luma_samples:                    u32,
+	sps_video_parameter_set_id:                    u8,
+	sps_max_sub_layers_minus1:                     u8,
+	sps_seq_parameter_set_id:                      u8,
+	bit_depth_luma_minus8:                         u8,
+	bit_depth_chroma_minus8:                       u8,
+	log2_max_pic_order_cnt_lsb_minus4:             u8,
+	log2_min_luma_coding_block_size_minus3:        u8,
+	log2_diff_max_min_luma_coding_block_size:      u8,
+	log2_min_luma_transform_block_size_minus2:     u8,
+	log2_diff_max_min_luma_transform_block_size:   u8,
+	max_transform_hierarchy_depth_inter:           u8,
+	max_transform_hierarchy_depth_intra:           u8,
+	num_short_term_ref_pic_sets:                   u8,
+	num_long_term_ref_pics_sps:                    u8,
+	pcm_sample_bit_depth_luma_minus1:              u8,
+	pcm_sample_bit_depth_chroma_minus1:            u8,
+	log2_min_pcm_luma_coding_block_size_minus3:    u8,
+	log2_diff_max_min_pcm_luma_coding_block_size:  u8,
+	reserved1:                                     u8,
+	reserved2:                                     u8,
+	palette_max_size:                              u8,
+	delta_palette_max_predictor_size:              u8,
+	motion_vector_resolution_control_idc:          u8,
+	sps_num_palette_predictor_initializers_minus1: u8,
+	conf_win_left_offset:                          u32,
+	conf_win_right_offset:                         u32,
+	conf_win_top_offset:                           u32,
+	conf_win_bottom_offset:                        u32,
+	pProfileTierLevel:                             ^VideoH265ProfileTierLevel,
+	pDecPicBufMgr:                                 ^VideoH265DecPicBufMgr,
+	pScalingLists:                                 [^]VideoH265ScalingLists,
+	pShortTermRefPicSet:                           ^VideoH265ShortTermRefPicSet,
+	pLongTermRefPicsSps:                           [^]VideoH265LongTermRefPicsSps,
+	pSequenceParameterSetVui:                      ^VideoH265SequenceParameterSetVui,
+	pPredictorPaletteEntries:                      [^]VideoH265PredictorPaletteEntries,
+}
+
+VideoH265PpsFlags :: struct {
+	bit_field: u32,
+}
+
+VideoH265PictureParameterSet :: struct {
+	flags:                                     VideoH265PpsFlags,
+	pps_pic_parameter_set_id:                  u8,
+	pps_seq_parameter_set_id:                  u8,
+	sps_video_parameter_set_id:                u8,
+	num_extra_slice_header_bits:               u8,
+	num_ref_idx_l0_default_active_minus1:      u8,
+	num_ref_idx_l1_default_active_minus1:      u8,
+	init_qp_minus26:                           i8,
+	diff_cu_qp_delta_depth:                    u8,
+	pps_cb_qp_offset:                          i8,
+	pps_cr_qp_offset:                          i8,
+	pps_beta_offset_div2:                      i8,
+	pps_tc_offset_div2:                        i8,
+	log2_parallel_merge_level_minus2:          u8,
+	log2_max_transform_skip_block_size_minus2: u8,
+	diff_cu_chroma_qp_offset_depth:            u8,
+	chroma_qp_offset_list_len_minus1:          u8,
+	cb_qp_offset_list:                         [VIDEO_H265_CHROMA_QP_OFFSET_LIST_SIZE]i8,
+	cr_qp_offset_list:                         [VIDEO_H265_CHROMA_QP_OFFSET_LIST_SIZE]i8,
+	log2_sao_offset_scale_luma:                u8,
+	log2_sao_offset_scale_chroma:              u8,
+	pps_act_y_qp_offset_plus5:                 i8,
+	pps_act_cb_qp_offset_plus5:                i8,
+	pps_act_cr_qp_offset_plus3:                i8,
+	pps_num_palette_predictor_initializers:    u8,
+	luma_bit_depth_entry_minus8:               u8,
+	chroma_bit_depth_entry_minus8:             u8,
+	num_tile_columns_minus1:                   u8,
+	num_tile_rows_minus1:                      u8,
+	reserved1:                                 u8,
+	reserved2:                                 u8,
+	column_width_minus1:                       [VIDEO_H265_CHROMA_QP_OFFSET_TILE_COLS_LIST_SIZE]u16,
+	row_height_minus1:                         [VIDEO_H265_CHROMA_QP_OFFSET_TILE_ROWS_LIST_SIZE]u16,
+	reserved3:                                 u32,
+	pScalingLists:                             [^]VideoH265ScalingLists,
+	pPredictorPaletteEntries:                  [^]VideoH265PredictorPaletteEntries,
+}
+
+VideoDecodeH264PictureInfoFlags :: struct {
+	bit_field: u32,
+}
+
+VideoDecodeH264PictureInfo :: struct {
+	flags:                VideoDecodeH264PictureInfoFlags,
+	seq_parameter_set_id: u8,
+	pic_parameter_set_id: u8,
+	reserved1:            u8,
+	reserved2:            u8,
+	frame_num:            u16,
+	idr_pic_id:           u16,
+	PicOrderCnt:          [VIDEO_DECODE_H264_FIELD_ORDER_COUNT_LIST_SIZE]i32,
+}
+
+VideoDecodeH264ReferenceInfoFlags :: struct {
+	bit_field: u32,
+}
+
+VideoDecodeH264ReferenceInfo :: struct {
+	flags:       VideoDecodeH264ReferenceInfoFlags,
+	FrameNum:    u16,
+	reserved:    u16,
+	PicOrderCnt: [VIDEO_DECODE_H264_FIELD_ORDER_COUNT_LIST_SIZE]i32,
+}
+
+VideoDecodeH265PictureInfoFlags :: struct {
+	bit_field: u32,
+}
+
+VideoDecodeH265PictureInfo :: struct {
+	flags:                        VideoDecodeH265PictureInfoFlags,
+	sps_video_parameter_set_id:   u8,
+	pps_seq_parameter_set_id:     u8,
+	pps_pic_parameter_set_id:     u8,
+	NumDeltaPocsOfRefRpsIdx:      u8,
+	PicOrderCntVal:               i32,
+	NumBitsForSTRefPicSetInSlice: u16,
+	reserved:                     u16,
+	RefPicSetStCurrBefore:        [VIDEO_DECODE_H265_REF_PIC_SET_LIST_SIZE]u8,
+	RefPicSetStCurrAfter:         [VIDEO_DECODE_H265_REF_PIC_SET_LIST_SIZE]u8,
+	RefPicSetLtCurr:              [VIDEO_DECODE_H265_REF_PIC_SET_LIST_SIZE]u8,
+}
+
+VideoDecodeH265ReferenceInfoFlags :: struct {
+	bit_field: u32,
+}
+
+VideoDecodeH265ReferenceInfo :: struct {
+	flags:          VideoDecodeH265ReferenceInfoFlags,
+	PicOrderCntVal: i32,
+}
+
 // Opaque structs
 
-wl_surface :: struct {} // Opaque struct defined by Wayland
-wl_display :: struct {} // Opaque struct defined by Wayland
+wl_surface   :: struct {} // Opaque struct defined by Wayland
+wl_display   :: struct {} // Opaque struct defined by Wayland
+IOSurfaceRef :: struct {} // Opaque struct defined by Apple’s CoreGraphics framework
 // Aliases
-PhysicalDeviceVariablePointerFeatures                   :: PhysicalDeviceVariablePointersFeatures
-PhysicalDeviceShaderDrawParameterFeatures               :: PhysicalDeviceShaderDrawParametersFeatures
-PipelineStageFlags2                                     :: Flags64
-PipelineStageFlag2                                      :: Flags64
-AccessFlags2                                            :: Flags64
-AccessFlag2                                             :: Flags64
-FormatFeatureFlags2                                     :: Flags64
-FormatFeatureFlag2                                      :: Flags64
-RenderingFlagsKHR                                       :: RenderingFlags
-RenderingFlagKHR                                        :: RenderingFlag
-RenderingInfoKHR                                        :: RenderingInfo
-RenderingAttachmentInfoKHR                              :: RenderingAttachmentInfo
-PipelineRenderingCreateInfoKHR                          :: PipelineRenderingCreateInfo
-PhysicalDeviceDynamicRenderingFeaturesKHR               :: PhysicalDeviceDynamicRenderingFeatures
-CommandBufferInheritanceRenderingInfoKHR                :: CommandBufferInheritanceRenderingInfo
-AttachmentSampleCountInfoNV                             :: AttachmentSampleCountInfoAMD
-RenderPassMultiviewCreateInfoKHR                        :: RenderPassMultiviewCreateInfo
-PhysicalDeviceMultiviewFeaturesKHR                      :: PhysicalDeviceMultiviewFeatures
-PhysicalDeviceMultiviewPropertiesKHR                    :: PhysicalDeviceMultiviewProperties
-PhysicalDeviceFeatures2KHR                              :: PhysicalDeviceFeatures2
-PhysicalDeviceProperties2KHR                            :: PhysicalDeviceProperties2
-FormatProperties2KHR                                    :: FormatProperties2
-ImageFormatProperties2KHR                               :: ImageFormatProperties2
-PhysicalDeviceImageFormatInfo2KHR                       :: PhysicalDeviceImageFormatInfo2
-QueueFamilyProperties2KHR                               :: QueueFamilyProperties2
-PhysicalDeviceMemoryProperties2KHR                      :: PhysicalDeviceMemoryProperties2
-SparseImageFormatProperties2KHR                         :: SparseImageFormatProperties2
-PhysicalDeviceSparseImageFormatInfo2KHR                 :: PhysicalDeviceSparseImageFormatInfo2
-PeerMemoryFeatureFlagsKHR                               :: PeerMemoryFeatureFlags
-PeerMemoryFeatureFlagKHR                                :: PeerMemoryFeatureFlag
-MemoryAllocateFlagsKHR                                  :: MemoryAllocateFlags
-MemoryAllocateFlagKHR                                   :: MemoryAllocateFlag
-MemoryAllocateFlagsInfoKHR                              :: MemoryAllocateFlagsInfo
-DeviceGroupRenderPassBeginInfoKHR                       :: DeviceGroupRenderPassBeginInfo
-DeviceGroupCommandBufferBeginInfoKHR                    :: DeviceGroupCommandBufferBeginInfo
-DeviceGroupSubmitInfoKHR                                :: DeviceGroupSubmitInfo
-DeviceGroupBindSparseInfoKHR                            :: DeviceGroupBindSparseInfo
-BindBufferMemoryDeviceGroupInfoKHR                      :: BindBufferMemoryDeviceGroupInfo
-BindImageMemoryDeviceGroupInfoKHR                       :: BindImageMemoryDeviceGroupInfo
-CommandPoolTrimFlagsKHR                                 :: CommandPoolTrimFlags
-PhysicalDeviceGroupPropertiesKHR                        :: PhysicalDeviceGroupProperties
-DeviceGroupDeviceCreateInfoKHR                          :: DeviceGroupDeviceCreateInfo
-ExternalMemoryHandleTypeFlagsKHR                        :: ExternalMemoryHandleTypeFlags
-ExternalMemoryHandleTypeFlagKHR                         :: ExternalMemoryHandleTypeFlag
-ExternalMemoryFeatureFlagsKHR                           :: ExternalMemoryFeatureFlags
-ExternalMemoryFeatureFlagKHR                            :: ExternalMemoryFeatureFlag
-ExternalMemoryPropertiesKHR                             :: ExternalMemoryProperties
-PhysicalDeviceExternalImageFormatInfoKHR                :: PhysicalDeviceExternalImageFormatInfo
-ExternalImageFormatPropertiesKHR                        :: ExternalImageFormatProperties
-PhysicalDeviceExternalBufferInfoKHR                     :: PhysicalDeviceExternalBufferInfo
-ExternalBufferPropertiesKHR                             :: ExternalBufferProperties
-PhysicalDeviceIDPropertiesKHR                           :: PhysicalDeviceIDProperties
-ExternalMemoryImageCreateInfoKHR                        :: ExternalMemoryImageCreateInfo
-ExternalMemoryBufferCreateInfoKHR                       :: ExternalMemoryBufferCreateInfo
-ExportMemoryAllocateInfoKHR                             :: ExportMemoryAllocateInfo
-ExternalSemaphoreHandleTypeFlagsKHR                     :: ExternalSemaphoreHandleTypeFlags
-ExternalSemaphoreHandleTypeFlagKHR                      :: ExternalSemaphoreHandleTypeFlag
-ExternalSemaphoreFeatureFlagsKHR                        :: ExternalSemaphoreFeatureFlags
-ExternalSemaphoreFeatureFlagKHR                         :: ExternalSemaphoreFeatureFlag
-PhysicalDeviceExternalSemaphoreInfoKHR                  :: PhysicalDeviceExternalSemaphoreInfo
-ExternalSemaphorePropertiesKHR                          :: ExternalSemaphoreProperties
-SemaphoreImportFlagsKHR                                 :: SemaphoreImportFlags
-SemaphoreImportFlagKHR                                  :: SemaphoreImportFlag
-ExportSemaphoreCreateInfoKHR                            :: ExportSemaphoreCreateInfo
-PhysicalDeviceShaderFloat16Int8FeaturesKHR              :: PhysicalDeviceShaderFloat16Int8Features
-PhysicalDeviceFloat16Int8FeaturesKHR                    :: PhysicalDeviceShaderFloat16Int8Features
-PhysicalDevice16BitStorageFeaturesKHR                   :: PhysicalDevice16BitStorageFeatures
-DescriptorUpdateTemplateKHR                             :: DescriptorUpdateTemplate
-DescriptorUpdateTemplateTypeKHR                         :: DescriptorUpdateTemplateType
-DescriptorUpdateTemplateCreateFlagsKHR                  :: DescriptorUpdateTemplateCreateFlags
-DescriptorUpdateTemplateEntryKHR                        :: DescriptorUpdateTemplateEntry
-DescriptorUpdateTemplateCreateInfoKHR                   :: DescriptorUpdateTemplateCreateInfo
-PhysicalDeviceImagelessFramebufferFeaturesKHR           :: PhysicalDeviceImagelessFramebufferFeatures
-FramebufferAttachmentsCreateInfoKHR                     :: FramebufferAttachmentsCreateInfo
-FramebufferAttachmentImageInfoKHR                       :: FramebufferAttachmentImageInfo
-RenderPassAttachmentBeginInfoKHR                        :: RenderPassAttachmentBeginInfo
-RenderPassCreateInfo2KHR                                :: RenderPassCreateInfo2
-AttachmentDescription2KHR                               :: AttachmentDescription2
-AttachmentReference2KHR                                 :: AttachmentReference2
-SubpassDescription2KHR                                  :: SubpassDescription2
-SubpassDependency2KHR                                   :: SubpassDependency2
-SubpassBeginInfoKHR                                     :: SubpassBeginInfo
-SubpassEndInfoKHR                                       :: SubpassEndInfo
-ExternalFenceHandleTypeFlagsKHR                         :: ExternalFenceHandleTypeFlags
-ExternalFenceHandleTypeFlagKHR                          :: ExternalFenceHandleTypeFlag
-ExternalFenceFeatureFlagsKHR                            :: ExternalFenceFeatureFlags
-ExternalFenceFeatureFlagKHR                             :: ExternalFenceFeatureFlag
-PhysicalDeviceExternalFenceInfoKHR                      :: PhysicalDeviceExternalFenceInfo
-ExternalFencePropertiesKHR                              :: ExternalFenceProperties
-FenceImportFlagsKHR                                     :: FenceImportFlags
-FenceImportFlagKHR                                      :: FenceImportFlag
-ExportFenceCreateInfoKHR                                :: ExportFenceCreateInfo
-PointClippingBehaviorKHR                                :: PointClippingBehavior
-TessellationDomainOriginKHR                             :: TessellationDomainOrigin
-PhysicalDevicePointClippingPropertiesKHR                :: PhysicalDevicePointClippingProperties
-RenderPassInputAttachmentAspectCreateInfoKHR            :: RenderPassInputAttachmentAspectCreateInfo
-InputAttachmentAspectReferenceKHR                       :: InputAttachmentAspectReference
-ImageViewUsageCreateInfoKHR                             :: ImageViewUsageCreateInfo
-PipelineTessellationDomainOriginStateCreateInfoKHR      :: PipelineTessellationDomainOriginStateCreateInfo
-PhysicalDeviceVariablePointerFeaturesKHR                :: PhysicalDeviceVariablePointersFeatures
-PhysicalDeviceVariablePointersFeaturesKHR               :: PhysicalDeviceVariablePointersFeatures
-MemoryDedicatedRequirementsKHR                          :: MemoryDedicatedRequirements
-MemoryDedicatedAllocateInfoKHR                          :: MemoryDedicatedAllocateInfo
-BufferMemoryRequirementsInfo2KHR                        :: BufferMemoryRequirementsInfo2
-ImageMemoryRequirementsInfo2KHR                         :: ImageMemoryRequirementsInfo2
-ImageSparseMemoryRequirementsInfo2KHR                   :: ImageSparseMemoryRequirementsInfo2
-MemoryRequirements2KHR                                  :: MemoryRequirements2
-SparseImageMemoryRequirements2KHR                       :: SparseImageMemoryRequirements2
-ImageFormatListCreateInfoKHR                            :: ImageFormatListCreateInfo
-SamplerYcbcrConversionKHR                               :: SamplerYcbcrConversion
-SamplerYcbcrModelConversionKHR                          :: SamplerYcbcrModelConversion
-SamplerYcbcrRangeKHR                                    :: SamplerYcbcrRange
-ChromaLocationKHR                                       :: ChromaLocation
-SamplerYcbcrConversionCreateInfoKHR                     :: SamplerYcbcrConversionCreateInfo
-SamplerYcbcrConversionInfoKHR                           :: SamplerYcbcrConversionInfo
-BindImagePlaneMemoryInfoKHR                             :: BindImagePlaneMemoryInfo
-ImagePlaneMemoryRequirementsInfoKHR                     :: ImagePlaneMemoryRequirementsInfo
-PhysicalDeviceSamplerYcbcrConversionFeaturesKHR         :: PhysicalDeviceSamplerYcbcrConversionFeatures
-SamplerYcbcrConversionImageFormatPropertiesKHR          :: SamplerYcbcrConversionImageFormatProperties
-BindBufferMemoryInfoKHR                                 :: BindBufferMemoryInfo
-BindImageMemoryInfoKHR                                  :: BindImageMemoryInfo
-PhysicalDeviceMaintenance3PropertiesKHR                 :: PhysicalDeviceMaintenance3Properties
-DescriptorSetLayoutSupportKHR                           :: DescriptorSetLayoutSupport
-PhysicalDeviceShaderSubgroupExtendedTypesFeaturesKHR    :: PhysicalDeviceShaderSubgroupExtendedTypesFeatures
-PhysicalDevice8BitStorageFeaturesKHR                    :: PhysicalDevice8BitStorageFeatures
-PhysicalDeviceShaderAtomicInt64FeaturesKHR              :: PhysicalDeviceShaderAtomicInt64Features
-DriverIdKHR                                             :: DriverId
-ConformanceVersionKHR                                   :: ConformanceVersion
-PhysicalDeviceDriverPropertiesKHR                       :: PhysicalDeviceDriverProperties
-ShaderFloatControlsIndependenceKHR                      :: ShaderFloatControlsIndependence
-PhysicalDeviceFloatControlsPropertiesKHR                :: PhysicalDeviceFloatControlsProperties
-ResolveModeFlagKHR                                      :: ResolveModeFlag
-ResolveModeFlagsKHR                                     :: ResolveModeFlags
-SubpassDescriptionDepthStencilResolveKHR                :: SubpassDescriptionDepthStencilResolve
-PhysicalDeviceDepthStencilResolvePropertiesKHR          :: PhysicalDeviceDepthStencilResolveProperties
-SemaphoreTypeKHR                                        :: SemaphoreType
-SemaphoreWaitFlagKHR                                    :: SemaphoreWaitFlag
-SemaphoreWaitFlagsKHR                                   :: SemaphoreWaitFlags
-PhysicalDeviceTimelineSemaphoreFeaturesKHR              :: PhysicalDeviceTimelineSemaphoreFeatures
-PhysicalDeviceTimelineSemaphorePropertiesKHR            :: PhysicalDeviceTimelineSemaphoreProperties
-SemaphoreTypeCreateInfoKHR                              :: SemaphoreTypeCreateInfo
-TimelineSemaphoreSubmitInfoKHR                          :: TimelineSemaphoreSubmitInfo
-SemaphoreWaitInfoKHR                                    :: SemaphoreWaitInfo
-SemaphoreSignalInfoKHR                                  :: SemaphoreSignalInfo
-PhysicalDeviceVulkanMemoryModelFeaturesKHR              :: PhysicalDeviceVulkanMemoryModelFeatures
-PhysicalDeviceShaderTerminateInvocationFeaturesKHR      :: PhysicalDeviceShaderTerminateInvocationFeatures
-PhysicalDeviceSeparateDepthStencilLayoutsFeaturesKHR    :: PhysicalDeviceSeparateDepthStencilLayoutsFeatures
-AttachmentReferenceStencilLayoutKHR                     :: AttachmentReferenceStencilLayout
-AttachmentDescriptionStencilLayoutKHR                   :: AttachmentDescriptionStencilLayout
-PhysicalDeviceUniformBufferStandardLayoutFeaturesKHR    :: PhysicalDeviceUniformBufferStandardLayoutFeatures
-PhysicalDeviceBufferDeviceAddressFeaturesKHR            :: PhysicalDeviceBufferDeviceAddressFeatures
-BufferDeviceAddressInfoKHR                              :: BufferDeviceAddressInfo
-BufferOpaqueCaptureAddressCreateInfoKHR                 :: BufferOpaqueCaptureAddressCreateInfo
-MemoryOpaqueCaptureAddressAllocateInfoKHR               :: MemoryOpaqueCaptureAddressAllocateInfo
-DeviceMemoryOpaqueCaptureAddressInfoKHR                 :: DeviceMemoryOpaqueCaptureAddressInfo
-PhysicalDeviceShaderIntegerDotProductFeaturesKHR        :: PhysicalDeviceShaderIntegerDotProductFeatures
-PhysicalDeviceShaderIntegerDotProductPropertiesKHR      :: PhysicalDeviceShaderIntegerDotProductProperties
-PipelineStageFlags2KHR                                  :: PipelineStageFlags2
-PipelineStageFlag2KHR                                   :: PipelineStageFlag2
-AccessFlags2KHR                                         :: AccessFlags2
-AccessFlag2KHR                                          :: AccessFlag2
-SubmitFlagKHR                                           :: SubmitFlag
-SubmitFlagsKHR                                          :: SubmitFlags
-MemoryBarrier2KHR                                       :: MemoryBarrier2
-BufferMemoryBarrier2KHR                                 :: BufferMemoryBarrier2
-ImageMemoryBarrier2KHR                                  :: ImageMemoryBarrier2
-DependencyInfoKHR                                       :: DependencyInfo
-SubmitInfo2KHR                                          :: SubmitInfo2
-SemaphoreSubmitInfoKHR                                  :: SemaphoreSubmitInfo
-CommandBufferSubmitInfoKHR                              :: CommandBufferSubmitInfo
-PhysicalDeviceSynchronization2FeaturesKHR               :: PhysicalDeviceSynchronization2Features
-PhysicalDeviceZeroInitializeWorkgroupMemoryFeaturesKHR  :: PhysicalDeviceZeroInitializeWorkgroupMemoryFeatures
-CopyBufferInfo2KHR                                      :: CopyBufferInfo2
-CopyImageInfo2KHR                                       :: CopyImageInfo2
-CopyBufferToImageInfo2KHR                               :: CopyBufferToImageInfo2
-CopyImageToBufferInfo2KHR                               :: CopyImageToBufferInfo2
-BlitImageInfo2KHR                                       :: BlitImageInfo2
-ResolveImageInfo2KHR                                    :: ResolveImageInfo2
-BufferCopy2KHR                                          :: BufferCopy2
-ImageCopy2KHR                                           :: ImageCopy2
-ImageBlit2KHR                                           :: ImageBlit2
-BufferImageCopy2KHR                                     :: BufferImageCopy2
-ImageResolve2KHR                                        :: ImageResolve2
-FormatFeatureFlags2KHR                                  :: FormatFeatureFlags2
-FormatFeatureFlag2KHR                                   :: FormatFeatureFlag2
-FormatProperties3KHR                                    :: FormatProperties3
-PhysicalDeviceMaintenance4FeaturesKHR                   :: PhysicalDeviceMaintenance4Features
-PhysicalDeviceMaintenance4PropertiesKHR                 :: PhysicalDeviceMaintenance4Properties
-DeviceBufferMemoryRequirementsKHR                       :: DeviceBufferMemoryRequirements
-DeviceImageMemoryRequirementsKHR                        :: DeviceImageMemoryRequirements
-PhysicalDeviceTextureCompressionASTCHDRFeaturesEXT      :: PhysicalDeviceTextureCompressionASTCHDRFeatures
-SamplerReductionModeEXT                                 :: SamplerReductionMode
-SamplerReductionModeCreateInfoEXT                       :: SamplerReductionModeCreateInfo
-PhysicalDeviceSamplerFilterMinmaxPropertiesEXT          :: PhysicalDeviceSamplerFilterMinmaxProperties
-PhysicalDeviceInlineUniformBlockFeaturesEXT             :: PhysicalDeviceInlineUniformBlockFeatures
-PhysicalDeviceInlineUniformBlockPropertiesEXT           :: PhysicalDeviceInlineUniformBlockProperties
-WriteDescriptorSetInlineUniformBlockEXT                 :: WriteDescriptorSetInlineUniformBlock
-DescriptorPoolInlineUniformBlockCreateInfoEXT           :: DescriptorPoolInlineUniformBlockCreateInfo
-DescriptorBindingFlagEXT                                :: DescriptorBindingFlag
-DescriptorBindingFlagsEXT                               :: DescriptorBindingFlags
-DescriptorSetLayoutBindingFlagsCreateInfoEXT            :: DescriptorSetLayoutBindingFlagsCreateInfo
-PhysicalDeviceDescriptorIndexingFeaturesEXT             :: PhysicalDeviceDescriptorIndexingFeatures
-PhysicalDeviceDescriptorIndexingPropertiesEXT           :: PhysicalDeviceDescriptorIndexingProperties
-DescriptorSetVariableDescriptorCountAllocateInfoEXT     :: DescriptorSetVariableDescriptorCountAllocateInfo
-DescriptorSetVariableDescriptorCountLayoutSupportEXT    :: DescriptorSetVariableDescriptorCountLayoutSupport
-RayTracingShaderGroupTypeNV                             :: RayTracingShaderGroupTypeKHR
-GeometryTypeNV                                          :: GeometryTypeKHR
-AccelerationStructureTypeNV                             :: AccelerationStructureTypeKHR
-CopyAccelerationStructureModeNV                         :: CopyAccelerationStructureModeKHR
-GeometryFlagsNV                                         :: GeometryFlagsKHR
-GeometryFlagNV                                          :: GeometryFlagKHR
-GeometryInstanceFlagsNV                                 :: GeometryInstanceFlagsKHR
-GeometryInstanceFlagNV                                  :: GeometryInstanceFlagKHR
-BuildAccelerationStructureFlagsNV                       :: BuildAccelerationStructureFlagsKHR
-BuildAccelerationStructureFlagNV                        :: BuildAccelerationStructureFlagKHR
-TransformMatrixNV                                       :: TransformMatrixKHR
-AabbPositionsNV                                         :: AabbPositionsKHR
-AccelerationStructureInstanceNV                         :: AccelerationStructureInstanceKHR
-QueueGlobalPriorityEXT                                  :: QueueGlobalPriorityKHR
-DeviceQueueGlobalPriorityCreateInfoEXT                  :: DeviceQueueGlobalPriorityCreateInfoKHR
-PipelineCreationFeedbackFlagEXT                         :: PipelineCreationFeedbackFlag
-PipelineCreationFeedbackFlagsEXT                        :: PipelineCreationFeedbackFlags
-PipelineCreationFeedbackCreateInfoEXT                   :: PipelineCreationFeedbackCreateInfo
-PipelineCreationFeedbackEXT                             :: PipelineCreationFeedback
-QueryPoolCreateInfoINTEL                                :: QueryPoolPerformanceQueryCreateInfoINTEL
-PhysicalDeviceScalarBlockLayoutFeaturesEXT              :: PhysicalDeviceScalarBlockLayoutFeatures
-PhysicalDeviceSubgroupSizeControlFeaturesEXT            :: PhysicalDeviceSubgroupSizeControlFeatures
-PhysicalDeviceSubgroupSizeControlPropertiesEXT          :: PhysicalDeviceSubgroupSizeControlProperties
-PipelineShaderStageRequiredSubgroupSizeCreateInfoEXT    :: PipelineShaderStageRequiredSubgroupSizeCreateInfo
-PhysicalDeviceBufferAddressFeaturesEXT                  :: PhysicalDeviceBufferDeviceAddressFeaturesEXT
-BufferDeviceAddressInfoEXT                              :: BufferDeviceAddressInfo
-ToolPurposeFlagEXT                                      :: ToolPurposeFlag
-ToolPurposeFlagsEXT                                     :: ToolPurposeFlags
-PhysicalDeviceToolPropertiesEXT                         :: PhysicalDeviceToolProperties
-ImageStencilUsageCreateInfoEXT                          :: ImageStencilUsageCreateInfo
-PhysicalDeviceHostQueryResetFeaturesEXT                 :: PhysicalDeviceHostQueryResetFeatures
-PhysicalDeviceShaderDemoteToHelperInvocationFeaturesEXT :: PhysicalDeviceShaderDemoteToHelperInvocationFeatures
-PhysicalDeviceTexelBufferAlignmentPropertiesEXT         :: PhysicalDeviceTexelBufferAlignmentProperties
-PrivateDataSlotEXT                                      :: PrivateDataSlot
-PrivateDataSlotCreateFlagsEXT                           :: PrivateDataSlotCreateFlags
-PhysicalDevicePrivateDataFeaturesEXT                    :: PhysicalDevicePrivateDataFeatures
-DevicePrivateDataCreateInfoEXT                          :: DevicePrivateDataCreateInfo
-PrivateDataSlotCreateInfoEXT                            :: PrivateDataSlotCreateInfo
-PhysicalDevicePipelineCreationCacheControlFeaturesEXT   :: PhysicalDevicePipelineCreationCacheControlFeatures
-PhysicalDeviceImageRobustnessFeaturesEXT                :: PhysicalDeviceImageRobustnessFeatures
-PhysicalDeviceGlobalPriorityQueryFeaturesEXT            :: PhysicalDeviceGlobalPriorityQueryFeaturesKHR
-QueueFamilyGlobalPriorityPropertiesEXT                  :: QueueFamilyGlobalPriorityPropertiesKHR
+PhysicalDeviceVariablePointerFeatures                       :: PhysicalDeviceVariablePointersFeatures
+PhysicalDeviceShaderDrawParameterFeatures                   :: PhysicalDeviceShaderDrawParametersFeatures
+PipelineStageFlags2                                         :: Flags64
+PipelineStageFlag2                                          :: Flags64
+AccessFlags2                                                :: Flags64
+AccessFlag2                                                 :: Flags64
+FormatFeatureFlags2                                         :: Flags64
+FormatFeatureFlag2                                          :: Flags64
+RenderingFlagsKHR                                           :: RenderingFlags
+RenderingFlagKHR                                            :: RenderingFlag
+RenderingInfoKHR                                            :: RenderingInfo
+RenderingAttachmentInfoKHR                                  :: RenderingAttachmentInfo
+PipelineRenderingCreateInfoKHR                              :: PipelineRenderingCreateInfo
+PhysicalDeviceDynamicRenderingFeaturesKHR                   :: PhysicalDeviceDynamicRenderingFeatures
+CommandBufferInheritanceRenderingInfoKHR                    :: CommandBufferInheritanceRenderingInfo
+AttachmentSampleCountInfoNV                                 :: AttachmentSampleCountInfoAMD
+RenderPassMultiviewCreateInfoKHR                            :: RenderPassMultiviewCreateInfo
+PhysicalDeviceMultiviewFeaturesKHR                          :: PhysicalDeviceMultiviewFeatures
+PhysicalDeviceMultiviewPropertiesKHR                        :: PhysicalDeviceMultiviewProperties
+PhysicalDeviceFeatures2KHR                                  :: PhysicalDeviceFeatures2
+PhysicalDeviceProperties2KHR                                :: PhysicalDeviceProperties2
+FormatProperties2KHR                                        :: FormatProperties2
+ImageFormatProperties2KHR                                   :: ImageFormatProperties2
+PhysicalDeviceImageFormatInfo2KHR                           :: PhysicalDeviceImageFormatInfo2
+QueueFamilyProperties2KHR                                   :: QueueFamilyProperties2
+PhysicalDeviceMemoryProperties2KHR                          :: PhysicalDeviceMemoryProperties2
+SparseImageFormatProperties2KHR                             :: SparseImageFormatProperties2
+PhysicalDeviceSparseImageFormatInfo2KHR                     :: PhysicalDeviceSparseImageFormatInfo2
+PeerMemoryFeatureFlagsKHR                                   :: PeerMemoryFeatureFlags
+PeerMemoryFeatureFlagKHR                                    :: PeerMemoryFeatureFlag
+MemoryAllocateFlagsKHR                                      :: MemoryAllocateFlags
+MemoryAllocateFlagKHR                                       :: MemoryAllocateFlag
+MemoryAllocateFlagsInfoKHR                                  :: MemoryAllocateFlagsInfo
+DeviceGroupRenderPassBeginInfoKHR                           :: DeviceGroupRenderPassBeginInfo
+DeviceGroupCommandBufferBeginInfoKHR                        :: DeviceGroupCommandBufferBeginInfo
+DeviceGroupSubmitInfoKHR                                    :: DeviceGroupSubmitInfo
+DeviceGroupBindSparseInfoKHR                                :: DeviceGroupBindSparseInfo
+BindBufferMemoryDeviceGroupInfoKHR                          :: BindBufferMemoryDeviceGroupInfo
+BindImageMemoryDeviceGroupInfoKHR                           :: BindImageMemoryDeviceGroupInfo
+CommandPoolTrimFlagsKHR                                     :: CommandPoolTrimFlags
+PhysicalDeviceGroupPropertiesKHR                            :: PhysicalDeviceGroupProperties
+DeviceGroupDeviceCreateInfoKHR                              :: DeviceGroupDeviceCreateInfo
+ExternalMemoryHandleTypeFlagsKHR                            :: ExternalMemoryHandleTypeFlags
+ExternalMemoryHandleTypeFlagKHR                             :: ExternalMemoryHandleTypeFlag
+ExternalMemoryFeatureFlagsKHR                               :: ExternalMemoryFeatureFlags
+ExternalMemoryFeatureFlagKHR                                :: ExternalMemoryFeatureFlag
+ExternalMemoryPropertiesKHR                                 :: ExternalMemoryProperties
+PhysicalDeviceExternalImageFormatInfoKHR                    :: PhysicalDeviceExternalImageFormatInfo
+ExternalImageFormatPropertiesKHR                            :: ExternalImageFormatProperties
+PhysicalDeviceExternalBufferInfoKHR                         :: PhysicalDeviceExternalBufferInfo
+ExternalBufferPropertiesKHR                                 :: ExternalBufferProperties
+PhysicalDeviceIDPropertiesKHR                               :: PhysicalDeviceIDProperties
+ExternalMemoryImageCreateInfoKHR                            :: ExternalMemoryImageCreateInfo
+ExternalMemoryBufferCreateInfoKHR                           :: ExternalMemoryBufferCreateInfo
+ExportMemoryAllocateInfoKHR                                 :: ExportMemoryAllocateInfo
+ExternalSemaphoreHandleTypeFlagsKHR                         :: ExternalSemaphoreHandleTypeFlags
+ExternalSemaphoreHandleTypeFlagKHR                          :: ExternalSemaphoreHandleTypeFlag
+ExternalSemaphoreFeatureFlagsKHR                            :: ExternalSemaphoreFeatureFlags
+ExternalSemaphoreFeatureFlagKHR                             :: ExternalSemaphoreFeatureFlag
+PhysicalDeviceExternalSemaphoreInfoKHR                      :: PhysicalDeviceExternalSemaphoreInfo
+ExternalSemaphorePropertiesKHR                              :: ExternalSemaphoreProperties
+SemaphoreImportFlagsKHR                                     :: SemaphoreImportFlags
+SemaphoreImportFlagKHR                                      :: SemaphoreImportFlag
+ExportSemaphoreCreateInfoKHR                                :: ExportSemaphoreCreateInfo
+PhysicalDeviceShaderFloat16Int8FeaturesKHR                  :: PhysicalDeviceShaderFloat16Int8Features
+PhysicalDeviceFloat16Int8FeaturesKHR                        :: PhysicalDeviceShaderFloat16Int8Features
+PhysicalDevice16BitStorageFeaturesKHR                       :: PhysicalDevice16BitStorageFeatures
+DescriptorUpdateTemplateKHR                                 :: DescriptorUpdateTemplate
+DescriptorUpdateTemplateTypeKHR                             :: DescriptorUpdateTemplateType
+DescriptorUpdateTemplateCreateFlagsKHR                      :: DescriptorUpdateTemplateCreateFlags
+DescriptorUpdateTemplateEntryKHR                            :: DescriptorUpdateTemplateEntry
+DescriptorUpdateTemplateCreateInfoKHR                       :: DescriptorUpdateTemplateCreateInfo
+PhysicalDeviceImagelessFramebufferFeaturesKHR               :: PhysicalDeviceImagelessFramebufferFeatures
+FramebufferAttachmentsCreateInfoKHR                         :: FramebufferAttachmentsCreateInfo
+FramebufferAttachmentImageInfoKHR                           :: FramebufferAttachmentImageInfo
+RenderPassAttachmentBeginInfoKHR                            :: RenderPassAttachmentBeginInfo
+RenderPassCreateInfo2KHR                                    :: RenderPassCreateInfo2
+AttachmentDescription2KHR                                   :: AttachmentDescription2
+AttachmentReference2KHR                                     :: AttachmentReference2
+SubpassDescription2KHR                                      :: SubpassDescription2
+SubpassDependency2KHR                                       :: SubpassDependency2
+SubpassBeginInfoKHR                                         :: SubpassBeginInfo
+SubpassEndInfoKHR                                           :: SubpassEndInfo
+ExternalFenceHandleTypeFlagsKHR                             :: ExternalFenceHandleTypeFlags
+ExternalFenceHandleTypeFlagKHR                              :: ExternalFenceHandleTypeFlag
+ExternalFenceFeatureFlagsKHR                                :: ExternalFenceFeatureFlags
+ExternalFenceFeatureFlagKHR                                 :: ExternalFenceFeatureFlag
+PhysicalDeviceExternalFenceInfoKHR                          :: PhysicalDeviceExternalFenceInfo
+ExternalFencePropertiesKHR                                  :: ExternalFenceProperties
+FenceImportFlagsKHR                                         :: FenceImportFlags
+FenceImportFlagKHR                                          :: FenceImportFlag
+ExportFenceCreateInfoKHR                                    :: ExportFenceCreateInfo
+PointClippingBehaviorKHR                                    :: PointClippingBehavior
+TessellationDomainOriginKHR                                 :: TessellationDomainOrigin
+PhysicalDevicePointClippingPropertiesKHR                    :: PhysicalDevicePointClippingProperties
+RenderPassInputAttachmentAspectCreateInfoKHR                :: RenderPassInputAttachmentAspectCreateInfo
+InputAttachmentAspectReferenceKHR                           :: InputAttachmentAspectReference
+ImageViewUsageCreateInfoKHR                                 :: ImageViewUsageCreateInfo
+PipelineTessellationDomainOriginStateCreateInfoKHR          :: PipelineTessellationDomainOriginStateCreateInfo
+PhysicalDeviceVariablePointerFeaturesKHR                    :: PhysicalDeviceVariablePointersFeatures
+PhysicalDeviceVariablePointersFeaturesKHR                   :: PhysicalDeviceVariablePointersFeatures
+MemoryDedicatedRequirementsKHR                              :: MemoryDedicatedRequirements
+MemoryDedicatedAllocateInfoKHR                              :: MemoryDedicatedAllocateInfo
+BufferMemoryRequirementsInfo2KHR                            :: BufferMemoryRequirementsInfo2
+ImageMemoryRequirementsInfo2KHR                             :: ImageMemoryRequirementsInfo2
+ImageSparseMemoryRequirementsInfo2KHR                       :: ImageSparseMemoryRequirementsInfo2
+MemoryRequirements2KHR                                      :: MemoryRequirements2
+SparseImageMemoryRequirements2KHR                           :: SparseImageMemoryRequirements2
+ImageFormatListCreateInfoKHR                                :: ImageFormatListCreateInfo
+SamplerYcbcrConversionKHR                                   :: SamplerYcbcrConversion
+SamplerYcbcrModelConversionKHR                              :: SamplerYcbcrModelConversion
+SamplerYcbcrRangeKHR                                        :: SamplerYcbcrRange
+ChromaLocationKHR                                           :: ChromaLocation
+SamplerYcbcrConversionCreateInfoKHR                         :: SamplerYcbcrConversionCreateInfo
+SamplerYcbcrConversionInfoKHR                               :: SamplerYcbcrConversionInfo
+BindImagePlaneMemoryInfoKHR                                 :: BindImagePlaneMemoryInfo
+ImagePlaneMemoryRequirementsInfoKHR                         :: ImagePlaneMemoryRequirementsInfo
+PhysicalDeviceSamplerYcbcrConversionFeaturesKHR             :: PhysicalDeviceSamplerYcbcrConversionFeatures
+SamplerYcbcrConversionImageFormatPropertiesKHR              :: SamplerYcbcrConversionImageFormatProperties
+BindBufferMemoryInfoKHR                                     :: BindBufferMemoryInfo
+BindImageMemoryInfoKHR                                      :: BindImageMemoryInfo
+PhysicalDeviceMaintenance3PropertiesKHR                     :: PhysicalDeviceMaintenance3Properties
+DescriptorSetLayoutSupportKHR                               :: DescriptorSetLayoutSupport
+PhysicalDeviceShaderSubgroupExtendedTypesFeaturesKHR        :: PhysicalDeviceShaderSubgroupExtendedTypesFeatures
+PhysicalDevice8BitStorageFeaturesKHR                        :: PhysicalDevice8BitStorageFeatures
+PhysicalDeviceShaderAtomicInt64FeaturesKHR                  :: PhysicalDeviceShaderAtomicInt64Features
+DriverIdKHR                                                 :: DriverId
+ConformanceVersionKHR                                       :: ConformanceVersion
+PhysicalDeviceDriverPropertiesKHR                           :: PhysicalDeviceDriverProperties
+ShaderFloatControlsIndependenceKHR                          :: ShaderFloatControlsIndependence
+PhysicalDeviceFloatControlsPropertiesKHR                    :: PhysicalDeviceFloatControlsProperties
+ResolveModeFlagKHR                                          :: ResolveModeFlag
+ResolveModeFlagsKHR                                         :: ResolveModeFlags
+SubpassDescriptionDepthStencilResolveKHR                    :: SubpassDescriptionDepthStencilResolve
+PhysicalDeviceDepthStencilResolvePropertiesKHR              :: PhysicalDeviceDepthStencilResolveProperties
+SemaphoreTypeKHR                                            :: SemaphoreType
+SemaphoreWaitFlagKHR                                        :: SemaphoreWaitFlag
+SemaphoreWaitFlagsKHR                                       :: SemaphoreWaitFlags
+PhysicalDeviceTimelineSemaphoreFeaturesKHR                  :: PhysicalDeviceTimelineSemaphoreFeatures
+PhysicalDeviceTimelineSemaphorePropertiesKHR                :: PhysicalDeviceTimelineSemaphoreProperties
+SemaphoreTypeCreateInfoKHR                                  :: SemaphoreTypeCreateInfo
+TimelineSemaphoreSubmitInfoKHR                              :: TimelineSemaphoreSubmitInfo
+SemaphoreWaitInfoKHR                                        :: SemaphoreWaitInfo
+SemaphoreSignalInfoKHR                                      :: SemaphoreSignalInfo
+PhysicalDeviceVulkanMemoryModelFeaturesKHR                  :: PhysicalDeviceVulkanMemoryModelFeatures
+PhysicalDeviceShaderTerminateInvocationFeaturesKHR          :: PhysicalDeviceShaderTerminateInvocationFeatures
+PhysicalDeviceSeparateDepthStencilLayoutsFeaturesKHR        :: PhysicalDeviceSeparateDepthStencilLayoutsFeatures
+AttachmentReferenceStencilLayoutKHR                         :: AttachmentReferenceStencilLayout
+AttachmentDescriptionStencilLayoutKHR                       :: AttachmentDescriptionStencilLayout
+PhysicalDeviceUniformBufferStandardLayoutFeaturesKHR        :: PhysicalDeviceUniformBufferStandardLayoutFeatures
+PhysicalDeviceBufferDeviceAddressFeaturesKHR                :: PhysicalDeviceBufferDeviceAddressFeatures
+BufferDeviceAddressInfoKHR                                  :: BufferDeviceAddressInfo
+BufferOpaqueCaptureAddressCreateInfoKHR                     :: BufferOpaqueCaptureAddressCreateInfo
+MemoryOpaqueCaptureAddressAllocateInfoKHR                   :: MemoryOpaqueCaptureAddressAllocateInfo
+DeviceMemoryOpaqueCaptureAddressInfoKHR                     :: DeviceMemoryOpaqueCaptureAddressInfo
+PhysicalDeviceShaderIntegerDotProductFeaturesKHR            :: PhysicalDeviceShaderIntegerDotProductFeatures
+PhysicalDeviceShaderIntegerDotProductPropertiesKHR          :: PhysicalDeviceShaderIntegerDotProductProperties
+PipelineStageFlags2KHR                                      :: PipelineStageFlags2
+PipelineStageFlag2KHR                                       :: PipelineStageFlag2
+AccessFlags2KHR                                             :: AccessFlags2
+AccessFlag2KHR                                              :: AccessFlag2
+SubmitFlagKHR                                               :: SubmitFlag
+SubmitFlagsKHR                                              :: SubmitFlags
+MemoryBarrier2KHR                                           :: MemoryBarrier2
+BufferMemoryBarrier2KHR                                     :: BufferMemoryBarrier2
+ImageMemoryBarrier2KHR                                      :: ImageMemoryBarrier2
+DependencyInfoKHR                                           :: DependencyInfo
+SubmitInfo2KHR                                              :: SubmitInfo2
+SemaphoreSubmitInfoKHR                                      :: SemaphoreSubmitInfo
+CommandBufferSubmitInfoKHR                                  :: CommandBufferSubmitInfo
+PhysicalDeviceSynchronization2FeaturesKHR                   :: PhysicalDeviceSynchronization2Features
+PhysicalDeviceZeroInitializeWorkgroupMemoryFeaturesKHR      :: PhysicalDeviceZeroInitializeWorkgroupMemoryFeatures
+CopyBufferInfo2KHR                                          :: CopyBufferInfo2
+CopyImageInfo2KHR                                           :: CopyImageInfo2
+CopyBufferToImageInfo2KHR                                   :: CopyBufferToImageInfo2
+CopyImageToBufferInfo2KHR                                   :: CopyImageToBufferInfo2
+BlitImageInfo2KHR                                           :: BlitImageInfo2
+ResolveImageInfo2KHR                                        :: ResolveImageInfo2
+BufferCopy2KHR                                              :: BufferCopy2
+ImageCopy2KHR                                               :: ImageCopy2
+ImageBlit2KHR                                               :: ImageBlit2
+BufferImageCopy2KHR                                         :: BufferImageCopy2
+ImageResolve2KHR                                            :: ImageResolve2
+FormatFeatureFlags2KHR                                      :: FormatFeatureFlags2
+FormatFeatureFlag2KHR                                       :: FormatFeatureFlag2
+FormatProperties3KHR                                        :: FormatProperties3
+PhysicalDeviceMaintenance4FeaturesKHR                       :: PhysicalDeviceMaintenance4Features
+PhysicalDeviceMaintenance4PropertiesKHR                     :: PhysicalDeviceMaintenance4Properties
+DeviceBufferMemoryRequirementsKHR                           :: DeviceBufferMemoryRequirements
+DeviceImageMemoryRequirementsKHR                            :: DeviceImageMemoryRequirements
+PhysicalDeviceTextureCompressionASTCHDRFeaturesEXT          :: PhysicalDeviceTextureCompressionASTCHDRFeatures
+SamplerReductionModeEXT                                     :: SamplerReductionMode
+SamplerReductionModeCreateInfoEXT                           :: SamplerReductionModeCreateInfo
+PhysicalDeviceSamplerFilterMinmaxPropertiesEXT              :: PhysicalDeviceSamplerFilterMinmaxProperties
+PhysicalDeviceInlineUniformBlockFeaturesEXT                 :: PhysicalDeviceInlineUniformBlockFeatures
+PhysicalDeviceInlineUniformBlockPropertiesEXT               :: PhysicalDeviceInlineUniformBlockProperties
+WriteDescriptorSetInlineUniformBlockEXT                     :: WriteDescriptorSetInlineUniformBlock
+DescriptorPoolInlineUniformBlockCreateInfoEXT               :: DescriptorPoolInlineUniformBlockCreateInfo
+DescriptorBindingFlagEXT                                    :: DescriptorBindingFlag
+DescriptorBindingFlagsEXT                                   :: DescriptorBindingFlags
+DescriptorSetLayoutBindingFlagsCreateInfoEXT                :: DescriptorSetLayoutBindingFlagsCreateInfo
+PhysicalDeviceDescriptorIndexingFeaturesEXT                 :: PhysicalDeviceDescriptorIndexingFeatures
+PhysicalDeviceDescriptorIndexingPropertiesEXT               :: PhysicalDeviceDescriptorIndexingProperties
+DescriptorSetVariableDescriptorCountAllocateInfoEXT         :: DescriptorSetVariableDescriptorCountAllocateInfo
+DescriptorSetVariableDescriptorCountLayoutSupportEXT        :: DescriptorSetVariableDescriptorCountLayoutSupport
+RayTracingShaderGroupTypeNV                                 :: RayTracingShaderGroupTypeKHR
+GeometryTypeNV                                              :: GeometryTypeKHR
+AccelerationStructureTypeNV                                 :: AccelerationStructureTypeKHR
+CopyAccelerationStructureModeNV                             :: CopyAccelerationStructureModeKHR
+GeometryFlagsNV                                             :: GeometryFlagsKHR
+GeometryFlagNV                                              :: GeometryFlagKHR
+GeometryInstanceFlagsNV                                     :: GeometryInstanceFlagsKHR
+GeometryInstanceFlagNV                                      :: GeometryInstanceFlagKHR
+BuildAccelerationStructureFlagsNV                           :: BuildAccelerationStructureFlagsKHR
+BuildAccelerationStructureFlagNV                            :: BuildAccelerationStructureFlagKHR
+TransformMatrixNV                                           :: TransformMatrixKHR
+AabbPositionsNV                                             :: AabbPositionsKHR
+AccelerationStructureInstanceNV                             :: AccelerationStructureInstanceKHR
+QueueGlobalPriorityEXT                                      :: QueueGlobalPriorityKHR
+DeviceQueueGlobalPriorityCreateInfoEXT                      :: DeviceQueueGlobalPriorityCreateInfoKHR
+PipelineCreationFeedbackFlagEXT                             :: PipelineCreationFeedbackFlag
+PipelineCreationFeedbackFlagsEXT                            :: PipelineCreationFeedbackFlags
+PipelineCreationFeedbackCreateInfoEXT                       :: PipelineCreationFeedbackCreateInfo
+PipelineCreationFeedbackEXT                                 :: PipelineCreationFeedback
+PhysicalDeviceFragmentShaderBarycentricFeaturesNV           :: PhysicalDeviceFragmentShaderBarycentricFeaturesKHR
+QueryPoolCreateInfoINTEL                                    :: QueryPoolPerformanceQueryCreateInfoINTEL
+PhysicalDeviceScalarBlockLayoutFeaturesEXT                  :: PhysicalDeviceScalarBlockLayoutFeatures
+PhysicalDeviceSubgroupSizeControlFeaturesEXT                :: PhysicalDeviceSubgroupSizeControlFeatures
+PhysicalDeviceSubgroupSizeControlPropertiesEXT              :: PhysicalDeviceSubgroupSizeControlProperties
+PipelineShaderStageRequiredSubgroupSizeCreateInfoEXT        :: PipelineShaderStageRequiredSubgroupSizeCreateInfo
+PhysicalDeviceBufferAddressFeaturesEXT                      :: PhysicalDeviceBufferDeviceAddressFeaturesEXT
+BufferDeviceAddressInfoEXT                                  :: BufferDeviceAddressInfo
+ToolPurposeFlagEXT                                          :: ToolPurposeFlag
+ToolPurposeFlagsEXT                                         :: ToolPurposeFlags
+PhysicalDeviceToolPropertiesEXT                             :: PhysicalDeviceToolProperties
+ImageStencilUsageCreateInfoEXT                              :: ImageStencilUsageCreateInfo
+PhysicalDeviceHostQueryResetFeaturesEXT                     :: PhysicalDeviceHostQueryResetFeatures
+PhysicalDeviceShaderDemoteToHelperInvocationFeaturesEXT     :: PhysicalDeviceShaderDemoteToHelperInvocationFeatures
+PhysicalDeviceTexelBufferAlignmentPropertiesEXT             :: PhysicalDeviceTexelBufferAlignmentProperties
+PrivateDataSlotEXT                                          :: PrivateDataSlot
+PrivateDataSlotCreateFlagsEXT                               :: PrivateDataSlotCreateFlags
+PhysicalDevicePrivateDataFeaturesEXT                        :: PhysicalDevicePrivateDataFeatures
+DevicePrivateDataCreateInfoEXT                              :: DevicePrivateDataCreateInfo
+PrivateDataSlotCreateInfoEXT                                :: PrivateDataSlotCreateInfo
+PhysicalDevicePipelineCreationCacheControlFeaturesEXT       :: PhysicalDevicePipelineCreationCacheControlFeatures
+PhysicalDeviceImageRobustnessFeaturesEXT                    :: PhysicalDeviceImageRobustnessFeatures
+PhysicalDeviceRasterizationOrderAttachmentAccessFeaturesARM :: PhysicalDeviceRasterizationOrderAttachmentAccessFeaturesEXT
+PhysicalDeviceMutableDescriptorTypeFeaturesVALVE            :: PhysicalDeviceMutableDescriptorTypeFeaturesEXT
+MutableDescriptorTypeListVALVE                              :: MutableDescriptorTypeListEXT
+MutableDescriptorTypeCreateInfoVALVE                        :: MutableDescriptorTypeCreateInfoEXT
+PipelineInfoEXT                                             :: PipelineInfoKHR
+PhysicalDeviceGlobalPriorityQueryFeaturesEXT                :: PhysicalDeviceGlobalPriorityQueryFeaturesKHR
+QueueFamilyGlobalPriorityPropertiesEXT                      :: QueueFamilyGlobalPriorityPropertiesKHR
+MemoryDecompressionMethodFlagNV                             :: Flags64
+MemoryDecompressionMethodFlagsNV                            :: Flags64
+ShaderRequiredSubgroupSizeCreateInfoEXT                     :: PipelineShaderStageRequiredSubgroupSizeCreateInfo
 
 

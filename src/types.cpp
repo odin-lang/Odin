@@ -83,7 +83,7 @@ enum BasicKind {
 	Basic_UntypedString,
 	Basic_UntypedRune,
 	Basic_UntypedNil,
-	Basic_UntypedUndef,
+	Basic_UntypedUninit,
 
 	Basic_COUNT,
 
@@ -515,7 +515,7 @@ gb_global Type basic_types[] = {
 	{Type_Basic, {Basic_UntypedString,     BasicFlag_String     | BasicFlag_Untyped,   0, STR_LIT("untyped string")}},
 	{Type_Basic, {Basic_UntypedRune,       BasicFlag_Integer    | BasicFlag_Untyped,   0, STR_LIT("untyped rune")}},
 	{Type_Basic, {Basic_UntypedNil,        BasicFlag_Untyped,                          0, STR_LIT("untyped nil")}},
-	{Type_Basic, {Basic_UntypedUndef,      BasicFlag_Untyped,                          0, STR_LIT("untyped undefined")}},
+	{Type_Basic, {Basic_UntypedUninit,     BasicFlag_Untyped,                          0, STR_LIT("untyped uninitialized")}},
 };
 
 // gb_global Type basic_type_aliases[] = {
@@ -589,7 +589,7 @@ gb_global Type *t_untyped_quaternion = &basic_types[Basic_UntypedQuaternion];
 gb_global Type *t_untyped_string     = &basic_types[Basic_UntypedString];
 gb_global Type *t_untyped_rune       = &basic_types[Basic_UntypedRune];
 gb_global Type *t_untyped_nil        = &basic_types[Basic_UntypedNil];
-gb_global Type *t_untyped_undef      = &basic_types[Basic_UntypedUndef];
+gb_global Type *t_untyped_uninit     = &basic_types[Basic_UntypedUninit];
 
 
 
@@ -1866,13 +1866,14 @@ gb_internal bool is_type_typeid(Type *t) {
 }
 gb_internal bool is_type_untyped_nil(Type *t) {
 	t = base_type(t);
-	return (t->kind == Type_Basic && t->Basic.kind == Basic_UntypedNil);
+	// NOTE(bill): checking for `nil` or `---` at once is just to improve the error handling
+	return (t->kind == Type_Basic && (t->Basic.kind == Basic_UntypedNil || t->Basic.kind == Basic_UntypedUninit));
 }
-gb_internal bool is_type_untyped_undef(Type *t) {
+gb_internal bool is_type_untyped_uninit(Type *t) {
 	t = base_type(t);
-	return (t->kind == Type_Basic && t->Basic.kind == Basic_UntypedUndef);
+	// NOTE(bill): checking for `nil` or `---` at once is just to improve the error handling
+	return (t->kind == Type_Basic && t->Basic.kind == Basic_UntypedUninit);
 }
-
 
 gb_internal bool is_type_empty_union(Type *t) {
 	t = base_type(t);
@@ -2205,10 +2206,6 @@ gb_internal bool is_type_polymorphic(Type *t, bool or_specialized=false) {
 	return false;
 }
 
-
-gb_internal gb_inline bool type_has_undef(Type *t) {
-	return true;
-}
 
 gb_internal bool type_has_nil(Type *t) {
 	t = base_type(t);
@@ -2769,13 +2766,23 @@ gb_internal Type *default_type(Type *type) {
 	return type;
 }
 
+gb_internal bool union_variant_index_types_equal(Type *v, Type *vt) {
+	if (are_types_identical(v, vt)) {
+		return true;
+	}
+	if (is_type_proc(v) && is_type_proc(vt)) {
+		return are_types_identical(base_type(v), base_type(vt));
+	}
+	return false;
+}
+
 gb_internal i64 union_variant_index(Type *u, Type *v) {
 	u = base_type(u);
 	GB_ASSERT(u->kind == Type_Union);
 
 	for_array(i, u->Union.variants) {
 		Type *vt = u->Union.variants[i];
-		if (are_types_identical(v, vt)) {
+		if (union_variant_index_types_equal(v, vt)) {
 			if (u->Union.kind == UnionType_no_nil) {
 				return cast(i64)(i+0);
 			} else {

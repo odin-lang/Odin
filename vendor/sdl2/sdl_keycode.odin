@@ -1,5 +1,6 @@
 package sdl2
 
+
 SCANCODE_MASK :: 1<<30
 SCANCODE_TO_KEYCODE :: #force_inline proc "c" (X: Scancode) -> Keycode {
 	return Keycode(i32(X) | SCANCODE_MASK)

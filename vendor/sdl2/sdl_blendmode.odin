@@ -2,6 +2,12 @@ package sdl2
 
 import "core:c"
 
+when ODIN_OS == .Windows {
+	foreign import lib "SDL2.lib"
+} else {
+	foreign import lib "system:SDL2"
+}
+
 /**
  *  \brief The blend mode used in SDL_RenderCopy() and drawing operations.
  */

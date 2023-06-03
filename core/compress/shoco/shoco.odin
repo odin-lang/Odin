@@ -177,12 +177,10 @@ decompress_slice_to_string :: proc(input: []u8, model := DEFAULT_MODEL, allocato
 	max_output_size := decompress_bound(len(input), model)
 
 	buf: [dynamic]u8
-	if !resize(&buf, max_output_size) {
-		return "", .Out_Of_Memory
-	}
+	resize(&buf, max_output_size) or_return
 
 	length, result := decompress_slice_to_output_buffer(input, buf[:])
-	resize(&buf, length)
+	resize(&buf, length) or_return
 	return string(buf[:]), result
 }
 decompress :: proc{decompress_slice_to_output_buffer, decompress_slice_to_string}
@@ -307,12 +305,10 @@ compress_string :: proc(input: string, model := DEFAULT_MODEL, allocator := cont
 	max_output_size := compress_bound(len(input))
 
 	buf: [dynamic]u8
-	if !resize(&buf, max_output_size) {
-		return {}, .Out_Of_Memory
-	}
+	resize(&buf, max_output_size) or_return
 
 	length, result := compress_string_to_buffer(input, buf[:])
-	resize(&buf, length)
+	resize(&buf, length) or_return
 	return buf[:length], result
 }
 compress :: proc{compress_string_to_buffer, compress_string}

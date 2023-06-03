@@ -1,6 +1,6 @@
 gb_internal bool lb_is_const(lbValue value) {
 	LLVMValueRef v = value.value;
-	if (is_type_untyped_nil(value.type) || is_type_untyped_undef(value.type)) {
+	if (is_type_untyped_nil(value.type)) {
 		// TODO(bill): Is this correct behaviour?
 		return true;
 	}

@@ -4,14 +4,12 @@ set -eu
 : ${CXX=clang++}
 : ${CPPFLAGS=}
 : ${CXXFLAGS=}
-: ${INCLUDE_DIRECTORIES=}
 : ${LDFLAGS=}
 : ${ODIN_VERSION=dev-$(date +"%Y-%m")}
 : ${GIT_SHA=}
 
 CPPFLAGS="$CPPFLAGS -DODIN_VERSION_RAW=\"$ODIN_VERSION\""
 CXXFLAGS="$CXXFLAGS -std=c++14"
-INCLUDE_DIRECTORIES="$INCLUDE_DIRECTORIES -Isrc/"
 LDFLAGS="$LDFLAGS -pthread -lm -lstdc++"
 
 if [ -d ".git" ]; then
@@ -137,7 +135,14 @@ build_odin() {
 		EXTRAFLAGS="-O3"
 		;;
 	release-native)
-		EXTRAFLAGS="-O3 -march=native"
+		local ARCH=$(uname -m)
+        	if [ "${ARCH}" == "arm64" ]; then
+            		# Use preferred flag for Arm (ie arm64 / aarch64 / etc)
+            		EXTRAFLAGS="-O3 -mcpu=native"
+        	else
+            		# Use preferred flag for x86 / amd64
+            		EXTRAFLAGS="-O3 -march=native"
+        	fi
 		;;
 	nightly)
 		EXTRAFLAGS="-DNIGHTLY -O3"
@@ -148,7 +153,7 @@ build_odin() {
 	esac
 
 	set -x
-	$CXX src/main.cpp src/libtommath.cpp $DISABLED_WARNINGS $CPPFLAGS $CXXFLAGS $INCLUDE_DIRECTORIES $EXTRAFLAGS $LDFLAGS -o odin
+	$CXX src/main.cpp src/libtommath.cpp $DISABLED_WARNINGS $CPPFLAGS $CXXFLAGS $EXTRAFLAGS $LDFLAGS -o odin
 	set +x
 }
 

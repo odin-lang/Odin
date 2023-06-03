@@ -50,7 +50,7 @@ foreign webgl {
 	AttachShader       :: proc(program: Program, shader: Shader) ---
 	BindAttribLocation :: proc(program: Program, index: i32, name: string) ---
 	BindBuffer         :: proc(target: Enum, buffer: Buffer) ---
-	BindFramebuffer    :: proc(target: Enum, buffer: Buffer) ---
+	BindFramebuffer    :: proc(target: Enum, framebuffer: Framebuffer) ---
 	BindTexture        :: proc(target: Enum, texture: Texture) ---
 	BlendColor         :: proc(red, green, blue, alpha: f32) ---
 	BlendEquation      :: proc(mode: Enum) ---

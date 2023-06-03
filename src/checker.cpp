@@ -27,8 +27,8 @@ gb_internal bool is_operand_value(Operand o) {
 gb_internal bool is_operand_nil(Operand o) {
 	return o.mode == Addressing_Value && o.type == t_untyped_nil;
 }
-gb_internal bool is_operand_undef(Operand o) {
-	return o.mode == Addressing_Value && o.type == t_untyped_undef;
+gb_internal bool is_operand_uninit(Operand o) {
+	return o.mode == Addressing_Value && o.type == t_untyped_uninit;
 }
 
 gb_internal bool check_rtti_type_disallowed(Token const &token, Type *type, char const *format) {
@@ -3469,6 +3469,19 @@ gb_internal void check_decl_attributes(CheckerContext *c, Array<Ast *> const &at
 	StringSet set = {};
 	defer (string_set_destroy(&set));
 
+	bool is_runtime = false;
+	if (c->scope && c->scope->file && (c->scope->flags & ScopeFlag_File) &&
+	    c->scope->file->pkg &&
+	    c->scope->file->pkg->kind == Package_Runtime) {
+		is_runtime = true;
+	} else if (c->scope && c->scope->parent &&
+		(c->scope->flags & ScopeFlag_Proc) &&
+		(c->scope->parent->flags & ScopeFlag_File) &&
+		c->scope->parent->file->pkg &&
+		c->scope->parent->file->pkg->kind == Package_Runtime) {
+		is_runtime = true;
+	}
+
 	for_array(i, attributes) {
 		Ast *attr = attributes[i];
 		if (attr->kind != Ast_Attribute) continue;
@@ -3504,9 +3517,14 @@ gb_internal void check_decl_attributes(CheckerContext *c, Array<Ast *> const &at
 				continue;
 			}
 
+			if (name == "builtin" && is_runtime) {
+				continue;
+			}
+
 			if (!proc(c, elem, name, value, ac)) {
 				if (!build_context.ignore_unknown_attributes) {
 					error(elem, "Unknown attribute element name '%.*s'", LIT(name));
+					error_line("\tDid you forget to use build flag '-ignore-unknown-attributes'?\n");
 				}
 			}
 		}
@@ -3663,9 +3681,9 @@ gb_internal void check_builtin_attributes(CheckerContext *ctx, Entity *e, Array<
 					error(value, "'builtin' cannot have a field value");
 				}
 				// Remove the builtin tag
-				attr->Attribute.elems[k] = attr->Attribute.elems[attr->Attribute.elems.count-1];
-				attr->Attribute.elems.count -= 1;
-				k--;
+				// attr->Attribute.elems[k] = attr->Attribute.elems[attr->Attribute.elems.count-1];
+				// attr->Attribute.elems.count -= 1;
+				// k--;
 
 				mutex_unlock(&ctx->info->builtin_mutex);
 			}

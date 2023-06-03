@@ -267,6 +267,8 @@ SHUT_RD   :: 0
 SHUT_WR   :: 1
 SHUT_RDWR :: 2
 
+F_GETFL: int : 3 /* Get file flags */
+F_SETFL: int : 4 /* Set file flags */
 
 // "Argv" arguments converted to Odin strings
 args := _alloc_command_line_arguments()
@@ -413,7 +415,7 @@ F_OK :: 0 // Test for file existance
 F_GETPATH :: 50 // return the full path of the fd
 
 foreign libc {
-	@(link_name="__error") __error :: proc() -> ^int ---
+	@(link_name="__error") __error :: proc() -> ^c.int ---
 
 	@(link_name="open")             _unix_open          :: proc(path: cstring, flags: i32, mode: u16) -> Handle ---
 	@(link_name="close")            _unix_close         :: proc(handle: Handle) -> c.int ---
@@ -438,7 +440,7 @@ foreign libc {
 	@(link_name="closedir")         _unix_closedir      :: proc(dirp: Dir) -> c.int ---
 	@(link_name="rewinddir")        _unix_rewinddir     :: proc(dirp: Dir) ---
 
-	@(link_name="__fcntl")          _unix__fcntl        :: proc(fd: Handle, cmd: c.int, buf: ^byte) -> c.int ---
+	@(link_name="__fcntl")          _unix__fcntl        :: proc(fd: Handle, cmd: c.int, #c_vararg args: ..any) -> c.int ---
 
 	@(link_name="rename") _unix_rename :: proc(old: cstring, new: cstring) -> c.int ---
 	@(link_name="remove") _unix_remove :: proc(path: cstring) -> c.int ---
@@ -464,6 +466,7 @@ foreign libc {
 	@(link_name="connect")          _unix_connect       :: proc(socket: int, addr: rawptr, addr_len: socklen_t) -> int ---
 	@(link_name="bind")             _unix_bind          :: proc(socket: int, addr: rawptr, addr_len: socklen_t) -> int ---
 	@(link_name="setsockopt")       _unix_setsockopt    :: proc(socket: int, level: int, opt_name: int, opt_val: rawptr, opt_len: socklen_t) -> int ---
+	@(link_name="getsockopt")       _unix_getsockopt    :: proc(socket: int, level: int, opt_name: int, opt_val: rawptr, opt_len: socklen_t) -> int ---
 	@(link_name="recvfrom")         _unix_recvfrom      :: proc(socket: int, buffer: rawptr, buffer_len: c.size_t, flags: int, addr: rawptr, addr_len: ^socklen_t) -> c.ssize_t ---
 	@(link_name="recv")             _unix_recv          :: proc(socket: int, buffer: rawptr, buffer_len: c.size_t, flags: int) -> c.ssize_t ---
 	@(link_name="sendto")           _unix_sendto        :: proc(socket: int, buffer: rawptr, buffer_len: c.size_t, flags: int, addr: rawptr, addr_len: socklen_t) -> c.ssize_t ---
@@ -489,7 +492,7 @@ foreign dl {
 }
 
 get_last_error :: proc "contextless" () -> int {
-	return __error()^
+	return int(__error()^)
 }
 
 get_last_error_string :: proc() -> string {
@@ -1016,6 +1019,14 @@ setsockopt :: proc(sd: Socket, level: int, optname: int, optval: rawptr, optlen:
 	return ERROR_NONE
 }
 
+getsockopt :: proc(sd: Socket, level: int, optname: int, optval: rawptr, optlen: socklen_t) -> Errno {
+	result := _unix_getsockopt(int(sd), level, optname, optval, optlen)
+	if result < 0 {
+		return Errno(get_last_error())
+	}
+	return ERROR_NONE
+}
+
 recvfrom :: proc(sd: Socket, data: []byte, flags: int, addr: ^SOCKADDR, addr_size: ^socklen_t) -> (u32, Errno) {
 	result := _unix_recvfrom(int(sd), raw_data(data), len(data), flags, addr, addr_size)
 	if result < 0 {
@@ -1054,4 +1065,12 @@ shutdown :: proc(sd: Socket, how: int) -> (Errno) {
 		return Errno(get_last_error())
 	}
 	return ERROR_NONE
+}
+
+fcntl :: proc(fd: int, cmd: int, arg: int) -> (int, Errno) {
+	result := _unix__fcntl(Handle(fd), c.int(cmd), c.int(arg))
+	if result < 0 {
+		return 0, Errno(get_last_error())
+	}
+	return int(result), ERROR_NONE
 }
