@@ -932,6 +932,11 @@ gb_internal i32 lb_convert_struct_index(lbModule *m, Type *t, i32 index) {
 		return field_remapping[index];
 	} else if (build_context.ptr_size != build_context.int_size) {
 		switch (t->kind) {
+		case Type_Basic:
+			if (t->Basic.kind != Basic_string) {
+				break;
+			}
+			/*fallthrough*/
 		case Type_Slice:
 			GB_ASSERT(build_context.ptr_size*2 == build_context.int_size);
 			switch (index) {
