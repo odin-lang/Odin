@@ -1335,14 +1335,17 @@ namespace lbAbiWasm {
 		auto args = array_make<lbArgType>(lb_function_type_args_allocator(), arg_count);
 
 		GB_ASSERT(original_type->kind == Type_Proc);
-		GB_ASSERT(cast(isize)arg_count == original_type->Proc.param_count);
+		GB_ASSERT(cast(isize)arg_count <= original_type->Proc.param_count);
 		auto const &params = original_type->Proc.params->Tuple.variables;
 
-		for (unsigned i = 0; i < arg_count; i++) {
+		for (unsigned i = 0, j = 0; i < arg_count; i++, j++) {
+			while (params[j]->kind != Entity_Variable) {
+				j++;
+			}
+			Type *ptype = params[j]->type;
 			LLVMTypeRef t = arg_types[i];
 			LLVMTypeKind kind = LLVMGetTypeKind(t);
 			if (kind == LLVMStructTypeKind || kind == LLVMArrayTypeKind) {
-				Type *ptype = params[i]->type;
 				if (is_type_slice(ptype) || is_type_string(ptype)) {
 					args[i] = pseudo_slice(c, t, calling_convention);
 				} else {
