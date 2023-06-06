@@ -326,7 +326,7 @@ gb_internal i64 lb_alignof(LLVMTypeRef type) {
 }
 
 
-#define LB_ABI_INFO(name) lbFunctionType *name(LLVMContextRef c, LLVMTypeRef *arg_types, unsigned arg_count, LLVMTypeRef return_type, bool return_is_defined, bool return_is_tuple, ProcCallingConvention calling_convention)
+#define LB_ABI_INFO(name) lbFunctionType *name(LLVMContextRef c, LLVMTypeRef *arg_types, unsigned arg_count, LLVMTypeRef return_type, bool return_is_defined, bool return_is_tuple, ProcCallingConvention calling_convention, Type *original_type)
 typedef LB_ABI_INFO(lbAbiInfoType);
 
 #define LB_ABI_COMPUTE_RETURN_TYPE(name) lbArgType name(lbFunctionType *ft, LLVMContextRef c, LLVMTypeRef return_type, bool return_is_defined, bool return_is_tuple)
@@ -1217,7 +1217,7 @@ namespace lbAbiWasm {
 		            The approach taken optimizes for passing things in multiple
 		            registers/arguments if possible rather than by pointer.
 	*/
-	gb_internal Array<lbArgType> compute_arg_types(LLVMContextRef c, LLVMTypeRef *arg_types, unsigned arg_count, ProcCallingConvention calling_convention);
+	gb_internal Array<lbArgType> compute_arg_types(LLVMContextRef c, LLVMTypeRef *arg_types, unsigned arg_count, ProcCallingConvention calling_convention, Type *original_type);
 	gb_internal LB_ABI_COMPUTE_RETURN_TYPE(compute_return_type);
 
 	enum {MAX_DIRECT_STRUCT_SIZE = 32};
@@ -1225,7 +1225,7 @@ namespace lbAbiWasm {
 	gb_internal LB_ABI_INFO(abi_info) {
 		lbFunctionType *ft = gb_alloc_item(permanent_allocator(), lbFunctionType);
 		ft->ctx = c;
-		ft->args = compute_arg_types(c, arg_types, arg_count, calling_convention);
+		ft->args = compute_arg_types(c, arg_types, arg_count, calling_convention, original_type);
 		ft->ret = compute_return_type(ft, c, return_type, return_is_defined, return_is_tuple);
 		ft->calling_convention = calling_convention;
 		return ft;
@@ -1315,15 +1315,39 @@ namespace lbAbiWasm {
 		return lb_arg_type_indirect(type, nullptr);
 	}
 	
+	gb_internal lbArgType pseudo_slice(LLVMContextRef c, LLVMTypeRef type, ProcCallingConvention calling_convention) {
+		if (build_context.metrics.ptr_size < build_context.metrics.int_size &&
+		    type_can_be_direct(type, calling_convention)) {
+			LLVMTypeRef types[2] = {
+				LLVMStructGetTypeAtIndex(type, 0),
+				// ignore padding
+				LLVMStructGetTypeAtIndex(type, 2)
+			};
+			LLVMTypeRef new_type = LLVMStructTypeInContext(c, types, gb_count_of(types), false);
+			return lb_arg_type_direct(new_type, type, nullptr, nullptr);
+		} else {
+			return is_struct(c, type, calling_convention);
+		}
+	}
 
-	gb_internal Array<lbArgType> compute_arg_types(LLVMContextRef c, LLVMTypeRef *arg_types, unsigned arg_count, ProcCallingConvention calling_convention) {
+	gb_internal Array<lbArgType> compute_arg_types(LLVMContextRef c, LLVMTypeRef *arg_types, unsigned arg_count, ProcCallingConvention calling_convention,
+	                                               Type *original_type) {
 		auto args = array_make<lbArgType>(lb_function_type_args_allocator(), arg_count);
+
+		GB_ASSERT(original_type->kind == Type_Proc);
+		GB_ASSERT(cast(isize)arg_count == original_type->Proc.param_count);
+		auto const &params = original_type->Proc.params->Tuple.variables;
 
 		for (unsigned i = 0; i < arg_count; i++) {
 			LLVMTypeRef t = arg_types[i];
 			LLVMTypeKind kind = LLVMGetTypeKind(t);
 			if (kind == LLVMStructTypeKind || kind == LLVMArrayTypeKind) {
-				args[i] = is_struct(c, t, calling_convention);
+				Type *ptype = params[i]->type;
+				if (is_type_slice(ptype) || is_type_string(ptype)) {
+					args[i] = pseudo_slice(c, t, calling_convention);
+				} else {
+					args[i] = is_struct(c, t, calling_convention);
+				}
 			} else {
 				args[i] = non_struct(c, t, false);
 			}
@@ -1460,32 +1484,33 @@ gb_internal LB_ABI_INFO(lb_get_abi_info_internal) {
 		}
 	case ProcCC_Win64:
 		GB_ASSERT(build_context.metrics.arch == TargetArch_amd64);
-		return lbAbiAmd64Win64::abi_info(c, arg_types, arg_count, return_type, return_is_defined, return_is_tuple, calling_convention);
+		return lbAbiAmd64Win64::abi_info(c, arg_types, arg_count, return_type, return_is_defined, return_is_tuple, calling_convention, original_type);
 	case ProcCC_SysV:
 		GB_ASSERT(build_context.metrics.arch == TargetArch_amd64);
-		return lbAbiAmd64SysV::abi_info(c, arg_types, arg_count, return_type, return_is_defined, return_is_tuple, calling_convention);
+		return lbAbiAmd64SysV::abi_info(c, arg_types, arg_count, return_type, return_is_defined, return_is_tuple, calling_convention, original_type);
 	}
 
 	switch (build_context.metrics.arch) {
 	case TargetArch_amd64:
 		if (build_context.metrics.os == TargetOs_windows) {
-			return lbAbiAmd64Win64::abi_info(c, arg_types, arg_count, return_type, return_is_defined, return_is_tuple, calling_convention);
+			return lbAbiAmd64Win64::abi_info(c, arg_types, arg_count, return_type, return_is_defined, return_is_tuple, calling_convention, original_type);
 		} else if (build_context.metrics.abi == TargetABI_Win64) {
-			return lbAbiAmd64Win64::abi_info(c, arg_types, arg_count, return_type, return_is_defined, return_is_tuple, calling_convention);
+			return lbAbiAmd64Win64::abi_info(c, arg_types, arg_count, return_type, return_is_defined, return_is_tuple, calling_convention, original_type);
 		} else if (build_context.metrics.abi == TargetABI_SysV) {
-			return lbAbiAmd64SysV::abi_info(c, arg_types, arg_count, return_type, return_is_defined, return_is_tuple, calling_convention);
+			return lbAbiAmd64SysV::abi_info(c, arg_types, arg_count, return_type, return_is_defined, return_is_tuple, calling_convention, original_type);
 		} else {
-			return lbAbiAmd64SysV::abi_info(c, arg_types, arg_count, return_type, return_is_defined, return_is_tuple, calling_convention);
+			return lbAbiAmd64SysV::abi_info(c, arg_types, arg_count, return_type, return_is_defined, return_is_tuple, calling_convention, original_type);
 		}
 	case TargetArch_i386:
-		return lbAbi386::abi_info(c, arg_types, arg_count, return_type, return_is_defined, return_is_tuple, calling_convention);
+		return lbAbi386::abi_info(c, arg_types, arg_count, return_type, return_is_defined, return_is_tuple, calling_convention, original_type);
 	case TargetArch_arm32:
-		return lbAbiArm32::abi_info(c, arg_types, arg_count, return_type, return_is_defined, return_is_tuple, calling_convention);
+		return lbAbiArm32::abi_info(c, arg_types, arg_count, return_type, return_is_defined, return_is_tuple, calling_convention, original_type);
 	case TargetArch_arm64:
-		return lbAbiArm64::abi_info(c, arg_types, arg_count, return_type, return_is_defined, return_is_tuple, calling_convention);
+		return lbAbiArm64::abi_info(c, arg_types, arg_count, return_type, return_is_defined, return_is_tuple, calling_convention, original_type);
 	case TargetArch_wasm32:
+		return lbAbiWasm::abi_info(c, arg_types, arg_count, return_type, return_is_defined, return_is_tuple, calling_convention, original_type);
 	case TargetArch_wasm64p32:
-		return lbAbiWasm::abi_info(c, arg_types, arg_count, return_type, return_is_defined, return_is_tuple, calling_convention);
+		return lbAbiWasm::abi_info(c, arg_types, arg_count, return_type, return_is_defined, return_is_tuple, calling_convention, original_type);
 	}
 
 	GB_PANIC("Unsupported ABI");
@@ -1499,7 +1524,8 @@ gb_internal LB_ABI_INFO(lb_get_abi_info) {
 		arg_types, arg_count,
 		return_type, return_is_defined,
 		ALLOW_SPLIT_MULTI_RETURNS && return_is_tuple && is_calling_convention_odin(calling_convention),
-		calling_convention);
+		calling_convention,
+		base_type(original_type));
 
 
 	// NOTE(bill): this is handled here rather than when developing the type in `lb_type_internal_for_procedures_raw`

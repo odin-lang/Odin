@@ -1580,7 +1580,7 @@ gb_internal LLVMTypeRef lb_type_internal_for_procedures_raw(lbModule *m, Type *t
 		}
 	}
 	GB_ASSERT(param_index == param_count);
-	lbFunctionType *ft = lb_get_abi_info(m->ctx, params, param_count, ret, ret != nullptr, return_is_tuple, type->Proc.calling_convention);
+	lbFunctionType *ft = lb_get_abi_info(m->ctx, params, param_count, ret, ret != nullptr, return_is_tuple, type->Proc.calling_convention, type);
 	{
 		for_array(j, ft->args) {
 			auto arg = ft->args[j];
