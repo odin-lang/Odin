@@ -107,7 +107,11 @@ gb_internal LLVMValueRef llvm_const_cast(LLVMValueRef val, LLVMTypeRef dst) {
 	case LLVMPointerTypeKind:
 		return LLVMConstPointerCast(val, dst);
 	case LLVMStructTypeKind:
-		return LLVMConstBitCast(val, dst);
+		// GB_PANIC("%s -> %s", LLVMPrintValueToString(val), LLVMPrintTypeToString(dst));
+		// NOTE(bill): It's not possible to do a bit cast on a struct, why was this code even here in the first place?
+		// It seems mostly to exist to get around the "anonymous -> named" struct assignments
+		// return LLVMConstBitCast(val, dst);
+		return val;
 	default:
 		GB_PANIC("Unhandled const cast %s to %s", LLVMPrintTypeToString(src), LLVMPrintTypeToString(dst));
 	}
@@ -1036,9 +1040,10 @@ gb_internal lbValue lb_const_value(lbModule *m, Type *type, ExactValue value, bo
 											}
 											cv_type = cvt->Struct.fields[index]->type;
 
-											if (is_type_struct(cv_type)) {
-												auto cv_field_remapping = lb_get_struct_remapping(m, cv_type);
-												idx_list[j-1] = cast(unsigned)cv_field_remapping[index];
+											if (is_type_struct(cvt)) {
+												auto cv_field_remapping = lb_get_struct_remapping(m, cvt);
+												unsigned remapped_index = cast(unsigned)cv_field_remapping[index];
+												idx_list[j-1] = remapped_index;
 											} else {
 												idx_list[j-1] = cast(unsigned)index;
 											}
