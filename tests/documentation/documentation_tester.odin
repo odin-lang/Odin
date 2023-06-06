@@ -14,6 +14,7 @@ Example_Test :: struct {
 	package_name: string,
 	example_code: []string,
 	expected_output: []string,
+	skip_output_check: bool,
 }
 
 g_header:   ^doc.Header
@@ -145,6 +146,7 @@ find_and_add_examples :: proc(docs: string, package_name: string, entity_name: s
 	curr_block_kind := Block_Kind.Other
 	start := 0
 
+	found_possible_output: bool
 	example_block: Block // when set the kind should be Example
 	output_block: Block // when set the kind should be Output
 	// rely on zii that the kinds have not been set
@@ -178,10 +180,16 @@ find_and_add_examples :: proc(docs: string, package_name: string, entity_name: s
 			switch {
 			case strings.has_prefix(line, "Example:"): next_block_kind = .Example
 			case strings.has_prefix(line, "Output:"): next_block_kind = .Output
+			case strings.has_prefix(line, "Possible Output:"):
+				next_block_kind = .Output
+				found_possible_output = true
 			}
 		case .Example:
 			switch {
 			case strings.has_prefix(line, "Output:"): next_block_kind = .Output
+			case strings.has_prefix(line, "Possible Output:"):
+				next_block_kind = .Output
+				found_possible_output = true
 			case ! (text == "" || strings.has_prefix(line, "\t")): next_block_kind = .Other
 			}
 		case .Output:
@@ -219,8 +227,9 @@ find_and_add_examples :: proc(docs: string, package_name: string, entity_name: s
 		{
 			// Output block starts with
 			// `Output:` and a number of white spaces,
+			// `Possible Output:` and a number of white spaces,
 			lines := &output_block.lines
-			for len(lines) > 0 && (strings.trim_space(lines[0]) == "" || strings.has_prefix(lines[0], "Output:")) {
+			for len(lines) > 0 && (strings.trim_space(lines[0]) == "" || strings.has_prefix(lines[0], "Output:") || strings.has_prefix(lines[0], "Possible Output:")) {
 				lines^ = lines[1:]
 			}
 			// Additionally we need to strip all empty lines at the end of output to not include those in the expected output
@@ -240,6 +249,7 @@ find_and_add_examples :: proc(docs: string, package_name: string, entity_name: s
 			package_name = package_name,
 			example_code = example_block.lines,
 			expected_output = output_block.lines,
+			skip_output_check = found_possible_output,
 		})
 	}
 }
@@ -404,25 +414,29 @@ main :: proc() {
 			continue
 		}
 
-		fmt.sbprintf(&test_runner, "\t%v_%v()\n", test.package_name, code_test_name)
-		fmt.sbprintf(&test_runner, "\t_check(%q, `", code_test_name)
-		had_line_error: bool
-		for line in test.expected_output {
-			// NOTE: this will escape the multiline string. Even with a backslash it still escapes due to the semantics of `
-			// I don't think any examples would really need this specific character so let's just make it forbidden and change
-			// in the future if we really need to
-			if strings.contains_rune(line, '`') {
-				fmt.eprintf("The line %q in the output for \"%s.%s\" contains a ` which is not allowed\n", line, test.package_name, test.entity_name)
-				g_bad_doc = true
-				had_line_error = true
+		// NOTE: packages like 'rand' are random by nature, in these cases we cannot verify against the output string
+		// in these cases we just mark the output as 'Possible Output' and we simply skip checking against the output
+		if ! test.skip_output_check {
+			fmt.sbprintf(&test_runner, "\t%v_%v()\n", test.package_name, code_test_name)
+			fmt.sbprintf(&test_runner, "\t_check(%q, `", code_test_name)
+			had_line_error: bool
+			for line in test.expected_output {
+				// NOTE: this will escape the multiline string. Even with a backslash it still escapes due to the semantics of `
+				// I don't think any examples would really need this specific character so let's just make it forbidden and change
+				// in the future if we really need to
+				if strings.contains_rune(line, '`') {
+					fmt.eprintf("The line %q in the output for \"%s.%s\" contains a ` which is not allowed\n", line, test.package_name, test.entity_name)
+					g_bad_doc = true
+					had_line_error = true
+				}
+				strings.write_string(&test_runner, line)
+				strings.write_string(&test_runner, "\n")
 			}
-			strings.write_string(&test_runner, line)
-			strings.write_string(&test_runner, "\n")
+			if had_line_error {
+				continue
+			}
+			strings.write_string(&test_runner, "`)\n")
 		}
-		if had_line_error {
-			continue
-		}
-		strings.write_string(&test_runner, "`)\n")
 		save_path := fmt.tprintf("verify/test_%v_%v.odin", test.package_name, code_test_name)
 
 		test_file_handle, err := os.open(save_path, os.O_WRONLY | os.O_CREATE); if err != 0 {

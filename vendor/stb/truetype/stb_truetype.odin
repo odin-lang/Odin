@@ -200,7 +200,7 @@ fontinfo :: struct {
 
 	numGlyphs: c.int,
 
-	loca, head, glyf, hhea, hmtx, kern: c.int,
+	loca, head, glyf, hhea, hmtx, kern, gpos, svg: c.int,
 	index_map: c.int,
 	indexToLocFormat: c.int,
 

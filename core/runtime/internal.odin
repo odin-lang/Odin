@@ -500,6 +500,42 @@ string_decode_rune :: #force_inline proc "contextless" (s: string) -> (rune, int
 	return rune(s0&MASK4)<<18 | rune(b1&MASKX)<<12 | rune(b2&MASKX)<<6 | rune(b3&MASKX), 4
 }
 
+string_decode_last_rune :: proc "contextless" (s: string) -> (rune, int) {
+	RUNE_ERROR :: '\ufffd'
+	RUNE_SELF  :: 0x80
+	UTF_MAX    :: 4
+
+	r: rune
+	size: int
+	start, end, limit: int
+
+	end = len(s)
+	if end == 0 {
+		return RUNE_ERROR, 0
+	}
+	start = end-1
+	r = rune(s[start])
+	if r < RUNE_SELF {
+		return r, 1
+	}
+
+	limit = max(end - UTF_MAX, 0)
+
+	for start-=1; start >= limit; start-=1 {
+		if (s[start] & 0xc0) != RUNE_SELF {
+			break
+		}
+	}
+
+	start = max(start, 0)
+	r, size = string_decode_rune(s[start:end])
+	if start+size != end {
+		return RUNE_ERROR, 1
+	}
+	return r, size
+}
+
+
 abs_f16 :: #force_inline proc "contextless" (x: f16) -> f16 {
 	return -x if x < 0 else x
 }

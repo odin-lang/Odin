@@ -3218,10 +3218,10 @@ gb_internal lbValue lb_build_call_expr_internal(lbProcedure *p, Ast *expr) {
 			Entity *e = params->variables[i];
 			if (args[i].type == nullptr) {
 				continue;
+			} else if (is_type_untyped_uninit(args[i].type)) {
+				args[i] = lb_const_undef(m, e->type);
 			} else if (is_type_untyped_nil(args[i].type)) {
 				args[i] = lb_const_nil(m, e->type);
-			} else if (is_type_untyped_undef(args[i].type)) {
-				args[i] = lb_const_undef(m, e->type);
 			}
 		}
 
@@ -3409,10 +3409,10 @@ gb_internal lbValue lb_build_call_expr_internal(lbProcedure *p, Ast *expr) {
 			Entity *e = param_tuple->variables[i];
 			if (args[i].type == nullptr) {
 				continue;
+			} else if (is_type_untyped_uninit(args[i].type)) {
+				args[i] = lb_const_undef(m, e->type);
 			} else if (is_type_untyped_nil(args[i].type)) {
 				args[i] = lb_const_nil(m, e->type);
-			} else if (is_type_untyped_undef(args[i].type)) {
-				args[i] = lb_const_undef(m, e->type);
 			}
 		}
 	}

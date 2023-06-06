@@ -1,6 +1,10 @@
 /*
 	Path handling utilities.
 */
+#if !defined(GB_SYSTEM_WINDOWS)
+#include <unistd.h>
+#endif
+
 gb_internal String remove_extension_from_path(String const &s) {
 	if (s.len != 0 && s.text[s.len-1] == '.') {
 		return s;
@@ -24,6 +28,29 @@ gb_internal String remove_directory_from_path(String const &s) {
 	}
 	return substring(s, s.len-len, s.len);
 }
+
+
+// NOTE(Mark Naughton): getcwd as String
+#if !defined(GB_SYSTEM_WINDOWS)
+gb_internal String get_current_directory(void) {
+	char cwd[256];
+	getcwd(cwd, 256);
+
+	return make_string_c(cwd);
+}
+
+#else
+gb_internal String get_current_directory(void) {
+	gbAllocator a = heap_allocator();
+
+	wchar_t cwd[256];
+	GetCurrentDirectoryW(256, cwd);
+
+	String16 wstr = make_string16_c(cwd);
+
+	return string16_to_string(a, wstr);
+}
+#endif
 
 gb_internal bool path_is_directory(String path);
 
@@ -392,7 +419,43 @@ gb_internal ReadDirectoryError read_directory(String path, Array<FileInfo> *fi) 
 
 	return ReadDirectory_None;
 }
+
+
 #else
 #error Implement read_directory
 #endif
 
+#if !defined(GB_SYSTEM_WINDOWS)
+gb_internal bool write_directory(String path) {
+	char const *pathname = (char *) path.text;
+
+	if (access(pathname, W_OK) < 0) {
+		return false;
+	}
+
+	return true;
+}
+#else
+gb_internal bool write_directory(String path) {
+	String16 wstr = string_to_string16(heap_allocator(), path);
+	LPCWSTR wdirectory_name = wstr.text;
+
+	HANDLE directory = CreateFileW(wdirectory_name,
+			GENERIC_WRITE,
+			0,
+			NULL,
+			OPEN_EXISTING,
+			FILE_FLAG_BACKUP_SEMANTICS,
+			NULL);
+
+	if (directory == INVALID_HANDLE_VALUE) {
+		DWORD error_code = GetLastError();
+		if (error_code == ERROR_ACCESS_DENIED) {
+			return false;
+		}
+	}
+
+	CloseHandle(directory);
+	return true;
+}
+#endif

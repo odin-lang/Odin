@@ -677,7 +677,7 @@ gb_internal void lb_addr_store(lbProcedure *p, lbAddr addr, lbValue value) {
 		return;
 	}
 	GB_ASSERT(value.type != nullptr);
-	if (is_type_untyped_undef(value.type)) {
+	if (is_type_untyped_uninit(value.type)) {
 		Type *t = lb_addr_type(addr);
 		value.type = t;
 		value.value = LLVMGetUndef(lb_type(p->module, t));
@@ -1830,7 +1830,7 @@ gb_internal LLVMTypeRef lb_type_internal(lbModule *m, Type *type) {
 		case Basic_UntypedString:     GB_PANIC("Basic_UntypedString"); break;
 		case Basic_UntypedRune:       GB_PANIC("Basic_UntypedRune"); break;
 		case Basic_UntypedNil:        GB_PANIC("Basic_UntypedNil"); break;
-		case Basic_UntypedUndef:      GB_PANIC("Basic_UntypedUndef"); break;
+		case Basic_UntypedUninit:     GB_PANIC("Basic_UntypedUninit"); break;
 		}
 		break;
 	case Type_Named:

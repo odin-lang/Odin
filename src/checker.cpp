@@ -27,8 +27,8 @@ gb_internal bool is_operand_value(Operand o) {
 gb_internal bool is_operand_nil(Operand o) {
 	return o.mode == Addressing_Value && o.type == t_untyped_nil;
 }
-gb_internal bool is_operand_undef(Operand o) {
-	return o.mode == Addressing_Value && o.type == t_untyped_undef;
+gb_internal bool is_operand_uninit(Operand o) {
+	return o.mode == Addressing_Value && o.type == t_untyped_uninit;
 }
 
 gb_internal bool check_rtti_type_disallowed(Token const &token, Type *type, char const *format) {
@@ -3469,6 +3469,19 @@ gb_internal void check_decl_attributes(CheckerContext *c, Array<Ast *> const &at
 	StringSet set = {};
 	defer (string_set_destroy(&set));
 
+	bool is_runtime = false;
+	if (c->scope && c->scope->file && (c->scope->flags & ScopeFlag_File) &&
+	    c->scope->file->pkg &&
+	    c->scope->file->pkg->kind == Package_Runtime) {
+		is_runtime = true;
+	} else if (c->scope && c->scope->parent &&
+		(c->scope->flags & ScopeFlag_Proc) &&
+		(c->scope->parent->flags & ScopeFlag_File) &&
+		c->scope->parent->file->pkg &&
+		c->scope->parent->file->pkg->kind == Package_Runtime) {
+		is_runtime = true;
+	}
+
 	for_array(i, attributes) {
 		Ast *attr = attributes[i];
 		if (attr->kind != Ast_Attribute) continue;
@@ -3504,9 +3517,14 @@ gb_internal void check_decl_attributes(CheckerContext *c, Array<Ast *> const &at
 				continue;
 			}
 
+			if (name == "builtin" && is_runtime) {
+				continue;
+			}
+
 			if (!proc(c, elem, name, value, ac)) {
 				if (!build_context.ignore_unknown_attributes) {
 					error(elem, "Unknown attribute element name '%.*s'", LIT(name));
+					error_line("\tDid you forget to use build flag '-ignore-unknown-attributes'?\n");
 				}
 			}
 		}
@@ -3663,9 +3681,9 @@ gb_internal void check_builtin_attributes(CheckerContext *ctx, Entity *e, Array<
 					error(value, "'builtin' cannot have a field value");
 				}
 				// Remove the builtin tag
-				attr->Attribute.elems[k] = attr->Attribute.elems[attr->Attribute.elems.count-1];
-				attr->Attribute.elems.count -= 1;
-				k--;
+				// attr->Attribute.elems[k] = attr->Attribute.elems[attr->Attribute.elems.count-1];
+				// attr->Attribute.elems.count -= 1;
+				// k--;
 
 				mutex_unlock(&ctx->info->builtin_mutex);
 			}
@@ -3874,6 +3892,13 @@ gb_internal void check_collect_value_decl(CheckerContext *c, Ast *decl) {
 						cc = ProcCC_CDecl;
 						if (c->foreign_context.default_cc > 0) {
 							cc = c->foreign_context.default_cc;
+						} else if (is_arch_wasm()) {
+							begin_error_block();
+							error(init, "For wasm related targets, it is required that you either define the"
+							            " @(default_calling_convention=<string>) on the foreign block or"
+							            " explicitly assign it on the procedure signature");
+							error_line("\tSuggestion: when dealing with normal Odin code (e.g. js_wasm32), use \"contextless\"; when dealing with Emscripten like code, use \"c\"\n");
+							end_error_block();
 						}
 					}
 					e->Procedure.link_prefix = c->foreign_context.link_prefix;
