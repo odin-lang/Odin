@@ -2471,6 +2471,7 @@ gb_internal void lb_build_stmt(lbProcedure *p, Ast *node) {
 			}
 			GB_ASSERT(lval_index == lvals.count);
 
+
 			for_array(i, vd->names) {
 				Ast *name = vd->names[i];
 				if (!is_blank_ident(name) && !lvals_preused[i]) {

@@ -1,4 +1,5 @@
 gb_internal void lb_add_debug_local_variable(lbProcedure *p, LLVMValueRef ptr, Type *type, Token const &token);
+gb_internal LLVMValueRef llvm_const_string_internal(lbModule *m, Type *t, LLVMValueRef data, LLVMValueRef len);
 
 gb_global Entity *lb_global_type_info_data_entity   = {};
 gb_global lbAddr lb_global_type_info_member_types   = {};
@@ -1776,11 +1777,23 @@ gb_internal LLVMTypeRef lb_type_internal(lbModule *m, Type *type) {
 					return type;
 				}
 				type = LLVMStructCreateNamed(ctx, name);
-				LLVMTypeRef fields[2] = {
-					LLVMPointerType(lb_type(m, t_u8), 0),
-					lb_type(m, t_int),
-				};
-				LLVMStructSetBody(type, fields, 2, false);
+
+				if (build_context.metrics.ptr_size < build_context.metrics.int_size) {
+					GB_ASSERT(build_context.metrics.ptr_size == 4);
+					GB_ASSERT(build_context.metrics.int_size == 8);
+					LLVMTypeRef fields[3] = {
+						LLVMPointerType(lb_type(m, t_u8), 0),
+						lb_type(m, t_i32),
+						lb_type(m, t_int),
+					};
+					LLVMStructSetBody(type, fields, 3, false);
+				} else {
+					LLVMTypeRef fields[2] = {
+						LLVMPointerType(lb_type(m, t_u8), 0),
+						lb_type(m, t_int),
+					};
+					LLVMStructSetBody(type, fields, 2, false);
+				}
 				return type;
 			}
 		case Basic_cstring: return LLVMPointerType(LLVMInt8TypeInContext(ctx), 0);
@@ -2533,10 +2546,9 @@ gb_internal lbValue lb_find_or_add_entity_string(lbModule *m, String const &str)
 		ptr = LLVMConstNull(lb_type(m, t_u8_ptr));
 	}
 	LLVMValueRef str_len = LLVMConstInt(lb_type(m, t_int), str.len, true);
-	LLVMValueRef values[2] = {ptr, str_len};
 
 	lbValue res = {};
-	res.value = llvm_const_named_struct(m, t_string, values, 2);
+	res.value = llvm_const_string_internal(m, t_string, ptr, str_len);
 	res.type = t_string;
 	return res;
 }
