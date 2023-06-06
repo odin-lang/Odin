@@ -1,4 +1,4 @@
-//+build js wasm32
+//+build js
 package runtime
 
 init_default_context_for_js: Context
