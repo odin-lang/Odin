@@ -180,15 +180,31 @@ gb_internal LLVMValueRef llvm_const_array(LLVMTypeRef elem_type, LLVMValueRef *v
 	return LLVMConstArray(elem_type, values, value_count);
 }
 
+gb_internal LLVMValueRef llvm_const_slice_internal(lbModule *m, LLVMValueRef data, LLVMValueRef len) {
+	if (build_context.metrics.ptr_size < build_context.metrics.int_size) {
+		GB_ASSERT(build_context.metrics.ptr_size == 4);
+		GB_ASSERT(build_context.metrics.int_size == 8);
+		LLVMValueRef vals[3] = {
+			data,
+			LLVMConstNull(lb_type(m, t_u32)),
+			len,
+		};
+		return LLVMConstStructInContext(m->ctx, vals, gb_count_of(vals), false);
+	} else {
+		LLVMValueRef vals[2] = {
+			data,
+			len,
+		};
+		return LLVMConstStructInContext(m->ctx, vals, gb_count_of(vals), false);
+	}
+}
 gb_internal LLVMValueRef llvm_const_slice(lbModule *m, lbValue data, lbValue len) {
 	GB_ASSERT(is_type_pointer(data.type) || is_type_multi_pointer(data.type));
 	GB_ASSERT(are_types_identical(len.type, t_int));
-	LLVMValueRef vals[2] = {
-		data.value,
-		len.value,
-	};
-	return LLVMConstStructInContext(m->ctx, vals, gb_count_of(vals), false);
+
+	return llvm_const_slice_internal(m, data.value, len.value);
 }
+
 
 
 gb_internal lbValue lb_const_nil(lbModule *m, Type *type) {

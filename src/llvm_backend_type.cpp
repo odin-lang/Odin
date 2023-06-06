@@ -157,11 +157,11 @@ gb_internal void lb_setup_type_info_data(lbProcedure *p) { // NOTE(bill): Setup 
 		global_type_info_data_entity_count = type->Array.count;
 
 		LLVMValueRef indices[2] = {llvm_zero(m), llvm_zero(m)};
-		LLVMValueRef values[2] = {
-			LLVMConstInBoundsGEP2(lb_type(m, lb_global_type_info_data_entity->type), lb_global_type_info_data_ptr(m).value, indices, gb_count_of(indices)),
-			LLVMConstInt(lb_type(m, t_int), type->Array.count, true),
-		};
-		LLVMValueRef slice = llvm_const_named_struct_internal(lb_type(m, type_deref(global_type_table.type)), values, gb_count_of(values));
+		LLVMValueRef data = LLVMConstInBoundsGEP2(lb_type(m, lb_global_type_info_data_entity->type), lb_global_type_info_data_ptr(m).value, indices, gb_count_of(indices));
+		LLVMValueRef len = LLVMConstInt(lb_type(m, t_int), type->Array.count, true);
+		Type *t = type_deref(global_type_table.type);
+		GB_ASSERT(is_type_slice(t));
+		LLVMValueRef slice = llvm_const_slice_internal(m, data, len);
 
 		LLVMSetInitializer(global_type_table.value, slice);
 	}
