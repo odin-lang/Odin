@@ -771,7 +771,7 @@ map_get :: proc "contextless" (m: $T/map[$K]$V, key: K) -> (stored_key: K, store
 	info := intrinsics.type_map_info(T)
 	key := key
 
-	h := info.key_hasher(&key, map_seed(m))
+	h := info.key_hasher(&key, map_seed(rm))
 	pos := map_desired_position(rm, h)
 	distance := uintptr(0)
 	mask := (uintptr(1) << map_log2_cap(rm)) - 1
