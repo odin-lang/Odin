@@ -1324,7 +1324,7 @@ namespace lbAbiWasm {
 				LLVMStructGetTypeAtIndex(type, 2)
 			};
 			LLVMTypeRef new_type = LLVMStructTypeInContext(c, types, gb_count_of(types), false);
-			return lb_arg_type_direct(new_type, type, nullptr, nullptr);
+			return lb_arg_type_direct(type, new_type, nullptr, nullptr);
 		} else {
 			return is_struct(c, type, calling_convention);
 		}
