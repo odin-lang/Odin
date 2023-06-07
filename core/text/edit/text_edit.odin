@@ -113,15 +113,16 @@ set_text :: proc(s: ^State, text: string) {
 }
 
 
-undo_state_push :: proc(s: ^State, undo: ^[dynamic]^Undo_State) {
+undo_state_push :: proc(s: ^State, undo: ^[dynamic]^Undo_State) -> mem.Allocator_Error {
 	text := string(s.builder.buf[:])
-	item := (^Undo_State)(mem.alloc(size_of(Undo_State) + len(text), align_of(Undo_State), s.undo_text_allocator))
+	item := (^Undo_State)(mem.alloc(size_of(Undo_State) + len(text), align_of(Undo_State), s.undo_text_allocator) or_return)
 	item.selection = s.selection
 	item.len = len(text)
 	#no_bounds_check {
 		runtime.copy(item.text[:len(text)], text)
 	}
-	append(undo, item)
+	append(undo, item) or_return
+	return nil
 }
 
 undo :: proc(s: ^State, undo, redo: ^[dynamic]^Undo_State) {

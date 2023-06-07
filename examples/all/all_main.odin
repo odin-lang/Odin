@@ -108,6 +108,9 @@ import sync             "core:sync"
 import testing          "core:testing"
 import scanner          "core:text/scanner"
 import i18n             "core:text/i18n"
+import match            "core:text/match"
+import table            "core:text/table"
+import edit             "core:text/edit"
 import thread           "core:thread"
 import time             "core:time"
 
@@ -210,6 +213,9 @@ _ :: sync
 _ :: testing
 _ :: scanner
 _ :: i18n
+_ :: match
+_ :: table
+_ :: edit
 _ :: thread
 _ :: time
 _ :: sysinfo
