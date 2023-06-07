@@ -67,6 +67,11 @@ _create :: proc(procedure: Thread_Proc, priority: Thread_Priority) -> ^Thread {
 
 		sync.unlock(&t.mutex)
 
+		if t.self_cleanup {
+			t.unix_thread = {}
+			free(t, t.creation_allocator)
+		}
+
 		return nil
 	}
 

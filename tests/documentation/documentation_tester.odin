@@ -290,7 +290,7 @@ _bad_test_found: bool
 
 @(private="file")
 _spawn_pipe_reader :: proc() {
-	thread.create_and_start(proc(^thread.Thread) {
+	thread.run(proc() {
 		stream := os.stream_from_handle(_read_pipe)
 		reader := io.to_reader(stream)
 		sync.post(&_pipe_reader_semaphore) // notify thread is ready

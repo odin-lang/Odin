@@ -47,6 +47,12 @@ _create :: proc(procedure: Thread_Proc, priority: Thread_Priority) -> ^Thread {
 
 		intrinsics.atomic_store(&t.flags, t.flags + {.Done})
 
+		if t.self_cleanup {
+			win32.CloseHandle(t.win32_thread)
+			t.win32_thread = win32.INVALID_HANDLE
+			free(t, t.creation_allocator)
+		}
+
 		return 0
 	}
 
