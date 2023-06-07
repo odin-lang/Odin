@@ -239,6 +239,10 @@ gb_internal bool check_is_terminating(Ast *node, String const &label) {
 		return check_is_terminating(unparen_expr(es->expr), label);
 	case_end;
 
+	case_ast_node(bs, BranchStmt, node);
+		return bs->token.kind == Token_fallthrough;
+	case_end;
+
 	case_ast_node(is, IfStmt, node);
 		if (is->else_stmt != nullptr) {
 			if (check_is_terminating(is->body, label) &&
