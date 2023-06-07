@@ -10,8 +10,16 @@ Thread_Proc :: #type proc(^Thread)
 
 MAX_USER_ARGUMENTS :: 8
 
+Thread_State :: enum u8 {
+	Started,
+	Joined,
+	Done,
+	Self_Cleanup,
+}
+
 Thread :: struct {
 	using specific: Thread_Os_Specific,
+	flags: bit_set[Thread_State; u8],
 	id:             int,
 	procedure:      Thread_Proc,
 
@@ -46,9 +54,6 @@ Thread :: struct {
 		This call ***must*** be done ***in the thread proc*** because the default temporary allocator uses thread local state!
 	*/
 	init_context: Maybe(runtime.Context),
-
-	// Indicates whether the thread will free itself when it completes
-	self_cleanup: bool,
 
 	creation_allocator: mem.Allocator,
 }
@@ -142,7 +147,7 @@ create_and_start :: proc(fn: proc(), init_context: Maybe(runtime.Context) = nil,
 	}
 	t := create(thread_proc, priority)
 	t.data = rawptr(fn)
-	t.self_cleanup = self_cleanup
+	if self_cleanup do t.flags += {.Self_Cleanup}
 	t.init_context = init_context
 	start(t)
 	return t
@@ -162,7 +167,7 @@ create_and_start_with_data :: proc(data: rawptr, fn: proc(data: rawptr), init_co
 	t.data = rawptr(fn)
 	t.user_index = 1
 	t.user_args = data
-	t.self_cleanup = self_cleanup
+	if self_cleanup do t.flags += {.Self_Cleanup}
 	t.init_context = init_context
 	start(t)
 	return t
@@ -181,7 +186,7 @@ create_and_start_with_poly_data :: proc(data: $T, fn: proc(data: T), init_contex
 	t.user_index = 1
 	data := data
 	mem.copy(&t.user_args[0], &data, size_of(data))
-	t.self_cleanup = self_cleanup
+	if self_cleanup do t.flags += {.Self_Cleanup}
 	t.init_context = init_context
 	start(t)
 	return t
@@ -203,7 +208,7 @@ create_and_start_with_poly_data2 :: proc(arg1: $T1, arg2: $T2, fn: proc(T1, T2),
 	arg1, arg2 := arg1, arg2
 	mem.copy(&t.user_args[0], &arg1, size_of(arg1))
 	mem.copy(&t.user_args[1], &arg2, size_of(arg2))
-	t.self_cleanup = self_cleanup
+	if self_cleanup do t.flags += {.Self_Cleanup}
 	t.init_context = init_context
 	start(t)
 	return t
@@ -228,7 +233,7 @@ create_and_start_with_poly_data3 :: proc(arg1: $T1, arg2: $T2, arg3: $T3, fn: pr
 	mem.copy(&t.user_args[0], &arg1, size_of(arg1))
 	mem.copy(&t.user_args[1], &arg2, size_of(arg2))
 	mem.copy(&t.user_args[2], &arg3, size_of(arg3))
-	t.self_cleanup = self_cleanup
+	if self_cleanup do t.flags += {.Self_Cleanup}
 	t.init_context = init_context
 	start(t)
 	return t
@@ -254,7 +259,7 @@ create_and_start_with_poly_data4 :: proc(arg1: $T1, arg2: $T2, arg3: $T3, arg4: 
 	mem.copy(&t.user_args[1], &arg2, size_of(arg2))
 	mem.copy(&t.user_args[2], &arg3, size_of(arg3))
 	mem.copy(&t.user_args[3], &arg4, size_of(arg4))
-	t.self_cleanup = self_cleanup
+	if self_cleanup do t.flags += {.Self_Cleanup}
 	t.init_context = init_context
 	start(t)
 	return t

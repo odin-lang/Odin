@@ -8,19 +8,12 @@ import "core:sys/unix"
 
 CAS :: intrinsics.atomic_compare_exchange_strong
 
-Thread_State :: enum u8 {
-	Started,
-	Joined,
-	Done,
-}
-
 // NOTE(tetra): Aligned here because of core/unix/pthread_linux.odin/pthread_t.
 // Also see core/sys/darwin/mach_darwin.odin/semaphore_t.
 Thread_Os_Specific :: struct #align 16 {
 	unix_thread: unix.pthread_t, // NOTE: very large on Darwin, small on Linux.
 	cond:        sync.Cond,
 	mutex:       sync.Mutex,
-	flags:       bit_set[Thread_State; u8],
 }
 //
 // Creates a thread which will run the given procedure.
@@ -67,7 +60,7 @@ _create :: proc(procedure: Thread_Proc, priority: Thread_Priority) -> ^Thread {
 
 		sync.unlock(&t.mutex)
 
-		if t.self_cleanup {
+		if .Self_Cleanup in t.flags {
 			t.unix_thread = {}
 			// NOTE(ftphikari): It doesn't matter which context 'free' received, right?
 			context = {}
