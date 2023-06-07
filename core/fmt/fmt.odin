@@ -1142,6 +1142,11 @@ _pad :: proc(fi: ^Info, s: string) {
 	if fi.minus { // right pad
 		io.write_string(fi.writer, s, &fi.n)
 		fmt_write_padding(fi, width)
+	} else if !fi.space && s != "" && s[0] == '-' {
+		// left pad accounting for zero pad of negative number
+		io.write_byte(fi.writer, '-', &fi.n)
+		fmt_write_padding(fi, width)
+		io.write_string(fi.writer, s[1:], &fi.n)
 	} else { // left pad
 		fmt_write_padding(fi, width)
 		io.write_string(fi.writer, s, &fi.n)
