@@ -2,7 +2,6 @@
 // +private
 package thread
 
-import "core:runtime"
 import "core:intrinsics"
 import "core:sync"
 import "core:sys/unix"
@@ -27,7 +26,7 @@ Thread_Os_Specific :: struct #align 16 {
 // Creates a thread which will run the given procedure.
 // It then waits for `start` to be called.
 //
-_create :: proc(procedure: Thread_Proc, priority := Thread_Priority.Normal) -> ^Thread {
+_create :: proc(procedure: Thread_Proc, priority: Thread_Priority) -> ^Thread {
 	__linux_thread_entry_proc :: proc "c" (t: rawptr) -> rawptr {
 		t := (^Thread)(t)
 
@@ -35,8 +34,6 @@ _create :: proc(procedure: Thread_Proc, priority := Thread_Priority.Normal) -> ^
 			// We need to give the thread a moment to start up before we enable cancellation.
 			can_set_thread_cancel_state := unix.pthread_setcancelstate(unix.PTHREAD_CANCEL_DISABLE, nil) == 0
 		}
-
-		context = runtime.default_context()
 
 		sync.lock(&t.mutex)
 
@@ -46,9 +43,6 @@ _create :: proc(procedure: Thread_Proc, priority := Thread_Priority.Normal) -> ^
 			sync.wait(&t.cond, &t.mutex)
 		}
 
-		init_context := t.init_context
-		context =	init_context.? or_else runtime.default_context()
-
 		when ODIN_OS != .Darwin {
 			// Enable thread's cancelability.
 			if can_set_thread_cancel_state {
@@ -57,15 +51,21 @@ _create :: proc(procedure: Thread_Proc, priority := Thread_Priority.Normal) -> ^
 			}
 		}
 
-		t.procedure(t)
+		{
+			init_context := t.init_context
+
+			// NOTE(tetra, 2023-05-31): Must do this AFTER thread.start() is called, so that the user can set the init_context, etc!
+			// Here on Unix, we start the OS thread in a running state, and so we manually have it wait on a condition
+			// variable above. We must perform that waiting BEFORE we select the context!
+			context = _select_context_for_thread(init_context)
+			defer _maybe_destroy_default_temp_allocator(init_context)
+
+			t.procedure(t)
+		}
 
 		intrinsics.atomic_store(&t.flags, t.flags + { .Done })
 
 		sync.unlock(&t.mutex)
-
-		if init_context == nil && context.temp_allocator.data == &runtime.global_default_temp_allocator_data {
-			runtime.default_temp_allocator_destroy(auto_cast context.temp_allocator.data)
-		}
 
 		return nil
 	}
