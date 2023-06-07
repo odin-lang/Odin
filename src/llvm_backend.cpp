@@ -1987,7 +1987,7 @@ gb_internal bool lb_generate_code(lbGenerator *gen) {
 		LLVMInitializeAArch64Disassembler();
 		break;
 	case TargetArch_wasm32:
-	case TargetArch_wasm64:
+	case TargetArch_wasm64p32:
 		LLVMInitializeWebAssemblyTargetInfo();
 		LLVMInitializeWebAssemblyTarget();
 		LLVMInitializeWebAssemblyTargetMC();

@@ -1,4 +1,5 @@
 gb_internal void lb_add_debug_local_variable(lbProcedure *p, LLVMValueRef ptr, Type *type, Token const &token);
+gb_internal LLVMValueRef llvm_const_string_internal(lbModule *m, Type *t, LLVMValueRef data, LLVMValueRef len);
 
 gb_global Entity *lb_global_type_info_data_entity   = {};
 gb_global lbAddr lb_global_type_info_member_types   = {};
@@ -1579,7 +1580,7 @@ gb_internal LLVMTypeRef lb_type_internal_for_procedures_raw(lbModule *m, Type *t
 		}
 	}
 	GB_ASSERT(param_index == param_count);
-	lbFunctionType *ft = lb_get_abi_info(m->ctx, params, param_count, ret, ret != nullptr, return_is_tuple, type->Proc.calling_convention);
+	lbFunctionType *ft = lb_get_abi_info(m->ctx, params, param_count, ret, ret != nullptr, return_is_tuple, type->Proc.calling_convention, type);
 	{
 		for_array(j, ft->args) {
 			auto arg = ft->args[j];
@@ -1625,6 +1626,8 @@ gb_internal LLVMTypeRef lb_type_internal(lbModule *m, Type *type) {
 	gb_unused(size);
 
 	GB_ASSERT(type != t_invalid);
+
+	bool bigger_int = build_context.ptr_size != build_context.int_size;
 
 	switch (type->kind) {
 	case Type_Basic:
@@ -1760,10 +1763,10 @@ gb_internal LLVMTypeRef lb_type_internal(lbModule *m, Type *type) {
 				return type;
 			}
 
-		case Basic_int:  return LLVMIntTypeInContext(ctx, 8*cast(unsigned)build_context.word_size);
-		case Basic_uint: return LLVMIntTypeInContext(ctx, 8*cast(unsigned)build_context.word_size);
+		case Basic_int:  return LLVMIntTypeInContext(ctx, 8*cast(unsigned)build_context.int_size);
+		case Basic_uint: return LLVMIntTypeInContext(ctx, 8*cast(unsigned)build_context.int_size);
 
-		case Basic_uintptr: return LLVMIntTypeInContext(ctx, 8*cast(unsigned)build_context.word_size);
+		case Basic_uintptr: return LLVMIntTypeInContext(ctx, 8*cast(unsigned)build_context.ptr_size);
 
 		case Basic_rawptr: return LLVMPointerType(LLVMInt8TypeInContext(ctx), 0);
 		case Basic_string:
@@ -1774,11 +1777,23 @@ gb_internal LLVMTypeRef lb_type_internal(lbModule *m, Type *type) {
 					return type;
 				}
 				type = LLVMStructCreateNamed(ctx, name);
-				LLVMTypeRef fields[2] = {
-					LLVMPointerType(lb_type(m, t_u8), 0),
-					lb_type(m, t_int),
-				};
-				LLVMStructSetBody(type, fields, 2, false);
+
+				if (build_context.metrics.ptr_size < build_context.metrics.int_size) {
+					GB_ASSERT(build_context.metrics.ptr_size == 4);
+					GB_ASSERT(build_context.metrics.int_size == 8);
+					LLVMTypeRef fields[3] = {
+						LLVMPointerType(lb_type(m, t_u8), 0),
+						lb_type(m, t_i32),
+						lb_type(m, t_int),
+					};
+					LLVMStructSetBody(type, fields, 3, false);
+				} else {
+					LLVMTypeRef fields[2] = {
+						LLVMPointerType(lb_type(m, t_u8), 0),
+						lb_type(m, t_int),
+					};
+					LLVMStructSetBody(type, fields, 2, false);
+				}
 				return type;
 			}
 		case Basic_cstring: return LLVMPointerType(LLVMInt8TypeInContext(ctx), 0);
@@ -1798,7 +1813,7 @@ gb_internal LLVMTypeRef lb_type_internal(lbModule *m, Type *type) {
 				return type;
 			}
 
-		case Basic_typeid: return LLVMIntTypeInContext(m->ctx, 8*cast(unsigned)build_context.word_size);
+		case Basic_typeid: return LLVMIntTypeInContext(m->ctx, 8*cast(unsigned)build_context.ptr_size);
 
 		// Endian Specific Types
 		case Basic_i16le:  return LLVMInt16TypeInContext(ctx);
@@ -1922,23 +1937,43 @@ gb_internal LLVMTypeRef lb_type_internal(lbModule *m, Type *type) {
 
 	case Type_Slice:
 		{
-			LLVMTypeRef fields[2] = {
-				LLVMPointerType(lb_type(m, type->Slice.elem), 0), // data
-				lb_type(m, t_int), // len
-			};
-			return LLVMStructTypeInContext(ctx, fields, 2, false);
+			if (bigger_int) {
+				LLVMTypeRef fields[3] = {
+					LLVMPointerType(lb_type(m, type->Slice.elem), 0), // data
+					lb_type_padding_filler(m, build_context.ptr_size, build_context.ptr_size), // padding
+					lb_type(m, t_int), // len
+				};
+				return LLVMStructTypeInContext(ctx, fields, gb_count_of(fields), false);
+			} else {
+				LLVMTypeRef fields[2] = {
+					LLVMPointerType(lb_type(m, type->Slice.elem), 0), // data
+					lb_type(m, t_int), // len
+				};
+				return LLVMStructTypeInContext(ctx, fields, gb_count_of(fields), false);
+			}
 		}
 		break;
 
 	case Type_DynamicArray:
 		{
-			LLVMTypeRef fields[4] = {
-				LLVMPointerType(lb_type(m, type->DynamicArray.elem), 0), // data
-				lb_type(m, t_int), // len
-				lb_type(m, t_int), // cap
-				lb_type(m, t_allocator), // allocator
-			};
-			return LLVMStructTypeInContext(ctx, fields, 4, false);
+			if (bigger_int) {
+				LLVMTypeRef fields[5] = {
+					LLVMPointerType(lb_type(m, type->DynamicArray.elem), 0), // data
+					lb_type_padding_filler(m, build_context.ptr_size, build_context.ptr_size), // padding
+					lb_type(m, t_int), // len
+					lb_type(m, t_int), // cap
+					lb_type(m, t_allocator), // allocator
+				};
+				return LLVMStructTypeInContext(ctx, fields, gb_count_of(fields), false);
+			} else {
+				LLVMTypeRef fields[4] = {
+					LLVMPointerType(lb_type(m, type->DynamicArray.elem), 0), // data
+					lb_type(m, t_int), // len
+					lb_type(m, t_int), // cap
+					lb_type(m, t_allocator), // allocator
+				};
+				return LLVMStructTypeInContext(ctx, fields, gb_count_of(fields), false);
+			}
 		}
 		break;
 
@@ -2145,9 +2180,17 @@ gb_internal LLVMTypeRef lb_type_internal(lbModule *m, Type *type) {
 	case Type_SoaPointer:
 		{
 			unsigned field_count = 2;
+			if (bigger_int) {
+				field_count = 3;
+			}
 			LLVMTypeRef *fields = gb_alloc_array(permanent_allocator(), LLVMTypeRef, field_count);
 			fields[0] = LLVMPointerType(lb_type(m, type->Pointer.elem), 0);
-			fields[1] = LLVMIntTypeInContext(ctx, 8*cast(unsigned)build_context.word_size);
+			if (bigger_int) {
+				fields[1] = lb_type_padding_filler(m, build_context.ptr_size, build_context.ptr_size);
+				fields[2] = LLVMIntTypeInContext(ctx, 8*cast(unsigned)build_context.int_size);
+			} else {
+				fields[1] = LLVMIntTypeInContext(ctx, 8*cast(unsigned)build_context.int_size);
+			}
 			return LLVMStructTypeInContext(ctx, fields, field_count, false);
 		}
 	
@@ -2503,10 +2546,9 @@ gb_internal lbValue lb_find_or_add_entity_string(lbModule *m, String const &str)
 		ptr = LLVMConstNull(lb_type(m, t_u8_ptr));
 	}
 	LLVMValueRef str_len = LLVMConstInt(lb_type(m, t_int), str.len, true);
-	LLVMValueRef values[2] = {ptr, str_len};
 
 	lbValue res = {};
-	res.value = llvm_const_named_struct(m, t_string, values, 2);
+	res.value = llvm_const_string_internal(m, t_string, ptr, str_len);
 	res.type = t_string;
 	return res;
 }

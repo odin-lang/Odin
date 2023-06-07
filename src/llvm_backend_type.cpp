@@ -68,21 +68,21 @@ gb_internal lbValue lb_typeid(lbModule *m, Type *type) {
 	}
 
 	u64 data = 0;
-	if (build_context.word_size == 4) {
+	if (build_context.ptr_size == 4) {
 		GB_ASSERT(id <= (1u<<24u));
 		data |= (id       &~ (1u<<24)) << 0u;  // index
 		data |= (kind     &~ (1u<<5))  << 24u; // kind
-		data |= (named    &~ (1u<<1))  << 29u; // kind
-		data |= (special  &~ (1u<<1))  << 30u; // kind
-		data |= (reserved &~ (1u<<1))  << 31u; // kind
+		data |= (named    &~ (1u<<1))  << 29u; // named
+		data |= (special  &~ (1u<<1))  << 30u; // special
+		data |= (reserved &~ (1u<<1))  << 31u; // reserved
 	} else {
-		GB_ASSERT(build_context.word_size == 8);
+		GB_ASSERT(build_context.ptr_size == 8);
 		GB_ASSERT(id <= (1ull<<56u));
 		data |= (id       &~ (1ull<<56)) << 0ul;  // index
 		data |= (kind     &~ (1ull<<5))  << 56ull; // kind
-		data |= (named    &~ (1ull<<1))  << 61ull; // kind
-		data |= (special  &~ (1ull<<1))  << 62ull; // kind
-		data |= (reserved &~ (1ull<<1))  << 63ull; // kind
+		data |= (named    &~ (1ull<<1))  << 61ull; // named
+		data |= (special  &~ (1ull<<1))  << 62ull; // special
+		data |= (reserved &~ (1ull<<1))  << 63ull; // reserved
 	}
 
 	lbValue res = {};
@@ -157,11 +157,11 @@ gb_internal void lb_setup_type_info_data(lbProcedure *p) { // NOTE(bill): Setup 
 		global_type_info_data_entity_count = type->Array.count;
 
 		LLVMValueRef indices[2] = {llvm_zero(m), llvm_zero(m)};
-		LLVMValueRef values[2] = {
-			LLVMConstInBoundsGEP2(lb_type(m, lb_global_type_info_data_entity->type), lb_global_type_info_data_ptr(m).value, indices, gb_count_of(indices)),
-			LLVMConstInt(lb_type(m, t_int), type->Array.count, true),
-		};
-		LLVMValueRef slice = llvm_const_named_struct_internal(lb_type(m, type_deref(global_type_table.type)), values, gb_count_of(values));
+		LLVMValueRef data = LLVMConstInBoundsGEP2(lb_type(m, lb_global_type_info_data_entity->type), lb_global_type_info_data_ptr(m).value, indices, gb_count_of(indices));
+		LLVMValueRef len = LLVMConstInt(lb_type(m, t_int), type->Array.count, true);
+		Type *t = type_deref(global_type_table.type);
+		GB_ASSERT(is_type_slice(t));
+		LLVMValueRef slice = llvm_const_slice_internal(m, data, len);
 
 		LLVMSetInitializer(global_type_table.value, slice);
 	}

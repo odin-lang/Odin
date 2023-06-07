@@ -971,13 +971,13 @@ gb_internal void init_universal(void) {
 
 	{
 		GlobalEnumValue values[TargetArch_COUNT] = {
-			{"Unknown", TargetArch_Invalid},
-			{"amd64",   TargetArch_amd64},
-			{"i386",    TargetArch_i386},
-			{"arm32",   TargetArch_arm32},
-			{"arm64",   TargetArch_arm64},
-			{"wasm32",  TargetArch_wasm32},
-			{"wasm64",  TargetArch_wasm64},
+			{"Unknown",   TargetArch_Invalid},
+			{"amd64",     TargetArch_amd64},
+			{"i386",      TargetArch_i386},
+			{"arm32",     TargetArch_arm32},
+			{"arm64",     TargetArch_arm64},
+			{"wasm32",    TargetArch_wasm32},
+			{"wasm64p32", TargetArch_wasm64p32},
 		};
 
 		auto fields = add_global_enum_type(str_lit("Odin_Arch_Type"), values, gb_count_of(values));
@@ -1000,8 +1000,6 @@ gb_internal void init_universal(void) {
 
 	{
 		GlobalEnumValue values[TargetEndian_COUNT] = {
-			{"Unknown", TargetEndian_Invalid},
-
 			{"Little",  TargetEndian_Little},
 			{"Big",     TargetEndian_Big},
 		};

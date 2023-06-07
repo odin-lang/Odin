@@ -3417,13 +3417,16 @@ gb_internal i64 type_size_of(Type *t) {
 	if (t->kind == Type_Basic) {
 		GB_ASSERT_MSG(is_type_typed(t), "%s", type_to_string(t));
 		switch (t->Basic.kind) {
-		case Basic_string:  size = 2*build_context.word_size; break;
-		case Basic_cstring: size = build_context.word_size;   break;
-		case Basic_any:     size = 2*build_context.word_size; break;
-		case Basic_typeid:  size = build_context.word_size;   break;
+		case Basic_string:  size = 2*build_context.int_size; break;
+		case Basic_cstring: size = build_context.ptr_size;   break;
+		case Basic_any:     size = 2*build_context.ptr_size; break;
+		case Basic_typeid:  size = build_context.ptr_size;   break;
 
-		case Basic_int: case Basic_uint: case Basic_uintptr: case Basic_rawptr:
-			size = build_context.word_size;
+		case Basic_int: case Basic_uint:
+			size = build_context.int_size;
+			break;
+		case Basic_uintptr: case Basic_rawptr:
+			size = build_context.ptr_size;
 			break;
 		default:
 			size = t->Basic.size;
@@ -3477,13 +3480,15 @@ gb_internal i64 type_align_of_internal(Type *t, TypePath *path) {
 	case Type_Basic: {
 		GB_ASSERT(is_type_typed(t));
 		switch (t->Basic.kind) {
-		case Basic_string:  return build_context.word_size;
-		case Basic_cstring: return build_context.word_size;
-		case Basic_any:     return build_context.word_size;
-		case Basic_typeid:  return build_context.word_size;
+		case Basic_string:  return build_context.int_size;
+		case Basic_cstring: return build_context.ptr_size;
+		case Basic_any:     return build_context.ptr_size;
+		case Basic_typeid:  return build_context.ptr_size;
 
-		case Basic_int: case Basic_uint: case Basic_uintptr: case Basic_rawptr:
-			return build_context.word_size;
+		case Basic_int: case Basic_uint:
+			return build_context.int_size;
+		case Basic_uintptr: case Basic_rawptr:
+			return build_context.ptr_size;
 
 		case Basic_complex32: case Basic_complex64: case Basic_complex128:
 			return type_size_of_internal(t, path) / 2;
@@ -3516,10 +3521,10 @@ gb_internal i64 type_align_of_internal(Type *t, TypePath *path) {
 
 	case Type_DynamicArray:
 		// data, count, capacity, allocator
-		return build_context.word_size;
+		return build_context.int_size;
 
 	case Type_Slice:
-		return build_context.word_size;
+		return build_context.int_size;
 
 
 	case Type_Tuple: {
@@ -3534,7 +3539,7 @@ gb_internal i64 type_align_of_internal(Type *t, TypePath *path) {
 	} break;
 
 	case Type_Map:
-		return build_context.word_size;
+		return build_context.ptr_size;
 	case Type_Enum:
 		return type_align_of_internal(t->Enum.base_type, path);
 
@@ -3614,10 +3619,10 @@ gb_internal i64 type_align_of_internal(Type *t, TypePath *path) {
 		return type_align_of_internal(t->RelativeSlice.base_integer, path);
 
 	case Type_SoaPointer:
-		return build_context.word_size;
+		return build_context.int_size;
 	}
 
-	// NOTE(bill): Things that are bigger than build_context.word_size, are actually comprised of smaller types
+	// NOTE(bill): Things that are bigger than build_context.ptr_size, are actually comprised of smaller types
 	// TODO(bill): Is this correct for 128-bit types (integers)?
 	return gb_clamp(next_pow2(type_size_of_internal(t, path)), 1, build_context.max_align);
 }
@@ -3699,24 +3704,26 @@ gb_internal i64 type_size_of_internal(Type *t, TypePath *path) {
 			return size;
 		}
 		switch (kind) {
-		case Basic_string:  return 2*build_context.word_size;
-		case Basic_cstring: return build_context.word_size;
-		case Basic_any:     return 2*build_context.word_size;
-		case Basic_typeid:  return build_context.word_size;
+		case Basic_string:  return 2*build_context.int_size;
+		case Basic_cstring: return build_context.ptr_size;
+		case Basic_any:     return 2*build_context.ptr_size;
+		case Basic_typeid:  return build_context.ptr_size;
 
-		case Basic_int: case Basic_uint: case Basic_uintptr: case Basic_rawptr:
-			return build_context.word_size;
+		case Basic_int: case Basic_uint:
+			return build_context.int_size;
+		case Basic_uintptr: case Basic_rawptr:
+			return build_context.ptr_size;
 		}
 	} break;
 
 	case Type_Pointer:
-		return build_context.word_size;
+		return build_context.ptr_size;
 
 	case Type_MultiPointer:
-		return build_context.word_size;
+		return build_context.ptr_size;
 
 	case Type_SoaPointer:
-		return build_context.word_size*2;
+		return build_context.int_size*2;
 
 	case Type_Array: {
 		i64 count, align, size, alignment;
@@ -3749,11 +3756,11 @@ gb_internal i64 type_size_of_internal(Type *t, TypePath *path) {
 	} break;
 
 	case Type_Slice: // ptr + len
-		return 2 * build_context.word_size;
+		return 2 * build_context.int_size;
 
 	case Type_DynamicArray:
 		// data + len + cap + allocator(procedure+data)
-		return (3 + 2)*build_context.word_size;
+		return 3*build_context.int_size + 2*build_context.ptr_size;
 
 	case Type_Map:
 		/*
@@ -3763,7 +3770,7 @@ gb_internal i64 type_size_of_internal(Type *t, TypePath *path) {
 				allocator: runtime.Allocator, // 2 words
 			}
 		*/
-		return (1 + 1 + 2)*build_context.word_size;
+		return (1 + 1 + 2)*build_context.ptr_size;
 
 	case Type_Tuple: {
 		i64 count, align, size;
@@ -3889,7 +3896,7 @@ gb_internal i64 type_size_of_internal(Type *t, TypePath *path) {
 	}
 
 	// Catch all
-	return build_context.word_size;
+	return build_context.ptr_size;
 }
 
 gb_internal i64 type_offset_of(Type *t, i32 index) {
@@ -3909,32 +3916,32 @@ gb_internal i64 type_offset_of(Type *t, i32 index) {
 	}  else if (t->kind == Type_Basic) {
 		if (t->Basic.kind == Basic_string) {
 			switch (index) {
-			case 0: return 0;                       // data
-			case 1: return build_context.word_size; // len
+			case 0: return 0;                      // data
+			case 1: return build_context.int_size; // len
 			}
 		} else if (t->Basic.kind == Basic_any) {
 			switch (index) {
-			case 0: return 0;                       // type_info
-			case 1: return build_context.word_size; // data
+			case 0: return 0;                      // type_info
+			case 1: return build_context.ptr_size; // data
 			}
 		}
 	} else if (t->kind == Type_Slice) {
 		switch (index) {
-		case 0: return 0;                         // data
-		case 1: return 1*build_context.word_size; // len
-		case 2: return 2*build_context.word_size; // cap
+		case 0: return 0;                        // data
+		case 1: return 1*build_context.int_size; // len
+		case 2: return 2*build_context.int_size; // cap
 		}
 	} else if (t->kind == Type_DynamicArray) {
 		switch (index) {
-		case 0: return 0;                         // data
-		case 1: return 1*build_context.word_size; // len
-		case 2: return 2*build_context.word_size; // cap
-		case 3: return 3*build_context.word_size; // allocator
+		case 0: return 0;                        // data
+		case 1: return 1*build_context.int_size; // len
+		case 2: return 2*build_context.int_size; // cap
+		case 3: return 3*build_context.int_size; // allocator
 		}
 	} else if (t->kind == Type_Union) {
 		/* i64 s = */ type_size_of(t);
 		switch (index) {
-		case -1: return align_formula(t->Union.variant_block_size, build_context.word_size); // __type_info
+		case -1: return align_formula(t->Union.variant_block_size, build_context.ptr_size); // __type_info
 		}
 	}
 	return 0;
