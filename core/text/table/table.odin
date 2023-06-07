@@ -9,12 +9,10 @@
 package text_table
 
 import "core:io"
-import "core:os"
 import "core:fmt"
 import "core:mem"
 import "core:mem/virtual"
 import "core:runtime"
-import "core:strings"
 
 Cell :: struct {
 	text: string,
