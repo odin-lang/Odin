@@ -1000,8 +1000,6 @@ gb_internal void init_universal(void) {
 
 	{
 		GlobalEnumValue values[TargetEndian_COUNT] = {
-			{"Unknown", TargetEndian_Invalid},
-
 			{"Little",  TargetEndian_Little},
 			{"Big",     TargetEndian_Big},
 		};

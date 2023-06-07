@@ -41,8 +41,6 @@ enum TargetArchKind : u16 {
 };
 
 enum TargetEndianKind : u8 {
-	TargetEndian_Invalid,
-
 	TargetEndian_Little,
 	TargetEndian_Big,
 
@@ -85,7 +83,6 @@ gb_global String target_arch_names[TargetArch_COUNT] = {
 };
 
 gb_global String target_endian_names[TargetEndian_COUNT] = {
-	str_lit(""),
 	str_lit("little"),
 	str_lit("big"),
 };
@@ -97,7 +94,8 @@ gb_global String target_abi_names[TargetABI_COUNT] = {
 };
 
 gb_global TargetEndianKind target_endians[TargetArch_COUNT] = {
-	TargetEndian_Invalid,
+	TargetEndian_Little,
+	TargetEndian_Little,
 	TargetEndian_Little,
 	TargetEndian_Little,
 	TargetEndian_Little,

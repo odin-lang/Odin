@@ -72,17 +72,17 @@ gb_internal lbValue lb_typeid(lbModule *m, Type *type) {
 		GB_ASSERT(id <= (1u<<24u));
 		data |= (id       &~ (1u<<24)) << 0u;  // index
 		data |= (kind     &~ (1u<<5))  << 24u; // kind
-		data |= (named    &~ (1u<<1))  << 29u; // kind
-		data |= (special  &~ (1u<<1))  << 30u; // kind
-		data |= (reserved &~ (1u<<1))  << 31u; // kind
+		data |= (named    &~ (1u<<1))  << 29u; // named
+		data |= (special  &~ (1u<<1))  << 30u; // special
+		data |= (reserved &~ (1u<<1))  << 31u; // reserved
 	} else {
 		GB_ASSERT(build_context.ptr_size == 8);
 		GB_ASSERT(id <= (1ull<<56u));
 		data |= (id       &~ (1ull<<56)) << 0ul;  // index
 		data |= (kind     &~ (1ull<<5))  << 56ull; // kind
-		data |= (named    &~ (1ull<<1))  << 61ull; // kind
-		data |= (special  &~ (1ull<<1))  << 62ull; // kind
-		data |= (reserved &~ (1ull<<1))  << 63ull; // kind
+		data |= (named    &~ (1ull<<1))  << 61ull; // named
+		data |= (special  &~ (1ull<<1))  << 62ull; // special
+		data |= (reserved &~ (1ull<<1))  << 63ull; // reserved
 	}
 
 	lbValue res = {};
