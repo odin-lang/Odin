@@ -915,6 +915,13 @@ gb_internal Type *add_global_type_name(Scope *scope, String const &type_name, Ty
 	return named_type;
 }
 
+gb_internal i64 odin_compile_timestamp(void) {
+	i64 us_after_1601 = cast(i64)gb_utc_time_now();
+	i64 us_after_1970 = us_after_1601 - 11644473600000000ll;
+	i64 ns_after_1970 = us_after_1970*1000ll;
+	return ns_after_1970;
+}
+
 
 gb_internal void init_universal(void) {
 	BuildContext *bc = &build_context;
@@ -1051,6 +1058,7 @@ gb_internal void init_universal(void) {
 
 	add_global_bool_constant("ODIN_VALGRIND_SUPPORT",         bc->ODIN_VALGRIND_SUPPORT);
 
+	add_global_constant("ODIN_COMPILE_TIMESTAMP", t_untyped_integer, exact_value_i64(odin_compile_timestamp()));
 
 
 // Builtin Procedures
