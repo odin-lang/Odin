@@ -342,9 +342,6 @@ gb_internal ExactValue exact_value_from_basic_literal(TokenKind kind, String con
 		utf8_decode(string.text, string.len, &r);
 		return exact_value_i64(r);
 	}
-	default:
-		GB_PANIC("Invalid token for basic literal");
-		break;
 	}
 
 	ExactValue result = {ExactValue_Invalid};
