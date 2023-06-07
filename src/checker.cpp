@@ -651,6 +651,9 @@ gb_internal bool check_vet_unused(Checker *c, Entity *e, VettedEntity *ve) {
 		case Entity_Variable:
 			if (e->scope->flags & (ScopeFlag_Global|ScopeFlag_Type|ScopeFlag_File)) {
 				return false;
+			} else if (e->flags & EntityFlag_Static) {
+				// ignore these for the time being
+				return false;
 			}
 		case Entity_ImportName:
 		case Entity_LibraryName:
