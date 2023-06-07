@@ -69,6 +69,8 @@ _create :: proc(procedure: Thread_Proc, priority: Thread_Priority) -> ^Thread {
 
 		if t.self_cleanup {
 			t.unix_thread = {}
+			// NOTE(ftphikari): It doesn't matter which context 'free' received, right?
+			context = {}
 			free(t, t.creation_allocator)
 		}
 

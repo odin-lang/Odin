@@ -50,6 +50,8 @@ _create :: proc(procedure: Thread_Proc, priority: Thread_Priority) -> ^Thread {
 		if t.self_cleanup {
 			win32.CloseHandle(t.win32_thread)
 			t.win32_thread = win32.INVALID_HANDLE
+			// NOTE(ftphikari): It doesn't matter which context 'free' received, right?
+			context = {}
 			free(t, t.creation_allocator)
 		}
 
