@@ -3,17 +3,13 @@ package os2
 import "core:io"
 
 to_stream :: proc(f: ^File) -> (s: io.Stream) {
-	s.stream_data = f
-	s.stream_vtable = &_file_stream_vtable
+	s.data = f
+	s.procedure = _file_stream_proc
 	return
 }
 
-to_writer :: proc(f: ^File) -> (s: io.Writer) {
-	return {to_stream(f)}
-}
-to_reader :: proc(f: ^File) -> (s: io.Reader) {
-	return {to_stream(f)}
-}
+to_writer :: to_stream
+to_reader :: to_stream
 
 
 @(private)
@@ -26,68 +22,52 @@ error_to_io_error :: proc(ferr: Error) -> io.Error {
 
 
 @(private)
-_file_stream_vtable := io.Stream_VTable{
-	impl_read = proc(s: io.Stream, p: []byte) -> (n: int, err: io.Error) {
-		f := (^File)(s.stream_data)
-		ferr: Error
-		n, ferr = read(f, p)
+_file_stream_proc :: proc(stream_data: rawptr, mode: io.Stream_Mode, p: []byte, offset: i64, whence: io.Seek_From) -> (n: i64, err: io.Error) {
+	f := (^File)(stream_data)
+	ferr: Error
+	i: int
+	switch mode {
+	case .Read:
+		i, ferr = read(f, p)
+		n = i64(i)
 		err = error_to_io_error(ferr)
 		return
-	},
-	impl_read_at = proc(s: io.Stream, p: []byte, offset: i64) -> (n: int, err: io.Error) {
-		f := (^File)(s.stream_data)
-		ferr: Error
-		n, ferr = read_at(f, p, offset)
+	case .Read_At:
+		i, ferr = read_at(f, p, offset)
+		n = i64(i)
 		err = error_to_io_error(ferr)
 		return
-	},
-	impl_write_to = proc(s: io.Stream, w: io.Writer) -> (n: i64, err: io.Error) {
-		f := (^File)(s.stream_data)
-		ferr: Error
-		n, ferr = write_to(f, w)
+	case .Write:
+		i, ferr = write(f, p)
+		n = i64(i)
 		err = error_to_io_error(ferr)
 		return
-	},
-	impl_write = proc(s: io.Stream, p: []byte) -> (n: int, err: io.Error) {
-		f := (^File)(s.stream_data)
-		ferr: Error
-		n, ferr = write(f, p)
+	case .Write_At:
+		i, ferr = write_at(f, p, offset)
+		n = i64(i)
 		err = error_to_io_error(ferr)
 		return
-	},
-	impl_write_at = proc(s: io.Stream, p: []byte, offset: i64) -> (n: int, err: io.Error) {
-		f := (^File)(s.stream_data)
-		ferr: Error
-		n, ferr = write_at(f, p, offset)
+	case .Seek:
+		n, ferr = seek(f, offset, Seek_From(whence))
 		err = error_to_io_error(ferr)
 		return
-	},
-	impl_read_from = proc(s: io.Stream, r: io.Reader) -> (n: i64, err: io.Error) {
-		f := (^File)(s.stream_data)
-		ferr: Error
-		n, ferr = read_from(f, r)
+	case .Size:
+		n, ferr = file_size(f)
 		err = error_to_io_error(ferr)
 		return
-	},
-	impl_seek = proc(s: io.Stream, offset: i64, whence: io.Seek_From) -> (i64, io.Error) {
-		f := (^File)(s.stream_data)
-		n, ferr := seek(f, offset, Seek_From(whence))
-		err := error_to_io_error(ferr)
-		return n, err
-	},
-	impl_size = proc(s: io.Stream) -> i64 {
-		f := (^File)(s.stream_data)
-		sz, _ := file_size(f)
-		return sz
-	},
-	impl_flush = proc(s: io.Stream) -> io.Error {
-		f := (^File)(s.stream_data)
-		ferr := flush(f)
-		return error_to_io_error(ferr)
-	},
-	impl_close = proc(s: io.Stream) -> io.Error {
-		f := (^File)(s.stream_data)
-		ferr := close(f)
-		return error_to_io_error(ferr)
-	},
+	case .Flush:
+		ferr = flush(f)
+		err = error_to_io_error(ferr)
+		return
+	case .Close:
+		ferr = close(f)
+		err = error_to_io_error(ferr)
+		return
+	case .Query:
+		return io.query_utility({.Read, .Read_At, .Write, .Write_At, .Seek, .Size, .Flush, .Close, .Query})
+	case .Destroy:
+		return 0, .Empty
+	}
+	return 0, .Empty
 }
+
