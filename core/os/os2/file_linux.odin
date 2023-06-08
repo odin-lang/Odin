@@ -73,6 +73,10 @@ _new_file :: proc(fd: uintptr, _: string) -> ^File {
 	file.impl.fd = int(fd)
 	file.impl.allocator = _file_allocator()
 	file.impl.name = _get_full_path(file.impl.fd, file.impl.allocator)
+	file.stream = {
+		data = file,
+		procedure = _file_stream_proc,
+	}
 	return file
 }
 
@@ -102,7 +106,7 @@ _name :: proc(f: ^File) -> string {
 	return f.impl.name if f != nil else ""
 }
 
-_seek :: proc(f: ^File, offset: i64, whence: Seek_From) -> (ret: i64, err: Error) {
+_seek :: proc(f: ^File, offset: i64, whence: io.Seek_From) -> (ret: i64, err: Error) {
 	res := unix.sys_lseek(f.impl.fd, offset, int(whence))
 	if res < 0 {
 		return -1, _get_platform_error(int(res))
@@ -139,11 +143,6 @@ _read_at :: proc(f: ^File, p: []byte, offset: i64) -> (n: int, err: Error) {
 	return
 }
 
-_read_from :: proc(f: ^File, r: io.Reader) -> (n: i64, err: Error) {
-	//TODO
-	return
-}
-
 _write :: proc(f: ^File, p: []byte) -> (n: int, err: Error) {
 	if len(p) == 0 {
 		return 0, nil
@@ -170,11 +169,6 @@ _write_at :: proc(f: ^File, p: []byte, offset: i64) -> (n: int, err: Error) {
 		b = b[m:]
 		offset += i64(m)
 	}
-	return
-}
-
-_write_to :: proc(f: ^File, w: io.Writer) -> (n: i64, err: Error) {
-	//TODO
 	return
 }
 
@@ -366,3 +360,53 @@ _is_dir_fd :: proc(fd: int) -> bool {
 _temp_name_to_cstring :: proc(name: string) -> (cname: cstring) {
 	return strings.clone_to_cstring(name, context.temp_allocator)
 }
+
+
+@(private="package")
+_file_stream_proc :: proc(stream_data: rawptr, mode: io.Stream_Mode, p: []byte, offset: i64, whence: io.Seek_From) -> (n: i64, err: io.Error) {
+	f := (^File)(stream_data)
+	ferr: Error
+	i: int
+	switch mode {
+	case .Read:
+		i, ferr = _read(f, p)
+		n = i64(i)
+		err = error_to_io_error(ferr)
+		return
+	case .Read_At:
+		i, ferr = _read_at(f, p, offset)
+		n = i64(i)
+		err = error_to_io_error(ferr)
+		return
+	case .Write:
+		i, ferr = _write(f, p)
+		n = i64(i)
+		err = error_to_io_error(ferr)
+		return
+	case .Write_At:
+		i, ferr = _write_at(f, p, offset)
+		n = i64(i)
+		err = error_to_io_error(ferr)
+		return
+	case .Seek:
+		n, ferr = _seek(f, offset, whence)
+		err = error_to_io_error(ferr)
+		return
+	case .Size:
+		n, ferr = _file_size(f)
+		err = error_to_io_error(ferr)
+		return
+	case .Flush:
+		ferr = _flush(f)
+		err = error_to_io_error(ferr)
+		return
+	case .Close, .Destroy:
+		ferr = _close(f)
+		err = error_to_io_error(ferr)
+		return
+	case .Query:
+		return io.query_utility({.Read, .Read_At, .Write, .Write_At, .Seek, .Size, .Flush, .Close, .Destroy, .Query})
+	}
+	return 0, .Empty
+}
+

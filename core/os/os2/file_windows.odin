@@ -144,6 +144,11 @@ _new_file :: proc(handle: uintptr, name: string) -> ^File {
 	}
 	f.impl.kind = kind
 
+	f.stream = {
+		data = f,
+		procedure = _file_stream_proc,
+	}
+
 	return f
 }
 
@@ -181,7 +186,7 @@ _name :: proc(f: ^File) -> string {
 	return f.impl.name if f != nil else ""
 }
 
-_seek :: proc(f: ^File, offset: i64, whence: Seek_From) -> (ret: i64, err: Error) {
+_seek :: proc(f: ^File, offset: i64, whence: io.Seek_From) -> (ret: i64, err: Error) {
 	handle := _handle(f)
 	if handle == win32.INVALID_HANDLE {
 		return 0, .Invalid_File
@@ -329,11 +334,6 @@ _read_at :: proc(f: ^File, p: []byte, offset: i64) -> (n: int, err: Error) {
 	return
 }
 
-_read_from :: proc(f: ^File, r: io.Reader) -> (n: i64, err: Error) {
-	// TODO(bill)
-	return
-}
-
 _write :: proc(f: ^File, p: []byte) -> (n: int, err: Error) {
 	if len(p) == 0 {
 		return
@@ -394,11 +394,6 @@ _write_at :: proc(f: ^File, p: []byte, offset: i64) -> (n: int, err: Error) {
 		p = p[m:]
 		offset += i64(m)
 	}
-	return
-}
-
-_write_to :: proc(f: ^File, w: io.Writer) -> (n: i64, err: Error) {
-	// TODO(bill)
 	return
 }
 
@@ -727,3 +722,55 @@ _is_dir :: proc(path: string) -> bool {
 	}
 	return false
 }
+
+
+@(private="package")
+_file_stream_proc :: proc(stream_data: rawptr, mode: io.Stream_Mode, p: []byte, offset: i64, whence: io.Seek_From) -> (n: i64, err: io.Error) {
+	f := (^File)(stream_data)
+	ferr: Error
+	i: int
+	switch mode {
+	case .Read:
+		i, ferr = _read(f, p)
+		n = i64(i)
+		err = error_to_io_error(ferr)
+		return
+	case .Read_At:
+		i, ferr = _read_at(f, p, offset)
+		n = i64(i)
+		err = error_to_io_error(ferr)
+		return
+	case .Write:
+		i, ferr = _write(f, p)
+		n = i64(i)
+		err = error_to_io_error(ferr)
+		return
+	case .Write_At:
+		i, ferr = _write_at(f, p, offset)
+		n = i64(i)
+		err = error_to_io_error(ferr)
+		return
+	case .Seek:
+		n, ferr = _seek(f, offset, whence)
+		err = error_to_io_error(ferr)
+		return
+	case .Size:
+		n, ferr = _file_size(f)
+		err = error_to_io_error(ferr)
+		return
+	case .Flush:
+		ferr = _flush(f)
+		err = error_to_io_error(ferr)
+		return
+	case .Close:
+		ferr = _close(f)
+		err = error_to_io_error(ferr)
+		return
+	case .Query:
+		return io.query_utility({.Read, .Read_At, .Write, .Write_At, .Seek, .Size, .Flush, .Close, .Query})
+	case .Destroy:
+		return 0, .Empty
+	}
+	return 0, .Empty
+}
+

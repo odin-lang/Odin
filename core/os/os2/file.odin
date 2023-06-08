@@ -5,13 +5,8 @@ import "core:time"
 import "core:runtime"
 
 File :: struct {
-	impl: _File,
-}
-
-Seek_From :: enum {
-	Start   = 0, // seek relative to the origin of the file
-	Current = 1, // seek relative to the current offset
-	End     = 2, // seek relative to the end
+	impl:   _File,
+	stream: io.Stream,
 }
 
 File_Mode :: distinct u32
@@ -72,45 +67,36 @@ fd :: proc(f: ^File) -> uintptr {
 	return _fd(f)
 }
 
-
-close :: proc(f: ^File) -> Error {
-	return _close(f)
-}
-
 name :: proc(f: ^File) -> string {
 	return _name(f)
 }
 
-seek :: proc(f: ^File, offset: i64, whence: Seek_From) -> (ret: i64, err: Error) {
-	return _seek(f, offset, whence)
+close :: proc(f: ^File) -> Error {
+	return io.close(f.stream)
+}
+
+seek :: proc(f: ^File, offset: i64, whence: io.Seek_From) -> (ret: i64, err: Error) {
+	return io.seek(f.stream, offset, whence)
 }
 
 read :: proc(f: ^File, p: []byte) -> (n: int, err: Error) {
-	return _read(f, p)
+	return io.read(f.stream, p)
 }
 
 read_at :: proc(f: ^File, p: []byte, offset: i64) -> (n: int, err: Error) {
-	return _read_at(f, p, offset)
-}
-
-read_from :: proc(f: ^File, r: io.Reader) -> (n: i64, err: Error) {
-	return _read_from(f, r)
+	return io.read_at(f.stream, p, offset)
 }
 
 write :: proc(f: ^File, p: []byte) -> (n: int, err: Error) {
-	return _write(f, p)
+	return io.write(f.stream, p)
 }
 
 write_at :: proc(f: ^File, p: []byte, offset: i64) -> (n: int, err: Error) {
-	return _write_at(f, p, offset)
-}
-
-write_to :: proc(f: ^File, w: io.Writer) -> (n: i64, err: Error) {
-	return _write_to(f, w)
+	return io.write_at(f.stream, p, offset)
 }
 
 file_size :: proc(f: ^File) -> (n: i64, err: Error) {
-	return _file_size(f)
+	return io.size(f.stream)
 }
 
 
@@ -119,7 +105,7 @@ sync :: proc(f: ^File) -> Error {
 }
 
 flush :: proc(f: ^File) -> Error {
-	return _flush(f)
+	return io.flush(f.stream)
 }
 
 truncate :: proc(f: ^File, size: i64) -> Error {
