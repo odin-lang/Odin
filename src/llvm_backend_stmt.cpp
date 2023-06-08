@@ -2463,6 +2463,7 @@ gb_internal void lb_build_stmt(lbProcedure *p, Ast *node) {
 							lb_add_entity(p->module, e, val);
 							lb_add_debug_local_variable(p, val.value, e->type, e->token);
 							lvals_preused[lval_index] = true;
+							lvals[lval_index] = *comp_lit_addr;
 						}
 					}
 				}
