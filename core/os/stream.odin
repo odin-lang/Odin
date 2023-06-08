@@ -31,14 +31,18 @@ _file_stream_proc :: proc(stream_data: rawptr, mode: io.Stream_Mode, p: []byte, 
 			err = .Unknown
 		}
 	case .Read_At:
-		n_int, os_err = read_at(fd, p, offset)
-		n = i64(n_int)
+		when !(ODIN_OS == .FreeBSD || ODIN_OS == .OpenBSD) {
+			n_int, os_err = read_at(fd, p, offset)
+			n = i64(n_int)
+		}
 	case .Write:
 		n_int, os_err = write(fd, p)
 		n = i64(n_int)
 	case .Write_At:
-		n_int, os_err = write_at(fd, p, offset)
-		n = i64(n_int)
+		when !(ODIN_OS == .FreeBSD || ODIN_OS == .OpenBSD) {
+			n_int, os_err = write_at(fd, p, offset)
+			n = i64(n_int)
+		}
 	case .Seek:
 		n, os_err = seek(fd, offset, int(whence))
 	case .Size:
@@ -46,7 +50,11 @@ _file_stream_proc :: proc(stream_data: rawptr, mode: io.Stream_Mode, p: []byte, 
 	case .Destroy:
 		err = .Empty
 	case .Query:
-		return io.query_utility({.Close, .Flush, .Read, .Read_At, .Write, .Write_At, .Seek, .Size, .Query})
+		when ODIN_OS == .FreeBSD || ODIN_OS == .OpenBSD {
+			return io.query_utility({.Close, .Flush, .Read, .Write, .Seek, .Size, .Query})
+		} else {
+			return io.query_utility({.Close, .Flush, .Read, .Read_At, .Write, .Write_At, .Seek, .Size, .Query})
+		}
 	}
 	if err == nil && os_err != 0 {
 		err = .Unknown
