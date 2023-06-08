@@ -283,9 +283,9 @@ _set_option :: proc(s: Any_Socket, option: Socket_Option, value: any, loc := #ca
 			t, ok := value.(time.Duration)
 			if !ok do panic("set_option() value must be a time.Duration here", loc)
 
-			nanos := time.duration_nanoseconds(t)
-			timeval_value.nanoseconds = int(nanos % 1e9)
-			timeval_value.seconds = (nanos - i64(timeval_value.nanoseconds)) / 1e9
+			micros := i64(time.duration_microseconds(t))
+			timeval_value.microseconds = int(micros % 1e6)
+			timeval_value.seconds = (micros - i64(timeval_value.microseconds)) / 1e6
 
 			ptr = &timeval_value
 			len = size_of(timeval_value)

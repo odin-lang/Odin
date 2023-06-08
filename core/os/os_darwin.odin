@@ -355,7 +355,7 @@ in6_addr :: struct #packed {
 
 Timeval :: struct {
 	seconds: i64,
-	nanoseconds: int,
+	microseconds: int,
 }
 
 Linger :: struct {
