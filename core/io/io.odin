@@ -75,29 +75,29 @@ Stream :: struct {
 	data:      rawptr,
 }
 
-Reader             :: struct {using stream: Stream}
-Writer             :: struct {using stream: Stream}
-Closer             :: struct {using stream: Stream}
-Flusher            :: struct {using stream: Stream}
-Seeker             :: struct {using stream: Stream}
+Reader             :: Stream
+Writer             :: Stream
+Closer             :: Stream
+Flusher            :: Stream
+Seeker             :: Stream
 
-Read_Writer        :: struct {using stream: Stream}
-Read_Closer        :: struct {using stream: Stream}
-Read_Write_Closer  :: struct {using stream: Stream}
-Read_Write_Seeker  :: struct {using stream: Stream}
+Read_Writer        :: Stream
+Read_Closer        :: Stream
+Read_Write_Closer  :: Stream
+Read_Write_Seeker  :: Stream
 
-Write_Closer       :: struct {using stream: Stream}
-Write_Seeker       :: struct {using stream: Stream}
-Write_Flusher      :: struct {using stream: Stream}
-Write_Flush_Closer :: struct {using stream: Stream}
+Write_Closer       :: Stream
+Write_Seeker       :: Stream
+Write_Flusher      :: Stream
+Write_Flush_Closer :: Stream
 
-Reader_At          :: struct {using stream: Stream}
-Writer_At          :: struct {using stream: Stream}
+Reader_At          :: Stream
+Writer_At          :: Stream
 
 
 destroy :: proc(s: Stream) -> (err: Error) {
-	_ = flush({s})
-	_ = close({s})
+	_ = flush(s)
+	_ = close(s)
 	if s.procedure != nil {
 		_, err = s.procedure(s.data, .Destroy, nil, 0, nil)
 	} else {
@@ -192,11 +192,10 @@ size :: proc(s: Stream) -> (n: i64, err: Error) {
 	if s.procedure != nil {
 		n, err = s.procedure(s.data, .Size, nil, 0, nil)
 		if err == .Empty {
-			seeker := Seeker{s}
 			n = 0
-			curr := seek(seeker, 0, .Current) or_return
-			end  := seek(seeker, 0, .End)     or_return
-			seek(seeker, curr, .Start)        or_return
+			curr := seek(s, 0, .Current) or_return
+			end  := seek(s, 0, .End)     or_return
+			seek(s, curr, .Start)        or_return
 			n = end
 		}
 	} else {
@@ -220,11 +219,9 @@ read_at :: proc(r: Reader_At, p: []byte, offset: i64, n_read: ^int = nil) -> (n:
 		if err != .Empty {
 			n = int(n64)
 		} else {
-			seeker := Seeker{r}
-			reader := Reader{r}
-			curr := seek(seeker, offset, .Current) or_return
-			n, err = read(reader, p)
-			_, err1 := seek(seeker, curr, .Start)
+			curr := seek(r, offset, .Current) or_return
+			n, err = read(r, p)
+			_, err1 := seek(r, curr, .Start)
 			if err1 != nil && err == nil {
 				err = err1
 			}
@@ -248,11 +245,9 @@ write_at :: proc(w: Writer_At, p: []byte, offset: i64, n_written: ^int = nil) ->
 		if err != .Empty {
 			n = int(n64)
 		} else {
-			seeker := Seeker{w}
-			writer := Writer{w}
-			curr := seek(seeker, offset, .Current) or_return
-			n, err = write(writer, p)
-			_, err1 := seek(seeker, curr, .Start)
+			curr := seek(w, offset, .Current) or_return
+			n, err = write(w, p)
+			_, err1 := seek(w, curr, .Start)
 			if err1 != nil && err == nil {
 				err = err1
 			}

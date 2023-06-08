@@ -216,7 +216,7 @@ read_slice_from_stream :: #force_inline proc(z: ^Context_Stream_Input, size: int
 	// TODO: REMOVE ALL USE OF context.temp_allocator here
 	// the is literally no need for it
 	b := make([]u8, size, context.temp_allocator)
-	_, e := io.read({z.input}, b[:])
+	_, e := io.read(z.input, b[:])
 	if e == .None {
 		return b, .None
 	}
