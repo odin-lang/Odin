@@ -241,7 +241,7 @@ socklen_t :: c.int
 
 Timeval :: struct {
 	seconds: i64,
-	nanoseconds: int,
+	microseconds: int,
 }
 
 // "Argv" arguments converted to Odin strings
