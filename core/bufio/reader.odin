@@ -311,18 +311,6 @@ reader_write_to :: proc(b: ^Reader, w: io.Writer) -> (n: i64, err: io.Error) {
 	}
 
 	m: i64
-	if nr, ok := io.to_writer_to(b.rd); ok {
-		m, err = io.write_to(nr, w)
-		n += m
-		return n, err
-	}
-
-	if nw, ok := io.to_reader_from(w); ok {
-		m, err = io.read_from(nw, b.rd)
-		n += m
-		return n, err
-	}
-
 	if b.w-b.r < len(b.buf) {
 		if err = _reader_read_new_chunk(b); err != nil {
 			return
@@ -352,47 +340,27 @@ reader_write_to :: proc(b: ^Reader, w: io.Writer) -> (n: i64, err: io.Error) {
 
 // reader_to_stream converts a Reader into an io.Stream
 reader_to_stream :: proc(b: ^Reader) -> (s: io.Stream) {
-	s.stream_data = b
-	s.stream_vtable = &_reader_vtable
+	s.data = b
+	s.procedure = _reader_proc
 	return
 }
 
 
 
 @(private)
-_reader_vtable := io.Stream_VTable{
-	impl_destroy = proc(s: io.Stream) -> io.Error {
-		b := (^Reader)(s.stream_data)
+_reader_proc :: proc(stream_data: rawptr, mode: io.Stream_Mode, p: []byte, offset: i64, whence: io.Seek_From) -> (n: i64, err: io.Error) {
+	b := (^Reader)(stream_data)
+	#partial switch mode {
+	case .Read:
+		return io._i64_err(reader_read(b, p))
+	case .Destroy:
 		reader_destroy(b)
-		return nil
-	},
-	impl_read = proc(s: io.Stream, p: []byte) -> (n: int, err: io.Error) {
-		b := (^Reader)(s.stream_data)
-		return reader_read(b, p)
-	},
-	impl_read_byte = proc(s: io.Stream) -> (c: byte, err: io.Error) {
-		b := (^Reader)(s.stream_data)
-		return reader_read_byte(b)
-	},
-	impl_unread_byte = proc(s: io.Stream) -> io.Error {
-		b := (^Reader)(s.stream_data)
-		return reader_unread_byte(b)
-	},
-	impl_read_rune = proc(s: io.Stream) -> (r: rune, size: int, err: io.Error) {
-		b := (^Reader)(s.stream_data)
-		return reader_read_rune(b)
-	},
-	impl_unread_rune = proc(s: io.Stream) -> io.Error {
-		b := (^Reader)(s.stream_data)
-		return reader_unread_rune(b)
-	},
-	impl_write_to = proc(s: io.Stream, w: io.Writer) -> (n: i64, err: io.Error) {
-		b := (^Reader)(s.stream_data)
-		return reader_write_to(b, w)
-	},
+		return
+	case .Query:
+		return io.query_utility({.Read, .Destroy, .Query})
+	}
+	return 0, .Empty
 }
-
-
 
 //
 // Utility procedures
