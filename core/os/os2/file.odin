@@ -5,8 +5,7 @@ import "core:time"
 import "core:runtime"
 
 File :: struct {
-	impl:   _File,
-	stream: io.Stream,
+	impl: _File,
 }
 
 File_Mode :: distinct u32
@@ -72,40 +71,39 @@ name :: proc(f: ^File) -> string {
 }
 
 close :: proc(f: ^File) -> Error {
-	return io.close(f.stream)
+	return io.close(f.impl.stream)
 }
 
 seek :: proc(f: ^File, offset: i64, whence: io.Seek_From) -> (ret: i64, err: Error) {
-	return io.seek(f.stream, offset, whence)
+	return io.seek(f.impl.stream, offset, whence)
 }
 
 read :: proc(f: ^File, p: []byte) -> (n: int, err: Error) {
-	return io.read(f.stream, p)
+	return io.read(f.impl.stream, p)
 }
 
 read_at :: proc(f: ^File, p: []byte, offset: i64) -> (n: int, err: Error) {
-	return io.read_at(f.stream, p, offset)
+	return io.read_at(f.impl.stream, p, offset)
 }
 
 write :: proc(f: ^File, p: []byte) -> (n: int, err: Error) {
-	return io.write(f.stream, p)
+	return io.write(f.impl.stream, p)
 }
 
 write_at :: proc(f: ^File, p: []byte, offset: i64) -> (n: int, err: Error) {
-	return io.write_at(f.stream, p, offset)
+	return io.write_at(f.impl.stream, p, offset)
 }
 
 file_size :: proc(f: ^File) -> (n: i64, err: Error) {
-	return io.size(f.stream)
-}
-
-
-sync :: proc(f: ^File) -> Error {
-	return _sync(f)
+	return io.size(f.impl.stream)
 }
 
 flush :: proc(f: ^File) -> Error {
-	return io.flush(f.stream)
+	return io.flush(f.impl.stream)
+}
+
+sync :: proc(f: ^File) -> Error {
+	return _sync(f)
 }
 
 truncate :: proc(f: ^File, size: i64) -> Error {
