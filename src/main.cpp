@@ -2238,7 +2238,7 @@ gb_internal void print_show_help(String const arg0, String const &command) {
 		print_usage_line(0, "");
 
 		print_usage_line(1, "-foreign-error-procedures");
-		print_usage_line(2, "States that the error procedues used in the runtime are defined in a separate translation unit");
+		print_usage_line(2, "States that the error procedures used in the runtime are defined in a separate translation unit");
 		print_usage_line(0, "");
 
 	}
