@@ -164,7 +164,7 @@ struct lbModule {
 	PtrMap<Type *, lbProcedure *> map_get_procs;
 	PtrMap<Type *, lbProcedure *> map_set_procs;
 
-	u32 nested_type_name_guid;
+	std::atomic<u32> nested_type_name_guid;
 
 	Array<lbProcedure *> procedures_to_generate;
 	Array<Entity *> global_procedures_and_types_to_create;
