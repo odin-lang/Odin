@@ -56,7 +56,7 @@ Allocator :: struct {
 DEFAULT_ALIGNMENT :: 2*align_of(rawptr)
 
 DEFAULT_PAGE_SIZE ::
-	64 * 1024 when ODIN_ARCH == .wasm32 || ODIN_ARCH == .wasm64 else
+	64 * 1024 when ODIN_ARCH == .wasm32 || ODIN_ARCH == .wasm64p32 else
 	16 * 1024 when ODIN_OS == .Darwin && ODIN_ARCH == .arm64 else
 	4 * 1024
 

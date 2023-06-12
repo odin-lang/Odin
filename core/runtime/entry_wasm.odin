@@ -1,5 +1,5 @@
 //+private
-//+build wasm32, wasm64
+//+build wasm32, wasm64p32
 package runtime
 
 import "core:intrinsics"

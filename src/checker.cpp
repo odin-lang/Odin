@@ -651,6 +651,9 @@ gb_internal bool check_vet_unused(Checker *c, Entity *e, VettedEntity *ve) {
 		case Entity_Variable:
 			if (e->scope->flags & (ScopeFlag_Global|ScopeFlag_Type|ScopeFlag_File)) {
 				return false;
+			} else if (e->flags & EntityFlag_Static) {
+				// ignore these for the time being
+				return false;
 			}
 		case Entity_ImportName:
 		case Entity_LibraryName:
@@ -912,6 +915,13 @@ gb_internal Type *add_global_type_name(Scope *scope, String const &type_name, Ty
 	return named_type;
 }
 
+gb_internal i64 odin_compile_timestamp(void) {
+	i64 us_after_1601 = cast(i64)gb_utc_time_now();
+	i64 us_after_1970 = us_after_1601 - 11644473600000000ll;
+	i64 ns_after_1970 = us_after_1970*1000ll;
+	return ns_after_1970;
+}
+
 
 gb_internal void init_universal(void) {
 	BuildContext *bc = &build_context;
@@ -971,13 +981,13 @@ gb_internal void init_universal(void) {
 
 	{
 		GlobalEnumValue values[TargetArch_COUNT] = {
-			{"Unknown", TargetArch_Invalid},
-			{"amd64",   TargetArch_amd64},
-			{"i386",    TargetArch_i386},
-			{"arm32",   TargetArch_arm32},
-			{"arm64",   TargetArch_arm64},
-			{"wasm32",  TargetArch_wasm32},
-			{"wasm64",  TargetArch_wasm64},
+			{"Unknown",   TargetArch_Invalid},
+			{"amd64",     TargetArch_amd64},
+			{"i386",      TargetArch_i386},
+			{"arm32",     TargetArch_arm32},
+			{"arm64",     TargetArch_arm64},
+			{"wasm32",    TargetArch_wasm32},
+			{"wasm64p32", TargetArch_wasm64p32},
 		};
 
 		auto fields = add_global_enum_type(str_lit("Odin_Arch_Type"), values, gb_count_of(values));
@@ -1000,8 +1010,6 @@ gb_internal void init_universal(void) {
 
 	{
 		GlobalEnumValue values[TargetEndian_COUNT] = {
-			{"Unknown", TargetEndian_Invalid},
-
 			{"Little",  TargetEndian_Little},
 			{"Big",     TargetEndian_Big},
 		};
@@ -1050,6 +1058,7 @@ gb_internal void init_universal(void) {
 
 	add_global_bool_constant("ODIN_VALGRIND_SUPPORT",         bc->ODIN_VALGRIND_SUPPORT);
 
+	add_global_constant("ODIN_COMPILE_TIMESTAMP", t_untyped_integer, exact_value_i64(odin_compile_timestamp()));
 
 
 // Builtin Procedures
@@ -3889,17 +3898,16 @@ gb_internal void check_collect_value_decl(CheckerContext *c, Ast *decl) {
 					GB_ASSERT(pl->type->kind == Ast_ProcType);
 					auto cc = pl->type->ProcType.calling_convention;
 					if (cc == ProcCC_ForeignBlockDefault) {
-						if (is_arch_wasm()) {
+						cc = ProcCC_CDecl;
+						if (c->foreign_context.default_cc > 0) {
+							cc = c->foreign_context.default_cc;
+						} else if (is_arch_wasm()) {
 							begin_error_block();
 							error(init, "For wasm related targets, it is required that you either define the"
 							            " @(default_calling_convention=<string>) on the foreign block or"
 							            " explicitly assign it on the procedure signature");
 							error_line("\tSuggestion: when dealing with normal Odin code (e.g. js_wasm32), use \"contextless\"; when dealing with Emscripten like code, use \"c\"\n");
 							end_error_block();
-						}
-						cc = ProcCC_CDecl;
-						if (c->foreign_context.default_cc > 0) {
-							cc = c->foreign_context.default_cc;
 						}
 					}
 					e->Procedure.link_prefix = c->foreign_context.link_prefix;

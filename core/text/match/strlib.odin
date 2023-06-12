@@ -266,6 +266,7 @@ match_balance :: proc(ms: ^Match_State, s, p: int) -> (unused: int, err: Error) 
 		return INVALID, .Invalid_Pattern_Capture
 	}
 
+
 	schar, ssize := utf8_peek(ms.src[s:]) or_return
 	pchar, psize := utf8_peek(ms.pattern[p:]) or_return
 
@@ -274,9 +275,9 @@ match_balance :: proc(ms: ^Match_State, s, p: int) -> (unused: int, err: Error) 
 		return INVALID, .OK
 	}
 
-	s_begin := s
 	cont := 1
-	s := s + ssize
+	s := s
+	s += ssize
 	begin := pchar
 	end, _ := utf8_peek(ms.pattern[p + psize:]) or_return
 

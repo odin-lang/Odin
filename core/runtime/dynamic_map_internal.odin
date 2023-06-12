@@ -184,7 +184,7 @@ map_cell_index_static :: #force_inline proc "contextless" (cells: [^]Map_Cell($T
 // len() for map
 @(require_results)
 map_len :: #force_inline proc "contextless" (m: Raw_Map) -> int {
-	return m.len
+	return int(m.len)
 }
 
 // cap() for map
@@ -207,8 +207,8 @@ map_load_factor :: #force_inline proc "contextless" (log2_capacity: uintptr) -> 
 }
 
 @(require_results)
-map_resize_threshold :: #force_inline proc "contextless" (m: Raw_Map) -> int {
-	return int(map_load_factor(map_log2_cap(m)))
+map_resize_threshold :: #force_inline proc "contextless" (m: Raw_Map) -> uintptr {
+	return map_load_factor(map_log2_cap(m))
 }
 
 // The data stores the log2 capacity in the lower six bits. This is primarily

@@ -666,7 +666,11 @@ gb_internal ExactValue exact_value_from_token(AstFile *f, Token const &token) {
 		}
 		break;
 	}
-	return exact_value_from_basic_literal(token.kind, s);
+	ExactValue value = exact_value_from_basic_literal(token.kind, s);
+	if (value.kind == ExactValue_Invalid) {
+		syntax_error(token, "Invalid token literal");
+	}
+	return value;
 }
 
 gb_internal String string_value_from_token(AstFile *f, Token const &token) {

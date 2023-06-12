@@ -6,23 +6,7 @@ _ :: mem
 
 ////////////////////////////////////////////////////////////////////////////////
 
-/*
-Class:
-	AccelerationStructureBoundingBoxGeometryDescriptor
-Class Methods:
-	alloc
-	descriptor
-Methods:
-	init
-	boundingBoxBuffer
-	boundingBoxBufferOffset
-	boundingBoxCount
-	boundingBoxStride
-	setBoundingBoxBuffer
-	setBoundingBoxBufferOffset
-	setBoundingBoxCount
-	setBoundingBoxStride
-*/
+
 @(objc_class="MTLAccelerationStructureBoundingBoxGeometryDescriptor")
 AccelerationStructureBoundingBoxGeometryDescriptor :: struct { using _: NS.Copying(AccelerationStructureBoundingBoxGeometryDescriptor), using _: AccelerationStructureDescriptor  }
 
@@ -73,19 +57,6 @@ AccelerationStructureBoundingBoxGeometryDescriptor_setBoundingBoxStride :: #forc
 
 ////////////////////////////////////////////////////////////////////////////////
 
-/*
-Class:
-	MotionKeyframeData
-Class Methods:
-	alloc
-	data
-Methods:
-	init
-	buffer
-	setBuffer
-	offset
-	setOffset
-*/
 
 @(objc_class="MTLMotionKeyframeData")
 MotionKeyframeData :: struct { using _: NS.Object }
@@ -121,10 +92,7 @@ MotionKeyframeData_setOffset :: #force_inline proc "c" (self: ^MotionKeyframeDat
 
 ////////////////////////////////////////////////////////////////////////////////
 
-/*
-Class:
-	AccelerationStructureMotionTriangleGeometryDescriptor
-*/
+
 
 @(objc_class="MTLAccelerationStructureMotionTriangleGeometryDescriptor")
 AccelerationStructureMotionTriangleGeometryDescriptor :: struct { using _: NS.Copying(AccelerationStructureMotionTriangleGeometryDescriptor), using _: AccelerationStructureGeometryDescriptor }
@@ -222,10 +190,7 @@ AccelerationStructureMotionTriangleGeometryDescriptor_setTransformationMatrixBuf
 
 ////////////////////////////////////////////////////////////////////////////////
 
-/*
-Class:
-	AccelerationStructureMotionBoundingBoxGeometryDescriptor
-*/
+
 
 @(objc_class="MTLAccelerationStructureMotionBoundingBoxGeometryDescriptor")
 AccelerationStructureMotionBoundingBoxGeometryDescriptor :: struct { using _: NS.Copying(AccelerationStructureMotionBoundingBoxGeometryDescriptor), using _: AccelerationStructureGeometryDescriptor }
@@ -279,16 +244,7 @@ AccelerationStructureMotionBoundingBoxGeometryDescriptor_setBoundingBoxCount :: 
 
 ////////////////////////////////////////////////////////////////////////////////
 
-/*
-Class:
-	AccelerationStructureDescriptor
-Class Methods:
-	alloc
-Methods:
-	init
-	setUsage
-	usage
-*/
+
 @(objc_class="MTLAccelerationStructureDescriptor")
 AccelerationStructureDescriptor :: struct { using _: NS.Copying(AccelerationStructureDescriptor) }
 
@@ -311,28 +267,7 @@ AccelerationStructureDescriptor_usage :: #force_inline proc "c" (self: ^Accelera
 
 ////////////////////////////////////////////////////////////////////////////////
 
-/*
-Class:
-	AccelerationStructureGeometryDescriptor
-Class Methods:
-	alloc
-Methods:
-	init
-	allowDuplicateIntersectionFunctionInvocation
-	intersectionFunctionTableOffset
-	opaque
-	setAllowDuplicateIntersectionFunctionInvocation
-	setIntersectionFunctionTableOffset
-	setOpaque
-	primitiveDataBuffer
-	setPrimitiveDataBuffer
-	primitiveDataBufferOffset
-	setPrimitiveDataBufferOffset
-	primitiveDataStride
-	setPrimitiveDataStride
-	primitiveDataElementSize
-	setPrimitiveDataElementSize
-*/
+
 @(objc_class="MTLAccelerationStructureGeometryDescriptor")
 AccelerationStructureGeometryDescriptor :: struct { using _: NS.Copying(AccelerationStructureGeometryDescriptor) }
 
@@ -405,35 +340,7 @@ AccelerationStructureGeometryDescriptor_setPrimitiveDataElementSize :: #force_in
 
 ////////////////////////////////////////////////////////////////////////////////
 
-/*
-Class:
-	AccelerationStructureTriangleGeometryDescriptor
-Class Methods:
-	alloc
-	descriptor
-Methods:
-	init
-	indexBuffer
-	indexBufferOffset
-	indexType
-	setIndexBuffer
-	setIndexBufferOffset
-	setIndexType
-	setTriangleCount
-	setVertexBuffer
-	setVertexBufferOffset
-	setVertexStride
-	triangleCount
-	vertexBuffer
-	vertexBufferOffset
-	vertexStride
-	vertexFormat
-	setVertexFormat
-	transformationMatrixBuffer
-	setTransformationMatrixBuffer
-	transformationMatrixBufferOffset
-	setTransformationMatrixBufferOffset
-*/
+
 @(objc_class="MTLAccelerationStructureTriangleGeometryDescriptor")
 AccelerationStructureTriangleGeometryDescriptor :: struct { using _: NS.Copying(AccelerationStructureTriangleGeometryDescriptor), using _: AccelerationStructureDescriptor  }
 
@@ -534,30 +441,7 @@ AccelerationStructureTriangleGeometryDescriptor_setTransformationMatrixBufferOff
 
 ////////////////////////////////////////////////////////////////////////////////
 
-/*
-Class:
-	Argument
-Class Methods:
-	alloc
-Methods:
-	init
-	access
-	arrayLength
-	bufferAlignment
-	bufferDataSize
-	bufferDataType
-	bufferPointerType
-	bufferStructType
-	index
-	isActive
-	isDepthTexture
-	name
-	textureDataType
-	textureType
-	threadgroupMemoryAlignment
-	threadgroupMemoryDataSize
-	type
-*/
+
 @(objc_class="MTLArgument")
 Argument :: struct { using _: NS.Object }
 
@@ -636,27 +520,7 @@ Argument_type :: #force_inline proc "c" (self: ^Argument) -> ArgumentType {
 
 ////////////////////////////////////////////////////////////////////////////////
 
-/*
-Class:
-	ArgumentDescriptor
-Class Methods:
-	alloc
-	argumentDescriptor
-Methods:
-	init
-	access
-	arrayLength
-	constantBlockAlignment
-	dataType
-	index
-	setAccess
-	setArrayLength
-	setConstantBlockAlignment
-	setDataType
-	setIndex
-	setTextureType
-	textureType
-*/
+
 @(objc_class="MTLArgumentDescriptor")
 ArgumentDescriptor :: struct { using _: NS.Copying(ArgumentDescriptor) }
 
@@ -723,22 +587,7 @@ ArgumentDescriptor_textureType :: #force_inline proc "c" (self: ^ArgumentDescrip
 
 ////////////////////////////////////////////////////////////////////////////////
 
-/*
-Class:
-	ArrayType
-Class Methods:
-	alloc
-Methods:
-	init
-	argumentIndexStride
-	arrayLength
-	elementArrayType
-	elementPointerType
-	elementStructType
-	elementTextureReferenceType
-	elementType
-	stride
-*/
+
 @(objc_class="MTLArrayType")
 ArrayType :: struct { using _: Type }
 
@@ -785,20 +634,7 @@ ArrayType_stride :: #force_inline proc "c" (self: ^ArrayType) -> NS.UInteger {
 
 ////////////////////////////////////////////////////////////////////////////////
 
-/*
-Class:
-	Attribute
-Class Methods:
-	alloc
-Methods:
-	init
-	attributeIndex
-	attributeType
-	isActive
-	isPatchControlPointData
-	isPatchData
-	name
-*/
+
 @(objc_class="MTLAttribute")
 Attribute :: struct { using _: NS.Object }
 
@@ -837,20 +673,7 @@ Attribute_name :: #force_inline proc "c" (self: ^Attribute) -> ^NS.String {
 
 ////////////////////////////////////////////////////////////////////////////////
 
-/*
-Class:
-	AttributeDescriptor
-Class Methods:
-	alloc
-Methods:
-	init
-	bufferIndex
-	format
-	offset
-	setBufferIndex
-	setFormat
-	setOffset
-*/
+
 @(objc_class="MTLAttributeDescriptor")
 AttributeDescriptor :: struct { using _: NS.Copying(AttributeDescriptor) }
 
@@ -889,16 +712,7 @@ AttributeDescriptor_setOffset :: #force_inline proc "c" (self: ^AttributeDescrip
 
 ////////////////////////////////////////////////////////////////////////////////
 
-/*
-Class:
-	AttributeDescriptorArray
-Class Methods:
-	alloc
-Methods:
-	init
-	objectAtIndexedSubscript
-	setObject
-*/
+
 @(objc_class="MTLAttributeDescriptorArray")
 AttributeDescriptorArray :: struct { using _: NS.Object }
 
@@ -921,16 +735,7 @@ AttributeDescriptorArray_setObject :: #force_inline proc "c" (self: ^AttributeDe
 
 ////////////////////////////////////////////////////////////////////////////////
 
-/*
-Class:
-	BinaryArchiveDescriptor
-Class Methods:
-	alloc
-Methods:
-	init
-	setUrl
-	url
-*/
+
 @(objc_class="MTLBinaryArchiveDescriptor")
 BinaryArchiveDescriptor :: struct { using _: NS.Copying(BinaryArchiveDescriptor) }
 
@@ -953,16 +758,7 @@ BinaryArchiveDescriptor_url :: #force_inline proc "c" (self: ^BinaryArchiveDescr
 
 ////////////////////////////////////////////////////////////////////////////////
 
-/*
-Class:
-	BlitPassDescriptor
-Class Methods:
-	alloc
-	blitPassDescriptor
-Methods:
-	init
-	sampleBufferAttachments
-*/
+
 @(objc_class="MTLBlitPassDescriptor")
 BlitPassDescriptor :: struct { using _: NS.Copying(BlitPassDescriptor) }
 
@@ -985,20 +781,7 @@ BlitPassDescriptor_sampleBufferAttachments :: #force_inline proc "c" (self: ^Bli
 
 ////////////////////////////////////////////////////////////////////////////////
 
-/*
-Class:
-	BlitPassSampleBufferAttachmentDescriptor
-Class Methods:
-	alloc
-Methods:
-	init
-	endOfEncoderSampleIndex
-	sampleBuffer
-	setEndOfEncoderSampleIndex
-	setSampleBuffer
-	setStartOfEncoderSampleIndex
-	startOfEncoderSampleIndex
-*/
+
 @(objc_class="MTLBlitPassSampleBufferAttachmentDescriptor")
 BlitPassSampleBufferAttachmentDescriptor :: struct { using _: NS.Copying(BlitPassSampleBufferAttachmentDescriptor) }
 
@@ -1037,16 +820,7 @@ BlitPassSampleBufferAttachmentDescriptor_startOfEncoderSampleIndex :: #force_inl
 
 ////////////////////////////////////////////////////////////////////////////////
 
-/*
-Class:
-	BlitPassSampleBufferAttachmentDescriptorArray
-Class Methods:
-	alloc
-Methods:
-	init
-	objectAtIndexedSubscript
-	setObject
-*/
+
 @(objc_class="MTLBlitPassSampleBufferAttachmentDescriptorArray")
 BlitPassSampleBufferAttachmentDescriptorArray :: struct { using _: NS.Object }
 
@@ -1069,20 +843,7 @@ BlitPassSampleBufferAttachmentDescriptorArray_setObject :: #force_inline proc "c
 
 ////////////////////////////////////////////////////////////////////////////////
 
-/*
-Class:
-	BufferLayoutDescriptor
-Class Methods:
-	alloc
-Methods:
-	init
-	setStepFunction
-	setStepRate
-	setStride
-	stepFunction
-	stepRate
-	stride
-*/
+
 @(objc_class="MTLBufferLayoutDescriptor")
 BufferLayoutDescriptor :: struct { using _: NS.Copying(BufferLayoutDescriptor) }
 
@@ -1121,16 +882,7 @@ BufferLayoutDescriptor_stride :: #force_inline proc "c" (self: ^BufferLayoutDesc
 
 ////////////////////////////////////////////////////////////////////////////////
 
-/*
-Class:
-	BufferLayoutDescriptorArray
-Class Methods:
-	alloc
-Methods:
-	init
-	objectAtIndexedSubscript
-	setObject
-*/
+
 @(objc_class="MTLBufferLayoutDescriptorArray")
 BufferLayoutDescriptorArray :: struct { using _: NS.Object }
 
@@ -1153,20 +905,7 @@ BufferLayoutDescriptorArray_setObject :: #force_inline proc "c" (self: ^BufferLa
 
 ////////////////////////////////////////////////////////////////////////////////
 
-/*
-Class:
-	CaptureDescriptor
-Class Methods:
-	alloc
-Methods:
-	init
-	captureObject
-	destination
-	outputURL
-	setCaptureObject
-	setDestination
-	setOutputURL
-*/
+
 @(objc_class="MTLCaptureDescriptor")
 CaptureDescriptor :: struct { using _: NS.Copying(CaptureDescriptor) }
 
@@ -1205,26 +944,7 @@ CaptureDescriptor_setOutputURL :: #force_inline proc "c" (self: ^CaptureDescript
 
 ////////////////////////////////////////////////////////////////////////////////
 
-/*
-Class:
-	CaptureManager
-Class Methods:
-	alloc
-	sharedCaptureManager
-Methods:
-	defaultCaptureScope
-	init
-	isCapturing
-	newCaptureScopeWithCommandQueue
-	newCaptureScopeWithDevice
-	setDefaultCaptureScope
-	startCaptureWithCommandQueue
-	startCaptureWithDescriptor
-	startCaptureWithDevice
-	startCaptureWithScope
-	stopCapture
-	supportsDestination
-*/
+
 @(objc_class="MTLCaptureManager")
 CaptureManager :: struct { using _: NS.Object }
 
@@ -1294,18 +1014,7 @@ CaptureManager_supportsDestination :: #force_inline proc "c" (self: ^CaptureMana
 
 ////////////////////////////////////////////////////////////////////////////////
 
-/*
-Class:
-	CommandBufferDescriptor
-Class Methods:
-	alloc
-Methods:
-	init
-	errorOptions
-	retainedReferences
-	setErrorOptions
-	setRetainedReferences
-*/
+
 @(objc_class="MTLCommandBufferDescriptor")
 CommandBufferDescriptor :: struct { using _: NS.Copying(CommandBufferDescriptor) }
 
@@ -1336,28 +1045,7 @@ CommandBufferDescriptor_setRetainedReferences :: #force_inline proc "c" (self: ^
 
 ////////////////////////////////////////////////////////////////////////////////
 
-/*
-Class:
-	CompileOptions
-Class Methods:
-	alloc
-Methods:
-	init
-	fastMathEnabled
-	installName
-	languageVersion
-	libraries
-	libraryType
-	preprocessorMacros
-	preserveInvariance
-	setFastMathEnabled
-	setInstallName
-	setLanguageVersion
-	setLibraries
-	setLibraryType
-	setPreprocessorMacros
-	setPreserveInvariance
-*/
+
 @(objc_class="MTLCompileOptions")
 CompileOptions :: struct { using _: NS.Copying(CompileOptions) }
 
@@ -1437,18 +1125,7 @@ CompileOptions_setOptimizationLevel :: #force_inline proc "c" (self: ^CompileOpt
 
 ////////////////////////////////////////////////////////////////////////////////
 
-/*
-Class:
-	ComputePassDescriptor
-Class Methods:
-	alloc
-	computePassDescriptor
-Methods:
-	init
-	dispatchType
-	sampleBufferAttachments
-	setDispatchType
-*/
+
 @(objc_class="MTLComputePassDescriptor")
 ComputePassDescriptor :: struct { using _: NS.Copying(ComputePassDescriptor) }
 
@@ -1479,20 +1156,7 @@ ComputePassDescriptor_setDispatchType :: #force_inline proc "c" (self: ^ComputeP
 
 ////////////////////////////////////////////////////////////////////////////////
 
-/*
-Class:
-	ComputePassSampleBufferAttachmentDescriptor
-Class Methods:
-	alloc
-Methods:
-	init
-	endOfEncoderSampleIndex
-	sampleBuffer
-	setEndOfEncoderSampleIndex
-	setSampleBuffer
-	setStartOfEncoderSampleIndex
-	startOfEncoderSampleIndex
-*/
+
 @(objc_class="MTLComputePassSampleBufferAttachmentDescriptor")
 ComputePassSampleBufferAttachmentDescriptor :: struct { using _: NS.Copying(ComputePassSampleBufferAttachmentDescriptor) }
 
@@ -1531,16 +1195,7 @@ ComputePassSampleBufferAttachmentDescriptor_startOfEncoderSampleIndex :: #force_
 
 ////////////////////////////////////////////////////////////////////////////////
 
-/*
-Class:
-	ComputePassSampleBufferAttachmentDescriptorArray
-Class Methods:
-	alloc
-Methods:
-	init
-	objectAtIndexedSubscript
-	setObject
-*/
+
 @(objc_class="MTLComputePassSampleBufferAttachmentDescriptorArray")
 ComputePassSampleBufferAttachmentDescriptorArray :: struct { using _: NS.Object }
 
@@ -1563,38 +1218,7 @@ ComputePassSampleBufferAttachmentDescriptorArray_setObject :: #force_inline proc
 
 ////////////////////////////////////////////////////////////////////////////////
 
-/*
-Class:
-	ComputePipelineDescriptor
-Class Methods:
-	alloc
-Methods:
-	init
-	binaryArchives
-	buffers
-	computeFunction
-	insertLibraries
-	label
-	linkedFunctions
-	maxCallStackDepth
-	maxTotalThreadsPerThreadgroup
-	reset
-	setBinaryArchives
-	setComputeFunction
-	setInsertLibraries
-	setLabel
-	setLinkedFunctions
-	setMaxCallStackDepth
-	setMaxTotalThreadsPerThreadgroup
-	setStageInputDescriptor
-	setSupportAddingBinaryFunctions
-	setSupportIndirectCommandBuffers
-	setThreadGroupSizeIsMultipleOfThreadExecutionWidth
-	stageInputDescriptor
-	supportAddingBinaryFunctions
-	supportIndirectCommandBuffers
-	threadGroupSizeIsMultipleOfThreadExecutionWidth
-*/
+
 @(objc_class="MTLComputePipelineDescriptor")
 ComputePipelineDescriptor :: struct { using _: NS.Copying(ComputePipelineDescriptor) }
 
@@ -1710,15 +1334,7 @@ ComputePipelineDescriptor_gpuResourceID :: #force_inline proc "c" (self: ^Comput
 
 ////////////////////////////////////////////////////////////////////////////////
 
-/*
-Class:
-	ComputePipelineReflection
-Class Methods:
-	alloc
-Methods:
-	init
-	arguments
-*/
+
 @(objc_class="MTLComputePipelineReflection")
 ComputePipelineReflection :: struct { using _: NS.Object }
 
@@ -1741,22 +1357,7 @@ ComputePipelineReflection_arguments :: #force_inline proc "c" (self: ^ComputePip
 
 ////////////////////////////////////////////////////////////////////////////////
 
-/*
-Class:
-	CounterSampleBufferDescriptor
-Class Methods:
-	alloc
-Methods:
-	init
-	counterSet
-	label
-	sampleCount
-	setCounterSet
-	setLabel
-	setSampleCount
-	setStorageMode
-	storageMode
-*/
+
 @(objc_class="MTLCounterSampleBufferDescriptor")
 CounterSampleBufferDescriptor :: struct { using _: NS.Copying(CounterSampleBufferDescriptor) }
 
@@ -1803,24 +1404,7 @@ CounterSampleBufferDescriptor_storageMode :: #force_inline proc "c" (self: ^Coun
 
 ////////////////////////////////////////////////////////////////////////////////
 
-/*
-Class:
-	DepthStencilDescriptor
-Class Methods:
-	alloc
-Methods:
-	init
-	backFaceStencil
-	depthCompareFunction
-	frontFaceStencil
-	isDepthWriteEnabled
-	label
-	setBackFaceStencil
-	setDepthCompareFunction
-	setDepthWriteEnabled
-	setFrontFaceStencil
-	setLabel
-*/
+
 @(objc_class="MTLDepthStencilDescriptor")
 DepthStencilDescriptor :: struct { using _: NS.Copying(DepthStencilDescriptor) }
 
@@ -1875,18 +1459,7 @@ DepthStencilDescriptor_setLabel :: #force_inline proc "c" (self: ^DepthStencilDe
 
 ////////////////////////////////////////////////////////////////////////////////
 
-/*
-Class:
-	FunctionConstant
-Class Methods:
-	alloc
-Methods:
-	init
-	index
-	name
-	required
-	type
-*/
+
 @(objc_class="MTLFunctionConstant")
 FunctionConstant :: struct { using _: NS.Copying(FunctionConstant) }
 
@@ -1917,18 +1490,7 @@ FunctionConstant_type :: #force_inline proc "c" (self: ^FunctionConstant) -> Dat
 
 ////////////////////////////////////////////////////////////////////////////////
 
-/*
-Class:
-	FunctionConstantValues
-Class Methods:
-	alloc
-Methods:
-	init
-	reset
-	setConstantValue
-	setConstantValue
-	setConstantValues
-*/
+
 @(objc_class="MTLFunctionConstantValues")
 FunctionConstantValues :: struct { using _: NS.Copying(FunctionConstantValues) }
 
@@ -1959,23 +1521,7 @@ FunctionConstantValues_setConstantValues :: #force_inline proc "c" (self: ^Funct
 
 ////////////////////////////////////////////////////////////////////////////////
 
-/*
-Class:
-	FunctionDescriptor
-Class Methods:
-	alloc
-	functionDescriptor
-Methods:
-	init
-	constantValues
-	name
-	options
-	setConstantValues
-	setName
-	setOptions
-	setSpecializedName
-	specializedName
-*/
+
 @(objc_class="MTLFunctionDescriptor")
 FunctionDescriptor :: struct { using _: NS.Copying(FunctionDescriptor) }
 
@@ -2026,14 +1572,7 @@ FunctionDescriptor_specializedName :: #force_inline proc "c" (self: ^FunctionDes
 
 ////////////////////////////////////////////////////////////////////////////////
 
-/*
-Class:
-	IntersectionFunctionDescriptor
-Class Methods:
-	alloc
-Methods:
-	init
-*/
+
 @(objc_class="MTLIntersectionFunctionDescriptor")
 IntersectionFunctionDescriptor :: struct { using _: NS.Copying(IntersectionFunctionDescriptor) }
 
@@ -2048,26 +1587,7 @@ IntersectionFunctionDescriptor_init :: #force_inline proc "c" (self: ^Intersecti
 
 ////////////////////////////////////////////////////////////////////////////////
 
-/*
-Class:
-	HeapDescriptor
-Class Methods:
-	alloc
-Methods:
-	init
-	cpuCacheMode
-	hazardTrackingMode
-	resourceOptions
-	setCpuCacheMode
-	setHazardTrackingMode
-	setResourceOptions
-	setSize
-	setStorageMode
-	setType
-	size
-	storageMode
-	type
-*/
+
 @(objc_class="MTLHeapDescriptor")
 HeapDescriptor :: struct { using _: NS.Copying(HeapDescriptor) }
 
@@ -2140,26 +1660,7 @@ HeapDescriptor_type :: #force_inline proc "c" (self: ^HeapDescriptor) -> HeapTyp
 
 ////////////////////////////////////////////////////////////////////////////////
 
-/*
-Class:
-	IndirectCommandBufferDescriptor
-Class Methods:
-	alloc
-Methods:
-	init
-	commandTypes
-	inheritBuffers
-	inheritPipelineState
-	maxFragmentBufferBindCount
-	maxKernelBufferBindCount
-	maxVertexBufferBindCount
-	setCommandTypes
-	setInheritBuffers
-	setInheritPipelineState
-	setMaxFragmentBufferBindCount
-	setMaxKernelBufferBindCount
-	setMaxVertexBufferBindCount
-*/
+
 @(objc_class="MTLIndirectCommandBufferDescriptor")
 IndirectCommandBufferDescriptor :: struct { using _: NS.Copying(IndirectCommandBufferDescriptor) }
 
@@ -2222,25 +1723,7 @@ IndirectCommandBufferDescriptor_setMaxVertexBufferBindCount :: #force_inline pro
 
 ////////////////////////////////////////////////////////////////////////////////
 
-/*
-Class:
-	InstanceAccelerationStructureDescriptor
-Class Methods:
-	alloc
-	descriptor
-Methods:
-	init
-	instanceCount
-	instanceDescriptorBuffer
-	instanceDescriptorBufferOffset
-	instanceDescriptorStride
-	instancedAccelerationStructures
-	setInstanceCount
-	setInstanceDescriptorBuffer
-	setInstanceDescriptorBufferOffset
-	setInstanceDescriptorStride
-	setInstancedAccelerationStructures
-*/
+
 @(objc_class="MTLInstanceAccelerationStructureDescriptor")
 InstanceAccelerationStructureDescriptor :: struct { using _: NS.Copying(InstanceAccelerationStructureDescriptor), using _: AccelerationStructureDescriptor  }
 
@@ -2339,17 +1822,7 @@ InstanceAccelerationStructureDescriptor_setMotionTransformCount :: #force_inline
 
 ////////////////////////////////////////////////////////////////////////////////
 
-/*
-Class:
-	IntersectionFunctionTableDescriptor
-Class Methods:
-	alloc
-	intersectionFunctionTableDescriptor
-Methods:
-	init
-	functionCount
-	setFunctionCount
-*/
+
 @(objc_class="MTLIntersectionFunctionTableDescriptor")
 IntersectionFunctionTableDescriptor :: struct { using _: NS.Copying(IntersectionFunctionTableDescriptor) }
 
@@ -2376,21 +1849,7 @@ IntersectionFunctionTableDescriptor_setFunctionCount :: #force_inline proc "c" (
 
 ////////////////////////////////////////////////////////////////////////////////
 
-/*
-Class:
-	LinkedFunctions
-Class Methods:
-	alloc
-	linkedFunctions
-Methods:
-	init
-	binaryFunctions
-	functions
-	groups
-	setBinaryFunctions
-	setFunctions
-	setGroups
-*/
+
 @(objc_class="MTLLinkedFunctions")
 LinkedFunctions :: struct { using _: NS.Copying(LinkedFunctions) }
 
@@ -2433,16 +1892,7 @@ LinkedFunctions_setGroups :: #force_inline proc "c" (self: ^LinkedFunctions, gro
 
 ////////////////////////////////////////////////////////////////////////////////
 
-/*
-Class:
-	PipelineBufferDescriptor
-Class Methods:
-	alloc
-Methods:
-	init
-	mutability
-	setMutability
-*/
+
 @(objc_class="MTLPipelineBufferDescriptor")
 PipelineBufferDescriptor :: struct { using _: NS.Copying(PipelineBufferDescriptor) }
 
@@ -2465,16 +1915,7 @@ PipelineBufferDescriptor_setMutability :: #force_inline proc "c" (self: ^Pipelin
 
 ////////////////////////////////////////////////////////////////////////////////
 
-/*
-Class:
-	PipelineBufferDescriptorArray
-Class Methods:
-	alloc
-Methods:
-	init
-	objectAtIndexedSubscript
-	setObject
-*/
+
 @(objc_class="MTLPipelineBufferDescriptorArray")
 PipelineBufferDescriptorArray :: struct { using _: NS.Object }
 
@@ -2497,21 +1938,7 @@ PipelineBufferDescriptorArray_setObject :: #force_inline proc "c" (self: ^Pipeli
 
 ////////////////////////////////////////////////////////////////////////////////
 
-/*
-Class:
-	PointerType
-Class Methods:
-	alloc
-Methods:
-	init
-	access
-	alignment
-	dataSize
-	elementArrayType
-	elementIsArgumentBuffer
-	elementStructType
-	elementType
-*/
+
 @(objc_class="MTLPointerType")
 PointerType :: struct { using _: Type }
 
@@ -2554,17 +1981,7 @@ PointerType_elementType :: #force_inline proc "c" (self: ^PointerType) -> DataTy
 
 ////////////////////////////////////////////////////////////////////////////////
 
-/*
-Class:
-	PrimitiveAccelerationStructureDescriptor
-Class Methods:
-	alloc
-	descriptor
-Methods:
-	init
-	geometryDescriptors
-	setGeometryDescriptors
-*/
+
 @(objc_class="MTLPrimitiveAccelerationStructureDescriptor")
 PrimitiveAccelerationStructureDescriptor :: struct { using _: NS.Copying(PrimitiveAccelerationStructureDescriptor), using _: AccelerationStructureDescriptor }
 
@@ -2639,16 +2056,7 @@ PrimitiveAccelerationStructureDescriptor_setMotionKeyframeCount :: #force_inline
 
 ////////////////////////////////////////////////////////////////////////////////
 
-/*
-Class:
-	RasterizationRateLayerArray
-Class Methods:
-	alloc
-Methods:
-	init
-	objectAtIndexedSubscript
-	setObject
-*/
+
 @(objc_class="MTLRasterizationRateLayerArray")
 RasterizationRateLayerArray :: struct { using _: NS.Object }
 
@@ -2671,21 +2079,7 @@ RasterizationRateLayerArray_setObject :: #force_inline proc "c" (self: ^Rasteriz
 
 ////////////////////////////////////////////////////////////////////////////////
 
-/*
-Class:
-	RasterizationRateLayerDescriptor
-Class Methods:
-	alloc
-Methods:
-	horizontal
-	horizontalSampleStorage
-	init
-	initWithSampleCount
-	initWithSampleCount
-	sampleCount
-	vertical
-	verticalSampleStorage
-*/
+
 @(objc_class="MTLRasterizationRateLayerDescriptor")
 RasterizationRateLayerDescriptor :: struct { using _: NS.Copying(RasterizationRateLayerDescriptor) }
 
@@ -2728,25 +2122,7 @@ RasterizationRateLayerDescriptor_verticalSampleStorage :: #force_inline proc "c"
 
 ////////////////////////////////////////////////////////////////////////////////
 
-/*
-Class:
-	RasterizationRateMapDescriptor
-Class Methods:
-	alloc
-	rasterizationRateMapDescriptorWithScreenSize
-	rasterizationRateMapDescriptorWithScreenSize
-	rasterizationRateMapDescriptorWithScreenSize
-Methods:
-	init
-	label
-	layerAtIndex
-	layerCount
-	layers
-	screenSize
-	setLabel
-	setLayer
-	setScreenSize
-*/
+
 @(objc_class="MTLRasterizationRateMapDescriptor")
 RasterizationRateMapDescriptor :: struct { using _: NS.Copying(RasterizationRateMapDescriptor) }
 
@@ -2805,16 +2181,7 @@ RasterizationRateMapDescriptor_setScreenSize :: #force_inline proc "c" (self: ^R
 
 ////////////////////////////////////////////////////////////////////////////////
 
-/*
-Class:
-	RasterizationRateSampleArray
-Class Methods:
-	alloc
-Methods:
-	init
-	objectAtIndexedSubscript
-	setObject
-*/
+
 @(objc_class="MTLRasterizationRateSampleArray")
 RasterizationRateSampleArray :: struct { using _: NS.Object }
 
@@ -2837,36 +2204,7 @@ RasterizationRateSampleArray_setObject :: #force_inline proc "c" (self: ^Rasteri
 
 ////////////////////////////////////////////////////////////////////////////////
 
-/*
-Class:
-	RenderPassAttachmentDescriptor
-Class Methods:
-	alloc
-Methods:
-	init
-	depthPlane
-	level
-	loadAction
-	resolveDepthPlane
-	resolveLevel
-	resolveSlice
-	resolveTexture
-	setDepthPlane
-	setLevel
-	setLoadAction
-	setResolveDepthPlane
-	setResolveLevel
-	setResolveSlice
-	setResolveTexture
-	setSlice
-	setStoreAction
-	setStoreActionOptions
-	setTexture
-	slice
-	storeAction
-	storeActionOptions
-	texture
-*/
+
 @(objc_class="MTLRenderPassAttachmentDescriptor")
 RenderPassAttachmentDescriptor :: struct { using _: NS.Copying(RenderPassAttachmentDescriptor) }
 
@@ -2969,16 +2307,7 @@ RenderPassAttachmentDescriptor_texture :: #force_inline proc "c" (self: ^RenderP
 
 ////////////////////////////////////////////////////////////////////////////////
 
-/*
-Class:
-	RenderPassColorAttachmentDescriptor
-Class Methods:
-	alloc
-Methods:
-	init
-	clearColor
-	setClearColor
-*/
+
 @(objc_class="MTLRenderPassColorAttachmentDescriptor")
 RenderPassColorAttachmentDescriptor :: struct { using _: NS.Copying(RenderPassColorAttachmentDescriptor), using _: RenderPassAttachmentDescriptor  }
 
@@ -3001,16 +2330,7 @@ RenderPassColorAttachmentDescriptor_setClearColor :: #force_inline proc "c" (sel
 
 ////////////////////////////////////////////////////////////////////////////////
 
-/*
-Class:
-	RenderPassColorAttachmentDescriptorArray
-Class Methods:
-	alloc
-Methods:
-	init
-	objectAtIndexedSubscript
-	setObject
-*/
+
 @(objc_class="MTLRenderPassColorAttachmentDescriptorArray")
 RenderPassColorAttachmentDescriptorArray :: struct { using _: NS.Object }
 
@@ -3033,18 +2353,7 @@ RenderPassColorAttachmentDescriptorArray_setObject :: #force_inline proc "c" (se
 
 ////////////////////////////////////////////////////////////////////////////////
 
-/*
-Class:
-	RenderPassDepthAttachmentDescriptor
-Class Methods:
-	alloc
-Methods:
-	init
-	clearDepth
-	depthResolveFilter
-	setClearDepth
-	setDepthResolveFilter
-*/
+
 @(objc_class="MTLRenderPassDepthAttachmentDescriptor")
 RenderPassDepthAttachmentDescriptor :: struct { using _: NS.Copying(RenderPassDepthAttachmentDescriptor), using _: RenderPassAttachmentDescriptor }
 
@@ -3075,43 +2384,7 @@ RenderPassDepthAttachmentDescriptor_setDepthResolveFilter :: #force_inline proc 
 
 ////////////////////////////////////////////////////////////////////////////////
 
-/*
-Class:
-	RenderPassDescriptor
-Class Methods:
-	alloc
-	renderPassDescriptor
-Methods:
-	init
-	colorAttachments
-	defaultRasterSampleCount
-	depthAttachment
-	getSamplePositions
-	imageblockSampleLength
-	rasterizationRateMap
-	renderTargetArrayLength
-	renderTargetHeight
-	renderTargetWidth
-	sampleBufferAttachments
-	setDefaultRasterSampleCount
-	setDepthAttachment
-	setImageblockSampleLength
-	setRasterizationRateMap
-	setRenderTargetArrayLength
-	setRenderTargetHeight
-	setRenderTargetWidth
-	setSamplePositions
-	setStencilAttachment
-	setThreadgroupMemoryLength
-	setTileHeight
-	setTileWidth
-	setVisibilityResultBuffer
-	stencilAttachment
-	threadgroupMemoryLength
-	tileHeight
-	tileWidth
-	visibilityResultBuffer
-*/
+
 @(objc_class="MTLRenderPassDescriptor")
 RenderPassDescriptor :: struct { using _: NS.Copying(RenderPassDescriptor), using _: AccelerationStructureDescriptor  }
 
@@ -3242,24 +2515,8 @@ RenderPassDescriptor_visibilityResultBuffer :: #force_inline proc "c" (self: ^Re
 
 ////////////////////////////////////////////////////////////////////////////////
 
-/*
-Class:
-	RenderPassSampleBufferAttachmentDescriptor
-Class Methods:
-	alloc
-Methods:
-	init
-	endOfFragmentSampleIndex
-	endOfVertexSampleIndex
-	sampleBuffer
-	setEndOfFragmentSampleIndex
-	setEndOfVertexSampleIndex
-	setSampleBuffer
-	setStartOfFragmentSampleIndex
-	setStartOfVertexSampleIndex
-	startOfFragmentSampleIndex
-	startOfVertexSampleIndex
-*/
+
+
 @(objc_class="MTLRenderPassSampleBufferAttachmentDescriptor")
 RenderPassSampleBufferAttachmentDescriptor :: struct { using _: NS.Copying(RenderPassSampleBufferAttachmentDescriptor) }
 
@@ -3314,16 +2571,7 @@ RenderPassSampleBufferAttachmentDescriptor_startOfVertexSampleIndex :: #force_in
 
 ////////////////////////////////////////////////////////////////////////////////
 
-/*
-Class:
-	RenderPassSampleBufferAttachmentDescriptorArray
-Class Methods:
-	alloc
-Methods:
-	init
-	objectAtIndexedSubscript
-	setObject
-*/
+
 @(objc_class="MTLRenderPassSampleBufferAttachmentDescriptorArray")
 RenderPassSampleBufferAttachmentDescriptorArray :: struct { using _: NS.Object }
 
@@ -3346,18 +2594,7 @@ RenderPassSampleBufferAttachmentDescriptorArray_setObject :: #force_inline proc 
 
 ////////////////////////////////////////////////////////////////////////////////
 
-/*
-Class:
-	RenderPassStencilAttachmentDescriptor
-Class Methods:
-	alloc
-Methods:
-	init
-	clearStencil
-	setClearStencil
-	setStencilResolveFilter
-	stencilResolveFilter
-*/
+
 @(objc_class="MTLRenderPassStencilAttachmentDescriptor")
 RenderPassStencilAttachmentDescriptor :: struct { using _: NS.Copying(RenderPassStencilAttachmentDescriptor) }
 
@@ -3388,32 +2625,7 @@ RenderPassStencilAttachmentDescriptor_stencilResolveFilter :: #force_inline proc
 
 ////////////////////////////////////////////////////////////////////////////////
 
-/*
-Class:
-	RenderPipelineColorAttachmentDescriptor
-Class Methods:
-	alloc
-Methods:
-	init
-	alphaBlendOperation
-	destinationAlphaBlendFactor
-	destinationRGBBlendFactor
-	isBlendingEnabled
-	pixelFormat
-	rgbBlendOperation
-	setAlphaBlendOperation
-	setBlendingEnabled
-	setDestinationAlphaBlendFactor
-	setDestinationRGBBlendFactor
-	setPixelFormat
-	setRgbBlendOperation
-	setSourceAlphaBlendFactor
-	setSourceRGBBlendFactor
-	setWriteMask
-	sourceAlphaBlendFactor
-	sourceRGBBlendFactor
-	writeMask
-*/
+
 @(objc_class="MTLRenderPipelineColorAttachmentDescriptor")
 RenderPipelineColorAttachmentDescriptor :: struct { using _: NS.Copying(RenderPipelineColorAttachmentDescriptor), using _: RenderPassAttachmentDescriptor }
 
@@ -3500,16 +2712,7 @@ RenderPipelineColorAttachmentDescriptor_writeMask :: #force_inline proc "c" (sel
 
 ////////////////////////////////////////////////////////////////////////////////
 
-/*
-Class:
-	RenderPipelineColorAttachmentDescriptorArray
-Class Methods:
-	alloc
-Methods:
-	init
-	objectAtIndexedSubscript
-	setObject
-*/
+
 @(objc_class="MTLRenderPipelineColorAttachmentDescriptorArray")
 RenderPipelineColorAttachmentDescriptorArray :: struct { using _: NS.Object }
 
@@ -3532,62 +2735,7 @@ RenderPipelineColorAttachmentDescriptorArray_setObject :: #force_inline proc "c"
 
 ////////////////////////////////////////////////////////////////////////////////
 
-/*
-Class:
-	RenderPipelineDescriptor
-Class Methods:
-	alloc
-Methods:
-	init
-	binaryArchives
-	colorAttachments
-	depthAttachmentPixelFormat
-	fragmentBuffers
-	fragmentFunction
-	inputPrimitiveTopology
-	isAlphaToCoverageEnabled
-	isAlphaToOneEnabled
-	isRasterizationEnabled
-	isTessellationFactorScaleEnabled
-	label
-	maxTessellationFactor
-	maxVertexAmplificationCount
-	rasterSampleCount
-	reset
-	sampleCount
-	setAlphaToCoverageEnabled
-	setAlphaToOneEnabled
-	setBinaryArchives
-	setDepthAttachmentPixelFormat
-	setFragmentFunction
-	setInputPrimitiveTopology
-	setLabel
-	setMaxTessellationFactor
-	setMaxVertexAmplificationCount
-	setRasterSampleCount
-	setRasterizationEnabled
-	setSampleCount
-	setStencilAttachmentPixelFormat
-	setSupportIndirectCommandBuffers
-	setTessellationControlPointIndexType
-	setTessellationFactorFormat
-	setTessellationFactorScaleEnabled
-	setTessellationFactorStepFunction
-	setTessellationOutputWindingOrder
-	setTessellationPartitionMode
-	setVertexDescriptor
-	setVertexFunction
-	stencilAttachmentPixelFormat
-	supportIndirectCommandBuffers
-	tessellationControlPointIndexType
-	tessellationFactorFormat
-	tessellationFactorStepFunction
-	tessellationOutputWindingOrder
-	tessellationPartitionMode
-	vertexBuffers
-	vertexDescriptor
-	vertexFunction
-*/
+
 @(objc_class="MTLRenderPipelineDescriptor")
 RenderPipelineDescriptor :: struct { using _: NS.Copying(RenderPipelineDescriptor) }
 
@@ -3889,17 +3037,7 @@ RenderPipelineDescriptor_rasterizationEnabled :: #force_inline proc "c" (self: ^
 
 ////////////////////////////////////////////////////////////////////////////////
 
-/*
-Class:
-	RenderPipelineReflection
-Class Methods:
-	alloc
-Methods:
-	init
-	fragmentArguments
-	tileArguments
-	vertexArguments
-*/
+
 @(objc_class="MTLRenderPipelineReflection")
 RenderPipelineReflection :: struct { using _: NS.Object }
 
@@ -3947,16 +3085,7 @@ RenderPipelineReflection_meshBindings :: #force_inline proc "c" (self: ^RenderPi
 
 ////////////////////////////////////////////////////////////////////////////////
 
-/*
-Class:
-	ResourceStatePassDescriptor
-Class Methods:
-	alloc
-	resourceStatePassDescriptor
-Methods:
-	init
-	sampleBufferAttachments
-*/
+
 @(objc_class="MTLResourceStatePassDescriptor")
 ResourceStatePassDescriptor :: struct { using _: NS.Copying(ResourceStatePassDescriptor) }
 
@@ -3979,20 +3108,7 @@ ResourceStatePassDescriptor_sampleBufferAttachments :: #force_inline proc "c" (s
 
 ////////////////////////////////////////////////////////////////////////////////
 
-/*
-Class:
-	ResourceStatePassSampleBufferAttachmentDescriptor
-Class Methods:
-	alloc
-Methods:
-	init
-	endOfEncoderSampleIndex
-	sampleBuffer
-	setEndOfEncoderSampleIndex
-	setSampleBuffer
-	setStartOfEncoderSampleIndex
-	startOfEncoderSampleIndex
-*/
+
 @(objc_class="MTLResourceStatePassSampleBufferAttachmentDescriptor")
 ResourceStatePassSampleBufferAttachmentDescriptor :: struct { using _: NS.Copying(ResourceStatePassSampleBufferAttachmentDescriptor) }
 
@@ -4031,16 +3147,7 @@ ResourceStatePassSampleBufferAttachmentDescriptor_startOfEncoderSampleIndex :: #
 
 ////////////////////////////////////////////////////////////////////////////////
 
-/*
-Class:
-	ResourceStatePassSampleBufferAttachmentDescriptorArray
-Class Methods:
-	alloc
-Methods:
-	init
-	objectAtIndexedSubscript
-	setObject
-*/
+
 @(objc_class="MTLResourceStatePassSampleBufferAttachmentDescriptorArray")
 ResourceStatePassSampleBufferAttachmentDescriptorArray :: struct { using _: NS.Object }
 
@@ -4063,44 +3170,7 @@ ResourceStatePassSampleBufferAttachmentDescriptorArray_setObject :: #force_inlin
 
 ////////////////////////////////////////////////////////////////////////////////
 
-/*
-Class:
-	SamplerDescriptor
-Class Methods:
-	alloc
-Methods:
-	init
-	borderColor
-	compareFunction
-	label
-	lodAverage
-	lodMaxClamp
-	lodMinClamp
-	magFilter
-	maxAnisotropy
-	minFilter
-	mipFilter
-	normalizedCoordinates
-	rAddressMode
-	sAddressMode
-	setBorderColor
-	setCompareFunction
-	setLabel
-	setLodAverage
-	setLodMaxClamp
-	setLodMinClamp
-	setMagFilter
-	setMaxAnisotropy
-	setMinFilter
-	setMipFilter
-	setNormalizedCoordinates
-	setRAddressMode
-	setSAddressMode
-	setSupportArgumentBuffers
-	setTAddressMode
-	supportArgumentBuffers
-	tAddressMode
-*/
+
 @(objc_class="MTLSamplerDescriptor")
 SamplerDescriptor :: struct { using _: NS.Copying(SamplerDescriptor) }
 
@@ -4235,15 +3305,7 @@ SamplerDescriptor_tAddressMode :: #force_inline proc "c" (self: ^SamplerDescript
 
 ////////////////////////////////////////////////////////////////////////////////
 
-/*
-Class:
-	SharedEventHandle
-Class Methods:
-	alloc
-Methods:
-	init
-	label
-*/
+
 @(objc_class="MTLSharedEventHandle")
 SharedEventHandle :: struct { using _: NS.Object }
 
@@ -4262,16 +3324,7 @@ SharedEventHandle_label :: #force_inline proc "c" (self: ^SharedEventHandle) -> 
 
 ////////////////////////////////////////////////////////////////////////////////
 
-/*
-Class:
-	SharedEventListener
-Class Methods:
-	alloc
-Methods:
-	dispatchQueue
-	init
-	initWithDispatchQueue
-*/
+
 @(objc_class="MTLSharedEventListener")
 SharedEventListener :: struct { using _: NS.Object }
 
@@ -4294,16 +3347,7 @@ SharedEventListener_initWithDispatchQueue :: #force_inline proc "c" (self: ^Shar
 
 ////////////////////////////////////////////////////////////////////////////////
 
-/*
-Class:
-	SharedTextureHandle
-Class Methods:
-	alloc
-Methods:
-	init
-	device
-	label
-*/
+
 @(objc_class="MTLSharedTextureHandle")
 SharedTextureHandle :: struct { using _: NS.Object }
 
@@ -4326,22 +3370,7 @@ SharedTextureHandle_label :: #force_inline proc "c" (self: ^SharedTextureHandle)
 
 ////////////////////////////////////////////////////////////////////////////////
 
-/*
-Class:
-	StageInputOutputDescriptor
-Class Methods:
-	alloc
-	stageInputOutputDescriptor
-Methods:
-	init
-	attributes
-	indexBufferIndex
-	indexType
-	layouts
-	reset
-	setIndexBufferIndex
-	setIndexType
-*/
+
 @(objc_class="MTLStageInputOutputDescriptor")
 StageInputOutputDescriptor :: struct { using _: NS.Copying(StageInputOutputDescriptor) }
 
@@ -4388,26 +3417,7 @@ StageInputOutputDescriptor_stageInputOutputDescriptor :: #force_inline proc "c" 
 
 ////////////////////////////////////////////////////////////////////////////////
 
-/*
-Class:
-	StencilDescriptor
-Class Methods:
-	alloc
-Methods:
-	init
-	depthFailureOperation
-	depthStencilPassOperation
-	readMask
-	setDepthFailureOperation
-	setDepthStencilPassOperation
-	setReadMask
-	setStencilCompareFunction
-	setStencilFailureOperation
-	setWriteMask
-	stencilCompareFunction
-	stencilFailureOperation
-	writeMask
-*/
+
 @(objc_class="MTLStencilDescriptor")
 StencilDescriptor :: struct { using _: NS.Copying(StencilDescriptor) }
 
@@ -4470,22 +3480,7 @@ StencilDescriptor_writeMask :: #force_inline proc "c" (self: ^StencilDescriptor)
 
 ////////////////////////////////////////////////////////////////////////////////
 
-/*
-Class:
-	StructMember
-Class Methods:
-	alloc
-Methods:
-	init
-	argumentIndex
-	arrayType
-	dataType
-	name
-	offset
-	pointerType
-	structType
-	textureReferenceType
-*/
+
 @(objc_class="MTLStructMember")
 StructMember :: struct { using _: NS.Object }
 
@@ -4532,16 +3527,7 @@ StructMember_textureReferenceType :: #force_inline proc "c" (self: ^StructMember
 
 ////////////////////////////////////////////////////////////////////////////////
 
-/*
-Class:
-	StructType
-Class Methods:
-	alloc
-Methods:
-	init
-	memberByName
-	members
-*/
+
 @(objc_class="MTLStructType")
 StructType :: struct { using _: Type }
 
@@ -4564,47 +3550,7 @@ StructType_members :: #force_inline proc "c" (self: ^StructType) -> ^NS.Array {
 
 ////////////////////////////////////////////////////////////////////////////////
 
-/*
-Class:
-	TextureDescriptor
-Class Methods:
-	alloc
-	texture2DDescriptorWithPixelFormat
-	textureBufferDescriptorWithPixelFormat
-	textureCubeDescriptorWithPixelFormat
-Methods:
-	init
-	allowGPUOptimizedContents
-	arrayLength
-	cpuCacheMode
-	depth
-	hazardTrackingMode
-	height
-	mipmapLevelCount
-	pixelFormat
-	resourceOptions
-	sampleCount
-	setAllowGPUOptimizedContents
-	setArrayLength
-	setCpuCacheMode
-	setDepth
-	setHazardTrackingMode
-	setHeight
-	setMipmapLevelCount
-	setPixelFormat
-	setResourceOptions
-	setSampleCount
-	setStorageMode
-	setSwizzle
-	setTextureType
-	setUsage
-	setWidth
-	storageMode
-	swizzle
-	textureType
-	usage
-	width
-*/
+
 @(objc_class="MTLTextureDescriptor")
 TextureDescriptor :: struct { using _: NS.Copying(TextureDescriptor) }
 
@@ -4760,18 +3706,7 @@ TextureDescriptor_setCompressionType :: #force_inline proc "c" (self: ^TextureDe
 
 ////////////////////////////////////////////////////////////////////////////////
 
-/*
-Class:
-	TextureReferenceType
-Class Methods:
-	alloc
-Methods:
-	init
-	access
-	isDepthTexture
-	textureDataType
-	textureType
-*/
+
 @(objc_class="MTLTextureReferenceType")
 TextureReferenceType :: struct { using _: Type }
 
@@ -4802,16 +3737,7 @@ TextureReferenceType_textureType :: #force_inline proc "c" (self: ^TextureRefere
 
 ////////////////////////////////////////////////////////////////////////////////
 
-/*
-Class:
-	TileRenderPipelineColorAttachmentDescriptor
-Class Methods:
-	alloc
-Methods:
-	init
-	pixelFormat
-	setPixelFormat
-*/
+
 @(objc_class="MTLTileRenderPipelineColorAttachmentDescriptor")
 TileRenderPipelineColorAttachmentDescriptor :: struct { using _: NS.Copying(TileRenderPipelineColorAttachmentDescriptor) }
 
@@ -4834,16 +3760,7 @@ TileRenderPipelineColorAttachmentDescriptor_setPixelFormat :: #force_inline proc
 
 ////////////////////////////////////////////////////////////////////////////////
 
-/*
-Class:
-	TileRenderPipelineColorAttachmentDescriptorArray
-Class Methods:
-	alloc
-Methods:
-	init
-	objectAtIndexedSubscript
-	setObject
-*/
+
 @(objc_class="MTLTileRenderPipelineColorAttachmentDescriptorArray")
 TileRenderPipelineColorAttachmentDescriptorArray :: struct { using _: NS.Object }
 
@@ -4866,29 +3783,7 @@ TileRenderPipelineColorAttachmentDescriptorArray_setObject :: #force_inline proc
 
 ////////////////////////////////////////////////////////////////////////////////
 
-/*
-Class:
-	TileRenderPipelineDescriptor
-Class Methods:
-	alloc
-Methods:
-	init
-	binaryArchives
-	colorAttachments
-	label
-	maxTotalThreadsPerThreadgroup
-	rasterSampleCount
-	reset
-	setBinaryArchives
-	setLabel
-	setMaxTotalThreadsPerThreadgroup
-	setRasterSampleCount
-	setThreadgroupSizeMatchesTileSize
-	setTileFunction
-	threadgroupSizeMatchesTileSize
-	tileBuffers
-	tileFunction
-*/
+
 @(objc_class="MTLTileRenderPipelineDescriptor")
 TileRenderPipelineDescriptor :: struct { using _: NS.Copying(TileRenderPipelineDescriptor) }
 
@@ -4963,15 +3858,7 @@ TileRenderPipelineDescriptor_tileFunction :: #force_inline proc "c" (self: ^Tile
 
 ////////////////////////////////////////////////////////////////////////////////
 
-/*
-Class:
-	Type
-Class Methods:
-	alloc
-Methods:
-	init
-	dataType
-*/
+
 @(objc_class="MTLType")
 Type :: struct { using _: NS.Object }
 
@@ -4990,20 +3877,7 @@ Type_dataType :: #force_inline proc "c" (self: ^Type) -> DataType {
 
 ////////////////////////////////////////////////////////////////////////////////
 
-/*
-Class:
-	VertexAttribute
-Class Methods:
-	alloc
-Methods:
-	init
-	attributeIndex
-	attributeType
-	isActive
-	isPatchControlPointData
-	isPatchData
-	name
-*/
+
 @(objc_class="MTLVertexAttribute")
 VertexAttribute :: struct { using _: NS.Object }
 
@@ -5042,20 +3916,7 @@ VertexAttribute_name :: #force_inline proc "c" (self: ^VertexAttribute) -> ^NS.S
 
 ////////////////////////////////////////////////////////////////////////////////
 
-/*
-Class:
-	VertexAttributeDescriptor
-Class Methods:
-	alloc
-Methods:
-	init
-	bufferIndex
-	format
-	offset
-	setBufferIndex
-	setFormat
-	setOffset
-*/
+
 @(objc_class="MTLVertexAttributeDescriptor")
 VertexAttributeDescriptor :: struct { using _: NS.Copying(VertexAttributeDescriptor) }
 
@@ -5094,16 +3955,7 @@ VertexAttributeDescriptor_setOffset :: #force_inline proc "c" (self: ^VertexAttr
 
 ////////////////////////////////////////////////////////////////////////////////
 
-/*
-Class:
-	VertexAttributeDescriptorArray
-Class Methods:
-	alloc
-Methods:
-	init
-	objectAtIndexedSubscript
-	setObject
-*/
+
 @(objc_class="MTLVertexAttributeDescriptorArray")
 VertexAttributeDescriptorArray :: struct { using _: NS.Object }
 
@@ -5126,20 +3978,7 @@ VertexAttributeDescriptorArray_setObject :: #force_inline proc "c" (self: ^Verte
 
 ////////////////////////////////////////////////////////////////////////////////
 
-/*
-Class:
-	VertexBufferLayoutDescriptor
-Class Methods:
-	alloc
-Methods:
-	init
-	setStepFunction
-	setStepRate
-	setStride
-	stepFunction
-	stepRate
-	stride
-*/
+
 @(objc_class="MTLVertexBufferLayoutDescriptor")
 VertexBufferLayoutDescriptor :: struct { using _: NS.Copying(VertexBufferLayoutDescriptor) }
 
@@ -5178,16 +4017,6 @@ VertexBufferLayoutDescriptor_stride :: #force_inline proc "c" (self: ^VertexBuff
 
 ////////////////////////////////////////////////////////////////////////////////
 
-/*
-Class:
-	VertexBufferLayoutDescriptorArray
-Class Methods:
-	alloc
-Methods:
-	init
-	objectAtIndexedSubscript
-	setObject
-*/
 @(objc_class="MTLVertexBufferLayoutDescriptorArray")
 VertexBufferLayoutDescriptorArray :: struct { using _: NS.Object }
 
@@ -5210,18 +4039,6 @@ VertexBufferLayoutDescriptorArray_setObject :: #force_inline proc "c" (self: ^Ve
 
 ////////////////////////////////////////////////////////////////////////////////
 
-/*
-Class:
-	VertexDescriptor
-Class Methods:
-	alloc
-	vertexDescriptor
-Methods:
-	init
-	attributes
-	layouts
-	reset
-*/
 @(objc_class="MTLVertexDescriptor")
 VertexDescriptor :: struct { using _: NS.Copying(VertexDescriptor) }
 
@@ -5252,17 +4069,7 @@ VertexDescriptor_vertexDescriptor :: #force_inline proc "c" () -> ^VertexDescrip
 
 ////////////////////////////////////////////////////////////////////////////////
 
-/*
-Class:
-	VisibleFunctionTableDescriptor
-Class Methods:
-	alloc
-	visibleFunctionTableDescriptor
-Methods:
-	init
-	functionCount
-	setFunctionCount
-*/
+
 @(objc_class="MTLVisibleFunctionTableDescriptor")
 VisibleFunctionTableDescriptor :: struct { using _: NS.Copying(VisibleFunctionTableDescriptor) }
 
@@ -5289,14 +4096,7 @@ VisibleFunctionTableDescriptor_visibleFunctionTableDescriptor :: #force_inline p
 
 ////////////////////////////////////////////////////////////////////////////////
 
-/*
-Class:
-	AccelerationStructure
-Class Methods:
-Methods:
-	size
-	getResourceID
-*/
+
 @(objc_class="MTLAccelerationStructure")
 AccelerationStructure :: struct { using _: Resource }
 
@@ -5312,25 +4112,7 @@ AccelerationStructure_getResourceID :: #force_inline proc "c" (self: ^Accelerati
 
 ////////////////////////////////////////////////////////////////////////////////
 
-/*
-Class:
-	AccelerationStructureCommandEncoder
-Class Methods:
-Methods:
-	buildAccelerationStructure
-	copyAccelerationStructure
-	copyAndCompactAccelerationStructure
-	refitAccelerationStructure
-	refitAccelerationStructureWithOptions
-	sampleCountersInBuffer
-	updateFence
-	useHeap
-	useHeaps
-	useResource
-	useResources
-	waitForFence
-	writeCompactedAccelerationStructureSize
-*/
+
 @(objc_class="MTLAccelerationStructureCommandEncoder")
 AccelerationStructureCommandEncoder :: struct { using _: CommandEncoder }
 
@@ -5590,38 +4372,6 @@ ObjectPayloadBinding_objectPayloadDataSize :: #force_inline proc "c" (self: ^Obj
 
 ////////////////////////////////////////////////////////////////////////////////
 
-/*
-Class:
-	ArgumentEncoder
-Class Methods:
-Methods:
-	alignment
-	constantDataAtIndex
-	device
-	encodedLength
-	label
-	newArgumentEncoderForBufferAtIndex
-	setAccelerationStructure
-	setArgumentBuffer
-	setArgumentBuffer
-	setBuffer
-	setBuffers
-	setComputePipelineState
-	setComputePipelineStates
-	setIndirectCommandBuffer
-	setIndirectCommandBuffers
-	setIntersectionFunctionTable
-	setIntersectionFunctionTables
-	setLabel
-	setRenderPipelineState
-	setRenderPipelineStates
-	setSamplerState
-	setSamplerStates
-	setTexture
-	setTextures
-	setVisibleFunctionTable
-	setVisibleFunctionTables
-*/
 @(objc_class="MTLArgumentEncoder")
 ArgumentEncoder :: struct { using _: NS.Object }
 
@@ -5740,19 +4490,6 @@ ArgumentEncoder_setVisibleFunctionTables :: #force_inline proc "odin" (self: ^Ar
 
 ////////////////////////////////////////////////////////////////////////////////
 
-/*
-Class:
-	BinaryArchive
-Class Methods:
-Methods:
-	addComputePipelineFunctionsWithDescriptor
-	addRenderPipelineFunctionsWithDescriptor
-	addTileRenderPipelineFunctionsWithDescriptor
-	device
-	label
-	serializeToURL
-	setLabel
-*/
 @(objc_class="MTLBinaryArchive")
 BinaryArchive :: struct { using _: NS.Copying(BinaryArchive) }
 
@@ -5798,37 +4535,6 @@ BinaryArchive_addFunction :: #force_inline proc "contextless" (self: ^BinaryArch
 
 ////////////////////////////////////////////////////////////////////////////////
 
-/*
-Class:
-	BlitCommandEncoder
-Class Methods:
-Methods:
-	copyFromBuffer
-	copyFromBuffer
-	copyFromBuffer
-	copyFromTexture
-	copyFromTexture
-	copyFromTexture
-	copyFromTexture
-	copyFromTexture
-	copyIndirectCommandBuffer
-	fillBuffer
-	generateMipmapsForTexture
-	getTextureAccessCounters
-	optimizeContentsForCPUAccess
-	optimizeContentsForCPUAccess
-	optimizeContentsForGPUAccess
-	optimizeContentsForGPUAccess
-	optimizeIndirectCommandBuffer
-	resetCommandsInBuffer
-	resetTextureAccessCounters
-	resolveCounters
-	sampleCountersInBuffer
-	synchronizeResource
-	synchronizeTexture
-	updateFence
-	waitForFence
-*/
 @(objc_class="MTLBlitCommandEncoder")
 BlitCommandEncoder :: struct { using _: CommandEncoder }
 
@@ -5935,20 +4641,6 @@ BlitCommandEncoder_waitForFence :: #force_inline proc "c" (self: ^BlitCommandEnc
 
 ////////////////////////////////////////////////////////////////////////////////
 
-/*
-Class:
-	Buffer
-Class Methods:
-Methods:
-	addDebugMarker
-	contents
-	didModifyRange
-	length
-	newRemoteBufferViewForDevice
-	newTextureWithDescriptor
-	remoteStorageBuffer
-	removeAllDebugMarkers
-*/
 @(objc_class="MTLBuffer")
 Buffer :: struct { using _: Resource }
 
@@ -6013,18 +4705,6 @@ Buffer_gpuAddress :: #force_inline proc "c" (self: ^Buffer) -> u64 {
 
 ////////////////////////////////////////////////////////////////////////////////
 
-/*
-Class:
-	CaptureScope
-Class Methods:
-Methods:
-	beginScope
-	commandQueue
-	device
-	endScope
-	label
-	setLabel
-*/
 @(objc_class="MTLCaptureScope")
 CaptureScope :: struct { using _: NS.Object }
 
@@ -6055,48 +4735,6 @@ CaptureScope_setLabel :: #force_inline proc "c" (self: ^CaptureScope, label: ^NS
 
 ////////////////////////////////////////////////////////////////////////////////
 
-/*
-Class:
-	CommandBuffer
-Class Methods:
-Methods:
-	GPUEndTime
-	GPUStartTime
-	accelerationStructureCommandEncoder
-	addCompletedHandler
-	addScheduledHandler
-	blitCommandEncoder
-	blitCommandEncoderWithDescriptor
-	commandQueue
-	commit
-	computeCommandEncoder
-	computeCommandEncoderWithDescriptor
-	computeCommandEncoderWithDispatchType
-	device
-	encodeSignalEvent
-	encodeWaitForEvent
-	enqueue
-	error
-	errorOptions
-	kernelEndTime
-	kernelStartTime
-	label
-	logs
-	parallelRenderCommandEncoderWithDescriptor
-	popDebugGroup
-	presentDrawable
-	presentDrawable
-	presentDrawable
-	pushDebugGroup
-	renderCommandEncoderWithDescriptor
-	resourceStateCommandEncoder
-	resourceStateCommandEncoderWithDescriptor
-	retainedReferences
-	setLabel
-	status
-	waitUntilCompleted
-	waitUntilScheduled
-*/
 @(objc_class="MTLCommandBuffer")
 CommandBuffer :: struct { using _: NS.Object }
 
@@ -6251,15 +4889,6 @@ CommandBuffer_waitUntilScheduled :: #force_inline proc "c" (self: ^CommandBuffer
 
 ////////////////////////////////////////////////////////////////////////////////
 
-/*
-Class:
-	CommandBufferEncoderInfo
-Class Methods:
-Methods:
-	debugSignposts
-	errorState
-	label
-*/
 @(objc_class="MTLCommandBufferEncoderInfo")
 CommandBufferEncoderInfo :: struct { using _: NS.Object }
 
@@ -6278,19 +4907,6 @@ CommandBufferEncoderInfo_label :: #force_inline proc "c" (self: ^CommandBufferEn
 
 ////////////////////////////////////////////////////////////////////////////////
 
-/*
-Class:
-	CommandEncoder
-Class Methods:
-Methods:
-	device
-	endEncoding
-	insertDebugSignpost
-	label
-	popDebugGroup
-	pushDebugGroup
-	setLabel
-*/
 @(objc_class="MTLCommandEncoder")
 CommandEncoder :: struct { using _: NS.Object }
 
@@ -6325,19 +4941,6 @@ CommandEncoder_setLabel :: #force_inline proc "c" (self: ^CommandEncoder, label:
 
 ////////////////////////////////////////////////////////////////////////////////
 
-/*
-Class:
-	CommandQueue
-Class Methods:
-Methods:
-	commandBuffer
-	commandBufferWithDescriptor
-	commandBufferWithUnretainedReferences
-	device
-	insertDebugCaptureBoundary
-	label
-	setLabel
-*/
 @(objc_class="MTLCommandQueue")
 CommandQueue :: struct { using _: NS.Object }
 
@@ -6372,47 +4975,6 @@ CommandQueue_setLabel :: #force_inline proc "c" (self: ^CommandQueue, label: ^NS
 
 ////////////////////////////////////////////////////////////////////////////////
 
-/*
-Class:
-	ComputeCommandEncoder
-Class Methods:
-Methods:
-	dispatchThreadgroups
-	dispatchThreadgroupsWithIndirectBuffer
-	dispatchThreads
-	dispatchType
-	executeCommandsInBuffer
-	executeCommandsInBuffer
-	memoryBarrierWithResources
-	memoryBarrierWithScope
-	sampleCountersInBuffer
-	setAccelerationStructure
-	setBuffer
-	setBufferOffset
-	setBuffers
-	setBytes
-	setComputePipelineState
-	setImageblockWidth
-	setIntersectionFunctionTable
-	setIntersectionFunctionTables
-	setSamplerState
-	setSamplerState
-	setSamplerStates
-	setSamplerStates
-	setStageInRegion
-	setStageInRegionWithIndirectBuffer
-	setTexture
-	setTextures
-	setThreadgroupMemoryLength
-	setVisibleFunctionTable
-	setVisibleFunctionTables
-	updateFence
-	useHeap
-	useHeaps
-	useResource
-	useResources
-	waitForFence
-*/
 @(objc_class="MTLComputeCommandEncoder")
 ComputeCommandEncoder :: struct { using _: CommandEncoder }
 
@@ -6562,23 +5124,6 @@ ComputeCommandEncoder_waitForFence :: #force_inline proc "c" (self: ^ComputeComm
 
 ////////////////////////////////////////////////////////////////////////////////
 
-/*
-Class:
-	ComputePipelineState
-Class Methods:
-Methods:
-	device
-	functionHandleWithFunction
-	imageblockMemoryLengthForDimensions
-	label
-	maxTotalThreadsPerThreadgroup
-	newComputePipelineStateWithAdditionalBinaryFunctions
-	newIntersectionFunctionTableWithDescriptor
-	newVisibleFunctionTableWithDescriptor
-	staticThreadgroupMemoryLength
-	supportIndirectCommandBuffers
-	threadExecutionWidth
-*/
 @(objc_class="MTLComputePipelineState")
 ComputePipelineState :: struct { using _: NS.Object }
 
@@ -6630,13 +5175,6 @@ ComputePipelineState_threadExecutionWidth :: #force_inline proc "c" (self: ^Comp
 
 ////////////////////////////////////////////////////////////////////////////////
 
-/*
-Class:
-	Counter
-Class Methods:
-Methods:
-	name
-*/
 @(objc_class="MTLCounter")
 Counter :: struct { using _: NS.Object }
 
@@ -6647,16 +5185,6 @@ Counter_name :: #force_inline proc "c" (self: ^Counter) -> ^NS.String {
 
 ////////////////////////////////////////////////////////////////////////////////
 
-/*
-Class:
-	CounterSampleBuffer
-Class Methods:
-Methods:
-	device
-	label
-	resolveCounterRange
-	sampleCount
-*/
 @(objc_class="MTLCounterSampleBuffer")
 CounterSampleBuffer :: struct { using _: NS.Object }
 
@@ -6679,14 +5207,6 @@ CounterSampleBuffer_sampleCount :: #force_inline proc "c" (self: ^CounterSampleB
 
 ////////////////////////////////////////////////////////////////////////////////
 
-/*
-Class:
-	CounterSet
-Class Methods:
-Methods:
-	counters
-	name
-*/
 @(objc_class="MTLCounterSet")
 CounterSet :: struct { using _: NS.Object }
 
@@ -6701,14 +5221,6 @@ CounterSet_name :: #force_inline proc "c" (self: ^CounterSet) -> ^NS.String {
 
 ////////////////////////////////////////////////////////////////////////////////
 
-/*
-Class:
-	DepthStencilState
-Class Methods:
-Methods:
-	device
-	label
-*/
 @(objc_class="MTLDepthStencilState")
 DepthStencilState :: struct { using _: NS.Object }
 
@@ -6723,107 +5235,6 @@ DepthStencilState_label :: #force_inline proc "c" (self: ^DepthStencilState) -> 
 
 ////////////////////////////////////////////////////////////////////////////////
 
-/*
-Class:
-	Device
-Class Methods:
-Methods:
-	accelerationStructureSizesWithDescriptor
-	areBarycentricCoordsSupported
-	areProgrammableSamplePositionsSupported
-	areRasterOrderGroupsSupported
-	argumentBuffersSupport
-	convertSparsePixelRegions
-	convertSparseTileRegions
-	counterSets
-	currentAllocatedSize
-	getDefaultSamplePositions
-	hasUnifiedMemory
-	heapBufferSizeAndAlignWithLength
-	heapTextureSizeAndAlignWithDescriptor
-	isDepth24Stencil8PixelFormatSupported
-	isHeadless
-	isLowPower
-	isRemovable
-	location
-	locationNumber
-	maxArgumentBufferSamplerCount
-	maxBufferLength
-	maxThreadgroupMemoryLength
-	maxThreadsPerThreadgroup
-	maxTransferRate
-	minimumLinearTextureAlignmentForPixelFormat
-	minimumTextureBufferAlignmentForPixelFormat
-	name
-	newAccelerationStructureWithDescriptor
-	newAccelerationStructureWithSize
-	newArgumentEncoderWithArguments
-	newBinaryArchiveWithDescriptor
-	newBufferWithBytes
-	newBufferWithBytesNoCopy
-	newBufferWithLength
-	newCommandQueue
-	newCommandQueueWithMaxCommandBufferCount
-	newComputePipelineStateWithDescriptor
-	newComputePipelineStateWithDescriptor
-	newComputePipelineStateWithFunction
-	newComputePipelineStateWithFunction
-	newComputePipelineStateWithFunction
-	newComputePipelineStateWithFunction
-	newCounterSampleBufferWithDescriptor
-	newDefaultLibrary
-	newDefaultLibraryWithBundle
-	newDepthStencilStateWithDescriptor
-	newDynamicLibrary
-	newDynamicLibraryWithURL
-	newEvent
-	newFence
-	newHeapWithDescriptor
-	newIndirectCommandBufferWithDescriptor
-	newLibraryWithData
-	newLibraryWithFile
-	newLibraryWithSource
-	newLibraryWithSource
-	newLibraryWithURL
-	newRasterizationRateMapWithDescriptor
-	newRenderPipelineStateWithDescriptor
-	newRenderPipelineStateWithDescriptor
-	newRenderPipelineStateWithDescriptor
-	newRenderPipelineStateWithDescriptor
-	newRenderPipelineStateWithTileDescriptor
-	newRenderPipelineStateWithTileDescriptor
-	newSamplerState
-	newSharedEvent
-	newSharedEventWithHandle
-	newSharedTextureWithDescriptor
-	newSharedTextureWithHandle
-	newTextureWithDescriptor
-	newTextureWithDescriptor
-	peerCount
-	peerGroupID
-	peerIndex
-	readWriteTextureSupport
-	recommendedMaxWorkingSetSize
-	registryID
-	sampleTimestamps
-	sparseTileSizeInBytes
-	sparseTileSizeWithTextureType
-	supports32BitFloatFiltering
-	supports32BitMSAA
-	supportsBCTextureCompression
-	supportsCounterSampling
-	supportsDynamicLibraries
-	supportsFamily
-	supportsFeatureSet
-	supportsFunctionPointers
-	supportsPullModelInterpolation
-	supportsQueryTextureLOD
-	supportsRasterizationRateMapWithLayerCount
-	supportsRaytracing
-	supportsShaderBarycentricCoordinates
-	supportsTextureSampleCount
-	supportsVertexAmplificationCount
-*/
 @(objc_class="MTLDevice")
 Device :: struct { using _: NS.Object }
 
@@ -7319,18 +5730,6 @@ Device_newIOCommandQueue :: #force_inline proc "contextless" (self: ^Device, des
 
 ////////////////////////////////////////////////////////////////////////////////
 
-/*
-Class:
-	Drawable
-Class Methods:
-Methods:
-	addPresentedHandler
-	drawableID
-	present
-	presentAfterMinimumDuration
-	presentAtTime
-	presentedTime
-*/
 @(objc_class="MTLDrawable")
 Drawable :: struct { using _: NS.Object }
 
@@ -7361,17 +5760,6 @@ Drawable_presentedTime :: #force_inline proc "c" (self: ^Drawable) -> CFTimeInte
 
 ////////////////////////////////////////////////////////////////////////////////
 
-/*
-Class:
-	DynamicLibrary
-Class Methods:
-Methods:
-	device
-	installName
-	label
-	serializeToURL
-	setLabel
-*/
 @(objc_class="MTLDynamicLibrary")
 DynamicLibrary :: struct { using _: NS.Object }
 
@@ -7399,15 +5787,6 @@ DynamicLibrary_setLabel :: #force_inline proc "c" (self: ^DynamicLibrary, label:
 
 ////////////////////////////////////////////////////////////////////////////////
 
-/*
-Class:
-	Event
-Class Methods:
-Methods:
-	device
-	label
-	setLabel
-*/
 @(objc_class="MTLEvent")
 Event :: struct { using _: NS.Object }
 
@@ -7426,15 +5805,6 @@ Event_setLabel :: #force_inline proc "c" (self: ^Event, label: ^NS.String) {
 
 ////////////////////////////////////////////////////////////////////////////////
 
-/*
-Class:
-	Fence
-Class Methods:
-Methods:
-	device
-	label
-	setLabel
-*/
 @(objc_class="MTLFence")
 Fence :: struct { using _: NS.Object }
 
@@ -7453,25 +5823,6 @@ Fence_setLabel :: #force_inline proc "c" (self: ^Fence, label: ^NS.String) {
 
 ////////////////////////////////////////////////////////////////////////////////
 
-/*
-Class:
-	Function
-Class Methods:
-Methods:
-	device
-	functionConstantsDictionary
-	functionType
-	label
-	name
-	newArgumentEncoderWithBufferIndex
-	newArgumentEncoderWithBufferIndex
-	options
-	patchControlPointCount
-	patchType
-	setLabel
-	stageInputAttributes
-	vertexAttributes
-*/
 @(objc_class="MTLFunction")
 Function :: struct { using _: NS.Object }
 
@@ -7530,15 +5881,6 @@ Function_vertexAttributes :: #force_inline proc "c" (self: ^Function) -> ^NS.Arr
 
 ////////////////////////////////////////////////////////////////////////////////
 
-/*
-Class:
-	FunctionHandle
-Class Methods:
-Methods:
-	device
-	functionType
-	name
-*/
 @(objc_class="MTLFunctionHandle")
 FunctionHandle :: struct { using _: NS.Object }
 
@@ -7557,26 +5899,13 @@ FunctionHandle_name :: #force_inline proc "c" (self: ^FunctionHandle) -> ^NS.Str
 
 ////////////////////////////////////////////////////////////////////////////////
 
-/*
-Class:
-	LogContainer
-*/
 
 @(objc_class="MTLLogContainer")
 LogContainer :: struct { using _: NS.FastEnumeration }
 
 ////////////////////////////////////////////////////////////////////////////////
 
-/*
-Class:
-	FunctionLog
-Class Methods:
-Methods:
-	debugLocation
-	encoderLabel
-	function
-	type
-*/
+
 @(objc_class="MTLFunctionLog")
 FunctionLog :: struct { using _: NS.Object }
 
@@ -7599,16 +5928,6 @@ FunctionLog_type :: #force_inline proc "c" (self: ^FunctionLog) -> FunctionLogTy
 
 ////////////////////////////////////////////////////////////////////////////////
 
-/*
-Class:
-	FunctionLogDebugLocation
-Class Methods:
-Methods:
-	URL
-	column
-	functionName
-	line
-*/
 @(objc_class="MTLFunctionLogDebugLocation")
 FunctionLogDebugLocation :: struct { using _: NS.Object }
 
@@ -7631,29 +5950,7 @@ FunctionLogDebugLocation_line :: #force_inline proc "c" (self: ^FunctionLogDebug
 
 ////////////////////////////////////////////////////////////////////////////////
 
-/*
-Class:
-	Heap
-Class Methods:
-Methods:
-	cpuCacheMode
-	currentAllocatedSize
-	device
-	hazardTrackingMode
-	label
-	maxAvailableSizeWithAlignment
-	newBufferWithLength
-	newBufferWithLength
-	newTextureWithDescriptor
-	newTextureWithDescriptor
-	resourceOptions
-	setLabel
-	setPurgeableState
-	size
-	storageMode
-	type
-	usedSize
-*/
+
 @(objc_class="MTLHeap")
 Heap :: struct { using _: NS.Object }
 
@@ -7764,16 +6061,6 @@ Heap_usedSize :: #force_inline proc "c" (self: ^Heap) -> NS.UInteger {
 
 ////////////////////////////////////////////////////////////////////////////////
 
-/*
-Class:
-	IndirectCommandBuffer
-Class Methods:
-Methods:
-	indirectComputeCommandAtIndex
-	indirectRenderCommandAtIndex
-	resetWithRange
-	size
-*/
 @(objc_class="MTLIndirectCommandBuffer")
 IndirectCommandBuffer :: struct { using _: Resource }
 
@@ -7811,22 +6098,6 @@ IndirectCommandBuffer_gpuResourceID :: #force_inline proc "c" (self: ^IndirectCo
 
 ////////////////////////////////////////////////////////////////////////////////
 
-/*
-Class:
-	IndirectComputeCommand
-Class Methods:
-Methods:
-	clearBarrier
-	concurrentDispatchThreadgroups
-	concurrentDispatchThreads
-	reset
-	setBarrier
-	setComputePipelineState
-	setImageblockWidth
-	setKernelBuffer
-	setStageInRegion
-	setThreadgroupMemoryLength
-*/
 @(objc_class="MTLIndirectComputeCommand")
 IndirectComputeCommand :: struct { using _: NS.Object }
 
@@ -7873,20 +6144,6 @@ IndirectComputeCommand_setThreadgroupMemoryLength :: #force_inline proc "c" (sel
 
 ////////////////////////////////////////////////////////////////////////////////
 
-/*
-Class:
-	IndirectRenderCommand
-Class Methods:
-Methods:
-	drawIndexedPatches
-	drawIndexedPrimitives
-	drawPatches
-	drawPrimitives
-	reset
-	setFragmentBuffer
-	setRenderPipelineState
-	setVertexBuffer
-*/
 @(objc_class="MTLIndirectRenderCommand")
 IndirectRenderCommand :: struct { using _: NS.Object }
 
@@ -7925,20 +6182,6 @@ IndirectRenderCommand_setVertexBuffer :: #force_inline proc "c" (self: ^Indirect
 
 ////////////////////////////////////////////////////////////////////////////////
 
-/*
-Class:
-	IntersectionFunctionTable
-Class Methods:
-Methods:
-	setBuffer
-	setBuffers
-	setFunction
-	setFunctions
-	setOpaqueTriangleIntersectionFunctionWithSignature
-	setOpaqueTriangleIntersectionFunctionWithSignature
-	setVisibleFunctionTable
-	setVisibleFunctionTables
-*/
 @(objc_class="MTLIntersectionFunctionTable")
 IntersectionFunctionTable :: struct { using _: Resource }
 
@@ -8142,30 +6385,6 @@ IOCommandBuffer_error :: #force_inline proc "c" (self: ^IOCommandBuffer) -> ^NS.
 
 ////////////////////////////////////////////////////////////////////////////////
 
-
-
-
-////////////////////////////////////////////////////////////////////////////////
-
-/*
-Class:
-	Library
-Class Methods:
-Methods:
-	device
-	functionNames
-	installName
-	label
-	newFunctionWithDescriptor
-	newFunctionWithDescriptor
-	newFunctionWithName
-	newFunctionWithName
-	newFunctionWithName
-	newIntersectionFunctionWithDescriptor
-	newIntersectionFunctionWithDescriptor
-	setLabel
-	type
-*/
 @(objc_class="MTLLibrary")
 Library :: struct { using _: NS.Object }
 
@@ -8236,19 +6455,6 @@ Library_type :: #force_inline proc "c" (self: ^Library) -> LibraryType {
 
 ////////////////////////////////////////////////////////////////////////////////
 
-/*
-Class:
-	ParallelRenderCommandEncoder
-Class Methods:
-Methods:
-	renderCommandEncoder
-	setColorStoreAction
-	setColorStoreActionOptions
-	setDepthStoreAction
-	setDepthStoreActionOptions
-	setStencilStoreAction
-	setStencilStoreActionOptions
-*/
 @(objc_class="MTLParallelRenderCommandEncoder")
 ParallelRenderCommandEncoder :: struct { using _: CommandEncoder }
 
@@ -8283,22 +6489,6 @@ ParallelRenderCommandEncoder_setStencilStoreActionOptions :: #force_inline proc 
 
 ////////////////////////////////////////////////////////////////////////////////
 
-/*
-Class:
-	RasterizationRateMap
-Class Methods:
-Methods:
-	copyParameterDataToBuffer
-	device
-	label
-	layerCount
-	mapPhysicalToScreenCoordinates
-	mapScreenToPhysicalCoordinates
-	parameterBufferSizeAndAlign
-	physicalGranularity
-	physicalSizeForLayer
-	screenSize
-*/
 @(objc_class="MTLRasterizationRateMap")
 RasterizationRateMap :: struct { using _: NS.Object }
 
@@ -8346,98 +6536,6 @@ RasterizationRateMap_screenSize :: #force_inline proc "c" (self: ^RasterizationR
 
 ////////////////////////////////////////////////////////////////////////////////
 
-/*
-Class:
-	RenderCommandEncoder
-Class Methods:
-Methods:
-	dispatchThreadsPerTile
-	drawIndexedPatches
-	drawIndexedPatches
-	drawIndexedPrimitives
-	drawIndexedPrimitives
-	drawIndexedPrimitives
-	drawIndexedPrimitives
-	drawPatches
-	drawPatches
-	drawPrimitives
-	drawPrimitives
-	drawPrimitives
-	drawPrimitives
-	executeCommandsInBuffer
-	executeCommandsInBuffer
-	memoryBarrierWithResources
-	memoryBarrierWithScope
-	sampleCountersInBuffer
-	setBlendColorRed
-	setColorStoreAction
-	setColorStoreActionOptions
-	setCullMode
-	setDepthBias
-	setDepthClipMode
-	setDepthStencilState
-	setDepthStoreAction
-	setDepthStoreActionOptions
-	setFragmentBuffer
-	setFragmentBufferOffset
-	setFragmentBuffers
-	setFragmentBytes
-	setFragmentSamplerState
-	setFragmentSamplerState
-	setFragmentSamplerStates
-	setFragmentSamplerStates
-	setFragmentTexture
-	setFragmentTextures
-	setFrontFacingWinding
-	setRenderPipelineState
-	setScissorRect
-	setScissorRects
-	setStencilFrontReferenceValue
-	setStencilReferenceValue
-	setStencilStoreAction
-	setStencilStoreActionOptions
-	setTessellationFactorBuffer
-	setTessellationFactorScale
-	setThreadgroupMemoryLength
-	setTileBuffer
-	setTileBufferOffset
-	setTileBuffers
-	setTileBytes
-	setTileSamplerState
-	setTileSamplerState
-	setTileSamplerStates
-	setTileSamplerStates
-	setTileTexture
-	setTileTextures
-	setTriangleFillMode
-	setVertexAmplificationCount
-	setVertexBuffer
-	setVertexBufferOffset
-	setVertexBuffers
-	setVertexBytes
-	setVertexSamplerState
-	setVertexSamplerState
-	setVertexSamplerStates
-	setVertexSamplerStates
-	setVertexTexture
-	setVertexTextures
-	setViewport
-	setViewports
-	setVisibilityResultMode
-	textureBarrier
-	tileHeight
-	tileWidth
-	updateFence
-	useHeap
-	useHeap
-	useHeaps
-	useHeaps
-	useResource
-	useResource
-	useResources
-	useResources
-	waitForFence
-*/
 @(objc_class="MTLRenderCommandEncoder")
 RenderCommandEncoder :: struct { using _: CommandEncoder }
 
@@ -8890,10 +6988,6 @@ RenderCommandEncoder_drawMeshThreadgroupsWithIndirectBuffer :: #force_inline pro
 
 ////////////////////////////////////////////////////////////////////////////////
 
-/*
-Class:
-	RenderPipelineFunctionsDescriptor
-*/
 @(objc_class="MTLRenderPipelineFunctionsDescriptor")
 RenderPipelineFunctionsDescriptor :: struct { using _: NS.Copying(RenderPipelineFunctionsDescriptor) }
 
@@ -8935,19 +7029,6 @@ RenderPipelineFunctionsDescriptor_setTileAdditionalBinaryFunctions :: #force_inl
 
 ////////////////////////////////////////////////////////////////////////////////
 
-/*
-Class:
-	RenderPipelineState
-Class Methods:
-Methods:
-	device
-	imageblockMemoryLengthForDimensions
-	imageblockSampleLength
-	label
-	maxTotalThreadsPerThreadgroup
-	supportIndirectCommandBuffers
-	threadgroupSizeMatchesTileSize
-*/
 @(objc_class="MTLRenderPipelineState")
 RenderPipelineState :: struct { using _: NS.Object }
 
@@ -9031,25 +7112,6 @@ RenderPipelineState_gpuResourceID :: #force_inline proc "c" (self: ^RenderPipeli
 
 ////////////////////////////////////////////////////////////////////////////////
 
-/*
-Class:
-	Resource
-Class Methods:
-Methods:
-	allocatedSize
-	cpuCacheMode
-	device
-	hazardTrackingMode
-	heap
-	heapOffset
-	isAliasable
-	label
-	makeAliasable
-	resourceOptions
-	setLabel
-	setPurgeableState
-	storageMode
-*/
 @(objc_class="MTLResource")
 Resource :: struct { using _: NS.Object }
 
@@ -9108,17 +7170,6 @@ Resource_storageMode :: #force_inline proc "c" (self: ^Resource) -> StorageMode 
 
 ////////////////////////////////////////////////////////////////////////////////
 
-/*
-Class:
-	ResourceStateCommandEncoder
-Class Methods:
-Methods:
-	updateFence
-	updateTextureMapping
-	updateTextureMapping
-	updateTextureMappings
-	waitForFence
-*/
 @(objc_class="MTLResourceStateCommandEncoder")
 ResourceStateCommandEncoder :: struct { using _: CommandEncoder }
 
@@ -9157,14 +7208,6 @@ ResourceStateCommandEncoder_moveTextureMappingsFromTexture :: #force_inline proc
 
 ////////////////////////////////////////////////////////////////////////////////
 
-/*
-Class:
-	SamplerState
-Class Methods:
-Methods:
-	device
-	label
-*/
 @(objc_class="MTLSamplerState")
 SamplerState :: struct { using _: NS.Object }
 
@@ -9183,16 +7226,6 @@ SamplerState_gpuResourceID :: #force_inline proc "c" (self: ^SamplerState) -> Re
 
 ////////////////////////////////////////////////////////////////////////////////
 
-/*
-Class:
-	SharedEvent
-Class Methods:
-Methods:
-	newSharedEventHandle
-	notifyListener
-	setSignaledValue
-	signaledValue
-*/
 @(objc_class="MTLSharedEvent")
 SharedEvent :: struct { using _: Event }
 
@@ -9215,47 +7248,6 @@ SharedEvent_signaledValue :: #force_inline proc "c" (self: ^SharedEvent) -> u64 
 
 ////////////////////////////////////////////////////////////////////////////////
 
-/*
-Class:
-	Texture
-Class Methods:
-Methods:
-	allowGPUOptimizedContents
-	arrayLength
-	buffer
-	bufferBytesPerRow
-	bufferOffset
-	depth
-	firstMipmapInTail
-	getBytes
-	getBytes
-	height
-	iosurface
-	iosurfacePlane
-	isFramebufferOnly
-	isShareable
-	isSparse
-	mipmapLevelCount
-	newRemoteTextureViewForDevice
-	newSharedTextureHandle
-	newTextureViewWithPixelFormat
-	newTextureViewWithPixelFormat
-	newTextureViewWithPixelFormat
-	parentRelativeLevel
-	parentRelativeSlice
-	parentTexture
-	pixelFormat
-	remoteStorageTexture
-	replaceRegion
-	replaceRegion
-	rootResource
-	sampleCount
-	swizzle
-	tailSizeInBytes
-	textureType
-	usage
-	width
-*/
 @(objc_class="MTLTexture")
 Texture :: struct { using _: Resource }
 
@@ -9419,14 +7411,6 @@ Texture_gpuResourceID :: #force_inline proc "c" (self: ^Texture) -> ResourceID {
 
 ////////////////////////////////////////////////////////////////////////////////
 
-/*
-Class:
-	VisibleFunctionTable
-Class Methods:
-Methods:
-	setFunction
-	setFunctions
-*/
 @(objc_class="MTLVisibleFunctionTable")
 VisibleFunctionTable :: struct { using _: Resource }
 
@@ -9444,9 +7428,6 @@ VisibleFunctionTable_gpuResourceID :: #force_inline proc "c" (self: ^VisibleFunc
 	return msgSend(ResourceID, self, "gpuResourceID")
 }
 
-
-
-// TODO: Entire FunctionStitching API (which appears not to be in been missed from the generator)
 
 
 

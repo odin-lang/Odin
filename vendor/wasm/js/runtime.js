@@ -313,8 +313,8 @@ class WebGLInterface {
 					this.ctx.bindBuffer(target, bufferObj)
 				}
 			},
-			BindFramebuffer: (target, buffer) => {
-				// TODO: BindFramebuffer
+			BindFramebuffer: (target, framebuffer) => {
+				this.ctx.bindFramebuffer(target, framebuffer ? this.framebuffers[framebuffer] : null)
 			},
 			BindTexture: (target, texture) => {
 				this.ctx.bindTexture(target, texture ? this.textures[texture] : null)

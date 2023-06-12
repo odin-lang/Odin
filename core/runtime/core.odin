@@ -425,7 +425,7 @@ Raw_Map :: struct {
 	// Map_Hash directly, though for consistency sake it's written as if it were
 	// an array of Map_Cell(Map_Hash).
 	data:      uintptr,   // 8-bytes on 64-bits, 4-bytes on 32-bits
-	len:       int,       // 8-bytes on 64-bits, 4-bytes on 32-bits
+	len:       uintptr,   // 8-bytes on 64-bits, 4-bytes on 32-bits
 	allocator: Allocator, // 16-bytes on 64-bits, 8-bytes on 32-bits
 }
 
@@ -471,7 +471,7 @@ Odin_OS_Type :: type_of(ODIN_OS)
 		arm32,
 		arm64,
 		wasm32,
-		wasm64,
+		wasm64p32,
 	}
 */
 Odin_Arch_Type :: type_of(ODIN_ARCH)

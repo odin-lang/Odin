@@ -518,7 +518,7 @@ gb_internal bool lb_is_matrix_simdable(Type *t) {
 				return true;
 			case TargetArch_i386:
 			case TargetArch_wasm32:
-			case TargetArch_wasm64:
+			case TargetArch_wasm64p32:
 				return false;
 			}
 		}
@@ -4230,11 +4230,12 @@ gb_internal lbAddr lb_build_addr_compound_lit(lbProcedure *p, Ast *expr) {
 				lbValue count = {};
 				count.type = t_int;
 
+				unsigned len_index = lb_convert_struct_index(p->module, type, 1);
 				if (lb_is_const(slice)) {
-					unsigned indices[1] = {1};
+					unsigned indices[1] = {len_index};
 					count.value = LLVMConstExtractValue(slice.value, indices, gb_count_of(indices));
 				} else {
-					count.value = LLVMBuildExtractValue(p->builder, slice.value, 1, "");
+					count.value = LLVMBuildExtractValue(p->builder, slice.value, len_index, "");
 				}
 				lb_fill_slice(p, v, data, count);
 			}
