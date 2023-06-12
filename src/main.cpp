@@ -675,7 +675,7 @@ enum BuildFlagKind {
 	BuildFlag_StrictStyle,
 	BuildFlag_StrictStyleInitOnly,
 	BuildFlag_ForeignErrorProcedures,
-	BuildFlag_DisallowRTTI,
+	BuildFlag_NoRTTI,
 	BuildFlag_DynamicMapCalls,
 
 	BuildFlag_Compact,
@@ -854,7 +854,8 @@ gb_internal bool parse_build_flags(Array<String> args) {
 	add_flag(&build_flags, BuildFlag_StrictStyleInitOnly,     str_lit("strict-style-init-only"),    BuildFlagParam_None,    Command__does_check);
 	add_flag(&build_flags, BuildFlag_ForeignErrorProcedures,  str_lit("foreign-error-procedures"),  BuildFlagParam_None,    Command__does_check);
 
-	add_flag(&build_flags, BuildFlag_DisallowRTTI,            str_lit("disallow-rtti"),             BuildFlagParam_None,    Command__does_check);
+	add_flag(&build_flags, BuildFlag_NoRTTI,                  str_lit("no-rtti"),                   BuildFlagParam_None,    Command__does_check);
+	add_flag(&build_flags, BuildFlag_NoRTTI,                  str_lit("disallow-rtti"),             BuildFlagParam_None,    Command__does_check);
 
 	add_flag(&build_flags, BuildFlag_DynamicMapCalls,         str_lit("dynamic-map-calls"),         BuildFlagParam_None,    Command__does_check);
 
@@ -1448,7 +1449,11 @@ gb_internal bool parse_build_flags(Array<String> args) {
 						case BuildFlag_DisallowDo:
 							build_context.disallow_do = true;
 							break;
-						case BuildFlag_DisallowRTTI:
+						case BuildFlag_NoRTTI:
+							if (name == "disallow-rtti") {
+								gb_printf_err("'-disallow-rtti' has been replaced with '-no-rtti'\n");
+								bad_flags = true;
+							}
 							build_context.disallow_rtti = true;
 							break;
 						case BuildFlag_DynamicMapCalls:
