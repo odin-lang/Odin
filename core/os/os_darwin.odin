@@ -355,7 +355,7 @@ in6_addr :: struct #packed {
 
 Timeval :: struct {
 	seconds: i64,
-	nanoseconds: int,
+	microseconds: int,
 }
 
 Linger :: struct {
@@ -965,8 +965,8 @@ _processor_core_count :: proc() -> int {
 
 _alloc_command_line_arguments :: proc() -> []string {
 	res := make([]string, len(runtime.args__))
-	for arg, i in runtime.args__ {
-		res[i] = string(arg)
+	for _, i in res {
+		res[i] = string(runtime.args__[i])
 	}
 	return res
 }

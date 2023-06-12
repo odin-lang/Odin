@@ -3,7 +3,7 @@ package runtime
 import "core:intrinsics"
 
 @(private="file")
-IS_WASM :: ODIN_ARCH == .wasm32 || ODIN_ARCH == .wasm64
+IS_WASM :: ODIN_ARCH == .wasm32 || ODIN_ARCH == .wasm64p32
 
 @(private)
 RUNTIME_LINKAGE :: "strong" when (

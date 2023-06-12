@@ -2,7 +2,6 @@
 //+private
 package thread
 
-import "core:runtime"
 import "core:intrinsics"
 import "core:sync"
 import win32 "core:sys/windows"
@@ -26,24 +25,28 @@ _thread_priority_map := [Thread_Priority]i32{
 	.High = +2,
 }
 
-_create :: proc(procedure: Thread_Proc, priority := Thread_Priority.Normal) -> ^Thread {
+_create :: proc(procedure: Thread_Proc, priority: Thread_Priority) -> ^Thread {
 	win32_thread_id: win32.DWORD
 
 	__windows_thread_entry_proc :: proc "stdcall" (t_: rawptr) -> win32.DWORD {
 		t := (^Thread)(t_)
-		context = t.init_context.? or_else runtime.default_context()
-		
+
 		t.id = sync.current_thread_id()
 
-		t.procedure(t)
+		{
+			init_context := t.init_context
+
+			// NOTE(tetra, 2023-05-31): Must do this AFTER thread.start() is called, so that the user can set the init_context, etc!
+			// Here on Windows, the thread is created in a suspended state, and so we can select the context anywhere before the call
+			// to t.procedure().
+			context = _select_context_for_thread(init_context)
+			defer _maybe_destroy_default_temp_allocator(init_context)
+
+			t.procedure(t)
+		}
 
 		intrinsics.atomic_store(&t.flags, t.flags + {.Done})
 
-		if t.init_context == nil {
-			if context.temp_allocator.data == &runtime.global_default_temp_allocator_data {
-				runtime.default_temp_allocator_destroy(auto_cast context.temp_allocator.data)
-			}
-		}
 		return 0
 	}
 

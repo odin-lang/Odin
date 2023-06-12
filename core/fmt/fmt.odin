@@ -1142,6 +1142,11 @@ _pad :: proc(fi: ^Info, s: string) {
 	if fi.minus { // right pad
 		io.write_string(fi.writer, s, &fi.n)
 		fmt_write_padding(fi, width)
+	} else if !fi.space && s != "" && s[0] == '-' {
+		// left pad accounting for zero pad of negative number
+		io.write_byte(fi.writer, '-', &fi.n)
+		fmt_write_padding(fi, width)
+		io.write_string(fi.writer, s[1:], &fi.n)
 	} else { // left pad
 		fmt_write_padding(fi, width)
 		io.write_string(fi.writer, s, &fi.n)
@@ -1961,11 +1966,22 @@ fmt_named :: proc(fi: ^Info, v: any, verb: rune, info: runtime.Type_Info_Named) 
 	switch a in v {
 	case runtime.Source_Code_Location:
 		io.write_string(fi.writer, a.file_path, &fi.n)
-		io.write_byte(fi.writer, '(', &fi.n)
-		io.write_int(fi.writer, int(a.line), 10, &fi.n)
-		io.write_byte(fi.writer, ':', &fi.n)
-		io.write_int(fi.writer, int(a.column), 10, &fi.n)
-		io.write_byte(fi.writer, ')', &fi.n)
+
+		when ODIN_ERROR_POS_STYLE == .Default {
+			io.write_byte(fi.writer, '(', &fi.n)
+			io.write_int(fi.writer, int(a.line), 10, &fi.n)
+			io.write_byte(fi.writer, ':', &fi.n)
+			io.write_int(fi.writer, int(a.column), 10, &fi.n)
+			io.write_byte(fi.writer, ')', &fi.n)
+		} else when ODIN_ERROR_POS_STYLE == .Unix {
+			io.write_byte(fi.writer, ':', &fi.n)
+			io.write_int(fi.writer, int(a.line), 10, &fi.n)
+			io.write_byte(fi.writer, ':', &fi.n)
+			io.write_int(fi.writer, int(a.column), 10, &fi.n)
+			io.write_byte(fi.writer, ':', &fi.n)
+		} else {
+			#panic("Unhandled ODIN_ERROR_POS_STYLE")
+		}
 		return
 
 	case time.Duration:

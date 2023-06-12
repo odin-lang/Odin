@@ -1812,7 +1812,7 @@ gb_internal void lb_build_return_stmt_internal(lbProcedure *p, lbValue res) {
 		if (res.value != nullptr) {
 			LLVMValueRef res_val = res.value;
 			i64 sz = type_size_of(res.type);
-			if (LLVMIsALoadInst(res_val) && sz > build_context.word_size) {
+			if (LLVMIsALoadInst(res_val) && sz > build_context.int_size) {
 				lbValue ptr = lb_address_from_load_or_generate_local(p, res);
 				lb_mem_copy_non_overlapping(p, p->return_ptr.addr, ptr, lb_const_int(p->module, t_int, sz));
 			} else {
@@ -2463,6 +2463,7 @@ gb_internal void lb_build_stmt(lbProcedure *p, Ast *node) {
 							lb_add_entity(p->module, e, val);
 							lb_add_debug_local_variable(p, val.value, e->type, e->token);
 							lvals_preused[lval_index] = true;
+							lvals[lval_index] = *comp_lit_addr;
 						}
 					}
 				}
@@ -2470,6 +2471,7 @@ gb_internal void lb_build_stmt(lbProcedure *p, Ast *node) {
 				lval_index += lb_append_tuple_values(p, &inits, init);
 			}
 			GB_ASSERT(lval_index == lvals.count);
+
 
 			for_array(i, vd->names) {
 				Ast *name = vd->names[i];
