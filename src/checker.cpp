@@ -32,7 +32,7 @@ gb_internal bool is_operand_uninit(Operand o) {
 }
 
 gb_internal bool check_rtti_type_disallowed(Token const &token, Type *type, char const *format) {
-	if (build_context.disallow_rtti && type) {
+	if (build_context.no_rtti && type) {
 		if (is_type_any(type)) {
 			gbString t = type_to_string(type);
 			error(token, format, t);
@@ -1054,7 +1054,7 @@ gb_internal void init_universal(void) {
 	add_global_bool_constant("ODIN_TEST",                     bc->command_kind == Command_test);
 	add_global_bool_constant("ODIN_NO_ENTRY_POINT",           bc->no_entry_point);
 	add_global_bool_constant("ODIN_FOREIGN_ERROR_PROCEDURES", bc->ODIN_FOREIGN_ERROR_PROCEDURES);
-	add_global_bool_constant("ODIN_DISALLOW_RTTI",            bc->disallow_rtti);
+	add_global_bool_constant("ODIN_NO_RTTI",            bc->no_rtti);
 
 	add_global_bool_constant("ODIN_VALGRIND_SUPPORT",         bc->ODIN_VALGRIND_SUPPORT);
 
@@ -1742,7 +1742,7 @@ gb_internal void add_implicit_entity(CheckerContext *c, Ast *clause, Entity *e) 
 
 gb_internal void add_type_info_type_internal(CheckerContext *c, Type *t);
 gb_internal void add_type_info_type(CheckerContext *c, Type *t) {
-	if (build_context.disallow_rtti) {
+	if (build_context.no_rtti) {
 		return;
 	}
 	if (t == nullptr) {
@@ -2343,7 +2343,7 @@ gb_internal void generate_minimum_dependency_set(Checker *c, Entity *start) {
 		str_lit("__multi3"),
 	);
 
-	FORCE_ADD_RUNTIME_ENTITIES(!build_context.disallow_rtti,
+	FORCE_ADD_RUNTIME_ENTITIES(!build_context.no_rtti,
 		// Odin types
 		str_lit("Type_Info"),
 

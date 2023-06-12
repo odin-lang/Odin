@@ -309,7 +309,7 @@ struct BuildContext {
 	
 	bool   copy_file_contents;
 
-	bool   disallow_rtti;
+	bool   no_rtti;
 
 	bool   dynamic_map_calls;
 
@@ -1227,8 +1227,8 @@ gb_internal void init_build_context(TargetMetrics *cross_target) {
 	if (bc->metrics.os == TargetOs_freestanding) {
 		bc->no_entry_point = true;
 	} else {
-		if (bc->disallow_rtti) {
-			gb_printf_err("-disallow-rtti is only allowed on freestanding targets\n");
+		if (bc->no_rtti) {
+			gb_printf_err("-no-rtti is only allowed on freestanding targets\n");
 			gb_exit(1);
 		}
 	}

@@ -15,7 +15,7 @@ gb_internal isize lb_type_info_index(CheckerInfo *info, Type *type, bool err_on_
 }
 
 gb_internal lbValue lb_typeid(lbModule *m, Type *type) {
-	GB_ASSERT(!build_context.disallow_rtti);
+	GB_ASSERT(!build_context.no_rtti);
 
 	type = default_type(type);
 
@@ -92,7 +92,7 @@ gb_internal lbValue lb_typeid(lbModule *m, Type *type) {
 }
 
 gb_internal lbValue lb_type_info(lbModule *m, Type *type) {
-	GB_ASSERT(!build_context.disallow_rtti);
+	GB_ASSERT(!build_context.no_rtti);
 
 	type = default_type(type);
 
@@ -141,7 +141,7 @@ gb_internal lbValue lb_type_info_member_tags_offset(lbProcedure *p, isize count)
 
 
 gb_internal void lb_setup_type_info_data(lbProcedure *p) { // NOTE(bill): Setup type_info data
-	if (build_context.disallow_rtti) {
+	if (build_context.no_rtti) {
 		return;
 	}
 

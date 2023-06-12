@@ -1048,7 +1048,7 @@ struct lbGlobalVariable {
 };
 
 gb_internal lbProcedure *lb_create_startup_type_info(lbModule *m) {
-	if (build_context.disallow_rtti) {
+	if (build_context.no_rtti) {
 		return nullptr;
 	}
 	Type *proc_type = alloc_type_proc(nullptr, nullptr, 0, nullptr, 0, false, ProcCC_CDecl);
@@ -2170,7 +2170,7 @@ gb_internal bool lb_generate_code(lbGenerator *gen) {
 
 	TIME_SECTION("LLVM Global Variables");
 
-	if (!build_context.disallow_rtti) {
+	if (!build_context.no_rtti) {
 		lbModule *m = default_module;
 
 		{ // Add type info data

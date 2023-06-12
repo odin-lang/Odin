@@ -566,7 +566,7 @@ __type_info_of :: proc "contextless" (id: typeid) -> ^Type_Info #no_bounds_check
 	return &type_table[n]
 }
 
-when !ODIN_DISALLOW_RTTI {
+when !ODIN_NO_RTTI {
 	typeid_base :: proc "contextless" (id: typeid) -> typeid {
 		ti := type_info_of(id)
 		ti = type_info_base(ti)
