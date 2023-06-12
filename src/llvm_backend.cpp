@@ -157,10 +157,10 @@ gb_internal lbValue lb_equal_proc_for_type(lbModule *m, Type *type) {
 		return {compare_proc->value, compare_proc->type};
 	}
 
-	static u32 proc_index = 0;
+	static std::atomic<u32> proc_index;
 
 	char buf[32] = {};
-	isize n = gb_snprintf(buf, 32, "__$equal%u", ++proc_index);
+	isize n = gb_snprintf(buf, 32, "__$equal%u", 1+proc_index.fetch_add(1));
 	char *str = gb_alloc_str_len(permanent_allocator(), buf, n-1);
 	String proc_name = make_string_c(str);
 
@@ -656,10 +656,10 @@ gb_internal lbValue lb_map_set_proc_for_type(lbModule *m, Type *type) {
 		GB_ASSERT(*found != nullptr);
 		return {(*found)->value, (*found)->type};
 	}
-	static u32 proc_index = 0;
+	static std::atomic<u32> proc_index;
 
 	char buf[32] = {};
-	isize n = gb_snprintf(buf, 32, "__$map_set-%u", ++proc_index);
+	isize n = gb_snprintf(buf, 32, "__$map_set-%u", 1+proc_index.fetch_add(1));
 	char *str = gb_alloc_str_len(permanent_allocator(), buf, n-1);
 	String proc_name = make_string_c(str);
 
@@ -774,7 +774,8 @@ gb_internal lbValue lb_map_set_proc_for_type(lbModule *m, Type *type) {
 
 
 gb_internal lbValue lb_generate_anonymous_proc_lit(lbModule *m, String const &prefix_name, Ast *expr, lbProcedure *parent) {
-	MUTEX_GUARD(&m->gen->anonymous_proc_lits_mutex);
+	mutex_lock(&m->gen->anonymous_proc_lits_mutex);
+	defer (mutex_unlock(&m->gen->anonymous_proc_lits_mutex));
 
 	lbProcedure **found = map_get(&m->gen->anonymous_proc_lits, expr);
 	if (found) {
@@ -788,7 +789,7 @@ gb_internal lbValue lb_generate_anonymous_proc_lit(lbModule *m, String const &pr
 	isize name_len = prefix_name.len + 6 + 11;
 	char *name_text = gb_alloc_array(permanent_allocator(), char, name_len);
 	static std::atomic<i32> name_id;
-	name_len = gb_snprintf(name_text, name_len, "%.*s$anon-%d", LIT(prefix_name), name_id.fetch_add(1));
+	name_len = gb_snprintf(name_text, name_len, "%.*s$anon-%d", LIT(prefix_name), 1+name_id.fetch_add(1));
 	String name = make_string((u8 *)name_text, name_len-1);
 
 	Type *type = type_of_expr(expr);
