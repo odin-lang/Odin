@@ -201,7 +201,7 @@ struct lbGenerator {
 	PtrMap<LLVMContextRef, lbModule *> modules_through_ctx; 
 	lbModule default_module;
 
-	BlockingMutex anonymous_proc_lits_mutex;
+	RecursiveMutex anonymous_proc_lits_mutex;
 	PtrMap<Ast *, lbProcedure *> anonymous_proc_lits; 
 
 	BlockingMutex foreign_mutex;
@@ -544,6 +544,8 @@ gb_internal gb_inline i64 lb_max_zero_init_size(void) {
 
 gb_internal LLVMTypeRef OdinLLVMGetArrayElementType(LLVMTypeRef type);
 gb_internal LLVMTypeRef OdinLLVMGetVectorElementType(LLVMTypeRef type);
+
+gb_internal String lb_filepath_ll_for_module(lbModule *m);
 
 #define LB_STARTUP_RUNTIME_PROC_NAME   "__$startup_runtime"
 #define LB_CLEANUP_RUNTIME_PROC_NAME   "__$cleanup_runtime"

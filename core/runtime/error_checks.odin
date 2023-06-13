@@ -122,7 +122,7 @@ matrix_bounds_check_error :: proc "contextless" (file: string, line, column: i32
 }
 
 
-when ODIN_DISALLOW_RTTI {
+when ODIN_NO_RTTI {
 	type_assertion_check :: proc "contextless" (ok: bool, file: string, line, column: i32) {
 		if ok {
 			return

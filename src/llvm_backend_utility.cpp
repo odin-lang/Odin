@@ -721,7 +721,7 @@ gb_internal lbValue lb_emit_union_cast(lbProcedure *p, lbValue value, Type *type
 		Type *dst_type = tuple->Tuple.variables[0]->type;
 
 		isize arg_count = 7;
-		if (build_context.disallow_rtti) {
+		if (build_context.no_rtti) {
 			arg_count = 4;
 		}
 
@@ -733,7 +733,7 @@ gb_internal lbValue lb_emit_union_cast(lbProcedure *p, lbValue value, Type *type
 		args[2] = lb_const_int(m, t_i32, pos.line);
 		args[3] = lb_const_int(m, t_i32, pos.column);
 
-		if (!build_context.disallow_rtti) {
+		if (!build_context.no_rtti) {
 			args[4] = lb_typeid(m, src_type);
 			args[5] = lb_typeid(m, dst_type);
 			args[6] = lb_emit_conv(p, value_, t_rawptr);
@@ -797,7 +797,7 @@ gb_internal lbAddr lb_emit_any_cast_addr(lbProcedure *p, lbValue value, Type *ty
 		lbValue ok = lb_emit_load(p, lb_emit_struct_ep(p, v.addr, 1));
 
 		isize arg_count = 7;
-		if (build_context.disallow_rtti) {
+		if (build_context.no_rtti) {
 			arg_count = 4;
 		}
 		auto args = array_make<lbValue>(permanent_allocator(), arg_count);
@@ -807,7 +807,7 @@ gb_internal lbAddr lb_emit_any_cast_addr(lbProcedure *p, lbValue value, Type *ty
 		args[2] = lb_const_int(m, t_i32, pos.line);
 		args[3] = lb_const_int(m, t_i32, pos.column);
 
-		if (!build_context.disallow_rtti) {
+		if (!build_context.no_rtti) {
 			args[4] = any_typeid;
 			args[5] = dst_typeid;
 			args[6] = lb_emit_struct_ev(p, value, 0);
