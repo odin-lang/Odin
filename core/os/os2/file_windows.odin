@@ -287,7 +287,7 @@ _read :: proc(f: ^File, p: []byte) -> (n: int, err: Error) {
 		}
 	}
 
-	return int(total_read), nil
+	return int(total_read), err
 }
 
 _read_at :: proc(f: ^File, p: []byte, offset: i64) -> (n: int, err: Error) {
