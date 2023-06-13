@@ -2984,7 +2984,7 @@ gb_internal lbValue lb_build_unary_and(lbProcedure *p, Ast *expr) {
 
 
 					isize arg_count = 6;
-					if (build_context.disallow_rtti) {
+					if (build_context.no_rtti) {
 						arg_count = 4;
 					}
 
@@ -2996,7 +2996,7 @@ gb_internal lbValue lb_build_unary_and(lbProcedure *p, Ast *expr) {
 					args[2] = lb_const_int(p->module, t_i32, pos.line);
 					args[3] = lb_const_int(p->module, t_i32, pos.column);
 
-					if (!build_context.disallow_rtti) {
+					if (!build_context.no_rtti) {
 						args[4] = lb_typeid(p->module, src_type);
 						args[5] = lb_typeid(p->module, dst_type);
 					}
@@ -3012,7 +3012,7 @@ gb_internal lbValue lb_build_unary_and(lbProcedure *p, Ast *expr) {
 				}
 				lbValue data_ptr = lb_emit_struct_ev(p, v, 0);
 				if ((p->state_flags & StateFlag_no_type_assert) == 0) {
-					GB_ASSERT(!build_context.disallow_rtti);
+					GB_ASSERT(!build_context.no_rtti);
 
 					lbValue any_id = lb_emit_struct_ev(p, v, 1);
 

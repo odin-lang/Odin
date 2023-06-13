@@ -2063,7 +2063,7 @@ gb_internal bool check_builtin_procedure(CheckerContext *c, Operand *operand, As
 		if (c->scope->flags&ScopeFlag_Global) {
 			compiler_error("'type_info_of' Cannot be declared within the runtime package due to how the internals of the compiler works");
 		}
-		if (build_context.disallow_rtti) {
+		if (build_context.no_rtti) {
 			error(call, "'%.*s' has been disallowed", LIT(builtin_name));
 			return false;
 		}
@@ -2106,7 +2106,7 @@ gb_internal bool check_builtin_procedure(CheckerContext *c, Operand *operand, As
 		if (c->scope->flags&ScopeFlag_Global) {
 			compiler_error("'typeid_of' Cannot be declared within the runtime package due to how the internals of the compiler works");
 		}
-		if (build_context.disallow_rtti) {
+		if (build_context.no_rtti) {
 			error(call, "'%.*s' has been disallowed", LIT(builtin_name));
 			return false;
 		}
