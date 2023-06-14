@@ -729,6 +729,12 @@ gb_internal void check_union_type(CheckerContext *ctx, Type *union_type, Ast *no
 	union_type->Union.kind = ut->kind;
 	switch (ut->kind) {
 	case UnionType_no_nil:
+		if (union_type->Union.is_polymorphic && poly_operands == nullptr) {
+			GB_ASSERT(variants.count == 0);
+			if (ut->variants.count != 1) {
+				break;
+			}
+		}
 		if (variants.count < 2) {
 			error(ut->align, "A union with #no_nil must have at least 2 variants");
 		}
