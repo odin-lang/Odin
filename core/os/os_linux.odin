@@ -1099,17 +1099,17 @@ fcntl :: proc(fd: int, cmd: int, arg: int) -> (int, Errno) {
 }
 
 poll :: proc(fds: [^]pollfd, nfds: nfds_t, timeout: int) -> (int, Errno) {
-  result := unix.sys_poll(fds, uint(nfds), timeout)
-  if result < 0 {
-    return 0, _get_errno(result)
-  }
-  return result, ERROR_NONE
+	result := unix.sys_poll(fds, uint(nfds), timeout)
+	if result < 0 {
+		return 0, _get_errno(result)
+	}
+	return result, ERROR_NONE
 }
 
 ppoll :: proc(fds: [^]pollfd, nfds: nfds_t, timeout: ^unix.timespec, sigmask: ^sigset_t) -> (int, Errno) {
-  result := unix.sys_ppoll(fds, uint(nfds), timeout, sigmask, size_of(sigset_t))
-  if result < 0 {
-    return 0, _get_errno(result)
-  }
-  return result, ERROR_NONE
+	result := unix.sys_ppoll(fds, uint(nfds), timeout, sigmask, size_of(sigset_t))
+	if result < 0 {
+		return 0, _get_errno(result)
+	}
+	return result, ERROR_NONE
 }
