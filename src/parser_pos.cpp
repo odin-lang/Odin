@@ -41,7 +41,11 @@ gb_internal Token ast_token(Ast *node) {
 	case Ast_MatrixIndexExpr:    return node->MatrixIndexExpr.open;
 	case Ast_SliceExpr:          return node->SliceExpr.open;
 	case Ast_Ellipsis:           return node->Ellipsis.token;
-	case Ast_FieldValue:         return node->FieldValue.eq;
+	case Ast_FieldValue:
+		if (node->FieldValue.field) {
+			return ast_token(node->FieldValue.field);
+		}
+		return node->FieldValue.eq;
 	case Ast_EnumFieldValue:     return ast_token(node->EnumFieldValue.name);
 	case Ast_DerefExpr:          return node->DerefExpr.op;
 	case Ast_TernaryIfExpr:      return ast_token(node->TernaryIfExpr.x);

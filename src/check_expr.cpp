@@ -14,6 +14,7 @@ enum CallArgumentError {
 	CallArgumentError_ParameterMissing,
 	CallArgumentError_DuplicateParameter,
 	CallArgumentError_NoneConstantParameter,
+	CallArgumentError_OutOfOrderParameters,
 
 	CallArgumentError_MAX,
 };
@@ -121,6 +122,7 @@ gb_internal void check_or_return_split_types(CheckerContext *c, Operand *x, Stri
 
 gb_internal bool is_diverging_expr(Ast *expr);
 
+gb_internal CallArgumentError check_order_of_call_arguments(CheckerContext *c, Type *proc_type, Ast *call, Slice<Ast *> const &args, bool show_error);
 
 enum LoadDirectiveResult {
 	LoadDirective_Success  = 0,
@@ -5604,6 +5606,10 @@ gb_internal CALL_ARGUMENT_CHECKER(check_named_call_arguments) {
 		}
 	});
 
+	if (check_order_of_call_arguments(c, proc_type, call, ce->args, show_error)) {
+		return CallArgumentError_OutOfOrderParameters;
+	}
+
 	for_array(i, ce->args) {
 		Ast *arg = ce->args[i];
 		ast_node(fv, FieldValue, arg);
@@ -5867,6 +5873,99 @@ gb_internal bool evaluate_where_clauses(CheckerContext *ctx, Ast *call_expr, Sco
 	return true;
 }
 
+gb_internal CallArgumentError check_order_of_call_arguments(CheckerContext *c, Type *proc_type, Ast *call, Slice<Ast *> const &args, bool show_error) {
+	CallArgumentError err = CallArgumentError_None;
+
+	if (proc_type == nullptr || !is_type_proc(proc_type)) {
+		// ignore for the time being
+		return err;
+	}
+
+	ast_node(ce, CallExpr, call);
+	if (!is_call_expr_field_value(ce)) {
+		return err;
+	}
+
+	TypeProc *pt = &base_type(proc_type)->Proc;
+	isize param_count = pt->param_count;
+
+	TEMPORARY_ALLOCATOR_GUARD();
+
+	auto arg_order_indices = slice_make<isize>(temporary_allocator(), args.count);
+	auto visited = slice_make<bool>(temporary_allocator(), param_count);
+
+	for_array(i, args) {
+		Ast *arg = args[i];
+		ast_node(fv, FieldValue, arg);
+
+		Ast *field = fv->field;
+		String name = {};
+		if (field != nullptr && field->kind == Ast_Ident) {
+			name = field->Ident.token.string;
+		} else {
+			err = CallArgumentError_InvalidFieldValue;
+			if (show_error) {
+				gbString s = expr_to_string(arg);
+				error(arg, "Invalid parameter name '%s' in procedure call", s);
+				gb_string_free(s);
+			}
+		}
+
+		isize index = lookup_procedure_parameter(pt, name);
+		if (index < 0) {
+			err = CallArgumentError_InvalidFieldValue;
+			if (show_error) {
+				error(arg, "No parameter named '%.*s' for this procedure type", LIT(name));
+			}
+		}
+		if (visited[index]) {
+			err = CallArgumentError_DuplicateParameter;
+			if (show_error) {
+				error(arg, "Duplicate parameter '%.*s' in procedure call", LIT(name));
+			}
+		}
+		arg_order_indices[i] = index;
+	}
+
+	if (err) {
+		return err;
+	}
+
+	for (isize i = 0; i < arg_order_indices.count-1; i++) {
+		isize a = arg_order_indices[i+0];
+		isize b = arg_order_indices[i+1];
+		GB_ASSERT(a != b);
+		if (a > b) {
+			err = CallArgumentError_OutOfOrderParameters;
+			if (show_error) {
+				Ast *arg_a = args[i+0];
+				Ast *arg_b = args[i+1];
+
+				isize curr_a_order = a;
+				for (isize j = i; j >= 0; j--) {
+					isize j_order = arg_order_indices[j];
+					if (b < j_order && j_order < curr_a_order) {
+						curr_a_order = j_order;
+						arg_a = args[j];
+					}
+				}
+
+
+				ast_node(fv_a, FieldValue, arg_a);
+				ast_node(fv_b, FieldValue, arg_b);
+
+				gbString s_a = expr_to_string(fv_a->field);
+				gbString s_b = expr_to_string(fv_b->field);
+				error(arg_b, "Parameter names out of order, expected '%s' to be called before '%s'", s_b, s_a);
+				gb_string_free(s_b);
+				gb_string_free(s_a);
+			}
+		}
+	}
+
+	return err;
+}
+
 
 gb_internal CallArgumentData check_call_arguments(CheckerContext *c, Operand *operand, Type *proc_type, Ast *call, Slice<Ast *> const &args) {
 	ast_node(ce, CallExpr, call);
@@ -5878,17 +5977,6 @@ gb_internal CallArgumentData check_call_arguments(CheckerContext *c, Operand *op
 	Type *result_type = t_invalid;
 
 	if (is_call_expr_field_value(ce)) {
-		call_checker = check_named_call_arguments;
-
-		operands = array_make<Operand>(heap_allocator(), args.count);
-
-		// NOTE(bill): This is give type hints for the named parameters
-		// in order to improve the type inference system
-
-		StringMap<Type *> type_hint_map = {}; // Key: String
-		string_map_init(&type_hint_map, 2*args.count);
-		defer (string_map_destroy(&type_hint_map));
-
 		Type *ptype = nullptr;
 		bool single_case = true;
 
@@ -5902,6 +5990,27 @@ gb_internal CallArgumentData check_call_arguments(CheckerContext *c, Operand *op
 		} else {
 			ptype = proc_type;
 		}
+
+		if (check_order_of_call_arguments(c, ptype, call, args, true)) {
+			CallArgumentData data = {};
+			data.result_type = t_invalid;
+			if (ptype && is_type_proc(ptype) && !is_type_polymorphic(ptype)) {
+				data.result_type = reduce_tuple_to_single_type(ptype->Proc.results);
+			}
+			return data;
+		}
+
+		call_checker = check_named_call_arguments;
+
+		operands = array_make<Operand>(heap_allocator(), args.count);
+
+		// NOTE(bill): This is give type hints for the named parameters
+		// in order to improve the type inference system
+
+		StringMap<Type *> type_hint_map = {}; // Key: String
+		string_map_init(&type_hint_map, 2*args.count);
+		defer (string_map_destroy(&type_hint_map));
+
 
 		if (single_case) {
 			Type *bptype = base_type(ptype);
