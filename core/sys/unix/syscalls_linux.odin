@@ -1567,6 +1567,23 @@ MADV_HWPOISON    :: 100
 // pipe2 flags
 O_CLOEXEC :: 0o2000000
 
+// poll events
+POLLIN         :: 0x0001
+POLLPRI        :: 0x0002
+POLLOUT        :: 0x0004
+POLLERR        :: 0x0008
+POLLHUP        :: 0x0010
+POLLNVAL       :: 0x0020
+POLLRDNORM     :: 0x0040
+POLLRDBAND     :: 0x0080
+POLLWRNORM     :: 0x0100
+POLLWRBAND     :: 0x0200
+POLLMSG        :: 0x0400
+POLLREMOVE     :: 0x1000
+POLLRDHUP      :: 0x2000
+POLLFREE       :: 0x4000
+POLL_BUSY_LOOP :: 0x8000
+
 // perf event data
 Perf_Sample :: struct #raw_union {
 	period:    u64,
@@ -2055,6 +2072,18 @@ sys_personality :: proc(persona: u64) -> int {
 
 sys_fcntl :: proc "contextless" (fd: int, cmd: int, arg: int) -> int {
 	return int(intrinsics.syscall(SYS_fcntl, uintptr(fd), uintptr(cmd), uintptr(arg)))
+}
+
+sys_select :: proc "contextless" (nfds: int, readfds, writefds, exceptfds: rawptr, timeout: rawptr) -> int {
+  return int(intrinsics.syscall(SYS_select, uintptr(nfds), uintptr(readfds), uintptr(writefds), uintptr(exceptfds), uintptr(timeout)))
+}
+
+sys_poll :: proc "contextless" (fds: rawptr, nfds: uint, timeout: int) -> int {
+  return int(intrinsics.syscall(SYS_poll, uintptr(fds), uintptr(nfds), uintptr(timeout)))
+}
+
+sys_ppoll :: proc "contextless" (fds: rawptr, nfds: uint, timeout: rawptr, sigmask: rawptr, sigsetsize: uint) -> int {
+  return int(intrinsics.syscall(SYS_ppoll, uintptr(fds), uintptr(nfds), uintptr(timeout), uintptr(sigmask), uintptr(sigsetsize)))
 }
 
 get_errno :: proc "contextless" (res: int) -> i32 {
