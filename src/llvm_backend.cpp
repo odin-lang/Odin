@@ -157,10 +157,10 @@ gb_internal lbValue lb_equal_proc_for_type(lbModule *m, Type *type) {
 		return {compare_proc->value, compare_proc->type};
 	}
 
-	static u32 proc_index = 0;
+	static std::atomic<u32> proc_index;
 
 	char buf[32] = {};
-	isize n = gb_snprintf(buf, 32, "__$equal%u", ++proc_index);
+	isize n = gb_snprintf(buf, 32, "__$equal%u", 1+proc_index.fetch_add(1));
 	char *str = gb_alloc_str_len(permanent_allocator(), buf, n-1);
 	String proc_name = make_string_c(str);
 
@@ -656,10 +656,10 @@ gb_internal lbValue lb_map_set_proc_for_type(lbModule *m, Type *type) {
 		GB_ASSERT(*found != nullptr);
 		return {(*found)->value, (*found)->type};
 	}
-	static u32 proc_index = 0;
+	static std::atomic<u32> proc_index;
 
 	char buf[32] = {};
-	isize n = gb_snprintf(buf, 32, "__$map_set-%u", ++proc_index);
+	isize n = gb_snprintf(buf, 32, "__$map_set-%u", 1+proc_index.fetch_add(1));
 	char *str = gb_alloc_str_len(permanent_allocator(), buf, n-1);
 	String proc_name = make_string_c(str);
 
@@ -771,56 +771,6 @@ gb_internal lbValue lb_map_set_proc_for_type(lbModule *m, Type *type) {
 
 	return {p->value, p->type};
 }
-
-
-gb_internal lbValue lb_generate_anonymous_proc_lit(lbModule *m, String const &prefix_name, Ast *expr, lbProcedure *parent) {
-	MUTEX_GUARD(&m->gen->anonymous_proc_lits_mutex);
-
-	lbProcedure **found = map_get(&m->gen->anonymous_proc_lits, expr);
-	if (found) {
-		return lb_find_procedure_value_from_entity(m, (*found)->entity);
-	}
-
-	ast_node(pl, ProcLit, expr);
-
-	// NOTE(bill): Generate a new name
-	// parent$count
-	isize name_len = prefix_name.len + 1 + 8 + 1;
-	char *name_text = gb_alloc_array(permanent_allocator(), char, name_len);
-	i32 name_id = cast(i32)m->gen->anonymous_proc_lits.count;
-
-	name_len = gb_snprintf(name_text, name_len, "%.*s$anon-%d", LIT(prefix_name), name_id);
-	String name = make_string((u8 *)name_text, name_len-1);
-
-	Type *type = type_of_expr(expr);
-
-	Token token = {};
-	token.pos = ast_token(expr).pos;
-	token.kind = Token_Ident;
-	token.string = name;
-	Entity *e = alloc_entity_procedure(nullptr, token, type, pl->tags);
-	e->file = expr->file();
-	e->decl_info = pl->decl;
-	e->code_gen_module = m;
-	e->flags |= EntityFlag_ProcBodyChecked;
-	lbProcedure *p = lb_create_procedure(m, e);
-
-	lbValue value = {};
-	value.value = p->value;
-	value.type = p->type;
-
-	array_add(&m->procedures_to_generate, p);
-	if (parent != nullptr) {
-		array_add(&parent->children, p);
-	} else {
-		string_map_set(&m->members, name, value);
-	}
-
-	map_set(&m->gen->anonymous_proc_lits, expr, p);
-
-	return value;
-}
-
 
 gb_internal lbValue lb_gen_map_cell_info_ptr(lbModule *m, Type *type) {
 	lbAddr *found = map_get(&m->map_cell_info_map, type);
@@ -1048,7 +998,7 @@ struct lbGlobalVariable {
 };
 
 gb_internal lbProcedure *lb_create_startup_type_info(lbModule *m) {
-	if (build_context.disallow_rtti) {
+	if (build_context.no_rtti) {
 		return nullptr;
 	}
 	Type *proc_type = alloc_type_proc(nullptr, nullptr, 0, nullptr, 0, false, ProcCC_CDecl);
@@ -1513,7 +1463,7 @@ gb_internal WORKER_TASK_PROC(lb_generate_missing_procedures_to_check_worker_proc
 	lbModule *m = cast(lbModule *)data;
 	for (isize i = 0; i < m->missing_procedures_to_check.count; i++) {
 		lbProcedure *p = m->missing_procedures_to_check[i];
-		debugf("Generate missing procedure: %.*s\n", LIT(p->name));
+		debugf("Generate missing procedure: %.*s module %p\n", LIT(p->name), m);
 		lb_generate_procedure(m, p);
 	}
 	return 0;
@@ -1576,7 +1526,6 @@ gb_internal void lb_llvm_module_passes(lbGenerator *gen, bool do_threading) {
 	}
 	thread_pool_wait();
 }
-
 
 gb_internal String lb_filepath_ll_for_module(lbModule *m) {
 	String path = concatenate3_strings(permanent_allocator(),
@@ -2170,7 +2119,7 @@ gb_internal bool lb_generate_code(lbGenerator *gen) {
 
 	TIME_SECTION("LLVM Global Variables");
 
-	if (!build_context.disallow_rtti) {
+	if (!build_context.no_rtti) {
 		lbModule *m = default_module;
 
 		{ // Add type info data

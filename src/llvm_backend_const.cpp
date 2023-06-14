@@ -473,6 +473,7 @@ gb_internal lbValue lb_const_value(lbModule *m, Type *type, ExactValue value, bo
 	if (value.kind == ExactValue_Procedure) {
 		lbValue res = {};
 		Ast *expr = unparen_expr(value.value_procedure);
+		GB_ASSERT(expr != nullptr);
 		if (expr->kind == Ast_ProcLit) {
 			res = lb_generate_anonymous_proc_lit(m, str_lit("_proclit"), expr);
 		} else {
