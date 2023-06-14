@@ -1100,14 +1100,6 @@ fcntl :: proc(fd: int, cmd: int, arg: int) -> (int, Errno) {
 	return result, ERROR_NONE
 }
 
-// select :: proc(nfds: int, readfds: ^fd_set, writefds: ^fd_set, exceptfds: ^fd_set, timeout: ^timeval) -> (int, Errno) {
-//   result := unix.sys_select(nfds, readfds, writefds, exceptfds, timeout)
-//   if result < 0 {
-//     return 0, _get_errno(result)
-//   }
-//   return result, ERROR_NONE
-// }
-
 poll :: proc(fds: [^]pollfd, nfds: nfds_t, timeout: int) -> (int, Errno) {
   result := unix.sys_poll(fds, uint(nfds), timeout)
   if result < 0 {
