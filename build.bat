@@ -76,8 +76,9 @@ set libs= ^
 	kernel32.lib ^
 	Synchronization.lib ^
 	bin\llvm\windows\LLVM-C.lib
-set res= ^
-	misc\odin.res
+
+set iconrc=misc\odin.rc
+set res=misc\odin.res
 
 set linker_flags= -incremental:no -opt:ref -subsystem:console
 
@@ -93,14 +94,14 @@ set linker_settings=%libs% %res% %linker_flags%
 del *.pdb > NUL 2> NUL
 del *.ilk > NUL 2> NUL
 
-rc misc/odin.rc
+rc %iconrc%
 cl %compiler_settings% "src\main.cpp" "src\libtommath.cpp" /link %linker_settings% -OUT:%exe_name%
 if %errorlevel% neq 0 goto end_of_build
 
 call build_vendor.bat
 if %errorlevel% neq 0 goto end_of_build
 
-if %release_mode% EQU 0 odin run examples/demo
+if %release_mode% EQU 0 odin run examples/demo -resource:%iconrc%
 
 del *.obj > NUL 2> NUL
 
