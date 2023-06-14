@@ -2074,13 +2074,9 @@ sys_fcntl :: proc "contextless" (fd: int, cmd: int, arg: int) -> int {
 	return int(intrinsics.syscall(SYS_fcntl, uintptr(fd), uintptr(cmd), uintptr(arg)))
 }
 
-sys_select :: proc "contextless" (nfds: int, readfds, writefds, exceptfds: rawptr, timeout: rawptr) -> int {
-  return int(intrinsics.syscall(SYS_select, uintptr(nfds), uintptr(readfds), uintptr(writefds), uintptr(exceptfds), uintptr(timeout)))
-}
-
 sys_poll :: proc "contextless" (fds: rawptr, nfds: uint, timeout: int) -> int {
   // NOTE: specialcased here because `arm64` does not have `poll`
-	when ODIN_ARCH != .arm64 {
+	when ODIN_ARCH == .arm64 {
     // redefined because we can't depend on the `unix` module here
     timespec :: struct {
       tv_sec: i64,
