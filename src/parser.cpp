@@ -2777,8 +2777,6 @@ gb_internal Ast *parse_call_expr(AstFile *f, Ast *operand) {
 
 			Ast *value = parse_value(f);
 			arg = ast_field_value(f, arg, value, eq);
-
-
 		}
 		array_add(&args, arg);
 

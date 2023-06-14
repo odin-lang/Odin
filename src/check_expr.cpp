@@ -6849,6 +6849,34 @@ gb_internal CallArgumentError check_polymorphic_record_type(CheckerContext *c, O
 
 
 
+// returns true on failure
+gb_internal bool check_call_parameter_mixture(Operand *operand, Slice<Ast *> const &args, char const *context) {
+	bool failure = false;
+	if (args.count > 0) {
+		bool first_is_field_value = (args[0]->kind == Ast_FieldValue);
+		for (Ast *arg : args) {
+			bool mix = false;
+			if (first_is_field_value) {
+				mix = arg->kind != Ast_FieldValue;
+			} else {
+				mix = arg->kind == Ast_FieldValue;
+			}
+			if (mix) {
+				error(arg, "Mixture of 'field = value' and value elements in a %s is not allowed", context);
+				failure = true;
+			}
+		}
+
+	}
+	return failure;
+}
+
+#define CHECK_CALL_PARAMETER_MIXTURE_OR_RETURN(context_) if (check_call_parameter_mixture(operand, args, "procedure call")) { \
+	operand->mode = Addressing_Invalid; \
+	operand->expr = call; \
+	return Expr_Stmt; \
+}
+
 
 gb_internal ExprKind check_call_expr(CheckerContext *c, Operand *operand, Ast *call, Ast *proc, Slice<Ast *> const &args, ProcInlining inlining, Type *type_hint) {
 	if (proc != nullptr &&
@@ -6888,30 +6916,8 @@ gb_internal ExprKind check_call_expr(CheckerContext *c, Operand *operand, Ast *c
 		}
 	}
 
-	if (args.count > 0) {
-		bool fail = false;
-		bool first_is_field_value = (args[0]->kind == Ast_FieldValue);
-		for (Ast *arg : args) {
-			bool mix = false;
-			if (first_is_field_value) {
-				mix = arg->kind != Ast_FieldValue;
-			} else {
-				mix = arg->kind == Ast_FieldValue;
-			}
-			if (mix) {
-				error(arg, "Mixture of 'field = value' and value elements in a procedure call is not allowed");
-				fail = true;
-			}
-		}
-
-		if (fail) {
-			operand->mode = Addressing_Invalid;
-			operand->expr = call;
-			return Expr_Stmt;
-		}
-	}
-
 	if (operand->mode == Addressing_Invalid) {
+		CHECK_CALL_PARAMETER_MIXTURE_OR_RETURN("procedure call");
 		for (Ast *arg : args) {
 			if (arg->kind == Ast_FieldValue) {
 				arg = arg->FieldValue.value;
@@ -6926,6 +6932,8 @@ gb_internal ExprKind check_call_expr(CheckerContext *c, Operand *operand, Ast *c
 	if (operand->mode == Addressing_Type) {
 		Type *t = operand->type;
 		if (is_type_polymorphic_record(t)) {
+			CHECK_CALL_PARAMETER_MIXTURE_OR_RETURN("polymorphic type construction");
+
 			if (!is_type_named(t)) {
 				gbString s = expr_to_string(operand->expr);
 				error(call, "Illegal use of an unnamed polymorphic record, %s", s);
@@ -6951,6 +6959,8 @@ gb_internal ExprKind check_call_expr(CheckerContext *c, Operand *operand, Ast *c
 				operand->type = t_invalid;
 			}
 		} else {
+			CHECK_CALL_PARAMETER_MIXTURE_OR_RETURN("type conversion");
+
 			operand->mode = Addressing_Invalid;
 			isize arg_count = args.count;
 			switch (arg_count) {
@@ -6996,6 +7006,8 @@ gb_internal ExprKind check_call_expr(CheckerContext *c, Operand *operand, Ast *c
 	}
 
 	if (operand->mode == Addressing_Builtin) {
+		CHECK_CALL_PARAMETER_MIXTURE_OR_RETURN("builtin call");
+
 		i32 id = operand->builtin_id;
 		Entity *e = entity_of_node(operand->expr);
 		if (e != nullptr && e->token.string == "expand_to_tuple") {
@@ -7008,6 +7020,8 @@ gb_internal ExprKind check_call_expr(CheckerContext *c, Operand *operand, Ast *c
 		operand->expr = call;
 		return builtin_procs[id].kind;
 	}
+
+	CHECK_CALL_PARAMETER_MIXTURE_OR_RETURN("procedure call");
 
 	Entity *initial_entity = entity_of_node(operand->expr);
 
@@ -7095,7 +7109,7 @@ gb_internal ExprKind check_call_expr(CheckerContext *c, Operand *operand, Ast *c
 				if (decl->proc_lit) {
 					ast_node(pl, ProcLit, decl->proc_lit);
 					if (pl->inlining == ProcInlining_no_inline) {
-						error(call, "'inline' cannot be applied to a procedure that has be marked as 'no_inline'");
+						error(call, "'#force_inline' cannot be applied to a procedure that has be marked as '#force_no_inline'");
 					}
 				}
 			}
@@ -7108,9 +7122,6 @@ gb_internal ExprKind check_call_expr(CheckerContext *c, Operand *operand, Ast *c
 	operand->expr = call;
 
 	{
-		if (proc_type == t_invalid) {
-			// gb_printf_err("%s\n", expr_to_string(operand->expr));
-		}
 		Type *type = nullptr;
 		if (operand->expr != nullptr && operand->expr->kind == Ast_CallExpr) {
 			type = type_of_expr(operand->expr->CallExpr.proc);
@@ -7127,8 +7138,6 @@ gb_internal ExprKind check_call_expr(CheckerContext *c, Operand *operand, Ast *c
 			}
 		}
 	}
-
-	// add_type_and_value(c, operand->expr, operand->mode, operand->type, operand->value);
 
 	return Expr_Expr;
 }
