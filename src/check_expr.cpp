@@ -101,8 +101,7 @@ gb_internal void     check_struct_type              (CheckerContext *c, Type *st
 gb_internal void     check_union_type               (CheckerContext *c, Type *union_type, Ast *node, Array<Operand> *poly_operands,
                                                      Type *named_type = nullptr, Type *original_type_for_poly = nullptr);
 
-gb_internal CallArgumentData check_call_arguments   (CheckerContext *c, Operand *operand, Type *proc_type, Ast *call);
-gb_internal Type *           check_init_variable    (CheckerContext *c, Entity *e, Operand *operand, String context_name);
+gb_internal Type *   check_init_variable            (CheckerContext *c, Entity *e, Operand *operand, String context_name);
 
 
 gb_internal void check_assignment_error_suggestion(CheckerContext *c, Operand *o, Type *type);
@@ -122,7 +121,7 @@ gb_internal void check_or_return_split_types(CheckerContext *c, Operand *x, Stri
 
 gb_internal bool is_diverging_expr(Ast *expr);
 
-gb_internal CallArgumentError check_order_of_call_arguments(CheckerContext *c, Type *proc_type, Ast *call, Slice<Ast *> const &args, bool show_error);
+gb_internal CallArgumentError check_order_of_call_arguments(CheckerContext *c, Type *proc_type, Ast *call, bool show_error);
 
 enum LoadDirectiveResult {
 	LoadDirective_Success  = 0,
@@ -5606,7 +5605,7 @@ gb_internal CALL_ARGUMENT_CHECKER(check_named_call_arguments) {
 		}
 	});
 
-	if (check_order_of_call_arguments(c, proc_type, call, ce->args, show_error)) {
+	if (check_order_of_call_arguments(c, proc_type, call, show_error)) {
 		return CallArgumentError_OutOfOrderParameters;
 	}
 
@@ -5873,7 +5872,7 @@ gb_internal bool evaluate_where_clauses(CheckerContext *ctx, Ast *call_expr, Sco
 	return true;
 }
 
-gb_internal CallArgumentError check_order_of_call_arguments(CheckerContext *c, Type *proc_type, Ast *call, Slice<Ast *> const &args, bool show_error) {
+gb_internal CallArgumentError check_order_of_call_arguments(CheckerContext *c, Type *proc_type, Ast *call, bool show_error) {
 	CallArgumentError err = CallArgumentError_None;
 
 	if (proc_type == nullptr || !is_type_proc(proc_type)) {
@@ -5891,11 +5890,11 @@ gb_internal CallArgumentError check_order_of_call_arguments(CheckerContext *c, T
 
 	TEMPORARY_ALLOCATOR_GUARD();
 
-	auto arg_order_indices = slice_make<isize>(temporary_allocator(), args.count);
+	auto arg_order_indices = slice_make<isize>(temporary_allocator(), ce->args.count);
 	auto visited = slice_make<bool>(temporary_allocator(), param_count);
 
-	for_array(i, args) {
-		Ast *arg = args[i];
+	for_array(i, ce->args) {
+		Ast *arg = ce->args[i];
 		ast_node(fv, FieldValue, arg);
 
 		Ast *field = fv->field;
@@ -5938,15 +5937,15 @@ gb_internal CallArgumentError check_order_of_call_arguments(CheckerContext *c, T
 		if (a > b) {
 			err = CallArgumentError_OutOfOrderParameters;
 			if (show_error) {
-				Ast *arg_a = args[i+0];
-				Ast *arg_b = args[i+1];
+				Ast *arg_a = ce->args[i+0];
+				Ast *arg_b = ce->args[i+1];
 
 				isize curr_a_order = a;
 				for (isize j = i; j >= 0; j--) {
 					isize j_order = arg_order_indices[j];
 					if (b < j_order && j_order < curr_a_order) {
 						curr_a_order = j_order;
-						arg_a = args[j];
+						arg_a = ce->args[j];
 					}
 				}
 
@@ -5967,15 +5966,18 @@ gb_internal CallArgumentError check_order_of_call_arguments(CheckerContext *c, T
 }
 
 
-gb_internal CallArgumentData check_call_arguments(CheckerContext *c, Operand *operand, Type *proc_type, Ast *call, Slice<Ast *> const &args) {
+gb_internal CallArgumentData check_call_arguments(CheckerContext *c, Operand *operand, Ast *call) {
 	ast_node(ce, CallExpr, call);
 
 	CallArgumentCheckerType *call_checker = check_call_arguments_internal;
 	Array<Operand> operands = {};
 	defer (array_free(&operands));
 
-	Type *result_type = t_invalid;
 
+	Type *result_type = t_invalid;
+	Type *proc_type = base_type(operand->type);
+
+	Slice<Ast *> const &args = ce->args;
 	if (is_call_expr_field_value(ce)) {
 		Type *ptype = nullptr;
 		bool single_case = true;
@@ -5991,7 +5993,7 @@ gb_internal CallArgumentData check_call_arguments(CheckerContext *c, Operand *op
 			ptype = proc_type;
 		}
 
-		if (check_order_of_call_arguments(c, ptype, call, args, true)) {
+		if (check_order_of_call_arguments(c, ptype, call, true)) {
 			CallArgumentData data = {};
 			data.result_type = t_invalid;
 			if (ptype && is_type_proc(ptype) && !is_type_polymorphic(ptype)) {
@@ -6850,20 +6852,31 @@ gb_internal CallArgumentError check_polymorphic_record_type(CheckerContext *c, O
 
 
 // returns true on failure
-gb_internal bool check_call_parameter_mixture(Operand *operand, Slice<Ast *> const &args, char const *context) {
+gb_internal bool check_call_parameter_mixture(Operand *operand, Slice<Ast *> const &args, char const *context, bool allow_mixed=false) {
 	bool failure = false;
 	if (args.count > 0) {
-		bool first_is_field_value = (args[0]->kind == Ast_FieldValue);
-		for (Ast *arg : args) {
-			bool mix = false;
-			if (first_is_field_value) {
-				mix = arg->kind != Ast_FieldValue;
-			} else {
-				mix = arg->kind == Ast_FieldValue;
+		if (allow_mixed) {
+			bool was_named = false;
+			for (Ast *arg : args) {
+				if (was_named && arg->kind != Ast_FieldValue) {
+					error(arg, "Non-named parameter is not allowed to follow named parameter i.e. 'field = value' in a %s", context);
+					failure = true;
+				}
+				was_named = was_named || arg->kind == Ast_FieldValue;
 			}
-			if (mix) {
-				error(arg, "Mixture of 'field = value' and value elements in a %s is not allowed", context);
-				failure = true;
+		} else {
+			bool first_is_field_value = (args[0]->kind == Ast_FieldValue);
+			for (Ast *arg : args) {
+				bool mix = false;
+				if (first_is_field_value) {
+					mix = arg->kind != Ast_FieldValue;
+				} else {
+					mix = arg->kind == Ast_FieldValue;
+				}
+				if (mix) {
+					error(arg, "Mixture of 'field = value' and value elements in a %s is not allowed", context);
+					failure = true;
+				}
 			}
 		}
 
@@ -6871,7 +6884,7 @@ gb_internal bool check_call_parameter_mixture(Operand *operand, Slice<Ast *> con
 	return failure;
 }
 
-#define CHECK_CALL_PARAMETER_MIXTURE_OR_RETURN(context_) if (check_call_parameter_mixture(operand, args, "procedure call")) { \
+#define CHECK_CALL_PARAMETER_MIXTURE_OR_RETURN(context_, ...) if (check_call_parameter_mixture(operand, args, context_, ##__VA_ARGS__)) { \
 	operand->mode = Addressing_Invalid; \
 	operand->expr = call; \
 	return Expr_Stmt; \
@@ -7021,6 +7034,7 @@ gb_internal ExprKind check_call_expr(CheckerContext *c, Operand *operand, Ast *c
 		return builtin_procs[id].kind;
 	}
 
+	// CHECK_CALL_PARAMETER_MIXTURE_OR_RETURN("procedure call", true);
 	CHECK_CALL_PARAMETER_MIXTURE_OR_RETURN("procedure call");
 
 	Entity *initial_entity = entity_of_node(operand->expr);
@@ -7034,8 +7048,8 @@ gb_internal ExprKind check_call_expr(CheckerContext *c, Operand *operand, Ast *c
 		}
 	}
 
-	Type *proc_type = base_type(operand->type);
 	if (operand->mode != Addressing_ProcGroup) {
+		Type *proc_type = base_type(operand->type);
 		bool valid_type = (proc_type != nullptr) && is_type_proc(proc_type);
 		bool valid_mode = is_operand_value(*operand);
 		if (!valid_type || !valid_mode) {
@@ -7053,7 +7067,7 @@ gb_internal ExprKind check_call_expr(CheckerContext *c, Operand *operand, Ast *c
 		}
 	}
 
-	CallArgumentData data = check_call_arguments(c, operand, proc_type, call, args);
+	CallArgumentData data = check_call_arguments(c, operand, call);
 	Type *result_type = data.result_type;
 	gb_zero_item(operand);
 	operand->expr = call;
@@ -7064,7 +7078,10 @@ gb_internal ExprKind check_call_expr(CheckerContext *c, Operand *operand, Ast *c
 		return Expr_Stmt;
 	}
 
-	Type *pt = base_type(proc_type);
+	Type *pt = base_type(operand->type);
+	if (pt == nullptr) {
+		pt = t_invalid;
+	}
 	if (pt == t_invalid) {
 		if (operand->expr != nullptr && operand->expr->kind == Ast_CallExpr) {
 			pt = type_of_expr(operand->expr->CallExpr.proc);
