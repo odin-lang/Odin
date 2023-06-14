@@ -71,35 +71,59 @@ name :: proc(f: ^File) -> string {
 }
 
 close :: proc(f: ^File) -> Error {
-	return io.close(f.impl.stream)
+	if f != nil {
+		return io.close(f.impl.stream)
+	}
+	return nil
 }
 
 seek :: proc(f: ^File, offset: i64, whence: io.Seek_From) -> (ret: i64, err: Error) {
-	return io.seek(f.impl.stream, offset, whence)
+	if f != nil {
+		return io.seek(f.impl.stream, offset, whence)
+	}
+	return 0, .Invalid_File
 }
 
 read :: proc(f: ^File, p: []byte) -> (n: int, err: Error) {
-	return io.read(f.impl.stream, p)
+	if f != nil {
+		return io.read(f.impl.stream, p)
+	}
+	return 0, .Invalid_File
 }
 
 read_at :: proc(f: ^File, p: []byte, offset: i64) -> (n: int, err: Error) {
-	return io.read_at(f.impl.stream, p, offset)
+	if f != nil {
+		return io.read_at(f.impl.stream, p, offset)
+	}
+	return 0, .Invalid_File
 }
 
 write :: proc(f: ^File, p: []byte) -> (n: int, err: Error) {
-	return io.write(f.impl.stream, p)
+	if f != nil {
+		return io.write(f.impl.stream, p)
+	}
+	return 0, .Invalid_File
 }
 
 write_at :: proc(f: ^File, p: []byte, offset: i64) -> (n: int, err: Error) {
-	return io.write_at(f.impl.stream, p, offset)
+	if f != nil {
+		return io.write_at(f.impl.stream, p, offset)
+	}
+	return 0, .Invalid_File
 }
 
 file_size :: proc(f: ^File) -> (n: i64, err: Error) {
-	return io.size(f.impl.stream)
+	if f != nil {
+		return io.size(f.impl.stream)
+	}
+	return 0, .Invalid_File
 }
 
 flush :: proc(f: ^File) -> Error {
-	return io.flush(f.impl.stream)
+	if f != nil {
+		return io.flush(f.impl.stream)
+	}
+	return nil
 }
 
 sync :: proc(f: ^File) -> Error {

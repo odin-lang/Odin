@@ -116,18 +116,18 @@ _seek :: proc(f: ^File, offset: i64, whence: io.Seek_From) -> (ret: i64, err: Er
 	return res, nil
 }
 
-_read :: proc(f: ^File, p: []byte) -> (n: int, err: Error) {
+_read :: proc(f: ^File, p: []byte) -> (i64, Error) {
 	if len(p) == 0 {
 		return 0, nil
 	}
-	n = unix.sys_read(f.impl.fd, &p[0], len(p))
+	n := unix.sys_read(f.impl.fd, &p[0], len(p))
 	if n < 0 {
 		return -1, _get_platform_error(n)
 	}
-	return n, nil
+	return i64(n), nil
 }
 
-_read_at :: proc(f: ^File, p: []byte, offset: i64) -> (n: int, err: Error) {
+_read_at :: proc(f: ^File, p: []byte, offset: i64) -> (n: i64, err: Error) {
 	if offset < 0 {
 		return 0, .Invalid_Offset
 	}
@@ -138,25 +138,25 @@ _read_at :: proc(f: ^File, p: []byte, offset: i64) -> (n: int, err: Error) {
 		if m < 0 {
 			return -1, _get_platform_error(m)
 		}
-		n += m
+		n += i64(m)
 		b = b[m:]
 		offset += i64(m)
 	}
 	return
 }
 
-_write :: proc(f: ^File, p: []byte) -> (n: int, err: Error) {
+_write :: proc(f: ^File, p: []byte) -> (i64, Error) {
 	if len(p) == 0 {
 		return 0, nil
 	}
-	n = unix.sys_write(f.impl.fd, &p[0], uint(len(p)))
+	n := unix.sys_write(f.impl.fd, &p[0], uint(len(p)))
 	if n < 0 {
 		return -1, _get_platform_error(n)
 	}
-	return int(n), nil
+	return i64(n), nil
 }
 
-_write_at :: proc(f: ^File, p: []byte, offset: i64) -> (n: int, err: Error) {
+_write_at :: proc(f: ^File, p: []byte, offset: i64) -> (n: i64, err: Error) {
 	if offset < 0 {
 		return 0, .Invalid_Offset
 	}
@@ -167,7 +167,7 @@ _write_at :: proc(f: ^File, p: []byte, offset: i64) -> (n: int, err: Error) {
 		if m < 0 {
 			return -1, _get_platform_error(m)
 		}
-		n += m
+		n += i64(m)
 		b = b[m:]
 		offset += i64(m)
 	}
@@ -371,23 +371,19 @@ _file_stream_proc :: proc(stream_data: rawptr, mode: io.Stream_Mode, p: []byte, 
 	i: int
 	switch mode {
 	case .Read:
-		i, ferr = _read(f, p)
-		n = i64(i)
+		n, ferr = _read(f, p)
 		err = error_to_io_error(ferr)
 		return
 	case .Read_At:
-		i, ferr = _read_at(f, p, offset)
-		n = i64(i)
+		n, ferr = _read_at(f, p, offset)
 		err = error_to_io_error(ferr)
 		return
 	case .Write:
-		i, ferr = _write(f, p)
-		n = i64(i)
+		n, ferr = _write(f, p)
 		err = error_to_io_error(ferr)
 		return
 	case .Write_At:
-		i, ferr = _write_at(f, p, offset)
-		n = i64(i)
+		n, ferr = _write_at(f, p, offset)
 		err = error_to_io_error(ferr)
 		return
 	case .Seek:
