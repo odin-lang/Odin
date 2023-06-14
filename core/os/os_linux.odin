@@ -440,9 +440,7 @@ pollfd :: struct {
 
 nfds_t :: distinct c.uint
 
-sigset_t :: struct {
-  __val: [16]c.ulong,
-}
+sigset_t :: distinct u64
 
 foreign libc {
 	@(link_name="__errno_location") __errno_location    :: proc() -> ^int ---
