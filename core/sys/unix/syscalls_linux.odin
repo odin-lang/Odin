@@ -2075,22 +2075,21 @@ sys_fcntl :: proc "contextless" (fd: int, cmd: int, arg: int) -> int {
 }
 
 sys_poll :: proc "contextless" (fds: rawptr, nfds: uint, timeout: int) -> int {
-  // NOTE: specialcased here because `arm64` does not have `poll`
+	// NOTE: specialcased here because `arm64` does not have `poll`
 	when ODIN_ARCH == .arm64 {
-    // redefined because we can't depend on the `unix` module here
-    timespec :: struct {
-      tv_sec: i64,
-      tv_nsec: i64,
-    }
-    seconds := i64(timeout / 1_000)
-    nanoseconds := i64((timeout % 1000) * 1_000_000)
-    timeout_spec := timespec{seconds, nanoseconds}
-
+		// redefined because we can't depend on the `unix` module here
+		timespec :: struct {
+			tv_sec: i64,
+			tv_nsec: i64,
+		}
+		seconds := i64(timeout / 1_000)
+		nanoseconds := i64((timeout % 1000) * 1_000_000)
+		timeout_spec := timespec{seconds, nanoseconds}
+		
 		return int(intrinsics.syscall(SYS_ppoll, uintptr(fds), uintptr(nfds), uintptr(&timeout_spec), uintptr(0), uintptr(8)))
 	} else {
-    return int(intrinsics.syscall(SYS_poll, uintptr(fds), uintptr(nfds), uintptr(timeout)))
+		return int(intrinsics.syscall(SYS_poll, uintptr(fds), uintptr(nfds), uintptr(timeout)))
 	}
-  
 }
 
 sys_ppoll :: proc "contextless" (fds: rawptr, nfds: uint, timeout: rawptr, sigmask: rawptr, sigsetsize: uint) -> int {
