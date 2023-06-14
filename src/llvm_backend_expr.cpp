@@ -1325,6 +1325,15 @@ handle_op:;
 	return {};
 }
 
+gb_internal bool lb_is_empty_string_constant(Ast *expr) {
+	if (expr->tav.value.kind == ExactValue_String &&
+	    is_type_string(expr->tav.type)) {
+		String s = expr->tav.value.value_string;
+		return s.len == 0;
+	}
+	return false;
+}
+
 gb_internal lbValue lb_build_binary_expr(lbProcedure *p, Ast *expr) {
 	ast_node(be, BinaryExpr, expr);
 
@@ -1373,13 +1382,27 @@ gb_internal lbValue lb_build_binary_expr(lbProcedure *p, Ast *expr) {
 	case Token_CmpEq:
 	case Token_NotEq:
 		if (is_type_untyped_nil(be->right->tav.type)) {
+			// `x == nil` or `x != nil`
 			lbValue left = lb_build_expr(p, be->left);
 			lbValue cmp = lb_emit_comp_against_nil(p, be->op.kind, left);
 			Type *type = default_type(tv.type);
 			return lb_emit_conv(p, cmp, type);
 		} else if (is_type_untyped_nil(be->left->tav.type)) {
+			// `nil == x` or `nil != x`
 			lbValue right = lb_build_expr(p, be->right);
 			lbValue cmp = lb_emit_comp_against_nil(p, be->op.kind, right);
+			Type *type = default_type(tv.type);
+			return lb_emit_conv(p, cmp, type);
+		} else if (lb_is_empty_string_constant(be->right)) {
+			// `x == ""` or `x != ""`
+			lbValue len = lb_string_len(p, lb_build_expr(p, be->left));
+			lbValue cmp = lb_emit_comp(p, be->op.kind, len, lb_const_int(p->module, t_int, 0));
+			Type *type = default_type(tv.type);
+			return lb_emit_conv(p, cmp, type);
+		} else if (lb_is_empty_string_constant(be->left)) {
+			// `"" == x` or `"" != x`
+			lbValue len = lb_string_len(p, lb_build_expr(p, be->right));
+			lbValue cmp = lb_emit_comp(p, be->op.kind, len, lb_const_int(p->module, t_int, 0));
 			Type *type = default_type(tv.type);
 			return lb_emit_conv(p, cmp, type);
 		}
@@ -2243,7 +2266,6 @@ gb_internal lbValue lb_compare_records(lbProcedure *p, TokenKind op_kind, lbValu
 	}
 	return res;
 }
-
 
 
 
