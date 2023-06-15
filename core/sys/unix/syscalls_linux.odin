@@ -2088,7 +2088,7 @@ sys_poll :: proc "contextless" (fds: rawptr, nfds: uint, timeout: int) -> int {
 }
 
 sys_ppoll :: proc "contextless" (fds: rawptr, nfds: uint, timeout: rawptr, sigmask: rawptr, sigsetsize: uint) -> int {
-  return int(intrinsics.syscall(SYS_ppoll, uintptr(fds), uintptr(nfds), uintptr(timeout), uintptr(sigmask), uintptr(sigsetsize)))
+	return int(intrinsics.syscall(SYS_ppoll, uintptr(fds), uintptr(nfds), uintptr(timeout), uintptr(sigmask), uintptr(sigsetsize)))
 }
 
 get_errno :: proc "contextless" (res: int) -> i32 {
