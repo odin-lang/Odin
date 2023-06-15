@@ -7,6 +7,7 @@ set -eu
 : ${LDFLAGS=}
 : ${ODIN_VERSION=dev-$(date +"%Y-%m")}
 : ${GIT_SHA=}
+: ${MAKE=make}
 
 CPPFLAGS="$CPPFLAGS -DODIN_VERSION_RAW=\"$ODIN_VERSION\""
 CXXFLAGS="$CXXFLAGS -std=c++14"
@@ -28,6 +29,12 @@ panic() {
 }
 
 version() { echo "$@" | awk -F. '{ printf("%d%03d%03d%03d\n", $1,$2,$3,$4); }'; }
+
+build_stb() {
+	# Build the required STB static libraries
+	set -x
+	${MAKE} -C "vendor/stb/src"
+}
 
 config_darwin() {
 	local ARCH=$(uname -m)
@@ -58,6 +65,8 @@ config_darwin() {
 	LDFLAGS="$LDFLAGS -liconv -ldl -framework System"
 	CXXFLAGS="$CXXFLAGS $($LLVM_CONFIG --cxxflags --ldflags)"
 	LDFLAGS="$LDFLAGS -lLLVM-C"
+
+	build_stb
 }
 
 config_freebsd() {
@@ -77,6 +86,8 @@ config_freebsd() {
 
 	CXXFLAGS="$CXXFLAGS $($LLVM_CONFIG --cxxflags --ldflags)"
 	LDFLAGS="$LDFLAGS $($LLVM_CONFIG --libs core native --system-libs)"
+
+	build_stb
 }
 
 config_openbsd() {
@@ -85,6 +96,8 @@ config_openbsd() {
 	LDFLAGS="$LDFLAGS -liconv"
 	CXXFLAGS="$CXXFLAGS $($LLVM_CONFIG --cxxflags --ldflags)"
 	LDFLAGS="$LDFLAGS $($LLVM_CONFIG --libs core native --system-libs)"
+
+	build_stb
 }
 
 config_linux() {
@@ -124,6 +137,8 @@ config_linux() {
 	# The annoyance is that this copy can be cluttering the development folder. TODO: split staging folders
 	# for development and compiler explorer builds
 	cp $(readlink -f $($LLVM_CONFIG --libfiles)) ./
+
+	build_stb
 }
 
 build_odin() {
