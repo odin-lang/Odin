@@ -3145,6 +3145,118 @@ gb_internal lbValue lb_build_call_expr(lbProcedure *p, Ast *expr) {
 	}
 	return res;
 }
+
+gb_internal void lb_add_values_to_array(lbProcedure *p, Array<lbValue> *args, lbValue value) {
+	if (is_type_tuple(value.type)) {
+		for_array(i, value.type->Tuple.variables) {
+			lbValue sub_value = lb_emit_struct_ev(p, value, cast(i32)i);
+			array_add(args, sub_value);
+		}
+	} else {
+		array_add(args, value);
+	}
+}
+gb_internal lbValue lb_build_call_expr_internal_with_arg_ordered_args(lbProcedure *p, lbValue value, TypeProc *pt, Ast *call, AstOrderedArgs *ordered_args) {
+	ast_node(ce, CallExpr, call);
+
+	auto args = array_make<lbValue>(permanent_allocator(), 0, pt->param_count);
+
+	bool vari_expand = (ce->ellipsis.pos.line != 0);
+
+	for_array(i, ordered_args->positional) {
+		Entity *e = pt->params->Tuple.variables[i];
+		GB_ASSERT(e->kind == Entity_Variable);
+
+		if (pt->variadic && pt->variadic_index == i) {
+			lbValue variadic_args = lb_const_nil(p->module, e->type);
+			auto variadic = slice(ordered_args->positional, pt->variadic_index, ordered_args->positional.count);
+			if (variadic.count != 0) {
+				// variadic call argument generation
+				Type *slice_type = e->type;
+				GB_ASSERT(slice_type->kind == Type_Slice);
+				if (vari_expand) {
+					GB_ASSERT(variadic.count == 1);
+					variadic_args = lb_build_expr(p, variadic[0]);
+					variadic_args = lb_emit_conv(p, variadic_args, slice_type);
+				} else {
+					Type *elem_type = slice_type->Slice.elem;
+
+					auto var_args = array_make<lbValue>(heap_allocator(), 0, variadic.count);
+					defer (array_free(&var_args));
+					for (Ast *var_arg : variadic) {
+						lbValue v = lb_build_expr(p, var_arg);
+						lb_add_values_to_array(p, &var_args, v);
+					}
+					isize slice_len = var_args.count;
+					if (slice_len > 0) {
+						lbAddr slice = lb_add_local_generated(p, slice_type, true);
+						lbAddr base_array = lb_add_local_generated(p, alloc_type_array(elem_type, slice_len), true);
+
+						for (isize i = 0; i < var_args.count; i++) {
+							lbValue addr = lb_emit_array_epi(p, base_array.addr, cast(i32)i);
+							lbValue var_arg = var_args[i];
+							var_arg = lb_emit_conv(p, var_arg, elem_type);
+							lb_emit_store(p, addr, var_arg);
+						}
+
+						lbValue base_elem = lb_emit_array_epi(p, base_array.addr, 0);
+						lbValue len = lb_const_int(p->module, t_int, slice_len);
+						lb_fill_slice(p, slice, base_elem, len);
+
+						variadic_args = lb_addr_load(p, slice);
+					}
+				}
+			}
+			array_add(&args, variadic_args);
+
+			break;
+		} else {
+			lbValue value = lb_build_expr(p, ordered_args->positional[i]);
+			lb_add_values_to_array(p, &args, value);
+		}
+	}
+
+	array_resize(&args, pt->param_count);
+
+	for (Ast *arg : ordered_args->named) {
+		ast_node(fv, FieldValue, arg);
+		GB_ASSERT(fv->field->kind == Ast_Ident);
+		String name = fv->field->Ident.token.string;
+		gb_unused(name);
+		isize param_index = lookup_procedure_parameter(pt, name);
+		GB_ASSERT(param_index >= 0);
+
+		lbValue value = lb_build_expr(p, fv->value);
+		GB_ASSERT(!is_type_tuple(value.type));
+		args[param_index] = value;
+	}
+
+	TokenPos pos = ast_token(ce->proc).pos;
+
+	for_array(i, args) {
+		Entity *e = pt->params->Tuple.variables[i];
+		lbValue arg = args[i];
+		if (arg.value == nullptr) {
+			switch (e->kind) {
+			case Entity_TypeName:
+				args[i] = lb_const_nil(p->module, e->type);
+				break;
+			case Entity_Variable:
+				args[i] = lb_handle_param_value(p, e->type, e->Variable.param_value, pos);
+				break;
+			case Entity_Constant:
+				GB_PANIC("TODO constant parameter");
+				break;
+			}
+		} else {
+			args[i] = lb_emit_conv(p, arg, e->type);
+		}
+	}
+
+
+	return lb_emit_call(p, value, args, ce->inlining);
+}
+
 gb_internal lbValue lb_build_call_expr_internal(lbProcedure *p, Ast *expr) {
 	lbModule *m = p->module;
 
@@ -3219,6 +3331,10 @@ gb_internal lbValue lb_build_call_expr_internal(lbProcedure *p, Ast *expr) {
 	GB_ASSERT(proc_type_->kind == Type_Proc);
 	TypeProc *pt = &proc_type_->Proc;
 
+	if (ce->ordered_args)  {
+		return lb_build_call_expr_internal_with_arg_ordered_args(p, value, pt, expr, ce->ordered_args);
+	}
+
 	if (is_call_expr_field_value(ce)) {
 		auto args = array_make<lbValue>(permanent_allocator(), pt->param_count);
 
@@ -3274,6 +3390,9 @@ gb_internal lbValue lb_build_call_expr_internal(lbProcedure *p, Ast *expr) {
 	isize arg_count = 0;
 	for_array(i, ce->args) {
 		Ast *arg = ce->args[i];
+		if (arg->kind == Ast_FieldValue) {
+			arg = arg->FieldValue.value;
+		}
 		TypeAndValue tav = type_and_value_of_expr(arg);
 		GB_ASSERT_MSG(tav.mode != Addressing_Invalid, "%s %s %d", expr_to_string(arg), expr_to_string(expr), tav.mode);
 		GB_ASSERT_MSG(tav.mode != Addressing_ProcGroup, "%s", expr_to_string(arg));
