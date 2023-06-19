@@ -2108,8 +2108,12 @@ gb_internal bool is_type_polymorphic(Type *t, bool or_specialized=false) {
 		return is_type_polymorphic(t->Matrix.elem, or_specialized);
 
 	case Type_Tuple:
-		for_array(i, t->Tuple.variables) {
-			if (is_type_polymorphic(t->Tuple.variables[i]->type, or_specialized)) {
+		for (Entity *e : t->Tuple.variables) {
+			if (e->kind == Entity_Constant) {
+				if (e->Constant.value.kind != ExactValue_Invalid) {
+					return or_specialized;
+				}
+			} else if (is_type_polymorphic(e->type, or_specialized)) {
 				return true;
 			}
 		}
@@ -4279,6 +4283,10 @@ gb_internal gbString write_type_to_string(gbString str, Type *type, bool shortha
 				if (var == nullptr) {
 					continue;
 				}
+				if (comma_index++ > 0) {
+					str = gb_string_appendc(str, ", ");
+				}
+
 				String name = var->token.string;
 				if (var->kind == Entity_Constant) {
 					str = gb_string_appendc(str, "$");
@@ -4293,10 +4301,6 @@ gb_internal gbString write_type_to_string(gbString str, Type *type, bool shortha
 						str = write_exact_value_to_string(str, var->Constant.value);
 					}
 					continue;
-				}
-
-				if (comma_index++ > 0) {
-					str = gb_string_appendc(str, ", ");
 				}
 
 				if (var->kind == Entity_Variable) {

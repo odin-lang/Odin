@@ -3165,7 +3165,12 @@ gb_internal lbValue lb_build_call_expr_internal_with_arg_split_args(lbProcedure 
 
 	for_array(i, split_args->positional) {
 		Entity *e = pt->params->Tuple.variables[i];
-		GB_ASSERT(e->kind == Entity_Variable);
+		if (e->kind == Entity_TypeName) {
+			array_add(&args, lb_const_nil(p->module, e->type));
+			continue;
+		} else if (e->kind != Entity_Variable) {
+			continue;
+		}
 
 		if (pt->variadic && pt->variadic_index == i) {
 			lbValue variadic_args = lb_const_nil(p->module, e->type);
