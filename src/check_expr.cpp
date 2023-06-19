@@ -5314,7 +5314,7 @@ gb_internal isize get_procedure_param_count_excluding_defaults(Type *pt, isize *
 }
 
 
-gb_internal isize lookup_procedure_parameter(TypeProc *pt, String parameter_name) {
+gb_internal isize lookup_procedure_parameter(TypeProc *pt, String const &parameter_name) {
 	isize param_count = pt->param_count;
 	for (isize i = 0; i < param_count; i++) {
 		Entity *e = pt->params->Tuple.variables[i];
@@ -5328,6 +5328,13 @@ gb_internal isize lookup_procedure_parameter(TypeProc *pt, String parameter_name
 	}
 	return -1;
 }
+
+gb_internal isize lookup_procedure_parameter(Type *type, String const &parameter_name) {
+	type = base_type(type);
+	GB_ASSERT(type->kind == Type_Proc);
+	return lookup_procedure_parameter(&type->Proc, parameter_name);
+}
+
 
 gb_internal CALL_ARGUMENT_CHECKER(check_call_arguments_internal) {
 	CallArgumentError err = CallArgumentError_None;
@@ -6052,7 +6059,7 @@ gb_internal bool check_named_arguments(CheckerContext *c, Type *type, Slice<Ast 
 				isize param_index = lookup_procedure_parameter(pt, key);
 				if (param_index < 0) {
 					if (show_error) {
-						error(value, "No parameter named '%.*s' for this procedure type %s", LIT(key), type_to_string(type));
+						error(value, "No parameter named '%.*s' for this procedure type", LIT(key));
 					}
 					success = false;
 					continue;
@@ -6119,6 +6126,35 @@ gb_internal CallArgumentData check_call_arguments_new_and_improved_proc_group(Ch
 			}
 		}
 
+		// ignore named arguments first
+		for (Ast *arg : named_args) {
+			if (arg->kind != Ast_FieldValue) {
+				continue;
+			}
+			ast_node(fv, FieldValue, arg);
+			if (fv->field->kind != Ast_Ident) {
+				continue;
+			}
+			String key = fv->field->Ident.token.string;
+			for (isize proc_index = procs.count-1; proc_index >= 0; proc_index--) {
+				Type *t = procs[proc_index]->type;
+				if (is_type_proc(t)) {
+					isize param_index = lookup_procedure_parameter(t, key);
+					if (param_index < 0) {
+						array_unordered_remove(&procs, proc_index);
+					}
+				}
+			}
+		}
+
+		if (procs.count == 0) {
+			// if any of the named arguments are wrong, the `procs` will be empty
+			// just start from scratch
+			array_free(&procs);
+			procs = proc_group_entities_cloned(c, *operand);
+		}
+
+		// filter by positional argument length
 		for (isize proc_index = 0; proc_index < procs.count; /**/) {
 			Entity *proc = procs[proc_index];
 			Type *pt = base_type(proc->type);
@@ -6134,33 +6170,6 @@ gb_internal CallArgumentData check_call_arguments_new_and_improved_proc_group(Ch
 				array_unordered_remove(&procs, proc_index);
 				continue;
 			}
-
-			// for (Ast *arg : named_args) {
-			// 	if (arg->kind != Ast_FieldValue) {
-			// 		continue;
-			// 	}
-			// 	ast_node(fv, FieldValue, arg);
-			// 	if (fv->field->kind != Ast_Ident) {
-			// 		continue;
-			// 	}
-			// 	bool ok = false;
-			// 	String key = fv->field->Ident.token.string;
-			// 	if (param_count) for (Entity *e : pt->Proc.params->Tuple.variables) {
-			// 		if (e->token.string == key) {
-			// 			ok = true;
-			// 			break;
-			// 		}
-			// 	}
-			// 	if (!ok) {
-			// 		if (proc_index < procs.count) {
-			// 			array_unordered_remove(&procs, proc_index);
-			// 			continue;
-			// 		} else {
-			// 			break;
-			// 		}
-			// 	}
-			// }
-
 			proc_index++;
 		}
 	}
