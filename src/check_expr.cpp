@@ -66,7 +66,7 @@ gb_internal int valid_index_and_score_cmp(void const *a, void const *b) {
 
 
 
-#define CALL_ARGUMENT_CHECKER(name) CallArgumentError name(CheckerContext *c, Ast *call, Type *proc_type, Entity *entity, Array<Operand> operands, Array<Operand> const &named_operands, CallArgumentErrorMode show_error_mode, CallArgumentData *data)
+#define CALL_ARGUMENT_CHECKER(name) CallArgumentError name(CheckerContext *c, Ast *call, Type *proc_type, Entity *entity, Array<Operand> positional_operands, Array<Operand> const &named_operands, CallArgumentErrorMode show_error_mode, CallArgumentData *data)
 typedef CALL_ARGUMENT_CHECKER(CallArgumentCheckerType);
 
 
@@ -5351,59 +5351,6 @@ gb_internal CALL_ARGUMENT_CHECKER(check_call_arguments_internal) {
 	i64 score = 0;
 	bool show_error = show_error_mode == CallArgumentMode_ShowErrors;
 
-	auto ordered_operands = array_make<Operand>(temporary_allocator(), pt->param_count);
-	bool *visited = gb_alloc_array(temporary_allocator(), bool, pt->param_count);
-
-	if (ce->split_args) {
-		GB_ASSERT(ce->split_args->named.count == named_operands.count);
-		for_array(i, ce->split_args->named) {
-			Ast *arg = ce->split_args->named[i];
-			Operand operand = named_operands[i];
-
-			ast_node(fv, FieldValue, arg);
-			if (fv->field->kind != Ast_Ident) {
-				if (show_error) {
-					gbString expr_str = expr_to_string(fv->field);
-					error(arg, "Invalid parameter name '%s' in procedure call", expr_str);
-					gb_string_free(expr_str);
-				}
-				err = CallArgumentError_InvalidFieldValue;
-				continue;
-			}
-			String name = fv->field->Ident.token.string;
-			isize param_index = lookup_procedure_parameter(pt, name);
-			if (param_index < 0) {
-				if (show_error) {
-					error(arg, "No parameter named '%.*s' for this procedure type", LIT(name));
-				}
-				err = CallArgumentError_ParameterNotFound;
-				continue;
-			}
-			if (visited[param_index]) {
-				if (show_error) {
-					error(arg, "Duplicate parameter '%.*s' in procedure call", LIT(name));
-				}
-				err = CallArgumentError_DuplicateParameter;
-				continue;
-			}
-
-			visited[param_index] = true;
-			ordered_operands[param_index] = operand;
-
-			err = CallArgumentError_DuplicateParameter;
-		}
-		if (err) {
-			return err;
-		}
-	}
-
-
-	TypeTuple *param_tuple = nullptr;
-	if (pt->params != nullptr) {
-		param_tuple = &pt->params->Tuple;
-	}
-
-
 	Type *final_proc_type = proc_type;
 	Entity *gen_entity = nullptr;
 
@@ -5421,7 +5368,263 @@ gb_internal CALL_ARGUMENT_CHECKER(check_call_arguments_internal) {
 			      LIT(ce->proc->Ident.token.string));
 		}
 		err = CallArgumentError_NonVariadicExpand;
-	} else if (operands.count == 0 && param_count_excluding_defaults == 0) {
+	}
+
+	if (ce->split_args) {
+		auto ordered_operands = array_make<Operand>(temporary_allocator(), pt->param_count);
+		auto visited = slice_make<bool>(temporary_allocator(), pt->param_count);
+
+		isize positional_operand_count = positional_operands.count;
+		if (variadic) {
+			positional_operand_count = gb_min(positional_operands.count, pt->variadic_index);
+		} else if (positional_operand_count > pt->param_count) {
+			err = CallArgumentError_TooManyArguments;
+			char const *err_fmt = "Too many arguments for '%s', expected %td arguments, got %td";
+			if (show_error) {
+				gbString proc_str = expr_to_string(ce->proc);
+				defer (gb_string_free(proc_str));
+				error(call, err_fmt, proc_str, param_count_excluding_defaults, positional_operands.count);
+			}
+			return err;
+		}
+		positional_operand_count = gb_min(positional_operand_count, pt->param_count);
+
+		for (isize i = 0; i < positional_operand_count; i++) {
+			ordered_operands[i] = positional_operands[i];
+			visited[i] = true;
+		}
+
+		auto variadic_operands = slice(slice_from_array(positional_operands), positional_operand_count, positional_operands.count);
+
+		if (named_operands.count != 0) {
+			GB_ASSERT(ce->split_args->named.count == named_operands.count);
+			for_array(i, ce->split_args->named) {
+				Ast *arg = ce->split_args->named[i];
+				Operand operand = named_operands[i];
+
+				ast_node(fv, FieldValue, arg);
+				if (fv->field->kind != Ast_Ident) {
+					if (show_error) {
+						gbString expr_str = expr_to_string(fv->field);
+						error(arg, "Invalid parameter name '%s' in procedure call", expr_str);
+						gb_string_free(expr_str);
+					}
+					err = CallArgumentError_InvalidFieldValue;
+					continue;
+				}
+				String name = fv->field->Ident.token.string;
+				isize param_index = lookup_procedure_parameter(pt, name);
+				if (param_index < 0) {
+					if (show_error) {
+						error(arg, "No parameter named '%.*s' for this procedure type", LIT(name));
+					}
+					err = CallArgumentError_ParameterNotFound;
+					continue;
+				}
+				if (visited[param_index]) {
+					if (show_error) {
+						error(arg, "Duplicate parameter '%.*s' in procedure call", LIT(name));
+					}
+					err = CallArgumentError_DuplicateParameter;
+					continue;
+				}
+				Entity *e = pt->params->Tuple.variables[param_index];
+
+				check_assignment(c, &operand, e->type, str_lit("named argument"));
+
+				visited[param_index] = true;
+				ordered_operands[param_index] = operand;
+
+				err = CallArgumentError_DuplicateParameter;
+			}
+		}
+
+		if (variadic) {
+			if (visited[pt->variadic_index] &&
+			    positional_operand_count < positional_operands.count) {
+				if (show_error) {
+					String name = pt->params->Tuple.variables[pt->variadic_index]->token.string;
+					error(call, "Variadic parameters already handled with a named argument '%.*s' in procedure call", LIT(name));
+				}
+				err = CallArgumentError_DuplicateParameter;
+			} else {
+				visited[pt->variadic_index] = true;
+			}
+
+		}
+
+
+		for (Operand const &o : ordered_operands) {
+			if (o.mode != Addressing_Invalid) {
+				check_no_copy_assignment(o, str_lit("procedure call expression"));
+			}
+		}
+
+		for (isize i = 0; i < pt->param_count; i++) {
+			if (!visited[i]) {
+				Entity *e = pt->params->Tuple.variables[i];
+				if (is_blank_ident(e->token)) {
+					continue;
+				}
+				if (e->kind == Entity_Variable) {
+					if (e->Variable.param_value.kind != ParameterValue_Invalid) {
+						score += assign_score_function(1);
+						continue;
+					}
+				}
+
+				if (show_error) {
+					if (e->kind == Entity_TypeName) {
+						error(call, "Type parameter '%.*s' is missing in procedure call",
+						      LIT(e->token.string));
+					} else if (e->kind == Entity_Constant && e->Constant.value.kind != ExactValue_Invalid) {
+						// Ignore
+					} else {
+						gbString str = type_to_string(e->type);
+						error(call, "Parameter '%.*s' of type '%s' is missing in procedure call",
+						      LIT(e->token.string), str);
+						gb_string_free(str);
+					}
+				}
+				err = CallArgumentError_ParameterMissing;
+			}
+		}
+
+		if (ordered_operands.count == 0 && param_count_excluding_defaults == 0) {
+			err = CallArgumentError_None;
+
+			if (variadic) {
+				GB_ASSERT(pt->params != nullptr && pt->params->Tuple.variables.count > 0);
+				Type *t = pt->params->Tuple.variables[0]->type;
+				if (is_type_polymorphic(t)) {
+					error(call, "Ambiguous call to a polymorphic variadic procedure with no variadic input");
+					err = CallArgumentError_AmbiguousPolymorphicVariadic;
+				}
+			}
+		} else {
+			if (pt->is_polymorphic && !pt->is_poly_specialized && err == CallArgumentError_None) {
+				PolyProcData poly_proc_data = {};
+				if (find_or_generate_polymorphic_procedure_from_parameters(c, entity, &ordered_operands, call, &poly_proc_data)) {
+					gen_entity = poly_proc_data.gen_entity;
+					Type *gept = base_type(gen_entity->type);
+					GB_ASSERT(is_type_proc(gept));
+					proc_type = gept;
+					pt = &gept->Proc;
+				} else {
+					err = CallArgumentError_WrongTypes;
+				}
+			}
+
+			for (isize i = 0; i < pt->param_count; i++) {
+				Entity *e = pt->params->Tuple.variables[i];
+				Operand *o = &ordered_operands[i];
+				bool param_is_variadic = pt->variadic && pt->variadic_index == i;
+
+				if (o->mode == Addressing_Invalid) {
+					if (param_is_variadic) {
+						Type *slice = e->type;
+						GB_ASSERT(is_type_slice(slice));
+						Type *elem = base_type(slice)->Slice.elem;
+
+						if (variadic_operands.count == 0) {
+							if (is_type_polymorphic(elem)) {
+								error(call, "Ambiguous call to a polymorphic variadic procedure with no variadic input");
+								err = CallArgumentError_AmbiguousPolymorphicVariadic;
+								return err;
+							}
+						} else {
+							if (vari_expand) {
+								GB_ASSERT(variadic_operands.count == 1);
+								check_assignment(c, &variadic_operands[0], slice, str_lit("variadic expanded argument"));
+							} else {
+								for (Operand &vo : variadic_operands) {
+									check_assignment(c, &vo, elem, str_lit("variadic argument"));
+								}
+							}
+						}
+					}
+					continue;
+				}
+
+				if (e->kind == Entity_TypeName) {
+					GB_ASSERT(pt->is_polymorphic);
+					if (o->mode != Addressing_Type) {
+						if (show_error) {
+							error(o->expr, "Expected a type for the argument '%.*s'", LIT(e->token.string));
+						}
+						err = CallArgumentError_WrongTypes;
+					}
+					if (are_types_identical(e->type, o->type)) {
+						score += assign_score_function(1);
+					} else {
+						score += assign_score_function(MAXIMUM_TYPE_DISTANCE);
+					}
+				} else {
+					i64 s = 0;
+					if (!check_is_assignable_to_with_score(c, o, e->type, &s, param_is_variadic)) {
+						bool ok = false;
+						if (ok) {
+							s = assign_score_function(MAXIMUM_TYPE_DISTANCE);
+						} else {
+							if (show_error) {
+								check_assignment(c, o, e->type, str_lit("procedure argument"));
+							}
+							err = CallArgumentError_WrongTypes;
+						}
+
+						if (e->flags & EntityFlag_ConstInput) {
+							if (o->mode != Addressing_Constant) {
+								if (show_error) {
+									error(o->expr, "Expected a constant value for the argument '%.*s'", LIT(e->token.string));
+								}
+								err = CallArgumentError_NoneConstantParameter;
+							}
+						}
+					} else if (show_error) {
+						check_assignment(c, o, e->type, str_lit("procedure argument"));
+					}
+					score += s;
+				}
+
+				if (o->mode == Addressing_Type && is_type_typeid(e->type)) {
+					add_type_info_type(c, o->type);
+					add_type_and_value(c, o->expr, Addressing_Value, e->type, exact_value_typeid(o->type));
+				}
+			}
+		}
+
+		if (data) {
+			data->score = score;
+			data->result_type = final_proc_type->Proc.results;
+			data->gen_entity = gen_entity;
+
+
+			Ast *proc_lit = nullptr;
+			if (ce->proc->tav.value.kind == ExactValue_Procedure) {
+				Ast *vp = unparen_expr(ce->proc->tav.value.value_procedure);
+				if (vp && vp->kind == Ast_ProcLit) {
+					proc_lit = vp;
+				}
+			}
+			if (proc_lit == nullptr) {
+				add_type_and_value(c, ce->proc, Addressing_Value, final_proc_type, {});
+			}
+		}
+
+		return err;
+	}
+
+	if (err) {
+		return err;
+	}
+
+	auto operands = positional_operands;
+	TypeTuple *param_tuple = nullptr;
+	if (pt->params != nullptr) {
+		param_tuple = &pt->params->Tuple;
+	}
+
+	if (operands.count == 0 && param_count_excluding_defaults == 0) {
 		err = CallArgumentError_None;
 
 		if (variadic) {
@@ -5641,6 +5844,7 @@ gb_internal bool is_call_expr_field_value(AstCallExpr *ce) {
 }
 
 gb_internal CALL_ARGUMENT_CHECKER(check_named_call_arguments) {
+	auto operands = positional_operands;
 	ast_node(ce, CallExpr, call);
 	GB_ASSERT(is_type_proc(proc_type));
 	proc_type = base_type(proc_type);
@@ -6705,37 +6909,26 @@ gb_internal CallArgumentData check_call_arguments_new_and_improved(CheckerContex
 			return data;
 		}
 
+		// if (pt->variadic) {
+		// 	isize param_index = pt->variadic_index;
 
-		for_array(i, positional_operands) {
-			Operand &o = positional_operands[i];
-			isize param_index = i;
+		// 	Entity *e = pt->params->Tuple.variables[param_index];
+		// 	GB_ASSERT(e->kind == Entity_Variable);
+		// 	GB_ASSERT(e->flags & EntityFlag_Ellipsis);
+		// 	GB_ASSERT(is_type_slice(e->type));
 
-			Entity *e = pt->params->Tuple.variables[param_index];
-			GB_ASSERT(e->kind == Entity_Variable);
-
-			check_assignment(c, &o, e->type, str_lit("procedure call expression"));
-		}
-
-		if (pt->variadic) {
-			isize param_index = pt->variadic_index;
-
-			Entity *e = pt->params->Tuple.variables[param_index];
-			GB_ASSERT(e->kind == Entity_Variable);
-			GB_ASSERT(e->flags & EntityFlag_Ellipsis);
-			GB_ASSERT(is_type_slice(e->type));
-
-			if (vari_expand) {
-				if (variadic_operands.count != 0) {
-					GB_ASSERT(variadic_operands.count == 1);
-					check_assignment(c, &variadic_operands[0], e->type, str_lit("procedure call expression"));
-				}
-			} else {
-				Type *elem = e->type->Slice.elem;
-				for (Operand &o : variadic_operands) {
-					check_assignment(c, &o, elem, str_lit("procedure call expression"));
-				}
-			}
-		}
+		// 	if (vari_expand) {
+		// 		if (variadic_operands.count != 0) {
+		// 			GB_ASSERT(variadic_operands.count == 1);
+		// 			check_assignment(c, &variadic_operands[0], e->type, str_lit("procedure call expression"));
+		// 		}
+		// 	} else {
+		// 		Type *elem = e->type->Slice.elem;
+		// 		for (Operand &o : variadic_operands) {
+		// 			check_assignment(c, &o, elem, str_lit("procedure call expression"));
+		// 		}
+		// 	}
+		// }
 
 		array_resize(&positional_operands, pt->param_count);
 
@@ -6770,68 +6963,6 @@ gb_internal CallArgumentData check_call_arguments_new_and_improved(CheckerContex
 			array_add(&named_parameters, NamedParameter{name, fv->value});
 		}
 
-		StringMap<Type *> type_hint_map = {}; // Key: String
-		string_map_init(&type_hint_map, 2*named_args.count);
-		defer (string_map_destroy(&type_hint_map));
-
-		if (pt != nullptr) {
-			TypeTuple *param_tuple = &pt->params->Tuple;
-			for (Entity *e : param_tuple->variables) {
-				if (is_blank_ident(e->token)) {
-					continue;
-				}
-				string_map_set(&type_hint_map, e->token.string, e->type);
-			}
-		} else if (operand->mode == Addressing_ProcGroup) {
-			Array<Entity *> procs = proc_group_entities(c, *operand);
-			for (Entity *proc : procs) {
-				Type *proc_type = base_type(proc->type);
-				if (is_type_proc(proc_type)) {
-					TypeProc *pt = &proc_type->Proc;
-					TypeTuple *param_tuple = nullptr;
-					if (pt->params != nullptr) {
-						param_tuple = &pt->params->Tuple;
-					}
-					if (param_tuple == nullptr) {
-						continue;
-					}
-					for (Entity *e : param_tuple->variables) {
-						if (is_blank_ident(e->token)) {
-							continue;
-						}
-						StringHashKey key = string_hash_string(e->token.string);
-						Type **found = string_map_get(&type_hint_map, key);
-						if (found) {
-							Type *t = *found;
-							if (t == nullptr) {
-								// NOTE(bill): Ambiguous named parameter across all types
-								continue;
-							}
-							if (are_types_identical(t, e->type)) {
-								// NOTE(bill): No need to set again
-							} else {
-								// NOTE(bill): Ambiguous named parameter across all types so set it to a nullptr
-								string_map_set(&type_hint_map, key, cast(Type *)nullptr);
-							}
-						} else {
-							string_map_set(&type_hint_map, key, e->type);
-						}
-					}
-				}
-			}
-		}
-
-		for (NamedParameter &param : named_parameters) {
-			Type *type_hint = nullptr;
-			if (Type **found = string_map_get(&type_hint_map, param.key)) {
-				type_hint = *found;
-			}
-
-			Operand operand = {};
-			check_expr_or_type(c, &operand, param.value, type_hint);
-			array_add(&named_operands, operand);
-		}
-
 		for (NamedParameter const &param : named_parameters) {
 			isize param_index = lookup_procedure_parameter(pt, param.key);
 			if (param_index < 0) {
@@ -6856,11 +6987,10 @@ gb_internal CallArgumentData check_call_arguments_new_and_improved(CheckerContex
 				any_failure = true;
 			}
 
-			check_assignment(c, &o, e->type, str_lit("procedure call expression"));
-
 			if (!prev_visited) {
 				positional_operands[param_index] = o;
 			}
+			array_add(&named_operands, o);
 		}
 
 	}
@@ -6891,17 +7021,6 @@ gb_internal CallArgumentData check_call_arguments_new_and_improved(CheckerContex
 		}
 	}
 
-	for (Operand const &o : positional_operands) {
-		check_no_copy_assignment(o, str_lit("procedure call expression"));
-	}
-	for (Operand const &o : variadic_operands) {
-		check_no_copy_assignment(o, str_lit("procedure call expression"));
-	}
-	for (Operand const &o : named_operands) {
-		check_no_copy_assignment(o, str_lit("procedure call expression"));
-	}
-
-
 	if (any_failure) {
 		return data;
 	}
@@ -6917,7 +7036,7 @@ gb_internal CallArgumentData check_call_arguments_new_and_improved(CheckerContex
 
 		Array<Operand> operands = array_clone(heap_allocator(), positional_operands);
 
-		CallArgumentError err = check_call_arguments_internal(c, call, proc_type, e, operands, named_operands, CallArgumentMode_ShowErrors, &data);
+		CallArgumentError err = check_call_arguments_internal(c, call, proc_type, e, operands, {}, CallArgumentMode_ShowErrors, &data);
 		gb_unused(err);
 		Entity *entity_to_use = data.gen_entity != nullptr ? data.gen_entity : e;
 		add_entity_use(c, ident, entity_to_use);
@@ -6948,127 +7067,6 @@ gb_internal CallArgumentData check_call_arguments_new_and_improved(CheckerContex
 		data.result_type = pt->results;
 	}
 	return data;
-#if 0
-
-
-
-	/*
-	auto visited = slice_make<bool>(temporary_allocator(), pt->param_count);
-	auto ordered_values = slice_make<ParameterValue>(temporary_allocator(), pt->param_count);
-
-
-	for_array(i, ce->args) {
-		Ast *arg = ce->args[i];
-
-		isize param_index = i;
-		String param_name = {};
-
-		if (arg->kind == Ast_FieldValue) {
-			ast_node(fv, FieldValue, arg);
-			if (fv->field->kind != Ast_Ident) {
-				gbString expr_str = expr_to_string(fv->field);
-				error(arg, "Invalid parameter name '%s' in procedure call", expr_str);
-				any_failure = true;
-				gb_string_free(expr_str);
-				continue;
-			}
-			param_name = fv->field->Ident.token.string;
-			param_index = lookup_procedure_parameter(pt, param_name);
-			if (param_index < 0) {
-				error(arg, "No parameter named '%.*s' for this procedure type", LIT(param_name));
-				any_failure = true;
-				continue;
-			}
-			arg = fv->value;
-		} else {
-			if (param_index >= pt->param_count) {
-				error(arg, "Too many parameters in procedure call, expected a maximum of %td, got %td", pt->param_count, ce->args.count);
-				any_failure = true;
-				break;
-			}
-
-			param_name = pt->params->Tuple.variables[param_index]->token.string;
-		}
-		if (visited[param_index]) {
-			error(arg, "Duplicate parameter '%.*s' in procedure call", LIT(param_name));
-			any_failure = true;
-		} else {
-			ParameterValue value = {};
-			value.kind = ParameterValue_Value;
-			value.original_ast_expr = arg;
-			value.ast_value = arg;
-			ordered_values[param_index] = value;
-		}
-		visited[param_index] = true;
-	}
-
-	for (isize i = 0; i < pt->param_count; i++) {
-		if (!visited[i]) {
-			Entity *e = pt->params->Tuple.variables[i];
-			if (e->kind == Entity_Variable &&
-			    has_parameter_value(e->Variable.param_value)) {
-				ordered_values[i] = e->Variable.param_value;
-				visited[i] = true;
-			}
-		}
-	}
-
-	for (isize i = 0; i < visited.count; i++) {
-		if (!visited[i]) {
-			Entity *e = pt->params->Tuple.variables[i];
-			gbString t = type_to_string(e->type);
-			defer (gb_string_free(t));
-			if (is_blank_ident(e->token)) {
-				error(call, "Missing parameter of type '%s' at index %td", t, i);
-			} else {
-				error(call, "Missing parameter '%.*s' of type '%s'", LIT(e->token.string), t, i);
-			}
-			return data;
-		}
-	}
-	*/
-	if (any_failure) {
-		return data;
-	}
-
-	Array<Operand> operands = {};
-	defer (array_free(&operands));
-
-	Ast *ident = unparen_expr(operand->expr);
-	while (ident->kind == Ast_SelectorExpr) {
-		Ast *s = ident->SelectorExpr.selector;
-		ident = unparen_expr(s);
-	}
-
-	Entity *e = entity_of_node(ident);
-
-	CallArgumentError err = check_call_arguments_internal(c, call, proc_type, e, operands, CallArgumentMode_ShowErrors, &data);
-	gb_unused(err);
-	Entity *entity_to_use = data.gen_entity != nullptr ? data.gen_entity : e;
-	add_entity_use(c, ident, entity_to_use);
-	if (entity_to_use != nullptr) {
-		update_untyped_expr_type(c, operand->expr, entity_to_use->type, true);
-	}
-	if (data.gen_entity != nullptr) {
-		Entity *e = data.gen_entity;
-		DeclInfo *decl = data.gen_entity->decl_info;
-		CheckerContext ctx = *c;
-		ctx.scope = decl->scope;
-		ctx.decl = decl;
-		ctx.proc_name = e->token.string;
-		ctx.curr_proc_decl = decl;
-		ctx.curr_proc_sig  = e->type;
-
-		GB_ASSERT(decl->proc_lit->kind == Ast_ProcLit);
-		bool ok = evaluate_where_clauses(&ctx, call, decl->scope, &decl->proc_lit->ProcLit.where_clauses, true);
-		decl->where_clauses_evaluated = true;
-
-		if (ok && (data.gen_entity->flags & EntityFlag_ProcBodyChecked) == 0) {
-			check_procedure_later(c->checker, e->file, e->token, decl, e->type, decl->proc_lit->ProcLit.body, decl->proc_lit->ProcLit.tags);
-		}
-	}
-	return data;
-#endif
 }
 
 
