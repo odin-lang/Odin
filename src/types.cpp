@@ -3326,6 +3326,9 @@ gb_internal bool are_struct_fields_reordered(Type *type) {
 	type = base_type(type);
 	GB_ASSERT(type->kind == Type_Struct);
 	type_set_offsets(type);
+	if (type->Struct.fields.count == 0) {
+		return false;
+	}
 	GB_ASSERT(type->Struct.offsets != nullptr);
 	
 	i64 prev_offset = 0;
@@ -3344,6 +3347,9 @@ gb_internal Slice<i32> struct_fields_index_by_increasing_offset(gbAllocator allo
 	type = base_type(type);
 	GB_ASSERT(type->kind == Type_Struct);
 	type_set_offsets(type);
+	if (type->Struct.fields.count == 0) {
+		return {};
+	}
 	GB_ASSERT(type->Struct.offsets != nullptr);
 	
 	auto indices = slice_make<i32>(allocator, type->Struct.fields.count);

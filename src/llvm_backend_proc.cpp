@@ -3156,20 +3156,20 @@ gb_internal void lb_add_values_to_array(lbProcedure *p, Array<lbValue> *args, lb
 		array_add(args, value);
 	}
 }
-gb_internal lbValue lb_build_call_expr_internal_with_arg_ordered_args(lbProcedure *p, lbValue value, TypeProc *pt, Ast *call, AstOrderedArgs *ordered_args) {
+gb_internal lbValue lb_build_call_expr_internal_with_arg_split_args(lbProcedure *p, lbValue value, TypeProc *pt, Ast *call, AstSplitArgs *split_args) {
 	ast_node(ce, CallExpr, call);
 
 	auto args = array_make<lbValue>(permanent_allocator(), 0, pt->param_count);
 
 	bool vari_expand = (ce->ellipsis.pos.line != 0);
 
-	for_array(i, ordered_args->positional) {
+	for_array(i, split_args->positional) {
 		Entity *e = pt->params->Tuple.variables[i];
 		GB_ASSERT(e->kind == Entity_Variable);
 
 		if (pt->variadic && pt->variadic_index == i) {
 			lbValue variadic_args = lb_const_nil(p->module, e->type);
-			auto variadic = slice(ordered_args->positional, pt->variadic_index, ordered_args->positional.count);
+			auto variadic = slice(split_args->positional, pt->variadic_index, split_args->positional.count);
 			if (variadic.count != 0) {
 				// variadic call argument generation
 				Type *slice_type = e->type;
@@ -3211,14 +3211,14 @@ gb_internal lbValue lb_build_call_expr_internal_with_arg_ordered_args(lbProcedur
 
 			break;
 		} else {
-			lbValue value = lb_build_expr(p, ordered_args->positional[i]);
+			lbValue value = lb_build_expr(p, split_args->positional[i]);
 			lb_add_values_to_array(p, &args, value);
 		}
 	}
 
 	array_resize(&args, pt->param_count);
 
-	for (Ast *arg : ordered_args->named) {
+	for (Ast *arg : split_args->named) {
 		ast_node(fv, FieldValue, arg);
 		GB_ASSERT(fv->field->kind == Ast_Ident);
 		String name = fv->field->Ident.token.string;
@@ -3331,8 +3331,8 @@ gb_internal lbValue lb_build_call_expr_internal(lbProcedure *p, Ast *expr) {
 	GB_ASSERT(proc_type_->kind == Type_Proc);
 	TypeProc *pt = &proc_type_->Proc;
 
-	if (ce->ordered_args)  {
-		return lb_build_call_expr_internal_with_arg_ordered_args(p, value, pt, expr, ce->ordered_args);
+	if (ce->split_args)  {
+		return lb_build_call_expr_internal_with_arg_split_args(p, value, pt, expr, ce->split_args);
 	}
 
 	if (is_call_expr_field_value(ce)) {

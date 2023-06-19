@@ -367,7 +367,7 @@ gb_global char const *union_type_kind_strings[UnionType_COUNT] = {
 	"#shared_nil",
 };
 
-struct AstOrderedArgs {
+struct AstSplitArgs {
 	Slice<Ast *> positional;
 	Slice<Ast *> named;
 };
@@ -447,7 +447,7 @@ AST_KIND(_ExprBegin,  "",  bool) \
 		ProcInlining inlining; \
 		bool         optional_ok_one; \
 		bool         was_selector; \
-		AstOrderedArgs *ordered_args; \
+		AstSplitArgs *split_args; \
 	}) \
 	AST_KIND(FieldValue,      "field value",              struct { Token eq; Ast *field, *value; }) \
 	AST_KIND(EnumFieldValue,  "enum field value",         struct { \
