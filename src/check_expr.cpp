@@ -700,23 +700,34 @@ gb_internal i64 check_distance_between_types(CheckerContext *c, Operand *operand
 				}
 				return -1;
 			}
-			if (src->kind == Type_Basic && src->Basic.kind == Basic_UntypedRune) {
-				if (is_type_integer(dst) || is_type_rune(dst)) {
-					if (is_type_typed(type)) {
-						return 2;
+			if (src->kind == Type_Basic) {
+				switch (src->Basic.kind) {
+				case Basic_UntypedRune:
+					if (is_type_integer(dst) || is_type_rune(dst)) {
+						if (is_type_typed(type)) {
+							return 2;
+						}
+						return 1;
 					}
-					return 1;
-				}
-				return -1;
-			}
-			if (src->kind == Type_Basic && src->Basic.kind == Basic_UntypedBool) {
-				if (is_type_boolean(dst)) {
-					if (is_type_typed(type)) {
-						return 2;
+					return -1;
+				case Basic_UntypedBool:
+					if (is_type_boolean(dst)) {
+						if (is_type_typed(type)) {
+							return 2;
+						}
+						return 1;
 					}
-					return 1;
+					return -1;
+				case Basic_UntypedString:
+					if (is_type_string(dst) || is_type_cstring(dst)) {
+						if (is_type_typed(type)) {
+							return 2;
+						}
+						return 1;
+					}
+					return -1;
 				}
-				return -1;
+
 			}
 		}
 	}
@@ -5461,9 +5472,12 @@ gb_internal CallArgumentError check_call_arguments_internal(CheckerContext *c, A
 		} else {
 			visited[pt->variadic_index] = true;
 
+			Operand *variadic_operand = &ordered_operands[pt->variadic_index];
+
 			if (vari_expand) {
 				GB_ASSERT(variadic_operands.count != 0);
-				ordered_operands[pt->variadic_index] = variadic_operands[0];
+				*variadic_operand = variadic_operands[0];
+				variadic_operand->type = default_type(variadic_operand->type);
 				actually_variadic = true;
 			} else {
 				AstFile *f = call->file();
@@ -5487,7 +5501,7 @@ gb_internal CallArgumentError check_call_arguments_internal(CheckerContext *c, A
 					dummy_argument_count += 1;
 					o.type = t_untyped_nil;
 				}
-				ordered_operands[pt->variadic_index] = o;
+				*variadic_operand = o;
 			}
 		}
 
