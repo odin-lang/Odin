@@ -5994,6 +5994,75 @@ gb_internal bool check_named_arguments(CheckerContext *c, Type *type, Slice<Ast 
 	return success;
 }
 
+gb_internal bool check_call_arguments_new_and_improved_single(CheckerContext *c, Ast *call, Operand *operand,
+	Entity *e, Type *proc_type,
+	Array<Operand> const &positional_operands, Array<Operand> const &named_operands,
+	CallArgumentErrorMode show_error_mode,
+	CallArgumentData *data) {
+
+	bool return_on_failure = show_error_mode == CallArgumentMode_NoErrors;
+
+	Ast *ident = operand->expr;
+	while (ident->kind == Ast_SelectorExpr) {
+		Ast *s = ident->SelectorExpr.selector;
+		ident = s;
+	}
+
+	if (e == nullptr) {
+		GB_ASSERT(proc_type == nullptr);
+		e = entity_of_node(ident);
+		proc_type = e->type;
+	}
+
+	proc_type = base_type(proc_type);
+	GB_ASSERT(proc_type->kind == Type_Proc);
+
+	CallArgumentError err = check_call_arguments_internal(c, call, proc_type, e, positional_operands, named_operands, show_error_mode, data);
+	if (return_on_failure && err != CallArgumentError_None) {
+		return false;
+	}
+
+	Entity *entity_to_use = data->gen_entity != nullptr ? data->gen_entity : e;
+	if (!return_on_failure) {
+		add_entity_use(c, ident, entity_to_use);
+		if (entity_to_use != nullptr) {
+			update_untyped_expr_type(c, operand->expr, entity_to_use->type, true);
+			add_type_and_value(c, operand->expr, operand->mode, entity_to_use->type, operand->value);
+		}
+	}
+
+	if (data->gen_entity != nullptr) {
+		Entity *e = data->gen_entity;
+		DeclInfo *decl = data->gen_entity->decl_info;
+		CheckerContext ctx = *c;
+		ctx.scope = decl->scope;
+		ctx.decl = decl;
+		ctx.proc_name = e->token.string;
+		ctx.curr_proc_decl = decl;
+		ctx.curr_proc_sig  = e->type;
+
+		GB_ASSERT(decl->proc_lit->kind == Ast_ProcLit);
+		bool ok = evaluate_where_clauses(&ctx, call, decl->scope, &decl->proc_lit->ProcLit.where_clauses, !return_on_failure);
+		if (return_on_failure) {
+			if (!ok) {
+				return false;
+			}
+
+		} else {
+			decl->where_clauses_evaluated = true;
+			if (ok && (data->gen_entity->flags & EntityFlag_ProcBodyChecked) == 0) {
+				check_procedure_later(c->checker, e->file, e->token, decl, e->type, decl->proc_lit->ProcLit.body, decl->proc_lit->ProcLit.tags);
+			}
+			if (is_type_proc(data->gen_entity->type)) {
+				Type *t = base_type(entity_to_use->type);
+				data->result_type = t->Proc.results;
+			}
+		}
+	}
+
+	return true;
+}
+
 
 gb_internal CallArgumentData check_call_arguments_new_and_improved_proc_group(CheckerContext *c, Operand *operand, Ast *call) {
 	ast_node(ce, CallExpr, call);
@@ -6089,11 +6158,6 @@ gb_internal CallArgumentData check_call_arguments_new_and_improved_proc_group(Ch
 	defer (array_free(&named_operands));
 
 	if (procs.count == 1) {
-		Ast *ident = operand->expr;
-		while (ident->kind == Ast_SelectorExpr) {
-			Ast *s = ident->SelectorExpr.selector;
-			ident = s;
-		}
 
 
 		Entity *e = procs[0];
@@ -6105,46 +6169,11 @@ gb_internal CallArgumentData check_call_arguments_new_and_improved_proc_group(Ch
 			return data;
 		}
 
-		CallArgumentError err = check_call_arguments_internal(c, call, e->type, e, positional_operands, named_operands, CallArgumentMode_ShowErrors, &data);
-		if (err != CallArgumentError_None) {
-
-		}
-
-
-		Type *proc_type = base_type(operand->type);
-
-		Entity *entity_to_use = data.gen_entity != nullptr ? data.gen_entity : e;
-		add_entity_use(c, ident, entity_to_use);
-		if (entity_to_use != nullptr) {
-			update_untyped_expr_type(c, operand->expr, entity_to_use->type, true);
-
-			proc_type = base_type(entity_to_use->type);
-		}
-
-		if (proc_type && proc_type->kind == Type_Proc) {
-			data.result_type = proc_type->Proc.results;
-			add_type_and_value(c, operand->expr, operand->mode, proc_type, operand->value);
-		}
-
-		if (data.gen_entity != nullptr) {
-			Entity *e = data.gen_entity;
-			DeclInfo *decl = data.gen_entity->decl_info;
-			CheckerContext ctx = *c;
-			ctx.scope = decl->scope;
-			ctx.decl = decl;
-			ctx.proc_name = e->token.string;
-			ctx.curr_proc_decl = decl;
-			ctx.curr_proc_sig  = e->type;
-
-			GB_ASSERT(decl->proc_lit->kind == Ast_ProcLit);
-			bool ok = evaluate_where_clauses(&ctx, call, decl->scope, &decl->proc_lit->ProcLit.where_clauses, true);
-			decl->where_clauses_evaluated = true;
-
-			if (ok && (data.gen_entity->flags & EntityFlag_ProcBodyChecked) == 0) {
-				check_procedure_later(c->checker, e->file, e->token, decl, e->type, decl->proc_lit->ProcLit.body, decl->proc_lit->ProcLit.tags);
-			}
-		}
-
+		check_call_arguments_new_and_improved_single(c, call, operand,
+			e, e->type,
+			positional_operands, named_operands,
+			CallArgumentMode_ShowErrors,
+			&data);
 		return data;
 	}
 
@@ -6256,7 +6285,6 @@ gb_internal CallArgumentData check_call_arguments_new_and_improved_proc_group(Ch
 		Entity *p = procs[i];
 		Type *pt = base_type(p->type);
 		if (pt != nullptr && is_type_proc(pt)) {
-			CallArgumentError err = CallArgumentError_None;
 			CallArgumentData data = {};
 			CheckerContext ctx = *c;
 
@@ -6264,26 +6292,17 @@ gb_internal CallArgumentData check_call_arguments_new_and_improved_proc_group(Ch
 			ctx.allow_polymorphic_types = is_type_polymorphic(pt);
 			ctx.hide_polymorphic_errors = true;
 
-			err = check_call_arguments_internal(&ctx, call, pt, p, positional_operands, named_operands, CallArgumentMode_NoErrors, &data);
-			if (err != CallArgumentError_None) {
+			bool is_a_candidate = check_call_arguments_new_and_improved_single(&ctx, call, operand,
+				p, pt,
+				positional_operands, named_operands,
+				CallArgumentMode_NoErrors,
+				&data);
+			if (!is_a_candidate) {
 				continue;
 			}
 			isize index = i;
 
 			if (data.gen_entity != nullptr) {
-				Entity *e = data.gen_entity;
-				DeclInfo *decl = data.gen_entity->decl_info;
-				ctx.scope = decl->scope;
-				ctx.decl = decl;
-				ctx.proc_name = e->token.string;
-				ctx.curr_proc_decl = decl;
-				ctx.curr_proc_sig  = e->type;
-
-				GB_ASSERT(decl->proc_lit->kind == Ast_ProcLit);
-				if (!evaluate_where_clauses(&ctx, call, decl->scope, &decl->proc_lit->ProcLit.where_clauses, false)) {
-					continue;
-				}
-
 				array_add(&proc_entities, data.gen_entity);
 				index = proc_entities.count-1;
 			}
@@ -6449,41 +6468,11 @@ gb_internal CallArgumentData check_call_arguments_new_and_improved_proc_group(Ch
 
 		Array<Operand> named_operands = {};
 
-		Type *proc_type = e->type;
-		CallArgumentData data = {};
-		CallArgumentError err = check_call_arguments_internal(c, call, proc_type, e, positional_operands, named_operands, CallArgumentMode_ShowErrors, &data);
-		gb_unused(err);
-		Entity *entity_to_use = data.gen_entity != nullptr ? data.gen_entity : e;
-		add_entity_use(c, ident, entity_to_use);
-		if (entity_to_use != nullptr) {
-			proc_type = base_type(entity_to_use->type);
-			update_untyped_expr_type(c, operand->expr, entity_to_use->type, true);
-			add_type_and_value(c, operand->expr, operand->mode, entity_to_use->type, operand->value);
-		}
-
-		if (data.gen_entity != nullptr) {
-			Entity *e = data.gen_entity;
-			DeclInfo *decl = data.gen_entity->decl_info;
-			CheckerContext ctx = *c;
-			ctx.scope = decl->scope;
-			ctx.decl = decl;
-			ctx.proc_name = e->token.string;
-			ctx.curr_proc_decl = decl;
-			ctx.curr_proc_sig  = e->type;
-
-			GB_ASSERT(decl->proc_lit->kind == Ast_ProcLit);
-			bool ok = evaluate_where_clauses(&ctx, call, decl->scope, &decl->proc_lit->ProcLit.where_clauses, true);
-			decl->where_clauses_evaluated = true;
-
-			if (ok && (data.gen_entity->flags & EntityFlag_ProcBodyChecked) == 0) {
-				check_procedure_later(c->checker, e->file, e->token, decl, e->type, decl->proc_lit->ProcLit.body, decl->proc_lit->ProcLit.tags);
-			}
-		}
-
-		if (is_type_proc(proc_type)) {
-			data.result_type = proc_type->Proc.results;
-		}
-
+		check_call_arguments_new_and_improved_single(c, call, operand,
+			e, e->type,
+			positional_operands, named_operands,
+			CallArgumentMode_ShowErrors,
+			&data);
 		return data;
 	}
 
@@ -6539,15 +6528,11 @@ gb_internal CallArgumentData check_call_arguments_new_and_improved(CheckerContex
 		return check_call_arguments_new_and_improved_proc_group(c, operand, call);
 	}
 
-
 	auto positional_operands = array_make<Operand>(heap_allocator(), 0, positional_args.count);
 	auto named_operands      = array_make<Operand>(heap_allocator(), 0, 0);
 
 	defer (array_free(&positional_operands));
 	defer (array_free(&named_operands));
-
-
-	Slice<bool> visited = {};
 
 	if (positional_args.count > 0) {
 		isize lhs_count = -1;
@@ -6555,8 +6540,6 @@ gb_internal CallArgumentData check_call_arguments_new_and_improved(CheckerContex
 		Entity **lhs =  nullptr;
 		if (pt != nullptr)  {
 			lhs = populate_proc_parameter_list(c, proc_type, &lhs_count, &is_variadic);
-		} else if (operand->mode == Addressing_ProcGroup) {
-			// TODO
 		}
 		check_unpack_arguments(c, lhs, lhs_count, &positional_operands, positional_args, is_variadic ? UnpackFlag_IsVariadic : UnpackFlag_None);
 	}
@@ -6597,49 +6580,11 @@ gb_internal CallArgumentData check_call_arguments_new_and_improved(CheckerContex
 	}
 
 	if (!any_failure) {
-		Ast *ident = operand->expr;
-		while (ident->kind == Ast_SelectorExpr) {
-			Ast *s = ident->SelectorExpr.selector;
-			ident = s;
-		}
-
-		Entity *e = entity_of_node(ident);
-
-		TokenPos pos = ast_token(call).pos;
-
-		CallArgumentError err = check_call_arguments_internal(c, call, proc_type, e, positional_operands, named_operands, CallArgumentMode_ShowErrors, &data);
-		gb_unused(err);
-		Entity *entity_to_use = data.gen_entity != nullptr ? data.gen_entity : e;
-		add_entity_use(c, ident, entity_to_use);
-		if (entity_to_use != nullptr) {
-			update_untyped_expr_type(c, operand->expr, entity_to_use->type, true);
-			add_type_and_value(c, operand->expr, operand->mode, entity_to_use->type, operand->value);
-		}
-		if (data.gen_entity != nullptr) {
-			Entity *e = data.gen_entity;
-			DeclInfo *decl = data.gen_entity->decl_info;
-			CheckerContext ctx = *c;
-			ctx.scope = decl->scope;
-			ctx.decl = decl;
-			ctx.proc_name = e->token.string;
-			ctx.curr_proc_decl = decl;
-			ctx.curr_proc_sig  = e->type;
-
-			GB_ASSERT(decl->proc_lit->kind == Ast_ProcLit);
-			bool ok = evaluate_where_clauses(&ctx, call, decl->scope, &decl->proc_lit->ProcLit.where_clauses, true);
-			decl->where_clauses_evaluated = true;
-
-			if (ok && (data.gen_entity->flags & EntityFlag_ProcBodyChecked) == 0) {
-				check_procedure_later(c->checker, e->file, e->token, decl, e->type, decl->proc_lit->ProcLit.body, decl->proc_lit->ProcLit.tags);
-			}
-
-			if (is_type_proc(data.gen_entity->type)) {
-				Type *t = base_type(entity_to_use->type);
-				// GB_ASSERT_MSG(!is_type_polymorphic(t), "%s", expr_to_string(call));
-				data.result_type = t->Proc.results;
-
-			}
-		}
+		check_call_arguments_new_and_improved_single(c, call, operand,
+			nullptr, nullptr,
+			positional_operands, named_operands,
+			CallArgumentMode_ShowErrors,
+			&data);
 	} else if (pt) {
 		data.result_type = pt->results;
 	}
@@ -6991,16 +6936,16 @@ gb_internal CallArgumentError check_polymorphic_record_type(CheckerContext *c, O
 
 
 
-// returns true on failure
-gb_internal bool check_call_parameter_mixture(Operand *operand, Slice<Ast *> const &args, char const *context, bool allow_mixed=false) {
-	bool failure = false;
+// returns true on success
+gb_internal bool check_call_parameter_mixture(Slice<Ast *> const &args, char const *context, bool allow_mixed=false) {
+	bool success = true;
 	if (args.count > 0) {
 		if (allow_mixed) {
 			bool was_named = false;
 			for (Ast *arg : args) {
 				if (was_named && arg->kind != Ast_FieldValue) {
 					error(arg, "Non-named parameter is not allowed to follow named parameter i.e. 'field = value' in a %s", context);
-					failure = true;
+					success = false;
 					break;
 				}
 				was_named = was_named || arg->kind == Ast_FieldValue;
@@ -7016,16 +6961,16 @@ gb_internal bool check_call_parameter_mixture(Operand *operand, Slice<Ast *> con
 				}
 				if (mix) {
 					error(arg, "Mixture of 'field = value' and value elements in a %s is not allowed", context);
-					failure = true;
+					success = false;
 				}
 			}
 		}
 
 	}
-	return failure;
+	return success;
 }
 
-#define CHECK_CALL_PARAMETER_MIXTURE_OR_RETURN(context_, ...) if (check_call_parameter_mixture(operand, args, context_, ##__VA_ARGS__)) { \
+#define CHECK_CALL_PARAMETER_MIXTURE_OR_RETURN(context_, ...) if (!check_call_parameter_mixture(args, context_, ##__VA_ARGS__)) { \
 	operand->mode = Addressing_Invalid; \
 	operand->expr = call; \
 	return Expr_Stmt; \
