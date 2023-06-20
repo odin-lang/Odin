@@ -6898,9 +6898,6 @@ gb_internal CallArgumentData check_call_arguments_new_and_improved(CheckerContex
 		Entity *e = entity_of_node(ident);
 
 		TokenPos pos = ast_token(call).pos;
-		if (pos.line == 282 && pos.column == 9 && is_type_polymorphic(proc_type)) {
-			// GB_PANIC("HERE! %s\n", expr_to_string(call));
-		}
 
 		CallArgumentError err = check_call_arguments_internal(c, call, proc_type, e, positional_operands, named_operands, CallArgumentMode_ShowErrors, &data);
 		gb_unused(err);
@@ -6908,6 +6905,7 @@ gb_internal CallArgumentData check_call_arguments_new_and_improved(CheckerContex
 		add_entity_use(c, ident, entity_to_use);
 		if (entity_to_use != nullptr) {
 			update_untyped_expr_type(c, operand->expr, entity_to_use->type, true);
+			add_type_and_value(c, operand->expr, operand->mode, entity_to_use->type, operand->value);
 		}
 		if (data.gen_entity != nullptr) {
 			Entity *e = data.gen_entity;
@@ -6931,6 +6929,7 @@ gb_internal CallArgumentData check_call_arguments_new_and_improved(CheckerContex
 				Type *t = base_type(entity_to_use->type);
 				// GB_ASSERT_MSG(!is_type_polymorphic(t), "%s", expr_to_string(call));
 				data.result_type = t->Proc.results;
+
 			}
 		}
 	} else if (pt) {
@@ -6954,17 +6953,8 @@ gb_internal CallArgumentData check_call_arguments(CheckerContext *c, Operand *op
 		if (all_non_poly) {
 			return check_call_arguments_new_and_improved(c, operand, call);
 		}
-	}
-
-	if (operand->mode != Addressing_ProcGroup) {
-		bool is_poly = is_type_polymorphic(operand->type);
-		bool ok = !is_poly;
-		if (!ok && c->pkg->name == "bug") {
-			ok = true;
-		}
-		if (ok) {
-			return check_call_arguments_new_and_improved(c, operand, call);
-		}
+	} else {
+		return check_call_arguments_new_and_improved(c, operand, call);
 	}
 
 	ast_node(ce, CallExpr, call);

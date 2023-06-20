@@ -3250,7 +3250,7 @@ gb_internal lbValue lb_build_call_expr_internal_with_arg_split_args(lbProcedure 
 				args[i] = lb_handle_param_value(p, e->type, e->Variable.param_value, pos);
 				break;
 			case Entity_Constant:
-				GB_PANIC("TODO constant parameter");
+				args[i] = lb_handle_param_value(p, e->type, e->Constant.param_value, pos);
 				break;
 			}
 		} else {
