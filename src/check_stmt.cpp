@@ -2207,7 +2207,13 @@ gb_internal void check_return_stmt(CheckerContext *ctx, Ast *node) {
 	} else if (operands.count != result_count) {
 		// Ignore error message as it has most likely already been reported
 		if (all_operands_valid(operands)) {
-			error(node, "Expected %td return values, got %td", result_count, operands.count);
+			if (operands.count == 1) {
+				gbString t = type_to_string(operands[0].type);
+				error(node, "Expected %td return values, got %td (%s)", result_count, operands.count, t);
+				gb_string_free(t);
+			} else {
+				error(node, "Expected %td return values, got %td", result_count, operands.count);
+			}
 		}
 	} else {
 		for (isize i = 0; i < result_count; i++) {

@@ -2123,7 +2123,6 @@ gb_internal bool is_type_polymorphic(Type *t, bool or_specialized=false) {
 		if (t->Proc.is_polymorphic) {
 			return true;
 		}
-		#if 1
 		if (t->Proc.param_count > 0 &&
 		    is_type_polymorphic(t->Proc.params, or_specialized)) {
 			return true;
@@ -2132,7 +2131,6 @@ gb_internal bool is_type_polymorphic(Type *t, bool or_specialized=false) {
 		    is_type_polymorphic(t->Proc.results, or_specialized)) {
 			return true;
 		}
-		#endif
 		break;
 
 	case Type_Enum:

@@ -1416,7 +1416,7 @@ gb_internal ParameterValue handle_parameter_value(CheckerContext *ctx, Type *in_
 }
 
 
-gb_internal Type *check_get_params(CheckerContext *ctx, Scope *scope, Ast *_params, bool *is_variadic_, isize *variadic_index_, bool *success_, isize *specialization_count_, Array<Operand> *operands) {
+gb_internal Type *check_get_params(CheckerContext *ctx, Scope *scope, Ast *_params, bool *is_variadic_, isize *variadic_index_, bool *success_, isize *specialization_count_, Array<Operand> const *operands) {
 	if (_params == nullptr) {
 		return nullptr;
 	}
@@ -1664,80 +1664,81 @@ gb_internal Type *check_get_params(CheckerContext *ctx, Scope *scope, Ast *_para
 				ExactValue poly_const = {};
 
 				if (operands != nullptr && variables.count < operands->count) {
-
 					Operand op = (*operands)[variables.count];
-					if (op.expr == nullptr) {
-						// NOTE(bill): 2019-03-30
-						// This is just to add the error message to determine_type_from_polymorphic which
-						// depends on valid position information
-						op.expr = _params;
-						op.mode = Addressing_Invalid;
-						op.type = t_invalid;
-					}
-					if (is_type_polymorphic_type) {
-						type = determine_type_from_polymorphic(ctx, type, op);
-						if (type == t_invalid) {
-							success = false;
-						} else if (!ctx->no_polymorphic_errors) {
-							// NOTE(bill): The type should be determined now and thus, no need to determine the type any more
-							is_type_polymorphic_type = false;
-							Entity *proc_entity = entity_from_expr(op.expr);
-							if ((proc_entity != nullptr) && (op.value.kind == ExactValue_Procedure)) {
-								if (is_type_polymorphic(proc_entity->type, false)) {
-									error(op.expr, "Cannot determine complete type of partial polymorphic procedure");
+					{
+						if (op.expr == nullptr) {
+							// NOTE(bill): 2019-03-30
+							// This is just to add the error message to determine_type_from_polymorphic which
+							// depends on valid position information
+							op.expr = _params;
+							op.mode = Addressing_Invalid;
+							op.type = t_invalid;
+						}
+						if (is_type_polymorphic_type) {
+							type = determine_type_from_polymorphic(ctx, type, op);
+							if (type == t_invalid) {
+								success = false;
+							} else if (!ctx->no_polymorphic_errors) {
+								// NOTE(bill): The type should be determined now and thus, no need to determine the type any more
+								is_type_polymorphic_type = false;
+								Entity *proc_entity = entity_from_expr(op.expr);
+								if ((proc_entity != nullptr) && (op.value.kind == ExactValue_Procedure)) {
+									if (is_type_polymorphic(proc_entity->type, false)) {
+										error(op.expr, "Cannot determine complete type of partial polymorphic procedure");
+									}
 								}
 							}
 						}
-					}
-					if (is_poly_name) {
-						bool valid = false;
-						if (is_type_proc(op.type)) {
-							Ast *expr = unparen_expr(op.expr);
-							Entity *proc_entity = entity_from_expr(expr);
-							if (proc_entity) {
-								poly_const = exact_value_procedure(proc_entity->identifier.load() ? proc_entity->identifier.load() : op.expr);
-								valid = true;
-							} else if (expr->kind == Ast_ProcLit) {
-								poly_const = exact_value_procedure(expr);
-								valid = true;
+						if (is_poly_name) {
+							bool valid = false;
+							if (is_type_proc(op.type)) {
+								Ast *expr = unparen_expr(op.expr);
+								Entity *proc_entity = entity_from_expr(expr);
+								if (proc_entity) {
+									poly_const = exact_value_procedure(proc_entity->identifier.load() ? proc_entity->identifier.load() : op.expr);
+									valid = true;
+								} else if (expr->kind == Ast_ProcLit) {
+									poly_const = exact_value_procedure(expr);
+									valid = true;
+								}
+							}
+							if (!valid) {
+								if (op.mode == Addressing_Constant) {
+									poly_const = op.value;
+								} else {
+									error(op.expr, "Expected a constant value for this polymorphic name parameter, got %s", expr_to_string(op.expr));
+									success = false;
+								}
 							}
 						}
-						if (!valid) {
-							if (op.mode == Addressing_Constant) {
-								poly_const = op.value;
-							} else {
-								error(op.expr, "Expected a constant value for this polymorphic name parameter, got %s", expr_to_string(op.expr));
+						if (type != t_invalid && !check_is_assignable_to(ctx, &op, type)) {
+							bool ok = true;
+							if (p->flags&FieldFlag_any_int) {
+								if ((!is_type_integer(op.type) && !is_type_enum(op.type)) || (!is_type_integer(type) && !is_type_enum(type))) {
+									ok = false;
+								} else if (!check_is_castable_to(ctx, &op, type)) {
+									ok = false;
+								}
+							}
+							if (!ok) {
 								success = false;
+								#if 0
+									gbString got = type_to_string(op.type);
+									gbString expected = type_to_string(type);
+									error(op.expr, "Cannot assigned type to parameter, got type '%s', expected '%s'", got, expected);
+									gb_string_free(expected);
+									gb_string_free(got);
+								#endif
 							}
 						}
-					}
-					if (type != t_invalid && !check_is_assignable_to(ctx, &op, type)) {
-						bool ok = true;
-						if (p->flags&FieldFlag_any_int) {
-							if ((!is_type_integer(op.type) && !is_type_enum(op.type)) || (!is_type_integer(type) && !is_type_enum(type))) {
-								ok = false;
-							} else if (!check_is_castable_to(ctx, &op, type)) {
-								ok = false;
-							}
-						}
-						if (!ok) {
-							success = false;
-							#if 0
-								gbString got = type_to_string(op.type);
-								gbString expected = type_to_string(type);
-								error(op.expr, "Cannot assigned type to parameter, got type '%s', expected '%s'", got, expected);
-								gb_string_free(expected);
-								gb_string_free(got);
-							#endif
-						}
-					}
 
-					if (is_type_untyped(default_type(type))) {
-						gbString str = type_to_string(type);
-						error(op.expr, "Cannot determine type from the parameter, got '%s'", str);
-						gb_string_free(str);
-						success = false;
-						type = t_invalid;
+						if (is_type_untyped(default_type(type))) {
+							gbString str = type_to_string(type);
+							error(op.expr, "Cannot determine type from the parameter, got '%s'", str);
+							gb_string_free(str);
+							success = false;
+							type = t_invalid;
+						}
 					}
 				}
 
@@ -1967,7 +1968,7 @@ gb_internal Type *check_get_results(CheckerContext *ctx, Scope *scope, Ast *_res
 
 
 // NOTE(bill): 'operands' is for generating non generic procedure type
-gb_internal bool check_procedure_type(CheckerContext *ctx, Type *type, Ast *proc_type_node, Array<Operand> *operands) {
+gb_internal bool check_procedure_type(CheckerContext *ctx, Type *type, Ast *proc_type_node, Array<Operand> const *operands) {
 	ast_node(pt, ProcType, proc_type_node);
 
 	if (ctx->polymorphic_scope == nullptr && ctx->allow_polymorphic_types) {
