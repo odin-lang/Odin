@@ -5447,6 +5447,9 @@ gb_internal CallArgumentError check_call_arguments_internal(CheckerContext *c, A
 		}
 	}
 
+	isize dummy_argument_count = 0;
+	bool actually_variadic = false;
+
 	if (variadic) {
 		if (visited[pt->variadic_index] &&
 		    positional_operand_count < positional_operands.count) {
@@ -5461,6 +5464,7 @@ gb_internal CallArgumentError check_call_arguments_internal(CheckerContext *c, A
 			if (vari_expand) {
 				GB_ASSERT(variadic_operands.count != 0);
 				ordered_operands[pt->variadic_index] = variadic_operands[0];
+				actually_variadic = true;
 			} else {
 				AstFile *f = call->file();
 
@@ -5470,6 +5474,7 @@ gb_internal CallArgumentError check_call_arguments_internal(CheckerContext *c, A
 				o.expr = ast_ident(f, make_token_ident("nil"));
 				o.expr->Ident.token.pos = ast_token(call).pos;
 				if (variadic_operands.count != 0) {
+					actually_variadic = true;
 					o.expr->Ident.token.pos = ast_token(variadic_operands[0].expr).pos;
 
 					Entity *vt = pt->params->Tuple.variables[pt->variadic_index];
@@ -5479,6 +5484,7 @@ gb_internal CallArgumentError check_call_arguments_internal(CheckerContext *c, A
 						o.type = vt->type;
 					}
 				} else {
+					dummy_argument_count += 1;
 					o.type = t_untyped_nil;
 				}
 				ordered_operands[pt->variadic_index] = o;
@@ -5504,6 +5510,8 @@ gb_internal CallArgumentError check_call_arguments_internal(CheckerContext *c, A
 					ordered_operands[i].mode = Addressing_Value;
 					ordered_operands[i].type = e->type;
 					ordered_operands[i].expr = e->Variable.param_value.original_ast_expr;
+
+					dummy_argument_count += 1;
 					score += assign_score_function(1);
 					continue;
 				}
@@ -5603,7 +5611,9 @@ gb_internal CallArgumentError check_call_arguments_internal(CheckerContext *c, A
 				} else if (show_error) {
 					check_assignment(c, o, e->type, str_lit("procedure argument"));
 				}
-				score += s;
+				if (!param_is_variadic) {
+					score += s;
+				}
 			}
 
 			if (o->mode == Addressing_Type && is_type_typeid(e->type)) {
@@ -6070,8 +6080,9 @@ gb_internal CallArgumentData check_call_arguments_new_and_improved_proc_group(Ch
 
 		CallArgumentError err = check_call_arguments_internal(c, call, e->type, e, positional_operands, named_operands, CallArgumentMode_ShowErrors, &data);
 		if (err != CallArgumentError_None) {
-			// handle error
+
 		}
+
 
 		Type *proc_type = base_type(operand->type);
 
@@ -6086,8 +6097,6 @@ gb_internal CallArgumentData check_call_arguments_new_and_improved_proc_group(Ch
 		if (proc_type && proc_type->kind == Type_Proc) {
 			data.result_type = proc_type->Proc.results;
 			add_type_and_value(c, operand->expr, operand->mode, proc_type, operand->value);
-		} else if (err == CallArgumentError_None) {
-			data.result_type = nullptr;
 		}
 
 		if (data.gen_entity != nullptr) {
@@ -6108,6 +6117,7 @@ gb_internal CallArgumentData check_call_arguments_new_and_improved_proc_group(Ch
 				check_procedure_later(c->checker, e->file, e->token, decl, e->type, decl->proc_lit->ProcLit.body, decl->proc_lit->ProcLit.tags);
 			}
 		}
+
 		return data;
 	}
 
@@ -6419,6 +6429,7 @@ gb_internal CallArgumentData check_call_arguments_new_and_improved_proc_group(Ch
 		Entity *entity_to_use = data.gen_entity != nullptr ? data.gen_entity : e;
 		add_entity_use(c, ident, entity_to_use);
 		if (entity_to_use != nullptr) {
+			proc_type = base_type(entity_to_use->type);
 			update_untyped_expr_type(c, operand->expr, entity_to_use->type, true);
 			add_type_and_value(c, operand->expr, operand->mode, entity_to_use->type, operand->value);
 		}
@@ -6441,6 +6452,11 @@ gb_internal CallArgumentData check_call_arguments_new_and_improved_proc_group(Ch
 				check_procedure_later(c->checker, e->file, e->token, decl, e->type, decl->proc_lit->ProcLit.body, decl->proc_lit->ProcLit.tags);
 			}
 		}
+
+		if (is_type_proc(proc_type)) {
+			data.result_type = proc_type->Proc.results;
+		}
+
 		return data;
 	}
 
