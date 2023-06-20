@@ -38,9 +38,9 @@ gb_global char const *CallArgumentError_strings[CallArgumentError_MAX] = {
 };
 
 
-enum CallArgumentErrorMode {
-	CallArgumentMode_NoErrors,
-	CallArgumentMode_ShowErrors,
+enum struct CallArgumentErrorMode {
+	NoErrors,
+	ShowErrors,
 };
 
 struct CallArgumentData {
@@ -5362,7 +5362,11 @@ gb_internal isize lookup_procedure_parameter(Type *type, String const &parameter
 	return lookup_procedure_parameter(&type->Proc, parameter_name);
 }
 
-gb_internal CallArgumentError check_call_arguments_internal(CheckerContext *c, Ast *call, Type *proc_type, Entity *entity, Array<Operand> positional_operands, Array<Operand> const &named_operands, CallArgumentErrorMode show_error_mode, CallArgumentData *data) {
+gb_internal CallArgumentError check_call_arguments_internal(CheckerContext *c, Ast *call,
+	Entity *entity, Type *proc_type,
+	Array<Operand> positional_operands, Array<Operand> const &named_operands,
+	CallArgumentErrorMode show_error_mode,
+	CallArgumentData *data) {
 	TEMPORARY_ALLOCATOR_GUARD();
 
 	CallArgumentError err = CallArgumentError_None;
@@ -5377,7 +5381,7 @@ gb_internal CallArgumentError check_call_arguments_internal(CheckerContext *c, A
 	bool variadic = pt->variadic;
 	bool vari_expand = (ce->ellipsis.pos.line != 0);
 	i64 score = 0;
-	bool show_error = show_error_mode == CallArgumentMode_ShowErrors;
+	bool show_error = show_error_mode == CallArgumentErrorMode::ShowErrors;
 
 	Type *final_proc_type = proc_type;
 	Entity *gen_entity = nullptr;
@@ -6000,7 +6004,7 @@ gb_internal bool check_call_arguments_new_and_improved_single(CheckerContext *c,
 	CallArgumentErrorMode show_error_mode,
 	CallArgumentData *data) {
 
-	bool return_on_failure = show_error_mode == CallArgumentMode_NoErrors;
+	bool return_on_failure = show_error_mode == CallArgumentErrorMode::NoErrors;
 
 	Ast *ident = operand->expr;
 	while (ident->kind == Ast_SelectorExpr) {
@@ -6017,7 +6021,7 @@ gb_internal bool check_call_arguments_new_and_improved_single(CheckerContext *c,
 	proc_type = base_type(proc_type);
 	GB_ASSERT(proc_type->kind == Type_Proc);
 
-	CallArgumentError err = check_call_arguments_internal(c, call, proc_type, e, positional_operands, named_operands, show_error_mode, data);
+	CallArgumentError err = check_call_arguments_internal(c, call, e, proc_type, positional_operands, named_operands, show_error_mode, data);
 	if (return_on_failure && err != CallArgumentError_None) {
 		return false;
 	}
@@ -6158,22 +6162,18 @@ gb_internal CallArgumentData check_call_arguments_new_and_improved_proc_group(Ch
 	defer (array_free(&named_operands));
 
 	if (procs.count == 1) {
-
-
 		Entity *e = procs[0];
 
 		lhs = populate_proc_parameter_list(c, e->type, &lhs_count, &is_variadic);
 		check_unpack_arguments(c, lhs, lhs_count, &positional_operands, positional_args, is_variadic ? UnpackFlag_IsVariadic : UnpackFlag_None);
 
-		if (!check_named_arguments(c, e->type, named_args, &named_operands, true)) {
-			return data;
+		if (check_named_arguments(c, e->type, named_args, &named_operands, true)) {
+			check_call_arguments_new_and_improved_single(c, call, operand,
+				e, e->type,
+				positional_operands, named_operands,
+				CallArgumentErrorMode::ShowErrors,
+				&data);
 		}
-
-		check_call_arguments_new_and_improved_single(c, call, operand,
-			e, e->type,
-			positional_operands, named_operands,
-			CallArgumentMode_ShowErrors,
-			&data);
 		return data;
 	}
 
@@ -6295,7 +6295,7 @@ gb_internal CallArgumentData check_call_arguments_new_and_improved_proc_group(Ch
 			bool is_a_candidate = check_call_arguments_new_and_improved_single(&ctx, call, operand,
 				p, pt,
 				positional_operands, named_operands,
-				CallArgumentMode_NoErrors,
+				CallArgumentErrorMode::NoErrors,
 				&data);
 			if (!is_a_candidate) {
 				continue;
@@ -6471,7 +6471,7 @@ gb_internal CallArgumentData check_call_arguments_new_and_improved_proc_group(Ch
 		check_call_arguments_new_and_improved_single(c, call, operand,
 			e, e->type,
 			positional_operands, named_operands,
-			CallArgumentMode_ShowErrors,
+			CallArgumentErrorMode::ShowErrors,
 			&data);
 		return data;
 	}
@@ -6583,7 +6583,7 @@ gb_internal CallArgumentData check_call_arguments_new_and_improved(CheckerContex
 		check_call_arguments_new_and_improved_single(c, call, operand,
 			nullptr, nullptr,
 			positional_operands, named_operands,
-			CallArgumentMode_ShowErrors,
+			CallArgumentErrorMode::ShowErrors,
 			&data);
 	} else if (pt) {
 		data.result_type = pt->results;
