@@ -676,6 +676,11 @@ gb_internal i64 check_distance_between_types(CheckerContext *c, Operand *operand
 								return 1;
 							}
 							break;
+						case Basic_UntypedString:
+							if (is_type_string(dst)) {
+								return 1;
+							}
+							break;
 						case Basic_UntypedFloat:
 							if (is_type_float(dst)) {
 								return 1;
@@ -701,33 +706,48 @@ gb_internal i64 check_distance_between_types(CheckerContext *c, Operand *operand
 				return -1;
 			}
 			if (src->kind == Type_Basic) {
+				i64 score = -1;
 				switch (src->Basic.kind) {
 				case Basic_UntypedRune:
 					if (is_type_integer(dst) || is_type_rune(dst)) {
-						if (is_type_typed(type)) {
-							return 2;
-						}
-						return 1;
+						score = 1;
 					}
-					return -1;
-				case Basic_UntypedBool:
-					if (is_type_boolean(dst)) {
-						if (is_type_typed(type)) {
-							return 2;
-						}
-						return 1;
+					break;
+				case Basic_UntypedInteger:
+					if (is_type_integer(dst) || is_type_rune(dst)) {
+						score = 1;
 					}
-					return -1;
+					break;
 				case Basic_UntypedString:
-					if (is_type_string(dst) || is_type_cstring(dst)) {
-						if (is_type_typed(type)) {
-							return 2;
-						}
-						return 1;
+					if (is_type_string(dst)) {
+						score = 1;
 					}
-					return -1;
+					break;
+				case Basic_UntypedFloat:
+					if (is_type_float(dst)) {
+						score = 1;
+					}
+					break;
+				case Basic_UntypedComplex:
+					if (is_type_complex(dst)) {
+						score = 1;
+					}
+					if (is_type_quaternion(dst)) {
+						score = 2;
+					}
+					break;
+				case Basic_UntypedQuaternion:
+					if (is_type_quaternion(dst)) {
+						score = 1;
+					}
+					break;
 				}
-
+				if (score > 0) {
+					if (is_type_typed(dst)) {
+						score += 1;
+					}
+				}
+				return score;
 			}
 		}
 	}
@@ -5447,14 +5467,9 @@ gb_internal CallArgumentError check_call_arguments_internal(CheckerContext *c, A
 				err = CallArgumentError_DuplicateParameter;
 				continue;
 			}
-			Entity *e = pt->params->Tuple.variables[param_index];
-
-			check_assignment(c, &operand, e->type, str_lit("named argument"));
 
 			visited[param_index] = true;
 			ordered_operands[param_index] = operand;
-
-			err = CallArgumentError_DuplicateParameter;
 		}
 	}
 
@@ -5469,7 +5484,7 @@ gb_internal CallArgumentError check_call_arguments_internal(CheckerContext *c, A
 				error(call, "Variadic parameters already handled with a named argument '%.*s' in procedure call", LIT(name));
 			}
 			err = CallArgumentError_DuplicateParameter;
-		} else {
+		} else if (!visited[pt->variadic_index]) {
 			visited[pt->variadic_index] = true;
 
 			Operand *variadic_operand = &ordered_operands[pt->variadic_index];
@@ -5548,6 +5563,52 @@ gb_internal CallArgumentError check_call_arguments_internal(CheckerContext *c, A
 		}
 	}
 
+	auto eval_param_and_score = [](CheckerContext *c, Operand *o, Type *param_type, CallArgumentError &err, bool param_is_variadic, Entity *e, bool show_error) -> i64 {
+		i64 s = 0;
+		if (!check_is_assignable_to_with_score(c, o, param_type, &s, param_is_variadic)) {
+			bool ok = false;
+			if (e && e->flags & EntityFlag_AnyInt) {
+				if (is_type_integer(param_type)) {
+					ok = check_is_castable_to(c, o, param_type);
+				}
+			}
+			if (ok) {
+				s = assign_score_function(MAXIMUM_TYPE_DISTANCE);
+			} else {
+				if (show_error) {
+					check_assignment(c, o, param_type, str_lit("procedure argument"));
+				}
+				err = CallArgumentError_WrongTypes;
+			}
+
+		} else if (show_error) {
+			check_assignment(c, o, param_type, str_lit("procedure argument"));
+		}
+
+		if (e && e->flags & EntityFlag_ConstInput) {
+			if (o->mode != Addressing_Constant) {
+				if (show_error) {
+					error(o->expr, "Expected a constant value for the argument '%.*s'", LIT(e->token.string));
+				}
+				err = CallArgumentError_NoneConstantParameter;
+			}
+		}
+
+
+		if (!err && is_type_any(param_type)) {
+			add_type_info_type(c, o->type);
+		}
+		if (o->mode == Addressing_Type && is_type_typeid(param_type)) {
+			add_type_info_type(c, o->type);
+			add_type_and_value(c, o->expr, Addressing_Value, param_type, exact_value_typeid(o->type));
+		} else if (show_error && is_type_untyped(o->type)) {
+			update_untyped_expr_type(c, o->expr, param_type, true);
+		}
+
+		return s;
+	};
+
+
 	if (ordered_operands.count == 0 && param_count_excluding_defaults == 0) {
 		err = CallArgumentError_None;
 
@@ -5555,7 +5616,9 @@ gb_internal CallArgumentError check_call_arguments_internal(CheckerContext *c, A
 			GB_ASSERT(pt->params != nullptr && pt->params->Tuple.variables.count > 0);
 			Type *t = pt->params->Tuple.variables[0]->type;
 			if (is_type_polymorphic(t)) {
-				error(call, "Ambiguous call to a polymorphic variadic procedure with no variadic input");
+				if (show_error) {
+					error(call, "Ambiguous call to a polymorphic variadic procedure with no variadic input");
+				}
 				err = CallArgumentError_AmbiguousPolymorphicVariadic;
 			}
 		}
@@ -5596,46 +5659,14 @@ gb_internal CallArgumentError check_call_arguments_internal(CheckerContext *c, A
 				} else {
 					score += assign_score_function(MAXIMUM_TYPE_DISTANCE);
 				}
-			} else {
-				i64 s = 0;
-				if (!check_is_assignable_to_with_score(c, o, e->type, &s, param_is_variadic)) {
-					bool ok = false;
-					if (e->flags & EntityFlag_AnyInt) {
-						if (is_type_integer(e->type)) {
-							ok = check_is_castable_to(c, o, e->type);
-						}
-					}
-					if (ok) {
-						s = assign_score_function(MAXIMUM_TYPE_DISTANCE);
-					} else {
-						if (show_error) {
-							check_assignment(c, o, e->type, str_lit("procedure argument"));
-						}
-						err = CallArgumentError_WrongTypes;
-					}
-
-					if (e->flags & EntityFlag_ConstInput) {
-						if (o->mode != Addressing_Constant) {
-							if (show_error) {
-								error(o->expr, "Expected a constant value for the argument '%.*s'", LIT(e->token.string));
-							}
-							err = CallArgumentError_NoneConstantParameter;
-						}
-					}
-				} else if (show_error) {
-					check_assignment(c, o, e->type, str_lit("procedure argument"));
-				}
-				if (!param_is_variadic) {
-					score += s;
-				}
+				continue;
 			}
 
-			if (o->mode == Addressing_Type && is_type_typeid(e->type)) {
-				add_type_info_type(c, o->type);
-				add_type_and_value(c, o->expr, Addressing_Value, e->type, exact_value_typeid(o->type));
-			} else if (show_error && is_type_untyped(o->type)) {
-				update_untyped_expr_type(c, o->expr, e->type, true);
+			if (param_is_variadic) {
+				continue;
 			}
+
+			score += eval_param_and_score(c, o, e->type, err, param_is_variadic, e, show_error);
 		}
 	}
 
@@ -5651,12 +5682,12 @@ gb_internal CallArgumentError check_call_arguments_internal(CheckerContext *c, A
 		}
 
 		for_array(operand_index, variadic_operands) {
-			Operand &o = variadic_operands[operand_index];
+			Operand *o = &variadic_operands[operand_index];
 			if (vari_expand) {
 				t = slice;
 				if (operand_index > 0) {
 					if (show_error) {
-						error(o.expr, "'..' in a variadic procedure can only have one variadic argument at the end");
+						error(o->expr, "'..' in a variadic procedure can only have one variadic argument at the end");
 					}
 					if (data) {
 						data->score = score;
@@ -5666,25 +5697,7 @@ gb_internal CallArgumentError check_call_arguments_internal(CheckerContext *c, A
 					return CallArgumentError_MultipleVariadicExpand;
 				}
 			}
-			i64 s = 0;
-			if (!check_is_assignable_to_with_score(c, &o, t, &s, true)) {
-				if (show_error) {
-					check_assignment(c, &o, t, str_lit("variadic argument"));
-				}
-				err = CallArgumentError_WrongTypes;
-			} else if (show_error) {
-				check_assignment(c, &o, t, str_lit("variadic argument"));
-			}
-			score += s;
-			if (is_type_any(elem)) {
-				add_type_info_type(c, o.type);
-			}
-			if (o.mode == Addressing_Type && is_type_typeid(t)) {
-				add_type_info_type(c, o.type);
-				add_type_and_value(c, o.expr, Addressing_Value, t, exact_value_typeid(o.type));
-			} else if (show_error && is_type_untyped(o.type)) {
-				update_untyped_expr_type(c, o.expr, t, true);
-			}
+			score += eval_param_and_score(c, o, t, err, true, nullptr, show_error);
 		}
 	}
 
