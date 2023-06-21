@@ -65,8 +65,6 @@ config_darwin() {
 	LDFLAGS="$LDFLAGS -liconv -ldl -framework System"
 	CXXFLAGS="$CXXFLAGS $($LLVM_CONFIG --cxxflags --ldflags)"
 	LDFLAGS="$LDFLAGS -lLLVM-C"
-
-	build_stb
 }
 
 config_freebsd() {
