@@ -3265,17 +3265,16 @@ gb_internal lbValue lb_build_call_expr_internal(lbProcedure *p, Ast *expr) {
 				GB_ASSERT(slice_type->kind == Type_Slice);
 
 				if (is_c_vararg) {
-					GB_PANIC("TODO #c_vararg");
 					GB_ASSERT(!vari_expand);
 
 					Type *elem_type = slice_type->Slice.elem;
 
 					for (Ast *var_arg : variadic) {
 						lbValue arg = lb_build_expr(p, var_arg);
-						if (!is_type_any(elem_type)) {
-							array_add(&args, lb_emit_conv(p, arg, elem_type));
-						} else {
+						if (is_type_any(elem_type)) {
 							array_add(&args, lb_emit_conv(p, arg, default_type(arg.type)));
+						} else {
+							array_add(&args, lb_emit_conv(p, arg, elem_type));
 						}
 					}
 					break;
@@ -3321,7 +3320,9 @@ gb_internal lbValue lb_build_call_expr_internal(lbProcedure *p, Ast *expr) {
 		}
 	}
 
-	array_resize(&args, pt->param_count);
+	if (!is_c_vararg) {
+		array_resize(&args, pt->param_count);
+	}
 
 	for (Ast *arg : ce->split_args->named) {
 		ast_node(fv, FieldValue, arg);
@@ -3343,6 +3344,9 @@ gb_internal lbValue lb_build_call_expr_internal(lbProcedure *p, Ast *expr) {
 		GB_ASSERT(args.count >= pt->params->Tuple.variables.count);
 		for_array(arg_index, pt->params->Tuple.variables) {
 			Entity *e = pt->params->Tuple.variables[arg_index];
+			if (pt->variadic && arg_index == pt->variadic_index) {
+				continue;
+			}
 
 			lbValue arg = args[arg_index];
 			if (arg.value == nullptr) {
@@ -3365,7 +3369,6 @@ gb_internal lbValue lb_build_call_expr_internal(lbProcedure *p, Ast *expr) {
 			}
 		}
 	}
-
 
 	isize final_count = is_c_vararg ? args.count : pt->param_count;
 	auto call_args = array_slice(args, 0, final_count);
