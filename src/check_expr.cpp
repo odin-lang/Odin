@@ -5893,7 +5893,7 @@ gb_internal bool check_named_arguments(CheckerContext *c, Type *type, Slice<Ast 
 	return success;
 }
 
-gb_internal bool check_call_arguments_new_and_improved_single(CheckerContext *c, Ast *call, Operand *operand,
+gb_internal bool check_call_arguments_single(CheckerContext *c, Ast *call, Operand *operand,
 	Entity *e, Type *proc_type,
 	Array<Operand> const &positional_operands, Array<Operand> const &named_operands,
 	CallArgumentErrorMode show_error_mode,
@@ -5963,7 +5963,7 @@ gb_internal bool check_call_arguments_new_and_improved_single(CheckerContext *c,
 }
 
 
-gb_internal CallArgumentData check_call_arguments_new_and_improved_proc_group(CheckerContext *c, Operand *operand, Ast *call) {
+gb_internal CallArgumentData check_call_arguments_proc_group(CheckerContext *c, Operand *operand, Ast *call) {
 	ast_node(ce, CallExpr, call);
 	GB_ASSERT(ce->split_args != nullptr);
 
@@ -6063,7 +6063,7 @@ gb_internal CallArgumentData check_call_arguments_new_and_improved_proc_group(Ch
 		check_unpack_arguments(c, lhs, lhs_count, &positional_operands, positional_args, is_variadic ? UnpackFlag_IsVariadic : UnpackFlag_None);
 
 		if (check_named_arguments(c, e->type, named_args, &named_operands, true)) {
-			check_call_arguments_new_and_improved_single(c, call, operand,
+			check_call_arguments_single(c, call, operand,
 				e, e->type,
 				positional_operands, named_operands,
 				CallArgumentErrorMode::ShowErrors,
@@ -6187,7 +6187,7 @@ gb_internal CallArgumentData check_call_arguments_new_and_improved_proc_group(Ch
 			ctx.allow_polymorphic_types = is_type_polymorphic(pt);
 			ctx.hide_polymorphic_errors = true;
 
-			bool is_a_candidate = check_call_arguments_new_and_improved_single(&ctx, call, operand,
+			bool is_a_candidate = check_call_arguments_single(&ctx, call, operand,
 				p, pt,
 				positional_operands, named_operands,
 				CallArgumentErrorMode::NoErrors,
@@ -6363,7 +6363,7 @@ gb_internal CallArgumentData check_call_arguments_new_and_improved_proc_group(Ch
 
 		Array<Operand> named_operands = {};
 
-		check_call_arguments_new_and_improved_single(c, call, operand,
+		check_call_arguments_single(c, call, operand,
 			e, e->type,
 			positional_operands, named_operands,
 			CallArgumentErrorMode::ShowErrors,
@@ -6375,7 +6375,7 @@ gb_internal CallArgumentData check_call_arguments_new_and_improved_proc_group(Ch
 }
 
 
-gb_internal CallArgumentData check_call_arguments_new_and_improved(CheckerContext *c, Operand *operand, Ast *call) {
+gb_internal CallArgumentData check_call_arguments(CheckerContext *c, Operand *operand, Ast *call) {
 	Type *proc_type = nullptr;
 
 	CallArgumentData data = {};
@@ -6418,7 +6418,7 @@ gb_internal CallArgumentData check_call_arguments_new_and_improved(CheckerContex
 	}
 
 	if (operand->mode == Addressing_ProcGroup) {
-		return check_call_arguments_new_and_improved_proc_group(c, operand, call);
+		return check_call_arguments_proc_group(c, operand, call);
 	}
 
 	auto positional_operands = array_make<Operand>(heap_allocator(), 0, positional_args.count);
@@ -6473,7 +6473,7 @@ gb_internal CallArgumentData check_call_arguments_new_and_improved(CheckerContex
 	}
 
 	if (!any_failure) {
-		check_call_arguments_new_and_improved_single(c, call, operand,
+		check_call_arguments_single(c, call, operand,
 			nullptr, nullptr,
 			positional_operands, named_operands,
 			CallArgumentErrorMode::ShowErrors,
@@ -7045,7 +7045,7 @@ gb_internal ExprKind check_call_expr(CheckerContext *c, Operand *operand, Ast *c
 		}
 	}
 
-	CallArgumentData data = check_call_arguments_new_and_improved(c, operand, call);
+	CallArgumentData data = check_call_arguments(c, operand, call);
 	Type *result_type = data.result_type;
 	gb_zero_item(operand);
 	operand->expr = call;
