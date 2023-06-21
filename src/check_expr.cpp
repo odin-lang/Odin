@@ -5908,11 +5908,13 @@ gb_internal bool check_call_arguments_single(CheckerContext *c, Ast *call, Opera
 	}
 
 	if (e == nullptr) {
-		GB_ASSERT(proc_type == nullptr);
 		e = entity_of_node(ident);
-		proc_type = e->type;
+		if (e != nullptr) {
+			proc_type = e->type;
+		}
 	}
 
+	GB_ASSERT(proc_type != nullptr);
 	proc_type = base_type(proc_type);
 	GB_ASSERT(proc_type->kind == Type_Proc);
 
@@ -5922,12 +5924,10 @@ gb_internal bool check_call_arguments_single(CheckerContext *c, Ast *call, Opera
 	}
 
 	Entity *entity_to_use = data->gen_entity != nullptr ? data->gen_entity : e;
-	if (!return_on_failure) {
+	if (!return_on_failure && entity_to_use != nullptr) {
 		add_entity_use(c, ident, entity_to_use);
-		if (entity_to_use != nullptr) {
-			update_untyped_expr_type(c, operand->expr, entity_to_use->type, true);
-			add_type_and_value(c, operand->expr, operand->mode, entity_to_use->type, operand->value);
-		}
+		update_untyped_expr_type(c, operand->expr, entity_to_use->type, true);
+		add_type_and_value(c, operand->expr, operand->mode, entity_to_use->type, operand->value);
 	}
 
 	if (data->gen_entity != nullptr) {
@@ -6474,7 +6474,7 @@ gb_internal CallArgumentData check_call_arguments(CheckerContext *c, Operand *op
 
 	if (!any_failure) {
 		check_call_arguments_single(c, call, operand,
-			nullptr, nullptr,
+			nullptr, proc_type,
 			positional_operands, named_operands,
 			CallArgumentErrorMode::ShowErrors,
 			&data);
