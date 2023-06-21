@@ -3168,9 +3168,12 @@ gb_internal lbValue lb_build_call_expr_internal_with_arg_split_args(lbProcedure 
 		if (e->kind == Entity_TypeName) {
 			array_add(&args, lb_const_nil(p->module, e->type));
 			continue;
-		} else if (e->kind != Entity_Variable) {
+		} else if (e->kind == Entity_Constant) {
+			array_add(&args, lb_const_value(p->module, e->type, e->Constant.value));
 			continue;
 		}
+
+		GB_ASSERT(e->kind == Entity_Variable);
 
 		if (pt->variadic && pt->variadic_index == i) {
 			lbValue variadic_args = lb_const_nil(p->module, e->type);
@@ -3238,23 +3241,30 @@ gb_internal lbValue lb_build_call_expr_internal_with_arg_split_args(lbProcedure 
 
 	TokenPos pos = ast_token(ce->proc).pos;
 
-	for_array(i, args) {
-		Entity *e = pt->params->Tuple.variables[i];
-		lbValue arg = args[i];
-		if (arg.value == nullptr) {
-			switch (e->kind) {
-			case Entity_TypeName:
-				args[i] = lb_const_nil(p->module, e->type);
-				break;
-			case Entity_Variable:
-				args[i] = lb_handle_param_value(p, e->type, e->Variable.param_value, pos);
-				break;
-			case Entity_Constant:
-				args[i] = lb_handle_param_value(p, e->type, e->Constant.param_value, pos);
-				break;
+
+	if (pt->params != nullptr)  {
+		for_array(arg_index, pt->params->Tuple.variables) {
+			Entity *e = pt->params->Tuple.variables[arg_index];
+
+			lbValue arg = args[arg_index];
+			if (arg.value == nullptr) {
+				switch (e->kind) {
+				case Entity_TypeName:
+					args[arg_index] = lb_const_nil(p->module, e->type);
+					break;
+				case Entity_Variable:
+					args[arg_index] = lb_handle_param_value(p, e->type, e->Variable.param_value, pos);
+					break;
+
+				case Entity_Constant:
+					args[arg_index] = lb_const_value(p->module, e->type, e->Constant.value);
+					break;
+				default:
+					GB_PANIC("Unknown entity kind %.*s\n", LIT(entity_strings[e->kind]));
+				}
+			} else {
+				args[arg_index] = lb_emit_conv(p, arg, e->type);
 			}
-		} else {
-			args[i] = lb_emit_conv(p, arg, e->type);
 		}
 	}
 
