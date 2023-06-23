@@ -47,6 +47,10 @@ import CA         "vendor:darwin/QuartzCore"
 // NOTE(bill): only one can be checked at a time
 import lua_5_4    "vendor:lua/5.4"
 
+import nvg       "vendor:nanovg"
+import nvg_gl    "vendor:nanovg/gl"
+import fontstash "vendor:fontstash"
+
 _ :: botan_bindings
 _ :: botan_blake2b
 _ :: gost
@@ -93,3 +97,7 @@ _ :: MTK
 _ :: CA
 
 _ :: lua_5_4
+
+_ :: nvg
+_ :: nvg_gl
+_ :: fontstash

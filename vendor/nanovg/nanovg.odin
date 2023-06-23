@@ -4,7 +4,6 @@ package nanovg
 // TODO rename enums to old nanovg style!
 
 import "core:mem"
-import "core:runtime"
 import "core:math"
 import "core:fmt"
 import "../fontstash"
@@ -452,10 +451,10 @@ RGBA :: proc(r, g, b, a: u8) -> (res: Color) {
 
 // Linearly interpolates from color c0 to c1, and returns resulting color value.
 LerpRGBA :: proc(c0, c1: Color, u: f32) -> (cint: Color) {
-	u := clamp(u, 0.0, 1.0)
-	oneminu := 1.0 - u
+	clamped := clamp(u, 0.0, 1.0)
+	oneminu := 1.0 - clamped
 	for i in 0..<4 {
-		cint[i] = c0[i] * oneminu + c1[i] * u
+		cint[i] = c0[i] * oneminu + c1[i] * clamped
 	}
 
 	return
@@ -469,8 +468,8 @@ HSL :: proc(h, s, l: f32) -> Color {
 
 // Returns color value specified by hue, saturation and lightness and alpha.
 // HSL values are all in range [0..1], alpha in range [0..255]
-HSLA :: proc(h, s, l: f32, a: u8) -> (col: Color) {
-	hue :: proc(h, m1, m2: f32) -> f32 {
+HSLA :: proc(hue, saturation, lightness: f32, a: u8) -> (col: Color) {
+	hue_get :: proc(h, m1, m2: f32) -> f32 {
 		h := h
 
 		if h < 0 {
@@ -492,17 +491,17 @@ HSLA :: proc(h, s, l: f32, a: u8) -> (col: Color) {
 		return m1
 	}
 
-	h := math.mod(h, 1.0)
+	h := math.mod(hue, 1.0)
 	if h < 0.0 {
 		h += 1.0
 	} 
-	s := clamp(s, 0.0, 1.0)
-	l := clamp(l, 0.0, 1.0)
+	s := clamp(saturation, 0.0, 1.0)
+	l := clamp(lightness, 0.0, 1.0)
 	m2 := l <= 0.5 ? (l * (1 + s)) : (l + s - l * s)
 	m1 := 2 * l - m2
-	col.r = clamp(hue(h + 1.0/3.0, m1, m2), 0.0, 1.0)
-	col.g = clamp(hue(h, m1, m2), 0.0, 1.0)
-	col.b = clamp(hue(h - 1.0/3.0, m1, m2), 0.0, 1.0)
+	col.r = clamp(hue_get(h + 1.0/3.0, m1, m2), 0.0, 1.0)
+	col.g = clamp(hue_get(h, m1, m2), 0.0, 1.0)
+	col.b = clamp(hue_get(h - 1.0/3.0, m1, m2), 0.0, 1.0)
 	col.a = f32(a) / 255.0
 	return
 }
@@ -919,8 +918,8 @@ CreateImageMem :: proc(ctx: ^Context, data: []byte, imageFlags: ImageFlags) -> i
 		return 0
 	}
 
-	data := mem.slice_ptr(img, int(w) * int(h) * int(n))
-	image := CreateImageRGBA(ctx, int(w), int(h), imageFlags, data)
+	pixel_data := mem.slice_ptr(img, int(w) * int(h) * int(n))
+	image := CreateImageRGBA(ctx, int(w), int(h), imageFlags, pixel_data)
 	stbi.image_free(img)
 	return image
 }
@@ -1115,11 +1114,11 @@ ImagePattern :: proc(
 Scissor :: proc(
 	ctx: ^Context,
 	x, y: f32,
-	w, h: f32,
+	width, height: f32,
 ) {
 	state := __getState(ctx)
-	w := max(w, 0)
-	h := max(h, 0)
+	w := max(width, 0)
+	h := max(height, 0)
 	
 	TransformIdentity(&state.scissor.xform)
 	state.scissor.xform[4] = x + w * 0.5
@@ -1568,7 +1567,7 @@ __flattenPaths :: proc(ctx: ^Context) {
 			}
 		}
 
-		for k in 0..<path.count {
+		for _ in 0..<path.count {
 			// Calculate segment direction and length
 			p0.dx = p1.x - p0.x
 			p0.dy = p1.y - p0.y
@@ -1874,14 +1873,14 @@ __calculateJoins :: proc(
 	} 
 
 	// Calculate which joins needs extra vertices to append, and gather vertex count.
-	for path, i in &cache.paths {
+	for path in &cache.paths {
 		pts := cache.points[path.first:]
 		p0 := &pts[path.count-1]
 		p1 := &pts[0]
 		nleft := 0
 		path.nbevel = 0
 
-		for j in 0..<path.count {
+		for _ in 0..<path.count {
 			dlx0, dly0, dlx1, dly1, dmr2, __cross, limit: f32
 			dlx0 = p0.dy
 			dly0 = -p0.dx
@@ -2844,14 +2843,14 @@ __isTransformFlipped :: proc(xform: []f32) -> bool {
 }
 
 // draw a single codepoint, useful for icons
-TextIcon :: proc(ctx: ^Context, x, y: f32, codepoint: rune) -> f32 {
+TextIcon :: proc(ctx: ^Context, xpos, ypos: f32, codepoint: rune) -> f32 {
 	state := __getState(ctx)
 	scale := __getFontScale(state) * ctx.devicePxRatio
 	invscale := f32(1.0) / scale
 	is_flipped := __isTransformFlipped(state.xform[:])
 
 	if state.fontId == -1 {
-		return x
+		return xpos
 	}
 
 	fs := &ctx.fs
@@ -2871,8 +2870,8 @@ TextIcon :: proc(ctx: ^Context, x, y: f32, codepoint: rune) -> f32 {
 	fscale := fontstash.__getPixelHeightScale(font, f32(isize) / 10)
 	
 	// transform x / y
-	x := x * scale
-	y := y * scale
+	x := xpos * scale
+	y := ypos * scale
 	switch fstate.ah {
 	case .LEFT: {}
 	
@@ -3160,7 +3159,7 @@ TextBreakLines :: proc(
 	fontstash.SetAlignVertical(fs, state.alignVertical)
 	fontstash.SetFont(fs, state.fontId)
 
-	break_row_width := break_row_width * scale
+	break_x := break_row_width * scale
 	iter := fontstash.TextIterInit(fs, 0, 0, text^)
 	prev_iter := iter
 	q: fontstash.Quad
@@ -3268,7 +3267,7 @@ TextBreakLines :: proc(
 				}
 
 				// Break to new line when a character is beyond break width.
-				if (type == .Char || type == .CJK) && next_width > break_row_width {
+				if (type == .Char || type == .CJK) && next_width > break_x {
 					// The run length is too long, need to break to new line.
 					if (break_end == row_start) {
 						// The current word is longer than the row length, just break it from here.
@@ -3374,7 +3373,6 @@ TextBoxBounds :: proc(
 
 	// alignment
 	halign := state.alignHorizontal
-	valign := state.alignVertical
 	old_align := state.alignHorizontal
 	defer state.alignHorizontal = old_align
 	state.alignHorizontal = .LEFT

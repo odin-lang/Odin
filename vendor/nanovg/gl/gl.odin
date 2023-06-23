@@ -1383,10 +1383,10 @@ BindFramebuffer :: proc(fb: ^framebuffer) {
 }
 
 CreateFramebuffer :: proc(ctx: ^nvg.Context, w, h: int, imageFlags: ImageFlags) -> (fb: framebuffer) {
-	defaultFBO: i32
-	defaultRBO: i32
-	gl.GetIntegerv(gl.FRAMEBUFFER_BINDING, &defaultFBO)
-	gl.GetIntegerv(gl.RENDERBUFFER_BINDING, &defaultRBO)
+	tempFBO: i32
+	tempRBO: i32
+	gl.GetIntegerv(gl.FRAMEBUFFER_BINDING, &tempFBO)
+	gl.GetIntegerv(gl.RENDERBUFFER_BINDING, &tempRBO)
 
 	imageFlags := imageFlags
 	incl(&imageFlags, ImageFlags { .FLIP_Y, .PREMULTIPLIED })
@@ -1422,8 +1422,8 @@ CreateFramebuffer :: proc(ctx: ^nvg.Context, w, h: int, imageFlags: ImageFlags) 
 // 			goto error
 	}
 
-	gl.BindFramebuffer(gl.FRAMEBUFFER, u32(defaultFBO))
-	gl.BindRenderbuffer(gl.RENDERBUFFER, u32(defaultRBO))
+	gl.BindFramebuffer(gl.FRAMEBUFFER, u32(tempFBO))
+	gl.BindRenderbuffer(gl.RENDERBUFFER, u32(tempRBO))
 	return 
 }
 

@@ -1,12 +1,10 @@
 package fontstash
 
 import "core:runtime"
-import "core:fmt"
 import "core:log"
 import "core:os"
 import "core:mem"
 import "core:math"
-import "core:unicode"
 import "core:strings"
 import stbtt "vendor:stb/truetype"
 
@@ -329,7 +327,7 @@ __AtlasAddWhiteRect :: proc(ctx: ^FontContext, w, h: int) {
 
 	// Rasterize
 	dst := ctx.textureData[gx + gy * ctx.width:]
-	for y in 0..<h {
+	for _ in 0..<h {
 		for x in 0..<w {
 			dst[x] = 0xff
 		}
@@ -464,7 +462,7 @@ __getGlyph :: proc(
 	font: ^Font,
 	codepoint: rune,
 	isize: i16,
-	blurSize: i16 = 0,
+	blur: i16 = 0,
 ) -> (res: ^Glyph) #no_bounds_check {
 	if isize < 2 {
 		return
@@ -479,7 +477,7 @@ __getGlyph :: proc(
 		if 
 			glyph.codepoint == codepoint && 
 			glyph.isize == isize &&
-			glyph.blurSize == blurSize 
+			glyph.blurSize == blur
 		{
 			res = glyph
 			return
@@ -506,10 +504,10 @@ __getGlyph :: proc(
 	}
 
 	pixel_size := f32(isize) / 10
-	blurSize := min(blurSize, 20)
+	blurSize := min(blur, 20)
 	padding := i16(blurSize + 2) // 2 minimum padding
 	scale := __getPixelHeightScale(render_font, pixel_size)
-	advance, lsb, x0, y0, x1, y1 := __buildGlyphBitmap(render_font, glyph_index, pixel_size, scale)
+	advance, _, x0, y0, x1, y1 := __buildGlyphBitmap(render_font, glyph_index, pixel_size, scale)
 	gw := (x1 - x0) + i32(padding) * 2
 	gh := (y1 - y0) + i32(padding) * 2 
 
@@ -596,7 +594,7 @@ BLUR_ZPREC :: 7
 __blurCols :: proc(dst: []u8, w, h, dstStride, alpha: int) {
 	dst := dst
 
-	for y in 0..<h {
+	for _ in 0..<h {
 		z := 0 // force zero border
 
 		for x in 1..<w {
@@ -620,7 +618,7 @@ __blurCols :: proc(dst: []u8, w, h, dstStride, alpha: int) {
 __blurRows :: proc(dst: []u8, w, h, dstStride, alpha: int) {
 	dst := dst
 
-	for x in 0..<w {
+	for _ in 0..<w {
 		z := 0 // force zero border
 		for y := dstStride; y < h * dstStride; y += dstStride {
 			z += (alpha * ((int(dst[y]) << BLUR_ZPREC) - z)) >> BLUR_APREC
@@ -657,38 +655,38 @@ __blur :: proc(dst: []u8, w, h, dstStride: int, blurSize: i16) {
 /////////////////////////////////
 
 ExpandAtlas :: proc(ctx: ^FontContext, width, height: int, allocator := context.allocator) -> bool {
-	width := max(ctx.width, width)
-	height := max(ctx.height, height)
+	w := max(ctx.width, width)
+	h := max(ctx.height, height)
 
-	if width == ctx.width && height == ctx.height {
+	if w == ctx.width && h == ctx.height {
 		return true
 	}
 
 	if ctx.callbackResize != nil {
-		ctx.callbackResize(ctx.userData, width, height)
+		ctx.callbackResize(ctx.userData, w, h)
 	}
 
-	data := make([]byte, width * height, allocator)
+	data := make([]byte, w * h, allocator)
 
 	for i in 0..<ctx.height {
-		dst := &data[i * width]
+		dst := &data[i * w]
 		src := &ctx.textureData[i * ctx.width]
 		mem.copy(dst, src, ctx.width)
 
-		if width > ctx.width {
-			mem.set(&data[i * width + ctx.width], 0, width - ctx.width)
+		if w > ctx.width {
+			mem.set(&data[i * w + ctx.width], 0, w - ctx.width)
 		}
 	}
 
-	if height > ctx.height {
-		mem.set(&data[ctx.height * width], 0, (height - ctx.height) * width)
+	if h > ctx.height {
+		mem.set(&data[ctx.height * w], 0, (h - ctx.height) * w)
 	}
 
 	delete(ctx.textureData)
 	ctx.textureData = data
 
 	// increase atlas size
-	__atlasExpand(ctx, width, height)
+	__atlasExpand(ctx, w, h)
 
 	// add existing data as dirty
 	maxy := i16(0)
@@ -700,10 +698,10 @@ ExpandAtlas :: proc(ctx: ^FontContext, width, height: int, allocator := context.
 	ctx.dirtyRect[2] = f32(ctx.width)
 	ctx.dirtyRect[3] = f32(maxy)
 
-	ctx.width = width
-	ctx.height = height
-	ctx.itw = 1.0 / f32(width)
-	ctx.ith = 1.0 / f32(height)
+	ctx.width = w
+	ctx.height = h
+	ctx.itw = 1.0 / f32(w)
+	ctx.ith = 1.0 / f32(h)
 
 	return true
 }
@@ -994,7 +992,7 @@ __getQuad :: proc(
 	}
 
 	// fill props right
-	rx, ry, x0, y0, x1, y1, xoff, yoff, glyph_width, glyph_height: f32
+	rx, ry, x0, y0, x1, y1, xoff, yoff: f32
 	xoff = f32(glyph.xoff + 1)
 	yoff = f32(glyph.yoff + 1)
 	x0 = f32(glyph.x0 + 1)
