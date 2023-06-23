@@ -415,7 +415,7 @@ __renderCreateTexture :: proc(
 
 			// No mips.
 			if .GENERATE_MIPMAPS in imageFlags {
-				log.errorf("Mip-maps is not support for non power-of-two textures (%d x %d)\n", w, h);
+				log.errorf("Mip-maps is not support for non power-of-two textures (%d x %d)\n", w, h)
 				excl(&imageFlags, ImageFlags { .GENERATE_MIPMAPS })
 			}
 		}
