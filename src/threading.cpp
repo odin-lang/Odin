@@ -1,90 +1,131 @@
 #if defined(GB_SYSTEM_LINUX)
 #include <signal.h>
+#if __has_include(<valgrind/helgrind.h>)
+#include <valgrind/helgrind.h>
+#define HAS_VALGRIND
+#endif
+#endif
+#if defined(GB_SYSTEM_WINDOWS)
+	#pragma warning(push)
+	#pragma warning(disable: 4505)
+#endif
+
+#if defined(HAS_VALGRIND)
+#define ANNOTATE_LOCK_PRE(m, t) VALGRIND_HG_MUTEX_LOCK_PRE(m, t)
+#define ANNOTATE_LOCK_POST(m) VALGRIND_HG_MUTEX_LOCK_POST(m)
+#define ANNOTATE_UNLOCK_PRE(m) VALGRIND_HG_MUTEX_UNLOCK_PRE(m)
+#define ANNOTATE_UNLOCK_POST(m) VALGRIND_HG_MUTEX_UNLOCK_POST(m)
+#define ANNOTATE_SEM_WAIT_POST(s) VALGRIND_HG_SEM_WAIT_POST(s)
+#define ANNOTATE_SEM_POST_PRE(s) VALGRIND_HG_SEM_POST_PRE(s)
+#else
+#define ANNOTATE_LOCK_PRE(m, t)
+#define ANNOTATE_LOCK_POST(m)
+#define ANNOTATE_UNLOCK_PRE(m)
+#define ANNOTATE_UNLOCK_POST(m)
+#define ANNOTATE_SEM_WAIT_POST(s)
+#define ANNOTATE_SEM_POST_PRE(s)
 #endif
 
 struct BlockingMutex;
 struct RecursiveMutex;
+struct RwMutex;
 struct Semaphore;
 struct Condition;
 struct Thread;
+struct ThreadPool;
+struct Parker;
 
 #define THREAD_PROC(name) isize name(struct Thread *thread)
-typedef THREAD_PROC(ThreadProc);
+gb_internal THREAD_PROC(thread_pool_thread_proc);
+
+#define WORKER_TASK_PROC(name) isize name(void *data)
+typedef WORKER_TASK_PROC(WorkerTaskProc);
+
+typedef struct WorkerTask {
+	WorkerTaskProc *do_work;
+	void           *data;
+} WorkerTask;
 
 struct Thread {
 #if defined(GB_SYSTEM_WINDOWS)
-	void *        win32_handle;
+	void *win32_handle;
 #else
-	pthread_t     posix_handle;
+	pthread_t posix_handle;
 #endif
 
-	ThreadProc * proc;
-	void *         user_data;
-	isize          user_index;
-	isize volatile return_value;
+	isize idx;
 
-	Semaphore * semaphore;
-	isize       stack_size;
-	std::atomic<bool> is_running;
+	WorkerTask *queue;
+	size_t capacity;
+	std::atomic<uint64_t> head_and_tail;
+
+	isize  stack_size;
+	struct ThreadPool *pool;
 };
 
+typedef std::atomic<i32> Futex;
+typedef volatile i32     Footex;
 
-void mutex_init    (BlockingMutex *m);
-void mutex_destroy (BlockingMutex *m);
-void mutex_lock    (BlockingMutex *m);
-bool mutex_try_lock(BlockingMutex *m);
-void mutex_unlock  (BlockingMutex *m);
-void mutex_init    (RecursiveMutex *m);
-void mutex_destroy (RecursiveMutex *m);
-void mutex_lock    (RecursiveMutex *m);
-bool mutex_try_lock(RecursiveMutex *m);
-void mutex_unlock  (RecursiveMutex *m);
+gb_internal void futex_wait(Futex *addr, Footex val);
+gb_internal void futex_signal(Futex *addr);
+gb_internal void futex_broadcast(Futex *addr);
 
-void semaphore_init   (Semaphore *s);
-void semaphore_destroy(Semaphore *s);
-void semaphore_post   (Semaphore *s, i32 count);
-void semaphore_wait   (Semaphore *s);
-void semaphore_release(Semaphore *s) { semaphore_post(s, 1); }
+gb_internal void mutex_lock    (BlockingMutex *m);
+gb_internal bool mutex_try_lock(BlockingMutex *m);
+gb_internal void mutex_unlock  (BlockingMutex *m);
+
+gb_internal void mutex_lock    (RecursiveMutex *m);
+gb_internal bool mutex_try_lock(RecursiveMutex *m);
+gb_internal void mutex_unlock  (RecursiveMutex *m);
+
+gb_internal void rw_mutex_lock           (RwMutex *m);
+gb_internal bool rw_mutex_try_lock       (RwMutex *m);
+gb_internal void rw_mutex_unlock         (RwMutex *m);
+gb_internal void rw_mutex_shared_lock    (RwMutex *m);
+gb_internal bool rw_mutex_try_shared_lock(RwMutex *m);
+gb_internal void rw_mutex_shared_unlock  (RwMutex *m);
+
+gb_internal void semaphore_post(Semaphore *s, i32 count);
+gb_internal void semaphore_wait(Semaphore *s);
 
 
-void condition_init(Condition *c);
-void condition_destroy(Condition *c);
-void condition_broadcast(Condition *c);
-void condition_signal(Condition *c);
-void condition_wait(Condition *c, BlockingMutex *m);
-void condition_wait_with_timeout(Condition *c, BlockingMutex *m, u32 timeout_in_ms);
+gb_internal void condition_broadcast(Condition *c);
+gb_internal void condition_signal(Condition *c);
+gb_internal void condition_wait(Condition *c, BlockingMutex *m);
 
-u32  thread_current_id(void);
+gb_internal void park(Parker *p);
+gb_internal void unpark_one(Parker *p);
+gb_internal void unpark_all(Parker *p);
 
-void thread_init            (Thread *t);
-void thread_destroy         (Thread *t);
-void thread_start           (Thread *t, ThreadProc *proc, void *data);
-void thread_start_with_stack(Thread *t, ThreadProc *proc, void *data, isize stack_size);
-void thread_join            (Thread *t);
-bool thread_is_running      (Thread const *t);
-void thread_set_name        (Thread *t, char const *name);
+gb_internal u32  thread_current_id(void);
 
-void yield_thread(void);
-void yield_process(void);
+gb_internal void thread_init                     (ThreadPool *pool, Thread *t, isize idx);
+gb_internal void thread_init_and_start           (ThreadPool *pool, Thread *t, isize idx);
+gb_internal void thread_join_and_destroy(Thread *t);
+gb_internal void thread_set_name        (Thread *t, char const *name);
+
+gb_internal void yield_thread(void);
+gb_internal void yield_process(void);
 
 
 struct MutexGuard {
-	MutexGuard() = delete;
+	MutexGuard()                   = delete;
 	MutexGuard(MutexGuard const &) = delete;
+	MutexGuard(MutexGuard &&)      = delete;
 
-	MutexGuard(BlockingMutex *bm) : bm{bm} {
+	explicit MutexGuard(BlockingMutex *bm) noexcept : bm{bm} {
 		mutex_lock(this->bm);
 	}
-	MutexGuard(RecursiveMutex *rm) : rm{rm} {
+	explicit MutexGuard(RecursiveMutex *rm) noexcept : rm{rm} {
 		mutex_lock(this->rm);
 	}
-	MutexGuard(BlockingMutex &bm) : bm{&bm} {
+	explicit MutexGuard(BlockingMutex &bm) noexcept : bm{&bm} {
 		mutex_lock(this->bm);
 	}
-	MutexGuard(RecursiveMutex &rm) : rm{&rm} {
+	explicit MutexGuard(RecursiveMutex &rm) noexcept : rm{&rm} {
 		mutex_lock(this->rm);
 	}
-	~MutexGuard() {
+	~MutexGuard() noexcept {
 		if (this->bm) {
 			mutex_unlock(this->bm);
 		} else if (this->rm) {
@@ -92,228 +133,321 @@ struct MutexGuard {
 		}
 	}
 
-	operator bool() const { return true; }
+	operator bool() const noexcept { return true; }
 
 	BlockingMutex *bm;
 	RecursiveMutex *rm;
 };
 
 #define MUTEX_GUARD_BLOCK(m) if (MutexGuard GB_DEFER_3(_mutex_guard_){m})
-#define MUTEX_GUARD(m) MutexGuard GB_DEFER_3(_mutex_guard_){m}
+#define MUTEX_GUARD(m) mutex_lock(m); defer (mutex_unlock(m))
 
+
+struct RecursiveMutex {
+	Futex owner;
+	i32   recursion;
+};
+
+gb_internal void mutex_lock(RecursiveMutex *m) {
+	Futex tid;
+	tid.store(cast(i32)thread_current_id());
+	for (;;) {
+		i32 prev_owner = 0;
+		m->owner.compare_exchange_strong(prev_owner, tid, std::memory_order_acquire, std::memory_order_acquire);
+		if (prev_owner == 0 || prev_owner == tid) {
+			m->recursion++;
+			// inside the lock
+			return;
+		}
+		futex_wait(&m->owner, prev_owner);
+	}
+}
+gb_internal bool mutex_try_lock(RecursiveMutex *m) {
+	Futex tid;
+	tid.store(cast(i32)thread_current_id());
+	i32 prev_owner = 0;
+	m->owner.compare_exchange_strong(prev_owner, tid, std::memory_order_acquire, std::memory_order_acquire);
+	if (prev_owner == 0 || prev_owner == tid) {
+		m->recursion++;
+		// inside the lock
+		return true;
+	}
+	return false;
+}
+gb_internal void mutex_unlock(RecursiveMutex *m) {
+	m->recursion--;
+	if (m->recursion != 0) {
+		return;
+	}
+	m->owner.exchange(0, std::memory_order_release);
+	futex_signal(&m->owner);
+	// outside the lock
+}
+
+struct Semaphore {
+	Footex count_;
+	Futex &count() noexcept {
+		return *(Futex *)&this->count_;
+	}
+	Futex const &count() const noexcept {
+		return *(Futex *)&this->count_;
+	}
+};
+
+gb_internal void semaphore_post(Semaphore *s, i32 count) {
+	s->count().fetch_add(count, std::memory_order_release);
+	if (s->count().load() == 1) {
+		futex_signal(&s->count());
+	} else {
+		futex_broadcast(&s->count());
+	}
+}
+gb_internal void semaphore_wait(Semaphore *s) {
+	for (;;) {
+		i32 original_count = s->count().load(std::memory_order_relaxed);
+		while (original_count == 0) {
+			futex_wait(&s->count(), original_count);
+			original_count = s->count().load(std::memory_order_relaxed);
+		}
+
+		if (!s->count().compare_exchange_strong(original_count, original_count-1, std::memory_order_acquire, std::memory_order_acquire)) {
+			return;
+		}
+	}
+}
 
 #if defined(GB_SYSTEM_WINDOWS)
 	struct BlockingMutex {
 		SRWLOCK srwlock;
 	};
-	void mutex_init(BlockingMutex *m) {
-	}
-	void mutex_destroy(BlockingMutex *m) {
-	}
-	void mutex_lock(BlockingMutex *m) {
+	gb_internal void mutex_lock(BlockingMutex *m) {
 		AcquireSRWLockExclusive(&m->srwlock);
 	}
-	bool mutex_try_lock(BlockingMutex *m) {
+	gb_internal bool mutex_try_lock(BlockingMutex *m) {
 		return !!TryAcquireSRWLockExclusive(&m->srwlock);
 	}
-	void mutex_unlock(BlockingMutex *m) {
+	gb_internal void mutex_unlock(BlockingMutex *m) {
 		ReleaseSRWLockExclusive(&m->srwlock);
 	}
 
-	struct RecursiveMutex {
-		CRITICAL_SECTION win32_critical_section;
-	};
-	void mutex_init(RecursiveMutex *m) {
-		InitializeCriticalSection(&m->win32_critical_section);
-	}
-	void mutex_destroy(RecursiveMutex *m) {
-		DeleteCriticalSection(&m->win32_critical_section);
-	}
-	void mutex_lock(RecursiveMutex *m) {
-		EnterCriticalSection(&m->win32_critical_section);
-	}
-	bool mutex_try_lock(RecursiveMutex *m) {
-		return TryEnterCriticalSection(&m->win32_critical_section) != 0;
-	}
-	void mutex_unlock(RecursiveMutex *m) {
-		LeaveCriticalSection(&m->win32_critical_section);
-	}
-
-	struct Semaphore {
-		void *win32_handle;
-	};
-
-	void semaphore_init(Semaphore *s) {
-		s->win32_handle = CreateSemaphoreA(NULL, 0, I32_MAX, NULL);
-	}
-	void semaphore_destroy(Semaphore *s) {
-		CloseHandle(s->win32_handle);
-	}
-	void semaphore_post(Semaphore *s, i32 count) {
-		ReleaseSemaphore(s->win32_handle, count, NULL);
-	}
-	void semaphore_wait(Semaphore *s) {
-		WaitForSingleObjectEx(s->win32_handle, INFINITE, FALSE);
-	}
-	
 	struct Condition {
 		CONDITION_VARIABLE cond;
 	};
-	
-	void condition_init(Condition *c) {
-	}
-	void condition_destroy(Condition *c) {	
-	}
-	void condition_broadcast(Condition *c) {
+
+	gb_internal void condition_broadcast(Condition *c) {
 		WakeAllConditionVariable(&c->cond);
 	}
-	void condition_signal(Condition *c) {
+	gb_internal void condition_signal(Condition *c) {
 		WakeConditionVariable(&c->cond);
 	}
-	void condition_wait(Condition *c, BlockingMutex *m) {
+	gb_internal void condition_wait(Condition *c, BlockingMutex *m) {
 		SleepConditionVariableSRW(&c->cond, &m->srwlock, INFINITE, 0);
 	}
-	void condition_wait_with_timeout(Condition *c, BlockingMutex *m, u32 timeout_in_ms) {
-		SleepConditionVariableSRW(&c->cond, &m->srwlock, timeout_in_ms, 0);
+
+	struct RwMutex {
+		SRWLOCK srwlock;
+	};
+
+	gb_internal void rw_mutex_lock(RwMutex *m) {
+		AcquireSRWLockExclusive(&m->srwlock);
+	}
+	gb_internal bool rw_mutex_try_lock(RwMutex *m) {
+		return !!TryAcquireSRWLockExclusive(&m->srwlock);
+	}
+	gb_internal void rw_mutex_unlock(RwMutex *m) {
+		ReleaseSRWLockExclusive(&m->srwlock);
 	}
 
+	gb_internal void rw_mutex_shared_lock(RwMutex *m) {
+		AcquireSRWLockShared(&m->srwlock);
+	}
+	gb_internal bool rw_mutex_try_shared_lock(RwMutex *m) {
+		return !!TryAcquireSRWLockShared(&m->srwlock);
+	}
+	gb_internal void rw_mutex_shared_unlock(RwMutex *m) {
+		ReleaseSRWLockShared(&m->srwlock);
+	}
 #else
+	enum Internal_Mutex_State : i32 {
+		Internal_Mutex_State_Unlocked = 0,
+		Internal_Mutex_State_Locked   = 1,
+		Internal_Mutex_State_Waiting  = 2,
+	};
+
 	struct BlockingMutex {
-		pthread_mutex_t pthread_mutex;
+		#if defined(HAS_VALGRIND)
+		BlockingMutex() {
+			VALGRIND_HG_MUTEX_INIT_POST(this, 0);
+		}
+		~BlockingMutex() {
+			VALGRIND_HG_MUTEX_DESTROY_PRE(this);
+		}
+		#endif
+		i32 state_;
+
+		Futex &state() {
+			return *(Futex *)&this->state_;
+		}
+		Futex const &state() const {
+			return *(Futex const *)&this->state_;
+		}
 	};
-	void mutex_init(BlockingMutex *m) {
-		pthread_mutex_init(&m->pthread_mutex, nullptr);
-	}
-	void mutex_destroy(BlockingMutex *m) {
-		pthread_mutex_destroy(&m->pthread_mutex);
-	}
-	void mutex_lock(BlockingMutex *m) {
-		pthread_mutex_lock(&m->pthread_mutex);
-	}
-	bool mutex_try_lock(BlockingMutex *m) {
-		return pthread_mutex_trylock(&m->pthread_mutex) == 0;
-	}
-	void mutex_unlock(BlockingMutex *m) {
-		pthread_mutex_unlock(&m->pthread_mutex);
+
+	gb_no_inline gb_internal void mutex_lock_slow(BlockingMutex *m, i32 curr_state) {
+		i32 new_state = curr_state;
+		for (i32 spin = 0; spin < 100; spin++) {
+			i32 state = Internal_Mutex_State_Unlocked;
+			bool ok = m->state().compare_exchange_weak(state, new_state, std::memory_order_acquire, std::memory_order_consume);
+			if (ok) {
+				return;
+			}
+			if (state == Internal_Mutex_State_Waiting) {
+				break;
+			}
+			for (i32 i = gb_min(spin+1, 32); i > 0; i--) {
+				yield_thread();
+			}
+		}
+
+		// Set just in case 100 iterations did not do it
+		new_state = Internal_Mutex_State_Waiting;
+
+		for (;;) {
+			if (m->state().exchange(Internal_Mutex_State_Waiting, std::memory_order_acquire) == Internal_Mutex_State_Unlocked) {
+				return;
+			}
+			futex_wait(&m->state(), new_state);
+			yield_thread();
+		}
 	}
 
-	struct RecursiveMutex {
-		pthread_mutex_t pthread_mutex;
-		pthread_mutexattr_t pthread_mutexattr;
-	};
-	void mutex_init(RecursiveMutex *m) {
-		pthread_mutexattr_init(&m->pthread_mutexattr);
-		pthread_mutexattr_settype(&m->pthread_mutexattr, PTHREAD_MUTEX_RECURSIVE);
-		pthread_mutex_init(&m->pthread_mutex, &m->pthread_mutexattr);
+	gb_internal void mutex_lock(BlockingMutex *m) {
+		ANNOTATE_LOCK_PRE(m, 0);
+		i32 v = m->state().exchange(Internal_Mutex_State_Locked, std::memory_order_acquire);
+		if (v != Internal_Mutex_State_Unlocked) {
+			mutex_lock_slow(m, v);
+		}
+		ANNOTATE_LOCK_POST(m);
 	}
-	void mutex_destroy(RecursiveMutex *m) {
-		pthread_mutex_destroy(&m->pthread_mutex);
-	}
-	void mutex_lock(RecursiveMutex *m) {
-		pthread_mutex_lock(&m->pthread_mutex);
-	}
-	bool mutex_try_lock(RecursiveMutex *m) {
-		return pthread_mutex_trylock(&m->pthread_mutex) == 0;
-	}
-	void mutex_unlock(RecursiveMutex *m) {
-		pthread_mutex_unlock(&m->pthread_mutex);
-	}
-
-	#if defined(GB_SYSTEM_OSX)
-		struct Semaphore {
-			semaphore_t osx_handle;
-		};
-
-		void semaphore_init   (Semaphore *s)            { semaphore_create(mach_task_self(), &s->osx_handle, SYNC_POLICY_FIFO, 0); }
-		void semaphore_destroy(Semaphore *s)            { semaphore_destroy(mach_task_self(), s->osx_handle); }
-		void semaphore_post   (Semaphore *s, i32 count) { while (count --> 0) semaphore_signal(s->osx_handle); }
-		void semaphore_wait   (Semaphore *s)            { semaphore_wait(s->osx_handle); }
-	#elif defined(GB_SYSTEM_UNIX)
-		struct Semaphore {
-			sem_t unix_handle;
-		};
-
-		void semaphore_init   (Semaphore *s)            { sem_init(&s->unix_handle, 0, 0); }
-		void semaphore_destroy(Semaphore *s)            { sem_destroy(&s->unix_handle); }
-		void semaphore_post   (Semaphore *s, i32 count) { while (count --> 0) sem_post(&s->unix_handle); }
-		void semaphore_wait   (Semaphore *s)            { int i; do { i = sem_wait(&s->unix_handle); } while (i == -1 && errno == EINTR); }
-	#else
-	#error Implement Semaphore for this platform
-	#endif
-		
-		
-	struct Condition {
-		pthread_cond_t pthread_cond;
-	};
-	
-	void condition_init(Condition *c) {
-		pthread_cond_init(&c->pthread_cond, NULL);
-	}
-	void condition_destroy(Condition *c) {	
-		pthread_cond_destroy(&c->pthread_cond);
-	}
-	void condition_broadcast(Condition *c) {
-		pthread_cond_broadcast(&c->pthread_cond);
-	}
-	void condition_signal(Condition *c) {
-		pthread_cond_signal(&c->pthread_cond);
-	}
-	void condition_wait(Condition *c, BlockingMutex *m) {
-		pthread_cond_wait(&c->pthread_cond, &m->pthread_mutex);
-	}
-	void condition_wait_with_timeout(Condition *c, BlockingMutex *m, u32 timeout_in_ms) {
-		struct timespec abstime = {};
-		abstime.tv_sec = timeout_in_ms/1000;
-		abstime.tv_nsec = cast(long)(timeout_in_ms%1000)*1e6;
-		pthread_cond_timedwait(&c->pthread_cond, &m->pthread_mutex, &abstime);
-		
-	}
-#endif
-	
-	
-struct Barrier {
-	BlockingMutex mutex;
-	Condition cond;
-	isize index;
-	isize generation_id;
-	isize thread_count;	
-};
-
-void barrier_init(Barrier *b, isize thread_count) {
-	mutex_init(&b->mutex);
-	condition_init(&b->cond);
-	b->index = 0;
-	b->generation_id = 0;
-	b->thread_count = 0;
-}
-
-void barrier_destroy(Barrier *b) {
-	condition_destroy(&b->cond);
-	mutex_destroy(&b->mutex);
-}
-
-// Returns true if it is the leader
-bool barrier_wait(Barrier *b) {
-	mutex_lock(&b->mutex);
-	defer (mutex_unlock(&b->mutex));
-	isize local_gen = b->generation_id;
-	b->index += 1;
-	if (b->index < b->thread_count) {
-		while (local_gen == b->generation_id && b->index < b->thread_count) {
-			condition_wait(&b->cond, &b->mutex);
+	gb_internal bool mutex_try_lock(BlockingMutex *m) {
+		ANNOTATE_LOCK_PRE(m, 1);
+		i32 v = m->state().exchange(Internal_Mutex_State_Locked, std::memory_order_acquire);
+		if (v == Internal_Mutex_State_Unlocked) {
+			ANNOTATE_LOCK_POST(m);
+			return true;
 		}
 		return false;
 	}
-	b->index = 0;
-	b->generation_id += 1;
-	condition_broadcast(&b->cond);
-	return true;
+
+	gb_no_inline gb_internal void mutex_unlock_slow(BlockingMutex *m) {
+		futex_signal(&m->state());
+	}
+
+	gb_internal void mutex_unlock(BlockingMutex *m) {
+		ANNOTATE_UNLOCK_PRE(m);
+		i32 v = m->state().exchange(Internal_Mutex_State_Unlocked, std::memory_order_release);
+		switch (v) {
+		case Internal_Mutex_State_Unlocked:
+			GB_PANIC("Unreachable");
+			break;
+		case Internal_Mutex_State_Locked:
+			// Okay
+			break;
+		case Internal_Mutex_State_Waiting:
+			mutex_unlock_slow(m);
+			break;
+		}
+		ANNOTATE_UNLOCK_POST(m);
+	}
+
+	struct Condition {
+		i32 state_;
+
+		Futex &state() {
+			return *(Futex *)&this->state_;
+		}
+		Futex const &state() const {
+			return *(Futex const *)&this->state_;
+		}
+	};
+
+	gb_internal void condition_broadcast(Condition *c) {
+		c->state().fetch_add(1, std::memory_order_release);
+		futex_broadcast(&c->state());
+	}
+	gb_internal void condition_signal(Condition *c) {
+		c->state().fetch_add(1, std::memory_order_release);
+		futex_signal(&c->state());
+	}
+	gb_internal void condition_wait(Condition *c, BlockingMutex *m) {
+		i32 state = c->state().load(std::memory_order_relaxed);
+		mutex_unlock(m);
+		futex_wait(&c->state(), state);
+		mutex_lock(m);
+	}
+
+	struct RwMutex {
+		// TODO(bill): make this a proper RW mutex
+		BlockingMutex mutex;
+	};
+
+	gb_internal void rw_mutex_lock(RwMutex *m) {
+		mutex_lock(&m->mutex);
+	}
+	gb_internal bool rw_mutex_try_lock(RwMutex *m) {
+		return mutex_try_lock(&m->mutex);
+	}
+	gb_internal void rw_mutex_unlock(RwMutex *m) {
+		mutex_unlock(&m->mutex);
+	}
+
+	gb_internal void rw_mutex_shared_lock(RwMutex *m) {
+		mutex_lock(&m->mutex);
+	}
+	gb_internal bool rw_mutex_try_shared_lock(RwMutex *m) {
+		return mutex_try_lock(&m->mutex);
+	}
+	gb_internal void rw_mutex_shared_unlock(RwMutex *m) {
+		mutex_unlock(&m->mutex);
+	}
+#endif
+
+struct Parker {
+	Futex state;
+};
+enum ParkerState : u32 {
+	ParkerState_Empty    = 0,
+	ParkerState_Notified = 1,
+	ParkerState_Parked   = UINT32_MAX,
+};
+
+gb_internal void park(Parker *p) {
+	if (p->state.fetch_sub(1, std::memory_order_acquire) == ParkerState_Notified) {
+		return;
+	}
+	for (;;) {
+		futex_wait(&p->state, ParkerState_Parked);
+		i32 notified = ParkerState_Empty;
+		if (p->state.compare_exchange_strong(notified, ParkerState_Empty, std::memory_order_acquire, std::memory_order_acquire)) {
+			return;
+		}
+	}
+}
+
+gb_internal void unpark_one(Parker *p) {
+	if (p->state.exchange(ParkerState_Notified, std::memory_order_release) == ParkerState_Parked) {
+		futex_signal(&p->state);
+	}
+}
+
+gb_internal void unpark_all(Parker *p) {
+	if (p->state.exchange(ParkerState_Notified, std::memory_order_release) == ParkerState_Parked) {
+		futex_broadcast(&p->state);
+	}
 }
 
 
-
-
-u32 thread_current_id(void) {
+gb_internal u32 thread_current_id(void) {
 	u32 thread_id;
 #if defined(GB_SYSTEM_WINDOWS)
 	#if defined(GB_ARCH_32_BIT) && defined(GB_CPU_X86)
@@ -340,7 +474,7 @@ u32 thread_current_id(void) {
 }
 
 
-gb_inline void yield_thread(void) {
+gb_internal gb_inline void yield_thread(void) {
 #if defined(GB_SYSTEM_WINDOWS)
 	_mm_pause();
 #elif defined(GB_SYSTEM_OSX)
@@ -358,7 +492,7 @@ gb_inline void yield_thread(void) {
 #endif
 }
 
-gb_inline void yield(void) {
+gb_internal gb_inline void yield(void) {
 #if defined(GB_SYSTEM_WINDOWS)
 	YieldProcessor();
 #else
@@ -366,61 +500,46 @@ gb_inline void yield(void) {
 #endif
 }
 
+#if defined(GB_SYSTEM_WINDOWS)
+gb_internal DWORD __stdcall internal_thread_proc(void *arg) {
+	Thread *t = cast(Thread *)arg;
+	thread_pool_thread_proc(t);
+	return 0;
+}
+#else
+gb_internal void *internal_thread_proc(void *arg) {
+#if (GB_SYSTEM_LINUX)
+	// NOTE: Don't permit any signal delivery to threads on Linux.
+	sigset_t mask = {};
+	sigfillset(&mask);
+	GB_ASSERT_MSG(pthread_sigmask(SIG_BLOCK, &mask, nullptr) == 0, "failed to block signals");
+#endif
 
-void thread_init(Thread *t) {
+	Thread *t = cast(Thread *)arg;
+	thread_pool_thread_proc(t);
+	return NULL;
+}
+#endif
+
+gb_internal void thread_init(ThreadPool *pool, Thread *t, isize idx) {
 	gb_zero_item(t);
 #if defined(GB_SYSTEM_WINDOWS)
 	t->win32_handle = INVALID_HANDLE_VALUE;
 #else
 	t->posix_handle = 0;
 #endif
-	t->semaphore = gb_alloc_item(heap_allocator(), Semaphore);
-	semaphore_init(t->semaphore);
+
+	t->capacity = 1 << 14; // must be a power of 2
+	t->queue = gb_alloc_array(heap_allocator(), WorkerTask, t->capacity);
+	t->head_and_tail = 0;
+	t->pool = pool;
+	t->idx = idx;
 }
 
-void thread_destroy(Thread *t) {
-	thread_join(t);
-	semaphore_destroy(t->semaphore);
-	gb_free(heap_allocator(), t->semaphore);
-}
 
-
-void gb__thread_run(Thread *t) {
-	semaphore_release(t->semaphore);
-	t->return_value = t->proc(t);
-}
-
-#if defined(GB_SYSTEM_WINDOWS)
-	DWORD __stdcall internal_thread_proc(void *arg) {
-		Thread *t = cast(Thread *)arg;
-		t->is_running.store(true);
-		gb__thread_run(t);
-		return 0;
-	}
-#else
-	void *internal_thread_proc(void *arg) {
-	#if (GB_SYSTEM_LINUX)
-		// NOTE: Don't permit any signal delivery to threads on Linux.
-		sigset_t mask = {};
-		sigfillset(&mask);
-		GB_ASSERT_MSG(pthread_sigmask(SIG_BLOCK, &mask, nullptr) == 0, "failed to block signals");
-	#endif
-		
-		Thread *t = cast(Thread *)arg;
-		t->is_running.store(true);
-		gb__thread_run(t);
-		return NULL;
-	}
-#endif
-
-void thread_start(Thread *t, ThreadProc *proc, void *user_data) { thread_start_with_stack(t, proc, user_data, 0); }
-
-void thread_start_with_stack(Thread *t, ThreadProc *proc, void *user_data, isize stack_size) {
-	GB_ASSERT(!t->is_running.load());
-	GB_ASSERT(proc != NULL);
-	t->proc = proc;
-	t->user_data = user_data;
-	t->stack_size = stack_size;
+gb_internal void thread_init_and_start(ThreadPool *pool, Thread *t, isize idx) {
+	thread_init(pool, t, idx);
+	isize stack_size = 0;
 
 #if defined(GB_SYSTEM_WINDOWS)
 	t->win32_handle = CreateThread(NULL, stack_size, internal_thread_proc, t, 0, NULL);
@@ -429,23 +548,17 @@ void thread_start_with_stack(Thread *t, ThreadProc *proc, void *user_data, isize
 	{
 		pthread_attr_t attr;
 		pthread_attr_init(&attr);
+		defer (pthread_attr_destroy(&attr));
 		pthread_attr_setdetachstate(&attr, PTHREAD_CREATE_JOINABLE);
 		if (stack_size != 0) {
 			pthread_attr_setstacksize(&attr, stack_size);
 		}
 		pthread_create(&t->posix_handle, &attr, internal_thread_proc, t);
-		pthread_attr_destroy(&attr);
 	}
 #endif
-
-	semaphore_wait(t->semaphore);
 }
 
-void thread_join(Thread *t) {
-	if (!t->is_running.load()) {
-		return;
-	}
-
+gb_internal void thread_join_and_destroy(Thread *t) {
 #if defined(GB_SYSTEM_WINDOWS)
 	WaitForSingleObject(t->win32_handle, INFINITE);
 	CloseHandle(t->win32_handle);
@@ -454,12 +567,11 @@ void thread_join(Thread *t) {
 	pthread_join(t->posix_handle, NULL);
 	t->posix_handle = 0;
 #endif
-	t->is_running.store(false);
+
+	gb_free(heap_allocator(), t->queue);
 }
 
-bool thread_is_running(Thread const *t) { return t->is_running.load(); }
-
-void thread_set_name(Thread *t, char const *name) {
+gb_internal void thread_set_name(Thread *t, char const *name) {
 #if defined(GB_COMPILER_MSVC)
 	#pragma pack(push, 8)
 		typedef struct {
@@ -494,3 +606,207 @@ void thread_set_name(Thread *t, char const *name) {
 #endif
 }
 
+#if defined(GB_SYSTEM_LINUX)
+#include <linux/futex.h>
+#include <sys/syscall.h>
+
+gb_internal void futex_signal(Futex *addr) {
+	int ret = syscall(SYS_futex, addr, FUTEX_WAKE | FUTEX_PRIVATE_FLAG, 1, NULL, NULL, 0);
+	if (ret == -1) {
+		perror("Futex wake");
+		GB_PANIC("Failed in futex wake!\n");
+	}
+}
+
+gb_internal void futex_broadcast(Futex *addr) {
+	int ret = syscall(SYS_futex, addr, FUTEX_WAKE | FUTEX_PRIVATE_FLAG, INT32_MAX, NULL, NULL, 0);
+	if (ret == -1) {
+		perror("Futex wake");
+		GB_PANIC("Failed in futex wake!\n");
+	}
+}
+
+gb_internal void futex_wait(Futex *addr, Footex val) {
+	for (;;) {
+		int ret = syscall(SYS_futex, addr, FUTEX_WAIT | FUTEX_PRIVATE_FLAG, val, NULL, NULL, 0);
+		if (ret == -1) {
+			if (errno != EAGAIN) {
+				perror("Futex wait");
+				GB_PANIC("Failed in futex wait!\n");
+			} else {
+				return;
+			}
+		} else if (ret == 0) {
+			if (*addr != val) {
+				return;
+			}
+		}
+	}
+}
+
+#elif defined(GB_SYSTEM_FREEBSD)
+
+#include <sys/types.h>
+#include <sys/umtx.h>
+
+gb_internal void futex_signal(Futex *addr) {
+	_umtx_op(addr, UMTX_OP_WAKE, 1, 0, 0);
+}
+
+gb_internal void futex_broadcast(Futex *addr) {
+	_umtx_op(addr, UMTX_OP_WAKE, INT32_MAX, 0, 0);
+}
+
+gb_internal void futex_wait(Futex *addr, Footex val) {
+	for (;;) {
+		int ret = _umtx_op(addr, UMTX_OP_WAIT_UINT, val, 0, NULL);
+		if (ret == 0) {
+			if (errno == ETIMEDOUT || errno == EINTR) {
+				continue;
+			}
+
+			perror("Futex wait");
+			GB_PANIC("Failed in futex wait!\n");
+		} else if (ret == 0) {
+			if (*addr != val) {
+				return;
+			}
+		}
+	}
+}
+
+#elif defined(GB_SYSTEM_OPENBSD)
+
+#include <sys/futex.h>
+
+gb_internal void futex_signal(Futex *f) {
+	for (;;) {
+		int ret = futex((volatile uint32_t *)f, FUTEX_WAKE | FUTEX_PRIVATE_FLAG, 1, NULL, NULL);
+		if (ret == -1) {
+			if (errno == ETIMEDOUT || errno == EINTR) {
+				continue;
+			}
+
+			perror("Futex wake");
+			GB_PANIC("futex wake fail");
+		} else if (ret == 1) {
+			return;
+		}
+	}
+}
+
+
+gb_internal void futex_broadcast(Futex *f) {
+	for (;;) {
+		int ret = futex((volatile uint32_t *)f, FUTEX_WAKE | FUTEX_PRIVATE_FLAG, INT32_MAX, NULL, NULL);
+		if (ret == -1) {
+			if (errno == ETIMEDOUT || errno == EINTR) {
+				continue;
+			}
+
+			perror("Futex wake");
+			GB_PANIC("futex wake fail");
+		} else if (ret == 1) {
+			return;
+		}
+	}
+}
+
+gb_internal void futex_wait(Futex *f, Footex val) {
+	for (;;) {
+		int ret = futex((volatile uint32_t *)f, FUTEX_WAIT | FUTEX_PRIVATE_FLAG, val, NULL, NULL);
+		if (ret == -1) {
+			if (*f != val) {
+				return;
+			}
+
+			if (errno == ETIMEDOUT || errno == EINTR) {
+				continue;
+			}
+
+			perror("Futex wait");
+			GB_PANIC("Failed in futex wait!\n");
+		}
+	}
+}
+
+#elif defined(GB_SYSTEM_OSX)
+
+#define UL_COMPARE_AND_WAIT	0x00000001
+#define ULF_NO_ERRNO        0x01000000
+
+extern "C" int __ulock_wait(uint32_t operation, void *addr, uint64_t value, uint32_t timeout); /* timeout is specified in microseconds */
+extern "C" int __ulock_wake(uint32_t operation, void *addr, uint64_t wake_value);
+
+gb_internal void futex_signal(Futex *f) {
+	for (;;) {
+		int ret = __ulock_wake(UL_COMPARE_AND_WAIT | ULF_NO_ERRNO, f, 0);
+		if (ret >= 0) {
+			return;
+		}
+		if (ret == -EINTR || ret == -EFAULT) {
+			continue;
+		}
+		if (ret == -ENOENT) {
+			return;
+		}
+		GB_PANIC("Failed in futex wake!\n");
+	}
+}
+
+gb_internal void futex_broadcast(Futex *f) {
+	for (;;) {
+		enum { ULF_WAKE_ALL = 0x00000100 };
+		int ret = __ulock_wake(UL_COMPARE_AND_WAIT | ULF_NO_ERRNO | ULF_WAKE_ALL, f, 0);
+		if (ret == 0) {
+			return;
+		}
+		if (ret == -EINTR || ret == -EFAULT) {
+			continue;
+		}
+		if (ret == -ENOENT) {
+			return;
+		}
+		GB_PANIC("Failed in futex wake!\n");
+	}
+}
+
+gb_internal void futex_wait(Futex *f, Footex val) {
+	for (;;) {
+		int ret = __ulock_wait(UL_COMPARE_AND_WAIT | ULF_NO_ERRNO, f, val, 0);
+		if (ret >= 0) {
+			if (*f != val) {
+				return;
+			}
+			continue;
+		}
+		if (ret == -EINTR || ret == -EFAULT) {continue;
+			ret = -ret;
+		}
+		if (ret == -ENOENT) {
+			return;
+		}
+
+		GB_PANIC("Failed in futex wait!\n");
+	}
+}
+#elif defined(GB_SYSTEM_WINDOWS)
+
+gb_internal void futex_signal(Futex *f) {
+	WakeByAddressSingle(f);
+}
+
+gb_internal void futex_broadcast(Futex *f) {
+	WakeByAddressAll(f);
+}
+
+gb_internal void futex_wait(Futex *f, Footex val) {
+	do {
+		WaitOnAddress(f, (void *)&val, sizeof(val), INFINITE);
+	} while (f->load() == val);
+}
+#endif
+
+#if defined(GB_SYSTEM_WINDOWS)
+	#pragma warning(pop)
+#endif

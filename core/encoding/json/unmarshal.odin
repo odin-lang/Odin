@@ -215,6 +215,12 @@ unmarshal_value :: proc(p: ^Parser, v: any) -> (err: Unmarshal_Error) {
 		}
 	}
 	
+	switch dst in &v {
+	// Handle json.Value as an unknown type
+	case Value:
+		dst = parse_value(p) or_return
+		return
+	}
 	
 	#partial switch token.kind {
 	case .Null:
@@ -346,6 +352,8 @@ unmarshal_object :: proc(p: ^Parser, v: any, end_token: Token_Kind) -> (err: Unm
 			
 			fields := reflect.struct_fields_zipped(ti.id)
 			
+			runtime.DEFAULT_TEMP_ALLOCATOR_TEMP_GUARD(ignore = context.temp_allocator == context.allocator)
+
 			field_used := make([]bool, len(fields), context.temp_allocator)
 			
 			use_field_idx := -1

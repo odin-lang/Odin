@@ -44,6 +44,31 @@ Info :: struct {
 // Custom formatter signature. It returns true if the formatting was successful and false when it could not be done
 User_Formatter :: #type proc(fi: ^Info, arg: any, verb: rune) -> bool
 
+// Example User Formatter:
+// SomeType :: struct {
+// 	value: int,
+// }
+// // Custom Formatter for SomeType
+// User_Formatter :: proc(fi: ^fmt.Info, arg: any, verb: rune) -> bool {
+// 	m := cast(^SomeType)arg.data
+// 	switch verb {
+// 	case 'v', 'd':
+// 		fmt.fmt_int(fi, u64(m.value), true, 8 * size_of(SomeType), verb)
+// 	case:
+// 		return false
+// 	}
+// 	return true
+// }
+// main :: proc() {
+// 	// Ensure the fmt._user_formatters map is initialized
+// 	fmt.set_user_formatters(new(map[typeid]fmt.User_Formatter))
+// 	err := fmt.register_user_formatter(type_info_of(SomeType).id, User_Formatter)
+// 	assert(err == .None)
+// 	// Use the custom formatter
+// 	x := SomeType{42}
+// 	fmt.println("Custom type value: ", x)
+// }
+
 Register_User_Formatter_Error :: enum {
 	None,
 	No_User_Formatter,
@@ -54,13 +79,27 @@ Register_User_Formatter_Error :: enum {
 // it is prefixed with `_` rather than marked with a private attribute so that users can access it if necessary
 _user_formatters: ^map[typeid]User_Formatter
 
-// set_user_formatters assigns m to a global value allowing the user have custom print formatting for specific
-// types
+// Sets user-defined formatters for custom print formatting of specific types
+//
+// Inputs:
+// - m: A pointer to a map of typeids to User_Formatter structs.
+//
+// NOTE: Must be called before using register_user_formatter.
+//
 set_user_formatters :: proc(m: ^map[typeid]User_Formatter) {
-	_user_formatters = m
+	assert(_user_formatters == nil, "set_user_formatters must not be called more than once.")
+    _user_formatters = m
 }
-// register_user_formatter assigns a formatter to a specific typeid. set_user_formatters must be called
-// before any use of this procedure.
+// Registers a user-defined formatter for a specific typeid
+//
+// Inputs:
+// - id: The typeid of the custom type.
+// - formatter: The User_Formatter function for the custom type.
+//
+// Returns: A Register_User_Formatter_Error value indicating the success or failure of the operation.
+//
+// WARNING: set_user_formatters must be called before using this procedure.
+//
 register_user_formatter :: proc(id: typeid, formatter: User_Formatter) -> Register_User_Formatter_Error {
 	if _user_formatters == nil {
 		return .No_User_Formatter
@@ -71,75 +110,151 @@ register_user_formatter :: proc(id: typeid, formatter: User_Formatter) -> Regist
 	_user_formatters[id] = formatter
 	return .None
 }
-
-
-// aprint procedure return a string that was allocated with the current context
-// They must be freed accordingly
+// 	Creates a formatted string
+//
+// 	*Allocates Using Context's Allocator*
+//
+// 	Inputs:
+// 	- args: A variadic list of arguments to be formatted.
+// 	- sep: An optional separator string (default is a single space).
+//
+// 	Returns: A formatted string. 
+//
 aprint :: proc(args: ..any, sep := " ") -> string {
 	str: strings.Builder
 	strings.builder_init(&str)
-	sbprint(buf=&str, args=args, sep=sep)
+	sbprint(&str, ..args, sep=sep)
 	return strings.to_string(str)
 }
-// aprintln procedure return a string that was allocated with the current context
-// They must be freed accordingly
+// 	Creates a formatted string with a newline character at the end
+//
+// 	*Allocates Using Context's Allocator*
+//
+// 	Inputs:
+// 	- args: A variadic list of arguments to be formatted.
+// 	- sep: An optional separator string (default is a single space).
+//
+// 	Returns: A formatted string with a newline character at the end.
+//
 aprintln :: proc(args: ..any, sep := " ") -> string {
 	str: strings.Builder
 	strings.builder_init(&str)
-	sbprintln(buf=&str, args=args, sep=sep)
+	sbprintln(&str, ..args, sep=sep)
 	return strings.to_string(str)
 }
-// aprintf procedure return a string that was allocated with the current context
-// They must be freed accordingly
+// 	Creates a formatted string using a format string and arguments
+//
+// 	*Allocates Using Context's Allocator*
+//
+// 	Inputs:
+// 	- fmt: A format string with placeholders for the provided arguments.
+// 	- args: A variadic list of arguments to be formatted.
+//
+// 	Returns: A formatted string. The returned string must be freed accordingly.
+//
 aprintf :: proc(fmt: string, args: ..any) -> string {
 	str: strings.Builder
 	strings.builder_init(&str)
 	sbprintf(&str, fmt, ..args)
 	return strings.to_string(str)
 }
-
-
-// tprint procedure return a string that was allocated with the current context's temporary allocator
+// 	Creates a formatted string
+//
+// 	*Allocates Using Context's Temporary Allocator*
+//
+// 	Inputs:
+// 	- args: A variadic list of arguments to be formatted.
+// 	- sep: An optional separator string (default is a single space).
+//
+// 	Returns: A formatted string.
+//
 tprint :: proc(args: ..any, sep := " ") -> string {
 	str: strings.Builder
 	strings.builder_init(&str, context.temp_allocator)
-	sbprint(buf=&str, args=args, sep=sep)
+	sbprint(&str, ..args, sep=sep)
 	return strings.to_string(str)
 }
-// tprintln procedure return a string that was allocated with the current context's temporary allocator
+// 	Creates a formatted string with a newline character at the end
+//
+// 	*Allocates Using Context's Temporary Allocator*
+//
+// 	Inputs:
+// 	- args: A variadic list of arguments to be formatted.
+// 	- sep: An optional separator string (default is a single space).
+//
+// 	Returns: A formatted string with a newline character at the end.
+//
 tprintln :: proc(args: ..any, sep := " ") -> string {
 	str: strings.Builder
 	strings.builder_init(&str, context.temp_allocator)
-	sbprintln(buf=&str, args=args, sep=sep)
+	sbprintln(&str, ..args, sep=sep)
 	return strings.to_string(str)
 }
-// tprintf procedure return a string that was allocated with the current context's temporary allocator
+// 	Creates a formatted string using a format string and arguments
+//
+// 	*Allocates Using Context's Temporary Allocator*
+//
+// 	Inputs:
+// 	- fmt: A format string with placeholders for the provided arguments.
+// 	- args: A variadic list of arguments to be formatted.
+//
+// 	Returns: A formatted string.
+//
 tprintf :: proc(fmt: string, args: ..any) -> string {
 	str: strings.Builder
 	strings.builder_init(&str, context.temp_allocator)
 	sbprintf(&str, fmt, ..args)
 	return strings.to_string(str)
 }
-
-
-// bprint procedures return a string using a buffer from an array
+// Creates a formatted string using a supplied buffer as the backing array. Writes into the buffer.
+//
+// Inputs:
+// - buf: The backing buffer
+// - args: A variadic list of arguments to be formatted
+// - sep: An optional separator string (default is a single space)
+//
+// Returns: A formatted string
+//
 bprint :: proc(buf: []byte, args: ..any, sep := " ") -> string {
 	sb := strings.builder_from_bytes(buf[0:len(buf)])
-	return sbprint(buf=&sb, args=args, sep=sep)
+	return sbprint(&sb, ..args, sep=sep)
 }
-// bprintln procedures return a string using a buffer from an array
+// Creates a formatted string using a supplied buffer as the backing array, appends newline. Writes into the buffer.
+//
+// Inputs:
+// - buf: The backing buffer
+// - args: A variadic list of arguments to be formatted
+// - sep: An optional separator string (default is a single space)
+//
+// Returns: A formatted string with a newline character at the end
+//
 bprintln :: proc(buf: []byte, args: ..any, sep := " ") -> string {
 	sb := strings.builder_from_bytes(buf[0:len(buf)])
-	return sbprintln(buf=&sb, args=args, sep=sep)
+	return sbprintln(&sb, ..args, sep=sep)
 }
-// bprintf procedures return a string using a buffer from an array
+// Creates a formatted string using a supplied buffer as the backing array. Writes into the buffer.
+//
+// Inputs:
+// - buf: The backing buffer
+// - fmt: A format string with placeholders for the provided arguments
+// - args: A variadic list of arguments to be formatted
+//
+// Returns: A formatted string
+//
 bprintf :: proc(buf: []byte, fmt: string, args: ..any) -> string {
 	sb := strings.builder_from_bytes(buf[0:len(buf)])
 	return sbprintf(&sb, fmt, ..args)
 }
-
-
-// formatted assert
+// Runtime assertion with a formatted message
+//
+// Inputs:
+// - condition: The boolean condition to be asserted
+// - fmt: A format string with placeholders for the provided arguments
+// - args: A variadic list of arguments to be formatted
+// - loc: The location of the caller
+//
+// Returns: True if the condition is met, otherwise triggers a runtime assertion with a formatted message
+//
 assertf :: proc(condition: bool, fmt: string, args: ..any, loc := #caller_location) -> bool {
 	if !condition {
 		p := context.assertion_failure_proc
@@ -151,8 +266,13 @@ assertf :: proc(condition: bool, fmt: string, args: ..any, loc := #caller_locati
 	}
 	return condition
 }
-
-// formatted panic
+// Runtime panic with a formatted message
+//
+// Inputs:
+// - fmt: A format string with placeholders for the provided arguments
+// - args: A variadic list of arguments to be formatted
+// - loc: The location of the caller
+//
 panicf :: proc(fmt: string, args: ..any, loc := #caller_location) -> ! {
 	p := context.assertion_failure_proc
 	if p == nil {
@@ -161,8 +281,16 @@ panicf :: proc(fmt: string, args: ..any, loc := #caller_location) -> ! {
 	message := tprintf(fmt, ..args)
 	p("Panic", message, loc)
 }
-
-// formatted printing for cstrings
+// Creates a formatted C string
+//
+// *Allocates Using Context's Allocator*
+//
+// Inputs:
+// - format: A format string with placeholders for the provided arguments
+// - args: A variadic list of arguments to be formatted
+//
+// Returns: A formatted C string
+//
 caprintf :: proc(format: string, args: ..any) -> cstring {
 	str: strings.Builder
 	strings.builder_init(&str)
@@ -171,8 +299,16 @@ caprintf :: proc(format: string, args: ..any) -> cstring {
 	s := strings.to_string(str)
 	return cstring(raw_data(s))
 }
-
-// c string with temp allocator
+// Creates a formatted C string
+//
+// *Allocates Using Context's Temporary Allocator*
+//
+// Inputs:
+// - format: A format string with placeholders for the provided arguments
+// - args: A variadic list of arguments to be formatted
+//
+// Returns: A formatted C string
+//
 ctprintf :: proc(format: string, args: ..any) -> cstring {
 	str: strings.Builder
 	strings.builder_init(&str, context.temp_allocator)
@@ -181,27 +317,54 @@ ctprintf :: proc(format: string, args: ..any) -> cstring {
 	s := strings.to_string(str)
 	return cstring(raw_data(s))
 }
-
-// sbprint formats using the default print settings and writes to buf
+// Formats using the default print settings and writes to the given strings.Builder
+//
+// Inputs:
+// - buf: A pointer to a strings.Builder to store the formatted string
+// - args: A variadic list of arguments to be formatted
+// - sep: An optional separator string (default is a single space)
+//
+// Returns: A formatted string
+//
 sbprint :: proc(buf: ^strings.Builder, args: ..any, sep := " ") -> string {
-	wprint(w=strings.to_writer(buf), args=args, sep=sep)
+	wprint(strings.to_writer(buf), ..args, sep=sep)
 	return strings.to_string(buf^)
 }
-
-// sbprintln formats using the default print settings and writes to buf
+// Formats and writes to a strings.Builder buffer using the default print settings
+//
+// Inputs:
+// - buf: A pointer to a strings.Builder buffer
+// - args: A variadic list of arguments to be formatted
+// - sep: An optional separator string (default is a single space)
+//
+// Returns: The resulting formatted string
+//
 sbprintln :: proc(buf: ^strings.Builder, args: ..any, sep := " ") -> string {
-	wprintln(w=strings.to_writer(buf), args=args, sep=sep)
+	wprintln(strings.to_writer(buf), ..args, sep=sep)
 	return strings.to_string(buf^)
 }
-
-// sbprintf formats according to the specififed format string and writes to buf
+// Formats and writes to a strings.Builder buffer according to the specified format string
+//
+// Inputs:
+// - buf: A pointer to a strings.Builder buffer
+// - fmt: The format string
+// - args: A variadic list of arguments to be formatted
+//
+// Returns: The resulting formatted string
+//
 sbprintf :: proc(buf: ^strings.Builder, fmt: string, args: ..any) -> string {
-	wprintf(w=strings.to_writer(buf), fmt=fmt, args=args)
+	wprintf(strings.to_writer(buf), fmt, ..args)
 	return strings.to_string(buf^)
 }
-
-
-// wprint formats using the default print settings and writes to w
+// Formats and writes to an io.Writer using the default print settings
+//
+// Inputs:
+// - w: An io.Writer to write to
+// - args: A variadic list of arguments to be formatted
+// - sep: An optional separator string (default is a single space)
+//
+// Returns: The number of bytes written
+//
 wprint :: proc(w: io.Writer, args: ..any, sep := " ") -> int {
 	fi: Info
 	fi.writer = w
@@ -232,8 +395,15 @@ wprint :: proc(w: io.Writer, args: ..any, sep := " ") -> int {
 
 	return fi.n
 }
-
-// wprintln formats using the default print settings and writes to w
+// Formats and writes to an io.Writer using the default print settings with a newline character at the end
+//
+// Inputs:
+// - w: An io.Writer to write to
+// - args: A variadic list of arguments to be formatted
+// - sep: An optional separator string (default is a single space)
+//
+// Returns: The number of bytes written
+//
 wprintln :: proc(w: io.Writer, args: ..any, sep := " ") -> int {
 	fi: Info
 	fi.writer = w
@@ -249,8 +419,15 @@ wprintln :: proc(w: io.Writer, args: ..any, sep := " ") -> int {
 	io.flush(auto_cast w)
 	return fi.n
 }
-
-// wprintf formats according to the specififed format string and writes to w
+// Formats and writes to an io.Writer according to the specified format string
+//
+// Inputs:
+// - w: An io.Writer to write to
+// - fmt: The format string
+// - args: A variadic list of arguments to be formatted
+//
+// Returns: The number of bytes written
+//
 wprintf :: proc(w: io.Writer, fmt: string, args: ..any) -> int {
 	fi: Info
 	arg_index: int = 0
@@ -526,28 +703,48 @@ wprintf :: proc(w: io.Writer, fmt: string, args: ..any) -> int {
 
 	return fi.n
 }
-
-// wprint_type is a utility procedure to write a ^runtime.Type_Info value to w
+// Writes a ^runtime.Type_Info value to an io.Writer
+//
+// Inputs:
+// - w: An io.Writer to write to
+// - info: A pointer to a runtime.Type_Info value
+//
+// Returns: The number of bytes written and an io.Error if encountered
+//
 wprint_type :: proc(w: io.Writer, info: ^runtime.Type_Info) -> (int, io.Error) {
 	n, err := reflect.write_type(w, info)
 	io.flush(auto_cast w)
 	return n, err
 }
-// wprint_typeid is a utility procedure to write a typeid value to w
+// Writes a typeid value to an io.Writer
+//
+// Inputs:
+// - w: An io.Writer to write to
+// - id: A typeid value
+//
+// Returns: The number of bytes written and an io.Error if encountered
+//
 wprint_typeid :: proc(w: io.Writer, id: typeid) -> (int, io.Error) {
 	n, err := reflect.write_type(w, type_info_of(id))
 	io.flush(auto_cast w)
 	return n, err
 }
-
-
-
-
+// Parses an integer from a given string starting at a specified offset
+//
+// Inputs:
+// - s: The string to parse the integer from
+// - offset: The position in the string to start parsing the integer
+//
+// Returns:
+// - result: The parsed integer
+// - new_offset: The position in the string after parsing the integer
+// - ok: A boolean indicating if the parsing was successful
+//
 _parse_int :: proc(s: string, offset: int) -> (result: int, new_offset: int, ok: bool) {
 	is_digit :: #force_inline proc(r: byte) -> bool { return '0' <= r && r <= '9' }
 
 	new_offset = offset
-	for new_offset <= len(s) {
+	for new_offset < len(s) {
 		c := s[new_offset]
 		if !is_digit(c) {
 			break
@@ -560,7 +757,20 @@ _parse_int :: proc(s: string, offset: int) -> (result: int, new_offset: int, ok:
 	ok = new_offset > offset
 	return
 }
-
+// Parses an argument number from a format string and determines if it's valid
+//
+// Inputs:
+// - fi: A pointer to an Info structure
+// - arg_index: The current argument index
+// - format: The format string to parse
+// - offset: The current position in the format string
+// - arg_count: The total number of arguments
+//
+// Returns:
+// - index: The parsed argument index
+// - new_offset: The new position in the format string
+// - ok: A boolean indicating if the parsed argument number is valid
+//
 _arg_number :: proc(fi: ^Info, arg_index: int, format: string, offset, arg_count: int) -> (index, new_offset: int, ok: bool) {
 	parse_arg_number :: proc(format: string) -> (int, int, bool) {
 		if len(format) < 3 {
@@ -594,7 +804,17 @@ _arg_number :: proc(fi: ^Info, arg_index: int, format: string, offset, arg_count
 	fi.good_arg_index = false
 	return arg_index, offset+width, false
 }
-
+// Retrieves an integer from a list of any type at the specified index
+//
+// Inputs:
+// - args: A list of values of any type
+// - arg_index: The index to retrieve the integer from
+//
+// Returns:
+// - int: The integer value at the specified index
+// - new_arg_index: The new argument index
+// - ok: A boolean indicating if the conversion to integer was successful
+//
 int_from_arg :: proc(args: []any, arg_index: int) -> (int, int, bool) {
 	num := 0
 	new_arg_index := arg_index
@@ -609,8 +829,12 @@ int_from_arg :: proc(args: []any, arg_index: int) -> (int, int, bool) {
 
 	return num, new_arg_index, ok
 }
-
-
+// Writes a bad verb error message
+//
+// Inputs:
+// - fi: A pointer to an Info structure
+// - verb: The invalid format verb
+//
 fmt_bad_verb :: proc(using fi: ^Info, verb: rune) {
 	prev_in_bad := fi.in_bad
 	defer fi.in_bad = prev_in_bad
@@ -628,7 +852,13 @@ fmt_bad_verb :: proc(using fi: ^Info, verb: rune) {
 	}
 	io.write_byte(writer, ')', &fi.n)
 }
-
+// Formats a boolean value according to the specified format verb
+//
+// Inputs:
+// - fi: A pointer to an Info structure
+// - b: The boolean value to format
+// - verb: The format verb
+//
 fmt_bool :: proc(using fi: ^Info, b: bool, verb: rune) {
 	switch verb {
 	case 't', 'v':
@@ -637,8 +867,12 @@ fmt_bool :: proc(using fi: ^Info, b: bool, verb: rune) {
 		fmt_bad_verb(fi, verb)
 	}
 }
-
-
+// Writes padding characters for formatting
+//
+// Inputs:
+// - fi: A pointer to an Info structure
+// - width: The number of padding characters to write
+//
 fmt_write_padding :: proc(fi: ^Info, width: int) {
 	if width <= 0 {
 		return
@@ -653,7 +887,18 @@ fmt_write_padding :: proc(fi: ^Info, width: int) {
 		io.write_byte(fi.writer, pad_byte, &fi.n)
 	}
 }
-
+// Formats an integer value with specified base, sign, bit size, and digits
+//
+// Inputs:
+// - fi: A pointer to an Info structure
+// - u: The integer value to format
+// - base: The base for integer formatting
+// - is_signed: A boolean indicating if the integer is signed
+// - bit_size: The bit size of the integer
+// - digits: A string containing the digits for formatting
+//
+// WARNING: May panic if the width and precision are too big, causing a buffer overrun
+//
 _fmt_int :: proc(fi: ^Info, u: u64, base: int, is_signed: bool, bit_size: int, digits: string) {
 	_, neg := strconv.is_integer_negative(u, is_signed, bit_size)
 
@@ -678,7 +923,7 @@ _fmt_int :: proc(fi: ^Info, u: u64, base: int, is_signed: bool, bit_size: int, d
 		}
 	} else if fi.zero && fi.width_set {
 		prec = fi.width
-		if neg || fi.plus || fi.space {
+		if neg || fi.plus {
 			// There needs to be space for the "sign"
 			prec -= 1
 		}
@@ -697,7 +942,6 @@ _fmt_int :: proc(fi: ^Info, u: u64, base: int, is_signed: bool, bit_size: int, d
 	flags: strconv.Int_Flags
 	if fi.hash && !fi.zero { flags |= {.Prefix} }
 	if fi.plus             { flags |= {.Plus}   }
-	if fi.space            { flags |= {.Space}  }
 	s := strconv.append_bits(buf[start:], u, base, is_signed, bit_size, digits, flags)
 
 	if fi.hash && fi.zero && fi.indent == 0 {
@@ -719,7 +963,18 @@ _fmt_int :: proc(fi: ^Info, u: u64, base: int, is_signed: bool, bit_size: int, d
 	fi.zero = false
 	_pad(fi, s)
 }
-
+// Formats an int128 value based on the provided formatting options.
+//
+// Inputs:
+// - fi: A pointer to the Info struct containing formatting options.
+// - u: The int128 value to be formatted.
+// - base: The base to be used for formatting the integer (e.g. 2, 8, 10, 12, 16).
+// - is_signed: Whether the value should be treated as signed or unsigned.
+// - bit_size: The number of bits of the value (e.g. 64, 128).
+// - digits: A string containing the digit characters to use for the formatted integer.
+//
+// WARNING: Panics if the formatting options result in a buffer overrun.
+//
 _fmt_int_128 :: proc(fi: ^Info, u: u128, base: int, is_signed: bool, bit_size: int, digits: string) {
 	_, neg := strconv.is_integer_negative_128(u, is_signed, bit_size)
 
@@ -744,7 +999,7 @@ _fmt_int_128 :: proc(fi: ^Info, u: u128, base: int, is_signed: bool, bit_size: i
 		}
 	} else if fi.zero && fi.width_set {
 		prec = fi.width
-		if neg || fi.plus || fi.space {
+		if neg || fi.plus {
 			// There needs to be space for the "sign"
 			prec -= 1
 		}
@@ -763,7 +1018,6 @@ _fmt_int_128 :: proc(fi: ^Info, u: u128, base: int, is_signed: bool, bit_size: i
 	flags: strconv.Int_Flags
 	if fi.hash && !fi.zero { flags |= {.Prefix} }
 	if fi.plus             { flags |= {.Plus}   }
-	if fi.space            { flags |= {.Space}  }
 	s := strconv.append_bits_128(buf[start:], u, base, is_signed, bit_size, digits, flags)
 
 	if fi.hash && fi.zero && fi.indent == 0 {
@@ -785,10 +1039,16 @@ _fmt_int_128 :: proc(fi: ^Info, u: u128, base: int, is_signed: bool, bit_size: i
 	fi.zero = false
 	_pad(fi, s)
 }
-
+// Hex Values:
 __DIGITS_LOWER := "0123456789abcdefx"
 __DIGITS_UPPER := "0123456789ABCDEFX"
-
+// Formats a rune value according to the specified formatting verb.
+//
+// Inputs:
+// - fi: A pointer to the Info struct containing formatting options.
+// - r: The rune value to be formatted.
+// - verb: The formatting verb to use (e.g. 'c', 'r', 'v', 'q').
+//
 fmt_rune :: proc(fi: ^Info, r: rune, verb: rune) {
 	switch verb {
 	case 'c', 'r', 'v':
@@ -799,7 +1059,15 @@ fmt_rune :: proc(fi: ^Info, r: rune, verb: rune) {
 		fmt_int(fi, u64(r), false, 32, verb)
 	}
 }
-
+// Formats an integer value according to the specified formatting verb.
+//
+// Inputs:
+// - fi: A pointer to the Info struct containing formatting options.
+// - u: The integer value to be formatted.
+// - is_signed: Whether the value should be treated as signed or unsigned.
+// - bit_size: The number of bits of the value (e.g. 32, 64).
+// - verb: The formatting verb to use (e.g. 'v', 'b', 'o', 'i', 'd', 'z', 'x', 'X', 'c', 'r', 'U').
+//
 fmt_int :: proc(fi: ^Info, u: u64, is_signed: bool, bit_size: int, verb: rune) {
 	switch verb {
 	case 'v': _fmt_int(fi, u, 10, is_signed, bit_size, __DIGITS_LOWER)
@@ -824,7 +1092,15 @@ fmt_int :: proc(fi: ^Info, u: u64, is_signed: bool, bit_size: int, verb: rune) {
 		fmt_bad_verb(fi, verb)
 	}
 }
-
+// Formats an int128 value according to the specified formatting verb.
+//
+// Inputs:
+// - fi: A pointer to the Info struct containing formatting options.
+// - u: The int128 value to be formatted.
+// - is_signed: Whether the value should be treated as signed or unsigned.
+// - bit_size: The number of bits of the value (e.g. 64, 128).
+// - verb: The formatting verb to use (e.g. 'v', 'b', 'o', 'i', 'd', 'z', 'x', 'X', 'c', 'r', 'U').
+//
 fmt_int_128 :: proc(fi: ^Info, u: u128, is_signed: bool, bit_size: int, verb: rune) {
 	switch verb {
 	case 'v': _fmt_int_128(fi, u, 10, is_signed, bit_size, __DIGITS_LOWER)
@@ -849,7 +1125,12 @@ fmt_int_128 :: proc(fi: ^Info, u: u128, is_signed: bool, bit_size: int, verb: ru
 		fmt_bad_verb(fi, verb)
 	}
 }
-
+// Pads a formatted string with the appropriate padding, based on the provided formatting options.
+//
+// Inputs:
+// - fi: A pointer to the Info struct containing formatting options.
+// - s: The string to be padded.
+//
 _pad :: proc(fi: ^Info, s: string) {
 	if !fi.width_set {
 		io.write_string(fi.writer, s, &fi.n)
@@ -861,85 +1142,58 @@ _pad :: proc(fi: ^Info, s: string) {
 	if fi.minus { // right pad
 		io.write_string(fi.writer, s, &fi.n)
 		fmt_write_padding(fi, width)
+	} else if !fi.space && s != "" && s[0] == '-' {
+		// left pad accounting for zero pad of negative number
+		io.write_byte(fi.writer, '-', &fi.n)
+		fmt_write_padding(fi, width)
+		io.write_string(fi.writer, s[1:], &fi.n)
 	} else { // left pad
 		fmt_write_padding(fi, width)
 		io.write_string(fi.writer, s, &fi.n)
 	}
 }
+// Formats a floating-point number with a specific format and precision.
+//
+// Inputs:
+// - fi: Pointer to the Info struct containing format settings.
+// - v: The floating-point number to format.
+// - bit_size: The size of the floating-point number in bits (16, 32, or 64).
+// - verb: The format specifier character.
+// - float_fmt: The byte format used for formatting the float (either 'f' or 'e').
+//
+// NOTE: Can return "NaN", "+Inf", "-Inf", "+<value>", or "-<value>".
+//
+_fmt_float_as :: proc(fi: ^Info, v: f64, bit_size: int, verb: rune, float_fmt: byte) {
+	prec := fi.prec if fi.prec_set else 3
+	buf: [386]byte
 
+	// Can return "NaN", "+Inf", "-Inf", "+<value>", "-<value>".
+	str := strconv.append_float(buf[:], v, float_fmt, prec, bit_size)
+
+	if !fi.plus {
+		// Strip sign from "+<value>" but not "+Inf".
+		if str[0] == '+' && str[1] != 'I' {
+			str = str[1:] 
+		}
+	}
+
+	_pad(fi, str)
+}
+// Formats a floating-point number with a specific format.
+//
+// Inputs:
+// - fi: Pointer to the Info struct containing format settings.
+// - v: The floating-point number to format.
+// - bit_size: The size of the floating-point number in bits (16, 32, or 64).
+// - verb: The format specifier character.
+//
 fmt_float :: proc(fi: ^Info, v: f64, bit_size: int, verb: rune) {
 	switch verb {
 	case 'f', 'F', 'g', 'G', 'v':
-		prec: int = 3
-		if fi.prec_set {
-			prec = fi.prec
-		}
-		buf: [386]byte
-
-		str := strconv.append_float(buf[1:], v, 'f', prec, bit_size)
-		b := buf[:len(str)+1]
-		if b[1] == '+' || b[1] == '-' {
-			b = b[1:]
-		} else {
-			b[0] = '+'
-		}
-
-		if fi.space && !fi.plus && b[0] == '+' {
-			b[0] = ' '
-		}
-
-		if len(b) > 1 && (b[1] == 'N' || b[1] == 'I') {
-			io.write_string(fi.writer, string(b), &fi.n)
-			return
-		}
-
-		if fi.plus || b[0] != '+' {
-			if fi.zero && fi.width_set && fi.width > len(b) {
-				io.write_byte(fi.writer, b[0], &fi.n)
-				fmt_write_padding(fi, fi.width - len(b))
-				io.write_string(fi.writer, string(b[1:]), &fi.n)
-			} else {
-				_pad(fi, string(b))
-			}
-		} else {
-			_pad(fi, string(b[1:]))
-		}
-
+		_fmt_float_as(fi, v, bit_size, verb, 'f')
 	case 'e', 'E':
-		prec: int = 3
-		if fi.prec_set {
-			prec = fi.prec
-		}
-		buf: [386]byte
-
-		str := strconv.append_float(buf[1:], v, 'e', prec, bit_size)
-		b := buf[:len(str)+1]
-		if b[1] == '+' || b[1] == '-' {
-			b = b[1:]
-		} else {
-			b[0] = '+'
-		}
-
-		if fi.space && !fi.plus && b[0] == '+' {
-			b[0] = ' '
-		}
-
-		if len(b) > 1 && (b[1] == 'N' || b[1] == 'I') {
-			io.write_string(fi.writer, string(b), &fi.n)
-			return
-		}
-
-		if fi.plus || str[0] != '+' {
-			if fi.zero && fi.width_set && fi.width > len(b) {
-				io.write_byte(fi.writer, b[0], &fi.n)
-				fmt_write_padding(fi, fi.width - len(b))
-				io.write_string(fi.writer, string(b[1:]), &fi.n)
-			} else {
-				_pad(fi, string(b))
-			}
-		} else {
-			_pad(fi, string(b[1:]))
-		}
+		// BUG(): "%.3e" returns "3.000e+00"
+		_fmt_float_as(fi, v, bit_size, verb, 'e')
 
 	case 'h', 'H':
 		prev_fi := fi^
@@ -965,8 +1219,13 @@ fmt_float :: proc(fi: ^Info, v: f64, bit_size: int, verb: rune) {
 		fmt_bad_verb(fi, verb)
 	}
 }
-
-
+// Formats a string with a specific format.
+//
+// Inputs:
+// - fi: Pointer to the Info struct containing format settings.
+// - s: The string to format.
+// - verb: The format specifier character (e.g. 's', 'v', 'q', 'x', 'X').
+//
 fmt_string :: proc(fi: ^Info, s: string, verb: rune) {
 	s, verb := s, verb
 	if ol, ok := fi.optional_len.?; ok {
@@ -1024,10 +1283,23 @@ fmt_string :: proc(fi: ^Info, s: string, verb: rune) {
 		fmt_bad_verb(fi, verb)
 	}
 }
+// Formats a C-style string with a specific format.
+//
+// Inputs:
+// - fi: Pointer to the Info struct containing format settings.
+// - s: The C-style string to format.
+// - verb: The format specifier character (Ref fmt_string).
+//
 fmt_cstring :: proc(fi: ^Info, s: cstring, verb: rune) {
 	fmt_string(fi, string(s), verb)
 }
-
+// Formats a raw pointer with a specific format.
+//
+// Inputs:
+// - fi: Pointer to the Info struct containing format settings.
+// - p: The raw pointer to format.
+// - verb: The format specifier character (e.g. 'p', 'v', 'b', 'o', 'i', 'd', 'z', 'x', 'X').
+//
 fmt_pointer :: proc(fi: ^Info, p: rawptr, verb: rune) {
 	u := u64(uintptr(p))
 	switch verb {
@@ -1048,7 +1320,13 @@ fmt_pointer :: proc(fi: ^Info, p: rawptr, verb: rune) {
 		fmt_bad_verb(fi, verb)
 	}
 }
-
+// Formats a Structure of Arrays (SoA) pointer with a specific format.
+//
+// Inputs:
+// - fi: Pointer to the Info struct containing format settings.
+// - p: The SoA pointer to format.
+// - verb: The format specifier character.
+//
 fmt_soa_pointer :: proc(fi: ^Info, p: runtime.Raw_Soa_Pointer, verb: rune) {
 	io.write_string(fi.writer, "#soa{data=0x", &fi.n)
 	_fmt_int(fi, u64(uintptr(p.data)), 16, false, 8*size_of(rawptr), __DIGITS_UPPER)
@@ -1056,8 +1334,13 @@ fmt_soa_pointer :: proc(fi: ^Info, p: runtime.Raw_Soa_Pointer, verb: rune) {
 	_fmt_int(fi, u64(p.index), 10, false, 8*size_of(rawptr), __DIGITS_UPPER)
 	io.write_string(fi.writer, "}", &fi.n)
 }
-
-
+// String representation of an enum value.
+//
+// Inputs:
+// - val: The enum value.
+//
+// Returns: The string representation of the enum value and a boolean indicating success.
+//
 enum_value_to_string :: proc(val: any) -> (string, bool) {
 	v := val
 	v.id = runtime.typeid_base(v.id)
@@ -1087,7 +1370,14 @@ enum_value_to_string :: proc(val: any) -> (string, bool) {
 
 	return "", false
 }
-
+// Returns the enum value of a string representation.
+//
+// $T: The typeid of the enum type.
+// Inputs:
+// - s: The string representation of the enum value.
+//
+// Returns: The enum value and a boolean indicating success.
+//
 string_to_enum_value :: proc($T: typeid, s: string) -> (T, bool) {
 	ti := runtime.type_info_base(type_info_of(T))
 	if e, ok := ti.variant.(runtime.Type_Info_Enum); ok {
@@ -1101,7 +1391,13 @@ string_to_enum_value :: proc($T: typeid, s: string) -> (T, bool) {
 	}
 	return T{}, false
 }
-
+// Formats an enum value with a specific format.
+//
+// Inputs:
+// - fi: Pointer to the Info struct containing format settings.
+// - v: The enum value to format.
+// - verb: The format specifier character (e.g. 'i','d','f','s','v','q').
+//
 fmt_enum :: proc(fi: ^Info, v: any, verb: rune) {
 	if v.id == nil || v.data == nil {
 		io.write_string(fi.writer, "<nil>", &fi.n)
@@ -1127,8 +1423,15 @@ fmt_enum :: proc(fi: ^Info, v: any, verb: rune) {
 		}
 	}
 }
-
-
+// Converts a stored enum value to a string representation
+//
+// Inputs:
+// - enum_type: A pointer to the runtime.Type_Info of the enumeration.
+// - ev: The runtime.Type_Info_Enum_Value of the stored enum value.
+// - offset: An optional integer to adjust the enumeration value (default is 0).
+//
+// Returns: A tuple containing the string representation of the enum value and a bool indicating success.
+//
 stored_enum_value_to_string :: proc(enum_type: ^runtime.Type_Info, ev: runtime.Type_Info_Enum_Value, offset: int = 0) -> (string, bool) {
 	et := runtime.type_info_base(enum_type)
 	ev := ev
@@ -1156,7 +1459,13 @@ stored_enum_value_to_string :: proc(enum_type: ^runtime.Type_Info, ev: runtime.T
 
 	return "", false
 }
-
+// Formats a bit set and writes it to the provided Info structure
+//
+// Inputs:
+// - fi: A pointer to the Info structure where the formatted bit set will be written.
+// - v: The bit set value to be formatted.
+// - name: An optional string for the name of the bit set (default is an empty string).
+//
 fmt_bit_set :: proc(fi: ^Info, v: any, name: string = "") {
 	is_bit_set_different_endian_to_platform :: proc(ti: ^runtime.Type_Info) -> bool {
 		if ti == nil {
@@ -1250,13 +1559,26 @@ fmt_bit_set :: proc(fi: ^Info, v: any, name: string = "") {
 		}
 	}
 }
-
+// Writes the specified number of indents to the provided Info structure
+//
+// Inputs:
+// - fi: A pointer to the Info structure where the indents will be written.
+//
 fmt_write_indent :: proc(fi: ^Info) {
 	for in 0..<fi.indent {
 		io.write_byte(fi.writer, '\t', &fi.n)
 	}
 }
-
+// Formats an array and writes it to the provided Info structure
+//
+// Inputs:
+// - fi: A pointer to the Info structure where the formatted array will be written.
+// - array_data: A raw pointer to the array data.
+// - count: The number of elements in the array.
+// - elem_size: The size of each element in the array.
+// - elem_id: The typeid of the array elements.
+// - verb: The formatting verb to be used for the array elements.
+//
 fmt_write_array :: proc(fi: ^Info, array_data: rawptr, count: int, elem_size: int, elem_id: typeid, verb: rune) {
 	io.write_byte(fi.writer, '[', &fi.n)
 	defer io.write_byte(fi.writer, ']', &fi.n)
@@ -1292,8 +1614,18 @@ fmt_write_array :: proc(fi: ^Info, array_data: rawptr, count: int, elem_size: in
 		}
 	}
 }
-
-
+// Handles struct tag processing for formatting
+//
+// Inputs:
+// - data: A raw pointer to the data being processed
+// - info: Type information about the struct
+// - idx: The index of the tag in the struct
+// - verb: A mutable pointer to the rune representing the format verb
+// - optional_len: A mutable pointer to an integer holding the optional length (if applicable)
+// - use_nul_termination: A mutable pointer to a boolean flag indicating if NUL termination is used
+//
+// Returns: A boolean value indicating whether to continue processing the tag
+//
 @(private)
 handle_tag :: proc(data: rawptr, info: reflect.Type_Info_Struct, idx: int, verb: ^rune, optional_len: ^int, use_nul_termination: ^bool) -> (do_continue: bool) {
 	handle_optional_len :: proc(data: rawptr, info: reflect.Type_Info_Struct, field_name: string, optional_len: ^int) {
@@ -1345,7 +1677,15 @@ handle_tag :: proc(data: rawptr, info: reflect.Type_Info_Struct, idx: int, verb:
 	}
 	return false
 }
-
+// Formats a struct for output, handling various struct types (e.g., SOA, raw unions)
+//
+// Inputs:
+// - fi: A mutable pointer to an Info struct containing formatting state
+// - v: The value to be formatted
+// - the_verb: The formatting verb to be used (e.g. 'v')
+// - info: Type information about the struct
+// - type_name: The name of the type being formatted
+//
 fmt_struct :: proc(fi: ^Info, v: any, the_verb: rune, info: runtime.Type_Info_Struct, type_name: string) {
 	if the_verb != 'v' {
 		fmt_bad_verb(fi, the_verb)
@@ -1499,7 +1839,15 @@ fmt_struct :: proc(fi: ^Info, v: any, the_verb: rune, info: runtime.Type_Info_St
 		}
 	}
 }
-
+// Searches for the first NUL-terminated element in a given buffer
+//
+// Inputs:
+// - ptr: The raw pointer to the buffer.
+// - elem_size: The size of each element in the buffer.
+// - max_n: The maximum number of elements to search (use -1 for no limit).
+//
+// Returns: The number of elements before the first NUL-terminated element.
+//
 @(private)
 search_nul_termination :: proc(ptr: rawptr, elem_size: int, max_n: int) -> (n: int) {
 	for p := uintptr(ptr); max_n < 0 || n < max_n; p += uintptr(elem_size) {
@@ -1510,7 +1858,16 @@ search_nul_termination :: proc(ptr: rawptr, elem_size: int, max_n: int) -> (n: i
 	}
 	return n
 }
-
+// Formats a NUL-terminated array into a string representation
+//
+// Inputs:
+// - fi: Pointer to the formatting Info struct.
+// - data: The raw pointer to the array data.
+// - max_n: The maximum number of elements to process.
+// - elem_size: The size of each element in the array.
+// - elem: Pointer to the type information of the array element.
+// - verb: The formatting verb.
+//
 fmt_array_nul_terminated :: proc(fi: ^Info, data: rawptr, max_n: int, elem_size: int, elem: ^reflect.Type_Info, verb: rune) {
 	if data == nil {
 		io.write_string(fi.writer, "<nil>", &fi.n)
@@ -1519,7 +1876,16 @@ fmt_array_nul_terminated :: proc(fi: ^Info, data: rawptr, max_n: int, elem_size:
 	n := search_nul_termination(data, elem_size, max_n)
 	fmt_array(fi, data, n, elem_size, elem, verb)
 }
-
+// Formats an array into a string representation
+//
+// Inputs:
+// - fi: Pointer to the formatting Info struct.
+// - data: The raw pointer to the array data.
+// - n: The number of elements in the array.
+// - elem_size: The size of each element in the array.
+// - elem: Pointer to the type information of the array element.
+// - verb: The formatting verb (e.g. 's','q','p').
+//
 fmt_array :: proc(fi: ^Info, data: rawptr, n: int, elem_size: int, elem: ^reflect.Type_Info, verb: rune) {
 	if data == nil && n > 0 {
 		io.write_string(fi.writer, "nil")
@@ -1574,7 +1940,16 @@ fmt_array :: proc(fi: ^Info, data: rawptr, n: int, elem_size: int, elem: ^reflec
 		fmt_write_array(fi, data, n, elem_size, elem.id, verb)
 	}
 }
-
+// Formats a named type into a string representation
+//
+// Inputs:
+// - fi: Pointer to the formatting Info struct.
+// - v: The value to format.
+// - verb: The formatting verb.
+// - info: The named type information.
+//
+// NOTE: This procedure supports built-in custom formatters for core library types such as runtime.Source_Code_Location, time.Duration, and time.Time.
+//
 fmt_named :: proc(fi: ^Info, v: any, verb: rune, info: runtime.Type_Info_Named) {
 	write_padded_number :: proc(fi: ^Info, i: i64, width: int) {
 		n := width-1
@@ -1591,11 +1966,22 @@ fmt_named :: proc(fi: ^Info, v: any, verb: rune, info: runtime.Type_Info_Named) 
 	switch a in v {
 	case runtime.Source_Code_Location:
 		io.write_string(fi.writer, a.file_path, &fi.n)
-		io.write_byte(fi.writer, '(', &fi.n)
-		io.write_int(fi.writer, int(a.line), 10, &fi.n)
-		io.write_byte(fi.writer, ':', &fi.n)
-		io.write_int(fi.writer, int(a.column), 10, &fi.n)
-		io.write_byte(fi.writer, ')', &fi.n)
+
+		when ODIN_ERROR_POS_STYLE == .Default {
+			io.write_byte(fi.writer, '(', &fi.n)
+			io.write_int(fi.writer, int(a.line), 10, &fi.n)
+			io.write_byte(fi.writer, ':', &fi.n)
+			io.write_int(fi.writer, int(a.column), 10, &fi.n)
+			io.write_byte(fi.writer, ')', &fi.n)
+		} else when ODIN_ERROR_POS_STYLE == .Unix {
+			io.write_byte(fi.writer, ':', &fi.n)
+			io.write_int(fi.writer, int(a.line), 10, &fi.n)
+			io.write_byte(fi.writer, ':', &fi.n)
+			io.write_int(fi.writer, int(a.column), 10, &fi.n)
+			io.write_byte(fi.writer, ':', &fi.n)
+		} else {
+			#panic("Unhandled ODIN_ERROR_POS_STYLE")
+		}
 		return
 
 	case time.Duration:
@@ -1723,7 +2109,15 @@ fmt_named :: proc(fi: ^Info, v: any, verb: rune, info: runtime.Type_Info_Named) 
 		fmt_value(fi, any{v.data, info.base.id}, verb)
 	}
 }
-
+// Formats a union type into a string representation
+//
+// Inputs:
+// - fi: Pointer to the formatting Info struct.
+// - v: The value to format.
+// - verb: The formatting verb.
+// - info: The union type information.
+// - type_size: The size of the union type.
+//
 fmt_union :: proc(fi: ^Info, v: any, verb: rune, info: runtime.Type_Info_Union, type_size: int) {
 	if type_size == 0 {
 		io.write_string(fi.writer, "nil", &fi.n)
@@ -1769,7 +2163,14 @@ fmt_union :: proc(fi: ^Info, v: any, verb: rune, info: runtime.Type_Info_Union, 
 		fmt_arg(fi, any{v.data, id}, verb)
 	}
 }
-
+// Formats a matrix as a string
+//
+// Inputs:
+// - fi: A pointer to an Info struct containing formatting information.
+// - v: The matrix value to be formatted.
+// - verb: The formatting verb rune.
+// - info: A runtime.Type_Info_Matrix struct containing matrix type information.
+//
 fmt_matrix :: proc(fi: ^Info, v: any, verb: rune, info: runtime.Type_Info_Matrix) {
 	io.write_string(fi.writer, "matrix[", &fi.n)
 	defer io.write_byte(fi.writer, ']', &fi.n)
@@ -1812,7 +2213,15 @@ fmt_matrix :: proc(fi: ^Info, v: any, verb: rune, info: runtime.Type_Info_Matrix
 		fmt_write_indent(fi)
 	}
 }
-
+// Formats a value based on its type and formatting verb
+//
+// Inputs:
+// - fi: A pointer to an Info struct containing formatting information.
+// - v: The value to be formatted.
+// - verb: The formatting verb rune.
+//
+// NOTE: Uses user formatters if available and not ignored.
+//
 fmt_value :: proc(fi: ^Info, v: any, verb: rune) {
 	if v.data == nil || v.id == nil {
 		io.write_string(fi.writer, "<nil>", &fi.n)
@@ -1834,8 +2243,8 @@ fmt_value :: proc(fi: ^Info, v: any, verb: rune) {
 
 	type_info := type_info_of(v.id)
 	switch info in type_info.variant {
-	case runtime.Type_Info_Any:   // Ignore
-	case runtime.Type_Info_Tuple: // Ignore
+	case runtime.Type_Info_Any:        // Ignore
+	case runtime.Type_Info_Parameters: // Ignore
 
 	case runtime.Type_Info_Named:
 		fmt_named(fi, v, verb, info)
@@ -2157,7 +2566,14 @@ fmt_value :: proc(fi: ^Info, v: any, verb: rune) {
 		fmt_matrix(fi, v, verb, info)
 	}
 }
-
+// Formats a complex number based on the given formatting verb
+//
+// Inputs:
+// - fi: A pointer to an Info struct containing formatting information.
+// - c: The complex128 value to be formatted.
+// - bits: The number of bits in the complex number (32 or 64).
+// - verb: The formatting verb rune ('f', 'F', 'v', 'h', 'H').
+//
 fmt_complex :: proc(fi: ^Info, c: complex128, bits: int, verb: rune) {
 	switch verb {
 	case 'f', 'F', 'v', 'h', 'H':
@@ -2174,7 +2590,14 @@ fmt_complex :: proc(fi: ^Info, c: complex128, bits: int, verb: rune) {
 		return
 	}
 }
-
+// Formats a quaternion number based on the given formatting verb
+//
+// Inputs:
+// - fi: A pointer to an Info struct containing formatting information.
+// - q: The quaternion256 value to be formatted.
+// - bits: The number of bits in the quaternion number (64, 128, or 256).
+// - verb: The formatting verb rune ('f', 'F', 'v', 'h', 'H').
+//
 fmt_quaternion  :: proc(fi: ^Info, q: quaternion256, bits: int, verb: rune) {
 	switch verb {
 	case 'f', 'F', 'v', 'h', 'H':
@@ -2205,7 +2628,15 @@ fmt_quaternion  :: proc(fi: ^Info, q: quaternion256, bits: int, verb: rune) {
 		return
 	}
 }
-
+// Formats an argument based on its type and the given formatting verb
+//
+// Inputs:
+// - fi: A pointer to an Info struct containing formatting information.
+// - arg: The value to be formatted.
+// - verb: The formatting verb rune (e.g. 'T').
+//
+// NOTE: Uses user formatters if available and not ignored.
+//
 fmt_arg :: proc(fi: ^Info, arg: any, verb: rune) {
 	if arg == nil {
 		io.write_string(fi.writer, "<nil>")
@@ -2232,18 +2663,10 @@ fmt_arg :: proc(fi: ^Info, arg: any, verb: rune) {
 		}
 	}
 
-
-	custom_types: switch a in arg {
-	case runtime.Source_Code_Location:
-		if fi.hash && verb == 'v' {
-			io.write_string(fi.writer, a.file_path,    &fi.n)
-			io.write_byte(fi.writer, '(',              &fi.n)
-			io.write_i64(fi.writer, i64(a.line), 10,   &fi.n)
-			io.write_byte(fi.writer, ':',              &fi.n)
-			io.write_i64(fi.writer, i64(a.column), 10, &fi.n)
-			io.write_byte(fi.writer, ')',              &fi.n)
-			return
-		}
+	arg_info := type_info_of(arg.id)
+	if info, ok := arg_info.variant.(runtime.Type_Info_Named); ok {
+		fmt_named(fi, arg, verb, info)
+		return
 	}
 
 	base_arg := arg
@@ -2322,7 +2745,3 @@ fmt_arg :: proc(fi: ^Info, arg: any, verb: rune) {
 	}
 
 }
-
-
-
-

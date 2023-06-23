@@ -143,7 +143,7 @@ Includes full bindings as well as wrappers to match the `core:crypto` API.
 See also LICENSE in the `commonmark` directory itself.
 Includes full bindings and Windows `.lib` and `.dll`.
 
-## CommonMark
+## zlib
 
 [zlib](https://github.com/madler/zlib) data compression library
 

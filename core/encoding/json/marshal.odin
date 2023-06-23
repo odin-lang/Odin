@@ -153,7 +153,7 @@ marshal_to_writer :: proc(w: io.Writer, v: any, opt: ^Marshal_Options) -> (err: 
 		case complex128: r, i = f64(real(z)), f64(imag(z))
 		case: return .Unsupported_Type
 		}
-	
+
 		io.write_byte(w, '[')    or_return
 		io.write_f64(w, r)       or_return
 		io.write_string(w, ", ") or_return
@@ -165,8 +165,8 @@ marshal_to_writer :: proc(w: io.Writer, v: any, opt: ^Marshal_Options) -> (err: 
 
 	case runtime.Type_Info_String:
 		switch s in a {
-		case string:  io.write_quoted_string(w, s)         or_return
-		case cstring: io.write_quoted_string(w, string(s)) or_return
+		case string:  io.write_quoted_string(w, s, '"', nil, true)         or_return
+		case cstring: io.write_quoted_string(w, string(s), '"', nil, true) or_return
 		}
 
 	case runtime.Type_Info_Boolean:
@@ -198,7 +198,7 @@ marshal_to_writer :: proc(w: io.Writer, v: any, opt: ^Marshal_Options) -> (err: 
 	case runtime.Type_Info_Procedure:
 		return .Unsupported_Type
 
-	case runtime.Type_Info_Tuple:
+	case runtime.Type_Info_Parameters:
 		return .Unsupported_Type
 
 	case runtime.Type_Info_Simd_Vector:
@@ -262,10 +262,14 @@ marshal_to_writer :: proc(w: io.Writer, v: any, opt: ^Marshal_Options) -> (err: 
 			}
 			map_cap := uintptr(runtime.map_cap(m^))
 			ks, vs, hs, _, _ := runtime.map_kvh_data_dynamic(m^, info.map_info)
+
+			i := 0
 			for bucket_index in 0..<map_cap {
 				if !runtime.map_hash_is_valid(hs[bucket_index]) {
 					continue
 				}
+				opt_write_iteration(w, opt, i) or_return
+				i += 1
 
 				key   := rawptr(runtime.map_cell_index_dynamic(ks, info.map_info.ks, bucket_index))
 				value := rawptr(runtime.map_cell_index_dynamic(vs, info.map_info.vs, bucket_index))
@@ -437,7 +441,7 @@ opt_write_start :: proc(w: io.Writer, opt: ^Marshal_Options, c: byte) -> (err: i
 	return
 }
 
-// insert comma seperation and write indentations
+// insert comma separation and write indentations
 opt_write_iteration :: proc(w: io.Writer, opt: ^Marshal_Options, iteration: int) -> (err: io.Error) {
 	switch opt.spec {
 	case .JSON, .JSON5: 
@@ -457,7 +461,7 @@ opt_write_iteration :: proc(w: io.Writer, opt: ^Marshal_Options, iteration: int)
 			if opt.pretty {
 				io.write_byte(w, '\n') or_return
 			} else {
-				// comma seperation necessary for non pretty output!
+				// comma separation necessary for non pretty output!
 				io.write_string(w, ", ") or_return
 			}
 		}

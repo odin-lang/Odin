@@ -1,6 +1,6 @@
-bool lb_is_const(lbValue value) {
+gb_internal bool lb_is_const(lbValue value) {
 	LLVMValueRef v = value.value;
-	if (is_type_untyped_nil(value.type) || is_type_untyped_undef(value.type)) {
+	if (is_type_untyped_nil(value.type)) {
 		// TODO(bill): Is this correct behaviour?
 		return true;
 	}
@@ -10,7 +10,7 @@ bool lb_is_const(lbValue value) {
 	return false;
 }
 
-bool lb_is_const_or_global(lbValue value) {
+gb_internal bool lb_is_const_or_global(lbValue value) {
 	if (lb_is_const(value)) {
 		return true;
 	}
@@ -29,7 +29,7 @@ bool lb_is_const_or_global(lbValue value) {
 }
 
 
-bool lb_is_elem_const(Ast *elem, Type *elem_type) {
+gb_internal bool lb_is_elem_const(Ast *elem, Type *elem_type) {
 	if (!elem_type_can_be_constant(elem_type)) {
 		return false;
 	}
@@ -42,7 +42,7 @@ bool lb_is_elem_const(Ast *elem, Type *elem_type) {
 }
 
 
-bool lb_is_const_nil(lbValue value) {
+gb_internal bool lb_is_const_nil(lbValue value) {
 	LLVMValueRef v = value.value;
 	if (LLVMIsConstant(v)) {
 		if (LLVMIsAConstantAggregateZero(v)) {
@@ -55,7 +55,7 @@ bool lb_is_const_nil(lbValue value) {
 }
 
 
-bool lb_is_expr_constant_zero(Ast *expr) {
+gb_internal bool lb_is_expr_constant_zero(Ast *expr) {
 	GB_ASSERT(expr != nullptr);
 	auto v = exact_value_to_integer(expr->tav.value);
 	if (v.kind == ExactValue_Integer) {
@@ -64,7 +64,7 @@ bool lb_is_expr_constant_zero(Ast *expr) {
 	return false;
 }
 
-String lb_get_const_string(lbModule *m, lbValue value) {
+gb_internal String lb_get_const_string(lbModule *m, lbValue value) {
 	GB_ASSERT(lb_is_const(value));
 	GB_ASSERT(LLVMIsConstant(value.value));
 
@@ -92,7 +92,7 @@ String lb_get_const_string(lbModule *m, lbValue value) {
 }
 
 
-LLVMValueRef llvm_const_cast(LLVMValueRef val, LLVMTypeRef dst) {
+gb_internal LLVMValueRef llvm_const_cast(LLVMValueRef val, LLVMTypeRef dst) {
 	LLVMTypeRef src = LLVMTypeOf(val);
 	if (src == dst) {
 		return val;
@@ -107,7 +107,11 @@ LLVMValueRef llvm_const_cast(LLVMValueRef val, LLVMTypeRef dst) {
 	case LLVMPointerTypeKind:
 		return LLVMConstPointerCast(val, dst);
 	case LLVMStructTypeKind:
-		return LLVMConstBitCast(val, dst);
+		// GB_PANIC("%s -> %s", LLVMPrintValueToString(val), LLVMPrintTypeToString(dst));
+		// NOTE(bill): It's not possible to do a bit cast on a struct, why was this code even here in the first place?
+		// It seems mostly to exist to get around the "anonymous -> named" struct assignments
+		// return LLVMConstBitCast(val, dst);
+		return val;
 	default:
 		GB_PANIC("Unhandled const cast %s to %s", LLVMPrintTypeToString(src), LLVMPrintTypeToString(dst));
 	}
@@ -116,7 +120,7 @@ LLVMValueRef llvm_const_cast(LLVMValueRef val, LLVMTypeRef dst) {
 }
 
 
-lbValue lb_const_ptr_cast(lbModule *m, lbValue value, Type *t) {
+gb_internal lbValue lb_const_ptr_cast(lbModule *m, lbValue value, Type *t) {
 	GB_ASSERT(is_type_internally_pointer_like(value.type));
 	GB_ASSERT(is_type_internally_pointer_like(t));
 	GB_ASSERT(lb_is_const(value));
@@ -127,7 +131,26 @@ lbValue lb_const_ptr_cast(lbModule *m, lbValue value, Type *t) {
 	return res;
 }
 
-LLVMValueRef llvm_const_named_struct(lbModule *m, Type *t, LLVMValueRef *values, isize value_count_) {
+
+gb_internal LLVMValueRef llvm_const_string_internal(lbModule *m, Type *t, LLVMValueRef data, LLVMValueRef len) {
+	if (build_context.metrics.ptr_size < build_context.metrics.int_size) {
+		LLVMValueRef values[3] = {
+			data,
+			LLVMConstNull(lb_type(m, t_i32)),
+			len,
+		};
+		return llvm_const_named_struct_internal(lb_type(m, t), values, 3);
+	} else {
+		LLVMValueRef values[2] = {
+			data,
+			len,
+		};
+		return llvm_const_named_struct_internal(lb_type(m, t), values, 2);
+	}
+}
+
+
+gb_internal LLVMValueRef llvm_const_named_struct(lbModule *m, Type *t, LLVMValueRef *values, isize value_count_) {
 	LLVMTypeRef struct_type = lb_type(m, t);
 	GB_ASSERT(LLVMGetTypeKind(struct_type) == LLVMStructTypeKind);
 	
@@ -157,7 +180,7 @@ LLVMValueRef llvm_const_named_struct(lbModule *m, Type *t, LLVMValueRef *values,
 	return llvm_const_named_struct_internal(struct_type, values_with_padding, values_with_padding_count);
 }
 
-LLVMValueRef llvm_const_named_struct_internal(LLVMTypeRef t, LLVMValueRef *values, isize value_count_) {
+gb_internal LLVMValueRef llvm_const_named_struct_internal(LLVMTypeRef t, LLVMValueRef *values, isize value_count_) {
 	unsigned value_count = cast(unsigned)value_count_;
 	unsigned elem_count = LLVMCountStructElementTypes(t);
 	GB_ASSERT_MSG(value_count == elem_count, "%s %u %u", LLVMPrintTypeToString(t), value_count, elem_count);
@@ -168,7 +191,7 @@ LLVMValueRef llvm_const_named_struct_internal(LLVMTypeRef t, LLVMValueRef *value
 	return LLVMConstNamedStruct(t, values, value_count);
 }
 
-LLVMValueRef llvm_const_array(LLVMTypeRef elem_type, LLVMValueRef *values, isize value_count_) {
+gb_internal LLVMValueRef llvm_const_array(LLVMTypeRef elem_type, LLVMValueRef *values, isize value_count_) {
 	unsigned value_count = cast(unsigned)value_count_;
 	for (unsigned i = 0; i < value_count; i++) {
 		values[i] = llvm_const_cast(values[i], elem_type);
@@ -176,49 +199,65 @@ LLVMValueRef llvm_const_array(LLVMTypeRef elem_type, LLVMValueRef *values, isize
 	return LLVMConstArray(elem_type, values, value_count);
 }
 
-LLVMValueRef llvm_const_slice(lbModule *m, lbValue data, lbValue len) {
+gb_internal LLVMValueRef llvm_const_slice_internal(lbModule *m, LLVMValueRef data, LLVMValueRef len) {
+	if (build_context.metrics.ptr_size < build_context.metrics.int_size) {
+		GB_ASSERT(build_context.metrics.ptr_size == 4);
+		GB_ASSERT(build_context.metrics.int_size == 8);
+		LLVMValueRef vals[3] = {
+			data,
+			LLVMConstNull(lb_type(m, t_u32)),
+			len,
+		};
+		return LLVMConstStructInContext(m->ctx, vals, gb_count_of(vals), false);
+	} else {
+		LLVMValueRef vals[2] = {
+			data,
+			len,
+		};
+		return LLVMConstStructInContext(m->ctx, vals, gb_count_of(vals), false);
+	}
+}
+gb_internal LLVMValueRef llvm_const_slice(lbModule *m, lbValue data, lbValue len) {
 	GB_ASSERT(is_type_pointer(data.type) || is_type_multi_pointer(data.type));
 	GB_ASSERT(are_types_identical(len.type, t_int));
-	LLVMValueRef vals[2] = {
-		data.value,
-		len.value,
-	};
-	return LLVMConstStructInContext(m->ctx, vals, gb_count_of(vals), false);
+
+	return llvm_const_slice_internal(m, data.value, len.value);
 }
 
 
-lbValue lb_const_nil(lbModule *m, Type *type) {
+
+gb_internal lbValue lb_const_nil(lbModule *m, Type *type) {
 	LLVMValueRef v = LLVMConstNull(lb_type(m, type));
 	return lbValue{v, type};
 }
 
-lbValue lb_const_undef(lbModule *m, Type *type) {
+gb_internal lbValue lb_const_undef(lbModule *m, Type *type) {
 	LLVMValueRef v = LLVMGetUndef(lb_type(m, type));
 	return lbValue{v, type};
 }
 
 
 
-lbValue lb_const_int(lbModule *m, Type *type, u64 value) {
+gb_internal lbValue lb_const_int(lbModule *m, Type *type, u64 value) {
 	lbValue res = {};
 	res.value = LLVMConstInt(lb_type(m, type), cast(unsigned long long)value, !is_type_unsigned(type));
 	res.type = type;
 	return res;
 }
 
-lbValue lb_const_string(lbModule *m, String const &value) {
+gb_internal lbValue lb_const_string(lbModule *m, String const &value) {
 	return lb_const_value(m, t_string, exact_value_string(value));
 }
 
 
-lbValue lb_const_bool(lbModule *m, Type *type, bool value) {
+gb_internal lbValue lb_const_bool(lbModule *m, Type *type, bool value) {
 	lbValue res = {};
 	res.value = LLVMConstInt(lb_type(m, type), value, false);
 	res.type = type;
 	return res;
 }
 
-LLVMValueRef lb_const_f16(lbModule *m, f32 f, Type *type=t_f16) {
+gb_internal LLVMValueRef lb_const_f16(lbModule *m, f32 f, Type *type=t_f16) {
 	GB_ASSERT(type_size_of(type) == 2);
 
 	u16 u = f32_to_f16(f);
@@ -229,7 +268,7 @@ LLVMValueRef lb_const_f16(lbModule *m, f32 f, Type *type=t_f16) {
 	return LLVMConstBitCast(i, lb_type(m, type));
 }
 
-LLVMValueRef lb_const_f32(lbModule *m, f32 f, Type *type=t_f32) {
+gb_internal LLVMValueRef lb_const_f32(lbModule *m, f32 f, Type *type=t_f32) {
 	GB_ASSERT(type_size_of(type) == 4);
 	u32 u = bit_cast<u32>(f);
 	if (is_type_different_to_arch_endianness(type)) {
@@ -241,7 +280,7 @@ LLVMValueRef lb_const_f32(lbModule *m, f32 f, Type *type=t_f32) {
 
 
 
-bool lb_is_expr_untyped_const(Ast *expr) {
+gb_internal bool lb_is_expr_untyped_const(Ast *expr) {
 	auto const &tv = type_and_value_of_expr(expr);
 	if (is_type_untyped(tv.type)) {
 		return tv.value.kind != ExactValue_Invalid;
@@ -250,13 +289,13 @@ bool lb_is_expr_untyped_const(Ast *expr) {
 }
 
 
-lbValue lb_expr_untyped_const_to_typed(lbModule *m, Ast *expr, Type *t) {
+gb_internal lbValue lb_expr_untyped_const_to_typed(lbModule *m, Ast *expr, Type *t) {
 	GB_ASSERT(is_type_typed(t));
 	auto const &tv = type_and_value_of_expr(expr);
 	return lb_const_value(m, t, tv.value);
 }
 
-lbValue lb_emit_source_code_location_const(lbProcedure *p, String const &procedure, TokenPos const &pos) {
+gb_internal lbValue lb_emit_source_code_location_const(lbProcedure *p, String const &procedure, TokenPos const &pos) {
 	lbModule *m = p->module;
 
 	LLVMValueRef fields[4] = {};
@@ -271,7 +310,7 @@ lbValue lb_emit_source_code_location_const(lbProcedure *p, String const &procedu
 	return res;
 }
 
-lbValue lb_emit_source_code_location_const(lbProcedure *p, Ast *node) {
+gb_internal lbValue lb_emit_source_code_location_const(lbProcedure *p, Ast *node) {
 	String proc_name = {};
 	if (p->entity) {
 		proc_name = p->entity->token.string;
@@ -284,7 +323,7 @@ lbValue lb_emit_source_code_location_const(lbProcedure *p, Ast *node) {
 }
 
 
-lbValue lb_emit_source_code_location_as_global_ptr(lbProcedure *p, String const &procedure, TokenPos const &pos) {
+gb_internal lbValue lb_emit_source_code_location_as_global_ptr(lbProcedure *p, String const &procedure, TokenPos const &pos) {
 	lbValue loc = lb_emit_source_code_location_const(p, procedure, pos);
 	lbAddr addr = lb_add_global_generated(p->module, loc.type, loc, nullptr);
 	lb_make_global_private_const(addr);
@@ -292,24 +331,24 @@ lbValue lb_emit_source_code_location_as_global_ptr(lbProcedure *p, String const 
 }
 
 
-lbValue lb_emit_source_code_location_as_global_ptr(lbProcedure *p, Ast *node) {
+gb_internal lbValue lb_emit_source_code_location_as_global_ptr(lbProcedure *p, Ast *node) {
 	lbValue loc = lb_emit_source_code_location_const(p, node);
 	lbAddr addr = lb_add_global_generated(p->module, loc.type, loc, nullptr);
 	lb_make_global_private_const(addr);
 	return addr.addr;
 }
 
-lbValue lb_emit_source_code_location_as_global(lbProcedure *p, String const &procedure, TokenPos const &pos) {
+gb_internal lbValue lb_emit_source_code_location_as_global(lbProcedure *p, String const &procedure, TokenPos const &pos) {
 	return lb_emit_load(p, lb_emit_source_code_location_as_global_ptr(p, procedure, pos));
 }
 
-lbValue lb_emit_source_code_location_as_global(lbProcedure *p, Ast *node) {
+gb_internal lbValue lb_emit_source_code_location_as_global(lbProcedure *p, Ast *node) {
 	return lb_emit_load(p, lb_emit_source_code_location_as_global_ptr(p, node));
 }
 
 
 
-LLVMValueRef lb_build_constant_array_values(lbModule *m, Type *type, Type *elem_type, isize count, LLVMValueRef *values, bool allow_local) {
+gb_internal LLVMValueRef lb_build_constant_array_values(lbModule *m, Type *type, Type *elem_type, isize count, LLVMValueRef *values, bool allow_local) {
 	bool is_local = allow_local && m->curr_procedure != nullptr;
 	bool is_const = true;
 	if (is_local) {
@@ -341,7 +380,7 @@ LLVMValueRef lb_build_constant_array_values(lbModule *m, Type *type, Type *elem_
 	return llvm_const_array(lb_type(m, elem_type), values, cast(unsigned int)count);
 }
 
-LLVMValueRef lb_big_int_to_llvm(lbModule *m, Type *original_type, BigInt const *a) {
+gb_internal LLVMValueRef lb_big_int_to_llvm(lbModule *m, Type *original_type, BigInt const *a) {
 	if (big_int_is_zero(a)) {
 		return LLVMConstNull(lb_type(m, original_type));
 	}
@@ -386,8 +425,33 @@ LLVMValueRef lb_big_int_to_llvm(lbModule *m, Type *original_type, BigInt const *
 	return value;
 }
 
+gb_internal bool lb_is_nested_possibly_constant(Type *ft, Selection const &sel, Ast *elem) {
+	GB_ASSERT(!sel.indirect);
+	for (i32 index : sel.index) {
+		Type *bt = base_type(ft);
+		switch (bt->kind) {
+		case Type_Struct:
+			if (bt->Struct.is_raw_union) {
+				return false;
+			}
+			ft = bt->Struct.fields[index]->type;
+			break;
+		case Type_Array:
+			ft = bt->Array.elem;
+			break;
+		default:
+			return false;
+		}
+	}
 
-lbValue lb_const_value(lbModule *m, Type *type, ExactValue value, bool allow_local) {
+
+	if (is_type_raw_union(ft) || is_type_typeid(ft)) {
+		return false;
+	}
+	return lb_is_elem_const(elem, ft);
+}
+
+gb_internal lbValue lb_const_value(lbModule *m, Type *type, ExactValue value, bool allow_local) {
 	LLVMContextRef ctx = m->ctx;
 
 	type = default_type(type);
@@ -409,9 +473,9 @@ lbValue lb_const_value(lbModule *m, Type *type, ExactValue value, bool allow_loc
 	if (value.kind == ExactValue_Procedure) {
 		lbValue res = {};
 		Ast *expr = unparen_expr(value.value_procedure);
+		GB_ASSERT(expr != nullptr);
 		if (expr->kind == Ast_ProcLit) {
 			res = lb_generate_anonymous_proc_lit(m, str_lit("_proclit"), expr);
-
 		} else {
 			Entity *e = entity_from_expr(expr);
 			res = lb_find_procedure_value_from_entity(m, e);
@@ -460,7 +524,10 @@ lbValue lb_const_value(lbModule *m, Type *type, ExactValue value, bool allow_loc
 					LLVMValueRef indices[2] = {llvm_zero(m), llvm_zero(m)};
 					LLVMValueRef ptr = LLVMBuildInBoundsGEP2(p->builder, llvm_type, array_data, indices, 2, "");
 					LLVMValueRef len = LLVMConstInt(lb_type(m, t_int), count, true);
+
 					lbAddr slice = lb_add_local_generated(p, type, false);
+					map_set(&m->exact_value_compound_literal_addr_map, value.value_compound, slice);
+
 					lb_fill_slice(p, slice, {ptr, alloc_type_pointer(elem)}, {len, t_int});
 					return lb_addr_load(p, slice);
 				}
@@ -612,10 +679,9 @@ lbValue lb_const_value(lbModule *m, Type *type, ExactValue value, bool allow_loc
 					ptr = LLVMConstNull(lb_type(m, t_u8_ptr));
 				}
 				LLVMValueRef str_len = LLVMConstInt(lb_type(m, t_int), value.value_string.len, true);
-				LLVMValueRef values[2] = {ptr, str_len};
 				GB_ASSERT(is_type_string(original_type));
 
-				res.value = llvm_const_named_struct(m, original_type, values, 2);
+				res.value = llvm_const_string_internal(m, original_type, ptr, str_len);
 			}
 
 			return res;
@@ -978,12 +1044,59 @@ lbValue lb_const_value(lbModule *m, Type *type, ExactValue value, bool allow_loc
 						GB_ASSERT(tav.mode != Addressing_Invalid);
 
 						Selection sel = lookup_field(type, name, false);
+						GB_ASSERT(!sel.indirect);
+
 						Entity *f = type->Struct.fields[sel.index[0]];
-							
 						i32 index = field_remapping[f->Variable.field_index];
 						if (elem_type_can_be_constant(f->type)) {
-							values[index] = lb_const_value(m, f->type, tav.value, allow_local).value;
-							visited[index] = true;
+							if (sel.index.count == 1) {
+								values[index] = lb_const_value(m, f->type, tav.value, allow_local).value;
+								visited[index] = true;
+							} else {
+								if (!visited[index]) {
+									values[index] = lb_const_value(m, f->type, {}, false).value;
+									visited[index] = true;
+								}
+								unsigned idx_list_len = cast(unsigned)sel.index.count-1;
+								unsigned *idx_list = gb_alloc_array(temporary_allocator(), unsigned, idx_list_len);
+
+								if (lb_is_nested_possibly_constant(type, sel, fv->value)) {
+									bool is_constant = true;
+									Type *cv_type = f->type;
+									for (isize j = 1; j < sel.index.count; j++) {
+										i32 index = sel.index[j];
+										Type *cvt = base_type(cv_type);
+
+										if (cvt->kind == Type_Struct) {
+											if (cvt->Struct.is_raw_union) {
+												// sanity check which should have been caught by `lb_is_nested_possibly_constant`
+												is_constant = false;
+												break;
+											}
+											cv_type = cvt->Struct.fields[index]->type;
+
+											if (is_type_struct(cvt)) {
+												auto cv_field_remapping = lb_get_struct_remapping(m, cvt);
+												unsigned remapped_index = cast(unsigned)cv_field_remapping[index];
+												idx_list[j-1] = remapped_index;
+											} else {
+												idx_list[j-1] = cast(unsigned)index;
+											}
+										} else if (cvt->kind == Type_Array) {
+											cv_type = cvt->Array.elem;
+
+											idx_list[j-1] = cast(unsigned)index;
+										} else {
+											GB_PANIC("UNKNOWN TYPE: %s", type_to_string(cv_type));
+										}
+									}
+									if (is_constant) {
+										LLVMValueRef elem_value = lb_const_value(m, tav.type, tav.value, allow_local).value;
+										GB_ASSERT(LLVMIsConstant(elem_value));
+										values[index] = LLVMConstInsertValue(values[index], elem_value, idx_list, idx_list_len);
+									}
+								}
+							}
 						}
 					}
 				} else {
@@ -1043,6 +1156,8 @@ lbValue lb_const_value(lbModule *m, Type *type, ExactValue value, bool allow_loc
 				GB_ASSERT(is_local);
 				lbProcedure *p = m->curr_procedure;
 				lbAddr v = lb_add_local_generated(p, res.type, true);
+				map_set(&m->exact_value_compound_literal_addr_map, value.value_compound, v);
+
 				LLVMBuildStore(p->builder, constant_value, v.addr.value);
 				for (isize i = 0; i < value_count; i++) {
 					LLVMValueRef val = old_values[i];

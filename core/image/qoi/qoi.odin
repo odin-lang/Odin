@@ -15,7 +15,6 @@ package qoi
 import "core:image"
 import "core:compress"
 import "core:bytes"
-import "core:os"
 
 Error   :: image.Error
 Image   :: image.Image
@@ -24,7 +23,7 @@ Options :: image.Options
 RGB_Pixel  :: image.RGB_Pixel
 RGBA_Pixel :: image.RGBA_Pixel
 
-save_to_memory  :: proc(output: ^bytes.Buffer, img: ^Image, options := Options{}, allocator := context.allocator) -> (err: Error) {
+save_to_buffer  :: proc(output: ^bytes.Buffer, img: ^Image, options := Options{}, allocator := context.allocator) -> (err: Error) {
 	context.allocator = allocator
 
 	if img == nil {
@@ -54,7 +53,7 @@ save_to_memory  :: proc(output: ^bytes.Buffer, img: ^Image, options := Options{}
 	// Calculate and allocate maximum size. We'll reclaim space to actually written output at the end.
 	max_size := pixels * (img.channels + 1) + size_of(image.QOI_Header) + size_of(u64be)
 
-	if !resize(&output.buf, max_size) {
+	if resize(&output.buf, max_size) != nil {
 		return .Unable_To_Allocate_Or_Resize
 	}
 
@@ -166,20 +165,6 @@ save_to_memory  :: proc(output: ^bytes.Buffer, img: ^Image, options := Options{}
 	return nil
 }
 
-save_to_file :: proc(output: string, img: ^Image, options := Options{}, allocator := context.allocator) -> (err: Error) {
-	context.allocator = allocator
-
-	out := &bytes.Buffer{}
-	defer bytes.buffer_destroy(out)
-
-	save_to_memory(out, img, options) or_return
-	write_ok := os.write_entire_file(output, out.buf[:])
-
-	return nil if write_ok else .Unable_To_Write_File
-}
-
-save :: proc{save_to_memory, save_to_file}
-
 load_from_bytes :: proc(data: []byte, options := Options{}, allocator := context.allocator) -> (img: ^Image, err: Error) {
 	ctx := &compress.Context_Memory_Input{
 		input_data = data,
@@ -187,19 +172,6 @@ load_from_bytes :: proc(data: []byte, options := Options{}, allocator := context
 
 	img, err = load_from_context(ctx, options, allocator)
 	return img, err
-}
-
-load_from_file :: proc(filename: string, options := Options{}, allocator := context.allocator) -> (img: ^Image, err: Error) {
-	context.allocator = allocator
-
-	data, ok := os.read_entire_file(filename)
-	defer delete(data)
-
-	if ok {
-		return load_from_bytes(data, options)
-	} else {
-		return nil, .Unable_To_Read_File
-	}
 }
 
 @(optimization_mode="speed")
@@ -261,7 +233,7 @@ load_from_context :: proc(ctx: ^$C, options := Options{}, allocator := context.a
 
 	bytes_needed := image.compute_buffer_size(int(header.width), int(header.height), img.channels, 8)
 
-	if !resize(&img.pixels.buf, bytes_needed) {
+	if resize(&img.pixels.buf, bytes_needed) != nil {
 	 	return img, .Unable_To_Allocate_Or_Resize
 	}
 
@@ -358,8 +330,6 @@ load_from_context :: proc(ctx: ^$C, options := Options{}, allocator := context.a
 
 	return
 }
-
-load :: proc{load_from_file, load_from_bytes, load_from_context}
 
 /*
 	Cleanup of image-specific data.

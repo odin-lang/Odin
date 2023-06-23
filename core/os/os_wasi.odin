@@ -89,7 +89,10 @@ seek :: proc(fd: Handle, offset: i64, whence: int) -> (i64, Errno) {
 current_thread_id :: proc "contextless" () -> int {
 	return 0
 }
-
+@(private)
+_processor_core_count :: proc() -> int {
+	return 1
+}
 
 file_size :: proc(fd: Handle) -> (i64, Errno) {
 	stat, err := wasi.fd_filestat_get(wasi.fd_t(fd))

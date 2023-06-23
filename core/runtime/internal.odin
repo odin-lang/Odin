@@ -3,7 +3,7 @@ package runtime
 import "core:intrinsics"
 
 @(private="file")
-IS_WASM :: ODIN_ARCH == .wasm32 || ODIN_ARCH == .wasm64
+IS_WASM :: ODIN_ARCH == .wasm32 || ODIN_ARCH == .wasm64p32
 
 @(private)
 RUNTIME_LINKAGE :: "strong" when (
@@ -184,32 +184,33 @@ mem_free_all :: #force_inline proc(allocator := context.allocator, loc := #calle
 	return
 }
 
-mem_resize :: proc(ptr: rawptr, old_size, new_size: int, alignment: int = DEFAULT_ALIGNMENT, allocator := context.allocator, loc := #caller_location) -> ([]byte, Allocator_Error) {
+mem_resize :: proc(ptr: rawptr, old_size, new_size: int, alignment: int = DEFAULT_ALIGNMENT, allocator := context.allocator, loc := #caller_location) -> (data: []byte, err: Allocator_Error) {
 	if allocator.procedure == nil {
 		return nil, nil
 	}
 	if new_size == 0 {
 		if ptr != nil {
-			_, err := allocator.procedure(allocator.data, .Free, 0, 0, ptr, old_size, loc)
-			return nil, err
+			_, err = allocator.procedure(allocator.data, .Free, 0, 0, ptr, old_size, loc)
+			return
 		}
-		return nil, nil
+		return
 	} else if ptr == nil {
 		return allocator.procedure(allocator.data, .Alloc, new_size, alignment, nil, 0, loc)
 	} else if old_size == new_size && uintptr(ptr) % uintptr(alignment) == 0 {
-		return ([^]byte)(ptr)[:old_size], nil
+		data = ([^]byte)(ptr)[:old_size]
+		return
 	}
 
-	data, err := allocator.procedure(allocator.data, .Resize, new_size, alignment, ptr, old_size, loc)
+	data, err = allocator.procedure(allocator.data, .Resize, new_size, alignment, ptr, old_size, loc)
 	if err == .Mode_Not_Implemented {
 		data, err = allocator.procedure(allocator.data, .Alloc, new_size, alignment, nil, 0, loc)
 		if err != nil {
-			return data, err
+			return
 		}
 		copy(data, ([^]byte)(ptr)[:old_size])
 		_, err = allocator.procedure(allocator.data, .Free, 0, 0, ptr, old_size, loc)
 	}
-	return data, err
+	return
 }
 
 memory_equal :: proc "contextless" (x, y: rawptr, n: int) -> bool {
@@ -223,7 +224,7 @@ memory_equal :: proc "contextless" (x, y: rawptr, n: int) -> bool {
 	
 	when size_of(uint) == 8 {
 		if word_length := length >> 3; word_length != 0 {
-			for i in 0..<word_length {
+			for _ in 0..<word_length {
 				if intrinsics.unaligned_load((^u64)(a)) != intrinsics.unaligned_load((^u64)(b)) {
 					return false
 				}
@@ -254,7 +255,7 @@ memory_equal :: proc "contextless" (x, y: rawptr, n: int) -> bool {
 		return true
 	} else {
 		if word_length := length >> 2; word_length != 0 {
-			for i in 0..<word_length {
+			for _ in 0..<word_length {
 				if intrinsics.unaligned_load((^u32)(a)) != intrinsics.unaligned_load((^u32)(b)) {
 					return false
 				}
@@ -498,6 +499,42 @@ string_decode_rune :: #force_inline proc "contextless" (s: string) -> (rune, int
 	}
 	return rune(s0&MASK4)<<18 | rune(b1&MASKX)<<12 | rune(b2&MASKX)<<6 | rune(b3&MASKX), 4
 }
+
+string_decode_last_rune :: proc "contextless" (s: string) -> (rune, int) {
+	RUNE_ERROR :: '\ufffd'
+	RUNE_SELF  :: 0x80
+	UTF_MAX    :: 4
+
+	r: rune
+	size: int
+	start, end, limit: int
+
+	end = len(s)
+	if end == 0 {
+		return RUNE_ERROR, 0
+	}
+	start = end-1
+	r = rune(s[start])
+	if r < RUNE_SELF {
+		return r, 1
+	}
+
+	limit = max(end - UTF_MAX, 0)
+
+	for start-=1; start >= limit; start-=1 {
+		if (s[start] & 0xc0) != RUNE_SELF {
+			break
+		}
+	}
+
+	start = max(start, 0)
+	r, size = string_decode_rune(s[start:end])
+	if start+size != end {
+		return RUNE_ERROR, 1
+	}
+	return r, size
+}
+
 
 abs_f16 :: #force_inline proc "contextless" (x: f16) -> f16 {
 	return -x if x < 0 else x

@@ -94,7 +94,15 @@ cap :: proc(array: Array_Type) -> int ---
 
 size_of      :: proc($T: typeid) -> int ---
 align_of     :: proc($T: typeid) -> int ---
-offset_of    :: proc($T: typeid) -> uintptr ---
+
+// e.g. offset_of(t.f), where t is an instance of the type T
+offset_of_selector :: proc(selector: $T) -> uintptr ---
+// e.g. offset_of(T, f), where T can be the type instead of a variable
+offset_of_member   :: proc($T: typeid, member: $M) -> uintptr ---
+offset_of :: proc{offset_of_selector, offset_of_member}
+// e.g. offset_of(T, "f"), where T can be the type instead of a variable
+offset_of_by_string :: proc($T: typeid, member: string) -> uintptr ---
+
 type_of      :: proc(x: expr) -> type ---
 type_info_of :: proc($T: typeid) -> ^runtime.Type_Info ---
 typeid_of    :: proc($T: typeid) -> typeid ---
@@ -109,7 +117,7 @@ jmag       :: proc(value: Quaternion) -> Float ---
 kmag       :: proc(value: Quaternion) -> Float ---
 conj       :: proc(value: Complex_Or_Quaternion) -> Complex_Or_Quaternion ---
 
-expand_to_tuple :: proc(value: Struct_Or_Array) -> (A, B, C, ...) ---
+expand_values :: proc(value: Struct_Or_Array) -> (A, B, C, ...) ---
 
 min   :: proc(values: ..T) -> T ---
 max   :: proc(values: ..T) -> T ---

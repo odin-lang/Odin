@@ -2,6 +2,7 @@ package json
 
 import "core:mem"
 import "core:unicode/utf8"
+import "core:unicode/utf16"
 import "core:strconv"
 
 Parser :: struct {
@@ -403,10 +404,18 @@ unquote_string :: proc(token: Token, spec: Specification, allocator := context.a
 				}
 				i += 6
 
+				// If this is a surrogate pair, decode as such by taking the next rune too.
+				if r >= utf8.SURROGATE_MIN && r <= utf8.SURROGATE_HIGH_MAX && len(s) > i + 2 && s[i:i+2] == "\\u" {
+					r2 := get_u4_rune(s[i:])
+					if r2 >= utf8.SURROGATE_LOW_MIN && r2 <= utf8.SURROGATE_MAX {
+						i += 6
+						r = utf16.decode_surrogate_pair(r, r2)
+					}
+				}
+
 				buf, buf_width := utf8.encode_rune(r)
 				copy(b[w:], buf[:buf_width])
 				w += buf_width
-
 
 			case '0':
 				if spec != .JSON {

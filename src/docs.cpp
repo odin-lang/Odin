@@ -28,7 +28,7 @@ gb_global char const *print_entity_names[Entity_Count] = {
 };
 
 
-GB_COMPARE_PROC(cmp_entities_for_printing) {
+gb_internal GB_COMPARE_PROC(cmp_entities_for_printing) {
 	GB_ASSERT(a != nullptr);
 	GB_ASSERT(b != nullptr);
 	Entity *x = *cast(Entity **)a;
@@ -49,14 +49,13 @@ GB_COMPARE_PROC(cmp_entities_for_printing) {
 	int ox = print_entity_kind_ordering[x->kind];
 	int oy = print_entity_kind_ordering[y->kind];
 	res = ox - oy;
-	if (res != 0) {
-		return res;
+	if (res == 0) {
+		res = string_compare(x->token.string, y->token.string);
 	}
-	res = string_compare(x->token.string, y->token.string);
 	return res;
 }
 
-GB_COMPARE_PROC(cmp_ast_package_by_name) {
+gb_internal GB_COMPARE_PROC(cmp_ast_package_by_name) {
 	GB_ASSERT(a != nullptr);
 	GB_ASSERT(b != nullptr);
 	AstPackage *x = *cast(AstPackage **)a;
@@ -67,7 +66,7 @@ GB_COMPARE_PROC(cmp_ast_package_by_name) {
 #include "docs_format.cpp"
 #include "docs_writer.cpp"
 
-void print_doc_line(i32 indent, String const &data) {
+gb_internal void print_doc_line(i32 indent, String const &data) {
 	while (indent --> 0) {
 		gb_printf("\t");
 	}
@@ -75,7 +74,7 @@ void print_doc_line(i32 indent, String const &data) {
 	gb_printf("\n");
 }
 
-void print_doc_line(i32 indent, char const *fmt, ...) {
+gb_internal void print_doc_line(i32 indent, char const *fmt, ...) {
 	while (indent --> 0) {
 		gb_printf("\t");
 	}
@@ -85,16 +84,7 @@ void print_doc_line(i32 indent, char const *fmt, ...) {
 	va_end(va);
 	gb_printf("\n");
 }
-void print_doc_line_no_newline(i32 indent, char const *fmt, ...) {
-	while (indent --> 0) {
-		gb_printf("\t");
-	}
-	va_list va;
-	va_start(va, fmt);
-	gb_printf_va(fmt, va);
-	va_end(va);
-}
-void print_doc_line_no_newline(i32 indent, String const &data) {
+gb_internal void print_doc_line_no_newline(i32 indent, String const &data) {
 	while (indent --> 0) {
 		gb_printf("\t");
 	}
@@ -102,7 +92,7 @@ void print_doc_line_no_newline(i32 indent, String const &data) {
 }
 
 
-bool print_doc_comment_group_string(i32 indent, CommentGroup *g) {
+gb_internal bool print_doc_comment_group_string(i32 indent, CommentGroup *g) {
 	if (g == nullptr) {
 		return false;
 	}
@@ -191,7 +181,7 @@ bool print_doc_comment_group_string(i32 indent, CommentGroup *g) {
 
 
 
-void print_doc_expr(Ast *expr) {
+gb_internal void print_doc_expr(Ast *expr) {
 	gbString s = nullptr;
 	if (build_context.cmd_doc_flags & CmdDocFlag_Short) {
 		s = expr_to_string_shorthand(expr);
@@ -202,8 +192,7 @@ void print_doc_expr(Ast *expr) {
 	gb_string_free(s);
 }
 
-
-void print_doc_package(CheckerInfo *info, AstPackage *pkg) {
+gb_internal void print_doc_package(CheckerInfo *info, AstPackage *pkg) {
 	if (pkg == nullptr) {
 		return;
 	}
@@ -220,10 +209,10 @@ void print_doc_package(CheckerInfo *info, AstPackage *pkg) {
 	}
 
 	if (pkg->scope != nullptr) {
-		auto entities = array_make<Entity *>(heap_allocator(), 0, pkg->scope->elements.entries.count);
+		auto entities = array_make<Entity *>(heap_allocator(), 0, pkg->scope->elements.count);
 		defer (array_free(&entities));
-		for_array(i, pkg->scope->elements.entries) {
-			Entity *e = pkg->scope->elements.entries[i].value;
+		for (auto const &entry : pkg->scope->elements) {
+			Entity *e = entry.value;
 			switch (e->kind) {
 			case Entity_Invalid:
 			case Entity_Builtin:
@@ -240,6 +229,12 @@ void print_doc_package(CheckerInfo *info, AstPackage *pkg) {
 				// Fine
 				break;
 			}
+			if (e->pkg != pkg) {
+				continue;
+			}
+			if (!is_entity_exported(e)) {
+				continue;
+			}
 			array_add(&entities, e);
 		}
 		gb_sort_array(entities.data, entities.count, cmp_entities_for_printing);
@@ -247,16 +242,7 @@ void print_doc_package(CheckerInfo *info, AstPackage *pkg) {
 		bool show_docs = (build_context.cmd_doc_flags & CmdDocFlag_Short) == 0;
 
 		EntityKind curr_entity_kind = Entity_Invalid;
-		for_array(i, entities) {
-			Entity *e = entities[i];
-			if (e->pkg != pkg) {
-				continue;
-			}
-			if (!is_entity_exported(e)) {
-				continue;
-			}
-
-
+		for (Entity *e : entities) {
 			if (curr_entity_kind != e->kind) {
 				if (curr_entity_kind != Entity_Invalid) {
 					print_doc_line(0, "");
@@ -297,7 +283,7 @@ void print_doc_package(CheckerInfo *info, AstPackage *pkg) {
 				print_doc_expr(init_expr);
 			}
 
-			gb_printf(";\n");
+			gb_printf("\n");
 
 			if (show_docs) {
 				print_doc_comment_group_string(3, docs);
@@ -320,7 +306,7 @@ void print_doc_package(CheckerInfo *info, AstPackage *pkg) {
 
 }
 
-void generate_documentation(Checker *c) {
+gb_internal void generate_documentation(Checker *c) {
 	CheckerInfo *info = &c->info;
 
 	if (build_context.cmd_doc_flags & CmdDocFlag_DocFormat) {
@@ -358,9 +344,9 @@ void generate_documentation(Checker *c) {
 
 		odin_doc_write(info, output_file_path);
 	} else {
-		auto pkgs = array_make<AstPackage *>(permanent_allocator(), 0, info->packages.entries.count);
-		for_array(i, info->packages.entries) {
-			AstPackage *pkg = info->packages.entries[i].value;
+		auto pkgs = array_make<AstPackage *>(permanent_allocator(), 0, info->packages.count);
+		for (auto const &entry : info->packages) {
+			AstPackage *pkg = entry.value;
 			if (build_context.cmd_doc_flags & CmdDocFlag_AllPackages) {
 				array_add(&pkgs, pkg);
 			} else {

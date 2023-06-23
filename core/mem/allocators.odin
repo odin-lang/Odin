@@ -2,6 +2,7 @@ package mem
 
 import "core:intrinsics"
 import "core:runtime"
+import "core:sync"
 
 nil_allocator_proc :: proc(allocator_data: rawptr, mode: Allocator_Mode,
                            size, alignment: int,
@@ -46,6 +47,7 @@ init_arena :: proc(a: ^Arena, data: []byte) {
 	a.temp_count = 0
 }
 
+@(require_results)
 arena_allocator :: proc(arena: ^Arena) -> Allocator {
 	return Allocator{
 		procedure = arena_allocator_proc,
@@ -100,6 +102,7 @@ arena_allocator_proc :: proc(allocator_data: rawptr, mode: Allocator_Mode,
 	return nil, nil
 }
 
+@(require_results)
 begin_arena_temp_memory :: proc(a: ^Arena) -> Arena_Temp_Memory {
 	tmp: Arena_Temp_Memory
 	tmp.arena = a
@@ -286,6 +289,7 @@ scratch_allocator_proc :: proc(allocator_data: rawptr, mode: Allocator_Mode,
 	return nil, nil
 }
 
+@(require_results)
 scratch_allocator :: proc(allocator: ^Scratch_Allocator) -> Allocator {
 	return Allocator{
 		procedure = scratch_allocator_proc,
@@ -325,6 +329,7 @@ init_stack :: proc(s: ^Stack, data: []byte) {
 	s.peak_used = 0
 }
 
+@(require_results)
 stack_allocator :: proc(stack: ^Stack) -> Allocator {
 	return Allocator{
 		procedure = stack_allocator_proc,
@@ -490,6 +495,7 @@ init_small_stack :: proc(s: ^Small_Stack, data: []byte) {
 	s.peak_used = 0
 }
 
+@(require_results)
 small_stack_allocator :: proc(stack: ^Small_Stack) -> Allocator {
 	return Allocator{
 		procedure = small_stack_allocator_proc,
@@ -673,6 +679,7 @@ dynamic_pool_allocator_proc :: proc(allocator_data: rawptr, mode: Allocator_Mode
 }
 
 
+@(require_results)
 dynamic_pool_allocator :: proc(pool: ^Dynamic_Pool) -> Allocator {
 	return Allocator{
 		procedure = dynamic_pool_allocator_proc,
@@ -705,12 +712,13 @@ dynamic_pool_destroy :: proc(using pool: ^Dynamic_Pool) {
 }
 
 
-dynamic_pool_alloc :: proc(pool: ^Dynamic_Pool, bytes: int) -> rawptr {
+@(require_results)
+dynamic_pool_alloc :: proc(pool: ^Dynamic_Pool, bytes: int) -> (rawptr, Allocator_Error) {
 	data, err := dynamic_pool_alloc_bytes(pool, bytes)
-	assert(err == nil)
-	return raw_data(data)
+	return raw_data(data), err
 }
 
+@(require_results)
 dynamic_pool_alloc_bytes :: proc(using pool: ^Dynamic_Pool, bytes: int) -> ([]byte, Allocator_Error) {
 	cycle_new_block :: proc(using pool: ^Dynamic_Pool) -> (err: Allocator_Error) {
 		if block_allocator.procedure == nil {
@@ -836,6 +844,7 @@ panic_allocator_proc :: proc(allocator_data: rawptr, mode: Allocator_Mode,
 	return nil, nil
 }
 
+@(require_results)
 panic_allocator :: proc() -> Allocator {
 	return Allocator{
 		procedure = panic_allocator_proc,
@@ -860,6 +869,7 @@ Tracking_Allocator :: struct {
 	backing:           Allocator,
 	allocation_map:    map[rawptr]Tracking_Allocator_Entry,
 	bad_free_array:    [dynamic]Tracking_Allocator_Bad_Free_Entry,
+	mutex:             sync.Mutex,
 	clear_on_free_all: bool,
 }
 
@@ -880,11 +890,14 @@ tracking_allocator_destroy :: proc(t: ^Tracking_Allocator) {
 
 
 tracking_allocator_clear :: proc(t: ^Tracking_Allocator) {
+	sync.mutex_lock(&t.mutex)
 	clear(&t.allocation_map)
 	clear(&t.bad_free_array)
+	sync.mutex_unlock(&t.mutex)
 }
 
 
+@(require_results)
 tracking_allocator :: proc(data: ^Tracking_Allocator) -> Allocator {
 	return Allocator{
 		data = data,
@@ -896,6 +909,9 @@ tracking_allocator_proc :: proc(allocator_data: rawptr, mode: Allocator_Mode,
                                 size, alignment: int,
                                 old_memory: rawptr, old_size: int, loc := #caller_location) -> (result: []byte, err: Allocator_Error) {
 	data := (^Tracking_Allocator)(allocator_data)
+
+	sync.mutex_guard(&data.mutex)
+
 	if mode == .Query_Info {
 		info := (^Allocator_Query_Info)(old_memory)
 		if info != nil && info.pointer != nil {

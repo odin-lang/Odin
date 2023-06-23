@@ -1,235 +1,204 @@
 template <typename T>
-struct PtrSetEntry {
-	T        ptr;
-	MapIndex next;
-};
-
-template <typename T>
 struct PtrSet {
-	Slice<MapIndex>    hashes;
-	Array<PtrSetEntry<T>> entries;
+	static_assert(TypeIsPointer<T>::value || TypeIsPtrSizedInteger<T>::value, "PtrSet::T must be a pointer");
+	static constexpr uintptr TOMBSTONE = ~(uintptr)(0ull);
+
+	T *   keys;
+	usize count;
+	usize capacity;
 };
 
-template <typename T> void ptr_set_init   (PtrSet<T> *s, gbAllocator a, isize capacity = 16);
-template <typename T> void ptr_set_destroy(PtrSet<T> *s);
-template <typename T> T    ptr_set_add    (PtrSet<T> *s, T ptr);
-template <typename T> bool ptr_set_update (PtrSet<T> *s, T ptr); // returns true if it previously existed
-template <typename T> bool ptr_set_exists (PtrSet<T> *s, T ptr);
-template <typename T> void ptr_set_remove (PtrSet<T> *s, T ptr);
-template <typename T> void ptr_set_clear  (PtrSet<T> *s);
-template <typename T> void ptr_set_grow   (PtrSet<T> *s);
-template <typename T> void ptr_set_rehash (PtrSet<T> *s, isize new_count);
-template <typename T> void ptr_set_reserve(PtrSet<T> *h, isize cap);
+template <typename T> gb_internal void ptr_set_init   (PtrSet<T> *s, isize capacity = 16);
+template <typename T> gb_internal void ptr_set_destroy(PtrSet<T> *s);
+template <typename T> gb_internal T    ptr_set_add    (PtrSet<T> *s, T ptr);
+template <typename T> gb_internal bool ptr_set_update (PtrSet<T> *s, T ptr); // returns true if it previously existed
+template <typename T> gb_internal bool ptr_set_exists (PtrSet<T> *s, T ptr);
+template <typename T> gb_internal void ptr_set_remove (PtrSet<T> *s, T ptr);
+template <typename T> gb_internal void ptr_set_clear  (PtrSet<T> *s);
 
+gb_internal gbAllocator ptr_set_allocator(void) {
+	return heap_allocator();
+}
 
 template <typename T>
-void ptr_set_init(PtrSet<T> *s, gbAllocator a, isize capacity) {
+gb_internal void ptr_set_init(PtrSet<T> *s, isize capacity) {
+	GB_ASSERT(s->keys == nullptr);
 	if (capacity != 0) {
 		capacity = next_pow2_isize(gb_max(16, capacity));
+		s->keys = gb_alloc_array(ptr_set_allocator(), T, capacity);
+		// This memory will be zeroed, no need to explicitly zero it
 	}
-
-	slice_init(&s->hashes,  a, capacity);
-	array_init(&s->entries, a, 0, capacity);
-	for (isize i = 0; i < capacity; i++) {
-		s->hashes.data[i] = MAP_SENTINEL;
-	}
+	s->count = 0;
+	s->capacity = capacity;
 }
 
 template <typename T>
-void ptr_set_destroy(PtrSet<T> *s) {
-	slice_free(&s->hashes, s->entries.allocator);
-	array_free(&s->entries);
+gb_internal void ptr_set_destroy(PtrSet<T> *s) {
+	gb_free(ptr_set_allocator(), s->keys);
+	s->keys = nullptr;
+	s->count = 0;
+	s->capacity = 0;
 }
 
 template <typename T>
-gb_internal MapIndex ptr_set__add_entry(PtrSet<T> *s, T ptr) {
-	PtrSetEntry<T> e = {};
-	e.ptr = ptr;
-	e.next = MAP_SENTINEL;
-	array_add(&s->entries, e);
-	return cast(MapIndex)(s->entries.count-1);
-}
-
-
-template <typename T>
-gb_internal MapFindResult ptr_set__find(PtrSet<T> *s, T ptr) {
-	MapFindResult fr = {MAP_SENTINEL, MAP_SENTINEL, MAP_SENTINEL};
-	if (s->hashes.count != 0) {
+gb_internal isize ptr_set__find(PtrSet<T> *s, T ptr) {
+	GB_ASSERT(ptr != nullptr);
+	if (s->count != 0) {
+	#if 0
+		for (usize i = 0; i < s->capacity; i++) {
+			if (s->keys[i] == ptr) {
+				return i;
+			}
+		}
+	#else
 		u32 hash = ptr_map_hash_key(ptr);
-		fr.hash_index = cast(MapIndex)(hash & (s->hashes.count-1));
-		fr.entry_index = s->hashes.data[fr.hash_index];
-		while (fr.entry_index != MAP_SENTINEL) {
-			if (s->entries.data[fr.entry_index].ptr == ptr) {
-				return fr;
+		usize mask = s->capacity-1;
+		usize hash_index = cast(usize)hash & mask;
+		for (usize i = 0; i < s->capacity; i++) {
+			T key = s->keys[hash_index];
+			if (key == ptr) {
+				return hash_index;
+			} else if (key == nullptr) {
+				return -1;
 			}
-			fr.entry_prev = fr.entry_index;
-			fr.entry_index = s->entries.data[fr.entry_index].next;
+			hash_index = (hash_index+1)&mask;
 		}
-	}
-	return fr;
-}
-
-template <typename T>
-gb_internal MapFindResult ptr_set__find_from_entry(PtrSet<T> *s, PtrSetEntry<T> *e) {
-	MapFindResult fr = {MAP_SENTINEL, MAP_SENTINEL, MAP_SENTINEL};
-	if (s->hashes.count != 0) {
-		u32 hash = ptr_map_hash_key(e->ptr);
-		fr.hash_index = cast(MapIndex)(hash & (s->hashes.count-1));
-		fr.entry_index = s->hashes.data[fr.hash_index];
-		while (fr.entry_index != MAP_SENTINEL) {
-			if (&s->entries.data[fr.entry_index] == e) {
-				return fr;
-			}
-			fr.entry_prev = fr.entry_index;
-			fr.entry_index = s->entries.data[fr.entry_index].next;
-		}
-	}
-	return fr;
-}
-
-template <typename T>
-gb_internal bool ptr_set__full(PtrSet<T> *s) {
-	return 0.75f * s->hashes.count <= s->entries.count;
-}
-
-template <typename T>
-gb_inline void ptr_set_grow(PtrSet<T> *s) {
-	isize new_count = gb_max(s->hashes.count<<1, 16);
-	ptr_set_rehash(s, new_count);
-}
-
-template <typename T>
-void ptr_set_reset_entries(PtrSet<T> *s) {
-	for (isize i = 0; i < s->hashes.count; i++) {
-		s->hashes.data[i] = MAP_SENTINEL;
-	}
-	for (isize i = 0; i < s->entries.count; i++) {
-		MapFindResult fr;
-		PtrSetEntry<T> *e = &s->entries.data[i];
-		e->next = MAP_SENTINEL;
-		fr = ptr_set__find_from_entry(s, e);
-		if (fr.entry_prev == MAP_SENTINEL) {
-			s->hashes[fr.hash_index] = cast(MapIndex)i;
-		} else {
-			s->entries[fr.entry_prev].next = cast(MapIndex)i;
-		}
-	}
-}
-
-template <typename T>
-void ptr_set_reserve(PtrSet<T> *s, isize cap) {
-	array_reserve(&s->entries, cap);
-	if (s->entries.count*2 < s->hashes.count) {
-		return;
-	}
-	slice_resize(&s->hashes, s->entries.allocator, cap*2);
-	ptr_set_reset_entries(s);
-}
-
-
-template <typename T>
-void ptr_set_rehash(PtrSet<T> *s, isize new_count) {
-	ptr_set_reserve(s, new_count);
-}
-
-template <typename T>
-gb_inline bool ptr_set_exists(PtrSet<T> *s, T ptr) {
-	isize index = ptr_set__find(s, ptr).entry_index;
-	return index != MAP_SENTINEL;
-}
-
-template <typename T>
-gb_inline isize ptr_entry_index(PtrSet<T> *s, T ptr) {
-	isize index = ptr_set__find(s, ptr).entry_index;
-	if (index != MAP_SENTINEL) {
-		return index;
+	#endif
 	}
 	return -1;
 }
 
-// Returns true if it already exists
 template <typename T>
-T ptr_set_add(PtrSet<T> *s, T ptr) {
-	MapIndex index;
-	MapFindResult fr;
-	if (s->hashes.count == 0) {
+gb_internal bool ptr_set__full(PtrSet<T> *s) {
+	return 0.75f * s->capacity <= s->count;
+}
+
+template <typename T>
+gb_internal gb_inline void ptr_set_grow(PtrSet<T> *old_set) {
+	if (old_set->capacity == 0) {
+		ptr_set_init(old_set);
+		return;
+	}
+
+	PtrSet<T> new_set = {};
+	ptr_set_init(&new_set, gb_max(old_set->capacity<<1, 16));
+
+	for (T ptr : *old_set) {
+		bool was_new = ptr_set_update(&new_set, ptr);
+		GB_ASSERT(!was_new);
+	}
+	GB_ASSERT(old_set->count == new_set.count);
+
+	ptr_set_destroy(old_set);
+
+	*old_set = new_set;
+}
+
+
+template <typename T>
+gb_internal gb_inline bool ptr_set_exists(PtrSet<T> *s, T ptr) {
+	return ptr_set__find(s, ptr) >= 0;
+}
+
+
+template <typename T>
+gb_internal bool ptr_set_update(PtrSet<T> *s, T ptr) { // returns true if it previously existsed
+	if (ptr_set_exists(s, ptr)) {
+		return true;
+	}
+
+	if (s->keys == nullptr) {
+		ptr_set_init(s);
+	} else if (ptr_set__full(s)) {
 		ptr_set_grow(s);
 	}
-	fr = ptr_set__find(s, ptr);
-	if (fr.entry_index == MAP_SENTINEL) {
-		index = ptr_set__add_entry(s, ptr);
-		if (fr.entry_prev != MAP_SENTINEL) {
-			s->entries.data[fr.entry_prev].next = index;
-		} else {
-			s->hashes.data[fr.hash_index] = index;
+	GB_ASSERT(s->count < s->capacity);
+	GB_ASSERT(s->capacity >= 0);
+
+	usize mask = s->capacity-1;
+	u32 hash = ptr_map_hash_key(ptr);
+	usize hash_index = (cast(usize)hash) & mask;
+	GB_ASSERT(hash_index < s->capacity);
+	for (usize i = 0; i < s->capacity; i++) {
+		T *key = &s->keys[hash_index];
+		GB_ASSERT(*key != ptr);
+		if (*key == (T)PtrSet<T>::TOMBSTONE || *key == nullptr) {
+			*key = ptr;
+			s->count++;
+			return false;
 		}
+		hash_index = (hash_index+1)&mask;
 	}
-	if (ptr_set__full(s)) {
-		ptr_set_grow(s);
-	}
+
+	GB_PANIC("ptr set out of memory");
+	return false;
+}
+
+template <typename T>
+gb_internal T ptr_set_add(PtrSet<T> *s, T ptr) {
+	ptr_set_update(s, ptr);
 	return ptr;
 }
 
+
 template <typename T>
-bool ptr_set_update(PtrSet<T> *s, T ptr) { // returns true if it previously existsed
-	bool exists = false;
-	MapIndex index;
-	MapFindResult fr;
-	if (s->hashes.count == 0) {
-		ptr_set_grow(s);
+gb_internal void ptr_set_remove(PtrSet<T> *s, T ptr) {
+	isize index = ptr_set__find(s, ptr);
+	if (index >= 0) {
+		GB_ASSERT(s->count > 0);
+		s->keys[index] = (T)PtrSet<T>::TOMBSTONE;
+		s->count--;
 	}
-	fr = ptr_set__find(s, ptr);
-	if (fr.entry_index != MAP_SENTINEL) {
-		exists = true;
-	} else {
-		index = ptr_set__add_entry(s, ptr);
-		if (fr.entry_prev != MAP_SENTINEL) {
-			s->entries.data[fr.entry_prev].next = index;
-		} else {
-			s->hashes.data[fr.hash_index] = index;
+}
+
+template <typename T>
+gb_internal gb_inline void ptr_set_clear(PtrSet<T> *s) {
+	s->count = 0;
+	gb_zero_size(s->keys, s->capacity*gb_size_of(T));
+}
+
+template <typename T>
+struct PtrSetIterator {
+	PtrSet<T> *set;
+	usize index;
+
+	PtrSetIterator<T> &operator++() noexcept {
+		for (;;) {
+			++index;
+			if (set->capacity == index) {
+				return *this;
+			}
+			T key = set->keys[index];
+			if (key != nullptr && key != (T)PtrSet<T>::TOMBSTONE) {
+				return *this;
+			}
 		}
 	}
-	if (ptr_set__full(s)) {
-		ptr_set_grow(s);
-	}
-	return exists;
-}
 
+	bool operator==(PtrSetIterator<T> const &other) const noexcept {
+		return this->set == other.set && this->index == other.index;
+	}
+
+
+	operator T *() const {
+		return &set->keys[index];
+	}
+};
 
 
 template <typename T>
-void ptr_set__erase(PtrSet<T> *s, MapFindResult fr) {
-	MapFindResult last;
-	if (fr.entry_prev == MAP_SENTINEL) {
-		s->hashes.data[fr.hash_index] = s->entries.data[fr.entry_index].next;
-	} else {
-		s->entries.data[fr.entry_prev].next = s->entries.data[fr.entry_index].next;
+gb_internal PtrSetIterator<T> begin(PtrSet<T> &set) noexcept {
+	usize index = 0;
+	while (index < set.capacity) {
+		T key = set.keys[index];
+		if (key != nullptr && key != (T)PtrSet<T>::TOMBSTONE) {
+			break;
+		}
+		index++;
 	}
-	if (cast(isize)fr.entry_index == s->entries.count-1) {
-		array_pop(&s->entries);
-		return;
-	}
-	s->entries.data[fr.entry_index] = s->entries.data[s->entries.count-1];
-	last = ptr_set__find(s, s->entries.data[fr.entry_index].ptr);
-	if (last.entry_prev != MAP_SENTINEL) {
-		s->entries.data[last.entry_prev].next = fr.entry_index;
-	} else {
-		s->hashes.data[last.hash_index] = fr.entry_index;
-	}
+	return PtrSetIterator<T>{&set, index};
 }
-
 template <typename T>
-void ptr_set_remove(PtrSet<T> *s, T ptr) {
-	MapFindResult fr = ptr_set__find(s, ptr);
-	if (fr.entry_index != MAP_SENTINEL) {
-		ptr_set__erase(s, fr);
-	}
-}
-
-template <typename T>
-gb_inline void ptr_set_clear(PtrSet<T> *s) {
-	array_clear(&s->entries);
-	for (isize i = 0; i < s->hashes.count; i++) {
-		s->hashes.data[i] = MAP_SENTINEL;
-	}
+gb_internal PtrSetIterator<T> end(PtrSet<T> &set) noexcept {
+	return PtrSetIterator<T>{&set, set.capacity};
 }

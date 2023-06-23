@@ -2,6 +2,7 @@ package os
 
 import win32 "core:sys/windows"
 import "core:intrinsics"
+import "core:runtime"
 import "core:unicode/utf16"
 
 is_path_separator :: proc(c: byte) -> bool {
@@ -219,6 +220,7 @@ file_size :: proc(fd: Handle) -> (i64, Errno) {
 
 @(private)
 MAX_RW :: 1<<30
+ERROR_EOF :: 38
 
 @(private)
 pread :: proc(fd: Handle, data: []byte, offset: i64) -> (int, Errno) {
@@ -227,11 +229,6 @@ pread :: proc(fd: Handle, data: []byte, offset: i64) -> (int, Errno) {
 		buf = buf[:MAX_RW]
 
 	}
-	curr_offset, e := seek(fd, offset, 1)
-	if e != 0 {
-		return 0, e
-	}
-	defer seek(fd, curr_offset, 0)
 
 	o := win32.OVERLAPPED{
 		OffsetHigh = u32(offset>>32),
@@ -242,6 +239,7 @@ pread :: proc(fd: Handle, data: []byte, offset: i64) -> (int, Errno) {
 
 	h := win32.HANDLE(fd)
 	done: win32.DWORD
+	e: Errno
 	if !win32.ReadFile(h, raw_data(buf), u32(len(buf)), &done, &o) {
 		e = Errno(win32.GetLastError())
 		done = 0
@@ -255,11 +253,6 @@ pwrite :: proc(fd: Handle, data: []byte, offset: i64) -> (int, Errno) {
 		buf = buf[:MAX_RW]
 
 	}
-	curr_offset, e := seek(fd, offset, 1)
-	if e != 0 {
-		return 0, e
-	}
-	defer seek(fd, curr_offset, 0)
 
 	o := win32.OVERLAPPED{
 		OffsetHigh = u32(offset>>32),
@@ -268,6 +261,7 @@ pwrite :: proc(fd: Handle, data: []byte, offset: i64) -> (int, Errno) {
 
 	h := win32.HANDLE(fd)
 	done: win32.DWORD
+	e: Errno
 	if !win32.WriteFile(h, raw_data(buf), u32(len(buf)), &done, &o) {
 		e = Errno(win32.GetLastError())
 		done = 0
@@ -275,6 +269,16 @@ pwrite :: proc(fd: Handle, data: []byte, offset: i64) -> (int, Errno) {
 	return int(done), e
 }
 
+/*
+read_at returns n: 0, err: 0 on EOF
+on Windows, read_at changes the position of the file cursor, on *nix, it does not.
+
+	bytes: [8]u8{}
+	read_at(fd, bytes, 0)
+	read(fd, bytes)
+
+will read from the location twice on *nix, and from two different locations on Windows
+*/
 read_at :: proc(fd: Handle, data: []byte, offset: i64) -> (n: int, err: Errno) {
 	if offset < 0 {
 		return 0, ERROR_NEGATIVE_OFFSET
@@ -283,6 +287,10 @@ read_at :: proc(fd: Handle, data: []byte, offset: i64) -> (n: int, err: Errno) {
 	b, offset := data, offset
 	for len(b) > 0 {
 		m, e := pread(fd, b, offset)
+		if e == ERROR_EOF {
+			err = 0
+			break
+		}
 		if e != 0 {
 			err = e
 			break
@@ -293,6 +301,16 @@ read_at :: proc(fd: Handle, data: []byte, offset: i64) -> (n: int, err: Errno) {
 	}
 	return
 }
+
+/*
+on Windows, write_at changes the position of the file cursor, on *nix, it does not.
+
+	bytes: [8]u8{}
+	write_at(fd, bytes, 0)
+	write(fd, bytes)
+
+will write to the location twice on *nix, and to two different locations on Windows
+*/
 write_at :: proc(fd: Handle, data: []byte, offset: i64) -> (n: int, err: Errno) {
 	if offset < 0 {
 		return 0, ERROR_NEGATIVE_OFFSET
@@ -327,6 +345,7 @@ get_std_handle :: proc "contextless" (h: uint) -> Handle {
 
 
 exists :: proc(path: string) -> bool {
+	runtime.DEFAULT_TEMP_ALLOCATOR_TEMP_GUARD()
 	wpath := win32.utf8_to_wstring(path, context.temp_allocator)
 	attribs := win32.GetFileAttributesW(wpath)
 
@@ -334,6 +353,7 @@ exists :: proc(path: string) -> bool {
 }
 
 is_file :: proc(path: string) -> bool {
+	runtime.DEFAULT_TEMP_ALLOCATOR_TEMP_GUARD()
 	wpath := win32.utf8_to_wstring(path, context.temp_allocator)
 	attribs := win32.GetFileAttributesW(wpath)
 
@@ -344,6 +364,7 @@ is_file :: proc(path: string) -> bool {
 }
 
 is_dir :: proc(path: string) -> bool {
+	runtime.DEFAULT_TEMP_ALLOCATOR_TEMP_GUARD()
 	wpath := win32.utf8_to_wstring(path, context.temp_allocator)
 	attribs := win32.GetFileAttributesW(wpath)
 
@@ -358,6 +379,8 @@ is_dir :: proc(path: string) -> bool {
 
 get_current_directory :: proc(allocator := context.allocator) -> string {
 	win32.AcquireSRWLockExclusive(&cwd_lock)
+
+	runtime.DEFAULT_TEMP_ALLOCATOR_TEMP_GUARD(ignore = context.temp_allocator == allocator)
 
 	sz_utf16 := win32.GetCurrentDirectoryW(0, nil)
 	dir_buf_wstr := make([]u16, sz_utf16, context.temp_allocator) // the first time, it _includes_ the NUL.
@@ -387,6 +410,7 @@ set_current_directory :: proc(path: string) -> (err: Errno) {
 
 
 change_directory :: proc(path: string) -> (err: Errno) {
+	runtime.DEFAULT_TEMP_ALLOCATOR_TEMP_GUARD()
 	wpath := win32.utf8_to_wstring(path, context.temp_allocator)
 
 	if !win32.SetCurrentDirectoryW(wpath) {
@@ -396,6 +420,7 @@ change_directory :: proc(path: string) -> (err: Errno) {
 }
 
 make_directory :: proc(path: string, mode: u32 = 0) -> (err: Errno) {
+	runtime.DEFAULT_TEMP_ALLOCATOR_TEMP_GUARD()
 	// Mode is unused on Windows, but is needed on *nix
 	wpath := win32.utf8_to_wstring(path, context.temp_allocator)
 
@@ -407,6 +432,7 @@ make_directory :: proc(path: string, mode: u32 = 0) -> (err: Errno) {
 
 
 remove_directory :: proc(path: string) -> (err: Errno) {
+	runtime.DEFAULT_TEMP_ALLOCATOR_TEMP_GUARD()
 	wpath := win32.utf8_to_wstring(path, context.temp_allocator)
 
 	if !win32.RemoveDirectoryW(wpath) {
@@ -479,12 +505,14 @@ fix_long_path :: proc(path: string) -> string {
 
 
 link :: proc(old_name, new_name: string) -> (err: Errno) {
+	runtime.DEFAULT_TEMP_ALLOCATOR_TEMP_GUARD()
 	n := win32.utf8_to_wstring(fix_long_path(new_name))
 	o := win32.utf8_to_wstring(fix_long_path(old_name))
 	return Errno(win32.CreateHardLinkW(n, o, nil))
 }
 
 unlink :: proc(path: string) -> (err: Errno) {
+	runtime.DEFAULT_TEMP_ALLOCATOR_TEMP_GUARD()
 	wpath := win32.utf8_to_wstring(path, context.temp_allocator)
 
 	if !win32.DeleteFileW(wpath) {
@@ -496,6 +524,7 @@ unlink :: proc(path: string) -> (err: Errno) {
 
 
 rename :: proc(old_path, new_path: string) -> (err: Errno) {
+	runtime.DEFAULT_TEMP_ALLOCATOR_TEMP_GUARD()
 	from := win32.utf8_to_wstring(old_path, context.temp_allocator)
 	to := win32.utf8_to_wstring(new_path, context.temp_allocator)
 

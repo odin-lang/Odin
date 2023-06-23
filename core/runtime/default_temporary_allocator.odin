@@ -1,159 +1,38 @@
 package runtime
 
 DEFAULT_TEMP_ALLOCATOR_BACKING_SIZE: int : #config(DEFAULT_TEMP_ALLOCATOR_BACKING_SIZE, 4 * Megabyte)
+NO_DEFAULT_TEMP_ALLOCATOR: bool : ODIN_OS == .Freestanding || ODIN_OS == .JS || ODIN_DEFAULT_TO_NIL_ALLOCATOR
 
-
-when ODIN_OS == .Freestanding || ODIN_OS == .JS || ODIN_DEFAULT_TO_NIL_ALLOCATOR {
+when NO_DEFAULT_TEMP_ALLOCATOR {
 	Default_Temp_Allocator :: struct {}
 	
-	default_temp_allocator_init :: proc(s: ^Default_Temp_Allocator, size: int, backup_allocator := context.allocator) {}
+	default_temp_allocator_init :: proc(s: ^Default_Temp_Allocator, size: int, backing_allocator := context.allocator) {}
 	
 	default_temp_allocator_destroy :: proc(s: ^Default_Temp_Allocator) {}
 	
 	default_temp_allocator_proc :: nil_allocator_proc
+
+	@(require_results)
+	default_temp_allocator_temp_begin :: proc(loc := #caller_location) -> (temp: Arena_Temp) {
+		return
+	}
+
+	default_temp_allocator_temp_end :: proc(temp: Arena_Temp, loc := #caller_location) {
+	}
 } else {
 	Default_Temp_Allocator :: struct {
-		data:               []byte,
-		curr_offset:        int,
-		prev_allocation:    rawptr,
-		backup_allocator:   Allocator,
-		leaked_allocations: [dynamic][]byte,
+		arena: Arena,
 	}
 	
-	default_temp_allocator_init :: proc(s: ^Default_Temp_Allocator, size: int, backup_allocator := context.allocator) {
-		s.data = make_aligned([]byte, size, 2*align_of(rawptr), backup_allocator)
-		s.curr_offset = 0
-		s.prev_allocation = nil
-		s.backup_allocator = backup_allocator
-		s.leaked_allocations.allocator = backup_allocator
+	default_temp_allocator_init :: proc(s: ^Default_Temp_Allocator, size: int, backing_allocator := context.allocator) {
+		_ = arena_init(&s.arena, uint(size), backing_allocator)
 	}
 
 	default_temp_allocator_destroy :: proc(s: ^Default_Temp_Allocator) {
-		if s == nil {
-			return
+		if s != nil {
+			arena_destroy(&s.arena)
+			s^ = {}
 		}
-		for ptr in s.leaked_allocations {
-			free(raw_data(ptr), s.backup_allocator)
-		}
-		delete(s.leaked_allocations)
-		delete(s.data, s.backup_allocator)
-		s^ = {}
-	}
-
-	@(private)
-	default_temp_allocator_alloc :: proc(s: ^Default_Temp_Allocator, size, alignment: int, loc := #caller_location) -> ([]byte, Allocator_Error) {
-		size := size
-		size = align_forward_int(size, alignment)
-
-		switch {
-		case s.curr_offset+size <= len(s.data):
-			start := uintptr(raw_data(s.data))
-			ptr := start + uintptr(s.curr_offset)
-			ptr = align_forward_uintptr(ptr, uintptr(alignment))
-			mem_zero(rawptr(ptr), size)
-
-			s.prev_allocation = rawptr(ptr)
-			offset := int(ptr - start)
-			s.curr_offset = offset + size
-			return byte_slice(rawptr(ptr), size), .None
-
-		case size <= len(s.data):
-			start := uintptr(raw_data(s.data))
-			ptr := align_forward_uintptr(start, uintptr(alignment))
-			mem_zero(rawptr(ptr), size)
-
-			s.prev_allocation = rawptr(ptr)
-			offset := int(ptr - start)
-			s.curr_offset = offset + size
-			return byte_slice(rawptr(ptr), size), .None
-		}
-		a := s.backup_allocator
-		if a.procedure == nil {
-			a = context.allocator
-			s.backup_allocator = a
-		}
-
-		data, err := mem_alloc_bytes(size, alignment, a, loc)
-		if err != nil {
-			return data, err
-		}
-		if s.leaked_allocations == nil {
-			s.leaked_allocations = make([dynamic][]byte, a)
-		}
-		append(&s.leaked_allocations, data)
-
-		// TODO(bill): Should leaks be notified about?
-		if logger := context.logger; logger.lowest_level <= .Warning {
-			if logger.procedure != nil {
-				logger.procedure(logger.data, .Warning, "default temp allocator resorted to backup_allocator" , logger.options, loc)
-			}
-		}
-
-		return data, .None
-	}
-
-	@(private)
-	default_temp_allocator_free :: proc(s: ^Default_Temp_Allocator, old_memory: rawptr, loc := #caller_location) -> Allocator_Error {
-		if old_memory == nil {
-			return .None
-		}
-
-		start := uintptr(raw_data(s.data))
-		end := start + uintptr(len(s.data))
-		old_ptr := uintptr(old_memory)
-
-		if s.prev_allocation == old_memory {
-			s.curr_offset = int(uintptr(s.prev_allocation) - start)
-			s.prev_allocation = nil
-			return .None
-		}
-
-		if start <= old_ptr && old_ptr < end {
-			// NOTE(bill): Cannot free this pointer but it is valid
-			return .None
-		}
-
-		if len(s.leaked_allocations) != 0 {
-			for data, i in s.leaked_allocations {
-				ptr := raw_data(data)
-				if ptr == old_memory {
-					free(ptr, s.backup_allocator)
-					ordered_remove(&s.leaked_allocations, i)
-					return .None
-				}
-			}
-		}
-		return .Invalid_Pointer
-		// panic("invalid pointer passed to default_temp_allocator");
-	}
-
-	@(private)
-	default_temp_allocator_free_all :: proc(s: ^Default_Temp_Allocator, loc := #caller_location) {
-		s.curr_offset = 0
-		s.prev_allocation = nil
-		for data in s.leaked_allocations {
-			free(raw_data(data), s.backup_allocator)
-		}
-		clear(&s.leaked_allocations)
-	}
-
-	@(private)
-	default_temp_allocator_resize :: proc(s: ^Default_Temp_Allocator, old_memory: rawptr, old_size, size, alignment: int, loc := #caller_location) -> ([]byte, Allocator_Error) {
-		begin := uintptr(raw_data(s.data))
-		end := begin + uintptr(len(s.data))
-		old_ptr := uintptr(old_memory)
-		if old_memory == s.prev_allocation && old_ptr & uintptr(alignment)-1 == 0 {
-			if old_ptr+uintptr(size) < end {
-				s.curr_offset = int(old_ptr-begin)+size
-				return byte_slice(old_memory, size), .None
-			}
-		}
-		data, err := default_temp_allocator_alloc(s, size, alignment, loc)
-		if err == .None {
-			copy(data, byte_slice(old_memory, old_size))
-			err = default_temp_allocator_free(s, old_memory, loc)
-		}
-		return data, err
 	}
 
 	default_temp_allocator_proc :: proc(allocator_data: rawptr, mode: Allocator_Mode,
@@ -161,40 +40,40 @@ when ODIN_OS == .Freestanding || ODIN_OS == .JS || ODIN_DEFAULT_TO_NIL_ALLOCATOR
 	                                    old_memory: rawptr, old_size: int, loc := #caller_location) -> (data: []byte, err: Allocator_Error) {
 
 		s := (^Default_Temp_Allocator)(allocator_data)
+		return arena_allocator_proc(&s.arena, mode, size, alignment, old_memory, old_size, loc)
+	}
 
-		if s.data == nil {
-			default_temp_allocator_init(s, DEFAULT_TEMP_ALLOCATOR_BACKING_SIZE, default_allocator())
+	@(require_results)
+	default_temp_allocator_temp_begin :: proc(loc := #caller_location) -> (temp: Arena_Temp) {
+		if context.temp_allocator.data == &global_default_temp_allocator_data {
+			temp = arena_temp_begin(&global_default_temp_allocator_data.arena, loc)
 		}
-
-		switch mode {
-		case .Alloc, .Alloc_Non_Zeroed:
-			data, err = default_temp_allocator_alloc(s, size, alignment, loc)
-		case .Free:
-			err = default_temp_allocator_free(s, old_memory, loc)
-
-		case .Free_All:
-			default_temp_allocator_free_all(s, loc)
-
-		case .Resize:
-			data, err = default_temp_allocator_resize(s, old_memory, old_size, size, alignment, loc)
-
-		case .Query_Features:
-			set := (^Allocator_Mode_Set)(old_memory)
-			if set != nil {
-				set^ = {.Alloc, .Alloc_Non_Zeroed, .Free, .Free_All, .Resize, .Query_Features}
-			}
-
-		case .Query_Info:
-			return nil, .Mode_Not_Implemented
-		}
-
 		return
 	}
+
+	default_temp_allocator_temp_end :: proc(temp: Arena_Temp, loc := #caller_location) {
+		arena_temp_end(temp, loc)
+	}
+
+	@(fini, private)
+	_destroy_temp_allocator_fini :: proc() {
+		default_temp_allocator_destroy(&global_default_temp_allocator_data)
+	}
 }
+
+@(deferred_out=default_temp_allocator_temp_end)
+DEFAULT_TEMP_ALLOCATOR_TEMP_GUARD :: #force_inline proc(ignore := false, loc := #caller_location) -> (Arena_Temp, Source_Code_Location) {
+	if ignore {
+		return {}, loc
+	} else {
+		return default_temp_allocator_temp_begin(loc), loc
+	}
+}
+
 
 default_temp_allocator :: proc(allocator: ^Default_Temp_Allocator) -> Allocator {
 	return Allocator{
 		procedure = default_temp_allocator_proc,
-		data = allocator,
+		data      = allocator,
 	}
 }

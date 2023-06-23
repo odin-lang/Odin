@@ -7,6 +7,7 @@ DEFAULT_PAGE_SIZE := uint(4096)
 
 Allocator_Error :: mem.Allocator_Error
 
+@(require_results)
 reserve :: proc "contextless" (size: uint) -> (data: []byte, err: Allocator_Error) {
 	return _reserve(size)
 }
@@ -15,6 +16,7 @@ commit :: proc "contextless" (data: rawptr, size: uint) -> Allocator_Error {
 	return _commit(data, size)
 }
 
+@(require_results)
 reserve_and_commit :: proc "contextless" (size: uint) -> (data: []byte, err: Allocator_Error) {
 	data = reserve(size) or_return
 	commit(raw_data(data), size) or_return
@@ -57,6 +59,7 @@ Memory_Block_Flag :: enum u32 {
 Memory_Block_Flags :: distinct bit_set[Memory_Block_Flag; u32]
 
 
+@(require_results)
 memory_block_alloc :: proc(committed, reserved: uint, flags: Memory_Block_Flags) -> (block: ^Memory_Block, err: Allocator_Error) {
 	align_formula :: proc "contextless" (size, align: uint) -> uint {
 		result := size + align-1
@@ -100,6 +103,7 @@ memory_block_alloc :: proc(committed, reserved: uint, flags: Memory_Block_Flags)
 	return &pmblock.block, nil
 }
 
+@(require_results)
 alloc_from_memory_block :: proc(block: ^Memory_Block, min_size, alignment: uint) -> (data: []byte, err: Allocator_Error) {
 	calc_alignment_offset :: proc "contextless" (block: ^Memory_Block, alignment: uintptr) -> uint {
 		alignment_offset := uint(0)
@@ -160,7 +164,7 @@ memory_block_dealloc :: proc(block_to_free: ^Memory_Block) {
 
 
 
-@(private)
+@(private, require_results)
 safe_add :: #force_inline proc "contextless" (x, y: uint) -> (uint, bool) {
 	z, did_overflow := intrinsics.overflow_add(x, y)
 	return z, !did_overflow

@@ -151,6 +151,13 @@ shoco_test :: proc(t: ^testing.T) {
 	}
 
 	for v in Shoco_Tests {
+		when ODIN_OS == .Windows {
+			v := v
+			// Compressed source files are not encoded with carriage returns but git replaces raw files lf with crlf on commit (on windows only)
+			// So replace crlf with lf on windows
+			v.raw, _ = bytes.replace_all(v.raw, { 0xD, 0xA }, { 0xA })
+		}
+
 		expected_raw        := len(v.raw)
 		expected_compressed := len(v.compressed)
 

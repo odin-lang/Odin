@@ -27,11 +27,11 @@ MenuItemCallback :: proc "c" (unused: rawptr, name: SEL, sender: ^Object)
 MenuItem :: struct {using _: Object} 
 
 @(objc_type=MenuItem, objc_name="alloc", objc_is_class_method=true)
-MenuItem_alloc :: proc() -> ^MenuItem {
+MenuItem_alloc :: proc "c" () -> ^MenuItem {
 	return msgSend(^MenuItem, MenuItem, "alloc")
 }
 @(objc_type=MenuItem, objc_name="registerActionCallback", objc_is_class_method=true)
-MenuItem_registerActionCallback :: proc(name: cstring, callback: MenuItemCallback) -> SEL {
+MenuItem_registerActionCallback :: proc "c" (name: cstring, callback: MenuItemCallback) -> SEL {
 	s := string(name)
 	n := len(s)
 	sel: SEL
@@ -51,22 +51,22 @@ MenuItem_registerActionCallback :: proc(name: cstring, callback: MenuItemCallbac
 }
 
 @(objc_type=MenuItem, objc_name="init")
-MenuItem_init :: proc(self: ^MenuItem) -> ^MenuItem {
+MenuItem_init :: proc "c" (self: ^MenuItem) -> ^MenuItem {
 	return msgSend(^MenuItem, self, "init")
 }
 
 @(objc_type=MenuItem, objc_name="setKeyEquivalentModifierMask")
-MenuItem_setKeyEquivalentModifierMask :: proc(self: ^MenuItem, modifierMask: KeyEquivalentModifierMask) {
+MenuItem_setKeyEquivalentModifierMask :: proc "c" (self: ^MenuItem, modifierMask: KeyEquivalentModifierMask) {
 	msgSend(nil, self, "setKeyEquivalentModifierMask:", modifierMask)
 }
 
 @(objc_type=MenuItem, objc_name="keyEquivalentModifierMask")
-MenuItem_keyEquivalentModifierMask :: proc(self: ^MenuItem) -> KeyEquivalentModifierMask {
+MenuItem_keyEquivalentModifierMask :: proc "c" (self: ^MenuItem) -> KeyEquivalentModifierMask {
 	return msgSend(KeyEquivalentModifierMask, self, "keyEquivalentModifierMask")
 }
 
 @(objc_type=MenuItem, objc_name="setSubmenu")
-MenuItem_setSubmenu :: proc(self: ^MenuItem, submenu: ^Menu) {
+MenuItem_setSubmenu :: proc "c" (self: ^MenuItem, submenu: ^Menu) {
 	msgSend(nil, self, "setSubmenu:", submenu)
 }
 
@@ -77,27 +77,27 @@ MenuItem_setSubmenu :: proc(self: ^MenuItem, submenu: ^Menu) {
 Menu :: struct {using _: Object} 
 
 @(objc_type=Menu, objc_name="alloc", objc_is_class_method=true)
-Menu_alloc :: proc() -> ^Menu {
+Menu_alloc :: proc "c" () -> ^Menu {
 	return msgSend(^Menu, Menu, "alloc")
 }
 
 @(objc_type=Menu, objc_name="init")
-Menu_init :: proc(self: ^Menu) -> ^Menu {
+Menu_init :: proc "c" (self: ^Menu) -> ^Menu {
 	return msgSend(^Menu, self, "init")
 }
 
 @(objc_type=Menu, objc_name="initWithTitle")
-Menu_initWithTitle :: proc(self: ^Menu, title: ^String) -> ^Menu {
+Menu_initWithTitle :: proc "c" (self: ^Menu, title: ^String) -> ^Menu {
 	return msgSend(^Menu, self, "initWithTitle:", title)
 }
 
 
 @(objc_type=Menu, objc_name="addItem")
-Menu_addItem :: proc(self: ^Menu, item: ^MenuItem) {
+Menu_addItem :: proc "c" (self: ^Menu, item: ^MenuItem) {
 	msgSend(nil, self, "addItem:", item)
 }
 
 @(objc_type=Menu, objc_name="addItemWithTitle")
-Menu_addItemWithTitle :: proc(self: ^Menu, title: ^String, selector: SEL, keyEquivalent: ^String) -> ^MenuItem {
+Menu_addItemWithTitle :: proc "c" (self: ^Menu, title: ^String, selector: SEL, keyEquivalent: ^String) -> ^MenuItem {
 	return msgSend(^MenuItem, self, "addItemWithTitle:action:keyEquivalent:", title, selector, keyEquivalent)
 }

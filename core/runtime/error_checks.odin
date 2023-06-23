@@ -22,7 +22,7 @@ bounds_check_error :: proc "contextless" (file: string, line, column: i32, index
 		return
 	}
 	@(cold)
-	handle_error :: proc "contextless" (file: string, line, column: i32, index, count: int) {
+	handle_error :: proc "contextless" (file: string, line, column: i32, index, count: int) -> ! {
 		print_caller_location(Source_Code_Location{file, line, column, ""})
 		print_string(" Index ")
 		print_i64(i64(index))
@@ -83,7 +83,7 @@ dynamic_array_expr_error :: proc "contextless" (file: string, line, column: i32,
 		return
 	}
 	@(cold)
-	handle_error :: proc "contextless" (file: string, line, column: i32, low, high, max: int) {
+	handle_error :: proc "contextless" (file: string, line, column: i32, low, high, max: int) -> ! {
 		print_caller_location(Source_Code_Location{file, line, column, ""})
 		print_string(" Invalid dynamic array indices ")
 		print_i64(i64(low))
@@ -104,7 +104,7 @@ matrix_bounds_check_error :: proc "contextless" (file: string, line, column: i32
 		return
 	}
 	@(cold)
-	handle_error :: proc "contextless" (file: string, line, column: i32, row_index, column_index, row_count, column_count: int) {
+	handle_error :: proc "contextless" (file: string, line, column: i32, row_index, column_index, row_count, column_count: int) -> ! {
 		print_caller_location(Source_Code_Location{file, line, column, ""})
 		print_string(" Matrix indices [")
 		print_i64(i64(row_index))
@@ -122,13 +122,13 @@ matrix_bounds_check_error :: proc "contextless" (file: string, line, column: i32
 }
 
 
-when ODIN_DISALLOW_RTTI {
+when ODIN_NO_RTTI {
 	type_assertion_check :: proc "contextless" (ok: bool, file: string, line, column: i32) {
 		if ok {
 			return
 		}
 		@(cold)
-		handle_error :: proc "contextless" (file: string, line, column: i32) {
+		handle_error :: proc "contextless" (file: string, line, column: i32) -> ! {
 			print_caller_location(Source_Code_Location{file, line, column, ""})
 			print_string(" Invalid type assertion\n")
 			type_assertion_trap()
@@ -141,7 +141,7 @@ when ODIN_DISALLOW_RTTI {
 			return
 		}
 		@(cold)
-		handle_error :: proc "contextless" (file: string, line, column: i32) {
+		handle_error :: proc "contextless" (file: string, line, column: i32) -> ! {
 			print_caller_location(Source_Code_Location{file, line, column, ""})
 			print_string(" Invalid type assertion\n")
 			type_assertion_trap()
@@ -154,7 +154,7 @@ when ODIN_DISALLOW_RTTI {
 			return
 		}
 		@(cold)
-		handle_error :: proc "contextless" (file: string, line, column: i32, from, to: typeid) {
+		handle_error :: proc "contextless" (file: string, line, column: i32, from, to: typeid) -> ! {
 			print_caller_location(Source_Code_Location{file, line, column, ""})
 			print_string(" Invalid type assertion from ")
 			print_typeid(from)
@@ -199,7 +199,7 @@ when ODIN_DISALLOW_RTTI {
 		}
 
 		@(cold)
-		handle_error :: proc "contextless" (file: string, line, column: i32, from, to: typeid, from_data: rawptr) {
+		handle_error :: proc "contextless" (file: string, line, column: i32, from, to: typeid, from_data: rawptr) -> ! {
 
 			actual := variant_type(from, from_data)
 
@@ -225,7 +225,7 @@ make_slice_error_loc :: #force_inline proc "contextless" (loc := #caller_locatio
 		return
 	}
 	@(cold)
-	handle_error :: proc "contextless" (loc: Source_Code_Location, len: int) {
+	handle_error :: proc "contextless" (loc: Source_Code_Location, len: int) -> ! {
 		print_caller_location(loc)
 		print_string(" Invalid slice length for make: ")
 		print_i64(i64(len))
@@ -240,7 +240,7 @@ make_dynamic_array_error_loc :: #force_inline proc "contextless" (using loc := #
 		return
 	}
 	@(cold)
-	handle_error :: proc "contextless" (loc: Source_Code_Location, len, cap: int) {
+	handle_error :: proc "contextless" (loc: Source_Code_Location, len, cap: int)  -> ! {
 		print_caller_location(loc)
 		print_string(" Invalid dynamic array parameters for make: ")
 		print_i64(i64(len))
@@ -257,7 +257,7 @@ make_map_expr_error_loc :: #force_inline proc "contextless" (loc := #caller_loca
 		return
 	}
 	@(cold)
-	handle_error :: proc "contextless" (loc: Source_Code_Location, cap: int) {
+	handle_error :: proc "contextless" (loc: Source_Code_Location, cap: int)  -> ! {
 		print_caller_location(loc)
 		print_string(" Invalid map capacity for make: ")
 		print_i64(i64(cap))

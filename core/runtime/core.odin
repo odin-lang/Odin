@@ -83,8 +83,8 @@ Type_Info_Multi_Pointer :: struct {
 	elem: ^Type_Info,
 }
 Type_Info_Procedure :: struct {
-	params:     ^Type_Info, // Type_Info_Tuple
-	results:    ^Type_Info, // Type_Info_Tuple
+	params:     ^Type_Info, // Type_Info_Parameters
+	results:    ^Type_Info, // Type_Info_Parameters
 	variadic:   bool,
 	convention: Calling_Convention,
 }
@@ -104,10 +104,12 @@ Type_Info_Enumerated_Array :: struct {
 }
 Type_Info_Dynamic_Array :: struct {elem: ^Type_Info, elem_size: int}
 Type_Info_Slice         :: struct {elem: ^Type_Info, elem_size: int}
-Type_Info_Tuple :: struct { // Only used for procedures parameters and results
+
+Type_Info_Parameters :: struct { // Only used for procedures parameters and results
 	types:        []^Type_Info,
 	names:        []string,
 }
+Type_Info_Tuple :: Type_Info_Parameters // Will be removed eventually
 
 Type_Info_Struct :: struct {
 	types:        []^Type_Info,
@@ -117,6 +119,7 @@ Type_Info_Struct :: struct {
 	tags:         []string,
 	is_packed:    bool,
 	is_raw_union: bool,
+	is_no_copy:   bool,
 	custom_align: bool,
 
 	equal: Equal_Proc, // set only when the struct has .Comparable set but does not have .Simple_Compare set
@@ -208,7 +211,7 @@ Type_Info :: struct {
 		Type_Info_Enumerated_Array,
 		Type_Info_Dynamic_Array,
 		Type_Info_Slice,
-		Type_Info_Tuple,
+		Type_Info_Parameters,
 		Type_Info_Struct,
 		Type_Info_Union,
 		Type_Info_Enum,
@@ -422,7 +425,7 @@ Raw_Map :: struct {
 	// Map_Hash directly, though for consistency sake it's written as if it were
 	// an array of Map_Cell(Map_Hash).
 	data:      uintptr,   // 8-bytes on 64-bits, 4-bytes on 32-bits
-	len:       int,       // 8-bytes on 64-bits, 4-bytes on 32-bits
+	len:       uintptr,   // 8-bytes on 64-bits, 4-bytes on 32-bits
 	allocator: Allocator, // 16-bytes on 64-bits, 8-bytes on 32-bits
 }
 
@@ -468,7 +471,7 @@ Odin_OS_Type :: type_of(ODIN_OS)
 		arm32,
 		arm64,
 		wasm32,
-		wasm64,
+		wasm64p32,
 	}
 */
 Odin_Arch_Type :: type_of(ODIN_ARCH)
@@ -505,11 +508,8 @@ Odin_Endian_Type :: type_of(ODIN_ENDIAN)
 foreign {
 	@(link_name="__$startup_runtime")
 	_startup_runtime :: proc "odin" () ---
-}
-
-@(link_name="__$cleanup_runtime")
-_cleanup_runtime :: proc() {
-	default_temp_allocator_destroy(&global_default_temp_allocator_data)
+	@(link_name="__$cleanup_runtime")
+	_cleanup_runtime :: proc "odin" () ---
 }
 
 _cleanup_runtime_contextless :: proc "contextless" () {
@@ -566,7 +566,7 @@ __type_info_of :: proc "contextless" (id: typeid) -> ^Type_Info #no_bounds_check
 	return &type_table[n]
 }
 
-when !ODIN_DISALLOW_RTTI {
+when !ODIN_NO_RTTI {
 	typeid_base :: proc "contextless" (id: typeid) -> typeid {
 		ti := type_info_of(id)
 		ti = type_info_base(ti)
@@ -622,7 +622,9 @@ __init_context :: proc "contextless" (c: ^Context) {
 	c.allocator.data = nil
 
 	c.temp_allocator.procedure = default_temp_allocator_proc
-	c.temp_allocator.data = &global_default_temp_allocator_data
+	when !NO_DEFAULT_TEMP_ALLOCATOR {
+		c.temp_allocator.data = &global_default_temp_allocator_data
+	}
 	
 	when !ODIN_DISABLE_ASSERT {
 		c.assertion_failure_proc = default_assertion_failure_proc

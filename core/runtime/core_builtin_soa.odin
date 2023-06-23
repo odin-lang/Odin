@@ -50,6 +50,7 @@ Raw_SOA_Footer_Dynamic_Array :: struct {
 	allocator: Allocator,
 }
 
+@(builtin, require_results)
 raw_soa_footer_slice :: proc(array: ^$T/#soa[]$E) -> (footer: ^Raw_SOA_Footer_Slice) {
 	if array == nil {
 		return nil
@@ -58,6 +59,7 @@ raw_soa_footer_slice :: proc(array: ^$T/#soa[]$E) -> (footer: ^Raw_SOA_Footer_Sl
 	footer = (^Raw_SOA_Footer_Slice)(uintptr(array) + field_count*size_of(rawptr))
 	return
 }
+@(builtin, require_results)
 raw_soa_footer_dynamic_array :: proc(array: ^$T/#soa[dynamic]$E) -> (footer: ^Raw_SOA_Footer_Dynamic_Array) {
 	if array == nil {
 		return nil
@@ -78,7 +80,7 @@ raw_soa_footer :: proc{
 
 
 
-@builtin
+@(builtin, require_results)
 make_soa_aligned :: proc($T: typeid/#soa[]$E, length: int, alignment: int, allocator := context.allocator, loc := #caller_location) -> (array: T, err: Allocator_Error) #optional_allocator_error {
 	if length <= 0 {
 		return
@@ -137,32 +139,31 @@ make_soa_aligned :: proc($T: typeid/#soa[]$E, length: int, alignment: int, alloc
 	return
 }
 
-@builtin
+@(builtin, require_results)
 make_soa_slice :: proc($T: typeid/#soa[]$E, length: int, allocator := context.allocator, loc := #caller_location) -> (array: T, err: Allocator_Error) #optional_allocator_error {
 	return make_soa_aligned(T, length, align_of(E), allocator, loc)
 }
 
-@builtin
-make_soa_dynamic_array :: proc($T: typeid/#soa[dynamic]$E, allocator := context.allocator, loc := #caller_location) -> (array: T) {
+@(builtin, require_results)
+make_soa_dynamic_array :: proc($T: typeid/#soa[dynamic]$E, allocator := context.allocator, loc := #caller_location) -> (array: T, err: Allocator_Error) #optional_allocator_error {
 	context.allocator = allocator
-	reserve_soa(&array, DEFAULT_RESERVE_CAPACITY, loc)
-	return
+	reserve_soa(&array, DEFAULT_RESERVE_CAPACITY, loc) or_return
+	return array, nil
 }
 
-@builtin
-make_soa_dynamic_array_len :: proc($T: typeid/#soa[dynamic]$E, auto_cast length: int, allocator := context.allocator, loc := #caller_location) -> (array: T) {
+@(builtin, require_results)
+make_soa_dynamic_array_len :: proc($T: typeid/#soa[dynamic]$E, #any_int length: int, allocator := context.allocator, loc := #caller_location) -> (array: T, err: Allocator_Error) #optional_allocator_error {
 	context.allocator = allocator
-	resize_soa(&array, length, loc)
-	return
+	resize_soa(&array, length, loc) or_return
+	return array, nil
 }
 
-@builtin
-make_soa_dynamic_array_len_cap :: proc($T: typeid/#soa[dynamic]$E, auto_cast length, capacity: int, allocator := context.allocator, loc := #caller_location) -> (array: T) {
+@(builtin, require_results)
+make_soa_dynamic_array_len_cap :: proc($T: typeid/#soa[dynamic]$E, #any_int length, capacity: int, allocator := context.allocator, loc := #caller_location) -> (array: T, err: Allocator_Error) #optional_allocator_error {
 	context.allocator = allocator
-	if reserve_soa(&array, capacity, loc) {
-		resize_soa(&array, length, loc)
-	}
-	return
+	reserve_soa(&array, capacity, loc) or_return
+	resize_soa(&array, length, loc) or_return
+	return array, nil
 }
 
 
@@ -176,27 +177,25 @@ make_soa :: proc{
 
 
 @builtin
-resize_soa :: proc(array: ^$T/#soa[dynamic]$E, length: int, loc := #caller_location) -> bool {
+resize_soa :: proc(array: ^$T/#soa[dynamic]$E, length: int, loc := #caller_location) -> Allocator_Error {
 	if array == nil {
-		return false
+		return nil
 	}
-	if !reserve_soa(array, length, loc) {
-		return false
-	}
+	reserve_soa(array, length, loc) or_return
 	footer := raw_soa_footer(array)
 	footer.len = length
-	return true
+	return nil
 }
 
 @builtin
-reserve_soa :: proc(array: ^$T/#soa[dynamic]$E, capacity: int, loc := #caller_location) -> bool {
+reserve_soa :: proc(array: ^$T/#soa[dynamic]$E, capacity: int, loc := #caller_location) -> Allocator_Error {
 	if array == nil {
-		return false
+		return nil
 	}
 
 	old_cap := cap(array)
 	if capacity <= old_cap {
-		return true
+		return nil
 	}
 
 	if array.allocator.procedure == nil {
@@ -207,7 +206,7 @@ reserve_soa :: proc(array: ^$T/#soa[dynamic]$E, capacity: int, loc := #caller_lo
 	footer := raw_soa_footer(array)
 	if size_of(E) == 0 {
 		footer.cap = capacity
-		return true
+		return nil
 	}
 
 	ti := type_info_of(typeid_of(T))
@@ -238,13 +237,10 @@ reserve_soa :: proc(array: ^$T/#soa[dynamic]$E, capacity: int, loc := #caller_lo
 
 	old_data := (^rawptr)(array)^
 
-	new_bytes, err := array.allocator.procedure(
+	new_bytes := array.allocator.procedure(
 		array.allocator.data, .Alloc, new_size, max_align,
 		nil, old_size, loc,
-	)
-	if new_bytes == nil || err != nil {
-		return false
-	}
+	) or_return
 	new_data := raw_data(new_bytes)
 
 
@@ -269,31 +265,28 @@ reserve_soa :: proc(array: ^$T/#soa[dynamic]$E, capacity: int, loc := #caller_lo
 		new_offset += type.size * capacity
 	}
 
-	_, err = array.allocator.procedure(
+	array.allocator.procedure(
 		array.allocator.data, .Free, 0, max_align,
 		old_data, old_size, loc,
-	)
+	) or_return
 
-	return true
+	return nil
 }
 
 @builtin
-append_soa_elem :: proc(array: ^$T/#soa[dynamic]$E, arg: E, loc := #caller_location) {
+append_soa_elem :: proc(array: ^$T/#soa[dynamic]$E, arg: E, loc := #caller_location) -> (n: int, err: Allocator_Error) #optional_allocator_error {
 	if array == nil {
-		return
+		return 0, nil
 	}
 
-	arg_len := 1
-
-	if cap(array) <= len(array)+arg_len {
-		cap := 2 * cap(array) + max(8, arg_len)
-		_ = reserve_soa(array, cap, loc)
+	if cap(array) <= len(array) + 1 {
+		cap := 2 * cap(array) + 8
+		err = reserve_soa(array, cap, loc) // do not 'or_return' here as it could be a partial success
 	}
-	arg_len = min(cap(array)-len(array), arg_len)
 
 	footer := raw_soa_footer(array)
 
-	if size_of(E) > 0 && arg_len > 0 {
+	if size_of(E) > 0 && cap(array)-len(array) > 0 {
 		ti := type_info_of(typeid_of(T))
 		ti = type_info_base(ti)
 		si := &ti.variant.(Type_Info_Struct)
@@ -326,12 +319,14 @@ append_soa_elem :: proc(array: ^$T/#soa[dynamic]$E, arg: E, loc := #caller_locat
 			soa_offset  += type.size * cap(array)
 			item_offset += type.size
 		}
+		footer.len += 1
+		return 1, err
 	}
-	footer.len += arg_len
+	return 0, err
 }
 
 @builtin
-append_soa_elems :: proc(array: ^$T/#soa[dynamic]$E, args: ..E, loc := #caller_location) {
+append_soa_elems :: proc(array: ^$T/#soa[dynamic]$E, args: ..E, loc := #caller_location) -> (n: int, err: Allocator_Error) #optional_allocator_error {
 	if array == nil {
 		return
 	}
@@ -343,7 +338,7 @@ append_soa_elems :: proc(array: ^$T/#soa[dynamic]$E, args: ..E, loc := #caller_l
 
 	if cap(array) <= len(array)+arg_len {
 		cap := 2 * cap(array) + max(8, arg_len)
-		_ = reserve_soa(array, cap, loc)
+		err = reserve_soa(array, cap, loc) // do not 'or_return' here as it could be a partial success
 	}
 	arg_len = min(cap(array)-len(array), arg_len)
 
@@ -380,8 +375,8 @@ append_soa_elems :: proc(array: ^$T/#soa[dynamic]$E, args: ..E, loc := #caller_l
 			item_offset += type.size
 		}
 	}
-
 	footer.len += arg_len
+	return arg_len, err
 }
 
 
@@ -393,21 +388,23 @@ append_soa :: proc{
 }
 
 
-delete_soa_slice :: proc(array: $T/#soa[]$E, allocator := context.allocator, loc := #caller_location) {
+delete_soa_slice :: proc(array: $T/#soa[]$E, allocator := context.allocator, loc := #caller_location) -> Allocator_Error {
 	when intrinsics.type_struct_field_count(E) != 0 {
 		array := array
 		ptr := (^rawptr)(&array)^
-		free(ptr, allocator, loc)
+		free(ptr, allocator, loc) or_return
 	}
+	return nil
 }
 
-delete_soa_dynamic_array :: proc(array: $T/#soa[dynamic]$E, loc := #caller_location) {
+delete_soa_dynamic_array :: proc(array: $T/#soa[dynamic]$E, loc := #caller_location) -> Allocator_Error {
 	when intrinsics.type_struct_field_count(E) != 0 {
 		array := array
 		ptr := (^rawptr)(&array)^
 		footer := raw_soa_footer(&array)
-		free(ptr, footer.allocator, loc)
+		free(ptr, footer.allocator, loc) or_return
 	}
+	return nil
 }
 
 

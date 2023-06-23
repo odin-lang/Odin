@@ -4,9 +4,11 @@ import NS "vendor:darwin/Foundation"
 
 foreign import "system:Metal.framework"
 
-CommonCounter :: ^NS.String
-CommonCounterSet :: ^NS.String
+CommonCounter          :: ^NS.String
+CommonCounterSet       :: ^NS.String
 DeviceNotificationName :: ^NS.String
+ErrorUserInfoKey       :: ^NS.ErrorUserInfoKey
+ErrorDomain            :: ^NS.ErrorDomain
 
 foreign Metal {
 	@(linkage="weak") CommonCounterTimestamp:                         CommonCounter
@@ -36,4 +38,12 @@ foreign Metal {
 	@(linkage="weak") DeviceWasAddedNotification:         DeviceNotificationName
 	@(linkage="weak") DeviceRemovalRequestedNotification: DeviceNotificationName
 	@(linkage="weak") DeviceWasRemovedNotification:       DeviceNotificationName
+}
+
+foreign Metal {
+	@(linkage="weak") CommandBufferEncoderInfoErrorKey: ErrorUserInfoKey
+}
+
+foreign Metal {
+	@(linkage="weak") IOErrorDomain: ErrorDomain
 }

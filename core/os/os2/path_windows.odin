@@ -23,7 +23,7 @@ _mkdir_all :: proc(path: string, perm: File_Mode) -> Error {
 	fix_root_directory :: proc(p: string) -> (s: string, allocated: bool, err: runtime.Allocator_Error) {
 		if len(p) == len(`\\?\c:`) {
 			if is_path_separator(p[0]) && is_path_separator(p[1]) && p[2] == '?' && is_path_separator(p[3]) && p[5] == ':' {
-				s = strings.concatenate_safe({p, `\`}, _file_allocator()) or_return
+				s = strings.concatenate({p, `\`}, _file_allocator()) or_return
 				allocated = true
 				return
 			}

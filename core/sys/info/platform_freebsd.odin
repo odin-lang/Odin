@@ -4,6 +4,7 @@ package sysinfo
 import sys "core:sys/unix"
 import "core:strings"
 import "core:strconv"
+import "core:runtime"
 
 @(private)
 version_string_buf: [1024]u8
@@ -46,6 +47,8 @@ init_os_version :: proc () {
 	if !sys.sysctl(mib, &kernel_version_buf) {
 		return
 	}
+
+	runtime.DEFAULT_TEMP_ALLOCATOR_TEMP_GUARD()
 
 	// Parse kernel version
 	release := string(cstring(raw_data(kernel_version_buf[:])))

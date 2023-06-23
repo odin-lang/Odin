@@ -1,4 +1,5 @@
 #include <math.h>
+#include <stdlib.h>
 
 gb_global BlockingMutex hash_exact_value_mutex;
 
@@ -6,7 +7,7 @@ struct Ast;
 struct HashKey;
 struct Type;
 struct Entity;
-bool are_types_identical(Type *x, Type *y);
+gb_internal bool are_types_identical(Type *x, Type *y);
 
 struct Complex128 {
 	f64 real, imag;
@@ -14,16 +15,6 @@ struct Complex128 {
 struct Quaternion256 {
 	f64 imag, jmag, kmag, real;
 };
-
-Quaternion256 quaternion256_inverse(Quaternion256 x) {
-	f64 invmag2 = 1.0 / (x.real*x.real + x.imag*x.imag + x.jmag*x.jmag + x.kmag*x.kmag);
-	x.real = +x.real * invmag2;
-	x.imag = -x.imag * invmag2;
-	x.jmag = -x.jmag * invmag2;
-	x.kmag = -x.kmag * invmag2;
-	return x;
-}
-
 
 enum ExactValueKind {
 	ExactValue_Invalid    = 0,
@@ -60,7 +51,7 @@ struct ExactValue {
 
 gb_global ExactValue const empty_exact_value = {};
 
-uintptr hash_exact_value(ExactValue v) {
+gb_internal uintptr hash_exact_value(ExactValue v) {
 	mutex_lock(&hash_exact_value_mutex);
 	defer (mutex_unlock(&hash_exact_value_mutex));
 	
@@ -70,7 +61,7 @@ uintptr hash_exact_value(ExactValue v) {
 	case ExactValue_Bool:
 		return gb_fnv32a(&v.value_bool, gb_size_of(v.value_bool));
 	case ExactValue_String:
-		return ptr_map_hash_key(string_intern(v.value_string));
+		return gb_fnv32a(v.value_string.text, v.value_string.len);
 	case ExactValue_Integer:
 		{
 			u32 key = gb_fnv32a(v.value_integer.dp, gb_size_of(*v.value_integer.dp) * v.value_integer.used);
@@ -97,44 +88,44 @@ uintptr hash_exact_value(ExactValue v) {
 }
 
 
-ExactValue exact_value_compound(Ast *node) {
+gb_internal ExactValue exact_value_compound(Ast *node) {
 	ExactValue result = {ExactValue_Compound};
 	result.value_compound = node;
 	return result;
 }
 
-ExactValue exact_value_bool(bool b) {
+gb_internal ExactValue exact_value_bool(bool b) {
 	ExactValue result = {ExactValue_Bool};
 	result.value_bool = (b != 0);
 	return result;
 }
 
-ExactValue exact_value_string(String string) {
+gb_internal ExactValue exact_value_string(String string) {
 	// TODO(bill): Allow for numbers with underscores in them
 	ExactValue result = {ExactValue_String};
 	result.value_string = string;
 	return result;
 }
 
-ExactValue exact_value_i64(i64 i) {
+gb_internal ExactValue exact_value_i64(i64 i) {
 	ExactValue result = {ExactValue_Integer};
 	big_int_from_i64(&result.value_integer, i);
 	return result;
 }
 
-ExactValue exact_value_u64(u64 i) {
+gb_internal ExactValue exact_value_u64(u64 i) {
 	ExactValue result = {ExactValue_Integer};
 	big_int_from_u64(&result.value_integer, i);
 	return result;
 }
 
-ExactValue exact_value_float(f64 f) {
+gb_internal ExactValue exact_value_float(f64 f) {
 	ExactValue result = {ExactValue_Float};
 	result.value_float = f;
 	return result;
 }
 
-ExactValue exact_value_complex(f64 real, f64 imag) {
+gb_internal ExactValue exact_value_complex(f64 real, f64 imag) {
 	ExactValue result = {ExactValue_Complex};
 	result.value_complex = gb_alloc_item(permanent_allocator(), Complex128);
 	result.value_complex->real = real;
@@ -142,7 +133,7 @@ ExactValue exact_value_complex(f64 real, f64 imag) {
 	return result;
 }
 
-ExactValue exact_value_quaternion(f64 real, f64 imag, f64 jmag, f64 kmag) {
+gb_internal ExactValue exact_value_quaternion(f64 real, f64 imag, f64 jmag, f64 kmag) {
 	ExactValue result = {ExactValue_Quaternion};
 	result.value_quaternion = gb_alloc_item(permanent_allocator(), Quaternion256);
 	result.value_quaternion->real = real;
@@ -152,27 +143,27 @@ ExactValue exact_value_quaternion(f64 real, f64 imag, f64 jmag, f64 kmag) {
 	return result;
 }
 
-ExactValue exact_value_pointer(i64 ptr) {
+gb_internal ExactValue exact_value_pointer(i64 ptr) {
 	ExactValue result = {ExactValue_Pointer};
 	result.value_pointer = ptr;
 	return result;
 }
 
-ExactValue exact_value_procedure(Ast *node) {
+gb_internal ExactValue exact_value_procedure(Ast *node) {
 	ExactValue result = {ExactValue_Procedure};
 	result.value_procedure = node;
 	return result;
 }
 
 
-ExactValue exact_value_typeid(Type *type) {
+gb_internal ExactValue exact_value_typeid(Type *type) {
 	ExactValue result = {ExactValue_Typeid};
 	result.value_typeid = type;
 	return result;
 }
 
 
-ExactValue exact_value_integer_from_string(String const &string) {
+gb_internal ExactValue exact_value_integer_from_string(String const &string) {
 	ExactValue result = {ExactValue_Integer};
 	bool success;
 	big_int_from_string(&result.value_integer, string, &success);
@@ -184,7 +175,36 @@ ExactValue exact_value_integer_from_string(String const &string) {
 
 
 
-f64 float_from_string(String string) {
+gb_internal f64 float_from_string(String const &string) {
+	if (string.len < 128) {
+		char buf[128] = {};
+		isize n = 0;
+		for (isize i = 0; i < string.len; i++) {
+			u8 c = string.text[i];
+			if (c == '_') {
+				continue;
+			}
+			if (c == 'E') { c = 'e'; }
+			buf[n++] = cast(char)c;
+		}
+		buf[n] = 0;
+		return atof(buf);
+	} else {
+		TEMPORARY_ALLOCATOR_GUARD();
+		char *buf = gb_alloc_array(temporary_allocator(), char, string.len+1);
+		isize n = 0;
+		for (isize i = 0; i < string.len; i++) {
+			u8 c = string.text[i];
+			if (c == '_') {
+				continue;
+			}
+			if (c == 'E') { c = 'e'; }
+			buf[n++] = cast(char)c;
+		}
+		buf[n] = 0;
+		return atof(buf);
+	}
+/*
 	isize i = 0;
 	u8 *str = string.text;
 	isize len = string.len;
@@ -260,9 +280,10 @@ f64 float_from_string(String string) {
 	}
 
 	return sign * (frac ? (value / scale) : (value * scale));
+*/
 }
 
-ExactValue exact_value_float_from_string(String string) {
+gb_internal ExactValue exact_value_float_from_string(String string) {
 	if (string.len > 2 && string[0] == '0' && string[1] == 'h') {
 
 		isize digit_count = 0;
@@ -298,7 +319,7 @@ ExactValue exact_value_float_from_string(String string) {
 }
 
 
-ExactValue exact_value_from_basic_literal(TokenKind kind, String const &string) {
+gb_internal ExactValue exact_value_from_basic_literal(TokenKind kind, String const &string) {
 	switch (kind) {
 	case Token_String:  return exact_value_string(string);
 	case Token_Integer: return exact_value_integer_from_string(string);
@@ -321,16 +342,13 @@ ExactValue exact_value_from_basic_literal(TokenKind kind, String const &string) 
 		utf8_decode(string.text, string.len, &r);
 		return exact_value_i64(r);
 	}
-	default:
-		GB_PANIC("Invalid token for basic literal");
-		break;
 	}
 
 	ExactValue result = {ExactValue_Invalid};
 	return result;
 }
 
-ExactValue exact_value_to_integer(ExactValue v) {
+gb_internal ExactValue exact_value_to_integer(ExactValue v) {
 	switch (v.kind) {
 	case ExactValue_Bool: {
 		i64 i = 0;
@@ -357,7 +375,7 @@ ExactValue exact_value_to_integer(ExactValue v) {
 	return r;
 }
 
-ExactValue exact_value_to_float(ExactValue v) {
+gb_internal ExactValue exact_value_to_float(ExactValue v) {
 	switch (v.kind) {
 	case ExactValue_Integer:
 		return exact_value_float(big_int_to_f64(&v.value_integer));
@@ -368,7 +386,7 @@ ExactValue exact_value_to_float(ExactValue v) {
 	return r;
 }
 
-ExactValue exact_value_to_complex(ExactValue v) {
+gb_internal ExactValue exact_value_to_complex(ExactValue v) {
 	switch (v.kind) {
 	case ExactValue_Integer:
 		return exact_value_complex(big_int_to_f64(&v.value_integer), 0);
@@ -383,7 +401,7 @@ ExactValue exact_value_to_complex(ExactValue v) {
 	v.value_complex = gb_alloc_item(permanent_allocator(), Complex128);
 	return r;
 }
-ExactValue exact_value_to_quaternion(ExactValue v) {
+gb_internal ExactValue exact_value_to_quaternion(ExactValue v) {
 	switch (v.kind) {
 	case ExactValue_Integer:
 		return exact_value_quaternion(big_int_to_f64(&v.value_integer), 0, 0, 0);
@@ -399,7 +417,7 @@ ExactValue exact_value_to_quaternion(ExactValue v) {
 	return r;
 }
 
-ExactValue exact_value_real(ExactValue v) {
+gb_internal ExactValue exact_value_real(ExactValue v) {
 	switch (v.kind) {
 	case ExactValue_Integer:
 	case ExactValue_Float:
@@ -413,7 +431,7 @@ ExactValue exact_value_real(ExactValue v) {
 	return r;
 }
 
-ExactValue exact_value_imag(ExactValue v) {
+gb_internal ExactValue exact_value_imag(ExactValue v) {
 	switch (v.kind) {
 	case ExactValue_Integer:
 	case ExactValue_Float:
@@ -427,7 +445,7 @@ ExactValue exact_value_imag(ExactValue v) {
 	return r;
 }
 
-ExactValue exact_value_jmag(ExactValue v) {
+gb_internal ExactValue exact_value_jmag(ExactValue v) {
 	switch (v.kind) {
 	case ExactValue_Integer:
 	case ExactValue_Float:
@@ -440,7 +458,7 @@ ExactValue exact_value_jmag(ExactValue v) {
 	return r;
 }
 
-ExactValue exact_value_kmag(ExactValue v) {
+gb_internal ExactValue exact_value_kmag(ExactValue v) {
 	switch (v.kind) {
 	case ExactValue_Integer:
 	case ExactValue_Float:
@@ -453,60 +471,60 @@ ExactValue exact_value_kmag(ExactValue v) {
 	return r;
 }
 
-ExactValue exact_value_make_imag(ExactValue v) {
-	switch (v.kind) {
-	case ExactValue_Integer:
-		return exact_value_complex(0, exact_value_to_float(v).value_float);
-	case ExactValue_Float:
-		return exact_value_complex(0, v.value_float);
-	default:
-		GB_PANIC("Expected an integer or float type for 'exact_value_make_imag'");
-	}
-	ExactValue r = {ExactValue_Invalid};
-	return r;
-}
+// gb_internal ExactValue exact_value_make_imag(ExactValue v) {
+// 	switch (v.kind) {
+// 	case ExactValue_Integer:
+// 		return exact_value_complex(0, exact_value_to_float(v).value_float);
+// 	case ExactValue_Float:
+// 		return exact_value_complex(0, v.value_float);
+// 	default:
+// 		GB_PANIC("Expected an integer or float type for 'exact_value_make_imag'");
+// 	}
+// 	ExactValue r = {ExactValue_Invalid};
+// 	return r;
+// }
 
-ExactValue exact_value_make_jmag(ExactValue v) {
-	switch (v.kind) {
-	case ExactValue_Integer:
-		return exact_value_quaternion(0, 0, exact_value_to_float(v).value_float, 0);
-	case ExactValue_Float:
-		return exact_value_quaternion(0, 0, v.value_float, 0);
-	default:
-		GB_PANIC("Expected an integer or float type for 'exact_value_make_imag'");
-	}
-	ExactValue r = {ExactValue_Invalid};
-	return r;
-}
+// gb_internal ExactValue exact_value_make_jmag(ExactValue v) {
+// 	switch (v.kind) {
+// 	case ExactValue_Integer:
+// 		return exact_value_quaternion(0, 0, exact_value_to_float(v).value_float, 0);
+// 	case ExactValue_Float:
+// 		return exact_value_quaternion(0, 0, v.value_float, 0);
+// 	default:
+// 		GB_PANIC("Expected an integer or float type for 'exact_value_make_jmag'");
+// 	}
+// 	ExactValue r = {ExactValue_Invalid};
+// 	return r;
+// }
 
-ExactValue exact_value_make_kmag(ExactValue v) {
-	switch (v.kind) {
-	case ExactValue_Integer:
-		return exact_value_quaternion(0, 0, 0, exact_value_to_float(v).value_float);
-	case ExactValue_Float:
-		return exact_value_quaternion(0, 0, 0, v.value_float);
-	default:
-		GB_PANIC("Expected an integer or float type for 'exact_value_make_imag'");
-	}
-	ExactValue r = {ExactValue_Invalid};
-	return r;
-}
+// gb_internal ExactValue exact_value_make_kmag(ExactValue v) {
+// 	switch (v.kind) {
+// 	case ExactValue_Integer:
+// 		return exact_value_quaternion(0, 0, 0, exact_value_to_float(v).value_float);
+// 	case ExactValue_Float:
+// 		return exact_value_quaternion(0, 0, 0, v.value_float);
+// 	default:
+// 		GB_PANIC("Expected an integer or float type for 'exact_value_make_kmag'");
+// 	}
+// 	ExactValue r = {ExactValue_Invalid};
+// 	return r;
+// }
 
-i64 exact_value_to_i64(ExactValue v) {
+gb_internal i64 exact_value_to_i64(ExactValue v) {
 	v = exact_value_to_integer(v);
 	if (v.kind == ExactValue_Integer) {
 		return big_int_to_i64(&v.value_integer);
 	}
 	return 0;
 }
-u64 exact_value_to_u64(ExactValue v) {
+gb_internal u64 exact_value_to_u64(ExactValue v) {
 	v = exact_value_to_integer(v);
 	if (v.kind == ExactValue_Integer) {
 		return big_int_to_u64(&v.value_integer);
 	}
 	return 0;
 }
-f64 exact_value_to_f64(ExactValue v) {
+gb_internal f64 exact_value_to_f64(ExactValue v) {
 	v = exact_value_to_float(v);
 	if (v.kind == ExactValue_Float) {
 		return v.value_float;
@@ -519,7 +537,7 @@ f64 exact_value_to_f64(ExactValue v) {
 
 
 
-ExactValue exact_unary_operator_value(TokenKind op, ExactValue v, i32 precision, bool is_unsigned) {
+gb_internal ExactValue exact_unary_operator_value(TokenKind op, ExactValue v, i32 precision, bool is_unsigned) {
 	switch (op) {
 	case Token_Add:	{
 		switch (v.kind) {
@@ -588,15 +606,13 @@ ExactValue exact_unary_operator_value(TokenKind op, ExactValue v, i32 precision,
 	}
 	}
 
-failure:
-	GB_PANIC("Invalid unary operation, %.*s", LIT(token_strings[op]));
-
+failure:;
 	ExactValue error_value = {};
 	return error_value;
 }
 
 // NOTE(bill): Make sure things are evaluated in correct order
-i32 exact_value_order(ExactValue const &v) {
+gb_internal i32 exact_value_order(ExactValue const &v) {
 	switch (v.kind) {
 	case ExactValue_Invalid:
 	case ExactValue_Compound:
@@ -623,7 +639,7 @@ i32 exact_value_order(ExactValue const &v) {
 	}
 }
 
-void match_exact_values(ExactValue *x, ExactValue *y) {
+gb_internal void match_exact_values(ExactValue *x, ExactValue *y) {
 	if (exact_value_order(*y) < exact_value_order(*x)) {
 		match_exact_values(y, x);
 		return;
@@ -687,7 +703,7 @@ void match_exact_values(ExactValue *x, ExactValue *y) {
 }
 
 // TODO(bill): Allow for pointer arithmetic? Or are pointer slices good enough?
-ExactValue exact_binary_operator_value(TokenKind op, ExactValue x, ExactValue y) {
+gb_internal ExactValue exact_binary_operator_value(TokenKind op, ExactValue x, ExactValue y) {
 	match_exact_values(&x, &y);
 
 	switch (x.kind) {
@@ -846,32 +862,32 @@ error:; // NOTE(bill): MSVC accepts this??? apparently you cannot declare variab
 	return empty_exact_value;
 }
 
-gb_inline ExactValue exact_value_add(ExactValue const &x, ExactValue const &y) {
+gb_internal gb_inline ExactValue exact_value_add(ExactValue const &x, ExactValue const &y) {
 	return exact_binary_operator_value(Token_Add, x, y);
 }
-gb_inline ExactValue exact_value_sub(ExactValue const &x, ExactValue const &y) {
+gb_internal gb_inline ExactValue exact_value_sub(ExactValue const &x, ExactValue const &y) {
 	return exact_binary_operator_value(Token_Sub, x, y);
 }
-gb_inline ExactValue exact_value_mul(ExactValue const &x, ExactValue const &y) {
+gb_internal gb_inline ExactValue exact_value_mul(ExactValue const &x, ExactValue const &y) {
 	return exact_binary_operator_value(Token_Mul, x, y);
 }
-gb_inline ExactValue exact_value_quo(ExactValue const &x, ExactValue const &y) {
+gb_internal gb_inline ExactValue exact_value_quo(ExactValue const &x, ExactValue const &y) {
 	return exact_binary_operator_value(Token_Quo, x, y);
 }
-gb_inline ExactValue exact_value_shift(TokenKind op, ExactValue const &x, ExactValue const &y) {
+gb_internal gb_inline ExactValue exact_value_shift(TokenKind op, ExactValue const &x, ExactValue const &y) {
 	return exact_binary_operator_value(op, x, y);
 }
 
-gb_inline ExactValue exact_value_increment_one(ExactValue const &x) {
+gb_internal gb_inline ExactValue exact_value_increment_one(ExactValue const &x) {
 	return exact_binary_operator_value(Token_Add, x, exact_value_i64(1));
 }
 
 
-i32 cmp_f64(f64 a, f64 b) {
+gb_internal gb_inline i32 cmp_f64(f64 a, f64 b) {
 	return (a > b) - (a < b);
 }
 
-bool compare_exact_values(TokenKind op, ExactValue x, ExactValue y) {
+gb_internal bool compare_exact_values(TokenKind op, ExactValue x, ExactValue y) {
 	match_exact_values(&x, &y);
 
 	switch (x.kind) {
@@ -969,12 +985,12 @@ bool compare_exact_values(TokenKind op, ExactValue x, ExactValue y) {
 	return false;
 }
 
-Entity *strip_entity_wrapping(Ast *expr);
-Entity *strip_entity_wrapping(Entity *e);
+gb_internal Entity *strip_entity_wrapping(Ast *expr);
+gb_internal Entity *strip_entity_wrapping(Entity *e);
 
-gbString write_expr_to_string(gbString str, Ast *node, bool shorthand);
+gb_internal gbString write_expr_to_string(gbString str, Ast *node, bool shorthand);
 
-gbString write_exact_value_to_string(gbString str, ExactValue const &v, isize string_limit=36) {
+gb_internal gbString write_exact_value_to_string(gbString str, ExactValue const &v, isize string_limit=36) {
 	switch (v.kind) {
 	case ExactValue_Invalid:
 		return str;
@@ -1017,6 +1033,6 @@ gbString write_exact_value_to_string(gbString str, ExactValue const &v, isize st
 	return str;
 };
 
-gbString exact_value_to_string(ExactValue const &v, isize string_limit=36) {
+gb_internal gbString exact_value_to_string(ExactValue const &v, isize string_limit=36) {
 	return write_exact_value_to_string(gb_string_make(heap_allocator(), ""), v, string_limit);
 }

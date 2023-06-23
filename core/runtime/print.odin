@@ -2,6 +2,82 @@ package runtime
 
 _INTEGER_DIGITS :: "0123456789abcdefghijklmnopqrstuvwxyz"
 
+@(private="file")
+_INTEGER_DIGITS_VAR := _INTEGER_DIGITS
+
+when !ODIN_NO_RTTI {
+	print_any_single :: proc "contextless" (arg: any) {
+		x := arg
+		if loc, ok := x.(Source_Code_Location); ok {
+			print_caller_location(loc)
+			return
+		}
+		x.id = typeid_base(x.id)
+		switch v in x {
+		case typeid:     print_typeid(v)
+		case ^Type_Info: print_type(v)
+
+		case string:  print_string(v)
+		case cstring: print_string(string(v))
+		case []byte:  print_string(string(v))
+
+		case rune:  print_rune(v)
+
+		case u8:    print_u64(u64(v))
+		case u16:   print_u64(u64(v))
+		case u16le: print_u64(u64(v))
+		case u16be: print_u64(u64(v))
+		case u32:   print_u64(u64(v))
+		case u32le: print_u64(u64(v))
+		case u32be: print_u64(u64(v))
+		case u64:   print_u64(u64(v))
+		case u64le: print_u64(u64(v))
+		case u64be: print_u64(u64(v))
+
+		case i8:    print_i64(i64(v))
+		case i16:   print_i64(i64(v))
+		case i16le: print_i64(i64(v))
+		case i16be: print_i64(i64(v))
+		case i32:   print_i64(i64(v))
+		case i32le: print_i64(i64(v))
+		case i32be: print_i64(i64(v))
+		case i64:   print_i64(i64(v))
+		case i64le: print_i64(i64(v))
+		case i64be: print_i64(i64(v))
+
+		case int:     print_int(v)
+		case uint:    print_uint(v)
+		case uintptr: print_uintptr(v)
+
+		case bool: print_string("true" if v else "false")
+		case b8:   print_string("true" if v else "false")
+		case b16:  print_string("true" if v else "false")
+		case b32:  print_string("true" if v else "false")
+		case b64:  print_string("true" if v else "false")
+
+		case:
+			ti := type_info_of(x.id)
+			#partial switch v in ti.variant {
+			case Type_Info_Pointer:
+				print_uintptr((^uintptr)(x.data)^)
+				return
+			}
+
+			print_string("<invalid-value>")
+		}
+	}
+	println_any :: proc "contextless" (args: ..any) {
+		loop: for arg, i in args {
+			if i != 0 {
+				print_string(" ")
+			}
+			print_any_single(arg)
+		}
+		print_string("\n")
+	}
+}
+
+
 encode_rune :: proc "contextless" (c: rune) -> ([4]u8, int) {
 	r := c
 
@@ -38,14 +114,14 @@ encode_rune :: proc "contextless" (c: rune) -> ([4]u8, int) {
 	return buf, 4
 }
 
-print_string :: proc "contextless" (str: string) -> (int, _OS_Errno) {
-	return os_write(transmute([]byte)str)
+print_string :: proc "contextless" (str: string) -> (n: int) {
+	n, _ = os_write(transmute([]byte)str)
+	return
 }
 
-print_strings :: proc "contextless" (args: ..string) -> (n: int, err: _OS_Errno) {
+print_strings :: proc "contextless" (args: ..string) -> (n: int) {
 	for str in args {
-		m: int
-		m, err = os_write(transmute([]byte)str)
+		m, err := os_write(transmute([]byte)str)
 		n += m
 		if err != 0 {
 			break
@@ -54,8 +130,9 @@ print_strings :: proc "contextless" (args: ..string) -> (n: int, err: _OS_Errno)
 	return
 }
 
-print_byte :: proc "contextless" (b: byte) -> (int, _OS_Errno) {
-	return os_write([]byte{b})
+print_byte :: proc "contextless" (b: byte) -> (n: int) {
+	n, _ = os_write([]byte{b})
+	return
 }
 
 print_encoded_rune :: proc "contextless" (r: rune) {
@@ -74,11 +151,10 @@ print_encoded_rune :: proc "contextless" (r: rune) {
 		if r <= 0 {
 			print_string("\\x00")
 		} else if r < 32 {
-			digits := _INTEGER_DIGITS
 			n0, n1 := u8(r) >> 4, u8(r) & 0xf
 			print_string("\\x")
-			print_byte(digits[n0])
-			print_byte(digits[n1])
+			print_byte(_INTEGER_DIGITS_VAR[n0])
+			print_byte(_INTEGER_DIGITS_VAR[n1])
 		} else {
 			print_rune(r)
 		}
@@ -86,7 +162,7 @@ print_encoded_rune :: proc "contextless" (r: rune) {
 	print_byte('\'')
 }
 
-print_rune :: proc "contextless" (r: rune) -> (int, _OS_Errno) #no_bounds_check {
+print_rune :: proc "contextless" (r: rune) -> int #no_bounds_check {
 	RUNE_SELF :: 0x80
 
 	if r < RUNE_SELF {
@@ -94,29 +170,27 @@ print_rune :: proc "contextless" (r: rune) -> (int, _OS_Errno) #no_bounds_check 
 	}
 
 	b, n := encode_rune(r)
-	return os_write(b[:n])
+	m, _ := os_write(b[:n])
+	return m
 }
 
 
 print_u64 :: proc "contextless" (x: u64) #no_bounds_check {
-	digits := _INTEGER_DIGITS
-
 	a: [129]byte
 	i := len(a)
 	b := u64(10)
 	u := x
 	for u >= b {
-		i -= 1; a[i] = digits[u % b]
+		i -= 1; a[i] = _INTEGER_DIGITS_VAR[u % b]
 		u /= b
 	}
-	i -= 1; a[i] = digits[u % b]
+	i -= 1; a[i] = _INTEGER_DIGITS_VAR[u % b]
 
 	os_write(a[i:])
 }
 
 
 print_i64 :: proc "contextless" (x: i64) #no_bounds_check {
-	digits := _INTEGER_DIGITS
 	b :: i64(10)
 
 	u := x
@@ -126,10 +200,10 @@ print_i64 :: proc "contextless" (x: i64) #no_bounds_check {
 	a: [129]byte
 	i := len(a)
 	for u >= b {
-		i -= 1; a[i] = digits[u % b]
+		i -= 1; a[i] = _INTEGER_DIGITS_VAR[u % b]
 		u /= b
 	}
-	i -= 1; a[i] = digits[u % b]
+	i -= 1; a[i] = _INTEGER_DIGITS_VAR[u % b]
 	if neg {
 		i -= 1; a[i] = '-'
 	}
@@ -160,7 +234,7 @@ print_caller_location :: proc "contextless" (using loc: Source_Code_Location) {
 	}
 }
 print_typeid :: proc "contextless" (id: typeid) {
-	when ODIN_DISALLOW_RTTI {
+	when ODIN_NO_RTTI {
 		if id == nil {
 			print_string("nil")
 		} else {
@@ -236,7 +310,7 @@ print_type :: proc "contextless" (ti: ^Type_Info) {
 		if info.params == nil {
 			print_string("()")
 		} else {
-			t := info.params.variant.(Type_Info_Tuple)
+			t := info.params.variant.(Type_Info_Parameters)
 			print_byte('(')
 			for t, i in t.types {
 				if i > 0 { print_string(", ") }
@@ -248,7 +322,7 @@ print_type :: proc "contextless" (ti: ^Type_Info) {
 			print_string(" -> ")
 			print_type(info.results)
 		}
-	case Type_Info_Tuple:
+	case Type_Info_Parameters:
 		count := len(info.names)
 		if count != 1 { print_byte('(') }
 		for name, i in info.names {

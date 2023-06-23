@@ -269,6 +269,12 @@ TestECDH :: struct {
 test_x25519 :: proc(t: ^testing.T) {
 	log(t, "Testing X25519")
 
+	// Local copy of this so that the base point doesn't need to be exported.
+	_BASE_POINT: [32]byte = {
+		9, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+		0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+	}
+
 	test_vectors := [?]TestECDH {
 		// Test vectors from RFC 7748
 		TestECDH{
@@ -295,7 +301,7 @@ test_x25519 :: proc(t: ^testing.T) {
 		// Abuse the test vectors to sanity-check the scalar-basepoint multiply.
 		p1, p2: [x25519.POINT_SIZE]byte
 		x25519.scalarmult_basepoint(p1[:], scalar[:])
-		x25519.scalarmult(p2[:], scalar[:], x25519._BASE_POINT[:])
+		x25519.scalarmult(p2[:], scalar[:], _BASE_POINT[:])
 		p1_str, p2_str := hex_string(p1[:]), hex_string(p2[:])
 		expect(t, p1_str == p2_str, fmt.tprintf("Expected %s for %s * basepoint, but got %s instead", p2_str, v.scalar, p1_str))
 	}

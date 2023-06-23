@@ -16,6 +16,7 @@ import coretime "core:time"
 import "core:strings"
 import "core:bytes"
 import "core:mem"
+import "core:runtime"
 
 /*
 	Cleanup of image-specific data.
@@ -91,12 +92,14 @@ core_time :: proc(c: image.PNG_Chunk) -> (t: coretime.Time, ok: bool) {
 }
 
 text :: proc(c: image.PNG_Chunk) -> (res: Text, ok: bool) {
+	runtime.DEFAULT_TEMP_ALLOCATOR_TEMP_GUARD(ignore = context.temp_allocator == context.allocator)
+
 	assert(len(c.data) == int(c.header.length))
 	#partial switch c.header.type {
 	case .tEXt:
 		ok = true
 
-		fields := bytes.split(s=c.data, sep=[]u8{0}, allocator=context.temp_allocator)
+		fields := bytes.split(c.data, sep=[]u8{0}, allocator=context.temp_allocator)
 		if len(fields) == 2 {
 			res.keyword = strings.clone(string(fields[0]))
 			res.text    = strings.clone(string(fields[1]))
@@ -107,7 +110,7 @@ text :: proc(c: image.PNG_Chunk) -> (res: Text, ok: bool) {
 	case .zTXt:
 		ok = true
 
-		fields := bytes.split_n(s=c.data, sep=[]u8{0}, n=3, allocator=context.temp_allocator)
+		fields := bytes.split_n(c.data, sep=[]u8{0}, n=3, allocator=context.temp_allocator)
 		if len(fields) != 3 || len(fields[1]) != 0 {
 			// Compression method must be 0=Deflate, which thanks to the split above turns
 			// into an empty slice
@@ -194,18 +197,18 @@ text_destroy :: proc(text: Text) {
 }
 
 iccp :: proc(c: image.PNG_Chunk) -> (res: iCCP, ok: bool) {
-	ok = true
+	runtime.DEFAULT_TEMP_ALLOCATOR_TEMP_GUARD(ignore = context.temp_allocator == context.allocator)
 
-	fields := bytes.split_n(s=c.data, sep=[]u8{0}, n=3, allocator=context.temp_allocator)
+	fields := bytes.split_n(c.data, sep=[]u8{0}, n=3, allocator=context.temp_allocator)
 
 	if len(fields[0]) < 1 || len(fields[0]) > 79 {
 		// Invalid profile name
-		ok = false; return
+		return
 	}
 
 	if len(fields[1]) != 0 {
 		// Compression method should be a zero, which the split turned into an empty slice.
-		ok = false; return
+		return
 	}
 
 	// Set up ZLIB context and decompress iCCP payload
@@ -213,12 +216,12 @@ iccp :: proc(c: image.PNG_Chunk) -> (res: iCCP, ok: bool) {
 	zlib_error := zlib.inflate_from_byte_array(fields[2], &buf)
 	if zlib_error != nil {
 		bytes.buffer_destroy(&buf)
-		ok = false; return
+		return
 	}
 
 	res.name = strings.clone(string(fields[0]))
 	res.profile = bytes.buffer_to_bytes(&buf)
-
+	ok = true
 	return
 }
 
@@ -256,18 +259,18 @@ plte :: proc(c: image.PNG_Chunk) -> (res: PLTE, ok: bool) {
 
 splt :: proc(c: image.PNG_Chunk) -> (res: sPLT, ok: bool) {
 	if c.header.type != .sPLT {
-		return {}, false
+		return
 	}
-	ok = true
+	runtime.DEFAULT_TEMP_ALLOCATOR_TEMP_GUARD(ignore = context.temp_allocator == context.allocator)
 
-	fields := bytes.split_n(s=c.data, sep=[]u8{0}, n=2, allocator=context.temp_allocator)
+	fields := bytes.split_n(c.data, sep=[]u8{0}, n=2, allocator=context.temp_allocator)
 	if len(fields) != 2 {
-		return {}, false
+		return
 	}
 
 	res.depth = fields[1][0]
 	if res.depth != 8 && res.depth != 16 {
-		return {}, false
+		return
 	}
 
 	data := fields[1][1:]
@@ -275,21 +278,21 @@ splt :: proc(c: image.PNG_Chunk) -> (res: sPLT, ok: bool) {
 
 	if res.depth == 8 {
 		if len(data) % 6 != 0 {
-			return {}, false
+			return
 		}
 		count = len(data) / 6
 		if count > 256 {
-			return {}, false
+			return
 		}
 
 		res.entries = mem.slice_data_cast([][4]u8, data)
 	} else { // res.depth == 16
 		if len(data) % 10 != 0 {
-			return {}, false
+			return
 		}
 		count = len(data) / 10
 		if count > 256 {
-			return {}, false
+			return
 		}
 
 		res.entries = mem.slice_data_cast([][4]u16, data)
@@ -297,7 +300,7 @@ splt :: proc(c: image.PNG_Chunk) -> (res: sPLT, ok: bool) {
 
 	res.name = strings.clone(string(fields[0]))
 	res.used = u16(count)
-
+	ok = true
 	return
 }
 

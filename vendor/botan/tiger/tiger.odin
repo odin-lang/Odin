@@ -71,7 +71,7 @@ hash_stream_128 :: proc(s: io.Stream) -> ([DIGEST_SIZE_128]byte, bool) {
     defer delete(buf)
     i := 1
     for i > 0 {
-        i, _ = s->impl_read(buf)
+        i, _ = io.read(s, buf)
         if i > 0 {
             botan.hash_update(ctx, len(buf) == 0 ? nil : &buf[0], uint(i))
         } 
@@ -150,7 +150,7 @@ hash_stream_160 :: proc(s: io.Stream) -> ([DIGEST_SIZE_160]byte, bool) {
     defer delete(buf)
     i := 1
     for i > 0 {
-        i, _ = s->impl_read(buf)
+        i, _ = io.read(s, buf)
         if i > 0 {
             botan.hash_update(ctx, len(buf) == 0 ? nil : &buf[0], uint(i))
         } 
@@ -229,7 +229,7 @@ hash_stream_192 :: proc(s: io.Stream) -> ([DIGEST_SIZE_192]byte, bool) {
     defer delete(buf)
     i := 1
     for i > 0 {
-        i, _ = s->impl_read(buf)
+        i, _ = io.read(s, buf)
         if i > 0 {
             botan.hash_update(ctx, len(buf) == 0 ? nil : &buf[0], uint(i))
         } 

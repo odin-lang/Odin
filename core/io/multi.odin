@@ -5,33 +5,37 @@ Multi_Reader :: struct {
 }
 
 @(private)
-_multi_reader_vtable := &Stream_VTable{
-	impl_read = proc(s: Stream, p: []byte) -> (n: int, err: Error) {
-		mr := (^Multi_Reader)(s.stream_data)
-		for len(mr.readers) > 0 {
-			r := mr.readers[0]
-			n, err = read(r, p)
-			if err == .EOF {
-				ordered_remove(&mr.readers, 0)
-			}
-			if n > 0 || err != .EOF {
-				if err == .EOF && len(mr.readers) > 0 {
-					// Don't return EOF yet, more readers remain
-					err = nil
-				}
-				return
-			}
+_multi_reader_proc :: proc(stream_data: rawptr, mode: Stream_Mode, p: []byte, offset: i64, whence: Seek_From) -> (n: i64, err: Error) {
+	if mode == .Query {
+		return query_utility({.Read, .Query})
+	} else if mode != .Read {
+		return 0, .Empty
+	}
+	mr := (^Multi_Reader)(stream_data)
+	for len(mr.readers) > 0 {
+		r := mr.readers[0]
+		n, err = _i64_err(read(r, p))
+		if err == .EOF {
+			ordered_remove(&mr.readers, 0)
 		}
-		return 0, .EOF
-	},
+		if n > 0 || err != .EOF {
+			if err == .EOF && len(mr.readers) > 0 {
+				// Don't return EOF yet, more readers remain
+				err = nil
+			}
+			return
+		}
+	}
+	return 0, .EOF
 }
+
 
 multi_reader_init :: proc(mr: ^Multi_Reader, readers: ..Reader, allocator := context.allocator) -> (r: Reader) {
 	all_readers := make([dynamic]Reader, 0, len(readers), allocator)
 
 	for w in readers {
-		if w.stream_vtable == _multi_reader_vtable {
-			other := (^Multi_Reader)(w.stream_data)
+		if w.procedure == _multi_reader_proc {
+			other := (^Multi_Reader)(w.data)
 			append(&all_readers, ..other.readers[:])
 		} else {
 			append(&all_readers, w)
@@ -40,8 +44,8 @@ multi_reader_init :: proc(mr: ^Multi_Reader, readers: ..Reader, allocator := con
 
 	mr.readers = all_readers
 
-	r.stream_vtable = _multi_reader_vtable
-	r.stream_data = mr
+	r.procedure = _multi_reader_proc
+	r.data = mr
 	return
 }
 
@@ -55,38 +59,42 @@ Multi_Writer :: struct {
 }
 
 @(private)
-_multi_writer_vtable := &Stream_VTable{
-	impl_write = proc(s: Stream, p: []byte) -> (n: int, err: Error) {
-		mw := (^Multi_Writer)(s.stream_data)
-		for w in mw.writers {
-			n, err = write(w, p)
-			if err != nil {
-				return
-			}
-			if n != len(p) {
-				err = .Short_Write
-				return
-			}
+_multi_writer_proc :: proc(stream_data: rawptr, mode: Stream_Mode, p: []byte, offset: i64, whence: Seek_From) -> (n: i64, err: Error) {
+	if mode == .Query {
+		return query_utility({.Write, .Query})
+	} else if mode != .Write {
+		return 0, .Empty
+	}
+	mw := (^Multi_Writer)(stream_data)
+	for w in mw.writers {
+		n, err = _i64_err(write(w, p))
+		if err != nil {
+			return
 		}
+		if n != i64(len(p)) {
+			err = .Short_Write
+			return
+		}
+	}
 
-		return len(p), nil
-	},
+	return i64(len(p)), nil
 }
+
 
 multi_writer_init :: proc(mw: ^Multi_Writer, writers: ..Writer, allocator := context.allocator) -> (out: Writer) {
 	mw.writers = make([dynamic]Writer, 0, len(writers), allocator)
 
 	for w in writers {
-		if w.stream_vtable == _multi_writer_vtable {
-			other := (^Multi_Writer)(w.stream_data)
+		if w.procedure == _multi_writer_proc {
+			other := (^Multi_Writer)(w.data)
 			append(&mw.writers, ..other.writers[:])
 		} else {
 			append(&mw.writers, w)
 		}
 	}
 
-	out.stream_vtable = _multi_writer_vtable
-	out.stream_data = mw
+	out.procedure = _multi_writer_proc
+	out.data = mw
 	return
 }
 

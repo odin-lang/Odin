@@ -38,7 +38,7 @@ SystemCursor :: enum c.int {
 	NUM_SYSTEM_CURSORS,
 }
 
-SDL_MouseWheelDirection :: enum c.int {
+MouseWheelDirection :: enum c.int {
 	NORMAL,    /**< The scroll direction is normal */
 	FLIPPED,   /**< The scroll direction is flipped / natural */
 }

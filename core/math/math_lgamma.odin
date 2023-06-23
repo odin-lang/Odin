@@ -80,7 +80,9 @@ package math
 //
 
 
+@(require_results)
 lgamma_f64 :: proc "contextless" (x: f64) -> (lgamma: f64, sign: int) {
+	@(require_results)
 	sin_pi :: proc "contextless" (x: f64) -> f64 {
 		if x < 0.25 {
 			return -sin(PI * x)
@@ -345,14 +347,14 @@ lgamma_f64 :: proc "contextless" (x: f64) -> (lgamma: f64, sign: int) {
 }
 
 
-lgamma_f16   :: proc "contextless" (x: f16)   -> (lgamma: f16, sign: int)   { r, s := lgamma_f64(f64(x)); return f16(r), s }
-lgamma_f32   :: proc "contextless" (x: f32)   -> (lgamma: f32, sign: int)   { r, s := lgamma_f64(f64(x)); return f32(r), s }
-lgamma_f16le :: proc "contextless" (x: f16le) -> (lgamma: f16le, sign: int) { r, s := lgamma_f64(f64(x)); return f16le(r), s }
-lgamma_f16be :: proc "contextless" (x: f16be) -> (lgamma: f16be, sign: int) { r, s := lgamma_f64(f64(x)); return f16be(r), s }
-lgamma_f32le :: proc "contextless" (x: f32le) -> (lgamma: f32le, sign: int) { r, s := lgamma_f64(f64(x)); return f32le(r), s }
-lgamma_f32be :: proc "contextless" (x: f32be) -> (lgamma: f32be, sign: int) { r, s := lgamma_f64(f64(x)); return f32be(r), s }
-lgamma_f64le :: proc "contextless" (x: f64le) -> (lgamma: f64le, sign: int) { r, s := lgamma_f64(f64(x)); return f64le(r), s }
-lgamma_f64be :: proc "contextless" (x: f64be) -> (lgamma: f64be, sign: int) { r, s := lgamma_f64(f64(x)); return f64be(r), s }
+@(require_results) lgamma_f16   :: proc "contextless" (x: f16)   -> (lgamma: f16, sign: int)   { r, s := lgamma_f64(f64(x)); return f16(r), s }
+@(require_results) lgamma_f32   :: proc "contextless" (x: f32)   -> (lgamma: f32, sign: int)   { r, s := lgamma_f64(f64(x)); return f32(r), s }
+@(require_results) lgamma_f16le :: proc "contextless" (x: f16le) -> (lgamma: f16le, sign: int) { r, s := lgamma_f64(f64(x)); return f16le(r), s }
+@(require_results) lgamma_f16be :: proc "contextless" (x: f16be) -> (lgamma: f16be, sign: int) { r, s := lgamma_f64(f64(x)); return f16be(r), s }
+@(require_results) lgamma_f32le :: proc "contextless" (x: f32le) -> (lgamma: f32le, sign: int) { r, s := lgamma_f64(f64(x)); return f32le(r), s }
+@(require_results) lgamma_f32be :: proc "contextless" (x: f32be) -> (lgamma: f32be, sign: int) { r, s := lgamma_f64(f64(x)); return f32be(r), s }
+@(require_results) lgamma_f64le :: proc "contextless" (x: f64le) -> (lgamma: f64le, sign: int) { r, s := lgamma_f64(f64(x)); return f64le(r), s }
+@(require_results) lgamma_f64be :: proc "contextless" (x: f64be) -> (lgamma: f64be, sign: int) { r, s := lgamma_f64(f64(x)); return f64be(r), s }
 
 lgamma :: proc{
 	lgamma_f16, lgamma_f16le, lgamma_f16be,

@@ -192,6 +192,7 @@ type_map_info      :: proc($T: typeid/map[$K]$V) -> ^runtime.Map_Info ---
 type_map_cell_info :: proc($T: typeid)           -> ^runtime.Map_Cell_Info ---
 
 type_convert_variants_to_pointers :: proc($T: typeid) -> typeid where type_is_union(T) ---
+type_merge :: proc($U, $V: typeid) -> typeid where type_is_union(U), type_is_union(V) ---
 
 constant_utf16_cstring :: proc($literal: string) -> [^]u16 ---
 
@@ -283,7 +284,7 @@ wasm_memory_atomic_wait32   :: proc(ptr: ^u32, expected: u32, timeout_ns: i64) -
 wasm_memory_atomic_notify32 :: proc(ptr: ^u32, waiters: u32) -> (waiters_woken_up: u32) ---
 
 // x86 Targets (i386, amd64)
-x86_cpuid  :: proc(ax, cx: u32) -> (eax, ebc, ecx, edx: u32) ---
+x86_cpuid  :: proc(ax, cx: u32) -> (eax, ebx, ecx, edx: u32) ---
 x86_xgetbv :: proc(cx: u32) -> (eax, edx: u32) ---
 
 

@@ -67,6 +67,7 @@ ENOPROTOOPT:		Errno : 42		/* Protocol not available */
 EPROTONOSUPPORT:	Errno : 43		/* Protocol not supported */
 ESOCKTNOSUPPORT:	Errno : 44		/* Socket type not supported */
 ENOTSUP:			Errno : 45		/* Operation not supported */
+EOPNOTSUPP::		ENOTSUP
 EPFNOSUPPORT:		Errno : 46		/* Protocol family not supported */
 EAFNOSUPPORT:		Errno : 47		/* Address family not supported by protocol family */
 EADDRINUSE:			Errno : 48		/* Address already in use */
@@ -179,6 +180,95 @@ RTLD_NODELETE :: 0x80
 RTLD_NOLOAD   :: 0x10
 RTLD_FIRST    :: 0x100
 
+SOL_SOCKET :: 0xFFFF
+
+SOCK_STREAM    :: 1
+SOCK_DGRAM     :: 2
+SOCK_RAW       :: 3
+SOCK_RDM       :: 4
+SOCK_SEQPACKET :: 5
+
+SO_DEBUG       :: 0x0001
+SO_ACCEPTCONN  :: 0x0002
+SO_REUSEADDR   :: 0x0004
+SO_KEEPALIVE   :: 0x0008
+SO_DONTROUTE   :: 0x0010
+SO_BROADCAST   :: 0x0020
+SO_USELOOPBACK :: 0x0040
+SO_LINGER      :: 0x0080
+SO_OOBINLINE   :: 0x0100
+SO_REUSEPORT   :: 0x0200
+SO_TIMESTAMP   :: 0x0400
+
+SO_DONTTRUNC   :: 0x2000
+SO_WANTMORE    :: 0x4000
+SO_WANTOOBFLAG :: 0x8000
+SO_SNDBUF      :: 0x1001
+SO_RCVBUF      :: 0x1002
+SO_SNDLOWAT	   :: 0x1003
+SO_RCVLOWAT    :: 0x1004
+SO_SNDTIMEO    :: 0x1005
+SO_RCVTIMEO    :: 0x1006
+SO_ERROR       :: 0x1007
+SO_TYPE        :: 0x1008
+SO_PRIVSTATE   :: 0x1009
+SO_NREAD       :: 0x1020
+SO_NKE         :: 0x1021
+
+AF_UNSPEC     :: 0
+AF_LOCAL      :: 1
+AF_UNIX       :: AF_LOCAL
+AF_INET       :: 2
+AF_IMPLINK    :: 3
+AF_PUP        :: 4
+AF_CHAOS      :: 5
+AF_NS         :: 6
+AF_ISO        :: 7
+AF_OSI        :: AF_ISO
+AF_ECMA       :: 8
+AF_DATAKIT    :: 9
+AF_CCITT      :: 10
+AF_SNA        :: 11
+AF_DECnet     :: 12
+AF_DLI        :: 13
+AF_LAT        :: 14
+AF_HYLINK     :: 15
+AF_APPLETALK  :: 16
+AF_ROUTE	  :: 17
+AF_LINK		  :: 18
+pseudo_AF_XTP :: 19
+AF_COIP		  :: 20
+AF_CNT		  :: 21
+pseudo_AF_RTIP :: 22
+AF_IPX         :: 23
+AF_SIP         :: 24
+pseudo_AF_PIP  :: 25
+pseudo_AF_BLUE :: 26
+AF_NDRV        :: 27
+AF_ISDN        :: 28
+AF_E164        :: AF_ISDN
+pseudo_AF_KEY  :: 29
+AF_INET6       :: 30
+AF_NATM        :: 31
+AF_SYSTEM      :: 32
+AF_NETBIOS     :: 33
+AF_PPP         :: 34
+
+TCP_NODELAY	:: 0x01
+TCP_MAXSEG	:: 0x02
+TCP_NOPUSH	:: 0x04
+TCP_NOOPT	:: 0x08
+
+IPPROTO_ICMP :: 1
+IPPROTO_TCP  :: 6
+IPPROTO_UDP  :: 17
+
+SHUT_RD   :: 0
+SHUT_WR   :: 1
+SHUT_RDWR :: 2
+
+F_GETFL: int : 3 /* Get file flags */
+F_SETFL: int : 4 /* Set file flags */
 
 // "Argv" arguments converted to Odin strings
 args := _alloc_command_line_arguments()
@@ -223,6 +313,58 @@ Dirent :: struct {
 }
 
 Dir :: distinct rawptr // DIR*
+
+SOCKADDR :: struct #packed {
+	len: c.char,
+	family: c.char,
+	sa_data: [14]c.char,
+}
+
+SOCKADDR_STORAGE_LH :: struct #packed {
+	len: c.char,
+	family: c.char,
+	__ss_pad1: [6]c.char,
+	__ss_align: i64,
+	__ss_pad2: [112]c.char,
+}
+
+sockaddr_in :: struct #packed {
+	sin_len: c.char,
+	sin_family: c.char,
+	sin_port: u16be,
+	sin_addr: in_addr,
+	sin_zero: [8]c.char,
+}
+
+sockaddr_in6 :: struct #packed {
+	sin6_len: c.char,
+	sin6_family: c.char,
+	sin6_port: u16be,
+	sin6_flowinfo: c.uint,
+	sin6_addr: in6_addr,
+	sin6_scope_id: c.uint,
+}
+
+in_addr :: struct #packed {
+	s_addr: u32,
+}
+
+in6_addr :: struct #packed {
+	s6_addr: [16]u8,
+}
+
+Timeval :: struct {
+	seconds: i64,
+	microseconds: int,
+}
+
+Linger :: struct {
+	onoff: int,
+	linger: int,
+}
+
+Socket    :: distinct int
+socklen_t :: c.int
 
 // File type
 S_IFMT   :: 0o170000 // Type of file mask
@@ -273,12 +415,14 @@ F_OK :: 0 // Test for file existance
 F_GETPATH :: 50 // return the full path of the fd
 
 foreign libc {
-	@(link_name="__error") __error :: proc() -> ^int ---
+	@(link_name="__error") __error :: proc() -> ^c.int ---
 
 	@(link_name="open")             _unix_open          :: proc(path: cstring, flags: i32, mode: u16) -> Handle ---
 	@(link_name="close")            _unix_close         :: proc(handle: Handle) -> c.int ---
-	@(link_name="read")             _unix_read          :: proc(handle: Handle, buffer: rawptr, count: int) -> int ---
-	@(link_name="write")            _unix_write         :: proc(handle: Handle, buffer: rawptr, count: int) -> int ---
+	@(link_name="read")             _unix_read          :: proc(handle: Handle, buffer: rawptr, count: c.size_t) -> int ---
+	@(link_name="write")            _unix_write         :: proc(handle: Handle, buffer: rawptr, count: c.size_t) -> int ---
+	@(link_name="pread")            _unix_pread         :: proc(handle: Handle, buffer: rawptr, count: c.size_t, offset: i64) -> int ---
+	@(link_name="pwrite")           _unix_pwrite        :: proc(handle: Handle, buffer: rawptr, count: c.size_t, offset: i64) -> int ---
 	@(link_name="lseek")            _unix_lseek         :: proc(fs: Handle, offset: int, whence: int) -> int ---
 	@(link_name="gettid")           _unix_gettid        :: proc() -> u64 ---
 	@(link_name="getpagesize")      _unix_getpagesize   :: proc() -> i32 ---
@@ -296,7 +440,7 @@ foreign libc {
 	@(link_name="closedir")         _unix_closedir      :: proc(dirp: Dir) -> c.int ---
 	@(link_name="rewinddir")        _unix_rewinddir     :: proc(dirp: Dir) ---
 
-	@(link_name="__fcntl")          _unix__fcntl        :: proc(fd: Handle, cmd: c.int, buf: ^byte) -> c.int ---
+	@(link_name="__fcntl")          _unix__fcntl        :: proc(fd: Handle, cmd: c.int, arg: uintptr) -> c.int ---
 
 	@(link_name="rename") _unix_rename :: proc(old: cstring, new: cstring) -> c.int ---
 	@(link_name="remove") _unix_remove :: proc(path: cstring) -> c.int ---
@@ -314,6 +458,20 @@ foreign libc {
 	@(link_name="realpath") _unix_realpath :: proc(path: cstring, resolved_path: rawptr) -> rawptr ---
 
 	@(link_name="strerror") _darwin_string_error :: proc(num : c.int) -> cstring ---
+	@(link_name="sysctlbyname") _sysctlbyname    :: proc(path: cstring, oldp: rawptr, oldlenp: rawptr, newp: rawptr, newlen: int) -> c.int ---
+
+	@(link_name="socket")           _unix_socket        :: proc(domain: int, type: int, protocol: int) -> int ---
+	@(link_name="listen")           _unix_listen        :: proc(socket: int, backlog: int) -> int ---
+	@(link_name="accept")           _unix_accept        :: proc(socket: int, addr: rawptr, addr_len: rawptr) -> int ---
+	@(link_name="connect")          _unix_connect       :: proc(socket: int, addr: rawptr, addr_len: socklen_t) -> int ---
+	@(link_name="bind")             _unix_bind          :: proc(socket: int, addr: rawptr, addr_len: socklen_t) -> int ---
+	@(link_name="setsockopt")       _unix_setsockopt    :: proc(socket: int, level: int, opt_name: int, opt_val: rawptr, opt_len: socklen_t) -> int ---
+	@(link_name="getsockopt")       _unix_getsockopt    :: proc(socket: int, level: int, opt_name: int, opt_val: rawptr, opt_len: socklen_t) -> int ---
+	@(link_name="recvfrom")         _unix_recvfrom      :: proc(socket: int, buffer: rawptr, buffer_len: c.size_t, flags: int, addr: rawptr, addr_len: ^socklen_t) -> c.ssize_t ---
+	@(link_name="recv")             _unix_recv          :: proc(socket: int, buffer: rawptr, buffer_len: c.size_t, flags: int) -> c.ssize_t ---
+	@(link_name="sendto")           _unix_sendto        :: proc(socket: int, buffer: rawptr, buffer_len: c.size_t, flags: int, addr: rawptr, addr_len: socklen_t) -> c.ssize_t ---
+	@(link_name="send")             _unix_send          :: proc(socket: int, buffer: rawptr, buffer_len: c.size_t, flags: int) -> c.ssize_t ---
+	@(link_name="shutdown")         _unix_shutdown      :: proc(socket: int, how: int) -> int ---
 
 	@(link_name="exit")    _unix_exit :: proc(status: c.int) -> ! ---
 }
@@ -334,7 +492,7 @@ foreign dl {
 }
 
 get_last_error :: proc "contextless" () -> int {
-	return __error()^
+	return int(__error()^)
 }
 
 get_last_error_string :: proc() -> string {
@@ -352,6 +510,7 @@ open :: proc(path: string, flags: int = O_RDWR, mode: int = 0) -> (Handle, Errno
 		flags = O_RDONLY
 	}
 
+	runtime.DEFAULT_TEMP_ALLOCATOR_TEMP_GUARD()
 	cstr := strings.clone_to_cstring(path, context.temp_allocator)
 	handle := _unix_open(cstr, i32(flags), u16(mode))
 	if handle == -1 {
@@ -384,45 +543,51 @@ close :: proc(fd: Handle) -> bool {
 @(private)
 MAX_RW :: 0x7fffffff // The limit on Darwin is max(i32), trying to read/write more than that fails.
 
-write :: proc(fd: Handle, data: []u8) -> (int, Errno) {
-	assert(fd != -1)
-
-	bytes_total := len(data)
-	bytes_written_total := 0
-
-	for bytes_written_total < bytes_total {
-		bytes_to_write := min(bytes_total - bytes_written_total, MAX_RW)
-		slice := data[bytes_written_total:bytes_written_total + bytes_to_write]
-		bytes_written := _unix_write(fd, raw_data(slice), bytes_to_write)
-		if bytes_written == -1 {
-			return bytes_written_total, 1
-		}
-		bytes_written_total += bytes_written
+write :: proc(fd: Handle, data: []byte) -> (int, Errno) {
+	if len(data) == 0 {
+		return 0, ERROR_NONE
 	}
 
-	return bytes_written_total, 0
+	bytes_written := _unix_write(fd, raw_data(data), c.size_t(len(data)))
+	if bytes_written < 0 {
+		return -1, Errno(get_last_error())
+	}
+	return bytes_written, ERROR_NONE
 }
 
 read :: proc(fd: Handle, data: []u8) -> (int, Errno) {
-	assert(fd != -1)
-
-	bytes_total := len(data)
-	bytes_read_total := 0
-
-	for bytes_read_total < bytes_total {
-		bytes_to_read := min(bytes_total - bytes_read_total, MAX_RW)
-		slice := data[bytes_read_total:bytes_read_total + bytes_to_read]
-		bytes_read := _unix_read(fd, raw_data(slice), bytes_to_read)
-		if bytes_read == -1 {
-			return bytes_read_total, 1
-		}
-		if bytes_read == 0 {
-			break
-		}
-		bytes_read_total += bytes_read
+	if len(data) == 0 {
+		return 0, ERROR_NONE
 	}
 
-	return bytes_read_total, 0
+	bytes_read := _unix_read(fd, raw_data(data), c.size_t(len(data)))
+	if bytes_read < 0 {
+		return -1, Errno(get_last_error())
+	}
+	return bytes_read, ERROR_NONE
+}
+read_at :: proc(fd: Handle, data: []byte, offset: i64) -> (int, Errno) {
+	if len(data) == 0 {
+		return 0, ERROR_NONE
+	}
+
+	bytes_read := _unix_pread(fd, raw_data(data), c.size_t(len(data)), offset)
+	if bytes_read < 0 {
+		return -1, Errno(get_last_error())
+	}
+	return bytes_read, ERROR_NONE
+}
+
+write_at :: proc(fd: Handle, data: []byte, offset: i64) -> (int, Errno) {
+	if len(data) == 0 {
+		return 0, ERROR_NONE
+	}
+
+	bytes_written := _unix_pwrite(fd, raw_data(data), c.size_t(len(data)), offset)
+	if bytes_written < 0 {
+		return -1, Errno(get_last_error())
+	}
+	return bytes_written, ERROR_NONE
 }
 
 seek :: proc(fd: Handle, offset: i64, whence: int) -> (i64, Errno) {
@@ -507,24 +672,28 @@ is_file :: proc {is_file_path, is_file_handle}
 is_dir :: proc {is_dir_path, is_dir_handle}
 
 exists :: proc(path: string) -> bool {
+	runtime.DEFAULT_TEMP_ALLOCATOR_TEMP_GUARD()
 	cpath := strings.clone_to_cstring(path, context.temp_allocator)
 	res := _unix_access(cpath, O_RDONLY)
 	return res == 0
 }
 
 rename :: proc(old: string, new: string) -> bool {
+	runtime.DEFAULT_TEMP_ALLOCATOR_TEMP_GUARD()
 	old_cstr := strings.clone_to_cstring(old, context.temp_allocator)
 	new_cstr := strings.clone_to_cstring(new, context.temp_allocator)
 	return _unix_rename(old_cstr, new_cstr) != -1
 }
 
 remove :: proc(path: string) -> bool {
+	runtime.DEFAULT_TEMP_ALLOCATOR_TEMP_GUARD()
 	path_cstr := strings.clone_to_cstring(path, context.temp_allocator)
 	return _unix_remove(path_cstr) != -1
 }
 
 @private
 _stat :: proc(path: string) -> (OS_Stat, Errno) {
+	runtime.DEFAULT_TEMP_ALLOCATOR_TEMP_GUARD()
 	cstr := strings.clone_to_cstring(path, context.temp_allocator)
 
 	s: OS_Stat
@@ -537,6 +706,7 @@ _stat :: proc(path: string) -> (OS_Stat, Errno) {
 
 @private
 _lstat :: proc(path: string) -> (OS_Stat, Errno) {
+	runtime.DEFAULT_TEMP_ALLOCATOR_TEMP_GUARD()
 	cstr := strings.clone_to_cstring(path, context.temp_allocator)
 
 	s: OS_Stat
@@ -602,6 +772,7 @@ _readdir :: proc(dirp: Dir) -> (entry: Dirent, err: Errno, end_of_stream: bool) 
 
 @private
 _readlink :: proc(path: string) -> (string, Errno) {
+	runtime.DEFAULT_TEMP_ALLOCATOR_TEMP_GUARD(ignore = context.temp_allocator == context.allocator)
 	path_cstr := strings.clone_to_cstring(path, context.temp_allocator)
 
 	bufsz : uint = 256
@@ -623,14 +794,14 @@ _readlink :: proc(path: string) -> (string, Errno) {
 }
 
 absolute_path_from_handle :: proc(fd: Handle) -> (string, Errno) {
-	buf : [256]byte
-	res  := _unix__fcntl(fd, F_GETPATH, &buf[0])
-	if	res != 0 {
-		return "", Errno(get_last_error())
+	buf: [DARWIN_MAXPATHLEN]byte
+	_, err := fcntl(int(fd), F_GETPATH, int(uintptr(&buf[0])))
+	if err != ERROR_NONE {
+		return "", err
 	}
 
 	path := strings.clone_from_cstring(cstring(&buf[0]))
-	return path, ERROR_NONE
+	return path, err
 }
 
 absolute_path_from_relative :: proc(rel: string) -> (path: string, err: Errno) {
@@ -639,6 +810,7 @@ absolute_path_from_relative :: proc(rel: string) -> (path: string, err: Errno) {
 		rel = "."
 	}
 
+	runtime.DEFAULT_TEMP_ALLOCATOR_TEMP_GUARD(ignore = context.temp_allocator == context.allocator)
 	rel_cstr := strings.clone_to_cstring(rel, context.temp_allocator)
 
 	path_ptr := _unix_realpath(rel_cstr, nil)
@@ -654,6 +826,7 @@ absolute_path_from_relative :: proc(rel: string) -> (path: string, err: Errno) {
 }
 
 access :: proc(path: string, mask: int) -> bool {
+	runtime.DEFAULT_TEMP_ALLOCATOR_TEMP_GUARD()
 	cstr := strings.clone_to_cstring(path, context.temp_allocator)
 	return _unix_access(cstr, mask) == 0
 }
@@ -678,6 +851,7 @@ heap_free :: proc(ptr: rawptr) {
 }
 
 lookup_env :: proc(key: string, allocator := context.allocator) -> (value: string, found: bool) {
+	runtime.DEFAULT_TEMP_ALLOCATOR_TEMP_GUARD(ignore = context.temp_allocator == allocator)
 	path_str := strings.clone_to_cstring(key, context.temp_allocator)
 	cstr := _unix_getenv(path_str)
 	if cstr == nil {
@@ -700,6 +874,7 @@ get_current_directory :: proc() -> string {
 			return string(cwd)
 		}
 		if Errno(get_last_error()) != ERANGE {
+			delete(buf)
 			return ""
 		}
 		resize(&buf, len(buf)+page_size)
@@ -708,6 +883,7 @@ get_current_directory :: proc() -> string {
 }
 
 set_current_directory :: proc(path: string) -> (err: Errno) {
+	runtime.DEFAULT_TEMP_ALLOCATOR_TEMP_GUARD()
 	cstr := strings.clone_to_cstring(path, context.temp_allocator)
 	res := _unix_chdir(cstr)
 	if res == -1 {
@@ -717,6 +893,7 @@ set_current_directory :: proc(path: string) -> (err: Errno) {
 }
 
 make_directory :: proc(path: string, mode: u16 = 0o775) -> Errno {
+	runtime.DEFAULT_TEMP_ALLOCATOR_TEMP_GUARD()
 	path_cstr := strings.clone_to_cstring(path, context.temp_allocator)
 	res := _unix_mkdir(path_cstr, mode)
 	if res == -1 {
@@ -741,12 +918,14 @@ current_thread_id :: proc "contextless" () -> int {
 }
 
 dlopen :: proc(filename: string, flags: int) -> rawptr {
+	runtime.DEFAULT_TEMP_ALLOCATOR_TEMP_GUARD()
 	cstr := strings.clone_to_cstring(filename, context.temp_allocator)
 	handle := _unix_dlopen(cstr, flags)
 	return handle
 }
 dlsym :: proc(handle: rawptr, symbol: string) -> rawptr {
 	assert(handle != nil)
+	runtime.DEFAULT_TEMP_ALLOCATOR_TEMP_GUARD()
 	cstr := strings.clone_to_cstring(symbol, context.temp_allocator)
 	proc_handle := _unix_dlsym(handle, cstr)
 	return proc_handle
@@ -771,11 +950,127 @@ get_page_size :: proc() -> int {
 	return page_size
 }
 
+@(private)
+_processor_core_count :: proc() -> int {
+	count : int = 0
+	count_size := size_of(count)
+	if _sysctlbyname("hw.logicalcpu", &count, &count_size, nil, 0) == 0 {
+		if count > 0 {
+			return count
+		}
+	}
+
+	return 1
+}
 
 _alloc_command_line_arguments :: proc() -> []string {
 	res := make([]string, len(runtime.args__))
-	for arg, i in runtime.args__ {
-		res[i] = string(arg)
+	for _, i in res {
+		res[i] = string(runtime.args__[i])
 	}
 	return res
+}
+
+socket :: proc(domain: int, type: int, protocol: int) -> (Socket, Errno) {
+	result := _unix_socket(domain, type, protocol)
+	if result < 0 {
+		return 0, Errno(get_last_error())
+	}
+	return Socket(result), ERROR_NONE
+}
+
+connect :: proc(sd: Socket, addr: ^SOCKADDR, len: socklen_t) -> (Errno) {
+	result := _unix_connect(int(sd), addr, len)
+	if result < 0 {
+		return Errno(get_last_error())
+	}
+	return ERROR_NONE
+}
+
+bind :: proc(sd: Socket, addr: ^SOCKADDR, len: socklen_t) -> (Errno) {
+	result := _unix_bind(int(sd), addr, len)
+	if result < 0 {
+		return Errno(get_last_error())
+	}
+	return ERROR_NONE
+}
+
+accept :: proc(sd: Socket, addr: ^SOCKADDR, len: rawptr) -> (Socket, Errno) {
+	result := _unix_accept(int(sd), rawptr(addr), len)
+	if result < 0 {
+		return 0, Errno(get_last_error())
+	}
+	return Socket(result), ERROR_NONE
+}
+
+listen :: proc(sd: Socket, backlog: int) -> (Errno) {
+	result := _unix_listen(int(sd), backlog)
+	if result < 0 {
+		return Errno(get_last_error())
+	}
+	return ERROR_NONE
+}
+
+setsockopt :: proc(sd: Socket, level: int, optname: int, optval: rawptr, optlen: socklen_t) -> (Errno) {
+	result := _unix_setsockopt(int(sd), level, optname, optval, optlen)
+	if result < 0 {
+		return Errno(get_last_error())
+	}
+	return ERROR_NONE
+}
+
+getsockopt :: proc(sd: Socket, level: int, optname: int, optval: rawptr, optlen: socklen_t) -> Errno {
+	result := _unix_getsockopt(int(sd), level, optname, optval, optlen)
+	if result < 0 {
+		return Errno(get_last_error())
+	}
+	return ERROR_NONE
+}
+
+recvfrom :: proc(sd: Socket, data: []byte, flags: int, addr: ^SOCKADDR, addr_size: ^socklen_t) -> (u32, Errno) {
+	result := _unix_recvfrom(int(sd), raw_data(data), len(data), flags, addr, addr_size)
+	if result < 0 {
+		return 0, Errno(get_last_error())
+	}
+	return u32(result), ERROR_NONE
+}
+
+recv :: proc(sd: Socket, data: []byte, flags: int) -> (u32, Errno) {
+	result := _unix_recv(int(sd), raw_data(data), len(data), flags)
+	if result < 0 {
+		return 0, Errno(get_last_error())
+	}
+	return u32(result), ERROR_NONE
+}
+
+sendto :: proc(sd: Socket, data: []u8, flags: int, addr: ^SOCKADDR, addrlen: socklen_t) -> (u32, Errno) {
+	result := _unix_sendto(int(sd), raw_data(data), len(data), flags, addr, addrlen)
+	if result < 0 {
+		return 0, Errno(get_last_error())
+	}
+	return u32(result), ERROR_NONE
+}
+
+send :: proc(sd: Socket, data: []byte, flags: int) -> (u32, Errno) {
+	result := _unix_send(int(sd), raw_data(data), len(data), 0)
+	if result < 0 {
+		return 0, Errno(get_last_error())
+	}
+	return u32(result), ERROR_NONE
+}
+
+shutdown :: proc(sd: Socket, how: int) -> (Errno) {
+	result := _unix_shutdown(int(sd), how)
+	if result < 0 {
+		return Errno(get_last_error())
+	}
+	return ERROR_NONE
+}
+
+fcntl :: proc(fd: int, cmd: int, arg: int) -> (int, Errno) {
+	result := _unix__fcntl(Handle(fd), c.int(cmd), uintptr(arg))
+	if result < 0 {
+		return 0, Errno(get_last_error())
+	}
+	return int(result), ERROR_NONE
 }

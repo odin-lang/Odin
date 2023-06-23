@@ -2,8 +2,14 @@
 //+private
 package sync
 
-import "core:os"
+foreign import libc "system:c"
+
+@(default_calling_convention="c")
+foreign libc {
+	@(link_name="getthrid", private="file")
+	_unix_getthrid :: proc() -> int ---
+}
 
 _current_thread_id :: proc "contextless" () -> int {
-	return os.current_thread_id()
+	return _unix_getthrid()
 }
