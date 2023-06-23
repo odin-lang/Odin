@@ -471,7 +471,7 @@ inflate_from_context :: proc(using ctx: ^compress.Context_Memory_Input, raw := f
 	}
 
 	// Parse ZLIB stream without header.
-	inflate_raw(z=ctx, expected_output_size=expected_output_size) or_return
+	inflate_raw(ctx, expected_output_size=expected_output_size) or_return
 
 	if !raw {
 		compress.discard_to_next_byte_lsb(ctx)
@@ -665,7 +665,7 @@ inflate_from_byte_array :: proc(input: []u8, buf: ^bytes.Buffer, raw := false, e
 	ctx.input_data = input
 	ctx.output = buf
 
-	return inflate_from_context(ctx=&ctx, raw=raw, expected_output_size=expected_output_size)
+	return inflate_from_context(&ctx, raw=raw, expected_output_size=expected_output_size)
 }
 
 inflate_from_byte_array_raw :: proc(input: []u8, buf: ^bytes.Buffer, raw := false, expected_output_size := -1) -> (err: Error) {
@@ -674,7 +674,7 @@ inflate_from_byte_array_raw :: proc(input: []u8, buf: ^bytes.Buffer, raw := fals
 	ctx.input_data = input
 	ctx.output = buf
 
-	return inflate_raw(z=&ctx, expected_output_size=expected_output_size)
+	return inflate_raw(&ctx, expected_output_size=expected_output_size)
 }
 
 inflate :: proc{inflate_from_context, inflate_from_byte_array}

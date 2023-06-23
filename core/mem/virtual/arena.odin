@@ -120,7 +120,7 @@ arena_alloc :: proc(arena: ^Arena, size: uint, alignment: uint, loc := #caller_l
 			if arena.minimum_block_size == 0 {
 				arena.minimum_block_size = DEFAULT_ARENA_STATIC_RESERVE_SIZE
 			}
-			arena_init_static(arena=arena, reserved=arena.minimum_block_size, commit_size=DEFAULT_ARENA_STATIC_COMMIT_SIZE) or_return
+			arena_init_static(arena, reserved=arena.minimum_block_size, commit_size=DEFAULT_ARENA_STATIC_COMMIT_SIZE) or_return
 		}
 		fallthrough
 	case .Buffer:

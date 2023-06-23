@@ -76,43 +76,43 @@ nil_logger :: proc() -> Logger {
 }
 
 debugf :: proc(fmt_str: string, args: ..any, location := #caller_location) {
-	logf(level=.Debug,   fmt_str=fmt_str, args=args, location=location)
+	logf(.Debug,   fmt_str, ..args, location=location)
 }
 infof  :: proc(fmt_str: string, args: ..any, location := #caller_location) {
-	logf(level=.Info,    fmt_str=fmt_str, args=args, location=location)
+	logf(.Info,    fmt_str, ..args, location=location)
 }
 warnf  :: proc(fmt_str: string, args: ..any, location := #caller_location) {
-	logf(level=.Warning, fmt_str=fmt_str, args=args, location=location)
+	logf(.Warning, fmt_str, ..args, location=location)
 }
 errorf :: proc(fmt_str: string, args: ..any, location := #caller_location) {
-	logf(level=.Error,   fmt_str=fmt_str, args=args, location=location)
+	logf(.Error,   fmt_str, ..args, location=location)
 }
 fatalf :: proc(fmt_str: string, args: ..any, location := #caller_location) {
-	logf(level=.Fatal,   fmt_str=fmt_str, args=args, location=location)
+	logf(.Fatal,   fmt_str, ..args, location=location)
 }
 
 debug :: proc(args: ..any, sep := " ", location := #caller_location) {
-	log(level=.Debug,   args=args, sep=sep, location=location)
+	log(.Debug,   ..args, sep=sep, location=location)
 }
 info  :: proc(args: ..any, sep := " ", location := #caller_location) {
-	log(level=.Info,    args=args, sep=sep, location=location)
+	log(.Info,    ..args, sep=sep, location=location)
 }
 warn  :: proc(args: ..any, sep := " ", location := #caller_location) {
-	log(level=.Warning, args=args, sep=sep, location=location)
+	log(.Warning, ..args, sep=sep, location=location)
 }
 error :: proc(args: ..any, sep := " ", location := #caller_location) {
-	log(level=.Error,   args=args, sep=sep, location=location)
+	log(.Error,   ..args, sep=sep, location=location)
 }
 fatal :: proc(args: ..any, sep := " ", location := #caller_location) {
-	log(level=.Fatal,   args=args, sep=sep, location=location)
+	log(.Fatal,   ..args, sep=sep, location=location)
 }
 
 panic :: proc(args: ..any, location := #caller_location) -> ! {
-	log(level=.Fatal, args=args, location=location)
+	log(.Fatal, ..args, location=location)
 	runtime.panic("log.panic", location)
 }
 panicf :: proc(fmt_str: string, args: ..any, location := #caller_location) -> ! {
-	logf(level=.Fatal, fmt_str=fmt_str, args=args, location=location)
+	logf(.Fatal, fmt_str, ..args, location=location)
 	runtime.panic("log.panicf", location)
 }
 
@@ -127,7 +127,7 @@ log :: proc(level: Level, args: ..any, sep := " ", location := #caller_location)
 	if level < logger.lowest_level {
 		return
 	}
-	str := fmt.tprint(args=args, sep=sep) //NOTE(Hoej): While tprint isn't thread-safe, no logging is.
+	str := fmt.tprint(..args, sep=sep) //NOTE(Hoej): While tprint isn't thread-safe, no logging is.
 	logger.procedure(logger.data, level, str, logger.options, location)
 }
 

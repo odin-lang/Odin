@@ -14,7 +14,7 @@ fprint :: proc(fd: os.Handle, args: ..any, sep := " ") -> int {
 
 	bufio.writer_init_with_buf(&b, {os.stream_from_handle(fd)}, buf[:])
 	w := bufio.writer_to_writer(&b)
-	return wprint(w=w, args=args, sep=sep)
+	return wprint(w, ..args, sep=sep)
 }
 
 // fprintln formats using the default print settings and writes to fd
@@ -26,7 +26,7 @@ fprintln :: proc(fd: os.Handle, args: ..any, sep := " ") -> int {
 	bufio.writer_init_with_buf(&b, {os.stream_from_handle(fd)}, buf[:])
 
 	w := bufio.writer_to_writer(&b)
-	return wprintln(w=w, args=args, sep=sep)
+	return wprintln(w, ..args, sep=sep)
 }
 // fprintf formats according to the specified format string and writes to fd
 fprintf :: proc(fd: os.Handle, fmt: string, args: ..any) -> int {
@@ -61,15 +61,15 @@ fprint_typeid :: proc(fd: os.Handle, id: typeid) -> (n: int, err: io.Error) {
 }
 
 // print formats using the default print settings and writes to os.stdout
-print   :: proc(args: ..any, sep := " ") -> int { return fprint(fd=os.stdout, args=args, sep=sep) }
+print   :: proc(args: ..any, sep := " ") -> int { return fprint(os.stdout, ..args, sep=sep) }
 // println formats using the default print settings and writes to os.stdout
-println :: proc(args: ..any, sep := " ") -> int { return fprintln(fd=os.stdout, args=args, sep=sep) }
+println :: proc(args: ..any, sep := " ") -> int { return fprintln(os.stdout, ..args, sep=sep) }
 // printf formats according to the specified format string and writes to os.stdout
 printf  :: proc(fmt: string, args: ..any) -> int { return fprintf(os.stdout, fmt, ..args) }
 
 // eprint formats using the default print settings and writes to os.stderr
-eprint   :: proc(args: ..any, sep := " ") -> int { return fprint(fd=os.stderr, args=args, sep=sep) }
+eprint   :: proc(args: ..any, sep := " ") -> int { return fprint(os.stderr, ..args, sep=sep) }
 // eprintln formats using the default print settings and writes to os.stderr
-eprintln :: proc(args: ..any, sep := " ") -> int { return fprintln(fd=os.stderr, args=args, sep=sep) }
+eprintln :: proc(args: ..any, sep := " ") -> int { return fprintln(os.stderr, ..args, sep=sep) }
 // eprintf formats according to the specified format string and writes to os.stderr
 eprintf  :: proc(fmt: string, args: ..any) -> int { return fprintf(os.stderr, fmt, ..args) }
