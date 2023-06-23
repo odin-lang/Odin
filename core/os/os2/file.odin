@@ -8,12 +8,6 @@ File :: struct {
 	impl: _File,
 }
 
-Seek_From :: enum {
-	Start   = 0, // seek relative to the origin of the file
-	Current = 1, // seek relative to the current offset
-	End     = 2, // seek relative to the end
-}
-
 File_Mode :: distinct u32
 File_Mode_Dir         :: File_Mode(1<<16)
 File_Mode_Named_Pipe  :: File_Mode(1<<17)
@@ -72,54 +66,68 @@ fd :: proc(f: ^File) -> uintptr {
 	return _fd(f)
 }
 
-
-close :: proc(f: ^File) -> Error {
-	return _close(f)
-}
-
 name :: proc(f: ^File) -> string {
 	return _name(f)
 }
 
-seek :: proc(f: ^File, offset: i64, whence: Seek_From) -> (ret: i64, err: Error) {
-	return _seek(f, offset, whence)
+close :: proc(f: ^File) -> Error {
+	if f != nil {
+		return io.close(f.impl.stream)
+	}
+	return nil
+}
+
+seek :: proc(f: ^File, offset: i64, whence: io.Seek_From) -> (ret: i64, err: Error) {
+	if f != nil {
+		return io.seek(f.impl.stream, offset, whence)
+	}
+	return 0, .Invalid_File
 }
 
 read :: proc(f: ^File, p: []byte) -> (n: int, err: Error) {
-	return _read(f, p)
+	if f != nil {
+		return io.read(f.impl.stream, p)
+	}
+	return 0, .Invalid_File
 }
 
 read_at :: proc(f: ^File, p: []byte, offset: i64) -> (n: int, err: Error) {
-	return _read_at(f, p, offset)
-}
-
-read_from :: proc(f: ^File, r: io.Reader) -> (n: i64, err: Error) {
-	return _read_from(f, r)
+	if f != nil {
+		return io.read_at(f.impl.stream, p, offset)
+	}
+	return 0, .Invalid_File
 }
 
 write :: proc(f: ^File, p: []byte) -> (n: int, err: Error) {
-	return _write(f, p)
+	if f != nil {
+		return io.write(f.impl.stream, p)
+	}
+	return 0, .Invalid_File
 }
 
 write_at :: proc(f: ^File, p: []byte, offset: i64) -> (n: int, err: Error) {
-	return _write_at(f, p, offset)
-}
-
-write_to :: proc(f: ^File, w: io.Writer) -> (n: i64, err: Error) {
-	return _write_to(f, w)
+	if f != nil {
+		return io.write_at(f.impl.stream, p, offset)
+	}
+	return 0, .Invalid_File
 }
 
 file_size :: proc(f: ^File) -> (n: i64, err: Error) {
-	return _file_size(f)
-}
-
-
-sync :: proc(f: ^File) -> Error {
-	return _sync(f)
+	if f != nil {
+		return io.size(f.impl.stream)
+	}
+	return 0, .Invalid_File
 }
 
 flush :: proc(f: ^File) -> Error {
-	return _flush(f)
+	if f != nil {
+		return io.flush(f.impl.stream)
+	}
+	return nil
+}
+
+sync :: proc(f: ^File) -> Error {
+	return _sync(f)
 }
 
 truncate :: proc(f: ^File, size: i64) -> Error {

@@ -12,7 +12,7 @@ fprint :: proc(fd: os.Handle, args: ..any, sep := " ") -> int {
 	b: bufio.Writer
 	defer bufio.writer_flush(&b)
 
-	bufio.writer_init_with_buf(&b, {os.stream_from_handle(fd)}, buf[:])
+	bufio.writer_init_with_buf(&b, os.stream_from_handle(fd), buf[:])
 	w := bufio.writer_to_writer(&b)
 	return wprint(w, ..args, sep=sep)
 }
@@ -23,7 +23,7 @@ fprintln :: proc(fd: os.Handle, args: ..any, sep := " ") -> int {
 	b: bufio.Writer
 	defer bufio.writer_flush(&b)
 
-	bufio.writer_init_with_buf(&b, {os.stream_from_handle(fd)}, buf[:])
+	bufio.writer_init_with_buf(&b, os.stream_from_handle(fd), buf[:])
 
 	w := bufio.writer_to_writer(&b)
 	return wprintln(w, ..args, sep=sep)
@@ -34,7 +34,7 @@ fprintf :: proc(fd: os.Handle, fmt: string, args: ..any) -> int {
 	b: bufio.Writer
 	defer bufio.writer_flush(&b)
 
-	bufio.writer_init_with_buf(&b, {os.stream_from_handle(fd)}, buf[:])
+	bufio.writer_init_with_buf(&b, os.stream_from_handle(fd), buf[:])
 
 	w := bufio.writer_to_writer(&b)
 	return wprintf(w, fmt, ..args)
@@ -44,7 +44,7 @@ fprint_type :: proc(fd: os.Handle, info: ^runtime.Type_Info) -> (n: int, err: io
 	b: bufio.Writer
 	defer bufio.writer_flush(&b)
 
-	bufio.writer_init_with_buf(&b, {os.stream_from_handle(fd)}, buf[:])
+	bufio.writer_init_with_buf(&b, os.stream_from_handle(fd), buf[:])
 
 	w := bufio.writer_to_writer(&b)
 	return wprint_type(w, info)
@@ -54,7 +54,7 @@ fprint_typeid :: proc(fd: os.Handle, id: typeid) -> (n: int, err: io.Error) {
 	b: bufio.Writer
 	defer bufio.writer_flush(&b)
 
-	bufio.writer_init_with_buf(&b, {os.stream_from_handle(fd)}, buf[:])
+	bufio.writer_init_with_buf(&b, os.stream_from_handle(fd), buf[:])
 
 	w := bufio.writer_to_writer(&b)
 	return wprint_typeid(w, id)

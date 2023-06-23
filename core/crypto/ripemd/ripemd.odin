@@ -69,7 +69,7 @@ hash_stream_128 :: proc(s: io.Stream) -> ([DIGEST_SIZE_128]byte, bool) {
     defer delete(buf)
     read := 1
     for read > 0 {
-        read, _ = s->impl_read(buf)
+        read, _ = io.read(s, buf)
         if read > 0 {
             update(&ctx, buf[:read])
         } 
@@ -145,7 +145,7 @@ hash_stream_160 :: proc(s: io.Stream) -> ([DIGEST_SIZE_160]byte, bool) {
     defer delete(buf)
     read := 1
     for read > 0 {
-        read, _ = s->impl_read(buf)
+        read, _ = io.read(s, buf)
         if read > 0 {
             update(&ctx, buf[:read])
         } 
@@ -221,7 +221,7 @@ hash_stream_256 :: proc(s: io.Stream) -> ([DIGEST_SIZE_256]byte, bool) {
     defer delete(buf)
     read := 1
     for read > 0 {
-        read, _ = s->impl_read(buf)
+        read, _ = io.read(s, buf)
         if read > 0 {
             update(&ctx, buf[:read])
         } 
@@ -297,7 +297,7 @@ hash_stream_320 :: proc(s: io.Stream) -> ([DIGEST_SIZE_320]byte, bool) {
     defer delete(buf)
     read := 1
     for read > 0 {
-        read, _ = s->impl_read(buf)
+        read, _ = io.read(s, buf)
         if read > 0 {
             update(&ctx, buf[:read])
         } 

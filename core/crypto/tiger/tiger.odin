@@ -71,7 +71,7 @@ hash_stream_128 :: proc(s: io.Stream) -> ([DIGEST_SIZE_128]byte, bool) {
     defer delete(buf)
     read := 1
     for read > 0 {
-        read, _ = s->impl_read(buf)
+        read, _ = io.read(s, buf)
         if read > 0 {
             _tiger.update(&ctx, buf[:read])
         } 
@@ -150,7 +150,7 @@ hash_stream_160 :: proc(s: io.Stream) -> ([DIGEST_SIZE_160]byte, bool) {
     defer delete(buf)
     read := 1
     for read > 0 {
-        read, _ = s->impl_read(buf)
+        read, _ = io.read(s, buf)
         if read > 0 {
             _tiger.update(&ctx, buf[:read])
         } 
@@ -229,7 +229,7 @@ hash_stream_192 :: proc(s: io.Stream) -> ([DIGEST_SIZE_192]byte, bool) {
     defer delete(buf)
     read := 1
     for read > 0 {
-        read, _ = s->impl_read(buf)
+        read, _ = io.read(s, buf)
         if read > 0 {
             _tiger.update(&ctx, buf[:read])
         } 
