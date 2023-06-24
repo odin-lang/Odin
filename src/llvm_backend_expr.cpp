@@ -518,7 +518,7 @@ gb_internal bool lb_is_matrix_simdable(Type *t) {
 				return true;
 			case TargetArch_i386:
 			case TargetArch_wasm32:
-			case TargetArch_wasm64:
+			case TargetArch_wasm64p32:
 				return false;
 			}
 		}
@@ -1325,6 +1325,15 @@ handle_op:;
 	return {};
 }
 
+gb_internal bool lb_is_empty_string_constant(Ast *expr) {
+	if (expr->tav.value.kind == ExactValue_String &&
+	    is_type_string(expr->tav.type)) {
+		String s = expr->tav.value.value_string;
+		return s.len == 0;
+	}
+	return false;
+}
+
 gb_internal lbValue lb_build_binary_expr(lbProcedure *p, Ast *expr) {
 	ast_node(be, BinaryExpr, expr);
 
@@ -1373,13 +1382,27 @@ gb_internal lbValue lb_build_binary_expr(lbProcedure *p, Ast *expr) {
 	case Token_CmpEq:
 	case Token_NotEq:
 		if (is_type_untyped_nil(be->right->tav.type)) {
+			// `x == nil` or `x != nil`
 			lbValue left = lb_build_expr(p, be->left);
 			lbValue cmp = lb_emit_comp_against_nil(p, be->op.kind, left);
 			Type *type = default_type(tv.type);
 			return lb_emit_conv(p, cmp, type);
 		} else if (is_type_untyped_nil(be->left->tav.type)) {
+			// `nil == x` or `nil != x`
 			lbValue right = lb_build_expr(p, be->right);
 			lbValue cmp = lb_emit_comp_against_nil(p, be->op.kind, right);
+			Type *type = default_type(tv.type);
+			return lb_emit_conv(p, cmp, type);
+		} else if (lb_is_empty_string_constant(be->right)) {
+			// `x == ""` or `x != ""`
+			lbValue len = lb_string_len(p, lb_build_expr(p, be->left));
+			lbValue cmp = lb_emit_comp(p, be->op.kind, len, lb_const_int(p->module, t_int, 0));
+			Type *type = default_type(tv.type);
+			return lb_emit_conv(p, cmp, type);
+		} else if (lb_is_empty_string_constant(be->left)) {
+			// `"" == x` or `"" != x`
+			lbValue len = lb_string_len(p, lb_build_expr(p, be->right));
+			lbValue cmp = lb_emit_comp(p, be->op.kind, len, lb_const_int(p->module, t_int, 0));
 			Type *type = default_type(tv.type);
 			return lb_emit_conv(p, cmp, type);
 		}
@@ -2246,7 +2269,6 @@ gb_internal lbValue lb_compare_records(lbProcedure *p, TokenKind op_kind, lbValu
 
 
 
-
 gb_internal lbValue lb_emit_comp(lbProcedure *p, TokenKind op_kind, lbValue left, lbValue right) {
 	Type *a = core_type(left.type);
 	Type *b = core_type(right.type);
@@ -2984,7 +3006,7 @@ gb_internal lbValue lb_build_unary_and(lbProcedure *p, Ast *expr) {
 
 
 					isize arg_count = 6;
-					if (build_context.disallow_rtti) {
+					if (build_context.no_rtti) {
 						arg_count = 4;
 					}
 
@@ -2996,7 +3018,7 @@ gb_internal lbValue lb_build_unary_and(lbProcedure *p, Ast *expr) {
 					args[2] = lb_const_int(p->module, t_i32, pos.line);
 					args[3] = lb_const_int(p->module, t_i32, pos.column);
 
-					if (!build_context.disallow_rtti) {
+					if (!build_context.no_rtti) {
 						args[4] = lb_typeid(p->module, src_type);
 						args[5] = lb_typeid(p->module, dst_type);
 					}
@@ -3012,7 +3034,7 @@ gb_internal lbValue lb_build_unary_and(lbProcedure *p, Ast *expr) {
 				}
 				lbValue data_ptr = lb_emit_struct_ev(p, v, 0);
 				if ((p->state_flags & StateFlag_no_type_assert) == 0) {
-					GB_ASSERT(!build_context.disallow_rtti);
+					GB_ASSERT(!build_context.no_rtti);
 
 					lbValue any_id = lb_emit_struct_ev(p, v, 1);
 
@@ -4230,11 +4252,12 @@ gb_internal lbAddr lb_build_addr_compound_lit(lbProcedure *p, Ast *expr) {
 				lbValue count = {};
 				count.type = t_int;
 
+				unsigned len_index = lb_convert_struct_index(p->module, type, 1);
 				if (lb_is_const(slice)) {
-					unsigned indices[1] = {1};
+					unsigned indices[1] = {len_index};
 					count.value = LLVMConstExtractValue(slice.value, indices, gb_count_of(indices));
 				} else {
-					count.value = LLVMBuildExtractValue(p->builder, slice.value, 1, "");
+					count.value = LLVMBuildExtractValue(p->builder, slice.value, len_index, "");
 				}
 				lb_fill_slice(p, v, data, count);
 			}

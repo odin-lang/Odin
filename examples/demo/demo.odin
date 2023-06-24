@@ -352,7 +352,7 @@ control_flow :: proc() {
 
 		if false {
 			f, err := os.open("my_file.txt")
-			if err != 0 {
+			if err != os.ERROR_NONE {
 				// handle error
 			}
 			defer os.close(f)
@@ -1175,13 +1175,13 @@ threading_example :: proc() {
 		N :: 3
 
 		pool: thread.Pool
-		thread.pool_init(pool=&pool, thread_count=N, allocator=context.allocator)
+		thread.pool_init(&pool, allocator=context.allocator, thread_count=N)
 		defer thread.pool_destroy(&pool)
 
 
 		for i in 0..<30 {
 			// be mindful of the allocator used for tasks. The allocator needs to be thread safe, or be owned by the task for exclusive use 
-			thread.pool_add_task(pool=&pool, procedure=task_proc, data=nil, user_index=i, allocator=context.allocator)
+			thread.pool_add_task(&pool, allocator=context.allocator, procedure=task_proc, data=nil, user_index=i)
 		}
 
 		thread.pool_start(&pool)

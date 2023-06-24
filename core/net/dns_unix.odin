@@ -44,9 +44,6 @@ _get_dns_records_os :: proc(hostname: string, type: DNS_Record_Type, allocator :
 	if !hosts_ok {
 		return nil, .Invalid_Hosts_Config_Error
 	}
-	if len(hosts) == 0 {
-		return
-	}
 
 	host_overrides := make([dynamic]DNS_Record)
 	for host in hosts {

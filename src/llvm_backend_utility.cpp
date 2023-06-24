@@ -721,7 +721,7 @@ gb_internal lbValue lb_emit_union_cast(lbProcedure *p, lbValue value, Type *type
 		Type *dst_type = tuple->Tuple.variables[0]->type;
 
 		isize arg_count = 7;
-		if (build_context.disallow_rtti) {
+		if (build_context.no_rtti) {
 			arg_count = 4;
 		}
 
@@ -733,7 +733,7 @@ gb_internal lbValue lb_emit_union_cast(lbProcedure *p, lbValue value, Type *type
 		args[2] = lb_const_int(m, t_i32, pos.line);
 		args[3] = lb_const_int(m, t_i32, pos.column);
 
-		if (!build_context.disallow_rtti) {
+		if (!build_context.no_rtti) {
 			args[4] = lb_typeid(m, src_type);
 			args[5] = lb_typeid(m, dst_type);
 			args[6] = lb_emit_conv(p, value_, t_rawptr);
@@ -797,7 +797,7 @@ gb_internal lbAddr lb_emit_any_cast_addr(lbProcedure *p, lbValue value, Type *ty
 		lbValue ok = lb_emit_load(p, lb_emit_struct_ep(p, v.addr, 1));
 
 		isize arg_count = 7;
-		if (build_context.disallow_rtti) {
+		if (build_context.no_rtti) {
 			arg_count = 4;
 		}
 		auto args = array_make<lbValue>(permanent_allocator(), arg_count);
@@ -807,7 +807,7 @@ gb_internal lbAddr lb_emit_any_cast_addr(lbProcedure *p, lbValue value, Type *ty
 		args[2] = lb_const_int(m, t_i32, pos.line);
 		args[3] = lb_const_int(m, t_i32, pos.column);
 
-		if (!build_context.disallow_rtti) {
+		if (!build_context.no_rtti) {
 			args[4] = any_typeid;
 			args[5] = dst_typeid;
 			args[6] = lb_emit_struct_ev(p, value, 0);
@@ -929,7 +929,38 @@ gb_internal lbStructFieldRemapping lb_get_struct_remapping(lbModule *m, Type *t)
 gb_internal i32 lb_convert_struct_index(lbModule *m, Type *t, i32 index) {
 	if (t->kind == Type_Struct) {
 		auto field_remapping = lb_get_struct_remapping(m, t);
-		index = field_remapping[index];
+		return field_remapping[index];
+	} else if (build_context.ptr_size != build_context.int_size) {
+		switch (t->kind) {
+		case Type_Basic:
+			if (t->Basic.kind != Basic_string) {
+				break;
+			}
+			/*fallthrough*/
+		case Type_Slice:
+			GB_ASSERT(build_context.ptr_size*2 == build_context.int_size);
+			switch (index) {
+			case 0: return 0; // data
+			case 1: return 2; // len
+			}
+			break;
+		case Type_DynamicArray:
+			GB_ASSERT(build_context.ptr_size*2 == build_context.int_size);
+			switch (index) {
+			case 0: return 0; // data
+			case 1: return 2; // len
+			case 2: return 3; // cap
+			case 3: return 4; // allocator
+			}
+			break;
+		case Type_SoaPointer:
+			GB_ASSERT(build_context.ptr_size*2 == build_context.int_size);
+			switch (index) {
+			case 0: return 0; // data
+			case 1: return 2; // offset
+			}
+			break;
+		}
 	}
 	return index;
 }
@@ -1563,7 +1594,7 @@ gb_internal lbValue lb_map_data_uintptr(lbProcedure *p, lbValue value) {
 	GB_ASSERT(is_type_map(value.type) || are_types_identical(value.type, t_raw_map));
 	lbValue data = lb_emit_struct_ev(p, value, 0);
 	u64 mask_value = 0;
-	if (build_context.word_size == 4) {
+	if (build_context.ptr_size == 4) {
 		mask_value = 0xfffffffful & ~(MAP_CACHE_LINE_SIZE-1);
 	} else {
 		mask_value = 0xffffffffffffffffull & ~(MAP_CACHE_LINE_SIZE-1);
@@ -1659,7 +1690,7 @@ gb_internal lbValue lb_emit_mul_add(lbProcedure *p, lbValue a, lbValue b, lbValu
 			break;
 		case TargetArch_i386:
 		case TargetArch_wasm32:
-		case TargetArch_wasm64:
+		case TargetArch_wasm64p32:
 			is_possible = false;
 			break;
 		}

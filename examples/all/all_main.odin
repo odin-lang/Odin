@@ -19,6 +19,8 @@ import priority_queue   "core:container/priority_queue"
 import queue            "core:container/queue"
 import small_array      "core:container/small_array"
 import lru              "core:container/lru"
+import list             "core:container/intrusive/list"
+import topological_sort "core:container/topological_sort"
 
 import crypto           "core:crypto"
 import blake            "core:crypto/blake"
@@ -48,6 +50,8 @@ import crypto_util      "core:crypto/util"
 import whirlpool        "core:crypto/whirlpool"
 import x25519           "core:crypto/x25519"
 
+import pe               "core:debug/pe"
+
 import dynlib           "core:dynlib"
 import net              "core:net"
 
@@ -58,9 +62,11 @@ import hxa              "core:encoding/hxa"
 import json             "core:encoding/json"
 import varint           "core:encoding/varint"
 import xml              "core:encoding/xml"
+import endian           "core:encoding/endian"
 
 import fmt              "core:fmt"
 import hash             "core:hash"
+import xxhash           "core:hash/xxhash"
 
 import image            "core:image"
 import netpbm           "core:image/netpbm"
@@ -80,9 +86,10 @@ import glm              "core:math/linalg/glsl"
 import hlm              "core:math/linalg/hlsl"
 import noise            "core:math/noise"
 import rand             "core:math/rand"
+import ease             "core:math/ease"
 
 import mem              "core:mem"
-// import virtual        "core:mem/virtual"
+import virtual          "core:mem/virtual"
 
 import ast              "core:odin/ast"
 import doc_format       "core:odin/doc-format"
@@ -90,6 +97,8 @@ import odin_format      "core:odin/format"
 import odin_parser      "core:odin/parser"
 import odin_printer     "core:odin/printer"
 import odin_tokenizer   "core:odin/tokenizer"
+
+import spall            "core:prof/spall"
 
 import os               "core:os"
 
@@ -108,6 +117,9 @@ import sync             "core:sync"
 import testing          "core:testing"
 import scanner          "core:text/scanner"
 import i18n             "core:text/i18n"
+import match            "core:text/match"
+import table            "core:text/table"
+import edit             "core:text/edit"
 import thread           "core:thread"
 import time             "core:time"
 
@@ -134,6 +146,8 @@ _ :: priority_queue
 _ :: queue
 _ :: small_array
 _ :: lru
+_ :: list
+_ :: topological_sort
 _ :: crypto
 _ :: blake
 _ :: blake2b
@@ -161,6 +175,7 @@ _ :: tiger2
 _ :: crypto_util
 _ :: whirlpool
 _ :: x25519
+_ :: pe
 _ :: dynlib
 _ :: net
 _ :: base32
@@ -170,8 +185,10 @@ _ :: hxa
 _ :: json
 _ :: varint
 _ :: xml
+_ :: endian
 _ :: fmt
 _ :: hash
+_ :: xxhash
 _ :: image
 _ :: netpbm
 _ :: png
@@ -188,7 +205,9 @@ _ :: glm
 _ :: hlm
 _ :: noise
 _ :: rand
+_ :: ease
 _ :: mem
+_ :: virtual
 _ :: ast
 _ :: doc_format
 _ :: odin_format
@@ -196,6 +215,7 @@ _ :: odin_parser
 _ :: odin_printer
 _ :: odin_tokenizer
 _ :: os
+_ :: spall
 _ :: slashpath
 _ :: filepath
 _ :: reflect
@@ -210,6 +230,9 @@ _ :: sync
 _ :: testing
 _ :: scanner
 _ :: i18n
+_ :: match
+_ :: table
+_ :: edit
 _ :: thread
 _ :: time
 _ :: sysinfo

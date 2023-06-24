@@ -199,6 +199,9 @@ struct DeclInfo {
 	BlockingMutex type_and_value_mutex;
 
 	Array<BlockLabel> labels;
+
+	// NOTE(bill): this is to prevent a race condition since these procedure literals can be created anywhere at any time
+	struct lbModule *code_gen_module;
 };
 
 // ProcInfo stores the information needed for checking a procedure

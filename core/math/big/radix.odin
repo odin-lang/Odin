@@ -429,7 +429,7 @@ internal_int_write_to_ascii_file :: proc(a: ^Int, filename: string, radix := i8(
 		len  = l,
 	}
 
-	ok := os.write_entire_file(name=filename, data=data, truncate=true)
+	ok := os.write_entire_file(filename, data, truncate=true)
 	return nil if ok else .Cannot_Write_File
 }
 

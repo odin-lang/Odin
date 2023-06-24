@@ -132,7 +132,7 @@ type_info_core :: runtime.type_info_core
 type_info_base_without_enum :: type_info_core
 
 
-when !ODIN_DISALLOW_RTTI {
+when !ODIN_NO_RTTI {
 	typeid_base :: runtime.typeid_base
 	typeid_core :: runtime.typeid_core
 	typeid_base_without_enum :: typeid_core

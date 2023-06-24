@@ -25,7 +25,7 @@ when ODIN_NO_CRT && ODIN_OS == .Windows {
 		RtlMoveMemory(dst, src, len)
 		return dst
 	}
-} else when ODIN_NO_CRT || (ODIN_ARCH == .wasm32 || ODIN_ARCH == .wasm64) {
+} else when ODIN_NO_CRT || (ODIN_ARCH == .wasm32 || ODIN_ARCH == .wasm64p32) {
 	@(link_name="memset", linkage="strong", require)
 	memset :: proc "c" (ptr: rawptr, val: i32, len: int) -> rawptr {
 		if ptr != nil && len != 0 {
