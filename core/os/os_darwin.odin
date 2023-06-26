@@ -1121,3 +1121,85 @@ fcntl :: proc(fd: int, cmd: int, arg: int) -> (int, Errno) {
 	}
 	return int(result), ERROR_NONE
 }
+
+KQueue_Error :: enum {
+	None,
+	Out_Of_Memory,
+	Descriptor_Table_Full,
+	File_Table_Full,
+	Unknown,
+}
+
+kqueue :: proc() -> (kq: Handle, err: KQueue_Error) {
+	kq = _darwin_kqueue()
+	if kq == -1 {
+		switch Errno(get_last_error()) {
+		case ENOMEM:
+			err = .Out_Of_Memory
+		case EMFILE:
+			err = .Descriptor_Table_Full
+		case ENFILE:
+			err = .File_Table_Full
+		case:
+			err = .Unknown
+		}
+	}
+	return
+}
+
+KEvent_Error :: enum {
+	None,
+	Access_Denied,
+	Invalid_Event,
+	Invalid_Descriptor,
+	Signal,
+	Invalid_Timeout_Or_Filter,
+	Event_Not_Found,
+	Out_Of_Memory,
+	Process_Not_Found,
+	Unknown,
+}
+
+kevent :: proc(
+	kq: Handle,
+	change_list: []KEvent,
+	event_list: []KEvent,
+	timeout: ^Time_Spec,
+) -> (
+	n_events: int,
+	err: KEvent_Error,
+) {
+	n_events = int(
+		_darwin_kevent(
+			kq,
+			raw_data(change_list),
+			c.int(len(change_list)),
+			raw_data(event_list),
+			c.int(len(event_list)),
+			timeout,
+		),
+	)
+	if n_events == -1 {
+		switch Errno(get_last_error()) {
+		case EACCES:
+			err = .Access_Denied
+		case EFAULT:
+			err = .Invalid_Event
+		case EBADF:
+			err = .Invalid_Descriptor
+		case EINTR:
+			err = .Signal
+		case EINVAL:
+			err = .Invalid_Timeout_Or_Filter
+		case ENOENT:
+			err = .Event_Not_Found
+		case ENOMEM:
+			err = .Out_Of_Memory
+		case ESRCH:
+			err = .Process_Not_Found
+		case:
+			err = .Unknown
+		}
+	}
+	return
+}
