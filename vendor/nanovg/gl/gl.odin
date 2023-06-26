@@ -1,3 +1,4 @@
+//+build windows, linux, darwin
 package nanovg_gl
 
 import "core:log"

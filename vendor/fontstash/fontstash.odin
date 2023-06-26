@@ -1,3 +1,4 @@
+//+build windows, linux, darwin
 package fontstash
 
 import "core:runtime"
