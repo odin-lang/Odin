@@ -3341,7 +3341,11 @@ gb_internal lbValue lb_build_call_expr_internal(lbProcedure *p, Ast *expr) {
 
 
 	if (pt->params != nullptr)  {
-		GB_ASSERT(args.count >= pt->params->Tuple.variables.count);
+		isize min_count = pt->params->Tuple.variables.count;
+		if (is_c_vararg) {
+			min_count -= 1;
+		}
+		GB_ASSERT(args.count >= min_count);
 		for_array(arg_index, pt->params->Tuple.variables) {
 			Entity *e = pt->params->Tuple.variables[arg_index];
 			if (pt->variadic && arg_index == pt->variadic_index) {
