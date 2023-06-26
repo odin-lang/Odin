@@ -417,6 +417,7 @@ gb_internal Type *check_assignment_variable(CheckerContext *ctx, Operand *lhs, O
 		return nullptr;
 
 	case Addressing_Variable:
+		check_old_for_or_switch_value_usage(lhs->expr);
 		break;
 
 	case Addressing_MapIndex: {
@@ -1141,8 +1142,14 @@ gb_internal void check_type_switch_stmt(CheckerContext *ctx, Ast *node, u32 mod_
 		syntax_error(as_token, "Expected 1 expression after 'in'");
 		return;
 	}
+	bool is_addressed = false;
+
 	Ast *lhs = as->lhs[0];
 	Ast *rhs = as->rhs[0];
+	if (lhs->kind == Ast_UnaryExpr && lhs->UnaryExpr.op.kind == Token_And) {
+		is_addressed = true;
+		lhs = lhs->UnaryExpr.expr;
+	}
 
 	check_expr(ctx, &x, rhs);
 	check_assignment(ctx, &x, nullptr, str_lit("type switch expression"));
@@ -1281,12 +1288,15 @@ gb_internal void check_type_switch_stmt(CheckerContext *ctx, Ast *node, u32 mod_
 			}
 		}
 
-		bool is_reference = false;
+		bool is_reference = is_addressed;
+		bool old_style = false;
 
-		if (is_ptr &&
+		if (!is_reference &&
+		    is_ptr &&
 		    cc->list.count == 1 &&
 		    case_type != nullptr) {
 			is_reference = true;
+			old_style = true;
 		}
 
 		if (cc->list.count > 1 || saw_nil) {
@@ -1305,9 +1315,12 @@ gb_internal void check_type_switch_stmt(CheckerContext *ctx, Ast *node, u32 mod_
 		{
 			Entity *tag_var = alloc_entity_variable(ctx->scope, lhs->Ident.token, case_type, EntityState_Resolved);
 			tag_var->flags |= EntityFlag_Used;
+			tag_var->flags |= EntityFlag_SwitchValue;
 			if (!is_reference) {
 				tag_var->flags |= EntityFlag_Value;
-				tag_var->flags |= EntityFlag_SwitchValue;
+			}
+			if (old_style) {
+				tag_var->flags |= EntityFlag_OldForOrSwitchValue;
 			}
 			add_entity(ctx, ctx->scope, lhs, tag_var);
 			add_entity_use(ctx, lhs, tag_var);
@@ -1683,6 +1696,7 @@ gb_internal void check_range_stmt(CheckerContext *ctx, Ast *node, u32 mod_flags)
 						error(token, "The %s variable '%.*s' cannot be made addressable", idx_name, LIT(str));
 					}
 				} else if (i == addressable_index && use_by_reference_for_value) {
+					entity->flags |= EntityFlag_OldForOrSwitchValue;
 					entity->flags &= ~EntityFlag_Value;
 				}
 				if (is_soa) {

@@ -2246,6 +2246,33 @@ gb_internal bool check_is_not_addressable(CheckerContext *c, Operand *o) {
 	return o->mode != Addressing_Variable && o->mode != Addressing_SoaVariable;
 }
 
+gb_internal void check_old_for_or_switch_value_usage(Ast *expr) {
+	Entity *e = entity_of_node(expr);
+	if (e != nullptr && (e->flags & EntityFlag_OldForOrSwitchValue) != 0) {
+		GB_ASSERT(e->kind == Entity_Variable);
+
+		begin_error_block();
+		defer (end_error_block());
+
+		if ((e->flags & EntityFlag_ForValue) != 0) {
+			Type *parent_type = type_deref(e->Variable.for_loop_parent_type);
+
+			error(expr, "Assuming a for-in defined value is addressable as the iterable is passed by value has been disallowed with '-strict-style'.");
+
+			if (is_type_map(parent_type)) {
+				error_line("\tSuggestion: Prefer doing 'for key, &%.*s in ...'\n", LIT(e->token.string));
+			} else {
+				error_line("\tSuggestion: Prefer doing 'for &%.*s in ...'\n", LIT(e->token.string));
+			}
+		} else {
+			GB_ASSERT((e->flags & EntityFlag_SwitchValue) != 0);
+
+			error(expr, "Assuming a switch-in defined value is addressable as the iterable is passed by value has been disallowed with '-strict-style'.");
+			error_line("\tSuggestion: Prefer doing 'switch &%.*s in ...'\n", LIT(e->token.string));
+		}
+	}
+}
+
 gb_internal void check_unary_expr(CheckerContext *c, Operand *o, Token op, Ast *node) {
 	switch (op.kind) {
 	case Token_And: { // Pointer address
@@ -2255,7 +2282,7 @@ gb_internal void check_unary_expr(CheckerContext *c, Operand *o, Token op, Ast *
 				gbString str = expr_to_string(ue->expr);
 				defer (gb_string_free(str));
 
-				Entity *e = entity_of_node(o->expr);
+				Entity *e = entity_of_node(ue->expr);
 				if (e != nullptr && (e->flags & EntityFlag_Param) != 0) {
 					error(op, "Cannot take the pointer address of '%s' which is a procedure parameter", str);
 				} else {
@@ -2306,6 +2333,11 @@ gb_internal void check_unary_expr(CheckerContext *c, Operand *o, Token op, Ast *
 				o->type = alloc_type_pointer(o->type);
 			}
 		} else {
+			if (build_context.strict_style && ast_node_expect(node, Ast_UnaryExpr)) {
+				ast_node(ue, UnaryExpr, node);
+				check_old_for_or_switch_value_usage(ue->expr);
+			}
+
 			o->type = alloc_type_pointer(o->type);
 		}
 
