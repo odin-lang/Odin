@@ -255,7 +255,7 @@ __blendFuncSeparate :: proc(ctx: ^Context, blend: ^Blend) {
 }
 
 __allocTexture :: proc(ctx: ^Context) -> (tex: ^Texture) {
-	for texture in &ctx.textures {
+	for &texture in ctx.textures {
 		if texture.id == 0 {
 			tex = &texture
 			break
@@ -275,7 +275,7 @@ __allocTexture :: proc(ctx: ^Context) -> (tex: ^Texture) {
 }
 
 __findTexture :: proc(ctx: ^Context, id: int) -> ^Texture {
-	for texture in &ctx.textures {
+	for &texture in ctx.textures {
 		if texture.id == id {
 			return &texture
 		}
@@ -285,7 +285,7 @@ __findTexture :: proc(ctx: ^Context, id: int) -> ^Texture {
 }
 
 __deleteTexture :: proc(ctx: ^Context, id: int) -> bool {
-	for texture, i in &ctx.textures {
+	for &texture, i in ctx.textures {
 		if texture.id == id {
 			if texture.tex != 0 && (.NO_DELETE not_in texture.flags) {
 				gl.DeleteTextures(1, &texture.tex)
@@ -1302,7 +1302,7 @@ __renderDelete :: proc(uptr: rawptr) {
 		gl.DeleteBuffers(1, &ctx.vertBuf)
 	}
 
-	for texture in &ctx.textures {
+	for &texture in ctx.textures {
 		if texture.tex != 0 && (.NO_DELETE not_in texture.flags) {
 			gl.DeleteTextures(1, &texture.tex)
 		}

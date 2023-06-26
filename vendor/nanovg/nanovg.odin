@@ -326,7 +326,7 @@ DeleteInternal :: proc(ctx: ^Context) {
 	__deletePathCache(ctx.cache)
 	fontstash.Destroy(&ctx.fs)
 
-	for image in &ctx.fontImages {
+	for &image in ctx.fontImages {
 		if image != 0 {
 			DeleteImage(ctx, image)
 		}
@@ -1874,7 +1874,7 @@ __calculateJoins :: proc(
 	} 
 
 	// Calculate which joins needs extra vertices to append, and gather vertex count.
-	for path in &cache.paths {
+	for &path in cache.paths {
 		pts := cache.points[path.first:]
 		p0 := &pts[path.count-1]
 		p1 := &pts[0]
@@ -1968,7 +1968,7 @@ __expandStroke :: proc(
 
 	// Calculate max vertex usage.
 	cverts := 0
-	for path in &cache.paths {
+	for &path in cache.paths {
 		loop := path.closed
 	
 		// TODO check if f32 calculation necessary?	
@@ -2097,7 +2097,7 @@ __expandFill :: proc(
 
 	// Calculate max vertex usage.
 	cverts := 0
-	for path in &cache.paths {
+	for &path in cache.paths {
 		cverts += path.count + path.nbevel + 1
 
 		if fringe {
@@ -2109,7 +2109,7 @@ __expandFill :: proc(
 	verts := __allocTempVerts(ctx, cverts)
 	dst_index: int
 
-	for path in &cache.paths {
+	for &path in cache.paths {
 		pts := cache.points[path.first:]
 		p0, p1: ^Point
 		rw, lw, woff: f32
@@ -2542,7 +2542,7 @@ Fill :: proc(ctx: ^Context) {
 		ctx.cache.paths[:],
 	)
 
-	for path in &ctx.cache.paths {
+	for &path in ctx.cache.paths {
 		ctx.fillTriCount += len(path.fill) - 2
 		ctx.fillTriCount += len(path.stroke) - 2
 		ctx.drawCallCount += 2
@@ -2588,7 +2588,7 @@ Stroke :: proc(ctx: ^Context) {
 		ctx.cache.paths[:],
 	)
 
-	for path in &ctx.cache.paths {
+	for &path in ctx.cache.paths {
 		ctx.strokeTriCount += len(path.stroke) - 2
 		ctx.drawCallCount += 1
 	}	
@@ -2597,7 +2597,7 @@ Stroke :: proc(ctx: ^Context) {
 DebugDumpPathCache :: proc(ctx: ^Context) {
 	fmt.printf("~~~~~~~~~~~~~Dumping %d cached paths\n", len(ctx.cache.paths))
 	
-	for path, i in &ctx.cache.paths {
+	for &path, i in ctx.cache.paths {
 		fmt.printf(" - Path %d\n", i)
 		
 		if len(path.fill) != 0 {
