@@ -238,10 +238,10 @@ find_and_add_examples :: proc(docs: string, package_name: string, entity_name: s
 			}
 		}
 		// Remove first layer of tabs which are always present
-		for line in &example_block.lines {
+		for &line in example_block.lines {
 			line = strings.trim_prefix(line, "\t")
 		}
-		for line in &output_block.lines {
+		for &line in output_block.lines {
 			line = strings.trim_prefix(line, "\t")
 		}
 		append(&g_examples_to_verify, Example_Test {
