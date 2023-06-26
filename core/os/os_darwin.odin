@@ -518,7 +518,7 @@ foreign libc {
 	@(link_name="shutdown")         _unix_shutdown      :: proc(socket: int, how: int) -> int ---
 
 	@(link_name = "kqueue") _darwin_kqueue :: proc() -> Handle ---
-	@(link_name = "kevent") _darwin_kevent :: proc(kq: c.int, change_list: [^]KEvent, n_changes: c.int, event_list: [^]KEvent, n_events: c.int, timeout: ^Time_Spec) -> c.int ---
+	@(link_name = "kevent") _darwin_kevent :: proc(kq: Handle, change_list: [^]KEvent, n_changes: c.int, event_list: [^]KEvent, n_events: c.int, timeout: ^Time_Spec) -> c.int ---
 
 	@(link_name="exit")    _unix_exit :: proc(status: c.int) -> ! ---
 }
