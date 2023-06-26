@@ -6828,15 +6828,15 @@ gb_internal CallArgumentError check_polymorphic_record_type(CheckerContext *c, O
 			return err;
 		}
 
-		String generated_name = make_string_c(expr_to_string(call));
-
 		CheckerContext ctx = *c;
 		// NOTE(bill): We need to make sure the lookup scope for the record is the same as where it was created
 		ctx.scope = polymorphic_record_parent_scope(original_type);
 		GB_ASSERT(ctx.scope != nullptr);
 
-		Type *named_type = alloc_type_named(generated_name, nullptr, nullptr);
 		Type *bt = base_type(original_type);
+		String generated_name = make_string_c(expr_to_string(call));
+
+		Type *named_type = alloc_type_named(generated_name, nullptr, nullptr);
 		if (bt->kind == Type_Struct) {
 			Ast *node = clone_ast(bt->Struct.node);
 			Type *struct_type = alloc_type_struct();
@@ -6859,6 +6859,49 @@ gb_internal CallArgumentError check_polymorphic_record_type(CheckerContext *c, O
 			check_close_scope(&ctx);
 		} else {
 			GB_PANIC("Unsupported parametric polymorphic record type");
+		}
+
+
+		bt = base_type(named_type);
+		if (bt->kind == Type_Struct || bt->kind == Type_Union) {
+			GB_ASSERT(original_type->kind == Type_Named);
+			Entity *e = original_type->Named.type_name;
+			GB_ASSERT(e->kind == Entity_TypeName);
+
+			gbString s = gb_string_make_reserve(heap_allocator(), e->token.string.len+3);
+			s = gb_string_append_fmt(s, "%.*s(", LIT(e->token.string));
+
+			Type *params = nullptr;
+			switch (bt->kind) {
+			case Type_Struct: params = bt->Struct.polymorphic_params; break;
+			case Type_Union:  params = bt->Union.polymorphic_params;  break;
+			}
+
+			if (params != nullptr) for_array(i, params->Tuple.variables) {
+				Entity *v = params->Tuple.variables[i];
+				String name = v->token.string;
+				if (i > 0) {
+					s = gb_string_append_fmt(s, ", ");
+				}
+				s = gb_string_append_fmt(s, "$%.*s", LIT(name));
+
+				if (v->kind == Entity_TypeName) {
+					if (v->type->kind != Type_Generic) {
+						s = gb_string_append_fmt(s, "=");
+						s = write_type_to_string(s, v->type, false);
+					}
+				} else if (v->kind == Entity_Constant) {
+					s = gb_string_append_fmt(s, "=");
+					s = write_exact_value_to_string(s, v->Constant.value);
+				}
+			}
+			s = gb_string_append_fmt(s, ")");
+
+			String new_name = make_string_c(s);
+			named_type->Named.name = new_name;
+			if (named_type->Named.type_name) {
+				named_type->Named.type_name->token.string = new_name;
+			}
 		}
 
 		operand->mode = Addressing_Type;
