@@ -209,6 +209,8 @@ struct Entity {
 
 			ParameterValue param_value;
 
+			Type *for_loop_parent_type;
+
 			String     thread_local_model;
 			Entity *   foreign_library;
 			Ast *      foreign_library_ident;
