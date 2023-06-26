@@ -366,6 +366,50 @@ Linger :: struct {
 Socket    :: distinct int
 socklen_t :: c.int
 
+KEvent :: struct {
+	ident:  uintptr,
+	filter: i16,
+	flags:  u16,
+	fflags: u32,
+	data:   c.intptr_t,
+	udata:  rawptr,
+}
+
+Time_Spec :: struct {
+	sec:  c.long,
+	nsec: c.long,
+}
+
+EV_ADD            :: 0x0001 /* add event to kq (implies enable) */
+EV_DELETE         :: 0x0002 /* delete event from kq */
+EV_ENABLE         :: 0x0004 /* enable event */
+EV_DISABLE        :: 0x0008 /* disable event (not reported) */
+EV_ONESHOT        :: 0x0010 /* only report one occurrence */
+EV_CLEAR          :: 0x0020 /* clear event state after reporting */
+EV_RECEIPT        :: 0x0040 /* force immediate event output */
+EV_DISPATCH       :: 0x0080 /* disable event after reporting */
+EV_UDATA_SPECIFIC :: 0x0100 /* unique kevent per udata value */
+EV_FANISHED       :: 0x0200 /* report that source has vanished  */
+EV_SYSFLAGS       :: 0xF000 /* reserved by system */
+EV_FLAG0          :: 0x1000 /* filter-specific flag */
+EV_FLAG1          :: 0x2000 /* filter-specific flag */
+EV_ERROR          :: 0x4000 /* error, data contains errno */
+EV_EOF            :: 0x8000 /* EOF detected */
+EV_DISPATCH2      :: (EV_DISPATCH | EV_UDATA_SPECIFIC)
+
+EVFILT_READ     :: -1
+EVFILT_WRITE    :: -2
+EVFILT_AIO      :: -3
+EVFILT_VNODE    :: -4
+EVFILT_PROC     :: -5
+EVFILT_SIGNAL   :: -6
+EVFILT_TIMER    :: -7
+EVFILT_MACHPORT :: -8
+EVFILT_FS       :: -9
+EVFILT_USER     :: -10
+EVFILT_VM       :: -12
+EVFILT_EXCEPT   :: -15
+
 // File type
 S_IFMT   :: 0o170000 // Type of file mask
 S_IFIFO  :: 0o010000 // Named pipe (fifo)
@@ -472,6 +516,9 @@ foreign libc {
 	@(link_name="sendto")           _unix_sendto        :: proc(socket: int, buffer: rawptr, buffer_len: c.size_t, flags: int, addr: rawptr, addr_len: socklen_t) -> c.ssize_t ---
 	@(link_name="send")             _unix_send          :: proc(socket: int, buffer: rawptr, buffer_len: c.size_t, flags: int) -> c.ssize_t ---
 	@(link_name="shutdown")         _unix_shutdown      :: proc(socket: int, how: int) -> int ---
+
+	@(link_name = "kqueue") _darwin_kqueue :: proc() -> Handle ---
+	@(link_name = "kevent") _darwin_kevent :: proc(kq: c.int, change_list: [^]KEvent, n_changes: c.int, event_list: [^]KEvent, n_events: c.int, timeout: ^Time_Spec) -> c.int ---
 
 	@(link_name="exit")    _unix_exit :: proc(status: c.int) -> ! ---
 }
