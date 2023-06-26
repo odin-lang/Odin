@@ -218,7 +218,9 @@ gb_internal lbValue lb_equal_proc_for_type(lbModule *m, Type *type) {
 
 		LLVMBuildRet(p->builder, LLVMConstInt(lb_type(m, t_bool), 0, false));
 	} else if (type->kind == Type_Union) {
-		if (is_type_union_maybe_pointer(type)) {
+		if (type_size_of(type) == 0) {
+			LLVMBuildRet(p->builder, LLVMConstInt(lb_type(m, t_bool), 1, false));
+		} else if (is_type_union_maybe_pointer(type)) {
 			Type *v = type->Union.variants[0];
 			Type *pv = alloc_type_pointer(v);
 

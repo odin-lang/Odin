@@ -654,10 +654,9 @@ gb_internal void lb_setup_type_info_data(lbProcedure *p) { // NOTE(bill): Setup 
 				lbValue count = lb_const_int(m, t_int, variant_count);
 				vals[0] = llvm_const_slice(m, memory_types, count);
 
-				i64 tag_size   = union_tag_size(t);
-				i64 tag_offset = align_formula(t->Union.variant_block_size, tag_size);
-
+				i64 tag_size = union_tag_size(t);
 				if (tag_size > 0) {
+					i64 tag_offset = align_formula(t->Union.variant_block_size, tag_size);
 					vals[1] = lb_const_int(m, t_uintptr, tag_offset).value;
 					vals[2] = lb_type_info(m, union_tag_type(t)).value;
 				} else {
