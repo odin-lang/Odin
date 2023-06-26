@@ -32,7 +32,7 @@ init :: proc(sorter: ^$S/Sorter($K)) {
 }
 
 destroy :: proc(sorter: ^$S/Sorter($K)) {
-	for _, v in &sorter.relations {
+	for _, v in sorter.relations {
 		delete(v.dependents)
 	}
 	delete(sorter.relations)
@@ -80,7 +80,7 @@ sort :: proc(sorter: ^$S/Sorter($K)) -> (sorted, cycled: [dynamic]K) {
 		}
 	}
 
-	for root in &sorted do for k, _ in relations[root].dependents {
+	for root in sorted do for k, _ in relations[root].dependents {
 		relation := &relations[k]
 		relation.dependencies -= 1
 		if relation.dependencies == 0 {

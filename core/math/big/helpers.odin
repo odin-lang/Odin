@@ -19,7 +19,7 @@ import rnd "core:math/rand"
 int_destroy :: proc(integers: ..^Int) {
 	integers := integers
 
-	for a in &integers {
+	for a in integers {
 		assert_if_nil(a)
 	}
 	#force_inline internal_int_destroy(..integers)
@@ -408,7 +408,7 @@ clear_if_uninitialized_multi :: proc(args: ..^Int, allocator := context.allocato
 	args := args
 	assert_if_nil(..args)
 
-	for i in &args {
+	for i in args {
 		#force_inline internal_clear_if_uninitialized_single(i, allocator) or_return
 	}
 	return err
@@ -435,7 +435,7 @@ int_init_multi :: proc(integers: ..^Int, allocator := context.allocator) -> (err
 	assert_if_nil(..integers)
 
 	integers := integers
-	for a in &integers {
+	for a in integers {
 		#force_inline internal_clear(a, true, allocator) or_return
 	}
 	return nil

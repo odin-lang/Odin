@@ -72,7 +72,7 @@ unmarshal_string :: proc(data: string, ptr: ^$T, spec := DEFAULT_SPECIFICATION, 
 @(private)
 assign_bool :: proc(val: any, b: bool) -> bool {
 	v := reflect.any_core(val)
-	switch dst in &v {
+	switch &dst in v {
 	case bool: dst = bool(b)
 	case b8:   dst = b8  (b)
 	case b16:  dst = b16 (b)
@@ -85,7 +85,7 @@ assign_bool :: proc(val: any, b: bool) -> bool {
 @(private)
 assign_int :: proc(val: any, i: $T) -> bool {
 	v := reflect.any_core(val)
-	switch dst in &v {
+	switch &dst in v {
 	case i8:      dst = i8     (i)
 	case i16:     dst = i16    (i)
 	case i16le:   dst = i16le  (i)
@@ -122,7 +122,7 @@ assign_int :: proc(val: any, i: $T) -> bool {
 @(private)
 assign_float :: proc(val: any, f: $T) -> bool {
 	v := reflect.any_core(val)
-	switch dst in &v {
+	switch &dst in v {
 	case f16:     dst = f16  (f)
 	case f16le:   dst = f16le(f)
 	case f16be:   dst = f16be(f)
@@ -150,7 +150,7 @@ assign_float :: proc(val: any, f: $T) -> bool {
 @(private)
 unmarshal_string_token :: proc(p: ^Parser, val: any, str: string, ti: ^reflect.Type_Info) -> bool {
 	val := val
-	switch dst in &val {
+	switch &dst in val {
 	case string:
 		dst = str
 		return true
@@ -215,7 +215,7 @@ unmarshal_value :: proc(p: ^Parser, v: any) -> (err: Unmarshal_Error) {
 		}
 	}
 	
-	switch dst in &v {
+	switch &dst in v {
 	// Handle json.Value as an unknown type
 	case Value:
 		dst = parse_value(p) or_return

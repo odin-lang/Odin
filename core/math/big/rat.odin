@@ -137,7 +137,7 @@ rat_copy :: proc(dst, src: ^Rat, minimize := false, allocator := context.allocat
 internal_rat_destroy :: proc(rationals: ..^Rat) {
 	rationals := rationals
 
-	for z in &rationals {
+	for &z in rationals {
 		internal_int_destroy(&z.a, &z.b)
 	}
 }

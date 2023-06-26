@@ -36,7 +36,7 @@ destroy :: proc(img: ^Image) {
 	bytes.buffer_destroy(&img.pixels)
 
 	if v, ok := img.metadata.(^image.PNG_Info); ok {
-		for chunk in &v.chunks {
+		for chunk in v.chunks {
 			delete(chunk.data)
 		}
 		delete(v.chunks)
