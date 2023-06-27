@@ -894,7 +894,6 @@ get_env :: proc(key: string, allocator := context.allocator) -> (value: string) 
 
 set_env :: proc(key, value: string) -> Errno {
 	runtime.DEFAULT_TEMP_ALLOCATOR_TEMP_GUARD()
-	s := strings.concatenate({key, "=", value, "\x00"}, context.temp_allocator)
   key_cstring := strings.unsafe_string_to_cstring(strings.concatenate({key, "\x00"}, context.temp_allocator))
   value_cstring := strings.unsafe_string_to_cstring(strings.concatenate({value, "\x00"}, context.temp_allocator))
   // NOTE(GoNZooo): `setenv` instead of `putenv` because it copies both key and value more commonly
