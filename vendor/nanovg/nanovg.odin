@@ -916,8 +916,8 @@ CreateImageMem :: proc(ctx: ^Context, data: []byte, imageFlags: ImageFlags) -> i
 		return 0
 	}
 
-	data  := img[:int(w) * int(h) * int(n)]
-	image := CreateImageRGBA(ctx, int(w), int(h), imageFlags, data)
+	pixel_data := img[:int(w) * int(h) * int(n)]
+	image := CreateImageRGBA(ctx, int(w), int(h), imageFlags, pixel_data)
 	stbi.image_free(img)
 	return image
 }

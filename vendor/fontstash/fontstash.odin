@@ -1067,7 +1067,7 @@ TextIterNext :: proc(
 			iter.x = iter.nextx
 			iter.y = iter.nexty
 			iter.codepointCount += 1
-			if glyph, ok := __getGlyph(ctx, iter.font, iter.codepoint, iter.isize, iter.iblur); ok {
+			if glyph, glyph_ok := __getGlyph(ctx, iter.font, iter.codepoint, iter.isize, iter.iblur); glyph_ok {
 				__getQuad(ctx, iter.font, iter.previousGlyphIndex, glyph, iter.scale, iter.spacing, &iter.nextx, &iter.nexty, quad)
 				iter.previousGlyphIndex = glyph.index
 			} else {
