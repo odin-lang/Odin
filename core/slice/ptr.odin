@@ -1,7 +1,7 @@
 package slice
 
 import "core:builtin"
-import "core:mem"
+import "core:runtime"
 
 ptr_add :: proc(p: $P/^$T, x: int) -> ^T {
 	return ([^]T)(p)[x:]
@@ -27,9 +27,9 @@ ptr_swap_non_overlapping :: proc(x, y: rawptr, len: int) {
 		a := rawptr(uintptr(x) + uintptr(i))
 		b := rawptr(uintptr(y) + uintptr(i))
 
-		mem.copy(t, a, BLOCK_SIZE)
-		mem.copy(a, b, BLOCK_SIZE)
-		mem.copy(b, t, BLOCK_SIZE)
+		runtime.mem_copy(t, a, BLOCK_SIZE)
+		runtime.mem_copy(a, b, BLOCK_SIZE)
+		runtime.mem_copy(b, t, BLOCK_SIZE)
 	}
 
 	if i < len {
@@ -38,9 +38,9 @@ ptr_swap_non_overlapping :: proc(x, y: rawptr, len: int) {
 		a := rawptr(uintptr(x) + uintptr(i))
 		b := rawptr(uintptr(y) + uintptr(i))
 
-		mem.copy(t, a, rem)
-		mem.copy(a, b, rem)
-		mem.copy(b, t, rem)
+		runtime.mem_copy(t, a, rem)
+		runtime.mem_copy(a, b, rem)
+		runtime.mem_copy(b, t, rem)
 	}
 }
 
@@ -59,9 +59,9 @@ ptr_swap_overlapping :: proc(x, y: rawptr, len: int) {
 	
 	for n := len; n > 0; n -= N {
 		m := builtin.min(n, N)
-		mem.copy(&buffer, a, m)
-		mem.copy(a, b, m)
-		mem.copy(b, &buffer, m)
+		runtime.mem_copy(&buffer, a, m)
+		runtime.mem_copy(a, b, m)
+		runtime.mem_copy(b, &buffer, m)
 		
 		a, b = a[N:], b[N:]
 	}
