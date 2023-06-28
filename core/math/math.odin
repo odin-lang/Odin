@@ -2160,51 +2160,57 @@ signbit :: proc{
 
 @(require_results)
 hypot_f16 :: proc "contextless" (x, y: f16) -> (r: f16) {
+	p, q := abs(x), abs(y)
 	switch {
-	case is_nan(x) || is_nan(y):
-		r = nan_f16()
-	case x == y:
-		r = x
-	case x == 0:
-		r = copy_sign_f16(1, y)
-	case (y > x) == (x > 0):
-		r = transmute(f16)(transmute(u16)x + 1)
-	case:
-		r = transmute(f16)(transmute(u16)x - 1)
+	case is_inf(p, 1) || is_inf(q, 1):
+		return inf_f16(1)
+	case is_nan(p) || is_nan(q):
+		return nan_f16()
 	}
-	return
+	if p < q {
+		p, q = q, p
+	}
+	if p == 0 {
+		return 0
+	}
+	q = q / p
+	return p * sqrt(1+q*q)
 }
 @(require_results)
 hypot_f32 :: proc "contextless" (x, y: f32) -> (r: f32) {
+	p, q := abs(x), abs(y)
 	switch {
-	case is_nan(x) || is_nan(y):
-		r = nan_f32()
-	case x == y:
-		r = x
-	case x == 0:
-		r = copy_sign_f32(1, y)
-	case (y > x) == (x > 0):
-		r = transmute(f32)(transmute(u32)x + 1)
-	case:
-		r = transmute(f32)(transmute(u32)x - 1)
+	case is_inf(p, 1) || is_inf(q, 1):
+		return inf_f32(1)
+	case is_nan(p) || is_nan(q):
+		return nan_f32()
 	}
-	return
+	if p < q {
+		p, q = q, p
+	}
+	if p == 0 {
+		return 0
+	}
+	q = q / p
+	return p * sqrt(1+q*q)
 }
 @(require_results)
 hypot_f64 :: proc "contextless" (x, y: f64) -> (r: f64) {
+	p, q := abs(x), abs(y)
 	switch {
-	case is_nan(x) || is_nan(y):
-		r = nan_f64()
-	case x == y:
-		r = x
-	case x == 0:
-		r = copy_sign_f64(1, y)
-	case (y > x) == (x > 0):
-		r = transmute(f64)(transmute(u64)x + 1)
-	case:
-		r = transmute(f64)(transmute(u64)x - 1)
+	case is_inf(p, 1) || is_inf(q, 1):
+		return inf_f64(1)
+	case is_nan(p) || is_nan(q):
+		return nan_f64()
 	}
-	return
+	if p < q {
+		p, q = q, p
+	}
+	if p == 0 {
+		return 0
+	}
+	q = q / p
+	return p * sqrt(1+q*q)
 }
 @(require_results) hypot_f16le :: proc "contextless" (x, y: f16le) -> (r: f16le) { return f16le(hypot_f16(f16(x), f16(y))) }
 @(require_results) hypot_f16be :: proc "contextless" (x, y: f16be) -> (r: f16be) { return f16be(hypot_f16(f16(x), f16(y))) }
