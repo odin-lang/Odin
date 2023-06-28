@@ -10,21 +10,21 @@ import "core:fmt"
 import "../fontstash"
 import stbi "vendor:stb/image"
 
-AlignVertical :: fontstash.AlignVertical
+AlignVertical   :: fontstash.AlignVertical
 AlignHorizontal :: fontstash.AlignHorizontal
 
 INIT_FONTIMAGE_SIZE :: 512
-MAX_FONTIMAGE_SIZE :: 2048
-MAX_FONTIMAGES :: 4
+MAX_FONTIMAGE_SIZE  :: 2048
+MAX_FONTIMAGES      :: 4
 
-MAX_STATES :: 32
+MAX_STATES         :: 32
 INIT_COMMANDS_SIZE :: 256
-INIT_POINTS_SIZE :: 128
-INIT_PATH_SIZE :: 16
-INIT_VERTS_SIZE :: 26
-KAPPA :: 0.5522847493
+INIT_POINTS_SIZE   :: 128
+INIT_PATH_SIZE     :: 16
+INIT_VERTS_SIZE    :: 26
+KAPPA              :: 0.5522847493
 
-Color :: [4]f32
+Color  :: [4]f32
 Matrix :: [6]f32
 Vertex :: [4]f32 // x,y,u,v
 
@@ -40,13 +40,13 @@ ImageFlag :: enum {
 ImageFlags :: bit_set[ImageFlag]
 
 Paint :: struct {
-	xform: Matrix,
-	extent: [2]f32,
-	radius: f32,
-	feather: f32,
+	xform:      Matrix,
+	extent:     [2]f32,
+	radius:     f32,
+	feather:    f32,
 	innerColor: Color,
 	outerColor: Color,
-	image: int,
+	image:      int,
 }
 
 Winding :: enum {
@@ -110,7 +110,7 @@ Texture :: enum {
 }
 
 ScissorT :: struct {
-	xform: Matrix,
+	xform:  Matrix,
 	extent: [2]f32,
 }
 
@@ -131,83 +131,83 @@ PointFlag :: enum {
 PointFlags :: bit_set[PointFlag]
 
 Point :: struct {
-	x, y: f32,
-	dx, dy: f32,
-	len: f32,
+	x, y:     f32,
+	dx, dy:   f32,
+	len:      f32,
 	dmx, dmy: f32,
-	flags: PointFlags,
+	flags:    PointFlags,
 }
 
 PathCache :: struct {
 	points: [dynamic]Point,
-	paths: [dynamic]Path,
-	verts: [dynamic]Vertex,
+	paths:  [dynamic]Path,
+	verts:  [dynamic]Vertex,
 	bounds: [4]f32,
 }
 
 Path :: struct {
-	first: int,
-	count: int,
-	closed: bool,
-	nbevel: int,
-	fill: []Vertex,
-	stroke: []Vertex,
+	first:   int,
+	count:   int,
+	closed:  bool,
+	nbevel:  int,
+	fill:    []Vertex,
+	stroke:  []Vertex,
 	winding: Winding,
-	convex: bool,
+	convex:  bool,
 }
 
 State :: struct {
 	compositeOperation: CompositeOperationState,
-	shapeAntiAlias: bool,
-	fill: Paint,
-	stroke: Paint,
-	strokeWidth: f32,
-	miterLimit: f32,
-	lineJoin: LineCapType,
-	lineCap: LineCapType,
-	alpha: f32,
-	xform: Matrix,
-	scissor: ScissorT,
+	shapeAntiAlias:     bool,
+	fill:               Paint,
+	stroke:             Paint,
+	strokeWidth:        f32,
+	miterLimit:         f32,
+	lineJoin:           LineCapType,
+	lineCap:            LineCapType,
+	alpha:              f32,
+	xform:              Matrix,
+	scissor:            ScissorT,
 
 	// font state
-	fontSize: f32,
-	letterSpacing: f32,
-	lineHeight: f32,
-	fontBlur: f32,
+	fontSize:        f32,
+	letterSpacing:   f32,
+	lineHeight:      f32,
+	fontBlur:        f32,
 	alignHorizontal: AlignHorizontal,
-	alignVertical: AlignVertical,
-	fontId: int,
+	alignVertical:   AlignVertical,
+	fontId:          int,
 }
 
 Context :: struct {
-	params: Params,
-	commands: [dynamic]f32,
-	commandx, commandy: f32,
-	states: [MAX_STATES]State,
-	nstates: int,
-	cache: PathCache,
-	tessTol: f32,
-	distTol: f32,
-	fringeWidth: f32,
+	params:        Params,
+	commands:      [dynamic]f32,
+	commandx,      commandy: f32,
+	states:        [MAX_STATES]State,
+	nstates:       int,
+	cache:         PathCache,
+	tessTol:       f32,
+	distTol:       f32,
+	fringeWidth:   f32,
 	devicePxRatio: f32,
 
 	// font
-	fs: fontstash.FontContext,
-	fontImages: [MAX_FONTIMAGES]int,
+	fs:           fontstash.FontContext,
+	fontImages:   [MAX_FONTIMAGES]int,
 	fontImageIdx: int,
 
 	// stats
-	drawCallCount: int,
-	fillTriCount: int,
+	drawCallCount:  int,
+	fillTriCount:   int,
 	strokeTriCount: int,
-	textTriCount: int,
+	textTriCount:   int,
 
 	// flush texture
 	textureDirty: bool,
 }
 
 Params :: struct {
-	userPtr: rawptr,
+	userPtr:       rawptr,
 	edgeAntiAlias: bool,
 	
 	// callbacks to fill out
@@ -216,19 +216,19 @@ Params :: struct {
 
 	// textures calls
 	renderCreateTexture: proc(
-		uptr: rawptr, 
-		type: Texture,
-		w, h: int, 
+		uptr:       rawptr,
+		type:       Texture,
+		w, h:       int,
 		imageFlags: ImageFlags, 
-		data: []byte,
+		data:       []byte,
 	) -> int,
 	renderDeleteTexture: proc(uptr: rawptr, image: int) -> bool,
 	renderUpdateTexture: proc(
-		uptr: rawptr, 
+		uptr:  rawptr,
 		image: int,
-		x, y: int,
-		w, h: int,
-		data: []byte,
+		x, y:  int,
+		w, h:  int,
+		data:  []byte,
 	) -> bool,
 	renderGetTextureSize: proc(uptr: rawptr, image: int, w, h: ^int) -> bool,
 
@@ -237,37 +237,37 @@ Params :: struct {
 	renderCancel: proc(uptr: rawptr),
 	renderFlush: proc(uptr: rawptr),
 	renderFill: proc(
-		uptr: rawptr, 
-		paint: ^Paint, 
+		uptr:               rawptr,
+		paint:              ^Paint,
 		compositeOperation: CompositeOperationState, 
-		scissor: ^ScissorT,
-		fringe: f32,
-		bounds: [4]f32,
-		paths: []Path,
+		scissor:            ^ScissorT,
+		fringe:             f32,
+		bounds:             [4]f32,
+		paths:              []Path,
 	),
 	renderStroke: proc(
-		uptr: rawptr, 
-		paint: ^Paint, 
+		uptr:               rawptr,
+		paint:              ^Paint,
 		compositeOperation: CompositeOperationState, 
-		scissor: ^ScissorT,
-		fringe: f32,
-		strokeWidth: f32,
-		paths: []Path,
+		scissor:            ^ScissorT,
+		fringe:             f32,
+		strokeWidth:        f32,
+		paths:              []Path,
 	),	
 	renderTriangles: proc(
-		uptr: rawptr, 
-		paint: ^Paint, 
+		uptr:               rawptr,
+		paint:              ^Paint,
 		compositeOperation: CompositeOperationState, 
-		scissor: ^ScissorT,
-		verts: []Vertex,
-		fringe: f32,
+		scissor:            ^ScissorT,
+		verts:              []Vertex,
+		fringe:             f32,
 	),
 }
 
 __allocPathCache :: proc(c: ^PathCache) {
 	c.points = make([dynamic]Point, 0, INIT_POINTS_SIZE)
-	c.paths = make([dynamic]Path, 0, INIT_PATH_SIZE)
-	c.verts = make([dynamic]Vertex, 0, INIT_VERTS_SIZE)
+	c.paths  = make([dynamic]Path, 0, INIT_PATH_SIZE)
+	c.verts  = make([dynamic]Vertex, 0, INIT_VERTS_SIZE)
 }
 
 __deletePathCache :: proc(c: PathCache) {
@@ -277,14 +277,14 @@ __deletePathCache :: proc(c: PathCache) {
 }
 
 __setDevicePxRatio :: proc(ctx: ^Context, ratio: f32) {
-	ctx.tessTol = 0.25 / ratio
-	ctx.distTol = 0.01 / ratio
-	ctx.fringeWidth = 1.0 / ratio
+	ctx.tessTol       = 0.25 / ratio
+	ctx.distTol       = 0.01 / ratio
+	ctx.fringeWidth   = 1.0 / ratio
 	ctx.devicePxRatio = ratio
 }
 
 __getState :: #force_inline proc(ctx: ^Context) -> ^State #no_bounds_check {
-	return &ctx.states[ctx.nstates - 1]
+	return &ctx.states[ctx.nstates-1]
 }
 
 CreateInternal :: proc(params: Params) -> (ctx: ^Context) {
@@ -311,7 +311,7 @@ CreateInternal :: proc(params: Params) -> (ctx: ^Context) {
 	
 	// handle to the image needs to be set to the new generated texture
 	ctx.fs.callbackResize = proc(data: rawptr, w, h: int) {
-		ctx := cast(^Context) data
+		ctx := (^Context)(data)
 		ctx.fontImages[0] = ctx.params.renderCreateTexture(ctx.params.userPtr, .Alpha, w, h, {}, ctx.fs.textureData)
 	}
 	
@@ -326,7 +326,7 @@ DeleteInternal :: proc(ctx: ^Context) {
 	__deletePathCache(ctx.cache)
 	fontstash.Destroy(&ctx.fs)
 
-	for &image in ctx.fontImages {
+	for image in ctx.fontImages {
 		if image != 0 {
 			DeleteImage(ctx, image)
 		}
@@ -350,9 +350,9 @@ DeleteInternal :: proc(ctx: ^Context) {
 	devicePixelRatio to: frameBufferWidth / windowWidth.
 */
 BeginFrame :: proc(
-	ctx: ^Context,
-	windowWidth: f32,
-	windowHeight: f32,
+	ctx:              ^Context,
+	windowWidth:      f32,
+	windowHeight:     f32,
 	devicePixelRatio: f32,
 ) {
 	ctx.nstates = 0
@@ -371,9 +371,9 @@ BeginFrame :: proc(
 
 @(deferred_out=EndFrame)
 FrameScoped :: proc(
-	ctx: ^Context,
-	windowWidth: f32,
-	windowHeight: f32,
+	ctx:              ^Context,
+	windowWidth:      f32,
+	windowHeight:     f32,
 	devicePixelRatio: f32,
 ) -> ^Context {
 	BeginFrame(ctx, windowWidth, windowHeight, devicePixelRatio)
@@ -454,7 +454,7 @@ RGBA :: proc(r, g, b, a: u8) -> (res: Color) {
 LerpRGBA :: proc(c0, c1: Color, u: f32) -> (cint: Color) {
 	clamped := clamp(u, 0.0, 1.0)
 	oneminu := 1.0 - clamped
-	for i in 0..<4 {
+	for _, i in cint {
 		cint[i] = c0[i] * oneminu + c1[i] * clamped
 	}
 
@@ -510,12 +510,9 @@ HSLA :: proc(hue, saturation, lightness: f32, a: u8) -> (col: Color) {
 // hex to 0xAARRGGBB color
 ColorHex :: proc(color: u32) -> (res: Color) {
 	color := color
-	res.b = f32(0x000000FF & color) / 255
-	color = color >> 8
-	res.g = f32(0x000000FF & color) / 255
-	color = color >> 8
-	res.r = f32(0x000000FF & color) / 255
-	color = color >> 8
+	res.b = f32(0x000000FF & color) / 255; color >>= 8
+	res.g = f32(0x000000FF & color) / 255; color >>= 8
+	res.r = f32(0x000000FF & color) / 255; color >>= 8
 	res.a = f32(0x000000FF & color) / 255
 	return
 }
@@ -634,7 +631,7 @@ TransformInverse :: proc(inv: ^Matrix, t: Matrix) -> bool {
 TransformPoint :: proc(
 	dx: ^f32, 
 	dy: ^f32, 
-	t: Matrix, 
+	t:  Matrix,
 	sx: f32, 
 	sy: f32,
 ) {
@@ -667,7 +664,7 @@ Save :: proc(ctx: ^Context) {
 
 	// copy prior
 	if ctx.nstates > 0 {
-		ctx.states[ctx.nstates] = ctx.states[ctx.nstates - 1]
+		ctx.states[ctx.nstates] = ctx.states[ctx.nstates-1]
 	}
 
 	ctx.nstates += 1
@@ -691,8 +688,8 @@ SaveScoped :: #force_inline proc(ctx: ^Context) {
 __setPaintColor :: proc(p: ^Paint, color: Color) {
 	p^ = {}
 	TransformIdentity(&p.xform)
-	p.radius = 0
-	p.feather = 1
+	p.radius     = 0
+	p.feather    = 1
 	p.innerColor = color
 	p.outerColor = color
 }
@@ -706,25 +703,25 @@ Reset :: proc(ctx: ^Context) {
 	__setPaintColor(&state.stroke, RGBA(0, 0, 0, 255))
 
 	state.compositeOperation = __compositeOperationState(.SOURCE_OVER)
-	state.shapeAntiAlias = true
-	state.strokeWidth = 1
-	state.miterLimit = 10
-	state.lineCap = .BUTT
-	state.lineJoin = .MITER
-	state.alpha = 1
+	state.shapeAntiAlias     = true
+	state.strokeWidth        = 1
+	state.miterLimit         = 10
+	state.lineCap            = .BUTT
+	state.lineJoin           = .MITER
+	state.alpha              = 1
 	TransformIdentity(&state.xform)
 
 	state.scissor.extent[0] = -1
 	state.scissor.extent[1] = -1
 
 	// font settings
-	state.fontSize = 16
-	state.letterSpacing = 0
-	state.lineHeight = 1
-	state.fontBlur = 0
+	state.fontSize        = 16
+	state.letterSpacing   = 0
+	state.lineHeight      = 1
+	state.fontBlur        = 0
 	state.alignHorizontal = .LEFT
-	state.alignVertical = .BASELINE
-	state.fontId = 0
+	state.alignVertical   = .BASELINE
+	state.fontId          = 0
 }
 
 ///////////////////////////////////////////////////////////
@@ -817,7 +814,7 @@ FillPaint :: proc(ctx: ^Context, paint: Paint) {
 
 Transform :: proc(ctx: ^Context, a, b, c, d, e, f: f32) {
 	state := __getState(ctx)
-	TransformPremultiply(&state.xform, { a, b, c, d, e, f })	
+	TransformPremultiply(&state.xform, {a, b, c, d, e, f})
 }
 
 // Resets current transform to a identity matrix.
@@ -874,10 +871,10 @@ Scale :: proc(ctx: ^Context, x, y: f32) {
 	There should be space for 6 floats in the return buffer for the values a-f.
 */
 CurrentTransform :: proc(ctx: ^Context, xform: ^Matrix) {
-	state := __getState(ctx)
 	if xform == nil {
 		return
 	}
+	state := __getState(ctx)
 	xform^ = state.xform
 }
 
@@ -901,7 +898,7 @@ CreateImagePath :: proc(ctx: ^Context, filename: cstring, imageFlags: ImageFlags
 		return 0
 	}
 
-	data := mem.slice_ptr(img, int(w) * int(h) * int(n))
+	data  := img[:int(w) * int(h) * int(n)]
 	image := CreateImageRGBA(ctx, int(w), int(h), imageFlags, data)
 	stbi.image_free(img)
 	return image
@@ -919,13 +916,13 @@ CreateImageMem :: proc(ctx: ^Context, data: []byte, imageFlags: ImageFlags) -> i
 		return 0
 	}
 
-	pixel_data := mem.slice_ptr(img, int(w) * int(h) * int(n))
-	image := CreateImageRGBA(ctx, int(w), int(h), imageFlags, pixel_data)
+	data  := img[:int(w) * int(h) * int(n)]
+	image := CreateImageRGBA(ctx, int(w), int(h), imageFlags, data)
 	stbi.image_free(img)
 	return image
 }
 
-CreateImage :: proc { CreateImagePath, CreateImageMem }
+CreateImage :: proc{CreateImagePath, CreateImageMem}
 
 // Creates image from specified image data.
 // Returns handle to the image.
@@ -980,8 +977,8 @@ DeleteImage :: proc(ctx: ^Context, image: int) {
 LinearGradient :: proc(
 	sx, sy: f32,
 	ex, ey: f32,
-	icol: Color,
-	ocol: Color,
+	icol:   Color,
+	ocol:   Color,
 ) -> (p: Paint) {
 	LARGE :: f32(1e5)
 
@@ -1024,10 +1021,10 @@ LinearGradient :: proc(
 */
 RadialGradient :: proc(
 	cx, cy: f32,
-	inr: f32,
-	outr: f32,
-	icol: Color,
-	ocol: Color,
+	inr:    f32,
+	outr:   f32,
+	icol:   Color,
+	ocol:   Color,
 ) -> (p: Paint) {
 	r := (inr+outr)*0.5
 	f := (outr-inr)
@@ -1056,8 +1053,8 @@ RadialGradient :: proc(
 BoxGradient :: proc(
 	x, y: f32,
 	w, h: f32,
-	r: f32,
-	f: f32,
+	r:    f32,
+	f:    f32,
 	icol: Color,
 	ocol: Color,
 ) -> (p: Paint) {
@@ -1084,10 +1081,10 @@ BoxGradient :: proc(
 */
 ImagePattern :: proc(
 	cx, cy: f32,
-	w, h: f32,
-	angle: f32,
-	image: int,
-	alpha: f32,
+	w, h:   f32,
+	angle:  f32,
+	image:  int,
+	alpha:  f32,
 ) -> (p: Paint) {
 	TransformRotate(&p.xform, angle)
 	p.xform[4] = cx
@@ -1097,7 +1094,7 @@ ImagePattern :: proc(
 	p.extent[1] = h
 
 	p.image = image
-	p.innerColor = { 1,1,1,alpha }
+	p.innerColor = {1, 1, 1, alpha}
 	p.outerColor = p.innerColor
 
 	return
@@ -1113,8 +1110,8 @@ ImagePattern :: proc(
 // Sets the current scissor rectangle.
 // The scissor rectangle is transformed by the current transform.
 Scissor :: proc(
-	ctx: ^Context,
-	x, y: f32,
+	ctx:           ^Context,
+	x, y:          f32,
 	width, height: f32,
 ) {
 	state := __getState(ctx)
@@ -1139,11 +1136,11 @@ Scissor :: proc(
 	transform space. The resulting shape is always rectangle.
 */
 IntersectScissor :: proc(
-	ctx: ^Context,
+	ctx:        ^Context,
 	x, y, w, h: f32,
 ) {
 	isect_rects :: proc(
-		dst: ^[4]f32,
+		dst:            ^[4]f32,
 		ax, ay, aw, ah: f32,
 		bx, by, bw, bh: f32,
 	) {
@@ -1158,8 +1155,6 @@ IntersectScissor :: proc(
 	}
 
 	state := __getState(ctx)
-	pxform: Matrix
-	invxorm: Matrix
 
 	// If no previous scissor has been set, set the scissor as current scissor.
 	if state.scissor.extent[0] < 0 {
@@ -1167,9 +1162,11 @@ IntersectScissor :: proc(
 		return
 	}
 
-	pxform = state.scissor.xform
+	pxform := state.scissor.xform
 	ex := state.scissor.extent[0]
 	ey := state.scissor.extent[1]
+
+	invxorm: Matrix
 	TransformInverse(&invxorm, state.xform)
 	TransformMultiply(&pxform, invxorm)
 	tex := ex * abs(pxform[0]) + ey * abs(pxform[2])
@@ -1197,27 +1194,26 @@ ResetScissor :: proc(ctx: ^Context) {
 ///////////////////////////////////////////////////////////
 
 // state table instead of if else chains
-OP_STATE_TABLE :: [CompositeOperation][2]BlendFactor {
-	.SOURCE_OVER = { .ONE, .ONE_MINUS_SRC_ALPHA	},
-	.SOURCE_IN = { .DST_ALPHA, .ZERO },
-	.SOURCE_OUT = { .ONE_MINUS_DST_ALPHA, .ZERO },
-	.ATOP = { .DST_ALPHA, .ONE_MINUS_SRC_ALPHA },
+OP_STATE_TABLE := [CompositeOperation][2]BlendFactor {
+	.SOURCE_OVER = {.ONE,                  .ONE_MINUS_SRC_ALPHA},
+	.SOURCE_IN   = {.DST_ALPHA,           .ZERO},
+	.SOURCE_OUT  = {.ONE_MINUS_DST_ALPHA, .ZERO},
+	.ATOP        = {.DST_ALPHA,           .ONE_MINUS_SRC_ALPHA},
 
-	.DESTINATION_OVER = { .ONE_MINUS_DST_ALPHA, .ONE },
-	.DESTINATION_IN = { .ZERO, .SRC_ALPHA },
-	.DESTINATION_OUT = { .ZERO, .ONE_MINUS_SRC_ALPHA },
-	.DESTINATION_ATOP = { .ONE_MINUS_DST_ALPHA, .SRC_ALPHA },
+	.DESTINATION_OVER = {.ONE_MINUS_DST_ALPHA, .ONE},
+	.DESTINATION_IN   = {.ZERO,                .SRC_ALPHA},
+	.DESTINATION_OUT  = {.ZERO,                .ONE_MINUS_SRC_ALPHA},
+	.DESTINATION_ATOP = {.ONE_MINUS_DST_ALPHA, .SRC_ALPHA},
 
-	.LIGHTER = { .ONE, .ONE },
-	.COPY = { .ONE, .ZERO },
-	.XOR = { .ONE_MINUS_DST_ALPHA, .ONE_MINUS_SRC_ALPHA },
+	.LIGHTER = {.ONE,                 .ONE},
+	.COPY    = {.ONE,                 .ZERO},
+	.XOR     = {.ONE_MINUS_DST_ALPHA, .ONE_MINUS_SRC_ALPHA},
 }
 
 __compositeOperationState :: proc(op: CompositeOperation) -> (res: CompositeOperationState) {
-	table := OP_STATE_TABLE
-	factors := table[op]
-	res.srcRGB = factors.x
-	res.dstRGB = factors.y
+	factors := OP_STATE_TABLE[op]
+	res.srcRGB   = factors.x
+	res.dstRGB   = factors.y
 	res.srcAlpha = factors.x
 	res.dstAlpha = factors.y
 	return
@@ -1236,20 +1232,19 @@ GlobalCompositeBlendFunc :: proc(ctx: ^Context, sfactor, dfactor: BlendFactor) {
 
 // Sets the composite operation with custom pixel arithmetic for RGB and alpha components separately. The parameters should be one of NVGblendFactor.
 GlobalCompositeBlendFuncSeparate :: proc(
-	ctx: ^Context,
-	srcRGB: BlendFactor,
-	dstRGB: BlendFactor,
+	ctx:      ^Context,
+	srcRGB:   BlendFactor,
+	dstRGB:   BlendFactor,
 	srcAlpha: BlendFactor,
 	dstAlpha: BlendFactor,
 ) {
-	op := CompositeOperationState {
+	state := __getState(ctx)
+	state.compositeOperation = CompositeOperationState{
 		srcRGB,
 		dstRGB,
 		srcAlpha,
 		dstAlpha,
 	}
-	state := __getState(ctx)
-	state.compositeOperation = op
 }
 
 ///////////////////////////////////////////////////////////
@@ -1277,46 +1272,38 @@ __distPtSeg :: proc(x, y, px, py, qx, qy: f32) -> f32 {
 	if d > 0 {
 		t /= d
 	}
-	
-	if t < 0 {
-		t = 0
-	} else if t > 1 {
-		t = 1
-	} 
+	t = clamp(t, 0, 1)
 
 	dx = px + t * pqx - x
 	dy = py + t * pqy - y
 	return dx * dx + dy * dy
 }
 
-__appendCommands :: proc(ctx: ^Context, values: []f32) {
+__appendCommands :: proc(ctx: ^Context, values: ..f32) {
 	state := __getState(ctx)
 
 	if Commands(values[0]) != .CLOSE && Commands(values[0]) != .WINDING {
-		ctx.commandx = values[len(values) - 2]
-		ctx.commandy = values[len(values) - 1]
+		ctx.commandx = values[len(values)-2]
+		ctx.commandy = values[len(values)-1]
 	}
-
-	i := 0
-	for i < len(values) {
+	for i := 0; i < len(values); /**/ {
 		cmd := Commands(values[i])
 
 		switch cmd {
 		case .MOVE_TO, .LINE_TO:
-			TransformPoint(&values[i + 1], &values[i + 2], state.xform, values[i + 1], values[i + 2])
+			TransformPoint(&values[i+1], &values[i+2], state.xform, values[i+1], values[i+2])
 			i += 3
-
 		case .BEZIER_TO:
-			TransformPoint(&values[i + 1], &values[i + 2], state.xform, values[i + 1], values[i + 2])
-			TransformPoint(&values[i + 3], &values[i + 4], state.xform, values[i + 3], values[i + 4])
-			TransformPoint(&values[i + 5], &values[i + 6], state.xform, values[i + 5], values[i + 6])
+			TransformPoint(&values[i+1], &values[i+2], state.xform, values[i+1], values[i+2])
+			TransformPoint(&values[i+3], &values[i+4], state.xform, values[i+3], values[i+4])
+			TransformPoint(&values[i+5], &values[i+6], state.xform, values[i+5], values[i+6])
 			i += 7
-
-		case .CLOSE: i += 1
-		case .WINDING: i += 2
-
-		// default
-		case: i += 1
+		case .CLOSE:
+			i += 1
+		case .WINDING:
+			i += 2
+		case:
+			i += 1
 		}
 	}
 
@@ -1331,22 +1318,22 @@ __clearPathCache :: proc(ctx: ^Context) {
 
 __lastPath :: proc(ctx: ^Context) -> ^Path {
 	if len(ctx.cache.paths) > 0 {
-		return &ctx.cache.paths[len(ctx.cache.paths) - 1]
+		return &ctx.cache.paths[len(ctx.cache.paths)-1]
 	}
 
 	return nil
 }
 
 __addPath :: proc(ctx: ^Context) {
-	append(&ctx.cache.paths, Path {
-		first = len(ctx.cache.points),
+	append(&ctx.cache.paths, Path{
+		first   = len(ctx.cache.points),
 		winding = .CCW,
 	})
 }
 
 __lastPoint :: proc(ctx: ^Context) -> ^Point {
 	if len(ctx.cache.paths) > 0 {
-		return &ctx.cache.points[len(ctx.cache.points) - 1]
+		return &ctx.cache.points[len(ctx.cache.points)-1]
 	}
 
 	return nil
@@ -1368,7 +1355,7 @@ __addPoint :: proc(ctx: ^Context, x, y: f32, flags: PointFlags) {
 		}
 	}
 
-	append(&ctx.cache.points, Point {
+	append(&ctx.cache.points, Point{
 		x = x,
 		y = y,
 		flags = flags,
@@ -1415,7 +1402,7 @@ __polyArea :: proc(points: []Point) -> f32 {
 	
 	for i := 2; i < len(points); i += 1 {
 		a := &points[0]
-		b := &points[i - 1]
+		b := &points[i-1]
 		c := &points[i]
 		area += __triarea2(a.x, a.y, b.x, b.y, c.x, c.y)
 	}
@@ -1448,24 +1435,24 @@ __normalize :: proc(x, y: ^f32) -> f32 {
 }
 
 __tesselateBezier :: proc(
-	ctx: ^Context,
+	ctx:    ^Context,
 	x1, y1: f32,
 	x2, y2: f32,
 	x3, y3: f32,
 	x4, y4: f32,
-	level: int,
-	flags: PointFlags,
+	level:  int,
+	flags:  PointFlags,
 ) {
 	if level > 10 {
 		return
 	}
 
-	x12 := (x1 + x2) * 0.5
-	y12 := (y1 + y2) * 0.5
-	x23 := (x2 + x3) * 0.5
-	y23 := (y2 + y3) * 0.5
-	x34 := (x3 + x4) * 0.5
-	y34 := (y3 + y4) * 0.5
+	x12  := (x1  + x2)  * 0.5
+	y12  := (y1  + y2)  * 0.5
+	x23  := (x2  + x3)  * 0.5
+	y23  := (y2  + y3)  * 0.5
+	x34  := (x3  + x4)  * 0.5
+	y34  := (y3  + y4)  * 0.5
 	x123 := (x12 + x23) * 0.5
 	y123 := (y12 + y23) * 0.5
 
@@ -1479,8 +1466,8 @@ __tesselateBezier :: proc(
 		return
 	}
 
-	x234 := (x23 + x34) * 0.5
-	y234 := (y23 + y34) * 0.5
+	x234  := (x23  + x34)  * 0.5
+	y234  := (y23  + y34)  * 0.5
 	x1234 := (x123 + x234) * 0.5
 	y1234 := (y123 + y234) * 0.5
 
@@ -1504,22 +1491,20 @@ __flattenPaths :: proc(ctx: ^Context) {
 		case .MOVE_TO:
 			__addPath(ctx)
 			p := ctx.commands[i + 1:]
-			__addPoint(ctx, p[0], p[1], { .CORNER })
+			__addPoint(ctx, p[0], p[1], {.CORNER})
 			i += 3
 
 		case .LINE_TO:
 			p := ctx.commands[i + 1:]
-			__addPoint(ctx, p[0], p[1], { .CORNER })
+			__addPoint(ctx, p[0], p[1], {.CORNER})
 			i += 3
 
 		case .BEZIER_TO:
-			last := __lastPoint(ctx)
-		
-			if last != nil {
+			if last := __lastPoint(ctx); last != nil {
 				cp1 := ctx.commands[i + 1:]
 				cp2 := ctx.commands[i + 3:]
 				p := ctx.commands[i + 5:]
-				__tesselateBezier(ctx, last.x,last.y, cp1[0],cp1[1], cp2[0],cp2[1], p[0],p[1], 0, { .CORNER })
+				__tesselateBezier(ctx, last.x,last.y, cp1[0],cp1[1], cp2[0],cp2[1], p[0],p[1], 0, {.CORNER})
 			}
 
 			i += 7
@@ -1542,8 +1527,7 @@ __flattenPaths :: proc(ctx: ^Context) {
 	cache.bounds[3] = -1e6
 
 	// Calculate the direction and length of line segments.
-	for j in 0..<len(cache.paths) {
-		path := &cache.paths[j]
+	for &path in cache.paths {
 		pts := cache.points[path.first:]
 
 		// If the first and last points are the same, remove the last, mark as closed path.
@@ -1551,7 +1535,7 @@ __flattenPaths :: proc(ctx: ^Context) {
 		p1 := &pts[0]
 		if __ptEquals(p0.x,p0.y, p1.x,p1.y, ctx.distTol) {
 			path.count -= 1
-			p0 = &pts[path.count - 1]
+			p0 = &pts[path.count-1]
 			path.closed = true
 		}
 
@@ -1618,24 +1602,19 @@ __chooseBevel :: proc(
 
 // set vertex & increase slice position (decreases length)
 __vset :: proc(dst: ^[]Vertex, x, y, u, v: f32, loc := #caller_location) {
-	dst[0] = { x, y, u, v }
+	dst[0] = {x, y, u, v}
 	dst^ = dst[1:]
 }
 
 __roundJoin :: proc(
-	dst: ^[]Vertex,
-	p0: ^Point,
-	p1: ^Point,
-	lw: f32,
-	rw: f32,
-	lu: f32,
-	ru: f32,
-	ncap: int,
+	dst:    ^[]Vertex,
+	p0, p1: ^Point,
+	lw, rw: f32,
+	lu,ru:  f32,
+	ncap:   int,
 ) {
-	dlx0 := p0.dy
-	dly0 := -p0.dx
-	dlx1 := p1.dy
-	dly1 := -p1.dx
+	dlx0, dly0 := p0.dy, -p0.dx
+	dlx1, dly1 := p1.dy, -p1.dx
 
 	if .LEFT in p1.flags {
 		lx0,ly0,lx1,ly1: f32
@@ -1659,11 +1638,11 @@ __roundJoin :: proc(
 			rx := p1.x + math.cos(a) * rw
 			ry := p1.y + math.sin(a) * rw
 			__vset(dst, p1.x, p1.y, 0.5, 1)
-			__vset(dst, rx, ry, ru,1)
+			__vset(dst, rx, ry, ru, 1)
 		}
 
-		__vset(dst, lx1, ly1, lu,1)
-		__vset(dst, p1.x - dlx1*rw, p1.y - dly1*rw, ru,1)
+		__vset(dst, lx1, ly1, lu, 1)
+		__vset(dst, p1.x - dlx1*rw, p1.y - dly1*rw, ru, 1)
 	} else {
 		rx0,ry0,rx1,ry1: f32
 		__chooseBevel(.INNER_BEVEL in p1.flags, p0, p1, -rw, &rx0, &ry0, &rx1, &ry1)
@@ -1673,8 +1652,8 @@ __roundJoin :: proc(
 			a1 += math.PI * 2
 		}
 
-		__vset(dst, p1.x + dlx0*rw, p1.y + dly0*rw, lu,1)
-		__vset(dst, rx0, ry0, ru,1)
+		__vset(dst, p1.x + dlx0*rw, p1.y + dly0*rw, lu, 1)
+		__vset(dst, rx0, ry0, ru, 1)
 
 		temp := int(math.ceil((a1 - a0) / math.PI * f32(ncap)))
 		n := clamp(temp, 2, ncap)
@@ -1688,24 +1667,19 @@ __roundJoin :: proc(
 			__vset(dst, p1.x, p1.y, 0.5, 1)
 		}
 
-		__vset(dst, p1.x + dlx1*rw, p1.y + dly1*rw, lu,1)
-		__vset(dst, rx1, ry1, ru,1)
+		__vset(dst, p1.x + dlx1*rw, p1.y + dly1*rw, lu, 1)
+		__vset(dst, rx1, ry1, ru, 1)
 	}
 }
 
 __bevelJoin :: proc(
-	dst: ^[]Vertex,
-	p0: ^Point,
-	p1: ^Point,
-	lw: f32,
-	rw: f32,
-	lu: f32,
-	ru: f32,
+	dst:    ^[]Vertex,
+	p0, p1: ^Point,
+	lw, rw: f32,
+	lu, ru: f32,
 ) {
-	dlx0 := p0.dy
-	dly0 := -p0.dx
-	dlx1 := p1.dy
-	dly1 := -p1.dx
+	dlx0,dly0  := p0.dy, -p0.dx
+	dlx1, dly1 := p1.dy, -p1.dx
 
 	rx0, ry0, rx1, ry1: f32
 	lx0, ly0, lx1, ly1: f32
@@ -1713,71 +1687,71 @@ __bevelJoin :: proc(
 	if .LEFT in p1.flags {
 		__chooseBevel(.INNER_BEVEL in p1.flags, p0, p1, lw, &lx0,&ly0, &lx1,&ly1)
 
-		__vset(dst, lx0, ly0, lu,1)
-		__vset(dst, p1.x - dlx0*rw, p1.y - dly0*rw, ru,1)
+		__vset(dst, lx0, ly0, lu, 1)
+		__vset(dst, p1.x - dlx0*rw, p1.y - dly0*rw, ru, 1)
 
 		if .BEVEL in p1.flags {
-			__vset(dst, lx0, ly0, lu,1)
-			__vset(dst, p1.x - dlx0*rw, p1.y - dly0*rw, ru,1)
+			__vset(dst, lx0, ly0, lu, 1)
+			__vset(dst, p1.x - dlx0*rw, p1.y - dly0*rw, ru, 1)
 
-			__vset(dst, lx1, ly1, lu,1)
-			__vset(dst, p1.x - dlx1*rw, p1.y - dly1*rw, ru,1)
+			__vset(dst, lx1, ly1, lu, 1)
+			__vset(dst, p1.x - dlx1*rw, p1.y - dly1*rw, ru, 1)
 		} else {
 			rx0 = p1.x - p1.dmx * rw
 			ry0 = p1.y - p1.dmy * rw
 
-			__vset(dst, p1.x, p1.y, 0.5,1)
-			__vset(dst, p1.x - dlx0*rw, p1.y - dly0*rw, ru,1)
+			__vset(dst, p1.x, p1.y, 0.5, 1)
+			__vset(dst, p1.x - dlx0*rw, p1.y - dly0*rw, ru, 1)
 
-			__vset(dst, rx0, ry0, ru,1)
-			__vset(dst, rx0, ry0, ru,1)
+			__vset(dst, rx0, ry0, ru, 1)
+			__vset(dst, rx0, ry0, ru, 1)
 
-			__vset(dst, p1.x, p1.y, 0.5,1)
-			__vset(dst, p1.x - dlx1*rw, p1.y - dly1*rw, ru,1)
+			__vset(dst, p1.x, p1.y, 0.5, 1)
+			__vset(dst, p1.x - dlx1*rw, p1.y - dly1*rw, ru, 1)
 		}
 
-		__vset(dst, lx1, ly1, lu,1)
-		__vset(dst, p1.x - dlx1*rw, p1.y - dly1*rw, ru,1)
+		__vset(dst, lx1, ly1, lu, 1)
+		__vset(dst, p1.x - dlx1*rw, p1.y - dly1*rw, ru, 1)
 	} else {
 		__chooseBevel(.INNER_BEVEL in p1.flags, p0, p1, -rw, &rx0,&ry0, &rx1,&ry1)
 
-		__vset(dst, p1.x + dlx0*lw, p1.y + dly0*lw, lu,1)
-		__vset(dst, rx0, ry0, ru,1)
+		__vset(dst, p1.x + dlx0*lw, p1.y + dly0*lw, lu, 1)
+		__vset(dst, rx0, ry0, ru, 1)
 
 		if .BEVEL in p1.flags {
-			__vset(dst, p1.x + dlx0*lw, p1.y + dly0*lw, lu,1)
-			__vset(dst, rx0, ry0, ru,1)
+			__vset(dst, p1.x + dlx0*lw, p1.y + dly0*lw, lu, 1)
+			__vset(dst, rx0, ry0, ru, 1)
 
-			__vset(dst, p1.x + dlx1*lw, p1.y + dly1*lw, lu,1)
-			__vset(dst, rx1, ry1, ru,1)
+			__vset(dst, p1.x + dlx1*lw, p1.y + dly1*lw, lu, 1)
+			__vset(dst, rx1, ry1, ru, 1)
 		} else {
 			lx0 = p1.x + p1.dmx * lw
 			ly0 = p1.y + p1.dmy * lw
 
-			__vset(dst, p1.x + dlx0*lw, p1.y + dly0*lw, lu,1)
-			__vset(dst, p1.x, p1.y, 0.5,1)
+			__vset(dst, p1.x + dlx0*lw, p1.y + dly0*lw, lu, 1)
+			__vset(dst, p1.x, p1.y, 0.5, 1)
 
-			__vset(dst, lx0, ly0, lu,1)
-			__vset(dst, lx0, ly0, lu,1)
+			__vset(dst, lx0, ly0, lu, 1)
+			__vset(dst, lx0, ly0, lu, 1)
 
-			__vset(dst, p1.x + dlx1*lw, p1.y + dly1*lw, lu,1)
-			__vset(dst, p1.x, p1.y, 0.5,1)
+			__vset(dst, p1.x + dlx1*lw, p1.y + dly1*lw, lu, 1)
+			__vset(dst, p1.x, p1.y, 0.5, 1)
 		}
 
-		__vset(dst, p1.x + dlx1*lw, p1.y + dly1*lw, lu,1)
-		__vset(dst, rx1, ry1, ru,1)
+		__vset(dst, p1.x + dlx1*lw, p1.y + dly1*lw, lu, 1)
+		__vset(dst, rx1, ry1, ru, 1)
 	}
 }
 
 __buttCapStart :: proc(
-	dst: ^[]Vertex,
-	p: ^Point,
+	dst:    ^[]Vertex,
+	p:      ^Point,
 	dx, dy: f32,
-	w: f32,
-	d: f32,
-	aa: f32,
-	u0: f32,
-	u1: f32,
+	w:      f32,
+	d:      f32,
+	aa:     f32,
+	u0:     f32,
+	u1:     f32,
 ) {
 	px := p.x - dx * d
 	py := p.y - dy * d
@@ -1790,14 +1764,14 @@ __buttCapStart :: proc(
 }
 
 __buttCapEnd :: proc(
-	dst: ^[]Vertex,
-	p: ^Point,
+	dst:    ^[]Vertex,
+	p:      ^Point,
 	dx, dy: f32,
-	w: f32,
-	d: f32,
-	aa: f32,
-	u0: f32,
-	u1: f32,
+	w:      f32,
+	d:      f32,
+	aa:     f32,
+	u0:     f32,
+	u1:     f32,
 ) {
 	px := p.x + dx * d
 	py := p.y + dy * d
@@ -1810,13 +1784,13 @@ __buttCapEnd :: proc(
 }
 
 __roundCapStart :: proc(
-	dst: ^[]Vertex,
-	p: ^Point,
+	dst:    ^[]Vertex,
+	p:      ^Point,
 	dx, dy: f32,
-	w: f32,
-	ncap: int,
-	u0: f32,
-	u1: f32,
+	w:      f32,
+	ncap:   int,
+	u0:     f32,
+	u1:     f32,
 ) {
 	px := p.x
 	py := p.y
@@ -1828,7 +1802,7 @@ __roundCapStart :: proc(
 		ax := math.cos(a) * w
 		ay := math.sin(a) * w
 		__vset(dst, px - dlx*ax - dx*ay, py - dly*ax - dy*ay, u0,1)
-		__vset(dst, px, py, 0.5,1)
+		__vset(dst, px, py, 0.5, 1)
 	}
 
 	__vset(dst, px + dlx*w, py + dly*w, u0,1)
@@ -1836,13 +1810,13 @@ __roundCapStart :: proc(
 }
 
 __roundCapEnd :: proc(
-	dst: ^[]Vertex,
-	p: ^Point,
+	dst:    ^[]Vertex,
+	p:      ^Point,
 	dx, dy: f32,
-	w: f32,
-	ncap: int,
-	u0: f32,
-	u1: f32,
+	w:      f32,
+	ncap:   int,
+	u0:     f32,
+	u1:     f32,
 ) {
 	px := p.x
 	py := p.y
@@ -1855,15 +1829,15 @@ __roundCapEnd :: proc(
 		a := f32(i) / f32(ncap - 1) * math.PI
 		ax := math.cos(a) * w
 		ay := math.sin(a) * w
-		__vset(dst, px, py, 0.5,1)
+		__vset(dst, px, py, 0.5, 1)
 		__vset(dst, px - dlx*ax + dx*ay, py - dly*ax + dy*ay, u0,1)
 	}
 }
 
 __calculateJoins :: proc(
-	ctx: ^Context,
-	w: f32,
-	lineJoin: LineCapType,
+	ctx:        ^Context,
+	w:          f32,
+	lineJoin:   LineCapType,
 	miterLimit: f32,
 ) {
 	cache := &ctx.cache
@@ -1876,8 +1850,8 @@ __calculateJoins :: proc(
 	// Calculate which joins needs extra vertices to append, and gather vertex count.
 	for &path in cache.paths {
 		pts := cache.points[path.first:]
-		p0 := &pts[path.count-1]
-		p1 := &pts[0]
+		p0  := &pts[path.count-1]
+		p1  := &pts[0]
 		nleft := 0
 		path.nbevel = 0
 
@@ -1891,9 +1865,9 @@ __calculateJoins :: proc(
 			p1.dmx = (dlx0 + dlx1) * 0.5
 			p1.dmy = (dly0 + dly1) * 0.5
 			dmr2 = p1.dmx*p1.dmx + p1.dmy*p1.dmy
-			if (dmr2 > 0.000001) {
+			if dmr2 > 0.000001 {
 				scale := 1.0 / dmr2
-				if (scale > 600.0) {
+				if scale > 600.0 {
 					scale = 600.0
 				}
 				p1.dmx *= scale
@@ -1901,25 +1875,25 @@ __calculateJoins :: proc(
 			}
 
 			// Clear flags, but keep the corner.
-			p1.flags = (.CORNER in p1.flags) ? { .CORNER } : {}
+			p1.flags = {.CORNER} if .CORNER in p1.flags else nil
 
 			// Keep track of left turns.
 			__cross = p1.dx * p0.dy - p0.dx * p1.dy
 			if __cross > 0.0 {
 				nleft += 1
-				incl(&p1.flags, PointFlag.LEFT)
+				p1.flags += {.LEFT}
 			}
 
 			// Calculate if we should use bevel or miter for inner join.
 			limit = max(1.01, min(p0.len, p1.len) * iw)
 			if (dmr2 * limit * limit) < 1.0 {
-				incl(&p1.flags, PointFlag.INNER_BEVEL)
+				p1.flags += {.INNER_BEVEL}
 			}
 
 			// Check to see if the corner needs to be beveled.
 			if .CORNER in p1.flags {
 				if (dmr2 * miterLimit*miterLimit) < 1.0 || lineJoin == .BEVEL || lineJoin == .ROUND {
-					incl(&p1.flags, PointFlag.BEVEL)
+					p1.flags += {.BEVEL}
 				}
 			}
 
@@ -1942,11 +1916,11 @@ __allocTempVerts :: proc(ctx: ^Context, nverts: int) -> []Vertex {
 }
 
 __expandStroke :: proc(
-	ctx: ^Context,
-	w: f32,
-	fringe: f32,
-	lineCap: LineCapType,
-	lineJoin: LineCapType,
+	ctx:        ^Context,
+	w:          f32,
+	fringe:     f32,
+	lineCap:    LineCapType,
+	lineJoin:   LineCapType,
 	miterLimit: f32,	
 ) -> bool {
 	cache := &ctx.cache
@@ -1968,7 +1942,7 @@ __expandStroke :: proc(
 
 	// Calculate max vertex usage.
 	cverts := 0
-	for &path in cache.paths {
+	for path in cache.paths {
 		loop := path.closed
 	
 		// TODO check if f32 calculation necessary?	
@@ -1991,8 +1965,7 @@ __expandStroke :: proc(
 	verts := __allocTempVerts(ctx, cverts)
 	dst_index: int
 
-	for i in 0..<len(cache.paths) {
-		path := &cache.paths[i]
+	for &path in cache.paths {
 		pts := cache.points[path.first:]
 		p0, p1: ^Point
 		start, end: int
@@ -2085,9 +2058,9 @@ __expandStroke :: proc(
 }
 
 __expandFill :: proc(
-	ctx: ^Context,
-	w: f32,
-	lineJoin: LineCapType,
+	ctx:        ^Context,
+	w:          f32,
+	lineJoin:   LineCapType,
 	miterLimit: f32,
 ) -> bool {
 	cache := &ctx.cache
@@ -2097,7 +2070,7 @@ __expandFill :: proc(
 
 	// Calculate max vertex usage.
 	cverts := 0
-	for &path in cache.paths {
+	for path in cache.paths {
 		cverts += path.count + path.nbevel + 1
 
 		if fringe {
@@ -2125,7 +2098,7 @@ __expandFill :: proc(
 			p0 = &pts[path.count-1]
 			p1 = &pts[0]
 
-			for j in 0..<path.count {
+			for _ in 0..<path.count {
 				if .BEVEL in p1.flags {
 					dlx0 := p0.dy
 					dly0 := -p0.dx
@@ -2135,25 +2108,25 @@ __expandFill :: proc(
 					if .LEFT in p1.flags {
 						lx := p1.x + p1.dmx * woff
 						ly := p1.y + p1.dmy * woff
-						__vset(&dst, lx, ly, 0.5,1)
+						__vset(&dst, lx, ly, 0.5, 1)
 					} else {
 						lx0 := p1.x + dlx0 * woff
 						ly0 := p1.y + dly0 * woff
 						lx1 := p1.x + dlx1 * woff
 						ly1 := p1.y + dly1 * woff
-						__vset(&dst, lx0, ly0, 0.5,1)
-						__vset(&dst, lx1, ly1, 0.5,1)
+						__vset(&dst, lx0, ly0, 0.5, 1)
+						__vset(&dst, lx1, ly1, 0.5, 1)
 					}
 				} else {
-					__vset(&dst, p1.x + (p1.dmx * woff), p1.y + (p1.dmy * woff), 0.5,1)
+					__vset(&dst, p1.x + (p1.dmx * woff), p1.y + (p1.dmy * woff), 0.5, 1)
 				}
 
 				p0 = p1
 				p1 = mem.ptr_offset(p1, 1)
 			}
 		} else {
-			for j in 0..<path.count {
-				__vset(&dst, pts[j].x, pts[j].y, 0.5,1)
+			for v in pts[:path.count] {
+				__vset(&dst, v.x, v.y, 0.5, 1)
 			}
 		}
 
@@ -2182,12 +2155,12 @@ __expandFill :: proc(
 			p0 = &pts[path.count-1]
 			p1 = &pts[0]
 
-			for j in 0..<path.count {
+			for _ in 0..<path.count {
 				if (.BEVEL in p1.flags) || (.INNER_BEVEL in p1.flags) {
 					__bevelJoin(&dst, p0, p1, lw, rw, lu, ru)
 				} else {
-					__vset(&dst, p1.x + (p1.dmx * lw), p1.y + (p1.dmy * lw), lu,1)
-					__vset(&dst, p1.x - (p1.dmx * rw), p1.y - (p1.dmy * rw), ru,1)
+					__vset(&dst, p1.x + (p1.dmx * lw), p1.y + (p1.dmy * lw), lu, 1)
+					__vset(&dst, p1.x - (p1.dmx * rw), p1.y - (p1.dmy * rw), ru, 1)
 				}
 
 				p0 = p1
@@ -2195,8 +2168,8 @@ __expandFill :: proc(
 			}
 
 			// Loop it
-			__vset(&dst, verts[dst_index + 0].x, verts[dst_index + 0].y, lu,1)
-			__vset(&dst, verts[dst_index + 1].x, verts[dst_index + 1].y, ru,1)
+			__vset(&dst, verts[dst_index + 0].x, verts[dst_index + 0].y, lu, 1)
+			__vset(&dst, verts[dst_index + 1].x, verts[dst_index + 1].y, ru, 1)
 
 			dst_diff := dst_start_length - len(dst) 
 			path.stroke = verts[dst_index:dst_index + dst_diff]
@@ -2257,14 +2230,12 @@ FillStrokeScoped :: proc(ctx: ^Context) {
 
 // Starts new sub-path with specified point as first point.
 MoveTo :: proc(ctx: ^Context, x, y: f32) {
-	values := [3]f32 { __cmdf(.MOVE_TO), x, y }
-	__appendCommands(ctx, values[:])
+	__appendCommands(ctx, __cmdf(.MOVE_TO), x, y)
 }
 
 // Adds line segment from the last point in the path to the specified point.
 LineTo :: proc(ctx: ^Context, x, y: f32) {
-	values := [3]f32 { __cmdf(.LINE_TO), x, y }
-	__appendCommands(ctx, values[:])
+	__appendCommands(ctx, __cmdf(.LINE_TO), x, y)
 }
 
 // Adds cubic bezier segment from last point in the path via two control points to the specified point.
@@ -2274,24 +2245,22 @@ BezierTo :: proc(
 	c2x, c2y: f32,
 	x, y: f32,
 ) {
-	values := [?]f32 { __cmdf(.BEZIER_TO), c1x, c1y, c2x, c2y, x, y }
-	__appendCommands(ctx, values[:])
+	__appendCommands(ctx, __cmdf(.BEZIER_TO), c1x, c1y, c2x, c2y, x, y)
 }
 
 // Adds quadratic bezier segment from last point in the path via a control point to the specified point.
 QuadTo :: proc(ctx: ^Context, cx, cy, x, y: f32) {
 	x0 := ctx.commandx
 	y0 := ctx.commandy
-	values := [?]f32 {
+	__appendCommands(ctx,
 		__cmdf(.BEZIER_TO),
-		x0 + 2 / 3 * (cx - x0), 
+		x0 + 2 / 3 * (cx - x0),
 		y0 + 2 / 3 * (cy - y0),
-		x + 2 / 3 * (cx - x), 
-		y + 2 / 3 * (cy - y),
+		x  + 2 / 3 * (cx - x),
+		y  + 2 / 3 * (cy - y),
 		x,
 		y,
-	}
-	__appendCommands(ctx, values[:])
+	)
 }
 
 // Adds an arc segment at the corner defined by the last path point, and two specified points.
@@ -2419,37 +2388,33 @@ Arc :: proc(ctx: ^Context, cx, cy, r, a0, a1: f32, dir: Winding) {
 	}
 
 	// stored internally
-	__appendCommands(ctx, values[:nvals])
+	__appendCommands(ctx, ..values[:nvals])
 }
 
 // Closes current sub-path with a line segment.
 ClosePath :: proc(ctx: ^Context) {
-	values := [1]f32 { __cmdf(.CLOSE) }
-	__appendCommands(ctx, values[:])
+	__appendCommands(ctx, __cmdf(.CLOSE))
 }
 
 // Sets the current sub-path winding, see NVGwinding and NVGsolidity.
 PathWinding :: proc(ctx: ^Context, direction: Winding) {
-	values := [2]f32 { __cmdf(.WINDING), f32(direction) }
-	__appendCommands(ctx, values[:])	
+	__appendCommands(ctx, __cmdf(.WINDING), f32(direction))
 }
 
 // same as path_winding but with different enum
 PathSolidity :: proc(ctx: ^Context, solidity: Solidity) {
-	values := [2]f32 { __cmdf(.WINDING), f32(solidity) }
-	__appendCommands(ctx, values[:])	
+	__appendCommands(ctx, __cmdf(.WINDING), f32(solidity))
 }
 
 // Creates new rectangle shaped sub-path.
 Rect :: proc(ctx: ^Context, x, y, w, h: f32) {
-	values := [?]f32 {
+	__appendCommands(ctx,
 		__cmdf(.MOVE_TO), x, y,
 		__cmdf(.LINE_TO), x, y + h,
 		__cmdf(.LINE_TO), x + w, y + h,
 		__cmdf(.LINE_TO), x + w, y,
 		__cmdf(.CLOSE),
-	}
-	__appendCommands(ctx, values[:])
+	)
 }
 
 // Creates new rounded rectangle shaped sub-path.
@@ -2472,15 +2437,15 @@ RoundedRectVarying :: proc(
 	} else {
 		halfw := abs(w) * 0.5
 		halfh := abs(h) * 0.5
-		rxBL := min(radius_bottom_left, halfw) * math.sign(w)
-		ryBL := min(radius_bottom_left, halfh) * math.sign(h)
-		rxBR := min(radius_bottom_right, halfw) * math.sign(w)
-		ryBR := min(radius_bottom_right, halfh) * math.sign(h)
-		rxTR := min(radius_top_right, halfw) * math.sign(w)
-		ryTR := min(radius_top_right, halfh) * math.sign(h)
-		rxTL := min(radius_top_left, halfw) * math.sign(w)
-		ryTL := min(radius_top_left, halfh) * math.sign(h)
-		values := [?]f32 {
+		rxBL  := min(radius_bottom_left, halfw) * math.sign(w)
+		ryBL  := min(radius_bottom_left, halfh) * math.sign(h)
+		rxBR  := min(radius_bottom_right, halfw) * math.sign(w)
+		ryBR  := min(radius_bottom_right, halfh) * math.sign(h)
+		rxTR  := min(radius_top_right, halfw) * math.sign(w)
+		ryTR  := min(radius_top_right, halfh) * math.sign(h)
+		rxTL  := min(radius_top_left, halfw) * math.sign(w)
+		ryTL  := min(radius_top_left, halfh) * math.sign(h)
+		__appendCommands(ctx,
 			__cmdf(.MOVE_TO), x, y + ryTL,
 			__cmdf(.LINE_TO), x, y + h - ryBL,
 			__cmdf(.BEZIER_TO), x, y + h - ryBL*(1 - KAPPA), x + rxBL*(1 - KAPPA), y + h, x + rxBL, y + h,
@@ -2491,22 +2456,20 @@ RoundedRectVarying :: proc(
 			__cmdf(.LINE_TO), x + rxTL, y,
 			__cmdf(.BEZIER_TO), x + rxTL*(1 - KAPPA), y, x, y + ryTL*(1 - KAPPA), x, y + ryTL,
 			__cmdf(.CLOSE),
-		}
-		__appendCommands(ctx, values[:])
+		)
 	}
 }
 
 // Creates new ellipse shaped sub-path.
 Ellipse :: proc(ctx: ^Context, cx, cy, rx, ry: f32) {
-	values := [?]f32 {
+	__appendCommands(ctx,
 		__cmdf(.MOVE_TO), cx-rx, cy,
 		__cmdf(.BEZIER_TO), cx-rx, cy+ry*KAPPA, cx-rx*KAPPA, cy+ry, cx, cy+ry,
 		__cmdf(.BEZIER_TO), cx+rx*KAPPA, cy+ry, cx+rx, cy+ry*KAPPA, cx+rx, cy,
 		__cmdf(.BEZIER_TO), cx+rx, cy-ry*KAPPA, cx+rx*KAPPA, cy-ry, cx, cy-ry,
 		__cmdf(.BEZIER_TO), cx-rx*KAPPA, cy-ry, cx-rx, cy-ry*KAPPA, cx-rx, cy,
 		__cmdf(.CLOSE),
-	}
-	__appendCommands(ctx, values[:])
+	)
 }
 
 // Creates new circle shaped sub-path.
@@ -2542,7 +2505,7 @@ Fill :: proc(ctx: ^Context) {
 		ctx.cache.paths[:],
 	)
 
-	for &path in ctx.cache.paths {
+	for path in ctx.cache.paths {
 		ctx.fillTriCount += len(path.fill) - 2
 		ctx.fillTriCount += len(path.stroke) - 2
 		ctx.drawCallCount += 2
@@ -2588,7 +2551,7 @@ Stroke :: proc(ctx: ^Context) {
 		ctx.cache.paths[:],
 	)
 
-	for &path in ctx.cache.paths {
+	for path in ctx.cache.paths {
 		ctx.strokeTriCount += len(path.stroke) - 2
 		ctx.drawCallCount += 1
 	}	
@@ -2597,22 +2560,22 @@ Stroke :: proc(ctx: ^Context) {
 DebugDumpPathCache :: proc(ctx: ^Context) {
 	fmt.printf("~~~~~~~~~~~~~Dumping %d cached paths\n", len(ctx.cache.paths))
 	
-	for &path, i in ctx.cache.paths {
+	for path, i in ctx.cache.paths {
 		fmt.printf(" - Path %d\n", i)
 		
 		if len(path.fill) != 0 {
 			fmt.printf("   - fill: %d\n", len(path.fill))
 			
-			for j in 0..<len(path.fill) {
-				fmt.printf("%f\t%f\n", path.fill[j].x, path.fill[j].y)
+			for v in path.fill {
+				fmt.printf("%f\t%f\n", v.x, v.y)
 			}
 		}
 
 		if len(path.stroke) != 0 {
 			fmt.printf("   - stroke: %d\n", len(path.stroke))
 			
-			for j in 0..<len(path.stroke) {
-				fmt.printf("%f\t%f\n", path.stroke[j].x, path.stroke[j].y)
+			for v in path.stroke {
+				fmt.printf("%f\t%f\n", v.x, v.y)
 			}
 		}
 	}
@@ -2766,7 +2729,6 @@ __flushTextTexture :: proc(ctx: ^Context) {
 	dirty: [4]f32
 	assert(ctx.params.renderUpdateTexture != nil)
 
-
 	if fontstash.ValidateTexture(&ctx.fs, &dirty) {
 		font_image := ctx.fontImages[ctx.fontImageIdx]
 		
@@ -2867,7 +2829,7 @@ TextIcon :: proc(ctx: ^Context, xpos, ypos: f32, codepoint: rune) -> f32 {
 	font := fontstash.__getFont(fs, state.fontId)
 	isize := i16(fstate.size * 10)
 	iblur := i16(fstate.blur)
-	glyph := fontstash.__getGlyph(fs, font, codepoint, isize, iblur)
+	glyph, _ := fontstash.__getGlyph(fs, font, codepoint, isize, iblur)
 	fscale := fontstash.__getPixelHeightScale(font, f32(isize) / 10)
 	
 	// transform x / y
@@ -2910,12 +2872,12 @@ TextIcon :: proc(ctx: ^Context, xpos, ypos: f32, codepoint: rune) -> f32 {
 		TransformPoint(&c[6], &c[7], state.xform, q.x0 * invscale, q.y1 * invscale)
 		
 		// Create triangles
-		verts[0] = { c[0], c[1], q.s0, q.t0 }
-		verts[1] = { c[4], c[5], q.s1, q.t1 }
-		verts[2] = { c[2], c[3], q.s1, q.t0 }
-		verts[3] = { c[0], c[1], q.s0, q.t0 }
-		verts[4] = { c[6], c[7], q.s0, q.t1 }
-		verts[5] = { c[4], c[5], q.s1, q.t1 }
+		verts[0] = {c[0], c[1], q.s0, q.t0}
+		verts[1] = {c[4], c[5], q.s1, q.t1}
+		verts[2] = {c[2], c[3], q.s1, q.t0}
+		verts[3] = {c[0], c[1], q.s0, q.t0}
+		verts[4] = {c[6], c[7], q.s0, q.t1}
+		verts[5] = {c[4], c[5], q.s1, q.t1}
 
 		ctx.textureDirty = true
 		__renderText(ctx, verts[:])
@@ -2986,12 +2948,12 @@ Text :: proc(ctx: ^Context, x, y: f32, text: string) -> f32 {
 		
 		// Create triangles
 		if nverts + 6 <= cverts {
-			verts[nverts]     = { c[0], c[1], q.s0, q.t0 }
-			verts[nverts + 1] = { c[4], c[5], q.s1, q.t1 }
-			verts[nverts + 2] = { c[2], c[3], q.s1, q.t0 }
-			verts[nverts + 3] = { c[0], c[1], q.s0, q.t0 }
-			verts[nverts + 4] = { c[6], c[7], q.s0, q.t1 }
-			verts[nverts + 5] = { c[4], c[5], q.s1, q.t1 }
+			verts[nverts+0] = {c[0], c[1], q.s0, q.t0}
+			verts[nverts+1] = {c[4], c[5], q.s1, q.t1}
+			verts[nverts+2] = {c[2], c[3], q.s1, q.t0}
+			verts[nverts+3] = {c[0], c[1], q.s0, q.t0}
+			verts[nverts+4] = {c[6], c[7], q.s0, q.t1}
+			verts[nverts+5] = {c[4], c[5], q.s1, q.t1}
 			nverts += 6
 		}
 	}
@@ -3033,17 +2995,17 @@ TextMetrics :: proc(ctx: ^Context) -> (ascender, descender, lineHeight: f32) {
 // Returns the horizontal advance of the measured text (i.e. where the next character should drawn).
 // Measured values are returned in local coordinate space.
 TextBounds :: proc(
-	ctx: ^Context,
-	x, y: f32,
-	input: string,
+	ctx:    ^Context,
+	x, y:   f32,
+	input:  string,
 	bounds: ^[4]f32 = nil,
 ) -> (advance: f32) {
-	state := __getState(ctx)
-	scale := __getFontScale(state) * ctx.devicePxRatio
+	state    := __getState(ctx)
+	scale    := __getFontScale(state) * ctx.devicePxRatio
 	invscale := f32(1.0) / scale
 
 	if state.fontId == -1 {
-		return {}
+		return 0
 	}
 
 	fs := &ctx.fs
@@ -3055,11 +3017,11 @@ TextBounds :: proc(
 	fontstash.SetFont(fs, state.fontId)
 
 	width := fontstash.TextBounds(fs, input, x * scale, y * scale, bounds)
-	
-	// Use line bounds for height.
-	one, two := fontstash.LineBounds(fs, y * scale)
 
 	if bounds != nil {
+		// Use line bounds for height.
+		one, two := fontstash.LineBounds(fs, y * scale)
+
 		bounds[1] = one
 		bounds[3] = two
 		bounds[0] *= invscale
@@ -3073,10 +3035,10 @@ TextBounds :: proc(
 
 // text row with relative byte offsets into a string
 Text_Row :: struct {
-	start: int,
-	end: int,
-	next: int,
-	width: f32,
+	start:      int,
+	end:        int,
+	next:       int,
+	width:      f32,
 	minx, maxx: f32,
 }
 
@@ -3091,10 +3053,10 @@ Codepoint_Type :: enum {
 // White space is stripped at the beginning of the rows, the text is split at word boundaries or when new-line characters are encountered.
 // Words longer than the max width are slit at nearest character (i.e. no hyphenation).
 TextBox :: proc(
-	ctx: ^Context, 
-	x, y: f32,
+	ctx:             ^Context,
+	x, y:            f32,
 	break_row_width: f32,
-	input: string,
+	input:           string,
 ) {
 	state := __getState(ctx)
 	rows: [2]Text_Row
@@ -3112,8 +3074,7 @@ TextBox :: proc(
 	y := y
 	input := input
 	for nrows, input_last in TextBreakLines(ctx, &input, break_row_width, &rows_mod) {
-		for i in 0..<nrows {
-			row := &rows[i]
+		for row in rows[:nrows] {
 			Text(ctx, x, y, input_last[row.start:row.end])		
 			y += lineHeight * state.lineHeight
 		}
@@ -3125,10 +3086,10 @@ TextBox :: proc(
 // White space is stripped at the beginning of the rows, the text is split at word boundaries or when new-line characters are encountered.
 // Words longer than the max width are slit at nearest character (i.e. no hyphenation).
 TextBreakLines :: proc(
-	ctx: ^Context,
-	text: ^string,
+	ctx:             ^Context,
+	text:            ^string,
 	break_row_width: f32,
-	rows: ^[]Text_Row,
+	rows:            ^[]Text_Row,
 ) -> (nrows: int, last: string, ok: bool) {
 	state := __getState(ctx)
 	scale := __getFontScale(state) * ctx.devicePxRatio
@@ -3144,7 +3105,7 @@ TextBreakLines :: proc(
 	word_start_x, word_min_x: f32
 
 	break_width, break_max_x: f32
-	type := Codepoint_Type.Space
+	type  := Codepoint_Type.Space
 	ptype := Codepoint_Type.Space
 	pcodepoint: rune
 
@@ -3160,9 +3121,10 @@ TextBreakLines :: proc(
 	fontstash.SetAlignVertical(fs, state.alignVertical)
 	fontstash.SetFont(fs, state.fontId)
 
-	break_x := break_row_width * scale
-	iter := fontstash.TextIterInit(fs, 0, 0, text^)
+	break_x   := break_row_width * scale
+	iter      := fontstash.TextIterInit(fs, 0, 0, text^)
 	prev_iter := iter
+
 	q: fontstash.Quad
 	stopped_early: bool
 
@@ -3179,36 +3141,37 @@ TextBreakLines :: proc(
 			type = .Space
 
 		case '\n':
-			type = pcodepoint == 13 ? .Space : .Newline
+			type = .Space if pcodepoint == 13 else .Newline
 		
 		case '\r':
-			type = pcodepoint == 10 ? .Space : .Newline
+			type = .Space if pcodepoint == 10 else .Newline
 
 		case 0x0085: 
 			// NEL
 			type = .Newline
 
 		case: 
-			if (iter.codepoint >= 0x4E00 && iter.codepoint <= 0x9FFF) ||
-				(iter.codepoint >= 0x3000 && iter.codepoint <= 0x30FF) ||
-				(iter.codepoint >= 0xFF00 && iter.codepoint <= 0xFFEF) ||
-				(iter.codepoint >= 0x1100 && iter.codepoint <= 0x11FF) ||
-				(iter.codepoint >= 0x3130 && iter.codepoint <= 0x318F) ||
-				(iter.codepoint >= 0xAC00 && iter.codepoint <= 0xD7AF) {
+			switch iter.codepoint {
+			case 0x4E00..=0x9FFF,
+			     0x3000..=0x30FF,
+			     0xFF00..=0xFFEF,
+			     0x1100..=0x11FF,
+			     0x3130..=0x318F,
+			     0xAC00..=0xD7AF:
 				type = .CJK
-			}	else {
+			case:
 				type = .Char
 			}
 		}
 
 		if type == .Newline {
 			// Always handle new lines.
-			rows[nrows].start = row_start != -1 ? row_start : iter.str
-			rows[nrows].end = row_end != -1 ? row_end : iter.str
+			rows[nrows].start = row_start if row_start != -1 else iter.str
+			rows[nrows].end   = row_end   if row_end   != -1 else iter.str
 			rows[nrows].width = row_width * invscale
-			rows[nrows].minx = row_min_x * invscale
-			rows[nrows].maxx = row_max_x * invscale
-			rows[nrows].next = iter.next
+			rows[nrows].minx  = row_min_x * invscale
+			rows[nrows].maxx  = row_max_x * invscale
+			rows[nrows].next  = iter.next
 			nrows += 1
 			
 			if nrows >= max_rows {
@@ -3270,7 +3233,7 @@ TextBreakLines :: proc(
 				// Break to new line when a character is beyond break width.
 				if (type == .Char || type == .CJK) && next_width > break_x {
 					// The run length is too long, need to break to new line.
-					if (break_end == row_start) {
+					if break_end == row_start {
 						// The current word is longer than the row length, just break it from here.
 						rows[nrows].start = row_start
 						rows[nrows].end = iter.str
@@ -3341,7 +3304,7 @@ TextBreakLines :: proc(
 	// NOTE a bit hacky, row.start / row.end need to work with last string range
 	last = text^
 	// advance early
-	next := rows[nrows - 1].next
+	next := rows[nrows-1].next
 	text^ = text[next:]
 	// terminate the for loop on non ok
 	ok = nrows != 0
@@ -3353,11 +3316,11 @@ TextBreakLines :: proc(
 // if the bounding box of the text should be returned. The bounds value are [xmin,ymin, xmax,ymax]
 // Measured values are returned in local coordinate space.
 TextBoxBounds :: proc(
-	ctx: ^Context, 
-	x, y: f32, 
+	ctx:           ^Context,
+	x, y:          f32,
 	breakRowWidth: f32, 
-	input: string, 
-	bounds: ^[4]f32,
+	input:         string,
+	bounds:        ^[4]f32,
 ) {
 	state := __getState(ctx)
 	rows: [2]Text_Row
@@ -3398,15 +3361,14 @@ TextBoxBounds :: proc(
 	y := y
 
 	for nrows, input_last in TextBreakLines(ctx, &input, breakRowWidth, &rows_mod) {
-		for i in 0..<nrows {
-			row := &rows[i]
+		for row in rows[:nrows] {
 			rminx, rmaxx, dx: f32
 			
 			// Horizontal bounds
 			switch halign {
-			case .LEFT: dx = 0
+			case .LEFT:   dx = 0
 			case .CENTER: dx = breakRowWidth*0.5 - row.width*0.5
-			case .RIGHT: dx = breakRowWidth - row.width
+			case .RIGHT:  dx = breakRowWidth     - row.width
 			}
 
 			rminx = x + row.minx + dx
@@ -3422,22 +3384,22 @@ TextBoxBounds :: proc(
 	}
 
 	if bounds != nil {
-		bounds^ = { minx, miny, maxx, maxy }
+		bounds^ = {minx, miny, maxx, maxy}
 	}
 }
 
 Glyph_Position :: struct {
-	str: int,
-	x: f32,
+	str:        int,
+	x:          f32,
 	minx, maxx: f32,
 }
 
 // Calculates the glyph x positions of the specified text.
 // Measured values are returned in local coordinate space.
 TextGlyphPositions :: proc(
-	ctx: ^Context, 
-	x, y: f32, 
-	text: string, 
+	ctx:       ^Context,
+	x, y:      f32,
+	text:      string,
 	positions: ^[]Glyph_Position,
 ) -> int {
 	state := __getState(ctx)
