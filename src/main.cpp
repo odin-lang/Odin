@@ -2563,7 +2563,7 @@ gb_internal void init_terminal(void) {
 		}
 	}
 #elif defined(GB_SYSTEM_OSX) || defined(GB_SYSTEM_UNIX)
-    FILE* file = popen("tput colors", "r");
+    FILE* file = popen("tput colors 2>/dev/null", "r");
     if (file) {
         char buffer[20];
         if (fgets(&buffer[0], 20, file)) {
