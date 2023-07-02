@@ -7406,12 +7406,6 @@ IOSurfaceRef :: struct {} // Opaque struct defined by Apple’s CoreGraphics fra
 // Aliases
 PhysicalDeviceVariablePointerFeatures                       :: PhysicalDeviceVariablePointersFeatures
 PhysicalDeviceShaderDrawParameterFeatures                   :: PhysicalDeviceShaderDrawParametersFeatures
-PipelineStageFlags2                                         :: Flags64
-PipelineStageFlag2                                          :: Flags64
-AccessFlags2                                                :: Flags64
-AccessFlag2                                                 :: Flags64
-FormatFeatureFlags2                                         :: Flags64
-FormatFeatureFlag2                                          :: Flags64
 RenderingFlagsKHR                                           :: RenderingFlags
 RenderingFlagKHR                                            :: RenderingFlag
 RenderingInfoKHR                                            :: RenderingInfo
