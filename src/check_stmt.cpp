@@ -1528,7 +1528,7 @@ gb_internal void check_range_stmt(CheckerContext *ctx, Ast *node, u32 mod_flags)
 			Type *t = base_type(type_deref(operand.type));
 			switch (t->kind) {
 			case Type_Basic:
-				if (t->Basic.kind == Basic_string) {
+				if (t->Basic.kind == Basic_string || t->Basic.kind == Basic_UntypedString) {
 					is_possibly_addressable = false;
 					array_add(&vals, t_rune);
 					array_add(&vals, t_int);
