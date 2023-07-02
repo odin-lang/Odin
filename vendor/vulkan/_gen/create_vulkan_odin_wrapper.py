@@ -434,8 +434,6 @@ def parse_fake_enums(f):
     
     data.sort(key=lambda x: x[0])
 
-
-
     fake_enums = {}
 
     for type_name, name, value in data:
@@ -443,8 +441,6 @@ def parse_fake_enums(f):
             fake_enums[type_name].append((name,value))
         else:
             fake_enums[type_name] = [(name, value)]
-
-
 
     for name in fake_enums.keys():
         flags_name = name.replace("FlagBits", "Flags")
@@ -520,10 +516,6 @@ def parse_fake_enums(f):
             f.write("\n")
 
         f.write("}\n\n")
-
- 
-
-
 
 def parse_structs(f):
     data = re.findall(r"typedef (struct|union) Vk(\w+?) {(.+?)} \w+?;", src, re.S)
