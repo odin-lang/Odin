@@ -2547,12 +2547,24 @@ gb_internal int strip_semicolons(Parser *parser) {
 	return cast(int)failed;
 }
 
-#if defined(GB_SYSTEM_OSX) || defined(GB_SYSTEM_UNIX)
-#include <stdio.h>
-#endif
-
 gb_internal void init_terminal(void) {
 	build_context.has_ansi_terminal_colours = false;
+
+    gbAllocator a = heap_allocator();
+
+    char const *no_color = gb_get_env("NO_COLOR", a);
+    defer (gb_free(a, cast(void *)no_color));
+    if (no_color != nullptr) {
+        return;
+    }
+
+    char const *force_color = gb_get_env("FORCE_COLOR", a);
+    defer (gb_free(a, cast(void *)force_color));
+    if (force_color != nullptr) {
+        build_context.has_ansi_terminal_colours = true;
+        return;
+    }
+
 #if defined(GB_SYSTEM_WINDOWS)
 	HANDLE hnd = GetStdHandle(STD_ERROR_HANDLE);
 	DWORD mode = 0;
@@ -2563,21 +2575,15 @@ gb_internal void init_terminal(void) {
 		}
 	}
 #elif defined(GB_SYSTEM_OSX) || defined(GB_SYSTEM_UNIX)
-    FILE* file = popen("tput colors 2>/dev/null", "r");
-    if (file) {
-        char buffer[20];
-        if (fgets(&buffer[0], 20, file)) {
-            u64 colors = gb_str_to_u64(buffer, nullptr, 10);
-            if (colors >= 8) {
-                build_context.has_ansi_terminal_colours = true;
-            }
-        }
-        pclose(file);
+    char const *term_ = gb_get_env("TERM", a);
+    defer (gb_free(a, cast(void *)term_));
+    String term = make_string_c(term_);
+    if (!str_eq(term, str_lit("dumb")) && isatty(STDERR_FILENO)) {
+        build_context.has_ansi_terminal_colours = true;
     }
 #endif
 
 	if (!build_context.has_ansi_terminal_colours) {
-		gbAllocator a = heap_allocator();
 		char const *odin_terminal_ = gb_get_env("ODIN_TERMINAL", a);
 		defer (gb_free(a, cast(void *)odin_terminal_));
 		String odin_terminal = make_string_c(odin_terminal_);
