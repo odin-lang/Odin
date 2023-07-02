@@ -2547,6 +2547,10 @@ gb_internal int strip_semicolons(Parser *parser) {
 	return cast(int)failed;
 }
 
+#if defined(GB_SYSTEM_OSX) || defined(GB_SYSTEM_UNIX)
+#include <stdio.h>
+#endif
+
 gb_internal void init_terminal(void) {
 	build_context.has_ansi_terminal_colours = false;
 #if defined(GB_SYSTEM_WINDOWS)
@@ -2558,6 +2562,18 @@ gb_internal void init_terminal(void) {
 			build_context.has_ansi_terminal_colours = true;
 		}
 	}
+#elif defined(GB_SYSTEM_OSX) || defined(GB_SYSTEM_UNIX)
+    FILE* file = popen("tput colors", "r");
+    if (file) {
+        char buffer[20];
+        if (fgets(&buffer[0], 20, file)) {
+            u64 colors = gb_str_to_u64(buffer, nullptr, 10);
+            if (colors >= 8) {
+                build_context.has_ansi_terminal_colours = true;
+            }
+        }
+        pclose(file);
+    }
 #endif
 
 	if (!build_context.has_ansi_terminal_colours) {
