@@ -2108,8 +2108,12 @@ gb_internal bool is_type_polymorphic(Type *t, bool or_specialized=false) {
 		return is_type_polymorphic(t->Matrix.elem, or_specialized);
 
 	case Type_Tuple:
-		for_array(i, t->Tuple.variables) {
-			if (is_type_polymorphic(t->Tuple.variables[i]->type, or_specialized)) {
+		for (Entity *e : t->Tuple.variables) {
+			if (e->kind == Entity_Constant) {
+				if (e->Constant.value.kind != ExactValue_Invalid) {
+					return or_specialized;
+				}
+			} else if (is_type_polymorphic(e->type, or_specialized)) {
 				return true;
 			}
 		}
@@ -2119,7 +2123,6 @@ gb_internal bool is_type_polymorphic(Type *t, bool or_specialized=false) {
 		if (t->Proc.is_polymorphic) {
 			return true;
 		}
-		#if 1
 		if (t->Proc.param_count > 0 &&
 		    is_type_polymorphic(t->Proc.params, or_specialized)) {
 			return true;
@@ -2128,7 +2131,6 @@ gb_internal bool is_type_polymorphic(Type *t, bool or_specialized=false) {
 		    is_type_polymorphic(t->Proc.results, or_specialized)) {
 			return true;
 		}
-		#endif
 		break;
 
 	case Type_Enum:
@@ -3326,6 +3328,9 @@ gb_internal bool are_struct_fields_reordered(Type *type) {
 	type = base_type(type);
 	GB_ASSERT(type->kind == Type_Struct);
 	type_set_offsets(type);
+	if (type->Struct.fields.count == 0) {
+		return false;
+	}
 	GB_ASSERT(type->Struct.offsets != nullptr);
 	
 	i64 prev_offset = 0;
@@ -3344,6 +3349,9 @@ gb_internal Slice<i32> struct_fields_index_by_increasing_offset(gbAllocator allo
 	type = base_type(type);
 	GB_ASSERT(type->kind == Type_Struct);
 	type_set_offsets(type);
+	if (type->Struct.fields.count == 0) {
+		return {};
+	}
 	GB_ASSERT(type->Struct.offsets != nullptr);
 	
 	auto indices = slice_make<i32>(allocator, type->Struct.fields.count);
@@ -4273,6 +4281,10 @@ gb_internal gbString write_type_to_string(gbString str, Type *type, bool shortha
 				if (var == nullptr) {
 					continue;
 				}
+				if (comma_index++ > 0) {
+					str = gb_string_appendc(str, ", ");
+				}
+
 				String name = var->token.string;
 				if (var->kind == Entity_Constant) {
 					str = gb_string_appendc(str, "$");
@@ -4287,10 +4299,6 @@ gb_internal gbString write_type_to_string(gbString str, Type *type, bool shortha
 						str = write_exact_value_to_string(str, var->Constant.value);
 					}
 					continue;
-				}
-
-				if (comma_index++ > 0) {
-					str = gb_string_appendc(str, ", ");
 				}
 
 				if (var->kind == Entity_Variable) {

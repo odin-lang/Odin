@@ -68,7 +68,7 @@ hash_stream :: proc(s: io.Stream) -> ([DIGEST_SIZE]byte, bool) {
     defer delete(buf)
     read := 1
     for read > 0 {
-        read, _ = s->impl_read(buf)
+        read, _ = io.read(s, buf)
         if read > 0 {
             update(&ctx, buf[:read])
         } 

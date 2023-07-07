@@ -2158,6 +2158,80 @@ signbit :: proc{
 }
 
 
+@(require_results)
+hypot_f16 :: proc "contextless" (x, y: f16) -> (r: f16) {
+	p, q := abs(x), abs(y)
+	switch {
+	case is_inf(p, 1) || is_inf(q, 1):
+		return inf_f16(1)
+	case is_nan(p) || is_nan(q):
+		return nan_f16()
+	}
+	if p < q {
+		p, q = q, p
+	}
+	if p == 0 {
+		return 0
+	}
+	q = q / p
+	return p * sqrt(1+q*q)
+}
+@(require_results)
+hypot_f32 :: proc "contextless" (x, y: f32) -> (r: f32) {
+	p, q := abs(x), abs(y)
+	switch {
+	case is_inf(p, 1) || is_inf(q, 1):
+		return inf_f32(1)
+	case is_nan(p) || is_nan(q):
+		return nan_f32()
+	}
+	if p < q {
+		p, q = q, p
+	}
+	if p == 0 {
+		return 0
+	}
+	q = q / p
+	return p * sqrt(1+q*q)
+}
+@(require_results)
+hypot_f64 :: proc "contextless" (x, y: f64) -> (r: f64) {
+	p, q := abs(x), abs(y)
+	switch {
+	case is_inf(p, 1) || is_inf(q, 1):
+		return inf_f64(1)
+	case is_nan(p) || is_nan(q):
+		return nan_f64()
+	}
+	if p < q {
+		p, q = q, p
+	}
+	if p == 0 {
+		return 0
+	}
+	q = q / p
+	return p * sqrt(1+q*q)
+}
+@(require_results) hypot_f16le :: proc "contextless" (x, y: f16le) -> (r: f16le) { return f16le(hypot_f16(f16(x), f16(y))) }
+@(require_results) hypot_f16be :: proc "contextless" (x, y: f16be) -> (r: f16be) { return f16be(hypot_f16(f16(x), f16(y))) }
+@(require_results) hypot_f32le :: proc "contextless" (x, y: f32le) -> (r: f32le) { return f32le(hypot_f32(f32(x), f32(y))) }
+@(require_results) hypot_f32be :: proc "contextless" (x, y: f32be) -> (r: f32be) { return f32be(hypot_f32(f32(x), f32(y))) }
+@(require_results) hypot_f64le :: proc "contextless" (x, y: f64le) -> (r: f64le) { return f64le(hypot_f64(f64(x), f64(y))) }
+@(require_results) hypot_f64be :: proc "contextless" (x, y: f64be) -> (r: f64be) { return f64be(hypot_f64(f64(x), f64(y))) }
+
+// hypot returns Sqrt(p*p + q*q), taking care to avoid unnecessary overflow and underflow.
+//
+// Special cases:
+//	hypot(±Inf, q) = +Inf
+//	hypot(p, ±Inf) = +Inf
+//	hypot(NaN, q) = NaN
+//	hypot(p, NaN) = NaN
+hypot :: proc{
+	hypot_f16, hypot_f16le, hypot_f16be,
+	hypot_f32, hypot_f32le, hypot_f32be,
+	hypot_f64, hypot_f64le, hypot_f64be,
+}
+
 F16_DIG        :: 3
 F16_EPSILON    :: 0.00097656
 F16_GUARD      :: 0

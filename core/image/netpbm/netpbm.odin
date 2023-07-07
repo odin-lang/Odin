@@ -161,18 +161,18 @@ save_to_buffer :: proc(img: ^Image, custom_info: Info = {}, allocator := context
 		// convert from native endianness
 		if img.depth == 16 {
 			pixels := mem.slice_data_cast([]u16be, data.buf[len(header_buf):])
-			for p in &pixels {
+			for &p in pixels {
 				p = u16be(transmute(u16) p)
 			}
 		} else if header.format in PFM {
 			if header.little_endian {
 				pixels := mem.slice_data_cast([]f32le, data.buf[len(header_buf):])
-				for p in &pixels {
+				for &p in pixels {
 					p = f32le(transmute(f32) p)
 				}
 			} else {
 				pixels := mem.slice_data_cast([]f32be, data.buf[len(header_buf):])
-				for p in &pixels {
+				for &p in pixels {
 					p = f32be(transmute(f32) p)
 				}
 			}
@@ -578,18 +578,18 @@ decode_image :: proc(img: ^Image, header: Header, data: []byte, allocator := con
 		if header.format in PFM {
 			pixels := mem.slice_data_cast([]f32, img.pixels.buf[:])
 			if header.little_endian {
-				for p in &pixels {
+				for &p in pixels {
 					p = f32(transmute(f32le) p)
 				}
 			} else {
-				for p in &pixels {
+				for &p in pixels {
 					p = f32(transmute(f32be) p)
 				}
 			}
 		} else {
 			if img.depth == 16 {
 				pixels := mem.slice_data_cast([]u16, img.pixels.buf[:])
-				for p in &pixels {
+				for &p in pixels {
 					p = u16(transmute(u16be) p)
 				}
 			}

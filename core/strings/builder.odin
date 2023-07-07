@@ -164,36 +164,27 @@ builder_init :: proc{
 	builder_init_len_cap,
 }
 @(private)
-_builder_stream_vtable_obj := io.Stream_VTable{
-	impl_write = proc(s: io.Stream, p: []byte) -> (n: int, err: io.Error) {
-		b := (^Builder)(s.stream_data)
-		n = write_bytes(b, p)
-		if n < len(p) {
+_builder_stream_proc :: proc(stream_data: rawptr, mode: io.Stream_Mode, p: []byte, offset: i64, whence: io.Seek_From) -> (n: i64, err: io.Error) {
+	b := (^Builder)(stream_data)
+	#partial switch mode {
+	case .Write:
+		n = i64(write_bytes(b, p))
+		if n < i64(len(p)) {
 			err = .EOF
 		}
 		return
-	},
-	impl_write_byte = proc(s: io.Stream, c: byte) -> (err: io.Error) {
-		b := (^Builder)(s.stream_data)
-		n := write_byte(b, c)
-		if n == 0 {
-			err = .EOF
-		}
+	case .Size:
+		n = i64(len(b.buf))
 		return
-	},
-	impl_size = proc(s: io.Stream) -> i64 {
-		b := (^Builder)(s.stream_data)
-		return i64(len(b.buf))
-	},
-	impl_destroy = proc(s: io.Stream) -> io.Error {
-		b := (^Builder)(s.stream_data)
+	case .Destroy:
 		builder_destroy(b)
-		return .None
-	},
+		return
+	case .Query:
+		return io.query_utility({.Write, .Size, .Destroy, .Query})
+	}
+	return 0, .Empty
 }
-// NOTE(dweiler): Work around a miscompilation bug on Linux still.
-@(private)
-_builder_stream_vtable := &_builder_stream_vtable_obj
+
 /*
 Returns an io.Stream from a Builder
 
@@ -204,7 +195,7 @@ Returns:
 - res: the io.Stream
 */
 to_stream :: proc(b: ^Builder) -> (res: io.Stream) {
-	return io.Stream{stream_vtable=_builder_stream_vtable, stream_data=b}
+	return io.Stream{procedure=_builder_stream_proc, data=b}
 }
 /*
 Returns an io.Writer from a Builder

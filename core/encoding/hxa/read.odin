@@ -83,7 +83,7 @@ read :: proc(data: []byte, filename := "<input>", print_error := false, allocato
 		meta_data = make([]Meta, int(capacity))
 		count := 0
 		defer meta_data = meta_data[:count]
-		for m in &meta_data {
+		for &m in meta_data {
 			m.name = read_name(r) or_return
 
 			type := read_value(r, Meta_Value_Type) or_return
@@ -116,7 +116,7 @@ read :: proc(data: []byte, filename := "<input>", print_error := false, allocato
 		layer_count := 0
 		layers = make(Layer_Stack, stack_count)
 		defer layers = layers[:layer_count]
-		for layer in &layers {
+		for &layer in layers {
 			layer.name = read_name(r) or_return
 			layer.components = read_value(r, u8) or_return
 			type := read_value(r, Layer_Data_Type) or_return

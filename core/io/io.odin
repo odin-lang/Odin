@@ -53,137 +53,106 @@ Error :: enum i32 {
 	Empty = -1,
 }
 
-Close_Proc       :: proc(using s: Stream) -> Error
-Flush_Proc       :: proc(using s: Stream) -> Error
-Seek_Proc        :: proc(using s: Stream, offset: i64, whence: Seek_From) -> (n: i64, err: Error)
-Size_Proc        :: proc(using s: Stream) -> i64
-Read_Proc        :: proc(using s: Stream, p: []byte) -> (n: int, err: Error)
-Read_At_Proc     :: proc(using s: Stream, p: []byte, off: i64) -> (n: int, err: Error)
-Read_From_Proc   :: proc(using s: Stream, r: Reader) -> (n: i64, err: Error)
-Read_Byte_Proc   :: proc(using s: Stream) -> (byte, Error)
-Read_Rune_Proc   :: proc(using s: Stream) -> (ch: rune, size: int, err: Error)
-Unread_Byte_Proc :: proc(using s: Stream) -> Error
-Unread_Rune_Proc :: proc(using s: Stream) -> Error
-Write_Proc       :: proc(using s: Stream, p: []byte) -> (n: int, err: Error)
-Write_At_Proc    :: proc(using s: Stream, p: []byte, off: i64) -> (n: int, err: Error)
-Write_To_Proc    :: proc(using s: Stream, w: Writer) -> (n: i64, err: Error)
-Write_Byte_Proc  :: proc(using s: Stream, c: byte) -> Error
-Write_Rune_Proc  :: proc(using s: Stream, r: rune) -> (size: int, err: Error)
-Destroy_Proc     :: proc(using s: Stream) -> Error
+Stream_Mode :: enum {
+	Close,
+	Flush,
+	Read,
+	Read_At,
+	Write,
+	Write_At,
+	Seek,
+	Size,
+	Destroy,
+	Query, // query what modes are available
+}
 
+Stream_Mode_Set :: distinct bit_set[Stream_Mode; i64]
+
+Stream_Proc :: #type proc(stream_data: rawptr, mode: Stream_Mode, p: []byte, offset: i64, whence: Seek_From) -> (n: i64, err: Error)
 
 Stream :: struct {
-	using stream_vtable: ^Stream_VTable,
-	stream_data:         rawptr,
-}
-Stream_VTable :: struct {
-	impl_close: Close_Proc,
-	impl_flush: Flush_Proc,
-
-	impl_seek:  Seek_Proc,
-	impl_size:  Size_Proc,
-
-	impl_read:      Read_Proc,
-	impl_read_at:   Read_At_Proc,
-	impl_read_byte: Read_Byte_Proc,
-	impl_read_rune: Read_Rune_Proc,
-	impl_write_to:  Write_To_Proc,
-
-	impl_write:      Write_Proc,
-	impl_write_at:   Write_At_Proc,
-	impl_write_byte: Write_Byte_Proc,
-	impl_write_rune: Write_Rune_Proc,
-	impl_read_from:  Read_From_Proc,
-
-	impl_unread_byte: Unread_Byte_Proc,
-	impl_unread_rune: Unread_Rune_Proc,
-
-	impl_destroy: Destroy_Proc,
+	procedure: Stream_Proc,
+	data:      rawptr,
 }
 
+Reader             :: Stream
+Writer             :: Stream
+Closer             :: Stream
+Flusher            :: Stream
+Seeker             :: Stream
 
-Reader             :: struct {using stream: Stream}
-Writer             :: struct {using stream: Stream}
-Closer             :: struct {using stream: Stream}
-Flusher            :: struct {using stream: Stream}
-Seeker             :: struct {using stream: Stream}
+Read_Writer        :: Stream
+Read_Closer        :: Stream
+Read_Write_Closer  :: Stream
+Read_Write_Seeker  :: Stream
 
-Read_Writer        :: struct {using stream: Stream}
-Read_Closer        :: struct {using stream: Stream}
-Read_Write_Closer  :: struct {using stream: Stream}
-Read_Write_Seeker  :: struct {using stream: Stream}
+Write_Closer       :: Stream
+Write_Seeker       :: Stream
+Write_Flusher      :: Stream
+Write_Flush_Closer :: Stream
 
-Write_Closer       :: struct {using stream: Stream}
-Write_Seeker       :: struct {using stream: Stream}
-Write_Flusher      :: struct {using stream: Stream}
-Write_Flush_Closer :: struct {using stream: Stream}
-
-Reader_At          :: struct {using stream: Stream}
-Writer_At          :: struct {using stream: Stream}
-Reader_From        :: struct {using stream: Stream}
-Writer_To          :: struct {using stream: Stream}
+Reader_At          :: Stream
+Writer_At          :: Stream
 
 
-destroy :: proc(s: Stream) -> Error {
-	close_err := close({s})
-	if s.stream_vtable != nil && s.impl_destroy != nil {
-		return s->impl_destroy()
+destroy :: proc(s: Stream) -> (err: Error) {
+	_ = flush(s)
+	_ = close(s)
+	if s.procedure != nil {
+		_, err = s.procedure(s.data, .Destroy, nil, 0, nil)
+	} else {
+		err = .Empty
 	}
-	if close_err != .None {
-		return close_err
-	}
-	return .Empty
+	return
 }
+
+query :: proc(s: Stream) -> (set: Stream_Mode_Set) {
+	if s.procedure != nil {
+		n, _ := s.procedure(s.data, .Query, nil, 0, nil)
+		set = transmute(Stream_Mode_Set)n
+		if set != nil {
+			set += {.Query}
+		}
+	}
+	return
+}
+
+query_utility :: #force_inline proc "contextless" (set: Stream_Mode_Set) -> (n: i64, err: Error) {
+	return transmute(i64)set, nil
+}
+
+_i64_err :: #force_inline proc "contextless" (n: int, err: Error) -> (i64, Error) {
+	return i64(n), err
+}
+
 
 // read reads up to len(p) bytes into s. It returns the number of bytes read and any error if occurred.
 //
 // When read encounters an .EOF or error after successfully reading n > 0 bytes, it returns the number of
 // bytes read along with the error.
 read :: proc(s: Reader, p: []byte, n_read: ^int = nil) -> (n: int, err: Error) {
-	if s.stream_vtable != nil {
-		if s.impl_read != nil {
-			n, err = s->impl_read(p)
-			if n_read != nil {
-				n_read^ += n
-			}
-			return
-		} else if s.impl_read_byte != nil {
-			bytes_read := 0
-			defer if n_read != nil {
-				n_read^ += bytes_read
-			}
-			for _, i in p {
-				p[i] = s->impl_read_byte() or_return
-				bytes_read += 1
-			}
-			return
-		}
+	if s.procedure != nil {
+		n64: i64
+		n64, err = s.procedure(s.data, .Read, p, 0, nil)
+		n = int(n64)
+		if n_read != nil { n_read^ += n }
+	} else {
+		err = .Empty
 	}
-	return 0, .Empty
+	return
 }
 
 // write writes up to len(p) bytes into s. It returns the number of bytes written and any error if occurred.
 write :: proc(s: Writer, p: []byte, n_written: ^int = nil) -> (n: int, err: Error) {
-	if s.stream_vtable != nil {
-		if s.impl_write != nil {
-			n, err = s->impl_write(p)
-			if n_written != nil {
-				n_written^ += n
-			}
-			return
-		} else if s.impl_write_byte != nil {
-			bytes_written := 0
-			defer if n_written != nil {
-				n_written^ += bytes_written
-			}
-			for c in p {
-				s->impl_write_byte(c) or_return
-				bytes_written += 1
-			}
-			return
-		}
+	if s.procedure != nil {
+		n64: i64
+		n64, err = s.procedure(s.data, .Write, p, 0, nil)
+		n = int(n64)
+		if n_written != nil { n_written^ += n }
+	} else {
+		err = .Empty
 	}
-	return 0, .Empty
+	return
 }
 
 // seek sets the offset of the next read or write to offset.
@@ -194,57 +163,45 @@ write :: proc(s: Writer, p: []byte, n_written: ^int = nil) -> (n: int, err: Erro
 //
 // seek returns the new offset to the start of the file/stream, and any error if occurred.
 seek :: proc(s: Seeker, offset: i64, whence: Seek_From) -> (n: i64, err: Error) {
-	if s.stream_vtable != nil && s.impl_seek != nil {
-		return s->impl_seek(offset, whence)
+	if s.procedure != nil {
+		n, err = s.procedure(s.data, .Seek, nil, offset, whence)
+	} else {
+		err = .Empty
 	}
-	return 0, .Empty
+	return
 }
 
 // The behaviour of close after the first call is stream implementation defined.
 // Different streams may document their own behaviour.
-close :: proc(s: Closer) -> Error {
-	if s.stream_vtable != nil && s.impl_close != nil {
-		return s->impl_close()
+close :: proc(s: Closer) -> (err: Error) {
+	if s.procedure != nil {
+		_, err = s.procedure(s.data, .Close, nil, 0, nil)
 	}
-	// Instead of .Empty, .None is fine in this case
-	return .None
+	return
 }
 
-flush :: proc(s: Flusher) -> Error {
-	if s.stream_vtable != nil && s.impl_flush != nil {
-		return s->impl_flush()
+flush :: proc(s: Flusher) -> (err: Error) {
+	if s.procedure != nil {
+		_, err = s.procedure(s.data, .Flush, nil, 0, nil)
 	}
-	// Instead of .Empty, .None is fine in this case
-	return .None
+	return
 }
 
 // size returns the size of the stream. If the stream does not support querying its size, 0 will be returned.
-size :: proc(s: Stream) -> i64 {
-	if s.stream_vtable == nil {
-		return 0
+size :: proc(s: Stream) -> (n: i64, err: Error) {
+	if s.procedure != nil {
+		n, err = s.procedure(s.data, .Size, nil, 0, nil)
+		if err == .Empty {
+			n = 0
+			curr := seek(s, 0, .Current) or_return
+			end  := seek(s, 0, .End)     or_return
+			seek(s, curr, .Start)        or_return
+			n = end
+		}
+	} else {
+		err = .Empty
 	}
-	if s.impl_size != nil {
-		return s->impl_size()
-	}
-	if s.impl_seek == nil {
-		return 0
-	}
-
-	curr, end: i64
-	err: Error
-	if curr, err = s->impl_seek(0, .Current); err != nil {
-		return 0
-	}
-
-	if end, err = s->impl_seek(0, .End); err != nil {
-		return 0
-	}
-
-	if _, err = s->impl_seek(curr, .Start); err != nil {
-		return 0
-	}
-
-	return end
+	return
 }
 
 
@@ -256,29 +213,24 @@ size :: proc(s: Stream) -> i64 {
 //
 // If n == len(p), err may be either nil or .EOF
 read_at :: proc(r: Reader_At, p: []byte, offset: i64, n_read: ^int = nil) -> (n: int, err: Error) {
-	defer if n_read != nil {
-		n_read^ += n
-	}
-	
-	if r.stream_vtable == nil {
-		return 0, .Empty
-	}
-	if r.impl_read_at != nil {
-		return r->impl_read_at(p, offset)
-	}
-	if r.impl_seek == nil || r.impl_read == nil {
-		return 0, .Empty
-	}
-
-	curr_offset := r->impl_seek(offset, .Current) or_return
-
-	n, err = r->impl_read(p)
-	_, err1 := r->impl_seek(curr_offset, .Start)
-	if err1 != nil && err == nil {
-		err = err1
+	if r.procedure != nil {
+		n64: i64
+		n64, err = r.procedure(r.data, .Read_At, p, offset, nil)
+		if err != .Empty {
+			n = int(n64)
+		} else {
+			curr := seek(r, offset, .Current) or_return
+			n, err = read(r, p)
+			_, err1 := seek(r, curr, .Start)
+			if err1 != nil && err == nil {
+				err = err1
+			}
+		}
+		if n_read != nil { n_read^ += n }
+	} else {
+		err = .Empty
 	}
 	return
-
 }
 
 // write_at writes len(p) bytes into p starting with the provided offset in the underlying Writer_At stream w.
@@ -287,97 +239,39 @@ read_at :: proc(r: Reader_At, p: []byte, offset: i64, n_read: ^int = nil) -> (n:
 // If write_at is writing to a Writer_At which has a seek offset, then write_at should not affect the underlying
 // seek offset.
 write_at :: proc(w: Writer_At, p: []byte, offset: i64, n_written: ^int = nil) -> (n: int, err: Error) {
-	defer if n_written != nil {
-		n_written^ += n
-	}
-	
-	if w.stream_vtable == nil {
-		return 0, .Empty
-	}
-	if w.impl_write_at != nil {
-		return w->impl_write_at(p, offset)
-	}
-	if w.impl_seek == nil || w.impl_write == nil {
-		return 0, .Empty
-	}
-
-	curr_offset: i64
-	curr_offset, err = w->impl_seek(offset, .Current)
-	if err != nil {
-		return 0, err
-	}
-
-	n, err = w->impl_write(p)
-	_, err1 := w->impl_seek(curr_offset, .Start)
-	if err1 != nil && err == nil {
-		err = err1
+	if w.procedure != nil {
+		n64: i64
+		n64, err = w.procedure(w.data, .Write_At, p, offset, nil)
+		if err != .Empty {
+			n = int(n64)
+		} else {
+			curr := seek(w, offset, .Current) or_return
+			n, err = write(w, p)
+			_, err1 := seek(w, curr, .Start)
+			if err1 != nil && err == nil {
+				err = err1
+			}
+		}
+		if n_written != nil { n_written^ += n }
+	} else {
+		err = .Empty
 	}
 	return
 }
 
-write_to :: proc(r: Writer_To, w: Writer) -> (n: i64, err: Error) {
-	if r.stream_vtable == nil || w.stream_vtable == nil {
-		return 0, .Empty
-	}
-	if r.impl_write_to != nil {
-		return r->impl_write_to(w)
-	}
-	return 0, .Empty
-}
-read_from :: proc(w: Reader_From, r: Reader) -> (n: i64, err: Error) {
-	if r.stream_vtable == nil || w.stream_vtable == nil {
-		return 0, .Empty
-	}
-	if r.impl_read_from != nil {
-		return w->impl_read_from(r)
-	}
-	return 0, .Empty
-}
-
-
 // read_byte reads and returns the next byte from r.
 read_byte :: proc(r: Reader, n_read: ^int = nil) -> (b: byte, err: Error) {
-	defer if err == nil && n_read != nil {
-		n_read^ += 1
-	}
-	
-	if r.stream_vtable == nil {
-		return 0, .Empty
-	}
-	if r.impl_read_byte != nil {
-		return r->impl_read_byte()
-	}
-	if r.impl_read == nil {
-		return 0, .Empty
-	}
-
 	buf: [1]byte
-	_, err = r->impl_read(buf[:])
-	return buf[0], err
+	_, err = read(r, buf[:], n_read)
+	b = buf[0]
+	return
 }
 
 write_byte :: proc(w: Writer, c: byte, n_written: ^int = nil) -> Error {
-	return _write_byte(auto_cast w, c, n_written)
-}
-
-@(private)
-_write_byte :: proc(w: Writer, c: byte, n_written: ^int = nil) -> (err: Error) {
-	defer if err == nil && n_written != nil {
-		n_written^ += 1
-	}
-	if w.stream_vtable == nil {
-		return .Empty
-	}
-	if w.impl_write_byte != nil {
-		return w->impl_write_byte(c)
-	}
-	if w.impl_write == nil {
-		return .Empty
-	}
-
-	b := [1]byte{c}
-	_, err = w->impl_write(b[:])
-	return err
+	buf: [1]byte
+	buf[0] = c
+	write(w, buf[:], n_written) or_return
+	return nil
 }
 
 // read_rune reads a single UTF-8 encoded Unicode codepoint and returns the rune and its size in bytes.
@@ -385,19 +279,9 @@ read_rune :: proc(br: Reader, n_read: ^int = nil) -> (ch: rune, size: int, err: 
 	defer if err == nil && n_read != nil {
 		n_read^ += size
 	}
-	if br.stream_vtable == nil {
-		return 0, 0, .Empty
-	}
-	if br.impl_read_rune != nil {
-		return br->impl_read_rune()
-	}
-	if br.impl_read == nil {
-		return 0, 0, .Empty
-	}
 
 	b: [utf8.UTF_MAX]byte
-	_, err = br->impl_read(b[:1])
-	
+	_, err = read(br, b[:1])
 
 	s0 := b[0]
 	ch = rune(s0)
@@ -415,7 +299,7 @@ read_rune :: proc(br: Reader, n_read: ^int = nil) -> (ch: rune, size: int, err: 
 		return
 	}
 	sz := int(x&7)
-	size, err = br->impl_read(b[1:sz])
+	size, err = read(br, b[1:sz])
 	if err != nil || size+1 < sz {
 		ch = utf8.RUNE_ERROR
 		return
@@ -424,28 +308,6 @@ read_rune :: proc(br: Reader, n_read: ^int = nil) -> (ch: rune, size: int, err: 
 	ch, size = utf8.decode_rune(b[:sz])
 	return
 }
-
-unread_byte :: proc(s: Stream) -> Error {
-	if s.stream_vtable == nil {
-		return .Empty
-	}
-	if s.impl_unread_byte != nil {
-		return s->impl_unread_byte()
-	}
-	if s.impl_seek != nil {
-		_, err := s->impl_seek(-1, .Current)
-		return err
-	}
-
-	return .Empty
-}
-unread_rune :: proc(s: Writer) -> Error {
-	if s.stream_vtable != nil && s.impl_unread_rune != nil {
-		return s->impl_unread_rune()
-	}
-	return .Empty
-}
-
 
 // write_string writes the contents of the string s to w.
 write_string :: proc(s: Writer, str: string, n_written: ^int = nil) -> (n: int, err: Error) {
@@ -457,14 +319,6 @@ write_rune :: proc(s: Writer, r: rune, n_written: ^int = nil) -> (size: int, err
 	defer if err == nil && n_written != nil {
 		n_written^ += size
 	}
-	
-	if s.stream_vtable == nil {
-		return 0, .Empty
-	}
-	if s.impl_write_rune != nil {
-		return s->impl_write_rune(r)
-	}
-
 	if r < utf8.RUNE_SELF {
 		err = write_byte(s, byte(r))
 		if err == nil {
@@ -542,21 +396,15 @@ copy_n :: proc(dst: Writer, src: Reader, n: i64) -> (written: i64, err: Error) {
 
 @(private)
 _copy_buffer :: proc(dst: Writer, src: Reader, buf: []byte) -> (written: i64, err: Error) {
-	if dst.stream_vtable == nil || src.stream_vtable == nil {
+	if dst.procedure == nil || src.procedure == nil {
 		return 0, .Empty
-	}
-	if src.impl_write_to != nil {
-		return src->impl_write_to(dst)
-	}
-	if src.impl_read_from != nil {
-		return dst->impl_read_from(src)
 	}
 	buf := buf
 	if buf == nil {
 		DEFAULT_SIZE :: 4 * 1024
 		size := DEFAULT_SIZE
-		if src.stream_vtable == _limited_reader_vtable {
-			l := (^Limited_Reader)(src.stream_data)
+		if src.procedure == _limited_reader_proc {
+			l := (^Limited_Reader)(src.data)
 			if i64(size) > l.n {
 				if l.n < 1 {
 					size = 1

@@ -1323,6 +1323,7 @@ gb_internal lbValue lb_emit_union_tag_value(lbProcedure *p, lbValue u) {
 
 gb_internal void lb_emit_store_union_variant_tag(lbProcedure *p, lbValue parent, Type *variant_type) {
 	Type *t = type_deref(parent.type);
+	GB_ASSERT(is_type_union(t));
 
 	if (is_type_union_maybe_pointer(t) || type_size_of(t) == 0) {
 		// No tag needed!
@@ -3003,8 +3004,9 @@ gb_internal lbAddr lb_add_local(lbProcedure *p, Type *type, Entity *e, bool zero
 	LLVMPositionBuilderAtEnd(p->builder, p->decl_block->block);
 
 	char const *name = "";
-	if (e != nullptr) {
-		// name = alloc_cstring(permanent_allocator(), e->token.string);
+	if (e != nullptr && e->token.string.len > 0 && e->token.string != "_") {
+		// NOTE(bill): for debugging purposes only
+		name = alloc_cstring(permanent_allocator(), e->token.string);
 	}
 
 	LLVMTypeRef llvm_type = lb_type(p->module, type);

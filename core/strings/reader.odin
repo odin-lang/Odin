@@ -35,8 +35,8 @@ Returns:
 - s: An io.Stream for the given Reader
 */
 reader_to_stream :: proc(r: ^Reader) -> (s: io.Stream) {
-	s.stream_data = r
-	s.stream_vtable = &_reader_vtable
+	s.data = r
+	s.procedure = _reader_proc
 	return
 }
 /*
@@ -294,41 +294,21 @@ This VTable is used by the Reader struct to provide its functionality
 as an `io.Stream`.
 */
 @(private)
-_reader_vtable := io.Stream_VTable{
-	impl_size = proc(s: io.Stream) -> i64 {
-		r := (^Reader)(s.stream_data)
-		return reader_size(r)
-	},
-	impl_read = proc(s: io.Stream, p: []byte) -> (n: int, err: io.Error) {
-		r := (^Reader)(s.stream_data)
-		return reader_read(r, p)
-	},
-	impl_read_at = proc(s: io.Stream, p: []byte, off: i64) -> (n: int, err: io.Error) {
-		r := (^Reader)(s.stream_data)
-		return reader_read_at(r, p, off)
-	},
-	impl_read_byte = proc(s: io.Stream) -> (byte, io.Error) {
-		r := (^Reader)(s.stream_data)
-		return reader_read_byte(r)
-	},
-	impl_unread_byte = proc(s: io.Stream) -> io.Error {
-		r := (^Reader)(s.stream_data)
-		return reader_unread_byte(r)
-	},
-	impl_read_rune = proc(s: io.Stream) -> (ch: rune, size: int, err: io.Error) {
-		r := (^Reader)(s.stream_data)
-		return reader_read_rune(r)
-	},
-	impl_unread_rune = proc(s: io.Stream) -> io.Error {
-		r := (^Reader)(s.stream_data)
-		return reader_unread_rune(r)
-	},
-	impl_seek = proc(s: io.Stream, offset: i64, whence: io.Seek_From) -> (i64, io.Error) {
-		r := (^Reader)(s.stream_data)
-		return reader_seek(r, offset, whence)
-	},
-	impl_write_to = proc(s: io.Stream, w: io.Writer) -> (n: i64, err: io.Error) {
-		r := (^Reader)(s.stream_data)
-		return reader_write_to(r, w)
-	},
+_reader_proc :: proc(stream_data: rawptr, mode: io.Stream_Mode, p: []byte, offset: i64, whence: io.Seek_From) -> (n: i64, err: io.Error) {
+	r := (^Reader)(stream_data)
+	#partial switch mode {
+	case .Size:
+		n = reader_size(r)
+		return
+	case .Read:
+		return io._i64_err(reader_read(r, p))
+	case .Read_At:
+		return io._i64_err(reader_read_at(r, p, offset))
+	case .Seek:
+		n, err = reader_seek(r, offset, whence)
+		return
+	case .Query:
+		return io.query_utility({.Size, .Read, .Read_At, .Seek, .Query})
+	}
+	return 0, .Empty
 }

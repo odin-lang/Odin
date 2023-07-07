@@ -7,6 +7,7 @@ on:
 
 jobs:
   build_windows:
+    if: github.repository == 'odin-lang/Odin'
     runs-on: windows-2022
     steps:
       - uses: actions/checkout@v1
@@ -37,6 +38,7 @@ jobs:
           name: windows_artifacts
           path: dist
   build_ubuntu:
+    if: github.repository == 'odin-lang/Odin'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v1
@@ -61,6 +63,7 @@ jobs:
           name: ubuntu_artifacts
           path: dist
   build_macos:
+    if: github.repository == 'odin-lang/Odin'
     runs-on: macOS-latest
     steps:
       - uses: actions/checkout@v1

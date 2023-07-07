@@ -432,6 +432,14 @@ AT_FDCWD            :: ~uintptr(99)	/* -100 */
 AT_REMOVEDIR        :: uintptr(0x200)
 AT_SYMLINK_NOFOLLOW :: uintptr(0x100)
 
+pollfd :: struct {
+	fd:      c.int,
+	events:  c.short,
+	revents: c.short,
+}
+
+sigset_t :: distinct u64
+
 foreign libc {
 	@(link_name="__errno_location") __errno_location    :: proc() -> ^int ---
 
@@ -450,6 +458,7 @@ foreign libc {
 	@(link_name="execvp")           _unix_execvp       :: proc(path: cstring, argv: [^]cstring) -> int ---
 	@(link_name="getenv")           _unix_getenv        :: proc(cstring) -> cstring ---
 	@(link_name="putenv")           _unix_putenv        :: proc(cstring) -> c.int ---
+	@(link_name="setenv")           _unix_setenv        :: proc(key: cstring, value: cstring, overwrite: c.int) -> c.int ---
 	@(link_name="realpath")         _unix_realpath      :: proc(path: cstring, resolved_path: rawptr) -> rawptr ---
 
 	@(link_name="exit")             _unix_exit          :: proc(status: c.int) -> ! ---
@@ -885,8 +894,10 @@ get_env :: proc(key: string, allocator := context.allocator) -> (value: string) 
 
 set_env :: proc(key, value: string) -> Errno {
 	runtime.DEFAULT_TEMP_ALLOCATOR_TEMP_GUARD()
-	s := strings.concatenate({key, "=", value, "\x00"}, context.temp_allocator)
-	res := _unix_putenv(strings.unsafe_string_to_cstring(s))
+	key_cstring := strings.clone_to_cstring(key, context.temp_allocator)
+	value_cstring := strings.clone_to_cstring(value, context.temp_allocator)
+	// NOTE(GoNZooo): `setenv` instead of `putenv` because it copies both key and value more commonly
+	res := _unix_setenv(key_cstring, value_cstring, 1)
 	if res < 0 {
 		return Errno(get_last_error())
 	}
@@ -1082,6 +1093,22 @@ shutdown :: proc(sd: Socket, how: int) -> (Errno) {
 
 fcntl :: proc(fd: int, cmd: int, arg: int) -> (int, Errno) {
 	result := unix.sys_fcntl(fd, cmd, arg)
+	if result < 0 {
+		return 0, _get_errno(result)
+	}
+	return result, ERROR_NONE
+}
+
+poll :: proc(fds: []pollfd, timeout: int) -> (int, Errno) {
+	result := unix.sys_poll(raw_data(fds), uint(len(fds)), timeout)
+	if result < 0 {
+		return 0, _get_errno(result)
+	}
+	return result, ERROR_NONE
+}
+
+ppoll :: proc(fds: []pollfd, timeout: ^unix.timespec, sigmask: ^sigset_t) -> (int, Errno) {
+	result := unix.sys_ppoll(raw_data(fds), uint(len(fds)), timeout, sigmask, size_of(sigset_t))
 	if result < 0 {
 		return 0, _get_errno(result)
 	}

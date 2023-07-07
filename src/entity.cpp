@@ -84,7 +84,9 @@ enum EntityFlag : u64 {
 	EntityFlag_CustomLinkage_LinkOnce = 1ull<<44,
 	
 	EntityFlag_Require = 1ull<<50,
-	EntityFlag_ByPtr = 1ull<<51, // enforce parameter is passed by pointer
+	EntityFlag_ByPtr   = 1ull<<51, // enforce parameter is passed by pointer
+
+	EntityFlag_OldForOrSwitchValue = 1ull<<52,
 
 	EntityFlag_Overridden    = 1ull<<63,
 };
@@ -208,6 +210,8 @@ struct Entity {
 			i32  field_group_index;
 
 			ParameterValue param_value;
+
+			Type *for_loop_parent_type;
 
 			String     thread_local_model;
 			Entity *   foreign_library;

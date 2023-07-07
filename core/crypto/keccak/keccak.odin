@@ -77,7 +77,7 @@ hash_stream_224 :: proc(s: io.Stream) -> ([DIGEST_SIZE_224]byte, bool) {
     defer delete(buf)
     read := 1
     for read > 0 {
-        read, _ = s->impl_read(buf)
+        read, _ = io.read(s, buf)
         if read > 0 {
             _sha3.update(&ctx, buf[:read])
         } 
@@ -159,7 +159,7 @@ hash_stream_256 :: proc(s: io.Stream) -> ([DIGEST_SIZE_256]byte, bool) {
     defer delete(buf)
     read := 1
     for read > 0 {
-        read, _ = s->impl_read(buf)
+        read, _ = io.read(s, buf)
         if read > 0 {
             _sha3.update(&ctx, buf[:read])
         } 
@@ -241,7 +241,7 @@ hash_stream_384 :: proc(s: io.Stream) -> ([DIGEST_SIZE_384]byte, bool) {
     defer delete(buf)
     read := 1
     for read > 0 {
-        read, _ = s->impl_read(buf)
+        read, _ = io.read(s, buf)
         if read > 0 {
             _sha3.update(&ctx, buf[:read])
         } 
@@ -323,7 +323,7 @@ hash_stream_512 :: proc(s: io.Stream) -> ([DIGEST_SIZE_512]byte, bool) {
     defer delete(buf)
     read := 1
     for read > 0 {
-        read, _ = s->impl_read(buf)
+        read, _ = io.read(s, buf)
         if read > 0 {
             _sha3.update(&ctx, buf[:read])
         } 

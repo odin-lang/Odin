@@ -429,7 +429,93 @@ def parse_enums(f):
         f.write("{} :: distinct bit_set[{}; Flags]\n".format(flag.ljust(max_len), flag_name))
         f.write("{} :: enum u32 {{}}\n".format(flag_name.ljust(max_len)))
 
+def parse_fake_enums(f):
+    data = re.findall(r"static const Vk(\w+FlagBits2) VK_(\w+?) = (\w+);", src, re.S)
+    
+    data.sort(key=lambda x: x[0])
 
+    fake_enums = {}
+
+    for type_name, name, value in data:
+        if type_name in fake_enums:
+            fake_enums[type_name].append((name,value))
+        else:
+            fake_enums[type_name] = [(name, value)]
+
+    for name in fake_enums.keys():
+        flags_name = name.replace("FlagBits", "Flags")
+        enum_name = name.replace("FlagBits", "Flag")
+        f.write("{} :: distinct bit_set[{}; Flags64]\n".format(flags_name, enum_name))
+        f.write("{} :: enum Flags64 {{\n".format(name.replace("FlagBits", "Flag")))
+
+        prefix = to_snake_case(name).upper()
+        suffix = None
+        for ext in ext_suffixes:
+            prefix_new = remove_suffix(prefix, "_"+ext)
+            assert suffix is None
+            if prefix_new != prefix:
+                suffix = "_"+ext
+                prefix = prefix_new
+                break
+
+
+        prefix = prefix.replace("_FLAG_BITS2", "_2")
+        prefix += "_"
+
+        ff = []
+
+        groups = []
+        flags = {}
+
+        names_and_values = fake_enums[name]
+
+        for name, value in names_and_values:
+            value = value.replace("ULL", "")
+            n = fix_enum_name(name, prefix, suffix, True)
+            try:
+                v = fix_enum_value(value, prefix, suffix, True)
+            except FlagError as e:
+                v = int(str(e))
+                groups.append((n, v))
+                continue
+            except IgnoreFlagError as e:
+                groups.append((n, 0))
+                continue
+
+            if n == v:
+                continue
+            try:
+                flags[int(v)] = n
+            except ValueError as e:
+                pass
+
+            if v == "NONE":
+                continue
+
+            ff.append((n, v))
+        
+        max_flag_value = max([int(v) for n, v in ff if is_int(v)] + [0])
+        max_group_value = max([int(v) for n, v in groups if is_int(v)] + [0])
+        if max_flag_value < max_group_value:
+            if (1<<max_flag_value)+1 < max_group_value:
+                ff.append(('_MAX', 31))
+                flags[31] = '_MAX'
+                pass
+
+        max_len = max([len(n) for n, v in ff] + [0])
+
+        flag_names = set([n for n, v in ff])
+
+        for n, v in ff:
+            if not is_int(v) and v not in flag_names:
+                print("Ignoring", n, "=", v)
+                continue
+            f.write("\t{} = {},".format(n.ljust(max_len), v))
+            if n == "_MAX":
+                f.write(" // Needed for the *_ALL bit set")
+            f.write("\n")
+
+        f.write("}\n\n")
 
 def parse_structs(f):
     data = re.findall(r"typedef (struct|union) Vk(\w+?) {(.+?)} \w+?;", src, re.S)
@@ -490,6 +576,10 @@ def parse_structs(f):
             continue
         name = name.replace("FlagBits", "Flag")
         _type = _type.replace("FlagBits", "Flag")
+
+        if name.endswith("Flag2") or name.endswith("Flags2"):
+            continue
+
         aliases.append((name, _type))
 
     max_len = max([len(n) for n, _ in aliases] + [0])
@@ -732,6 +822,7 @@ with open("../enums.odin", 'w', encoding='utf-8') as f:
     f.write(BASE)
     f.write("\n")
     parse_enums(f)
+    parse_fake_enums(f)
     f.write("\n\n")
 with open("../structs.odin", 'w', encoding='utf-8') as f:
     f.write(BASE)

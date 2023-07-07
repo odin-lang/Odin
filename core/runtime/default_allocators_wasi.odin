@@ -1,5 +1,5 @@
 //+build wasi
 package runtime
 
-default_allocator_proc :: nil_allocator_proc
-default_allocator :: nil_allocator
+default_allocator_proc :: panic_allocator_proc
+default_allocator :: panic_allocator
