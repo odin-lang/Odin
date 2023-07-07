@@ -2730,7 +2730,10 @@ gb_internal lbValue lb_find_procedure_value_from_entity(lbModule *m, Entity *e) 
 	} else {
 		array_add(&m->missing_procedures_to_check, missing_proc);
 	}
+
+	rw_mutex_shared_lock(&m->values_mutex);
 	found = map_get(&m->values, e);
+	rw_mutex_shared_unlock(&m->values_mutex);
 	if (found) {
 		return *found;
 	}
