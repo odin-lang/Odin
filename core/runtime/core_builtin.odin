@@ -112,7 +112,7 @@ remove_range :: proc(array: ^$D/[dynamic]$T, lo, hi: int, loc := #caller_locatio
 // Note: If the dynamic array as no elements (`len(array) == 0`), this procedure will panic.
 @builtin
 pop :: proc(array: ^$T/[dynamic]$E, loc := #caller_location) -> (res: E) #no_bounds_check {
-	assert(len(array) > 0, "", loc)
+	assert(len(array) > 0, loc=loc)
 	res = array[len(array)-1]
 	(^Raw_Dynamic_Array)(array).len -= 1
 	return res
@@ -136,7 +136,7 @@ pop_safe :: proc(array: ^$T/[dynamic]$E) -> (res: E, ok: bool) #no_bounds_check 
 // Note: If the dynamic array as no elements (`len(array) == 0`), this procedure will panic.
 @builtin
 pop_front :: proc(array: ^$T/[dynamic]$E, loc := #caller_location) -> (res: E) #no_bounds_check {
-	assert(len(array) > 0, "", loc)
+	assert(len(array) > 0, loc=loc)
 	res = array[0]
 	if len(array) > 1 {
 		copy(array[0:], array[1:])
@@ -424,7 +424,7 @@ append_elem :: proc(array: ^$T/[dynamic]$E, arg: E, loc := #caller_location) -> 
 			a := (^Raw_Dynamic_Array)(array)
 			when size_of(E) != 0 {
 				data := ([^]E)(a.data)
-				assert(condition=data != nil, loc=loc)
+				assert(data != nil, loc=loc)
 				data[a.len] = arg
 			}
 			a.len += 1
@@ -459,7 +459,7 @@ append_elems :: proc(array: ^$T/[dynamic]$E, args: ..E, loc := #caller_location)
 			a := (^Raw_Dynamic_Array)(array)
 			when size_of(E) != 0 {
 				data := ([^]E)(a.data)
-				assert(condition=data != nil, loc=loc)
+				assert(data != nil, loc=loc)
 				intrinsics.mem_copy(&data[a.len], raw_data(args), size_of(E) * arg_len)
 			}
 			a.len += arg_len
@@ -472,7 +472,7 @@ append_elems :: proc(array: ^$T/[dynamic]$E, args: ..E, loc := #caller_location)
 @builtin
 append_elem_string :: proc(array: ^$T/[dynamic]$E/u8, arg: $A/string, loc := #caller_location) -> (n: int, err: Allocator_Error) #optional_allocator_error {
 	args := transmute([]E)arg
-	return append_elems(array=array, args=args, loc=loc)
+	return append_elems(array, ..args, loc=loc)
 }
 
 
@@ -481,7 +481,7 @@ append_elem_string :: proc(array: ^$T/[dynamic]$E/u8, arg: $A/string, loc := #ca
 append_string :: proc(array: ^$T/[dynamic]$E/u8, args: ..string, loc := #caller_location) -> (n: int, err: Allocator_Error) #optional_allocator_error {
 	n_arg: int
 	for arg in args {
-		n_arg, err = append(array = array, args = transmute([]E)(arg), loc = loc)
+		n_arg, err = append(array, ..transmute([]E)(arg), loc=loc)
 		n += n_arg
 		if err != nil {
 			return

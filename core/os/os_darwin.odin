@@ -314,15 +314,16 @@ Dirent :: struct {
 
 Dir :: distinct rawptr // DIR*
 
+ADDRESS_FAMILY :: c.char
 SOCKADDR :: struct #packed {
 	len: c.char,
-	family: c.char,
+	family: ADDRESS_FAMILY,
 	sa_data: [14]c.char,
 }
 
 SOCKADDR_STORAGE_LH :: struct #packed {
 	len: c.char,
-	family: c.char,
+	family: ADDRESS_FAMILY,
 	__ss_pad1: [6]c.char,
 	__ss_align: i64,
 	__ss_pad2: [112]c.char,
@@ -330,7 +331,7 @@ SOCKADDR_STORAGE_LH :: struct #packed {
 
 sockaddr_in :: struct #packed {
 	sin_len: c.char,
-	sin_family: c.char,
+	sin_family: ADDRESS_FAMILY,
 	sin_port: u16be,
 	sin_addr: in_addr,
 	sin_zero: [8]c.char,
@@ -338,7 +339,7 @@ sockaddr_in :: struct #packed {
 
 sockaddr_in6 :: struct #packed {
 	sin6_len: c.char,
-	sin6_family: c.char,
+	sin6_family: ADDRESS_FAMILY,
 	sin6_port: u16be,
 	sin6_flowinfo: c.uint,
 	sin6_addr: in6_addr,

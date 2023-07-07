@@ -11,27 +11,24 @@ foreign odin_env {
 }
 
 @(private="file")
-write_vtable := io.Stream_VTable{
-	impl_write = proc(s: io.Stream, p: []byte) -> (n: int, err: io.Error) {
-		fd := u32(uintptr(s.stream_data))
+write_stream_proc :: proc(stream_data: rawptr, mode: io.Stream_Mode, p: []byte, offset: i64, whence: io.Seek_From) -> (n: i64, err: io.Error) {
+	if mode == .Write {
+		fd := u32(uintptr(stream_data))
 		write(fd, p)
-		return len(p), nil
-	},	
+		return i64(len(p)), nil
+	}
+	return 0, .Empty
 }
 
 @(private="file")
 stdout := io.Writer{
-	stream = {
-		stream_vtable = &write_vtable,
-		stream_data = rawptr(uintptr(1)),
-	},
+	procedure = write_stream_proc,
+	data      = rawptr(uintptr(1)),
 }
 @(private="file")
 stderr := io.Writer{
-	stream = {
-		stream_vtable = &write_vtable,
-		stream_data = rawptr(uintptr(2)),
-	},
+	procedure = write_stream_proc,
+	data      = rawptr(uintptr(2)),
 }
 
 // print formats using the default print settings and writes to stdout

@@ -114,7 +114,7 @@ set_cell_alignment :: proc(tbl: ^Table, row, col: int, alignment: Cell_Alignment
 
 format :: proc(tbl: ^Table, _fmt: string, args: ..any, loc := #caller_location) -> string {
 	context.allocator = tbl.format_allocator
-	return fmt.aprintf(fmt = _fmt, args = args)
+	return fmt.aprintf(_fmt, ..args)
 }
 
 header :: proc(tbl: ^Table, values: ..any, loc := #caller_location) {

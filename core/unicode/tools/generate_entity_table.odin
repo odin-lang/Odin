@@ -221,7 +221,7 @@ named_xml_entity_to_rune :: proc(name: string) -> (decoded: rune, ok: bool) {
 
 	delete(entity_map)
 	delete(names)
-	for name in &names {
+	for &name in names {
 		free(&name)
 	}
 }

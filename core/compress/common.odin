@@ -188,7 +188,8 @@ input_size_from_memory :: proc(z: ^Context_Memory_Input) -> (res: i64, err: Erro
 }
 
 input_size_from_stream :: proc(z: ^Context_Stream_Input) -> (res: i64, err: Error) {
-	return io.size(z.input), nil
+	res, _ = io.size(z.input)
+	return
 }
 
 input_size :: proc{input_size_from_memory, input_size_from_stream}
@@ -215,7 +216,7 @@ read_slice_from_stream :: #force_inline proc(z: ^Context_Stream_Input, size: int
 	// TODO: REMOVE ALL USE OF context.temp_allocator here
 	// the is literally no need for it
 	b := make([]u8, size, context.temp_allocator)
-	_, e := z.input->impl_read(b[:])
+	_, e := io.read(z.input, b[:])
 	if e == .None {
 		return b, .None
 	}

@@ -4,66 +4,60 @@ import "core:io"
 
 stream_from_handle :: proc(fd: Handle) -> io.Stream {
 	s: io.Stream
-	s.stream_data = rawptr(uintptr(fd))
-	s.stream_vtable = &_file_stream_vtable
+	s.data = rawptr(uintptr(fd))
+	s.procedure = _file_stream_proc
 	return s
 }
 
 
 @(private)
-_file_stream_vtable := io.Stream_VTable{
-	impl_read = proc(s: io.Stream, p: []byte) -> (n: int, err: io.Error) {
-		fd := Handle(uintptr(s.stream_data))
-		os_err: Errno
-		n, os_err = read(fd, p)
-		return
-	},
-	impl_read_at = proc(s: io.Stream, p: []byte, offset: i64) -> (n: int, err: io.Error) {
-		when ODIN_OS == .Windows || ODIN_OS == .WASI {
-			fd := Handle(uintptr(s.stream_data))
-			os_err: Errno
-			n, os_err = read_at(fd, p, offset)
-		}
-		return
-	},
-	impl_write = proc(s: io.Stream, p: []byte) -> (n: int, err: io.Error) {
-		fd := Handle(uintptr(s.stream_data))
-		os_err: Errno
-		n, os_err = write(fd, p)
-		return
-	},
-	impl_write_at = proc(s: io.Stream, p: []byte, offset: i64) -> (n: int, err: io.Error) {
-		when ODIN_OS == .Windows || ODIN_OS == .WASI {
-			fd := Handle(uintptr(s.stream_data))
-			os_err: Errno
-			n, os_err = write_at(fd, p, offset)
-			_ = os_err
-		}
-		return
-	},
-	impl_seek = proc(s: io.Stream, offset: i64, whence: io.Seek_From) -> (i64, io.Error) {
-		fd := Handle(uintptr(s.stream_data))
-		n, os_err := seek(fd, offset, int(whence))
-		_ = os_err
-		return n, nil
-	},
-	impl_size = proc(s: io.Stream) -> i64 {
-		fd := Handle(uintptr(s.stream_data))
-		sz, _ := file_size(fd)
-		return sz
-	},
-	impl_flush = proc(s: io.Stream) -> io.Error {
+_file_stream_proc :: proc(stream_data: rawptr, mode: io.Stream_Mode, p: []byte, offset: i64, whence: io.Seek_From) -> (n: i64, err: io.Error) {
+	fd := Handle(uintptr(stream_data))
+	n_int: int
+	os_err: Errno
+	switch mode {
+	case .Close:
+		close(fd)
+	case .Flush:
 		when ODIN_OS == .Windows {
-			fd := Handle(uintptr(s.stream_data))
 			flush(fd)
 		} else {
 			// TOOD(bill): other operating systems
 		}
-		return nil
-	},
-	impl_close = proc(s: io.Stream) -> io.Error {
-		fd := Handle(uintptr(s.stream_data))
-		close(fd)
-		return nil
-	},
+	case .Read:
+		n_int, os_err = read(fd, p)
+		n = i64(n_int)
+		if os_err != 0 {
+			err = .Unknown
+		}
+	case .Read_At:
+		when !(ODIN_OS == .FreeBSD || ODIN_OS == .OpenBSD) {
+			n_int, os_err = read_at(fd, p, offset)
+			n = i64(n_int)
+		}
+	case .Write:
+		n_int, os_err = write(fd, p)
+		n = i64(n_int)
+	case .Write_At:
+		when !(ODIN_OS == .FreeBSD || ODIN_OS == .OpenBSD) {
+			n_int, os_err = write_at(fd, p, offset)
+			n = i64(n_int)
+		}
+	case .Seek:
+		n, os_err = seek(fd, offset, int(whence))
+	case .Size:
+		n, os_err = file_size(fd)
+	case .Destroy:
+		err = .Empty
+	case .Query:
+		when ODIN_OS == .FreeBSD || ODIN_OS == .OpenBSD {
+			return io.query_utility({.Close, .Flush, .Read, .Write, .Seek, .Size, .Query})
+		} else {
+			return io.query_utility({.Close, .Flush, .Read, .Read_At, .Write, .Write_At, .Seek, .Size, .Query})
+		}
+	}
+	if err == nil && os_err != 0 {
+		err = .Unknown
+	}
+	return
 }

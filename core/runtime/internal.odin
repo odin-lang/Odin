@@ -566,16 +566,37 @@ max_f64 :: #force_inline proc "contextless" (a, b: f64) -> f64 {
 }
 
 abs_complex32 :: #force_inline proc "contextless" (x: complex32) -> f16 {
-	r, i := real(x), imag(x)
-	return f16(intrinsics.sqrt(f32(r*r + i*i)))
+	p, q := abs(real(x)), abs(imag(x))
+	if p < q {
+		p, q = q, p
+	}
+	if p == 0 {
+		return 0
+	}
+	q = q / p
+	return p * f16(intrinsics.sqrt(f32(1 + q*q)))
 }
 abs_complex64 :: #force_inline proc "contextless" (x: complex64) -> f32 {
-	r, i := real(x), imag(x)
-	return intrinsics.sqrt(r*r + i*i)
+	p, q := abs(real(x)), abs(imag(x))
+	if p < q {
+		p, q = q, p
+	}
+	if p == 0 {
+		return 0
+	}
+	q = q / p
+	return p * intrinsics.sqrt(1 + q*q)
 }
 abs_complex128 :: #force_inline proc "contextless" (x: complex128) -> f64 {
-	r, i := real(x), imag(x)
-	return intrinsics.sqrt(r*r + i*i)
+	p, q := abs(real(x)), abs(imag(x))
+	if p < q {
+		p, q = q, p
+	}
+	if p == 0 {
+		return 0
+	}
+	q = q / p
+	return p * intrinsics.sqrt(1 + q*q)
 }
 abs_quaternion64 :: #force_inline proc "contextless" (x: quaternion64) -> f16 {
 	r, i, j, k := real(x), imag(x), jmag(x), kmag(x)

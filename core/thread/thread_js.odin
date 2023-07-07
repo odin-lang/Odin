@@ -5,15 +5,7 @@ import "core:intrinsics"
 import "core:sync"
 import "core:mem"
 
-Thread_State :: enum u8 {
-	Started,
-	Joined,
-	Done,
-}
-
-Thread_Os_Specific :: struct {
-	flags:       bit_set[Thread_State; u8],
-}
+Thread_Os_Specific :: struct {}
 
 _thread_priority_map := [Thread_Priority]i32{
 	.Normal = 0,
