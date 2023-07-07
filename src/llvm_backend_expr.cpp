@@ -2276,7 +2276,10 @@ gb_internal lbValue lb_emit_comp(lbProcedure *p, TokenKind op_kind, lbValue left
 	GB_ASSERT(gb_is_between(op_kind, Token__ComparisonBegin+1, Token__ComparisonEnd-1));
 
 	lbValue nil_check = {};
-	if (is_type_untyped_nil(left.type)) {
+
+	if (is_type_array_like(left.type) || is_type_array_like(right.type)) {
+		// don't do `nil` check if it is array-like
+	} else if (is_type_untyped_nil(left.type)) {
 		nil_check = lb_emit_comp_against_nil(p, op_kind, right);
 	} else if (is_type_untyped_nil(right.type)) {
 		nil_check = lb_emit_comp_against_nil(p, op_kind, left);
@@ -2332,7 +2335,7 @@ gb_internal lbValue lb_emit_comp(lbProcedure *p, TokenKind op_kind, lbValue left
 		lbValue res = lb_emit_comp(p, op_kind, val, lb_const_nil(p->module, val.type));
 		return lb_emit_conv(p, res, t_bool);
 	}
-	if (is_type_array(a) || is_type_enumerated_array(a)) {
+	if (is_type_array_like(a)) {
 		Type *tl = base_type(a);
 		lbValue lhs = lb_address_from_load_or_generate_local(p, left);
 		lbValue rhs = lb_address_from_load_or_generate_local(p, right);
