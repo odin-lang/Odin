@@ -285,17 +285,6 @@ gb_internal Scope *create_scope_from_package(CheckerContext *c, AstPackage *pkg)
 }
 
 gb_internal void destroy_scope(Scope *scope) {
-	for (auto const &entry : scope->elements) {
-		Entity *e = entry.value;
-		if (e->kind == Entity_Variable) {
-			if (!(e->flags & EntityFlag_Used)) {
-#if 0
-				warning(e->token, "Unused variable '%.*s'", LIT(e->token.string));
-#endif
-			}
-		}
-	}
-
 	for (Scope *child = scope->head_child; child != nullptr; child = child->next) {
 		destroy_scope(child);
 	}
