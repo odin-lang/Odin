@@ -1719,7 +1719,7 @@ gb_internal bool check_unary_op(CheckerContext *c, Operand *o, Token op) {
 		break;
 
 	case Token_Not:
-		if (!is_type_boolean(type)) {
+		if (!is_type_boolean(type) || is_type_array_like(o->type)) {
 			ERROR_BLOCK();
 			str = expr_to_string(o->expr);
 			error(op, "Operator '%.*s' is only allowed on boolean expressions", LIT(op.string));
