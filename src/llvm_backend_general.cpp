@@ -3004,8 +3004,9 @@ gb_internal lbAddr lb_add_local(lbProcedure *p, Type *type, Entity *e, bool zero
 	LLVMPositionBuilderAtEnd(p->builder, p->decl_block->block);
 
 	char const *name = "";
-	if (e != nullptr) {
-		// name = alloc_cstring(permanent_allocator(), e->token.string);
+	if (e != nullptr && e->token.string.len > 0 && e->token.string != "_") {
+		// NOTE(bill): for debugging purposes only
+		name = alloc_cstring(permanent_allocator(), e->token.string);
 	}
 
 	LLVMTypeRef llvm_type = lb_type(p->module, type);

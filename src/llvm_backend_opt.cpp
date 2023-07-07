@@ -375,16 +375,6 @@ gb_internal void lb_run_function_pass_manager(LLVMPassManagerRef fpm, lbProcedur
 		return;
 	}
 	LLVMRunFunctionPassManager(fpm, p->value);
-	switch (pass_manager_kind) {
-	case lbFunctionPassManager_none:
-		return;
-	case lbFunctionPassManager_default:
-	case lbFunctionPassManager_default_without_memcpy:
-		if (build_context.optimization_level < 0) {
-			return;
-		}
-		break;
-	}
 	// NOTE(bill): LLVMAddDCEPass doesn't seem to be exported in the official DLL's for LLVM
 	// which means we cannot rely upon it
 	// This is also useful for read the .ll for debug purposes because a lot of instructions
