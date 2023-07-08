@@ -71,6 +71,10 @@ gb_global Timings global_timings = {0};
 #include "checker.cpp"
 #include "docs.cpp"
 
+#if defined(GB_SYSTEM_WINDOWS)
+#include "tilde_backend.cpp"
+#endif
+
 #include "llvm_backend.cpp"
 
 #if defined(GB_SYSTEM_OSX)
@@ -696,6 +700,8 @@ enum BuildFlagKind {
 	BuildFlag_InternalIgnoreLLVMBuild,
 
 #if defined(GB_SYSTEM_WINDOWS)
+	BuildFlag_Tilde,
+
 	BuildFlag_IgnoreVsSearch,
 	BuildFlag_ResourceFile,
 	BuildFlag_WindowsPdbName,
@@ -870,6 +876,8 @@ gb_internal bool parse_build_flags(Array<String> args) {
 	add_flag(&build_flags, BuildFlag_InternalIgnoreLLVMBuild, str_lit("internal-ignore-llvm-build"),BuildFlagParam_None,    Command_all);
 
 #if defined(GB_SYSTEM_WINDOWS)
+	add_flag(&build_flags, BuildFlag_Tilde,                   str_lit("tilde"),                     BuildFlagParam_None,    Command__does_build);
+
 	add_flag(&build_flags, BuildFlag_IgnoreVsSearch,          str_lit("ignore-vs-search"),          BuildFlagParam_None,    Command__does_build);
 	add_flag(&build_flags, BuildFlag_ResourceFile,            str_lit("resource"),                  BuildFlagParam_String,  Command__does_build);
 	add_flag(&build_flags, BuildFlag_WindowsPdbName,          str_lit("pdb-name"),                  BuildFlagParam_String,  Command__does_build);
@@ -1537,6 +1545,10 @@ gb_internal bool parse_build_flags(Array<String> args) {
 							build_context.ignore_llvm_build = true;
 							break;
 					#if defined(GB_SYSTEM_WINDOWS)
+						case BuildFlag_Tilde:
+							build_context.tilde_backend = true;
+							break;
+
 						case BuildFlag_IgnoreVsSearch: {
 							GB_ASSERT(value.kind == ExactValue_Invalid);
 							build_context.ignore_microsoft_magic = true;
@@ -2882,27 +2894,38 @@ int main(int arg_count, char const **arg_ptr) {
 		return 0;
 	}
 
-	MAIN_TIME_SECTION("LLVM API Code Gen");
-	lbGenerator *gen = gb_alloc_item(permanent_allocator(), lbGenerator);
-	if (!lb_init_generator(gen, checker)) {
-		return 1;
-	}
-	if (lb_generate_code(gen)) {
-		switch (build_context.build_mode) {
-		case BuildMode_Executable:
-		case BuildMode_DynamicLibrary:
-			i32 result = linker_stage(gen);
-			if (result) {
-				if (build_context.show_timings) {
-					show_timings(checker, &global_timings);
-				}
-				return result;
-			}
-			break;
+#if defined(GB_SYSTEM_WINDOWS)
+	if (build_context.tilde_backend) {
+		MAIN_TIME_SECTION("Tilde Code Gen");
+		if (!tb_generate_code(checker)) {
+			return 1;
 		}
-	}
 
-	remove_temp_files(gen);
+	} else
+#endif
+	{
+		MAIN_TIME_SECTION("LLVM API Code Gen");
+		lbGenerator *gen = gb_alloc_item(permanent_allocator(), lbGenerator);
+		if (!lb_init_generator(gen, checker)) {
+			return 1;
+		}
+		if (lb_generate_code(gen)) {
+			switch (build_context.build_mode) {
+			case BuildMode_Executable:
+			case BuildMode_DynamicLibrary:
+				i32 result = linker_stage(gen);
+				if (result) {
+					if (build_context.show_timings) {
+						show_timings(checker, &global_timings);
+					}
+					return result;
+				}
+				break;
+			}
+		}
+
+		remove_temp_files(gen);
+	}
 
 	if (build_context.show_timings) {
 		show_timings(checker, &global_timings);
