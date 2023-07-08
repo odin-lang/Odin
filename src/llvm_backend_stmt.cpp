@@ -1878,7 +1878,9 @@ gb_internal void lb_build_return_stmt(lbProcedure *p, Slice<Ast *> const &return
 	} else if (return_count == 1) {
 		Entity *e = tuple->variables[0];
 		if (res_count == 0) {
+			rw_mutex_shared_lock(&p->module->values_mutex);
 			lbValue found = map_must_get(&p->module->values, e);
+			rw_mutex_shared_unlock(&p->module->values_mutex);
 			res = lb_emit_load(p, found);
 		} else {
 			res = lb_build_expr(p, return_results[0]);
@@ -1887,7 +1889,9 @@ gb_internal void lb_build_return_stmt(lbProcedure *p, Slice<Ast *> const &return
 		if (p->type->Proc.has_named_results) {
 			// NOTE(bill): store the named values before returning
 			if (e->token.string != "") {
+				rw_mutex_shared_lock(&p->module->values_mutex);
 				lbValue found = map_must_get(&p->module->values, e);
+				rw_mutex_shared_unlock(&p->module->values_mutex);
 				lb_emit_store(p, found, lb_emit_conv(p, res, e->type));
 			}
 		}
@@ -1903,7 +1907,9 @@ gb_internal void lb_build_return_stmt(lbProcedure *p, Slice<Ast *> const &return
 		} else {
 			for (isize res_index = 0; res_index < return_count; res_index++) {
 				Entity *e = tuple->variables[res_index];
+				rw_mutex_shared_lock(&p->module->values_mutex);
 				lbValue found = map_must_get(&p->module->values, e);
+				rw_mutex_shared_unlock(&p->module->values_mutex);
 				lbValue res = lb_emit_load(p, found);
 				array_add(&results, res);
 			}
@@ -1925,7 +1931,9 @@ gb_internal void lb_build_return_stmt(lbProcedure *p, Slice<Ast *> const &return
 				if (e->token.string == "") {
 					continue;
 				}
+				rw_mutex_shared_lock(&p->module->values_mutex);
 				named_results[i] = map_must_get(&p->module->values, e);
+				rw_mutex_shared_unlock(&p->module->values_mutex);
 				values[i] = lb_emit_conv(p, results[i], e->type);
 			}
 

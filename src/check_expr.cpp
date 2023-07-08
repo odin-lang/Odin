@@ -664,6 +664,11 @@ gb_internal i64 check_distance_between_types(CheckerContext *c, Operand *operand
 				if (check_representable_as_constant(c, operand->value, dst, nullptr)) {
 					if (is_type_typed(dst) && src->kind == Type_Basic) {
 						switch (src->Basic.kind) {
+						case Basic_UntypedBool:
+							if (is_type_boolean(dst)) {
+								return 1;
+							}
+							break;
 						case Basic_UntypedRune:
 							if (is_type_integer(dst) || is_type_rune(dst)) {
 								return 1;
@@ -704,45 +709,54 @@ gb_internal i64 check_distance_between_types(CheckerContext *c, Operand *operand
 				return -1;
 			}
 			if (src->kind == Type_Basic) {
+				Type *d = base_array_type(dst);
 				i64 score = -1;
 				switch (src->Basic.kind) {
+				case Basic_UntypedBool:
+					if (is_type_boolean(d)) {
+						score = 1;
+					}
+					break;
 				case Basic_UntypedRune:
-					if (is_type_integer(dst) || is_type_rune(dst)) {
+					if (is_type_integer(d) || is_type_rune(d)) {
 						score = 1;
 					}
 					break;
 				case Basic_UntypedInteger:
-					if (is_type_integer(dst) || is_type_rune(dst)) {
+					if (is_type_integer(d) || is_type_rune(d)) {
 						score = 1;
 					}
 					break;
 				case Basic_UntypedString:
-					if (is_type_string(dst)) {
+					if (is_type_string(d)) {
 						score = 1;
 					}
 					break;
 				case Basic_UntypedFloat:
-					if (is_type_float(dst)) {
+					if (is_type_float(d)) {
 						score = 1;
 					}
 					break;
 				case Basic_UntypedComplex:
-					if (is_type_complex(dst)) {
+					if (is_type_complex(d)) {
 						score = 1;
 					}
-					if (is_type_quaternion(dst)) {
+					if (is_type_quaternion(d)) {
 						score = 2;
 					}
 					break;
 				case Basic_UntypedQuaternion:
-					if (is_type_quaternion(dst)) {
+					if (is_type_quaternion(d)) {
 						score = 1;
 					}
 					break;
 				}
 				if (score > 0) {
-					if (is_type_typed(dst)) {
+					if (is_type_typed(d)) {
 						score += 1;
+					}
+					if (d != dst) {
+						score += 6;
 					}
 				}
 				return score;
@@ -1705,7 +1719,7 @@ gb_internal bool check_unary_op(CheckerContext *c, Operand *o, Token op) {
 		break;
 
 	case Token_Not:
-		if (!is_type_boolean(type)) {
+		if (!is_type_boolean(type) || is_type_array_like(o->type)) {
 			ERROR_BLOCK();
 			str = expr_to_string(o->expr);
 			error(op, "Operator '%.*s' is only allowed on boolean expressions", LIT(op.string));
@@ -4760,7 +4774,10 @@ gb_internal Entity *check_selector(CheckerContext *c, Operand *operand, Ast *nod
 
 	if (entity == nullptr && selector->kind == Ast_Ident) {
 		String field_name = selector->Ident.token.string;
-		if (is_type_dynamic_array(type_deref(operand->type))) {
+		Type *t = type_deref(operand->type);
+		if (t == nullptr) {
+			error(operand->expr, "Cannot use a selector expression on 0-value expression");
+		} else if (is_type_dynamic_array(t)) {
 			init_mem_allocator(c->checker);
 		}
 		sel = lookup_field(operand->type, field_name, operand->mode == Addressing_Type);
