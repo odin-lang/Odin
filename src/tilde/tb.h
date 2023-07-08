@@ -632,7 +632,7 @@ struct TB_Arena {
 };
 
 // allocates in 16MiB chunks and does linear allocation in 'em
-TB_Arena* tb_default_arena(void);
+TB_API TB_Arena* tb_default_arena(void);
 
 ////////////////////////////////
 // Module management
