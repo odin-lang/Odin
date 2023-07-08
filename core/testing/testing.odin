@@ -4,6 +4,9 @@ import "core:fmt"
 import "core:io"
 import "core:time"
 import "core:intrinsics"
+import "core:reflect"
+
+_ :: reflect // alias reflect to nothing to force visibility for -vet
 
 // IMPORTANT NOTE: Compiler requires this layout
 Test_Signature :: proc(^T)
@@ -89,7 +92,7 @@ expect :: proc(t: ^T, ok: bool, msg: string = "", loc := #caller_location) -> bo
 	return ok
 }
 expect_value :: proc(t: ^T, value, expected: $T, loc := #caller_location) -> bool where intrinsics.type_is_comparable(T) {
-	ok := value == expected
+	ok := value == expected || reflect.is_nil(value) && reflect.is_nil(expected)
 	if !ok {
 		errorf(t, "expected %v, got %v", expected, value, loc=loc)
 	}
