@@ -2900,7 +2900,6 @@ int main(int arg_count, char const **arg_ptr) {
 		if (!tb_generate_code(checker)) {
 			return 1;
 		}
-
 	} else
 #endif
 	{
