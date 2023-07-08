@@ -346,6 +346,8 @@ struct lbProcedure {
 };
 
 
+#define ABI_PKG_NAME_SEPARATOR "."
+
 
 #if !ODIN_LLVM_MINIMUM_VERSION_14
 #define LLVMConstGEP2(Ty__, ConstantVal__, ConstantIndices__, NumIndices__) LLVMConstGEP(ConstantVal__, ConstantIndices__, NumIndices__)

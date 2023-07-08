@@ -757,7 +757,7 @@ gb_internal void lb_build_nested_proc(lbProcedure *p, AstProcLit *pd, Entity *e)
 	char *name_text = gb_alloc_array(permanent_allocator(), char, name_len);
 
 	i32 guid = cast(i32)p->children.count;
-	name_len = gb_snprintf(name_text, name_len, "%.*s.%.*s-%d", LIT(p->name), LIT(pd_name), guid);
+	name_len = gb_snprintf(name_text, name_len, "%.*s" ABI_PKG_NAME_SEPARATOR "%.*s-%d", LIT(p->name), LIT(pd_name), guid);
 	String name = make_string(cast(u8 *)name_text, name_len-1);
 
 	e->Procedure.link_name = name;
