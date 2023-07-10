@@ -206,12 +206,12 @@ foreign ws2_32 {
 		optval: ^c_char,
 		optlen: ^c_int,
 	) -> c_int ---
-	// https://learn.microsoft.com/en-us/windows/win32/api/winsock2/nf-winsock2-ntohl
+	// [MS-Docs](https://learn.microsoft.com/en-us/windows/win32/api/winsock2/nf-winsock2-ntohl)
 	ntohl :: proc(netlong: c_ulong) -> c_ulong ---
-	// https://learn.microsoft.com/en-us/windows/win32/api/winsock2/nf-winsock2-ntohs
+	// [MS-Docs](https://learn.microsoft.com/en-us/windows/win32/api/winsock2/nf-winsock2-ntohs)
 	ntohs :: proc(netshort: c_ushort) -> c_ushort ---
-	// https://learn.microsoft.com/en-us/windows/win32/api/winsock2/nf-winsock2-htonl
+	// [MS-Docs](https://learn.microsoft.com/en-us/windows/win32/api/winsock2/nf-winsock2-htonl)
 	htonl :: proc(hostlong: c_ulong) -> c_ulong ---
-	// https://learn.microsoft.com/en-us/windows/win32/api/winsock2/nf-winsock2-htons
+	// [MS-Docs](https://learn.microsoft.com/en-us/windows/win32/api/winsock2/nf-winsock2-htons)
 	htons :: proc(hostshort: c_ushort) -> c_ushort ---
 }
