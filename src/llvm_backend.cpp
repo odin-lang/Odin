@@ -1832,19 +1832,20 @@ gb_internal lbProcedure *lb_create_main_procedure(lbModule *m, lbProcedure *star
 		exit_args[0] = lb_emit_select(p, result, lb_const_int(m, t_int, 0), lb_const_int(m, t_int, 1));
 		lb_emit_call(p, exit_runner, exit_args, ProcInlining_none);
 	} else {
-		if (m->info->entry_point != nullptr) { lbValue entry_point = lb_find_procedure_value_from_entity(m, m->info->entry_point);
+		if (m->info->entry_point != nullptr) {
+			lbValue entry_point = lb_find_procedure_value_from_entity(m, m->info->entry_point);
 			lb_emit_call(p, entry_point, {}, ProcInlining_no_inline);
 		}
 
 		if (call_cleanup) {
-		   lbValue cleanup_runtime_value = {cleanup_runtime->value, cleanup_runtime->type};
-		   lb_emit_call(p, cleanup_runtime_value, {}, ProcInlining_none);
+			lbValue cleanup_runtime_value = {cleanup_runtime->value, cleanup_runtime->type};
+			lb_emit_call(p, cleanup_runtime_value, {}, ProcInlining_none);
 		}
 
 		if (is_dll_main) {
-		   LLVMBuildRet(p->builder, LLVMConstInt(lb_type(m, t_i32), 1, false));
+			LLVMBuildRet(p->builder, LLVMConstInt(lb_type(m, t_i32), 1, false));
 		} else {
-		   LLVMBuildRet(p->builder, LLVMConstInt(lb_type(m, t_i32), 0, false));
+			LLVMBuildRet(p->builder, LLVMConstInt(lb_type(m, t_i32), 0, false));
 		}
 	}
 
