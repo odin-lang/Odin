@@ -1827,30 +1827,12 @@ gb_internal lbProcedure *lb_create_main_procedure(lbModule *m, lbProcedure *star
 		args[0] = lb_addr_load(p, all_tests_slice);
 		lbValue result = lb_emit_call(p, runner, args);
 
-		lbBlock *block_success = lb_create_block(p, "success");
-		lbBlock *block_failure = lb_create_block(p, "failure");
-
-		lbValue result_success = lb_emit_comp(p, Token_CmpEq, result, lb_const_bool(m, t_bool, true));
-		lb_emit_if(p, result_success, block_success, block_failure);
-
 		lbValue exit_runner = lb_find_package_value(m, str_lit("os"), str_lit("exit"));
-
-		lb_start_block(p, block_success);
-		{
-			auto exit_args = array_make<lbValue>(temporary_allocator(), 1);
-			exit_args[0] = lb_const_int(m, t_int, 0);
-			lb_emit_call(p, exit_runner, exit_args);
-		}
-
-		lb_start_block(p, block_failure);
-		{
-			auto exit_args = array_make<lbValue>(temporary_allocator(), 1);
-			exit_args[0] = lb_const_int(m, t_int, 1);
-			lb_emit_call(p, exit_runner, exit_args);
-		}
+		auto exit_args = array_make<lbValue>(temporary_allocator(), 1);
+		exit_args[0] = lb_emit_select(p, result, lb_const_int(m, t_int, 0), lb_const_int(m, t_int, 1));
+		lb_emit_call(p, exit_runner, exit_args, ProcInlining_none);
 	} else {
-		if (m->info->entry_point != nullptr) {
-			lbValue entry_point = lb_find_procedure_value_from_entity(m, m->info->entry_point);
+		if (m->info->entry_point != nullptr) { lbValue entry_point = lb_find_procedure_value_from_entity(m, m->info->entry_point);
 			lb_emit_call(p, entry_point, {}, ProcInlining_no_inline);
 		}
 
