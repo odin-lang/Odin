@@ -7,7 +7,7 @@ current_thread_id :: proc "contextless" () -> int {
 	return _current_thread_id()
 }
 
-// A Mutex is a [mutual exclusion lock](https://en.wikipedia.org/wiki/Mutual_exclusion).
+// A Mutex is a [[mutual exclusion lock; https://en.wikipedia.org/wiki/Mutual_exclusion]]
 // It can be used to prevent more than one thread from executing the same piece of code,
 // and thus prevent access to same piece of memory by multiple threads, at the same time.
 //
