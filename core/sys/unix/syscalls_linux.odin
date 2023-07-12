@@ -2054,6 +2054,10 @@ sys_recvfrom :: proc "contextless" (sd: int, buf: rawptr, len: uint, flags: int,
 	return i64(intrinsics.syscall(SYS_recvfrom, uintptr(sd), uintptr(buf), uintptr(len), uintptr(flags), uintptr(addr), uintptr(alen)))
 }
 
+sys_send :: proc "contextless" (sd: int, buf: rawptr, len: uint, flags: int) -> i64 {
+	return i64(intrinsics.syscall(SYS_send, uintptr(sd), uintptr(buf), uintptr(len), uintptr(flags)))
+}
+
 sys_sendto :: proc "contextless" (sd: int, buf: rawptr, len: uint, flags: int, addr: rawptr, alen: i32) -> i64 {
 	return i64(intrinsics.syscall(SYS_sendto, uintptr(sd), uintptr(buf), uintptr(len), uintptr(flags), uintptr(addr), uintptr(alen)))
 }
