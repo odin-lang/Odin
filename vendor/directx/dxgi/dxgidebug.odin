@@ -139,3 +139,21 @@ IDebug1_VTable :: struct {
 	DisableLeakTrackingForThread:   proc "stdcall" (this: ^IDebug1),
 	IsLeakTrackingEnabledForThread: proc "stdcall" (this: ^IDebug1) -> BOOL,
 }
+
+
+GetDebugInterface: proc "stdcall" (riid: ^IID, ppDebug: ^rawptr) -> HRESULT
+// Call this to start using GetDebugInterface
+debug_interface_init :: proc() -> bool {
+	debug_lib := win32.LoadLibraryW(win32.L("dxgidebug.dll"))
+	if debug_lib == nil {
+		return false
+	}
+
+	ptr := win32.GetProcAddress(debug_lib, "DXGIGetDebugInterface")
+	if ptr == nil {
+		return false
+	}
+
+	GetDebugInterface = auto_cast(ptr)
+	return true
+}
