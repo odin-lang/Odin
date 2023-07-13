@@ -145,8 +145,8 @@ GET_DEBUG_INTERFACE_PROC :: #type proc "stdcall" (riid: ^IID, ppDebug: ^rawptr) 
 
 GetDebugInterface: GET_DEBUG_INTERFACE_PROC
 
-// Call this to start using GetDebugInterface
-debug_interface_init :: proc() -> bool {
+// Helper function to initialize GetDebugInterface
+InitDebugInterface :: proc() -> bool {
 	debug_lib := win32.LoadLibraryW(win32.L("dxgidebug.dll"))
 	if debug_lib == nil {
 		return false
