@@ -150,7 +150,7 @@ ID3DInclude_VTable :: struct {
 }
 
 // Default file includer
-D3DCOMPILE_STANDARD_FILE_INCLUDE :: cast(^ID3DInclude)uintptr(1)
+D3DCOMPILE_STANDARD_FILE_INCLUDE :: (^ID3DInclude)(uintptr(1))
 
 
 ID3D11Module :: struct #raw_union {

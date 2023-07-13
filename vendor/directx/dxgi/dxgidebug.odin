@@ -141,7 +141,10 @@ IDebug1_VTable :: struct {
 }
 
 
-GetDebugInterface: proc "stdcall" (riid: ^IID, ppDebug: ^rawptr) -> HRESULT
+GET_DEBUG_INTERFACE_PROC :: #type proc "stdcall" (riid: ^IID, ppDebug: ^rawptr) -> HRESULT
+
+GetDebugInterface: GET_DEBUG_INTERFACE_PROC
+
 // Call this to start using GetDebugInterface
 debug_interface_init :: proc() -> bool {
 	debug_lib := win32.LoadLibraryW(win32.L("dxgidebug.dll"))
@@ -154,6 +157,6 @@ debug_interface_init :: proc() -> bool {
 		return false
 	}
 
-	GetDebugInterface = auto_cast(ptr)
+	GetDebugInterface = cast(GET_DEBUG_INTERFACE_PROC)ptr
 	return true
 }
