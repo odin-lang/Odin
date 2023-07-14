@@ -458,6 +458,22 @@ gb_internal TB_FunctionPrototype *cg_procedure_type_as_prototype(cgModule *m, Ty
 			case Basic_f64be: param.dt = TB_TYPE_F64; break;
 			}
 
+		case Type_Pointer:
+		case Type_MultiPointer:
+		case Type_Proc:
+			param.dt = TB_TYPE_PTR;
+			break;
+
+		default:
+			switch (sz) {
+			case 1: param.dt = TB_TYPE_I8;  break;
+			case 2: param.dt = TB_TYPE_I16; break;
+			case 4: param.dt = TB_TYPE_I32; break;
+			case 8: param.dt = TB_TYPE_I64; break;
+			default:
+				param.dt = TB_TYPE_PTR;
+				break;
+			}
 		}
 
 		if (param.dt.width != 0) {
@@ -468,7 +484,13 @@ gb_internal TB_FunctionPrototype *cg_procedure_type_as_prototype(cgModule *m, Ty
 		}
 	}
 
-	return tb_prototype_create(m->mod, TB_CDECL, params.count, params.data, 0, nullptr, false);
+	auto results = array_make<TB_PrototypeParam>(heap_allocator(), 0, pt->result_count);
+	// if (pt->results) for (Entity *e : pt->params->Tuple.variables) {
+	// 	// TODO(bill):
+	// }
+
+
+	return tb_prototype_create(m->mod, TB_CDECL, params.count, params.data, results.count, results.data, pt->c_vararg);
 }
 
 gb_internal cgProcedure *cg_procedure_create(cgModule *m, Entity *entity, bool ignore_body=false) {
@@ -619,7 +641,8 @@ gb_internal void cg_procedure_generate(cgProcedure *p) {
 	cg_procedure_begin(p);
 	defer (cg_procedure_end(p));
 
-	if (p->name != "bug.main") {
+	if (p->name != "bug.main" &&
+	    p->name != "main") {
 		return;
 	}
 	if (p->body != nullptr) {
@@ -628,7 +651,11 @@ gb_internal void cg_procedure_generate(cgProcedure *p) {
 }
 
 
+#include "tilde_const.cpp"
+#include "tilde_expr.cpp"
 #include "tilde_stmt.cpp"
+
+
 
 gb_internal bool cg_generate_code(Checker *c) {
 	TIME_SECTION("Tilde Module Initializtion");
@@ -722,88 +749,110 @@ gb_internal bool cg_generate_code(Checker *c) {
 		cg_procedure_generate(m->procedures_to_generate[i]);
 	}
 
+	TB_DebugFormat debug_format = TB_DEBUGFMT_NONE;
+	if (build_context.ODIN_DEBUG) {
+		switch (build_context.metrics.os) {
+		case TargetOs_windows:
+			debug_format = TB_DEBUGFMT_CODEVIEW;
+			break;
+		case TargetOs_darwin:
+		case TargetOs_linux:
+		case TargetOs_essence:
+		case TargetOs_freebsd:
+		case TargetOs_openbsd:
+			debug_format = TB_DEBUGFMT_DWARF;
+			break;
+		}
+	}
+	TB_ExportBuffer export_buffer = tb_module_object_export(m->mod, debug_format);
+	defer (tb_export_buffer_free(export_buffer));
+
+	char const *path = "W:/Odin/tilde_main.obj";
+	GB_ASSERT(tb_export_buffer_to_file(export_buffer, path));
 
 
 	////////////////////////////////////////////////////////////////////////////////////
 
 
-	TB_Arena *arena = tb_default_arena();
+	// TB_Arena *arena = tb_default_arena();
 
-	TB_Global *str = nullptr;
-	{
-		TB_Global *str_data = nullptr;
-		{
-			str_data = tb_global_create(m->mod, "csb$1", nullptr, TB_LINKAGE_PRIVATE);
-			tb_global_set_storage(m->mod, tb_module_get_rdata(m->mod), str_data, 8, 1, 1);
-			void *region = tb_global_add_region(m->mod, str_data, 0, 8);
-			memcpy(region, "Hellope\x00", 8);
-		}
+	// TB_Global *str = nullptr;
+	// {
+	// 	TB_Global *str_data = nullptr;
+	// 	{
+	// 		str_data = tb_global_create(m->mod, "csb$1", nullptr, TB_LINKAGE_PRIVATE);
+	// 		tb_global_set_storage(m->mod, tb_module_get_rdata(m->mod), str_data, 8, 1, 1);
+	// 		void *region = tb_global_add_region(m->mod, str_data, 0, 8);
+	// 		memcpy(region, "Hellope\x00", 8);
+	// 	}
 
-		str = tb_global_create(m->mod, "global$str", nullptr, TB_LINKAGE_PRIVATE);
-		tb_global_set_storage(m->mod, tb_module_get_rdata(m->mod), str, 16, 8, 2);
-		tb_global_add_symbol_reloc(m->mod, str, 0, cast(TB_Symbol *)str_data);
-		void *len = tb_global_add_region(m->mod, str, 8, 8);
-		*cast(i64 *)len = 7;
-	}
+	// 	str = tb_global_create(m->mod, "global$str", nullptr, TB_LINKAGE_PRIVATE);
+	// 	tb_global_set_storage(m->mod, tb_module_get_rdata(m->mod), str, 16, 8, 2);
+	// 	tb_global_add_symbol_reloc(m->mod, str, 0, cast(TB_Symbol *)str_data);
+	// 	void *len = tb_global_add_region(m->mod, str, 8, 8);
+	// 	*cast(i64 *)len = 7;
+	// }
 
-	{
-		TB_PrototypeParam printf_ret = {TB_TYPE_I32};
-		TB_PrototypeParam printf_params = {TB_TYPE_PTR};
-		TB_FunctionPrototype *printf_proto = tb_prototype_create(m->mod, TB_STDCALL, 1, &printf_params, 1, &printf_ret, true);
-		TB_External *printf_proc = tb_extern_create(m->mod, "printf", TB_EXTERNAL_SO_LOCAL);
+	// {
+	// 	TB_PrototypeParam printf_ret = {TB_TYPE_I32};
+	// 	TB_PrototypeParam printf_params = {TB_TYPE_PTR};
+	// 	TB_FunctionPrototype *printf_proto = tb_prototype_create(m->mod, TB_STDCALL, 1, &printf_params, 1, &printf_ret, true);
+	// 	TB_External *printf_proc = tb_extern_create(m->mod, "printf", TB_EXTERNAL_SO_LOCAL);
 
-		TB_PrototypeParam main_ret = {TB_TYPE_I32};
-		TB_FunctionPrototype *main_proto = tb_prototype_create(m->mod, TB_STDCALL, 0, nullptr, 1, &main_ret, false);
-		TB_Function *         p = tb_function_create(m->mod, "main", TB_LINKAGE_PUBLIC, TB_COMDAT_NONE);
-		tb_function_set_prototype(p, main_proto, arena);
-
-
-		auto str_ptr          = tb_inst_get_symbol_address(p, cast(TB_Symbol *)str);
-		auto str_data_ptr_ptr = tb_inst_member_access(p, str_ptr, 0);
-		auto str_data_ptr     = tb_inst_load(p, TB_TYPE_PTR, str_data_ptr_ptr, 1, false);
-		auto str_len_ptr      = tb_inst_member_access(p, str_ptr, 8);
-		auto str_len          = tb_inst_load(p, TB_TYPE_I64, str_len_ptr, 8, false);
+	// 	TB_PrototypeParam main_ret = {TB_TYPE_I32};
+	// 	TB_FunctionPrototype *main_proto = tb_prototype_create(m->mod, TB_STDCALL, 0, nullptr, 1, &main_ret, false);
+	// 	TB_Function *         p = tb_function_create(m->mod, "main", TB_LINKAGE_PUBLIC, TB_COMDAT_NONE);
+	// 	tb_function_set_prototype(p, main_proto, arena);
 
 
-		TB_Node *params[4] = {};
-		params[0] = tb_inst_cstring(p, "%.*s %s!\n");
-		params[1] = tb_inst_trunc(p, str_len, TB_TYPE_I32);
-		params[2] = str_data_ptr;
-		params[3] = tb_inst_cstring(p, "World");
-		TB_MultiOutput output = tb_inst_call(p, printf_proto, tb_inst_get_symbol_address(p, cast(TB_Symbol *)printf_proc), gb_count_of(params), params);
-		gb_unused(output);
-		TB_Node *printf_return_value = output.single;
-
-		TB_Node *zero = tb_inst_uint(p, TB_TYPE_I32, 0);
-		TB_Node *one  = tb_inst_uint(p, TB_TYPE_I32, 1);
-
-		TB_Node *prev_case = tb_inst_get_control(p);
-
-		TB_Node *true_case  = tb_inst_region(p);
-		TB_Node *false_case = tb_inst_region(p);
-
-		TB_Node *cond = tb_inst_cmp_igt(p, printf_return_value, zero, true);
-		tb_inst_if(p, cond, true_case, false_case);
-
-		tb_inst_set_control(p, true_case);
-		tb_inst_ret(p, 1, &zero);
-
-		tb_inst_set_control(p, false_case);
-		tb_inst_ret(p, 1, &one);
-
-		tb_inst_set_control(p, prev_case);
+	// 	auto str_ptr          = tb_inst_get_symbol_address(p, cast(TB_Symbol *)str);
+	// 	auto str_data_ptr_ptr = tb_inst_member_access(p, str_ptr, 0);
+	// 	auto str_data_ptr     = tb_inst_load(p, TB_TYPE_PTR, str_data_ptr_ptr, 1, false);
+	// 	auto str_len_ptr      = tb_inst_member_access(p, str_ptr, 8);
+	// 	auto str_len          = tb_inst_load(p, TB_TYPE_I64, str_len_ptr, 8, false);
 
 
-		tb_module_compile_function(m->mod, p, TB_ISEL_FAST);
+	// 	TB_Node *params[4] = {};
+	// 	params[0] = tb_inst_cstring(p, "%.*s %s!\n");
+	// 	params[1] = tb_inst_trunc(p, str_len, TB_TYPE_I32);
+	// 	params[2] = str_data_ptr;
+	// 	params[3] = tb_inst_cstring(p, "World");
+	// 	TB_MultiOutput output = tb_inst_call(p, printf_proto, tb_inst_get_symbol_address(p, cast(TB_Symbol *)printf_proc), gb_count_of(params), params);
+	// 	gb_unused(output);
+	// 	TB_Node *printf_return_value = output.single;
 
-		tb_function_print(p, tb_default_print_callback, stdout);
+	// 	TB_Node *zero = tb_inst_uint(p, TB_TYPE_I32, 0);
+	// 	TB_Node *one  = tb_inst_uint(p, TB_TYPE_I32, 1);
 
-		TB_ExportBuffer export_buffer = tb_module_object_export(m->mod, TB_DEBUGFMT_NONE);
-		defer (tb_export_buffer_free(export_buffer));
+	// 	TB_Node *prev_case = tb_inst_get_control(p);
 
-		char const *path = "W:/Odin/tilde_main.obj";
-		GB_ASSERT(tb_export_buffer_to_file(export_buffer, path));
-	}
+	// 	TB_Node *true_case  = tb_inst_region(p);
+	// 	TB_Node *false_case = tb_inst_region(p);
+
+	// 	TB_Node *cond = tb_inst_cmp_igt(p, printf_return_value, zero, true);
+	// 	tb_inst_if(p, cond, true_case, false_case);
+
+	// 	tb_inst_set_control(p, true_case);
+	// 	tb_inst_ret(p, 1, &zero);
+
+	// 	tb_inst_set_control(p, false_case);
+	// 	tb_inst_ret(p, 1, &one);
+
+	// 	tb_inst_set_control(p, prev_case);
+
+
+	// 	tb_module_compile_function(m->mod, p, TB_ISEL_FAST);
+
+	// 	tb_function_print(p, tb_default_print_callback, stdout);
+
+
+	// 	TB_DebugFormat debug_format = TB_DEBUGFMT_NONE;
+	// 	TB_ExportBuffer export_buffer = tb_module_object_export(m->mod, debug_format);
+	// 	defer (tb_export_buffer_free(export_buffer));
+
+	// 	char const *path = "W:/Odin/tilde_main.obj";
+	// 	GB_ASSERT(tb_export_buffer_to_file(export_buffer, path));
+	// }
 	return true;
 }
 

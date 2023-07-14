@@ -188,6 +188,8 @@ gb_internal cgValue cg_value(TB_Node *    node, Type *type);
 gb_internal cgAddr cg_addr(cgValue const &value);
 
 
+gb_internal cgValue cg_const_value(cgProcedure *p, Type *type, ExactValue const &value);
+
 
 gb_internal void cg_build_stmt(cgProcedure *p, Ast *stmt);
 gb_internal void cg_build_stmt_list(cgProcedure *p, Slice<Ast *> const &stmts);

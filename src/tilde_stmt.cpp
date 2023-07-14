@@ -44,12 +44,13 @@ gb_internal void cg_pop_target_list(cgProcedure *p) {
 	p->target_list = p->target_list->prev;
 }
 
+gb_internal TB_DebugType *cg_debug_type(cgModule *m, Type *type) {
+	// TODO(bill): cg_debug_type
+	return tb_debug_get_void(m->mod);
+}
+
 gb_internal cgAddr cg_add_local(cgProcedure *p, Type *type, Entity *e, bool zero_init) {
-	char const *name = "";
-	if (e != nullptr && e->token.string.len > 0 && e->token.string != "_") {
-		// NOTE(bill): for debugging purposes only
-		name = alloc_cstring(permanent_allocator(), e->token.string);
-	}
+	GB_ASSERT(type != nullptr);
 
 	isize size = type_size_of(type);
 	TB_CharUnits alignment = cast(TB_CharUnits)type_align_of(type);
@@ -58,6 +59,14 @@ gb_internal cgAddr cg_add_local(cgProcedure *p, Type *type, Entity *e, bool zero
 	}
 
 	TB_Node *local = tb_inst_local(p->func, cast(u32)size, alignment);
+
+	if (e != nullptr && e->token.string.len > 0 && e->token.string != "_") {
+		// NOTE(bill): for debugging purposes only
+		char const *name = alloc_cstring(permanent_allocator(), e->token.string);
+
+		TB_DebugType *debug_type = cg_debug_type(p->module, type);
+		tb_function_attrib_variable(p->func, local, name, debug_type);
+	}
 
 	if (zero_init) {
 		bool is_volatile = false;
@@ -81,6 +90,80 @@ gb_internal void cg_scope_close(cgProcedure *p, cgDeferExitKind kind, TB_Node *c
 gb_internal void cg_emit_defer_stmts(cgProcedure *p, cgDeferExitKind kind, TB_Node *control_region) {
 	// TODO(bill): cg_emit_defer_stmts
 }
+
+gb_internal void cg_build_assignment(cgProcedure *p, Array<cgAddr> const &lhs, Slice<Ast *> const &rhs) {
+
+}
+
+
+gb_internal void cg_build_assign_stmt(cgProcedure *p, AstAssignStmt *as) {
+	if (as->op.kind == Token_Eq) {
+		auto lvals = array_make<cgAddr>(permanent_allocator(), 0, as->lhs.count);
+
+		for (Ast *lhs : as->lhs) {
+			cgAddr lval = {};
+			if (!is_blank_ident(lhs)) {
+				lval = cg_build_addr(p, lhs);
+			}
+			array_add(&lvals, lval);
+		}
+		cg_build_assignment(p, lvals, as->rhs);
+		return;
+	}
+
+	GB_ASSERT(as->lhs.count == 1);
+	GB_ASSERT(as->rhs.count == 1);
+	// NOTE(bill): Only 1 += 1 is allowed, no tuples
+	// +=, -=, etc
+
+	GB_PANIC("do += etc assignments");
+
+	i32 op_ = cast(i32)as->op.kind;
+	op_ += Token_Add - Token_AddEq; // Convert += to +
+	TokenKind op = cast(TokenKind)op_;
+
+	gb_unused(op);
+/*
+	if (op == Token_CmpAnd || op == Token_CmpOr) {
+		Type *type = as->lhs[0]->tav.type;
+		cgValue new_value = lb_emit_logical_binary_expr(p, op, as->lhs[0], as->rhs[0], type);
+
+		cgAddr lhs = lb_build_addr(p, as->lhs[0]);
+		lb_addr_store(p, lhs, new_value);
+	} else {
+		cgAddr lhs = lb_build_addr(p, as->lhs[0]);
+		lbValue value = lb_build_expr(p, as->rhs[0]);
+		Type *lhs_type = lb_addr_type(lhs);
+
+		// NOTE(bill): Allow for the weird edge case of:
+		// array *= matrix
+		if (op == Token_Mul && is_type_matrix(value.type) && is_type_array(lhs_type)) {
+			lbValue old_value = lb_addr_load(p, lhs);
+			Type *type = old_value.type;
+			lbValue new_value = lb_emit_vector_mul_matrix(p, old_value, value, type);
+			lb_addr_store(p, lhs, new_value);
+			return;
+		}
+
+		if (is_type_array(lhs_type)) {
+			lb_build_assign_stmt_array(p, op, lhs, value);
+			return;
+		} else {
+			lbValue old_value = lb_addr_load(p, lhs);
+			Type *type = old_value.type;
+
+			lbValue change = lb_emit_conv(p, value, type);
+			lbValue new_value = lb_emit_arith(p, op, old_value, change, type);
+			lb_addr_store(p, lhs, new_value);
+		}
+	}
+*/
+}
+
+gb_internal void cg_build_return_stmt(cgProcedure *p, Slice<Ast *> const &return_results) {
+
+}
+
 
 gb_internal void cg_build_stmt(cgProcedure *p, Ast *node) {
 	Ast *prev_stmt = p->curr_stmt;
@@ -236,6 +319,18 @@ gb_internal void cg_build_stmt(cgProcedure *p, Ast *node) {
 		tb_inst_unreachable(p->func);
 
 		tb_inst_set_control(p->func, prev_block);
+	case_end;
+
+	case_ast_node(es, ExprStmt, node);
+		cg_build_expr(p, es->expr);
+	case_end;
+
+	case_ast_node(as, AssignStmt, node);
+		cg_build_assign_stmt(p, as);
+	case_end;
+
+	case_ast_node(rs, ReturnStmt, node);
+		cg_build_return_stmt(p, rs->results);
 	case_end;
 
 	default:
