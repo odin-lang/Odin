@@ -708,14 +708,12 @@ gb_internal void cg_procedure_begin(cgProcedure *p) {
 	if (p == nullptr || p->func == nullptr) {
 		return;
 	}
-	gb_printf_err("cg_procedure_begin %.*s\n", LIT(p->name));
 }
 
 gb_internal void cg_procedure_end(cgProcedure *p) {
 	if (p == nullptr || p->func == nullptr) {
 		return;
 	}
-	gb_printf_err("cg_procedure_end %.*s\n", LIT(p->name));
 	tb_inst_ret(p->func, 0, nullptr);
 	tb_module_compile_function(p->module->mod, p->func, TB_ISEL_FAST);
 }
@@ -731,16 +729,14 @@ gb_internal void cg_procedure_generate(cgProcedure *p) {
 	    p->name != "main") {
 		return;
 	}
-	if (p->body != nullptr) {
-		cg_build_stmt(p, p->body);
-	}
+	cg_build_stmt(p, p->body);
 }
 
 
 #include "tilde_const.cpp"
 #include "tilde_expr.cpp"
+#include "tilde_proc.cpp"
 #include "tilde_stmt.cpp"
-
 
 
 gb_internal bool cg_generate_code(Checker *c) {

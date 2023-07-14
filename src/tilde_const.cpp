@@ -17,7 +17,7 @@ gb_internal cgValue cg_const_nil(cgProcedure *p, Type *type) {
 	}
 
 	if (is_type_internally_pointer_like(type)) {
-		return cg_value(tb_inst_ptr(p->func, 0), type);
+		return cg_value(tb_inst_uint(p->func, dt, 0), type);
 	} else if (is_type_integer(type) || is_type_boolean(type) || is_type_bit_set(type)) {
 		return cg_value(tb_inst_uint(p->func, dt, 0), type);
 	} else if (is_type_float(type)) {
@@ -34,7 +34,7 @@ gb_internal cgValue cg_const_nil(cgProcedure *p, Type *type) {
 	return {};
 }
 
-gb_internal cgValue cg_const_value(cgProcedure *p, Type *type, ExactValue const &value) {
+gb_internal cgValue cg_const_value(cgModule *m, cgProcedure *p, Type *type, ExactValue const &value) {
 	TB_Node *node = nullptr;
 
 	if (value.kind == ExactValue_Invalid) {
@@ -42,4 +42,9 @@ gb_internal cgValue cg_const_value(cgProcedure *p, Type *type, ExactValue const 
 	}
 
 	return cg_value(node, type);
+}
+
+gb_internal cgValue cg_const_value(cgProcedure *p, Type *type, ExactValue const &value) {
+	GB_ASSERT(p != nullptr);
+	return cg_const_value(p->module, p, type, value);
 }

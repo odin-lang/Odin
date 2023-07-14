@@ -1,5 +1,4 @@
-
-gb_internal cgValue cg_emit_load(cgProcedure *p, cgValue const &ptr, bool is_volatile=false) {
+gb_internal cgValue cg_emit_load(cgProcedure *p, cgValue const &ptr, bool is_volatile) {
 	GB_ASSERT(is_type_pointer(ptr.type));
 	Type *type = type_deref(ptr.type);
 	TB_DataType dt = cg_data_type(type);
@@ -33,10 +32,10 @@ gb_internal cgValue cg_emit_load(cgProcedure *p, cgValue const &ptr, bool is_vol
 	return cg_value(tb_inst_load(p->func, dt, the_ptr, alignment, is_volatile), type);
 }
 
-gb_internal void cg_emit_store(cgProcedure *p, cgValue dst, cgValue const &src, bool is_volatile=false) {
+gb_internal void cg_emit_store(cgProcedure *p, cgValue dst, cgValue const &src, bool is_volatile) {
 	if (dst.kind == cgValue_Addr) {
 		dst = cg_emit_load(p, dst, is_volatile);
-	} else if (dst.kind = cgValue_Symbol) {
+	} else if (dst.kind == cgValue_Symbol) {
 		dst = cg_value(tb_inst_get_symbol_address(p->func, dst.symbol), dst.type);
 	}
 
