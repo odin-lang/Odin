@@ -346,7 +346,9 @@ struct lbProcedure {
 };
 
 
+#ifndef ABI_PKG_NAME_SEPARATOR
 #define ABI_PKG_NAME_SEPARATOR "."
+#endif
 
 
 #if !ODIN_LLVM_MINIMUM_VERSION_14

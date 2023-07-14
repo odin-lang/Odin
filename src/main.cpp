@@ -2897,9 +2897,15 @@ int main(int arg_count, char const **arg_ptr) {
 #if defined(GB_SYSTEM_WINDOWS)
 	if (build_context.tilde_backend) {
 		MAIN_TIME_SECTION("Tilde Code Gen");
-		if (!tb_generate_code(checker)) {
+		if (!cg_generate_code(checker)) {
 			return 1;
 		}
+
+		if (build_context.show_timings) {
+			show_timings(checker, &global_timings);
+		}
+
+		return 0;
 	} else
 #endif
 	{

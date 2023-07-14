@@ -2,8 +2,6 @@ struct Scope;
 struct Checker;
 struct Type;
 struct DeclInfo;
-struct lbModule;
-struct lbProcedure;
 
 
 #define ENTITY_KINDS \
@@ -183,8 +181,14 @@ struct Entity {
 
 	Entity *    aliased_of;
 
-	lbModule *   code_gen_module;
-	lbProcedure *code_gen_procedure;
+	union {
+		struct lbModule *code_gen_module;
+		struct cgModule *cg_module;
+	};
+	union {
+		struct lbProcedure *code_gen_procedure;
+		struct cgProcedure *cg_procedure;
+	};
 
 	u64         order_in_src;
 	String      deprecated_message;
