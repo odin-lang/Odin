@@ -88,6 +88,29 @@ struct cgAddr {
 };
 
 
+struct cgTargetList {
+	cgTargetList *prev;
+	bool          is_block;
+	// control regions
+	TB_Node *     break_;
+	TB_Node *     continue_;
+	TB_Node *     fallthrough_;
+};
+
+struct cgBranchBlocks {
+	Ast *    label;
+	TB_Node *break_;
+	TB_Node *continue_;
+};
+
+enum cgDeferExitKind {
+	cgDeferExit_Default,
+	cgDeferExit_Return,
+	cgDeferExit_Branch,
+};
+
+
+
 struct cgProcedure {
 	u32 flags;
 	u16 state_flags;
@@ -113,6 +136,10 @@ struct cgProcedure {
 
 	cgValue value;
 
+	Ast *curr_stmt;
+
+	cgTargetList *        target_list;
+	Array<cgBranchBlocks> branch_blocks;
 };
 
 
@@ -128,6 +155,8 @@ struct cgModule {
 	StringMap<cgProcedure *> procedures;
 	PtrMap<TB_Function *, Entity *> procedure_values;
 	Array<cgProcedure *> procedures_to_generate;
+
+	PtrMap<uintptr, TB_FileID> file_id_map; // Key: AstFile.id (i32 cast to uintptr)
 
 	std::atomic<u32> nested_type_name_guid;
 };
@@ -158,3 +187,8 @@ gb_internal cgValue cg_value(TB_Node *    node, Type *type);
 
 gb_internal cgAddr cg_addr(cgValue const &value);
 
+
+
+gb_internal void cg_build_stmt(cgProcedure *p, Ast *stmt);
+gb_internal void cg_build_stmt_list(cgProcedure *p, Slice<Ast *> const &stmts);
+gb_internal void cg_build_when_stmt(cgProcedure *p, AstWhenStmt *ws);

@@ -187,12 +187,23 @@ cgModule *cg_module_create(Checker *c) {
 	map_init(&m->values);
 	array_init(&m->procedures_to_generate, heap_allocator());
 
+	map_init(&m->file_id_map);
+
+
+	for_array(id, global_files) {
+		if (AstFile *f = global_files[id]) {
+			char const *path = alloc_cstring(permanent_allocator(), f->fullpath);
+			map_set(&m->file_id_map, cast(uintptr)id, tb_file_create(m->mod, path));
+		}
+	}
+
 	return m;
 }
 
 void cg_module_destroy(cgModule *m) {
 	map_destroy(&m->values);
 	array_free(&m->procedures_to_generate);
+	map_destroy(&m->file_id_map);
 
 	tb_module_destroy(m->mod);
 }
@@ -601,14 +612,23 @@ gb_internal void cg_procedure_end(cgProcedure *p) {
 	tb_module_compile_function(p->module->mod, p->func, TB_ISEL_FAST);
 }
 
-gb_internal void  cg_procedure_build_body(cgProcedure *p) {
+gb_internal void cg_procedure_generate(cgProcedure *p) {
 	if (p->body == nullptr) {
 		return;
 	}
+	cg_procedure_begin(p);
+	defer (cg_procedure_end(p));
 
-	// TODO(bill):
+	if (p->name != "bug.main") {
+		return;
+	}
+	if (p->body != nullptr) {
+		cg_build_stmt(p, p->body);
+	}
 }
 
+
+#include "tilde_stmt.cpp"
 
 gb_internal bool cg_generate_code(Checker *c) {
 	TIME_SECTION("Tilde Module Initializtion");
@@ -699,12 +719,7 @@ gb_internal bool cg_generate_code(Checker *c) {
 
 
 	for (isize i = 0; i < m->procedures_to_generate.count; i++) {
-		cgProcedure *p = m->procedures_to_generate[i];
-		cg_procedure_begin(p);
-		if (p->name == "main") {
-			cg_procedure_build_body(p);
-		}
-		cg_procedure_end(p);
+		cg_procedure_generate(m->procedures_to_generate[i]);
 	}
 
 
