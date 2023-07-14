@@ -325,11 +325,6 @@ typedef enum TB_NodeTypeEnum {
     // PHI
     TB_PHI, // fn(r: region, x: []data)
 
-    // NOTE(NeGate): only used internally, if you
-    // see one in normal IR things went wrong in
-    // an optimization pass
-    TB_PASS,
-
     // variadic
     TB_VA_START,
 
@@ -518,6 +513,7 @@ typedef struct {
 
 typedef struct {
     TB_Node* end;
+    const char* tag;
 
     size_t succ_count;
     TB_Node** succ;
@@ -892,6 +888,9 @@ TB_API TB_Node* tb_inst_get_control(TB_Function* f);
 
 TB_API TB_Node* tb_inst_region(TB_Function* f);
 
+// if len is -1, it's null terminated
+TB_API void tb_inst_set_region_name(TB_Node* n, ptrdiff_t len, const char* name);
+
 TB_API void tb_inst_unreachable(TB_Function* f);
 TB_API void tb_inst_debugbreak(TB_Function* f);
 TB_API void tb_inst_trap(TB_Function* f);
@@ -975,8 +974,6 @@ TB_API TB_Node* tb_inst_shr(TB_Function* f, TB_Node* a, TB_Node* b);
 // By default you can use TB_MEM_ORDER_SEQ_CST for the memory order to get
 // correct but possibly slower results on certain platforms (those with relaxed
 // memory models).
-TB_API TB_Node* tb_inst_atomic_test_and_set(TB_Function* f, TB_Node* addr, TB_MemoryOrder order);
-TB_API TB_Node* tb_inst_atomic_clear(TB_Function* f, TB_Node* addr, TB_MemoryOrder order);
 
 // Must be aligned to the natural alignment of dt
 TB_API TB_Node* tb_inst_atomic_load(TB_Function* f, TB_Node* addr, TB_DataType dt, TB_MemoryOrder order);
@@ -1033,7 +1030,6 @@ TB_API TB_Node* tb_inst_safepoint(TB_Function* f, size_t param_count, TB_Node** 
 
 TB_API TB_Node* tb_inst_incomplete_phi(TB_Function* f, TB_DataType dt, TB_Node* region, size_t preds);
 TB_API bool tb_inst_add_phi_operand(TB_Function* f, TB_Node* phi, TB_Node* region, TB_Node* val);
-TB_API void tb_inst_set_phis_to_region(TB_Function* f, TB_Node* region, size_t phi_count, TB_Node** phis);
 
 TB_API TB_Node* tb_inst_phi2(TB_Function* f, TB_Node* region, TB_Node* a, TB_Node* b);
 TB_API void tb_inst_goto(TB_Function* f, TB_Node* target);
@@ -1043,49 +1039,26 @@ TB_API void tb_inst_branch(TB_Function* f, TB_DataType dt, TB_Node* key, TB_Node
 TB_API void tb_inst_ret(TB_Function* f, size_t count, TB_Node** values);
 
 ////////////////////////////////
-// Transformation pass library
+// Optimizer
 ////////////////////////////////
-typedef struct TB_OptQueue TB_OptQueue;
 
-TB_API bool tb_optqueue_mark(TB_OptQueue* restrict queue, TB_Node* n, bool mark_kids);
-TB_API void tb_optqueue_kill(TB_OptQueue* restrict queue, TB_Node* n);
-TB_API void tb_optqueue_fill_all(TB_OptQueue* restrict queue, TB_Node* n);
+// Function-level optimizations are managed via TB_FuncOpt, it's tied
+// to a single TB_Function and it'll can be used to run peepholes incrementally
+// between whatever passes TB may have.
+typedef struct TB_FuncOpt TB_FuncOpt;
 
-typedef struct TB_Pass {
-    // it's either a module-level pass or function-level
-    bool is_module;
-    const char* name;
+// the arena is used to allocate the nodes
+TB_API TB_FuncOpt* tb_funcopt_enter(TB_Function* f, TB_Arena* arena);
+TB_API void tb_funcopt_exit(TB_FuncOpt* opt);
 
-    union {
-        bool(*func_run)(TB_Function* f, TB_OptQueue* queue);
-        bool(*mod_run)(TB_Module* m);
-    };
-} TB_Pass;
+TB_API bool tb_funcopt_peephole(TB_FuncOpt* opt);
+TB_API bool tb_funcopt_mem2reg(TB_FuncOpt* f);
+TB_API bool tb_funcopt_loop(TB_FuncOpt* f);
 
-typedef struct {
-    bool module_level;
-    uint32_t start, end;
-} TB_Passes;
+TB_API void tb_funcopt_kill(TB_FuncOpt* restrict queue, TB_Node* n);
 
-typedef struct TB_PassManager {
-    size_t count;
-    const TB_Pass* passes;
-} TB_PassManager;
-
-// each iteration the user can take the function sequence and apply
-// it to the functions (or module if module_level is true)
-#define TB_DO_PASSES(it, pm, mod) for (TB_Passes it = { 0 }; tb_passes_iter(pm, mod, &it);)
-TB_API bool tb_passes_iter(TB_PassManager* manager, TB_Module* m, TB_Passes* passes);
-
-// Applies optimizations to the entire module
-TB_API void tb_module_optimize(TB_Module* m, size_t pass_count, const TB_Pass* passes[]);
-
-// Applies a set of function level passes onto a function
-TB_API void tb_function_apply_passes(TB_PassManager* manager, TB_Passes passes, TB_Function* f, TB_Arena* arena);
-TB_API void tb_module_apply_passes(TB_PassManager* manager, TB_Passes passes, TB_Module* m, TB_Arena* arena);
-
-TB_API TB_Pass tb_opt_mem2reg(void);
-TB_API TB_Pass tb_opt_identity(void);
+TB_API bool tb_funcopt_mark(TB_FuncOpt* restrict queue, TB_Node* n);
+TB_API void tb_funcopt_mark_users(TB_FuncOpt* restrict queue, TB_Node* n);
 
 ////////////////////////////////
 // IR access
