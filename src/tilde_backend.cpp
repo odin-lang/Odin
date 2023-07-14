@@ -1,5 +1,88 @@
 #include "tilde_backend.hpp"
 
+// returns TB_TYPE_VOID if not trivially possible
+gb_internal TB_DataType cg_data_type(Type *t) {
+	GB_ASSERT(t != nullptr);
+	t = core_type(t);
+	switch (t->kind) {
+	case Type_Basic:
+		switch (t->Basic.kind) {
+		case Basic_bool: return TB_TYPE_BOOL;
+		case Basic_b8:   return TB_TYPE_BOOL;
+		case Basic_b16:  return TB_TYPE_I16;
+		case Basic_b32:  return TB_TYPE_I32;
+		case Basic_b64:  return TB_TYPE_I64;
+
+		case Basic_i8:   return TB_TYPE_I8;
+		case Basic_u8:   return TB_TYPE_I8;
+		case Basic_i16:  return TB_TYPE_I16;
+		case Basic_u16:  return TB_TYPE_I16;
+		case Basic_i32:  return TB_TYPE_I32;
+		case Basic_u32:  return TB_TYPE_I32;
+		case Basic_i64:  return TB_TYPE_I64;
+		case Basic_u64:  return TB_TYPE_I64;
+		case Basic_i128: return TB_TYPE_I128;
+		case Basic_u128: return TB_TYPE_I128;
+
+		case Basic_rune: return TB_TYPE_I32;
+
+		case Basic_f16: return TB_TYPE_I16;
+		case Basic_f32: return TB_TYPE_F32;
+		case Basic_f64: return TB_TYPE_F64;
+
+		case Basic_int:     return TB_TYPE_INTN(cast(u16)build_context.int_size);
+		case Basic_uint:    return TB_TYPE_INTN(cast(u16)build_context.int_size);
+		case Basic_uintptr: return TB_TYPE_INTN(cast(u16)build_context.ptr_size);
+		case Basic_rawptr:  return TB_TYPE_PTR;
+		case Basic_cstring: return TB_TYPE_PTR;
+
+		case Basic_typeid:  return TB_TYPE_INTN(cast(u16)build_context.ptr_size);
+
+		// Endian Specific Types
+		case Basic_i16le:  return TB_TYPE_I16;
+		case Basic_u16le:  return TB_TYPE_I16;
+		case Basic_i32le:  return TB_TYPE_I32;
+		case Basic_u32le:  return TB_TYPE_I32;
+		case Basic_i64le:  return TB_TYPE_I64;
+		case Basic_u64le:  return TB_TYPE_I64;
+		case Basic_i128le: return TB_TYPE_I128;
+		case Basic_u128le: return TB_TYPE_I128;
+
+		case Basic_i16be:  return TB_TYPE_I16;
+		case Basic_u16be:  return TB_TYPE_I16;
+		case Basic_i32be:  return TB_TYPE_I32;
+		case Basic_u32be:  return TB_TYPE_I32;
+		case Basic_i64be:  return TB_TYPE_I64;
+		case Basic_u64be:  return TB_TYPE_I64;
+		case Basic_i128be: return TB_TYPE_I128;
+		case Basic_u128be: return TB_TYPE_I128;
+
+		case Basic_f16le: return TB_TYPE_I16;
+		case Basic_f32le: return TB_TYPE_F32;
+		case Basic_f64le: return TB_TYPE_F64;
+
+		case Basic_f16be: return TB_TYPE_I16;
+		case Basic_f32be: return TB_TYPE_F32;
+		case Basic_f64be: return TB_TYPE_F64;
+		}
+
+	case Type_Pointer:
+	case Type_MultiPointer:
+	case Type_Proc:
+		return TB_TYPE_PTR;
+
+	case Type_BitSet:
+		return cg_data_type(bit_set_to_int(t));
+
+	case Type_RelativePointer:
+		return cg_data_type(t->RelativePointer.base_integer);
+	}
+
+	// unknown
+	return {};
+}
+
+
 gb_internal cgValue cg_value(TB_Global *g, Type *type) {
 	return cg_value((TB_Symbol *)g, type);
 }

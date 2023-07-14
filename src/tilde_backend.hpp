@@ -7,6 +7,9 @@
 
 #include "tilde/tb.h"
 
+#define TB_TYPE_I128  TB_DataType{ { TB_INT, 0, 128 } }
+
+
 #if defined(GB_SYSTEM_WINDOWS)
 	#pragma warning(pop)
 #endif

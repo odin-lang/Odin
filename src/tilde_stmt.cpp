@@ -96,6 +96,90 @@ gb_internal void cg_build_assignment(cgProcedure *p, Array<cgAddr> const &lhs, S
 }
 
 
+gb_internal cgValue cg_emit_load(cgProcedure *p, cgValue const &ptr, bool is_volatile=false) {
+	GB_ASSERT(is_type_pointer(ptr.type));
+	Type *type = type_deref(ptr.type);
+	TB_DataType dt = cg_data_type(type);
+
+	if (TB_IS_VOID_TYPE(dt)) {
+		switch (ptr.kind) {
+		case cgValue_Value:
+			return cg_lvalue_addr(ptr.node, type);
+		case cgValue_Addr:
+			GB_PANIC("NOT POSSIBLE");
+			break;
+		case cgValue_Symbol:
+			return cg_lvalue_addr(tb_inst_get_symbol_address(p->func, ptr.symbol), type);
+		}
+	}
+
+	TB_CharUnits alignment = 1; // for the time being
+
+	TB_Node *the_ptr = nullptr;
+	switch (ptr.kind) {
+	case cgValue_Value:
+		the_ptr = ptr.node;
+		break;
+	case cgValue_Addr:
+		the_ptr = tb_inst_load(p->func, TB_TYPE_PTR, ptr.node, alignment, is_volatile);
+		break;
+	case cgValue_Symbol:
+		the_ptr = tb_inst_get_symbol_address(p->func, ptr.symbol);
+		break;
+	}
+	return cg_value(tb_inst_load(p->func, dt, the_ptr, alignment, is_volatile), type);
+}
+
+gb_internal void cg_emit_store(cgProcedure *p, cgValue dst, cgValue const &src, bool is_volatile=false) {
+	if (dst.kind == cgValue_Addr) {
+		dst = cg_emit_load(p, dst, is_volatile);
+	} else if (dst.kind = cgValue_Symbol) {
+		dst = cg_value(tb_inst_get_symbol_address(p->func, dst.symbol), dst.type);
+	}
+
+	GB_ASSERT(is_type_pointer(dst.type));
+	Type *dst_type = type_deref(dst.type);
+
+	GB_ASSERT_MSG(are_types_identical(dst_type, src.type), "%s vs %s", type_to_string(dst_type), type_to_string(src.type));
+
+	TB_DataType dt = cg_data_type(dst_type);
+	TB_DataType st = cg_data_type(src.type);
+	GB_ASSERT(dt.raw == st.raw);
+
+	if (TB_IS_VOID_TYPE(dt)) {
+		// TODO(bill): needs to be memmove
+		GB_PANIC("todo emit store to aggregate type");
+		return;
+	}
+
+	TB_CharUnits alignment = 1; // for the time being
+
+	switch (dst.kind) {
+	case cgValue_Value:
+		switch (dst.kind) {
+		case cgValue_Value:
+			tb_inst_store(p->func, dt, dst.node, src.node, alignment, is_volatile);
+			return;
+		case cgValue_Addr:
+			tb_inst_store(p->func, dt, dst.node,
+			              tb_inst_load(p->func, st, src.node, alignment, is_volatile),
+			              alignment, is_volatile);
+			return;
+		case cgValue_Symbol:
+			tb_inst_store(p->func, dt, dst.node,
+			              tb_inst_get_symbol_address(p->func, src.symbol),
+			              alignment, is_volatile);
+			return;
+		}
+	case cgValue_Addr:
+	case cgValue_Symbol:
+		GB_PANIC("should be handled above");
+		break;
+	}
+}
+
+
+
 gb_internal void cg_build_assign_stmt(cgProcedure *p, AstAssignStmt *as) {
 	if (as->op.kind == Token_Eq) {
 		auto lvals = array_make<cgAddr>(permanent_allocator(), 0, as->lhs.count);

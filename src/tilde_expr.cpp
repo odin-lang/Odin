@@ -50,6 +50,10 @@ gb_internal cgValue cg_build_expr(cgProcedure *p, Ast *expr) {
 	}
 
 	cgValue res = cg_build_expr_internal(p, expr);
+	if (res.kind == cgValue_Symbol) {
+		GB_ASSERT(is_type_pointer(res.type));
+		res = cg_value(tb_inst_get_symbol_address(p->func, res.symbol), res.type);
+	}
 
 	if (expr->state_flags & StateFlag_SelectorCallExpr) {
 		// map_set(&p->selector_values, expr, res);
