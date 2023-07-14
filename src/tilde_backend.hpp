@@ -7,8 +7,9 @@
 
 #include "tilde/tb.h"
 
-#define TB_TYPE_I128  TB_DataType{ { TB_INT, 0, 128 } }
-
+#define TB_TYPE_I128   TB_DataType{ { TB_INT, 0, 128 } }
+#define TB_TYPE_INT    TB_TYPE_INTN(cast(u16)build_context.int_size)
+#define TB_TYPE_INTPTR TB_TYPE_INTN(cast(u16)build_context.ptr_size)
 
 #if defined(GB_SYSTEM_WINDOWS)
 	#pragma warning(pop)
@@ -162,6 +163,7 @@ struct cgModule {
 	PtrMap<uintptr, TB_FileID> file_id_map; // Key: AstFile.id (i32 cast to uintptr)
 
 	std::atomic<u32> nested_type_name_guid;
+	std::atomic<u32> const_nil_guid;
 };
 
 #ifndef ABI_PKG_NAME_SEPARATOR

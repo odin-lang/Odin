@@ -1,3 +1,9 @@
+gb_internal cgValue cg_emit_conv(cgProcedure *p, cgValue value, Type *type) {
+	// TODO(bill): cg_emit_conv
+	return value;
+}
+
+
 gb_internal cgValue cg_build_expr_internal(cgProcedure *p, Ast *expr);
 gb_internal cgValue cg_build_expr(cgProcedure *p, Ast *expr) {
 	u16 prev_state_flags = p->state_flags;

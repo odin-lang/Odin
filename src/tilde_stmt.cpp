@@ -1,3 +1,223 @@
+
+gb_internal cgValue cg_emit_load(cgProcedure *p, cgValue const &ptr, bool is_volatile=false) {
+	GB_ASSERT(is_type_pointer(ptr.type));
+	Type *type = type_deref(ptr.type);
+	TB_DataType dt = cg_data_type(type);
+
+	if (TB_IS_VOID_TYPE(dt)) {
+		switch (ptr.kind) {
+		case cgValue_Value:
+			return cg_lvalue_addr(ptr.node, type);
+		case cgValue_Addr:
+			GB_PANIC("NOT POSSIBLE");
+			break;
+		case cgValue_Symbol:
+			return cg_lvalue_addr(tb_inst_get_symbol_address(p->func, ptr.symbol), type);
+		}
+	}
+
+	TB_CharUnits alignment = 1; // for the time being
+
+	TB_Node *the_ptr = nullptr;
+	switch (ptr.kind) {
+	case cgValue_Value:
+		the_ptr = ptr.node;
+		break;
+	case cgValue_Addr:
+		the_ptr = tb_inst_load(p->func, TB_TYPE_PTR, ptr.node, alignment, is_volatile);
+		break;
+	case cgValue_Symbol:
+		the_ptr = tb_inst_get_symbol_address(p->func, ptr.symbol);
+		break;
+	}
+	return cg_value(tb_inst_load(p->func, dt, the_ptr, alignment, is_volatile), type);
+}
+
+gb_internal void cg_emit_store(cgProcedure *p, cgValue dst, cgValue const &src, bool is_volatile=false) {
+	if (dst.kind == cgValue_Addr) {
+		dst = cg_emit_load(p, dst, is_volatile);
+	} else if (dst.kind = cgValue_Symbol) {
+		dst = cg_value(tb_inst_get_symbol_address(p->func, dst.symbol), dst.type);
+	}
+
+	GB_ASSERT(is_type_pointer(dst.type));
+	Type *dst_type = type_deref(dst.type);
+
+	GB_ASSERT_MSG(are_types_identical(dst_type, src.type), "%s vs %s", type_to_string(dst_type), type_to_string(src.type));
+
+	TB_DataType dt = cg_data_type(dst_type);
+	TB_DataType st = cg_data_type(src.type);
+	GB_ASSERT(dt.raw == st.raw);
+
+	TB_CharUnits alignment = 1; // for the time being
+
+	if (TB_IS_VOID_TYPE(dt)) {
+		TB_Node *dst_ptr = nullptr;
+		TB_Node *src_ptr = nullptr;
+
+		switch (dst.kind) {
+		case cgValue_Value:
+			dst_ptr	= dst.node;
+			break;
+		case cgValue_Addr:
+			GB_PANIC("DST cgValue_Addr should be handled above");
+			break;
+		case cgValue_Symbol:
+			dst_ptr = tb_inst_get_symbol_address(p->func, dst.symbol);
+			break;
+		}
+
+		switch (src.kind) {
+		case cgValue_Value:
+			GB_PANIC("SRC cgValue_Value should be handled above");
+			break;
+		case cgValue_Symbol:
+			GB_PANIC("SRC cgValue_Symbol should be handled above");
+			break;
+		case cgValue_Addr:
+			src_ptr = src.node;
+			break;
+		}
+
+		// IMPORTANT TODO(bill): needs to be memmove
+		i64 sz = type_size_of(dst_type);
+		TB_Node *count = tb_inst_uint(p->func, TB_TYPE_INT, cast(u64)sz);
+		tb_inst_memcpy(p->func, dst_ptr, src_ptr, count, alignment, is_volatile);
+		return;
+	}
+
+	switch (dst.kind) {
+	case cgValue_Value:
+		switch (dst.kind) {
+		case cgValue_Value:
+			tb_inst_store(p->func, dt, dst.node, src.node, alignment, is_volatile);
+			return;
+		case cgValue_Addr:
+			tb_inst_store(p->func, dt, dst.node,
+			              tb_inst_load(p->func, st, src.node, alignment, is_volatile),
+			              alignment, is_volatile);
+			return;
+		case cgValue_Symbol:
+			tb_inst_store(p->func, dt, dst.node,
+			              tb_inst_get_symbol_address(p->func, src.symbol),
+			              alignment, is_volatile);
+			return;
+		}
+	case cgValue_Addr:
+		GB_PANIC("cgValue_Addr should be handled above");
+		break;
+	case cgValue_Symbol:
+		GB_PANIC(" cgValue_Symbol should be handled above");
+		break;
+	}
+}
+
+
+gb_internal cgValue cg_address_from_load(cgProcedure *p, cgValue value) {
+	switch (value.kind) {
+	case cgValue_Value:
+		{
+			TB_Node *load_inst = value.node;
+			GB_ASSERT_MSG(load_inst->type == TB_LOAD, "expected a load instruction");
+			TB_Node *ptr = load_inst->inputs[1];
+			return cg_value(ptr, alloc_type_pointer(value.type));
+		}
+	case cgValue_Addr:
+		return cg_value(value.node, alloc_type_pointer(value.type));
+	case cgValue_Symbol:
+		GB_PANIC("Symbol is an invalid use case for cg_address_from_load");
+		return {};
+	}
+}
+
+gb_internal bool cg_addr_is_empty(cgAddr const &addr) {
+	switch (addr.kind) {
+	case cgValue_Value:
+	case cgValue_Addr:
+		return addr.addr.node == nullptr;
+	case cgValue_Symbol:
+		return addr.addr.symbol == nullptr;
+	}
+	return true;
+}
+
+gb_internal Type *cg_addr_type(cgAddr const &addr) {
+	if (cg_addr_is_empty(addr)) {
+		return nullptr;
+	}
+	switch (addr.kind) {
+	case cgAddr_Map:
+		{
+			Type *t = base_type(addr.map.type);
+			GB_ASSERT(is_type_map(t));
+			return t->Map.value;
+		}
+	case cgAddr_Swizzle:
+		return addr.swizzle.type;
+	case cgAddr_SwizzleLarge:
+		return addr.swizzle_large.type;
+	case cgAddr_Context:
+		if (addr.ctx.sel.index.count > 0) {
+			Type *t = t_context;
+			for_array(i, addr.ctx.sel.index) {
+				GB_ASSERT(is_type_struct(t));
+				t = base_type(t)->Struct.fields[addr.ctx.sel.index[i]]->type;
+			}
+			return t;
+		}
+		break;
+	}
+	return type_deref(addr.addr.type);
+}
+
+gb_internal cgValue cg_addr_load(cgProcedure *p, cgAddr addr) {
+	GB_PANIC("TODO(bill): cg_addr_load");
+	return {};
+}
+
+
+gb_internal void cg_addr_store(cgProcedure *p, cgAddr addr, cgValue value) {
+	if (cg_addr_is_empty(addr)) {
+		return;
+	}
+	GB_ASSERT(value.type != nullptr);
+	if (is_type_untyped_uninit(value.type)) {
+		Type *t = cg_addr_type(addr);
+		value = cg_value(tb_inst_poison(p->func), t);
+		// TODO(bill): IS THIS EVEN A GOOD IDEA?
+	} else if (is_type_untyped_nil(value.type)) {
+		Type *t = cg_addr_type(addr);
+		value = cg_const_nil(p, t);
+	}
+
+	if (addr.kind == cgAddr_RelativePointer && addr.relative.deref) {
+		addr = cg_addr(cg_address_from_load(p, cg_addr_load(p, addr)));
+	}
+
+	if (addr.kind == cgAddr_RelativePointer) {
+		GB_PANIC("TODO(bill): cgAddr_RelativePointer");
+	} else if (addr.kind == cgAddr_RelativeSlice) {
+		GB_PANIC("TODO(bill): cgAddr_RelativeSlice");
+	} else if (addr.kind == cgAddr_Map) {
+		GB_PANIC("TODO(bill): cgAddr_Map");
+	} else if (addr.kind == cgAddr_Context) {
+		GB_PANIC("TODO(bill): cgAddr_Context");
+	} else if (addr.kind == cgAddr_SoaVariable) {
+		GB_PANIC("TODO(bill): cgAddr_SoaVariable");
+	} else if (addr.kind == cgAddr_Swizzle) {
+		GB_ASSERT(addr.swizzle.count <= 4);
+		GB_PANIC("TODO(bill): cgAddr_Swizzle");
+	} else if (addr.kind == cgAddr_SwizzleLarge) {
+		GB_PANIC("TODO(bill): cgAddr_SwizzleLarge");
+	}
+
+	value = cg_emit_conv(p, value, cg_addr_type(addr));
+	cg_emit_store(p, addr.addr, value);
+}
+
+
+
+
 gb_internal cgBranchBlocks cg_lookup_branch_blocks(cgProcedure *p, Ast *ident) {
 	GB_ASSERT(ident->kind == Ast_Ident);
 	Entity *e = entity_of_node(ident);
@@ -91,94 +311,11 @@ gb_internal void cg_emit_defer_stmts(cgProcedure *p, cgDeferExitKind kind, TB_No
 	// TODO(bill): cg_emit_defer_stmts
 }
 
-gb_internal void cg_build_assignment(cgProcedure *p, Array<cgAddr> const &lhs, Slice<Ast *> const &rhs) {
-
-}
-
-
-gb_internal cgValue cg_emit_load(cgProcedure *p, cgValue const &ptr, bool is_volatile=false) {
-	GB_ASSERT(is_type_pointer(ptr.type));
-	Type *type = type_deref(ptr.type);
-	TB_DataType dt = cg_data_type(type);
-
-	if (TB_IS_VOID_TYPE(dt)) {
-		switch (ptr.kind) {
-		case cgValue_Value:
-			return cg_lvalue_addr(ptr.node, type);
-		case cgValue_Addr:
-			GB_PANIC("NOT POSSIBLE");
-			break;
-		case cgValue_Symbol:
-			return cg_lvalue_addr(tb_inst_get_symbol_address(p->func, ptr.symbol), type);
-		}
-	}
-
-	TB_CharUnits alignment = 1; // for the time being
-
-	TB_Node *the_ptr = nullptr;
-	switch (ptr.kind) {
-	case cgValue_Value:
-		the_ptr = ptr.node;
-		break;
-	case cgValue_Addr:
-		the_ptr = tb_inst_load(p->func, TB_TYPE_PTR, ptr.node, alignment, is_volatile);
-		break;
-	case cgValue_Symbol:
-		the_ptr = tb_inst_get_symbol_address(p->func, ptr.symbol);
-		break;
-	}
-	return cg_value(tb_inst_load(p->func, dt, the_ptr, alignment, is_volatile), type);
-}
-
-gb_internal void cg_emit_store(cgProcedure *p, cgValue dst, cgValue const &src, bool is_volatile=false) {
-	if (dst.kind == cgValue_Addr) {
-		dst = cg_emit_load(p, dst, is_volatile);
-	} else if (dst.kind = cgValue_Symbol) {
-		dst = cg_value(tb_inst_get_symbol_address(p->func, dst.symbol), dst.type);
-	}
-
-	GB_ASSERT(is_type_pointer(dst.type));
-	Type *dst_type = type_deref(dst.type);
-
-	GB_ASSERT_MSG(are_types_identical(dst_type, src.type), "%s vs %s", type_to_string(dst_type), type_to_string(src.type));
-
-	TB_DataType dt = cg_data_type(dst_type);
-	TB_DataType st = cg_data_type(src.type);
-	GB_ASSERT(dt.raw == st.raw);
-
-	if (TB_IS_VOID_TYPE(dt)) {
-		// TODO(bill): needs to be memmove
-		GB_PANIC("todo emit store to aggregate type");
+gb_internal void cg_build_assignment(cgProcedure *p, Array<cgAddr> const &lvals, Slice<Ast *> const &values) {
+	if (values.count == 0) {
 		return;
 	}
-
-	TB_CharUnits alignment = 1; // for the time being
-
-	switch (dst.kind) {
-	case cgValue_Value:
-		switch (dst.kind) {
-		case cgValue_Value:
-			tb_inst_store(p->func, dt, dst.node, src.node, alignment, is_volatile);
-			return;
-		case cgValue_Addr:
-			tb_inst_store(p->func, dt, dst.node,
-			              tb_inst_load(p->func, st, src.node, alignment, is_volatile),
-			              alignment, is_volatile);
-			return;
-		case cgValue_Symbol:
-			tb_inst_store(p->func, dt, dst.node,
-			              tb_inst_get_symbol_address(p->func, src.symbol),
-			              alignment, is_volatile);
-			return;
-		}
-	case cgValue_Addr:
-	case cgValue_Symbol:
-		GB_PANIC("should be handled above");
-		break;
-	}
 }
-
-
 
 gb_internal void cg_build_assign_stmt(cgProcedure *p, AstAssignStmt *as) {
 	if (as->op.kind == Token_Eq) {
@@ -213,19 +350,19 @@ gb_internal void cg_build_assign_stmt(cgProcedure *p, AstAssignStmt *as) {
 		cgValue new_value = lb_emit_logical_binary_expr(p, op, as->lhs[0], as->rhs[0], type);
 
 		cgAddr lhs = lb_build_addr(p, as->lhs[0]);
-		lb_addr_store(p, lhs, new_value);
+		cg_addr_store(p, lhs, new_value);
 	} else {
 		cgAddr lhs = lb_build_addr(p, as->lhs[0]);
-		lbValue value = lb_build_expr(p, as->rhs[0]);
+		cgValue value = lb_build_expr(p, as->rhs[0]);
 		Type *lhs_type = lb_addr_type(lhs);
 
 		// NOTE(bill): Allow for the weird edge case of:
 		// array *= matrix
 		if (op == Token_Mul && is_type_matrix(value.type) && is_type_array(lhs_type)) {
-			lbValue old_value = lb_addr_load(p, lhs);
+			cgValue old_value = lb_addr_load(p, lhs);
 			Type *type = old_value.type;
-			lbValue new_value = lb_emit_vector_mul_matrix(p, old_value, value, type);
-			lb_addr_store(p, lhs, new_value);
+			cgValue new_value = lb_emit_vector_mul_matrix(p, old_value, value, type);
+			cg_addr_store(p, lhs, new_value);
 			return;
 		}
 
@@ -233,12 +370,12 @@ gb_internal void cg_build_assign_stmt(cgProcedure *p, AstAssignStmt *as) {
 			lb_build_assign_stmt_array(p, op, lhs, value);
 			return;
 		} else {
-			lbValue old_value = lb_addr_load(p, lhs);
+			cgValue old_value = lb_addr_load(p, lhs);
 			Type *type = old_value.type;
 
-			lbValue change = lb_emit_conv(p, value, type);
-			lbValue new_value = lb_emit_arith(p, op, old_value, change, type);
-			lb_addr_store(p, lhs, new_value);
+			cgValue change = lb_emit_conv(p, value, type);
+			cgValue new_value = lb_emit_arith(p, op, old_value, change, type);
+			cg_addr_store(p, lhs, new_value);
 		}
 	}
 */

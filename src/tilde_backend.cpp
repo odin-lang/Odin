@@ -4,58 +4,61 @@
 gb_internal TB_DataType cg_data_type(Type *t) {
 	GB_ASSERT(t != nullptr);
 	t = core_type(t);
+	i64 sz = type_size_of(t);
 	switch (t->kind) {
 	case Type_Basic:
 		switch (t->Basic.kind) {
-		case Basic_bool: return TB_TYPE_BOOL;
-		case Basic_b8:   return TB_TYPE_BOOL;
-		case Basic_b16:  return TB_TYPE_I16;
-		case Basic_b32:  return TB_TYPE_I32;
-		case Basic_b64:  return TB_TYPE_I64;
+		case Basic_bool:
+		case Basic_b8:
+		case Basic_b16:
+		case Basic_b32:
+		case Basic_b64:
 
-		case Basic_i8:   return TB_TYPE_I8;
-		case Basic_u8:   return TB_TYPE_I8;
-		case Basic_i16:  return TB_TYPE_I16;
-		case Basic_u16:  return TB_TYPE_I16;
-		case Basic_i32:  return TB_TYPE_I32;
-		case Basic_u32:  return TB_TYPE_I32;
-		case Basic_i64:  return TB_TYPE_I64;
-		case Basic_u64:  return TB_TYPE_I64;
-		case Basic_i128: return TB_TYPE_I128;
-		case Basic_u128: return TB_TYPE_I128;
+		case Basic_i8:
+		case Basic_u8:
+		case Basic_i16:
+		case Basic_u16:
+		case Basic_i32:
+		case Basic_u32:
+		case Basic_i64:
+		case Basic_u64:
+		case Basic_i128:
+		case Basic_u128:
 
-		case Basic_rune: return TB_TYPE_I32;
+		case Basic_rune:
+
+		case Basic_int:
+		case Basic_uint:
+		case Basic_uintptr:
+		case Basic_typeid:
+			return TB_TYPE_INTN(cast(u16)(8*sz));
 
 		case Basic_f16: return TB_TYPE_I16;
 		case Basic_f32: return TB_TYPE_F32;
 		case Basic_f64: return TB_TYPE_F64;
 
-		case Basic_int:     return TB_TYPE_INTN(cast(u16)build_context.int_size);
-		case Basic_uint:    return TB_TYPE_INTN(cast(u16)build_context.int_size);
-		case Basic_uintptr: return TB_TYPE_INTN(cast(u16)build_context.ptr_size);
 		case Basic_rawptr:  return TB_TYPE_PTR;
 		case Basic_cstring: return TB_TYPE_PTR;
 
-		case Basic_typeid:  return TB_TYPE_INTN(cast(u16)build_context.ptr_size);
 
 		// Endian Specific Types
-		case Basic_i16le:  return TB_TYPE_I16;
-		case Basic_u16le:  return TB_TYPE_I16;
-		case Basic_i32le:  return TB_TYPE_I32;
-		case Basic_u32le:  return TB_TYPE_I32;
-		case Basic_i64le:  return TB_TYPE_I64;
-		case Basic_u64le:  return TB_TYPE_I64;
-		case Basic_i128le: return TB_TYPE_I128;
-		case Basic_u128le: return TB_TYPE_I128;
-
-		case Basic_i16be:  return TB_TYPE_I16;
-		case Basic_u16be:  return TB_TYPE_I16;
-		case Basic_i32be:  return TB_TYPE_I32;
-		case Basic_u32be:  return TB_TYPE_I32;
-		case Basic_i64be:  return TB_TYPE_I64;
-		case Basic_u64be:  return TB_TYPE_I64;
-		case Basic_i128be: return TB_TYPE_I128;
-		case Basic_u128be: return TB_TYPE_I128;
+		case Basic_i16le:
+		case Basic_u16le:
+		case Basic_i32le:
+		case Basic_u32le:
+		case Basic_i64le:
+		case Basic_u64le:
+		case Basic_i128le:
+		case Basic_u128le:
+		case Basic_i16be:
+		case Basic_u16be:
+		case Basic_i32be:
+		case Basic_u32be:
+		case Basic_i64be:
+		case Basic_u64be:
+		case Basic_i128be:
+		case Basic_u128be:
+			return TB_TYPE_INTN(cast(u16)(8*sz));
 
 		case Basic_f16le: return TB_TYPE_I16;
 		case Basic_f32le: return TB_TYPE_F32;
