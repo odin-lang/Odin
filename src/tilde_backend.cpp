@@ -184,7 +184,7 @@ gb_internal void cg_create_global_variables(cgModule *m) {
 		// gb_printf_err("max_type_info_count: %td\n", max_type_info_count);
 		Type *t = alloc_type_array(t_type_info, max_type_info_count);
 
-		TB_Global *g = tb_global_create(m->mod, CG_TYPE_INFO_DATA_NAME, nullptr, TB_LINKAGE_PRIVATE);
+		TB_Global *g = tb_global_create(m->mod, -1, CG_TYPE_INFO_DATA_NAME, nullptr, TB_LINKAGE_PRIVATE);
 		tb_global_set_storage(m->mod, tb_module_get_rdata(m->mod), g, type_size_of(t), 16, max_type_info_count);
 
 		cgValue value = cg_value(g, alloc_type_pointer(t));
@@ -219,7 +219,7 @@ gb_internal void cg_create_global_variables(cgModule *m) {
 			{
 				char const *name = CG_TYPE_INFO_TYPES_NAME;
 				Type *t = alloc_type_array(t_type_info_ptr, count);
-				TB_Global *g = tb_global_create(m->mod, name, nullptr, TB_LINKAGE_PRIVATE);
+				TB_Global *g = tb_global_create(m->mod, -1, name, nullptr, TB_LINKAGE_PRIVATE);
 				tb_global_set_storage(m->mod, tb_module_get_rdata(m->mod), g, type_size_of(t), 16, count);
 				cg_global_type_info_member_types = cg_addr(cg_value(g, alloc_type_pointer(t)));
 
@@ -227,14 +227,14 @@ gb_internal void cg_create_global_variables(cgModule *m) {
 			{
 				char const *name = CG_TYPE_INFO_NAMES_NAME;
 				Type *t = alloc_type_array(t_string, count);
-				TB_Global *g = tb_global_create(m->mod, name, nullptr, TB_LINKAGE_PRIVATE);
+				TB_Global *g = tb_global_create(m->mod, -1, name, nullptr, TB_LINKAGE_PRIVATE);
 				tb_global_set_storage(m->mod, tb_module_get_rdata(m->mod), g, type_size_of(t), 16, count);
 				cg_global_type_info_member_names = cg_addr(cg_value(g, alloc_type_pointer(t)));
 			}
 			{
 				char const *name = CG_TYPE_INFO_OFFSETS_NAME;
 				Type *t = alloc_type_array(t_uintptr, count);
-				TB_Global *g = tb_global_create(m->mod, name, nullptr, TB_LINKAGE_PRIVATE);
+				TB_Global *g = tb_global_create(m->mod, -1, name, nullptr, TB_LINKAGE_PRIVATE);
 				tb_global_set_storage(m->mod, tb_module_get_rdata(m->mod), g, type_size_of(t), 16, count);
 				cg_global_type_info_member_offsets = cg_addr(cg_value(g, alloc_type_pointer(t)));
 			}
@@ -242,7 +242,7 @@ gb_internal void cg_create_global_variables(cgModule *m) {
 			{
 				char const *name = CG_TYPE_INFO_USINGS_NAME;
 				Type *t = alloc_type_array(t_bool, count);
-				TB_Global *g = tb_global_create(m->mod, name, nullptr, TB_LINKAGE_PRIVATE);
+				TB_Global *g = tb_global_create(m->mod, -1, name, nullptr, TB_LINKAGE_PRIVATE);
 				tb_global_set_storage(m->mod, tb_module_get_rdata(m->mod), g, type_size_of(t), 16, count);
 				cg_global_type_info_member_usings = cg_addr(cg_value(g, alloc_type_pointer(t)));
 			}
@@ -250,7 +250,7 @@ gb_internal void cg_create_global_variables(cgModule *m) {
 			{
 				char const *name = CG_TYPE_INFO_TAGS_NAME;
 				Type *t = alloc_type_array(t_string, count);
-				TB_Global *g = tb_global_create(m->mod, name, nullptr, TB_LINKAGE_PRIVATE);
+				TB_Global *g = tb_global_create(m->mod, -1, name, nullptr, TB_LINKAGE_PRIVATE);
 				tb_global_set_storage(m->mod, tb_module_get_rdata(m->mod), g, type_size_of(t), 16, count);
 				cg_global_type_info_member_tags = cg_addr(cg_value(g, alloc_type_pointer(t)));
 			}
@@ -268,7 +268,7 @@ cgModule *cg_module_create(Checker *c) {
 	TB_FeatureSet feature_set = {};
 	bool is_jit = false;
 	m->mod = tb_module_create(TB_ARCH_X86_64, TB_SYSTEM_WINDOWS, &feature_set, is_jit);
-	tb_module_set_tls_index(m->mod, "_tls_index");
+	tb_module_set_tls_index(m->mod, 10, "_tls_index");
 
 	map_init(&m->values);
 	array_init(&m->procedures_to_generate, heap_allocator());
@@ -634,8 +634,6 @@ gb_internal cgProcedure *cg_procedure_create(cgModule *m, Entity *entity, bool i
 	// p->scope_stack.allocator   = a;
 	// map_init(&p->tuple_fix_map, 0);
 
-	char const *link_name_c = alloc_cstring(temporary_allocator(), link_name);
-
 	TB_Linkage linkage = TB_LINKAGE_PRIVATE;
 	if (p->is_export) {
 		linkage = TB_LINKAGE_PUBLIC;
@@ -643,11 +641,11 @@ gb_internal cgProcedure *cg_procedure_create(cgModule *m, Entity *entity, bool i
 		if (ignore_body) {
 			linkage = TB_LINKAGE_PUBLIC;
 		}
-		p->symbol = cast(TB_Symbol *)tb_extern_create(m->mod, link_name_c, TB_EXTERNAL_SO_LOCAL);
+		p->symbol = cast(TB_Symbol *)tb_extern_create(m->mod, link_name.len, cast(char const *)link_name.text, TB_EXTERNAL_SO_LOCAL);
 	}
 
 	if (p->symbol == nullptr)  {
-		p->func = tb_function_create(m->mod, link_name_c, linkage, TB_COMDAT_NONE);
+		p->func = tb_function_create(m->mod, link_name.len, cast(char const *)link_name.text, linkage, TB_COMDAT_NONE);
 		tb_function_set_prototype(p->func, cg_procedure_type_as_prototype(m, p->type), tb_default_arena());
 		p->symbol = cast(TB_Symbol *)p->func;
 	}
@@ -688,12 +686,9 @@ gb_internal cgProcedure *cg_procedure_create_dummy(cgModule *m, String const &li
 	// map_init(&p->tuple_fix_map, 0);
 
 
-
-	char const *link_name_c = alloc_cstring(temporary_allocator(), link_name);
-
 	TB_Linkage linkage = TB_LINKAGE_PRIVATE;
 
-	p->func = tb_function_create(m->mod, link_name_c, linkage, TB_COMDAT_NONE);
+	p->func = tb_function_create(m->mod, link_name.len, cast(char const *)link_name.text, linkage, TB_COMDAT_NONE);
 	tb_function_set_prototype(p->func, cg_procedure_type_as_prototype(m, p->type), tb_default_arena());
 	p->symbol = cast(TB_Symbol *)p->func;
 
@@ -715,6 +710,13 @@ gb_internal void cg_procedure_end(cgProcedure *p) {
 		return;
 	}
 	tb_inst_ret(p->func, 0, nullptr);
+	if (p->name == "main") {
+		TB_Arena *arena = tb_default_arena();
+		defer (arena->free(arena));
+		TB_FuncOpt *opt = tb_funcopt_enter(p->func, arena);
+		defer (tb_funcopt_exit(opt));
+		tb_funcopt_print(opt);
+	}
 	tb_module_compile_function(p->module->mod, p->func, TB_ISEL_FAST);
 }
 

@@ -8,7 +8,7 @@ gb_internal cgValue cg_const_nil(cgProcedure *p, Type *type) {
 		TB_Module *m = p->module->mod;
 		char name[32] = {};
 		gb_snprintf(name, 31, "cnil$%u", 1+p->module->const_nil_guid.fetch_add(1));
-		TB_Global *global = tb_global_create(m, name, nullptr, TB_LINKAGE_PRIVATE);
+		TB_Global *global = tb_global_create(m, -1, name, nullptr, TB_LINKAGE_PRIVATE);
 		tb_global_set_storage(m, tb_module_get_rdata(m), global, size, align, 0);
 
 		TB_Symbol *symbol = cast(TB_Symbol *)global;
@@ -41,6 +41,18 @@ gb_internal cgValue cg_const_value(cgModule *m, cgProcedure *p, Type *type, Exac
 		return cg_const_nil(p, type);
 	}
 
+	if (value.kind == ExactValue_Procedure) {
+		Ast *expr = unparen_expr(value.value_procedure);
+		Entity *e = entity_of_node(expr);
+		if (e != nullptr) {
+			cgValue found = cg_find_procedure_value_from_entity(m, e);
+			GB_ASSERT(are_types_identical(type, found.type));
+			return found;
+		}
+
+	}
+
+	GB_ASSERT(node != nullptr);
 	return cg_value(node, type);
 }
 

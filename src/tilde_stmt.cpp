@@ -8,14 +8,16 @@ gb_internal cgValue cg_emit_load(cgProcedure *p, cgValue const &ptr, bool is_vol
 		case cgValue_Value:
 			return cg_lvalue_addr(ptr.node, type);
 		case cgValue_Addr:
-			GB_PANIC("NOT POSSIBLE");
+			GB_PANIC("NOT POSSIBLE - Cannot load an lvalue to begin with");
 			break;
 		case cgValue_Symbol:
 			return cg_lvalue_addr(tb_inst_get_symbol_address(p->func, ptr.symbol), type);
 		}
 	}
 
-	TB_CharUnits alignment = 1; // for the time being
+	// use the natural alignment
+	// if people need a special alignment, they can use `intrinsics.unaligned_load`
+	TB_CharUnits alignment = cast(TB_CharUnits)type_align_of(type);
 
 	TB_Node *the_ptr = nullptr;
 	switch (ptr.kind) {
@@ -48,7 +50,9 @@ gb_internal void cg_emit_store(cgProcedure *p, cgValue dst, cgValue const &src, 
 	TB_DataType st = cg_data_type(src.type);
 	GB_ASSERT(dt.raw == st.raw);
 
-	TB_CharUnits alignment = 1; // for the time being
+	// use the natural alignment
+	// if people need a special alignment, they can use `intrinsics.unaligned_store`
+	TB_CharUnits alignment = cast(TB_CharUnits)type_align_of(dst_type);
 
 	if (TB_IS_VOID_TYPE(dt)) {
 		TB_Node *dst_ptr = nullptr;
@@ -281,10 +285,9 @@ gb_internal cgAddr cg_add_local(cgProcedure *p, Type *type, Entity *e, bool zero
 
 	if (e != nullptr && e->token.string.len > 0 && e->token.string != "_") {
 		// NOTE(bill): for debugging purposes only
-		char const *name = alloc_cstring(permanent_allocator(), e->token.string);
-
-		TB_DebugType *debug_type = cg_debug_type(p->module, type);
-		tb_function_attrib_variable(p->func, local, name, debug_type);
+		// String name = e->token.string;
+		// TB_DebugType *debug_type = cg_debug_type(p->module, type);
+		// tb_function_attrib_variable(p->func, name.len, cast(char const *)name.text, debug_type);
 	}
 
 	if (zero_init) {
@@ -546,7 +549,7 @@ gb_internal void cg_build_stmt(cgProcedure *p, Ast *node) {
 	case_end;
 
 	case_ast_node(as, AssignStmt, node);
-		cg_build_assign_stmt(p, as);
+		// cg_build_assign_stmt(p, as);
 	case_end;
 
 	case_ast_node(rs, ReturnStmt, node);

@@ -213,3 +213,5 @@ gb_internal void cg_emit_store(cgProcedure *p, cgValue dst, cgValue const &src, 
 gb_internal cgAddr cg_add_local(cgProcedure *p, Type *type, Entity *e, bool zero_init);
 
 gb_internal cgValue cg_build_call_expr(cgProcedure *p, Ast *expr);
+
+gb_internal cgValue cg_find_procedure_value_from_entity(cgModule *m, Entity *e);

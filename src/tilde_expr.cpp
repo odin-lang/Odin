@@ -101,7 +101,7 @@ gb_internal cgValue cg_build_expr(cgProcedure *p, Ast *expr) {
 
 	cgValue res = cg_build_expr_internal(p, expr);
 	if (res.kind == cgValue_Symbol) {
-		GB_ASSERT(is_type_pointer(res.type));
+		GB_ASSERT(is_type_internally_pointer_like(res.type));
 		res = cg_value(tb_inst_get_symbol_address(p->func, res.symbol), res.type);
 	}
 
@@ -161,6 +161,7 @@ gb_internal cgValue cg_build_expr_internal(cgProcedure *p, Ast *expr) {
 			         token_pos_to_string(token.pos));
 			return {};
 		} else if (e->kind == Entity_Nil) {
+			GB_PANIC("TODO: cg_find_ident nil");
 			// TODO(bill): is this correct?
 			return cg_value(cast(TB_Node *)nullptr, e->type);
 		}
