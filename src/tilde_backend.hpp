@@ -113,7 +113,11 @@ enum cgDeferExitKind {
 	cgDeferExit_Branch,
 };
 
-
+struct cgContextData {
+	cgAddr ctx;
+	isize scope_index;
+	isize uses;
+};
 
 struct cgProcedure {
 	u32 flags;
@@ -144,6 +148,12 @@ struct cgProcedure {
 
 	cgTargetList *        target_list;
 	Array<cgBranchBlocks> branch_blocks;
+
+	Scope *curr_scope;
+	i32    scope_index;
+
+	Array<Scope *>       scope_stack;
+	Array<cgContextData> context_stack;
 };
 
 
@@ -215,3 +225,5 @@ gb_internal cgAddr cg_add_local(cgProcedure *p, Type *type, Entity *e, bool zero
 gb_internal cgValue cg_build_call_expr(cgProcedure *p, Ast *expr);
 
 gb_internal cgValue cg_find_procedure_value_from_entity(cgModule *m, Entity *e);
+
+gb_internal TB_DebugType *cg_debug_type(cgModule *m, Type *type);

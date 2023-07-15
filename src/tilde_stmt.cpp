@@ -549,7 +549,7 @@ gb_internal void cg_build_stmt(cgProcedure *p, Ast *node) {
 	case_end;
 
 	case_ast_node(as, AssignStmt, node);
-		// cg_build_assign_stmt(p, as);
+		cg_build_assign_stmt(p, as);
 	case_end;
 
 	case_ast_node(rs, ReturnStmt, node);

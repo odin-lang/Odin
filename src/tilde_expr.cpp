@@ -1,3 +1,89 @@
+gb_internal cgContextData *cg_push_context_onto_stack(cgProcedure *p, cgAddr ctx) {
+	ctx.kind = cgAddr_Context;
+	cgContextData *cd = array_add_and_get(&p->context_stack);
+	cd->ctx = ctx;
+	cd->scope_index = p->scope_index;
+	return cd;
+}
+
+gb_internal cgAddr cg_find_or_generate_context_ptr(cgProcedure *p) {
+	if (p->context_stack.count > 0) {
+		return p->context_stack[p->context_stack.count-1].ctx;
+	}
+
+	Type *pt = base_type(p->type);
+	GB_ASSERT(pt->kind == Type_Proc);
+	GB_ASSERT(pt->Proc.calling_convention != ProcCC_Odin);
+
+	cgAddr c = cg_add_local(p, t_context, nullptr, true);
+	tb_node_append_attrib(c.addr.node, tb_function_attrib_variable(p->func, -1, "context", cg_debug_type(p->module, t_context)));
+	c.kind = cgAddr_Context;
+	// lb_emit_init_context(p, c);
+	cg_push_context_onto_stack(p, c);
+	// lb_add_debug_context_variable(p, c);
+
+	return c;
+}
+
+gb_internal cgValue cg_find_value_from_entity(cgModule *m, Entity *e) {
+	e = strip_entity_wrapping(e);
+	GB_ASSERT(e != nullptr);
+
+	GB_ASSERT(e->token.string != "_");
+
+	if (e->kind == Entity_Procedure) {
+		return cg_find_procedure_value_from_entity(m, e);
+	}
+
+	cgValue *found = nullptr;
+	rw_mutex_shared_lock(&m->values_mutex);
+	found = map_get(&m->values, e);
+	rw_mutex_shared_unlock(&m->values_mutex);
+	if (found) {
+		return *found;
+	}
+
+	// GB_PANIC("\n\tError in: %s, missing value '%.*s'\n", token_pos_to_string(e->token.pos), LIT(e->token.string));
+	return {};
+}
+
+gb_internal cgAddr cg_build_addr_from_entity(cgProcedure *p, Entity *e, Ast *expr) {
+	GB_ASSERT(e != nullptr);
+	if (e->kind == Entity_Constant) {
+		Type *t = default_type(type_of_expr(expr));
+		cgValue v = cg_const_value(p, t, e->Constant.value);
+		GB_PANIC("TODO(bill): cg_add_global_generated");
+		// return cg_add_global_generated(p->module, t, v);
+		return {};
+	}
+
+
+	cgValue v = {};
+
+	cgModule *m = p->module;
+
+	rw_mutex_lock(&m->values_mutex);
+	cgValue *found = map_get(&m->values, e);
+	rw_mutex_unlock(&m->values_mutex);
+	if (found) {
+		v = *found;
+	} else if (e->kind == Entity_Variable && e->flags & EntityFlag_Using) {
+		GB_PANIC("TODO(bill): cg_get_using_variable");
+		// NOTE(bill): Calculate the using variable every time
+		// v = cg_get_using_variable(p, e);
+	} else if (e->flags & EntityFlag_SoaPtrField) {
+		GB_PANIC("TODO(bill): cg_get_soa_variable_addr");
+		// return cg_get_soa_variable_addr(p, e);
+	}
+
+
+	if (v.node == nullptr) {
+		return cg_addr(cg_find_value_from_entity(m, e));
+	}
+
+	return cg_addr(v);
+}
+
 gb_internal cgValue cg_typeid(cgModule *m, Type *t) {
 	GB_ASSERT("TODO(bill): cg_typeid");
 	return {};
@@ -248,6 +334,65 @@ gb_internal cgValue cg_build_expr_internal(cgProcedure *p, Ast *expr) {
 }
 
 
+gb_internal cgAddr cg_build_addr_internal(cgProcedure *p, Ast *expr);
 gb_internal cgAddr cg_build_addr(cgProcedure *p, Ast *expr) {
+	expr = unparen_expr(expr);
+
+	// IMPORTANT NOTE(bill):
+	// Selector Call Expressions (foo->bar(...))
+	// must only evaluate `foo` once as it gets transformed into
+	// `foo.bar(foo, ...)`
+	// And if `foo` is a procedure call or something more complex, storing the value
+	// once is a very good idea
+	// If a stored value is found, it must be removed from the cache
+	if (expr->state_flags & StateFlag_SelectorCallExpr) {
+		// lbAddr *pp = map_get(&p->selector_addr, expr);
+		// if (pp != nullptr) {
+		// 	lbAddr res = *pp;
+		// 	map_remove(&p->selector_addr, expr);
+		// 	return res;
+		// }
+	}
+	cgAddr addr = cg_build_addr_internal(p, expr);
+	if (expr->state_flags & StateFlag_SelectorCallExpr) {
+		// map_set(&p->selector_addr, expr, addr);
+	}
+	return addr;
+}
+
+
+gb_internal cgAddr cg_build_addr_internal(cgProcedure *p, Ast *expr) {
+	switch (expr->kind) {
+	case_ast_node(i, Implicit, expr);
+		cgAddr v = {};
+		switch (i->kind) {
+		case Token_context:
+			v = cg_find_or_generate_context_ptr(p);
+			break;
+		}
+
+		GB_ASSERT(v.addr.node != nullptr);
+		return v;
+	case_end;
+
+	case_ast_node(i, Ident, expr);
+		if (is_blank_ident(expr)) {
+			cgAddr val = {};
+			return val;
+		}
+		String name = i->token.string;
+		Entity *e = entity_of_node(expr);
+		return cg_build_addr_from_entity(p, e, expr);
+	case_end;
+	}
+
+	TokenPos token_pos = ast_token(expr).pos;
+	GB_PANIC("Unexpected address expression\n"
+	         "\tAst: %.*s @ "
+	         "%s\n",
+	         LIT(ast_strings[expr->kind]),
+	         token_pos_to_string(token_pos));
+
+
 	return {};
 }
