@@ -33,7 +33,7 @@ gb_internal TB_DataType cg_data_type(Type *t) {
 		case Basic_typeid:
 			return TB_TYPE_INTN(cast(u16)(8*sz));
 
-		case Basic_f16: return TB_TYPE_I16;
+		case Basic_f16: return TB_TYPE_F16;
 		case Basic_f32: return TB_TYPE_F32;
 		case Basic_f64: return TB_TYPE_F64;
 
@@ -60,11 +60,11 @@ gb_internal TB_DataType cg_data_type(Type *t) {
 		case Basic_u128be:
 			return TB_TYPE_INTN(cast(u16)(8*sz));
 
-		case Basic_f16le: return TB_TYPE_I16;
+		case Basic_f16le: return TB_TYPE_F16;
 		case Basic_f32le: return TB_TYPE_F32;
 		case Basic_f64le: return TB_TYPE_F64;
 
-		case Basic_f16be: return TB_TYPE_I16;
+		case Basic_f16be: return TB_TYPE_F16;
 		case Basic_f32be: return TB_TYPE_F32;
 		case Basic_f64be: return TB_TYPE_F64;
 		}
@@ -173,9 +173,128 @@ gb_internal isize cg_type_info_index(CheckerInfo *info, Type *type, bool err_on_
 	return -1;
 }
 
-gb_internal void cg_create_global_variables(cgModule *m) {
+struct cgGlobalVariable {
+	cgValue var;
+	cgValue init;
+	DeclInfo *decl;
+	bool is_initialized;
+};
+
+// Returns already_has_entry_point
+gb_internal bool cg_global_variables_create(cgModule *m) {
+	isize global_variable_max_count = 0;
+	bool already_has_entry_point = false;
+
+	for (Entity *e : m->info->entities) {
+		String name = e->token.string;
+
+		if (e->kind == Entity_Variable) {
+			global_variable_max_count++;
+		} else if (e->kind == Entity_Procedure) {
+			if ((e->scope->flags&ScopeFlag_Init) && name == "main") {
+				GB_ASSERT(e == m->info->entry_point);
+			}
+			if (build_context.command_kind == Command_test &&
+			    (e->Procedure.is_export || e->Procedure.link_name.len > 0)) {
+				String link_name = e->Procedure.link_name;
+				if (e->pkg->kind == Package_Runtime) {
+					if (link_name == "main"           ||
+					    link_name == "DllMain"        ||
+					    link_name == "WinMain"        ||
+					    link_name == "wWinMain"       ||
+					    link_name == "mainCRTStartup" ||
+					    link_name == "_start") {
+						already_has_entry_point = true;
+					}
+				}
+			}
+		}
+	}
+	auto global_variables = array_make<cgGlobalVariable>(permanent_allocator(), 0, global_variable_max_count);
+
+	auto *min_dep_set = &m->info->minimum_dependency_set;
+
+	for (DeclInfo *d : m->info->variable_init_order) {
+		Entity *e = d->entity;
+
+		if ((e->scope->flags & ScopeFlag_File) == 0) {
+			continue;
+		}
+
+		if (!ptr_set_exists(min_dep_set, e)) {
+			continue;
+		}
+
+		DeclInfo *decl = decl_info_of_entity(e);
+		if (decl == nullptr) {
+			continue;
+		}
+		GB_ASSERT(e->kind == Entity_Variable);
+
+		bool is_foreign = e->Variable.is_foreign;
+		bool is_export  = e->Variable.is_export;
+
+		String name = cg_get_entity_name(m, e);
+
+		TB_Linkage linkage = TB_LINKAGE_PRIVATE;
+
+		if (is_foreign) {
+			linkage = TB_LINKAGE_PUBLIC;
+			// lb_add_foreign_library_path(m, e->Variable.foreign_library);
+			// lb_set_wasm_import_attributes(g.value, e, name);
+		} else if (is_export) {
+			linkage = TB_LINKAGE_PUBLIC;
+		}
+		// lb_set_linkage_from_entity_flags(m, g.value, e->flags);
+
+		TB_DebugType *debug_type = cg_debug_type(m, e->type);
+		TB_Global *global = tb_global_create(m->mod, name.len, cast(char const *)name.text, debug_type, linkage);
+		cgValue g = cg_value(global, alloc_type_pointer(e->type));
+
+		TB_ModuleSection *section = tb_module_get_data(m->mod);
+
+		if (e->Variable.thread_local_model != "") {
+			section = tb_module_get_tls(m->mod);
+		}
+		if (e->Variable.link_section.len > 0) {
+			// TODO(bill): custom module sections
+			// LLVMSetSection(g.value, alloc_cstring(permanent_allocator(), e->Variable.link_section));
+		}
+
+		size_t max_objects = 0;
+		tb_global_set_storage(m->mod, section, global, type_size_of(e->type), type_align_of(e->type), max_objects);
+
+		cgGlobalVariable var = {};
+		var.var = g;
+		var.decl = decl;
+
+		if (decl->init_expr != nullptr) {
+			// TypeAndValue tav = type_and_value_of_expr(decl->init_expr);
+			// if (!is_type_any(e->type) && !is_type_union(e->type)) {
+			// 	if (tav.mode != Addressing_Invalid) {
+			// 		if (tav.value.kind != ExactValue_Invalid) {
+			// 			ExactValue v = tav.value;
+			// 			lbValue init = lb_const_value(m, tav.type, v);
+			// 			LLVMSetInitializer(g.value, init.value);
+			// 			var.is_initialized = true;
+			// 		}
+			// 	}
+			// }
+			// if (!var.is_initialized && is_type_untyped_nil(tav.type)) {
+			// 	var.is_initialized = true;
+			// }
+		}
+
+		array_add(&global_variables, var);
+
+		cg_add_entity(m, e, g);
+		cg_add_member(m, name, g);
+	}
+
+
+
 	if (build_context.no_rtti) {
-		return;
+		return already_has_entry_point;
 	}
 
 	CheckerInfo *info = m->info;
@@ -256,9 +375,11 @@ gb_internal void cg_create_global_variables(cgModule *m) {
 			}
 		}
 	}
+
+	return already_has_entry_point;
 }
 
-cgModule *cg_module_create(Checker *c) {
+gb_internal cgModule *cg_module_create(Checker *c) {
 	cgModule *m = gb_alloc_item(permanent_allocator(), cgModule);
 
 	m->checker = c;
@@ -286,7 +407,7 @@ cgModule *cg_module_create(Checker *c) {
 	return m;
 }
 
-void cg_module_destroy(cgModule *m) {
+gb_internal void cg_module_destroy(cgModule *m) {
 	map_destroy(&m->values);
 	array_free(&m->procedures_to_generate);
 	map_destroy(&m->file_id_map);
@@ -391,7 +512,7 @@ gb_internal String cg_mangle_name(cgModule *m, Entity *e) {
 	return mangled_name;
 }
 
-String cg_get_entity_name(cgModule *m, Entity *e) {
+gb_internal String cg_get_entity_name(cgModule *m, Entity *e) {
 	if (e != nullptr && e->kind == Entity_TypeName && e->TypeName.ir_mangled_name.len != 0) {
 		return e->TypeName.ir_mangled_name;
 	}
@@ -438,14 +559,6 @@ String cg_get_entity_name(cgModule *m, Entity *e) {
 	return name;
 }
 
-
-struct cgGlobalVariable {
-	cgValue var;
-	cgValue init;
-	DeclInfo *decl;
-	bool is_initialized;
-};
-
 #include "tilde_const.cpp"
 #include "tilde_expr.cpp"
 #include "tilde_proc.cpp"
@@ -463,37 +576,8 @@ gb_internal bool cg_generate_code(Checker *c) {
 
 	TIME_SECTION("Tilde Global Variables");
 
-	cg_create_global_variables(m);
-
-	// isize global_variable_max_count = 0;
-	// bool already_has_entry_point = false;
-
-	// for (Entity *e : info->entities) {
-	// 	String name = e->token.string;
-
-	// 	if (e->kind == Entity_Variable) {
-	// 		global_variable_max_count++;
-	// 	} else if (e->kind == Entity_Procedure) {
-	// 		if ((e->scope->flags&ScopeFlag_Init) && name == "main") {
-	// 			GB_ASSERT(e == info->entry_point);
-	// 		}
-	// 		if (build_context.command_kind == Command_test &&
-	// 		    (e->Procedure.is_export || e->Procedure.link_name.len > 0)) {
-	// 			String link_name = e->Procedure.link_name;
-	// 			if (e->pkg->kind == Package_Runtime) {
-	// 				if (link_name == "main"           ||
-	// 				    link_name == "DllMain"        ||
-	// 				    link_name == "WinMain"        ||
-	// 				    link_name == "wWinMain"       ||
-	// 				    link_name == "mainCRTStartup" ||
-	// 				    link_name == "_start") {
-	// 					already_has_entry_point = true;
-	// 				}
-	// 			}
-	// 		}
-	// 	}
-	// }
-	// auto global_variables = array_make<cgGlobalVariable>(permanent_allocator(), 0, global_variable_max_count);
+	bool already_has_entry_point = cg_global_variables_create(m);
+	gb_unused(already_has_entry_point);
 
 	if (true) {
 		Type *proc_type = alloc_type_proc(nullptr, nullptr, 0, nullptr, 0, false, ProcCC_Odin);

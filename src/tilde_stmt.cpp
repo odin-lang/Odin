@@ -131,6 +131,9 @@ gb_internal cgValue cg_address_from_load(cgProcedure *p, cgValue value) {
 		GB_PANIC("Symbol is an invalid use case for cg_address_from_load");
 		return {};
 	}
+	GB_PANIC("Invalid cgValue for cg_address_from_load");
+	return {};
+
 }
 
 gb_internal bool cg_addr_is_empty(cgAddr const &addr) {
@@ -174,7 +177,14 @@ gb_internal Type *cg_addr_type(cgAddr const &addr) {
 }
 
 gb_internal cgValue cg_addr_load(cgProcedure *p, cgAddr addr) {
-	GB_PANIC("TODO(bill): cg_addr_load");
+	if (addr.addr.node == nullptr) {
+		return {};
+	}
+	switch (addr.kind) {
+	case cgAddr_Default:
+		return cg_emit_load(p, addr.addr);
+	}
+	GB_PANIC("TODO(bill): cg_addr_load %p", addr.addr.node);
 	return {};
 }
 
@@ -285,19 +295,23 @@ gb_internal cgAddr cg_add_local(cgProcedure *p, Type *type, Entity *e, bool zero
 
 	if (e != nullptr && e->token.string.len > 0 && e->token.string != "_") {
 		// NOTE(bill): for debugging purposes only
-		// String name = e->token.string;
-		// TB_DebugType *debug_type = cg_debug_type(p->module, type);
-		// tb_function_attrib_variable(p->func, name.len, cast(char const *)name.text, debug_type);
+		String name = e->token.string;
+		TB_DebugType *debug_type = cg_debug_type(p->module, type);
+		tb_node_append_attrib(local, tb_function_attrib_variable(p->func, name.len, cast(char const *)name.text, debug_type));
 	}
 
 	if (zero_init) {
 		bool is_volatile = false;
-		TB_Node *zero  = tb_inst_uint(p->func, TB_TYPE_I8,  0);
+		TB_Node *zero = tb_inst_uint(p->func, TB_TYPE_I8, 0);
 		TB_Node *count = tb_inst_uint(p->func, TB_TYPE_I32, cast(u64)size);
 		tb_inst_memset(p->func, local, zero, count, alignment, is_volatile);
 	}
 
-	return cg_addr(cg_value(local, alloc_type_pointer(type)));
+	cgAddr addr = cg_addr(cg_value(local, alloc_type_pointer(type)));
+	if (e) {
+		map_set(&p->variable_map, e, addr);
+	}
+	return addr;
 }
 
 
@@ -313,10 +327,59 @@ gb_internal void cg_emit_defer_stmts(cgProcedure *p, cgDeferExitKind kind, TB_No
 	// TODO(bill): cg_emit_defer_stmts
 }
 
+
+gb_internal isize cg_append_tuple_values(cgProcedure *p, Array<cgValue> *dst_values, cgValue src_value) {
+	isize init_count = dst_values->count;
+	Type *t = src_value.type;
+	if (t && t->kind == Type_Tuple) {
+		GB_PANIC("TODO(bill): tuple assignments");
+		// cgTupleFix *tf = map_get(&p->tuple_fix_map, src_value.value);
+		// if (tf) {
+		// 	for (cgValue const &value : tf->values) {
+		// 		array_add(dst_values, value);
+		// 	}
+		// } else {
+		// 	for_array(i, t->Tuple.variables) {
+		// 		cgValue v = cg_emit_tuple_ev(p, src_value, cast(i32)i);
+		// 		array_add(dst_values, v);
+		// 	}
+		// }
+	} else {
+		array_add(dst_values, src_value);
+	}
+	return dst_values->count - init_count;
+}
 gb_internal void cg_build_assignment(cgProcedure *p, Array<cgAddr> const &lvals, Slice<Ast *> const &values) {
 	if (values.count == 0) {
 		return;
 	}
+
+	auto inits = array_make<cgValue>(permanent_allocator(), 0, lvals.count);
+
+	for (Ast *rhs : values) {
+		cgValue init = cg_build_expr(p, rhs);
+		cg_append_tuple_values(p, &inits, init);
+	}
+
+	bool prev_in_assignment = p->in_multi_assignment;
+
+	isize lval_count = 0;
+	for (cgAddr const &lval : lvals) {
+		if (!cg_addr_is_empty(lval)) {
+			// check if it is not a blank identifier
+			lval_count += 1;
+		}
+	}
+	p->in_multi_assignment = lval_count > 1;
+
+	GB_ASSERT(lvals.count == inits.count);
+	for_array(i, inits) {
+		cgAddr lval = lvals[i];
+		cgValue init = inits[i];
+		cg_addr_store(p, lval, init);
+	}
+
+	p->in_multi_assignment = prev_in_assignment;
 }
 
 gb_internal void cg_build_assign_stmt(cgProcedure *p, AstAssignStmt *as) {

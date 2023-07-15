@@ -7,6 +7,7 @@
 
 #include "tilde/tb.h"
 
+#define TB_TYPE_F16    TB_DataType{ { TB_INT, 0, 16 } }
 #define TB_TYPE_I128   TB_DataType{ { TB_INT, 0, 128 } }
 #define TB_TYPE_INT    TB_TYPE_INTN(cast(u16)build_context.int_size)
 #define TB_TYPE_INTPTR TB_TYPE_INTN(cast(u16)build_context.ptr_size)
@@ -127,6 +128,7 @@ struct cgProcedure {
 	Array<cgProcedure *> children;
 
 	TB_Function *func;
+	TB_FunctionPrototype *proto;
 	TB_Symbol *symbol;
 
 	Entity *  entity;
@@ -151,9 +153,12 @@ struct cgProcedure {
 
 	Scope *curr_scope;
 	i32    scope_index;
+	bool   in_multi_assignment;
 
 	Array<Scope *>       scope_stack;
 	Array<cgContextData> context_stack;
+
+	PtrMap<Entity *, cgAddr> variable_map;
 };
 
 
@@ -227,3 +232,7 @@ gb_internal cgValue cg_build_call_expr(cgProcedure *p, Ast *expr);
 gb_internal cgValue cg_find_procedure_value_from_entity(cgModule *m, Entity *e);
 
 gb_internal TB_DebugType *cg_debug_type(cgModule *m, Type *type);
+
+gb_internal String cg_get_entity_name(cgModule *m, Entity *e);
+
+gb_internal cgValue cg_typeid(cgModule *m, Type *t);
