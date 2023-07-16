@@ -228,6 +228,9 @@ foreign user32 {
 	SetWindowRgn :: proc(hWnd: HWND, hRgn: HRGN, bRedraw: BOOL) -> int ---
 	CreateRectRgnIndirect :: proc(lprect: ^RECT) -> HRGN ---
 	GetSystemMetricsForDpi :: proc(nIndex: int, dpi: UINT) -> int ---
+
+	GetSystemMenu :: proc(hWnd: HWND, bRevert: BOOL) -> HMENU ---
+	EnableMenuItem :: proc(hMenu: HMENU, uIDEnableItem: UINT, uEnable: UINT) -> BOOL ---
 }
 
 CreateWindowW :: #force_inline proc "stdcall" (
