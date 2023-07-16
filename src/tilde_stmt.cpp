@@ -228,6 +228,61 @@ gb_internal void cg_addr_store(cgProcedure *p, cgAddr addr, cgValue value) {
 	cg_emit_store(p, addr.addr, value);
 }
 
+gb_internal cgValue cg_addr_get_ptr(cgProcedure *p, cgAddr const &addr) {
+	if (cg_addr_is_empty(addr)) {
+		GB_PANIC("Illegal addr -> nullptr");
+		return {};
+	}
+
+	switch (addr.kind) {
+	case cgAddr_Map:
+		GB_PANIC("TODO(bill): cg_addr_get_ptr cgAddr_Map");
+		// return cg_internal_dynamic_map_get_ptr(p, addr.addr, addr.map.key);
+		break;
+
+	case cgAddr_RelativePointer: {
+		Type *rel_ptr = base_type(cg_addr_type(addr));
+		GB_ASSERT(rel_ptr->kind == Type_RelativePointer);
+
+		cgValue ptr = cg_emit_conv(p, addr.addr, t_uintptr);
+		cgValue offset = cg_emit_conv(p, ptr, alloc_type_pointer(rel_ptr->RelativePointer.base_integer));
+		offset = cg_emit_load(p, offset);
+
+		if (!is_type_unsigned(rel_ptr->RelativePointer.base_integer)) {
+			offset = cg_emit_conv(p, offset, t_i64);
+		}
+		offset = cg_emit_conv(p, offset, t_uintptr);
+
+		GB_PANIC("TODO(bill): cg_addr_get_ptr cgAddr_RelativePointer");
+		// cgValue absolute_ptr = cg_emit_arith(p, Token_Add, ptr, offset, t_uintptr);
+		// absolute_ptr = cg_emit_conv(p, absolute_ptr, rel_ptr->RelativePointer.pointer_type);
+
+		// cgValue cond = cg_emit_comp(p, Token_CmpEq, offset, cg_const_nil(p->module, rel_ptr->RelativePointer.base_integer));
+
+		// // NOTE(bill): nil check
+		// cgValue nil_ptr = cg_const_nil(p->module, rel_ptr->RelativePointer.pointer_type);
+		// cgValue final_ptr = cg_emit_select(p, cond, nil_ptr, absolute_ptr);
+		// return final_ptr;
+		break;
+	}
+
+	case cgAddr_SoaVariable:
+		// TODO(bill): FIX THIS HACK
+		return cg_address_from_load(p, cg_addr_load(p, addr));
+
+	case cgAddr_Context:
+		GB_PANIC("cgAddr_Context should be handled elsewhere");
+		break;
+
+	case cgAddr_Swizzle:
+	case cgAddr_SwizzleLarge:
+		// TOOD(bill): is this good enough logic?
+		break;
+	}
+
+	return addr.addr;
+}
+
 
 
 
