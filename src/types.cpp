@@ -725,7 +725,7 @@ struct TypePath;
 
 gb_internal i64      type_size_of   (Type *t);
 gb_internal i64      type_align_of  (Type *t);
-gb_internal i64      type_offset_of (Type *t, i32 index);
+gb_internal i64      type_offset_of (Type *t, i32 index, Type **field_type_=nullptr);
 gb_internal gbString type_to_string (Type *type, bool shorthand=true);
 gb_internal gbString type_to_string (Type *type, gbAllocator allocator, bool shorthand=true);
 gb_internal i64      type_size_of_internal(Type *t, TypePath *path);
@@ -3907,50 +3907,83 @@ gb_internal i64 type_size_of_internal(Type *t, TypePath *path) {
 	return build_context.ptr_size;
 }
 
-gb_internal i64 type_offset_of(Type *t, i32 index) {
+gb_internal i64 type_offset_of(Type *t, i32 index, Type **field_type_) {
 	t = base_type(t);
-	if (t->kind == Type_Struct) {
+	switch (t->kind) {
+	case Type_Struct:
 		type_set_offsets(t);
 		if (gb_is_between(index, 0, t->Struct.fields.count-1)) {
 			GB_ASSERT(t->Struct.offsets != nullptr);
+			if (field_type_) *field_type_ = t->Struct.fields[index]->type;
 			return t->Struct.offsets[index];
 		}
-	} else if (t->kind == Type_Tuple) {
+		break;
+	case Type_Tuple:
 		type_set_offsets(t);
 		if (gb_is_between(index, 0, t->Tuple.variables.count-1)) {
 			GB_ASSERT(t->Tuple.offsets != nullptr);
+			if (field_type_) *field_type_ = t->Tuple.variables[index]->type;
 			return t->Tuple.offsets[index];
 		}
-	}  else if (t->kind == Type_Basic) {
+		break;
+	case Type_Basic:
 		if (t->Basic.kind == Basic_string) {
 			switch (index) {
-			case 0: return 0;                      // data
-			case 1: return build_context.int_size; // len
+			case 0:
+				if (field_type_) *field_type_ = t_u8_ptr;
+				return 0;                      // data
+			case 1:
+				if (field_type_) *field_type_ = t_int;
+				return build_context.int_size; // len
 			}
 		} else if (t->Basic.kind == Basic_any) {
 			switch (index) {
-			case 0: return 0;                      // type_info
-			case 1: return build_context.ptr_size; // data
+			case 0:
+				if (field_type_) *field_type_ = t_rawptr;
+				return 0;                      // data
+			case 1:
+				if (field_type_) *field_type_ = t_typeid;
+				return build_context.ptr_size; // id
 			}
 		}
-	} else if (t->kind == Type_Slice) {
+		break;
+	case Type_Slice:
 		switch (index) {
-		case 0: return 0;                        // data
-		case 1: return 1*build_context.int_size; // len
-		case 2: return 2*build_context.int_size; // cap
+		case 0:
+			if (field_type_) *field_type_ = alloc_type_multi_pointer(t->Slice.elem);
+			return 0;                        // data
+		case 1:
+			if (field_type_) *field_type_ = t_int;
+			return 1*build_context.int_size; // len
 		}
-	} else if (t->kind == Type_DynamicArray) {
+		break;
+	case Type_DynamicArray:
 		switch (index) {
-		case 0: return 0;                        // data
-		case 1: return 1*build_context.int_size; // len
-		case 2: return 2*build_context.int_size; // cap
-		case 3: return 3*build_context.int_size; // allocator
+		case 0:
+			if (field_type_) *field_type_ = alloc_type_multi_pointer(t->DynamicArray.elem);
+			return 0;                        // data
+		case 1:
+			if (field_type_) *field_type_ = t_int;
+			return 1*build_context.int_size; // len
+		case 2:
+			if (field_type_) *field_type_ = t_int;
+			return 2*build_context.int_size; // cap
+		case 3:
+			if (field_type_) *field_type_ = t_allocator;
+			return 3*build_context.int_size; // allocator
 		}
-	} else if (t->kind == Type_Union) {
-		/* i64 s = */ type_size_of(t);
-		switch (index) {
-		case -1: return align_formula(t->Union.variant_block_size, build_context.ptr_size); // __type_info
+		break;
+	case Type_Union:
+		if (!is_type_union_maybe_pointer(t)) {
+			/* i64 s = */ type_size_of(t);
+			switch (index) {
+			case -1:
+				if (field_type_) *field_type_ = union_tag_type(t);
+				union_tag_size(t);
+				return t->Union.variant_block_size;
+			}
 		}
+		break;
 	}
 	GB_ASSERT(index == 0);
 	return 0;

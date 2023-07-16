@@ -211,6 +211,8 @@ gb_internal cgAddr cg_addr(cgValue const &value);
 gb_internal cgValue cg_const_value(cgProcedure *p, Type *type, ExactValue const &value);
 gb_internal cgValue cg_const_nil(cgProcedure *p, Type *type);
 
+gb_internal cgValue cg_flatten_value(cgProcedure *p, cgValue value);
+
 gb_internal void cg_build_stmt(cgProcedure *p, Ast *stmt);
 gb_internal void cg_build_stmt_list(cgProcedure *p, Slice<Ast *> const &stmts);
 gb_internal void cg_build_when_stmt(cgProcedure *p, AstWhenStmt *ws);
@@ -227,6 +229,7 @@ gb_internal cgValue cg_emit_load(cgProcedure *p, cgValue const &ptr, bool is_vol
 gb_internal void cg_emit_store(cgProcedure *p, cgValue dst, cgValue const &src, bool is_volatile=false);
 
 gb_internal cgAddr cg_add_local(cgProcedure *p, Type *type, Entity *e, bool zero_init);
+gb_internal cgValue cg_address_from_load_or_generate_local(cgProcedure *p, cgValue value);
 
 gb_internal cgValue cg_build_call_expr(cgProcedure *p, Ast *expr);
 
@@ -237,3 +240,9 @@ gb_internal TB_DebugType *cg_debug_type(cgModule *m, Type *type);
 gb_internal String cg_get_entity_name(cgModule *m, Entity *e);
 
 gb_internal cgValue cg_typeid(cgModule *m, Type *t);
+
+gb_internal cgValue cg_emit_ptr_offset(cgProcedure *p, cgValue ptr, cgValue index);
+gb_internal cgValue cg_emit_array_ep(cgProcedure *p, cgValue s, cgValue index);
+gb_internal cgValue cg_emit_array_epi(cgProcedure *p, cgValue s, i64 index);
+gb_internal cgValue cg_emit_struct_ep(cgProcedure *p, cgValue s, i64 index);
+gb_internal cgValue cg_emit_deep_field_gep(cgProcedure *p, cgValue e, Selection const &sel);

@@ -790,11 +790,6 @@ gb_internal cgAddr cg_build_addr_slice_expr(cgProcedure *p, Ast *expr) {
 
 			tb_inst_store(p->func, TB_TYPE_PTR, data_ptr, offset, cast(TB_CharUnits)build_context.ptr_size, false);
 			tb_inst_store(p->func, TB_TYPE_INT, len_ptr,  len,    cast(TB_CharUnits)build_context.int_size, false);
-
-			// LLVMValueRef gep0 = cg_emit_struct_ep(p, res.addr, 0).value;
-			// LLVMValueRef gep1 = cg_emit_struct_ep(p, res.addr, 1).value;
-			// LLVMBuildStore(p->builder, ptr, gep0);
-			// LLVMBuildStore(p->builder, len, gep1);
 			return res;
 		}
 	}
@@ -1256,10 +1251,8 @@ gb_internal cgAddr cg_build_addr_internal(cgProcedure *p, Ast *expr) {
 			cgAddr addr = cg_build_addr(p, se->expr);
 			if (addr.kind == cgAddr_Map) {
 				cgValue v = cg_addr_load(p, addr);
-				cgValue a = {}; GB_PANIC("TODO(bill): cg_address_from_load_or_generate_local");
-				// cgValue a = cg_address_from_load_or_generate_local(p, v);
-				GB_PANIC("TODO(bill): cg_emit_deep_field_gep");
-				// a = cg_emit_deep_field_gep(p, a, sel);
+				cgValue a = cg_address_from_load_or_generate_local(p, v);
+				a = cg_emit_deep_field_gep(p, a, sel);
 				return cg_addr(a);
 			} else if (addr.kind == cgAddr_Context) {
 				GB_ASSERT(sel.index.count > 0);
@@ -1271,34 +1264,33 @@ gb_internal cgAddr cg_build_addr_internal(cgProcedure *p, Ast *expr) {
 				return addr;
 			} else if (addr.kind == cgAddr_SoaVariable) {
 				cgValue index = addr.soa.index;
-				i32 first_index = sel.index[0];
+				i64 first_index = sel.index[0];
 				Selection sub_sel = sel;
 				sub_sel.index.data += 1;
 				sub_sel.index.count -= 1;
 
-				cgValue arr = {}; GB_PANIC("TODO(bill): cg_emit_struct_ep");
-				gb_unused(first_index);
-				// cgValue arr = cg_emit_struct_ep(p, addr.addr, first_index);
+				cgValue arr = cg_emit_struct_ep(p, addr.addr, first_index);
 
-				// Type *t = base_type(type_deref(addr.addr.type));
-				// GB_ASSERT(is_type_soa_struct(t));
+				Type *t = base_type(type_deref(addr.addr.type));
+				GB_ASSERT(is_type_soa_struct(t));
 
+				// TODO(bill): bounds checking for soa variable
 				// if (addr.soa.index_expr != nullptr && (!cg_is_const(addr.soa.index) || t->Struct.soa_kind != StructSoa_Fixed)) {
 				// 	cgValue len = cg_soa_struct_len(p, addr.addr);
 				// 	cg_emit_bounds_check(p, ast_token(addr.soa.index_expr), addr.soa.index, len);
 				// }
 
-				// cgValue item = {};
+				cgValue item = {};
 
-				// if (t->Struct.soa_kind == StructSoa_Fixed) {
-				// 	item = cg_emit_array_ep(p, arr, index);
-				// } else {
-				// 	item = cg_emit_ptr_offset(p, cg_emit_load(p, arr), index);
-				// }
-				// if (sub_sel.index.count > 0) {
-				// 	item = cg_emit_deep_field_gep(p, item, sub_sel);
-				// }
-				// return cg_addr(item);
+				if (t->Struct.soa_kind == StructSoa_Fixed) {
+					item = cg_emit_array_ep(p, arr, index);
+				} else {
+					item = cg_emit_ptr_offset(p, cg_emit_load(p, arr), index);
+				}
+				if (sub_sel.index.count > 0) {
+					item = cg_emit_deep_field_gep(p, item, sub_sel);
+				}
+				return cg_addr(item);
 			} else if (addr.kind == cgAddr_Swizzle) {
 				GB_ASSERT(sel.index.count > 0);
 				// NOTE(bill): just patch the index in place
@@ -1310,8 +1302,7 @@ gb_internal cgAddr cg_build_addr_internal(cgProcedure *p, Ast *expr) {
 			}
 
 			cgValue a = cg_addr_get_ptr(p, addr);
-			GB_PANIC("TODO(bill): cg_emit_deep_field_gep");
-			// a = cg_emit_deep_field_gep(p, a, sel);
+			a = cg_emit_deep_field_gep(p, a, sel);
 			return cg_addr(a);
 		}
 	case_end;

@@ -253,13 +253,13 @@ gb_internal cgValue cg_addr_get_ptr(cgProcedure *p, cgAddr const &addr) {
 		}
 		offset = cg_emit_conv(p, offset, t_uintptr);
 
-		GB_PANIC("TODO(bill): cg_addr_get_ptr cgAddr_RelativePointer");
-		// cgValue absolute_ptr = cg_emit_arith(p, Token_Add, ptr, offset, t_uintptr);
-		// absolute_ptr = cg_emit_conv(p, absolute_ptr, rel_ptr->RelativePointer.pointer_type);
+		cgValue absolute_ptr = cg_emit_arith(p, Token_Add, ptr, offset, t_uintptr);
+		absolute_ptr = cg_emit_conv(p, absolute_ptr, rel_ptr->RelativePointer.pointer_type);
 
+		GB_PANIC("TODO(bill): cg_addr_get_ptr cgAddr_RelativePointer");
 		// cgValue cond = cg_emit_comp(p, Token_CmpEq, offset, cg_const_nil(p->module, rel_ptr->RelativePointer.base_integer));
 
-		// // NOTE(bill): nil check
+		// NOTE(bill): nil check
 		// cgValue nil_ptr = cg_const_nil(p->module, rel_ptr->RelativePointer.pointer_type);
 		// cgValue final_ptr = cg_emit_select(p, cond, nil_ptr, absolute_ptr);
 		// return final_ptr;
@@ -282,6 +282,219 @@ gb_internal cgValue cg_addr_get_ptr(cgProcedure *p, cgAddr const &addr) {
 
 	return addr.addr;
 }
+
+gb_internal cgValue cg_emit_ptr_offset(cgProcedure *p, cgValue ptr, cgValue index) {
+	GB_ASSERT(ptr.kind == cgValue_Value);
+	GB_ASSERT(index.kind == cgValue_Value);
+	GB_ASSERT(is_type_pointer(ptr.type) || is_type_multi_pointer(ptr.type));
+	GB_ASSERT(is_type_integer(index.type));
+
+	Type *elem = type_deref(ptr.type, true);
+	i64 stride = type_size_of(elem);
+	ptr.node = tb_inst_array_access(p->func, ptr.node, index.node, stride);
+	return ptr;
+}
+gb_internal cgValue cg_emit_array_ep(cgProcedure *p, cgValue s, cgValue index) {
+	GB_ASSERT(s.kind == cgValue_Value);
+	GB_ASSERT(index.kind == cgValue_Value);
+
+	Type *t = s.type;
+	GB_ASSERT_MSG(is_type_pointer(t), "%s", type_to_string(t));
+	Type *st = base_type(type_deref(t));
+	GB_ASSERT_MSG(is_type_array(st) || is_type_enumerated_array(st) || is_type_matrix(st), "%s", type_to_string(st));
+	GB_ASSERT_MSG(is_type_integer(core_type(index.type)), "%s", type_to_string(index.type));
+
+
+	Type *elem = base_array_type(st);
+	i64 stride = type_size_of(elem);
+	s.node = tb_inst_array_access(p->func, s.node, index.node, stride);
+	return s;
+}
+gb_internal cgValue cg_emit_array_epi(cgProcedure *p, cgValue s, i64 index) {
+	return cg_emit_array_ep(p, s, cg_const_int(p, t_int, index));
+}
+
+
+gb_internal cgValue cg_emit_struct_ep(cgProcedure *p, cgValue s, i64 index) {
+	s = cg_flatten_value(p, s);
+
+	GB_ASSERT(is_type_pointer(s.type));
+	Type *t = base_type(type_deref(s.type));
+	Type *result_type = nullptr;
+
+	if (is_type_relative_pointer(t)) {
+		s = cg_addr_get_ptr(p, cg_addr(s));
+	}
+
+	if (is_type_struct(t)) {
+		result_type = get_struct_field_type(t, index);
+	} else if (is_type_union(t)) {
+		GB_ASSERT(index == -1);
+		GB_PANIC("TODO(bill): cg_emit_union_tag_ptr");
+		// return cg_emit_union_tag_ptr(p, s);
+	} else if (is_type_tuple(t)) {
+		GB_PANIC("TODO(bill): cg_emit_tuple_ep");
+		// return cg_emit_tuple_ep(p, s, index);
+		// return cg_emit_tuple_ep(p, s, index);
+	} else if (is_type_complex(t)) {
+		Type *ft = base_complex_elem_type(t);
+		switch (index) {
+		case 0: result_type = ft; break;
+		case 1: result_type = ft; break;
+		}
+	} else if (is_type_quaternion(t)) {
+		Type *ft = base_complex_elem_type(t);
+		switch (index) {
+		case 0: result_type = ft; break;
+		case 1: result_type = ft; break;
+		case 2: result_type = ft; break;
+		case 3: result_type = ft; break;
+		}
+	} else if (is_type_slice(t)) {
+		switch (index) {
+		case 0: result_type = alloc_type_pointer(t->Slice.elem); break;
+		case 1: result_type = t_int; break;
+		}
+	} else if (is_type_string(t)) {
+		switch (index) {
+		case 0: result_type = t_u8_ptr; break;
+		case 1: result_type = t_int;    break;
+		}
+	} else if (is_type_any(t)) {
+		switch (index) {
+		case 0: result_type = t_rawptr; break;
+		case 1: result_type = t_typeid; break;
+		}
+	} else if (is_type_dynamic_array(t)) {
+		switch (index) {
+		case 0: result_type = alloc_type_pointer(t->DynamicArray.elem); break;
+		case 1: result_type = t_int;       break;
+		case 2: result_type = t_int;       break;
+		case 3: result_type = t_allocator; break;
+		}
+	} else if (is_type_map(t)) {
+		init_map_internal_types(t);
+		Type *itp = alloc_type_pointer(t_raw_map);
+		s = cg_emit_transmute(p, s, itp);
+
+		switch (index) {
+		case 0: result_type = get_struct_field_type(t_raw_map, 0); break;
+		case 1: result_type = get_struct_field_type(t_raw_map, 1); break;
+		case 2: result_type = get_struct_field_type(t_raw_map, 2); break;
+		}
+	} else if (is_type_array(t)) {
+		return cg_emit_array_epi(p, s, index);
+	} else if (is_type_relative_slice(t)) {
+		switch (index) {
+		case 0: result_type = t->RelativeSlice.base_integer; break;
+		case 1: result_type = t->RelativeSlice.base_integer; break;
+		}
+	} else if (is_type_soa_pointer(t)) {
+		switch (index) {
+		case 0: result_type = alloc_type_pointer(t->SoaPointer.elem); break;
+		case 1: result_type = t_int; break;
+		}
+	} else {
+		GB_PANIC("TODO(bill): struct_gep type: %s, %d", type_to_string(s.type), index);
+	}
+
+	GB_ASSERT_MSG(result_type != nullptr, "%s %d", type_to_string(t), index);
+
+	GB_PANIC("TODO(bill): cg_emit_struct_ep_internal");
+	// return cg_emit_struct_ep_internal(p, s, index, result_type);
+	return {};
+}
+
+gb_internal cgValue cg_emit_deep_field_gep(cgProcedure *p, cgValue e, Selection const &sel) {
+	GB_ASSERT(sel.index.count > 0);
+	Type *type = type_deref(e.type);
+
+	for_array(i, sel.index) {
+		i64 index = sel.index[i];
+		if (is_type_pointer(type)) {
+			type = type_deref(type);
+			e = cg_emit_load(p, e);
+		}
+		type = core_type(type);
+
+		if (type->kind == Type_SoaPointer) {
+			cgValue addr = cg_emit_struct_ep(p, e, 0);
+			cgValue index = cg_emit_struct_ep(p, e, 1);
+			addr = cg_emit_load(p, addr);
+			index = cg_emit_load(p, index);
+
+			i64 first_index = sel.index[0];
+			Selection sub_sel = sel;
+			sub_sel.index.data += 1;
+			sub_sel.index.count -= 1;
+
+			cgValue arr = cg_emit_struct_ep(p, addr, first_index);
+
+			Type *t = base_type(type_deref(addr.type));
+			GB_ASSERT(is_type_soa_struct(t));
+
+			if (t->Struct.soa_kind == StructSoa_Fixed) {
+				e = cg_emit_array_ep(p, arr, index);
+			} else {
+				e = cg_emit_ptr_offset(p, cg_emit_load(p, arr), index);
+			}
+		} else if (is_type_quaternion(type)) {
+			e = cg_emit_struct_ep(p, e, index);
+		} else if (is_type_raw_union(type)) {
+			type = get_struct_field_type(type, index);
+			GB_ASSERT(is_type_pointer(e.type));
+			e = cg_emit_transmute(p, e, alloc_type_pointer(type));
+		} else if (is_type_struct(type)) {
+			type = get_struct_field_type(type, index);
+			e = cg_emit_struct_ep(p, e, index);
+		} else if (type->kind == Type_Union) {
+			GB_ASSERT(index == -1);
+			type = t_type_info_ptr;
+			e = cg_emit_struct_ep(p, e, index);
+		} else if (type->kind == Type_Tuple) {
+			type = type->Tuple.variables[index]->type;
+			e = cg_emit_struct_ep(p, e, index);
+		} else if (type->kind == Type_Basic) {
+			switch (type->Basic.kind) {
+			case Basic_any: {
+				if (index == 0) {
+					type = t_rawptr;
+				} else if (index == 1) {
+					type = t_type_info_ptr;
+				}
+				e = cg_emit_struct_ep(p, e, index);
+				break;
+			}
+
+			case Basic_string:
+				e = cg_emit_struct_ep(p, e, index);
+				break;
+
+			default:
+				GB_PANIC("un-gep-able type %s", type_to_string(type));
+				break;
+			}
+		} else if (type->kind == Type_Slice) {
+			e = cg_emit_struct_ep(p, e, index);
+		} else if (type->kind == Type_DynamicArray) {
+			e = cg_emit_struct_ep(p, e, index);
+		} else if (type->kind == Type_Array) {
+			e = cg_emit_array_epi(p, e, index);
+		} else if (type->kind == Type_Map) {
+			e = cg_emit_struct_ep(p, e, index);
+		} else if (type->kind == Type_RelativePointer) {
+			e = cg_emit_struct_ep(p, e, index);
+		} else {
+			GB_PANIC("un-gep-able type %s", type_to_string(type));
+		}
+	}
+
+	return e;
+}
+
+
+
+
 
 
 
@@ -367,6 +580,23 @@ gb_internal cgAddr cg_add_local(cgProcedure *p, Type *type, Entity *e, bool zero
 		map_set(&p->variable_map, e, addr);
 	}
 	return addr;
+}
+
+gb_internal cgValue cg_address_from_load_or_generate_local(cgProcedure *p, cgValue value) {
+	switch (value.kind) {
+	case cgValue_Value:
+		if (value.node->type == TB_LOAD) {
+			TB_Node *ptr = value.node->inputs[1];
+			return cg_value(ptr, alloc_type_pointer(value.type));
+		}
+		break;
+	case cgValue_Addr:
+		return cg_value(value.node, alloc_type_pointer(value.type));
+	}
+
+	cgAddr res = cg_add_local(p, value.type, nullptr, false);
+	cg_addr_store(p, res, value);
+	return res.addr;
 }
 
 
