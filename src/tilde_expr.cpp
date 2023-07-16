@@ -115,15 +115,18 @@ gb_internal cgValue cg_correct_endianness(cgProcedure *p, cgValue value) {
 	return value;
 }
 
-gb_internal cgValue cg_emit_conv(cgProcedure *p, cgValue value, Type *type) {
-	// TODO(bill): cg_emit_conv
-	return value;
-}
-
 gb_internal cgValue cg_emit_transmute(cgProcedure *p, cgValue value, Type *type) {
 	GB_ASSERT(type_size_of(value.type) == type_size_of(type));
 
 	value = cg_flatten_value(p, value);
+
+	if (are_types_identical(value.type, type)) {
+		return value;
+	}
+	if (are_types_identical(core_type(value.type), core_type(type))) {
+		value.type = type;
+		return value;
+	}
 
 	i64 src_align = type_align_of(value.type);
 	i64 dst_align = type_align_of(type);
@@ -153,6 +156,380 @@ gb_internal cgValue cg_emit_transmute(cgProcedure *p, cgValue value, Type *type)
 	return value;
 
 }
+gb_internal cgValue cg_emit_byte_swap(cgProcedure *p, cgValue value, Type *end_type) {
+	GB_ASSERT(type_size_of(value.type) == type_size_of(end_type));
+
+	if (type_size_of(value.type) < 2) {
+		return value;
+	}
+
+	if (is_type_float(value.type)) {
+		i64 sz = type_size_of(value.type);
+		Type *integer_type = nullptr;
+		switch (sz) {
+		case 2: integer_type = t_u16; break;
+		case 4: integer_type = t_u32; break;
+		case 8: integer_type = t_u64; break;
+		}
+		GB_ASSERT(integer_type != nullptr);
+		value = cg_emit_transmute(p, value, integer_type);
+	}
+
+	GB_ASSERT(value.kind == cgValue_Value);
+
+	value.node = tb_inst_bswap(p->func, value.node);
+	return cg_emit_transmute(p, value, end_type);
+}
+
+gb_internal cgValue cg_emit_conv(cgProcedure *p, cgValue value, Type *t) {
+	t = reduce_tuple_to_single_type(t);
+
+	value = cg_flatten_value(p, value);
+
+	Type *src_type = value.type;
+	if (are_types_identical(t, src_type)) {
+		return value;
+	}
+
+	Type *src = core_type(src_type);
+	Type *dst = core_type(t);
+	GB_ASSERT(src != nullptr);
+	GB_ASSERT(dst != nullptr);
+
+	if (are_types_identical(src, dst)) {
+		return cg_emit_transmute(p, value, t);
+	}
+
+	TB_DataType st = cg_data_type(src);
+	TB_DataType dt = cg_data_type(t);
+
+	if (is_type_integer(src) && is_type_integer(dst)) {
+		GB_ASSERT(src->kind == Type_Basic &&
+		          dst->kind == Type_Basic);
+		GB_ASSERT(value.kind == cgValue_Value);
+
+		i64 sz = type_size_of(default_type(src));
+		i64 dz = type_size_of(default_type(dst));
+
+		if (sz == dz) {
+			if (dz > 1 && !types_have_same_internal_endian(src, dst)) {
+				return cg_emit_byte_swap(p, value, t);
+			}
+			value.type = t;
+			return value;
+		}
+
+		if (sz > 1 && is_type_different_to_arch_endianness(src)) {
+			Type *platform_src_type = integer_endian_type_to_platform_type(src);
+			value = cg_emit_byte_swap(p, value, platform_src_type);
+		}
+
+		TB_Node* (*op)(TB_Function* f, TB_Node* src, TB_DataType dt) = tb_inst_trunc;
+
+		if (dz < sz) {
+			op = tb_inst_trunc;
+		} else if (dz == sz) {
+			op = tb_inst_bitcast;
+		} else if (dz > sz) {
+			op = is_type_unsigned(src) ? tb_inst_zxt : tb_inst_sxt; // zero extent
+		}
+
+		if (dz > 1 && is_type_different_to_arch_endianness(dst)) {
+			Type *platform_dst_type = integer_endian_type_to_platform_type(dst);
+
+			cgValue res = cg_value(op(p->func, value.node, cg_data_type(platform_dst_type)), platform_dst_type);
+			return cg_emit_byte_swap(p, res, t);
+		} else {
+			return cg_value(op(p->func, value.node, dt), t);
+		}
+	}
+
+	// boolean -> boolean/integer
+	if (is_type_boolean(src) && (is_type_boolean(dst) || is_type_integer(dst))) {
+		TB_Node *v = tb_inst_cmp_ne(p->func, value.node, tb_inst_uint(p->func, st, 0));
+		return cg_value(tb_inst_zxt(p->func, v, dt), t);
+	}
+
+	// integer -> boolean
+	if (is_type_integer(src) && is_type_boolean(dst)) {
+		TB_Node *v = tb_inst_cmp_ne(p->func, value.node, tb_inst_uint(p->func, st, 0));
+		return cg_value(tb_inst_zxt(p->func, v, dt), t);
+	}
+
+	if (is_type_cstring(src) && is_type_u8_ptr(dst)) {
+		return cg_emit_transmute(p, value, dst);
+	}
+	if (is_type_u8_ptr(src) && is_type_cstring(dst)) {
+		return cg_emit_transmute(p, value, dst);
+	}
+	if (is_type_cstring(src) && is_type_u8_multi_ptr(dst)) {
+		return cg_emit_transmute(p, value, dst);
+	}
+	if (is_type_u8_multi_ptr(src) && is_type_cstring(dst)) {
+		return cg_emit_transmute(p, value, dst);
+	}
+	if (is_type_cstring(src) && is_type_rawptr(dst)) {
+		return cg_emit_transmute(p, value, dst);
+	}
+	if (is_type_rawptr(src) && is_type_cstring(dst)) {
+		return cg_emit_transmute(p, value, dst);
+	}
+
+
+	if (are_types_identical(src, t_cstring) && are_types_identical(dst, t_string)) {
+		GB_PANIC("TODO(bill): cstring_to_string call");
+		// TEMPORARY_ALLOCATOR_GUARD();
+		// lbValue c = lb_emit_conv(p, value, t_cstring);
+		// auto args = array_make<lbValue>(temporary_allocator(), 1);
+		// args[0] = c;
+		// lbValue s = lb_emit_runtime_call(p, "cstring_to_string", args);
+		// return lb_emit_conv(p, s, dst);
+	}
+
+	// float -> float
+	if (is_type_float(src) && is_type_float(dst)) {
+		i64 sz = type_size_of(src);
+		i64 dz = type_size_of(dst);
+
+		if (sz == 2 || dz == 2) {
+			GB_PANIC("TODO(bill): f16 conversions");
+		}
+
+
+		if (dz == sz) {
+			if (types_have_same_internal_endian(src, dst)) {
+				return cg_value(value.node, t);
+			} else {
+				return cg_emit_byte_swap(p, value, t);
+			}
+		}
+
+		if (is_type_different_to_arch_endianness(src) || is_type_different_to_arch_endianness(dst)) {
+			Type *platform_src_type = integer_endian_type_to_platform_type(src);
+			Type *platform_dst_type = integer_endian_type_to_platform_type(dst);
+			cgValue res = {};
+			res = cg_emit_conv(p, value, platform_src_type);
+			res = cg_emit_conv(p, res, platform_dst_type);
+			if (is_type_different_to_arch_endianness(dst)) {
+				res = cg_emit_byte_swap(p, res, t);
+			}
+			return cg_emit_conv(p, res, t);
+		}
+
+
+		if (dz >= sz) {
+			return cg_value(tb_inst_fpxt(p->func, value.node, dt), t);
+		}
+		return cg_value(tb_inst_trunc(p->func, value.node, dt), t);
+	}
+
+	if (is_type_complex(src) && is_type_complex(dst)) {
+		GB_PANIC("TODO(bill): complex -> complex");
+	}
+
+	if (is_type_quaternion(src) && is_type_quaternion(dst)) {
+		// @QuaternionLayout
+		GB_PANIC("TODO(bill): quaternion -> quaternion");
+	}
+	if (is_type_integer(src) && is_type_complex(dst)) {
+		GB_PANIC("TODO(bill): int -> complex");
+	}
+	if (is_type_float(src) && is_type_complex(dst)) {
+		GB_PANIC("TODO(bill): float -> complex");
+	}
+	if (is_type_integer(src) && is_type_quaternion(dst)) {
+		GB_PANIC("TODO(bill): int -> quaternion");
+	}
+	if (is_type_float(src) && is_type_quaternion(dst)) {
+		GB_PANIC("TODO(bill): float -> quaternion");
+	}
+	if (is_type_complex(src) && is_type_quaternion(dst)) {
+		GB_PANIC("TODO(bill): complex -> quaternion");
+	}
+
+
+	// float <-> integer
+	if (is_type_float(src) && is_type_integer(dst)) {
+		if (is_type_different_to_arch_endianness(src) || is_type_different_to_arch_endianness(dst)) {
+			Type *platform_src_type = integer_endian_type_to_platform_type(src);
+			Type *platform_dst_type = integer_endian_type_to_platform_type(dst);
+			cgValue res = {};
+			res = cg_emit_conv(p, value, platform_src_type);
+			res = cg_emit_conv(p, res, platform_dst_type);
+			return cg_emit_conv(p, res, t);
+		}
+
+		// if (is_type_integer_128bit(dst)) {
+		// 	TEMPORARY_ALLOCATOR_GUARD();
+
+		// 	auto args = array_make<lbValue>(temporary_allocator(), 1);
+		// 	args[0] = value;
+		// 	char const *call = "fixunsdfdi";
+		// 	if (is_type_unsigned(dst)) {
+		// 		call = "fixunsdfti";
+		// 	}
+		// 	lbValue res_i128 = lb_emit_runtime_call(p, call, args);
+		// 	return lb_emit_conv(p, res_i128, t);
+		// }
+
+		bool is_signed = !is_type_unsigned(dst);
+		return cg_value(tb_inst_float2int(p->func, value.node, dt, is_signed), t);
+	}
+	if (is_type_integer(src) && is_type_float(dst)) {
+		if (is_type_different_to_arch_endianness(src) || is_type_different_to_arch_endianness(dst)) {
+			Type *platform_src_type = integer_endian_type_to_platform_type(src);
+			Type *platform_dst_type = integer_endian_type_to_platform_type(dst);
+			cgValue res = {};
+			res = cg_emit_conv(p, value, platform_src_type);
+			res = cg_emit_conv(p, res, platform_dst_type);
+			if (is_type_different_to_arch_endianness(dst)) {
+				res = cg_emit_byte_swap(p, res, t);
+			}
+			return cg_emit_conv(p, res, t);
+		}
+
+		// if (is_type_integer_128bit(src)) {
+		// 	TEMPORARY_ALLOCATOR_GUARD();
+
+		// 	auto args = array_make<lbValue>(temporary_allocator(), 1);
+		// 	args[0] = value;
+		// 	char const *call = "floattidf";
+		// 	if (is_type_unsigned(src)) {
+		// 		call = "floattidf_unsigned";
+		// 	}
+		// 	lbValue res_f64 = lb_emit_runtime_call(p, call, args);
+		// 	return lb_emit_conv(p, res_f64, t);
+		// }
+
+		bool is_signed = !is_type_unsigned(dst);
+		return cg_value(tb_inst_int2float(p->func, value.node, dt, is_signed), t);
+	}
+
+	if (is_type_simd_vector(dst)) {
+		GB_PANIC("TODO(bill): ? -> #simd vector");
+	}
+
+
+	// Pointer <-> uintptr
+	if (is_type_pointer(src) && is_type_uintptr(dst)) {
+		return cg_value(tb_inst_ptr2int(p->func, value.node, dt), t);
+	}
+	if (is_type_uintptr(src) && is_type_pointer(dst)) {
+		return cg_value(tb_inst_int2ptr(p->func, value.node), t);
+	}
+	if (is_type_multi_pointer(src) && is_type_uintptr(dst)) {
+		return cg_value(tb_inst_ptr2int(p->func, value.node, dt), t);
+	}
+	if (is_type_uintptr(src) && is_type_multi_pointer(dst)) {
+		return cg_value(tb_inst_int2ptr(p->func, value.node), t);
+	}
+
+	if (is_type_union(dst)) {
+		GB_PANIC("TODO(bill): ? -> union");
+	}
+
+	// NOTE(bill): This has to be done before 'Pointer <-> Pointer' as it's
+	// subtype polymorphism casting
+	if (check_is_assignable_to_using_subtype(src_type, t)) {
+		GB_PANIC("TODO(bill): ? -> subtyping");
+	}
+
+	// Pointer <-> Pointer
+	if (is_type_pointer(src) && is_type_pointer(dst)) {
+		return cg_value(tb_inst_bitcast(p->func, value.node, dt), t);
+	}
+	if (is_type_multi_pointer(src) && is_type_pointer(dst)) {
+		return cg_value(tb_inst_bitcast(p->func, value.node, dt), t);
+	}
+	if (is_type_pointer(src) && is_type_multi_pointer(dst)) {
+		return cg_value(tb_inst_bitcast(p->func, value.node, dt), t);
+	}
+	if (is_type_multi_pointer(src) && is_type_multi_pointer(dst)) {
+		return cg_value(tb_inst_bitcast(p->func, value.node, dt), t);
+	}
+
+	// proc <-> proc
+	if (is_type_proc(src) && is_type_proc(dst)) {
+		return cg_value(tb_inst_bitcast(p->func, value.node, dt), t);
+	}
+
+	// pointer -> proc
+	if (is_type_pointer(src) && is_type_proc(dst)) {
+		return cg_value(tb_inst_bitcast(p->func, value.node, dt), t);
+	}
+	// proc -> pointer
+	if (is_type_proc(src) && is_type_pointer(dst)) {
+		return cg_value(tb_inst_bitcast(p->func, value.node, dt), t);
+	}
+
+	// []byte/[]u8 <-> string
+	if (is_type_u8_slice(src) && is_type_string(dst)) {
+		return cg_emit_transmute(p, value, t);
+	}
+	if (is_type_string(src) && is_type_u8_slice(dst)) {
+		return cg_emit_transmute(p, value, t);
+	}
+
+	if (is_type_matrix(dst) && !is_type_matrix(src)) {
+		GB_PANIC("TODO(bill): !matrix -> matrix");
+	}
+
+	if (is_type_matrix(dst) && is_type_matrix(src)) {
+		GB_PANIC("TODO(bill): matrix -> matrix");
+	}
+
+	if (is_type_any(dst)) {
+		GB_PANIC("TODO(bill): ? -> any");
+	}
+
+	i64 src_sz = type_size_of(src);
+	i64 dst_sz = type_size_of(dst);
+
+	if (src_sz == dst_sz) {
+		// bit_set <-> integer
+		if (is_type_integer(src) && is_type_bit_set(dst)) {
+			cgValue v = cg_emit_conv(p, value, bit_set_to_int(dst));
+			return cg_emit_transmute(p, v, t);
+		}
+		if (is_type_bit_set(src) && is_type_integer(dst)) {
+			cgValue bs = cg_emit_transmute(p, value, bit_set_to_int(src));
+			return cg_emit_conv(p, bs, dst);
+		}
+
+		// typeid <-> integer
+		if (is_type_integer(src) && is_type_typeid(dst)) {
+			return cg_emit_transmute(p, value, dst);
+		}
+		if (is_type_typeid(src) && is_type_integer(dst)) {
+			return cg_emit_transmute(p, value, dst);
+		}
+	}
+
+
+	if (is_type_untyped(src)) {
+		if (is_type_string(src) && is_type_string(dst)) {
+			cgAddr result = cg_add_local(p, t, nullptr, false);
+			cg_addr_store(p, result, value);
+			return cg_addr_load(p, result);
+		}
+	}
+
+
+	gb_printf_err("%.*s\n", LIT(p->name));
+	gb_printf_err("cg_emit_conv: src -> dst\n");
+	gb_printf_err("Not Identical %s != %s\n", type_to_string(src_type), type_to_string(t));
+	gb_printf_err("Not Identical %s != %s\n", type_to_string(src), type_to_string(dst));
+	gb_printf_err("Not Identical %p != %p\n", src_type, t);
+	gb_printf_err("Not Identical %p != %p\n", src, dst);
+
+
+	GB_PANIC("Invalid type conversion: '%s' to '%s' for procedure '%.*s'",
+	         type_to_string(src_type), type_to_string(t),
+	         LIT(p->name));
+
+	return {};
+}
+
 
 
 gb_internal cgAddr cg_build_addr_slice_expr(cgProcedure *p, Ast *expr) {
@@ -227,30 +604,39 @@ gb_internal cgAddr cg_build_addr_slice_expr(cgProcedure *p, Ast *expr) {
 	}
 
 	case Type_MultiPointer: {
-		// lbAddr res = lb_add_local_generated(p, type_of_expr(expr), false);
-		// if (se->high == nullptr) {
-		// 	lbValue offset = base;
-		// 	LLVMValueRef indices[1] = {low.value};
-		// 	offset.value = LLVMBuildGEP2(p->builder, lb_type(p->module, offset.type->MultiPointer.elem), offset.value, indices, 1, "");
-		// 	lb_addr_store(p, res, offset);
-		// } else {
-		// 	low = lb_emit_conv(p, low, t_int);
-		// 	high = lb_emit_conv(p, high, t_int);
+		Type *res_type = type_of_expr(expr);
+		if (se->high == nullptr) {
+			cgAddr res = cg_add_local(p, res_type, nullptr, false);
+			GB_ASSERT(base.kind == cgValue_Value);
+			GB_ASSERT(low.kind == cgValue_Value);
 
-		// 	lb_emit_multi_pointer_slice_bounds_check(p, se->open, low, high);
+			i64 stride = type_size_of(type->MultiPointer.elem);
+			cgValue offset = cg_value(tb_inst_array_access(p->func, base.node, low.node, stride), base.type);
+			cg_addr_store(p, res, offset);
+			return res;
+		} else {
+			cgAddr res = cg_add_local(p, res_type, nullptr, true);
+			low  = cg_emit_conv(p, low,  t_int);
+			high = cg_emit_conv(p, high, t_int);
 
-		// 	LLVMValueRef indices[1] = {low.value};
-		// 	LLVMValueRef ptr = LLVMBuildGEP2(p->builder, lb_type(p->module, base.type->MultiPointer.elem), base.value, indices, 1, "");
-		// 	LLVMValueRef len = LLVMBuildSub(p->builder, high.value, low.value, "");
+			// cg_emit_multi_pointer_slice_bounds_check(p, se->open, low, high);
 
-		// 	LLVMValueRef gep0 = lb_emit_struct_ep(p, res.addr, 0).value;
-		// 	LLVMValueRef gep1 = lb_emit_struct_ep(p, res.addr, 1).value;
-		// 	LLVMBuildStore(p->builder, ptr, gep0);
-		// 	LLVMBuildStore(p->builder, len, gep1);
-		// }
-		// return res;
-		GB_PANIC("cg_build_addr_slice_expr Type_MultiPointer");
-		break;
+			i64 stride = type_size_of(type->MultiPointer.elem);
+			TB_Node *offset = tb_inst_array_access(p->func, base.node, low.node, stride);
+			TB_Node *len = tb_inst_sub(p->func, high.node, low.node, cast(TB_ArithmeticBehavior)0);
+
+			TB_Node *data_ptr = tb_inst_member_access(p->func, res.addr.node, type_offset_of(res_type, 0));
+			TB_Node *len_ptr  = tb_inst_member_access(p->func, res.addr.node, type_offset_of(res_type, 1));
+
+			tb_inst_store(p->func, TB_TYPE_PTR, data_ptr, offset, cast(TB_CharUnits)build_context.ptr_size, false);
+			tb_inst_store(p->func, TB_TYPE_INT, len_ptr,  len,    cast(TB_CharUnits)build_context.int_size, false);
+
+			// LLVMValueRef gep0 = cg_emit_struct_ep(p, res.addr, 0).value;
+			// LLVMValueRef gep1 = cg_emit_struct_ep(p, res.addr, 1).value;
+			// LLVMBuildStore(p->builder, ptr, gep0);
+			// LLVMBuildStore(p->builder, len, gep1);
+			return res;
+		}
 	}
 
 	case Type_Array: {

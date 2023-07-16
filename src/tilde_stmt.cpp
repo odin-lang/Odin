@@ -376,6 +376,10 @@ gb_internal void cg_build_assignment(cgProcedure *p, Array<cgAddr> const &lvals,
 	for_array(i, inits) {
 		cgAddr lval = lvals[i];
 		cgValue init = inits[i];
+		if (init.type == nullptr) {
+			// TODO(bill): figure out how to do this
+			continue;
+		}
 		cg_addr_store(p, lval, init);
 	}
 

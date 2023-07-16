@@ -3952,6 +3952,7 @@ gb_internal i64 type_offset_of(Type *t, i32 index) {
 		case -1: return align_formula(t->Union.variant_block_size, build_context.ptr_size); // __type_info
 		}
 	}
+	GB_ASSERT(index == 0);
 	return 0;
 }
 

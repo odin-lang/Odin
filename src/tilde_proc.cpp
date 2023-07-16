@@ -1,4 +1,7 @@
 gb_internal TB_FunctionPrototype *cg_procedure_type_as_prototype(cgModule *m, Type *type) {
+	// TODO(bill): cache the procedure type generation
+	GB_ASSERT(build_context.metrics.os == TargetOs_windows);
+
 	GB_ASSERT(type != nullptr);
 	type = base_type(type);
 	GB_ASSERT(type->kind == Type_Proc);
@@ -35,7 +38,7 @@ gb_internal TB_FunctionPrototype *cg_procedure_type_as_prototype(cgModule *m, Ty
 				param.dt = TB_TYPE_INTN(cast(u16)(8*sz));
 				break;
 
-			case Basic_f16: param.dt = TB_TYPE_I16; break;
+			case Basic_f16: param.dt = TB_TYPE_F16; break;
 			case Basic_f32: param.dt = TB_TYPE_F32; break;
 			case Basic_f64: param.dt = TB_TYPE_F64; break;
 
@@ -86,11 +89,11 @@ gb_internal TB_FunctionPrototype *cg_procedure_type_as_prototype(cgModule *m, Ty
 				param.dt = TB_TYPE_INTN(cast(u16)(8*sz));
 				break;
 
-			case Basic_f16le: param.dt = TB_TYPE_I16; break;
+			case Basic_f16le: param.dt = TB_TYPE_F16; break;
 			case Basic_f32le: param.dt = TB_TYPE_F32; break;
 			case Basic_f64le: param.dt = TB_TYPE_F64; break;
 
-			case Basic_f16be: param.dt = TB_TYPE_I16; break;
+			case Basic_f16be: param.dt = TB_TYPE_F16; break;
 			case Basic_f32be: param.dt = TB_TYPE_F32; break;
 			case Basic_f64be: param.dt = TB_TYPE_F64; break;
 			}
@@ -117,15 +120,139 @@ gb_internal TB_FunctionPrototype *cg_procedure_type_as_prototype(cgModule *m, Ty
 			if (is_blank_ident(e->token)) {
 				param.name = alloc_cstring(temporary_allocator(), e->token.string);
 			}
+			param.debug_type = cg_debug_type(m, e->type);
 			array_add(&params, param);
 		}
 	}
 
-	auto results = array_make<TB_PrototypeParam>(heap_allocator(), 0, pt->result_count);
-	// if (pt->results) for (Entity *e : pt->params->Tuple.variables) {
-	// 	// TODO(bill):
-	// }
+	auto results = array_make<TB_PrototypeParam>(heap_allocator(), 0, 1);
 
+	Type *result_type = reduce_tuple_to_single_type(pt->results);
+
+	if (result_type) {
+		bool return_is_tuple = result_type->kind == Type_Tuple && is_calling_convention_odin(pt->calling_convention);
+
+		if (return_is_tuple) {
+			for (isize i = 0; i < result_type->Tuple.variables.count-1; i++) {
+				Entity *e = result_type->Tuple.variables[i];
+				TB_PrototypeParam param = {};
+				param.dt = TB_TYPE_PTR;
+				param.debug_type = cg_debug_type(m, alloc_type_pointer(e->type));
+				array_add(&params, param);
+			}
+
+			result_type = result_type->Tuple.variables[result_type->Tuple.variables.count-1]->type;
+		}
+
+		Type *rt = core_type(result_type);
+		i64 sz = type_size_of(rt);
+
+		TB_PrototypeParam result = {};
+
+		switch (rt->kind) {
+		case Type_Basic:
+			switch (rt->Basic.kind) {
+			case Basic_bool:
+			case Basic_b8:
+			case Basic_b16:
+			case Basic_b32:
+			case Basic_b64:
+			case Basic_i8:
+			case Basic_u8:
+			case Basic_i16:
+			case Basic_u16:
+			case Basic_i32:
+			case Basic_u32:
+			case Basic_i64:
+			case Basic_u64:
+			case Basic_i128:
+			case Basic_u128:
+			case Basic_rune:
+			case Basic_int:
+			case Basic_uint:
+			case Basic_uintptr:
+				result.dt = TB_TYPE_INTN(cast(u16)(8*sz));
+				break;
+
+			case Basic_f16: result.dt = TB_TYPE_I16; break;
+			case Basic_f32: result.dt = TB_TYPE_F32; break;
+			case Basic_f64: result.dt = TB_TYPE_F64; break;
+
+			case Basic_rawptr:
+				result.dt = TB_TYPE_PTR;
+				break;
+			case Basic_cstring: // ^u8
+				result.dt = TB_TYPE_PTR;
+				break;
+
+			case Basic_typeid:
+				result.dt = TB_TYPE_INTN(cast(u16)(8*sz));
+				break;
+
+			// Endian Specific Types
+			case Basic_i16le:
+			case Basic_u16le:
+			case Basic_i32le:
+			case Basic_u32le:
+			case Basic_i64le:
+			case Basic_u64le:
+			case Basic_i128le:
+			case Basic_u128le:
+			case Basic_i16be:
+			case Basic_u16be:
+			case Basic_i32be:
+			case Basic_u32be:
+			case Basic_i64be:
+			case Basic_u64be:
+			case Basic_i128be:
+			case Basic_u128be:
+				result.dt = TB_TYPE_INTN(cast(u16)(8*sz));
+				break;
+
+			case Basic_f16le: result.dt = TB_TYPE_I16; break;
+			case Basic_f32le: result.dt = TB_TYPE_F32; break;
+			case Basic_f64le: result.dt = TB_TYPE_F64; break;
+
+			case Basic_f16be: result.dt = TB_TYPE_I16; break;
+			case Basic_f32be: result.dt = TB_TYPE_F32; break;
+			case Basic_f64be: result.dt = TB_TYPE_F64; break;
+			}
+
+		case Type_Pointer:
+		case Type_MultiPointer:
+		case Type_Proc:
+			result.dt = TB_TYPE_PTR;
+			break;
+
+		default:
+			switch (sz) {
+			case 1: result.dt = TB_TYPE_I8;  break;
+			case 2: result.dt = TB_TYPE_I16; break;
+			case 4: result.dt = TB_TYPE_I32; break;
+			case 8: result.dt = TB_TYPE_I64; break;
+			}
+		}
+
+		if (result.dt.raw != 0) {
+			result.debug_type = cg_debug_type(m, result_type);
+			array_add(&results, result);
+		} else {
+			result.debug_type = cg_debug_type(m, alloc_type_pointer(result_type));
+			result.dt = TB_TYPE_PTR;
+
+			array_resize(&params, params.count+1);
+			array_copy(&params, params, 1);
+			params[0] = result;
+		}
+	}
+
+	if (pt->calling_convention == ProcCC_Odin) {
+		TB_PrototypeParam param = {};
+		param.dt = TB_TYPE_PTR;
+		param.debug_type = cg_debug_type(m, t_context_ptr);
+		param.name = "__.context_ptr";
+		array_add(&params, param);
+	}
 
 	return tb_prototype_create(m->mod, TB_CDECL, params.count, params.data, results.count, results.data, pt->c_vararg);
 }
@@ -408,12 +535,16 @@ gb_internal cgValue cg_emit_call(cgProcedure * p, cgValue value, Slice<cgValue> 
 	}
 	GB_ASSERT(value.kind == cgValue_Value);
 
+	// TODO(bill): abstract out the function prototype stuff so that you handle the ABI correctly (at least for win64 at the moment)
 	TB_FunctionPrototype *proto = cg_procedure_type_as_prototype(p->module, value.type);
 	TB_Node *target = value.node;
-	auto params = slice_make<TB_Node *>(temporary_allocator(), 0);
+	auto params = slice_make<TB_Node *>(temporary_allocator(), 0 /*proto->param_count*/);
+	for_array(i, params) {
+		// params[i] = proto
+	}
 
 	GB_ASSERT(target != nullptr);
-	TB_MultiOutput multi_output = tb_inst_call(p->func, proto, target, 0, nullptr);
+	TB_MultiOutput multi_output = tb_inst_call(p->func, proto, target, params.count, params.data);
 	gb_unused(multi_output);
 	return {};
 }
