@@ -684,6 +684,37 @@ gb_internal TB_DebugType *cg_debug_type_internal_record(cgModule *m, Type *type,
 			return record;
 		}
 		break;
+
+	case Type_Tuple:
+		{
+			GB_ASSERT(record_name.len == 0);
+			type_set_offsets(bt);
+
+			TB_DebugType *record = tb_debug_create_struct(m->mod, 0, "");
+			TB_DebugType **fields = tb_debug_record_begin(record, bt->Tuple.variables.count);
+			for_array(i, bt->Tuple.variables) {
+				Entity *e = bt->Tuple.variables[i];
+				Type *type = e->type;
+				if (is_type_proc(type)) {
+					type = t_rawptr;
+				}
+				TB_DebugType *field_type = cg_debug_type(m, type);
+				String        name       = e->token.string;
+				TB_CharUnits  offset     = cast(TB_CharUnits)bt->Tuple.offsets[i];
+				if (name.len == 0) {
+					name = str_lit("_");
+				}
+
+				fields[i] = tb_debug_create_field(m->mod, field_type, name.len, cast(char const *)name.text, offset);
+			}
+			tb_debug_record_end(
+				record,
+				cast(TB_CharUnits)type_size_of(type),
+				cast(TB_CharUnits)type_align_of(type)
+			);
+			return record;
+		}
+		break;
 	case Type_Union:
 		{
 			TB_DebugType *record = tb_debug_create_struct(m->mod, record_name.len, cast(char const *)record_name.text);
@@ -738,6 +769,7 @@ gb_internal TB_DebugType *cg_debug_type_internal(cgModule *m, Type *type) {
 	if (type == nullptr) {
 		return tb_debug_get_void(m->mod);
 	}
+	Type *original_type = type;
 	if (type->kind == Type_Named) {
 		String name = type->Named.name;
 		TB_DebugType *res = cg_debug_type_internal_record(m, type, name);
@@ -912,22 +944,99 @@ gb_internal TB_DebugType *cg_debug_type_internal(cgModule *m, Type *type) {
 		}
 	case Type_Map:
 		return cg_debug_type(m, t_raw_map);
+
 	case Type_Struct:
-		return cg_debug_type_internal_record(m, type, {});
+	case Type_Tuple:
 	case Type_Union:
 		return cg_debug_type_internal_record(m, type, {});
+
 	case Type_Enum:
 		return tb_debug_get_integer(m->mod, is_signed, bits);
-	case Type_Tuple:
-		GB_PANIC("SHOULD NEVER HIT");
-		break;
+
 	case Type_Proc:
 		{
 			TypeProc *pt = &type->Proc;
 			isize param_count  = 0;
 			isize return_count = 0;
+
+			bool is_odin_cc = is_calling_convention_odin(pt->calling_convention);
+
+			if (pt->params) for (Entity *e : pt->params->Tuple.variables) {
+				if (e->kind == Entity_Variable) {
+					param_count += 1;
+				}
+			}
+
+			if (pt->results) {
+				if (is_odin_cc) {
+					param_count += pt->result_count-1;
+					return_count = 1;
+				} else {
+					return_count = 1;
+				}
+			}
+
+			if (is_odin_cc) {
+				// `context` ptr
+				param_count += 1;
+			}
+
 			TB_DebugType *func = tb_debug_create_func(m->mod, TB_CDECL, param_count, return_count, pt->c_vararg);
-			return func;
+			TB_DebugType *func_ptr = tb_debug_create_ptr(m->mod, func);
+			map_set(&m->debug_type_map, original_type, func_ptr);
+			map_set(&m->debug_type_map, type, func_ptr);
+
+			TB_DebugType **params = tb_debug_func_params(func);
+			TB_DebugType **returns = tb_debug_func_returns(func);
+
+			isize param_index = 0;
+			isize return_index = 0;
+			if (pt->params) for (Entity *e : pt->params->Tuple.variables) {
+				if (e->kind == Entity_Variable) {
+					Type *type = e->type;
+					if (is_type_proc(type)) {
+						type = t_rawptr;
+					}
+					String name = e->token.string;
+					if (name.len == 0) {
+						name = str_lit("_");
+					}
+					params[param_index++] = tb_debug_create_field(m->mod, cg_debug_type(m, type), name.len, cast(char const *)name.text, 0);
+				}
+			}
+
+			if (pt->results) {
+				if (is_odin_cc) {
+					for (isize i = 0; i < pt->results->Tuple.variables.count-1; i++) {
+						Entity *e = pt->results->Tuple.variables[i];
+						GB_ASSERT(e->kind == Entity_Variable);
+						Type *type = e->type;
+						if (is_type_proc(e->type)) {
+							type = t_rawptr;
+						}
+						type = alloc_type_pointer(type);
+
+						String name = e->token.string;
+						if (name.len == 0) {
+							name = str_lit("_");
+						}
+						params[param_index++] = tb_debug_create_field(m->mod, cg_debug_type(m, type), name.len, cast(char const *)name.text, 0);
+					}
+
+					Type *last_type = pt->results->Tuple.variables[pt->results->Tuple.variables.count-1]->type;
+					if (is_type_proc(last_type)) {
+						last_type = t_rawptr;
+					}
+					returns[return_index++] = cg_debug_type(m, last_type);
+				} else {
+					returns[return_index++] = cg_debug_type(m, pt->results);
+				}
+			}
+
+			GB_ASSERT(param_index  == param_count);
+			GB_ASSERT(return_index == return_count);
+
+			return func_ptr;
 		}
 		break;
 	case Type_BitSet:
