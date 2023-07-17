@@ -5388,8 +5388,8 @@ Device_newBufferWithLength :: #force_inline proc "c" (self: ^Device, length: NS.
 
 @(objc_type=Device, objc_name="newBuffer")
 Device_newBuffer :: proc{
-	// Device_newBufferWithBytes,
-	// Device_newBufferWithBytesNoCopy,
+	Device_newBufferWithBytes,
+	Device_newBufferWithBytesNoCopy,
 	Device_newBufferWithSlice,
 	Device_newBufferWithSliceNoCopy,
 	Device_newBufferWithLength,
