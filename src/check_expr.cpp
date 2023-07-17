@@ -6136,7 +6136,6 @@ gb_internal CallArgumentData check_call_arguments_proc_group(CheckerContext *c, 
 	{
 		// NOTE(bill, 2019-07-13): This code is used to improve the type inference for procedure groups
 		// where the same positional parameter has the same type value (and ellipsis)
-		bool proc_arg_count_all_equal = true;
 		isize proc_arg_count = -1;
 		for (Entity *p : procs) {
 			Type *pt = base_type(p->type);
@@ -6144,15 +6143,12 @@ gb_internal CallArgumentData check_call_arguments_proc_group(CheckerContext *c, 
 				if (proc_arg_count < 0) {
 					proc_arg_count = pt->Proc.param_count;
 				} else {
-					if (proc_arg_count != pt->Proc.param_count) {
-						proc_arg_count_all_equal = false;
-						break;
-					}
+					proc_arg_count = gb_min(proc_arg_count, pt->Proc.param_count);
 				}
 			}
 		}
 
-		if (proc_arg_count >= 0 && proc_arg_count_all_equal) {
+		if (proc_arg_count >= 0) {
 			lhs_count = proc_arg_count;
 			if (lhs_count > 0)  {
 				lhs = gb_alloc_array(heap_allocator(), Entity *, lhs_count);
