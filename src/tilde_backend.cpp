@@ -31,7 +31,7 @@ gb_internal TB_DataType cg_data_type(Type *t) {
 		case Basic_uint:
 		case Basic_uintptr:
 		case Basic_typeid:
-			return TB_TYPE_INTN(cast(u16)(8*sz));
+			return TB_TYPE_INTN(cast(u16)gb_min(8*sz, 64));
 
 		case Basic_f16: return TB_TYPE_F16;
 		case Basic_f32: return TB_TYPE_F32;
@@ -58,7 +58,7 @@ gb_internal TB_DataType cg_data_type(Type *t) {
 		case Basic_u64be:
 		case Basic_i128be:
 		case Basic_u128be:
-			return TB_TYPE_INTN(cast(u16)(8*sz));
+			return TB_TYPE_INTN(cast(u16)gb_min(8*sz, 64));
 
 		case Basic_f16le: return TB_TYPE_F16;
 		case Basic_f32le: return TB_TYPE_F32;

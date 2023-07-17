@@ -86,7 +86,7 @@ gb_internal cgValue cg_const_value(cgModule *m, cgProcedure *p, Type *type, Exac
 		return cg_value(tb_inst_uint(p->func, dt, value.value_bool), type);
 
 	case ExactValue_Integer:
-		GB_ASSERT(dt.raw != TB_TYPE_I128.raw);
+		// GB_ASSERT(dt.raw != TB_TYPE_I128.raw);
 		if (is_type_unsigned(type)) {
 			u64 i = exact_value_to_u64(value);
 			return cg_value(tb_inst_uint(p->func, dt, i), type);

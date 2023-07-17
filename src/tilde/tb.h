@@ -195,8 +195,6 @@ typedef union TB_DataType {
 typedef enum TB_NodeTypeEnum {
     TB_NULL = 0,
 
-    TB_RETURN, // fn(r: region, x: data)
-
     // only one per function
     TB_START, // fn()
 
@@ -823,7 +821,16 @@ TB_API TB_DebugType* tb_debug_create_array(TB_Module* m, TB_DebugType* base, siz
 TB_API TB_DebugType* tb_debug_create_struct(TB_Module* m, ptrdiff_t len, const char* tag);
 TB_API TB_DebugType* tb_debug_create_union(TB_Module* m, ptrdiff_t len, const char* tag);
 TB_API TB_DebugType* tb_debug_create_field(TB_Module* m, TB_DebugType* type, ptrdiff_t len, const char* name, TB_CharUnits offset);
-TB_API void tb_debug_complete_record(TB_DebugType* type, TB_DebugType** members, size_t count, TB_CharUnits size, TB_CharUnits align);
+
+// returns the array you need to fill with fields
+TB_API TB_DebugType** tb_debug_record_begin(TB_DebugType* type, size_t count);
+TB_API void tb_debug_record_end(TB_DebugType* type, TB_CharUnits size, TB_CharUnits align);
+
+TB_API TB_DebugType* tb_debug_create_func(TB_Module* m, TB_CallingConv cc, size_t param_count, size_t return_count, bool has_varargs);
+
+// you'll need to fill these if you make a function
+TB_API TB_DebugType** tb_debug_func_params(TB_DebugType* type);
+TB_API TB_DebugType** tb_debug_func_returns(TB_DebugType* type);
 
 ////////////////////////////////
 // IR access
@@ -850,6 +857,8 @@ TB_API TB_Global* tb_symbol_as_global(TB_Symbol* s);
 ////////////////////////////////
 // Function IR Generation
 ////////////////////////////////
+TB_API void tb_get_data_type_size(TB_Module* mod, TB_DataType dt, size_t* size, size_t* align);
+
 // the user_data is expected to be a valid FILE*
 TB_API void tb_default_print_callback(void* user_data, const char* fmt, ...);
 
@@ -868,6 +877,12 @@ TB_API void tb_symbol_set_name(TB_Symbol* s, ptrdiff_t len, const char* name);
 
 TB_API void tb_symbol_bind_ptr(TB_Symbol* s, void* ptr);
 TB_API const char* tb_symbol_get_name(TB_Symbol* s);
+
+// same as tb_function_set_prototype except it will handle lowering from types like the TB_DebugType
+// into the correct ABI and exposing sane looking nodes to the parameters.
+//
+// returns the parameters
+TB_API TB_Node** tb_function_set_prototype_from_dbg(TB_Function* f, TB_DebugType* dbg, TB_Arena* arena, size_t* out_param_count);
 
 // if arena is NULL, defaults to module arena which is freed on tb_free_thread_resources
 TB_API void tb_function_set_prototype(TB_Function* f, TB_FunctionPrototype* p, TB_Arena* arena);
@@ -890,7 +905,6 @@ TB_API void tb_inst_keep_alive(TB_Function* f, TB_Node* src);
 TB_API TB_Node* tb_inst_poison(TB_Function* f);
 
 TB_API TB_Node* tb_inst_param(TB_Function* f, int param_id);
-TB_API TB_Node* tb_inst_param_addr(TB_Function* f, int param_id);
 
 TB_API TB_Node* tb_inst_fpxt(TB_Function* f, TB_Node* src, TB_DataType dt);
 TB_API TB_Node* tb_inst_sxt(TB_Function* f, TB_Node* src, TB_DataType dt);
@@ -902,7 +916,7 @@ TB_API TB_Node* tb_inst_int2float(TB_Function* f, TB_Node* src, TB_DataType dt, 
 TB_API TB_Node* tb_inst_float2int(TB_Function* f, TB_Node* src, TB_DataType dt, bool is_signed);
 TB_API TB_Node* tb_inst_bitcast(TB_Function* f, TB_Node* src, TB_DataType dt);
 
-TB_API TB_Node* tb_inst_local(TB_Function* f, uint32_t size, TB_CharUnits align);
+TB_API TB_Node* tb_inst_local(TB_Function* f, TB_CharUnits size, TB_CharUnits align);
 TB_API TB_Node* tb_inst_load(TB_Function* f, TB_DataType dt, TB_Node* addr, TB_CharUnits align, bool is_volatile);
 TB_API void tb_inst_store(TB_Function* f, TB_DataType dt, TB_Node* addr, TB_Node* val, TB_CharUnits align, bool is_volatile);
 
@@ -918,7 +932,7 @@ TB_API TB_Node* tb_inst_string(TB_Function* f, size_t len, const char* str);
 TB_API void tb_inst_memset(TB_Function* f, TB_Node* dst, TB_Node* val, TB_Node* count, TB_CharUnits align, bool is_volatile);
 
 // zero 'count' bytes on 'dst'
-TB_API void tb_inst_memzero(TB_Function* f, TB_Node* dst, TB_Node* val, TB_Node* count, TB_CharUnits align, bool is_volatile);
+TB_API void tb_inst_memzero(TB_Function* f, TB_Node* dst, TB_Node* count, TB_CharUnits align, bool is_volatile);
 
 // performs a copy of 'count' elements from one memory location to another
 // both locations cannot overlap.

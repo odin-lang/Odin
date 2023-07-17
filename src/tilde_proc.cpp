@@ -35,7 +35,7 @@ gb_internal TB_FunctionPrototype *cg_procedure_type_as_prototype(cgModule *m, Ty
 			case Basic_int:
 			case Basic_uint:
 			case Basic_uintptr:
-				param.dt = TB_TYPE_INTN(cast(u16)(8*sz));
+				param.dt = TB_TYPE_INTN(cast(u16)gb_min(64, 8*sz));
 				break;
 
 			case Basic_f16: param.dt = TB_TYPE_F16; break;
@@ -66,7 +66,7 @@ gb_internal TB_FunctionPrototype *cg_procedure_type_as_prototype(cgModule *m, Ty
 				break;
 
 			case Basic_typeid:
-				param.dt = TB_TYPE_INTN(cast(u16)(8*sz));
+				param.dt = TB_TYPE_INTN(cast(u16)gb_min(64, 8*sz));
 				break;
 
 			// Endian Specific Types
@@ -86,7 +86,7 @@ gb_internal TB_FunctionPrototype *cg_procedure_type_as_prototype(cgModule *m, Ty
 			case Basic_u64be:
 			case Basic_i128be:
 			case Basic_u128be:
-				param.dt = TB_TYPE_INTN(cast(u16)(8*sz));
+				param.dt = TB_TYPE_INTN(cast(u16)gb_min(64, 8*sz));
 				break;
 
 			case Basic_f16le: param.dt = TB_TYPE_F16; break;
@@ -171,7 +171,7 @@ gb_internal TB_FunctionPrototype *cg_procedure_type_as_prototype(cgModule *m, Ty
 			case Basic_int:
 			case Basic_uint:
 			case Basic_uintptr:
-				result.dt = TB_TYPE_INTN(cast(u16)(8*sz));
+				result.dt = TB_TYPE_INTN(cast(u16)gb_min(64, 8*sz));
 				break;
 
 			case Basic_f16: result.dt = TB_TYPE_I16; break;
@@ -186,7 +186,7 @@ gb_internal TB_FunctionPrototype *cg_procedure_type_as_prototype(cgModule *m, Ty
 				break;
 
 			case Basic_typeid:
-				result.dt = TB_TYPE_INTN(cast(u16)(8*sz));
+				result.dt = TB_TYPE_INTN(cast(u16)gb_min(64, 8*sz));
 				break;
 
 			// Endian Specific Types
@@ -206,7 +206,7 @@ gb_internal TB_FunctionPrototype *cg_procedure_type_as_prototype(cgModule *m, Ty
 			case Basic_u64be:
 			case Basic_i128be:
 			case Basic_u128be:
-				result.dt = TB_TYPE_INTN(cast(u16)(8*sz));
+				result.dt = TB_TYPE_INTN(cast(u16)gb_min(64, 8*sz));
 				break;
 
 			case Basic_f16le: result.dt = TB_TYPE_I16; break;
@@ -395,70 +395,75 @@ gb_internal void cg_procedure_begin(cgProcedure *p) {
 
 	GB_ASSERT(p->type->kind == Type_Proc);
 	TypeProc *pt = &p->type->Proc;
-	if (pt->params) {
-		int param_index = 0;
-		for (Entity *e : pt->params->Tuple.variables) {
-			if (e->kind != Entity_Variable) {
-				continue;
-			}
-
-			if (param_index >= p->proto->param_count) {
-				break;
-			}
-
-			TB_Node *ptr = tb_inst_param_addr(p->func, param_index);
-			cgValue local = cg_value(ptr, alloc_type_pointer(e->type));
-
-			if (e != nullptr && e->token.string.len > 0 && e->token.string != "_") {
-				// NOTE(bill): for debugging purposes only
-				String name = e->token.string;
-				TB_DebugType *debug_type = cg_debug_type(p->module, e->type);
-				tb_node_append_attrib(ptr, tb_function_attrib_variable(p->func, name.len, cast(char const *)name.text, debug_type));
-
-			}
-			cgAddr addr = cg_addr(local);
-			if (e) {
-				map_set(&p->variable_map, e, addr);
-			}
-
-			// if (arg_type->kind == lbArg_Ignore) {
-			// 	continue;
-			// } else if (arg_type->kind == lbArg_Direct) {
-			// 	if (e->token.string.len != 0 && !is_blank_ident(e->token.string)) {
-			// 		LLVMTypeRef param_type = lb_type(p->module, e->type);
-			// 		LLVMValueRef original_value = LLVMGetParam(p->value, param_offset+param_index);
-			// 		LLVMValueRef value = OdinLLVMBuildTransmute(p, original_value, param_type);
-
-			// 		lbValue param = {};
-			// 		param.value = value;
-			// 		param.type = e->type;
-
-			// 		map_set(&p->direct_parameters, e, param);
-
-			// 		lbValue ptr = lb_address_from_load_or_generate_local(p, param);
-			// 		GB_ASSERT(LLVMIsAAllocaInst(ptr.value));
-			// 		lb_add_entity(p->module, e, ptr);
-
-			// 		lbBlock *block = p->decl_block;
-			// 		if (original_value != value) {
-			// 			block = p->curr_block;
-			// 		}
-			// 		LLVMValueRef debug_storage_value = value;
-			// 		if (original_value != value && LLVMIsALoadInst(value)) {
-			// 			debug_storage_value = LLVMGetOperand(value, 0);
-			// 		}
-			// 		lb_add_debug_param_variable(p, debug_storage_value, e->type, e->token, param_index+1, block, arg_type->kind);
-			// 	}
-			// } else if (arg_type->kind == lbArg_Indirect) {
-			// 	if (e->token.string.len != 0 && !is_blank_ident(e->token.string)) {
-			// 		lbValue ptr = {};
-			// 		ptr.value = LLVMGetParam(p->value, param_offset+param_index);
-			// 		ptr.type = alloc_type_pointer(e->type);
-			// 		lb_add_entity(p->module, e, ptr);
-			// 		lb_add_debug_param_variable(p, ptr.value, e->type, e->token, param_index+1, p->decl_block, arg_type->kind);
-			// 	}
-			// }
+	if (pt->params == nullptr) {
+		return;
+	}
+	int param_index = 0;
+	for (Entity *e : pt->params->Tuple.variables) {
+		if (e->kind != Entity_Variable) {
+			continue;
 		}
+
+		if (param_index >= p->proto->param_count) {
+			break;
+		}
+
+		// TB_Node *ptr = tb_inst_param_addr(p->func, param_index);
+		TB_Node *param = tb_inst_param(p->func, param_index);
+		TB_Node *ptr = tb_inst_local(p->func, cast(TB_CharUnits)type_size_of(e->type), cast(TB_CharUnits)type_align_of(e->type));
+		TB_DataType dt = cg_data_type(e->type);
+		tb_inst_store(p->func, dt, ptr, param, cast(TB_CharUnits)type_align_of(e->type), false);
+		cgValue local = cg_value(ptr, alloc_type_pointer(e->type));
+
+		if (e != nullptr && e->token.string.len > 0 && e->token.string != "_") {
+			// NOTE(bill): for debugging purposes only
+			String name = e->token.string;
+			TB_DebugType *debug_type = cg_debug_type(p->module, e->type);
+			tb_node_append_attrib(ptr, tb_function_attrib_variable(p->func, name.len, cast(char const *)name.text, debug_type));
+
+		}
+		cgAddr addr = cg_addr(local);
+		if (e) {
+			map_set(&p->variable_map, e, addr);
+		}
+
+		// if (arg_type->kind == lbArg_Ignore) {
+		// 	continue;
+		// } else if (arg_type->kind == lbArg_Direct) {
+		// 	if (e->token.string.len != 0 && !is_blank_ident(e->token.string)) {
+		// 		LLVMTypeRef param_type = lb_type(p->module, e->type);
+		// 		LLVMValueRef original_value = LLVMGetParam(p->value, param_offset+param_index);
+		// 		LLVMValueRef value = OdinLLVMBuildTransmute(p, original_value, param_type);
+
+		// 		lbValue param = {};
+		// 		param.value = value;
+		// 		param.type = e->type;
+
+		// 		map_set(&p->direct_parameters, e, param);
+
+		// 		lbValue ptr = lb_address_from_load_or_generate_local(p, param);
+		// 		GB_ASSERT(LLVMIsAAllocaInst(ptr.value));
+		// 		lb_add_entity(p->module, e, ptr);
+
+		// 		lbBlock *block = p->decl_block;
+		// 		if (original_value != value) {
+		// 			block = p->curr_block;
+		// 		}
+		// 		LLVMValueRef debug_storage_value = value;
+		// 		if (original_value != value && LLVMIsALoadInst(value)) {
+		// 			debug_storage_value = LLVMGetOperand(value, 0);
+		// 		}
+		// 		lb_add_debug_param_variable(p, debug_storage_value, e->type, e->token, param_index+1, block, arg_type->kind);
+		// 	}
+		// } else if (arg_type->kind == lbArg_Indirect) {
+		// 	if (e->token.string.len != 0 && !is_blank_ident(e->token.string)) {
+		// 		lbValue ptr = {};
+		// 		ptr.value = LLVMGetParam(p->value, param_offset+param_index);
+		// 		ptr.type = alloc_type_pointer(e->type);
+		// 		lb_add_entity(p->module, e, ptr);
+		// 		lb_add_debug_param_variable(p, ptr.value, e->type, e->token, param_index+1, p->decl_block, arg_type->kind);
+		// 	}
+		// }
 	}
 }
 
@@ -466,7 +471,9 @@ gb_internal void cg_procedure_end(cgProcedure *p) {
 	if (p == nullptr || p->func == nullptr) {
 		return;
 	}
-	tb_inst_ret(p->func, 0, nullptr);
+	if (tb_inst_get_control(p->func)) {
+		tb_inst_ret(p->func, 0, nullptr);
+	}
 	if (p->name == "main") {
 		TB_Arena *arena = tb_default_arena();
 		defer (arena->free(arena));

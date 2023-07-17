@@ -736,7 +736,33 @@ gb_internal void cg_build_assign_stmt(cgProcedure *p, AstAssignStmt *as) {
 }
 
 gb_internal void cg_build_return_stmt(cgProcedure *p, Slice<Ast *> const &return_results) {
+	TypeTuple *tuple  = &p->type->Proc.results->Tuple;
+	isize return_count = p->type->Proc.result_count;
+	gb_unused(tuple);
+	isize res_count = return_results.count;
+	gb_unused(res_count);
 
+	if (return_count == 0) {
+		tb_inst_ret(p->func, 0, nullptr);
+		return;
+	} else if (return_count == 1) {
+		Entity *e = tuple->variables[0];
+		if (res_count == 0) {
+			cgValue zero = cg_const_nil(p, tuple->variables[0]->type);
+			if (zero.kind == cgValue_Value) {
+				tb_inst_ret(p->func, 1, &zero.node);
+			}
+			return;
+		}
+		cgValue res = cg_build_expr(p, return_results[0]);
+		res = cg_emit_conv(p, res, e->type);
+		if (res.kind == cgValue_Value) {
+			tb_inst_ret(p->func, 1, &res.node);
+		}
+		return;
+	} else {
+		GB_PANIC("TODO(bill): MUTLIPLE RETURN VALUES");
+	}
 }
 
 
