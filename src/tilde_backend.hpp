@@ -176,6 +176,9 @@ struct cgModule {
 	PtrMap<TB_Function *, Entity *> procedure_values;
 	Array<cgProcedure *> procedures_to_generate;
 
+	RecursiveMutex debug_type_mutex;
+	PtrMap<Type *, TB_DebugType *> debug_type_map;
+
 	PtrMap<uintptr, TB_FileID> file_id_map; // Key: AstFile.id (i32 cast to uintptr)
 
 	std::atomic<u32> nested_type_name_guid;

@@ -396,6 +396,8 @@ gb_internal cgModule *cg_module_create(Checker *c) {
 
 	map_init(&m->file_id_map);
 
+	map_init(&m->debug_type_map);
+
 
 	for_array(id, global_files) {
 		if (AstFile *f = global_files[id]) {
@@ -411,6 +413,7 @@ gb_internal void cg_module_destroy(cgModule *m) {
 	map_destroy(&m->values);
 	array_free(&m->procedures_to_generate);
 	map_destroy(&m->file_id_map);
+	map_destroy(&m->debug_type_map);
 
 	tb_module_destroy(m->mod);
 }

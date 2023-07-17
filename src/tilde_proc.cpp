@@ -409,7 +409,7 @@ gb_internal void cg_procedure_begin(cgProcedure *p) {
 		}
 
 		// TB_Node *ptr = tb_inst_param_addr(p->func, param_index);
-		TB_Node *param = tb_inst_param(p->func, param_index);
+		TB_Node *param = tb_inst_param(p->func, param_index++);
 		TB_Node *ptr = tb_inst_local(p->func, cast(TB_CharUnits)type_size_of(e->type), cast(TB_CharUnits)type_align_of(e->type));
 		TB_DataType dt = cg_data_type(e->type);
 		tb_inst_store(p->func, dt, ptr, param, cast(TB_CharUnits)type_align_of(e->type), false);
