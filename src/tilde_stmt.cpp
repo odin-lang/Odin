@@ -325,84 +325,167 @@ gb_internal cgValue cg_emit_struct_ep(cgProcedure *p, cgValue s, i64 index) {
 	if (is_type_relative_pointer(t)) {
 		s = cg_addr_get_ptr(p, cg_addr(s));
 	}
+	i64 offset = -1;
+	i64 int_size = build_context.int_size;
+	i64 ptr_size = build_context.ptr_size;
 
-	if (is_type_struct(t)) {
-		result_type = get_struct_field_type(t, index);
-	} else if (is_type_union(t)) {
+	switch (t->kind) {
+	case Type_Struct:
+		{
+			type_set_offsets(t);
+			result_type = t->Struct.fields[index]->type;
+			offset = t->Struct.offsets[index];
+		}
+		break;
+	case Type_Union:
 		GB_ASSERT(index == -1);
 		GB_PANIC("TODO(bill): cg_emit_union_tag_ptr");
+		break;
 		// return cg_emit_union_tag_ptr(p, s);
-	} else if (is_type_tuple(t)) {
+	case Type_Tuple:
 		GB_PANIC("TODO(bill): cg_emit_tuple_ep");
+		break;
 		// return cg_emit_tuple_ep(p, s, index);
-		// return cg_emit_tuple_ep(p, s, index);
-	} else if (is_type_complex(t)) {
-		Type *ft = base_complex_elem_type(t);
+	case Type_Slice:
 		switch (index) {
-		case 0: result_type = ft; break;
-		case 1: result_type = ft; break;
+		case 0:
+			result_type = alloc_type_pointer(t->Slice.elem);
+			offset = 0;
+			break;
+		case 1:
+			result_type = t_int;
+			offset = int_size;
+			break;
 		}
-	} else if (is_type_quaternion(t)) {
-		Type *ft = base_complex_elem_type(t);
-		switch (index) {
-		case 0: result_type = ft; break;
-		case 1: result_type = ft; break;
-		case 2: result_type = ft; break;
-		case 3: result_type = ft; break;
-		}
-	} else if (is_type_slice(t)) {
-		switch (index) {
-		case 0: result_type = alloc_type_pointer(t->Slice.elem); break;
-		case 1: result_type = t_int; break;
-		}
-	} else if (is_type_string(t)) {
-		switch (index) {
-		case 0: result_type = t_u8_ptr; break;
-		case 1: result_type = t_int;    break;
-		}
-	} else if (is_type_any(t)) {
-		switch (index) {
-		case 0: result_type = t_rawptr; break;
-		case 1: result_type = t_typeid; break;
-		}
-	} else if (is_type_dynamic_array(t)) {
-		switch (index) {
-		case 0: result_type = alloc_type_pointer(t->DynamicArray.elem); break;
-		case 1: result_type = t_int;       break;
-		case 2: result_type = t_int;       break;
-		case 3: result_type = t_allocator; break;
-		}
-	} else if (is_type_map(t)) {
-		init_map_internal_types(t);
-		Type *itp = alloc_type_pointer(t_raw_map);
-		s = cg_emit_transmute(p, s, itp);
+		break;
+	case Type_Basic:
+		switch (t->Basic.kind) {
+		case Basic_string:
+			switch (index) {
+			case 0:
+				result_type = t_u8_ptr;
+				offset = 0;
+				break;
+			case 1:
+				result_type = t_int;
+				offset = int_size;
+				break;
+			}
+			break;
+		case Basic_any:
+			switch (index) {
+			case 0:
+				result_type = t_rawptr;
+				offset = 0;
+				break;
+			case 1:
+				result_type = t_typeid;
+				offset = ptr_size;
+				break;
+			}
+			break;
 
-		switch (index) {
-		case 0: result_type = get_struct_field_type(t_raw_map, 0); break;
-		case 1: result_type = get_struct_field_type(t_raw_map, 1); break;
-		case 2: result_type = get_struct_field_type(t_raw_map, 2); break;
+		case Basic_complex32:
+		case Basic_complex64:
+		case Basic_complex128:
+			{
+				Type *ft = base_complex_elem_type(t);
+				i64 sz = type_size_of(ft);
+				switch (index) {
+				case 0: case 1:
+					result_type = ft; offset = sz * index; break;
+				default: goto error_case;
+				}
+				break;
+			}
+		case Basic_quaternion64:
+		case Basic_quaternion128:
+		case Basic_quaternion256:
+			{
+				Type *ft = base_complex_elem_type(t);
+				i64 sz = type_size_of(ft);
+				switch (index) {
+				case 0: case 1: case 2: case 3:
+					result_type = ft; offset = sz * index; break;
+				default: goto error_case;
+				}
+			}
+			break;
+		default:
+			goto error_case;
 		}
-	} else if (is_type_array(t)) {
+		break;
+	case Type_DynamicArray:
+		switch (index) {
+		case 0:
+			result_type = alloc_type_pointer(t->DynamicArray.elem);
+			offset = index*int_size;
+			break;
+		case 1: case 2:
+			result_type = t_int;
+			offset = index*int_size;
+			break;
+		case 3:
+			result_type = t_allocator;
+			offset = index*int_size;
+			break;
+		default: goto error_case;
+		}
+		break;
+	case Type_Map:
+		{
+			init_map_internal_types(t);
+			Type *itp = alloc_type_pointer(t_raw_map);
+			s = cg_emit_transmute(p, s, itp);
+
+			Type *rms = base_type(t_raw_map);
+			GB_ASSERT(rms->kind == Type_Struct);
+
+			if (0 <= index && index < 3) {
+				result_type = rms->Struct.fields[index]->type;
+				offset = rms->Struct.offsets[index];
+			} else {
+				goto error_case;
+			}
+			break;
+		}
+	case Type_Array:
 		return cg_emit_array_epi(p, s, index);
-	} else if (is_type_relative_slice(t)) {
-		switch (index) {
-		case 0: result_type = t->RelativeSlice.base_integer; break;
-		case 1: result_type = t->RelativeSlice.base_integer; break;
+	case Type_RelativeSlice:
+		{
+			Type *bi = t->RelativeSlice.base_integer;
+			i64 sz = type_size_of(bi);
+			switch (index) {
+			case 0:
+			case 1:
+				result_type = bi;
+				offset = sz * index;
+				break;
+			default:
+				goto error_case;
+			}
 		}
-	} else if (is_type_soa_pointer(t)) {
+		break;
+	case Type_SoaPointer:
 		switch (index) {
 		case 0: result_type = alloc_type_pointer(t->SoaPointer.elem); break;
 		case 1: result_type = t_int; break;
 		}
-	} else {
+		break;
+	default:
+	error_case:;
 		GB_PANIC("TODO(bill): struct_gep type: %s, %d", type_to_string(s.type), index);
+		break;
 	}
 
 	GB_ASSERT_MSG(result_type != nullptr, "%s %d", type_to_string(t), index);
+	GB_ASSERT(offset >= 0);
 
-	GB_PANIC("TODO(bill): cg_emit_struct_ep_internal");
-	// return cg_emit_struct_ep_internal(p, s, index, result_type);
-	return {};
+	GB_ASSERT(s.kind == cgValue_Value);
+	return cg_value(
+		tb_inst_member_access(p->func, s.node, offset),
+		alloc_type_pointer(result_type)
+	);
 }
 
 gb_internal cgValue cg_emit_deep_field_gep(cgProcedure *p, cgValue e, Selection const &sel) {
@@ -417,7 +500,8 @@ gb_internal cgValue cg_emit_deep_field_gep(cgProcedure *p, cgValue e, Selection 
 		}
 		type = core_type(type);
 
-		if (type->kind == Type_SoaPointer) {
+		switch (type->kind) {
+		case Type_SoaPointer: {
 			cgValue addr = cg_emit_struct_ep(p, e, 0);
 			cgValue index = cg_emit_struct_ep(p, e, 1);
 			addr = cg_emit_load(p, addr);
@@ -438,25 +522,11 @@ gb_internal cgValue cg_emit_deep_field_gep(cgProcedure *p, cgValue e, Selection 
 			} else {
 				e = cg_emit_ptr_offset(p, cg_emit_load(p, arr), index);
 			}
-		} else if (is_type_quaternion(type)) {
-			e = cg_emit_struct_ep(p, e, index);
-		} else if (is_type_raw_union(type)) {
-			type = get_struct_field_type(type, index);
-			GB_ASSERT(is_type_pointer(e.type));
-			e = cg_emit_transmute(p, e, alloc_type_pointer(type));
-		} else if (is_type_struct(type)) {
-			type = get_struct_field_type(type, index);
-			e = cg_emit_struct_ep(p, e, index);
-		} else if (type->kind == Type_Union) {
-			GB_ASSERT(index == -1);
-			type = t_type_info_ptr;
-			e = cg_emit_struct_ep(p, e, index);
-		} else if (type->kind == Type_Tuple) {
-			type = type->Tuple.variables[index]->type;
-			e = cg_emit_struct_ep(p, e, index);
-		} else if (type->kind == Type_Basic) {
+			break;
+		}
+		case Type_Basic:
 			switch (type->Basic.kind) {
-			case Basic_any: {
+			case Basic_any:
 				if (index == 0) {
 					type = t_rawptr;
 				} else if (index == 1) {
@@ -464,28 +534,42 @@ gb_internal cgValue cg_emit_deep_field_gep(cgProcedure *p, cgValue e, Selection 
 				}
 				e = cg_emit_struct_ep(p, e, index);
 				break;
-			}
-
-			case Basic_string:
+			default:
 				e = cg_emit_struct_ep(p, e, index);
 				break;
-
-			default:
-				GB_PANIC("un-gep-able type %s", type_to_string(type));
-				break;
 			}
-		} else if (type->kind == Type_Slice) {
+			break;
+		case Type_Struct:
+			if (type->Struct.is_raw_union) {
+				type = get_struct_field_type(type, index);
+				GB_ASSERT(is_type_pointer(e.type));
+				e = cg_emit_transmute(p, e, alloc_type_pointer(type));
+			} else {
+				type = get_struct_field_type(type, index);
+				e = cg_emit_struct_ep(p, e, index);
+			}
+			break;
+		case Type_Union:
+			GB_ASSERT(index == -1);
+			type = t_type_info_ptr;
 			e = cg_emit_struct_ep(p, e, index);
-		} else if (type->kind == Type_DynamicArray) {
+			break;
+		case Type_Tuple:
+			type = type->Tuple.variables[index]->type;
 			e = cg_emit_struct_ep(p, e, index);
-		} else if (type->kind == Type_Array) {
+			break;
+		case Type_Slice:
+		case Type_DynamicArray:
+		case Type_Map:
+		case Type_RelativePointer:
+			e = cg_emit_struct_ep(p, e, index);
+			break;
+		case Type_Array:
 			e = cg_emit_array_epi(p, e, index);
-		} else if (type->kind == Type_Map) {
-			e = cg_emit_struct_ep(p, e, index);
-		} else if (type->kind == Type_RelativePointer) {
-			e = cg_emit_struct_ep(p, e, index);
-		} else {
+			break;
+		default:
 			GB_PANIC("un-gep-able type %s", type_to_string(type));
+			break;
 		}
 	}
 
