@@ -4519,8 +4519,9 @@ gb_internal lbAddr lb_build_addr_internal(lbProcedure *p, Ast *expr) {
 			Selection sel = lookup_field(type, selector, false);
 			GB_ASSERT(sel.entity != nullptr);
 			if (sel.pseudo_field) {
-				GB_ASSERT(sel.entity->kind == Entity_Procedure);
+				GB_ASSERT(sel.entity->kind == Entity_Procedure || sel.entity->kind == Entity_ProcGroup);
 				Entity *e = entity_of_node(sel_node);
+				GB_ASSERT(e->kind == Entity_Procedure);
 				return lb_addr(lb_find_value_from_entity(p->module, e));
 			}
 
