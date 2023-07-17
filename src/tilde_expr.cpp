@@ -1,4 +1,5 @@
 gb_internal cgValue cg_flatten_value(cgProcedure *p, cgValue value) {
+	GB_ASSERT(value.kind != cgValue_Multi);
 	if (value.kind == cgValue_Symbol) {
 		GB_ASSERT(is_type_internally_pointer_like(value.type));
 		value = cg_value(tb_inst_get_symbol_address(p->func, value.symbol), value.type);
@@ -151,6 +152,9 @@ gb_internal cgValue cg_emit_transmute(cgProcedure *p, cgValue value, Type *type)
 		return value;
 	case cgValue_Symbol:
 		GB_PANIC("should be handled above");
+		break;
+	case cgValue_Multi:
+		GB_PANIC("cannot transmute multiple values at once");
 		break;
 	}
 	return value;

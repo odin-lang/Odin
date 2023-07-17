@@ -34,6 +34,11 @@ enum cgValueKind : u32 {
 	cgValue_Value,
 	cgValue_Addr,
 	cgValue_Symbol,
+	cgValue_Multi,
+};
+
+struct cgValueMultiNodes {
+	Slice<TB_Node *> nodes;
 };
 
 struct cgValue {
@@ -42,6 +47,7 @@ struct cgValue {
 	union {
 		TB_Symbol *symbol;
 		TB_Node *  node;
+		cgValueMultiNodes *multi_nodes;
 	};
 };
 
@@ -131,6 +137,9 @@ struct cgProcedure {
 	TB_Function *func;
 	TB_FunctionPrototype *proto;
 	TB_Symbol *symbol;
+
+	// includes parameters, pointers to return values, and context ptr
+	Slice<TB_Node *> param_nodes;
 
 	Entity *  entity;
 	cgModule *module;

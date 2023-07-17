@@ -10,6 +10,9 @@ gb_internal cgValue cg_emit_load(cgProcedure *p, cgValue const &ptr, bool is_vol
 		case cgValue_Addr:
 			GB_PANIC("NOT POSSIBLE - Cannot load an lvalue to begin with");
 			break;
+		case cgValue_Multi:
+			GB_PANIC("NOT POSSIBLE - Cannot load multiple values at once");
+			break;
 		case cgValue_Symbol:
 			return cg_lvalue_addr(tb_inst_get_symbol_address(p->func, ptr.symbol), type);
 		}
@@ -27,6 +30,9 @@ gb_internal cgValue cg_emit_load(cgProcedure *p, cgValue const &ptr, bool is_vol
 	case cgValue_Addr:
 		the_ptr = tb_inst_load(p->func, TB_TYPE_PTR, ptr.node, alignment, is_volatile);
 		break;
+	case cgValue_Multi:
+		GB_PANIC("NOT POSSIBLE - Cannot load multiple values at once");
+		break;
 	case cgValue_Symbol:
 		the_ptr = tb_inst_get_symbol_address(p->func, ptr.symbol);
 		break;
@@ -35,6 +41,8 @@ gb_internal cgValue cg_emit_load(cgProcedure *p, cgValue const &ptr, bool is_vol
 }
 
 gb_internal void cg_emit_store(cgProcedure *p, cgValue dst, cgValue const &src, bool is_volatile) {
+	GB_ASSERT_MSG(dst.kind != cgValue_Multi, "cannot store to multiple values at once");
+
 	if (dst.kind == cgValue_Addr) {
 		dst = cg_emit_load(p, dst, is_volatile);
 	} else if (dst.kind == cgValue_Symbol) {
@@ -130,6 +138,9 @@ gb_internal cgValue cg_address_from_load(cgProcedure *p, cgValue value) {
 	case cgValue_Symbol:
 		GB_PANIC("Symbol is an invalid use case for cg_address_from_load");
 		return {};
+	case cgValue_Multi:
+		GB_PANIC("Multi is an invalid use case for cg_address_from_load");
+		break;
 	}
 	GB_PANIC("Invalid cgValue for cg_address_from_load");
 	return {};
@@ -143,6 +154,8 @@ gb_internal bool cg_addr_is_empty(cgAddr const &addr) {
 		return addr.addr.node == nullptr;
 	case cgValue_Symbol:
 		return addr.addr.symbol == nullptr;
+	case cgValue_Multi:
+		return addr.addr.multi_nodes == nullptr;
 	}
 	return true;
 }
@@ -670,6 +683,8 @@ gb_internal cgValue cg_address_from_load_or_generate_local(cgProcedure *p, cgVal
 		break;
 	case cgValue_Addr:
 		return cg_value(value.node, alloc_type_pointer(value.type));
+	case cgValue_Multi:
+		GB_PANIC("cgValue_Multi not allowed");
 	}
 
 	cgAddr res = cg_add_local(p, value.type, nullptr, false);
