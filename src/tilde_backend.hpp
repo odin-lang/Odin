@@ -178,6 +178,7 @@ struct cgModule {
 
 	RecursiveMutex debug_type_mutex;
 	PtrMap<Type *, TB_DebugType *> debug_type_map;
+	PtrMap<Type *, TB_DebugType *> proc_debug_type_map; // not pointer to
 
 	PtrMap<uintptr, TB_FileID> file_id_map; // Key: AstFile.id (i32 cast to uintptr)
 
