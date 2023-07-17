@@ -757,6 +757,66 @@ gb_internal String handle_link_name(CheckerContext *ctx, Token token, String lin
 	return link_name;
 }
 
+gb_internal void check_objc_methods(CheckerContext *ctx, Entity *e, AttributeContext const &ac) {
+	if (!(ac.objc_name.len || ac.objc_is_class_method || ac.objc_type)) {
+		return;
+	}
+	if (ac.objc_name.len == 0 && ac.objc_is_class_method) {
+		error(e->token, "@(objc_name) is required with @(objc_is_class_method)");
+	} else if (ac.objc_type == nullptr) {
+		error(e->token, "@(objc_name) requires that @(objc_type) to be set");
+	} else if (ac.objc_name.len == 0 && ac.objc_type) {
+		error(e->token, "@(objc_name) is required with @(objc_type)");
+	} else {
+		Type *t = ac.objc_type;
+		if (t->kind == Type_Named) {
+			Entity *tn = t->Named.type_name;
+
+			GB_ASSERT(tn->kind == Entity_TypeName);
+
+			if (tn->scope != e->scope) {
+				error(e->token, "@(objc_name) attribute may only be applied to procedures and types within the same scope");
+			} else {
+				mutex_lock(&global_type_name_objc_metadata_mutex);
+				defer (mutex_unlock(&global_type_name_objc_metadata_mutex));
+
+				if (!tn->TypeName.objc_metadata) {
+					tn->TypeName.objc_metadata = create_type_name_obj_c_metadata();
+				}
+				auto *md = tn->TypeName.objc_metadata;
+				mutex_lock(md->mutex);
+				defer (mutex_unlock(md->mutex));
+
+				if (!ac.objc_is_class_method) {
+					bool ok = true;
+					for (TypeNameObjCMetadataEntry const &entry : md->value_entries) {
+						if (entry.name == ac.objc_name) {
+							error(e->token, "Previous declaration of @(objc_name=\"%.*s\")", LIT(ac.objc_name));
+							ok = false;
+							break;
+						}
+					}
+					if (ok) {
+						array_add(&md->value_entries, TypeNameObjCMetadataEntry{ac.objc_name, e});
+					}
+				} else {
+					bool ok = true;
+					for (TypeNameObjCMetadataEntry const &entry : md->type_entries) {
+						if (entry.name == ac.objc_name) {
+							error(e->token, "Previous declaration of @(objc_name=\"%.*s\")", LIT(ac.objc_name));
+							ok = false;
+							break;
+						}
+					}
+					if (ok) {
+						array_add(&md->type_entries, TypeNameObjCMetadataEntry{ac.objc_name, e});
+					}
+				}
+			}
+		}
+	}
+}
+
 gb_internal void check_proc_decl(CheckerContext *ctx, Entity *e, DeclInfo *d) {
 	GB_ASSERT(e->type == nullptr);
 	if (d->proc_lit->kind != Ast_ProcLit) {
@@ -840,62 +900,7 @@ gb_internal void check_proc_decl(CheckerContext *ctx, Entity *e, DeclInfo *d) {
 	}
 	e->Procedure.optimization_mode = cast(ProcedureOptimizationMode)ac.optimization_mode;
 
-	if (ac.objc_name.len || ac.objc_is_class_method || ac.objc_type) {
-		if (ac.objc_name.len == 0 && ac.objc_is_class_method) {
-			error(e->token, "@(objc_name) is required with @(objc_is_class_method)");
-		} else if (ac.objc_type == nullptr) {
-			error(e->token, "@(objc_name) requires that @(objc_type) to be set");
-		} else if (ac.objc_name.len == 0 && ac.objc_type) {
-			error(e->token, "@(objc_name) is required with @(objc_type)");
-		} else {
-			Type *t = ac.objc_type;
-			if (t->kind == Type_Named) {
-				Entity *tn = t->Named.type_name;
-
-				GB_ASSERT(tn->kind == Entity_TypeName);
-
-				if (tn->scope != e->scope) {
-					error(e->token, "@(objc_name) attribute may only be applied to procedures and types within the same scope");
-				} else {
-					mutex_lock(&global_type_name_objc_metadata_mutex);
-					defer (mutex_unlock(&global_type_name_objc_metadata_mutex));
-
-					if (!tn->TypeName.objc_metadata) {
-						tn->TypeName.objc_metadata = create_type_name_obj_c_metadata();
-					}
-					auto *md = tn->TypeName.objc_metadata;
-					mutex_lock(md->mutex);
-					defer (mutex_unlock(md->mutex));
-
-					if (!ac.objc_is_class_method) {
-						bool ok = true;
-						for (TypeNameObjCMetadataEntry const &entry : md->value_entries) {
-							if (entry.name == ac.objc_name) {
-								error(e->token, "Previous declaration of @(objc_name=\"%.*s\")", LIT(ac.objc_name));
-								ok = false;
-								break;
-							}
-						}
-						if (ok) {
-							array_add(&md->value_entries, TypeNameObjCMetadataEntry{ac.objc_name, e});
-						}
-					} else {
-						bool ok = true;
-						for (TypeNameObjCMetadataEntry const &entry : md->type_entries) {
-							if (entry.name == ac.objc_name) {
-								error(e->token, "Previous declaration of @(objc_name=\"%.*s\")", LIT(ac.objc_name));
-								ok = false;
-								break;
-							}
-						}
-						if (ok) {
-							array_add(&md->type_entries, TypeNameObjCMetadataEntry{ac.objc_name, e});
-						}
-					}
-				}
-			}
-		}
-	}
+	check_objc_methods(ctx, e, ac);
 
 	if (ac.require_target_feature.len != 0 && ac.enable_target_feature.len != 0) {
 		error(e->token, "Attributes @(require_target_feature=...) and @(enable_target_feature=...) cannot be used together");
@@ -1241,7 +1246,7 @@ gb_internal void check_global_variable_decl(CheckerContext *ctx, Entity *&e, Ast
 	check_rtti_type_disallowed(e->token, e->type, "A variable declaration is using a type, %s, which has been disallowed");
 }
 
-gb_internal void check_proc_group_decl(CheckerContext *ctx, Entity *&pg_entity, DeclInfo *d) {
+gb_internal void check_proc_group_decl(CheckerContext *ctx, Entity *pg_entity, DeclInfo *d) {
 	GB_ASSERT(pg_entity->kind == Entity_ProcGroup);
 	auto *pge = &pg_entity->ProcGroup;
 	String proc_group_name = pg_entity->token.string;
@@ -1365,6 +1370,11 @@ gb_internal void check_proc_group_decl(CheckerContext *ctx, Entity *&pg_entity, 
 			}
 		}
 	}
+
+	AttributeContext ac = {};
+	check_decl_attributes(ctx, d->attributes, proc_group_attribute, &ac);
+	check_objc_methods(ctx, pg_entity, ac);
+
 
 }
 

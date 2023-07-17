@@ -7,10 +7,21 @@ current_thread_id :: proc "contextless" () -> int {
 	return _current_thread_id()
 }
 
-// A Mutex is a mutual exclusion lock
-// The zero value for a Mutex is an unlocked mutex
+// A Mutex is a [[mutual exclusion lock; https://en.wikipedia.org/wiki/Mutual_exclusion]]
+// It can be used to prevent more than one thread from executing the same piece of code,
+// and thus prevent access to same piece of memory by multiple threads, at the same time.
 //
-// A Mutex must not be copied after first use
+// A Mutex's zero value represents an initial, *unlocked* state.
+//
+// If another thread tries to take the lock while another thread holds it, it will pause
+// until the lock is released. Code or memory that is "surrounded" by a mutex lock is said
+// to be "guarded by a mutex".
+//
+// A Mutex must not be copied after first use (e.g., after locking it the first time).
+// This is because, in order to coordinate with other threads, all threads must watch
+// the same memory address to know when the lock has been released. Trying to use a
+// copy of the lock at a different memory address will result in broken and unsafe
+// behavior. For this reason, Mutexes are marked as `#no_copy`.
 Mutex :: struct #no_copy {
 	impl: _Mutex,
 }

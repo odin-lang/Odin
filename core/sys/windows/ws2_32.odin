@@ -206,4 +206,14 @@ foreign ws2_32 {
 		optval: ^c_char,
 		optlen: ^c_int,
 	) -> c_int ---
+	// [MS-Docs](https://learn.microsoft.com/en-us/windows/win32/api/winsock2/nf-winsock2-ntohl)
+	ntohl :: proc(netlong: c_ulong) -> c_ulong ---
+	// [MS-Docs](https://learn.microsoft.com/en-us/windows/win32/api/winsock2/nf-winsock2-ntohs)
+	ntohs :: proc(netshort: c_ushort) -> c_ushort ---
+	// [MS-Docs](https://learn.microsoft.com/en-us/windows/win32/api/winsock2/nf-winsock2-htonl)
+	@(deprecated="Use endian specific integers instead, https://odin-lang.org/docs/overview/#basic-types")
+	htonl :: proc(hostlong: c_ulong) -> c_ulong ---
+	// [MS-Docs](https://learn.microsoft.com/en-us/windows/win32/api/winsock2/nf-winsock2-htons)
+	@(deprecated="Use endian specific integers instead, https://odin-lang.org/docs/overview/#basic-types")
+	htons :: proc(hostshort: c_ushort) -> c_ushort ---
 }
