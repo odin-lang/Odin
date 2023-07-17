@@ -6258,14 +6258,18 @@ gb_internal CallArgumentData check_call_arguments_proc_group(CheckerContext *c, 
 			}
 			isize index = i;
 
+			ValidIndexAndScore item = {};
+			item.score = data.score;
+
 			if (data.gen_entity != nullptr) {
 				array_add(&proc_entities, data.gen_entity);
 				index = proc_entities.count-1;
+
+				// prefer non-polymorphic procedures over polymorphic
+				item.score += assign_score_function(1);
 			}
 
-			ValidIndexAndScore item = {};
 			item.index = index;
-			item.score = data.score;
 			array_add(&valids, item);
 		}
 	}
@@ -6348,8 +6352,6 @@ gb_internal CallArgumentData check_call_arguments_proc_group(CheckerContext *c, 
 			String name = proc->token.string;
 			max_name_length = gb_max(max_name_length, prefix.len + prefix_sep.len + name.len);
 
-
-
 			gbString pt;
 			if (t->Proc.node != nullptr) {
 				pt = expr_to_string(t->Proc.node);
@@ -6417,8 +6419,8 @@ gb_internal CallArgumentData check_call_arguments_proc_group(CheckerContext *c, 
 		error(operand->expr, "Ambiguous procedure group call '%s' that match with the given arguments", expr_name);
 		print_argument_types();
 
-		for (isize i = 0; i < valids.count; i++) {
-			Entity *proc = proc_entities[valids[i].index];
+		for (auto const &valid : valids) {
+			Entity *proc = proc_entities[valid.index];
 			GB_ASSERT(proc != nullptr);
 			TokenPos pos = proc->token.pos;
 			Type *t = base_type(proc->type); GB_ASSERT(t->kind == Type_Proc);
