@@ -14,6 +14,7 @@ set COMMON=-collection:tests=..\..
 ..\..\..\odin build ..\test_issue_2113.odin %COMMON% -file -debug || exit /b
 ..\..\..\odin test ..\test_issue_2466.odin %COMMON% -file || exit /b
 ..\..\..\odin test ..\test_issue_2615.odin %COMMON% -file || exit /b
+..\..\..\odin test ..\test_issue_2637.odin %COMMON% -file || exit /b
 
 @echo off
 
