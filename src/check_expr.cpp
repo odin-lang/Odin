@@ -6136,7 +6136,6 @@ gb_internal CallArgumentData check_call_arguments_proc_group(CheckerContext *c, 
 	{
 		// NOTE(bill, 2019-07-13): This code is used to improve the type inference for procedure groups
 		// where the same positional parameter has the same type value (and ellipsis)
-		bool proc_arg_count_all_equal = true;
 		isize proc_arg_count = -1;
 		for (Entity *p : procs) {
 			Type *pt = base_type(p->type);
@@ -6144,15 +6143,12 @@ gb_internal CallArgumentData check_call_arguments_proc_group(CheckerContext *c, 
 				if (proc_arg_count < 0) {
 					proc_arg_count = pt->Proc.param_count;
 				} else {
-					if (proc_arg_count != pt->Proc.param_count) {
-						proc_arg_count_all_equal = false;
-						break;
-					}
+					proc_arg_count = gb_min(proc_arg_count, pt->Proc.param_count);
 				}
 			}
 		}
 
-		if (proc_arg_count >= 0 && proc_arg_count_all_equal) {
+		if (proc_arg_count >= 0) {
 			lhs_count = proc_arg_count;
 			if (lhs_count > 0)  {
 				lhs = gb_alloc_array(heap_allocator(), Entity *, lhs_count);
@@ -6258,14 +6254,18 @@ gb_internal CallArgumentData check_call_arguments_proc_group(CheckerContext *c, 
 			}
 			isize index = i;
 
+			ValidIndexAndScore item = {};
+			item.score = data.score;
+
 			if (data.gen_entity != nullptr) {
 				array_add(&proc_entities, data.gen_entity);
 				index = proc_entities.count-1;
+
+				// prefer non-polymorphic procedures over polymorphic
+				item.score += assign_score_function(1);
 			}
 
-			ValidIndexAndScore item = {};
 			item.index = index;
-			item.score = data.score;
 			array_add(&valids, item);
 		}
 	}
@@ -6348,8 +6348,6 @@ gb_internal CallArgumentData check_call_arguments_proc_group(CheckerContext *c, 
 			String name = proc->token.string;
 			max_name_length = gb_max(max_name_length, prefix.len + prefix_sep.len + name.len);
 
-
-
 			gbString pt;
 			if (t->Proc.node != nullptr) {
 				pt = expr_to_string(t->Proc.node);
@@ -6417,8 +6415,8 @@ gb_internal CallArgumentData check_call_arguments_proc_group(CheckerContext *c, 
 		error(operand->expr, "Ambiguous procedure group call '%s' that match with the given arguments", expr_name);
 		print_argument_types();
 
-		for (isize i = 0; i < valids.count; i++) {
-			Entity *proc = proc_entities[valids[i].index];
+		for (auto const &valid : valids) {
+			Entity *proc = proc_entities[valid.index];
 			GB_ASSERT(proc != nullptr);
 			TokenPos pos = proc->token.pos;
 			Type *t = base_type(proc->type); GB_ASSERT(t->kind == Type_Proc);
