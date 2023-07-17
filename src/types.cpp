@@ -3081,7 +3081,7 @@ gb_internal Selection lookup_field_with_selection(Type *type_, String field_name
 				mutex_lock(md->mutex);
 				defer (mutex_unlock(md->mutex));
 				for (TypeNameObjCMetadataEntry const &entry : md->value_entries) {
-					GB_ASSERT(entry.entity->kind == Entity_Procedure);
+					GB_ASSERT(entry.entity->kind == Entity_Procedure || entry.entity->kind == Entity_ProcGroup);
 					if (entry.name == field_name) {
 						sel.entity = entry.entity;
 						sel.pseudo_field = true;
