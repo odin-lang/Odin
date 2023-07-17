@@ -1133,7 +1133,7 @@ foreign lib {
 
 	SetGesturesEnabled     :: proc(flags: Gestures) ---          // Enable a set of gestures using flags
 	IsGestureDetected      :: proc(gesture: Gesture) -> bool --- // Check if a gesture have been detected
-	GetGestureDetected     :: proc() -> Gesture ---              // Get latest detected gesture
+	GetGestureDetected     :: proc() -> Gestures ---             // Get latest detected gesture
 	GetGestureHoldDuration :: proc() -> f32 ---                  // Get gesture hold time in milliseconds
 	GetGestureDragVector   :: proc() -> Vector2 ---              // Get gesture drag vector
 	GetGestureDragAngle    :: proc() -> f32 ---                  // Get gesture drag angle

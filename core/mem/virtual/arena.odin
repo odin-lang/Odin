@@ -242,7 +242,7 @@ arena_growing_bootstrap_new_by_name :: proc($T: typeid, $field_name: string, min
 	return arena_growing_bootstrap_new_by_offset(T, offset_of_by_string(T, field_name), minimum_block_size)
 }
 
-// Ability to bootstrap allocate a struct with an arena within the struct itself using the growing variant strategy.
+// Ability to bootstrap allocate a struct with an arena within the struct itself using the static variant strategy.
 @(require_results)
 arena_static_bootstrap_new_by_offset :: proc($T: typeid, offset_to_arena: uintptr, reserved: uint) -> (ptr: ^T, err: Allocator_Error) {
 	bootstrap: Arena
@@ -258,7 +258,7 @@ arena_static_bootstrap_new_by_offset :: proc($T: typeid, offset_to_arena: uintpt
 	return
 }
 
-// Ability to bootstrap allocate a struct with an arena within the struct itself using the growing variant strategy.
+// Ability to bootstrap allocate a struct with an arena within the struct itself using the static variant strategy.
 @(require_results)
 arena_static_bootstrap_new_by_name :: proc($T: typeid, $field_name: string, reserved: uint) -> (ptr: ^T, err: Allocator_Error) {
 	return arena_static_bootstrap_new_by_offset(T, offset_of_by_string(T, field_name), reserved)
@@ -271,7 +271,7 @@ arena_allocator :: proc(arena: ^Arena) -> mem.Allocator {
 	return mem.Allocator{arena_allocator_proc, arena}
 }
 
-// The allocator procedured by an `Allocator` produced by `arena_allocator`
+// The allocator procedure used by an `Allocator` produced by `arena_allocator`
 arena_allocator_proc :: proc(allocator_data: rawptr, mode: mem.Allocator_Mode,
                              size, alignment: int,
                              old_memory: rawptr, old_size: int,
@@ -328,7 +328,7 @@ arena_allocator_proc :: proc(allocator_data: rawptr, mode: mem.Allocator_Mode,
 
 
 
-// An `Arena_Temp` is a way to produce temporary watermarks to reset a arena to a previous state.
+// An `Arena_Temp` is a way to produce temporary watermarks to reset an arena to a previous state.
 // All uses of an `Arena_Temp` must be handled by ending them with `arena_temp_end` or ignoring them with `arena_temp_ignore`.
 Arena_Temp :: struct {
 	arena: ^Arena,
