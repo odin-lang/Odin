@@ -941,7 +941,7 @@ TB_API void tb_inst_memcpy(TB_Function* f, TB_Node* dst, TB_Node* src, TB_Node* 
 // result = base + (index * stride)
 TB_API TB_Node* tb_inst_array_access(TB_Function* f, TB_Node* base, TB_Node* index, int64_t stride);
 
-// result = base +
+// result = base + offset
 // where base is a pointer
 TB_API TB_Node* tb_inst_member_access(TB_Function* f, TB_Node* base, int64_t offset);
 

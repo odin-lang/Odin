@@ -145,6 +145,8 @@ struct cgProcedure {
 	bool         is_entry_point;
 	bool         is_startup;
 
+	TB_DebugType *debug_type;
+
 	cgValue value;
 
 	Ast *curr_stmt;

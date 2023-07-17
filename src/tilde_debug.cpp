@@ -12,6 +12,20 @@ gb_internal TB_DebugType *cg_debug_type(cgModule *m, Type *type) {
 	return res;
 }
 
+gb_internal TB_DebugType *cg_debug_type_for_proc(cgModule *m, Type *type) {
+	GB_ASSERT(is_type_proc(type));
+	TB_DebugType **func_found = nullptr;
+	TB_DebugType *func_ptr = cg_debug_type(m, type);
+	GB_ASSERT(func_ptr != nullptr);
+
+	mutex_lock(&m->debug_type_mutex);
+	func_found = map_get(&m->proc_debug_type_map, type);
+	mutex_unlock(&m->debug_type_mutex);
+	GB_ASSERT(func_found != nullptr);
+	return *func_found;
+}
+
+
 gb_internal TB_DebugType *cg_debug_type_internal_record(cgModule *m, Type *type, String const &record_name) {
 	Type *bt = base_type(type);
 	switch (bt->kind) {
@@ -345,7 +359,7 @@ gb_internal TB_DebugType *cg_debug_type_internal(cgModule *m, Type *type) {
 				}
 			}
 
-			if (is_odin_cc) {
+			if (pt->calling_convention == ProcCC_Odin) {
 				// `context` ptr
 				param_count += 1;
 			}
@@ -406,8 +420,14 @@ gb_internal TB_DebugType *cg_debug_type_internal(cgModule *m, Type *type) {
 				}
 			}
 
-			GB_ASSERT(param_index  == param_count);
-			GB_ASSERT(return_index == return_count);
+			if (pt->calling_convention == ProcCC_Odin) {
+				Type *type = t_context_ptr;
+				String name = str_lit("__.context_ptr");
+				params[param_index++] = tb_debug_create_field(m->mod, cg_debug_type(m, type), name.len, cast(char const *)name.text, 0);
+			}
+
+			GB_ASSERT_MSG(param_index  == param_count,  "%td vs %td for %s", param_index,  param_count, type_to_string(type));
+			GB_ASSERT_MSG(return_index == return_count, "%td vs %td for %s", return_index, return_count, type_to_string(type));
 
 			return func_ptr;
 		}

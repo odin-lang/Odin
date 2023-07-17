@@ -326,8 +326,16 @@ gb_internal cgProcedure *cg_procedure_create(cgModule *m, Entity *entity, bool i
 	if (p->symbol == nullptr)  {
 		TB_Arena *arena = tb_default_arena();
 		p->func = tb_function_create(m->mod, link_name.len, cast(char const *)link_name.text, linkage, TB_COMDAT_NONE);
-		p->proto = cg_procedure_type_as_prototype(m, p->type);
-		tb_function_set_prototype(p->func, p->proto, arena);
+
+		// p->proto = cg_procedure_type_as_prototype(m, p->type);
+		// tb_function_set_prototype(p->func, p->proto, arena);
+
+		size_t out_param_count = 0;
+		p->debug_type = cg_debug_type_for_proc(m, p->type);
+		TB_Node **params = tb_function_set_prototype_from_dbg(p->func, p->debug_type, arena, &out_param_count);
+		gb_unused(params);
+		p->proto = tb_function_get_prototype(p->func);
+
 		p->symbol = cast(TB_Symbol *)p->func;
 	}
 
@@ -373,8 +381,16 @@ gb_internal cgProcedure *cg_procedure_create_dummy(cgModule *m, String const &li
 
 	TB_Arena *arena = tb_default_arena();
 	p->func = tb_function_create(m->mod, link_name.len, cast(char const *)link_name.text, linkage, TB_COMDAT_NONE);
-	p->proto = cg_procedure_type_as_prototype(m, p->type);
-	tb_function_set_prototype(p->func, p->proto, arena);
+
+	// p->proto = cg_procedure_type_as_prototype(m, p->type);
+	// tb_function_set_prototype(p->func, p->proto, arena);
+	size_t out_param_count = 0;
+	p->debug_type = cg_debug_type_for_proc(m, p->type);
+	TB_Node **params = tb_function_set_prototype_from_dbg(p->func, p->debug_type, arena, &out_param_count);
+	gb_unused(params);
+	p->proto = tb_function_get_prototype(p->func);
+
+
 	p->symbol = cast(TB_Symbol *)p->func;
 
 	cgValue proc_value = cg_value(p->symbol, p->type);
