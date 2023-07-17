@@ -4171,7 +4171,7 @@ gb_internal lbAddr lb_build_addr_compound_lit(lbProcedure *p, Ast *expr) {
 
 				// HACK TODO(bill): THIS IS A MASSIVE HACK!!!!
 				if (is_type_union(ft) && !are_types_identical(fet, ft) && !is_type_untyped(fet)) {
-					GB_ASSERT_MSG(union_variant_index(ft, fet) > 0, "%s", type_to_string(fet));
+					GB_ASSERT_MSG(union_variant_index(ft, fet) >= 0, "%s", type_to_string(fet));
 
 					lb_emit_store_union_variant(p, gep, field_expr, fet);
 				} else {
