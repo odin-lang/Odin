@@ -30,10 +30,10 @@ struct cgModule;
 
 
 enum cgValueKind : u32 {
-	cgValue_Value,
-	cgValue_Addr,
-	cgValue_Symbol,
-	cgValue_Multi,
+	cgValue_Value,  // rvalue
+	cgValue_Addr,   // lvalue
+	cgValue_Symbol, // global
+	cgValue_Multi,  // multiple values
 };
 
 struct cgValueMulti;
@@ -267,3 +267,8 @@ gb_internal cgValue cg_emit_array_ep(cgProcedure *p, cgValue s, cgValue index);
 gb_internal cgValue cg_emit_array_epi(cgProcedure *p, cgValue s, i64 index);
 gb_internal cgValue cg_emit_struct_ep(cgProcedure *p, cgValue s, i64 index);
 gb_internal cgValue cg_emit_deep_field_gep(cgProcedure *p, cgValue e, Selection const &sel);
+
+gb_internal cgValue cg_emit_conv(cgProcedure *p, cgValue value, Type *t);
+gb_internal cgValue cg_emit_comp_against_nil(cgProcedure *p, TokenKind op_kind, cgValue x);
+gb_internal cgValue cg_emit_comp(cgProcedure *p, TokenKind op_kind, cgValue left, cgValue right);
+gb_internal cgValue cg_emit_arith(cgProcedure *p, TokenKind op, cgValue lhs, cgValue rhs, Type *type);
