@@ -185,13 +185,13 @@ gb_internal TB_DebugType *cg_debug_type_internal(cgModule *m, Type *type) {
 		case Basic_u32:           return tb_debug_get_integer(m->mod, is_signed, bits);
 		case Basic_i64:           return tb_debug_get_integer(m->mod, is_signed, bits);
 		case Basic_u64:           return tb_debug_get_integer(m->mod, is_signed, bits);
-		case Basic_i128:          return tb_debug_get_integer(m->mod, is_signed, 64/*bits*/);
-		case Basic_u128:          return tb_debug_get_integer(m->mod, is_signed, 64/*bits*/);
+		case Basic_i128:          return tb_debug_get_integer(m->mod, is_signed, bits);
+		case Basic_u128:          return tb_debug_get_integer(m->mod, is_signed, bits);
 		case Basic_rune:          return tb_debug_get_integer(m->mod, is_signed, bits);
 
 		case Basic_f16:           return tb_debug_get_integer(m->mod, false, bits);
-		case Basic_f32:           return tb_debug_get_float(m->mod, TB_FLT_32);
-		case Basic_f64:           return tb_debug_get_float(m->mod,TB_FLT_64);
+		case Basic_f32:           return tb_debug_get_float(m->mod,   TB_FLT_32);
+		case Basic_f64:           return tb_debug_get_float(m->mod,   TB_FLT_64);
 
 		case Basic_complex32:
 		case Basic_complex64:
@@ -263,7 +263,7 @@ gb_internal TB_DebugType *cg_debug_type_internal(cgModule *m, Type *type) {
 				tb_debug_record_end(record, size, align);
 				return record;
 			}
-		case Basic_typeid:        return tb_debug_get_integer(m->mod, is_signed, bits);
+		case Basic_typeid: return tb_debug_get_integer(m->mod, false, bits);
 
 		case Basic_i16le:         return tb_debug_get_integer(m->mod, is_signed, bits);
 		case Basic_u16le:         return tb_debug_get_integer(m->mod, is_signed, bits);
@@ -271,23 +271,23 @@ gb_internal TB_DebugType *cg_debug_type_internal(cgModule *m, Type *type) {
 		case Basic_u32le:         return tb_debug_get_integer(m->mod, is_signed, bits);
 		case Basic_i64le:         return tb_debug_get_integer(m->mod, is_signed, bits);
 		case Basic_u64le:         return tb_debug_get_integer(m->mod, is_signed, bits);
-		case Basic_i128le:        return tb_debug_get_integer(m->mod, is_signed, 64/*bits*/);
-		case Basic_u128le:        return tb_debug_get_integer(m->mod, is_signed, 64/*bits*/);
+		case Basic_i128le:        return tb_debug_get_integer(m->mod, is_signed, bits);
+		case Basic_u128le:        return tb_debug_get_integer(m->mod, is_signed, bits);
 		case Basic_i16be:         return tb_debug_get_integer(m->mod, is_signed, bits);
 		case Basic_u16be:         return tb_debug_get_integer(m->mod, is_signed, bits);
 		case Basic_i32be:         return tb_debug_get_integer(m->mod, is_signed, bits);
 		case Basic_u32be:         return tb_debug_get_integer(m->mod, is_signed, bits);
 		case Basic_i64be:         return tb_debug_get_integer(m->mod, is_signed, bits);
 		case Basic_u64be:         return tb_debug_get_integer(m->mod, is_signed, bits);
-		case Basic_i128be:        return tb_debug_get_integer(m->mod, is_signed, 64/*bits*/);
-		case Basic_u128be:        return tb_debug_get_integer(m->mod, is_signed, 64/*bits*/);
+		case Basic_i128be:        return tb_debug_get_integer(m->mod, is_signed, bits);
+		case Basic_u128be:        return tb_debug_get_integer(m->mod, is_signed, bits);
 
 		case Basic_f16le:         return tb_debug_get_integer(m->mod, false, bits);
-		case Basic_f32le:         return tb_debug_get_float(m->mod, TB_FLT_32);
-		case Basic_f64le:         return tb_debug_get_float(m->mod,TB_FLT_64);
+		case Basic_f32le:         return tb_debug_get_float(m->mod,   TB_FLT_32);
+		case Basic_f64le:         return tb_debug_get_float(m->mod,   TB_FLT_64);
 		case Basic_f16be:         return tb_debug_get_integer(m->mod, false, bits);
-		case Basic_f32be:         return tb_debug_get_float(m->mod, TB_FLT_32);
-		case Basic_f64be:         return tb_debug_get_float(m->mod,TB_FLT_64);
+		case Basic_f32be:         return tb_debug_get_float(m->mod,   TB_FLT_32);
+		case Basic_f64be:         return tb_debug_get_float(m->mod,   TB_FLT_64);
 		}
 		break;
 	case Type_Generic:
@@ -350,8 +350,9 @@ gb_internal TB_DebugType *cg_debug_type_internal(cgModule *m, Type *type) {
 				}
 			}
 
-			if (pt->results) {
+			if (pt->result_count > 0) {
 				if (is_odin_cc) {
+					// Split returns
 					param_count += pt->result_count-1;
 					return_count = 1;
 				} else {
@@ -392,8 +393,10 @@ gb_internal TB_DebugType *cg_debug_type_internal(cgModule *m, Type *type) {
 				}
 			}
 
-			if (pt->results) {
+			if (pt->result_count) {
+				GB_ASSERT(pt->results);
 				if (is_odin_cc) {
+					// Split Returns
 					for (isize i = 0; i < pt->results->Tuple.variables.count-1; i++) {
 						Entity *e = pt->results->Tuple.variables[i];
 						GB_ASSERT(e->kind == Entity_Variable);

@@ -818,6 +818,7 @@ TB_API TB_DebugType* tb_debug_get_integer(TB_Module* m, bool is_signed, int bits
 TB_API TB_DebugType* tb_debug_get_float(TB_Module* m, TB_FloatFormat fmt);
 TB_API TB_DebugType* tb_debug_create_ptr(TB_Module* m, TB_DebugType* base);
 TB_API TB_DebugType* tb_debug_create_array(TB_Module* m, TB_DebugType* base, size_t count);
+TB_API TB_DebugType* tb_debug_create_alias(TB_Module* m, TB_DebugType* base, ptrdiff_t len, const char* tag);
 TB_API TB_DebugType* tb_debug_create_struct(TB_Module* m, ptrdiff_t len, const char* tag);
 TB_API TB_DebugType* tb_debug_create_union(TB_Module* m, ptrdiff_t len, const char* tag);
 TB_API TB_DebugType* tb_debug_create_field(TB_Module* m, TB_DebugType* type, ptrdiff_t len, const char* name, TB_CharUnits offset);
@@ -883,6 +884,7 @@ TB_API const char* tb_symbol_get_name(TB_Symbol* s);
 //
 // returns the parameters
 TB_API TB_Node** tb_function_set_prototype_from_dbg(TB_Function* f, TB_DebugType* dbg, TB_Arena* arena, size_t* out_param_count);
+TB_API TB_FunctionPrototype* tb_prototype_from_dbg(TB_Module* m, TB_DebugType* dbg);
 
 // if arena is NULL, defaults to module arena which is freed on tb_free_thread_resources
 TB_API void tb_function_set_prototype(TB_Function* f, TB_FunctionPrototype* p, TB_Arena* arena);

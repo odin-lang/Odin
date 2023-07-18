@@ -8,8 +8,7 @@
 #include "tilde/tb.h"
 
 #define TB_TYPE_F16    TB_DataType{ { TB_INT, 0, 16 } }
-// #define TB_TYPE_I128   TB_DataType{ { TB_INT, 0, 128 } }
-#define TB_TYPE_I128   TB_TYPE_INTN(64)
+#define TB_TYPE_I128   TB_DataType{ { TB_INT, 0, 128 } }
 #define TB_TYPE_INT    TB_TYPE_INTN(cast(u16)(8*build_context.int_size))
 #define TB_TYPE_INTPTR TB_TYPE_INTN(cast(u16)(8*build_context.ptr_size))
 
@@ -190,6 +189,9 @@ struct cgModule {
 	RecursiveMutex debug_type_mutex;
 	PtrMap<Type *, TB_DebugType *> debug_type_map;
 	PtrMap<Type *, TB_DebugType *> proc_debug_type_map; // not pointer to
+
+	RecursiveMutex proc_proto_mutex;
+	PtrMap<Type *, TB_FunctionPrototype *> proc_proto_map;
 
 	PtrMap<uintptr, TB_FileID> file_id_map; // Key: AstFile.id (i32 cast to uintptr)
 

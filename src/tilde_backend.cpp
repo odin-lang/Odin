@@ -411,6 +411,7 @@ gb_internal cgModule *cg_module_create(Checker *c) {
 
 	map_init(&m->debug_type_map);
 	map_init(&m->proc_debug_type_map);
+	map_init(&m->proc_proto_map);
 
 
 	for_array(id, global_files) {
@@ -429,6 +430,7 @@ gb_internal void cg_module_destroy(cgModule *m) {
 	map_destroy(&m->file_id_map);
 	map_destroy(&m->debug_type_map);
 	map_destroy(&m->proc_debug_type_map);
+	map_destroy(&m->proc_proto_map);
 
 	tb_module_destroy(m->mod);
 }
