@@ -799,6 +799,9 @@ gb_internal cgValue cg_emit_conv(cgProcedure *p, cgValue value, Type *t) {
 	}
 
 	TB_DataType st = cg_data_type(src);
+	if (value.kind == cgValue_Value && !TB_IS_VOID_TYPE(value.node->dt)) {
+		st = value.node->dt;
+	}
 	TB_DataType dt = cg_data_type(t);
 
 	if (is_type_integer(src) && is_type_integer(dst)) {
@@ -1751,10 +1754,9 @@ gb_internal cgValue cg_build_binary_expr(cgProcedure *p, Ast *expr) {
 			}
 			if (left.node == nullptr)  left  = cg_build_expr(p, be->left);
 			if (right.node == nullptr) right = cg_build_expr(p, be->right);
-			GB_PANIC("TODO(bill): cg_emit_comp");
-			// cgValue cmp = cg_emit_comp(p, be->op.kind, left, right);
-			// Type *type = default_type(tv.type);
-			// return cg_emit_conv(p, cmp, type);
+			cgValue cmp = cg_emit_comp(p, be->op.kind, left, right);
+			Type *type = default_type(tv.type);
+			return cg_emit_conv(p, cmp, type);
 		}
 
 	case Token_CmpAnd:
@@ -1824,6 +1826,60 @@ gb_internal cgValue cg_build_binary_expr(cgProcedure *p, Ast *expr) {
 	return {};
 }
 
+gb_internal cgValue cg_build_cond(cgProcedure *p, Ast *cond, TB_Node *true_block, TB_Node *false_block) {
+	cond = unparen_expr(cond);
+
+	GB_ASSERT(cond != nullptr);
+	GB_ASSERT(true_block  != nullptr);
+	GB_ASSERT(false_block != nullptr);
+
+	// Use to signal not to do compile time short circuit for consts
+	cgValue no_comptime_short_circuit = {};
+
+	switch (cond->kind) {
+	case_ast_node(ue, UnaryExpr, cond);
+		if (ue->op.kind == Token_Not) {
+			cgValue cond_val = cg_build_cond(p, ue->expr, false_block, true_block);
+			return cond_val;
+			// if (cond_val.value && LLVMIsConstant(cond_val.value)) {
+			// 	return cg_const_bool(p->module, cond_val.type, LLVMConstIntGetZExtValue(cond_val.value) == 0);
+			// }
+			// return no_comptime_short_circuit;
+		}
+	case_end;
+
+	case_ast_node(be, BinaryExpr, cond);
+		if (be->op.kind == Token_CmpAnd) {
+			TB_Node *block = tb_inst_region(p->func);
+			tb_inst_set_region_name(block, -1, "cmp.and");
+			cg_build_cond(p, be->left, block, false_block);
+			tb_inst_set_control(p->func, block);
+			cg_build_cond(p, be->right, true_block, false_block);
+			return no_comptime_short_circuit;
+		} else if (be->op.kind == Token_CmpOr) {
+			TB_Node *block = tb_inst_region(p->func);
+			tb_inst_set_region_name(block, -1, "cmp.or");
+			cg_build_cond(p, be->left, true_block, block);
+			tb_inst_set_control(p->func, block);
+			cg_build_cond(p, be->right, true_block, false_block);
+			return no_comptime_short_circuit;
+		}
+	case_end;
+	}
+
+	cgValue v = {};
+	if (cg_is_expr_untyped_const(cond)) {
+		v = cg_expr_untyped_const_to_typed(p, cond, t_llvm_bool);
+	} else {
+		v = cg_build_expr(p, cond);
+	}
+
+	v = cg_emit_conv(p, v, t_llvm_bool);
+
+	tb_inst_if(p->func, v.node, true_block, false_block);
+
+	return v;
+}
 
 gb_internal cgValue cg_build_expr_internal(cgProcedure *p, Ast *expr);
 gb_internal cgValue cg_build_expr(cgProcedure *p, Ast *expr) {
@@ -1994,7 +2050,47 @@ gb_internal cgValue cg_build_expr_internal(cgProcedure *p, Ast *expr) {
 
 
 	case_ast_node(te, TernaryIfExpr, expr);
-		GB_PANIC("TODO(bill): TernaryIfExpr");
+		cgValue incoming_values[2] = {};
+		TB_Node *incoming_regions[2] = {};
+
+		TB_Node *then  = tb_inst_region(p->func);
+		TB_Node *done  = tb_inst_region(p->func);
+		TB_Node *else_ = tb_inst_region(p->func);
+		tb_inst_set_region_name(then,  -1, "if.then");
+		tb_inst_set_region_name(done,  -1, "if.done");
+		tb_inst_set_region_name(else_, -1, "if.else");
+
+		cg_build_cond(p, te->cond, then, else_);
+		tb_inst_set_control(p->func, then);
+
+		Type *type = default_type(type_of_expr(expr));
+
+		incoming_values[0] = cg_emit_conv(p, cg_build_expr(p, te->x), type);
+		incoming_regions[0] = tb_inst_get_control(p->func);
+
+		tb_inst_goto(p->func, done);
+		tb_inst_set_control(p->func, else_);
+
+		incoming_values[1] = cg_emit_conv(p, cg_build_expr(p, te->y), type);
+		incoming_regions[1] = tb_inst_get_control(p->func);
+
+		tb_inst_goto(p->func, done);
+		tb_inst_set_control(p->func, done);
+
+		GB_ASSERT(incoming_values[0].kind == cgValue_Value ||
+		          incoming_values[0].kind == cgValue_Addr);
+		GB_ASSERT(incoming_values[0].kind == incoming_values[1].kind);
+		cgValue res = {};
+		res.kind = incoming_values[0].kind;
+		res.type = type;
+		TB_DataType dt = cg_data_type(type);
+		if (res.kind == cgValue_Addr) {
+			dt = TB_TYPE_PTR;
+		}
+		res.node = tb_inst_incomplete_phi(p->func, dt, done, 2);
+		tb_inst_add_phi_operand(p->func, res.node, incoming_regions[0], incoming_values[0].node);
+		tb_inst_add_phi_operand(p->func, res.node, incoming_regions[1], incoming_values[1].node);
+		return res;
 	case_end;
 
 	case_ast_node(te, TernaryWhenExpr, expr);
