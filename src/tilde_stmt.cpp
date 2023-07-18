@@ -966,13 +966,32 @@ gb_internal void cg_build_stmt(cgProcedure *p, Ast *node) {
 			for (Ast *name : vd->names) {
 				if (!is_blank_ident(name)) {
 					Entity *e = entity_of_node(name);
-					bool zero_init = true;
-					cgAddr addr = cg_add_local(p, e->type, e, zero_init);
+					cgAddr addr = cg_add_local(p, e->type, e, true);
 					gb_unused(addr);
 				}
 			}
 		} else {
-			GB_PANIC("TODO multiple variables");
+			auto lvals = slice_make<cgAddr>(temporary_allocator(), vd->names.count);
+			auto inits = array_make<cgValue>(temporary_allocator(), 0, lvals.count);
+			for (Ast *rhs : values) {
+				rhs = unparen_expr(rhs);
+				cgValue init = cg_build_expr(p, rhs);
+				cg_append_tuple_values(p, &inits, init);
+			}
+
+			for_array(i, vd->names) {
+				Ast *name = vd->names[i];
+				if (!is_blank_ident(name)) {
+					Entity *e = entity_of_node(name);
+					lvals[i] = cg_add_local(p, e->type, e, true);
+				}
+			}
+			GB_ASSERT(lvals.count == inits.count);
+			for_array(i, inits) {
+				cgAddr lval = lvals[i];
+				cgValue init = inits[i];
+				cg_addr_store(p, lval, init);
+			}
 		}
 	case_end;
 

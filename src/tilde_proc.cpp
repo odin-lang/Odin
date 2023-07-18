@@ -242,7 +242,8 @@ gb_internal void cg_procedure_end(cgProcedure *p) {
 	if (tb_inst_get_control(p->func)) {
 		tb_inst_ret(p->func, 0, nullptr);
 	}
-	if (p->name == "main") {
+	// if (p->name == "main") {
+	if (p->name == "bug.main") {
 		TB_Arena *arena = tb_default_arena();
 		defer (arena->free(arena));
 		TB_FuncOpt *opt = tb_funcopt_enter(p->func, arena);

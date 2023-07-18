@@ -7,6 +7,19 @@ gb_internal cgValue cg_flatten_value(cgProcedure *p, cgValue value) {
 	return value;
 }
 
+gb_internal bool cg_is_expr_untyped_const(Ast *expr) {
+	auto const &tv = type_and_value_of_expr(expr);
+	if (is_type_untyped(tv.type)) {
+		return tv.value.kind != ExactValue_Invalid;
+	}
+	return false;
+}
+gb_internal cgValue cg_expr_untyped_const_to_typed(cgProcedure *p, Ast *expr, Type *t) {
+	GB_ASSERT(is_type_typed(t));
+	auto const &tv = type_and_value_of_expr(expr);
+	return cg_const_value(p, t, tv.value);
+}
+
 gb_internal cgContextData *cg_push_context_onto_stack(cgProcedure *p, cgAddr ctx) {
 	ctx.kind = cgAddr_Context;
 	cgContextData *cd = array_add_and_get(&p->context_stack);
@@ -909,7 +922,173 @@ gb_internal cgAddr cg_build_addr_slice_expr(cgProcedure *p, Ast *expr) {
 	return {};
 }
 
+gb_internal cgValue cg_build_binary_expr(cgProcedure *p, Ast *expr) {
+	ast_node(be, BinaryExpr, expr);
 
+	TypeAndValue tv = type_and_value_of_expr(expr);
+
+	if (is_type_matrix(be->left->tav.type) || is_type_matrix(be->right->tav.type)) {
+		cgValue left = cg_build_expr(p, be->left);
+		cgValue right = cg_build_expr(p, be->right);
+		GB_PANIC("TODO(bill): cg_emit_arith_matrix");
+		// return cg_emit_arith_matrix(p, be->op.kind, left, right, default_type(tv.type), false);
+	}
+
+
+	switch (be->op.kind) {
+	case Token_Add:
+	case Token_Sub:
+	case Token_Mul:
+	case Token_Quo:
+	case Token_Mod:
+	case Token_ModMod:
+	case Token_And:
+	case Token_Or:
+	case Token_Xor:
+	case Token_AndNot: {
+		Type *type = default_type(tv.type);
+		cgValue left = cg_build_expr(p, be->left);
+		cgValue right = cg_build_expr(p, be->right);
+		return cg_emit_arith(p, be->op.kind, left, right, type);
+	}
+
+	case Token_Shl:
+	case Token_Shr: {
+		cgValue left, right;
+		Type *type = default_type(tv.type);
+		left = cg_build_expr(p, be->left);
+
+		if (cg_is_expr_untyped_const(be->right)) {
+			// NOTE(bill): RHS shift operands can still be untyped
+			// Just bypass the standard cg_build_expr
+			right = cg_expr_untyped_const_to_typed(p, be->right, type);
+		} else {
+			right = cg_build_expr(p, be->right);
+		}
+		return cg_emit_arith(p, be->op.kind, left, right, type);
+	}
+
+	case Token_CmpEq:
+	case Token_NotEq:
+		GB_PANIC("TODO(bill): comparisons");
+		// if (is_type_untyped_nil(be->right->tav.type)) {
+		// 	// `x == nil` or `x != nil`
+		// 	cgValue left = cg_build_expr(p, be->left);
+		// 	cgValue cmp = cg_emit_comp_against_nil(p, be->op.kind, left);
+		// 	Type *type = default_type(tv.type);
+		// 	return cg_emit_conv(p, cmp, type);
+		// } else if (is_type_untyped_nil(be->left->tav.type)) {
+		// 	// `nil == x` or `nil != x`
+		// 	cgValue right = cg_build_expr(p, be->right);
+		// 	cgValue cmp = cg_emit_comp_against_nil(p, be->op.kind, right);
+		// 	Type *type = default_type(tv.type);
+		// 	return cg_emit_conv(p, cmp, type);
+		// } else if (cg_is_empty_string_constant(be->right)) {
+		// 	// `x == ""` or `x != ""`
+		// 	cgValue s = cg_build_expr(p, be->left);
+		// 	s = cg_emit_conv(p, s, t_string);
+		// 	cgValue len = cg_string_len(p, s);
+		// 	cgValue cmp = cg_emit_comp(p, be->op.kind, len, cg_const_int(p->module, t_int, 0));
+		// 	Type *type = default_type(tv.type);
+		// 	return cg_emit_conv(p, cmp, type);
+		// } else if (cg_is_empty_string_constant(be->left)) {
+		// 	// `"" == x` or `"" != x`
+		// 	cgValue s = cg_build_expr(p, be->right);
+		// 	s = cg_emit_conv(p, s, t_string);
+		// 	cgValue len = cg_string_len(p, s);
+		// 	cgValue cmp = cg_emit_comp(p, be->op.kind, len, cg_const_int(p->module, t_int, 0));
+		// 	Type *type = default_type(tv.type);
+		// 	return cg_emit_conv(p, cmp, type);
+		// }
+		/*fallthrough*/
+	case Token_Lt:
+	case Token_LtEq:
+	case Token_Gt:
+	case Token_GtEq:
+		{
+			cgValue left = {};
+			cgValue right = {};
+
+			if (be->left->tav.mode == Addressing_Type) {
+				left = cg_typeid(p->module, be->left->tav.type);
+			}
+			if (be->right->tav.mode == Addressing_Type) {
+				right = cg_typeid(p->module, be->right->tav.type);
+			}
+			if (left.node == nullptr)  left  = cg_build_expr(p, be->left);
+			if (right.node == nullptr) right = cg_build_expr(p, be->right);
+			GB_PANIC("TODO(bill): cg_emit_comp");
+			// cgValue cmp = cg_emit_comp(p, be->op.kind, left, right);
+			// Type *type = default_type(tv.type);
+			// return cg_emit_conv(p, cmp, type);
+		}
+
+	case Token_CmpAnd:
+	case Token_CmpOr:
+		GB_PANIC("TODO(bill): cg_emit_logical_binary_expr");
+		// return cg_emit_logical_binary_expr(p, be->op.kind, be->left, be->right, tv.type);
+
+	case Token_in:
+	case Token_not_in:
+		{
+			cgValue left = cg_build_expr(p, be->left);
+			cgValue right = cg_build_expr(p, be->right);
+			Type *rt = base_type(right.type);
+			if (is_type_pointer(rt)) {
+				right = cg_emit_load(p, right);
+				rt = base_type(type_deref(rt));
+			}
+
+			switch (rt->kind) {
+			case Type_Map:
+				{
+					GB_PANIC("TODO(bill): in/not_in for maps");
+					// cgValue map_ptr = cg_address_from_load_or_generate_local(p, right);
+					// cgValue key = left;
+					// cgValue ptr = cg_internal_dynamic_map_get_ptr(p, map_ptr, key);
+					// if (be->op.kind == Token_in) {
+					// 	return cg_emit_conv(p, cg_emit_comp_against_nil(p, Token_NotEq, ptr), t_bool);
+					// } else {
+					// 	return cg_emit_conv(p, cg_emit_comp_against_nil(p, Token_CmpEq, ptr), t_bool);
+					// }
+				}
+				break;
+			case Type_BitSet:
+				{
+					Type *key_type = rt->BitSet.elem;
+					GB_ASSERT(are_types_identical(left.type, key_type));
+
+					Type *it = bit_set_to_int(rt);
+					left = cg_emit_conv(p, left, it);
+					if (is_type_different_to_arch_endianness(it)) {
+						left = cg_emit_byte_swap(p, left, integer_endian_type_to_platform_type(it));
+					}
+
+					cgValue lower = cg_const_value(p, left.type, exact_value_i64(rt->BitSet.lower));
+					cgValue key = cg_emit_arith(p, Token_Sub, left, lower, left.type);
+					cgValue bit = cg_emit_arith(p, Token_Shl, cg_const_int(p, left.type, 1), key, left.type);
+					bit = cg_emit_conv(p, bit, it);
+
+					cgValue old_value = cg_emit_transmute(p, right, it);
+					cgValue new_value = cg_emit_arith(p, Token_And, old_value, bit, it);
+
+					GB_PANIC("TODO(bill): cg_emit_comp");
+					// TokenKind op = (be->op.kind == Token_in) ? Token_NotEq : Token_CmpEq;
+					// return cg_emit_conv(p, cg_emit_comp(p, op, new_value, cg_const_int(p, new_value.type, 0)), t_bool);
+				}
+				break;
+			default:
+				GB_PANIC("Invalid 'in' type");
+			}
+			break;
+		}
+		break;
+	default:
+		GB_PANIC("Invalid binary expression");
+		break;
+	}
+	return {};
+}
 
 
 gb_internal cgValue cg_build_expr_internal(cgProcedure *p, Ast *expr);
@@ -1130,6 +1309,9 @@ gb_internal cgValue cg_build_expr_internal(cgProcedure *p, Ast *expr) {
 		return cg_addr_load(p, cg_build_addr(p, expr));
 	case_end;
 
+	case_ast_node(ie, BinaryExpr, expr);
+		return cg_build_binary_expr(p, expr);
+	case_end;
 	}
 	GB_PANIC("TODO(bill): cg_build_expr_internal %.*s", LIT(ast_strings[expr->kind]));
 	return {};
