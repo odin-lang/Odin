@@ -922,6 +922,167 @@ gb_internal cgAddr cg_build_addr_slice_expr(cgProcedure *p, Ast *expr) {
 	return {};
 }
 
+gb_internal cgValue cg_emit_unary_arith(cgProcedure *p, TokenKind op, cgValue x, Type *type) {
+	switch (op) {
+	case Token_Add:
+		return x;
+	case Token_Not: // Boolean not
+	case Token_Xor: // Bitwise not
+	case Token_Sub: // Number negation
+		break;
+	case Token_Pointer:
+		GB_PANIC("This should be handled elsewhere");
+		break;
+	}
+
+	x = cg_flatten_value(p, x);
+
+	if (is_type_array_like(x.type)) {
+		GB_PANIC("TODO(bill): cg_emit_unary_arith is_type_array_like");
+		// // IMPORTANT TODO(bill): This is very wasteful with regards to stack memory
+		// Type *tl = base_type(x.type);
+		// cgValue val = cg_address_from_load_or_generate_local(p, x);
+		// GB_ASSERT(is_type_array_like(type));
+		// Type *elem_type = base_array_type(type);
+
+		// // NOTE(bill): Doesn't need to be zero because it will be initialized in the loops
+		// cgAddr res_addr = cg_add_local(p, type, nullptr, false);
+		// cgValue res = cg_addr_get_ptr(p, res_addr);
+
+		// bool inline_array_arith = cg_can_try_to_inline_array_arith(type);
+
+		// i32 count = cast(i32)get_array_type_count(tl);
+
+		// LLVMTypeRef vector_type = nullptr;
+		// if (op != Token_Not && cg_try_vector_cast(p->module, val, &vector_type)) {
+		// 	LLVMValueRef vp = LLVMBuildPointerCast(p->builder, val.value, LLVMPointerType(vector_type, 0), "");
+		// 	LLVMValueRef v = LLVMBuildLoad2(p->builder, vector_type, vp, "");
+
+		// 	LLVMValueRef opv = nullptr;
+		// 	switch (op) {
+		// 	case Token_Xor:
+		// 		opv = LLVMBuildNot(p->builder, v, "");
+		// 		break;
+		// 	case Token_Sub:
+		// 		if (is_type_float(elem_type)) {
+		// 			opv = LLVMBuildFNeg(p->builder, v, "");
+		// 		} else {
+		// 			opv = LLVMBuildNeg(p->builder, v, "");
+		// 		}
+		// 		break;
+		// 	}
+
+		// 	if (opv != nullptr) {
+		// 		LLVMSetAlignment(res.value, cast(unsigned)cg_alignof(vector_type));
+		// 		LLVMValueRef res_ptr = LLVMBuildPointerCast(p->builder, res.value, LLVMPointerType(vector_type, 0), "");
+		// 		LLVMBuildStore(p->builder, opv, res_ptr);
+		// 		return cg_emit_conv(p, cg_emit_load(p, res), type);
+		// 	}
+		// }
+
+		// if (inline_array_arith) {
+		// 	// inline
+		// 	for (i32 i = 0; i < count; i++) {
+		// 		cgValue e = cg_emit_load(p, cg_emit_array_epi(p, val, i));
+		// 		cgValue z = cg_emit_unary_arith(p, op, e, elem_type);
+		// 		cg_emit_store(p, cg_emit_array_epi(p, res, i), z);
+		// 	}
+		// } else {
+		// 	auto loop_data = cg_loop_start(p, count, t_i32);
+
+		// 	cgValue e = cg_emit_load(p, cg_emit_array_ep(p, val, loop_data.idx));
+		// 	cgValue z = cg_emit_unary_arith(p, op, e, elem_type);
+		// 	cg_emit_store(p, cg_emit_array_ep(p, res, loop_data.idx), z);
+
+		// 	cg_loop_end(p, loop_data);
+		// }
+		// return cg_emit_load(p, res);
+	}
+
+	if (op == Token_Xor) {
+		GB_ASSERT(x.kind == cgValue_Value);
+		cgValue cmp = cg_value(tb_inst_not(p->func, x.node), x.type);
+		return cg_emit_conv(p, cmp, type);
+	}
+
+	if (op == Token_Not) {
+		TB_Node *zero = cg_const_nil(p, x.type).node;
+		cgValue cmp = cg_value(tb_inst_cmp_ne(p->func, x.node, zero), x.type);
+		return cg_emit_conv(p, cmp, type);
+	}
+
+	if (op == Token_Sub && is_type_integer(type) && is_type_different_to_arch_endianness(type)) {
+		Type *platform_type = integer_endian_type_to_platform_type(type);
+		cgValue v = cg_emit_byte_swap(p, x, platform_type);
+
+		cgValue res = cg_value(tb_inst_neg(p->func, v.node), platform_type);
+		return cg_emit_byte_swap(p, res, type);
+	}
+
+	if (op == Token_Sub && is_type_float(type) && is_type_different_to_arch_endianness(type)) {
+		Type *platform_type = integer_endian_type_to_platform_type(type);
+		cgValue v = cg_emit_byte_swap(p, x, platform_type);
+
+		cgValue res = cg_value(tb_inst_neg(p->func, v.node), platform_type);
+		return cg_emit_byte_swap(p, res, type);
+	}
+
+	cgValue res = {};
+
+	if (op == Token_Sub) { // Number negation
+		if (is_type_integer(x.type)) {
+			res = cg_value(tb_inst_neg(p->func, x.node), x.type);
+		} else if (is_type_float(x.type)) {
+			res = cg_value(tb_inst_neg(p->func, x.node), x.type);
+		} else if (is_type_complex(x.type)) {
+			GB_PANIC("TODO(bill): neg complex");
+			// LLVMValueRef v0 = LLVMBuildFNeg(p->builder, LLVMBuildExtractValue(p->builder, x.value, 0, ""), "");
+			// LLVMValueRef v1 = LLVMBuildFNeg(p->builder, LLVMBuildExtractValue(p->builder, x.value, 1, ""), "");
+
+			// cgAddr addr = cg_add_local_generated(p, x.type, false);
+			// LLVMTypeRef type = llvm_addr_type(p->module, addr.addr);
+			// LLVMBuildStore(p->builder, v0, LLVMBuildStructGEP2(p->builder, type, addr.addr.value, 0, ""));
+			// LLVMBuildStore(p->builder, v1, LLVMBuildStructGEP2(p->builder, type, addr.addr.value, 1, ""));
+			// return cg_addr_load(p, addr);
+
+		} else if (is_type_quaternion(x.type)) {
+			GB_PANIC("TODO(bill): neg quaternion");
+			// LLVMValueRef v0 = LLVMBuildFNeg(p->builder, LLVMBuildExtractValue(p->builder, x.value, 0, ""), "");
+			// LLVMValueRef v1 = LLVMBuildFNeg(p->builder, LLVMBuildExtractValue(p->builder, x.value, 1, ""), "");
+			// LLVMValueRef v2 = LLVMBuildFNeg(p->builder, LLVMBuildExtractValue(p->builder, x.value, 2, ""), "");
+			// LLVMValueRef v3 = LLVMBuildFNeg(p->builder, LLVMBuildExtractValue(p->builder, x.value, 3, ""), "");
+
+			// cgAddr addr = cg_add_local_generated(p, x.type, false);
+			// LLVMTypeRef type = llvm_addr_type(p->module, addr.addr);
+			// LLVMBuildStore(p->builder, v0, LLVMBuildStructGEP2(p->builder, type, addr.addr.value, 0, ""));
+			// LLVMBuildStore(p->builder, v1, LLVMBuildStructGEP2(p->builder, type, addr.addr.value, 1, ""));
+			// LLVMBuildStore(p->builder, v2, LLVMBuildStructGEP2(p->builder, type, addr.addr.value, 2, ""));
+			// LLVMBuildStore(p->builder, v3, LLVMBuildStructGEP2(p->builder, type, addr.addr.value, 3, ""));
+			// return cg_addr_load(p, addr);
+		} else if (is_type_simd_vector(x.type)) {
+			GB_PANIC("TODO(bill): neg simd");
+			// Type *elem = base_array_type(x.type);
+			// if (is_type_float(elem)) {
+			// 	res.value = LLVMBuildFNeg(p->builder, x.value, "");
+			// } else {
+			// 	res.value = LLVMBuildNeg(p->builder, x.value, "");
+			// }
+		} else if (is_type_matrix(x.type)) {
+			GB_PANIC("TODO(bill): neg matrix");
+			// cgValue zero = {};
+			// zero.value = LLVMConstNull(cg_type(p->module, type));
+			// zero.type = type;
+			// return cg_emit_arith_matrix(p, Token_Sub, zero, x, type, true);
+		} else {
+			GB_PANIC("Unhandled type %s", type_to_string(x.type));
+		}
+		res.type = x.type;
+		return res;
+	}
+
+	return res;
+}
+
 gb_internal cgValue cg_build_binary_expr(cgProcedure *p, Ast *expr) {
 	ast_node(be, BinaryExpr, expr);
 
@@ -1309,7 +1470,15 @@ gb_internal cgValue cg_build_expr_internal(cgProcedure *p, Ast *expr) {
 		return cg_addr_load(p, cg_build_addr(p, expr));
 	case_end;
 
-	case_ast_node(ie, BinaryExpr, expr);
+	case_ast_node(ue, UnaryExpr, expr);
+		if (ue->op.kind == Token_And) {
+			GB_PANIC("TODO(bill): cg_build_unary_and");
+			// return cg_build_unary_and(p, expr);
+		}
+		cgValue v = cg_build_expr(p, ue->expr);
+		return cg_emit_unary_arith(p, ue->op.kind, v, type);
+	case_end;
+	case_ast_node(be, BinaryExpr, expr);
 		return cg_build_binary_expr(p, expr);
 	case_end;
 	}
