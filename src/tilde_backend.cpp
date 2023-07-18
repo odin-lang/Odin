@@ -118,15 +118,15 @@ gb_internal cgValue cg_lvalue_addr(TB_Node *node, Type *type) {
 	return v;
 }
 
-gb_internal cgValue cg_value_multi(cgValueMultiNodes *multi_nodes, Type *type) {
+gb_internal cgValue cg_value_multi(cgValueMulti *multi, Type *type) {
 	GB_ASSERT(type->kind == Type_Tuple);
-	GB_ASSERT(multi_nodes != nullptr);
+	GB_ASSERT(multi != nullptr);
 	GB_ASSERT(type->Tuple.variables.count > 1);
-	GB_ASSERT(multi_nodes->nodes.count == type->Tuple.variables.count);
+	GB_ASSERT(multi->values.count == type->Tuple.variables.count);
 	cgValue v = {};
 	v.kind = cgValue_Multi;
 	v.type = type;
-	v.multi_nodes = multi_nodes;
+	v.multi = multi;
 	return v;
 }
 

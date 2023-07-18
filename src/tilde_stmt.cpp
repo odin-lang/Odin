@@ -155,7 +155,7 @@ gb_internal bool cg_addr_is_empty(cgAddr const &addr) {
 	case cgValue_Symbol:
 		return addr.addr.symbol == nullptr;
 	case cgValue_Multi:
-		return addr.addr.multi_nodes == nullptr;
+		return addr.addr.multi == nullptr;
 	}
 	return true;
 }
@@ -710,18 +710,12 @@ gb_internal isize cg_append_tuple_values(cgProcedure *p, Array<cgValue> *dst_val
 	isize init_count = dst_values->count;
 	Type *t = src_value.type;
 	if (t && t->kind == Type_Tuple) {
-		GB_PANIC("TODO(bill): tuple assignments");
-		// cgTupleFix *tf = map_get(&p->tuple_fix_map, src_value.value);
-		// if (tf) {
-		// 	for (cgValue const &value : tf->values) {
-		// 		array_add(dst_values, value);
-		// 	}
-		// } else {
-		// 	for_array(i, t->Tuple.variables) {
-		// 		cgValue v = cg_emit_tuple_ev(p, src_value, cast(i32)i);
-		// 		array_add(dst_values, v);
-		// 	}
-		// }
+		GB_ASSERT(src_value.kind == cgValue_Multi);
+		GB_ASSERT(src_value.multi != nullptr);
+		GB_ASSERT(src_value.multi->values.count == t->Tuple.variables.count);
+		for (cgValue const &value : src_value.multi->values) {
+			array_add(dst_values, value);
+		}
 	} else {
 		array_add(dst_values, src_value);
 	}

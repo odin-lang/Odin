@@ -36,9 +36,7 @@ enum cgValueKind : u32 {
 	cgValue_Multi,
 };
 
-struct cgValueMultiNodes {
-	Slice<TB_Node *> nodes;
-};
+struct cgValueMulti;
 
 struct cgValue {
 	cgValueKind kind;
@@ -46,9 +44,14 @@ struct cgValue {
 	union {
 		TB_Symbol *symbol;
 		TB_Node *  node;
-		cgValueMultiNodes *multi_nodes;
+		cgValueMulti *multi;
 	};
 };
+
+struct cgValueMulti {
+	Slice<cgValue> values;
+};
+
 
 enum cgAddrKind {
 	cgAddr_Default,
