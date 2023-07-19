@@ -186,6 +186,86 @@ gb_internal isize cg_type_info_index(CheckerInfo *info, Type *type, bool err_on_
 	return -1;
 }
 
+
+gb_internal u64 cg_typeid_as_u64(cgModule *m, Type *type) {
+	GB_ASSERT(!build_context.no_rtti);
+
+	type = default_type(type);
+
+	u64 id = cast(u64)cg_type_info_index(m->info, type);
+	GB_ASSERT(id >= 0);
+
+	u64 kind = Typeid_Invalid;
+	u64 named = is_type_named(type) && type->kind != Type_Basic;
+	u64 special = 0;
+	u64 reserved = 0;
+
+	Type *bt = base_type(type);
+	TypeKind tk = bt->kind;
+	switch (tk) {
+	case Type_Basic: {
+		u32 flags = bt->Basic.flags;
+		if (flags & BasicFlag_Boolean)  kind = Typeid_Boolean;
+		if (flags & BasicFlag_Integer)  kind = Typeid_Integer;
+		if (flags & BasicFlag_Unsigned) kind = Typeid_Integer;
+		if (flags & BasicFlag_Float)    kind = Typeid_Float;
+		if (flags & BasicFlag_Complex)  kind = Typeid_Complex;
+		if (flags & BasicFlag_Pointer)  kind = Typeid_Pointer;
+		if (flags & BasicFlag_String)   kind = Typeid_String;
+		if (flags & BasicFlag_Rune)     kind = Typeid_Rune;
+	} break;
+	case Type_Pointer:         kind = Typeid_Pointer;          break;
+	case Type_MultiPointer:    kind = Typeid_Multi_Pointer;    break;
+	case Type_Array:           kind = Typeid_Array;            break;
+	case Type_Matrix:          kind = Typeid_Matrix;           break;
+	case Type_EnumeratedArray: kind = Typeid_Enumerated_Array; break;
+	case Type_Slice:           kind = Typeid_Slice;            break;
+	case Type_DynamicArray:    kind = Typeid_Dynamic_Array;    break;
+	case Type_Map:             kind = Typeid_Map;              break;
+	case Type_Struct:          kind = Typeid_Struct;           break;
+	case Type_Enum:            kind = Typeid_Enum;             break;
+	case Type_Union:           kind = Typeid_Union;            break;
+	case Type_Tuple:           kind = Typeid_Tuple;            break;
+	case Type_Proc:            kind = Typeid_Procedure;        break;
+	case Type_BitSet:          kind = Typeid_Bit_Set;          break;
+	case Type_SimdVector:      kind = Typeid_Simd_Vector;      break;
+	case Type_RelativePointer: kind = Typeid_Relative_Pointer; break;
+	case Type_RelativeSlice:   kind = Typeid_Relative_Slice;   break;
+	case Type_SoaPointer:      kind = Typeid_SoaPointer;       break;
+	}
+
+	if (is_type_cstring(type)) {
+		special = 1;
+	} else if (is_type_integer(type) && !is_type_unsigned(type)) {
+		special = 1;
+	}
+
+	u64 data = 0;
+	if (build_context.ptr_size == 4) {
+		GB_ASSERT(id <= (1u<<24u));
+		data |= (id       &~ (1u<<24)) << 0u;  // index
+		data |= (kind     &~ (1u<<5))  << 24u; // kind
+		data |= (named    &~ (1u<<1))  << 29u; // named
+		data |= (special  &~ (1u<<1))  << 30u; // special
+		data |= (reserved &~ (1u<<1))  << 31u; // reserved
+	} else {
+		GB_ASSERT(build_context.ptr_size == 8);
+		GB_ASSERT(id <= (1ull<<56u));
+		data |= (id       &~ (1ull<<56)) << 0ul;  // index
+		data |= (kind     &~ (1ull<<5))  << 56ull; // kind
+		data |= (named    &~ (1ull<<1))  << 61ull; // named
+		data |= (special  &~ (1ull<<1))  << 62ull; // special
+		data |= (reserved &~ (1ull<<1))  << 63ull; // reserved
+	}
+	return data;
+}
+
+gb_internal cgValue cg_typeid(cgProcedure *p, Type *t) {
+	u64 x = cg_typeid_as_u64(p->module, t);
+	return cg_value(tb_inst_uint(p->func, cg_data_type(t_typeid), x), t_typeid);
+}
+
+
 struct cgGlobalVariable {
 	cgValue var;
 	cgValue init;

@@ -1323,7 +1323,6 @@ gb_internal void cg_build_type_switch_stmt(cgProcedure *p, Ast *node) {
 			tag = cg_emit_load(p, tag_ptr);
 		}
 	} else if (switch_kind == TypeSwitch_Any) {
-		GB_PANIC("TODO(bill): type switch any");
 		tag = cg_emit_load(p, cg_emit_struct_ep(p, parent_ptr, 1));
 	} else {
 		GB_PANIC("Unknown switch kind");
@@ -1406,13 +1405,11 @@ gb_internal void cg_build_type_switch_stmt(cgProcedure *p, Ast *node) {
 					key = union_variant_index(ut, case_type);
 				}
 			} else if (switch_kind == TypeSwitch_Any) {
-				GB_PANIC("TODO(bill): any");
-				// if (is_type_untyped_nil(case_type)) {
-				// 	saw_nil = true;
-				// 	on_val = lb_const_nil(m, t_typeid);
-				// } else {
-				// 	on_val = lb_typeid(m, case_type);
-				// }
+				if (is_type_untyped_nil(case_type)) {
+					key = 0;
+				} else {
+					key = cast(i64)cg_typeid_as_u64(p->module, case_type);
+				}
 			}
 			GB_ASSERT(key >= 0);
 

@@ -120,11 +120,6 @@ gb_internal cgAddr cg_build_addr_from_entity(cgProcedure *p, Entity *e, Ast *exp
 	return cg_addr(v);
 }
 
-gb_internal cgValue cg_typeid(cgProcedure *p, Type *t) {
-	GB_ASSERT("TODO(bill): cg_typeid");
-	return {};
-}
-
 gb_internal cgValue cg_emit_union_tag_ptr(cgProcedure *p, cgValue const &parent_ptr) {
 	Type *t = parent_ptr.type;
 	Type *ut = base_type(type_deref(t));
