@@ -349,6 +349,10 @@ gb_internal bool find_or_generate_polymorphic_procedure(CheckerContext *old_c, E
 		return false;
 	}
 
+	if (base_entity->flags & EntityFlag_Disabled) {
+		return false;
+	}
+
 	String name = base_entity->token.string;
 
 	Type *src = base_type(base_entity->type);
