@@ -2060,13 +2060,13 @@ gb_internal cgValue cg_build_expr_internal(cgProcedure *p, Ast *expr) {
 		incoming_values [0] = cg_emit_conv(p, cg_build_expr(p, te->x), type);
 		incoming_regions[0] = tb_inst_get_control(p->func);
 
-		tb_inst_goto(p->func, done);
+		cg_emit_goto(p, done);
 		tb_inst_set_control(p->func, else_);
 
 		incoming_values [1] = cg_emit_conv(p, cg_build_expr(p, te->y), type);
 		incoming_regions[1] = tb_inst_get_control(p->func);
 
-		tb_inst_goto(p->func, done);
+		cg_emit_goto(p, done);
 		tb_inst_set_control(p->func, done);
 
 		GB_ASSERT(incoming_values[0].kind == cgValue_Value ||

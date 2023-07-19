@@ -247,9 +247,9 @@ gb_internal void    cg_addr_store(cgProcedure *p, cgAddr addr, cgValue value);
 gb_internal cgValue cg_addr_get_ptr(cgProcedure *p, cgAddr const &addr);
 
 gb_internal cgValue cg_emit_load(cgProcedure *p, cgValue const &ptr, bool is_volatile=false);
-gb_internal void cg_emit_store(cgProcedure *p, cgValue dst, cgValue const &src, bool is_volatile=false);
+gb_internal void    cg_emit_store(cgProcedure *p, cgValue dst, cgValue const &src, bool is_volatile=false);
 
-gb_internal cgAddr cg_add_local(cgProcedure *p, Type *type, Entity *e, bool zero_init);
+gb_internal cgAddr  cg_add_local(cgProcedure *p, Type *type, Entity *e, bool zero_init);
 gb_internal cgValue cg_address_from_load_or_generate_local(cgProcedure *p, cgValue value);
 
 gb_internal cgValue cg_build_call_expr(cgProcedure *p, Ast *expr);
@@ -272,6 +272,8 @@ gb_internal cgValue cg_emit_conv(cgProcedure *p, cgValue value, Type *t);
 gb_internal cgValue cg_emit_comp_against_nil(cgProcedure *p, TokenKind op_kind, cgValue x);
 gb_internal cgValue cg_emit_comp(cgProcedure *p, TokenKind op_kind, cgValue left, cgValue right);
 gb_internal cgValue cg_emit_arith(cgProcedure *p, TokenKind op, cgValue lhs, cgValue rhs, Type *type);
+
+gb_internal bool    cg_emit_goto(cgProcedure *p, TB_Node *control_region);
 
 gb_internal TB_Node *tb_inst_region_with_name(TB_Function *f, ptrdiff_t n, char const *name) {
 	#if 1

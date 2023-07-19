@@ -1,3 +1,11 @@
+gb_internal bool cg_emit_goto(cgProcedure *p, TB_Node *control_region) {
+	if (tb_inst_get_control(p->func)) {
+		tb_inst_goto(p->func, control_region);
+		return true;
+	}
+	return false;
+}
+
 gb_internal cgValue cg_emit_load(cgProcedure *p, cgValue const &ptr, bool is_volatile) {
 	GB_ASSERT(is_type_pointer(ptr.type));
 	Type *type = type_deref(ptr.type);
@@ -857,7 +865,7 @@ gb_internal void cg_build_if_stmt(cgProcedure *p, Ast *node) {
 
 	if (is->init != nullptr) {
 		TB_Node *init = tb_inst_region_with_name(p->func, -1, "if_init");
-		tb_inst_goto(p->func, init);
+		cg_emit_goto(p, init);
 		tb_inst_set_control(p->func, init);
 		cg_build_stmt(p, is->init);
 	}
@@ -886,7 +894,7 @@ gb_internal void cg_build_if_stmt(cgProcedure *p, Ast *node) {
 
 	cg_build_stmt(p, is->body);
 
-	tb_inst_goto(p->func, done);
+	cg_emit_goto(p, done);
 
 	if (is->else_stmt != nullptr) {
 		tb_inst_set_control(p->func, else_);
@@ -895,7 +903,7 @@ gb_internal void cg_build_if_stmt(cgProcedure *p, Ast *node) {
 		cg_build_stmt(p, is->else_stmt);
 		cg_scope_close(p, cgDeferExit_Default, nullptr);
 
-		tb_inst_goto(p->func, done);
+		cg_emit_goto(p, done);
 	}
 
 	tb_inst_set_control(p->func, done);
@@ -909,7 +917,7 @@ gb_internal void cg_build_for_stmt(cgProcedure *p, Ast *node) {
 
 	if (fs->init != nullptr) {
 		TB_Node *init = tb_inst_region_with_name(p->func, -1, "for_init");
-		tb_inst_goto(p->func, init);
+		cg_emit_goto(p, init);
 		tb_inst_set_control(p->func, init);
 		cg_build_stmt(p, fs->init);
 	}
@@ -924,7 +932,7 @@ gb_internal void cg_build_for_stmt(cgProcedure *p, Ast *node) {
 		post = tb_inst_region_with_name(p->func, -1, "for_post");
 	}
 
-	tb_inst_goto(p->func, loop);
+	cg_emit_goto(p, loop);
 	tb_inst_set_control(p->func, loop);
 
 	if (loop != body) {
@@ -936,12 +944,12 @@ gb_internal void cg_build_for_stmt(cgProcedure *p, Ast *node) {
 	cg_build_stmt(p, fs->body);
 	cg_pop_target_list(p);
 
-	tb_inst_goto(p->func, post);
+	cg_emit_goto(p, post);
 
 	if (fs->post != nullptr) {
 		tb_inst_set_control(p->func, post);
 		cg_build_stmt(p, fs->post);
-		tb_inst_goto(p->func, loop);
+		cg_emit_goto(p, loop);
 	}
 	tb_inst_set_control(p->func, done);
 }
@@ -1144,13 +1152,13 @@ gb_internal void cg_build_switch_stmt(cgProcedure *p, Ast *node) {
 		cg_scope_close(p, cgDeferExit_Default, body_region);
 		cg_pop_target_list(p);
 
-		tb_inst_goto(p->func, done);
+		cg_emit_goto(p, done);
 		tb_inst_set_control(p->func, next_cond);
 	}
 
 	if (default_block != nullptr) {
 		if (!is_trivial) {
-			tb_inst_goto(p->func, default_block);
+			cg_emit_goto(p, default_block);
 		}
 		tb_inst_set_control(p->func, default_block);
 
@@ -1161,7 +1169,8 @@ gb_internal void cg_build_switch_stmt(cgProcedure *p, Ast *node) {
 		cg_pop_target_list(p);
 	}
 
-	tb_inst_goto(p->func, done);
+
+	cg_emit_goto(p, done);
 	tb_inst_set_control(p->func, done);
 
 	cg_scope_close(p, cgDeferExit_Default, done);
@@ -1232,7 +1241,7 @@ gb_internal void cg_build_stmt(cgProcedure *p, Ast *node) {
 		cg_scope_close(p, cgDeferExit_Default, nullptr);
 
 		if (done != nullptr) {
-			tb_inst_goto(p->func, done);
+			cg_emit_goto(p, done);
 			tb_inst_set_control(p->func, done);
 		}
 
@@ -1304,9 +1313,7 @@ gb_internal void cg_build_stmt(cgProcedure *p, Ast *node) {
 	case_end;
 
 	case_ast_node(bs, BranchStmt, node);
-		TB_Node *prev_block = tb_inst_get_control(p->func);
-
-		TB_Node *block = nullptr;
+ 		TB_Node *block = nullptr;
 
 		if (bs->label != nullptr) {
 			cgBranchBlocks bb = cg_lookup_branch_blocks(p, bs->label);
@@ -1333,9 +1340,7 @@ gb_internal void cg_build_stmt(cgProcedure *p, Ast *node) {
 		GB_ASSERT(block != nullptr);
 
 		cg_emit_defer_stmts(p, cgDeferExit_Branch, block);
-		tb_inst_goto(p->func, block);
-
-		tb_inst_set_control(p->func, prev_block);
+		cg_emit_goto(p, block);
 	case_end;
 
 	case_ast_node(es, ExprStmt, node);
