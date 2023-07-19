@@ -40,19 +40,25 @@ Pool :: struct {
 	threads: []^Thread,
 
 
-	tasks:      [dynamic]Task,
-	tasks_done: [dynamic]Task,
+	tasks:            [dynamic]Task,
+	tasks_done:       [dynamic]Task,
+	track_tasks_done: bool,
 }
 
 // Once initialized, the pool's memory address is not allowed to change until
-// it is destroyed. 
+// it is destroyed.
 //
 // The thread pool requires an allocator which it either owns, or which is thread safe.
-pool_init :: proc(pool: ^Pool, allocator: mem.Allocator, thread_count: int) {
+pool_init :: proc(pool: ^Pool, allocator: mem.Allocator, thread_count: int, track_tasks_done: bool = true) {
 	context.allocator = allocator
 	pool.allocator = allocator
 	pool.tasks      = make([dynamic]Task)
-	pool.tasks_done = make([dynamic]Task)
+
+	pool.track_tasks_done = track_tasks_done
+	if pool.track_tasks_done {
+		pool.tasks_done = make([dynamic]Task)
+	}
+
 	pool.threads    = make([]^Thread, max(thread_count, 1))
 
 	pool.is_running = true
@@ -79,7 +85,10 @@ pool_init :: proc(pool: ^Pool, allocator: mem.Allocator, thread_count: int) {
 
 pool_destroy :: proc(pool: ^Pool) {
 	delete(pool.tasks)
-	delete(pool.tasks_done)
+
+	if pool.track_tasks_done {
+		delete(pool.tasks_done)
+	}
 
 	for &t in pool.threads {
 		destroy(t)
@@ -191,6 +200,7 @@ pool_pop_waiting :: proc(pool: ^Pool) -> (task: Task, got_task: bool) {
 
 // Use this to take out finished tasks.
 pool_pop_done :: proc(pool: ^Pool) -> (task: Task, got_task: bool) {
+	assert(pool.track_tasks_done)
 	sync.guard(&pool.mutex)
 
 	if len(pool.tasks_done) != 0 {
@@ -211,7 +221,10 @@ pool_do_work :: proc(pool: ^Pool, task: Task) {
 
 	sync.guard(&pool.mutex)
 
-	append(&pool.tasks_done, task)
+	if pool.track_tasks_done {
+		append(&pool.tasks_done, task)
+	}
+
 	intrinsics.atomic_add(&pool.num_done, 1)
 	intrinsics.atomic_sub(&pool.num_outstanding, 1)
 	intrinsics.atomic_sub(&pool.num_in_processing, 1)
