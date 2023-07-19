@@ -203,7 +203,7 @@ struct cgModule {
 };
 
 #ifndef ABI_PKG_NAME_SEPARATOR
-#define ABI_PKG_NAME_SEPARATOR "."
+#define ABI_PKG_NAME_SEPARATOR "@"
 #endif
 
 gb_global Entity *cg_global_type_info_data_entity   = {};
@@ -272,3 +272,9 @@ gb_internal cgValue cg_emit_conv(cgProcedure *p, cgValue value, Type *t);
 gb_internal cgValue cg_emit_comp_against_nil(cgProcedure *p, TokenKind op_kind, cgValue x);
 gb_internal cgValue cg_emit_comp(cgProcedure *p, TokenKind op_kind, cgValue left, cgValue right);
 gb_internal cgValue cg_emit_arith(cgProcedure *p, TokenKind op, cgValue lhs, cgValue rhs, Type *type);
+
+gb_internal TB_Node *tb_inst_region_with_name(TB_Function *f, ptrdiff_t n, char const *name) {
+	TB_Node *region = tb_inst_region(f);
+	tb_inst_set_region_name(region, n, name);
+	return region;
+}

@@ -852,6 +852,57 @@ gb_internal void cg_build_return_stmt(cgProcedure *p, Slice<Ast *> const &return
 	}
 }
 
+gb_internal void cg_build_if_stmt(cgProcedure *p, Ast *node) {
+	ast_node(is, IfStmt, node);
+	cg_scope_open(p, is->scope); // Scope #1
+	defer (cg_scope_close(p, cgDeferExit_Default, nullptr));
+
+	if (is->init != nullptr) {
+		TB_Node *init = tb_inst_region_with_name(p->func, -1, "if_init");
+		tb_inst_goto(p->func, init);
+		tb_inst_set_control(p->func, init);
+		cg_build_stmt(p, is->init);
+	}
+
+	TB_Node *then  = tb_inst_region_with_name(p->func, -1, "if_then");
+	TB_Node *done  = tb_inst_region_with_name(p->func, -1, "if_done");
+	TB_Node *else_ = done;
+	if (is->else_stmt != nullptr) {
+		else_ = tb_inst_region_with_name(p->func, -1, "if_else");
+	}
+
+	cgValue cond = cg_build_cond(p, is->cond, then, else_);
+	gb_unused(cond);
+
+	if (is->label != nullptr) {
+		cgTargetList *tl = cg_push_target_list(p, is->label, done, nullptr, nullptr);
+		tl->is_block = true;
+	}
+
+	// TODO(bill): should we do a constant check?
+	// Which philosophy are we following?
+	// - IR represents what the code represents (probably this)
+	// - IR represents what the code executes
+
+	tb_inst_set_control(p->func, then);
+
+	cg_build_stmt(p, is->body);
+
+	tb_inst_goto(p->func, done);
+
+	if (is->else_stmt != nullptr) {
+		tb_inst_set_control(p->func, else_);
+
+		cg_scope_open(p, scope_of_node(is->else_stmt));
+		cg_build_stmt(p, is->else_stmt);
+		cg_scope_close(p, cgDeferExit_Default, nullptr);
+
+		tb_inst_goto(p->func, done);
+	}
+
+	tb_inst_set_control(p->func, done);
+}
+
 
 gb_internal void cg_build_stmt(cgProcedure *p, Ast *node) {
 	Ast *prev_stmt = p->curr_stmt;
@@ -907,8 +958,7 @@ gb_internal void cg_build_stmt(cgProcedure *p, Ast *node) {
 	case_ast_node(bs, BlockStmt, node);
 		TB_Node *done = nullptr;
 		if (bs->label != nullptr) {
-			done = tb_inst_region(p->func);
-			tb_inst_set_region_name(done, -1, "block.done");
+			done = tb_inst_region_with_name(p->func, -1, "block_done");
 			cgTargetList *tl = cg_push_target_list(p, bs->label, done, nullptr, nullptr);
 			tl->is_block = true;
 		}
@@ -1038,6 +1088,10 @@ gb_internal void cg_build_stmt(cgProcedure *p, Ast *node) {
 
 	case_ast_node(rs, ReturnStmt, node);
 		cg_build_return_stmt(p, rs->results);
+	case_end;
+
+	case_ast_node(is, IfStmt, node);
+		cg_build_if_stmt(p, node);
 	case_end;
 
 	default:

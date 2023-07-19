@@ -243,7 +243,7 @@ gb_internal void cg_procedure_end(cgProcedure *p) {
 		tb_inst_ret(p->func, 0, nullptr);
 	}
 	// if (p->name == "main") {
-	if (p->name == "bug.main") {
+	if (p->name == "bug" ABI_PKG_NAME_SEPARATOR "main") {
 		TB_Arena *arena = tb_default_arena();
 		defer (arena->free(arena));
 		TB_FuncOpt *opt = tb_funcopt_enter(p->func, arena);
@@ -262,7 +262,7 @@ gb_internal void cg_procedure_generate(cgProcedure *p) {
 	cg_procedure_begin(p);
 	defer (cg_procedure_end(p));
 
-	if (p->name != "bug.main" &&
+	if (p->name != "bug" ABI_PKG_NAME_SEPARATOR "main" &&
 	    p->name != "main") {
 		return;
 	}
