@@ -72,7 +72,7 @@ gb_global Timings global_timings = {0};
 #include "docs.cpp"
 
 #if defined(GB_SYSTEM_WINDOWS)
-#include "tilde_backend.cpp"
+#include "tilde.cpp"
 #endif
 
 #include "llvm_backend.cpp"
