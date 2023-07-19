@@ -1353,19 +1353,15 @@ gb_internal void cg_build_stmt(cgProcedure *p, Ast *node) {
 		}
 
 		bool is_static = false;
-		if (vd->names.count > 0) {
-			for (Ast *name : vd->names) {
-				if (!is_blank_ident(name)) {
-					GB_ASSERT(name->kind == Ast_Ident);
-					Entity *e = entity_of_node(name);
-					TokenPos pos = ast_token(name).pos;
-					GB_ASSERT_MSG(e != nullptr, "\n%s missing entity for %.*s", token_pos_to_string(pos), LIT(name->Ident.token.string));
-					if (e->flags & EntityFlag_Static) {
-						// NOTE(bill): If one of the entities is static, they all are
-						is_static = true;
-						break;
-					}
-				}
+		for (Ast *name : vd->names) if (!is_blank_ident(name)) {
+			// NOTE(bill): Sanity check to check for the existence of the variable's Entity
+			GB_ASSERT(name->kind == Ast_Ident);
+			Entity *e = entity_of_node(name);
+			TokenPos pos = ast_token(name).pos;
+			GB_ASSERT_MSG(e != nullptr, "\n%s missing entity for %.*s", token_pos_to_string(pos), LIT(name->Ident.token.string));
+			if (e->flags & EntityFlag_Static) {
+				// NOTE(bill): If one of the entities is static, they all are
+				is_static = true;
 			}
 		}
 		if (is_static) {
@@ -1375,37 +1371,26 @@ gb_internal void cg_build_stmt(cgProcedure *p, Ast *node) {
 
 		TEMPORARY_ALLOCATOR_GUARD();
 
-		auto const &values = vd->values;
-		if (values.count == 0) {
-			for (Ast *name : vd->names) {
-				if (!is_blank_ident(name)) {
-					Entity *e = entity_of_node(name);
-					cgAddr addr = cg_add_local(p, e->type, e, true);
-					gb_unused(addr);
-				}
+		auto lvals = slice_make<cgAddr>(temporary_allocator(), vd->names.count);
+		for_array(i, vd->names) {
+			Ast *name = vd->names[i];
+			if (!is_blank_ident(name)) {
+				Entity *e = entity_of_node(name);
+				lvals[i] = cg_add_local(p, e->type, e, true);
 			}
-		} else {
-			auto lvals = slice_make<cgAddr>(temporary_allocator(), vd->names.count);
-			auto inits = array_make<cgValue>(temporary_allocator(), 0, lvals.count);
-			for (Ast *rhs : values) {
-				rhs = unparen_expr(rhs);
-				cgValue init = cg_build_expr(p, rhs);
-				cg_append_tuple_values(p, &inits, init);
-			}
+		}
 
-			for_array(i, vd->names) {
-				Ast *name = vd->names[i];
-				if (!is_blank_ident(name)) {
-					Entity *e = entity_of_node(name);
-					lvals[i] = cg_add_local(p, e->type, e, true);
-				}
-			}
-			GB_ASSERT(lvals.count == inits.count);
-			for_array(i, inits) {
-				cgAddr lval = lvals[i];
-				cgValue init = inits[i];
-				cg_addr_store(p, lval, init);
-			}
+		auto inits = array_make<cgValue>(temporary_allocator(), 0, vd->values.count != 0 ? lvals.count : 0);
+		for (Ast *rhs : vd->values) {
+			cgValue init = cg_build_expr(p, rhs);
+			cg_append_tuple_values(p, &inits, init);
+		}
+
+		GB_ASSERT(vd->values.count == 0 || lvals.count == inits.count);
+		for_array(i, inits) {
+			cgAddr  lval = lvals[i];
+			cgValue init = inits[i];
+			cg_addr_store(p, lval, init);
 		}
 	case_end;
 
@@ -1460,8 +1445,23 @@ gb_internal void cg_build_stmt(cgProcedure *p, Ast *node) {
 		cg_build_for_stmt(p, node);
 	case_end;
 
+	case_ast_node(rs, RangeStmt, node);
+		GB_PANIC("TODO(bill): cg_build_range_stmt");
+		// cg_build_range_stmt(p, rs, rs->scope);
+	case_end;
+
+	case_ast_node(rs, UnrollRangeStmt, node);
+		GB_PANIC("TODO(bill): lb_build_unroll_range_stmt");
+		// cg_build_range_stmt(p, rs, rs->scope);
+	case_end;
+
 	case_ast_node(fs, SwitchStmt, node);
 		cg_build_switch_stmt(p, node);
+	case_end;
+
+	case_ast_node(ss, TypeSwitchStmt, node);
+		GB_PANIC("TODO(bill): cg_build_type_switch_stmt");
+		// cg_build_type_switch_stmt(p, ss);
 	case_end;
 
 	case_ast_node(ds, DeferStmt, node);
@@ -1479,6 +1479,7 @@ gb_internal void cg_build_stmt(cgProcedure *p, Ast *node) {
 		GB_ASSERT(d->control_region != nullptr);
 		d->stmt = ds->stmt;
 	case_end;
+
 
 
 	default:
