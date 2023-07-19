@@ -274,6 +274,18 @@ gb_internal cgValue cg_emit_comp(cgProcedure *p, TokenKind op_kind, cgValue left
 gb_internal cgValue cg_emit_arith(cgProcedure *p, TokenKind op, cgValue lhs, cgValue rhs, Type *type);
 
 gb_internal TB_Node *tb_inst_region_with_name(TB_Function *f, ptrdiff_t n, char const *name) {
+	#if 1
+	if (n < 0) {
+		n = gb_strlen(name);
+	}
+	static std::atomic<u32> id;
+
+	char *new_name = gb_alloc_array(temporary_allocator(), char, n+12);
+	n = -1 + gb_snprintf(new_name, n+11, "%.*s_%u", cast(int)n, name, 1+id.fetch_add(1));
+
+	name = new_name;
+	#endif
+
 	TB_Node *region = tb_inst_region(f);
 	tb_inst_set_region_name(region, n, name);
 	return region;

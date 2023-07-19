@@ -778,48 +778,46 @@ gb_internal void cg_build_assign_stmt(cgProcedure *p, AstAssignStmt *as) {
 	// NOTE(bill): Only 1 += 1 is allowed, no tuples
 	// +=, -=, etc
 
-	GB_PANIC("do += etc assignments");
-
 	i32 op_ = cast(i32)as->op.kind;
 	op_ += Token_Add - Token_AddEq; // Convert += to +
 	TokenKind op = cast(TokenKind)op_;
 
-	gb_unused(op);
-/*
 	if (op == Token_CmpAnd || op == Token_CmpOr) {
-		Type *type = as->lhs[0]->tav.type;
-		cgValue new_value = lb_emit_logical_binary_expr(p, op, as->lhs[0], as->rhs[0], type);
+		GB_PANIC("TODO(bill): cg_emit_logical_binary_expr");
+		// Type *type = as->lhs[0]->tav.type;
+		// cgValue new_value = cg_emit_logical_binary_expr(p, op, as->lhs[0], as->rhs[0], type);
 
-		cgAddr lhs = lb_build_addr(p, as->lhs[0]);
-		cg_addr_store(p, lhs, new_value);
+		// cgAddr lhs = cg_build_addr(p, as->lhs[0]);
+		// cg_addr_store(p, lhs, new_value);
 	} else {
-		cgAddr lhs = lb_build_addr(p, as->lhs[0]);
-		cgValue value = lb_build_expr(p, as->rhs[0]);
-		Type *lhs_type = lb_addr_type(lhs);
+		cgAddr lhs = cg_build_addr(p, as->lhs[0]);
+		cgValue value = cg_build_expr(p, as->rhs[0]);
+		Type *lhs_type = cg_addr_type(lhs);
 
 		// NOTE(bill): Allow for the weird edge case of:
 		// array *= matrix
 		if (op == Token_Mul && is_type_matrix(value.type) && is_type_array(lhs_type)) {
-			cgValue old_value = lb_addr_load(p, lhs);
-			Type *type = old_value.type;
-			cgValue new_value = lb_emit_vector_mul_matrix(p, old_value, value, type);
-			cg_addr_store(p, lhs, new_value);
-			return;
+			GB_PANIC("TODO(bill): array *= matrix");
+			// cgValue old_value = cg_addr_load(p, lhs);
+			// Type *type = old_value.type;
+			// cgValue new_value = cg_emit_vector_mul_matrix(p, old_value, value, type);
+			// cg_addr_store(p, lhs, new_value);
+			// return;
 		}
 
 		if (is_type_array(lhs_type)) {
-			lb_build_assign_stmt_array(p, op, lhs, value);
-			return;
+			GB_PANIC("TODO(bill): cg_build_assign_stmt_array");
+			// cg_build_assign_stmt_array(p, op, lhs, value);
+			// return;
 		} else {
-			cgValue old_value = lb_addr_load(p, lhs);
+			cgValue old_value = cg_addr_load(p, lhs);
 			Type *type = old_value.type;
 
-			cgValue change = lb_emit_conv(p, value, type);
-			cgValue new_value = lb_emit_arith(p, op, old_value, change, type);
+			cgValue change = cg_emit_conv(p, value, type);
+			cgValue new_value = cg_emit_arith(p, op, old_value, change, type);
 			cg_addr_store(p, lhs, new_value);
 		}
 	}
-*/
 }
 
 gb_internal void cg_build_return_stmt(cgProcedure *p, Slice<Ast *> const &return_results) {
@@ -900,6 +898,51 @@ gb_internal void cg_build_if_stmt(cgProcedure *p, Ast *node) {
 		tb_inst_goto(p->func, done);
 	}
 
+	tb_inst_set_control(p->func, done);
+}
+
+gb_internal void cg_build_for_stmt(cgProcedure *p, Ast *node) {
+	ast_node(fs, ForStmt, node);
+
+	cg_scope_open(p, fs->scope);
+	defer (cg_scope_close(p, cgDeferExit_Default, nullptr));
+
+	if (fs->init != nullptr) {
+		TB_Node *init = tb_inst_region_with_name(p->func, -1, "for_init");
+		tb_inst_goto(p->func, init);
+		tb_inst_set_control(p->func, init);
+		cg_build_stmt(p, fs->init);
+	}
+	TB_Node *body = tb_inst_region_with_name(p->func, -1, "for_body");
+	TB_Node *done = tb_inst_region_with_name(p->func, -1, "for_done");
+	TB_Node *loop = body;
+	if (fs->cond != nullptr) {
+		loop = tb_inst_region_with_name(p->func, -1, "for_loop");
+	}
+	TB_Node *post = loop;
+	if (fs->post != nullptr) {
+		post = tb_inst_region_with_name(p->func, -1, "for_post");
+	}
+
+	tb_inst_goto(p->func, loop);
+	tb_inst_set_control(p->func, loop);
+
+	if (loop != body) {
+		cg_build_cond(p, fs->cond, body, done);
+		tb_inst_set_control(p->func, body);
+	}
+
+	cg_push_target_list(p, fs->label, done, post, nullptr);
+	cg_build_stmt(p, fs->body);
+	cg_pop_target_list(p);
+
+	tb_inst_goto(p->func, post);
+
+	if (fs->post != nullptr) {
+		tb_inst_set_control(p->func, post);
+		cg_build_stmt(p, fs->post);
+		tb_inst_goto(p->func, loop);
+	}
 	tb_inst_set_control(p->func, done);
 }
 
@@ -1092,6 +1135,10 @@ gb_internal void cg_build_stmt(cgProcedure *p, Ast *node) {
 
 	case_ast_node(is, IfStmt, node);
 		cg_build_if_stmt(p, node);
+	case_end;
+
+	case_ast_node(fs, ForStmt, node);
+		cg_build_for_stmt(p, node);
 	case_end;
 
 	default:

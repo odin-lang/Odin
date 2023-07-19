@@ -283,12 +283,12 @@ gb_internal cgValue cg_emit_comp(cgProcedure *p, TokenKind op_kind, cgValue left
 
 
 		// TokenKind cmp_op = Token_And;
-		// lbValue res = lb_const_bool(p->module, t_llvm_bool, true);
+		// lbValue res = lb_const_bool(p->module, t_bool, true);
 		// if (op_kind == Token_NotEq) {
-		// 	res = lb_const_bool(p->module, t_llvm_bool, false);
+		// 	res = lb_const_bool(p->module, t_bool, false);
 		// 	cmp_op = Token_Or;
 		// } else if (op_kind == Token_CmpEq) {
-		// 	res = lb_const_bool(p->module, t_llvm_bool, true);
+		// 	res = lb_const_bool(p->module, t_bool, true);
 		// 	cmp_op = Token_And;
 		// }
 
@@ -706,9 +706,9 @@ gb_internal cgValue cg_emit_comp_against_nil(cgProcedure *p, TokenKind op_kind, 
 			GB_PANIC("TODO(bill): cg_emit_struct_ev");
 			// if (type_size_of(t) == 0) {
 			// 	if (op_kind == Token_CmpEq) {
-			// 		return cg_const_bool(p->module, t_llvm_bool, true);
+			// 		return cg_const_bool(p->module, t_bool, true);
 			// 	} else if (op_kind == Token_NotEq) {
-			// 		return cg_const_bool(p->module, t_llvm_bool, false);
+			// 		return cg_const_bool(p->module, t_bool, false);
 			// 	}
 			// } else if (is_type_union_maybe_pointer(t)) {
 			// 	cgValue tag = cg_emit_transmute(p, x, t_rawptr);
@@ -1867,13 +1867,12 @@ gb_internal cgValue cg_build_cond(cgProcedure *p, Ast *cond, TB_Node *true_block
 
 	cgValue v = {};
 	if (cg_is_expr_untyped_const(cond)) {
-		v = cg_expr_untyped_const_to_typed(p, cond, t_llvm_bool);
+		v = cg_expr_untyped_const_to_typed(p, cond, t_bool);
 	} else {
 		v = cg_build_expr(p, cond);
 	}
 
-	v = cg_emit_conv(p, v, t_llvm_bool);
-
+	GB_ASSERT(v.kind == cgValue_Value);
 	tb_inst_if(p->func, v.node, true_block, false_block);
 
 	return v;
