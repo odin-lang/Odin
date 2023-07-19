@@ -1273,6 +1273,258 @@ gb_internal void cg_build_switch_stmt(cgProcedure *p, Ast *node) {
 	cg_scope_close(p, cgDeferExit_Default, done);
 }
 
+gb_internal void cg_type_case_body(cgProcedure *p, Ast *label, Ast *clause, TB_Node *body_region, TB_Node *done_region) {
+	// ast_node(cc, CaseClause, clause);
+
+	// cg_push_target_list(p, label, done, nullptr, nullptr);
+	// cg_build_stmt_list(p, cc->stmts);
+	// cg_scope_close(p, cgDeferExit_Default, body_region);
+	// cg_pop_target_list(p);
+
+	// cg_emit_goto(p, done_region);
+}
+
+gb_internal void cg_build_type_switch_stmt(cgProcedure *p, Ast *node) {
+	ast_node(ss, TypeSwitchStmt, node);
+
+	cg_scope_open(p, ss->scope);
+
+	ast_node(as, AssignStmt, ss->tag);
+	GB_ASSERT(as->lhs.count == 1);
+	GB_ASSERT(as->rhs.count == 1);
+
+	cgValue parent = cg_build_expr(p, as->rhs[0]);
+	bool is_parent_ptr = is_type_pointer(parent.type);
+	Type *parent_base_type = type_deref(parent.type);
+	gb_unused(parent_base_type);
+
+	TypeSwitchKind switch_kind = check_valid_type_switch_type(parent.type);
+	GB_ASSERT(switch_kind != TypeSwitch_Invalid);
+
+
+	cgValue parent_value = parent;
+
+	cgValue parent_ptr = parent;
+	if (!is_parent_ptr) {
+		parent_ptr = cg_address_from_load_or_generate_local(p, parent);
+	}
+
+	cgValue tag = {};
+	cgValue union_data = {};
+	if (switch_kind == TypeSwitch_Union) {
+		union_data = cg_emit_conv(p, parent_ptr, t_rawptr);
+		Type *union_type = type_deref(parent_ptr.type);
+		if (is_type_union_maybe_pointer(union_type)) {
+			tag = cg_emit_conv(p, cg_emit_comp_against_nil(p, Token_NotEq, union_data), t_int);
+		} else if (union_tag_size(union_type) == 0) {
+			tag = {}; // there is no tag for a zero sized union
+		} else {
+			cgValue tag_ptr = cg_emit_union_tag_ptr(p, parent_ptr);
+			tag = cg_emit_load(p, tag_ptr);
+		}
+	} else if (switch_kind == TypeSwitch_Any) {
+		GB_PANIC("TODO(bill): type switch any");
+		tag = cg_emit_load(p, cg_emit_struct_ep(p, parent_ptr, 1));
+	} else {
+		GB_PANIC("Unknown switch kind");
+	}
+
+	ast_node(body, BlockStmt, ss->body);
+
+	TB_Node *done_region = cg_control_region(p, "typeswitch_done");
+	TB_Node *else_region = done_region;
+	TB_Node *default_region = nullptr;
+	isize num_cases = 0;
+
+	for (Ast *clause : body->stmts) {
+		ast_node(cc, CaseClause, clause);
+		num_cases += cc->list.count;
+		if (cc->list.count == 0) {
+			GB_ASSERT(default_region == nullptr);
+			default_region = cg_control_region(p, "typeswitch_default_body");
+			else_region = default_region;
+		}
+	}
+
+	bool all_by_reference = false;
+	for (Ast *clause : body->stmts) {
+		ast_node(cc, CaseClause, clause);
+		if (cc->list.count != 1) {
+			continue;
+		}
+		Entity *case_entity = implicit_entity_of_node(clause);
+		all_by_reference |= (case_entity->flags & EntityFlag_Value) == 0;
+		break;
+	}
+
+	TB_Node *backing_ptr = nullptr;
+	if (!all_by_reference) {
+		bool variants_found = false;
+		i64 max_size = 0;
+		i64 max_align = 1;
+		for (Ast *clause : body->stmts) {
+			ast_node(cc, CaseClause, clause);
+			if (cc->list.count != 1) {
+				continue;
+			}
+			Entity *case_entity = implicit_entity_of_node(clause);
+			if (!is_type_untyped_nil(case_entity->type)) {
+				max_size = gb_max(max_size, type_size_of(case_entity->type));
+				max_align = gb_max(max_align, type_align_of(case_entity->type));
+				variants_found = true;
+			}
+		}
+		if (variants_found) {
+			backing_ptr = tb_inst_local(p->func, cast(TB_CharUnits)max_size, cast(TB_CharUnits)max_align);
+		}
+	}
+
+	TEMPORARY_ALLOCATOR_GUARD();
+	TB_Node **control_regions = gb_alloc_array(temporary_allocator(), TB_Node *, body->stmts.count);
+	TB_SwitchEntry *switch_entries = gb_alloc_array(temporary_allocator(), TB_SwitchEntry, num_cases);
+
+	isize case_index = 0;
+	for_array(i, body->stmts) {
+		Ast *clause = body->stmts[i];
+		ast_node(cc, CaseClause, clause);
+		if (cc->list.count == 0) {
+			control_regions[i] = default_region;
+			continue;
+		}
+
+		TB_Node *region = cg_control_region(p, "typeswitch_body");
+		control_regions[i] = region;
+
+		for (Ast *type_expr : cc->list) {
+			Type *case_type = type_of_expr(type_expr);
+			i64 key = -1;
+			if (switch_kind == TypeSwitch_Union) {
+				Type *ut = base_type(type_deref(parent.type));
+				if (is_type_untyped_nil(case_type)) {
+					key = 0;
+				} else {
+					key = union_variant_index(ut, case_type);
+				}
+			} else if (switch_kind == TypeSwitch_Any) {
+				GB_PANIC("TODO(bill): any");
+				// if (is_type_untyped_nil(case_type)) {
+				// 	saw_nil = true;
+				// 	on_val = lb_const_nil(m, t_typeid);
+				// } else {
+				// 	on_val = lb_typeid(m, case_type);
+				// }
+			}
+			GB_ASSERT(key >= 0);
+
+			switch_entries[case_index++] = TB_SwitchEntry{key, region};
+		}
+	}
+
+	GB_ASSERT(case_index == num_cases);
+
+	{
+		TB_DataType dt = {};
+		TB_Node *key = nullptr;
+		if (type_size_of(parent_base_type) == 0) {
+			GB_ASSERT(tag.node == nullptr);
+			key = tb_inst_bool(p->func, false);
+			dt = cg_data_type(t_bool);
+		} else {
+			GB_ASSERT(tag.kind == cgValue_Value && tag.node != nullptr);
+			dt = cg_data_type(tag.type);
+			key = tag.node;
+		}
+
+		GB_ASSERT(!TB_IS_VOID_TYPE(dt));
+		tb_inst_branch(p->func, dt, key, else_region, num_cases, switch_entries);
+	}
+
+
+	for_array(i, body->stmts) {
+		Ast *clause = body->stmts[i];
+		ast_node(cc, CaseClause, clause);
+
+		bool saw_nil = false;
+		for (Ast *type_expr : cc->list) {
+			Type *case_type = type_of_expr(type_expr);
+			if (is_type_untyped_nil(case_type)) {
+				saw_nil = true;
+			}
+		}
+
+		Entity *case_entity = implicit_entity_of_node(clause);
+		bool by_reference = (case_entity->flags & EntityFlag_Value) == 0;
+
+		cg_scope_open(p, cc->scope);
+
+		TB_Node *body_region = control_regions[i];
+		tb_inst_set_control(p->func, body_region);
+
+		if (cc->list.count == 1 && !saw_nil) {
+			cgValue data = {};
+			if (switch_kind == TypeSwitch_Union) {
+				data = union_data;
+			} else if (switch_kind == TypeSwitch_Any) {
+				data = cg_emit_load(p, cg_emit_struct_ep(p, parent_ptr, 0));
+			}
+			GB_ASSERT(data.kind == cgValue_Value);
+
+			Type *ct = case_entity->type;
+			Type *ct_ptr = alloc_type_pointer(ct);
+
+			cgValue ptr = {};
+
+			if (backing_ptr) { // by value
+				GB_ASSERT(!by_reference);
+
+				i64 size = type_size_of(case_entity->type);
+				i64 align = type_align_of(case_entity->type);
+
+				// make a copy of the case value
+				tb_inst_memcpy(p->func,
+				               backing_ptr, // dst
+				               data.node,   // src
+				               tb_inst_uint(p->func, TB_TYPE_INT, size),
+				               cast(TB_CharUnits)align,
+				               false
+				);
+
+				ptr = cg_value(backing_ptr, ct_ptr);
+
+			} else { // by reference
+				GB_ASSERT(by_reference);
+				ptr = cg_emit_conv(p, data, ct_ptr);
+			}
+			GB_ASSERT(are_types_identical(case_entity->type, type_deref(ptr.type)));
+
+			cg_add_entity(p->module, case_entity, ptr);
+			String name = case_entity->token.string;
+			TB_Attrib *dbg = tb_function_attrib_variable(p->func, name.len, cast(char const *)name.text, cg_debug_type(p->module, ct));
+			tb_node_append_attrib(ptr.node, dbg);
+		} else {
+			if (case_entity->flags & EntityFlag_Value) {
+				// by value
+				cgAddr x = cg_add_local(p, case_entity->type, case_entity, false);
+				cg_addr_store(p, x, parent_value);
+			} else {
+				// by reference
+				cg_add_entity(p->module, case_entity, parent_value);
+			}
+		}
+
+		cg_push_target_list(p, ss->label, done_region, nullptr, nullptr);
+		cg_build_stmt_list(p, cc->stmts);
+		cg_scope_close(p, cgDeferExit_Default, body_region);
+		cg_pop_target_list(p);
+
+		cg_emit_goto(p, done_region);
+	}
+
+	cg_emit_goto(p, done_region);
+	tb_inst_set_control(p->func, done_region);
+	cg_scope_close(p, cgDeferExit_Default, done_region);
+}
+
 
 gb_internal void cg_build_stmt(cgProcedure *p, Ast *node) {
 	Ast *prev_stmt = p->curr_stmt;
@@ -1459,9 +1711,8 @@ gb_internal void cg_build_stmt(cgProcedure *p, Ast *node) {
 		cg_build_switch_stmt(p, node);
 	case_end;
 
-	case_ast_node(ss, TypeSwitchStmt, node);
-		GB_PANIC("TODO(bill): cg_build_type_switch_stmt");
-		// cg_build_type_switch_stmt(p, ss);
+	case_ast_node(ts, TypeSwitchStmt, node);
+		cg_build_type_switch_stmt(p, node);
 	case_end;
 
 	case_ast_node(ds, DeferStmt, node);

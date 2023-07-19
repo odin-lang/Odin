@@ -125,6 +125,26 @@ gb_internal cgValue cg_typeid(cgProcedure *p, Type *t) {
 	return {};
 }
 
+gb_internal cgValue cg_emit_union_tag_ptr(cgProcedure *p, cgValue const &parent_ptr) {
+	Type *t = parent_ptr.type;
+	Type *ut = base_type(type_deref(t));
+	GB_ASSERT_MSG(is_type_pointer(t), "%s", type_to_string(t));
+	GB_ASSERT_MSG(ut->kind == Type_Union, "%s", type_to_string(t));
+
+	GB_ASSERT(!is_type_union_maybe_pointer_original_alignment(ut));
+	GB_ASSERT(!is_type_union_maybe_pointer(ut));
+	GB_ASSERT(type_size_of(ut) > 0);
+
+	Type *tag_type = union_tag_type(ut);
+	i64 tag_offset = ut->Union.variant_block_size;
+
+	GB_ASSERT(parent_ptr.kind == cgValue_Value);
+	TB_Node *ptr = parent_ptr.node;
+	TB_Node *tag_ptr = tb_inst_member_access(p->func, ptr, tag_offset);
+	return cg_value(tag_ptr, alloc_type_pointer(tag_type));
+}
+
+
 
 gb_internal cgValue cg_correct_endianness(cgProcedure *p, cgValue value) {
 	Type *src = core_type(value.type);
@@ -166,7 +186,9 @@ gb_internal cgValue cg_emit_transmute(cgProcedure *p, cgValue value, Type *type)
 	case cgValue_Value:
 		GB_ASSERT(!TB_IS_VOID_TYPE(dt));
 		value.type = type;
-		value.node = tb_inst_bitcast(p->func, value.node, dt);
+		if (value.node->dt.raw != dt.raw) {
+			value.node = tb_inst_bitcast(p->func, value.node, dt);
+		}
 		return value;
 	case cgValue_Addr:
 		value.type = type;
@@ -1037,30 +1059,30 @@ gb_internal cgValue cg_emit_conv(cgProcedure *p, cgValue value, Type *t) {
 
 	// Pointer <-> Pointer
 	if (is_type_pointer(src) && is_type_pointer(dst)) {
-		return cg_value(tb_inst_bitcast(p->func, value.node, dt), t);
+		return cg_value(value.node, t);
 	}
 	if (is_type_multi_pointer(src) && is_type_pointer(dst)) {
-		return cg_value(tb_inst_bitcast(p->func, value.node, dt), t);
+		return cg_value(value.node, t);
 	}
 	if (is_type_pointer(src) && is_type_multi_pointer(dst)) {
-		return cg_value(tb_inst_bitcast(p->func, value.node, dt), t);
+		return cg_value(value.node, t);
 	}
 	if (is_type_multi_pointer(src) && is_type_multi_pointer(dst)) {
-		return cg_value(tb_inst_bitcast(p->func, value.node, dt), t);
+		return cg_value(value.node, t);
 	}
 
 	// proc <-> proc
 	if (is_type_proc(src) && is_type_proc(dst)) {
-		return cg_value(tb_inst_bitcast(p->func, value.node, dt), t);
+		return cg_value(value.node, t);
 	}
 
 	// pointer -> proc
 	if (is_type_pointer(src) && is_type_proc(dst)) {
-		return cg_value(tb_inst_bitcast(p->func, value.node, dt), t);
+		return cg_value(value.node, t);
 	}
 	// proc -> pointer
 	if (is_type_proc(src) && is_type_pointer(dst)) {
-		return cg_value(tb_inst_bitcast(p->func, value.node, dt), t);
+		return cg_value(value.node, t);
 	}
 
 	// []byte/[]u8 <-> string
