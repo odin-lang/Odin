@@ -120,7 +120,7 @@ gb_internal cgAddr cg_build_addr_from_entity(cgProcedure *p, Entity *e, Ast *exp
 	return cg_addr(v);
 }
 
-gb_internal cgValue cg_typeid(cgModule *m, Type *t) {
+gb_internal cgValue cg_typeid(cgProcedure *p, Type *t) {
 	GB_ASSERT("TODO(bill): cg_typeid");
 	return {};
 }
@@ -1747,10 +1747,10 @@ gb_internal cgValue cg_build_binary_expr(cgProcedure *p, Ast *expr) {
 			cgValue right = {};
 
 			if (be->left->tav.mode == Addressing_Type) {
-				left = cg_typeid(p->module, be->left->tav.type);
+				left = cg_typeid(p, be->left->tav.type);
 			}
 			if (be->right->tav.mode == Addressing_Type) {
-				right = cg_typeid(p->module, be->right->tav.type);
+				right = cg_typeid(p, be->right->tav.type);
 			}
 			if (left.node == nullptr)  left  = cg_build_expr(p, be->left);
 			if (right.node == nullptr) right = cg_build_expr(p, be->right);
@@ -1944,8 +1944,6 @@ gb_internal cgValue cg_build_expr(cgProcedure *p, Ast *expr) {
 
 
 gb_internal cgValue cg_build_expr_internal(cgProcedure *p, Ast *expr) {
-	cgModule *m = p->module;
-
 	expr = unparen_expr(expr);
 
 	TokenPos expr_pos = ast_token(expr).pos;
@@ -1964,7 +1962,7 @@ gb_internal cgValue cg_build_expr_internal(cgProcedure *p, Ast *expr) {
 		return cg_const_value(p, type, tv.value);
 	} else if (tv.mode == Addressing_Type) {
 		// NOTE(bill, 2023-01-16): is this correct? I hope so at least
-		return cg_typeid(m, tv.type);
+		return cg_typeid(p, tv.type);
 	}
 
 	switch (expr->kind) {

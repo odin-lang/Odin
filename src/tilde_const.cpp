@@ -63,7 +63,7 @@ gb_internal cgValue cg_const_value(cgModule *m, cgProcedure *p, Type *type, Exac
 		return cg_const_nil(p, type);
 
 	case ExactValue_Typeid:
-		return cg_typeid(m, value.value_typeid);
+		return cg_typeid(p, value.value_typeid);
 
 	case ExactValue_Procedure:
 		{
