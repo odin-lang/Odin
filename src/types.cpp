@@ -725,7 +725,7 @@ struct TypePath;
 
 gb_internal i64      type_size_of   (Type *t);
 gb_internal i64      type_align_of  (Type *t);
-gb_internal i64      type_offset_of (Type *t, i32 index, Type **field_type_=nullptr);
+gb_internal i64      type_offset_of (Type *t, i64 index, Type **field_type_=nullptr);
 gb_internal gbString type_to_string (Type *type, bool shorthand=true);
 gb_internal gbString type_to_string (Type *type, gbAllocator allocator, bool shorthand=true);
 gb_internal i64      type_size_of_internal(Type *t, TypePath *path);
@@ -3907,7 +3907,7 @@ gb_internal i64 type_size_of_internal(Type *t, TypePath *path) {
 	return build_context.ptr_size;
 }
 
-gb_internal i64 type_offset_of(Type *t, i32 index, Type **field_type_) {
+gb_internal i64 type_offset_of(Type *t, i64 index, Type **field_type_) {
 	t = base_type(t);
 	switch (t->kind) {
 	case Type_Struct:
@@ -3926,6 +3926,11 @@ gb_internal i64 type_offset_of(Type *t, i32 index, Type **field_type_) {
 			return t->Tuple.offsets[index];
 		}
 		break;
+
+	case Type_Array:
+		GB_ASSERT(0 <= index && index < t->Array.count);
+		return index * type_size_of(t->Array.elem);
+
 	case Type_Basic:
 		if (t->Basic.kind == Basic_string) {
 			switch (index) {
@@ -3999,8 +4004,10 @@ gb_internal i64 type_offset_of_from_selection(Type *type, Selection sel) {
 		i32 index = sel.index[i];
 		t = base_type(t);
 		offset += type_offset_of(t, index);
-		if (t->kind == Type_Struct && !t->Struct.is_raw_union) {
+		if (t->kind == Type_Struct) {
 			t = t->Struct.fields[index]->type;
+		} else if (t->kind == Type_Array) {
+			t = t->Array.elem;
 		} else {
 			// NOTE(bill): No need to worry about custom types, just need the alignment
 			switch (t->kind) {

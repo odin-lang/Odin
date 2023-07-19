@@ -139,9 +139,192 @@ gb_internal TB_Global *cg_global_const_string(cgModule *m, String const &str, Ty
 	return global;
 }
 
-gb_internal TB_Global *cg_global_const_comp_literal(cgModule *m, Type *type, Ast *value_compound, bool allow_local);
+gb_internal bool cg_elem_type_can_be_constant(Type *t) {
+	t = base_type(t);
+	if (t == t_invalid) {
+		return false;
+	}
+	if (is_type_dynamic_array(t) || is_type_map(t)) {
+		return false;
+	}
+	return true;
+}
 
-gb_internal bool cg_global_const_add_region(cgModule *m, TB_Global *global, ExactValue const &value, Type *type, i64 offset, bool allow_local) {
+
+gb_internal bool cg_is_elem_const(Ast *elem, Type *elem_type) {
+	if (!cg_elem_type_can_be_constant(elem_type)) {
+		return false;
+	}
+	if (elem->kind == Ast_FieldValue) {
+		elem = elem->FieldValue.value;
+	}
+	TypeAndValue tav = type_and_value_of_expr(elem);
+	GB_ASSERT_MSG(tav.mode != Addressing_Invalid, "%s %s", expr_to_string(elem), type_to_string(tav.type));
+	return tav.value.kind != ExactValue_Invalid;
+}
+
+gb_internal bool cg_is_nested_possibly_constant(Type *ft, Selection const &sel, Ast *elem) {
+	GB_ASSERT(!sel.indirect);
+	for (i32 index : sel.index) {
+		Type *bt = base_type(ft);
+		switch (bt->kind) {
+		case Type_Struct:
+			// if (bt->Struct.is_raw_union) {
+				// return false;
+			// }
+			ft = bt->Struct.fields[index]->type;
+			break;
+		case Type_Array:
+			ft = bt->Array.elem;
+			break;
+		default:
+			return false;
+		}
+	}
+	return cg_is_elem_const(elem, ft);
+}
+
+gb_internal i64 cg_global_const_calculate_region_count_from_basic_type(Type *type) {
+	type = core_type(type);
+
+	switch (type->kind) {
+	case Type_Basic:
+		switch (type->Basic.kind) {
+		case Basic_string:  // ^u8 + int
+		case Basic_any:     // rawptr + typeid
+			return 2;
+		}
+		return 1;
+	case Type_Pointer:
+	case Type_MultiPointer:
+	case Type_Proc:
+		return true;
+	case Type_Slice:
+		return 2;
+	case Type_DynamicArray:
+		return 5;
+	case Type_Map:
+		return 4;
+
+	case Type_Enum:
+	case Type_BitSet:
+		return 1;
+
+	case Type_RelativePointer:
+		return 1;
+	case Type_RelativeSlice:
+		return 1; // technically 1
+	case Type_Matrix:
+		return 1;
+
+	default:
+		GB_PANIC("TODO(bill): %s", type_to_string(type));
+		break;
+	}
+	return -1;
+}
+gb_internal isize cg_global_const_calculate_region_count(ExactValue const &value, Type *type) {
+	isize count = 0;
+	switch (value.kind) {
+	case ExactValue_Invalid:
+		break;
+	case ExactValue_Bool:
+	case ExactValue_Integer:
+	case ExactValue_Float:
+	case ExactValue_Pointer:
+	case ExactValue_Typeid:
+	case ExactValue_Complex:
+	case ExactValue_Quaternion:
+		count += 1;
+		break;
+
+	case ExactValue_Procedure:
+		count += 1;
+		break;
+
+	case ExactValue_String:
+		if (is_type_cstring(type) || is_type_array_like(type)) {
+			count += 1;
+		} else {
+			count += 2;
+		}
+		break;
+
+	case ExactValue_Compound: {
+		ast_node(cl, CompoundLit, value.value_compound);
+		Type *bt = base_type(type);
+		if (bt->kind == Type_Struct) {
+			if (cl->elems[0]->kind == Ast_FieldValue) {
+				isize elem_count = cl->elems.count;
+				for (isize i = 0; i < elem_count; i++) {
+					ast_node(fv, FieldValue, cl->elems[i]);
+					String name = fv->field->Ident.token.string;
+
+					Selection sel = lookup_field(type, name, false);
+					GB_ASSERT(!sel.indirect);
+
+					Entity *f = bt->Struct.fields[sel.index[0]];
+
+					if (!cg_elem_type_can_be_constant(f->type)) {
+						continue;
+					}
+
+					if (sel.index.count == 1) {
+						count += cg_global_const_calculate_region_count(fv->value->tav.value, f->type);
+					} else {
+						TEMPORARY_ALLOCATOR_GUARD();
+						isize idx_list_len = sel.index.count-1;
+						isize *idx_list = gb_alloc_array(temporary_allocator(), isize, idx_list_len);
+
+						count += 1; // just in case
+						if (cg_is_nested_possibly_constant(type, sel, fv->value)) {
+							Type *cv_type = f->type;
+							for (isize j = 1; j < sel.index.count; j++) {
+								i32 index = sel.index[j];
+								Type *cvt = base_type(cv_type);
+
+								idx_list[j-1] = index;
+								if (cvt->kind == Type_Struct) {
+									cv_type = cvt->Struct.fields[index]->type;
+								} else if (cvt->kind == Type_Array) {
+									cv_type = cvt->Array.elem;
+								} else {
+									GB_PANIC("UNKNOWN TYPE: %s", type_to_string(cv_type));
+								}
+							}
+
+							count += cg_global_const_calculate_region_count(fv->value->tav.value, cv_type);
+						}
+					}
+				}
+			} else {
+				for_array(i, cl->elems) {
+					i64 field_index = i;
+					Ast *elem = cl->elems[i];
+					TypeAndValue tav = elem->tav;
+					Entity *f = bt->Struct.fields[field_index];
+					if (!cg_elem_type_can_be_constant(f->type)) {
+						continue;
+					}
+
+					ExactValue value = {};
+					if (tav.mode != Addressing_Invalid) {
+						value = tav.value;
+					}
+					count += cg_global_const_calculate_region_count(value, type);
+				}
+			}
+		} else {
+			GB_PANIC("TODO(bill): %s", type_to_string(type));
+		}
+	}break;
+	}
+	return count;
+}
+
+gb_internal TB_Global *cg_global_const_comp_literal(cgModule *m, Type *type, ExactValue const &value, TB_Global *global, i64 base_offset);
+
+gb_internal bool cg_global_const_add_region(cgModule *m, TB_Global *global, ExactValue const &value, Type *type, i64 offset) {
 	GB_ASSERT(is_type_endian_little(type));
 	GB_ASSERT(!is_type_different_to_arch_endianness(type));
 
@@ -198,8 +381,8 @@ gb_internal bool cg_global_const_add_region(cgModule *m, TB_Global *global, Exac
 
 		case ExactValue_Compound:
 			{
-				TB_Global *nested_global = cg_global_const_comp_literal(m, type, value.value_compound, allow_local);
-				tb_global_add_symbol_reloc(m->mod, global, offset, cast(TB_Symbol *)nested_global);
+				TB_Global *out_global = cg_global_const_comp_literal(m, type, value, global, offset);
+				GB_ASSERT(out_global == global);
 			}
 			break;
 
@@ -269,32 +452,36 @@ gb_internal bool cg_global_const_add_region(cgModule *m, TB_Global *global, Exac
 }
 
 
-gb_internal TB_Global *cg_global_const_comp_literal(cgModule *m, Type *type, Ast *value_compound, bool allow_local) {
-	Type *original_type = type;
-	if (is_type_struct(type)) {
-		ast_node(cl, CompoundLit, value_compound);
+gb_internal TB_Global *cg_global_const_comp_literal(cgModule *m, Type *original_type, ExactValue const &value, TB_Global *global, i64 base_offset) {
+	GB_ASSERT(value.kind == ExactValue_Compound);
+	Ast *value_compound = value.value_compound;
+	ast_node(cl, CompoundLit, value_compound);
 
-		Type *bt = base_type(type);
+	TEMPORARY_ALLOCATOR_GUARD();
 
+	if (global == nullptr) {
 		char name[32] = {};
 		gb_snprintf(name, 31, "complit$%u", 1+m->const_nil_guid.fetch_add(1));
-		TB_Global *global = tb_global_create(m->mod, -1, name, cg_debug_type(m, original_type), TB_LINKAGE_PRIVATE);
+		global = tb_global_create(m->mod, -1, name, cg_debug_type(m, original_type), TB_LINKAGE_PRIVATE);
 		i64 size = type_size_of(original_type);
 		i64 align = type_align_of(original_type);
 
 		// READ ONLY?
 		TB_ModuleSection *section = tb_module_get_rdata(m->mod);
-		if (cl->elems.count == 0/* || bt->Struct.is_raw_union*/) {
+		if (cl->elems.count == 0) {
 			tb_global_set_storage(m->mod, section, global, size, align, 0);
 			return global;
 		}
 
-		TEMPORARY_ALLOCATOR_GUARD();
-		isize value_count = bt->Struct.fields.count;
-		// cgValue * values  = gb_alloc_array(temporary_allocator(), cgValue, value_count);
-		bool *   visited  = gb_alloc_array(temporary_allocator(), bool,  value_count);
-		tb_global_set_storage(m->mod, section, global, size, align, value_count);
 
+		isize global_region_count = cg_global_const_calculate_region_count(value, original_type);
+		tb_global_set_storage(m->mod, section, global, size, align, global_region_count);
+		gb_printf_err("global_region_count %td\n", global_region_count);
+	}
+
+
+	Type *bt = base_type(original_type);
+	if (bt->kind == Type_Struct) {
 		if (cl->elems[0]->kind == Ast_FieldValue) {
 			isize elem_count = cl->elems.count;
 			for (isize i = 0; i < elem_count; i++) {
@@ -303,65 +490,18 @@ gb_internal TB_Global *cg_global_const_comp_literal(cgModule *m, Type *type, Ast
 
 				TypeAndValue tav = fv->value->tav;
 				GB_ASSERT(tav.mode != Addressing_Invalid);
+				ExactValue value = tav.value;
 
-				Selection sel = lookup_field(type, name, false);
+				Selection sel = lookup_field(bt, name, false);
 				GB_ASSERT(!sel.indirect);
 
-				Entity *f = bt->Struct.fields[sel.index[0]];
-				i64 index = f->Variable.field_index;
-				if (elem_type_can_be_constant(f->type)) {
-					if (sel.index.count == 1) {
-						i64 offset = bt->Struct.offsets[index];
-						if (cg_global_const_add_region(m, global, fv->value->tav.value, f->type, offset, allow_local)) {
-							visited[i] = true;
-							continue;
-						}
-					} else {
-						// if (!visited[index]) {
-							GB_PANIC("using struct fields");
-						// 	values[index] = lb_const_value(m, f->type, {}, false).value;
-						// 	visited[index] = true;
-						// }
-						// unsigned idx_list_len = cast(unsigned)sel.index.count-1;
-						// unsigned *idx_list = gb_alloc_array(temporary_allocator(), unsigned, idx_list_len);
+				if (!cg_is_nested_possibly_constant(bt, sel, fv->value)) {
+					continue;
+				}
 
-						// if (lb_is_nested_possibly_constant(type, sel, fv->value)) {
-						// 	bool is_constant = true;
-						// 	Type *cv_type = f->type;
-						// 	for (isize j = 1; j < sel.index.count; j++) {
-						// 		i32 index = sel.index[j];
-						// 		Type *cvt = base_type(cv_type);
-
-						// 		if (cvt->kind == Type_Struct) {
-						// 			if (cvt->Struct.is_raw_union) {
-						// 				// sanity check which should have been caught by `lb_is_nested_possibly_constant`
-						// 				is_constant = false;
-						// 				break;
-						// 			}
-						// 			cv_type = cvt->Struct.fields[index]->type;
-
-						// 			if (is_type_struct(cvt)) {
-						// 				auto cv_field_remapping = lb_get_struct_remapping(m, cvt);
-						// 				unsigned remapped_index = cast(unsigned)cv_field_remapping[index];
-						// 				idx_list[j-1] = remapped_index;
-						// 			} else {
-						// 				idx_list[j-1] = cast(unsigned)index;
-						// 			}
-						// 		} else if (cvt->kind == Type_Array) {
-						// 			cv_type = cvt->Array.elem;
-
-						// 			idx_list[j-1] = cast(unsigned)index;
-						// 		} else {
-						// 			GB_PANIC("UNKNOWN TYPE: %s", type_to_string(cv_type));
-						// 		}
-						// 	}
-						// 	if (is_constant) {
-						// 		LLVMValueRef elem_value = lb_const_value(m, tav.type, tav.value, allow_local).value;
-						// 		GB_ASSERT(LLVMIsConstant(elem_value));
-						// 		values[index] = LLVMConstInsertValue(values[index], elem_value, idx_list, idx_list_len);
-						// 	}
-						// }
-					}
+				i64 offset = type_offset_of_from_selection(bt, sel);
+				if (cg_global_const_add_region(m, global, value, sel.entity->type, base_offset+offset)) {
+					continue;
 				}
 			}
 		} else {
@@ -370,7 +510,7 @@ gb_internal TB_Global *cg_global_const_comp_literal(cgModule *m, Type *type, Ast
 				Ast *elem = cl->elems[i];
 				TypeAndValue tav = elem->tav;
 				Entity *f = bt->Struct.fields[field_index];
-				if (!elem_type_can_be_constant(f->type)) {
+				if (!cg_elem_type_can_be_constant(f->type)) {
 					continue;
 				}
 
@@ -380,8 +520,7 @@ gb_internal TB_Global *cg_global_const_comp_literal(cgModule *m, Type *type, Ast
 				if (tav.mode != Addressing_Invalid) {
 					value = tav.value;
 				}
-				if (cg_global_const_add_region(m, global, value, f->type, offset, allow_local)) {
-					visited[i] = true;
+				if (cg_global_const_add_region(m, global, value, f->type, base_offset+offset)) {
 					continue;
 				}
 			}
@@ -390,15 +529,13 @@ gb_internal TB_Global *cg_global_const_comp_literal(cgModule *m, Type *type, Ast
 		return global;
 	}
 
-	GB_PANIC("TODO(bill): constant compound literal for %s", type_to_string(type));
+	GB_PANIC("TODO(bill): constant compound literal for %s", type_to_string(original_type));
 	return nullptr;
 }
 
 
-gb_internal cgValue cg_const_value(cgModule *m, cgProcedure *p, Type *type, ExactValue const &value, bool allow_local_ = true) {
+gb_internal cgValue cg_const_value(cgModule *m, cgProcedure *p, Type *type, ExactValue const &value) {
 	TB_Node *node = nullptr;
-
-	bool allow_local = allow_local_ && p != nullptr;
 
 	TB_DataType dt = cg_data_type(type);
 
@@ -470,7 +607,7 @@ gb_internal cgValue cg_const_value(cgModule *m, cgProcedure *p, Type *type, Exac
 
 	case ExactValue_Compound:
 		{
-			TB_Symbol *symbol = cast(TB_Symbol *)cg_global_const_comp_literal(m, type, value.value_compound, allow_local);
+			TB_Symbol *symbol = cast(TB_Symbol *)cg_global_const_comp_literal(m, type, value, nullptr, 0);
 			if (p) {
 				TB_Node *node = tb_inst_get_symbol_address(p->func, symbol);
 				return cg_lvalue_addr(node, type);
