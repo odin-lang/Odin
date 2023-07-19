@@ -1185,7 +1185,7 @@ handle_op:;
 		}
 	}
 
-	TB_ArithmeticBehavior arith_behavior = cast(TB_ArithmeticBehavior)50;
+	TB_ArithmeticBehavior arith_behavior = cast(TB_ArithmeticBehavior)0;
 
 	Type *integral_type = type;
 	if (is_type_simd_vector(integral_type)) {
@@ -2065,13 +2065,13 @@ gb_internal cgValue cg_build_expr_internal(cgProcedure *p, Ast *expr) {
 
 		Type *type = default_type(type_of_expr(expr));
 
-		incoming_values[0] = cg_emit_conv(p, cg_build_expr(p, te->x), type);
+		incoming_values [0] = cg_emit_conv(p, cg_build_expr(p, te->x), type);
 		incoming_regions[0] = tb_inst_get_control(p->func);
 
 		tb_inst_goto(p->func, done);
 		tb_inst_set_control(p->func, else_);
 
-		incoming_values[1] = cg_emit_conv(p, cg_build_expr(p, te->y), type);
+		incoming_values [1] = cg_emit_conv(p, cg_build_expr(p, te->y), type);
 		incoming_regions[1] = tb_inst_get_control(p->func);
 
 		tb_inst_goto(p->func, done);
@@ -2080,6 +2080,7 @@ gb_internal cgValue cg_build_expr_internal(cgProcedure *p, Ast *expr) {
 		GB_ASSERT(incoming_values[0].kind == cgValue_Value ||
 		          incoming_values[0].kind == cgValue_Addr);
 		GB_ASSERT(incoming_values[0].kind == incoming_values[1].kind);
+
 		cgValue res = {};
 		res.kind = incoming_values[0].kind;
 		res.type = type;

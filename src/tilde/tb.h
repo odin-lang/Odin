@@ -33,8 +33,9 @@
 
 // These are flags
 typedef enum TB_ArithmeticBehavior {
-    TB_ARITHMATIC_NSW = 1,
-    TB_ARITHMATIC_NUW = 2,
+    TB_ARITHMATIC_NONE = 0,
+    TB_ARITHMATIC_NSW  = 1,
+    TB_ARITHMATIC_NUW  = 2,
 } TB_ArithmeticBehavior;
 
 typedef enum TB_DebugFormat {

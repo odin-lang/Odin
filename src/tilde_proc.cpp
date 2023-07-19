@@ -244,13 +244,13 @@ gb_internal void cg_procedure_end(cgProcedure *p) {
 	}
 	// if (p->name == "main") {
 	if (p->name == "bug.main") {
-		// TB_Arena *arena = tb_default_arena();
-		// defer (arena->free(arena));
-		// TB_FuncOpt *opt = tb_funcopt_enter(p->func, arena);
-		// defer (tb_funcopt_exit(opt));
-		// tb_funcopt_print(opt);
+		TB_Arena *arena = tb_default_arena();
+		defer (arena->free(arena));
+		TB_FuncOpt *opt = tb_funcopt_enter(p->func, arena);
+		defer (tb_funcopt_exit(opt));
+		tb_funcopt_print(opt);
 
-		tb_function_print(p->func, tb_default_print_callback, stdout);
+		// tb_function_print(p->func, tb_default_print_callback, stdout);
 	}
 	tb_module_compile_function(p->module->mod, p->func, TB_ISEL_FAST);
 }
