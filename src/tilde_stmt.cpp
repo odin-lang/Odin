@@ -945,6 +945,130 @@ gb_internal void cg_build_for_stmt(cgProcedure *p, Ast *node) {
 	}
 	tb_inst_set_control(p->func, done);
 }
+gb_internal void cg_build_switch_stmt(cgProcedure *p, Ast *node) {
+	ast_node(ss, SwitchStmt, node);
+	cg_scope_open(p, ss->scope);
+
+	if (ss->init != nullptr) {
+		cg_build_stmt(p, ss->init);
+	}
+	cgValue tag = {};
+	if (ss->tag != nullptr) {
+		tag = cg_build_expr(p, ss->tag);
+	} else {
+		tag = cg_const_bool(p, t_bool, true);
+	}
+
+	TB_Node *done = tb_inst_region_with_name(p->func, -1, "switch_done");
+
+	ast_node(body, BlockStmt, ss->body);
+
+	isize case_count = body->stmts.count;
+	Slice<Ast *> default_stmts = {};
+	TB_Node *default_fall  = nullptr;
+	TB_Node *default_block = nullptr;
+	Scope *  default_scope = nullptr;
+	TB_Node *fall = nullptr;
+
+	auto body_blocks = slice_make<TB_Node *>(permanent_allocator(), body->stmts.count);
+	auto body_scopes = slice_make<Scope *>(permanent_allocator(), body->stmts.count);
+	for_array(i, body->stmts) {
+		Ast *clause = body->stmts[i];
+		ast_node(cc, CaseClause, clause);
+
+		body_blocks[i] = tb_inst_region_with_name(p->func, -1, cc->list.count == 0 ? "switch_default_body" : "switch_case_body");
+		body_scopes[i] = cc->scope;
+		if (cc->list.count == 0) {
+			default_block = body_blocks[i];
+			default_scope = cc->scope;
+		}
+	}
+
+	for_array(i, body->stmts) {
+		Ast *clause = body->stmts[i];
+		ast_node(cc, CaseClause, clause);
+
+		TB_Node *body = body_blocks[i];
+		Scope *body_scope = body_scopes[i];
+		fall = done;
+		if (i+1 < case_count) {
+			fall = body_blocks[i+1];
+		}
+
+		if (cc->list.count == 0) {
+			// default case
+			default_stmts = cc->stmts;
+			default_fall  = fall;
+			default_block = body;
+			continue;
+		}
+
+		TB_Node *next_cond = nullptr;
+		for (Ast *expr : cc->list) {
+			expr = unparen_expr(expr);
+
+			next_cond = tb_inst_region_with_name(p->func, -1, "switch_case_next");
+
+			cgValue cond = {};
+			if (is_ast_range(expr)) {
+				ast_node(ie, BinaryExpr, expr);
+				TokenKind op = Token_Invalid;
+				switch (ie->op.kind) {
+				case Token_Ellipsis:  op = Token_LtEq; break;
+				case Token_RangeFull: op = Token_LtEq; break;
+				case Token_RangeHalf: op = Token_Lt;   break;
+				default: GB_PANIC("Invalid interval operator"); break;
+				}
+				cgValue lhs = cg_build_expr(p, ie->left);
+				cgValue rhs = cg_build_expr(p, ie->right);
+
+				cgValue cond_lhs = cg_emit_comp(p, Token_LtEq, lhs, tag);
+				cgValue cond_rhs = cg_emit_comp(p, op, tag, rhs);
+				cond = cg_emit_arith(p, Token_And, cond_lhs, cond_rhs, t_bool);
+			} else {
+				if (expr->tav.mode == Addressing_Type) {
+					GB_ASSERT(is_type_typeid(tag.type));
+					cgValue e = cg_typeid(p->module, expr->tav.type);
+					e = cg_emit_conv(p, e, tag.type);
+					cond = cg_emit_comp(p, Token_CmpEq, tag, e);
+				} else {
+					cond = cg_emit_comp(p, Token_CmpEq, tag, cg_build_expr(p, expr));
+				}
+			}
+
+			GB_ASSERT(cond.kind == cgValue_Value);
+			tb_inst_if(p->func, cond.node, body, next_cond);
+			tb_inst_set_control(p->func, next_cond);
+		}
+
+		tb_inst_set_control(p->func, body);
+
+		cg_push_target_list(p, ss->label, done, nullptr, fall);
+		cg_scope_open(p, body_scope);
+		cg_build_stmt_list(p, cc->stmts);
+		cg_scope_close(p, cgDeferExit_Default, body);
+		cg_pop_target_list(p);
+
+		tb_inst_goto(p->func, done);
+		tb_inst_set_control(p->func, next_cond);
+	}
+
+	if (default_block != nullptr) {
+		tb_inst_goto(p->func, default_block);
+		tb_inst_set_control(p->func, default_block);
+
+		cg_push_target_list(p, ss->label, done, nullptr, default_fall);
+		cg_scope_open(p, default_scope);
+		cg_build_stmt_list(p, default_stmts);
+		cg_scope_close(p, cgDeferExit_Default, default_block);
+		cg_pop_target_list(p);
+	}
+
+	tb_inst_goto(p->func, done);
+	tb_inst_set_control(p->func, done);
+
+	cg_scope_close(p, cgDeferExit_Default, done);
+}
 
 
 gb_internal void cg_build_stmt(cgProcedure *p, Ast *node) {
@@ -1139,6 +1263,10 @@ gb_internal void cg_build_stmt(cgProcedure *p, Ast *node) {
 
 	case_ast_node(fs, ForStmt, node);
 		cg_build_for_stmt(p, node);
+	case_end;
+
+	case_ast_node(fs, SwitchStmt, node);
+		cg_build_switch_stmt(p, node);
 	case_end;
 
 	default:

@@ -123,3 +123,6 @@ gb_internal cgValue cg_const_value(cgProcedure *p, Type *type, ExactValue const 
 gb_internal cgValue cg_const_int(cgProcedure *p, Type *type, i64 i) {
 	return cg_const_value(p, type, exact_value_i64(i));
 }
+gb_internal cgValue cg_const_bool(cgProcedure *p, Type *type, bool v) {
+	return cg_value(tb_inst_bool(p->func, v), type);
+}
