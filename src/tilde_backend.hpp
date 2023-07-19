@@ -111,7 +111,7 @@ struct cgTargetList {
 	TB_Node *     fallthrough_;
 };
 
-struct cgBranchBlocks {
+struct cgBranchRegions {
 	Ast *    label;
 	TB_Node *break_;
 	TB_Node *continue_;
@@ -123,10 +123,35 @@ enum cgDeferExitKind {
 	cgDeferExit_Branch,
 };
 
+enum cgDeferKind {
+	cgDefer_Node,
+	cgDefer_Proc,
+};
+
+struct cgDefer {
+	cgDeferKind kind;
+	isize       scope_index;
+	isize       context_stack_count;
+	TB_Node *   control_region;
+	union {
+		Ast *stmt;
+		struct {
+			cgValue deferred;
+			Slice<cgValue> result_as_args;
+		} proc;
+	};
+};
+
+
 struct cgContextData {
 	cgAddr ctx;
 	isize scope_index;
 	isize uses;
+};
+
+struct cgControlRegion {
+	TB_Node *control_region;
+	isize    scope_index;
 };
 
 struct cgProcedure {
@@ -162,15 +187,18 @@ struct cgProcedure {
 
 	Ast *curr_stmt;
 
-	cgTargetList *        target_list;
-	Array<cgBranchBlocks> branch_blocks;
+	cgTargetList *         target_list;
+	Array<cgDefer>         defer_stack;
+	Array<Scope *>         scope_stack;
+	Array<cgContextData>   context_stack;
+
+	Array<cgControlRegion> control_regions;
+	Array<cgBranchRegions> branch_regions;
 
 	Scope *curr_scope;
 	i32    scope_index;
 	bool   in_multi_assignment;
 
-	Array<Scope *>       scope_stack;
-	Array<cgContextData> context_stack;
 
 	PtrMap<Entity *, cgAddr> variable_map;
 };
@@ -275,20 +303,5 @@ gb_internal cgValue cg_emit_arith(cgProcedure *p, TokenKind op, cgValue lhs, cgV
 
 gb_internal bool    cg_emit_goto(cgProcedure *p, TB_Node *control_region);
 
-gb_internal TB_Node *tb_inst_region_with_name(TB_Function *f, ptrdiff_t n, char const *name) {
-	#if 1
-	if (n < 0) {
-		n = gb_strlen(name);
-	}
-	static std::atomic<u32> id;
 
-	char *new_name = gb_alloc_array(temporary_allocator(), char, n+12);
-	n = -1 + gb_snprintf(new_name, n+11, "%.*s_%u", cast(int)n, name, 1+id.fetch_add(1));
-
-	name = new_name;
-	#endif
-
-	TB_Node *region = tb_inst_region(f);
-	tb_inst_set_region_name(region, n, name);
-	return region;
-}
+gb_internal TB_Node *cg_control_region(cgProcedure *p, char const *name);

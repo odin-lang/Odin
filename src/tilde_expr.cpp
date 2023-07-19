@@ -1850,13 +1850,13 @@ gb_internal cgValue cg_build_cond(cgProcedure *p, Ast *cond, TB_Node *true_block
 
 	case_ast_node(be, BinaryExpr, cond);
 		if (be->op.kind == Token_CmpAnd) {
-			TB_Node *block = tb_inst_region_with_name(p->func, -1, "cmp_and");
+			TB_Node *block = cg_control_region(p, "cmp_and");
 			cg_build_cond(p, be->left, block, false_block);
 			tb_inst_set_control(p->func, block);
 			cg_build_cond(p, be->right, true_block, false_block);
 			return no_comptime_short_circuit;
 		} else if (be->op.kind == Token_CmpOr) {
-			TB_Node *block = tb_inst_region_with_name(p->func, -1, "cmp_or");
+			TB_Node *block = cg_control_region(p, "cmp_or");
 			cg_build_cond(p, be->left, true_block, block);
 			tb_inst_set_control(p->func, block);
 			cg_build_cond(p, be->right, true_block, false_block);
@@ -2048,9 +2048,9 @@ gb_internal cgValue cg_build_expr_internal(cgProcedure *p, Ast *expr) {
 		cgValue incoming_values[2] = {};
 		TB_Node *incoming_regions[2] = {};
 
-		TB_Node *then  = tb_inst_region_with_name(p->func, -1, "if_then");
-		TB_Node *done  = tb_inst_region_with_name(p->func, -1, "if_done");
-		TB_Node *else_ = tb_inst_region_with_name(p->func, -1, "if_else");
+		TB_Node *then  = cg_control_region(p, "if_then");
+		TB_Node *done  = cg_control_region(p, "if_done");
+		TB_Node *else_ = cg_control_region(p, "if_else");
 
 		cg_build_cond(p, te->cond, then, else_);
 		tb_inst_set_control(p->func, then);

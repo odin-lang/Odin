@@ -66,13 +66,15 @@ gb_internal cgProcedure *cg_procedure_create(cgModule *m, Entity *entity, bool i
 
 	gbAllocator a = heap_allocator();
 	p->children.allocator      = a;
-	// p->defer_stmts.allocator   = a;
-	// p->blocks.allocator        = a;
-	p->branch_blocks.allocator = a;
-	p->context_stack.allocator = a;
+
+	p->defer_stack.allocator   = a;
 	p->scope_stack.allocator   = a;
+	p->context_stack.allocator = a;
+
+	p->control_regions.allocator = a;
+	p->branch_regions.allocator = a;
+
 	map_init(&p->variable_map);
-	// map_init(&p->tuple_fix_map, 0);
 
 	TB_Linkage linkage = TB_LINKAGE_PRIVATE;
 	if (p->is_export) {
@@ -126,13 +128,15 @@ gb_internal cgProcedure *cg_procedure_create_dummy(cgModule *m, String const &li
 
 	gbAllocator a = heap_allocator();
 	p->children.allocator      = a;
-	// p->defer_stmts.allocator   = a;
-	// p->blocks.allocator        = a;
-	p->branch_blocks.allocator = a;
-	p->scope_stack.allocator = a;
+
+	p->defer_stack.allocator   = a;
+	p->scope_stack.allocator   = a;
 	p->context_stack.allocator = a;
+
+	p->control_regions.allocator = a;
+	p->branch_regions.allocator = a;
+
 	map_init(&p->variable_map);
-	// map_init(&p->tuple_fix_map, 0);
 
 
 	TB_Linkage linkage = TB_LINKAGE_PRIVATE;
@@ -170,8 +174,8 @@ gb_internal void cg_procedure_begin(cgProcedure *p) {
 	if (decl != nullptr) {
 		for_array(i, decl->labels) {
 			BlockLabel bl = decl->labels[i];
-			cgBranchBlocks bb = {bl.label, nullptr, nullptr};
-			array_add(&p->branch_blocks, bb);
+			cgBranchRegions bb = {bl.label, nullptr, nullptr};
+			array_add(&p->branch_regions, bb);
 		}
 	}
 

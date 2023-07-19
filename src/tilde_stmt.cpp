@@ -6,6 +6,23 @@ gb_internal bool cg_emit_goto(cgProcedure *p, TB_Node *control_region) {
 	return false;
 }
 
+gb_internal TB_Node *cg_control_region(cgProcedure *p, char const *name) {
+	TEMPORARY_ALLOCATOR_GUARD();
+
+	isize n = gb_strlen(name);
+
+	char *new_name = gb_alloc_array(temporary_allocator(), char, n+12);
+	n = -1 + gb_snprintf(new_name, n+11, "%.*s_%u", cast(int)n, name, p->control_regions.count);
+
+	TB_Node *region = tb_inst_region(p->func);
+	tb_inst_set_region_name(region, n, new_name);
+
+	GB_ASSERT(p->scope_index >= 0);
+	array_add(&p->control_regions, cgControlRegion{region, p->scope_index});
+
+	return region;
+}
+
 gb_internal cgValue cg_emit_load(cgProcedure *p, cgValue const &ptr, bool is_volatile) {
 	GB_ASSERT(is_type_pointer(ptr.type));
 	Type *type = type_deref(ptr.type);
@@ -604,18 +621,18 @@ gb_internal cgValue cg_emit_deep_field_gep(cgProcedure *p, cgValue e, Selection 
 
 
 
-gb_internal cgBranchBlocks cg_lookup_branch_blocks(cgProcedure *p, Ast *ident) {
+gb_internal cgBranchRegions cg_lookup_branch_regions(cgProcedure *p, Ast *ident) {
 	GB_ASSERT(ident->kind == Ast_Ident);
 	Entity *e = entity_of_node(ident);
 	GB_ASSERT(e->kind == Entity_Label);
-	for (cgBranchBlocks const &b : p->branch_blocks) {
+	for (cgBranchRegions const &b : p->branch_regions) {
 		if (b.label == e->Label.node) {
 			return b;
 		}
 	}
 
 	GB_PANIC("Unreachable");
-	cgBranchBlocks empty = {};
+	cgBranchRegions empty = {};
 	return empty;
 }
 
@@ -630,7 +647,7 @@ gb_internal cgTargetList *cg_push_target_list(cgProcedure *p, Ast *label, TB_Nod
 	if (label != nullptr) { // Set label blocks
 		GB_ASSERT(label->kind == Ast_Label);
 
-		for (cgBranchBlocks &b : p->branch_blocks) {
+		for (cgBranchRegions &b : p->branch_regions) {
 			GB_ASSERT(b.label != nullptr && label != nullptr);
 			GB_ASSERT(b.label->kind == Ast_Label);
 			if (b.label == label) {
@@ -701,16 +718,97 @@ gb_internal cgValue cg_address_from_load_or_generate_local(cgProcedure *p, cgVal
 }
 
 
-gb_internal void cg_scope_open(cgProcedure *p, Scope *scope) {
-	// TODO(bill): cg_scope_open
+gb_internal void cg_build_defer_stmt(cgProcedure *p, cgDefer const &d) {
+	TB_Node *curr_region = tb_inst_get_control(p->func);
+	if (curr_region == nullptr) {
+		return;
+	}
+
+	// NOTE(bill): The prev block may defer injection before it's terminator
+	TB_Node *last_instr = nullptr;
+	if (curr_region->input_count) {
+		last_instr = *(curr_region->inputs + curr_region->input_count);
+	}
+	if (last_instr && TB_IS_NODE_TERMINATOR(last_instr->type)) {
+		// NOTE(bill): ReturnStmt defer stuff will be handled previously
+		return;
+	}
+
+	isize prev_context_stack_count = p->context_stack.count;
+	GB_ASSERT(prev_context_stack_count <= p->context_stack.capacity);
+	defer (p->context_stack.count = prev_context_stack_count);
+	p->context_stack.count = d.context_stack_count;
+
+	TB_Node *b = cg_control_region(p, "defer");
+	if (last_instr == nullptr) {
+		cg_emit_goto(p, b);
+	}
+
+	tb_inst_set_control(p->func, b);
+	if (d.kind == cgDefer_Node) {
+		cg_build_stmt(p, d.stmt);
+	} else if (d.kind == cgDefer_Proc) {
+		cg_emit_call(p, d.proc.deferred, d.proc.result_as_args);
+	}
 }
 
-gb_internal void cg_scope_close(cgProcedure *p, cgDeferExitKind kind, TB_Node *control_region, bool pop_stack=true) {
-	// TODO(bill): cg_scope_close
-}
 
 gb_internal void cg_emit_defer_stmts(cgProcedure *p, cgDeferExitKind kind, TB_Node *control_region) {
-	// TODO(bill): cg_emit_defer_stmts
+	isize count = p->defer_stack.count;
+	isize i = count;
+	while (i --> 0) {
+		cgDefer const &d = p->defer_stack[i];
+
+		if (kind == cgDeferExit_Default) {
+			if (p->scope_index == d.scope_index &&
+			    d.scope_index > 0) {
+				cg_build_defer_stmt(p, d);
+				array_pop(&p->defer_stack);
+				continue;
+			} else {
+				break;
+			}
+		} else if (kind == cgDeferExit_Return) {
+			cg_build_defer_stmt(p, d);
+		} else if (kind == cgDeferExit_Branch) {
+			GB_PANIC("TODO(bill): cgDeferExit_Branch");
+			GB_ASSERT(control_region != nullptr);
+			isize lower_limit = -1;
+			for (auto const &cr : p->control_regions) {
+				if (cr.control_region == control_region) {
+					lower_limit = cr.scope_index;
+					break;
+				}
+			}
+			GB_ASSERT(lower_limit >= 0);
+			if (lower_limit < d.scope_index) {
+				cg_build_defer_stmt(p, d);
+			}
+		}
+	}
+}
+
+gb_internal void cg_scope_open(cgProcedure *p, Scope *scope) {
+	// TODO(bill): debug scope information
+
+	p->scope_index += 1;
+	array_add(&p->scope_stack, scope);
+}
+
+gb_internal void cg_scope_close(cgProcedure *p, cgDeferExitKind kind, TB_Node *control_region) {
+	cg_emit_defer_stmts(p, kind, control_region);
+	GB_ASSERT(p->scope_index > 0);
+
+	while (p->context_stack.count > 0) {
+		auto *ctx = &p->context_stack[p->context_stack.count-1];
+		if (ctx->scope_index < p->scope_index) {
+			break;
+		}
+		array_pop(&p->context_stack);
+	}
+
+	p->scope_index -= 1;
+	array_pop(&p->scope_stack);
 }
 
 
@@ -864,17 +962,17 @@ gb_internal void cg_build_if_stmt(cgProcedure *p, Ast *node) {
 	defer (cg_scope_close(p, cgDeferExit_Default, nullptr));
 
 	if (is->init != nullptr) {
-		TB_Node *init = tb_inst_region_with_name(p->func, -1, "if_init");
+		TB_Node *init = cg_control_region(p, "if_init");
 		cg_emit_goto(p, init);
 		tb_inst_set_control(p->func, init);
 		cg_build_stmt(p, is->init);
 	}
 
-	TB_Node *then  = tb_inst_region_with_name(p->func, -1, "if_then");
-	TB_Node *done  = tb_inst_region_with_name(p->func, -1, "if_done");
+	TB_Node *then  = cg_control_region(p, "if_then");
+	TB_Node *done  = cg_control_region(p, "if_done");
 	TB_Node *else_ = done;
 	if (is->else_stmt != nullptr) {
-		else_ = tb_inst_region_with_name(p->func, -1, "if_else");
+		else_ = cg_control_region(p, "if_else");
 	}
 
 	cgValue cond = cg_build_cond(p, is->cond, then, else_);
@@ -916,20 +1014,20 @@ gb_internal void cg_build_for_stmt(cgProcedure *p, Ast *node) {
 	defer (cg_scope_close(p, cgDeferExit_Default, nullptr));
 
 	if (fs->init != nullptr) {
-		TB_Node *init = tb_inst_region_with_name(p->func, -1, "for_init");
+		TB_Node *init = cg_control_region(p, "for_init");
 		cg_emit_goto(p, init);
 		tb_inst_set_control(p->func, init);
 		cg_build_stmt(p, fs->init);
 	}
-	TB_Node *body = tb_inst_region_with_name(p->func, -1, "for_body");
-	TB_Node *done = tb_inst_region_with_name(p->func, -1, "for_done");
+	TB_Node *body = cg_control_region(p, "for_body");
+	TB_Node *done = cg_control_region(p, "for_done");
 	TB_Node *loop = body;
 	if (fs->cond != nullptr) {
-		loop = tb_inst_region_with_name(p->func, -1, "for_loop");
+		loop = cg_control_region(p, "for_loop");
 	}
 	TB_Node *post = loop;
 	if (fs->post != nullptr) {
-		post = tb_inst_region_with_name(p->func, -1, "for_post");
+		post = cg_control_region(p, "for_post");
 	}
 
 	cg_emit_goto(p, loop);
@@ -1018,7 +1116,7 @@ gb_internal void cg_build_switch_stmt(cgProcedure *p, Ast *node) {
 		tag = cg_const_bool(p, t_bool, true);
 	}
 
-	TB_Node *done = tb_inst_region_with_name(p->func, -1, "switch_done");
+	TB_Node *done = cg_control_region(p, "switch_done");
 
 	ast_node(body, BlockStmt, ss->body);
 
@@ -1036,7 +1134,7 @@ gb_internal void cg_build_switch_stmt(cgProcedure *p, Ast *node) {
 		Ast *clause = body->stmts[i];
 		ast_node(cc, CaseClause, clause);
 
-		body_regions[i] = tb_inst_region_with_name(p->func, -1, cc->list.count == 0 ? "switch_default_body" : "switch_case_body");
+		body_regions[i] = cg_control_region(p, cc->list.count == 0 ? "switch_default_body" : "switch_case_body");
 		body_scopes[i] = cc->scope;
 		if (cc->list.count == 0) {
 			default_block = body_regions[i];
@@ -1110,7 +1208,7 @@ gb_internal void cg_build_switch_stmt(cgProcedure *p, Ast *node) {
 		if (!is_trivial) for (Ast *expr : cc->list) {
 			expr = unparen_expr(expr);
 
-			next_cond = tb_inst_region_with_name(p->func, -1, "switch_case_next");
+			next_cond = cg_control_region(p, "switch_case_next");
 
 			cgValue cond = {};
 			if (is_ast_range(expr)) {
@@ -1231,7 +1329,7 @@ gb_internal void cg_build_stmt(cgProcedure *p, Ast *node) {
 	case_ast_node(bs, BlockStmt, node);
 		TB_Node *done = nullptr;
 		if (bs->label != nullptr) {
-			done = tb_inst_region_with_name(p->func, -1, "block_done");
+			done = cg_control_region(p, "block_done");
 			cgTargetList *tl = cg_push_target_list(p, bs->label, done, nullptr, nullptr);
 			tl->is_block = true;
 		}
@@ -1316,7 +1414,7 @@ gb_internal void cg_build_stmt(cgProcedure *p, Ast *node) {
  		TB_Node *block = nullptr;
 
 		if (bs->label != nullptr) {
-			cgBranchBlocks bb = cg_lookup_branch_blocks(p, bs->label);
+			cgBranchRegions bb = cg_lookup_branch_regions(p, bs->label);
 			switch (bs->token.kind) {
 			case Token_break:    block = bb.break_;    break;
 			case Token_continue: block = bb.continue_; break;
