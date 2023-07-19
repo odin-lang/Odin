@@ -68,7 +68,7 @@ gb_internal cgProcedure *cg_procedure_create(cgModule *m, Entity *entity, bool i
 	p->children.allocator      = a;
 	// p->defer_stmts.allocator   = a;
 	// p->blocks.allocator        = a;
-	// p->branch_blocks.allocator = a;
+	p->branch_blocks.allocator = a;
 	p->context_stack.allocator = a;
 	p->scope_stack.allocator   = a;
 	map_init(&p->variable_map);
@@ -128,7 +128,7 @@ gb_internal cgProcedure *cg_procedure_create_dummy(cgModule *m, String const &li
 	p->children.allocator      = a;
 	// p->defer_stmts.allocator   = a;
 	// p->blocks.allocator        = a;
-	// p->branch_blocks.allocator = a;
+	p->branch_blocks.allocator = a;
 	p->scope_stack.allocator = a;
 	p->context_stack.allocator = a;
 	map_init(&p->variable_map);
@@ -163,6 +163,16 @@ gb_internal void cg_procedure_begin(cgProcedure *p) {
 
 	if (p->body == nullptr) {
 		return;
+	}
+
+
+	DeclInfo *decl = decl_info_of_entity(p->entity);
+	if (decl != nullptr) {
+		for_array(i, decl->labels) {
+			BlockLabel bl = decl->labels[i];
+			cgBranchBlocks bb = {bl.label, nullptr, nullptr};
+			array_add(&p->branch_blocks, bb);
+		}
 	}
 
 	GB_ASSERT(p->type->kind == Type_Proc);

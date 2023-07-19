@@ -1330,14 +1330,10 @@ gb_internal void cg_build_stmt(cgProcedure *p, Ast *node) {
 				}
 			}
 		}
-		if (block != nullptr) {
-			cg_emit_defer_stmts(p, cgDeferExit_Branch, block);
-		}
+		GB_ASSERT(block != nullptr);
 
-
+		cg_emit_defer_stmts(p, cgDeferExit_Branch, block);
 		tb_inst_goto(p->func, block);
-		tb_inst_set_control(p->func, block);
-		tb_inst_unreachable(p->func);
 
 		tb_inst_set_control(p->func, prev_block);
 	case_end;
