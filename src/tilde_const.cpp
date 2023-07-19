@@ -253,10 +253,10 @@ gb_internal isize cg_global_const_calculate_region_count(ExactValue const &value
 	case ExactValue_Compound: {
 		ast_node(cl, CompoundLit, value.value_compound);
 		Type *bt = base_type(type);
-		if (bt->kind == Type_Struct) {
+		switch (bt->kind) {
+		case Type_Struct:
 			if (cl->elems[0]->kind == Ast_FieldValue) {
-				isize elem_count = cl->elems.count;
-				for (isize i = 0; i < elem_count; i++) {
+				for (isize i = 0; i < cl->elems.count; i++) {
 					ast_node(fv, FieldValue, cl->elems[i]);
 					String name = fv->field->Ident.token.string;
 
@@ -314,8 +314,44 @@ gb_internal isize cg_global_const_calculate_region_count(ExactValue const &value
 					count += cg_global_const_calculate_region_count(value, type);
 				}
 			}
-		} else {
+			break;
+		case Type_Array:
+			if (!cg_elem_type_can_be_constant(bt->Array.elem)) {
+				break;
+			}
+			for (Ast *elem : cl->elems) {
+				if (elem->kind == Ast_FieldValue) {
+					ast_node(fv, FieldValue, elem);
+					ExactValue const &value = elem->FieldValue.value->tav.value;
+					if (is_ast_range(fv->field)) {
+						ast_node(ie, BinaryExpr, fv->field);
+						TypeAndValue lo_tav = ie->left->tav;
+						TypeAndValue hi_tav = ie->right->tav;
+						GB_ASSERT(lo_tav.mode == Addressing_Constant);
+						GB_ASSERT(hi_tav.mode == Addressing_Constant);
+
+						TokenKind op = ie->op.kind;
+						i64 lo = exact_value_to_i64(lo_tav.value);
+						i64 hi = exact_value_to_i64(hi_tav.value);
+						if (op != Token_RangeHalf) {
+							hi += 1;
+						}
+
+						for (i64 i = lo; i < hi; i++) {
+							count += cg_global_const_calculate_region_count(value, bt->Array.elem);
+						}
+					} else {
+						count += cg_global_const_calculate_region_count(value, bt->Array.elem);
+					}
+				} else {
+					ExactValue const &value = elem->tav.value;
+					count += cg_global_const_calculate_region_count(value, bt->Array.elem);
+				}
+			}
+			break;
+		default:
 			GB_PANIC("TODO(bill): %s", type_to_string(type));
+			break;
 		}
 	}break;
 	}
@@ -479,9 +515,13 @@ gb_internal TB_Global *cg_global_const_comp_literal(cgModule *m, Type *original_
 		gb_printf_err("global_region_count %td\n", global_region_count);
 	}
 
+	if (cl->elems.count == 0) {
+		return global;
+	}
 
 	Type *bt = base_type(original_type);
-	if (bt->kind == Type_Struct) {
+	switch (bt->kind) {
+	case Type_Struct:
 		if (cl->elems[0]->kind == Ast_FieldValue) {
 			isize elem_count = cl->elems.count;
 			for (isize i = 0; i < elem_count; i++) {
@@ -500,9 +540,7 @@ gb_internal TB_Global *cg_global_const_comp_literal(cgModule *m, Type *original_
 				}
 
 				i64 offset = type_offset_of_from_selection(bt, sel);
-				if (cg_global_const_add_region(m, global, value, sel.entity->type, base_offset+offset)) {
-					continue;
-				}
+				cg_global_const_add_region(m, global, value, sel.entity->type, base_offset+offset);
 			}
 		} else {
 			for_array(i, cl->elems) {
@@ -520,9 +558,54 @@ gb_internal TB_Global *cg_global_const_comp_literal(cgModule *m, Type *original_
 				if (tav.mode != Addressing_Invalid) {
 					value = tav.value;
 				}
-				if (cg_global_const_add_region(m, global, value, f->type, base_offset+offset)) {
-					continue;
+				cg_global_const_add_region(m, global, value, f->type, base_offset+offset);
+			}
+		}
+		return global;
+
+	case Type_Array:
+		if (cl->elems[0]->kind == Ast_FieldValue) {
+			Type *et = bt->Array.elem;
+			i64 elem_size = type_size_of(et);
+			for (Ast *elem : cl->elems) {
+				ast_node(fv, FieldValue, elem);
+
+				ExactValue const &value = fv->value->tav.value;
+
+				if (is_ast_range(fv->field)) {
+					ast_node(ie, BinaryExpr, fv->field);
+					TypeAndValue lo_tav = ie->left->tav;
+					TypeAndValue hi_tav = ie->right->tav;
+					GB_ASSERT(lo_tav.mode == Addressing_Constant);
+					GB_ASSERT(hi_tav.mode == Addressing_Constant);
+
+					TokenKind op = ie->op.kind;
+					i64 lo = exact_value_to_i64(lo_tav.value);
+					i64 hi = exact_value_to_i64(hi_tav.value);
+					if (op != Token_RangeHalf) {
+						hi += 1;
+					}
+
+					for (i64 i = lo; i < hi; i++) {
+						i64 offset = i * elem_size;
+						cg_global_const_add_region(m, global, value, et, base_offset+offset);
+					}
+				} else {
+					TypeAndValue index_tav = fv->field->tav;
+					GB_ASSERT(index_tav.mode == Addressing_Constant);
+					i64 i = exact_value_to_i64(index_tav.value);
+					i64 offset = i * elem_size;
+					cg_global_const_add_region(m, global, value, et, base_offset+offset);
 				}
+			}
+		} else {
+			Type *et = bt->Array.elem;
+			i64 elem_size = type_size_of(et);
+			i64 offset = 0;
+			for (Ast *elem : cl->elems) {
+				ExactValue const &value = elem->tav.value;
+				cg_global_const_add_region(m, global, value, et, base_offset+offset);
+				offset += elem_size;
 			}
 		}
 
