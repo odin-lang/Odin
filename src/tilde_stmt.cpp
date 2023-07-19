@@ -725,14 +725,14 @@ gb_internal void cg_build_defer_stmt(cgProcedure *p, cgDefer const &d) {
 	}
 
 	// NOTE(bill): The prev block may defer injection before it's terminator
-	TB_Node *last_instr = nullptr;
-	if (curr_region->input_count) {
-		last_instr = *(curr_region->inputs + curr_region->input_count);
-	}
-	if (last_instr && TB_IS_NODE_TERMINATOR(last_instr->type)) {
-		// NOTE(bill): ReturnStmt defer stuff will be handled previously
-		return;
-	}
+	TB_Node *last_inst = nullptr;
+	// if (curr_region->input_count) {
+	// 	last_inst = *(curr_region->inputs + curr_region->input_count);
+	// }
+	// if (last_inst && TB_IS_NODE_TERMINATOR(last_inst->type)) {
+	// 	// NOTE(bill): ReturnStmt defer stuff will be handled previously
+	// 	return;
+	// }
 
 	isize prev_context_stack_count = p->context_stack.count;
 	GB_ASSERT(prev_context_stack_count <= p->context_stack.capacity);
@@ -740,7 +740,7 @@ gb_internal void cg_build_defer_stmt(cgProcedure *p, cgDefer const &d) {
 	p->context_stack.count = d.context_stack_count;
 
 	TB_Node *b = cg_control_region(p, "defer");
-	if (last_instr == nullptr) {
+	if (last_inst == nullptr) {
 		cg_emit_goto(p, b);
 	}
 
@@ -771,7 +771,6 @@ gb_internal void cg_emit_defer_stmts(cgProcedure *p, cgDeferExitKind kind, TB_No
 		} else if (kind == cgDeferExit_Return) {
 			cg_build_defer_stmt(p, d);
 		} else if (kind == cgDeferExit_Branch) {
-			GB_PANIC("TODO(bill): cgDeferExit_Branch");
 			GB_ASSERT(control_region != nullptr);
 			isize lower_limit = -1;
 			for (auto const &cr : p->control_regions) {
@@ -1464,6 +1463,23 @@ gb_internal void cg_build_stmt(cgProcedure *p, Ast *node) {
 	case_ast_node(fs, SwitchStmt, node);
 		cg_build_switch_stmt(p, node);
 	case_end;
+
+	case_ast_node(ds, DeferStmt, node);
+		Type *pt = base_type(p->type);
+		GB_ASSERT(pt->kind == Type_Proc);
+		if (pt->Proc.calling_convention == ProcCC_Odin) {
+			GB_ASSERT(p->context_stack.count != 0);
+		}
+
+		cgDefer *d = array_add_and_get(&p->defer_stack);
+		d->kind = cgDefer_Node;
+		d->scope_index = p->scope_index;
+		d->context_stack_count = p->context_stack.count;
+		d->control_region = tb_inst_get_control(p->func);
+		GB_ASSERT(d->control_region != nullptr);
+		d->stmt = ds->stmt;
+	case_end;
+
 
 	default:
 		GB_PANIC("TODO cg_build_stmt %.*s", LIT(ast_strings[node->kind]));

@@ -181,11 +181,8 @@ gb_internal void cg_procedure_begin(cgProcedure *p) {
 
 	GB_ASSERT(p->type->kind == Type_Proc);
 	TypeProc *pt = &p->type->Proc;
-	if (pt->params == nullptr) {
-		return;
-	}
 	int param_index = 0;
-	for (Entity *e : pt->params->Tuple.variables) {
+	if (pt->params != nullptr) for (Entity *e : pt->params->Tuple.variables) {
 		if (e->kind != Entity_Variable) {
 			continue;
 		}
@@ -246,6 +243,28 @@ gb_internal void cg_procedure_begin(cgProcedure *p) {
 		// 		lb_add_debug_param_variable(p, ptr.value, e->type, e->token, param_index+1, p->decl_block, arg_type->kind);
 		// 	}
 		// }
+	}
+
+	if (p->type->Proc.calling_convention == ProcCC_Odin) {
+		// NOTE(bill): Push context on to stack from implicit parameter
+
+		String name = str_lit("__.context_ptr");
+
+		Entity *e = alloc_entity_param(nullptr, make_token_ident(name), t_context_ptr, false, false);
+		e->flags |= EntityFlag_NoAlias;
+
+		TB_Node *param = p->param_nodes[p->param_nodes.count-1];
+		param = tb_inst_load(p->func, TB_TYPE_PTR, param, cast(TB_CharUnits)build_context.ptr_size, false);
+
+		cgValue local = cg_value(param, t_context_ptr);
+		cgAddr addr = cg_addr(local);
+		map_set(&p->variable_map, e, addr);
+
+
+		cgContextData *cd = array_add_and_get(&p->context_stack);
+		cd->ctx = addr;
+		cd->scope_index = -1;
+		cd->uses = +1; // make sure it has been used already
 	}
 }
 
