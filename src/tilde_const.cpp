@@ -291,27 +291,9 @@ gb_internal isize cg_global_const_calculate_region_count(ExactValue const &value
 					if (sel.index.count == 1) {
 						count += cg_global_const_calculate_region_count(fv->value->tav.value, f->type);
 					} else {
-						TEMPORARY_ALLOCATOR_GUARD();
-						isize idx_list_len = sel.index.count-1;
-						isize *idx_list = gb_alloc_array(temporary_allocator(), isize, idx_list_len);
-
 						count += 1; // just in case
 						if (cg_is_nested_possibly_constant(type, sel, fv->value)) {
-							Type *cv_type = f->type;
-							for (isize j = 1; j < sel.index.count; j++) {
-								i32 index = sel.index[j];
-								Type *cvt = base_type(cv_type);
-
-								idx_list[j-1] = index;
-								if (cvt->kind == Type_Struct) {
-									cv_type = cvt->Struct.fields[index]->type;
-								} else if (cvt->kind == Type_Array) {
-									cv_type = cvt->Array.elem;
-								} else {
-									GB_PANIC("UNKNOWN TYPE: %s", type_to_string(cv_type));
-								}
-							}
-
+							Type *cv_type = sel.entity->type;
 							count += cg_global_const_calculate_region_count(fv->value->tav.value, cv_type);
 						}
 					}
@@ -475,6 +457,7 @@ gb_internal bool cg_global_const_add_region(cgModule *m, ExactValue const &value
 		return true;
 	}
 
+	GB_ASSERT(!is_type_array_like(bt));
 
 	switch (value.kind) {
 	case ExactValue_Bool:
