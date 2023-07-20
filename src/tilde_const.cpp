@@ -243,6 +243,14 @@ gb_internal isize cg_global_const_calculate_region_count(ExactValue const &value
 
 		i64 base_count = cg_global_const_calculate_region_count(value, elem);
 		return base_count * type->Array.count;
+	} else if (is_type_matrix(type) &&
+		value.kind != ExactValue_Invalid &&
+		value.kind != ExactValue_Compound) {
+		return 1;
+	} else if (is_type_simd_vector(type) &&
+		value.kind != ExactValue_Invalid &&
+		value.kind != ExactValue_Compound) {
+		return 1;
 	}
 
 	isize count = 0;
@@ -430,6 +438,8 @@ gb_internal bool cg_global_const_add_region(cgModule *m, ExactValue const &value
 	} else if (is_type_matrix(type) &&
 		value.kind != ExactValue_Invalid &&
 		value.kind != ExactValue_Compound) {
+		GB_PANIC("TODO(bill): matrices");
+
 		i64 row = bt->Matrix.row_count;
 		i64 column = bt->Matrix.column_count;
 		GB_ASSERT(row == column);
@@ -437,23 +447,23 @@ gb_internal bool cg_global_const_add_region(cgModule *m, ExactValue const &value
 		Type *elem = bt->Matrix.elem;
 
 		i64 elem_size = type_size_of(elem);
+		gb_unused(elem_size);
 
-		for (i64 i = 0; i < row; i++) {
-			i64 index = matrix_indices_to_offset(type, i, i);
-			cg_global_const_add_region(m, value, elem, global, offset+(index * elem_size));
-		}
+		// 1 region in memory, not many
 
 		return true;
 	} else if (is_type_simd_vector(type) &&
 		value.kind != ExactValue_Invalid &&
 		value.kind != ExactValue_Compound) {
 
+		GB_PANIC("TODO(bill): #simd vectors");
+
 		Type *et = type->SimdVector.elem;
 		i64 elem_size = type_size_of(et);
+		gb_unused(elem_size);
 
-		for (i64 i = 0; i < bt->SimdVector.count; i++) {
-			cg_global_const_add_region(m, value, et, global, offset+(i * elem_size));
-		}
+		// 1 region in memory, not many
+
 		return true;
 	}
 
@@ -775,9 +785,11 @@ gb_internal cgValue cg_const_value(cgModule *m, cgProcedure *p, Type *type, Exac
 
 	switch (value.kind) {
 	case ExactValue_Invalid:
+		GB_ASSERT(p != nullptr);
 		return cg_const_nil(p, type);
 
 	case ExactValue_Typeid:
+		GB_ASSERT(p != nullptr);
 		return cg_typeid(p, value.value_typeid);
 
 	case ExactValue_Procedure:
@@ -787,6 +799,10 @@ gb_internal cgValue cg_const_value(cgModule *m, cgProcedure *p, Type *type, Exac
 			if (e != nullptr) {
 				cgValue found = cg_find_procedure_value_from_entity(m, e);
 				GB_ASSERT(are_types_identical(type, found.type));
+				GB_ASSERT(found.kind == cgValue_Symbol);
+				if (p) {
+					return cg_flatten_value(p, found);
+				}
 				return found;
 			}
 			GB_PANIC("TODO(bill): cg_const_value ExactValue_Procedure");
@@ -796,10 +812,12 @@ gb_internal cgValue cg_const_value(cgModule *m, cgProcedure *p, Type *type, Exac
 
 	switch (value.kind) {
 	case ExactValue_Bool:
+		GB_ASSERT(p != nullptr);
 		GB_ASSERT(!TB_IS_VOID_TYPE(dt));
 		return cg_value(tb_inst_uint(p->func, dt, value.value_bool), type);
 
 	case ExactValue_Integer:
+		GB_ASSERT(p != nullptr);
 		GB_ASSERT(!TB_IS_VOID_TYPE(dt));
 		// GB_ASSERT(dt.raw != TB_TYPE_I128.raw);
 		if (is_type_unsigned(type)) {
@@ -812,6 +830,7 @@ gb_internal cgValue cg_const_value(cgModule *m, cgProcedure *p, Type *type, Exac
 		break;
 
 	case ExactValue_Float:
+		GB_ASSERT(p != nullptr);
 		GB_ASSERT(!TB_IS_VOID_TYPE(dt));
 		GB_ASSERT(dt.raw != TB_TYPE_F16.raw);
 		GB_ASSERT(!is_type_different_to_arch_endianness(type));
