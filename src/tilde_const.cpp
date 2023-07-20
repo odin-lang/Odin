@@ -110,7 +110,7 @@ gb_internal TB_Global *cg_global_const_string(cgModule *m, String const &str, Ty
 	char name[32] = {};
 	gb_snprintf(name, 31, "csb$%u", 1+m->const_nil_guid.fetch_add(1));
 
-	TB_Global *str_global = tb_global_create(m->mod, -1, name, cg_debug_type(m, t_cstring), TB_LINKAGE_PRIVATE);
+	TB_Global *str_global = tb_global_create(m->mod, -1, name, nullptr, TB_LINKAGE_PRIVATE);
 	i64 size = str.len+1;
 	tb_global_set_storage(m->mod, tb_module_get_rdata(m->mod), str_global, size, 1, 1);
 	u8 *data = cast(u8 *)tb_global_add_region(m->mod, str_global, 0, size);
@@ -127,7 +127,6 @@ gb_internal TB_Global *cg_global_const_string(cgModule *m, String const &str, Ty
 	if (global == nullptr) {
 		global = tb_global_create(m->mod, -1, name, cg_debug_type(m, type), TB_LINKAGE_PRIVATE);
 		tb_global_set_storage(m->mod, tb_module_get_rdata(m->mod), str_global, type_size_of(type), type_align_of(type), 2);
-
 	}
 
 	tb_global_add_symbol_reloc(m->mod, global, offset+0, cast(TB_Symbol *)str_global);
@@ -222,10 +221,34 @@ gb_internal i64 cg_global_const_calculate_region_count_from_basic_type(Type *typ
 	return -1;
 }
 gb_internal isize cg_global_const_calculate_region_count(ExactValue const &value, Type *type) {
+	Type *bt = base_type(type);
+	if (is_type_array(type) && value.kind == ExactValue_String && !is_type_u8(core_array_type(type))) {
+		if (is_type_rune_array(type)) {
+			return 1;
+		}
+
+		Type *et = base_array_type(type);
+		i64 base_count = 2;
+		if (is_type_cstring(et)) {
+			base_count = 1;
+		}
+		return base_count * bt->Array.count;
+	} else if (is_type_u8_array(type) && value.kind == ExactValue_String) {
+		return 1;
+	} else if (is_type_array(type) &&
+		value.kind != ExactValue_Invalid &&
+		value.kind != ExactValue_String &&
+		value.kind != ExactValue_Compound) {
+		Type *elem = type->Array.elem;
+
+		i64 base_count = cg_global_const_calculate_region_count(value, elem);
+		return base_count * type->Array.count;
+	}
+
 	isize count = 0;
 	switch (value.kind) {
 	case ExactValue_Invalid:
-		break;
+		return 0;
 	case ExactValue_Bool:
 	case ExactValue_Integer:
 	case ExactValue_Float:
@@ -233,22 +256,18 @@ gb_internal isize cg_global_const_calculate_region_count(ExactValue const &value
 	case ExactValue_Typeid:
 	case ExactValue_Complex:
 	case ExactValue_Quaternion:
-		count += 1;
-		break;
+		return 1;
 
 	case ExactValue_Procedure:
-		count += 1;
-		break;
+		return 1;
 
 	case ExactValue_String:
 		if (is_type_string(type)) {
-			count += 2;
+			return 2;
 		} else if (is_type_cstring(type) || is_type_array_like(type)) {
-			count += 1;
-		} else {
-			count += 2;
+			return 1;
 		}
-		break;
+		return 2;
 
 	case ExactValue_Compound: {
 		ast_node(cl, CompoundLit, value.value_compound);
@@ -354,15 +373,12 @@ gb_internal isize cg_global_const_calculate_region_count(ExactValue const &value
 		} break;
 
 		case Type_BitSet:
-			count += 1;
-			break;
+			return 1;
 		case Type_Matrix:
-			count += 1;
-			break;
+			return 1;
 
 		case Type_Slice:
-			count += 2;
-			break;
+			return 2;
 
 		default:
 			GB_PANIC("TODO(bill): %s", type_to_string(type));
@@ -379,124 +395,192 @@ gb_internal bool cg_global_const_add_region(cgModule *m, ExactValue const &value
 	GB_ASSERT(is_type_endian_little(type));
 	GB_ASSERT(!is_type_different_to_arch_endianness(type));
 
+	GB_ASSERT(global != nullptr);
+
 	i64 size = type_size_of(type);
-	if (value.kind != ExactValue_Invalid) {
-		switch (value.kind) {
-		case ExactValue_Bool:
-			{
-				bool *res = cast(bool *)tb_global_add_region(m->mod, global, offset, size);
-				*res = !!value.value_bool;
-			}
-			break;
+	if (value.kind == ExactValue_Invalid) {
+		return false;
+	}
+	if (is_type_array(type) && value.kind == ExactValue_String && !is_type_u8(core_array_type(type))) {
+		if (is_type_rune_array(type)) {
+			i64 count = type->Array.count;
+			Rune rune;
+			isize rune_offset = 0;
+			isize width = 1;
+			String s = value.value_string;
 
-		case ExactValue_Integer:
-			{
-				void *res = tb_global_add_region(m->mod, global, offset, size);
-				cg_write_big_int_at_ptr(res, &value.value_integer, type);
-			}
-			break;
+			Rune *runes = cast(Rune *)tb_global_add_region(m->mod, global, offset, count*4);
 
-		case ExactValue_Float:
-			{
-				f64 f = exact_value_to_f64(value);
-				void *res = tb_global_add_region(m->mod, global, offset, size);
-				switch (size) {
-				case 2: *(u16 *)res = f32_to_f16(cast(f32)f); break;
-				case 4: *(f32 *)res = cast(f32)f;             break;
-				case 8: *(f64 *)res = cast(f64)f;             break;
-				}
-			}
-			break;
+			for (i64 i = 0; i < count && rune_offset < s.len; i++) {
+				width = utf8_decode(s.text+rune_offset, s.len-rune_offset, &rune);
+				runes[i] = rune;
+				rune_offset += width;
 
-		case ExactValue_Pointer:
-			{
-				void *res = tb_global_add_region(m->mod, global, offset, size);
-				*(u64 *)res = exact_value_to_u64(value);
 			}
-			break;
+			GB_ASSERT(offset == s.len);
+			return true;
+		}
+		Type *bt = base_type(type);
+		Type *et = bt->Array.elem;
+		i64 elem_size = type_size_of(et);
 
-		case ExactValue_String:
-			cg_global_const_string(m, value.value_string, type, global, offset);
-			break;
-
-		case ExactValue_Typeid:
-			{
-				void *dst = tb_global_add_region(m->mod, global, offset, size);
-				u64 id = cg_typeid_as_u64(m, value.value_typeid);
-				cg_write_uint_at_ptr(dst, id, t_typeid);
-			}
-			break;
-
-		case ExactValue_Compound:
-			{
-				TB_Global *out_global = cg_global_const_comp_literal(m, type, value, global, offset);
-				GB_ASSERT(out_global == global);
-			}
-			break;
-
-		case ExactValue_Procedure:
-			GB_PANIC("TODO(bill): nested procedure values/literals\n");
-			break;
-		case ExactValue_Complex:
-			{
-				Complex128 c = {};
-				if (value.value_complex) {
-					c = *value.value_complex;
-				}
-				void *res = tb_global_add_region(m->mod, global, offset, size);
-				switch (size) {
-				case 4:
-					((u16 *)res)[0] = f32_to_f16(cast(f32)c.real);
-					((u16 *)res)[1] = f32_to_f16(cast(f32)c.imag);
-					break;
-				case 8:
-					((f32 *)res)[0] = cast(f32)c.real;
-					((f32 *)res)[1] = cast(f32)c.imag;
-					break;
-				case 16:
-					((f64 *)res)[0] = cast(f64)c.real;
-					((f64 *)res)[1] = cast(f64)c.imag;
-					break;
-				}
-			}
-			break;
-		case ExactValue_Quaternion:
-			{
-				// @QuaternionLayout
-				Quaternion256 q = {};
-				if (value.value_quaternion) {
-					q = *value.value_quaternion;
-				}
-				void *res = tb_global_add_region(m->mod, global, offset, size);
-				switch (size) {
-				case 8:
-					((u16 *)res)[0] = f32_to_f16(cast(f32)q.imag);
-					((u16 *)res)[1] = f32_to_f16(cast(f32)q.jmag);
-					((u16 *)res)[2] = f32_to_f16(cast(f32)q.kmag);
-					((u16 *)res)[3] = f32_to_f16(cast(f32)q.real);
-					break;
-				case 16:
-					((f32 *)res)[0] = cast(f32)q.imag;
-					((f32 *)res)[1] = cast(f32)q.jmag;
-					((f32 *)res)[2] = cast(f32)q.kmag;
-					((f32 *)res)[3] = cast(f32)q.real;
-					break;
-				case 32:
-					((f64 *)res)[0] = cast(f64)q.imag;
-					((f64 *)res)[1] = cast(f64)q.jmag;
-					((f64 *)res)[2] = cast(f64)q.kmag;
-					((f64 *)res)[3] = cast(f64)q.real;
-					break;
-				}
-			}
-			break;
-		default:
-			GB_PANIC("%s", type_to_string(type));
-			break;
+		for (i64 i = 0; i < bt->Array.count; i++) {
+			cg_global_const_add_region(m, value, et, global, offset+(i * elem_size));
 		}
 		return true;
+	} else if (is_type_u8_array(type) && value.kind == ExactValue_String) {
+		u8 *dst = cast(u8 *)tb_global_add_region(m->mod, global, offset, size);
+		gb_memcopy(dst, value.value_string.text, gb_min(value.value_string.len, size));
+		return true;
+	} else if (is_type_array(type) &&
+		value.kind != ExactValue_Invalid &&
+		value.kind != ExactValue_String &&
+		value.kind != ExactValue_Compound) {
+
+		Type *bt = base_type(type);
+		Type *et = bt->Array.elem;
+		i64 elem_size = type_size_of(et);
+
+		for (i64 i = 0; i < bt->Array.count; i++) {
+			cg_global_const_add_region(m, value, et, global, offset+(i * elem_size));
+		}
+
+		return true;
+	} else if (is_type_matrix(type) &&
+		value.kind != ExactValue_Invalid &&
+		value.kind != ExactValue_Compound) {
+		i64 row = type->Matrix.row_count;
+		i64 column = type->Matrix.column_count;
+		GB_ASSERT(row == column);
+
+		GB_PANIC("TODO(bill): constant matrix from scalar");
+	} else if (is_type_simd_vector(type) &&
+		value.kind != ExactValue_Invalid &&
+		value.kind != ExactValue_Compound) {
+		GB_PANIC("TODO(bill): constant vector from scalar");
 	}
-	return false;
+
+
+	switch (value.kind) {
+	case ExactValue_Bool:
+		{
+			bool *res = cast(bool *)tb_global_add_region(m->mod, global, offset, size);
+			*res = !!value.value_bool;
+		}
+		break;
+
+	case ExactValue_Integer:
+		{
+			void *res = tb_global_add_region(m->mod, global, offset, size);
+			cg_write_big_int_at_ptr(res, &value.value_integer, type);
+		}
+		break;
+
+	case ExactValue_Float:
+		{
+			f64 f = exact_value_to_f64(value);
+			void *res = tb_global_add_region(m->mod, global, offset, size);
+			switch (size) {
+			case 2: *(u16 *)res = f32_to_f16(cast(f32)f); break;
+			case 4: *(f32 *)res = cast(f32)f;             break;
+			case 8: *(f64 *)res = cast(f64)f;             break;
+			}
+		}
+		break;
+
+	case ExactValue_Pointer:
+		{
+			void *res = tb_global_add_region(m->mod, global, offset, size);
+			*(u64 *)res = exact_value_to_u64(value);
+		}
+		break;
+
+	case ExactValue_String:
+		if (is_type_array_like(type)) {
+			GB_ASSERT(global != nullptr);
+			void *data = tb_global_add_region(m->mod, global, offset, size);
+			gb_memcopy(data, value.value_string.text, gb_min(value.value_string.len, size));
+		} else {
+			cg_global_const_string(m, value.value_string, type, global, offset);
+		}
+		break;
+
+	case ExactValue_Typeid:
+		{
+			void *dst = tb_global_add_region(m->mod, global, offset, size);
+			u64 id = cg_typeid_as_u64(m, value.value_typeid);
+			cg_write_uint_at_ptr(dst, id, t_typeid);
+		}
+		break;
+
+	case ExactValue_Compound:
+		{
+			TB_Global *out_global = cg_global_const_comp_literal(m, type, value, global, offset);
+			GB_ASSERT(out_global == global);
+		}
+		break;
+
+	case ExactValue_Procedure:
+		GB_PANIC("TODO(bill): nested procedure values/literals\n");
+		break;
+	case ExactValue_Complex:
+		{
+			Complex128 c = {};
+			if (value.value_complex) {
+				c = *value.value_complex;
+			}
+			void *res = tb_global_add_region(m->mod, global, offset, size);
+			switch (size) {
+			case 4:
+				((u16 *)res)[0] = f32_to_f16(cast(f32)c.real);
+				((u16 *)res)[1] = f32_to_f16(cast(f32)c.imag);
+				break;
+			case 8:
+				((f32 *)res)[0] = cast(f32)c.real;
+				((f32 *)res)[1] = cast(f32)c.imag;
+				break;
+			case 16:
+				((f64 *)res)[0] = cast(f64)c.real;
+				((f64 *)res)[1] = cast(f64)c.imag;
+				break;
+			}
+		}
+		break;
+	case ExactValue_Quaternion:
+		{
+			// @QuaternionLayout
+			Quaternion256 q = {};
+			if (value.value_quaternion) {
+				q = *value.value_quaternion;
+			}
+			void *res = tb_global_add_region(m->mod, global, offset, size);
+			switch (size) {
+			case 8:
+				((u16 *)res)[0] = f32_to_f16(cast(f32)q.imag);
+				((u16 *)res)[1] = f32_to_f16(cast(f32)q.jmag);
+				((u16 *)res)[2] = f32_to_f16(cast(f32)q.kmag);
+				((u16 *)res)[3] = f32_to_f16(cast(f32)q.real);
+				break;
+			case 16:
+				((f32 *)res)[0] = cast(f32)q.imag;
+				((f32 *)res)[1] = cast(f32)q.jmag;
+				((f32 *)res)[2] = cast(f32)q.kmag;
+				((f32 *)res)[3] = cast(f32)q.real;
+				break;
+			case 32:
+				((f64 *)res)[0] = cast(f64)q.imag;
+				((f64 *)res)[1] = cast(f64)q.jmag;
+				((f64 *)res)[2] = cast(f64)q.kmag;
+				((f64 *)res)[3] = cast(f64)q.real;
+				break;
+			}
+		}
+		break;
+	default:
+		GB_PANIC("%s", type_to_string(type));
+		break;
+	}
+	return true;
 }
 
 
@@ -558,7 +642,6 @@ gb_internal TB_Global *cg_global_const_comp_literal(cgModule *m, Type *original_
 				if (!cg_is_nested_possibly_constant(bt, sel, fv->value)) {
 					continue;
 				}
-
 
 				i64 offset = type_offset_of_from_selection(bt, sel);
 				cg_global_const_add_region(m, value, sel.entity->type, global, base_offset+offset);

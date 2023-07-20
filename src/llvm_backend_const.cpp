@@ -567,7 +567,7 @@ gb_internal lbValue lb_const_value(lbModule *m, Type *type, ExactValue value, bo
 
 		}
 	} else if (is_type_array(type) && value.kind == ExactValue_String && !is_type_u8(core_array_type(type))) {
-		if (is_type_rune_array(type) && value.kind == ExactValue_String) {
+		if (is_type_rune_array(type)) {
 			i64 count  = type->Array.count;
 			Type *elem = type->Array.elem;
 			LLVMTypeRef et = lb_type(m, elem);
