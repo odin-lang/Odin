@@ -51,18 +51,6 @@ gb_internal cgValue cg_const_nil(cgProcedure *p, Type *type) {
 	return cg_const_nil(p->module, p, type);
 }
 
-gb_internal TB_Global *cg_global_const_cstring(cgModule *m, String const &str, Type *type) {
-	char name[32] = {};
-	gb_snprintf(name, 31, "csb$%u", 1+m->const_nil_guid.fetch_add(1));
-	TB_Global *global = tb_global_create(m->mod, -1, name, cg_debug_type(m, type), TB_LINKAGE_PRIVATE);
-	i64 size = str.len+1;
-	tb_global_set_storage(m->mod, tb_module_get_rdata(m->mod), global, size, 1, 1);
-	u8 *data = cast(u8 *)tb_global_add_region(m->mod, global, 0, size+1);
-	gb_memcopy(data, str.text, str.len);
-	data[str.len] = 0;
-	return global;
-
-}
 
 gb_internal void cg_write_big_int_at_ptr(void *dst, BigInt const *a, Type *original_type) {
 	GB_ASSERT(build_context.endian_kind == TargetEndian_Little);
@@ -116,24 +104,34 @@ gb_internal void cg_write_uint_at_ptr(void *dst, u64 i, Type *original_type) {
 	cg_write_big_int_at_ptr(dst, &v.value_integer, original_type);
 }
 
-gb_internal TB_Global *cg_global_const_string(cgModule *m, String const &str, Type *type) {
-	if (is_type_cstring(type)) {
-		return cg_global_const_cstring(m, str, type);
-	}
+gb_internal TB_Global *cg_global_const_string(cgModule *m, String const &str, Type *type, TB_Global *global, i64 offset) {
 	GB_ASSERT(is_type_string(type));
 
 	char name[32] = {};
-	gb_snprintf(name, 31, "csl$%u", 1+m->const_nil_guid.fetch_add(1));
-	TB_Global *global = tb_global_create(m->mod, -1, name, cg_debug_type(m, type), TB_LINKAGE_PRIVATE);
+	gb_snprintf(name, 31, "csb$%u", 1+m->const_nil_guid.fetch_add(1));
 
+	TB_Global *str_global = tb_global_create(m->mod, -1, name, cg_debug_type(m, t_cstring), TB_LINKAGE_PRIVATE);
+	i64 size = str.len+1;
+	tb_global_set_storage(m->mod, tb_module_get_rdata(m->mod), str_global, size, 1, 1);
+	u8 *data = cast(u8 *)tb_global_add_region(m->mod, str_global, 0, size);
+	gb_memcopy(data, str.text, str.len);
+	data[str.len] = 0;
 
-	i64 size = type_size_of(type);
-	i64 align = type_align_of(type);
-	tb_global_set_storage(m->mod, tb_module_get_rdata(m->mod), global, size, align, 2);
+	if (is_type_cstring(type)) {
+		if (global) {
+			tb_global_add_symbol_reloc(m->mod, global, offset+0, cast(TB_Symbol *)str_global);
+		}
+		return str_global;
+	}
 
-	tb_global_add_symbol_reloc(m->mod, global, 0, cast(TB_Symbol *)cg_global_const_cstring(m, str, t_cstring));
+	if (global == nullptr) {
+		global = tb_global_create(m->mod, -1, name, cg_debug_type(m, type), TB_LINKAGE_PRIVATE);
+		tb_global_set_storage(m->mod, tb_module_get_rdata(m->mod), str_global, type_size_of(type), type_align_of(type), 2);
 
-	void *len_ptr = tb_global_add_region(m->mod, global, build_context.int_size, build_context.int_size);
+	}
+
+	tb_global_add_symbol_reloc(m->mod, global, offset+0, cast(TB_Symbol *)str_global);
+	void *len_ptr = tb_global_add_region(m->mod, global, offset+build_context.int_size, build_context.int_size);
 	cg_write_int_at_ptr(len_ptr, str.len, t_int);
 
 	return global;
@@ -243,7 +241,9 @@ gb_internal isize cg_global_const_calculate_region_count(ExactValue const &value
 		break;
 
 	case ExactValue_String:
-		if (is_type_cstring(type) || is_type_array_like(type)) {
+		if (is_type_string(type)) {
+			count += 2;
+		} else if (is_type_cstring(type) || is_type_array_like(type)) {
 			count += 1;
 		} else {
 			count += 2;
@@ -316,7 +316,10 @@ gb_internal isize cg_global_const_calculate_region_count(ExactValue const &value
 			}
 			break;
 		case Type_Array:
-			if (!cg_elem_type_can_be_constant(bt->Array.elem)) {
+		case Type_EnumeratedArray:
+		case Type_SimdVector: {
+			Type *et = base_array_type(bt);
+			if (!cg_elem_type_can_be_constant(et)) {
 				break;
 			}
 			for (Ast *elem : cl->elems) {
@@ -338,17 +341,29 @@ gb_internal isize cg_global_const_calculate_region_count(ExactValue const &value
 						}
 
 						for (i64 i = lo; i < hi; i++) {
-							count += cg_global_const_calculate_region_count(value, bt->Array.elem);
+							count += cg_global_const_calculate_region_count(value, et);
 						}
 					} else {
-						count += cg_global_const_calculate_region_count(value, bt->Array.elem);
+						count += cg_global_const_calculate_region_count(value, et);
 					}
 				} else {
 					ExactValue const &value = elem->tav.value;
-					count += cg_global_const_calculate_region_count(value, bt->Array.elem);
+					count += cg_global_const_calculate_region_count(value, et);
 				}
 			}
+		} break;
+
+		case Type_BitSet:
+			count += 1;
 			break;
+		case Type_Matrix:
+			count += 1;
+			break;
+
+		case Type_Slice:
+			count += 2;
+			break;
+
 		default:
 			GB_PANIC("TODO(bill): %s", type_to_string(type));
 			break;
@@ -360,7 +375,7 @@ gb_internal isize cg_global_const_calculate_region_count(ExactValue const &value
 
 gb_internal TB_Global *cg_global_const_comp_literal(cgModule *m, Type *type, ExactValue const &value, TB_Global *global, i64 base_offset);
 
-gb_internal bool cg_global_const_add_region(cgModule *m, TB_Global *global, ExactValue const &value, Type *type, i64 offset) {
+gb_internal bool cg_global_const_add_region(cgModule *m, ExactValue const &value, Type *type, TB_Global *global, i64 offset) {
 	GB_ASSERT(is_type_endian_little(type));
 	GB_ASSERT(!is_type_different_to_arch_endianness(type));
 
@@ -401,10 +416,7 @@ gb_internal bool cg_global_const_add_region(cgModule *m, TB_Global *global, Exac
 			break;
 
 		case ExactValue_String:
-			{
-				TB_Symbol *symbol = cast(TB_Symbol *)cg_global_const_string(m, value.value_string, type);
-				tb_global_add_symbol_reloc(m->mod, global, offset, symbol);
-			}
+			cg_global_const_string(m, value.value_string, type, global, offset);
 			break;
 
 		case ExactValue_Typeid:
@@ -503,7 +515,13 @@ gb_internal TB_Global *cg_global_const_comp_literal(cgModule *m, Type *original_
 		i64 align = type_align_of(original_type);
 
 		// READ ONLY?
-		TB_ModuleSection *section = tb_module_get_rdata(m->mod);
+		TB_ModuleSection *section = nullptr;
+		if (is_type_string(original_type) || is_type_cstring(original_type)) {
+			section = tb_module_get_rdata(m->mod);
+		} else {
+			section = tb_module_get_data(m->mod);
+		}
+
 		if (cl->elems.count == 0) {
 			tb_global_set_storage(m->mod, section, global, size, align, 0);
 			return global;
@@ -512,14 +530,16 @@ gb_internal TB_Global *cg_global_const_comp_literal(cgModule *m, Type *original_
 
 		isize global_region_count = cg_global_const_calculate_region_count(value, original_type);
 		tb_global_set_storage(m->mod, section, global, size, align, global_region_count);
-		gb_printf_err("global_region_count %td\n", global_region_count);
 	}
 
 	if (cl->elems.count == 0) {
 		return global;
 	}
 
+
 	Type *bt = base_type(original_type);
+	i64 bt_size = type_size_of(bt);
+
 	switch (bt->kind) {
 	case Type_Struct:
 		if (cl->elems[0]->kind == Ast_FieldValue) {
@@ -539,8 +559,9 @@ gb_internal TB_Global *cg_global_const_comp_literal(cgModule *m, Type *original_
 					continue;
 				}
 
+
 				i64 offset = type_offset_of_from_selection(bt, sel);
-				cg_global_const_add_region(m, global, value, sel.entity->type, base_offset+offset);
+				cg_global_const_add_region(m, value, sel.entity->type, global, base_offset+offset);
 			}
 		} else {
 			for_array(i, cl->elems) {
@@ -558,14 +579,16 @@ gb_internal TB_Global *cg_global_const_comp_literal(cgModule *m, Type *original_
 				if (tav.mode != Addressing_Invalid) {
 					value = tav.value;
 				}
-				cg_global_const_add_region(m, global, value, f->type, base_offset+offset);
+				cg_global_const_add_region(m, value, f->type, global, base_offset+offset);
 			}
 		}
 		return global;
 
 	case Type_Array:
+	case Type_EnumeratedArray:
+	case Type_SimdVector:
 		if (cl->elems[0]->kind == Ast_FieldValue) {
-			Type *et = bt->Array.elem;
+			Type *et = base_array_type(bt);
 			i64 elem_size = type_size_of(et);
 			for (Ast *elem : cl->elems) {
 				ast_node(fv, FieldValue, elem);
@@ -588,27 +611,74 @@ gb_internal TB_Global *cg_global_const_comp_literal(cgModule *m, Type *original_
 
 					for (i64 i = lo; i < hi; i++) {
 						i64 offset = i * elem_size;
-						cg_global_const_add_region(m, global, value, et, base_offset+offset);
+						cg_global_const_add_region(m, value, et, global, base_offset+offset);
 					}
 				} else {
 					TypeAndValue index_tav = fv->field->tav;
 					GB_ASSERT(index_tav.mode == Addressing_Constant);
 					i64 i = exact_value_to_i64(index_tav.value);
 					i64 offset = i * elem_size;
-					cg_global_const_add_region(m, global, value, et, base_offset+offset);
+					cg_global_const_add_region(m, value, et, global, base_offset+offset);
 				}
 			}
 		} else {
-			Type *et = bt->Array.elem;
+			Type *et = base_array_type(bt);
 			i64 elem_size = type_size_of(et);
 			i64 offset = 0;
 			for (Ast *elem : cl->elems) {
 				ExactValue const &value = elem->tav.value;
-				cg_global_const_add_region(m, global, value, et, base_offset+offset);
+				cg_global_const_add_region(m, value, et, global, base_offset+offset);
 				offset += elem_size;
 			}
 		}
 
+		return global;
+
+	case Type_BitSet:
+		if (bt_size > 0) {
+			BigInt bits = {};
+			BigInt one = {};
+			big_int_from_u64(&one, 1);
+
+			for_array(i, cl->elems) {
+				Ast *e = cl->elems[i];
+				GB_ASSERT(e->kind != Ast_FieldValue);
+
+				TypeAndValue tav = e->tav;
+				if (tav.mode != Addressing_Constant) {
+					continue;
+				}
+				GB_ASSERT(tav.value.kind == ExactValue_Integer);
+				i64 v = big_int_to_i64(&tav.value.value_integer);
+				i64 lower = bt->BitSet.lower;
+				u64 index = cast(u64)(v-lower);
+				BigInt bit = {};
+				big_int_from_u64(&bit, index);
+				big_int_shl(&bit, &one, &bit);
+				big_int_or(&bits, &bits, &bit);
+			}
+
+			void *dst = tb_global_add_region(m->mod, global, base_offset, bt_size);
+			cg_write_big_int_at_ptr(dst, &bits, original_type);
+		}
+		return global;
+
+	case Type_Matrix:
+		GB_PANIC("TODO(bill): constant compound literal for %s", type_to_string(original_type));
+		break;
+
+	case Type_Slice:
+		{
+			i64 count = gb_max(cl->elems.count, cl->max_count);
+			Type *elem = bt->Slice.elem;
+			Type *t = alloc_type_array(elem, count);
+			TB_Global *backing_array = cg_global_const_comp_literal(m, t, value, nullptr, 0);
+
+			tb_global_add_symbol_reloc(m->mod, global, base_offset+0, cast(TB_Symbol *)backing_array);
+
+			void *len_ptr = tb_global_add_region(m->mod, global, base_offset+build_context.int_size, build_context.int_size);
+			cg_write_int_at_ptr(len_ptr, count, t_int);
+		}
 		return global;
 	}
 
@@ -676,7 +746,7 @@ gb_internal cgValue cg_const_value(cgModule *m, cgProcedure *p, Type *type, Exac
 
 	case ExactValue_String:
 		{
-			TB_Symbol *symbol = cast(TB_Symbol *)cg_global_const_string(m, value.value_string, type);
+			TB_Symbol *symbol = cast(TB_Symbol *)cg_global_const_string(m, value.value_string, type, nullptr, 0);
 			if (p) {
 				TB_Node *node = tb_inst_get_symbol_address(p->func, symbol);
 				return cg_lvalue_addr(node, type);
