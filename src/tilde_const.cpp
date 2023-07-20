@@ -397,6 +397,7 @@ gb_internal bool cg_global_const_add_region(cgModule *m, ExactValue const &value
 
 	GB_ASSERT(global != nullptr);
 
+	Type *bt = base_type(type);
 	i64 size = type_size_of(type);
 	if (value.kind == ExactValue_Invalid) {
 		return false;
@@ -420,7 +421,6 @@ gb_internal bool cg_global_const_add_region(cgModule *m, ExactValue const &value
 			GB_ASSERT(offset == s.len);
 			return true;
 		}
-		Type *bt = base_type(type);
 		Type *et = bt->Array.elem;
 		i64 elem_size = type_size_of(et);
 
@@ -437,7 +437,6 @@ gb_internal bool cg_global_const_add_region(cgModule *m, ExactValue const &value
 		value.kind != ExactValue_String &&
 		value.kind != ExactValue_Compound) {
 
-		Type *bt = base_type(type);
 		Type *et = bt->Array.elem;
 		i64 elem_size = type_size_of(et);
 
@@ -449,15 +448,31 @@ gb_internal bool cg_global_const_add_region(cgModule *m, ExactValue const &value
 	} else if (is_type_matrix(type) &&
 		value.kind != ExactValue_Invalid &&
 		value.kind != ExactValue_Compound) {
-		i64 row = type->Matrix.row_count;
-		i64 column = type->Matrix.column_count;
+		i64 row = bt->Matrix.row_count;
+		i64 column = bt->Matrix.column_count;
 		GB_ASSERT(row == column);
 
-		GB_PANIC("TODO(bill): constant matrix from scalar");
+		Type *elem = bt->Matrix.elem;
+
+		i64 elem_size = type_size_of(elem);
+
+		for (i64 i = 0; i < row; i++) {
+			i64 index = matrix_indices_to_offset(type, i, i);
+			cg_global_const_add_region(m, value, elem, global, offset+(index * elem_size));
+		}
+
+		return true;
 	} else if (is_type_simd_vector(type) &&
 		value.kind != ExactValue_Invalid &&
 		value.kind != ExactValue_Compound) {
-		GB_PANIC("TODO(bill): constant vector from scalar");
+
+		Type *et = type->SimdVector.elem;
+		i64 elem_size = type_size_of(et);
+
+		for (i64 i = 0; i < bt->SimdVector.count; i++) {
+			cg_global_const_add_region(m, value, et, global, offset+(i * elem_size));
+		}
+		return true;
 	}
 
 
