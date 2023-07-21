@@ -594,40 +594,40 @@ trunc :: proc{
 
 @(require_results)
 round_f16   :: proc "contextless" (x: f16)   -> f16 {
-	return ceil(x - 0.5) if x < 0 else floor(x + 0.5)
+	return ceil(x - 0.4998) if x < 0 else floor(x + 0.4998)
 }
 @(require_results)
 round_f16le :: proc "contextless" (x: f16le) -> f16le {
-	return ceil(x - 0.5) if x < 0 else floor(x + 0.5)
+	return ceil(x - 0.4998) if x < 0 else floor(x + 0.4998)
 }
 @(require_results)
 round_f16be :: proc "contextless" (x: f16be) -> f16be {
-	return ceil(x - 0.5) if x < 0 else floor(x + 0.5)
+	return ceil(x - 0.4998) if x < 0 else floor(x + 0.4998)
 }
 
 @(require_results)
 round_f32   :: proc "contextless" (x: f32)   -> f32 {
-	return ceil(x - 0.5) if x < 0 else floor(x + 0.5)
+	return ceil(x - 0.49999997) if x < 0 else floor(x + 0.49999997)
 }
 @(require_results)
 round_f32le :: proc "contextless" (x: f32le) -> f32le {
-	return ceil(x - 0.5) if x < 0 else floor(x + 0.5)
+	return ceil(x - 0.49999997) if x < 0 else floor(x + 0.49999997)
 }
 @(require_results)
 round_f32be :: proc "contextless" (x: f32be) -> f32be {
-	return ceil(x - 0.5) if x < 0 else floor(x + 0.5)
+	return ceil(x - 0.49999997) if x < 0 else floor(x + 0.49999997)
 }
 @(require_results)
 round_f64   :: proc "contextless" (x: f64)   -> f64 {
-	return ceil(x - 0.5) if x < 0 else floor(x + 0.5)
+	return ceil(x - 0.49999999999999994) if x < 0 else floor(x + 0.49999999999999994)
 }
 @(require_results)
 round_f64le :: proc "contextless" (x: f64le) -> f64le {
-	return ceil(x - 0.5) if x < 0 else floor(x + 0.5)
+	return ceil(x - 0.49999999999999994) if x < 0 else floor(x + 0.49999999999999994)
 }
 @(require_results)
 round_f64be :: proc "contextless" (x: f64be) -> f64be {
-	return ceil(x - 0.5) if x < 0 else floor(x + 0.5)
+	return ceil(x - 0.49999999999999994) if x < 0 else floor(x + 0.49999999999999994)
 }
 round :: proc{
 	round_f16, round_f16le, round_f16be,
