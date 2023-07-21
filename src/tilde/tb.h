@@ -196,6 +196,11 @@ typedef union TB_DataType {
 typedef enum TB_NodeTypeEnum {
     TB_NULL = 0,
 
+    // Immediates
+    TB_INTEGER_CONST,
+    TB_FLOAT32_CONST,
+    TB_FLOAT64_CONST,
+
     // only one per function
     TB_START, // fn()
 
@@ -253,11 +258,6 @@ typedef enum TB_NodeTypeEnum {
     TB_MEMBER_ACCESS,
     TB_ARRAY_ACCESS,
 
-    // Immediates
-    TB_INTEGER_CONST,
-    TB_FLOAT32_CONST,
-    TB_FLOAT64_CONST,
-
     // Conversions
     TB_TRUNCATE,
     TB_FLOAT_EXT,
@@ -295,6 +295,8 @@ typedef enum TB_NodeTypeEnum {
     TB_SHL,
     TB_SHR,
     TB_SAR,
+    TB_ROL,
+    TB_ROR,
     TB_UDIV,
     TB_SDIV,
     TB_UMOD,
@@ -335,9 +337,6 @@ typedef enum TB_NodeTypeEnum {
     TB_X86INTRIN_RSQRT,
 } TB_NodeTypeEnum;
 typedef uint8_t TB_NodeType;
-
-#define TB_IS_NODE_SIDE_EFFECT(type) ((type) >= TB_LINE_INFO && (type) <= TB_DEBUGBREAK)
-#define TB_IS_NODE_TERMINATOR(type)  ((type) >= TB_BRANCH && (type) <= TB_TRAP)
 
 typedef int TB_Label;
 
@@ -980,6 +979,8 @@ TB_API TB_Node* tb_inst_xor(TB_Function* f, TB_Node* a, TB_Node* b);
 TB_API TB_Node* tb_inst_sar(TB_Function* f, TB_Node* a, TB_Node* b);
 TB_API TB_Node* tb_inst_shl(TB_Function* f, TB_Node* a, TB_Node* b, TB_ArithmeticBehavior arith_behavior);
 TB_API TB_Node* tb_inst_shr(TB_Function* f, TB_Node* a, TB_Node* b);
+TB_API TB_Node* tb_inst_rol(TB_Function* f, TB_Node* a, TB_Node* b);
+TB_API TB_Node* tb_inst_ror(TB_Function* f, TB_Node* a, TB_Node* b);
 
 // Atomics
 // By default you can use TB_MEM_ORDER_SEQ_CST for the memory order to get
@@ -1052,10 +1053,7 @@ TB_API void tb_inst_ret(TB_Function* f, size_t count, TB_Node** values);
 ////////////////////////////////
 // Optimizer
 ////////////////////////////////
-
-// Function-level optimizations are managed via TB_FuncOpt, it's tied
-// to a single TB_Function and it'll can be used to run peepholes incrementally
-// between whatever passes TB may have.
+// Function analysis, optimizations, and codegen are all part of this
 typedef struct TB_FuncOpt TB_FuncOpt;
 
 // the arena is used to allocate the nodes
