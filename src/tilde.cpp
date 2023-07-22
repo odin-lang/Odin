@@ -75,6 +75,7 @@ gb_internal TB_DataType cg_data_type(Type *t) {
 		case Basic_f32be: return TB_TYPE_F32;
 		case Basic_f64be: return TB_TYPE_F64;
 		}
+		break;
 
 	case Type_Pointer:
 	case Type_MultiPointer:

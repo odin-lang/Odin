@@ -89,11 +89,9 @@ gb_internal cgProcedure *cg_procedure_create(cgModule *m, Entity *entity, bool i
 	if (p->symbol == nullptr)  {
 		p->func = tb_function_create(m->mod, link_name.len, cast(char const *)link_name.text, linkage, TB_COMDAT_NONE);
 
-		size_t out_param_count = 0;
 		p->debug_type = cg_debug_type_for_proc(m, p->type);
-		TB_Node **params = tb_function_set_prototype_from_dbg(p->func, p->debug_type, cg_arena(), &out_param_count);
-		p->param_nodes = {params, cast(isize)out_param_count};
-		p->proto = tb_function_get_prototype(p->func);
+		p->proto = tb_prototype_from_dbg(m->mod, p->debug_type);
+		tb_function_set_prototype(p->func, p->proto, cg_arena());
 
 		p->symbol = cast(TB_Symbol *)p->func;
 	}
@@ -142,12 +140,9 @@ gb_internal cgProcedure *cg_procedure_create_dummy(cgModule *m, String const &li
 
 	p->func = tb_function_create(m->mod, link_name.len, cast(char const *)link_name.text, linkage, TB_COMDAT_NONE);
 
-	size_t out_param_count = 0;
 	p->debug_type = cg_debug_type_for_proc(m, p->type);
-	TB_Node **params = tb_function_set_prototype_from_dbg(p->func, p->debug_type, cg_arena(), &out_param_count);
-	p->param_nodes = {params, cast(isize)out_param_count};
-	p->proto = tb_function_get_prototype(p->func);
-
+	p->proto = tb_prototype_from_dbg(m->mod, p->debug_type);
+	tb_function_set_prototype(p->func, p->proto, cg_arena());
 
 	p->symbol = cast(TB_Symbol *)p->func;
 
@@ -179,25 +174,59 @@ gb_internal void cg_procedure_begin(cgProcedure *p) {
 
 	GB_ASSERT(p->type->kind == Type_Proc);
 	TypeProc *pt = &p->type->Proc;
+	bool is_odin_like_cc = is_calling_convention_odin(pt->calling_convention);
 	int param_index = 0;
+	int param_count = p->proto->param_count;
+
+	if (pt->results) {
+		Type *result_type = nullptr;
+		if (is_odin_like_cc) {
+			result_type = pt->results->Tuple.variables[pt->results->Tuple.variables.count-1]->type;
+		} else {
+			result_type = pt->results;
+		}
+		TB_DebugType *debug_type = cg_debug_type(p->module, result_type);
+		TB_PassingRule rule = tb_get_passing_rule_from_dbg(p->module->mod, debug_type, true);
+		if (rule == TB_PASSING_INDIRECT) {
+			param_index++;
+		}
+	}
+
 	if (pt->params != nullptr) for (Entity *e : pt->params->Tuple.variables) {
 		if (e->kind != Entity_Variable) {
 			continue;
 		}
 
-		if (param_index >= p->param_nodes.count) {
+		GB_ASSERT_MSG(param_index < param_count, "%d < %d %.*s :: %s", param_index, param_count, LIT(p->name), type_to_string(p->type));
+
+		TB_Node *param_ptr = nullptr;
+
+		TB_CharUnits size  = cast(TB_CharUnits)type_size_of(e->type);
+		TB_CharUnits align = cast(TB_CharUnits)type_align_of(e->type);
+		TB_DebugType *debug_type = cg_debug_type(p->module, e->type);
+		TB_PassingRule rule = tb_get_passing_rule_from_dbg(p->module->mod, debug_type, false);
+		switch (rule) {
+		case TB_PASSING_DIRECT: {
+			TB_Node *param = tb_inst_param(p->func, param_index++);
+			param_ptr = tb_inst_local(p->func, size, align);
+			tb_inst_store(p->func, param->dt, param_ptr, param, align, false);
+		} break;
+		case TB_PASSING_INDIRECT:
+			// TODO(bill): does this need a copy? for non-odin calling convention stuff?
+			param_ptr = tb_inst_param(p->func, param_index++);
 			break;
+		case TB_PASSING_IGNORE:
+			continue;
 		}
 
-		TB_Node *param = p->param_nodes[param_index++];
-		cgValue local = cg_value(param, alloc_type_pointer(e->type));
+		GB_ASSERT(param_ptr->dt.type == TB_PTR);
+
+		cgValue local = cg_value(param_ptr, alloc_type_pointer(e->type));
 
 		if (e != nullptr && e->token.string.len > 0 && e->token.string != "_") {
 			// NOTE(bill): for debugging purposes only
 			String name = e->token.string;
-			TB_DebugType *debug_type = cg_debug_type(p->module, e->type);
-			tb_node_append_attrib(param, tb_function_attrib_variable(p->func, name.len, cast(char const *)name.text, debug_type));
-
+			tb_node_append_attrib(param_ptr, tb_function_attrib_variable(p->func, name.len, cast(char const *)name.text, debug_type));
 		}
 		cgAddr addr = cg_addr(local);
 		if (e) {
@@ -243,7 +272,9 @@ gb_internal void cg_procedure_begin(cgProcedure *p) {
 		// }
 	}
 
-	if (p->type->Proc.calling_convention == ProcCC_Odin) {
+	// isize split_offset = param_index;
+
+	if (pt->calling_convention == ProcCC_Odin) {
 		// NOTE(bill): Push context on to stack from implicit parameter
 
 		String name = str_lit("__.context_ptr");
@@ -251,10 +282,8 @@ gb_internal void cg_procedure_begin(cgProcedure *p) {
 		Entity *e = alloc_entity_param(nullptr, make_token_ident(name), t_context_ptr, false, false);
 		e->flags |= EntityFlag_NoAlias;
 
-		TB_Node *param = p->param_nodes[p->param_nodes.count-1];
-		param = tb_inst_load(p->func, TB_TYPE_PTR, param, cast(TB_CharUnits)build_context.ptr_size, false);
-
-		cgValue local = cg_value(param, t_context_ptr);
+		TB_Node *param_ptr = tb_inst_param(p->func, param_count-1);
+		cgValue local = cg_value(param_ptr, t_context_ptr);
 		cgAddr addr = cg_addr(local);
 		map_set(&p->variable_map, e, addr);
 
@@ -263,6 +292,26 @@ gb_internal void cg_procedure_begin(cgProcedure *p) {
 		cd->ctx = addr;
 		cd->scope_index = -1;
 		cd->uses = +1; // make sure it has been used already
+	}
+
+	if (pt->has_named_results) {
+		auto const &results = pt->results->Tuple.variables;
+		for_array(i, results) {
+			Entity *e = results[i];
+			GB_ASSERT(e->kind == Entity_Variable);
+
+			if (e->token.string == "") {
+				continue;
+			}
+			GB_ASSERT(!is_blank_ident(e->token));
+
+			cgAddr res = cg_add_local(p, e->type, e, true);
+
+			if (e->Variable.param_value.kind != ParameterValue_Invalid) {
+				cgValue c = cg_handle_param_value(p, e->type, e->Variable.param_value, e->token.pos);
+				cg_addr_store(p, res, c);
+			}
+		}
 	}
 }
 
@@ -276,7 +325,8 @@ gb_internal void cg_procedure_end(cgProcedure *p) {
 	bool emit_asm = false;
 	// if (p->name == "main") {
 	if (
-	    p->name == "bug" ABI_PKG_NAME_SEPARATOR "main" ||
+	    p->name == "runtime" ABI_PKG_NAME_SEPARATOR "print_string" ||
+	    // p->name == "bug" ABI_PKG_NAME_SEPARATOR "main" ||
 	    // p->name == "main" ||
 	    false
 	) {
@@ -301,18 +351,27 @@ gb_internal void cg_procedure_end(cgProcedure *p) {
 	}
 }
 
+gb_global String procedures_to_generate_list[] = {
+	str_lit("bug" ABI_PKG_NAME_SEPARATOR "main"),
+	str_lit("main"),
+};
+
 gb_internal void cg_procedure_generate(cgProcedure *p) {
 	if (p->body == nullptr) {
 		return;
 	}
-	cg_procedure_begin(p);
-	defer (cg_procedure_end(p));
 
-	if (p->name != "bug" ABI_PKG_NAME_SEPARATOR "main" &&
-	    p->name != "main") {
-		return;
+	if (
+	    p->name == "runtime" ABI_PKG_NAME_SEPARATOR "print_string" ||
+	    // p->name == "bug" ABI_PKG_NAME_SEPARATOR "main" ||
+	    // p->name == "main" ||
+	    false
+	) {
+		cg_procedure_begin(p);
+		cg_build_stmt(p, p->body);
 	}
-	cg_build_stmt(p, p->body);
+
+	cg_procedure_end(p);
 }
 
 

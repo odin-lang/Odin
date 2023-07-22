@@ -166,9 +166,6 @@ struct cgProcedure {
 	TB_FunctionPrototype *proto;
 	TB_Symbol *symbol;
 
-	// includes parameters, pointers to return values, and context ptr
-	Slice<TB_Node *> param_nodes;
-
 	Entity *  entity;
 	cgModule *module;
 	String    name;
@@ -309,11 +306,11 @@ gb_internal cgValue cg_emit_arith(cgProcedure *p, TokenKind op, cgValue lhs, cgV
 
 gb_internal bool    cg_emit_goto(cgProcedure *p, TB_Node *control_region);
 
-
 gb_internal TB_Node *cg_control_region(cgProcedure *p, char const *name);
 
 gb_internal isize cg_append_tuple_values(cgProcedure *p, Array<cgValue> *dst_values, cgValue src_value);
 
+gb_internal cgValue cg_handle_param_value(cgProcedure *p, Type *parameter_type, ParameterValue const &param_value, TokenPos const &pos);
 
 gb_internal cgValue cg_builtin_len(cgProcedure *p, cgValue value);
 gb_internal cgValue cg_builtin_raw_data(cgProcedure *p, cgValue const &x);

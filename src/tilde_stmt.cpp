@@ -914,7 +914,10 @@ gb_internal void cg_build_assignment(cgProcedure *p, Array<cgAddr> const &lvals,
 		}
 
 	    	Type *type = cg_addr_type(lval);
-		GB_ASSERT(are_types_identical(type, init.type));
+		if (!cg_addr_is_empty(lval)) {
+			GB_ASSERT_MSG(are_types_identical(init.type, type), "%s = %s", type_to_string(init.type), type_to_string(type));
+		}
+
 		if (init.kind == cgValue_Addr &&
 		    !cg_addr_is_empty(lval)) {
 		    	// NOTE(bill): This is needed for certain constructs such as this:

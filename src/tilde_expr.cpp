@@ -179,7 +179,7 @@ gb_internal cgValue cg_emit_transmute(cgProcedure *p, cgValue value, Type *type)
 	TB_DataType dt = cg_data_type(type);
 	switch (value.kind) {
 	case cgValue_Value:
-		GB_ASSERT_MSG(!TB_IS_VOID_TYPE(dt), "%s", type_to_string(type));
+		GB_ASSERT_MSG(!TB_IS_VOID_TYPE(dt), "%d %s -> %s", dt.type, type_to_string(value.type), type_to_string(type));
 		value.type = type;
 		if (value.node->dt.raw != dt.raw) {
 			value.node = tb_inst_bitcast(p->func, value.node, dt);

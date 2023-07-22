@@ -851,7 +851,7 @@ gb_internal cgValue cg_const_value(cgModule *m, cgProcedure *p, Type *type, Exac
 				TB_Node *node = tb_inst_get_symbol_address(p->func, symbol);
 				return cg_lvalue_addr(node, type);
 			} else {
-				return cg_value(symbol, type);
+				return cg_value(symbol, alloc_type_pointer(type));
 			}
 		}
 
