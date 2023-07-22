@@ -63,6 +63,7 @@ gb_internal cgProcedure *cg_procedure_create(cgModule *m, Entity *entity, bool i
 	p->is_foreign     = entity->Procedure.is_foreign;
 	p->is_export      = entity->Procedure.is_export;
 	p->is_entry_point = false;
+	p->split_returns_index = -1;
 
 	gbAllocator a = heap_allocator();
 	p->children.allocator      = a;
@@ -122,6 +123,7 @@ gb_internal cgProcedure *cg_procedure_create_dummy(cgModule *m, String const &li
 	p->is_foreign     = false;
 	p->is_export      = false;
 	p->is_entry_point = false;
+	p->split_returns_index = -1;
 
 	gbAllocator a = heap_allocator();
 	p->children.allocator      = a;
@@ -188,6 +190,7 @@ gb_internal void cg_procedure_begin(cgProcedure *p) {
 		TB_DebugType *debug_type = cg_debug_type(p->module, result_type);
 		TB_PassingRule rule = tb_get_passing_rule_from_dbg(p->module->mod, debug_type, true);
 		if (rule == TB_PASSING_INDIRECT) {
+			p->return_by_ptr = true;
 			param_index++;
 		}
 	}
@@ -272,7 +275,7 @@ gb_internal void cg_procedure_begin(cgProcedure *p) {
 		// }
 	}
 
-	// isize split_offset = param_index;
+	p->split_returns_index = param_index;
 
 	if (pt->calling_convention == ProcCC_Odin) {
 		// NOTE(bill): Push context on to stack from implicit parameter
@@ -323,24 +326,6 @@ gb_internal void cg_procedure_end(cgProcedure *p) {
 		tb_inst_ret(p->func, 0, nullptr);
 	}
 	bool emit_asm = false;
-	// if (p->name == "main") {
-	if (
-	    p->name == "runtime" ABI_PKG_NAME_SEPARATOR "print_string" ||
-	    // p->name == "bug" ABI_PKG_NAME_SEPARATOR "main" ||
-	    // p->name == "main" ||
-	    false
-	) {
-		TB_Arena *arena = tb_default_arena();
-		defer (arena->free(arena));
-		TB_FuncOpt *opt = tb_funcopt_enter(p->func, arena);
-		defer (tb_funcopt_exit(opt));
-		tb_funcopt_print(opt);
-
-		// emit_asm = true;
-
-		// GraphViz printing
-		// tb_function_print(p->func, tb_default_print_callback, stdout);
-	}
 	TB_FunctionOutput *output = tb_module_compile_function(p->module->mod, p->func, TB_ISEL_FAST, emit_asm);
 	if (emit_asm) {
 		TB_Assembly *assembly = tb_output_get_asm(output);
@@ -361,17 +346,33 @@ gb_internal void cg_procedure_generate(cgProcedure *p) {
 		return;
 	}
 
+	bool build_body = false;
+
 	if (
-	    p->name == "runtime" ABI_PKG_NAME_SEPARATOR "print_string" ||
+	    string_starts_with(p->name, str_lit("runtime" ABI_PKG_NAME_SEPARATOR "_os_write")) ||
 	    // p->name == "bug" ABI_PKG_NAME_SEPARATOR "main" ||
 	    // p->name == "main" ||
 	    false
 	) {
+		build_body = true;
+	}
+
+	if (build_body) {
 		cg_procedure_begin(p);
 		cg_build_stmt(p, p->body);
 	}
-
 	cg_procedure_end(p);
+
+	if (build_body) {
+		TB_Arena *arena = tb_default_arena();
+		defer (arena->free(arena));
+		TB_FuncOpt *opt = tb_funcopt_enter(p->func, arena);
+		defer (tb_funcopt_exit(opt));
+		tb_funcopt_print(opt);
+
+		// GraphViz printing
+		// tb_function_print(p->func, tb_default_print_callback, stdout);
+	}
 }
 
 
@@ -543,9 +544,11 @@ gb_internal cgValue cg_emit_call(cgProcedure * p, cgValue value, Slice<cgValue> 
 	case 1:
 		if (return_is_indirect) {
 			return cg_lvalue_addr(params[0], pt->results->Tuple.variables[0]->type);
+		} else {
+			GB_ASSERT(multi_output.count == 1);
+			TB_Node *node = multi_output.single;
+			return cg_value(node, pt->results->Tuple.variables[0]->type);
 		}
-		GB_ASSERT(multi_output.count == 1);
-		return cg_value(multi_output.single, pt->results->Tuple.variables[0]->type);
 	}
 
 	cgValueMulti *multi = gb_alloc_item(permanent_allocator(), cgValueMulti);

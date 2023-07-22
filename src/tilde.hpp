@@ -196,6 +196,8 @@ struct cgProcedure {
 	Scope *curr_scope;
 	i32    scope_index;
 	bool   in_multi_assignment;
+	isize  split_returns_index;
+	bool   return_by_ptr;
 
 
 	PtrMap<Entity *, cgAddr> variable_map;

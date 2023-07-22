@@ -1,5 +1,7 @@
 gb_internal TB_DebugType *cg_debug_type_internal(cgModule *m, Type *type);
 gb_internal TB_DebugType *cg_debug_type(cgModule *m, Type *type) {
+	type = reduce_tuple_to_single_type(type);
+
 	mutex_lock(&m->debug_type_mutex);
 	defer (mutex_unlock(&m->debug_type_mutex));
 	TB_DebugType **found = map_get(&m->debug_type_map, type);
@@ -235,7 +237,8 @@ gb_internal TB_DebugType *cg_debug_type_internal(cgModule *m, Type *type) {
 		case Basic_uint:          return tb_debug_get_integer(m->mod, is_signed, bits);
 		case Basic_uintptr:       return tb_debug_get_integer(m->mod, is_signed, bits);
 
-		case Basic_rawptr:        return tb_debug_create_ptr(m->mod, tb_debug_get_void(m->mod));
+		case Basic_rawptr:
+			return tb_debug_create_ptr(m->mod, tb_debug_get_void(m->mod));
 		case Basic_string:
 			{
 				String name = basic_types[type->Basic.kind].Basic.name;

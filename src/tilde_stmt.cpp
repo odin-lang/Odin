@@ -1011,31 +1011,91 @@ gb_internal void cg_build_assign_stmt(cgProcedure *p, AstAssignStmt *as) {
 gb_internal void cg_build_return_stmt(cgProcedure *p, Slice<Ast *> const &return_results) {
 	TypeTuple *tuple  = &p->type->Proc.results->Tuple;
 	isize return_count = p->type->Proc.result_count;
-	gb_unused(tuple);
-	isize res_count = return_results.count;
-	gb_unused(res_count);
 
 	if (return_count == 0) {
 		tb_inst_ret(p->func, 0, nullptr);
 		return;
-	} else if (return_count == 1) {
-		Entity *e = tuple->variables[0];
-		if (res_count == 0) {
-			cgValue zero = cg_const_nil(p, tuple->variables[0]->type);
-			if (zero.kind == cgValue_Value) {
-				tb_inst_ret(p->func, 1, &zero.node);
+	}
+	TEMPORARY_ALLOCATOR_GUARD();
+
+	auto results = array_make<cgValue>(temporary_allocator(), 0, return_count);
+
+	if (return_results.count != 0) {
+		for (isize i = 0; i < return_results.count; i++) {
+			cgValue res = cg_build_expr(p, return_results[i]);
+			cg_append_tuple_values(p, &results, res);
+		}
+	} else {
+		for_array(i, tuple->variables) {
+			Entity *e = tuple->variables[i];
+			cgAddr addr = map_must_get(&p->variable_map, e);
+			cgValue res = cg_addr_load(p, addr);
+			array_add(&results, res);
+		}
+	}
+	GB_ASSERT(results.count == return_count);
+
+	if (return_results.count != 0 && p->type->Proc.has_named_results) {
+		// NOTE(bill): store the named values before returning
+		for_array(i, tuple->variables) {
+			Entity *e = tuple->variables[i];
+			cgAddr addr = map_must_get(&p->variable_map, e);
+			cg_addr_store(p, addr, results[i]);
+		}
+	}
+	for_array(i, tuple->variables) {
+		Entity *e = tuple->variables[i];
+		results[i] = cg_emit_conv(p, results[i], e->type);
+	}
+
+
+	if (p->split_returns_index >= 0) {
+		GB_ASSERT(is_calling_convention_odin(p->type->Proc.calling_convention));
+
+		for (isize i = 0; i < return_count-1; i++) {
+			Entity *e = tuple->variables[i];
+			TB_Node *ret_ptr = tb_inst_param(p->func, cast(int)(p->split_returns_index+i));
+			cgValue ptr = cg_value(ret_ptr, alloc_type_pointer(e->type));
+			cg_emit_store(p, ptr, results[i]);
+		}
+
+		if (p->return_by_ptr) {
+			Entity *e = tuple->variables[return_count-1];
+			TB_Node *ret_ptr = tb_inst_param(p->func, 0);
+			cgValue ptr = cg_value(ret_ptr, alloc_type_pointer(e->type));
+			cg_emit_store(p, ptr, results[return_count-1]);
+
+			tb_inst_ret(p->func, 0, nullptr);
+			return;
+		} else {
+			GB_ASSERT(p->proto->return_count == 1);
+			TB_DataType dt = TB_PROTOTYPE_RETURNS(p->proto)->dt;
+
+			cgValue result = cg_flatten_value(p, results[0]);
+			TB_Node *final_res = nullptr;
+			if (result.kind == cgValue_Addr) {
+				TB_CharUnits align = cast(TB_CharUnits)type_align_of(result.type);
+				final_res = tb_inst_load(p->func, dt, result.node, align, false);
+			} else {
+				GB_ASSERT(result.kind == cgValue_Value);
+				if (result.node->dt.raw == dt.raw) {
+					final_res = result.node;
+				} else {
+					final_res = tb_inst_bitcast(p->func, result.node, dt);
+				}
 			}
+			GB_ASSERT(final_res != nullptr);
+
+			tb_inst_ret(p->func, 1, &final_res);
 			return;
 		}
-		cgValue res = cg_build_expr(p, return_results[0]);
-		res = cg_emit_conv(p, res, e->type);
-		if (res.kind == cgValue_Value) {
-			tb_inst_ret(p->func, 1, &res.node);
-		}
-		return;
+
 	} else {
-		GB_PANIC("TODO(bill): MUTLIPLE RETURN VALUES");
+		GB_ASSERT(!is_calling_convention_odin(p->type->Proc.calling_convention));
 	}
+
+
+	GB_PANIC("TODO(bill): %.*s MUTLIPLE RETURN VALUES %td %td", LIT(p->name), results.count, return_results.count);
 }
 
 gb_internal void cg_build_if_stmt(cgProcedure *p, Ast *node) {

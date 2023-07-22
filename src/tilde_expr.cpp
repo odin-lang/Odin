@@ -15,6 +15,15 @@ gb_internal cgValue cg_flatten_value(cgProcedure *p, cgValue value) {
 	return value;
 }
 
+gb_internal cgValue cg_emit_select(cgProcedure *p, cgValue const &cond, cgValue const &x, cgValue const &y) {
+	GB_ASSERT(x.kind == y.kind);
+	GB_ASSERT(cond.kind == cgValue_Value);
+	cgValue res = x;
+	res.node = tb_inst_select(p->func, cond.node, x.node, y.node);
+	return res;
+}
+
+
 gb_internal bool cg_is_expr_untyped_const(Ast *expr) {
 	auto const &tv = type_and_value_of_expr(expr);
 	if (is_type_untyped(tv.type)) {
@@ -1724,36 +1733,35 @@ gb_internal cgValue cg_build_binary_expr(cgProcedure *p, Ast *expr) {
 
 	case Token_CmpEq:
 	case Token_NotEq:
-		GB_PANIC("TODO(bill): comparisons");
-		// if (is_type_untyped_nil(be->right->tav.type)) {
-		// 	// `x == nil` or `x != nil`
-		// 	cgValue left = cg_build_expr(p, be->left);
-		// 	cgValue cmp = cg_emit_comp_against_nil(p, be->op.kind, left);
-		// 	Type *type = default_type(tv.type);
-		// 	return cg_emit_conv(p, cmp, type);
-		// } else if (is_type_untyped_nil(be->left->tav.type)) {
-		// 	// `nil == x` or `nil != x`
-		// 	cgValue right = cg_build_expr(p, be->right);
-		// 	cgValue cmp = cg_emit_comp_against_nil(p, be->op.kind, right);
-		// 	Type *type = default_type(tv.type);
-		// 	return cg_emit_conv(p, cmp, type);
-		// } else if (cg_is_empty_string_constant(be->right)) {
-		// 	// `x == ""` or `x != ""`
-		// 	cgValue s = cg_build_expr(p, be->left);
-		// 	s = cg_emit_conv(p, s, t_string);
-		// 	cgValue len = cg_string_len(p, s);
-		// 	cgValue cmp = cg_emit_comp(p, be->op.kind, len, cg_const_int(p->module, t_int, 0));
-		// 	Type *type = default_type(tv.type);
-		// 	return cg_emit_conv(p, cmp, type);
-		// } else if (cg_is_empty_string_constant(be->left)) {
-		// 	// `"" == x` or `"" != x`
-		// 	cgValue s = cg_build_expr(p, be->right);
-		// 	s = cg_emit_conv(p, s, t_string);
-		// 	cgValue len = cg_string_len(p, s);
-		// 	cgValue cmp = cg_emit_comp(p, be->op.kind, len, cg_const_int(p->module, t_int, 0));
-		// 	Type *type = default_type(tv.type);
-		// 	return cg_emit_conv(p, cmp, type);
-		// }
+		if (is_type_untyped_nil(be->right->tav.type)) {
+			// `x == nil` or `x != nil`
+			cgValue left = cg_build_expr(p, be->left);
+			cgValue cmp = cg_emit_comp_against_nil(p, be->op.kind, left);
+			Type *type = default_type(tv.type);
+			return cg_emit_conv(p, cmp, type);
+		} else if (is_type_untyped_nil(be->left->tav.type)) {
+			// `nil == x` or `nil != x`
+			cgValue right = cg_build_expr(p, be->right);
+			cgValue cmp = cg_emit_comp_against_nil(p, be->op.kind, right);
+			Type *type = default_type(tv.type);
+			return cg_emit_conv(p, cmp, type);
+		}/* else if (cg_is_empty_string_constant(be->right)) {
+			// `x == ""` or `x != ""`
+			cgValue s = cg_build_expr(p, be->left);
+			s = cg_emit_conv(p, s, t_string);
+			cgValue len = cg_string_len(p, s);
+			cgValue cmp = cg_emit_comp(p, be->op.kind, len, cg_const_int(p->module, t_int, 0));
+			Type *type = default_type(tv.type);
+			return cg_emit_conv(p, cmp, type);
+		} else if (cg_is_empty_string_constant(be->left)) {
+			// `"" == x` or `"" != x`
+			cgValue s = cg_build_expr(p, be->right);
+			s = cg_emit_conv(p, s, t_string);
+			cgValue len = cg_string_len(p, s);
+			cgValue cmp = cg_emit_comp(p, be->op.kind, len, cg_const_int(p->module, t_int, 0));
+			Type *type = default_type(tv.type);
+			return cg_emit_conv(p, cmp, type);
+		}*/
 		/*fallthrough*/
 	case Token_Lt:
 	case Token_LtEq:
@@ -2255,7 +2263,6 @@ gb_internal cgValue cg_build_expr_internal(cgProcedure *p, Ast *expr) {
 			         token_pos_to_string(token.pos));
 			return {};
 		} else if (e->kind == Entity_Nil) {
-			GB_PANIC("TODO: cg_find_ident nil");
 			// TODO(bill): is this correct?
 			return cg_value(cast(TB_Node *)nullptr, e->type);
 		}

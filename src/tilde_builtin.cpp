@@ -91,6 +91,18 @@ gb_internal cgValue cg_builtin_raw_data(cgProcedure *p, cgValue const &value) {
 	return res;
 }
 
+gb_internal cgValue cg_builtin_min(cgProcedure *p, Type *t, cgValue x, cgValue y) {
+	x = cg_emit_conv(p, x, t);
+	y = cg_emit_conv(p, y, t);
+	return cg_emit_select(p, cg_emit_comp(p, Token_Lt, x, y), x, y);
+}
+gb_internal cgValue cg_builtin_max(cgProcedure *p, Type *t, cgValue x, cgValue y) {
+	x = cg_emit_conv(p, x, t);
+	y = cg_emit_conv(p, y, t);
+	return cg_emit_select(p, cg_emit_comp(p, Token_Gt, x, y), x, y);
+}
+
+
 gb_internal cgValue cg_build_builtin(cgProcedure *p, BuiltinProcId id, Ast *expr) {
 	ast_node(ce, CallExpr, expr);
 
@@ -137,6 +149,32 @@ gb_internal cgValue cg_build_builtin(cgProcedure *p, BuiltinProcId id, Ast *expr
 		return cg_builtin_len(p, v);
 	}
 
+	case BuiltinProc_min:
+		if (ce->args.count == 2) {
+			Type *t = type_of_expr(expr);
+			return cg_builtin_min(p, t, cg_build_expr(p, ce->args[0]), cg_build_expr(p, ce->args[1]));
+		} else {
+			Type *t = type_of_expr(expr);
+			cgValue x = cg_build_expr(p, ce->args[0]);
+			for (isize i = 1; i < ce->args.count; i++) {
+				x = cg_builtin_min(p, t, x, cg_build_expr(p, ce->args[i]));
+			}
+			return x;
+		}
+		break;
+	case BuiltinProc_max:
+		if (ce->args.count == 2) {
+			Type *t = type_of_expr(expr);
+			return cg_builtin_max(p, t, cg_build_expr(p, ce->args[0]), cg_build_expr(p, ce->args[1]));
+		} else {
+			Type *t = type_of_expr(expr);
+			cgValue x = cg_build_expr(p, ce->args[0]);
+			for (isize i = 1; i < ce->args.count; i++) {
+				x = cg_builtin_max(p, t, x, cg_build_expr(p, ce->args[i]));
+			}
+			return x;
+		}
+		break;
 
 	}
 
