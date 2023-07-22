@@ -252,7 +252,45 @@ gb_internal void cg_addr_store(cgProcedure *p, cgAddr addr, cgValue value) {
 	} else if (addr.kind == cgAddr_Map) {
 		GB_PANIC("TODO(bill): cgAddr_Map");
 	} else if (addr.kind == cgAddr_Context) {
-		GB_PANIC("TODO(bill): cgAddr_Context");
+		cgAddr old_addr = cg_find_or_generate_context_ptr(p);
+
+		bool create_new = true;
+		for_array(i, p->context_stack) {
+			cgContextData *ctx_data = &p->context_stack[i];
+			if (ctx_data->ctx.addr.node == old_addr.addr.node) {
+				if (ctx_data->uses > 0) {
+					create_new = true;
+				} else if (p->scope_index > ctx_data->scope_index) {
+					create_new = true;
+				} else {
+					// gb_printf_err("%.*s (curr:%td) (ctx:%td) (uses:%td)\n", LIT(p->name), p->scope_index, ctx_data->scope_index, ctx_data->uses);
+					create_new = false;
+				}
+				break;
+			}
+		}
+
+		cgValue next = {};
+		if (create_new) {
+			cgValue old = cg_addr_load(p, old_addr);
+			cgAddr next_addr = cg_add_local(p, t_context, nullptr, true);
+			cg_addr_store(p, next_addr, old);
+			cg_push_context_onto_stack(p, next_addr);
+			next = next_addr.addr;
+		} else {
+			next = old_addr.addr;
+		}
+
+		if (addr.ctx.sel.index.count > 0) {
+			cgValue lhs = cg_emit_deep_field_gep(p, next, addr.ctx.sel);
+			cgValue rhs = cg_emit_conv(p, value, type_deref(lhs.type));
+			cg_emit_store(p, lhs, rhs);
+		} else {
+			cgValue lhs = next;
+			cgValue rhs = cg_emit_conv(p, value, cg_addr_type(addr));
+			cg_emit_store(p, lhs, rhs);
+		}
+		return;
 	} else if (addr.kind == cgAddr_SoaVariable) {
 		GB_PANIC("TODO(bill): cgAddr_SoaVariable");
 	} else if (addr.kind == cgAddr_Swizzle) {

@@ -210,9 +210,6 @@ typedef enum TB_NodeTypeEnum {
     // projection
     TB_PROJ,
 
-    // metadata
-    TB_KEEPALIVE,
-
     TB_CALL,  // normal call
     TB_SCALL, // system call
 
@@ -640,14 +637,32 @@ TB_API void tb_module_set_tls_index(TB_Module* m, ptrdiff_t len, const char* nam
 TB_API void tb_module_layout_sections(TB_Module* m);
 
 ////////////////////////////////
-// Exporter
+// Compiled code introspection
 ////////////////////////////////
+enum { TB_ASSEMBLY_CHUNK_CAP = 4*1024 - sizeof(size_t[2]) };
+
+typedef struct TB_Assembly TB_Assembly;
+struct TB_Assembly {
+    TB_Assembly* next;
+
+    // nice chunk of text here
+    size_t length;
+    char data[];
+};
 
 // this is where the machine code and other relevant pieces go.
 typedef struct TB_FunctionOutput TB_FunctionOutput;
 
 // returns NULL if it fails
-TB_API TB_FunctionOutput* tb_module_compile_function(TB_Module* m, TB_Function* f, TB_ISelMode isel_mode);
+TB_API TB_FunctionOutput* tb_module_compile_function(TB_Module* m, TB_Function* f, TB_ISelMode isel_mode, bool emit_asm);
+
+TB_API uint8_t* tb_output_get_code(TB_FunctionOutput* out, size_t* out_length);
+
+// returns NULL if no assembly was generated
+TB_API TB_Assembly* tb_output_get_asm(TB_FunctionOutput* out);
+
+// this is relative to the start of the function (the start of the prologue)
+TB_API TB_Safepoint* tb_safepoint_get(TB_Function* f, uint32_t relative_ip);
 
 ////////////////////////////////
 // Exporter
@@ -780,6 +795,27 @@ struct TB_FunctionPrototype {
 // matching signatures.
 TB_API TB_FunctionPrototype* tb_prototype_create(TB_Module* m, TB_CallingConv cc, size_t param_count, const TB_PrototypeParam* params, size_t return_count, const TB_PrototypeParam* returns, bool has_varargs);
 
+// same as tb_function_set_prototype except it will handle lowering from types like the TB_DebugType
+// into the correct ABI and exposing sane looking nodes to the parameters.
+//
+// returns the parameters
+TB_API TB_Node** tb_function_set_prototype_from_dbg(TB_Function* f, TB_DebugType* dbg, TB_Arena* arena, size_t* out_param_count);
+TB_API TB_FunctionPrototype* tb_prototype_from_dbg(TB_Module* m, TB_DebugType* dbg);
+
+// used for ABI parameter passing
+typedef enum {
+    // needs a direct value
+    TB_PASSING_DIRECT,
+
+    // needs an address to the value
+    TB_PASSING_INDIRECT,
+
+    // doesn't use this parameter
+    TB_PASSING_IGNORE,
+} TB_PassingRule;
+
+TB_API TB_PassingRule tb_get_passing_rule_from_dbg(TB_Module* mod, TB_DebugType* param_type, bool is_return);
+
 ////////////////////////////////
 // Globals
 ////////////////////////////////
@@ -829,6 +865,8 @@ TB_API void tb_debug_record_end(TB_DebugType* type, TB_CharUnits size, TB_CharUn
 
 TB_API TB_DebugType* tb_debug_create_func(TB_Module* m, TB_CallingConv cc, size_t param_count, size_t return_count, bool has_varargs);
 
+TB_API TB_DebugType* tb_debug_field_type(TB_DebugType* type);
+
 // you'll need to fill these if you make a function
 TB_API TB_DebugType** tb_debug_func_params(TB_DebugType* type);
 TB_API TB_DebugType** tb_debug_func_returns(TB_DebugType* type);
@@ -838,12 +876,6 @@ TB_API TB_DebugType** tb_debug_func_returns(TB_DebugType* type);
 ////////////////////////////////
 // it is an index to the input
 #define TB_FOR_INPUT_IN_NODE(it, parent) for (TB_Node **it = parent->inputs, **__end = it + (parent)->input_count; it != __end; it++)
-
-////////////////////////////////
-// Compiled code introspection
-////////////////////////////////
-// this is relative to the start of the function (the start of the prologue)
-TB_API TB_Safepoint* tb_safepoint_get(TB_Function* f, uint32_t relative_ip);
 
 ////////////////////////////////
 // Symbols
@@ -879,13 +911,6 @@ TB_API void tb_symbol_set_name(TB_Symbol* s, ptrdiff_t len, const char* name);
 TB_API void tb_symbol_bind_ptr(TB_Symbol* s, void* ptr);
 TB_API const char* tb_symbol_get_name(TB_Symbol* s);
 
-// same as tb_function_set_prototype except it will handle lowering from types like the TB_DebugType
-// into the correct ABI and exposing sane looking nodes to the parameters.
-//
-// returns the parameters
-TB_API TB_Node** tb_function_set_prototype_from_dbg(TB_Function* f, TB_DebugType* dbg, TB_Arena* arena, size_t* out_param_count);
-TB_API TB_FunctionPrototype* tb_prototype_from_dbg(TB_Module* m, TB_DebugType* dbg);
-
 // if arena is NULL, defaults to module arena which is freed on tb_free_thread_resources
 TB_API void tb_function_set_prototype(TB_Function* f, TB_FunctionPrototype* p, TB_Arena* arena);
 TB_API TB_FunctionPrototype* tb_function_get_prototype(TB_Function* f);
@@ -903,7 +928,6 @@ TB_API void tb_inst_set_region_name(TB_Node* n, ptrdiff_t len, const char* name)
 TB_API void tb_inst_unreachable(TB_Function* f);
 TB_API void tb_inst_debugbreak(TB_Function* f);
 TB_API void tb_inst_trap(TB_Function* f);
-TB_API void tb_inst_keep_alive(TB_Function* f, TB_Node* src);
 TB_API TB_Node* tb_inst_poison(TB_Function* f);
 
 TB_API TB_Node* tb_inst_param(TB_Function* f, int param_id);

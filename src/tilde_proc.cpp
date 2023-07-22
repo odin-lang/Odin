@@ -87,12 +87,11 @@ gb_internal cgProcedure *cg_procedure_create(cgModule *m, Entity *entity, bool i
 	}
 
 	if (p->symbol == nullptr)  {
-		TB_Arena *arena = tb_default_arena();
 		p->func = tb_function_create(m->mod, link_name.len, cast(char const *)link_name.text, linkage, TB_COMDAT_NONE);
 
 		size_t out_param_count = 0;
 		p->debug_type = cg_debug_type_for_proc(m, p->type);
-		TB_Node **params = tb_function_set_prototype_from_dbg(p->func, p->debug_type, arena, &out_param_count);
+		TB_Node **params = tb_function_set_prototype_from_dbg(p->func, p->debug_type, cg_arena(), &out_param_count);
 		p->param_nodes = {params, cast(isize)out_param_count};
 		p->proto = tb_function_get_prototype(p->func);
 
@@ -141,12 +140,11 @@ gb_internal cgProcedure *cg_procedure_create_dummy(cgModule *m, String const &li
 
 	TB_Linkage linkage = TB_LINKAGE_PRIVATE;
 
-	TB_Arena *arena = tb_default_arena();
 	p->func = tb_function_create(m->mod, link_name.len, cast(char const *)link_name.text, linkage, TB_COMDAT_NONE);
 
 	size_t out_param_count = 0;
 	p->debug_type = cg_debug_type_for_proc(m, p->type);
-	TB_Node **params = tb_function_set_prototype_from_dbg(p->func, p->debug_type, arena, &out_param_count);
+	TB_Node **params = tb_function_set_prototype_from_dbg(p->func, p->debug_type, cg_arena(), &out_param_count);
 	p->param_nodes = {params, cast(isize)out_param_count};
 	p->proto = tb_function_get_prototype(p->func);
 
@@ -275,17 +273,32 @@ gb_internal void cg_procedure_end(cgProcedure *p) {
 	if (tb_inst_get_control(p->func)) {
 		tb_inst_ret(p->func, 0, nullptr);
 	}
+	bool emit_asm = false;
 	// if (p->name == "main") {
-	if (p->name == "bug" ABI_PKG_NAME_SEPARATOR "main") {
+	if (
+	    // p->name == "bug" ABI_PKG_NAME_SEPARATOR "main" ||
+	    p->name == "main" ||
+	    false
+	) {
 		TB_Arena *arena = tb_default_arena();
 		defer (arena->free(arena));
 		TB_FuncOpt *opt = tb_funcopt_enter(p->func, arena);
 		defer (tb_funcopt_exit(opt));
 		tb_funcopt_print(opt);
 
+		// emit_asm = true;
+
+		// GraphViz printing
 		// tb_function_print(p->func, tb_default_print_callback, stdout);
 	}
-	tb_module_compile_function(p->module->mod, p->func, TB_ISEL_FAST);
+	TB_FunctionOutput *output = tb_module_compile_function(p->module->mod, p->func, TB_ISEL_FAST, emit_asm);
+	if (emit_asm) {
+		TB_Assembly *assembly = tb_output_get_asm(output);
+		for (TB_Assembly *node = assembly; node != nullptr; node = node->next) {
+			gb_printf_err("%.*s", cast(int)node->length, node->data);
+		}
+		gb_printf_err("\n");
+	}
 }
 
 gb_internal void cg_procedure_generate(cgProcedure *p) {
@@ -332,7 +345,9 @@ gb_internal cgValue cg_build_call_expr(cgProcedure *p, Ast *expr) {
 	cgValue res = cg_build_call_expr_internal(p, expr);
 
 	if (ce->optional_ok_one) { // TODO(bill): Minor hack for #optional_ok procedures
-		GB_PANIC("Handle optional_ok_one");
+		GB_ASSERT(res.kind == cgValue_Multi);
+		GB_ASSERT(res.multi->values.count == 2);
+		return res.multi->values[0];
 		// GB_ASSERT(is_type_tuple(res.type));
 		// GB_ASSERT(res.type->Tuple.variables.count == 2);
 		// return cg_emit_struct_ev(p, res, 0);
@@ -345,18 +360,111 @@ gb_internal cgValue cg_emit_call(cgProcedure * p, cgValue value, Slice<cgValue> 
 		value = cg_value(tb_inst_get_symbol_address(p->func, value.symbol), value.type);
 	}
 	GB_ASSERT(value.kind == cgValue_Value);
+	TEMPORARY_ALLOCATOR_GUARD();
 
-	// TODO(bill): abstract out the function prototype stuff so that you handle the ABI correctly (at least for win64 at the moment)
-	TB_FunctionPrototype *proto = cg_procedure_type_as_prototype(p->module, value.type);
+	TB_Module *m = p->module->mod;
+
+
+	Type *type = base_type(value.type);
+	GB_ASSERT(type->kind == Type_Proc);
+	TypeProc *pt = &type->Proc;
+	gb_unused(pt);
+
+	TB_FunctionPrototype *proto = cg_procedure_type_as_prototype(p->module, type);
 	TB_Node *target = value.node;
-	auto params = slice_make<TB_Node *>(temporary_allocator(), 0 /*proto->param_count*/);
-	for_array(i, params) {
-		// params[i] = proto
+	auto params = slice_make<TB_Node *>(temporary_allocator(), proto->param_count);
+
+
+	GB_ASSERT(build_context.metrics.os == TargetOs_windows);
+	// TODO(bill): Support more than Win64 ABI
+
+	bool is_odin_like_cc = is_calling_convention_odin(pt->calling_convention);
+	GB_ASSERT(is_odin_like_cc);
+
+	bool return_is_indirect = false;
+
+	isize param_index = 0;
+	if (pt->result_count != 0) {
+		Type *last_result = pt->results->Tuple.variables[pt->results->Tuple.variables.count-1]->type;
+
+		TB_DebugType *dbg = cg_debug_type(p->module, last_result);
+		TB_PassingRule rule = tb_get_passing_rule_from_dbg(m, dbg, true);
+		if (rule == TB_PASSING_INDIRECT) {
+			return_is_indirect = true;
+			TB_CharUnits size = cast(TB_CharUnits)type_size_of(last_result);
+			TB_CharUnits align = cast(TB_CharUnits)type_align_of(last_result);
+			params[param_index++] = tb_inst_local(p->func, size, align);
+		}
+	}
+	for (cgValue arg : args) {
+		Type *param_type = pt->params->Tuple.variables[param_index]->type;
+		arg = cg_emit_conv(p, arg, param_type);
+		arg = cg_flatten_value(p, arg);
+
+		TB_Node *param = nullptr;
+
+		TB_DebugType *dbg = cg_debug_type(p->module, param_type);
+		TB_PassingRule rule = tb_get_passing_rule_from_dbg(m, dbg, false);
+		switch (rule) {
+		case TB_PASSING_DIRECT:
+			GB_ASSERT(arg.kind == cgValue_Value);
+			param = arg.node;
+			break;
+		case TB_PASSING_INDIRECT:
+			{
+				// indirect
+				cgValue arg_ptr = cg_address_from_load_or_generate_local(p, arg);
+				GB_ASSERT(arg_ptr.kind == cgValue_Value);
+				param = arg_ptr.node;
+			}
+			break;
+		case TB_PASSING_IGNORE:
+			continue;
+		}
+
+		params[param_index++] = param;
+	}
+
+	// Split returns
+	for (isize i = 0; i < pt->result_count-1; i++) {
+		Type *result = pt->results->Tuple.variables[i]->type;
+		TB_CharUnits size = cast(TB_CharUnits)type_size_of(result);
+		TB_CharUnits align = cast(TB_CharUnits)type_align_of(result);
+		params[param_index++] = tb_inst_local(p->func, size, align);
+	}
+
+	if (pt->calling_convention == ProcCC_Odin) {
+		cgValue ctx_ptr = cg_find_or_generate_context_ptr(p).addr;
+		GB_ASSERT(ctx_ptr.kind == cgValue_Value);
+		params[param_index++] = ctx_ptr.node;
+	}
+	GB_ASSERT_MSG(param_index == params.count, "%td vs %td\n %s %u %u",
+	              param_index, params.count,
+	              type_to_string(type),
+	              proto->return_count,
+	              proto->param_count);
+
+	for (TB_Node *param : params) {
+		GB_ASSERT(param != nullptr);
 	}
 
 	GB_ASSERT(target != nullptr);
 	TB_MultiOutput multi_output = tb_inst_call(p->func, proto, target, params.count, params.data);
 	gb_unused(multi_output);
+
+	switch (pt->result_count) {
+	case 0:
+		return {};
+	case 1:
+		if (return_is_indirect) {
+			return cg_lvalue_addr(params[0], pt->results->Tuple.variables[0]->type);
+		}
+		GB_ASSERT(multi_output.count == 1);
+		return cg_value(multi_output.single, pt->results->Tuple.variables[0]->type);
+	}
+
+
+
 	return {};
 }
 
