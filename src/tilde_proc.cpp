@@ -379,7 +379,6 @@ gb_internal cgValue cg_emit_call(cgProcedure * p, cgValue value, Slice<cgValue> 
 	// TODO(bill): Support more than Win64 ABI
 
 	bool is_odin_like_cc = is_calling_convention_odin(pt->calling_convention);
-	GB_ASSERT_MSG(is_odin_like_cc, "TODO(bill): non-odin like procedures");
 
 	bool return_is_indirect = false;
 
@@ -394,16 +393,19 @@ gb_internal cgValue cg_emit_call(cgProcedure * p, cgValue value, Slice<cgValue> 
 
 	isize param_index = 0;
 	if (pt->result_count != 0) {
-		Type *last_result = result_entities[result_entities.count-1]->type;
-
-		TB_DebugType *dbg = cg_debug_type(p->module, last_result);
+		Type *return_type = nullptr;
+		if (is_odin_like_cc) {
+			return_type = result_entities[result_entities.count-1]->type;
+		} else {
+			return_type = pt->results;
+		}
+		TB_DebugType *dbg = cg_debug_type(p->module, return_type);
 		TB_PassingRule rule = tb_get_passing_rule_from_dbg(m, dbg, true);
 		if (rule == TB_PASSING_INDIRECT) {
 			return_is_indirect = true;
-			TB_CharUnits size = cast(TB_CharUnits)type_size_of(last_result);
-			TB_CharUnits align = cast(TB_CharUnits)gb_max(type_align_of(last_result), 16);
+			TB_CharUnits size = cast(TB_CharUnits)type_size_of(return_type);
+			TB_CharUnits align = cast(TB_CharUnits)gb_max(type_align_of(return_type), 16);
 			TB_Node *local = tb_inst_local(p->func, size, align);
-			// TODO(bill): Should this need to be zeroed any way?
 			tb_inst_memzero(p->func, local, tb_inst_uint(p->func, TB_TYPE_INT, size), align, false);
 			params[param_index++] = local;
 		}
@@ -424,8 +426,13 @@ gb_internal cgValue cg_emit_call(cgProcedure * p, cgValue value, Slice<cgValue> 
 			break;
 		case TB_PASSING_INDIRECT:
 			{
+				cgValue arg_ptr = {};
 				// indirect
-				cgValue arg_ptr = cg_address_from_load_or_generate_local(p, arg);
+				if (is_odin_like_cc) {
+					arg_ptr = cg_address_from_load_or_generate_local(p, arg);
+				} else {
+					arg_ptr = cg_copy_value_to_ptr(p, arg, param_type, 16);
+				}
 				GB_ASSERT(arg_ptr.kind == cgValue_Value);
 				param = arg_ptr.node;
 			}
@@ -438,15 +445,18 @@ gb_internal cgValue cg_emit_call(cgProcedure * p, cgValue value, Slice<cgValue> 
 	}
 
 	// Split returns
-	isize split_offset = param_index;
-	for (isize i = 0; i < pt->result_count-1; i++) {
-		Type *result = result_entities[i]->type;
-		TB_CharUnits size = cast(TB_CharUnits)type_size_of(result);
-		TB_CharUnits align = cast(TB_CharUnits)gb_max(type_align_of(result), 16);
-		TB_Node *local = tb_inst_local(p->func, size, align);
-		// TODO(bill): Should this need to be zeroed any way?
-		tb_inst_memzero(p->func, local, tb_inst_uint(p->func, TB_TYPE_INT, size), align, false);
-		params[param_index++] = local;
+	isize split_offset = -1;
+	if (is_odin_like_cc) {
+		split_offset = param_index;
+		for (isize i = 0; i < pt->result_count-1; i++) {
+			Type *result = result_entities[i]->type;
+			TB_CharUnits size = cast(TB_CharUnits)type_size_of(result);
+			TB_CharUnits align = cast(TB_CharUnits)gb_max(type_align_of(result), 16);
+			TB_Node *local = tb_inst_local(p->func, size, align);
+			// TODO(bill): Should this need to be zeroed any way?
+			tb_inst_memzero(p->func, local, tb_inst_uint(p->func, TB_TYPE_INT, size), align, false);
+			params[param_index++] = local;
+		}
 	}
 
 	if (pt->calling_convention == ProcCC_Odin) {
@@ -483,6 +493,7 @@ gb_internal cgValue cg_emit_call(cgProcedure * p, cgValue value, Slice<cgValue> 
 	multi->values = slice_make<cgValue>(permanent_allocator(), pt->result_count);
 
 	if (is_odin_like_cc) {
+		GB_ASSERT(split_offset >= 0);
 		for (isize i = 0; i < pt->result_count-1; i++) {
 			multi->values[i] = cg_lvalue_addr(params[split_offset+i], result_entities[i]->type);
 		}
@@ -506,7 +517,24 @@ gb_internal cgValue cg_emit_call(cgProcedure * p, cgValue value, Slice<cgValue> 
 			}
 		}
 	} else {
-		GB_PANIC("TODO non-odin like multiple return stuff");
+		TB_Node *the_tuple = {};
+		if (return_is_indirect) {
+			the_tuple = params[0];
+		} else {
+			GB_ASSERT(multi_output.count == 1);
+			TB_Node *res = multi_output.single;
+
+			// struct-like returns passed in registers
+			TB_CharUnits size  = cast(TB_CharUnits)type_size_of(pt->results);
+			TB_CharUnits align = cast(TB_CharUnits)type_align_of(pt->results);
+			the_tuple = tb_inst_local(p->func, size, align);
+			tb_inst_store(p->func, res->dt, the_tuple, res, align, false);
+		}
+		for (isize i = 0; i < pt->result_count; i++) {
+			i64 offset = type_offset_of(pt->results, i, nullptr);
+			TB_Node *ptr = tb_inst_member_access(p->func, the_tuple, offset);
+			multi->values[i] = cg_lvalue_addr(ptr, result_entities[i]->type);
+		}
 	}
 
 	return cg_value_multi(multi, pt->results);

@@ -736,6 +736,20 @@ gb_internal cgAddr cg_add_local(cgProcedure *p, Type *type, Entity *e, bool zero
 	return addr;
 }
 
+gb_internal cgValue cg_copy_value_to_ptr(cgProcedure *p, cgValue value, Type *original_type, isize min_alignment) {
+	TB_CharUnits size  = cast(TB_CharUnits)type_size_of(original_type);
+	TB_CharUnits align = cast(TB_CharUnits)gb_max(type_align_of(original_type), min_alignment);
+	TB_Node *copy = tb_inst_local(p->func, size, align);
+	if (value.kind == cgValue_Value) {
+		tb_inst_store(p->func, cg_data_type(original_type), copy, value.node, align, false);
+	} else {
+		GB_ASSERT(value.kind == cgValue_Addr);
+		tb_inst_memcpy(p->func, copy, value.node, tb_inst_uint(p->func, TB_TYPE_INT, size), align, false);
+	}
+
+	return cg_value(copy, alloc_type_pointer(original_type));
+}
+
 gb_internal cgValue cg_address_from_load_or_generate_local(cgProcedure *p, cgValue value) {
 	switch (value.kind) {
 	case cgValue_Value:

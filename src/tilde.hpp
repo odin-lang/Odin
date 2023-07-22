@@ -282,6 +282,7 @@ gb_internal void    cg_emit_store(cgProcedure *p, cgValue dst, cgValue const &sr
 
 gb_internal cgAddr  cg_add_local(cgProcedure *p, Type *type, Entity *e, bool zero_init);
 gb_internal cgValue cg_address_from_load_or_generate_local(cgProcedure *p, cgValue value);
+gb_internal cgValue cg_copy_value_to_ptr(cgProcedure *p, cgValue value, Type *original_type, isize min_alignment);
 
 gb_internal cgValue cg_build_call_expr(cgProcedure *p, Ast *expr);
 
