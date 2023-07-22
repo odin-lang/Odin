@@ -126,7 +126,7 @@ gb_internal TB_Global *cg_global_const_string(cgModule *m, String const &str, Ty
 
 	if (global == nullptr) {
 		global = tb_global_create(m->mod, -1, name, cg_debug_type(m, type), TB_LINKAGE_PRIVATE);
-		tb_global_set_storage(m->mod, tb_module_get_rdata(m->mod), str_global, type_size_of(type), type_align_of(type), 2);
+		tb_global_set_storage(m->mod, tb_module_get_rdata(m->mod), global, type_size_of(type), type_align_of(type), 2);
 	}
 
 	tb_global_add_symbol_reloc(m->mod, global, offset+0, cast(TB_Symbol *)str_global);

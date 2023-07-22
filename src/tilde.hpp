@@ -42,8 +42,9 @@ struct cgValue {
 	cgValueKind kind;
 	Type *      type;
 	union {
-		TB_Symbol *symbol;
-		TB_Node *  node;
+		// NOTE: any value in this union must be a pointer
+		TB_Symbol *   symbol;
+		TB_Node *     node;
 		cgValueMulti *multi;
 	};
 };
@@ -309,3 +310,5 @@ gb_internal bool    cg_emit_goto(cgProcedure *p, TB_Node *control_region);
 
 
 gb_internal TB_Node *cg_control_region(cgProcedure *p, char const *name);
+
+gb_internal isize cg_append_tuple_values(cgProcedure *p, Array<cgValue> *dst_values, cgValue src_value);
