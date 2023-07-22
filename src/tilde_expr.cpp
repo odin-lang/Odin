@@ -179,7 +179,7 @@ gb_internal cgValue cg_emit_transmute(cgProcedure *p, cgValue value, Type *type)
 	TB_DataType dt = cg_data_type(type);
 	switch (value.kind) {
 	case cgValue_Value:
-		GB_ASSERT(!TB_IS_VOID_TYPE(dt));
+		GB_ASSERT_MSG(!TB_IS_VOID_TYPE(dt), "%s", type_to_string(type));
 		value.type = type;
 		if (value.node->dt.raw != dt.raw) {
 			value.node = tb_inst_bitcast(p->func, value.node, dt);
@@ -1959,6 +1959,255 @@ gb_internal cgValue cg_build_expr(cgProcedure *p, Ast *expr) {
 }
 
 
+gb_internal cgValue cg_find_ident(cgProcedure *p, Entity *e, Ast *expr) {
+	cgAddr *found_addr = map_get(&p->variable_map, e);
+	if (found_addr) {
+		return cg_addr_load(p, *found_addr);
+	}
+
+	cgValue *found = nullptr;
+	rw_mutex_shared_lock(&p->module->values_mutex);
+	found = map_get(&p->module->values, e);
+	rw_mutex_shared_unlock(&p->module->values_mutex);
+
+	if (found) {
+
+		auto v = *found;
+		// NOTE(bill): This is because pointers are already pointers in LLVM
+		if (is_type_proc(v.type)) {
+			return v;
+		}
+		return cg_emit_load(p, v);
+	} else if (e != nullptr && e->kind == Entity_Variable) {
+		return cg_addr_load(p, cg_build_addr(p, expr));
+	}
+
+	if (e->kind == Entity_Procedure) {
+		return cg_find_procedure_value_from_entity(p->module, e);
+	}
+
+	String pkg = {};
+	if (e->pkg) {
+		pkg = e->pkg->name;
+	}
+	gb_printf_err("Error in: %s\n", token_pos_to_string(ast_token(expr).pos));
+	GB_PANIC("nullptr value for expression from identifier: %.*s.%.*s (%p) : %s @ %p", LIT(pkg), LIT(e->token.string), e, type_to_string(e->type), expr);
+	return {};
+}
+
+gb_internal cgValue cg_build_unary_and(cgProcedure *p, Ast *expr) {
+	ast_node(ue, UnaryExpr, expr);
+	auto tv = type_and_value_of_expr(expr);
+
+
+	Ast *ue_expr = unparen_expr(ue->expr);
+	if (ue_expr->kind == Ast_IndexExpr && tv.mode == Addressing_OptionalOkPtr && is_type_tuple(tv.type)) {
+		GB_PANIC("TODO(bill): &m[k]");
+		// Type *tuple = tv.type;
+
+		// Type *map_type = type_of_expr(ue_expr->IndexExpr.expr);
+		// Type *ot = base_type(map_type);
+		// Type *t = base_type(type_deref(ot));
+		// bool deref = t != ot;
+		// GB_ASSERT(t->kind == Type_Map);
+		// ast_node(ie, IndexExpr, ue_expr);
+
+		// lbValue map_val = lb_build_addr_ptr(p, ie->expr);
+		// if (deref) {
+		// 	map_val = lb_emit_load(p, map_val);
+		// }
+
+		// lbValue key = lb_build_expr(p, ie->index);
+		// key = lb_emit_conv(p, key, t->Map.key);
+
+		// lbAddr addr = lb_addr_map(map_val, key, t, alloc_type_pointer(t->Map.value));
+		// lbValue ptr = lb_addr_get_ptr(p, addr);
+
+		// lbValue ok = lb_emit_comp_against_nil(p, Token_NotEq, ptr);
+		// ok = lb_emit_conv(p, ok, tuple->Tuple.variables[1]->type);
+
+		// lbAddr res = lb_add_local_generated(p, tuple, false);
+		// lbValue gep0 = lb_emit_struct_ep(p, res.addr, 0);
+		// lbValue gep1 = lb_emit_struct_ep(p, res.addr, 1);
+		// lb_emit_store(p, gep0, ptr);
+		// lb_emit_store(p, gep1, ok);
+		// return lb_addr_load(p, res);
+
+	} else if (is_type_soa_pointer(tv.type)) {
+		GB_PANIC("TODO(bill): &soa[i]");
+		// ast_node(ie, IndexExpr, ue_expr);
+		// lbValue addr = lb_build_addr_ptr(p, ie->expr);
+		// lbValue index = lb_build_expr(p, ie->index);
+
+		// if (!build_context.no_bounds_check) {
+		// 	// TODO(bill): soa bounds checking
+		// }
+
+		// return lb_make_soa_pointer(p, tv.type, addr, index);
+	} else if (ue_expr->kind == Ast_CompoundLit) {
+		cgValue v = cg_build_expr(p, ue->expr);
+
+		Type *type = v.type;
+		cgAddr addr = {};
+		// if (p->is_startup) {
+			// addr = cg_add_global_generated(p->module, type, v);
+		// } else {
+			addr = cg_add_local(p, type, nullptr, false);
+		// }
+		cg_addr_store(p, addr, v);
+		return addr.addr;
+
+	} else if (ue_expr->kind == Ast_TypeAssertion) {
+		GB_PANIC("TODO(bill): &v.(T)");
+		// if (is_type_tuple(tv.type)) {
+		// 	Type *tuple = tv.type;
+		// 	Type *ptr_type = tuple->Tuple.variables[0]->type;
+		// 	Type *ok_type = tuple->Tuple.variables[1]->type;
+
+		// 	ast_node(ta, TypeAssertion, ue_expr);
+		// 	TokenPos pos = ast_token(expr).pos;
+		// 	Type *type = type_of_expr(ue_expr);
+		// 	GB_ASSERT(!is_type_tuple(type));
+
+		// 	lbValue e = lb_build_expr(p, ta->expr);
+		// 	Type *t = type_deref(e.type);
+		// 	if (is_type_union(t)) {
+		// 		lbValue v = e;
+		// 		if (!is_type_pointer(v.type)) {
+		// 			v = lb_address_from_load_or_generate_local(p, v);
+		// 		}
+		// 		Type *src_type = type_deref(v.type);
+		// 		Type *dst_type = type;
+
+		// 		lbValue src_tag = {};
+		// 		lbValue dst_tag = {};
+		// 		if (is_type_union_maybe_pointer(src_type)) {
+		// 			src_tag = lb_emit_comp_against_nil(p, Token_NotEq, v);
+		// 			dst_tag = lb_const_bool(p->module, t_bool, true);
+		// 		} else {
+		// 			src_tag = lb_emit_load(p, lb_emit_union_tag_ptr(p, v));
+		// 			dst_tag = lb_const_union_tag(p->module, src_type, dst_type);
+		// 		}
+
+		// 		lbValue ok = lb_emit_comp(p, Token_CmpEq, src_tag, dst_tag);
+
+		// 		lbValue data_ptr = lb_emit_conv(p, v, ptr_type);
+		// 		lbAddr res = lb_add_local_generated(p, tuple, true);
+		// 		lbValue gep0 = lb_emit_struct_ep(p, res.addr, 0);
+		// 		lbValue gep1 = lb_emit_struct_ep(p, res.addr, 1);
+		// 		lb_emit_store(p, gep0, lb_emit_select(p, ok, data_ptr, lb_const_nil(p->module, ptr_type)));
+		// 		lb_emit_store(p, gep1, lb_emit_conv(p, ok, ok_type));
+		// 		return lb_addr_load(p, res);
+		// 	} else if (is_type_any(t)) {
+		// 		lbValue v = e;
+		// 		if (is_type_pointer(v.type)) {
+		// 			v = lb_emit_load(p, v);
+		// 		}
+
+		// 		lbValue data_ptr = lb_emit_conv(p, lb_emit_struct_ev(p, v, 0), ptr_type);
+		// 		lbValue any_id = lb_emit_struct_ev(p, v, 1);
+		// 		lbValue id = lb_typeid(p->module, type);
+
+		// 		lbValue ok = lb_emit_comp(p, Token_CmpEq, any_id, id);
+
+		// 		lbAddr res = lb_add_local_generated(p, tuple, false);
+		// 		lbValue gep0 = lb_emit_struct_ep(p, res.addr, 0);
+		// 		lbValue gep1 = lb_emit_struct_ep(p, res.addr, 1);
+		// 		lb_emit_store(p, gep0, lb_emit_select(p, ok, data_ptr, lb_const_nil(p->module, ptr_type)));
+		// 		lb_emit_store(p, gep1, lb_emit_conv(p, ok, ok_type));
+		// 		return lb_addr_load(p, res);
+		// 	} else {
+		// 		GB_PANIC("TODO(bill): type assertion %s", type_to_string(type));
+		// 	}
+
+		// } else {
+		// 	GB_ASSERT(is_type_pointer(tv.type));
+
+		// 	ast_node(ta, TypeAssertion, ue_expr);
+		// 	TokenPos pos = ast_token(expr).pos;
+		// 	Type *type = type_of_expr(ue_expr);
+		// 	GB_ASSERT(!is_type_tuple(type));
+
+		// 	lbValue e = lb_build_expr(p, ta->expr);
+		// 	Type *t = type_deref(e.type);
+		// 	if (is_type_union(t)) {
+		// 		lbValue v = e;
+		// 		if (!is_type_pointer(v.type)) {
+		// 			v = lb_address_from_load_or_generate_local(p, v);
+		// 		}
+		// 		Type *src_type = type_deref(v.type);
+		// 		Type *dst_type = type;
+
+
+		// 		if ((p->state_flags & StateFlag_no_type_assert) == 0) {
+		// 			lbValue src_tag = {};
+		// 			lbValue dst_tag = {};
+		// 			if (is_type_union_maybe_pointer(src_type)) {
+		// 				src_tag = lb_emit_comp_against_nil(p, Token_NotEq, v);
+		// 				dst_tag = lb_const_bool(p->module, t_bool, true);
+		// 			} else {
+		// 				src_tag = lb_emit_load(p, lb_emit_union_tag_ptr(p, v));
+		// 				dst_tag = lb_const_union_tag(p->module, src_type, dst_type);
+		// 			}
+
+
+		// 			isize arg_count = 6;
+		// 			if (build_context.no_rtti) {
+		// 				arg_count = 4;
+		// 			}
+
+		// 			lbValue ok = lb_emit_comp(p, Token_CmpEq, src_tag, dst_tag);
+		// 			auto args = array_make<lbValue>(permanent_allocator(), arg_count);
+		// 			args[0] = ok;
+
+		// 			args[1] = lb_find_or_add_entity_string(p->module, get_file_path_string(pos.file_id));
+		// 			args[2] = lb_const_int(p->module, t_i32, pos.line);
+		// 			args[3] = lb_const_int(p->module, t_i32, pos.column);
+
+		// 			if (!build_context.no_rtti) {
+		// 				args[4] = lb_typeid(p->module, src_type);
+		// 				args[5] = lb_typeid(p->module, dst_type);
+		// 			}
+		// 			lb_emit_runtime_call(p, "type_assertion_check", args);
+		// 		}
+
+		// 		lbValue data_ptr = v;
+		// 		return lb_emit_conv(p, data_ptr, tv.type);
+		// 	} else if (is_type_any(t)) {
+		// 		lbValue v = e;
+		// 		if (is_type_pointer(v.type)) {
+		// 			v = lb_emit_load(p, v);
+		// 		}
+		// 		lbValue data_ptr = lb_emit_struct_ev(p, v, 0);
+		// 		if ((p->state_flags & StateFlag_no_type_assert) == 0) {
+		// 			GB_ASSERT(!build_context.no_rtti);
+
+		// 			lbValue any_id = lb_emit_struct_ev(p, v, 1);
+
+		// 			lbValue id = lb_typeid(p->module, type);
+		// 			lbValue ok = lb_emit_comp(p, Token_CmpEq, any_id, id);
+		// 			auto args = array_make<lbValue>(permanent_allocator(), 6);
+		// 			args[0] = ok;
+
+		// 			args[1] = lb_find_or_add_entity_string(p->module, get_file_path_string(pos.file_id));
+		// 			args[2] = lb_const_int(p->module, t_i32, pos.line);
+		// 			args[3] = lb_const_int(p->module, t_i32, pos.column);
+
+		// 			args[4] = any_id;
+		// 			args[5] = id;
+		// 			lb_emit_runtime_call(p, "type_assertion_check", args);
+		// 		}
+
+		// 		return lb_emit_conv(p, data_ptr, tv.type);
+		// 	} else {
+		// 		GB_PANIC("TODO(bill): type assertion %s", type_to_string(type));
+		// 	}
+		// }
+	}
+
+	return cg_build_addr_ptr(p, ue->expr);
+}
+
 
 gb_internal cgValue cg_build_expr_internal(cgProcedure *p, Ast *expr) {
 	expr = unparen_expr(expr);
@@ -2016,9 +2265,7 @@ gb_internal cgValue cg_build_expr_internal(cgProcedure *p, Ast *expr) {
 		if (addr) {
 			return cg_addr_load(p, *addr);
 		}
-		// return cg_find_ident(p, m, e, expr);
-		GB_PANIC("TODO: cg_find_ident");
-		return {};
+		return cg_find_ident(p, e, expr);
 	case_end;
 
 	case_ast_node(i, Implicit, expr);
@@ -2151,8 +2398,7 @@ gb_internal cgValue cg_build_expr_internal(cgProcedure *p, Ast *expr) {
 
 	case_ast_node(ue, UnaryExpr, expr);
 		if (ue->op.kind == Token_And) {
-			GB_PANIC("TODO(bill): cg_build_unary_and");
-			// return cg_build_unary_and(p, expr);
+			return cg_build_unary_and(p, expr);
 		}
 		cgValue v = cg_build_expr(p, ue->expr);
 		return cg_emit_unary_arith(p, ue->op.kind, v, type);
@@ -2166,6 +2412,10 @@ gb_internal cgValue cg_build_expr_internal(cgProcedure *p, Ast *expr) {
 
 }
 
+gb_internal cgValue cg_build_addr_ptr(cgProcedure *p, Ast *expr) {
+	cgAddr addr = cg_build_addr(p, expr);
+	return cg_addr_get_ptr(p, addr);
+}
 
 gb_internal cgAddr cg_build_addr_internal(cgProcedure *p, Ast *expr);
 gb_internal cgAddr cg_build_addr(cgProcedure *p, Ast *expr) {
@@ -2193,6 +2443,225 @@ gb_internal cgAddr cg_build_addr(cgProcedure *p, Ast *expr) {
 	return addr;
 }
 
+gb_internal cgAddr cg_build_addr_index_expr(cgProcedure *p, Ast *expr) {
+	ast_node(ie, IndexExpr, expr);
+
+	Type *t = base_type(type_of_expr(ie->expr));
+
+	bool deref = is_type_pointer(t);
+	t = base_type(type_deref(t));
+	if (is_type_soa_struct(t)) {
+		GB_PANIC("TODO(bill): #soa");
+		// // SOA STRUCTURES!!!!
+		// lbValue val = cg_build_addr_ptr(p, ie->expr);
+		// if (deref) {
+		// 	val = cg_emit_load(p, val);
+		// }
+
+		// cgValue index = cg_build_expr(p, ie->index);
+		// return cg_addr_soa_variable(val, index, ie->index);
+	}
+
+	if (ie->expr->tav.mode == Addressing_SoaVariable) {
+		GB_PANIC("TODO(bill): #soa");
+		// // SOA Structures for slices/dynamic arrays
+		// GB_ASSERT(is_type_pointer(type_of_expr(ie->expr)));
+
+		// lbValue field = lb_build_expr(p, ie->expr);
+		// lbValue index = lb_build_expr(p, ie->index);
+
+
+		// if (!build_context.no_bounds_check) {
+		// 	// TODO HACK(bill): Clean up this hack to get the length for bounds checking
+		// 	// GB_ASSERT(LLVMIsALoadInst(field.value));
+
+		// 	// lbValue a = {};
+		// 	// a.value = LLVMGetOperand(field.value, 0);
+		// 	// a.type = alloc_type_pointer(field.type);
+
+		// 	// irInstr *b = &a->Instr;
+		// 	// GB_ASSERT(b->kind == irInstr_StructElementPtr);
+		// 	// lbValue base_struct = b->StructElementPtr.address;
+
+		// 	// GB_ASSERT(is_type_soa_struct(type_deref(ir_type(base_struct))));
+		// 	// lbValue len = ir_soa_struct_len(p, base_struct);
+		// 	// lb_emit_bounds_check(p, ast_token(ie->index), index, len);
+		// }
+		// lbValue val = lb_emit_ptr_offset(p, field, index);
+		// return lb_addr(val);
+	}
+
+	GB_ASSERT_MSG(is_type_indexable(t), "%s %s", type_to_string(t), expr_to_string(expr));
+
+	if (is_type_map(t)) {
+		GB_PANIC("TODO(bill): map indexing");
+		// lbAddr map_addr = lb_build_addr(p, ie->expr);
+		// lbValue key = lb_build_expr(p, ie->index);
+		// key = lb_emit_conv(p, key, t->Map.key);
+
+		// Type *result_type = type_of_expr(expr);
+		// lbValue map_ptr = lb_addr_get_ptr(p, map_addr);
+		// if (is_type_pointer(type_deref(map_ptr.type))) {
+		// 	map_ptr = lb_emit_load(p, map_ptr);
+		// }
+		// return lb_addr_map(map_ptr, key, t, result_type);
+	}
+
+	switch (t->kind) {
+	case Type_Array: {
+		cgValue array = {};
+		array = cg_build_addr_ptr(p, ie->expr);
+		if (deref) {
+			array = cg_emit_load(p, array);
+		}
+		cgValue index = cg_build_expr(p, ie->index);
+		index = cg_emit_conv(p, index, t_int);
+		cgValue elem = cg_emit_array_ep(p, array, index);
+
+		auto index_tv = type_and_value_of_expr(ie->index);
+		if (index_tv.mode != Addressing_Constant) {
+			// cgValue len = cg_const_int(p->module, t_int, t->Array.count);
+			// cg_emit_bounds_check(p, ast_token(ie->index), index, len);
+		}
+		return cg_addr(elem);
+	}
+
+	case Type_EnumeratedArray: {
+		cgValue array = {};
+		array = cg_build_addr_ptr(p, ie->expr);
+		if (deref) {
+			array = cg_emit_load(p, array);
+		}
+
+		Type *index_type = t->EnumeratedArray.index;
+
+		auto index_tv = type_and_value_of_expr(ie->index);
+
+		cgValue index = {};
+		if (compare_exact_values(Token_NotEq, *t->EnumeratedArray.min_value, exact_value_i64(0))) {
+			if (index_tv.mode == Addressing_Constant) {
+				ExactValue idx = exact_value_sub(index_tv.value, *t->EnumeratedArray.min_value);
+				index = cg_const_value(p, index_type, idx);
+			} else {
+				index = cg_emit_arith(p, Token_Sub,
+				                      cg_build_expr(p, ie->index),
+				                      cg_const_value(p, index_type, *t->EnumeratedArray.min_value),
+				                      index_type);
+				index = cg_emit_conv(p, index, t_int);
+			}
+		} else {
+			index = cg_emit_conv(p, cg_build_expr(p, ie->index), t_int);
+		}
+
+		cgValue elem = cg_emit_array_ep(p, array, index);
+
+		if (index_tv.mode != Addressing_Constant) {
+			// cgValue len = cg_const_int(p->module, t_int, t->EnumeratedArray.count);
+			// cg_emit_bounds_check(p, ast_token(ie->index), index, len);
+		}
+		return cg_addr(elem);
+	}
+
+	case Type_Slice: {
+		cgValue slice = {};
+		slice = cg_build_expr(p, ie->expr);
+		if (deref) {
+			slice = cg_emit_load(p, slice);
+		}
+		cgValue elem = cg_builtin_raw_data(p, slice);
+		cgValue index = cg_emit_conv(p, cg_build_expr(p, ie->index), t_int);
+		// cgValue len = cg_builtin_len(p, slice);
+		// cg_emit_bounds_check(p, ast_token(ie->index), index, len);
+		cgValue v = cg_emit_ptr_offset(p, elem, index);
+		return cg_addr(v);
+	}
+
+	case Type_MultiPointer: {
+		cgValue multi_ptr = {};
+		multi_ptr = cg_build_expr(p, ie->expr);
+		if (deref) {
+			multi_ptr = cg_emit_load(p, multi_ptr);
+		}
+		cgValue index = cg_build_expr(p, ie->index);
+		index = cg_emit_conv(p, index, t_int);
+
+		return cg_addr(cg_emit_ptr_offset(p, multi_ptr, index));
+	}
+
+	case Type_RelativeSlice: {
+		GB_PANIC("TODO(bill): relative slice");
+		// lbAddr slice_addr = {};
+		// if (deref) {
+		// 	slice_addr = lb_addr(lb_build_expr(p, ie->expr));
+		// } else {
+		// 	slice_addr = lb_build_addr(p, ie->expr);
+		// }
+		// lbValue slice = lb_addr_load(p, slice_addr);
+
+		// lbValue elem = lb_slice_elem(p, slice);
+		// lbValue index = lb_emit_conv(p, lb_build_expr(p, ie->index), t_int);
+		// lbValue len = lb_slice_len(p, slice);
+		// lb_emit_bounds_check(p, ast_token(ie->index), index, len);
+		// lbValue v = lb_emit_ptr_offset(p, elem, index);
+		// return lb_addr(v);
+	}
+
+	case Type_DynamicArray: {
+		cgValue dynamic_array = {};
+		dynamic_array = cg_build_expr(p, ie->expr);
+		if (deref) {
+			dynamic_array = cg_emit_load(p, dynamic_array);
+		}
+		cgValue elem = cg_builtin_raw_data(p, dynamic_array);
+		cgValue index = cg_emit_conv(p, cg_build_expr(p, ie->index), t_int);
+		// cgValue len = cg_dynamic_array_len(p, dynamic_array);
+		// cg_emit_bounds_check(p, ast_token(ie->index), index, len);
+		cgValue v = cg_emit_ptr_offset(p, elem, index);
+		return cg_addr(v);
+	}
+
+	case Type_Matrix: {
+		GB_PANIC("TODO(bill): matrix");
+		// lbValue matrix = {};
+		// matrix = lb_build_addr_ptr(p, ie->expr);
+		// if (deref) {
+		// 	matrix = lb_emit_load(p, matrix);
+		// }
+		// lbValue index = lb_build_expr(p, ie->index);
+		// index = lb_emit_conv(p, index, t_int);
+		// lbValue elem = lb_emit_matrix_ep(p, matrix, lb_const_int(p->module, t_int, 0), index);
+		// elem = lb_emit_conv(p, elem, alloc_type_pointer(type_of_expr(expr)));
+
+		// auto index_tv = type_and_value_of_expr(ie->index);
+		// if (index_tv.mode != Addressing_Constant) {
+		// 	lbValue len = lb_const_int(p->module, t_int, t->Matrix.column_count);
+		// 	lb_emit_bounds_check(p, ast_token(ie->index), index, len);
+		// }
+		// return lb_addr(elem);
+	}
+
+
+	case Type_Basic: { // Basic_string
+		cgValue str;
+		cgValue elem;
+		cgValue len;
+		cgValue index;
+
+		str = cg_build_expr(p, ie->expr);
+		if (deref) {
+			str = cg_emit_load(p, str);
+		}
+		elem = cg_builtin_raw_data(p, str);
+		len = cg_builtin_len(p, str);
+
+		index = cg_emit_conv(p, cg_build_expr(p, ie->index), t_int);
+		// cg_emit_bounds_check(p, ast_token(ie->index), index, len);
+
+		return cg_addr(cg_emit_ptr_offset(p, elem, index));
+	}
+	}
+	return {};
+}
 
 gb_internal cgAddr cg_build_addr_internal(cgProcedure *p, Ast *expr) {
 	switch (expr->kind) {
@@ -2216,6 +2685,10 @@ gb_internal cgAddr cg_build_addr_internal(cgProcedure *p, Ast *expr) {
 		String name = i->token.string;
 		Entity *e = entity_of_node(expr);
 		return cg_build_addr_from_entity(p, e, expr);
+	case_end;
+
+	case_ast_node(ie, IndexExpr, expr);
+		return cg_build_addr_index_expr(p, expr);
 	case_end;
 
 	case_ast_node(se, SliceExpr, expr);
@@ -2349,7 +2822,6 @@ gb_internal cgAddr cg_build_addr_internal(cgProcedure *p, Ast *expr) {
 	         "%s\n",
 	         LIT(ast_strings[expr->kind]),
 	         token_pos_to_string(token_pos));
-
 
 	return {};
 }

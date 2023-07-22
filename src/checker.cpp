@@ -1114,6 +1114,7 @@ gb_internal void init_universal(void) {
 
 
 	t_u8_ptr       = alloc_type_pointer(t_u8);
+	t_u8_multi_ptr = alloc_type_multi_pointer(t_u8);
 	t_int_ptr      = alloc_type_pointer(t_int);
 	t_i64_ptr      = alloc_type_pointer(t_i64);
 	t_f64_ptr      = alloc_type_pointer(t_f64);

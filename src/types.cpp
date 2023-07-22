@@ -594,6 +594,7 @@ gb_global Type *t_untyped_uninit     = &basic_types[Basic_UntypedUninit];
 
 
 gb_global Type *t_u8_ptr       = nullptr;
+gb_global Type *t_u8_multi_ptr = nullptr;
 gb_global Type *t_int_ptr      = nullptr;
 gb_global Type *t_i64_ptr      = nullptr;
 gb_global Type *t_f64_ptr      = nullptr;

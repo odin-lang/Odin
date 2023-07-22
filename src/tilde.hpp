@@ -272,6 +272,7 @@ gb_internal void cg_build_when_stmt(cgProcedure *p, AstWhenStmt *ws);
 
 gb_internal cgValue cg_build_expr(cgProcedure *p, Ast *expr);
 gb_internal cgAddr  cg_build_addr(cgProcedure *p, Ast *expr);
+gb_internal cgValue cg_build_addr_ptr(cgProcedure *p, Ast *expr);
 
 gb_internal Type *  cg_addr_type(cgAddr const &addr);
 gb_internal cgValue cg_addr_load(cgProcedure *p, cgAddr addr);
@@ -312,3 +313,7 @@ gb_internal bool    cg_emit_goto(cgProcedure *p, TB_Node *control_region);
 gb_internal TB_Node *cg_control_region(cgProcedure *p, char const *name);
 
 gb_internal isize cg_append_tuple_values(cgProcedure *p, Array<cgValue> *dst_values, cgValue src_value);
+
+
+gb_internal cgValue cg_builtin_len(cgProcedure *p, cgValue value);
+gb_internal cgValue cg_builtin_raw_data(cgProcedure *p, cgValue const &x);

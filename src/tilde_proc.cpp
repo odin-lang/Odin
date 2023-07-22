@@ -607,7 +607,8 @@ gb_internal cgValue cg_build_call_expr_internal(cgProcedure *p, Ast *expr) {
 			}
 			return {};
 		}
-		GB_PANIC("TODO(bill): builtin procs %d %.*s", id, LIT(builtin_procs[id].name));
+
+		return cg_build_builtin(p, id, expr);
 	}
 
 	// NOTE(bill): Regular call
