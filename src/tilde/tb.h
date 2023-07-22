@@ -951,7 +951,7 @@ TB_API TB_Node* tb_inst_sint(TB_Function* f, TB_DataType dt, int64_t imm);
 TB_API TB_Node* tb_inst_uint(TB_Function* f, TB_DataType dt, uint64_t imm);
 TB_API TB_Node* tb_inst_float32(TB_Function* f, float imm);
 TB_API TB_Node* tb_inst_float64(TB_Function* f, double imm);
-TB_API TB_Node* tb_inst_cstring(TB_Function* f, const char* str);
+TB_API TB_Node* tb_inst_cstring(TB_Function* f, const char* srt);
 TB_API TB_Node* tb_inst_string(TB_Function* f, size_t len, const char* str);
 
 // write 'val' over 'count' bytes on 'dst'

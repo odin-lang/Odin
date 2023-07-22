@@ -276,8 +276,8 @@ gb_internal void cg_procedure_end(cgProcedure *p) {
 	bool emit_asm = false;
 	// if (p->name == "main") {
 	if (
-	    // p->name == "bug" ABI_PKG_NAME_SEPARATOR "main" ||
-	    p->name == "main" ||
+	    p->name == "bug" ABI_PKG_NAME_SEPARATOR "main" ||
+	    // p->name == "main" ||
 	    false
 	) {
 		TB_Arena *arena = tb_default_arena();
@@ -379,25 +379,37 @@ gb_internal cgValue cg_emit_call(cgProcedure * p, cgValue value, Slice<cgValue> 
 	// TODO(bill): Support more than Win64 ABI
 
 	bool is_odin_like_cc = is_calling_convention_odin(pt->calling_convention);
-	GB_ASSERT(is_odin_like_cc);
+	GB_ASSERT_MSG(is_odin_like_cc, "TODO(bill): non-odin like procedures");
 
 	bool return_is_indirect = false;
 
+	Slice<Entity *> result_entities = {};
+	Slice<Entity *> param_entities  = {};
+	if (pt->results) {
+		result_entities = pt->results->Tuple.variables;
+	}
+	if (pt->params) {
+		param_entities = pt->params->Tuple.variables;
+	}
+
 	isize param_index = 0;
 	if (pt->result_count != 0) {
-		Type *last_result = pt->results->Tuple.variables[pt->results->Tuple.variables.count-1]->type;
+		Type *last_result = result_entities[result_entities.count-1]->type;
 
 		TB_DebugType *dbg = cg_debug_type(p->module, last_result);
 		TB_PassingRule rule = tb_get_passing_rule_from_dbg(m, dbg, true);
 		if (rule == TB_PASSING_INDIRECT) {
 			return_is_indirect = true;
 			TB_CharUnits size = cast(TB_CharUnits)type_size_of(last_result);
-			TB_CharUnits align = cast(TB_CharUnits)type_align_of(last_result);
-			params[param_index++] = tb_inst_local(p->func, size, align);
+			TB_CharUnits align = cast(TB_CharUnits)gb_max(type_align_of(last_result), 16);
+			TB_Node *local = tb_inst_local(p->func, size, align);
+			// TODO(bill): Should this need to be zeroed any way?
+			tb_inst_memzero(p->func, local, tb_inst_uint(p->func, TB_TYPE_INT, size), align, false);
+			params[param_index++] = local;
 		}
 	}
 	for (cgValue arg : args) {
-		Type *param_type = pt->params->Tuple.variables[param_index]->type;
+		Type *param_type = param_entities[param_index]->type;
 		arg = cg_emit_conv(p, arg, param_type);
 		arg = cg_flatten_value(p, arg);
 
@@ -426,11 +438,15 @@ gb_internal cgValue cg_emit_call(cgProcedure * p, cgValue value, Slice<cgValue> 
 	}
 
 	// Split returns
+	isize split_offset = param_index;
 	for (isize i = 0; i < pt->result_count-1; i++) {
-		Type *result = pt->results->Tuple.variables[i]->type;
+		Type *result = result_entities[i]->type;
 		TB_CharUnits size = cast(TB_CharUnits)type_size_of(result);
-		TB_CharUnits align = cast(TB_CharUnits)type_align_of(result);
-		params[param_index++] = tb_inst_local(p->func, size, align);
+		TB_CharUnits align = cast(TB_CharUnits)gb_max(type_align_of(result), 16);
+		TB_Node *local = tb_inst_local(p->func, size, align);
+		// TODO(bill): Should this need to be zeroed any way?
+		tb_inst_memzero(p->func, local, tb_inst_uint(p->func, TB_TYPE_INT, size), align, false);
+		params[param_index++] = local;
 	}
 
 	if (pt->calling_convention == ProcCC_Odin) {
@@ -463,9 +479,37 @@ gb_internal cgValue cg_emit_call(cgProcedure * p, cgValue value, Slice<cgValue> 
 		return cg_value(multi_output.single, pt->results->Tuple.variables[0]->type);
 	}
 
+	cgValueMulti *multi = gb_alloc_item(permanent_allocator(), cgValueMulti);
+	multi->values = slice_make<cgValue>(permanent_allocator(), pt->result_count);
 
+	if (is_odin_like_cc) {
+		for (isize i = 0; i < pt->result_count-1; i++) {
+			multi->values[i] = cg_lvalue_addr(params[split_offset+i], result_entities[i]->type);
+		}
 
-	return {};
+		Type *end_type = result_entities[pt->result_count-1]->type;
+		if (return_is_indirect) {
+			multi->values[pt->result_count-1] = cg_lvalue_addr(params[0], end_type);
+		} else {
+			GB_ASSERT(multi_output.count == 1);
+			TB_DataType dt = cg_data_type(end_type);
+			TB_Node *res = multi_output.single;
+			if (res->dt.raw != dt.raw) {
+				// struct-like returns passed in registers
+				TB_CharUnits size  = cast(TB_CharUnits)type_size_of(end_type);
+				TB_CharUnits align = cast(TB_CharUnits)type_align_of(end_type);
+				TB_Node *addr = tb_inst_local(p->func, size, align);
+				tb_inst_store(p->func, res->dt, addr, res, align, false);
+				multi->values[pt->result_count-1] = cg_lvalue_addr(addr, end_type);
+			} else {
+				multi->values[pt->result_count-1] = cg_value(res, end_type);
+			}
+		}
+	} else {
+		GB_PANIC("TODO non-odin like multiple return stuff");
+	}
+
+	return cg_value_multi(multi, pt->results);
 }
 
 gb_internal cgValue cg_build_call_expr_internal(cgProcedure *p, Ast *expr) {
