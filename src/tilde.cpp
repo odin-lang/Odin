@@ -126,6 +126,19 @@ gb_internal cgValue cg_lvalue_addr(TB_Node *node, Type *type) {
 	return v;
 }
 
+gb_internal cgValue cg_lvalue_addr_to_value(cgValue v) {
+	if (v.kind == cgValue_Value) {
+		GB_ASSERT(is_type_pointer(v.type));
+		GB_ASSERT(v.node->dt.type == TB_PTR);
+	} else {
+		GB_ASSERT(v.kind == cgValue_Addr);
+		GB_ASSERT(v.node->dt.type == TB_PTR);
+		v.kind = cgValue_Value;
+		v.type = alloc_type_pointer(v.type);
+	}
+	return v;
+}
+
 gb_internal cgValue cg_value_multi(cgValueMulti *multi, Type *type) {
 	GB_ASSERT(type->kind == Type_Tuple);
 	GB_ASSERT(multi != nullptr);
@@ -137,6 +150,24 @@ gb_internal cgValue cg_value_multi(cgValueMulti *multi, Type *type) {
 	v.multi = multi;
 	return v;
 }
+
+gb_internal cgValue cg_value_multi(Slice<cgValue> const &values, Type *type) {
+	cgValueMulti *multi = gb_alloc_item(permanent_allocator(), cgValueMulti);
+	multi->values = values;
+	return cg_value_multi(multi, type);
+}
+
+
+gb_internal cgValue cg_value_multi2(cgValue const &x, cgValue const &y, Type *type) {
+	GB_ASSERT(type->kind == Type_Tuple);
+	GB_ASSERT(type->Tuple.variables.count == 2);
+	cgValueMulti *multi = gb_alloc_item(permanent_allocator(), cgValueMulti);
+	multi->values = slice_make<cgValue>(permanent_allocator(), 2);
+	multi->values[0] = x;
+	multi->values[1] = y;
+	return cg_value_multi(multi, type);
+}
+
 
 gb_internal cgAddr cg_addr(cgValue const &value) {
 	GB_ASSERT(value.kind != cgValue_Multi);
@@ -151,10 +182,21 @@ gb_internal cgAddr cg_addr(cgValue const &value) {
 	return addr;
 }
 
+gb_internal void cg_set_debug_pos_from_node(cgProcedure *p, Ast *node) {
+	if (node) {
+		TokenPos pos = ast_token(node).pos;
+		TB_FileID *file_id = map_get(&p->module->file_id_map, cast(uintptr)pos.file_id);
+		if (file_id) {
+			tb_inst_set_location(p->func, *file_id, pos.line);
+		}
+	}
+}
+
 
 gb_internal void cg_add_entity(cgModule *m, Entity *e, cgValue const &val) {
 	if (e) {
 		rw_mutex_lock(&m->values_mutex);
+		GB_ASSERT(val.node != nullptr);
 		map_set(&m->values, e, val);
 		rw_mutex_unlock(&m->values_mutex);
 	}
@@ -744,7 +786,7 @@ gb_internal bool cg_generate_code(Checker *c) {
 	}
 
 	TB_DebugFormat debug_format = TB_DEBUGFMT_NONE;
-	if (build_context.ODIN_DEBUG) {
+	if (build_context.ODIN_DEBUG || true) {
 		switch (build_context.metrics.os) {
 		case TargetOs_windows:
 			debug_format = TB_DEBUGFMT_CODEVIEW;

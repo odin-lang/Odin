@@ -1046,6 +1046,7 @@ gb_internal void init_universal(void) {
 	add_global_bool_constant("ODIN_NO_RTTI",            bc->no_rtti);
 
 	add_global_bool_constant("ODIN_VALGRIND_SUPPORT",         bc->ODIN_VALGRIND_SUPPORT);
+	add_global_bool_constant("ODIN_TILDE",                    bc->tilde_backend);
 
 	add_global_constant("ODIN_COMPILE_TIMESTAMP", t_untyped_integer, exact_value_i64(odin_compile_timestamp()));
 
@@ -2311,7 +2312,9 @@ gb_internal void generate_minimum_dependency_set(Checker *c, Entity *start) {
 		str_lit("memory_equal"),
 		str_lit("memory_compare"),
 		str_lit("memory_compare_zero"),
+	);
 
+	FORCE_ADD_RUNTIME_ENTITIES(!build_context.tilde_backend,
 		// Extended data type internal procedures
 		str_lit("umodti3"),
 		str_lit("udivti3"),

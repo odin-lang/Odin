@@ -272,6 +272,7 @@ gb_internal void cg_build_when_stmt(cgProcedure *p, AstWhenStmt *ws);
 gb_internal cgValue cg_build_expr(cgProcedure *p, Ast *expr);
 gb_internal cgAddr  cg_build_addr(cgProcedure *p, Ast *expr);
 gb_internal cgValue cg_build_addr_ptr(cgProcedure *p, Ast *expr);
+gb_internal cgValue cg_build_cond(cgProcedure *p, Ast *cond, TB_Node *true_block, TB_Node *false_block);
 
 gb_internal Type *  cg_addr_type(cgAddr const &addr);
 gb_internal cgValue cg_addr_load(cgProcedure *p, cgAddr addr);
@@ -279,13 +280,15 @@ gb_internal void    cg_addr_store(cgProcedure *p, cgAddr addr, cgValue value);
 gb_internal cgValue cg_addr_get_ptr(cgProcedure *p, cgAddr const &addr);
 
 gb_internal cgValue cg_emit_load(cgProcedure *p, cgValue const &ptr, bool is_volatile=false);
-gb_internal void    cg_emit_store(cgProcedure *p, cgValue dst, cgValue const &src, bool is_volatile=false);
+gb_internal void    cg_emit_store(cgProcedure *p, cgValue dst, cgValue src, bool is_volatile=false);
 
 gb_internal cgAddr  cg_add_local(cgProcedure *p, Type *type, Entity *e, bool zero_init);
 gb_internal cgValue cg_address_from_load_or_generate_local(cgProcedure *p, cgValue value);
 gb_internal cgValue cg_copy_value_to_ptr(cgProcedure *p, cgValue value, Type *original_type, isize min_alignment);
 
 gb_internal cgValue cg_build_call_expr(cgProcedure *p, Ast *expr);
+gb_internal void cg_build_return_stmt(cgProcedure *p, Slice<Ast *> const &return_results);
+gb_internal void cg_build_return_stmt_internal(cgProcedure *p, Slice<cgValue> const &results);
 
 gb_internal cgValue cg_find_procedure_value_from_entity(cgModule *m, Entity *e);
 
@@ -300,6 +303,7 @@ gb_internal cgValue cg_emit_array_ep(cgProcedure *p, cgValue s, cgValue index);
 gb_internal cgValue cg_emit_array_epi(cgProcedure *p, cgValue s, i64 index);
 gb_internal cgValue cg_emit_struct_ep(cgProcedure *p, cgValue s, i64 index);
 gb_internal cgValue cg_emit_deep_field_gep(cgProcedure *p, cgValue e, Selection const &sel);
+gb_internal cgValue cg_emit_struct_ev(cgProcedure *p, cgValue s, i64 index);
 
 gb_internal cgValue cg_emit_conv(cgProcedure *p, cgValue value, Type *t);
 gb_internal cgValue cg_emit_comp_against_nil(cgProcedure *p, TokenKind op_kind, cgValue x);
@@ -316,3 +320,4 @@ gb_internal cgValue cg_handle_param_value(cgProcedure *p, Type *parameter_type, 
 
 gb_internal cgValue cg_builtin_len(cgProcedure *p, cgValue value);
 gb_internal cgValue cg_builtin_raw_data(cgProcedure *p, cgValue const &x);
+

@@ -61,6 +61,7 @@ gb_internal cgValue cg_builtin_raw_data(cgProcedure *p, cgValue const &value) {
 			cgValue ptr = cg_value(value.node, alloc_type_pointer(value.type));
 			cgValue data_ptr = cg_emit_struct_ep(p, ptr, 0);
 			res = cg_emit_load(p, data_ptr);
+			GB_ASSERT(is_type_multi_pointer(res.type));
 		}
 		break;
 	case Type_DynamicArray:
@@ -82,7 +83,12 @@ gb_internal cgValue cg_builtin_raw_data(cgProcedure *p, cgValue const &value) {
 		}
 		break;
 	case Type_Pointer:
+		GB_ASSERT(is_type_array_like(t->Pointer.elem));
+		GB_ASSERT(value.kind == cgValue_Value);
+		res = cg_value(value.node, alloc_type_multi_pointer(base_array_type(t->Pointer.elem)));
+		break;
 	case Type_MultiPointer:
+
 		GB_PANIC("TODO(bill) %s", type_to_string(value.type));
 		// res = cg_emit_conv(p, value, tv.type);
 		break;
@@ -101,6 +107,37 @@ gb_internal cgValue cg_builtin_max(cgProcedure *p, Type *t, cgValue x, cgValue y
 	y = cg_emit_conv(p, y, t);
 	return cg_emit_select(p, cg_emit_comp(p, Token_Gt, x, y), x, y);
 }
+
+gb_internal cgValue cg_builtin_abs(cgProcedure *p, cgValue x) {
+	if (is_type_unsigned(x.type)) {
+		return x;
+	}
+
+	if (is_type_quaternion(x.type)) {
+		GB_PANIC("TODO(bill): abs quaternion");
+	} else if (is_type_complex(x.type)) {
+		GB_PANIC("TODO(bill): abs complex");
+	}
+
+	TB_DataType dt = cg_data_type(x.type);
+	GB_ASSERT(!TB_IS_VOID_TYPE(dt));
+	TB_Node *zero = nullptr;
+	if (dt.type == TB_FLOAT) {
+		if (dt.data == 32) {
+			zero = tb_inst_float32(p->func, 0);
+		} else if (dt.data == 64) {
+			zero = tb_inst_float64(p->func, 0);
+		}
+	} else {
+		zero = tb_inst_uint(p->func, dt, 0);
+	}
+	GB_ASSERT(zero != nullptr);
+
+	cgValue cond = cg_emit_comp(p, Token_Lt, x, cg_value(zero, x.type));
+	cgValue neg = cg_emit_unary_arith(p, Token_Sub, x, x.type);
+	return cg_emit_select(p, cond, neg, x);
+}
+
 
 
 gb_internal cgValue cg_build_builtin(cgProcedure *p, BuiltinProcId id, Ast *expr) {
@@ -149,6 +186,12 @@ gb_internal cgValue cg_build_builtin(cgProcedure *p, BuiltinProcId id, Ast *expr
 		return cg_builtin_len(p, v);
 	}
 
+	case BuiltinProc_raw_data:
+		{
+			cgValue v = cg_build_expr(p, ce->args[0]);
+			return cg_builtin_raw_data(p, v);
+		}
+
 	case BuiltinProc_min:
 		if (ce->args.count == 2) {
 			Type *t = type_of_expr(expr);
@@ -175,6 +218,96 @@ gb_internal cgValue cg_build_builtin(cgProcedure *p, BuiltinProcId id, Ast *expr
 			return x;
 		}
 		break;
+
+	case BuiltinProc_abs:
+		{
+			cgValue x = cg_build_expr(p, ce->args[0]);
+			return cg_builtin_abs(p, x);
+		}
+
+	case BuiltinProc_debug_trap:
+		tb_inst_debugbreak(p->func);
+		return {};
+	case BuiltinProc_trap:
+		tb_inst_trap(p->func);
+		return {};
+
+	case BuiltinProc_mem_zero:
+		{
+			cgValue ptr = cg_build_expr(p, ce->args[0]);
+			cgValue len = cg_build_expr(p, ce->args[1]);
+			GB_ASSERT(ptr.kind == cgValue_Value);
+			GB_ASSERT(len.kind == cgValue_Value);
+			tb_inst_memzero(p->func, ptr.node, len.node, 1, false);
+			return {};
+		}
+
+	case BuiltinProc_mem_copy:
+		{
+			cgValue dst = cg_build_expr(p, ce->args[0]);
+			cgValue src = cg_build_expr(p, ce->args[1]);
+			cgValue len = cg_build_expr(p, ce->args[2]);
+			GB_ASSERT(dst.kind == cgValue_Value);
+			GB_ASSERT(src.kind == cgValue_Value);
+			GB_ASSERT(len.kind == cgValue_Value);
+			// TODO(bill): This needs to be memmove
+			tb_inst_memcpy(p->func, dst.node, src.node, len.node, 1, false);
+			return {};
+		}
+
+	case BuiltinProc_mem_copy_non_overlapping:
+		{
+			cgValue dst = cg_build_expr(p, ce->args[0]);
+			cgValue src = cg_build_expr(p, ce->args[1]);
+			cgValue len = cg_build_expr(p, ce->args[2]);
+			GB_ASSERT(dst.kind == cgValue_Value);
+			GB_ASSERT(src.kind == cgValue_Value);
+			GB_ASSERT(len.kind == cgValue_Value);
+			tb_inst_memcpy(p->func, dst.node, src.node, len.node, 1, false);
+			return {};
+		}
+
+
+	case BuiltinProc_overflow_add:
+		{
+			Type *res_type = type_of_expr(expr);
+			GB_ASSERT(res_type->kind == Type_Tuple);
+			GB_ASSERT(res_type->Tuple.variables.count == 2);
+			// TODO(bill): do a proper overflow add
+			Type *type = res_type->Tuple.variables[0]->type;
+			Type *ok_type = res_type->Tuple.variables[1]->type;
+			cgValue x = cg_build_expr(p, ce->args[0]);
+			cgValue y = cg_build_expr(p, ce->args[1]);
+			x = cg_emit_conv(p, x, type);
+			y = cg_emit_conv(p, y, type);
+			cgValue res = cg_emit_arith(p, Token_Add, x, y, type);
+			cgValue ok  = cg_const_int(p, ok_type, false);
+
+			return cg_value_multi2(res, ok, res_type);
+		}
+
+
+	case BuiltinProc_ptr_offset:
+		{
+			cgValue ptr = cg_build_expr(p, ce->args[0]);
+			cgValue len = cg_build_expr(p, ce->args[1]);
+			len = cg_emit_conv(p, len, t_int);
+			return cg_emit_ptr_offset(p, ptr, len);
+		}
+	case BuiltinProc_ptr_sub:
+		{
+			Type *elem0 = type_deref(type_of_expr(ce->args[0]));
+			Type *elem1 = type_deref(type_of_expr(ce->args[1]));
+			GB_ASSERT(are_types_identical(elem0, elem1));
+			Type *elem = elem0;
+
+			cgValue ptr0 = cg_emit_conv(p, cg_build_expr(p, ce->args[0]), t_uintptr);
+			cgValue ptr1 = cg_emit_conv(p, cg_build_expr(p, ce->args[1]), t_uintptr);
+
+			cgValue diff = cg_emit_arith(p, Token_Sub, ptr0, ptr1, t_uintptr);
+			diff = cg_emit_conv(p, diff, t_int);
+			return cg_emit_arith(p, Token_Quo, diff, cg_const_int(p, t_int, type_size_of(elem)), t_int);
+		}
 
 	}
 

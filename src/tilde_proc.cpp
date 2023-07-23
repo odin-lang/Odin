@@ -86,6 +86,10 @@ gb_internal cgProcedure *cg_procedure_create(cgModule *m, Entity *entity, bool i
 		}
 		p->symbol = cast(TB_Symbol *)tb_extern_create(m->mod, link_name.len, cast(char const *)link_name.text, TB_EXTERNAL_SO_LOCAL);
 	}
+	if (p->name == "main") {
+		// TODO(bill): figure out when this should be public or not
+		linkage = TB_LINKAGE_PUBLIC;
+	}
 
 	if (p->symbol == nullptr)  {
 		p->func = tb_function_create(m->mod, link_name.len, cast(char const *)link_name.text, linkage, TB_COMDAT_NONE);
@@ -97,9 +101,9 @@ gb_internal cgProcedure *cg_procedure_create(cgModule *m, Entity *entity, bool i
 		p->symbol = cast(TB_Symbol *)p->func;
 	}
 
-	cgValue proc_value = cg_value(p->symbol, p->type);
-	cg_add_entity(m, entity, proc_value);
-	cg_add_member(m, p->name, proc_value);
+	p->value = cg_value(p->symbol, p->type);
+	cg_add_entity(m, entity, p->value);
+	cg_add_member(m, p->name, p->value);
 	cg_add_procedure_value(m, p);
 
 
@@ -275,7 +279,9 @@ gb_internal void cg_procedure_begin(cgProcedure *p) {
 		// }
 	}
 
-	p->split_returns_index = param_index;
+	if (is_odin_like_cc) {
+		p->split_returns_index = param_index;
+	}
 
 	if (pt->calling_convention == ProcCC_Odin) {
 		// NOTE(bill): Push context on to stack from implicit parameter
@@ -323,9 +329,15 @@ gb_internal void cg_procedure_end(cgProcedure *p) {
 		return;
 	}
 	if (tb_inst_get_control(p->func)) {
+		GB_ASSERT(p->type->Proc.result_count == 0);
 		tb_inst_ret(p->func, 0, nullptr);
 	}
 	bool emit_asm = false;
+
+	if (string_starts_with(p->name, str_lit("bug@main"))) {
+		// emit_asm = true;
+	}
+
 	TB_FunctionOutput *output = tb_module_compile_function(p->module->mod, p->func, TB_ISEL_FAST, emit_asm);
 	if (emit_asm) {
 		TB_Assembly *assembly = tb_output_get_asm(output);
@@ -336,44 +348,67 @@ gb_internal void cg_procedure_end(cgProcedure *p) {
 	}
 }
 
-gb_global String procedures_to_generate_list[] = {
-	str_lit("bug" ABI_PKG_NAME_SEPARATOR "main"),
-	str_lit("main"),
-};
-
 gb_internal void cg_procedure_generate(cgProcedure *p) {
 	if (p->body == nullptr) {
 		return;
 	}
 
-	bool build_body = false;
-
-	if (
-	    string_starts_with(p->name, str_lit("runtime" ABI_PKG_NAME_SEPARATOR "_os_write")) ||
-	    // p->name == "bug" ABI_PKG_NAME_SEPARATOR "main" ||
-	    // p->name == "main" ||
-	    false
-	) {
-		build_body = true;
-	}
-
-	if (build_body) {
-		cg_procedure_begin(p);
-		cg_build_stmt(p, p->body);
-	}
+	cg_procedure_begin(p);
+	cg_build_stmt(p, p->body);
 	cg_procedure_end(p);
 
-	if (build_body) {
+	if (string_starts_with(p->name, str_lit("bug@main"))) { // IR Printing
 		TB_Arena *arena = tb_default_arena();
 		defer (arena->free(arena));
 		TB_FuncOpt *opt = tb_funcopt_enter(p->func, arena);
 		defer (tb_funcopt_exit(opt));
 		tb_funcopt_print(opt);
-
-		// GraphViz printing
-		// tb_function_print(p->func, tb_default_print_callback, stdout);
+		fprintf(stdout, "\n");
+	}
+	if (false) { // GraphViz printing
+		tb_function_print(p->func, tb_default_print_callback, stdout);
 	}
 }
+
+gb_internal void cg_build_nested_proc(cgProcedure *p, AstProcLit *pd, Entity *e) {
+	GB_ASSERT(pd->body != nullptr);
+	cgModule *m = p->module;
+	auto *min_dep_set = &m->info->minimum_dependency_set;
+
+	if (ptr_set_exists(min_dep_set, e) == false) {
+		// NOTE(bill): Nothing depends upon it so doesn't need to be built
+		return;
+	}
+
+	// NOTE(bill): Generate a new name
+	// parent.name-guid
+	String original_name = e->token.string;
+	String pd_name = original_name;
+	if (e->Procedure.link_name.len > 0) {
+		pd_name = e->Procedure.link_name;
+	}
+
+
+	isize name_len = p->name.len + 1 + pd_name.len + 1 + 10 + 1;
+	char *name_text = gb_alloc_array(permanent_allocator(), char, name_len);
+
+	i32 guid = cast(i32)p->children.count;
+	name_len = gb_snprintf(name_text, name_len, "%.*s" ABI_PKG_NAME_SEPARATOR "%.*s-%d", LIT(p->name), LIT(pd_name), guid);
+	String name = make_string(cast(u8 *)name_text, name_len-1);
+
+	e->Procedure.link_name = name;
+
+	cgProcedure *nested_proc = cg_procedure_create(p->module, e);
+	e->cg_procedure = nested_proc;
+
+	cgValue value = nested_proc->value;
+
+	cg_add_entity(m, e, value);
+	array_add(&p->children, nested_proc);
+	array_add(&m->procedures_to_generate, nested_proc);
+}
+
+
 
 
 
@@ -388,6 +423,7 @@ gb_internal cgValue cg_find_procedure_value_from_entity(cgModule *m, Entity *e) 
 	found = map_get(&m->values, e);
 	rw_mutex_shared_unlock(&m->values_mutex);
 	if (found) {
+		GB_ASSERT(found->node != nullptr);
 		return *found;
 	}
 
@@ -408,9 +444,6 @@ gb_internal cgValue cg_build_call_expr(cgProcedure *p, Ast *expr) {
 		GB_ASSERT(res.kind == cgValue_Multi);
 		GB_ASSERT(res.multi->values.count == 2);
 		return res.multi->values[0];
-		// GB_ASSERT(is_type_tuple(res.type));
-		// GB_ASSERT(res.type->Tuple.variables.count == 2);
-		// return cg_emit_struct_ev(p, res, 0);
 	}
 	return res;
 }
@@ -470,8 +503,9 @@ gb_internal cgValue cg_emit_call(cgProcedure * p, cgValue value, Slice<cgValue> 
 			params[param_index++] = local;
 		}
 	}
-	for (cgValue arg : args) {
-		Type *param_type = param_entities[param_index]->type;
+	for_array(i, args) {
+		Type *param_type = param_entities[i]->type;
+		cgValue arg = args[i];
 		arg = cg_emit_conv(p, arg, param_type);
 		arg = cg_flatten_value(p, arg);
 
@@ -629,9 +663,7 @@ gb_internal cgValue cg_handle_param_value(cgProcedure *p, Type *parameter_type, 
 			if (p->entity != nullptr) {
 				proc_name = p->entity->token.string;
 			}
-			GB_PANIC("TODO(bill): cg_emit_source_code_location_as_global");
-			// return cg_emit_source_code_location_as_global(p, proc_name, pos);
-			break;
+			return cg_emit_source_code_location_as_global(p, proc_name, pos);
 		}
 	case ParameterValue_Value:
 		return cg_build_expr(p, param_value.ast_value);

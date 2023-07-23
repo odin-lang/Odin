@@ -52,6 +52,13 @@ gb_internal cgValue cg_const_nil(cgProcedure *p, Type *type) {
 }
 
 
+gb_internal cgValue cg_emit_source_code_location_as_global(cgProcedure *p, String const &proc_name, TokenPos pos) {
+	// TODO(bill): cg_emit_source_code_location_as_global
+	return cg_const_nil(p, t_source_code_location);
+}
+
+
+
 gb_internal void cg_write_big_int_at_ptr(void *dst, BigInt const *a, Type *original_type) {
 	GB_ASSERT(build_context.endian_kind == TargetEndian_Little);
 	size_t sz = cast(size_t)type_size_of(original_type);
@@ -109,7 +116,6 @@ gb_internal TB_Global *cg_global_const_string(cgModule *m, String const &str, Ty
 
 	char name[32] = {};
 	gb_snprintf(name, 31, "csb$%u", 1+m->const_nil_guid.fetch_add(1));
-
 	TB_Global *str_global = tb_global_create(m->mod, -1, name, nullptr, TB_LINKAGE_PRIVATE);
 	i64 size = str.len+1;
 	tb_global_set_storage(m->mod, tb_module_get_rdata(m->mod), str_global, size, 1, 1);
@@ -125,6 +131,7 @@ gb_internal TB_Global *cg_global_const_string(cgModule *m, String const &str, Ty
 	}
 
 	if (global == nullptr) {
+		gb_snprintf(name, 31, "cstr$%u", 1+m->const_nil_guid.fetch_add(1));
 		global = tb_global_create(m->mod, -1, name, cg_debug_type(m, type), TB_LINKAGE_PRIVATE);
 		tb_global_set_storage(m->mod, tb_module_get_rdata(m->mod), global, type_size_of(type), type_align_of(type), 2);
 	}
@@ -778,18 +785,47 @@ gb_internal TB_Global *cg_global_const_comp_literal(cgModule *m, Type *original_
 }
 
 
-gb_internal cgValue cg_const_value(cgModule *m, cgProcedure *p, Type *type, ExactValue const &value) {
+gb_internal cgValue cg_const_value(cgProcedure *p, Type *type, ExactValue const &value) {
+	GB_ASSERT(p != nullptr);
 	TB_Node *node = nullptr;
 
+	if (is_type_untyped(type)) {
+		// TODO(bill): THIS IS A COMPLETE HACK, WHY DOES THIS NOT A TYPE?
+		GB_ASSERT(type->kind == Type_Basic);
+		switch (type->Basic.kind) {
+		case Basic_UntypedBool:
+			type = t_bool;
+			break;
+		case Basic_UntypedInteger:
+			type = t_i64;
+			break;
+		case Basic_UntypedFloat:
+			type = t_f64;
+			break;
+		case Basic_UntypedComplex:
+			type = t_complex128;
+			break;
+		case Basic_UntypedQuaternion:
+			type = t_quaternion256;
+			break;
+		case Basic_UntypedString:
+			type = t_string;
+			break;
+		case Basic_UntypedRune:
+			type = t_rune;
+			break;
+		case Basic_UntypedNil:
+		case Basic_UntypedUninit:
+			return cg_value(cast(TB_Node *)nullptr, type);
+		}
+	}
 	TB_DataType dt = cg_data_type(type);
 
 	switch (value.kind) {
 	case ExactValue_Invalid:
-		GB_ASSERT(p != nullptr);
 		return cg_const_nil(p, type);
 
 	case ExactValue_Typeid:
-		GB_ASSERT(p != nullptr);
 		return cg_typeid(p, value.value_typeid);
 
 	case ExactValue_Procedure:
@@ -797,13 +833,13 @@ gb_internal cgValue cg_const_value(cgModule *m, cgProcedure *p, Type *type, Exac
 			Ast *expr = unparen_expr(value.value_procedure);
 			Entity *e = entity_of_node(expr);
 			if (e != nullptr) {
-				cgValue found = cg_find_procedure_value_from_entity(m, e);
-				GB_ASSERT(are_types_identical(type, found.type));
+				cgValue found = cg_find_procedure_value_from_entity(p->module, e);
+				GB_ASSERT_MSG(are_types_identical(type, found.type),
+				              "%.*s %s == %s",
+				              LIT(p->name),
+				              type_to_string(type), type_to_string(found.type));
 				GB_ASSERT(found.kind == cgValue_Symbol);
-				if (p) {
-					return cg_flatten_value(p, found);
-				}
-				return found;
+				return cg_flatten_value(p, found);
 			}
 			GB_PANIC("TODO(bill): cg_const_value ExactValue_Procedure");
 		}
@@ -812,12 +848,10 @@ gb_internal cgValue cg_const_value(cgModule *m, cgProcedure *p, Type *type, Exac
 
 	switch (value.kind) {
 	case ExactValue_Bool:
-		GB_ASSERT(p != nullptr);
 		GB_ASSERT(!TB_IS_VOID_TYPE(dt));
 		return cg_value(tb_inst_uint(p->func, dt, value.value_bool), type);
 
 	case ExactValue_Integer:
-		GB_ASSERT(p != nullptr);
 		GB_ASSERT(!TB_IS_VOID_TYPE(dt));
 		// GB_ASSERT(dt.raw != TB_TYPE_I128.raw);
 		if (is_type_unsigned(type)) {
@@ -830,7 +864,6 @@ gb_internal cgValue cg_const_value(cgModule *m, cgProcedure *p, Type *type, Exac
 		break;
 
 	case ExactValue_Float:
-		GB_ASSERT(p != nullptr);
 		GB_ASSERT(!TB_IS_VOID_TYPE(dt));
 		GB_ASSERT(dt.raw != TB_TYPE_F16.raw);
 		GB_ASSERT(!is_type_different_to_arch_endianness(type));
@@ -846,13 +879,36 @@ gb_internal cgValue cg_const_value(cgModule *m, cgProcedure *p, Type *type, Exac
 
 	case ExactValue_String:
 		{
-			TB_Symbol *symbol = cast(TB_Symbol *)cg_global_const_string(m, value.value_string, type, nullptr, 0);
-			if (p) {
-				TB_Node *node = tb_inst_get_symbol_address(p->func, symbol);
-				return cg_lvalue_addr(node, type);
-			} else {
-				return cg_value(symbol, alloc_type_pointer(type));
+			GB_ASSERT(is_type_string(type));
+			cgModule *m = p->module;
+
+			String str = value.value_string;
+
+			char name[32] = {};
+			gb_snprintf(name, 31, "csb$%u", 1+m->const_nil_guid.fetch_add(1));
+			TB_Global *cstr_global = tb_global_create(m->mod, -1, name, nullptr, TB_LINKAGE_PRIVATE);
+			i64 size = str.len+1;
+			tb_global_set_storage(m->mod, tb_module_get_rdata(m->mod), cstr_global, size, 1, 1);
+			u8 *data = cast(u8 *)tb_global_add_region(m->mod, cstr_global, 0, size);
+			gb_memcopy(data, str.text, str.len);
+			data[str.len] = 0;
+
+			if (is_type_cstring(type)) {
+				cgValue s = cg_value(cstr_global, type);
+				return cg_flatten_value(p, s);
 			}
+
+			gb_snprintf(name, 31, "str$%u", 1+m->const_nil_guid.fetch_add(1));
+			TB_Global *str_global = tb_global_create(m->mod, -1, name, cg_debug_type(m, type), TB_LINKAGE_PRIVATE);
+			tb_global_set_storage(m->mod, tb_module_get_rdata(m->mod), str_global, type_size_of(type), type_align_of(type), 2);
+
+			tb_global_add_symbol_reloc(m->mod, str_global, 0, cast(TB_Symbol *)cstr_global);
+			void *len_ptr = tb_global_add_region(m->mod, str_global, build_context.int_size, build_context.int_size);
+			cg_write_int_at_ptr(len_ptr, str.len, t_int);
+
+			TB_Node *s = tb_inst_get_symbol_address(p->func, cast(TB_Symbol *)str_global);
+			return cg_lvalue_addr(s, type);
+
 		}
 
 	case ExactValue_Pointer:
@@ -860,13 +916,9 @@ gb_internal cgValue cg_const_value(cgModule *m, cgProcedure *p, Type *type, Exac
 
 	case ExactValue_Compound:
 		{
-			TB_Symbol *symbol = cast(TB_Symbol *)cg_global_const_comp_literal(m, type, value, nullptr, 0);
-			if (p) {
-				TB_Node *node = tb_inst_get_symbol_address(p->func, symbol);
-				return cg_lvalue_addr(node, type);
-			} else {
-				return cg_value(symbol, type);
-			}
+			TB_Symbol *symbol = cast(TB_Symbol *)cg_global_const_comp_literal(p->module, type, value, nullptr, 0);
+			TB_Node *node = tb_inst_get_symbol_address(p->func, symbol);
+			return cg_lvalue_addr(node, type);
 		}
 		break;
 	}
@@ -874,11 +926,6 @@ gb_internal cgValue cg_const_value(cgModule *m, cgProcedure *p, Type *type, Exac
 
 	GB_ASSERT(node != nullptr);
 	return cg_value(node, type);
-}
-
-gb_internal cgValue cg_const_value(cgProcedure *p, Type *type, ExactValue const &value) {
-	GB_ASSERT(p != nullptr);
-	return cg_const_value(p->module, p, type, value);
 }
 
 gb_internal cgValue cg_const_int(cgProcedure *p, Type *type, i64 i) {

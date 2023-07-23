@@ -368,7 +368,11 @@ gb_internal TB_DebugType *cg_debug_type_internal(cgModule *m, Type *type) {
 				param_count += 1;
 			}
 
-			TB_DebugType *func = tb_debug_create_func(m->mod, TB_CDECL, param_count, return_count, pt->c_vararg);
+			TB_CallingConv tb_cc = TB_CDECL;
+			if (pt->calling_convention == ProcCC_StdCall) {
+				tb_cc = TB_STDCALL;
+			}
+			TB_DebugType *func = tb_debug_create_func(m->mod, tb_cc, param_count, return_count, pt->c_vararg);
 
 			map_set(&m->proc_debug_type_map, original_type, func);
 			map_set(&m->proc_debug_type_map, type, func);
