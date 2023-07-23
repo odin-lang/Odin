@@ -12,6 +12,7 @@ gb_internal cgValue cg_builtin_len(cgProcedure *p, cgValue value) {
 				return cg_emit_load(p, len_ptr);
 			}
 		case Basic_cstring:
+			GB_PANIC("TODO(bill): len(cstring)");
 			break;
 		}
 		break;
@@ -50,6 +51,69 @@ gb_internal cgValue cg_builtin_len(cgProcedure *p, cgValue value) {
 	GB_PANIC("TODO(bill): cg_builtin_len %s", type_to_string(t));
 	return {};
 }
+
+gb_internal cgValue cg_builtin_cap(cgProcedure *p, cgValue value) {
+	Type *t = base_type(value.type);
+
+	switch (t->kind) {
+	case Type_Basic:
+		switch (t->Basic.kind) {
+		case Basic_string:
+			{
+				GB_ASSERT(value.kind == cgValue_Addr);
+				cgValue ptr = cg_value(value.node, alloc_type_pointer(value.type));
+				cgValue len_ptr = cg_emit_struct_ep(p, ptr, 1);
+				return cg_emit_load(p, len_ptr);
+			}
+		case Basic_cstring:
+			GB_PANIC("TODO(bill): cap(cstring)");
+			break;
+		}
+		break;
+	case Type_Array:
+		return cg_const_int(p, t_int, t->Array.count);
+	case Type_EnumeratedArray:
+		return cg_const_int(p, t_int, t->EnumeratedArray.count);
+	case Type_Slice:
+		{
+			GB_ASSERT(value.kind == cgValue_Addr);
+			cgValue ptr = cg_value(value.node, alloc_type_pointer(value.type));
+			cgValue len_ptr = cg_emit_struct_ep(p, ptr, 1);
+			return cg_emit_load(p, len_ptr);
+		}
+	case Type_DynamicArray:
+		{
+			GB_ASSERT(value.kind == cgValue_Addr);
+			cgValue ptr = cg_value(value.node, alloc_type_pointer(value.type));
+			cgValue len_ptr = cg_emit_struct_ep(p, ptr, 2);
+			return cg_emit_load(p, len_ptr);
+		}
+	case Type_Map:
+		{
+			TB_DataType dt_uintptr = cg_data_type(t_uintptr);
+			TB_Node *zero = tb_inst_uint(p->func, dt_uintptr, 0);
+			TB_Node *one  = tb_inst_uint(p->func, dt_uintptr, 0);
+			TB_Node *mask = tb_inst_uint(p->func, dt_uintptr, MAP_CACHE_LINE_SIZE-1);
+
+			TB_Node *data = cg_emit_struct_ev(p, value, 0).node;
+			TB_Node *log2_cap = tb_inst_and(p->func, data, mask);
+			TB_Node *cap = tb_inst_shl(p->func, one, log2_cap, cast(TB_ArithmeticBehavior)0);
+			TB_Node *cmp = tb_inst_cmp_eq(p->func, data, zero);
+
+			cgValue res = cg_value(tb_inst_select(p->func, cmp, zero, cap), t_uintptr);
+			return cg_emit_conv(p, res, t_int);
+		}
+	case Type_Struct:
+		GB_ASSERT(is_type_soa_struct(t));
+		break;
+	case Type_RelativeSlice:
+		break;
+	}
+
+	GB_PANIC("TODO(bill): cg_builtin_cap %s", type_to_string(t));
+	return {};
+}
+
 
 gb_internal cgValue cg_builtin_raw_data(cgProcedure *p, cgValue const &value) {
 	Type *t = base_type(value.type);
@@ -108,7 +172,7 @@ gb_internal cgValue cg_builtin_max(cgProcedure *p, Type *t, cgValue x, cgValue y
 	return cg_emit_select(p, cg_emit_comp(p, Token_Gt, x, y), x, y);
 }
 
-gb_internal cgValue cg_builtin_abs(cgProcedure *p, cgValue x) {
+gb_internal cgValue cg_builtin_abs(cgProcedure *p, cgValue const &x) {
 	if (is_type_unsigned(x.type)) {
 		return x;
 	}
@@ -136,6 +200,39 @@ gb_internal cgValue cg_builtin_abs(cgProcedure *p, cgValue x) {
 	cgValue cond = cg_emit_comp(p, Token_Lt, x, cg_value(zero, x.type));
 	cgValue neg = cg_emit_unary_arith(p, Token_Sub, x, x.type);
 	return cg_emit_select(p, cond, neg, x);
+}
+
+gb_internal cgValue cg_builtin_clamp(cgProcedure *p, Type *t, cgValue const &x, cgValue const &min, cgValue const &max) {
+	cgValue z = x;
+	z = cg_builtin_max(p, t, z, min);
+	z = cg_builtin_min(p, t, z, max);
+	return z;
+}
+
+
+
+gb_internal cgValue cg_builtin_mem_zero(cgProcedure *p, cgValue const &ptr, cgValue const &len) {
+	GB_ASSERT(ptr.kind == cgValue_Value);
+	GB_ASSERT(len.kind == cgValue_Value);
+	tb_inst_memzero(p->func, ptr.node, len.node, 1, false);
+	return ptr;
+}
+
+gb_internal cgValue cg_builtin_mem_copy(cgProcedure *p, cgValue const &dst, cgValue const &src, cgValue const &len) {
+	GB_ASSERT(dst.kind == cgValue_Value);
+	GB_ASSERT(src.kind == cgValue_Value);
+	GB_ASSERT(len.kind == cgValue_Value);
+	// TODO(bill): This needs to be memmove
+	tb_inst_memcpy(p->func, dst.node, src.node, len.node, 1, false);
+	return dst;
+}
+
+gb_internal cgValue cg_builtin_mem_copy_non_overlapping(cgProcedure *p, cgValue const &dst, cgValue const &src, cgValue const &len) {
+	GB_ASSERT(dst.kind == cgValue_Value);
+	GB_ASSERT(src.kind == cgValue_Value);
+	GB_ASSERT(len.kind == cgValue_Value);
+	tb_inst_memcpy(p->func, dst.node, src.node, len.node, 1, false);
+	return dst;
 }
 
 
@@ -186,6 +283,17 @@ gb_internal cgValue cg_build_builtin(cgProcedure *p, BuiltinProcId id, Ast *expr
 		return cg_builtin_len(p, v);
 	}
 
+	case BuiltinProc_cap: {
+		cgValue v = cg_build_expr(p, ce->args[0]);
+		Type *t = base_type(v.type);
+		if (is_type_pointer(t)) {
+			// IMPORTANT TODO(bill): Should there be a nil pointer check?
+			v = cg_emit_load(p, v);
+			t = type_deref(t);
+		}
+		return cg_builtin_cap(p, v);
+	}
+
 	case BuiltinProc_raw_data:
 		{
 			cgValue v = cg_build_expr(p, ce->args[0]);
@@ -225,6 +333,14 @@ gb_internal cgValue cg_build_builtin(cgProcedure *p, BuiltinProcId id, Ast *expr
 			return cg_builtin_abs(p, x);
 		}
 
+	case BuiltinProc_clamp:
+		{
+			cgValue x   = cg_build_expr(p, ce->args[0]);
+			cgValue min = cg_build_expr(p, ce->args[1]);
+			cgValue max = cg_build_expr(p, ce->args[2]);
+			return cg_builtin_clamp(p, type_of_expr(expr), x, min, max);
+		}
+
 	case BuiltinProc_debug_trap:
 		tb_inst_debugbreak(p->func);
 		return {};
@@ -236,10 +352,7 @@ gb_internal cgValue cg_build_builtin(cgProcedure *p, BuiltinProcId id, Ast *expr
 		{
 			cgValue ptr = cg_build_expr(p, ce->args[0]);
 			cgValue len = cg_build_expr(p, ce->args[1]);
-			GB_ASSERT(ptr.kind == cgValue_Value);
-			GB_ASSERT(len.kind == cgValue_Value);
-			tb_inst_memzero(p->func, ptr.node, len.node, 1, false);
-			return {};
+			return cg_builtin_mem_zero(p, ptr, len);
 		}
 
 	case BuiltinProc_mem_copy:
@@ -247,12 +360,7 @@ gb_internal cgValue cg_build_builtin(cgProcedure *p, BuiltinProcId id, Ast *expr
 			cgValue dst = cg_build_expr(p, ce->args[0]);
 			cgValue src = cg_build_expr(p, ce->args[1]);
 			cgValue len = cg_build_expr(p, ce->args[2]);
-			GB_ASSERT(dst.kind == cgValue_Value);
-			GB_ASSERT(src.kind == cgValue_Value);
-			GB_ASSERT(len.kind == cgValue_Value);
-			// TODO(bill): This needs to be memmove
-			tb_inst_memcpy(p->func, dst.node, src.node, len.node, 1, false);
-			return {};
+			return cg_builtin_mem_copy(p, dst, src, len);
 		}
 
 	case BuiltinProc_mem_copy_non_overlapping:
@@ -260,11 +368,7 @@ gb_internal cgValue cg_build_builtin(cgProcedure *p, BuiltinProcId id, Ast *expr
 			cgValue dst = cg_build_expr(p, ce->args[0]);
 			cgValue src = cg_build_expr(p, ce->args[1]);
 			cgValue len = cg_build_expr(p, ce->args[2]);
-			GB_ASSERT(dst.kind == cgValue_Value);
-			GB_ASSERT(src.kind == cgValue_Value);
-			GB_ASSERT(len.kind == cgValue_Value);
-			tb_inst_memcpy(p->func, dst.node, src.node, len.node, 1, false);
-			return {};
+			return cg_builtin_mem_copy_non_overlapping(p, dst, src, len);
 		}
 
 
