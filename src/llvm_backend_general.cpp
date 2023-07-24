@@ -103,47 +103,13 @@ gb_internal bool lb_init_generator(lbGenerator *gen, Checker *c) {
 	}
 
 	String init_fullpath = c->parser->init_fullpath;
-
-	if (build_context.out_filepath.len == 0) {
-		gen->output_name = remove_directory_from_path(init_fullpath);
-		gen->output_name = remove_extension_from_path(gen->output_name);
-		gen->output_name = string_trim_whitespace(gen->output_name);
-		if (gen->output_name.len == 0) {
-			gen->output_name = c->info.init_scope->pkg->name;
-		}
-		gen->output_base = gen->output_name;
-	} else {
-		gen->output_name = build_context.out_filepath;
-		gen->output_name = string_trim_whitespace(gen->output_name);
-		if (gen->output_name.len == 0) {
-			gen->output_name = c->info.init_scope->pkg->name;
-		}
-		isize pos = string_extension_position(gen->output_name);
-		if (pos < 0) {
-			gen->output_base = gen->output_name;
-		} else {
-			gen->output_base = substring(gen->output_name, 0, pos);
-		}
-	}
-	gbAllocator ha = heap_allocator();
-	array_init(&gen->output_object_paths, ha);
-	array_init(&gen->output_temp_paths, ha);
-
-	gen->output_base = path_to_full_path(ha, gen->output_base);
-
-	gbString output_file_path = gb_string_make_length(ha, gen->output_base.text, gen->output_base.len);
-	output_file_path = gb_string_appendc(output_file_path, ".obj");
-	defer (gb_string_free(output_file_path));
+	linker_data_init(gen, &c->info, init_fullpath);
 
 	gen->info = &c->info;
 
 	map_init(&gen->modules, gen->info->packages.count*2);
 	map_init(&gen->modules_through_ctx, gen->info->packages.count*2);
 	map_init(&gen->anonymous_proc_lits, 1024);
-
-
-	array_init(&gen->foreign_libraries,       heap_allocator(), 0, 1024);
-	ptr_set_init(&gen->foreign_libraries_set, 1024);
 
 	if (USE_SEPARATE_MODULES) {
 		for (auto const &entry : gen->info->packages) {

@@ -2489,16 +2489,24 @@ int main(int arg_count, char const **arg_ptr) {
 
 #if defined(GB_SYSTEM_WINDOWS)
 	if (build_context.tilde_backend) {
+		LinkerData linker_data = {};
 		MAIN_TIME_SECTION("Tilde Code Gen");
-		if (!cg_generate_code(checker)) {
+		if (!cg_generate_code(checker, &linker_data)) {
 			return 1;
 		}
 
-		if (build_context.show_timings) {
-			show_timings(checker, &global_timings);
+		switch (build_context.build_mode) {
+		case BuildMode_Executable:
+		case BuildMode_DynamicLibrary:
+			i32 result = linker_stage(&linker_data);
+			if (result) {
+				if (build_context.show_timings) {
+					show_timings(checker, &global_timings);
+				}
+				return result;
+			}
+			break;
 		}
-
-		return 0;
 	} else
 #endif
 	{

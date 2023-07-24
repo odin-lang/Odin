@@ -208,6 +208,7 @@ struct cgModule {
 	TB_Module *  mod;
 	Checker *    checker;
 	CheckerInfo *info;
+	LinkerData * linker_data;
 
 	RwMutex values_mutex;
 	PtrMap<Entity *, cgValue> values;

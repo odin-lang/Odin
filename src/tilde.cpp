@@ -717,11 +717,12 @@ gb_internal String cg_get_entity_name(cgModule *m, Entity *e) {
 #include "tilde_stmt.cpp"
 
 
-gb_internal bool cg_generate_code(Checker *c) {
+gb_internal bool cg_generate_code(Checker *c, LinkerData *linker_data) {
 	TIME_SECTION("Tilde Module Initializtion");
 
 	CheckerInfo *info = &c->info;
-	gb_unused(info);
+
+	linker_data_init(linker_data, info, c->parser->init_fullpath);
 
 	global_tb_arenas = slice_make<TB_Arena *>(permanent_allocator(), global_thread_pool.threads.count);
 	for_array(i, global_tb_arenas) {
@@ -803,8 +804,10 @@ gb_internal bool cg_generate_code(Checker *c) {
 	TB_ExportBuffer export_buffer = tb_module_object_export(m->mod, debug_format);
 	defer (tb_export_buffer_free(export_buffer));
 
-	char const *path = "W:/Odin/tilde_main.obj";
-	GB_ASSERT(tb_export_buffer_to_file(export_buffer, path));
+	char const *filepath_obj = "W:/Odin/tilde_main.obj";
+
+	array_add(&linker_data->output_object_paths, make_string_c(filepath_obj));
+	GB_ASSERT(tb_export_buffer_to_file(export_buffer, filepath_obj));
 
 	return true;
 }
