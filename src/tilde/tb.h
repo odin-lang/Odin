@@ -386,7 +386,6 @@ typedef struct TB_Symbol {
     } tag;
 
     // refers to the prev or next symbol with the same tag
-    struct TB_Symbol* prev;
     struct TB_Symbol* next;
     char* name;
 

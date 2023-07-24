@@ -11,7 +11,7 @@ RUNTIME_LINKAGE :: "strong" when (
 	ODIN_BUILD_MODE == .Dynamic ||
 	!ODIN_NO_CRT) &&
 	!IS_WASM) else "internal"
-RUNTIME_REQUIRE :: true
+RUNTIME_REQUIRE :: !ODIN_TILDE
 
 
 @(private)
@@ -218,10 +218,18 @@ memory_equal :: proc "contextless" (x, y: rawptr, n: int) -> bool {
 	case n == 0: return true
 	case x == y: return true
 	}
-	
 	a, b := ([^]byte)(x), ([^]byte)(y)
 	length := uint(n)
+
+	for i := uint(0); i < length; i += 1 {
+		if a[i] != b[i] {
+			return false
+		}
+	}
+	return true
 	
+/*
+
 	when size_of(uint) == 8 {
 		if word_length := length >> 3; word_length != 0 {
 			for _ in 0..<word_length {
@@ -276,6 +284,7 @@ memory_equal :: proc "contextless" (x, y: rawptr, n: int) -> bool {
 
 		return true
 	}
+*/
 
 }
 memory_compare :: proc "contextless" (a, b: rawptr, n: int) -> int #no_bounds_check {

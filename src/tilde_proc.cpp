@@ -334,8 +334,8 @@ gb_internal void cg_procedure_end(cgProcedure *p) {
 	}
 	bool emit_asm = false;
 
-	if (string_starts_with(p->name, str_lit("bug@main"))) {
-		// emit_asm = true;
+	if (string_starts_with(p->name, str_lit("bug@"))) {
+		emit_asm = true;
 	}
 
 	TB_FunctionOutput *output = tb_module_compile_function(p->module->mod, p->func, TB_ISEL_FAST, emit_asm);
@@ -357,7 +357,10 @@ gb_internal void cg_procedure_generate(cgProcedure *p) {
 	cg_build_stmt(p, p->body);
 	cg_procedure_end(p);
 
-	if (string_starts_with(p->name, str_lit("bug@main"))) { // IR Printing
+	if (
+	    // string_starts_with(p->name, str_lit("bug@")) ||
+	    false
+	) { // IR Printing
 		TB_Arena *arena = tb_default_arena();
 		defer (arena->free(arena));
 		TB_FuncOpt *opt = tb_funcopt_enter(p->func, arena);

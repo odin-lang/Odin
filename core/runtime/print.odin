@@ -215,19 +215,19 @@ print_uint    :: proc "contextless" (x: uint)    { print_u64(u64(x)) }
 print_uintptr :: proc "contextless" (x: uintptr) { print_u64(u64(x)) }
 print_int     :: proc "contextless" (x: int)     { print_i64(i64(x)) }
 
-print_caller_location :: proc "contextless" (using loc: Source_Code_Location) {
-	print_string(file_path)
+print_caller_location :: proc "contextless" (loc: Source_Code_Location) {
+	print_string(loc.file_path)
 	when ODIN_ERROR_POS_STYLE == .Default {
 		print_byte('(')
-		print_u64(u64(line))
+		print_u64(u64(loc.line))
 		print_byte(':')
-		print_u64(u64(column))
+		print_u64(u64(loc.column))
 		print_byte(')')
 	} else when ODIN_ERROR_POS_STYLE == .Unix {
 		print_byte(':')
-		print_u64(u64(line))
+		print_u64(u64(loc.line))
 		print_byte(':')
-		print_u64(u64(column))
+		print_u64(u64(loc.column))
 		print_byte(':')
 	} else {
 		#panic("unhandled ODIN_ERROR_POS_STYLE")

@@ -887,6 +887,7 @@ gb_internal cgValue cg_const_value(cgProcedure *p, Type *type, ExactValue const 
 			char name[32] = {};
 			gb_snprintf(name, 31, "csb$%u", 1+m->const_nil_guid.fetch_add(1));
 			TB_Global *cstr_global = tb_global_create(m->mod, -1, name, nullptr, TB_LINKAGE_PRIVATE);
+
 			i64 size = str.len+1;
 			tb_global_set_storage(m->mod, tb_module_get_rdata(m->mod), cstr_global, size, 1, 1);
 			u8 *data = cast(u8 *)tb_global_add_region(m->mod, cstr_global, 0, size);
