@@ -352,7 +352,7 @@ gb_internal WORKER_TASK_PROC(cg_procedure_compile_worker_proc) {
 	bool emit_asm = false;
 
 	if (
-	    // string_starts_with(p->name, str_lit("runtime@_os_write")) ||
+	    // string_starts_with(p->name, str_lit("bug@main")) ||
 	    false
 	) {
 		emit_asm = true;
@@ -866,8 +866,7 @@ gb_internal cgValue cg_build_call_expr_internal(cgProcedure *p, Ast *expr) {
 
 						cgValue base_elem = cg_emit_array_epi(p, base_array.addr, 0);
 						cgValue len = cg_const_int(p, t_int, slice_len);
-						GB_PANIC("TODO(bill): cg_fill_slice");
-						// cg_fill_slice(p, slice, base_elem, len);
+						cg_fill_slice(p, slice, base_elem, len);
 
 						variadic_args = cg_addr_load(p, slice);
 					}

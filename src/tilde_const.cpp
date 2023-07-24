@@ -31,7 +31,7 @@ gb_internal cgValue cg_const_nil(cgModule *m, cgProcedure *p, Type *type) {
 
 	if (is_type_internally_pointer_like(type)) {
 		return cg_value(tb_inst_uint(p->func, dt, 0), type);
-	} else if (is_type_integer(type) || is_type_boolean(type) || is_type_bit_set(type)) {
+	} else if (is_type_integer(type) || is_type_boolean(type) || is_type_bit_set(type) || is_type_typeid(type)) {
 		return cg_value(tb_inst_uint(p->func, dt, 0), type);
 	} else if (is_type_float(type)) {
 		switch (size) {
@@ -51,10 +51,49 @@ gb_internal cgValue cg_const_nil(cgProcedure *p, Type *type) {
 	return cg_const_nil(p->module, p, type);
 }
 
+gb_internal TB_Global *cg_global_const_string(cgModule *m, String const &str, Type *type, TB_Global *global, i64 offset);
+gb_internal void cg_write_int_at_ptr(void *dst, i64 i, Type *original_type);
+
+gb_internal void cg_global_source_code_location_const(cgModule *m, String const &proc_name, TokenPos pos, TB_Global *global, i64 offset) {
+	// Source_Code_Location :: struct {
+	// 	file_path:    string,
+	// 	line, column: i32,
+	// 	procedure:    string,
+	// }
+
+	i64 file_path_offset = type_offset_of(t_source_code_location, 0);
+	i64 line_offset      = type_offset_of(t_source_code_location, 1);
+	i64 column_offset    = type_offset_of(t_source_code_location, 2);
+	i64 procedure_offset = type_offset_of(t_source_code_location, 3);
+
+	String file_path = get_file_path_string(pos.file_id);
+	if (file_path.len != 0) {
+		cg_global_const_string(m, file_path, t_string, global, offset+file_path_offset);
+	}
+
+	void *line_ptr   = tb_global_add_region(m->mod, global, offset+line_offset,   4);
+	void *column_ptr = tb_global_add_region(m->mod, global, offset+column_offset, 4);
+	cg_write_int_at_ptr(line_ptr,   pos.line,   t_i32);
+	cg_write_int_at_ptr(column_ptr, pos.column, t_i32);
+
+	if (proc_name.len != 0) {
+		cg_global_const_string(m, proc_name, t_string, global, offset+procedure_offset);
+	}
+}
+
 
 gb_internal cgValue cg_emit_source_code_location_as_global(cgProcedure *p, String const &proc_name, TokenPos pos) {
-	// TODO(bill): cg_emit_source_code_location_as_global
-	return cg_const_nil(p, t_source_code_location);
+	cgModule *m = p->module;
+	char name[32] = {};
+	gb_snprintf(name, 31, "scl$%u", 1+m->const_nil_guid.fetch_add(1));
+
+	TB_Global *global = tb_global_create(m->mod, -1, name, cg_debug_type(m, t_source_code_location), TB_LINKAGE_PRIVATE);
+	tb_global_set_storage(m->mod, tb_module_get_rdata(m->mod), global, type_size_of(t_source_code_location), type_align_of(t_source_code_location), 6);
+
+	cg_global_source_code_location_const(m, proc_name, pos, global, 0);
+
+	TB_Node *ptr = tb_inst_get_symbol_address(p->func, cast(TB_Symbol *)global);
+	return cg_lvalue_addr(ptr, t_source_code_location);
 }
 
 
@@ -141,33 +180,6 @@ gb_internal TB_Global *cg_global_const_string(cgModule *m, String const &str, Ty
 	cg_write_int_at_ptr(len_ptr, str.len, t_int);
 
 	return global;
-}
-
-gb_internal void cg_global_source_code_location_const(cgModule *m, String const &proc_name, TokenPos pos, TB_Global *global, i64 offset) {
-	// Source_Code_Location :: struct {
-	// 	file_path:    string,
-	// 	line, column: i32,
-	// 	procedure:    string,
-	// }
-
-	i64 file_path_offset = type_offset_of(t_source_code_location, 0);
-	i64 line_offset      = type_offset_of(t_source_code_location, 1);
-	i64 column_offset    = type_offset_of(t_source_code_location, 2);
-	i64 procedure_offset = type_offset_of(t_source_code_location, 3);
-
-	String file_path = get_file_path_string(pos.file_id);
-	if (file_path.len != 0) {
-		cg_global_const_string(m, file_path, t_string, global, offset+file_path_offset);
-	}
-
-	void *line_ptr   = tb_global_add_region(m->mod, global, offset+line_offset,   4);
-	void *column_ptr = tb_global_add_region(m->mod, global, offset+column_offset, 4);
-	cg_write_int_at_ptr(line_ptr,   pos.line,   t_i32);
-	cg_write_int_at_ptr(column_ptr, pos.column, t_i32);
-
-	if (proc_name.len != 0) {
-		cg_global_const_string(m, proc_name, t_string, global, offset+procedure_offset);
-	}
 }
 
 gb_internal bool cg_elem_type_can_be_constant(Type *t) {
@@ -1003,3 +1015,12 @@ gb_internal cgValue cg_const_int(cgProcedure *p, Type *type, i64 i) {
 gb_internal cgValue cg_const_bool(cgProcedure *p, Type *type, bool v) {
 	return cg_value(tb_inst_bool(p->func, v), type);
 }
+
+gb_internal cgValue cg_const_string(cgProcedure *p, Type *type, String const &str) {
+	return cg_const_value(p, type, exact_value_string(str));
+}
+
+gb_internal cgValue cg_const_union_tag(cgProcedure *p, Type *u, Type *v) {
+	return cg_const_value(p, union_tag_type(u), exact_value_i64(union_variant_index(u, v)));
+}
+

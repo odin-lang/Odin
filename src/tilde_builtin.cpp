@@ -267,8 +267,7 @@ gb_internal cgValue cg_build_builtin(cgProcedure *p, BuiltinProcId id, Ast *expr
 			pos = e->token.pos;
 
 		}
-		GB_PANIC("TODO(bill): cg_emit_source_code_location_as_global");
-		// return cg_emit_source_code_location_as_global(p, procedure, pos);
+		return cg_emit_source_code_location_as_global(p, procedure, pos);
 	} break;
 
 	case BuiltinProc_len: {

@@ -267,7 +267,8 @@ gb_internal cgValue cg_emit_byte_swap(cgProcedure *p, cgValue value, Type *end_t
 
 	GB_ASSERT(value.kind == cgValue_Value);
 
-	value.node = tb_inst_bswap(p->func, value.node);
+	// TODO(bill): bswap
+	// value.node = tb_inst_bswap(p->func, value.node);
 	return cg_emit_transmute(p, value, end_type);
 }
 
@@ -913,13 +914,12 @@ gb_internal cgValue cg_emit_conv(cgProcedure *p, cgValue value, Type *t) {
 
 
 	if (are_types_identical(src, t_cstring) && are_types_identical(dst, t_string)) {
-		GB_PANIC("TODO(bill): cstring_to_string call");
-		// TEMPORARY_ALLOCATOR_GUARD();
-		// lbValue c = lb_emit_conv(p, value, t_cstring);
-		// auto args = array_make<lbValue>(temporary_allocator(), 1);
-		// args[0] = c;
-		// lbValue s = lb_emit_runtime_call(p, "cstring_to_string", args);
-		// return lb_emit_conv(p, s, dst);
+		TEMPORARY_ALLOCATOR_GUARD();
+		cgValue c = cg_emit_conv(p, value, t_cstring);
+		auto args = slice_make<cgValue>(temporary_allocator(), 1);
+		args[0] = c;
+		cgValue s = cg_emit_runtime_call(p, "cstring_to_string", args);
+		return cg_emit_conv(p, s, dst);
 	}
 
 	// float -> float
@@ -1115,7 +1115,29 @@ gb_internal cgValue cg_emit_conv(cgProcedure *p, cgValue value, Type *t) {
 	}
 
 	if (is_type_any(dst)) {
-		GB_PANIC("TODO(bill): ? -> any");
+		if (is_type_untyped_nil(src) ||
+		    is_type_untyped_uninit(src)) {
+			return cg_const_nil(p, t);
+		}
+
+		cgAddr result = cg_add_local(p, t, nullptr, false);
+
+		Type *st = default_type(src_type);
+
+		cgValue data = cg_address_from_load_or_generate_local(p, value);
+		GB_ASSERT(is_type_pointer(data.type));
+		GB_ASSERT(is_type_typed(st));
+
+		data = cg_emit_conv(p, data, t_rawptr);
+
+		cgValue id = cg_typeid(p, st);
+		cgValue data_ptr = cg_emit_struct_ep(p, result.addr, 0);
+		cgValue id_ptr   = cg_emit_struct_ep(p, result.addr, 1);
+
+		cg_emit_store(p, data_ptr, data);
+		cg_emit_store(p, id_ptr,   id);
+
+		return cg_addr_load(p, result);
 	}
 
 	i64 src_sz = type_size_of(src);
@@ -2868,6 +2890,190 @@ gb_internal cgValue cg_build_unary_and(cgProcedure *p, Ast *expr) {
 	return cg_build_addr_ptr(p, ue->expr);
 }
 
+gb_internal cgValue cg_emit_cast_union(cgProcedure *p, cgValue value, Type *type, TokenPos pos) {
+	Type *src_type = value.type;
+	bool is_ptr = is_type_pointer(src_type);
+
+	bool is_tuple = true;
+	Type *tuple = type;
+	if (type->kind != Type_Tuple) {
+		is_tuple = false;
+		tuple = make_optional_ok_type(type);
+	}
+
+
+	if (is_ptr) {
+		value = cg_emit_load(p, value);
+	}
+	Type *src = base_type(type_deref(src_type));
+	GB_ASSERT_MSG(is_type_union(src), "%s", type_to_string(src_type));
+	Type *dst = tuple->Tuple.variables[0]->type;
+
+	cgValue value_  = cg_address_from_load_or_generate_local(p, value);
+
+	if ((p->state_flags & StateFlag_no_type_assert) != 0 && !is_tuple) {
+		// just do a bit cast of the data at the front
+		cgValue ptr = cg_emit_conv(p, value_, alloc_type_pointer(type));
+		return cg_emit_load(p, ptr);
+	}
+
+
+	cgValue tag = {};
+	cgValue dst_tag = {};
+	cgValue cond = {};
+	cgValue data = {};
+
+	cgValue gep0 = cg_add_local(p, tuple->Tuple.variables[0]->type, nullptr, true).addr;
+	cgValue gep1 = cg_add_local(p, tuple->Tuple.variables[1]->type, nullptr, true).addr;
+
+	if (is_type_union_maybe_pointer(src)) {
+		data = cg_emit_load(p, cg_emit_conv(p, value_, gep0.type));
+	} else {
+		tag     = cg_emit_load(p, cg_emit_union_tag_ptr(p, value_));
+		dst_tag = cg_const_union_tag(p, src, dst);
+	}
+
+	TB_Node *ok_block  = cg_control_region(p, "union_cast_ok");
+	TB_Node *end_block = cg_control_region(p, "union_cast_end");
+
+	if (data.node != nullptr) {
+		GB_ASSERT(is_type_union_maybe_pointer(src));
+		cond = cg_emit_comp_against_nil(p, Token_NotEq, data);
+	} else {
+		cond = cg_emit_comp(p, Token_CmpEq, tag, dst_tag);
+	}
+
+	cg_emit_if(p, cond, ok_block, end_block);
+	tb_inst_set_control(p->func, ok_block);
+
+	if (data.node == nullptr) {
+		data = cg_emit_load(p, cg_emit_conv(p, value_, gep0.type));
+	}
+	cg_emit_store(p, gep0, data);
+	cg_emit_store(p, gep1, cg_const_bool(p, t_bool, true));
+
+	cg_emit_goto(p, end_block);
+	tb_inst_set_control(p->func, end_block);
+
+	if (!is_tuple) {
+		GB_ASSERT((p->state_flags & StateFlag_no_type_assert) == 0);
+		// NOTE(bill): Panic on invalid conversion
+		Type *dst_type = tuple->Tuple.variables[0]->type;
+
+		isize arg_count = 7;
+		if (build_context.no_rtti) {
+			arg_count = 4;
+		}
+
+		cgValue ok = cg_emit_load(p, gep1);
+		auto args = slice_make<cgValue>(permanent_allocator(), arg_count);
+		args[0] = ok;
+
+		args[1] = cg_const_string(p, t_string, get_file_path_string(pos.file_id));
+		args[2] = cg_const_int(p, t_i32, pos.line);
+		args[3] = cg_const_int(p, t_i32, pos.column);
+
+		if (!build_context.no_rtti) {
+			args[4] = cg_typeid(p, src_type);
+			args[5] = cg_typeid(p, dst_type);
+			args[6] = cg_emit_conv(p, value_, t_rawptr);
+		}
+		cg_emit_runtime_call(p, "type_assertion_check2", args);
+
+		return cg_emit_load(p, gep0);
+	}
+
+	return cg_value_multi2(cg_emit_load(p, gep0), cg_emit_load(p, gep1), tuple);
+}
+
+gb_internal cgValue cg_emit_cast_any(cgProcedure *p, cgValue value, Type *type, TokenPos pos) {
+	Type *src_type = value.type;
+
+	if (is_type_pointer(src_type)) {
+		value = cg_emit_load(p, value);
+	}
+
+	bool is_tuple = true;
+	Type *tuple = type;
+	if (type->kind != Type_Tuple) {
+		is_tuple = false;
+		tuple = make_optional_ok_type(type);
+	}
+	Type *dst_type = tuple->Tuple.variables[0]->type;
+
+	if ((p->state_flags & StateFlag_no_type_assert) != 0 && !is_tuple) {
+		// just do a bit cast of the data at the front
+		cgValue ptr = cg_emit_struct_ev(p, value, 0);
+		ptr = cg_emit_conv(p, ptr, alloc_type_pointer(type));
+		return cg_emit_load(p, ptr);
+	}
+
+	cgValue dst_typeid = cg_typeid(p, dst_type);
+	cgValue any_typeid = cg_emit_struct_ev(p, value, 1);
+
+
+	TB_Node *ok_block = cg_control_region(p, "any_cast_ok");
+	TB_Node *end_block = cg_control_region(p, "any_cast_end");
+	cgValue cond = cg_emit_comp(p, Token_CmpEq, any_typeid, dst_typeid);
+	cg_emit_if(p, cond, ok_block, end_block);
+	tb_inst_set_control(p->func, ok_block);
+
+	cgValue gep0 = cg_add_local(p, tuple->Tuple.variables[0]->type, nullptr, true).addr;
+	cgValue gep1 = cg_add_local(p, tuple->Tuple.variables[1]->type, nullptr, true).addr;
+
+	cgValue any_data = cg_emit_struct_ev(p, value, 0);
+	cgValue ptr = cg_emit_conv(p, any_data, alloc_type_pointer(dst_type));
+	cg_emit_store(p, gep0, cg_emit_load(p, ptr));
+	cg_emit_store(p, gep1, cg_const_bool(p, t_bool, true));
+
+	cg_emit_goto(p, end_block);
+	tb_inst_set_control(p->func, end_block);
+
+	if (!is_tuple) {
+		// NOTE(bill): Panic on invalid conversion
+		cgValue ok = cg_emit_load(p, gep1);
+
+		isize arg_count = 7;
+		if (build_context.no_rtti) {
+			arg_count = 4;
+		}
+		auto args = slice_make<cgValue>(permanent_allocator(), arg_count);
+		args[0] = ok;
+
+		args[1] = cg_const_string(p, t_string, get_file_path_string(pos.file_id));
+		args[2] = cg_const_int(p, t_i32, pos.line);
+		args[3] = cg_const_int(p, t_i32, pos.column);
+
+		if (!build_context.no_rtti) {
+			args[4] = any_typeid;
+			args[5] = dst_typeid;
+			args[6] = cg_emit_struct_ev(p, value, 0);
+		}
+		cg_emit_runtime_call(p, "type_assertion_check2", args);
+
+		return cg_emit_load(p, gep0);
+	}
+
+	return cg_value_multi2(cg_emit_load(p, gep0), cg_emit_load(p, gep1), tuple);
+}
+
+
+gb_internal cgValue cg_build_type_assertion(cgProcedure *p, Ast *expr, Type *type) {
+	ast_node(ta, TypeAssertion, expr);
+
+	TokenPos pos = ast_token(expr).pos;
+	cgValue e = cg_build_expr(p, ta->expr);
+	Type *t = type_deref(e.type);
+
+	if (is_type_union(t)) {
+		return cg_emit_cast_union(p, e, type, pos);
+	} else if (is_type_any(t)) {
+		return cg_emit_cast_any(p, e, type, pos);
+	}
+	GB_PANIC("TODO(bill): type assertion %s", type_to_string(e.type));
+	return {};
+}
+
 
 gb_internal cgValue cg_build_expr_internal(cgProcedure *p, Ast *expr) {
 	expr = unparen_expr(expr);
@@ -3079,8 +3285,11 @@ gb_internal cgValue cg_build_expr_internal(cgProcedure *p, Ast *expr) {
 	case_ast_node(oe, OrElseExpr, expr);
 		return cg_build_or_else(p, oe->x, oe->y, tv.type);
 	case_end;
+
+	case_ast_node(ta, TypeAssertion, expr);
+		return cg_build_type_assertion(p, expr, tv.type);
+	case_end;
 	}
-	GB_PANIC("TODO(bill): cg_build_expr_internal %.*s", LIT(ast_strings[expr->kind]));
 	return {};
 
 }

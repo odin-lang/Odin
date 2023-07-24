@@ -260,7 +260,7 @@ gb_internal isize cg_type_info_index(CheckerInfo *info, Type *type, bool err_on_
 		}
 	}
 	if (err_on_not_found) {
-		GB_PANIC("NOT FOUND lb_type_info_index %s @ index %td", type_to_string(type), index);
+		GB_PANIC("NOT FOUND lb_type_info_index '%s' @ index %td", type_to_string(type), index);
 	}
 	return -1;
 }

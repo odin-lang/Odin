@@ -409,11 +409,9 @@ gb_internal cgValue cg_emit_struct_ep(cgProcedure *p, cgValue s, i64 index) {
 
 	switch (t->kind) {
 	case Type_Struct:
-		{
-			type_set_offsets(t);
-			result_type = t->Struct.fields[index]->type;
-			offset = t->Struct.offsets[index];
-		}
+		type_set_offsets(t);
+		result_type = t->Struct.fields[index]->type;
+		offset = t->Struct.offsets[index];
 		break;
 	case Type_Union:
 		GB_ASSERT(index == -1);
@@ -421,7 +419,10 @@ gb_internal cgValue cg_emit_struct_ep(cgProcedure *p, cgValue s, i64 index) {
 		break;
 		// return cg_emit_union_tag_ptr(p, s);
 	case Type_Tuple:
-		GB_PANIC("TODO(bill): cg_emit_tuple_ep");
+		type_set_offsets(t);
+		result_type = t->Tuple.variables[index]->type;
+		offset = t->Tuple.offsets[index];
+		GB_PANIC("TODO(bill): cg_emit_tuple_ep %d", s.kind);
 		break;
 		// return cg_emit_tuple_ep(p, s, index);
 	case Type_Slice:
@@ -1799,8 +1800,11 @@ gb_internal void cg_build_switch_stmt(cgProcedure *p, Ast *node) {
 				expr = unparen_expr(expr);
 				GB_ASSERT(!is_ast_range(expr));
 				if (expr->tav.mode == Addressing_Type) {
-					GB_PANIC("TODO(bill): cg_typeid as i64");
-					// key = cg_typeid(p, expr->tav.value.value_typeid);
+					Type *type = expr->tav.value.value_typeid;
+					if (type == nullptr || type == t_invalid) {
+						type = expr->tav.type;
+					}
+					key = cg_typeid_as_u64(p->module, type);
 				} else {
 					auto tv = type_and_value_of_expr(expr);
 					GB_ASSERT(tv.mode == Addressing_Constant);
@@ -1912,21 +1916,16 @@ gb_internal void cg_build_switch_stmt(cgProcedure *p, Ast *node) {
 	cg_scope_close(p, cgDeferExit_Default, done);
 }
 
-gb_internal void cg_type_case_body(cgProcedure *p, Ast *label, Ast *clause, TB_Node *body_region, TB_Node *done_region) {
-	// ast_node(cc, CaseClause, clause);
-
-	// cg_push_target_list(p, label, done, nullptr, nullptr);
-	// cg_build_stmt_list(p, cc->stmts);
-	// cg_scope_close(p, cgDeferExit_Default, body_region);
-	// cg_pop_target_list(p);
-
-	// cg_emit_goto(p, done_region);
-}
-
 gb_internal void cg_build_type_switch_stmt(cgProcedure *p, Ast *node) {
 	ast_node(ss, TypeSwitchStmt, node);
 
+	TB_Node *done_region = cg_control_region(p, "typeswitch_done");
+	TB_Node *else_region = done_region;
+	TB_Node *default_region = nullptr;
+	isize num_cases = 0;
+
 	cg_scope_open(p, ss->scope);
+	defer (cg_scope_close(p, cgDeferExit_Default, done_region));
 
 	ast_node(as, AssignStmt, ss->tag);
 	GB_ASSERT(as->lhs.count == 1);
@@ -1968,11 +1967,6 @@ gb_internal void cg_build_type_switch_stmt(cgProcedure *p, Ast *node) {
 	}
 
 	ast_node(body, BlockStmt, ss->body);
-
-	TB_Node *done_region = cg_control_region(p, "typeswitch_done");
-	TB_Node *else_region = done_region;
-	TB_Node *default_region = nullptr;
-	isize num_cases = 0;
 
 	for (Ast *clause : body->stmts) {
 		ast_node(cc, CaseClause, clause);
@@ -2158,7 +2152,6 @@ gb_internal void cg_build_type_switch_stmt(cgProcedure *p, Ast *node) {
 
 	cg_emit_goto(p, done_region);
 	tb_inst_set_control(p->func, done_region);
-	cg_scope_close(p, cgDeferExit_Default, done_region);
 }
 
 
