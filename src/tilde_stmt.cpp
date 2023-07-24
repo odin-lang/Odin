@@ -2036,9 +2036,9 @@ gb_internal void cg_build_constant_value_decl(cgProcedure *p, AstValueDecl *vd) 
 
 			cgValue value = p->value;
 
-			array_add(&p->module->procedures_to_generate, nested_proc);
 			array_add(&p->children, nested_proc);
 			string_map_set(&p->module->members, name, value);
+			cg_add_procedure_to_queue(nested_proc);
 		}
 	}
 }

@@ -210,13 +210,14 @@ struct cgModule {
 	CheckerInfo *info;
 	LinkerData * linker_data;
 
-	RwMutex values_mutex;
-	PtrMap<Entity *, cgValue> values;
-	StringMap<cgValue> members;
+	bool do_threading;
+	Array<cgProcedure *> single_threaded_procedure_queue;
 
-	StringMap<cgProcedure *> procedures;
+	RwMutex values_mutex;
+	PtrMap<Entity *, cgValue>       values;
+	StringMap<cgValue>              members;
+	StringMap<cgProcedure *>        procedures;
 	PtrMap<TB_Function *, Entity *> procedure_values;
-	Array<cgProcedure *> procedures_to_generate;
 
 	RecursiveMutex debug_type_mutex;
 	PtrMap<Type *, TB_DebugType *> debug_type_map;
@@ -225,6 +226,7 @@ struct cgModule {
 	RecursiveMutex proc_proto_mutex;
 	PtrMap<Type *, TB_FunctionPrototype *> proc_proto_map;
 
+	// NOTE(bill): no need to protect this with a mutex
 	PtrMap<uintptr, TB_FileID> file_id_map; // Key: AstFile.id (i32 cast to uintptr)
 
 	std::atomic<u32> nested_type_name_guid;
@@ -251,6 +253,8 @@ gb_global isize cg_global_type_info_member_tags_index    = 0;
 
 
 gb_internal TB_Arena *cg_arena(void);
+
+gb_internal void cg_add_procedure_to_queue(cgProcedure *p);
 
 gb_internal cgValue cg_value(TB_Global *  g,    Type *type);
 gb_internal cgValue cg_value(TB_External *e,    Type *type);

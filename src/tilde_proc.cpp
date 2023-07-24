@@ -35,7 +35,9 @@ gb_internal cgProcedure *cg_procedure_create(cgModule *m, Entity *entity, bool i
 		cgValue *found = string_map_get(&m->members, key);
 		if (found) {
 			cg_add_entity(m, entity, *found);
+			rw_mutex_lock(&m->values_mutex);
 			p = string_map_must_get(&m->procedures, key);
+			rw_mutex_unlock(&m->values_mutex);
 			if (!ignore_body && p->func != nullptr) {
 				return nullptr;
 			}
@@ -96,7 +98,6 @@ gb_internal cgProcedure *cg_procedure_create(cgModule *m, Entity *entity, bool i
 
 		p->debug_type = cg_debug_type_for_proc(m, p->type);
 		p->proto = tb_prototype_from_dbg(m->mod, p->debug_type);
-		tb_function_set_prototype(p->func, p->proto, cg_arena());
 
 		p->symbol = cast(TB_Symbol *)p->func;
 	}
@@ -148,7 +149,6 @@ gb_internal cgProcedure *cg_procedure_create_dummy(cgModule *m, String const &li
 
 	p->debug_type = cg_debug_type_for_proc(m, p->type);
 	p->proto = tb_prototype_from_dbg(m->mod, p->debug_type);
-	tb_function_set_prototype(p->func, p->proto, cg_arena());
 
 	p->symbol = cast(TB_Symbol *)p->func;
 
@@ -163,6 +163,8 @@ gb_internal void cg_procedure_begin(cgProcedure *p) {
 	if (p == nullptr || p->func == nullptr) {
 		return;
 	}
+
+	tb_function_set_prototype(p->func, p->proto, cg_arena());
 
 	if (p->body == nullptr) {
 		return;
@@ -324,19 +326,11 @@ gb_internal void cg_procedure_begin(cgProcedure *p) {
 	}
 }
 
-gb_internal void cg_procedure_end(cgProcedure *p) {
-	if (p == nullptr || p->func == nullptr) {
-		return;
-	}
-	if (tb_inst_get_control(p->func)) {
-		GB_ASSERT(p->type->Proc.result_count == 0);
-		tb_inst_ret(p->func, 0, nullptr);
-	}
-	bool emit_asm = false;
 
-	if (string_starts_with(p->name, str_lit("runtime@_os_write"))) {
-		// emit_asm = true;
-	}
+gb_internal WORKER_TASK_PROC(cg_procedure_compile_worker_proc) {
+	cgProcedure *p = cast(cgProcedure *)data;
+
+	bool emit_asm = false;
 
 	TB_FunctionOutput *output = tb_module_compile_function(p->module->mod, p->func, TB_ISEL_FAST, emit_asm);
 	if (emit_asm) {
@@ -346,6 +340,24 @@ gb_internal void cg_procedure_end(cgProcedure *p) {
 		}
 		gb_printf_err("\n");
 	}
+
+	return 0;
+}
+
+gb_internal void cg_procedure_end(cgProcedure *p) {
+	if (p == nullptr || p->func == nullptr) {
+		return;
+	}
+	if (tb_inst_get_control(p->func)) {
+		GB_ASSERT(p->type->Proc.result_count == 0);
+		tb_inst_ret(p->func, 0, nullptr);
+	}
+
+	if (p->module->do_threading) {
+		thread_pool_add_task(cg_procedure_compile_worker_proc, p);
+	} else {
+		cg_procedure_compile_worker_proc(p);
+	}
 }
 
 gb_internal void cg_procedure_generate(cgProcedure *p) {
@@ -353,9 +365,11 @@ gb_internal void cg_procedure_generate(cgProcedure *p) {
 		return;
 	}
 
+
 	cg_procedure_begin(p);
 	cg_build_stmt(p, p->body);
 	cg_procedure_end(p);
+
 
 	if (
 	    // string_starts_with(p->name, str_lit("runtime@_os_write")) ||
@@ -408,7 +422,7 @@ gb_internal void cg_build_nested_proc(cgProcedure *p, AstProcLit *pd, Entity *e)
 
 	cg_add_entity(m, e, value);
 	array_add(&p->children, nested_proc);
-	array_add(&m->procedures_to_generate, nested_proc);
+	cg_add_procedure_to_queue(nested_proc);
 }
 
 

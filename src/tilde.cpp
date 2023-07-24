@@ -7,6 +7,13 @@ gb_internal TB_Arena *cg_arena(void) {
 	return global_tb_arenas[current_thread_index()];
 }
 
+gb_internal void cg_global_arena_init(void) {
+	global_tb_arenas = slice_make<TB_Arena *>(permanent_allocator(), global_thread_pool.threads.count);
+	for_array(i, global_tb_arenas) {
+		global_tb_arenas[i] = tb_default_arena();
+	}
+}
+
 // returns TB_TYPE_VOID if not trivially possible
 gb_internal TB_DataType cg_data_type(Type *t) {
 	GB_ASSERT(t != nullptr);
@@ -535,13 +542,14 @@ gb_internal cgModule *cg_module_create(Checker *c) {
 	tb_module_set_tls_index(m->mod, 10, "_tls_index");
 
 	map_init(&m->values);
-	array_init(&m->procedures_to_generate, heap_allocator());
 
 	map_init(&m->file_id_map);
 
 	map_init(&m->debug_type_map);
 	map_init(&m->proc_debug_type_map);
 	map_init(&m->proc_proto_map);
+
+	array_init(&m->single_threaded_procedure_queue, heap_allocator());
 
 
 	for_array(id, global_files) {
@@ -556,11 +564,12 @@ gb_internal cgModule *cg_module_create(Checker *c) {
 
 gb_internal void cg_module_destroy(cgModule *m) {
 	map_destroy(&m->values);
-	array_free(&m->procedures_to_generate);
 	map_destroy(&m->file_id_map);
 	map_destroy(&m->debug_type_map);
 	map_destroy(&m->proc_debug_type_map);
 	map_destroy(&m->proc_proto_map);
+
+	array_free(&m->single_threaded_procedure_queue);
 
 	tb_module_destroy(m->mod);
 }
@@ -772,6 +781,21 @@ gb_internal String cg_filepath_obj_for_module(cgModule *m) {
 }
 
 
+gb_internal WORKER_TASK_PROC(cg_procedure_generate_worker_proc) {
+	cgProcedure *p = cast(cgProcedure *)data;
+	cg_procedure_generate(p);
+	return 0;
+}
+
+gb_internal void cg_add_procedure_to_queue(cgProcedure *p) {
+	cgModule *m = p->module;
+	if (m->do_threading) {
+		thread_pool_add_task(cg_procedure_generate_worker_proc, p);
+	} else {
+		array_add(&m->single_threaded_procedure_queue, p);
+	}
+}
+
 gb_internal bool cg_generate_code(Checker *c, LinkerData *linker_data) {
 	TIME_SECTION("Tilde Module Initializtion");
 
@@ -779,13 +803,12 @@ gb_internal bool cg_generate_code(Checker *c, LinkerData *linker_data) {
 
 	linker_data_init(linker_data, info, c->parser->init_fullpath);
 
-	global_tb_arenas = slice_make<TB_Arena *>(permanent_allocator(), global_thread_pool.threads.count);
-	for_array(i, global_tb_arenas) {
-		global_tb_arenas[i] = tb_default_arena();
-	}
+	cg_global_arena_init();
 
 	cgModule *m = cg_module_create(c);
 	defer (cg_module_destroy(m));
+
+	m->do_threading = true;
 
 	TIME_SECTION("Tilde Global Variables");
 
@@ -798,6 +821,7 @@ gb_internal bool cg_generate_code(Checker *c, LinkerData *linker_data) {
 		p->is_startup = true;
 
 		cg_procedure_begin(p);
+		tb_inst_ret(p->func, 0, nullptr);
 		cg_procedure_end(p);
 	}
 
@@ -807,14 +831,19 @@ gb_internal bool cg_generate_code(Checker *c, LinkerData *linker_data) {
 		p->is_startup = true;
 
 		cg_procedure_begin(p);
+		tb_inst_ret(p->func, 0, nullptr);
 		cg_procedure_end(p);
 	}
 
 	auto *min_dep_set = &info->minimum_dependency_set;
 
+	Array<cgProcedure *> procedures_to_generate = {};
+	array_init(&procedures_to_generate, heap_allocator());
+	defer (array_free(&procedures_to_generate));
+
 	for (Entity *e : info->entities) {
-		String  name  = e->token.string;
-		Scope * scope = e->scope;
+		String name  = e->token.string;
+		Scope *scope = e->scope;
 
 		if ((scope->flags & ScopeFlag_File) == 0) {
 			continue;
@@ -832,14 +861,23 @@ gb_internal bool cg_generate_code(Checker *c, LinkerData *linker_data) {
 			continue;
 		}
 		if (cgProcedure *p = cg_procedure_create(m, e)) {
-			array_add(&m->procedures_to_generate, p);
+			array_add(&procedures_to_generate, p);
 		}
 	}
 
-
-	for (isize i = 0; i < m->procedures_to_generate.count; i++) {
-		cg_procedure_generate(m->procedures_to_generate[i]);
+	for (cgProcedure *p : procedures_to_generate) {
+		cg_add_procedure_to_queue(p);
 	}
+
+	if (!m->do_threading) {
+		for (isize i = 0; i < m->single_threaded_procedure_queue.count; i++) {
+			cgProcedure *p = m->single_threaded_procedure_queue[i];
+			cg_procedure_generate(p);
+		}
+	}
+
+	thread_pool_wait();
+
 
 	TB_DebugFormat debug_format = TB_DEBUGFMT_NONE;
 	if (build_context.ODIN_DEBUG || true) {
