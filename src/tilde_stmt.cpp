@@ -1261,6 +1261,164 @@ gb_internal void cg_build_for_stmt(cgProcedure *p, Ast *node) {
 	tb_inst_set_control(p->func, done);
 }
 
+
+gb_internal Ast *cg_strip_and_prefix(Ast *ident) {
+	if (ident != nullptr) {
+		if (ident->kind == Ast_UnaryExpr && ident->UnaryExpr.op.kind == Token_And) {
+			ident = ident->UnaryExpr.expr;
+		}
+		GB_ASSERT(ident->kind == Ast_Ident);
+	}
+	return ident;
+}
+
+gb_internal void cg_emit_increment(cgProcedure *p, cgValue addr) {
+	GB_ASSERT(is_type_pointer(addr.type));
+	Type *type = type_deref(addr.type);
+	cgValue v_one = cg_const_value(p, type, exact_value_i64(1));
+	cg_emit_store(p, addr, cg_emit_arith(p, Token_Add, cg_emit_load(p, addr), v_one, type));
+
+}
+
+gb_internal void cg_build_range_stmt_interval(cgProcedure *p, AstBinaryExpr *node,
+                                              AstRangeStmt *rs, Scope *scope) {
+	bool ADD_EXTRA_WRAPPING_CHECK = true;
+
+	cg_scope_open(p, scope);
+
+	Ast *val0 = rs->vals.count > 0 ? cg_strip_and_prefix(rs->vals[0]) : nullptr;
+	Ast *val1 = rs->vals.count > 1 ? cg_strip_and_prefix(rs->vals[1]) : nullptr;
+	Type *val0_type = nullptr;
+	Type *val1_type = nullptr;
+	if (val0 != nullptr && !is_blank_ident(val0)) {
+		val0_type = type_of_expr(val0);
+	}
+	if (val1 != nullptr && !is_blank_ident(val1)) {
+		val1_type = type_of_expr(val1);
+	}
+
+	TokenKind op = Token_Lt;
+	switch (node->op.kind) {
+	case Token_Ellipsis:  op = Token_LtEq; break;
+	case Token_RangeFull: op = Token_LtEq; break;
+	case Token_RangeHalf: op = Token_Lt;  break;
+	default: GB_PANIC("Invalid interval operator"); break;
+	}
+
+
+	cgValue lower = cg_build_expr(p, node->left);
+	cgValue upper = {}; // initialized each time in the loop
+
+	cgAddr value;
+	if (val0_type != nullptr) {
+		value = cg_add_local(p, val0_type, entity_of_node(val0), false);
+	} else {
+		value = cg_add_local(p, lower.type, nullptr, false);
+	}
+	cg_addr_store(p, value, lower);
+
+	cgAddr index;
+	if (val1_type != nullptr) {
+		index = cg_add_local(p, val1_type, entity_of_node(val1), false);
+	} else {
+		index = cg_add_local(p, t_int, nullptr, false);
+	}
+	cg_addr_store(p, index, cg_const_int(p, t_int, 0));
+
+	TB_Node *loop = cg_control_region(p, "for_interval_loop");
+	TB_Node *body = cg_control_region(p, "for_interval_body");
+	TB_Node *done = cg_control_region(p, "for_interval_done");
+
+	cg_emit_goto(p, loop);
+	tb_inst_set_control(p->func, loop);
+
+	upper = cg_build_expr(p, node->right);
+	cgValue curr_value = cg_addr_load(p, value);
+	cgValue cond = cg_emit_comp(p, op, curr_value, upper);
+	cg_emit_if(p, cond, body, done);
+	tb_inst_set_control(p->func, body);
+
+	cgValue val = cg_addr_load(p, value);
+	cgValue idx = cg_addr_load(p, index);
+
+	auto const &store_val = [](cgProcedure *p, Ast *stmt_val, cgValue const &value) {
+		Entity *e = entity_of_node(stmt_val);
+		if (e == nullptr) {
+			return;
+		}
+
+		if (e->flags & EntityFlag_Value) {
+			if (value.kind == cgValue_Addr) {
+				cgValue ptr = cg_address_from_load_or_generate_local(p, value);
+				cg_add_entity(p->module, e, ptr);
+				return;
+			}
+		}
+
+		cgAddr addr = cg_add_local(p, e->type, e, false);
+		cg_addr_store(p, addr, value);
+		return;
+	};
+
+	if (val0_type) store_val(p, val0, val);
+	if (val1_type) store_val(p, val1, idx);
+
+
+	{
+		// NOTE: this check block will most likely be optimized out, and is here
+		// to make this code easier to read
+		TB_Node *check = nullptr;
+		TB_Node *post = cg_control_region(p, "for_interval_post");
+
+		TB_Node *continue_block = post;
+
+		if (ADD_EXTRA_WRAPPING_CHECK &&
+		    op == Token_LtEq) {
+			check = cg_control_region(p, "for_interval_check");
+			continue_block = check;
+		}
+
+		cg_push_target_list(p, rs->label, done, continue_block, nullptr);
+
+		cg_build_stmt(p, rs->body);
+
+		cg_scope_close(p, cgDeferExit_Default, nullptr);
+		cg_pop_target_list(p);
+
+		if (check != nullptr) {
+			cg_emit_goto(p, check);
+			tb_inst_set_control(p->func, check);
+
+			cgValue check_cond = cg_emit_comp(p, Token_NotEq, curr_value, upper);
+			cg_emit_if(p, check_cond, post, done);
+		} else {
+			cg_emit_goto(p, post);
+		}
+
+		tb_inst_set_control(p->func, post);
+		cg_emit_increment(p, value.addr);
+		cg_emit_increment(p, index.addr);
+		cg_emit_goto(p, loop);
+	}
+
+	tb_inst_set_control(p->func, done);
+
+}
+
+gb_internal void cg_build_range_stmt(cgProcedure *p, Ast *node) {
+	ast_node(rs, RangeStmt, node);
+
+	Ast *expr = unparen_expr(rs->expr);
+
+
+	if (is_ast_range(expr)) {
+		cg_build_range_stmt_interval(p, &expr->BinaryExpr, rs, rs->scope);
+		return;
+	}
+
+	GB_PANIC("TODO(bill): cg_build_range_stmt");
+}
+
 gb_internal bool cg_switch_stmt_can_be_trivial_jump_table(AstSwitchStmt *ss) {
 	if (ss->tag == nullptr) {
 		return false;
@@ -1899,8 +2057,7 @@ gb_internal void cg_build_stmt(cgProcedure *p, Ast *node) {
 	case_end;
 
 	case_ast_node(rs, RangeStmt, node);
-		GB_PANIC("TODO(bill): cg_build_range_stmt %.*s", LIT(p->name));
-		// cg_build_range_stmt(p, rs, rs->scope);
+		cg_build_range_stmt(p, node);
 	case_end;
 
 	case_ast_node(rs, UnrollRangeStmt, node);

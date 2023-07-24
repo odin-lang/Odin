@@ -277,6 +277,7 @@ gb_internal void cg_build_stmt(cgProcedure *p, Ast *stmt);
 gb_internal void cg_build_stmt_list(cgProcedure *p, Slice<Ast *> const &stmts);
 gb_internal void cg_build_when_stmt(cgProcedure *p, AstWhenStmt *ws);
 
+
 gb_internal cgValue cg_build_expr(cgProcedure *p, Ast *expr);
 gb_internal cgAddr  cg_build_addr(cgProcedure *p, Ast *expr);
 gb_internal cgValue cg_build_addr_ptr(cgProcedure *p, Ast *expr);
@@ -295,8 +296,11 @@ gb_internal cgValue cg_address_from_load_or_generate_local(cgProcedure *p, cgVal
 gb_internal cgValue cg_copy_value_to_ptr(cgProcedure *p, cgValue value, Type *original_type, isize min_alignment);
 
 gb_internal cgValue cg_build_call_expr(cgProcedure *p, Ast *expr);
+
 gb_internal void cg_build_return_stmt(cgProcedure *p, Slice<Ast *> const &return_results);
 gb_internal void cg_build_return_stmt_internal(cgProcedure *p, Slice<cgValue> const &results);
+gb_internal void cg_build_range_stmt(cgProcedure *p, Ast *node);
+
 
 gb_internal cgValue cg_find_procedure_value_from_entity(cgModule *m, Entity *e);
 
