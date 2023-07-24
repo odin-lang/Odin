@@ -199,7 +199,6 @@ struct cgProcedure {
 	isize  split_returns_index;
 	bool   return_by_ptr;
 
-
 	PtrMap<Entity *, cgAddr> variable_map;
 };
 
@@ -255,6 +254,7 @@ gb_global isize cg_global_type_info_member_tags_index    = 0;
 gb_internal TB_Arena *cg_arena(void);
 
 gb_internal void cg_add_procedure_to_queue(cgProcedure *p);
+gb_internal void cg_setup_type_info_data(cgModule *m);
 
 gb_internal cgValue cg_value(TB_Global *  g,    Type *type);
 gb_internal cgValue cg_value(TB_External *e,    Type *type);

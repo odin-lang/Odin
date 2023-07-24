@@ -489,15 +489,14 @@ gb_internal bool cg_global_variables_create(cgModule *m) {
 				char const *name = CG_TYPE_INFO_TYPES_NAME;
 				Type *t = alloc_type_array(t_type_info_ptr, count);
 				TB_Global *g = tb_global_create(m->mod, -1, name, nullptr, TB_LINKAGE_PRIVATE);
-				tb_global_set_storage(m->mod, tb_module_get_rdata(m->mod), g, type_size_of(t), 16, count);
+				tb_global_set_storage(m->mod, tb_module_get_rdata(m->mod), g, type_size_of(t), 16, count*2);
 				cg_global_type_info_member_types = cg_addr(cg_value(g, alloc_type_pointer(t)));
-
 			}
 			{
 				char const *name = CG_TYPE_INFO_NAMES_NAME;
 				Type *t = alloc_type_array(t_string, count);
 				TB_Global *g = tb_global_create(m->mod, -1, name, nullptr, TB_LINKAGE_PRIVATE);
-				tb_global_set_storage(m->mod, tb_module_get_rdata(m->mod), g, type_size_of(t), 16, count);
+				tb_global_set_storage(m->mod, tb_module_get_rdata(m->mod), g, type_size_of(t), 16, count*2);
 				cg_global_type_info_member_names = cg_addr(cg_value(g, alloc_type_pointer(t)));
 			}
 			{
@@ -520,10 +519,12 @@ gb_internal bool cg_global_variables_create(cgModule *m) {
 				char const *name = CG_TYPE_INFO_TAGS_NAME;
 				Type *t = alloc_type_array(t_string, count);
 				TB_Global *g = tb_global_create(m->mod, -1, name, nullptr, TB_LINKAGE_PRIVATE);
-				tb_global_set_storage(m->mod, tb_module_get_rdata(m->mod), g, type_size_of(t), 16, count);
+				tb_global_set_storage(m->mod, tb_module_get_rdata(m->mod), g, type_size_of(t), 16, count*2);
 				cg_global_type_info_member_tags = cg_addr(cg_value(g, alloc_type_pointer(t)));
 			}
 		}
+
+		cg_setup_type_info_data(m);
 	}
 
 	return already_has_entry_point;
@@ -722,6 +723,7 @@ gb_internal String cg_get_entity_name(cgModule *m, Entity *e) {
 #include "tilde_debug.cpp"
 #include "tilde_expr.cpp"
 #include "tilde_builtin.cpp"
+#include "tilde_type_info.cpp"
 #include "tilde_proc.cpp"
 #include "tilde_stmt.cpp"
 
@@ -808,7 +810,7 @@ gb_internal bool cg_generate_code(Checker *c, LinkerData *linker_data) {
 	cgModule *m = cg_module_create(c);
 	defer (cg_module_destroy(m));
 
-	m->do_threading = true;
+	m->do_threading = false;
 
 	TIME_SECTION("Tilde Global Variables");
 
