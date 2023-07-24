@@ -303,12 +303,15 @@ gb_internal cgValue cg_build_builtin(cgProcedure *p, BuiltinProcId id, Ast *expr
 	case BuiltinProc_min:
 		if (ce->args.count == 2) {
 			Type *t = type_of_expr(expr);
-			return cg_builtin_min(p, t, cg_build_expr(p, ce->args[0]), cg_build_expr(p, ce->args[1]));
+			cgValue x = cg_build_expr(p, ce->args[0]);
+			cgValue y = cg_build_expr(p, ce->args[1]);
+			return cg_builtin_min(p, t, x, y);
 		} else {
 			Type *t = type_of_expr(expr);
 			cgValue x = cg_build_expr(p, ce->args[0]);
 			for (isize i = 1; i < ce->args.count; i++) {
-				x = cg_builtin_min(p, t, x, cg_build_expr(p, ce->args[i]));
+				cgValue y = cg_build_expr(p, ce->args[i]);
+				x = cg_builtin_min(p, t, x, y);
 			}
 			return x;
 		}
@@ -316,12 +319,15 @@ gb_internal cgValue cg_build_builtin(cgProcedure *p, BuiltinProcId id, Ast *expr
 	case BuiltinProc_max:
 		if (ce->args.count == 2) {
 			Type *t = type_of_expr(expr);
-			return cg_builtin_max(p, t, cg_build_expr(p, ce->args[0]), cg_build_expr(p, ce->args[1]));
+			cgValue x = cg_build_expr(p, ce->args[0]);
+			cgValue y = cg_build_expr(p, ce->args[1]);
+			return cg_builtin_max(p, t, x, y);
 		} else {
 			Type *t = type_of_expr(expr);
 			cgValue x = cg_build_expr(p, ce->args[0]);
 			for (isize i = 1; i < ce->args.count; i++) {
-				x = cg_builtin_max(p, t, x, cg_build_expr(p, ce->args[i]));
+				cgValue y = cg_build_expr(p, ce->args[i]);
+				x = cg_builtin_max(p, t, x, y);
 			}
 			return x;
 		}
