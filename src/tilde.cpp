@@ -717,6 +717,61 @@ gb_internal String cg_get_entity_name(cgModule *m, Entity *e) {
 #include "tilde_stmt.cpp"
 
 
+gb_internal String cg_filepath_obj_for_module(cgModule *m) {
+	String path = concatenate3_strings(permanent_allocator(),
+		build_context.build_paths[BuildPath_Output].basename,
+		STR_LIT("/"),
+		build_context.build_paths[BuildPath_Output].name
+	);
+
+	// if (m->file) {
+	// 	char buf[32] = {};
+	// 	isize n = gb_snprintf(buf, gb_size_of(buf), "-%u", m->file->id);
+	// 	String suffix = make_string((u8 *)buf, n-1);
+	// 	path = concatenate_strings(permanent_allocator(), path, suffix);
+	// } else if (m->pkg) {
+	// 	path = concatenate3_strings(permanent_allocator(), path, STR_LIT("-"), m->pkg->name);
+	// }
+
+	String ext = {};
+
+	if (build_context.build_mode == BuildMode_Assembly) {
+		ext = STR_LIT(".S");
+	} else {
+		if (is_arch_wasm()) {
+			ext = STR_LIT(".wasm.o");
+		} else {
+			switch (build_context.metrics.os) {
+			case TargetOs_windows:
+				ext = STR_LIT(".obj");
+				break;
+			default:
+			case TargetOs_darwin:
+			case TargetOs_linux:
+			case TargetOs_essence:
+				ext = STR_LIT(".o");
+				break;
+
+			case TargetOs_freestanding:
+				switch (build_context.metrics.abi) {
+				default:
+				case TargetABI_Default:
+				case TargetABI_SysV:
+					ext = STR_LIT(".o");
+					break;
+				case TargetABI_Win64:
+					ext = STR_LIT(".obj");
+					break;
+				}
+				break;
+			}
+		}
+	}
+
+	return concatenate_strings(permanent_allocator(), path, ext);
+}
+
+
 gb_internal bool cg_generate_code(Checker *c, LinkerData *linker_data) {
 	TIME_SECTION("Tilde Module Initializtion");
 
@@ -804,10 +859,9 @@ gb_internal bool cg_generate_code(Checker *c, LinkerData *linker_data) {
 	TB_ExportBuffer export_buffer = tb_module_object_export(m->mod, debug_format);
 	defer (tb_export_buffer_free(export_buffer));
 
-	char const *filepath_obj = "W:/Odin/tilde_main.obj";
-
-	array_add(&linker_data->output_object_paths, make_string_c(filepath_obj));
-	GB_ASSERT(tb_export_buffer_to_file(export_buffer, filepath_obj));
+	String filepath_obj = cg_filepath_obj_for_module(m);
+	array_add(&linker_data->output_object_paths, filepath_obj);
+	GB_ASSERT(tb_export_buffer_to_file(export_buffer, cast(char const *)filepath_obj.text));
 
 	return true;
 }
