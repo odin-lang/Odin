@@ -235,7 +235,24 @@ gb_internal void cg_procedure_begin(cgProcedure *p) {
 		if (e != nullptr && e->token.string.len > 0 && e->token.string != "_") {
 			// NOTE(bill): for debugging purposes only
 			String name = e->token.string;
-			tb_node_append_attrib(param_ptr, tb_function_attrib_variable(p->func, name.len, cast(char const *)name.text, debug_type));
+			TB_DebugType *param_debug_type = debug_type;
+			TB_Node *     param_ptr_to_use = param_ptr;
+			if (rule == TB_PASSING_INDIRECT) {
+				// HACK TODO(bill): this is just to get the debug information
+				TB_CharUnits ptr_size = cast(TB_CharUnits)build_context.ptr_size;
+				TB_Node *dummy_param = tb_inst_local(p->func, ptr_size, ptr_size);
+				tb_inst_store(p->func, TB_TYPE_PTR, dummy_param, param_ptr, ptr_size, false);
+				param_ptr_to_use = dummy_param;
+				param_debug_type = tb_debug_create_ptr(p->module->mod, param_debug_type);
+			}
+			tb_node_append_attrib(
+				param_ptr_to_use,
+				tb_function_attrib_variable(
+					p->func,
+					name.len, cast(char const *)name.text,
+					param_debug_type
+				)
+			);
 		}
 		cgAddr addr = cg_addr(local);
 		if (e) {
@@ -332,13 +349,20 @@ gb_internal WORKER_TASK_PROC(cg_procedure_compile_worker_proc) {
 
 	bool emit_asm = false;
 
+	if (
+	    string_starts_with(p->name, str_lit("runtime@_os_write")) ||
+	    false
+	) {
+		emit_asm = true;
+	}
+
 	TB_FunctionOutput *output = tb_module_compile_function(p->module->mod, p->func, TB_ISEL_FAST, emit_asm);
 	if (emit_asm) {
 		TB_Assembly *assembly = tb_output_get_asm(output);
 		for (TB_Assembly *node = assembly; node != nullptr; node = node->next) {
-			gb_printf_err("%.*s", cast(int)node->length, node->data);
+			fprintf(stdout, "%.*s", cast(int)node->length, node->data);
 		}
-		gb_printf_err("\n");
+		fprintf(stdout, "\n");
 	}
 
 	return 0;

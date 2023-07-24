@@ -547,7 +547,7 @@ gb_internal cgValue cg_emit_comp(cgProcedure *p, TokenKind op_kind, cgValue left
 		case Token_Gt:    res = tb_inst_cmp_igt(p->func, lhs, rhs, is_signed); break;
 		case Token_GtEq:  res = tb_inst_cmp_ige(p->func, lhs, rhs, is_signed); break;
 		case Token_Lt:    res = tb_inst_cmp_ilt(p->func, lhs, rhs, is_signed); break;
-		case Token_LtEq:  res = tb_inst_cmp_ige(p->func, lhs, rhs, is_signed); break;
+		case Token_LtEq:  res = tb_inst_cmp_ile(p->func, lhs, rhs, is_signed); break;
 		}
 
 		GB_ASSERT(res != nullptr);
@@ -562,7 +562,7 @@ gb_internal cgValue cg_emit_comp(cgProcedure *p, TokenKind op_kind, cgValue left
 		case Token_Gt:    res = tb_inst_cmp_fgt(p->func, lhs, rhs); break;
 		case Token_GtEq:  res = tb_inst_cmp_fge(p->func, lhs, rhs); break;
 		case Token_Lt:    res = tb_inst_cmp_flt(p->func, lhs, rhs); break;
-		case Token_LtEq:  res = tb_inst_cmp_fge(p->func, lhs, rhs); break;
+		case Token_LtEq:  res = tb_inst_cmp_fle(p->func, lhs, rhs); break;
 		}
 		GB_ASSERT(res != nullptr);
 		return cg_value(res, t_bool);

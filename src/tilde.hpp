@@ -256,6 +256,9 @@ gb_internal TB_Arena *cg_arena(void);
 gb_internal void cg_add_procedure_to_queue(cgProcedure *p);
 gb_internal void cg_setup_type_info_data(cgModule *m);
 
+gb_internal isize cg_global_const_calculate_region_count(ExactValue const &value, Type *type);
+gb_internal bool  cg_global_const_add_region(cgModule *m, ExactValue const &value, Type *type, TB_Global *global, i64 offset);
+
 gb_internal cgValue cg_value(TB_Global *  g,    Type *type);
 gb_internal cgValue cg_value(TB_External *e,    Type *type);
 gb_internal cgValue cg_value(TB_Function *f,    Type *type);
