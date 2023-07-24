@@ -199,6 +199,13 @@ gb_internal void cg_set_debug_pos_from_node(cgProcedure *p, Ast *node) {
 	}
 }
 
+gb_internal void cg_add_symbol(cgModule *m, Entity *e, TB_Symbol *symbol) {
+	if (e) {
+		rw_mutex_lock(&m->values_mutex);
+		map_set(&m->symbols, e, symbol);
+		rw_mutex_unlock(&m->values_mutex);
+	}
+}
 
 gb_internal void cg_add_entity(cgModule *m, Entity *e, cgValue const &val) {
 	if (e) {
@@ -221,10 +228,25 @@ gb_internal void cg_add_procedure_value(cgModule *m, cgProcedure *p) {
 	rw_mutex_lock(&m->values_mutex);
 	if (p->entity != nullptr) {
 		map_set(&m->procedure_values, p->func, p->entity);
+		if (p->symbol != nullptr) {
+			map_set(&m->symbols, p->entity, p->symbol);
+		}
 	}
 	string_map_set(&m->procedures, p->name, p);
 	rw_mutex_unlock(&m->values_mutex);
 
+}
+
+gb_internal TB_Symbol *cg_find_symbol_from_entity(cgModule *m, Entity *e) {
+	if (e) {
+		rw_mutex_lock(&m->values_mutex);
+		defer (rw_mutex_unlock(&m->values_mutex));
+		TB_Symbol **found = map_get(&m->symbols, e);
+		if (found) {
+			return *found;
+		}
+	}
+	return nullptr;
 }
 
 gb_internal isize cg_type_info_index(CheckerInfo *info, Type *type, bool err_on_not_found=true) {
@@ -449,11 +471,13 @@ gb_internal bool cg_global_variables_create(cgModule *m) {
 				var.is_initialized = true;
 			}
 		} else {
-			tb_global_set_storage(m->mod, section, global, type_size_of(e->type), type_align_of(e->type), 0);
+			i64 max_regions = cg_global_const_calculate_region_count_from_basic_type(e->type);
+			tb_global_set_storage(m->mod, section, global, type_size_of(e->type), type_align_of(e->type), max_regions);
 		}
 
 		array_add(&global_variables, var);
 
+		cg_add_symbol(m, e, cast(TB_Symbol *)global);
 		cg_add_entity(m, e, g);
 		cg_add_member(m, name, g);
 	}
@@ -478,6 +502,7 @@ gb_internal cgModule *cg_module_create(Checker *c) {
 	tb_module_set_tls_index(m->mod, 10, "_tls_index");
 
 	map_init(&m->values);
+	map_init(&m->symbols);
 
 	map_init(&m->file_id_map);
 
@@ -500,6 +525,7 @@ gb_internal cgModule *cg_module_create(Checker *c) {
 
 gb_internal void cg_module_destroy(cgModule *m) {
 	map_destroy(&m->values);
+	map_destroy(&m->symbols);
 	map_destroy(&m->file_id_map);
 	map_destroy(&m->debug_type_map);
 	map_destroy(&m->proc_debug_type_map);

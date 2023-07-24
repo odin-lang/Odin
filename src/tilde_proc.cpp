@@ -103,6 +103,8 @@ gb_internal cgProcedure *cg_procedure_create(cgModule *m, Entity *entity, bool i
 	}
 
 	p->value = cg_value(p->symbol, p->type);
+
+	cg_add_symbol(m, entity, p->symbol);
 	cg_add_entity(m, entity, p->value);
 	cg_add_member(m, p->name, p->value);
 	cg_add_procedure_value(m, p);

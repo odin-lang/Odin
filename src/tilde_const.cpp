@@ -143,6 +143,33 @@ gb_internal TB_Global *cg_global_const_string(cgModule *m, String const &str, Ty
 	return global;
 }
 
+gb_internal void cg_global_source_code_location_const(cgModule *m, String const &proc_name, TokenPos pos, TB_Global *global, i64 offset) {
+	// Source_Code_Location :: struct {
+	// 	file_path:    string,
+	// 	line, column: i32,
+	// 	procedure:    string,
+	// }
+
+	i64 file_path_offset = type_offset_of(t_source_code_location, 0);
+	i64 line_offset      = type_offset_of(t_source_code_location, 1);
+	i64 column_offset    = type_offset_of(t_source_code_location, 2);
+	i64 procedure_offset = type_offset_of(t_source_code_location, 3);
+
+	String file_path = get_file_path_string(pos.file_id);
+	if (file_path.len != 0) {
+		cg_global_const_string(m, file_path, t_string, global, offset+file_path_offset);
+	}
+
+	void *line_ptr   = tb_global_add_region(m->mod, global, offset+line_offset,   4);
+	void *column_ptr = tb_global_add_region(m->mod, global, offset+column_offset, 4);
+	cg_write_int_at_ptr(line_ptr,   pos.line,   t_i32);
+	cg_write_int_at_ptr(column_ptr, pos.column, t_i32);
+
+	if (proc_name.len != 0) {
+		cg_global_const_string(m, proc_name, t_string, global, offset+procedure_offset);
+	}
+}
+
 gb_internal bool cg_elem_type_can_be_constant(Type *t) {
 	t = base_type(t);
 	if (t == t_invalid) {
@@ -201,10 +228,11 @@ gb_internal i64 cg_global_const_calculate_region_count_from_basic_type(Type *typ
 		return 1;
 	case Type_Pointer:
 	case Type_MultiPointer:
+		return 2; // allows for offsets
 	case Type_Proc:
-		return true;
+		return 1;
 	case Type_Slice:
-		return 2;
+		return 3; // alows for offsets
 	case Type_DynamicArray:
 		return 5;
 	case Type_Map:
@@ -220,6 +248,46 @@ gb_internal i64 cg_global_const_calculate_region_count_from_basic_type(Type *typ
 		return 1; // technically 1
 	case Type_Matrix:
 		return 1;
+
+	case Type_Array:
+		{
+			Type *elem = type->Array.elem;
+			i64 count = cg_global_const_calculate_region_count_from_basic_type(elem);
+			return count*type->Array.count;
+		}
+	case Type_EnumeratedArray:
+		{
+			Type *elem = type->EnumeratedArray.elem;
+			i64 count = cg_global_const_calculate_region_count_from_basic_type(elem);
+			return count*type->EnumeratedArray.count;
+		}
+
+	case Type_Struct:
+		if (type->Struct.is_raw_union) {
+			i64 max_count = 0;
+			for (Entity *f : type->Struct.fields) {
+				i64 count = cg_global_const_calculate_region_count_from_basic_type(f->type);
+				max_count = gb_max(count, max_count);
+			}
+			return max_count;
+		} else {
+			i64 max_count = 0;
+			for (Entity *f : type->Struct.fields) {
+				max_count += cg_global_const_calculate_region_count_from_basic_type(f->type);
+			}
+			return max_count;
+		}
+		break;
+	case Type_Union:
+		{
+			i64 max_count = 0;
+			for (Type *t : type->Union.variants) {
+				i64 count = cg_global_const_calculate_region_count_from_basic_type(t);
+				max_count = gb_max(count, max_count);
+			}
+			return max_count+1;
+		}
+		break;
 
 	default:
 		GB_PANIC("TODO(bill): %s", type_to_string(type));
