@@ -396,7 +396,7 @@ gb_internal void cg_procedure_generate(cgProcedure *p) {
 
 
 	if (
-	    // string_starts_with(p->name, str_lit("runtime@_os_write")) ||
+	    // string_starts_with(p->name, str_lit("bug@main")) ||
 	    false
 	) { // IR Printing
 		TB_Arena *arena = tb_default_arena();

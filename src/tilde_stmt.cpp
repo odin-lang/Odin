@@ -1280,6 +1280,25 @@ gb_internal void cg_emit_increment(cgProcedure *p, cgValue addr) {
 
 }
 
+gb_internal void cg_range_stmt_store_val(cgProcedure *p, Ast *stmt_val, cgValue const &value) {
+	Entity *e = entity_of_node(stmt_val);
+	if (e == nullptr) {
+		return;
+	}
+
+	if (e->flags & EntityFlag_Value) {
+		if (value.kind == cgValue_Addr) {
+			cgValue ptr = cg_address_from_load_or_generate_local(p, value);
+			cg_add_entity(p->module, e, ptr);
+			return;
+		}
+	}
+
+	cgAddr addr = cg_add_local(p, e->type, e, false);
+	cg_addr_store(p, addr, value);
+	return;
+}
+
 gb_internal void cg_build_range_stmt_interval(cgProcedure *p, AstBinaryExpr *node,
                                               AstRangeStmt *rs, Scope *scope) {
 	bool ADD_EXTRA_WRAPPING_CHECK = true;
@@ -1341,27 +1360,8 @@ gb_internal void cg_build_range_stmt_interval(cgProcedure *p, AstBinaryExpr *nod
 	cgValue val = cg_addr_load(p, value);
 	cgValue idx = cg_addr_load(p, index);
 
-	auto const &store_val = [](cgProcedure *p, Ast *stmt_val, cgValue const &value) {
-		Entity *e = entity_of_node(stmt_val);
-		if (e == nullptr) {
-			return;
-		}
-
-		if (e->flags & EntityFlag_Value) {
-			if (value.kind == cgValue_Addr) {
-				cgValue ptr = cg_address_from_load_or_generate_local(p, value);
-				cg_add_entity(p->module, e, ptr);
-				return;
-			}
-		}
-
-		cgAddr addr = cg_add_local(p, e->type, e, false);
-		cg_addr_store(p, addr, value);
-		return;
-	};
-
-	if (val0_type) store_val(p, val0, val);
-	if (val1_type) store_val(p, val1, idx);
+	if (val0_type) cg_range_stmt_store_val(p, val0, val);
+	if (val1_type) cg_range_stmt_store_val(p, val1, idx);
 
 
 	{
@@ -1402,6 +1402,147 @@ gb_internal void cg_build_range_stmt_interval(cgProcedure *p, AstBinaryExpr *nod
 	}
 
 	tb_inst_set_control(p->func, done);
+}
+
+gb_internal void cg_build_range_stmt_indexed(cgProcedure *p, cgValue expr, Type *val_type, cgValue count_ptr,
+                                             cgValue *val_, cgValue *idx_, TB_Node **loop_, TB_Node **done_,
+                                             bool is_reverse) {
+	cgValue count = {};
+	Type *expr_type = base_type(type_deref(expr.type));
+	switch (expr_type->kind) {
+	case Type_Array:
+		count = cg_const_int(p, t_int, expr_type->Array.count);
+		break;
+	}
+
+	cgValue val = {};
+	cgValue idx = {};
+	TB_Node *loop = nullptr;
+	TB_Node *done = nullptr;
+	TB_Node *body = nullptr;
+
+	loop = cg_control_region(p, "for_index_loop");
+	body = cg_control_region(p, "for_index_body");
+	done = cg_control_region(p, "for_index_done");
+
+	cgAddr index = cg_add_local(p, t_int, nullptr, false);
+
+	if (!is_reverse) {
+		/*
+			for x, i in array {
+				...
+			}
+
+			i := -1
+			for {
+				i += 1
+				if !(i < len(array)) {
+					break
+				}
+				#no_bounds_check x := array[i]
+				...
+			}
+		*/
+
+		cg_addr_store(p, index, cg_const_int(p, t_int, cast(u64)-1));
+
+		cg_emit_goto(p, loop);
+		tb_inst_set_control(p->func, loop);
+
+		cgValue incr = cg_emit_arith(p, Token_Add, cg_addr_load(p, index), cg_const_int(p, t_int, 1), t_int);
+		cg_addr_store(p, index, incr);
+
+		if (count.node == nullptr) {
+			GB_ASSERT(count_ptr.node != nullptr);
+			count = cg_emit_load(p, count_ptr);
+		}
+		cgValue cond = cg_emit_comp(p, Token_Lt, incr, count);
+		cg_emit_if(p, cond, body, done);
+	} else {
+		// NOTE(bill): REVERSED LOGIC
+		/*
+			#reverse for x, i in array {
+				...
+			}
+
+			i := len(array)
+			for {
+				i -= 1
+				if i < 0 {
+					break
+				}
+				#no_bounds_check x := array[i]
+				...
+			}
+		*/
+
+		if (count.node == nullptr) {
+			GB_ASSERT(count_ptr.node != nullptr);
+			count = cg_emit_load(p, count_ptr);
+		}
+		count = cg_emit_conv(p, count, t_int);
+		cg_addr_store(p, index, count);
+
+		cg_emit_goto(p, loop);
+		tb_inst_set_control(p->func, loop);
+
+		cgValue incr = cg_emit_arith(p, Token_Sub, cg_addr_load(p, index), cg_const_int(p, t_int, 1), t_int);
+		cg_addr_store(p, index, incr);
+
+		cgValue anti_cond = cg_emit_comp(p, Token_Lt, incr, cg_const_int(p, t_int, 0));
+		cg_emit_if(p, anti_cond, done, body);
+	}
+
+	tb_inst_set_control(p->func, body);
+
+	idx = cg_addr_load(p, index);
+	switch (expr_type->kind) {
+	case Type_Array: {
+		if (val_type != nullptr) {
+			val = cg_emit_load(p, cg_emit_array_ep(p, expr, idx));
+		}
+		break;
+	}
+	case Type_EnumeratedArray: {
+		if (val_type != nullptr) {
+			val = cg_emit_load(p, cg_emit_array_ep(p, expr, idx));
+			// NOTE(bill): Override the idx value for the enumeration
+			Type *index_type = expr_type->EnumeratedArray.index;
+			if (compare_exact_values(Token_NotEq, *expr_type->EnumeratedArray.min_value, exact_value_u64(0))) {
+				idx = cg_emit_arith(p, Token_Add, idx, cg_const_value(p, index_type, *expr_type->EnumeratedArray.min_value), index_type);
+			}
+		}
+		break;
+	}
+	case Type_Slice: {
+		if (val_type != nullptr) {
+			cgValue elem = cg_builtin_raw_data(p, expr);
+			val = cg_emit_load(p, cg_emit_ptr_offset(p, elem, idx));
+		}
+		break;
+	}
+	case Type_DynamicArray: {
+		if (val_type != nullptr) {
+			cgValue elem = cg_emit_struct_ep(p, expr, 0);
+			elem = cg_emit_load(p, elem);
+			val = cg_emit_load(p, cg_emit_ptr_offset(p, elem, idx));
+		}
+		break;
+	}
+	case Type_Struct: {
+		GB_ASSERT(is_type_soa_struct(expr_type));
+		break;
+	}
+
+	default:
+		GB_PANIC("Cannot do range_indexed of %s", type_to_string(expr_type));
+		break;
+	}
+
+	if (val_)  *val_  = val;
+	if (idx_)  *idx_  = idx;
+	if (loop_) *loop_ = loop;
+	if (done_) *done_ = done;
 
 }
 
@@ -1410,13 +1551,144 @@ gb_internal void cg_build_range_stmt(cgProcedure *p, Ast *node) {
 
 	Ast *expr = unparen_expr(rs->expr);
 
-
 	if (is_ast_range(expr)) {
 		cg_build_range_stmt_interval(p, &expr->BinaryExpr, rs, rs->scope);
 		return;
 	}
 
-	GB_PANIC("TODO(bill): cg_build_range_stmt");
+	Type *expr_type = type_of_expr(expr);
+	if (expr_type != nullptr) {
+		Type *et = base_type(type_deref(expr_type));
+	 	if (is_type_soa_struct(et)) {
+	 		GB_PANIC("TODO(bill): #soa array range statements");
+			// cg_build_range_stmt_struct_soa(p, rs, scope);
+			return;
+		}
+	}
+
+	cg_scope_open(p, rs->scope);
+
+
+	Ast *val0 = rs->vals.count > 0 ? cg_strip_and_prefix(rs->vals[0]) : nullptr;
+	Ast *val1 = rs->vals.count > 1 ? cg_strip_and_prefix(rs->vals[1]) : nullptr;
+	Type *val0_type = nullptr;
+	Type *val1_type = nullptr;
+	if (val0 != nullptr && !is_blank_ident(val0)) {
+		val0_type = type_of_expr(val0);
+	}
+	if (val1 != nullptr && !is_blank_ident(val1)) {
+		val1_type = type_of_expr(val1);
+	}
+
+	cgValue val = {};
+	cgValue key = {};
+	TB_Node *loop = nullptr;
+	TB_Node *done = nullptr;
+	bool is_map = false;
+	TypeAndValue tav = type_and_value_of_expr(expr);
+
+	if (tav.mode == Addressing_Type) {
+		GB_PANIC("TODO(bill): range statement over enum type");
+	} else {
+		Type *expr_type = type_of_expr(expr);
+		Type *et = base_type(type_deref(expr_type));
+		switch (et->kind) {
+		case Type_Map: {
+			is_map = true;
+			cgValue map = cg_build_addr_ptr(p, expr);
+			if (is_type_pointer(type_deref(map.type))) {
+				map = cg_emit_load(p, map);
+			}
+			GB_PANIC("TODO(bill): cg_build_range_map");
+			// cg_build_range_map(p, map, val1_type, &val, &key, &loop, &done);
+			break;
+		}
+		case Type_Array: {
+			cgValue array = cg_build_addr_ptr(p, expr);
+			if (is_type_pointer(type_deref(array.type))) {
+				array = cg_emit_load(p, array);
+			}
+			cgAddr count_ptr = cg_add_local(p, t_int, nullptr, false);
+			cg_addr_store(p, count_ptr, cg_const_int(p, t_int, et->Array.count));
+			cg_build_range_stmt_indexed(p, array, val0_type, count_ptr.addr, &val, &key, &loop, &done, rs->reverse);
+			break;
+		}
+		case Type_EnumeratedArray: {
+			cgValue array = cg_build_addr_ptr(p, expr);
+			if (is_type_pointer(type_deref(array.type))) {
+				array = cg_emit_load(p, array);
+			}
+			cgAddr count_ptr = cg_add_local(p, t_int, nullptr, false);
+			cg_addr_store(p, count_ptr, cg_const_int(p, t_int, et->EnumeratedArray.count));
+			cg_build_range_stmt_indexed(p, array, val0_type, count_ptr.addr, &val, &key, &loop, &done, rs->reverse);
+			break;
+		}
+		case Type_DynamicArray: {
+			cgValue count_ptr = {};
+			cgValue array = cg_build_addr_ptr(p, expr);
+			if (is_type_pointer(type_deref(array.type))) {
+				array = cg_emit_load(p, array);
+			}
+			count_ptr = cg_emit_struct_ep(p, array, 1);
+			GB_PANIC("TODO(bill): cg_build_range_stmt_indexed");
+			// cg_build_range_stmt_indexed(p, array, val0_type, count_ptr, &val, &key, &loop, &done, rs->reverse);
+			break;
+		}
+		case Type_Slice: {
+			cgValue count_ptr = {};
+			cgValue slice = cg_build_expr(p, expr);
+			if (is_type_pointer(slice.type)) {
+				count_ptr = cg_emit_struct_ep(p, slice, 1);
+				slice = cg_emit_load(p, slice);
+			} else {
+				count_ptr = cg_add_local(p, t_int, nullptr, false).addr;
+				cg_emit_store(p, count_ptr, cg_builtin_len(p, slice));
+			}
+			cg_build_range_stmt_indexed(p, slice, val0_type, count_ptr, &val, &key, &loop, &done, rs->reverse);
+			break;
+		}
+		case Type_Basic: {
+			cgValue string = cg_build_expr(p, expr);
+			if (is_type_pointer(string.type)) {
+				string = cg_emit_load(p, string);
+			}
+			if (is_type_untyped(expr_type)) {
+				cgAddr s = cg_add_local(p, default_type(string.type), nullptr, false);
+				cg_addr_store(p, s, string);
+				string = cg_addr_load(p, s);
+			}
+			Type *t = base_type(string.type);
+			GB_ASSERT(!is_type_cstring(t));
+			GB_PANIC("TODO(bill): cg_build_range_string");
+			// cg_build_range_string(p, string, val0_type, &val, &key, &loop, &done, rs->reverse);
+			break;
+		}
+		case Type_Tuple:
+			GB_PANIC("TODO(bill): cg_build_range_tuple");
+			// cg_build_range_tuple(p, expr, val0_type, val1_type, &val, &key, &loop, &done);
+			break;
+		default:
+			GB_PANIC("Cannot range over %s", type_to_string(expr_type));
+			break;
+		}
+	}
+
+	if (is_map) {
+		if (val0_type) cg_range_stmt_store_val(p, val0, key);
+		if (val1_type) cg_range_stmt_store_val(p, val1, val);
+	} else {
+		if (val0_type) cg_range_stmt_store_val(p, val0, val);
+		if (val1_type) cg_range_stmt_store_val(p, val1, key);
+	}
+
+	cg_push_target_list(p, rs->label, done, loop, nullptr);
+
+	cg_build_stmt(p, rs->body);
+
+	cg_scope_close(p, cgDeferExit_Default, nullptr);
+	cg_pop_target_list(p);
+	cg_emit_goto(p, loop);
+	tb_inst_set_control(p->func, done);
 }
 
 gb_internal bool cg_switch_stmt_can_be_trivial_jump_table(AstSwitchStmt *ss) {

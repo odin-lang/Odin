@@ -2417,22 +2417,20 @@ cgAddr cg_build_addr_compound_lit(cgProcedure *p, Ast *expr) {
 	// 	break;
 	// }
 
-	// case Type_Array: {
-	// 	cg_addr_store(p, v, cg_const_value(p->module, type, exact_value_compound(expr)));
+	case Type_Array: {
+		auto temp_data = array_make<cgCompoundLitElemTempData>(temporary_allocator(), 0, cl->elems.count);
 
-	// 	auto temp_data = array_make<cgCompoundLitElemTempData>(temporary_allocator(), 0, cl->elems.count);
+		populate(p, cl->elems, &temp_data, type);
 
-	// 	populate(p, cl->elems, &temp_data, type);
+		cgValue dst_ptr = cg_addr_get_ptr(p, v);
+		for_array(i, temp_data) {
+			i32 index = cast(i32)(temp_data[i].elem_index);
+			temp_data[i].gep = cg_emit_array_epi(p, dst_ptr, index);
+		}
 
-	// 	cgValue dst_ptr = cg_addr_get_ptr(p, v);
-	// 	for_array(i, temp_data) {
-	// 		i32 index = cast(i32)(temp_data[i].elem_index);
-	// 		temp_data[i].gep = cg_emit_array_epi(p, dst_ptr, index);
-	// 	}
-
-	// 	assign_array(p, temp_data);
-	// 	break;
-	// }
+		assign_array(p, temp_data);
+		break;
+	}
 	// case Type_EnumeratedArray: {
 	// 	cg_addr_store(p, v, cg_const_value(p->module, type, exact_value_compound(expr)));
 
@@ -2468,7 +2466,7 @@ cgAddr cg_build_addr_compound_lit(cgProcedure *p, Ast *expr) {
 		}
 
 		assign_array(p, temp_data);
-		cg_fill_slice(p, v, data, cg_const_int(p, t_int, cl->max_count));
+		cg_fill_slice(p, v, data, cg_const_int(p, t_int, count));
 		return v;
 	}
 
