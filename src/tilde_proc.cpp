@@ -677,6 +677,12 @@ gb_internal cgValue cg_emit_call(cgProcedure * p, cgValue value, Slice<cgValue> 
 	return cg_value_multi(multi, pt->results);
 }
 
+gb_internal cgValue cg_emit_runtime_call(cgProcedure *p, char const *name, Slice<cgValue> const &args) {
+	AstPackage *pkg = p->module->info->runtime_package;
+	Entity *e = scope_lookup_current(pkg->scope, make_string_c(name));
+	cgValue value = cg_find_procedure_value_from_entity(p->module, e);
+	return cg_emit_call(p, value, args);
+}
 
 gb_internal cgValue cg_handle_param_value(cgProcedure *p, Type *parameter_type, ParameterValue const &param_value, TokenPos const &pos) {
 	switch (param_value.kind) {

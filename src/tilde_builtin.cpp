@@ -236,7 +236,6 @@ gb_internal cgValue cg_builtin_mem_copy_non_overlapping(cgProcedure *p, cgValue 
 }
 
 
-
 gb_internal cgValue cg_build_builtin(cgProcedure *p, BuiltinProcId id, Ast *expr) {
 	ast_node(ce, CallExpr, expr);
 
@@ -417,6 +416,21 @@ gb_internal cgValue cg_build_builtin(cgProcedure *p, BuiltinProcId id, Ast *expr
 			cgValue diff = cg_emit_arith(p, Token_Sub, ptr0, ptr1, t_uintptr);
 			diff = cg_emit_conv(p, diff, t_int);
 			return cg_emit_arith(p, Token_Quo, diff, cg_const_int(p, t_int, type_size_of(elem)), t_int);
+		}
+
+	case BuiltinProc_type_info_of:
+		{
+			Ast *arg = ce->args[0];
+			TypeAndValue tav = type_and_value_of_expr(arg);
+			if (tav.mode == Addressing_Type) {
+				Type *t = default_type(type_of_expr(arg));
+				return cg_type_info(p, t);
+			}
+			GB_ASSERT(is_type_typeid(tav.type));
+
+			auto args = slice_make<cgValue>(permanent_allocator(), 1);
+			args[0] = cg_build_expr(p, arg);
+			return cg_emit_runtime_call(p, "__type_info_of", args);
 		}
 
 	}

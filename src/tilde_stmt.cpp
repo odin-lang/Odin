@@ -1630,8 +1630,7 @@ gb_internal void cg_build_range_stmt(cgProcedure *p, Ast *node) {
 				array = cg_emit_load(p, array);
 			}
 			count_ptr = cg_emit_struct_ep(p, array, 1);
-			GB_PANIC("TODO(bill): cg_build_range_stmt_indexed");
-			// cg_build_range_stmt_indexed(p, array, val0_type, count_ptr, &val, &key, &loop, &done, rs->reverse);
+			cg_build_range_stmt_indexed(p, array, val0_type, count_ptr, &val, &key, &loop, &done, rs->reverse);
 			break;
 		}
 		case Type_Slice: {

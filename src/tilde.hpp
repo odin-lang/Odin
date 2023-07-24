@@ -301,7 +301,7 @@ gb_internal void cg_build_return_stmt(cgProcedure *p, Slice<Ast *> const &return
 gb_internal void cg_build_return_stmt_internal(cgProcedure *p, Slice<cgValue> const &results);
 gb_internal void cg_build_range_stmt(cgProcedure *p, Ast *node);
 
-
+gb_internal cgValue cg_find_value_from_entity(cgModule *m, Entity *e);
 gb_internal cgValue cg_find_procedure_value_from_entity(cgModule *m, Entity *e);
 
 gb_internal TB_DebugType *cg_debug_type(cgModule *m, Type *type);
@@ -321,6 +321,9 @@ gb_internal cgValue cg_emit_conv(cgProcedure *p, cgValue value, Type *t);
 gb_internal cgValue cg_emit_comp_against_nil(cgProcedure *p, TokenKind op_kind, cgValue x);
 gb_internal cgValue cg_emit_comp(cgProcedure *p, TokenKind op_kind, cgValue left, cgValue right);
 gb_internal cgValue cg_emit_arith(cgProcedure *p, TokenKind op, cgValue lhs, cgValue rhs, Type *type);
+
+gb_internal cgValue cg_emit_call(cgProcedure * p, cgValue value, Slice<cgValue> const &args);
+gb_internal cgValue cg_emit_runtime_call(cgProcedure *p, char const *name, Slice<cgValue> const &args);
 
 gb_internal bool    cg_emit_goto(cgProcedure *p, TB_Node *control_region);
 

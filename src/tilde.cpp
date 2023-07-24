@@ -243,6 +243,24 @@ gb_internal isize cg_type_info_index(CheckerInfo *info, Type *type, bool err_on_
 	return -1;
 }
 
+gb_internal cgValue cg_global_type_info_data_ptr(cgProcedure *p) {
+	cgValue v = cg_find_value_from_entity(p->module, cg_global_type_info_data_entity);
+	return cg_flatten_value(p, v);
+}
+
+
+gb_internal cgValue cg_type_info(cgProcedure *p, Type *type) {
+	GB_ASSERT(!build_context.no_rtti);
+
+	type = default_type(type);
+
+	isize index = cg_type_info_index(p->module->info, type);
+	GB_ASSERT(index >= 0);
+
+	cgValue data = cg_global_type_info_data_ptr(p);
+	return cg_emit_array_epi(p, data, index);
+}
+
 
 gb_internal u64 cg_typeid_as_u64(cgModule *m, Type *type) {
 	GB_ASSERT(!build_context.no_rtti);

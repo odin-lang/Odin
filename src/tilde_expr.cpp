@@ -191,7 +191,46 @@ gb_internal cgValue cg_emit_transmute(cgProcedure *p, cgValue value, Type *type)
 		GB_ASSERT_MSG(!TB_IS_VOID_TYPE(dt), "%d %s -> %s", dt.type, type_to_string(value.type), type_to_string(type));
 		value.type = type;
 		if (value.node->dt.raw != dt.raw) {
-			value.node = tb_inst_bitcast(p->func, value.node, dt);
+			switch (value.node->dt.type) {
+			case TB_INT:
+				switch (value.node->dt.type) {
+				case TB_INT:
+					break;
+				case TB_FLOAT:
+					value.node = tb_inst_bitcast(p->func, value.node, dt);
+					break;
+				case TB_PTR:
+					value.node = tb_inst_int2ptr(p->func, value.node);
+					break;
+				}
+				break;
+			case TB_FLOAT:
+				switch (value.node->dt.type) {
+				case TB_INT:
+					value.node = tb_inst_bitcast(p->func, value.node, dt);
+					break;
+				case TB_FLOAT:
+					break;
+				case TB_PTR:
+					value.node = tb_inst_bitcast(p->func, value.node, TB_TYPE_INTPTR);
+					value.node = tb_inst_int2ptr(p->func, value.node);
+					break;
+				}
+				break;
+			case TB_PTR:
+				switch (value.node->dt.type) {
+				case TB_INT:
+					value.node = tb_inst_ptr2int(p->func, value.node, dt);
+					break;
+				case TB_FLOAT:
+					value.node = tb_inst_ptr2int(p->func, value.node, TB_TYPE_INTPTR);
+					value.node = tb_inst_bitcast(p->func, value.node, dt);
+					break;
+				case TB_PTR:
+					break;
+				}
+				break;
+			}
 		}
 		return value;
 	case cgValue_Addr:
