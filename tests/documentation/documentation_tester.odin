@@ -238,10 +238,10 @@ find_and_add_examples :: proc(docs: string, package_name: string, entity_name: s
 			}
 		}
 		// Remove first layer of tabs which are always present
-		for line in &example_block.lines {
+		for &line in example_block.lines {
 			line = strings.trim_prefix(line, "\t")
 		}
-		for line in &output_block.lines {
+		for &line in output_block.lines {
 			line = strings.trim_prefix(line, "\t")
 		}
 		append(&g_examples_to_verify, Example_Test {
@@ -290,7 +290,7 @@ _bad_test_found: bool
 
 @(private="file")
 _spawn_pipe_reader :: proc() {
-	thread.create_and_start(proc(^thread.Thread) {
+	thread.run(proc() {
 		stream := os.stream_from_handle(_read_pipe)
 		reader := io.to_reader(stream)
 		sync.post(&_pipe_reader_semaphore) // notify thread is ready

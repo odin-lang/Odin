@@ -50,7 +50,7 @@ Player :: struct {
 	player_num: c.int,
 	using u: struct #raw_union {
 		local: struct {},
-		remove: struct {
+		remote: struct {
 			ip_address: [32]byte,
 			port: u16,
 		},

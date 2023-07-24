@@ -335,7 +335,7 @@ load_from_context :: proc(z: ^$C, buf: ^bytes.Buffer, known_gzip_size := -1, exp
 
 	// fmt.printf("GZIP: Expected Payload Size: %v\n", expected_output_size);
 
-	zlib_error := zlib.inflate_raw(z=z, expected_output_size=expected_output_size)
+	zlib_error := zlib.inflate_raw(z, expected_output_size=expected_output_size)
 	if zlib_error != nil {
 		return zlib_error
 	}

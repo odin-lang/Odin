@@ -3299,12 +3299,39 @@ void const *gb_memrchr(void const *data, u8 c, isize n) {
 
 
 
-gb_inline void *gb_alloc_align (gbAllocator a, isize size, isize alignment)                                { return a.proc(a.data, gbAllocation_Alloc, size, alignment, NULL, 0, GB_DEFAULT_ALLOCATOR_FLAGS); }
-gb_inline void *gb_alloc       (gbAllocator a, isize size)                                                 { return gb_alloc_align(a, size, GB_DEFAULT_MEMORY_ALIGNMENT); }
-gb_inline void  gb_free        (gbAllocator a, void *ptr)                                                  { if (ptr != NULL) a.proc(a.data, gbAllocation_Free, 0, 0, ptr, 0, GB_DEFAULT_ALLOCATOR_FLAGS); }
-gb_inline void  gb_free_all    (gbAllocator a)                                                             { a.proc(a.data, gbAllocation_FreeAll, 0, 0, NULL, 0, GB_DEFAULT_ALLOCATOR_FLAGS); }
-gb_inline void *gb_resize      (gbAllocator a, void *ptr, isize old_size, isize new_size)                  { return gb_resize_align(a, ptr, old_size, new_size, GB_DEFAULT_MEMORY_ALIGNMENT); }
-gb_inline void *gb_resize_align(gbAllocator a, void *ptr, isize old_size, isize new_size, isize alignment) { return a.proc(a.data, gbAllocation_Resize, new_size, alignment, ptr, old_size, GB_DEFAULT_ALLOCATOR_FLAGS); }
+gb_inline void *gb_alloc_align (gbAllocator a, isize size, isize alignment) {
+	if (size == 0) {
+		return NULL;
+	}
+	return a.proc(a.data, gbAllocation_Alloc, size, alignment, NULL, 0, GB_DEFAULT_ALLOCATOR_FLAGS);
+}
+gb_inline void *gb_alloc(gbAllocator a, isize size) {
+	return gb_alloc_align(a, size, GB_DEFAULT_MEMORY_ALIGNMENT);
+}
+gb_inline void  gb_free(gbAllocator a, void *ptr) {
+	if (ptr != NULL) {
+		a.proc(a.data, gbAllocation_Free, 0, 0, ptr, 0, GB_DEFAULT_ALLOCATOR_FLAGS);
+	}
+}
+gb_inline void  gb_free_all(gbAllocator a) {
+	a.proc(a.data, gbAllocation_FreeAll, 0, 0, NULL, 0, GB_DEFAULT_ALLOCATOR_FLAGS);
+}
+gb_inline void *gb_resize(gbAllocator a, void *ptr, isize old_size, isize new_size) {
+	return gb_resize_align(a, ptr, old_size, new_size, GB_DEFAULT_MEMORY_ALIGNMENT);
+}
+gb_inline void *gb_resize_align(gbAllocator a, void *ptr, isize old_size, isize new_size, isize alignment) {
+	if (new_size == 0) {
+		if (ptr != NULL) {
+			return a.proc(a.data, gbAllocation_Free, 0, 0, ptr, old_size, GB_DEFAULT_ALLOCATOR_FLAGS);
+		}
+		return NULL;
+	} else if (ptr == NULL) {
+		return a.proc(a.data, gbAllocation_Alloc, new_size, alignment, NULL, 0, GB_DEFAULT_ALLOCATOR_FLAGS);
+	} else if (old_size == new_size && ((uintptr)ptr % (uintptr)alignment) == 0) {
+		return ptr;
+	}
+	return a.proc(a.data, gbAllocation_Resize, new_size, alignment, ptr, old_size, GB_DEFAULT_ALLOCATOR_FLAGS);
+}
 
 gb_inline void *gb_alloc_copy      (gbAllocator a, void const *src, isize size) {
 	return gb_memcopy(gb_alloc(a, size), src, size);

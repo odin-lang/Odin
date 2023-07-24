@@ -123,7 +123,7 @@ register_user_formatter :: proc(id: typeid, formatter: User_Formatter) -> Regist
 aprint :: proc(args: ..any, sep := " ") -> string {
 	str: strings.Builder
 	strings.builder_init(&str)
-	sbprint(buf=&str, args=args, sep=sep)
+	sbprint(&str, ..args, sep=sep)
 	return strings.to_string(str)
 }
 // 	Creates a formatted string with a newline character at the end
@@ -139,7 +139,7 @@ aprint :: proc(args: ..any, sep := " ") -> string {
 aprintln :: proc(args: ..any, sep := " ") -> string {
 	str: strings.Builder
 	strings.builder_init(&str)
-	sbprintln(buf=&str, args=args, sep=sep)
+	sbprintln(&str, ..args, sep=sep)
 	return strings.to_string(str)
 }
 // 	Creates a formatted string using a format string and arguments
@@ -171,7 +171,7 @@ aprintf :: proc(fmt: string, args: ..any) -> string {
 tprint :: proc(args: ..any, sep := " ") -> string {
 	str: strings.Builder
 	strings.builder_init(&str, context.temp_allocator)
-	sbprint(buf=&str, args=args, sep=sep)
+	sbprint(&str, ..args, sep=sep)
 	return strings.to_string(str)
 }
 // 	Creates a formatted string with a newline character at the end
@@ -187,7 +187,7 @@ tprint :: proc(args: ..any, sep := " ") -> string {
 tprintln :: proc(args: ..any, sep := " ") -> string {
 	str: strings.Builder
 	strings.builder_init(&str, context.temp_allocator)
-	sbprintln(buf=&str, args=args, sep=sep)
+	sbprintln(&str, ..args, sep=sep)
 	return strings.to_string(str)
 }
 // 	Creates a formatted string using a format string and arguments
@@ -217,7 +217,7 @@ tprintf :: proc(fmt: string, args: ..any) -> string {
 //
 bprint :: proc(buf: []byte, args: ..any, sep := " ") -> string {
 	sb := strings.builder_from_bytes(buf[0:len(buf)])
-	return sbprint(buf=&sb, args=args, sep=sep)
+	return sbprint(&sb, ..args, sep=sep)
 }
 // Creates a formatted string using a supplied buffer as the backing array, appends newline. Writes into the buffer.
 //
@@ -230,7 +230,7 @@ bprint :: proc(buf: []byte, args: ..any, sep := " ") -> string {
 //
 bprintln :: proc(buf: []byte, args: ..any, sep := " ") -> string {
 	sb := strings.builder_from_bytes(buf[0:len(buf)])
-	return sbprintln(buf=&sb, args=args, sep=sep)
+	return sbprintln(&sb, ..args, sep=sep)
 }
 // Creates a formatted string using a supplied buffer as the backing array. Writes into the buffer.
 //
@@ -327,7 +327,7 @@ ctprintf :: proc(format: string, args: ..any) -> cstring {
 // Returns: A formatted string
 //
 sbprint :: proc(buf: ^strings.Builder, args: ..any, sep := " ") -> string {
-	wprint(w=strings.to_writer(buf), args=args, sep=sep)
+	wprint(strings.to_writer(buf), ..args, sep=sep)
 	return strings.to_string(buf^)
 }
 // Formats and writes to a strings.Builder buffer using the default print settings
@@ -340,7 +340,7 @@ sbprint :: proc(buf: ^strings.Builder, args: ..any, sep := " ") -> string {
 // Returns: The resulting formatted string
 //
 sbprintln :: proc(buf: ^strings.Builder, args: ..any, sep := " ") -> string {
-	wprintln(w=strings.to_writer(buf), args=args, sep=sep)
+	wprintln(strings.to_writer(buf), ..args, sep=sep)
 	return strings.to_string(buf^)
 }
 // Formats and writes to a strings.Builder buffer according to the specified format string
@@ -353,7 +353,7 @@ sbprintln :: proc(buf: ^strings.Builder, args: ..any, sep := " ") -> string {
 // Returns: The resulting formatted string
 //
 sbprintf :: proc(buf: ^strings.Builder, fmt: string, args: ..any) -> string {
-	wprintf(w=strings.to_writer(buf), fmt=fmt, args=args)
+	wprintf(strings.to_writer(buf), fmt, ..args)
 	return strings.to_string(buf^)
 }
 // Formats and writes to an io.Writer using the default print settings

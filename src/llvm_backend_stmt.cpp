@@ -619,6 +619,18 @@ gb_internal void lb_build_range_string(lbProcedure *p, lbValue expr, Type *val_t
 }
 
 
+gb_internal Ast *lb_strip_and_prefix(Ast *ident) {
+	if (ident != nullptr) {
+		if (ident->kind == Ast_UnaryExpr && ident->UnaryExpr.op.kind == Token_And) {
+			ident = ident->UnaryExpr.expr;
+		}
+		GB_ASSERT(ident->kind == Ast_Ident);
+	}
+	return ident;
+}
+
+
+
 gb_internal void lb_build_range_interval(lbProcedure *p, AstBinaryExpr *node,
                                          AstRangeStmt *rs, Scope *scope) {
 	bool ADD_EXTRA_WRAPPING_CHECK = true;
@@ -627,13 +639,15 @@ gb_internal void lb_build_range_interval(lbProcedure *p, AstBinaryExpr *node,
 
 	lb_open_scope(p, scope);
 
+	Ast *val0 = rs->vals.count > 0 ? lb_strip_and_prefix(rs->vals[0]) : nullptr;
+	Ast *val1 = rs->vals.count > 1 ? lb_strip_and_prefix(rs->vals[1]) : nullptr;
 	Type *val0_type = nullptr;
 	Type *val1_type = nullptr;
-	if (rs->vals.count > 0 && rs->vals[0] != nullptr && !is_blank_ident(rs->vals[0])) {
-		val0_type = type_of_expr(rs->vals[0]);
+	if (val0 != nullptr && !is_blank_ident(val0)) {
+		val0_type = type_of_expr(val0);
 	}
-	if (rs->vals.count > 1 && rs->vals[1] != nullptr && !is_blank_ident(rs->vals[1])) {
-		val1_type = type_of_expr(rs->vals[1]);
+	if (val1 != nullptr && !is_blank_ident(val1)) {
+		val1_type = type_of_expr(val1);
 	}
 
 	TokenKind op = Token_Lt;
@@ -649,7 +663,7 @@ gb_internal void lb_build_range_interval(lbProcedure *p, AstBinaryExpr *node,
 
 	lbAddr value;
 	if (val0_type != nullptr) {
-		Entity *e = entity_of_node(rs->vals[0]);
+		Entity *e = entity_of_node(val0);
 		value = lb_add_local(p, val0_type, e, false);
 	} else {
 		value = lb_add_local_generated(p, lower.type, false);
@@ -658,7 +672,7 @@ gb_internal void lb_build_range_interval(lbProcedure *p, AstBinaryExpr *node,
 
 	lbAddr index;
 	if (val1_type != nullptr) {
-		Entity *e = entity_of_node(rs->vals[1]);
+		Entity *e = entity_of_node(val1);
 		index = lb_add_local(p, val1_type, e, false);
 	} else {
 		index = lb_add_local_generated(p, t_int, false);
@@ -680,8 +694,8 @@ gb_internal void lb_build_range_interval(lbProcedure *p, AstBinaryExpr *node,
 
 	lbValue val = lb_addr_load(p, value);
 	lbValue idx = lb_addr_load(p, index);
-	if (val0_type) lb_store_range_stmt_val(p, rs->vals[0], val);
-	if (val1_type) lb_store_range_stmt_val(p, rs->vals[1], idx);
+	if (val0_type) lb_store_range_stmt_val(p, val0, val);
+	if (val1_type) lb_store_range_stmt_val(p, val1, idx);
 
 	{
 		// NOTE: this check block will most likely be optimized out, and is here
@@ -815,12 +829,14 @@ gb_internal void lb_build_range_stmt_struct_soa(lbProcedure *p, AstRangeStmt *rs
 	lb_open_scope(p, scope);
 
 
+	Ast *val0 = rs->vals.count > 0 ? lb_strip_and_prefix(rs->vals[0]) : nullptr;
+	Ast *val1 = rs->vals.count > 1 ? lb_strip_and_prefix(rs->vals[1]) : nullptr;
 	Type *val_types[2] = {};
-	if (rs->vals.count > 0 && rs->vals[0] != nullptr && !is_blank_ident(rs->vals[0])) {
-		val_types[0] = type_of_expr(rs->vals[0]);
+	if (val0 != nullptr && !is_blank_ident(val0)) {
+		val_types[0] = type_of_expr(val0);
 	}
-	if (rs->vals.count > 1 && rs->vals[1] != nullptr && !is_blank_ident(rs->vals[1])) {
-		val_types[1] = type_of_expr(rs->vals[1]);
+	if (val1 != nullptr && !is_blank_ident(val1)) {
+		val_types[1] = type_of_expr(val1);
 	}
 
 
@@ -901,14 +917,14 @@ gb_internal void lb_build_range_stmt_struct_soa(lbProcedure *p, AstRangeStmt *rs
 
 
 	if (val_types[0]) {
-		Entity *e = entity_of_node(rs->vals[0]);
+		Entity *e = entity_of_node(val0);
 		if (e != nullptr) {
 			lbAddr soa_val = lb_addr_soa_variable(array.addr, lb_addr_load(p, index), nullptr);
 			map_set(&p->module->soa_values, e, soa_val);
 		}
 	}
 	if (val_types[1]) {
-		lb_store_range_stmt_val(p, rs->vals[1], lb_addr_load(p, index));
+		lb_store_range_stmt_val(p, val1, lb_addr_load(p, index));
 	}
 
 
@@ -942,13 +958,15 @@ gb_internal void lb_build_range_stmt(lbProcedure *p, AstRangeStmt *rs, Scope *sc
 
 	lb_open_scope(p, scope);
 
+	Ast *val0 = rs->vals.count > 0 ? lb_strip_and_prefix(rs->vals[0]) : nullptr;
+	Ast *val1 = rs->vals.count > 1 ? lb_strip_and_prefix(rs->vals[1]) : nullptr;
 	Type *val0_type = nullptr;
 	Type *val1_type = nullptr;
-	if (rs->vals.count > 0 && rs->vals[0] != nullptr && !is_blank_ident(rs->vals[0])) {
-		val0_type = type_of_expr(rs->vals[0]);
+	if (val0 != nullptr && !is_blank_ident(val0)) {
+		val0_type = type_of_expr(val0);
 	}
-	if (rs->vals.count > 1 && rs->vals[1] != nullptr && !is_blank_ident(rs->vals[1])) {
-		val1_type = type_of_expr(rs->vals[1]);
+	if (val1 != nullptr && !is_blank_ident(val1)) {
+		val1_type = type_of_expr(val1);
 	}
 
 	lbValue val = {};
@@ -1042,11 +1060,11 @@ gb_internal void lb_build_range_stmt(lbProcedure *p, AstRangeStmt *rs, Scope *sc
 
 
 	if (is_map) {
-		if (val0_type) lb_store_range_stmt_val(p, rs->vals[0], key);
-		if (val1_type) lb_store_range_stmt_val(p, rs->vals[1], val);
+		if (val0_type) lb_store_range_stmt_val(p, val0, key);
+		if (val1_type) lb_store_range_stmt_val(p, val1, val);
 	} else {
-		if (val0_type) lb_store_range_stmt_val(p, rs->vals[0], val);
-		if (val1_type) lb_store_range_stmt_val(p, rs->vals[1], key);
+		if (val0_type) lb_store_range_stmt_val(p, val0, val);
+		if (val1_type) lb_store_range_stmt_val(p, val1, key);
 	}
 
 	lb_push_target_list(p, rs->label, done, loop, nullptr);
@@ -1064,21 +1082,23 @@ gb_internal void lb_build_unroll_range_stmt(lbProcedure *p, AstUnrollRangeStmt *
 
 	lb_open_scope(p, scope); // Open scope here
 
+	Ast *val0 = lb_strip_and_prefix(rs->val0);
+	Ast *val1 = lb_strip_and_prefix(rs->val1);
 	Type *val0_type = nullptr;
 	Type *val1_type = nullptr;
-	if (rs->val0 != nullptr && !is_blank_ident(rs->val0)) {
-		val0_type = type_of_expr(rs->val0);
+	if (val0 != nullptr && !is_blank_ident(val0)) {
+		val0_type = type_of_expr(val0);
 	}
-	if (rs->val1 != nullptr && !is_blank_ident(rs->val1)) {
-		val1_type = type_of_expr(rs->val1);
+	if (val1 != nullptr && !is_blank_ident(val1)) {
+		val1_type = type_of_expr(val1);
 	}
 
 	if (val0_type != nullptr) {
-		Entity *e = entity_of_node(rs->val0);
+		Entity *e = entity_of_node(val0);
 		lb_add_local(p, e->type, e, true);
 	}
 	if (val1_type != nullptr) {
-		Entity *e = entity_of_node(rs->val1);
+		Entity *e = entity_of_node(val1);
 		lb_add_local(p, e->type, e, true);
 	}
 
@@ -1092,8 +1112,8 @@ gb_internal void lb_build_unroll_range_stmt(lbProcedure *p, AstUnrollRangeStmt *
 
 		lbAddr val0_addr = {};
 		lbAddr val1_addr = {};
-		if (val0_type) val0_addr = lb_build_addr(p, rs->val0);
-		if (val1_type) val1_addr = lb_build_addr(p, rs->val1);
+		if (val0_type) val0_addr = lb_build_addr(p, val0);
+		if (val1_type) val1_addr = lb_build_addr(p, val1);
 
 		TokenKind op = expr->BinaryExpr.op.kind;
 		Ast *start_expr = expr->BinaryExpr.left;
@@ -1135,8 +1155,8 @@ gb_internal void lb_build_unroll_range_stmt(lbProcedure *p, AstUnrollRangeStmt *
 
 		lbAddr val0_addr = {};
 		lbAddr val1_addr = {};
-		if (val0_type) val0_addr = lb_build_addr(p, rs->val0);
-		if (val1_type) val1_addr = lb_build_addr(p, rs->val1);
+		if (val0_type) val0_addr = lb_build_addr(p, val0);
+		if (val1_type) val1_addr = lb_build_addr(p, val1);
 
 		for_array(i, bet->Enum.fields) {
 			Entity *field = bet->Enum.fields[i];
@@ -1149,8 +1169,8 @@ gb_internal void lb_build_unroll_range_stmt(lbProcedure *p, AstUnrollRangeStmt *
 	} else {
 		lbAddr val0_addr = {};
 		lbAddr val1_addr = {};
-		if (val0_type) val0_addr = lb_build_addr(p, rs->val0);
-		if (val1_type) val1_addr = lb_build_addr(p, rs->val1);
+		if (val0_type) val0_addr = lb_build_addr(p, val0);
+		if (val1_type) val1_addr = lb_build_addr(p, val1);
 
 		GB_ASSERT(expr->tav.mode == Addressing_Constant);
 
@@ -1858,7 +1878,9 @@ gb_internal void lb_build_return_stmt(lbProcedure *p, Slice<Ast *> const &return
 	} else if (return_count == 1) {
 		Entity *e = tuple->variables[0];
 		if (res_count == 0) {
+			rw_mutex_shared_lock(&p->module->values_mutex);
 			lbValue found = map_must_get(&p->module->values, e);
+			rw_mutex_shared_unlock(&p->module->values_mutex);
 			res = lb_emit_load(p, found);
 		} else {
 			res = lb_build_expr(p, return_results[0]);
@@ -1867,7 +1889,9 @@ gb_internal void lb_build_return_stmt(lbProcedure *p, Slice<Ast *> const &return
 		if (p->type->Proc.has_named_results) {
 			// NOTE(bill): store the named values before returning
 			if (e->token.string != "") {
+				rw_mutex_shared_lock(&p->module->values_mutex);
 				lbValue found = map_must_get(&p->module->values, e);
+				rw_mutex_shared_unlock(&p->module->values_mutex);
 				lb_emit_store(p, found, lb_emit_conv(p, res, e->type));
 			}
 		}
@@ -1883,7 +1907,9 @@ gb_internal void lb_build_return_stmt(lbProcedure *p, Slice<Ast *> const &return
 		} else {
 			for (isize res_index = 0; res_index < return_count; res_index++) {
 				Entity *e = tuple->variables[res_index];
+				rw_mutex_shared_lock(&p->module->values_mutex);
 				lbValue found = map_must_get(&p->module->values, e);
+				rw_mutex_shared_unlock(&p->module->values_mutex);
 				lbValue res = lb_emit_load(p, found);
 				array_add(&results, res);
 			}
@@ -1905,7 +1931,9 @@ gb_internal void lb_build_return_stmt(lbProcedure *p, Slice<Ast *> const &return
 				if (e->token.string == "") {
 					continue;
 				}
+				rw_mutex_shared_lock(&p->module->values_mutex);
 				named_results[i] = map_must_get(&p->module->values, e);
+				rw_mutex_shared_unlock(&p->module->values_mutex);
 				values[i] = lb_emit_conv(p, results[i], e->type);
 			}
 

@@ -1194,7 +1194,7 @@ Output:
 split_lines :: proc(s: string, allocator := context.allocator) -> (res: []string, err: mem.Allocator_Error) #optional_allocator_error {
 	sep :: "\n"
 	lines := _split(s, sep, 0, -1, allocator) or_return
-	for line in &lines {
+	for &line in lines {
 		line = _trim_cr(line)
 	}
 	return lines, nil
@@ -1234,7 +1234,7 @@ Output:
 split_lines_n :: proc(s: string, n: int, allocator := context.allocator) -> (res: []string, err: mem.Allocator_Error) #optional_allocator_error {
 	sep :: "\n"
 	lines := _split(s, sep, 0, n, allocator) or_return
-	for line in &lines {
+	for &line in lines {
 		line = _trim_cr(line)
 	}
 	return lines, nil
@@ -1273,7 +1273,7 @@ Output:
 split_lines_after :: proc(s: string, allocator := context.allocator) -> (res: []string, err: mem.Allocator_Error) #optional_allocator_error {
 	sep :: "\n"
 	lines := _split(s, sep, len(sep), -1, allocator) or_return
-	for line in &lines {
+	for &line in lines {
 		line = _trim_cr(line)
 	}
 	return lines, nil
@@ -1314,7 +1314,7 @@ Output:
 split_lines_after_n :: proc(s: string, n: int, allocator := context.allocator) -> (res: []string, err: mem.Allocator_Error) #optional_allocator_error {
 	sep :: "\n"
 	lines := _split(s, sep, len(sep), n, allocator) or_return
-	for line in &lines {
+	for &line in lines {
 		line = _trim_cr(line)
 	}
 	return lines, nil

@@ -813,22 +813,22 @@ panic_allocator_proc :: proc(allocator_data: rawptr, mode: Allocator_Mode,
 	switch mode {
 	case .Alloc:
 		if size > 0 {
-			panic("mem: panic allocator, .Alloc called")
+			panic("mem: panic allocator, .Alloc called", loc=loc)
 		}
 	case .Alloc_Non_Zeroed:
 		if size > 0 {
-			panic("mem: panic allocator, .Alloc_Non_Zeroed called")
+			panic("mem: panic allocator, .Alloc_Non_Zeroed called", loc=loc)
 		}
 	case .Resize:
 		if size > 0 {
-			panic("mem: panic allocator, .Resize called")
+			panic("mem: panic allocator, .Resize called", loc=loc)
 		}
 	case .Free:
 		if old_memory != nil {
-			panic("mem: panic allocator, .Free called")
+			panic("mem: panic allocator, .Free called", loc=loc)
 		}
 	case .Free_All:
-		panic("mem: panic allocator, .Free_All called")
+		panic("mem: panic allocator, .Free_All called", loc=loc)
 
 	case .Query_Features:
 		set := (^Allocator_Mode_Set)(old_memory)
@@ -838,7 +838,7 @@ panic_allocator_proc :: proc(allocator_data: rawptr, mode: Allocator_Mode,
 		return nil, nil
 
 	case .Query_Info:
-		panic("mem: panic allocator, .Query_Info called")
+		panic("mem: panic allocator, .Query_Info called", loc=loc)
 	}
 
 	return nil, nil

@@ -6,17 +6,10 @@ import "core:intrinsics"
 import "core:sync"
 import win32 "core:sys/windows"
 
-Thread_State :: enum u8 {
-	Started,
-	Joined,
-	Done,
-}
-
 Thread_Os_Specific :: struct {
 	win32_thread:    win32.HANDLE,
 	win32_thread_id: win32.DWORD,
 	mutex:           sync.Mutex,
-	flags:           bit_set[Thread_State; u8],
 }
 
 _thread_priority_map := [Thread_Priority]i32{
@@ -46,6 +39,14 @@ _create :: proc(procedure: Thread_Proc, priority: Thread_Priority) -> ^Thread {
 		}
 
 		intrinsics.atomic_store(&t.flags, t.flags + {.Done})
+
+		if .Self_Cleanup in t.flags {
+			win32.CloseHandle(t.win32_thread)
+			t.win32_thread = win32.INVALID_HANDLE
+			// NOTE(ftphikari): It doesn't matter which context 'free' received, right?
+			context = {}
+			free(t, t.creation_allocator)
+		}
 
 		return 0
 	}

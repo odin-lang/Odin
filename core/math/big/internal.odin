@@ -1857,7 +1857,7 @@ internal_root_n :: proc { internal_int_root_n, }
 internal_int_destroy :: proc(integers: ..^Int) {
 	integers := integers
 
-	for a in &integers {
+	for &a in integers {
 		if internal_int_allocated_cap(a) > 0 {
 			mem.zero_slice(a.digit[:])
 			free(&a.digit[0])
@@ -2909,7 +2909,7 @@ internal_int_init_multi :: proc(integers: ..^Int, allocator := context.allocator
 	context.allocator = allocator
 
 	integers := integers
-	for a in &integers {
+	for a in integers {
 		internal_clear(a) or_return
 	}
 	return nil

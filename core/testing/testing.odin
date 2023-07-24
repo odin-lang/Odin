@@ -4,6 +4,9 @@ import "core:fmt"
 import "core:io"
 import "core:time"
 import "core:intrinsics"
+import "core:reflect"
+
+_ :: reflect // alias reflect to nothing to force visibility for -vet
 
 // IMPORTANT NOTE: Compiler requires this layout
 Test_Signature :: proc(^T)
@@ -46,15 +49,15 @@ errorf :: proc(t: ^T, format: string, args: ..any, loc := #caller_location) {
 }
 
 fail :: proc(t: ^T, loc := #caller_location) {
-	error(t=t, args={"FAIL"}, loc=loc)
+	error(t, "FAIL", loc=loc)
 	t.error_count += 1
 }
 
 fail_now :: proc(t: ^T, msg := "", loc := #caller_location) {
 	if msg != "" {
-		error(t=t, args={"FAIL:", msg}, loc=loc)
+		error(t, "FAIL:", msg, loc=loc)
 	} else {
-		error(t=t, args={"FAIL"}, loc=loc)
+		error(t, "FAIL", loc=loc)
 	}
 	t.error_count += 1
 	if t._fail_now != nil {
@@ -84,14 +87,14 @@ cleanup :: proc(t: ^T, procedure: proc(rawptr), user_data: rawptr) {
 
 expect :: proc(t: ^T, ok: bool, msg: string = "", loc := #caller_location) -> bool {
 	if !ok {
-		error(t=t, args={msg}, loc=loc)
+		error(t, msg, loc=loc)
 	}
 	return ok
 }
 expect_value :: proc(t: ^T, value, expected: $T, loc := #caller_location) -> bool where intrinsics.type_is_comparable(T) {
-	ok := value == expected
+	ok := value == expected || reflect.is_nil(value) && reflect.is_nil(expected)
 	if !ok {
-		errorf(t=t, format="expected %v, got %v", args={expected, value}, loc=loc)
+		errorf(t, "expected %v, got %v", expected, value, loc=loc)
 	}
 	return ok
 }

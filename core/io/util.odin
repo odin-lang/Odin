@@ -292,17 +292,21 @@ Tee_Reader :: struct {
 }
 
 @(private)
-_tee_reader_vtable := &Stream_VTable{
-	impl_read = proc(s: Stream, p: []byte) -> (n: int, err: Error) {
-		t := (^Tee_Reader)(s.stream_data)
-		n, err = read(t.r, p)
+_tee_reader_proc :: proc(stream_data: rawptr, mode: Stream_Mode, p: []byte, offset: i64, whence: Seek_From) -> (n: i64, err: Error) {
+	t := (^Tee_Reader)(stream_data)
+	#partial switch mode {
+	case .Read:
+		n, err = _i64_err(read(t.r, p))
 		if n > 0 {
 			if wn, werr := write(t.w, p[:n]); werr != nil {
-				return wn, werr
+				return i64(wn), werr
 			}
 		}
 		return
-	},
+	case .Query:
+		return query_utility({.Read, .Query})
+	}
+	return 0, .Empty
 }
 
 // tee_reader_init returns a Reader that writes to 'w' what it reads from 'r'
@@ -317,8 +321,8 @@ tee_reader_init :: proc(t: ^Tee_Reader, r: Reader, w: Writer, allocator := conte
 }
 
 tee_reader_to_reader :: proc(t: ^Tee_Reader) -> (r: Reader) {
-	r.stream_data = t
-	r.stream_vtable = _tee_reader_vtable
+	r.data = t
+	r.procedure = _tee_reader_proc
 	return
 }
 
@@ -332,9 +336,10 @@ Limited_Reader :: struct {
 }
 
 @(private)
-_limited_reader_vtable := &Stream_VTable{
-	impl_read = proc(s: Stream, p: []byte) -> (n: int, err: Error) {
-		l := (^Limited_Reader)(s.stream_data)
+_limited_reader_proc :: proc(stream_data: rawptr, mode: Stream_Mode, p: []byte, offset: i64, whence: Seek_From) -> (n: i64, err: Error) {
+	l := (^Limited_Reader)(stream_data)
+	#partial switch mode {
+	case .Read:
 		if l.n <= 0 {
 			return 0, .EOF
 		}
@@ -342,10 +347,13 @@ _limited_reader_vtable := &Stream_VTable{
 		if i64(len(p)) > l.n {
 			p = p[0:l.n]
 		}
-		n, err = read(l.r, p)
+		n, err = _i64_err(read(l.r, p))
 		l.n -= i64(n)
 		return
-	},
+	case .Query:
+		return query_utility({.Read, .Query})
+	}
+	return 0, .Empty
 }
 
 limited_reader_init :: proc(l: ^Limited_Reader, r: Reader, n: i64) -> Reader {
@@ -355,8 +363,8 @@ limited_reader_init :: proc(l: ^Limited_Reader, r: Reader, n: i64) -> Reader {
 }
 
 limited_reader_to_reader :: proc(l: ^Limited_Reader) -> (r: Reader) {
-	r.stream_vtable = _limited_reader_vtable
-	r.stream_data = l
+	r.procedure = _limited_reader_proc
+	r.data = l
 	return
 }
 
@@ -375,15 +383,16 @@ section_reader_init :: proc(s: ^Section_Reader, r: Reader_At, off: i64, n: i64) 
 	return
 }
 section_reader_to_stream :: proc(s: ^Section_Reader) -> (out: Stream) {
-	out.stream_data = s
-	out.stream_vtable = _section_reader_vtable
+	out.data = s
+	out.procedure = _section_reader_proc
 	return
 }
 
 @(private)
-_section_reader_vtable := &Stream_VTable{
-	impl_read = proc(stream: Stream, p: []byte) -> (n: int, err: Error) {
-		s := (^Section_Reader)(stream.stream_data)
+_section_reader_proc :: proc(stream_data: rawptr, mode: Stream_Mode, p: []byte, offset: i64, whence: Seek_From) -> (n: i64, err: Error) {
+	s := (^Section_Reader)(stream_data)
+	#partial switch mode {
+	case .Read:
 		if s.off >= s.limit {
 			return 0, .EOF
 		}
@@ -391,13 +400,11 @@ _section_reader_vtable := &Stream_VTable{
 		if max := s.limit - s.off; i64(len(p)) > max {
 			p = p[0:max]
 		}
-		n, err = read_at(s.r, p, s.off)
+		n, err = _i64_err(read_at(s.r, p, s.off))
 		s.off += i64(n)
 		return
-	},
-	impl_read_at = proc(stream: Stream, p: []byte, off: i64) -> (n: int, err: Error) {
-		s := (^Section_Reader)(stream.stream_data)
-		p, off := p, off
+	case .Read_At:
+		p, off := p, offset
 
 		if off < 0 || off >= s.limit - s.base {
 			return 0, .EOF
@@ -405,17 +412,15 @@ _section_reader_vtable := &Stream_VTable{
 		off += s.base
 		if max := s.limit - off; i64(len(p)) > max {
 			p = p[0:max]
-			n, err = read_at(s.r, p, off)
+			n, err = _i64_err(read_at(s.r, p, off))
 			if err == nil {
 				err = .EOF
 			}
 			return
 		}
-		return read_at(s.r, p, off)
-	},
-	impl_seek = proc(stream: Stream, offset: i64, whence: Seek_From) -> (n: i64, err: Error) {
-		s := (^Section_Reader)(stream.stream_data)
+		return _i64_err(read_at(s.r, p, off))
 
+	case .Seek:
 		offset := offset
 		switch whence {
 		case:
@@ -433,10 +438,12 @@ _section_reader_vtable := &Stream_VTable{
 		s.off = offset
 		n = offset - s.base
 		return
-	},
-	impl_size = proc(stream: Stream) -> i64 {
-		s := (^Section_Reader)(stream.stream_data)
-		return s.limit - s.base
-	},
-}
+	case .Size:
+		n = s.limit - s.base
+		return
+	case .Query:
+		return query_utility({.Read, .Read_At, .Seek, .Size, .Query})
+	}
+	return 0, nil
 
+}

@@ -173,14 +173,6 @@ writer_read_from :: proc(b: ^Writer, r: io.Reader) -> (n: i64, err: io.Error) {
 	if b.err != nil {
 		return 0, b.err
 	}
-	if writer_buffered(b) == 0 {
-		if w, ok := io.to_reader_from(b.wr); !ok {
-			n, err = io.read_from(w, r)
-			b.err = err
-			return
-		}
-	}
-
 	for {
 		if writer_available(b) == 0 {
 			writer_flush(b) or_return
@@ -222,46 +214,35 @@ writer_read_from :: proc(b: ^Writer, r: io.Reader) -> (n: i64, err: io.Error) {
 
 // writer_to_stream converts a Writer into an io.Stream
 writer_to_stream :: proc(b: ^Writer) -> (s: io.Stream) {
-	s.stream_data = b
-	s.stream_vtable = &_writer_vtable
+	s.data = b
+	s.procedure = _writer_proc
 	return
 }
 
 // writer_to_stream converts a Writer into an io.Stream
 writer_to_writer :: proc(b: ^Writer) -> (s: io.Writer) {
-	s.stream_data = b
-	s.stream_vtable = &_writer_vtable
-	return
+	return writer_to_stream(b)
 }
 
 
 
-
 @(private)
-_writer_vtable := io.Stream_VTable{
-	impl_destroy = proc(s: io.Stream) -> io.Error {
-		b := (^Writer)(s.stream_data)
+_writer_proc :: proc(stream_data: rawptr, mode: io.Stream_Mode, p: []byte, offset: i64, whence: io.Seek_From) -> (n: i64, err: io.Error) {
+	b := (^Writer)(stream_data)
+	#partial switch mode {
+	case .Flush:
+		err = writer_flush(b)
+		return
+	case .Write:
+		n_int: int
+		n_int, err = writer_write(b, p)
+		n = i64(n_int)
+		return
+	case .Destroy:
 		writer_destroy(b)
-		return nil
-	},
-	impl_flush = proc(s: io.Stream)  -> io.Error {
-		b := (^Writer)(s.stream_data)
-		return writer_flush(b)
-	},
-	impl_write = proc(s: io.Stream, p: []byte) -> (n: int, err: io.Error) {
-		b := (^Writer)(s.stream_data)
-		return writer_write(b, p)
-	},
-	impl_write_byte = proc(s: io.Stream, c: byte) -> io.Error {
-		b := (^Writer)(s.stream_data)
-		return writer_write_byte(b, c)
-	},
-	impl_write_rune = proc(s: io.Stream, r: rune) -> (int, io.Error) {
-		b := (^Writer)(s.stream_data)
-		return writer_write_rune(b, r)
-	},
-	impl_read_from = proc(s: io.Stream, r: io.Reader) -> (n: i64, err: io.Error) {
-		b := (^Writer)(s.stream_data)
-		return writer_read_from(b, r)
-	},
+		return
+	case .Query:
+		return io.query_utility({.Flush, .Write, .Destroy, .Query})
+	}
+	return 0, .Empty
 }

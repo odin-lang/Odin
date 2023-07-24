@@ -87,6 +87,7 @@ import hlm              "core:math/linalg/hlsl"
 import noise            "core:math/noise"
 import rand             "core:math/rand"
 import ease             "core:math/ease"
+import cmplx            "core:math/cmplx"
 
 import mem              "core:mem"
 import virtual          "core:mem/virtual"
@@ -206,6 +207,7 @@ _ :: hlm
 _ :: noise
 _ :: rand
 _ :: ease
+_ :: cmplx
 _ :: mem
 _ :: virtual
 _ :: ast
