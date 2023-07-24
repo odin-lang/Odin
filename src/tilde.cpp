@@ -799,7 +799,7 @@ gb_internal bool cg_generate_code(Checker *c, LinkerData *linker_data) {
 
 
 	TB_DebugFormat debug_format = TB_DEBUGFMT_NONE;
-	if (build_context.ODIN_DEBUG || true) {
+	if (build_context.ODIN_DEBUG) {
 		switch (build_context.metrics.os) {
 		case TargetOs_windows:
 			debug_format = TB_DEBUGFMT_CODEVIEW;

@@ -350,7 +350,7 @@ gb_internal WORKER_TASK_PROC(cg_procedure_compile_worker_proc) {
 	bool emit_asm = false;
 
 	if (
-	    string_starts_with(p->name, str_lit("runtime@_os_write")) ||
+	    // string_starts_with(p->name, str_lit("runtime@_os_write")) ||
 	    false
 	) {
 		emit_asm = true;
