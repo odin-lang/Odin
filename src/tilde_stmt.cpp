@@ -2155,6 +2155,136 @@ gb_internal void cg_build_type_switch_stmt(cgProcedure *p, Ast *node) {
 }
 
 
+gb_internal void cg_build_mutable_value_decl(cgProcedure *p, Ast *node) {
+	ast_node(vd, ValueDecl, node);
+	if (!vd->is_mutable) {
+		return;
+	}
+
+	bool is_static = false;
+	for (Ast *name : vd->names) if (!is_blank_ident(name)) {
+		// NOTE(bill): Sanity check to check for the existence of the variable's Entity
+		GB_ASSERT(name->kind == Ast_Ident);
+		Entity *e = entity_of_node(name);
+		TokenPos pos = ast_token(name).pos;
+		GB_ASSERT_MSG(e != nullptr, "\n%s missing entity for %.*s", token_pos_to_string(pos), LIT(name->Ident.token.string));
+		if (e->flags & EntityFlag_Static) {
+			// NOTE(bill): If one of the entities is static, they all are
+			is_static = true;
+		}
+	}
+
+	if (is_static) {
+		for_array(i, vd->names) {
+			Ast *ident = vd->names[i];
+			GB_ASSERT(!is_blank_ident(ident));
+			Entity *e = entity_of_node(ident);
+			GB_ASSERT(e->flags & EntityFlag_Static);
+			String name = e->token.string;
+
+			String mangled_name = {};
+			{
+				gbString str = gb_string_make_length(permanent_allocator(), p->name.text, p->name.len);
+				str = gb_string_appendc(str, "-");
+				str = gb_string_append_fmt(str, ".%.*s-%llu", LIT(name), cast(long long)e->id);
+				mangled_name.text = cast(u8 *)str;
+				mangled_name.len = gb_string_length(str);
+			}
+
+			cgModule *m = p->module;
+
+			TB_DebugType *debug_type = cg_debug_type(m, e->type);
+			TB_Global *global = tb_global_create(m->mod, mangled_name.len, cast(char const *)mangled_name.text, debug_type, TB_LINKAGE_PRIVATE);
+
+			TB_ModuleSection *section = tb_module_get_data(m->mod);
+			if (e->Variable.thread_local_model != "") {
+				section = tb_module_get_tls(m->mod);
+				String model = e->Variable.thread_local_model;
+				if (model == "default") {
+					// TODO(bill): Thread Local Storage models
+				} else if (model == "localdynamic") {
+					// TODO(bill): Thread Local Storage models
+				} else if (model == "initialexec") {
+					// TODO(bill): Thread Local Storage models
+				} else if (model == "localexec") {
+					// TODO(bill): Thread Local Storage models
+				} else {
+					GB_PANIC("Unhandled thread local mode %.*s", LIT(model));
+				}
+			}
+
+			i64 max_objects = 0;
+			ExactValue value = {};
+
+			if (vd->values.count > 0) {
+				GB_ASSERT(vd->names.count == vd->values.count);
+				Ast *ast_value = vd->values[i];
+				GB_ASSERT(ast_value->tav.mode == Addressing_Constant ||
+				          ast_value->tav.mode == Addressing_Invalid);
+
+				value = ast_value->tav.value;
+				max_objects = cg_global_const_calculate_region_count(value, e->type);
+			}
+			tb_global_set_storage(m->mod, section, global, type_size_of(e->type), type_align_of(e->type), max_objects);
+
+			cg_global_const_add_region(m, value, e->type, global, 0);
+
+			TB_Node *node = tb_inst_get_symbol_address(p->func, cast(TB_Symbol *)global);
+			cgValue global_val = cg_value(node, alloc_type_pointer(e->type));
+			cg_add_entity(p->module, e, global_val);
+			cg_add_member(p->module, mangled_name, global_val);
+		}
+		return;
+	}
+
+	TEMPORARY_ALLOCATOR_GUARD();
+
+	auto inits = array_make<cgValue>(temporary_allocator(), 0, vd->values.count != 0 ? vd->names.count : 0);
+	for (Ast *rhs : vd->values) {
+		cgValue init = cg_build_expr(p, rhs);
+		cg_append_tuple_values(p, &inits, init);
+	}
+
+
+	auto lvals = slice_make<cgAddr>(temporary_allocator(), vd->names.count);
+	for_array(i, vd->names) {
+		Ast *name = vd->names[i];
+		if (!is_blank_ident(name)) {
+			Entity *e = entity_of_node(name);
+			bool zero_init = vd->values.count == 0;
+			if (vd->names.count == vd->values.count) {
+				Ast *expr = unparen_expr(vd->values[i]);
+				if (expr->kind == Ast_CompoundLit &&
+				    inits[i].kind == cgValue_Addr) {
+				    	TB_Node *ptr = inits[i].node;
+
+				    	if (e != nullptr && e->token.string.len > 0 && e->token.string != "_") {
+				    		// NOTE(bill): for debugging purposes only
+				    		String name = e->token.string;
+				    		TB_DebugType *debug_type = cg_debug_type(p->module, e->type);
+				    		tb_node_append_attrib(ptr, tb_function_attrib_variable(p->func, name.len, cast(char const *)name.text, debug_type));
+				    	}
+
+					cgAddr addr = cg_addr(inits[i]);
+					map_set(&p->variable_map, e, addr);
+					continue;
+				}
+			}
+
+			lvals[i] = cg_add_local(p, e->type, e, zero_init);
+		}
+	}
+
+
+	GB_ASSERT(vd->values.count == 0 || lvals.count == inits.count);
+	for_array(i, inits) {
+		cgAddr  lval = lvals[i];
+		cgValue init = inits[i];
+		cg_addr_store(p, lval, init);
+	}
+}
+
+
 gb_internal void cg_build_stmt(cgProcedure *p, Ast *node) {
 	Ast *prev_stmt = p->curr_stmt;
 	defer (p->curr_stmt = prev_stmt);
@@ -2223,130 +2353,7 @@ gb_internal void cg_build_stmt(cgProcedure *p, Ast *node) {
 	case_end;
 
 	case_ast_node(vd, ValueDecl, node);
-		if (!vd->is_mutable) {
-			return;
-		}
-
-		bool is_static = false;
-		for (Ast *name : vd->names) if (!is_blank_ident(name)) {
-			// NOTE(bill): Sanity check to check for the existence of the variable's Entity
-			GB_ASSERT(name->kind == Ast_Ident);
-			Entity *e = entity_of_node(name);
-			TokenPos pos = ast_token(name).pos;
-			GB_ASSERT_MSG(e != nullptr, "\n%s missing entity for %.*s", token_pos_to_string(pos), LIT(name->Ident.token.string));
-			if (e->flags & EntityFlag_Static) {
-				// NOTE(bill): If one of the entities is static, they all are
-				is_static = true;
-			}
-		}
-		if (is_static) {
-			for_array(i, vd->names) {
-				Ast *ident = vd->names[i];
-				GB_ASSERT(!is_blank_ident(ident));
-				Entity *e = entity_of_node(ident);
-				GB_ASSERT(e->flags & EntityFlag_Static);
-				String name = e->token.string;
-
-				String mangled_name = {};
-				{
-					gbString str = gb_string_make_length(permanent_allocator(), p->name.text, p->name.len);
-					str = gb_string_appendc(str, "-");
-					str = gb_string_append_fmt(str, ".%.*s-%llu", LIT(name), cast(long long)e->id);
-					mangled_name.text = cast(u8 *)str;
-					mangled_name.len = gb_string_length(str);
-				}
-
-				cgModule *m = p->module;
-
-				TB_DebugType *debug_type = cg_debug_type(m, e->type);
-				TB_Global *global = tb_global_create(m->mod, mangled_name.len, cast(char const *)mangled_name.text, debug_type, TB_LINKAGE_PRIVATE);
-
-				TB_ModuleSection *section = tb_module_get_data(m->mod);
-				if (e->Variable.thread_local_model != "") {
-					section = tb_module_get_tls(m->mod);
-					String model = e->Variable.thread_local_model;
-					if (model == "default") {
-						// TODO(bill): Thread Local Storage models
-					} else if (model == "localdynamic") {
-						// TODO(bill): Thread Local Storage models
-					} else if (model == "initialexec") {
-						// TODO(bill): Thread Local Storage models
-					} else if (model == "localexec") {
-						// TODO(bill): Thread Local Storage models
-					} else {
-						GB_PANIC("Unhandled thread local mode %.*s", LIT(model));
-					}
-				}
-
-				i64 max_objects = 0;
-				ExactValue value = {};
-
-				if (vd->values.count > 0) {
-					GB_ASSERT(vd->names.count == vd->values.count);
-					Ast *ast_value = vd->values[i];
-					GB_ASSERT(ast_value->tav.mode == Addressing_Constant ||
-					          ast_value->tav.mode == Addressing_Invalid);
-
-					value = ast_value->tav.value;
-					max_objects = cg_global_const_calculate_region_count(value, e->type);
-				}
-				tb_global_set_storage(m->mod, section, global, type_size_of(e->type), type_align_of(e->type), max_objects);
-
-				cg_global_const_add_region(m, value, e->type, global, 0);
-
-				TB_Node *node = tb_inst_get_symbol_address(p->func, cast(TB_Symbol *)global);
-				cgValue global_val = cg_value(node, alloc_type_pointer(e->type));
-				cg_add_entity(p->module, e, global_val);
-				cg_add_member(p->module, mangled_name, global_val);
-			}
-			return;
-		}
-
-		TEMPORARY_ALLOCATOR_GUARD();
-
-		auto inits = array_make<cgValue>(temporary_allocator(), 0, vd->values.count != 0 ? vd->names.count : 0);
-		for (Ast *rhs : vd->values) {
-			cgValue init = cg_build_expr(p, rhs);
-			cg_append_tuple_values(p, &inits, init);
-		}
-
-
-		auto lvals = slice_make<cgAddr>(temporary_allocator(), vd->names.count);
-		for_array(i, vd->names) {
-			Ast *name = vd->names[i];
-			if (!is_blank_ident(name)) {
-				Entity *e = entity_of_node(name);
-				bool zero_init = vd->values.count == 0;
-				if (vd->names.count == vd->values.count) {
-					Ast *expr = unparen_expr(vd->values[i]);
-					if (expr->kind == Ast_CompoundLit &&
-					    inits[i].kind == cgValue_Addr) {
-					    	TB_Node *ptr = inits[i].node;
-
-					    	if (e != nullptr && e->token.string.len > 0 && e->token.string != "_") {
-					    		// NOTE(bill): for debugging purposes only
-					    		String name = e->token.string;
-					    		TB_DebugType *debug_type = cg_debug_type(p->module, e->type);
-					    		tb_node_append_attrib(ptr, tb_function_attrib_variable(p->func, name.len, cast(char const *)name.text, debug_type));
-					    	}
-
-						cgAddr addr = cg_addr(inits[i]);
-						map_set(&p->variable_map, e, addr);
-						continue;
-					}
-				}
-
-				lvals[i] = cg_add_local(p, e->type, e, zero_init);
-			}
-		}
-
-
-		GB_ASSERT(vd->values.count == 0 || lvals.count == inits.count);
-		for_array(i, inits) {
-			cgAddr  lval = lvals[i];
-			cgValue init = inits[i];
-			cg_addr_store(p, lval, init);
-		}
+		cg_build_mutable_value_decl(p, node);
 	case_end;
 
 	case_ast_node(bs, BranchStmt, node);
