@@ -3646,18 +3646,26 @@ gb_internal i64 *type_set_offsets_of(Slice<Entity *> const &fields, bool is_pack
 		}
 	} else if (is_packed) {
 		for_array(i, fields) {
-			i64 size = type_size_of(fields[i]->type);
-			offsets[i] = curr_offset;
-			curr_offset += size;
+			if (fields[i]->kind != Entity_Variable) {
+				offsets[i] = -1;
+			} else {
+				i64 size = type_size_of(fields[i]->type);
+				offsets[i] = curr_offset;
+				curr_offset += size;
+			}
 		}
 	} else {
 		for_array(i, fields) {
-			Type *t = fields[i]->type;
-			i64 align = gb_max(type_align_of(t), 1);
-			i64 size  = gb_max(type_size_of( t), 0);
-			curr_offset = align_formula(curr_offset, align);
-			offsets[i] = curr_offset;
-			curr_offset += size;
+			if (fields[i]->kind != Entity_Variable) {
+				offsets[i] = -1;
+			} else {
+				Type *t = fields[i]->type;
+				i64 align = gb_max(type_align_of(t), 1);
+				i64 size  = gb_max(type_size_of( t), 0);
+				curr_offset = align_formula(curr_offset, align);
+				offsets[i] = curr_offset;
+				curr_offset += size;
+			}
 		}
 	}
 	return offsets;
@@ -3924,7 +3932,9 @@ gb_internal i64 type_offset_of(Type *t, i64 index, Type **field_type_) {
 		if (gb_is_between(index, 0, t->Tuple.variables.count-1)) {
 			GB_ASSERT(t->Tuple.offsets != nullptr);
 			if (field_type_) *field_type_ = t->Tuple.variables[index]->type;
-			return t->Tuple.offsets[index];
+			i64 offset = t->Tuple.offsets[index];
+			GB_ASSERT(offset >= 0);
+			return offset;
 		}
 		break;
 

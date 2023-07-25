@@ -5985,8 +5985,8 @@ gb_internal bool check_call_arguments_single(CheckerContext *c, Ast *call, Opera
 	}
 
 	Entity *entity_to_use = data->gen_entity != nullptr ? data->gen_entity : e;
+	add_entity_use(c, ident, entity_to_use);
 	if (!return_on_failure && entity_to_use != nullptr) {
-		add_entity_use(c, ident, entity_to_use);
 		update_untyped_expr_type(c, operand->expr, entity_to_use->type, true);
 		add_type_and_value(c, operand->expr, operand->mode, entity_to_use->type, operand->value);
 	}
@@ -7174,6 +7174,7 @@ gb_internal ExprKind check_call_expr(CheckerContext *c, Operand *operand, Ast *c
 				c->decl->defer_used += 1;
 			}
 		}
+		add_entity_use(c, operand->expr, initial_entity);
 	}
 
 	if (operand->mode != Addressing_ProcGroup) {

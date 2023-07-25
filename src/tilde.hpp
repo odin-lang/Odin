@@ -309,7 +309,8 @@ gb_internal cgValue cg_addr_get_ptr(cgProcedure *p, cgAddr const &addr);
 gb_internal cgValue cg_emit_load(cgProcedure *p, cgValue const &ptr, bool is_volatile=false);
 gb_internal void    cg_emit_store(cgProcedure *p, cgValue dst, cgValue src, bool is_volatile=false);
 
-gb_internal cgAddr  cg_add_local(cgProcedure *p, Type *type, Entity *e, bool zero_init);
+gb_internal cgAddr  cg_add_local (cgProcedure *p, Type *type, Entity *e, bool zero_init);
+gb_internal cgAddr  cg_add_global(cgProcedure *p, Type *type, Entity *e);
 gb_internal cgValue cg_address_from_load_or_generate_local(cgProcedure *p, cgValue value);
 gb_internal cgValue cg_copy_value_to_ptr(cgProcedure *p, cgValue value, Type *original_type, isize min_alignment);
 

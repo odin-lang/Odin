@@ -582,8 +582,13 @@ gb_internal cgValue cg_emit_call(cgProcedure * p, cgValue value, Slice<cgValue> 
 			params[param_index++] = local;
 		}
 	}
+	isize param_entity_index = 0;
 	for_array(i, args) {
-		Type *param_type = param_entities[i]->type;
+		Entity *param_entity = nullptr;
+		do {
+			param_entity = param_entities[param_entity_index++];
+		} while (param_entity->kind != Entity_Variable);
+		Type *param_type = param_entity->type;
 		cgValue arg = args[i];
 		arg = cg_emit_conv(p, arg, param_type);
 		arg = cg_flatten_value(p, arg);
@@ -839,7 +844,15 @@ gb_internal cgValue cg_build_call_expr_internal(cgProcedure *p, Ast *expr) {
 
 	GB_ASSERT(ce->split_args != nullptr);
 
-	auto args = array_make<cgValue>(temporary_allocator(), 0, pt->param_count);
+	isize internal_param_count = 0;
+	if (pt->params) for (Entity *e : pt->params->Tuple.variables) {
+		if (e->kind == Entity_Variable) {
+			internal_param_count += 1;
+		}
+	}
+	GB_ASSERT(internal_param_count <= pt->param_count);
+
+	auto args = array_make<cgValue>(temporary_allocator(), 0, internal_param_count);
 
 	bool vari_expand = (ce->ellipsis.pos.line != 0);
 	bool is_c_vararg = pt->c_vararg;
@@ -918,7 +931,7 @@ gb_internal cgValue cg_build_call_expr_internal(cgProcedure *p, Ast *expr) {
 	}
 
 	if (!is_c_vararg) {
-		array_resize(&args, pt->param_count);
+		array_resize(&args, internal_param_count);
 	}
 
 	for (Ast *arg : ce->split_args->named) {
@@ -938,39 +951,39 @@ gb_internal cgValue cg_build_call_expr_internal(cgProcedure *p, Ast *expr) {
 
 
 	if (pt->params != nullptr)  {
-		isize min_count = pt->params->Tuple.variables.count;
+		isize min_count = internal_param_count;
 		if (is_c_vararg) {
 			min_count -= 1;
 		}
-		GB_ASSERT(args.count >= min_count);
-		for_array(arg_index, pt->params->Tuple.variables) {
-			Entity *e = pt->params->Tuple.variables[arg_index];
-			if (pt->variadic && arg_index == pt->variadic_index) {
+		GB_ASSERT_MSG(args.count >= min_count, "in %.*s", LIT(p->name));
+		isize arg_index = 0;
+		for_array(param_index, pt->params->Tuple.variables) {
+			Entity *e = pt->params->Tuple.variables[param_index];
+			if (e->kind == Entity_TypeName) {
+				continue;
+			} else if (e->kind == Entity_Constant) {
+				continue;
+			}
+			GB_ASSERT(e->kind == Entity_Variable);
+
+			if (pt->variadic && param_index == pt->variadic_index) {
 				if (!is_c_vararg && args[arg_index].node == nullptr) {
-					args[arg_index] = cg_const_nil(p, e->type);
+					args[arg_index++] = cg_const_nil(p, e->type);
 				}
 				continue;
 			}
 
 			cgValue arg = args[arg_index];
 			if (arg.node == nullptr) {
-				switch (e->kind) {
-				case Entity_TypeName:
-				case Entity_Constant:
-					break;
-				case Entity_Variable:
-					args[arg_index] = cg_handle_param_value(p, e->type, e->Variable.param_value, pos);
-					break;
-				default:
-					GB_PANIC("Unknown entity kind %.*s\n", LIT(entity_strings[e->kind]));
-				}
+				GB_ASSERT(e->kind == Entity_Variable);
+				args[arg_index++] = cg_handle_param_value(p, e->type, e->Variable.param_value, pos);
 			} else {
-				args[arg_index] = cg_emit_conv(p, arg, e->type);
+				args[arg_index++] = cg_emit_conv(p, arg, e->type);
 			}
 		}
 	}
 
-	isize final_count = is_c_vararg ? args.count : pt->param_count;
+	isize final_count = is_c_vararg ? args.count : internal_param_count;
 	auto call_args = slice(args, 0, final_count);
 
 	return cg_emit_call(p, value, call_args);

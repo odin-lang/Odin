@@ -747,6 +747,34 @@ gb_internal cgAddr cg_add_local(cgProcedure *p, Type *type, Entity *e, bool zero
 	return addr;
 }
 
+gb_internal cgAddr cg_add_global(cgProcedure *p, Type *type, Entity *e) {
+	GB_ASSERT(type != nullptr);
+
+	isize size = type_size_of(type);
+	TB_CharUnits alignment = cast(TB_CharUnits)type_align_of(type);
+	if (is_type_matrix(type)) {
+		alignment *= 2; // NOTE(bill): Just in case
+	}
+
+	TB_Global *global = tb_global_create(p->module->mod, 0, "", nullptr, TB_LINKAGE_PRIVATE);
+	tb_global_set_storage(p->module->mod, tb_module_get_data(p->module->mod), global, size, alignment, 0);
+	TB_Node *local = tb_inst_get_symbol_address(p->func, cast(TB_Symbol *)global);
+
+	if (e != nullptr && e->token.string.len > 0 && e->token.string != "_") {
+		// NOTE(bill): for debugging purposes only
+		String name = e->token.string;
+		TB_DebugType *debug_type = cg_debug_type(p->module, type);
+		tb_node_append_attrib(local, tb_function_attrib_variable(p->func, name.len, cast(char const *)name.text, debug_type));
+	}
+
+	cgAddr addr = cg_addr(cg_value(local, alloc_type_pointer(type)));
+	if (e) {
+		map_set(&p->variable_map, e, addr);
+	}
+	return addr;
+}
+
+
 gb_internal cgValue cg_copy_value_to_ptr(cgProcedure *p, cgValue value, Type *original_type, isize min_alignment) {
 	TB_CharUnits size  = cast(TB_CharUnits)type_size_of(original_type);
 	TB_CharUnits align = cast(TB_CharUnits)gb_max(type_align_of(original_type), min_alignment);

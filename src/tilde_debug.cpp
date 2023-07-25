@@ -76,9 +76,18 @@ gb_internal TB_DebugType *cg_debug_type_internal_record(cgModule *m, Type *type,
 			type_set_offsets(bt);
 
 			TB_DebugType *record = tb_debug_create_struct(m->mod, 0, "");
-			TB_DebugType **fields = tb_debug_record_begin(record, bt->Tuple.variables.count);
+			isize record_count = 0;
+			for (Entity *e : bt->Tuple.variables) {
+				if (e->kind == Entity_Variable) {
+					record_count += 1;
+				}
+			}
+			TB_DebugType **fields = tb_debug_record_begin(record, record_count);
 			for_array(i, bt->Tuple.variables) {
 				Entity *e = bt->Tuple.variables[i];
+				if (e->kind != Entity_Variable) {
+					continue;
+				}
 				Type *type = e->type;
 				if (is_type_proc(type)) {
 					type = t_rawptr;

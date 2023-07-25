@@ -2399,7 +2399,12 @@ cgAddr cg_build_addr_compound_lit(cgProcedure *p, Ast *expr) {
 	Type *type = type_of_expr(expr);
 	Type *bt = base_type(type);
 
-	cgAddr v = cg_add_local(p, type, nullptr, true);
+	cgAddr v = {};
+	if (p->is_startup) {
+		v = cg_add_global(p, type, nullptr);
+	} else {
+		v = cg_add_local(p, type, nullptr, true);
+	}
 
 	if (cl->elems.count == 0) {
 		// No need to create it
@@ -2424,8 +2429,6 @@ cgAddr cg_build_addr_compound_lit(cgProcedure *p, Ast *expr) {
 	}
 	TokenPos pos = ast_token(expr).pos;
 
-	if (cl->elems.count == 0) {
-	}
 
 	switch (bt->kind) {
 	default: GB_PANIC("Unknown CompoundLit type: %s", type_to_string(type)); break;
@@ -2493,21 +2496,22 @@ cgAddr cg_build_addr_compound_lit(cgProcedure *p, Ast *expr) {
 		return v;
 	}
 
-	// case Type_Map: {
-	// 	GB_ASSERT(!build_context.no_dynamic_literals);
+	case Type_Map: {
+		GB_ASSERT(!build_context.no_dynamic_literals);
+		GB_PANIC("TODO(bill): map literals");
 
-	// 	cgValue err = cg_dynamic_map_reserve(p, v.addr, 2*cl->elems.count, pos);
-	// 	gb_unused(err);
+		// cgValue err = cg_dynamic_map_reserve(p, v.addr, 2*cl->elems.count, pos);
+		// gb_unused(err);
 
-	// 	for (Ast *elem : cl->elems) {
-	// 		ast_node(fv, FieldValue, elem);
+		// for (Ast *elem : cl->elems) {
+		// 	ast_node(fv, FieldValue, elem);
 
-	// 		cgValue key   = cg_build_expr(p, fv->field);
-	// 		cgValue value = cg_build_expr(p, fv->value);
-	// 		cg_internal_dynamic_map_set(p, v.addr, type, key, value, elem);
-	// 	}
-	// 	break;
-	// }
+		// 	cgValue key   = cg_build_expr(p, fv->field);
+		// 	cgValue value = cg_build_expr(p, fv->value);
+		// 	cg_internal_dynamic_map_set(p, v.addr, type, key, value, elem);
+		// }
+		break;
+	}
 
 	case Type_Array: {
 		auto temp_data = array_make<cgCompoundLitElemTempData>(temporary_allocator(), 0, cl->elems.count);
@@ -2523,23 +2527,21 @@ cgAddr cg_build_addr_compound_lit(cgProcedure *p, Ast *expr) {
 		assign_array(p, temp_data);
 		break;
 	}
-	// case Type_EnumeratedArray: {
-	// 	cg_addr_store(p, v, cg_const_value(p->module, type, exact_value_compound(expr)));
+	case Type_EnumeratedArray: {
+		auto temp_data = array_make<cgCompoundLitElemTempData>(temporary_allocator(), 0, cl->elems.count);
 
-	// 	auto temp_data = array_make<cgCompoundLitElemTempData>(temporary_allocator(), 0, cl->elems.count);
+		populate(p, cl->elems, &temp_data, type);
 
-	// 	populate(p, cl->elems, &temp_data, type);
+		cgValue dst_ptr = cg_addr_get_ptr(p, v);
+		i64 index_offset = exact_value_to_i64(*bt->EnumeratedArray.min_value);
+		for_array(i, temp_data) {
+			i32 index = cast(i32)(temp_data[i].elem_index - index_offset);
+			temp_data[i].gep = cg_emit_array_epi(p, dst_ptr, index);
+		}
 
-	// 	cgValue dst_ptr = cg_addr_get_ptr(p, v);
-	// 	i64 index_offset = exact_value_to_i64(*bt->EnumeratedArray.min_value);
-	// 	for_array(i, temp_data) {
-	// 		i32 index = cast(i32)(temp_data[i].elem_index - index_offset);
-	// 		temp_data[i].gep = cg_emit_array_epi(p, dst_ptr, index);
-	// 	}
-
-	// 	assign_array(p, temp_data);
-	// 	break;
-	// }
+		assign_array(p, temp_data);
+		break;
+	}
 	case Type_Slice: {
 		isize count = gb_max(cl->elems.count, cl->max_count);
 
@@ -2570,88 +2572,89 @@ cgAddr cg_build_addr_compound_lit(cgProcedure *p, Ast *expr) {
 		return v;
 	}
 
-	// case Type_DynamicArray: {
-	// 	GB_ASSERT(!build_context.no_dynamic_literals);
+	case Type_DynamicArray: {
+		GB_ASSERT(!build_context.no_dynamic_literals);
 
-	// 	Type *et = bt->DynamicArray.elem;
-	// 	cgValue size  = cg_const_int(p->module, t_int, type_size_of(et));
-	// 	cgValue align = cg_const_int(p->module, t_int, type_align_of(et));
+		Type *et = bt->DynamicArray.elem;
+		cgValue size  = cg_const_int(p, t_int, type_size_of(et));
+		cgValue align = cg_const_int(p, t_int, type_align_of(et));
 
-	// 	i64 item_count = gb_max(cl->max_count, cl->elems.count);
-	// 	{
+		i64 item_count = gb_max(cl->max_count, cl->elems.count);
+		{
 
-	// 		auto args = array_make<cgValue>(temporary_allocator(), 5);
-	// 		args[0] = cg_emit_conv(p, cg_addr_get_ptr(p, v), t_rawptr);
-	// 		args[1] = size;
-	// 		args[2] = align;
-	// 		args[3] = cg_const_int(p->module, t_int, item_count);
-	// 		args[4] = cg_emit_source_code_location_as_global(p, proc_name, pos);
-	// 		cg_emit_runtime_call(p, "__dynamic_array_reserve", args);
-	// 	}
+			auto args = slice_make<cgValue>(temporary_allocator(), 5);
+			args[0] = cg_emit_conv(p, cg_addr_get_ptr(p, v), t_rawptr);
+			args[1] = size;
+			args[2] = align;
+			args[3] = cg_const_int(p, t_int, item_count);
+			args[4] = cg_emit_source_code_location_as_global(p, proc_name, pos);
+			cg_emit_runtime_call(p, "__dynamic_array_reserve", args);
+		}
 
-	// 	cgValue items = cg_generate_local_array(p, et, item_count);
+		Type *array_type = alloc_type_array(et, item_count);
+		cgAddr items_addr = cg_add_local(p, array_type, nullptr, true);
+		cgValue items = cg_addr_get_ptr(p, items_addr);
 
-	// 	auto temp_data = array_make<cgCompoundLitElemTempData>(temporary_allocator(), 0, cl->elems.count);
-	// 	populate(p, cl->elems, &temp_data, type);
+		auto temp_data = array_make<cgCompoundLitElemTempData>(temporary_allocator(), 0, cl->elems.count);
+		populate(p, cl->elems, &temp_data, type);
 
-	// 	for_array(i, temp_data) {
-	// 		temp_data[i].gep = cg_emit_array_epi(p, items, temp_data[i].elem_index);
-	// 	}
-	// 	assign_array(p, temp_data);
+		for_array(i, temp_data) {
+			temp_data[i].gep = cg_emit_array_epi(p, items, temp_data[i].elem_index);
+		}
+		assign_array(p, temp_data);
 
-	// 	{
-	// 		auto args = array_make<cgValue>(temporary_allocator(), 6);
-	// 		args[0] = cg_emit_conv(p, v.addr, t_rawptr);
-	// 		args[1] = size;
-	// 		args[2] = align;
-	// 		args[3] = cg_emit_conv(p, items, t_rawptr);
-	// 		args[4] = cg_const_int(p->module, t_int, item_count);
-	// 		args[5] = cg_emit_source_code_location_as_global(p, proc_name, pos);
-	// 		cg_emit_runtime_call(p, "__dynamic_array_append", args);
-	// 	}
-	// 	break;
-	// }
+		{
+			auto args = slice_make<cgValue>(temporary_allocator(), 6);
+			args[0] = cg_emit_conv(p, v.addr, t_rawptr);
+			args[1] = size;
+			args[2] = align;
+			args[3] = cg_emit_conv(p, items, t_rawptr);
+			args[4] = cg_const_int(p, t_int, item_count);
+			args[5] = cg_emit_source_code_location_as_global(p, proc_name, pos);
+			cg_emit_runtime_call(p, "__dynamic_array_append", args);
+		}
+		break;
+	}
 
-	// case Type_Basic: {
-	// 	GB_ASSERT(is_type_any(bt));
-	// 	cg_addr_store(p, v, cg_const_value(p->module, type, exact_value_compound(expr)));
-	// 	String field_names[2] = {
-	// 		str_lit("data"),
-	// 		str_lit("id"),
-	// 	};
-	// 	Type *field_types[2] = {
-	// 		t_rawptr,
-	// 		t_typeid,
-	// 	};
+	case Type_Basic: {
+		GB_ASSERT(is_type_any(bt));
+		String field_names[2] = {
+			str_lit("data"),
+			str_lit("id"),
+		};
+		Type *field_types[2] = {
+			t_rawptr,
+			t_typeid,
+		};
 
-	// 	for_array(field_index, cl->elems) {
-	// 		Ast *elem = cl->elems[field_index];
+		for_array(field_index, cl->elems) {
+			Ast *elem = cl->elems[field_index];
 
-	// 		cgValue field_expr = {};
-	// 		isize index = field_index;
+			cgValue field_expr = {};
+			isize index = field_index;
 
-	// 		if (elem->kind == Ast_FieldValue) {
-	// 			ast_node(fv, FieldValue, elem);
-	// 			Selection sel = lookup_field(bt, fv->field->Ident.token.string, false);
-	// 			index = sel.index[0];
-	// 			elem = fv->value;
-	// 		} else {
-	// 			TypeAndValue tav = type_and_value_of_expr(elem);
-	// 			Selection sel = lookup_field(bt, field_names[field_index], false);
-	// 			index = sel.index[0];
-	// 		}
+			if (elem->kind == Ast_FieldValue) {
+				ast_node(fv, FieldValue, elem);
+				Selection sel = lookup_field(bt, fv->field->Ident.token.string, false);
+				index = sel.index[0];
+				elem = fv->value;
+			} else {
+				TypeAndValue tav = type_and_value_of_expr(elem);
+				Selection sel = lookup_field(bt, field_names[field_index], false);
+				index = sel.index[0];
+			}
 
-	// 		field_expr = cg_build_expr(p, elem);
+			field_expr = cg_build_expr(p, elem);
 
-	// 		GB_ASSERT(field_expr.type->kind != Type_Tuple);
+			GB_ASSERT(field_expr.type->kind != Type_Tuple);
 
-	// 		Type *ft = field_types[index];
-	// 		cgValue fv = cg_emit_conv(p, field_expr, ft);
-	// 		cgValue gep = cg_emit_struct_ep(p, cg_addr_get_ptr(p, v), cast(i32)index);
-	// 		cg_emit_store(p, gep, fv);
-	// 	}
-	// 	break;
-	// }
+			Type *ft = field_types[index];
+			cgValue fv = cg_emit_conv(p, field_expr, ft);
+			cgValue gep = cg_emit_struct_ep(p, cg_addr_get_ptr(p, v), index);
+			cg_emit_store(p, gep, fv);
+		}
+		break;
+	}
 
 	case Type_BitSet: {
 		i64 sz = type_size_of(type);
@@ -2679,48 +2682,41 @@ cgAddr cg_build_addr_compound_lit(cgProcedure *p, Ast *expr) {
 		return v;
 	}
 
-	// case Type_Matrix: {
-	// 	cg_addr_store(p, v, cg_const_value(p->module, type, exact_value_compound(expr)));
+	case Type_Matrix: {
+		auto temp_data = array_make<cgCompoundLitElemTempData>(temporary_allocator(), 0, cl->elems.count);
 
-	// 	auto temp_data = array_make<cgCompoundLitElemTempData>(temporary_allocator(), 0, cl->elems.count);
+		populate(p, cl->elems, &temp_data, type);
 
-	// 	populate(p, cl->elems, &temp_data, type);
+		cgValue dst_ptr = cg_addr_get_ptr(p, v);
+		for_array(i, temp_data) {
+			temp_data[i].gep = cg_emit_array_epi(p, dst_ptr, temp_data[i].elem_index);
+		}
 
-	// 	cgValue dst_ptr = cg_addr_get_ptr(p, v);
-	// 	for_array(i, temp_data) {
-	// 		temp_data[i].gep = cg_emit_array_epi(p, dst_ptr, temp_data[i].elem_index);
-	// 	}
+		assign_array(p, temp_data);
+		break;
+	}
 
-	// 	assign_array(p, temp_data);
-	// 	break;
-	// }
+	case Type_SimdVector: {
+		// auto temp_data = array_make<cgCompoundLitElemTempData>(temporary_allocator(), 0, cl->elems.count);
 
-	// case Type_SimdVector: {
-	// 	cgValue vector_value = cg_const_value(p->module, type, exact_value_compound(expr));
-	// 	defer (cg_addr_store(p, v, vector_value));
+		// populate(p, cl->elems, &temp_data, type);
 
-	// 	auto temp_data = array_make<cgCompoundLitElemTempData>(temporary_allocator(), 0, cl->elems.count);
+		// // TODO(bill): reduce the need for individual `insertelement` if a `shufflevector`
+		// // might be a better option
+		// for (auto const &td : temp_data) if (td.value.node != nullptr) {
+		// 	if (td.elem_length > 0) {
+		// 		for (i64 k = 0; k < td.elem_length; k++) {
+		// 			LLVMValueRef index = cg_const_int(p->module, t_u32, td.elem_index + k).value;
+		// 			vector_value.value = LLVMBuildInsertElement(p->builder, vector_value.value, td.value.value, index, "");
+		// 		}
+		// 	} else {
+		// 		LLVMValueRef index = cg_const_int(p->module, t_u32, td.elem_index).value;
+		// 		vector_value.value = LLVMBuildInsertElement(p->builder, vector_value.value, td.value.value, index, "");
 
-	// 	populate(p, cl->elems, &temp_data, type);
-
-	// 	// TODO(bill): reduce the need for individual `insertelement` if a `shufflevector`
-	// 	// might be a better option
-	// 	for (auto const &td : temp_data) {
-	// 		if (td.value.value != nullptr) {
-	// 			if (td.elem_length > 0) {
-	// 				for (i64 k = 0; k < td.elem_length; k++) {
-	// 					LLVMValueRef index = cg_const_int(p->module, t_u32, td.elem_index + k).value;
-	// 					vector_value.value = LLVMBuildInsertElement(p->builder, vector_value.value, td.value.value, index, "");
-	// 				}
-	// 			} else {
-	// 				LLVMValueRef index = cg_const_int(p->module, t_u32, td.elem_index).value;
-	// 				vector_value.value = LLVMBuildInsertElement(p->builder, vector_value.value, td.value.value, index, "");
-
-	// 			}
-	// 		}
-	// 	}
-	// 	break;
-	// }
+		// 	}
+		// }
+		break;
+	}
 	}
 
 	return v;
