@@ -3,12 +3,12 @@ package slice
 import "core:intrinsics"
 import "core:builtin"
 import "core:math/bits"
-import "core:mem"
+import "core:runtime"
 
 _ :: intrinsics
 _ :: builtin
 _ :: bits
-_ :: mem
+_ :: runtime
 
 /*
 	Turn a pointer and a length into a slice.
@@ -164,7 +164,7 @@ equal :: proc(a, b: $T/[]$E) -> bool where intrinsics.type_is_comparable(E) {
 		return false
 	}
 	when intrinsics.type_is_simple_compare(E) {
-		return mem.compare_ptrs(raw_data(a), raw_data(b), len(a)*size_of(E)) == 0
+		return runtime.memory_compare(raw_data(a), raw_data(b), len(a)*size_of(E)) == 0
 	} else {
 		for i in 0..<len(a) {
 			if a[i] != b[i] {
@@ -180,7 +180,7 @@ simple_equal :: proc(a, b: $T/[]$E) -> bool where intrinsics.type_is_simple_comp
 	if len(a) != len(b) {
 		return false
 	}
-	return mem.compare_ptrs(raw_data(a), raw_data(b), len(a)*size_of(E)) == 0
+	return runtime.memory_compare(raw_data(a), raw_data(b), len(a)*size_of(E)) == 0
 }
 
 /*
@@ -220,6 +220,12 @@ has_suffix :: proc(array: $T/[]$E, needle: E) -> bool where intrinsics.type_is_c
 	return false
 }
 
+zero :: proc(array: $T/[]$E) #no_bounds_check {
+	if len(array) > 0 {
+		intrinsics.mem_zero(raw_data(array), size_of(E)*len(array))
+	}
+}
+
 fill :: proc(array: $T/[]$E, value: E) #no_bounds_check {
 	if len(array) <= 0 {
 		return
@@ -250,7 +256,7 @@ swap_with_slice :: proc(a, b: $T/[]$E, loc := #caller_location) {
 }
 
 @(require_results)
-concatenate :: proc(a: []$T/[]$E, allocator := context.allocator) -> (res: T, err: mem.Allocator_Error) #optional_allocator_error {
+concatenate :: proc(a: []$T/[]$E, allocator := context.allocator) -> (res: T, err: runtime.Allocator_Error) #optional_allocator_error {
 	if len(a) == 0 {
 		return
 	}
@@ -268,7 +274,7 @@ concatenate :: proc(a: []$T/[]$E, allocator := context.allocator) -> (res: T, er
 
 // copies a slice into a new slice
 @(require_results)
-clone :: proc(a: $T/[]$E, allocator := context.allocator) -> ([]E, mem.Allocator_Error) #optional_allocator_error {
+clone :: proc(a: $T/[]$E, allocator := context.allocator) -> ([]E, runtime.Allocator_Error) #optional_allocator_error {
 	d, err := make([]E, len(a), allocator)
 	copy(d[:], a)
 	return d, err
@@ -276,7 +282,7 @@ clone :: proc(a: $T/[]$E, allocator := context.allocator) -> ([]E, mem.Allocator
 
 
 // copies slice into a new dynamic array
-clone_to_dynamic :: proc(a: $T/[]$E, allocator := context.allocator) -> ([dynamic]E, mem.Allocator_Error) #optional_allocator_error {
+clone_to_dynamic :: proc(a: $T/[]$E, allocator := context.allocator) -> ([dynamic]E, runtime.Allocator_Error) #optional_allocator_error {
 	d, err := make([dynamic]E, len(a), allocator)
 	copy(d[:], a)
 	return d, err
@@ -286,12 +292,12 @@ to_dynamic :: clone_to_dynamic
 // Converts slice into a dynamic array without cloning or allocating memory
 @(require_results)
 into_dynamic :: proc(a: $T/[]$E) -> [dynamic]E {
-	s := transmute(mem.Raw_Slice)a
-	d := mem.Raw_Dynamic_Array{
+	s := transmute(runtime.Raw_Slice)a
+	d := runtime.Raw_Dynamic_Array{
 		data = s.data,
 		len  = 0,
 		cap  = s.len,
-		allocator = mem.nil_allocator(),
+		allocator = runtime.nil_allocator(),
 	}
 	return transmute([dynamic]E)d
 }
@@ -373,7 +379,7 @@ as_ptr :: proc(array: $T/[]$E) -> [^]E {
 
 
 @(require_results)
-mapper :: proc(s: $S/[]$U, f: proc(U) -> $V, allocator := context.allocator) -> (r: []V, err: mem.Allocator_Error) #optional_allocator_error {
+mapper :: proc(s: $S/[]$U, f: proc(U) -> $V, allocator := context.allocator) -> (r: []V, err: runtime.Allocator_Error) #optional_allocator_error {
 	r = make([]V, len(s), allocator) or_return
 	for v, i in s {
 		r[i] = f(v)
@@ -402,7 +408,7 @@ filter :: proc(s: $S/[]$U, f: proc(U) -> bool, allocator := context.allocator) -
 }
 
 @(require_results)
-scanner :: proc (s: $S/[]$U, initializer: $V, f: proc(V, U) -> V, allocator := context.allocator) -> (res: []V, err: mem.Allocator_Error) #optional_allocator_error {
+scanner :: proc (s: $S/[]$U, initializer: $V, f: proc(V, U) -> V, allocator := context.allocator) -> (res: []V, err: runtime.Allocator_Error) #optional_allocator_error {
 	if len(s) == 0 { return }
 
 	res = make([]V, len(s), allocator) or_return

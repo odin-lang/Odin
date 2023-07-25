@@ -655,7 +655,6 @@ enum BuildFlagKind {
 	BuildFlag_ShowDebugMessages,
 	BuildFlag_Vet,
 	BuildFlag_VetExtra,
-	BuildFlag_UseLLVMApi,
 	BuildFlag_IgnoreUnknownAttributes,
 	BuildFlag_ExtraLinkerFlags,
 	BuildFlag_ExtraAssemblerFlags,
@@ -671,11 +670,10 @@ enum BuildFlagKind {
 
 	BuildFlag_DisallowDo,
 	BuildFlag_DefaultToNilAllocator,
-	BuildFlag_InsertSemicolon,
 	BuildFlag_StrictStyle,
 	BuildFlag_StrictStyleInitOnly,
 	BuildFlag_ForeignErrorProcedures,
-	BuildFlag_DisallowRTTI,
+	BuildFlag_NoRTTI,
 	BuildFlag_DynamicMapCalls,
 
 	BuildFlag_Compact,
@@ -834,7 +832,6 @@ gb_internal bool parse_build_flags(Array<String> args) {
 	add_flag(&build_flags, BuildFlag_ShowDebugMessages,       str_lit("show-debug-messages"),       BuildFlagParam_None,    Command_all);
 	add_flag(&build_flags, BuildFlag_Vet,                     str_lit("vet"),                       BuildFlagParam_None,    Command__does_check);
 	add_flag(&build_flags, BuildFlag_VetExtra,                str_lit("vet-extra"),                 BuildFlagParam_None,    Command__does_check);
-	add_flag(&build_flags, BuildFlag_UseLLVMApi,              str_lit("llvm-api"),                  BuildFlagParam_None,    Command__does_build);
 	add_flag(&build_flags, BuildFlag_IgnoreUnknownAttributes, str_lit("ignore-unknown-attributes"), BuildFlagParam_None,    Command__does_check);
 	add_flag(&build_flags, BuildFlag_ExtraLinkerFlags,        str_lit("extra-linker-flags"),        BuildFlagParam_String,  Command__does_build);
 	add_flag(&build_flags, BuildFlag_ExtraAssemblerFlags,     str_lit("extra-assembler-flags"),     BuildFlagParam_String,  Command__does_build);
@@ -849,12 +846,12 @@ gb_internal bool parse_build_flags(Array<String> args) {
 
 	add_flag(&build_flags, BuildFlag_DisallowDo,              str_lit("disallow-do"),               BuildFlagParam_None,    Command__does_check);
 	add_flag(&build_flags, BuildFlag_DefaultToNilAllocator,   str_lit("default-to-nil-allocator"),  BuildFlagParam_None,    Command__does_check);
-	add_flag(&build_flags, BuildFlag_InsertSemicolon,         str_lit("insert-semicolon"),          BuildFlagParam_None,    Command__does_check);
 	add_flag(&build_flags, BuildFlag_StrictStyle,             str_lit("strict-style"),              BuildFlagParam_None,    Command__does_check);
 	add_flag(&build_flags, BuildFlag_StrictStyleInitOnly,     str_lit("strict-style-init-only"),    BuildFlagParam_None,    Command__does_check);
 	add_flag(&build_flags, BuildFlag_ForeignErrorProcedures,  str_lit("foreign-error-procedures"),  BuildFlagParam_None,    Command__does_check);
 
-	add_flag(&build_flags, BuildFlag_DisallowRTTI,            str_lit("disallow-rtti"),             BuildFlagParam_None,    Command__does_check);
+	add_flag(&build_flags, BuildFlag_NoRTTI,                  str_lit("no-rtti"),                   BuildFlagParam_None,    Command__does_check);
+	add_flag(&build_flags, BuildFlag_NoRTTI,                  str_lit("disallow-rtti"),             BuildFlagParam_None,    Command__does_check);
 
 	add_flag(&build_flags, BuildFlag_DynamicMapCalls,         str_lit("dynamic-map-calls"),         BuildFlagParam_None,    Command__does_check);
 
@@ -1372,11 +1369,6 @@ gb_internal bool parse_build_flags(Array<String> args) {
 							build_context.vet_extra = true;
 							break;
 						}
-						case BuildFlag_UseLLVMApi: {
-							gb_printf_err("-llvm-api flag is not required any more\n");
-							bad_flags = true;
-							break;
-						}
 						case BuildFlag_IgnoreUnknownAttributes:
 							build_context.ignore_unknown_attributes = true;
 							break;
@@ -1448,8 +1440,12 @@ gb_internal bool parse_build_flags(Array<String> args) {
 						case BuildFlag_DisallowDo:
 							build_context.disallow_do = true;
 							break;
-						case BuildFlag_DisallowRTTI:
-							build_context.disallow_rtti = true;
+						case BuildFlag_NoRTTI:
+							if (name == "disallow-rtti") {
+								gb_printf_err("'-disallow-rtti' has been replaced with '-no-rtti'\n");
+								bad_flags = true;
+							}
+							build_context.no_rtti = true;
 							break;
 						case BuildFlag_DynamicMapCalls:
 							build_context.dynamic_map_calls = true;
@@ -1460,11 +1456,6 @@ gb_internal bool parse_build_flags(Array<String> args) {
 						case BuildFlag_ForeignErrorProcedures:
 							build_context.ODIN_FOREIGN_ERROR_PROCEDURES = true;
 							break;
-						case BuildFlag_InsertSemicolon: {
-							gb_printf_err("-insert-semicolon flag is not required any more\n");
-							bad_flags = true;
-							break;
-						}
 						case BuildFlag_StrictStyle: {
 							if (build_context.strict_style_init_only) {
 								gb_printf_err("-strict-style and -strict-style-init-only cannot be used together\n");
@@ -2558,6 +2549,22 @@ gb_internal int strip_semicolons(Parser *parser) {
 
 gb_internal void init_terminal(void) {
 	build_context.has_ansi_terminal_colours = false;
+
+	gbAllocator a = heap_allocator();
+
+	char const *no_color = gb_get_env("NO_COLOR", a);
+	defer (gb_free(a, cast(void *)no_color));
+	if (no_color != nullptr) {
+		return;
+	}
+
+	char const *force_color = gb_get_env("FORCE_COLOR", a);
+	defer (gb_free(a, cast(void *)force_color));
+	if (force_color != nullptr) {
+		build_context.has_ansi_terminal_colours = true;
+		return;
+	}
+
 #if defined(GB_SYSTEM_WINDOWS)
 	HANDLE hnd = GetStdHandle(STD_ERROR_HANDLE);
 	DWORD mode = 0;
@@ -2567,10 +2574,16 @@ gb_internal void init_terminal(void) {
 			build_context.has_ansi_terminal_colours = true;
 		}
 	}
+#elif defined(GB_SYSTEM_OSX) || defined(GB_SYSTEM_UNIX)
+	char const *term_ = gb_get_env("TERM", a);
+	defer (gb_free(a, cast(void *)term_));
+	String term = make_string_c(term_);
+	if (!str_eq(term, str_lit("dumb")) && isatty(STDERR_FILENO)) {
+		build_context.has_ansi_terminal_colours = true;
+	}
 #endif
 
 	if (!build_context.has_ansi_terminal_colours) {
-		gbAllocator a = heap_allocator();
 		char const *odin_terminal_ = gb_get_env("ODIN_TERMINAL", a);
 		defer (gb_free(a, cast(void *)odin_terminal_));
 		String odin_terminal = make_string_c(odin_terminal_);

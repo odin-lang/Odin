@@ -15,7 +15,7 @@ gb_internal isize lb_type_info_index(CheckerInfo *info, Type *type, bool err_on_
 }
 
 gb_internal lbValue lb_typeid(lbModule *m, Type *type) {
-	GB_ASSERT(!build_context.disallow_rtti);
+	GB_ASSERT(!build_context.no_rtti);
 
 	type = default_type(type);
 
@@ -92,7 +92,7 @@ gb_internal lbValue lb_typeid(lbModule *m, Type *type) {
 }
 
 gb_internal lbValue lb_type_info(lbModule *m, Type *type) {
-	GB_ASSERT(!build_context.disallow_rtti);
+	GB_ASSERT(!build_context.no_rtti);
 
 	type = default_type(type);
 
@@ -141,7 +141,7 @@ gb_internal lbValue lb_type_info_member_tags_offset(lbProcedure *p, isize count)
 
 
 gb_internal void lb_setup_type_info_data(lbProcedure *p) { // NOTE(bill): Setup type_info data
-	if (build_context.disallow_rtti) {
+	if (build_context.no_rtti) {
 		return;
 	}
 
@@ -654,10 +654,9 @@ gb_internal void lb_setup_type_info_data(lbProcedure *p) { // NOTE(bill): Setup 
 				lbValue count = lb_const_int(m, t_int, variant_count);
 				vals[0] = llvm_const_slice(m, memory_types, count);
 
-				i64 tag_size   = union_tag_size(t);
-				i64 tag_offset = align_formula(t->Union.variant_block_size, tag_size);
-
+				i64 tag_size = union_tag_size(t);
 				if (tag_size > 0) {
+					i64 tag_offset = align_formula(t->Union.variant_block_size, tag_size);
 					vals[1] = lb_const_int(m, t_uintptr, tag_offset).value;
 					vals[2] = lb_type_info(m, union_tag_type(t)).value;
 				} else {

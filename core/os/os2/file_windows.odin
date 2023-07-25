@@ -38,6 +38,8 @@ _File :: struct {
 	wname: win32.wstring,
 	kind: _File_Kind,
 
+	stream: io.Stream,
+
 	allocator: runtime.Allocator,
 
 	rw_mutex: sync.RW_Mutex, // read write calls
@@ -144,6 +146,11 @@ _new_file :: proc(handle: uintptr, name: string) -> ^File {
 	}
 	f.impl.kind = kind
 
+	f.impl.stream = {
+		data = f,
+		procedure = _file_stream_proc,
+	}
+
 	return f
 }
 
@@ -181,7 +188,7 @@ _name :: proc(f: ^File) -> string {
 	return f.impl.name if f != nil else ""
 }
 
-_seek :: proc(f: ^File, offset: i64, whence: Seek_From) -> (ret: i64, err: Error) {
+_seek :: proc(f: ^File, offset: i64, whence: io.Seek_From) -> (ret: i64, err: Error) {
 	handle := _handle(f)
 	if handle == win32.INVALID_HANDLE {
 		return 0, .Invalid_File
@@ -208,7 +215,7 @@ _seek :: proc(f: ^File, offset: i64, whence: Seek_From) -> (ret: i64, err: Error
 	return i64(hi)<<32 + i64(dw_ptr), nil
 }
 
-_read :: proc(f: ^File, p: []byte) -> (n: int, err: Error) {
+_read :: proc(f: ^File, p: []byte) -> (n: i64, err: Error) {
 	read_console :: proc(handle: win32.HANDLE, b: []byte) -> (n: int, err: Error) {
 		if len(b) == 0 {
 			return 0, nil
@@ -274,7 +281,7 @@ _read :: proc(f: ^File, p: []byte) -> (n: int, err: Error) {
 			n, err := read_console(handle, p[total_read:][:to_read])
 			total_read += n
 			if err != nil {
-				return int(total_read), err
+				return i64(total_read), err
 			}
 		} else {
 			ok = win32.ReadFile(handle, &p[total_read], to_read, &single_read_length, nil)
@@ -287,11 +294,11 @@ _read :: proc(f: ^File, p: []byte) -> (n: int, err: Error) {
 		}
 	}
 
-	return int(total_read), nil
+	return i64(total_read), err
 }
 
-_read_at :: proc(f: ^File, p: []byte, offset: i64) -> (n: int, err: Error) {
-	pread :: proc(f: ^File, data: []byte, offset: i64) -> (n: int, err: Error) {
+_read_at :: proc(f: ^File, p: []byte, offset: i64) -> (n: i64, err: Error) {
+	pread :: proc(f: ^File, data: []byte, offset: i64) -> (n: i64, err: Error) {
 		buf := data
 		if len(buf) > MAX_RW {
 			buf = buf[:MAX_RW]
@@ -313,7 +320,7 @@ _read_at :: proc(f: ^File, p: []byte, offset: i64) -> (n: int, err: Error) {
 			err = _get_platform_error()
 			done = 0
 		}
-		n = int(done)
+		n = i64(done)
 		return
 	}
 
@@ -329,12 +336,7 @@ _read_at :: proc(f: ^File, p: []byte, offset: i64) -> (n: int, err: Error) {
 	return
 }
 
-_read_from :: proc(f: ^File, r: io.Reader) -> (n: i64, err: Error) {
-	// TODO(bill)
-	return
-}
-
-_write :: proc(f: ^File, p: []byte) -> (n: int, err: Error) {
+_write :: proc(f: ^File, p: []byte) -> (n: i64, err: Error) {
 	if len(p) == 0 {
 		return
 	}
@@ -352,17 +354,17 @@ _write :: proc(f: ^File, p: []byte) -> (n: int, err: Error) {
 
 		e := win32.WriteFile(handle, &p[total_write], to_write, &single_write_length, nil)
 		if single_write_length <= 0 || !e {
-			n = int(total_write)
+			n = i64(total_write)
 			err = _get_platform_error()
 			return
 		}
 		total_write += i64(single_write_length)
 	}
-	return int(total_write), nil
+	return i64(total_write), nil
 }
 
-_write_at :: proc(f: ^File, p: []byte, offset: i64) -> (n: int, err: Error) {
-	pwrite :: proc(f: ^File, data: []byte, offset: i64) -> (n: int, err: Error) {
+_write_at :: proc(f: ^File, p: []byte, offset: i64) -> (n: i64, err: Error) {
+	pwrite :: proc(f: ^File, data: []byte, offset: i64) -> (n: i64, err: Error) {
 		buf := data
 		if len(buf) > MAX_RW {
 			buf = buf[:MAX_RW]
@@ -382,7 +384,7 @@ _write_at :: proc(f: ^File, p: []byte, offset: i64) -> (n: int, err: Error) {
 			err = _get_platform_error()
 			done = 0
 		}
-		n = int(done)
+		n = i64(done)
 		return
 	}
 
@@ -394,11 +396,6 @@ _write_at :: proc(f: ^File, p: []byte, offset: i64) -> (n: int, err: Error) {
 		p = p[m:]
 		offset += i64(m)
 	}
-	return
-}
-
-_write_to :: proc(f: ^File, w: io.Writer) -> (n: i64, err: Error) {
-	// TODO(bill)
 	return
 }
 
@@ -727,3 +724,51 @@ _is_dir :: proc(path: string) -> bool {
 	}
 	return false
 }
+
+
+@(private="package")
+_file_stream_proc :: proc(stream_data: rawptr, mode: io.Stream_Mode, p: []byte, offset: i64, whence: io.Seek_From) -> (n: i64, err: io.Error) {
+	f := (^File)(stream_data)
+	ferr: Error
+	i: int
+	switch mode {
+	case .Read:
+		n, ferr = _read(f, p)
+		err = error_to_io_error(ferr)
+		return
+	case .Read_At:
+		n, ferr = _read_at(f, p, offset)
+		err = error_to_io_error(ferr)
+		return
+	case .Write:
+		n, ferr = _write(f, p)
+		err = error_to_io_error(ferr)
+		return
+	case .Write_At:
+		n, ferr = _write_at(f, p, offset)
+		err = error_to_io_error(ferr)
+		return
+	case .Seek:
+		n, ferr = _seek(f, offset, whence)
+		err = error_to_io_error(ferr)
+		return
+	case .Size:
+		n, ferr = _file_size(f)
+		err = error_to_io_error(ferr)
+		return
+	case .Flush:
+		ferr = _flush(f)
+		err = error_to_io_error(ferr)
+		return
+	case .Close:
+		ferr = _close(f)
+		err = error_to_io_error(ferr)
+		return
+	case .Query:
+		return io.query_utility({.Read, .Read_At, .Write, .Write_At, .Seek, .Size, .Flush, .Close, .Query})
+	case .Destroy:
+		return 0, .Empty
+	}
+	return 0, .Empty
+}
+

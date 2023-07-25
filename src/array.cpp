@@ -80,7 +80,9 @@ gb_internal Slice<T> slice_make(gbAllocator const &allocator, isize count) {
 	GB_ASSERT(count >= 0);
 	Slice<T> s = {};
 	s.data = gb_alloc_array(allocator, T, count);
-	GB_ASSERT(s.data != nullptr);
+	if (count > 0) {
+		GB_ASSERT(s.data != nullptr);
+	}
 	s.count = count;
 	return s;
 }

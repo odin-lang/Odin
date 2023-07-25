@@ -314,15 +314,16 @@ Dirent :: struct {
 
 Dir :: distinct rawptr // DIR*
 
+ADDRESS_FAMILY :: c.char
 SOCKADDR :: struct #packed {
 	len: c.char,
-	family: c.char,
+	family: ADDRESS_FAMILY,
 	sa_data: [14]c.char,
 }
 
 SOCKADDR_STORAGE_LH :: struct #packed {
 	len: c.char,
-	family: c.char,
+	family: ADDRESS_FAMILY,
 	__ss_pad1: [6]c.char,
 	__ss_align: i64,
 	__ss_pad2: [112]c.char,
@@ -330,7 +331,7 @@ SOCKADDR_STORAGE_LH :: struct #packed {
 
 sockaddr_in :: struct #packed {
 	sin_len: c.char,
-	sin_family: c.char,
+	sin_family: ADDRESS_FAMILY,
 	sin_port: u16be,
 	sin_addr: in_addr,
 	sin_zero: [8]c.char,
@@ -338,7 +339,7 @@ sockaddr_in :: struct #packed {
 
 sockaddr_in6 :: struct #packed {
 	sin6_len: c.char,
-	sin6_family: c.char,
+	sin6_family: ADDRESS_FAMILY,
 	sin6_port: u16be,
 	sin6_flowinfo: c.uint,
 	sin6_addr: in6_addr,
@@ -355,7 +356,7 @@ in6_addr :: struct #packed {
 
 Timeval :: struct {
 	seconds: i64,
-	nanoseconds: int,
+	microseconds: int,
 }
 
 Linger :: struct {
@@ -440,7 +441,7 @@ foreign libc {
 	@(link_name="closedir")         _unix_closedir      :: proc(dirp: Dir) -> c.int ---
 	@(link_name="rewinddir")        _unix_rewinddir     :: proc(dirp: Dir) ---
 
-	@(link_name="__fcntl")          _unix__fcntl        :: proc(fd: Handle, cmd: c.int, #c_vararg args: ..any) -> c.int ---
+	@(link_name="__fcntl")          _unix__fcntl        :: proc(fd: Handle, cmd: c.int, arg: uintptr) -> c.int ---
 
 	@(link_name="rename") _unix_rename :: proc(old: cstring, new: cstring) -> c.int ---
 	@(link_name="remove") _unix_remove :: proc(path: cstring) -> c.int ---
@@ -794,14 +795,14 @@ _readlink :: proc(path: string) -> (string, Errno) {
 }
 
 absolute_path_from_handle :: proc(fd: Handle) -> (string, Errno) {
-	buf : [256]byte
-	res  := _unix__fcntl(fd, F_GETPATH, &buf[0])
-	if	res != 0 {
-		return "", Errno(get_last_error())
+	buf: [DARWIN_MAXPATHLEN]byte
+	_, err := fcntl(int(fd), F_GETPATH, int(uintptr(&buf[0])))
+	if err != ERROR_NONE {
+		return "", err
 	}
 
 	path := strings.clone_from_cstring(cstring(&buf[0]))
-	return path, ERROR_NONE
+	return path, err
 }
 
 absolute_path_from_relative :: proc(rel: string) -> (path: string, err: Errno) {
@@ -1068,7 +1069,7 @@ shutdown :: proc(sd: Socket, how: int) -> (Errno) {
 }
 
 fcntl :: proc(fd: int, cmd: int, arg: int) -> (int, Errno) {
-	result := _unix__fcntl(Handle(fd), c.int(cmd), c.int(arg))
+	result := _unix__fcntl(Handle(fd), c.int(cmd), uintptr(arg))
 	if result < 0 {
 		return 0, Errno(get_last_error())
 	}

@@ -729,6 +729,12 @@ gb_internal void check_union_type(CheckerContext *ctx, Type *union_type, Ast *no
 	union_type->Union.kind = ut->kind;
 	switch (ut->kind) {
 	case UnionType_no_nil:
+		if (union_type->Union.is_polymorphic && poly_operands == nullptr) {
+			GB_ASSERT(variants.count == 0);
+			if (ut->variants.count != 1) {
+				break;
+			}
+		}
 		if (variants.count < 2) {
 			error(ut->align, "A union with #no_nil must have at least 2 variants");
 		}
@@ -1410,7 +1416,7 @@ gb_internal ParameterValue handle_parameter_value(CheckerContext *ctx, Type *in_
 }
 
 
-gb_internal Type *check_get_params(CheckerContext *ctx, Scope *scope, Ast *_params, bool *is_variadic_, isize *variadic_index_, bool *success_, isize *specialization_count_, Array<Operand> *operands) {
+gb_internal Type *check_get_params(CheckerContext *ctx, Scope *scope, Ast *_params, bool *is_variadic_, isize *variadic_index_, bool *success_, isize *specialization_count_, Array<Operand> const *operands) {
 	if (_params == nullptr) {
 		return nullptr;
 	}
@@ -1658,7 +1664,6 @@ gb_internal Type *check_get_params(CheckerContext *ctx, Scope *scope, Ast *_para
 				ExactValue poly_const = {};
 
 				if (operands != nullptr && variables.count < operands->count) {
-
 					Operand op = (*operands)[variables.count];
 					if (op.expr == nullptr) {
 						// NOTE(bill): 2019-03-30
@@ -1961,7 +1966,7 @@ gb_internal Type *check_get_results(CheckerContext *ctx, Scope *scope, Ast *_res
 
 
 // NOTE(bill): 'operands' is for generating non generic procedure type
-gb_internal bool check_procedure_type(CheckerContext *ctx, Type *type, Ast *proc_type_node, Array<Operand> *operands) {
+gb_internal bool check_procedure_type(CheckerContext *ctx, Type *type, Ast *proc_type_node, Array<Operand> const *operands) {
 	ast_node(pt, ProcType, proc_type_node);
 
 	if (ctx->polymorphic_scope == nullptr && ctx->allow_polymorphic_types) {

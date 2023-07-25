@@ -375,69 +375,31 @@ buffer_read_from :: proc(b: ^Buffer, r: io.Reader) -> (n: i64, err: io.Error) #n
 
 
 buffer_to_stream :: proc(b: ^Buffer) -> (s: io.Stream) {
-	s.stream_data = b
-	s.stream_vtable = &_buffer_vtable
+	s.data = b
+	s.procedure = _buffer_proc
 	return
 }
 
 @(private)
-_buffer_vtable := io.Stream_VTable{
-	impl_size = proc(s: io.Stream) -> i64 {
-		b := (^Buffer)(s.stream_data)
-		return i64(buffer_capacity(b))
-	},
-	impl_read = proc(s: io.Stream, p: []byte) -> (n: int, err: io.Error) {
-		b := (^Buffer)(s.stream_data)
-		return buffer_read(b, p)
-	},
-	impl_read_at = proc(s: io.Stream, p: []byte, offset: i64) -> (n: int, err: io.Error) {
-		b := (^Buffer)(s.stream_data)
-		return buffer_read_at(b, p, int(offset))
-	},
-	impl_read_byte = proc(s: io.Stream) -> (byte, io.Error) {
-		b := (^Buffer)(s.stream_data)
-		return buffer_read_byte(b)
-	},
-	impl_read_rune = proc(s: io.Stream) -> (r: rune, size: int, err: io.Error) {
-		b := (^Buffer)(s.stream_data)
-		return buffer_read_rune(b)
-	},
-	impl_write = proc(s: io.Stream, p: []byte) -> (n: int, err: io.Error) {
-		b := (^Buffer)(s.stream_data)
-		return buffer_write(b, p)
-	},
-	impl_write_at = proc(s: io.Stream, p: []byte, offset: i64) -> (n: int, err: io.Error) {
-		b := (^Buffer)(s.stream_data)
-		return buffer_write_at(b, p, int(offset))
-	},
-	impl_write_byte = proc(s: io.Stream, c: byte) -> io.Error {
-		b := (^Buffer)(s.stream_data)
-		return buffer_write_byte(b, c)
-	},
-	impl_write_rune = proc(s: io.Stream, r: rune) -> (int, io.Error) {
-		b := (^Buffer)(s.stream_data)
-		return buffer_write_rune(b, r)
-	},
-	impl_unread_byte = proc(s: io.Stream) -> io.Error {
-		b := (^Buffer)(s.stream_data)
-		return buffer_unread_byte(b)
-	},
-	impl_unread_rune = proc(s: io.Stream) -> io.Error {
-		b := (^Buffer)(s.stream_data)
-		return buffer_unread_rune(b)
-	},
-	impl_destroy = proc(s: io.Stream) -> io.Error {
-		b := (^Buffer)(s.stream_data)
+_buffer_proc :: proc(stream_data: rawptr, mode: io.Stream_Mode, p: []byte, offset: i64, whence: io.Seek_From) -> (n: i64, err: io.Error) {
+	b := (^Buffer)(stream_data)
+	#partial switch mode {
+	case .Read:
+		return io._i64_err(buffer_read(b, p))
+	case .Read_At:
+		return io._i64_err(buffer_read_at(b, p, int(offset)))
+	case .Write:
+		return io._i64_err(buffer_write(b, p))
+	case .Write_At:
+		return io._i64_err(buffer_write_at(b, p, int(offset)))
+	case .Size:
+		n = i64(buffer_capacity(b))
+		return
+	case .Destroy:
 		buffer_destroy(b)
-		return nil
-	},
-	impl_write_to = proc(s: io.Stream, w: io.Writer) -> (n: i64, err: io.Error) {
-		b := (^Buffer)(s.stream_data)
-		return buffer_write_to(b, w)
-	},
-	impl_read_from = proc(s: io.Stream, r: io.Reader) -> (n: i64, err: io.Error) {
-		b := (^Buffer)(s.stream_data)
-		return buffer_read_from(b, r)
-	},
+		return
+	case .Query:
+		return io.query_utility({.Read, .Read_At, .Write, .Write_At, .Size, .Destroy})
+	}
+	return 0, .Empty
 }
-

@@ -164,7 +164,7 @@ struct lbModule {
 	PtrMap<Type *, lbProcedure *> map_get_procs;
 	PtrMap<Type *, lbProcedure *> map_set_procs;
 
-	u32 nested_type_name_guid;
+	std::atomic<u32> nested_type_name_guid;
 
 	Array<lbProcedure *> procedures_to_generate;
 	Array<Entity *> global_procedures_and_types_to_create;
@@ -201,7 +201,7 @@ struct lbGenerator {
 	PtrMap<LLVMContextRef, lbModule *> modules_through_ctx; 
 	lbModule default_module;
 
-	BlockingMutex anonymous_proc_lits_mutex;
+	RecursiveMutex anonymous_proc_lits_mutex;
 	PtrMap<Ast *, lbProcedure *> anonymous_proc_lits; 
 
 	BlockingMutex foreign_mutex;
@@ -345,6 +345,8 @@ struct lbProcedure {
 	PtrMap<LLVMValueRef, lbTupleFix> tuple_fix_map;
 };
 
+
+#define ABI_PKG_NAME_SEPARATOR "."
 
 
 #if !ODIN_LLVM_MINIMUM_VERSION_14
@@ -544,6 +546,8 @@ gb_internal gb_inline i64 lb_max_zero_init_size(void) {
 
 gb_internal LLVMTypeRef OdinLLVMGetArrayElementType(LLVMTypeRef type);
 gb_internal LLVMTypeRef OdinLLVMGetVectorElementType(LLVMTypeRef type);
+
+gb_internal String lb_filepath_ll_for_module(lbModule *m);
 
 #define LB_STARTUP_RUNTIME_PROC_NAME   "__$startup_runtime"
 #define LB_CLEANUP_RUNTIME_PROC_NAME   "__$cleanup_runtime"

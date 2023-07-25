@@ -450,7 +450,7 @@ flux_tween_init :: proc(tween: ^Flux_Tween($T), duration: time.Duration) where i
 flux_update :: proc(flux: ^Flux_Map($T), dt: f64) where intrinsics.type_is_float(T) {
 	clear(&flux.keys_to_be_deleted)
 
-	for key, tween in &flux.values {
+	for key, &tween in flux.values {
 		delay_remainder := f64(0)
 
 		// Update delay if necessary.

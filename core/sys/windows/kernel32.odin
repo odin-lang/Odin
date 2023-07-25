@@ -159,6 +159,11 @@ foreign kernel32 {
 	WaitForSingleObject :: proc(hHandle: HANDLE, dwMilliseconds: DWORD) -> DWORD ---
 	Sleep :: proc(dwMilliseconds: DWORD) ---
 	GetProcessId :: proc(handle: HANDLE) -> DWORD ---
+	CopyFileW :: proc(
+		lpExistingFileName: LPCWSTR,
+		lpNewFileName: LPCWSTR,
+		bFailIfExists: BOOL,
+	) -> BOOL ---
 	CopyFileExW :: proc(
 		lpExistingFileName: LPCWSTR,
 		lpNewFileName: LPCWSTR,

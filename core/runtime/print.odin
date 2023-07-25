@@ -5,7 +5,7 @@ _INTEGER_DIGITS :: "0123456789abcdefghijklmnopqrstuvwxyz"
 @(private="file")
 _INTEGER_DIGITS_VAR := _INTEGER_DIGITS
 
-when !ODIN_DISALLOW_RTTI {
+when !ODIN_NO_RTTI {
 	print_any_single :: proc "contextless" (arg: any) {
 		x := arg
 		if loc, ok := x.(Source_Code_Location); ok {
@@ -234,7 +234,7 @@ print_caller_location :: proc "contextless" (using loc: Source_Code_Location) {
 	}
 }
 print_typeid :: proc "contextless" (id: typeid) {
-	when ODIN_DISALLOW_RTTI {
+	when ODIN_NO_RTTI {
 		if id == nil {
 			print_string("nil")
 		} else {

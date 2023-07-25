@@ -265,7 +265,8 @@ gb_internal bool show_error_on_line(TokenPos const &pos, TokenPos end) {
 	defer (gb_string_free(the_line));
 
 	if (the_line != nullptr) {
-		String line = make_string(cast(u8 const *)the_line, gb_string_length(the_line));
+		char const *line_text = the_line;
+		isize line_len = gb_string_length(the_line);
 
 		// TODO(bill): This assumes ASCII
 
@@ -285,21 +286,27 @@ gb_internal bool show_error_on_line(TokenPos const &pos, TokenPos end) {
 
 		isize squiggle_extra = 0;
 
-		if (line.len > MAX_LINE_LENGTH_PADDED) {
+		if (line_len > MAX_LINE_LENGTH_PADDED) {
 			i32 left = MAX_TAB_WIDTH;
-			line.text += offset-left;
-			line.len  -= offset-left;
-			offset = left+MAX_TAB_WIDTH/2;
-			if (line.len > MAX_LINE_LENGTH_PADDED) {
-				line.len = MAX_LINE_LENGTH_PADDED;
-				if (error_length > line.len-left) {
-					error_length = cast(i32)line.len - left;
+			if (offset > 0) {
+				line_text += offset-left;
+				line_len  -= offset-left;
+				offset = left+MAX_TAB_WIDTH/2;
+			}
+			if (line_len > MAX_LINE_LENGTH_PADDED) {
+				line_len = MAX_LINE_LENGTH_PADDED;
+				if (error_length > line_len-left) {
+					error_length = cast(i32)line_len - left;
 					squiggle_extra = 1;
 				}
 			}
-			error_out("... %.*s ...", LIT(line));
+			if (offset > 0) {
+				error_out("... %.*s ...", cast(i32)line_len, line_text);
+			} else {
+				error_out("%.*s ...", cast(i32)line_len, line_text);
+			}
 		} else {
-			error_out("%.*s", LIT(line));
+			error_out("%.*s", cast(i32)line_len, line_text);
 		}
 		error_out("\n\t");
 
@@ -312,7 +319,7 @@ gb_internal bool show_error_on_line(TokenPos const &pos, TokenPos end) {
 		error_out("^");
 		if (end.file_id == pos.file_id) {
 			if (end.line > pos.line) {
-				for (i32 i = offset; i < line.len; i++) {
+				for (i32 i = offset; i < line_len; i++) {
 					error_out("~");
 				}
 			} else if (end.line == pos.line && end.column > pos.column) {

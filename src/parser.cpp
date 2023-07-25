@@ -2752,9 +2752,9 @@ gb_internal Ast *parse_call_expr(AstFile *f, Ast *operand) {
 
 	open_paren = expect_token(f, Token_OpenParen);
 
+	bool seen_ellipsis = false;
 	while (f->curr_token.kind != Token_CloseParen &&
-	       f->curr_token.kind != Token_EOF &&
-	       ellipsis.pos.line == 0) {
+	       f->curr_token.kind != Token_EOF) {
 		if (f->curr_token.kind == Token_Comma) {
 			syntax_error(f->curr_token, "Expected an expression not ,");
 		} else if (f->curr_token.kind == Token_Eq) {
@@ -2777,10 +2777,14 @@ gb_internal Ast *parse_call_expr(AstFile *f, Ast *operand) {
 
 			Ast *value = parse_value(f);
 			arg = ast_field_value(f, arg, value, eq);
-
-
+		} else if (seen_ellipsis) {
+			syntax_error(arg, "Positional arguments are not allowed after '..'");
 		}
 		array_add(&args, arg);
+
+		if (ellipsis.pos.line != 0) {
+			seen_ellipsis = true;
+		}
 
 		if (!allow_field_separator(f)) {
 			break;

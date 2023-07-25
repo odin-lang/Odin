@@ -334,10 +334,35 @@ gb_internal bool lb_is_instr_terminating(LLVMValueRef instr) {
 	return false;
 }
 
+gb_internal lbModule *lb_module_of_expr(lbGenerator *gen, Ast *expr) {
+	GB_ASSERT(expr != nullptr);
+	lbModule **found = nullptr;
+	AstFile *file = expr->file();
+	if (file) {
+		found = map_get(&gen->modules, cast(void *)file);
+		if (found) {
+			return *found;
+		}
+
+		if (file->pkg) {
+			found = map_get(&gen->modules, cast(void *)file->pkg);
+			if (found) {
+				return *found;
+			}
+		}
+	}
+
+	return &gen->default_module;
+}
 
 gb_internal lbModule *lb_module_of_entity(lbGenerator *gen, Entity *e) {
 	GB_ASSERT(e != nullptr);
 	lbModule **found = nullptr;
+	if (e->kind == Entity_Procedure &&
+	    e->decl_info &&
+	    e->decl_info->code_gen_module) {
+		return e->decl_info->code_gen_module;
+	}
 	if (e->file) {
 		found = map_get(&gen->modules, cast(void *)e->file);
 		if (found) {
@@ -1298,6 +1323,7 @@ gb_internal lbValue lb_emit_union_tag_value(lbProcedure *p, lbValue u) {
 
 gb_internal void lb_emit_store_union_variant_tag(lbProcedure *p, lbValue parent, Type *variant_type) {
 	Type *t = type_deref(parent.type);
+	GB_ASSERT(is_type_union(t));
 
 	if (is_type_union_maybe_pointer(t) || type_size_of(t) == 0) {
 		// No tag needed!
@@ -1377,7 +1403,7 @@ gb_internal String lb_mangle_name(lbModule *m, Entity *e) {
 	char *new_name = gb_alloc_array(permanent_allocator(), char, max_len);
 	isize new_name_len = gb_snprintf(
 		new_name, max_len,
-		"%.*s.%.*s", LIT(pkgn), LIT(name)
+		"%.*s" ABI_PKG_NAME_SEPARATOR "%.*s", LIT(pkgn), LIT(name)
 	);
 	if (require_suffix_id) {
 		char *str = new_name + new_name_len-1;
@@ -1426,8 +1452,8 @@ gb_internal String lb_set_nested_type_name_ir_mangled_name(Entity *e, lbProcedur
 	if (p != nullptr) {
 		isize name_len = p->name.len + 1 + ts_name.len + 1 + 10 + 1;
 		char *name_text = gb_alloc_array(permanent_allocator(), char, name_len);
-		u32 guid = ++p->module->nested_type_name_guid;
-		name_len = gb_snprintf(name_text, name_len, "%.*s.%.*s-%u", LIT(p->name), LIT(ts_name), guid);
+		u32 guid = 1+p->module->nested_type_name_guid.fetch_add(1);
+		name_len = gb_snprintf(name_text, name_len, "%.*s" ABI_PKG_NAME_SEPARATOR "%.*s-%u", LIT(p->name), LIT(ts_name), guid);
 
 		String name = make_string(cast(u8 *)name_text, name_len-1);
 		e->TypeName.ir_mangled_name = name;
@@ -1436,9 +1462,8 @@ gb_internal String lb_set_nested_type_name_ir_mangled_name(Entity *e, lbProcedur
 		// NOTE(bill): a nested type be required before its parameter procedure exists. Just give it a temp name for now
 		isize name_len = 9 + 1 + ts_name.len + 1 + 10 + 1;
 		char *name_text = gb_alloc_array(permanent_allocator(), char, name_len);
-		static u32 guid = 0;
-		guid += 1;
-		name_len = gb_snprintf(name_text, name_len, "_internal.%.*s-%u", LIT(ts_name), guid);
+		static std::atomic<u32> guid;
+		name_len = gb_snprintf(name_text, name_len, "_internal" ABI_PKG_NAME_SEPARATOR "%.*s-%u", LIT(ts_name), 1+guid.fetch_add(1));
 
 		String name = make_string(cast(u8 *)name_text, name_len-1);
 		e->TypeName.ir_mangled_name = name;
@@ -2662,9 +2687,12 @@ gb_internal lbValue lb_find_ident(lbProcedure *p, lbModule *m, Entity *e, Ast *e
 
 
 gb_internal lbValue lb_find_procedure_value_from_entity(lbModule *m, Entity *e) {
+	lbGenerator *gen = m->gen;
+
 	GB_ASSERT(is_type_proc(e->type));
 	e = strip_entity_wrapping(e);
 	GB_ASSERT(e != nullptr);
+	GB_ASSERT(e->kind == Entity_Procedure);
 
 	lbValue *found = nullptr;
 	rw_mutex_shared_lock(&m->values_mutex);
@@ -2678,33 +2706,97 @@ gb_internal lbValue lb_find_procedure_value_from_entity(lbModule *m, Entity *e) 
 
 	lbModule *other_module = m;
 	if (USE_SEPARATE_MODULES) {
-		other_module = lb_module_of_entity(m->gen, e);
+		other_module = lb_module_of_entity(gen, e);
 	}
 	if (other_module == m) {
-		debugf("Missing Procedure (lb_find_procedure_value_from_entity): %.*s\n", LIT(e->token.string));
+		debugf("Missing Procedure (lb_find_procedure_value_from_entity): %.*s module %p\n", LIT(e->token.string), m);
 	}
 	ignore_body = other_module != m;
 
 	lbProcedure *missing_proc = lb_create_procedure(m, e, ignore_body);
 	if (ignore_body) {
+		mutex_lock(&gen->anonymous_proc_lits_mutex);
+		defer (mutex_unlock(&gen->anonymous_proc_lits_mutex));
+
 		GB_ASSERT(other_module != nullptr);
 		rw_mutex_shared_lock(&other_module->values_mutex);
 		auto *found = map_get(&other_module->values, e);
 		rw_mutex_shared_unlock(&other_module->values_mutex);
 		if (found == nullptr) {
+			// THIS IS THE RACE CONDITION
 			lbProcedure *missing_proc_in_other_module = lb_create_procedure(other_module, e, false);
 			array_add(&other_module->missing_procedures_to_check, missing_proc_in_other_module);
 		}
 	} else {
 		array_add(&m->missing_procedures_to_check, missing_proc);
 	}
+
+	rw_mutex_shared_lock(&m->values_mutex);
 	found = map_get(&m->values, e);
+	rw_mutex_shared_unlock(&m->values_mutex);
 	if (found) {
 		return *found;
 	}
 
 	GB_PANIC("Error in: %s, missing procedure %.*s\n", token_pos_to_string(e->token.pos), LIT(e->token.string));
 	return {};
+}
+
+
+
+gb_internal lbValue lb_generate_anonymous_proc_lit(lbModule *m, String const &prefix_name, Ast *expr, lbProcedure *parent) {
+	lbGenerator *gen = m->gen;
+
+	mutex_lock(&gen->anonymous_proc_lits_mutex);
+	defer (mutex_unlock(&gen->anonymous_proc_lits_mutex));
+
+	TokenPos pos = ast_token(expr).pos;
+	lbProcedure **found = map_get(&gen->anonymous_proc_lits, expr);
+	if (found) {
+		return lb_find_procedure_value_from_entity(m, (*found)->entity);
+	}
+
+	ast_node(pl, ProcLit, expr);
+
+	// NOTE(bill): Generate a new name
+	// parent$count
+	isize name_len = prefix_name.len + 6 + 11;
+	char *name_text = gb_alloc_array(permanent_allocator(), char, name_len);
+	static std::atomic<i32> name_id;
+	name_len = gb_snprintf(name_text, name_len, "%.*s$anon-%d", LIT(prefix_name), 1+name_id.fetch_add(1));
+	String name = make_string((u8 *)name_text, name_len-1);
+
+	Type *type = type_of_expr(expr);
+
+	GB_ASSERT(pl->decl->entity == nullptr);
+	Token token = {};
+	token.pos = ast_token(expr).pos;
+	token.kind = Token_Ident;
+	token.string = name;
+	Entity *e = alloc_entity_procedure(nullptr, token, type, pl->tags);
+	e->file = expr->file();
+
+	// NOTE(bill): this is to prevent a race condition since these procedure literals can be created anywhere at any time
+	pl->decl->code_gen_module = m;
+	e->decl_info = pl->decl;
+	pl->decl->entity = e;
+	e->flags |= EntityFlag_ProcBodyChecked;
+
+	lbProcedure *p = lb_create_procedure(m, e);
+	GB_ASSERT(e->code_gen_module == m);
+
+	lbValue value = {};
+	value.value = p->value;
+	value.type = p->type;
+
+	map_set(&gen->anonymous_proc_lits, expr, p);
+	array_add(&m->procedures_to_generate, p);
+	if (parent != nullptr) {
+		array_add(&parent->children, p);
+	} else {
+		string_map_set(&m->members, name, value);
+	}
+	return value;
 }
 
 
@@ -2915,8 +3007,9 @@ gb_internal lbAddr lb_add_local(lbProcedure *p, Type *type, Entity *e, bool zero
 	LLVMPositionBuilderAtEnd(p->builder, p->decl_block->block);
 
 	char const *name = "";
-	if (e != nullptr) {
-		// name = alloc_cstring(permanent_allocator(), e->token.string);
+	if (e != nullptr && e->token.string.len > 0 && e->token.string != "_") {
+		// NOTE(bill): for debugging purposes only
+		name = alloc_cstring(permanent_allocator(), e->token.string);
 	}
 
 	LLVMTypeRef llvm_type = lb_type(p->module, type);

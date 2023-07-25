@@ -32,7 +32,7 @@ gb_internal bool is_operand_uninit(Operand o) {
 }
 
 gb_internal bool check_rtti_type_disallowed(Token const &token, Type *type, char const *format) {
-	if (build_context.disallow_rtti && type) {
+	if (build_context.no_rtti && type) {
 		if (is_type_any(type)) {
 			gbString t = type_to_string(type);
 			error(token, format, t);
@@ -285,17 +285,6 @@ gb_internal Scope *create_scope_from_package(CheckerContext *c, AstPackage *pkg)
 }
 
 gb_internal void destroy_scope(Scope *scope) {
-	for (auto const &entry : scope->elements) {
-		Entity *e = entry.value;
-		if (e->kind == Entity_Variable) {
-			if (!(e->flags & EntityFlag_Used)) {
-#if 0
-				warning(e->token, "Unused variable '%.*s'", LIT(e->token.string));
-#endif
-			}
-		}
-	}
-
 	for (Scope *child = scope->head_child; child != nullptr; child = child->next) {
 		destroy_scope(child);
 	}
@@ -1054,7 +1043,7 @@ gb_internal void init_universal(void) {
 	add_global_bool_constant("ODIN_TEST",                     bc->command_kind == Command_test);
 	add_global_bool_constant("ODIN_NO_ENTRY_POINT",           bc->no_entry_point);
 	add_global_bool_constant("ODIN_FOREIGN_ERROR_PROCEDURES", bc->ODIN_FOREIGN_ERROR_PROCEDURES);
-	add_global_bool_constant("ODIN_DISALLOW_RTTI",            bc->disallow_rtti);
+	add_global_bool_constant("ODIN_NO_RTTI",            bc->no_rtti);
 
 	add_global_bool_constant("ODIN_VALGRIND_SUPPORT",         bc->ODIN_VALGRIND_SUPPORT);
 
@@ -1742,7 +1731,7 @@ gb_internal void add_implicit_entity(CheckerContext *c, Ast *clause, Entity *e) 
 
 gb_internal void add_type_info_type_internal(CheckerContext *c, Type *t);
 gb_internal void add_type_info_type(CheckerContext *c, Type *t) {
-	if (build_context.disallow_rtti) {
+	if (build_context.no_rtti) {
 		return;
 	}
 	if (t == nullptr) {
@@ -2343,7 +2332,7 @@ gb_internal void generate_minimum_dependency_set(Checker *c, Entity *start) {
 		str_lit("__multi3"),
 	);
 
-	FORCE_ADD_RUNTIME_ENTITIES(!build_context.disallow_rtti,
+	FORCE_ADD_RUNTIME_ENTITIES(!build_context.no_rtti,
 		// Odin types
 		str_lit("Type_Info"),
 
@@ -2945,6 +2934,54 @@ gb_internal DECL_ATTRIBUTE_PROC(foreign_block_decl_attribute) {
 
 	return false;
 }
+
+gb_internal DECL_ATTRIBUTE_PROC(proc_group_attribute) {
+	if (name == ATTRIBUTE_USER_TAG_NAME) {
+		ExactValue ev = check_decl_attribute_value(c, value);
+		if (ev.kind != ExactValue_String) {
+			error(elem, "Expected a string value for '%.*s'", LIT(name));
+		}
+		return true;
+	} else if (name == "objc_name") {
+		ExactValue ev = check_decl_attribute_value(c, value);
+		if (ev.kind == ExactValue_String) {
+			if (string_is_valid_identifier(ev.value_string)) {
+				ac->objc_name = ev.value_string;
+			} else {
+				error(elem, "Invalid identifier for '%.*s', got '%.*s'", LIT(name), LIT(ev.value_string));
+			}
+		} else {
+			error(elem, "Expected a string value for '%.*s'", LIT(name));
+		}
+		return true;
+	} else if (name == "objc_is_class_method") {
+		ExactValue ev = check_decl_attribute_value(c, value);
+		if (ev.kind == ExactValue_Bool) {
+			ac->objc_is_class_method = ev.value_bool;
+		} else {
+			error(elem, "Expected a boolean value for '%.*s'", LIT(name));
+		}
+		return true;
+	} else if (name == "objc_type") {
+		if (value == nullptr) {
+			error(elem, "Expected a type for '%.*s'", LIT(name));
+		} else {
+			Type *objc_type = check_type(c, value);
+			if (objc_type != nullptr) {
+				if (!has_type_got_objc_class_attribute(objc_type)) {
+					gbString t = type_to_string(objc_type);
+					error(value, "'%.*s' expected a named type with the attribute @(obj_class=<string>), got type %s", LIT(name), t);
+					gb_string_free(t);
+				} else {
+					ac->objc_type = objc_type;
+				}
+			}
+		}
+		return true;
+	}
+	return false;
+}
+
 
 gb_internal DECL_ATTRIBUTE_PROC(proc_decl_attribute) {
 	if (name == ATTRIBUTE_USER_TAG_NAME) {

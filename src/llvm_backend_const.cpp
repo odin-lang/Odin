@@ -473,6 +473,7 @@ gb_internal lbValue lb_const_value(lbModule *m, Type *type, ExactValue value, bo
 	if (value.kind == ExactValue_Procedure) {
 		lbValue res = {};
 		Ast *expr = unparen_expr(value.value_procedure);
+		GB_ASSERT(expr != nullptr);
 		if (expr->kind == Ast_ProcLit) {
 			res = lb_generate_anonymous_proc_lit(m, str_lit("_proclit"), expr);
 		} else {
@@ -482,7 +483,10 @@ gb_internal lbValue lb_const_value(lbModule *m, Type *type, ExactValue value, bo
 		GB_ASSERT(res.value != nullptr);
 		GB_ASSERT(LLVMGetValueKind(res.value) == LLVMFunctionValueKind);
 
-		res.value = LLVMConstPointerCast(res.value, lb_type(m, res.type));
+		if (LLVMGetIntrinsicID(res.value) == 0) {
+			// NOTE(bill): do not cast intrinsics as they are not really procedures that can be casted
+			res.value = LLVMConstPointerCast(res.value, lb_type(m, res.type));
+		}
 		return res;
 	}
 

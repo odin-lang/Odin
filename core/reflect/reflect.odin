@@ -132,7 +132,7 @@ type_info_core :: runtime.type_info_core
 type_info_base_without_enum :: type_info_core
 
 
-when !ODIN_DISALLOW_RTTI {
+when !ODIN_NO_RTTI {
 	typeid_base :: runtime.typeid_base
 	typeid_core :: runtime.typeid_core
 	typeid_base_without_enum :: typeid_core
@@ -781,7 +781,7 @@ set_union_variant_raw_tag :: proc(a: any, tag: i64) {
 		tag_ptr := uintptr(a.data) + info.tag_offset
 		tag_any := any{rawptr(tag_ptr), info.tag_type.id}
 
-		switch i in &tag_any {
+		switch &i in tag_any {
 		case u8:   i = u8(tag)
 		case i8:   i = i8(tag)
 		case u16:  i = u16(tag)
@@ -1312,7 +1312,7 @@ relative_pointer_to_absolute_raw :: proc(data: rawptr, base_integer_id: typeid) 
 
 	ptr_any := any{data, base_integer_id}
 	ptr: rawptr
-	switch i in &ptr_any {
+	switch &i in ptr_any {
 	case u8:    ptr = _handle(&i)
 	case u16:   ptr = _handle(&i)
 	case u32:   ptr = _handle(&i)
