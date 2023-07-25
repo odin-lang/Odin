@@ -2246,20 +2246,42 @@ gb_internal void cg_build_stmt(cgProcedure *p, Ast *node) {
 
 		TEMPORARY_ALLOCATOR_GUARD();
 
+		auto inits = array_make<cgValue>(temporary_allocator(), 0, vd->values.count != 0 ? vd->names.count : 0);
+		for (Ast *rhs : vd->values) {
+			cgValue init = cg_build_expr(p, rhs);
+			cg_append_tuple_values(p, &inits, init);
+		}
+
+
 		auto lvals = slice_make<cgAddr>(temporary_allocator(), vd->names.count);
 		for_array(i, vd->names) {
 			Ast *name = vd->names[i];
 			if (!is_blank_ident(name)) {
 				Entity *e = entity_of_node(name);
-				lvals[i] = cg_add_local(p, e->type, e, true);
+				bool zero_init = vd->values.count == 0;
+				if (vd->names.count == vd->values.count) {
+					Ast *expr = unparen_expr(vd->values[i]);
+					if (expr->kind == Ast_CompoundLit &&
+					    inits[i].kind == cgValue_Addr) {
+					    	TB_Node *ptr = inits[i].node;
+
+					    	if (e != nullptr && e->token.string.len > 0 && e->token.string != "_") {
+					    		// NOTE(bill): for debugging purposes only
+					    		String name = e->token.string;
+					    		TB_DebugType *debug_type = cg_debug_type(p->module, e->type);
+					    		tb_node_append_attrib(ptr, tb_function_attrib_variable(p->func, name.len, cast(char const *)name.text, debug_type));
+					    	}
+
+						cgAddr addr = cg_addr(inits[i]);
+						map_set(&p->variable_map, e, addr);
+						continue;
+					}
+				}
+
+				lvals[i] = cg_add_local(p, e->type, e, zero_init);
 			}
 		}
 
-		auto inits = array_make<cgValue>(temporary_allocator(), 0, vd->values.count != 0 ? lvals.count : 0);
-		for (Ast *rhs : vd->values) {
-			cgValue init = cg_build_expr(p, rhs);
-			cg_append_tuple_values(p, &inits, init);
-		}
 
 		GB_ASSERT(vd->values.count == 0 || lvals.count == inits.count);
 		for_array(i, inits) {

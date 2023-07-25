@@ -260,44 +260,6 @@ gb_internal void cg_procedure_begin(cgProcedure *p) {
 		if (e) {
 			map_set(&p->variable_map, e, addr);
 		}
-
-		// if (arg_type->kind == lbArg_Ignore) {
-		// 	continue;
-		// } else if (arg_type->kind == lbArg_Direct) {
-		// 	if (e->token.string.len != 0 && !is_blank_ident(e->token.string)) {
-		// 		LLVMTypeRef param_type = lb_type(p->module, e->type);
-		// 		LLVMValueRef original_value = LLVMGetParam(p->value, param_offset+param_index);
-		// 		LLVMValueRef value = OdinLLVMBuildTransmute(p, original_value, param_type);
-
-		// 		lbValue param = {};
-		// 		param.value = value;
-		// 		param.type = e->type;
-
-		// 		map_set(&p->direct_parameters, e, param);
-
-		// 		lbValue ptr = lb_address_from_load_or_generate_local(p, param);
-		// 		GB_ASSERT(LLVMIsAAllocaInst(ptr.value));
-		// 		lb_add_entity(p->module, e, ptr);
-
-		// 		lbBlock *block = p->decl_block;
-		// 		if (original_value != value) {
-		// 			block = p->curr_block;
-		// 		}
-		// 		LLVMValueRef debug_storage_value = value;
-		// 		if (original_value != value && LLVMIsALoadInst(value)) {
-		// 			debug_storage_value = LLVMGetOperand(value, 0);
-		// 		}
-		// 		lb_add_debug_param_variable(p, debug_storage_value, e->type, e->token, param_index+1, block, arg_type->kind);
-		// 	}
-		// } else if (arg_type->kind == lbArg_Indirect) {
-		// 	if (e->token.string.len != 0 && !is_blank_ident(e->token.string)) {
-		// 		lbValue ptr = {};
-		// 		ptr.value = LLVMGetParam(p->value, param_offset+param_index);
-		// 		ptr.type = alloc_type_pointer(e->type);
-		// 		lb_add_entity(p->module, e, ptr);
-		// 		lb_add_debug_param_variable(p, ptr.value, e->type, e->token, param_index+1, p->decl_block, arg_type->kind);
-		// 	}
-		// }
 	}
 
 	if (is_odin_like_cc) {
@@ -351,6 +313,20 @@ gb_internal WORKER_TASK_PROC(cg_procedure_compile_worker_proc) {
 
 	bool emit_asm = false;
 
+	if (false &&
+	    string_starts_with(p->name, str_lit("bug@main"))) {
+		TB_Arena *arena = cg_arena();
+		TB_FuncOpt *opt = tb_funcopt_enter(p->func, arena);
+		defer (tb_funcopt_exit(opt));
+
+		tb_funcopt_peephole(opt);
+		tb_funcopt_mem2reg(opt);
+		tb_funcopt_peephole(opt);
+
+		emit_asm = true;
+	}
+
+
 	if (
 	    // string_starts_with(p->name, str_lit("bug@main")) ||
 	    false
@@ -398,7 +374,7 @@ gb_internal void cg_procedure_generate(cgProcedure *p) {
 
 
 	if (
-	    // string_starts_with(p->name, str_lit("bug@main")) ||
+	    string_starts_with(p->name, str_lit("bug@main")) ||
 	    false
 	) { // IR Printing
 		TB_Arena *arena = tb_default_arena();
