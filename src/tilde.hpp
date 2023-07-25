@@ -257,6 +257,9 @@ gb_global GlobalTypeInfoData cg_global_type_info_member_usings      = {};
 gb_global GlobalTypeInfoData cg_global_type_info_member_tags        = {};
 gb_global GlobalTypeInfoData cg_global_type_info_member_enum_values = {};
 
+gb_global cgProcedure *cg_startup_runtime_proc = nullptr;
+gb_global cgProcedure *cg_cleanup_runtime_proc = nullptr;
+
 
 
 gb_internal TB_Arena *cg_arena(void);

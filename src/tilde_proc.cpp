@@ -408,8 +408,11 @@ gb_internal void cg_procedure_end(cgProcedure *p) {
 		return;
 	}
 	if (tb_inst_get_control(p->func)) {
-		GB_ASSERT(p->type->Proc.result_count == 0);
-		tb_inst_ret(p->func, 0, nullptr);
+		if (p->type->Proc.result_count == 0) {
+			tb_inst_ret(p->func, 0, nullptr);
+		} else {
+			tb_inst_unreachable(p->func);
+		}
 	}
 
 	if (p->module->do_threading) {

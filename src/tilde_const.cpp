@@ -555,11 +555,11 @@ gb_internal bool cg_global_const_add_region(cgModule *m, ExactValue const &value
 		return true;
 	}
 
-	GB_ASSERT(!is_type_array_like(bt));
 
 	switch (value.kind) {
 	case ExactValue_Bool:
 		{
+			GB_ASSERT_MSG(!is_type_array_like(bt), "%s", type_to_string(type));
 			bool *res = cast(bool *)tb_global_add_region(m->mod, global, offset, size);
 			*res = !!value.value_bool;
 		}
@@ -567,6 +567,7 @@ gb_internal bool cg_global_const_add_region(cgModule *m, ExactValue const &value
 
 	case ExactValue_Integer:
 		{
+			GB_ASSERT_MSG(!is_type_array_like(bt), "%s", type_to_string(type));
 			void *res = tb_global_add_region(m->mod, global, offset, size);
 			cg_write_big_int_at_ptr(res, &value.value_integer, type);
 		}
@@ -574,6 +575,7 @@ gb_internal bool cg_global_const_add_region(cgModule *m, ExactValue const &value
 
 	case ExactValue_Float:
 		{
+			GB_ASSERT_MSG(!is_type_array_like(bt), "%s", type_to_string(type));
 			f64 f = exact_value_to_f64(value);
 			void *res = tb_global_add_region(m->mod, global, offset, size);
 			switch (size) {
@@ -586,6 +588,7 @@ gb_internal bool cg_global_const_add_region(cgModule *m, ExactValue const &value
 
 	case ExactValue_Pointer:
 		{
+			GB_ASSERT_MSG(!is_type_array_like(bt), "%s", type_to_string(type));
 			void *res = tb_global_add_region(m->mod, global, offset, size);
 			*(u64 *)res = exact_value_to_u64(value);
 		}
@@ -603,6 +606,7 @@ gb_internal bool cg_global_const_add_region(cgModule *m, ExactValue const &value
 
 	case ExactValue_Typeid:
 		{
+			GB_ASSERT_MSG(!is_type_array_like(bt), "%s", type_to_string(type));
 			void *dst = tb_global_add_region(m->mod, global, offset, size);
 			u64 id = cg_typeid_as_u64(m, value.value_typeid);
 			cg_write_uint_at_ptr(dst, id, t_typeid);
@@ -621,6 +625,7 @@ gb_internal bool cg_global_const_add_region(cgModule *m, ExactValue const &value
 		break;
 	case ExactValue_Complex:
 		{
+			GB_ASSERT_MSG(!is_type_array_like(bt), "%s", type_to_string(type));
 			Complex128 c = {};
 			if (value.value_complex) {
 				c = *value.value_complex;
@@ -644,6 +649,7 @@ gb_internal bool cg_global_const_add_region(cgModule *m, ExactValue const &value
 		break;
 	case ExactValue_Quaternion:
 		{
+			GB_ASSERT_MSG(!is_type_array_like(bt), "%s", type_to_string(type));
 			// @QuaternionLayout
 			Quaternion256 q = {};
 			if (value.value_quaternion) {

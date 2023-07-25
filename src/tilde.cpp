@@ -694,22 +694,14 @@ gb_internal bool cg_generate_code(Checker *c, LinkerData *linker_data) {
 		Type *proc_type = alloc_type_proc(nullptr, nullptr, 0, nullptr, 0, false, ProcCC_Odin);
 		cgProcedure *p = cg_procedure_create_dummy(m, str_lit(CG_STARTUP_RUNTIME_PROC_NAME), proc_type);
 		p->is_startup = true;
-
-		cg_procedure_begin(p);
-		cg_global_variables_initialize(p, &global_variables);
-
-		tb_inst_ret(p->func, 0, nullptr);
-		cg_procedure_end(p);
+		cg_startup_runtime_proc = p;
 	}
 
 	if (true) {
 		Type *proc_type = alloc_type_proc(nullptr, nullptr, 0, nullptr, 0, false, ProcCC_Odin);
 		cgProcedure *p = cg_procedure_create_dummy(m, str_lit(CG_CLEANUP_RUNTIME_PROC_NAME), proc_type);
 		p->is_startup = true;
-
-		cg_procedure_begin(p);
-		tb_inst_ret(p->func, 0, nullptr);
-		cg_procedure_end(p);
+		cg_cleanup_runtime_proc = p;
 	}
 
 	auto *min_dep_set = &info->minimum_dependency_set;
@@ -740,6 +732,19 @@ gb_internal bool cg_generate_code(Checker *c, LinkerData *linker_data) {
 		if (cgProcedure *p = cg_procedure_create(m, e)) {
 			array_add(&procedures_to_generate, p);
 		}
+	}
+	{
+		cgProcedure *p = cg_startup_runtime_proc;
+		cg_procedure_begin(p);
+		cg_global_variables_initialize(p, &global_variables);
+		tb_inst_ret(p->func, 0, nullptr);
+		cg_procedure_end(p);
+	}
+	{
+		cgProcedure *p = cg_cleanup_runtime_proc;
+		cg_procedure_begin(p);
+		tb_inst_ret(p->func, 0, nullptr);
+		cg_procedure_end(p);
 	}
 
 	for (cgProcedure *p : procedures_to_generate) {

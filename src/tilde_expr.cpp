@@ -86,6 +86,39 @@ gb_internal cgValue cg_find_value_from_entity(cgModule *m, Entity *e) {
 	return {};
 }
 
+gb_internal cgValue cg_get_using_variable(cgProcedure *p, Entity *e) {
+	GB_ASSERT(e->kind == Entity_Variable && e->flags & EntityFlag_Using);
+	String name = e->token.string;
+	Entity *parent = e->using_parent;
+	Selection sel = lookup_field(parent->type, name, false);
+	GB_ASSERT(sel.entity != nullptr);
+	cgValue *pv = map_get(&p->module->values, parent);
+
+	cgValue v = {};
+
+	if (pv == nullptr && parent->flags & EntityFlag_SoaPtrField) {
+		// NOTE(bill): using SOA value (probably from for-in statement)
+		GB_PANIC("TODO(bill): cg_get_soa_variable_addr");
+		// cgAddr parent_addr = cg_get_soa_variable_addr(p, parent);
+		// v = cg_addr_get_ptr(p, parent_addr);
+	} else if (pv != nullptr) {
+		v = *pv;
+	} else {
+		GB_ASSERT_MSG(e->using_expr != nullptr, "%.*s %.*s", LIT(e->token.string), LIT(name));
+		v = cg_build_addr_ptr(p, e->using_expr);
+	}
+	GB_ASSERT(v.node != nullptr);
+	GB_ASSERT_MSG(parent->type == type_deref(v.type), "%s %s", type_to_string(parent->type), type_to_string(v.type));
+	cgValue ptr = cg_emit_deep_field_gep(p, v, sel);
+	// if (parent->scope) {
+	// 	if ((parent->scope->flags & (ScopeFlag_File|ScopeFlag_Pkg)) == 0) {
+	// 		cg_add_debug_local_variable(p, ptr.value, e->type, e->token);
+	// 	}
+	// } else {
+	// 	cg_add_debug_local_variable(p, ptr.value, e->type, e->token);
+	// }
+	return ptr;
+}
 gb_internal cgAddr cg_build_addr_from_entity(cgProcedure *p, Entity *e, Ast *expr) {
 	GB_ASSERT(e != nullptr);
 	if (e->kind == Entity_Constant) {
@@ -111,9 +144,8 @@ gb_internal cgAddr cg_build_addr_from_entity(cgProcedure *p, Entity *e, Ast *exp
 	if (found) {
 		v = *found;
 	} else if (e->kind == Entity_Variable && e->flags & EntityFlag_Using) {
-		GB_PANIC("TODO(bill): cg_get_using_variable");
 		// NOTE(bill): Calculate the using variable every time
-		// v = cg_get_using_variable(p, e);
+		v = cg_get_using_variable(p, e);
 	} else if (e->flags & EntityFlag_SoaPtrField) {
 		GB_PANIC("TODO(bill): cg_get_soa_variable_addr");
 		// return cg_get_soa_variable_addr(p, e);
@@ -434,11 +466,10 @@ gb_internal cgValue cg_emit_comp(cgProcedure *p, TokenKind op_kind, cgValue left
 		}
 		GB_ASSERT(runtime_procedure != nullptr);
 
-		GB_PANIC("TODO(bill): cg_emit_runtime_call");
-		// auto args = array_make<lbValue>(permanent_allocator(), 2);
-		// args[0] = left;
-		// args[1] = right;
-		// return cg_emit_runtime_call(p, runtime_procedure, args);
+		auto args = slice_make<cgValue>(permanent_allocator(), 2);
+		args[0] = left;
+		args[1] = right;
+		return cg_emit_runtime_call(p, runtime_procedure, args);
 	}
 
 	if (is_type_complex(a)) {
@@ -2514,7 +2545,15 @@ cgAddr cg_build_addr_compound_lit(cgProcedure *p, Ast *expr) {
 
 		TB_CharUnits backing_size = cast(TB_CharUnits)(type_size_of(bt->Slice.elem) * count);
 		TB_CharUnits align = cast(TB_CharUnits)type_align_of(bt->Slice.elem);
-		TB_Node *backing = tb_inst_local(p->func, backing_size, align);
+
+		TB_Node *backing = nullptr;
+		if (p->is_startup) {
+			TB_Global *global = tb_global_create(p->module->mod, 0, "", nullptr, TB_LINKAGE_PRIVATE);
+			tb_global_set_storage(p->module->mod, tb_module_get_data(p->module->mod), global, backing_size, align, 0);
+			backing = tb_inst_get_symbol_address(p->func, cast(TB_Symbol *)global);
+		} else {
+			backing = tb_inst_local(p->func, backing_size, align);
+		}
 
 		cgValue data = cg_value(backing, alloc_type_multi_pointer(bt->Slice.elem));
 
