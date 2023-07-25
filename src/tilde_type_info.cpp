@@ -1,4 +1,8 @@
-gb_internal void cg_global_const_type_info_ptr(cgModule *m, TB_Global *type_info_array, Type *type, TB_Global *global, i64 offset) {
+gb_internal void cg_global_const_type_info_ptr(cgModule *m, Type *type, TB_Global *global, i64 offset) {
+	GB_ASSERT(type != nullptr);
+	TB_Symbol *type_table_array = cg_find_symbol_from_entity(m, cg_global_type_info_data_entity);
+
+
 	i64 index_in_bytes = cast(i64)cg_type_info_index(m->info, type);
 	index_in_bytes *= type_size_of(t_type_info);
 
@@ -7,7 +11,7 @@ gb_internal void cg_global_const_type_info_ptr(cgModule *m, TB_Global *type_info
 	cg_write_int_at_ptr(ti_ptr_ptr, index_in_bytes, t_uintptr);
 
 	// NOTE(bill): this will add to the byte offset set previously
-	tb_global_add_symbol_reloc(m->mod, global, offset, cast(TB_Symbol *)type_info_array);
+	tb_global_add_symbol_reloc(m->mod, global, offset, type_table_array);
 }
 
 gb_internal cgValue cg_global_type_info_data_ptr(cgProcedure *p) {
@@ -129,7 +133,6 @@ gb_internal void cg_set_type_info_member_types(cgModule *m, TB_Global *global, i
 	if (count == 0) {
 		return;
 	}
-	TB_Global *type_table_array = cast(TB_Global *)cg_find_symbol_from_entity(m, cg_global_type_info_data_entity);
 
 	void *data_ptr = tb_global_add_region(m->mod, global, offset+0, build_context.ptr_size);
 	i64 offset_in_bytes = cg_global_type_info_member_types.index * type_size_of(cg_global_type_info_member_types.elem_type);
@@ -142,7 +145,7 @@ gb_internal void cg_set_type_info_member_types(cgModule *m, TB_Global *global, i
 		i64 elem_size = type_size_of(cg_global_type_info_member_types.elem_type);
 		Type *type = type_proc(i, userdata);
 		i64 offset_for_elem = offset_in_bytes + i*elem_size;
-		cg_global_const_type_info_ptr(m, type_table_array, type, cg_global_type_info_member_types.global, offset_for_elem);
+		cg_global_const_type_info_ptr(m, type, cg_global_type_info_member_types.global, offset_for_elem);
 	}
 
 	void *len_ptr  = tb_global_add_region(m->mod, global, offset+build_context.int_size, build_context.int_size);
@@ -248,6 +251,32 @@ gb_internal void cg_set_type_info_member_tags(cgModule *m, TB_Global *global, is
 	cg_write_int_at_ptr(len_ptr, count, t_int);
 }
 
+gb_internal void cg_set_type_info_member_enum_values(cgModule *m, TB_Global *global, isize offset, isize count, void *userdata, i64 (*value_proc)(isize index, void *userdata)) {
+	if (count == 0) {
+		return;
+	}
+	void *data_ptr = tb_global_add_region(m->mod, global, offset+0, build_context.ptr_size);
+	i64 offset_in_bytes = cg_global_type_info_member_enum_values.index * type_size_of(cg_global_type_info_member_enum_values.elem_type);
+	cg_global_type_info_member_enum_values.index += count;
+
+	cg_write_int_at_ptr(data_ptr, offset_in_bytes, t_uintptr);
+	tb_global_add_symbol_reloc(m->mod, global, offset+0, cast(TB_Symbol *)cg_global_type_info_member_enum_values.global);
+
+	for (isize i = 0; i < count; i++) {
+		i64 elem_size = type_size_of(cg_global_type_info_member_enum_values.elem_type);
+		GB_ASSERT(elem_size == 8);
+		i64 the_value = value_proc(i, userdata);
+		i64 offset_for_elem = offset_in_bytes + i*elem_size;
+
+		void *offset_ptr = tb_global_add_region(m->mod, cg_global_type_info_member_enum_values.global, offset_for_elem, elem_size);
+		cg_write_uint_at_ptr(offset_ptr, the_value, cg_global_type_info_member_enum_values.elem_type);
+	}
+
+	void *len_ptr  = tb_global_add_region(m->mod, global, offset+build_context.int_size, build_context.int_size);
+	cg_write_int_at_ptr(len_ptr, count, t_int);
+}
+
+
 
 gb_internal void cg_setup_type_info_data(cgModule *m) {
 	if (build_context.no_rtti) {
@@ -274,6 +303,7 @@ gb_internal void cg_setup_type_info_data(cgModule *m) {
 	{ // Type info member buffer
 		// NOTE(bill): Removes need for heap allocation by making it global memory
 		isize count = 0;
+		isize enum_count = 0;
 
 		for (Type *t : m->info->type_info_types) {
 			isize index = cg_type_info_index(m->info, t, false);
@@ -290,6 +320,9 @@ gb_internal void cg_setup_type_info_data(cgModule *m) {
 				break;
 			case Type_Tuple:
 				count += t->Tuple.variables.count;
+				break;
+			case Type_Enum:
+				enum_count += t->Enum.fields.count;
 				break;
 			}
 		}
@@ -332,6 +365,14 @@ gb_internal void cg_setup_type_info_data(cgModule *m) {
 				tb_global_set_storage(m->mod, tb_module_get_rdata(m->mod), g, type_size_of(t), 16, count*2);
 				cg_global_type_info_member_tags = GlobalTypeInfoData{g, t, t_string, 0};
 			}
+		}
+
+		if (enum_count > 0) {
+			char const *name = CG_TYPE_INFO_ENUM_VALUES_NAME;
+			Type *t = alloc_type_array(t_i64, enum_count);
+			TB_Global *g = tb_global_create(m->mod, -1, name, nullptr, TB_LINKAGE_PRIVATE);
+			tb_global_set_storage(m->mod, tb_module_get_rdata(m->mod), g, type_size_of(t), 16, enum_count);
+			cg_global_type_info_member_enum_values = GlobalTypeInfoData{g, t, t_i64, 0};
 		}
 	}
 	gb_unused(info);
@@ -378,6 +419,12 @@ gb_internal void cg_setup_type_info_data(cgModule *m) {
 	i64 union_tag_offset    = type_info_union->Union.variant_block_size;
 	Type *ti_union_tag_type = union_tag_type(type_info_union);
 	u64 union_tag_type_size = type_size_of(ti_union_tag_type);
+
+	auto const &set_bool = [](cgModule *m, TB_Global *global, i64 offset, bool value) {
+		bool *ptr = cast(bool *)tb_global_add_region(m->mod, global, offset, 1);
+		*ptr = value;
+	};
+
 
 	for_array(type_info_type_index, info->type_info_types) {
 		Type *t = info->type_info_types[type_info_type_index];
@@ -450,7 +497,7 @@ gb_internal void cg_setup_type_info_data(cgModule *m) {
 			cg_global_source_code_location_const(m, proc_name, pos, global, offset+loc_offset);
 
 			i64 base_offset = type_offset_of(tag_type, 1);
-			cg_global_const_type_info_ptr(m, type_table_array, t->Named.base, global, offset+base_offset);
+			cg_global_const_type_info_ptr(m, t->Named.base, global, offset+base_offset);
 			break;
 		}
 
@@ -562,11 +609,8 @@ gb_internal void cg_setup_type_info_data(cgModule *m) {
 				break;
 
 			case Basic_cstring:
-				{
-					tag_type = t_type_info_string;
-					bool *b = cast(bool *)tb_global_add_region(m->mod, global, offset+0, 1);
-					*b = true;
-				}
+				tag_type = t_type_info_string;
+				set_bool(m, global, offset+0, true);
 				break;
 
 			case Basic_any:
@@ -581,22 +625,22 @@ gb_internal void cg_setup_type_info_data(cgModule *m) {
 
 		case Type_Pointer:
 			tag_type = t_type_info_pointer;
-			cg_global_const_type_info_ptr(m, type_table_array, t->Pointer.elem, global, offset+0);
+			cg_global_const_type_info_ptr(m, t->Pointer.elem, global, offset+0);
 			break;
 		case Type_MultiPointer:
 			tag_type = t_type_info_multi_pointer;
-			cg_global_const_type_info_ptr(m, type_table_array, t->MultiPointer.elem, global, offset+0);
+			cg_global_const_type_info_ptr(m, t->MultiPointer.elem, global, offset+0);
 			break;
 		case Type_SoaPointer:
 			tag_type = t_type_info_soa_pointer;
-			cg_global_const_type_info_ptr(m, type_table_array, t->SoaPointer.elem, global, offset+0);
+			cg_global_const_type_info_ptr(m, t->SoaPointer.elem, global, offset+0);
 			break;
 
 		case Type_Array:
 			{
 				tag_type = t_type_info_array;
 
-				cg_global_const_type_info_ptr(m, type_table_array, t->Array.elem, global, offset+0);
+				cg_global_const_type_info_ptr(m, t->Array.elem, global, offset+0);
 				void *elem_size_ptr = tb_global_add_region(m->mod, global, offset+1*build_context.int_size, build_context.int_size);
 				void *count_ptr     = tb_global_add_region(m->mod, global, offset+2*build_context.int_size, build_context.int_size);
 
@@ -617,22 +661,21 @@ gb_internal void cg_setup_type_info_data(cgModule *m) {
 				i64 max_value_offset = type_offset_of(tag_type, 5);
 				i64 is_sparse_offset = type_offset_of(tag_type, 6);
 
-				cg_global_const_type_info_ptr(m, type_table_array, t->EnumeratedArray.elem,  global, offset+elem_offset);
-				cg_global_const_type_info_ptr(m, type_table_array, t->EnumeratedArray.index, global, offset+index_offset);
+				cg_global_const_type_info_ptr(m, t->EnumeratedArray.elem,  global, offset+elem_offset);
+				cg_global_const_type_info_ptr(m, t->EnumeratedArray.index, global, offset+index_offset);
 
 				void *elem_size_ptr = tb_global_add_region(m->mod, global, offset+elem_size_offset, build_context.int_size);
 				void *count_ptr     = tb_global_add_region(m->mod, global, offset+count_offset,     build_context.int_size);
 
 				void *min_value_ptr = tb_global_add_region(m->mod, global, offset+min_value_offset, type_size_of(t_type_info_enum_value));
 				void *max_value_ptr = tb_global_add_region(m->mod, global, offset+max_value_offset, type_size_of(t_type_info_enum_value));
-				void *is_sparse_ptr = tb_global_add_region(m->mod, global, offset+is_sparse_offset, 1);
 
 				cg_write_int_at_ptr(elem_size_ptr, type_size_of(t->EnumeratedArray.elem), t_int);
 				cg_write_int_at_ptr(count_ptr,     t->EnumeratedArray.count,              t_int);
 
 				cg_write_int_at_ptr(min_value_ptr, exact_value_to_i64(*t->EnumeratedArray.min_value), t_type_info_enum_value);
 				cg_write_int_at_ptr(max_value_ptr, exact_value_to_i64(*t->EnumeratedArray.max_value), t_type_info_enum_value);
-				*(bool *)is_sparse_ptr = t->EnumeratedArray.is_sparse;
+				set_bool(m, global, offset+is_sparse_offset, t->EnumeratedArray.is_sparse);
 			}
 			break;
 
@@ -640,7 +683,7 @@ gb_internal void cg_setup_type_info_data(cgModule *m) {
 			{
 				tag_type = t_type_info_dynamic_array;
 
-				cg_global_const_type_info_ptr(m, type_table_array, t->DynamicArray.elem, global, offset+0);
+				cg_global_const_type_info_ptr(m, t->DynamicArray.elem, global, offset+0);
 				void *elem_size_ptr = tb_global_add_region(m->mod, global, offset+1*build_context.int_size, build_context.int_size);
 				cg_write_int_at_ptr(elem_size_ptr, type_size_of(t->DynamicArray.elem), t_int);
 			}
@@ -649,7 +692,7 @@ gb_internal void cg_setup_type_info_data(cgModule *m) {
 			{
 				tag_type = t_type_info_slice;
 
-				cg_global_const_type_info_ptr(m, type_table_array, t->Slice.elem, global, offset+0);
+				cg_global_const_type_info_ptr(m, t->Slice.elem, global, offset+0);
 				void *elem_size_ptr = tb_global_add_region(m->mod, global, offset+1*build_context.int_size, build_context.int_size);
 				cg_write_int_at_ptr(elem_size_ptr, type_size_of(t->Slice.elem), t_int);
 			}
@@ -665,16 +708,15 @@ gb_internal void cg_setup_type_info_data(cgModule *m) {
 				i64 convention_offset = type_offset_of(tag_type, 3);
 
 				if (t->Proc.params) {
-					cg_global_const_type_info_ptr(m, type_table_array, t->Proc.params, global, offset+params_offset);
+					cg_global_const_type_info_ptr(m, t->Proc.params, global, offset+params_offset);
 				}
 				if (t->Proc.results) {
-					cg_global_const_type_info_ptr(m, type_table_array, t->Proc.results, global, offset+results_offset);
+					cg_global_const_type_info_ptr(m, t->Proc.results, global, offset+results_offset);
 				}
 
-				bool *variadic_ptr   = cast(bool *)tb_global_add_region(m->mod, global, offset+variadic_offset,   1);
-				u8 *  convention_ptr = cast(u8 *)  tb_global_add_region(m->mod, global, offset+convention_offset, 1);
+				set_bool(m, global, offset+variadic_offset, t->Proc.variadic);
 
-				*variadic_ptr = t->Proc.variadic;
+				u8 *convention_ptr = cast(u8 *)tb_global_add_region(m->mod, global, offset+convention_offset, 1);
 				*convention_ptr = cast(u8)t->Proc.calling_convention;
 			}
 			break;
@@ -704,7 +746,25 @@ gb_internal void cg_setup_type_info_data(cgModule *m) {
 			{
 				tag_type = t_type_info_enum;
 
-				// TODO(bill): Type_Info_Enum
+				i64 base_offset   = type_offset_of(tag_type, 0);
+				i64 names_offset  = type_offset_of(tag_type, 1);
+				i64 values_offset = type_offset_of(tag_type, 2);
+
+				cg_global_const_type_info_ptr(m, t->Enum.base_type, global, offset+base_offset);
+
+				i64 count = t->Enum.fields.count;
+
+				cg_set_type_info_member_names(m, global, offset+names_offset, count, t, [](isize i, void *userdata) -> String {
+					Type *t = cast(Type *)userdata;
+					return t->Enum.fields[i]->token.string;
+				});
+
+				cg_set_type_info_member_enum_values(m, global, offset+values_offset, count, t, [](isize i, void *userdata) -> i64 {
+					Type *t = cast(Type *)userdata;
+					Entity *e = t->Enum.fields[i];
+					GB_ASSERT(e->kind == Entity_Constant);
+					return exact_value_to_i64(e->Constant.value);
+				});
 			}
 			break;
 		case Type_Struct:
@@ -728,6 +788,7 @@ gb_internal void cg_setup_type_info_data(cgModule *m) {
 				i64 soa_base_type_offset = type_offset_of(tag_type, 11);
 				i64 soa_len_offset       = type_offset_of(tag_type, 12);
 
+				// TODO(bill): equal proc stuff
 				gb_unused(equal_offset);
 
 				i64 count = t->Struct.fields.count;
@@ -758,11 +819,6 @@ gb_internal void cg_setup_type_info_data(cgModule *m) {
 				});
 
 
-				auto const &set_bool = [](cgModule *m, TB_Global *global, i64 offset, bool value) {
-					bool *ptr = cast(bool *)tb_global_add_region(m->mod, global, offset, 1);
-					*ptr = value;
-				};
-
 				set_bool(m, global, offset+is_packed_offset,    t->Struct.is_packed);
 				set_bool(m, global, offset+is_raw_union_offset, t->Struct.is_raw_union);
 				set_bool(m, global, offset+is_no_copy_offset,   t->Struct.is_no_copy);
@@ -772,7 +828,7 @@ gb_internal void cg_setup_type_info_data(cgModule *m) {
 					u8 *kind_ptr = cast(u8 *)tb_global_add_region(m->mod, global, offset+soa_kind_offset, 1);
 					*kind_ptr = cast(u8)t->Struct.soa_kind;
 
-					cg_global_const_type_info_ptr(m, type_table_array, t->Struct.soa_elem, global, offset+soa_base_type_offset);
+					cg_global_const_type_info_ptr(m, t->Struct.soa_elem, global, offset+soa_base_type_offset);
 
 					void *soa_len_ptr = tb_global_add_region(m->mod, global, offset+soa_len_offset, build_context.int_size);
 					cg_write_int_at_ptr(soa_len_ptr, t->Struct.soa_count, t_int);
@@ -783,44 +839,135 @@ gb_internal void cg_setup_type_info_data(cgModule *m) {
 			{
 				tag_type = t_type_info_union;
 
-				// TODO(bill): Type_Info_Union
+				i64 variants_offset      = type_offset_of(tag_type, 0);
+				i64 tag_offset_offset    = type_offset_of(tag_type, 1);
+				i64 tag_type_offset      = type_offset_of(tag_type, 2);
+
+				i64 equal_offset         = type_offset_of(tag_type, 3);
+
+				i64 custom_align_offset  = type_offset_of(tag_type, 4);
+				i64 no_nil_offset        = type_offset_of(tag_type, 5);
+				i64 shared_nil_offset    = type_offset_of(tag_type, 6);
+
+				// TODO(bill): equal procs
+				gb_unused(equal_offset);
+
+				i64 count = t->Union.variants.count;
+
+				cg_set_type_info_member_types(m, global, offset+variants_offset, count, t, [](isize i, void *userdata) -> Type * {
+					Type *t = cast(Type *)userdata;
+					return t->Union.variants[i];
+				});
+
+				void *tag_offset_ptr = tb_global_add_region(m->mod, global, offset+tag_offset_offset, build_context.ptr_size);
+				cg_write_uint_at_ptr(tag_offset_ptr, t->Union.variant_block_size, t_uintptr);
+
+				cg_global_const_type_info_ptr(m, union_tag_type(t), global, offset+tag_type_offset);
+
+				set_bool(m, global, offset+custom_align_offset, t->Union.custom_align != 0);
+				set_bool(m, global, offset+no_nil_offset, t->Union.kind == UnionType_no_nil);
+				set_bool(m, global, offset+shared_nil_offset, t->Union.kind == UnionType_shared_nil);
 			}
 			break;
 		case Type_Map:
 			{
 				tag_type = t_type_info_map;
 
-				// TODO(bill): Type_Info_Map
+				i64 key_offset      = type_offset_of(tag_type, 0);
+				i64 value_offset    = type_offset_of(tag_type, 1);
+				i64 map_info_offset = type_offset_of(tag_type, 2);
+
+				// TODO(bill): map info
+				gb_unused(map_info_offset);
+
+				cg_global_const_type_info_ptr(m, t->Map.key,   global, offset+key_offset);
+				cg_global_const_type_info_ptr(m, t->Map.value, global, offset+value_offset);
+
 			}
 			break;
 		case Type_BitSet:
 			{
 				tag_type = t_type_info_bit_set;
 
-				// TODO(bill): Type_Info_Bit_Set
+				i64 elem_offset       = type_offset_of(tag_type, 0);
+				i64 underlying_offset = type_offset_of(tag_type, 1);
+				i64 lower_offset      = type_offset_of(tag_type, 2);
+				i64 upper_offset      = type_offset_of(tag_type, 3);
+
+				cg_global_const_type_info_ptr(m, t->BitSet.elem, global, offset+elem_offset);
+				if (t->BitSet.underlying) {
+					cg_global_const_type_info_ptr(m, t->BitSet.underlying, global, offset+underlying_offset);
+				}
+
+				void *lower_ptr = tb_global_add_region(m->mod, global, offset+lower_offset, 8);
+				void *upper_ptr = tb_global_add_region(m->mod, global, offset+upper_offset, 8);
+
+				cg_write_int_at_ptr(lower_ptr, t->BitSet.lower, t_i64);
+				cg_write_int_at_ptr(upper_ptr, t->BitSet.upper, t_i64);
 			}
 			break;
 		case Type_SimdVector:
 			{
 				tag_type = t_type_info_simd_vector;
 
-				// TODO(bill): Type_Info_Simd_Vector
+				i64 elem_offset      = type_offset_of(tag_type, 0);
+				i64 elem_size_offset = type_offset_of(tag_type, 1);
+				i64 count_offset     = type_offset_of(tag_type, 2);
+
+				cg_global_const_type_info_ptr(m, t->SimdVector.elem, global, offset+elem_offset);
+
+				void *elem_size_ptr = tb_global_add_region(m->mod, global, offset+elem_size_offset, build_context.int_size);
+				void *count_ptr     = tb_global_add_region(m->mod, global, offset+count_offset,     build_context.int_size);
+
+				cg_write_int_at_ptr(elem_size_ptr, type_size_of(t->SimdVector.elem), t_int);
+				cg_write_int_at_ptr(count_ptr,     t->SimdVector.count,              t_int);
 			}
 			break;
 
 		case Type_RelativePointer:
 			{
 				tag_type = t_type_info_relative_pointer;
+
+				i64 pointer_offset      = type_offset_of(tag_type, 0);
+				i64 base_integer_offset = type_offset_of(tag_type, 1);
+
+				cg_global_const_type_info_ptr(m, t->RelativePointer.pointer_type, global, offset+pointer_offset);
+				cg_global_const_type_info_ptr(m, t->RelativePointer.base_integer, global, offset+base_integer_offset);
 			}
 			break;
 		case Type_RelativeSlice:
 			{
 				tag_type = t_type_info_relative_slice;
+
+				i64 slice_offset        = type_offset_of(tag_type, 0);
+				i64 base_integer_offset = type_offset_of(tag_type, 1);
+
+				cg_global_const_type_info_ptr(m, t->RelativeSlice.slice_type,   global, offset+slice_offset);
+				cg_global_const_type_info_ptr(m, t->RelativeSlice.base_integer, global, offset+base_integer_offset);
 			}
 			break;
 		case Type_Matrix:
 			{
 				tag_type = t_type_info_matrix;
+
+				i64 elem_offset         = type_offset_of(tag_type, 0);
+				i64 elem_size_offset    = type_offset_of(tag_type, 1);
+				i64 elem_stride_offset  = type_offset_of(tag_type, 2);
+				i64 row_count_offset    = type_offset_of(tag_type, 3);
+				i64 column_count_offset = type_offset_of(tag_type, 4);
+
+				cg_global_const_type_info_ptr(m, t->Matrix.elem, global, offset+elem_offset);
+
+				void *elem_size_ptr    = tb_global_add_region(m->mod, global, offset+elem_size_offset,    build_context.int_size);
+				void *elem_stride_ptr  = tb_global_add_region(m->mod, global, offset+elem_stride_offset,  build_context.int_size);
+				void *row_count_ptr    = tb_global_add_region(m->mod, global, offset+row_count_offset,    build_context.int_size);
+				void *column_count_ptr = tb_global_add_region(m->mod, global, offset+column_count_offset, build_context.int_size);
+
+				cg_write_int_at_ptr(elem_size_ptr,    type_size_of(t->Matrix.elem),   t_int);
+				cg_write_int_at_ptr(elem_stride_ptr,  matrix_type_stride_in_elems(t), t_int);
+				cg_write_int_at_ptr(row_count_ptr,    t->Matrix.row_count,            t_int);
+				cg_write_int_at_ptr(column_count_ptr, t->Matrix.column_count,         t_int);
+
 			}
 			break;
 		}

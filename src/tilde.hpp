@@ -19,12 +19,13 @@
 #define CG_STARTUP_RUNTIME_PROC_NAME   "__$startup_runtime"
 #define CG_CLEANUP_RUNTIME_PROC_NAME   "__$cleanup_runtime"
 #define CG_STARTUP_TYPE_INFO_PROC_NAME "__$startup_type_info"
-#define CG_TYPE_INFO_DATA_NAME       "__$type_info_data"
-#define CG_TYPE_INFO_TYPES_NAME      "__$type_info_types_data"
-#define CG_TYPE_INFO_NAMES_NAME      "__$type_info_names_data"
-#define CG_TYPE_INFO_OFFSETS_NAME    "__$type_info_offsets_data"
-#define CG_TYPE_INFO_USINGS_NAME     "__$type_info_usings_data"
-#define CG_TYPE_INFO_TAGS_NAME       "__$type_info_tags_data"
+#define CG_TYPE_INFO_DATA_NAME         "__$type_info_data"
+#define CG_TYPE_INFO_TYPES_NAME        "__$type_info_types_data"
+#define CG_TYPE_INFO_NAMES_NAME        "__$type_info_names_data"
+#define CG_TYPE_INFO_OFFSETS_NAME      "__$type_info_offsets_data"
+#define CG_TYPE_INFO_USINGS_NAME       "__$type_info_usings_data"
+#define CG_TYPE_INFO_TAGS_NAME         "__$type_info_tags_data"
+#define CG_TYPE_INFO_ENUM_VALUES_NAME  "__$type_info_enum_values_data"
 
 struct cgModule;
 
@@ -245,11 +246,12 @@ struct GlobalTypeInfoData {
 };
 
 gb_global Entity *cg_global_type_info_data_entity   = {};
-gb_global GlobalTypeInfoData cg_global_type_info_member_types   = {};
-gb_global GlobalTypeInfoData cg_global_type_info_member_names   = {};
-gb_global GlobalTypeInfoData cg_global_type_info_member_offsets = {};
-gb_global GlobalTypeInfoData cg_global_type_info_member_usings  = {};
-gb_global GlobalTypeInfoData cg_global_type_info_member_tags    = {};
+gb_global GlobalTypeInfoData cg_global_type_info_member_types       = {};
+gb_global GlobalTypeInfoData cg_global_type_info_member_names       = {};
+gb_global GlobalTypeInfoData cg_global_type_info_member_offsets     = {};
+gb_global GlobalTypeInfoData cg_global_type_info_member_usings      = {};
+gb_global GlobalTypeInfoData cg_global_type_info_member_tags        = {};
+gb_global GlobalTypeInfoData cg_global_type_info_member_enum_values = {};
 
 
 
