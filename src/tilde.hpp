@@ -237,19 +237,20 @@ struct cgModule {
 #define ABI_PKG_NAME_SEPARATOR "@"
 #endif
 
-gb_global Entity *cg_global_type_info_data_entity   = {};
-gb_global cgAddr cg_global_type_info_member_types   = {};
-gb_global cgAddr cg_global_type_info_member_names   = {};
-gb_global cgAddr cg_global_type_info_member_offsets = {};
-gb_global cgAddr cg_global_type_info_member_usings  = {};
-gb_global cgAddr cg_global_type_info_member_tags    = {};
+struct GlobalTypeInfoData {
+	TB_Global *global;
+	Type *     array_type;
+	Type *     elem_type;
+	isize      index;
+};
 
-gb_global isize cg_global_type_info_data_index           = 0;
-gb_global isize cg_global_type_info_member_types_index   = 0;
-gb_global isize cg_global_type_info_member_names_index   = 0;
-gb_global isize cg_global_type_info_member_offsets_index = 0;
-gb_global isize cg_global_type_info_member_usings_index  = 0;
-gb_global isize cg_global_type_info_member_tags_index    = 0;
+gb_global Entity *cg_global_type_info_data_entity   = {};
+gb_global GlobalTypeInfoData cg_global_type_info_member_types   = {};
+gb_global GlobalTypeInfoData cg_global_type_info_member_names   = {};
+gb_global GlobalTypeInfoData cg_global_type_info_member_offsets = {};
+gb_global GlobalTypeInfoData cg_global_type_info_member_usings  = {};
+gb_global GlobalTypeInfoData cg_global_type_info_member_tags    = {};
+
 
 
 gb_internal TB_Arena *cg_arena(void);
@@ -269,6 +270,9 @@ gb_internal cgValue cg_value(TB_Node *    node, Type *type);
 
 gb_internal cgAddr cg_addr(cgValue const &value);
 
+gb_internal u64 cg_typeid_as_u64(cgModule *m, Type *type);
+gb_internal cgValue cg_type_info(cgProcedure *p, Type *type);
+gb_internal isize cg_type_info_index(CheckerInfo *info, Type *type, bool err_on_not_found=true);
 
 gb_internal cgValue cg_const_value(cgProcedure *p, Type *type, ExactValue const &value);
 gb_internal cgValue cg_const_nil(cgProcedure *p, Type *type);
