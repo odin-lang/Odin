@@ -267,7 +267,7 @@ struct cgGlobalVariable {
 };
 
 // Returns already_has_entry_point
-gb_internal bool cg_global_variables_create(cgModule *m) {
+gb_internal bool cg_global_variables_create(cgModule *m, Array<cgGlobalVariable> *global_variables) {
 	isize global_variable_max_count = 0;
 	bool already_has_entry_point = false;
 
@@ -296,7 +296,7 @@ gb_internal bool cg_global_variables_create(cgModule *m) {
 			}
 		}
 	}
-	auto global_variables = array_make<cgGlobalVariable>(permanent_allocator(), 0, global_variable_max_count);
+	*global_variables = array_make<cgGlobalVariable>(permanent_allocator(), 0, global_variable_max_count);
 
 	auto *min_dep_set = &m->info->minimum_dependency_set;
 
@@ -358,7 +358,7 @@ gb_internal bool cg_global_variables_create(cgModule *m) {
 			isize max_regions = cg_global_const_calculate_region_count(tav.value, e->type);
 			tb_global_set_storage(m->mod, section, global, type_size_of(e->type), type_align_of(e->type), max_regions);
 
-			if (tav.mode != Addressing_Invalid &&
+			if (tav.mode == Addressing_Constant &&
 			    tav.value.kind != ExactValue_Invalid) {
 				cg_global_const_add_region(m, tav.value, e->type, global, 0);
 				var.is_initialized = true;
@@ -367,23 +367,35 @@ gb_internal bool cg_global_variables_create(cgModule *m) {
 				var.is_initialized = true;
 			}
 		} else {
+			var.is_initialized = true;
+			// TODO(bill): is this even needed;
 			i64 max_regions = cg_global_const_calculate_region_count_from_basic_type(e->type);
 			tb_global_set_storage(m->mod, section, global, type_size_of(e->type), type_align_of(e->type), max_regions);
 		}
 
-		array_add(&global_variables, var);
+		array_add(global_variables, var);
 
 		cg_add_symbol(m, e, cast(TB_Symbol *)global);
 		cg_add_entity(m, e, g);
 		cg_add_member(m, name, g);
 	}
 
-
-
 	cg_setup_type_info_data(m);
 
 	return already_has_entry_point;
 }
+
+gb_internal void cg_global_variables_initialize(cgProcedure *p, Array<cgGlobalVariable> *global_variables) {
+	for (cgGlobalVariable &var : *global_variables) {
+		if (var.is_initialized) {
+			continue;
+		}
+		cgValue src = cg_build_expr(p, var.decl->init_expr);
+		cgValue dst = cg_flatten_value(p, var.var);
+		cg_emit_store(p, dst, src);
+	}
+}
+
 
 gb_internal cgModule *cg_module_create(Checker *c) {
 	cgModule *m = gb_alloc_item(permanent_allocator(), cgModule);
@@ -674,7 +686,8 @@ gb_internal bool cg_generate_code(Checker *c, LinkerData *linker_data) {
 
 	TIME_SECTION("Tilde Global Variables");
 
-	bool already_has_entry_point = cg_global_variables_create(m);
+	Array<cgGlobalVariable> global_variables = {};
+	bool already_has_entry_point = cg_global_variables_create(m, &global_variables);
 	gb_unused(already_has_entry_point);
 
 	if (true) {
@@ -683,6 +696,8 @@ gb_internal bool cg_generate_code(Checker *c, LinkerData *linker_data) {
 		p->is_startup = true;
 
 		cg_procedure_begin(p);
+		cg_global_variables_initialize(p, &global_variables);
+
 		tb_inst_ret(p->func, 0, nullptr);
 		cg_procedure_end(p);
 	}
