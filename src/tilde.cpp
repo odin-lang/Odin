@@ -250,7 +250,9 @@ gb_internal TB_Symbol *cg_find_symbol_from_entity(cgModule *m, Entity *e) {
 	String link_name = cg_get_entity_name(m, e);
 	cgProcedure **proc_found = string_map_get(&m->procedures, link_name);
 	if (proc_found) {
-		return (*proc_found)->symbol;
+		TB_Symbol *symbol = (*proc_found)->symbol;
+		map_set(&m->symbols, e, symbol);
+		return symbol;
 	}
 	GB_PANIC("could not find entity's symbol %.*s", LIT(e->token.string));
 	return nullptr;

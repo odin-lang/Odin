@@ -2240,7 +2240,65 @@ gb_internal void cg_build_stmt(cgProcedure *p, Ast *node) {
 			}
 		}
 		if (is_static) {
-			GB_PANIC("TODO(bill): build static variables");
+			for_array(i, vd->names) {
+				Ast *ident = vd->names[i];
+				GB_ASSERT(!is_blank_ident(ident));
+				Entity *e = entity_of_node(ident);
+				GB_ASSERT(e->flags & EntityFlag_Static);
+				String name = e->token.string;
+
+				String mangled_name = {};
+				{
+					gbString str = gb_string_make_length(permanent_allocator(), p->name.text, p->name.len);
+					str = gb_string_appendc(str, "-");
+					str = gb_string_append_fmt(str, ".%.*s-%llu", LIT(name), cast(long long)e->id);
+					mangled_name.text = cast(u8 *)str;
+					mangled_name.len = gb_string_length(str);
+				}
+
+				cgModule *m = p->module;
+
+				TB_DebugType *debug_type = cg_debug_type(m, e->type);
+				TB_Global *global = tb_global_create(m->mod, mangled_name.len, cast(char const *)mangled_name.text, debug_type, TB_LINKAGE_PRIVATE);
+
+				TB_ModuleSection *section = tb_module_get_data(m->mod);
+				if (e->Variable.thread_local_model != "") {
+					section = tb_module_get_tls(m->mod);
+					String model = e->Variable.thread_local_model;
+					if (model == "default") {
+						// TODO(bill): Thread Local Storage models
+					} else if (model == "localdynamic") {
+						// TODO(bill): Thread Local Storage models
+					} else if (model == "initialexec") {
+						// TODO(bill): Thread Local Storage models
+					} else if (model == "localexec") {
+						// TODO(bill): Thread Local Storage models
+					} else {
+						GB_PANIC("Unhandled thread local mode %.*s", LIT(model));
+					}
+				}
+
+				i64 max_objects = 0;
+				ExactValue value = {};
+
+				if (vd->values.count > 0) {
+					GB_ASSERT(vd->names.count == vd->values.count);
+					Ast *ast_value = vd->values[i];
+					GB_ASSERT(ast_value->tav.mode == Addressing_Constant ||
+					          ast_value->tav.mode == Addressing_Invalid);
+
+					value = ast_value->tav.value;
+					max_objects = cg_global_const_calculate_region_count(value, e->type);
+				}
+				tb_global_set_storage(m->mod, section, global, type_size_of(e->type), type_align_of(e->type), max_objects);
+
+				cg_global_const_add_region(m, value, e->type, global, 0);
+
+				TB_Node *node = tb_inst_get_symbol_address(p->func, cast(TB_Symbol *)global);
+				cgValue global_val = cg_value(node, alloc_type_pointer(e->type));
+				cg_add_entity(p->module, e, global_val);
+				cg_add_member(p->module, mangled_name, global_val);
+			}
 			return;
 		}
 

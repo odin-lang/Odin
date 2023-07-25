@@ -347,22 +347,23 @@ gb_internal isize cg_global_const_calculate_region_count(ExactValue const &value
 	case ExactValue_Bool:
 	case ExactValue_Integer:
 	case ExactValue_Float:
-	case ExactValue_Pointer:
 	case ExactValue_Typeid:
 	case ExactValue_Complex:
 	case ExactValue_Quaternion:
 		return 1;
+	case ExactValue_Pointer:
+		return 2;
 
 	case ExactValue_Procedure:
 		return 1;
 
 	case ExactValue_String:
 		if (is_type_string(type)) {
-			return 2;
+			return 3;
 		} else if (is_type_cstring(type) || is_type_array_like(type)) {
-			return 1;
+			return 2;
 		}
-		return 2;
+		return 3;
 
 	case ExactValue_Compound: {
 		ast_node(cl, CompoundLit, value.value_compound);
@@ -455,7 +456,7 @@ gb_internal isize cg_global_const_calculate_region_count(ExactValue const &value
 			return 1;
 
 		case Type_Slice:
-			return 2;
+			return 3;
 
 		default:
 			GB_PANIC("TODO(bill): %s", type_to_string(type));
