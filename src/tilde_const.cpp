@@ -911,17 +911,24 @@ gb_internal cgValue cg_const_value(cgProcedure *p, Type *type, ExactValue const 
 	case ExactValue_Procedure:
 		{
 			Ast *expr = unparen_expr(value.value_procedure);
+			if (expr->kind == Ast_ProcLit) {
+				cgProcedure *anon = cg_procedure_generate_anonymous(p->module, expr, p);
+				TB_Node *ptr = tb_inst_get_symbol_address(p->func, anon->symbol);
+				GB_ASSERT(are_types_identical(type, anon->type));
+				return cg_value(ptr, type);
+			}
+
 			Entity *e = entity_of_node(expr);
 			if (e != nullptr) {
-				cgValue found = cg_find_procedure_value_from_entity(p->module, e);
-				GB_ASSERT_MSG(are_types_identical(type, found.type),
-				              "%.*s %s == %s",
-				              LIT(p->name),
-				              type_to_string(type), type_to_string(found.type));
-				GB_ASSERT(found.kind == cgValue_Symbol);
-				return cg_flatten_value(p, found);
+				TB_Symbol *found = cg_find_symbol_from_entity(p->module, e);
+				GB_ASSERT_MSG(found != nullptr, "could not find '%.*s'", LIT(e->token.string));
+				TB_Node *ptr = tb_inst_get_symbol_address(p->func, found);
+				GB_ASSERT(type != nullptr);
+				GB_ASSERT(are_types_identical(type, e->type));
+				return cg_value(ptr, type);
 			}
-			GB_PANIC("TODO(bill): cg_const_value ExactValue_Procedure");
+
+			GB_PANIC("TODO(bill): cg_const_value ExactValue_Procedure %s", expr_to_string(expr));
 		}
 		break;
 	}

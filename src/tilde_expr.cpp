@@ -3090,7 +3090,6 @@ gb_internal cgValue cg_build_expr_internal(cgProcedure *p, Ast *expr) {
 		// 	gb_printf_err("%s %s : %s @ %p\n", token_pos_to_string(expr_pos), expr_to_string(expr), type_to_string(expr->tav.type), expr);
 		// 	GB_PANIC("%s\n", type_to_string(tv.type));
 		// }
-
 		// NOTE(bill): Short on constant values
 		return cg_const_value(p, type, tv.value);
 	} else if (tv.mode == Addressing_Type) {
@@ -3289,7 +3288,22 @@ gb_internal cgValue cg_build_expr_internal(cgProcedure *p, Ast *expr) {
 	case_ast_node(ta, TypeAssertion, expr);
 		return cg_build_type_assertion(p, expr, tv.type);
 	case_end;
+
+	case_ast_node(pl, ProcLit, expr);
+		cgProcedure *anon = cg_procedure_generate_anonymous(p->module, expr, p);
+		GB_ASSERT(anon != nullptr);
+		GB_ASSERT(anon->symbol != nullptr);
+		return cg_value(tb_inst_get_symbol_address(p->func, anon->symbol), type);
+	case_end;
+
 	}
+	TokenPos token_pos = ast_token(expr).pos;
+	GB_PANIC("Unexpected expression\n"
+	         "\tAst: %.*s @ "
+	         "%s\n",
+	         LIT(ast_strings[expr->kind]),
+	         token_pos_to_string(token_pos));
+
 	return {};
 
 }

@@ -161,6 +161,63 @@ gb_internal cgProcedure *cg_procedure_create_dummy(cgModule *m, String const &li
 	return p;
 }
 
+gb_internal cgProcedure *cg_procedure_generate_anonymous(cgModule *m, Ast *expr, cgProcedure *parent) {
+	expr = unparen_expr(expr);
+	ast_node(pl, ProcLit, expr);
+
+	mutex_lock(&m->anonymous_proc_lits_mutex);
+	defer (mutex_unlock(&m->anonymous_proc_lits_mutex));
+
+	cgProcedure **found = map_get(&m->anonymous_proc_lits_map, expr);
+	if (found) {
+		return *found;
+	}
+
+	TokenPos pos = ast_token(expr).pos;
+
+	// NOTE(bill): Generate a new name
+	// parent$count
+
+	String prefix_name = str_lit("proc_lit");
+	if (parent) {
+		prefix_name = parent->name;
+	}
+
+	isize name_len = prefix_name.len + 6 + 11;
+	char *name_text = gb_alloc_array(permanent_allocator(), char, name_len);
+
+	static std::atomic<i32> name_id;
+	name_len = gb_snprintf(name_text, name_len, "%.*s$anon-%d", LIT(prefix_name), 1+name_id.fetch_add(1));
+	String name = make_string((u8 *)name_text, name_len-1);
+
+	Type *type = type_of_expr(expr);
+
+	GB_ASSERT(pl->decl->entity == nullptr);
+	Token token = {};
+	token.pos = ast_token(expr).pos;
+	token.kind = Token_Ident;
+	token.string = name;
+	Entity *e = alloc_entity_procedure(nullptr, token, type, pl->tags);
+	e->file = expr->file();
+
+	// NOTE(bill): this is to prevent a race condition since these procedure literals can be created anywhere at any time
+	e->decl_info = pl->decl;
+	pl->decl->entity = e;
+	e->flags |= EntityFlag_ProcBodyChecked;
+
+	cgProcedure *p = cg_procedure_create(m, e);
+
+	map_set(&m->anonymous_proc_lits_map, expr, p);
+
+	if (parent != nullptr) {
+		array_add(&parent->children, p);
+	}
+
+	cg_add_procedure_to_queue(p);
+	return p;
+
+}
+
 gb_internal void cg_procedure_begin(cgProcedure *p) {
 	if (p == nullptr || p->func == nullptr) {
 		return;
@@ -374,7 +431,7 @@ gb_internal void cg_procedure_generate(cgProcedure *p) {
 
 
 	if (
-	    string_starts_with(p->name, str_lit("bug@main")) ||
+	    // string_starts_with(p->name, str_lit("bug@main")) ||
 	    false
 	) { // IR Printing
 		TB_Arena *arena = tb_default_arena();

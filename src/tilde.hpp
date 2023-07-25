@@ -227,6 +227,10 @@ struct cgModule {
 	RecursiveMutex proc_proto_mutex;
 	PtrMap<Type *, TB_FunctionPrototype *> proc_proto_map;
 
+	BlockingMutex anonymous_proc_lits_mutex;
+	PtrMap<Ast *, cgProcedure *> anonymous_proc_lits_map;
+
+
 	// NOTE(bill): no need to protect this with a mutex
 	PtrMap<uintptr, TB_FileID> file_id_map; // Key: AstFile.id (i32 cast to uintptr)
 
@@ -259,10 +263,13 @@ gb_internal TB_Arena *cg_arena(void);
 
 gb_internal void cg_add_procedure_to_queue(cgProcedure *p);
 gb_internal void cg_setup_type_info_data(cgModule *m);
+gb_internal cgProcedure *cg_procedure_generate_anonymous(cgModule *m, Ast *expr, cgProcedure *parent);
 
 gb_internal isize cg_global_const_calculate_region_count(ExactValue const &value, Type *type);
 gb_internal i64   cg_global_const_calculate_region_count_from_basic_type(Type *type);
 gb_internal bool  cg_global_const_add_region(cgModule *m, ExactValue const &value, Type *type, TB_Global *global, i64 offset);
+
+gb_internal String cg_get_entity_name(cgModule *m, Entity *e);
 
 gb_internal cgValue cg_value(TB_Global *  g,    Type *type);
 gb_internal cgValue cg_value(TB_External *e,    Type *type);

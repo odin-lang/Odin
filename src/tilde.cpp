@@ -238,14 +238,21 @@ gb_internal void cg_add_procedure_value(cgModule *m, cgProcedure *p) {
 }
 
 gb_internal TB_Symbol *cg_find_symbol_from_entity(cgModule *m, Entity *e) {
-	if (e) {
-		rw_mutex_lock(&m->values_mutex);
-		defer (rw_mutex_unlock(&m->values_mutex));
-		TB_Symbol **found = map_get(&m->symbols, e);
-		if (found) {
-			return *found;
-		}
+	GB_ASSERT(e != nullptr);
+
+	rw_mutex_lock(&m->values_mutex);
+	defer (rw_mutex_unlock(&m->values_mutex));
+	TB_Symbol **found = map_get(&m->symbols, e);
+	if (found) {
+		return *found;
 	}
+
+	String link_name = cg_get_entity_name(m, e);
+	cgProcedure **proc_found = string_map_get(&m->procedures, link_name);
+	if (proc_found) {
+		return (*proc_found)->symbol;
+	}
+	GB_PANIC("could not find entity's symbol %.*s", LIT(e->token.string));
 	return nullptr;
 }
 
@@ -397,6 +404,8 @@ gb_internal cgModule *cg_module_create(Checker *c) {
 	map_init(&m->proc_debug_type_map);
 	map_init(&m->proc_proto_map);
 
+	map_init(&m->anonymous_proc_lits_map);
+
 	array_init(&m->single_threaded_procedure_queue, heap_allocator());
 
 
@@ -417,6 +426,7 @@ gb_internal void cg_module_destroy(cgModule *m) {
 	map_destroy(&m->debug_type_map);
 	map_destroy(&m->proc_debug_type_map);
 	map_destroy(&m->proc_proto_map);
+	map_destroy(&m->anonymous_proc_lits_map);
 
 	array_free(&m->single_threaded_procedure_queue);
 
