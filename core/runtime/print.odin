@@ -8,6 +8,11 @@ _INTEGER_DIGITS_VAR := _INTEGER_DIGITS
 when !ODIN_NO_RTTI {
 	print_any_single :: proc "contextless" (arg: any) {
 		x := arg
+		if x.data == nil {
+			print_string("nil")
+			return
+		}
+
 		if loc, ok := x.(Source_Code_Location); ok {
 			print_caller_location(loc)
 			return
@@ -48,6 +53,7 @@ when !ODIN_NO_RTTI {
 		case int:     print_int(v)
 		case uint:    print_uint(v)
 		case uintptr: print_uintptr(v)
+		case rawptr:  print_uintptr(uintptr(v))
 
 		case bool: print_string("true" if v else "false")
 		case b8:   print_string("true" if v else "false")
@@ -58,7 +64,7 @@ when !ODIN_NO_RTTI {
 		case:
 			ti := type_info_of(x.id)
 			#partial switch v in ti.variant {
-			case Type_Info_Pointer:
+			case Type_Info_Pointer, Type_Info_Multi_Pointer:
 				print_uintptr((^uintptr)(x.data)^)
 				return
 			}
@@ -67,7 +73,9 @@ when !ODIN_NO_RTTI {
 		}
 	}
 	println_any :: proc "contextless" (args: ..any) {
+		context = default_context()
 		loop: for arg, i in args {
+			assert(arg.id != nil)
 			if i != 0 {
 				print_string(" ")
 			}

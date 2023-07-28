@@ -6,6 +6,7 @@
 #endif
 
 #include "tilde/tb.h"
+#include "tilde/tb_arena.h"
 
 #define TB_TYPE_F16    TB_DataType{ { TB_INT, 0, 16 } }
 #define TB_TYPE_I128   TB_DataType{ { TB_INT, 0, 128 } }
@@ -230,6 +231,12 @@ struct cgModule {
 	BlockingMutex anonymous_proc_lits_mutex;
 	PtrMap<Ast *, cgProcedure *> anonymous_proc_lits_map;
 
+	RecursiveMutex generated_procs_mutex;
+	PtrMap<Type *, cgProcedure *> equal_procs;
+	PtrMap<Type *, cgProcedure *> hasher_procs;
+	PtrMap<Type *, cgProcedure *> map_get_procs;
+	PtrMap<Type *, cgProcedure *> map_set_procs;
+
 
 	// NOTE(bill): no need to protect this with a mutex
 	PtrMap<uintptr, TB_FileID> file_id_map; // Key: AstFile.id (i32 cast to uintptr)
@@ -319,6 +326,7 @@ gb_internal cgValue cg_build_call_expr(cgProcedure *p, Ast *expr);
 
 gb_internal void cg_build_return_stmt(cgProcedure *p, Slice<Ast *> const &return_results);
 gb_internal void cg_build_return_stmt_internal(cgProcedure *p, Slice<cgValue> const &results);
+gb_internal void cg_build_return_stmt_internal_single(cgProcedure *p, cgValue result);
 gb_internal void cg_build_range_stmt(cgProcedure *p, Ast *node);
 
 gb_internal cgValue cg_find_value_from_entity(cgModule *m, Entity *e);
@@ -341,6 +349,10 @@ gb_internal cgValue cg_emit_conv(cgProcedure *p, cgValue value, Type *t);
 gb_internal cgValue cg_emit_comp_against_nil(cgProcedure *p, TokenKind op_kind, cgValue x);
 gb_internal cgValue cg_emit_comp(cgProcedure *p, TokenKind op_kind, cgValue left, cgValue right);
 gb_internal cgValue cg_emit_arith(cgProcedure *p, TokenKind op, cgValue lhs, cgValue rhs, Type *type);
+gb_internal cgValue cg_emit_unary_arith(cgProcedure *p, TokenKind op, cgValue x, Type *type);
+
+gb_internal cgProcedure *cg_equal_proc_for_type(cgModule *m, Type *type);
+
 
 gb_internal cgValue cg_emit_call(cgProcedure * p, cgValue value, Slice<cgValue> const &args);
 gb_internal cgValue cg_emit_runtime_call(cgProcedure *p, char const *name, Slice<cgValue> const &args);

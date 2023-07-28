@@ -304,6 +304,42 @@ gb_internal cgValue cg_emit_byte_swap(cgProcedure *p, cgValue value, Type *end_t
 	return cg_emit_transmute(p, value, end_type);
 }
 
+gb_internal cgValue cg_emit_comp_records(cgProcedure *p, TokenKind op_kind, cgValue left, cgValue right, Type *type) {
+	GB_ASSERT((is_type_struct(type) || is_type_union(type)) && is_type_comparable(type));
+	cgValue left_ptr  = cg_address_from_load_or_generate_local(p, left);
+	cgValue right_ptr = cg_address_from_load_or_generate_local(p, right);
+	cgValue res = {};
+	if (type_size_of(type) == 0) {
+		switch (op_kind) {
+		case Token_CmpEq:
+			return cg_const_bool(p, t_bool, true);
+		case Token_NotEq:
+			return cg_const_bool(p, t_bool, false);
+		}
+		GB_PANIC("invalid operator");
+	}
+	TEMPORARY_ALLOCATOR_GUARD();
+	if (is_type_simple_compare(type)) {
+		// TODO(bill): Test to see if this is actually faster!!!!
+		auto args = slice_make<cgValue>(temporary_allocator(), 3);
+		args[0] = cg_emit_conv(p, left_ptr, t_rawptr);
+		args[1] = cg_emit_conv(p, right_ptr, t_rawptr);
+		args[2] = cg_const_int(p, t_int, type_size_of(type));
+		res = cg_emit_runtime_call(p, "memory_equal", args);
+	} else {
+		cgProcedure *equal_proc = cg_equal_proc_for_type(p->module, type);
+		cgValue value = cg_value(tb_inst_get_symbol_address(p->func, equal_proc->symbol), equal_proc->type);
+		auto args = slice_make<cgValue>(temporary_allocator(), 2);
+		args[0] = cg_emit_conv(p, left_ptr, t_rawptr);
+		args[1] = cg_emit_conv(p, right_ptr, t_rawptr);
+		res = cg_emit_call(p, value, args);
+	}
+	if (op_kind == Token_NotEq) {
+		res = cg_emit_unary_arith(p, Token_Not, res, res.type);
+	}
+	return res;
+}
+
 gb_internal cgValue cg_emit_comp(cgProcedure *p, TokenKind op_kind, cgValue left, cgValue right) {
 	GB_ASSERT(gb_is_between(op_kind, Token__ComparisonBegin+1, Token__ComparisonEnd-1));
 
@@ -440,13 +476,11 @@ gb_internal cgValue cg_emit_comp(cgProcedure *p, TokenKind op_kind, cgValue left
 	}
 
 	if ((is_type_struct(a) || is_type_union(a)) && is_type_comparable(a)) {
-		GB_PANIC("TODO(bill): cg_compare_records");
-		// return cg_compare_records(p, op_kind, left, right, a);
+		return cg_emit_comp_records(p, op_kind, left, right, a);
 	}
 
 	if ((is_type_struct(b) || is_type_union(b)) && is_type_comparable(b)) {
-		GB_PANIC("TODO(bill): cg_compare_records");
-		// return cg_compare_records(p, op_kind, left, right, b);
+		return cg_emit_comp_records(p, op_kind, left, right, b);
 	}
 
 	if (is_type_string(a)) {

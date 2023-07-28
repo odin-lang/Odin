@@ -368,22 +368,17 @@ gb_internal void cg_procedure_begin(cgProcedure *p) {
 gb_internal WORKER_TASK_PROC(cg_procedure_compile_worker_proc) {
 	cgProcedure *p = cast(cgProcedure *)data;
 
-	bool emit_asm = false;
+	TB_Passes *opt = tb_pass_enter(p->func, cg_arena());
+	defer (tb_pass_exit(opt));
 
-	if (false &&
-	    string_starts_with(p->name, str_lit("bug@main"))) {
-		TB_Arena *arena = cg_arena();
-		TB_FuncOpt *opt = tb_funcopt_enter(p->func, arena);
-		defer (tb_funcopt_exit(opt));
-
-		tb_funcopt_peephole(opt);
-		tb_funcopt_mem2reg(opt);
-		tb_funcopt_peephole(opt);
-
-		emit_asm = true;
+	// optimization passes
+	if (false) {
+		tb_pass_peephole(opt);
+		tb_pass_mem2reg(opt);
+		tb_pass_peephole(opt);
 	}
 
-
+	bool emit_asm = false;
 	if (
 	    // string_starts_with(p->name, str_lit("runtime@_windows_default_alloc_or_resize")) ||
 	    false
@@ -391,12 +386,27 @@ gb_internal WORKER_TASK_PROC(cg_procedure_compile_worker_proc) {
 		emit_asm = true;
 	}
 
-	TB_FunctionOutput *output = tb_module_compile_function(p->module->mod, p->func, TB_ISEL_FAST, emit_asm);
+	// emit ir
+	if (
+	    // string_starts_with(p->name, str_lit("bug@main")) ||
+	    // p->name == str_lit("runtime@_windows_default_alloc_or_resize") ||
+	    false
+	) { // IR Printing
+		TB_Arena *arena = cg_arena();
+		TB_Passes *passes = tb_pass_enter(p->func, arena);
+		defer (tb_pass_exit(passes));
+
+		tb_pass_print(passes);
+		fprintf(stdout, "\n");
+	}
+	if (false) { // GraphViz printing
+		tb_function_print(p->func, tb_default_print_callback, stdout);
+	}
+
+	// compile
+	TB_FunctionOutput *output = tb_pass_codegen(opt, emit_asm);
 	if (emit_asm) {
-		TB_Assembly *assembly = tb_output_get_asm(output);
-		for (TB_Assembly *node = assembly; node != nullptr; node = node->next) {
-			fprintf(stdout, "%.*s", cast(int)node->length, node->data);
-		}
+		tb_output_print_asm(output, stdout);
 		fprintf(stdout, "\n");
 	}
 
@@ -427,27 +437,9 @@ gb_internal void cg_procedure_generate(cgProcedure *p) {
 		return;
 	}
 
-
 	cg_procedure_begin(p);
 	cg_build_stmt(p, p->body);
 	cg_procedure_end(p);
-
-
-	if (
-	    // string_starts_with(p->name, str_lit("runtime@_windows_default_alloc")) ||
-	    // p->name == str_lit("runtime@_windows_default_alloc_or_resize") ||
-	    false
-	) { // IR Printing
-		TB_Arena *arena = tb_default_arena();
-		defer (arena->free(arena));
-		TB_FuncOpt *opt = tb_funcopt_enter(p->func, arena);
-		defer (tb_funcopt_exit(opt));
-		tb_funcopt_print(opt);
-		fprintf(stdout, "\n");
-	}
-	if (false) { // GraphViz printing
-		tb_function_print(p->func, tb_default_print_callback, stdout);
-	}
 }
 
 gb_internal void cg_build_nested_proc(cgProcedure *p, AstProcLit *pd, Entity *e) {
@@ -988,4 +980,96 @@ gb_internal cgValue cg_build_call_expr_internal(cgProcedure *p, Ast *expr) {
 	auto call_args = slice(args, 0, final_count);
 
 	return cg_emit_call(p, value, call_args);
+}
+
+
+
+
+gb_internal cgProcedure *cg_equal_proc_for_type(cgModule *m, Type *type) {
+	type = base_type(type);
+	GB_ASSERT(is_type_comparable(type));
+
+	mutex_lock(&m->generated_procs_mutex);
+	defer (mutex_unlock(&m->generated_procs_mutex));
+
+	cgProcedure **found = map_get(&m->equal_procs, type);
+	if (found) {
+		return *found;
+	}
+
+	static std::atomic<u32> proc_index;
+
+	char buf[32] = {};
+	isize n = gb_snprintf(buf, 32, "__$equal%u", 1+proc_index.fetch_add(1));
+	char *str = gb_alloc_str_len(permanent_allocator(), buf, n-1);
+	String proc_name = make_string_c(str);
+
+
+	cgProcedure *p = cg_procedure_create_dummy(m, proc_name, t_equal_proc);
+	map_set(&m->equal_procs, type, p);
+
+	cg_procedure_begin(p);
+
+	TB_Node *x = tb_inst_param(p->func, 0);
+	TB_Node *y = tb_inst_param(p->func, 1);
+	GB_ASSERT(x->dt.type == TB_PTR);
+	GB_ASSERT(y->dt.type == TB_PTR);
+
+	TB_DataType ret_dt = TB_PROTOTYPE_RETURNS(p->proto)->dt;
+
+	TB_Node *node_true  = tb_inst_uint(p->func, ret_dt, true);
+	TB_Node *node_false = tb_inst_uint(p->func, ret_dt, false);
+
+	TB_Node *same_ptr_region = cg_control_region(p, "same_ptr");
+	TB_Node *diff_ptr_region = cg_control_region(p, "diff_ptr");
+
+	TB_Node *is_same_ptr = tb_inst_cmp_eq(p->func, x, y);
+	tb_inst_if(p->func, is_same_ptr, same_ptr_region, diff_ptr_region);
+
+	tb_inst_set_control(p->func, same_ptr_region);
+	tb_inst_ret(p->func, 1, &node_true);
+
+	tb_inst_set_control(p->func, diff_ptr_region);
+
+	Type *pt = alloc_type_pointer(type);
+	cgValue lhs = cg_value(x, pt);
+	cgValue rhs = cg_value(y, pt);
+
+	if (type->kind == Type_Struct) {
+		type_set_offsets(type);
+
+		TB_Node *false_region  = cg_control_region(p, "bfalse");
+		cgValue res = cg_const_bool(p, t_bool, true);
+
+		for_array(i, type->Struct.fields) {
+			TB_Node *next_region = cg_control_region(p, "btrue");
+
+			cgValue plhs  = cg_emit_struct_ep(p, lhs, i);
+			cgValue prhs  = cg_emit_struct_ep(p, rhs, i);
+			cgValue left  = cg_emit_load(p, plhs);
+			cgValue right = cg_emit_load(p, prhs);
+			cgValue ok    = cg_emit_comp(p, Token_CmpEq, left, right);
+
+			cg_emit_if(p, ok, next_region, false_region);
+
+			cg_emit_goto(p, next_region);
+			tb_inst_set_control(p->func, next_region);
+		}
+
+		tb_inst_ret(p->func, 1, &node_true);
+		tb_inst_set_control(p->func, false_region);
+		tb_inst_ret(p->func, 1, &node_false);
+
+	} else if (type->kind == Type_Union) {
+		GB_PANIC("TODO(bill): union comparison");
+	} else {
+		cgValue left  = cg_lvalue_addr(x, type);
+		cgValue right = cg_lvalue_addr(y, type);
+		cgValue ok = cg_emit_comp(p, Token_CmpEq, left, right);
+		cg_build_return_stmt_internal_single(p, ok);
+	}
+
+	cg_procedure_end(p);
+
+	return p;
 }

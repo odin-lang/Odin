@@ -1047,6 +1047,14 @@ gb_internal void cg_build_assign_stmt(cgProcedure *p, AstAssignStmt *as) {
 	}
 }
 
+gb_internal void cg_build_return_stmt_internal_single(cgProcedure *p, cgValue result) {
+	Slice<cgValue> results = {};
+	results.data = &result;
+	results.count = 1;
+	cg_build_return_stmt_internal(p, results);
+}
+
+
 gb_internal void cg_build_return_stmt_internal(cgProcedure *p, Slice<cgValue> const &results) {
 	TypeTuple *tuple  = &p->type->Proc.results->Tuple;
 	isize return_count = p->type->Proc.result_count;

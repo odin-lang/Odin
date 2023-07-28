@@ -1,16 +1,16 @@
 #include "tilde.hpp"
 
 
-gb_global Slice<TB_Arena *> global_tb_arenas;
+gb_global Slice<TB_Arena> global_tb_arenas;
 
 gb_internal TB_Arena *cg_arena(void) {
-	return global_tb_arenas[current_thread_index()];
+	return &global_tb_arenas[current_thread_index()];
 }
 
 gb_internal void cg_global_arena_init(void) {
-	global_tb_arenas = slice_make<TB_Arena *>(permanent_allocator(), global_thread_pool.threads.count);
+	global_tb_arenas = slice_make<TB_Arena>(permanent_allocator(), global_thread_pool.threads.count);
 	for_array(i, global_tb_arenas) {
-		global_tb_arenas[i] = tb_default_arena();
+		tb_arena_create(&global_tb_arenas[i], 2ull<<20);
 	}
 }
 
@@ -426,14 +426,15 @@ gb_internal cgModule *cg_module_create(Checker *c) {
 
 	map_init(&m->values);
 	map_init(&m->symbols);
-
 	map_init(&m->file_id_map);
-
 	map_init(&m->debug_type_map);
 	map_init(&m->proc_debug_type_map);
 	map_init(&m->proc_proto_map);
-
 	map_init(&m->anonymous_proc_lits_map);
+	map_init(&m->equal_procs);
+	map_init(&m->hasher_procs);
+	map_init(&m->map_get_procs);
+	map_init(&m->map_set_procs);
 
 	array_init(&m->single_threaded_procedure_queue, heap_allocator());
 
@@ -456,6 +457,10 @@ gb_internal void cg_module_destroy(cgModule *m) {
 	map_destroy(&m->proc_debug_type_map);
 	map_destroy(&m->proc_proto_map);
 	map_destroy(&m->anonymous_proc_lits_map);
+	map_destroy(&m->equal_procs);
+	map_destroy(&m->hasher_procs);
+	map_destroy(&m->map_get_procs);
+	map_destroy(&m->map_set_procs);
 
 	array_free(&m->single_threaded_procedure_queue);
 
@@ -751,6 +756,19 @@ gb_internal bool cg_generate_code(Checker *c, LinkerData *linker_data) {
 			array_add(&procedures_to_generate, p);
 		}
 	}
+	for (cgProcedure *p : procedures_to_generate) {
+		cg_add_procedure_to_queue(p);
+	}
+
+	if (!m->do_threading) {
+		for (isize i = 0; i < m->single_threaded_procedure_queue.count; i++) {
+			cgProcedure *p = m->single_threaded_procedure_queue[i];
+			cg_procedure_generate(p);
+		}
+	}
+
+	thread_pool_wait();
+
 	{
 		cgProcedure *p = cg_startup_runtime_proc;
 		cg_procedure_begin(p);
@@ -765,18 +783,6 @@ gb_internal bool cg_generate_code(Checker *c, LinkerData *linker_data) {
 		cg_procedure_end(p);
 	}
 
-	for (cgProcedure *p : procedures_to_generate) {
-		cg_add_procedure_to_queue(p);
-	}
-
-	if (!m->do_threading) {
-		for (isize i = 0; i < m->single_threaded_procedure_queue.count; i++) {
-			cgProcedure *p = m->single_threaded_procedure_queue[i];
-			cg_procedure_generate(p);
-		}
-	}
-
-	thread_pool_wait();
 
 
 	TB_DebugFormat debug_format = TB_DEBUGFMT_NONE;

@@ -15,20 +15,21 @@
 #define TB_VERSION_MINOR 2
 #define TB_VERSION_PATCH 0
 
-#ifdef __cplusplus
-#define TB_EXTERN extern "C"
-#else
-#define TB_EXTERN
-#endif
-
-#ifdef TB_DLL
-#  ifdef TB_IMPORT_DLL
-#    define TB_API TB_EXTERN __declspec(dllimport)
+#ifndef TB_API
+#  ifdef __cplusplus
+#    define TB_EXTERN extern "C"
 #  else
-#    define TB_API TB_EXTERN __declspec(dllexport)
+#    define TB_EXTERN
 #  endif
-#else
-#  define TB_API TB_EXTERN
+#  ifdef TB_DLL
+#    ifdef TB_IMPORT_DLL
+#      define TB_API TB_EXTERN __declspec(dllimport)
+#    else
+#      define TB_API TB_EXTERN __declspec(dllexport)
+#    endif
+#  else
+#    define TB_API TB_EXTERN
+#  endif
 #endif
 
 // These are flags
@@ -171,7 +172,6 @@ typedef enum TB_FloatFormat {
 typedef union TB_DataType {
     struct {
         uint8_t type;
-        // 2^N where N is the width value.
         // Only integers and floats can be wide.
         uint8_t width;
         // for integers it's the bitwidth
@@ -406,8 +406,6 @@ typedef struct TB_Symbol {
 
 typedef int TB_Reg;
 
-#define TB_NULL_REG NULL
-
 typedef struct TB_Node TB_Node;
 struct TB_Node {
     TB_NodeType type;
@@ -586,29 +584,13 @@ typedef struct {
 
 typedef void (*TB_PrintCallback)(void* user_data, const char* fmt, ...);
 
-////////////////////////////////
-// Arena
-////////////////////////////////
-// the goal is to move more things to transparent arenas, for now it's just function
-// IR which is a big one if you're interested in freeing them in whatever organization
-// you please.
-
-// allocations can make no guarentees about being sequential
-// tho it would be greatly appreciated at least to some degree.
+// defined in common/arena.h
 typedef struct TB_Arena TB_Arena;
-struct TB_Arena {
-    // alignment never goes past max_align_t
-    void* (*alloc)(TB_Arena* arena, size_t size, size_t align);
 
-    // clearing but we're not done with it yet, cheap
-    void (*clear)(TB_Arena* arena);
-
-    // frees everything within the arena, potentially expensive
-    void (*free)(TB_Arena* arena);
-};
-
-// allocates in 16MiB chunks and does linear allocation in 'em
-TB_API TB_Arena* tb_default_arena(void);
+// 0 for default
+TB_API void tb_arena_create(TB_Arena* restrict arena, size_t chunk_size);
+TB_API void tb_arena_destroy(TB_Arena* restrict arena);
+TB_API bool tb_arena_is_empty(TB_Arena* arena);
 
 ////////////////////////////////
 // Module management
@@ -651,8 +633,7 @@ struct TB_Assembly {
 // this is where the machine code and other relevant pieces go.
 typedef struct TB_FunctionOutput TB_FunctionOutput;
 
-// returns NULL if it fails
-TB_API TB_FunctionOutput* tb_module_compile_function(TB_Module* m, TB_Function* f, TB_ISelMode isel_mode, bool emit_asm);
+TB_API void tb_output_print_asm(TB_FunctionOutput* out, FILE* fp);
 
 TB_API uint8_t* tb_output_get_code(TB_FunctionOutput* out, size_t* out_length);
 
@@ -865,6 +846,9 @@ TB_API TB_DebugType* tb_debug_create_func(TB_Module* m, TB_CallingConv cc, size_
 
 TB_API TB_DebugType* tb_debug_field_type(TB_DebugType* type);
 
+TB_API size_t tb_debug_func_return_count(TB_DebugType* type);
+TB_API size_t tb_debug_func_param_count(TB_DebugType* type);
+
 // you'll need to fill these if you make a function
 TB_API TB_DebugType** tb_debug_func_params(TB_DebugType* type);
 TB_API TB_DebugType** tb_debug_func_returns(TB_DebugType* type);
@@ -894,9 +878,6 @@ TB_API void tb_get_data_type_size(TB_Module* mod, TB_DataType dt, size_t* size, 
 TB_API void tb_default_print_callback(void* user_data, const char* fmt, ...);
 
 TB_API void tb_inst_set_location(TB_Function* f, TB_FileID file, int line);
-
-// this only allows for power of two vector types
-TB_API TB_DataType tb_vector_type(TB_DataTypeEnum type, int width);
 
 // if section is NULL, default to .text
 TB_API TB_Function* tb_function_create(TB_Module* m, ptrdiff_t len, const char* name, TB_Linkage linkage, TB_ComdatType comdat);
@@ -1073,25 +1054,40 @@ TB_API void tb_inst_branch(TB_Function* f, TB_DataType dt, TB_Node* key, TB_Node
 TB_API void tb_inst_ret(TB_Function* f, size_t count, TB_Node** values);
 
 ////////////////////////////////
-// Optimizer
+// Passes
 ////////////////////////////////
 // Function analysis, optimizations, and codegen are all part of this
-typedef struct TB_FuncOpt TB_FuncOpt;
+typedef struct TB_Passes TB_Passes;
 
-// the arena is used to allocate the nodes
-TB_API TB_FuncOpt* tb_funcopt_enter(TB_Function* f, TB_Arena* arena);
-TB_API void tb_funcopt_exit(TB_FuncOpt* opt);
+// the arena is used to allocate the nodes while passes are being done.
+TB_API TB_Passes* tb_pass_enter(TB_Function* f, TB_Arena* arena);
+TB_API void tb_pass_exit(TB_Passes* opt);
 
-TB_API bool tb_funcopt_peephole(TB_FuncOpt* opt);
-TB_API bool tb_funcopt_mem2reg(TB_FuncOpt* opt);
-TB_API bool tb_funcopt_loop(TB_FuncOpt* opt);
+// transformation passes:
+//   peephole: runs most simple reductions on the code,
+//     should be run after any bigger passes (it's incremental
+//     so it's not that bad)
+//
+//   mem2reg: lowers TB_LOCALs into SSA values, this makes more
+//     data flow analysis possible on the code and allows to codegen
+//     to place variables into registers.
+//
+//   loop: NOT READY
+//
+TB_API bool tb_pass_peephole(TB_Passes* opt);
+TB_API bool tb_pass_mem2reg(TB_Passes* opt);
+TB_API bool tb_pass_loop(TB_Passes* opt);
 
-// isn't an optimization, just does the name flat form of IR printing
-TB_API bool tb_funcopt_print(TB_FuncOpt* opt);
+// analysis
+//   print: prints IR in a flattened text form.
+TB_API bool tb_pass_print(TB_Passes* opt);
 
-TB_API void tb_funcopt_kill(TB_FuncOpt* opt, TB_Node* n);
-TB_API bool tb_funcopt_mark(TB_FuncOpt* opt, TB_Node* n);
-TB_API void tb_funcopt_mark_users(TB_FuncOpt* opt, TB_Node* n);
+// codegen
+TB_API TB_FunctionOutput* tb_pass_codegen(TB_Passes* opt, bool emit_asm);
+
+TB_API void tb_pass_kill_node(TB_Passes* opt, TB_Node* n);
+TB_API bool tb_pass_mark(TB_Passes* opt, TB_Node* n);
+TB_API void tb_pass_mark_users(TB_Passes* opt, TB_Node* n);
 
 ////////////////////////////////
 // IR access
@@ -1099,8 +1095,6 @@ TB_API void tb_funcopt_mark_users(TB_FuncOpt* opt, TB_Node* n);
 TB_API const char* tb_node_get_name(TB_Node* n);
 
 TB_API TB_Node* tb_get_parent_region(TB_Node* n);
-TB_API bool tb_has_effects(TB_Node* n);
-
 TB_API bool tb_node_is_constant_non_zero(TB_Node* n);
 TB_API bool tb_node_is_constant_zero(TB_Node* n);
 
