@@ -65,18 +65,20 @@ print_element :: proc(writer: io.Writer, doc: ^Document, element_id: Element_ID,
 
 	if element.kind == .Element {
 		wprintf(writer, "<%v>\n", element.ident)
-		if len(element.value) > 0 {
-			tab(writer, indent + 1)
-			wprintf(writer, "[Value] %v\n", element.value)
+
+		for value in element.value {
+			switch v in value {
+			case string:
+				tab(writer, indent + 1)
+				wprintf(writer, "[Value] %v\n", v)
+			case Element_ID:
+				print_element(writer, doc, v, indent + 1)
+			}
 		}
 
 		for attr in element.attribs {
 			tab(writer, indent + 1)
 			wprintf(writer, "[Attr] %v: %v\n", attr.key, attr.val)
-		}
-
-		for child in element.children {
-			print_element(writer, doc, child, indent + 1)
 		}
 	} else if element.kind == .Comment {
 		wprintf(writer, "[COMMENT] %v\n", element.value)
