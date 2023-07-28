@@ -47,7 +47,7 @@ TESTS :: []TEST{
 			},
 			expected_doctype = "恥ずべきフクロウ",
 		},
-		crc32     = 0x30d82264,
+		crc32     = 0xe9b62f03,
 	},
 
 	{
@@ -62,7 +62,7 @@ TESTS :: []TEST{
 			},
 			expected_doctype = "恥ずべきフクロウ",
 		},
-		crc32     = 0xad31d8e8,
+		crc32     = 0x9c2643ed,
 	},
 
 	{
@@ -77,7 +77,7 @@ TESTS :: []TEST{
 			},
 			expected_doctype = "TS",
 		},
-		crc32     = 0x7bce2630,
+		crc32     = 0x859b7443,
 	},
 
 	{
@@ -92,7 +92,7 @@ TESTS :: []TEST{
 			},
 			expected_doctype = "xliff",
 		},
-		crc32     = 0x43f19d61,
+		crc32     = 0x3deaf329,
 	},
 
 	{
@@ -107,7 +107,7 @@ TESTS :: []TEST{
 			},
 			expected_doctype = "xliff",
 		},
-		crc32     = 0x961e7635,
+		crc32     = 0x0c55e287,
 	},
 
 	{
@@ -118,7 +118,7 @@ TESTS :: []TEST{
 			},
 			expected_doctype = "html",
 		},
-		crc32     = 0x573c1033,
+		crc32     = 0x05373317,
 	},
 
 	{
@@ -129,7 +129,7 @@ TESTS :: []TEST{
 			},
 			expected_doctype = "html",
 		},
-		crc32     = 0x82588917,
+		crc32     = 0x3b6d4a90,
 	},
 
 	{
@@ -140,7 +140,7 @@ TESTS :: []TEST{
 			},
 			expected_doctype = "html",
 		},
-		crc32     = 0x5e74d8a6,
+		crc32     = 0x5be2ffdc,
 	},
 
 	/*
@@ -170,7 +170,7 @@ TESTS :: []TEST{
 			expected_doctype = "",
 		},
 		err       = .None,
-		crc32     = 0xcaa042b9,
+		crc32     = 0x420dbac5,
 	},
 }
 
@@ -260,18 +260,20 @@ doc_to_string :: proc(doc: ^xml.Document) -> (result: string) {
 
 		if element.kind == .Element {
 			wprintf(writer, "<%v>\n", element.ident)
-			if len(element.value) > 0 {
-				tab(writer, indent + 1)
-				wprintf(writer, "[Value] %v\n", element.value)
+
+			for value in element.value {
+				switch v in value {
+				case string:
+					tab(writer, indent + 1)
+					wprintf(writer, "[Value] %v\n", v)
+				case xml.Element_ID:
+					print_element(writer, doc, v, indent + 1)
+				}
 			}
 
 			for attr in element.attribs {
 				tab(writer, indent + 1)
 				wprintf(writer, "[Attr] %v: %v\n", attr.key, attr.val)
-			}
-
-			for child in element.children {
-				print_element(writer, doc, child, indent + 1)
 			}
 		} else if element.kind == .Comment {
 			wprintf(writer, "[COMMENT] %v\n", element.value)
