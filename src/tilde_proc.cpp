@@ -18,7 +18,7 @@ gb_internal TB_FunctionPrototype *cg_procedure_type_as_prototype(cgModule *m, Ty
 	return proto;
 }
 
-gb_internal cgProcedure *cg_procedure_create(cgModule *m, Entity *entity, bool ignore_body=false) {
+gb_internal cgProcedure *cg_procedure_create(cgModule *m, Entity *entity, bool ignore_body) {
 	GB_ASSERT(entity != nullptr);
 	GB_ASSERT(entity->kind == Entity_Procedure);
 	if (!entity->Procedure.is_foreign) {
@@ -385,7 +385,7 @@ gb_internal WORKER_TASK_PROC(cg_procedure_compile_worker_proc) {
 
 
 	if (
-	    // string_starts_with(p->name, str_lit("bug@main")) ||
+	    // string_starts_with(p->name, str_lit("runtime@_windows_default_alloc_or_resize")) ||
 	    false
 	) {
 		emit_asm = true;
@@ -434,7 +434,8 @@ gb_internal void cg_procedure_generate(cgProcedure *p) {
 
 
 	if (
-	    // string_starts_with(p->name, str_lit("bug@main")) ||
+	    // string_starts_with(p->name, str_lit("runtime@_windows_default_alloc")) ||
+	    // p->name == str_lit("runtime@_windows_default_alloc_or_resize") ||
 	    false
 	) { // IR Printing
 		TB_Arena *arena = tb_default_arena();

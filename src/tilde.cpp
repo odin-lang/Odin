@@ -241,9 +241,9 @@ gb_internal TB_Symbol *cg_find_symbol_from_entity(cgModule *m, Entity *e) {
 	GB_ASSERT(e != nullptr);
 
 	rw_mutex_lock(&m->values_mutex);
-	defer (rw_mutex_unlock(&m->values_mutex));
 	TB_Symbol **found = map_get(&m->symbols, e);
 	if (found) {
+		rw_mutex_unlock(&m->values_mutex);
 		return *found;
 	}
 
@@ -252,8 +252,23 @@ gb_internal TB_Symbol *cg_find_symbol_from_entity(cgModule *m, Entity *e) {
 	if (proc_found) {
 		TB_Symbol *symbol = (*proc_found)->symbol;
 		map_set(&m->symbols, e, symbol);
+		rw_mutex_unlock(&m->values_mutex);
 		return symbol;
 	}
+	rw_mutex_unlock(&m->values_mutex);
+
+	if (e->kind == Entity_Procedure) {
+		debugf("[Tilde] try to generate procedure %.*s as it was not in the minimum_dependency_set", LIT(e->token.string));
+		// IMPORTANT TODO(bill): This is an utter bodge, try and fix this shit
+		cgProcedure *p = cg_procedure_create(m, e);
+		if (p != nullptr) {
+			GB_ASSERT(p->symbol != nullptr);
+			cg_add_procedure_to_queue(p);
+			return p->symbol;
+		}
+	}
+
+
 	GB_PANIC("could not find entity's symbol %.*s", LIT(e->token.string));
 	return nullptr;
 }
@@ -662,6 +677,9 @@ gb_internal WORKER_TASK_PROC(cg_procedure_generate_worker_proc) {
 }
 
 gb_internal void cg_add_procedure_to_queue(cgProcedure *p) {
+	if (p == nullptr) {
+		return;
+	}
 	cgModule *m = p->module;
 	if (m->do_threading) {
 		thread_pool_add_task(cg_procedure_generate_worker_proc, p);

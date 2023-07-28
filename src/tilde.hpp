@@ -264,6 +264,7 @@ gb_global cgProcedure *cg_cleanup_runtime_proc = nullptr;
 
 gb_internal TB_Arena *cg_arena(void);
 
+gb_internal cgProcedure *cg_procedure_create(cgModule *m, Entity *entity, bool ignore_body=false);
 gb_internal void cg_add_procedure_to_queue(cgProcedure *p);
 gb_internal void cg_setup_type_info_data(cgModule *m);
 gb_internal cgProcedure *cg_procedure_generate_anonymous(cgModule *m, Ast *expr, cgProcedure *parent);

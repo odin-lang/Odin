@@ -5112,27 +5112,6 @@ gb_internal bool check_identifier_exists(Scope *s, Ast *node, bool nested = fals
 	return false;
 }
 
-gb_internal isize add_dependencies_from_unpacking(CheckerContext *c, Entity **lhs, isize lhs_count, isize tuple_index, isize tuple_count) {
-	if (lhs != nullptr && c->decl != nullptr) {
-		for (isize j = 0; (tuple_index + j) < lhs_count && j < tuple_count; j++) {
-			Entity *e = lhs[tuple_index + j];
-			if (e != nullptr) {
-				DeclInfo *decl = decl_info_of_entity(e);
-				if (decl != nullptr) {
-					rw_mutex_shared_lock(&decl->deps_mutex);
-					rw_mutex_lock(&c->decl->deps_mutex);
-					for (Entity *dep : decl->deps) {
-						ptr_set_add(&c->decl->deps, dep);
-					}
-					rw_mutex_unlock(&c->decl->deps_mutex);
-					rw_mutex_shared_unlock(&decl->deps_mutex);
-				}
-			}
-		}
-	}
-	return tuple_count;
-}
-
 gb_internal bool check_no_copy_assignment(Operand const &o, String const &context) {
 	if (o.type && is_type_no_copy(o.type)) {
 		Ast *expr = unparen_expr(o.expr);
@@ -5240,6 +5219,31 @@ enum UnpackFlag : u32 {
 
 
 gb_internal bool check_unpack_arguments(CheckerContext *ctx, Entity **lhs, isize lhs_count, Array<Operand> *operands, Slice<Ast *> const &rhs_arguments, UnpackFlags flags) {
+	auto const &add_dependencies_from_unpacking = [](CheckerContext *c, Entity **lhs, isize lhs_count, isize tuple_index, isize tuple_count) -> isize {
+		if (lhs == nullptr || c->decl == nullptr) {
+			return tuple_count;
+		}
+		for (isize j = 0; (tuple_index + j) < lhs_count && j < tuple_count; j++) {
+			Entity *e = lhs[tuple_index + j];
+			if (e == nullptr) {
+				continue;
+			}
+			DeclInfo *decl = decl_info_of_entity(e);
+			if (decl == nullptr) {
+				continue;
+			}
+			rw_mutex_shared_lock(&decl->deps_mutex);
+			rw_mutex_lock(&c->decl->deps_mutex);
+			for (Entity *dep : decl->deps) {
+				ptr_set_add(&c->decl->deps, dep);
+			}
+			rw_mutex_unlock(&c->decl->deps_mutex);
+			rw_mutex_shared_unlock(&decl->deps_mutex);
+		}
+		return tuple_count;
+	};
+
+
 	bool allow_ok    = (flags & UnpackFlag_AllowOk) != 0;
 	bool is_variadic = (flags & UnpackFlag_IsVariadic) != 0;
 	bool allow_undef = (flags & UnpackFlag_AllowUndef) != 0;
