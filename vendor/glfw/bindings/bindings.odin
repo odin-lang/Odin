@@ -22,8 +22,21 @@ when ODIN_OS == .Windows {
 		}
 	}
 } else when ODIN_OS == .Linux {
-	// TODO: Add the billion-or-so static libs to link to in linux
-	foreign import glfw "system:glfw"
+	when GLFW_DYNAMIC {
+		foreign import glfw "system:glfw"
+	} else {
+		foreign import glfw {
+			"../lib/linux/libglfw3.a",
+			"system:rt",
+			"system:m",
+			"system:dl",
+			"system:X11",
+			"system:pthread",
+			"system:xcb",
+			"system:Xau",
+			"system:Xdmcp",
+		}
+	}
 } else when ODIN_OS == .Darwin {
 	 foreign import glfw { 
         	"../lib/darwin/libglfw3.a",
