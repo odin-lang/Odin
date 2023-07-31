@@ -1,4 +1,5 @@
 //+build windows, linux, darwin
+//+vet !using-param
 package fontstash
 
 import "core:runtime"

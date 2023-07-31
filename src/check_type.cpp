@@ -1474,9 +1474,9 @@ gb_internal Type *check_get_params(CheckerContext *ctx, Scope *scope, Ast *_para
 		Type *specialization = nullptr;
 
 		bool is_using = (p->flags&FieldFlag_using) != 0;
-		if ((build_context.vet_flags & VetFlag_UsingParam) && is_using) {
+		if ((check_vet_flags(param) & VetFlag_UsingParam) && is_using) {
 			ERROR_BLOCK();
-			error(param, "'using' on a procedure parameter is now allowed when '-vet' or '-vet-using-stmt' is applied");
+			error(param, "'using' on a procedure parameter is now allowed when '-vet' or '-vet-using-param' is applied");
 			error_line("\t'using' is considered bad practice to use as a statement/procedure parameter outside of immediate refactoring\n");
 
 		}
