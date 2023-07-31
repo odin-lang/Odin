@@ -1,7 +1,6 @@
 // Tests "linalg_glsl_math.odin" in "core:math/linalg/glsl".
 // Must be run with `-collection:tests=` flag, e.g.
 // ./odin run tests/core/math/linalg/glsl/test_linalg_glsl_math.odin -collection:tests=./tests
-//+vet !using-stmt
 package test_core_math_linalg_glsl_math
 
 import glsl "core:math/linalg/glsl"
@@ -23,9 +22,6 @@ main :: proc() {
 
 @test
 test_fract_f32 :: proc(t: ^testing.T) {
-
-	using math
-
 	r: f32
 
 	Datum :: struct {
@@ -36,8 +32,8 @@ test_fract_f32 :: proc(t: ^testing.T) {
 	@static data := []Datum{
 		{ 0, 10.5, 0.5 }, // Issue #1574 fract in linalg/glm is broken
 		{ 1, -10.5, -0.5 },
-		{ 2, F32_MIN, F32_MIN }, // 0x1p-126
-		{ 3, -F32_MIN, -F32_MIN },
+		{ 2, math.F32_MIN, math.F32_MIN }, // 0x1p-126
+		{ 3, -math.F32_MIN, -math.F32_MIN },
 		{ 4, 0.0, 0.0 },
 		{ 5, -0.0, -0.0 },
 		{ 6, 1, 0.0 },
@@ -55,9 +51,6 @@ test_fract_f32 :: proc(t: ^testing.T) {
 
 @test
 test_fract_f64 :: proc(t: ^testing.T) {
-
-	using math
-
 	r: f64
 
 	Datum :: struct {
@@ -68,8 +61,8 @@ test_fract_f64 :: proc(t: ^testing.T) {
 	@static data := []Datum{
 		{ 0, 10.5, 0.5 }, // Issue #1574 fract in linalg/glm is broken
 		{ 1, -10.5, -0.5 },
-		{ 2, F64_MIN, F64_MIN }, // 0x1p-1022
-		{ 3, -F64_MIN, -F64_MIN },
+		{ 2, math.F64_MIN, math.F64_MIN }, // 0x1p-1022
+		{ 3, -math.F64_MIN, -math.F64_MIN },
 		{ 4, 0.0, 0.0 },
 		{ 5, -0.0, -0.0 },
 		{ 6, 1, 0.0 },
