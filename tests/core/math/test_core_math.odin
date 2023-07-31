@@ -73,10 +73,10 @@ test_classify_f16 :: proc(t: ^testing.T) {
 	}
 
 	/* Check all subnormals (exponent 0, 10-bit significand non-zero) */
-	for i :u16 = 1; i < 0x400; i += 1 {
-		v :f16 = transmute(f16)i
+	for i in u16(1)..<0x400 {
+		v := transmute(f16)i
 		r = classify_f16(v)
-		e :Float_Class: Subnormal
+		e :: Float_Class.Subnormal
 		tc.expect(t, r == e, fmt.tprintf("i:%d %s(%h) -> %v != %v", i, #procedure, v, r, e))
 	}
 }
