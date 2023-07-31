@@ -52,7 +52,7 @@ set compiler_defines= -DODIN_VERSION_RAW=\"%odin_version_raw%\"
 
 if not exist .git\ goto skip_git_hash
 for /f "tokens=1,2" %%i IN ('git show "--pretty=%%cd %%h" "--date=format:%%Y-%%m" --no-patch --no-notes HEAD') do (
-	set odin_version_raw=%%i
+	set odin_version_raw=dev-%%i
 	set GIT_SHA=%%j
 )
 if %ERRORLEVEL% equ 0 set compiler_defines=%compiler_defines% -DGIT_SHA=\"%GIT_SHA%\"
