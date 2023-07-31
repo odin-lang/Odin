@@ -13,20 +13,25 @@ find_child_by_ident :: proc(doc: ^Document, parent_id: Element_ID, ident: string
 	tag := doc.elements[parent_id]
 
 	count := 0
-	for child_id in tag.children {
-		child := doc.elements[child_id]
-		/*
-			Skip commments. They have no name.
-		*/
-		if child.kind  != .Element                { continue }
+	for v in tag.value {
+		switch child_id in v {
+		case string: continue
+		case Element_ID:
+			child := doc.elements[child_id]
+			/*
+				Skip commments. They have no name.
+			*/
+			if child.kind  != .Element                { continue }
 
-		/*
-			If the ident matches and it's the nth such child, return it.
-		*/
-		if child.ident == ident {
-			if count == nth                       { return child_id, true }
-			count += 1
+			/*
+				If the ident matches and it's the nth such child, return it.
+			*/
+			if child.ident == ident {
+				if count == nth                       { return child_id, true }
+				count += 1
+			}
 		}
+
 	}
 	return 0, false
 }

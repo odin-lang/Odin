@@ -118,8 +118,6 @@ TESTS := []Test_Suite{
 
 @test
 tests :: proc(t: ^testing.T) {
-	using fmt
-
 	cat: ^i18n.Translation
 	err: i18n.Error
 
@@ -142,8 +140,6 @@ tests :: proc(t: ^testing.T) {
 }
 
 main :: proc() {
-	using fmt
-
 	track: mem.Tracking_Allocator
 	mem.tracking_allocator_init(&track, context.allocator)
 	context.allocator = mem.tracking_allocator(&track)
@@ -157,9 +153,9 @@ main :: proc() {
 	}
 
 	if len(track.allocation_map) > 0 {
-		println()
+		fmt.println()
 		for _, v in track.allocation_map {
-			printf("%v Leaked %v bytes.\n", v.location, v.size)
+			fmt.printf("%v Leaked %v bytes.\n", v.location, v.size)
 		}
 	}
 }

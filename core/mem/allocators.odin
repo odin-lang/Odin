@@ -111,11 +111,11 @@ begin_arena_temp_memory :: proc(a: ^Arena) -> Arena_Temp_Memory {
 	return tmp
 }
 
-end_arena_temp_memory :: proc(using tmp: Arena_Temp_Memory) {
-	assert(arena.offset >= prev_offset)
-	assert(arena.temp_count > 0)
-	arena.offset = prev_offset
-	arena.temp_count -= 1
+end_arena_temp_memory :: proc(tmp: Arena_Temp_Memory) {
+	assert(tmp.arena.offset >= tmp.prev_offset)
+	assert(tmp.arena.temp_count > 0)
+	tmp.arena.offset = tmp.prev_offset
+	tmp.arena.temp_count -= 1
 }
 
 
@@ -702,11 +702,11 @@ dynamic_pool_init :: proc(pool: ^Dynamic_Pool,
 	pool.         used_blocks.allocator = array_allocator
 }
 
-dynamic_pool_destroy :: proc(using pool: ^Dynamic_Pool) {
+dynamic_pool_destroy :: proc(pool: ^Dynamic_Pool) {
 	dynamic_pool_free_all(pool)
-	delete(unused_blocks)
-	delete(used_blocks)
-	delete(out_band_allocations)
+	delete(pool.unused_blocks)
+	delete(pool.used_blocks)
+	delete(pool.out_band_allocations)
 
 	zero(pool, size_of(pool^))
 }
@@ -719,90 +719,90 @@ dynamic_pool_alloc :: proc(pool: ^Dynamic_Pool, bytes: int) -> (rawptr, Allocato
 }
 
 @(require_results)
-dynamic_pool_alloc_bytes :: proc(using pool: ^Dynamic_Pool, bytes: int) -> ([]byte, Allocator_Error) {
-	cycle_new_block :: proc(using pool: ^Dynamic_Pool) -> (err: Allocator_Error) {
-		if block_allocator.procedure == nil {
+dynamic_pool_alloc_bytes :: proc(p: ^Dynamic_Pool, bytes: int) -> ([]byte, Allocator_Error) {
+	cycle_new_block :: proc(p: ^Dynamic_Pool) -> (err: Allocator_Error) {
+		if p.block_allocator.procedure == nil {
 			panic("You must call pool_init on a Pool before using it")
 		}
 
-		if current_block != nil {
-			append(&used_blocks, current_block)
+		if p.current_block != nil {
+			append(&p.used_blocks, p.current_block)
 		}
 
 		new_block: rawptr
-		if len(unused_blocks) > 0 {
-			new_block = pop(&unused_blocks)
+		if len(p.unused_blocks) > 0 {
+			new_block = pop(&p.unused_blocks)
 		} else {
 			data: []byte
-			data, err = block_allocator.procedure(block_allocator.data, Allocator_Mode.Alloc,
-			                                           block_size, alignment,
-			                                           nil, 0)
+			data, err = p.block_allocator.procedure(p.block_allocator.data, Allocator_Mode.Alloc,
+			                                        p.block_size, p.alignment,
+			                                        nil, 0)
 			new_block = raw_data(data)
 		}
 
-		bytes_left = block_size
-		current_pos = new_block
-		current_block = new_block
+		p.bytes_left    = p.block_size
+		p.current_pos   = new_block
+		p.current_block = new_block
 		return
 	}
 
 	n := bytes
-	extra := alignment - (n % alignment)
+	extra := p.alignment - (n % p.alignment)
 	n += extra
-	if n >= out_band_size {
-		assert(block_allocator.procedure != nil)
-		memory, err := block_allocator.procedure(block_allocator.data, Allocator_Mode.Alloc,
-			                                block_size, alignment,
-			                                nil, 0)
+	if n >= p.out_band_size {
+		assert(p.block_allocator.procedure != nil)
+		memory, err := p.block_allocator.procedure(p.block_allocator.data, Allocator_Mode.Alloc,
+		                                           p.block_size, p.alignment,
+		                                           nil, 0)
 		if memory != nil {
-			append(&out_band_allocations, raw_data(memory))
+			append(&p.out_band_allocations, raw_data(memory))
 		}
 		return memory, err
 	}
 
-	if bytes_left < n {
-		err := cycle_new_block(pool)
+	if p.bytes_left < n {
+		err := cycle_new_block(p)
 		if err != nil {
 			return nil, err
 		}
-		if current_block == nil {
+		if p.current_block == nil {
 			return nil, .Out_Of_Memory
 		}
 	}
 
-	memory := current_pos
-	current_pos = ptr_offset((^byte)(current_pos), n)
-	bytes_left -= n
-	return byte_slice(memory, bytes), nil
+	memory := p.current_pos
+	p.current_pos = ([^]byte)(p.current_pos)[n:]
+	p.bytes_left -= n
+	return ([^]byte)(memory)[:bytes], nil
 }
 
 
-dynamic_pool_reset :: proc(using pool: ^Dynamic_Pool) {
-	if current_block != nil {
-		append(&unused_blocks, current_block)
-		current_block = nil
+dynamic_pool_reset :: proc(p: ^Dynamic_Pool) {
+	if p.current_block != nil {
+		append(&p.unused_blocks, p.current_block)
+		p.current_block = nil
 	}
 
-	for block in used_blocks {
-		append(&unused_blocks, block)
+	for block in p.used_blocks {
+		append(&p.unused_blocks, block)
 	}
-	clear(&used_blocks)
+	clear(&p.used_blocks)
 
-	for a in out_band_allocations {
-		free(a, block_allocator)
+	for a in p.out_band_allocations {
+		free(a, p.block_allocator)
 	}
-	clear(&out_band_allocations)
+	clear(&p.out_band_allocations)
 
-	bytes_left = 0 // Make new allocations call `cycle_new_block` again.
+	p.bytes_left = 0 // Make new allocations call `cycle_new_block` again.
 }
 
-dynamic_pool_free_all :: proc(using pool: ^Dynamic_Pool) {
-	dynamic_pool_reset(pool)
+dynamic_pool_free_all :: proc(p: ^Dynamic_Pool) {
+	dynamic_pool_reset(p)
 
-	for block in unused_blocks {
-		free(block, block_allocator)
+	for block in p.unused_blocks {
+		free(block, p.block_allocator)
 	}
-	clear(&unused_blocks)
+	clear(&p.unused_blocks)
 }
 
 

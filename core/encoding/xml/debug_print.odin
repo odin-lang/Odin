@@ -19,43 +19,39 @@ import "core:fmt"
 */
 print :: proc(writer: io.Writer, doc: ^Document) -> (written: int, err: io.Error) {
 	if doc == nil { return }
-	using fmt
-
-	written += wprintf(writer, "[XML Prolog]\n")
+	written += fmt.wprintf(writer, "[XML Prolog]\n")
 
 	for attr in doc.prologue {
-		written += wprintf(writer, "\t%v: %v\n", attr.key, attr.val)
+		written += fmt.wprintf(writer, "\t%v: %v\n", attr.key, attr.val)
 	}
 
-	written += wprintf(writer, "[Encoding] %v\n", doc.encoding)
+	written += fmt.wprintf(writer, "[Encoding] %v\n", doc.encoding)
 
 	if len(doc.doctype.ident) > 0 {
-		written += wprintf(writer, "[DOCTYPE]  %v\n", doc.doctype.ident)
+		written += fmt.wprintf(writer, "[DOCTYPE]  %v\n", doc.doctype.ident)
 
 		if len(doc.doctype.rest) > 0 {
-		 	wprintf(writer, "\t%v\n", doc.doctype.rest)
+		 	fmt.wprintf(writer, "\t%v\n", doc.doctype.rest)
 		}
 	}
 
 	for comment in doc.comments {
-		written += wprintf(writer, "[Pre-root comment]  %v\n", comment)
+		written += fmt.wprintf(writer, "[Pre-root comment]  %v\n", comment)
 	}
 
 	if len(doc.elements) > 0 {
-	 	wprintln(writer, " --- ")
+	 	fmt.wprintln(writer, " --- ")
 	 	print_element(writer, doc, 0)
-	 	wprintln(writer, " --- ")
+	 	fmt.wprintln(writer, " --- ")
 	 }
 
 	return written, .None
 }
 
 print_element :: proc(writer: io.Writer, doc: ^Document, element_id: Element_ID, indent := 0) -> (written: int, err: io.Error) {
-	using fmt
-
 	tab :: proc(writer: io.Writer, indent: int) {
 		for _ in 0..=indent {
-			wprintf(writer, "\t")
+			fmt.wprintf(writer, "\t")
 		}
 	}
 
@@ -64,22 +60,24 @@ print_element :: proc(writer: io.Writer, doc: ^Document, element_id: Element_ID,
 	element := doc.elements[element_id]
 
 	if element.kind == .Element {
-		wprintf(writer, "<%v>\n", element.ident)
-		if len(element.value) > 0 {
-			tab(writer, indent + 1)
-			wprintf(writer, "[Value] %v\n", element.value)
+		fmt.wprintf(writer, "<%v>\n", element.ident)
+
+		for value in element.value {
+			switch v in value {
+			case string:
+				tab(writer, indent + 1)
+				fmt.wprintf(writer, "[Value] %v\n", v)
+			case Element_ID:
+				print_element(writer, doc, v, indent + 1)
+			}
 		}
 
 		for attr in element.attribs {
 			tab(writer, indent + 1)
-			wprintf(writer, "[Attr] %v: %v\n", attr.key, attr.val)
-		}
-
-		for child in element.children {
-			print_element(writer, doc, child, indent + 1)
+			fmt.wprintf(writer, "[Attr] %v: %v\n", attr.key, attr.val)
 		}
 	} else if element.kind == .Comment {
-		wprintf(writer, "[COMMENT] %v\n", element.value)
+		fmt.wprintf(writer, "[COMMENT] %v\n", element.value)
 	}
 
 	return written, .None

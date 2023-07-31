@@ -72,10 +72,10 @@ example :: proc() {
 	 	return
 	}
 
-	printf("Found `<charlist>` with %v children, %v elements total\n", len(docs[0].elements[charlist].children), docs[0].element_count)
+	printf("Found `<charlist>` with %v children, %v elements total\n", len(docs[0].elements[charlist].value), docs[0].element_count)
 
-	crc32 := doc_hash(docs[0])
-	printf("[%v] CRC32: 0x%08x\n", "🎉" if crc32 == 0xcaa042b9 else "🤬", crc32)
+	crc32 := doc_hash(docs[0], false)
+	printf("[%v] CRC32: 0x%08x\n", "🎉" if crc32 == 0x420dbac5 else "🤬", crc32)
 
 	for round in 0..<N {
 		defer xml.destroy(docs[round])
