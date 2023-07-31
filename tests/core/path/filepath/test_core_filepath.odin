@@ -22,9 +22,6 @@ main :: proc() {
 
 @test
 test_split_list_windows :: proc(t: ^testing.T) {
-
-	using filepath
-
 	Datum :: struct {
 		i: int,
 		v: string,
@@ -43,7 +40,7 @@ test_split_list_windows :: proc(t: ^testing.T) {
 
 	for d, i in data {
 		assert(i == d.i, fmt.tprintf("wrong data index: i %d != d.i %d\n", i, d.i))
-		r := split_list(d.v)
+		r := filepath.split_list(d.v)
 		defer delete(r)
 		tc.expect(t, len(r) == len(d.e), fmt.tprintf("i:%d %s(%s) len(r) %d != len(d.e) %d",
 													 i, #procedure, d.v, len(r), len(d.e)))
@@ -57,12 +54,12 @@ test_split_list_windows :: proc(t: ^testing.T) {
 
 	{
 		v := ""
-		r := split_list(v)
+		r := filepath.split_list(v)
 		tc.expect(t, r == nil, fmt.tprintf("%s(%s) -> %v != nil", #procedure, v, r))
 	}
 	{
 		v := "a"
-		r := split_list(v)
+		r := filepath.split_list(v)
 		defer delete(r)
 		tc.expect(t, len(r) == 1, fmt.tprintf("%s(%s) len(r) %d != 1", #procedure, v, len(r)))
 		if len(r) == 1 {
@@ -73,9 +70,6 @@ test_split_list_windows :: proc(t: ^testing.T) {
 
 @test
 test_split_list_unix :: proc(t: ^testing.T) {
-
-	using filepath
-
 	Datum :: struct {
 		i: int,
 		v: string,
@@ -94,7 +88,7 @@ test_split_list_unix :: proc(t: ^testing.T) {
 
 	for d, i in data {
 		assert(i == d.i, fmt.tprintf("wrong data index: i %d != d.i %d\n", i, d.i))
-		r := split_list(d.v)
+		r := filepath.split_list(d.v)
 		defer delete(r)
 		tc.expect(t, len(r) == len(d.e), fmt.tprintf("i:%d %s(%s) len(r) %d != len(d.e) %d",
 													 i, #procedure, d.v, len(r), len(d.e)))
@@ -108,12 +102,12 @@ test_split_list_unix :: proc(t: ^testing.T) {
 
 	{
 		v := ""
-		r := split_list(v)
+		r := filepath.split_list(v)
 		tc.expect(t, r == nil, fmt.tprintf("%s(%s) -> %v != nil", #procedure, v, r))
 	}
 	{
 		v := "a"
-		r := split_list(v)
+		r := filepath.split_list(v)
 		defer delete(r)
 		tc.expect(t, len(r) == 1, fmt.tprintf("%s(%s) len(r) %d != 1", #procedure, v, len(r)))
 		if len(r) == 1 {

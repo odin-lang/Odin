@@ -11,6 +11,7 @@
 // package png implements a PNG image reader
 //
 // The PNG specification is at https://www.w3.org/TR/PNG/.
+//+vet !using-stmt
 package png
 
 import "core:compress"
@@ -444,15 +445,14 @@ load_from_context :: proc(ctx: ^$C, options := Options{}, allocator := context.a
 			img.width  = int(header.width)
 			img.height = int(header.height)
 
-			using header
 			h := image.PNG_IHDR{
-				width              = width,
-				height             = height,
-				bit_depth          = bit_depth,
-				color_type         = color_type,
-				compression_method = compression_method,
-				filter_method      = filter_method,
-				interlace_method   = interlace_method,
+				width              = header.width,
+				height             = header.height,
+				bit_depth          = header.bit_depth,
+				color_type         = header.color_type,
+				compression_method = header.compression_method,
+				filter_method      = header.filter_method,
+				interlace_method   = header.interlace_method,
 			}
 			info.header = h
 

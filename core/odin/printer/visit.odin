@@ -336,22 +336,20 @@ hint_current_line :: proc(p: ^Printer, hint: Line_Type) {
 
 @(private)
 visit_decl :: proc(p: ^Printer, decl: ^ast.Decl, called_in_stmt := false) {
-	using ast
-
 	if decl == nil {
 		return
 	}
 
 	#partial switch v in decl.derived_stmt {
-	case ^Expr_Stmt:
+	case ^ast.Expr_Stmt:
 		move_line(p, decl.pos)
 		visit_expr(p, v.expr)
 		if p.config.semicolons {
 			push_generic_token(p, .Semicolon, 0)
 		}
-	case ^When_Stmt:
-		visit_stmt(p, cast(^Stmt)decl)
-	case ^Foreign_Import_Decl:
+	case ^ast.When_Stmt:
+		visit_stmt(p, cast(^ast.Stmt)decl)
+	case ^ast.Foreign_Import_Decl:
 		if len(v.attributes) > 0 {
 			sort.sort(sort_attribute(&v.attributes))
 			move_line(p, v.attributes[0].pos)
@@ -370,7 +368,7 @@ visit_decl :: proc(p: ^Printer, decl: ^ast.Decl, called_in_stmt := false) {
 		for path in v.fullpaths {
 			push_ident_token(p, path, 0)
 		}
-	case ^Foreign_Block_Decl:
+	case ^ast.Foreign_Block_Decl:
 		if len(v.attributes) > 0 {
 			sort.sort(sort_attribute(&v.attributes))
 			move_line(p, v.attributes[0].pos)
@@ -383,7 +381,7 @@ visit_decl :: proc(p: ^Printer, decl: ^ast.Decl, called_in_stmt := false) {
 
 		visit_expr(p, v.foreign_library)
 		visit_stmt(p, v.body)
-	case ^Import_Decl:
+	case ^ast.Import_Decl:
 		move_line(p, decl.pos)
 
 		if v.name.text != "" {
@@ -395,7 +393,7 @@ visit_decl :: proc(p: ^Printer, decl: ^ast.Decl, called_in_stmt := false) {
 			push_ident_token(p, v.fullpath, 1)
 		}
 
-	case ^Value_Decl:
+	case ^ast.Value_Decl:
 		if len(v.attributes) > 0 {
 			sort.sort(sort_attribute(&v.attributes))
 			move_line(p, v.attributes[0].pos)
@@ -447,9 +445,9 @@ visit_decl :: proc(p: ^Printer, decl: ^ast.Decl, called_in_stmt := false) {
 
 		for value in v.values {
 			#partial switch a in value.derived {
-			case ^Union_Type, ^Enum_Type, ^Struct_Type:
+			case ^ast.Union_Type, ^ast.Enum_Type, ^ast.Struct_Type:
 				add_semicolon = false || called_in_stmt
-			case ^Proc_Lit:
+			case ^ast.Proc_Lit:
 				add_semicolon = false
 			}
 		}
@@ -510,40 +508,38 @@ visit_attributes :: proc(p: ^Printer, attributes: [dynamic]^ast.Attribute) {
 
 @(private)
 visit_stmt :: proc(p: ^Printer, stmt: ^ast.Stmt, block_type: Block_Type = .Generic, empty_block := false, block_stmt := false) {
-	using ast
-
 	if stmt == nil {
 		return
 	}
 
 
 	switch v in stmt.derived_stmt {
-	case ^Bad_Stmt:
-	case ^Bad_Decl:
-	case ^Package_Decl:
+	case ^ast.Bad_Stmt:
+	case ^ast.Bad_Decl:
+	case ^ast.Package_Decl:
 
-	case ^Empty_Stmt:
+	case ^ast.Empty_Stmt:
 		push_generic_token(p, .Semicolon, 0)
-	case ^Tag_Stmt:
+	case ^ast.Tag_Stmt:
 		push_generic_token(p, .Hash, 1)
 		push_generic_token(p, v.op.kind, 1, v.op.text)
 		visit_stmt(p, v.stmt)
 
 
-	case ^Import_Decl:
-		visit_decl(p, cast(^Decl)stmt, true)
+	case ^ast.Import_Decl:
+		visit_decl(p, cast(^ast.Decl)stmt, true)
 		return
-	case ^Value_Decl:
-		visit_decl(p, cast(^Decl)stmt, true)
+	case ^ast.Value_Decl:
+		visit_decl(p, cast(^ast.Decl)stmt, true)
 		return
-	case ^Foreign_Import_Decl:
-		visit_decl(p, cast(^Decl)stmt, true)
+	case ^ast.Foreign_Import_Decl:
+		visit_decl(p, cast(^ast.Decl)stmt, true)
 		return
-	case ^Foreign_Block_Decl:
-		visit_decl(p, cast(^Decl)stmt, true)
+	case ^ast.Foreign_Block_Decl:
+		visit_decl(p, cast(^ast.Decl)stmt, true)
 		return
 
-	case ^Using_Stmt:
+	case ^ast.Using_Stmt:
 		move_line(p, v.pos)
 
 		push_generic_token(p, .Using, 1)
@@ -553,7 +549,7 @@ visit_stmt :: proc(p: ^Printer, stmt: ^ast.Stmt, block_type: Block_Type = .Gener
 		if p.config.semicolons {
 			push_generic_token(p, .Semicolon, 0)
 		}
-	case ^Block_Stmt:
+	case ^ast.Block_Stmt:
 		move_line(p, v.pos)
 
 		if v.pos.line == v.end.line {
@@ -583,7 +579,7 @@ visit_stmt :: proc(p: ^Printer, stmt: ^ast.Stmt, block_type: Block_Type = .Gener
 				visit_end_brace(p, v.end)
 			}
 		}
-	case ^If_Stmt:
+	case ^ast.If_Stmt:
 		move_line(p, v.pos)
 
 		if v.label != nil {
@@ -606,7 +602,7 @@ visit_stmt :: proc(p: ^Printer, stmt: ^ast.Stmt, block_type: Block_Type = .Gener
 
 		uses_do := false
 
-		if check_stmt, ok := v.body.derived.(^Block_Stmt); ok && check_stmt.uses_do {
+		if check_stmt, ok := v.body.derived.(^ast.Block_Stmt); ok && check_stmt.uses_do {
 			uses_do = true
 		}
 
@@ -637,7 +633,7 @@ visit_stmt :: proc(p: ^Printer, stmt: ^ast.Stmt, block_type: Block_Type = .Gener
 
 			visit_stmt(p, v.else_stmt)
 		}
-	case ^Switch_Stmt:
+	case ^ast.Switch_Stmt:
 		move_line(p, v.pos)
 
 		if v.label != nil {
@@ -665,7 +661,7 @@ visit_stmt :: proc(p: ^Printer, stmt: ^ast.Stmt, block_type: Block_Type = .Gener
 
 		visit_expr(p, v.cond)
 		visit_stmt(p, v.body)
-	case ^Case_Clause:
+	case ^ast.Case_Clause:
 		move_line(p, v.pos)
 
 		if !p.config.indent_cases {
@@ -689,7 +685,7 @@ visit_stmt :: proc(p: ^Printer, stmt: ^ast.Stmt, block_type: Block_Type = .Gener
 		if !p.config.indent_cases {
 			indent(p)
 		}
-	case ^Type_Switch_Stmt:
+	case ^ast.Type_Switch_Stmt:
 		move_line(p, v.pos)
 
 		hint_current_line(p, {.Switch_Stmt})
@@ -707,7 +703,7 @@ visit_stmt :: proc(p: ^Printer, stmt: ^ast.Stmt, block_type: Block_Type = .Gener
 
 		visit_stmt(p, v.tag)
 		visit_stmt(p, v.body)
-	case ^Assign_Stmt:
+	case ^ast.Assign_Stmt:
 		move_line(p, v.pos)
 
 		hint_current_line(p, {.Assign})
@@ -721,13 +717,13 @@ visit_stmt :: proc(p: ^Printer, stmt: ^ast.Stmt, block_type: Block_Type = .Gener
 		if block_stmt && p.config.semicolons {
 			push_generic_token(p, .Semicolon, 0)
 		}
-	case ^Expr_Stmt:
+	case ^ast.Expr_Stmt:
 		move_line(p, v.pos)
 		visit_expr(p, v.expr)
 		if block_stmt && p.config.semicolons {
 			push_generic_token(p, .Semicolon, 0)
 		}
-	case ^For_Stmt:
+	case ^ast.For_Stmt:
 		// this should be simplified
 		move_line(p, v.pos)
 
@@ -764,7 +760,7 @@ visit_stmt :: proc(p: ^Printer, stmt: ^ast.Stmt, block_type: Block_Type = .Gener
 
 		visit_stmt(p, v.body)
 
-	case ^Inline_Range_Stmt:
+	case ^ast.Inline_Range_Stmt:
 		move_line(p, v.pos)
 
 		if v.label != nil {
@@ -790,7 +786,7 @@ visit_stmt :: proc(p: ^Printer, stmt: ^ast.Stmt, block_type: Block_Type = .Gener
 		visit_expr(p, v.expr)
 		visit_stmt(p, v.body)
 
-	case ^Range_Stmt:
+	case ^ast.Range_Stmt:
 		move_line(p, v.pos)
 
 		if v.label != nil {
@@ -816,7 +812,7 @@ visit_stmt :: proc(p: ^Printer, stmt: ^ast.Stmt, block_type: Block_Type = .Gener
 		visit_expr(p, v.expr)
 
 		visit_stmt(p, v.body)
-	case ^Return_Stmt:
+	case ^ast.Return_Stmt:
 		move_line(p, v.pos)
 
 		push_generic_token(p, .Return, 1)
@@ -828,7 +824,7 @@ visit_stmt :: proc(p: ^Printer, stmt: ^ast.Stmt, block_type: Block_Type = .Gener
 		if block_stmt && p.config.semicolons {
 			push_generic_token(p, .Semicolon, 0)
 		}
-	case ^Defer_Stmt:
+	case ^ast.Defer_Stmt:
 		move_line(p, v.pos)
 		push_generic_token(p, .Defer, 0)
 
@@ -837,7 +833,7 @@ visit_stmt :: proc(p: ^Printer, stmt: ^ast.Stmt, block_type: Block_Type = .Gener
 		if p.config.semicolons {
 			push_generic_token(p, .Semicolon, 0)
 		}
-	case ^When_Stmt:
+	case ^ast.When_Stmt:
 		move_line(p, v.pos)
 		push_generic_token(p, .When, 1)
 		visit_expr(p, v.cond)
@@ -857,7 +853,7 @@ visit_stmt :: proc(p: ^Printer, stmt: ^ast.Stmt, block_type: Block_Type = .Gener
 			visit_stmt(p, v.else_stmt)
 		}
 
-	case ^Branch_Stmt:
+	case ^ast.Branch_Stmt:
 		move_line(p, v.pos)
 
 		push_generic_token(p, v.tok.kind, 0)
@@ -921,8 +917,6 @@ push_poly_params :: proc(p: ^Printer, poly_params: ^ast.Field_List) {
 
 @(private)
 visit_expr :: proc(p: ^Printer, expr: ^ast.Expr, options := List_Options{}) {
-	using ast
-
 	if expr == nil {
 		return
 	}
@@ -930,14 +924,14 @@ visit_expr :: proc(p: ^Printer, expr: ^ast.Expr, options := List_Options{}) {
 	set_source_position(p, expr.pos)
 
 	switch v in expr.derived_expr {
-	case ^Bad_Expr:
+	case ^ast.Bad_Expr:
 
-	case ^Tag_Expr:
+	case ^ast.Tag_Expr:
 		push_generic_token(p, .Hash, 1)
 		push_generic_token(p, v.op.kind, 1, v.op.text)
 		visit_expr(p, v.expr)
 
-	case ^Inline_Asm_Expr:
+	case ^ast.Inline_Asm_Expr:
 		push_generic_token(p, v.tok.kind, 1, v.tok.text)
 
 		push_generic_token(p, .Open_Paren, 1)
@@ -954,42 +948,42 @@ visit_expr :: proc(p: ^Printer, expr: ^ast.Expr, options := List_Options{}) {
 		push_generic_token(p, .Comma, 0)
 		visit_expr(p, v.constraints_string)
 		push_generic_token(p, .Close_Brace, 0)
-	case ^Undef:
+	case ^ast.Undef:
 		push_generic_token(p, .Undef, 1)
-	case ^Auto_Cast:
+	case ^ast.Auto_Cast:
 		push_generic_token(p, v.op.kind, 1)
 		visit_expr(p, v.expr)
-	case ^Ternary_If_Expr:
+	case ^ast.Ternary_If_Expr:
 		visit_expr(p, v.x)
 		push_generic_token(p, v.op1.kind, 1)
 		visit_expr(p, v.cond)
 		push_generic_token(p, v.op2.kind, 1)
 		visit_expr(p, v.y)
-	case ^Ternary_When_Expr:
+	case ^ast.Ternary_When_Expr:
 		visit_expr(p, v.x)
 		push_generic_token(p, v.op1.kind, 1)
 		visit_expr(p, v.cond)
 		push_generic_token(p, v.op2.kind, 1)
 		visit_expr(p, v.y)
-	case ^Or_Else_Expr:
+	case ^ast.Or_Else_Expr:
 		visit_expr(p, v.x)
 		push_generic_token(p, v.token.kind, 1)
 		visit_expr(p, v.y)
-	case ^Or_Return_Expr:
+	case ^ast.Or_Return_Expr:
 		visit_expr(p, v.expr)
 		push_generic_token(p, v.token.kind, 1)
-	case ^Selector_Call_Expr:
+	case ^ast.Selector_Call_Expr:
 		visit_expr(p, v.call.expr)
 		push_generic_token(p, .Open_Paren, 1)
 		visit_exprs(p, v.call.args, {.Add_Comma})
 		push_generic_token(p, .Close_Paren, 0)
-	case ^Ellipsis:
+	case ^ast.Ellipsis:
 		push_generic_token(p, .Ellipsis, 1)
 		visit_expr(p, v.expr)
-	case ^Relative_Type:
+	case ^ast.Relative_Type:
 		visit_expr(p, v.tag)
 		visit_expr(p, v.type)
-	case ^Slice_Expr:
+	case ^ast.Slice_Expr:
 		visit_expr(p, v.expr)
 		push_generic_token(p, .Open_Bracket, 0)
 		visit_expr(p, v.low)
@@ -999,37 +993,37 @@ visit_expr :: proc(p: ^Printer, expr: ^ast.Expr, options := List_Options{}) {
 			visit_expr(p, v.high)
 		}
 		push_generic_token(p, .Close_Bracket, 0)
-	case ^Ident:
+	case ^ast.Ident:
 		if .Enforce_Poly_Names in options {
 			push_generic_token(p, .Dollar, 1)
 			push_ident_token(p, v.name, 0)
 		} else {
 			push_ident_token(p, v.name, 1)
 		}
-	case ^Deref_Expr:
+	case ^ast.Deref_Expr:
 		visit_expr(p, v.expr)
 		push_generic_token(p, v.op.kind, 0)
-	case ^Type_Cast:
+	case ^ast.Type_Cast:
 		push_generic_token(p, v.tok.kind, 1)
 		push_generic_token(p, .Open_Paren, 0)
 		visit_expr(p, v.type)
 		push_generic_token(p, .Close_Paren, 0)
 		merge_next_token(p)
 		visit_expr(p, v.expr)
-	case ^Basic_Directive:
+	case ^ast.Basic_Directive:
 		push_generic_token(p, v.tok.kind, 1)
 		push_ident_token(p, v.name, 0)
-	case ^Distinct_Type:
+	case ^ast.Distinct_Type:
 		push_generic_token(p, .Distinct, 1)
 		visit_expr(p, v.type)
-	case ^Dynamic_Array_Type:
+	case ^ast.Dynamic_Array_Type:
 		visit_expr(p, v.tag)
 		push_generic_token(p, .Open_Bracket, 1)
 		push_generic_token(p, .Dynamic, 0)
 		push_generic_token(p, .Close_Bracket, 0)
 		merge_next_token(p)
 		visit_expr(p, v.elem)
-	case ^Bit_Set_Type:
+	case ^ast.Bit_Set_Type:
 		push_generic_token(p, .Bit_Set, 1)
 		push_generic_token(p, .Open_Bracket, 0)
 
@@ -1041,7 +1035,7 @@ visit_expr :: proc(p: ^Printer, expr: ^ast.Expr, options := List_Options{}) {
 		}
 
 		push_generic_token(p, .Close_Bracket, 0)
-	case ^Union_Type:
+	case ^ast.Union_Type:
 		push_generic_token(p, .Union, 1)
 
 		push_poly_params(p, v.poly_params)
@@ -1066,7 +1060,7 @@ visit_expr :: proc(p: ^Printer, expr: ^ast.Expr, options := List_Options{}) {
 			visit_exprs(p, v.variants, {.Add_Comma, .Trailing})
 			visit_end_brace(p, v.end)
 		}
-	case ^Enum_Type:
+	case ^ast.Enum_Type:
 		push_generic_token(p, .Enum, 1)
 
 		hint_current_line(p, {.Enum})
@@ -1089,7 +1083,7 @@ visit_expr :: proc(p: ^Printer, expr: ^ast.Expr, options := List_Options{}) {
 		}
 
 		set_source_position(p, v.end)
-	case ^Struct_Type:
+	case ^ast.Struct_Type:
 		push_generic_token(p, .Struct, 1)
 
 		hint_current_line(p, {.Struct})
@@ -1124,7 +1118,7 @@ visit_expr :: proc(p: ^Printer, expr: ^ast.Expr, options := List_Options{}) {
 		}
 
 		set_source_position(p, v.end)
-	case ^Proc_Lit:
+	case ^ast.Proc_Lit:
 		switch v.inlining {
 		case .None:
 		case .Inline:
@@ -1143,16 +1137,16 @@ visit_expr :: proc(p: ^Printer, expr: ^ast.Expr, options := List_Options{}) {
 		} else {
 			push_generic_token(p, .Undef, 1)
 		}
-	case ^Proc_Type:
+	case ^ast.Proc_Type:
 		visit_proc_type(p, v)
-	case ^Basic_Lit:
+	case ^ast.Basic_Lit:
 		push_generic_token(p, v.tok.kind, 1, v.tok.text)
-	case ^Binary_Expr:
+	case ^ast.Binary_Expr:
 		visit_binary_expr(p, v)
-	case ^Implicit_Selector_Expr:
+	case ^ast.Implicit_Selector_Expr:
 		push_generic_token(p, .Period, 1)
 		push_ident_token(p, v.field.name, 0)
-	case ^Call_Expr:
+	case ^ast.Call_Expr:
 		visit_expr(p, v.expr)
 
 		push_format_token(p,
@@ -1167,34 +1161,34 @@ visit_expr :: proc(p: ^Printer, expr: ^ast.Expr, options := List_Options{}) {
 
 		visit_call_exprs(p, v.args, v.ellipsis.kind == .Ellipsis)
 		push_generic_token(p, .Close_Paren, 0)
-	case ^Typeid_Type:
+	case ^ast.Typeid_Type:
 		push_generic_token(p, .Typeid, 1)
 
 		if v.specialization != nil {
 			push_generic_token(p, .Quo, 0)
 			visit_expr(p, v.specialization)
 		}
-	case ^Selector_Expr:
+	case ^ast.Selector_Expr:
 		visit_expr(p, v.expr)
 		push_generic_token(p, v.op.kind, 0)
 		visit_expr(p, v.field)
-	case ^Paren_Expr:
+	case ^ast.Paren_Expr:
 		push_generic_token(p, .Open_Paren, 1)
 		visit_expr(p, v.expr)
 		push_generic_token(p, .Close_Paren, 0)
-	case ^Index_Expr:
+	case ^ast.Index_Expr:
 		visit_expr(p, v.expr)
 		push_generic_token(p, .Open_Bracket, 0)
 		visit_expr(p, v.index)
 		push_generic_token(p, .Close_Bracket, 0)
-	case ^Matrix_Index_Expr:
+	case ^ast.Matrix_Index_Expr:
 		visit_expr(p, v.expr)
 		push_generic_token(p, .Open_Bracket, 0)
 		visit_expr(p, v.row_index)
 		push_generic_token(p, .Comma, 0)
 		visit_expr(p, v.column_index)
 		push_generic_token(p, .Close_Bracket, 0)
-	case ^Proc_Group:
+	case ^ast.Proc_Group:
 		push_generic_token(p, v.tok.kind, 1)
 
 		if len(v.args) != 0 && v.pos.line != v.args[len(v.args) - 1].pos.line {
@@ -1209,7 +1203,7 @@ visit_expr :: proc(p: ^Printer, expr: ^ast.Expr, options := List_Options{}) {
 			push_generic_token(p, .Close_Brace, 0)
 		}
 
-	case ^Comp_Lit:
+	case ^ast.Comp_Lit:
 		if v.type != nil {
 			visit_expr(p, v.type)
 		}
@@ -1226,18 +1220,18 @@ visit_expr :: proc(p: ^Printer, expr: ^ast.Expr, options := List_Options{}) {
 			push_generic_token(p, .Close_Brace, 0)
 		}
 
-	case ^Unary_Expr:
+	case ^ast.Unary_Expr:
 		push_generic_token(p, v.op.kind, 1)
 		merge_next_token(p)
 		visit_expr(p, v.expr)
-	case ^Field_Value:
+	case ^ast.Field_Value:
 		visit_expr(p, v.field)
 		push_generic_token(p, .Eq, 1)
 		visit_expr(p, v.value)
-	case ^Type_Assertion:
+	case ^ast.Type_Assertion:
 		visit_expr(p, v.expr)
 
-		if unary, ok := v.type.derived.(^Unary_Expr); ok && unary.op.text == "?" {
+		if unary, ok := v.type.derived.(^ast.Unary_Expr); ok && unary.op.text == "?" {
 			push_generic_token(p, .Period, 0)
 			visit_expr(p, v.type)
 		} else {
@@ -1247,13 +1241,13 @@ visit_expr :: proc(p: ^Printer, expr: ^ast.Expr, options := List_Options{}) {
 			push_generic_token(p, .Close_Paren, 0)
 		}
 
-	case ^Pointer_Type:
+	case ^ast.Pointer_Type:
 		push_generic_token(p, .Pointer, 1)
 		merge_next_token(p)
 		visit_expr(p, v.elem)
-	case ^Implicit:
+	case ^ast.Implicit:
 		push_generic_token(p, v.tok.kind, 1)
-	case ^Poly_Type:
+	case ^ast.Poly_Type:
 		push_generic_token(p, .Dollar, 1)
 		merge_next_token(p)
 		visit_expr(p, v.type)
@@ -1263,28 +1257,28 @@ visit_expr :: proc(p: ^Printer, expr: ^ast.Expr, options := List_Options{}) {
 			merge_next_token(p)
 			visit_expr(p, v.specialization)
 		}
-	case ^Array_Type:
+	case ^ast.Array_Type:
 		visit_expr(p, v.tag)
 		push_generic_token(p, .Open_Bracket, 1)
 		visit_expr(p, v.len)
 		push_generic_token(p, .Close_Bracket, 0)
 		merge_next_token(p)
 		visit_expr(p, v.elem)
-	case ^Map_Type:
+	case ^ast.Map_Type:
 		push_generic_token(p, .Map, 1)
 		push_generic_token(p, .Open_Bracket, 0)
 		visit_expr(p, v.key)
 		push_generic_token(p, .Close_Bracket, 0)
 		merge_next_token(p)
 		visit_expr(p, v.value)
-	case ^Helper_Type:
+	case ^ast.Helper_Type:
 		visit_expr(p, v.type)
-	case ^Multi_Pointer_Type:
+	case ^ast.Multi_Pointer_Type:
 		push_generic_token(p, .Open_Bracket, 1)
 		push_generic_token(p, .Pointer, 0)
 		push_generic_token(p, .Close_Bracket, 0)
 		visit_expr(p, v.elem)
-	case ^Matrix_Type:
+	case ^ast.Matrix_Type:
 		push_generic_token(p, .Matrix, 1)
 		push_generic_token(p, .Open_Bracket, 0)
 		visit_expr(p, v.row_count)
