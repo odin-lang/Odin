@@ -3002,6 +3002,12 @@ gb_internal DECL_ATTRIBUTE_PROC(proc_group_attribute) {
 			}
 		}
 		return true;
+	} else if (name == "require_results") {
+		if (value != nullptr) {
+			error(elem, "Expected no value for '%.*s'", LIT(name));
+		}
+		ac->require_results = true;
+		return true;
 	}
 	return false;
 }
