@@ -14,7 +14,7 @@ LDFLAGS="$LDFLAGS -pthread -lm -lstdc++"
 if [ -d ".git" ] && [ $(which git) ]; then
 	versionTag=( $(git show --pretty='%cd %h' --date=format:%Y-%m --no-patch --no-notes HEAD) )
 	if [ $? -eq 0 ]; then
-		ODIN_VERSION="${versionTag[0]}"
+		ODIN_VERSION="dev-${versionTag[0]}"
 		GIT_SHA="${versionTag[1]}"
 		CPPFLAGS="$CPPFLAGS -DGIT_SHA=\"$GIT_SHA\""
 	fi
