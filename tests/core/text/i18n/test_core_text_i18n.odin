@@ -1,3 +1,4 @@
+//+vet !using-stmt
 package test_core_text_i18n
 
 import "core:mem"

@@ -214,43 +214,40 @@ doc_to_string :: proc(doc: ^xml.Document) -> (result: string) {
 	*/
 	print :: proc(writer: io.Writer, doc: ^xml.Document) -> (written: int, err: io.Error) {
 		if doc == nil { return }
-		using fmt
 
-		written += wprintf(writer, "[XML Prolog]\n")
+		written += fmt.wprintf(writer, "[XML Prolog]\n")
 
 		for attr in doc.prologue {
-			written += wprintf(writer, "\t%v: %v\n", attr.key, attr.val)
+			written += fmt.wprintf(writer, "\t%v: %v\n", attr.key, attr.val)
 		}
 
-		written += wprintf(writer, "[Encoding] %v\n", doc.encoding)
+		written += fmt.wprintf(writer, "[Encoding] %v\n", doc.encoding)
 
 		if len(doc.doctype.ident) > 0 {
-			written += wprintf(writer, "[DOCTYPE]  %v\n", doc.doctype.ident)
+			written += fmt.wprintf(writer, "[DOCTYPE]  %v\n", doc.doctype.ident)
 
 			if len(doc.doctype.rest) > 0 {
-			 	wprintf(writer, "\t%v\n", doc.doctype.rest)
+			 	fmt.wprintf(writer, "\t%v\n", doc.doctype.rest)
 			}
 		}
 
 		for comment in doc.comments {
-			written += wprintf(writer, "[Pre-root comment]  %v\n", comment)
+			written += fmt.wprintf(writer, "[Pre-root comment]  %v\n", comment)
 		}
 
 		if doc.element_count > 0 {
-		 	wprintln(writer, " --- ")
+		 	fmt.wprintln(writer, " --- ")
 		 	print_element(writer, doc, 0)
-		 	wprintln(writer, " --- ")
+		 	fmt.wprintln(writer, " --- ")
 		 }
 
 		return written, .None
 	}
 
 	print_element :: proc(writer: io.Writer, doc: ^xml.Document, element_id: xml.Element_ID, indent := 0) -> (written: int, err: io.Error) {
-		using fmt
-
 		tab :: proc(writer: io.Writer, indent: int) {
 			for _ in 0..=indent {
-				wprintf(writer, "\t")
+				fmt.wprintf(writer, "\t")
 			}
 		}
 
@@ -259,13 +256,13 @@ doc_to_string :: proc(doc: ^xml.Document) -> (result: string) {
 		element := doc.elements[element_id]
 
 		if element.kind == .Element {
-			wprintf(writer, "<%v>\n", element.ident)
+			fmt.wprintf(writer, "<%v>\n", element.ident)
 
 			for value in element.value {
 				switch v in value {
 				case string:
 					tab(writer, indent + 1)
-					wprintf(writer, "[Value] %v\n", v)
+					fmt.wprintf(writer, "[Value] %v\n", v)
 				case xml.Element_ID:
 					print_element(writer, doc, v, indent + 1)
 				}
@@ -273,10 +270,10 @@ doc_to_string :: proc(doc: ^xml.Document) -> (result: string) {
 
 			for attr in element.attribs {
 				tab(writer, indent + 1)
-				wprintf(writer, "[Attr] %v: %v\n", attr.key, attr.val)
+				fmt.wprintf(writer, "[Attr] %v: %v\n", attr.key, attr.val)
 			}
 		} else if element.kind == .Comment {
-			wprintf(writer, "[COMMENT] %v\n", element.value)
+			fmt.wprintf(writer, "[COMMENT] %v\n", element.value)
 		}
 
 		return written, .None
@@ -291,8 +288,6 @@ doc_to_string :: proc(doc: ^xml.Document) -> (result: string) {
 
 @test
 run_tests :: proc(t: ^testing.T) {
-	using fmt
-
 	for test in TESTS {
 		path := test_file_path(test.filename)
 		log(t, fmt.tprintf("Trying to parse %v", path))
@@ -307,11 +302,11 @@ run_tests :: proc(t: ^testing.T) {
 		crc32 := hash.crc32(tree_bytes)
 
 		failed := err != test.err
-		err_msg := tprintf("Expected return value %v, got %v", test.err, err)
+		err_msg := fmt.tprintf("Expected return value %v, got %v", test.err, err)
 		expect(t, err == test.err, err_msg)
 
 		failed |= crc32 != test.crc32
-		err_msg  = tprintf("Expected CRC 0x%08x, got 0x%08x, with options %v", test.crc32, crc32, test.options)
+		err_msg  = fmt.tprintf("Expected CRC 0x%08x, got 0x%08x, with options %v", test.crc32, crc32, test.options)
 		expect(t, crc32 == test.crc32, err_msg)
 
 		if failed {
@@ -319,7 +314,7 @@ run_tests :: proc(t: ^testing.T) {
 				Don't fully print big trees.
 			*/
 			tree_string = tree_string[:min(2_048, len(tree_string))]
-			println(tree_string)
+			fmt.println(tree_string)
 		}
 	}
 }

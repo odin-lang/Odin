@@ -1,6 +1,7 @@
 // Tests "linalg_glsl_math.odin" in "core:math/linalg/glsl".
 // Must be run with `-collection:tests=` flag, e.g.
 // ./odin run tests/core/math/linalg/glsl/test_linalg_glsl_math.odin -collection:tests=./tests
+//+vet !using-stmt
 package test_core_math_linalg_glsl_math
 
 import glsl "core:math/linalg/glsl"

@@ -21,16 +21,13 @@ main :: proc() {
 
 @test
 test_read :: proc(t: ^testing.T) {
-
-	using hxa
-
 	filename := tc.get_data_path(t, TEAPOT_PATH)
 	defer delete(filename)
 
-	file, err := read_from_file(filename)
+	file, err := hxa.read_from_file(filename)
 	e :: hxa.Read_Error.None
 	tc.expect(t, err == e, fmt.tprintf("%v: read_from_file(%v) -> %v != %v", #procedure, filename, err, e))
-	defer file_destroy(file)
+	defer hxa.file_destroy(file)
 
 	/* Header */
 	tc.expect(t, file.magic_number == 0x417848, fmt.tprintf("%v: file.magic_number %v != %v",

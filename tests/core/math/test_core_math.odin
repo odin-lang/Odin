@@ -1,6 +1,7 @@
 // Tests "math.odin" in "core:math".
 // Must be run with `-collection:tests=` flag, e.g.
 // ./odin run tests/core/math/test_core_math.odin -collection:tests=./tests
+//+vet !using-stmt
 package test_core_math
 
 import "core:fmt"
