@@ -104,6 +104,8 @@ struct AstFile {
 	Token        package_token;
 	String       package_name;
 
+	u64          vet_flags;
+	bool         vet_flags_set;
 
 	// >= 0: In Expression
 	// <  0: In Control Clause

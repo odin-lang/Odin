@@ -655,9 +655,9 @@ gb_internal bool check_vet_unused(Checker *c, Entity *e, VettedEntity *ve) {
 	return false;
 }
 
-gb_internal void check_scope_usage(Checker *c, Scope *scope) {
-	bool vet_unused = true;
-	bool vet_shadowing = true;
+gb_internal void check_scope_usage(Checker *c, Scope *scope, u64 vet_flags) {
+	bool vet_unused = (vet_flags & VetFlag_Unused) != 0;
+	bool vet_shadowing = (vet_flags & (VetFlag_Shadowing|VetFlag_Using)) != 0;
 
 	Array<VettedEntity> vetted_entities = {};
 	array_init(&vetted_entities, heap_allocator());
@@ -691,15 +691,17 @@ gb_internal void check_scope_usage(Checker *c, Scope *scope) {
 
 		if (ve.kind == VettedEntity_Shadowed_And_Unused) {
 			error(e->token, "'%.*s' declared but not used, possibly shadows declaration at line %d", LIT(name), other->token.pos.line);
-		} else if (build_context.vet) {
+		} else if (vet_flags) {
 			switch (ve.kind) {
 			case VettedEntity_Unused:
-				error(e->token, "'%.*s' declared but not used", LIT(name));
+				if (vet_flags & VetFlag_Unused) {
+					error(e->token, "'%.*s' declared but not used", LIT(name));
+				}
 				break;
 			case VettedEntity_Shadowed:
-				if (e->flags&EntityFlag_Using) {
+				if ((vet_flags & (VetFlag_Shadowing|VetFlag_Using)) != 0 && e->flags&EntityFlag_Using) {
 					error(e->token, "Declaration of '%.*s' from 'using' shadows declaration at line %d", LIT(name), other->token.pos.line);
-				} else {
+				} else if ((vet_flags & (VetFlag_Shadowing)) != 0) {
 					error(e->token, "Declaration of '%.*s' shadows declaration at line %d", LIT(name), other->token.pos.line);
 				}
 				break;
@@ -726,7 +728,7 @@ gb_internal void check_scope_usage(Checker *c, Scope *scope) {
 		if (child->flags & (ScopeFlag_Proc|ScopeFlag_Type|ScopeFlag_File)) {
 			// Ignore these
 		} else {
-			check_scope_usage(c, child);
+			check_scope_usage(c, child, vet_flags);
 		}
 	}
 }
@@ -5952,7 +5954,11 @@ gb_internal void check_parsed_files(Checker *c) {
 	TIME_SECTION("check scope usage");
 	for (auto const &entry : c->info.files) {
 		AstFile *f = entry.value;
-		check_scope_usage(c, f->scope);
+		u64 vet_flags = build_context.vet_flags;
+		if (f->vet_flags_set) {
+			vet_flags = f->vet_flags;
+		}
+		check_scope_usage(c, f->scope, vet_flags);
 	}
 
 	TIME_SECTION("add basic type information");

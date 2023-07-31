@@ -654,6 +654,10 @@ enum BuildFlagKind {
 	BuildFlag_NoThreadedChecker,
 	BuildFlag_ShowDebugMessages,
 	BuildFlag_Vet,
+	BuildFlag_VetShadowing,
+	BuildFlag_VetUnused,
+	BuildFlag_VetUsingStmt,
+	BuildFlag_VetUsingParam,
 	BuildFlag_VetExtra,
 	BuildFlag_IgnoreUnknownAttributes,
 	BuildFlag_ExtraLinkerFlags,
@@ -830,8 +834,14 @@ gb_internal bool parse_build_flags(Array<String> args) {
 	add_flag(&build_flags, BuildFlag_UseSeparateModules,      str_lit("use-separate-modules"),      BuildFlagParam_None,    Command__does_build);
 	add_flag(&build_flags, BuildFlag_NoThreadedChecker,       str_lit("no-threaded-checker"),       BuildFlagParam_None,    Command__does_check);
 	add_flag(&build_flags, BuildFlag_ShowDebugMessages,       str_lit("show-debug-messages"),       BuildFlagParam_None,    Command_all);
+
 	add_flag(&build_flags, BuildFlag_Vet,                     str_lit("vet"),                       BuildFlagParam_None,    Command__does_check);
+	add_flag(&build_flags, BuildFlag_VetUnused,               str_lit("vet-unused"),                BuildFlagParam_None,    Command__does_check);
+	add_flag(&build_flags, BuildFlag_VetShadowing,            str_lit("vet-shadowing"),             BuildFlagParam_None,    Command__does_check);
+	add_flag(&build_flags, BuildFlag_VetUsingStmt,            str_lit("vet-using-stmt"),            BuildFlagParam_None,    Command__does_check);
+	add_flag(&build_flags, BuildFlag_VetUsingParam,           str_lit("vet-using-param"),            BuildFlagParam_None,    Command__does_check);
 	add_flag(&build_flags, BuildFlag_VetExtra,                str_lit("vet-extra"),                 BuildFlagParam_None,    Command__does_check);
+
 	add_flag(&build_flags, BuildFlag_IgnoreUnknownAttributes, str_lit("ignore-unknown-attributes"), BuildFlagParam_None,    Command__does_check);
 	add_flag(&build_flags, BuildFlag_ExtraLinkerFlags,        str_lit("extra-linker-flags"),        BuildFlagParam_String,  Command__does_build);
 	add_flag(&build_flags, BuildFlag_ExtraAssemblerFlags,     str_lit("extra-assembler-flags"),     BuildFlagParam_String,  Command__does_build);
@@ -1362,13 +1372,23 @@ gb_internal bool parse_build_flags(Array<String> args) {
 							build_context.show_debug_messages = true;
 							break;
 						case BuildFlag_Vet:
-							build_context.vet = true;
+							if (build_context.vet_flags & VetFlag_Extra) {
+								build_context.vet_flags |= VetFlag_All;
+							} else {
+								build_context.vet_flags &= ~VetFlag_Extra;
+								build_context.vet_flags |= VetFlag_All;
+							}
 							break;
-						case BuildFlag_VetExtra: {
-							build_context.vet = true;
-							build_context.vet_extra = true;
+
+						case BuildFlag_VetUnused:     build_context.vet_flags |= VetFlag_Unused;    break;
+						case BuildFlag_VetShadowing:  build_context.vet_flags |= VetFlag_Shadowing; break;
+						case BuildFlag_VetUsingStmt:  build_context.vet_flags |= VetFlag_UsingStmt; break;
+						case BuildFlag_VetUsingParam: build_context.vet_flags |= VetFlag_UsingParam; break;
+
+						case BuildFlag_VetExtra:
+							build_context.vet_flags = VetFlag_All | VetFlag_Extra;
 							break;
-						}
+
 						case BuildFlag_IgnoreUnknownAttributes:
 							build_context.ignore_unknown_attributes = true;
 							break;
@@ -2124,19 +2144,42 @@ gb_internal void print_show_help(String const arg0, String const &command) {
 		print_usage_line(2, "Multithread the semantic checker stage");
 		print_usage_line(0, "");
 		#endif
+	}
 
+	if (check) {
 		print_usage_line(1, "-vet");
 		print_usage_line(2, "Do extra checks on the code");
 		print_usage_line(2, "Extra checks include:");
-		print_usage_line(3, "Variable shadowing within procedures");
-		print_usage_line(3, "Unused declarations");
+		print_usage_line(2, "-vet-unused");
+		print_usage_line(2, "-vet-shadowing");
+		print_usage_line(2, "-vet-using-stmt");
+		print_usage_line(0, "");
+
+		print_usage_line(1, "-vet-unused");
+		print_usage_line(2, "Checks for unused declarations");
+		print_usage_line(0, "");
+
+		print_usage_line(1, "-vet-shadowing");
+		print_usage_line(2, "Checks for variable shadowing within procedures");
+		print_usage_line(0, "");
+
+		print_usage_line(1, "-vet-using-stmt");
+		print_usage_line(2, "Checks for the use of 'using' as a statement");
+		print_usage_line(2, "'using' is considered bad practice outside of immediate refactoring");
+		print_usage_line(0, "");
+
+		print_usage_line(1, "-vet-using-param");
+		print_usage_line(2, "Checks for the use of 'using' on procedure parameters");
+		print_usage_line(2, "'using' is considered bad practice outside of immediate refactoring");
 		print_usage_line(0, "");
 
 		print_usage_line(1, "-vet-extra");
 		print_usage_line(2, "Do even more checks than standard vet on the code");
 		print_usage_line(2, "To treat the extra warnings as errors, use -warnings-as-errors");
 		print_usage_line(0, "");
+	}
 
+	if (check) {
 		print_usage_line(1, "-ignore-unknown-attributes");
 		print_usage_line(2, "Ignores unknown attributes");
 		print_usage_line(2, "This can be used with metaprogramming tools");

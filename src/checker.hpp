@@ -449,6 +449,13 @@ struct CheckerContext {
 	Ast *assignment_lhs_hint;
 };
 
+u64 check_vet_flags(CheckerContext *c) {
+	if (c->file && c->file->vet_flags_set) {
+		return c->file->vet_flags;
+	}
+	return build_context.vet_flags;
+}
+
 
 struct Checker {
 	Parser *    parser;

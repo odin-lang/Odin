@@ -2464,6 +2464,12 @@ gb_internal void check_stmt_internal(CheckerContext *ctx, Ast *node, u32 flags) 
 			error(us->token, "Empty 'using' list");
 			return;
 		}
+		if (check_vet_flags(ctx) & VetFlag_UsingStmt) {
+			ERROR_BLOCK();
+			error(node, "'using' as a statement is now allowed when '-vet' or '-vet-using' is applied");
+			error_line("\t'using' is considered bad practice to use as a statement outside of immediate refactoring\n");
+		}
+
 		for (Ast *expr : us->list) {
 			expr = unparen_expr(expr);
 			Entity *e = nullptr;

@@ -5528,6 +5528,83 @@ gb_internal bool parse_build_tag(Token token_for_pos, String s) {
 	return any_correct;
 }
 
+gb_internal String vet_tag_get_token(String s, String *out) {
+	s = string_trim_whitespace(s);
+	isize n = 0;
+	while (n < s.len) {
+		Rune rune = 0;
+		isize width = utf8_decode(&s[n], s.len-n, &rune);
+		if (n == 0 && rune == '!') {
+
+		} else if (!rune_is_letter(rune) && !rune_is_digit(rune) && rune != '-') {
+			isize k = gb_max(gb_max(n, width), 1);
+			*out = substring(s, k, s.len);
+			return substring(s, 0, k);
+		}
+		n += width;
+	}
+	out->len = 0;
+	return s;
+}
+
+
+gb_internal u64 parse_vet_tag(Token token_for_pos, String s) {
+	String const prefix = str_lit("+vet");
+	GB_ASSERT(string_starts_with(s, prefix));
+	s = string_trim_whitespace(substring(s, prefix.len, s.len));
+
+	if (s.len == 0) {
+		return VetFlag_All;
+	}
+
+
+	u64 vet_flags = 0;
+	u64 vet_not_flags = 0;
+
+	while (s.len > 0) {
+		String p = string_trim_whitespace(vet_tag_get_token(s, &s));
+		if (p.len == 0) break;
+
+		bool is_notted = false;
+		if (p[0] == '!') {
+			is_notted = true;
+			p = substring(p, 1, p.len);
+			if (p.len == 0) {
+				syntax_error(token_for_pos, "Expected a vet flag name after '!'");
+				break;
+			}
+		}
+
+		if (p.len == 0) {
+			continue;
+		}
+
+		u64 flag = get_vet_flag_from_name(p);
+		if (flag != VetFlag_NONE) {
+			if (is_notted) {
+				vet_not_flags |= flag;
+			} else {
+				vet_flags     |= flag;
+			}
+		} else {
+			ERROR_BLOCK();
+			syntax_error(token_for_pos, "Invalid vet flag name: %.*s", LIT(p));
+			error_line("\tExpected one of the following\n");
+			error_line("\tunused\n");
+			error_line("\tshadowing\n");
+			error_line("\tusing-stmt\n");
+			error_line("\tusing-param\n");
+			error_line("\textra\n");
+			break;
+		}
+	}
+
+	if (vet_flags == 0 && vet_not_flags != 0) {
+		vet_flags = VetFlag_All;
+	}
+	return vet_flags &~ vet_not_flags;
+}
+
 gb_internal String dir_from_path(String path) {
 	String base_dir = path;
 	for (isize i = path.len-1; i >= 0; i--) {
@@ -5679,6 +5756,9 @@ gb_internal bool parse_file(Parser *p, AstFile *f) {
 						if (!parse_build_tag(tok, lc)) {
 							return false;
 						}
+					} else if (string_starts_with(lc, str_lit("+vet"))) {
+						f->vet_flags = parse_vet_tag(tok, lc);
+						f->vet_flags_set = true;
 					} else if (string_starts_with(lc, str_lit("+ignore"))) {
 							return false;
 					} else if (string_starts_with(lc, str_lit("+private"))) {

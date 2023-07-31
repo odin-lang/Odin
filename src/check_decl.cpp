@@ -1636,7 +1636,7 @@ gb_internal bool check_proc_body(CheckerContext *ctx_, Token token, DeclInfo *de
 	}
 	check_close_scope(ctx);
 
-	check_scope_usage(ctx->checker, ctx->scope);
+	check_scope_usage(ctx->checker, ctx->scope, check_vet_flags(ctx));
 
 	add_deps_from_child_to_parent(decl);
 
