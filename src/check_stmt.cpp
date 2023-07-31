@@ -2464,9 +2464,9 @@ gb_internal void check_stmt_internal(CheckerContext *ctx, Ast *node, u32 flags) 
 			error(us->token, "Empty 'using' list");
 			return;
 		}
-		if (check_vet_flags(ctx) & VetFlag_UsingStmt) {
+		if (check_vet_flags(node) & VetFlag_UsingStmt) {
 			ERROR_BLOCK();
-			error(node, "'using' as a statement is now allowed when '-vet' or '-vet-using' is applied");
+			error(node, "'using' as a statement is now allowed when '-vet' or '-vet-using' is applied %llu %llu", check_vet_flags(ctx), node->file()->vet_flags);
 			error_line("\t'using' is considered bad practice to use as a statement outside of immediate refactoring\n");
 		}
 

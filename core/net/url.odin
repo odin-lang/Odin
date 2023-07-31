@@ -63,100 +63,100 @@ split_url :: proc(url: string, allocator := context.allocator) -> (scheme, host,
 }
 
 join_url :: proc(scheme, host, path: string, queries: map[string]string, allocator := context.allocator) -> string {
-	using strings
+	b := strings.builder_make(allocator)
+	strings.builder_grow(&b, len(scheme) + 3 + len(host) + 1 + len(path))
 
-	b := builder_make(allocator)
-	builder_grow(&b, len(scheme) + 3 + len(host) + 1 + len(path))
-
-	write_string(&b, scheme)
-	write_string(&b, "://")
-	write_string(&b, trim_space(host))
+	strings.write_string(&b, scheme)
+	strings.write_string(&b, "://")
+	strings.write_string(&b, strings.trim_space(host))
 
 	if path != "" {
-		if path[0] != '/' do write_string(&b, "/")
-		write_string(&b, trim_space(path))
+		if path[0] != '/' {
+			strings.write_string(&b, "/")
+		}
+		strings.write_string(&b, strings.trim_space(path))
 	}
 
 
 	query_length := len(queries)
-	if query_length > 0 do write_string(&b, "?")
+	if query_length > 0 {
+		strings.write_string(&b, "?")
+	}
 	i := 0
 	for query_name, query_value in queries {
-		write_string(&b, query_name)
+		strings.write_string(&b, query_name)
 		if query_value != "" {
-			write_string(&b, "=")
-			write_string(&b, query_value)
+			strings.write_string(&b, "=")
+			strings.write_string(&b, query_value)
 		}
 		if i < query_length - 1 {
-			write_string(&b, "&")
+			strings.write_string(&b, "&")
 		}
 		i += 1
 	}
 
-	return to_string(b)
+	return strings.to_string(b)
 }
 
 percent_encode :: proc(s: string, allocator := context.allocator) -> string {
-	using strings
-
-	b := builder_make(allocator)
-	builder_grow(&b, len(s) + 16) // NOTE(tetra): A reasonable number to allow for the number of things we need to escape.
+	b := strings.builder_make(allocator)
+	strings.builder_grow(&b, len(s) + 16) // NOTE(tetra): A reasonable number to allow for the number of things we need to escape.
 
 	for ch in s {
 		switch ch {
 		case 'A'..='Z', 'a'..='z', '0'..='9', '-', '_', '.', '~':
-			write_rune(&b, ch)
+			strings.write_rune(&b, ch)
 		case:
 			bytes, n := utf8.encode_rune(ch)
 			for byte in bytes[:n] {
 				buf: [2]u8 = ---
 				t := strconv.append_int(buf[:], i64(byte), 16)
-				write_rune(&b, '%')
-				write_string(&b, t)
+				strings.write_rune(&b, '%')
+				strings.write_string(&b, t)
 			}
 		}
 	}
 
-	return to_string(b)
+	return strings.to_string(b)
 }
 
 percent_decode :: proc(encoded_string: string, allocator := context.allocator) -> (decoded_string: string, ok: bool) {
-	using strings
-
-	b := builder_make(allocator)
-	builder_grow(&b, len(encoded_string))
-	defer if !ok do builder_destroy(&b)
+	b := strings.builder_make(allocator)
+	strings.builder_grow(&b, len(encoded_string))
+	defer if !ok do strings.builder_destroy(&b)
 
 	s := encoded_string
 
 	for len(s) > 0 {
-		i := index_byte(s, '%')
+		i := strings.index_byte(s, '%')
 		if i == -1 {
-			write_string(&b, s) // no '%'s; the string is already decoded
+			strings.write_string(&b, s) // no '%'s; the string is already decoded
 			break
 		}
 
-		write_string(&b, s[:i])
+		strings.write_string(&b, s[:i])
 		s = s[i:]
 
 		if len(s) == 0 do return // percent without anything after it
 		s = s[1:]
 
 		if s[0] == '%' {
-			write_byte(&b, '%')
+			strings.write_byte(&b, '%')
 			s = s[1:]
 			continue
 		}
 
-		if len(s) < 2 do return // percent without encoded value
+		if len(s) < 2 {
+			return // percent without encoded value
+		}
 
 		val := hex.decode_sequence(s[:2]) or_return
-		write_byte(&b, val)
+		strings.write_byte(&b, val)
 		s = s[2:]
 	}
 
 	ok = true
-	decoded_string = to_string(b)
+	decoded_string = strings.to_string(b)
 	return
 }
 

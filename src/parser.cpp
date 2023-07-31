@@ -5563,7 +5563,9 @@ gb_internal u64 parse_vet_tag(Token token_for_pos, String s) {
 
 	while (s.len > 0) {
 		String p = string_trim_whitespace(vet_tag_get_token(s, &s));
-		if (p.len == 0) break;
+		if (p.len == 0) {
+			break;
+		}
 
 		bool is_notted = false;
 		if (p[0] == '!') {
@@ -5571,12 +5573,8 @@ gb_internal u64 parse_vet_tag(Token token_for_pos, String s) {
 			p = substring(p, 1, p.len);
 			if (p.len == 0) {
 				syntax_error(token_for_pos, "Expected a vet flag name after '!'");
-				break;
+				return build_context.vet_flags;
 			}
-		}
-
-		if (p.len == 0) {
-			continue;
 		}
 
 		u64 flag = get_vet_flag_from_name(p);
@@ -5595,13 +5593,20 @@ gb_internal u64 parse_vet_tag(Token token_for_pos, String s) {
 			error_line("\tusing-stmt\n");
 			error_line("\tusing-param\n");
 			error_line("\textra\n");
-			break;
+			return build_context.vet_flags;
 		}
 	}
 
-	if (vet_flags == 0 && vet_not_flags != 0) {
-		vet_flags = VetFlag_All;
+	if (vet_flags == 0 && vet_not_flags == 0) {
+		return build_context.vet_flags;
 	}
+	if (vet_flags == 0 && vet_not_flags != 0) {
+		return build_context.vet_flags &~ vet_not_flags;
+	}
+	if (vet_flags != 0 && vet_not_flags == 0) {
+		return vet_flags;
+	}
+	GB_ASSERT(vet_flags != 0 && vet_not_flags != 0);
 	return vet_flags &~ vet_not_flags;
 }
 

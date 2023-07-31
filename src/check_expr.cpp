@@ -3099,7 +3099,7 @@ gb_internal void check_cast(CheckerContext *c, Operand *x, Type *type) {
 		update_untyped_expr_type(c, x->expr, final_type, true);
 	}
 
-	if (check_vet_flags(c) & VetFlag_Extra) {
+	if (check_vet_flags(x->expr) & VetFlag_Extra) {
 		if (are_types_identical(x->type, type)) {
 			gbString str = type_to_string(type);
 			warning(x->expr, "Unneeded cast to the same type '%s'", str);
@@ -3171,7 +3171,7 @@ gb_internal bool check_transmute(CheckerContext *c, Ast *node, Operand *o, Type 
 		return false;
 	}
 
-	if (check_vet_flags(c) & VetFlag_Extra) {
+	if (check_vet_flags(node) & VetFlag_Extra) {
 		if (are_types_identical(o->type, dst_t)) {
 			gbString str = type_to_string(dst_t);
 			warning(o->expr, "Unneeded transmute to the same type '%s'", str);
@@ -10028,7 +10028,7 @@ gb_internal ExprKind check_expr_base_internal(CheckerContext *c, Operand *o, Ast
 			Type *type = type_of_expr(ac->expr);
 			check_cast(c, o, type_hint);
 			if (is_type_typed(type) && are_types_identical(type, type_hint)) {
-				if (check_vet_flags(c) & VetFlag_Extra) {
+				if (check_vet_flags(node) & VetFlag_Extra) {
 					error(node, "Redundant 'auto_cast' applied to expression");
 				}
 			}

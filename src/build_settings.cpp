@@ -218,10 +218,10 @@ enum BuildPath : u8 {
 
 enum VetFlags : u64 {
 	VetFlag_NONE       = 0,
-	VetFlag_Unused     = 1u<<0,
-	VetFlag_Shadowing  = 1u<<1,
-	VetFlag_UsingStmt  = 1u<<2,
-	VetFlag_UsingParam = 1u<<3,
+	VetFlag_Unused     = 1u<<0, // 1
+	VetFlag_Shadowing  = 1u<<1, // 2
+	VetFlag_UsingStmt  = 1u<<2, // 4
+	VetFlag_UsingParam = 1u<<3, // 8
 
 	VetFlag_Extra     = 1u<<16,
 

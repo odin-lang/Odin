@@ -449,12 +449,8 @@ struct CheckerContext {
 	Ast *assignment_lhs_hint;
 };
 
-u64 check_vet_flags(CheckerContext *c) {
-	if (c->file && c->file->vet_flags_set) {
-		return c->file->vet_flags;
-	}
-	return build_context.vet_flags;
-}
+gb_internal u64 check_vet_flags(CheckerContext *c);
+gb_internal u64 check_vet_flags(Ast *node);
 
 
 struct Checker {

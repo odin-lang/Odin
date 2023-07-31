@@ -521,6 +521,28 @@ GB_COMPARE_PROC(entity_variable_pos_cmp) {
 }
 
 
+
+gb_internal u64 check_vet_flags(CheckerContext *c) {
+	AstFile *file = c->file;
+	if (file == nullptr &&
+	    c->curr_proc_decl &&
+	    c->curr_proc_decl->proc_lit) {
+		file = c->curr_proc_decl->proc_lit->file();
+	}
+	if (file && file->vet_flags_set) {
+		return file->vet_flags;
+	}
+	return build_context.vet_flags;
+}
+
+gb_internal u64 check_vet_flags(Ast *node) {
+	AstFile *file = node->file();
+	if (file && file->vet_flags_set) {
+		return file->vet_flags;
+	}
+	return build_context.vet_flags;
+}
+
 enum VettedEntityKind {
 	VettedEntity_Invalid,
 
