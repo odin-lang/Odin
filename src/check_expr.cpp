@@ -2261,7 +2261,7 @@ gb_internal bool check_is_not_addressable(CheckerContext *c, Operand *o) {
 }
 
 gb_internal void check_old_for_or_switch_value_usage(Ast *expr) {
-	if (!build_context.strict_style) {
+	if (!(build_context.strict_style || (check_vet_flags(expr) & VetFlag_Style))) {
 		return;
 	}
 
@@ -2351,7 +2351,7 @@ gb_internal void check_unary_expr(CheckerContext *c, Operand *o, Token op, Ast *
 				o->type = alloc_type_pointer(o->type);
 			}
 		} else {
-			if (build_context.strict_style && ast_node_expect(node, Ast_UnaryExpr)) {
+			if (ast_node_expect(node, Ast_UnaryExpr)) {
 				ast_node(ue, UnaryExpr, node);
 				check_old_for_or_switch_value_usage(ue->expr);
 			}

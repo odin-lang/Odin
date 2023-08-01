@@ -653,12 +653,16 @@ enum BuildFlagKind {
 	BuildFlag_UseSeparateModules,
 	BuildFlag_NoThreadedChecker,
 	BuildFlag_ShowDebugMessages,
+
 	BuildFlag_Vet,
 	BuildFlag_VetShadowing,
 	BuildFlag_VetUnused,
 	BuildFlag_VetUsingStmt,
 	BuildFlag_VetUsingParam,
+	BuildFlag_VetStyle,
+	BuildFlag_VetSemicolon,
 	BuildFlag_VetExtra,
+
 	BuildFlag_IgnoreUnknownAttributes,
 	BuildFlag_ExtraLinkerFlags,
 	BuildFlag_ExtraAssemblerFlags,
@@ -839,7 +843,9 @@ gb_internal bool parse_build_flags(Array<String> args) {
 	add_flag(&build_flags, BuildFlag_VetUnused,               str_lit("vet-unused"),                BuildFlagParam_None,    Command__does_check);
 	add_flag(&build_flags, BuildFlag_VetShadowing,            str_lit("vet-shadowing"),             BuildFlagParam_None,    Command__does_check);
 	add_flag(&build_flags, BuildFlag_VetUsingStmt,            str_lit("vet-using-stmt"),            BuildFlagParam_None,    Command__does_check);
-	add_flag(&build_flags, BuildFlag_VetUsingParam,           str_lit("vet-using-param"),            BuildFlagParam_None,    Command__does_check);
+	add_flag(&build_flags, BuildFlag_VetUsingParam,           str_lit("vet-using-param"),           BuildFlagParam_None,    Command__does_check);
+	add_flag(&build_flags, BuildFlag_VetStyle,                str_lit("vet-style"),                 BuildFlagParam_None,    Command__does_check);
+	add_flag(&build_flags, BuildFlag_VetSemicolon,            str_lit("vet-semicolon"),             BuildFlagParam_None,    Command__does_check);
 	add_flag(&build_flags, BuildFlag_VetExtra,                str_lit("vet-extra"),                 BuildFlagParam_None,    Command__does_check);
 
 	add_flag(&build_flags, BuildFlag_IgnoreUnknownAttributes, str_lit("ignore-unknown-attributes"), BuildFlagParam_None,    Command__does_check);
@@ -1380,10 +1386,12 @@ gb_internal bool parse_build_flags(Array<String> args) {
 							}
 							break;
 
-						case BuildFlag_VetUnused:     build_context.vet_flags |= VetFlag_Unused;    break;
-						case BuildFlag_VetShadowing:  build_context.vet_flags |= VetFlag_Shadowing; break;
-						case BuildFlag_VetUsingStmt:  build_context.vet_flags |= VetFlag_UsingStmt; break;
+						case BuildFlag_VetUnused:     build_context.vet_flags |= VetFlag_Unused;     break;
+						case BuildFlag_VetShadowing:  build_context.vet_flags |= VetFlag_Shadowing;  break;
+						case BuildFlag_VetUsingStmt:  build_context.vet_flags |= VetFlag_UsingStmt;  break;
 						case BuildFlag_VetUsingParam: build_context.vet_flags |= VetFlag_UsingParam; break;
+						case BuildFlag_VetStyle:      build_context.vet_flags |= VetFlag_Style;      break;
+						case BuildFlag_VetSemicolon:  build_context.vet_flags |= VetFlag_Semicolon;  break;
 
 						case BuildFlag_VetExtra:
 							build_context.vet_flags = VetFlag_All | VetFlag_Extra;
@@ -2173,6 +2181,16 @@ gb_internal void print_show_help(String const arg0, String const &command) {
 		print_usage_line(2, "'using' is considered bad practice outside of immediate refactoring");
 		print_usage_line(0, "");
 
+		print_usage_line(1, "-vet-style");
+		print_usage_line(2, "Errs on missing trailing commas followed by a newline");
+		print_usage_line(2, "Errs on deprecated syntax");
+		print_usage_line(2, "Does not err on unneeded tokens (unlike -strict-style)");
+		print_usage_line(0, "");
+
+		print_usage_line(1, "-vet-semicolon");
+		print_usage_line(2, "Errs on unneeded semicolons");
+		print_usage_line(0, "");
+
 		print_usage_line(1, "-vet-extra");
 		print_usage_line(2, "Do even more checks than standard vet on the code");
 		print_usage_line(2, "To treat the extra warnings as errors, use -warnings-as-errors");
@@ -2249,10 +2267,12 @@ gb_internal void print_show_help(String const arg0, String const &command) {
 
 		print_usage_line(1, "-strict-style");
 		print_usage_line(2, "Errs on unneeded tokens, such as unneeded semicolons");
+		print_usage_line(2, "Errs on missing trailing commas followed by a newline");
+		print_usage_line(2, "Errs on deprecated syntax");
 		print_usage_line(0, "");
 
 		print_usage_line(1, "-strict-style-init-only");
-		print_usage_line(2, "Errs on unneeded tokens, such as unneeded semicolons, only on the initial project");
+		print_usage_line(2, "Same as -strict-style but only on the initial package");
 		print_usage_line(0, "");
 
 		print_usage_line(1, "-ignore-warnings");
