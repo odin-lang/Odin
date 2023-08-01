@@ -1602,8 +1602,6 @@ gb_internal void assign_removal_flag_to_semicolon(AstFile *f) {
 
 	if (build_context.strict_style || (ast_file_vet_flags(f) & VetFlag_Semicolon)) {
 		syntax_error(*prev_token, "Found unneeded semicolon");
-	} else if (build_context.strict_style_init_only && f->pkg->kind == Package_Init) {
-		syntax_error(*prev_token, "Found unneeded semicolon");
 	}
 	prev_token->flags |= TokenFlag_Remove;
 }

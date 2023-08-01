@@ -679,7 +679,6 @@ enum BuildFlagKind {
 	BuildFlag_DisallowDo,
 	BuildFlag_DefaultToNilAllocator,
 	BuildFlag_StrictStyle,
-	BuildFlag_StrictStyleInitOnly,
 	BuildFlag_ForeignErrorProcedures,
 	BuildFlag_NoRTTI,
 	BuildFlag_DynamicMapCalls,
@@ -863,7 +862,6 @@ gb_internal bool parse_build_flags(Array<String> args) {
 	add_flag(&build_flags, BuildFlag_DisallowDo,              str_lit("disallow-do"),               BuildFlagParam_None,    Command__does_check);
 	add_flag(&build_flags, BuildFlag_DefaultToNilAllocator,   str_lit("default-to-nil-allocator"),  BuildFlagParam_None,    Command__does_check);
 	add_flag(&build_flags, BuildFlag_StrictStyle,             str_lit("strict-style"),              BuildFlagParam_None,    Command__does_check);
-	add_flag(&build_flags, BuildFlag_StrictStyleInitOnly,     str_lit("strict-style-init-only"),    BuildFlagParam_None,    Command__does_check);
 	add_flag(&build_flags, BuildFlag_ForeignErrorProcedures,  str_lit("foreign-error-procedures"),  BuildFlagParam_None,    Command__does_check);
 
 	add_flag(&build_flags, BuildFlag_NoRTTI,                  str_lit("no-rtti"),                   BuildFlagParam_None,    Command__does_check);
@@ -1484,20 +1482,9 @@ gb_internal bool parse_build_flags(Array<String> args) {
 						case BuildFlag_ForeignErrorProcedures:
 							build_context.ODIN_FOREIGN_ERROR_PROCEDURES = true;
 							break;
-						case BuildFlag_StrictStyle: {
-							if (build_context.strict_style_init_only) {
-								gb_printf_err("-strict-style and -strict-style-init-only cannot be used together\n");
-							}
+						case BuildFlag_StrictStyle:
 							build_context.strict_style = true;
 							break;
-						}
-						case BuildFlag_StrictStyleInitOnly: {
-							if (build_context.strict_style) {
-								gb_printf_err("-strict-style and -strict-style-init-only cannot be used together\n");
-							}
-							build_context.strict_style_init_only = true;
-							break;
-						}
 						case BuildFlag_Short:
 							build_context.cmd_doc_flags |= CmdDocFlag_Short;
 							break;
@@ -2262,10 +2249,6 @@ gb_internal void print_show_help(String const arg0, String const &command) {
 		print_usage_line(2, "Errs on unneeded tokens, such as unneeded semicolons");
 		print_usage_line(2, "Errs on missing trailing commas followed by a newline");
 		print_usage_line(2, "Errs on deprecated syntax");
-		print_usage_line(0, "");
-
-		print_usage_line(1, "-strict-style-init-only");
-		print_usage_line(2, "Same as -strict-style but only on the initial package");
 		print_usage_line(0, "");
 
 		print_usage_line(1, "-ignore-warnings");
