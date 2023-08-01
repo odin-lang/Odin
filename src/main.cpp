@@ -174,7 +174,7 @@ gb_internal i32 linker_stage(lbGenerator *gen) {
 	}
 
 	if (build_context.cross_compiling && selected_target_metrics->metrics == &target_essence_amd64) {
-#if defined(GB_SYSTEM_UNIX) 
+#if defined(GB_SYSTEM_UNIX)
 		result = system_exec_command_line_app("linker", "x86_64-essence-gcc \"%.*s.o\" -o \"%.*s\" %.*s %.*s",
 			LIT(output_filename), LIT(output_filename), LIT(build_context.link_flags), LIT(build_context.extra_linker_flags));
 #else
@@ -498,13 +498,13 @@ gb_internal i32 linker_stage(lbGenerator *gen) {
 				// line arguments prepared previously are incompatible with ld.
 				if (build_context.metrics.os == TargetOs_darwin) {
 					link_settings = gb_string_appendc(link_settings, "-Wl,-init,'__odin_entry_point' ");
-					// NOTE(weshardee): __odin_exit_point should also be added, but -fini 
+					// NOTE(weshardee): __odin_exit_point should also be added, but -fini
 					// does not exist on MacOS
 				} else {
 					link_settings = gb_string_appendc(link_settings, "-Wl,-init,'_odin_entry_point' ");
 					link_settings = gb_string_appendc(link_settings, "-Wl,-fini,'_odin_exit_point' ");
 				}
-				
+
 			} else if (build_context.metrics.os != TargetOs_openbsd) {
 				// OpenBSD defaults to PIE executable. do not pass -no-pie for it.
 				link_settings = gb_string_appendc(link_settings, "-no-pie ");
@@ -1587,7 +1587,7 @@ gb_internal bool parse_build_flags(Array<String> args) {
 								if (path_is_directory(path)) {
 									gb_printf_err("Invalid -pdb-name path. %.*s, is a directory.\n", LIT(path));
 									bad_flags = true;
-									break;									
+									break;
 								}
 								// #if defined(GB_SYSTEM_WINDOWS)
 								// 	String ext = path_extension(path);
@@ -2018,6 +2018,10 @@ gb_internal void print_show_help(String const arg0, String const &command) {
 
 		print_usage_line(1, "-show-more-timings");
 		print_usage_line(2, "Shows an advanced overview of the timings of different stages within the compiler in milliseconds");
+		print_usage_line(0, "");
+
+		print_usage_line(1, "-show-system-calls");
+		print_usage_line(2, "Prints the whole command and arguments for calls to external tools like linker and assembler");
 		print_usage_line(0, "");
 
 		print_usage_line(1, "-export-timings:<format>");
@@ -2853,7 +2857,7 @@ int main(int arg_count, char const **arg_ptr) {
 		for_array(i, build_context.build_paths) {
 			String build_path = path_to_string(heap_allocator(), build_context.build_paths[i]);
 			debugf("build_paths[%ld]: %.*s\n", i, LIT(build_path));
-		}		
+		}
 	}
 
 	init_global_thread_pool();
