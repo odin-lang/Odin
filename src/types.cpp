@@ -997,7 +997,7 @@ gb_internal Type *alloc_type_enumerated_array(Type *elem, Type *index, ExactValu
 
 gb_internal Type *alloc_type_slice(Type *elem) {
 	Type *t = alloc_type(Type_Slice);
-	t->Array.elem = elem;
+	t->Slice.elem = elem;
 	return t;
 }
 
