@@ -462,7 +462,7 @@ gb_internal bool find_or_generate_polymorphic_procedure(CheckerContext *old_c, E
 
 
 	{
-		// LEAK TODO(bill): This is technically a memory leak as it has to generate the type twice
+		// LEAK NOTE(bill): This is technically a memory leak as it has to generate the type twice
 		bool prev_no_polymorphic_errors = nctx.no_polymorphic_errors;
 		defer (nctx.no_polymorphic_errors = prev_no_polymorphic_errors);
 		nctx.no_polymorphic_errors = false;
@@ -470,7 +470,7 @@ gb_internal bool find_or_generate_polymorphic_procedure(CheckerContext *old_c, E
 		// NOTE(bill): Reset scope from the failed procedure type
 		scope_reset(scope);
 
-		// LEAK TODO(bill): Cloning this AST may be leaky
+		// LEAK NOTE(bill): Cloning this AST may be leaky but this is not really an issue due to arena-based allocation
 		Ast *cloned_proc_type_node = clone_ast(pt->node);
 		success = check_procedure_type(&nctx, final_proc_type, cloned_proc_type_node, &operands);
 		if (!success) {
@@ -778,16 +778,6 @@ gb_internal i64 check_distance_between_types(CheckerContext *c, Operand *operand
 		}
 	}
 
-	// ^T <- rawptr
-#if 0
-	// TODO(bill): Should C-style (not C++) pointer cast be allowed?
-	if (is_type_pointer(dst) && is_type_rawptr(src)) {
-	    return true;
-	}
-#endif
-#if 1
-
-
 	// rawptr <- ^T
 	if (are_types_identical(type, t_rawptr) && is_type_pointer(src)) {
 		return 5;
@@ -808,7 +798,6 @@ gb_internal i64 check_distance_between_types(CheckerContext *c, Operand *operand
 			return 4;
 		}
 	}
-#endif
 
 	if (is_type_polymorphic(dst) && !is_type_polymorphic(src)) {
 		bool modify_type = !c->no_polymorphic_errors;
@@ -824,7 +813,6 @@ gb_internal i64 check_distance_between_types(CheckerContext *c, Operand *operand
 			}
 		}
 
-		// TODO(bill): Determine which rule is a better on in practice
 		if (dst->Union.variants.count == 1) {
 			Type *vt = dst->Union.variants[0];
 			i64 score = check_distance_between_types(c, operand, vt);
@@ -1093,7 +1081,7 @@ gb_internal void check_assignment(CheckerContext *c, Operand *operand, Type *typ
 
 			// TODO(bill): is this a good enough error message?
 			error(operand->expr,
-			      "Cannot assign overloaded procedure '%s' to '%s' in %.*s",
+			      "Cannot assign overloaded procedure group '%s' to '%s' in %.*s",
 			      expr_str,
 			      op_type_str,
 			      LIT(context_name));
@@ -1120,7 +1108,6 @@ gb_internal void check_assignment(CheckerContext *c, Operand *operand, Type *typ
 
 		switch (operand->mode) {
 		case Addressing_Builtin:
-			// TODO(bill): Actually allow built in procedures to be passed around and thus be created on use
 			error(operand->expr,
 			      "Cannot assign built-in procedure '%s' in %.*s",
 			      expr_str,
@@ -1412,9 +1399,6 @@ gb_internal bool is_polymorphic_type_assignable(CheckerContext *c, Type *poly, T
 		return false;
 	case Type_Proc:
 		if (source->kind == Type_Proc) {
-			// return check_is_assignable_to(c, &o, poly);
-			// TODO(bill): Polymorphic type assignment
-			#if 1
 			TypeProc *x = &poly->Proc;
 			TypeProc *y = &source->Proc;
 			if (x->calling_convention != y->calling_convention) {
@@ -1447,7 +1431,6 @@ gb_internal bool is_polymorphic_type_assignable(CheckerContext *c, Type *poly, T
 			}
 
 			return true;
-			#endif
 		}
 		return false;
 	case Type_Map:
@@ -1699,7 +1682,6 @@ gb_internal bool check_unary_op(CheckerContext *c, Operand *o, Token op) {
 		gb_string_free(str);
 		return false;
 	}
-	// TODO(bill): Handle errors correctly
 	Type *type = base_type(core_array_type(o->type));
 	gbString str = nullptr;
 	switch (op.kind) {
@@ -1743,7 +1725,6 @@ gb_internal bool check_unary_op(CheckerContext *c, Operand *o, Token op) {
 gb_internal bool check_binary_op(CheckerContext *c, Operand *o, Token op) {
 	Type *main_type = o->type;
 
-	// TODO(bill): Handle errors correctly
 	Type *type = base_type(core_array_type(main_type));
 	Type *ct = core_type(type);
 
@@ -2774,8 +2755,6 @@ gb_internal void check_shift(CheckerContext *c, Operand *x, Operand *y, Ast *nod
 		error(node, "Shift amount cannot be negative: '%s'", err_str);
 		gb_string_free(err_str);
 	}
-
-	// TODO(bill): Should we support shifts for fixed arrays and #simd vectors?
 
 	if (!is_type_integer(x->type)) {
 		gbString err_str = expr_to_string(x->expr);
@@ -4437,7 +4416,6 @@ gb_internal ExactValue get_constant_field_single(CheckerContext *c, ExactValue v
 	case_end;
 
 	default:
-		// TODO(bill): Should this be a general fallback?
 		if (success_) *success_ = true;
 		if (finish_) *finish_ = true;
 		return empty_exact_value;
@@ -4793,8 +4771,6 @@ gb_internal Entity *check_selector(CheckerContext *c, Operand *operand, Ast *nod
 	}
 
 	if (entity == nullptr && selector->kind == Ast_Ident && is_type_array(type_deref(operand->type))) {
-		// TODO(bill): Simd_Vector swizzling
-
 		String field_name = selector->Ident.token.string;
 		if (1 < field_name.len && field_name.len <= 4) {
 			u8 swizzles_xyzw[4] = {'x', 'y', 'z', 'w'};

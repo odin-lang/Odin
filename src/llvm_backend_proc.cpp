@@ -362,7 +362,6 @@ gb_internal lbProcedure *lb_create_dummy_procedure(lbModule *m, String link_name
 
 	Type *pt = p->type;
 	lbCallingConventionKind cc_kind = lbCallingConvention_C;
-	// TODO(bill): Clean up this logic
 	if (!is_arch_wasm()) {
 		cc_kind = lb_calling_convention_map[pt->Proc.calling_convention];
 	}
@@ -1702,7 +1701,6 @@ gb_internal lbValue lb_build_builtin_proc(lbProcedure *p, Ast *expr, TypeAndValu
 		lbValue v = lb_build_expr(p, ce->args[0]);
 		Type *t = base_type(v.type);
 		if (is_type_pointer(t)) {
-			// IMPORTANT TODO(bill): Should there be a nil pointer check?
 			v = lb_emit_load(p, v);
 			t = type_deref(t);
 		}
@@ -1730,7 +1728,6 @@ gb_internal lbValue lb_build_builtin_proc(lbProcedure *p, Ast *expr, TypeAndValu
 		lbValue v = lb_build_expr(p, ce->args[0]);
 		Type *t = base_type(v.type);
 		if (is_type_pointer(t)) {
-			// IMPORTANT TODO(bill): Should there be a nil pointer check?
 			v = lb_emit_load(p, v);
 			t = type_deref(t);
 		}
@@ -3144,7 +3141,7 @@ gb_internal lbValue lb_build_call_expr(lbProcedure *p, Ast *expr) {
 
 	lbValue res = lb_build_call_expr_internal(p, expr);
 
-	if (ce->optional_ok_one) { // TODO(bill): Minor hack for #optional_ok procedures
+	if (ce->optional_ok_one) {
 		GB_ASSERT(is_type_tuple(res.type));
 		GB_ASSERT(res.type->Tuple.variables.count == 2);
 		return lb_emit_struct_ev(p, res, 0);

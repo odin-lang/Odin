@@ -4968,7 +4968,6 @@ gb_internal bool init_parser(Parser *p) {
 
 gb_internal void destroy_parser(Parser *p) {
 	GB_ASSERT(p != nullptr);
-	// TODO(bill): Fix memory leak
 	for (AstPackage *pkg : p->packages) {
 		for (AstFile *file : pkg->files) {
 			destroy_ast_file(file);
@@ -5012,7 +5011,6 @@ gb_internal WORKER_TASK_PROC(parser_worker_proc) {
 
 
 gb_internal void parser_add_file_to_process(Parser *p, AstPackage *pkg, FileInfo fi, TokenPos pos) {
-	// TODO(bill): Use a better allocator
 	ImportedFile f = {pkg, fi, pos, p->file_to_process_count++};
 	auto wd = gb_alloc_item(permanent_allocator(), ParserWorkerData);
 	wd->parser = p;

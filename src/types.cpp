@@ -143,6 +143,7 @@ struct TypeStruct {
 	Type *          soa_elem;
 	i32             soa_count;
 	StructSoaKind   soa_kind;
+	BlockingMutex   mutex; // for settings offsets
 
 	bool            is_polymorphic;
 	bool            are_offsets_set             : 1;
@@ -244,6 +245,7 @@ struct TypeProc {
 	TYPE_KIND(Tuple, struct {                                 \
 		Slice<Entity *> variables; /* Entity_Variable */  \
 		i64 *           offsets;                          \
+		BlockingMutex   mutex; /* for settings offsets */ \
 		bool            are_offsets_being_processed;      \
 		bool            are_offsets_set;                  \
 		bool            is_packed;                        \
@@ -821,6 +823,9 @@ gb_internal void type_path_pop(TypePath *tp) {
 #define FAILURE_ALIGNMENT 0
 
 gb_internal bool type_ptr_set_update(PtrSet<Type *> *s, Type *t) {
+	if (t == nullptr) {
+		return true;
+	}
 	if (ptr_set_exists(s, t)) {
 		return true;
 	}
@@ -829,13 +834,17 @@ gb_internal bool type_ptr_set_update(PtrSet<Type *> *s, Type *t) {
 }
 
 gb_internal bool type_ptr_set_exists(PtrSet<Type *> *s, Type *t) {
+	if (t == nullptr) {
+		return true;
+	}
+
 	if (ptr_set_exists(s, t)) {
 		return true;
 	}
 
 	// TODO(bill, 2019-10-05): This is very slow and it's probably a lot
 	// faster to cache types correctly
-	for (Type *f : *s) {
+	for (Type *f : *s) if (f->kind == t->kind) {
 		if (are_types_identical(t, f)) {
 			ptr_set_add(s, t);
 			return true;
@@ -2666,7 +2675,6 @@ gb_internal bool are_types_identical_internal(Type *x, Type *y, bool check_tuple
 		    x->Struct.soa_kind == y->Struct.soa_kind &&
 		    x->Struct.soa_count == y->Struct.soa_count &&
 		    are_types_identical(x->Struct.soa_elem, y->Struct.soa_elem)) {
-			// TODO(bill); Fix the custom alignment rule
 			for_array(i, x->Struct.fields) {
 				Entity *xf = x->Struct.fields[i];
 				Entity *yf = y->Struct.fields[i];
@@ -2807,7 +2815,6 @@ gb_internal i64 union_tag_size(Type *u) {
 		return 0;
 	}
 
-	// TODO(bill): Is this an okay approach?
 	i64 max_align = 1;
 
 	if (u->Union.variants.count < 1ull<<8) {
@@ -2817,7 +2824,7 @@ gb_internal i64 union_tag_size(Type *u) {
 	} else if (u->Union.variants.count < 1ull<<32) {
 		max_align = 4;
 	} else {
-		GB_PANIC("how many variants do you have?!");
+		compiler_error("how many variants do you have?! %lld", cast(long long)u->Union.variants.count);
 	}
 
 	for_array(i, u->Union.variants) {
@@ -3136,8 +3143,6 @@ gb_internal Selection lookup_field_with_selection(Type *type_, String field_name
 		switch (type->Basic.kind) {
 		case Basic_any: {
 		#if 1
-			// IMPORTANT TODO(bill): Should these members be available to should I only allow them with
-			// `Raw_Any` type?
 			String data_str = str_lit("data");
 			String id_str = str_lit("id");
 			gb_local_persist Entity *entity__any_data = alloc_entity_field(nullptr, make_token_ident(data_str), t_rawptr, false, 0);
@@ -3663,10 +3668,9 @@ gb_internal i64 *type_set_offsets_of(Slice<Entity *> const &fields, bool is_pack
 }
 
 gb_internal bool type_set_offsets(Type *t) {
-	MUTEX_GUARD(&g_type_mutex); // TODO(bill): only per struct
-
 	t = base_type(t);
 	if (t->kind == Type_Struct) {
+		MUTEX_GUARD(&t->Struct.mutex);
 		if (!t->Struct.are_offsets_set) {
 			t->Struct.are_offsets_being_processed = true;
 			t->Struct.offsets = type_set_offsets_of(t->Struct.fields, t->Struct.is_packed, t->Struct.is_raw_union);
@@ -3675,6 +3679,7 @@ gb_internal bool type_set_offsets(Type *t) {
 			return true;
 		}
 	} else if (is_type_tuple(t)) {
+		MUTEX_GUARD(&t->Tuple.mutex);
 		if (!t->Tuple.are_offsets_set) {
 			t->Tuple.are_offsets_being_processed = true;
 			t->Tuple.offsets = type_set_offsets_of(t->Tuple.variables, t->Tuple.is_packed, false);
@@ -3849,7 +3854,6 @@ gb_internal i64 type_size_of_internal(Type *t, TypePath *path) {
 					max = size;
 				}
 			}
-			// TODO(bill): Is this how it should work?
 			return align_formula(max, align);
 		} else {
 			i64 count = 0, size = 0, align = 0;

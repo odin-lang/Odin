@@ -7,13 +7,15 @@ gb_internal Type *check_init_variable(CheckerContext *ctx, Entity *e, Operand *o
 		e->type == t_invalid) {
 
 		if (operand->mode == Addressing_Builtin) {
+			ERROR_BLOCK();
 			gbString expr_str = expr_to_string(operand->expr);
 
-			// TODO(bill): is this a good enough error message?
 			error(operand->expr,
-				  "Cannot assign built-in procedure '%s' in %.*s",
-				  expr_str,
-				  LIT(context_name));
+			      "Cannot assign built-in procedure '%s' in %.*s",
+			      expr_str,
+			      LIT(context_name));
+
+			error_line("\tBuilt-in procedures are implemented by the compiler and might not be actually instantiated procedure\n");
 
 			operand->mode = Addressing_Invalid;
 
@@ -159,9 +161,8 @@ gb_internal void check_init_constant(CheckerContext *ctx, Entity *e, Operand *op
 	}
 
 	if (operand->mode != Addressing_Constant) {
-		// TODO(bill): better error
 		gbString str = expr_to_string(operand->expr);
-		error(operand->expr, "'%s' is not a constant", str);
+		error(operand->expr, "'%s' is not a compile-time known constant", str);
 		gb_string_free(str);
 		if (e->type == nullptr) {
 			e->type = t_invalid;
