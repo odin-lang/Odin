@@ -354,31 +354,7 @@ gb_internal void check_type_decl(CheckerContext *ctx, Entity *e, Ast *init_expr,
 
 	// using decl
 	if (decl->is_using) {
-		warning(init_expr, "'using' an enum declaration is not allowed, prefer using implicit selector expressions e.g. '.A'");
-		#if 1
-		// NOTE(bill): Must be an enum declaration
-		if (te->kind == Ast_EnumType) {
-			Scope *parent = e->scope;
-			if (parent->flags&ScopeFlag_File) {
-				// NOTE(bill): Use package scope
-				parent = parent->parent;
-			}
-
-			Type *t = base_type(e->type);
-			if (t->kind == Type_Enum) {
-				for (Entity *f : t->Enum.fields) {
-					if (f->kind != Entity_Constant) {
-						continue;
-					}
-					String name = f->token.string;
-					if (is_blank_ident(name)) {
-						continue;
-					}
-					add_entity(ctx, parent, nullptr, f);
-				}
-			}
-		}
-		#endif
+		error(init_expr, "'using' an enum declaration is not allowed, prefer using implicit selector expressions e.g. '.A'");
 	}
 }
 

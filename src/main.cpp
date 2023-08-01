@@ -2142,16 +2142,9 @@ gb_internal void print_show_help(String const arg0, String const &command) {
 	}
 
 	if (check) {
-		#if defined(GB_SYSTEM_WINDOWS)
 		print_usage_line(1, "-no-threaded-checker");
 		print_usage_line(2, "Disabled multithreading in the semantic checker stage");
 		print_usage_line(0, "");
-		#else
-		print_usage_line(1, "-threaded-checker");
-		print_usage_line(1, "[EXPERIMENTAL]");
-		print_usage_line(2, "Multithread the semantic checker stage");
-		print_usage_line(0, "");
-		#endif
 	}
 
 	if (check) {

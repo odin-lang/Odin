@@ -3085,7 +3085,7 @@ gb_internal DECL_ATTRIBUTE_PROC(proc_decl_attribute) {
 			check_expr(c, &o, value);
 			Entity *e = entity_of_node(o.expr);
 			if (e != nullptr && e->kind == Entity_Procedure) {
-				warning(elem, "'%.*s' is deprecated, please use one of the following instead: 'deferred_none', 'deferred_in', 'deferred_out'", LIT(name));
+				error(elem, "'%.*s' is not allowed any more, please use one of the following instead: 'deferred_none', 'deferred_in', 'deferred_out'", LIT(name));
 				if (ac->deferred_procedure.entity != nullptr) {
 					error(elem, "Previous usage of a 'deferred_*' attribute");
 				}
@@ -4584,7 +4584,7 @@ gb_internal DECL_ATTRIBUTE_PROC(foreign_import_decl_attribute) {
 		if (value != nullptr) {
 			error(elem, "Expected no parameter for '%.*s'", LIT(name));
 		} else if (name == "force") {
-			warning(elem, "'force' is deprecated and is identical to 'require'");
+			error(elem, "'force' was replaced with 'require'");
 		}
 		ac->require_declaration = true;
 		return true;
@@ -6104,7 +6104,7 @@ gb_internal void check_parsed_files(Checker *c) {
 		while (mpsc_dequeue(&c->info.intrinsics_entry_point_usage, &node)) {
 			if (c->info.entry_point == nullptr && node != nullptr) {
 				if (node->file()->pkg->kind != Package_Runtime) {
-					warning(node, "usage of intrinsics.__entry_point will be a no-op");
+					error(node, "usage of intrinsics.__entry_point will be a no-op");
 				}
 			}
 		}

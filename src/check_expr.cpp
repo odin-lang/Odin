@@ -7153,7 +7153,7 @@ gb_internal ExprKind check_call_expr(CheckerContext *c, Operand *operand, Ast *c
 		i32 id = operand->builtin_id;
 		Entity *e = entity_of_node(operand->expr);
 		if (e != nullptr && e->token.string == "expand_to_tuple") {
-			warning(operand->expr, "'expand_to_tuple' has been replaced with 'expand_values'");
+			error(operand->expr, "'expand_to_tuple' has been replaced with 'expand_values'");
 		}
 		if (!check_builtin_procedure(c, operand, call, id, type_hint)) {
 			operand->mode = Addressing_Invalid;
