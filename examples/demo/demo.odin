@@ -459,6 +459,27 @@ named_proc_return_parameters :: proc() {
 	fmt.println("foo2 =", foo2()) // 567 321
 }
 
+variadic_procedures :: proc() {
+	fmt.println("\n# variadic procedures")
+	sum :: proc(nums: ..int, init_value:= 0) -> (result: int) {
+		result = init_value
+		for n in nums {
+			result += n
+		}
+		return
+	}
+	fmt.println("sum(()) =", sum())
+	fmt.println("sum(1, 2) =", sum(1, 2))
+	fmt.println("sum(1, 2, 3, 4, 5) =", sum(1, 2, 3, 4, 5))
+	fmt.println("sum(1, 2, 3, 4, 5, init_value = 5) =", sum(1, 2, 3, 4, 5, init_value = 5))
+
+	// pass a slice as varargs
+	odds := []int{1, 3, 5}
+	fmt.println("odds =", odds)
+	fmt.println("sum(..odds) =", sum(..odds))
+	fmt.println("sum(..odds, init_value = 5) =", sum(..odds, init_value = 5))
+}
+
 
 explicit_procedure_overloading :: proc() {
 	fmt.println("\n# explicit procedure overloading")
@@ -2463,6 +2484,7 @@ main :: proc() {
 		the_basics()
 		control_flow()
 		named_proc_return_parameters()
+		variadic_procedures()
 		explicit_procedure_overloading()
 		struct_type()
 		union_type()
