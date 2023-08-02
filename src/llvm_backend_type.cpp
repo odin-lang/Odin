@@ -731,7 +731,6 @@ gb_internal void lb_setup_type_info_data(lbProcedure *p) { // NOTE(bill): Setup 
 
 				type_set_offsets(t); // NOTE(bill): Just incase the offsets have not been set yet
 				for (isize source_index = 0; source_index < count; source_index++) {
-					// TODO(bill): Order fields in source order not layout order
 					Entity *f = t->Struct.fields[source_index];
 					lbValue tip = lb_type_info(m, f->type);
 					i64 foffset = 0;

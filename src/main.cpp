@@ -174,7 +174,7 @@ gb_internal i32 linker_stage(lbGenerator *gen) {
 	}
 
 	if (build_context.cross_compiling && selected_target_metrics->metrics == &target_essence_amd64) {
-#if defined(GB_SYSTEM_UNIX) 
+#if defined(GB_SYSTEM_UNIX)
 		result = system_exec_command_line_app("linker", "x86_64-essence-gcc \"%.*s.o\" -o \"%.*s\" %.*s %.*s",
 			LIT(output_filename), LIT(output_filename), LIT(build_context.link_flags), LIT(build_context.extra_linker_flags));
 #else
@@ -498,13 +498,13 @@ gb_internal i32 linker_stage(lbGenerator *gen) {
 				// line arguments prepared previously are incompatible with ld.
 				if (build_context.metrics.os == TargetOs_darwin) {
 					link_settings = gb_string_appendc(link_settings, "-Wl,-init,'__odin_entry_point' ");
-					// NOTE(weshardee): __odin_exit_point should also be added, but -fini 
+					// NOTE(weshardee): __odin_exit_point should also be added, but -fini
 					// does not exist on MacOS
 				} else {
 					link_settings = gb_string_appendc(link_settings, "-Wl,-init,'_odin_entry_point' ");
 					link_settings = gb_string_appendc(link_settings, "-Wl,-fini,'_odin_exit_point' ");
 				}
-				
+
 			} else if (build_context.metrics.os != TargetOs_openbsd) {
 				// OpenBSD defaults to PIE executable. do not pass -no-pie for it.
 				link_settings = gb_string_appendc(link_settings, "-no-pie ");
@@ -653,12 +653,16 @@ enum BuildFlagKind {
 	BuildFlag_UseSeparateModules,
 	BuildFlag_NoThreadedChecker,
 	BuildFlag_ShowDebugMessages,
+
 	BuildFlag_Vet,
 	BuildFlag_VetShadowing,
 	BuildFlag_VetUnused,
 	BuildFlag_VetUsingStmt,
 	BuildFlag_VetUsingParam,
+	BuildFlag_VetStyle,
+	BuildFlag_VetSemicolon,
 	BuildFlag_VetExtra,
+
 	BuildFlag_IgnoreUnknownAttributes,
 	BuildFlag_ExtraLinkerFlags,
 	BuildFlag_ExtraAssemblerFlags,
@@ -675,7 +679,6 @@ enum BuildFlagKind {
 	BuildFlag_DisallowDo,
 	BuildFlag_DefaultToNilAllocator,
 	BuildFlag_StrictStyle,
-	BuildFlag_StrictStyleInitOnly,
 	BuildFlag_ForeignErrorProcedures,
 	BuildFlag_NoRTTI,
 	BuildFlag_DynamicMapCalls,
@@ -839,7 +842,9 @@ gb_internal bool parse_build_flags(Array<String> args) {
 	add_flag(&build_flags, BuildFlag_VetUnused,               str_lit("vet-unused"),                BuildFlagParam_None,    Command__does_check);
 	add_flag(&build_flags, BuildFlag_VetShadowing,            str_lit("vet-shadowing"),             BuildFlagParam_None,    Command__does_check);
 	add_flag(&build_flags, BuildFlag_VetUsingStmt,            str_lit("vet-using-stmt"),            BuildFlagParam_None,    Command__does_check);
-	add_flag(&build_flags, BuildFlag_VetUsingParam,           str_lit("vet-using-param"),            BuildFlagParam_None,    Command__does_check);
+	add_flag(&build_flags, BuildFlag_VetUsingParam,           str_lit("vet-using-param"),           BuildFlagParam_None,    Command__does_check);
+	add_flag(&build_flags, BuildFlag_VetStyle,                str_lit("vet-style"),                 BuildFlagParam_None,    Command__does_check);
+	add_flag(&build_flags, BuildFlag_VetSemicolon,            str_lit("vet-semicolon"),             BuildFlagParam_None,    Command__does_check);
 	add_flag(&build_flags, BuildFlag_VetExtra,                str_lit("vet-extra"),                 BuildFlagParam_None,    Command__does_check);
 
 	add_flag(&build_flags, BuildFlag_IgnoreUnknownAttributes, str_lit("ignore-unknown-attributes"), BuildFlagParam_None,    Command__does_check);
@@ -857,7 +862,6 @@ gb_internal bool parse_build_flags(Array<String> args) {
 	add_flag(&build_flags, BuildFlag_DisallowDo,              str_lit("disallow-do"),               BuildFlagParam_None,    Command__does_check);
 	add_flag(&build_flags, BuildFlag_DefaultToNilAllocator,   str_lit("default-to-nil-allocator"),  BuildFlagParam_None,    Command__does_check);
 	add_flag(&build_flags, BuildFlag_StrictStyle,             str_lit("strict-style"),              BuildFlagParam_None,    Command__does_check);
-	add_flag(&build_flags, BuildFlag_StrictStyleInitOnly,     str_lit("strict-style-init-only"),    BuildFlagParam_None,    Command__does_check);
 	add_flag(&build_flags, BuildFlag_ForeignErrorProcedures,  str_lit("foreign-error-procedures"),  BuildFlagParam_None,    Command__does_check);
 
 	add_flag(&build_flags, BuildFlag_NoRTTI,                  str_lit("no-rtti"),                   BuildFlagParam_None,    Command__does_check);
@@ -1380,10 +1384,12 @@ gb_internal bool parse_build_flags(Array<String> args) {
 							}
 							break;
 
-						case BuildFlag_VetUnused:     build_context.vet_flags |= VetFlag_Unused;    break;
-						case BuildFlag_VetShadowing:  build_context.vet_flags |= VetFlag_Shadowing; break;
-						case BuildFlag_VetUsingStmt:  build_context.vet_flags |= VetFlag_UsingStmt; break;
+						case BuildFlag_VetUnused:     build_context.vet_flags |= VetFlag_Unused;     break;
+						case BuildFlag_VetShadowing:  build_context.vet_flags |= VetFlag_Shadowing;  break;
+						case BuildFlag_VetUsingStmt:  build_context.vet_flags |= VetFlag_UsingStmt;  break;
 						case BuildFlag_VetUsingParam: build_context.vet_flags |= VetFlag_UsingParam; break;
+						case BuildFlag_VetStyle:      build_context.vet_flags |= VetFlag_Style;      break;
+						case BuildFlag_VetSemicolon:  build_context.vet_flags |= VetFlag_Semicolon;  break;
 
 						case BuildFlag_VetExtra:
 							build_context.vet_flags = VetFlag_All | VetFlag_Extra;
@@ -1476,20 +1482,9 @@ gb_internal bool parse_build_flags(Array<String> args) {
 						case BuildFlag_ForeignErrorProcedures:
 							build_context.ODIN_FOREIGN_ERROR_PROCEDURES = true;
 							break;
-						case BuildFlag_StrictStyle: {
-							if (build_context.strict_style_init_only) {
-								gb_printf_err("-strict-style and -strict-style-init-only cannot be used together\n");
-							}
+						case BuildFlag_StrictStyle:
 							build_context.strict_style = true;
 							break;
-						}
-						case BuildFlag_StrictStyleInitOnly: {
-							if (build_context.strict_style) {
-								gb_printf_err("-strict-style and -strict-style-init-only cannot be used together\n");
-							}
-							build_context.strict_style_init_only = true;
-							break;
-						}
 						case BuildFlag_Short:
 							build_context.cmd_doc_flags |= CmdDocFlag_Short;
 							break;
@@ -1592,7 +1587,7 @@ gb_internal bool parse_build_flags(Array<String> args) {
 								if (path_is_directory(path)) {
 									gb_printf_err("Invalid -pdb-name path. %.*s, is a directory.\n", LIT(path));
 									bad_flags = true;
-									break;									
+									break;
 								}
 								// #if defined(GB_SYSTEM_WINDOWS)
 								// 	String ext = path_extension(path);
@@ -2025,6 +2020,10 @@ gb_internal void print_show_help(String const arg0, String const &command) {
 		print_usage_line(2, "Shows an advanced overview of the timings of different stages within the compiler in milliseconds");
 		print_usage_line(0, "");
 
+		print_usage_line(1, "-show-system-calls");
+		print_usage_line(2, "Prints the whole command and arguments for calls to external tools like linker and assembler");
+		print_usage_line(0, "");
+
 		print_usage_line(1, "-export-timings:<format>");
 		print_usage_line(2, "Export timings to one of a few formats. Requires `-show-timings` or `-show-more-timings`");
 		print_usage_line(2, "Available options:");
@@ -2134,16 +2133,9 @@ gb_internal void print_show_help(String const arg0, String const &command) {
 	}
 
 	if (check) {
-		#if defined(GB_SYSTEM_WINDOWS)
 		print_usage_line(1, "-no-threaded-checker");
 		print_usage_line(2, "Disabled multithreading in the semantic checker stage");
 		print_usage_line(0, "");
-		#else
-		print_usage_line(1, "-threaded-checker");
-		print_usage_line(1, "[EXPERIMENTAL]");
-		print_usage_line(2, "Multithread the semantic checker stage");
-		print_usage_line(0, "");
-		#endif
 	}
 
 	if (check) {
@@ -2171,6 +2163,16 @@ gb_internal void print_show_help(String const arg0, String const &command) {
 		print_usage_line(1, "-vet-using-param");
 		print_usage_line(2, "Checks for the use of 'using' on procedure parameters");
 		print_usage_line(2, "'using' is considered bad practice outside of immediate refactoring");
+		print_usage_line(0, "");
+
+		print_usage_line(1, "-vet-style");
+		print_usage_line(2, "Errs on missing trailing commas followed by a newline");
+		print_usage_line(2, "Errs on deprecated syntax");
+		print_usage_line(2, "Does not err on unneeded tokens (unlike -strict-style)");
+		print_usage_line(0, "");
+
+		print_usage_line(1, "-vet-semicolon");
+		print_usage_line(2, "Errs on unneeded semicolons");
 		print_usage_line(0, "");
 
 		print_usage_line(1, "-vet-extra");
@@ -2249,10 +2251,8 @@ gb_internal void print_show_help(String const arg0, String const &command) {
 
 		print_usage_line(1, "-strict-style");
 		print_usage_line(2, "Errs on unneeded tokens, such as unneeded semicolons");
-		print_usage_line(0, "");
-
-		print_usage_line(1, "-strict-style-init-only");
-		print_usage_line(2, "Errs on unneeded tokens, such as unneeded semicolons, only on the initial project");
+		print_usage_line(2, "Errs on missing trailing commas followed by a newline");
+		print_usage_line(2, "Errs on deprecated syntax");
 		print_usage_line(0, "");
 
 		print_usage_line(1, "-ignore-warnings");
@@ -2857,7 +2857,7 @@ int main(int arg_count, char const **arg_ptr) {
 		for_array(i, build_context.build_paths) {
 			String build_path = path_to_string(heap_allocator(), build_context.build_paths[i]);
 			debugf("build_paths[%ld]: %.*s\n", i, LIT(build_path));
-		}		
+		}
 	}
 
 	init_global_thread_pool();

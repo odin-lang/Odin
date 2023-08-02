@@ -7,13 +7,15 @@ gb_internal Type *check_init_variable(CheckerContext *ctx, Entity *e, Operand *o
 		e->type == t_invalid) {
 
 		if (operand->mode == Addressing_Builtin) {
+			ERROR_BLOCK();
 			gbString expr_str = expr_to_string(operand->expr);
 
-			// TODO(bill): is this a good enough error message?
 			error(operand->expr,
-				  "Cannot assign built-in procedure '%s' in %.*s",
-				  expr_str,
-				  LIT(context_name));
+			      "Cannot assign built-in procedure '%s' in %.*s",
+			      expr_str,
+			      LIT(context_name));
+
+			error_line("\tBuilt-in procedures are implemented by the compiler and might not be actually instantiated procedure\n");
 
 			operand->mode = Addressing_Invalid;
 
@@ -159,9 +161,8 @@ gb_internal void check_init_constant(CheckerContext *ctx, Entity *e, Operand *op
 	}
 
 	if (operand->mode != Addressing_Constant) {
-		// TODO(bill): better error
 		gbString str = expr_to_string(operand->expr);
-		error(operand->expr, "'%s' is not a constant", str);
+		error(operand->expr, "'%s' is not a compile-time known constant", str);
 		gb_string_free(str);
 		if (e->type == nullptr) {
 			e->type = t_invalid;
@@ -354,31 +355,7 @@ gb_internal void check_type_decl(CheckerContext *ctx, Entity *e, Ast *init_expr,
 
 	// using decl
 	if (decl->is_using) {
-		warning(init_expr, "'using' an enum declaration is not allowed, prefer using implicit selector expressions e.g. '.A'");
-		#if 1
-		// NOTE(bill): Must be an enum declaration
-		if (te->kind == Ast_EnumType) {
-			Scope *parent = e->scope;
-			if (parent->flags&ScopeFlag_File) {
-				// NOTE(bill): Use package scope
-				parent = parent->parent;
-			}
-
-			Type *t = base_type(e->type);
-			if (t->kind == Type_Enum) {
-				for (Entity *f : t->Enum.fields) {
-					if (f->kind != Entity_Constant) {
-						continue;
-					}
-					String name = f->token.string;
-					if (is_blank_ident(name)) {
-						continue;
-					}
-					add_entity(ctx, parent, nullptr, f);
-				}
-			}
-		}
-		#endif
+		error(init_expr, "'using' an enum declaration is not allowed, prefer using implicit selector expressions e.g. '.A'");
 	}
 }
 

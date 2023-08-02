@@ -696,8 +696,8 @@ gb_internal void tokenizer_get_token(Tokenizer *t, Token *token, int repeat=0) {
 			if (entry->kind != Token_Invalid && entry->hash == hash) {
 				if (str_eq(entry->text, token->string)) {
 					token->kind = entry->kind;
-					if (token->kind == Token_not_in && entry->text == "notin") {
-						syntax_warning(*token, "'notin' is deprecated in favour of 'not_in'");
+					if (token->kind == Token_not_in && entry->text.len == 5) {
+						syntax_error(*token, "Did you mean 'not_in'?");
 					}
 				}
 			}
