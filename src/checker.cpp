@@ -967,7 +967,6 @@ gb_internal void init_universal(void) {
 	add_global_bool_constant("true",  true);
 	add_global_bool_constant("false", false);
 
-	// TODO(bill): Set through flags in the compiler
 	add_global_string_constant("ODIN_VENDOR",  bc->ODIN_VENDOR);
 	add_global_string_constant("ODIN_VERSION", bc->ODIN_VERSION);
 	add_global_string_constant("ODIN_ROOT",    bc->ODIN_ROOT);
@@ -1477,7 +1476,6 @@ gb_internal void add_type_and_value(CheckerContext *ctx, Ast *expr, AddressingMo
 	if (ctx->decl) {
 		mutex = &ctx->decl->type_and_value_mutex;
 	} else if (ctx->pkg) {
-		// TODO(bill): is a per package mutex is a good idea here?
 		mutex = &ctx->pkg->type_and_value_mutex;
 	}
 
@@ -2580,9 +2578,6 @@ gb_internal Array<EntityGraphNode *> generate_entity_dependency_graph(CheckerInf
 		}
 	}
 
-	// TODO(bill): This could be multithreaded to improve performance
-	// This means that the entity graph node set will have to be thread safe
-
 	TIME_SECTION("generate_entity_dependency_graph: Calculate edges for graph M - Part 2");
 	auto G = array_make<EntityGraphNode *>(allocator, 0, M.count);
 
@@ -3085,7 +3080,7 @@ gb_internal DECL_ATTRIBUTE_PROC(proc_decl_attribute) {
 			check_expr(c, &o, value);
 			Entity *e = entity_of_node(o.expr);
 			if (e != nullptr && e->kind == Entity_Procedure) {
-				warning(elem, "'%.*s' is deprecated, please use one of the following instead: 'deferred_none', 'deferred_in', 'deferred_out'", LIT(name));
+				error(elem, "'%.*s' is not allowed any more, please use one of the following instead: 'deferred_none', 'deferred_in', 'deferred_out'", LIT(name));
 				if (ac->deferred_procedure.entity != nullptr) {
 					error(elem, "Previous usage of a 'deferred_*' attribute");
 				}
@@ -4584,7 +4579,7 @@ gb_internal DECL_ATTRIBUTE_PROC(foreign_import_decl_attribute) {
 		if (value != nullptr) {
 			error(elem, "Expected no parameter for '%.*s'", LIT(name));
 		} else if (name == "force") {
-			warning(elem, "'force' is deprecated and is identical to 'require'");
+			error(elem, "'force' was replaced with 'require'");
 		}
 		ac->require_declaration = true;
 		return true;
@@ -6104,7 +6099,7 @@ gb_internal void check_parsed_files(Checker *c) {
 		while (mpsc_dequeue(&c->info.intrinsics_entry_point_usage, &node)) {
 			if (c->info.entry_point == nullptr && node != nullptr) {
 				if (node->file()->pkg->kind != Package_Runtime) {
-					warning(node, "usage of intrinsics.__entry_point will be a no-op");
+					error(node, "usage of intrinsics.__entry_point will be a no-op");
 				}
 			}
 		}

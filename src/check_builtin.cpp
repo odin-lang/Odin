@@ -1406,7 +1406,7 @@ gb_internal bool check_builtin_procedure_directive(CheckerContext *c, Operand *o
 		}
 		return false;
 	} else if (name == "load_or") {
-		warning(call, "'#load_or' is deprecated in favour of '#load(path) or_else default'");
+		error(call, "'#load_or' has now been removed in favour of '#load(path) or_else default'");
 
 		if (ce->args.count != 2) {
 			if (ce->args.count == 0) {

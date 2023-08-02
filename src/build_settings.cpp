@@ -222,6 +222,8 @@ enum VetFlags : u64 {
 	VetFlag_Shadowing  = 1u<<1, // 2
 	VetFlag_UsingStmt  = 1u<<2, // 4
 	VetFlag_UsingParam = 1u<<3, // 8
+	VetFlag_Style      = 1u<<4, // 16
+	VetFlag_Semicolon  = 1u<<5, // 32
 
 	VetFlag_Extra     = 1u<<16,
 
@@ -239,6 +241,10 @@ u64 get_vet_flag_from_name(String const &name) {
 		return VetFlag_UsingStmt;
 	} else if (name == "using-param") {
 		return VetFlag_UsingParam;
+	} else if (name == "style") {
+		return VetFlag_Style;
+	} else if (name == "semicolon") {
+		return VetFlag_Semicolon;
 	} else if (name == "extra") {
 		return VetFlag_Extra;
 	}
@@ -319,7 +325,6 @@ struct BuildContext {
 	bool   disallow_do;
 
 	bool   strict_style;
-	bool   strict_style_init_only;
 
 	bool   ignore_warnings;
 	bool   warnings_as_errors;
