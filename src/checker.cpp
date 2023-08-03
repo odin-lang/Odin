@@ -521,6 +521,28 @@ GB_COMPARE_PROC(entity_variable_pos_cmp) {
 }
 
 
+
+gb_internal u64 check_vet_flags(CheckerContext *c) {
+	AstFile *file = c->file;
+	if (file == nullptr &&
+	    c->curr_proc_decl &&
+	    c->curr_proc_decl->proc_lit) {
+		file = c->curr_proc_decl->proc_lit->file();
+	}
+	if (file && file->vet_flags_set) {
+		return file->vet_flags;
+	}
+	return build_context.vet_flags;
+}
+
+gb_internal u64 check_vet_flags(Ast *node) {
+	AstFile *file = node->file();
+	if (file && file->vet_flags_set) {
+		return file->vet_flags;
+	}
+	return build_context.vet_flags;
+}
+
 enum VettedEntityKind {
 	VettedEntity_Invalid,
 
@@ -655,9 +677,9 @@ gb_internal bool check_vet_unused(Checker *c, Entity *e, VettedEntity *ve) {
 	return false;
 }
 
-gb_internal void check_scope_usage(Checker *c, Scope *scope) {
-	bool vet_unused = true;
-	bool vet_shadowing = true;
+gb_internal void check_scope_usage(Checker *c, Scope *scope, u64 vet_flags) {
+	bool vet_unused = (vet_flags & VetFlag_Unused) != 0;
+	bool vet_shadowing = (vet_flags & (VetFlag_Shadowing|VetFlag_Using)) != 0;
 
 	Array<VettedEntity> vetted_entities = {};
 	array_init(&vetted_entities, heap_allocator());
@@ -691,15 +713,17 @@ gb_internal void check_scope_usage(Checker *c, Scope *scope) {
 
 		if (ve.kind == VettedEntity_Shadowed_And_Unused) {
 			error(e->token, "'%.*s' declared but not used, possibly shadows declaration at line %d", LIT(name), other->token.pos.line);
-		} else if (build_context.vet) {
+		} else if (vet_flags) {
 			switch (ve.kind) {
 			case VettedEntity_Unused:
-				error(e->token, "'%.*s' declared but not used", LIT(name));
+				if (vet_flags & VetFlag_Unused) {
+					error(e->token, "'%.*s' declared but not used", LIT(name));
+				}
 				break;
 			case VettedEntity_Shadowed:
-				if (e->flags&EntityFlag_Using) {
+				if ((vet_flags & (VetFlag_Shadowing|VetFlag_Using)) != 0 && e->flags&EntityFlag_Using) {
 					error(e->token, "Declaration of '%.*s' from 'using' shadows declaration at line %d", LIT(name), other->token.pos.line);
-				} else {
+				} else if ((vet_flags & (VetFlag_Shadowing)) != 0) {
 					error(e->token, "Declaration of '%.*s' shadows declaration at line %d", LIT(name), other->token.pos.line);
 				}
 				break;
@@ -726,7 +750,7 @@ gb_internal void check_scope_usage(Checker *c, Scope *scope) {
 		if (child->flags & (ScopeFlag_Proc|ScopeFlag_Type|ScopeFlag_File)) {
 			// Ignore these
 		} else {
-			check_scope_usage(c, child);
+			check_scope_usage(c, child, vet_flags);
 		}
 	}
 }
@@ -943,7 +967,6 @@ gb_internal void init_universal(void) {
 	add_global_bool_constant("true",  true);
 	add_global_bool_constant("false", false);
 
-	// TODO(bill): Set through flags in the compiler
 	add_global_string_constant("ODIN_VENDOR",  bc->ODIN_VENDOR);
 	add_global_string_constant("ODIN_VERSION", bc->ODIN_VERSION);
 	add_global_string_constant("ODIN_ROOT",    bc->ODIN_ROOT);
@@ -1455,7 +1478,6 @@ gb_internal void add_type_and_value(CheckerContext *ctx, Ast *expr, AddressingMo
 	if (ctx->decl) {
 		mutex = &ctx->decl->type_and_value_mutex;
 	} else if (ctx->pkg) {
-		// TODO(bill): is a per package mutex is a good idea here?
 		mutex = &ctx->pkg->type_and_value_mutex;
 	}
 
@@ -1583,29 +1605,27 @@ gb_internal void add_entity_use(CheckerContext *c, Ast *identifier, Entity *enti
 	if (entity == nullptr) {
 		return;
 	}
-	if (identifier != nullptr) {
-		if (identifier->kind != Ast_Ident) {
-			return;
-		}
-		Ast *empty_ident = nullptr;
-		entity->identifier.compare_exchange_strong(empty_ident, identifier);
-
-		identifier->Ident.entity = entity;
-
-		String dmsg = entity->deprecated_message;
-		if (dmsg.len > 0) {
-			warning(identifier, "%.*s is deprecated: %.*s", LIT(entity->token.string), LIT(dmsg));
-		}
-		String wmsg = entity->warning_message;
-		if (wmsg.len > 0) {
-			warning(identifier, "%.*s: %.*s", LIT(entity->token.string), LIT(wmsg));
-		}
-	}
-	entity->flags |= EntityFlag_Used;
 	add_declaration_dependency(c, entity);
+	entity->flags |= EntityFlag_Used;
 	if (entity_has_deferred_procedure(entity)) {
 		Entity *deferred = entity->Procedure.deferred_procedure.entity;
 		add_entity_use(c, nullptr, deferred);
+	}
+	if (identifier == nullptr || identifier->kind != Ast_Ident) {
+		return;
+	}
+	Ast *empty_ident = nullptr;
+	entity->identifier.compare_exchange_strong(empty_ident, identifier);
+
+	identifier->Ident.entity = entity;
+
+	String dmsg = entity->deprecated_message;
+	if (dmsg.len > 0) {
+		warning(identifier, "%.*s is deprecated: %.*s", LIT(entity->token.string), LIT(dmsg));
+	}
+	String wmsg = entity->warning_message;
+	if (wmsg.len > 0) {
+		warning(identifier, "%.*s: %.*s", LIT(entity->token.string), LIT(wmsg));
 	}
 }
 
@@ -2560,9 +2580,6 @@ gb_internal Array<EntityGraphNode *> generate_entity_dependency_graph(CheckerInf
 		}
 	}
 
-	// TODO(bill): This could be multithreaded to improve performance
-	// This means that the entity graph node set will have to be thread safe
-
 	TIME_SECTION("generate_entity_dependency_graph: Calculate edges for graph M - Part 2");
 	auto G = array_make<EntityGraphNode *>(allocator, 0, M.count);
 
@@ -2982,6 +2999,12 @@ gb_internal DECL_ATTRIBUTE_PROC(proc_group_attribute) {
 			}
 		}
 		return true;
+	} else if (name == "require_results") {
+		if (value != nullptr) {
+			error(elem, "Expected no value for '%.*s'", LIT(name));
+		}
+		ac->require_results = true;
+		return true;
 	}
 	return false;
 }
@@ -3059,7 +3082,7 @@ gb_internal DECL_ATTRIBUTE_PROC(proc_decl_attribute) {
 			check_expr(c, &o, value);
 			Entity *e = entity_of_node(o.expr);
 			if (e != nullptr && e->kind == Entity_Procedure) {
-				warning(elem, "'%.*s' is deprecated, please use one of the following instead: 'deferred_none', 'deferred_in', 'deferred_out'", LIT(name));
+				error(elem, "'%.*s' is not allowed any more, please use one of the following instead: 'deferred_none', 'deferred_in', 'deferred_out'", LIT(name));
 				if (ac->deferred_procedure.entity != nullptr) {
 					error(elem, "Previous usage of a 'deferred_*' attribute");
 				}
@@ -4558,7 +4581,7 @@ gb_internal DECL_ATTRIBUTE_PROC(foreign_import_decl_attribute) {
 		if (value != nullptr) {
 			error(elem, "Expected no parameter for '%.*s'", LIT(name));
 		} else if (name == "force") {
-			warning(elem, "'force' is deprecated and is identical to 'require'");
+			error(elem, "'force' was replaced with 'require'");
 		}
 		ac->require_declaration = true;
 		return true;
@@ -5956,7 +5979,11 @@ gb_internal void check_parsed_files(Checker *c) {
 	TIME_SECTION("check scope usage");
 	for (auto const &entry : c->info.files) {
 		AstFile *f = entry.value;
-		check_scope_usage(c, f->scope);
+		u64 vet_flags = build_context.vet_flags;
+		if (f->vet_flags_set) {
+			vet_flags = f->vet_flags;
+		}
+		check_scope_usage(c, f->scope, vet_flags);
 	}
 
 	TIME_SECTION("add basic type information");
@@ -6074,7 +6101,7 @@ gb_internal void check_parsed_files(Checker *c) {
 		while (mpsc_dequeue(&c->info.intrinsics_entry_point_usage, &node)) {
 			if (c->info.entry_point == nullptr && node != nullptr) {
 				if (node->file()->pkg->kind != Package_Runtime) {
-					warning(node, "usage of intrinsics.__entry_point will be a no-op");
+					error(node, "usage of intrinsics.__entry_point will be a no-op");
 				}
 			}
 		}

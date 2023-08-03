@@ -43,11 +43,7 @@ main :: proc() {
 
 @test
 test_classify_f16 :: proc(t: ^testing.T) {
-
-	using math
-	using Float_Class
-
-	r: Float_Class
+	r: math.Float_Class
 
 	Datum :: struct {
 		i: int,
@@ -55,38 +51,34 @@ test_classify_f16 :: proc(t: ^testing.T) {
 		e: math.Float_Class,
 	}
 	@static data := []Datum{
-		{ 0, 1.2, Normal },
-		{ 1, 0h0001, Subnormal },
-		{ 2, 0.0, Zero },
-		{ 3, -0.0, Neg_Zero },
-		{ 4, SNAN_F16, NaN },
-		{ 5, QNAN_F16, NaN },
-		{ 6, INF_F16, Inf },
-		{ 7, NEG_INF_F16, Neg_Inf },
+		{ 0, 1.2, .Normal },
+		{ 1, 0h0001, .Subnormal },
+		{ 2, 0.0, .Zero },
+		{ 3, -0.0, .Neg_Zero },
+		{ 4, math.SNAN_F16, .NaN },
+		{ 5, math.QNAN_F16, .NaN },
+		{ 6, math.INF_F16, .Inf },
+		{ 7, math.NEG_INF_F16, .Neg_Inf },
 	}
 
 	for d, i in data {
 		assert(i == d.i)
-		r = classify_f16(d.v)
+		r = math.classify_f16(d.v)
 		tc.expect(t, r == d.e, fmt.tprintf("i:%d %s(%h) -> %v != %v", i, #procedure, d.v, r, d.e))
 	}
 
 	/* Check all subnormals (exponent 0, 10-bit significand non-zero) */
-	for i :u16 = 1; i < 0x400; i += 1 {
-		v :f16 = transmute(f16)i
-		r = classify_f16(v)
-		e :Float_Class: Subnormal
+	for i in u16(1)..<0x400 {
+		v := transmute(f16)i
+		r = math.classify_f16(v)
+		e :: math.Float_Class.Subnormal
 		tc.expect(t, r == e, fmt.tprintf("i:%d %s(%h) -> %v != %v", i, #procedure, v, r, e))
 	}
 }
 
 @test
 test_classify_f32 :: proc(t: ^testing.T) {
-
-	using math
-	using Float_Class
-
-	r: Float_Class
+	r: math.Float_Class
 
 	Datum :: struct {
 		i: int,
@@ -94,30 +86,26 @@ test_classify_f32 :: proc(t: ^testing.T) {
 		e: math.Float_Class,
 	}
 	@static data := []Datum{
-		{ 0, 1.2, Normal },
-		{ 1, 0h0000_0001, Subnormal },
-		{ 2, 0.0, Zero },
-		{ 3, -0.0, Neg_Zero },
-		{ 4, SNAN_F32, NaN },
-		{ 5, QNAN_F32, NaN },
-		{ 6, INF_F32, Inf },
-		{ 7, NEG_INF_F32, Neg_Inf },
+		{ 0, 1.2, .Normal },
+		{ 1, 0h0000_0001, .Subnormal },
+		{ 2, 0.0, .Zero },
+		{ 3, -0.0, .Neg_Zero },
+		{ 4, math.SNAN_F32, .NaN },
+		{ 5, math.QNAN_F32, .NaN },
+		{ 6, math.INF_F32, .Inf },
+		{ 7, math.NEG_INF_F32, .Neg_Inf },
 	}
 
 	for d, i in data {
 		assert(i == d.i)
-		r = classify_f32(d.v)
+		r = math.classify_f32(d.v)
 		tc.expect(t, r == d.e, fmt.tprintf("i:%d %s(%h) -> %v != %v", i, #procedure, d.v, r, d.e))
 	}
 }
 
 @test
 test_classify_f64 :: proc(t: ^testing.T) {
-
-	using math
-	using Float_Class
-
-	r: Float_Class
+	r: math.Float_Class
 
 	Datum :: struct {
 		i: int,
@@ -125,28 +113,25 @@ test_classify_f64 :: proc(t: ^testing.T) {
 		e: math.Float_Class,
 	}
 	@static data := []Datum{
-		{ 0, 1.2, Normal },
-		{ 1, 0h0000_0000_0000_0001, Subnormal },
-		{ 2, 0.0, Zero },
-		{ 3, -0.0, Neg_Zero },
-		{ 4, SNAN_F64, NaN },
-		{ 5, QNAN_F64, NaN },
-		{ 6, INF_F64, Inf },
-		{ 7, NEG_INF_F64, Neg_Inf },
+		{ 0, 1.2, .Normal },
+		{ 1, 0h0000_0000_0000_0001, .Subnormal },
+		{ 2, 0.0, .Zero },
+		{ 3, -0.0, .Neg_Zero },
+		{ 4, math.SNAN_F64, .NaN },
+		{ 5, math.QNAN_F64, .NaN },
+		{ 6, math.INF_F64, .Inf },
+		{ 7, math.NEG_INF_F64, .Neg_Inf },
 	}
 
 	for d, i in data {
 		assert(i == d.i)
-		r = classify_f64(d.v)
+		r = math.classify_f64(d.v)
 		tc.expect(t, r == d.e, fmt.tprintf("i:%d %s(%h) -> %v != %v", i, #procedure, d.v, r, d.e))
 	}
 }
 
 @test
 test_trunc_f16 :: proc(t: ^testing.T) {
-
-	using math
-
 	r, v: f16
 
 	Datum :: struct {
@@ -158,16 +143,16 @@ test_trunc_f16 :: proc(t: ^testing.T) {
 		{ 0, 10.5, 10 }, // Issue #1574 fract in linalg/glm is broken
 		{ 1, -10.5, -10 },
 
-		{ 2, F16_MAX, F16_MAX },
-		{ 3, -F16_MAX, -F16_MAX },
-		{ 4, F16_MIN, 0.0 },
-		{ 5, -F16_MIN, -0.0 },
+		{ 2, math.F16_MAX, math.F16_MAX },
+		{ 3, -math.F16_MAX, -math.F16_MAX },
+		{ 4, math.F16_MIN, 0.0 },
+		{ 5, -math.F16_MIN, -0.0 },
 		{ 6, 0.0, 0.0 },
 		{ 7, -0.0, -0.0 },
 		{ 8, 1, 1 },
 		{ 9, -1, -1 },
-		{ 10, INF_F16, INF_F16 },
-		{ 11, NEG_INF_F16, NEG_INF_F16 },
+		{ 10, math.INF_F16, math.INF_F16 },
+		{ 11, math.NEG_INF_F16, math.NEG_INF_F16 },
 
 		/* From https://en.wikipedia.org/wiki/Half-precision_floating-point_format */
 		{ 12, 0h3C01, 1 }, // 0x1.004p+0 (smallest > 1)
@@ -185,24 +170,21 @@ test_trunc_f16 :: proc(t: ^testing.T) {
 
 	for d, i in data {
 		assert(i == d.i)
-		r = trunc_f16(d.v)
+		r = math.trunc_f16(d.v)
 		tc.expect(t, r == d.e, fmt.tprintf("i:%d %s(%h) -> %h != %h", i, #procedure, d.v, r, d.e))
 	}
 
-	v = SNAN_F16
-	r = trunc_f16(v)
-	tc.expect(t, is_nan_f16(r), fmt.tprintf("%s(%f) -> %f != NaN", #procedure, v, r))
+	v = math.SNAN_F16
+	r = math.trunc_f16(v)
+	tc.expect(t, math.is_nan_f16(r), fmt.tprintf("%s(%f) -> %f != NaN", #procedure, v, r))
 
-	v = QNAN_F16
-	r = trunc_f16(v)
-	tc.expect(t, is_nan_f16(r), fmt.tprintf("%s(%f) -> %f != NaN", #procedure, v, r))
+	v = math.QNAN_F16
+	r = math.trunc_f16(v)
+	tc.expect(t, math.is_nan_f16(r), fmt.tprintf("%s(%f) -> %f != NaN", #procedure, v, r))
 }
 
 @test
 test_trunc_f32 :: proc(t: ^testing.T) {
-
-	using math
-
 	r, v: f32
 
 	Datum :: struct {
@@ -214,16 +196,16 @@ test_trunc_f32 :: proc(t: ^testing.T) {
 		{ 0, 10.5, 10 }, // Issue #1574 fract in linalg/glm is broken
 		{ 1, -10.5, -10 },
 
-		{ 2, F32_MAX, F32_MAX },
-		{ 3, -F32_MAX, -F32_MAX },
-		{ 4, F32_MIN, 0.0 },
-		{ 5, -F32_MIN, -0.0 },
+		{ 2, math.F32_MAX, math.F32_MAX },
+		{ 3, -math.F32_MAX, -math.F32_MAX },
+		{ 4, math.F32_MIN, 0.0 },
+		{ 5, -math.F32_MIN, -0.0 },
 		{ 6, 0.0, 0.0 },
 		{ 7, -0.0, -0.0 },
 		{ 8, 1, 1 },
 		{ 9, -1, -1 },
-		{ 10, INF_F32, INF_F32 },
-		{ 11, NEG_INF_F32, NEG_INF_F32 },
+		{ 10, math.INF_F32, math.INF_F32 },
+		{ 11, math.NEG_INF_F32, math.NEG_INF_F32 },
 
 		/* From https://en.wikipedia.org/wiki/Single-precision_floating-point_format */
 		{ 12, 0h3F80_0001, 1 }, // 0x1.000002p+0 (smallest > 1)
@@ -250,24 +232,21 @@ test_trunc_f32 :: proc(t: ^testing.T) {
 
 	for d, i in data {
 		assert(i == d.i)
-		r = trunc_f32(d.v)
+		r = math.trunc_f32(d.v)
 		tc.expect(t, r == d.e, fmt.tprintf("i:%d %s(%h) -> %h != %h", i, #procedure, d.v, r, d.e))
 	}
 
-	v = SNAN_F32
-	r = trunc_f32(v)
-	tc.expect(t, is_nan_f32(r), fmt.tprintf("%s(%f) -> %f != NaN", #procedure, v, r))
+	v = math.SNAN_F32
+	r = math.trunc_f32(v)
+	tc.expect(t, math.is_nan_f32(r), fmt.tprintf("%s(%f) -> %f != NaN", #procedure, v, r))
 
-	v = QNAN_F32
-	r = trunc_f32(v)
-	tc.expect(t, is_nan_f32(r), fmt.tprintf("%s(%f) -> %f != NaN", #procedure, v, r))
+	v = math.QNAN_F32
+	r = math.trunc_f32(v)
+	tc.expect(t, math.is_nan_f32(r), fmt.tprintf("%s(%f) -> %f != NaN", #procedure, v, r))
 }
 
 @test
 test_trunc_f64 :: proc(t: ^testing.T) {
-
-	using math
-
 	r, v: f64
 
 	Datum :: struct {
@@ -279,16 +258,16 @@ test_trunc_f64 :: proc(t: ^testing.T) {
 		{ 0, 10.5, 10 }, // Issue #1574 fract in linalg/glm is broken
 		{ 1, -10.5, -10 },
 
-		{ 2, F64_MAX, F64_MAX },
-		{ 3, -F64_MAX, -F64_MAX },
-		{ 4, F64_MIN, 0.0 },
-		{ 5, -F64_MIN, -0.0 },
+		{ 2, math.F64_MAX, math.F64_MAX },
+		{ 3, -math.F64_MAX, -math.F64_MAX },
+		{ 4, math.F64_MIN, 0.0 },
+		{ 5, -math.F64_MIN, -0.0 },
 		{ 6, 0.0, 0.0 },
 		{ 7, -0.0, -0.0 },
 		{ 8, 1, 1 },
 		{ 9, -1, -1 },
-		{ 10, INF_F64, INF_F64 },
-		{ 11, NEG_INF_F64, NEG_INF_F64 },
+		{ 10, math.INF_F64, math.INF_F64 },
+		{ 11, math.NEG_INF_F64, math.NEG_INF_F64 },
 
 		/* From https://en.wikipedia.org/wiki/Double-precision_floating-point_format */
 		{ 12, 0h3FF0_0000_0000_0001, 1 }, // 0x1.0000000000001p+0 (smallest > 1)
@@ -315,17 +294,17 @@ test_trunc_f64 :: proc(t: ^testing.T) {
 
 	for d, i in data {
 		assert(i == d.i)
-		r = trunc_f64(d.v)
+		r = math.trunc_f64(d.v)
 		tc.expect(t, r == d.e, fmt.tprintf("i:%d %s(%h) -> %h != %h", i, #procedure, d.v, r, d.e))
 	}
 
-	v = SNAN_F64
-	r = trunc_f64(v)
-	tc.expect(t, is_nan_f64(r), fmt.tprintf("%s(%f) -> %f != NaN", #procedure, v, r))
+	v = math.SNAN_F64
+	r = math.trunc_f64(v)
+	tc.expect(t, math.is_nan_f64(r), fmt.tprintf("%s(%f) -> %f != NaN", #procedure, v, r))
 
-	v = QNAN_F64
-	r = trunc_f64(v)
-	tc.expect(t, is_nan_f64(r), fmt.tprintf("%s(%f) -> %f != NaN", #procedure, v, r))
+	v = math.QNAN_F64
+	r = math.trunc_f64(v)
+	tc.expect(t, math.is_nan_f64(r), fmt.tprintf("%s(%f) -> %f != NaN", #procedure, v, r))
 }
 
 

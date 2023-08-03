@@ -1688,7 +1688,6 @@ gb_internal void lb_build_type_switch_stmt(lbProcedure *p, AstTypeSwitchStmt *ss
 			lb_add_entity(p->module, case_entity, ptr);
 			lb_add_debug_local_variable(p, ptr.value, case_entity->type, case_entity->token);
 		} else {
-			// TODO(bill): is the correct expected behaviour?
 			lb_store_type_case_implicit(p, clause, parent_value);
 		}
 
@@ -2014,12 +2013,10 @@ gb_internal void lb_build_if_stmt(lbProcedure *p, Ast *node) {
 	defer (lb_close_scope(p, lbDeferExit_Default, nullptr));
 
 	if (is->init != nullptr) {
-		// TODO(bill): Should this have a separate block to begin with?
-	#if 1
 		lbBlock *init = lb_create_block(p, "if.init");
 		lb_emit_jump(p, init);
 		lb_start_block(p, init);
-	#endif
+
 		lb_build_stmt(p, is->init);
 	}
 	lbBlock *then = lb_create_block(p, "if.then");

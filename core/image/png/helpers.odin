@@ -80,11 +80,10 @@ time :: proc(c: image.PNG_Chunk) -> (res: tIME, ok: bool) {
 }
 
 core_time :: proc(c: image.PNG_Chunk) -> (t: coretime.Time, ok: bool) {
-	if png_time, png_ok := time(c); png_ok {
-		using png_time
+	if t, png_ok := time(c); png_ok {
 		return coretime.datetime_to_time(
-			int(year), int(month), int(day),
-			int(hour), int(minute), int(second),
+			int(t.year), int(t.month),  int(t.day),
+			int(t.hour), int(t.minute), int(t.second),
 		)
 	} else {
 		return {}, false

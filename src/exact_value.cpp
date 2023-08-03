@@ -26,8 +26,8 @@ enum ExactValueKind {
 	ExactValue_Complex    = 5,
 	ExactValue_Quaternion = 6,
 	ExactValue_Pointer    = 7,
-	ExactValue_Compound   = 8,  // TODO(bill): Is this good enough?
-	ExactValue_Procedure  = 9, // TODO(bill): Is this good enough?
+	ExactValue_Compound   = 8,
+	ExactValue_Procedure  = 9,
 	ExactValue_Typeid     = 10,
 
 	ExactValue_Count,
@@ -101,7 +101,6 @@ gb_internal ExactValue exact_value_bool(bool b) {
 }
 
 gb_internal ExactValue exact_value_string(String string) {
-	// TODO(bill): Allow for numbers with underscores in them
 	ExactValue result = {ExactValue_String};
 	result.value_string = string;
 	return result;
@@ -702,7 +701,6 @@ gb_internal void match_exact_values(ExactValue *x, ExactValue *y) {
 	compiler_error("match_exact_values: How'd you get here? Invalid ExactValueKind %d", x->kind);
 }
 
-// TODO(bill): Allow for pointer arithmetic? Or are pointer slices good enough?
 gb_internal ExactValue exact_binary_operator_value(TokenKind op, ExactValue x, ExactValue y) {
 	match_exact_values(&x, &y);
 
@@ -943,7 +941,6 @@ gb_internal bool compare_exact_values(TokenKind op, ExactValue x, ExactValue y) 
 	case ExactValue_String: {
 		String a = x.value_string;
 		String b = y.value_string;
-		// TODO(bill): gb_memcompare is used because the strings are UTF-8
 		switch (op) {
 		case Token_CmpEq: return a == b;
 		case Token_NotEq: return a != b;

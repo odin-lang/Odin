@@ -21,16 +21,13 @@ main :: proc() {
 
 @test
 test_read :: proc(t: ^testing.T) {
-
-	using hxa
-
 	filename := tc.get_data_path(t, TEAPOT_PATH)
 	defer delete(filename)
 
-	file, err := read_from_file(filename)
+	file, err := hxa.read_from_file(filename)
 	e :: hxa.Read_Error.None
 	tc.expect(t, err == e, fmt.tprintf("%v: read_from_file(%v) -> %v != %v", #procedure, filename, err, e))
-	defer file_destroy(file)
+	defer hxa.file_destroy(file)
 
 	/* Header */
 	tc.expect(t, file.magic_number == 0x417848, fmt.tprintf("%v: file.magic_number %v != %v",
@@ -134,38 +131,35 @@ test_read :: proc(t: ^testing.T) {
 
 @test
 test_write :: proc(t: ^testing.T) {
-
-	using hxa
-
-	n1 :Node
+	n1: hxa.Node
 
 	n1_m1_value := []f64le{0.4, -1.23, 2341.6, -333.333}
-	n1_m1 := Meta{"m1", n1_m1_value}
+	n1_m1 := hxa.Meta{"m1", n1_m1_value}
 
-	n1.meta_data = []Meta{n1_m1}
+	n1.meta_data = []hxa.Meta{n1_m1}
 
-	n1_l1 := Layer{"l1", 2, []f32le{32.1, -41.3}}
-	n1_l2 := Layer{"l2", 3, []f64le{0.64, 1.64, -2.64}}
+	n1_l1 := hxa.Layer{"l1", 2, []f32le{32.1, -41.3}}
+	n1_l2 := hxa.Layer{"l2", 3, []f64le{0.64, 1.64, -2.64}}
 
-	n1_content := Node_Image{Image_Type.Image_1D, [3]u32le{1, 1, 2}, Layer_Stack{n1_l1, n1_l2}} 
+	n1_content := hxa.Node_Image{.Image_1D, [3]u32le{1, 1, 2}, hxa.Layer_Stack{n1_l1, n1_l2}}
 
 	n1.content = n1_content
 
-	w_file :File
-	w_file.nodes = []Node{n1}
+	w_file: hxa.File
+	w_file.nodes = []hxa.Node{n1}
 
-	required_size := required_write_size(w_file)
+	required_size := hxa.required_write_size(w_file)
 	buf := make([]u8, required_size)
 
-	n, write_err := write(buf, w_file)
+	n, write_err := hxa.write(buf, w_file)
 	write_e :: hxa.Write_Error.None
 	tc.expect(t, write_err == write_e, fmt.tprintf("%v: write_err %v != %v", #procedure, write_err, write_e))
 	tc.expect(t, n == required_size, fmt.tprintf("%v: n %v != %v", #procedure, n, required_size))
 
-	file, read_err := read(buf)
+	file, read_err := hxa.read(buf)
 	read_e :: hxa.Read_Error.None
 	tc.expect(t, read_err == read_e, fmt.tprintf("%v: read_err %v != %v", #procedure, read_err, read_e))
-	defer file_destroy(file)
+	defer hxa.file_destroy(file)
 
 	delete(buf)
 

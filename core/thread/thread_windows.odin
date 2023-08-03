@@ -129,8 +129,8 @@ _destroy :: proc(thread: ^Thread) {
 	free(thread, thread.creation_allocator)
 }
 
-_terminate :: proc(using thread : ^Thread, exit_code: int) {
-	win32.TerminateThread(win32_thread, u32(exit_code))
+_terminate :: proc(thread: ^Thread, exit_code: int) {
+	win32.TerminateThread(thread.win32_thread, u32(exit_code))
 }
 
 _yield :: proc() {

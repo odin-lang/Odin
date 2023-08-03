@@ -387,8 +387,6 @@ struct CheckerInfo {
 	BlockingMutex foreign_mutex; // NOT recursive
 	StringMap<Entity *> foreigns;
 
-	// NOTE(bill): These are actually MPSC queues
-	// TODO(bill): Convert them to be MPSC queues
 	MPSCQueue<Entity *> definition_queue;
 	MPSCQueue<Entity *> entity_queue;
 	MPSCQueue<Entity *> required_global_variable_queue;
@@ -448,6 +446,9 @@ struct CheckerContext {
 
 	Ast *assignment_lhs_hint;
 };
+
+gb_internal u64 check_vet_flags(CheckerContext *c);
+gb_internal u64 check_vet_flags(Ast *node);
 
 
 struct Checker {

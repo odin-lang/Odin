@@ -125,38 +125,38 @@ error :: proc(t: ^Tokenizer, offset: int, msg: string, args: ..any) {
 }
 
 @(optimization_mode="speed")
-advance_rune :: proc(using t: ^Tokenizer) {
+advance_rune :: proc(t: ^Tokenizer) {
 	#no_bounds_check {
 		/*
 			Already bounds-checked here.
 		*/
-		if read_offset < len(src) {
-			offset = read_offset
-			if ch == '\n' {
-				line_offset = offset
-				line_count += 1
+		if t.read_offset < len(t.src) {
+			t.offset = t.read_offset
+			if t.ch == '\n' {
+				t.line_offset = t.offset
+				t.line_count += 1
 			}
-			r, w := rune(src[read_offset]), 1
+			r, w := rune(t.src[t.read_offset]), 1
 			switch {
 			case r == 0:
 				error(t, t.offset, "illegal character NUL")
 			case r >= utf8.RUNE_SELF:
-				r, w = #force_inline utf8.decode_rune_in_string(src[read_offset:])
+				r, w = #force_inline utf8.decode_rune_in_string(t.src[t.read_offset:])
 				if r == utf8.RUNE_ERROR && w == 1 {
 					error(t, t.offset, "illegal UTF-8 encoding")
-				} else if r == utf8.RUNE_BOM && offset > 0 {
+				} else if r == utf8.RUNE_BOM && t.offset > 0 {
 					error(t, t.offset, "illegal byte order mark")
 				}
 			}
-			read_offset += w
-			ch = r
+			t.read_offset += w
+			t.ch = r
 		} else {
-			offset = len(src)
-			if ch == '\n' {
-				line_offset = offset
-				line_count += 1
+			t.offset = len(t.src)
+			if t.ch == '\n' {
+				t.line_offset = t.offset
+				t.line_count += 1
 			}
-			ch = -1
+			t.ch = -1
 		}
 	}
 }

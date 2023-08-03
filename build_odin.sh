@@ -8,16 +8,19 @@ set -eu
 : ${ODIN_VERSION=dev-$(date +"%Y-%m")}
 : ${GIT_SHA=}
 
-CPPFLAGS="$CPPFLAGS -DODIN_VERSION_RAW=\"$ODIN_VERSION\""
 CXXFLAGS="$CXXFLAGS -std=c++14"
 LDFLAGS="$LDFLAGS -pthread -lm -lstdc++"
 
-if [ -d ".git" ]; then
-	GIT_SHA=$(git rev-parse --short HEAD || :)
-	if [ "$GIT_SHA" ]; then
+if [ -d ".git" ] && [ $(which git) ]; then
+	versionTag=( $(git show --pretty='%cd %h' --date=format:%Y-%m --no-patch --no-notes HEAD) )
+	if [ $? -eq 0 ]; then
+		ODIN_VERSION="dev-${versionTag[0]}"
+		GIT_SHA="${versionTag[1]}"
 		CPPFLAGS="$CPPFLAGS -DGIT_SHA=\"$GIT_SHA\""
 	fi
 fi
+
+CPPFLAGS="$CPPFLAGS -DODIN_VERSION_RAW=\"$ODIN_VERSION\""
 
 DISABLED_WARNINGS="-Wno-switch -Wno-macro-redefined -Wno-unused-value"
 OS=$(uname)

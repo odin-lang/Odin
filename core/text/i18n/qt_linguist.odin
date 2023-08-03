@@ -30,10 +30,26 @@ TS_XML_Options := xml.Options{
 parse_qt_linguist_from_bytes :: proc(data: []byte, options := DEFAULT_PARSE_OPTIONS, pluralizer: proc(int) -> int = nil, allocator := context.allocator) -> (translation: ^Translation, err: Error) {
 	context.allocator = allocator
 
+	get_str :: proc(val: xml.Value) -> (str: string, err: Error) {
+		v, ok := val.(string)
+		if ok {
+			return v, .None
+		}
+		return "", .Bad_Str
+	}
+
+	get_id :: proc(val: xml.Value) -> (str: xml.Element_ID, err: Error) {
+		v, ok := val.(xml.Element_ID)
+		if ok {
+			return v, .None
+		}
+		return 0, .Bad_Id
+	}
+
 	ts, xml_err := xml.parse(data, TS_XML_Options)
 	defer xml.destroy(ts)
 
-	if xml_err != .None || ts.element_count < 1 || ts.elements[0].ident != "TS" || len(ts.elements[0].children) == 0 {
+	if xml_err != .None || ts.element_count < 1 || ts.elements[0].ident != "TS" || len(ts.elements[0].value) == 0 {
 		return nil, .TS_File_Parse_Error
 	}
 
@@ -46,10 +62,12 @@ parse_qt_linguist_from_bytes :: proc(data: []byte, options := DEFAULT_PARSE_OPTI
 
 	section: ^Section
 
-	for child_id in ts.elements[0].children {
+	for value in ts.elements[0].value {
+		child_id := get_id(value) or_return
+
 		// These should be <context>s.
-		child := ts.elements[child_id]
-		if child.ident != "context" {
+
+		if ts.elements[child_id].ident != "context" {
 			return translation, .TS_File_Expected_Context
 		}
 
@@ -61,7 +79,8 @@ parse_qt_linguist_from_bytes :: proc(data: []byte, options := DEFAULT_PARSE_OPTI
 
 		section_name, _ := strings.intern_get(&translation.intern, "")
 		if !options.merge_sections {
-			section_name, _ = strings.intern_get(&translation.intern, ts.elements[section_name_id].value)
+			value_text := get_str(ts.elements[section_name_id].value[0]) or_return
+			section_name, _ = strings.intern_get(&translation.intern, value_text)
 		}
 
 		if section_name not_in translation.k_v {
@@ -92,8 +111,14 @@ parse_qt_linguist_from_bytes :: proc(data: []byte, options := DEFAULT_PARSE_OPTI
 				return translation, .TS_File_Expected_Translation
 			}
 
-			source, _ := strings.intern_get(&translation.intern, ts.elements[source_id].value)
-			xlat,   _ := strings.intern_get(&translation.intern, ts.elements[translation_id].value)
+			source    := get_str(ts.elements[source_id].value[0]) or_return
+			source, _  = strings.intern_get(&translation.intern, source)
+
+			xlat := ""
+			if !has_plurals {
+				xlat    = get_str(ts.elements[translation_id].value[0]) or_return
+				xlat, _ = strings.intern_get(&translation.intern, xlat)
+			}
 
 			if source in section {
 				return translation, .Duplicate_Key
@@ -124,7 +149,8 @@ parse_qt_linguist_from_bytes :: proc(data: []byte, options := DEFAULT_PARSE_OPTI
 					if !numerus_found {
 						break
 					}
-					numerus, _ := strings.intern_get(&translation.intern, ts.elements[numerus_id].value)
+					numerus := get_str(ts.elements[numerus_id].value[0]) or_return
+					numerus, _ = strings.intern_get(&translation.intern, numerus)
 					section[source][num_plurals] = numerus
 
 					num_plurals += 1

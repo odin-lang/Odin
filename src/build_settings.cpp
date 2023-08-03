@@ -216,6 +216,43 @@ enum BuildPath : u8 {
 	BuildPathCOUNT,
 };
 
+enum VetFlags : u64 {
+	VetFlag_NONE       = 0,
+	VetFlag_Unused     = 1u<<0, // 1
+	VetFlag_Shadowing  = 1u<<1, // 2
+	VetFlag_UsingStmt  = 1u<<2, // 4
+	VetFlag_UsingParam = 1u<<3, // 8
+	VetFlag_Style      = 1u<<4, // 16
+	VetFlag_Semicolon  = 1u<<5, // 32
+
+	VetFlag_Extra     = 1u<<16,
+
+	VetFlag_All = VetFlag_Unused|VetFlag_Shadowing|VetFlag_UsingStmt, // excluding extra
+
+	VetFlag_Using = VetFlag_UsingStmt|VetFlag_UsingParam,
+};
+
+u64 get_vet_flag_from_name(String const &name) {
+	if (name == "unused") {
+		return VetFlag_Unused;
+	} else if (name == "shadowing") {
+		return VetFlag_Shadowing;
+	} else if (name == "using-stmt") {
+		return VetFlag_UsingStmt;
+	} else if (name == "using-param") {
+		return VetFlag_UsingParam;
+	} else if (name == "style") {
+		return VetFlag_Style;
+	} else if (name == "semicolon") {
+		return VetFlag_Semicolon;
+	} else if (name == "extra") {
+		return VetFlag_Extra;
+	}
+	return VetFlag_NONE;
+}
+
+
+
 // This stores the information for the specify architecture of this build
 struct BuildContext {
 	// Constants
@@ -255,6 +292,8 @@ struct BuildContext {
 	String resource_filepath;
 	String pdb_filepath;
 
+	u64 vet_flags;
+
 	bool   has_resource;
 	String link_flags;
 	String extra_linker_flags;
@@ -280,15 +319,12 @@ struct BuildContext {
 	bool   no_entry_point;
 	bool   no_thread_local;
 	bool   use_lld;
-	bool   vet;
-	bool   vet_extra;
 	bool   cross_compiling;
 	bool   different_os;
 	bool   keep_object_files;
 	bool   disallow_do;
 
 	bool   strict_style;
-	bool   strict_style_init_only;
 
 	bool   ignore_warnings;
 	bool   warnings_as_errors;

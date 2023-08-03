@@ -1861,8 +1861,8 @@ gb_internal LLVMTypeRef lb_type_internal(lbModule *m, Type *type) {
 			case Type_SimdVector:
 				return lb_type_internal(m, base);
 
-			// TODO(bill): Deal with this correctly. Can this be named?
 			case Type_Proc:
+				// TODO(bill): Deal with this correctly. Can this be named?
 				return lb_type_internal(m, base);
 
 			case Type_Tuple:
@@ -2835,7 +2835,6 @@ gb_internal lbValue lb_find_value_from_entity(lbModule *m, Entity *e) {
 	if (USE_SEPARATE_MODULES) {
 		lbModule *other_module = lb_module_of_entity(m->gen, e);
 
-		// TODO(bill): correct this logic
 		bool is_external = other_module != m;
 		if (!is_external) {
 			if (e->code_gen_module != nullptr) {
