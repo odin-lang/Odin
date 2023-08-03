@@ -72,7 +72,7 @@ gb_global Timings global_timings = {0};
 
 #include "linker.cpp"
 
-#if defined(GB_SYSTEM_WINDOWS)
+#if defined(GB_SYSTEM_WINDOWS) && defined(ODIN_TILDE_BACKEND)
 #define ALLOW_TILDE 1
 #else
 #define ALLOW_TILDE 0

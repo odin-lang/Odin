@@ -78,8 +78,14 @@ set compiler_includes= ^
 set libs= ^
 	kernel32.lib ^
 	Synchronization.lib ^
-	bin\llvm\windows\LLVM-C.lib ^
-	src\tilde\tb.lib
+	bin\llvm\windows\LLVM-C.lib
+
+set tilde_backend=0
+if %tilde_backend% EQU 1 (
+	set libs=%libs% src\tilde\tb.lib
+	set compiler_defines=%compiler_defines% -DODIN_TILDE_BACKEND
+)
+
 
 set linker_flags= -incremental:no -opt:ref -subsystem:console
 
