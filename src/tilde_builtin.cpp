@@ -432,6 +432,12 @@ gb_internal cgValue cg_build_builtin(cgProcedure *p, BuiltinProcId id, Ast *expr
 			return cg_emit_runtime_call(p, "__type_info_of", args);
 		}
 
+
+	case BuiltinProc_type_equal_proc:
+		return cg_equal_proc_value_for_type(p, ce->args[0]->tav.type);
+
+	case BuiltinProc_type_hasher_proc:
+		return cg_hasher_proc_value_for_type(p, ce->args[0]->tav.type);
 	}
 
 

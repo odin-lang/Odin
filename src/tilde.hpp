@@ -350,9 +350,12 @@ gb_internal cgValue cg_emit_comp_against_nil(cgProcedure *p, TokenKind op_kind, 
 gb_internal cgValue cg_emit_comp(cgProcedure *p, TokenKind op_kind, cgValue left, cgValue right);
 gb_internal cgValue cg_emit_arith(cgProcedure *p, TokenKind op, cgValue lhs, cgValue rhs, Type *type);
 gb_internal cgValue cg_emit_unary_arith(cgProcedure *p, TokenKind op, cgValue x, Type *type);
+gb_internal void    cg_emit_increment(cgProcedure *p, cgValue addr);
 
-gb_internal cgProcedure *cg_equal_proc_for_type(cgModule *m, Type *type);
-
+gb_internal cgProcedure *cg_equal_proc_for_type (cgModule *m, Type *type);
+gb_internal cgProcedure *cg_hasher_proc_for_type(cgModule *m, Type *type);
+gb_internal cgValue     cg_hasher_proc_value_for_type(cgProcedure *p, Type *type);
+gb_internal cgValue     cg_equal_proc_value_for_type(cgProcedure *p, Type *type);
 
 gb_internal cgValue cg_emit_call(cgProcedure * p, cgValue value, Slice<cgValue> const &args);
 gb_internal cgValue cg_emit_runtime_call(cgProcedure *p, char const *name, Slice<cgValue> const &args);

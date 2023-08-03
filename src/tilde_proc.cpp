@@ -984,6 +984,17 @@ gb_internal cgValue cg_build_call_expr_internal(cgProcedure *p, Ast *expr) {
 
 
 
+gb_internal cgValue cg_hasher_proc_value_for_type(cgProcedure *p, Type *type) {
+	cgProcedure *found = cg_hasher_proc_for_type(p->module, type);
+	return cg_value(tb_inst_get_symbol_address(p->func, found->symbol), found->type);
+}
+
+gb_internal cgValue cg_equal_proc_value_for_type(cgProcedure *p, Type *type) {
+	cgProcedure *found = cg_equal_proc_for_type(p->module, type);
+	return cg_value(tb_inst_get_symbol_address(p->func, found->symbol), found->type);
+}
+
+
 
 gb_internal cgProcedure *cg_equal_proc_for_type(cgModule *m, Type *type) {
 	type = base_type(type);
@@ -1115,5 +1126,182 @@ gb_internal cgProcedure *cg_equal_proc_for_type(cgModule *m, Type *type) {
 
 	cg_procedure_end(p);
 
+	return p;
+}
+
+
+gb_internal cgValue cg_simple_compare_hash(cgProcedure *p, Type *type, cgValue data, cgValue seed) {
+	TEMPORARY_ALLOCATOR_GUARD();
+
+	GB_ASSERT_MSG(is_type_simple_compare(type), "%s", type_to_string(type));
+
+	auto args = slice_make<cgValue>(temporary_allocator(), 3);
+	args[0] = data;
+	args[1] = seed;
+	args[2] = cg_const_int(p, t_int, type_size_of(type));
+	return cg_emit_runtime_call(p, "default_hasher", args);
+}
+
+
+
+
+
+gb_internal cgProcedure *cg_hasher_proc_for_type(cgModule *m, Type *type) {
+	type = base_type(type);
+	GB_ASSERT(is_type_valid_for_keys(type));
+
+	mutex_lock(&m->generated_procs_mutex);
+	defer (mutex_unlock(&m->generated_procs_mutex));
+
+	cgProcedure **found = map_get(&m->hasher_procs, type);
+	if (found) {
+		return *found;
+	}
+
+	static std::atomic<u32> proc_index;
+
+	char buf[32] = {};
+	isize n = gb_snprintf(buf, 32, "__$hasher%u", 1+proc_index.fetch_add(1));
+	char *str = gb_alloc_str_len(permanent_allocator(), buf, n-1);
+	String proc_name = make_string_c(str);
+
+
+	cgProcedure *p = cg_procedure_create_dummy(m, proc_name, t_hasher_proc);
+	map_set(&m->hasher_procs, type, p);
+
+	cg_procedure_begin(p);
+	defer (cg_procedure_end(p));
+
+	TB_Node *x = tb_inst_param(p->func, 0); // data
+	TB_Node *y = tb_inst_param(p->func, 1); // seed
+
+	cgValue data = cg_value(x, t_rawptr);
+	cgValue seed = cg_value(y, t_uintptr);
+
+	if (is_type_simple_compare(type)) {
+		cgValue res = cg_simple_compare_hash(p, type, data, seed);
+		cg_build_return_stmt_internal_single(p, res);
+		return p;
+	}
+
+	TEMPORARY_ALLOCATOR_GUARD();
+
+	auto args = slice_make<cgValue>(temporary_allocator(), 2);
+
+	if (type->kind == Type_Struct) {
+		type_set_offsets(type);
+		for_array(i, type->Struct.fields) {
+			i64 offset = type->Struct.offsets[i];
+			Entity *field = type->Struct.fields[i];
+			cgValue field_hasher = cg_hasher_proc_value_for_type(p, field->type);
+
+			TB_Node *ptr = tb_inst_member_access(p->func, data.node, offset);
+
+			args[0] = cg_value(ptr, alloc_type_pointer(field->type));
+			args[1] = seed;
+			seed = cg_emit_call(p, field_hasher, args);
+		}
+
+		cg_build_return_stmt_internal_single(p, seed);
+	} else if (type->kind == Type_Union) {
+		if (type_size_of(type) == 0) {
+			cg_build_return_stmt_internal_single(p, seed);
+		} else if (is_type_union_maybe_pointer(type)) {
+			Type *v = type->Union.variants[0];
+			cgValue variant_hasher = cg_hasher_proc_value_for_type(p, v);
+
+			args[0] = data;
+			args[1] = seed;
+			cgValue res = cg_emit_call(p, variant_hasher, args);
+			cg_build_return_stmt_internal_single(p, seed);
+		} else {
+			TB_Node *end_region = cg_control_region(p, "bend");
+			TB_Node *switch_region = cg_control_region(p, "bswitch");
+
+			cg_emit_goto(p, switch_region);
+
+			size_t entry_count = type->Union.variants.count;
+			TB_SwitchEntry *keys = gb_alloc_array(temporary_allocator(), TB_SwitchEntry, entry_count);
+			for (size_t i = 0; i < entry_count; i++) {
+				TB_Node *region = cg_control_region(p, "bcase");
+				Type *variant = type->Union.variants[i];
+				keys[i].key = union_variant_index(type, variant);
+				keys[i].value = region;
+
+				tb_inst_set_control(p->func, region);
+
+				cgValue variant_hasher = cg_hasher_proc_value_for_type(p, variant);
+
+				args[0] = data;
+				args[1] = seed;
+				cgValue res = cg_emit_call(p, variant_hasher, args);
+				cg_build_return_stmt_internal_single(p, res);
+			}
+
+			tb_inst_set_control(p->func, switch_region);
+
+			cgValue tag_ptr = cg_emit_union_tag_ptr(p, data);
+			cgValue tag = cg_emit_load(p, tag_ptr);
+
+			TB_DataType tag_dt = cg_data_type(tag.type);
+			GB_ASSERT(tag.kind == cgValue_Value);
+			tb_inst_branch(p->func, tag_dt, tag.node, end_region, entry_count, keys);
+
+			tb_inst_set_control(p->func, end_region);
+			cg_build_return_stmt_internal_single(p, seed);
+		}
+	} else if (type->kind == Type_Array) {
+		cgAddr pres = cg_add_local(p, t_uintptr, nullptr, false);
+		cg_addr_store(p, pres, seed);
+
+		cgValue elem_hasher = cg_hasher_proc_value_for_type(p, type->Array.elem);
+
+		auto loop_data = cg_loop_start(p, type->Array.count, t_int);
+
+		i64 stride = type_size_of(type->Array.elem);
+		TB_Node *ptr = tb_inst_array_access(p->func, data.node, loop_data.index.node, stride);
+		args[0] = cg_value(ptr, alloc_type_pointer(type->Array.elem));
+		args[1] = cg_addr_load(p, pres);
+
+		cgValue new_seed = cg_emit_call(p, elem_hasher, args);
+		cg_addr_store(p, pres, new_seed);
+
+		cg_loop_end(p, loop_data);
+
+		cgValue res = cg_addr_load(p, pres);
+		cg_build_return_stmt_internal_single(p, res);
+	} else if (type->kind == Type_EnumeratedArray) {
+		cgAddr pres = cg_add_local(p, t_uintptr, nullptr, false);
+		cg_addr_store(p, pres, seed);
+
+		cgValue elem_hasher = cg_hasher_proc_value_for_type(p, type->EnumeratedArray.elem);
+
+		auto loop_data = cg_loop_start(p, type->EnumeratedArray.count, t_int);
+
+		i64 stride = type_size_of(type->EnumeratedArray.elem);
+		TB_Node *ptr = tb_inst_array_access(p->func, data.node, loop_data.index.node, stride);
+		args[0] = cg_value(ptr, alloc_type_pointer(type->EnumeratedArray.elem));
+		args[1] = cg_addr_load(p, pres);
+
+		cgValue new_seed = cg_emit_call(p, elem_hasher, args);
+		cg_addr_store(p, pres, new_seed);
+
+		cg_loop_end(p, loop_data);
+
+		cgValue res = cg_addr_load(p, pres);
+		cg_build_return_stmt_internal_single(p, res);
+	} else if (is_type_cstring(type)) {
+		args[0] = data;
+		args[1] = seed;
+		cgValue res = cg_emit_runtime_call(p, "default_hasher_cstring", args);
+		cg_build_return_stmt_internal_single(p, seed);
+	} else if (is_type_string(type)) {
+		args[0] = data;
+		args[1] = seed;
+		cgValue res = cg_emit_runtime_call(p, "default_hasher_string", args);
+		cg_build_return_stmt_internal_single(p, seed);
+	} else {
+		GB_PANIC("Unhandled type for hasher: %s", type_to_string(type));
+	}
 	return p;
 }

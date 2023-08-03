@@ -1780,6 +1780,48 @@ gb_internal void cg_emit_if(cgProcedure *p, cgValue const &cond, TB_Node *true_r
 	tb_inst_if(p->func, cond.node, true_region, false_region);
 }
 
+
+struct cgLoopData {
+	cgAddr  index_addr;
+	cgValue index;
+	TB_Node *body;
+	TB_Node *done;
+	TB_Node *loop;
+};
+
+gb_internal cgLoopData cg_loop_start(cgProcedure *p, isize count, Type *index_type) {
+	cgLoopData data = {};
+
+	cgValue max = cg_const_int(p, index_type, count);
+
+	data.index_addr = cg_add_local(p, index_type, nullptr, true);
+
+	data.body = cg_control_region(p, "loop_body");
+	data.done = cg_control_region(p, "loop_done");
+	data.loop = cg_control_region(p, "loop_loop");
+
+	cg_emit_goto(p, data.loop);
+	tb_inst_set_control(p->func, data.loop);
+
+	data.index = cg_addr_load(p, data.index_addr);
+
+	cgValue cond = cg_emit_comp(p, Token_Lt, data.index, max);
+	cg_emit_if(p, cond, data.body, data.done);
+	tb_inst_set_control(p->func, data.body);
+
+	return data;
+}
+
+gb_internal void cg_loop_end(cgProcedure *p, cgLoopData const &data) {
+	if (data.index_addr.addr.node != nullptr) {
+		cg_emit_increment(p, data.index_addr.addr);
+		cg_emit_goto(p, data.loop);
+		tb_inst_set_control(p->func, data.done);
+	}
+}
+
+
+
 gb_internal void cg_build_try_lhs_rhs(cgProcedure *p, Ast *arg, Type *final_type, cgValue *lhs_, cgValue *rhs_) {
 	cgValue lhs = {};
 	cgValue rhs = {};
