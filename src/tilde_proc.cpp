@@ -1061,7 +1061,51 @@ gb_internal cgProcedure *cg_equal_proc_for_type(cgModule *m, Type *type) {
 		tb_inst_ret(p->func, 1, &node_false);
 
 	} else if (type->kind == Type_Union) {
-		GB_PANIC("TODO(bill): union comparison");
+		if (type_size_of(type) == 0) {
+			tb_inst_ret(p->func, 1, &node_true);
+		} else if (is_type_union_maybe_pointer(type)) {
+			Type *v = type->Union.variants[0];
+			Type *pv = alloc_type_pointer(v);
+
+			cgValue left  = cg_emit_load(p, cg_emit_conv(p, lhs, pv));
+			cgValue right = cg_emit_load(p, cg_emit_conv(p, rhs, pv));
+			cgValue ok = cg_emit_comp(p, Token_CmpEq, left, right);
+			cg_build_return_stmt_internal_single(p, ok);
+		} else {
+			TB_Node *false_region  = cg_control_region(p, "bfalse");
+			TB_Node *switch_region = cg_control_region(p, "bswitch");
+
+			cgValue lhs_tag = cg_emit_load(p, cg_emit_union_tag_ptr(p, lhs));
+			cgValue rhs_tag = cg_emit_load(p, cg_emit_union_tag_ptr(p, rhs));
+
+			cgValue tag_eq = cg_emit_comp(p, Token_CmpEq, lhs_tag, rhs_tag);
+			cg_emit_if(p, tag_eq, switch_region, false_region);
+
+			size_t entry_count = type->Union.variants.count;
+			TB_SwitchEntry *keys = gb_alloc_array(temporary_allocator(), TB_SwitchEntry, entry_count);
+			for (size_t i = 0; i < entry_count; i++) {
+				TB_Node *region = cg_control_region(p, "bcase");
+				Type *variant = type->Union.variants[i];
+				keys[i].key = union_variant_index(type, variant);
+				keys[i].value = region;
+
+				tb_inst_set_control(p->func, region);
+				Type *vp = alloc_type_pointer(variant);
+				cgValue left  = cg_emit_load(p, cg_emit_conv(p, lhs, vp));
+				cgValue right = cg_emit_load(p, cg_emit_conv(p, rhs, vp));
+				cgValue ok = cg_emit_comp(p, Token_CmpEq, left, right);
+				cg_build_return_stmt_internal_single(p, ok);
+			}
+
+
+			tb_inst_set_control(p->func, switch_region);
+			TB_DataType tag_dt = cg_data_type(lhs_tag.type);
+			GB_ASSERT(lhs_tag.kind == cgValue_Value);
+			tb_inst_branch(p->func, tag_dt, lhs_tag.node, false_region, entry_count, keys);
+
+			tb_inst_set_control(p->func, false_region);
+			tb_inst_ret(p->func, 1, &node_false);
+		}
 	} else {
 		cgValue left  = cg_lvalue_addr(x, type);
 		cgValue right = cg_lvalue_addr(y, type);
