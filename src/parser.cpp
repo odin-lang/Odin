@@ -4183,6 +4183,8 @@ gb_internal Ast *parse_when_stmt(AstFile *f) {
 		syntax_error(f->curr_token, "Expected condition for when statement");
 	}
 
+	bool was_in_when_statement = f->in_when_statement;
+	f->in_when_statement = true;
 	if (allow_token(f, Token_do)) {
 		body = parse_do_body(f, cond ? ast_token(cond) : token, "then when statement");
 	} else {
@@ -4209,6 +4211,7 @@ gb_internal Ast *parse_when_stmt(AstFile *f) {
 			break;
 		}
 	}
+	f->in_when_statement = was_in_when_statement;
 
 	return ast_when_stmt(f, token, cond, body, else_stmt);
 }
@@ -4468,6 +4471,10 @@ gb_internal Ast *parse_import_decl(AstFile *f, ImportDeclKind kind) {
 	} else {
 		s = ast_import_decl(f, token, file_path, import_name, docs, f->line_comment);
 		array_add(&f->imports, s);
+	}
+
+	if (f->in_when_statement) {
+		syntax_error(import_name, "Cannot use 'import' within a 'when' statement. Prefer using the file suffixes (e.g. foo_windows.odin) or '//+build' tags");
 	}
 
 	if (kind != ImportDecl_Standard) {
