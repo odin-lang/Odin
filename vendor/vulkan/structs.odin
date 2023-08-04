@@ -5,9 +5,9 @@ package vulkan
 
 import "core:c"
 
+import win32 "core:sys/windows"
+_ :: win32
 when ODIN_OS == .Windows {
-	import win32 "core:sys/windows"
-
 	HINSTANCE           :: win32.HINSTANCE
 	HWND                :: win32.HWND
 	HMONITOR            :: win32.HMONITOR
