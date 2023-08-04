@@ -845,7 +845,7 @@ gb_internal bool type_ptr_set_exists(PtrSet<Type *> *s, Type *t) {
 
 	// TODO(bill, 2019-10-05): This is very slow and it's probably a lot
 	// faster to cache types correctly
-	for (Type *f : *s) if (f->kind == t->kind) {
+	for (Type *f : *s) {
 		if (are_types_identical(t, f)) {
 			ptr_set_add(s, t);
 			return true;
