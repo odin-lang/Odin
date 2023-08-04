@@ -2,6 +2,7 @@
 package miniaudio
 
 import "core:sys/unix"
+import "core:c"
 
 thread :: unix.pthread_t
 mutex :: unix.pthread_mutex_t
