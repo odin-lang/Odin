@@ -267,8 +267,8 @@ struct TypeProc {
 		Type *pointer_type;                               \
 		Type *base_integer;                               \
 	})                                                        \
-	TYPE_KIND(RelativeSlice, struct {                         \
-		Type *slice_type;                                 \
+	TYPE_KIND(RelativeMultiPointer, struct {                  \
+		Type *pointer_type;                               \
 		Type *base_integer;                               \
 	})                                                        \
 	TYPE_KIND(Matrix, struct {                                \
@@ -349,7 +349,7 @@ enum Typeid_Kind : u8 {
 	Typeid_Bit_Set,
 	Typeid_Simd_Vector,
 	Typeid_Relative_Pointer,
-	Typeid_Relative_Slice,
+	Typeid_Relative_Multi_Pointer,
 	Typeid_Matrix,
 	Typeid_SoaPointer,
 };
@@ -635,7 +635,7 @@ gb_global Type *t_type_info_map                  = nullptr;
 gb_global Type *t_type_info_bit_set              = nullptr;
 gb_global Type *t_type_info_simd_vector          = nullptr;
 gb_global Type *t_type_info_relative_pointer     = nullptr;
-gb_global Type *t_type_info_relative_slice       = nullptr;
+gb_global Type *t_type_info_relative_multi_pointer = nullptr;
 gb_global Type *t_type_info_matrix               = nullptr;
 gb_global Type *t_type_info_soa_pointer          = nullptr;
 
@@ -664,7 +664,7 @@ gb_global Type *t_type_info_map_ptr              = nullptr;
 gb_global Type *t_type_info_bit_set_ptr          = nullptr;
 gb_global Type *t_type_info_simd_vector_ptr      = nullptr;
 gb_global Type *t_type_info_relative_pointer_ptr = nullptr;
-gb_global Type *t_type_info_relative_slice_ptr   = nullptr;
+gb_global Type *t_type_info_relative_multi_pointer_ptr = nullptr;
 gb_global Type *t_type_info_matrix_ptr           = nullptr;
 gb_global Type *t_type_info_soa_pointer_ptr      = nullptr;
 
@@ -737,6 +737,7 @@ gb_internal Type *   bit_set_to_int(Type *t);
 gb_internal bool     are_types_identical(Type *x, Type *y);
 
 gb_internal bool  is_type_pointer(Type *t);
+gb_internal bool  is_type_multi_pointer(Type *t);
 gb_internal bool  is_type_soa_pointer(Type *t);
 gb_internal bool  is_type_proc(Type *t);
 gb_internal bool  is_type_slice(Type *t);
@@ -1035,12 +1036,12 @@ gb_internal Type *alloc_type_relative_pointer(Type *pointer_type, Type *base_int
 	return t;
 }
 
-gb_internal Type *alloc_type_relative_slice(Type *slice_type, Type *base_integer) {
-	GB_ASSERT(is_type_slice(slice_type));
+gb_internal Type *alloc_type_relative_multi_pointer(Type *pointer_type, Type *base_integer) {
+	GB_ASSERT(is_type_multi_pointer(pointer_type));
 	GB_ASSERT(is_type_integer(base_integer));
-	Type *t = alloc_type(Type_RelativeSlice);
-	t->RelativeSlice.slice_type   = slice_type;
-	t->RelativeSlice.base_integer = base_integer;
+	Type *t = alloc_type(Type_RelativeMultiPointer);
+	t->RelativeMultiPointer.pointer_type = pointer_type;
+	t->RelativeMultiPointer.base_integer = base_integer;
 	return t;
 }
 
@@ -1551,9 +1552,9 @@ gb_internal bool is_type_relative_pointer(Type *t) {
 	t = base_type(t);
 	return t->kind == Type_RelativePointer;
 }
-gb_internal bool is_type_relative_slice(Type *t) {
+gb_internal bool is_type_relative_multi_pointer(Type *t) {
 	t = base_type(t);
-	return t->kind == Type_RelativeSlice;
+	return t->kind == Type_RelativeMultiPointer;
 }
 
 gb_internal bool is_type_u8_slice(Type *t) {
@@ -1970,7 +1971,7 @@ gb_internal bool is_type_indexable(Type *t) {
 		return true;
 	case Type_EnumeratedArray:
 		return true;
-	case Type_RelativeSlice:
+	case Type_RelativeMultiPointer:
 		return true;
 	case Type_Matrix:
 		return true;
@@ -1989,7 +1990,7 @@ gb_internal bool is_type_sliceable(Type *t) {
 		return true;
 	case Type_EnumeratedArray:
 		return false;
-	case Type_RelativeSlice:
+	case Type_RelativeMultiPointer:
 		return true;
 	case Type_Matrix:
 		return false;
@@ -2195,12 +2196,12 @@ gb_internal bool is_type_polymorphic(Type *t, bool or_specialized=false) {
 		}
 		break;
 
-	case Type_RelativeSlice:
-		if (is_type_polymorphic(t->RelativeSlice.slice_type, or_specialized)) {
+	case Type_RelativeMultiPointer:
+		if (is_type_polymorphic(t->RelativeMultiPointer.pointer_type, or_specialized)) {
 			return true;
 		}
-		if (t->RelativeSlice.base_integer != nullptr &&
-		    is_type_polymorphic(t->RelativeSlice.base_integer, or_specialized)) {
+		if (t->RelativeMultiPointer.base_integer != nullptr &&
+		    is_type_polymorphic(t->RelativeMultiPointer.base_integer, or_specialized)) {
 			return true;
 		}
 		break;
@@ -2258,7 +2259,7 @@ gb_internal bool type_has_nil(Type *t) {
 		return false;
 
 	case Type_RelativePointer:
-	case Type_RelativeSlice:
+	case Type_RelativeMultiPointer:
 		return true;
 	}
 	return false;
@@ -2425,7 +2426,7 @@ gb_internal bool is_type_load_safe(Type *type) {
 		return true;
 
 	case Type_RelativePointer:
-	case Type_RelativeSlice:
+	case Type_RelativeMultiPointer:
 		return true;
 
 	case Type_Pointer:
@@ -3629,8 +3630,8 @@ gb_internal i64 type_align_of_internal(Type *t, TypePath *path) {
 
 	case Type_RelativePointer:
 		return type_align_of_internal(t->RelativePointer.base_integer, path);
-	case Type_RelativeSlice:
-		return type_align_of_internal(t->RelativeSlice.base_integer, path);
+	case Type_RelativeMultiPointer:
+		return type_align_of_internal(t->RelativeMultiPointer.base_integer, path);
 
 	case Type_SoaPointer:
 		return build_context.int_size;
@@ -3912,8 +3913,8 @@ gb_internal i64 type_size_of_internal(Type *t, TypePath *path) {
 
 	case Type_RelativePointer:
 		return type_size_of_internal(t->RelativePointer.base_integer, path);
-	case Type_RelativeSlice:
-		return 2*type_size_of_internal(t->RelativeSlice.base_integer, path);
+	case Type_RelativeMultiPointer:
+		return type_size_of_internal(t->RelativeMultiPointer.base_integer, path);
 	}
 
 	// Catch all
@@ -4466,11 +4467,11 @@ gb_internal gbString write_type_to_string(gbString str, Type *type, bool shortha
 		str = gb_string_append_fmt(str, ") ");
 		str = write_type_to_string(str, type->RelativePointer.pointer_type);
 		break;
-	case Type_RelativeSlice:
+	case Type_RelativeMultiPointer:
 		str = gb_string_append_fmt(str, "#relative(");
-		str = write_type_to_string(str, type->RelativeSlice.base_integer);
+		str = write_type_to_string(str, type->RelativePointer.base_integer);
 		str = gb_string_append_fmt(str, ") ");
-		str = write_type_to_string(str, type->RelativeSlice.slice_type);
+		str = write_type_to_string(str, type->RelativePointer.pointer_type);
 		break;
 		
 	case Type_Matrix:

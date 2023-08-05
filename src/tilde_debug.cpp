@@ -457,20 +457,8 @@ gb_internal TB_DebugType *cg_debug_type_internal(cgModule *m, Type *type) {
 		return tb_debug_create_array(m->mod, cg_debug_type(m, type->SimdVector.elem), type->SimdVector.count);
 	case Type_RelativePointer:
 		return cg_debug_type(m, type->RelativePointer.base_integer);
-	case Type_RelativeSlice:
-		{
-			String name = {};
-			TB_DebugType *record = tb_debug_create_struct(m->mod, name.len, cast(char const *)name.text);
-
-			TB_DebugType *base_integer = cg_debug_type(m, type->RelativeSlice.base_integer);
-			TB_CharUnits bi_size = cast(TB_CharUnits)type_size_of(type->RelativeSlice.base_integer);
-			TB_DebugType **fields = tb_debug_record_begin(record, 2);
-			fields[0] = tb_debug_create_field(m->mod, base_integer, -1, "data", 0*bi_size);
-			fields[1] = tb_debug_create_field(m->mod, base_integer, -1, "len",  1*bi_size);
-
-			tb_debug_record_end(record, size, align);
-			return record;
-		}
+	case Type_RelativeMultiPointer:
+		return cg_debug_type(m, type->RelativeMultiPointer.base_integer);
 	case Type_Matrix:
 		{
 			i64 count = matrix_type_total_internal_elems(type);

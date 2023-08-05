@@ -1124,11 +1124,6 @@ gb_internal lbValue lb_emit_struct_ep(lbProcedure *p, lbValue s, i32 index) {
 		}
 	} else if (is_type_array(t)) {
 		return lb_emit_array_epi(p, s, index);
-	} else if (is_type_relative_slice(t)) {
-		switch (index) {
-		case 0: result_type = t->RelativeSlice.base_integer; break;
-		case 1: result_type = t->RelativeSlice.base_integer; break;
-		}
 	} else if (is_type_soa_pointer(t)) {
 		switch (index) {
 		case 0: result_type = alloc_type_pointer(t->SoaPointer.elem); break;
@@ -1547,7 +1542,7 @@ gb_internal lbValue lb_slice_elem(lbProcedure *p, lbValue slice) {
 	return lb_emit_struct_ev(p, slice, 0);
 }
 gb_internal lbValue lb_slice_len(lbProcedure *p, lbValue slice) {
-	GB_ASSERT(is_type_slice(slice.type) || is_type_relative_slice(slice.type));
+	GB_ASSERT(is_type_slice(slice.type));
 	return lb_emit_struct_ev(p, slice, 1);
 }
 gb_internal lbValue lb_dynamic_array_elem(lbProcedure *p, lbValue da) {

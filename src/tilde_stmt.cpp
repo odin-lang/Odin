@@ -530,21 +530,6 @@ gb_internal cgValue cg_emit_struct_ep(cgProcedure *p, cgValue s, i64 index) {
 		}
 	case Type_Array:
 		return cg_emit_array_epi(p, s, index);
-	case Type_RelativeSlice:
-		{
-			Type *bi = t->RelativeSlice.base_integer;
-			i64 sz = type_size_of(bi);
-			switch (index) {
-			case 0:
-			case 1:
-				result_type = bi;
-				offset = sz * index;
-				break;
-			default:
-				goto error_case;
-			}
-		}
-		break;
 	case Type_SoaPointer:
 		switch (index) {
 		case 0: result_type = alloc_type_pointer(t->SoaPointer.elem); break;

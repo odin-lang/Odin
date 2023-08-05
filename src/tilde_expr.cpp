@@ -1469,8 +1469,8 @@ gb_internal cgAddr cg_build_addr_slice_expr(cgProcedure *p, Ast *expr) {
 		return slice;
 	}
 
-	case Type_RelativeSlice:
-		GB_PANIC("TODO(bill): Type_RelativeSlice should be handled above already on the cg_addr_load");
+	case Type_RelativeMultiPointer:
+		GB_PANIC("TODO(bill): Type_RelativeMultiPointer should be handled above already on the cg_addr_load");
 		break;
 
 	case Type_DynamicArray: {
@@ -3598,22 +3598,18 @@ gb_internal cgAddr cg_build_addr_index_expr(cgProcedure *p, Ast *expr) {
 		return cg_addr(v);
 	}
 
-	case Type_RelativeSlice: {
-		GB_PANIC("TODO(bill): relative slice");
-		// lbAddr slice_addr = {};
-		// if (deref) {
-		// 	slice_addr = lb_addr(lb_build_expr(p, ie->expr));
-		// } else {
-		// 	slice_addr = lb_build_addr(p, ie->expr);
-		// }
-		// lbValue slice = lb_addr_load(p, slice_addr);
+	case Type_RelativeMultiPointer: {
+		cgValue multi_ptr = {};
+		multi_ptr = cg_build_expr(p, ie->expr);
+		if (deref) {
+			multi_ptr = cg_emit_load(p, multi_ptr);
+		}
+		cgValue index = cg_build_expr(p, ie->index);
+		index = cg_emit_conv(p, index, t_int);
 
-		// lbValue elem = lb_slice_elem(p, slice);
-		// lbValue index = lb_emit_conv(p, lb_build_expr(p, ie->index), t_int);
-		// lbValue len = lb_slice_len(p, slice);
-		// lb_emit_bounds_check(p, ast_token(ie->index), index, len);
-		// lbValue v = lb_emit_ptr_offset(p, elem, index);
-		// return lb_addr(v);
+		cgValue v = cg_emit_ptr_offset(p, multi_ptr, index);
+		v.type = alloc_type_pointer(type_deref(v.type, true));
+		return cg_addr(v);
 	}
 
 	case Type_DynamicArray: {

@@ -1969,9 +1969,9 @@ gb_internal void add_type_info_type_internal(CheckerContext *c, Type *t) {
 		add_type_info_type_internal(c, bt->RelativePointer.base_integer);
 		break;
 
-	case Type_RelativeSlice:
-		add_type_info_type_internal(c, bt->RelativeSlice.slice_type);
-		add_type_info_type_internal(c, bt->RelativeSlice.base_integer);
+	case Type_RelativeMultiPointer:
+		add_type_info_type_internal(c, bt->RelativeMultiPointer.pointer_type);
+		add_type_info_type_internal(c, bt->RelativeMultiPointer.base_integer);
 		break;
 
 	case Type_Matrix:
@@ -2210,9 +2210,9 @@ gb_internal void add_min_dep_type_info(Checker *c, Type *t) {
 		add_min_dep_type_info(c, bt->RelativePointer.base_integer);
 		break;
 
-	case Type_RelativeSlice:
-		add_min_dep_type_info(c, bt->RelativeSlice.slice_type);
-		add_min_dep_type_info(c, bt->RelativeSlice.base_integer);
+	case Type_RelativeMultiPointer:
+		add_min_dep_type_info(c, bt->RelativeMultiPointer.pointer_type);
+		add_min_dep_type_info(c, bt->RelativeMultiPointer.base_integer);
 		break;
 
 	case Type_Matrix:
@@ -2800,7 +2800,7 @@ gb_internal void init_core_type_info(Checker *c) {
 	t_type_info_bit_set          = find_core_type(c, str_lit("Type_Info_Bit_Set"));
 	t_type_info_simd_vector      = find_core_type(c, str_lit("Type_Info_Simd_Vector"));
 	t_type_info_relative_pointer = find_core_type(c, str_lit("Type_Info_Relative_Pointer"));
-	t_type_info_relative_slice   = find_core_type(c, str_lit("Type_Info_Relative_Slice"));
+	t_type_info_relative_multi_pointer = find_core_type(c, str_lit("Type_Info_Relative_Multi_Pointer"));
 	t_type_info_matrix           = find_core_type(c, str_lit("Type_Info_Matrix"));
 	t_type_info_soa_pointer      = find_core_type(c, str_lit("Type_Info_Soa_Pointer"));
 
@@ -2829,7 +2829,7 @@ gb_internal void init_core_type_info(Checker *c) {
 	t_type_info_bit_set_ptr          = alloc_type_pointer(t_type_info_bit_set);
 	t_type_info_simd_vector_ptr      = alloc_type_pointer(t_type_info_simd_vector);
 	t_type_info_relative_pointer_ptr = alloc_type_pointer(t_type_info_relative_pointer);
-	t_type_info_relative_slice_ptr   = alloc_type_pointer(t_type_info_relative_slice);
+	t_type_info_relative_multi_pointer_ptr = alloc_type_pointer(t_type_info_relative_multi_pointer);
 	t_type_info_matrix_ptr           = alloc_type_pointer(t_type_info_matrix);
 	t_type_info_soa_pointer_ptr      = alloc_type_pointer(t_type_info_soa_pointer);
 }

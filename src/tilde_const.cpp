@@ -255,9 +255,9 @@ gb_internal i64 cg_global_const_calculate_region_count_from_basic_type(Type *typ
 		return 1;
 
 	case Type_RelativePointer:
-		return 1;
-	case Type_RelativeSlice:
-		return 1; // technically 1
+	case Type_RelativeMultiPointer:
+		return 2; // allows for offsets
+
 	case Type_Matrix:
 		return 1;
 

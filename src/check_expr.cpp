@@ -856,8 +856,8 @@ gb_internal i64 check_distance_between_types(CheckerContext *c, Operand *operand
 		}
 	}
 
-	if (is_type_relative_slice(dst)) {
-		i64 score = check_distance_between_types(c, operand, dst->RelativeSlice.slice_type);
+	if (is_type_relative_multi_pointer(dst)) {
+		i64 score = check_distance_between_types(c, operand, dst->RelativeMultiPointer.pointer_type);
 		if (score >= 0) {
 			return score+2;
 		}
@@ -1005,8 +1005,8 @@ gb_internal AstPackage *get_package_of_type(Type *type) {
 		case Type_RelativePointer:
 			type = type->RelativePointer.pointer_type;
 			continue;
-		case Type_RelativeSlice:
-			type = type->RelativeSlice.slice_type;
+		case Type_RelativeMultiPointer:
+			type = type->RelativeMultiPointer.pointer_type;
 			continue;
 		}
 		return nullptr;
@@ -7366,11 +7366,11 @@ gb_internal bool check_set_index_data(Operand *o, Type *t, bool indirection, i64
 		}
 		return true;
 
-	case Type_RelativeSlice:
+	case Type_RelativeMultiPointer:
 		{
-			Type *slice_type = base_type(t->RelativeSlice.slice_type);
-			GB_ASSERT(slice_type->kind == Type_Slice);
-			o->type = slice_type->Slice.elem;
+			Type *pointer_type = base_type(t->RelativeMultiPointer.pointer_type);
+			GB_ASSERT(pointer_type->kind == Type_MultiPointer);
+			o->type = pointer_type->MultiPointer.elem;
 			if (o->mode != Addressing_Constant) {
 				o->mode = Addressing_Variable;
 			}
@@ -9502,14 +9502,14 @@ gb_internal ExprKind check_index_expr(CheckerContext *c, Operand *o, Ast *node, 
 
 	if (is_const) {
 		if (is_type_array(t)) {
-			// OKay
+			// Okay
 		} else if (is_type_slice(t)) {
 			// Okay
 		} else if (is_type_enumerated_array(t)) {
 			// Okay
 		} else if (is_type_string(t)) {
 			// Okay
-		} else if (is_type_relative_slice(t)) {
+		} else if (is_type_relative_multi_pointer(t)) {
 			// Okay
 		} else if (is_type_matrix(t)) {
 			// Okay
@@ -9647,17 +9647,9 @@ gb_internal ExprKind check_slice_expr(CheckerContext *c, Operand *o, Ast *node, 
 		}
 		break;
 
-	case Type_RelativeSlice:
+	case Type_RelativeMultiPointer:
 		valid = true;
-		o->type = t->RelativeSlice.slice_type;
-		if (o->mode != Addressing_Variable) {
-			gbString str = expr_to_string(node);
-			error(node, "Cannot relative slice '%s', as value is not addressable", str);
-			gb_string_free(str);
-			o->mode = Addressing_Invalid;
-			o->expr = node;
-			return kind;
-		}
+		o->type = type_deref(o->type);
 		break;
 
 	case Type_EnumeratedArray:
@@ -9736,7 +9728,18 @@ gb_internal ExprKind check_slice_expr(CheckerContext *c, Operand *o, Ast *node, 
 			x[i:n] -> []T
 		*/
 		o->type = alloc_type_slice(t->MultiPointer.elem);
+	} else if (t->kind == Type_RelativeMultiPointer && se->high != nullptr) {
+		/*
+			x[:]   -> [^]T
+			x[i:]  -> [^]T
+			x[:n]  -> []T
+			x[i:n] -> []T
+		*/
+		Type *pointer_type = base_type(t->RelativeMultiPointer.pointer_type);
+		GB_ASSERT(pointer_type->kind == Type_MultiPointer);
+		o->type = alloc_type_slice(pointer_type->MultiPointer.elem);
 	}
+
 
 	o->mode = Addressing_Value;
 

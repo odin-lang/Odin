@@ -44,8 +44,6 @@ gb_internal cgValue cg_builtin_len(cgProcedure *p, cgValue value) {
 	case Type_Struct:
 		GB_ASSERT(is_type_soa_struct(t));
 		break;
-	case Type_RelativeSlice:
-		break;
 	}
 
 	GB_PANIC("TODO(bill): cg_builtin_len %s", type_to_string(t));
@@ -105,8 +103,6 @@ gb_internal cgValue cg_builtin_cap(cgProcedure *p, cgValue value) {
 		}
 	case Type_Struct:
 		GB_ASSERT(is_type_soa_struct(t));
-		break;
-	case Type_RelativeSlice:
 		break;
 	}
 

@@ -75,24 +75,24 @@ gb_internal u64 cg_typeid_as_u64(cgModule *m, Type *type) {
 		if (flags & BasicFlag_String)   kind = Typeid_String;
 		if (flags & BasicFlag_Rune)     kind = Typeid_Rune;
 	} break;
-	case Type_Pointer:         kind = Typeid_Pointer;          break;
-	case Type_MultiPointer:    kind = Typeid_Multi_Pointer;    break;
-	case Type_Array:           kind = Typeid_Array;            break;
-	case Type_Matrix:          kind = Typeid_Matrix;           break;
-	case Type_EnumeratedArray: kind = Typeid_Enumerated_Array; break;
-	case Type_Slice:           kind = Typeid_Slice;            break;
-	case Type_DynamicArray:    kind = Typeid_Dynamic_Array;    break;
-	case Type_Map:             kind = Typeid_Map;              break;
-	case Type_Struct:          kind = Typeid_Struct;           break;
-	case Type_Enum:            kind = Typeid_Enum;             break;
-	case Type_Union:           kind = Typeid_Union;            break;
-	case Type_Tuple:           kind = Typeid_Tuple;            break;
-	case Type_Proc:            kind = Typeid_Procedure;        break;
-	case Type_BitSet:          kind = Typeid_Bit_Set;          break;
-	case Type_SimdVector:      kind = Typeid_Simd_Vector;      break;
-	case Type_RelativePointer: kind = Typeid_Relative_Pointer; break;
-	case Type_RelativeSlice:   kind = Typeid_Relative_Slice;   break;
-	case Type_SoaPointer:      kind = Typeid_SoaPointer;       break;
+	case Type_Pointer:              kind = Typeid_Pointer;                break;
+	case Type_MultiPointer:         kind = Typeid_Multi_Pointer;          break;
+	case Type_Array:                kind = Typeid_Array;                  break;
+	case Type_Matrix:               kind = Typeid_Matrix;                 break;
+	case Type_EnumeratedArray:      kind = Typeid_Enumerated_Array;       break;
+	case Type_Slice:                kind = Typeid_Slice;                  break;
+	case Type_DynamicArray:         kind = Typeid_Dynamic_Array;          break;
+	case Type_Map:                  kind = Typeid_Map;                    break;
+	case Type_Struct:               kind = Typeid_Struct;                 break;
+	case Type_Enum:                 kind = Typeid_Enum;                   break;
+	case Type_Union:                kind = Typeid_Union;                  break;
+	case Type_Tuple:                kind = Typeid_Tuple;                  break;
+	case Type_Proc:                 kind = Typeid_Procedure;              break;
+	case Type_BitSet:               kind = Typeid_Bit_Set;                break;
+	case Type_SimdVector:           kind = Typeid_Simd_Vector;            break;
+	case Type_RelativePointer:      kind = Typeid_Relative_Pointer;       break;
+	case Type_RelativeMultiPointer: kind = Typeid_Relative_Multi_Pointer; break;
+	case Type_SoaPointer:           kind = Typeid_SoaPointer;             break;
 	}
 
 	if (is_type_cstring(type)) {
@@ -935,15 +935,15 @@ gb_internal void cg_setup_type_info_data(cgModule *m) {
 				cg_global_const_type_info_ptr(m, t->RelativePointer.base_integer, global, offset+base_integer_offset);
 			}
 			break;
-		case Type_RelativeSlice:
+		case Type_RelativeMultiPointer:
 			{
-				tag_type = t_type_info_relative_slice;
+				tag_type = t_type_info_relative_multi_pointer;
 
-				i64 slice_offset        = type_offset_of(tag_type, 0);
+				i64 pointer_offset      = type_offset_of(tag_type, 0);
 				i64 base_integer_offset = type_offset_of(tag_type, 1);
 
-				cg_global_const_type_info_ptr(m, t->RelativeSlice.slice_type,   global, offset+slice_offset);
-				cg_global_const_type_info_ptr(m, t->RelativeSlice.base_integer, global, offset+base_integer_offset);
+				cg_global_const_type_info_ptr(m, t->RelativePointer.pointer_type, global, offset+pointer_offset);
+				cg_global_const_type_info_ptr(m, t->RelativePointer.base_integer, global, offset+base_integer_offset);
 			}
 			break;
 		case Type_Matrix:

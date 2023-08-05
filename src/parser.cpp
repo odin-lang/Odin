@@ -2235,7 +2235,11 @@ gb_internal Ast *parse_operand(AstFile *f, bool lhs) {
 			return parse_check_directive_for_statement(operand, name, StateFlag_no_type_assert);
 		} else if (name.string == "relative") {
 			Ast *tag = ast_basic_directive(f, token, name);
-			tag = parse_call_expr(f, tag);
+			if (f->curr_token.kind != Token_OpenParen) {
+				syntax_error(tag, "expected #relative(<integer type>) <type>");
+			} else {
+				tag = parse_call_expr(f, tag);
+			}
 			Ast *type = parse_type(f);
 			return ast_relative_type(f, tag, type);
 		} else if (name.string == "force_inline" ||

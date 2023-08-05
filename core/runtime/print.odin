@@ -471,11 +471,11 @@ print_type :: proc "contextless" (ti: ^Type_Info) {
 		print_string(") ")
 		print_type(info.pointer)
 
-	case Type_Info_Relative_Slice:
+	case Type_Info_Relative_Multi_Pointer:
 		print_string("#relative(")
 		print_type(info.base_integer)
 		print_string(") ")
-		print_type(info.slice)
+		print_type(info.pointer)
 		
 	case Type_Info_Matrix:
 		print_string("matrix[")

@@ -2863,7 +2863,6 @@ gb_internal lbValue lb_build_unary_and(lbProcedure *p, Ast *expr) {
 	ast_node(ue, UnaryExpr, expr);
 	auto tv = type_and_value_of_expr(expr);
 
-
 	Ast *ue_expr = unparen_expr(ue->expr);
 	if (ue_expr->kind == Ast_IndexExpr && tv.mode == Addressing_OptionalOkPtr && is_type_tuple(tv.type)) {
 		Type *tuple = tv.type;
@@ -3803,25 +3802,32 @@ gb_internal lbAddr lb_build_addr_index_expr(lbProcedure *p, Ast *expr) {
 		lbValue v = {};
 
 		LLVMValueRef indices[1] = {index.value};
-		v.value = LLVMBuildGEP2(p->builder, lb_type(p->module, t->MultiPointer.elem), multi_ptr.value, indices, 1, "foo");
+		v.value = LLVMBuildGEP2(p->builder, lb_type(p->module, t->MultiPointer.elem), multi_ptr.value, indices, 1, "");
 		v.type = alloc_type_pointer(t->MultiPointer.elem);
 		return lb_addr(v);
 	}
 
-	case Type_RelativeSlice: {
-		lbAddr slice_addr = {};
+	case Type_RelativeMultiPointer: {
+		lbAddr rel_ptr_addr = {};
 		if (deref) {
-			slice_addr = lb_addr(lb_build_expr(p, ie->expr));
+			lbValue rel_ptr_ptr = lb_build_expr(p, ie->expr);
+			rel_ptr_addr = lb_addr(rel_ptr_ptr);
 		} else {
-			slice_addr = lb_build_addr(p, ie->expr);
+			rel_ptr_addr = lb_build_addr(p, ie->expr);
 		}
-		lbValue slice = lb_addr_load(p, slice_addr);
+		lbValue rel_ptr = lb_relative_pointer_to_pointer(p, rel_ptr_addr);
 
-		lbValue elem = lb_slice_elem(p, slice);
-		lbValue index = lb_emit_conv(p, lb_build_expr(p, ie->index), t_int);
-		lbValue len = lb_slice_len(p, slice);
-		lb_emit_bounds_check(p, ast_token(ie->index), index, len);
-		lbValue v = lb_emit_ptr_offset(p, elem, index);
+		lbValue index = lb_build_expr(p, ie->index);
+		index = lb_emit_conv(p, index, t_int);
+		lbValue v = {};
+
+		Type *pointer_type = base_type(t->RelativeMultiPointer.pointer_type);
+		GB_ASSERT(pointer_type->kind == Type_MultiPointer);
+		Type *elem = pointer_type->MultiPointer.elem;
+
+		LLVMValueRef indices[1] = {index.value};
+		v.value = LLVMBuildGEP2(p->builder, lb_type(p->module, elem), rel_ptr.value, indices, 1, "");
+		v.type = alloc_type_pointer(elem);
 		return lb_addr(v);
 	}
 
@@ -3925,8 +3931,11 @@ gb_internal lbAddr lb_build_addr_slice_expr(lbProcedure *p, Ast *expr) {
 		return slice;
 	}
 
-	case Type_RelativeSlice:
-		GB_PANIC("TODO(bill): Type_RelativeSlice should be handled above already on the lb_addr_load");
+	case Type_RelativePointer:
+		GB_PANIC("TODO(bill): Type_RelativePointer should be handled above already on the lb_addr_load");
+		break;
+	case Type_RelativeMultiPointer:
+		GB_PANIC("TODO(bill): Type_RelativeMultiPointer should be handled above already on the lb_addr_load");
 		break;
 
 	case Type_DynamicArray: {
@@ -3996,7 +4005,7 @@ gb_internal lbAddr lb_build_addr_slice_expr(lbProcedure *p, Ast *expr) {
 	}
 
 	case Type_Basic: {
-		GB_ASSERT(type == t_string);
+		GB_ASSERT_MSG(type == t_string, "got %s", type_to_string(type));
 		lbValue len = lb_string_len(p, base);
 		if (high.value == nullptr) high = len;
 

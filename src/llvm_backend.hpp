@@ -69,7 +69,6 @@ enum lbAddrKind {
 	lbAddr_SoaVariable,
 
 	lbAddr_RelativePointer,
-	lbAddr_RelativeSlice,
 
 	lbAddr_Swizzle,
 	lbAddr_SwizzleLarge,
