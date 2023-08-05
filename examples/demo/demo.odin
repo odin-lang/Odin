@@ -2024,12 +2024,11 @@ relative_data_types :: proc() {
 	fmt.println(ptr^)
 
 	arr := [3]int{1, 2, 3}
-	s := arr[:]
-	rel_slice: #relative(i16) []int
-	rel_slice = s
-	fmt.println(rel_slice)
-	fmt.println(rel_slice[:])
-	fmt.println(rel_slice[1])
+	multi_ptr: #relative(i16) [^]int
+	multi_ptr = &arr[0]
+	fmt.println(multi_ptr)
+	fmt.println(multi_ptr[:3])
+	fmt.println(multi_ptr[1])
 }
 
 or_else_operator :: proc() {
