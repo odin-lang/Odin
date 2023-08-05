@@ -3329,9 +3329,15 @@ gb_internal lbValue lb_build_call_expr_internal(lbProcedure *p, Ast *expr) {
 		isize param_index = lookup_procedure_parameter(pt, name);
 		GB_ASSERT(param_index >= 0);
 
-		lbValue value = lb_build_expr(p, fv->value);
-		GB_ASSERT(!is_type_tuple(value.type));
-		args[param_index] = value;
+		Entity *e = pt->params->Tuple.variables[param_index];
+		if (e->kind == Entity_TypeName) {
+			lbValue value = lb_const_nil(p->module, e->type);
+			args[param_index] = value;
+		} else {
+			lbValue value = lb_build_expr(p, fv->value);
+			GB_ASSERT(!is_type_tuple(value.type));
+			args[param_index] = value;
+		}
 	}
 
 	TokenPos pos = ast_token(ce->proc).pos;
