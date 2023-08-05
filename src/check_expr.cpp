@@ -5478,6 +5478,8 @@ gb_internal CallArgumentError check_call_arguments_internal(CheckerContext *c, A
 
 	auto variadic_operands = slice(slice_from_array(positional_operands), positional_operand_count, positional_operands.count);
 
+	bool named_variadic_param = false;
+
 	if (named_operands.count != 0) {
 		GB_ASSERT(ce->split_args->named.count == named_operands.count);
 		for_array(i, ce->split_args->named) {
@@ -5502,6 +5504,9 @@ gb_internal CallArgumentError check_call_arguments_internal(CheckerContext *c, A
 				}
 				err = CallArgumentError_ParameterNotFound;
 				continue;
+			}
+			if (pt->variadic && param_index == pt->variadic_index) {
+				named_variadic_param = true;
 			}
 			if (visited[param_index]) {
 				if (show_error) {
@@ -5704,11 +5709,6 @@ gb_internal CallArgumentError check_call_arguments_internal(CheckerContext *c, A
 				}
 				continue;
 			}
-
-			if (param_is_variadic) {
-				continue;
-			}
-
 			score += eval_param_and_score(c, o, e->type, err, param_is_variadic, e, show_error);
 		}
 	}
