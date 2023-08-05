@@ -3692,6 +3692,9 @@ gb_internal bool check_builtin_procedure(CheckerContext *c, Operand *operand, As
 					case Type_SimdVector:
 						operand->type = alloc_type_multi_pointer(base_array_type(base));
 						break;
+					case Type_Matrix:
+						operand->type = alloc_type_multi_pointer(base->Matrix.elem);
+						break;
 					}
 				}
 				break;
