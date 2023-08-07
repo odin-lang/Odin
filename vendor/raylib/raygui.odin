@@ -3,7 +3,6 @@ package raylib
 import c "core:c/libc"
 
 when ODIN_OS == .Windows {
-	@(extra_linker_flags="/NODEFAULTLIB:libcmt")
 	foreign import lib {
 		"windows/raygui.lib",
 	}
