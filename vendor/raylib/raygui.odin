@@ -1,7 +1,6 @@
-package raygui
+package raylib
 
 import c "core:c/libc"
-import "vendor:raylib"
 
 when ODIN_OS == .Windows {
 	@(extra_linker_flags="/NODEFAULTLIB:libcmt")
@@ -221,8 +220,8 @@ foreign lib {
     GuiGetState :: proc() -> c.int ---                                                                          // Get gui state (global state)
 
     // Font set/get functions
-    GuiSetFont :: proc(font: raylib.Font) ---                                                                   // Set gui custom font (global state)
-    GuiGetFont :: proc() -> raylib.Font ---                                                                     // Get gui custom font (global state)
+    GuiSetFont :: proc(font: Font) ---                                                                          // Set gui custom font (global state)
+    GuiGetFont :: proc() -> Font ---                                                                            // Get gui custom font (global state)
 
     // Style set/get functions
     GuiSetStyle :: proc(control: c.int, property: c.int, value: c.int) ---                                      // Set one style property
@@ -243,52 +242,52 @@ foreign lib {
     GuiSetIconScale :: proc(scale: c.int) ---                                                                   // Set default icon drawing size
     GuiGetIcons :: proc() -> [^]u32 ---                                                                         // Get raygui icons data pointer
     GuiLoadIcons :: proc(fileName: cstring, loadIconsName: bool) -> [^]cstring ---                              // Load raygui icons file (.rgi) into internal icons data
-    GuiDrawIcon :: proc(iconId: c.int, posX: c.int, posY: c.int, pixelSize: c.int, color: raylib.Color) ---     // Draw icon using pixel size at specified position
+    GuiDrawIcon :: proc(iconId: c.int, posX: c.int, posY: c.int, pixelSize: c.int, color: Color) ---            // Draw icon using pixel size at specified position
     // #endif
 
 
     // Controls
     //----------------------------------------------------------------------------------------------------------
     // Container/separator controls, useful for controls organization
-    GuiWindowBox    :: proc(bounds: raylib.Rectangle, title: cstring) -> c.int ---                               // Window Box control, shows a window that can be closed
-    GuiGroupBox     :: proc(bounds: raylib.Rectangle, text: cstring) -> c.int ---                                // Group Box control with text name
-    GuiLine         :: proc(bounds: raylib.Rectangle, text: cstring) -> c.int ---                                // Line separator control, could contain text
-    GuiPanel        :: proc(bounds: raylib.Rectangle, text: cstring) -> c.int ---                                // Panel control, useful to group controls
-    GuiTabBar       :: proc(bounds: raylib.Rectangle, text: [^]cstring, count: c.int, active: ^c.int) -> c.int --- // Tab Bar control, returns TAB to be closed or -1
-    GuiScrollPanel  :: proc(bounds: raylib.Rectangle, text: cstring, content: raylib.Rectangle, scroll: ^raylib.Vector2, view: ^raylib.Rectangle) -> c.int --- // Scroll Panel control
+    GuiWindowBox    :: proc(bounds: Rectangle, title: cstring) -> c.int ---                               // Window Box control, shows a window that can be closed
+    GuiGroupBox     :: proc(bounds: Rectangle, text: cstring) -> c.int ---                                // Group Box control with text name
+    GuiLine         :: proc(bounds: Rectangle, text: cstring) -> c.int ---                                // Line separator control, could contain text
+    GuiPanel        :: proc(bounds: Rectangle, text: cstring) -> c.int ---                                // Panel control, useful to group controls
+    GuiTabBar       :: proc(bounds: Rectangle, text: [^]cstring, count: c.int, active: ^c.int) -> c.int --- // Tab Bar control, returns TAB to be closed or -1
+    GuiScrollPanel  :: proc(bounds: Rectangle, text: cstring, content: Rectangle, scroll: ^Vector2, view: ^Rectangle) -> c.int --- // Scroll Panel control
 
     // Basic controls set
-    GuiLabel        :: proc(bounds: raylib.Rectangle, text: cstring) -> c.int ---                                // Label control, shows text
-    GuiButton       :: proc(bounds: raylib.Rectangle, text: cstring) -> c.int ---                                // Button control, returns true when clicked
-    GuiLabelButton  :: proc(bounds: raylib.Rectangle, text: cstring) -> c.int ---                                // Label button control, show true when clicked
-    GuiToggle       :: proc(bounds: raylib.Rectangle, text: cstring, active: ^bool) -> c.int ---                 // Toggle Button control, returns true when active
-    GuiToggleGroup  :: proc(bounds: raylib.Rectangle, text: cstring, active: ^c.int) -> c.int ---                // Toggle Group control, returns active toggle index
-    GuiCheckBox     :: proc(bounds: raylib.Rectangle, text: cstring, checked: ^bool) -> c.int ---                // Check Box control, returns true when active
-    GuiComboBox     :: proc(bounds: raylib.Rectangle, text: cstring, active: ^c.int) -> c.int ---                // Combo Box control, returns selected item index
+    GuiLabel        :: proc(bounds: Rectangle, text: cstring) -> c.int ---                                // Label control, shows text
+    GuiButton       :: proc(bounds: Rectangle, text: cstring) -> c.int ---                                // Button control, returns true when clicked
+    GuiLabelButton  :: proc(bounds: Rectangle, text: cstring) -> c.int ---                                // Label button control, show true when clicked
+    GuiToggle       :: proc(bounds: Rectangle, text: cstring, active: ^bool) -> c.int ---                 // Toggle Button control, returns true when active
+    GuiToggleGroup  :: proc(bounds: Rectangle, text: cstring, active: ^c.int) -> c.int ---                // Toggle Group control, returns active toggle index
+    GuiCheckBox     :: proc(bounds: Rectangle, text: cstring, checked: ^bool) -> c.int ---                // Check Box control, returns true when active
+    GuiComboBox     :: proc(bounds: Rectangle, text: cstring, active: ^c.int) -> c.int ---                // Combo Box control, returns selected item index
 
-    GuiDropdownBox  :: proc(bounds: raylib.Rectangle, text: cstring, active: ^c.int, editMode: bool) -> c.int --- // Dropdown Box control, returns selected item
-    GuiSpinner      :: proc(bounds: raylib.Rectangle, text: cstring, value: ^c.int, minValue: c.int, maxValue: c.int, editMode: bool) -> c.int --- // Spinner control, returns selected value
-    GuiValueBox     :: proc(bounds: raylib.Rectangle, text: cstring, value: ^c.int, minValue: c.int, maxValue: c.int, editMode: bool) -> c.int --- // Value Box control, updates input text with numbers
-    GuiTextBox      :: proc(bounds: raylib.Rectangle, text: cstring, textSize: c.int, editMode: bool) -> c.int --- // Text Box control, updates input text
+    GuiDropdownBox  :: proc(bounds: Rectangle, text: cstring, active: ^c.int, editMode: bool) -> c.int --- // Dropdown Box control, returns selected item
+    GuiSpinner      :: proc(bounds: Rectangle, text: cstring, value: ^c.int, minValue: c.int, maxValue: c.int, editMode: bool) -> c.int --- // Spinner control, returns selected value
+    GuiValueBox     :: proc(bounds: Rectangle, text: cstring, value: ^c.int, minValue: c.int, maxValue: c.int, editMode: bool) -> c.int --- // Value Box control, updates input text with numbers
+    GuiTextBox      :: proc(bounds: Rectangle, text: cstring, textSize: c.int, editMode: bool) -> c.int --- // Text Box control, updates input text
 
-    GuiSlider       :: proc(bounds: raylib.Rectangle, textLeft: cstring, textRight: cstring, value: ^f32, minValue: f32, maxValue: f32) -> c.int --- // Slider control, returns selected value
-    GuiSliderBar    :: proc(bounds: raylib.Rectangle, textLeft: cstring, textRight: cstring, value: ^f32, minValue: f32, maxValue: f32) -> c.int --- // Slider Bar control, returns selected value
-    GuiProgressBar  :: proc(bounds: raylib.Rectangle, textLeft: cstring, textRight: cstring, value: ^f32, minValu: f32, maxValue: f32) -> c.int --- // Progress Bar control, shows current progress value
-    GuiStatusBar    :: proc(bounds: raylib.Rectangle, text: cstring) -> c.int ---                                // Status Bar control, shows info text
-    GuiDummyRec     :: proc(bounds: raylib.Rectangle, text: cstring) -> c.int ---                                // Dummy control for placeholders
-    GuiGrid         :: proc(bounds: raylib.Rectangle, text: cstring, spacing: f32, subdivs: c.int, mouseCell: ^raylib.Vector2) --- // Grid control, returns mouse cell position
+    GuiSlider       :: proc(bounds: Rectangle, textLeft: cstring, textRight: cstring, value: ^f32, minValue: f32, maxValue: f32) -> c.int --- // Slider control, returns selected value
+    GuiSliderBar    :: proc(bounds: Rectangle, textLeft: cstring, textRight: cstring, value: ^f32, minValue: f32, maxValue: f32) -> c.int --- // Slider Bar control, returns selected value
+    GuiProgressBar  :: proc(bounds: Rectangle, textLeft: cstring, textRight: cstring, value: ^f32, minValu: f32, maxValue: f32) -> c.int --- // Progress Bar control, shows current progress value
+    GuiStatusBar    :: proc(bounds: Rectangle, text: cstring) -> c.int ---                                // Status Bar control, shows info text
+    GuiDummyRec     :: proc(bounds: Rectangle, text: cstring) -> c.int ---                                // Dummy control for placeholders
+    GuiGrid         :: proc(bounds: Rectangle, text: cstring, spacing: f32, subdivs: c.int, mouseCell: ^Vector2) --- // Grid control, returns mouse cell position
 
     // Advance controls set
-    GuiListView         :: proc(bounds: raylib.Rectangle, text: cstring, scrollIndex: ^c.int, active: ^c.int) -> c.int --- // List View control, returns selected list item index
-    GuiListViewEx       :: proc(bounds: raylib.Rectangle, text:[^]cstring, count: c.int, scrollIndex: ^c.int, active: ^c.int, focus: ^c.int) -> c.int --- // List View with extended parameters
-    GuiMessageBox       :: proc(bounds: raylib.Rectangle, title: cstring, message: cstring, buttons: cstring) -> c.int --- // Message Box control, displays a message
-    GuiTextInputBox     :: proc(bounds: raylib.Rectangle, title: cstring, message: cstring, buttons: cstring, text: cstring, textMaxSize: c.int, secretViewActive: ^bool) -> c.int --- // Text Input Box control, ask for text, supports secret
-    GuiColorPicker      :: proc(bounds: raylib.Rectangle, text: cstring, color: ^raylib.Color) -> c.int ---      // Color Picker control (multiple color controls)
-    GuiColorPanel       :: proc(bounds: raylib.Rectangle, text: cstring, color: ^raylib.Color) -> c.int ---      // Color Panel control
-    GuiColorBarAlpha    :: proc(bounds: raylib.Rectangle, text: cstring, alpha: ^f32) -> c.int ---               // Color Bar Alpha control
-    GuiColorBarHue      :: proc(bounds: raylib.Rectangle, text: cstring, value: ^f32) -> c.int ---               // Color Bar Hue control
-    GuiColorPickerHSV   :: proc(bounds: raylib.Rectangle, text: cstring, colorHsv: ^raylib.Vector3) -> c.int --- // Color Picker control that avoids conversion to RGB on each call (multiple color controls)
-    GuiColorPanelHSV    :: proc(bounds: raylib.Rectangle, text: cstring, colorHsv: ^raylib.Vector3) -> c.int --- // Color Panel control that returns HSV color value, used by GuiColorPickerHSV()
+    GuiListView         :: proc(bounds: Rectangle, text: cstring, scrollIndex: ^c.int, active: ^c.int) -> c.int --- // List View control, returns selected list item index
+    GuiListViewEx       :: proc(bounds: Rectangle, text:[^]cstring, count: c.int, scrollIndex: ^c.int, active: ^c.int, focus: ^c.int) -> c.int --- // List View with extended parameters
+    GuiMessageBox       :: proc(bounds: Rectangle, title: cstring, message: cstring, buttons: cstring) -> c.int --- // Message Box control, displays a message
+    GuiTextInputBox     :: proc(bounds: Rectangle, title: cstring, message: cstring, buttons: cstring, text: cstring, textMaxSize: c.int, secretViewActive: ^bool) -> c.int --- // Text Input Box control, ask for text, supports secret
+    GuiColorPicker      :: proc(bounds: Rectangle, text: cstring, color: ^Color) -> c.int ---             // Color Picker control (multiple color controls)
+    GuiColorPanel       :: proc(bounds: Rectangle, text: cstring, color: ^Color) -> c.int ---             // Color Panel control
+    GuiColorBarAlpha    :: proc(bounds: Rectangle, text: cstring, alpha: ^f32) -> c.int ---               // Color Bar Alpha control
+    GuiColorBarHue      :: proc(bounds: Rectangle, text: cstring, value: ^f32) -> c.int ---               // Color Bar Hue control
+    GuiColorPickerHSV   :: proc(bounds: Rectangle, text: cstring, colorHsv: ^Vector3) -> c.int ---        // Color Picker control that avoids conversion to RGB on each call (multiple color controls)
+    GuiColorPanelHSV    :: proc(bounds: Rectangle, text: cstring, colorHsv: ^Vector3) -> c.int ---        // Color Panel control that returns HSV color value, used by GuiColorPickerHSV()
     //----------------------------------------------------------------------------------------------------------
 }
 
