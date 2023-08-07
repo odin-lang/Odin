@@ -283,7 +283,7 @@ foreign lib {
     GuiProgressBar  :: proc(bounds: Rectangle, textLeft: cstring, textRight: cstring, value: ^f32, minValue: f32, maxValue: f32) -> c.int --- // Progress Bar control, shows current progress value
     GuiStatusBar    :: proc(bounds: Rectangle, text: cstring) -> c.int ---                                // Status Bar control, shows info text
     GuiDummyRec     :: proc(bounds: Rectangle, text: cstring) -> c.int ---                                // Dummy control for placeholders
-    GuiGrid         :: proc(bounds: Rectangle, text: cstring, spacing: f32, subdivs: c.int, mouseCell: ^Vector2) --- // Grid control, returns mouse cell position
+    GuiGrid         :: proc(bounds: Rectangle, text: cstring, spacing: f32, subdivs: c.int, mouseCell: ^Vector2) -> c.int --- // Grid control, returns mouse cell position
 
     // Advance controls set
     
