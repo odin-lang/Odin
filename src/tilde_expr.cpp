@@ -147,8 +147,7 @@ gb_internal cgAddr cg_build_addr_from_entity(cgProcedure *p, Entity *e, Ast *exp
 		// NOTE(bill): Calculate the using variable every time
 		v = cg_get_using_variable(p, e);
 	} else if (e->flags & EntityFlag_SoaPtrField) {
-		GB_PANIC("TODO(bill): cg_get_soa_variable_addr");
-		// return cg_get_soa_variable_addr(p, e);
+		return map_must_get(&p->soa_values_map, e);
 	}
 
 
@@ -3541,15 +3540,13 @@ gb_internal cgAddr cg_build_addr_index_expr(cgProcedure *p, Ast *expr) {
 	bool deref = is_type_pointer(t);
 	t = base_type(type_deref(t));
 	if (is_type_soa_struct(t)) {
-		GB_PANIC("TODO(bill): #soa");
-		// // SOA STRUCTURES!!!!
-		// lbValue val = cg_build_addr_ptr(p, ie->expr);
-		// if (deref) {
-		// 	val = cg_emit_load(p, val);
-		// }
+		cgValue val = cg_build_addr_ptr(p, ie->expr);
+		if (deref) {
+			val = cg_emit_load(p, val);
+		}
 
-		// cgValue index = cg_build_expr(p, ie->index);
-		// return cg_addr_soa_variable(val, index, ie->index);
+		cgValue index = cg_build_expr(p, ie->index);
+		return cg_addr_soa_variable(val, index, ie->index);
 	}
 
 	if (ie->expr->tav.mode == Addressing_SoaVariable) {
@@ -3788,8 +3785,7 @@ gb_internal cgAddr cg_build_addr_internal(cgProcedure *p, Ast *expr) {
 			cgValue value = cg_build_expr(p, de->expr);
 			cgValue ptr = cg_emit_struct_ev(p, value, 0);
 			cgValue idx = cg_emit_struct_ev(p, value, 1);
-			GB_PANIC("TODO(bill): cg_addr_soa_variable");
-			// return cg_addr_soa_variable(ptr, idx, nullptr);
+			return cg_addr_soa_variable(ptr, idx, nullptr);
 		}
 		cgValue addr = cg_build_expr(p, de->expr);
 		return cg_addr(addr);

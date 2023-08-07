@@ -201,6 +201,14 @@ gb_internal cgAddr cg_addr_map(cgValue addr, cgValue map_key, Type *map_type, Ty
 	return v;
 }
 
+gb_internal cgAddr cg_addr_soa_variable(cgValue addr, cgValue index, Ast *index_expr) {
+	cgAddr v = {cgAddr_SoaVariable, addr};
+	v.soa.index = index;
+	v.soa.index_expr = index_expr;
+	return v;
+}
+
+
 
 gb_internal void cg_set_debug_pos_from_node(cgProcedure *p, Ast *node) {
 	if (node) {

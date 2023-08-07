@@ -202,6 +202,7 @@ struct cgProcedure {
 	bool   return_by_ptr;
 
 	PtrMap<Entity *, cgAddr> variable_map;
+	PtrMap<Entity *, cgAddr> soa_values_map;
 };
 
 

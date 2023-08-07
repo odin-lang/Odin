@@ -78,6 +78,7 @@ gb_internal cgProcedure *cg_procedure_create(cgModule *m, Entity *entity, bool i
 	p->branch_regions.allocator = a;
 
 	map_init(&p->variable_map);
+	map_init(&p->soa_values_map);
 
 	TB_Linkage linkage = TB_LINKAGE_PRIVATE;
 	if (p->is_export) {
@@ -143,7 +144,7 @@ gb_internal cgProcedure *cg_procedure_create_dummy(cgModule *m, String const &li
 	p->branch_regions.allocator = a;
 
 	map_init(&p->variable_map);
-
+	map_init(&p->soa_values_map);
 
 	TB_Linkage linkage = TB_LINKAGE_PRIVATE;
 

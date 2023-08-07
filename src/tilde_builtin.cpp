@@ -43,6 +43,26 @@ gb_internal cgValue cg_builtin_len(cgProcedure *p, cgValue value) {
 		}
 	case Type_Struct:
 		GB_ASSERT(is_type_soa_struct(t));
+		{
+			if (t->Struct.soa_kind == StructSoa_Fixed) {
+				return cg_const_int(p, t_int, t->Struct.soa_count);
+			}
+
+			GB_ASSERT(t->Struct.soa_kind == StructSoa_Slice ||
+			          t->Struct.soa_kind == StructSoa_Dynamic);
+
+			isize n = 0;
+			Type *elem = base_type(t->Struct.soa_elem);
+			if (elem->kind == Type_Struct) {
+				n = cast(isize)elem->Struct.fields.count;
+			} else if (elem->kind == Type_Array) {
+				n = cast(isize)elem->Array.count;
+			} else {
+				GB_PANIC("Unreachable");
+			}
+
+			return cg_emit_struct_ev(p, value, n);
+		}
 		break;
 	}
 

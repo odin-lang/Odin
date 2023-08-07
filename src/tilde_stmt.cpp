@@ -1649,6 +1649,126 @@ gb_internal void cg_build_range_stmt_enum(cgProcedure *p, Type *enum_type, Type 
 	if (done_) *done_ = done;
 }
 
+gb_internal void cg_build_range_stmt_struct_soa(cgProcedure *p, AstRangeStmt *rs, Scope *scope) {
+	Ast *expr = unparen_expr(rs->expr);
+	TypeAndValue tav = type_and_value_of_expr(expr);
+
+	TB_Node *loop = nullptr;
+	TB_Node *body = nullptr;
+	TB_Node *done = nullptr;
+
+	bool is_reverse = rs->reverse;
+
+	cg_scope_open(p, scope);
+
+	Ast *val0 = rs->vals.count > 0 ? cg_strip_and_prefix(rs->vals[0]) : nullptr;
+	Ast *val1 = rs->vals.count > 1 ? cg_strip_and_prefix(rs->vals[1]) : nullptr;
+	Type *val_types[2] = {};
+	if (val0 != nullptr && !is_blank_ident(val0)) {
+		val_types[0] = type_of_expr(val0);
+	}
+	if (val1 != nullptr && !is_blank_ident(val1)) {
+		val_types[1] = type_of_expr(val1);
+	}
+
+	cgAddr array = cg_build_addr(p, expr);
+	if (is_type_pointer(cg_addr_type(array))) {
+		array = cg_addr(cg_addr_load(p, array));
+	}
+	cgValue count = cg_builtin_len(p, cg_addr_load(p, array));
+
+
+	cgAddr index = cg_add_local(p, t_int, nullptr, false);
+
+	if (!is_reverse) {
+		/*
+			for x, i in array {
+				...
+			}
+
+			i := -1
+			for {
+				i += 1
+				if !(i < len(array)) {
+					break
+				}
+				x := array[i] // but #soa-ified
+				...
+			}
+		*/
+
+		cg_addr_store(p, index, cg_const_int(p, t_int, cast(u64)-1));
+
+		loop = cg_control_region(p, "for_soa_loop");
+		cg_emit_goto(p, loop);
+		tb_inst_set_control(p->func, loop);
+
+		cgValue incr = cg_emit_arith(p, Token_Add, cg_addr_load(p, index), cg_const_int(p, t_int, 1), t_int);
+		cg_addr_store(p, index, incr);
+
+		body = cg_control_region(p, "for_soa_body");
+		done = cg_control_region(p, "for_soa_done");
+
+		cgValue cond = cg_emit_comp(p, Token_Lt, incr, count);
+		cg_emit_if(p, cond, body, done);
+	} else {
+		// NOTE(bill): REVERSED LOGIC
+		/*
+			#reverse for x, i in array {
+				...
+			}
+
+			i := len(array)
+			for {
+				i -= 1
+				if i < 0 {
+					break
+				}
+				#no_bounds_check x := array[i] // but #soa-ified
+				...
+			}
+		*/
+		cg_addr_store(p, index, count);
+
+		loop = cg_control_region(p, "for_soa_loop");
+		cg_emit_goto(p, loop);
+		tb_inst_set_control(p->func, loop);
+
+		cgValue incr = cg_emit_arith(p, Token_Sub, cg_addr_load(p, index), cg_const_int(p, t_int, 1), t_int);
+		cg_addr_store(p, index, incr);
+
+		body = cg_control_region(p, "for_soa_body");
+		done = cg_control_region(p, "for_soa_done");
+
+		cgValue cond = cg_emit_comp(p, Token_Lt, incr, cg_const_int(p, t_int, 0));
+		cg_emit_if(p, cond, done, body);
+	}
+	tb_inst_set_control(p->func, body);
+
+
+	if (val_types[0]) {
+		Entity *e = entity_of_node(val0);
+		if (e != nullptr) {
+			cgAddr soa_val = cg_addr_soa_variable(array.addr, cg_addr_load(p, index), nullptr);
+			map_set(&p->soa_values_map, e, soa_val);
+		}
+	}
+	if (val_types[1]) {
+		cg_range_stmt_store_val(p, val1, cg_addr_load(p, index));
+	}
+
+
+	cg_push_target_list(p, rs->label, done, loop, nullptr);
+
+	cg_build_stmt(p, rs->body);
+
+	cg_scope_close(p, cgDeferExit_Default, nullptr);
+	cg_pop_target_list(p);
+	cg_emit_goto(p, loop);
+	tb_inst_set_control(p->func, done);
+
+}
+
 
 gb_internal void cg_build_range_stmt(cgProcedure *p, Ast *node) {
 	ast_node(rs, RangeStmt, node);
@@ -1664,8 +1784,7 @@ gb_internal void cg_build_range_stmt(cgProcedure *p, Ast *node) {
 	if (expr_type != nullptr) {
 		Type *et = base_type(type_deref(expr_type));
 	 	if (is_type_soa_struct(et)) {
-	 		GB_PANIC("TODO(bill): #soa array range statements");
-			// cg_build_range_stmt_struct_soa(p, rs, scope);
+			cg_build_range_stmt_struct_soa(p, rs, rs->scope);
 			return;
 		}
 	}
